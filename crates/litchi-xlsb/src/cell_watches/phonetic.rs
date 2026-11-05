@@ -35,7 +35,7 @@ impl Type {
             _ => {
                 return Err(validation::invalid(
                     "BrtPhoneticInfo phType",
-                    value.to_string(),
+                    "unexpected value",
                 ));
             },
         };
@@ -75,7 +75,7 @@ impl Alignment {
             _ => {
                 return Err(validation::invalid(
                     "BrtPhoneticInfo phAli",
-                    value.to_string(),
+                    "unexpected value",
                 ));
             },
         };

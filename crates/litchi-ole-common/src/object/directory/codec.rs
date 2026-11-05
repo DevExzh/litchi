@@ -3,6 +3,7 @@
 use super::catalog::Projection;
 use super::model::{EntryKind, Links, Metadata, NOSTREAM, Sid};
 use super::validation;
+use crate::Error;
 use crate::property_set::Guid;
 use litchi_cfb::{DirectoryEntry, OleError};
 
@@ -17,7 +18,7 @@ pub(crate) fn decode(entry: &DirectoryEntry) -> Result<Metadata, OleError> {
             )));
         },
     };
-    let sid = Sid::new(entry.sid)?;
+    let sid = decode_sid(entry.sid)?;
     let links = Links::from_raw(
         decode_link(entry.sid_left)?,
         decode_link(entry.sid_right)?,
@@ -41,7 +42,7 @@ fn decode_link(raw: u32) -> Result<Option<Sid>, OleError> {
     if raw == NOSTREAM {
         Ok(None)
     } else {
-        Sid::new(raw).map(Some)
+        decode_sid(raw).map(Some)
     }
 }
 
@@ -51,7 +52,7 @@ pub(crate) fn decode_links(entry: &DirectoryEntry) -> Result<Links, OleError> {
         decode_link(entry.sid_right)?,
         decode_link(entry.sid_child)?,
     );
-    let sid = Sid::new(entry.sid)?;
+    let sid = decode_sid(entry.sid)?;
     if [links.left(), links.right(), links.child()]
         .into_iter()
         .flatten()
@@ -62,6 +63,22 @@ pub(crate) fn decode_links(entry: &DirectoryEntry) -> Result<Links, OleError> {
         ));
     }
     Ok(links)
+}
+
+/// The directory codec still uses the CFB substrate error while it validates
+/// raw links. Keep this boundary explicit: a future common error such as a
+/// patch conflict or refusal must never be flattened into a low-level CFB
+/// format string by a blanket `From<Error>` conversion.
+fn decode_sid(raw: u32) -> Result<Sid, OleError> {
+    Sid::new(raw).map_err(|error| match error {
+        Error::Cfb(error) => error,
+        Error::Limit { .. }
+        | Error::InvalidLimit { .. }
+        | Error::PatchConflict
+        | Error::Refused(_) => {
+            OleError::InvalidFormat("CFB directory SID validation produced a non-CFB error".into())
+        },
+    })
 }
 
 /// Projects one entry while retaining unsupported entry kinds as raw data.

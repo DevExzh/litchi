@@ -7,7 +7,7 @@
 | `parse_rtf` | `fuzz_targets/parse_rtf.rs` | none (arbitrary bytes) |
 
 `parse_rtf` sends each input through the compressed-RTF transport decoder and
-the public `Document` byte parser. Inputs larger than 1 MiB are skipped rather
+the public `Package` byte parser. Inputs larger than 1 MiB are skipped rather
 than truncated. Both paths use explicit finite expansion, token, binary, and
 opaque-node limits; successful parses additionally visit document text and a
 bounded paragraph selector. The harness does not write files or retain a

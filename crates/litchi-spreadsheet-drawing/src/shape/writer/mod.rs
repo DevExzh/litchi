@@ -31,11 +31,13 @@
 //! computation, and all inputs are bounded and validated at authoring time.
 
 use std::collections::{HashMap, HashSet};
-use std::fmt::Write as _;
+use std::fmt::{self, Write as _};
 
 use litchi_core::xml::escape::escape_xml;
 use litchi_drawingml::geom::Preset;
-use litchi_drawingml::text::body::writer::write_contents as write_text_body_contents;
+use litchi_drawingml::text::body::writer::{
+    Limits as TextBodyLimits, write_contents as write_text_body_contents,
+};
 
 use super::{
     Anchor, CellMarker, EditAs, EmuExtent, EmuOffset, Geometry, GroupTransform, Paragraph,
@@ -43,7 +45,9 @@ use super::{
 };
 use crate::Error;
 use litchi_drawingml::geometry::writer::write_custom_geometry;
-use litchi_drawingml::geometry::{CustomGeometry, validate_custom_geometry};
+use litchi_drawingml::geometry::{
+    CustomGeometry, Limits as GeometryLimits, validate_custom_geometry,
+};
 
 macro_rules! write_xml {
     ($xml:expr, $($arguments:tt)*) => {
@@ -74,8 +78,8 @@ const MAX_GROUP_DEPTH: usize = 32;
 ///
 /// Construct with [`ShapeSpec::text_box`] (or [`ShapeSpec::shape`]
 /// for a non-text-box shape), then adjust `properties`, `paragraphs`,
-/// or flags before handing it to `MutableWorksheet::add_shape`.
-#[derive(Debug, Clone, PartialEq)]
+/// or flags before handing it to `builder::Worksheet::add_shape`.
+#[derive(Clone, PartialEq)]
 pub struct ShapeSpec {
     /// Shape name written to `xdr:cNvPr@name`.
     pub name: String,
@@ -93,6 +97,28 @@ pub struct ShapeSpec {
     pub properties: Properties,
     /// The text story as paragraphs with runs.
     pub paragraphs: Vec<Paragraph>,
+}
+
+impl fmt::Debug for ShapeSpec {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let run_count = self
+            .paragraphs
+            .iter()
+            .map(|paragraph| paragraph.runs.len())
+            .sum::<usize>();
+        formatter
+            .debug_struct("ShapeSpec")
+            .field("name_present", &(!self.name.is_empty()))
+            .field("description_present", &self.description.is_some())
+            .field("hidden", &self.hidden)
+            .field("is_text_box", &self.is_text_box)
+            .field("anchor", &self.anchor)
+            .field("geometry", &self.geometry)
+            .field("properties", &self.properties)
+            .field("paragraph_count", &self.paragraphs.len())
+            .field("run_count", &run_count)
+            .finish()
+    }
 }
 
 impl ShapeSpec {
@@ -121,10 +147,8 @@ impl ShapeSpec {
         let paragraphs = text
             .split('\n')
             .map(|line| Paragraph {
-                runs: vec![Run {
-                    text: line.to_string(),
-                    ..Run::default()
-                }],
+                runs: vec![Run::plain(line)],
+                ..Paragraph::default()
             })
             .collect();
         Self {
@@ -159,6 +183,14 @@ impl ShapeSpec {
         if self.paragraphs.len() > MAX_SHAPE_PARAGRAPHS {
             return Err("shape paragraph count limit exceeded".to_string());
         }
+        if self.properties.has_unmodeled_content {
+            return Err("shape text body contains unmodeled content".to_string());
+        }
+        // The text-body writer emits text runs and line-break elements with
+        // `sz`, `b`, `i` and `u`; refuse what it cannot represent exactly.
+        if let Some(content) = litchi_drawingml::text::body::writer::unsupported(&self.paragraphs) {
+            return Err(format!("shape text {content} cannot be written"));
+        }
         let mut text_bytes = 0usize;
         for paragraph in &self.paragraphs {
             if paragraph.runs.len() > MAX_RUNS_PER_PARAGRAPH {
@@ -186,7 +218,7 @@ impl ShapeSpec {
 /// The name resolves to the target's drawing object ID at serialization
 /// time; the target may be any authored shape, group child, group, or other
 /// connector in the same worksheet drawing part.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct ConnectionEndSpec {
     /// Name of the referenced shape (`xdr:cNvPr@name`).
     pub shape_name: String,
@@ -194,8 +226,18 @@ pub struct ConnectionEndSpec {
     pub site: u32,
 }
 
+impl fmt::Debug for ConnectionEndSpec {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ConnectionEndSpec")
+            .field("shape_name_present", &(!self.shape_name.is_empty()))
+            .field("site", &self.site)
+            .finish()
+    }
+}
+
 /// One authored connection shape (`xdr:cxnSp`) linking two shapes.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct ConnectionShapeSpec {
     /// Shape name written to `xdr:cNvPr@name`.
     pub name: String,
@@ -212,6 +254,21 @@ pub struct ConnectionShapeSpec {
     pub start: ConnectionEndSpec,
     /// End connection site.
     pub end: ConnectionEndSpec,
+}
+
+impl fmt::Debug for ConnectionShapeSpec {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ConnectionShapeSpec")
+            .field("name_present", &(!self.name.is_empty()))
+            .field("description_present", &self.description.is_some())
+            .field("hidden", &self.hidden)
+            .field("anchor", &self.anchor)
+            .field("geometry", &self.geometry)
+            .field("start", &self.start)
+            .field("end", &self.end)
+            .finish()
+    }
 }
 
 impl ConnectionShapeSpec {
@@ -259,7 +316,7 @@ impl ConnectionShapeSpec {
 }
 
 /// One authored shape group (`xdr:grpSp`) with nested objects.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct GroupSpec {
     /// Group name written to `xdr:cNvPr@name`.
     pub name: String,
@@ -275,6 +332,20 @@ pub struct GroupSpec {
     /// children are ignored — children position themselves through the
     /// group's coordinate transform.
     pub children: Vec<ObjectSpec>,
+}
+
+impl fmt::Debug for GroupSpec {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("GroupSpec")
+            .field("name_present", &(!self.name.is_empty()))
+            .field("description_present", &self.description.is_some())
+            .field("hidden", &self.hidden)
+            .field("anchor", &self.anchor)
+            .field("transform", &self.transform)
+            .field("child_count", &self.children.len())
+            .finish()
+    }
 }
 
 impl GroupSpec {
@@ -309,7 +380,7 @@ impl GroupSpec {
 }
 
 /// One authored drawing object: a shape, a group, or a connection shape.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum ObjectSpec {
     /// A text-box or plain shape.
     Shape(ShapeSpec),
@@ -317,6 +388,19 @@ pub enum ObjectSpec {
     Group(GroupSpec),
     /// A connection shape.
     Connection(ConnectionShapeSpec),
+}
+
+impl fmt::Debug for ObjectSpec {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Shape(shape) => formatter.debug_tuple("Shape").field(shape).finish(),
+            Self::Group(group) => formatter.debug_tuple("Group").field(group).finish(),
+            Self::Connection(connection) => formatter
+                .debug_tuple("Connection")
+                .field(connection)
+                .finish(),
+        }
+    }
 }
 
 impl From<ShapeSpec> for ObjectSpec {
@@ -430,6 +514,27 @@ fn validate_children(
     Ok(())
 }
 
+fn validate_shape_geometry(geometry: &Geometry, limits: GeometryLimits) -> WriteResult<()> {
+    let Geometry::Custom(geometry) = geometry else {
+        return Ok(());
+    };
+    litchi_drawingml::geometry::writer::measure_custom_geometry(geometry, &limits)?;
+    Ok(())
+}
+
+fn validate_group_geometry(group: &GroupSpec, limits: GeometryLimits) -> WriteResult<()> {
+    for child in &group.children {
+        match child {
+            ObjectSpec::Shape(shape) => validate_shape_geometry(&shape.geometry, limits)?,
+            ObjectSpec::Group(group) => validate_group_geometry(group, limits)?,
+            ObjectSpec::Connection(connection) => {
+                validate_shape_geometry(&connection.geometry, limits)?
+            },
+        }
+    }
+    Ok(())
+}
+
 /// Validate anchor markers against worksheet bounds (and ordering for
 /// two-cell anchors), mirroring the checks applied to images and charts.
 fn validate_anchor(anchor: &Anchor) -> Result<(), String> {
@@ -493,6 +598,41 @@ struct State {
     names: HashMap<String, u32>,
     preallocated: bool,
     emitted_names: HashSet<String>,
+    geometry_limits: GeometryLimits,
+    top_level_count: usize,
+}
+
+/// Errors raised while emitting a drawing object.
+///
+/// Structural authoring failures stay in the spreadsheet-drawing error
+/// family, while a shared DrawingML body failure remains a typed source
+/// instead of being flattened into its display text.
+enum WriteError {
+    Invalid(String),
+    Drawing(litchi_drawingml::Error),
+}
+
+type WriteResult<T> = Result<T, WriteError>;
+
+impl From<String> for WriteError {
+    fn from(message: String) -> Self {
+        Self::Invalid(message)
+    }
+}
+
+impl From<litchi_drawingml::Error> for WriteError {
+    fn from(error: litchi_drawingml::Error) -> Self {
+        Self::Drawing(error)
+    }
+}
+
+impl From<WriteError> for Error {
+    fn from(error: WriteError) -> Self {
+        match error {
+            WriteError::Invalid(message) => Self::Invalid(message),
+            WriteError::Drawing(error) => Self::Drawing(error),
+        }
+    }
 }
 
 impl State {
@@ -506,12 +646,53 @@ impl State {
         shapes: &[ShapeSpec],
         groups: &[GroupSpec],
         connections: &[ConnectionShapeSpec],
-    ) -> Result<Self, String> {
+        geometry_limits: GeometryLimits,
+    ) -> WriteResult<Self> {
+        let geometry_limits = geometry_limits.validate()?;
+        let mut top_level_count = 0usize;
+        let mut object_count = 0usize;
+        for shape in shapes {
+            shape.validate_inner(top_level_count)?;
+            validate_shape_geometry(&shape.geometry, geometry_limits)?;
+            top_level_count = top_level_count
+                .checked_add(1)
+                .ok_or_else(|| "worksheet drawing top-level count overflow".to_string())?;
+            object_count = object_count
+                .checked_add(1)
+                .ok_or_else(|| "worksheet drawing object count overflow".to_string())?;
+        }
+        for group in groups {
+            group.validate_inner(top_level_count)?;
+            validate_group_geometry(group, geometry_limits)?;
+            top_level_count = top_level_count
+                .checked_add(1)
+                .ok_or_else(|| "worksheet drawing top-level count overflow".to_string())?;
+            object_count = object_count
+                .checked_add(Self::group_object_count(group)?)
+                .ok_or_else(|| "worksheet drawing object count overflow".to_string())?;
+        }
+        for connection in connections {
+            connection.validate_inner(top_level_count)?;
+            validate_shape_geometry(&connection.geometry, geometry_limits)?;
+            top_level_count = top_level_count
+                .checked_add(1)
+                .ok_or_else(|| "worksheet drawing top-level count overflow".to_string())?;
+            object_count = object_count
+                .checked_add(1)
+                .ok_or_else(|| "worksheet drawing object count overflow".to_string())?;
+        }
+        if object_count > MAX_OBJECTS_PER_DRAWING {
+            return Err("worksheet drawing object count limit exceeded"
+                .to_string()
+                .into());
+        }
         let mut emitter = Self {
             next_id: first_id,
             names: HashMap::new(),
             preallocated: true,
             emitted_names: HashSet::new(),
+            geometry_limits,
+            top_level_count: 0,
         };
         for shape in shapes {
             emitter.reserve(&shape.name)?;
@@ -523,6 +704,20 @@ impl State {
             emitter.reserve(&connection.name)?;
         }
         Ok(emitter)
+    }
+
+    fn group_object_count(group: &GroupSpec) -> Result<usize, String> {
+        let mut count = 1usize;
+        for child in &group.children {
+            let child_count = match child {
+                ObjectSpec::Shape(_) | ObjectSpec::Connection(_) => 1,
+                ObjectSpec::Group(group) => Self::group_object_count(group)?,
+            };
+            count = count
+                .checked_add(child_count)
+                .ok_or_else(|| "worksheet drawing object count overflow".to_string())?;
+        }
+        Ok(count)
     }
 
     fn reserve_group(&mut self, group: &GroupSpec) -> Result<(), String> {
@@ -547,7 +742,7 @@ impl State {
             .checked_add(1)
             .ok_or_else(|| "drawing object ID space exhausted".to_string())?;
         if self.names.insert(name.to_string(), id).is_some() {
-            return Err(format!("duplicate shape name '{name}' in drawing"));
+            return Err("duplicate shape name in drawing".to_string());
         }
         Ok(())
     }
@@ -557,10 +752,10 @@ impl State {
         &mut self,
         xml: &mut String,
         shape: &ShapeSpec,
-    ) -> Result<(), String> {
+    ) -> WriteResult<()> {
         self.write_anchored(xml, &shape.anchor, |emitter, xml| {
             let id = emitter.allocate(&shape.name)?;
-            write_shape_xml(xml, shape, id);
+            write_shape_xml(xml, shape, id, &emitter.geometry_limits)?;
             Ok(())
         })
     }
@@ -570,7 +765,7 @@ impl State {
         &mut self,
         xml: &mut String,
         group: &GroupSpec,
-    ) -> Result<(), String> {
+    ) -> WriteResult<()> {
         self.write_anchored(xml, &group.anchor, |emitter, xml| {
             emitter.write_group_xml(xml, group)
         })
@@ -581,7 +776,7 @@ impl State {
         &mut self,
         xml: &mut String,
         connection: &ConnectionShapeSpec,
-    ) -> Result<(), String> {
+    ) -> WriteResult<()> {
         self.write_anchored(xml, &connection.anchor, |emitter, xml| {
             emitter.write_connection_xml(xml, connection)
         })
@@ -592,8 +787,8 @@ impl State {
         &mut self,
         xml: &mut String,
         anchor: &Anchor,
-        inner: impl FnOnce(&mut Self, &mut String) -> Result<(), String>,
-    ) -> Result<(), String> {
+        inner: impl FnOnce(&mut Self, &mut String) -> WriteResult<()>,
+    ) -> WriteResult<()> {
         write_anchor_open(xml, anchor);
         inner(self, xml)?;
         xml.push_str("<xdr:clientData/>");
@@ -607,11 +802,11 @@ impl State {
 
     /// Serialize one authored object without an anchor (top-level or nested
     /// in a group).
-    fn write_object(&mut self, xml: &mut String, object: &ObjectSpec) -> Result<(), String> {
+    fn write_object(&mut self, xml: &mut String, object: &ObjectSpec) -> WriteResult<()> {
         match object {
             ObjectSpec::Shape(shape) => {
                 let id = self.allocate(&shape.name)?;
-                write_shape_xml(xml, shape, id);
+                write_shape_xml(xml, shape, id, &self.geometry_limits)?;
                 Ok(())
             },
             ObjectSpec::Group(group) => self.write_group_xml(xml, group),
@@ -619,7 +814,7 @@ impl State {
         }
     }
 
-    fn write_group_xml(&mut self, xml: &mut String, group: &GroupSpec) -> Result<(), String> {
+    fn write_group_xml(&mut self, xml: &mut String, group: &GroupSpec) -> WriteResult<()> {
         let id = self.allocate(&group.name)?;
         xml.push_str("<xdr:grpSp><xdr:nvGrpSpPr>");
         write_c_nv_pr(xml, id, &group.name, &group.description, group.hidden);
@@ -674,7 +869,7 @@ impl State {
         &mut self,
         xml: &mut String,
         connection: &ConnectionShapeSpec,
-    ) -> Result<(), String> {
+    ) -> WriteResult<()> {
         let id = self.allocate(&connection.name)?;
         let start_id = self.resolve(&connection.start.shape_name)?;
         let end_id = self.resolve(&connection.end.shape_name)?;
@@ -703,7 +898,9 @@ impl State {
                     escape_xml(preset.token())
                 );
             },
-            Geometry::Custom(geometry) => write_custom_geometry(xml, geometry),
+            Geometry::Custom(geometry) => {
+                write_custom_geometry(xml, geometry, &self.geometry_limits)?;
+            },
         }
         xml.push_str("</xdr:spPr></xdr:cxnSp>");
         Ok(())
@@ -715,9 +912,9 @@ impl State {
                 .names
                 .get(name)
                 .copied()
-                .ok_or_else(|| format!("shape name '{name}' was not preallocated"))?;
+                .ok_or_else(|| "shape name was not preallocated".to_string())?;
             if !self.emitted_names.insert(name.to_string()) {
-                return Err(format!("duplicate shape name '{name}' in drawing"));
+                return Err("duplicate shape name in drawing".to_string());
             }
             return Ok(id);
         }
@@ -730,7 +927,7 @@ impl State {
             .checked_add(1)
             .ok_or_else(|| "drawing object ID space exhausted".to_string())?;
         if self.names.insert(name.to_string(), id).is_some() {
-            return Err(format!("duplicate shape name '{name}' in drawing"));
+            return Err("duplicate shape name in drawing".to_string());
         }
         Ok(id)
     }
@@ -739,7 +936,7 @@ impl State {
         self.names
             .get(name)
             .copied()
-            .ok_or_else(|| format!("connection shape references unknown shape '{name}'"))
+            .ok_or_else(|| "connection shape references an unknown shape".to_string())
     }
 }
 
@@ -816,7 +1013,12 @@ fn write_position(xml: &mut String, position: &EmuOffset) {
     );
 }
 
-fn write_shape_xml(xml: &mut String, spec: &ShapeSpec, id: u32) {
+fn write_shape_xml(
+    xml: &mut String,
+    spec: &ShapeSpec,
+    id: u32,
+    geometry_limits: &GeometryLimits,
+) -> WriteResult<()> {
     xml.push_str(r#"<xdr:sp macro="" textlink=""><xdr:nvSpPr>"#);
     write_c_nv_pr(xml, id, &spec.name, &spec.description, spec.hidden);
     if spec.is_text_box {
@@ -827,7 +1029,9 @@ fn write_shape_xml(xml: &mut String, spec: &ShapeSpec, id: u32) {
     xml.push_str("</xdr:nvSpPr><xdr:spPr>");
     xml.push_str(r#"<a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></a:xfrm>"#);
     match &spec.geometry {
-        Geometry::Custom(geometry) => write_custom_geometry(xml, geometry),
+        Geometry::Custom(geometry) => {
+            write_custom_geometry(xml, geometry, geometry_limits)?;
+        },
         Geometry::Preset(preset) => {
             write_xml!(
                 xml,
@@ -837,8 +1041,14 @@ fn write_shape_xml(xml: &mut String, spec: &ShapeSpec, id: u32) {
         },
     }
     xml.push_str("</xdr:spPr><xdr:txBody>");
-    write_text_body_contents(xml, &spec.properties, &spec.paragraphs);
+    write_text_body_contents(
+        xml,
+        &spec.properties,
+        &spec.paragraphs,
+        TextBodyLimits::DEFAULT,
+    )?;
     xml.push_str("</xdr:txBody></xdr:sp>");
+    Ok(())
 }
 
 /// Fresh `SpreadsheetDrawing` XML authoring state.
@@ -852,16 +1062,18 @@ pub struct Emitter {
 
 impl Emitter {
     /// Create an emitter whose first allocated object ID is `first_id`.
-    #[must_use]
-    pub fn new(first_id: u32) -> Self {
-        Self {
+    pub fn new(first_id: u32, geometry_limits: GeometryLimits) -> crate::Result<Self> {
+        let geometry_limits = geometry_limits.validate()?;
+        Ok(Self {
             inner: State {
                 next_id: first_id,
                 names: HashMap::new(),
                 preallocated: false,
                 emitted_names: HashSet::new(),
+                geometry_limits,
+                top_level_count: 0,
             },
-        }
+        })
     }
 
     /// Preallocate IDs for a complete fresh drawing graph.
@@ -870,10 +1082,11 @@ impl Emitter {
         shapes: &[ShapeSpec],
         groups: &[GroupSpec],
         connections: &[ConnectionShapeSpec],
+        geometry_limits: GeometryLimits,
     ) -> crate::Result<Self> {
-        State::for_objects(first_id, shapes, groups, connections)
+        State::for_objects(first_id, shapes, groups, connections, geometry_limits)
             .map(|inner| Self { inner })
-            .map_err(Error::Invalid)
+            .map_err(Error::from)
     }
 
     /// Write a fresh top-level shape enclosed in its anchor.
@@ -882,10 +1095,17 @@ impl Emitter {
         xml: &mut String,
         shape: &ShapeSpec,
     ) -> crate::Result<()> {
-        shape.validate(self.inner.names.len())?;
-        self.inner
+        shape.validate(self.inner.top_level_count)?;
+        validate_shape_geometry(&shape.geometry, self.inner.geometry_limits)
+            .map_err(Error::from)?;
+        let result = self
+            .inner
             .write_anchored_shape(xml, shape)
-            .map_err(Error::Invalid)
+            .map_err(Error::from);
+        if result.is_ok() {
+            self.inner.top_level_count += 1;
+        }
+        result
     }
 
     /// Write a fresh top-level group enclosed in its anchor.
@@ -894,10 +1114,16 @@ impl Emitter {
         xml: &mut String,
         group: &GroupSpec,
     ) -> crate::Result<()> {
-        group.validate(self.inner.names.len())?;
-        self.inner
+        group.validate(self.inner.top_level_count)?;
+        validate_group_geometry(group, self.inner.geometry_limits).map_err(Error::from)?;
+        let result = self
+            .inner
             .write_anchored_group(xml, group)
-            .map_err(Error::Invalid)
+            .map_err(Error::from);
+        if result.is_ok() {
+            self.inner.top_level_count += 1;
+        }
+        result
     }
 
     /// Write a fresh top-level connection shape enclosed in its anchor.
@@ -906,10 +1132,17 @@ impl Emitter {
         xml: &mut String,
         connection: &ConnectionShapeSpec,
     ) -> crate::Result<()> {
-        connection.validate(self.inner.names.len())?;
-        self.inner
+        connection.validate(self.inner.top_level_count)?;
+        validate_shape_geometry(&connection.geometry, self.inner.geometry_limits)
+            .map_err(Error::from)?;
+        let result = self
+            .inner
             .write_anchored_connection(xml, connection)
-            .map_err(Error::Invalid)
+            .map_err(Error::from);
+        if result.is_ok() {
+            self.inner.top_level_count += 1;
+        }
+        result
     }
 }
 

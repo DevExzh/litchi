@@ -1,0 +1,24 @@
+[package]
+name        = "litchi-iwa-style"
+description = "Shared iWork drawing-style and media engines for the Pages, Numbers and Keynote owners."
+version.workspace      = true
+edition.workspace      = true
+authors.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[dependencies]
+litchi-iwa-archive = { workspace = true }
+litchi-iwa-common  = { workspace = true }
+litchi-iwa-core    = { workspace = true }
+litchi-iwa-protos  = { workspace = true }
+litchi-iwa-text    = { workspace = true }
+litchi-iwa-text-wire = { workspace = true }
+thiserror          = { workspace = true }
+
+[dev-dependencies]
+prost = { workspace = true }
+
+[lints]
+workspace = true

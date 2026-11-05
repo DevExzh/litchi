@@ -15,6 +15,7 @@
 //! `RRTabId` is omitted only for the normative more-than-4112-sheet exception.
 //! ```
 
+use litchi_core::edit::RefusalKind;
 use std::sync::Arc;
 
 use super::revision_records as records;
@@ -100,10 +101,11 @@ pub(crate) fn scan_revision_header_guids_with_sheet_count(
     workbook_sheet_count: usize,
 ) -> Result<Arc<[[u8; 16]]>> {
     if data.len() > max_stream_bytes {
-        return Err(Error::UnsafeEdit(format!(
-            "Revision Log stream has {} bytes; maximum is {max_stream_bytes}",
-            data.len()
-        )));
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit revision log",
+            "the Revision Log stream exceeds its byte limit",
+        ));
     }
     if max_records < 4 {
         return Err(Error::InvalidData(
@@ -118,9 +120,11 @@ pub(crate) fn scan_revision_header_guids_with_sheet_count(
         .checked_mul(16)
         .ok_or(Error::Allocation("sizing Revision Log GUID closure"))?;
     if guid_bytes > max_stream_bytes {
-        return Err(Error::UnsafeEdit(format!(
-            "Revision Log GUID closure requires {guid_bytes} bytes; maximum is {max_stream_bytes}"
-        )));
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit revision log",
+            "the Revision Log GUID closure exceeds the stream byte limit",
+        ));
     }
     let mut guids = Vec::new();
     guids
@@ -201,9 +205,11 @@ fn scan_revision_header_counts(
                     .checked_add(1)
                     .ok_or(Error::Allocation("counting Revision Log headers"))?;
                 if header_count > max_guids {
-                    return Err(Error::UnsafeEdit(format!(
-                        "Revision Log contains more than {max_guids} headers"
-                    )));
+                    return Err(Error::refused(
+                        RefusalKind::UnsupportedOperation,
+                        "edit revision log",
+                        "the Revision Log exceeds its header limit",
+                    ));
                 }
                 if scan
                     .peek_type()?
@@ -272,10 +278,11 @@ impl<'a> RevisionScan<'a> {
             .checked_add(1)
             .ok_or(Error::Allocation("counting Revision Log records"))?;
         if self.records > self.maximum {
-            return Err(Error::UnsafeEdit(format!(
-                "Revision Log contains more than {} framed records",
-                self.maximum
-            )));
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit revision log",
+                "the Revision Log exceeds its framed-record limit",
+            ));
         }
         let (record_type, payload, next) = framed_record(self.data, self.offset)?;
         self.offset = next;
@@ -490,9 +497,11 @@ fn count_framed_records(data: &[u8], maximum: usize) -> Result<usize> {
             .checked_add(1)
             .ok_or(Error::Allocation("counting Revision Log records"))?;
         if count > maximum {
-            return Err(Error::UnsafeEdit(format!(
-                "Revision Log contains more than {maximum} framed records"
-            )));
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit revision log",
+                "the Revision Log exceeds its framed-record limit",
+            ));
         }
         let (_, _, next) = framed_record(data, offset)?;
         offset = next;

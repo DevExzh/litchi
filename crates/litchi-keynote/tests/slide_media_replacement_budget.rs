@@ -9,10 +9,11 @@
 
 use std::io;
 
-use litchi_iwa_archive::{Limits, package::Catalog};
+use litchi_iwa_archive::package::Catalog;
 use litchi_keynote::{
-    MediaPart, MovieSelector, Package, ReadOptions, SemanticLimits, SlideMediaDataError,
-    SlideMediaDataLimitKind, SlideSelector,
+    MovieSelector, OpenOptions, Package, SemanticLimits, SlideSelector,
+    slide::media::data::Error as SlideMediaDataError,
+    slide::media::data::LimitKind as SlideMediaDataLimitKind, slide::media::data::MediaPart,
 };
 
 const NATIVE_SOURCE: &[u8] =
@@ -23,7 +24,7 @@ const MAX_REFERENCE_SEARCH_STEPS: usize = usize::BITS as usize + 1;
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 fn member_bytes(name: &str) -> TestResult<Vec<u8>> {
-    Catalog::from_bytes(NATIVE_SOURCE)?
+    Catalog::from_bytes(NATIVE_SOURCE, Default::default())?
         .iter()
         .find(|entry| entry.name() == name)
         .map(|entry| entry.data().to_vec())
@@ -38,17 +39,10 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn package_with_reference_limit(limit: usize) -> TestResult<Package> {
-    let semantic = SemanticLimits::new(
-        SemanticLimits::MAX_OBJECTS,
-        SemanticLimits::MAX_SLIDES,
-        limit,
-        SemanticLimits::MAX_TEXT_STORAGES,
-        SemanticLimits::MAX_TEXT_FRAGMENTS,
-        SemanticLimits::MAX_TEXT_BYTES,
-    )?;
+    let semantic = SemanticLimits::builder().max_references(limit)?.build()?;
     Ok(Package::from_bytes_with_options(
         NATIVE_SOURCE,
-        ReadOptions::new(Limits::default(), semantic),
+        OpenOptions::new().semantic_limits(semantic),
     )?)
 }
 
@@ -172,7 +166,7 @@ fn edge_reference_profile_rejects_media_operation_after_validation() -> TestResu
             io::Error::other("the edge reference budget must reject the operation-local closure")
         })?;
     match error {
-        SlideMediaDataError::LimitExceeded {
+        SlideMediaDataError::Limit {
             kind: SlideMediaDataLimitKind::References,
             observed,
             maximum,

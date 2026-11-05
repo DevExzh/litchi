@@ -29,11 +29,16 @@ pub struct Parser<'a> {
     memory_expression_ends: Vec<usize>,
     control_flow_targets: Vec<usize>,
     base_cell: Option<(u32, u32)>,
+    limits: crate::raw::Limits,
 }
 
 impl<'a> Parser<'a> {
-    /// Create a new formula parser
-    pub fn new(data: &'a [u8]) -> Self {
+    /// Create a formula parser under an explicit raw profile.
+    ///
+    /// `limits` bounds the token and ancillary streams (payload) and every
+    /// decoded string (UTF-16 units); the MS-XLSB formula ceilings still apply.
+    #[must_use]
+    pub const fn new(data: &'a [u8], limits: crate::raw::Limits) -> Self {
         Parser {
             data,
             offset: 0,
@@ -43,11 +48,13 @@ impl<'a> Parser<'a> {
             memory_expression_ends: Vec::new(),
             control_flow_targets: Vec::new(),
             base_cell: None,
+            limits,
         }
     }
 
     /// Parse a formula together with its corresponding `RgbExtra` stream.
-    pub fn with_extra(data: &'a [u8], extra: &'a [u8]) -> Self {
+    #[must_use]
+    pub const fn with_extra(data: &'a [u8], extra: &'a [u8], limits: crate::raw::Limits) -> Self {
         Parser {
             data,
             offset: 0,
@@ -57,11 +64,18 @@ impl<'a> Parser<'a> {
             memory_expression_ends: Vec::new(),
             control_flow_targets: Vec::new(),
             base_cell: None,
+            limits,
         }
     }
 
     /// Parse a shared-formula definition relative to a concrete target cell.
-    pub fn with_base_cell(data: &'a [u8], row: u32, col: u32) -> Self {
+    #[must_use]
+    pub const fn with_base_cell(
+        data: &'a [u8],
+        row: u32,
+        col: u32,
+        limits: crate::raw::Limits,
+    ) -> Self {
         Parser {
             data,
             offset: 0,
@@ -71,11 +85,19 @@ impl<'a> Parser<'a> {
             memory_expression_ends: Vec::new(),
             control_flow_targets: Vec::new(),
             base_cell: Some((row, col)),
+            limits,
         }
     }
 
     /// Parse a shared formula and ancillary stream at a concrete target cell.
-    pub fn with_base_cell_and_extra(data: &'a [u8], extra: &'a [u8], row: u32, col: u32) -> Self {
+    #[must_use]
+    pub const fn with_base_cell_and_extra(
+        data: &'a [u8],
+        extra: &'a [u8],
+        row: u32,
+        col: u32,
+        limits: crate::raw::Limits,
+    ) -> Self {
         Parser {
             data,
             offset: 0,
@@ -85,6 +107,7 @@ impl<'a> Parser<'a> {
             memory_expression_ends: Vec::new(),
             control_flow_targets: Vec::new(),
             base_cell: Some((row, col)),
+            limits,
         }
     }
 
@@ -116,6 +139,7 @@ impl<'a> Parser<'a> {
         reason = "formula dependency spans use parser-proven offsets without unchecked conversions"
     )]
     pub(crate) fn parse_spanned(&mut self) -> Result<Vec<(Token, std::ops::Range<usize>)>> {
+        self.admit()?;
         let mut tokens = Vec::new();
         let mut boundaries = Vec::new();
 
@@ -126,41 +150,52 @@ impl<'a> Parser<'a> {
             boundaries.push(self.offset);
         }
 
-        if let Some(end) = self
+        if let Some(_end) = self
             .memory_expression_ends
             .iter()
             .find(|end| boundaries.binary_search(end).is_err())
         {
-            return Err(Error::InvalidFormula(format!(
-                "memory expression ends at byte {end}, which is not a token boundary"
-            )));
+            return Err(Error::InvalidFormula(
+                "memory expression ends at byte, which is not a token boundary",
+            ));
         }
 
-        if let Some(target) = self
+        if let Some(_target) = self
             .control_flow_targets
             .iter()
             .find(|target| boundaries.binary_search(target).is_err())
         {
-            return Err(Error::InvalidFormula(format!(
-                "control-flow target byte {target} is not a token boundary"
-            )));
+            return Err(Error::InvalidFormula(
+                "control-flow target byte is not a token boundary",
+            ));
         }
 
         if self.validate_extra && self.extra_offset != self.extra.len() {
-            return Err(Error::InvalidFormula(format!(
-                "formula has {} unconsumed ancillary bytes",
-                self.extra.len() - self.extra_offset
-            )));
+            return Err(Error::InvalidFormula(
+                "formula has unconsumed ancillary bytes",
+            ));
         }
 
         Ok(tokens)
+    }
+
+    /// Admit both streams against the caller's raw payload ceiling.
+    fn admit(&self) -> Result<()> {
+        self.limits.admit(self.data.len())?;
+        self.limits.admit(self.extra.len())?;
+        Ok(())
+    }
+
+    /// Refuse a declared string longer than the caller's UTF-16-unit ceiling.
+    fn admit_units(&self, units: usize, offset: usize) -> Result<()> {
+        Ok(self.limits.admit_units(units, offset)?)
     }
 
     /// Parse a single token
     fn parse_token(&mut self) -> Result<Token> {
         if self.offset >= self.data.len() {
             return Err(Error::InvalidFormula(
-                "unexpected end of formula token stream".to_string(),
+                "unexpected end of formula token stream",
             ));
         }
 
@@ -230,24 +265,20 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn require(&self, len: usize, context: &str) -> Result<()> {
+    fn require(&self, len: usize, _context: &str) -> Result<()> {
         if self.offset + len <= self.data.len() {
             Ok(())
         } else {
-            Err(Error::InvalidFormula(format!(
-                "truncated {context} token at byte {}: need {len} bytes, have {}",
-                self.offset.saturating_sub(1),
-                self.data.len().saturating_sub(self.offset)
-            )))
+            Err(Error::InvalidFormula(
+                "truncated token at byte: need bytes, have",
+            ))
         }
     }
 
-    fn validate_classed_token(&self, context: &str) -> Result<()> {
+    fn validate_classed_token(&self, _context: &str) -> Result<()> {
         let token = self.data[self.offset - 1];
         if token & 0x80 != 0 {
-            return Err(Error::InvalidFormula(format!(
-                "{context} token 0x{token:02X} has its reserved bit set"
-            )));
+            return Err(Error::InvalidFormula("token has its reserved bit set"));
         }
         Ok(())
     }
@@ -277,10 +308,11 @@ impl<'a> Parser<'a> {
     fn parse_str(&mut self) -> Result<Token> {
         self.require(2, "PtgStr length")?;
         let len = read_u16_le_at(self.data, self.offset)? as usize;
+        self.admit_units(len, self.offset)?;
         self.offset += 2;
         let byte_len = len
             .checked_mul(2)
-            .ok_or_else(|| Error::InvalidFormula("PtgStr UTF-16 length overflow".to_string()))?;
+            .ok_or(Error::InvalidFormula("PtgStr UTF-16 length overflow"))?;
         self.require(byte_len, "PtgStr text")?;
         let units = self.data[self.offset..self.offset + byte_len]
             .as_chunks::<2>()
@@ -289,7 +321,7 @@ impl<'a> Parser<'a> {
             .map(|pair| u16::from_le_bytes([pair[0], pair[1]]));
         let string = char::decode_utf16(units)
             .collect::<std::result::Result<String, _>>()
-            .map_err(|_| Error::Encoding("invalid UTF-16 in PtgStr".to_string()))?;
+            .map_err(|_| Error::Encoding("invalid UTF-16 in PtgStr"))?;
         self.offset += byte_len;
 
         Ok(Token::String(string))
@@ -302,9 +334,7 @@ impl<'a> Parser<'a> {
         let raw = self.data[self.offset];
         self.offset += 1;
         if raw > 1 {
-            return Err(Error::InvalidFormula(format!(
-                "invalid PtgBool value {raw}"
-            )));
+            return Err(Error::InvalidFormula("invalid PtgBool value"));
         }
 
         Ok(Token::Bool(raw != 0))
@@ -317,9 +347,7 @@ impl<'a> Parser<'a> {
         let error_code = self.data[self.offset];
         self.offset += 1;
         if !is_formula_error_code(error_code) {
-            return Err(Error::InvalidFormula(format!(
-                "invalid PtgErr code 0x{error_code:02X}"
-            )));
+            return Err(Error::InvalidFormula("invalid PtgErr code"));
         }
 
         Ok(Token::Error(error_code))
@@ -337,9 +365,9 @@ impl<'a> Parser<'a> {
             self.require(2, "PtgAttrChoose count")?;
             let count = usize::from(read_u16_le_at(self.data, self.offset)?) + 1;
             self.offset += 2;
-            let byte_len = count.checked_mul(2).ok_or_else(|| {
-                Error::InvalidFormula("PtgAttrChoose offset count overflow".to_string())
-            })?;
+            let byte_len = count
+                .checked_mul(2)
+                .ok_or(Error::InvalidFormula("PtgAttrChoose offset count overflow"))?;
             self.require(byte_len, "PtgAttrChoose offsets")?;
             let offsets = self.data[self.offset..self.offset + byte_len]
                 .as_chunks::<2>()
@@ -349,21 +377,18 @@ impl<'a> Parser<'a> {
                 .collect::<Vec<_>>();
             self.offset += byte_len;
             if offsets[0] != byte_len {
-                return Err(Error::InvalidFormula(format!(
-                    "PtgAttrChoose first offset is {}, expected {byte_len}",
-                    offsets[0]
-                )));
+                return Err(Error::InvalidFormula("PtgAttrChoose first offset"));
             }
             self.control_flow_targets.push(self.offset);
             for offset in &offsets[1..] {
-                let target = self.offset.checked_add(*offset).ok_or_else(|| {
-                    Error::InvalidFormula("PtgAttrChoose target overflow".to_string())
-                })?;
+                let target = self
+                    .offset
+                    .checked_add(*offset)
+                    .ok_or(Error::InvalidFormula("PtgAttrChoose target overflow"))?;
                 if target > self.data.len() {
-                    return Err(Error::InvalidFormula(format!(
-                        "PtgAttrChoose target byte {target} exceeds formula length {}",
-                        self.data.len()
-                    )));
+                    return Err(Error::InvalidFormula(
+                        "PtgAttrChoose target byte exceeds formula length",
+                    ));
                 }
                 self.control_flow_targets.push(target);
             }
@@ -383,14 +408,11 @@ impl<'a> Parser<'a> {
                         .offset
                         .checked_add(offset)
                         .and_then(|value| value.checked_add(adjustment))
-                        .ok_or_else(|| {
-                            Error::InvalidFormula("PtgAttr target overflow".to_string())
-                        })?;
+                        .ok_or(Error::InvalidFormula("PtgAttr target overflow"))?;
                     if target > self.data.len() {
-                        return Err(Error::InvalidFormula(format!(
-                            "PtgAttr target byte {target} exceeds formula length {}",
-                            self.data.len()
-                        )));
+                        return Err(Error::InvalidFormula(
+                            "PtgAttr target byte exceeds formula length",
+                        ));
                     }
                     self.control_flow_targets.push(target);
                 }
@@ -405,9 +427,7 @@ impl<'a> Parser<'a> {
                     Ok(Token::Attribute(selector))
                 }
             },
-            _ => Err(Error::InvalidFormula(format!(
-                "unknown PtgAttr selector 0x{selector:02X}"
-            ))),
+            _ => Err(Error::InvalidFormula("unknown PtgAttr selector")),
         }
     }
 
@@ -423,9 +443,7 @@ impl<'a> Parser<'a> {
                 self.offset += 4;
                 Ok(Token::PivotName(index))
             },
-            _ => Err(Error::InvalidFormula(format!(
-                "unknown extended Ptg selector 0x{selector:02X}"
-            ))),
+            _ => Err(Error::InvalidFormula("unknown extended Ptg selector")),
         }
     }
 
@@ -439,19 +457,16 @@ impl<'a> Parser<'a> {
         self.offset += 12;
 
         if flags & 0xC000 != 0 {
-            return Err(Error::InvalidFormula(format!(
-                "PtgList reserved flag bits are nonzero: 0x{:04X}",
-                flags & 0xC000
-            )));
+            return Err(Error::InvalidFormula(
+                "PtgList reserved flag bits are nonzero",
+            ));
         }
         let data_type = match (flags >> 10) & 0x03 {
             0 => TableDataType::Reference,
             1 => TableDataType::Value,
             2 => TableDataType::Array,
             _ => {
-                return Err(Error::InvalidFormula(
-                    "PtgList has reserved data type 3".to_string(),
-                ));
+                return Err(Error::InvalidFormula("PtgList has reserved data type 3"));
             },
         };
         let invalid = flags & 0x1000 != 0;
@@ -460,9 +475,9 @@ impl<'a> Parser<'a> {
             (None, None, None)
         } else {
             if raw_list_index == 0 || raw_list_index == u32::MAX {
-                return Err(Error::InvalidFormula(format!(
-                    "PtgList has invalid table identifier {raw_list_index}"
-                )));
+                return Err(Error::InvalidFormula(
+                    "PtgList has invalid table identifier",
+                ));
             }
             let row_type = parse_table_row_type(((flags >> 2) & 0x1F) as u8)?;
             let columns = match flags & 0x03 {
@@ -470,16 +485,14 @@ impl<'a> Parser<'a> {
                 1 => {
                     if col_first >= 16_384 {
                         return Err(Error::InvalidFormula(
-                            "PtgList first column is outside worksheet bounds".to_string(),
+                            "PtgList first column is outside worksheet bounds",
                         ));
                     }
                     TableColumns::One(col_first)
                 },
                 2 => {
                     if col_first > col_last || col_last >= 16_384 {
-                        return Err(Error::InvalidFormula(
-                            "PtgList column range is invalid".to_string(),
-                        ));
+                        return Err(Error::InvalidFormula("PtgList column range is invalid"));
                     }
                     TableColumns::Range {
                         first: col_first,
@@ -488,7 +501,7 @@ impl<'a> Parser<'a> {
                 },
                 _ => {
                     return Err(Error::InvalidFormula(
-                        "PtgList has reserved column selector 3".to_string(),
+                        "PtgList has reserved column selector 3",
                     ));
                 },
             };
@@ -517,26 +530,23 @@ impl<'a> Parser<'a> {
         let has_columns = match self.extra[self.extra_offset] {
             0 => false,
             1 => true,
-            value => {
-                return Err(Error::InvalidFormula(format!(
-                    "invalid PtgExtraList hasColumns {value}"
-                )));
+            _value => {
+                return Err(Error::InvalidFormula("invalid PtgExtraList hasColumns"));
             },
         };
         let row_flags = read_u16_le_at(self.extra, self.extra_offset + 1)?;
         if row_flags & !0x001F != 0 {
-            return Err(Error::InvalidFormula(format!(
-                "PtgExtraList reserved row bits are nonzero: 0x{:04X}",
-                row_flags & !0x001F
-            )));
+            return Err(Error::InvalidFormula(
+                "PtgExtraList reserved row bits are nonzero",
+            ));
         }
         let row_type = parse_table_row_type((row_flags & 0x1F) as u8)?;
         let table_len = usize::from(read_u16_le_at(self.extra, self.extra_offset + 3)?);
         self.extra_offset += 5;
         if table_len == 0 || table_len >= 256 {
-            return Err(Error::InvalidFormula(format!(
-                "PtgExtraList table length {table_len} is outside 1..=255"
-            )));
+            return Err(Error::InvalidFormula(
+                "PtgExtraList table length is outside 1255",
+            ));
         }
         let table = self.parse_extra_utf16(table_len, "PtgExtraList table")?;
         let columns = if has_columns {
@@ -545,14 +555,10 @@ impl<'a> Parser<'a> {
             let count = self.extra[self.extra_offset + 2];
             self.extra_offset += 3;
             if reserved != 0 {
-                return Err(Error::InvalidFormula(
-                    "SxSu reserved field is nonzero".to_string(),
-                ));
+                return Err(Error::InvalidFormula("SxSu reserved field is nonzero"));
             }
             if !matches!(count, 1 | 2) {
-                return Err(Error::InvalidFormula(format!(
-                    "invalid SxSu column count {count}"
-                )));
+                return Err(Error::InvalidFormula("invalid SxSu column count"));
             }
             let first = self.parse_sxos(count == 2, "SxSu first column")?;
             if count == 1 {
@@ -576,36 +582,31 @@ impl<'a> Parser<'a> {
         let not_last = match self.extra[self.extra_offset] {
             0 => false,
             1 => true,
-            value => {
-                return Err(Error::InvalidFormula(format!(
-                    "invalid {context} notLast {value}"
-                )));
+            _value => {
+                return Err(Error::InvalidFormula("invalid notLast"));
             },
         };
         let reserved = read_u16_le_at(self.extra, self.extra_offset + 1)?;
         let length = usize::try_from(read_u32_le_at(self.extra, self.extra_offset + 3)?)
-            .map_err(|_| Error::InvalidFormula(format!("{context} length overflow")))?;
+            .map_err(|_| Error::InvalidFormula("length overflow"))?;
         self.extra_offset += 7;
         if not_last != expected_not_last {
-            return Err(Error::InvalidFormula(format!(
-                "{context} has inconsistent notLast flag"
-            )));
+            return Err(Error::InvalidFormula("has inconsistent notLast flag"));
         }
         if reserved != 2 {
-            return Err(Error::InvalidFormula(format!(
-                "{context} reserved field is {reserved}, expected 2"
-            )));
+            return Err(Error::InvalidFormula("reserved field is, expected 2"));
         }
         if length == 0 {
-            return Err(Error::InvalidFormula(format!("{context} name is empty")));
+            return Err(Error::InvalidFormula("name is empty"));
         }
         self.parse_extra_utf16(length, context)
     }
 
     fn parse_extra_utf16(&mut self, units: usize, context: &str) -> Result<String> {
+        self.admit_units(units, self.extra_offset)?;
         let byte_len = units
             .checked_mul(2)
-            .ok_or_else(|| Error::InvalidFormula(format!("{context} length overflow")))?;
+            .ok_or(Error::InvalidFormula("length overflow"))?;
         self.require_extra(byte_len, context)?;
         let value = char::decode_utf16(
             self.extra[self.extra_offset..self.extra_offset + byte_len]
@@ -615,29 +616,27 @@ impl<'a> Parser<'a> {
                 .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]])),
         )
         .collect::<std::result::Result<String, _>>()
-        .map_err(|_| Error::Encoding(format!("invalid UTF-16 in {context}")))?;
+        .map_err(|_| Error::Encoding("invalid UTF-16"))?;
         self.extra_offset += byte_len;
         Ok(value)
     }
 
-    fn require_extra(&self, len: usize, context: &str) -> Result<()> {
+    fn require_extra(&self, len: usize, _context: &str) -> Result<()> {
         if self.extra_offset + len <= self.extra.len() {
             Ok(())
         } else {
-            Err(Error::InvalidFormula(format!(
-                "truncated {context} at ancillary byte {}: need {len} bytes, have {}",
-                self.extra_offset,
-                self.extra.len().saturating_sub(self.extra_offset)
-            )))
+            Err(Error::InvalidFormula(
+                "truncated at ancillary byte: need bytes, have",
+            ))
         }
     }
 
     fn parse_array(&mut self) -> Result<Token> {
         let token = self.data[self.offset - 1];
         if token & 0x80 != 0 || !matches!(token & 0x60, 0x40 | 0x60) {
-            return Err(Error::InvalidFormula(format!(
-                "PtgArray has invalid data type in token 0x{token:02X}"
-            )));
+            return Err(Error::InvalidFormula(
+                "PtgArray has invalid data type in token",
+            ));
         }
         self.require(14, "PtgArray")?;
         self.offset += 14;
@@ -646,21 +645,21 @@ impl<'a> Parser<'a> {
         let cols = read_u32_le_at(self.extra, self.extra_offset + 4)?;
         self.extra_offset += 8;
         if rows == 0 || cols == 0 || rows > 1_048_576 || cols > 16_384 {
-            return Err(Error::InvalidFormula(format!(
-                "PtgExtraArray dimensions {rows}x{cols} are invalid"
-            )));
+            return Err(Error::InvalidFormula(
+                "PtgExtraArray dimensions x are invalid",
+            ));
         }
         let count_u64 = u64::from(rows)
             .checked_mul(u64::from(cols))
-            .ok_or_else(|| Error::InvalidFormula("array size overflow".to_string()))?;
-        let count = usize::try_from(count_u64)
-            .map_err(|_| Error::InvalidFormula("array is too large".to_string()))?;
+            .ok_or(Error::InvalidFormula("array size overflow"))?;
+        let count =
+            usize::try_from(count_u64).map_err(|_| Error::InvalidFormula("array is too large"))?;
         // Every SerAr uses at least two bytes. Reject impossible dimensions
         // before allocating based on attacker-controlled counts.
         if count > self.extra.len().saturating_sub(self.extra_offset) / 2 {
-            return Err(Error::InvalidFormula(format!(
-                "PtgExtraArray declares {count} values beyond its ancillary payload"
-            )));
+            return Err(Error::InvalidFormula(
+                "PtgExtraArray declares values beyond its ancillary payload",
+            ));
         }
         let mut values = Vec::with_capacity(count);
         for _ in 0..count {
@@ -678,15 +677,16 @@ impl<'a> Parser<'a> {
                 0x01 => {
                     self.require_extra(2, "SerStr length")?;
                     let len = usize::from(read_u16_le_at(self.extra, self.extra_offset)?);
+                    self.admit_units(len, self.extra_offset)?;
                     self.extra_offset += 2;
                     if len >= 256 {
-                        return Err(Error::InvalidFormula(format!(
-                            "SerStr length {len} exceeds 255 UTF-16 code units"
-                        )));
+                        return Err(Error::InvalidFormula(
+                            "SerStr length exceeds 255 UTF-16 code units",
+                        ));
                     }
-                    let byte_len = len.checked_mul(2).ok_or_else(|| {
-                        Error::InvalidFormula("SerStr length overflow".to_string())
-                    })?;
+                    let byte_len = len
+                        .checked_mul(2)
+                        .ok_or(Error::InvalidFormula("SerStr length overflow"))?;
                     self.require_extra(byte_len, "SerStr text")?;
                     let units = self.extra[self.extra_offset..self.extra_offset + byte_len]
                         .as_chunks::<2>()
@@ -695,7 +695,7 @@ impl<'a> Parser<'a> {
                         .map(|pair| u16::from_le_bytes([pair[0], pair[1]]));
                     let value = char::decode_utf16(units)
                         .collect::<std::result::Result<String, _>>()
-                        .map_err(|_| Error::Encoding("invalid UTF-16 in SerStr".to_string()))?;
+                        .map_err(|_| Error::Encoding("invalid UTF-16 in SerStr"))?;
                     self.extra_offset += byte_len;
                     ArrayValue::String(value)
                 },
@@ -704,9 +704,7 @@ impl<'a> Parser<'a> {
                     let value = self.extra[self.extra_offset];
                     self.extra_offset += 1;
                     if value > 1 {
-                        return Err(Error::InvalidFormula(format!(
-                            "invalid SerBool value {value}"
-                        )));
+                        return Err(Error::InvalidFormula("invalid SerBool value"));
                     }
                     ArrayValue::Bool(value != 0)
                 },
@@ -714,25 +712,19 @@ impl<'a> Parser<'a> {
                     self.require_extra(4, "SerErr")?;
                     let error = self.extra[self.extra_offset];
                     if !matches!(error, 0x00 | 0x07 | 0x0F | 0x17 | 0x1D | 0x24 | 0x2A | 0x2B) {
-                        return Err(Error::InvalidFormula(format!(
-                            "invalid SerErr code 0x{error:02X}"
-                        )));
+                        return Err(Error::InvalidFormula("invalid SerErr code"));
                     }
                     if self.extra[self.extra_offset + 1..self.extra_offset + 4]
                         .iter()
                         .any(|byte| *byte != 0)
                     {
-                        return Err(Error::InvalidFormula(
-                            "SerErr reserved bytes are nonzero".to_string(),
-                        ));
+                        return Err(Error::InvalidFormula("SerErr reserved bytes are nonzero"));
                     }
                     self.extra_offset += 4;
                     ArrayValue::Error(error)
                 },
                 _ => {
-                    return Err(Error::InvalidFormula(format!(
-                        "unknown SerAr tag 0x{tag:02X}"
-                    )));
+                    return Err(Error::InvalidFormula("unknown SerAr tag"));
                 },
             };
             values.push(value);
@@ -743,9 +735,9 @@ impl<'a> Parser<'a> {
     fn parse_memory(&mut self, mut kind: MemoryKind) -> Result<Token> {
         let token = self.data[self.offset - 1];
         if token & 0x80 != 0 {
-            return Err(Error::InvalidFormula(format!(
-                "memory token 0x{token:02X} has its reserved bit set"
-            )));
+            return Err(Error::InvalidFormula(
+                "memory token has its reserved bit set",
+            ));
         }
         let (payload_len, cce_offset) = match kind {
             MemoryKind::Function => (2, 0),
@@ -756,9 +748,7 @@ impl<'a> Parser<'a> {
         if matches!(kind, MemoryKind::Error(_)) {
             let error = self.data[self.offset];
             if !matches!(error, 0x00 | 0x07 | 0x0F | 0x17 | 0x1D | 0x24 | 0x2A | 0x2B) {
-                return Err(Error::InvalidFormula(format!(
-                    "invalid PtgMemErr code 0x{error:02X}"
-                )));
+                return Err(Error::InvalidFormula("invalid PtgMemErr code"));
             }
             kind = MemoryKind::Error(error);
         }
@@ -766,14 +756,13 @@ impl<'a> Parser<'a> {
         self.offset += payload_len;
         if expression_bytes == 0 {
             return Err(Error::InvalidFormula(
-                "memory token has an empty reference expression".to_string(),
+                "memory token has an empty reference expression",
             ));
         }
         if usize::from(expression_bytes) > self.data.len().saturating_sub(self.offset) {
-            return Err(Error::InvalidFormula(format!(
-                "memory token declares {expression_bytes} expression bytes, but only {} remain",
-                self.data.len().saturating_sub(self.offset)
-            )));
+            return Err(Error::InvalidFormula(
+                "memory token declares expression bytes, but only remain",
+            ));
         }
         self.memory_expression_ends
             .push(self.offset + usize::from(expression_bytes));
@@ -782,12 +771,12 @@ impl<'a> Parser<'a> {
         if kind == MemoryKind::Area {
             self.require_extra(4, "PtgExtraMem count")?;
             let count = usize::try_from(read_u32_le_at(self.extra, self.extra_offset)?)
-                .map_err(|_| Error::InvalidFormula("PtgExtraMem is too large".to_string()))?;
+                .map_err(|_| Error::InvalidFormula("PtgExtraMem is too large"))?;
             self.extra_offset += 4;
             if count > self.extra.len().saturating_sub(self.extra_offset) / 16 {
-                return Err(Error::InvalidFormula(format!(
-                    "PtgExtraMem declares {count} ranges beyond its ancillary payload"
-                )));
+                return Err(Error::InvalidFormula(
+                    "PtgExtraMem declares ranges beyond its ancillary payload",
+                ));
             }
             cached_ranges.reserve(count);
             for _ in 0..count {
@@ -887,9 +876,9 @@ impl<'a> Parser<'a> {
     fn parse_reference_error(&mut self, is_area: bool, is_3d: bool) -> Result<Token> {
         let token = self.data[self.offset - 1];
         if token & 0x80 != 0 {
-            return Err(Error::InvalidFormula(format!(
-                "reference-error token 0x{token:02X} has its reserved bit set"
-            )));
+            return Err(Error::InvalidFormula(
+                "reference-error token has its reserved bit set",
+            ));
         }
         let sheet_index = if is_3d {
             self.require(2, "3D reference-error sheet index")?;
@@ -911,9 +900,9 @@ impl<'a> Parser<'a> {
     fn parse_ref_3d(&mut self) -> Result<Token> {
         let token = self.data[self.offset - 1];
         if token & 0x80 != 0 {
-            return Err(Error::InvalidFormula(format!(
-                "PtgRef3d token 0x{token:02X} has its reserved bit set"
-            )));
+            return Err(Error::InvalidFormula(
+                "PtgRef3d token has its reserved bit set",
+            ));
         }
         self.require(8, "PtgRef3d")?;
         let sheet_index = read_u16_le_at(self.data, self.offset)?;
@@ -922,9 +911,9 @@ impl<'a> Parser<'a> {
         self.offset += 8;
         let col = u32::from(col_data & 0x3FFF);
         if row >= 1_048_576 || col >= 16_384 {
-            return Err(Error::InvalidFormula(format!(
-                "PtgRef3d coordinate ({row}, {col}) is outside the worksheet"
-            )));
+            return Err(Error::InvalidFormula(
+                "PtgRef3d coordinate (, ) is outside the worksheet",
+            ));
         }
         Ok(Token::CellRef3d {
             sheet_index,
@@ -938,9 +927,9 @@ impl<'a> Parser<'a> {
     fn parse_area_3d(&mut self) -> Result<Token> {
         let token = self.data[self.offset - 1];
         if token & 0x80 != 0 {
-            return Err(Error::InvalidFormula(format!(
-                "PtgArea3d token 0x{token:02X} has its reserved bit set"
-            )));
+            return Err(Error::InvalidFormula(
+                "PtgArea3d token has its reserved bit set",
+            ));
         }
         self.require(14, "PtgArea3d")?;
         let sheet_index = read_u16_le_at(self.data, self.offset)?;
@@ -975,17 +964,15 @@ impl<'a> Parser<'a> {
     ) -> Result<(u32, u32)> {
         if !offset_reference {
             if row_data >= 1_048_576 || col_data >= 16_384 {
-                return Err(Error::InvalidFormula(format!(
-                    "reference ({row_data}, {col_data}) is outside the worksheet"
-                )));
+                return Err(Error::InvalidFormula(
+                    "reference (, ) is outside the worksheet",
+                ));
             }
             return Ok((row_data, u32::from(col_data)));
         }
-        let (base_row, base_col) = self.base_cell.ok_or_else(|| {
-            Error::InvalidFormula(
-                "PtgRefN/PtgAreaN requires a target cell for offset resolution".to_string(),
-            )
-        })?;
+        let (base_row, base_col) = self.base_cell.ok_or(Error::InvalidFormula(
+            "PtgRefN/PtgAreaN requires a target cell for offset resolution",
+        ))?;
 
         let row = if row_relative {
             add_wrapped_offset(base_row, row_data as i32, 1_048_576)
@@ -1003,9 +990,9 @@ impl<'a> Parser<'a> {
             u32::from(col_data)
         };
         if row >= 1_048_576 || col >= 16_384 {
-            return Err(Error::InvalidFormula(format!(
-                "resolved reference ({row}, {col}) is outside the worksheet"
-            )));
+            return Err(Error::InvalidFormula(
+                "resolved reference (, ) is outside the worksheet",
+            ));
         }
         Ok((row, col))
     }
@@ -1040,16 +1027,12 @@ impl<'a> Parser<'a> {
 
         if !is_command && let Some(function) = builtin_function_by_index(index) {
             if function.min_args == function.max_args {
-                return Err(Error::InvalidFormula(format!(
-                    "PtgFuncVar specifies fixed-arity function {}",
-                    function.name
-                )));
+                return Err(Error::InvalidFormula(
+                    "PtgFuncVar specifies fixed-arity function",
+                ));
             }
             if !function.accepts_arg_count(arg_count) {
-                return Err(Error::InvalidFormula(format!(
-                    "{} does not accept {arg_count} arguments",
-                    function.name
-                )));
+                return Err(Error::InvalidFormula("does not accept arguments"));
             }
         }
 
@@ -1069,7 +1052,7 @@ impl<'a> Parser<'a> {
         self.offset += 4;
         if name_index == 0 {
             return Err(Error::InvalidFormula(
-                "PtgName index is one-based and cannot be zero".to_string(),
+                "PtgName index is one-based and cannot be zero",
             ));
         }
 
@@ -1084,7 +1067,7 @@ impl<'a> Parser<'a> {
         self.offset += 6;
         if name_index == 0 {
             return Err(Error::InvalidFormula(
-                "PtgNameX name index is one-based and cannot be zero".to_string(),
+                "PtgNameX name index is one-based and cannot be zero",
             ));
         }
         Ok(Token::ExternalName {
@@ -1095,16 +1078,15 @@ impl<'a> Parser<'a> {
 
     /// Resolve the parameter count of a fixed-arity `Ftab` function.
     fn get_function_arg_count(index: u16) -> Result<u8> {
-        let function = builtin_function_by_index(index).ok_or_else(|| {
-            Error::UnsupportedFeature(format!(
-                "fixed-arity XLSB function index {index} is not a non-macro Ftab entry"
-            ))
+        let function = builtin_function_by_index(index).ok_or({
+            Error::UnsupportedFeature(
+                "fixed-arity XLSB function index is not a non-macro Ftab entry",
+            )
         })?;
         if function.min_args != function.max_args {
-            return Err(Error::InvalidFormula(format!(
-                "PtgFunc specifies variable-arity function {}",
-                function.name
-            )));
+            return Err(Error::InvalidFormula(
+                "PtgFunc specifies variable-arity function",
+            ));
         }
         Ok(function.min_args)
     }

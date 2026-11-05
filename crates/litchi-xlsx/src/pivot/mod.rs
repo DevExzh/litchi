@@ -7,49 +7,54 @@
 use std::collections::HashMap;
 
 pub mod cache;
-pub use server_formats::cached_unique_names;
 pub mod chart;
 pub mod fields;
 pub mod filters;
+#[path = "server_formats/mod.rs"]
+pub(crate) mod formats;
 pub mod reader;
-pub mod server_formats;
 pub mod styles;
+#[cfg(test)]
+mod tests;
 pub mod writer;
 
+pub use formats::{cached_unique_names, table_data};
+
+pub mod server_formats {
+    //! Source-bound support for the MS-XLSX `pivotTableServerFormats`
+    //! extension of a non-worksheet PivotTable.
+    //!
+    //! [`crate::Workbook::pivot_table_server_formats`] reads the typed values;
+    //! [`crate::Package::edit_pivot_table`] starts an [`Edit`] that stages
+    //! [`ServerFormat`] values or explicit [`Attribute`] operations through
+    //! [`Format`]; [`Edit::commit`] returns a [`Commit`] holding the new
+    //! package, the exact reversible [`Patch`] and the [`Diagnostics`], and
+    //! [`crate::Package::apply_pivot_table`] replays a patch. The source
+    //! package never changes.
+
+    pub use super::formats::{
+        Attribute, Commit, Diagnostics, Edit, Error, Format, LimitKind, Patch, PivotTableSelector,
+        PivotTableServerFormats, PivotTableView, ServerFormat, Snapshot, load,
+    };
+    #[cfg(test)]
+    pub(crate) use super::formats::{apply_patch, edit};
+    pub(crate) use super::formats::{edit_workbook, view_workbook};
+}
+
+pub use cached_unique_names::{
+    CachedUniqueName, CachedUniqueNames, PivotCacheFieldHandle, PivotCacheFieldSelector,
+    PivotCacheHandle, PivotCacheId, PivotCacheSelector,
+};
 pub use reader::{
     read_pivot_cache_definition, read_pivot_cache_records, read_pivot_table_definition,
     read_pivot_tables,
 };
-pub use server_formats::cached_unique_names::{
-    CacheSelector as PivotCacheSelector, CachedUniqueName, CachedUniqueNames,
-    Commit as CachedUniqueNamesCommit, DiagnosticStatus as CachedUniqueNamesDiagnosticStatus,
-    FieldSelector as PivotCacheFieldSelector, Patch as CachedUniqueNamesPatch,
-    PivotCacheEditHandle as PivotCacheEdit, PivotCacheFieldHandle, PivotCacheHandle, PivotCacheId,
-    Snapshot as CachedUniqueNamesSnapshot, Transaction as CachedUniqueNamesTransaction,
-    WorkbookCommit as CachedUniqueNamesWorkbookCommit,
-    WorkbookPatch as CachedUniqueNamesWorkbookPatch,
-    WorkbookTransaction as CachedUniqueNamesWorkbookTransaction,
-};
-pub use server_formats::table_data::{
-    Commit as PivotTableDataCommit, Patch as PivotTableDataPatch, PivotCellAddress, PivotCellType,
-    PivotCellValueEdit, PivotRowView, PivotTableDataDiagnostic, PivotTableDataLimits,
-    PivotTableDataView, PivotValueAttributeEdit, PivotValueCellExtraEdit, PivotValueCellExtraView,
-    PivotValueCellView, Snapshot as PivotTableDataSnapshot,
-    Transaction as PivotTableDataTransaction, WorkbookCommit as PivotTableDataWorkbookCommit,
-    WorkbookPatch as PivotTableDataWorkbookPatch, WorkbookTransaction as PivotTableDataEdit,
-    edit as edit_pivot_table_data, edit_with_limits as edit_pivot_table_data_with_limits,
-    load as load_pivot_table_data, load_with_limits as load_pivot_table_data_with_limits,
-};
 pub use server_formats::{
-    AttributeEdit as PivotServerFormatAttributeEdit, Commit as PivotServerFormatsCommit,
-    Patch as PivotServerFormatsPatch, PivotTableSelector, PivotTableServerFormats, PivotTableView,
-    ServerFormat, ServerFormatEdit, Snapshot as PivotServerFormatsSnapshot,
-    Transaction as PivotServerFormatsTransaction,
-    WorkbookCommit as PivotTableServerFormatsWorkbookCommit,
-    WorkbookPatch as PivotTableServerFormatsWorkbookPatch,
-    WorkbookTransaction as PivotTableServerFormatsEdit,
-    apply_patch as apply_pivot_server_formats_patch, edit as edit_pivot_server_formats,
-    load as load_pivot_server_formats,
+    PivotTableSelector, PivotTableServerFormats, PivotTableView, ServerFormat,
+};
+pub use table_data::{
+    PivotCellAddress, PivotCellType, PivotRowView, PivotTableDataDiagnostic, PivotTableDataView,
+    PivotValueCellExtraView, PivotValueCellView,
 };
 pub use writer::{write_pivot_cache_definition, write_pivot_cache_records, write_pivot_table};
 

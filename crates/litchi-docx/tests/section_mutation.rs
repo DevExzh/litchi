@@ -1,4 +1,4 @@
-use litchi_docx::writer::{MutableDocument, SectionProperties};
+use litchi_docx::builder::{Document as MutableDocument, SectionProperties};
 use litchi_docx::{Package, header_footer::Kind, section::Start};
 use std::io::Cursor;
 
@@ -48,9 +48,9 @@ fn accepts_strict_sections_and_rejects_malformed_body_final_placement() {
 
 #[test]
 fn package_roundtrip_keeps_distinct_section_header_footer_parts() {
-    let mut package = Package::new().unwrap();
+    let mut builder = litchi_docx::Builder::new().unwrap();
     {
-        let document = package.document_mut().unwrap();
+        let document = builder.document().unwrap();
         document.add_paragraph_with_text("first");
         document.add_paragraph_with_text("second");
         let mut first = SectionProperties::default().with_start_type(Start::NewPage);
@@ -79,9 +79,10 @@ fn package_roundtrip_keeps_distinct_section_header_footer_parts() {
             )
             .unwrap();
     }
+    let package = builder.build().unwrap();
 
     let mut bytes = Cursor::new(Vec::new());
-    package.to_stream(&mut bytes).unwrap();
+    package.write_to(&mut bytes).unwrap();
     bytes.set_position(0);
     let reopened = Package::from_reader(bytes).unwrap();
     assert_eq!(reopened.document().unwrap().sections().unwrap().len(), 2);

@@ -15,7 +15,9 @@ mod keynote_slide_media_data_seed;
 use std::{fmt::Debug, fmt::Display, hint::black_box, sync::OnceLock};
 
 use libfuzzer_sys::fuzz_target;
-use litchi::keynote::{Limits, MovieSelector, Package, ReadOptions, SemanticLimits, SlideSelector};
+use litchi::keynote::{
+    MovieSelector, OpenOptions, Package, SemanticLimits, SlideSelector, SourceLimits,
+};
 use litchi_iwa_archive::package::Catalog;
 
 use keynote_slide_media_data_seed as seed;
@@ -38,27 +40,29 @@ fuzz_target!(|data: &[u8]| {
     exercise_input_limit();
 });
 
-fn options() -> ReadOptions {
-    static OPTIONS: OnceLock<ReadOptions> = OnceLock::new();
+fn options() -> OpenOptions {
+    static OPTIONS: OnceLock<OpenOptions> = OnceLock::new();
     *OPTIONS.get_or_init(|| {
-        let archive = Limits::new(
-            MAX_INPUT_BYTES,
-            MAX_ENTRIES,
-            MAX_ENTRY_BYTES,
-            MAX_EXPANDED_BYTES,
-            MAX_IWA_STREAM_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid lifecycle archive limits: {error}"));
-        let semantic = SemanticLimits::new(
-            MAX_OBJECTS,
-            MAX_SLIDES,
-            MAX_REFERENCES,
-            MAX_TEXT_STORAGES,
-            MAX_TEXT_FRAGMENTS,
-            MAX_TEXT_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid lifecycle semantic limits: {error}"));
-        ReadOptions::new(archive, semantic)
+        let archive = SourceLimits::builder()
+            .max_input_bytes(MAX_INPUT_BYTES)
+            .and_then(|limits| limits.max_entries(MAX_ENTRIES))
+            .and_then(|limits| limits.max_entry_bytes(MAX_ENTRY_BYTES))
+            .and_then(|limits| limits.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+            .and_then(|limits| limits.max_component_bytes(MAX_IWA_STREAM_BYTES))
+            .and_then(|limits| limits.build())
+            .unwrap_or_else(|error| unreachable!("valid lifecycle archive limits: {error}"));
+        let semantic = SemanticLimits::builder()
+            .max_objects(MAX_OBJECTS)
+            .and_then(|limits| limits.max_slides(MAX_SLIDES))
+            .and_then(|limits| limits.max_references(MAX_REFERENCES))
+            .and_then(|limits| limits.max_text_storages(MAX_TEXT_STORAGES))
+            .and_then(|limits| limits.max_text_fragments(MAX_TEXT_FRAGMENTS))
+            .and_then(|limits| limits.max_text_bytes(MAX_TEXT_BYTES))
+            .and_then(|limits| limits.build())
+            .unwrap_or_else(|error| unreachable!("valid lifecycle semantic limits: {error}"));
+        OpenOptions::new()
+            .source_limits(archive)
+            .semantic_limits(semantic)
     })
 }
 
@@ -91,11 +95,15 @@ fn verify_seed_lifecycle_paths(package: &Package) {
     ] {
         let commit = if duplicate {
             package
-                .duplicate_slide_media(slide, movie)
+                .edit_slide_media_lifecycle()
+                .duplicate(slide, movie)
+                .and_then(|edit| edit.commit())
                 .unwrap_or_else(|error| panic!("seed lifecycle duplication must succeed: {error}"))
         } else {
             package
-                .remove_slide_media(slide, movie)
+                .edit_slide_media_lifecycle()
+                .remove(slide, movie)
+                .and_then(|edit| edit.commit())
                 .unwrap_or_else(|error| panic!("seed lifecycle removal must succeed: {error}"))
         };
         let candidate = package_bytes(commit.package())
@@ -128,9 +136,15 @@ fn exercise_arbitrary_input(data: &[u8]) {
             };
             let movie = MovieSelector::index(usize::from(control(data, 1) % 3));
             let result = if control(data, 2) & 1 == 0 {
-                package.duplicate_slide_media(slide, movie)
+                package
+                    .edit_slide_media_lifecycle()
+                    .duplicate(slide, movie)
+                    .and_then(|edit| edit.commit())
             } else {
-                package.remove_slide_media(slide, movie)
+                package
+                    .edit_slide_media_lifecycle()
+                    .remove(slide, movie)
+                    .and_then(|edit| edit.commit())
             };
             if let Err(error) = result {
                 observe_error(error);
@@ -159,9 +173,15 @@ fn exercise_lifecycle(package: &Package, data: &[u8]) {
     let movie = MovieSelector::index(movie_position);
     let duplicate = control(data, 2) & 1 == 0;
     let result = if duplicate {
-        package.duplicate_slide_media(slide, movie)
+        package
+            .edit_slide_media_lifecycle()
+            .duplicate(slide, movie)
+            .and_then(|edit| edit.commit())
     } else {
-        package.remove_slide_media(slide, movie)
+        package
+            .edit_slide_media_lifecycle()
+            .remove(slide, movie)
+            .and_then(|edit| edit.commit())
     };
 
     let commit = match result {
@@ -233,17 +253,17 @@ fn exercise_lifecycle(package: &Package, data: &[u8]) {
 
 fn exercise_input_limit() {
     let source = seed::bytes();
-    let defaults = Limits::default();
-    let tight = Limits::new(
-        u64::try_from(source.len().saturating_sub(1)).unwrap_or(0),
-        defaults.max_entries(),
-        defaults.max_entry_bytes(),
-        defaults.max_total_bytes(),
-        defaults.max_iwa_stream_bytes(),
-    )
-    .unwrap_or_else(|error| panic!("finite lifecycle input limit must construct: {error}"));
+    let defaults = SourceLimits::default();
+    let tight = SourceLimits::builder()
+        .max_input_bytes(u64::try_from(source.len().saturating_sub(1)).unwrap_or(0))
+        .and_then(|limits| limits.max_entries(defaults.max_entries()))
+        .and_then(|limits| limits.max_entry_bytes(defaults.max_entry_bytes()))
+        .and_then(|limits| limits.max_aggregate_bytes(defaults.max_aggregate_bytes()))
+        .and_then(|limits| limits.max_component_bytes(defaults.max_component_bytes()))
+        .and_then(|limits| limits.build())
+        .unwrap_or_else(|error| panic!("finite lifecycle input limit must construct: {error}"));
     if let Err(error) =
-        Package::from_bytes_with_options(source, ReadOptions::new(tight, SemanticLimits::default()))
+        Package::from_bytes_with_options(source, OpenOptions::new().source_limits(tight))
     {
         observe_error(error);
     } else {
@@ -260,7 +280,7 @@ fn assert_member_unchanged(before: &[u8], after: Option<&[u8]>, name: &str) {
 }
 
 fn member(source: &[u8], name: &str) -> Option<Vec<u8>> {
-    Catalog::from_bytes(source)
+    Catalog::from_bytes(source, Default::default())
         .ok()?
         .iter()
         .find(|entry| entry.name() == name)

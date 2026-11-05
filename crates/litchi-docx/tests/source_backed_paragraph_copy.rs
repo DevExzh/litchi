@@ -3,7 +3,9 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use litchi_core::{OwnedSource, Position, ReadAt};
-use litchi_docx::source_backed::paragraph_copy::{Error, Limits, Patch, Refusal};
+use litchi_docx::source_backed::paragraph_copy::raw::{
+    Error, LimitKind, Limits, Patch, Refusal, RemovalPatch, Tree,
+};
 use litchi_docx::{Package, source_backed};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter};
@@ -60,6 +62,13 @@ fn open(source: Vec<u8>) -> source_backed::Package {
     source_backed::Package::from_read_at(read_at).unwrap()
 }
 
+fn admit_copy(source: Vec<u8>) -> Result<(), Error> {
+    open(source)
+        .edit_plain_paragraph_copy()?
+        .projected()
+        .map(|_| ())
+}
+
 fn reopened_texts(bytes: Vec<u8>) -> Vec<String> {
     Package::from_reader(io::Cursor::new(bytes))
         .unwrap()
@@ -69,6 +78,161 @@ fn reopened_texts(bytes: Vec<u8>) -> Vec<String> {
         .iter()
         .map(|paragraph| paragraph.text().unwrap())
         .collect()
+}
+
+#[test]
+fn raw_tree_copy_and_removal_are_bounded_reversible_and_streamable() {
+    let limits = Limits::default();
+    let source = document(&["alpha", "beta"]);
+    let mut copy_tree = Tree::from_xml(source.clone(), limits).unwrap();
+    assert_eq!(copy_tree.paragraph_count(), 2);
+    let copy = copy_tree
+        .copy_plain_paragraph(Position::new(0), Position::new(2))
+        .unwrap();
+    assert_eq!(copy.effect_report().copied_paragraphs, 1);
+    let copied_xml = copy_tree.xml_bytes().to_vec();
+    let copy_wire = copy.to_bytes(limits).unwrap();
+    let decoded_copy = Patch::from_bytes(&copy_wire, limits).unwrap();
+    assert_eq!(copy_tree.paragraph_count(), 3);
+    copy_tree.apply_copy(&decoded_copy.inverse()).unwrap();
+    assert_eq!(copy_tree.xml_bytes(), source);
+
+    let mut reopened_after = Tree::from_xml(copied_xml.clone(), limits).unwrap();
+    reopened_after.apply_copy(&decoded_copy.inverse()).unwrap();
+    assert_eq!(reopened_after.xml_bytes(), source);
+
+    let mut reopened_source = Tree::from_xml(source.clone(), limits).unwrap();
+    reopened_source.apply_copy(&decoded_copy).unwrap();
+    assert_eq!(reopened_source.xml_bytes(), copied_xml);
+
+    let second = reopened_source
+        .copy_plain_paragraph(Position::new(1), Position::new(0))
+        .unwrap();
+    let second_xml = reopened_source.xml_bytes().to_vec();
+    let second_wire = second.to_bytes(limits).unwrap();
+    let decoded_second = Patch::from_bytes(&second_wire, limits).unwrap();
+    let mut reopened_first = Tree::from_xml(copied_xml.clone(), limits).unwrap();
+    reopened_first.apply_copy(&decoded_second).unwrap();
+    assert_eq!(reopened_first.xml_bytes(), second_xml);
+    let mut reopened_second = Tree::from_xml(second_xml.clone(), limits).unwrap();
+    reopened_second
+        .apply_copy(&decoded_second.inverse())
+        .unwrap();
+    reopened_second.apply_copy(&decoded_copy.inverse()).unwrap();
+    assert_eq!(reopened_second.xml_bytes(), source);
+
+    let mut changed_copy_base = Tree::from_xml(document(&["alpha", "changed"]), limits).unwrap();
+    assert!(matches!(
+        changed_copy_base.apply_copy(&decoded_copy),
+        Err(Error::PatchConflict)
+    ));
+
+    let xml_limited = Limits::new(
+        copied_xml.len() - 1,
+        limits.max_paragraphs(),
+        limits.max_events(),
+        limits.max_depth(),
+        copied_xml.len(),
+        limits.max_durable_bytes(),
+    )
+    .unwrap();
+    let mut xml_limited_tree = Tree::from_xml(source.clone(), xml_limited).unwrap();
+    assert!(matches!(
+        xml_limited_tree.apply_copy(&decoded_copy),
+        Err(Error::Limit {
+            kind: LimitKind::XmlBytes,
+            ..
+        })
+    ));
+    assert_eq!(xml_limited_tree.xml_bytes(), source);
+
+    let output_limited = Limits::new(
+        copied_xml.len(),
+        limits.max_paragraphs(),
+        limits.max_events(),
+        limits.max_depth(),
+        copied_xml.len() - 1,
+        limits.max_durable_bytes(),
+    )
+    .unwrap();
+    let mut output_limited_tree = Tree::from_xml(source.clone(), output_limited).unwrap();
+    assert!(matches!(
+        output_limited_tree.apply_copy(&decoded_copy),
+        Err(Error::Limit {
+            kind: LimitKind::OutputBytes,
+            ..
+        })
+    ));
+    assert_eq!(output_limited_tree.xml_bytes(), source);
+
+    let paragraph_limited = Limits::new(
+        copied_xml.len(),
+        2,
+        limits.max_events(),
+        limits.max_depth(),
+        copied_xml.len(),
+        limits.max_durable_bytes(),
+    )
+    .unwrap();
+    let mut paragraph_limited_tree = Tree::from_xml(source.clone(), paragraph_limited).unwrap();
+    assert!(matches!(
+        paragraph_limited_tree.apply_copy(&decoded_copy),
+        Err(Error::Limit {
+            kind: LimitKind::Paragraphs,
+            ..
+        })
+    ));
+    assert_eq!(paragraph_limited_tree.xml_bytes(), source);
+
+    let before_failed_output = copy_tree.xml_bytes().to_vec();
+    assert!(matches!(
+        copy_tree.copy_plain_paragraph(Position::new(2), Position::new(0)),
+        Err(Error::OutOfBounds { .. })
+    ));
+    assert_eq!(copy_tree.xml_bytes(), before_failed_output);
+    let output_limits = Limits::new(1024, 4, 100, 16, 1, 4096).unwrap();
+    let mut refused_output = Vec::new();
+    assert!(matches!(
+        copy_tree.write_to(&mut refused_output, output_limits),
+        Err(Error::Limit {
+            kind: LimitKind::OutputBytes,
+            ..
+        })
+    ));
+    assert!(refused_output.is_empty());
+    let mut copied_output = Vec::new();
+    copy_tree.write_to(&mut copied_output, limits).unwrap();
+    assert_eq!(copied_output, source);
+
+    let mut removal_tree = Tree::from_xml(source.clone(), limits).unwrap();
+    let removal = removal_tree
+        .remove_plain_paragraph(Position::new(0))
+        .unwrap();
+    assert_eq!(removal.effect_report().removed_paragraphs, 1);
+    let removed_xml = removal_tree.xml_bytes().to_vec();
+    let removal_wire = removal.to_bytes(limits).unwrap();
+    let decoded_removal = RemovalPatch::from_bytes(&removal_wire, limits).unwrap();
+    removal_tree
+        .apply_removal(&decoded_removal.inverse())
+        .unwrap();
+    assert_eq!(removal_tree.xml_bytes(), source);
+
+    let mut reopened_removed = Tree::from_xml(removed_xml.clone(), limits).unwrap();
+    reopened_removed
+        .apply_removal(&decoded_removal.inverse())
+        .unwrap();
+    assert_eq!(reopened_removed.xml_bytes(), source);
+    let mut reopened_removal_source = Tree::from_xml(source.clone(), limits).unwrap();
+    reopened_removal_source
+        .apply_removal(&decoded_removal)
+        .unwrap();
+    assert_eq!(reopened_removal_source.xml_bytes(), removed_xml);
+
+    let mut changed_removal_base = Tree::from_xml(document(&["alpha", "changed"]), limits).unwrap();
+    assert!(matches!(
+        changed_removal_base.apply_removal(&decoded_removal),
+        Err(Error::PatchConflict)
+    ));
 }
 
 fn payload_range(zip: &[u8], name: &str) -> std::ops::Range<usize> {
@@ -120,24 +284,24 @@ fn copies_exact_fragment_at_first_middle_and_last_source_order_slots() {
     for (before, expected) in cases {
         let source = bytes(&fixture(MAIN, document(&["alpha", "beta", "gamma"])));
         let package = open(source);
-        let snapshot = package.plain_paragraph_copy_snapshot().unwrap();
+        let mut edit = package.edit_plain_paragraph_copy().unwrap();
+        let snapshot = edit.projected().unwrap();
         let selected = snapshot
             .xml_bytes()
             .windows(b"<w:p><w:r><w:t>beta</w:t></w:r></w:p>".len())
             .filter(|window| *window == b"<w:p><w:r><w:t>beta</w:t></w:r></w:p>")
             .count();
         assert_eq!(selected, 1);
-        let mut edit = snapshot.edit();
         edit.copy_plain_paragraph(Position::new(1), Position::new(before))
             .unwrap();
-        let commit = edit.commit();
-        assert_eq!(commit.effect_report().copied_paragraphs, 1);
+        let projected = edit.projected().unwrap();
+        let commit = edit.commit().unwrap();
+        assert_eq!(commit.patch().effect_report().copied_paragraphs, 1);
         assert_eq!(
-            commit.effect_report().copied_bytes,
+            commit.patch().effect_report().copied_bytes,
             b"<w:p><w:r><w:t>beta</w:t></w:r></w:p>".len()
         );
-        let projected_copies = commit
-            .projected()
+        let projected_copies = projected
             .xml_bytes()
             .windows(b"<w:p><w:r><w:t>beta</w:t></w:r></w:p>".len())
             .filter(|window| *window == b"<w:p><w:r><w:t>beta</w:t></w:r></w:p>")
@@ -149,7 +313,8 @@ fn copies_exact_fragment_at_first_middle_and_last_source_order_slots() {
 
         let mut output = Vec::new();
         package
-            .publish_plain_paragraph_copy_to_stream(&mut output, &commit)
+            .apply_plain_paragraph_copy(commit.patch())
+            .and_then(|committed| Ok(committed.package().write_to(&mut output)?))
             .unwrap();
         assert_eq!(reopened_texts(output), expected);
     }
@@ -163,10 +328,14 @@ fn publication_raw_copies_unselected_members_and_inverse_restores_exact_artifact
     let mut edit = package.edit_plain_paragraph_copy().unwrap();
     edit.copy_plain_paragraph(Position::new(0), Position::new(2))
         .unwrap();
-    let commit = edit.commit();
+    let commit = edit.commit().unwrap();
     let mut output = Vec::new();
     let publication = package
-        .publish_plain_paragraph_copy_to_stream(&mut output, &commit)
+        .apply_plain_paragraph_copy(commit.patch())
+        .and_then(|committed| {
+            committed.package().write_to(&mut output)?;
+            Ok(committed)
+        })
         .unwrap();
     assert_eq!(
         &output[payload_range(&output, UNUSED)],
@@ -174,18 +343,26 @@ fn publication_raw_copies_unselected_members_and_inverse_restores_exact_artifact
         "unselected physical payload must be raw-identical"
     );
 
-    let inverse_wire = publication.inverse_patch().to_bytes().unwrap();
-    let durable_inverse = Patch::from_bytes(&inverse_wire).unwrap();
+    let inverse_wire = publication
+        .patch()
+        .inverse()
+        .durable()
+        .unwrap()
+        .to_bytes(Limits::default())
+        .unwrap();
+    let durable_inverse = Patch::from_bytes(&inverse_wire, Limits::default()).unwrap();
     let mut durable_restored = Vec::new();
     open(output.clone())
-        .publish_plain_paragraph_copy_patch_to_stream(&mut durable_restored, &durable_inverse)
+        .apply_plain_paragraph_copy(&durable_inverse.into())
+        .and_then(|committed| Ok(committed.package().write_to(&mut durable_restored)?))
         .unwrap();
     assert_eq!(durable_restored, source);
 
     let published = open(output);
     let mut restored = Vec::new();
     published
-        .publish_plain_paragraph_copy_inverse_to_stream(&mut restored, &publication)
+        .apply_plain_paragraph_copy(&publication.patch().inverse())
+        .and_then(|committed| Ok(committed.package().write_to(&mut restored)?))
         .unwrap();
     assert_eq!(restored, source);
 }
@@ -194,43 +371,75 @@ fn publication_raw_copies_unselected_members_and_inverse_restores_exact_artifact
 fn durable_forward_inverse_are_canonical_and_reject_whole_artifact_staleness() {
     let source = bytes(&fixture(MAIN, document(&["a", "b", "c"])));
     let package = open(source.clone());
-    let snapshot = package.plain_paragraph_copy_snapshot().unwrap();
-    let mut edit = snapshot.edit();
+    let mut edit = package.edit_plain_paragraph_copy().unwrap();
     edit.copy_plain_paragraph(Position::new(2), Position::new(1))
         .unwrap();
-    let commit = edit.commit();
-    let wire = commit.patch().to_bytes().unwrap();
-    let live_applied = commit.patch().apply(&snapshot).unwrap();
-    assert_eq!(live_applied.xml_bytes(), commit.projected().xml_bytes());
-    assert_eq!(wire, commit.patch().to_bytes().unwrap());
-    let durable = Patch::from_bytes(&wire).unwrap();
-    assert_eq!(durable.to_bytes().unwrap(), wire);
-    let applied = durable.apply(&snapshot).unwrap();
-    assert_eq!(applied.xml_bytes(), commit.projected().xml_bytes());
-    let mut published = Vec::new();
-    open(source.clone())
-        .publish_plain_paragraph_copy_patch_to_stream(&mut published, &durable)
+    let commit = edit.commit().unwrap();
+    let wire = commit
+        .patch()
+        .durable()
+        .unwrap()
+        .to_bytes(Limits::default())
         .unwrap();
-    assert_eq!(reopened_texts(published), ["a", "c", "b", "c"]);
-    let inverse_wire = durable.inverse().to_bytes().unwrap();
-    let inverse = Patch::from_bytes(&inverse_wire).unwrap();
-    let restored = inverse.apply(&applied).unwrap();
-    assert_eq!(restored.xml_bytes(), snapshot.xml_bytes());
+    let caller_limits = Limits::new(1024, 4, 100, 8, 2048, wire.len() - 1).unwrap();
+    assert!(matches!(
+        commit.patch().durable().unwrap().to_bytes(caller_limits),
+        Err(Error::Limit {
+            kind: LimitKind::DurablePatchBytes,
+            ..
+        })
+    ));
+    assert!(matches!(
+        Patch::from_bytes(&wire, caller_limits),
+        Err(Error::InvalidDurable)
+    ));
+    assert_eq!(
+        wire,
+        commit
+            .patch()
+            .durable()
+            .unwrap()
+            .to_bytes(Limits::default())
+            .unwrap()
+    );
+    let durable = Patch::from_bytes(&wire, Limits::default()).unwrap();
+    assert_eq!(durable.to_bytes(Limits::default()).unwrap(), wire);
+    let mut published = Vec::new();
+    let publication = open(source.clone())
+        .apply_plain_paragraph_copy(&durable.clone().into())
+        .unwrap();
+    publication.package().write_to(&mut published).unwrap();
+    assert_eq!(reopened_texts(published.clone()), ["a", "c", "b", "c"]);
+    let inverse_wire = publication
+        .patch()
+        .inverse()
+        .durable()
+        .unwrap()
+        .to_bytes(Limits::default())
+        .unwrap();
+    let inverse = Patch::from_bytes(&inverse_wire, Limits::default()).unwrap();
+    assert_eq!(inverse.to_bytes(Limits::default()).unwrap(), inverse_wire);
+    let mut restored = Vec::new();
+    open(published)
+        .apply_plain_paragraph_copy(&publication.patch().inverse())
+        .and_then(|committed| Ok(committed.package().write_to(&mut restored)?))
+        .unwrap();
+    assert_eq!(restored, source);
 
     let mut foreign = fixture(MAIN, document(&["a", "b", "c"]));
     foreign
         .get_part_mut(&PackURI::new(format!("/{UNUSED}")).unwrap())
         .unwrap()
         .set_blob(b"different retained member".to_vec());
-    let stale = open(bytes(&foreign))
-        .plain_paragraph_copy_snapshot()
-        .unwrap();
-    assert!(matches!(durable.apply(&stale), Err(Error::StaleSource)));
+    assert!(matches!(
+        open(bytes(&foreign)).apply_plain_paragraph_copy(&durable.into()),
+        Err(Error::PatchConflict)
+    ));
 
     let mut tampered = wire;
     tampered[58..62].copy_from_slice(&0u32.to_le_bytes());
     assert!(matches!(
-        Patch::from_bytes(&tampered),
+        Patch::from_bytes(&tampered, Limits::default()),
         Err(Error::InvalidDurable)
     ));
 }
@@ -239,20 +448,34 @@ fn durable_forward_inverse_are_canonical_and_reject_whole_artifact_staleness() {
 fn empty_edit_is_an_exact_noop_and_stale_inverse_writes_nothing() {
     let source = bytes(&fixture(MAIN, document(&["only"])));
     let package = open(source.clone());
-    let commit = package.edit_plain_paragraph_copy().unwrap().commit();
+    let commit = package
+        .edit_plain_paragraph_copy()
+        .unwrap()
+        .commit()
+        .unwrap();
     assert!(commit.patch().is_noop());
-    assert!(commit.effect_report().is_noop());
+    assert!(commit.patch().effect_report().is_noop());
     let mut output = Vec::new();
     let publication = package
-        .publish_plain_paragraph_copy_to_stream(&mut output, &commit)
+        .apply_plain_paragraph_copy(commit.patch())
+        .and_then(|committed| {
+            committed.package().write_to(&mut output)?;
+            Ok(committed)
+        })
         .unwrap();
     assert_eq!(output, source);
 
     let foreign = open(bytes(&fixture(MAIN, document(&["foreign"]))));
     let mut inverse_output = Vec::new();
+    let result = foreign
+        .apply_plain_paragraph_copy(&publication.patch().inverse())
+        .and_then(|committed| {
+            committed.package().write_to(&mut inverse_output)?;
+            Ok(committed)
+        });
     assert!(matches!(
-        foreign.publish_plain_paragraph_copy_inverse_to_stream(&mut inverse_output, &publication),
-        Err(Error::StaleSource)
+        result,
+        Err(Error::Document(litchi_docx::Error::PatchConflict { .. }))
     ));
     assert!(inverse_output.is_empty());
 }
@@ -261,13 +484,13 @@ fn empty_edit_is_an_exact_noop_and_stale_inverse_writes_nothing() {
 fn positions_operation_count_and_resource_limits_are_failure_atomic() {
     let source = bytes(&fixture(MAIN, document(&["a", "b"])));
     let package = open(source.clone());
-    let snapshot = package.plain_paragraph_copy_snapshot().unwrap();
-    let mut edit = snapshot.edit();
+    let mut edit = package.edit_plain_paragraph_copy().unwrap();
+    let original = edit.projected().unwrap();
     assert!(matches!(
         edit.copy_plain_paragraph(Position::new(2), Position::new(0)),
         Err(Error::OutOfBounds { kind: "source", .. })
     ));
-    assert_eq!(edit.projected().xml_bytes(), snapshot.xml_bytes());
+    assert_eq!(edit.projected().unwrap().xml_bytes(), original.xml_bytes());
     assert!(matches!(
         edit.copy_plain_paragraph(Position::new(0), Position::new(3)),
         Err(Error::OutOfBounds {
@@ -275,52 +498,60 @@ fn positions_operation_count_and_resource_limits_are_failure_atomic() {
             ..
         })
     ));
-    assert_eq!(edit.projected().xml_bytes(), snapshot.xml_bytes());
+    assert_eq!(edit.projected().unwrap().xml_bytes(), original.xml_bytes());
     edit.copy_plain_paragraph(Position::new(0), Position::new(1))
         .unwrap();
-    let once = edit.projected().xml_bytes().to_vec();
+    let once = edit.projected().unwrap().xml_bytes().to_vec();
     assert!(matches!(
         edit.copy_plain_paragraph(Position::new(0), Position::new(1)),
         Err(Error::Limit {
-            resource: "operations",
+            kind: LimitKind::Operations,
             ..
         })
     ));
-    assert_eq!(edit.projected().xml_bytes(), once);
+    assert_eq!(edit.projected().unwrap().xml_bytes(), once);
 
     let paragraph_limited = Limits::new(1024, 1, 100, 8, 2048, 4096).unwrap();
     assert!(matches!(
-        open(source.clone()).plain_paragraph_copy_snapshot_with_limits(paragraph_limited),
+        open(source.clone())
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().paragraph_copy(paragraph_limited)
+            )
+            .edit_plain_paragraph_copy()
+            .and_then(|edit| edit.projected().map(|_| ())),
         Err(Error::Limit {
-            resource: "paragraphs",
+            kind: LimitKind::Paragraphs,
             ..
         })
     ));
     let output_limited = Limits::new(1024, 4, 100, 8, document(&["a", "b"]).len(), 4096).unwrap();
-    let snapshot = open(source)
-        .plain_paragraph_copy_snapshot_with_limits(output_limited)
+    let mut edit = open(source)
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().paragraph_copy(output_limited))
+        .edit_plain_paragraph_copy()
         .unwrap();
-    let mut edit = snapshot.edit();
+    let original = edit.projected().unwrap();
     assert!(matches!(
         edit.copy_plain_paragraph(Position::new(0), Position::new(0)),
         Err(Error::Limit {
-            resource: "output bytes",
+            kind: LimitKind::OutputBytes,
             ..
         })
     ));
-    assert_eq!(edit.projected().xml_bytes(), snapshot.xml_bytes());
+    assert_eq!(edit.projected().unwrap().xml_bytes(), original.xml_bytes());
 
     let durable_limited = Limits::new(1024, 4, 100, 8, 2048, 128).unwrap();
-    let snapshot = open(bytes(&fixture(MAIN, document(&["a"]))))
-        .plain_paragraph_copy_snapshot_with_limits(durable_limited)
+    let mut edit = open(bytes(&fixture(MAIN, document(&["a"]))))
+        .with_semantic_limits(
+            litchi_docx::SemanticLimits::default().paragraph_copy(durable_limited),
+        )
+        .edit_plain_paragraph_copy()
         .unwrap();
-    let mut edit = snapshot.edit();
     edit.copy_plain_paragraph(Position::new(0), Position::new(1))
         .unwrap();
     assert!(matches!(
-        edit.commit().patch().to_bytes(),
+        edit.commit().unwrap().patch().to_bytes(Limits::default()),
         Err(Error::Limit {
-            resource: "durable patch bytes",
+            kind: LimitKind::DurablePatchBytes,
             ..
         })
     ));
@@ -343,7 +574,7 @@ fn relationships_dependencies_signatures_macros_and_paths_are_refused() {
         bytes(&package)
     };
     assert!(matches!(
-        open(external).plain_paragraph_copy_snapshot(),
+        admit_copy(external),
         Err(Error::Refused(Refusal::ExternalRelationship))
     ));
 
@@ -363,7 +594,7 @@ fn relationships_dependencies_signatures_macros_and_paths_are_refused() {
         bytes(&package)
     };
     assert!(matches!(
-        open(custom_xml).plain_paragraph_copy_snapshot(),
+        admit_copy(custom_xml),
         Err(Error::Refused(Refusal::UnsupportedDependency))
     ));
 
@@ -385,7 +616,7 @@ fn relationships_dependencies_signatures_macros_and_paths_are_refused() {
                 false,
             );
         assert!(matches!(
-            open(bytes(&package)).plain_paragraph_copy_snapshot(),
+            admit_copy(bytes(&package)),
             Err(Error::Refused(Refusal::UnsupportedDependency))
         ));
     }
@@ -403,7 +634,7 @@ fn relationships_dependencies_signatures_macros_and_paths_are_refused() {
         bytes(&package)
     };
     assert!(matches!(
-        open(signed).plain_paragraph_copy_snapshot(),
+        admit_copy(signed),
         Err(Error::Refused(Refusal::SignatureInfrastructure))
     ));
 
@@ -414,13 +645,13 @@ fn relationships_dependencies_signatures_macros_and_paths_are_refused() {
         .set_content_type(ct::WML_DOCUMENT_MACRO_MAIN.to_owned())
         .unwrap();
     assert!(matches!(
-        open(bytes(&macro_package)).plain_paragraph_copy_snapshot(),
+        admit_copy(bytes(&macro_package)),
         Err(Error::Refused(Refusal::MacroEnabled))
     ));
 
     let hostile_path = bytes(&fixture("word/sub/document.xml", document(&["plain"])));
     assert!(matches!(
-        open(hostile_path).plain_paragraph_copy_snapshot(),
+        admit_copy(hostile_path),
         Err(Error::Refused(Refusal::MainDocumentShape))
     ));
 }
@@ -464,7 +695,7 @@ fn structured_paragraphs_sections_and_hostile_namespaces_are_refused() {
     ];
     for xml in cases {
         assert!(matches!(
-            open(bytes(&fixture(MAIN, xml.into_bytes()))).plain_paragraph_copy_snapshot(),
+            admit_copy(bytes(&fixture(MAIN, xml.into_bytes()))),
             Err(Error::Refused(
                 Refusal::ComplexDocument | Refusal::ComplexParagraph
             ))
@@ -487,10 +718,11 @@ fn strict_and_ordinary_producer_namespace_declarations_are_supported() {
     let mut edit = package.edit_plain_paragraph_copy().unwrap();
     edit.copy_plain_paragraph(Position::new(0), Position::new(1))
         .unwrap();
-    let commit = edit.commit();
+    let commit = edit.commit().unwrap();
     let mut output = Vec::new();
     package
-        .publish_plain_paragraph_copy_to_stream(&mut output, &commit)
+        .apply_plain_paragraph_copy(commit.patch())
+        .and_then(|committed| Ok(committed.package().write_to(&mut output)?))
         .unwrap();
     assert_eq!(reopened_texts(output), ["strict", "strict"]);
 
@@ -499,7 +731,9 @@ fn strict_and_ordinary_producer_namespace_declarations_are_supported() {
     );
     assert_eq!(
         open(bytes(&fixture(MAIN, ordinary.into_bytes())))
-            .plain_paragraph_copy_snapshot()
+            .edit_plain_paragraph_copy()
+            .unwrap()
+            .projected()
             .unwrap()
             .paragraph_count(),
         1
@@ -510,7 +744,9 @@ fn strict_and_ordinary_producer_namespace_declarations_are_supported() {
     );
     assert_eq!(
         open(bytes(&fixture(MAIN, escaped.into_bytes())))
-            .plain_paragraph_copy_snapshot()
+            .edit_plain_paragraph_copy()
+            .unwrap()
+            .projected()
             .unwrap()
             .paragraph_count(),
         1
@@ -521,11 +757,10 @@ fn strict_and_ordinary_producer_namespace_declarations_are_supported() {
 fn empty_body_and_empty_or_sole_paragraph_slots_are_unambiguous() {
     let empty_body =
         format!(r#"<w:document xmlns:w="{W}"><w:body></w:body></w:document>"#).into_bytes();
-    let snapshot = open(bytes(&fixture(MAIN, empty_body)))
-        .plain_paragraph_copy_snapshot()
+    let mut edit = open(bytes(&fixture(MAIN, empty_body)))
+        .edit_plain_paragraph_copy()
         .unwrap();
-    assert_eq!(snapshot.paragraph_count(), 0);
-    let mut edit = snapshot.edit();
+    assert_eq!(edit.projected().unwrap().paragraph_count(), 0);
     assert!(matches!(
         edit.copy_plain_paragraph(Position::new(0), Position::new(0)),
         Err(Error::OutOfBounds { kind: "source", .. })
@@ -538,9 +773,10 @@ fn empty_body_and_empty_or_sole_paragraph_slots_are_unambiguous() {
         let mut edit = package.edit_plain_paragraph_copy().unwrap();
         edit.copy_plain_paragraph(Position::new(0), Position::new(before))
             .unwrap();
-        let commit = edit.commit();
-        assert_eq!(commit.projected().paragraph_count(), 2);
-        assert_eq!(commit.effect_report().copied_bytes, b"<w:p/>".len());
+        let projected = edit.projected().unwrap();
+        let commit = edit.commit().unwrap();
+        assert_eq!(projected.paragraph_count(), 2);
+        assert_eq!(commit.patch().effect_report().copied_bytes, b"<w:p/>".len());
     }
 }
 
@@ -563,7 +799,7 @@ fn enforced_protection_is_refused() {
             .unwrap()
             .relate_to("settings.xml", rt::SETTINGS);
         assert!(matches!(
-            open(bytes(&package)).plain_paragraph_copy_snapshot(),
+            admit_copy(bytes(&package)),
             Err(Error::Refused(Refusal::Protection))
         ));
     }
@@ -609,12 +845,16 @@ fn changed_source_version_is_rejected_before_publication_output() {
     let mut edit = package.edit_plain_paragraph_copy().unwrap();
     edit.copy_plain_paragraph(Position::new(0), Position::new(1))
         .unwrap();
-    let commit = edit.commit();
+    let commit = edit.commit().unwrap();
     source.revision.fetch_add(1, Ordering::SeqCst);
     let mut output = Vec::new();
     assert!(
         package
-            .publish_plain_paragraph_copy_to_stream(&mut output, &commit)
+            .apply_plain_paragraph_copy(commit.patch())
+            .and_then(|committed| {
+                committed.package().write_to(&mut output)?;
+                Ok(committed)
+            })
             .is_err()
     );
     assert!(output.is_empty());
@@ -676,13 +916,14 @@ fn partial_sinks_complete_and_write_zero_fails_without_false_progress() {
     let mut edit = package.edit_plain_paragraph_copy().unwrap();
     edit.copy_plain_paragraph(Position::new(0), Position::new(2))
         .unwrap();
-    let commit = edit.commit();
+    let commit = edit.commit().unwrap();
     let mut partial = PartialSink {
         bytes: Vec::new(),
         chunk: 7,
     };
     package
-        .publish_plain_paragraph_copy_to_stream(&mut partial, &commit)
+        .apply_plain_paragraph_copy(commit.patch())
+        .and_then(|committed| Ok(committed.package().write_to(&mut partial)?))
         .unwrap();
     assert_eq!(reopened_texts(partial.bytes), ["a", "b", "a"]);
 
@@ -690,8 +931,14 @@ fn partial_sinks_complete_and_write_zero_fails_without_false_progress() {
     let mut edit = package.edit_plain_paragraph_copy().unwrap();
     edit.copy_plain_paragraph(Position::new(0), Position::new(2))
         .unwrap();
-    let commit = edit.commit();
-    let Err(error) = package.publish_plain_paragraph_copy_to_stream(ZeroSink, &commit) else {
+    let commit = edit.commit().unwrap();
+    let Err(error) = package
+        .apply_plain_paragraph_copy(commit.patch())
+        .and_then(|committed| {
+            committed.package().write_to(ZeroSink)?;
+            Ok(committed)
+        })
+    else {
         panic!("write-zero sink must fail");
     };
     assert!(
@@ -707,13 +954,18 @@ fn partial_sinks_complete_and_write_zero_fails_without_false_progress() {
     let mut edit = package.edit_plain_paragraph_copy().unwrap();
     edit.copy_plain_paragraph(Position::new(0), Position::new(2))
         .unwrap();
-    let commit = edit.commit();
+    let commit = edit.commit().unwrap();
     let mut failing = FailingSink {
         accepted: 0,
         limit: 128,
     };
     assert!(matches!(
-        package.publish_plain_paragraph_copy_to_stream(&mut failing, &commit),
+        package
+            .apply_plain_paragraph_copy(commit.patch())
+            .and_then(|committed| {
+                committed.package().write_to(&mut failing)?;
+                Ok(committed)
+            }),
         Err(Error::Document(litchi_docx::Error::Opc(
             litchi_opc::OpcError::IncompleteOutput { written: 128, .. }
         )))

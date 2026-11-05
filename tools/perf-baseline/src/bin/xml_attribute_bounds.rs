@@ -25,8 +25,8 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use litchi_ooxml_common::mce::{
-    Capabilities, Error as MceError, Limits as MceLimits, SemanticEvent, StreamError, StreamLimits,
-    process_markup_compatibility, process_markup_compatibility_stream,
+    Capabilities, Error as MceError, LimitKind, Limits as MceLimits, SemanticEvent, StreamError,
+    StreamLimits, process_markup_compatibility, process_markup_compatibility_stream,
     process_markup_compatibility_stream_with_observers,
 };
 use litchi_opc::{BlobPart, PackURI};
@@ -268,7 +268,7 @@ const BENIGN_STYLES: &str =
 
 fn fixture_member(package: &str, member: &str) -> Result<Vec<u8>, Box<dyn Error>> {
     let bytes = std::fs::read(package)?;
-    let archive = ArchiveReader::new(&bytes)?;
+    let archive = ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default())?;
     Ok(archive.read(member)?)
 }
 
@@ -583,9 +583,17 @@ fn mce_error_value(error: &MceError) -> Value {
         MceError::MustUnderstand(message) => {
             json!({"kind": "must_understand", "message": message})
         },
-        MceError::LimitExceeded(message) => {
-            json!({"kind": "limit_exceeded", "message": message})
-        },
+        MceError::LimitExceeded {
+            kind,
+            observed,
+            maximum,
+        } => json!({
+            "kind": "limit_exceeded",
+            "limit_kind": format!("{kind:?}"),
+            "observed": observed,
+            "maximum": maximum,
+            "message": error.to_string(),
+        }),
         MceError::Xml(message) => json!({"kind": "xml", "message": message}),
         MceError::Allocation { resource, source } => json!({
             "kind": "allocation",
@@ -1262,35 +1270,22 @@ fn qualification_controls() -> (Vec<Value>, usize) {
             },
             _ => false,
         };
-        let expected_codec_error_message = if expectation == "limit" {
-            Some("attributes per element")
+        let expected_limit_kind = if expectation == "limit" {
+            Some(Value::String(format!("{:?}", LimitKind::Attributes)))
         } else {
             None
         };
-        let expected_stream_error_message = if expectation == "limit" {
-            Some(if configured_limit == 4096 {
-                "stream attributes per event"
-            } else {
-                "attributes per element"
-            })
-        } else {
-            None
-        };
-        let codec_error_message = codec
-            .get("error")
-            .and_then(|error| error.get("message"))
-            .and_then(Value::as_str);
-        let stream_error_message = stream
+        let codec_limit_kind = codec.get("error").and_then(|error| error.get("limit_kind"));
+        let stream_limit_kind = stream
             .get("error")
             .and_then(|error| error.get("error"))
-            .and_then(|error| error.get("message"))
-            .and_then(Value::as_str);
+            .and_then(|error| error.get("limit_kind"));
         let expectation_met = codec_expected
             && stream_expected
             && codec.get("qualification_complete") == Some(&Value::Bool(true))
             && stream.get("qualification_complete") == Some(&Value::Bool(true))
-            && codec_error_message == expected_codec_error_message
-            && stream_error_message == expected_stream_error_message;
+            && codec_limit_kind == expected_limit_kind.as_ref()
+            && stream_limit_kind == expected_limit_kind.as_ref();
         if !expectation_met {
             failures += 1;
         }
@@ -1474,13 +1469,14 @@ fn differential(args: &[String]) -> Result<(), Box<dyn Error>> {
             );
             continue;
         }
-        let archive = match ArchiveReader::new(&bytes) {
-            Ok(archive) => archive,
-            Err(error) => {
-                input.record_failure("package_open", &path, None, error);
-                continue;
-            },
-        };
+        let archive =
+            match ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default()) {
+                Ok(archive) => archive,
+                Err(error) => {
+                    input.record_failure("package_open", &path, None, error);
+                    continue;
+                },
+            };
         let names: Vec<String> = archive.file_names().map(str::to_owned).collect();
         let mut package_input = PackageInput {
             path: path.display().to_string(),
@@ -1689,7 +1685,7 @@ fn collect_packages(
             },
         };
         if bytes.starts_with(b"PK\x03\x04") {
-            match ArchiveReader::new(&bytes) {
+            match ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default()) {
                 Ok(archive) if archive.contains("[Content_Types].xml") => {
                     let identity = match std::fs::canonicalize(root) {
                         Ok(identity) => identity,

@@ -83,11 +83,17 @@ pub struct ParagraphProperties {
     pub legacy_border_position: Option<LegacyBorderPosition>,
     /// Background shading
     pub shading: Option<Shading>,
-    /// Paragraph is inside a table
+    /// Paragraph is inside a table (`sprmPFInTable`)
     pub in_table: bool,
     /// Paragraph is a table row end marker
     pub is_table_row_end: bool,
-    /// Table nesting level (itap: 0 = not in table, 1+ = nested level)
+    /// Table depth as stored by `sprmPItap` and `sprmPDtap`, 0 when neither
+    /// is present.
+    ///
+    /// This is the stored value, not the paragraph's table depth: Word 97
+    /// marks every table paragraph with `sprmPFInTable` alone, so its table
+    /// paragraphs store 0 here. Use [`Self::table_depth`] for the depth that
+    /// groups paragraphs into tables.
     pub table_nesting_level: i32,
     /// Inner table cell flag
     pub inner_table_cell: bool,
@@ -717,6 +723,25 @@ pub enum BorderStyle {
 }
 
 impl ParagraphProperties {
+    /// The paragraph's table depth: 0 outside every table, 1 in a top-level
+    /// table, 2 or more in a nested table.
+    ///
+    /// [MS-DOC] §2.4.3 derives the depth from `sprmPFInTable`, `sprmPItap`
+    /// and `sprmPDtap` applied as direct paragraph properties, and says a
+    /// paragraph that is not in a table has depth 0. So a paragraph without
+    /// `sprmPFInTable` has depth 0 whatever depth it stores (the flag "MUST
+    /// be 1 any time the table depth is greater than zero"), and a paragraph
+    /// with it has the stored depth ([`Self::table_nesting_level`]) or 1 when
+    /// it stores none. The second case is how Word 97, which predates nested
+    /// tables, writes every table: `sprmPFInTable` without `sprmPItap`.
+    #[must_use]
+    pub fn table_depth(&self) -> u32 {
+        if !self.in_table {
+            return 0;
+        }
+        u32::try_from(self.table_nesting_level).unwrap_or(0).max(1)
+    }
+
     /// Check if any formatting is applied.
     #[must_use]
     pub fn has_formatting(&self) -> bool {

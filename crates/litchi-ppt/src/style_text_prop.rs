@@ -242,8 +242,120 @@ impl StyleTextPropAtom {
         data
     }
 
+    /// Apply `apply` to the character formatting of the UTF-16 units
+    /// `start..end` of a body of `text_length` units (record 0323).
+    ///
+    /// `record_bytes` is the body's complete `StyleTextPropAtom`, or `None`
+    /// for a body without one, which gains a default paragraph run and
+    /// character runs. Character runs are split at `start` and `end`; the
+    /// paragraph runs keep their exact bytes. `None` when no run changes.
+    pub(crate) fn rewrite_character_format(
+        record_bytes: Option<&[u8]>,
+        text_length: usize,
+        start: usize,
+        end: usize,
+        apply: impl Fn(&TextCFException) -> TextCFException,
+    ) -> Result<Option<Vec<u8>>> {
+        let coverage = text_length
+            .checked_add(1)
+            .and_then(|length| u32::try_from(length).ok())
+            .ok_or_else(|| corrupted("StyleTextPropAtom text length exceeds u32"))?;
+        let (start, end) = (
+            u32::try_from(start).map_err(|_err| corrupted("run start exceeds u32"))?,
+            u32::try_from(end).map_err(|_err| corrupted("run end exceeds u32"))?,
+        );
+        if start >= end || end > coverage {
+            return Err(corrupted("run range is outside the text body"));
+        }
+        let (header, paragraph_bytes, runs) = match record_bytes {
+            Some(bytes) => {
+                let (record, consumed) = Record::parse_strict(bytes, 0)?;
+                if consumed != bytes.len() {
+                    return Err(corrupted("StyleTextPropAtom has trailing record bytes"));
+                }
+                let parsed = Self::parse_record(&record, text_length)?;
+                let paragraph = parsed
+                    .paragraph_runs
+                    .iter()
+                    .flat_map(TextPFRun::to_payload)
+                    .collect::<Vec<_>>();
+                let character = parsed
+                    .character_runs
+                    .iter()
+                    .flat_map(TextCFRun::to_payload)
+                    .collect::<Vec<_>>();
+                // The raw record stays authoritative: refuse a payload the
+                // typed runs would not reproduce byte for byte.
+                if [paragraph.as_slice(), character.as_slice()].concat() != record.data.as_ref() {
+                    return Ok(None);
+                }
+                (bytes[..4].to_vec(), paragraph, parsed.character_runs)
+            },
+            None => {
+                let mut header = Vec::with_capacity(4);
+                header.extend_from_slice(&0u16.to_le_bytes());
+                header.extend_from_slice(&STYLE_TEXT_PROP_TYPE.to_le_bytes());
+                let mut paragraph = Vec::with_capacity(10);
+                paragraph.extend_from_slice(&coverage.to_le_bytes());
+                paragraph.extend_from_slice(&0u16.to_le_bytes());
+                paragraph.extend_from_slice(&0u32.to_le_bytes());
+                (
+                    header,
+                    paragraph,
+                    vec![TextCFRun {
+                        count: coverage,
+                        character: TextCFException::default(),
+                    }],
+                )
+            },
+        };
+        let mut split = Vec::with_capacity(runs.len() + 2);
+        let mut offset = 0u32;
+        let mut changed = record_bytes.is_none();
+        for run in runs {
+            let run_end = offset + run.count;
+            let mut cuts = vec![offset];
+            for cut in [start, end] {
+                if cut > offset && cut < run_end {
+                    cuts.push(cut);
+                }
+            }
+            cuts.push(run_end);
+            for window in cuts.windows(2) {
+                let (piece_start, piece_end) = (window[0], window[1]);
+                let inside = piece_start >= start && piece_end <= end;
+                let character = if inside {
+                    let applied = apply(&run.character);
+                    changed |= applied != run.character;
+                    applied
+                } else {
+                    run.character.clone()
+                };
+                split.push(TextCFRun {
+                    count: piece_end - piece_start,
+                    character,
+                });
+            }
+            offset = run_end;
+        }
+        if !changed {
+            return Ok(None);
+        }
+        let mut payload = paragraph_bytes;
+        for run in &split {
+            payload.extend_from_slice(&run.to_payload());
+        }
+        let length = u32::try_from(payload.len())
+            .map_err(|_err| corrupted("StyleTextPropAtom exceeds u32"))?;
+        let mut data = header;
+        data.extend_from_slice(&length.to_le_bytes());
+        data.extend_from_slice(&payload);
+        Ok(Some(data))
+    }
+
     /// Rewrites only the two coverage counts of a style atom that has one
-    /// paragraph run and one character run.
+    /// paragraph run and one character run (optionally followed by a
+    /// one-character run for the paragraph mark, which stays exact).
     ///
     /// The raw record remains authoritative: exception bytes, reserved bits,
     /// and header spelling are copied exactly. `None` means that distributing
@@ -259,17 +371,28 @@ impl StyleTextPropAtom {
             return Err(corrupted("StyleTextPropAtom has trailing record bytes"));
         }
         let parsed = Self::parse_record(&record, old_text_length)?;
-        let ([paragraph], [character]) = (
+        let old_coverage = u32::try_from(old_text_length)
+            .ok()
+            .and_then(|length| length.checked_add(1))
+            .ok_or_else(|| corrupted("StyleTextPropAtom old text length exceeds u32"))?;
+        // One character run over the text and its paragraph mark, or one run
+        // over the text followed by a one-character run for the mark, which
+        // `PowerPoint` writes when the mark carries other character
+        // properties. The first run is resized; the mark run stays exact.
+        let ([paragraph], character) = (
             parsed.paragraph_runs.as_slice(),
             parsed.character_runs.as_slice(),
         ) else {
             return Ok(None);
         };
-        let old_coverage = u32::try_from(old_text_length)
-            .ok()
-            .and_then(|length| length.checked_add(1))
-            .ok_or_else(|| corrupted("StyleTextPropAtom old text length exceeds u32"))?;
-        if paragraph.count != old_coverage || character.count != old_coverage {
+        let (character, mark) = match character {
+            [character] => (character, 1),
+            [character, mark] if mark.count == 1 && character.count == old_coverage - 1 => {
+                (character, 0)
+            },
+            _ => return Ok(None),
+        };
+        if paragraph.count != old_coverage || character.count + 1 - mark != old_coverage {
             return Err(corrupted(
                 "StyleTextPropAtom single runs do not cover the old text",
             ));
@@ -278,6 +401,10 @@ impl StyleTextPropAtom {
             .ok()
             .and_then(|length| length.checked_add(1))
             .ok_or_else(|| corrupted("StyleTextPropAtom new text length exceeds u32"))?;
+        let new_character_coverage = new_coverage - 1 + mark;
+        if new_character_coverage == 0 {
+            return Ok(None);
+        }
         let character_count_offset = 8usize
             .checked_add(paragraph.to_payload().len())
             .ok_or_else(|| corrupted("StyleTextPropAtom run offset overflows"))?;
@@ -291,7 +418,7 @@ impl StyleTextPropAtom {
         let mut rewritten = record_bytes.to_vec();
         rewritten[8..12].copy_from_slice(&new_coverage.to_le_bytes());
         rewritten[character_count_offset..character_count_end]
-            .copy_from_slice(&new_coverage.to_le_bytes());
+            .copy_from_slice(&new_character_coverage.to_le_bytes());
         Ok(Some(rewritten))
     }
 }
@@ -441,6 +568,32 @@ mod tests {
         expected[8..12].copy_from_slice(&10u32.to_le_bytes());
         expected[18..22].copy_from_slice(&10u32.to_le_bytes());
         assert_eq!(resized, expected);
+    }
+
+    #[test]
+    fn mark_run_stays_exact_when_the_text_run_is_resized() {
+        let mut payload = Vec::new();
+        payload.extend_from_slice(&4u32.to_le_bytes());
+        payload.extend_from_slice(&0u16.to_le_bytes());
+        payload.extend_from_slice(&0u32.to_le_bytes());
+        payload.extend_from_slice(&3u32.to_le_bytes());
+        payload.extend_from_slice(&0u32.to_le_bytes());
+        payload.extend_from_slice(&1u32.to_le_bytes());
+        payload.extend_from_slice(&0u32.to_le_bytes());
+        let source = raw_style_record(&payload);
+        let resized = StyleTextPropAtom::resize_single_run_record(&source, 3, 9)
+            .unwrap()
+            .unwrap();
+        let mut expected = source.clone();
+        expected[8..12].copy_from_slice(&10u32.to_le_bytes());
+        expected[18..22].copy_from_slice(&9u32.to_le_bytes());
+        assert_eq!(resized, expected);
+        // An empty text would leave the text run empty.
+        assert!(
+            StyleTextPropAtom::resize_single_run_record(&source, 3, 0)
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[test]

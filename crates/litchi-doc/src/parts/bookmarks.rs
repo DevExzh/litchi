@@ -17,7 +17,7 @@ impl BookmarksTable {
     /// Parse `SttbfBkmk`, `PlcfBkf`, and `PlcfBkl`.
     ///
     /// Word-compatible per-bookmark repairs are applied but their record is
-    /// discarded; use [`Self::parse_recording`] to enumerate them.
+    /// discarded by this convenience parser.
     pub fn parse(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<Self> {
         Self::parse_recording(fib, table_stream).map(|(table, _)| table)
     }

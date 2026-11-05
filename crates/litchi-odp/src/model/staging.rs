@@ -376,7 +376,8 @@ mod tests {
             "tdf169979.odp",
         ] {
             let path = root.join(name);
-            let presentation = crate::Presentation::open(&path)
+            let presentation = crate::Package::open(&path)
+                .and_then(|package| package.presentation())
                 .unwrap_or_else(|error| panic!("{name}: opening native fixture: {error}"));
             let staged = presentation
                 .staging()

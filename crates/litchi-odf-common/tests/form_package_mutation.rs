@@ -17,7 +17,7 @@ const CONTENT: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-
 
 fn package() -> Vec<u8> {
     let content = CONTENT.replace("LISTENER", LISTENER);
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(constants::ODF_TEXT).unwrap();
     writer
         .add_file(constants::ODF_CONTENT, content.as_bytes())

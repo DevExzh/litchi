@@ -4,66 +4,29 @@ use std::sync::Arc;
 
 use crate::{Error, Result, chart};
 
-use super::Snapshot;
+use super::Package;
 
-/// Published result of a successful Graph package transaction.
-#[derive(Debug, Clone)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-    changed: bool,
-}
+/// A published standalone Graph package edit: the new package, its
+/// source-checked patch and diagnostics.
+pub type Commit = litchi_core::edit::Commit<Package, Patch>;
 
-impl Commit {
-    pub(super) fn new(snapshot: Snapshot, patch: Patch, changed: bool) -> Self {
-        Self {
-            snapshot,
-            patch,
-            changed,
-        }
-    }
-
-    /// Whether the complete compound-file artifact differs from its source.
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-
-    /// Borrow the validated post-edit package snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Borrow the source-checked reversible package patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consume the commit into its exact output artifact bytes.
-    #[must_use]
-    pub fn into_bytes(self) -> Vec<u8> {
-        self.snapshot.into_bytes()
-    }
-
-    /// Consume the commit into its output snapshot and reversible patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
-    }
-}
+/// Content-free diagnostics of one package commit.
+pub use litchi_core::edit::Diagnostics;
 
 /// A reversible, source-bound whole-package patch.
 #[derive(Debug, Clone)]
 pub struct Patch {
-    source: Arc<[u8]>,
-    replacement: Arc<[u8]>,
+    source: Arc<Vec<u8>>,
+    replacement: Arc<Vec<u8>>,
     chart: chart::Patch,
 }
 
 impl Patch {
-    pub(super) fn new(source: Arc<[u8]>, replacement: Arc<[u8]>, chart: chart::Patch) -> Self {
+    pub(super) fn new(
+        source: Arc<Vec<u8>>,
+        replacement: Arc<Vec<u8>>,
+        chart: chart::Patch,
+    ) -> Self {
         Self {
             source,
             replacement,
@@ -91,8 +54,9 @@ impl Patch {
 
     /// Whether the typed package edit was a semantic no-op.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.source.as_ref() == self.replacement.as_ref() && self.chart.is_empty()
+    pub fn is_noop(&self) -> bool {
+        (Arc::ptr_eq(&self.source, &self.replacement) || self.source == self.replacement)
+            && self.chart.is_noop()
     }
 
     /// Returns the source-checked inverse patch.
@@ -105,25 +69,20 @@ impl Patch {
         }
     }
 
-    /// Applies this patch only to the exact source snapshot it captured.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
-        if source.bytes.as_ref() != self.source.as_ref() {
-            return Err(Error::UnsupportedMutation {
+    pub(super) fn apply_to(&self, source: &Package) -> Result<Commit> {
+        if !Arc::ptr_eq(source.bytes.shared(), &self.source)
+            && **source.bytes.shared() != *self.source
+        {
+            return Err(Error::PatchConflict {
                 operation: "package-patch",
-                reason: "patch source package does not match the target snapshot",
+                reason: "patch source package does not match the target package",
             });
         }
-        Snapshot::from_bytes_with_limits(self.replacement.to_vec(), source.limits())
-    }
-
-    /// Reverts this patch only from its exact replacement snapshot.
-    pub fn revert(&self, replacement: &Snapshot) -> Result<Snapshot> {
-        if replacement.bytes.as_ref() != self.replacement.as_ref() {
-            return Err(Error::UnsupportedMutation {
-                operation: "package-patch",
-                reason: "patch replacement package does not match the target snapshot",
-            });
-        }
-        Snapshot::from_bytes_with_limits(self.source.to_vec(), replacement.limits())
+        let package = Package::from_shared(Arc::clone(&self.replacement), source.limits)?;
+        Ok(Commit::new(
+            package,
+            self.clone(),
+            Diagnostics::new(!self.is_noop()),
+        ))
     }
 }

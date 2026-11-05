@@ -6,16 +6,16 @@
 
 //! Workbook-writer serialization and round-trip tests.
 
-use super::super::WorkbookWriter;
-use crate::raw::{Writer, kind};
-use crate::writer::MutableWorksheet;
+use super::super::Builder;
+use crate::raw::{Encoder, kind};
+use crate::writer::Worksheet;
 use litchi_opc::constants::relationship_type as rel;
 use litchi_opc::{OpcPackage, PackURI};
 use std::io::Cursor;
 
 #[test]
 fn pivot_chart_round_trips_with_lossless_view_and_cache_graph() {
-    use crate::chart::{Anchor, Chart};
+    use crate::builder::chart::{Anchor, Chart};
 
     let mut begin_view = vec![0u8; 32];
     begin_view[28..32].copy_from_slice(&1u32.to_le_bytes());
@@ -26,7 +26,7 @@ fn pivot_chart_round_trips_with_lossless_view_and_cache_graph() {
     }
     let mut view_bytes = Vec::new();
     {
-        let mut writer = Writer::new(&mut view_bytes);
+        let mut writer = Encoder::new(&mut view_bytes, crate::raw::Limits::DEFAULT);
         writer
             .write_record(kind::BEGIN_SX_VIEW, &begin_view)
             .unwrap();
@@ -36,7 +36,8 @@ fn pivot_chart_round_trips_with_lossless_view_and_cache_graph() {
         writer.write_record(kind::END_SX_LOCATION, &[]).unwrap();
         writer.write_record(kind::END_SX_VIEW, &[]).unwrap();
     }
-    let view = crate::pivot_view::Part::from_bytes(view_bytes.clone()).unwrap();
+    let view = crate::pivot_view::Part::from_bytes(view_bytes.clone(), crate::raw::Limits::DEFAULT)
+        .unwrap();
 
     let chart = Chart::line_chart(
         "Revenue",
@@ -47,11 +48,11 @@ fn pivot_chart_round_trips_with_lossless_view_and_cache_graph() {
     .unwrap()
     .into_pivot_chart(view_name)
     .unwrap();
-    let mut sheet = MutableWorksheet::new("Pivot Host");
+    let mut sheet = Worksheet::new("Pivot Host");
     sheet.add_pivot_table_view(view).unwrap();
     sheet.add_chart(chart).unwrap();
 
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     let cache_id = workbook
         .add_pivot_cache(&crate::package::pivot::PivotCacheDefinition::default())
         .unwrap();
@@ -59,9 +60,9 @@ fn pivot_chart_round_trips_with_lossless_view_and_cache_graph() {
     workbook.add_worksheet(sheet);
 
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook.build().unwrap().write_to(&mut output).unwrap();
     let bytes = output.into_inner();
-    let package = OpcPackage::from_bytes(&bytes).unwrap();
+    let package = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     let sheet_part = package
         .get_part(&PackURI::new("/xl/worksheets/sheet1.bin").unwrap())
         .unwrap();
@@ -101,7 +102,7 @@ fn pivot_chart_round_trips_with_lossless_view_and_cache_graph() {
 
 #[test]
 fn pivot_chart_refuses_a_missing_view_binding() {
-    use crate::chart::{Anchor, Chart};
+    use crate::builder::chart::{Anchor, Chart};
 
     let chart = Chart::line_chart(
         "Revenue",
@@ -112,13 +113,13 @@ fn pivot_chart_refuses_a_missing_view_binding() {
     .unwrap()
     .into_pivot_chart("MissingPivot")
     .unwrap();
-    let mut sheet = MutableWorksheet::new("Host");
+    let mut sheet = Worksheet::new("Host");
     sheet.add_chart(chart).unwrap();
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     workbook.add_worksheet(sheet);
 
     let error = workbook
-        .save(Cursor::new(Vec::new()))
+        .build()
         .expect_err("missing PivotTable binding must fail");
-    assert!(error.to_string().contains("missing pivot table"));
+    assert!(error.to_string().contains("missing pivot table"), "{error}");
 }

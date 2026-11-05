@@ -1,0 +1,841 @@
+{
+  "format": "pages",
+  "state": "open",
+  "verbs": {
+    "get": {
+      "supported": true
+    },
+    "find": {
+      "supported": true
+    },
+    "query": {
+      "supported": true
+    },
+    "view": {
+      "supported": true
+    },
+    "evaluate": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "none: import and evaluation are worksheet operations",
+      "reason": "this format has no worksheets"
+    },
+    "set": {
+      "supported": true
+    },
+    "add": {
+      "supported": true
+    },
+    "remove": {
+      "supported": true
+    },
+    "move": {
+      "supported": true
+    },
+    "swap": {
+      "supported": true
+    },
+    "edit": {
+      "supported": true
+    },
+    "batch": {
+      "supported": true
+    },
+    "import": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "none: import and evaluation are worksheet operations",
+      "reason": "this format has no worksheets"
+    },
+    "merge": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "template merge for the ODF object formats and iWork (record 0295)",
+      "reason": "template merge fills word-processing, presentation and spreadsheet templates"
+    },
+    "replace": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0295 follow-up: a find adapter over the format's text edits",
+      "reason": "find/replace is not integrated for this format"
+    },
+    "refresh": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0295 follow-up: field refresh for PPT, RTF and the ODF object formats",
+      "reason": "this format has no field refresh adapter"
+    },
+    "save": {
+      "supported": true
+    },
+    "create": {
+      "supported": true
+    },
+    "dump": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0336 follow-up: dump plans for the remaining formats",
+      "reason": "this format's write verbs cannot yet rebuild its node tree on a created document"
+    },
+    "raw": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0336: package parts exist in OOXML and packaged ODF only",
+      "reason": "this format has no package parts"
+    },
+    "validate": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0336 follow-up: an iWork package validator from the iWork owners",
+      "reason": "iWork packages are validated by their owners on open; no report-producing validator exists"
+    },
+    "add-part": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0336: package parts exist in OOXML and packaged ODF only",
+      "reason": "this format has no package parts"
+    },
+    "raw-set": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0336: package parts exist in OOXML and packaged ODF only",
+      "reason": "this format has no package parts"
+    }
+  },
+  "views": {
+    "text": {
+      "supported": true
+    },
+    "annotated": {
+      "supported": true
+    },
+    "outline": {
+      "supported": true
+    },
+    "stats": {
+      "supported": true
+    },
+    "issues": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    "forms": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    "html": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "svg": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "screenshot": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "pdf": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    }
+  },
+  "elements": [
+    {
+      "format": "pages",
+      "element": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/"
+        ]
+      },
+      "children": [
+        {
+          "element": "body",
+          "pathSegment": "body"
+        },
+        {
+          "element": "section",
+          "pathSegment": "section"
+        },
+        {
+          "element": "footnotes",
+          "pathSegment": "footnotes"
+        }
+      ],
+      "properties": {
+        "sectionCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "paragraphCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "tableCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      }
+    },
+    {
+      "format": "pages",
+      "element": "body",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/body"
+        ]
+      },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "p"
+        },
+        {
+          "element": "table",
+          "pathSegment": "tbl"
+        },
+        {
+          "element": "chart",
+          "pathSegment": "chart"
+        }
+      ],
+      "properties": {
+        "paragraphCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "pages",
+      "element": "paragraph",
+      "parent": "body",
+      "elementAliases": [
+        "p"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]"
+        ]
+      },
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "section": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "objects": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "font.bold": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.italic": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.underline": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.strike": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.size": {
+          "type": "font-size",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.name": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.color": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "pages",
+      "element": "section",
+      "parent": "document",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/section[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "header",
+          "pathSegment": "header"
+        },
+        {
+          "element": "footer",
+          "pathSegment": "footer"
+        }
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "paragraphCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "pages",
+      "element": "table",
+      "parent": "body",
+      "elementAliases": [
+        "tbl"
+      ],
+      "operations": {
+        "add": true,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/tbl[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "row",
+          "pathSegment": "tr"
+        }
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "rows": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "columns": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "data": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "pages",
+      "element": "row",
+      "parent": "table",
+      "elementAliases": [
+        "tr"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/body/tbl[N]/tr[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "cell",
+          "pathSegment": "tc"
+        }
+      ],
+      "properties": {
+        "cellCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "pages",
+      "element": "cell",
+      "parent": "row",
+      "elementAliases": [
+        "tc"
+      ],
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/body/tbl[N]/tr[N]/tc[N]"
+        ]
+      },
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "comment": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "type": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "value": {
+          "type": "scalar",
+          "add": false,
+          "set": true,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "pages",
+      "element": "header",
+      "parent": "section",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/section[N]/header[N]"
+        ]
+      },
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "template": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "slot": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "pages",
+      "element": "footer",
+      "parent": "section",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/section[N]/footer[N]"
+        ]
+      },
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "template": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "slot": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "pages",
+      "element": "footnotes",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/footnotes"
+        ]
+      },
+      "children": [
+        {
+          "element": "footnote",
+          "pathSegment": "footnote"
+        }
+      ],
+      "properties": {
+        "count": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "pages",
+      "element": "footnote",
+      "parent": "footnotes",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/footnotes/footnote[N]"
+        ]
+      },
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "mark": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "pages",
+      "element": "chart",
+      "parent": "body",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/body/chart[N]"
+        ]
+      },
+      "properties": {
+        "font.size": {
+          "type": "font-size",
+          "add": false,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    }
+  ],
+  "gaps": [
+    {
+      "subject": "element",
+      "element": "r",
+      "code": "unsupported_capability",
+      "followUp": "record 0309 follow-up: Pages run elements",
+      "reason": "Pages body text has no run elements in the tree yet; character properties are written on a whole paragraph (`font.*` on `p`) through the leaf's section::text_style family, and Package::section_text_runs reads the runs"
+    },
+    {
+      "subject": "operation",
+      "verb": "get",
+      "element": "metadata",
+      "context": "path-read",
+      "code": "unsupported_capability",
+      "followUp": "record 0299 Pages metadata node",
+      "reason": "`set(\"/metadata\", ..)` writes the document properties through the leaf metadata family; the path is set-only, and reads go through File::metadata()"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "tc",
+      "context": "cells in a formula graph",
+      "code": "unsupported_capability",
+      "followUp": "record 0309 follow-ups",
+      "reason": "body-table cells take text, numbers, booleans and clears through table::values; a formula cell, or one a formula or chart reads, is refused so no calculation cache goes stale"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "tbl",
+      "context": "a document without a body table",
+      "code": "unsupported_capability",
+      "followUp": "record 0329 follow-up: a built-in table template",
+      "reason": "a new body table copies the structure (styles, header counts, storage layout) of the document's first body table; a document without one has none to copy"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "p",
+      "context": "a paragraph that anchors a chart, image or footnote",
+      "code": "unsupported_capability",
+      "followUp": "record 0301 follow-up: delete those anchored objects with their paragraph",
+      "reason": "a paragraph whose anchors are all body tables is removed with its tables (record 0301); removing one that anchors a chart, image or footnote, or moving any anchored paragraph, would delete or move an object the leaf has no transaction for here"
+    },
+    {
+      "subject": "operation",
+      "verb": "create",
+      "element": "document",
+      "context": "a document with a fresh identity",
+      "code": "unsupported_capability",
+      "followUp": "litchi_pages::builder::Builder with Identity::generate",
+      "reason": "`create` returns the deterministic minimal Pages document (`Package::new`); a fresh document identity is an explicit leaf builder input"
+    },
+    {
+      "subject": "view",
+      "mode": "issues",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "forms",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "html",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "svg",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "screenshot",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "pdf",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    }
+  ]
+}

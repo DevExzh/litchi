@@ -10,10 +10,43 @@ use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::result::Result;
 
-use litchi_docx::styles::effects::{Owner, Resource, Snapshot};
-use litchi_docx::{Package, ReadLimits};
+use litchi_docx::styles::effects::{Limits, Owner, Patch, Resource, Snapshot};
+use litchi_docx::{Package, SourceLimits};
 use sha2::{Digest, Sha256};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
+
+/// Stage `resource` as `owner`'s part and publish it into `package`;
+/// returns whether the package changed.
+fn put_effects(
+    package: &mut Package,
+    owner: Owner,
+    resource: Resource,
+) -> litchi_docx::Result<bool> {
+    let mut edit = package.edit_styles_with_effects(owner);
+    edit.put(resource);
+    let commit = edit.commit()?;
+    let changed = commit.diagnostics().changed();
+    *package = commit.into_package();
+    Ok(changed)
+}
+
+/// Stage the removal of `owner`'s part and publish it into `package`;
+/// returns whether the package changed.
+fn remove_effects(package: &mut Package, owner: Owner) -> litchi_docx::Result<bool> {
+    let mut edit = package.edit_styles_with_effects(owner);
+    edit.remove();
+    let commit = edit.commit()?;
+    let changed = commit.diagnostics().changed();
+    *package = commit.into_package();
+    Ok(changed)
+}
+
+/// Replay an owner-bound patch into `package` and return the owner's
+/// published snapshot.
+fn apply_effects(package: &mut Package, patch: &Patch) -> litchi_docx::Result<Snapshot> {
+    *package = package.apply_styles_with_effects(patch)?.into_package();
+    package.styles_with_effects(patch.owner())
+}
 
 const EFFECTS_CONTENT_TYPE: &[u8] = b"application/vnd.ms-word.stylesWithEffects+xml";
 const EFFECTS_RELATIONSHIP: &[u8] =
@@ -44,7 +77,7 @@ fn fixture_bytes(relative: &str) -> FixtureResult<Vec<u8>> {
 }
 
 fn archive_members(bytes: &[u8]) -> FixtureResult<BTreeMap<String, Vec<u8>>> {
-    let archive = ArchiveReader::new(bytes)
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
         .map_err(|error| FixtureError(format!("open fixture archive: {error:?}")))?;
     archive
         .file_names()
@@ -67,9 +100,10 @@ fn rewrite_archive<F>(bytes: &[u8], mut rewrite: F) -> FixtureResult<Vec<u8>>
 where
     F: FnMut(&str, Vec<u8>) -> FixtureResult<Option<Vec<u8>>>,
 {
-    let archive = ArchiveReader::new(bytes)
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
         .map_err(|error| FixtureError(format!("open fixture archive: {error:?}")))?;
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in archive.file_names() {
         let content = archive
             .read(name)
@@ -96,9 +130,10 @@ fn replace_member(bytes: &[u8], selected: &str, replacement: Vec<u8>) -> Fixture
 }
 
 fn rename_member(bytes: &[u8], selected: &str, replacement: &str) -> FixtureResult<Vec<u8>> {
-    let archive = ArchiveReader::new(bytes)
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
         .map_err(|error| FixtureError(format!("open fixture archive: {error:?}")))?;
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in archive.file_names() {
         let content = archive
             .read(name)
@@ -126,7 +161,8 @@ fn add_member(bytes: &[u8], added: &str, content: Vec<u8>) -> FixtureResult<Vec<
     if members.contains_key(added) {
         return Err(FixtureError(format!("fixture already has member {added}")));
     }
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for (name, member) in members {
         writer
             .write_stored(&name, &member)
@@ -184,7 +220,7 @@ fn replace_all(source: &[u8], marker: &[u8], replacement: &[u8]) -> Vec<u8> {
 fn package_bytes(package: &mut Package) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
     package
-        .to_stream(&mut output)
+        .write_to(&mut output)
         .expect("serialize DOCX package in test");
     output.into_inner()
 }
@@ -192,7 +228,7 @@ fn package_bytes(package: &mut Package) -> Vec<u8> {
 fn fixture_resource(relative: &str, member: &str) -> FixtureResult<Resource> {
     let bytes = fixture_bytes(relative)?;
     let xml = archive_member(&bytes, member)?;
-    Resource::from_xml(xml)
+    Resource::new(xml, &Limits::DEFAULT)
         .map_err(|error| FixtureError(format!("parse fixture resource {member}: {error}")))
 }
 
@@ -208,7 +244,7 @@ fn changed_resource(snapshot: &Snapshot) -> Resource {
         br#"<w:extensibilityMarker data="changed"/></w:styles>"#,
     )
     .expect("fixture effects root");
-    let resource = Resource::from_xml(xml).expect("changed effects resource is valid");
+    let resource = Resource::new(xml, &Limits::DEFAULT).expect("changed effects resource is valid");
     assert_eq!(resource.conformance(), snapshot.conformance());
     resource
 }
@@ -258,8 +294,8 @@ impl MutationCap {
         }
     }
 
-    fn set(self, value: u64) -> FixtureResult<ReadLimits> {
-        let builder = ReadLimits::builder();
+    fn set(self, value: u64) -> FixtureResult<SourceLimits> {
+        let builder = SourceLimits::builder();
         let builder = match self {
             Self::Parts => builder.max_parts(
                 usize::try_from(value)
@@ -330,7 +366,7 @@ fn relationship_xml_events(xml: &[u8], name: &str) -> FixtureResult<usize> {
 }
 
 fn package_metrics(bytes: &[u8]) -> FixtureResult<PackageMetrics> {
-    let opc = litchi_opc::OpcPackage::from_vec(bytes.to_vec())
+    let opc = litchi_opc::OpcPackage::from_vec(bytes.to_vec(), SourceLimits::default())
         .map_err(|error| FixtureError(format!("open OPC metrics source: {error:?}")))?;
     let total_part_bytes = opc.try_iter_parts().try_fold(0_u64, |total, part| {
         let part = part.map_err(|error| FixtureError(format!("decode part payload: {error:?}")))?;
@@ -447,21 +483,26 @@ fn fixture_without_main_effects_or_owner_relationships(relative: &str) -> Fixtur
 fn assert_effects_add_rejected_under_cap(
     source: &[u8],
     resource: &Resource,
-    limits: ReadLimits,
+    limits: SourceLimits,
     label: &str,
     cap: MutationCap,
 ) -> FixtureResult<()> {
     let expected_resource = match cap {
-        MutationCap::Parts => litchi_opc::ReadResource::Parts,
-        MutationCap::TotalPartBytes => litchi_opc::ReadResource::TotalPartBytes,
-        MutationCap::TotalRelationships => litchi_opc::ReadResource::TotalRelationships,
-        MutationCap::RelationshipParts => litchi_opc::ReadResource::RelationshipParts,
-        MutationCap::RelationshipGraphNodes => litchi_opc::ReadResource::RelationshipGraphNodes,
-        MutationCap::RelationshipXmlEvents => litchi_opc::ReadResource::TotalRelationshipXmlEvents,
-        MutationCap::RelationshipXmlBytes => litchi_opc::ReadResource::TotalRelationshipXmlBytes,
+        MutationCap::Parts => litchi_opc::SourceLimitKind::Parts,
+        MutationCap::TotalPartBytes => litchi_opc::SourceLimitKind::TotalPartBytes,
+        MutationCap::TotalRelationships => litchi_opc::SourceLimitKind::TotalRelationships,
+        MutationCap::RelationshipParts => litchi_opc::SourceLimitKind::RelationshipParts,
+        MutationCap::RelationshipGraphNodes => litchi_opc::SourceLimitKind::RelationshipGraphNodes,
+        MutationCap::RelationshipXmlEvents => {
+            litchi_opc::SourceLimitKind::TotalRelationshipXmlEvents
+        },
+        MutationCap::RelationshipXmlBytes => litchi_opc::SourceLimitKind::TotalRelationshipXmlBytes,
     };
-    let mut package = Package::from_reader_with_limits(Cursor::new(source.to_vec()), limits)
-        .map_err(|error| FixtureError(format!("open baseline under {label}: {error}")))?;
+    let mut package = Package::from_reader_with_options(
+        Cursor::new(source.to_vec()),
+        litchi_docx::OpenOptions::default().source_limits(limits),
+    )
+    .map_err(|error| FixtureError(format!("open baseline under {label}: {error}")))?;
     let baseline = package_bytes(&mut package);
     assert_eq!(baseline, source, "baseline changed under {label} cap");
     assert!(
@@ -472,9 +513,7 @@ fn assert_effects_add_rejected_under_cap(
     );
 
     assert!(
-        package
-            .put_styles_with_effects(Owner::MainDocument, resource.clone())
-            .is_err(),
+        put_effects(&mut package, Owner::MainDocument, resource.clone()).is_err(),
         "put unexpectedly passed the {label} cap"
     );
     assert_eq!(
@@ -487,14 +526,13 @@ fn assert_effects_add_rejected_under_cap(
         .styles_with_effects(Owner::MainDocument)
         .map_err(|error| FixtureError(format!("reload baseline after {label} put: {error}")))?;
     assert!(snapshot.is_empty());
-    let mut edit = snapshot.edit();
-    edit.replace_resource(Some(resource.clone()))
-        .map_err(|error| FixtureError(format!("stage {label} patch: {error}")))?;
+    let mut edit = package.edit_styles_with_effects(Owner::MainDocument);
+    edit.replace_resource(Some(resource.clone()));
     assert!(
         matches!(
             edit.commit(),
-            Err(litchi_docx::Error::Opc(litchi_opc::OpcError::ReadLimit {
-                resource, actual, maximum,
+            Err(litchi_docx::Error::Opc(litchi_opc::OpcError::Limit {
+                kind: resource, observed: actual, maximum,
             })) if resource == expected_resource && actual > maximum
         ),
         "commit must reject {label} before serializing projected metadata"
@@ -508,17 +546,16 @@ fn assert_effects_add_rejected_under_cap(
     let generous_snapshot = generous
         .styles_with_effects(Owner::MainDocument)
         .map_err(|error| FixtureError(format!("read generous {label} source: {error}")))?;
-    let mut edit = generous_snapshot.edit();
-    edit.replace_resource(Some(resource.clone()))
-        .map_err(|error| FixtureError(format!("stage generous {label} patch: {error}")))?;
+    assert!(generous_snapshot.is_empty());
+    let mut edit = generous.edit_styles_with_effects(Owner::MainDocument);
+    edit.replace_resource(Some(resource.clone()));
     let patch = edit
         .commit()
         .map_err(|error| FixtureError(format!("commit generous {label} patch: {error}")))?
-        .into_patch();
+        .into_parts()
+        .1;
     assert!(
-        package
-            .apply_styles_with_effects_patch(Owner::MainDocument, &patch)
-            .is_err(),
+        apply_effects(&mut package, &patch).is_err(),
         "patch unexpectedly passed the destination's {label} cap"
     );
     assert_eq!(
@@ -526,8 +563,11 @@ fn assert_effects_add_rejected_under_cap(
         baseline,
         "failed patch changed bytes under {label} cap"
     );
-    let reopened = Package::from_reader_with_limits(Cursor::new(baseline), limits)
-        .map_err(|error| FixtureError(format!("reopen baseline under {label}: {error}")))?;
+    let reopened = Package::from_reader_with_options(
+        Cursor::new(baseline),
+        litchi_docx::OpenOptions::default().source_limits(limits),
+    )
+    .map_err(|error| FixtureError(format!("reopen baseline under {label}: {error}")))?;
     assert!(
         reopened
             .styles_with_effects(Owner::MainDocument)
@@ -739,14 +779,17 @@ fn source_snapshots_retain_shared_payloads_and_exact_noop_commits() {
     assert_eq!(source, cloned_source);
     assert_eq!(source.as_ptr(), cloned_source.as_ptr());
 
-    let commit = snapshot
-        .edit()
+    let commit = package
+        .edit_styles_with_effects(Owner::MainDocument)
         .commit()
         .expect("commit no-op effects transaction");
+    assert!(!commit.diagnostics().changed());
     assert_eq!(commit.patch().before(), commit.patch().after());
     assert_eq!(
         commit
-            .snapshot()
+            .package()
+            .styles_with_effects(Owner::MainDocument)
+            .expect("no-op snapshot")
             .resource()
             .expect("no-op resource")
             .xml_bytes()
@@ -764,17 +807,14 @@ fn source_resource_replace_inverse_stale_and_save_reopen_are_owner_bound() {
         .expect("load main effects");
     let replacement = changed_resource(&base);
 
-    let mut edit = base.edit();
-    edit.replace_resource(Some(replacement))
-        .expect("stage effects replacement");
+    let mut edit = package.edit_styles_with_effects(Owner::MainDocument);
+    edit.replace_resource(Some(replacement));
     let commit = edit.commit().expect("commit effects replacement");
     assert_ne!(commit.patch().before(), commit.patch().after());
     let patch = commit.patch().clone();
     let changed_bytes = package_bytes(&mut package);
 
-    package
-        .apply_styles_with_effects_patch(Owner::MainDocument, &patch)
-        .expect("publish effects replacement");
+    apply_effects(&mut package, &patch).expect("publish effects replacement");
     assert_ne!(package_bytes(&mut package), changed_bytes);
     let published = package
         .styles_with_effects(Owner::MainDocument)
@@ -789,17 +829,11 @@ fn source_resource_replace_inverse_stale_and_save_reopen_are_owner_bound() {
     );
 
     let after_failed_stale = package_bytes(&mut package);
-    assert!(
-        package
-            .apply_styles_with_effects_patch(Owner::MainDocument, &patch)
-            .is_err()
-    );
+    assert!(apply_effects(&mut package, &patch).is_err());
     assert_eq!(package_bytes(&mut package), after_failed_stale);
 
     let inverse = patch.inverse();
-    package
-        .apply_styles_with_effects_patch(Owner::MainDocument, &inverse)
-        .expect("publish inverse effects patch");
+    apply_effects(&mut package, &inverse).expect("publish inverse effects patch");
     assert_eq!(
         package
             .styles_with_effects(Owner::MainDocument)
@@ -811,9 +845,7 @@ fn source_resource_replace_inverse_stale_and_save_reopen_are_owner_bound() {
     );
 
     let mut output = Cursor::new(Vec::new());
-    package
-        .to_stream(&mut output)
-        .expect("save effects package");
+    package.write_to(&mut output).expect("save effects package");
     let reopened =
         Package::from_reader(Cursor::new(output.into_inner())).expect("reopen effects package");
     assert_eq!(
@@ -837,21 +869,18 @@ fn public_patch_rejects_cross_owner_and_cross_package_snapshots_atomically() -> 
         .map_err(|error| FixtureError(format!("load cross-owner main: {error}")))?;
     let glossary_before = archive_member(&source, "word/glossary/stylesWithEffects.xml")?;
     let replacement = changed_resource(&main);
-    let mut edit = main.edit();
-    edit.replace_resource(Some(replacement.clone()))
-        .map_err(|error| FixtureError(format!("stage cross-owner replacement: {error}")))?;
+    let mut edit = package.edit_styles_with_effects(Owner::MainDocument);
+    edit.replace_resource(Some(replacement.clone()));
     let patch = edit
         .commit()
         .map_err(|error| FixtureError(format!("commit cross-owner replacement: {error}")))?
-        .into_patch();
+        .into_parts()
+        .1;
 
+    // Cross-owner replay is unrepresentable: the patch carries its owner, so
+    // it can only ever be checked against the main owner's snapshot.
+    assert_eq!(patch.owner(), Owner::MainDocument);
     let before_cross_owner = package_bytes(&mut package);
-    assert!(
-        package
-            .apply_styles_with_effects_patch(Owner::Glossary, &patch)
-            .is_err(),
-        "a main-owner patch must reject a glossary snapshot"
-    );
     assert_eq!(
         package_bytes(&mut package),
         before_cross_owner,
@@ -872,9 +901,7 @@ fn public_patch_rejects_cross_owner_and_cross_package_snapshots_atomically() -> 
         .map_err(|error| FixtureError(format!("open cross-package source: {error}")))?;
     let other_before = package_bytes(&mut other);
     assert!(
-        other
-            .apply_styles_with_effects_patch(Owner::MainDocument, &patch)
-            .is_err(),
+        apply_effects(&mut other, &patch).is_err(),
         "a patch from another package snapshot must be rejected"
     );
     assert_eq!(
@@ -893,20 +920,18 @@ fn public_replace_inverse_restores_exact_package_bytes() -> FixtureResult<()> {
     let snapshot = package
         .styles_with_effects(Owner::MainDocument)
         .map_err(|error| FixtureError(format!("load exact-inverse source: {error}")))?;
-    let mut edit = snapshot.edit();
-    edit.replace_resource(Some(changed_resource(&snapshot)))
-        .map_err(|error| FixtureError(format!("stage exact-inverse replacement: {error}")))?;
+    let mut edit = package.edit_styles_with_effects(Owner::MainDocument);
+    edit.replace_resource(Some(changed_resource(&snapshot)));
     let patch = edit
         .commit()
         .map_err(|error| FixtureError(format!("commit exact-inverse replacement: {error}")))?
-        .into_patch();
-    package
-        .apply_styles_with_effects_patch(Owner::MainDocument, &patch)
+        .into_parts()
+        .1;
+    apply_effects(&mut package, &patch)
         .map_err(|error| FixtureError(format!("publish exact-inverse replacement: {error}")))?;
     assert_ne!(package_bytes(&mut package), original);
 
-    package
-        .apply_styles_with_effects_patch(Owner::MainDocument, &patch.inverse())
+    apply_effects(&mut package, &patch.inverse())
         .map_err(|error| FixtureError(format!("publish exact-inverse restoration: {error}")))?;
     assert_eq!(
         package_bytes(&mut package),
@@ -967,12 +992,18 @@ fn source_bound_clear_and_inverse_restore_custom_target_and_relationship() -> Fi
         original_effects
     );
 
-    let mut edit = base.edit();
-    assert!(!edit.is_changed());
-    edit.clear_resource();
-    assert!(edit.is_changed());
+    let mut edit = package.edit_styles_with_effects(Owner::MainDocument);
+    assert!(
+        !edit
+            .clone()
+            .commit()
+            .expect("commit unstaged edit")
+            .diagnostics()
+            .changed()
+    );
+    edit.remove();
     let commit = edit.commit().expect("commit effects removal");
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert_eq!(commit.patch().owner(), Owner::MainDocument);
     assert_eq!(
         commit.patch().before().expect("removal source").xml_bytes(),
@@ -981,9 +1012,7 @@ fn source_bound_clear_and_inverse_restore_custom_target_and_relationship() -> Fi
     assert!(commit.patch().after().is_none());
     let patch = commit.patch().clone();
 
-    let removed = package
-        .apply_styles_with_effects_patch(Owner::MainDocument, &patch)
-        .expect("publish effects removal");
+    let removed = apply_effects(&mut package, &patch).expect("publish effects removal");
     assert!(removed.is_empty());
     let removed_bytes = package_bytes(&mut package);
     assert!(archive_member(&removed_bytes, custom_member).is_err());
@@ -994,9 +1023,7 @@ fn source_bound_clear_and_inverse_restore_custom_target_and_relationship() -> Fi
             .any(|window| window == EFFECTS_RELATIONSHIP)
     );
 
-    let restored = package
-        .apply_styles_with_effects_patch(Owner::MainDocument, &patch.inverse())
-        .expect("publish effects inverse");
+    let restored = apply_effects(&mut package, &patch.inverse()).expect("publish effects inverse");
     assert_eq!(
         restored
             .resource()
@@ -1062,10 +1089,10 @@ fn package_absent_owner_edit_keeps_source_owner_precondition() -> FixtureResult<
         .styles_with_effects(Owner::MainDocument)
         .expect("load absent main effects owner");
     assert!(snapshot.is_empty());
-    let mut edit = snapshot.edit();
-    edit.clear_resource();
+    let mut edit = package.edit_styles_with_effects(Owner::MainDocument);
+    edit.remove();
     let commit = edit.commit().expect("commit absent-owner no-op");
-    assert!(!commit.changed());
+    assert!(!commit.diagnostics().changed());
     assert!(
         commit
             .patch()
@@ -1092,25 +1119,25 @@ fn explicit_resource_crud_does_not_create_missing_glossary_or_seed_a_fifth_part(
     );
     let before = package_bytes(&mut no_glossary);
     assert!(
-        !no_glossary
-            .remove_styles_with_effects(Owner::MainDocument)
+        !remove_effects(&mut no_glossary, Owner::MainDocument)
             .expect("missing main effects is a no-op")
     );
     assert_eq!(package_bytes(&mut no_glossary), before);
-    assert!(
-        no_glossary
-            .put_styles_with_effects(Owner::Glossary, resource.clone())
-            .is_err()
-    );
+    assert!(put_effects(&mut no_glossary, Owner::Glossary, resource.clone()).is_err());
     assert_eq!(package_bytes(&mut no_glossary), before);
 
     let mut with_glossary = Package::new().expect("new DOCX package");
-    with_glossary
-        .put_glossary(
+    with_glossary = {
+        let mut edit = with_glossary.edit_glossary();
+        edit.put(
             litchi_docx::glossary::Catalog::new(),
             litchi_docx::glossary::Conformance::Transitional,
         )
         .expect("create glossary without effects resource");
+        edit.commit()
+            .expect("create glossary without effects resource")
+            .into_package()
+    };
     assert!(
         with_glossary
             .styles_with_effects(Owner::Glossary)
@@ -1128,8 +1155,7 @@ fn explicit_resource_crud_does_not_create_missing_glossary_or_seed_a_fifth_part(
         "glossary seed must remain four resources"
     );
     assert!(
-        with_glossary
-            .put_styles_with_effects(Owner::Glossary, resource)
+        put_effects(&mut with_glossary, Owner::Glossary, resource)
             .expect("explicitly create glossary effects resource")
     );
     assert!(
@@ -1156,27 +1182,20 @@ fn signed_effects_noop_preserves_source_and_changed_publication_requires_unsign(
         .expect("signed effects resource")
         .clone();
     assert!(
-        !package
-            .put_styles_with_effects(Owner::MainDocument, same)
-            .expect("signed exact effects no-op")
+        !put_effects(&mut package, Owner::MainDocument, same).expect("signed exact effects no-op")
     );
     assert!(package.is_signed());
     assert_eq!(package_bytes(&mut package), original);
 
     let changed = changed_resource(&snapshot);
     let before = package_bytes(&mut package);
-    assert!(
-        package
-            .put_styles_with_effects(Owner::MainDocument, changed.clone())
-            .is_err()
-    );
+    assert!(put_effects(&mut package, Owner::MainDocument, changed.clone()).is_err());
     assert!(package.is_signed());
     assert_eq!(package_bytes(&mut package), before);
 
-    package.unsign();
+    package = package.unsign();
     assert!(
-        package
-            .put_styles_with_effects(Owner::MainDocument, changed)
+        put_effects(&mut package, Owner::MainDocument, changed)
             .expect("changed effects after explicit unsign")
     );
     assert!(!package.is_signed());
@@ -1185,18 +1204,24 @@ fn signed_effects_noop_preserves_source_and_changed_publication_requires_unsign(
 #[test]
 fn effects_resource_limits_and_malformed_grammar_fail_closed() -> FixtureResult<()> {
     let bytes = fixture_bytes("poi/test-data/document/Bug54849.docx")?;
-    let limit = ReadLimits::builder()
+    let limit = SourceLimits::builder()
         .max_part_bytes(1)
         .map_err(|error| FixtureError(format!("part limit: {error:?}")))?
         .build()
         .map_err(|error| FixtureError(format!("build read limits: {error:?}")))?;
-    assert!(Package::from_reader_with_limits(Cursor::new(bytes.clone()), limit).is_err());
+    assert!(
+        Package::from_reader_with_options(
+            Cursor::new(bytes.clone()),
+            litchi_docx::OpenOptions::default().source_limits(limit)
+        )
+        .is_err()
+    );
 
     let malformed = b"<w:styles xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:style></w:styles>";
-    assert!(Resource::from_xml(malformed.to_vec()).is_err());
+    assert!(Resource::new(malformed.to_vec(), &Limits::DEFAULT).is_err());
     let wrong_root =
         b"<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"/>";
-    assert!(Resource::from_xml(wrong_root.to_vec()).is_err());
+    assert!(Resource::new(wrong_root.to_vec(), &Limits::DEFAULT).is_err());
     Ok(())
 }
 
@@ -1224,7 +1249,7 @@ fn effects_resource_rejects_malformed_opaque_xml() {
         let xml = format!(
             "{prolog}<w:styles xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"{attributes}>{body}</w:styles>"
         );
-        if Resource::from_xml(xml.into_bytes()).is_ok() {
+        if Resource::new(xml.into_bytes(), &Limits::DEFAULT).is_ok() {
             accepted.push(label);
         }
     }
@@ -1291,9 +1316,7 @@ fn secondary_effects_projection_failures_refuse_public_main_read_and_edit() -> F
             .map_err(|error| FixtureError(format!("reopen secondary {label} fixture: {error}")))?;
         let before_edit = package_bytes(&mut edit_package);
         assert!(
-            edit_package
-                .remove_styles_with_effects(Owner::MainDocument)
-                .is_err(),
+            remove_effects(&mut edit_package, Owner::MainDocument).is_err(),
             "main edit bypassed secondary {label} projection failure"
         );
         assert_eq!(
@@ -1327,21 +1350,46 @@ fn native_effects_read_honors_caller_event_and_depth_limits() -> FixtureResult<(
     }
     assert!(maximum_depth > 2);
     let limits = [
-        ReadLimits::builder()
-            .max_xml_events(events - 1)
-            .unwrap()
-            .build()
+        (
+            SourceLimits::builder()
+                .max_events(events - 1)
+                .unwrap()
+                .build()
+                .unwrap(),
+            Limits::new(
+                Limits::DEFAULT.xml_bytes(),
+                events - 1,
+                Limits::DEFAULT.depth(),
+                Limits::DEFAULT.nodes(),
+                Limits::DEFAULT.attributes(),
+                Limits::DEFAULT.attribute_bytes(),
+            )
             .unwrap(),
-        ReadLimits::builder()
-            .max_xml_depth(maximum_depth - 1)
-            .unwrap()
-            .build()
+        ),
+        (
+            SourceLimits::builder()
+                .max_depth(maximum_depth - 1)
+                .unwrap()
+                .build()
+                .unwrap(),
+            Limits::new(
+                Limits::DEFAULT.xml_bytes(),
+                Limits::DEFAULT.events(),
+                maximum_depth - 1,
+                Limits::DEFAULT.nodes(),
+                Limits::DEFAULT.attributes(),
+                Limits::DEFAULT.attribute_bytes(),
+            )
             .unwrap(),
+        ),
     ];
-    for limit in limits {
-        let package = litchi_opc::OpcPackage::from_vec_with_limits(bytes.clone(), limit)
+    for (limit, effects_limits) in limits {
+        let package = litchi_opc::OpcPackage::from_vec(bytes.clone(), limit)
             .expect("native OPC package fits ingress limits");
-        assert!(litchi_docx::styles::effects::load(&package, Owner::MainDocument).is_err());
+        assert!(
+            litchi_docx::styles::effects::raw::load(&package, Owner::MainDocument, &effects_limits)
+                .is_err()
+        );
     }
     Ok(())
 }
@@ -1418,11 +1466,7 @@ fn effects_owner_rejects_leaf_outbound_and_shared_inbound_edges() -> FixtureResu
     let mut package =
         Package::from_reader(Cursor::new(shared_package)).expect("open shared inbound fixture");
     let before = package_bytes(&mut package);
-    assert!(
-        package
-            .remove_styles_with_effects(Owner::MainDocument)
-            .is_err()
-    );
+    assert!(remove_effects(&mut package, Owner::MainDocument).is_err());
     assert_eq!(package_bytes(&mut package), before);
     Ok(())
 }
@@ -1436,7 +1480,7 @@ fn effects_namespace_prefix_and_unknown_xml_are_source_preserving() -> FixtureRe
         b"xmlns:w=",
         b"xmlns:x=",
     )?;
-    let parsed = Resource::from_xml(prefixed.clone())
+    let parsed = Resource::new(prefixed.clone(), &Limits::DEFAULT)
         .map_err(|error| FixtureError(format!("namespace-prefix parse: {error}")))?;
     assert_eq!(parsed.xml_bytes(), prefixed);
 
@@ -1445,11 +1489,10 @@ fn effects_namespace_prefix_and_unknown_xml_are_source_preserving() -> FixtureRe
         b"</w:styles>",
         br#"<w:unknownExtension xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" data="preserve"/></w:styles>"#,
     )?;
-    let resource = Resource::from_xml(unknown.clone())
+    let resource = Resource::new(unknown.clone(), &Limits::DEFAULT)
         .map_err(|error| FixtureError(format!("unknown-extension parse: {error}")))?;
     let mut package = Package::from_reader(Cursor::new(base)).expect("open source fixture");
-    package
-        .put_styles_with_effects(Owner::MainDocument, resource)
+    put_effects(&mut package, Owner::MainDocument, resource)
         .expect("publish source-preserving unknown extension");
     let reopened = Package::from_reader(Cursor::new(package_bytes(&mut package)))
         .expect("reopen source-preserving fixture");
@@ -1468,16 +1511,18 @@ fn effects_namespace_prefix_and_unknown_xml_are_source_preserving() -> FixtureRe
 #[test]
 fn effects_addition_honors_public_package_caps_atomically() -> FixtureResult<()> {
     let native = fixture_bytes("poi/test-data/document/Bug54849.docx")?;
-    let resource = Resource::from_xml(archive_member(&native, "word/stylesWithEffects.xml")?)
-        .map_err(|error| FixtureError(format!("parse effects addition resource: {error}")))?;
+    let resource = Resource::new(
+        archive_member(&native, "word/stylesWithEffects.xml")?,
+        &Limits::DEFAULT,
+    )
+    .map_err(|error| FixtureError(format!("parse effects addition resource: {error}")))?;
     let source = fixture_without_main_effects("poi/test-data/document/Bug54849.docx")?;
     let source_metrics = package_metrics(&source)?;
 
     let mut generous = Package::from_reader(Cursor::new(source.clone()))
         .map_err(|error| FixtureError(format!("open generous baseline: {error}")))?;
     assert!(
-        generous
-            .put_styles_with_effects(Owner::MainDocument, resource.clone())
+        put_effects(&mut generous, Owner::MainDocument, resource.clone())
             .map_err(|error| FixtureError(format!("derive generous addition: {error}")))?
     );
     let projected = package_bytes(&mut generous);
@@ -1518,7 +1563,7 @@ fn effects_addition_honors_public_package_caps_atomically() -> FixtureResult<()>
         }
     }
 
-    let exact_limits = ReadLimits::builder()
+    let exact_limits = SourceLimits::builder()
         .max_parts(projected_metrics.parts)
         .map_err(|error| FixtureError(format!("set exact part cap: {error:?}")))?
         .max_total_part_bytes(projected_metrics.total_part_bytes)
@@ -1531,12 +1576,14 @@ fn effects_addition_honors_public_package_caps_atomically() -> FixtureResult<()>
         .map_err(|error| FixtureError(format!("set exact XML byte cap: {error:?}")))?
         .build()
         .map_err(|error| FixtureError(format!("build exact mutation caps: {error:?}")))?;
-    let mut exact = Package::from_reader_with_limits(Cursor::new(source.clone()), exact_limits)
-        .map_err(|error| FixtureError(format!("open exact-fit baseline: {error}")))?;
+    let mut exact = Package::from_reader_with_options(
+        Cursor::new(source.clone()),
+        litchi_docx::OpenOptions::default().source_limits(exact_limits),
+    )
+    .map_err(|error| FixtureError(format!("open exact-fit baseline: {error}")))?;
     assert_eq!(package_bytes(&mut exact), source);
     assert!(
-        exact
-            .put_styles_with_effects(Owner::MainDocument, resource.clone())
+        put_effects(&mut exact, Owner::MainDocument, resource.clone())
             .map_err(|error| FixtureError(format!("exact-fit put: {error}")))?
     );
     assert_eq!(
@@ -1544,22 +1591,24 @@ fn effects_addition_honors_public_package_caps_atomically() -> FixtureResult<()>
         projected_metrics
     );
 
-    let mut exact_patch =
-        Package::from_reader_with_limits(Cursor::new(source.clone()), exact_limits)
-            .map_err(|error| FixtureError(format!("open exact-fit patch baseline: {error}")))?;
+    let mut exact_patch = Package::from_reader_with_options(
+        Cursor::new(source.clone()),
+        litchi_docx::OpenOptions::default().source_limits(exact_limits),
+    )
+    .map_err(|error| FixtureError(format!("open exact-fit patch baseline: {error}")))?;
     let snapshot = exact_patch
         .styles_with_effects(Owner::MainDocument)
         .map_err(|error| FixtureError(format!("read exact-fit patch baseline: {error}")))?;
-    let mut edit = snapshot.edit();
-    edit.replace_resource(Some(resource))
-        .map_err(|error| FixtureError(format!("stage exact-fit addition patch: {error}")))?;
+    assert!(snapshot.is_empty());
+    let mut edit = exact_patch.edit_styles_with_effects(Owner::MainDocument);
+    edit.replace_resource(Some(resource));
     let patch = edit
         .commit()
         .map_err(|error| FixtureError(format!("commit exact-fit addition patch: {error}")))?
-        .into_patch();
+        .into_parts()
+        .1;
     assert!(
-        exact_patch
-            .apply_styles_with_effects_patch(Owner::MainDocument, &patch)
+        apply_effects(&mut exact_patch, &patch)
             .map_err(|error| FixtureError(format!("exact-fit addition patch: {error}")))?
             .resource()
             .is_some()
@@ -1575,8 +1624,11 @@ fn effects_addition_honors_public_package_caps_atomically() -> FixtureResult<()>
 fn effects_addition_honors_relationship_part_and_graph_caps_with_source_less_owner()
 -> FixtureResult<()> {
     let native = fixture_bytes("poi/test-data/document/Bug54849.docx")?;
-    let resource = Resource::from_xml(archive_member(&native, "word/stylesWithEffects.xml")?)
-        .map_err(|error| FixtureError(format!("parse effects source-less addition: {error}")))?;
+    let resource = Resource::new(
+        archive_member(&native, "word/stylesWithEffects.xml")?,
+        &Limits::DEFAULT,
+    )
+    .map_err(|error| FixtureError(format!("parse effects source-less addition: {error}")))?;
     let source = fixture_without_main_effects_or_owner_relationships(
         "ooxml/docx/ComplexNumberedLists.docx",
     )?;
@@ -1587,8 +1639,7 @@ fn effects_addition_honors_relationship_part_and_graph_caps_with_source_less_own
     let mut generous = Package::from_reader(Cursor::new(source.clone()))
         .map_err(|error| FixtureError(format!("open source-less owner baseline: {error}")))?;
     assert!(
-        generous
-            .put_styles_with_effects(Owner::MainDocument, resource.clone())
+        put_effects(&mut generous, Owner::MainDocument, resource.clone())
             .map_err(|error| FixtureError(format!("create source-less owner rels: {error}")))?
     );
     let projected = package_bytes(&mut generous);
@@ -1626,19 +1677,21 @@ fn effects_addition_honors_relationship_part_and_graph_caps_with_source_less_own
         )?;
     }
 
-    let exact_limits = ReadLimits::builder()
+    let exact_limits = SourceLimits::builder()
         .max_relationship_parts(projected_metrics.relationship_parts)
         .map_err(|error| FixtureError(format!("set exact relationship-part cap: {error:?}")))?
         .max_relationship_graph_nodes(projected_metrics.relationship_graph_nodes)
         .map_err(|error| FixtureError(format!("set exact graph-node cap: {error:?}")))?
         .build()
         .map_err(|error| FixtureError(format!("build exact topology caps: {error:?}")))?;
-    let mut exact = Package::from_reader_with_limits(Cursor::new(source.clone()), exact_limits)
-        .map_err(|error| FixtureError(format!("open source-less exact-fit baseline: {error}")))?;
+    let mut exact = Package::from_reader_with_options(
+        Cursor::new(source.clone()),
+        litchi_docx::OpenOptions::default().source_limits(exact_limits),
+    )
+    .map_err(|error| FixtureError(format!("open source-less exact-fit baseline: {error}")))?;
     assert_eq!(package_bytes(&mut exact), source);
     assert!(
-        exact
-            .put_styles_with_effects(Owner::MainDocument, resource.clone())
+        put_effects(&mut exact, Owner::MainDocument, resource.clone())
             .map_err(|error| FixtureError(format!("source-less exact-fit put: {error}")))?
     );
     assert_eq!(
@@ -1646,12 +1699,15 @@ fn effects_addition_honors_relationship_part_and_graph_caps_with_source_less_own
         projected_metrics
     );
 
-    let mut exact_patch = Package::from_reader_with_limits(Cursor::new(source), exact_limits)
-        .map_err(|error| {
-            FixtureError(format!(
-                "open source-less exact-fit patch baseline: {error}"
-            ))
-        })?;
+    let mut exact_patch = Package::from_reader_with_options(
+        Cursor::new(source),
+        litchi_docx::OpenOptions::default().source_limits(exact_limits),
+    )
+    .map_err(|error| {
+        FixtureError(format!(
+            "open source-less exact-fit patch baseline: {error}"
+        ))
+    })?;
     let snapshot = exact_patch
         .styles_with_effects(Owner::MainDocument)
         .map_err(|error| {
@@ -1659,16 +1715,16 @@ fn effects_addition_honors_relationship_part_and_graph_caps_with_source_less_own
                 "read source-less exact-fit patch baseline: {error}"
             ))
         })?;
-    let mut edit = snapshot.edit();
-    edit.replace_resource(Some(resource))
-        .map_err(|error| FixtureError(format!("stage source-less exact-fit patch: {error}")))?;
+    assert!(snapshot.is_empty());
+    let mut edit = exact_patch.edit_styles_with_effects(Owner::MainDocument);
+    edit.replace_resource(Some(resource));
     let patch = edit
         .commit()
         .map_err(|error| FixtureError(format!("commit source-less exact-fit patch: {error}")))?
-        .into_patch();
+        .into_parts()
+        .1;
     assert!(
-        exact_patch
-            .apply_styles_with_effects_patch(Owner::MainDocument, &patch)
+        apply_effects(&mut exact_patch, &patch)
             .map_err(|error| FixtureError(format!("apply source-less exact-fit patch: {error}")))?
             .resource()
             .is_some()
@@ -1703,17 +1759,15 @@ fn assert_replacement_honors_total_part_bytes_cap(
                 .len(),
         "replacement must grow the selected {owner:?} part"
     );
-    let mut edit = base.edit();
-    edit.replace_resource(Some(replacement.clone()))
-        .map_err(|error| FixtureError(format!("stage generous {owner:?} replacement: {error}")))?;
+    let mut edit = generous.edit_styles_with_effects(owner);
+    edit.replace_resource(Some(replacement.clone()));
     let commit = edit
         .commit()
         .map_err(|error| FixtureError(format!("commit generous {owner:?} replacement: {error}")))?;
-    let published = generous
-        .apply_styles_with_effects_commit(owner, commit)
-        .map_err(|error| {
-            FixtureError(format!("publish generous {owner:?} replacement: {error}"))
-        })?;
+    generous = commit.into_package();
+    let published = generous.styles_with_effects(owner).map_err(|error| {
+        FixtureError(format!("publish generous {owner:?} replacement: {error}"))
+    })?;
     assert_eq!(
         published
             .resource()
@@ -1733,30 +1787,31 @@ fn assert_replacement_honors_total_part_bytes_cap(
         "one-under replacement cap must still admit the source package"
     );
 
-    let exact_limits = ReadLimits::builder()
+    let exact_limits = SourceLimits::builder()
         .max_total_part_bytes(exact_total)
         .map_err(|error| FixtureError(format!("set exact {owner:?} total-part cap: {error:?}")))?
         .build()
         .map_err(|error| {
             FixtureError(format!("build exact {owner:?} total-part cap: {error:?}"))
         })?;
-    let mut exact = Package::from_reader_with_limits(Cursor::new(source.to_vec()), exact_limits)
-        .map_err(|error| {
-            FixtureError(format!("open exact {owner:?} replacement source: {error}"))
-        })?;
+    let mut exact = Package::from_reader_with_options(
+        Cursor::new(source.to_vec()),
+        litchi_docx::OpenOptions::default().source_limits(exact_limits),
+    )
+    .map_err(|error| FixtureError(format!("open exact {owner:?} replacement source: {error}")))?;
     assert_eq!(package_bytes(&mut exact), source);
     let exact_base = exact.styles_with_effects(owner).map_err(|error| {
         FixtureError(format!("load exact {owner:?} replacement source: {error}"))
     })?;
-    let mut exact_edit = exact_base.edit();
-    exact_edit
-        .replace_resource(Some(replacement.clone()))
-        .map_err(|error| FixtureError(format!("stage exact {owner:?} replacement: {error}")))?;
+    assert!(exact_base.resource().is_some());
+    let mut exact_edit = exact.edit_styles_with_effects(owner);
+    exact_edit.replace_resource(Some(replacement.clone()));
     let exact_commit = exact_edit
         .commit()
         .map_err(|error| FixtureError(format!("commit exact {owner:?} replacement: {error}")))?;
+    exact = exact_commit.into_package();
     let exact_published = exact
-        .apply_styles_with_effects_commit(owner, exact_commit)
+        .styles_with_effects(owner)
         .map_err(|error| FixtureError(format!("publish exact {owner:?} replacement: {error}")))?;
     assert_eq!(
         exact_published
@@ -1771,8 +1826,11 @@ fn assert_replacement_honors_total_part_bytes_cap(
         exact_total,
         "exact {owner:?} cap changed the final part-byte metric"
     );
-    let reopened = Package::from_reader_with_limits(Cursor::new(exact_output), exact_limits)
-        .map_err(|error| FixtureError(format!("reopen exact {owner:?} replacement: {error}")))?;
+    let reopened = Package::from_reader_with_options(
+        Cursor::new(exact_output),
+        litchi_docx::OpenOptions::default().source_limits(exact_limits),
+    )
+    .map_err(|error| FixtureError(format!("reopen exact {owner:?} replacement: {error}")))?;
     assert_eq!(
         reopened
             .styles_with_effects(owner)
@@ -1783,7 +1841,7 @@ fn assert_replacement_honors_total_part_bytes_cap(
         replacement.xml_bytes()
     );
 
-    let one_under_limits = ReadLimits::builder()
+    let one_under_limits = SourceLimits::builder()
         .max_total_part_bytes(one_under)
         .map_err(|error| {
             FixtureError(format!("set one-under {owner:?} total-part cap: {error:?}"))
@@ -1794,14 +1852,15 @@ fn assert_replacement_honors_total_part_bytes_cap(
                 "build one-under {owner:?} total-part cap: {error:?}"
             ))
         })?;
-    let mut limited =
-        Package::from_reader_with_limits(Cursor::new(source.to_vec()), one_under_limits).map_err(
-            |error| {
-                FixtureError(format!(
-                    "open one-under {owner:?} replacement source: {error}"
-                ))
-            },
-        )?;
+    let mut limited = Package::from_reader_with_options(
+        Cursor::new(source.to_vec()),
+        litchi_docx::OpenOptions::default().source_limits(one_under_limits),
+    )
+    .map_err(|error| {
+        FixtureError(format!(
+            "open one-under {owner:?} replacement source: {error}"
+        ))
+    })?;
     let baseline = package_bytes(&mut limited);
     assert_eq!(baseline, source);
     let limited_base = limited.styles_with_effects(owner).map_err(|error| {
@@ -1809,19 +1868,18 @@ fn assert_replacement_honors_total_part_bytes_cap(
             "load one-under {owner:?} replacement source: {error}"
         ))
     })?;
-    let mut limited_edit = limited_base.edit();
-    limited_edit
-        .replace_resource(Some(replacement))
-        .map_err(|error| FixtureError(format!("stage one-under {owner:?} replacement: {error}")))?;
+    assert!(limited_base.resource().is_some());
+    let mut limited_edit = limited.edit_styles_with_effects(owner);
+    limited_edit.replace_resource(Some(replacement));
     let commit_error = limited_edit
         .commit()
         .expect_err("one-under replacement must fail at transaction commit");
     assert!(
         matches!(
             commit_error,
-            litchi_docx::Error::Opc(litchi_opc::OpcError::ReadLimit {
-                resource: litchi_opc::ReadResource::TotalPartBytes,
-                actual,
+            litchi_docx::Error::Opc(litchi_opc::OpcError::Limit {
+                kind: litchi_opc::SourceLimitKind::TotalPartBytes,
+                observed: actual,
                 maximum,
             }) if actual == exact_total && maximum == one_under
         ),
@@ -1832,10 +1890,11 @@ fn assert_replacement_honors_total_part_bytes_cap(
         baseline,
         "one-under {owner:?} commit changed package output"
     );
-    let reopened_baseline =
-        Package::from_reader_with_limits(Cursor::new(baseline), one_under_limits).map_err(
-            |error| FixtureError(format!("reopen one-under {owner:?} baseline: {error}")),
-        )?;
+    let reopened_baseline = Package::from_reader_with_options(
+        Cursor::new(baseline),
+        litchi_docx::OpenOptions::default().source_limits(one_under_limits),
+    )
+    .map_err(|error| FixtureError(format!("reopen one-under {owner:?} baseline: {error}")))?;
     assert_eq!(
         reopened_baseline
             .styles_with_effects(owner)
@@ -1867,8 +1926,11 @@ fn existing_owner_replacement_honors_exact_and_one_under_total_part_bytes_caps()
 #[test]
 fn absent_owner_inverse_rejects_candidate_with_different_relationship_id() -> FixtureResult<()> {
     let native = fixture_bytes("poi/test-data/document/Bug54849.docx")?;
-    let resource = Resource::from_xml(archive_member(&native, "word/stylesWithEffects.xml")?)
-        .map_err(|error| FixtureError(format!("parse stale inverse resource: {error}")))?;
+    let resource = Resource::new(
+        archive_member(&native, "word/stylesWithEffects.xml")?,
+        &Limits::DEFAULT,
+    )
+    .map_err(|error| FixtureError(format!("parse stale inverse resource: {error}")))?;
     let source = fixture_without_main_effects("ooxml/docx/ComplexNumberedLists.docx")?;
     let mut package = Package::from_reader(Cursor::new(source))
         .map_err(|error| FixtureError(format!("open stale inverse source: {error}")))?;
@@ -1876,15 +1938,14 @@ fn absent_owner_inverse_rejects_candidate_with_different_relationship_id() -> Fi
         .styles_with_effects(Owner::MainDocument)
         .map_err(|error| FixtureError(format!("read stale inverse absent owner: {error}")))?;
     assert!(absent.is_empty());
-    let mut edit = absent.edit();
-    edit.replace_resource(Some(resource.clone()))
-        .map_err(|error| FixtureError(format!("stage stale inverse addition: {error}")))?;
+    let mut edit = package.edit_styles_with_effects(Owner::MainDocument);
+    edit.replace_resource(Some(resource.clone()));
     let patch = edit
         .commit()
         .map_err(|error| FixtureError(format!("commit stale inverse addition: {error}")))?
-        .into_patch();
-    package
-        .apply_styles_with_effects_patch(Owner::MainDocument, &patch)
+        .into_parts()
+        .1;
+    apply_effects(&mut package, &patch)
         .map_err(|error| FixtureError(format!("publish stale inverse addition: {error}")))?;
     let added = package_bytes(&mut package);
     let relationships_name = "word/_rels/document.xml.rels";
@@ -1909,9 +1970,7 @@ fn absent_owner_inverse_rejects_candidate_with_different_relationship_id() -> Fi
     );
     let before = package_bytes(&mut candidate);
     assert!(
-        candidate
-            .apply_styles_with_effects_patch(Owner::MainDocument, &patch.inverse())
-            .is_err(),
+        apply_effects(&mut candidate, &patch.inverse()).is_err(),
         "inverse must reject a candidate with a different relationship ID"
     );
     assert_eq!(package_bytes(&mut candidate), before);
@@ -1945,22 +2004,25 @@ fn removing_effects_removes_empty_target_relationship_member_and_inverse_restore
     let snapshot = package
         .styles_with_effects(Owner::MainDocument)
         .map_err(|error| FixtureError(format!("load empty-target-rels effects: {error}")))?;
-    let mut edit = snapshot.edit();
-    edit.clear_resource();
+    assert_eq!(
+        snapshot.resource().expect("effects resource").xml_bytes(),
+        original_effects
+    );
+    let mut edit = package.edit_styles_with_effects(Owner::MainDocument);
+    edit.remove();
     let patch = edit
         .commit()
         .map_err(|error| FixtureError(format!("commit empty-target-rels removal: {error}")))?
-        .into_patch();
-    let removed = package
-        .apply_styles_with_effects_patch(Owner::MainDocument, &patch)
+        .into_parts()
+        .1;
+    let removed = apply_effects(&mut package, &patch)
         .map_err(|error| FixtureError(format!("remove empty-target-rels effects: {error}")))?;
     assert!(removed.is_empty());
     let removed_bytes = package_bytes(&mut package);
     assert!(archive_member(&removed_bytes, "word/stylesWithEffects.xml").is_err());
     assert!(archive_member(&removed_bytes, target_relationships).is_err());
 
-    let restored = package
-        .apply_styles_with_effects_patch(Owner::MainDocument, &patch.inverse())
+    let restored = apply_effects(&mut package, &patch.inverse())
         .map_err(|error| FixtureError(format!("restore empty-target-rels effects: {error}")))?;
     assert_eq!(
         restored.resource().expect("inverse resource").xml_bytes(),

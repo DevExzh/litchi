@@ -1,0 +1,171 @@
+{
+  "schema": 1,
+  "status": "passed isolated workspace documentation; full53gate remains required",
+  "source": {
+    "commit": "49c25ef67f62a8bb943e7c6a0bf464e49ae87d07",
+    "status": "",
+    "branch": "uo2/budget-validation",
+    "cargo_locks": {
+      "Cargo.lock": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+      "tools/perf-baseline/Cargo.lock": "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184",
+      "tools/native-resave/Cargo.lock": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378",
+      "crates/litchi-core/fuzz/Cargo.lock": "395413860f3740a461efa0273b823449323b7860956e9c01cd1c6b1d654eccf2",
+      "crates/litchi-ops/fuzz/Cargo.lock": "10708241205e4a90c0120b3f41a77e7548715761801d66da2d55911e59e9ab8a",
+      "crates/litchi/fuzz/Cargo.lock": "c499d5efe6bba3991672c52f75f78a39a294a5b80e98f62a6ee2bb28dd2a2eb6"
+    }
+  },
+  "root": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation",
+  "target": "/home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/target",
+  "policy": {
+    "runner_files": {
+      "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe-next-20261024/run_safe_gate.py": "0d8111c04bc9666566dab7c4f281a9f3fd7bb41efd64bd92703450abeee0bf14",
+      "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe-next-20261024/safe_chunked_tests.py": "70fdb56c96e4ed9e1d1e0d2b1e9c7f1db148a2115fb25246d13464569290cc35",
+      "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe-next-20261024/bin/cargo": "495e24c6f60b238378386d86ac4158cba904992ce8870a9494f2c4a0eedd256d"
+    },
+    "cargo_wrapper": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe-next-20261024/bin/cargo",
+    "offline": true,
+    "locked": true,
+    "memory_max": "20G",
+    "build_jobs": 1,
+    "test_threads": 1,
+    "target_guard_before": 19200000000,
+    "target_guard_after": 20000000000,
+    "free_guard": 12000000000
+  },
+  "selection": {
+    "only": [
+      "wsdoc"
+    ],
+    "start_at": null,
+    "indexes": [
+      34
+    ],
+    "full_step_count": 53,
+    "partial": true
+  },
+  "state": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/wsdoc-49c25ef67f/state.json",
+    "bytes": 6906,
+    "sha256": "99ef0db900a02e54b9a9b1d5971fd41c0076e2b61850553ba9fab6e8aa7d6df3"
+  },
+  "plan": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/wsdoc-49c25ef67f/plan.json",
+    "bytes": 21952,
+    "sha256": "463d3c06a25612f2591936d88f6bbeaa88d16859b3e6e51f44852c59ff3dcb03"
+  },
+  "step": {
+    "index": 34,
+    "total": 53,
+    "name": "wsdoc",
+    "attempt": "1792827392719701687-1607544",
+    "command": [
+      "cargo",
+      "doc",
+      "-q",
+      "--workspace",
+      "--no-deps",
+      "--all-features"
+    ],
+    "environment": {
+      "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/target",
+      "CARGO_NET_OFFLINE": "true",
+      "LITCHI_MEM_MAX": "20G",
+      "CARGO_BUILD_JOBS": "1",
+      "RUST_TEST_THREADS": "1",
+      "CARGO_INCREMENTAL": "0",
+      "RUSTDOCFLAGS": "-Dwarnings",
+      "LITCHI_GATE_ATTEMPT": "1792827392719701687-1607544"
+    },
+    "exit": 0,
+    "seconds": 1057.4715530872345,
+    "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/wsdoc-49c25ef67f/34-wsdoc-attempt-1792827392719701687-1607544.log",
+    "log_bytes": 0,
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target_bytes_after": 4504969096,
+    "post_exit": {
+      "target_bytes": 4504969096,
+      "samples": [
+        {
+          "at": 1792828449.6015506,
+          "target_bytes": 4504969096,
+          "owned": [],
+          "builders": []
+        },
+        {
+          "at": 1792828449.8896387,
+          "target_bytes": 4504969096,
+          "owned": [],
+          "builders": []
+        },
+        {
+          "at": 1792828450.1842308,
+          "target_bytes": 4504969096,
+          "owned": [],
+          "builders": []
+        }
+      ]
+    },
+    "source_after": {
+      "commit": "49c25ef67f62a8bb943e7c6a0bf464e49ae87d07",
+      "status": "",
+      "branch": "uo2/budget-validation",
+      "cargo_locks": {
+        "Cargo.lock": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+        "tools/perf-baseline/Cargo.lock": "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184",
+        "tools/native-resave/Cargo.lock": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378",
+        "crates/litchi-core/fuzz/Cargo.lock": "395413860f3740a461efa0273b823449323b7860956e9c01cd1c6b1d654eccf2",
+        "crates/litchi-ops/fuzz/Cargo.lock": "10708241205e4a90c0120b3f41a77e7548715761801d66da2d55911e59e9ab8a",
+        "crates/litchi/fuzz/Cargo.lock": "c499d5efe6bba3991672c52f75f78a39a294a5b80e98f62a6ee2bb28dd2a2eb6"
+      }
+    },
+    "cargo_locks_before": {
+      "Cargo.lock": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+      "tools/perf-baseline/Cargo.lock": "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184",
+      "tools/native-resave/Cargo.lock": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378",
+      "crates/litchi-core/fuzz/Cargo.lock": "395413860f3740a461efa0273b823449323b7860956e9c01cd1c6b1d654eccf2",
+      "crates/litchi-ops/fuzz/Cargo.lock": "10708241205e4a90c0120b3f41a77e7548715761801d66da2d55911e59e9ab8a",
+      "crates/litchi/fuzz/Cargo.lock": "c499d5efe6bba3991672c52f75f78a39a294a5b80e98f62a6ee2bb28dd2a2eb6"
+    },
+    "cargo_locks_after": {
+      "Cargo.lock": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+      "tools/perf-baseline/Cargo.lock": "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184",
+      "tools/native-resave/Cargo.lock": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378",
+      "crates/litchi-core/fuzz/Cargo.lock": "395413860f3740a461efa0273b823449323b7860956e9c01cd1c6b1d654eccf2",
+      "crates/litchi-ops/fuzz/Cargo.lock": "10708241205e4a90c0120b3f41a77e7548715761801d66da2d55911e59e9ab8a",
+      "crates/litchi/fuzz/Cargo.lock": "c499d5efe6bba3991672c52f75f78a39a294a5b80e98f62a6ee2bb28dd2a2eb6"
+    },
+    "cargo_target_trace": [
+      {
+        "pid": "1607855",
+        "cargo_command": "doc",
+        "target": "/home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/target"
+      }
+    ],
+    "cargo_target_sizes": {
+      "/home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/target": {
+        "bytes": 4504969096
+      }
+    },
+    "cargo_target_trace_file": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/wsdoc-49c25ef67f/34-wsdoc-attempt-1792827392719701687-1607544-cargo-targets.tsv",
+    "cargo_target_trace_bytes": 75,
+    "cargo_target_trace_sha256": "5386e56ea133eab8c9af40d42835f2080ae21cffac0f7c2be17557428564c5c5",
+    "preflight": {
+      "started": 1792827393.8947933,
+      "target_bytes": 4435344057,
+      "free_bytes": 1255216463872,
+      "builders": []
+    },
+    "free_bytes_after": 1284981145600,
+    "effective_exit": 0,
+    "status": "passed"
+  },
+  "regenerator": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/record-wsdoc-20261024.py",
+    "bytes": 1773,
+    "sha256": "a6bec0ab899ab8d24414215a2928ee69eb854793859dc6e7d53d9dcd73fc33ec"
+  },
+  "regeneration_command": [
+    "python3",
+    "/home/zhuhe/code/litchi-worktrees/.coord/record-wsdoc-20261024.py"
+  ]
+}

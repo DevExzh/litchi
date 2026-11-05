@@ -1,0 +1,40 @@
+{
+  "source": "ad52437f5e5e2c71ea476eedd5ddcf61aee2021d",
+  "pid": 4104127,
+  "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation",
+  "command": [
+    "python3",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/run-semantic-checks-disk-guarded.py",
+    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/clippy-shared-types-v23-commands.json",
+    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/clippy-shared-types-v23"
+  ],
+  "started_unix_seconds": 1792789186.6811135,
+  "target": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target",
+  "lock_sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--keep-going",
+        "--message-format=json-render-diagnostics",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 101,
+      "seconds": 409.91155710900057,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/clippy-shared-types-v23/check-0.log",
+      "bytes": 1930533,
+      "sha256": "82bd88ec48725f5dd7162336e83a7996bc7b4532ead738d81d597ec0de36088b",
+      "target_bytes_before": 4330035351,
+      "completed_test_executables_pruned": []
+    }
+  ],
+  "note": "All reviewed shared-type migrations and gate bindings composed. Whole-workspace all-target all-feature Clippy returns one automatic-deref lint in facade chart admission and two now-redundant PPTX test-seam Diagnostics qualifications. Correct only those spellings. The shared migrations compile; full final qualification remains open."
+}

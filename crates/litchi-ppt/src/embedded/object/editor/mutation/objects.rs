@@ -63,7 +63,11 @@ pub(crate) fn remove(editor: &mut Editor, id: u32) -> Result<ExternalObject> {
         .iter()
         .any(|object| object.persist_id() == persist)
     {
-        candidate.removed_persist_ids.insert(persist);
+        // A storage staged by this edit was never live: dropping it
+        // removes nothing from the source.
+        if candidate.mappings.contains_key(&persist) {
+            candidate.removed_persist_ids.insert(persist);
+        }
         candidate.staged_storage.remove(&persist);
     }
     candidate.rewrite_object_list = true;

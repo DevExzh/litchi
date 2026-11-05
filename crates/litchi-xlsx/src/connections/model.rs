@@ -2,7 +2,7 @@
 
 use super::codec::bounded;
 use super::{codec, invalid};
-use litchi_core::sheet::Result;
+use crate::error::{Error, Result};
 use std::collections::{HashMap, HashSet};
 
 // XML namespaces and package limits are kept with the typed owner so every layer
@@ -323,10 +323,6 @@ impl Connections {
         Ok(())
     }
 
-    pub fn update(&mut self, id: u32, connection: Connection) -> Result<()> {
-        self.replace(id, connection)
-    }
-
     pub fn replace(&mut self, id: u32, connection: Connection) -> Result<()> {
         if connection.id != id {
             return Err(invalid("replacement connection ID must remain stable"));
@@ -438,7 +434,11 @@ where
             .checked_add(1)
             .ok_or_else(|| invalid("connection count overflow"))?;
         if count > MAX_CONNECTIONS {
-            return Err(invalid("invalid connection count"));
+            return Err(Error::limit(
+                super::LimitKind::Connections,
+                count,
+                MAX_CONNECTIONS,
+            ));
         }
         ids.try_reserve(1)
             .map_err(|_source| invalid("connection validation allocation failed"))?;
@@ -475,25 +475,41 @@ where
         {
             bounded(z)?;
         }
-        if c.web
-            .as_ref()
-            .and_then(|x| x.tables.as_ref())
-            .is_some_and(|x| x.is_empty() || x.len() > MAX_WEB_TABLES)
-        {
-            return Err(invalid("invalid web table count"));
+        if let Some(tables) = c.web.as_ref().and_then(|x| x.tables.as_ref()) {
+            if tables.len() > MAX_WEB_TABLES {
+                return Err(Error::limit(
+                    super::LimitKind::WebTables,
+                    tables.len(),
+                    MAX_WEB_TABLES,
+                ));
+            }
+            if tables.is_empty() {
+                return Err(invalid("invalid web table count"));
+            }
         }
-        if c.text
-            .as_ref()
-            .and_then(|x| x.fields.as_ref())
-            .is_some_and(|x| x.is_empty() || x.len() > MAX_TEXT_FIELDS)
-        {
-            return Err(invalid("invalid text field count"));
+        if let Some(fields) = c.text.as_ref().and_then(|x| x.fields.as_ref()) {
+            if fields.len() > MAX_TEXT_FIELDS {
+                return Err(Error::limit(
+                    super::LimitKind::TextFields,
+                    fields.len(),
+                    MAX_TEXT_FIELDS,
+                ));
+            }
+            if fields.is_empty() {
+                return Err(invalid("invalid text field count"));
+            }
         }
-        if c.parameters
-            .as_ref()
-            .is_some_and(|x| x.is_empty() || x.len() > MAX_PARAMETERS)
-        {
-            return Err(invalid("invalid parameter count"));
+        if let Some(parameters) = c.parameters.as_ref() {
+            if parameters.len() > MAX_PARAMETERS {
+                return Err(Error::limit(
+                    super::LimitKind::Parameters,
+                    parameters.len(),
+                    MAX_PARAMETERS,
+                ));
+            }
+            if parameters.is_empty() {
+                return Err(invalid("invalid parameter count"));
+            }
         }
         if let Some(e) = &c.extension_xml {
             codec::parse_dom(e)?;
@@ -506,7 +522,11 @@ where
         return Err(invalid("invalid connection count"));
     }
     if ext > MAX_EXTENSION_BYTES {
-        return Err(invalid("connection extensions exceed 8 MiB"));
+        return Err(Error::limit(
+            super::LimitKind::ExtensionBytes,
+            ext,
+            MAX_EXTENSION_BYTES,
+        ));
     }
     Ok(())
 }

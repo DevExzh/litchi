@@ -1,0 +1,785 @@
+{
+  "binary_bytes": "41879184",
+  "binary_path": "/tmp/litchi-unified-0234-target/release/unified-rtf-remove-baseline",
+  "binary_sha256": "b9d79489a81f252916cad0bdbb08d2a1ee12a58c8f9ff01627fcae90e9c81005",
+  "build_command": "CARGO_NET_OFFLINE=true CARGO_TARGET_DIR=/tmp/litchi-unified-0234-target cargo build --release --manifest-path tools/perf-baseline/unified-rtf-remove/Cargo.toml (external copied lock via nightly lockfile-path; cc 1.6.0)",
+  "cases": [
+    {
+      "corpus": {
+        "bytes": 28,
+        "sha256": "79e38cebea93107c04c2ad6e99f3f67d252616fe830d3ac067374cfed1d0b7d4"
+      },
+      "paragraphs": 1,
+      "protocol": {
+        "input_parse_timed": false,
+        "order": "native,unified,unified,native",
+        "output_serialization_timed": false,
+        "rounds": 9,
+        "selector_parse_timed": false,
+        "warmup": 2
+      },
+      "removed": 1,
+      "selector": "/body/p[1]",
+      "shape": "single_path",
+      "timing": {
+        "native": {
+          "median_ns": 2430,
+          "p75_ns": 2460,
+          "sample_count": 18,
+          "samples_ns": [
+            2700,
+            2460,
+            2410,
+            2470,
+            2450,
+            2480,
+            2440,
+            2400,
+            2370,
+            2540,
+            2390,
+            2430,
+            2380,
+            2390,
+            2410,
+            2440,
+            2400,
+            2430
+          ]
+        },
+        "unified": {
+          "median_ns": 2780,
+          "p75_ns": 2820,
+          "sample_count": 18,
+          "samples_ns": [
+            2920,
+            2920,
+            2720,
+            2850,
+            2790,
+            2920,
+            2780,
+            2770,
+            2730,
+            2820,
+            2730,
+            2790,
+            2750,
+            2780,
+            2750,
+            2720,
+            2700,
+            2760
+          ]
+        }
+      },
+      "warm_equivalence": {
+        "kind": "exact_bytes",
+        "native_bytes": 13,
+        "native_sha256": "c3e9d883e122e1ea87175bd16ccd5009737b51e3a9fde809ebbffde29e0e91be",
+        "unified_bytes": 13,
+        "unified_sha256": "c3e9d883e122e1ea87175bd16ccd5009737b51e3a9fde809ebbffde29e0e91be"
+      }
+    },
+    {
+      "corpus": {
+        "bytes": 28,
+        "sha256": "79e38cebea93107c04c2ad6e99f3f67d252616fe830d3ac067374cfed1d0b7d4"
+      },
+      "paragraphs": 1,
+      "protocol": {
+        "input_parse_timed": false,
+        "order": "native,unified,unified,native",
+        "output_serialization_timed": false,
+        "rounds": 9,
+        "selector_parse_timed": false,
+        "warmup": 2
+      },
+      "removed": 1,
+      "selector": "/body/p",
+      "shape": "query_all",
+      "timing": {
+        "native": {
+          "median_ns": 2360,
+          "p75_ns": 2390,
+          "sample_count": 18,
+          "samples_ns": [
+            2410,
+            2360,
+            2330,
+            2440,
+            2390,
+            2340,
+            2340,
+            2360,
+            2320,
+            2330,
+            2340,
+            2350,
+            2320,
+            2380,
+            2370,
+            2470,
+            2390,
+            2410
+          ]
+        },
+        "unified": {
+          "median_ns": 3470,
+          "p75_ns": 3500,
+          "sample_count": 18,
+          "samples_ns": [
+            3570,
+            3500,
+            3440,
+            3490,
+            3540,
+            3470,
+            3440,
+            3490,
+            3430,
+            3460,
+            3430,
+            3500,
+            3440,
+            3450,
+            3420,
+            3510,
+            3420,
+            3530
+          ]
+        }
+      },
+      "warm_equivalence": {
+        "kind": "exact_bytes",
+        "native_bytes": 13,
+        "native_sha256": "c3e9d883e122e1ea87175bd16ccd5009737b51e3a9fde809ebbffde29e0e91be",
+        "unified_bytes": 13,
+        "unified_sha256": "c3e9d883e122e1ea87175bd16ccd5009737b51e3a9fde809ebbffde29e0e91be"
+      }
+    },
+    {
+      "corpus": {
+        "bytes": 208,
+        "sha256": "83d1a2ff9d6d61bf07d3e201dff39f2cbd9dd44e6f58fe0c1aed3923eaa7f1d4"
+      },
+      "paragraphs": 10,
+      "protocol": {
+        "input_parse_timed": false,
+        "order": "native,unified,unified,native",
+        "output_serialization_timed": false,
+        "rounds": 9,
+        "selector_parse_timed": false,
+        "warmup": 2
+      },
+      "removed": 1,
+      "selector": "/body/p[6]",
+      "shape": "single_path",
+      "timing": {
+        "native": {
+          "median_ns": 7190,
+          "p75_ns": 7230,
+          "sample_count": 18,
+          "samples_ns": [
+            7630,
+            7410,
+            7230,
+            7340,
+            7280,
+            7210,
+            7150,
+            7220,
+            6960,
+            7010,
+            6940,
+            7000,
+            7070,
+            6990,
+            7210,
+            7160,
+            7190,
+            7120
+          ]
+        },
+        "unified": {
+          "median_ns": 7550,
+          "p75_ns": 7670,
+          "sample_count": 18,
+          "samples_ns": [
+            8020,
+            7710,
+            7730,
+            7710,
+            7540,
+            7440,
+            7310,
+            7420,
+            7550,
+            7410,
+            7540,
+            7480,
+            7450,
+            7390,
+            7670,
+            7570,
+            7580,
+            7610
+          ]
+        }
+      },
+      "warm_equivalence": {
+        "kind": "exact_bytes",
+        "native_bytes": 188,
+        "native_sha256": "fd396f442d1bcf0ce759d3c92a56d88e7bf411770da85ab48cd5318da04b8216",
+        "unified_bytes": 188,
+        "unified_sha256": "fd396f442d1bcf0ce759d3c92a56d88e7bf411770da85ab48cd5318da04b8216"
+      }
+    },
+    {
+      "corpus": {
+        "bytes": 208,
+        "sha256": "83d1a2ff9d6d61bf07d3e201dff39f2cbd9dd44e6f58fe0c1aed3923eaa7f1d4"
+      },
+      "paragraphs": 10,
+      "protocol": {
+        "input_parse_timed": false,
+        "order": "native,unified,unified,native",
+        "output_serialization_timed": false,
+        "rounds": 9,
+        "selector_parse_timed": false,
+        "warmup": 2
+      },
+      "removed": 10,
+      "selector": "/body/p",
+      "shape": "query_all",
+      "timing": {
+        "native": {
+          "median_ns": 6800,
+          "p75_ns": 6940,
+          "sample_count": 18,
+          "samples_ns": [
+            6940,
+            7050,
+            6990,
+            6980,
+            7010,
+            6880,
+            6700,
+            6790,
+            6870,
+            6590,
+            6660,
+            6670,
+            6760,
+            6720,
+            6710,
+            6800,
+            6890,
+            6790
+          ]
+        },
+        "unified": {
+          "median_ns": 8540,
+          "p75_ns": 8710,
+          "sample_count": 18,
+          "samples_ns": [
+            9150,
+            8620,
+            8910,
+            8780,
+            8770,
+            8400,
+            8590,
+            8540,
+            8390,
+            8430,
+            8410,
+            8480,
+            8340,
+            8460,
+            8310,
+            8710,
+            8490,
+            8560
+          ]
+        }
+      },
+      "warm_equivalence": {
+        "kind": "exact_bytes",
+        "native_bytes": 13,
+        "native_sha256": "c3e9d883e122e1ea87175bd16ccd5009737b51e3a9fde809ebbffde29e0e91be",
+        "unified_bytes": 13,
+        "unified_sha256": "c3e9d883e122e1ea87175bd16ccd5009737b51e3a9fde809ebbffde29e0e91be"
+      }
+    },
+    {
+      "corpus": {
+        "bytes": 2008,
+        "sha256": "e449e743c145fb8247ae011fc959362e5d9faa1116efb9fd7e39d8cbd06c5c39"
+      },
+      "paragraphs": 100,
+      "protocol": {
+        "input_parse_timed": false,
+        "order": "native,unified,unified,native",
+        "output_serialization_timed": false,
+        "rounds": 9,
+        "selector_parse_timed": false,
+        "warmup": 2
+      },
+      "removed": 1,
+      "selector": "/body/p[51]",
+      "shape": "single_path",
+      "timing": {
+        "native": {
+          "median_ns": 45351,
+          "p75_ns": 47290,
+          "sample_count": 18,
+          "samples_ns": [
+            47750,
+            45120,
+            53690,
+            46320,
+            45270,
+            45210,
+            45040,
+            44890,
+            45001,
+            45351,
+            44940,
+            47370,
+            47290,
+            47930,
+            46760,
+            45330,
+            47011,
+            44750
+          ]
+        },
+        "unified": {
+          "median_ns": 46790,
+          "p75_ns": 47570,
+          "sample_count": 18,
+          "samples_ns": [
+            53310,
+            45351,
+            47681,
+            46080,
+            45060,
+            45150,
+            44930,
+            47570,
+            45140,
+            44860,
+            45640,
+            51661,
+            47400,
+            46790,
+            47250,
+            46780,
+            47520,
+            47640
+          ]
+        }
+      },
+      "warm_equivalence": {
+        "kind": "exact_bytes",
+        "native_bytes": 1988,
+        "native_sha256": "286662b232d1abaa0f056c4de09bbe81ff61e053ba16a652865edc022781470a",
+        "unified_bytes": 1988,
+        "unified_sha256": "286662b232d1abaa0f056c4de09bbe81ff61e053ba16a652865edc022781470a"
+      }
+    },
+    {
+      "corpus": {
+        "bytes": 2008,
+        "sha256": "e449e743c145fb8247ae011fc959362e5d9faa1116efb9fd7e39d8cbd06c5c39"
+      },
+      "paragraphs": 100,
+      "protocol": {
+        "input_parse_timed": false,
+        "order": "native,unified,unified,native",
+        "output_serialization_timed": false,
+        "rounds": 9,
+        "selector_parse_timed": false,
+        "warmup": 2
+      },
+      "removed": 100,
+      "selector": "/body/p",
+      "shape": "query_all",
+      "timing": {
+        "native": {
+          "median_ns": 41531,
+          "p75_ns": 41710,
+          "sample_count": 18,
+          "samples_ns": [
+            41730,
+            41700,
+            41611,
+            41710,
+            41760,
+            41980,
+            41200,
+            49340,
+            41260,
+            41540,
+            41410,
+            41531,
+            41180,
+            41170,
+            41370,
+            41290,
+            41170,
+            41360
+          ]
+        },
+        "unified": {
+          "median_ns": 48490,
+          "p75_ns": 48650,
+          "sample_count": 18,
+          "samples_ns": [
+            48570,
+            48880,
+            48410,
+            48280,
+            48881,
+            56580,
+            48240,
+            48371,
+            48250,
+            48221,
+            48660,
+            48650,
+            48090,
+            48570,
+            48601,
+            48490,
+            48150,
+            48101
+          ]
+        }
+      },
+      "warm_equivalence": {
+        "kind": "exact_bytes",
+        "native_bytes": 13,
+        "native_sha256": "c3e9d883e122e1ea87175bd16ccd5009737b51e3a9fde809ebbffde29e0e91be",
+        "unified_bytes": 13,
+        "unified_sha256": "c3e9d883e122e1ea87175bd16ccd5009737b51e3a9fde809ebbffde29e0e91be"
+      }
+    },
+    {
+      "corpus": {
+        "bytes": 20008,
+        "sha256": "d6d2f40e185bb83888d86a37e4845598e9b7c751910f4bf2ad12c776aed1581e"
+      },
+      "paragraphs": 1000,
+      "protocol": {
+        "input_parse_timed": false,
+        "order": "native,unified,unified,native",
+        "output_serialization_timed": false,
+        "rounds": 9,
+        "selector_parse_timed": false,
+        "warmup": 2
+      },
+      "removed": 1,
+      "selector": "/body/p[501]",
+      "shape": "single_path",
+      "timing": {
+        "native": {
+          "median_ns": 546992,
+          "p75_ns": 548682,
+          "sample_count": 18,
+          "samples_ns": [
+            539632,
+            539232,
+            541222,
+            545742,
+            537092,
+            543272,
+            538212,
+            549592,
+            547922,
+            552602,
+            546992,
+            550522,
+            548682,
+            551492,
+            548232,
+            546142,
+            543432,
+            547582
+          ]
+        },
+        "unified": {
+          "median_ns": 541682,
+          "p75_ns": 543262,
+          "sample_count": 18,
+          "samples_ns": [
+            537252,
+            536132,
+            538432,
+            537722,
+            537742,
+            535382,
+            539292,
+            535093,
+            537102,
+            547743,
+            541682,
+            542083,
+            544982,
+            545862,
+            542922,
+            543262,
+            543812,
+            542522
+          ]
+        }
+      },
+      "warm_equivalence": {
+        "kind": "exact_bytes",
+        "native_bytes": 19988,
+        "native_sha256": "dccd1473e229c0c2685886c4158fd92e1cf558d15b2b5dd5ce2b6d8e19e65ee0",
+        "unified_bytes": 19988,
+        "unified_sha256": "dccd1473e229c0c2685886c4158fd92e1cf558d15b2b5dd5ce2b6d8e19e65ee0"
+      }
+    },
+    {
+      "corpus": {
+        "bytes": 20008,
+        "sha256": "d6d2f40e185bb83888d86a37e4845598e9b7c751910f4bf2ad12c776aed1581e"
+      },
+      "paragraphs": 1000,
+      "protocol": {
+        "input_parse_timed": false,
+        "order": "native,unified,unified,native",
+        "output_serialization_timed": false,
+        "rounds": 9,
+        "selector_parse_timed": false,
+        "warmup": 2
+      },
+      "removed": 1000,
+      "selector": "/body/p",
+      "shape": "query_all",
+      "timing": {
+        "native": {
+          "median_ns": 377982,
+          "p75_ns": 383122,
+          "sample_count": 18,
+          "samples_ns": [
+            377251,
+            377101,
+            383122,
+            379921,
+            381262,
+            387991,
+            375632,
+            376192,
+            383002,
+            375881,
+            377492,
+            384352,
+            377982,
+            377482,
+            428402,
+            376742,
+            376912,
+            384182
+          ]
+        },
+        "unified": {
+          "median_ns": 439771,
+          "p75_ns": 442872,
+          "sample_count": 18,
+          "samples_ns": [
+            433462,
+            442382,
+            435352,
+            444942,
+            442872,
+            434632,
+            433302,
+            440361,
+            435341,
+            490742,
+            441942,
+            434861,
+            434311,
+            451572,
+            435631,
+            442901,
+            439771,
+            434422
+          ]
+        }
+      },
+      "warm_equivalence": {
+        "kind": "exact_bytes",
+        "native_bytes": 13,
+        "native_sha256": "c3e9d883e122e1ea87175bd16ccd5009737b51e3a9fde809ebbffde29e0e91be",
+        "unified_bytes": 13,
+        "unified_sha256": "c3e9d883e122e1ea87175bd16ccd5009737b51e3a9fde809ebbffde29e0e91be"
+      }
+    },
+    {
+      "corpus": {
+        "bytes": 200008,
+        "sha256": "48bf8faba6a9b4bb7f9668d515b015a758431807a560d4c5626d48e3e4731e15"
+      },
+      "paragraphs": 10000,
+      "protocol": {
+        "input_parse_timed": false,
+        "order": "native,unified,unified,native",
+        "output_serialization_timed": false,
+        "rounds": 9,
+        "selector_parse_timed": false,
+        "warmup": 2
+      },
+      "removed": 1,
+      "selector": "/body/p[5001]",
+      "shape": "single_path",
+      "timing": {
+        "native": {
+          "median_ns": 6492497,
+          "p75_ns": 6524317,
+          "sample_count": 18,
+          "samples_ns": [
+            6496697,
+            6521487,
+            6492497,
+            6483597,
+            6461927,
+            6486597,
+            6457166,
+            6523987,
+            6464647,
+            6556597,
+            6524317,
+            6492317,
+            6548017,
+            6491878,
+            6307817,
+            6613957,
+            6391847,
+            6550417
+          ]
+        },
+        "unified": {
+          "median_ns": 6485347,
+          "p75_ns": 6522187,
+          "sample_count": 18,
+          "samples_ns": [
+            6548407,
+            6583097,
+            6446957,
+            6459387,
+            6494347,
+            6485347,
+            6481417,
+            6529618,
+            6522187,
+            6477497,
+            6471667,
+            6487117,
+            6594167,
+            6286026,
+            6444906,
+            6331557,
+            6418006,
+            6513957
+          ]
+        }
+      },
+      "warm_equivalence": {
+        "kind": "exact_bytes",
+        "native_bytes": 199988,
+        "native_sha256": "589e35fe59fb0de01c9e355a02941fcffdfbafc7f670eac9832774d724882255",
+        "unified_bytes": 199988,
+        "unified_sha256": "589e35fe59fb0de01c9e355a02941fcffdfbafc7f670eac9832774d724882255"
+      }
+    },
+    {
+      "corpus": {
+        "bytes": 200008,
+        "sha256": "48bf8faba6a9b4bb7f9668d515b015a758431807a560d4c5626d48e3e4731e15"
+      },
+      "paragraphs": 10000,
+      "protocol": {
+        "input_parse_timed": false,
+        "order": "native,unified,unified,native",
+        "output_serialization_timed": false,
+        "rounds": 9,
+        "selector_parse_timed": false,
+        "warmup": 2
+      },
+      "removed": 10000,
+      "selector": "/body/p",
+      "shape": "query_all",
+      "timing": {
+        "native": {
+          "median_ns": 3849397,
+          "p75_ns": 3874036,
+          "sample_count": 18,
+          "samples_ns": [
+            3839126,
+            3849397,
+            3800375,
+            3874036,
+            3788966,
+            3876356,
+            3806986,
+            3874606,
+            3804476,
+            3852376,
+            3796186,
+            3856446,
+            3806226,
+            3860226,
+            3825136,
+            3876786,
+            3904036,
+            3844676
+          ]
+        },
+        "unified": {
+          "median_ns": 4416889,
+          "p75_ns": 4448438,
+          "sample_count": 18,
+          "samples_ns": [
+            4448438,
+            4380268,
+            4423759,
+            4370728,
+            4529249,
+            4378118,
+            4416889,
+            4365198,
+            4467969,
+            4376228,
+            4455349,
+            4366298,
+            4428498,
+            4384219,
+            4474178,
+            4376919,
+            4435899,
+            4390388
+          ]
+        }
+      },
+      "warm_equivalence": {
+        "kind": "exact_bytes",
+        "native_bytes": 13,
+        "native_sha256": "c3e9d883e122e1ea87175bd16ccd5009737b51e3a9fde809ebbffde29e0e91be",
+        "unified_bytes": 13,
+        "unified_sha256": "c3e9d883e122e1ea87175bd16ccd5009737b51e3a9fde809ebbffde29e0e91be"
+      }
+    }
+  ],
+  "machine": "ip-172-31-39-190; pinned CPU 0; shared host",
+  "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+  "schema": "rtf_remove_benchmark.v1",
+  "source_commit": "95984af5d89955322ab2555cc6673d3d9881dd35",
+  "source_digest": "2b3d761f21cc742731676f64dc3f72f628b04983",
+  "target": "x86_64-unknown-linux-gnu",
+  "trial": 3
+}

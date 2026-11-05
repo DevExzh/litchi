@@ -3,7 +3,7 @@ use std::borrow::Cow;
 
 use super::{
     Feature, Features, Limits, Mode, Properties, ReferenceMode, inspect, invalidate_formulas,
-    parse, parse_features, parse_features_with_limits, rewrite,
+    parse, parse_features, rewrite,
 };
 use crate::error::Result;
 use litchi_opc::{OpcPackage, PackURI};
@@ -11,7 +11,10 @@ use litchi_opc::{OpcPackage, PackURI};
 const NS: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 
 fn parse_xml(child: &str) -> Result<Option<Properties>> {
-    parse(format!(r#"<workbook xmlns="{NS}">{child}</workbook>"#).as_bytes())
+    parse(
+        format!(r#"<workbook xmlns="{NS}">{child}</workbook>"#).as_bytes(),
+        &Limits::default(),
+    )
 }
 
 #[test]
@@ -58,7 +61,10 @@ fn parses_all_attributes_and_effective_defaults() {
 fn supports_strict_namespace_and_mce_fallback() {
     let strict = br#"<workbook xmlns="http://purl.oclc.org/ooxml/spreadsheetml/main"><calcPr calcMode="manual"/></workbook>"#;
     assert_eq!(
-        parse(strict).unwrap().unwrap().calculation_mode(),
+        parse(strict, &Limits::default())
+            .unwrap()
+            .unwrap()
+            .calculation_mode(),
         Mode::Manual
     );
     let mce = format!(
@@ -70,7 +76,10 @@ fn supports_strict_namespace_and_mce_fallback() {
         NS
     );
     assert_eq!(
-        parse(mce.as_bytes()).unwrap().unwrap().reference_mode(),
+        parse(mce.as_bytes(), &Limits::default())
+            .unwrap()
+            .unwrap()
+            .reference_mode(),
         ReferenceMode::R1C1
     );
 }
@@ -107,15 +116,15 @@ fn rejects_entity_references_inside_calc_pr() {
 
 #[test]
 fn rejects_oversized_workbook_xml() {
-    assert!(parse(&vec![b' '; MAX_XML_BYTES + 1]).is_err());
+    assert!(parse(&vec![b' '; MAX_XML_BYTES + 1], &Limits::default()).is_err());
 }
 
 fn fixture(bytes: &[u8]) -> Properties {
-    let package = OpcPackage::from_bytes(bytes).unwrap();
+    let package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     let part = package
         .get_part(&PackURI::new("/xl/workbook.xml").unwrap())
         .unwrap();
-    parse(part.blob()).unwrap().unwrap()
+    parse(part.blob(), &Limits::default()).unwrap().unwrap()
 }
 
 #[test]
@@ -167,13 +176,15 @@ fn parses_ordered_strict_features_and_applies_feature_limits() {
     let xml = format!(
         r#"<s:workbook xmlns:s="{STRICT}" xmlns:f="{XCALCF}"><s:extLst><s:ext uri="{URI}"><f:calcFeatures><f:feature name="A"/><f:feature name="A"/></f:calcFeatures></s:ext></s:extLst></s:workbook>"#,
     );
-    let features = parse_features(xml.as_bytes()).unwrap().unwrap();
+    let features = parse_features(xml.as_bytes(), &Limits::default())
+        .unwrap()
+        .unwrap();
     assert_eq!(features.len(), 2);
     assert_eq!(features.as_slice()[0].as_str(), "A");
     assert_eq!(features.occurrence_count("A"), 2);
 
     let limits = Limits::new().with_max_features(1).unwrap();
-    assert!(parse_features_with_limits(xml.as_bytes(), &limits).is_err());
+    assert!(parse_features(xml.as_bytes(), &limits).is_err());
 }
 
 #[test]
@@ -224,7 +235,7 @@ fn invalidation_preserves_qualified_future_calc_pr_attributes_exactly() {
     let xml = format!(
         r#"<s:workbook xmlns:s="{NS}"><s:calcPr xmlns:z="urn:future" calcId='9' z:future = 'kept&amp;exact' calcMode="manual"></s:calcPr></s:workbook>"#,
     );
-    assert!(parse(xml.as_bytes()).is_err());
+    assert!(parse(xml.as_bytes(), &Limits::default()).is_err());
     let limits = Limits::default();
     let inspected = inspect(xml.as_bytes(), &limits).unwrap();
     let changed = invalidate_formulas(&inspected, &limits)
@@ -344,7 +355,9 @@ fn understands_xcalcf_choice_and_collapses_extension_uri_token() {
     let xml = format!(
         r#"<workbook xmlns="{NS}" xmlns:mc="{MCE}" xmlns:f="{XCALCF}"><mc:AlternateContent><mc:Choice Requires="f"><extLst><ext uri="  {URI} &#xA; "><f:calcFeatures><f:feature name="choice"/></f:calcFeatures></ext></extLst></mc:Choice><mc:Fallback><extLst><ext uri="{URI}"><f:calcFeatures><f:feature name="fallback"/></f:calcFeatures></ext></extLst></mc:Fallback></mc:AlternateContent></workbook>"#,
     );
-    let features = parse_features(xml.as_bytes()).unwrap().unwrap();
+    let features = parse_features(xml.as_bytes(), &Limits::default())
+        .unwrap()
+        .unwrap();
     assert_eq!(features.as_slice()[0].as_str(), "choice");
 }
 
@@ -353,7 +366,7 @@ fn rejects_mixed_dialect_owners_and_out_of_order_calc_pr() {
     const STRICT: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
     let mixed =
         format!(r#"<s:workbook xmlns:s="{STRICT}" xmlns:t="{NS}"><t:calcPr/></s:workbook>"#,);
-    assert!(parse(mixed.as_bytes()).is_err());
+    assert!(parse(mixed.as_bytes(), &Limits::default()).is_err());
     assert!(parse_xml("<calcPr/><sheets/>").is_err());
 }
 
@@ -371,7 +384,9 @@ fn serializes_large_feature_collections_with_valid_structure() {
     let output = rewrite(&inspected, None, Some(&features), &limits)
         .unwrap()
         .into_owned();
-    let reparsed = parse_features(&output).unwrap().unwrap();
+    let reparsed = parse_features(&output, &Limits::default())
+        .unwrap()
+        .unwrap();
     assert_eq!(reparsed.len(), 4096);
     assert_eq!(reparsed.as_slice()[0].as_str(), "feature-0&exact");
     assert_eq!(reparsed.as_slice()[4095].as_str(), "feature-4095&exact");

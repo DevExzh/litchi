@@ -17,6 +17,7 @@
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 
+use litchi_opc::SourceLimits;
 use litchi_opc::phys_pkg::PhysPkgReader;
 use quick_xml::events::Event;
 use xml_minifier::audit::{self, Limits, package};
@@ -141,7 +142,7 @@ fn every_well_formed_fixture_member_passes_the_source_audit() {
             .into_owned();
         let bytes = std::fs::read(&path).unwrap();
         if bytes.starts_with(b"PK\x03\x04") {
-            let Ok(archive) = PhysPkgReader::new(&bytes) else {
+            let Ok(archive) = PhysPkgReader::new(&bytes, SourceLimits::default()) else {
                 continue;
             };
             let Ok(names) = archive.member_names() else {

@@ -34,8 +34,8 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, FileSource, Limits, OwnedSource,
     Position, ReadAt, Resource, SourceVersion,
 };
-use litchi_docx::{document::TransactionError, source_backed};
-use litchi_opc::{ReadLimits, SourceCacheLimits};
+use litchi_docx::{document::Error as TransactionError, source_backed};
+use litchi_opc::{SourceCacheLimits, SourceLimits};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -196,12 +196,12 @@ impl Config {
 #[derive(Clone, Copy, Debug, Serialize)]
 struct ReadLimitsRecord {
     max_input_bytes: u64,
-    max_archive_members: usize,
+    max_members: usize,
     max_archive_member_name_bytes: u64,
     max_archive_metadata_bytes: u64,
     max_archive_compressed_bytes: u64,
-    max_archive_entry_bytes: u64,
-    max_archive_total_bytes: u64,
+    max_entry_bytes: u64,
+    max_aggregate_bytes: u64,
     max_parts: usize,
     max_part_bytes: u64,
     max_total_part_bytes: u64,
@@ -213,23 +213,23 @@ struct ReadLimitsRecord {
     max_relationships_per_part: usize,
     max_total_relationships: usize,
     max_relationship_graph_nodes: usize,
-    max_xml_events: usize,
+    max_events: usize,
     max_total_relationship_xml_events: usize,
-    max_xml_depth: usize,
+    max_depth: usize,
     max_xml_attribute_bytes: usize,
     max_relationship_target_bytes: usize,
 }
 
 impl ReadLimitsRecord {
-    fn from_limits(limits: ReadLimits) -> Self {
+    fn from_limits(limits: SourceLimits) -> Self {
         Self {
             max_input_bytes: limits.max_input_bytes(),
-            max_archive_members: limits.max_archive_members(),
+            max_members: limits.max_members(),
             max_archive_member_name_bytes: limits.max_archive_member_name_bytes(),
             max_archive_metadata_bytes: limits.max_archive_metadata_bytes(),
             max_archive_compressed_bytes: limits.max_archive_compressed_bytes(),
-            max_archive_entry_bytes: limits.max_archive_entry_bytes(),
-            max_archive_total_bytes: limits.max_archive_total_bytes(),
+            max_entry_bytes: limits.max_entry_bytes(),
+            max_aggregate_bytes: limits.max_aggregate_bytes(),
             max_parts: limits.max_parts(),
             max_part_bytes: limits.max_part_bytes(),
             max_total_part_bytes: limits.max_total_part_bytes(),
@@ -241,9 +241,9 @@ impl ReadLimitsRecord {
             max_relationships_per_part: limits.max_relationships_per_part(),
             max_total_relationships: limits.max_total_relationships(),
             max_relationship_graph_nodes: limits.max_relationship_graph_nodes(),
-            max_xml_events: limits.max_xml_events(),
+            max_events: limits.max_events(),
             max_total_relationship_xml_events: limits.max_total_relationship_xml_events(),
-            max_xml_depth: limits.max_xml_depth(),
+            max_depth: limits.max_depth(),
             max_xml_attribute_bytes: limits.max_xml_attribute_bytes(),
             max_relationship_target_bytes: limits.max_relationship_target_bytes(),
         }
@@ -273,7 +273,7 @@ struct LimitsRecord {
 }
 
 fn limits_record(api: ApiMode) -> LimitsRecord {
-    let read_limits = ReadLimits::default();
+    let read_limits = SourceLimits::default();
     let cache_limits = SourceCacheLimits::default();
     LimitsRecord {
         read_limits: ReadLimitsRecord::from_limits(read_limits),
@@ -1109,13 +1109,13 @@ fn prepare() -> Result<Prepared, Box<dyn Error>> {
     }
     crate::verify_docx_source_edit_output(&corpus, &expected_output)?;
     let source_document_xml = commit.patch().source().xml_bytes().to_vec();
-    let candidate_document_xml = commit.snapshot().xml_bytes().to_vec();
+    let candidate_document_xml = commit.patch().target().xml_bytes().to_vec();
     let replayed = commit.patch().apply(commit.patch().source())?;
-    let replay_forward_verified = replayed.xml_bytes() == commit.snapshot().xml_bytes();
-    let restored = commit.patch().inverse().apply(commit.snapshot())?;
+    let replay_forward_verified = replayed.xml_bytes() == commit.patch().target().xml_bytes();
+    let restored = commit.patch().inverse().apply(commit.patch().target())?;
     let inverse_restores_source_verified =
         restored.xml_bytes() == commit.patch().source().xml_bytes();
-    let stale_target_refusal_verified = commit.patch().apply(commit.snapshot()).is_err();
+    let stale_target_refusal_verified = commit.patch().apply(commit.patch().target()).is_err();
     let foreign_package = litchi_docx::source_backed::Package::from_read_at(Arc::new(
         OwnedSource::new(expected_output.clone()),
     ))?;
@@ -1213,10 +1213,8 @@ fn finite_context() -> Result<(Budget, ExecutionContext), Box<dyn Error>> {
 fn is_managed_boundary_refusal(error: &(dyn Error + 'static)) -> bool {
     matches!(
         error.downcast_ref::<TransactionError>(),
-        Some(TransactionError::Document(litchi_docx::Error::UnsafeEdit {
-            operation: "document_snapshot",
-            ..
-        }))
+        Some(TransactionError::Document(litchi_docx::Error::Refused(refusal)))
+            if refusal.operation() == "document_snapshot"
     )
 }
 
@@ -1244,21 +1242,20 @@ fn execute_api(
 ) -> Result<TimedOperation, Box<dyn Error>> {
     let open_started = phase_start(config.phase_diagnostics);
     let package = match budget {
-        Some((_budget, context, _before)) => {
-            source_backed::Package::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                source,
-                ReadLimits::default(),
-                SourceCacheLimits::new(CACHE_MAX_BYTES, CACHE_MAX_ENTRIES)?,
-                context.clone(),
-            )?
-        },
+        Some((_budget, context, _before)) => source_backed::Package::from_read_at_with_options(
+            source,
+            litchi_docx::OpenOptions::default()
+                .source_limits(SourceLimits::default())
+                .cache_limits(SourceCacheLimits::new(CACHE_MAX_BYTES, CACHE_MAX_ENTRIES)?)
+                .execution_context(context.clone()),
+        )?,
         None => source_backed::Package::from_read_at(source)?,
     };
     let cache_before = package.cache_diagnostics();
     let open_ns = phase_elapsed(open_started)?;
 
     let edit_staging_started = phase_start(config.phase_diagnostics);
-    let mut edit = package.edit_document()?;
+    let mut edit = package.edit()?;
     edit.replace_paragraph_text(
         Position::new(prepared.target_position),
         &prepared.replacement_text,
@@ -1270,11 +1267,11 @@ fn execute_api(
     let commit_ns = phase_elapsed(commit_started)?;
 
     let diagnostics_xml_identity_started = phase_start(config.phase_diagnostics);
-    let commit_changed = commit.patch().changed();
+    let commit_changed = !commit.patch().is_noop();
     let commit_operations = commit.diagnostics().operations();
     let commit_identity_verified = commit.patch().source().xml_bytes()
         == prepared.source_document_xml.as_slice()
-        && commit.snapshot().xml_bytes() == prepared.candidate_document_xml.as_slice();
+        && commit.patch().target().xml_bytes() == prepared.candidate_document_xml.as_slice();
     let cache_live = package.cache_diagnostics();
     let materializations = cache_live
         .successful_loads
@@ -1283,7 +1280,10 @@ fn execute_api(
     let diagnostics_xml_identity_ns = phase_elapsed(diagnostics_xml_identity_started)?;
 
     let publication_started = phase_start(config.phase_diagnostics);
-    let published = package.publish_document_commit_to_stream(sink, &commit)?;
+    // Record 0355a: the detached commit replays onto the package and the
+    // committed package is written.
+    let published = package.apply(commit.patch())?.into_package();
+    published.write_to(sink)?;
     let publication_ns = phase_elapsed(publication_started)?;
 
     let published_snapshot_drop_started = phase_start(config.phase_diagnostics);
@@ -2129,7 +2129,7 @@ mod tests {
     #[test]
     fn limits_report_uses_package_defaults_without_claiming_managed_budget() {
         let report = limits_record(ApiMode::UnmanagedApi);
-        let read_limits = ReadLimits::default();
+        let read_limits = SourceLimits::default();
         let cache_limits = SourceCacheLimits::default();
         assert_eq!(
             report.read_limits.max_input_bytes,

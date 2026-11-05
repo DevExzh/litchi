@@ -3,12 +3,13 @@
     reason = "integration tests deliberately panic on unexpected failures"
 )]
 
+use litchi_odf_common::Error as PackageError;
 use litchi_odf_common::constants::ODF_FORMULA;
 use litchi_odf_common::core::OwnedPackage;
 use litchi_odf_formula::authoring::content::{self, Closure, NumberType, Qualifier};
 use litchi_odf_formula::authoring::{self, Display, Variant};
 use litchi_odf_formula::{
-    ContentSymbol, DependencyConflictKind, Element, Formula, History, NodePath, OpaqueStarMath,
+    ContentSymbol, DependencyConflictKind, Element, History, NodePath, OpaqueStarMath, Package,
     StarMathVersion, codec,
 };
 use soapberry_zip::office::StreamingArchiveWriter;
@@ -27,13 +28,13 @@ fn every_checked_constructor_family_builds_compact_reopenable_mathml() {
     for child in children {
         root.push_child(child);
     }
-    let xml = codec::serialize(&root);
+    let xml = codec::serialize(&root, &codec::Limits::default()).expect("serialize corpus");
 
     assert!(!xml.contains('\n'));
     assert!(!xml.contains("> <"));
-    let formula = Formula::create(&xml).expect("complete constructor corpus");
-    let reopened = Formula::from_bytes(formula.to_bytes()).expect("full package reopen");
-    assert_eq!(reopened.root(), &root);
+    let formula = create(&xml).expect("complete constructor corpus");
+    let reopened = open(formula.as_bytes()).expect("full package reopen");
+    assert_eq!(reopened.formula().root(), &root);
 
     assert!(content::declaration(authoring::identifier("x"), None).is_err());
     assert!(
@@ -55,9 +56,10 @@ fn deterministic_xml_property_corpus_covers_every_constructor_and_raw_ingress() 
         } else {
             authoring::document_root(element, Display::Inline)
         };
-        let baseline = codec::serialize(&root);
-        let baseline_formula = Formula::create(&baseline).expect("constructor baseline");
-        assert!(Formula::from_bytes(baseline_formula.to_bytes()).is_ok());
+        let baseline =
+            codec::serialize(&root, &codec::Limits::default()).expect("serialize baseline");
+        let baseline_formula = create(&baseline).expect("constructor baseline");
+        assert!(open(baseline_formula.as_bytes()).is_ok());
 
         for mutation in 0..12_usize {
             let mut bytes = baseline.as_bytes().to_vec();
@@ -68,10 +70,10 @@ fn deterministic_xml_property_corpus_covers_every_constructor_and_raw_ingress() 
                 bytes.truncate(bytes.len().saturating_sub((mutation % 5).saturating_add(1)));
             }
             let candidate = String::from_utf8(bytes).expect("ASCII corpus");
-            let first = Formula::create(&candidate).is_ok();
-            let second = Formula::create(&candidate).is_ok();
-            let raw = Formula::from_bytes(raw_formula_package(&candidate, None)).is_ok();
-            let parsed = codec::parse(&candidate).is_ok();
+            let first = create(&candidate).is_ok();
+            let second = create(&candidate).is_ok();
+            let raw = open(raw_formula_package(&candidate, None)).is_ok();
+            let parsed = codec::parse(&candidate, &codec::Limits::default()).is_ok();
             assert_eq!(
                 first, second,
                 "document {document_index}, mutation {mutation}"
@@ -82,8 +84,8 @@ fn deterministic_xml_property_corpus_covers_every_constructor_and_raw_ingress() 
             );
             assert!(!first || raw, "authored ingress accepted rejected raw XML");
             if first {
-                let accepted = Formula::create(&candidate).expect("accepted mutation");
-                assert!(Formula::from_bytes(accepted.to_bytes()).is_ok());
+                let accepted = create(&candidate).expect("accepted mutation");
+                assert!(open(accepted.as_bytes()).is_ok());
             }
             if !raw {
                 malformed += 1;
@@ -135,17 +137,14 @@ fn presentation_content_and_annotation_boundaries_are_deterministic() {
     ];
 
     for xml in valid {
-        assert!(
-            Formula::create(&xml).is_ok(),
-            "rejected valid boundary: {xml}"
-        );
-        assert!(Formula::from_bytes(raw_formula_package(&xml, None)).is_ok());
+        assert!(create(&xml).is_ok(), "rejected valid boundary: {xml}");
+        assert!(open(raw_formula_package(&xml, None)).is_ok());
     }
     for xml in malformed {
-        let first = Formula::create(&xml).is_err();
-        let second = Formula::create(&xml).is_err();
+        let first = create(&xml).is_err();
+        let second = create(&xml).is_err();
         assert!(first && second, "accepted malformed boundary: {xml}");
-        assert!(Formula::from_bytes(raw_formula_package(&xml, None)).is_err());
+        assert!(open(raw_formula_package(&xml, None)).is_err());
     }
 }
 
@@ -155,10 +154,10 @@ fn annotations_and_resources_retain_exact_provenance_through_opaque_edit_history
         r#"<math xmlns="{NS}"><semantics><mrow><mi>x</mi><mo>+</mo><mn>1</mn></mrow><annotation encoding="StarMath 5.0">x + 1</annotation><annotation encoding="text/plain">human note</annotation><annotation-xml encoding="application/xml"><v:proof xmlns:v="urn:vendor:proof" id="7"/></annotation-xml><annotation encoding="StarMath 6">x plus 1</annotation></semantics></math>"#
     );
     let raw = raw_formula_package(&xml, Some((RESOURCE_PATH, RESOURCE_BYTES)));
-    let source = Formula::from_bytes(raw.clone()).expect("raw resource package");
+    let source = open(raw.clone()).expect("raw resource package");
     assert_eq!(source.as_bytes(), raw);
-    assert_eq!(source.annotations().len(), 4);
-    let starmath = source.starmath_annotations();
+    assert_eq!(source.formula().annotations().len(), 4);
+    let starmath = source.formula().starmath_annotations();
     assert_eq!(starmath.len(), 2);
     assert_eq!(starmath[0].opaque().source(), "x + 1");
     assert_eq!(starmath[1].opaque().source(), "x plus 1");
@@ -173,17 +172,25 @@ fn annotations_and_resources_retain_exact_provenance_through_opaque_edit_history
     token_edit.join(&opaque_edit).expect("annotation join");
     let commit = token_edit.commit().expect("resource-preserving commit");
     let patch = commit.patch().clone();
-    let target = commit.into_formula();
-    let reopened = Formula::from_bytes(target.to_bytes()).expect("changed package reopen");
-    assert_eq!(reopened.starmath().expect("StarMath").opaque(), &opaque);
+    let target = commit.into_package();
+    let reopened = open(target.as_bytes()).expect("changed package reopen");
+    assert_eq!(
+        reopened.formula().starmath().expect("StarMath").opaque(),
+        &opaque
+    );
 
-    let package = OwnedPackage::from_bytes(reopened.to_bytes()).expect("raw changed package");
+    let package =
+        OwnedPackage::from_bytes(reopened.to_bytes().expect("bytes")).expect("raw changed package");
     assert_eq!(
         package.get_file(RESOURCE_PATH).expect("preserved resource"),
         RESOURCE_BYTES
     );
     assert_eq!(
-        patch.inverse().apply(&target).expect("inverse").as_bytes(),
+        target
+            .apply(&patch.inverse())
+            .expect("inverse")
+            .into_package()
+            .as_bytes(),
         source.as_bytes()
     );
 
@@ -191,11 +198,11 @@ fn annotations_and_resources_retain_exact_provenance_through_opaque_edit_history
         let mut candidate = raw.clone();
         let index = usize::try_from(deterministic_state(case, 37)).unwrap_or(0) % candidate.len();
         candidate[index] ^= 1_u8 << (case % 8);
-        let first = Formula::from_bytes(candidate.clone()).is_ok();
-        let second = Formula::from_bytes(candidate.clone()).is_ok();
+        let first = open(candidate.clone()).is_ok();
+        let second = open(candidate.clone()).is_ok();
         assert_eq!(first, second, "raw resource package case {case}");
-        if let Ok(accepted) = Formula::from_bytes(candidate) {
-            assert!(Formula::from_bytes(accepted.to_bytes()).is_ok());
+        if let Ok(accepted) = open(candidate) {
+            assert!(open(accepted.as_bytes()).is_ok());
         }
     }
 }
@@ -233,7 +240,7 @@ fn deterministic_merge_transfer_and_history_properties_reopen_and_reverse() {
         left.join(&right).expect("joined edits");
         let first_commit = left.commit().expect("first commit");
         let first_patch = first_commit.patch().clone();
-        let first = first_commit.into_formula();
+        let first = first_commit.into_package();
 
         let mut annotation_edit = first.edit();
         let opaque = OpaqueStarMath::new(StarMathVersion::V6, format!("case_{case}"))
@@ -243,7 +250,7 @@ fn deterministic_merge_transfer_and_history_properties_reopen_and_reverse() {
             .expect("history StarMath edit");
         let second_commit = annotation_edit.commit().expect("second commit");
         let second_patch = second_commit.patch().clone();
-        let target = second_commit.into_formula();
+        let target = second_commit.into_package();
 
         let mut history = History::new();
         history
@@ -252,21 +259,28 @@ fn deterministic_merge_transfer_and_history_properties_reopen_and_reverse() {
         history
             .push(second_patch.clone())
             .expect("second history link");
+        assert!(matches!(
+            history.push(second_patch.clone()),
+            Err(PackageError::PatchConflict { .. })
+        ));
+        assert!(matches!(
+            history.apply(&target),
+            Err(PackageError::PatchConflict { .. })
+        ));
         let durable = history.to_bytes().expect("history bytes");
         let decoded = History::from_bytes(&durable).expect("history reopen");
         let applied = decoded.apply(&base).expect("history apply");
         assert_eq!(applied.as_bytes(), target.as_bytes());
-        assert!(Formula::from_bytes(applied.to_bytes()).is_ok());
+        assert!(open(applied.as_bytes()).is_ok());
 
-        let restored_first = second_patch
-            .inverse()
-            .apply(&target)
+        let restored_first = target
+            .apply(&second_patch.inverse())
             .expect("second inverse");
-        let restored_base = first_patch
-            .inverse()
-            .apply(&restored_first)
+        let restored_base = restored_first
+            .into_package()
+            .apply(&first_patch.inverse())
             .expect("first inverse");
-        assert_eq!(restored_base.as_bytes(), base.as_bytes());
+        assert_eq!(restored_base.into_package().as_bytes(), base.as_bytes());
 
         let mut corrupted = durable;
         let index = usize::try_from(deterministic_state(case, 91)).unwrap_or(0) % corrupted.len();
@@ -505,7 +519,7 @@ fn complete_content_corpus() -> Vec<Element> {
     corpus
 }
 
-fn history_base() -> Formula {
+fn history_base() -> Package {
     let presentation = authoring::row(
         (0..6)
             .map(|index| authoring::identifier(&format!("p{index}")))
@@ -525,7 +539,8 @@ fn history_base() -> Formula {
     root.push_child(presentation);
     root.push_child(content);
     root.push_child(semantics);
-    Formula::create(codec::serialize(&root)).expect("history base")
+    create(codec::serialize(&root, &codec::Limits::default()).expect("history XML"))
+        .expect("history base")
 }
 
 fn deterministic_state(document: usize, mutation: usize) -> u32 {
@@ -547,7 +562,8 @@ fn raw_formula_package(content: &str, resource: Option<(&str, &[u8])>) -> Vec<u8
     let manifest = format!(
         r#"<?xml version="1.0"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="{ODF_FORMULA}"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/>{resource_entry}</manifest:manifest>"#
     );
-    let mut archive = StreamingArchiveWriter::new();
+    let mut archive =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     archive
         .write_stored("mimetype", ODF_FORMULA.as_bytes())
         .expect("mimetype");
@@ -561,4 +577,12 @@ fn raw_formula_package(content: &str, resource: Option<(&str, &[u8])>) -> Vec<u8
         .write_deflated("META-INF/manifest.xml", manifest.as_bytes())
         .expect("manifest");
     archive.finish_to_bytes().expect("raw package")
+}
+
+fn create(mathml: impl Into<String>) -> Result<Package, litchi_odf_formula::Error> {
+    litchi_odf_formula::Builder::from_mathml(mathml).build()
+}
+
+fn open(bytes: impl AsRef<[u8]>) -> Result<Package, litchi_odf_formula::Error> {
+    Package::from_bytes(bytes.as_ref())
 }

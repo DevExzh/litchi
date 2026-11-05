@@ -57,34 +57,40 @@ impl Position {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Selector {
     /// Select the footnote whose body anchor is at this UTF-16 position.
-    At(Position),
+    Anchor(Position),
     /// Select the footnote at this zero-based source order.
-    Index(usize),
+    Position(litchi_core::Position),
 }
 
 impl Selector {
     /// Create a position-based selector.
     #[must_use]
     pub const fn at(position: Position) -> Self {
-        Self::At(position)
+        Self::Anchor(position)
     }
 
     /// Create a zero-based source-order selector.
     #[must_use]
     pub const fn index(index: usize) -> Self {
-        Self::Index(index)
+        Self::Position(litchi_core::Position::new(index))
     }
 }
 
 impl From<Position> for Selector {
     fn from(position: Position) -> Self {
-        Self::At(position)
+        Self::Anchor(position)
     }
 }
 
 impl From<usize> for Selector {
     fn from(index: usize) -> Self {
-        Self::Index(index)
+        Self::index(index)
+    }
+}
+
+impl From<litchi_core::Position> for Selector {
+    fn from(position: litchi_core::Position) -> Self {
+        Self::Position(position)
     }
 }
 
@@ -151,9 +157,12 @@ mod tests {
         let position = Position::from_utf16_index(17)
             .unwrap_or_else(|error| panic!("valid UTF-16 position: {error}"));
         assert_eq!(position.utf16_index(), 17);
-        assert_eq!(Selector::from(position), Selector::At(position));
-        assert_eq!(Selector::at(position), Selector::At(position));
-        assert_eq!(Selector::index(2), Selector::Index(2));
+        assert_eq!(Selector::from(position), Selector::Anchor(position));
+        assert_eq!(Selector::at(position), Selector::Anchor(position));
+        assert_eq!(
+            Selector::index(2),
+            Selector::Position(litchi_core::Position::new(2))
+        );
         if usize::BITS > u32::BITS {
             assert_eq!(
                 Position::from_utf16_index(usize::MAX),
@@ -186,4 +195,11 @@ mod tests {
             Err(Error::CustomMarkTooLarge)
         );
     }
+}
+
+/// Exact-source transactions over the rooted body's footnotes.
+pub mod transaction {
+    pub use crate::package::body_footnote::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal, Snapshot,
+    };
 }

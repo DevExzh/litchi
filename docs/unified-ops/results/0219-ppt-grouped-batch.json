@@ -1,0 +1,2533 @@
+{
+  "source_commit": "27c3cb1e80d3f48050352cb9b0baecfa23b5263a",
+  "source_files": {
+    "crates/litchi-ppt/src/text_edit.rs": "cde12cb5f15aa5e5d66d21e817db58b8738b72d6cd30ca87fa6ff0e84d41c78c",
+    "tools/perf-baseline/src/unified_ops.rs": "61103c1b7b5736754bf345044219632b5ae3fcf2e275fdef4103a413114e1ba0",
+    "tools/perf-baseline/src/lib.rs": "c39676659f9fb479f3bbedaea807ba618595421a5e6f238cb4916ac07fdfac8a",
+    "crates/litchi-ops/src/transaction.rs": "aa587e69cc394e0c7087dd5c1340865e2b02d210011d3ea3cab2a3621d3853d5",
+    "crates/litchi-ops/src/format/ppt/write/coalesce.rs": "b6fd6e9e52bb4a6db154a8e988bdb12de2738dff3bc10699e4db84a8c4e1d15a"
+  },
+  "binary_identity": {
+    "path": "/tmp/litchi-unified-0219-target/release/litchi-perf-baseline",
+    "binary_sha256": "c0f36f43a20f09fd259fe48ac622f22ec9818e2e971a3154931e4ba5655c116a",
+    "binary_bytes": 82920416,
+    "mode_bits": 509,
+    "executable": true,
+    "profile": "release"
+  },
+  "environment": {
+    "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "git_revision": "27c3cb1e80d3f48050352cb9b0baecfa23b5263a",
+    "git_worktree_dirty": true,
+    "logical_cpus_available": 32,
+    "allocator": "Rust system allocator",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1",
+    "os": "linux",
+    "kernel": "Linux 7.0.0-1013-aws",
+    "cpu_model": "AMD EPYC 9R45",
+    "total_memory_bytes": 132553801728,
+    "page_size_bytes": 4096,
+    "filesystem_type": null,
+    "source_destination_same_device": null,
+    "cpu_affinity": "0-31",
+    "storage_identifier": null
+  },
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2",
+  "machine": "Linux-7.0.0-1013-aws-x86_64-with-glibc2.43",
+  "build_command": "CARGO_INCREMENTAL=0 CARGO_NET_OFFLINE=true CARGO_PROFILE_RELEASE_LTO=false cargo build --release --manifest-path tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline",
+  "lock_policy": "External copy of tools/perf-baseline/Cargo.lock passed through -Z lockfile-path and resolver.lockfile-path; repository lockfiles unchanged. Facade validation used a separate external root lock with cc 1.7.0 downgraded to cached 1.6.0.",
+  "repository_lock_sha256": {
+    "Cargo.lock": "650227248cacddae70bfda1d31728fd1ee7ad215647d2c7c18d31857e3dac48a",
+    "tools/perf-baseline/Cargo.lock": "5dcdb0f17dcfbce9704826ab4ab63c970447669130daae9f2d74e640c8577216"
+  },
+  "command_template": "litchi-perf-baseline --samples 5 --warmup 1 --case ppt_text_batch_{owner}_native_{count}_v1,ppt_text_batch_{owner}_unified_{count}_v1 --json OUTPUT.json",
+  "method": "Fourteen separate pair invocations in count order (1,10,100,256,1000,4096,10000), eager then positional. Native leg then unified leg; one warmup and five samples each. No concurrent builds or tests. Runtime sources committed; documentation uncommitted. Blocked leg order, not alternating AB/BA.",
+  "timing_scope": "Opening, fixture and command-vector preparation, serialization and byte/source checks excluded. String path parsing, native/unified publication and patch destruction included. 1k uses default snapshot limit; 10k explicitly uses 1 GiB. Native 256-item chunks with 4096-operation rollover; unified uses one atomic facade edit.",
+  "limitations": "Synthetic same-slide text closure edits only, local warm prepared owners. No command-batch JSON conversion, geometry, cold opens, broad corpus or allocation qualification. Blocked leg order can retain drift. Per-chunk append-only publication remains; relative speedup does not establish linear scaling.",
+  "prior_record": "0218-ppt-batch.json",
+  "prior_source_and_output_hashes_match": true,
+  "cases": [
+    {
+      "owner": "eager",
+      "operations": 1,
+      "native": {
+        "case": "ppt_text_batch_eager_native_1_v1",
+        "corpus": {
+          "name": "ppt-text-batch-1",
+          "generator": "litchi-ppt-text-batch-v1",
+          "package_format": "PPT/CFB",
+          "shape": "1",
+          "payload_kind": "deterministic-text-boxes",
+          "compression": "none",
+          "entry_count": 1,
+          "archive_member_count": 4,
+          "entry_bytes": 39,
+          "uncompressed_payload_bytes": 39,
+          "archive_bytes": 7168,
+          "archive_sha256": "4e52a3ca3f84043f771183257538c4a6314ba5b8244483ba9302894d2b9d242d",
+          "target_entry": "slide:0/shape:0",
+          "target_payload_bytes": 39,
+          "target_payload_sha256": "556c6fc20cb1fc08390eb8a77c9102a9b18c1bc4a961f0b88ac4bc3705e3674d",
+          "xlsx": null
+        },
+        "elapsed_ns": {
+          "unit": "ns",
+          "samples": [
+            106520,
+            107221,
+            110171,
+            112411,
+            116880
+          ],
+          "sample_order": [
+            4,
+            3,
+            2,
+            0,
+            1
+          ],
+          "min": 106520,
+          "p50": 110171,
+          "p95": 116880,
+          "p99": 116880,
+          "max": 116880,
+          "mean": 110640.6,
+          "standard_deviation": 4211.827429988079,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 105411.76390767329,
+            "upper": 115869.43609232672
+          }
+        },
+        "sink": null,
+        "source": {
+          "read_calls": [],
+          "read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "ordinary_payload_read_bytes": [],
+          "max_in_flight_reads": [],
+          "unified_ops": {
+            "leg": "native",
+            "predecessor": "ppt_text_batch_native_vs_unified_v1",
+            "twin": "ppt_text_batch_eager_unified_1_v1",
+            "timed_calls": "prepared litchi_ppt::Package::edit with 256-target set_shape_texts chunks and 4096-operation commit rollover",
+            "performance_claim": "none: one leg of a paired unified/leaf re-measurement (plan 0003 \u00a75.3); comparisons belong to the M0a S10 record",
+            "projection_sha256": "6ab15ad2f4ca374c8acadc3ebb20e46329e4537fe389fd7917df337d66954507",
+            "verified_samples": 5,
+            "legs_agree": true,
+            "ppt_text_batch": {
+              "leg": "native",
+              "owner": "eager",
+              "count": 1,
+              "native_chunk_size": 256,
+              "native_operation_limit": 4096,
+              "native_chunk_calls": 1,
+              "native_commits": 1,
+              "unified_operations": 1,
+              "unified_commits": 1,
+              "semantic_snapshot_limit_bytes": 268435456,
+              "source_sha256": "4e52a3ca3f84043f771183257538c4a6314ba5b8244483ba9302894d2b9d242d",
+              "expected_output_sha256": "6ab15ad2f4ca374c8acadc3ebb20e46329e4537fe389fd7917df337d66954507",
+              "exact_output_verified": true,
+              "unchanged_source_verified": true,
+              "timing_scope": "one prepared native or unified text-batch publication; opening, fixture construction, command-vector preparation, output serialization, exact equivalence and source checks are outside the timer; unified string-path parsing is timed"
+            }
+          }
+        }
+      },
+      "unified": {
+        "case": "ppt_text_batch_eager_unified_1_v1",
+        "corpus": {
+          "name": "ppt-text-batch-1",
+          "generator": "litchi-ppt-text-batch-v1",
+          "package_format": "PPT/CFB",
+          "shape": "1",
+          "payload_kind": "deterministic-text-boxes",
+          "compression": "none",
+          "entry_count": 1,
+          "archive_member_count": 4,
+          "entry_bytes": 39,
+          "uncompressed_payload_bytes": 39,
+          "archive_bytes": 7168,
+          "archive_sha256": "4e52a3ca3f84043f771183257538c4a6314ba5b8244483ba9302894d2b9d242d",
+          "target_entry": "slide:0/shape:0",
+          "target_payload_bytes": 39,
+          "target_payload_sha256": "556c6fc20cb1fc08390eb8a77c9102a9b18c1bc4a961f0b88ac4bc3705e3674d",
+          "xlsx": null
+        },
+        "elapsed_ns": {
+          "unit": "ns",
+          "samples": [
+            118220,
+            118531,
+            121541,
+            126831,
+            132231
+          ],
+          "sample_order": [
+            1,
+            0,
+            3,
+            4,
+            2
+          ],
+          "min": 118220,
+          "p50": 121541,
+          "p95": 132231,
+          "p99": 132231,
+          "max": 132231,
+          "mean": 123470.8,
+          "standard_deviation": 5994.345268667795,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 116029.03050405302,
+            "upper": 130912.56949594698
+          }
+        },
+        "sink": null,
+        "source": {
+          "read_calls": [],
+          "read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "ordinary_payload_read_bytes": [],
+          "max_in_flight_reads": [],
+          "unified_ops": {
+            "leg": "unified",
+            "predecessor": "ppt_text_batch_native_vs_unified_v1",
+            "twin": "ppt_text_batch_eager_native_1_v1",
+            "timed_calls": "prepared litchi::File::edit shape text sets from string paths (path parsing included) in one facade transaction with 4096-operation native rollover",
+            "performance_claim": "none: one leg of a paired unified/leaf re-measurement (plan 0003 \u00a75.3); comparisons belong to the M0a S10 record",
+            "projection_sha256": "6ab15ad2f4ca374c8acadc3ebb20e46329e4537fe389fd7917df337d66954507",
+            "verified_samples": 5,
+            "legs_agree": true,
+            "ppt_text_batch": {
+              "leg": "unified",
+              "owner": "eager",
+              "count": 1,
+              "native_chunk_size": 256,
+              "native_operation_limit": 4096,
+              "native_chunk_calls": 1,
+              "native_commits": 1,
+              "unified_operations": 1,
+              "unified_commits": 1,
+              "semantic_snapshot_limit_bytes": 268435456,
+              "source_sha256": "4e52a3ca3f84043f771183257538c4a6314ba5b8244483ba9302894d2b9d242d",
+              "expected_output_sha256": "6ab15ad2f4ca374c8acadc3ebb20e46329e4537fe389fd7917df337d66954507",
+              "exact_output_verified": true,
+              "unchanged_source_verified": true,
+              "timing_scope": "one prepared native or unified text-batch publication; opening, fixture construction, command-vector preparation, output serialization, exact equivalence and source checks are outside the timer; unified string-path parsing is timed"
+            }
+          }
+        }
+      },
+      "unified_over_native_p50": 1.1032032022946148,
+      "native_p50_speedup_over_0218": 1.0096123299234825,
+      "unified_p50_speedup_over_0218": 0.951942142980558
+    },
+    {
+      "owner": "positional",
+      "operations": 1,
+      "native": {
+        "case": "ppt_text_batch_positional_native_1_v1",
+        "corpus": {
+          "name": "ppt-text-batch-1",
+          "generator": "litchi-ppt-text-batch-v1",
+          "package_format": "PPT/CFB",
+          "shape": "1",
+          "payload_kind": "deterministic-text-boxes",
+          "compression": "none",
+          "entry_count": 1,
+          "archive_member_count": 4,
+          "entry_bytes": 39,
+          "uncompressed_payload_bytes": 39,
+          "archive_bytes": 7168,
+          "archive_sha256": "4e52a3ca3f84043f771183257538c4a6314ba5b8244483ba9302894d2b9d242d",
+          "target_entry": "slide:0/shape:0",
+          "target_payload_bytes": 39,
+          "target_payload_sha256": "556c6fc20cb1fc08390eb8a77c9102a9b18c1bc4a961f0b88ac4bc3705e3674d",
+          "xlsx": null
+        },
+        "elapsed_ns": {
+          "unit": "ns",
+          "samples": [
+            111591,
+            111740,
+            116701,
+            125640,
+            132021
+          ],
+          "sample_order": [
+            4,
+            3,
+            1,
+            0,
+            2
+          ],
+          "min": 111591,
+          "p50": 116701,
+          "p95": 132021,
+          "p99": 132021,
+          "max": 132021,
+          "mean": 119538.6,
+          "standard_deviation": 9014.874835514911,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 108346.94894323255,
+            "upper": 130730.25105676746
+          }
+        },
+        "sink": null,
+        "source": {
+          "read_calls": [],
+          "read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "ordinary_payload_read_bytes": [],
+          "max_in_flight_reads": [],
+          "unified_ops": {
+            "leg": "native",
+            "predecessor": "ppt_text_batch_native_vs_unified_v1",
+            "twin": "ppt_text_batch_positional_unified_1_v1",
+            "timed_calls": "prepared litchi_ppt::Package::edit with 256-target set_shape_texts chunks and 4096-operation commit rollover",
+            "performance_claim": "none: one leg of a paired unified/leaf re-measurement (plan 0003 \u00a75.3); comparisons belong to the M0a S10 record",
+            "projection_sha256": "6ab15ad2f4ca374c8acadc3ebb20e46329e4537fe389fd7917df337d66954507",
+            "verified_samples": 5,
+            "legs_agree": true,
+            "ppt_text_batch": {
+              "leg": "native",
+              "owner": "positional",
+              "count": 1,
+              "native_chunk_size": 256,
+              "native_operation_limit": 4096,
+              "native_chunk_calls": 1,
+              "native_commits": 1,
+              "unified_operations": 1,
+              "unified_commits": 1,
+              "semantic_snapshot_limit_bytes": 268435456,
+              "source_sha256": "4e52a3ca3f84043f771183257538c4a6314ba5b8244483ba9302894d2b9d242d",
+              "expected_output_sha256": "6ab15ad2f4ca374c8acadc3ebb20e46329e4537fe389fd7917df337d66954507",
+              "exact_output_verified": true,
+              "unchanged_source_verified": true,
+              "timing_scope": "one prepared native or unified text-batch publication; opening, fixture construction, command-vector preparation, output serialization, exact equivalence and source checks are outside the timer; unified string-path parsing is timed"
+            }
+          }
+        }
+      },
+      "unified": {
+        "case": "ppt_text_batch_positional_unified_1_v1",
+        "corpus": {
+          "name": "ppt-text-batch-1",
+          "generator": "litchi-ppt-text-batch-v1",
+          "package_format": "PPT/CFB",
+          "shape": "1",
+          "payload_kind": "deterministic-text-boxes",
+          "compression": "none",
+          "entry_count": 1,
+          "archive_member_count": 4,
+          "entry_bytes": 39,
+          "uncompressed_payload_bytes": 39,
+          "archive_bytes": 7168,
+          "archive_sha256": "4e52a3ca3f84043f771183257538c4a6314ba5b8244483ba9302894d2b9d242d",
+          "target_entry": "slide:0/shape:0",
+          "target_payload_bytes": 39,
+          "target_payload_sha256": "556c6fc20cb1fc08390eb8a77c9102a9b18c1bc4a961f0b88ac4bc3705e3674d",
+          "xlsx": null
+        },
+        "elapsed_ns": {
+          "unit": "ns",
+          "samples": [
+            126231,
+            127291,
+            128050,
+            137761,
+            140931
+          ],
+          "sample_order": [
+            4,
+            0,
+            2,
+            1,
+            3
+          ],
+          "min": 126231,
+          "p50": 128050,
+          "p95": 140931,
+          "p99": 140931,
+          "max": 140931,
+          "mean": 132052.8,
+          "standard_deviation": 6782.265196820308,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 123632.85553685142,
+            "upper": 140472.74446314856
+          }
+        },
+        "sink": null,
+        "source": {
+          "read_calls": [],
+          "read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "ordinary_payload_read_bytes": [],
+          "max_in_flight_reads": [],
+          "unified_ops": {
+            "leg": "unified",
+            "predecessor": "ppt_text_batch_native_vs_unified_v1",
+            "twin": "ppt_text_batch_positional_native_1_v1",
+            "timed_calls": "prepared litchi::File::edit shape text sets from string paths (path parsing included) in one facade transaction with 4096-operation native rollover",
+            "performance_claim": "none: one leg of a paired unified/leaf re-measurement (plan 0003 \u00a75.3); comparisons belong to the M0a S10 record",
+            "projection_sha256": "6ab15ad2f4ca374c8acadc3ebb20e46329e4537fe389fd7917df337d66954507",
+            "verified_samples": 5,
+            "legs_agree": true,
+            "ppt_text_batch": {
+              "leg": "unified",
+              "owner": "positional",
+              "count": 1,
+              "native_chunk_size": 256,
+              "native_operation_limit": 4096,
+              "native_chunk_calls": 1,
+              "native_commits": 1,
+              "unified_operations": 1,
+              "unified_commits": 1,
+              "semantic_snapshot_limit_bytes": 268435456,
+              "source_sha256": "4e52a3ca3f84043f771183257538c4a6314ba5b8244483ba9302894d2b9d242d",
+              "expected_output_sha256": "6ab15ad2f4ca374c8acadc3ebb20e46329e4537fe389fd7917df337d66954507",
+              "exact_output_verified": true,
+              "unchanged_source_verified": true,
+              "timing_scope": "one prepared native or unified text-batch publication; opening, fixture construction, command-vector preparation, output serialization, exact equivalence and source checks are outside the timer; unified string-path parsing is timed"
+            }
+          }
+        }
+      },
+      "unified_over_native_p50": 1.0972485240057925,
+      "native_p50_speedup_over_0218": 0.9976778262397066,
+      "unified_p50_speedup_over_0218": 0.974853572823116
+    },
+    {
+      "owner": "eager",
+      "operations": 10,
+      "native": {
+        "case": "ppt_text_batch_eager_native_10_v1",
+        "corpus": {
+          "name": "ppt-text-batch-10",
+          "generator": "litchi-ppt-text-batch-v1",
+          "package_format": "PPT/CFB",
+          "shape": "10",
+          "payload_kind": "deterministic-text-boxes",
+          "compression": "none",
+          "entry_count": 10,
+          "archive_member_count": 4,
+          "entry_bytes": 40,
+          "uncompressed_payload_bytes": 400,
+          "archive_bytes": 8704,
+          "archive_sha256": "5629e03ddbc611a8f541cf01c3e47cd6614f949c6a0b9bf4a5f00c42a1917c27",
+          "target_entry": "slide:0/shape:0",
+          "target_payload_bytes": 40,
+          "target_payload_sha256": "42bd6ce571a2fcb0f6c8e3288711e8ac9acbe4cc3cacfcd0f4942ffe2fef1a80",
+          "xlsx": null
+        },
+        "elapsed_ns": {
+          "unit": "ns",
+          "samples": [
+            144840,
+            144841,
+            146491,
+            147961,
+            151731
+          ],
+          "sample_order": [
+            2,
+            3,
+            4,
+            1,
+            0
+          ],
+          "min": 144840,
+          "p50": 146491,
+          "p95": 151731,
+          "p99": 151731,
+          "max": 151731,
+          "mean": 147172.8,
+          "standard_deviation": 2861.0550851040994,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 143620.9004172648,
+            "upper": 150724.69958273516
+          }
+        },
+        "sink": null,
+        "source": {
+          "read_calls": [],
+          "read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "ordinary_payload_read_bytes": [],
+          "max_in_flight_reads": [],
+          "unified_ops": {
+            "leg": "native",
+            "predecessor": "ppt_text_batch_native_vs_unified_v1",
+            "twin": "ppt_text_batch_eager_unified_10_v1",
+            "timed_calls": "prepared litchi_ppt::Package::edit with 256-target set_shape_texts chunks and 4096-operation commit rollover",
+            "performance_claim": "none: one leg of a paired unified/leaf re-measurement (plan 0003 \u00a75.3); comparisons belong to the M0a S10 record",
+            "projection_sha256": "b521cf33baeac4f14a63327accd70ae8f9cc3df858f156db7776f916b8cfdbe9",
+            "verified_samples": 5,
+            "legs_agree": true,
+            "ppt_text_batch": {
+              "leg": "native",
+              "owner": "eager",
+              "count": 10,
+              "native_chunk_size": 256,
+              "native_operation_limit": 4096,
+              "native_chunk_calls": 1,
+              "native_commits": 1,
+              "unified_operations": 10,
+              "unified_commits": 1,
+              "semantic_snapshot_limit_bytes": 268435456,
+              "source_sha256": "5629e03ddbc611a8f541cf01c3e47cd6614f949c6a0b9bf4a5f00c42a1917c27",
+              "expected_output_sha256": "b521cf33baeac4f14a63327accd70ae8f9cc3df858f156db7776f916b8cfdbe9",
+              "exact_output_verified": true,
+              "unchanged_source_verified": true,
+              "timing_scope": "one prepared native or unified text-batch publication; opening, fixture construction, command-vector preparation, output serialization, exact equivalence and source checks are outside the timer; unified string-path parsing is timed"
+            }
+          }
+        }
+      },
+      "unified": {
+        "case": "ppt_text_batch_eager_unified_10_v1",
+        "corpus": {
+          "name": "ppt-text-batch-10",
+          "generator": "litchi-ppt-text-batch-v1",
+          "package_format": "PPT/CFB",
+          "shape": "10",
+          "payload_kind": "deterministic-text-boxes",
+          "compression": "none",
+          "entry_count": 10,
+          "archive_member_count": 4,
+          "entry_bytes": 40,
+          "uncompressed_payload_bytes": 400,
+          "archive_bytes": 8704,
+          "archive_sha256": "5629e03ddbc611a8f541cf01c3e47cd6614f949c6a0b9bf4a5f00c42a1917c27",
+          "target_entry": "slide:0/shape:0",
+          "target_payload_bytes": 40,
+          "target_payload_sha256": "42bd6ce571a2fcb0f6c8e3288711e8ac9acbe4cc3cacfcd0f4942ffe2fef1a80",
+          "xlsx": null
+        },
+        "elapsed_ns": {
+          "unit": "ns",
+          "samples": [
+            189081,
+            189121,
+            193501,
+            195181,
+            224091
+          ],
+          "sample_order": [
+            1,
+            3,
+            2,
+            0,
+            4
+          ],
+          "min": 189081,
+          "p50": 193501,
+          "p95": 224091,
+          "p99": 224091,
+          "max": 224091,
+          "mean": 198195.0,
+          "standard_deviation": 14723.477170831626,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 179916.31928121025,
+            "upper": 216473.68071878975
+          }
+        },
+        "sink": null,
+        "source": {
+          "read_calls": [],
+          "read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "ordinary_payload_read_bytes": [],
+          "max_in_flight_reads": [],
+          "unified_ops": {
+            "leg": "unified",
+            "predecessor": "ppt_text_batch_native_vs_unified_v1",
+            "twin": "ppt_text_batch_eager_native_10_v1",
+            "timed_calls": "prepared litchi::File::edit shape text sets from string paths (path parsing included) in one facade transaction with 4096-operation native rollover",
+            "performance_claim": "none: one leg of a paired unified/leaf re-measurement (plan 0003 \u00a75.3); comparisons belong to the M0a S10 record",
+            "projection_sha256": "b521cf33baeac4f14a63327accd70ae8f9cc3df858f156db7776f916b8cfdbe9",
+            "verified_samples": 5,
+            "legs_agree": true,
+            "ppt_text_batch": {
+              "leg": "unified",
+              "owner": "eager",
+              "count": 10,
+              "native_chunk_size": 256,
+              "native_operation_limit": 4096,
+              "native_chunk_calls": 1,
+              "native_commits": 1,
+              "unified_operations": 10,
+              "unified_commits": 1,
+              "semantic_snapshot_limit_bytes": 268435456,
+              "source_sha256": "5629e03ddbc611a8f541cf01c3e47cd6614f949c6a0b9bf4a5f00c42a1917c27",
+              "expected_output_sha256": "b521cf33baeac4f14a63327accd70ae8f9cc3df858f156db7776f916b8cfdbe9",
+              "exact_output_verified": true,
+              "unchanged_source_verified": true,
+              "timing_scope": "one prepared native or unified text-batch publication; opening, fixture construction, command-vector preparation, output serialization, exact equivalence and source checks are outside the timer; unified string-path parsing is timed"
+            }
+          }
+        }
+      },
+      "unified_over_native_p50": 1.3209070864421706,
+      "native_p50_speedup_over_0218": 1.1507942467455339,
+      "unified_p50_speedup_over_0218": 1.074624937338825
+    },
+    {
+      "owner": "positional",
+      "operations": 10,
+      "native": {
+        "case": "ppt_text_batch_positional_native_10_v1",
+        "corpus": {
+          "name": "ppt-text-batch-10",
+          "generator": "litchi-ppt-text-batch-v1",
+          "package_format": "PPT/CFB",
+          "shape": "10",
+          "payload_kind": "deterministic-text-boxes",
+          "compression": "none",
+          "entry_count": 10,
+          "archive_member_count": 4,
+          "entry_bytes": 40,
+          "uncompressed_payload_bytes": 400,
+          "archive_bytes": 8704,
+          "archive_sha256": "5629e03ddbc611a8f541cf01c3e47cd6614f949c6a0b9bf4a5f00c42a1917c27",
+          "target_entry": "slide:0/shape:0",
+          "target_payload_bytes": 40,
+          "target_payload_sha256": "42bd6ce571a2fcb0f6c8e3288711e8ac9acbe4cc3cacfcd0f4942ffe2fef1a80",
+          "xlsx": null
+        },
+        "elapsed_ns": {
+          "unit": "ns",
+          "samples": [
+            144431,
+            146941,
+            150031,
+            152751,
+            170171
+          ],
+          "sample_order": [
+            4,
+            3,
+            2,
+            0,
+            1
+          ],
+          "min": 144431,
+          "p50": 150031,
+          "p95": 170171,
+          "p99": 170171,
+          "max": 170171,
+          "mean": 152865.0,
+          "standard_deviation": 10170.647963625523,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 140238.49712480864,
+            "upper": 165491.50287519136
+          }
+        },
+        "sink": null,
+        "source": {
+          "read_calls": [],
+          "read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "ordinary_payload_read_bytes": [],
+          "max_in_flight_reads": [],
+          "unified_ops": {
+            "leg": "native",
+            "predecessor": "ppt_text_batch_native_vs_unified_v1",
+            "twin": "ppt_text_batch_positional_unified_10_v1",
+            "timed_calls": "prepared litchi_ppt::Package::edit with 256-target set_shape_texts chunks and 4096-operation commit rollover",
+            "performance_claim": "none: one leg of a paired unified/leaf re-measurement (plan 0003 \u00a75.3); comparisons belong to the M0a S10 record",
+            "projection_sha256": "b521cf33baeac4f14a63327accd70ae8f9cc3df858f156db7776f916b8cfdbe9",
+            "verified_samples": 5,
+            "legs_agree": true,
+            "ppt_text_batch": {
+              "leg": "native",
+              "owner": "positional",
+              "count": 10,
+              "native_chunk_size": 256,
+              "native_operation_limit": 4096,
+              "native_chunk_calls": 1,
+              "native_commits": 1,
+              "unified_operations": 10,
+              "unified_commits": 1,
+              "semantic_snapshot_limit_bytes": 268435456,
+              "source_sha256": "5629e03ddbc611a8f541cf01c3e47cd6614f949c6a0b9bf4a5f00c42a1917c27",
+              "expected_output_sha256": "b521cf33baeac4f14a63327accd70ae8f9cc3df858f156db7776f916b8cfdbe9",
+              "exact_output_verified": true,
+              "unchanged_source_verified": true,
+              "timing_scope": "one prepared native or unified text-batch publication; opening, fixture construction, command-vector preparation, output serialization, exact equivalence and source checks are outside the timer; unified string-path parsing is timed"
+            }
+          }
+        }
+      },
+      "unified": {
+        "case": "ppt_text_batch_positional_unified_10_v1",
+        "corpus": {
+          "name": "ppt-text-batch-10",
+          "generator": "litchi-ppt-text-batch-v1",
+          "package_format": "PPT/CFB",
+          "shape": "10",
+          "payload_kind": "deterministic-text-boxes",
+          "compression": "none",
+          "entry_count": 10,
+          "archive_member_count": 4,
+          "entry_bytes": 40,
+          "uncompressed_payload_bytes": 400,
+          "archive_bytes": 8704,
+          "archive_sha256": "5629e03ddbc611a8f541cf01c3e47cd6614f949c6a0b9bf4a5f00c42a1917c27",
+          "target_entry": "slide:0/shape:0",
+          "target_payload_bytes": 40,
+          "target_payload_sha256": "42bd6ce571a2fcb0f6c8e3288711e8ac9acbe4cc3cacfcd0f4942ffe2fef1a80",
+          "xlsx": null
+        },
+        "elapsed_ns": {
+          "unit": "ns",
+          "samples": [
+            206481,
+            207061,
+            214631,
+            215201,
+            234801
+          ],
+          "sample_order": [
+            3,
+            2,
+            1,
+            4,
+            0
+          ],
+          "min": 206481,
+          "p50": 214631,
+          "p95": 234801,
+          "p99": 234801,
+          "max": 234801,
+          "mean": 215635.0,
+          "standard_deviation": 11465.61293607978,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 201400.84351154394,
+            "upper": 229869.15648845606
+          }
+        },
+        "sink": null,
+        "source": {
+          "read_calls": [],
+          "read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "ordinary_payload_read_bytes": [],
+          "max_in_flight_reads": [],
+          "unified_ops": {
+            "leg": "unified",
+            "predecessor": "ppt_text_batch_native_vs_unified_v1",
+            "twin": "ppt_text_batch_positional_native_10_v1",
+            "timed_calls": "prepared litchi::File::edit shape text sets from string paths (path parsing included) in one facade transaction with 4096-operation native rollover",
+            "performance_claim": "none: one leg of a paired unified/leaf re-measurement (plan 0003 \u00a75.3); comparisons belong to the M0a S10 record",
+            "projection_sha256": "b521cf33baeac4f14a63327accd70ae8f9cc3df858f156db7776f916b8cfdbe9",
+            "verified_samples": 5,
+            "legs_agree": true,
+            "ppt_text_batch": {
+              "leg": "unified",
+              "owner": "positional",
+              "count": 10,
+              "native_chunk_size": 256,
+              "native_operation_limit": 4096,
+              "native_chunk_calls": 1,
+              "native_commits": 1,
+              "unified_operations": 10,
+              "unified_commits": 1,
+              "semantic_snapshot_limit_bytes": 268435456,
+              "source_sha256": "5629e03ddbc611a8f541cf01c3e47cd6614f949c6a0b9bf4a5f00c42a1917c27",
+              "expected_output_sha256": "b521cf33baeac4f14a63327accd70ae8f9cc3df858f156db7776f916b8cfdbe9",
+              "exact_output_verified": true,
+              "unchanged_source_verified": true,
+              "timing_scope": "one prepared native or unified text-batch publication; opening, fixture construction, command-vector preparation, output serialization, exact equivalence and source checks are outside the timer; unified string-path parsing is timed"
+            }
+          }
+        }
+      },
+      "unified_over_native_p50": 1.4305776806126733,
+      "native_p50_speedup_over_0218": 1.1489692130293072,
+      "unified_p50_speedup_over_0218": 1.0804683386836011
+    },
+    {
+      "owner": "eager",
+      "operations": 100,
+      "native": {
+        "case": "ppt_text_batch_eager_native_100_v1",
+        "corpus": {
+          "name": "ppt-text-batch-100",
+          "generator": "litchi-ppt-text-batch-v1",
+          "package_format": "PPT/CFB",
+          "shape": "100",
+          "payload_kind": "deterministic-text-boxes",
+          "compression": "none",
+          "entry_count": 100,
+          "archive_member_count": 4,
+          "entry_bytes": 41,
+          "uncompressed_payload_bytes": 4100,
+          "archive_bytes": 25600,
+          "archive_sha256": "85e8264e587adc75dfe0638593a8e75d186e98ffd366bcb458fa18cbcdf6a06c",
+          "target_entry": "slide:0/shape:0",
+          "target_payload_bytes": 41,
+          "target_payload_sha256": "2707ebc75af090f2fce216700bf835abd1b0da1a7756d4ce19d3be8bbcc29135",
+          "xlsx": null
+        },
+        "elapsed_ns": {
+          "unit": "ns",
+          "samples": [
+            545103,
+            545143,
+            546183,
+            553123,
+            566593
+          ],
+          "sample_order": [
+            3,
+            1,
+            4,
+            2,
+            0
+          ],
+          "min": 545103,
+          "p50": 546183,
+          "p95": 566593,
+          "p99": 566593,
+          "max": 566593,
+          "mean": 551229.0,
+          "standard_deviation": 9215.057243446725,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 539788.8295019587,
+            "upper": 562669.1704980413
+          }
+        },
+        "sink": null,
+        "source": {
+          "read_calls": [],
+          "read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "ordinary_payload_read_bytes": [],
+          "max_in_flight_reads": [],
+          "unified_ops": {
+            "leg": "native",
+            "predecessor": "ppt_text_batch_native_vs_unified_v1",
+            "twin": "ppt_text_batch_eager_unified_100_v1",
+            "timed_calls": "prepared litchi_ppt::Package::edit with 256-target set_shape_texts chunks and 4096-operation commit rollover",
+            "performance_claim": "none: one leg of a paired unified/leaf re-measurement (plan 0003 \u00a75.3); comparisons belong to the M0a S10 record",
+            "projection_sha256": "1efa02ff52c07df3ace0e9b8ce57b8eb28e96efc899db5c1accaaa429df9642a",
+            "verified_samples": 5,
+            "legs_agree": true,
+            "ppt_text_batch": {
+              "leg": "native",
+              "owner": "eager",
+              "count": 100,
+              "native_chunk_size": 256,
+              "native_operation_limit": 4096,
+              "native_chunk_calls": 1,
+              "native_commits": 1,
+              "unified_operations": 100,
+              "unified_commits": 1,
+              "semantic_snapshot_limit_bytes": 268435456,
+              "source_sha256": "85e8264e587adc75dfe0638593a8e75d186e98ffd366bcb458fa18cbcdf6a06c",
+              "expected_output_sha256": "1efa02ff52c07df3ace0e9b8ce57b8eb28e96efc899db5c1accaaa429df9642a",
+              "exact_output_verified": true,
+              "unchanged_source_verified": true,
+              "timing_scope": "one prepared native or unified text-batch publication; opening, fixture construction, command-vector preparation, output serialization, exact equivalence and source checks are outside the timer; unified string-path parsing is timed"
+            }
+          }
+        }
+      },
+      "unified": {
+        "case": "ppt_text_batch_eager_unified_100_v1",
+        "corpus": {
+          "name": "ppt-text-batch-100",
+          "generator": "litchi-ppt-text-batch-v1",
+          "package_format": "PPT/CFB",
+          "shape": "100",
+          "payload_kind": "deterministic-text-boxes",
+          "compression": "none",
+          "entry_count": 100,
+          "archive_member_count": 4,
+          "entry_bytes": 41,
+          "uncompressed_payload_bytes": 4100,
+          "archive_bytes": 25600,
+          "archive_sha256": "85e8264e587adc75dfe0638593a8e75d186e98ffd366bcb458fa18cbcdf6a06c",
+          "target_entry": "slide:0/shape:0",
+          "target_payload_bytes": 41,
+          "target_payload_sha256": "2707ebc75af090f2fce216700bf835abd1b0da1a7756d4ce19d3be8bbcc29135",
+          "xlsx": null
+        },
+        "elapsed_ns": {
+          "unit": "ns",
+          "samples": [
+            887305,
+            890095,
+            901415,
+            903475,
+            911585
+          ],
+          "sample_order": [
+            4,
+            3,
+            0,
+            1,
+            2
+          ],
+          "min": 887305,
+          "p50": 901415,
+          "p95": 911585,
+          "p99": 911585,
+          "max": 911585,
+          "mean": 898775.0,
+          "standard_deviation": 10000.737472806682,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 886359.4350422866,
+            "upper": 911190.5649577134
+          }
+        },
+        "sink": null,
+        "source": {
+          "read_calls": [],
+          "read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "ordinary_payload_read_bytes": [],
+          "max_in_flight_reads": [],
+          "unified_ops": {
+            "leg": "unified",
+            "predecessor": "ppt_text_batch_native_vs_unified_v1",
+            "twin": "ppt_text_batch_eager_native_100_v1",
+            "timed_calls": "prepared litchi::File::edit shape text sets from string paths (path parsing included) in one facade transaction with 4096-operation native rollover",
+            "performance_claim": "none: one leg of a paired unified/leaf re-measurement (plan 0003 \u00a75.3); comparisons belong to the M0a S10 record",
+            "projection_sha256": "1efa02ff52c07df3ace0e9b8ce57b8eb28e96efc899db5c1accaaa429df9642a",
+            "verified_samples": 5,
+            "legs_agree": true,
+            "ppt_text_batch": {
+              "leg": "unified",
+              "owner": "eager",
+              "count": 100,
+              "native_chunk_size": 256,
+              "native_operation_limit": 4096,
+              "native_chunk_calls": 1,
+              "native_commits": 1,
+              "unified_operations": 100,
+              "unified_commits": 1,
+              "semantic_snapshot_limit_bytes": 268435456,
+              "source_sha256": "85e8264e587adc75dfe0638593a8e75d186e98ffd366bcb458fa18cbcdf6a06c",
+              "expected_output_sha256": "1efa02ff52c07df3ace0e9b8ce57b8eb28e96efc899db5c1accaaa429df9642a",
+              "exact_output_verified": true,
+              "unchanged_source_verified": true,
+              "timing_scope": "one prepared native or unified text-batch publication; opening, fixture construction, command-vector preparation, output serialization, exact equivalence and source checks are outside the timer; unified string-path parsing is timed"
+            }
+          }
+        }
+      },
+      "unified_over_native_p50": 1.6503900707272106,
+      "native_p50_speedup_over_0218": 4.248068870689861,
+      "unified_p50_speedup_over_0218": 2.9992112401058337
+    },
+    {
+      "owner": "positional",
+      "operations": 100,
+      "native": {
+        "case": "ppt_text_batch_positional_native_100_v1",
+        "corpus": {
+          "name": "ppt-text-batch-100",
+          "generator": "litchi-ppt-text-batch-v1",
+          "package_format": "PPT/CFB",
+          "shape": "100",
+          "payload_kind": "deterministic-text-boxes",
+          "compression": "none",
+          "entry_count": 100,
+          "archive_member_count": 4,
+          "entry_bytes": 41,
+          "uncompressed_payload_bytes": 4100,
+          "archive_bytes": 25600,
+          "archive_sha256": "85e8264e587adc75dfe0638593a8e75d186e98ffd366bcb458fa18cbcdf6a06c",
+          "target_entry": "slide:0/shape:0",
+          "target_payload_bytes": 41,
+          "target_payload_sha256": "2707ebc75af090f2fce216700bf835abd1b0da1a7756d4ce19d3be8bbcc29135",
+          "xlsx": null
+        },
+        "elapsed_ns": {
+          "unit": "ns",
+          "samples": [
+            540053,
+            544753,
+            549673,
+            553903,
+            573153
+          ],
+          "sample_order": [
+            3,
+            1,
+            4,
+            2,
+            0
+          ],
+          "min": 540053,
+          "p50": 549673,
+          "p95": 573153,
+          "p99": 573153,
+          "max": 573153,
+          "mean": 552307.0,
+          "standard_deviation": 12759.940438732458,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 536465.9812946889,
+            "upper": 568148.0187053111
+          }
+        },
+        "sink": null,
+        "source": {
+          "read_calls": [],
+          "read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "ordinary_payload_read_bytes": [],
+          "max_in_flight_reads": [],
+          "unified_ops": {
+            "leg": "native",
+            "predecessor": "ppt_text_batch_native_vs_unified_v1",
+            "twin": "ppt_text_batch_positional_unified_100_v1",
+            "timed_calls": "prepared litchi_ppt::Package::edit with 256-target set_shape_texts chunks and 4096-operation commit rollover",
+            "performance_claim": "none: one leg of a paired unified/leaf re-measurement (plan 0003 \u00a75.3); comparisons belong to the M0a S10 record",
+            "projection_sha256": "1efa02ff52c07df3ace0e9b8ce57b8eb28e96efc899db5c1accaaa429df9642a",
+            "verified_samples": 5,
+            "legs_agree": true,
+            "ppt_text_batch": {
+              "leg": "native",
+              "owner": "positional",
+              "count": 100,
+              "native_chunk_size": 256,
+              "native_operation_limit": 4096,
+              "native_chunk_calls": 1,
+              "native_commits": 1,
+              "unified_operations": 100,
+              "unified_commits": 1,
+              "semantic_snapshot_limit_bytes": 268435456,
+              "source_sha256": "85e8264e587adc75dfe0638593a8e75d186e98ffd366bcb458fa18cbcdf6a06c",
+              "expected_output_sha256": "1efa02ff52c07df3ace0e9b8ce57b8eb28e96efc899db5c1accaaa429df9642a",
+              "exact_output_verified": true,
+              "unchanged_source_verified": true,
+              "timing_scope": "one prepared native or unified text-batch publication; opening, fixture construction, command-vector preparation, output serialization, exact equivalence and source checks are outside the timer; unified string-path parsing is timed"
+            }
+          }
+        }
+      },
+      "unified": {
+        "case": "ppt_text_batch_positional_unified_100_v1",
+        "corpus": {
+          "name": "ppt-text-batch-100",
+          "generator": "litchi-ppt-text-batch-v1",
+          "package_format": "PPT/CFB",
+          "shape": "100",
+          "payload_kind": "deterministic-text-boxes",
+          "compression": "none",
+          "entry_count": 100,
+          "archive_member_count": 4,
+          "entry_bytes": 41,
+          "uncompressed_payload_bytes": 4100,
+          "archive_bytes": 25600,
+          "archive_sha256": "85e8264e587adc75dfe0638593a8e75d186e98ffd366bcb458fa18cbcdf6a06c",
+          "target_entry": "slide:0/shape:0",
+          "target_payload_bytes": 41,
+          "target_payload_sha256": "2707ebc75af090f2fce216700bf835abd1b0da1a7756d4ce19d3be8bbcc29135",
+          "xlsx": null
+        },
+        "elapsed_ns": {
+          "unit": "ns",
+          "samples": [
+            1035136,
+            1040106,
+            1040246,
+            1040486,
+            1054075
+          ],
+          "sample_order": [
+            4,
+            3,
+            1,
+            2,
+            0
+          ],
+          "min": 1035136,
+          "p50": 1040246,
+          "p95": 1054075,
+          "p99": 1054075,
+          "max": 1054075,
+          "mean": 1042009.8,
+          "standard_deviation": 7104.146479345694,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 1033190.2512093973,
+            "upper": 1050829.3487906028
+          }
+        },
+        "sink": null,
+        "source": {
+          "read_calls": [],
+          "read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "ordinary_payload_read_bytes": [],
+          "max_in_flight_reads": [],
+          "unified_ops": {
+            "leg": "unified",
+            "predecessor": "ppt_text_batch_native_vs_unified_v1",
+            "twin": "ppt_text_batch_positional_native_100_v1",
+            "timed_calls": "prepared litchi::File::edit shape text sets from string paths (path parsing included) in one facade transaction with 4096-operation native rollover",
+            "performance_claim": "none: one leg of a paired unified/leaf re-measurement (plan 0003 \u00a75.3); comparisons belong to the M0a S10 record",
+            "projection_sha256": "1efa02ff52c07df3ace0e9b8ce57b8eb28e96efc899db5c1accaaa429df9642a",
+            "verified_samples": 5,
+            "legs_agree": true,
+            "ppt_text_batch": {
+              "leg": "unified",
+              "owner": "positional",
+              "count": 100,
+              "native_chunk_size": 256,
+              "native_operation_limit": 4096,
+              "native_chunk_calls": 1,
+              "native_commits": 1,
+              "unified_operations": 100,
+              "unified_commits": 1,
+              "semantic_snapshot_limit_bytes": 268435456,
+              "source_sha256": "85e8264e587adc75dfe0638593a8e75d186e98ffd366bcb458fa18cbcdf6a06c",
+              "expected_output_sha256": "1efa02ff52c07df3ace0e9b8ce57b8eb28e96efc899db5c1accaaa429df9642a",
+              "exact_output_verified": true,
+              "unchanged_source_verified": true,
+              "timing_scope": "one prepared native or unified text-batch publication; opening, fixture construction, command-vector preparation, output serialization, exact equivalence and source checks are outside the timer; unified string-path parsing is timed"
+            }
+          }
+        }
+      },
+      "unified_over_native_p50": 1.8924815299277935,
+      "native_p50_speedup_over_0218": 4.266596685665841,
+      "unified_p50_speedup_over_0218": 2.7711002974296464
+    },
+    {
+      "owner": "eager",
+      "operations": 256,
+      "native": {
+        "case": "ppt_text_batch_eager_native_256_v1",
+        "corpus": {
+          "name": "ppt-text-batch-256",
+          "generator": "litchi-ppt-text-batch-v1",
+          "package_format": "PPT/CFB",
+          "shape": "256",
+          "payload_kind": "deterministic-text-boxes",
+          "compression": "none",
+          "entry_count": 256,
+          "archive_member_count": 4,
+          "entry_bytes": 41,
+          "uncompressed_payload_bytes": 10496,
+          "archive_bytes": 54272,
+          "archive_sha256": "c8cf6d61cc0da1536043eb3950c6684a6c6d133e8825b1e322819368d2fce966",
+          "target_entry": "slide:0/shape:0",
+          "target_payload_bytes": 41,
+          "target_payload_sha256": "18af4f87b130a08e2b21eb05d3fd8016f34cb3fb70e9399a39ffa1e14e1cfba4",
+          "xlsx": null
+        },
+        "elapsed_ns": {
+          "unit": "ns",
+          "samples": [
+            1253097,
+            1253307,
+            1254707,
+            1263507,
+            1271537
+          ],
+          "sample_order": [
+            4,
+            1,
+            2,
+            0,
+            3
+          ],
+          "min": 1253097,
+          "p50": 1254707,
+          "p95": 1271537,
+          "p99": 1271537,
+          "max": 1271537,
+          "mean": 1259231.0,
+          "standard_deviation": 8107.220855508985,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 1249166.169538067,
+            "upper": 1269295.830461933
+          }
+        },
+        "sink": null,
+        "source": {
+          "read_calls": [],
+          "read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "ordinary_payload_read_bytes": [],
+          "max_in_flight_reads": [],
+          "unified_ops": {
+            "leg": "native",
+            "predecessor": "ppt_text_batch_native_vs_unified_v1",
+            "twin": "ppt_text_batch_eager_unified_256_v1",
+            "timed_calls": "prepared litchi_ppt::Package::edit with 256-target set_shape_texts chunks and 4096-operation commit rollover",
+            "performance_claim": "none: one leg of a paired unified/leaf re-measurement (plan 0003 \u00a75.3); comparisons belong to the M0a S10 record",
+            "projection_sha256": "b2163c15a545105b6ccf4a52446dd1c0cfeb43737de1fe8d1450ae5d31b987d9",
+            "verified_samples": 5,
+            "legs_agree": true,
+            "ppt_text_batch": {
+              "leg": "native",
+              "owner": "eager",
+              "count": 256,
+              "native_chunk_size": 256,
+              "native_operation_limit": 4096,
+              "native_chunk_calls": 1,
+              "native_commits": 1,
+              "unified_operations": 256,
+              "unified_commits": 1,
+              "semantic_snapshot_limit_bytes": 268435456,
+              "source_sha256": "c8cf6d61cc0da1536043eb3950c6684a6c6d133e8825b1e322819368d2fce966",
+              "expected_output_sha256": "b2163c15a545105b6ccf4a52446dd1c0cfeb43737de1fe8d1450ae5d31b987d9",
+              "exact_output_verified": true,
+              "unchanged_source_verified": true,
+              "timing_scope": "one prepared native or unified text-batch publication; opening, fixture construction, command-vector preparation, output serialization, exact equivalence and source checks are outside the timer; unified string-path parsing is timed"
+            }
+          }
+        }
+      },
+      "unified": {
+        "case": "ppt_text_batch_eager_unified_256_v1",
+        "corpus": {
+          "name": "ppt-text-batch-256",
+          "generator": "litchi-ppt-text-batch-v1",
+          "package_format": "PPT/CFB",
+          "shape": "256",
+          "payload_kind": "deterministic-text-boxes",
+          "compression": "none",
+          "entry_count": 256,
+          "archive_member_count": 4,
+          "entry_bytes": 41,
+          "uncompressed_payload_bytes": 10496,
+          "archive_bytes": 54272,
+          "archive_sha256": "c8cf6d61cc0da1536043eb3950c6684a6c6d133e8825b1e322819368d2fce966",
+          "target_entry": "slide:0/shape:0",
+          "target_payload_bytes": 41,
+          "target_payload_sha256": "18af4f87b130a08e2b21eb05d3fd8016f34cb3fb70e9399a39ffa1e14e1cfba4",
+          "xlsx": null
+        },
+        "elapsed_ns": {
+          "unit": "ns",
+          "samples": [
+            2103321,
+            2141902,
+            2144622,
+            2146981,
+            2152742
+          ],
+          "sample_order": [
+            1,
+            2,
+            4,
+            0,
+            3
+          ],
+          "min": 2103321,
+          "p50": 2144622,
+          "p95": 2152742,
+          "p99": 2152742,
+          "max": 2152742,
+          "mean": 2137913.6,
+          "standard_deviation": 19746.247296638372,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 2113399.326262777,
+            "upper": 2162427.873737223
+          }
+        },
+        "sink": null,
+        "source": {
+          "read_calls": [],
+          "read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "ordinary_payload_read_bytes": [],
+          "max_in_flight_reads": [],
+          "unified_ops": {
+            "leg": "unified",
+            "predecessor": "ppt_text_batch_native_vs_unified_v1",
+            "twin": "ppt_text_batch_eager_native_256_v1",
+            "timed_calls": "prepared litchi::File::edit shape text sets from string paths (path parsing included) in one facade transaction with 4096-operation native rollover",
+            "performance_claim": "none: one leg of a paired unified/leaf re-measurement (plan 0003 \u00a75.3); comparisons belong to the M0a S10 record",
+            "projection_sha256": "b2163c15a545105b6ccf4a52446dd1c0cfeb43737de1fe8d1450ae5d31b987d9",
+            "verified_samples": 5,
+            "legs_agree": true,
+            "ppt_text_batch": {
+              "leg": "unified",
+              "owner": "eager",
+              "count": 256,
+              "native_chunk_size": 256,
+              "native_operation_limit": 4096,
+              "native_chunk_calls": 1,
+              "native_commits": 1,
+              "unified_operations": 256,
+              "unified_commits": 1,
+              "semantic_snapshot_limit_bytes": 268435456,
+              "source_sha256": "c8cf6d61cc0da1536043eb3950c6684a6c6d133e8825b1e322819368d2fce966",
+              "expected_output_sha256": "b2163c15a545105b6ccf4a52446dd1c0cfeb43737de1fe8d1450ae5d31b987d9",
+              "exact_output_verified": true,
+              "unchanged_source_verified": true,
+              "timing_scope": "one prepared native or unified text-batch publication; opening, fixture construction, command-vector preparation, output serialization, exact equivalence and source checks are outside the timer; unified string-path parsing is timed"
+            }
+          }
+        }
+      },
+      "unified_over_native_p50": 1.7092612060026764
+    },
+    {
+      "owner": "positional",
+      "operations": 256,
+      "native": {
+        "case": "ppt_text_batch_positional_native_256_v1",
+        "corpus": {
+          "name": "ppt-text-batch-256",
+          "generator": "litchi-ppt-text-batch-v1",
+          "package_format": "PPT/CFB",
+          "shape": "256",
+          "payload_kind": "deterministic-text-boxes",
+          "compression": "none",
+          "entry_count": 256,
+          "archive_member_count": 4,
+          "entry_bytes": 41,
+          "uncompressed_payload_bytes": 10496,
+          "archive_bytes": 54272,
+          "archive_sha256": "c8cf6d61cc0da1536043eb3950c6684a6c6d133e8825b1e322819368d2fce966",
+          "target_entry": "slide:0/shape:0",
+          "target_payload_bytes": 41,
+          "target_payload_sha256": "18af4f87b130a08e2b21eb05d3fd8016f34cb3fb70e9399a39ffa1e14e1cfba4",
+          "xlsx": null
+        },
+        "elapsed_ns": {
+          "unit": "ns",
+          "samples": [
+            1246557,
+            1249957,
+            1250527,
+            1253236,
+            1256027
+          ],
+          "sample_order": [
+            4,
+            1,
+            3,
+            0,
+            2
+          ],
+          "min": 1246557,
+          "p50": 1250527,
+          "p95": 1256027,
+          "p99": 1256027,
+          "max": 1256027,
+          "mean": 1251260.8,
+          "standard_deviation": 3570.089942844553,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 1246828.6584993566,
+            "upper": 1255692.9415006435
+          }
+        },
+        "sink": null,
+        "source": {
+          "read_calls": [],
+          "read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "ordinary_payload_read_bytes": [],
+          "max_in_flight_reads": [],
+          "unified_ops": {
+            "leg": "native",
+            "predecessor": "ppt_text_batch_native_vs_unified_v1",
+            "twin": "ppt_text_batch_positional_unified_256_v1",
+            "timed_calls": "prepared litchi_ppt::Package::edit with 256-target set_shape_texts chunks and 4096-operation commit rollover",
+            "performance_claim": "none: one leg of a paired unified/leaf re-measurement (plan 0003 \u00a75.3); comparisons belong to the M0a S10 record",
+            "projection_sha256": "b2163c15a545105b6ccf4a52446dd1c0cfeb43737de1fe8d1450ae5d31b987d9",
+            "verified_samples": 5,
+            "legs_agree": true,
+            "ppt_text_batch": {
+              "leg": "native",
+              "owner": "positional",
+              "count": 256,
+              "native_chunk_size": 256,
+              "native_operation_limit": 4096,
+              "native_chunk_calls": 1,
+              "native_commits": 1,
+              "unified_operations": 256,
+              "unified_commits": 1,
+              "semantic_snapshot_limit_bytes": 268435456,
+              "source_sha256": "c8cf6d61cc0da1536043eb3950c6684a6c6d133e8825b1e322819368d2fce966",
+              "expected_output_sha256": "b2163c15a545105b6ccf4a52446dd1c0cfeb43737de1fe8d1450ae5d31b987d9",
+              "exact_output_verified": true,
+              "unchanged_source_verified": true,
+              "timing_scope": "one prepared native or unified text-batch publication; opening, fixture construction, command-vector preparation, output serialization, exact equivalence and source checks are outside the timer; unified string-path parsing is timed"
+            }
+          }
+        }
+      },
+      "unified": {
+        "case": "ppt_text_batch_positional_unified_256_v1",
+        "corpus": {
+          "name": "ppt-text-batch-256",
+          "generator": "litchi-ppt-text-batch-v1",
+          "package_format": "PPT/CFB",
+          "shape": "256",
+          "payload_kind": "deterministic-text-boxes",
+          "compression": "none",
+          "entry_count": 256,
+          "archive_member_count": 4,
+          "entry_bytes": 41,
+          "uncompressed_payload_bytes": 10496,
+          "archive_bytes": 54272,
+          "archive_sha256": "c8cf6d61cc0da1536043eb3950c6684a6c6d133e8825b1e322819368d2fce966",
+          "target_entry": "slide:0/shape:0",
+          "target_payload_bytes": 41,
+          "target_payload_sha256": "18af4f87b130a08e2b21eb05d3fd8016f34cb3fb70e9399a39ffa1e14e1cfba4",
+          "xlsx": null
+        },
+        "elapsed_ns": {
+          "unit": "ns",
+          "samples": [
+            2460644,
+            2477953,
+            2483233,
+            2484944,
+            2492234
+          ],
+          "sample_order": [
+            2,
+            0,
+            1,
+            3,
+            4
+          ],
+          "min": 2460644,
+          "p50": 2483233,
+          "p95": 2492234,
+          "p99": 2492234,
+          "max": 2492234,
+          "mean": 2479801.6,
+          "standard_deviation": 11866.068358980525,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 2465070.2921435363,
+            "upper": 2494532.907856464
+          }
+        },
+        "sink": null,
+        "source": {
+          "read_calls": [],
+          "read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "ordinary_payload_read_bytes": [],
+          "max_in_flight_reads": [],
+          "unified_ops": {
+            "leg": "unified",
+            "predecessor": "ppt_text_batch_native_vs_unified_v1",
+            "twin": "ppt_text_batch_positional_native_256_v1",
+            "timed_calls": "prepared litchi::File::edit shape text sets from string paths (path parsing included) in one facade transaction with 4096-operation native rollover",
+            "performance_claim": "none: one leg of a paired unified/leaf re-measurement (plan 0003 \u00a75.3); comparisons belong to the M0a S10 record",
+            "projection_sha256": "b2163c15a545105b6ccf4a52446dd1c0cfeb43737de1fe8d1450ae5d31b987d9",
+            "verified_samples": 5,
+            "legs_agree": true,
+            "ppt_text_batch": {
+              "leg": "unified",
+              "owner": "positional",
+              "count": 256,
+              "native_chunk_size": 256,
+              "native_operation_limit": 4096,
+              "native_chunk_calls": 1,
+              "native_commits": 1,
+              "unified_operations": 256,
+              "unified_commits": 1,
+              "semantic_snapshot_limit_bytes": 268435456,
+              "source_sha256": "c8cf6d61cc0da1536043eb3950c6684a6c6d133e8825b1e322819368d2fce966",
+              "expected_output_sha256": "b2163c15a545105b6ccf4a52446dd1c0cfeb43737de1fe8d1450ae5d31b987d9",
+              "exact_output_verified": true,
+              "unchanged_source_verified": true,
+              "timing_scope": "one prepared native or unified text-batch publication; opening, fixture construction, command-vector preparation, output serialization, exact equivalence and source checks are outside the timer; unified string-path parsing is timed"
+            }
+          }
+        }
+      },
+      "unified_over_native_p50": 1.9857492081338508
+    },
+    {
+      "owner": "eager",
+      "operations": 1000,
+      "native": {
+        "case": "ppt_text_batch_eager_native_1000_v1",
+        "corpus": {
+          "name": "ppt-text-batch-1000",
+          "generator": "litchi-ppt-text-batch-v1",
+          "package_format": "PPT/CFB",
+          "shape": "1000",
+          "payload_kind": "deterministic-text-boxes",
+          "compression": "none",
+          "entry_count": 1000,
+          "archive_member_count": 4,
+          "entry_bytes": 42,
+          "uncompressed_payload_bytes": 42000,
+          "archive_bytes": 194048,
+          "archive_sha256": "f9459ca126fbc9345649c9d6a51f0b60b05f8cd893e3f6b3cc956d07a9475d0b",
+          "target_entry": "slide:0/shape:0",
+          "target_payload_bytes": 42,
+          "target_payload_sha256": "7e382deca3914aad886997f6b504e883b2f7b829e8520c6a39c17c2002617ddb",
+          "xlsx": null
+        },
+        "elapsed_ns": {
+          "unit": "ns",
+          "samples": [
+            14051647,
+            14226448,
+            14358149,
+            14478350,
+            14549400
+          ],
+          "sample_order": [
+            4,
+            0,
+            3,
+            2,
+            1
+          ],
+          "min": 14051647,
+          "p50": 14358149,
+          "p95": 14549400,
+          "p99": 14549400,
+          "max": 14549400,
+          "mean": 14332798.8,
+          "standard_deviation": 199437.14022643797,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 14085204.582454061,
+            "upper": 14580393.01754594
+          }
+        },
+        "sink": null,
+        "source": {
+          "read_calls": [],
+          "read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "ordinary_payload_read_bytes": [],
+          "max_in_flight_reads": [],
+          "unified_ops": {
+            "leg": "native",
+            "predecessor": "ppt_text_batch_native_vs_unified_v1",
+            "twin": "ppt_text_batch_eager_unified_1000_v1",
+            "timed_calls": "prepared litchi_ppt::Package::edit with 256-target set_shape_texts chunks and 4096-operation commit rollover",
+            "performance_claim": "none: one leg of a paired unified/leaf re-measurement (plan 0003 \u00a75.3); comparisons belong to the M0a S10 record",
+            "projection_sha256": "9026890a2266140618a733550a4fae7eeced07f535ec4e6f20392074c92d2053",
+            "verified_samples": 5,
+            "legs_agree": true,
+            "ppt_text_batch": {
+              "leg": "native",
+              "owner": "eager",
+              "count": 1000,
+              "native_chunk_size": 256,
+              "native_operation_limit": 4096,
+              "native_chunk_calls": 4,
+              "native_commits": 1,
+              "unified_operations": 1000,
+              "unified_commits": 1,
+              "semantic_snapshot_limit_bytes": 268435456,
+              "source_sha256": "f9459ca126fbc9345649c9d6a51f0b60b05f8cd893e3f6b3cc956d07a9475d0b",
+              "expected_output_sha256": "9026890a2266140618a733550a4fae7eeced07f535ec4e6f20392074c92d2053",
+              "exact_output_verified": true,
+              "unchanged_source_verified": true,
+              "timing_scope": "one prepared native or unified text-batch publication; opening, fixture construction, command-vector preparation, output serialization, exact equivalence and source checks are outside the timer; unified string-path parsing is timed"
+            }
+          }
+        }
+      },
+      "unified": {
+        "case": "ppt_text_batch_eager_unified_1000_v1",
+        "corpus": {
+          "name": "ppt-text-batch-1000",
+          "generator": "litchi-ppt-text-batch-v1",
+          "package_format": "PPT/CFB",
+          "shape": "1000",
+          "payload_kind": "deterministic-text-boxes",
+          "compression": "none",
+          "entry_count": 1000,
+          "archive_member_count": 4,
+          "entry_bytes": 42,
+          "uncompressed_payload_bytes": 42000,
+          "archive_bytes": 194048,
+          "archive_sha256": "f9459ca126fbc9345649c9d6a51f0b60b05f8cd893e3f6b3cc956d07a9475d0b",
+          "target_entry": "slide:0/shape:0",
+          "target_payload_bytes": 42,
+          "target_payload_sha256": "7e382deca3914aad886997f6b504e883b2f7b829e8520c6a39c17c2002617ddb",
+          "xlsx": null
+        },
+        "elapsed_ns": {
+          "unit": "ns",
+          "samples": [
+            17626817,
+            17774478,
+            17925819,
+            18096739,
+            18102300
+          ],
+          "sample_order": [
+            2,
+            4,
+            0,
+            1,
+            3
+          ],
+          "min": 17626817,
+          "p50": 17925819,
+          "p95": 18102300,
+          "p99": 18102300,
+          "max": 18102300,
+          "mean": 17905230.6,
+          "standard_deviation": 206486.12118808314,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 17648885.319719642,
+            "upper": 18161575.88028036
+          }
+        },
+        "sink": null,
+        "source": {
+          "read_calls": [],
+          "read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "ordinary_payload_read_bytes": [],
+          "max_in_flight_reads": [],
+          "unified_ops": {
+            "leg": "unified",
+            "predecessor": "ppt_text_batch_native_vs_unified_v1",
+            "twin": "ppt_text_batch_eager_native_1000_v1",
+            "timed_calls": "prepared litchi::File::edit shape text sets from string paths (path parsing included) in one facade transaction with 4096-operation native rollover",
+            "performance_claim": "none: one leg of a paired unified/leaf re-measurement (plan 0003 \u00a75.3); comparisons belong to the M0a S10 record",
+            "projection_sha256": "9026890a2266140618a733550a4fae7eeced07f535ec4e6f20392074c92d2053",
+            "verified_samples": 5,
+            "legs_agree": true,
+            "ppt_text_batch": {
+              "leg": "unified",
+              "owner": "eager",
+              "count": 1000,
+              "native_chunk_size": 256,
+              "native_operation_limit": 4096,
+              "native_chunk_calls": 4,
+              "native_commits": 1,
+              "unified_operations": 1000,
+              "unified_commits": 1,
+              "semantic_snapshot_limit_bytes": 268435456,
+              "source_sha256": "f9459ca126fbc9345649c9d6a51f0b60b05f8cd893e3f6b3cc956d07a9475d0b",
+              "expected_output_sha256": "9026890a2266140618a733550a4fae7eeced07f535ec4e6f20392074c92d2053",
+              "exact_output_verified": true,
+              "unchanged_source_verified": true,
+              "timing_scope": "one prepared native or unified text-batch publication; opening, fixture construction, command-vector preparation, output serialization, exact equivalence and source checks are outside the timer; unified string-path parsing is timed"
+            }
+          }
+        }
+      },
+      "unified_over_native_p50": 1.2484770146904034,
+      "native_p50_speedup_over_0218": 13.48316987099103,
+      "unified_p50_speedup_over_0218": 11.011107553858487
+    },
+    {
+      "owner": "positional",
+      "operations": 1000,
+      "native": {
+        "case": "ppt_text_batch_positional_native_1000_v1",
+        "corpus": {
+          "name": "ppt-text-batch-1000",
+          "generator": "litchi-ppt-text-batch-v1",
+          "package_format": "PPT/CFB",
+          "shape": "1000",
+          "payload_kind": "deterministic-text-boxes",
+          "compression": "none",
+          "entry_count": 1000,
+          "archive_member_count": 4,
+          "entry_bytes": 42,
+          "uncompressed_payload_bytes": 42000,
+          "archive_bytes": 194048,
+          "archive_sha256": "f9459ca126fbc9345649c9d6a51f0b60b05f8cd893e3f6b3cc956d07a9475d0b",
+          "target_entry": "slide:0/shape:0",
+          "target_payload_bytes": 42,
+          "target_payload_sha256": "7e382deca3914aad886997f6b504e883b2f7b829e8520c6a39c17c2002617ddb",
+          "xlsx": null
+        },
+        "elapsed_ns": {
+          "unit": "ns",
+          "samples": [
+            13649835,
+            13687176,
+            13691865,
+            13699385,
+            13867826
+          ],
+          "sample_order": [
+            1,
+            2,
+            4,
+            0,
+            3
+          ],
+          "min": 13649835,
+          "p50": 13691865,
+          "p95": 13867826,
+          "p99": 13867826,
+          "max": 13867826,
+          "mean": 13719217.4,
+          "standard_deviation": 85244.59310302316,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 13613389.226243591,
+            "upper": 13825045.57375641
+          }
+        },
+        "sink": null,
+        "source": {
+          "read_calls": [],
+          "read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "ordinary_payload_read_bytes": [],
+          "max_in_flight_reads": [],
+          "unified_ops": {
+            "leg": "native",
+            "predecessor": "ppt_text_batch_native_vs_unified_v1",
+            "twin": "ppt_text_batch_positional_unified_1000_v1",
+            "timed_calls": "prepared litchi_ppt::Package::edit with 256-target set_shape_texts chunks and 4096-operation commit rollover",
+            "performance_claim": "none: one leg of a paired unified/leaf re-measurement (plan 0003 \u00a75.3); comparisons belong to the M0a S10 record",
+            "projection_sha256": "9026890a2266140618a733550a4fae7eeced07f535ec4e6f20392074c92d2053",
+            "verified_samples": 5,
+            "legs_agree": true,
+            "ppt_text_batch": {
+              "leg": "native",
+              "owner": "positional",
+              "count": 1000,
+              "native_chunk_size": 256,
+              "native_operation_limit": 4096,
+              "native_chunk_calls": 4,
+              "native_commits": 1,
+              "unified_operations": 1000,
+              "unified_commits": 1,
+              "semantic_snapshot_limit_bytes": 268435456,
+              "source_sha256": "f9459ca126fbc9345649c9d6a51f0b60b05f8cd893e3f6b3cc956d07a9475d0b",
+              "expected_output_sha256": "9026890a2266140618a733550a4fae7eeced07f535ec4e6f20392074c92d2053",
+              "exact_output_verified": true,
+              "unchanged_source_verified": true,
+              "timing_scope": "one prepared native or unified text-batch publication; opening, fixture construction, command-vector preparation, output serialization, exact equivalence and source checks are outside the timer; unified string-path parsing is timed"
+            }
+          }
+        }
+      },
+      "unified": {
+        "case": "ppt_text_batch_positional_unified_1000_v1",
+        "corpus": {
+          "name": "ppt-text-batch-1000",
+          "generator": "litchi-ppt-text-batch-v1",
+          "package_format": "PPT/CFB",
+          "shape": "1000",
+          "payload_kind": "deterministic-text-boxes",
+          "compression": "none",
+          "entry_count": 1000,
+          "archive_member_count": 4,
+          "entry_bytes": 42,
+          "uncompressed_payload_bytes": 42000,
+          "archive_bytes": 194048,
+          "archive_sha256": "f9459ca126fbc9345649c9d6a51f0b60b05f8cd893e3f6b3cc956d07a9475d0b",
+          "target_entry": "slide:0/shape:0",
+          "target_payload_bytes": 42,
+          "target_payload_sha256": "7e382deca3914aad886997f6b504e883b2f7b829e8520c6a39c17c2002617ddb",
+          "xlsx": null
+        },
+        "elapsed_ns": {
+          "unit": "ns",
+          "samples": [
+            18575652,
+            18631293,
+            18641863,
+            18670333,
+            18677352
+          ],
+          "sample_order": [
+            4,
+            3,
+            2,
+            1,
+            0
+          ],
+          "min": 18575652,
+          "p50": 18641863,
+          "p95": 18677352,
+          "p99": 18677352,
+          "max": 18677352,
+          "mean": 18639298.6,
+          "standard_deviation": 40412.71676465227,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 18589127.628961764,
+            "upper": 18689469.57103824
+          }
+        },
+        "sink": null,
+        "source": {
+          "read_calls": [],
+          "read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "ordinary_payload_read_bytes": [],
+          "max_in_flight_reads": [],
+          "unified_ops": {
+            "leg": "unified",
+            "predecessor": "ppt_text_batch_native_vs_unified_v1",
+            "twin": "ppt_text_batch_positional_native_1000_v1",
+            "timed_calls": "prepared litchi::File::edit shape text sets from string paths (path parsing included) in one facade transaction with 4096-operation native rollover",
+            "performance_claim": "none: one leg of a paired unified/leaf re-measurement (plan 0003 \u00a75.3); comparisons belong to the M0a S10 record",
+            "projection_sha256": "9026890a2266140618a733550a4fae7eeced07f535ec4e6f20392074c92d2053",
+            "verified_samples": 5,
+            "legs_agree": true,
+            "ppt_text_batch": {
+              "leg": "unified",
+              "owner": "positional",
+              "count": 1000,
+              "native_chunk_size": 256,
+              "native_operation_limit": 4096,
+              "native_chunk_calls": 4,
+              "native_commits": 1,
+              "unified_operations": 1000,
+              "unified_commits": 1,
+              "semantic_snapshot_limit_bytes": 268435456,
+              "source_sha256": "f9459ca126fbc9345649c9d6a51f0b60b05f8cd893e3f6b3cc956d07a9475d0b",
+              "expected_output_sha256": "9026890a2266140618a733550a4fae7eeced07f535ec4e6f20392074c92d2053",
+              "exact_output_verified": true,
+              "unchanged_source_verified": true,
+              "timing_scope": "one prepared native or unified text-batch publication; opening, fixture construction, command-vector preparation, output serialization, exact equivalence and source checks are outside the timer; unified string-path parsing is timed"
+            }
+          }
+        }
+      },
+      "unified_over_native_p50": 1.361528396606306,
+      "native_p50_speedup_over_0218": 14.02593620372389,
+      "unified_p50_speedup_over_0218": 10.541841553067952
+    },
+    {
+      "owner": "eager",
+      "operations": 4096,
+      "native": {
+        "case": "ppt_text_batch_eager_native_4096_v1",
+        "corpus": {
+          "name": "ppt-text-batch-4096",
+          "generator": "litchi-ppt-text-batch-v1",
+          "package_format": "PPT/CFB",
+          "shape": "4096",
+          "payload_kind": "deterministic-text-boxes",
+          "compression": "none",
+          "entry_count": 4096,
+          "archive_member_count": 4,
+          "entry_bytes": 42,
+          "uncompressed_payload_bytes": 172032,
+          "archive_bytes": 774656,
+          "archive_sha256": "613937e20aac69890cf4d9dade3ce2ff853b7aab3630761bcaf753a766f92728",
+          "target_entry": "slide:0/shape:0",
+          "target_payload_bytes": 42,
+          "target_payload_sha256": "63804558b009b367f665d860378597fc017e16164269830b1ac67f07026059f9",
+          "xlsx": null
+        },
+        "elapsed_ns": {
+          "unit": "ns",
+          "samples": [
+            263187887,
+            265158729,
+            267628942,
+            268206586,
+            279975471
+          ],
+          "sample_order": [
+            1,
+            0,
+            3,
+            4,
+            2
+          ],
+          "min": 263187887,
+          "p50": 267628942,
+          "p95": 279975471,
+          "p99": 279975471,
+          "max": 279975471,
+          "mean": 268831523.0,
+          "standard_deviation": 6545310.676529533,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 260705749.26642945,
+            "upper": 276957296.7335705
+          }
+        },
+        "sink": null,
+        "source": {
+          "read_calls": [],
+          "read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "ordinary_payload_read_bytes": [],
+          "max_in_flight_reads": [],
+          "unified_ops": {
+            "leg": "native",
+            "predecessor": "ppt_text_batch_native_vs_unified_v1",
+            "twin": "ppt_text_batch_eager_unified_4096_v1",
+            "timed_calls": "prepared litchi_ppt::Package::edit with 256-target set_shape_texts chunks and 4096-operation commit rollover",
+            "performance_claim": "none: one leg of a paired unified/leaf re-measurement (plan 0003 \u00a75.3); comparisons belong to the M0a S10 record",
+            "projection_sha256": "2aa787f00863bbc1862c9f74c04605c7f96124e76750b15d7bef50d7299cdd61",
+            "verified_samples": 5,
+            "legs_agree": true,
+            "ppt_text_batch": {
+              "leg": "native",
+              "owner": "eager",
+              "count": 4096,
+              "native_chunk_size": 256,
+              "native_operation_limit": 4096,
+              "native_chunk_calls": 16,
+              "native_commits": 1,
+              "unified_operations": 4096,
+              "unified_commits": 1,
+              "semantic_snapshot_limit_bytes": 268435456,
+              "source_sha256": "613937e20aac69890cf4d9dade3ce2ff853b7aab3630761bcaf753a766f92728",
+              "expected_output_sha256": "2aa787f00863bbc1862c9f74c04605c7f96124e76750b15d7bef50d7299cdd61",
+              "exact_output_verified": true,
+              "unchanged_source_verified": true,
+              "timing_scope": "one prepared native or unified text-batch publication; opening, fixture construction, command-vector preparation, output serialization, exact equivalence and source checks are outside the timer; unified string-path parsing is timed"
+            }
+          }
+        }
+      },
+      "unified": {
+        "case": "ppt_text_batch_eager_unified_4096_v1",
+        "corpus": {
+          "name": "ppt-text-batch-4096",
+          "generator": "litchi-ppt-text-batch-v1",
+          "package_format": "PPT/CFB",
+          "shape": "4096",
+          "payload_kind": "deterministic-text-boxes",
+          "compression": "none",
+          "entry_count": 4096,
+          "archive_member_count": 4,
+          "entry_bytes": 42,
+          "uncompressed_payload_bytes": 172032,
+          "archive_bytes": 774656,
+          "archive_sha256": "613937e20aac69890cf4d9dade3ce2ff853b7aab3630761bcaf753a766f92728",
+          "target_entry": "slide:0/shape:0",
+          "target_payload_bytes": 42,
+          "target_payload_sha256": "63804558b009b367f665d860378597fc017e16164269830b1ac67f07026059f9",
+          "xlsx": null
+        },
+        "elapsed_ns": {
+          "unit": "ns",
+          "samples": [
+            285525142,
+            286298286,
+            289797776,
+            294628333,
+            308275499
+          ],
+          "sample_order": [
+            4,
+            3,
+            2,
+            1,
+            0
+          ],
+          "min": 285525142,
+          "p50": 289797776,
+          "p95": 308275499,
+          "p99": 308275499,
+          "max": 308275499,
+          "mean": 292905007.2,
+          "standard_deviation": 9313806.030589307,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 281342243.5447442,
+            "upper": 304467770.8552558
+          }
+        },
+        "sink": null,
+        "source": {
+          "read_calls": [],
+          "read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "ordinary_payload_read_bytes": [],
+          "max_in_flight_reads": [],
+          "unified_ops": {
+            "leg": "unified",
+            "predecessor": "ppt_text_batch_native_vs_unified_v1",
+            "twin": "ppt_text_batch_eager_native_4096_v1",
+            "timed_calls": "prepared litchi::File::edit shape text sets from string paths (path parsing included) in one facade transaction with 4096-operation native rollover",
+            "performance_claim": "none: one leg of a paired unified/leaf re-measurement (plan 0003 \u00a75.3); comparisons belong to the M0a S10 record",
+            "projection_sha256": "2aa787f00863bbc1862c9f74c04605c7f96124e76750b15d7bef50d7299cdd61",
+            "verified_samples": 5,
+            "legs_agree": true,
+            "ppt_text_batch": {
+              "leg": "unified",
+              "owner": "eager",
+              "count": 4096,
+              "native_chunk_size": 256,
+              "native_operation_limit": 4096,
+              "native_chunk_calls": 16,
+              "native_commits": 1,
+              "unified_operations": 4096,
+              "unified_commits": 1,
+              "semantic_snapshot_limit_bytes": 268435456,
+              "source_sha256": "613937e20aac69890cf4d9dade3ce2ff853b7aab3630761bcaf753a766f92728",
+              "expected_output_sha256": "2aa787f00863bbc1862c9f74c04605c7f96124e76750b15d7bef50d7299cdd61",
+              "exact_output_verified": true,
+              "unchanged_source_verified": true,
+              "timing_scope": "one prepared native or unified text-batch publication; opening, fixture construction, command-vector preparation, output serialization, exact equivalence and source checks are outside the timer; unified string-path parsing is timed"
+            }
+          }
+        }
+      },
+      "unified_over_native_p50": 1.0828342175339167
+    },
+    {
+      "owner": "positional",
+      "operations": 4096,
+      "native": {
+        "case": "ppt_text_batch_positional_native_4096_v1",
+        "corpus": {
+          "name": "ppt-text-batch-4096",
+          "generator": "litchi-ppt-text-batch-v1",
+          "package_format": "PPT/CFB",
+          "shape": "4096",
+          "payload_kind": "deterministic-text-boxes",
+          "compression": "none",
+          "entry_count": 4096,
+          "archive_member_count": 4,
+          "entry_bytes": 42,
+          "uncompressed_payload_bytes": 172032,
+          "archive_bytes": 774656,
+          "archive_sha256": "613937e20aac69890cf4d9dade3ce2ff853b7aab3630761bcaf753a766f92728",
+          "target_entry": "slide:0/shape:0",
+          "target_payload_bytes": 42,
+          "target_payload_sha256": "63804558b009b367f665d860378597fc017e16164269830b1ac67f07026059f9",
+          "xlsx": null
+        },
+        "elapsed_ns": {
+          "unit": "ns",
+          "samples": [
+            254210637,
+            255839026,
+            256373100,
+            256530611,
+            259230795
+          ],
+          "sample_order": [
+            0,
+            4,
+            2,
+            1,
+            3
+          ],
+          "min": 254210637,
+          "p50": 256373100,
+          "p95": 259230795,
+          "p99": 259230795,
+          "max": 259230795,
+          "mean": 256436833.8,
+          "standard_deviation": 1811932.787500597,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 254187382.76867414,
+            "upper": 258686284.8313259
+          }
+        },
+        "sink": null,
+        "source": {
+          "read_calls": [],
+          "read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "ordinary_payload_read_bytes": [],
+          "max_in_flight_reads": [],
+          "unified_ops": {
+            "leg": "native",
+            "predecessor": "ppt_text_batch_native_vs_unified_v1",
+            "twin": "ppt_text_batch_positional_unified_4096_v1",
+            "timed_calls": "prepared litchi_ppt::Package::edit with 256-target set_shape_texts chunks and 4096-operation commit rollover",
+            "performance_claim": "none: one leg of a paired unified/leaf re-measurement (plan 0003 \u00a75.3); comparisons belong to the M0a S10 record",
+            "projection_sha256": "2aa787f00863bbc1862c9f74c04605c7f96124e76750b15d7bef50d7299cdd61",
+            "verified_samples": 5,
+            "legs_agree": true,
+            "ppt_text_batch": {
+              "leg": "native",
+              "owner": "positional",
+              "count": 4096,
+              "native_chunk_size": 256,
+              "native_operation_limit": 4096,
+              "native_chunk_calls": 16,
+              "native_commits": 1,
+              "unified_operations": 4096,
+              "unified_commits": 1,
+              "semantic_snapshot_limit_bytes": 268435456,
+              "source_sha256": "613937e20aac69890cf4d9dade3ce2ff853b7aab3630761bcaf753a766f92728",
+              "expected_output_sha256": "2aa787f00863bbc1862c9f74c04605c7f96124e76750b15d7bef50d7299cdd61",
+              "exact_output_verified": true,
+              "unchanged_source_verified": true,
+              "timing_scope": "one prepared native or unified text-batch publication; opening, fixture construction, command-vector preparation, output serialization, exact equivalence and source checks are outside the timer; unified string-path parsing is timed"
+            }
+          }
+        }
+      },
+      "unified": {
+        "case": "ppt_text_batch_positional_unified_4096_v1",
+        "corpus": {
+          "name": "ppt-text-batch-4096",
+          "generator": "litchi-ppt-text-batch-v1",
+          "package_format": "PPT/CFB",
+          "shape": "4096",
+          "payload_kind": "deterministic-text-boxes",
+          "compression": "none",
+          "entry_count": 4096,
+          "archive_member_count": 4,
+          "entry_bytes": 42,
+          "uncompressed_payload_bytes": 172032,
+          "archive_bytes": 774656,
+          "archive_sha256": "613937e20aac69890cf4d9dade3ce2ff853b7aab3630761bcaf753a766f92728",
+          "target_entry": "slide:0/shape:0",
+          "target_payload_bytes": 42,
+          "target_payload_sha256": "63804558b009b367f665d860378597fc017e16164269830b1ac67f07026059f9",
+          "xlsx": null
+        },
+        "elapsed_ns": {
+          "unit": "ns",
+          "samples": [
+            281924412,
+            282376834,
+            289768136,
+            293602047,
+            293863168
+          ],
+          "sample_order": [
+            3,
+            0,
+            4,
+            1,
+            2
+          ],
+          "min": 281924412,
+          "p50": 289768136,
+          "p95": 293863168,
+          "p99": 293863168,
+          "max": 293863168,
+          "mean": 288306919.4,
+          "standard_deviation": 5851233.680168384,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 281042817.9238413,
+            "upper": 295571020.87615865
+          }
+        },
+        "sink": null,
+        "source": {
+          "read_calls": [],
+          "read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "ordinary_payload_read_bytes": [],
+          "max_in_flight_reads": [],
+          "unified_ops": {
+            "leg": "unified",
+            "predecessor": "ppt_text_batch_native_vs_unified_v1",
+            "twin": "ppt_text_batch_positional_native_4096_v1",
+            "timed_calls": "prepared litchi::File::edit shape text sets from string paths (path parsing included) in one facade transaction with 4096-operation native rollover",
+            "performance_claim": "none: one leg of a paired unified/leaf re-measurement (plan 0003 \u00a75.3); comparisons belong to the M0a S10 record",
+            "projection_sha256": "2aa787f00863bbc1862c9f74c04605c7f96124e76750b15d7bef50d7299cdd61",
+            "verified_samples": 5,
+            "legs_agree": true,
+            "ppt_text_batch": {
+              "leg": "unified",
+              "owner": "positional",
+              "count": 4096,
+              "native_chunk_size": 256,
+              "native_operation_limit": 4096,
+              "native_chunk_calls": 16,
+              "native_commits": 1,
+              "unified_operations": 4096,
+              "unified_commits": 1,
+              "semantic_snapshot_limit_bytes": 268435456,
+              "source_sha256": "613937e20aac69890cf4d9dade3ce2ff853b7aab3630761bcaf753a766f92728",
+              "expected_output_sha256": "2aa787f00863bbc1862c9f74c04605c7f96124e76750b15d7bef50d7299cdd61",
+              "exact_output_verified": true,
+              "unchanged_source_verified": true,
+              "timing_scope": "one prepared native or unified text-batch publication; opening, fixture construction, command-vector preparation, output serialization, exact equivalence and source checks are outside the timer; unified string-path parsing is timed"
+            }
+          }
+        }
+      },
+      "unified_over_native_p50": 1.130259516306508
+    },
+    {
+      "owner": "eager",
+      "operations": 10000,
+      "native": {
+        "case": "ppt_text_batch_eager_native_10000_v1",
+        "corpus": {
+          "name": "ppt-text-batch-10000",
+          "generator": "litchi-ppt-text-batch-v1",
+          "package_format": "PPT/CFB",
+          "shape": "10000",
+          "payload_kind": "deterministic-text-boxes",
+          "compression": "none",
+          "entry_count": 10000,
+          "archive_member_count": 4,
+          "entry_bytes": 43,
+          "uncompressed_payload_bytes": 430000,
+          "archive_bytes": 1891328,
+          "archive_sha256": "2a6ea7e8008b71bbeb4a90bc0cfd631e73e2f63f4193b47bad1148576f051c56",
+          "target_entry": "slide:0/shape:0",
+          "target_payload_bytes": 43,
+          "target_payload_sha256": "e8fd28de92a4be76965cb8b6e0b27cacda4b01828a76720a68d3d6814676217b",
+          "xlsx": null
+        },
+        "elapsed_ns": {
+          "unit": "ns",
+          "samples": [
+            4345112813,
+            4429758806,
+            4439748230,
+            4440732865,
+            4452207694
+          ],
+          "sample_order": [
+            0,
+            2,
+            1,
+            4,
+            3
+          ],
+          "min": 4345112813,
+          "p50": 4439748230,
+          "p95": 4452207694,
+          "p99": 4452207694,
+          "max": 4452207694,
+          "mean": 4421512081.6,
+          "standard_deviation": 43442700.62257887,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 4367579491.830023,
+            "upper": 4475444671.369978
+          }
+        },
+        "sink": null,
+        "source": {
+          "read_calls": [],
+          "read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "ordinary_payload_read_bytes": [],
+          "max_in_flight_reads": [],
+          "unified_ops": {
+            "leg": "native",
+            "predecessor": "ppt_text_batch_native_vs_unified_v1",
+            "twin": "ppt_text_batch_eager_unified_10000_v1",
+            "timed_calls": "prepared litchi_ppt::Package::edit with 256-target set_shape_texts chunks and 4096-operation commit rollover",
+            "performance_claim": "none: one leg of a paired unified/leaf re-measurement (plan 0003 \u00a75.3); comparisons belong to the M0a S10 record",
+            "projection_sha256": "4c16d3ea912f9b94fa5bd4b26fc5646e2d0b713b9570a8d34da48b05eaf57bcc",
+            "verified_samples": 5,
+            "legs_agree": true,
+            "ppt_text_batch": {
+              "leg": "native",
+              "owner": "eager",
+              "count": 10000,
+              "native_chunk_size": 256,
+              "native_operation_limit": 4096,
+              "native_chunk_calls": 40,
+              "native_commits": 3,
+              "unified_operations": 10000,
+              "unified_commits": 3,
+              "semantic_snapshot_limit_bytes": 1073741824,
+              "source_sha256": "2a6ea7e8008b71bbeb4a90bc0cfd631e73e2f63f4193b47bad1148576f051c56",
+              "expected_output_sha256": "4c16d3ea912f9b94fa5bd4b26fc5646e2d0b713b9570a8d34da48b05eaf57bcc",
+              "exact_output_verified": true,
+              "unchanged_source_verified": true,
+              "timing_scope": "one prepared native or unified text-batch publication; opening, fixture construction, command-vector preparation, output serialization, exact equivalence and source checks are outside the timer; unified string-path parsing is timed"
+            }
+          }
+        }
+      },
+      "unified": {
+        "case": "ppt_text_batch_eager_unified_10000_v1",
+        "corpus": {
+          "name": "ppt-text-batch-10000",
+          "generator": "litchi-ppt-text-batch-v1",
+          "package_format": "PPT/CFB",
+          "shape": "10000",
+          "payload_kind": "deterministic-text-boxes",
+          "compression": "none",
+          "entry_count": 10000,
+          "archive_member_count": 4,
+          "entry_bytes": 43,
+          "uncompressed_payload_bytes": 430000,
+          "archive_bytes": 1891328,
+          "archive_sha256": "2a6ea7e8008b71bbeb4a90bc0cfd631e73e2f63f4193b47bad1148576f051c56",
+          "target_entry": "slide:0/shape:0",
+          "target_payload_bytes": 43,
+          "target_payload_sha256": "e8fd28de92a4be76965cb8b6e0b27cacda4b01828a76720a68d3d6814676217b",
+          "xlsx": null
+        },
+        "elapsed_ns": {
+          "unit": "ns",
+          "samples": [
+            4553478465,
+            4570844485,
+            4573782344,
+            4610453745,
+            4637364819
+          ],
+          "sample_order": [
+            1,
+            2,
+            0,
+            4,
+            3
+          ],
+          "min": 4553478465,
+          "p50": 4573782344,
+          "p95": 4637364819,
+          "p99": 4637364819,
+          "max": 4637364819,
+          "mean": 4589184771.6,
+          "standard_deviation": 33993482.52427484,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 4546983054.81995,
+            "upper": 4631386488.380051
+          }
+        },
+        "sink": null,
+        "source": {
+          "read_calls": [],
+          "read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "ordinary_payload_read_bytes": [],
+          "max_in_flight_reads": [],
+          "unified_ops": {
+            "leg": "unified",
+            "predecessor": "ppt_text_batch_native_vs_unified_v1",
+            "twin": "ppt_text_batch_eager_native_10000_v1",
+            "timed_calls": "prepared litchi::File::edit shape text sets from string paths (path parsing included) in one facade transaction with 4096-operation native rollover",
+            "performance_claim": "none: one leg of a paired unified/leaf re-measurement (plan 0003 \u00a75.3); comparisons belong to the M0a S10 record",
+            "projection_sha256": "4c16d3ea912f9b94fa5bd4b26fc5646e2d0b713b9570a8d34da48b05eaf57bcc",
+            "verified_samples": 5,
+            "legs_agree": true,
+            "ppt_text_batch": {
+              "leg": "unified",
+              "owner": "eager",
+              "count": 10000,
+              "native_chunk_size": 256,
+              "native_operation_limit": 4096,
+              "native_chunk_calls": 40,
+              "native_commits": 3,
+              "unified_operations": 10000,
+              "unified_commits": 3,
+              "semantic_snapshot_limit_bytes": 1073741824,
+              "source_sha256": "2a6ea7e8008b71bbeb4a90bc0cfd631e73e2f63f4193b47bad1148576f051c56",
+              "expected_output_sha256": "4c16d3ea912f9b94fa5bd4b26fc5646e2d0b713b9570a8d34da48b05eaf57bcc",
+              "exact_output_verified": true,
+              "unchanged_source_verified": true,
+              "timing_scope": "one prepared native or unified text-batch publication; opening, fixture construction, command-vector preparation, output serialization, exact equivalence and source checks are outside the timer; unified string-path parsing is timed"
+            }
+          }
+        }
+      },
+      "unified_over_native_p50": 1.0301895754120274,
+      "native_p50_speedup_over_0218": 5.447987132369441,
+      "unified_p50_speedup_over_0218": 5.245560580177884
+    },
+    {
+      "owner": "positional",
+      "operations": 10000,
+      "native": {
+        "case": "ppt_text_batch_positional_native_10000_v1",
+        "corpus": {
+          "name": "ppt-text-batch-10000",
+          "generator": "litchi-ppt-text-batch-v1",
+          "package_format": "PPT/CFB",
+          "shape": "10000",
+          "payload_kind": "deterministic-text-boxes",
+          "compression": "none",
+          "entry_count": 10000,
+          "archive_member_count": 4,
+          "entry_bytes": 43,
+          "uncompressed_payload_bytes": 430000,
+          "archive_bytes": 1891328,
+          "archive_sha256": "2a6ea7e8008b71bbeb4a90bc0cfd631e73e2f63f4193b47bad1148576f051c56",
+          "target_entry": "slide:0/shape:0",
+          "target_payload_bytes": 43,
+          "target_payload_sha256": "e8fd28de92a4be76965cb8b6e0b27cacda4b01828a76720a68d3d6814676217b",
+          "xlsx": null
+        },
+        "elapsed_ns": {
+          "unit": "ns",
+          "samples": [
+            4218203435,
+            4218383089,
+            4251434282,
+            4491691480,
+            4500935348
+          ],
+          "sample_order": [
+            2,
+            0,
+            1,
+            3,
+            4
+          ],
+          "min": 4218203435,
+          "p50": 4251434282,
+          "p95": 4500935348,
+          "p99": 4500935348,
+          "max": 4500935348,
+          "mean": 4336129526.8,
+          "standard_deviation": 146888181.29647854,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 4153772999.4573236,
+            "upper": 4518486054.142677
+          }
+        },
+        "sink": null,
+        "source": {
+          "read_calls": [],
+          "read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "ordinary_payload_read_bytes": [],
+          "max_in_flight_reads": [],
+          "unified_ops": {
+            "leg": "native",
+            "predecessor": "ppt_text_batch_native_vs_unified_v1",
+            "twin": "ppt_text_batch_positional_unified_10000_v1",
+            "timed_calls": "prepared litchi_ppt::Package::edit with 256-target set_shape_texts chunks and 4096-operation commit rollover",
+            "performance_claim": "none: one leg of a paired unified/leaf re-measurement (plan 0003 \u00a75.3); comparisons belong to the M0a S10 record",
+            "projection_sha256": "4c16d3ea912f9b94fa5bd4b26fc5646e2d0b713b9570a8d34da48b05eaf57bcc",
+            "verified_samples": 5,
+            "legs_agree": true,
+            "ppt_text_batch": {
+              "leg": "native",
+              "owner": "positional",
+              "count": 10000,
+              "native_chunk_size": 256,
+              "native_operation_limit": 4096,
+              "native_chunk_calls": 40,
+              "native_commits": 3,
+              "unified_operations": 10000,
+              "unified_commits": 3,
+              "semantic_snapshot_limit_bytes": 1073741824,
+              "source_sha256": "2a6ea7e8008b71bbeb4a90bc0cfd631e73e2f63f4193b47bad1148576f051c56",
+              "expected_output_sha256": "4c16d3ea912f9b94fa5bd4b26fc5646e2d0b713b9570a8d34da48b05eaf57bcc",
+              "exact_output_verified": true,
+              "unchanged_source_verified": true,
+              "timing_scope": "one prepared native or unified text-batch publication; opening, fixture construction, command-vector preparation, output serialization, exact equivalence and source checks are outside the timer; unified string-path parsing is timed"
+            }
+          }
+        }
+      },
+      "unified": {
+        "case": "ppt_text_batch_positional_unified_10000_v1",
+        "corpus": {
+          "name": "ppt-text-batch-10000",
+          "generator": "litchi-ppt-text-batch-v1",
+          "package_format": "PPT/CFB",
+          "shape": "10000",
+          "payload_kind": "deterministic-text-boxes",
+          "compression": "none",
+          "entry_count": 10000,
+          "archive_member_count": 4,
+          "entry_bytes": 43,
+          "uncompressed_payload_bytes": 430000,
+          "archive_bytes": 1891328,
+          "archive_sha256": "2a6ea7e8008b71bbeb4a90bc0cfd631e73e2f63f4193b47bad1148576f051c56",
+          "target_entry": "slide:0/shape:0",
+          "target_payload_bytes": 43,
+          "target_payload_sha256": "e8fd28de92a4be76965cb8b6e0b27cacda4b01828a76720a68d3d6814676217b",
+          "xlsx": null
+        },
+        "elapsed_ns": {
+          "unit": "ns",
+          "samples": [
+            4580666988,
+            4628125329,
+            4661923007,
+            4665251748,
+            4697006477
+          ],
+          "sample_order": [
+            2,
+            0,
+            4,
+            1,
+            3
+          ],
+          "min": 4580666988,
+          "p50": 4661923007,
+          "p95": 4697006477,
+          "p99": 4697006477,
+          "max": 4697006477,
+          "mean": 4646594709.8,
+          "standard_deviation": 44192676.34616721,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 4591731051.462506,
+            "upper": 4701458368.137494
+          }
+        },
+        "sink": null,
+        "source": {
+          "read_calls": [],
+          "read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "ordinary_payload_read_bytes": [],
+          "max_in_flight_reads": [],
+          "unified_ops": {
+            "leg": "unified",
+            "predecessor": "ppt_text_batch_native_vs_unified_v1",
+            "twin": "ppt_text_batch_positional_native_10000_v1",
+            "timed_calls": "prepared litchi::File::edit shape text sets from string paths (path parsing included) in one facade transaction with 4096-operation native rollover",
+            "performance_claim": "none: one leg of a paired unified/leaf re-measurement (plan 0003 \u00a75.3); comparisons belong to the M0a S10 record",
+            "projection_sha256": "4c16d3ea912f9b94fa5bd4b26fc5646e2d0b713b9570a8d34da48b05eaf57bcc",
+            "verified_samples": 5,
+            "legs_agree": true,
+            "ppt_text_batch": {
+              "leg": "unified",
+              "owner": "positional",
+              "count": 10000,
+              "native_chunk_size": 256,
+              "native_operation_limit": 4096,
+              "native_chunk_calls": 40,
+              "native_commits": 3,
+              "unified_operations": 10000,
+              "unified_commits": 3,
+              "semantic_snapshot_limit_bytes": 1073741824,
+              "source_sha256": "2a6ea7e8008b71bbeb4a90bc0cfd631e73e2f63f4193b47bad1148576f051c56",
+              "expected_output_sha256": "4c16d3ea912f9b94fa5bd4b26fc5646e2d0b713b9570a8d34da48b05eaf57bcc",
+              "exact_output_verified": true,
+              "unchanged_source_verified": true,
+              "timing_scope": "one prepared native or unified text-batch publication; opening, fixture construction, command-vector preparation, output serialization, exact equivalence and source checks are outside the timer; unified string-path parsing is timed"
+            }
+          }
+        }
+      },
+      "unified_over_native_p50": 1.0965529978289807,
+      "native_p50_speedup_over_0218": 5.553764915752731,
+      "unified_p50_speedup_over_0218": 5.217834438379861
+    }
+  ],
+  "scaling_1000_to_10000": {
+    "eager": {
+      "native": 309.214525493502,
+      "unified": 255.15053699917422
+    },
+    "positional": {
+      "native": 310.5080485383109,
+      "unified": 250.07817121067782
+    }
+  }
+}

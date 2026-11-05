@@ -1,6 +1,6 @@
 //! Typed, inert `PowerPoint` font models.
 
-use crate::package::RecordLimits;
+use crate::package::SourceLimits;
 use std::sync::Arc;
 use std::{fmt, ops::Deref};
 
@@ -570,7 +570,7 @@ impl FontCollections {
 /// Composed record and font resource limits.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Limits {
-    pub records: RecordLimits,
+    pub records: SourceLimits,
     pub max_fonts_per_collection: usize,
     pub max_facets: usize,
     pub max_facet_bytes: usize,
@@ -580,7 +580,7 @@ pub struct Limits {
 impl Default for Limits {
     fn default() -> Self {
         Self {
-            records: RecordLimits::default(),
+            records: SourceLimits::default(),
             max_fonts_per_collection: 129,
             max_facets: 516,
             max_facet_bytes: 32 * 1024 * 1024,

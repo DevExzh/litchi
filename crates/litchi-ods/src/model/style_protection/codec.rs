@@ -7,6 +7,7 @@ use super::{
     validation::validate_protection_style_collection,
 };
 use litchi_core::{Error, Result, xml::escape_xml};
+use litchi_odf_common::XmlStreamLimits;
 use quick_xml::{
     XmlVersion,
     events::{BytesStart, Event},
@@ -28,14 +29,25 @@ fn checked_position(reader: &NsReader<&[u8]>) -> Result<usize> {
 pub fn rewrite_conditional_styles(
     fragment: Option<&PreservedXmlFragment>,
     styles: &[ConditionalStyle],
+    limits: &XmlStreamLimits,
 ) -> Result<PreservedXmlFragment> {
+    if let Some(fragment) = fragment {
+        ensure_xml_size(&fragment.xml, limits)?;
+    }
     let canonical = write_conditional_styles(styles);
+    ensure_xml_size(&canonical, limits)?;
+    if let Some(fragment) = fragment {
+        ensure_combined_size(fragment.xml.len(), canonical.len(), limits)?;
+    }
     let Some(fragment) = fragment else {
         return Ok(PreservedXmlFragment {
-            xml: format!(
-                "<office:automatic-styles xmlns:office=\"{}\">{canonical}</office:automatic-styles>",
-                String::from_utf8_lossy(OFFICE_NAMESPACE)
-            ),
+            xml: ensure_xml_size_string(
+                format!(
+                    "<office:automatic-styles xmlns:office=\"{}\">{canonical}</office:automatic-styles>",
+                    String::from_utf8_lossy(OFFICE_NAMESPACE)
+                ),
+                limits,
+            )?,
             namespaces: BTreeMap::new(),
         });
     };
@@ -70,7 +82,7 @@ pub fn rewrite_conditional_styles(
         },
     };
     Ok(PreservedXmlFragment {
-        xml,
+        xml: ensure_xml_size_string(xml, limits)?,
         namespaces: fragment.namespaces.clone(),
     })
 }
@@ -82,7 +94,11 @@ pub fn rewrite_managed_cell_styles(
     fragment: Option<&PreservedXmlFragment>,
     conditional_styles: &[ConditionalStyle],
     protection_styles: &[TableStyle],
+    limits: &XmlStreamLimits,
 ) -> Result<PreservedXmlFragment> {
+    if let Some(fragment) = fragment {
+        ensure_xml_size(&fragment.xml, limits)?;
+    }
     validate_protection_style_collection(protection_styles)?;
     for conditional in conditional_styles {
         if let Some(protection) = protection_styles
@@ -97,19 +113,26 @@ pub fn rewrite_managed_cell_styles(
         }
     }
     let canonical = write_managed_styles(conditional_styles, protection_styles);
+    ensure_xml_size(&canonical, limits)?;
+    if let Some(fragment) = fragment {
+        ensure_combined_size(fragment.xml.len(), canonical.len(), limits)?;
+    }
     let Some(fragment) = fragment else {
         return Ok(PreservedXmlFragment {
-            xml: format!(
-                "<office:automatic-styles xmlns:office=\"{}\">{canonical}</office:automatic-styles>",
-                String::from_utf8_lossy(OFFICE_NAMESPACE)
-            ),
+            xml: ensure_xml_size_string(
+                format!(
+                    "<office:automatic-styles xmlns:office=\"{}\">{canonical}</office:automatic-styles>",
+                    String::from_utf8_lossy(OFFICE_NAMESPACE)
+                ),
+                limits,
+            )?,
             namespaces: BTreeMap::new(),
         });
     };
     let (ranges, insertion) = managed_style_ranges(&fragment.xml)?;
     let xml = rewrite_ranges(&fragment.xml, ranges, insertion, &canonical)?;
     Ok(PreservedXmlFragment {
-        xml,
+        xml: ensure_xml_size_string(xml, limits)?,
         namespaces: fragment.namespaces.clone(),
     })
 }
@@ -561,21 +584,29 @@ fn write_conditional_styles(styles: &[ConditionalStyle]) -> String {
 /// # Errors
 ///
 /// Returns an error when the source XML is malformed.
-pub fn extract_automatic_styles(xml: &str) -> Result<Option<PreservedXmlFragment>> {
-    extract_office_fragment(xml, b"automatic-styles")
+pub fn extract_automatic_styles(
+    xml: &str,
+    limits: &XmlStreamLimits,
+) -> Result<Option<PreservedXmlFragment>> {
+    extract_office_fragment(xml, b"automatic-styles", limits)
 }
 
 /// # Errors
 ///
 /// Returns an error when the source XML is malformed.
-pub fn extract_font_face_decls(xml: &str) -> Result<Option<PreservedXmlFragment>> {
-    extract_office_fragment(xml, b"font-face-decls")
+pub fn extract_font_face_decls(
+    xml: &str,
+    limits: &XmlStreamLimits,
+) -> Result<Option<PreservedXmlFragment>> {
+    extract_office_fragment(xml, b"font-face-decls", limits)
 }
 
 fn extract_office_fragment(
     xml: &str,
     expected_local_name: &[u8],
+    limits: &XmlStreamLimits,
 ) -> Result<Option<PreservedXmlFragment>> {
+    ensure_xml_size(xml, limits)?;
     let fragment_name = String::from_utf8_lossy(expected_local_name);
     let mut reader = NsReader::from_str(xml);
     let mut buffer = Vec::new();
@@ -617,7 +648,7 @@ fn extract_office_fragment(
                     ));
                 }
                 return Ok(Some(PreservedXmlFragment {
-                    xml: xml[event_start..event_end].to_string(),
+                    xml: ensure_xml_size_string(xml[event_start..event_end].to_string(), limits)?,
                     namespaces,
                 }));
             },
@@ -639,7 +670,7 @@ fn extract_office_fragment(
                         ))
                     })?;
                     return Ok(Some(PreservedXmlFragment {
-                        xml: xml[start..event_end].to_string(),
+                        xml: ensure_xml_size_string(xml[start..event_end].to_string(), limits)?,
                         namespaces,
                     }));
                 }
@@ -664,6 +695,36 @@ fn extract_office_fragment(
         )));
     }
     Ok(None)
+}
+
+fn ensure_xml_size(xml: &str, limits: &XmlStreamLimits) -> Result<()> {
+    if u64::try_from(xml.len()).unwrap_or(u64::MAX) > limits.max_bytes() {
+        return Err(Error::InvalidFormat(
+            "style-protection XML exceeds the configured XML limit".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn ensure_xml_size_string(xml: String, limits: &XmlStreamLimits) -> Result<String> {
+    ensure_xml_size(&xml, limits)?;
+    Ok(xml)
+}
+
+fn ensure_combined_size(
+    existing: usize,
+    additional: usize,
+    limits: &XmlStreamLimits,
+) -> Result<()> {
+    let size = existing.checked_add(additional).ok_or_else(|| {
+        Error::InvalidFormat("style-protection XML output size overflow".to_string())
+    })?;
+    if u64::try_from(size).unwrap_or(u64::MAX) > limits.max_bytes() {
+        return Err(Error::InvalidFormat(
+            "style-protection XML output exceeds the configured XML limit".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 fn mark_managed_candidate(candidate: &mut Option<(usize, bool, bool)>) -> Result<()> {

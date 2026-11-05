@@ -1,3 +1,7 @@
+#![allow(
+    clippy::redundant_closure_call,
+    reason = "raw OPC test edits stage one closure over the edit's graph"
+)]
 use litchi_docx::mail_merge::{
     Conformance, DataSourceObject, DataType, Destination, FieldMap, FieldMappingType, Recipient,
     Recipients, RelationshipId, Settings, Source, Target,
@@ -49,8 +53,9 @@ fn generated_graph_round_trips_without_fetching_or_interpreting_sources() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("mail-merge.docx");
     let mut package = Package::new().unwrap();
-    package
-        .set_mail_merge(
+    package = {
+        let mut edit = package.edit_mail_merge();
+        edit.set(
             settings_model(),
             Some(Source::External(
                 "https://example.invalid/never-fetch.csv".into(),
@@ -64,6 +69,8 @@ fn generated_graph_round_trips_without_fetching_or_interpreting_sources() {
             Conformance::Transitional,
         )
         .unwrap();
+        edit.commit().unwrap().into_package()
+    };
     package.save(&path).unwrap();
 
     let mut reopened = Package::open(&path).unwrap();
@@ -92,9 +99,12 @@ fn generated_graph_round_trips_without_fetching_or_interpreting_sources() {
 
     let mut updated = loaded_recipients.clone();
     updated.set_recipient_active(1, true).unwrap();
-    reopened
-        .update_mail_merge_recipients(updated, Conformance::Transitional)
-        .unwrap();
+    reopened = {
+        let mut edit = reopened.edit_mail_merge();
+        edit.update_recipients(updated, Conformance::Transitional)
+            .unwrap();
+        edit.commit().unwrap().into_package()
+    };
     assert!(
         reopened
             .document()
@@ -110,8 +120,9 @@ fn generated_graph_round_trips_without_fetching_or_interpreting_sources() {
 #[test]
 fn strict_relationships_and_settings_order_are_emitted() {
     let mut package = Package::new().unwrap();
-    package
-        .set_mail_merge(
+    package = {
+        let mut edit = package.edit_mail_merge();
+        edit.set(
             settings_model(),
             Some(Source::External("urn:inert:data".into())),
             None,
@@ -119,6 +130,8 @@ fn strict_relationships_and_settings_order_are_emitted() {
             Conformance::Strict,
         )
         .unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let merge = package.mail_merge_settings().unwrap().unwrap();
     let document = package.opc_package().main_document_part().unwrap();
     let settings_rel = document
@@ -148,21 +161,27 @@ fn strict_relationships_and_settings_order_are_emitted() {
 fn unrelated_settings_xml_is_preserved_and_invalid_updates_are_atomic() {
     let mut package = Package::new().unwrap();
     let settings_uri = PackURI::new("/word/settings.xml").unwrap();
-    package
-        .edit_opc(|opc| {
-            let settings_part = opc.get_part_mut(&settings_uri)?;
-            let original = std::str::from_utf8(settings_part.blob())
-                .map_err(|error| Error::InvalidFormat(error.to_string()))?;
-            let marked = original.replace(
-                "</w:settings>",
-                r#"<x:sentinel xmlns:x="urn:test" keep="exact"/></w:settings>"#,
-            );
-            settings_part.set_blob(marked.into_bytes());
-            Ok(())
-        })
+    package = {
+        let mut edit = package.edit_opc();
+        (|opc: &mut litchi_opc::OpcPackage| -> litchi_docx::Result<_> {
+            {
+                let settings_part = opc.get_part_mut(&settings_uri)?;
+                let original = std::str::from_utf8(settings_part.blob())
+                    .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+                let marked = original.replace(
+                    "</w:settings>",
+                    r#"<x:sentinel xmlns:x="urn:test" keep="exact"/></w:settings>"#,
+                );
+                settings_part.set_blob(marked.into_bytes());
+                Ok(())
+            }
+        })(edit.package_mut())
         .unwrap();
-    package
-        .set_mail_merge(
+        edit.commit().unwrap().into_package()
+    };
+    package = {
+        let mut edit = package.edit_mail_merge();
+        edit.set(
             settings_model(),
             None,
             None,
@@ -170,6 +189,8 @@ fn unrelated_settings_xml_is_preserved_and_invalid_updates_are_atomic() {
             Conformance::Transitional,
         )
         .unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let before_count = package.opc_package().part_count();
     let before_xml = package
         .opc_package()
@@ -186,15 +207,19 @@ fn unrelated_settings_xml_is_preserved_and_invalid_updates_are_atomic() {
     let mut invalid = settings_model();
     invalid.set_active_record(0);
     assert!(
-        package
-            .update_mail_merge(
+        {
+            let mut edit = package.edit_mail_merge();
+            edit.update(
                 invalid,
                 Some(Source::External("https://example.invalid".into())),
                 None,
                 None,
                 Conformance::Transitional,
             )
-            .is_err()
+            .map(|_| ())
+            .and_then(|()| edit.commit().map(|_| ()))
+        }
+        .is_err()
     );
     assert_eq!(package.opc_package().part_count(), before_count);
     assert_eq!(
@@ -210,8 +235,9 @@ fn unrelated_settings_xml_is_preserved_and_invalid_updates_are_atomic() {
 #[test]
 fn clear_preserves_an_internal_source_still_shared_elsewhere() {
     let mut package = Package::new().unwrap();
-    package
-        .set_mail_merge(
+    package = {
+        let mut edit = package.edit_mail_merge();
+        edit.set(
             settings_model(),
             Some(Source::Internal {
                 bytes: b"shared opaque source".to_vec(),
@@ -223,6 +249,8 @@ fn clear_preserves_an_internal_source_still_shared_elsewhere() {
             Conformance::Transitional,
         )
         .unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let merge = package.mail_merge_settings().unwrap().unwrap();
     let target = match package
         .mail_merge_target(
@@ -246,32 +274,45 @@ fn clear_preserves_an_internal_source_still_shared_elsewhere() {
         "rIdShared".into(),
         false,
     );
-    package
-        .edit_opc(|opc| {
-            opc.add_part(Box::new(footer));
-            Ok(())
-        })
-        .unwrap();
-    assert!(package.clear_mail_merge().unwrap());
+    package = {
+        let mut edit = package.edit_opc();
+        edit.package_mut().add_part(Box::new(footer));
+        edit.commit().unwrap().into_package()
+    };
+    assert!({
+        let mut edit = package.edit_mail_merge();
+        let value = edit.clear().unwrap();
+        package = edit.commit().unwrap().into_package();
+        value
+    });
     assert!(package.mail_merge_settings().unwrap().is_none());
     assert!(package.opc_package().get_part(&target).is_ok());
-    assert!(!package.clear_mail_merge().unwrap());
+    assert!(!{
+        let mut edit = package.edit_mail_merge();
+        let value = edit.clear().unwrap();
+        assert!(!edit.commit().unwrap().diagnostics().changed());
+        value
+    });
 }
 
 #[test]
 fn malformed_uri_and_recipient_limits_fail_before_package_mutation() {
-    let mut package = Package::new().unwrap();
+    let package = Package::new().unwrap();
     let part_count = package.opc_package().part_count();
     assert!(
-        package
-            .set_mail_merge(
+        {
+            let mut edit = package.edit_mail_merge();
+            edit.set(
                 settings_model(),
                 Some(Source::External("bad\nuri".into())),
                 None,
                 None,
                 Conformance::Transitional,
             )
-            .is_err()
+            .map(|_| ())
+            .and_then(|()| edit.commit().map(|_| ()))
+        }
+        .is_err()
     );
     assert_eq!(package.opc_package().part_count(), part_count);
     assert!(package.mail_merge_settings().unwrap().is_none());

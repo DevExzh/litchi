@@ -13,6 +13,10 @@ use litchi_opc::SourceBackedPackage;
 use litchi_opc::leniency::{Defect as OpcDefect, RelationshipDefect};
 use litchi_xlsb::{Defect, Package, SourceBackedWorkbook, ToleranceReport, Workbook};
 
+#[path = "support/projection.rs"]
+mod projection;
+use projection::OwnedWorkbook as _;
+
 const WORKBOOK_RELS: &str = "xl/_rels/workbook.bin.rels";
 const DUPLICATE: &str = r#"<Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="theme/theme1.xml"/>"#;
 
@@ -27,8 +31,14 @@ fn fixture() -> Vec<u8> {
 /// `Simple.xlsb` with a second `rId4` relationship in the workbook manifest.
 fn duplicate_relationship_id() -> Vec<u8> {
     let source = fixture();
-    let archive = soapberry_zip::office::ArchiveReader::new(&source).unwrap();
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let archive = soapberry_zip::office::ArchiveReader::new(
+        &source,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     for name in archive.file_names() {
         let mut bytes = archive.read(name).unwrap();
         if name == WORKBOOK_RELS {
@@ -86,17 +96,19 @@ fn duplicate_relationship_id_is_listed_in_the_workbook_report_on_every_route() {
     let worksheet = eager.worksheet(0).unwrap();
     assert_clean(worksheet.tolerance_report(), "eager worksheet");
 
-    let owned = Package::from_bytes(bytes.clone()).unwrap();
+    let owned = Package::from_bytes(&bytes).unwrap();
     assert_duplicate_recorded(owned.tolerance_report(), "owned package");
-    let adopted = owned.into_workbook().unwrap();
+    let adopted = owned.owned_workbook().unwrap();
     assert_duplicate_recorded(adopted.tolerance_report(), "owned package workbook");
 
     let source = SourceBackedWorkbook::from_reader(Cursor::new(bytes.clone())).unwrap();
     assert_duplicate_recorded(&source.tolerance_report(), "source-backed");
 
-    let materialized = SourceBackedPackage::from_reader_with_limits(
+    let materialized = SourceBackedPackage::from_reader(
         Cursor::new(bytes),
-        litchi_opc::ReadLimits::default(),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
     )
     .unwrap()
     .into_opc_package()
@@ -115,9 +127,7 @@ fn conformant_package_contributes_no_packaging_repairs() {
         "eager",
     );
     assert_clean(
-        Package::from_bytes(bytes.clone())
-            .unwrap()
-            .tolerance_report(),
+        Package::from_bytes(&bytes).unwrap().tolerance_report(),
         "owned package",
     );
     assert_clean(
@@ -126,9 +136,11 @@ fn conformant_package_contributes_no_packaging_repairs() {
             .tolerance_report(),
         "source-backed",
     );
-    let materialized = SourceBackedPackage::from_reader_with_limits(
+    let materialized = SourceBackedPackage::from_reader(
         Cursor::new(bytes),
-        litchi_opc::ReadLimits::default(),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
     )
     .unwrap()
     .into_opc_package()

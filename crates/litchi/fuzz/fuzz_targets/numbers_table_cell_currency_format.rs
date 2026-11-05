@@ -19,20 +19,20 @@ use std::{
 
 use libfuzzer_sys::fuzz_target;
 use litchi::numbers::{
-    CellPosition, Package, PackageLimits, PackageReadOptions, PackageSemanticLimits, SheetSelector,
-    TableSelector,
+    At, Package, SheetSelector, TableSelector,
     cell::data_format::currency::{
         Currency, CurrencyCode, CurrencyStyle, DecimalPlaces, NegativeStyle, ThousandsSeparator,
         transaction::Error as CurrencyError,
     },
 };
 use litchi_iwa_archive::package::Catalog;
-use litchi_numbers_wire::BncCell;
+use litchi_numbers_wire::{BncCell, Limits};
 
 #[path = "../../../litchi-numbers/tests/support/table_cell_data_format_fixture.rs"]
 mod fixture;
 
 const MAX_INPUT_BYTES: u64 = 512 * 1024;
+const WIRE_LIMITS: Limits = Limits::DEFAULT;
 const MAX_ENTRIES: usize = 128;
 const MAX_ENTRY_BYTES: u64 = 1024 * 1024;
 const MAX_EXPANDED_BYTES: u64 = 4 * 1024 * 1024;
@@ -52,9 +52,9 @@ const NATIVE_NUMBERS: &[u8] = include_bytes!("../../../../test-data/iwork/number
 // B3 is a stable explicit Number cell in the checked-in Numbers source.  It
 // is useful as a real-package wrong-family oracle; the source-built fixture
 // below is the success source for Currency transactions.
-const NATIVE_POSITION: CellPosition = CellPosition::new(2, 1);
-const FIXTURE_POSITION: CellPosition = CellPosition::new(0, 0);
-const FIXTURE_SIBLING_POSITION: CellPosition = CellPosition::new(0, 1);
+const NATIVE_POSITION: At = At::new(2, 1);
+const FIXTURE_POSITION: At = At::new(0, 0);
+const FIXTURE_SIBLING_POSITION: At = At::new(0, 1);
 
 fuzz_target!(|data: &[u8]| {
     match Package::from_bytes_with_options(data, options()) {
@@ -83,23 +83,32 @@ fuzz_target!(|data: &[u8]| {
     exercise_operation_limit();
 });
 
-fn options() -> PackageReadOptions {
-    static OPTIONS: OnceLock<PackageReadOptions> = OnceLock::new();
+fn options() -> litchi::numbers::OpenOptions {
+    static OPTIONS: OnceLock<litchi::numbers::OpenOptions> = OnceLock::new();
     *OPTIONS.get_or_init(|| {
-        let archive = PackageLimits::new(
-            MAX_INPUT_BYTES,
-            MAX_ENTRIES,
-            MAX_ENTRY_BYTES,
-            MAX_EXPANDED_BYTES,
-            MAX_IWA_STREAM_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid Currency archive limits: {error}"));
-        let semantic =
-            PackageSemanticLimits::new(MAX_OBJECTS, MAX_SHEETS, MAX_TABLES, MAX_REFERENCES)
-                .unwrap_or_else(|error| unreachable!("valid Currency semantic limits: {error}"))
-                .with_projection_limits(MAX_MATERIALIZED_CELLS, MAX_TEXT_BYTES)
-                .unwrap_or_else(|error| unreachable!("valid Currency projection limits: {error}"));
-        PackageReadOptions::new(archive, semantic)
+        let archive = litchi::numbers::SourceLimits::builder()
+            .max_input_bytes(MAX_INPUT_BYTES)
+            .and_then(|b| b.max_members(MAX_ENTRIES))
+            .and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES))
+            .and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+            .and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid Currency archive limits: {error}"));
+        let semantic = litchi::numbers::SemanticLimits::builder()
+            .max_objects(MAX_OBJECTS)
+            .and_then(|b| b.max_sheets(MAX_SHEETS))
+            .and_then(|b| b.max_tables(MAX_TABLES))
+            .and_then(|b| b.max_references(MAX_REFERENCES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid Currency semantic limits: {error}"))
+            .to_builder()
+            .max_materialized_cells(MAX_MATERIALIZED_CELLS)
+            .and_then(|b| b.max_output_text_bytes(MAX_TEXT_BYTES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid Currency projection limits: {error}"));
+        litchi::numbers::OpenOptions::new()
+            .source_limits(archive)
+            .semantic_limits(semantic)
     })
 }
 
@@ -162,12 +171,7 @@ fn secondary_currency_package() -> &'static Package {
     })
 }
 
-fn exercise_package(
-    package: &Package,
-    data: &[u8],
-    position: CellPosition,
-    fixture_invariants: bool,
-) {
+fn exercise_package(package: &Package, data: &[u8], position: At, fixture_invariants: bool) {
     exercise_selector_reads(package, data, position);
     exercise_selector_errors(package, position);
 
@@ -205,8 +209,8 @@ fn exercise_package(
     assert_eq!(package_bytes(package), source_bytes);
 }
 
-fn exercise_selector_reads(package: &Package, data: &[u8], position: CellPosition) {
-    let random_position = CellPosition::new(
+fn exercise_selector_reads(package: &Package, data: &[u8], position: At) {
+    let random_position = At::new(
         u32::from(control(data, 4) % 8),
         u32::from(control(data, 5) % 8),
     );
@@ -221,7 +225,7 @@ fn exercise_selector_reads(package: &Package, data: &[u8], position: CellPositio
         position,
     ));
 
-    if let Some(sheet) = package.document().sheets().first()
+    if let Some(sheet) = package.workbook_ref().sheets().first()
         && let Some(table) = sheet.tables().next()
     {
         observe_result(package.table_cell_currency_format(
@@ -232,9 +236,9 @@ fn exercise_selector_reads(package: &Package, data: &[u8], position: CellPositio
     }
 }
 
-fn exercise_selector_errors(package: &Package, position: CellPosition) {
+fn exercise_selector_errors(package: &Package, position: At) {
     let source_bytes = package_bytes(package);
-    let sheet_count = package.document().sheets().len();
+    let sheet_count = package.workbook_ref().sheets().len();
     if let Err(error) = package.table_cell_currency_format(
         SheetSelector::index(sheet_count),
         TableSelector::index(0),
@@ -259,7 +263,7 @@ fn exercise_selector_errors(package: &Package, position: CellPosition) {
     if let Err(error) = package.table_cell_currency_format(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(u32::MAX, u32::MAX),
+        At::new(u32::MAX, u32::MAX),
     ) {
         observe_error(error);
     }
@@ -271,7 +275,7 @@ fn exercise_transaction(
     source_bytes: &[u8],
     before: Option<Currency>,
     requested: Currency,
-    position: CellPosition,
+    position: At,
     data: &[u8],
     fixture_invariants: bool,
 ) {
@@ -389,7 +393,7 @@ fn exercise_transaction(
     black_box((patch.before(), patch.after(), patch.path()));
 }
 
-fn exercise_wrong_family(package: &Package, position: CellPosition) {
+fn exercise_wrong_family(package: &Package, position: At) {
     let source_bytes = package_bytes(package);
     let read = package.table_cell_currency_format(
         SheetSelector::index(0),
@@ -397,7 +401,7 @@ fn exercise_wrong_family(package: &Package, position: CellPosition) {
         position,
     );
     assert!(
-        matches!(read, Err(CurrencyError::WrongFormatFamily { .. })),
+        matches!(read, Err(CurrencyError::Refused(litchi::numbers::cell::data_format::currency::transaction::Refusal::WrongFormatFamily { .. }))),
         "non-Currency cell must be refused by the Currency API: {read:?}"
     );
     let edit = package.edit_table_cell_currency_format(
@@ -406,7 +410,7 @@ fn exercise_wrong_family(package: &Package, position: CellPosition) {
         position,
     );
     assert!(
-        matches!(edit, Err(CurrencyError::WrongFormatFamily { .. })),
+        matches!(edit, Err(CurrencyError::Refused(litchi::numbers::cell::data_format::currency::transaction::Refusal::WrongFormatFamily { .. }))),
         "non-Currency cell edit must be refused by the Currency API: {edit:?}"
     );
     assert_eq!(package_bytes(package), source_bytes);
@@ -639,7 +643,8 @@ fn cell_format_ids(source: &[u8], index: usize) -> (Option<u32>, Option<u32>) {
     let cell = cells
         .get(index)
         .unwrap_or_else(|| panic!("Currency fixture cell {index} is missing"));
-    let cell = BncCell::parse(cell).unwrap_or_else(|error| panic!("Currency BNC cell: {error}"));
+    let cell = BncCell::parse(cell, &WIRE_LIMITS)
+        .unwrap_or_else(|error| panic!("Currency BNC cell: {error}"));
     (cell.format_identifier(), cell.secondary_format_identifier())
 }
 
@@ -719,7 +724,7 @@ fn exercise_locked_graph() {
             .set(Currency::default().with_code(CurrencyCode::GBP))
             .commit();
         assert!(
-            matches!(result, Err(CurrencyError::TableLocked { .. })),
+            matches!(result, Err(CurrencyError::Refused(litchi::numbers::cell::data_format::currency::transaction::Refusal::TableLocked { .. }))),
             "changed Currency edit must refuse a locked table: {result:?}"
         );
         assert_eq!(package_bytes(&package), before);
@@ -816,9 +821,16 @@ fn exercise_input_limit() {
 fn exercise_semantic_limit() {
     static ONCE: OnceLock<()> = OnceLock::new();
     ONCE.get_or_init(|| {
-        let semantic = PackageSemanticLimits::new(1, 1, 1, 1)
+        let semantic = litchi::numbers::SemanticLimits::builder()
+            .max_objects(1)
+            .and_then(|b| b.max_sheets(1))
+            .and_then(|b| b.max_tables(1))
+            .and_then(|b| b.max_references(1))
+            .and_then(|b| b.build())
             .unwrap_or_else(|error| panic!("one-entry Currency semantic limits: {error}"));
-        let constrained = PackageReadOptions::new(options().archive(), semantic);
+        let constrained = litchi::numbers::OpenOptions::new()
+            .source_limits(options().source_limits_value())
+            .semantic_limits(semantic);
         let result = Package::from_bytes_with_options(
             &fixture::synthetic_package_for(
                 fixture::FormatFamily::Currency,
@@ -843,17 +855,25 @@ fn exercise_operation_limit() {
             fixture::FormatSharing::Shared,
         )
         .unwrap_or_else(|error| panic!("Currency operation-limit source: {error}"));
-        let limits = PackageLimits::new(
-            u64::try_from(source.len()).unwrap_or(u64::MAX),
-            PackageLimits::MAX_ENTRIES,
-            PackageLimits::MAX_ENTRY_BYTES,
-            PackageLimits::MAX_TOTAL_BYTES,
-            PackageLimits::MAX_IWA_STREAM_BYTES,
-        )
-        .unwrap_or_else(|error| panic!("Currency operation limits: {error}"));
+        let limits = litchi::numbers::SourceLimits::builder()
+            .max_input_bytes(u64::try_from(source.len()).unwrap_or(u64::MAX))
+            .and_then(|b| b.max_members(litchi::numbers::SourceLimits::MAXIMUM.max_members()))
+            .and_then(|b| {
+                b.max_entry_bytes(litchi::numbers::SourceLimits::MAXIMUM.max_entry_bytes())
+            })
+            .and_then(|b| {
+                b.max_aggregate_bytes(litchi::numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+            })
+            .and_then(|b| {
+                b.max_component_bytes(litchi::numbers::SourceLimits::MAXIMUM.max_component_bytes())
+            })
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| panic!("Currency operation limits: {error}"));
         let package = Package::from_bytes_with_options(
             &source,
-            PackageReadOptions::new(limits, PackageSemanticLimits::default()),
+            litchi::numbers::OpenOptions::new()
+                .source_limits(limits)
+                .semantic_limits(litchi::numbers::SemanticLimits::DEFAULT),
         )
         .unwrap_or_else(|error| panic!("Currency exact-limit source must open: {error}"));
         let before = package_bytes(&package);
@@ -877,9 +897,9 @@ fn exercise_operation_limit() {
 
 fn assert_exact_locality(source: &[u8], target: &[u8]) {
     let before =
-        Catalog::from_bytes(source).unwrap_or_else(|error| panic!("source catalog: {error}"));
+        Catalog::from_bytes(source, Default::default()).unwrap_or_else(|error| panic!("source catalog: {error}"));
     let after =
-        Catalog::from_bytes(target).unwrap_or_else(|error| panic!("target catalog: {error}"));
+        Catalog::from_bytes(target, Default::default()).unwrap_or_else(|error| panic!("target catalog: {error}"));
     let mut changed = Vec::new();
     for entry in before.iter() {
         let candidate = after
@@ -920,9 +940,11 @@ fn assert_non_format_bnc_bytes(source: &[u8], target: &[u8]) {
     assert_eq!(before.len(), after.len());
     for (left, right) in before.iter().zip(after.iter()) {
         let left_cell =
-            BncCell::parse(left).unwrap_or_else(|error| panic!("source BNC cell: {error}"));
+            BncCell::parse(left, &WIRE_LIMITS)
+                .unwrap_or_else(|error| panic!("source BNC cell: {error}"));
         let right_cell =
-            BncCell::parse(right).unwrap_or_else(|error| panic!("target BNC cell: {error}"));
+            BncCell::parse(right, &WIRE_LIMITS)
+                .unwrap_or_else(|error| panic!("target BNC cell: {error}"));
         assert_eq!(
             left_cell
                 .cached_scalar()
@@ -942,9 +964,12 @@ fn assert_non_format_bnc_bytes(source: &[u8], target: &[u8]) {
 
 fn normalized_cell(cell: &[u8]) -> Vec<u8> {
     let mut parsed =
-        BncCell::parse(cell).unwrap_or_else(|error| panic!("BNC normalization: {error}"));
+        BncCell::parse(cell, &WIRE_LIMITS)
+            .unwrap_or_else(|error| panic!("BNC normalization: {error}"));
     parsed.clear_explicit_format();
-    parsed.encode()
+    parsed
+        .encode(&WIRE_LIMITS)
+        .unwrap_or_else(|error| panic!("BNC normalization encode: {error}"))
 }
 
 fn package_bytes(package: &Package) -> Vec<u8> {

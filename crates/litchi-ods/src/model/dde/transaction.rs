@@ -137,7 +137,7 @@ impl CachedRow {
         }
         self.cells
             .try_reserve(1)
-            .map_err(|_| CoreError::Unsupported("DDE cached row allocation failed".to_string()))?;
+            .map_err(|_| CoreError::Other("DDE cached row allocation failed".to_string()))?;
         self.cells.push(cell);
         Ok(())
     }
@@ -209,9 +209,9 @@ impl CachedTable {
                 MAX_CACHE_CELLS,
             ));
         }
-        self.rows.try_reserve(1).map_err(|_| {
-            CoreError::Unsupported("DDE cached table allocation failed".to_string())
-        })?;
+        self.rows
+            .try_reserve(1)
+            .map_err(|_| CoreError::Other("DDE cached table allocation failed".to_string()))?;
         self.rows.push(row);
         Ok(())
     }
@@ -509,7 +509,7 @@ impl Edit {
             .and_then(|value| value.checked_mul(size_of::<T>()))
             .ok_or_else(|| invalid_core("DDE draft vector memory size overflows"))?;
         self.staging_reservations.try_reserve(1).map_err(|_| {
-            CoreError::Unsupported("DDE staging reservation allocation failed".to_string())
+            CoreError::Other("DDE staging reservation allocation failed".to_string())
         })?;
         Ok(Some(self.reserve_staging_token(delta)?))
     }
@@ -534,7 +534,7 @@ impl Edit {
             // lazy initialization atomic when the first mutating operation is
             // refused by a finite memory budget.
             self.staging_reservations.try_reserve(1).map_err(|_| {
-                CoreError::Unsupported("DDE staging reservation allocation failed".to_string())
+                CoreError::Other("DDE staging reservation allocation failed".to_string())
             })?;
             let vector_reservation = self.reserve_staging_token(estimate)?;
             let mut sources = Vec::new();
@@ -543,7 +543,7 @@ impl Edit {
                 .is_err()
             {
                 drop(vector_reservation);
-                return Err(CoreError::Unsupported(
+                return Err(CoreError::Other(
                     "DDE sheet draft allocation failed".to_string(),
                 ));
             }
@@ -601,13 +601,13 @@ impl Edit {
             // See `ensure_sheet_sources`: retain the vector admission only
             // after the initial draft vector has been built successfully.
             self.staging_reservations.try_reserve(1).map_err(|_| {
-                CoreError::Unsupported("DDE staging reservation allocation failed".to_string())
+                CoreError::Other("DDE staging reservation allocation failed".to_string())
             })?;
             let vector_reservation = self.reserve_staging_token(estimate)?;
             let mut links = Vec::new();
             if links.try_reserve_exact(self.before.links().len()).is_err() {
                 drop(vector_reservation);
-                return Err(CoreError::Unsupported(
+                return Err(CoreError::Other(
                     "DDE link draft allocation failed".to_string(),
                 ));
             }
@@ -744,7 +744,7 @@ impl Edit {
                     self.sheet_sources = None;
                     self.staging_reservations.truncate(initial_reservations);
                 }
-                return Err(CoreError::Unsupported(
+                return Err(CoreError::Other(
                     "DDE sheet source allocation failed".to_string(),
                 ));
             }
@@ -953,9 +953,7 @@ impl Edit {
                     self.links = None;
                     self.staging_reservations.truncate(initial_reservations);
                 }
-                return Err(CoreError::Unsupported(
-                    "DDE link allocation failed".to_string(),
-                ));
+                return Err(CoreError::Other("DDE link allocation failed".to_string()));
             }
         }
         self.retain_vector_growth(growth);
@@ -1215,7 +1213,7 @@ impl Edit {
     }
 
     /// Validate and publish the edit under a retained execution context.
-    pub fn commit(&mut self, context: &ExecutionContext) -> CoreResult<Commit> {
+    pub(crate) fn commit(&mut self, context: &ExecutionContext) -> CoreResult<Commit> {
         self.before.context().check().map_err(map_execution_core)?;
         context.check().map_err(map_execution_core)?;
         if self.before.enforce_context_lineage()
@@ -1226,26 +1224,16 @@ impl Edit {
             ));
         }
         if self.is_noop() {
-            let source = Arc::new(self.before.clone());
             return Ok(Commit {
                 snapshot: self.before.clone(),
-                patch: Patch {
-                    source: Arc::clone(&source),
-                    target: source,
-                },
                 changed: false,
             });
         }
         let rendered = render_source(&self.before, self, context)?;
         if rendered.xml == self.before.content.as_ref() {
             drop(rendered);
-            let source = Arc::new(self.before.clone());
             return Ok(Commit {
                 snapshot: self.before.clone(),
-                patch: Patch {
-                    source: Arc::clone(&source),
-                    target: source,
-                },
                 changed: false,
             });
         }
@@ -1257,14 +1245,8 @@ impl Edit {
         // The candidate, parser projection, and readback renderer have all
         // finished using the transient source-splice allocations.
         drop(rendered);
-        let source = Arc::new(self.before.clone());
-        let target_source = Arc::new(target.clone());
         Ok(Commit {
             snapshot: target,
-            patch: Patch {
-                source,
-                target: target_source,
-            },
             changed: true,
         })
     }
@@ -1354,129 +1336,22 @@ impl Edit {
 
 /// A complete DDE transaction result.
 #[derive(Clone, Debug)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
-    patch: Patch,
     changed: bool,
 }
 
 impl Commit {
     /// Whether source bytes changed.
     #[must_use]
-    pub const fn changed(&self) -> bool {
+    pub(crate) const fn changed(&self) -> bool {
         self.changed
     }
 
     /// Borrow the typed post-commit snapshot.
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
-    }
-
-    /// Borrow the exact reversible patch.
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
-    }
-}
-
-/// An exact-source, reversible `content.xml` DDE patch.
-#[derive(Clone, Debug)]
-pub struct Patch {
-    source: Arc<Snapshot>,
-    target: Arc<Snapshot>,
-}
-
-impl PartialEq for Patch {
-    fn eq(&self, other: &Self) -> bool {
-        self.source_xml() == other.source_xml() && self.target_xml() == other.target_xml()
-    }
-}
-
-impl Eq for Patch {}
-
-impl Patch {
-    /// Whether the patch preserves source bytes exactly.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        // Commits that preserve bytes intentionally retain one Arc for both
-        // endpoints.  Use that O(1) invariant instead of scanning the whole
-        // content XML from a non-fallible query.
-        Arc::ptr_eq(&self.source, &self.target)
-    }
-
-    /// Whether the patch changes source bytes.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        !self.is_empty()
-    }
-
-    /// Return the exact source XML this patch expects.
-    #[must_use]
-    pub fn source_xml(&self) -> &str {
-        self.source.source_xml()
-    }
-
-    /// Return the exact target XML this patch publishes.
-    #[must_use]
-    pub fn target_xml(&self) -> &str {
-        self.target.source_xml()
-    }
-
-    /// Return the exact inverse patch.
-    #[must_use]
-    pub fn inverse(&self) -> Self {
-        Self {
-            source: Arc::clone(&self.target),
-            target: Arc::clone(&self.source),
-        }
-    }
-
-    /// Apply the patch to an exact source snapshot under its destination
-    /// limits and retained context.
-    pub fn apply(&self, snapshot: &Snapshot) -> CoreResult<Commit> {
-        self.source.context().check().map_err(map_execution_core)?;
-        snapshot.context().check().map_err(map_execution_core)?;
-        if !compare_xml_bytes(
-            snapshot.context(),
-            snapshot.content.as_ref(),
-            self.source.content.as_ref(),
-        )? {
-            return Err(invalid_core("ODS DDE patch source snapshot does not match"));
-        }
-        if self.is_empty() {
-            return Ok(Commit {
-                snapshot: snapshot.clone(),
-                patch: self.clone(),
-                changed: false,
-            });
-        }
-        if self.target.content.len() > snapshot.limits().output_bytes() {
-            return Err(resource_core(
-                "output bytes",
-                self.target.content.len(),
-                snapshot.limits().output_bytes(),
-            ));
-        }
-        let output_reservation = snapshot
-            .context()
-            .reserve(Resource::OutputBytes, self.target.content.len() as u64)
-            .map_err(map_execution_core)
-            .map(Arc::new)?;
-        let mut target = Snapshot::parse_shared_with_context(
-            Arc::clone(&self.target.content),
-            snapshot.limits(),
-            snapshot.context(),
-            snapshot.enforce_context_lineage(),
-        )
-        .map_err(CoreError::from)?;
-        target.enforce_context_lineage = snapshot.enforce_context_lineage();
-        target._output_reservation = Some(output_reservation);
-        Ok(Commit {
-            snapshot: target,
-            patch: self.clone(),
-            changed: true,
-        })
     }
 }
 
@@ -1533,13 +1408,13 @@ impl Scan {
             )
             .map_err(map_execution_core)?;
         let mut tables = Vec::new();
-        tables.try_reserve_exact(table_capacity).map_err(|_| {
-            CoreError::Unsupported("DDE table catalog allocation failed".to_string())
-        })?;
+        tables
+            .try_reserve_exact(table_capacity)
+            .map_err(|_| CoreError::Other("DDE table catalog allocation failed".to_string()))?;
         let mut links = Vec::new();
-        links.try_reserve_exact(link_capacity).map_err(|_| {
-            CoreError::Unsupported("DDE link catalog allocation failed".to_string())
-        })?;
+        links
+            .try_reserve_exact(link_capacity)
+            .map_err(|_| CoreError::Other("DDE link catalog allocation failed".to_string()))?;
         Ok(Self {
             spreadsheet: None,
             spreadsheet_close_start: None,
@@ -1616,7 +1491,7 @@ enum FrameKind {
     DocumentContent,
     Body,
     Mce,
-    Spreadsheet,
+    Workbook,
     Table(usize),
     Links,
     Link(usize),
@@ -1868,7 +1743,7 @@ fn render_source(
         .ok_or_else(|| invalid_core("DDE replacement count overflows"))?;
     replacements
         .try_reserve_exact(replacement_capacity)
-        .map_err(|_| CoreError::Unsupported("DDE replacement allocation failed".to_string()))?;
+        .map_err(|_| CoreError::Other("DDE replacement allocation failed".to_string()))?;
     render_sheet_sources(before, edit, &scan, &mut replacements, context)?;
     render_links(before, edit, &scan, &mut replacements, context)?;
     replacements.sort_by(|left, right| {
@@ -1909,7 +1784,7 @@ fn render_source(
     let mut output = String::new();
     output
         .try_reserve_exact(target_len)
-        .map_err(|_| CoreError::Unsupported("DDE output allocation failed".to_string()))?;
+        .map_err(|_| CoreError::Other("DDE output allocation failed".to_string()))?;
     let mut cursor = 0usize;
     for replacement in replacements {
         context.check().map_err(map_execution_core)?;
@@ -1925,7 +1800,7 @@ fn render_source(
     let mut cache_names = Vec::new();
     cache_names
         .try_reserve_exact(scan.links.len())
-        .map_err(|_| CoreError::Unsupported("DDE cache-name allocation failed".to_string()))?;
+        .map_err(|_| CoreError::Other("DDE cache-name allocation failed".to_string()))?;
     for site in scan.links {
         cache_names.push(site.cache_name);
     }
@@ -2129,7 +2004,7 @@ fn render_links(
         })?;
         let mut body = String::new();
         body.try_reserve(body_estimate)
-            .map_err(|_| CoreError::Unsupported("DDE link body allocation failed".to_string()))?;
+            .map_err(|_| CoreError::Other("DDE link body allocation failed".to_string()))?;
         for draft in desired_links {
             context.check().map_err(map_execution_core)?;
             context
@@ -2171,9 +2046,9 @@ fn render_links(
             .checked_add(128)
             .ok_or_else(|| invalid_core("DDE link replacement size overflows"))?;
         let mut replacement = String::new();
-        replacement.try_reserve(replacement_estimate).map_err(|_| {
-            CoreError::Unsupported("DDE link replacement allocation failed".to_string())
-        })?;
+        replacement
+            .try_reserve(replacement_estimate)
+            .map_err(|_| CoreError::Other("DDE link replacement allocation failed".to_string()))?;
         replacement.push_str("<table:dde-links xmlns:table=\"");
         replacement.push_str(std::str::from_utf8(TABLE).unwrap_or(""));
         replacement.push_str("\">");
@@ -2223,9 +2098,9 @@ fn render_links(
                 .ok_or_else(|| invalid_core("DDE link container size overflows"))
         })?;
         let mut container = String::new();
-        container.try_reserve(container_estimate).map_err(|_| {
-            CoreError::Unsupported("DDE link container allocation failed".to_string())
-        })?;
+        container
+            .try_reserve(container_estimate)
+            .map_err(|_| CoreError::Other("DDE link container allocation failed".to_string()))?;
         container.push_str("<table:dde-links xmlns:table=\"");
         container.push_str(std::str::from_utf8(TABLE).unwrap_or(""));
         container.push_str("\">");
@@ -2298,9 +2173,9 @@ fn render_existing_link_with_source(
         .len()
         .checked_add(source_render_estimate(source)?)
         .ok_or_else(|| invalid_core("DDE link render size overflows"))?;
-    output.try_reserve(capacity).map_err(|_| {
-        CoreError::Unsupported("DDE source-only link allocation failed".to_string())
-    })?;
+    output
+        .try_reserve(capacity)
+        .map_err(|_| CoreError::Other("DDE source-only link allocation failed".to_string()))?;
     context.check().map_err(map_execution_core)?;
     context
         .consume(Resource::Work, 1)
@@ -2429,7 +2304,7 @@ fn render_source_declaration(source: &Source) -> CoreResult<String> {
     let mut output = String::new();
     output
         .try_reserve(source_render_estimate(source)?)
-        .map_err(|_| CoreError::Unsupported("DDE source allocation failed".to_string()))?;
+        .map_err(|_| CoreError::Other("DDE source allocation failed".to_string()))?;
     output.push_str("<office:dde-source xmlns:office=\"");
     output.push_str(std::str::from_utf8(OFFICE).unwrap_or(""));
     output.push_str("\" office:dde-application=\"");
@@ -2477,7 +2352,7 @@ fn render_link_with_cache_name(
         .try_reserve(link_render_estimate_with_cache_name(
             link, cache_name, context,
         )?)
-        .map_err(|_| CoreError::Unsupported("DDE link allocation failed".to_string()))?;
+        .map_err(|_| CoreError::Other("DDE link allocation failed".to_string()))?;
     output.push_str("<table:dde-link xmlns:table=\"");
     output.push_str(std::str::from_utf8(TABLE).unwrap_or(""));
     output.push_str("\">");
@@ -2501,7 +2376,7 @@ fn render_cached_table_with_name(
         .try_reserve(cached_table_render_estimate_with_name(
             table, cache_name, context,
         )?)
-        .map_err(|_| CoreError::Unsupported("DDE cached table allocation failed".to_string()))?;
+        .map_err(|_| CoreError::Other("DDE cached table allocation failed".to_string()))?;
     output.push_str("<table:table xmlns:table=\"");
     output.push_str(std::str::from_utf8(TABLE).unwrap_or(""));
     output.push_str("\" xmlns:office=\"");
@@ -2897,9 +2772,9 @@ fn scan_source(
                     &mut scan, parent, namespace, &element, start, end, &reader, limits, context,
                 )?;
                 scan.reserve_vec_slot::<Frame>(stack.len(), stack.capacity(), context)?;
-                stack.try_reserve_exact(1).map_err(|_| {
-                    CoreError::Unsupported("DDE XML frame allocation failed".to_string())
-                })?;
+                stack
+                    .try_reserve_exact(1)
+                    .map_err(|_| CoreError::Other("DDE XML frame allocation failed".to_string()))?;
                 stack.push(Frame { kind, start });
             },
             Event::Empty(element) => {
@@ -3015,15 +2890,15 @@ fn classify_start(
             range: start..start,
             opaque: false,
         });
-        return Ok(FrameKind::Spreadsheet);
+        return Ok(FrameKind::Workbook);
     }
-    if matches!(parent, Some(FrameKind::Spreadsheet)) && namespace == NamespaceTag::Table {
+    if matches!(parent, Some(FrameKind::Workbook)) && namespace == NamespaceTag::Table {
         if local.as_ref() == b"table" {
             let name = source_table_name(element, reader, limits, context)?;
             scan.reserve_vec_slot::<TableSite>(scan.tables.len(), scan.tables.capacity(), context)?;
-            scan.tables.try_reserve_exact(1).map_err(|_| {
-                CoreError::Unsupported("DDE table catalog allocation failed".to_string())
-            })?;
+            scan.tables
+                .try_reserve_exact(1)
+                .map_err(|_| CoreError::Other("DDE table catalog allocation failed".to_string()))?;
             let index = scan.tables.len();
             scan.tables.push(TableSite {
                 element: ElementSite {
@@ -3082,9 +2957,9 @@ fn classify_start(
         && local.as_ref() == b"dde-link"
     {
         scan.reserve_vec_slot::<LinkSite>(scan.links.len(), scan.links.capacity(), context)?;
-        scan.links.try_reserve_exact(1).map_err(|_| {
-            CoreError::Unsupported("DDE link catalog allocation failed".to_string())
-        })?;
+        scan.links
+            .try_reserve_exact(1)
+            .map_err(|_| CoreError::Other("DDE link catalog allocation failed".to_string()))?;
         let index = scan.links.len();
         let opaque = !owner_attributes_known(element, context)?;
         scan.links.push(LinkSite {
@@ -3212,13 +3087,13 @@ fn classify_empty(
         mark_unknown_child(scan, parent);
         return Ok(());
     }
-    if matches!(parent, Some(FrameKind::Spreadsheet)) && namespace == NamespaceTag::Table {
+    if matches!(parent, Some(FrameKind::Workbook)) && namespace == NamespaceTag::Table {
         if local.as_ref() == b"table" {
             let name = source_table_name(element, reader, limits, context)?;
             scan.reserve_vec_slot::<TableSite>(scan.tables.len(), scan.tables.capacity(), context)?;
-            scan.tables.try_reserve_exact(1).map_err(|_| {
-                CoreError::Unsupported("DDE table catalog allocation failed".to_string())
-            })?;
+            scan.tables
+                .try_reserve_exact(1)
+                .map_err(|_| CoreError::Other("DDE table catalog allocation failed".to_string()))?;
             scan.tables.push(TableSite {
                 element: ElementSite {
                     range: start..end,
@@ -3348,7 +3223,7 @@ fn finish_frame(scan: &mut Scan, frame: Frame, closing_start: usize, end: usize)
         | FrameKind::Mce
         | FrameKind::Other
         | FrameKind::CacheContent(_) => {},
-        FrameKind::Spreadsheet => {
+        FrameKind::Workbook => {
             let site = scan
                 .spreadsheet
                 .as_mut()
@@ -3848,14 +3723,34 @@ fn same_budget_lineage(left: &ExecutionContext, right: &ExecutionContext) -> Cor
 
 fn map_execution_core(error: ExecutionError) -> CoreError {
     match error {
-        ExecutionError::Cancelled => {
-            CoreError::Unsupported("ODS DDE operation cancelled".to_string())
-        },
+        ExecutionError::Cancelled => CoreError::Other("ODS DDE operation cancelled".to_string()),
         ExecutionError::ResourceLimit(limit) => CoreError::ResourceLimit(limit),
-        other => CoreError::Unsupported(format!(
-            "ODS DDE execution policy rejected operation: {other}"
-        )),
+        _other => CoreError::Other("ODS DDE execution policy rejected operation".to_string()),
     }
+}
+
+/// Admit an exact target `content.xml` under a destination's limits and
+/// execution context, as a patch replay did before record 0358a: the output
+/// ceiling, an output reservation and a full parse under that policy.
+pub(crate) fn admit_target(
+    target: &Arc<str>,
+    limits: Limits,
+    context: &ExecutionContext,
+) -> CoreResult<()> {
+    context.check().map_err(map_execution_core)?;
+    if target.len() > limits.output_bytes() {
+        return Err(resource_core(
+            "output bytes",
+            target.len(),
+            limits.output_bytes(),
+        ));
+    }
+    let _output = context
+        .reserve(Resource::OutputBytes, target.len() as u64)
+        .map_err(map_execution_core)?;
+    Snapshot::parse_shared_with_context(Arc::clone(target), limits, context, true)
+        .map(drop)
+        .map_err(CoreError::from)
 }
 
 fn invalid_core(message: impl Into<String>) -> CoreError {

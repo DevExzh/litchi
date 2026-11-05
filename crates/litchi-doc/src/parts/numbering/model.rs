@@ -87,7 +87,7 @@ pub enum NumberFormat {
 }
 
 impl NumberFormat {
-    /// Writer-compatible name for decimal numbering.
+    /// Builder-compatible name for decimal numbering.
     #[allow(
         non_upper_case_globals,
         reason = "name follows the corresponding MS-DOC specification symbol"

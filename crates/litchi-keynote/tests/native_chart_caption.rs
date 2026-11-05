@@ -97,18 +97,18 @@ struct ChartPayload {
 }
 
 fn chart_payload(source: &[u8]) -> TestResult<ChartPayload> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut selected = None;
 
     for entry in catalog.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = match SnappyStream::decompress(entry.data()) {
+        let stream = match SnappyStream::decompress(entry.data(), Default::default()) {
             Ok(stream) => stream,
             Err(_) => continue,
         };
-        let archive = match Archive::parse(stream.as_bytes()) {
+        let archive = match Archive::parse(stream.as_bytes(), Default::default()) {
             Ok(archive) => archive,
             Err(_) => continue,
         };
@@ -120,7 +120,7 @@ fn chart_payload(source: &[u8]) -> TestResult<ChartPayload> {
                 if message.type_ != CHART_MESSAGE_TYPE {
                     continue;
                 }
-                let outer = WireView::parse(&message.data)?;
+                let outer = WireView::parse(&message.data, litchi_iwa_common::WireLimits::DEFAULT)?;
                 for field in outer.fields().filter(|field| {
                     field.number() == CHART_EXTENSION_FIELD && field.wire_type() == 2
                 }) {
@@ -148,17 +148,17 @@ fn chart_payload(source: &[u8]) -> TestResult<ChartPayload> {
 }
 
 fn metadata_member(source: &[u8]) -> TestResult<String> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut selected = None;
     for entry in catalog.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = match SnappyStream::decompress(entry.data()) {
+        let stream = match SnappyStream::decompress(entry.data(), Default::default()) {
             Ok(stream) => stream,
             Err(_) => continue,
         };
-        let archive = match Archive::parse(stream.as_bytes()) {
+        let archive = match Archive::parse(stream.as_bytes(), Default::default()) {
             Ok(archive) => archive,
             Err(_) => continue,
         };
@@ -179,7 +179,7 @@ fn metadata_member(source: &[u8]) -> TestResult<String> {
 }
 
 fn slide_node_member(source: &[u8]) -> TestResult<String> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut selected = catalog
         .iter()
         .filter(|entry| entry.name().rsplit('/').next() == Some("Document.iwa"));
@@ -193,17 +193,17 @@ fn slide_node_member(source: &[u8]) -> TestResult<String> {
 }
 
 fn caption_style_member(source: &[u8]) -> TestResult<String> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut style_identifier = None;
     for entry in catalog.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = match SnappyStream::decompress(entry.data()) {
+        let stream = match SnappyStream::decompress(entry.data(), Default::default()) {
             Ok(stream) => stream,
             Err(_) => continue,
         };
-        let archive = match Archive::parse(stream.as_bytes()) {
+        let archive = match Archive::parse(stream.as_bytes(), Default::default()) {
             Ok(archive) => archive,
             Err(_) => continue,
         };
@@ -237,11 +237,11 @@ fn caption_style_member(source: &[u8]) -> TestResult<String> {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = match SnappyStream::decompress(entry.data()) {
+        let stream = match SnappyStream::decompress(entry.data(), Default::default()) {
             Ok(stream) => stream,
             Err(_) => continue,
         };
-        let archive = match Archive::parse(stream.as_bytes()) {
+        let archive = match Archive::parse(stream.as_bytes(), Default::default()) {
             Ok(archive) => archive,
             Err(_) => continue,
         };
@@ -263,7 +263,7 @@ fn caption_style_member(source: &[u8]) -> TestResult<String> {
 }
 
 fn preview_members(source: &[u8]) -> TestResult<Vec<String>> {
-    Ok(Catalog::from_bytes(source)?
+    Ok(Catalog::from_bytes(source, Default::default())?
         .iter()
         .filter(|entry| {
             !entry.name().ends_with(".iwa")
@@ -295,8 +295,8 @@ fn assert_caption_locality(
     chart_member: &str,
     rewrites_slide_node: bool,
 ) -> TestResult {
-    let source_catalog = Catalog::from_bytes(source)?;
-    let target_catalog = Catalog::from_bytes(target)?;
+    let source_catalog = Catalog::from_bytes(source, Default::default())?;
+    let target_catalog = Catalog::from_bytes(target, Default::default())?;
     let metadata = metadata_member(source)?;
     let previews = preview_members(source)?;
     let mut changed = Vec::new();
@@ -352,8 +352,8 @@ fn assert_caption_locality(
 
 fn assert_caption_style_untouched(source: &[u8], target: &[u8]) -> TestResult {
     let member = caption_style_member(source)?;
-    let source_catalog = Catalog::from_bytes(source)?;
-    let target_catalog = Catalog::from_bytes(target)?;
+    let source_catalog = Catalog::from_bytes(source, Default::default())?;
+    let target_catalog = Catalog::from_bytes(target, Default::default())?;
     let source_entry = source_catalog
         .iter()
         .find(|entry| entry.name() == member)

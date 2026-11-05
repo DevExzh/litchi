@@ -1,0 +1,139 @@
+{
+  "schema": "litchi.api-capture.independent-review.v1",
+  "review": "READY_FOR_PROTOCOL_COMPOSITION",
+  "review_scope": "read-only final all-68 API capture binding; no source, Cargo, or PROGRESS edits",
+  "capture": {
+    "source_commit": "a3ec9799939071d535925133c483bc998aa9667c",
+    "source_tree": "6695495fda31c2a11a8c673bc2f3291ef4bc2a6c",
+    "output": "output",
+    "run_status": "complete",
+    "captured": 68,
+    "reused": 0,
+    "package_count": 68,
+    "package_set_sha256": "afeface99e189880df1fea08aa4426b5ef10fa77b23f1a279bf665a20a1cdd8f",
+    "cargo_lock_sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
+    "run_json": {
+      "bytes": 2103,
+      "sha256": "ced68abf464fcba9a0ecbe33783ffdeffcd4b0ad0f897a6d90054c8d9a621791"
+    },
+    "inventory_tsv": {
+      "bytes": 10174,
+      "sha256": "161754e5dbe5b7d149b8631a507e6c1a1b222bf2b780e14f84cb48cdec5039c8",
+      "rows": 84
+    },
+    "packages_json": {
+      "bytes": 15728,
+      "sha256": "01f073a68dee9eb939a063102386a4a9fc004aac2dbbfe5159ba336c72533a85"
+    },
+    "scaffold_disposition_tsv": {
+      "bytes": 12634,
+      "sha256": "57d486415c0e940160a3e0ed29bee08b79b14b013973973a06827e2b17445529",
+      "rows": 84,
+      "decision_counts": {"UNASSIGNED_REQUIRED_REVIEW": 84},
+      "blank_evidence": 84,
+      "blank_owner": 84,
+      "accepted_as_review": false
+    },
+    "recheck": {
+      "directory": "recheck-20261024-1707",
+      "inventory_sha256": "161754e5dbe5b7d149b8631a507e6c1a1b222bf2b780e14f84cb48cdec5039c8",
+      "disposition_sha256": "57d486415c0e940160a3e0ed29bee08b79b14b013973973a06827e2b17445529",
+      "inventory_byte_equal": true,
+      "disposition_byte_equal": true,
+      "inventory_stderr_bytes": 0
+    }
+  },
+  "receipt_identity_check": {
+    "receipt_count": 68,
+    "unique_packages": 68,
+    "packages_json_count": 68,
+    "receipt_package_set_equals_packages_json": true,
+    "manifest_package_name_matches": 68,
+    "packages_json_source_commit_matches": true,
+    "packages_json_lock_matches": true,
+    "status_ok": 68,
+    "source_commit_matches": 68,
+    "lock_matches": 68,
+    "manifest_hash_matches": 68,
+    "artifact_exists_bytes_sha_matches": 68,
+    "artifact_json_parseable": 68,
+    "all_features_offline_locked": 68,
+    "capture_environment_variants": 1,
+    "errors": 0,
+    "max_target_post_bytes": 3749318288,
+    "max_peak_rss_bytes": 2995376128,
+    "cap_bytes": 20000000000
+  },
+  "source_equivalence": {
+    "assembled_candidate_commit": "c796d0acc24c7c6e6fd08980b9e31af6bb86b18b",
+    "assembled_candidate_tree": "6fe4f6f68046d2ee99dc7ca982004c406e484336",
+    "equivalence_receipt": "assembled-c796-source-equivalence.json",
+    "equivalence_receipt_sha256": "9ccc36a7d380461d444a6e455c9bb661d858377b6d5f745c3c3a6374012bdfb9",
+    "root_cargo_toml_sha256": "f5ec007892023b38f1deaef1ce20714db58b58448a3bea088be3b847b84570de",
+    "root_cargo_lock_sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
+    "crate_source_and_manifest_equivalence": true,
+    "only_crate_path_change": "crates/litchi-xls/src/cell_values/tests.rs",
+    "only_crate_change_classification": "test-only exact rustfmt expansion"
+  },
+  "reviewed_dispositions": {
+    "prior_inventory": "docs/unified-ops/results/0362ul14/inventory-082.tsv",
+    "prior_inventory_sha256": "161754e5dbe5b7d149b8631a507e6c1a1b222bf2b780e14f84cb48cdec5039c8",
+    "current_inventory_byte_equal_prior": true,
+    "prior_reviewed_disposition": "docs/unified-ops/results/0362ul14/reviewed-disposition-082.tsv",
+    "prior_reviewed_disposition_sha256": "3b0d48c38a4cc53e319c720d5e5ef4a1378631b10de5ec13190b03f5d3ad1a3e",
+    "prior_rows": 84,
+    "prior_nonblank_decision_evidence_owner": 84,
+    "identity_keys_exactly_match_inventory": true,
+    "decision_counts": {
+      "RAW_READER_METHOD": 38,
+      "WIRE_SCHEMA": 26,
+      "WIRE_REQUEST": 7,
+      "COMPOSITION_DESCRIPTOR": 4,
+      "OPC_SOURCE_PLAN_DESCRIPTOR": 4,
+      "AST_VALUE": 2,
+      "RAW_ARCHIVE_DESCRIPTOR": 1,
+      "RAW_WIRE_DESCRIPTOR": 1,
+      "OPC_XML_SPLICE_DESCRIPTOR": 1
+    },
+    "validator_result": "validated 84 disposition rows; no approval inferred",
+    "new_inventory_rows": 0
+  },
+  "source_role_revalidation": {
+    "prior_source_role_review": "docs/unified-ops/results/0362ul14/source-role-review.json",
+    "prior_source_role_review_sha256": "b15dfc42d36015e7811f6d9b8c4161b5a9fe1a50f7b8d5f4499bfeea37f5eb43",
+    "proof_rows": 84,
+    "unique_proof_source_paths": 21,
+    "unchanged_proof_source_paths": 20,
+    "changed_proof_source_paths": 1,
+    "changed_path_review": {
+      "path": "crates/litchi-iwa-protos/src/numbers_table_cell_storage_codec.rs",
+      "old_commit": "082fbeafe8f1e68c7118ec8561b5bd6fe1577415",
+      "old_bytes": 383476,
+      "old_sha256": "3752c7a97c805d8ff94b875efa9a90dc92bcabf82d6d2b74646747df843bc415",
+      "new_commit": "a3ec9799939071d535925133c483bc998aa9667c",
+      "new_bytes": 381767,
+      "new_sha256": "a1fadd3117237317441ca953e0d7f3a63a8d3c4da0d9e5b94cd245723a098c18",
+      "affected_rows": 3,
+      "affected_paths": [
+        "litchi_iwa_protos::numbers_table_cell_storage_codec::ControlCellSpecTableReferenceEdit",
+        "litchi_iwa_protos::numbers_table_cell_storage_codec::HeaderSizeEdit",
+        "litchi_iwa_protos::numbers_table_cell_storage_codec::TableDataListEntryRefCountEdit"
+      ],
+      "diff_review": "40 lines remove six public Reference-suffix alias/forwarder definitions only; canonical ControlCellSpecTableReferenceEdit, HeaderSizeEdit, TableDataListEntryRefCountEdit, Prepared*ControlCellSpecTableRewrite and prepare/rewrite canonical routes remain.",
+      "current_capture_check": "removed six names absent from litchi_iwa_protos rustdoc inventory; occurrences are limited to the historical validation ledger and explicit api_glossary ban list"
+    },
+    "changed_crate_paths_since_prior": 16,
+    "changed_crate_paths_outside_reviewed_proof": 15,
+    "no_new_rows_or_waivers": true
+  },
+  "commands": [
+    "git diff --name-status 082fbeafe8f1e68c7118ec8561b5bd6fe1577415 a3ec9799939071d535925133c483bc998aa9667c -- crates",
+    "git rev-parse HEAD^{tree}; sha256sum Cargo.toml Cargo.lock (a3 and c796 sources)",
+    "python3 tools/validate_api_disposition.py inventory-082.tsv reviewed-disposition-082.tsv",
+    "read-only Python verification of all 68 receipt identity, manifest, artifact, flag, and cap fields"
+  ],
+  "limitations": [
+    "No Cargo command was run during this independent review; receipt validation is hash/metadata based.",
+    "The current capture disposition.tsv is an intentionally blank scaffold and was not treated as acceptance; the prior reviewed disposition is the bound semantic review artifact."
+  ]
+}

@@ -28,7 +28,7 @@ use litchi_iwa_archive::{Limits, SourceCatalog};
 use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes,
     varint::encoded_len,
-    wire::{WireDescent, WirePreflight, WireView, preflight_wire_tree_with_limits},
+    wire::{WireDescent, WirePreflight, WireView, preflight_wire_tree},
 };
 use litchi_iwa_core::{ArchiveObject, FieldType};
 use thiserror::Error as ThisError;
@@ -559,7 +559,7 @@ pub(crate) fn strict_optional_reference(
     let _ = preflight_wire_message(source, limits, budget)?;
     budget.charge_work(source.len())?;
     let bounded = remaining_wire_limits(limits, budget)?;
-    let view = WireView::parse_with_limits(source, bounded).map_err(map_wire_error)?;
+    let view = WireView::parse(source, bounded).map_err(map_wire_error)?;
     budget.charge_fields(view.len())?;
     let mut result = None;
     for field in view.fields() {
@@ -587,7 +587,7 @@ pub(crate) fn strict_reference(
     let _ = preflight_wire_message(source, limits, budget)?;
     budget.charge_work(source.len())?;
     let bounded = remaining_wire_limits(limits, budget)?;
-    let view = WireView::parse_with_limits(source, bounded).map_err(map_wire_error)?;
+    let view = WireView::parse(source, bounded).map_err(map_wire_error)?;
     budget.charge_fields(view.len())?;
     let mut identifier = None;
     let mut deprecated_type = None;
@@ -643,7 +643,7 @@ pub(crate) fn preflight_wire_message(
     budget: &Budget,
 ) -> Result<WirePreflight, Error> {
     let bounded = remaining_wire_limits(limits, budget)?;
-    let report = preflight_wire_tree_with_limits(source, bounded, |_visit| Ok(WireDescent::Skip))
+    let report = preflight_wire_tree(source, bounded, |_visit| Ok(WireDescent::Skip))
         .map_err(map_wire_error)?;
     if report.fields() > budget.remaining_fields() {
         let observed = budget
@@ -685,7 +685,7 @@ pub(crate) fn preflight_soundtrack_payload(
     budget: &Budget,
 ) -> Result<WirePreflight, Error> {
     let bounded = remaining_wire_limits(limits, budget)?;
-    let report = preflight_wire_tree_with_limits(source, bounded, |visit| {
+    let report = preflight_wire_tree(source, bounded, |visit| {
         let field = visit.field();
         if matches!(field.wire_type(), 3 | 4) {
             return Err(litchi_iwa_common::Error::InvalidFormat(
@@ -750,8 +750,8 @@ pub(crate) fn validate_soundtrack_media_references(
 ) -> Result<(), Error> {
     let _ = preflight_soundtrack_payload(source, limits, budget)?;
     budget.charge_work(source.len())?;
-    let view = WireView::parse_with_limits(source, remaining_wire_limits(limits, budget)?)
-        .map_err(map_wire_error)?;
+    let view =
+        WireView::parse(source, remaining_wire_limits(limits, budget)?).map_err(map_wire_error)?;
     budget.charge_fields(view.len())?;
     let mut observed = 0usize;
     for field in view.fields() {
@@ -1401,7 +1401,7 @@ pub(crate) fn validate_reference_role_disjointness(
         budget,
     )?;
     budget.charge_work(show_payload.len())?;
-    let show = WireView::parse_with_limits(show_payload, remaining_wire_limits(limits, budget)?)
+    let show = WireView::parse(show_payload, remaining_wire_limits(limits, budget)?)
         .map_err(map_wire_error)?;
     budget.charge_fields(show.len())?;
     let mut slide_tree_payload = None;
@@ -1434,8 +1434,8 @@ fn reject_selected_identifier_in_reference_fields(
 ) -> Result<(), Error> {
     let _ = preflight_wire_message(source, limits, budget)?;
     budget.charge_work(source.len())?;
-    let view = WireView::parse_with_limits(source, remaining_wire_limits(limits, budget)?)
-        .map_err(map_wire_error)?;
+    let view =
+        WireView::parse(source, remaining_wire_limits(limits, budget)?).map_err(map_wire_error)?;
     budget.charge_fields(view.len())?;
     for field in view.fields() {
         if !reference_fields.contains(&field.number()) {
@@ -1751,8 +1751,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             maximum: limit as u64,
         },
         litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
-        litchi_iwa_common::Error::InvalidFormat(_)
-        | litchi_iwa_common::Error::InvalidLimit { .. } => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 

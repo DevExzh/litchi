@@ -1,0 +1,1 @@
+[{"command":"add","parent":"/","type":"slide"},{"command":"add","parent":"/slide[1]","type":"shape","props":{"text":"Title","x":"2cm","y":"1cm","width":"20cm","height":"3cm"}}]

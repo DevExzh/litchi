@@ -1,0 +1,89 @@
+{
+  "record": "0359ra",
+  "status": "checkfree",
+  "decision": "preserve-refusal-cost-open",
+  "baseline_commit": "86d708878f",
+  "candidate_base_commit": "dd00ae1611",
+  "probe": "crates/litchi-rtf/examples/refusal_contract_bench.rs",
+  "probe_sha256": "9d9e91c639e47ccc94f154464f6f97a0dc0002a3b2fb37251f61b17bf71cdb22",
+  "profiler": {
+    "tool": "valgrind callgrind",
+    "version": "3.26.0",
+    "events": "Ir",
+    "cpu": 7,
+    "command": "taskset -c 7 valgrind --tool=callgrind --dump-instr=yes --collect-jumps=yes --callgrind-out-file=<external-output> <0359b-binary>"
+  },
+  "binaries": {
+    "before": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/rtf-refusals/binaries/before",
+      "size_bytes": 4124032,
+      "sha256": "4693bd12232d92a61ef2f437de2d623e345a106288d5d0a5c5638cf27677420a"
+    },
+    "after": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/rtf-refusals/binaries/after",
+      "size_bytes": 4137976,
+      "sha256": "0ca9e98098c9e687737c9f446019cf5108f17c3b024cf0f565890d26ff61ec96"
+    }
+  },
+  "workload": {
+    "samples": 34,
+    "warmups": 3,
+    "measured_samples": 31,
+    "scenario_order": [
+      "open_1k",
+      "noop_1k",
+      "text_commit_1k",
+      "text_commit_save_1k",
+      "replay_1k",
+      "tail_commit_1k",
+      "unsupported_content",
+      "protected_commit"
+    ],
+    "iterations": {
+      "open_1k": 1,
+      "noop_1k": 100,
+      "text_commit_1k": 1,
+      "text_commit_save_1k": 1,
+      "replay_1k": 100,
+      "tail_commit_1k": 1,
+      "unsupported_content": 1000,
+      "protected_commit": 100
+    },
+    "unsupported_content_calls": 34000
+  },
+  "profile": {
+    "before_ir": 627525400,
+    "after_ir": 627424214,
+    "delta_ir": -101186,
+    "function_costs": [
+      {"id": 1066, "name": "Package::from_bytes_with_options", "calls": 103, "before_ir": 4738, "after_ir": 4738},
+      {"id": 1132, "name": "Package::edit", "calls": 37468, "before_ir": 861764, "after_ir": 861764},
+      {"id": 1002, "name": "Edit::replace_text", "calls": 3469, "before_ir": 565810, "after_ir": 569279},
+      {"id": 1018, "name": "Edit::commit", "calls": 6869, "before_ir": 268167, "after_ir": 268167},
+      {"id": 1020, "name": "Edit::commit_staged", "calls": 6869, "before_ir": 3536484, "after_ir": 3553967},
+      {"id": 1140, "name": "tail_append::Edit::append_text_paragraphs", "calls": 34, "before_ir": 2312, "after_ir": 2312},
+      {"id": 1146, "name": "tail_append::Edit::commit", "calls": 34, "before_ir": 14586, "after_ir": 14926},
+      {"id": 1134, "name": "Package::to_bytes", "calls": 34, "before_ir": 2652, "after_ir": 2652},
+      {"id": 1138, "name": "Package::apply", "calls": 3400, "before_ir": 251600, "after_ir": 251600},
+      {"id": 1162, "name": "Edit::set_text_underline", "calls": 34000, "before_ir": 1360000, "after_ir": 1496000}
+    ]
+  },
+  "external_profile_artifacts": [
+    {
+      "file": "/home/zhuhe/code/litchi-worktrees/.coord/rtf-refusals/callgrind-20261022/before.callgrind",
+      "size_bytes": 512449,
+      "sha256": "f9b8459e0983b6e5e9dcdb45a3f76c8ee5e308733f1b0e025cbd6f227242bc6b"
+    },
+    {
+      "file": "/home/zhuhe/code/litchi-worktrees/.coord/rtf-refusals/callgrind-20261022/after.callgrind",
+      "size_bytes": 512765,
+      "sha256": "fd867758cbaf471f3561a8a4a0dfc488fc39b35084468e0ead6a9e7d0e719334"
+    }
+  ],
+  "native_qualification": {
+    "status": "open-for-any-future-candidate",
+    "driver": "/home/zhuhe/code/litchi-worktrees/.coord/rtf-refusals/run-abba.py",
+    "required_artifacts": ["release binaries and hashes", "all A-B-B-A JSONL outputs", "summary and process monitor", "paired heaptrack captures and summaries", "test, fidelity and glossary logs"],
+    "native_timing_waived": false
+  }
+}

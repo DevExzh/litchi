@@ -7,23 +7,22 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
-use litchi_rtf::{CustomXmlAttribute, CustomXmlTag, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{CustomXmlAttribute, CustomXmlTag, write::Writer};
 use std::borrow::Cow;
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
 #[test]
 fn parses_namespaced_tag_with_attributes_and_round_trips() {
-    let document = RtfDocument::parse(concat!(
+    let document = Tree::parse(concat!(
         r#"{\rtf1\ansi{\*\xmlnstbl {\xmlns1 urn:example:test}}"#,
         r#"{\xmlopen \xmlns1 employee}{\*\xmlattrname id}{\*\xmlattrvalue 5}Body{\xmlclose employee}}"#,
-    ))
+    ), litchi_rtf::read::OpenOptions::default())
     .unwrap();
     assert_eq!(document.text(), "Body");
     let tags = document.custom_xml_tags();
@@ -37,7 +36,8 @@ fn parses_namespaced_tag_with_attributes_and_round_trips() {
     assert_eq!(tag.position, 0);
     assert_eq!(tag.content, "Body");
 
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), "Body");
     assert_eq!(reparsed.custom_xml_tags(), tags);
     assert_eq!(reparsed.xml_namespaces(), document.xml_namespaces());
@@ -45,10 +45,13 @@ fn parses_namespaced_tag_with_attributes_and_round_trips() {
 
 #[test]
 fn parses_nested_attributes_inside_xmlopen_and_nested_tags() {
-    let document = RtfDocument::parse(concat!(
-        r#"{\rtf1 pre{\xmlopen {\*\xmlattrname a}{\*\xmlattrvalue b}outer}"#,
-        r#"x{\xmlopen inner}y{\xmlclose inner}z{\xmlclose outer}post}"#,
-    ))
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1 pre{\xmlopen {\*\xmlattrname a}{\*\xmlattrvalue b}outer}"#,
+            r#"x{\xmlopen inner}y{\xmlclose inner}z{\xmlclose outer}post}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     assert_eq!(document.text(), "prexyzpost");
     let tags = document.custom_xml_tags();
@@ -64,17 +67,21 @@ fn parses_nested_attributes_inside_xmlopen_and_nested_tags() {
     assert_eq!(tags[1].position, 4);
     assert_eq!(tags[1].content, "y");
 
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.custom_xml_tags(), tags);
 }
 
 #[test]
 fn parses_empty_and_unicode_tag_content() {
-    let document = RtfDocument::parse(concat!(
-        r#"{\rtf1{\xmlopen empty}{\xmlclose empty}"#,
-        r#"{\xmlopen empl\u20320?}X{\xmlclose empl\u20320?}}"#,
-    ))
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1{\xmlopen empty}{\xmlclose empty}"#,
+            r#"{\xmlopen empl\u20320?}X{\xmlclose empl\u20320?}}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     assert_eq!(document.text(), "X");
     let tags = document.custom_xml_tags();
@@ -85,7 +92,8 @@ fn parses_empty_and_unicode_tag_content() {
     assert_eq!(tags[1].name, "empl你");
     assert_eq!(tags[1].content, "X");
 
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.custom_xml_tags(), tags);
 }
 
@@ -152,7 +160,10 @@ fn rejects_malformed_custom_xml_markup() {
         r"{\rtf1{\xmlopen a}{\xmlopen b}B{\xmlclose a}{\xmlclose b}}",
     ];
     for rtf in cases {
-        assert!(RtfDocument::parse(rtf).is_err(), "accepted malformed {rtf}");
+        assert!(
+            Tree::parse(rtf, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted malformed {rtf}"
+        );
     }
 }
 
@@ -167,7 +178,7 @@ fn rejects_excessive_nesting_depth() {
         rtf.push_str(r"{\xmlclose t}");
     }
     rtf.push('}');
-    assert!(RtfDocument::parse(&rtf).is_err());
+    assert!(Tree::parse(&rtf, litchi_rtf::read::OpenOptions::default()).is_err());
 
     let mut valid = String::from(r"{\rtf1");
     for _ in 0..64 {
@@ -178,7 +189,7 @@ fn rejects_excessive_nesting_depth() {
         valid.push_str(r"{\xmlclose t}");
     }
     valid.push('}');
-    let document = RtfDocument::parse(&valid).unwrap();
+    let document = Tree::parse(&valid, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(document.custom_xml_tags().len(), 64);
 }
 
@@ -203,7 +214,7 @@ fn rejects_custom_xml_markup_in_non_body_stories() {
     ];
     for rtf in cases {
         assert!(
-            RtfDocument::parse(rtf).is_err(),
+            Tree::parse(rtf, litchi_rtf::read::OpenOptions::default()).is_err(),
             "accepted non-body custom XML markup {rtf}"
         );
     }
@@ -211,10 +222,13 @@ fn rejects_custom_xml_markup_in_non_body_stories() {
 
 #[test]
 fn coexists_with_bookmarks_and_body_markup() {
-    let document = RtfDocument::parse(concat!(
-        r#"{\rtf1\ansi{\*\bkmkstart bm}pre{\*\bkmkend bm}"#,
-        r#"{\xmlopen wrap}\b bold\b0{\xmlclose wrap}}"#,
-    ))
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1\ansi{\*\bkmkstart bm}pre{\*\bkmkend bm}"#,
+            r#"{\xmlopen wrap}\b bold\b0{\xmlclose wrap}}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     assert_eq!(document.text(), "prebold");
     let bookmark = &document.bookmarks().bookmarks()[0];
@@ -224,7 +238,8 @@ fn coexists_with_bookmarks_and_body_markup() {
     assert_eq!(tags[0].position, 3);
     assert_eq!(tags[0].content, "bold");
 
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.custom_xml_tags(), tags);
     assert_eq!(

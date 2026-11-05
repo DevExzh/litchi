@@ -399,7 +399,7 @@ mod tests {
 
     fn evaluate(source: &str) -> Result<f64, super::super::EvaluationFailure> {
         let execution = execution();
-        let expression = Expression::parse(source).unwrap();
+        let expression = Expression::parse(source, &Default::default()).unwrap();
         evaluate_scalar_with_context(&expression, &execution, &EvaluationLimits::default()).map(
             |value| match value.value() {
                 ScalarValue::Number(value) => *value,

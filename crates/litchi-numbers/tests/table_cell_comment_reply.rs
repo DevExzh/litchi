@@ -18,11 +18,8 @@ use fixture::*;
 use litchi_iwa_archive::{Limits, package::Catalog};
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tsp, tst};
-use litchi_numbers::cell::comment::CommentReplyIndex;
-use litchi_numbers::{
-    CellPosition, Package, PackageLimits, PackageReadOptions, PackageSemanticLimits, SheetSelector,
-    TableSelector,
-};
+use litchi_numbers::cell::comment::{CommentReplyIndex, transaction};
+use litchi_numbers::{At, Package, SheetSelector, TableSelector};
 use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -41,7 +38,7 @@ fn read_all(package: &Package, row: usize) -> TestResult<Vec<String>> {
     let replies = package.table_cell_comment_replies(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(u32::try_from(row)?, 0),
+        At::new(u32::try_from(row)?, 0),
     )?;
     Ok(replies
         .iter()
@@ -54,7 +51,7 @@ fn read_one(package: &Package, row: usize, index: u32) -> TestResult<String> {
         .table_cell_comment_reply(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(u32::try_from(row)?, 0),
+            At::new(u32::try_from(row)?, 0),
             CommentReplyIndex::new(index),
         )?
         .text()
@@ -69,7 +66,7 @@ fn root_comment_creation_reuses_strict_graph_and_is_exactly_reversible() -> Test
         package.table_cell_comment(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(1, 0),
+            At::new(1, 0),
         )?,
         None,
     );
@@ -77,7 +74,7 @@ fn root_comment_creation_reuses_strict_graph_and_is_exactly_reversible() -> Test
     let commit = package.set_table_cell_comment(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(1, 0),
+        At::new(1, 0),
         "new strict root",
     )?;
     assert_eq!(
@@ -86,7 +83,7 @@ fn root_comment_creation_reuses_strict_graph_and_is_exactly_reversible() -> Test
             .table_cell_comment(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(1, 0),
+                At::new(1, 0),
             )?
             .as_ref()
             .map(|comment| comment.text()),
@@ -102,7 +99,7 @@ fn root_comment_creation_reuses_strict_graph_and_is_exactly_reversible() -> Test
             .table_cell_comment(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(1, 0),
+                At::new(1, 0),
             )?
             .as_ref()
             .map(|comment| comment.text()),
@@ -138,7 +135,7 @@ fn root_comment_creation_populates_an_empty_author_storage_atomically() -> TestR
     let commit = package.set_table_cell_comment(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(1, 0),
+        At::new(1, 0),
         "new root with generated author",
     )?;
     let created = commit
@@ -146,7 +143,7 @@ fn root_comment_creation_populates_an_empty_author_storage_atomically() -> TestR
         .table_cell_comment(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(1, 0),
+            At::new(1, 0),
         )?
         .ok_or_else(|| io::Error::other("generated root comment is missing"))?;
     assert_eq!(created.text(), "new root with generated author");
@@ -228,7 +225,7 @@ fn root_comment_creation_builds_a_missing_comment_list_atomically() -> TestResul
     let commit = package.set_table_cell_comment(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(1, 0),
+        At::new(1, 0),
         "new root with generated list",
     )?;
     assert_eq!(
@@ -237,7 +234,7 @@ fn root_comment_creation_builds_a_missing_comment_list_atomically() -> TestResul
             .table_cell_comment(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(1, 0),
+                At::new(1, 0),
             )?
             .as_ref()
             .map(|comment| comment.text()),
@@ -322,7 +319,7 @@ fn root_comment_creation_builds_a_missing_author_storage_atomically() -> TestRes
     let commit = package.set_table_cell_comment(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(1, 0),
+        At::new(1, 0),
         "new root with generated author storage",
     )?;
     assert_eq!(
@@ -331,7 +328,7 @@ fn root_comment_creation_builds_a_missing_author_storage_atomically() -> TestRes
             .table_cell_comment(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(1, 0),
+                At::new(1, 0),
             )?
             .as_ref()
             .map(|comment| comment.text()),
@@ -425,14 +422,14 @@ fn root_comment_creation_materializes_a_missing_cell_slot_atomically() -> TestRe
         package.table_cell_comment(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(1, 1),
+            At::new(1, 1),
         )?,
         None,
     );
     let commit = package.set_table_cell_comment(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(1, 1),
+        At::new(1, 1),
         "new root in sparse slot",
     )?;
     assert_eq!(
@@ -441,7 +438,7 @@ fn root_comment_creation_materializes_a_missing_cell_slot_atomically() -> TestRe
             .table_cell_comment(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(1, 1),
+                At::new(1, 1),
             )?
             .as_ref()
             .map(|comment| comment.text()),
@@ -451,7 +448,7 @@ fn root_comment_creation_materializes_a_missing_cell_slot_atomically() -> TestRe
         commit.package().table_cell_comment(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(1, 0),
+            At::new(1, 0),
         )?,
         None,
     );
@@ -459,6 +456,33 @@ fn root_comment_creation_materializes_a_missing_cell_slot_atomically() -> TestRe
         .package()
         .apply_table_cell_comment(&commit.patch().inverse())?;
     assert_eq!(exact_bytes(restored.package())?, source);
+    Ok(())
+}
+
+#[test]
+fn shared_root_clear_detaches_a_new_root_and_reopens_atomically() -> TestResult {
+    let source = fixture(FixtureMode::Rootless, None)?;
+    let package = load_package(&source)?;
+    let created = package.set_table_cell_comment(
+        SheetSelector::index(0),
+        TableSelector::index(0),
+        At::new(1, 0),
+        "temporary root",
+    )?;
+    let cleared = created.package().clear_table_cell_comment(
+        SheetSelector::index(0),
+        TableSelector::index(0),
+        At::new(1, 0),
+    )?;
+    assert_eq!(
+        cleared.package().table_cell_comment(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            At::new(1, 0),
+        )?,
+        None,
+    );
+    assert!(cleared.diagnostics().changed());
     Ok(())
 }
 
@@ -474,7 +498,7 @@ fn root_comment_creation_fails_closed_on_unsupported_graphs() -> TestResult {
         let result = package.set_table_cell_comment(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(1, 0),
+            At::new(1, 0),
             "must not publish",
         );
         assert!(
@@ -487,7 +511,7 @@ fn root_comment_creation_fails_closed_on_unsupported_graphs() -> TestResult {
 }
 
 fn member_data(source: &[u8], name: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     Ok(catalog
         .iter()
         .find(|entry| entry.name() == name)
@@ -498,17 +522,21 @@ fn member_data(source: &[u8], name: &str) -> TestResult<Vec<u8>> {
 
 fn member_archive(source: &[u8], name: &str) -> TestResult<Archive> {
     Ok(Archive::parse(
-        SnappyStream::decompress(&member_data(source, name)?)?.as_bytes(),
+        SnappyStream::decompress(&member_data(source, name)?, Default::default())?.as_bytes(),
+        Default::default(),
     )?)
 }
 
 fn reply_member_name(source: &[u8], identifier: u64) -> TestResult<String> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+        let archive = Archive::parse(
+            SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+            Default::default(),
+        )?;
         if archive.object(identifier).is_some() {
             return Ok(entry.name().to_owned());
         }
@@ -517,12 +545,15 @@ fn reply_member_name(source: &[u8], identifier: u64) -> TestResult<String> {
 }
 
 fn object_exists(source: &[u8], identifier: u64) -> TestResult<bool> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+        let archive = Archive::parse(
+            SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+            Default::default(),
+        )?;
         if archive.object(identifier).is_some() {
             return Ok(true);
         }
@@ -535,14 +566,18 @@ fn rewrite_member(
     name: &str,
     mut rewrite: impl FnMut(&mut Archive) -> TestResult,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == name)
         .ok_or_else(|| io::Error::other(format!("member {name} is missing")))?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     rewrite(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             name,
@@ -579,7 +614,7 @@ fn assert_read_rejected(source: &[u8], label: &str) -> TestResult {
                     .table_cell_comment_replies(
                         SheetSelector::index(0),
                         TableSelector::index(0),
-                        CellPosition::new(0, 0),
+                        At::new(0, 0),
                     )
                     .is_err(),
                 "hostile reply source was accepted: {label}"
@@ -600,7 +635,7 @@ fn assert_edit_rejected_atomically(source: &[u8], label: &str) -> TestResult {
     let result = package.set_table_cell_comment_reply(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
         CommentReplyIndex::new(0),
         "replacement",
     );
@@ -717,7 +752,7 @@ fn unknown_scalar_and_group_are_retained_or_rejected_without_source_mutation() -
     let result = package.set_table_cell_comment_reply(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
         CommentReplyIndex::new(0),
         "unknown-preserving rewrite",
     );
@@ -749,34 +784,210 @@ fn unknown_scalar_and_group_are_retained_or_rejected_without_source_mutation() -
 fn semantic_and_physical_limits_reject_without_mutating_the_source() -> TestResult {
     let source = fixture(FixtureMode::DuplicateText, None)?;
     let original = source.clone();
-    let semantic = PackageSemanticLimits::new(
-        PackageSemanticLimits::MAX_OBJECTS,
-        1,
-        PackageSemanticLimits::MAX_TABLES,
-        1,
-    )?;
-    let options = PackageReadOptions::new(PackageLimits::default(), semantic);
+    let semantic = litchi_numbers::SemanticLimits::builder()
+        .max_objects(litchi_numbers::SemanticLimits::MAXIMUM.max_objects())
+        .and_then(|b| b.max_sheets(1))
+        .and_then(|b| b.max_tables(litchi_numbers::SemanticLimits::MAXIMUM.max_tables()))
+        .and_then(|b| b.max_references(1))
+        .and_then(|b| b.build())?;
+    let options = litchi_numbers::OpenOptions::new().semantic_limits(semantic);
     assert!(Package::from_bytes_with_options(&source, options).is_err());
     assert_eq!(source, original);
 
-    let default_semantic = PackageSemanticLimits::default();
-    let capped_semantic =
-        default_semantic.with_projection_limits(default_semantic.max_materialized_cells(), 1024)?;
+    let default_semantic = litchi_numbers::SemanticLimits::DEFAULT;
+    let capped_semantic = default_semantic
+        .to_builder()
+        .max_materialized_cells(default_semantic.max_materialized_cells())
+        .and_then(|b| b.max_output_text_bytes(1024))
+        .and_then(|b| b.build())?;
     let package = Package::from_bytes_with_options(
         &source,
-        PackageReadOptions::new(PackageLimits::default(), capped_semantic),
+        litchi_numbers::OpenOptions::new().semantic_limits(capped_semantic),
     )?;
     let before = exact_bytes(&package)?;
     let result = package
         .edit_table_cell_comment_replies(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .append("x".repeat(16 * 1024))
         .commit();
-    assert!(result.is_err());
+    assert!(matches!(
+        result,
+        Err(transaction::Error::Limit {
+            kind: transaction::LimitKind::TextBytes,
+            ..
+        })
+    ));
     assert_eq!(exact_bytes(&package)?, before);
+    Ok(())
+}
+
+#[test]
+fn shared_root_entry_limit_rejects_candidate_before_publish() -> TestResult {
+    let source = fixture(FixtureMode::Rootless, None)?;
+    let source_catalog = Catalog::from_bytes(&source, Default::default())?;
+    let source_max_entry = source_catalog
+        .iter()
+        .map(|entry| entry.data().len())
+        .max()
+        .ok_or_else(|| io::Error::other("source has no entries"))?;
+    let source_max_entry = u64::try_from(source_max_entry)?;
+    let source_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_input_bytes())
+        .and_then(|builder| {
+            builder.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members())
+        })
+        .and_then(|builder| builder.max_entry_bytes(source_max_entry))
+        .and_then(|builder| {
+            builder.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|builder| {
+            builder.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|builder| builder.build())?;
+    let package = Package::from_bytes_with_options(
+        &source,
+        litchi_numbers::OpenOptions::new().source_limits(source_limits),
+    )?;
+    let before = exact_bytes(&package)?;
+    let error = package
+        .set_table_cell_comment(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            At::new(1, 0),
+            "root under a retained-entry ceiling",
+        )
+        .expect_err("the candidate must exceed the retained entry ceiling");
+    assert!(
+        format!("{error:?}").contains("CompressedBytes")
+            || format!("{error:?}").contains("EntryBytes"),
+        "expected a typed retained-entry limit, got {error:?}"
+    );
+    assert_eq!(exact_bytes(&package)?, before);
+    Ok(())
+}
+
+#[test]
+fn retained_compressed_entry_limit_accepts_exact_reply_output() -> TestResult {
+    let source = fixture(FixtureMode::SingleRoot, None)?;
+    let menu_text = "reply with an owner-level compressed budget boundary".repeat(8);
+    let baseline = load_package(&source)?;
+    let target = baseline.set_table_cell_comment_reply(
+        SheetSelector::index(0),
+        TableSelector::index(0),
+        At::new(0, 0),
+        CommentReplyIndex::new(0),
+        &menu_text,
+    )?;
+    let target_bytes = exact_bytes(target.package())?;
+    let source_catalog = Catalog::from_bytes(&source, Default::default())?;
+    let target_catalog = Catalog::from_bytes(&target_bytes, Default::default())?;
+    let source_max_entry = source_catalog
+        .iter()
+        .map(|entry| entry.data().len())
+        .max()
+        .ok_or_else(|| io::Error::other("source has no entries"))?;
+    let target_max_entry = target_catalog
+        .iter()
+        .map(|entry| entry.data().len())
+        .max()
+        .ok_or_else(|| io::Error::other("target has no entries"))?;
+    assert!(target_max_entry > source_max_entry);
+    let target_max_entry = u64::try_from(target_max_entry)?;
+
+    let exact_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_input_bytes())
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(target_max_entry))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
+    let exact_package = Package::from_bytes_with_options(
+        &source,
+        litchi_numbers::OpenOptions::new().source_limits(exact_limits),
+    )?;
+    let exact_source_limits = exact_package.open_options().source_limits_value();
+    assert_eq!(
+        exact_source_limits.max_entry_bytes(),
+        target_max_entry,
+        "the admitted physical profile must retain the selected entry ceiling"
+    );
+    let exact_archive_limits = Limits::new(
+        exact_source_limits.max_input_bytes(),
+        exact_source_limits.max_members(),
+        exact_source_limits.max_entry_bytes(),
+        exact_source_limits.max_aggregate_bytes(),
+        exact_source_limits.max_component_bytes(),
+    )?;
+    assert_eq!(
+        exact_archive_limits.max_entry_bytes(),
+        target_max_entry,
+        "the catalog profile must retain the selected entry ceiling"
+    );
+    assert_eq!(
+        exact_archive_limits
+            .snappy_limits()?
+            .max_compressed_stream(),
+        usize::try_from(target_max_entry)?,
+        "the physical Snappy profile must use the selected compressed ceiling"
+    );
+    let exact_commit = exact_package.set_table_cell_comment_reply(
+        SheetSelector::index(0),
+        TableSelector::index(0),
+        At::new(0, 0),
+        CommentReplyIndex::new(0),
+        &menu_text,
+    )?;
+    let exact_catalog =
+        Catalog::from_bytes(&exact_bytes(exact_commit.package())?, Default::default())?;
+    assert_eq!(
+        exact_catalog.iter().map(|entry| entry.data().len()).max(),
+        usize::try_from(target_max_entry).ok()
+    );
+    assert_eq!(exact_bytes(exact_commit.package())?, target_bytes);
+
+    let one_under_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_input_bytes())
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(target_max_entry - 1))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
+    let one_under_package = Package::from_bytes_with_options(
+        &source,
+        litchi_numbers::OpenOptions::new().source_limits(one_under_limits),
+    )?;
+    let before = exact_bytes(&one_under_package)?;
+    let error = one_under_package
+        .set_table_cell_comment_reply(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            At::new(0, 0),
+            CommentReplyIndex::new(0),
+            &menu_text,
+        )
+        .expect_err("one byte below the encoded reply member must refuse");
+    assert!(
+        matches!(
+            &error,
+            transaction::Error::Limit {
+                kind: transaction::LimitKind::CompressedBytes,
+                ..
+            }
+        ),
+        "expected typed compressed-budget refusal through the public reply route, got {error:?}"
+    );
+    assert_eq!(exact_bytes(&one_under_package)?, before);
     Ok(())
 }
 
@@ -802,7 +1013,7 @@ fn reply_index_is_checked_and_duplicate_text_uses_source_ordinal() -> TestResult
             .table_cell_comment_reply(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(0, 0),
+                At::new(0, 0),
                 CommentReplyIndex::new(3),
             )
             .is_err()
@@ -833,7 +1044,7 @@ fn collection_noop_is_exact_and_debug_redacts_reply_text() -> TestResult {
     let edit = package.edit_table_cell_comment_replies(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
     )?;
     assert!(!format!("{edit:?}").contains(&before));
     let commit = edit
@@ -857,7 +1068,7 @@ fn append_set_remove_and_a1_wrappers_are_reversible() -> TestResult {
         .edit_table_cell_comment_replies(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .append("second reply")
         .commit()?;
@@ -883,7 +1094,7 @@ fn append_set_remove_and_a1_wrappers_are_reversible() -> TestResult {
     let set = package.set_table_cell_comment_reply(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
         CommentReplyIndex::new(0),
         "replaced reply",
     )?;
@@ -900,7 +1111,7 @@ fn append_set_remove_and_a1_wrappers_are_reversible() -> TestResult {
     let directly_added = package.add_table_cell_comment_reply(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
         "directly appended reply",
     )?;
     assert_eq!(
@@ -924,13 +1135,13 @@ fn append_set_remove_and_a1_wrappers_are_reversible() -> TestResult {
 }
 
 #[test]
-fn reply_text_edits_preserve_metadata_and_append_inherits_the_source_leaf() -> TestResult {
+fn reply_text_edits_preserve_metadata_and_append_uses_the_commenting_author() -> TestResult {
     let source = fixture(FixtureMode::SingleRoot, None)?;
     let package = load_package(&source)?;
     let original = package.table_cell_comment_replies(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
     )?;
     assert_eq!(original.len(), 1);
     let original_reply = &original[0];
@@ -940,39 +1151,40 @@ fn reply_text_edits_preserve_metadata_and_append_inherits_the_source_leaf() -> T
     let appended = package.add_table_cell_comment_reply(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
         "metadata-preserving append",
     )?;
     let appended_replies = appended.package().table_cell_comment_replies(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
     )?;
     assert_eq!(appended.patch().before(), original.as_ref());
     assert_eq!(appended.patch().after(), appended_replies.as_ref());
     assert_eq!(appended_replies[0], *original_reply);
-    assert_eq!(
-        appended_replies[1].timestamp(),
-        original_reply.timestamp(),
-        "an appended reply must inherit its source leaf timestamp"
+    // The host's reply writer stamps a new reply with the package's
+    // commenting author and a creation date; it does not copy a sibling's.
+    assert!(
+        appended_replies[1].timestamp().is_some(),
+        "an appended reply must carry a creation date"
     );
     assert_eq!(
         appended_replies[1].author(),
         original_reply.author(),
-        "an appended reply must inherit its source leaf author"
+        "an appended reply must be written by the package's commenting author"
     );
 
     let replaced = package.set_table_cell_comment_reply(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
         CommentReplyIndex::new(0),
         "metadata-preserving replacement",
     )?;
     let replaced_reply = replaced.package().table_cell_comment_reply(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
         CommentReplyIndex::new(0),
     )?;
     assert_eq!(replaced.patch().before(), original.as_ref());
@@ -1017,7 +1229,7 @@ fn shared_root_edit_is_copy_on_write_and_preserves_sibling() -> TestResult {
     let commit = package.set_table_cell_comment_reply(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
         CommentReplyIndex::new(0),
         "first-only",
     )?;
@@ -1056,7 +1268,7 @@ fn removing_the_last_reply_culls_the_unshared_reply_archive() -> TestResult {
     let commit = package.remove_table_cell_comment_reply(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
         CommentReplyIndex::new(0),
     )?;
     assert!(read_all(commit.package(), 0)?.is_empty());
@@ -1077,14 +1289,14 @@ fn inverse_conflict_and_locality_are_exact_source_operations() -> TestResult {
     let first = package.set_table_cell_comment_reply(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
         CommentReplyIndex::new(0),
         "first branch",
     )?;
     let second = package.set_table_cell_comment_reply(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
         CommentReplyIndex::new(0),
         "second branch",
     )?;
@@ -1115,7 +1327,7 @@ fn missing_comment_root_reports_a_typed_error_without_source_mutation() -> TestR
         .table_cell_comment_reply(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(1, 0),
+            At::new(1, 0),
             CommentReplyIndex::new(0),
         )
         .expect_err("a cell without a root comment must reject an ordinal read");
@@ -1165,13 +1377,37 @@ fn export_comment_read_parity_fuzz_fixtures() -> TestResult {
 
 #[test]
 fn read_only_graphs_preserve_strict_mutation_ownership() -> TestResult {
-    for corruption in [Corruption::FieldInfoMissing, Corruption::OpaqueInbound] {
-        let source = with_corruption(FixtureMode::SingleRoot, corruption)?;
-        let package = load_package(&source)?;
-        assert_eq!(read_all(&package, 0)?, vec!["first reply".to_owned()]);
-        assert_eq!(exact_bytes(&package)?, source);
-        assert_edit_rejected_atomically(&source, &format!("{corruption:?}"))?;
-    }
+    let source = with_corruption(FixtureMode::SingleRoot, Corruption::OpaqueInbound)?;
+    let package = load_package(&source)?;
+    assert_eq!(read_all(&package, 0)?, vec!["first reply".to_owned()]);
+    assert_eq!(exact_bytes(&package)?, source);
+    assert_edit_rejected_atomically(&source, "OpaqueInbound")?;
+    Ok(())
+}
+
+/// Native Numbers keeps a comment graph's aggregate references and omits
+/// their FieldInfo mirror (record 0318): such a graph is edited like a
+/// mirrored one, and the edit is exactly reversible.
+#[test]
+fn graphs_without_field_info_mirrors_are_edited() -> TestResult {
+    let source = with_corruption(FixtureMode::SingleRoot, Corruption::FieldInfoMissing)?;
+    let package = load_package(&source)?;
+    assert_eq!(read_all(&package, 0)?, vec!["first reply".to_owned()]);
+    let commit = package.set_table_cell_comment_reply(
+        SheetSelector::index(0),
+        TableSelector::index(0),
+        At::new(0, 0),
+        CommentReplyIndex::new(0),
+        "replacement",
+    )?;
+    assert_eq!(
+        read_all(commit.package(), 0)?,
+        vec!["replacement".to_owned()]
+    );
+    let restored = commit
+        .package()
+        .apply_table_cell_comment_reply(&commit.patch().inverse())?;
+    assert_eq!(exact_bytes(restored.package())?, source);
     Ok(())
 }
 

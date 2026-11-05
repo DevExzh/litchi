@@ -42,10 +42,7 @@ pub(super) fn validate_consolidation(source: &PivotCacheConsolidationSource) -> 
     if source.pages.len() > MAX_CONSOLIDATION_PAGES {
         return Err(malformed(
             "BrtBeginPCDSCPages",
-            format!(
-                "{} consolidation pages exceed the maximum of {MAX_CONSOLIDATION_PAGES}",
-                source.pages.len()
-            ),
+            "consolidation pages exceed the maximum",
         ));
     }
     Ok(())
@@ -89,10 +86,7 @@ pub(super) fn validate_rule_filter(filter: &PivotRuleFilter) -> Result<()> {
     if filter.item_types & !ITEM_TYPES_MASK != 0 {
         return Err(malformed(
             "BrtBeginPRFilter",
-            format!(
-                "item types 0x{:X} exceed the 13-bit mask",
-                filter.item_types
-            ),
+            "item types 0x exceed the 13-bit mask",
         ));
     }
     Ok(())

@@ -1,11 +1,11 @@
 use std::io::Cursor;
 
-use litchi_xls::Workbook;
-use litchi_xls::writer::{Row, Writer};
+use litchi_xls::raw::Reader;
+use litchi_xls::writer::{Builder, Row};
 
 #[test]
 fn generated_worksheet_indexes_regenerate_and_parse() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_worksheet("Empty").unwrap();
 
     let ordinary = writer.add_worksheet("Ordinary").unwrap();
@@ -32,8 +32,8 @@ fn generated_worksheet_indexes_regenerate_and_parse() {
         .unwrap();
 
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
-    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
 
     let empty = workbook
         .xls_worksheet(0)

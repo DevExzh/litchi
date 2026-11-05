@@ -91,7 +91,7 @@ impl WorkbookDrawing {
         let mut pending: Option<(PendingTxo, bool)> = None;
         let mut drawing_run = false;
         let mut external_txo = false;
-        let records = Records::new(data);
+        let records = Records::new(data, litchi_biff::Limits::default()).map_err(invalid_data)?;
 
         for record in records {
             let record = record.map_err(invalid_data)?;
@@ -172,7 +172,9 @@ impl WorkbookDrawing {
         let mut result = Vec::new();
         let mut offset = 0usize;
         while offset < self.officeart.len() {
-            let (root, size) = Record::parse(&self.officeart, offset).map_err(invalid_data)?;
+            let (root, size) =
+                Record::parse(&self.officeart, offset, litchi_odraw::Limits::default())
+                    .map_err(invalid_data)?;
             if root.kind() != RecordKind::DgContainer {
                 return Err(invalid_data(
                     "XLS MSODRAWING sequence does not start with a DgContainer",
@@ -181,7 +183,8 @@ impl WorkbookDrawing {
             let end = offset
                 .checked_add(size)
                 .ok_or_else(|| invalid_data("XLS OfficeArt drawing extent overflow"))?;
-            let shapes = shape::parse(&self.officeart[offset..end]).map_err(invalid_data)?;
+            let shapes = shape::parse(&self.officeart[offset..end], Default::default())
+                .map_err(invalid_data)?;
             for shape in &shapes {
                 result.push(Shape::from_odraw(shape, &mut self.texts)?);
             }
@@ -200,7 +203,7 @@ fn standalone_textbox(data: &[u8]) -> std::io::Result<bool> {
     if data.len() < 8 {
         return Ok(false);
     }
-    let Ok((record, size)) = Record::parse(data, 0) else {
+    let Ok((record, size)) = Record::parse(data, 0, litchi_odraw::Limits::default()) else {
         return Ok(false);
     };
     if size != data.len() || record.kind() != RecordKind::ClientTextbox {
@@ -594,28 +597,49 @@ mod tests {
 
     #[test]
     fn projects_the_typed_sheet_anchor_from_officeart() {
-        use litchi_odraw::{shape::Flags, shape::Native, write};
+        use litchi_odraw::{
+            builder::{PropertyBuilder, ShapeBuilder},
+            shape::Flags,
+            shape::Native,
+            write,
+        };
 
         let expected = SheetAnchor::new(
             crate::AnchorPoint::new(1, 2, -4, 3).unwrap(),
             crate::AnchorPoint::new(4, 7, 900, 200).unwrap(),
-            crate::AnchorBehavior::Size,
+            crate::AnchorBehavior::MoveWithoutResize,
         )
         .unwrap();
         let mut children = Vec::new();
-        write::ShapeBuilder::new(Native::RECTANGLE, 42)
+        ShapeBuilder::new(Native::RECTANGLE, 42)
             .with_flags(Flags::HAVE_ANCHOR | Flags::HAVE_SPT)
-            .write(&mut children)
+            .write(&mut children, Default::default())
             .unwrap();
-        write::PropertyBuilder::new().write(&mut children).unwrap();
+        PropertyBuilder::new()
+            .write(&mut children, Default::default())
+            .unwrap();
         children.extend_from_slice(&expected.to_record_bytes());
-        write::atom(&mut children, 0, write::Atom::ClientData, &[]).unwrap();
+        write::atom(
+            &mut children,
+            0,
+            write::Atom::ClientData,
+            &[],
+            Default::default(),
+        )
+        .unwrap();
 
         let mut bytes = Vec::new();
-        write::container(&mut bytes, 0, write::Container::Sp, &children).unwrap();
-        let (record, consumed) = Record::parse(&bytes, 0).unwrap();
+        write::container(
+            &mut bytes,
+            0,
+            write::Container::Sp,
+            &children,
+            Default::default(),
+        )
+        .unwrap();
+        let (record, consumed) = Record::parse(&bytes, 0, litchi_odraw::Limits::default()).unwrap();
         assert_eq!(consumed, bytes.len());
-        let parsed = DrawShape::try_from(record).unwrap();
+        let parsed = DrawShape::from_record(record, Default::default()).unwrap();
         let projected = Shape::from_odraw(&parsed, &mut VecDeque::new()).unwrap();
         assert_eq!(projected.sheet_anchor, Some(expected));
     }
@@ -625,9 +649,16 @@ mod tests {
         use litchi_odraw::write;
 
         let mut children = Vec::new();
-        write::dg(&mut children, 0, 0).unwrap();
+        write::dg(&mut children, 0, 0, litchi_odraw::Limits::default()).unwrap();
         let mut officeart = Vec::new();
-        write::container(&mut officeart, 0, write::Container::Dg, &children).unwrap();
+        write::container(
+            &mut officeart,
+            0,
+            write::Container::Dg,
+            &children,
+            Default::default(),
+        )
+        .unwrap();
         let mut workbook = biff(MSO_DRAWING, &officeart[..5]);
         workbook.extend_from_slice(&biff(CONTINUE, &officeart[5..]));
 

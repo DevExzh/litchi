@@ -1,8 +1,7 @@
 //! Failure-atomic typed link transactions.
 
 use super::{Link, Patch, Snapshot, Times, validation};
-use crate::property_set::Guid;
-use litchi_cfb::OleError;
+use crate::{Error, property_set::Guid};
 
 /// A deterministic identity for one exact serialized OLEDS link stream.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -33,12 +32,12 @@ impl Revision {
 
 /// An isolated typed edit over one source link snapshot.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub struct Edit {
     source: Snapshot,
     candidate: Link,
 }
 
-impl Transaction {
+impl Edit {
     pub(crate) fn new(source: Snapshot) -> Self {
         Self {
             candidate: source.link.clone(),
@@ -60,7 +59,7 @@ impl Transaction {
 
     /// Whether any typed field differs from the source snapshot.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn has_changes(&self) -> bool {
         self.candidate != self.source.link
     }
 
@@ -75,7 +74,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error when `flags` changes the embedded/linked layout.
-    pub fn set_flags(&mut self, flags: u32) -> Result<&mut Self, OleError> {
+    pub fn set_flags(&mut self, flags: u32) -> Result<&mut Self, Error> {
         self.candidate.set_flags(flags)?;
         Ok(self)
     }
@@ -92,7 +91,7 @@ impl Transaction {
     ///
     /// Returns an error when the link has no class identifier field in its
     /// wire layout.
-    pub fn set_class_id(&mut self, value: Guid) -> Result<&mut Self, OleError> {
+    pub fn set_class_id(&mut self, value: Guid) -> Result<&mut Self, Error> {
         self.candidate.set_class_id(value)?;
         Ok(self)
     }
@@ -103,7 +102,7 @@ impl Transaction {
     ///
     /// Returns an error when the link has no timestamp group in its wire
     /// layout.
-    pub fn set_times(&mut self, value: Times) -> Result<&mut Self, OleError> {
+    pub fn set_times(&mut self, value: Times) -> Result<&mut Self, Error> {
         self.candidate.set_times(value)?;
         Ok(self)
     }
@@ -114,9 +113,9 @@ impl Transaction {
     ///
     /// Returns an error when `edit` fails or leaves the candidate with an
     /// invalid OLEDS layout.
-    pub fn update<F>(&mut self, edit: F) -> Result<&mut Self, OleError>
+    pub fn update<F>(&mut self, edit: F) -> Result<&mut Self, Error>
     where
-        F: FnOnce(&mut Link) -> Result<(), OleError>,
+        F: FnOnce(&mut Link) -> Result<(), Error>,
     {
         let mut candidate = self.candidate.clone();
         edit(&mut candidate)?;
@@ -125,87 +124,34 @@ impl Transaction {
         Ok(self)
     }
 
-    /// Projects and validates the current candidate without publishing it.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the candidate has an invalid OLEDS layout.
-    pub fn snapshot(&self) -> Result<Snapshot, OleError> {
-        self.materialize()
-    }
-
-    /// Restores the source candidate and returns the immutable source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
-    }
-
     /// Validates and publishes the candidate without mutating its source.
     ///
     /// # Errors
     ///
     /// Returns an error when the candidate has an invalid OLEDS layout.
-    pub fn commit(self) -> Result<Commit, OleError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         let snapshot = self.materialize()?;
         let patch = self.source.patch_to(&snapshot);
-        Ok(Commit { snapshot, patch })
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(snapshot, patch, diagnostics))
     }
 
-    fn materialize(&self) -> Result<Snapshot, OleError> {
+    fn materialize(&self) -> Result<Snapshot, Error> {
         validation::validate(&self.candidate)?;
-        if !self.is_changed() {
+        if !self.has_changes() {
             return Ok(self.source.clone());
         }
-        let bytes = self.candidate.to_bytes().into();
-        Snapshot::parse_shared(bytes)
+        let bytes = self.candidate.to_bytes(self.source.limits())?.into();
+        Snapshot::parse_shared(bytes, self.source.limits())
     }
 }
 
-/// A successful link publication containing a new snapshot and reversible
-/// source-checked patch.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
+/// A published edit: the new snapshot, its reversible patch and
+/// diagnostics.
+pub type Commit = litchi_core::edit::Commit<Snapshot, Patch>;
 
-impl Commit {
-    /// Whether the publication changed any source bytes.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        !self.patch.is_noop()
-    }
-
-    /// Borrows the published immutable snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Borrows the reversible patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Moves the published snapshot out of this commit.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
-    }
-
-    /// Moves the reversible patch out of this commit.
-    #[must_use]
-    pub fn into_patch(self) -> Patch {
-        self.patch
-    }
-
-    /// Splits this publication into its snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
-    }
-}
+/// Content-free diagnostics of one commit.
+pub use litchi_core::edit::Diagnostics;
 
 /// Runs one typed link edit and publishes it atomically.
 ///
@@ -213,9 +159,9 @@ impl Commit {
 ///
 /// Returns an error when `edit` fails or leaves the link with an invalid OLEDS
 /// layout.
-pub fn update<F>(snapshot: &Snapshot, edit: F) -> Result<Commit, OleError>
+pub fn update<F>(snapshot: &Snapshot, edit: F) -> Result<Commit, Error>
 where
-    F: FnOnce(&mut Transaction) -> Result<(), OleError>,
+    F: FnOnce(&mut Edit) -> Result<(), Error>,
 {
     let mut transaction = snapshot.edit();
     edit(&mut transaction)?;

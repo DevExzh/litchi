@@ -23,16 +23,14 @@ use litchi_iwa_archive::package::{EntryEdit, ExactArtifacts};
 use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes,
     varint::encoded_len,
-    wire::{
-        NestedFieldEdit, NestedFieldReplacement, WireView, patch_nested_fields_batched_with_limits,
-    },
+    wire::{NestedFieldEdit, NestedFieldReplacement, WireView, patch_nested_fields_batched},
 };
 use litchi_iwa_core::{
     Archive, ArchiveObject, ArchiveReferenceKind, ArchiveReferenceOccurrence,
     ArchiveReferencePolicy, ArchiveReferenceVisitor, FieldType, RawMessage, SnappyStream,
 };
 use litchi_iwa_protos::{package_metadata_codec, table_dimension_codec as codec, table_info_codec};
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::{Package, PhysicalSource, ReadError, SemanticLimitKind};
 use crate::SlideSelector;
@@ -72,7 +70,7 @@ const MAX_ROLE_MESSAGE_TYPES: [u32; 7] = [
 /// Finite resources governed by one slide-table dimension operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum SlideTableDimensionLimitKind {
+pub enum LimitKind {
     InputBytes,
     OutputBytes,
     Entries,
@@ -94,7 +92,7 @@ pub enum SlideTableDimensionLimitKind {
     TransactionWork,
 }
 
-impl fmt::Display for SlideTableDimensionLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -123,7 +121,7 @@ impl fmt::Display for SlideTableDimensionLimitKind {
 /// Content-free semantic path for a slide-table dimension operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum SlideTableDimensionPath {
+pub enum Path {
     /// The complete package.
     Package,
     /// One checked slide/table and dimension.
@@ -134,7 +132,7 @@ pub enum SlideTableDimensionPath {
     },
 }
 
-impl fmt::Display for SlideTableDimensionPath {
+impl fmt::Display for Path {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Package => f.write_str("package"),
@@ -155,9 +153,36 @@ impl fmt::Display for SlideTableDimensionPath {
 }
 
 /// Failure from a Keynote slide-table dimension read or transaction.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum SlideTableDimensionError {
+pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    #[error("the selected Keynote slide-table dimension source is invalid")]
+    InvalidSource,
+    #[error(
+        "Keynote slide-table dimensions {kind} limit exceeded: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        kind: LimitKind,
+        observed: u64,
+        maximum: u64,
+    },
+    #[error("could not allocate {amount} units for the Keynote slide-table dimension transaction")]
+    Allocation { amount: usize },
+    #[error("the edited Keynote slide-table dimension failed semantic verification")]
+    Verification,
+    #[error("the Keynote slide-table dimension patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     #[error("this Keynote source does not support physical slide-table dimension edits")]
     UnsupportedSource,
     #[error("the requested Keynote slide-table dimension graph has an unsupported dependency")]
@@ -176,22 +201,32 @@ pub enum SlideTableDimensionError {
     TablePositionNotFound { position: Position },
     #[error("the selected Keynote slide table is locked")]
     Locked,
-    #[error("the selected Keynote slide-table dimension source is invalid")]
-    InvalidSource,
-    #[error(
-        "Keynote slide-table dimensions {kind} limit exceeded: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        kind: SlideTableDimensionLimitKind,
-        observed: u64,
-        maximum: u64,
-    },
-    #[error("could not allocate {amount} units for the Keynote slide-table dimension transaction")]
-    Allocation { amount: usize },
-    #[error("the edited Keynote slide-table dimension failed semantic verification")]
-    Verification,
-    #[error("the Keynote slide-table dimension patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. }
+            | Self::UnsupportedDependency { .. }
+            | Self::UnsupportedTopology { .. } => RefusalKind::UnsupportedContent,
+            Self::AmbiguousSelector { .. } | Self::EmptySlideName { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::TablePositionNotFound { .. } => RefusalKind::NotFound,
+            Self::Locked { .. } => RefusalKind::Protected,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -237,18 +272,16 @@ struct DimensionBudget {
 }
 
 impl DimensionBudget {
-    fn new(package: &Package) -> Result<Self, SlideTableDimensionError> {
+    fn new(package: &Package) -> Result<Self, Error> {
         let wire = package.wire_limits().map_err(map_wire_error)?;
         let archive = package.state.options.archive();
         let source = usize::try_from(archive.max_input_bytes())
-            .map_err(|_| SlideTableDimensionError::InvalidSource)?
+            .map_err(|_| Error::InvalidSource)?
             .max(1);
         let total = usize::try_from(archive.max_total_bytes())
             .unwrap_or(usize::MAX)
             .max(source);
-        let aggregate = source
-            .checked_mul(8)
-            .ok_or(SlideTableDimensionError::InvalidSource)?;
+        let aggregate = source.checked_mul(8).ok_or(Error::InvalidSource)?;
         let semantic = package.semantic_limits();
         let components = package.state.source.components().len().max(1);
         Ok(Self {
@@ -311,13 +344,11 @@ impl DimensionBudget {
         current: &mut usize,
         amount: usize,
         maximum: usize,
-        kind: SlideTableDimensionLimitKind,
-    ) -> Result<(), SlideTableDimensionError> {
-        let observed = current
-            .checked_add(amount)
-            .ok_or(SlideTableDimensionError::InvalidSource)?;
+        kind: LimitKind,
+    ) -> Result<(), Error> {
+        let observed = current.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > maximum {
-            return Err(SlideTableDimensionError::LimitExceeded {
+            return Err(Error::Limit {
                 kind,
                 observed: observed as u64,
                 maximum: maximum as u64,
@@ -327,183 +358,167 @@ impl DimensionBudget {
         Ok(())
     }
 
-    fn input(&mut self, amount: usize) -> Result<(), SlideTableDimensionError> {
+    fn input(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.input,
             amount,
             self.max_input,
-            SlideTableDimensionLimitKind::InputBytes,
+            LimitKind::InputBytes,
         )
     }
-    fn output(&mut self, amount: usize) -> Result<(), SlideTableDimensionError> {
+    fn output(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.output,
             amount,
             self.max_output,
-            SlideTableDimensionLimitKind::OutputBytes,
+            LimitKind::OutputBytes,
         )
     }
-    fn entries(&mut self, amount: usize) -> Result<(), SlideTableDimensionError> {
+    fn entries(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.entries,
             amount,
             self.max_entries,
-            SlideTableDimensionLimitKind::Entries,
+            LimitKind::Entries,
         )
     }
-    fn entry_bytes(&mut self, amount: usize) -> Result<(), SlideTableDimensionError> {
+    fn entry_bytes(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.entry_bytes,
             amount,
             self.max_entry_bytes,
-            SlideTableDimensionLimitKind::EntryBytes,
+            LimitKind::EntryBytes,
         )
     }
-    fn total_bytes(&mut self, amount: usize) -> Result<(), SlideTableDimensionError> {
+    fn total_bytes(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.total_bytes,
             amount,
             self.max_total_bytes,
-            SlideTableDimensionLimitKind::TotalBytes,
+            LimitKind::TotalBytes,
         )
     }
-    fn objects(&mut self, amount: usize) -> Result<(), SlideTableDimensionError> {
+    fn objects(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.objects,
             amount,
             self.max_objects,
-            SlideTableDimensionLimitKind::PayloadObjects,
+            LimitKind::PayloadObjects,
         )
     }
-    fn messages(&mut self, amount: usize) -> Result<(), SlideTableDimensionError> {
+    fn messages(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.messages,
             amount,
             self.max_messages,
-            SlideTableDimensionLimitKind::PayloadMessages,
+            LimitKind::PayloadMessages,
         )
     }
-    fn items(&mut self, amount: usize) -> Result<(), SlideTableDimensionError> {
+    fn items(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.items,
             amount,
             self.max_items,
-            SlideTableDimensionLimitKind::PayloadItems,
+            LimitKind::PayloadItems,
         )
     }
-    fn references(&mut self, amount: usize) -> Result<(), SlideTableDimensionError> {
+    fn references(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.references,
             amount,
             self.max_references,
-            SlideTableDimensionLimitKind::References,
+            LimitKind::References,
         )
     }
-    fn wire_bytes(&mut self, amount: usize) -> Result<(), SlideTableDimensionError> {
+    fn wire_bytes(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.wire_bytes,
             amount,
             self.max_wire_bytes,
-            SlideTableDimensionLimitKind::WireBytes,
+            LimitKind::WireBytes,
         )
     }
-    fn wire_output(&mut self, amount: usize) -> Result<(), SlideTableDimensionError> {
+    fn wire_output(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.wire_output,
             amount,
             self.max_wire_output,
-            SlideTableDimensionLimitKind::WireOutputBytes,
+            LimitKind::WireOutputBytes,
         )
     }
-    fn fields(&mut self, amount: usize) -> Result<(), SlideTableDimensionError> {
+    fn fields(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.fields,
             amount,
             self.max_fields,
-            SlideTableDimensionLimitKind::WireFields,
+            LimitKind::WireFields,
         )
     }
-    fn work(&mut self, amount: usize) -> Result<(), SlideTableDimensionError> {
-        Self::add(
-            &mut self.work,
-            amount,
-            self.max_work,
-            SlideTableDimensionLimitKind::WireWork,
-        )
+    fn work(&mut self, amount: usize) -> Result<(), Error> {
+        Self::add(&mut self.work, amount, self.max_work, LimitKind::WireWork)
     }
-    fn allocations(&mut self, amount: usize) -> Result<(), SlideTableDimensionError> {
+    fn allocations(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.allocations,
             amount,
             self.max_allocations,
-            SlideTableDimensionLimitKind::Allocations,
+            LimitKind::Allocations,
         )
     }
-    fn retained(&mut self, amount: usize) -> Result<(), SlideTableDimensionError> {
+    fn retained(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.retained,
             amount,
             self.max_retained,
-            SlideTableDimensionLimitKind::Retained,
+            LimitKind::Retained,
         )
     }
-    fn scratch(&mut self, amount: usize) -> Result<(), SlideTableDimensionError> {
+    fn scratch(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.scratch,
             amount,
             self.max_scratch,
-            SlideTableDimensionLimitKind::Scratch,
+            LimitKind::Scratch,
         )
     }
-    fn components(&mut self, amount: usize) -> Result<(), SlideTableDimensionError> {
+    fn components(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.components,
             amount,
             self.max_components,
-            SlideTableDimensionLimitKind::Components,
+            LimitKind::Components,
         )
     }
-    fn transaction_work(&mut self, amount: usize) -> Result<(), SlideTableDimensionError> {
+    fn transaction_work(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.transaction_work,
             amount,
             self.max_transaction_work,
-            SlideTableDimensionLimitKind::TransactionWork,
+            LimitKind::TransactionWork,
         )
     }
 
-    fn physical(&mut self, amount: usize) -> Result<(), SlideTableDimensionError> {
+    fn physical(&mut self, amount: usize) -> Result<(), Error> {
         self.input(amount)?;
         self.entry_bytes(amount)?;
         self.total_bytes(amount)?;
         self.work(amount)
     }
 
-    fn residual_wire(&self, package: &Package) -> Result<WireLimits, SlideTableDimensionError> {
+    fn residual_wire(&self, package: &Package) -> Result<WireLimits, Error> {
         let base = package.wire_limits().map_err(map_wire_error)?;
-        let input = self.remaining_wire(
-            self.wire_bytes,
-            self.max_wire_bytes,
-            SlideTableDimensionLimitKind::WireBytes,
-        )?;
+        let input =
+            self.remaining_wire(self.wire_bytes, self.max_wire_bytes, LimitKind::WireBytes)?;
         let output = self.remaining_wire(
             self.wire_output,
             self.max_wire_output,
-            SlideTableDimensionLimitKind::WireOutputBytes,
+            LimitKind::WireOutputBytes,
         )?;
-        let fields = self.remaining_wire(
-            self.fields,
-            self.max_fields,
-            SlideTableDimensionLimitKind::WireFields,
-        )?;
-        let work = self.remaining_wire(
-            self.work,
-            self.max_work,
-            SlideTableDimensionLimitKind::WireWork,
-        )?;
+        let fields = self.remaining_wire(self.fields, self.max_fields, LimitKind::WireFields)?;
+        let work = self.remaining_wire(self.work, self.max_work, LimitKind::WireWork)?;
         if self.max_nesting == 0 {
-            return Err(SlideTableDimensionError::LimitExceeded {
-                kind: SlideTableDimensionLimitKind::WireNesting,
+            return Err(Error::Limit {
+                kind: LimitKind::WireNesting,
                 observed: 1,
                 maximum: 0,
             });
@@ -517,16 +532,11 @@ impl DimensionBudget {
             .map_err(map_wire_error)
     }
 
-    fn remaining_wire(
-        &self,
-        used: usize,
-        maximum: usize,
-        kind: SlideTableDimensionLimitKind,
-    ) -> Result<usize, SlideTableDimensionError> {
+    fn remaining_wire(&self, used: usize, maximum: usize, kind: LimitKind) -> Result<usize, Error> {
         maximum
             .checked_sub(used)
             .filter(|remaining| *remaining > 0)
-            .ok_or(SlideTableDimensionError::LimitExceeded {
+            .ok_or(Error::Limit {
                 kind,
                 observed: used.saturating_add(1) as u64,
                 maximum: maximum as u64,
@@ -537,13 +547,10 @@ impl DimensionBudget {
         &self,
         package: &Package,
         _bytes: usize,
-    ) -> Result<codec::DecodeOptions, SlideTableDimensionError> {
+    ) -> Result<codec::DecodeOptions, Error> {
         let limits = self.residual_wire(package)?;
-        let references = self.remaining_wire(
-            self.references,
-            self.max_references,
-            SlideTableDimensionLimitKind::References,
-        )?;
+        let references =
+            self.remaining_wire(self.references, self.max_references, LimitKind::References)?;
         Ok(codec::DecodeOptions::new(
             limits.max_input_bytes(),
             limits.max_fields(),
@@ -554,10 +561,7 @@ impl DimensionBudget {
         ))
     }
 
-    fn codec_report(
-        &mut self,
-        report: codec::DecodeReport,
-    ) -> Result<(), SlideTableDimensionError> {
+    fn codec_report(&mut self, report: codec::DecodeReport) -> Result<(), Error> {
         self.input(report.source_bytes())?;
         self.wire_bytes(report.source_bytes())?;
         self.fields(report.fields())?;
@@ -565,8 +569,8 @@ impl DimensionBudget {
         self.references(report.references())?;
         self.nesting = self.nesting.max(report.max_depth() as usize);
         if self.nesting > self.max_nesting {
-            return Err(SlideTableDimensionError::LimitExceeded {
-                kind: SlideTableDimensionLimitKind::WireNesting,
+            return Err(Error::Limit {
+                kind: LimitKind::WireNesting,
                 observed: self.nesting as u64,
                 maximum: self.max_nesting as u64,
             });
@@ -577,7 +581,7 @@ impl DimensionBudget {
     fn reassembly(
         &mut self,
         requirements: litchi_iwa_archive::package::ReassemblyExecutionRequirements,
-    ) -> Result<(), SlideTableDimensionError> {
+    ) -> Result<(), Error> {
         self.output(requirements.output_bytes())?;
         self.wire_output(requirements.output_bytes())?;
         self.allocations(requirements.allocations())?;
@@ -631,8 +635,8 @@ impl fmt::Debug for DimensionSelection {
 }
 
 impl DimensionSelection {
-    const fn path(&self) -> SlideTableDimensionPath {
-        SlideTableDimensionPath::Table {
+    const fn path(&self) -> Path {
+        Path::Table {
             slide: self.slide_position,
             table: self.table_position,
             dimension: self.dimension,
@@ -641,15 +645,15 @@ impl DimensionSelection {
 }
 
 /// One mutable dimension value staged against an immutable package snapshot.
-pub struct SlideTableDimensionEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
     selection: DimensionSelection,
     after: Size,
 }
 
-impl fmt::Debug for SlideTableDimensionEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("SlideTableDimensionEdit")
+        f.debug_struct("Edit")
             .field("path", &self.selection.path())
             .field("before", &self.selection.before)
             .field("after", &self.after)
@@ -657,7 +661,7 @@ impl fmt::Debug for SlideTableDimensionEdit<'_> {
     }
 }
 
-impl SlideTableDimensionEdit<'_> {
+impl Edit<'_> {
     #[must_use]
     pub const fn slide_position(&self) -> Position {
         self.selection.slide_position
@@ -674,7 +678,7 @@ impl SlideTableDimensionEdit<'_> {
     }
 
     #[must_use]
-    pub const fn path(&self) -> SlideTableDimensionPath {
+    pub const fn path(&self) -> Path {
         self.selection.path()
     }
 
@@ -709,14 +713,14 @@ impl SlideTableDimensionEdit<'_> {
         self.set(Size::Default)
     }
 
-    pub fn commit(self) -> Result<SlideTableDimensionCommit, SlideTableDimensionError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         commit_edit(self.source, &self.selection, self.after)
     }
 }
 
 /// Exact-source reversible slide-table dimension patch.
 #[derive(Clone, PartialEq)]
-pub struct SlideTableDimensionPatch {
+pub struct Patch {
     artifacts: ExactArtifacts,
     selection: DimensionSelection,
     before: Size,
@@ -727,9 +731,9 @@ pub struct SlideTableDimensionPatch {
     target_previews_absent: bool,
 }
 
-impl fmt::Debug for SlideTableDimensionPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("SlideTableDimensionPatch")
+        f.debug_struct("Patch")
             .field("path", &self.selection.path())
             .field("before", &self.before)
             .field("after", &self.after)
@@ -737,9 +741,9 @@ impl fmt::Debug for SlideTableDimensionPatch {
     }
 }
 
-impl SlideTableDimensionPatch {
+impl Patch {
     #[must_use]
-    pub const fn path(&self) -> SlideTableDimensionPath {
+    pub const fn path(&self) -> Path {
         self.selection.path()
     }
 
@@ -790,14 +794,14 @@ impl SlideTableDimensionPatch {
 
 /// Compact publication diagnostics for one dimension transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SlideTableDimensionDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     deleted_previews: usize,
     full_reparse_performed: bool,
 }
 
-impl SlideTableDimensionDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -840,13 +844,13 @@ impl SlideTableDimensionDiagnostics {
 /// Fully verified result of one dimension transaction.
 #[must_use = "a slide-table dimension commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct SlideTableDimensionCommit {
+pub struct Commit {
     package: Package,
-    patch: SlideTableDimensionPatch,
-    diagnostics: SlideTableDimensionDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl SlideTableDimensionCommit {
+impl Commit {
     #[must_use]
     pub const fn package(&self) -> &Package {
         &self.package
@@ -857,13 +861,19 @@ impl SlideTableDimensionCommit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
     #[must_use]
-    pub const fn patch(&self) -> &SlideTableDimensionPatch {
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
+    #[must_use]
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     #[must_use]
-    pub const fn diagnostics(&self) -> &SlideTableDimensionDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
@@ -875,7 +885,7 @@ impl Package {
         slide: impl Into<SlideSelector<'slide>>,
         table: impl Into<TableSelector>,
         dimension: Dimension,
-    ) -> Result<Size, SlideTableDimensionError> {
+    ) -> Result<Size, Error> {
         let mut budget = DimensionBudget::new(self)?;
         Ok(select_table(self, slide.into(), table.into(), dimension, &mut budget)?.before)
     }
@@ -886,10 +896,10 @@ impl Package {
         slide: impl Into<SlideSelector<'slide>>,
         table: impl Into<TableSelector>,
         dimension: Dimension,
-    ) -> Result<SlideTableDimensionEdit<'_>, SlideTableDimensionError> {
+    ) -> Result<Edit<'_>, Error> {
         let mut budget = DimensionBudget::new(self)?;
         let selection = select_table(self, slide.into(), table.into(), dimension, &mut budget)?;
-        Ok(SlideTableDimensionEdit {
+        Ok(Edit {
             source: self,
             after: selection.before,
             selection,
@@ -897,13 +907,10 @@ impl Package {
     }
 
     /// Apply an exact-source checked reversible dimension patch.
-    pub fn apply_slide_table_dimension_size(
-        &self,
-        patch: &SlideTableDimensionPatch,
-    ) -> Result<SlideTableDimensionCommit, SlideTableDimensionError> {
+    pub fn apply_slide_table_dimension_size(&self, patch: &Patch) -> Result<Commit, Error> {
         let catalog = physical_catalog(self)?;
         if !patch.artifacts.authorizes_source(&catalog.shared_source()) {
-            return Err(SlideTableDimensionError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let mut budget = DimensionBudget::new(self)?;
         let current = select_table(
@@ -914,14 +921,14 @@ impl Package {
             &mut budget,
         )?;
         if !same_selection(&current, &patch.selection) || current.before != patch.before {
-            return Err(SlideTableDimensionError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if patch.is_noop() {
             self.validate().map_err(map_read_error)?;
-            return Ok(SlideTableDimensionCommit {
+            return Ok(Commit {
                 package: self.snapshot(),
                 patch: patch.clone(),
-                diagnostics: SlideTableDimensionDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         reopen_patch(self, patch, &mut budget)
@@ -932,7 +939,7 @@ fn commit_edit(
     source: &Package,
     selection: &DimensionSelection,
     after: Size,
-) -> Result<SlideTableDimensionCommit, SlideTableDimensionError> {
+) -> Result<Commit, Error> {
     let catalog = physical_catalog(source)?;
     let mut budget = DimensionBudget::new(source)?;
     let current = select_table(
@@ -943,15 +950,15 @@ fn commit_edit(
         &mut budget,
     )?;
     if !same_selection(&current, selection) || current.before != selection.before {
-        return Err(SlideTableDimensionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let source_previews = super::rendering_invalidation::root_preview_deletions(catalog.package())
-        .map_err(|_| SlideTableDimensionError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?;
     if after == selection.before {
         let bytes = catalog.shared_source();
-        return Ok(SlideTableDimensionCommit {
+        return Ok(Commit {
             package: source.snapshot(),
-            patch: SlideTableDimensionPatch {
+            patch: Patch {
                 artifacts: ExactArtifacts::new(Arc::clone(&bytes), bytes),
                 selection: selection.clone(),
                 before: selection.before,
@@ -961,14 +968,14 @@ fn commit_edit(
                 source_previews_absent: source_previews.len() == 0,
                 target_previews_absent: source_previews.len() == 0,
             },
-            diagnostics: SlideTableDimensionDiagnostics::unchanged(),
+            diagnostics: Diagnostics::unchanged(),
         });
     }
     if !catalog.source_is_exact() {
-        return Err(SlideTableDimensionError::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     if selection.locked {
-        return Err(SlideTableDimensionError::Locked);
+        return Err(Error::Refused(Refusal::Locked));
     }
     let candidate = rewrite_dimension(
         source,
@@ -986,12 +993,12 @@ fn commit_edit(
         &mut budget,
     )?;
     if !same_selection(&candidate_selection, selection) || candidate_selection.before != after {
-        return Err(SlideTableDimensionError::Verification);
+        return Err(Error::Verification);
     }
     let target_catalog = physical_catalog(&candidate)?;
     let target_previews =
         super::rendering_invalidation::root_preview_deletions(target_catalog.package())
-            .map_err(|_| SlideTableDimensionError::Verification)?;
+            .map_err(|_| Error::Verification)?;
     verify_locality(
         source,
         &candidate,
@@ -1006,9 +1013,9 @@ fn commit_edit(
     budget.retained(source.source_bytes().len())?;
     let target = target_catalog.shared_source();
     let touched = usize::from(selection.table_info_component != selection.bucket_component) + 1;
-    Ok(SlideTableDimensionCommit {
+    Ok(Commit {
         package: candidate,
-        patch: SlideTableDimensionPatch {
+        patch: Patch {
             artifacts: ExactArtifacts::new(Arc::from(source.source_bytes()), target),
             selection: selection.clone(),
             before: selection.before,
@@ -1018,7 +1025,7 @@ fn commit_edit(
             source_previews_absent: source_previews.len() == 0,
             target_previews_absent: target_previews.len() == 0,
         },
-        diagnostics: SlideTableDimensionDiagnostics::published(
+        diagnostics: Diagnostics::published(
             touched,
             source_previews.len().saturating_sub(target_previews.len()),
         ),
@@ -1027,9 +1034,9 @@ fn commit_edit(
 
 fn reopen_patch(
     source: &Package,
-    patch: &SlideTableDimensionPatch,
+    patch: &Patch,
     budget: &mut DimensionBudget,
-) -> Result<SlideTableDimensionCommit, SlideTableDimensionError> {
+) -> Result<Commit, Error> {
     budget.input(patch.artifacts.target().len())?;
     budget.transaction_work(patch.artifacts.target().len())?;
     budget.allocations(1)?;
@@ -1046,16 +1053,16 @@ fn reopen_patch(
         budget,
     )?;
     if !same_selection(&selected, &patch.selection) || selected.before != patch.after {
-        return Err(SlideTableDimensionError::Verification);
+        return Err(Error::Verification);
     }
     let source_catalog = physical_catalog(source)?;
     let target_catalog = physical_catalog(&candidate)?;
     let source_previews =
         super::rendering_invalidation::root_preview_deletions(source_catalog.package())
-            .map_err(|_| SlideTableDimensionError::Verification)?;
+            .map_err(|_| Error::Verification)?;
     let target_previews =
         super::rendering_invalidation::root_preview_deletions(target_catalog.package())
-            .map_err(|_| SlideTableDimensionError::Verification)?;
+            .map_err(|_| Error::Verification)?;
     verify_locality(
         source,
         &candidate,
@@ -1066,13 +1073,10 @@ fn reopen_patch(
         target_previews.names(),
         budget,
     )?;
-    Ok(SlideTableDimensionCommit {
+    Ok(Commit {
         package: candidate,
         patch: patch.clone(),
-        diagnostics: SlideTableDimensionDiagnostics::published(
-            patch.touched_components,
-            patch.deleted_previews,
-        ),
+        diagnostics: Diagnostics::published(patch.touched_components, patch.deleted_previews),
     })
 }
 
@@ -1082,7 +1086,7 @@ fn select_table(
     table_selector: TableSelector,
     dimension: Dimension,
     budget: &mut DimensionBudget,
-) -> Result<DimensionSelection, SlideTableDimensionError> {
+) -> Result<DimensionSelection, Error> {
     let catalog = physical_catalog(package)?;
     budget.entries(catalog.package().len())?;
     budget.input(package.source_bytes().len())?;
@@ -1092,12 +1096,12 @@ fn select_table(
     let record = package
         .slide_record_at(slide_position.get())
         .map_err(map_read_error)?
-        .ok_or(SlideTableDimensionError::SlidePositionNotFound {
+        .ok_or(Error::Refused(Refusal::SlidePositionNotFound {
             position: slide_position,
-        })?;
+        }))?;
     let (_slide_component, slide) = package
         .object_with_component(record.slide_identifier)
-        .ok_or(SlideTableDimensionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     ensure_unique_identity(package, record.slide_identifier, budget)?;
     let (slide_message_index, slide_payload) = unique_message(slide, SLIDE_MESSAGE_TYPE)?;
     let owned = repeated_references(
@@ -1119,7 +1123,7 @@ fn select_table(
     let mut owned_set = HashSet::new();
     owned_set
         .try_reserve(owned.len())
-        .map_err(|_| SlideTableDimensionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: owned.len(),
         })?;
     owned_set.extend(owned.iter().copied());
@@ -1128,13 +1132,13 @@ fn select_table(
     budget.allocations(z_order.len())?;
     table_candidates
         .try_reserve_exact(z_order.len())
-        .map_err(|_| SlideTableDimensionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: z_order.len(),
         })?;
     for table_info_identifier in z_order.iter().copied() {
         let (table_info_component, table_info_object) = package
             .object_with_component(table_info_identifier)
-            .ok_or(SlideTableDimensionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let mut role_count = 0usize;
         let mut role_type = None;
         for message in &table_info_object.messages {
@@ -1145,19 +1149,19 @@ fn select_table(
         }
         if role_type != Some(TABLE_INFO_MESSAGE_TYPE) {
             if role_count != 0 {
-                return Err(SlideTableDimensionError::UnsupportedTopology);
+                return Err(Error::Refused(Refusal::UnsupportedTopology));
             }
             continue;
         }
         if role_count != 1 || !owned_set.contains(&table_info_identifier) {
-            return Err(SlideTableDimensionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let (table_info_message, info_payload) =
             unique_message(table_info_object, TABLE_INFO_MESSAGE_TYPE)?;
         let info = decode_table_info(info_payload, package, budget)?;
         let parent = table_parent(info_payload, budget.residual_wire(package)?, budget)?;
         if parent != record.slide_identifier {
-            return Err(SlideTableDimensionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let model_identifier = info.table_model().identifier().get();
         validate_table_info_metadata(
@@ -1168,7 +1172,7 @@ fn select_table(
         )?;
         let (model_component, model_object) = package
             .object_with_component(model_identifier)
-            .ok_or(SlideTableDimensionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let mut model_role_count = 0usize;
         let mut model_role_type = None;
         for message in &model_object.messages {
@@ -1178,7 +1182,7 @@ fn select_table(
             }
         }
         if model_role_count != 1 || model_role_type != Some(TABLE_MODEL_MESSAGE_TYPE) {
-            return Err(SlideTableDimensionError::UnsupportedTopology);
+            return Err(Error::Refused(Refusal::UnsupportedTopology));
         }
         let (model_message, model_payload) =
             unique_message(model_object, TABLE_MODEL_MESSAGE_TYPE)?;
@@ -1187,7 +1191,7 @@ fn select_table(
             .map_err(map_codec_error)?;
         budget.codec_report(report)?;
         if model.number_of_rows() == 0 || model.number_of_columns() == 0 {
-            return Err(SlideTableDimensionError::UnsupportedTopology);
+            return Err(Error::Refused(Refusal::UnsupportedTopology));
         }
         let (default_row_height, default_column_width) =
             parse_model_defaults(model_payload, budget.residual_wire(package)?, budget)?;
@@ -1230,11 +1234,12 @@ fn select_table(
         default_column_width,
         geometry,
         locked,
-    ) = table_candidates.get(table_position.get()).cloned().ok_or(
-        SlideTableDimensionError::TablePositionNotFound {
+    ) = table_candidates
+        .get(table_position.get())
+        .cloned()
+        .ok_or(Error::Refused(Refusal::TablePositionNotFound {
             position: table_position,
-        },
-    )?;
+        }))?;
     ensure_unique_identity(package, table_info_identifier, budget)?;
     ensure_unique_identity(package, model_identifier, budget)?;
     ensure_unique_table_owner(
@@ -1256,7 +1261,7 @@ fn select_table(
         .map_err(map_codec_error)?;
     budget.codec_report(report)?;
     if model.number_of_rows() != rows || model.number_of_columns() != columns {
-        return Err(SlideTableDimensionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let store_options = budget.codec_options(package, model.base_data_store().len())?;
     let (store, store_report) =
@@ -1272,19 +1277,19 @@ fn select_table(
     let row_references =
         storage_references(store.row_headers(), budget.residual_wire(package)?, budget)?;
     let expected_rows = usize::try_from(rows.div_ceil(DEFAULT_HEADER_BUCKET_ROWS))
-        .map_err(|_| SlideTableDimensionError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?;
     if row_references.len() != expected_rows {
-        return Err(SlideTableDimensionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let column_identifier = checked_reference(store.column_headers())?;
     if row_references.contains(&column_identifier) {
-        return Err(SlideTableDimensionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     budget.allocations(row_references.len())?;
     let mut row_locations = Vec::new();
     row_locations
         .try_reserve_exact(row_references.len())
-        .map_err(|_| SlideTableDimensionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: row_references.len(),
         })?;
     reject_duplicates(&row_references, budget)?;
@@ -1330,7 +1335,7 @@ fn select_table(
             let bucket = row_locations
                 .get(slot)
                 .cloned()
-                .ok_or(SlideTableDimensionError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             (bucket, row_selected.unwrap_or(Size::Default))
         },
         Dimension::Column(_) => (
@@ -1400,15 +1405,15 @@ fn validate_model_storage_references(
     row_locations: &[BucketLocation],
     column_location: &BucketLocation,
     budget: &mut DimensionBudget,
-) -> Result<(), SlideTableDimensionError> {
+) -> Result<(), Error> {
     let (_, model) = package
         .object_with_component(model_identifier)
-        .ok_or(SlideTableDimensionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let info = model
         .archive_info
         .message_infos
         .get(model_message_index)
-        .ok_or(SlideTableDimensionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.items(info.object_references.len().saturating_add(1))?;
     budget.fields(info.field_infos.len())?;
     budget.references(
@@ -1430,15 +1435,15 @@ fn validate_model_storage_references(
     let mut expected = HashMap::new();
     expected
         .try_reserve(storage_count)
-        .map_err(|_| SlideTableDimensionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: storage_count,
         })?;
     let mut expected_paths = HashMap::new();
-    expected_paths.try_reserve(storage_count).map_err(|_| {
-        SlideTableDimensionError::Allocation {
+    expected_paths
+        .try_reserve(storage_count)
+        .map_err(|_| Error::Allocation {
             amount: storage_count,
-        }
-    })?;
+        })?;
     for location in row_locations {
         expected.insert(location.identifier, 0usize);
         expected_paths.insert(location.identifier, MODEL_ROW_BUCKET_PATH);
@@ -1450,7 +1455,7 @@ fn validate_model_storage_references(
         .iter()
         .any(|identifier| expected.contains_key(identifier))
     {
-        return Err(SlideTableDimensionError::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     for identifier in &info.object_references {
         if let Some(count) = expected.get_mut(identifier) {
@@ -1460,7 +1465,7 @@ fn validate_model_storage_references(
     let mut field_counts = HashMap::new();
     field_counts
         .try_reserve(storage_count)
-        .map_err(|_| SlideTableDimensionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: storage_count,
         })?;
     for field in &info.field_infos {
@@ -1469,7 +1474,7 @@ fn validate_model_storage_references(
             .iter()
             .any(|identifier| expected.contains_key(identifier))
         {
-            return Err(SlideTableDimensionError::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         let selected = field.object_references.iter().find_map(|identifier| {
             expected_paths
@@ -1480,14 +1485,14 @@ fn validate_model_storage_references(
             if field.object_references.as_slice() != [identifier]
                 || field.path.as_slice() != expected_path
             {
-                return Err(SlideTableDimensionError::UnsupportedDependency);
+                return Err(Error::Refused(Refusal::UnsupportedDependency));
             }
             let count = field_counts.entry(identifier).or_insert(0usize);
             *count = (*count).saturating_add(1);
         } else if field.path.as_slice() == MODEL_ROW_BUCKET_PATH
             || field.path.as_slice() == MODEL_COLUMN_BUCKET_PATH
         {
-            return Err(SlideTableDimensionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     if expected.values().any(|count| *count != 1)
@@ -1495,17 +1500,15 @@ fn validate_model_storage_references(
             .keys()
             .any(|identifier| field_counts.get(identifier) != Some(&1))
     {
-        return Err(SlideTableDimensionError::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     Ok(())
 }
 
-fn physical_catalog(
-    package: &Package,
-) -> Result<&litchi_iwa_archive::SourceCatalog, SlideTableDimensionError> {
+fn physical_catalog(package: &Package) -> Result<&litchi_iwa_archive::SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
-        PhysicalSource::Semantic(_) => Err(SlideTableDimensionError::UnsupportedSource),
+        PhysicalSource::Semantic(_) => Err(Error::Refused(Refusal::UnsupportedSource)),
     }
 }
 
@@ -1520,7 +1523,7 @@ fn validate_package_metadata(
     row_locations: &[BucketLocation],
     column_location: &BucketLocation,
     budget: &mut DimensionBudget,
-) -> Result<(), SlideTableDimensionError> {
+) -> Result<(), Error> {
     let physical_capacity = package
         .state
         .source
@@ -1528,13 +1531,13 @@ fn validate_package_metadata(
         .iter()
         .map(|component| component.archive().objects.len())
         .try_fold(0usize, |total, count| total.checked_add(count))
-        .ok_or(SlideTableDimensionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.allocations(physical_capacity)?;
     budget.transaction_work(physical_capacity)?;
     let mut physical_identifiers = HashSet::new();
     physical_identifiers
         .try_reserve(physical_capacity)
-        .map_err(|_| SlideTableDimensionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: physical_capacity,
         })?;
     let mut physical_maximum = 0u64;
@@ -1542,12 +1545,9 @@ fn validate_package_metadata(
         budget.components(1)?;
         for object in &component.archive().objects {
             budget.objects(1)?;
-            let identifier = object
-                .archive_info
-                .identifier
-                .ok_or(SlideTableDimensionError::InvalidSource)?;
+            let identifier = object.archive_info.identifier.ok_or(Error::InvalidSource)?;
             if !physical_identifiers.insert(identifier) {
-                return Err(SlideTableDimensionError::UnsupportedDependency);
+                return Err(Error::Refused(Refusal::UnsupportedDependency));
             }
             physical_maximum = physical_maximum.max(identifier);
         }
@@ -1557,7 +1557,7 @@ fn validate_package_metadata(
     let mut selected_targets = Vec::new();
     selected_targets
         .try_reserve_exact(target_capacity)
-        .map_err(|_| SlideTableDimensionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: target_capacity,
         })?;
     selected_targets.push(MetadataTarget {
@@ -1587,28 +1587,25 @@ fn validate_package_metadata(
                 if message.type_ == PACKAGE_METADATA_MESSAGE_TYPE
                     && payload.replace(message.data.as_slice()).is_some()
                 {
-                    return Err(SlideTableDimensionError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
             }
         }
     }
-    let payload = payload.ok_or(SlideTableDimensionError::InvalidSource)?;
+    let payload = payload.ok_or(Error::InvalidSource)?;
     let limits = budget.residual_wire(package)?;
     let remaining_components = budget.remaining_wire(
         budget.components,
         budget.max_components,
-        SlideTableDimensionLimitKind::Components,
+        LimitKind::Components,
     )?;
     let remaining_references = budget.remaining_wire(
         budget.references,
         budget.max_references,
-        SlideTableDimensionLimitKind::References,
+        LimitKind::References,
     )?;
-    let remaining_items = budget.remaining_wire(
-        budget.items,
-        budget.max_items,
-        SlideTableDimensionLimitKind::PayloadItems,
-    )?;
+    let remaining_items =
+        budget.remaining_wire(budget.items, budget.max_items, LimitKind::PayloadItems)?;
     let options = package_metadata_codec::RewriteOptions::new(
         payload.len().max(1).min(limits.max_input_bytes()),
         limits.max_output_bytes(),
@@ -1638,14 +1635,14 @@ fn validate_package_metadata(
     budget.scratch(report.scratch_bytes())?;
     budget.nesting = budget.nesting.max(report.max_depth() as usize);
     if budget.nesting > budget.max_nesting {
-        return Err(SlideTableDimensionError::LimitExceeded {
-            kind: SlideTableDimensionLimitKind::WireNesting,
+        return Err(Error::Limit {
+            kind: LimitKind::WireNesting,
             observed: budget.nesting as u64,
             maximum: budget.max_nesting as u64,
         });
     }
     if visitor.unknown {
-        return Err(SlideTableDimensionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if visitor
         .external_component_identifiers
@@ -1664,7 +1661,7 @@ fn validate_package_metadata(
             .iter()
             .any(|target| !visitor.object_components.contains_key(&target.identifier))
     {
-        return Err(SlideTableDimensionError::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     Ok(())
 }
@@ -1707,32 +1704,32 @@ impl<'a> StrictPackageMetadataVisitor<'a> {
     fn new(
         physical_identifiers: &'a HashSet<u64>,
         selected_targets: &'a [MetadataTarget<'a>],
-    ) -> Result<Self, SlideTableDimensionError> {
+    ) -> Result<Self, Error> {
         let capacity = physical_identifiers.len();
         let mut component_identifiers = HashSet::new();
         component_identifiers
             .try_reserve(capacity)
-            .map_err(|_| SlideTableDimensionError::Allocation { amount: capacity })?;
+            .map_err(|_| Error::Allocation { amount: capacity })?;
         let mut external_component_identifiers = HashSet::new();
         external_component_identifiers
             .try_reserve(capacity)
-            .map_err(|_| SlideTableDimensionError::Allocation { amount: capacity })?;
+            .map_err(|_| Error::Allocation { amount: capacity })?;
         let mut external_object_identifiers = HashSet::new();
         external_object_identifiers
             .try_reserve(capacity)
-            .map_err(|_| SlideTableDimensionError::Allocation { amount: capacity })?;
+            .map_err(|_| Error::Allocation { amount: capacity })?;
         let mut uuid_pairs = HashSet::new();
         uuid_pairs
             .try_reserve(capacity)
-            .map_err(|_| SlideTableDimensionError::Allocation { amount: capacity })?;
+            .map_err(|_| Error::Allocation { amount: capacity })?;
         let mut object_bindings = HashMap::new();
         object_bindings
             .try_reserve(capacity)
-            .map_err(|_| SlideTableDimensionError::Allocation { amount: capacity })?;
+            .map_err(|_| Error::Allocation { amount: capacity })?;
         let mut object_components = HashMap::new();
         object_components
             .try_reserve(capacity)
-            .map_err(|_| SlideTableDimensionError::Allocation { amount: capacity })?;
+            .map_err(|_| Error::Allocation { amount: capacity })?;
         Ok(Self {
             physical_identifiers,
             selected_targets,
@@ -1885,28 +1882,25 @@ impl package_metadata_codec::PackageMetadataVisitor for StrictPackageMetadataVis
 fn resolve_slide_position(
     package: &Package,
     selector: SlideSelector<'_>,
-) -> Result<Position, SlideTableDimensionError> {
+) -> Result<Position, Error> {
     match selector {
         SlideSelector::Position(position) => Ok(position),
         SlideSelector::Name(name) => {
             if name.is_empty() {
-                return Err(SlideTableDimensionError::EmptySlideName);
+                return Err(Error::Refused(Refusal::EmptySlideName));
             }
             let show = package.show().map_err(map_read_error)?;
             show.select_slide(selector)
-                .map_err(|_| SlideTableDimensionError::AmbiguousSelector)?
+                .map_err(|_| Error::Refused(Refusal::AmbiguousSelector))?
                 .map(|slide| Position::new(slide.index()))
-                .ok_or(SlideTableDimensionError::SlideNameNotFound)
+                .ok_or(Error::Refused(Refusal::SlideNameNotFound))
         },
     }
 }
 
-fn unique_message(
-    object: &ArchiveObject,
-    message_type: u32,
-) -> Result<(usize, &[u8]), SlideTableDimensionError> {
+fn unique_message(object: &ArchiveObject, message_type: u32) -> Result<(usize, &[u8]), Error> {
     if object.messages.len() != object.archive_info.message_infos.len() {
-        return Err(SlideTableDimensionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut selected = None;
     let mut recognized_role = None;
@@ -1914,31 +1908,25 @@ fn unique_message(
         validate_message_header(object, index)?;
         if is_role_type(message.type_) {
             if recognized_role.replace(message.type_).is_some() || message.type_ != message_type {
-                return Err(SlideTableDimensionError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
         if message.type_ == message_type
             && selected.replace((index, message.data.as_slice())).is_some()
         {
-            return Err(SlideTableDimensionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
-    selected.ok_or(SlideTableDimensionError::InvalidSource)
+    selected.ok_or(Error::InvalidSource)
 }
 
-fn validate_message_header(
-    object: &ArchiveObject,
-    index: usize,
-) -> Result<(), SlideTableDimensionError> {
-    let message = object
-        .messages
-        .get(index)
-        .ok_or(SlideTableDimensionError::InvalidSource)?;
+fn validate_message_header(object: &ArchiveObject, index: usize) -> Result<(), Error> {
+    let message = object.messages.get(index).ok_or(Error::InvalidSource)?;
     let info = object
         .archive_info
         .message_infos
         .get(index)
-        .ok_or(SlideTableDimensionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if message.type_ != info.type_
         || usize::try_from(info.length).ok() != Some(message.data.len())
         || object.archive_info.should_merge == Some(true)
@@ -1948,7 +1936,7 @@ fn validate_message_header(
         || !info.fields_to_remove.is_empty()
         || !info.diff_read_version.is_empty()
     {
-        return Err(SlideTableDimensionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -1962,9 +1950,9 @@ fn repeated_references(
     number: u32,
     limits: WireLimits,
     budget: &mut DimensionBudget,
-) -> Result<Vec<u64>, SlideTableDimensionError> {
+) -> Result<Vec<u64>, Error> {
     budget.wire_bytes(payload.len())?;
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let count = fields
         .fields()
         .filter(|field| field.number() == number)
@@ -1976,11 +1964,11 @@ fn repeated_references(
     let mut values = Vec::new();
     values
         .try_reserve_exact(count)
-        .map_err(|_| SlideTableDimensionError::Allocation { amount: count })?;
+        .map_err(|_| Error::Allocation { amount: count })?;
     for field in fields.fields().filter(|field| field.number() == number) {
         field.validate_canonical_framing().map_err(map_wire_error)?;
         if field.wire_type() != 2 {
-            return Err(SlideTableDimensionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         values.push(strict_reference(field.payload(), limits, budget)?);
     }
@@ -1991,40 +1979,40 @@ fn table_parent(
     payload: &[u8],
     limits: WireLimits,
     budget: &mut DimensionBudget,
-) -> Result<u64, SlideTableDimensionError> {
+) -> Result<u64, Error> {
     budget.wire_bytes(payload.len())?;
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut parent = None;
     for field in fields.fields() {
         if field.number() == TABLE_SUPER_FIELD {
             if parent.replace(field).is_some() || field.wire_type() != 2 {
-                return Err(SlideTableDimensionError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             field.validate_canonical_framing().map_err(map_wire_error)?;
         }
     }
     budget.fields(fields.fields().count())?;
     budget.work(payload.len())?;
-    let parent = parent.ok_or(SlideTableDimensionError::InvalidSource)?;
+    let parent = parent.ok_or(Error::InvalidSource)?;
     if parent.wire_type() != 2 {
-        return Err(SlideTableDimensionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     budget.wire_bytes(parent.payload().len())?;
-    let drawable = WireView::parse_with_limits(parent.payload(), limits).map_err(map_wire_error)?;
+    let drawable = WireView::parse(parent.payload(), limits).map_err(map_wire_error)?;
     let mut parent_field = None;
     for field in drawable.fields() {
         if field.number() == DRAWABLE_PARENT_FIELD {
             if parent_field.replace(field).is_some() || field.wire_type() != 2 {
-                return Err(SlideTableDimensionError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             field.validate_canonical_framing().map_err(map_wire_error)?;
         }
     }
     budget.fields(drawable.fields().count())?;
     budget.work(parent.payload().len())?;
-    let parent_field = parent_field.ok_or(SlideTableDimensionError::InvalidSource)?;
+    let parent_field = parent_field.ok_or(Error::InvalidSource)?;
     if parent_field.wire_type() != 2 {
-        return Err(SlideTableDimensionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     strict_reference(parent_field.payload(), limits, budget)
 }
@@ -2033,36 +2021,36 @@ fn strict_reference(
     payload: &[u8],
     limits: WireLimits,
     budget: &mut DimensionBudget,
-) -> Result<u64, SlideTableDimensionError> {
+) -> Result<u64, Error> {
     budget.wire_bytes(payload.len())?;
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut identifier = None;
     for field in fields.fields() {
         field.validate_canonical_framing().map_err(map_wire_error)?;
         match field.number() {
             1 => {
                 if field.wire_type() != 0 || identifier.is_some() {
-                    return Err(SlideTableDimensionError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
-                let (value, width) = decode_varint_from_bytes(field.payload())
-                    .map_err(|_| SlideTableDimensionError::InvalidSource)?;
+                let (value, width) =
+                    decode_varint_from_bytes(field.payload()).map_err(|_| Error::InvalidSource)?;
                 if value == 0 || width != encoded_len(value) {
-                    return Err(SlideTableDimensionError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 identifier = Some(value);
             },
-            2 | 3 => return Err(SlideTableDimensionError::UnsupportedDependency),
-            _ => return Err(SlideTableDimensionError::InvalidSource),
+            2 | 3 => return Err(Error::Refused(Refusal::UnsupportedDependency)),
+            _ => return Err(Error::InvalidSource),
         }
     }
     budget.fields(fields.fields().count())?;
     budget.work(payload.len())?;
-    identifier.ok_or(SlideTableDimensionError::InvalidSource)
+    identifier.ok_or(Error::InvalidSource)
 }
 
-fn checked_reference(reference: codec::ReferenceSnapshot) -> Result<u64, SlideTableDimensionError> {
+fn checked_reference(reference: codec::ReferenceSnapshot) -> Result<u64, Error> {
     if reference.identifier() == 0 || reference.deprecated_is_external() == Some(true) {
-        return Err(SlideTableDimensionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(reference.identifier())
 }
@@ -2071,7 +2059,7 @@ fn decode_table_info(
     payload: &[u8],
     package: &Package,
     budget: &mut DimensionBudget,
-) -> Result<table_info_codec::TableInfoSnapshot, SlideTableDimensionError> {
+) -> Result<table_info_codec::TableInfoSnapshot, Error> {
     let limits = budget.residual_wire(package)?;
     budget.wire_bytes(payload.len())?;
     let options = table_info_codec::DecodeOptions::new(
@@ -2082,7 +2070,7 @@ fn decode_table_info(
     );
     let snapshot =
         table_info_codec::decode_table_info(payload, options).map_err(map_table_info_error)?;
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     budget.fields(view.fields().count())?;
     budget.work(payload.len())?;
     Ok(snapshot)
@@ -2092,9 +2080,9 @@ fn parse_model_defaults(
     payload: &[u8],
     limits: WireLimits,
     budget: &mut DimensionBudget,
-) -> Result<(f64, f64), SlideTableDimensionError> {
+) -> Result<(f64, f64), Error> {
     budget.wire_bytes(payload.len())?;
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut row = None;
     let mut column = None;
     for field in fields.fields() {
@@ -2102,17 +2090,17 @@ fn parse_model_defaults(
         match field.number() {
             16 | 17 => {
                 if field.wire_type() != 1 {
-                    return Err(SlideTableDimensionError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 let value = u64::from_le_bytes(
                     field
                         .payload()
                         .try_into()
-                        .map_err(|_| SlideTableDimensionError::InvalidSource)?,
+                        .map_err(|_| Error::InvalidSource)?,
                 );
                 let value = f64::from_bits(value);
                 if !value.is_finite() || value <= 0.0 {
-                    return Err(SlideTableDimensionError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 let target = if field.number() == 16 {
                     &mut row
@@ -2120,7 +2108,7 @@ fn parse_model_defaults(
                     &mut column
                 };
                 if target.replace(value).is_some() {
-                    return Err(SlideTableDimensionError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
             },
             _ => {},
@@ -2129,8 +2117,8 @@ fn parse_model_defaults(
     budget.fields(fields.fields().count())?;
     budget.work(payload.len())?;
     Ok((
-        row.ok_or(SlideTableDimensionError::InvalidSource)?,
-        column.ok_or(SlideTableDimensionError::InvalidSource)?,
+        row.ok_or(Error::InvalidSource)?,
+        column.ok_or(Error::InvalidSource)?,
     ))
 }
 
@@ -2144,56 +2132,54 @@ fn parse_table_geometry(
     payload: &[u8],
     limits: WireLimits,
     budget: &mut DimensionBudget,
-) -> Result<Geometry, SlideTableDimensionError> {
+) -> Result<Geometry, Error> {
     budget.wire_bytes(payload.len())?;
-    let root = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let root = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut super_field = None;
     for field in root.fields() {
         if field.number() == TABLE_SUPER_FIELD {
             if super_field.replace(field).is_some() || field.wire_type() != 2 {
-                return Err(SlideTableDimensionError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             field.validate_canonical_framing().map_err(map_wire_error)?;
         }
     }
-    let super_field = super_field.ok_or(SlideTableDimensionError::InvalidSource)?;
+    let super_field = super_field.ok_or(Error::InvalidSource)?;
     if super_field.wire_type() != 2 {
-        return Err(SlideTableDimensionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     budget.wire_bytes(super_field.payload().len())?;
-    let drawable =
-        WireView::parse_with_limits(super_field.payload(), limits).map_err(map_wire_error)?;
+    let drawable = WireView::parse(super_field.payload(), limits).map_err(map_wire_error)?;
     let mut geometry = None;
     for field in drawable.fields() {
         if field.number() == DRAWABLE_GEOMETRY_FIELD {
             if geometry.replace(field).is_some() || field.wire_type() != 2 {
-                return Err(SlideTableDimensionError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             field.validate_canonical_framing().map_err(map_wire_error)?;
         }
     }
-    let geometry = geometry.ok_or(SlideTableDimensionError::InvalidSource)?;
+    let geometry = geometry.ok_or(Error::InvalidSource)?;
     if geometry.wire_type() != 2 {
-        return Err(SlideTableDimensionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     budget.wire_bytes(geometry.payload().len())?;
-    let geometry =
-        WireView::parse_with_limits(geometry.payload(), limits).map_err(map_wire_error)?;
+    let geometry = WireView::parse(geometry.payload(), limits).map_err(map_wire_error)?;
     let mut size = None;
     for field in geometry.fields() {
         if field.number() == GEOMETRY_SIZE_FIELD {
             if size.replace(field).is_some() || field.wire_type() != 2 {
-                return Err(SlideTableDimensionError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             field.validate_canonical_framing().map_err(map_wire_error)?;
         }
     }
-    let size = size.ok_or(SlideTableDimensionError::InvalidSource)?;
+    let size = size.ok_or(Error::InvalidSource)?;
     if size.wire_type() != 2 {
-        return Err(SlideTableDimensionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     budget.wire_bytes(size.payload().len())?;
-    let size = WireView::parse_with_limits(size.payload(), limits).map_err(map_wire_error)?;
+    let size = WireView::parse(size.payload(), limits).map_err(map_wire_error)?;
     let mut width = None;
     let mut height = None;
     for field in size.fields() {
@@ -2201,16 +2187,16 @@ fn parse_table_geometry(
         match field.number() {
             SIZE_WIDTH_FIELD | SIZE_HEIGHT_FIELD => {
                 if field.wire_type() != 5 || field.payload().len() != 4 {
-                    return Err(SlideTableDimensionError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 let value = f32::from_bits(u32::from_le_bytes(
                     field
                         .payload()
                         .try_into()
-                        .map_err(|_| SlideTableDimensionError::InvalidSource)?,
+                        .map_err(|_| Error::InvalidSource)?,
                 ));
                 if !value.is_finite() || value <= 0.0 {
-                    return Err(SlideTableDimensionError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 let target = if field.number() == SIZE_WIDTH_FIELD {
                     &mut width
@@ -2218,7 +2204,7 @@ fn parse_table_geometry(
                     &mut height
                 };
                 if target.replace(value).is_some() {
-                    return Err(SlideTableDimensionError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
             },
             _ => {},
@@ -2239,8 +2225,8 @@ fn parse_table_geometry(
             .saturating_add(size.fields().count()),
     )?;
     Ok(Geometry {
-        width: width.ok_or(SlideTableDimensionError::InvalidSource)?,
-        height: height.ok_or(SlideTableDimensionError::InvalidSource)?,
+        width: width.ok_or(Error::InvalidSource)?,
+        height: height.ok_or(Error::InvalidSource)?,
     })
 }
 
@@ -2249,15 +2235,15 @@ fn object_message_payload(
     identifier: u64,
     message_index: usize,
     message_type: u32,
-) -> Result<&[u8], SlideTableDimensionError> {
+) -> Result<&[u8], Error> {
     let (_, object) = package
         .object_with_component(identifier)
-        .ok_or(SlideTableDimensionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let message = object
         .messages
         .get(message_index)
         .filter(|message| message.type_ == message_type)
-        .ok_or(SlideTableDimensionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     validate_message_header(object, message_index)?;
     Ok(message.data.as_slice())
 }
@@ -2266,7 +2252,7 @@ fn object_index_for(
     package: &Package,
     identifier: u64,
     budget: &mut DimensionBudget,
-) -> Result<usize, SlideTableDimensionError> {
+) -> Result<usize, Error> {
     for component in package.state.source.components().iter() {
         budget.components(1)?;
         for (index, object) in component.archive().objects.iter().enumerate() {
@@ -2277,7 +2263,7 @@ fn object_index_for(
             }
         }
     }
-    Err(SlideTableDimensionError::InvalidSource)
+    Err(Error::InvalidSource)
 }
 
 #[derive(Clone)]
@@ -2292,9 +2278,9 @@ fn storage_references(
     payload: &[u8],
     limits: WireLimits,
     budget: &mut DimensionBudget,
-) -> Result<Vec<u64>, SlideTableDimensionError> {
+) -> Result<Vec<u64>, Error> {
     budget.wire_bytes(payload.len())?;
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let count = fields.fields().filter(|field| field.number() == 2).count();
     budget.fields(fields.fields().count())?;
     budget.work(payload.len())?;
@@ -2303,11 +2289,11 @@ fn storage_references(
     let mut references = Vec::new();
     references
         .try_reserve_exact(count)
-        .map_err(|_| SlideTableDimensionError::Allocation { amount: count })?;
+        .map_err(|_| Error::Allocation { amount: count })?;
     for field in fields.fields().filter(|field| field.number() == 2) {
         field.validate_canonical_framing().map_err(map_wire_error)?;
         if field.wire_type() != 2 {
-            return Err(SlideTableDimensionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         references.push(strict_reference(field.payload(), limits, budget)?);
     }
@@ -2356,7 +2342,7 @@ fn locate_bucket(
     package: &Package,
     identifier: u64,
     budget: &mut DimensionBudget,
-) -> Result<BucketLocation, SlideTableDimensionError> {
+) -> Result<BucketLocation, Error> {
     let mut found = None;
     for component in package.state.source.components().iter() {
         budget.components(1)?;
@@ -2366,7 +2352,7 @@ fn locate_bucket(
                 continue;
             }
             if found.is_some() {
-                return Err(SlideTableDimensionError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             let mut message_index = None;
             let mut role_count = 0usize;
@@ -2379,7 +2365,7 @@ fn locate_bucket(
                     role_count = role_count.saturating_add(1);
                     if message.type_ == HEADER_BUCKET_MESSAGE_TYPE {
                         if message_index.replace(index).is_some() {
-                            return Err(SlideTableDimensionError::InvalidSource);
+                            return Err(Error::InvalidSource);
                         }
                     } else {
                         wrong_role = true;
@@ -2387,14 +2373,14 @@ fn locate_bucket(
                 }
             }
             if wrong_role || role_count != 1 {
-                return Err(SlideTableDimensionError::UnsupportedTopology);
+                return Err(Error::Refused(Refusal::UnsupportedTopology));
             }
-            let message = message_index.ok_or(SlideTableDimensionError::InvalidSource)?;
+            let message = message_index.ok_or(Error::InvalidSource)?;
             let message_info = value
                 .archive_info
                 .message_infos
                 .get(message)
-                .ok_or(SlideTableDimensionError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             // Header-storage buckets are leaf records.  A selected bucket
             // must not carry an alternate ArchiveInfo edge or FieldInfo route
             // that could make the in-place rewrite shared or ambiguous.
@@ -2402,7 +2388,7 @@ fn locate_bucket(
                 || !message_info.data_references.is_empty()
                 || !message_info.field_infos.is_empty()
             {
-                return Err(SlideTableDimensionError::UnsupportedDependency);
+                return Err(Error::Refused(Refusal::UnsupportedDependency));
             }
             budget.allocations(1)?;
             found = Some(BucketLocation {
@@ -2413,7 +2399,7 @@ fn locate_bucket(
             });
         }
     }
-    found.ok_or(SlideTableDimensionError::InvalidSource)
+    found.ok_or(Error::InvalidSource)
 }
 
 fn collect_axis(
@@ -2423,11 +2409,10 @@ fn collect_axis(
     dimension: Dimension,
     default: f64,
     budget: &mut DimensionBudget,
-) -> Result<(f32, Option<Size>), SlideTableDimensionError> {
-    let selected =
-        u32::try_from(dimension.index()).map_err(|_| SlideTableDimensionError::InvalidSource)?;
+) -> Result<(f32, Option<Size>), Error> {
+    let selected = u32::try_from(dimension.index()).map_err(|_| Error::InvalidSource)?;
     if selected >= limit {
-        return Err(SlideTableDimensionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut total = 0.0f64;
     let mut selected_size = None;
@@ -2443,7 +2428,7 @@ fn collect_axis(
                 let minimum = u32::try_from(slot)
                     .ok()
                     .and_then(|slot| slot.checked_mul(DEFAULT_HEADER_BUCKET_ROWS))
-                    .ok_or(SlideTableDimensionError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
                 (
                     minimum,
                     minimum
@@ -2453,12 +2438,12 @@ fn collect_axis(
             },
             Dimension::Column(_) => (0, limit),
         };
-        let count = usize::try_from(maximum.saturating_sub(minimum))
-            .map_err(|_| SlideTableDimensionError::InvalidSource)?;
+        let count =
+            usize::try_from(maximum.saturating_sub(minimum)).map_err(|_| Error::InvalidSource)?;
         budget.allocations(count)?;
         let mut seen = HashSet::new();
         seen.try_reserve(count)
-            .map_err(|_| SlideTableDimensionError::Allocation { amount: count })?;
+            .map_err(|_| Error::Allocation { amount: count })?;
         let mut reader = HeaderReader {
             selected,
             minimum,
@@ -2479,7 +2464,7 @@ fn collect_axis(
             reader.total + default * f64::from(u32::try_from(missing).unwrap_or(u32::MAX));
         total += bucket_total;
         if reader.invalid {
-            return Err(SlideTableDimensionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if reader.found.is_some() {
             selected_size = Some(
@@ -2487,7 +2472,7 @@ fn collect_axis(
                     .found
                     .map(size_from_bits)
                     .transpose()?
-                    .ok_or(SlideTableDimensionError::InvalidSource)?,
+                    .ok_or(Error::InvalidSource)?,
             );
         }
     }
@@ -2495,44 +2480,37 @@ fn collect_axis(
     Ok((total, selected_size))
 }
 
-fn size_from_bits(bits: u32) -> Result<Size, SlideTableDimensionError> {
+fn size_from_bits(bits: u32) -> Result<Size, Error> {
     if bits == 0 {
         return Ok(Size::Default);
     }
     Points::new(f32::from_bits(bits))
         .map(Size::Points)
-        .map_err(|_| SlideTableDimensionError::InvalidSource)
+        .map_err(|_| Error::InvalidSource)
 }
 
-fn validate_geometry_matches(
-    geometry: Geometry,
-    rows: f32,
-    columns: f32,
-) -> Result<(), SlideTableDimensionError> {
+fn validate_geometry_matches(geometry: Geometry, rows: f32, columns: f32) -> Result<(), Error> {
     fn close(left: f32, right: f32) -> bool {
         let tolerance = 0.01f32.max(left.abs().max(right.abs()) * 0.0001);
         (left - right).abs() <= tolerance
     }
     if !close(geometry.width, columns) || !close(geometry.height, rows) {
-        return Err(SlideTableDimensionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
 
-fn reject_duplicates(
-    values: &[u64],
-    budget: &mut DimensionBudget,
-) -> Result<(), SlideTableDimensionError> {
+fn reject_duplicates(values: &[u64], budget: &mut DimensionBudget) -> Result<(), Error> {
     budget.allocations(values.len())?;
     budget.transaction_work(values.len())?;
     let mut seen = HashSet::new();
     seen.try_reserve(values.len())
-        .map_err(|_| SlideTableDimensionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: values.len(),
         })?;
     for value in values {
         if !seen.insert(*value) {
-            return Err(SlideTableDimensionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(())
@@ -2544,13 +2522,13 @@ fn validate_slide_metadata(
     owned: &[u64],
     z_order: &[u64],
     budget: &mut DimensionBudget,
-) -> Result<(), SlideTableDimensionError> {
+) -> Result<(), Error> {
     validate_message_header(object, message_index)?;
     let info = object
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(SlideTableDimensionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.fields(info.field_infos.len())?;
     budget.references(
         info.object_references
@@ -2562,7 +2540,7 @@ fn validate_slide_metadata(
     let mut expected_counts = HashMap::new();
     expected_counts
         .try_reserve(expected_capacity)
-        .map_err(|_| SlideTableDimensionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: expected_capacity,
         })?;
     for identifier in owned.iter().chain(z_order) {
@@ -2595,7 +2573,7 @@ fn validate_slide_metadata(
                 || !field.data_references.is_empty()
                 || field.object_references.as_slice() != owned
             {
-                return Err(SlideTableDimensionError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             owned_field = true;
             for identifier in &field.object_references {
@@ -2611,7 +2589,7 @@ fn validate_slide_metadata(
                 || !field.data_references.is_empty()
                 || field.object_references.as_slice() != z_order
             {
-                return Err(SlideTableDimensionError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             z_order_field = true;
             for identifier in &field.object_references {
@@ -2620,17 +2598,17 @@ fn validate_slide_metadata(
                 }
             }
         } else if !field.object_references.is_empty() || !field.data_references.is_empty() {
-            return Err(SlideTableDimensionError::UnsupportedTopology);
+            return Err(Error::Refused(Refusal::UnsupportedTopology));
         }
     }
     if owned_field != z_order_field {
-        return Err(SlideTableDimensionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if expected_counts
         .values()
         .any(|count| *count == 0 || *count > 3)
     {
-        return Err(SlideTableDimensionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -2640,13 +2618,13 @@ fn validate_table_info_metadata(
     message_index: usize,
     model: u64,
     budget: &mut DimensionBudget,
-) -> Result<(), SlideTableDimensionError> {
+) -> Result<(), Error> {
     validate_message_header(object, message_index)?;
     let info = object
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(SlideTableDimensionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.fields(info.field_infos.len())?;
     budget.references(
         info.object_references
@@ -2660,7 +2638,7 @@ fn validate_table_info_metadata(
         .count()
         != 1
     {
-        return Err(SlideTableDimensionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut model_field = false;
     for field in &info.field_infos {
@@ -2678,11 +2656,11 @@ fn validate_table_info_metadata(
                 || !field.data_references.is_empty()
                 || field.object_references.as_slice() != [model]
             {
-                return Err(SlideTableDimensionError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             model_field = true;
         } else if !field.object_references.is_empty() || !field.data_references.is_empty() {
-            return Err(SlideTableDimensionError::UnsupportedTopology);
+            return Err(Error::Refused(Refusal::UnsupportedTopology));
         }
     }
     Ok(())
@@ -2692,7 +2670,7 @@ fn ensure_unique_identity(
     package: &Package,
     identifier: u64,
     budget: &mut DimensionBudget,
-) -> Result<(), SlideTableDimensionError> {
+) -> Result<(), Error> {
     let mut count = 0usize;
     for component in package.state.source.components().iter() {
         budget.components(1)?;
@@ -2706,7 +2684,7 @@ fn ensure_unique_identity(
     if count == 1 {
         Ok(())
     } else {
-        Err(SlideTableDimensionError::UnsupportedDependency)
+        Err(Error::Refused(Refusal::UnsupportedDependency))
     }
 }
 
@@ -2716,7 +2694,7 @@ fn ensure_unique_table_owner(
     table_info_identifier: u64,
     model_identifier: u64,
     budget: &mut DimensionBudget,
-) -> Result<(), SlideTableDimensionError> {
+) -> Result<(), Error> {
     let mut owned = 0usize;
     let mut z_order = 0usize;
     let mut selected = false;
@@ -2767,7 +2745,7 @@ fn ensure_unique_table_owner(
     if owned == 1 && z_order == 1 && selected && model_owners == 1 {
         Ok(())
     } else {
-        Err(SlideTableDimensionError::UnsupportedDependency)
+        Err(Error::Refused(Refusal::UnsupportedDependency))
     }
 }
 
@@ -2782,7 +2760,7 @@ fn validate_global_references(
     row_locations: &[BucketLocation],
     column_location: &BucketLocation,
     budget: &mut DimensionBudget,
-) -> Result<(), SlideTableDimensionError> {
+) -> Result<(), Error> {
     let limits = package
         .state
         .options
@@ -2792,12 +2770,12 @@ fn validate_global_references(
     let slide = package
         .object_with_component(slide_identifier)
         .map(|(_, object)| object)
-        .ok_or(SlideTableDimensionError::UnsupportedDependency)?;
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
     let slide_info = slide
         .archive_info
         .message_infos
         .get(slide_message_index)
-        .ok_or(SlideTableDimensionError::UnsupportedDependency)?;
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
     let expected_table_edges = slide_info
         .object_references
         .iter()
@@ -2812,12 +2790,12 @@ fn validate_global_references(
     let table_info = package
         .object_with_component(table_info_identifier)
         .map(|(_, object)| object)
-        .ok_or(SlideTableDimensionError::UnsupportedDependency)?;
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
     let table_info_info = table_info
         .archive_info
         .message_infos
         .get(table_info_message_index)
-        .ok_or(SlideTableDimensionError::UnsupportedDependency)?;
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
     let expected_model_edges = table_info_info
         .object_references
         .iter()
@@ -2830,19 +2808,19 @@ fn validate_global_references(
         .filter(|identifier| **identifier == model_identifier)
         .count();
     if expected_table_edges == 0 || expected_model_edges == 0 {
-        return Err(SlideTableDimensionError::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     let storage_capacity = row_locations.len().saturating_add(1);
     budget.allocations(storage_capacity)?;
     let mut storage_identifiers = HashSet::new();
     storage_identifiers
         .try_reserve(storage_capacity)
-        .map_err(|_| SlideTableDimensionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: storage_capacity,
         })?;
     for location in row_locations.iter().chain(std::iter::once(column_location)) {
         if !storage_identifiers.insert(location.identifier) {
-            return Err(SlideTableDimensionError::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
     }
     budget.transaction_work(storage_capacity)?;
@@ -2900,7 +2878,7 @@ fn validate_global_references(
             )?;
             budget.work(object.data_length as usize)?;
             object
-                .inspect_references_with_policy_and_limits(
+                .inspect_references_with_policy(
                     &mut visitor,
                     ArchiveReferencePolicy::RejectUnknownMetadata,
                     limits,
@@ -2912,7 +2890,7 @@ fn validate_global_references(
         || visitor.table_edges != visitor.expected_table_edges
         || visitor.model_edges != visitor.expected_model_edges
     {
-        return Err(SlideTableDimensionError::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     // Every storage bucket must have one physical object identity.  This also
     // prevents a later rewrite from silently selecting an alias in another
@@ -3011,7 +2989,7 @@ fn rewrite_dimension(
     after: Size,
     previews: &[&'static str],
     budget: &mut DimensionBudget,
-) -> Result<Package, SlideTableDimensionError> {
+) -> Result<Package, Error> {
     let catalog = physical_catalog(source)?;
     let physical_limits = source.state.options.archive();
     let limits = budget.residual_wire(source)?;
@@ -3042,8 +3020,7 @@ fn rewrite_dimension(
         selection.bucket_message,
         HEADER_BUCKET_MESSAGE_TYPE,
     )?;
-    let index = u32::try_from(selection.dimension.index())
-        .map_err(|_| SlideTableDimensionError::InvalidSource)?;
+    let index = u32::try_from(selection.dimension.index()).map_err(|_| Error::InvalidSource)?;
     let limit = match selection.dimension {
         Dimension::Row(_) => selection.rows,
         Dimension::Column(_) => selection.columns,
@@ -3102,7 +3079,7 @@ fn rewrite_dimension(
         ),
     ];
     let rewritten_geometry =
-        patch_nested_fields_batched_with_limits(table_info_payload, &geometry_edits, limits)
+        patch_nested_fields_batched(table_info_payload, &geometry_edits, limits)
             .map_err(map_wire_error)?;
     budget.wire_bytes(table_info_payload.len())?;
     budget.wire_output(rewritten_geometry.len())?;
@@ -3134,7 +3111,7 @@ fn rewrite_dimension(
     let mut compressed_entries = Vec::new();
     compressed_entries
         .try_reserve_exact(replacement_count)
-        .map_err(|_| SlideTableDimensionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: replacement_count,
         })?;
     budget.allocations(replacement_count)?;
@@ -3161,11 +3138,11 @@ fn rewrite_dimension(
         )?);
     }
     let mut edits = Vec::new();
-    edits.try_reserve_exact(replacement_count).map_err(|_| {
-        SlideTableDimensionError::Allocation {
+    edits
+        .try_reserve_exact(replacement_count)
+        .map_err(|_| Error::Allocation {
             amount: replacement_count,
-        }
-    })?;
+        })?;
     budget.allocations(replacement_count)?;
     if selection.bucket_component == selection.table_info_component {
         edits.push(EntryEdit::new(
@@ -3211,16 +3188,22 @@ fn rewrite_component(
     component_name: &str,
     replacements: &[NativeReplacement<'_>],
     budget: &mut DimensionBudget,
-) -> Result<Vec<u8>, SlideTableDimensionError> {
+) -> Result<Vec<u8>, Error> {
     let catalog = physical_catalog(source)?;
+    let snappy_limits = source
+        .state
+        .options
+        .archive()
+        .snappy_limits()
+        .map_err(map_archive_error)?;
     budget.transaction_work(catalog.package().len())?;
     let entry = catalog
         .package()
         .iter()
         .find(|entry| entry.name() == component_name)
-        .ok_or(SlideTableDimensionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(SlideTableDimensionError::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let archive_limits = source
         .state
@@ -3231,7 +3214,7 @@ fn rewrite_component(
     budget.allocations(1)?;
     budget.retained(entry.data().len())?;
     budget.physical(entry.data().len())?;
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         source
             .state
@@ -3244,25 +3227,24 @@ fn rewrite_component(
     budget.allocations(1)?;
     budget.retained(stream.as_bytes().len())?;
     budget.physical(stream.as_bytes().len())?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     charge_archive_inventory(&archive, budget)?;
     for replacement in replacements {
         let object = archive
             .object_mut(replacement.identifier)
-            .ok_or(SlideTableDimensionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         validate_message_header(object, replacement.message)?;
         let message = object
             .messages
             .get(replacement.message)
-            .ok_or(SlideTableDimensionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if message.type_ != replacement.message_type {
-            return Err(SlideTableDimensionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         budget.allocations(replacement.payload.len())?;
         budget.retained(replacement.payload.len())?;
         object
-            .replace_message_preserving_header_with_limits(
+            .replace_message_preserving_header(
                 replacement.message,
                 RawMessage {
                     type_: replacement.message_type,
@@ -3273,43 +3255,41 @@ fn rewrite_component(
             .map_err(map_core_error)?;
     }
     let encoded_length = archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_core_error)?;
-    let compressed_bound =
-        SnappyStream::maximum_compressed_len(encoded_length).map_err(map_core_error)?;
+    let compressed_bound = SnappyStream::maximum_compressed_len(encoded_length, snappy_limits)
+        .map_err(map_core_error)?;
     budget.output(encoded_length.saturating_add(compressed_bound))?;
     budget.allocations(encoded_length)?;
     budget.retained(encoded_length)?;
     budget.allocations(compressed_bound)?;
     budget.retained(compressed_bound)?;
-    let encoded = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
+    let encoded = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     if encoded.len() != encoded_length {
-        return Err(SlideTableDimensionError::Verification);
+        return Err(Error::Verification);
     }
-    let compressed = SnappyStream::compress(&encoded).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&encoded, snappy_limits).map_err(map_core_error)?;
     if compressed.len() > compressed_bound {
-        return Err(SlideTableDimensionError::Verification);
+        return Err(Error::Verification);
     }
     Ok(compressed)
 }
 
-fn effective_size(size: Size, default: f64) -> Result<f32, SlideTableDimensionError> {
+fn effective_size(size: Size, default: f64) -> Result<f32, Error> {
     let value = match size {
         Size::Default => default,
         Size::Points(points) => f64::from(points.value()),
     };
     if !value.is_finite() || value <= 0.0 || value > f64::from(f32::MAX) {
-        return Err(SlideTableDimensionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(value as f32)
 }
 
-fn checked_total(total: f32, old: f32, new: f32) -> Result<f32, SlideTableDimensionError> {
+fn checked_total(total: f32, old: f32, new: f32) -> Result<f32, Error> {
     let value = f64::from(total) - f64::from(old) + f64::from(new);
     if !value.is_finite() || value <= 0.0 || value > f64::from(f32::MAX) {
-        return Err(SlideTableDimensionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(value as f32)
 }
@@ -3323,7 +3303,7 @@ fn verify_locality(
     source_previews: &[&'static str],
     target_previews: &[&'static str],
     budget: &mut DimensionBudget,
-) -> Result<(), SlideTableDimensionError> {
+) -> Result<(), Error> {
     let source_catalog = physical_catalog(source)?;
     let candidate_catalog = physical_catalog(candidate)?;
     budget.entries(
@@ -3341,23 +3321,23 @@ fn verify_locality(
     let mut source_names = HashSet::new();
     source_names
         .try_reserve(source_catalog.package().len())
-        .map_err(|_| SlideTableDimensionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: source_catalog.package().len(),
         })?;
     for entry in source_catalog.package().iter() {
         if !source_names.insert(entry.name()) {
-            return Err(SlideTableDimensionError::Verification);
+            return Err(Error::Verification);
         }
     }
     let mut candidate_entries = HashMap::new();
     candidate_entries
         .try_reserve(candidate_catalog.package().len())
-        .map_err(|_| SlideTableDimensionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: candidate_catalog.package().len(),
         })?;
     for entry in candidate_catalog.package().iter() {
         if candidate_entries.insert(entry.name(), entry).is_some() {
-            return Err(SlideTableDimensionError::Verification);
+            return Err(Error::Verification);
         }
     }
     for entry in source_catalog.package().iter() {
@@ -3372,11 +3352,11 @@ fn verify_locality(
         let preview = source_previews.contains(&entry.name());
         if preview && !target_previews.contains(&entry.name()) {
             if candidate_entry.is_some() {
-                return Err(SlideTableDimensionError::Verification);
+                return Err(Error::Verification);
             }
             continue;
         }
-        let candidate_entry = candidate_entry.ok_or(SlideTableDimensionError::Verification)?;
+        let candidate_entry = candidate_entry.ok_or(Error::Verification)?;
         let changed = entry.name() == selection.bucket_component.as_ref()
             || entry.name() == selection.table_info_component.as_ref();
         if !changed
@@ -3388,12 +3368,12 @@ fn verify_locality(
                     candidate_entry.raw_record().central_directory_record(),
                 ))
         {
-            return Err(SlideTableDimensionError::Verification);
+            return Err(Error::Verification);
         }
     }
     for entry in candidate_catalog.package().iter() {
         if !source_names.contains(entry.name()) && !target_previews.contains(&entry.name()) {
-            return Err(SlideTableDimensionError::Verification);
+            return Err(Error::Verification);
         }
     }
 
@@ -3411,20 +3391,20 @@ fn verify_locality(
         let source_archive = component_archive(source, component_name, budget)?;
         let candidate_archive = component_archive(candidate, component_name, budget)?;
         if source_archive.objects.len() != candidate_archive.objects.len() {
-            return Err(SlideTableDimensionError::Verification);
+            return Err(Error::Verification);
         }
         for source_object in &source_archive.objects {
             let identifier = source_object
                 .archive_info
                 .identifier
-                .ok_or(SlideTableDimensionError::Verification)?;
+                .ok_or(Error::Verification)?;
             let candidate_object = candidate_archive
                 .object(identifier)
-                .ok_or(SlideTableDimensionError::Verification)?;
+                .ok_or(Error::Verification)?;
             let selected_object = identifier == selection.bucket_identifier
                 || identifier == selection.table_info_identifier;
             if !selected_object && !source_object.same_content_ignoring_offsets(candidate_object) {
-                return Err(SlideTableDimensionError::Verification);
+                return Err(Error::Verification);
             }
             if selected_object {
                 if !same_archive_info_ignoring_message_length(
@@ -3432,7 +3412,7 @@ fn verify_locality(
                     &candidate_object.archive_info,
                     allowed_message_for_identifier(identifier, selection),
                 ) {
-                    return Err(SlideTableDimensionError::Verification);
+                    return Err(Error::Verification);
                 }
                 let allowed_message = allowed_message_for_identifier(identifier, selection);
                 for (index, source_message) in source_object.messages.iter().enumerate() {
@@ -3440,11 +3420,11 @@ fn verify_locality(
                         let candidate_message = candidate_object
                             .messages
                             .get(index)
-                            .ok_or(SlideTableDimensionError::Verification)?;
+                            .ok_or(Error::Verification)?;
                         if source_message.type_ != candidate_message.type_
                             || source_message.data != candidate_message.data
                         {
-                            return Err(SlideTableDimensionError::Verification);
+                            return Err(Error::Verification);
                         }
                     }
                 }
@@ -3500,10 +3480,7 @@ fn same_central_directory_record(left: &[u8], right: &[u8]) -> bool {
             || (left.len() >= 46 && left[..42] == right[..42] && left[46..] == right[46..]))
 }
 
-fn charge_archive_inventory(
-    archive: &Archive,
-    budget: &mut DimensionBudget,
-) -> Result<(), SlideTableDimensionError> {
+fn charge_archive_inventory(archive: &Archive, budget: &mut DimensionBudget) -> Result<(), Error> {
     budget.objects(archive.objects.len())?;
     let mut messages = 0usize;
     let mut fields = 0usize;
@@ -3543,21 +3520,21 @@ fn component_archive(
     package: &Package,
     name: &str,
     budget: &mut DimensionBudget,
-) -> Result<Archive, SlideTableDimensionError> {
+) -> Result<Archive, Error> {
     let catalog = physical_catalog(package)?;
     budget.transaction_work(catalog.package().len())?;
     let entry = catalog
         .package()
         .iter()
         .find(|entry| entry.name() == name)
-        .ok_or(SlideTableDimensionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(SlideTableDimensionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     budget.allocations(1)?;
     budget.retained(entry.data().len())?;
     budget.physical(entry.data().len())?;
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         package
             .state
@@ -3570,7 +3547,7 @@ fn component_archive(
     budget.allocations(1)?;
     budget.retained(stream.as_bytes().len())?;
     budget.physical(stream.as_bytes().len())?;
-    let archive = Archive::parse_with_limits(
+    let archive = Archive::parse(
         stream.as_bytes(),
         package
             .state
@@ -3584,252 +3561,228 @@ fn component_archive(
     Ok(archive)
 }
 
-fn map_read_error(error: ReadError) -> SlideTableDimensionError {
+fn map_read_error(error: ReadError) -> Error {
     match error {
         ReadError::SemanticLimit {
             kind,
             observed,
             maximum,
             ..
-        } => SlideTableDimensionError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                SemanticLimitKind::References => SlideTableDimensionLimitKind::References,
-                _ => SlideTableDimensionLimitKind::WireWork,
+                SemanticLimitKind::References => LimitKind::References,
+                _ => LimitKind::WireWork,
             },
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        ReadError::Allocation { amount, .. } => SlideTableDimensionError::Allocation { amount },
-        _ => SlideTableDimensionError::InvalidSource,
+        ReadError::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_codec_error(error: codec::DecodeError) -> SlideTableDimensionError {
+fn map_codec_error(error: codec::DecodeError) -> Error {
     if let Some(amount) = error.allocation_requested() {
-        return SlideTableDimensionError::Allocation { amount };
+        return Error::Allocation { amount };
     }
     let Some(limit) = error.resource_limit() else {
-        return SlideTableDimensionError::InvalidSource;
+        return Error::InvalidSource;
     };
     let (kind, observed, maximum) = match limit {
         codec::DecodeLimit::Bytes { observed, maximum } => {
-            (SlideTableDimensionLimitKind::WireBytes, observed, maximum)
+            (LimitKind::WireBytes, observed, maximum)
         },
         codec::DecodeLimit::References { observed, maximum } => {
-            (SlideTableDimensionLimitKind::References, observed, maximum)
+            (LimitKind::References, observed, maximum)
         },
-        codec::DecodeLimit::Text { observed, maximum } => {
-            (SlideTableDimensionLimitKind::WireWork, observed, maximum)
-        },
+        codec::DecodeLimit::Text { observed, maximum } => (LimitKind::WireWork, observed, maximum),
         codec::DecodeLimit::Fields { observed, maximum } => {
-            (SlideTableDimensionLimitKind::WireFields, observed, maximum)
+            (LimitKind::WireFields, observed, maximum)
         },
-        codec::DecodeLimit::Work { observed, maximum } => {
-            (SlideTableDimensionLimitKind::WireWork, observed, maximum)
-        },
+        codec::DecodeLimit::Work { observed, maximum } => (LimitKind::WireWork, observed, maximum),
         codec::DecodeLimit::Nesting { observed, maximum } => {
-            return SlideTableDimensionError::LimitExceeded {
-                kind: SlideTableDimensionLimitKind::WireNesting,
+            return Error::Limit {
+                kind: LimitKind::WireNesting,
                 observed: u64::from(observed),
                 maximum: u64::from(maximum),
             };
         },
         codec::DecodeLimit::Allocation { requested } => {
-            return SlideTableDimensionError::Allocation { amount: requested };
+            return Error::Allocation { amount: requested };
         },
         codec::DecodeLimit::Retained { observed, maximum } => {
-            (SlideTableDimensionLimitKind::Retained, observed, maximum)
+            (LimitKind::Retained, observed, maximum)
         },
-        _ => return SlideTableDimensionError::InvalidSource,
+        _ => return Error::InvalidSource,
     };
-    SlideTableDimensionError::LimitExceeded {
+    Error::Limit {
         kind,
         observed: observed as u64,
         maximum: maximum as u64,
     }
 }
 
-fn map_table_info_error(error: table_info_codec::DecodeError) -> SlideTableDimensionError {
+fn map_table_info_error(error: table_info_codec::DecodeError) -> Error {
     if let Some(amount) = error.allocation_amount() {
-        return SlideTableDimensionError::Allocation { amount };
+        return Error::Allocation { amount };
     }
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return SlideTableDimensionError::LimitExceeded {
-            kind: SlideTableDimensionLimitKind::WireFields,
+        return Error::Limit {
+            kind: LimitKind::WireFields,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return SlideTableDimensionError::LimitExceeded {
-            kind: SlideTableDimensionLimitKind::WireWork,
+        return Error::Limit {
+            kind: LimitKind::WireWork,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some((observed, maximum)) = error.output_limit_values() {
-        return SlideTableDimensionError::LimitExceeded {
-            kind: SlideTableDimensionLimitKind::WireOutputBytes,
+        return Error::Limit {
+            kind: LimitKind::WireOutputBytes,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some((observed, maximum)) = error.allocation_limit_values() {
-        return SlideTableDimensionError::LimitExceeded {
-            kind: SlideTableDimensionLimitKind::Allocations,
+        return Error::Limit {
+            kind: LimitKind::Allocations,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some((observed, maximum)) = error.retained_limit_values() {
-        return SlideTableDimensionError::LimitExceeded {
-            kind: SlideTableDimensionLimitKind::Retained,
+        return Error::Limit {
+            kind: LimitKind::Retained,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some((observed, maximum)) = error.scratch_limit_values() {
-        return SlideTableDimensionError::LimitExceeded {
-            kind: SlideTableDimensionLimitKind::Scratch,
+        return Error::Limit {
+            kind: LimitKind::Scratch,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some(limit) = error.wire_resource_limit() {
         return match limit {
-            table_info_codec::WireResourceLimit::Bytes { observed, maximum } => {
-                SlideTableDimensionError::LimitExceeded {
-                    kind: SlideTableDimensionLimitKind::WireBytes,
-                    observed: observed.unwrap_or_default() as u64,
-                    maximum: maximum.unwrap_or_default() as u64,
-                }
+            table_info_codec::WireResourceLimit::Bytes { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireBytes,
+                observed: observed.unwrap_or_default() as u64,
+                maximum: maximum.unwrap_or_default() as u64,
             },
-            table_info_codec::WireResourceLimit::Nesting { observed, maximum } => {
-                SlideTableDimensionError::LimitExceeded {
-                    kind: SlideTableDimensionLimitKind::WireNesting,
-                    observed: observed.unwrap_or_default() as u64,
-                    maximum: maximum.unwrap_or_default() as u64,
-                }
+            table_info_codec::WireResourceLimit::Nesting { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireNesting,
+                observed: observed.unwrap_or_default() as u64,
+                maximum: maximum.unwrap_or_default() as u64,
             },
-            _ => SlideTableDimensionError::InvalidSource,
+            _ => Error::InvalidSource,
         };
     }
-    SlideTableDimensionError::InvalidSource
+    Error::InvalidSource
 }
 
-fn map_wire_error(_error: litchi_iwa_common::Error) -> SlideTableDimensionError {
-    SlideTableDimensionError::InvalidSource
+fn map_wire_error(_error: litchi_iwa_common::Error) -> Error {
+    Error::InvalidSource
 }
 
-fn map_metadata_error(error: package_metadata_codec::RewriteError) -> SlideTableDimensionError {
+fn map_metadata_error(error: package_metadata_codec::RewriteError) -> Error {
     if let Some(amount) = error.allocation_request() {
-        return SlideTableDimensionError::Allocation { amount };
+        return Error::Allocation { amount };
     }
     let Some(limit) = error.resource_limit() else {
-        return SlideTableDimensionError::InvalidSource;
+        return Error::InvalidSource;
     };
     let (kind, observed, maximum) = match limit {
         package_metadata_codec::RewriteLimit::InputBytes { observed, maximum } => {
-            (SlideTableDimensionLimitKind::InputBytes, observed, maximum)
+            (LimitKind::InputBytes, observed, maximum)
         },
         package_metadata_codec::RewriteLimit::OutputBytes { observed, maximum } => {
-            (SlideTableDimensionLimitKind::OutputBytes, observed, maximum)
+            (LimitKind::OutputBytes, observed, maximum)
         },
         package_metadata_codec::RewriteLimit::Fields { observed, maximum } => {
-            (SlideTableDimensionLimitKind::WireFields, observed, maximum)
+            (LimitKind::WireFields, observed, maximum)
         },
         package_metadata_codec::RewriteLimit::Work { observed, maximum } => {
-            (SlideTableDimensionLimitKind::WireWork, observed, maximum)
+            (LimitKind::WireWork, observed, maximum)
         },
         package_metadata_codec::RewriteLimit::Nesting { observed, maximum } => {
-            return SlideTableDimensionError::LimitExceeded {
-                kind: SlideTableDimensionLimitKind::WireNesting,
+            return Error::Limit {
+                kind: LimitKind::WireNesting,
                 observed: u64::from(observed),
                 maximum: u64::from(maximum),
             };
         },
         package_metadata_codec::RewriteLimit::Components { observed, maximum } => {
-            (SlideTableDimensionLimitKind::Components, observed, maximum)
+            (LimitKind::Components, observed, maximum)
         },
         package_metadata_codec::RewriteLimit::References { observed, maximum } => {
-            (SlideTableDimensionLimitKind::References, observed, maximum)
+            (LimitKind::References, observed, maximum)
         },
         package_metadata_codec::RewriteLimit::Additions { observed, maximum } => {
-            (SlideTableDimensionLimitKind::Allocations, observed, maximum)
+            (LimitKind::Allocations, observed, maximum)
         },
-        _ => return SlideTableDimensionError::InvalidSource,
+        _ => return Error::InvalidSource,
     };
-    SlideTableDimensionError::LimitExceeded {
+    Error::Limit {
         kind,
         observed: observed as u64,
         maximum: maximum as u64,
     }
 }
 
-fn map_archive_error(error: litchi_iwa_archive::Error) -> SlideTableDimensionError {
+fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     match error {
         litchi_iwa_archive::Error::Limit {
             kind,
             observed,
             maximum,
-        } => SlideTableDimensionError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_archive::LimitKind::InputBytes => {
-                    SlideTableDimensionLimitKind::InputBytes
-                },
-                litchi_iwa_archive::LimitKind::OutputBytes => {
-                    SlideTableDimensionLimitKind::OutputBytes
-                },
-                litchi_iwa_archive::LimitKind::Entries => SlideTableDimensionLimitKind::Entries,
+                litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
+                litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_archive::LimitKind::Entries => LimitKind::Entries,
                 litchi_iwa_archive::LimitKind::EntryBytes
-                | litchi_iwa_archive::LimitKind::CompressedEntryBytes => {
-                    SlideTableDimensionLimitKind::EntryBytes
-                },
-                litchi_iwa_archive::LimitKind::TotalBytes => {
-                    SlideTableDimensionLimitKind::TotalBytes
-                },
-                _ => SlideTableDimensionLimitKind::WireWork,
+                | litchi_iwa_archive::LimitKind::CompressedEntryBytes => LimitKind::EntryBytes,
+                litchi_iwa_archive::LimitKind::TotalBytes => LimitKind::TotalBytes,
+                _ => LimitKind::WireWork,
             },
             observed,
             maximum,
         },
-        litchi_iwa_archive::Error::Allocation { amount, .. } => {
-            SlideTableDimensionError::Allocation { amount }
-        },
+        litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
         litchi_iwa_archive::Error::Iwa(error) => map_core_error(error),
-        _ => SlideTableDimensionError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_core_error(error: litchi_iwa_core::Error) -> SlideTableDimensionError {
+fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
             kind,
             observed,
             maximum,
-        } => SlideTableDimensionError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_core::LimitKind::Objects => SlideTableDimensionLimitKind::PayloadObjects,
+                litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
                 litchi_iwa_core::LimitKind::Messages
-                | litchi_iwa_core::LimitKind::MessagesPerObject => {
-                    SlideTableDimensionLimitKind::PayloadMessages
-                },
-                litchi_iwa_core::LimitKind::HeaderNesting => {
-                    SlideTableDimensionLimitKind::WireNesting
-                },
+                | litchi_iwa_core::LimitKind::MessagesPerObject => LimitKind::PayloadMessages,
+                litchi_iwa_core::LimitKind::HeaderNesting => LimitKind::WireNesting,
                 litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
                 | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes
-                | litchi_iwa_core::LimitKind::SnappyFrames => {
-                    SlideTableDimensionLimitKind::EntryBytes
-                },
-                _ => SlideTableDimensionLimitKind::WireWork,
+                | litchi_iwa_core::LimitKind::SnappyFrames => LimitKind::EntryBytes,
+                _ => LimitKind::WireWork,
             },
             observed: observed as u64,
             maximum: maximum as u64,
         },
         litchi_iwa_core::Error::Allocation { requested, .. } => {
-            SlideTableDimensionError::Allocation { amount: requested }
+            Error::Allocation { amount: requested }
         },
-        _ => SlideTableDimensionError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }

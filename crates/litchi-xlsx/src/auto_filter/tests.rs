@@ -5,7 +5,11 @@ use crate::sort::SortMethod;
 use litchi_opc::PackURI;
 fn fixture(path: &str) -> Definition {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let p = litchi_opc::phys_pkg::OwnedPhysPkgReader::open(root.join(path)).unwrap();
+    let p = litchi_opc::phys_pkg::OwnedPhysPkgReader::open(
+        root.join(path),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     let u = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
     parse_auto_filter(&p.blob_for(&u).unwrap())
         .unwrap()

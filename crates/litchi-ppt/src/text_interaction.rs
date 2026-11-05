@@ -8,6 +8,7 @@ use super::hyperlink::{Interaction, InteractionLimits, InteractionTrigger, encod
 use super::package::{Error, Result};
 use super::records::Record;
 use crate::consts::RecordType;
+use crate::package::SourceLimits;
 
 /// Resource limits for text-range interaction parsing and authoring.
 #[allow(
@@ -31,6 +32,25 @@ impl Default for TextInteractionLimits {
             max_interactions: 4096,
             max_text_units: 16 * 1024 * 1024,
         }
+    }
+}
+
+/// Derive text-range limits from the selected source profile for a
+/// source-backed projection.
+pub(crate) fn limits_for_source(source: SourceLimits) -> TextInteractionLimits {
+    TextInteractionLimits {
+        interaction: InteractionLimits {
+            max_record_bytes: source.max_record_bytes(),
+            max_macro_name_bytes: source
+                .max_record_payload_bytes()
+                .min(InteractionLimits::default().max_macro_name_bytes),
+            max_events: source.max_events(),
+            max_depth: source.max_depth(),
+            max_record_payload_bytes: source.max_record_payload_bytes(),
+            max_aggregate_payload_bytes: source.max_aggregate_payload_bytes(),
+        },
+        max_interactions: source.max_events().min(4096),
+        max_text_units: source.max_record_payload_bytes().min(u32::MAX as usize) as u32,
     }
 }
 
@@ -517,7 +537,10 @@ mod tests {
     #[test]
     fn rejects_orphans_trigger_mismatch_ranges_and_limits() {
         let click = pair(InteractionTrigger::Click, TextRange::new(1, 3).unwrap());
-        let action = click.interaction.to_record().unwrap();
+        let action = click
+            .interaction
+            .to_record(&InteractionLimits::default())
+            .unwrap();
         let hover_anchor = record(
             0,
             1,

@@ -155,7 +155,7 @@ impl WireKind {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Property {
     pub(crate) pid: i32,
     pub(crate) format_id: String,
@@ -168,7 +168,10 @@ pub(crate) struct Property {
 /// Names are unique case-insensitively. Exact-name insertion replaces a value
 /// while retaining its PID; insertion with different casing is rejected as
 /// ambiguous. Iterators use lexical name order, while XML output uses PID order.
-#[derive(Debug)]
+///
+/// A clone carries the same properties, PIDs and wire kinds, and the same
+/// tolerance report.
+#[derive(Debug, Clone)]
 pub struct Props {
     pub(crate) properties: BTreeMap<String, Property>,
     pub(crate) folded_names: BTreeMap<String, String>,
@@ -212,10 +215,9 @@ impl Props {
 
     /// Validates properties reserved by Microsoft Office for a particular host.
     ///
-    /// Use this before emitting a package when the host is known. [`Self::read`]
-    /// and [`Self::write`] perform the host-independent checks automatically;
-    /// [`Self::read_for`] and [`Self::write_for`] additionally enforce the
-    /// host-specific sensitivity-label property scope.
+    /// Use this before staging a semantic metadata publication when the host
+    /// is known. [`Self::read_for`] additionally applies the host-specific
+    /// sensitivity-label property scope while reading.
     /// # Errors
     ///
     /// Returns an error when input violates OOXML constraints, exceeds a configured
@@ -254,7 +256,7 @@ impl Props {
                 base,
                 new_text,
                 MAX_TOTAL_TEXT_BYTES,
-                "custom-property text bytes",
+                crate::LimitKind::CustomPropertyTextBytes,
             )?;
             let wire = if property.wire.is_text() && matches!(value, Value::Text(_)) {
                 property.wire
@@ -272,21 +274,26 @@ impl Props {
                 "custom property name '{name}' duplicates an existing name case-insensitively"
             )));
         }
-        let actual_count = checked_increment(self.properties.len(), "custom properties")?;
+        let actual_count =
+            checked_increment(self.properties.len(), crate::LimitKind::CustomProperties)?;
         if actual_count > MAX_PROPERTIES {
-            return Err(limit("custom properties", MAX_PROPERTIES, actual_count));
+            return Err(limit(
+                crate::LimitKind::CustomProperties,
+                MAX_PROPERTIES,
+                actual_count,
+            ));
         }
         let names = checked_total(
             self.name_bytes,
             name.len(),
             MAX_TOTAL_NAME_BYTES,
-            "custom-property name bytes",
+            crate::LimitKind::CustomPropertyNameBytes,
         )?;
         let texts = checked_total(
             self.text_bytes,
             value_text_bytes(&value),
             MAX_TOTAL_TEXT_BYTES,
-            "custom-property text bytes",
+            crate::LimitKind::CustomPropertyTextBytes,
         )?;
         let pid = self
             .next_pid
@@ -365,6 +372,21 @@ impl Props {
         self.properties.is_empty()
     }
 
+    /// Whether `other` holds exactly the same names with equal values.
+    ///
+    /// This is what a reader observes: PIDs, format identifiers, the text
+    /// wire kind (`vt:lpstr` or `vt:lpwstr`) and the tolerance report are not
+    /// compared.
+    #[must_use]
+    pub fn same_values(&self, other: &Self) -> bool {
+        self.properties.len() == other.properties.len()
+            && self.properties.iter().zip(&other.properties).all(
+                |((left_name, left), (right_name, right))| {
+                    left_name == right_name && left.value == right.value
+                },
+            )
+    }
+
     pub(crate) fn insert_parsed(
         &mut self,
         name: String,
@@ -387,21 +409,26 @@ impl Props {
                 "duplicate custom property name '{name}' (names are case-insensitive)"
             )));
         }
-        let actual_count = checked_increment(self.properties.len(), "custom properties")?;
+        let actual_count =
+            checked_increment(self.properties.len(), crate::LimitKind::CustomProperties)?;
         if actual_count > MAX_PROPERTIES {
-            return Err(limit("custom properties", MAX_PROPERTIES, actual_count));
+            return Err(limit(
+                crate::LimitKind::CustomProperties,
+                MAX_PROPERTIES,
+                actual_count,
+            ));
         }
         let names = checked_total(
             self.name_bytes,
             name.len(),
             MAX_TOTAL_NAME_BYTES,
-            "custom-property name bytes",
+            crate::LimitKind::CustomPropertyNameBytes,
         )?;
         let texts = checked_total(
             self.text_bytes,
             value_text_bytes(&value),
             MAX_TOTAL_TEXT_BYTES,
-            "custom-property text bytes",
+            crate::LimitKind::CustomPropertyTextBytes,
         )?;
         self.folded_names.insert(folded, name.clone());
         self.properties.insert(
@@ -428,7 +455,7 @@ pub(crate) fn validate_value(value: &Value) -> Result<()> {
         Value::Text(text) => {
             if text.len() > MAX_TEXT_BYTES {
                 return Err(limit(
-                    "custom-property text bytes",
+                    crate::LimitKind::CustomPropertyTextBytes,
                     MAX_TEXT_BYTES,
                     text.len(),
                 ));
@@ -457,7 +484,7 @@ pub(crate) fn validate_name(name: &str) -> Result<()> {
     }
     if name.len() > MAX_NAME_BYTES {
         return Err(limit(
-            "custom-property name bytes",
+            crate::LimitKind::CustomPropertyNameBytes,
             MAX_NAME_BYTES,
             name.len(),
         ));
@@ -465,7 +492,7 @@ pub(crate) fn validate_name(name: &str) -> Result<()> {
     let chars = name.chars().count();
     if chars > MAX_NAME_CHARS {
         return Err(limit(
-            "custom-property name characters",
+            crate::LimitKind::CustomPropertyNameCharacters,
             MAX_NAME_CHARS,
             chars,
         ));

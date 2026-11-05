@@ -24,10 +24,11 @@ use litchi_core::{
     OwnedSource, ReadAt, Resource, SourceVersion,
 };
 use litchi_opc::{
-    OpcError, PackURI, ReadLimits, SourceArtifactFingerprint, SourceBackedPackage,
+    OpcError, PackURI, SourceArtifactFingerprint, SourceBackedPackage, SourceLimits,
     SourcePartSpliceLimits, SourcePartSpliceProof, SourcePartSpliceReplay,
     SourcePartSpliceReplayError, SourcePartSpliceReplayProof, SpliceResource,
 };
+use litchi_opc::{SourceCacheLimits, SourceReadPolicy};
 use sha2::{Digest as _, Sha256};
 use soapberry_zip::office::StreamingArchiveWriter;
 
@@ -75,7 +76,8 @@ fn archive_with_source(deflated: bool, source: &[u8]) -> Vec<u8> {
     let relationships = format!(
         r#"<Relationships xmlns="{RELATIONSHIPS_NS}"><Relationship Id="rDoc" Type="{OFFICE_DOCUMENT_REL}" Target="{TARGET_MEMBER}"/></Relationships>"#
     );
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .expect("content-types fixture must be writable");
@@ -116,7 +118,13 @@ fn multi_window_fragment() -> Vec<u8> {
 
 fn open(deflated: bool) -> (SourceBackedPackage, Vec<u8>) {
     let bytes = archive(deflated);
-    let package = SourceBackedPackage::from_vec(bytes.clone()).expect("fixture package must open");
+    let package = SourceBackedPackage::from_vec(
+        bytes.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .expect("fixture package must open");
     (package, bytes)
 }
 
@@ -146,14 +154,19 @@ fn proof_for(
 }
 
 fn target_bytes(archive: &[u8]) -> Vec<u8> {
-    SourceBackedPackage::from_vec(archive.to_vec())
-        .expect("published archive must open")
-        .part(&pack(TARGET_URI))
-        .expect("published target must exist")
-        .data()
-        .expect("published target must read")
-        .as_bytes()
-        .to_vec()
+    SourceBackedPackage::from_vec(
+        archive.to_vec(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .expect("published archive must open")
+    .part(&pack(TARGET_URI))
+    .expect("published target must exist")
+    .data()
+    .expect("published target must read")
+    .as_bytes()
+    .to_vec()
 }
 
 fn managed_context(memory: u64) -> (Budget, CancellationSource, ExecutionContext) {
@@ -187,6 +200,7 @@ fn publication_memory_envelope(archive_bytes: &[u8], limits: SourcePartSpliceLim
     let indexed = soapberry_zip::office::IndexedArchive::from_reader(
         Cursor::new(archive_bytes.to_vec()),
         archive_bytes.len() as u64,
+        soapberry_zip::office::ArchiveLimits::default(),
     )
     .expect("fixture archive must have an indexed memory envelope");
     let target = indexed
@@ -608,7 +622,7 @@ fn expected_replay_artifact(deflated: bool) -> (Vec<u8>, u64, SourceArtifactFing
     let provider = ReplayProvider::new(FRAGMENT, ReplayMode::Exact);
     let plan = replay_plan(&package, provider, SourcePartSpliceLimits::default());
     let mut output = Vec::new();
-    plan.write_to_stream(&mut output)
+    plan.write_to(&mut output)
         .expect("reference replay publication must succeed");
     let length = output.len() as u64;
     let hash = SourceArtifactFingerprint::from_sha256(digest(&output));
@@ -685,7 +699,7 @@ fn replay_store_and_deflate_preserve_opaque_members_and_target_bytes() {
         );
         let mut output = Vec::new();
         let publication = plan
-            .write_to_stream(&mut output)
+            .write_to(&mut output)
             .expect("replay splice must publish");
 
         assert_eq!(target_bytes(&output), candidate(SOURCE, FRAGMENT));
@@ -725,8 +739,13 @@ fn replay_512_byte_window_handles_multi_window_source_and_payload() {
 
     for deflated in [false, true] {
         let source_archive = archive_with_source(deflated, &source);
-        let package = SourceBackedPackage::from_vec(source_archive.clone())
-            .expect("multi-window fixture package must open");
+        let package = SourceBackedPackage::from_vec(
+            source_archive.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            None,
+        )
+        .expect("multi-window fixture package must open");
         let provider = ChunkedReplayProvider::new(fragment.clone(), 173);
         let plan = package
             .prepare_source_part_splice_with_replay(
@@ -737,7 +756,7 @@ fn replay_512_byte_window_handles_multi_window_source_and_payload() {
             )
             .expect("a 512-byte replay window must prepare");
         let mut output = Vec::new();
-        plan.write_to_stream(&mut output)
+        plan.write_to(&mut output)
             .expect("a multi-window replay must publish");
 
         assert_eq!(target_bytes(&output), expected);
@@ -773,7 +792,7 @@ fn replay_expected_artifact_accepts_exact_store_and_deflate_output() {
             SourcePartSpliceLimits::default(),
         );
         let mut output = Vec::new();
-        plan.write_to_stream_with_expected_artifact(&mut output, expected_len, expected_hash)
+        plan.write_to_with_expected_artifact(&mut output, expected_len, expected_hash)
             .expect("the exact expected artifact must authorize publication");
         assert_eq!(output, expected);
     }
@@ -798,7 +817,7 @@ fn replay_expected_artifact_mismatch_writes_zero_bytes() {
             );
             let mut output = Vec::new();
             let error = plan
-                .write_to_stream_with_expected_artifact(&mut output, length, hash)
+                .write_to_with_expected_artifact(&mut output, length, hash)
                 .expect_err("an expected artifact mismatch must refuse publication");
             assert!(
                 matches!(error, OpcError::SourceArtifactMismatch { .. }),
@@ -823,7 +842,7 @@ fn replay_expected_artifact_preview_failure_keeps_caller_sink_empty() {
     );
     let mut output = Vec::new();
     let error = plan
-        .write_to_stream_with_expected_artifact(&mut output, expected_len, expected_hash)
+        .write_to_with_expected_artifact(&mut output, expected_len, expected_hash)
         .expect_err("a preview reader failure must refuse publication");
     assert!(
         output.is_empty(),
@@ -845,10 +864,12 @@ fn replay_expected_artifact_charges_one_managed_output_artifact() {
         let (expected, expected_len, expected_hash) = expected_replay_artifact(deflated);
         let (budget, _cancellation, context) =
             managed_context_with_output(128 * 1024 * 1024, expected_len);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(OwnedSource::new(archive(deflated))),
-            ReadLimits::default(),
-            context,
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .expect("managed expected-artifact fixture must open");
         let plan = replay_plan(
@@ -858,7 +879,7 @@ fn replay_expected_artifact_charges_one_managed_output_artifact() {
         );
         let before = budget.used(Resource::OutputBytes);
         let mut output = Vec::new();
-        plan.write_to_stream_with_expected_artifact(&mut output, expected_len, expected_hash)
+        plan.write_to_with_expected_artifact(&mut output, expected_len, expected_hash)
             .expect("the exact output ceiling must permit one artifact");
         assert_eq!(output, expected);
         assert_eq!(
@@ -880,7 +901,7 @@ fn replay_expected_artifact_change_during_measurement_writes_zero_bytes() {
     );
     let mut output = Vec::new();
     let error = plan
-        .write_to_stream_with_expected_artifact(&mut output, expected_len, expected_hash)
+        .write_to_with_expected_artifact(&mut output, expected_len, expected_hash)
         .expect_err("a changed replay during actual measurement must be refused");
     assert!(
         matches!(
@@ -905,7 +926,7 @@ fn replay_expected_artifact_change_during_emission_is_incomplete() {
     );
     let mut output = Vec::new();
     let error = plan
-        .write_to_stream_with_expected_artifact(&mut output, expected_len, expected_hash)
+        .write_to_with_expected_artifact(&mut output, expected_len, expected_hash)
         .expect_err("a changed replay during emission must report incomplete output");
     assert!(
         matches!(error, OpcError::IncompleteOutput { .. }),
@@ -924,10 +945,12 @@ fn replay_expected_artifact_noop_releases_preview_memory_and_charges_once() {
     let expected_hash = SourceArtifactFingerprint::from_sha256(digest(&source_archive));
     let (budget, _cancellation, context) =
         managed_context_with_output(128 * 1024 * 1024, expected_len);
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(source_archive.clone())),
-        ReadLimits::default(),
-        context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .expect("managed no-op fixture must open");
     let provider = ReplayProvider::new(&[], ReplayMode::Exact);
@@ -948,7 +971,7 @@ fn replay_expected_artifact_noop_releases_preview_memory_and_charges_once() {
         budget: budget.clone(),
         peak_memory: Arc::clone(&peak_memory),
     };
-    plan.write_to_stream_with_expected_artifact(&mut sink, expected_len, expected_hash)
+    plan.write_to_with_expected_artifact(&mut sink, expected_len, expected_hash)
         .expect("the exact no-op artifact must publish");
     assert_eq!(sink.bytes, source_archive);
     assert_eq!(
@@ -1014,7 +1037,7 @@ fn replay_opens_fresh_readers_for_candidate_measurement_and_emission() {
         "candidate verification needs one reader"
     );
     let mut output = Vec::new();
-    plan.write_to_stream(&mut output)
+    plan.write_to(&mut output)
         .expect("replay publication must succeed");
     assert_eq!(
         provider.open_count(),
@@ -1101,10 +1124,12 @@ fn replay_provider_open_and_mid_read_errors_are_typed() {
 #[test]
 fn replay_reader_cancellation_is_reported_as_typed_cancelled() {
     let (_budget, cancellation, context) = managed_context(64 * 1024 * 1024);
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(archive(false))),
-        ReadLimits::default(),
-        context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .expect("managed replay fixture must open");
     let provider = CancellingReplayProvider::new(cancellation);
@@ -1155,7 +1180,7 @@ fn replay_provider_change_on_measurement_stops_before_sink_output() {
     assert_eq!(provider.open_count(), 1);
     let mut output = Vec::new();
     let error = plan
-        .write_to_stream(&mut output)
+        .write_to(&mut output)
         .expect_err("provider bytes changing for measurement must be refused");
     assert!(
         output.is_empty(),
@@ -1188,10 +1213,12 @@ fn concurrent_replay_publications_charge_one_window_per_live_reader() {
     let source_archive = archive(false);
     let limits = SourcePartSpliceLimits::default();
     let (budget, _cancellation, context) = managed_context(128 * 1024 * 1024);
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(source_archive.clone())),
-        ReadLimits::default(),
-        context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .expect("managed replay fixture must open");
     let provider = BlockingReplayProvider::new(FRAGMENT);
@@ -1233,14 +1260,14 @@ fn concurrent_replay_publications_charge_one_window_per_live_reader() {
     thread::scope(|scope| {
         let first = scope.spawn(move || {
             let mut output = Vec::new();
-            let result = first_plan.write_to_stream(&mut output);
+            let result = first_plan.write_to(&mut output);
             (result, output)
         });
         provider.wait_until_first_publication_reader();
 
         let second = scope.spawn(move || {
             let mut output = Vec::new();
-            let result = second_plan.write_to_stream(&mut output);
+            let result = second_plan.write_to(&mut output);
             (result, output)
         });
         let (second_result, second_output) = second
@@ -1306,7 +1333,7 @@ fn replay_short_sink_reports_exact_partial_output() {
     let plan = replay_plan(&package, provider, SourcePartSpliceLimits::default());
     let mut sink = PrefixFailSink::new(19);
     let error = plan
-        .write_to_stream(&mut sink)
+        .write_to(&mut sink)
         .expect_err("short sink must fail the replay publication");
     let written = match error {
         OpcError::IncompleteOutput { written, .. } => written,
@@ -1330,7 +1357,7 @@ fn replay_reader_error_during_publication_reports_accepted_output() {
         );
         let mut output = Vec::new();
         let error = plan
-            .write_to_stream(&mut output)
+            .write_to(&mut output)
             .expect_err("reader failure must refuse an incomplete publication");
         match error {
             OpcError::IncompleteOutput { written, source } => {
@@ -1423,8 +1450,14 @@ fn contains_source_change(error: &OpcError) -> bool {
 fn replay_source_change_after_sink_progress_is_incomplete() {
     let source_bytes = archive(false);
     let source = MutableSource::new(source_bytes);
-    let package = SourceBackedPackage::from_read_at(source.clone())
-        .expect("mutable replay fixture must open");
+    let package = SourceBackedPackage::from_read_at(
+        source.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .expect("mutable replay fixture must open");
     let provider = ReplayProvider::new(FRAGMENT, ReplayMode::Exact);
     let plan = replay_plan(&package, provider, SourcePartSpliceLimits::default());
     let mut sink = MutatingSink {
@@ -1433,7 +1466,7 @@ fn replay_source_change_after_sink_progress_is_incomplete() {
         mutated: false,
     };
     let error = plan
-        .write_to_stream(&mut sink)
+        .write_to(&mut sink)
         .expect_err("source mutation during replay publication must fail");
     assert!(
         contains_source_change(&error),
@@ -1465,13 +1498,13 @@ fn prepared_replay_authenticates_late_length_and_hash_failures_in_every_pass() {
                     assert_eq!(provider.open_count(), 1);
                     let mut output = Vec::new();
                     let result = if expected_artifact {
-                        plan.write_to_stream_with_expected_artifact(
+                        plan.write_to_with_expected_artifact(
                             &mut output,
                             expected_len,
                             expected_hash,
                         )
                     } else {
-                        plan.write_to_stream(&mut output)
+                        plan.write_to(&mut output)
                     };
                     let error =
                         result.expect_err("every later replay pass must authenticate bytes");

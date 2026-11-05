@@ -26,7 +26,7 @@ use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::image_adjustments_codec::{
     self as image_adjustments_codec, ImageAdjustmentsSnapshot, ImageAdjustmentsWrite,
 };
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::{Package, PhysicalSource, ReadError, SemanticLimitKind};
 use crate::slide::image::ImageSelector;
@@ -44,7 +44,7 @@ const LAYOUT_IMAGE_FLAG: u32 = 1;
 /// Resource category reported by a focused image-adjustment operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum SlideImageAdjustmentsLimitKind {
+pub enum LimitKind {
     /// Source or candidate wire bytes.
     WireBytes,
     /// Parsed fields.
@@ -63,7 +63,7 @@ pub enum SlideImageAdjustmentsLimitKind {
     OutputBytes,
 }
 
-impl fmt::Display for SlideImageAdjustmentsLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::WireBytes => "wire bytes",
@@ -79,9 +79,41 @@ impl fmt::Display for SlideImageAdjustmentsLimitKind {
 }
 
 /// Failure raised by a selector-first image-adjustment read or edit.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum SlideImageAdjustmentsError {
+pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The source graph or payload is malformed.
+    #[error("the Keynote image-adjustment source is invalid")]
+    InvalidSource,
+    /// A finite operation budget was exceeded.
+    #[error(
+        "Keynote image-adjustment {kind} limit exceeded: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        kind: LimitKind,
+        observed: u64,
+        maximum: u64,
+    },
+    /// A required temporary allocation could not be reserved.
+    #[error("could not allocate {amount} units for Keynote image adjustments")]
+    Allocation { amount: usize },
+    /// The reopened candidate did not retain the requested semantic value.
+    #[error("the edited Keynote image adjustments failed semantic verification")]
+    Verification,
+    /// The patch was created from another exact package artifact.
+    #[error("the Keynote image-adjustment patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The package does not retain an exact physical source suitable for edits.
     #[error("this Keynote source does not support physical image-adjustment edits")]
     UnsupportedSource,
@@ -103,33 +135,37 @@ pub enum SlideImageAdjustmentsError {
     /// No image matched the requested source-order position.
     #[error("the selected Keynote slide has no image at position {position:?}")]
     ImagePositionNotFound { position: Position },
-    /// The source graph or payload is malformed.
-    #[error("the Keynote image-adjustment source is invalid")]
-    InvalidSource,
-    /// A finite operation budget was exceeded.
-    #[error(
-        "Keynote image-adjustment {kind} limit exceeded: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        kind: SlideImageAdjustmentsLimitKind,
-        observed: u64,
-        maximum: u64,
-    },
-    /// A required temporary allocation could not be reserved.
-    #[error("could not allocate {amount} units for Keynote image adjustments")]
-    Allocation { amount: usize },
-    /// The reopened candidate did not retain the requested semantic value.
-    #[error("the edited Keynote image adjustments failed semantic verification")]
-    Verification,
-    /// The patch was created from another exact package artifact.
-    #[error("the Keynote image-adjustment patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. } | Self::UnsupportedDependency { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+            Self::AmbiguousSelector { .. } | Self::EmptySlideName { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::ImagePositionNotFound { .. } => RefusalKind::NotFound,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// Typed failures at the hidden host migration seam.
 #[doc(hidden)]
 #[cfg(feature = "internal-iwork-source")]
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 pub enum ImageAdjustmentsError {
     /// The strict neutral codec rejected the source or candidate.
     #[error("image-adjustments codec rejected the payload: {0}")]
@@ -140,16 +176,16 @@ pub enum ImageAdjustmentsError {
 }
 
 /// One mutable image-adjustment value staged against an immutable package.
-pub struct SlideImageAdjustmentsEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
     selection: ImageSelection,
     after: ImageAdjustments,
 }
 
-impl fmt::Debug for SlideImageAdjustmentsEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SlideImageAdjustmentsEdit")
+            .debug_struct("Edit")
             .field("slide_position", &self.selection.slide_position)
             .field("image_position", &self.selection.image_position)
             .field("before", &self.selection.before)
@@ -158,12 +194,12 @@ impl fmt::Debug for SlideImageAdjustmentsEdit<'_> {
     }
 }
 
-impl<'a> SlideImageAdjustmentsEdit<'a> {
+impl<'a> Edit<'a> {
     fn new<'slide>(
         source: &'a Package,
         slide_selector: impl Into<SlideSelector<'slide>>,
         image_selector: impl Into<ImageSelector>,
-    ) -> Result<Self, SlideImageAdjustmentsError> {
+    ) -> Result<Self, Error> {
         let mut budget = ImageBudget::for_package(source)?;
         let selection = select_image_with_budget(
             source,
@@ -204,23 +240,20 @@ impl<'a> SlideImageAdjustmentsEdit<'a> {
     }
 
     /// Replace all three optional inspector controls.
-    pub fn set(
-        mut self,
-        adjustments: ImageAdjustments,
-    ) -> Result<Self, SlideImageAdjustmentsError> {
+    pub fn set(mut self, adjustments: ImageAdjustments) -> Result<Self, Error> {
         self.after = adjustments;
         Ok(self)
     }
 
     /// Commit this exact-source edit after reopening and verifying its candidate.
-    pub fn commit(self) -> Result<SlideImageAdjustmentsCommit, SlideImageAdjustmentsError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         commit_edit(self.source, &self.selection, self.after)
     }
 }
 
 /// Exact-source checked reversible image-adjustment patch.
 #[derive(Clone, PartialEq)]
-pub struct SlideImageAdjustmentsPatch {
+pub struct Patch {
     artifacts: ExactArtifacts,
     selection: ImageSelection,
     before: ImageAdjustments,
@@ -228,10 +261,10 @@ pub struct SlideImageAdjustmentsPatch {
     touched_components: usize,
 }
 
-impl fmt::Debug for SlideImageAdjustmentsPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SlideImageAdjustmentsPatch")
+            .debug_struct("Patch")
             .field("slide_position", &self.selection.slide_position)
             .field("image_position", &self.selection.image_position)
             .field("before", &self.before)
@@ -240,7 +273,7 @@ impl fmt::Debug for SlideImageAdjustmentsPatch {
     }
 }
 
-impl SlideImageAdjustmentsPatch {
+impl Patch {
     /// Return the selected slide source position.
     #[must_use]
     pub const fn slide_position(&self) -> Position {
@@ -298,13 +331,13 @@ impl SlideImageAdjustmentsPatch {
 
 /// Compact evidence describing one image-adjustment publication.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SlideImageAdjustmentsDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     full_reparse_performed: bool,
 }
 
-impl SlideImageAdjustmentsDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -343,13 +376,13 @@ impl SlideImageAdjustmentsDiagnostics {
 /// Fully verified result of one image-adjustment transaction.
 #[must_use = "a Keynote image-adjustment commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct SlideImageAdjustmentsCommit {
+pub struct Commit {
     package: Package,
-    patch: SlideImageAdjustmentsPatch,
-    diagnostics: SlideImageAdjustmentsDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl SlideImageAdjustmentsCommit {
+impl Commit {
     /// Borrow the fully reopened package snapshot.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -362,15 +395,21 @@ impl SlideImageAdjustmentsCommit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the reversible exact-source patch.
     #[must_use]
-    pub const fn patch(&self) -> &SlideImageAdjustmentsPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Borrow compact publication diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> &SlideImageAdjustmentsDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
@@ -428,14 +467,12 @@ struct ImageBudget {
 }
 
 impl ImageBudget {
-    fn for_package(package: &Package) -> Result<Self, SlideImageAdjustmentsError> {
+    fn for_package(package: &Package) -> Result<Self, Error> {
         let limits = package.wire_limits().map_err(map_wire_error)?;
         let physical = package.state.options.archive();
-        let source = usize::try_from(physical.max_input_bytes())
-            .map_err(|_| SlideImageAdjustmentsError::InvalidSource)?;
-        let aggregate = source
-            .checked_mul(4)
-            .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+        let source =
+            usize::try_from(physical.max_input_bytes()).map_err(|_| Error::InvalidSource)?;
+        let aggregate = source.checked_mul(4).ok_or(Error::InvalidSource)?;
         let semantic = package.semantic_limits();
         Ok(Self {
             limits,
@@ -448,7 +485,7 @@ impl ImageBudget {
             max_allocations: semantic
                 .max_objects()
                 .checked_add(semantic.max_references())
-                .ok_or(SlideImageAdjustmentsError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
             max_retained: aggregate,
             input: 0,
             output: 0,
@@ -465,13 +502,11 @@ impl ImageBudget {
         current: &mut usize,
         amount: usize,
         maximum: usize,
-        kind: SlideImageAdjustmentsLimitKind,
-    ) -> Result<(), SlideImageAdjustmentsError> {
-        let observed = current
-            .checked_add(amount)
-            .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+        kind: LimitKind,
+    ) -> Result<(), Error> {
+        let observed = current.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > maximum {
-            return Err(SlideImageAdjustmentsError::LimitExceeded {
+            return Err(Error::Limit {
                 kind,
                 observed: observed as u64,
                 maximum: maximum as u64,
@@ -481,55 +516,45 @@ impl ImageBudget {
         Ok(())
     }
 
-    fn scan(
-        &mut self,
-        payload: &[u8],
-        fields: usize,
-        depth: usize,
-    ) -> Result<(), SlideImageAdjustmentsError> {
+    fn scan(&mut self, payload: &[u8], fields: usize, depth: usize) -> Result<(), Error> {
         Self::add(
             &mut self.input,
             payload.len(),
             self.max_input,
-            SlideImageAdjustmentsLimitKind::WireBytes,
+            LimitKind::WireBytes,
         )?;
         Self::add(
             &mut self.fields,
             fields,
             self.max_fields,
-            SlideImageAdjustmentsLimitKind::WireFields,
+            LimitKind::WireFields,
         )?;
         Self::add(
             &mut self.work,
             payload.len(),
             self.max_work,
-            SlideImageAdjustmentsLimitKind::WireWork,
+            LimitKind::WireWork,
         )?;
         self.nesting(depth)
     }
 
-    fn source(&mut self, amount: usize) -> Result<(), SlideImageAdjustmentsError> {
+    fn source(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.input,
             amount,
             self.max_input,
-            SlideImageAdjustmentsLimitKind::WireBytes,
+            LimitKind::WireBytes,
         )
     }
 
-    fn work(&mut self, amount: usize) -> Result<(), SlideImageAdjustmentsError> {
-        Self::add(
-            &mut self.work,
-            amount,
-            self.max_work,
-            SlideImageAdjustmentsLimitKind::WireWork,
-        )
+    fn work(&mut self, amount: usize) -> Result<(), Error> {
+        Self::add(&mut self.work, amount, self.max_work, LimitKind::WireWork)
     }
 
-    fn nesting(&mut self, depth: usize) -> Result<(), SlideImageAdjustmentsError> {
+    fn nesting(&mut self, depth: usize) -> Result<(), Error> {
         if depth > self.max_nesting {
-            return Err(SlideImageAdjustmentsError::LimitExceeded {
-                kind: SlideImageAdjustmentsLimitKind::WireNesting,
+            return Err(Error::Limit {
+                kind: LimitKind::WireNesting,
                 observed: depth as u64,
                 maximum: self.max_nesting as u64,
             });
@@ -538,39 +563,39 @@ impl ImageBudget {
         Ok(())
     }
 
-    fn references(&mut self, amount: usize) -> Result<(), SlideImageAdjustmentsError> {
+    fn references(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.references,
             amount,
             self.max_references,
-            SlideImageAdjustmentsLimitKind::References,
+            LimitKind::References,
         )
     }
 
-    fn allocations(&mut self, amount: usize) -> Result<(), SlideImageAdjustmentsError> {
+    fn allocations(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.allocations,
             amount,
             self.max_allocations,
-            SlideImageAdjustmentsLimitKind::Allocations,
+            LimitKind::Allocations,
         )
     }
 
-    fn retained(&mut self, amount: usize) -> Result<(), SlideImageAdjustmentsError> {
+    fn retained(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.retained,
             amount,
             self.max_retained,
-            SlideImageAdjustmentsLimitKind::Retained,
+            LimitKind::Retained,
         )
     }
 
-    fn output(&mut self, amount: usize) -> Result<(), SlideImageAdjustmentsError> {
+    fn output(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.output,
             amount,
             self.max_output,
-            SlideImageAdjustmentsLimitKind::OutputBytes,
+            LimitKind::OutputBytes,
         )
     }
 
@@ -578,13 +603,11 @@ impl ImageBudget {
         current: usize,
         amount: usize,
         maximum: usize,
-        kind: SlideImageAdjustmentsLimitKind,
-    ) -> Result<(), SlideImageAdjustmentsError> {
-        let observed = current
-            .checked_add(amount)
-            .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+        kind: LimitKind,
+    ) -> Result<(), Error> {
+        let observed = current.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > maximum {
-            return Err(SlideImageAdjustmentsError::LimitExceeded {
+            return Err(Error::Limit {
                 kind,
                 observed: observed as u64,
                 maximum: maximum as u64,
@@ -593,63 +616,60 @@ impl ImageBudget {
         Ok(())
     }
 
-    fn preflight_allocations(&self, amount: usize) -> Result<(), SlideImageAdjustmentsError> {
+    fn preflight_allocations(&self, amount: usize) -> Result<(), Error> {
         Self::preflight(
             self.allocations,
             amount,
             self.max_allocations,
-            SlideImageAdjustmentsLimitKind::Allocations,
+            LimitKind::Allocations,
         )
     }
 
-    fn preflight_retained(&self, amount: usize) -> Result<(), SlideImageAdjustmentsError> {
+    fn preflight_retained(&self, amount: usize) -> Result<(), Error> {
         Self::preflight(
             self.retained,
             amount,
             self.max_retained,
-            SlideImageAdjustmentsLimitKind::Retained,
+            LimitKind::Retained,
         )
     }
 
-    fn residual_wire_limits(&self) -> Result<WireLimits, SlideImageAdjustmentsError> {
-        let input = self.max_input.checked_sub(self.input).ok_or(
-            SlideImageAdjustmentsError::LimitExceeded {
-                kind: SlideImageAdjustmentsLimitKind::WireBytes,
-                observed: self.max_input.saturating_add(1) as u64,
-                maximum: self.max_input as u64,
-            },
-        )?;
+    fn residual_wire_limits(&self) -> Result<WireLimits, Error> {
+        let input = self.max_input.checked_sub(self.input).ok_or(Error::Limit {
+            kind: LimitKind::WireBytes,
+            observed: self.max_input.saturating_add(1) as u64,
+            maximum: self.max_input as u64,
+        })?;
         if input == 0 {
-            return Err(SlideImageAdjustmentsError::LimitExceeded {
-                kind: SlideImageAdjustmentsLimitKind::WireBytes,
+            return Err(Error::Limit {
+                kind: LimitKind::WireBytes,
                 observed: self.max_input.saturating_add(1) as u64,
                 maximum: self.max_input as u64,
             });
         }
-        let fields = self.max_fields.checked_sub(self.fields).ok_or(
-            SlideImageAdjustmentsError::LimitExceeded {
-                kind: SlideImageAdjustmentsLimitKind::WireFields,
+        let fields = self
+            .max_fields
+            .checked_sub(self.fields)
+            .ok_or(Error::Limit {
+                kind: LimitKind::WireFields,
                 observed: self.max_fields.saturating_add(1) as u64,
                 maximum: self.max_fields as u64,
-            },
-        )?;
+            })?;
         if fields == 0 {
-            return Err(SlideImageAdjustmentsError::LimitExceeded {
-                kind: SlideImageAdjustmentsLimitKind::WireFields,
+            return Err(Error::Limit {
+                kind: LimitKind::WireFields,
                 observed: self.max_fields.saturating_add(1) as u64,
                 maximum: self.max_fields as u64,
             });
         }
-        let work = self.max_work.checked_sub(self.work).ok_or(
-            SlideImageAdjustmentsError::LimitExceeded {
-                kind: SlideImageAdjustmentsLimitKind::WireWork,
-                observed: self.max_work.saturating_add(1) as u64,
-                maximum: self.max_work as u64,
-            },
-        )?;
+        let work = self.max_work.checked_sub(self.work).ok_or(Error::Limit {
+            kind: LimitKind::WireWork,
+            observed: self.max_work.saturating_add(1) as u64,
+            maximum: self.max_work as u64,
+        })?;
         if work == 0 {
-            return Err(SlideImageAdjustmentsError::LimitExceeded {
-                kind: SlideImageAdjustmentsLimitKind::WireWork,
+            return Err(Error::Limit {
+                kind: LimitKind::WireWork,
                 observed: self.max_work.saturating_add(1) as u64,
                 maximum: self.max_work as u64,
             });
@@ -665,20 +685,20 @@ impl ImageBudget {
     fn codec_options(
         &self,
         source: &[u8],
-    ) -> Result<image_adjustments_codec::DecodeOptions, SlideImageAdjustmentsError> {
+    ) -> Result<image_adjustments_codec::DecodeOptions, Error> {
         let limits = self.residual_wire_limits()?;
-        let recursion = u32::try_from(limits.max_nesting())
-            .map_err(|_| SlideImageAdjustmentsError::InvalidSource)?;
-        let output = self.max_output.checked_sub(self.output).ok_or(
-            SlideImageAdjustmentsError::LimitExceeded {
-                kind: SlideImageAdjustmentsLimitKind::OutputBytes,
+        let recursion = u32::try_from(limits.max_nesting()).map_err(|_| Error::InvalidSource)?;
+        let output = self
+            .max_output
+            .checked_sub(self.output)
+            .ok_or(Error::Limit {
+                kind: LimitKind::OutputBytes,
                 observed: self.max_output.saturating_add(1) as u64,
                 maximum: self.max_output as u64,
-            },
-        )?;
+            })?;
         if output == 0 {
-            return Err(SlideImageAdjustmentsError::LimitExceeded {
-                kind: SlideImageAdjustmentsLimitKind::OutputBytes,
+            return Err(Error::Limit {
+                kind: LimitKind::OutputBytes,
                 observed: self.max_output.saturating_add(1) as u64,
                 maximum: self.max_output as u64,
             });
@@ -692,45 +712,42 @@ impl ImageBudget {
         .with_max_output_bytes(output))
     }
 
-    fn codec_report(
-        &mut self,
-        report: image_adjustments_codec::DecodeReport,
-    ) -> Result<(), SlideImageAdjustmentsError> {
+    fn codec_report(&mut self, report: image_adjustments_codec::DecodeReport) -> Result<(), Error> {
         Self::add(
             &mut self.input,
             report.input_bytes(),
             self.max_input,
-            SlideImageAdjustmentsLimitKind::WireBytes,
+            LimitKind::WireBytes,
         )?;
         Self::add(
             &mut self.fields,
             report.fields(),
             self.max_fields,
-            SlideImageAdjustmentsLimitKind::WireFields,
+            LimitKind::WireFields,
         )?;
         Self::add(
             &mut self.work,
             report.work_bytes(),
             self.max_work,
-            SlideImageAdjustmentsLimitKind::WireWork,
+            LimitKind::WireWork,
         )?;
         Self::add(
             &mut self.allocations,
             report.allocations(),
             self.max_allocations,
-            SlideImageAdjustmentsLimitKind::Allocations,
+            LimitKind::Allocations,
         )?;
         Self::add(
             &mut self.retained,
             report.retained_bytes(),
             self.max_retained,
-            SlideImageAdjustmentsLimitKind::Retained,
+            LimitKind::Retained,
         )?;
         Self::add(
             &mut self.retained,
             report.scratch_bytes(),
             self.max_retained,
-            SlideImageAdjustmentsLimitKind::Retained,
+            LimitKind::Retained,
         )?;
         let depth = usize::try_from(report.max_depth()).unwrap_or(usize::MAX);
         self.nesting(depth)
@@ -739,19 +756,19 @@ impl ImageBudget {
     fn codec_requirements(
         &mut self,
         requirements: image_adjustments_codec::RewriteExecutionRequirements,
-    ) -> Result<(), SlideImageAdjustmentsError> {
+    ) -> Result<(), Error> {
         self.output(requirements.output_bytes)?;
         Self::add(
             &mut self.fields,
             requirements.fields,
             self.max_fields,
-            SlideImageAdjustmentsLimitKind::WireFields,
+            LimitKind::WireFields,
         )?;
         Self::add(
             &mut self.work,
             requirements.work_bytes,
             self.max_work,
-            SlideImageAdjustmentsLimitKind::WireWork,
+            LimitKind::WireWork,
         )?;
         self.nesting(usize::try_from(requirements.max_depth).unwrap_or(usize::MAX))?;
         self.allocations(requirements.allocations)?;
@@ -760,14 +777,14 @@ impl ImageBudget {
         Ok(())
     }
 
-    fn preflight_output(&self, amount: usize) -> Result<(), SlideImageAdjustmentsError> {
+    fn preflight_output(&self, amount: usize) -> Result<(), Error> {
         let observed = self
             .output
             .checked_add(amount)
-            .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if observed > self.max_output {
-            return Err(SlideImageAdjustmentsError::LimitExceeded {
-                kind: SlideImageAdjustmentsLimitKind::OutputBytes,
+            return Err(Error::Limit {
+                kind: LimitKind::OutputBytes,
                 observed: observed as u64,
                 maximum: self.max_output as u64,
             });
@@ -775,14 +792,11 @@ impl ImageBudget {
         Ok(())
     }
 
-    fn preflight_work(&self, amount: usize) -> Result<(), SlideImageAdjustmentsError> {
-        let observed = self
-            .work
-            .checked_add(amount)
-            .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+    fn preflight_work(&self, amount: usize) -> Result<(), Error> {
+        let observed = self.work.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > self.max_work {
-            return Err(SlideImageAdjustmentsError::LimitExceeded {
-                kind: SlideImageAdjustmentsLimitKind::WireWork,
+            return Err(Error::Limit {
+                kind: LimitKind::WireWork,
                 observed: observed as u64,
                 maximum: self.max_work as u64,
             });
@@ -790,23 +804,9 @@ impl ImageBudget {
         Ok(())
     }
 
-    fn candidate_reopen(
-        &mut self,
-        package: &Package,
-        bytes: usize,
-    ) -> Result<(), SlideImageAdjustmentsError> {
-        Self::add(
-            &mut self.input,
-            bytes,
-            self.max_input,
-            SlideImageAdjustmentsLimitKind::WireBytes,
-        )?;
-        Self::add(
-            &mut self.work,
-            bytes,
-            self.max_work,
-            SlideImageAdjustmentsLimitKind::WireWork,
-        )?;
+    fn candidate_reopen(&mut self, package: &Package, bytes: usize) -> Result<(), Error> {
+        Self::add(&mut self.input, bytes, self.max_input, LimitKind::WireBytes)?;
+        Self::add(&mut self.work, bytes, self.max_work, LimitKind::WireWork)?;
         let (allocations, retained) = package_reopen_requirements(package, bytes)?;
         self.preflight_allocations(allocations)?;
         self.preflight_retained(retained)?;
@@ -817,7 +817,7 @@ impl ImageBudget {
     fn reassembly(
         &mut self,
         requirements: litchi_iwa_archive::package::ReassemblyExecutionRequirements,
-    ) -> Result<(), SlideImageAdjustmentsError> {
+    ) -> Result<(), Error> {
         self.output(requirements.output_bytes())?;
         self.allocations(requirements.allocations())?;
         self.retained(requirements.retained_bytes())?;
@@ -832,7 +832,7 @@ impl Package {
         &self,
         slide_selector: impl Into<SlideSelector<'slide>>,
         image_selector: impl Into<ImageSelector>,
-    ) -> Result<ImageAdjustments, SlideImageAdjustmentsError> {
+    ) -> Result<ImageAdjustments, Error> {
         let mut budget = ImageBudget::for_package(self)?;
         Ok(select_image_with_budget(
             self,
@@ -849,19 +849,16 @@ impl Package {
         &self,
         slide_selector: impl Into<SlideSelector<'slide>>,
         image_selector: impl Into<ImageSelector>,
-    ) -> Result<SlideImageAdjustmentsEdit<'_>, SlideImageAdjustmentsError> {
-        SlideImageAdjustmentsEdit::new(self, slide_selector, image_selector)
+    ) -> Result<Edit<'_>, Error> {
+        Edit::new(self, slide_selector, image_selector)
     }
 
     /// Apply an exact-source checked image-adjustment patch.
-    pub fn apply_slide_image_adjustments(
-        &self,
-        patch: &SlideImageAdjustmentsPatch,
-    ) -> Result<SlideImageAdjustmentsCommit, SlideImageAdjustmentsError> {
+    pub fn apply_slide_image_adjustments(&self, patch: &Patch) -> Result<Commit, Error> {
         let catalog = physical_catalog(self)?;
         let source = catalog.shared_source();
         if !patch.artifacts.authorizes_source(&source) {
-            return Err(SlideImageAdjustmentsError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let mut budget = ImageBudget::for_package(self)?;
         budget.source(self.source_bytes().len())?;
@@ -873,21 +870,51 @@ impl Package {
             &mut budget,
         )?;
         if !same_selection(&current, &patch.selection) || current.before != patch.before {
-            return Err(SlideImageAdjustmentsError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if patch.is_noop() {
             self.validate().map_err(map_read_error)?;
-            return Ok(SlideImageAdjustmentsCommit {
+            return Ok(Commit {
                 package: self.snapshot(),
                 patch: patch.clone(),
-                diagnostics: SlideImageAdjustmentsDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         if !catalog.source_is_exact() {
-            return Err(SlideImageAdjustmentsError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         reopen_target_patch(self, patch, &mut budget)
     }
+}
+
+/// The identity of one selected slide image, shared with the image
+/// lifecycle family (record 0372).
+#[derive(Debug, Clone, Copy)]
+pub(super) struct SelectedImage {
+    pub(super) slide_position: Position,
+    pub(super) image_position: Position,
+    pub(super) slide_identifier: u64,
+    pub(super) image_identifier: u64,
+    /// Whether the image was materialized from the slide's layout.
+    pub(super) layout: bool,
+}
+
+/// Resolve one slide image under this family's strict ownership checks.
+pub(super) fn select_slide_image(
+    package: &Package,
+    slide_selector: SlideSelector<'_>,
+    image_selector: ImageSelector,
+) -> Result<SelectedImage, Error> {
+    let mut budget = ImageBudget::for_package(package)?;
+    let selection =
+        select_image_with_budget(package, slide_selector, image_selector, false, &mut budget)?;
+    Ok(SelectedImage {
+        slide_position: selection.slide_position,
+        image_position: selection.image_position,
+        slide_identifier: selection.slide_identifier,
+        image_identifier: selection.image_identifier,
+        layout: selection.layout,
+    })
 }
 
 /// Decode one borrowed complete `TSD.ImageArchive` payload for the legacy host.
@@ -964,17 +991,17 @@ fn select_image_with_budget(
     image_selector: ImageSelector,
     require_editable: bool,
     budget: &mut ImageBudget,
-) -> Result<ImageSelection, SlideImageAdjustmentsError> {
+) -> Result<ImageSelection, Error> {
     let slide_position = resolve_slide_position(package, slide_selector)?;
     let record = package
         .slide_record_at(slide_position.get())
         .map_err(map_read_error)?
-        .ok_or(SlideImageAdjustmentsError::SlidePositionNotFound {
+        .ok_or(Error::Refused(Refusal::SlidePositionNotFound {
             position: slide_position,
-        })?;
+        }))?;
     let (slide_component_name, slide) = package
         .object_with_component(record.slide_identifier)
-        .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let slide_message = unique_message(slide, SLIDE_MESSAGE_TYPE)?;
     let image_position = image_selector.as_position();
     let mut image_count = 0usize;
@@ -982,7 +1009,7 @@ fn select_image_with_budget(
     visit_references_with_callback(slide_message.1, budget, |identifier, budget| {
         let (component, image) = package
             .object_with_component(identifier)
-            .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if image
             .messages
             .iter()
@@ -991,7 +1018,7 @@ fn select_image_with_budget(
             return Ok(());
         }
         if component != slide_component_name {
-            return Err(SlideImageAdjustmentsError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let (message_index, payload) = unique_message(image, IMAGE_MESSAGE_TYPE)?;
         let (parent, layout) = image_metadata(payload, budget)?;
@@ -1003,24 +1030,22 @@ fn select_image_with_budget(
                 layout,
             });
         }
-        image_count = image_count
-            .checked_add(1)
-            .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+        image_count = image_count.checked_add(1).ok_or(Error::InvalidSource)?;
         Ok(())
     })?;
-    let entry = selected.ok_or(SlideImageAdjustmentsError::ImagePositionNotFound {
+    let entry = selected.ok_or(Error::Refused(Refusal::ImagePositionNotFound {
         position: image_position,
-    })?;
+    }))?;
     if require_editable && entry.layout {
-        return Err(SlideImageAdjustmentsError::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     let image = package
         .object(entry.identifier)
-        .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let payload = image
         .messages
         .get(entry.message_index)
-        .ok_or(SlideImageAdjustmentsError::InvalidSource)?
+        .ok_or(Error::InvalidSource)?
         .data
         .as_slice();
     let before = decode_with_budget(payload, budget)?;
@@ -1038,16 +1063,12 @@ fn select_image_with_budget(
     })
 }
 
-fn decode_with_budget(
-    payload: &[u8],
-    budget: &mut ImageBudget,
-) -> Result<ImageAdjustments, SlideImageAdjustmentsError> {
+fn decode_with_budget(payload: &[u8], budget: &mut ImageBudget) -> Result<ImageAdjustments, Error> {
     let options = budget.codec_options(payload)?;
     let (snapshot, report) =
         image_adjustments_codec::decode_image_adjustments_with_report(payload, options)
             .map_err(map_codec_error)?;
-    let adjustments = adjustments_from_snapshot(snapshot)
-        .map_err(|_| SlideImageAdjustmentsError::InvalidSource)?;
+    let adjustments = adjustments_from_snapshot(snapshot).map_err(|_| Error::InvalidSource)?;
     budget.codec_report(report)?;
     Ok(adjustments)
 }
@@ -1056,7 +1077,7 @@ fn commit_edit(
     source: &Package,
     selection: &ImageSelection,
     after: ImageAdjustments,
-) -> Result<SlideImageAdjustmentsCommit, SlideImageAdjustmentsError> {
+) -> Result<Commit, Error> {
     let catalog = physical_catalog(source)?;
     let source_bytes = catalog.shared_source();
     let mut budget = ImageBudget::for_package(source)?;
@@ -1069,23 +1090,23 @@ fn commit_edit(
         &mut budget,
     )?;
     if !same_selection(&current, selection) || current.before != selection.before {
-        return Err(SlideImageAdjustmentsError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if selection.before == after {
-        return Ok(SlideImageAdjustmentsCommit {
+        return Ok(Commit {
             package: source.snapshot(),
-            patch: SlideImageAdjustmentsPatch {
+            patch: Patch {
                 artifacts: ExactArtifacts::new(Arc::clone(&source_bytes), source_bytes),
                 selection: selection.clone(),
                 before: selection.before,
                 after,
                 touched_components: 0,
             },
-            diagnostics: SlideImageAdjustmentsDiagnostics::unchanged(),
+            diagnostics: Diagnostics::unchanged(),
         });
     }
     if !catalog.source_is_exact() {
-        return Err(SlideImageAdjustmentsError::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let candidate = rewrite_image(source, selection, after, &mut budget)?;
     candidate.validate().map_err(map_read_error)?;
@@ -1098,27 +1119,27 @@ fn commit_edit(
         &mut budget,
     )?;
     if !same_selection(&selected, selection) || selected.before != after {
-        return Err(SlideImageAdjustmentsError::Verification);
+        return Err(Error::Verification);
     }
     verify_locality(source, &candidate, selection, &mut budget)?;
-    Ok(SlideImageAdjustmentsCommit {
+    Ok(Commit {
         package: candidate,
-        patch: SlideImageAdjustmentsPatch {
+        patch: Patch {
             artifacts: ExactArtifacts::new(source_bytes, Arc::clone(&target)),
             selection: selection.clone(),
             before: selection.before,
             after,
             touched_components: 1,
         },
-        diagnostics: SlideImageAdjustmentsDiagnostics::published(),
+        diagnostics: Diagnostics::published(),
     })
 }
 
 fn reopen_target_patch(
     source: &Package,
-    patch: &SlideImageAdjustmentsPatch,
+    patch: &Patch,
     budget: &mut ImageBudget,
-) -> Result<SlideImageAdjustmentsCommit, SlideImageAdjustmentsError> {
+) -> Result<Commit, Error> {
     budget.candidate_reopen(source, patch.artifacts.target().len())?;
     let candidate =
         Package::from_source_with_options(patch.artifacts.target(), source.state.options)
@@ -1132,13 +1153,13 @@ fn reopen_target_patch(
         budget,
     )?;
     if !same_selection(&selected, &patch.selection) || selected.before != patch.after {
-        return Err(SlideImageAdjustmentsError::Verification);
+        return Err(Error::Verification);
     }
     verify_locality(source, &candidate, &patch.selection, budget)?;
-    Ok(SlideImageAdjustmentsCommit {
+    Ok(Commit {
         package: candidate,
         patch: patch.clone(),
-        diagnostics: SlideImageAdjustmentsDiagnostics::published(),
+        diagnostics: Diagnostics::published(),
     })
 }
 
@@ -1147,15 +1168,15 @@ fn rewrite_image(
     selection: &ImageSelection,
     after: ImageAdjustments,
     budget: &mut ImageBudget,
-) -> Result<Package, SlideImageAdjustmentsError> {
+) -> Result<Package, Error> {
     let catalog = physical_catalog(source)?;
     let entry = catalog
         .package()
         .iter()
         .find(|entry| entry.name() == selection.slide_component_name.as_ref())
-        .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(SlideImageAdjustmentsError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let source_archive = component_archive(source, selection.slide_component_name.as_ref())?;
     let archive_limits = source
@@ -1172,19 +1193,19 @@ fn rewrite_image(
         .map_err(map_archive_error)?;
     let object = source_archive
         .object(selection.image_identifier)
-        .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let original = object
         .messages
         .get(selection.message_index)
-        .ok_or(SlideImageAdjustmentsError::InvalidSource)?
+        .ok_or(Error::InvalidSource)?
         .data
         .as_slice();
     let source_encoded_len = source_archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_core_error)?;
     let before = decode_with_budget(original, budget)?;
     if before != selection.before {
-        return Err(SlideImageAdjustmentsError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let options = budget.codec_options(original)?;
     let prepared = image_adjustments_codec::prepare_image_adjustments_rewrite(
@@ -1201,27 +1222,20 @@ fn rewrite_image(
         original.len(),
         requirements.output_bytes,
     )?;
-    let compressed_bound =
-        SnappyStream::maximum_compressed_len(encoded_bound).map_err(map_core_error)?;
-    if compressed_bound > snappy_limits.max_compressed_stream() {
-        return Err(SlideImageAdjustmentsError::LimitExceeded {
-            kind: SlideImageAdjustmentsLimitKind::WireBytes,
-            observed: compressed_bound as u64,
-            maximum: snappy_limits.max_compressed_stream() as u64,
-        });
-    }
+    let compressed_bound = SnappyStream::maximum_compressed_len(encoded_bound, snappy_limits)
+        .map_err(map_core_error)?;
     let package_bound = source
         .source_bytes()
         .len()
         .checked_sub(entry.data().len())
         .and_then(|value| value.checked_add(compressed_bound))
-        .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.preflight_output(encoded_bound)?;
     budget.preflight_output(package_bound)?;
     budget.preflight_work(
         encoded_bound
             .checked_add(compressed_bound)
-            .ok_or(SlideImageAdjustmentsError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     let (clone_allocations, clone_retained) =
         archive_clone_requirements(source_archive, source_encoded_len)?;
@@ -1231,14 +1245,14 @@ fn rewrite_image(
     let total_allocations = clone_allocations
         .checked_add(header_allocations)
         .and_then(|amount| amount.checked_add(serialization_allocations))
-        .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.preflight_allocations(total_allocations)?;
     let temporary_retained = clone_retained
         .checked_add(header_retained)
         .and_then(|amount| amount.checked_add(serialization_retained))
         .and_then(|amount| amount.checked_add(encoded_bound))
         .and_then(|amount| amount.checked_add(compressed_bound))
-        .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.preflight_retained(temporary_retained)?;
     budget.allocations(total_allocations)?;
     budget.retained(clone_retained)?;
@@ -1251,12 +1265,12 @@ fn rewrite_image(
         .into_output();
     let verified = decode_with_budget(&rewritten, budget)?;
     if verified != after {
-        return Err(SlideImageAdjustmentsError::Verification);
+        return Err(Error::Verification);
     }
     archive
         .object_mut(selection.image_identifier)
-        .ok_or(SlideImageAdjustmentsError::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .ok_or(Error::InvalidSource)?
+        .replace_message_preserving_header(
             selection.message_index,
             RawMessage {
                 type_: IMAGE_MESSAGE_TYPE,
@@ -1265,12 +1279,10 @@ fn rewrite_image(
             archive_limits,
         )
         .map_err(map_core_error)?;
-    let bytes = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
+    let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     budget.output(bytes.len())?;
     budget.retained(bytes.len())?;
-    let compressed = SnappyStream::compress(&bytes).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
     budget.retained(compressed.len())?;
     let edits = [EntryEdit::new(
         selection.slide_component_name.as_ref(),
@@ -1293,11 +1305,11 @@ fn verify_locality(
     candidate: &Package,
     selection: &ImageSelection,
     budget: &mut ImageBudget,
-) -> Result<(), SlideImageAdjustmentsError> {
+) -> Result<(), Error> {
     let source_catalog = physical_catalog(source)?;
     let candidate_catalog = physical_catalog(candidate)?;
     if source_catalog.package().len() != candidate_catalog.package().len() {
-        return Err(SlideImageAdjustmentsError::Verification);
+        return Err(Error::Verification);
     }
     for source_entry in source_catalog.package().iter() {
         budget.work(source_entry.name().len().saturating_add(1))?;
@@ -1305,17 +1317,17 @@ fn verify_locality(
             .package()
             .iter()
             .find(|entry| entry.name() == source_entry.name())
-            .ok_or(SlideImageAdjustmentsError::Verification)?;
+            .ok_or(Error::Verification)?;
         if source_entry.name() != selection.slide_component_name.as_ref()
             && source_entry.data() != candidate_entry.data()
         {
-            return Err(SlideImageAdjustmentsError::Verification);
+            return Err(Error::Verification);
         }
     }
     let source_archive = component_archive(source, selection.slide_component_name.as_ref())?;
     let candidate_archive = component_archive(candidate, selection.slide_component_name.as_ref())?;
     if source_archive.objects.len() != candidate_archive.objects.len() {
-        return Err(SlideImageAdjustmentsError::Verification);
+        return Err(Error::Verification);
     }
     let archive_limits = source
         .state
@@ -1328,15 +1340,15 @@ fn verify_locality(
         let identifier = source_object
             .archive_info
             .identifier
-            .ok_or(SlideImageAdjustmentsError::Verification)?;
+            .ok_or(Error::Verification)?;
         let candidate_object = candidate_archive
             .object(identifier)
-            .ok_or(SlideImageAdjustmentsError::Verification)?;
+            .ok_or(Error::Verification)?;
         if identifier == selection.image_identifier {
             let candidate_message = candidate_object
                 .messages
                 .get(selection.message_index)
-                .ok_or(SlideImageAdjustmentsError::Verification)?;
+                .ok_or(Error::Verification)?;
             let (clone_allocations, clone_retained) = archive_object_clone_requirements(
                 source_object,
                 candidate_object,
@@ -1352,7 +1364,7 @@ fn verify_locality(
                 data: candidate_message.data.clone(),
             };
             expected
-                .replace_message_preserving_header_with_limits(
+                .replace_message_preserving_header(
                     selection.message_index,
                     replacement,
                     archive_limits,
@@ -1361,10 +1373,10 @@ fn verify_locality(
             expected.header_length = candidate_object.header_length;
             expected.data_length = candidate_object.data_length;
             if !expected.same_content_ignoring_offsets(candidate_object) {
-                return Err(SlideImageAdjustmentsError::Verification);
+                return Err(Error::Verification);
             }
         } else if !source_object.same_content_ignoring_offsets(candidate_object) {
-            return Err(SlideImageAdjustmentsError::Verification);
+            return Err(Error::Verification);
         }
     }
     Ok(())
@@ -1373,7 +1385,7 @@ fn verify_locality(
 fn component_archive<'package>(
     package: &'package Package,
     name: &str,
-) -> Result<&'package Archive, SlideImageAdjustmentsError> {
+) -> Result<&'package Archive, Error> {
     physical_catalog(package)?;
     package
         .state
@@ -1382,32 +1394,31 @@ fn component_archive<'package>(
         .iter()
         .find(|component| component.name() == name)
         .map(|component| component.archive())
-        .ok_or(SlideImageAdjustmentsError::InvalidSource)
+        .ok_or(Error::InvalidSource)
 }
 
 fn rewritten_archive_bound(
     source_encoded_len: usize,
     original_len: usize,
     replacement_len: usize,
-) -> Result<usize, SlideImageAdjustmentsError> {
+) -> Result<usize, Error> {
     const MAX_REWRITE_FRAMING_GROWTH: usize = 64;
     source_encoded_len
         .checked_sub(original_len)
         .and_then(|value| value.checked_add(replacement_len))
         .and_then(|value| value.checked_add(MAX_REWRITE_FRAMING_GROWTH))
-        .ok_or(SlideImageAdjustmentsError::InvalidSource)
+        .ok_or(Error::InvalidSource)
 }
 
 fn archive_header_rewrite_requirements(
     object: &litchi_iwa_core::ArchiveObject,
-) -> Result<(usize, usize), SlideImageAdjustmentsError> {
-    let header = usize::try_from(object.header_length)
-        .map_err(|_| SlideImageAdjustmentsError::InvalidSource)?;
+) -> Result<(usize, usize), Error> {
+    let header = usize::try_from(object.header_length).map_err(|_| Error::InvalidSource)?;
     let retained = header
         .checked_add(64)
         .and_then(|header| header.checked_mul(3))
-        .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
-    // replace_message_preserving_header_with_limits constructs canonical,
+        .ok_or(Error::InvalidSource)?;
+    // replace_message_preserving_header constructs canonical,
     // rewritten, and post-mutation header buffers before publishing the
     // changed message.  The core API currently exposes no fallible clone of
     // those internal buffers, so the focused owner admits their bounded
@@ -1415,17 +1426,14 @@ fn archive_header_rewrite_requirements(
     Ok((3, retained))
 }
 
-fn archive_serialization_requirements(
-    archive: &Archive,
-) -> Result<(usize, usize), SlideImageAdjustmentsError> {
+fn archive_serialization_requirements(archive: &Archive) -> Result<(usize, usize), Error> {
     let mut retained = 0usize;
     for object in &archive.objects {
-        let header = usize::try_from(object.header_length)
-            .map_err(|_| SlideImageAdjustmentsError::InvalidSource)?;
+        let header = usize::try_from(object.header_length).map_err(|_| Error::InvalidSource)?;
         retained = retained
             .checked_add(header)
             .and_then(|amount| amount.checked_add(64))
-            .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     // One output Vec, one Snappy output Vec, and one temporary encoded header
     // per archive object.  Snappy's internal workspace remains governed by
@@ -1435,14 +1443,14 @@ fn archive_serialization_requirements(
         .objects
         .len()
         .checked_add(2)
-        .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     Ok((allocations, retained))
 }
 
 fn archive_clone_requirements(
     archive: &Archive,
     encoded_len: usize,
-) -> Result<(usize, usize), SlideImageAdjustmentsError> {
+) -> Result<(usize, usize), Error> {
     // `encoded_len` covers the source payload and its retained physical
     // framing.  The remaining accounting covers the decoded container
     // vectors, nested metadata vectors, and cloned raw-header boxes.  This
@@ -1466,17 +1474,15 @@ fn archive_clone_requirements(
         // A parsed object with a framed header can retain at most both boxes;
         // reserve that upper bound from the public framing length.
         if object.header_length != 0 {
-            allocations = allocations
-                .checked_add(2)
-                .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+            allocations = allocations.checked_add(2).ok_or(Error::InvalidSource)?;
             retained = retained
                 .checked_add(
                     usize::try_from(object.header_length)
-                        .map_err(|_| SlideImageAdjustmentsError::InvalidSource)?
+                        .map_err(|_| Error::InvalidSource)?
                         .checked_mul(2)
-                        .ok_or(SlideImageAdjustmentsError::InvalidSource)?,
+                        .ok_or(Error::InvalidSource)?,
                 )
-                .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
         }
         for message in &object.messages {
             add_clone_bytes(message.data.len(), &mut allocations, &mut retained)?;
@@ -1540,7 +1546,7 @@ fn archive_clone_requirements(
 fn package_reopen_requirements(
     package: &Package,
     source_bytes: usize,
-) -> Result<(usize, usize), SlideImageAdjustmentsError> {
+) -> Result<(usize, usize), Error> {
     let archive_limits = package
         .state
         .options
@@ -1561,73 +1567,63 @@ fn package_reopen_requirements(
     // the metadata sizes visible at this boundary without pretending to
     // account for every private parser temporary.
     for entry in entries {
-        allocations = allocations
-            .checked_add(1)
-            .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+        allocations = allocations.checked_add(1).ok_or(Error::InvalidSource)?;
         let entry_slots = 2usize
             .checked_mul(size_of::<usize>())
-            .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         retained = retained
             .checked_add(entry.name().len())
             .and_then(|value| value.checked_add(entry_slots))
-            .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     if !components.is_empty() {
-        allocations = allocations
-            .checked_add(1)
-            .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+        allocations = allocations.checked_add(1).ok_or(Error::InvalidSource)?;
         let component_slots = components
             .len()
             .checked_mul(2)
             .and_then(|count| count.checked_mul(size_of::<usize>()))
-            .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         retained = retained
             .checked_add(component_slots)
-            .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     for component in components.iter() {
-        allocations = allocations
-            .checked_add(1)
-            .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+        allocations = allocations.checked_add(1).ok_or(Error::InvalidSource)?;
         retained = retained
             .checked_add(component.name().len())
-            .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         object_count = object_count
             .checked_add(component.archive().objects.len())
-            .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let encoded_len = component
             .archive()
-            .encoded_len_with_limits(archive_limits)
+            .encoded_len(archive_limits)
             .map_err(map_core_error)?;
         let (archive_allocations, archive_retained) =
             archive_clone_requirements(component.archive(), encoded_len)?;
         allocations = allocations
             .checked_add(archive_allocations)
-            .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         retained = retained
             .checked_add(archive_retained)
-            .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     if object_count != 0 {
-        allocations = allocations
-            .checked_add(1)
-            .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+        allocations = allocations.checked_add(1).ok_or(Error::InvalidSource)?;
         retained = retained
             .checked_add(
                 object_count
                     .checked_mul(size_of::<(u64, usize, usize)>())
-                    .ok_or(SlideImageAdjustmentsError::InvalidSource)?,
+                    .ok_or(Error::InvalidSource)?,
             )
-            .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     // Conversion of the reassembly Vec into the package's shared source may
     // require a second immutable allocation before the temporary Vec drops.
-    allocations = allocations
-        .checked_add(1)
-        .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+    allocations = allocations.checked_add(1).ok_or(Error::InvalidSource)?;
     retained = retained
         .checked_add(source_bytes)
-        .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     Ok((allocations, retained))
 }
 
@@ -1635,20 +1631,18 @@ fn add_clone_vec<T>(
     length: usize,
     allocations: &mut usize,
     retained: &mut usize,
-) -> Result<(), SlideImageAdjustmentsError> {
+) -> Result<(), Error> {
     if length == 0 {
         return Ok(());
     }
-    *allocations = allocations
-        .checked_add(1)
-        .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+    *allocations = allocations.checked_add(1).ok_or(Error::InvalidSource)?;
     *retained = retained
         .checked_add(
             length
                 .checked_mul(size_of::<T>())
-                .ok_or(SlideImageAdjustmentsError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )
-        .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     Ok(())
 }
 
@@ -1656,7 +1650,7 @@ fn add_clone_bytes(
     length: usize,
     allocations: &mut usize,
     retained: &mut usize,
-) -> Result<(), SlideImageAdjustmentsError> {
+) -> Result<(), Error> {
     add_clone_vec::<u8>(length, allocations, retained)
 }
 
@@ -1664,7 +1658,7 @@ fn archive_object_clone_requirements(
     source: &litchi_iwa_core::ArchiveObject,
     candidate: &litchi_iwa_core::ArchiveObject,
     replacement_len: usize,
-) -> Result<(usize, usize), SlideImageAdjustmentsError> {
+) -> Result<(usize, usize), Error> {
     let mut allocations = 0usize;
     let mut retained = size_of::<litchi_iwa_core::ArchiveObject>();
     add_clone_vec::<RawMessage>(source.messages.len(), &mut allocations, &mut retained)?;
@@ -1729,48 +1723,43 @@ fn archive_object_clone_requirements(
         }
     }
     if source.header_length != 0 {
-        allocations = allocations
-            .checked_add(2)
-            .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+        allocations = allocations.checked_add(2).ok_or(Error::InvalidSource)?;
         retained = retained
             .checked_add(
                 usize::try_from(source.header_length)
-                    .map_err(|_| SlideImageAdjustmentsError::InvalidSource)?
+                    .map_err(|_| Error::InvalidSource)?
                     .checked_mul(2)
-                    .ok_or(SlideImageAdjustmentsError::InvalidSource)?,
+                    .ok_or(Error::InvalidSource)?,
             )
-            .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     // The selected candidate message is cloned into the expected object.  A
     // header-preserving replacement also builds bounded before/rewritten/after
     // header buffers before it publishes the mutation.
     add_clone_bytes(replacement_len, &mut allocations, &mut retained)?;
-    let source_header = usize::try_from(source.header_length)
-        .map_err(|_| SlideImageAdjustmentsError::InvalidSource)?;
-    let candidate_header = usize::try_from(candidate.header_length)
-        .map_err(|_| SlideImageAdjustmentsError::InvalidSource)?;
+    let source_header = usize::try_from(source.header_length).map_err(|_| Error::InvalidSource)?;
+    let candidate_header =
+        usize::try_from(candidate.header_length).map_err(|_| Error::InvalidSource)?;
     let header_scratch = source_header
         .checked_add(candidate_header)
         .and_then(|bytes| bytes.checked_mul(3))
-        .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
-    allocations = allocations
-        .checked_add(3)
-        .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
+    allocations = allocations.checked_add(3).ok_or(Error::InvalidSource)?;
     retained = retained
         .checked_add(header_scratch)
-        .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     Ok((allocations, retained))
 }
 
 fn resolve_slide_position(
     package: &Package,
     selector: SlideSelector<'_>,
-) -> Result<Position, SlideImageAdjustmentsError> {
+) -> Result<Position, Error> {
     match selector {
         SlideSelector::Position(position) => Ok(position),
         SlideSelector::Name(name) => {
             if name.is_empty() {
-                return Err(SlideImageAdjustmentsError::EmptySlideName);
+                return Err(Error::Refused(Refusal::EmptySlideName));
             }
             package
                 .show()
@@ -1778,7 +1767,7 @@ fn resolve_slide_position(
                 .select_slide(selector)
                 .map_err(map_slide_selector_error)?
                 .map(|slide| Position::new(slide.index()))
-                .ok_or(SlideImageAdjustmentsError::SlideNameNotFound)
+                .ok_or(Error::Refused(Refusal::SlideNameNotFound))
         },
     }
 }
@@ -1787,12 +1776,12 @@ fn visit_references_with_callback<F>(
     payload: &[u8],
     budget: &mut ImageBudget,
     mut callback: F,
-) -> Result<(), SlideImageAdjustmentsError>
+) -> Result<(), Error>
 where
-    F: FnMut(u64, &mut ImageBudget) -> Result<(), SlideImageAdjustmentsError>,
+    F: FnMut(u64, &mut ImageBudget) -> Result<(), Error>,
 {
-    let fields = WireView::parse_with_limits(payload, budget.residual_wire_limits()?)
-        .map_err(map_wire_error)?;
+    let fields =
+        WireView::parse(payload, budget.residual_wire_limits()?).map_err(map_wire_error)?;
     budget.scan(payload, fields.len(), 1)?;
     let count = fields
         .fields()
@@ -1806,10 +1795,10 @@ where
         .filter(|field| field.number() == SLIDE_OWNED_DRAWABLES_FIELD)
     {
         if field.wire_type() != 2 {
-            return Err(SlideImageAdjustmentsError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field.validate_canonical_framing().map_err(map_wire_error)?;
-        let nested = WireView::parse_with_limits(field.payload(), budget.residual_wire_limits()?)
+        let nested = WireView::parse(field.payload(), budget.residual_wire_limits()?)
             .map_err(map_wire_error)?;
         budget.scan(field.payload(), nested.len(), 2)?;
         strict_reference_view(&nested)?;
@@ -1819,14 +1808,14 @@ where
         .fields()
         .filter(|field| field.number() == SLIDE_OWNED_DRAWABLES_FIELD)
     {
-        let nested = WireView::parse_with_limits(field.payload(), budget.residual_wire_limits()?)
+        let nested = WireView::parse(field.payload(), budget.residual_wire_limits()?)
             .map_err(map_wire_error)?;
         callback(strict_reference_view(&nested)?, budget)?;
     }
     Ok(())
 }
 
-fn strict_reference_view(fields: &WireView<'_>) -> Result<u64, SlideImageAdjustmentsError> {
+fn strict_reference_view(fields: &WireView<'_>) -> Result<u64, Error> {
     let mut identifier = None;
     for reference in fields.fields() {
         reference.validate_canonical_key().map_err(map_wire_error)?;
@@ -1836,28 +1825,25 @@ fn strict_reference_view(fields: &WireView<'_>) -> Result<u64, SlideImageAdjustm
         match reference.number() {
             1 => {
                 if reference.wire_type() != 0 || identifier.is_some() {
-                    return Err(SlideImageAdjustmentsError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 let (value, width) = decode_varint_from_bytes(reference.payload())
-                    .map_err(|_| SlideImageAdjustmentsError::InvalidSource)?;
+                    .map_err(|_| Error::InvalidSource)?;
                 if value == 0 || width != encoded_len(value) {
-                    return Err(SlideImageAdjustmentsError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 identifier = Some(value);
             },
-            2 | 3 => return Err(SlideImageAdjustmentsError::InvalidSource),
+            2 | 3 => return Err(Error::InvalidSource),
             _ => {},
         }
     }
-    identifier.ok_or(SlideImageAdjustmentsError::InvalidSource)
+    identifier.ok_or(Error::InvalidSource)
 }
 
-fn image_metadata(
-    payload: &[u8],
-    budget: &mut ImageBudget,
-) -> Result<(u64, bool), SlideImageAdjustmentsError> {
-    let fields = WireView::parse_with_limits(payload, budget.residual_wire_limits()?)
-        .map_err(map_wire_error)?;
+fn image_metadata(payload: &[u8], budget: &mut ImageBudget) -> Result<(u64, bool), Error> {
+    let fields =
+        WireView::parse(payload, budget.residual_wire_limits()?).map_err(map_wire_error)?;
     budget.scan(payload, fields.len(), 1)?;
     let mut parent = None;
     let mut seen_super = false;
@@ -1869,12 +1855,11 @@ fn image_metadata(
         match field.number() {
             IMAGE_SUPER_FIELD => {
                 if seen_super || field.wire_type() != 2 {
-                    return Err(SlideImageAdjustmentsError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 seen_super = true;
-                let nested =
-                    WireView::parse_with_limits(field.payload(), budget.residual_wire_limits()?)
-                        .map_err(map_wire_error)?;
+                let nested = WireView::parse(field.payload(), budget.residual_wire_limits()?)
+                    .map_err(map_wire_error)?;
                 budget.scan(field.payload(), nested.len(), 2)?;
                 let mut found = None;
                 for inner in nested.fields() {
@@ -1882,7 +1867,7 @@ fn image_metadata(
                     inner.validate_canonical_framing().map_err(map_wire_error)?;
                     if inner.number() == DRAWABLE_PARENT_FIELD {
                         if found.is_some() || inner.wire_type() != 2 {
-                            return Err(SlideImageAdjustmentsError::InvalidSource);
+                            return Err(Error::InvalidSource);
                         }
                         found = Some(strict_reference_payload(inner.payload(), budget)?);
                     }
@@ -1891,47 +1876,43 @@ fn image_metadata(
             },
             IMAGE_FLAGS_FIELD => {
                 if flags.is_some() || field.wire_type() != 0 {
-                    return Err(SlideImageAdjustmentsError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
-                let (value, width) = decode_varint_from_bytes(field.payload())
-                    .map_err(|_| SlideImageAdjustmentsError::InvalidSource)?;
+                let (value, width) =
+                    decode_varint_from_bytes(field.payload()).map_err(|_| Error::InvalidSource)?;
                 if width != encoded_len(value) {
-                    return Err(SlideImageAdjustmentsError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
-                let value =
-                    u32::try_from(value).map_err(|_| SlideImageAdjustmentsError::InvalidSource)?;
+                let value = u32::try_from(value).map_err(|_| Error::InvalidSource)?;
                 flags = Some(value);
             },
             IMAGE_DATA_FIELD => {
                 if data.is_some() || field.wire_type() != 2 {
-                    return Err(SlideImageAdjustmentsError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 data = Some(strict_reference_payload(field.payload(), budget)?);
             },
             _ => {},
         }
     }
-    let _data_identifier = data.ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+    let _data_identifier = data.ok_or(Error::InvalidSource)?;
     Ok((
-        parent.ok_or(SlideImageAdjustmentsError::InvalidSource)?,
+        parent.ok_or(Error::InvalidSource)?,
         flags.unwrap_or(0) & LAYOUT_IMAGE_FLAG != 0,
     ))
 }
 
-fn validate_image_parent(parent: u64, expected: u64) -> Result<(), SlideImageAdjustmentsError> {
+fn validate_image_parent(parent: u64, expected: u64) -> Result<(), Error> {
     if parent == expected {
         Ok(())
     } else {
-        Err(SlideImageAdjustmentsError::InvalidSource)
+        Err(Error::InvalidSource)
     }
 }
 
-fn strict_reference_payload(
-    payload: &[u8],
-    budget: &mut ImageBudget,
-) -> Result<u64, SlideImageAdjustmentsError> {
-    let fields = WireView::parse_with_limits(payload, budget.residual_wire_limits()?)
-        .map_err(map_wire_error)?;
+fn strict_reference_payload(payload: &[u8], budget: &mut ImageBudget) -> Result<u64, Error> {
+    let fields =
+        WireView::parse(payload, budget.residual_wire_limits()?).map_err(map_wire_error)?;
     budget.scan(payload, fields.len(), 3)?;
     let mut identifier = None;
     for field in fields.fields() {
@@ -1940,28 +1921,28 @@ fn strict_reference_payload(
         match field.number() {
             1 => {
                 if field.wire_type() != 0 || identifier.is_some() {
-                    return Err(SlideImageAdjustmentsError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
-                let (value, width) = decode_varint_from_bytes(field.payload())
-                    .map_err(|_| SlideImageAdjustmentsError::InvalidSource)?;
+                let (value, width) =
+                    decode_varint_from_bytes(field.payload()).map_err(|_| Error::InvalidSource)?;
                 if value == 0 || width != encoded_len(value) {
-                    return Err(SlideImageAdjustmentsError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 identifier = Some(value);
             },
-            2 | 3 => return Err(SlideImageAdjustmentsError::InvalidSource),
+            2 | 3 => return Err(Error::InvalidSource),
             _ => {},
         }
     }
-    identifier.ok_or(SlideImageAdjustmentsError::InvalidSource)
+    identifier.ok_or(Error::InvalidSource)
 }
 
 fn unique_message(
     object: &litchi_iwa_core::ArchiveObject,
     message_type: u32,
-) -> Result<(usize, &[u8]), SlideImageAdjustmentsError> {
+) -> Result<(usize, &[u8]), Error> {
     if object.messages.len() != object.archive_info.message_infos.len() {
-        return Err(SlideImageAdjustmentsError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut selected = None;
     for (index, message) in object.messages.iter().enumerate() {
@@ -1969,19 +1950,19 @@ fn unique_message(
             .archive_info
             .message_infos
             .get(index)
-            .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if info.type_ != message.type_
             || usize::try_from(info.length).ok() != Some(message.data.len())
         {
-            return Err(SlideImageAdjustmentsError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if message.type_ == message_type
             && selected.replace((index, message.data.as_slice())).is_some()
         {
-            return Err(SlideImageAdjustmentsError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
-    selected.ok_or(SlideImageAdjustmentsError::InvalidSource)
+    selected.ok_or(Error::InvalidSource)
 }
 
 fn ensure_unique_image_owner(
@@ -1989,7 +1970,7 @@ fn ensure_unique_image_owner(
     slide_identifier: u64,
     image_identifier: u64,
     budget: &mut ImageBudget,
-) -> Result<(), SlideImageAdjustmentsError> {
+) -> Result<(), Error> {
     let mut occurrences = 0usize;
     let mut selected_occurrences = 0usize;
     for component in package.state.source.components().iter() {
@@ -2004,13 +1985,11 @@ fn ensure_unique_image_owner(
             let (_, slide_payload) = unique_message(object, SLIDE_MESSAGE_TYPE)?;
             visit_references_with_callback(slide_payload, budget, |reference, _budget| {
                 if reference == image_identifier {
-                    occurrences = occurrences
-                        .checked_add(1)
-                        .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+                    occurrences = occurrences.checked_add(1).ok_or(Error::InvalidSource)?;
                     if object.archive_info.identifier == Some(slide_identifier) {
                         selected_occurrences = selected_occurrences
                             .checked_add(1)
-                            .ok_or(SlideImageAdjustmentsError::InvalidSource)?;
+                            .ok_or(Error::InvalidSource)?;
                     }
                 }
                 Ok(())
@@ -2018,7 +1997,7 @@ fn ensure_unique_image_owner(
         }
     }
     if occurrences != 1 || selected_occurrences != 1 {
-        return Err(SlideImageAdjustmentsError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -2034,35 +2013,31 @@ fn same_selection(left: &ImageSelection, right: &ImageSelection) -> bool {
         && left.layout == right.layout
 }
 
-fn physical_catalog(
-    package: &Package,
-) -> Result<&litchi_iwa_archive::SourceCatalog, SlideImageAdjustmentsError> {
+fn physical_catalog(package: &Package) -> Result<&litchi_iwa_archive::SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
-        PhysicalSource::Semantic(_) => Err(SlideImageAdjustmentsError::UnsupportedSource),
+        PhysicalSource::Semantic(_) => Err(Error::Refused(Refusal::UnsupportedSource)),
     }
 }
 
-fn map_slide_selector_error(error: SlideSelectorError) -> SlideImageAdjustmentsError {
+fn map_slide_selector_error(error: SlideSelectorError) -> Error {
     match error {
-        SlideSelectorError::DuplicateSlideName { .. } => {
-            SlideImageAdjustmentsError::AmbiguousSelector
-        },
-        SlideSelectorError::EmptySlideName => SlideImageAdjustmentsError::EmptySlideName,
+        SlideSelectorError::DuplicateSlideName { .. } => Error::Refused(Refusal::AmbiguousSelector),
+        SlideSelectorError::EmptySlideName => Error::Refused(Refusal::EmptySlideName),
     }
 }
 
-fn map_read_error(error: ReadError) -> SlideImageAdjustmentsError {
+fn map_read_error(error: ReadError) -> Error {
     match error {
         ReadError::SemanticLimit {
             kind,
             observed,
             maximum,
             ..
-        } => SlideImageAdjustmentsError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                SemanticLimitKind::References => SlideImageAdjustmentsLimitKind::References,
-                _ => SlideImageAdjustmentsLimitKind::WireWork,
+                SemanticLimitKind::References => LimitKind::References,
+                _ => LimitKind::WireWork,
             },
             observed: observed as u64,
             maximum: maximum as u64,
@@ -2072,133 +2047,105 @@ fn map_read_error(error: ReadError) -> SlideImageAdjustmentsError {
             observed,
             maximum,
             ..
-        } => SlideImageAdjustmentsError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                super::PayloadLimitKind::Bytes => SlideImageAdjustmentsLimitKind::WireBytes,
-                super::PayloadLimitKind::Fields => SlideImageAdjustmentsLimitKind::WireFields,
-                super::PayloadLimitKind::Nesting => SlideImageAdjustmentsLimitKind::WireNesting,
-                super::PayloadLimitKind::Work => SlideImageAdjustmentsLimitKind::WireWork,
+                super::PayloadLimitKind::Bytes => LimitKind::WireBytes,
+                super::PayloadLimitKind::Fields => LimitKind::WireFields,
+                super::PayloadLimitKind::Nesting => LimitKind::WireNesting,
+                super::PayloadLimitKind::Work => LimitKind::WireWork,
             },
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        ReadError::Allocation { amount, .. } => SlideImageAdjustmentsError::Allocation { amount },
-        _ => SlideImageAdjustmentsError::InvalidSource,
+        ReadError::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_codec_error(error: image_adjustments_codec::DecodeError) -> SlideImageAdjustmentsError {
+fn map_codec_error(error: image_adjustments_codec::DecodeError) -> Error {
     if let Some(limit) = error.limit_kind() {
         let (observed, maximum) = error.limit_values().unwrap_or((0, 0));
         let kind = match limit {
-            image_adjustments_codec::DecodeLimit::InputBytes => {
-                SlideImageAdjustmentsLimitKind::WireBytes
-            },
+            image_adjustments_codec::DecodeLimit::InputBytes => LimitKind::WireBytes,
             image_adjustments_codec::DecodeLimit::OutputBytes
-            | image_adjustments_codec::DecodeLimit::Retained => {
-                SlideImageAdjustmentsLimitKind::OutputBytes
-            },
-            image_adjustments_codec::DecodeLimit::Fields => {
-                SlideImageAdjustmentsLimitKind::WireFields
-            },
-            image_adjustments_codec::DecodeLimit::Nesting => {
-                SlideImageAdjustmentsLimitKind::WireNesting
-            },
+            | image_adjustments_codec::DecodeLimit::Retained => LimitKind::OutputBytes,
+            image_adjustments_codec::DecodeLimit::Fields => LimitKind::WireFields,
+            image_adjustments_codec::DecodeLimit::Nesting => LimitKind::WireNesting,
             image_adjustments_codec::DecodeLimit::Work
             | image_adjustments_codec::DecodeLimit::Allocations
-            | image_adjustments_codec::DecodeLimit::Scratch => {
-                SlideImageAdjustmentsLimitKind::WireWork
-            },
-            _ => SlideImageAdjustmentsLimitKind::WireWork,
+            | image_adjustments_codec::DecodeLimit::Scratch => LimitKind::WireWork,
+            _ => LimitKind::WireWork,
         };
-        return SlideImageAdjustmentsError::LimitExceeded {
+        return Error::Limit {
             kind,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
-    SlideImageAdjustmentsError::InvalidSource
+    Error::InvalidSource
 }
 
-fn map_wire_error(error: litchi_iwa_common::Error) -> SlideImageAdjustmentsError {
+fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
     match error {
         litchi_iwa_common::Error::LimitExceeded {
             kind,
             observed,
             limit,
-        } => SlideImageAdjustmentsError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_common::LimitKind::InputBytes => {
-                    SlideImageAdjustmentsLimitKind::WireBytes
-                },
-                litchi_iwa_common::LimitKind::Fields => SlideImageAdjustmentsLimitKind::WireFields,
-                litchi_iwa_common::LimitKind::OutputBytes => {
-                    SlideImageAdjustmentsLimitKind::OutputBytes
-                },
-                litchi_iwa_common::LimitKind::Nesting => {
-                    SlideImageAdjustmentsLimitKind::WireNesting
-                },
+                litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
+                litchi_iwa_common::LimitKind::Fields => LimitKind::WireFields,
+                litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_common::LimitKind::Nesting => LimitKind::WireNesting,
                 litchi_iwa_common::LimitKind::RewriteWork
                 | litchi_iwa_common::LimitKind::TableRows
                 | litchi_iwa_common::LimitKind::TableColumns
                 | litchi_iwa_common::LimitKind::TableCells
-                | litchi_iwa_common::LimitKind::MaterializedCells => {
-                    SlideImageAdjustmentsLimitKind::WireWork
-                },
+                | litchi_iwa_common::LimitKind::MaterializedCells => LimitKind::WireWork,
             },
             observed: observed as u64,
             maximum: limit as u64,
         },
-        litchi_iwa_common::Error::Allocation { amount, .. } => {
-            SlideImageAdjustmentsError::Allocation { amount }
-        },
-        _ => SlideImageAdjustmentsError::InvalidSource,
+        litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_archive_error(error: litchi_iwa_archive::Error) -> SlideImageAdjustmentsError {
+fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     match error {
         litchi_iwa_archive::Error::Limit {
             observed,
             maximum,
             kind,
-        } => SlideImageAdjustmentsError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes
                 | litchi_iwa_archive::LimitKind::CompressedEntryBytes
                 | litchi_iwa_archive::LimitKind::EntryBytes
                 | litchi_iwa_archive::LimitKind::TotalBytes
                 | litchi_iwa_archive::LimitKind::IwaStreamBytes
-                | litchi_iwa_archive::LimitKind::IwaTotalBytes => {
-                    SlideImageAdjustmentsLimitKind::WireBytes
-                },
+                | litchi_iwa_archive::LimitKind::IwaTotalBytes => LimitKind::WireBytes,
                 litchi_iwa_archive::LimitKind::Entries
                 | litchi_iwa_archive::LimitKind::MemberNameBytes
-                | litchi_iwa_archive::LimitKind::MetadataBytes => {
-                    SlideImageAdjustmentsLimitKind::WireFields
-                },
-                litchi_iwa_archive::LimitKind::OutputBytes => {
-                    SlideImageAdjustmentsLimitKind::OutputBytes
-                },
+                | litchi_iwa_archive::LimitKind::MetadataBytes => LimitKind::WireFields,
+                litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
             },
             observed,
             maximum,
         },
         litchi_iwa_archive::Error::Iwa(error) => map_core_error(error),
-        litchi_iwa_archive::Error::Allocation { amount, .. } => {
-            SlideImageAdjustmentsError::Allocation { amount }
-        },
-        _ => SlideImageAdjustmentsError::InvalidSource,
+        litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_core_error(error: litchi_iwa_core::Error) -> SlideImageAdjustmentsError {
+fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
             kind,
             observed,
             maximum,
-        } => SlideImageAdjustmentsError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::ArchiveBytes
                 | litchi_iwa_core::LimitKind::ObjectBytes
@@ -2209,35 +2156,29 @@ fn map_core_error(error: litchi_iwa_core::Error) -> SlideImageAdjustmentsError {
                 | litchi_iwa_core::LimitKind::SnappyStreamBytes
                 | litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
                 | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes
-                | litchi_iwa_core::LimitKind::SnappyFrames => {
-                    SlideImageAdjustmentsLimitKind::WireBytes
-                },
+                | litchi_iwa_core::LimitKind::SnappyFrames => LimitKind::WireBytes,
                 litchi_iwa_core::LimitKind::Objects
                 | litchi_iwa_core::LimitKind::Messages
                 | litchi_iwa_core::LimitKind::MessagesPerObject
                 | litchi_iwa_core::LimitKind::HeaderFields
-                | litchi_iwa_core::LimitKind::MetadataItems => {
-                    SlideImageAdjustmentsLimitKind::WireFields
-                },
-                litchi_iwa_core::LimitKind::HeaderNesting => {
-                    SlideImageAdjustmentsLimitKind::WireNesting
-                },
+                | litchi_iwa_core::LimitKind::MetadataItems => LimitKind::WireFields,
+                litchi_iwa_core::LimitKind::HeaderNesting => LimitKind::WireNesting,
             },
             observed: observed as u64,
             maximum: maximum as u64,
         },
         litchi_iwa_core::Error::Allocation { requested, .. } => {
-            SlideImageAdjustmentsError::Allocation { amount: requested }
+            Error::Allocation { amount: requested }
         },
-        _ => SlideImageAdjustmentsError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        ImageBudget, ImageSelector, SlideImageAdjustmentsError, SlideImageAdjustmentsLimitKind,
-        image_metadata, strict_reference_payload, validate_image_parent,
+        Error, ImageBudget, ImageSelector, LimitKind, image_metadata, strict_reference_payload,
+        validate_image_parent,
     };
     use litchi_core::Position;
     use litchi_iwa_common::{WireLimits, encode_varint_into};
@@ -2309,7 +2250,7 @@ mod tests {
         let mut limits = budget(WireLimits::default());
         assert!(matches!(
             image_metadata(&source, &mut limits),
-            Err(SlideImageAdjustmentsError::InvalidSource)
+            Err(Error::InvalidSource)
         ));
     }
 
@@ -2321,7 +2262,7 @@ mod tests {
         assert!(!layout);
         assert!(matches!(
             validate_image_parent(parent, 7),
-            Err(SlideImageAdjustmentsError::InvalidSource)
+            Err(Error::InvalidSource)
         ));
     }
 
@@ -2332,7 +2273,7 @@ mod tests {
         let mut limits = budget(WireLimits::default());
         assert!(matches!(
             image_metadata(&duplicate, &mut limits),
-            Err(SlideImageAdjustmentsError::InvalidSource)
+            Err(Error::InvalidSource)
         ));
 
         let mut wrong_wire = image_with_parent(42);
@@ -2340,7 +2281,7 @@ mod tests {
         let mut limits = budget(WireLimits::default());
         assert!(matches!(
             image_metadata(&wrong_wire, &mut limits),
-            Err(SlideImageAdjustmentsError::InvalidSource)
+            Err(Error::InvalidSource)
         ));
     }
 
@@ -2351,7 +2292,7 @@ mod tests {
         let mut limits = budget(WireLimits::default());
         assert!(matches!(
             image_metadata(&source, &mut limits),
-            Err(SlideImageAdjustmentsError::InvalidSource)
+            Err(Error::InvalidSource)
         ));
     }
 
@@ -2361,7 +2302,7 @@ mod tests {
         varint_field(&mut source, 1, 8);
         assert!(matches!(
             strict_reference_payload(&source, &mut budget(WireLimits::default())),
-            Err(SlideImageAdjustmentsError::InvalidSource)
+            Err(Error::InvalidSource)
         ));
     }
 
@@ -2373,8 +2314,8 @@ mod tests {
         let error = budget.scan(&[0x08], 2, 1).unwrap_err();
         assert!(matches!(
             error,
-            SlideImageAdjustmentsError::LimitExceeded {
-                kind: SlideImageAdjustmentsLimitKind::WireFields,
+            Error::Limit {
+                kind: LimitKind::WireFields,
                 observed: 3,
                 maximum: 2,
             }

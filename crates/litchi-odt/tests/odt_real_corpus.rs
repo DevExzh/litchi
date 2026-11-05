@@ -1,7 +1,7 @@
 //! Real Writer corpus compatibility through the current ODT facade.
 
 use litchi_core::Error;
-use litchi_odt::{Document, ScriptResourceKind, core::OwnedPackage, transaction::Position};
+use litchi_odt::{Package, ScriptResourceKind, core::OwnedPackage, transaction::Position};
 use std::path::{Path, PathBuf};
 
 fn corpus() -> PathBuf {
@@ -42,7 +42,7 @@ fn writer_packages_parse_and_extract_semantics() -> Result<(), Error> {
         ("writer-table-of-contents.odt", 9, 0),
     ];
     for (file, minimum_paragraphs, minimum_tables) in cases {
-        let document = Document::open(corpus().join(file))?;
+        let document = Package::open(corpus().join(file))?.document()?;
         assert!(!document.text()?.trim().is_empty(), "{file}: empty text");
         assert!(
             document.paragraphs()?.len() >= minimum_paragraphs,
@@ -66,19 +66,19 @@ fn writer_packages_parse_and_extract_semantics() -> Result<(), Error> {
 
 #[test]
 fn writer_packages_expose_fixture_specific_semantics() -> Result<(), Error> {
-    let table = Document::open(corpus().join("writer-table.odt"))?;
+    let table = Package::open(corpus().join("writer-table.odt"))?.document()?;
     assert_eq!(table.tables()?.len(), 1);
 
-    let headers = Document::open(corpus().join("writer-header-footer.odt"))?;
+    let headers = Package::open(corpus().join("writer-header-footer.odt"))?.document()?;
     assert!(!headers.master_pages()?.is_empty());
 
-    let fields = Document::open(corpus().join("writer-user-fields.odt"))?;
+    let fields = Package::open(corpus().join("writer-user-fields.odt"))?.document()?;
     assert!(!fields.dynamic_text_fields()?.is_empty());
 
-    let images = Document::open(corpus().join("writer-images-frames.odt"))?;
+    let images = Package::open(corpus().join("writer-images-frames.odt"))?.document()?;
     assert!(!images.images()?.is_empty());
 
-    let toc = Document::open(corpus().join("writer-table-of-contents.odt"))?;
+    let toc = Package::open(corpus().join("writer-table-of-contents.odt"))?.document()?;
     assert_eq!(toc.text_indexes()?.len(), 1);
     Ok(())
 }
@@ -90,14 +90,14 @@ fn genuine_formatted_metadata_survives_a_public_paragraph_transaction_exactly() 
     let source_bytes = std::fs::read(&path)?;
     let source_package = OwnedPackage::from_bytes(source_bytes.clone())?;
     let source_meta = source_package.get_file("meta.xml")?;
-    let document = Document::from_bytes(source_bytes)?;
-    let mut edit = document.edit()?;
+    let document = Package::from_bytes(&source_bytes)?;
+    let mut edit = document.edit();
     edit.replace_paragraph(Position::new(0), "provenance-safe paragraph")?;
     let commit = edit.commit()?;
 
-    let reopened = commit.snapshot().document()?;
+    let reopened = commit.package().document()?;
     assert!(reopened.text()?.contains("provenance-safe paragraph"));
-    let changed = OwnedPackage::from_bytes(commit.snapshot().as_bytes().to_vec())?;
+    let changed = OwnedPackage::from_bytes(commit.package().as_bytes().to_vec())?;
     assert_eq!(changed.get_file("meta.xml")?, source_meta);
     let manifest = String::from_utf8(changed.get_file("META-INF/manifest.xml")?)
         .map_err(|error| Error::InvalidFormat(error.to_string()))?;
@@ -109,9 +109,9 @@ fn genuine_formatted_metadata_survives_a_public_paragraph_transaction_exactly() 
 #[test]
 fn real_xxe_package_is_rejected_without_resolution() -> Result<(), Error> {
     let file = "writer-minimal-nasty.odt";
-    let document = match Document::open(corpus().join(file)) {
+    let document = match Package::open(corpus().join(file)).and_then(|package| package.document()) {
         Ok(document) => document,
-        Err(Error::InvalidFormat(_)) => return Ok(()),
+        Err(litchi_odf_common::Error::Core(Error::InvalidFormat(_))) => return Ok(()),
         Err(error) => panic!("open produced a non-format error for {file}: {error:?}"),
     };
     assert_invalid(document.text(), file, "text");
@@ -123,7 +123,7 @@ fn real_xxe_package_is_rejected_without_resolution() -> Result<(), Error> {
 
 #[test]
 fn real_macro_package_exposes_only_inert_stored_resources() -> Result<(), Error> {
-    let document = Document::open(libreoffice_macro())?;
+    let document = Package::open(libreoffice_macro())?.document()?;
     let resources = document.script_resources()?;
     assert_eq!(resources.len(), 3);
     assert!(resources.iter().all(|resource| !resource.bytes.is_empty()));

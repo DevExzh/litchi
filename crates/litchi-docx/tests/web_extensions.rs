@@ -1,3 +1,7 @@
+#![allow(
+    clippy::redundant_closure_call,
+    reason = "raw OPC test edits stage one closure over the edit's graph"
+)]
 use std::collections::BTreeMap;
 use std::io::Cursor;
 
@@ -8,6 +12,15 @@ use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
 #[path = "web_extensions/durable.rs"]
 mod durable;
+
+/// Stage a planned task-pane patch and publish it into `package`; returns
+/// whether the package changed.
+fn apply_plan(package: &mut Package, patch: &web::Patch) -> litchi_docx::Result<bool> {
+    let mut edit = package.edit_task_panes();
+    let changed = edit.apply_plan(patch)?;
+    *package = edit.commit()?.into_package();
+    Ok(changed)
+}
 
 fn custom_functions() -> web::CustomFunctions {
     let mut functions = web::CustomFunctions::new();
@@ -50,11 +63,34 @@ fn package_bytes(package: &Package) -> Vec<u8> {
 }
 
 fn members(bytes: &[u8]) -> BTreeMap<String, Vec<u8>> {
-    let archive = ArchiveReader::new(bytes).unwrap();
+    let archive =
+        ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     archive
         .file_names()
         .map(|name| (name.to_owned(), archive.read(name).unwrap()))
         .collect()
+}
+
+/// Web-extension replay mismatches use DOCX's public typed patch-conflict
+/// variant. Keep the assertion at the error-category boundary instead of
+/// coupling the consumer to an obsolete diagnostic string.
+fn assert_patch_conflict(error: &litchi_docx::Error, context: &str) {
+    assert!(
+        matches!(error, litchi_docx::Error::PatchConflict { .. }),
+        "{context}: expected a DOCX patch conflict, got {error:?}"
+    );
+}
+
+/// Malformed durable operation fields stay at the typed shared OOXML invalid
+/// boundary; do not couple the consumer to their diagnostic text.
+fn assert_common_invalid(error: &litchi_docx::Error, context: &str) {
+    assert!(
+        matches!(
+            error,
+            litchi_docx::Error::Common(litchi_ooxml_common::Error::Invalid(_))
+        ),
+        "{context}: expected a shared OOXML invalid error, got {error:?}"
+    );
 }
 
 fn replace_once(bytes: &[u8], from: &[u8], to: &[u8]) -> Vec<u8> {
@@ -92,8 +128,10 @@ fn rewrite_member<F>(bytes: &[u8], selected: &str, mut rewrite: F) -> Vec<u8>
 where
     F: FnMut(&[u8]) -> Vec<u8>,
 {
-    let archive = ArchiveReader::new(bytes).unwrap();
-    let mut writer = StreamingArchiveWriter::new();
+    let archive =
+        ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in archive.file_names() {
         let content = archive.read(name).unwrap();
         let content = if name == selected {
@@ -107,9 +145,11 @@ where
 }
 
 fn add_member(bytes: &[u8], added: &str, content: &[u8]) -> Vec<u8> {
-    let archive = ArchiveReader::new(bytes).unwrap();
+    let archive =
+        ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     assert!(!archive.file_names().any(|name| name == added));
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in archive.file_names() {
         writer
             .write_stored(name, &archive.read(name).unwrap())
@@ -250,13 +290,21 @@ fn publicly_constructed_custom_function_payloads_round_trip_in_both_conformances
     for conformance in [web::Conformance::Transitional, web::Conformance::Strict] {
         let (panes, metadata) = authored_panes();
         let mut package = Package::new().unwrap();
-        package.put_task_panes(panes.clone(), conformance).unwrap();
+        package = {
+            let mut edit = package.edit_task_panes();
+            edit.put(panes.clone(), conformance).unwrap();
+            edit.commit().unwrap().into_package()
+        };
 
         assert_eq!(loaded_custom_functions(&package), metadata);
         let first = package_bytes(&package);
 
         let mut second = Package::new().unwrap();
-        second.put_task_panes(panes, conformance).unwrap();
+        second = {
+            let mut edit = second.edit_task_panes();
+            edit.put(panes, conformance).unwrap();
+            edit.commit().unwrap().into_package()
+        };
         assert_eq!(members(&first), members(&package_bytes(&second)));
 
         let first_members = members(&first);
@@ -289,10 +337,15 @@ fn public_task_pane_plan_is_nonmutating_and_inverse_restores_saved_members_exact
     let patch = package
         .plan_task_panes(panes, web::Conformance::Transitional)
         .unwrap();
-    assert!(!patch.is_empty());
+    assert!(!patch.is_noop());
     assert_eq!(members(&package_bytes(&package)), original);
 
-    assert!(package.apply_task_panes_patch(&patch).unwrap());
+    assert!({
+        let mut edit = package.edit_task_panes();
+        let value = edit.apply_plan(&patch).unwrap();
+        package = edit.commit().unwrap().into_package();
+        value
+    });
     let published = package_bytes(&package);
     let published_members = members(&published);
     for (name, content) in &original {
@@ -303,7 +356,12 @@ fn public_task_pane_plan_is_nonmutating_and_inverse_restores_saved_members_exact
 
     let mut reopened = Package::from_reader(Cursor::new(published)).unwrap();
     assert_eq!(loaded_custom_functions(&reopened), custom_functions());
-    assert!(reopened.apply_task_panes_patch(&patch.inverse()).unwrap());
+    assert!({
+        let mut edit = reopened.edit_task_panes();
+        let value = edit.apply_plan(&patch.inverse()).unwrap();
+        reopened = edit.commit().unwrap().into_package();
+        value
+    });
     assert_eq!(members(&package_bytes(&reopened)), original);
 }
 
@@ -311,24 +369,36 @@ fn public_task_pane_plan_is_nonmutating_and_inverse_restores_saved_members_exact
 fn changed_and_exact_noop_public_patches_have_expected_effects() {
     let (panes, _) = authored_panes();
     let mut package = Package::new().unwrap();
-    package
-        .put_task_panes(panes, web::Conformance::Transitional)
-        .unwrap();
+    package = {
+        let mut edit = package.edit_task_panes();
+        edit.put(panes, web::Conformance::Transitional).unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let before_noop = members(&package_bytes(&package));
     let loaded = package.task_panes().unwrap().unwrap();
     let noop = package
         .plan_task_panes(loaded, web::Conformance::Transitional)
         .unwrap();
-    assert!(noop.is_empty());
-    assert!(!package.apply_task_panes_patch(&noop).unwrap());
+    assert!(noop.is_noop());
+    assert!(!{
+        let mut edit = package.edit_task_panes();
+        let value = edit.apply_plan(&noop).unwrap();
+        package = edit.commit().unwrap().into_package();
+        value
+    });
     assert_eq!(members(&package_bytes(&package)), before_noop);
 
     let changed = changed_panes(&package);
     let patch = package
         .plan_task_panes(changed.clone(), web::Conformance::Strict)
         .unwrap();
-    assert!(!patch.is_empty());
-    assert!(package.apply_task_panes_patch(&patch).unwrap());
+    assert!(!patch.is_noop());
+    assert!({
+        let mut edit = package.edit_task_panes();
+        let value = edit.apply_plan(&patch).unwrap();
+        package = edit.commit().unwrap().into_package();
+        value
+    });
     let loaded = package.task_panes().unwrap().unwrap();
     assert!(loaded.get(0usize).unwrap().visible());
     assert_eq!(loaded.get(0usize).unwrap().row(), 3);
@@ -340,9 +410,11 @@ fn changed_and_exact_noop_public_patches_have_expected_effects() {
 fn stale_content_types_and_relationship_lexical_members_refuse_atomically() {
     let (panes, _) = authored_panes();
     let mut source = Package::new().unwrap();
-    source
-        .put_task_panes(panes, web::Conformance::Transitional)
-        .unwrap();
+    source = {
+        let mut edit = source.edit_task_panes();
+        edit.put(panes, web::Conformance::Transitional).unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let patch = source.plan_remove_task_panes().unwrap();
     let original = package_bytes(&source);
 
@@ -361,25 +433,20 @@ fn stale_content_types_and_relationship_lexical_members_refuse_atomically() {
         )
     });
 
-    for (name, expected, variant) in [
-        (
-            "content types",
-            "source content-types changed",
-            content_types_variant,
-        ),
-        (
-            "root relationships",
-            "source relationship metadata changed",
-            relationship_variant,
-        ),
+    for (name, variant) in [
+        ("content types", content_types_variant),
+        ("root relationships", relationship_variant),
     ] {
-        let mut stale = Package::from_reader(Cursor::new(variant)).unwrap();
+        let stale = Package::from_reader(Cursor::new(variant)).unwrap();
         let before = members(&package_bytes(&stale));
-        let error = stale.apply_task_panes_patch(&patch).unwrap_err();
-        assert!(
-            error.to_string().contains(expected),
-            "{name}: unexpected stale error: {error}"
-        );
+        let error = {
+            let mut edit = stale.edit_task_panes();
+            edit.apply_plan(&patch)
+                .map(|_| ())
+                .and_then(|()| edit.commit().map(|_| ()))
+        }
+        .unwrap_err();
+        assert_patch_conflict(&error, &format!("{name}: unexpected stale error"));
         assert_eq!(members(&package_bytes(&stale)), before);
     }
 }
@@ -388,15 +455,22 @@ fn stale_content_types_and_relationship_lexical_members_refuse_atomically() {
 fn signed_noop_is_preserved_but_changed_publication_requires_explicit_unsign() {
     let (panes, _) = authored_panes();
     let mut package = Package::new().unwrap();
-    package
-        .put_task_panes(panes, web::Conformance::Transitional)
+    package = {
+        let mut edit = package.edit_task_panes();
+        edit.put(panes, web::Conformance::Transitional).unwrap();
+        edit.commit().unwrap().into_package()
+    };
+    package = {
+        let mut edit = package.edit_opc();
+        (|opc: &mut litchi_opc::OpcPackage| -> litchi_docx::Result<_> {
+            {
+                opc.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
+                Ok(())
+            }
+        })(edit.package_mut())
         .unwrap();
-    package
-        .edit_opc(|opc| {
-            opc.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
-            Ok(())
-        })
-        .unwrap();
+        edit.commit().unwrap().into_package()
+    };
     assert!(package.is_signed());
 
     let before = members(&package_bytes(&package));
@@ -404,49 +478,55 @@ fn signed_noop_is_preserved_but_changed_publication_requires_explicit_unsign() {
     let noop = package
         .plan_task_panes(loaded, web::Conformance::Transitional)
         .unwrap();
-    assert!(noop.is_empty());
-    assert!(!package.apply_task_panes_patch(&noop).unwrap());
+    assert!(noop.is_noop());
+    assert!(!{
+        let mut edit = package.edit_task_panes();
+        let value = edit.apply_plan(&noop).unwrap();
+        package = edit.commit().unwrap().into_package();
+        value
+    });
     assert!(package.is_signed());
     assert_eq!(members(&package_bytes(&package)), before);
 
     let signed_patch = package
         .plan_task_panes(changed_panes(&package), web::Conformance::Transitional)
         .unwrap();
-    let error = package.apply_task_panes_patch(&signed_patch).unwrap_err();
-    assert!(error.to_string().contains("explicit Package::unsign"));
+    let error = {
+        let mut edit = package.edit_task_panes();
+        edit.apply_plan(&signed_patch)
+            .map(|_| ())
+            .and_then(|()| edit.commit().map(|_| ()))
+    }
+    .unwrap_err();
+    assert!(matches!(
+        error,
+        litchi_docx::Error::Opc(litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    ));
     assert!(package.is_signed());
     assert_eq!(members(&package_bytes(&package)), before);
 
-    package.unsign();
+    package = package.unsign();
     let after_unsign = members(&package_bytes(&package));
-    let error = package.apply_task_panes_patch(&signed_patch).unwrap_err();
-    assert!(
-        error.to_string().to_ascii_lowercase().contains("source"),
-        "signed patch did not become stale after unsign: {error}"
-    );
+    let error = {
+        let mut edit = package.edit_task_panes();
+        edit.apply_plan(&signed_patch)
+            .map(|_| ())
+            .and_then(|()| edit.commit().map(|_| ()))
+    }
+    .unwrap_err();
+    assert_patch_conflict(&error, "signed patch did not become stale after unsign");
     assert_eq!(members(&package_bytes(&package)), after_unsign);
 
     let patch = package
         .plan_task_panes(changed_panes(&package), web::Conformance::Transitional)
         .unwrap();
-    assert!(package.apply_task_panes_patch(&patch).unwrap());
+    assert!({
+        let mut edit = package.edit_task_panes();
+        let value = edit.apply_plan(&patch).unwrap();
+        package = edit.commit().unwrap().into_package();
+        value
+    });
     assert!(!package.is_signed());
-}
-
-#[test]
-fn dirty_document_facade_refuses_task_pane_planning_without_publication() {
-    let (panes, _) = authored_panes();
-    let mut package = Package::new().unwrap();
-    package
-        .document_mut()
-        .unwrap()
-        .add_paragraph_with_text("unmaterialized document edit");
-    let before = members(&package_bytes(&package));
-    let error = package
-        .plan_task_panes(panes, web::Conformance::Transitional)
-        .unwrap_err();
-    assert!(error.to_string().contains("unmaterialized changes"));
-    assert_eq!(members(&package_bytes(&package)), before);
 }
 
 #[test]
@@ -456,26 +536,38 @@ fn public_limits_and_malformed_namespace_or_attribute_fixtures_refuse_atomically
     let mut limits = web::Limits::standard();
     limits.items = 0;
     let plan_error = package
-        .plan_task_panes_with_limits(panes.clone(), web::Conformance::Transitional, &limits)
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().task_panes(limits))
+        .plan_task_panes(panes.clone(), web::Conformance::Transitional)
         .expect_err("item limit should reject task-pane planning");
     assert!(plan_error.to_string().contains("task pane"));
     assert_unchanged_after_error(&mut package, |package| {
-        let error = package
-            .put_task_panes_with_limits(panes.clone(), web::Conformance::Transitional, &limits)
-            .err()
-            .expect("item limit should reject task-pane publication");
+        let error = {
+            let mut edit = package.edit_task_panes_with_options(
+                litchi_docx::task_panes::EditOptions::default().limits(limits),
+            );
+            edit.put(panes.clone(), web::Conformance::Transitional)
+                .map(|_| ())
+                .and_then(|()| edit.commit().map(|_| ()))
+        }
+        .expect_err("item limit should reject task-pane publication");
         assert!(error.to_string().contains("task pane"));
     });
 
     let mut valid = Package::new().unwrap();
-    valid
-        .put_task_panes(panes.clone(), web::Conformance::Transitional)
-        .unwrap();
+    valid = {
+        let mut edit = valid.edit_task_panes();
+        edit.put(panes.clone(), web::Conformance::Transitional)
+            .unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let valid_bytes = package_bytes(&valid);
     let mut read_limits = web::Limits::standard();
     read_limits.xml_bytes = 1;
     let limited = Package::from_reader(Cursor::new(valid_bytes.clone())).unwrap();
-    let error = limited.task_panes_with_limits(&read_limits).unwrap_err();
+    let error = limited
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().task_panes(read_limits))
+        .task_panes()
+        .unwrap_err();
     assert!(error.to_string().contains("XML") || error.to_string().contains("xml"));
 
     let mut remove_limits = web::Limits::standard();
@@ -483,7 +575,8 @@ fn public_limits_and_malformed_namespace_or_attribute_fixtures_refuse_atomically
     let plan_remove_limited = Package::from_reader(Cursor::new(valid_bytes.clone())).unwrap();
     let before_plan_remove = members(&package_bytes(&plan_remove_limited));
     let error = plan_remove_limited
-        .plan_remove_task_panes_with_limits(&remove_limits)
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().task_panes(remove_limits))
+        .plan_remove_task_panes()
         .expect_err("part-deletion limit should reject task-pane removal planning");
     assert!(error.to_string().contains("deletion"));
     assert_eq!(
@@ -491,11 +584,17 @@ fn public_limits_and_malformed_namespace_or_attribute_fixtures_refuse_atomically
         before_plan_remove
     );
 
-    let mut remove_limited = Package::from_reader(Cursor::new(valid_bytes.clone())).unwrap();
+    let remove_limited = Package::from_reader(Cursor::new(valid_bytes.clone())).unwrap();
     let before_remove = members(&package_bytes(&remove_limited));
-    let error = remove_limited
-        .remove_task_panes_with_limits(&remove_limits)
-        .expect_err("part-deletion limit should reject task-pane removal");
+    let error = {
+        let mut edit = remove_limited.edit_task_panes_with_options(
+            litchi_docx::task_panes::EditOptions::default().limits(remove_limits),
+        );
+        edit.remove()
+            .map(|_| ())
+            .and_then(|()| edit.commit().map(|_| ()))
+    }
+    .expect_err("part-deletion limit should reject task-pane removal");
     assert!(error.to_string().contains("deletion"));
     assert_eq!(members(&package_bytes(&remove_limited)), before_remove);
 
@@ -526,27 +625,47 @@ fn public_limits_and_malformed_namespace_or_attribute_fixtures_refuse_atomically
 fn public_remove_and_inverse_restore_task_panes_after_save_and_reopen() {
     let (panes, _) = authored_panes();
     let mut package = Package::new().unwrap();
-    package
-        .put_task_panes(panes, web::Conformance::Strict)
-        .unwrap();
+    package = {
+        let mut edit = package.edit_task_panes();
+        edit.put(panes, web::Conformance::Strict).unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let original = members(&package_bytes(&package));
     let patch = package.plan_remove_task_panes().unwrap();
-    assert!(!patch.is_empty());
-    assert!(package.apply_task_panes_patch(&patch).unwrap());
+    assert!(!patch.is_noop());
+    assert!({
+        let mut edit = package.edit_task_panes();
+        let value = edit.apply_plan(&patch).unwrap();
+        package = edit.commit().unwrap().into_package();
+        value
+    });
     assert_eq!(package.task_panes().unwrap(), None);
 
     let published = package_bytes(&package);
     let mut reopened = Package::from_reader(Cursor::new(published)).unwrap();
-    assert!(reopened.apply_task_panes_patch(&patch.inverse()).unwrap());
+    assert!({
+        let mut edit = reopened.edit_task_panes();
+        let value = edit.apply_plan(&patch.inverse()).unwrap();
+        reopened = edit.commit().unwrap().into_package();
+        value
+    });
     assert!(reopened.task_panes().unwrap().is_some());
     assert_eq!(members(&package_bytes(&reopened)), original);
 
     let (direct_panes, _) = authored_panes();
     let mut direct = Package::new().unwrap();
-    direct
-        .put_task_panes(direct_panes, web::Conformance::Transitional)
-        .unwrap();
-    assert!(direct.remove_task_panes().unwrap());
+    direct = {
+        let mut edit = direct.edit_task_panes();
+        edit.put(direct_panes, web::Conformance::Transitional)
+            .unwrap();
+        edit.commit().unwrap().into_package()
+    };
+    assert!({
+        let mut edit = direct.edit_task_panes();
+        let value = edit.remove().unwrap();
+        direct = edit.commit().unwrap().into_package();
+        value
+    });
     assert_eq!(direct.task_panes().unwrap(), None);
 }
 
@@ -554,9 +673,11 @@ fn public_remove_and_inverse_restore_task_panes_after_save_and_reopen() {
 fn legacy_taskpane_child_name_is_refused_without_claiming_broad_schema_compatibility() {
     let (panes, _) = authored_panes();
     let mut authored = Package::new().unwrap();
-    authored
-        .put_task_panes(panes, web::Conformance::Transitional)
-        .unwrap();
+    authored = {
+        let mut edit = authored.edit_task_panes();
+        edit.put(panes, web::Conformance::Transitional).unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let source = package_bytes(&authored);
     let legacy = rewrite_member(&source, "webextensions/taskpanes.xml", |content| {
         replace_once(content, b"<wetp:webextensionref", b"<wetp:webextension")
@@ -578,9 +699,11 @@ fn legacy_taskpane_child_name_is_refused_without_claiming_broad_schema_compatibi
 fn custom_function_rewrite_targets_later_payload_extension_after_vendor_extension() {
     let (panes, _) = authored_panes();
     let mut authored = Package::new().unwrap();
-    authored
-        .put_task_panes(panes, web::Conformance::Transitional)
-        .unwrap();
+    authored = {
+        let mut edit = authored.edit_task_panes();
+        edit.put(panes, web::Conformance::Transitional).unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let source = package_bytes(&authored);
     let vendor_extension = br#"<a:ext xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:v="urn:litchi:test:web-extension" uri="urn:litchi:vendor"><v:opaque/></a:ext>"#;
     let variant = rewrite_member(&source, "webextensions/webextension1.xml", |content| {
@@ -593,8 +716,13 @@ fn custom_function_rewrite_targets_later_payload_extension_after_vendor_extensio
     let patch = package
         .plan_task_panes(desired, web::Conformance::Transitional)
         .unwrap();
-    assert!(!patch.is_empty());
-    assert!(package.apply_task_panes_patch(&patch).unwrap());
+    assert!(!patch.is_noop());
+    assert!({
+        let mut edit = package.edit_task_panes();
+        let value = edit.apply_plan(&patch).unwrap();
+        package = edit.commit().unwrap().into_package();
+        value
+    });
 
     let extension = members(&package_bytes(&package));
     let extension = extension.get("webextensions/webextension1.xml").unwrap();
@@ -622,15 +750,22 @@ fn custom_function_rewrite_targets_later_payload_extension_after_vendor_extensio
 fn custom_function_semantic_noop_preserves_noncanonical_addin_taskpane_xml_and_signature() {
     let (panes, _) = authored_panes();
     let mut authored = Package::new().unwrap();
-    authored
-        .put_task_panes(panes, web::Conformance::Transitional)
+    authored = {
+        let mut edit = authored.edit_task_panes();
+        edit.put(panes, web::Conformance::Transitional).unwrap();
+        edit.commit().unwrap().into_package()
+    };
+    authored = {
+        let mut edit = authored.edit_opc();
+        (|opc: &mut litchi_opc::OpcPackage| -> litchi_docx::Result<_> {
+            {
+                opc.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
+                Ok(())
+            }
+        })(edit.package_mut())
         .unwrap();
-    authored
-        .edit_opc(|opc| {
-            opc.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
-            Ok(())
-        })
-        .unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let source = package_bytes(&authored);
     let noncanonical = rewrite_member(&source, "webextensions/webextension1.xml", |content| {
         noncanonical_web_member(
@@ -653,8 +788,13 @@ fn custom_function_semantic_noop_preserves_noncanonical_addin_taskpane_xml_and_s
     let patch = package
         .plan_task_panes(loaded, web::Conformance::Transitional)
         .unwrap();
-    assert!(patch.is_empty());
-    assert!(!package.apply_task_panes_patch(&patch).unwrap());
+    assert!(patch.is_noop());
+    assert!(!{
+        let mut edit = package.edit_task_panes();
+        let value = edit.apply_plan(&patch).unwrap();
+        package = edit.commit().unwrap().into_package();
+        value
+    });
     assert!(package.is_signed());
     assert_eq!(members(&package_bytes(&package)), before);
 }
@@ -662,12 +802,15 @@ fn custom_function_semantic_noop_preserves_noncanonical_addin_taskpane_xml_and_s
 #[test]
 fn omitted_contains_boolean_is_distinct_from_explicit_false_and_inverse_restores_source() {
     let mut authored = Package::new().unwrap();
-    authored
-        .put_task_panes(
+    authored = {
+        let mut edit = authored.edit_task_panes();
+        edit.put(
             panes_with_custom_functions(explicit_false_custom_functions()),
             web::Conformance::Transitional,
         )
         .unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let source = package_bytes(&authored);
     let omitted = rewrite_member(&source, "webextensions/webextension1.xml", |content| {
         replace_once(content, b" val=\"false\"", b"")
@@ -687,8 +830,13 @@ fn omitted_contains_boolean_is_distinct_from_explicit_false_and_inverse_restores
             web::Conformance::Transitional,
         )
         .unwrap();
-    assert!(!patch.is_empty());
-    assert!(package.apply_task_panes_patch(&patch).unwrap());
+    assert!(!patch.is_noop());
+    assert!({
+        let mut edit = package.edit_task_panes();
+        let value = edit.apply_plan(&patch).unwrap();
+        package = edit.commit().unwrap().into_package();
+        value
+    });
     let published = members(&package_bytes(&package));
     assert!(
         published
@@ -706,7 +854,12 @@ fn omitted_contains_boolean_is_distinct_from_explicit_false_and_inverse_restores
             .explicit_value(),
         Some(false)
     );
-    assert!(reopened.apply_task_panes_patch(&patch.inverse()).unwrap());
+    assert!({
+        let mut edit = reopened.edit_task_panes();
+        let value = edit.apply_plan(&patch.inverse()).unwrap();
+        reopened = edit.commit().unwrap().into_package();
+        value
+    });
     assert_eq!(members(&package_bytes(&reopened)), original);
 }
 
@@ -715,9 +868,11 @@ fn known_custom_function_payload_comments_and_processing_instructions_are_retain
  {
     let (panes, _) = authored_panes();
     let mut authored = Package::new().unwrap();
-    authored
-        .put_task_panes(panes, web::Conformance::Transitional)
-        .unwrap();
+    authored = {
+        let mut edit = authored.edit_task_panes();
+        edit.put(panes, web::Conformance::Transitional).unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let source = package_bytes(&authored);
     let variant = rewrite_member(&source, "webextensions/webextension1.xml", |content| {
         insert_before(
@@ -740,8 +895,8 @@ fn known_custom_function_payload_comments_and_processing_instructions_are_retain
             assert_eq!(members(&package_bytes(&package)), before);
         },
         Ok(patch) => {
-            assert!(!patch.is_empty());
-            match package.apply_task_panes_patch(&patch) {
+            assert!(!patch.is_noop());
+            match apply_plan(&mut package, &patch) {
                 Err(error) => {
                     let message = error.to_string().to_ascii_lowercase();
                     assert!(
@@ -774,9 +929,11 @@ fn known_custom_function_payload_comments_and_processing_instructions_are_retain
 fn internal_custom_payload_markup_survives_changed_attributes_or_refuses_atomically() {
     let (panes, _) = authored_panes();
     let mut authored = Package::new().unwrap();
-    authored
-        .put_task_panes(panes, web::Conformance::Transitional)
-        .unwrap();
+    authored = {
+        let mut edit = authored.edit_task_panes();
+        edit.put(panes, web::Conformance::Transitional).unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let source = package_bytes(&authored);
     let background = b"<we:backgroundAppData xmlns:we=\"http://schemas.microsoft.com/office/webextensions/webextension/2010/11\" state=\"7\" runtimeId=\"runtime-public\"/>";
     let expanded_background = b"<we:backgroundAppData xmlns:we=\"http://schemas.microsoft.com/office/webextensions/webextension/2010/11\" state=\"7\" runtimeId=\"runtime-public\"><!--inside-background--><?inside-background keep?></we:backgroundAppData>";
@@ -800,8 +957,8 @@ fn internal_custom_payload_markup_survives_changed_attributes_or_refuses_atomica
             assert_eq!(members(&package_bytes(&package)), before);
         },
         Ok(patch) => {
-            assert!(!patch.is_empty());
-            match package.apply_task_panes_patch(&patch) {
+            assert!(!patch.is_noop());
+            match apply_plan(&mut package, &patch) {
                 Err(error) => {
                     let message = error.to_string().to_ascii_lowercase();
                     assert!(
@@ -835,7 +992,12 @@ fn internal_custom_payload_markup_survives_changed_attributes_or_refuses_atomica
 
                     let mut reopened =
                         Package::from_reader(Cursor::new(package_bytes(&package))).unwrap();
-                    assert!(reopened.apply_task_panes_patch(&patch.inverse()).unwrap());
+                    assert!({
+                        let mut edit = reopened.edit_task_panes();
+                        let value = edit.apply_plan(&patch.inverse()).unwrap();
+                        reopened = edit.commit().unwrap().into_package();
+                        value
+                    });
                     assert_eq!(members(&package_bytes(&reopened)), before);
                 },
             }
@@ -846,12 +1008,15 @@ fn internal_custom_payload_markup_survives_changed_attributes_or_refuses_atomica
 #[test]
 fn empty_custom_function_list_grows_without_dropping_internal_markup_or_siblings() {
     let mut authored = Package::new().unwrap();
-    authored
-        .put_task_panes(
+    authored = {
+        let mut edit = authored.edit_task_panes();
+        edit.put(
             panes_with_custom_functions(custom_functions_empty_list()),
             web::Conformance::Transitional,
         )
         .unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let source = package_bytes(&authored);
     let empty_list = b"<we:customFunctionList xmlns:we=\"http://schemas.microsoft.com/office/webextensions/webextension/2010/11\"/>";
     let marked_empty_list = b"<we:customFunctionList xmlns:we=\"http://schemas.microsoft.com/office/webextensions/webextension/2010/11\"><!--empty-list--><?empty-list keep?></we:customFunctionList>";
@@ -872,8 +1037,13 @@ fn empty_custom_function_list_grows_without_dropping_internal_markup_or_siblings
             assert_eq!(members(&package_bytes(&package)), before);
         },
         Ok(patch) => {
-            assert!(!patch.is_empty());
-            assert!(package.apply_task_panes_patch(&patch).unwrap());
+            assert!(!patch.is_noop());
+            assert!({
+                let mut edit = package.edit_task_panes();
+                let value = edit.apply_plan(&patch).unwrap();
+                package = edit.commit().unwrap().into_package();
+                value
+            });
             let published = members(&package_bytes(&package));
             let extension = published.get("webextensions/webextension1.xml").unwrap();
             for marker in [
@@ -894,7 +1064,12 @@ fn empty_custom_function_list_grows_without_dropping_internal_markup_or_siblings
             );
 
             let mut reopened = Package::from_reader(Cursor::new(package_bytes(&package))).unwrap();
-            assert!(reopened.apply_task_panes_patch(&patch.inverse()).unwrap());
+            assert!({
+                let mut edit = reopened.edit_task_panes();
+                let value = edit.apply_plan(&patch.inverse()).unwrap();
+                reopened = edit.commit().unwrap().into_package();
+                value
+            });
             assert_eq!(members(&package_bytes(&reopened)), before);
         },
     }
@@ -904,9 +1079,11 @@ fn empty_custom_function_list_grows_without_dropping_internal_markup_or_siblings
 fn changed_custom_metadata_preserves_noncanonical_owner_bytes_and_inverse_after_reopen() {
     let (panes, _) = authored_panes();
     let mut authored = Package::new().unwrap();
-    authored
-        .put_task_panes(panes, web::Conformance::Transitional)
-        .unwrap();
+    authored = {
+        let mut edit = authored.edit_task_panes();
+        edit.put(panes, web::Conformance::Transitional).unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let source = package_bytes(&authored);
     let variant = rewrite_member(&source, "webextensions/webextension1.xml", |content| {
         let content = noncanonical_web_member(
@@ -930,8 +1107,13 @@ fn changed_custom_metadata_preserves_noncanonical_owner_bytes_and_inverse_after_
     let patch = package
         .plan_task_panes(desired, web::Conformance::Transitional)
         .unwrap();
-    assert!(!patch.is_empty());
-    assert!(package.apply_task_panes_patch(&patch).unwrap());
+    assert!(!patch.is_noop());
+    assert!({
+        let mut edit = package.edit_task_panes();
+        let value = edit.apply_plan(&patch).unwrap();
+        package = edit.commit().unwrap().into_package();
+        value
+    });
     let after = members(&package_bytes(&package));
     for (name, content) in &before {
         if name != "webextensions/webextension1.xml" {
@@ -952,33 +1134,53 @@ fn changed_custom_metadata_preserves_noncanonical_owner_bytes_and_inverse_after_
     let second_patch = package
         .plan_task_panes(second_desired, web::Conformance::Transitional)
         .unwrap();
-    assert!(!second_patch.is_empty());
-    assert!(package.apply_task_panes_patch(&second_patch).unwrap());
-    assert!(
-        package
-            .apply_task_panes_patch(&second_patch.inverse())
-            .unwrap()
-    );
-    assert!(package.apply_task_panes_patch(&patch.inverse()).unwrap());
+    assert!(!second_patch.is_noop());
+    assert!({
+        let mut edit = package.edit_task_panes();
+        let value = edit.apply_plan(&second_patch).unwrap();
+        package = edit.commit().unwrap().into_package();
+        value
+    });
+    assert!({
+        let mut edit = package.edit_task_panes();
+        let value = edit.apply_plan(&second_patch.inverse()).unwrap();
+        package = edit.commit().unwrap().into_package();
+        value
+    });
+    assert!({
+        let mut edit = package.edit_task_panes();
+        let value = edit.apply_plan(&patch.inverse()).unwrap();
+        package = edit.commit().unwrap().into_package();
+        value
+    });
     assert_eq!(members(&package_bytes(&package)), before);
 
     let mut reopened = Package::from_reader(Cursor::new(variant)).unwrap();
-    assert!(reopened.apply_task_panes_patch(&patch).unwrap());
+    assert!({
+        let mut edit = reopened.edit_task_panes();
+        let value = edit.apply_plan(&patch).unwrap();
+        reopened = edit.commit().unwrap().into_package();
+        value
+    });
     let mut reopened_after = Package::from_reader(Cursor::new(package_bytes(&reopened))).unwrap();
-    assert!(
-        reopened_after
-            .apply_task_panes_patch(&patch.inverse())
-            .unwrap()
-    );
+    assert!({
+        let mut edit = reopened_after.edit_task_panes();
+        let value = edit.apply_plan(&patch.inverse()).unwrap();
+        reopened_after = edit.commit().unwrap().into_package();
+        value
+    });
     assert_eq!(members(&package_bytes(&reopened_after)), before);
 }
 
 #[test]
 fn two_pane_custom_metadata_edit_is_local_to_selected_extension() {
     let mut package = Package::new().unwrap();
-    package
-        .put_task_panes(two_authored_panes(), web::Conformance::Transitional)
-        .unwrap();
+    package = {
+        let mut edit = package.edit_task_panes();
+        edit.put(two_authored_panes(), web::Conformance::Transitional)
+            .unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let before = members(&package_bytes(&package));
     let first_name = extension_member_name(&before, "public-instance").to_owned();
     let second_name = extension_member_name(&before, "second-instance").to_owned();
@@ -987,8 +1189,13 @@ fn two_pane_custom_metadata_edit_is_local_to_selected_extension() {
     let patch = package
         .plan_task_panes(desired, web::Conformance::Transitional)
         .unwrap();
-    assert!(!patch.is_empty());
-    assert!(package.apply_task_panes_patch(&patch).unwrap());
+    assert!(!patch.is_noop());
+    assert!({
+        let mut edit = package.edit_task_panes();
+        let value = edit.apply_plan(&patch).unwrap();
+        package = edit.commit().unwrap().into_package();
+        value
+    });
     let after = members(&package_bytes(&package));
     assert_eq!(after.get(&second_name), Some(&second_before));
     for (name, content) in &before {
@@ -1007,16 +1214,24 @@ fn two_pane_custom_metadata_edit_is_local_to_selected_extension() {
     );
 
     let mut reopened = Package::from_reader(Cursor::new(package_bytes(&package))).unwrap();
-    assert!(reopened.apply_task_panes_patch(&patch.inverse()).unwrap());
+    assert!({
+        let mut edit = reopened.edit_task_panes();
+        let value = edit.apply_plan(&patch.inverse()).unwrap();
+        reopened = edit.commit().unwrap().into_package();
+        value
+    });
     assert_eq!(members(&package_bytes(&reopened)), before);
 }
 
 #[test]
 fn noncustom_two_pane_edit_preserves_opaque_unselected_addin_or_refuses_atomically() {
     let mut authored = Package::new().unwrap();
-    authored
-        .put_task_panes(two_authored_panes(), web::Conformance::Transitional)
-        .unwrap();
+    authored = {
+        let mut edit = authored.edit_task_panes();
+        edit.put(two_authored_panes(), web::Conformance::Transitional)
+            .unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let source = package_bytes(&authored);
     let source_members = members(&source);
     let second_name = extension_member_name(&source_members, "second-instance").to_owned();
@@ -1043,7 +1258,7 @@ fn noncustom_two_pane_edit_preserves_opaque_unselected_addin_or_refuses_atomical
             );
             assert_eq!(members(&package_bytes(&package)), before);
         },
-        Ok(patch) => match package.apply_task_panes_patch(&patch) {
+        Ok(patch) => match apply_plan(&mut package, &patch) {
             Err(error) => {
                 let message = error.to_string().to_ascii_lowercase();
                 assert!(
@@ -1070,9 +1285,12 @@ fn noncustom_two_pane_edit_preserves_opaque_unselected_addin_or_refuses_atomical
 #[test]
 fn noncustom_edit_with_taskpane_opaque_marker_preserves_it_or_refuses_atomically() {
     let mut authored = Package::new().unwrap();
-    authored
-        .put_task_panes(two_authored_panes(), web::Conformance::Transitional)
-        .unwrap();
+    authored = {
+        let mut edit = authored.edit_task_panes();
+        edit.put(two_authored_panes(), web::Conformance::Transitional)
+            .unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let source = package_bytes(&authored);
     let variant = rewrite_member(&source, "webextensions/taskpanes.xml", |content| {
         insert_before(
@@ -1111,7 +1329,7 @@ fn noncustom_edit_with_taskpane_opaque_marker_preserves_it_or_refuses_atomically
             );
             assert_eq!(members(&package_bytes(&package)), before);
         },
-        Ok(patch) => match package.apply_task_panes_patch(&patch) {
+        Ok(patch) => match apply_plan(&mut package, &patch) {
             Err(error) => {
                 let message = error.to_string().to_ascii_lowercase();
                 assert!(
@@ -1156,7 +1374,11 @@ fn conformance_noop_ignores_missing_unused_prefix_and_vendor_other_dialect_text(
     ] {
         let (panes, _) = authored_panes();
         let mut authored = Package::new().unwrap();
-        authored.put_task_panes(panes, conformance).unwrap();
+        authored = {
+            let mut edit = authored.edit_task_panes();
+            edit.put(panes, conformance).unwrap();
+            edit.commit().unwrap().into_package()
+        };
         let source = package_bytes(&authored);
         let missing_unused_relationship_prefix =
             rewrite_member(&source, "webextensions/webextension1.xml", |content| {
@@ -1185,8 +1407,13 @@ fn conformance_noop_ignores_missing_unused_prefix_and_vendor_other_dialect_text(
             let before = members(&package_bytes(&package));
             let loaded = package.task_panes().unwrap().unwrap();
             let patch = package.plan_task_panes(loaded, conformance).unwrap();
-            assert!(patch.is_empty(), "{name} incorrectly became a changed plan");
-            assert!(!package.apply_task_panes_patch(&patch).unwrap());
+            assert!(patch.is_noop(), "{name} incorrectly became a changed plan");
+            assert!(!{
+                let mut edit = package.edit_task_panes();
+                let value = edit.apply_plan(&patch).unwrap();
+                package = edit.commit().unwrap().into_package();
+                value
+            });
             assert_eq!(members(&package_bytes(&package)), before, "{name}");
         }
     }
@@ -1196,9 +1423,11 @@ fn conformance_noop_ignores_missing_unused_prefix_and_vendor_other_dialect_text(
 fn inactive_mce_branch_is_retained_or_rejected_precisely_during_custom_edit() {
     let (panes, _) = authored_panes();
     let mut authored = Package::new().unwrap();
-    authored
-        .put_task_panes(panes, web::Conformance::Transitional)
-        .unwrap();
+    authored = {
+        let mut edit = authored.edit_task_panes();
+        edit.put(panes, web::Conformance::Transitional).unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let source = package_bytes(&authored);
     let alternate = br#"<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:u="urn:litchi:unsupported" xmlns:v="urn:litchi:mce"><mc:Choice Requires="u"><v:inactive marker="choice"/></mc:Choice><mc:Fallback><v:inactive marker="fallback"/></mc:Fallback></mc:AlternateContent>"#;
     let variant = rewrite_member(&source, "webextensions/webextension1.xml", |content| {
@@ -1252,8 +1481,8 @@ fn inactive_mce_branch_is_retained_or_rejected_precisely_during_custom_edit() {
             assert_eq!(members(&package_bytes(&package)), before);
         },
         Ok(patch) => {
-            assert!(!patch.is_empty());
-            match package.apply_task_panes_patch(&patch) {
+            assert!(!patch.is_noop());
+            match apply_plan(&mut package, &patch) {
                 Err(error) => {
                     let message = error.to_string().to_ascii_lowercase();
                     assert!(
@@ -1286,7 +1515,12 @@ fn inactive_mce_branch_is_retained_or_rejected_precisely_during_custom_edit() {
                     );
                     let mut reopened =
                         Package::from_reader(Cursor::new(package_bytes(&package))).unwrap();
-                    assert!(reopened.apply_task_panes_patch(&patch.inverse()).unwrap());
+                    assert!({
+                        let mut edit = reopened.edit_task_panes();
+                        let value = edit.apply_plan(&patch.inverse()).unwrap();
+                        reopened = edit.commit().unwrap().into_package();
+                        value
+                    });
                     assert_eq!(members(&package_bytes(&reopened)), before);
                 },
             }
@@ -1298,14 +1532,16 @@ fn inactive_mce_branch_is_retained_or_rejected_precisely_during_custom_edit() {
 fn semantic_noop_patch_rejects_semantically_stale_source_atomically() {
     let (panes, _) = authored_panes();
     let mut source = Package::new().unwrap();
-    source
-        .put_task_panes(panes, web::Conformance::Transitional)
-        .unwrap();
+    source = {
+        let mut edit = source.edit_task_panes();
+        edit.put(panes, web::Conformance::Transitional).unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let loaded = source.task_panes().unwrap().unwrap();
     let noop = source
         .plan_task_panes(loaded, web::Conformance::Transitional)
         .unwrap();
-    assert!(noop.is_empty());
+    assert!(noop.is_noop());
     let original = package_bytes(&source);
     let stale_bytes = rewrite_member(&original, "webextensions/webextension1.xml", |content| {
         replace_once(content, b"runtime-public", b"runtime-stale")
@@ -1342,7 +1578,7 @@ fn semantic_noop_patch_rejects_semantically_stale_source_atomically() {
             web::Conformance::Transitional,
         )
         .unwrap();
-    assert!(add_in_noop.is_empty());
+    assert!(add_in_noop.is_noop());
     let add_in_relationship_lexical_bytes = rewrite_member(
         &add_in_relationship_bytes,
         "webextensions/_rels/webextension1.xml.rels",
@@ -1360,25 +1596,27 @@ fn semantic_noop_patch_rejects_semantically_stale_source_atomically() {
         ("task-pane relationship XML", pane_relationship_bytes),
         ("new add-in relationship member", add_in_relationship_bytes),
     ] {
-        let mut stale = Package::from_reader(Cursor::new(stale_bytes)).unwrap();
+        let stale = Package::from_reader(Cursor::new(stale_bytes)).unwrap();
         let before = members(&package_bytes(&stale));
-        let error = stale.apply_task_panes_patch(&noop).unwrap_err();
-        let message = error.to_string().to_ascii_lowercase();
-        assert!(
-            message.contains("source")
-                || message.contains("stale")
-                || message.contains("relationship"),
-            "{name} stale no-op refusal was not identifiable: {error}"
-        );
+        let error = {
+            let mut edit = stale.edit_task_panes();
+            edit.apply_plan(&noop)
+                .map(|_| ())
+                .and_then(|()| edit.commit().map(|_| ()))
+        }
+        .unwrap_err();
+        assert_patch_conflict(&error, &format!("{name} stale no-op refusal"));
         assert_eq!(members(&package_bytes(&stale)), before, "{name}");
     }
-    let mut stale = Package::from_reader(Cursor::new(add_in_relationship_lexical_bytes)).unwrap();
+    let stale = Package::from_reader(Cursor::new(add_in_relationship_lexical_bytes)).unwrap();
     let before = members(&package_bytes(&stale));
-    let error = stale.apply_task_panes_patch(&add_in_noop).unwrap_err();
-    let message = error.to_string().to_ascii_lowercase();
-    assert!(
-        message.contains("source") || message.contains("stale") || message.contains("relationship"),
-        "add-in relationship lexical stale refusal was not identifiable: {error}"
-    );
+    let error = {
+        let mut edit = stale.edit_task_panes();
+        edit.apply_plan(&add_in_noop)
+            .map(|_| ())
+            .and_then(|()| edit.commit().map(|_| ()))
+    }
+    .unwrap_err();
+    assert_patch_conflict(&error, "add-in relationship lexical stale refusal");
     assert_eq!(members(&package_bytes(&stale)), before);
 }

@@ -154,6 +154,51 @@ impl Resolver for ConditionalResolver {
     }
 }
 
+/// The 64 selected observations, each with its literal cell closure decoded
+/// from the compact row-major blocks of
+/// `test-data/odf/formula-conditional-native/observations.json` (see its
+/// `PROVENANCE.md`) into one `{sheet, row, column, type, value}` object per
+/// cell.
+fn observations() -> serde_json::Value {
+    let source =
+        include_str!("../../../test-data/odf/formula-conditional-native/observations.json");
+    let mut observations: serde_json::Value =
+        serde_json::from_str(source).expect("cached observations");
+    for observation in observations.as_array_mut().expect("observation array") {
+        let blocks = observation["cells"].as_array().expect("cell blocks");
+        let mut cells = Vec::new();
+        for block in blocks {
+            let mut fields = block.as_str().expect("cell block").split('\t');
+            let mut next = || fields.next().expect("cell block field");
+            let sheet = next().to_owned();
+            let row: u64 = next().parse().expect("block row");
+            let column: u64 = next().parse().expect("block column");
+            let width: u64 = next().parse().expect("block width");
+            for (offset, cell) in fields.enumerate() {
+                let offset = offset as u64;
+                let (kind, value) = match cell.split_at(1) {
+                    ("n", value) => ("number", Some(value)),
+                    ("t", value) => ("text", Some(value)),
+                    ("e", "") => ("empty", None),
+                    _ => panic!("unknown cell code {cell:?}"),
+                };
+                let mut entry = serde_json::json!({
+                    "sheet": sheet,
+                    "row": row + offset / width,
+                    "column": column + offset % width,
+                    "type": kind,
+                });
+                if let Some(value) = value {
+                    entry["value"] = serde_json::Value::from(value);
+                }
+                cells.push(entry);
+            }
+        }
+        observation["cells"] = serde_json::Value::Array(cells);
+    }
+    observations
+}
+
 fn assert_close(actual: f64, expected: f64, formula: &str) {
     if expected == 0.0 {
         assert_eq!(
@@ -172,11 +217,7 @@ fn assert_close(actual: f64, expected: f64, formula: &str) {
 
 #[test]
 fn selected_libreoffice_conditional_caches_match_literal_resolved_sources() {
-    let source = include_str!(
-        "../../../docs/report/spec-gap-validation-evidence/ods-formula-conditional-aggregates/native/cached-results.json"
-    );
-    let observations: serde_json::Value =
-        serde_json::from_str(source).expect("cached observations");
+    let observations = observations();
     let rows = observations.as_array().expect("observation array");
     assert_eq!(rows.len(), 64);
     assert!(rows.iter().any(|entry| {
@@ -226,7 +267,8 @@ fn selected_libreoffice_conditional_caches_match_literal_resolved_sources() {
             "formula-cell input leaked into {formula}"
         );
         let resolver = ConditionalResolver::new(sheet.clone(), formula_row, formula_column, cells);
-        let expression = Expression::parse(formula).expect("upstream formula parses");
+        let expression =
+            Expression::parse(formula, &Default::default()).expect("upstream formula parses");
         let context = Context::new(
             &execution,
             Position::new(&sheet, formula_row - 1, formula_column - 1),
@@ -265,11 +307,7 @@ fn selected_libreoffice_conditional_caches_match_literal_resolved_sources() {
 
 #[test]
 fn conditional_native_receipt_keeps_profile_variances_and_converter_explicit() {
-    let selected_source = include_str!(
-        "../../../docs/report/spec-gap-validation-evidence/ods-formula-conditional-aggregates/native/cached-results.json"
-    );
-    let selected: serde_json::Value =
-        serde_json::from_str(selected_source).expect("selected cached observations");
+    let selected = observations();
     let rows = selected.as_array().expect("selected observation array");
     let source = include_str!(
         "../../../docs/report/spec-gap-validation-evidence/ods-formula-conditional-aggregates/native/provenance.json"

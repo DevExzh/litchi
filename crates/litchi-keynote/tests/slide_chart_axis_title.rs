@@ -12,8 +12,9 @@ use litchi_iwa_archive::Limits;
 use litchi_iwa_common::wire::WireView;
 use litchi_iwa_protos::{tsd, tsp};
 use litchi_keynote::{
-    Axis, ChartAxisTitleError, ChartAxisTitleLimitKind, ChartSelector, Package, Position,
-    ReadOptions, SemanticLimits, SlideSelector,
+    Axis, ChartSelector, OpenOptions, Package, Position, SlideSelector, SourceLimits,
+    chart::axis_title::Error as ChartAxisTitleError,
+    chart::axis_title::LimitKind as ChartAxisTitleLimitKind,
 };
 use prost::Message as _;
 
@@ -429,27 +430,37 @@ fn selectors_report_missing_and_ambiguous_chart_names() -> TestResult<()> {
     let package = Package::from_bytes(&source)?;
     assert!(matches!(
         package.slide_chart_axis_title(0usize, ChartSelector::name("missing"), Axis::Category),
-        Err(ChartAxisTitleError::ChartNameNotFound)
+        Err(ChartAxisTitleError::Refused(
+            litchi_keynote::chart::axis_title::Refusal::ChartNameNotFound
+        ))
     ));
     assert!(matches!(
         package.slide_chart_axis_title(SlideSelector::name("missing"), 0usize, Axis::Category),
-        Err(ChartAxisTitleError::SlideNameNotFound)
+        Err(ChartAxisTitleError::Refused(
+            litchi_keynote::chart::axis_title::Refusal::SlideNameNotFound
+        ))
     ));
     assert!(matches!(
         package.slide_chart_axis_title(Position::new(9), 0usize, Axis::Category),
-        Err(ChartAxisTitleError::SlidePositionNotFound { .. })
+        Err(ChartAxisTitleError::Refused(
+            litchi_keynote::chart::axis_title::Refusal::SlidePositionNotFound { .. }
+        ))
     ));
     assert!(matches!(
         package.slide_chart_axis_title(SlideSelector::name(""), 0usize, Axis::Category),
-        Err(ChartAxisTitleError::EmptySlideName)
+        Err(ChartAxisTitleError::Refused(
+            litchi_keynote::chart::axis_title::Refusal::EmptySlideName
+        ))
     ));
     assert!(matches!(
         package.slide_chart_axis_title(0usize, ChartSelector::name(""), Axis::Category),
-        Err(ChartAxisTitleError::EmptyChartName)
+        Err(ChartAxisTitleError::Refused(
+            litchi_keynote::chart::axis_title::Refusal::EmptyChartName
+        ))
     ));
     assert!(matches!(
         package.edit_slide_chart_axis_title(0usize, 4usize, Axis::Category),
-        Err(ChartAxisTitleError::ChartPositionNotFound { position })
+        Err(ChartAxisTitleError::Refused(litchi_keynote::chart::axis_title::Refusal::ChartPositionNotFound { position }))
             if position == Position::new(4)
     ));
 
@@ -462,7 +473,9 @@ fn selectors_report_missing_and_ambiguous_chart_names() -> TestResult<()> {
     let duplicate = Package::from_bytes(&duplicate_chart_title)?;
     assert!(matches!(
         duplicate.slide_chart_axis_title(0usize, ChartSelector::name("Revenue"), Axis::Value),
-        Err(ChartAxisTitleError::AmbiguousSelector)
+        Err(ChartAxisTitleError::Refused(
+            litchi_keynote::chart::axis_title::Refusal::AmbiguousSelector
+        ))
     ));
     Ok(())
 }
@@ -471,7 +484,7 @@ fn selectors_report_missing_and_ambiguous_chart_names() -> TestResult<()> {
 fn locked_or_unsupported_chart_graphs_are_rejected_for_mutation() -> TestResult<()> {
     let source = synthetic_metadata_package(false)?;
     let chart = message_payload(&source, CHARTS[0], CHART_MESSAGE_TYPE)?;
-    let drawable = WireView::parse(&chart)?
+    let drawable = WireView::parse(&chart, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == 1)
         .ok_or_else(|| io::Error::other("missing chart drawable"))?;
@@ -731,17 +744,15 @@ fn output_limit_at_max_minus_one_rejects_atomically() -> TestResult<()> {
     let target = exact_bytes(baseline.package())?;
     assert!(target.len() > source.len());
     let defaults = Limits::default();
-    let limits = Limits::new(
-        u64::try_from(target.len() - 1)?,
-        defaults.max_entries(),
-        defaults.max_entry_bytes(),
-        defaults.max_total_bytes(),
-        defaults.max_iwa_stream_bytes(),
-    )?;
-    let package = Package::from_bytes_with_options(
-        &source,
-        ReadOptions::new(limits, SemanticLimits::default()),
-    )?;
+    let limits = SourceLimits::builder()
+        .max_input_bytes(u64::try_from(target.len() - 1)?)?
+        .max_entries(defaults.max_entries())?
+        .max_entry_bytes(defaults.max_entry_bytes())?
+        .max_aggregate_bytes(defaults.max_total_bytes())?
+        .max_component_bytes(defaults.max_iwa_stream_bytes())?
+        .build()?;
+    let package =
+        Package::from_bytes_with_options(&source, OpenOptions::new().source_limits(limits))?;
     let before = exact_bytes(&package)?;
     let result = package
         .edit_slide_chart_axis_title(0usize, 0usize, Axis::Category)
@@ -750,7 +761,7 @@ fn output_limit_at_max_minus_one_rejects_atomically() -> TestResult<()> {
     assert!(
         matches!(
             result,
-            Err(ChartAxisTitleError::LimitExceeded {
+            Err(ChartAxisTitleError::Limit {
                 kind: ChartAxisTitleLimitKind::OutputBytes,
                 ..
             })

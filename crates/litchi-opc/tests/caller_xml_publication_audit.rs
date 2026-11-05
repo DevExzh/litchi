@@ -20,14 +20,15 @@
 
 use std::sync::Arc;
 
-use litchi_opc::{OpcError, OpcPackage, PackURI, PackageWriter, TargetMode};
+use litchi_opc::{OpcError, OpcPackage, PackURI, PackageWriter, SourceLimits, TargetMode};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
 const BOGUS_SPACE: &str = r#" xml:space="bogus""#;
 const ITEM: &str = "/custom/item.xml";
 
 fn source(content_types_attribute: &str, relationships_attribute: &str, item: &str) -> Vec<u8> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_deflated(
             "[Content_Types].xml",
@@ -66,8 +67,11 @@ fn assert_audit_refusal<T: std::fmt::Debug>(result: litchi_opc::Result<T>, membe
 #[test]
 fn added_owned_xml_parts_are_audited_before_insertion() {
     let name = uri(ITEM);
-    let donor = OpcPackage::from_vec(source("", "", r#"<item xml:space="bogus"/>"#))
-        .expect("the source validator admits the donor");
+    let donor = OpcPackage::from_vec(
+        source("", "", r#"<item xml:space="bogus"/>"#),
+        SourceLimits::default(),
+    )
+    .expect("the source validator admits the donor");
     let token = donor
         .source_xml_part(&name)
         .expect("source provenance yields a token");
@@ -85,13 +89,14 @@ fn added_owned_xml_parts_are_audited_before_insertion() {
     assert_eq!(PackageWriter::to_bytes(&receiver).unwrap(), before);
 
     // Well-formed caller XML is still accepted and published unchanged.
-    let donor = OpcPackage::from_vec(source("", "", "<item>kept</item>")).unwrap();
+    let donor =
+        OpcPackage::from_vec(source("", "", "<item>kept</item>"), SourceLimits::default()).unwrap();
     receiver
         .try_add_owned_xml_part(donor.source_xml_part(&name).unwrap())
         .expect("benign caller XML");
     let output = PackageWriter::to_bytes(&receiver).unwrap();
     assert_eq!(
-        ArchiveReader::new(&output)
+        ArchiveReader::new(&output, soapberry_zip::office::ArchiveLimits::default())
             .unwrap()
             .read("custom/item.xml")
             .unwrap(),
@@ -102,19 +107,25 @@ fn added_owned_xml_parts_are_audited_before_insertion() {
 #[test]
 fn replaced_content_types_tokens_are_audited_before_installation() {
     let source = source(BOGUS_SPACE, "", "<item/>");
-    let mut package = OpcPackage::from_vec(source.clone()).expect("the manifest parser admits it");
-    let current = package.source_content_types().unwrap();
+    let mut package = OpcPackage::from_vec(source.clone(), SourceLimits::default())
+        .expect("the manifest parser admits it");
+    let current = package
+        .source_content_types(SourceLimits::default())
+        .unwrap();
     let replacement = current
         .with_part_overrides(&[(&uri(ITEM), "application/xml")], 1 << 20)
         .unwrap();
     assert_ne!(replacement.bytes(), current.bytes());
 
     assert_audit_refusal(
-        package.try_replace_content_types(current.bytes(), &replacement),
+        package.try_replace_content_types(current.bytes(), &replacement, SourceLimits::default()),
         "/[Content_Types].xml",
     );
     assert_eq!(
-        package.source_content_types().unwrap().bytes(),
+        package
+            .source_content_types(SourceLimits::default())
+            .unwrap()
+            .bytes(),
         current.bytes()
     );
     // The untouched source is still published exactly, its own bytes
@@ -133,7 +144,8 @@ fn manifest_tokens_the_read_policy_admits_keep_their_size_under_the_audit() {
         } else {
             ""
         };
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer
             .write_deflated(
                 "[Content_Types].xml",
@@ -156,16 +168,21 @@ fn manifest_tokens_the_read_policy_admits_keep_their_size_under_the_audit() {
     };
 
     for (root_attribute, admitted) in [("", true), (BOGUS_SPACE, false)] {
-        let donor = OpcPackage::from_vec(manifest(root_attribute, true)).unwrap();
-        let token = donor.source_content_types().unwrap();
-        let mut package = OpcPackage::from_vec(manifest(root_attribute, false)).unwrap();
-        let current = package.source_content_types().unwrap();
-        let result = package.try_replace_content_types(current.bytes(), &token);
+        let donor =
+            OpcPackage::from_vec(manifest(root_attribute, true), SourceLimits::default()).unwrap();
+        let token = donor.source_content_types(SourceLimits::default()).unwrap();
+        let mut package =
+            OpcPackage::from_vec(manifest(root_attribute, false), SourceLimits::default()).unwrap();
+        let current = package
+            .source_content_types(SourceLimits::default())
+            .unwrap();
+        let result =
+            package.try_replace_content_types(current.bytes(), &token, SourceLimits::default());
         if admitted {
             assert!(result.expect("the admitted size is audited, not refused"));
             let output = PackageWriter::to_bytes(&package).unwrap();
             assert_eq!(
-                ArchiveReader::new(&output)
+                ArchiveReader::new(&output, soapberry_zip::office::ArchiveLimits::default())
                     .unwrap()
                     .read("[Content_Types].xml")
                     .unwrap(),
@@ -180,10 +197,12 @@ fn manifest_tokens_the_read_policy_admits_keep_their_size_under_the_audit() {
 #[test]
 fn replaced_relationship_tokens_are_audited_before_installation() {
     let source = source("", BOGUS_SPACE, "<item/>");
-    let mut package =
-        OpcPackage::from_vec(source.clone()).expect("the relationships parser admits it");
+    let mut package = OpcPackage::from_vec(source.clone(), SourceLimits::default())
+        .expect("the relationships parser admits it");
     let root = uri("/");
-    let expected = package.source_relationships(&root).unwrap();
+    let expected = package
+        .source_relationships(&root, SourceLimits::default())
+        .unwrap();
     let replacement = expected
         .with_relationship(
             "urn:test:again",
@@ -195,10 +214,15 @@ fn replaced_relationship_tokens_are_audited_before_installation() {
         .unwrap();
 
     assert_audit_refusal(
-        package.try_replace_relationships(&expected, &replacement),
+        package.try_replace_relationships(&expected, &replacement, SourceLimits::default()),
         "/_rels/.rels",
     );
-    assert_eq!(package.source_relationships(&root).unwrap(), expected);
+    assert_eq!(
+        package
+            .source_relationships(&root, SourceLimits::default())
+            .unwrap(),
+        expected
+    );
     assert_eq!(package.rels().len(), 1);
     assert_eq!(PackageWriter::to_bytes(&package).unwrap(), source);
 }
@@ -210,9 +234,14 @@ fn batch_source_tokens_are_audited_before_any_mutation() {
 
     // A malformed relationships token with a clean manifest.
     let source_with_bad_rels = source("", BOGUS_SPACE, "<item/>");
-    let mut package = OpcPackage::from_vec(source_with_bad_rels.clone()).unwrap();
-    let content_types = package.source_content_types().unwrap();
-    let expected = package.source_relationships(&root).unwrap();
+    let mut package =
+        OpcPackage::from_vec(source_with_bad_rels.clone(), SourceLimits::default()).unwrap();
+    let content_types = package
+        .source_content_types(SourceLimits::default())
+        .unwrap();
+    let expected = package
+        .source_relationships(&root, SourceLimits::default())
+        .unwrap();
     let replacement = expected
         .with_relationship(
             "urn:test:again",
@@ -232,7 +261,12 @@ fn batch_source_tokens_are_audited_before_any_mutation() {
         ),
         "/_rels/.rels",
     );
-    assert_eq!(package.source_relationships(&root).unwrap(), expected);
+    assert_eq!(
+        package
+            .source_relationships(&root, SourceLimits::default())
+            .unwrap(),
+        expected
+    );
     assert_eq!(
         PackageWriter::to_bytes(&package).unwrap(),
         source_with_bad_rels
@@ -240,12 +274,17 @@ fn batch_source_tokens_are_audited_before_any_mutation() {
 
     // A malformed manifest token with an unchanged relationships token.
     let source_with_bad_manifest = source(BOGUS_SPACE, "", "<item/>");
-    let mut package = OpcPackage::from_vec(source_with_bad_manifest.clone()).unwrap();
-    let content_types = package.source_content_types().unwrap();
+    let mut package =
+        OpcPackage::from_vec(source_with_bad_manifest.clone(), SourceLimits::default()).unwrap();
+    let content_types = package
+        .source_content_types(SourceLimits::default())
+        .unwrap();
     let replacement = content_types
         .with_part_overrides(&[(&item, "application/xml")], 1 << 20)
         .unwrap();
-    let relationships = package.source_relationships(&root).unwrap();
+    let relationships = package
+        .source_relationships(&root, SourceLimits::default())
+        .unwrap();
     assert_audit_refusal(
         package.try_add_parts_with_source_tokens(
             content_types.bytes(),
@@ -257,7 +296,10 @@ fn batch_source_tokens_are_audited_before_any_mutation() {
         "/[Content_Types].xml",
     );
     assert_eq!(
-        package.source_content_types().unwrap().bytes(),
+        package
+            .source_content_types(SourceLimits::default())
+            .unwrap()
+            .bytes(),
         content_types.bytes()
     );
     assert_eq!(

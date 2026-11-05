@@ -1,0 +1,583 @@
+{
+  "baseline_commit": "e63a1fe3534bcaaae2ce367339f7f8275877baef",
+  "cpu": 0,
+  "blocks": 5,
+  "target_ms": 500,
+  "source_sha256": "9bcfddea884b2b295f395cb4cb2fc62e88dc107ce8cf196a4129dfccb83a728b",
+  "runner_sha256": "51403a56cea89ef76546a8022611390856e03d64520b5e65dd4b304a3f4b0c46",
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+  "locks": {
+    "before": "9af16e09b318748dfcffdbed26d82dd85361f8a80d11bd77633e559b4e75cfc1",
+    "after": "9af16e09b318748dfcffdbed26d82dd85361f8a80d11bd77633e559b4e75cfc1"
+  },
+  "binaries": {
+    "before": {
+      "timed": {
+        "bytes": 875864,
+        "sha256": "5f40b5c419e6e5f0c6132736128522d02f56c59f9a101fda0b6ef229f23c7cf6"
+      },
+      "allocations": {
+        "bytes": 918032,
+        "sha256": "e066d50391d1315230177b1baa830224ce755e619533dbb6d6bb0935bdda39d1"
+      }
+    },
+    "after": {
+      "timed": {
+        "bytes": 877800,
+        "sha256": "4491ad2494c510915a055f378a71d6423c312824d9f9578d871e82303fdae599"
+      },
+      "allocations": {
+        "bytes": 920128,
+        "sha256": "e5dbbc5c9968e512d0f36de4220cdf2c84f07dd29ae71cdcfdab6d8c832171fb"
+      }
+    }
+  },
+  "status": "Accepted with the longer v4-copy-followup qualification; see 0361e for all paired results and scope.",
+  "rows": [
+    {
+      "route": "compress-small",
+      "after_before": [
+        0.9985037297124212,
+        0.9196426692190023,
+        1.0448908998577724,
+        0.9510794543186426,
+        0.9009623821287903
+      ],
+      "allocations": {
+        "before": {
+          "route": "compress-small",
+          "iterations": 1,
+          "ns": 370,
+          "checksum": "dd8553a283c0d28389d66234c31fec889433dd43ba7f1670cf2e539173b36c37",
+          "bytes": 86,
+          "bound": 1230,
+          "peak": 2456,
+          "retained": 0,
+          "allocated": 2456,
+          "allocations": 2
+        },
+        "after": {
+          "route": "compress-small",
+          "iterations": 1,
+          "ns": 350,
+          "checksum": "dd8553a283c0d28389d66234c31fec889433dd43ba7f1670cf2e539173b36c37",
+          "bytes": 86,
+          "bound": 1230,
+          "peak": 1230,
+          "retained": 0,
+          "allocated": 1230,
+          "allocations": 1
+        }
+      },
+      "fidelity": true,
+      "minimum_leg_ns": 472762303,
+      "eligible": true,
+      "median_after_before": 0.9510794543186426
+    },
+    {
+      "route": "compress-large",
+      "after_before": [
+        1.0104182935566113,
+        0.9933698797706351,
+        1.0033667351222932,
+        1.0057187374092336,
+        0.99311422510121
+      ],
+      "allocations": {
+        "before": {
+          "route": "compress-large",
+          "iterations": 1,
+          "ns": 241391,
+          "checksum": "16a062d5eb83551a632f9b77d9b2bf23a1e2ed18bebb8aa1b307786ab1861b01",
+          "bytes": 199104,
+          "bound": 4895616,
+          "peak": 5004874,
+          "retained": 0,
+          "allocated": 9823744,
+          "allocations": 66
+        },
+        "after": {
+          "route": "compress-large",
+          "iterations": 1,
+          "ns": 252801,
+          "checksum": "16a062d5eb83551a632f9b77d9b2bf23a1e2ed18bebb8aa1b307786ab1861b01",
+          "bytes": 199104,
+          "bound": 4895616,
+          "peak": 4928384,
+          "retained": 0,
+          "allocated": 4928384,
+          "allocations": 2
+        }
+      },
+      "fidelity": true,
+      "minimum_leg_ns": 470609294,
+      "eligible": true,
+      "median_after_before": 1.0033667351222932
+    },
+    {
+      "route": "compress-noise",
+      "after_before": [
+        0.6817235626468869,
+        0.6797335029958457,
+        0.6748668733160164,
+        0.6882390673413105,
+        0.6923959041303807
+      ],
+      "allocations": {
+        "before": {
+          "route": "compress-noise",
+          "iterations": 1,
+          "ns": 953105,
+          "checksum": "4fe80a683a051ddd1d3356421d1a9d2275d26268be605f702b422b4133f75437",
+          "bytes": 4194944,
+          "bound": 4895616,
+          "peak": 5004874,
+          "retained": 0,
+          "allocated": 9823744,
+          "allocations": 66
+        },
+        "after": {
+          "route": "compress-noise",
+          "iterations": 1,
+          "ns": 892634,
+          "checksum": "4fe80a683a051ddd1d3356421d1a9d2275d26268be605f702b422b4133f75437",
+          "bytes": 4194944,
+          "bound": 4895616,
+          "peak": 4928384,
+          "retained": 0,
+          "allocated": 4928384,
+          "allocations": 2
+        }
+      },
+      "fidelity": true,
+      "minimum_leg_ns": 450883377,
+      "eligible": true,
+      "median_after_before": 0.6817235626468869
+    },
+    {
+      "route": "decompress-small",
+      "after_before": [
+        0.9992698698118976,
+        0.998354037029808,
+        1.0045930029736463,
+        1.0000622423853893,
+        0.9990064001076723
+      ],
+      "allocations": {
+        "before": {
+          "route": "decompress-small",
+          "iterations": 1,
+          "ns": 340,
+          "checksum": "3256441b6e7e627e4d8a603d7129eec6086ce420d792012228b979c7eb51fe1e",
+          "bytes": 1024,
+          "bound": 1230,
+          "peak": 1024,
+          "retained": 0,
+          "allocated": 1024,
+          "allocations": 1
+        },
+        "after": {
+          "route": "decompress-small",
+          "iterations": 1,
+          "ns": 350,
+          "checksum": "3256441b6e7e627e4d8a603d7129eec6086ce420d792012228b979c7eb51fe1e",
+          "bytes": 1024,
+          "bound": 1230,
+          "peak": 1024,
+          "retained": 0,
+          "allocated": 1024,
+          "allocations": 1
+        }
+      },
+      "fidelity": true,
+      "minimum_leg_ns": 499959346,
+      "eligible": true,
+      "median_after_before": 0.9992698698118976
+    },
+    {
+      "route": "decompress-large",
+      "after_before": [
+        1.0005961290637297,
+        1.000607615414057,
+        1.000318502531381,
+        0.9992331336888385,
+        1.0000575408332903
+      ],
+      "allocations": {
+        "before": {
+          "route": "decompress-large",
+          "iterations": 1,
+          "ns": 956615,
+          "checksum": "4eb5b7ae7093bece04ad9e39145525b0c5e59426cfe88be0c22ff5e9dc613716",
+          "bytes": 4194304,
+          "bound": 4895616,
+          "peak": 4194304,
+          "retained": 0,
+          "allocated": 4194304,
+          "allocations": 1
+        },
+        "after": {
+          "route": "decompress-large",
+          "iterations": 1,
+          "ns": 948304,
+          "checksum": "4eb5b7ae7093bece04ad9e39145525b0c5e59426cfe88be0c22ff5e9dc613716",
+          "bytes": 4194304,
+          "bound": 4895616,
+          "peak": 4194304,
+          "retained": 0,
+          "allocated": 4194304,
+          "allocations": 1
+        }
+      },
+      "fidelity": true,
+      "minimum_leg_ns": 498448540,
+      "eligible": true,
+      "median_after_before": 1.000318502531381
+    },
+    {
+      "route": "decompress-noise",
+      "after_before": [
+        1.0002084776505529,
+        1.0068318855758462,
+        0.9987379855715274,
+        1.0019872758351072,
+        1.0022530728518964
+      ],
+      "allocations": {
+        "before": {
+          "route": "decompress-noise",
+          "iterations": 1,
+          "ns": 118551,
+          "checksum": "ba1fe3617b354e9a5ccf0ca62517c7f4595980b5f0f158679e1a886217d70976",
+          "bytes": 4194304,
+          "bound": 4895616,
+          "peak": 4194304,
+          "retained": 0,
+          "allocated": 4194304,
+          "allocations": 1
+        },
+        "after": {
+          "route": "decompress-noise",
+          "iterations": 1,
+          "ns": 111601,
+          "checksum": "ba1fe3617b354e9a5ccf0ca62517c7f4595980b5f0f158679e1a886217d70976",
+          "bytes": 4194304,
+          "bound": 4895616,
+          "peak": 4194304,
+          "retained": 0,
+          "allocated": 4194304,
+          "allocations": 1
+        }
+      },
+      "fidelity": true,
+      "minimum_leg_ns": 485293711,
+      "eligible": true,
+      "median_after_before": 1.0019872758351072
+    },
+    {
+      "route": "bound-large",
+      "after_before": [
+        0.17053598671891546,
+        0.1702193190588274,
+        0.17037168168283132,
+        0.17046832526447725,
+        0.17035468330232048
+      ],
+      "allocations": {
+        "before": {
+          "route": "bound-large",
+          "iterations": 1,
+          "ns": 230,
+          "checksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0,
+          "bound": 4895616,
+          "peak": 0,
+          "retained": 0,
+          "allocated": 0,
+          "allocations": 0
+        },
+        "after": {
+          "route": "bound-large",
+          "iterations": 1,
+          "ns": 180,
+          "checksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0,
+          "bound": 4895616,
+          "peak": 0,
+          "retained": 0,
+          "allocated": 0,
+          "allocations": 0
+        }
+      },
+      "fidelity": true,
+      "minimum_leg_ns": 423889235,
+      "eligible": true,
+      "median_after_before": 0.17037168168283132
+    },
+    {
+      "route": "framing",
+      "after_before": [
+        1.0236668993113829,
+        0.8966037038025033,
+        0.9789111512589267,
+        0.9674110173927658,
+        0.9810163122871527
+      ],
+      "allocations": {
+        "before": {
+          "route": "framing",
+          "iterations": 1,
+          "ns": 6430,
+          "checksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0,
+          "bound": 4895616,
+          "peak": 0,
+          "retained": 0,
+          "allocated": 0,
+          "allocations": 0
+        },
+        "after": {
+          "route": "framing",
+          "iterations": 1,
+          "ns": 5920,
+          "checksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0,
+          "bound": 4895616,
+          "peak": 0,
+          "retained": 0,
+          "allocated": 0,
+          "allocations": 0
+        }
+      },
+      "fidelity": true,
+      "minimum_leg_ns": 461628841,
+      "eligible": true,
+      "median_after_before": 0.9789111512589267
+    },
+    {
+      "route": "copy-small",
+      "after_before": [
+        0.8489997386838322,
+        0.815756873104167,
+        0.8400920623854872,
+        0.7804113658444843,
+        0.8193327352391216
+      ],
+      "allocations": {
+        "before": {
+          "route": "copy-small",
+          "iterations": 1,
+          "ns": 220,
+          "checksum": "bdbe832117d0967018c545f959e03e62b1b2554449a1bf6f021ac18891d1e01a",
+          "bytes": 1140,
+          "bound": 1230,
+          "peak": 1140,
+          "retained": 0,
+          "allocated": 1140,
+          "allocations": 1
+        },
+        "after": {
+          "route": "copy-small",
+          "iterations": 1,
+          "ns": 200,
+          "checksum": "bdbe832117d0967018c545f959e03e62b1b2554449a1bf6f021ac18891d1e01a",
+          "bytes": 1140,
+          "bound": 1230,
+          "peak": 1140,
+          "retained": 0,
+          "allocated": 1140,
+          "allocations": 1
+        }
+      },
+      "fidelity": true,
+      "minimum_leg_ns": 432350743,
+      "eligible": true,
+      "median_after_before": 0.8193327352391216
+    },
+    {
+      "route": "copy-large",
+      "after_before": [
+        0.9989045751957625,
+        0.9994228359518558,
+        1.0166179214487263,
+        1.0114553524936734,
+        1.012846372581301
+      ],
+      "allocations": {
+        "before": {
+          "route": "copy-large",
+          "iterations": 1,
+          "ns": 67650,
+          "checksum": "6ab774d661b9c606207d44e2031721165b0ad08a4cc75ec392000c948c57de57",
+          "bytes": 4194420,
+          "bound": 4895616,
+          "peak": 4194420,
+          "retained": 0,
+          "allocated": 4194420,
+          "allocations": 1
+        },
+        "after": {
+          "route": "copy-large",
+          "iterations": 1,
+          "ns": 91111,
+          "checksum": "6ab774d661b9c606207d44e2031721165b0ad08a4cc75ec392000c948c57de57",
+          "bytes": 4194420,
+          "bound": 4895616,
+          "peak": 4194420,
+          "retained": 0,
+          "allocated": 4194420,
+          "allocations": 1
+        }
+      },
+      "fidelity": true,
+      "minimum_leg_ns": 459135956,
+      "eligible": true,
+      "median_after_before": 1.0114553524936734
+    },
+    {
+      "route": "write-small",
+      "after_before": [
+        0.999688958645162,
+        1.0134800813232603,
+        1.0141971813241093,
+        1.0007301835823057,
+        0.9587551988099688
+      ],
+      "allocations": {
+        "before": {
+          "route": "write-small",
+          "iterations": 1,
+          "ns": 170,
+          "checksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0,
+          "bound": 1230,
+          "peak": 0,
+          "retained": 0,
+          "allocated": 0,
+          "allocations": 0
+        },
+        "after": {
+          "route": "write-small",
+          "iterations": 1,
+          "ns": 120,
+          "checksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0,
+          "bound": 1230,
+          "peak": 0,
+          "retained": 0,
+          "allocated": 0,
+          "allocations": 0
+        }
+      },
+      "fidelity": true,
+      "minimum_leg_ns": 445594518,
+      "eligible": true,
+      "median_after_before": 1.0007301835823057
+    },
+    {
+      "route": "write-large",
+      "after_before": [
+        1.0017714363746246,
+        0.9945819102687353,
+        1.0146214564245533,
+        1.0019936017579962,
+        0.9987460146002276
+      ],
+      "allocations": {
+        "before": {
+          "route": "write-large",
+          "iterations": 1,
+          "ns": 84700,
+          "checksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0,
+          "bound": 4895616,
+          "peak": 0,
+          "retained": 0,
+          "allocated": 0,
+          "allocations": 0
+        },
+        "after": {
+          "route": "write-large",
+          "iterations": 1,
+          "ns": 95190,
+          "checksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0,
+          "bound": 4895616,
+          "peak": 0,
+          "retained": 0,
+          "allocated": 0,
+          "allocations": 0
+        }
+      },
+      "fidelity": true,
+      "minimum_leg_ns": 478165933,
+      "eligible": true,
+      "median_after_before": 1.0017714363746246
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/native-v4/measurements.json",
+      "bytes": 254130,
+      "sha256": "ecd38f3e2af6d6285d292f594be53093cacdf098250944dfdb4ac4fd7a9e8550"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/native-v4/samples.jsonl",
+      "bytes": 182518,
+      "sha256": "732439c46311dfa9ff944f113fb35eb27330db7b9ca9c4aee10450ca1e1a92dd"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/native-v4.log",
+      "bytes": 1430,
+      "sha256": "7bfc1cd1a7b42f874b31b1455039b0e35684c29c7d51bcbeada8365c3b48a9cc"
+    }
+  ],
+  "build_artifacts": [
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-v4/before/source-digests.json",
+      "bytes": 59186,
+      "sha256": "baa5273285bfbfd5ed8b37116836876281bb87be61ea38e430285e77dd2ddbf7"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-v4/before/build-timed.log",
+      "bytes": 4047,
+      "sha256": "8f216daf765ce760af0d6f22240a6ab4c0075fcd6c98822f3cde92da12ec54f4"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-v4/before/build-allocations.log",
+      "bytes": 259,
+      "sha256": "ca92ef2ff6e0ea9e9a75630052ef16f32a58cc66503e416d8c355eb99df0a55e"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-v4/after/source-digests.json",
+      "bytes": 59186,
+      "sha256": "dcbfbe2d20f914a64512e1c08c30f29b439c0e5627760809c962fcdf1b9de3eb"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-v4/after/build-timed.log",
+      "bytes": 4038,
+      "sha256": "f803ed4ed4387c1766bc23cc0c1c117013abe5bcd837a94b436f932efaddf322"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-v4/after/build-allocations.log",
+      "bytes": 258,
+      "sha256": "984d3395010601d58fc8d5170ec66e56065bbb1bada373b2319d262f43b3484d"
+    }
+  ],
+  "command": [
+    "taskset",
+    "-c",
+    "0",
+    "python3",
+    "docs/unified-ops/results/0361d/snappy-probe.py",
+    "run",
+    "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-v4",
+    "--results-dir",
+    "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/native-v4",
+    "--blocks",
+    "5",
+    "--target-ms",
+    "500"
+  ],
+  "allocation_metric_scope": "Incremental operation peak/retained bytes over live fixture and warm result; separately instrumented binaries, not RSS."
+}

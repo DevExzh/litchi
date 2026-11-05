@@ -25,7 +25,7 @@ impl Package {
     /// resulting XML have validated. Unmodeled settings nodes and auxiliary
     /// package entries remain untouched; policy values are inert metadata and
     /// are never enforced by this method.
-    pub fn set_protection(&mut self, policy: &Policy) -> Result<Option<Policy>> {
+    pub(crate) fn set_protection(&mut self, policy: &Policy) -> Result<Option<Policy>> {
         policy.validate()?;
         let before = self.protection()?;
         if before.as_ref().is_some_and(|value| value == policy)
@@ -34,7 +34,7 @@ impl Package {
             return Ok(before);
         }
         let bytes = rewrite_owned_package(self.owned_package(), self.mimetype(), policy)?;
-        *self = Self::from_bytes(bytes)?;
+        *self = Self::from_vec(bytes)?;
         Ok(before)
     }
 }
@@ -46,7 +46,7 @@ impl FlatDocument {
     }
 
     /// Replace document interaction policy metadata atomically.
-    pub fn set_protection(&mut self, policy: &Policy) -> Result<Policy> {
+    pub(crate) fn set_protection(&mut self, policy: &Policy) -> Result<Policy> {
         policy.validate()?;
         let before = self.protection()?;
         if &before == policy {
@@ -86,7 +86,7 @@ pub(crate) fn rewrite_owned_package(
         Some(super::codec::empty_package(policy)?)
     };
 
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(mimetype)?;
     for path in [
         constants::ODF_CONTENT,

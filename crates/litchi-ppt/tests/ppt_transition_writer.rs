@@ -5,33 +5,36 @@
 )]
 
 //! Round-trip tests for slide transitions authored with the create-side
-//! writer: a transition set via `Writer::set_slide_transition` must be emitted
+//! writer: a transition set via `Builder::set_slide_transition` must be emitted
 //! as an `SSSlideInfoAtom` (MS-PPT 2.6.6) and read back by the crate's own
 //! reader.
 
 use std::io::Cursor;
 
-use litchi_ppt::writer::{SlideTiming, WriteError, Writer};
+use litchi_ppt::writer::{Builder, SlideTiming, WriteError};
 use litchi_ppt::{
-    AdvanceMode, Package, Record, SoundAction, TransitionDirection, TransitionInfo,
-    TransitionSpeed, TransitionType,
+    AdvanceMode, Record, SoundAction, TransitionDirection, TransitionInfo, TransitionSpeed,
+    TransitionType, raw::Reader,
 };
 
-fn write(writer: &mut Writer) -> Vec<u8> {
+fn write(writer: &mut Builder) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    litchi_ppt::raw::encode(writer, &mut output).unwrap();
     output.into_inner()
 }
 
 /// Payloads of every `SSSlideInfoAtom` (record type 1017) found in the Slide
 /// containers (record type 1006) of the written presentation, in slide order.
 fn slide_info_atom_payloads(bytes: &[u8]) -> Vec<Vec<u8>> {
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     let stream = ole.open_stream(&["PowerPoint Document"]).unwrap();
     let mut payloads = Vec::new();
     let mut offset = 0;
     while offset < stream.len() {
-        let (record, consumed) = Record::parse(&stream, offset).unwrap();
+        let (record, consumed) =
+            Record::parse(&stream, offset, &litchi_ppt::SourceLimits::default()).unwrap();
         if record.record_type_raw == 1006
             && let Some(atom) = record
                 .children
@@ -47,7 +50,7 @@ fn slide_info_atom_payloads(bytes: &[u8]) -> Vec<Vec<u8>> {
 
 #[test]
 fn authored_transition_round_trips_through_reader() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let wipe_slide = writer.add_slide().unwrap();
     writer
         .set_slide_transition(
@@ -71,7 +74,7 @@ fn authored_transition_round_trips_through_reader() {
     let plain_slide = writer.add_slide().unwrap();
 
     let bytes = write(&mut writer);
-    let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
     let presentation = package.presentation().unwrap();
     let slides = presentation.slides().unwrap();
     assert_eq!(slides.len(), 3);
@@ -96,7 +99,7 @@ fn authored_transition_round_trips_through_reader() {
 
 #[test]
 fn authored_transition_record_layout_matches_spec() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let wipe_slide = writer.add_slide().unwrap();
     writer
         .set_slide_transition(
@@ -170,7 +173,7 @@ fn directional_transitions_round_trip() {
         (TransitionType::Wheel, TransitionDirection::Spokes3),
     ];
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     for (transition_type, direction) in cases {
         let slide = writer.add_slide().unwrap();
         writer
@@ -182,7 +185,7 @@ fn directional_transitions_round_trip() {
     }
 
     let bytes = write(&mut writer);
-    let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
     let presentation = package.presentation().unwrap();
     let slides = presentation.slides().unwrap();
 
@@ -201,7 +204,7 @@ fn directional_transitions_round_trip() {
 
 #[test]
 fn hidden_timing_survives_when_transition_set() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     writer
         .set_slide_transition(
@@ -221,7 +224,7 @@ fn hidden_timing_survives_when_transition_set() {
     assert_ne!(flags & (1 << 0), 0, "fManualAdvance from the transition");
     assert_ne!(flags & (1 << 2), 0, "fHidden preserved from the timing");
 
-    let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
     let presentation = package.presentation().unwrap();
     let slides = presentation.slides().unwrap();
     let timing = slides[0].timing().unwrap();
@@ -233,14 +236,14 @@ fn hidden_timing_survives_when_transition_set() {
 
 #[test]
 fn timing_still_emitted_for_slides_without_transition() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     writer
         .set_slide_timing(slide, SlideTiming::auto_advance(5000))
         .unwrap();
 
     let bytes = write(&mut writer);
-    let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
     let presentation = package.presentation().unwrap();
     let slides = presentation.slides().unwrap();
 
@@ -257,7 +260,7 @@ fn timing_still_emitted_for_slides_without_transition() {
 
 #[test]
 fn transition_with_sound_is_refused() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     let transition = TransitionInfo {
         sound: Some(SoundAction::builtin("Applause")),
@@ -269,7 +272,7 @@ fn transition_with_sound_is_refused() {
 
 #[test]
 fn transition_without_binary_ppt_representation_is_refused() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     let result =
         writer.set_slide_transition(slide, TransitionInfo::with_type(TransitionType::Morph));
@@ -278,7 +281,7 @@ fn transition_without_binary_ppt_representation_is_refused() {
 
 #[test]
 fn transition_on_missing_slide_is_refused() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let result = writer.set_slide_transition(0, TransitionInfo::with_type(TransitionType::Fade));
     assert!(matches!(result, Err(WriteError::InvalidData(_))));
 }

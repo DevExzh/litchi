@@ -58,9 +58,13 @@ impl WorkbookLayout {
 }
 
 pub(super) fn validate(bytes: &[u8], limits: Limits) -> Result<ValidatedPackage> {
-    let mut cfb = OleFile::open(Cursor::new(bytes))?;
+    let mut cfb = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())?;
     let entries = cfb.list_directory_entries(&[])?;
-    check_limit("root entries", entries.len(), limits.max_streams)?;
+    check_limit(
+        crate::LimitKind::RootEntries,
+        entries.len(),
+        limits.max_streams,
+    )?;
 
     let mut workbook = None;
     let mut comp_obj = None;
@@ -86,9 +90,17 @@ pub(super) fn validate(bytes: &[u8], limits: Limits) -> Result<ValidatedPackage>
     }
 
     let workbook_bytes = workbook.ok_or(Error::MissingStream { name: WORKBOOK })?;
-    check_limit_u64("Workbook bytes", workbook_bytes, limits.max_workbook_bytes)?;
+    check_limit_u64(
+        crate::LimitKind::WorkbookBytes,
+        workbook_bytes,
+        limits.max_workbook_bytes,
+    )?;
     let workbook = cfb.open_stream(&[WORKBOOK])?;
-    check_limit("Workbook bytes", workbook.len(), limits.max_workbook_bytes)?;
+    check_limit(
+        crate::LimitKind::WorkbookBytes,
+        workbook.len(),
+        limits.max_workbook_bytes,
+    )?;
     let workbook_layout = validate_workbook(&workbook, limits)?;
 
     Ok(ValidatedPackage {
@@ -108,7 +120,11 @@ fn validate_entry(entry: &DirectoryEntry, limits: Limits) -> Result<()> {
             entry_type: entry.entry_type,
         });
     }
-    check_limit_u64("stream bytes", entry.size, limits.max_stream_bytes)
+    check_limit_u64(
+        crate::LimitKind::StreamBytes,
+        entry.size,
+        limits.max_stream_bytes,
+    )
 }
 
 pub(super) fn validate_workbook(bytes: &[u8], limits: Limits) -> Result<WorkbookLayout> {
@@ -116,7 +132,7 @@ pub(super) fn validate_workbook(bytes: &[u8], limits: Limits) -> Result<Workbook
     let mut chart_start = None;
     let mut chart_end = None;
     let mut chart_records = 0usize;
-    for item in Records::with_limits(bytes, limits.biff)? {
+    for item in Records::new(bytes, limits.biff)? {
         let record = item?;
         state = match state {
             StreamState::GlobalsBof => {
@@ -145,7 +161,7 @@ pub(super) fn validate_workbook(bytes: &[u8], limits: Limits) -> Result<Workbook
                     resource: "chart record count",
                 })?;
                 check_limit(
-                    "chart record count",
+                    crate::LimitKind::ChartRecords,
                     chart_records,
                     limits.max_chart_records,
                 )?;
@@ -295,10 +311,10 @@ fn workbook_error<T>(offset: usize, reason: &'static str) -> Result<T> {
     Err(Error::InvalidWorkbook { offset, reason })
 }
 
-pub(super) fn check_limit(resource: &'static str, observed: usize, maximum: usize) -> Result<()> {
+pub(super) fn check_limit(kind: crate::LimitKind, observed: usize, maximum: usize) -> Result<()> {
     if observed > maximum {
-        return Err(Error::LimitExceeded {
-            resource,
+        return Err(Error::Limit {
+            kind,
             observed: as_u64(observed),
             maximum: as_u64(maximum),
         });
@@ -306,11 +322,11 @@ pub(super) fn check_limit(resource: &'static str, observed: usize, maximum: usiz
     Ok(())
 }
 
-fn check_limit_u64(resource: &'static str, observed: u64, maximum: usize) -> Result<()> {
+fn check_limit_u64(kind: crate::LimitKind, observed: u64, maximum: usize) -> Result<()> {
     let maximum = as_u64(maximum);
     if observed > maximum {
-        return Err(Error::LimitExceeded {
-            resource,
+        return Err(Error::Limit {
+            kind,
             observed,
             maximum,
         });

@@ -40,18 +40,20 @@ use crate::package::data_validation::{
 };
 use crate::package::error::{Error, Result};
 use crate::package::formula::ParsedFormula;
-use crate::raw::Writer;
+use crate::raw::Encoder;
 use crate::raw::kind;
 use crate::writer::bin_range::{parse_range_list, write_bin_range_list};
 use std::io::Write;
 
 /// Write classic and Office 2013 validation collections as required.
 pub fn write_data_validations<W: Write>(
-    writer: &mut Writer<W>,
+    writer: &mut Encoder<W>,
     validations: &[Validation],
     classic_settings: Settings,
     extension14_settings: Settings,
+    limits: crate::raw::Limits,
 ) -> Result<()> {
+    limits.validate()?;
     if validations.is_empty() {
         return Ok(());
     }
@@ -70,14 +72,15 @@ pub fn write_data_validations<W: Write>(
     if classic.len() > 65_534 || extension14.len() > 65_534 {
         return Err(invalid("a validation collection exceeds 65,534 rules"));
     }
-    write_classic_collection(writer, &classic, classic_settings)?;
-    write_extension14_collection(writer, &extension14, extension14_settings)
+    write_classic_collection(writer, &classic, classic_settings, limits)?;
+    write_extension14_collection(writer, &extension14, extension14_settings, limits)
 }
 
 fn write_classic_collection<W: Write>(
-    writer: &mut Writer<W>,
+    writer: &mut Encoder<W>,
     validations: &[&Validation],
     settings: Settings,
+    limits: crate::raw::Limits,
 ) -> Result<()> {
     if validations.is_empty() {
         return Ok(());
@@ -102,10 +105,10 @@ fn write_classic_collection<W: Write>(
     for &dv in validations {
         if let Some(list_formula) = &dv.list_formula {
             let mut payload = Vec::new();
-            write_xl_wide_string(&mut payload, list_formula);
+            write_xl_wide_string(&mut payload, list_formula, limits)?;
             writer.write_record(kind::D_VAL_LIST, &payload)?;
         }
-        let payload = serialize_data_validation(dv)?;
+        let payload = serialize_data_validation(dv, limits)?;
         writer.write_record(kind::D_VAL, &payload)?;
     }
 
@@ -114,9 +117,10 @@ fn write_classic_collection<W: Write>(
 }
 
 fn write_extension14_collection<W: Write>(
-    writer: &mut Writer<W>,
+    writer: &mut Encoder<W>,
     validations: &[&Validation],
     settings: Settings,
+    limits: crate::raw::Limits,
 ) -> Result<()> {
     if validations.is_empty() {
         return Ok(());
@@ -132,15 +136,34 @@ fn write_extension14_collection<W: Write>(
     for &validation in validations {
         writer.write_record(
             kind::D_VAL14,
-            &serialize_extension14_validation(validation)?,
+            &serialize_extension14_validation(validation, limits)?,
         )?;
     }
     writer.write_record(kind::END_D_VALS14, &[])?;
     Ok(())
 }
 
+/// The records of one classic validation: its optional `BrtDValList`
+/// override and its `BrtDVal` (record 0322 splices these into an existing
+/// collection).
+pub(crate) fn encode_classic_records(
+    dv: &Validation,
+    limits: crate::raw::Limits,
+) -> Result<Vec<u8>> {
+    validate_rule(dv)?;
+    let mut out = Vec::new();
+    let mut writer = Encoder::new(&mut out, limits);
+    if let Some(list_formula) = &dv.list_formula {
+        let mut payload = Vec::new();
+        write_xl_wide_string(&mut payload, list_formula, limits)?;
+        writer.write_record(kind::D_VAL_LIST, &payload)?;
+    }
+    writer.write_record(kind::D_VAL, &serialize_data_validation(dv, limits)?)?;
+    Ok(out)
+}
+
 /// Serialize a single [`Validation`] into the `BrtDVal` binary payload.
-fn serialize_data_validation(dv: &Validation) -> Result<Vec<u8>> {
+fn serialize_data_validation(dv: &Validation, limits: crate::raw::Limits) -> Result<Vec<u8>> {
     let mut buf = Vec::with_capacity(128);
 
     // --- flags (u32) ---
@@ -181,10 +204,10 @@ fn serialize_data_validation(dv: &Validation) -> Result<Vec<u8>> {
     write_bin_range_list(&ranges, &mut buf)?;
 
     // --- XLWideStrings: errorTitle, errorMessage, inputTitle, inputMessage ---
-    write_xl_nullable_wide_string(&mut buf, dv.error_title.as_deref());
-    write_xl_nullable_wide_string(&mut buf, dv.error_text.as_deref());
-    write_xl_nullable_wide_string(&mut buf, dv.input_title.as_deref());
-    write_xl_nullable_wide_string(&mut buf, dv.input_text.as_deref());
+    write_xl_nullable_wide_string(&mut buf, dv.error_title.as_deref(), limits)?;
+    write_xl_nullable_wide_string(&mut buf, dv.error_text.as_deref(), limits)?;
+    write_xl_nullable_wide_string(&mut buf, dv.input_title.as_deref(), limits)?;
+    write_xl_nullable_wide_string(&mut buf, dv.input_text.as_deref(), limits)?;
 
     // --- formula1 (BIFF12 formula: cb_ptg + PTG bytes + cb_adddata + adddata) ---
     let formula1_text =
@@ -208,23 +231,51 @@ fn serialize_data_validation(dv: &Validation) -> Result<Vec<u8>> {
         false,
     )?;
 
-    Ok(buf)
+    finish_payload(buf, limits)
 }
 
 /// Write an `XLWideString` (u32 character count + UTF-16LE code units).
-fn write_xl_wide_string(buf: &mut Vec<u8>, s: &str) {
+fn write_xl_wide_string(buf: &mut Vec<u8>, s: &str, limits: crate::raw::Limits) -> Result<()> {
+    limits.validate()?;
     let utf16: Vec<u16> = s.encode_utf16().collect();
+    if utf16.len() > limits.string_units() {
+        return Err(Error::from(crate::raw::Error::StringLimit {
+            units: utf16.len(),
+            limit: limits.string_units(),
+            offset: 0,
+        }));
+    }
     buf.extend_from_slice(&(utf16.len() as u32).to_le_bytes());
     for ch in &utf16 {
         buf.extend_from_slice(&ch.to_le_bytes());
     }
+    Ok(())
 }
 
-fn write_xl_nullable_wide_string(buf: &mut Vec<u8>, value: Option<&str>) {
+fn write_xl_nullable_wide_string(
+    buf: &mut Vec<u8>,
+    value: Option<&str>,
+    limits: crate::raw::Limits,
+) -> Result<()> {
     match value {
-        Some(value) => write_xl_wide_string(buf, value),
-        None => buf.extend_from_slice(&u32::MAX.to_le_bytes()),
+        Some(value) => write_xl_wide_string(buf, value, limits),
+        None => {
+            buf.extend_from_slice(&u32::MAX.to_le_bytes());
+            Ok(())
+        },
     }
+}
+
+fn finish_payload(buf: Vec<u8>, limits: crate::raw::Limits) -> Result<Vec<u8>> {
+    limits.validate()?;
+    if buf.len() > limits.payload() {
+        return Err(Error::from(crate::raw::Error::PayloadLimit {
+            length: buf.len(),
+            limit: limits.payload(),
+            offset: 0,
+        }));
+    }
+    Ok(buf)
 }
 
 /// Write a BIFF12 formula.
@@ -275,7 +326,10 @@ fn write_biff12_formula(
     Ok(())
 }
 
-fn serialize_extension14_validation(dv: &Validation) -> Result<Vec<u8>> {
+fn serialize_extension14_validation(
+    dv: &Validation,
+    limits: crate::raw::Limits,
+) -> Result<Vec<u8>> {
     let ranges = parse_range_list(&dv.cell_ranges)?;
     let formula1 = compile_formula(
         dv.formula1_binary.as_ref(),
@@ -309,11 +363,11 @@ fn serialize_extension14_validation(dv: &Validation) -> Result<Vec<u8>> {
         flags |= 0x0200_0000;
     }
     buf.extend_from_slice(&flags.to_le_bytes());
-    write_xl_nullable_wide_string(&mut buf, dv.error_title.as_deref());
-    write_xl_nullable_wide_string(&mut buf, dv.error_text.as_deref());
-    write_xl_nullable_wide_string(&mut buf, dv.input_title.as_deref());
-    write_xl_nullable_wide_string(&mut buf, dv.input_text.as_deref());
-    Ok(buf)
+    write_xl_nullable_wide_string(&mut buf, dv.error_title.as_deref(), limits)?;
+    write_xl_nullable_wide_string(&mut buf, dv.error_text.as_deref(), limits)?;
+    write_xl_nullable_wide_string(&mut buf, dv.input_title.as_deref(), limits)?;
+    write_xl_nullable_wide_string(&mut buf, dv.input_text.as_deref(), limits)?;
+    finish_payload(buf, limits)
 }
 
 fn compile_formula(
@@ -362,9 +416,9 @@ fn compile_string_list(text: &str) -> Result<ParsedFormula> {
         .unwrap_or(text);
     let length = value.encode_utf16().count();
     if length > 255 {
-        return Err(Error::InvalidFormula(format!(
-            "inline validation string list has {length} UTF-16 units; maximum is 255 (use list_formula for BrtDValList)"
-        )));
+        return Err(Error::InvalidFormula(
+            "inline validation string list has UTF-16 units; maximum is 255 (use list_formula for BrtDValList)",
+        ));
     }
     let mut rgce = Vec::new();
     build_ptg_for_value(text, &mut rgce);
@@ -376,19 +430,16 @@ fn compile_string_list(text: &str) -> Result<ParsedFormula> {
 
 fn validate_rule(dv: &Validation) -> Result<()> {
     if dv.validation_type > 7 {
-        return Err(invalid(format!(
-            "validation type {} exceeds 7",
-            dv.validation_type
-        )));
+        return Err(invalid("validation type exceeds 7"));
     }
     if dv.error_style > 2 {
-        return Err(invalid(format!("error style {} exceeds 2", dv.error_style)));
+        return Err(invalid("error style exceeds 2"));
     }
     if dv.ime_mode > 10 {
-        return Err(invalid(format!("IME mode {} exceeds 10", dv.ime_mode)));
+        return Err(invalid("IME mode exceeds 10"));
     }
     if !matches!(dv.validation_type, 0 | 3 | 7) && dv.operator > 7 {
-        return Err(invalid(format!("operator {} exceeds 7", dv.operator)));
+        return Err(invalid("operator exceeds 7"));
     }
     if dv.record_kind == RecordKind::Extension14 && dv.list_formula.is_some() {
         return Err(invalid(
@@ -405,33 +456,26 @@ fn validate_rule(dv: &Validation) -> Result<()> {
     {
         let _ = compile_string_list(formula)?;
     }
-    for (name, value, maximum) in [
+    for (_name, value, maximum) in [
         ("error title", dv.error_title.as_deref(), 32),
         ("error message", dv.error_text.as_deref(), 225),
         ("prompt title", dv.input_title.as_deref(), 32),
         ("prompt message", dv.input_text.as_deref(), 255),
     ] {
         if value.is_some_and(|text| text.encode_utf16().count() > maximum) {
-            return Err(invalid(format!(
-                "{name} exceeds {maximum} UTF-16 code units"
-            )));
+            return Err(invalid("exceeds UTF-16 code units"));
         }
     }
-    for (name, formula) in [
+    for (_name, formula) in [
         ("formula1", dv.formula1_binary.as_ref()),
         ("formula2", dv.formula2_binary.as_ref()),
     ] {
         if let Some(formula) = formula {
             if formula.rgce.is_empty() || formula.rgce.len() > 16_384 {
-                return Err(Error::InvalidFormula(format!(
-                    "{name} token length {} is outside 1..=16,384",
-                    formula.rgce.len()
-                )));
+                return Err(Error::InvalidFormula("token length is outside 116,384"));
             }
             if formula.rgcb.len() > u32::MAX as usize {
-                return Err(Error::InvalidFormula(format!(
-                    "{name} ancillary stream is too large"
-                )));
+                return Err(Error::InvalidFormula("ancillary stream is too large"));
             }
         }
     }
@@ -456,10 +500,9 @@ fn validate_rule(dv: &Validation) -> Result<()> {
         _ => (true, false),
     };
     if (first, second) != required {
-        return Err(Error::InvalidFormula(format!(
-            "validation formula presence {first}/{second} does not match required {}/{}",
-            required.0, required.1
-        )));
+        return Err(Error::InvalidFormula(
+            "validation formula presence / does not match required /",
+        ));
     }
     let ranges = parse_range_list(&dv.cell_ranges)?;
     let maximum = if dv.record_kind == RecordKind::Classic {
@@ -468,10 +511,9 @@ fn validate_rule(dv: &Validation) -> Result<()> {
         usize::MAX
     };
     if ranges.is_empty() || ranges.len() > maximum {
-        return Err(invalid(format!(
-            "validation range count {} is outside 1..={maximum}",
-            ranges.len()
-        )));
+        return Err(invalid(
+            "validation range count is outside its allowed range",
+        ));
     }
     if ranges.iter().any(|range| {
         range.row_first > range.row_last
@@ -484,11 +526,12 @@ fn validate_rule(dv: &Validation) -> Result<()> {
     Ok(())
 }
 
-fn invalid(value: impl Into<String>) -> Error {
-    Error::Unrecognized {
-        typ: "BrtDVal".to_string(),
-        val: value.into(),
-    }
+fn invalid(_value: &'static str) -> Error {
+    Error::refused(
+        litchi_core::edit::RefusalKind::InvalidValue,
+        "build_xlsb",
+        "the data-validation value is outside the XLSB vocabulary",
+    )
 }
 
 /// Build the most appropriate PTG token for a formula value string.
@@ -535,7 +578,7 @@ fn build_ptg_for_value(text: &str, ptg: &mut Vec<u8>) {
 mod tests {
     use super::*;
     use crate::package::formula::Context;
-    use crate::raw::Writer;
+    use crate::raw::Encoder;
 
     #[test]
     fn test_serialize_list_validation() {
@@ -562,7 +605,7 @@ mod tests {
             record_kind: Default::default(),
         };
 
-        let payload = serialize_data_validation(&dv).unwrap();
+        let payload = serialize_data_validation(&dv, crate::raw::Limits::DEFAULT).unwrap();
         // flags at offset 0 should have type=3, allow_blank, string_list, show_error
         let flags = u32::from_le_bytes(payload[0..4].try_into().unwrap());
         assert_eq!(flags & 0x0F, 3); // type = list
@@ -597,7 +640,7 @@ mod tests {
             record_kind: Default::default(),
         };
 
-        let payload = serialize_data_validation(&dv).unwrap();
+        let payload = serialize_data_validation(&dv, crate::raw::Limits::DEFAULT).unwrap();
         let flags = u32::from_le_bytes(payload[0..4].try_into().unwrap());
         assert_eq!(flags & 0x0F, 1); // type = whole number
         assert_eq!((flags >> 4) & 0x07, 1); // error style = warning
@@ -629,7 +672,7 @@ mod tests {
             record_kind: Default::default(),
         };
 
-        let payload = serialize_data_validation(&dv).unwrap();
+        let payload = serialize_data_validation(&dv, crate::raw::Limits::DEFAULT).unwrap();
         let flags = u32::from_le_bytes(payload[0..4].try_into().unwrap());
         assert_eq!(flags & 0x0F, 2); // type = decimal
         assert_eq!((flags >> 20) & 0x0F, 4); // operator = between
@@ -660,7 +703,7 @@ mod tests {
             record_kind: Default::default(),
         };
 
-        let payload = serialize_data_validation(&dv).unwrap();
+        let payload = serialize_data_validation(&dv, crate::raw::Limits::DEFAULT).unwrap();
         let flags = u32::from_le_bytes(payload[0..4].try_into().unwrap());
         assert_eq!(flags & 0x0F, 4); // type = date
     }
@@ -668,7 +711,7 @@ mod tests {
     #[test]
     fn test_write_data_validations_empty() {
         let mut buffer = Vec::new();
-        let mut writer = Writer::new(&mut buffer);
+        let mut writer = Encoder::new(&mut buffer, crate::raw::Limits::DEFAULT);
         let validations: Vec<Validation> = vec![];
 
         let result = write_data_validations(
@@ -676,6 +719,7 @@ mod tests {
             &validations,
             Settings::default(),
             Settings::default(),
+            crate::raw::Limits::DEFAULT,
         );
         assert!(result.is_ok());
         assert!(buffer.is_empty()); // No records written for empty list
@@ -684,7 +728,7 @@ mod tests {
     #[test]
     fn test_write_data_validations_single() {
         let mut buffer = Vec::new();
-        let mut writer = Writer::new(&mut buffer);
+        let mut writer = Encoder::new(&mut buffer, crate::raw::Limits::DEFAULT);
         let validations = vec![Validation {
             validation_type: 3, // list
             operator: 0,
@@ -713,6 +757,7 @@ mod tests {
             &validations,
             Settings::default(),
             Settings::default(),
+            crate::raw::Limits::DEFAULT,
         );
         assert!(result.is_ok());
         assert!(!buffer.is_empty());
@@ -776,7 +821,7 @@ mod tests {
     #[test]
     fn test_write_xl_wide_string() {
         let mut buf = Vec::new();
-        write_xl_wide_string(&mut buf, "Test");
+        write_xl_wide_string(&mut buf, "Test", crate::raw::Limits::DEFAULT).unwrap();
         assert!(!buf.is_empty());
 
         let char_count = u32::from_le_bytes(buf[0..4].try_into().unwrap());
@@ -786,9 +831,25 @@ mod tests {
     #[test]
     fn test_write_xl_wide_string_empty() {
         let mut buf = Vec::new();
-        write_xl_wide_string(&mut buf, "");
+        write_xl_wide_string(&mut buf, "", crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(buf.len(), 4); // Just the char count (0)
         assert_eq!(u32::from_le_bytes(buf[0..4].try_into().unwrap()), 0);
+    }
+
+    #[test]
+    fn raw_limits_bound_writer_strings_and_payloads() {
+        let mut buf = Vec::new();
+        assert!(matches!(
+            write_xl_wide_string(&mut buf, "ab", crate::raw::Limits::new(1024, 1)),
+            Err(Error::Wire(crate::raw::Error::StringLimit { .. }))
+        ));
+
+        let mut rule = Validation::new(1, "A1".to_owned());
+        rule.error_text = Some("message".to_owned());
+        assert!(matches!(
+            serialize_data_validation(&rule, crate::raw::Limits::new(8, 1024)),
+            Err(Error::Wire(crate::raw::Error::PayloadLimit { .. }))
+        ));
     }
 
     #[test]
@@ -800,8 +861,14 @@ mod tests {
         rule.ime_mode = 5;
         rule.error_title = Some(String::new());
         validate_rule(&rule).unwrap();
-        let payload = serialize_data_validation(&rule).unwrap();
-        let parsed = Validation::parse_classic(&payload, None, &Context::default()).unwrap();
+        let payload = serialize_data_validation(&rule, crate::raw::Limits::DEFAULT).unwrap();
+        let parsed = Validation::parse_classic(
+            &payload,
+            None,
+            &Context::default(),
+            crate::raw::Limits::DEFAULT,
+        )
+        .unwrap();
 
         assert_eq!(parsed.cell_ranges, "A1:A4 C1");
         assert_eq!(parsed.formula1.as_deref(), Some("1"));
@@ -818,8 +885,13 @@ mod tests {
         rule.formula1 = Some("B2>0".to_string());
         rule.record_kind = RecordKind::Extension14;
         validate_rule(&rule).unwrap();
-        let payload = serialize_extension14_validation(&rule).unwrap();
-        let parsed = Validation::parse_extension14(&payload, &Context::default()).unwrap();
+        let payload = serialize_extension14_validation(&rule, crate::raw::Limits::DEFAULT).unwrap();
+        let parsed = Validation::parse_extension14(
+            &payload,
+            &Context::default(),
+            crate::raw::Limits::DEFAULT,
+        )
+        .unwrap();
 
         assert_eq!(parsed.record_kind, RecordKind::Extension14);
         assert_eq!(parsed.cell_ranges, "B2:B12 D2:D12");
@@ -829,19 +901,35 @@ mod tests {
 
         let mut malformed = payload;
         malformed[4..8].copy_from_slice(&2u32.to_le_bytes());
-        assert!(Validation::parse_extension14(&malformed, &Context::default()).is_err());
+        assert!(
+            Validation::parse_extension14(
+                &malformed,
+                &Context::default(),
+                crate::raw::Limits::DEFAULT
+            )
+            .is_err()
+        );
     }
 
     #[test]
     fn dval_list_payload_preserves_the_formula_override() {
         let mut payload = Vec::new();
-        write_xl_wide_string(&mut payload, "One,\"Two,Three\",Four");
+        write_xl_wide_string(
+            &mut payload,
+            "One,\"Two,Three\",Four",
+            crate::raw::Limits::DEFAULT,
+        )
+        .unwrap();
         assert_eq!(
-            crate::package::data_validation::parse_dval_list(&payload).unwrap(),
+            crate::package::data_validation::parse_dval_list(&payload, crate::raw::Limits::DEFAULT)
+                .unwrap(),
             "One,\"Two,Three\",Four"
         );
         payload.extend_from_slice(&[0, 0]);
-        assert!(crate::package::data_validation::parse_dval_list(&payload).is_err());
+        assert!(
+            crate::package::data_validation::parse_dval_list(&payload, crate::raw::Limits::DEFAULT)
+                .is_err()
+        );
     }
 
     #[test]
@@ -849,15 +937,20 @@ mod tests {
         let long_list = "x".repeat(256);
         let mut inline = Validation::new(3, "A1".to_string());
         inline.formula1 = Some(long_list.clone());
-        assert!(serialize_data_validation(&inline).is_err());
+        assert!(serialize_data_validation(&inline, crate::raw::Limits::DEFAULT).is_err());
 
         let mut override_rule = Validation::new(3, "A1".to_string());
         override_rule.list_formula = Some(long_list.clone());
         validate_rule(&override_rule).unwrap();
-        let payload = serialize_data_validation(&override_rule).unwrap();
-        let parsed =
-            Validation::parse_classic(&payload, Some(long_list.clone()), &Context::default())
-                .unwrap();
+        let payload =
+            serialize_data_validation(&override_rule, crate::raw::Limits::DEFAULT).unwrap();
+        let parsed = Validation::parse_classic(
+            &payload,
+            Some(long_list.clone()),
+            &Context::default(),
+            crate::raw::Limits::DEFAULT,
+        )
+        .unwrap();
         assert_eq!(parsed.formula1.as_deref(), Some(long_list.as_str()));
         assert_eq!(parsed.list_formula.as_deref(), Some(long_list.as_str()));
     }

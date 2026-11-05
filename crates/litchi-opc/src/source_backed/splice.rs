@@ -12,7 +12,7 @@ use super::{
     map_execution_error, map_io_error, map_preservation_error, overlay_unavailable,
 };
 use crate::error::SpliceResource;
-use crate::limits::ReadResource;
+use crate::limits::SourceLimitKind;
 use crate::packuri::PackURI;
 use litchi_core::{ExecutionContext, Reservation, Resource, SourceVersion};
 use sha2::{Digest as _, Sha256};
@@ -96,17 +96,21 @@ impl SourcePartSpliceLimits {
 
     fn validate(self) -> Result<()> {
         for (resource, value) in [
-            (ReadResource::PartBytes, self.max_source_bytes),
-            (ReadResource::PartBytes, self.max_fragment_bytes),
-            (ReadResource::PartBytes, self.max_candidate_bytes),
+            (SourceLimitKind::PartBytes, self.max_source_bytes),
+            (SourceLimitKind::PartBytes, self.max_fragment_bytes),
+            (SourceLimitKind::PartBytes, self.max_candidate_bytes),
             (
-                ReadResource::ArchiveCompressedBytes,
+                SourceLimitKind::ArchiveCompressedBytes,
                 self.max_compressed_bytes,
             ),
-            (ReadResource::ArchiveTotalBytes, self.max_archive_bytes),
+            (SourceLimitKind::AggregateBytes, self.max_archive_bytes),
         ] {
             if value == 0 || value == u64::MAX {
-                return Err(OpcError::InvalidReadLimit { resource, value });
+                return Err(OpcError::InvalidLimit {
+                    kind: resource,
+                    value,
+                    maximum: u64::MAX - 1,
+                });
             }
         }
         validate_splice_limit(SpliceResource::OutputBytes, self.max_output_bytes)?;
@@ -424,7 +428,7 @@ impl SourcePartSpliceFragment<'_> {
 /// fragment or an explicit replay handle. The package's physical ZIP
 /// implementation remains private to OPC.
 pub struct SourcePartSplicePlan<'package> {
-    package: &'package SourceBackedPackage,
+    package: std::borrow::Cow<'package, SourceBackedPackage>,
     target: usize,
     validation_mode: SpliceAuditMode,
     fragment: Option<Arc<Vec<u8>>>,
@@ -488,18 +492,27 @@ impl<'package> SourcePartSplicePlan<'package> {
 
     /// Publish the plan to a sequential sink and retain an exact inverse
     /// authorization for the resulting artifact.
-    pub fn write_to_stream<W: Write>(self, writer: W) -> Result<SourcePartSplicePublication> {
-        self.write_to_stream_inner(writer, None, true)
+    pub fn write_to<W: Write>(self, writer: W) -> Result<SourcePartSplicePublication> {
+        self.write_to_inner(writer, None, true, None)
+    }
+
+    /// Publish this splice through a recipient-owned artifact stream policy.
+    pub fn write_to_with_policy<W: Write>(
+        self,
+        writer: W,
+        policy: &super::artifact_restore::ArtifactStreamPolicy<'_>,
+    ) -> Result<SourcePartSplicePublication> {
+        self.write_to_inner(writer, None, true, Some(policy))
     }
 
     /// Publish while recording accepted output and low-level ZIP work in an
     /// OPC-owned accounting report.
-    pub fn write_to_stream_with_accounting<W: Write>(
+    pub fn write_to_with_accounting<W: Write>(
         self,
         writer: W,
         accounting: &mut OpcOperationAccounting,
     ) -> Result<SourcePartSplicePublication> {
-        self.write_to_stream_inner(writer, Some(accounting), true)
+        self.write_to_inner(writer, Some(accounting), true, None)
     }
 
     /// Authenticate the complete candidate artifact in a bounded sink before
@@ -507,7 +520,7 @@ impl<'package> SourcePartSplicePlan<'package> {
     /// sequential shallow copy of this plan and does not charge external
     /// output bytes; the publishing pass retains the ordinary output-budget
     /// and partial-output semantics.
-    pub fn write_to_stream_with_expected_artifact<W: Write>(
+    pub fn write_to_with_expected_artifact<W: Write>(
         self,
         writer: W,
         expected_len: u64,
@@ -515,7 +528,7 @@ impl<'package> SourcePartSplicePlan<'package> {
     ) -> Result<SourcePartSplicePublication> {
         let (preview_len, preview_sha256) = {
             let preview = self.clone_for_preview();
-            let publication = match preview.write_to_stream_inner(io::sink(), None, false) {
+            let publication = match preview.write_to_inner(io::sink(), None, false, None) {
                 Ok(publication) => publication,
                 Err(OpcError::IncompleteOutput { source, .. }) => return Err(*source),
                 Err(error) => return Err(error),
@@ -538,7 +551,7 @@ impl<'package> SourcePartSplicePlan<'package> {
             });
         }
 
-        let publication = self.write_to_stream_inner(writer, None, true)?;
+        let publication = self.write_to_inner(writer, None, true, None)?;
         if publication.candidate_artifact_len != expected_len {
             return Err(OpcError::IncompleteOutput {
                 written: publication.candidate_artifact_len,
@@ -560,9 +573,90 @@ impl<'package> SourcePartSplicePlan<'package> {
         Ok(publication)
     }
 
+    /// Authenticate and publish this splice through a recipient-owned policy.
+    pub fn write_to_with_expected_artifact_with_policy<W: Write>(
+        self,
+        writer: W,
+        expected_len: u64,
+        expected_sha256: SourceArtifactFingerprint,
+        policy: &super::artifact_restore::ArtifactStreamPolicy<'_>,
+    ) -> Result<SourcePartSplicePublication> {
+        let probe = policy.probe();
+        let (preview_len, preview_sha256) = {
+            let preview = self.clone_for_preview();
+            let publication = match preview.write_to_inner(io::sink(), None, false, Some(&probe)) {
+                Ok(publication) => publication,
+                Err(OpcError::IncompleteOutput { source, .. }) => return Err(*source),
+                Err(error) => return Err(error),
+            };
+            (
+                publication.candidate_artifact_len,
+                publication.candidate_artifact,
+            )
+        };
+        if preview_len != expected_len {
+            return Err(OpcError::SourceArtifactMismatch {
+                artifact: "candidate",
+                field: "length",
+            });
+        }
+        if preview_sha256 != expected_sha256 {
+            return Err(OpcError::SourceArtifactMismatch {
+                artifact: "candidate",
+                field: "fingerprint",
+            });
+        }
+        let publication = self.write_to_inner(writer, None, true, Some(policy))?;
+        if publication.candidate_artifact_len != expected_len {
+            return Err(OpcError::IncompleteOutput {
+                written: publication.candidate_artifact_len,
+                source: Box::new(OpcError::SourceArtifactMismatch {
+                    artifact: "candidate",
+                    field: "length",
+                }),
+            });
+        }
+        if publication.candidate_artifact != expected_sha256 {
+            return Err(OpcError::IncompleteOutput {
+                written: publication.candidate_artifact_len,
+                source: Box::new(OpcError::SourceArtifactMismatch {
+                    artifact: "candidate",
+                    field: "fingerprint",
+                }),
+            });
+        }
+        Ok(publication)
+    }
+
+    /// An independent copy of this plan that publishes the same candidate:
+    /// a plan can be written more than once (record 0355a: the output of a
+    /// committed source-backed package is written on every save).
+    #[must_use]
+    pub fn duplicate(&self) -> Self {
+        self.clone_for_preview()
+    }
+
+    /// This plan over its own share of the source package, so it can outlive
+    /// the borrow it was prepared from (record 0355a).
+    #[must_use]
+    pub fn into_owned(self) -> SourcePartSplicePlan<'static> {
+        SourcePartSplicePlan {
+            package: std::borrow::Cow::Owned(self.package.into_owned()),
+            target: self.target,
+            validation_mode: self.validation_mode,
+            fragment: self.fragment,
+            replay: self.replay,
+            proof: self.proof,
+            limits: self.limits,
+            source_artifact: self.source_artifact,
+            fragment_memory_reservation: self.fragment_memory_reservation,
+            xml_workspace_reservation: self.xml_workspace_reservation,
+        }
+    }
+
     fn clone_for_preview(&self) -> Self {
         Self {
-            package: self.package,
+            package: self.package.clone(),
             target: self.target,
             validation_mode: self.validation_mode,
             fragment: self.fragment.as_ref().map(Arc::clone),
@@ -575,11 +669,12 @@ impl<'package> SourcePartSplicePlan<'package> {
         }
     }
 
-    fn write_to_stream_inner<W: Write>(
+    fn write_to_inner<W: Write>(
         self,
         writer: W,
         mut accounting: Option<&mut OpcOperationAccounting>,
         charge_output: bool,
+        policy: Option<&super::artifact_restore::ArtifactStreamPolicy<'_>>,
     ) -> Result<SourcePartSplicePublication> {
         self.package.disable_read_ahead_for_publication()?;
         self.package.source.ensure_current()?;
@@ -592,17 +687,20 @@ impl<'package> SourcePartSplicePlan<'package> {
             // branch intentionally bypasses XML and signature checks so a
             // malformed or signed source can still be reproduced exactly.
             limits_check(
-                ReadResource::ArchiveTotalBytes,
+                SourceLimitKind::AggregateBytes,
                 self.package.source.length,
                 self.limits.archive_limit(),
             )?;
             let mut hashing = HashingSink::new(writer);
-            if charge_output {
+            if let Some(policy) = policy {
+                self.source_artifact
+                    .write_to_with_policy(&mut hashing, policy)?;
+            } else if charge_output {
                 match accounting.as_deref_mut() {
                     Some(report) => self
                         .source_artifact
-                        .write_to_stream_with_accounting(&mut hashing, report)?,
-                    None => self.source_artifact.write_to_stream(&mut hashing)?,
+                        .write_to_with_accounting(&mut hashing, report)?,
+                    None => self.source_artifact.write_to(&mut hashing)?,
                 }
             } else {
                 write_source_artifact_without_output_budget(
@@ -629,7 +727,7 @@ impl<'package> SourcePartSplicePlan<'package> {
                 "decoded splice refuses encrypted ZIP members",
             ));
         }
-        let preservation_memory = preservation_memory_requirement(self.package)?;
+        let preservation_memory = preservation_memory_requirement(&self.package)?;
         let _preservation_memory_reservation = reserve_memory(
             self.package.source.context.as_ref(),
             preservation_memory,
@@ -646,18 +744,11 @@ impl<'package> SourcePartSplicePlan<'package> {
         let _monitored = self.package.source.monitor_publication();
         self.package.check_topology_progress()?;
 
-        let mut scratch = Vec::new();
-        scratch
-            .try_reserve_exact(soapberry_zip::RECOMMENDED_BUFFER_SIZE)
-            .map_err(|source| OpcError::Allocation {
-                resource: "source-backed OPC decoded splice preservation index",
-                source,
-            })?;
-        scratch.resize(soapberry_zip::RECOMMENDED_BUFFER_SIZE, 0);
+        let mut scratch = [0_u8; super::PRESERVATION_INDEX_STACK_BYTES];
         let index = self
             .package
             .archive
-            .preservation_index_with_limits(&mut scratch, self.package.limits.zip_limits())
+            .preservation_index(&mut scratch, self.package.limits.zip_limits())
             .map_err(map_preservation_error)?;
         self.package.source.ensure_current()?;
         if index.archive_end_offset() != self.package.source.length {
@@ -666,7 +757,9 @@ impl<'package> SourcePartSplicePlan<'package> {
             ));
         }
 
-        let target_name = self.package.parts[self.target].partname.membername();
+        let target_name = self.package.catalog.parts[self.target]
+            .partname
+            .membername();
         let preserved_target = index
             .entries()
             .iter()
@@ -684,10 +777,13 @@ impl<'package> SourcePartSplicePlan<'package> {
             self.limits.archive_limit(),
         )
         .map_err(map_preservation_error)?;
+        if let Some(policy) = policy {
+            policy.admit_splice_candidate(&self.package, self.target, self.proof.candidate_len)?;
+        }
 
         let source_snapshot = self.package.source.clone();
         let part = PartView {
-            package: self.package,
+            package: &self.package,
             index: self.target,
         };
         let proof = self.proof;
@@ -729,7 +825,37 @@ impl<'package> SourcePartSplicePlan<'package> {
             }
         };
 
-        let result = if let Some(context) = self.package.cache.context() {
+        let result = if let Some(policy) = policy {
+            let counted = match accounting.as_deref_mut() {
+                Some(report) => Counted::with_accounting(
+                    &mut hashing,
+                    &mut written,
+                    report,
+                    &mut accounting_error,
+                    false,
+                ),
+                None => Counted::new(&mut hashing, &mut written),
+            };
+            let policy_sink = super::artifact_restore::policy_source_sink(
+                policy,
+                counted,
+                &source_snapshot,
+                self.package.cache.context(),
+            )?;
+            match run_replay_with_admission(
+                &index,
+                preservation_target,
+                compression,
+                replay_limits,
+                Chunked { inner: policy_sink },
+                &mut callback,
+                &mut zip_accounting,
+                |profile| policy.admit_preservation_profile(profile),
+            ) {
+                Ok(mut sink) => sink.flush().map_err(map_io_error),
+                Err(error) => Err(map_replay_error(error)),
+            }
+        } else if let Some(context) = self.package.cache.context() {
             if charge_output {
                 let output_reservation_failures = self
                     .package
@@ -850,6 +976,9 @@ impl<'package> SourcePartSplicePlan<'package> {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .take()
+            .map_or(result, |error| Err(map_execution_error(error)));
+        let result = policy
+            .and_then(|policy| policy.take_failure())
             .map_or(result, |error| Err(map_execution_error(error)));
         let result = match (
             result,
@@ -1003,16 +1132,17 @@ impl SourceBackedPackage {
         maximum: u64,
     ) -> Result<SourcePartSpliceFragment<'_>> {
         if maximum == 0 || maximum == u64::MAX {
-            return Err(OpcError::InvalidReadLimit {
-                resource: ReadResource::PartBytes,
+            return Err(OpcError::InvalidLimit {
+                kind: SourceLimitKind::PartBytes,
                 value: maximum,
+                maximum: u64::MAX - 1,
             });
         }
         self.source.ensure_current()?;
         self.cache.check_context().map_err(map_execution_error)?;
-        limits_check(ReadResource::PartBytes, length, maximum)?;
+        limits_check(SourceLimitKind::PartBytes, length, maximum)?;
         limits_check(
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             length,
             self.limits.max_part_bytes(),
         )?;
@@ -1065,10 +1195,11 @@ impl SourceBackedPackage {
     /// Prepare an insertion while transferring the fragment's original
     /// preallocation reservation into the returned plan.
     ///
-    /// The fragment must have been allocated by this exact package instance;
-    /// another instance, even over identical source bytes, cannot substitute
-    /// a different execution budget. All ordinary splice proof, XML, source,
-    /// and publication checks remain in force.
+    /// The fragment must have been allocated by this package or by a clone of
+    /// it, which shares this package's execution budget. A separately opened
+    /// package, even over identical source bytes, cannot substitute a
+    /// different execution budget. All ordinary splice proof, XML, source, and
+    /// publication checks remain in force.
     pub fn prepare_source_part_splice_with_fragment(
         &self,
         partname: &PackURI,
@@ -1076,7 +1207,7 @@ impl SourceBackedPackage {
         fragment: SourcePartSpliceFragment<'_>,
         limits: SourcePartSpliceLimits,
     ) -> Result<SourcePartSplicePlan<'_>> {
-        if !std::ptr::eq(self, fragment.package) {
+        if !self.is_same_opened_package(fragment.package) {
             return Err(overlay_unavailable(
                 "decoded splice fragment belongs to a different source package",
             ));
@@ -1152,9 +1283,9 @@ impl SourceBackedPackage {
             .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))?;
         let audit_xml = xml_minifier::audit::package::is_xml_part(
             partname.as_str(),
-            self.parts[target].content_type.as_str(),
+            self.catalog.parts[target].content_type.as_str(),
         );
-        let target_entry = self.parts[target].entry_id;
+        let target_entry = self.catalog.parts[target].entry_id;
         let source_version = self.source.version();
         if proof.source_version != source_version {
             return Err(OpcError::SourceChanged {
@@ -1173,12 +1304,12 @@ impl SourceBackedPackage {
             ));
         }
         self.limits.check(
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             proof.source_len,
             self.limits.max_part_bytes(),
         )?;
         self.limits.check(
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             proof.source_len,
             limits.max_source_bytes,
         )?;
@@ -1205,7 +1336,7 @@ impl SourceBackedPackage {
             }
         }
         limits_check(
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             replay_proof.encoded_len,
             limits.max_fragment_bytes,
         )?;
@@ -1219,7 +1350,7 @@ impl SourceBackedPackage {
             ));
         }
         limits_check(
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             candidate_len,
             limits.max_candidate_bytes,
         )?;
@@ -1231,7 +1362,7 @@ impl SourceBackedPackage {
         let candidate_len_usize = usize::try_from(candidate_len).map_err(|_| {
             overlay_unavailable("decoded replay candidate length does not fit this platform")
         })?;
-        self.validate_overlay_limits(std::iter::once((target, candidate_len_usize)))?;
+        self.validate_overlay_limits(std::iter::once((target, candidate_len_usize)), self.limits)?;
         let is_noop = proof.is_exact_insertion_noop();
         if !is_noop {
             if self.has_signature_infrastructure() {
@@ -1269,7 +1400,7 @@ impl SourceBackedPackage {
             validation_mode
         };
         Ok(SourcePartSplicePlan {
-            package: self,
+            package: std::borrow::Cow::Borrowed(self),
             target,
             validation_mode,
             fragment: None,
@@ -1300,9 +1431,9 @@ impl SourceBackedPackage {
             .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))?;
         let audit_xml = xml_minifier::audit::package::is_xml_part(
             partname.as_str(),
-            self.parts[target].content_type.as_str(),
+            self.catalog.parts[target].content_type.as_str(),
         );
-        let target_entry = self.parts[target].entry_id;
+        let target_entry = self.catalog.parts[target].entry_id;
         let source_version = self.source.version();
         if proof.source_version != source_version {
             return Err(OpcError::SourceChanged {
@@ -1321,12 +1452,12 @@ impl SourceBackedPackage {
             ));
         }
         self.limits.check(
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             proof.source_len,
             self.limits.max_part_bytes(),
         )?;
         self.limits.check(
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             proof.source_len,
             limits.max_source_bytes,
         )?;
@@ -1339,14 +1470,14 @@ impl SourceBackedPackage {
         }
         limits.validate()?;
         limits_check(
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             fragment_len,
             limits.max_fragment_bytes,
         )?;
         let fragment_capacity = u64::try_from(fragment.capacity())
             .map_err(|_| overlay_unavailable("decoded splice fragment capacity exceeds u64"))?;
         limits_check(
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             fragment_capacity,
             limits.max_fragment_bytes,
         )?;
@@ -1365,7 +1496,7 @@ impl SourceBackedPackage {
             ));
         }
         limits_check(
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             candidate_len,
             limits.max_candidate_bytes,
         )?;
@@ -1377,7 +1508,7 @@ impl SourceBackedPackage {
         let candidate_len_usize = usize::try_from(candidate_len).map_err(|_| {
             overlay_unavailable("decoded splice candidate length does not fit this platform")
         })?;
-        self.validate_overlay_limits(std::iter::once((target, candidate_len_usize)))?;
+        self.validate_overlay_limits(std::iter::once((target, candidate_len_usize)), self.limits)?;
         let is_noop = proof.is_exact_insertion_noop();
         if !is_noop {
             if self.has_signature_infrastructure() {
@@ -1435,7 +1566,7 @@ impl SourceBackedPackage {
             validation_mode
         };
         Ok(SourcePartSplicePlan {
-            package: self,
+            package: std::borrow::Cow::Borrowed(self),
             target,
             validation_mode,
             fragment: Some(fragment),
@@ -1617,11 +1748,11 @@ impl SourcePartSplicePublication {
     }
 }
 
-fn limits_check(resource: ReadResource, actual: u64, maximum: u64) -> Result<()> {
+fn limits_check(resource: SourceLimitKind, actual: u64, maximum: u64) -> Result<()> {
     if actual > maximum {
-        return Err(OpcError::ReadLimit {
-            resource,
-            actual,
+        return Err(OpcError::Limit {
+            kind: resource,
+            observed: actual,
             maximum,
         });
     }
@@ -3098,7 +3229,7 @@ impl BufRead for SpliceAuditReader<'_, '_, '_, '_, '_> {
     }
 }
 
-fn map_replay_error(error: ReplayPublicationError<OpcError>) -> OpcError {
+fn map_replay_error(error: ReplayPublicationError<OpcError, OpcError>) -> OpcError {
     match error {
         ReplayPublicationError::Archive { source, .. } => map_preservation_error(source),
         ReplayPublicationError::Callback { source, .. } => source,
@@ -3107,20 +3238,21 @@ fn map_replay_error(error: ReplayPublicationError<OpcError>) -> OpcError {
             actual,
             maximum,
             ..
-        } => OpcError::ReadLimit {
-            resource: match resource {
-                ReplayResource::DecodedBytes => ReadResource::PartBytes,
-                ReplayResource::CompressedBytes => ReadResource::ArchiveCompressedBytes,
-                ReplayResource::ArchiveBytes => ReadResource::ArchiveTotalBytes,
+        } => OpcError::Limit {
+            kind: match resource {
+                ReplayResource::DecodedBytes => SourceLimitKind::PartBytes,
+                ReplayResource::CompressedBytes => SourceLimitKind::ArchiveCompressedBytes,
+                ReplayResource::ArchiveBytes => SourceLimitKind::AggregateBytes,
             },
-            actual,
+            observed: actual,
             maximum,
         },
         ReplayPublicationError::Sink { source, .. } => map_io_error(source),
         ReplayPublicationError::NonDeterministic { .. } => {
             overlay_unavailable("decoded splice replay produced non-deterministic output")
         },
-        _ => overlay_unavailable("decoded splice replay returned an unknown failure"),
+        ReplayPublicationError::Admission { source, .. } => source,
+        _ => overlay_unavailable("decoded splice replay returned an unknown publication error"),
     }
 }
 
@@ -3145,6 +3277,33 @@ where
         sink,
         accounting,
         callback,
+    )
+}
+
+fn run_replay_with_admission<'archive, R, W, F, G>(
+    index: &soapberry_zip::PreservationIndex<'archive, R>,
+    target: PreservationEntryId,
+    compression: soapberry_zip::CompressionMethod,
+    limits: ReplayLimits,
+    sink: W,
+    callback: F,
+    accounting: &mut soapberry_zip::ZipOperationAccounting,
+    admission: G,
+) -> std::result::Result<W, ReplayPublicationError<OpcError, OpcError>>
+where
+    R: ReaderAt,
+    W: Write,
+    F: FnMut(&mut dyn Write) -> Result<()>,
+    G: FnOnce(&soapberry_zip::PreservationOutputProfile<'_>) -> Result<()>,
+{
+    index.write_replacing_with_replay_with_admission_and_accounting(
+        target,
+        compression,
+        limits,
+        sink,
+        accounting,
+        callback,
+        admission,
     )
 }
 

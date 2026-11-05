@@ -27,12 +27,14 @@ use std::{
 use litchi_cfb::{OleFile, OleFileLimits};
 use litchi_crypto::ooxml::{self, IntegrityStatus, Kind, Limits as CryptoLimits, Mode};
 use litchi_crypto::spaces;
-use litchi_doc::{Error as DocError, Limits as DocLimits, OpenOptions, Package as DocPackage};
+use litchi_doc::{
+    Error as DocError, OpenOptions, SourceLimits as DocSourceLimits, raw::Reader as DocReader,
+};
 use litchi_docx::source_backed::Package as DocxSourcePackage;
-use litchi_opc::{OpcError, OpcPackage, ReadLimits, SourceBackedPackage};
+use litchi_opc::{OpcError, OpcPackage, SourceBackedPackage, SourceLimits};
 use litchi_sign::{Policy, Status};
-use litchi_xls::Workbook as XlsWorkbook;
-use litchi_xlsx::Workbook as XlsxWorkbook;
+use litchi_xls::raw::Reader as XlsReader;
+use litchi_xlsx::Package as XlsxPackage;
 use serde::Serialize;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -886,8 +888,7 @@ fn preserve_fixture(fixture: &Fixture, bytes: &[u8]) -> Result<OperationResult> 
             let archive = ZipArchive::from_seekable(Cursor::new(bytes), &mut locate_buffer)?;
             admit_zip_archive_entries(fixture.id, &archive)?;
             let mut buffer = vec![0u8; RECOMMENDED_BUFFER_SIZE];
-            let index =
-                PreservationIndex::new_with_limits(&archive, &mut buffer, archive_limits())?;
+            let index = PreservationIndex::new(&archive, &mut buffer, archive_limits())?;
             let output = index.write_to(&PreservationPlan::copy_all(&index), Vec::new())?;
             if output.as_slice() != bytes {
                 return Err(format!("{} no-op ZIP preservation changed bytes", fixture.id).into());
@@ -908,7 +909,7 @@ fn preserve_fixture(fixture: &Fixture, bytes: &[u8]) -> Result<OperationResult> 
 }
 
 fn validate_zip(fixture: &Fixture, bytes: &[u8]) -> Result<OperationResult> {
-    let package = OpcPackage::from_vec_with_limits(bytes.to_vec(), opc_limits()?);
+    let package = OpcPackage::from_vec(bytes.to_vec(), opc_limits()?);
     if matches!(fixture.oracle, Oracle::Malformed) {
         if package.is_ok() {
             return Err(format!("{} unexpectedly opened as an OPC package", fixture.id).into());
@@ -931,7 +932,12 @@ fn validate_zip(fixture: &Fixture, bytes: &[u8]) -> Result<OperationResult> {
             {
                 return Err(format!("{} signature verification failed", fixture.id).into());
             }
-            let source = SourceBackedPackage::from_vec_with_limits(bytes.to_vec(), opc_limits()?)?;
+            let source = SourceBackedPackage::from_vec(
+                bytes.to_vec(),
+                opc_limits()?,
+                litchi_opc::SourceCacheLimits::default(),
+                None,
+            )?;
             let (target, replacement) = {
                 let main = source.main_document_part()?;
                 let target = main.partname().clone();
@@ -957,22 +963,18 @@ fn validate_zip(fixture: &Fixture, bytes: &[u8]) -> Result<OperationResult> {
             {
                 return Err(format!("{} protection marker missing", fixture.id).into());
             }
-            let source = SourceBackedPackage::from_vec_with_limits(bytes.to_vec(), opc_limits()?)?;
+            let source = SourceBackedPackage::from_vec(
+                bytes.to_vec(),
+                opc_limits()?,
+                litchi_opc::SourceCacheLimits::default(),
+                None,
+            )?;
             let docx = DocxSourcePackage::from_source_backed_package(source)?;
             let mut edit = docx.edit_document_variables()?;
-            edit.set_variable("security_matrix", "must-refuse")?;
-            let commit = edit.commit()?;
-            if !commit.changed() {
-                return Err(
-                    format!("{} protected edit was unexpectedly unchanged", fixture.id).into(),
-                );
-            }
-            let mut output = Vec::new();
-            if !matches!(
-                docx.publish_document_variables_commit_to_stream(&mut output, &commit),
-                Err(litchi_docx::Error::UnsafeEdit { .. })
-            ) || !output.is_empty()
-            {
+            edit.set("security_matrix", "must-refuse")?;
+            // Record 0355a: the changed commit of a protected document is
+            // refused at commit, before any package or output exists.
+            if !matches!(edit.commit(), Err(litchi_docx::Error::Refused(_))) {
                 return Err(format!(
                     "{} protected edit was not refused before output",
                     fixture.id
@@ -991,7 +993,10 @@ fn validate_zip(fixture: &Fixture, bytes: &[u8]) -> Result<OperationResult> {
             }
         },
         Oracle::Xxe => {
-            let _ = XlsxWorkbook::from_slice_with_limits(bytes, opc_limits()?)?;
+            let _ = XlsxPackage::from_bytes_with_options(
+                bytes,
+                litchi_xlsx::OpenOptions::new().source_limits(opc_limits()?),
+            )?;
             if !target
                 .windows(b"schemaLocation".len())
                 .any(|window| window == b"schemaLocation")
@@ -1003,7 +1008,10 @@ fn validate_zip(fixture: &Fixture, bytes: &[u8]) -> Result<OperationResult> {
             }
         },
         Oracle::SharedStrings => {
-            let _ = XlsxWorkbook::from_slice_with_limits(bytes, opc_limits()?)?;
+            let _ = XlsxPackage::from_bytes_with_options(
+                bytes,
+                litchi_xlsx::OpenOptions::new().source_limits(opc_limits()?),
+            )?;
             if !target.windows(b"sst".len()).any(|window| window == b"sst") {
                 return Err(format!("{} shared-string target missing", fixture.id).into());
             }
@@ -1021,13 +1029,11 @@ fn validate_zip(fixture: &Fixture, bytes: &[u8]) -> Result<OperationResult> {
 }
 
 fn validate_cfb(fixture: &Fixture, bytes: &[u8]) -> Result<OperationResult> {
-    let mut ole = OleFile::open_with_limits(Cursor::new(bytes), cfb_limits()?)?;
+    let mut ole = OleFile::open(Cursor::new(bytes), cfb_limits()?)?;
     match fixture.oracle {
         Oracle::Macro => {
-            let mut workbook = XlsWorkbook::from_ole_file(OleFile::open_with_limits(
-                Cursor::new(bytes),
-                cfb_limits()?,
-            )?)?;
+            let mut workbook =
+                XlsReader::from_ole_file(OleFile::open(Cursor::new(bytes), cfb_limits()?)?)?;
             let metadata = workbook.vba_metadata();
             if !metadata.has_project_marker()
                 || !metadata.has_project_storage()
@@ -1041,7 +1047,9 @@ fn validate_cfb(fixture: &Fixture, bytes: &[u8]) -> Result<OperationResult> {
             if !storage.is_structurally_complete() || !storage.may_contain_macro_code() {
                 return Err(format!("{} VBA storage is incomplete", fixture.id).into());
             }
-            let project = workbook.vba()?.ok_or("macro fixture has no VBA project")?;
+            let project = workbook
+                .vba(&litchi_vba::Limits::default())?
+                .ok_or("macro fixture has no VBA project")?;
             if !project
                 .modules()
                 .iter()
@@ -1084,10 +1092,10 @@ fn validate_crypto(fixture: &Fixture, bytes: &[u8]) -> Result<OperationResult> {
     };
     let limits = crypto_limits();
     enforce_strict_data_spaces_oracle(fixture, bytes, profile)?;
-    if ooxml::inspect_with(bytes, &limits)? != Kind::Encrypted(profile.mode) {
+    if ooxml::inspect(bytes, &limits)? != Kind::Encrypted(profile.mode) {
         return Err(format!("{} encryption mode changed", fixture.id).into());
     }
-    let opened = ooxml::open_with(bytes.to_vec(), profile.password, &limits)?;
+    let opened = ooxml::open(bytes.to_vec(), profile.password, &limits)?;
     if opened.mode() != Some(profile.mode) {
         return Err(format!("{} opened under the wrong encryption mode", fixture.id).into());
     }
@@ -1116,15 +1124,14 @@ fn validate_encrypted_doc(
     }
     let mut package = open_doc_package(bytes)?;
     if !matches!(
-        package
-            .document_with_options(OpenOptions::default().with_password("wrong".to_owned().into())),
+        package.document_with_options(OpenOptions::default().password("wrong".to_owned().into())),
         Err(DocError::InvalidPassword)
     ) {
         return Err(format!("{} accepted the wrong password", fixture.id).into());
     }
     let mut package = open_doc_package(bytes)?;
     let document = package
-        .document_with_options(OpenOptions::default().with_password(password.to_owned().into()))?;
+        .document_with_options(OpenOptions::default().password(password.to_owned().into()))?;
     let text = document.text()?;
     if text.trim().is_empty() || sha256_hex(text.as_bytes()) != semantic_sha256 {
         return Err(format!("{} semantic password readback changed", fixture.id).into());
@@ -1132,14 +1139,17 @@ fn validate_encrypted_doc(
     Ok(())
 }
 
-fn open_doc_package(bytes: &[u8]) -> Result<DocPackage<Cursor<&[u8]>>> {
-    let ole = OleFile::open_with_limits(Cursor::new(bytes), cfb_limits()?)?;
-    let limits = DocLimits::try_new(
-        MAX_INPUT_BYTES as usize,
-        MAX_INPUT_BYTES as usize,
-        MAX_INPUT_BYTES as usize,
-    )?;
-    Ok(DocPackage::from_ole_file_with_limits(ole, limits)?)
+fn open_doc_package(bytes: &[u8]) -> Result<DocReader<Cursor<&[u8]>>> {
+    let ole = OleFile::open(Cursor::new(bytes), cfb_limits()?)?;
+    let limits = DocSourceLimits::builder()
+        .max_input_bytes(MAX_INPUT_BYTES as usize)?
+        .max_entry_bytes(MAX_INPUT_BYTES as usize)?
+        .max_aggregate_bytes(MAX_INPUT_BYTES as usize)?
+        .build()?;
+    Ok(DocReader::from_ole_file_with_options(
+        ole,
+        OpenOptions::default().source_limits(limits),
+    )?)
 }
 
 fn read_crypto(fixture: &Fixture, bytes: &[u8]) -> Result<OperationResult> {
@@ -1147,7 +1157,7 @@ fn read_crypto(fixture: &Fixture, bytes: &[u8]) -> Result<OperationResult> {
         return Err(format!("{} has a non-crypto oracle", fixture.id).into());
     };
     enforce_strict_data_spaces_oracle(fixture, bytes, profile)?;
-    let opened = ooxml::open_with(bytes.to_vec(), profile.password, &crypto_limits())?;
+    let opened = ooxml::open(bytes.to_vec(), profile.password, &crypto_limits())?;
     if opened.mode() != Some(profile.mode)
         || sha256_hex(opened.bytes()) != CLEAR_CRYPTO_SHA256
         || (profile.mode.is_agile() && opened.integrity() != Some(IntegrityStatus::Authenticated))
@@ -1165,8 +1175,8 @@ fn enforce_strict_data_spaces_oracle(
     if !profile.strict_data_spaces_refusal {
         return Ok(());
     }
-    let mut ole = OleFile::open_with_limits(Cursor::new(bytes), cfb_limits()?)?;
-    if spaces::inspect(&mut ole).is_ok() {
+    let mut ole = OleFile::open(Cursor::new(bytes), cfb_limits()?)?;
+    if spaces::inspect(&mut ole, &spaces::Limits::default()).is_ok() {
         return Err(format!(
             "{} strict DataSpaces inspection unexpectedly accepted the zero-block graph",
             fixture.id
@@ -1177,7 +1187,7 @@ fn enforce_strict_data_spaces_oracle(
 }
 
 fn read_cfb_stream(fixture: &Fixture, bytes: &[u8]) -> Result<Vec<u8>> {
-    let mut ole = OleFile::open_with_limits(Cursor::new(bytes), cfb_limits()?)?;
+    let mut ole = OleFile::open(Cursor::new(bytes), cfb_limits()?)?;
     let wanted = match fixture.oracle {
         Oracle::Macro => "_VBA_PROJECT_CUR",
         Oracle::CfbBoundary | Oracle::EncryptedDoc { .. } => "WordDocument",
@@ -1227,10 +1237,7 @@ fn bounded_archive<'data>(
 ) -> Result<(ArchiveReader<'data>, usize)> {
     let preflight = ZipArchive::from_slice(bytes)?.into_zip_archive();
     let total_entries = admit_zip_archive_entries(fixture_id, &preflight)?;
-    Ok((
-        ArchiveReader::new_with_limits(bytes, archive_limits())?,
-        total_entries,
-    ))
+    Ok((ArchiveReader::new(bytes, archive_limits())?, total_entries))
 }
 
 fn admit_zip_archive_entries<R: ReaderAt>(
@@ -1265,16 +1272,16 @@ fn admit_zip_archive_entries<R: ReaderAt>(
     Ok(actual)
 }
 
-fn opc_limits() -> Result<ReadLimits> {
-    Ok(ReadLimits::builder()
+fn opc_limits() -> Result<SourceLimits> {
+    Ok(SourceLimits::builder()
         .max_input_bytes(MAX_INPUT_BYTES)?
-        .max_archive_members(MAX_MEMBERS)?
+        .max_members(MAX_MEMBERS)?
         .max_archive_total_entries(MAX_MEMBERS)?
         .max_archive_member_name_bytes(MAX_MEMBER_NAME_BYTES)?
         .max_archive_metadata_bytes(MAX_INPUT_BYTES)?
         .max_archive_compressed_bytes(MAX_INPUT_BYTES)?
-        .max_archive_entry_bytes(MAX_INPUT_BYTES)?
-        .max_archive_total_bytes(MAX_INPUT_BYTES)?
+        .max_entry_bytes(MAX_INPUT_BYTES)?
+        .max_aggregate_bytes(MAX_INPUT_BYTES)?
         .max_parts(MAX_MEMBERS)?
         .max_part_bytes(MAX_INPUT_BYTES)?
         .max_total_part_bytes(MAX_INPUT_BYTES)?
@@ -1286,9 +1293,9 @@ fn opc_limits() -> Result<ReadLimits> {
         .max_relationships_per_part(MAX_RELATIONSHIPS)?
         .max_total_relationships(MAX_RELATIONSHIPS)?
         .max_relationship_graph_nodes(MAX_MEMBERS)?
-        .max_xml_events(MAX_RELATIONSHIPS)?
+        .max_events(MAX_RELATIONSHIPS)?
         .max_total_relationship_xml_events(MAX_RELATIONSHIPS)?
-        .max_xml_depth(256)?
+        .max_depth(256)?
         .max_xml_attribute_bytes(MAX_INPUT_BYTES as usize)?
         .max_relationship_target_bytes(MAX_INPUT_BYTES as usize)?
         .build()?)
@@ -1565,7 +1572,7 @@ fn profile_json() -> Value {
             "zip": "a bounded Rust central-directory preflight counts every entry, including directories, before ArchiveReader or PreservationIndex ownership; ArchiveLimits::max_files remains the non-directory file limit",
             "cfb": "source length, header counts, 512KiB directory, and 64MiB allocation-table ceilings are checked before CFB index allocation",
             "crypto": "the 512KiB CFB directory and 64MiB allocation-table ceilings are applied through the explicit OOXML encryption profile before DataSpaces inspection or decryption",
-            "opc": "ReadLimits apply an explicit total central-directory entry preflight, then bound the non-directory member index and part payload reads",
+            "opc": "SourceLimits apply an explicit total central-directory entry preflight, then bound the non-directory member index and part payload reads",
         },
         "notes": "Rows are executable correctness operations. ZIP total-entry admission is explicit because ArchiveLimits::max_files excludes directory records. The zero-DataSpaces-block fixture must refuse strict spaces inspection while compatibility OOXML decryption accepts it. Timing is opt-in and intentionally not captured by this candidate.",
     })
@@ -1716,7 +1723,7 @@ fn member_inventory(
             Ok((members, logical_bytes, "complete", total_entries))
         },
         ContainerKind::Cfb | ContainerKind::EncryptedCfb => {
-            let mut ole = OleFile::open_with_limits(Cursor::new(bytes), cfb_limits()?)?;
+            let mut ole = OleFile::open(Cursor::new(bytes), cfb_limits()?)?;
             let paths = ole.list_streams();
             if paths.len() > MAX_MEMBERS {
                 return Err(format!("{} stream count exceeds bound", fixture.id).into());
@@ -1755,7 +1762,7 @@ fn relationship_inventory(fixture: &Fixture, bytes: &[u8]) -> Result<Value> {
             "evidence": "CFB container has no OPC relationship graph",
         }));
     }
-    match OpcPackage::from_vec_with_limits(bytes.to_vec(), opc_limits()?) {
+    match OpcPackage::from_vec(bytes.to_vec(), opc_limits()?) {
         Ok(package) => {
             let count = package.rels().len()
                 + package
@@ -1987,7 +1994,8 @@ mod tests {
 
     #[test]
     fn declared_zip_member_size_refuses_before_payload_read() {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer.write_stored("payload.bin", b"small").unwrap();
         let mut bytes = writer.finish_to_bytes().unwrap();
         let central = bytes
@@ -1996,12 +2004,13 @@ mod tests {
             .expect("central directory");
         let oversized = (MAX_INPUT_BYTES + 1) as u32;
         bytes[central + 24..central + 28].copy_from_slice(&oversized.to_le_bytes());
-        assert!(ArchiveReader::new_with_limits(&bytes, archive_limits()).is_err());
+        assert!(ArchiveReader::new(&bytes, archive_limits()).is_err());
     }
 
     #[test]
     fn total_zip_entry_admission_includes_directory_records() {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         for index in 0..=MAX_MEMBERS {
             let name = format!("directory-{index}/");
             writer.write_stored(&name, &[]).unwrap();
@@ -2017,7 +2026,7 @@ mod tests {
             .find(|fixture| fixture.id == "crypto-msoffcrypto-agile-zero-block-graph")
             .unwrap();
         let bytes = load_fixture(fixture).unwrap();
-        assert!(spaces::inspect_bytes(&bytes).is_err());
+        assert!(spaces::inspect_bytes(&bytes, &spaces::Limits::default()).is_err());
         validate_crypto(fixture, &bytes).unwrap();
     }
 

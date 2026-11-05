@@ -7,26 +7,18 @@
 //! cargo run -p litchi-docx --example write_docx
 //! ```
 
-use litchi_docx::{Package, ParagraphAlignment};
-use litchi_ooxml_common::Props;
+use litchi_docx::metadata::Metadata;
+use litchi_docx::{Builder, Package, ParagraphAlignment};
 use tempfile::NamedTempFile;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Building a new DOCX in memory...");
 
-    let mut pkg = Package::new()?;
-
-    // Set core properties.
-    let _ = pkg.put_props(
-        Props::new()
-            .title("litchi-docx example")
-            .creator("litchi-docx write_docx example")
-            .subject("Round-trip demo"),
-    );
+    let mut builder = Builder::new()?;
 
     // Build the body of the document.
     {
-        let doc = pkg.document_mut()?;
+        let doc = builder.document()?;
 
         // Heading 1
         doc.add_heading("Round-Trip Demo", 1)?;
@@ -62,6 +54,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             c.set_text("42");
         }
     }
+    let pkg = builder.build()?;
+
+    // Set core properties through the metadata transaction.
+    let mut metadata = pkg.edit_metadata();
+    metadata.set(Metadata {
+        title: Some("litchi-docx example".to_owned()),
+        author: Some("litchi-docx write_docx example".to_owned()),
+        subject: Some("Round-trip demo".to_owned()),
+        ..Metadata::default()
+    });
+    let pkg = metadata.commit()?.into_package();
 
     // Save to a tempfile (with .docx extension so reopen path-detection is unambiguous).
     let tmp = NamedTempFile::with_suffix(".docx")?;
@@ -82,14 +85,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Round-tripped table count    : {}", table_count);
     println!("\n--- Round-tripped text ---\n{}", text);
 
-    let props = reopened.props();
+    let props = reopened.metadata();
     println!(
         "\nRound-tripped title   : {:?}",
         props.and_then(|p| p.title.as_deref())
     );
     println!(
-        "Round-tripped creator : {:?}",
-        props.and_then(|p| p.creator.as_deref())
+        "Round-tripped author  : {:?}",
+        props.and_then(|p| p.author.as_deref())
     );
     println!(
         "Round-tripped subject : {:?}",

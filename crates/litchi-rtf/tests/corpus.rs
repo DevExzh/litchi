@@ -7,7 +7,7 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
-use litchi_rtf::RtfDocument;
+use litchi_rtf::raw::Tree;
 
 const FIXTURES: &[&str] = &[
     "background.rtf",
@@ -63,7 +63,7 @@ fn parses_the_real_world_rtf_compatibility_corpus() {
         let path = corpus.join(fixture);
         let bytes = std::fs::read(&path)
             .unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display()));
-        RtfDocument::from_bytes(&bytes)
+        Tree::from_bytes(&bytes, litchi_rtf::read::OpenOptions::default())
             .unwrap_or_else(|error| panic!("failed to parse {}: {error}", path.display()));
     }
 
@@ -73,9 +73,14 @@ fn parses_the_real_world_rtf_compatibility_corpus() {
         let path = corpus.join(fixture);
         let bytes = std::fs::read(&path)
             .unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display()));
+        // Refused typed as an unsupported code page, not as malformed
+        // (record 0347).
         assert!(
-            RtfDocument::from_bytes(&bytes).is_err(),
-            "accepted unsupported code page in {}",
+            matches!(
+                Tree::from_bytes(&bytes, litchi_rtf::read::OpenOptions::default()),
+                Err(litchi_rtf::Error::UnsupportedCodePage(10001 | 10007))
+            ),
+            "{} is not refused as an unsupported code page",
             path.display()
         );
     }

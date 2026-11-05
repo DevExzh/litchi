@@ -6,7 +6,7 @@ use std::sync::Arc;
 use litchi_drawingml::ink::actions::{self, Profile};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    OpcError, OpcPackage, OwnedContentTypes, OwnedRelationships, PackURI, Part, ReadResource,
+    OpcError, OpcPackage, OwnedContentTypes, OwnedRelationships, PackURI, Part, SourceLimitKind,
     TargetMode,
 };
 use quick_xml::events::Event;
@@ -18,7 +18,7 @@ use super::model::{
     ActionAnchor, AnchorFingerprint, Dialect, InboundReference, PackageRelationship, RawAnchor,
     Snapshot,
 };
-use super::transaction::{Commit, Patch};
+use super::transaction::{Change, Prepared};
 use crate::presentation::embedded::{invalid, limit};
 use crate::{Error, Result};
 
@@ -90,20 +90,26 @@ impl TargetCache {
             ))
         })?;
         if target.blob().len() > limits.target_bytes {
-            return Err(limit("ink-action target bytes", limits.target_bytes));
+            return Err(limit(
+                crate::error::CodecLimitKind::PayloadBytes,
+                target.blob().len(),
+                limits.target_bytes,
+            ));
         }
         let retained = self
             .retained_bytes
             .checked_add(target.blob().len())
             .ok_or_else(|| {
                 limit(
-                    "ink-action aggregate target bytes",
+                    crate::error::CodecLimitKind::RetainedBytes,
+                    usize::MAX,
                     limits.total_target_bytes,
                 )
             })?;
         if retained > limits.total_target_bytes {
             return Err(limit(
-                "ink-action aggregate target bytes",
+                crate::error::CodecLimitKind::RetainedBytes,
+                retained,
                 limits.total_target_bytes,
             ));
         }
@@ -113,7 +119,10 @@ impl TargetCache {
         let closure = relationship_index.closure(target_name)?;
         let inbound = Arc::from(closure.owned_inbound()?);
         let outbound = Arc::from(closure.owned_outbound()?);
-        let profile = Arc::new(actions::read_profile(target.blob())?);
+        let profile = Arc::new(actions::read_profile(
+            target.blob(),
+            actions::Limits::DEFAULT,
+        )?);
         // The shared DrawingML profile retains the exact source allocation.
         // Reuse it for the anchor/cache view instead of retaining the OPC
         // `Arc<Vec<u8>>` next to a second profile-source allocation.
@@ -357,9 +366,13 @@ fn load_slide_catalog_with_index(
             inbound,
             outbound,
         });
-        semantic_ordinal = semantic_ordinal
-            .checked_add(1)
-            .ok_or_else(|| limit("ink-action semantic ordinal", limits.anchors))?;
+        semantic_ordinal = semantic_ordinal.checked_add(1).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::Index,
+                usize::MAX,
+                limits.anchors,
+            )
+        })?;
     }
     if validate_shared_owners {
         validate_shared_slide_owners(
@@ -600,9 +613,9 @@ fn capture_source_readset(package: &OpcPackage, owner: &PackURI) -> Result<Sourc
     let read_limits = package.read_limits();
     let root = PackURI::new("/").map_err(OpcError::InvalidPackUri)?;
     Ok(SourceReadset {
-        content_types: package.source_content_types_with_limits(read_limits)?,
-        owner_relationships: package.source_relationships_with_limits(owner, read_limits)?,
-        package_relationships: package.source_relationships_with_limits(&root, read_limits)?,
+        content_types: package.source_content_types(read_limits)?,
+        owner_relationships: package.source_relationships(owner, read_limits)?,
+        package_relationships: package.source_relationships(&root, read_limits)?,
     })
 }
 
@@ -620,7 +633,7 @@ fn validate_relationship_sources(package: &OpcPackage) -> Result<()> {
     let mut total_xml_events = 0usize;
     let mut total_relationships = 0usize;
 
-    let root_source = package.source_relationships_with_limits(&root, limits)?;
+    let root_source = package.source_relationships(&root, limits)?;
     validate_relationship_source(
         &root_source,
         limits,
@@ -631,7 +644,7 @@ fn validate_relationship_sources(package: &OpcPackage) -> Result<()> {
     )?;
 
     for part in package.iter_parts() {
-        let source = package.source_relationships_with_limits(part.partname(), limits)?;
+        let source = package.source_relationships(part.partname(), limits)?;
         validate_relationship_source(
             &source,
             limits,
@@ -646,7 +659,7 @@ fn validate_relationship_sources(package: &OpcPackage) -> Result<()> {
 
 fn validate_relationship_source(
     source: &OwnedRelationships,
-    limits: litchi_opc::ReadLimits,
+    limits: litchi_opc::SourceLimits,
     relationship_parts: &mut usize,
     total_xml_bytes: &mut usize,
     total_xml_events: &mut usize,
@@ -659,7 +672,7 @@ fn validate_relationship_source(
         .checked_add(1)
         .ok_or_else(|| invalid("relationship part count overflows"))?;
     check_relationship_limit(
-        ReadResource::RelationshipParts,
+        SourceLimitKind::RelationshipParts,
         *relationship_parts,
         limits.max_relationship_parts(),
     )?;
@@ -668,7 +681,7 @@ fn validate_relationship_source(
         .checked_add(source.bytes().len())
         .ok_or_else(|| invalid("relationship XML byte count overflows"))?;
     check_relationship_limit(
-        ReadResource::TotalRelationshipXmlBytes,
+        SourceLimitKind::TotalRelationshipXmlBytes,
         *total_xml_bytes,
         limits.max_total_relationship_xml_bytes(),
     )?;
@@ -678,7 +691,7 @@ fn validate_relationship_source(
         .checked_add(events)
         .ok_or_else(|| invalid("relationship XML event count overflows"))?;
     check_relationship_limit(
-        ReadResource::TotalRelationshipXmlEvents,
+        SourceLimitKind::TotalRelationshipXmlEvents,
         *total_xml_events,
         limits.max_total_relationship_xml_events(),
     )?;
@@ -686,7 +699,7 @@ fn validate_relationship_source(
         .checked_add(relationships)
         .ok_or_else(|| invalid("relationship count overflows"))?;
     check_relationship_limit(
-        ReadResource::TotalRelationships,
+        SourceLimitKind::TotalRelationships,
         *total_relationships,
         limits.max_total_relationships(),
     )?;
@@ -718,11 +731,15 @@ fn relationship_xml_metrics(xml: &[u8]) -> Result<(usize, usize)> {
     Ok((events, relationships))
 }
 
-fn check_relationship_limit(resource: ReadResource, actual: usize, maximum: usize) -> Result<()> {
+fn check_relationship_limit(
+    resource: SourceLimitKind,
+    actual: usize,
+    maximum: usize,
+) -> Result<()> {
     if actual > maximum {
-        return Err(Error::Opc(OpcError::ReadLimit {
-            resource,
-            actual: actual as u64,
+        return Err(Error::Opc(OpcError::Limit {
+            kind: resource,
+            observed: actual as u64,
             maximum: maximum as u64,
         }));
     }
@@ -731,7 +748,7 @@ fn check_relationship_limit(resource: ReadResource, actual: usize, maximum: usiz
 
 fn capture_owner_relationship_source(package: &OpcPackage, owner: &PackURI) -> Result<()> {
     let read_limits = package.read_limits();
-    package.source_relationships_with_limits(owner, read_limits)?;
+    package.source_relationships(owner, read_limits)?;
     Ok(())
 }
 
@@ -768,14 +785,14 @@ fn package_relationships<'a>(
 }
 
 /// Apply a source-checked existing-target patch atomically.
-pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
+pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Change) -> Result<Snapshot> {
     let before = patch.before();
     let slide = package.get_part(&before.slide_part_name)?;
     let current = load_snapshot(package, before.slide_index, slide, &before.limits())?;
     if !current.same_source(before) {
-        return Err(Error::StaleSource);
+        return Err(Error::PatchConflict);
     }
-    if patch.is_empty() {
+    if patch.is_noop() {
         return Ok(current);
     }
     if package.is_signed() || package.requires_signature_edit_policy() {
@@ -798,11 +815,11 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
 
 /// Apply a committed existing-target transaction atomically.
 #[inline]
-pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot> {
+pub(crate) fn apply_commit(package: &mut OpcPackage, commit: Prepared) -> Result<Snapshot> {
     apply_patch(package, commit.patch())
 }
 
-fn install_patch(package: &mut OpcPackage, patch: &Patch) -> Result<()> {
+fn install_patch(package: &mut OpcPackage, patch: &Change) -> Result<()> {
     let before = patch.before();
     let after = patch.after();
     let owner_changed = package.get_part(&before.slide_part_name)?.blob() != after.source_xml();
@@ -854,13 +871,13 @@ fn install_patch(package: &mut OpcPackage, patch: &Patch) -> Result<()> {
     Ok(())
 }
 
-fn preflight_patch_limits(package: &OpcPackage, patch: &Patch) -> Result<()> {
+fn preflight_patch_limits(package: &OpcPackage, patch: &Change) -> Result<()> {
     let read_limits = package.read_limits();
     let part_count = package.part_count();
     if part_count > read_limits.max_parts() {
-        return Err(Error::Opc(OpcError::ReadLimit {
-            resource: ReadResource::Parts,
-            actual: part_count as u64,
+        return Err(Error::Opc(OpcError::Limit {
+            kind: SourceLimitKind::Parts,
+            observed: part_count as u64,
             maximum: read_limits.max_parts() as u64,
         }));
     }
@@ -892,9 +909,9 @@ fn preflight_patch_limits(package: &OpcPackage, patch: &Patch) -> Result<()> {
         let actual =
             u64::try_from(size).map_err(|_| invalid("ink-action staged part bytes exceed u64"))?;
         if actual > read_limits.max_part_bytes() {
-            return Err(Error::Opc(OpcError::ReadLimit {
-                resource: ReadResource::PartBytes,
-                actual,
+            return Err(Error::Opc(OpcError::Limit {
+                kind: SourceLimitKind::PartBytes,
+                observed: actual,
                 maximum: read_limits.max_part_bytes(),
             }));
         }
@@ -902,9 +919,9 @@ fn preflight_patch_limits(package: &OpcPackage, patch: &Patch) -> Result<()> {
             .checked_add(actual)
             .ok_or_else(|| invalid("ink-action staged package bytes overflow"))?;
         if total > read_limits.max_total_part_bytes() {
-            return Err(Error::Opc(OpcError::ReadLimit {
-                resource: ReadResource::TotalPartBytes,
-                actual: total,
+            return Err(Error::Opc(OpcError::Limit {
+                kind: SourceLimitKind::TotalPartBytes,
+                observed: total,
                 maximum: read_limits.max_total_part_bytes(),
             }));
         }
@@ -940,7 +957,11 @@ fn push_reference(
     maximum: usize,
 ) -> Result<()> {
     if output.len() >= maximum {
-        return Err(limit("ink-action relationship edges", maximum));
+        return Err(limit(
+            crate::error::CodecLimitKind::Relationships,
+            output.len().checked_add(1).unwrap_or(usize::MAX),
+            maximum,
+        ));
     }
     output.try_reserve(1).map_err(|source| Error::Allocation {
         resource: "ink-action relationship edges",
@@ -953,7 +974,8 @@ fn push_reference(
     ] {
         if value.len() > MAX_RELATIONSHIP_FIELD_BYTES {
             return Err(limit(
-                "ink-action relationship metadata bytes",
+                crate::error::CodecLimitKind::RelationshipBytes,
+                value.len(),
                 MAX_RELATIONSHIP_FIELD_BYTES,
             ));
         }

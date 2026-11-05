@@ -13,7 +13,9 @@ use std::result::Result;
 
 use crate::{Seconds, Slide, SlideSelector, SlideSelectorError, SlideSelectorResult};
 
-pub use crate::package::show_settings::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
+pub use crate::package::show_settings::{
+    Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+};
 
 const NORMAL_MODE: i32 = 0;
 const SELF_PLAYING_MODE: i32 = 1;
@@ -395,18 +397,6 @@ impl Show {
             },
             SlideSelector::Position(position) => Ok(self.slides.get(position.get())),
         }
-    }
-
-    /// Select a slide by checked zero-based position.
-    ///
-    /// This compatibility helper delegates to [`Self::select_slide`]. New
-    /// code can pass a [`SlideSelector`] to make the lookup domain explicit.
-    #[deprecated(
-        note = "use `Show::slides().get(index)` for positional lookup or `Show::select_slide(SlideSelector::position(Position::new(index)))` to retain selector errors"
-    )]
-    #[must_use]
-    pub fn slide(&self, index: usize) -> Option<&Slide> {
-        self.select_slide(index).ok().flatten()
     }
 
     /// Borrow validated show settings.

@@ -7,7 +7,7 @@
 //! model from its semantic owner module.
 
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{Part, Relationships};
+use litchi_opc::{PackURI, Part, Relationships};
 
 use super::{Worksheet, WorksheetKind};
 use crate::error::{Result, invalid};
@@ -16,11 +16,17 @@ use crate::error::{Result, invalid};
 ///
 /// The table model itself remains [`crate::table::Table`]; this wrapper only
 /// records the package edge needed to edit or inspect the owning relationship.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct TablePart {
     relationship_id: Box<str>,
     part_name: Box<str>,
     table: crate::table::Table,
+}
+
+impl std::fmt::Debug for TablePart {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.debug_struct("TablePart").finish_non_exhaustive()
+    }
 }
 
 impl TablePart {
@@ -222,16 +228,9 @@ pub(crate) fn views(sheet: &Worksheet) -> Result<Option<crate::sheet_view::Colle
 
 /// Parse every table relationship owned by the worksheet.
 pub(crate) fn tables(sheet: &Worksheet) -> Result<Vec<TablePart>> {
-    let mut values = Vec::new();
-    for relationship in relationships(sheet)?
-        .iter()
-        .filter(|relationship| matches!(relationship.reltype(), rt::TABLE | rt::STRICT_TABLE))
-    {
-        if relationship.is_external() {
-            return Err(invalid("worksheet table relationship cannot be external"));
-        }
-        let part_name = relationship.target_partname()?;
-        let table_part = sheet.owner.package.get_part(&part_name)?;
+    let limits = sheet.owner.package.read_limits();
+    collect_tables(relationships(sheet)?, |part_name| {
+        let table_part = sheet.owner.package.get_part(part_name)?;
         if table_part.content_type() != ct::SML_TABLE {
             return Err(invalid(format!(
                 "worksheet table part '{part_name}' has content type '{}', expected '{}'",
@@ -239,7 +238,32 @@ pub(crate) fn tables(sheet: &Worksheet) -> Result<Vec<TablePart>> {
                 ct::SML_TABLE
             )));
         }
-        let table = crate::table::parse_table_xml(table_part.blob())?
+        crate::source_limits::validate_xml_limits(table_part.blob(), limits)?;
+        crate::table::parse_table_xml(table_part.blob())
+    })
+}
+
+/// Load the tables a worksheet's relationships name, in canonical order.
+///
+/// `load` reads and parses one table part, checking its content type. Both
+/// workbook owners share this traversal, so they report the same tables in
+/// the same order and refuse the same relationships: sorted by relationship
+/// ID, then by part name, because the relationship collection itself is
+/// unordered.
+pub(crate) fn collect_tables(
+    relationships: &Relationships,
+    mut load: impl FnMut(&PackURI) -> Result<Option<crate::table::Table>>,
+) -> Result<Vec<TablePart>> {
+    let mut values = Vec::new();
+    for relationship in relationships
+        .iter()
+        .filter(|relationship| matches!(relationship.reltype(), rt::TABLE | rt::STRICT_TABLE))
+    {
+        if relationship.is_external() {
+            return Err(invalid("worksheet table relationship cannot be external"));
+        }
+        let part_name = relationship.target_partname()?;
+        let table = load(&part_name)?
             .ok_or_else(|| invalid("worksheet table part is missing its table root"))?;
         values.push(TablePart {
             relationship_id: relationship.r_id().into(),
@@ -253,6 +277,89 @@ pub(crate) fn tables(sheet: &Worksheet) -> Result<Vec<TablePart>> {
             .then_with(|| left.part_name.cmp(&right.part_name))
     });
     Ok(values)
+}
+
+/// The table whose display name, or failing that whose name, equals `name`
+/// without regard to case.
+///
+/// Excel compares table names without regard to case. Display names are
+/// unique in a workbook and are the names formulas use, so a display-name
+/// match wins over a name match.
+pub(crate) fn find_table(mut tables: Vec<TablePart>, name: &str) -> Result<Option<TablePart>> {
+    let displays = matching_positions(&tables, name, true);
+    let positions = if displays.is_empty() {
+        matching_positions(&tables, name, false)
+    } else {
+        displays
+    };
+    match positions.as_slice() {
+        [] => Ok(None),
+        [position] => Ok(Some(tables.swap_remove(*position))),
+        _ => Err(crate::Error::Ambiguous {
+            kind: "table",
+            matches: positions.len(),
+        }),
+    }
+}
+
+/// Resolve one display name (preferred), otherwise one internal name.
+/// Every sheet is checked so duplicate matches cannot depend on iteration order.
+pub(crate) fn find_workbook_table<S>(
+    sheets: impl Iterator<Item = S>,
+    mut tables_of: impl FnMut(&S) -> Result<Option<Vec<TablePart>>>,
+    name: &str,
+) -> Result<Option<(S, TablePart)>> {
+    let mut display = None;
+    let mut fallback = None;
+    let mut display_count = 0;
+    let mut name_count = 0;
+    for sheet in sheets {
+        let Some(mut tables) = tables_of(&sheet)? else {
+            continue;
+        };
+        let matches = matching_positions(&tables, name, true);
+        if let Some(&position) = matches.first() {
+            display_count += matches.len();
+            if display.is_none() {
+                display = Some((sheet, tables.swap_remove(position)));
+            }
+        } else {
+            let matches = matching_positions(&tables, name, false);
+            name_count += matches.len();
+            if fallback.is_none() {
+                if let Some(&position) = matches.first() {
+                    fallback = Some((sheet, tables.swap_remove(position)));
+                }
+            }
+        }
+    }
+    let matches = if display_count != 0 {
+        display_count
+    } else {
+        name_count
+    };
+    if matches > 1 {
+        return Err(crate::Error::Ambiguous {
+            kind: "table",
+            matches,
+        });
+    }
+    Ok(display.or(fallback))
+}
+
+fn matching_positions(tables: &[TablePart], name: &str, display: bool) -> Vec<usize> {
+    tables
+        .iter()
+        .enumerate()
+        .filter_map(|(position, part)| {
+            let candidate = if display {
+                &part.table.display_name
+            } else {
+                &part.table.name
+            };
+            crate::sheet::equivalent(candidate, name).then_some(position)
+        })
+        .collect()
 }
 
 /// Load and validate every query-table part owned by the worksheet.
@@ -298,11 +405,10 @@ pub(crate) fn array_formulas(sheet: &Worksheet) -> Result<Vec<ArrayFormula>> {
 
 #[cfg(test)]
 mod tests {
-    use crate::Workbook;
 
     #[test]
     fn empty_snapshot_exposes_typed_worksheet_facades() {
-        let workbook = Workbook::new().expect("minimal workbook");
+        let workbook = crate::Package::new().expect("minimal workbook");
         let sheet = workbook.active_sheet().expect("active worksheet");
 
         assert!(
@@ -334,5 +440,70 @@ mod tests {
                 .expect("array-formula read")
                 .is_empty()
         );
+    }
+}
+
+#[cfg(test)]
+mod table_lookup_tests {
+    #![allow(clippy::unwrap_used, reason = "focused table lookup fixtures")]
+    use super::{TablePart, find_table, find_workbook_table};
+
+    fn part(name: &str, display: &str) -> TablePart {
+        let mut table = crate::table::Table::new(1, name, "A1:B3");
+        table.display_name = display.into();
+        TablePart {
+            relationship_id: "rId1".into(),
+            part_name: "/xl/tables/table1.xml".into(),
+            table,
+        }
+    }
+
+    #[test]
+    fn duplicate_names_refuse_instead_of_selecting_first() {
+        assert!(matches!(
+            find_table(
+                vec![part("one", "Straße"), part("two", "STRASSE")],
+                "strasse"
+            ),
+            Err(crate::Error::Ambiguous { matches: 2, .. })
+        ));
+        let result =
+            find_workbook_table(0..2, |_| Ok(Some(vec![part("one", "Straße")])), "strasse");
+        assert!(matches!(
+            result,
+            Err(crate::Error::Ambiguous { matches: 2, .. })
+        ));
+        let result =
+            find_workbook_table(0..2, |_| Ok(Some(vec![part("Straße", "other")])), "STRASSE");
+        assert!(matches!(
+            result,
+            Err(crate::Error::Ambiguous { matches: 2, .. })
+        ));
+    }
+
+    #[test]
+    fn display_names_take_precedence_over_internal_names() {
+        let found = find_table(
+            vec![part("chosen", "other"), part("winner", "CHOSEN")],
+            "chosen",
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(found.table.name, "winner");
+        let found = find_workbook_table(
+            0..3,
+            |sheet| {
+                Ok(Some(vec![if *sheet == 2 {
+                    part("winner", "chosen")
+                } else {
+                    part("chosen", "other")
+                }]))
+            },
+            "chosen",
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(found.0, 2);
+        assert_eq!(found.1.table.name, "winner");
     }
 }

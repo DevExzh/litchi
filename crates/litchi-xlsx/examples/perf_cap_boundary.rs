@@ -2,7 +2,7 @@
 //!
 //! This retained benchmark example builds against the frozen baseline and
 //! candidate source manifests.  It deliberately uses only public
-//! `OwnedSource`, `SourceBackedEditor`, and the existing `soapberry-zip` and
+//! `OwnedSource`, `SourceBackedWorkbook`, and the existing `soapberry-zip` and
 //! `serde_json` dependencies; no Cargo metadata is changed.
 //!
 //! `--size 160` produces `5*N*N + 2*N + 6 == 128_326` XML events, below the
@@ -36,7 +36,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use litchi_core::OwnedSource;
-use litchi_xlsx::cell_values::SourceBackedEditor;
+use litchi_xlsx::SourceBackedWorkbook;
 use litchi_xlsx::{Address, Number, Selector, Value};
 use quick_xml::Reader;
 use quick_xml::events::Event;
@@ -243,7 +243,8 @@ fn archive_for(worksheet: &[u8]) -> AnyResult<Vec<u8>> {
         r#"<Relationships xmlns="{OPC_REL}"><Relationship Id="rIdSheet" Type="{REL}/worksheet" Target="worksheets/sheet1.xml"/></Relationships>"#
     );
 
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer.write_stored("[Content_Types].xml", content_types.as_bytes())?;
     writer.write_stored("_rels/.rels", root_relationships.as_bytes())?;
     writer.write_stored("xl/workbook.xml", workbook.as_bytes())?;
@@ -335,13 +336,15 @@ fn fixture(size: usize) -> AnyResult<Fixture> {
 
 fn verify_noop_publication(fixture: &Fixture) -> AnyResult<()> {
     let source = Arc::new(OwnedSource::new(fixture.archive.clone()));
-    let editor = SourceBackedEditor::from_read_at(source.clone())?;
-    let commit = editor.edit_sheets([Selector::from("Sheet1")])?.commit()?;
-    if commit.changed() || !commit.patch().is_empty() {
+    let editor = SourceBackedWorkbook::from_read_at(source.clone())?;
+    let commit = editor
+        .edit_cell_values([Selector::from("Sheet1")])?
+        .commit()?;
+    if commit.diagnostics().changed() || !commit.patch().is_noop() {
         return Err("cap-boundary empty commit changed the source".into());
     }
     let mut published = Vec::new();
-    editor.publish_multi_commit_to_stream(&mut published, &commit)?;
+    commit.package().write_to(&mut published)?;
     if published != fixture.archive {
         return Err("cap-boundary no-op publication changed archive bytes".into());
     }
@@ -353,35 +356,35 @@ fn verify_noop_publication(fixture: &Fixture) -> AnyResult<()> {
 
 fn run_iteration(fixture: &Fixture) -> AnyResult<u128> {
     let source = Arc::new(OwnedSource::new(fixture.archive.clone()));
-    let editor = SourceBackedEditor::from_read_at(source.clone())?;
+    let editor = SourceBackedWorkbook::from_read_at(source.clone())?;
     let selectors = [Selector::from("Sheet1")];
 
     let started = Instant::now();
-    let planned = editor.edit_sheets(selectors);
+    let planned = editor.edit_cell_values(selectors);
     // `planned` remains alive beyond this statement and is inspected only
     // after the measured interval has closed.
     let duration_ns = started.elapsed().as_nanos();
 
     let transaction = planned?;
-    if transaction.worksheet_count() != 1 {
+    if transaction.worksheet_count()? != 1 {
         return Err("cap-boundary selected an unexpected worksheet count".into());
     }
     let a1 = Address::from_a1("A1")?;
     let last = Address::from_a1(&fixture.last_cell)?;
     let first_expected = Value::Number(Number::new("1")?);
     let last_expected = Value::Number(Number::new(fixture.cells.to_string())?);
-    if transaction.before().value(0, a1) != Some(&first_expected)
-        || transaction.before().value(0, last) != Some(&last_expected)
+    let before = transaction.before()?;
+    if before.value(0, a1) != Some(&first_expected) || before.value(0, last) != Some(&last_expected)
     {
         return Err("cap-boundary source snapshot lost A1 or the last cell".into());
     }
 
     let commit = transaction.commit()?;
-    if commit.changed() || !commit.patch().is_empty() {
+    if commit.diagnostics().changed() || !commit.patch().is_noop() {
         return Err("cap-boundary empty commit was not an exact no-op".into());
     }
-    if commit.snapshot().value(0, a1) != Some(&first_expected)
-        || commit.snapshot().value(0, last) != Some(&last_expected)
+    if commit.patch().after().value(0, a1) != Some(&first_expected)
+        || commit.patch().after().value(0, last) != Some(&last_expected)
     {
         return Err("cap-boundary committed snapshot lost A1 or the last cell".into());
     }

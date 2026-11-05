@@ -1,4 +1,5 @@
 use super::{Object, UnknownKind, parse};
+use litchi_opc::SourceLimits;
 
 #[test]
 fn parses_prefixed_strict_picture_and_chart_anchors_in_source_order() {
@@ -21,7 +22,7 @@ fn parses_prefixed_strict_picture_and_chart_anchors_in_source_order() {
             </a:graphicData></a:graphic></s:graphicFrame><s:clientData/></s:twoCellAnchor>
     </s:wsDr>"#;
 
-    let drawing = parse(xml).unwrap().unwrap();
+    let drawing = parse(xml, &SourceLimits::default()).unwrap().unwrap();
     assert_eq!(drawing.len(), 2);
     assert_eq!(drawing.pictures().count(), 1);
     assert_eq!(drawing.charts().count(), 1);
@@ -51,7 +52,7 @@ fn parses_default_namespace_transitional_drawing() {
             <clientData/></twoCellAnchor>
     </wsDr>"#;
 
-    let drawing = parse(xml).unwrap().unwrap();
+    let drawing = parse(xml, &SourceLimits::default()).unwrap().unwrap();
     assert_eq!(
         drawing.pictures().next().unwrap().relationship_id,
         "rIdImage"
@@ -71,7 +72,7 @@ fn retains_unknown_shape_as_inert_structure() {
             </xdr:sp><xdr:clientData/></xdr:twoCellAnchor>
     </xdr:wsDr>"#;
 
-    let drawing = parse(xml).unwrap().unwrap();
+    let drawing = parse(xml, &SourceLimits::default()).unwrap().unwrap();
     let unknown = drawing.unknown().next().unwrap();
     assert_eq!(unknown.kind, UnknownKind::Shape);
     assert_eq!(unknown.description.as_deref(), Some("Text box"));
@@ -91,7 +92,7 @@ fn parses_chartsheet_absolute_anchor_chart() {
             </a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:absoluteAnchor>
     </xdr:wsDr>"#;
 
-    let drawing = parse(xml).unwrap().unwrap();
+    let drawing = parse(xml, &SourceLimits::default()).unwrap().unwrap();
     assert_eq!(
         drawing.charts().next().unwrap().relationship_id,
         "chart-rel"
@@ -100,7 +101,7 @@ fn parses_chartsheet_absolute_anchor_chart() {
     assert_eq!(drawing.charts().next().unwrap().anchor.to_col, 0);
 
     let empty = r#"<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"><xdr:absoluteAnchor/></xdr:wsDr>"#;
-    assert!(parse(empty).is_err());
+    assert!(parse(empty, &SourceLimits::default()).is_err());
 }
 
 #[test]
@@ -112,14 +113,17 @@ fn rejects_malformed_drawing_anchors_and_bounded_marker_text() {
         "<xdr:twoCellAnchor><xdr:from><xdr:col>x</xdr:col></xdr:from></xdr:twoCellAnchor>",
     ] {
         let xml = format!(r#"<xdr:wsDr xmlns:xdr="{ROOT}">{body}</xdr:wsDr>"#);
-        assert!(parse(&xml).is_err(), "accepted {xml}");
+        assert!(
+            parse(&xml, &SourceLimits::default()).is_err(),
+            "accepted {xml}"
+        );
     }
 
     let oversized = "x".repeat(65);
     let xml = format!(
         r#"<xdr:wsDr xmlns:xdr="{ROOT}"><xdr:twoCellAnchor><xdr:from><xdr:col>{oversized}</xdr:col></xdr:from></xdr:twoCellAnchor></xdr:wsDr>"#
     );
-    assert!(parse(&xml).is_err());
+    assert!(parse(&xml, &SourceLimits::default()).is_err());
 }
 
 #[test]

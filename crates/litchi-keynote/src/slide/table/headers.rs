@@ -15,9 +15,6 @@ pub use litchi_iwa_common::table::headers::Settings;
 /// Transaction types for persisted Keynote slide-table header settings.
 pub mod transaction {
     pub use crate::package::slide_table_headers::{
-        SlideTableHeaderCommit as Commit, SlideTableHeaderDiagnostics as Diagnostics,
-        SlideTableHeaderEdit as Edit, SlideTableHeaderError as Error,
-        SlideTableHeaderInvalidReason as InvalidReason, SlideTableHeaderLimitKind as LimitKind,
-        SlideTableHeaderPatch as Patch, SlideTableHeaderPath as Path,
+        Commit, Diagnostics, Edit, Error, InvalidReason, LimitKind, Patch, Path, Refusal,
     };
 }

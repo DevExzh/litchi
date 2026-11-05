@@ -379,6 +379,7 @@ dependencies = [
  "base64",
  "chrono",
  "fast-float2",
+ "libc",
  "once_cell",
  "rand",
  "serde",

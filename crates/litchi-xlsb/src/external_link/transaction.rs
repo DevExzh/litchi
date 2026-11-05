@@ -17,14 +17,9 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-    /// Parse and validate one complete inert External Link part stream.
-    pub fn read(data: &[u8]) -> Result<Self> {
-        Self::read_with_limits(data, ExternalLinkLimits::DEFAULT)
-    }
-
     /// Parse and validate one complete inert External Link part stream with a
     /// caller-supplied operation policy.
-    pub fn read_with_limits(data: &[u8], limits: ExternalLinkLimits) -> Result<Self> {
+    pub fn read(data: &[u8], limits: ExternalLinkLimits) -> Result<Self> {
         let mut budget = limits.budget();
         let source = codec::parse_source_with_budget(data, &mut budget)?;
         validation::validate_relationship(source.parsed.link(), source.parsed.relationship_id())?;
@@ -69,7 +64,7 @@ impl Snapshot {
     pub fn resolved_link(&self, source: impl Into<String>) -> Result<Link> {
         if self.relationship_id().is_none() {
             return Err(Error::InvalidFormula(
-                "DDE external links do not have a relationship source".to_string(),
+                "DDE external links do not have a relationship source",
             ));
         }
         let mut link = self.link.clone();
@@ -102,10 +97,11 @@ impl Snapshot {
         true
     }
 
-    /// Start a detached, failure-atomic transaction.
+    /// Start a detached, failure-atomic byte-level draft of this stream;
+    /// [`Draft::finish`] returns its exact, reversible stream [`Patch`].
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub fn draft(&self) -> Draft {
+        Draft {
             base: self.clone(),
             link: self.link.clone(),
         }
@@ -120,14 +116,14 @@ impl PartialEq for Snapshot {
 
 impl Eq for Snapshot {}
 
-/// A detached transaction over typed link metadata and inert caches.
+/// A detached draft over typed link metadata and inert caches.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub struct Draft {
     base: Snapshot,
     link: Link,
 }
 
-impl Transaction {
+impl Draft {
     /// Borrow the currently staged link.
     #[must_use]
     pub const fn link(&self) -> &Link {
@@ -287,7 +283,7 @@ impl Transaction {
         let item = entries
             .iter_mut()
             .find(|entry| same_name(entry.name(), name))
-            .ok_or_else(|| invalid("DDE item was not found"))?;
+            .ok_or_else(|| invalid("DDE item was not"))?;
         *item = item
             .clone()
             .with_advise(want_advise)
@@ -305,7 +301,7 @@ impl Transaction {
         let item = entries
             .iter_mut()
             .find(|entry| same_name(entry.name(), name))
-            .ok_or_else(|| invalid("DDE item was not found"))?;
+            .ok_or_else(|| invalid("DDE item was not"))?;
         *item = match cache {
             Some(cache) => item.clone().with_cached_values(cache),
             None => item.clone().without_cached_values(),
@@ -362,7 +358,7 @@ impl Transaction {
         let item = entries
             .iter_mut()
             .find(|entry| same_name(entry.name(), name))
-            .ok_or_else(|| invalid("OLE item was not found"))?;
+            .ok_or_else(|| invalid("OLE item was not"))?;
         *item = item
             .clone()
             .with_advise(want_advise)
@@ -380,7 +376,7 @@ impl Transaction {
         let item = entries
             .iter_mut()
             .find(|entry| same_name(entry.name(), name))
-            .ok_or_else(|| invalid("OLE item was not found"))?;
+            .ok_or_else(|| invalid("OLE item was not"))?;
         *item = match cache {
             Some(cache) => item.clone().with_cached_values(cache),
             None => item.clone().without_cached_values(),
@@ -388,16 +384,18 @@ impl Transaction {
         self.apply_candidate(candidate)
     }
 
-    /// Validate and publish an immutable snapshot plus reversible patch.
-    pub fn commit(self) -> Result<Commit> {
+    /// Validate the draft and return the planned stream snapshot and its
+    /// exact, reversible stream patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns the link validation, serialization and limit errors.
+    pub fn finish(self) -> Result<(Snapshot, Patch)> {
         validation::validate_link(&self.link)?;
         if self.link == self.base.link {
             let before = clone_bytes(self.base.source_bytes(), "external-link patch before")?;
             let after = clone_bytes(&before, "external-link patch after")?;
-            return Ok(Commit {
-                snapshot: self.base,
-                patch: Patch { before, after },
-            });
+            return Ok((self.base, Patch { before, after }));
         }
 
         let relationship_id = match self.link.kind() {
@@ -411,51 +409,18 @@ impl Transaction {
             self.base.limits,
         )?;
         let after = bytes;
-        let snapshot = Snapshot::read_with_limits(&after, self.base.limits)?;
+        let snapshot = Snapshot::read(&after, self.base.limits)?;
         let before = clone_bytes(self.base.source_bytes(), "external-link patch before")?;
         if after.as_slice() == self.base.source_bytes() {
-            return Ok(Commit {
-                snapshot: self.base,
-                patch: Patch { before, after },
-            });
+            return Ok((self.base, Patch { before, after }));
         }
-        Ok(Commit {
-            snapshot,
-            patch: Patch { before, after },
-        })
+        Ok((snapshot, Patch { before, after }))
     }
 
     fn apply_candidate(&mut self, candidate: Link) -> Result<()> {
         validation::validate_link(&candidate)?;
         self.link = candidate;
         Ok(())
-    }
-}
-
-/// A successful immutable transaction result.
-#[derive(Debug, Clone)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
-
-impl Commit {
-    /// Borrow the committed snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Borrow the source-checked reversible patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Split the commit into its snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
     }
 }
 
@@ -469,7 +434,7 @@ pub struct Patch {
 impl Patch {
     /// Whether this patch leaves the stream byte-identical.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before == self.after
     }
 
@@ -485,14 +450,10 @@ impl Patch {
         &self.after
     }
 
-    /// Apply only to the exact source stream used to create this patch.
-    pub fn apply(&self, source: &[u8]) -> Result<Vec<u8>> {
-        apply_with_limits(source, self, ExternalLinkLimits::DEFAULT)
-    }
-
-    /// Alias for transaction pipelines.
-    pub fn commit(&self, source: &[u8]) -> Result<Vec<u8>> {
-        self.apply(source)
+    /// Apply only to the exact source stream used to create this patch,
+    /// validating the result under `limits`.
+    pub fn apply(&self, source: &[u8], limits: ExternalLinkLimits) -> Result<Vec<u8>> {
+        apply(source, self, limits)
     }
 
     /// Return the exact inverse patch.
@@ -517,33 +478,18 @@ impl Patch {
     }
 }
 
-/// Read one complete inert external-link stream.
-pub fn read(data: &[u8]) -> Result<Snapshot> {
-    Snapshot::read(data)
-}
-
 /// Read one complete inert external-link stream with explicit limits.
-pub fn read_with_limits(data: &[u8], limits: ExternalLinkLimits) -> Result<Snapshot> {
-    Snapshot::read_with_limits(data, limits)
+pub fn read(data: &[u8], limits: ExternalLinkLimits) -> Result<Snapshot> {
+    Snapshot::read(data, limits)
 }
 
-/// Apply a previously committed patch to one complete external-link stream.
-pub fn apply(data: &[u8], patch: &Patch) -> Result<Vec<u8>> {
-    patch.apply(data)
-}
-
-/// Apply a previously committed patch with explicit byte limits.
-pub fn apply_with_limits(
-    data: &[u8],
-    patch: &Patch,
-    limits: ExternalLinkLimits,
-) -> Result<Vec<u8>> {
+/// Apply a previously finished patch to one complete external-link stream,
+/// validating the result under `limits`.
+pub fn apply(data: &[u8], patch: &Patch, limits: ExternalLinkLimits) -> Result<Vec<u8>> {
     if data != patch.before.as_slice() {
-        return Err(invalid(
-            "external-link patch source snapshot does not match",
-        ));
+        return Err(Error::PatchConflict);
     }
-    let validated = Snapshot::read_with_limits(&patch.after, limits)?;
+    let validated = Snapshot::read(&patch.after, limits)?;
     drop(validated);
     clone_bytes(&patch.after, "external-link patch output")
 }
@@ -561,8 +507,8 @@ fn same_name(left: &str, right: &str) -> bool {
         .eq(right.chars().flat_map(char::to_lowercase))
 }
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormula(message.into())
+fn invalid(message: &'static str) -> Error {
+    Error::InvalidFormula(message)
 }
 
 fn clone_bytes(bytes: &[u8], resource: &'static str) -> Result<Vec<u8>> {

@@ -4,7 +4,7 @@
 //! The crate keeps format-independent font ownership in semantic modules:
 //! [`embedding`] prepares publishable font data from a caller-supplied
 //! resolver, [`obfuscation`] implements the OOXML XOR transform, and the
-//! optional [`discovery`] and [`subset`] modules provide native backends.
+//! optional `discovery` and `subset` modules provide native backends.
 
 #![forbid(unsafe_code)]
 
@@ -20,12 +20,10 @@ pub mod subset;
 pub use discovery::Loader;
 #[cfg(feature = "automatic")]
 pub use embedding::prepare;
-pub use embedding::{
-    Mode, PreparationLimits, Prepared, Resolver, prepare_with, prepare_with_limits,
-};
+pub use embedding::{Mode, PreparationLimits, Prepared, Resolver, prepare_with};
 pub use model::{
     Charset, CollectGlyphs, Family, FontData, FontError, FontProperties, GlyphMap, Glyphs, License,
     LicenseError, Panose, Permission, Pitch, Request, Restrictions, Signature, Style,
 };
 #[cfg(feature = "subset")]
-pub use subset::{Allsorts, Subsetter, glyph_ids};
+pub use subset::{Allsorts, Limits, Subsetter, glyph_ids};

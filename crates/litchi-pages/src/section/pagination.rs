@@ -342,3 +342,10 @@ mod tests {
         Ok(())
     }
 }
+
+/// Exact-source transactions for one section's pagination.
+pub mod transaction {
+    pub use crate::package::section_pagination::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+}

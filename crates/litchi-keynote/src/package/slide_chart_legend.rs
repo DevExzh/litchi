@@ -25,7 +25,7 @@ use litchi_iwa_archive::{
 use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes, encode_varint_into,
     varint::encoded_len,
-    wire::{WireField, parse_wire_fields_with_limits},
+    wire::{WireField, parse_wire_fields},
 };
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::keynote_chart_legend_codec::{
@@ -34,9 +34,9 @@ use litchi_iwa_protos::keynote_chart_legend_codec::{
     WireResourceLimit as ChartLegendVisibilityWireResourceLimit, decode_chart_legend,
     prepare_chart_legend_visibility_rewrite,
 };
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
-use super::slide_chart_title::{ChartSelection, ChartTitleError, select_chart};
+use super::slide_chart_title::{ChartSelection, Error as ChartTitleError, select_chart};
 use super::{Package, PhysicalSource, ReadError, SemanticLimitKind};
 use crate::{ChartSelector, SlideSelector};
 
@@ -47,7 +47,7 @@ const MAX_LEGEND_CODEC_BYTES: usize = 64 * 1024 * 1024;
 /// A finite resource governed by one chart-legend visibility operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum ChartLegendVisibilityLimitKind {
+pub enum LimitKind {
     /// Complete input package bytes.
     InputBytes,
     /// Complete rewritten package or payload bytes.
@@ -76,7 +76,7 @@ pub enum ChartLegendVisibilityLimitKind {
     LegendBytes,
 }
 
-impl fmt::Display for ChartLegendVisibilityLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -97,9 +97,44 @@ impl fmt::Display for ChartLegendVisibilityLimitKind {
 }
 
 /// A content-redacted failure raised by a chart-legend visibility operation.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum ChartLegendVisibilityError {
+pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The selected chart graph or generated extension was malformed.
+    #[error("the Keynote chart-legend source cannot be edited safely")]
+    InvalidSource,
+    /// A finite resource ceiling was exceeded.
+    #[error(
+        "Keynote chart-legend visibility {kind} limit exceeded: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        /// Resource category that exceeded its limit.
+        kind: LimitKind,
+        /// Observed or requested amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A bounded destination allocation failed before publication.
+    #[error("could not allocate {amount} units for the Keynote chart-legend transaction")]
+    Allocation { amount: usize },
+    /// Full candidate reopening did not reproduce the requested state.
+    #[error("the edited Keynote chart legend failed semantic verification")]
+    Verification,
+    /// The patch does not belong to this exact immutable package artifact.
+    #[error("the Keynote chart-legend patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The source was not retained as an exact physical package.
     #[error("this Keynote source does not support physical chart-legend edits")]
     UnsupportedSource,
@@ -124,35 +159,35 @@ pub enum ChartLegendVisibilityError {
     /// An empty exact chart name was supplied.
     #[error("the Keynote chart selector name cannot be empty")]
     EmptyChartName,
-    /// The selected chart graph or generated extension was malformed.
-    #[error("the Keynote chart-legend source cannot be edited safely")]
-    InvalidSource,
-    /// A finite resource ceiling was exceeded.
-    #[error(
-        "Keynote chart-legend visibility {kind} limit exceeded: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        /// Resource category that exceeded its limit.
-        kind: ChartLegendVisibilityLimitKind,
-        /// Observed or requested amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-    },
-    /// A bounded destination allocation failed before publication.
-    #[error("could not allocate {amount} units for the Keynote chart-legend transaction")]
-    Allocation { amount: usize },
-    /// Full candidate reopening did not reproduce the requested state.
-    #[error("the edited Keynote chart legend failed semantic verification")]
-    Verification,
-    /// The patch does not belong to this exact immutable package artifact.
-    #[error("the Keynote chart-legend patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+            Self::AmbiguousSelector { .. }
+            | Self::EmptySlideName { .. }
+            | Self::EmptyChartName { .. } => RefusalKind::InvalidValue,
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::ChartNameNotFound { .. }
+            | Self::ChartPositionNotFound { .. } => RefusalKind::NotFound,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// One mutable chart-legend visibility value staged against an immutable
 /// package snapshot.
-pub struct ChartLegendVisibilityEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
     slide_position: Position,
     chart_position: Position,
@@ -163,10 +198,10 @@ pub struct ChartLegendVisibilityEdit<'a> {
     after: bool,
 }
 
-impl fmt::Debug for ChartLegendVisibilityEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("ChartLegendVisibilityEdit")
+            .debug_struct("Edit")
             .field("slide_position", &self.slide_position)
             .field("chart_position", &self.chart_position)
             .field("before", &self.before)
@@ -175,12 +210,12 @@ impl fmt::Debug for ChartLegendVisibilityEdit<'_> {
     }
 }
 
-impl<'a> ChartLegendVisibilityEdit<'a> {
+impl<'a> Edit<'a> {
     fn new<'slide, 'chart>(
         source: &'a Package,
         slide_selector: impl Into<SlideSelector<'slide>>,
         chart_selector: impl Into<ChartSelector<'chart>>,
-    ) -> Result<Self, ChartLegendVisibilityError> {
+    ) -> Result<Self, Error> {
         let selection = select_chart(source, slide_selector.into(), chart_selector.into(), true)
             .map_err(map_chart_title_error)?;
         let before = read_selected_visibility(source, &selection)?;
@@ -228,7 +263,7 @@ impl<'a> ChartLegendVisibilityEdit<'a> {
     }
 
     /// Validate and atomically publish the staged immutable candidate.
-    pub fn commit(self) -> Result<ChartLegendVisibilityCommit, ChartLegendVisibilityError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         let catalog = physical_catalog(self.source)?;
         let source_bytes = catalog.shared_source();
         let source_selection = select_chart(
@@ -244,14 +279,14 @@ impl<'a> ChartLegendVisibilityEdit<'a> {
             || source_selection.slide_identifier != self.slide_identifier
             || current != self.before
         {
-            return Err(ChartLegendVisibilityError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
 
         if self.before == self.after {
             self.source.validate().map_err(map_read_error)?;
-            return Ok(ChartLegendVisibilityCommit {
+            return Ok(Commit {
                 package: self.source.snapshot(),
-                patch: ChartLegendVisibilityPatch {
+                patch: Patch {
                     artifacts: ExactArtifacts::new(Arc::clone(&source_bytes), source_bytes),
                     slide_position: self.slide_position,
                     chart_position: self.chart_position,
@@ -263,12 +298,12 @@ impl<'a> ChartLegendVisibilityEdit<'a> {
                     deleted_previews: 0,
                     target_requires_invalidated_previews: false,
                 },
-                diagnostics: ChartLegendVisibilityDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
 
         if !catalog.source_is_exact() {
-            return Err(ChartLegendVisibilityError::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         self.source.validate().map_err(map_read_error)?;
         let (package, deleted_previews) =
@@ -286,9 +321,9 @@ impl<'a> ChartLegendVisibilityEdit<'a> {
             true,
         )?;
         let target = physical_catalog(&package)?.shared_source();
-        Ok(ChartLegendVisibilityCommit {
+        Ok(Commit {
             package,
-            patch: ChartLegendVisibilityPatch {
+            patch: Patch {
                 artifacts: ExactArtifacts::new(source_bytes, Arc::clone(&target)),
                 slide_position: self.slide_position,
                 chart_position: self.chart_position,
@@ -300,14 +335,14 @@ impl<'a> ChartLegendVisibilityEdit<'a> {
                 deleted_previews,
                 target_requires_invalidated_previews: true,
             },
-            diagnostics: ChartLegendVisibilityDiagnostics::published(deleted_previews),
+            diagnostics: Diagnostics::published(deleted_previews),
         })
     }
 }
 
 /// An exact-source-checked reversible semantic chart-legend patch.
 #[derive(Clone, PartialEq, Eq)]
-pub struct ChartLegendVisibilityPatch {
+pub struct Patch {
     artifacts: ExactArtifacts,
     slide_position: Position,
     chart_position: Position,
@@ -320,10 +355,10 @@ pub struct ChartLegendVisibilityPatch {
     target_requires_invalidated_previews: bool,
 }
 
-impl fmt::Debug for ChartLegendVisibilityPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("ChartLegendVisibilityPatch")
+            .debug_struct("Patch")
             .field("slide_position", &self.slide_position)
             .field("chart_position", &self.chart_position)
             .field("before", &self.before)
@@ -332,7 +367,7 @@ impl fmt::Debug for ChartLegendVisibilityPatch {
     }
 }
 
-impl ChartLegendVisibilityPatch {
+impl Patch {
     /// Return the selected semantic slide position.
     #[must_use]
     pub const fn slide_position(&self) -> Position {
@@ -396,14 +431,14 @@ impl ChartLegendVisibilityPatch {
 
 /// Compact evidence describing one chart-legend visibility commit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ChartLegendVisibilityDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     deleted_previews: usize,
     full_reparse_performed: bool,
 }
 
-impl ChartLegendVisibilityDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -450,13 +485,13 @@ impl ChartLegendVisibilityDiagnostics {
 /// The fully verified result of one immutable chart-legend transaction.
 #[must_use = "a Keynote chart-legend commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct ChartLegendVisibilityCommit {
+pub struct Commit {
     package: Package,
-    patch: ChartLegendVisibilityPatch,
-    diagnostics: ChartLegendVisibilityDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl ChartLegendVisibilityCommit {
+impl Commit {
     /// Borrow the fully reopened immutable package snapshot.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -469,15 +504,21 @@ impl ChartLegendVisibilityCommit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the reversible exact-source patch.
     #[must_use]
-    pub const fn patch(&self) -> &ChartLegendVisibilityPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Borrow compact publication diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> &ChartLegendVisibilityDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
@@ -492,7 +533,7 @@ impl Package {
         &self,
         slide_selector: impl Into<SlideSelector<'slide>>,
         chart_selector: impl Into<ChartSelector<'chart>>,
-    ) -> Result<bool, ChartLegendVisibilityError> {
+    ) -> Result<bool, Error> {
         let selection = select_chart(self, slide_selector.into(), chart_selector.into(), true)
             .map_err(map_chart_title_error)?;
         read_selected_visibility(self, &selection)
@@ -503,19 +544,16 @@ impl Package {
         &self,
         slide_selector: impl Into<SlideSelector<'slide>>,
         chart_selector: impl Into<ChartSelector<'chart>>,
-    ) -> Result<ChartLegendVisibilityEdit<'_>, ChartLegendVisibilityError> {
-        ChartLegendVisibilityEdit::new(self, slide_selector, chart_selector)
+    ) -> Result<Edit<'_>, Error> {
+        Edit::new(self, slide_selector, chart_selector)
     }
 
     /// Apply an exact-source-checked chart-legend patch.
-    pub fn apply_slide_chart_legend(
-        &self,
-        patch: &ChartLegendVisibilityPatch,
-    ) -> Result<ChartLegendVisibilityCommit, ChartLegendVisibilityError> {
+    pub fn apply_slide_chart_legend(&self, patch: &Patch) -> Result<Commit, Error> {
         let catalog = physical_catalog(self)?;
         let source = catalog.shared_source();
         if !patch.artifacts.authorizes_source(&source) {
-            return Err(ChartLegendVisibilityError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let selection = select_chart(
             self,
@@ -530,18 +568,18 @@ impl Package {
             || selection.slide_identifier != patch.slide_identifier
             || current != patch.before
         {
-            return Err(ChartLegendVisibilityError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if patch.is_noop() {
             self.validate().map_err(map_read_error)?;
-            return Ok(ChartLegendVisibilityCommit {
+            return Ok(Commit {
                 package: self.snapshot(),
                 patch: patch.clone(),
-                diagnostics: ChartLegendVisibilityDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         if !catalog.source_is_exact() {
-            return Err(ChartLegendVisibilityError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let candidate =
             Package::from_source_with_options(patch.artifacts.target(), self.state.options)
@@ -558,21 +596,18 @@ impl Package {
             patch.after,
             patch.target_requires_invalidated_previews,
         )?;
-        Ok(ChartLegendVisibilityCommit {
+        Ok(Commit {
             package: candidate,
             patch: patch.clone(),
-            diagnostics: ChartLegendVisibilityDiagnostics::published(patch.deleted_previews),
+            diagnostics: Diagnostics::published(patch.deleted_previews),
         })
     }
 }
 
-fn read_selected_visibility(
-    package: &Package,
-    selection: &ChartSelection,
-) -> Result<bool, ChartLegendVisibilityError> {
+fn read_selected_visibility(package: &Package, selection: &ChartSelection) -> Result<bool, Error> {
     let (_, object) = package
         .object_with_component(selection.non_style_identifier)
-        .ok_or(ChartLegendVisibilityError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let message = exactly_one_message(object, CHART_NON_STYLE_MESSAGE_TYPE)?;
     read_chart_legend_visibility(
         message.data.as_slice(),
@@ -580,11 +615,8 @@ fn read_selected_visibility(
     )
 }
 
-fn read_chart_legend_visibility(
-    data: &[u8],
-    limits: WireLimits,
-) -> Result<bool, ChartLegendVisibilityError> {
-    let fields = parse_wire_fields_with_limits(data, limits).map_err(map_wire_error)?;
+fn read_chart_legend_visibility(data: &[u8], limits: WireLimits) -> Result<bool, Error> {
+    let fields = parse_wire_fields(data, limits).map_err(map_wire_error)?;
     let mut extension = None;
     for field in fields
         .iter()
@@ -592,7 +624,7 @@ fn read_chart_legend_visibility(
         .filter(|field| field.number() == GENERATED_CHART_NON_STYLE_EXTENSION_FIELD)
     {
         if extension.is_some() || field.wire_type() != 2 {
-            return Err(ChartLegendVisibilityError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field
             .validate_canonical_framing(data)
@@ -611,15 +643,15 @@ fn rewrite_chart_legend(
     source: &Package,
     selection: &ChartSelection,
     visible: bool,
-) -> Result<(Package, usize), ChartLegendVisibilityError> {
+) -> Result<(Package, usize), Error> {
     let catalog = physical_catalog(source)?;
     let entry = catalog
         .package()
         .iter()
         .find(|entry| entry.name() == selection.non_style_component_name)
-        .ok_or(ChartLegendVisibilityError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(ChartLegendVisibilityError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let archive_limits = source
         .state
@@ -627,7 +659,13 @@ fn rewrite_chart_legend(
         .archive()
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    let stream = SnappyStream::decompress_with_limits(
+    let snappy_limits = source
+        .state
+        .options
+        .archive()
+        .snappy_limits()
+        .map_err(map_archive_error)?;
+    let stream = SnappyStream::decompress(
         entry.data(),
         source
             .state
@@ -637,23 +675,22 @@ fn rewrite_chart_legend(
             .map_err(map_archive_error)?,
     )
     .map_err(map_core_error)?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     validate_canonical_object_length_prefixes(stream.as_bytes(), &archive)?;
     let (message_index, message_data) = {
         let object = archive
             .object(selection.non_style_identifier)
-            .ok_or(ChartLegendVisibilityError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let mut index = None;
         for (candidate, message) in object.messages.iter().enumerate() {
             if message.type_ != CHART_NON_STYLE_MESSAGE_TYPE {
                 continue;
             }
             if index.replace(candidate).is_some() {
-                return Err(ChartLegendVisibilityError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
-        let index = index.ok_or(ChartLegendVisibilityError::InvalidSource)?;
+        let index = index.ok_or(Error::InvalidSource)?;
         (index, object.messages[index].data.as_slice())
     };
     let limits = source.wire_limits().map_err(map_wire_error)?;
@@ -664,8 +701,8 @@ fn rewrite_chart_legend(
     let patched = patch_chart_non_style_visibility(message_data, visible, limits)?;
     archive
         .object_mut(selection.non_style_identifier)
-        .ok_or(ChartLegendVisibilityError::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .ok_or(Error::InvalidSource)?
+        .replace_message_preserving_header(
             message_index,
             RawMessage {
                 type_: CHART_NON_STYLE_MESSAGE_TYPE,
@@ -674,10 +711,8 @@ fn rewrite_chart_legend(
             archive_limits,
         )
         .map_err(map_core_error)?;
-    let bytes = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
-    let compressed = SnappyStream::compress(&bytes).map_err(map_core_error)?;
+    let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
     let edit = EntryEdit::new(
         selection.non_style_component_name.as_str(),
         compressed.as_slice(),
@@ -702,8 +737,8 @@ fn patch_chart_non_style_visibility(
     data: &[u8],
     visible: bool,
     limits: WireLimits,
-) -> Result<Vec<u8>, ChartLegendVisibilityError> {
-    let fields = parse_wire_fields_with_limits(data, limits).map_err(map_wire_error)?;
+) -> Result<Vec<u8>, Error> {
+    let fields = parse_wire_fields(data, limits).map_err(map_wire_error)?;
     let extension_field = fields
         .iter()
         .copied()
@@ -714,11 +749,11 @@ fn patch_chart_non_style_visibility(
         .count()
         > 1
     {
-        return Err(ChartLegendVisibilityError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if let Some(field) = extension_field {
         if field.wire_type() != 2 {
-            return Err(ChartLegendVisibilityError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field
             .validate_canonical_framing(data)
@@ -747,9 +782,8 @@ fn rewrite_chart_non_style_extension(
     extension_field: Option<WireField>,
     replacement: &[u8],
     limits: WireLimits,
-) -> Result<Vec<u8>, ChartLegendVisibilityError> {
-    let replacement_length =
-        u64::try_from(replacement.len()).map_err(|_| ChartLegendVisibilityError::InvalidSource)?;
+) -> Result<Vec<u8>, Error> {
+    let replacement_length = u64::try_from(replacement.len()).map_err(|_| Error::InvalidSource)?;
     let key_length = extension_field.map_or_else(
         || encoded_len((u64::from(GENERATED_CHART_NON_STYLE_EXTENSION_FIELD) << 3) | 2),
         |field| field.key_end() - field.start(),
@@ -757,7 +791,7 @@ fn rewrite_chart_non_style_extension(
     let replacement_field_length = key_length
         .checked_add(encoded_len(replacement_length))
         .and_then(|length| length.checked_add(replacement.len()))
-        .ok_or(ChartLegendVisibilityError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let output_length = extension_field
         .map_or_else(
             || data.len().checked_add(replacement_field_length),
@@ -767,20 +801,20 @@ fn rewrite_chart_non_style_extension(
                     .and_then(|length| length.checked_add(replacement_field_length))
             },
         )
-        .ok_or(ChartLegendVisibilityError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if output_length > limits.max_output_bytes() {
-        return Err(ChartLegendVisibilityError::LimitExceeded {
-            kind: ChartLegendVisibilityLimitKind::OutputBytes,
+        return Err(Error::Limit {
+            kind: LimitKind::OutputBytes,
             observed: usize_to_u64(output_length),
             maximum: usize_to_u64(limits.max_output_bytes()),
         });
     }
     let mut output = Vec::new();
-    output.try_reserve_exact(output_length).map_err(|_| {
-        ChartLegendVisibilityError::Allocation {
+    output
+        .try_reserve_exact(output_length)
+        .map_err(|_| Error::Allocation {
             amount: output_length,
-        }
-    })?;
+        })?;
     match extension_field {
         Some(field) => {
             output.extend_from_slice(&data[..field.start()]);
@@ -813,9 +847,9 @@ fn verify_chart_candidate(
     slide_identifier: u64,
     expected_visibility: bool,
     require_invalidated_previews: bool,
-) -> Result<(), ChartLegendVisibilityError> {
+) -> Result<(), Error> {
     if source.state.total_objects != candidate.state.total_objects {
-        return Err(ChartLegendVisibilityError::Verification);
+        return Err(Error::Verification);
     }
     let source_selection = select_chart(
         source,
@@ -839,13 +873,13 @@ fn verify_chart_candidate(
         || candidate_selection.slide_identifier != slide_identifier
         || source_selection.title != candidate_selection.title
     {
-        return Err(ChartLegendVisibilityError::Verification);
+        return Err(Error::Verification);
     }
     if read_selected_visibility(candidate, &candidate_selection)? != expected_visibility {
-        return Err(ChartLegendVisibilityError::Verification);
+        return Err(Error::Verification);
     }
     if source.show().map_err(map_read_error)? != candidate.show().map_err(map_read_error)? {
-        return Err(ChartLegendVisibilityError::Verification);
+        return Err(Error::Verification);
     }
     verify_chart_package_locality(
         source,
@@ -862,7 +896,7 @@ fn verify_chart_package_locality(
     selected_component_name: &str,
     selected_identifier: u64,
     require_invalidated_previews: bool,
-) -> Result<(), ChartLegendVisibilityError> {
+) -> Result<(), Error> {
     let source_catalog = physical_catalog(source)?;
     let candidate_catalog = physical_catalog(candidate)?;
     let source_previews =
@@ -872,7 +906,7 @@ fn verify_chart_package_locality(
         super::rendering_invalidation::root_preview_deletions(candidate_catalog.package())
             .map_err(map_rendering_error)?;
     if require_invalidated_previews && !candidate_previews.names().is_empty() {
-        return Err(ChartLegendVisibilityError::Verification);
+        return Err(Error::Verification);
     }
 
     // Reassembly can remove the three exact root preview members and relocate
@@ -894,18 +928,18 @@ fn verify_chart_package_locality(
                     || (!selected && !same_unselected_package_entry(source_entry, candidate_entry))
                     || (selected && !same_selected_package_entry(source_entry, candidate_entry))
                 {
-                    return Err(ChartLegendVisibilityError::Verification);
+                    return Err(Error::Verification);
                 }
             },
             (None, None) => break,
-            _ => return Err(ChartLegendVisibilityError::Verification),
+            _ => return Err(Error::Verification),
         }
     }
 
     let source_components = source_catalog.components();
     let candidate_components = candidate_catalog.components();
     if source_components.len() != candidate_components.len() {
-        return Err(ChartLegendVisibilityError::Verification);
+        return Err(Error::Verification);
     }
     let archive_limits = source
         .state
@@ -921,7 +955,7 @@ fn verify_chart_package_locality(
             || source_component.archive().objects.len()
                 != candidate_component.archive().objects.len()
         {
-            return Err(ChartLegendVisibilityError::Verification);
+            return Err(Error::Verification);
         }
         if source_component.name() != selected_component_name {
             for (source_object, candidate_object) in source_component
@@ -931,7 +965,7 @@ fn verify_chart_package_locality(
                 .zip(&candidate_component.archive().objects)
             {
                 if !source_object.same_content_ignoring_offsets(candidate_object) {
-                    return Err(ChartLegendVisibilityError::Verification);
+                    return Err(Error::Verification);
                 }
             }
             continue;
@@ -945,7 +979,7 @@ fn verify_chart_package_locality(
         )?;
     }
     if !selected_component_seen {
-        return Err(ChartLegendVisibilityError::Verification);
+        return Err(Error::Verification);
     }
     Ok(())
 }
@@ -954,25 +988,25 @@ fn verify_selected_chart_component(
     source: &Archive,
     candidate: &Archive,
     selected_identifier: u64,
-    archive_limits: litchi_iwa_core::ArchiveLimits,
-) -> Result<(), ChartLegendVisibilityError> {
+    archive_limits: litchi_iwa_core::Limits,
+) -> Result<(), Error> {
     let mut selected_seen = false;
     for (source_object, candidate_object) in source.objects.iter().zip(&candidate.objects) {
         if source_object.archive_info.identifier != candidate_object.archive_info.identifier {
-            return Err(ChartLegendVisibilityError::Verification);
+            return Err(Error::Verification);
         }
         let identifier = source_object
             .archive_info
             .identifier
-            .ok_or(ChartLegendVisibilityError::Verification)?;
+            .ok_or(Error::Verification)?;
         if identifier != selected_identifier {
             if !source_object.same_content_ignoring_offsets(candidate_object) {
-                return Err(ChartLegendVisibilityError::Verification);
+                return Err(Error::Verification);
             }
             continue;
         }
         if std::mem::replace(&mut selected_seen, true) {
-            return Err(ChartLegendVisibilityError::Verification);
+            return Err(Error::Verification);
         }
         let selected_message_index =
             unique_message_index(source_object, CHART_NON_STYLE_MESSAGE_TYPE)?;
@@ -984,7 +1018,7 @@ fn verify_selected_chart_component(
         )?;
     }
     if !selected_seen {
-        return Err(ChartLegendVisibilityError::Verification);
+        return Err(Error::Verification);
     }
     Ok(())
 }
@@ -993,14 +1027,14 @@ fn verify_selected_chart_object(
     source: &ArchiveObject,
     candidate: &ArchiveObject,
     selected_message_index: usize,
-    archive_limits: litchi_iwa_core::ArchiveLimits,
-) -> Result<(), ChartLegendVisibilityError> {
+    archive_limits: litchi_iwa_core::Limits,
+) -> Result<(), Error> {
     if source.archive_info.identifier != candidate.archive_info.identifier
         || source.archive_info.should_merge != candidate.archive_info.should_merge
         || source.messages.len() != candidate.messages.len()
         || source.archive_info.message_infos.len() != candidate.archive_info.message_infos.len()
     {
-        return Err(ChartLegendVisibilityError::Verification);
+        return Err(Error::Verification);
     }
     for (index, ((source_message, candidate_message), (source_info, candidate_info))) in source
         .messages
@@ -1019,10 +1053,10 @@ fn verify_selected_chart_object(
             if source_message.type_ != candidate_message.type_
                 || !message_info_equal_except_length(source_info, candidate_info)
             {
-                return Err(ChartLegendVisibilityError::Verification);
+                return Err(Error::Verification);
             }
         } else if source_message != candidate_message || source_info != candidate_info {
-            return Err(ChartLegendVisibilityError::Verification);
+            return Err(Error::Verification);
         }
     }
 
@@ -1032,11 +1066,11 @@ fn verify_selected_chart_object(
     let candidate_message = candidate
         .messages
         .get(selected_message_index)
-        .ok_or(ChartLegendVisibilityError::Verification)?
+        .ok_or(Error::Verification)?
         .clone();
     let mut expected = source.clone();
     expected
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             selected_message_index,
             candidate_message,
             archive_limits,
@@ -1045,25 +1079,22 @@ fn verify_selected_chart_object(
     expected.header_length = candidate.header_length;
     expected.data_length = candidate.data_length;
     if !expected.same_content_ignoring_offsets(candidate) {
-        return Err(ChartLegendVisibilityError::Verification);
+        return Err(Error::Verification);
     }
     Ok(())
 }
 
-fn unique_message_index(
-    object: &ArchiveObject,
-    message_type: u32,
-) -> Result<usize, ChartLegendVisibilityError> {
+fn unique_message_index(object: &ArchiveObject, message_type: u32) -> Result<usize, Error> {
     let mut selected = None;
     for (index, message) in object.messages.iter().enumerate() {
         if message.type_ != message_type {
             continue;
         }
         if selected.replace(index).is_some() {
-            return Err(ChartLegendVisibilityError::Verification);
+            return Err(Error::Verification);
         }
     }
-    selected.ok_or(ChartLegendVisibilityError::Verification)
+    selected.ok_or(Error::Verification)
 }
 
 fn same_unselected_package_entry(
@@ -1262,66 +1293,52 @@ fn message_info_equal_except_length(
         && source.diff_read_version == candidate.diff_read_version
 }
 
-fn exactly_one_message(
-    object: &ArchiveObject,
-    message_type: u32,
-) -> Result<&RawMessage, ChartLegendVisibilityError> {
+fn exactly_one_message(object: &ArchiveObject, message_type: u32) -> Result<&RawMessage, Error> {
     let mut selected = None;
     for message in &object.messages {
         if message.type_ != message_type {
             continue;
         }
         if selected.replace(message).is_some() {
-            return Err(ChartLegendVisibilityError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
-    selected.ok_or(ChartLegendVisibilityError::InvalidSource)
+    selected.ok_or(Error::InvalidSource)
 }
 
 fn validate_canonical_object_length_prefixes(
     source: &[u8],
     archive: &Archive,
-) -> Result<(), ChartLegendVisibilityError> {
+) -> Result<(), Error> {
     for object in &archive.objects {
-        let offset = usize::try_from(object.header_offset)
-            .map_err(|_| ChartLegendVisibilityError::InvalidSource)?;
-        let remaining = source
-            .get(offset..)
-            .ok_or(ChartLegendVisibilityError::InvalidSource)?;
-        let (header_bytes, prefix_bytes) = decode_varint_from_bytes(remaining)
-            .map_err(|_| ChartLegendVisibilityError::InvalidSource)?;
+        let offset = usize::try_from(object.header_offset).map_err(|_| Error::InvalidSource)?;
+        let remaining = source.get(offset..).ok_or(Error::InvalidSource)?;
+        let (header_bytes, prefix_bytes) =
+            decode_varint_from_bytes(remaining).map_err(|_| Error::InvalidSource)?;
         if prefix_bytes != encoded_len(header_bytes) {
-            return Err(ChartLegendVisibilityError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let framed_header_bytes = header_bytes
-            .checked_add(
-                u64::try_from(prefix_bytes)
-                    .map_err(|_| ChartLegendVisibilityError::InvalidSource)?,
-            )
-            .ok_or(ChartLegendVisibilityError::InvalidSource)?;
+            .checked_add(u64::try_from(prefix_bytes).map_err(|_| Error::InvalidSource)?)
+            .ok_or(Error::InvalidSource)?;
         if framed_header_bytes != object.header_length
             || object
                 .header_offset
                 .checked_add(object.header_length)
-                .ok_or(ChartLegendVisibilityError::InvalidSource)?
+                .ok_or(Error::InvalidSource)?
                 != object.data_offset
         {
-            return Err(ChartLegendVisibilityError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(())
 }
 
-fn legend_decode_options(
-    source: &[u8],
-    limits: WireLimits,
-) -> Result<DecodeOptions, ChartLegendVisibilityError> {
-    let recursion_limit = u32::try_from(limits.max_nesting()).map_err(|_| {
-        ChartLegendVisibilityError::LimitExceeded {
-            kind: ChartLegendVisibilityLimitKind::WireNesting,
-            observed: usize_to_u64(limits.max_nesting()),
-            maximum: u64::from(u32::MAX),
-        }
+fn legend_decode_options(source: &[u8], limits: WireLimits) -> Result<DecodeOptions, Error> {
+    let recursion_limit = u32::try_from(limits.max_nesting()).map_err(|_| Error::Limit {
+        kind: LimitKind::WireNesting,
+        observed: usize_to_u64(limits.max_nesting()),
+        maximum: u64::from(u32::MAX),
     })?;
     let source_limit = source.len().max(1);
     let codec_input = source_limit.min(MAX_LEGEND_CODEC_BYTES);
@@ -1344,163 +1361,157 @@ fn legend_decode_options(
     )
 }
 
-fn physical_catalog(package: &Package) -> Result<&SourceCatalog, ChartLegendVisibilityError> {
+fn physical_catalog(package: &Package) -> Result<&SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
-        PhysicalSource::Semantic(_) => Err(ChartLegendVisibilityError::UnsupportedSource),
+        PhysicalSource::Semantic(_) => Err(Error::Refused(Refusal::UnsupportedSource)),
     }
 }
 
-fn map_chart_title_error(error: ChartTitleError) -> ChartLegendVisibilityError {
+fn map_chart_title_error(error: ChartTitleError) -> Error {
     match error {
-        ChartTitleError::UnsupportedSource => ChartLegendVisibilityError::UnsupportedSource,
-        ChartTitleError::AmbiguousSelector => ChartLegendVisibilityError::AmbiguousSelector,
-        ChartTitleError::EmptySlideName => ChartLegendVisibilityError::EmptySlideName,
-        ChartTitleError::SlideNameNotFound => ChartLegendVisibilityError::SlideNameNotFound,
-        ChartTitleError::SlidePositionNotFound { position } => {
-            ChartLegendVisibilityError::SlidePositionNotFound { position }
+        ChartTitleError::Refused(crate::chart::title::Refusal::UnsupportedSource) => {
+            Error::Refused(Refusal::UnsupportedSource)
         },
-        ChartTitleError::ChartNameNotFound => ChartLegendVisibilityError::ChartNameNotFound,
-        ChartTitleError::ChartPositionNotFound { position } => {
-            ChartLegendVisibilityError::ChartPositionNotFound { position }
+        ChartTitleError::Refused(crate::chart::title::Refusal::AmbiguousSelector) => {
+            Error::Refused(Refusal::AmbiguousSelector)
         },
-        ChartTitleError::EmptyChartName => ChartLegendVisibilityError::EmptyChartName,
-        ChartTitleError::LimitExceeded {
+        ChartTitleError::Refused(crate::chart::title::Refusal::EmptySlideName) => {
+            Error::Refused(Refusal::EmptySlideName)
+        },
+        ChartTitleError::Refused(crate::chart::title::Refusal::SlideNameNotFound) => {
+            Error::Refused(Refusal::SlideNameNotFound)
+        },
+        ChartTitleError::Refused(crate::chart::title::Refusal::SlidePositionNotFound {
+            position,
+        }) => Error::Refused(Refusal::SlidePositionNotFound { position }),
+        ChartTitleError::Refused(crate::chart::title::Refusal::ChartNameNotFound) => {
+            Error::Refused(Refusal::ChartNameNotFound)
+        },
+        ChartTitleError::Refused(crate::chart::title::Refusal::ChartPositionNotFound {
+            position,
+        }) => Error::Refused(Refusal::ChartPositionNotFound { position }),
+        ChartTitleError::Refused(crate::chart::title::Refusal::EmptyChartName) => {
+            Error::Refused(Refusal::EmptyChartName)
+        },
+        ChartTitleError::Limit {
             kind,
             observed,
             maximum,
-        } => ChartLegendVisibilityError::LimitExceeded {
+        } => Error::Limit {
             kind: map_chart_title_limit(kind),
             observed,
             maximum,
         },
-        ChartTitleError::Allocation { amount } => ChartLegendVisibilityError::Allocation { amount },
-        _ => ChartLegendVisibilityError::InvalidSource,
+        ChartTitleError::Allocation { amount } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_chart_title_limit(
-    kind: super::slide_chart_title::ChartTitleLimitKind,
-) -> ChartLegendVisibilityLimitKind {
-    use super::slide_chart_title::ChartTitleLimitKind;
+fn map_chart_title_limit(kind: super::slide_chart_title::LimitKind) -> LimitKind {
+    use super::slide_chart_title::LimitKind as ChartTitleLimitKind;
     match kind {
-        ChartTitleLimitKind::InputBytes => ChartLegendVisibilityLimitKind::InputBytes,
-        ChartTitleLimitKind::OutputBytes => ChartLegendVisibilityLimitKind::OutputBytes,
-        ChartTitleLimitKind::WireBytes => ChartLegendVisibilityLimitKind::WireBytes,
-        ChartTitleLimitKind::Entries => ChartLegendVisibilityLimitKind::Entries,
-        ChartTitleLimitKind::EntryBytes => ChartLegendVisibilityLimitKind::EntryBytes,
-        ChartTitleLimitKind::TotalBytes => ChartLegendVisibilityLimitKind::TotalBytes,
-        ChartTitleLimitKind::Slides => ChartLegendVisibilityLimitKind::Slides,
-        ChartTitleLimitKind::References => ChartLegendVisibilityLimitKind::References,
-        ChartTitleLimitKind::WireFields => ChartLegendVisibilityLimitKind::WireFields,
-        ChartTitleLimitKind::WireNesting => ChartLegendVisibilityLimitKind::WireNesting,
-        ChartTitleLimitKind::WireWork => ChartLegendVisibilityLimitKind::WireWork,
-        _ => ChartLegendVisibilityLimitKind::LegendBytes,
+        ChartTitleLimitKind::InputBytes => LimitKind::InputBytes,
+        ChartTitleLimitKind::OutputBytes => LimitKind::OutputBytes,
+        ChartTitleLimitKind::WireBytes => LimitKind::WireBytes,
+        ChartTitleLimitKind::Entries => LimitKind::Entries,
+        ChartTitleLimitKind::EntryBytes => LimitKind::EntryBytes,
+        ChartTitleLimitKind::TotalBytes => LimitKind::TotalBytes,
+        ChartTitleLimitKind::Slides => LimitKind::Slides,
+        ChartTitleLimitKind::References => LimitKind::References,
+        // The shared graph proof does not retain caller selector names for
+        // legend reads; keep this defensive forwarding path in the family's
+        // aggregate byte category.
+        ChartTitleLimitKind::SelectorBytes => LimitKind::LegendBytes,
+        ChartTitleLimitKind::WireFields => LimitKind::WireFields,
+        ChartTitleLimitKind::WireNesting => LimitKind::WireNesting,
+        ChartTitleLimitKind::WireWork => LimitKind::WireWork,
+        _ => LimitKind::LegendBytes,
     }
 }
 
-fn map_legend_codec_error(error: ChartLegendVisibilityDecodeError) -> ChartLegendVisibilityError {
+fn map_legend_codec_error(error: ChartLegendVisibilityDecodeError) -> Error {
     if let Some(limit) = error.resource_limit() {
         return match limit {
-            ChartLegendVisibilityDecodeLimit::Bytes { observed, maximum } => {
-                ChartLegendVisibilityError::LimitExceeded {
-                    kind: ChartLegendVisibilityLimitKind::WireBytes,
-                    observed: usize_to_u64(observed),
-                    maximum: usize_to_u64(maximum),
-                }
+            ChartLegendVisibilityDecodeLimit::Bytes { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireBytes,
+                observed: usize_to_u64(observed),
+                maximum: usize_to_u64(maximum),
             },
-            ChartLegendVisibilityDecodeLimit::Fields { observed, maximum } => {
-                ChartLegendVisibilityError::LimitExceeded {
-                    kind: ChartLegendVisibilityLimitKind::WireFields,
-                    observed: usize_to_u64(observed),
-                    maximum: usize_to_u64(maximum),
-                }
+            ChartLegendVisibilityDecodeLimit::Fields { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireFields,
+                observed: usize_to_u64(observed),
+                maximum: usize_to_u64(maximum),
             },
-            ChartLegendVisibilityDecodeLimit::Work { observed, maximum } => {
-                ChartLegendVisibilityError::LimitExceeded {
-                    kind: ChartLegendVisibilityLimitKind::WireWork,
-                    observed: usize_to_u64(observed),
-                    maximum: usize_to_u64(maximum),
-                }
+            ChartLegendVisibilityDecodeLimit::Work { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireWork,
+                observed: usize_to_u64(observed),
+                maximum: usize_to_u64(maximum),
             },
-            ChartLegendVisibilityDecodeLimit::Output { observed, maximum } => {
-                ChartLegendVisibilityError::LimitExceeded {
-                    kind: ChartLegendVisibilityLimitKind::OutputBytes,
-                    observed: usize_to_u64(observed),
-                    maximum: usize_to_u64(maximum),
-                }
+            ChartLegendVisibilityDecodeLimit::Output { observed, maximum } => Error::Limit {
+                kind: LimitKind::OutputBytes,
+                observed: usize_to_u64(observed),
+                maximum: usize_to_u64(maximum),
             },
-            ChartLegendVisibilityDecodeLimit::Nesting { observed, maximum } => {
-                ChartLegendVisibilityError::LimitExceeded {
-                    kind: ChartLegendVisibilityLimitKind::WireNesting,
-                    observed: u64::from(observed),
-                    maximum: u64::from(maximum),
-                }
+            ChartLegendVisibilityDecodeLimit::Nesting { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireNesting,
+                observed: u64::from(observed),
+                maximum: u64::from(maximum),
             },
-            ChartLegendVisibilityDecodeLimit::Allocations { observed, maximum } => {
-                ChartLegendVisibilityError::LimitExceeded {
-                    kind: ChartLegendVisibilityLimitKind::Allocations,
-                    observed: usize_to_u64(observed),
-                    maximum: usize_to_u64(maximum),
-                }
+            ChartLegendVisibilityDecodeLimit::Allocations { observed, maximum } => Error::Limit {
+                kind: LimitKind::Allocations,
+                observed: usize_to_u64(observed),
+                maximum: usize_to_u64(maximum),
             },
             ChartLegendVisibilityDecodeLimit::Retained { observed, maximum }
-            | ChartLegendVisibilityDecodeLimit::Scratch { observed, maximum } => {
-                ChartLegendVisibilityError::LimitExceeded {
-                    kind: ChartLegendVisibilityLimitKind::TotalBytes,
-                    observed: usize_to_u64(observed),
-                    maximum: usize_to_u64(maximum),
-                }
+            | ChartLegendVisibilityDecodeLimit::Scratch { observed, maximum } => Error::Limit {
+                kind: LimitKind::TotalBytes,
+                observed: usize_to_u64(observed),
+                maximum: usize_to_u64(maximum),
             },
-            _ => ChartLegendVisibilityError::InvalidSource,
+            _ => Error::InvalidSource,
         };
     }
     if let Some(limit) = error.wire_resource_limit() {
         return match limit {
-            ChartLegendVisibilityWireResourceLimit::Bytes { observed, maximum } => {
-                ChartLegendVisibilityError::LimitExceeded {
-                    kind: ChartLegendVisibilityLimitKind::WireBytes,
-                    observed: usize_to_u64(observed),
-                    maximum: usize_to_u64(maximum),
-                }
+            ChartLegendVisibilityWireResourceLimit::Bytes { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireBytes,
+                observed: usize_to_u64(observed),
+                maximum: usize_to_u64(maximum),
             },
-            ChartLegendVisibilityWireResourceLimit::Nesting { observed, maximum } => {
-                ChartLegendVisibilityError::LimitExceeded {
-                    kind: ChartLegendVisibilityLimitKind::WireNesting,
-                    observed: u64::from(observed),
-                    maximum: u64::from(maximum),
-                }
+            ChartLegendVisibilityWireResourceLimit::Nesting { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireNesting,
+                observed: u64::from(observed),
+                maximum: u64::from(maximum),
             },
-            _ => ChartLegendVisibilityError::InvalidSource,
+            _ => Error::InvalidSource,
         };
     }
     if let Some(amount) = error.allocation_amount() {
-        return ChartLegendVisibilityError::Allocation { amount };
+        return Error::Allocation { amount };
     }
-    ChartLegendVisibilityError::InvalidSource
+    Error::InvalidSource
 }
 
-fn map_rendering_error(
-    _error: super::rendering_invalidation::RenderingInvalidationError,
-) -> ChartLegendVisibilityError {
-    ChartLegendVisibilityError::InvalidSource
+fn map_rendering_error(_error: super::rendering_invalidation::RenderingInvalidationError) -> Error {
+    Error::InvalidSource
 }
 
-fn map_read_error(error: ReadError) -> ChartLegendVisibilityError {
+fn map_read_error(error: ReadError) -> Error {
     match error {
         ReadError::SemanticLimit {
             kind,
             observed,
             maximum,
             ..
-        } => ChartLegendVisibilityError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                SemanticLimitKind::Objects => ChartLegendVisibilityLimitKind::Entries,
-                SemanticLimitKind::Slides => ChartLegendVisibilityLimitKind::Slides,
-                SemanticLimitKind::References => ChartLegendVisibilityLimitKind::References,
+                SemanticLimitKind::Objects => LimitKind::Entries,
+                SemanticLimitKind::Slides => LimitKind::Slides,
+                SemanticLimitKind::References => LimitKind::References,
                 SemanticLimitKind::TextStorages
                 | SemanticLimitKind::TextFragments
-                | SemanticLimitKind::TextBytes => ChartLegendVisibilityLimitKind::WireFields,
+                | SemanticLimitKind::TextBytes => LimitKind::WireFields,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
@@ -1510,71 +1521,57 @@ fn map_read_error(error: ReadError) -> ChartLegendVisibilityError {
             observed,
             maximum,
             ..
-        } => ChartLegendVisibilityError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                super::PayloadLimitKind::Bytes => ChartLegendVisibilityLimitKind::WireBytes,
-                super::PayloadLimitKind::Fields => ChartLegendVisibilityLimitKind::WireFields,
-                super::PayloadLimitKind::Nesting => ChartLegendVisibilityLimitKind::WireNesting,
-                super::PayloadLimitKind::Work => ChartLegendVisibilityLimitKind::WireWork,
+                super::PayloadLimitKind::Bytes => LimitKind::WireBytes,
+                super::PayloadLimitKind::Fields => LimitKind::WireFields,
+                super::PayloadLimitKind::Nesting => LimitKind::WireNesting,
+                super::PayloadLimitKind::Work => LimitKind::WireWork,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         },
-        ReadError::Allocation { amount, .. } => ChartLegendVisibilityError::Allocation { amount },
-        _ => ChartLegendVisibilityError::InvalidSource,
+        ReadError::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_archive_error(error: litchi_iwa_archive::Error) -> ChartLegendVisibilityError {
+fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     match error {
         litchi_iwa_archive::Error::Limit {
             kind,
             observed,
             maximum,
-        } => ChartLegendVisibilityError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_archive::LimitKind::InputBytes => {
-                    ChartLegendVisibilityLimitKind::InputBytes
-                },
-                litchi_iwa_archive::LimitKind::OutputBytes => {
-                    ChartLegendVisibilityLimitKind::OutputBytes
-                },
-                litchi_iwa_archive::LimitKind::Entries => ChartLegendVisibilityLimitKind::Entries,
-                litchi_iwa_archive::LimitKind::EntryBytes => {
-                    ChartLegendVisibilityLimitKind::EntryBytes
-                },
-                litchi_iwa_archive::LimitKind::TotalBytes => {
-                    ChartLegendVisibilityLimitKind::TotalBytes
-                },
-                _ => ChartLegendVisibilityLimitKind::WireBytes,
+                litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
+                litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_archive::LimitKind::Entries => LimitKind::Entries,
+                litchi_iwa_archive::LimitKind::EntryBytes => LimitKind::EntryBytes,
+                litchi_iwa_archive::LimitKind::TotalBytes => LimitKind::TotalBytes,
+                _ => LimitKind::WireBytes,
             },
             observed,
             maximum,
         },
-        litchi_iwa_archive::Error::Allocation { amount, .. } => {
-            ChartLegendVisibilityError::Allocation { amount }
-        },
-        _ => ChartLegendVisibilityError::InvalidSource,
+        litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_core_error(error: litchi_iwa_core::Error) -> ChartLegendVisibilityError {
+fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
             kind,
             observed,
             maximum,
-        } => ChartLegendVisibilityError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_core::LimitKind::ArchiveBytes => {
-                    ChartLegendVisibilityLimitKind::TotalBytes
-                },
+                litchi_iwa_core::LimitKind::ArchiveBytes => LimitKind::TotalBytes,
                 litchi_iwa_core::LimitKind::Objects
                 | litchi_iwa_core::LimitKind::Messages
                 | litchi_iwa_core::LimitKind::MessagesPerObject
-                | litchi_iwa_core::LimitKind::MetadataItems => {
-                    ChartLegendVisibilityLimitKind::Entries
-                },
+                | litchi_iwa_core::LimitKind::MetadataItems => LimitKind::Entries,
                 litchi_iwa_core::LimitKind::ObjectBytes
                 | litchi_iwa_core::LimitKind::MessageBytes
                 | litchi_iwa_core::LimitKind::HeaderBytes
@@ -1582,64 +1579,44 @@ fn map_core_error(error: litchi_iwa_core::Error) -> ChartLegendVisibilityError {
                 | litchi_iwa_core::LimitKind::SnappyChunkBytes
                 | litchi_iwa_core::LimitKind::SnappyStreamBytes
                 | litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
-                | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes => {
-                    ChartLegendVisibilityLimitKind::WireBytes
-                },
-                litchi_iwa_core::LimitKind::HeaderFields => {
-                    ChartLegendVisibilityLimitKind::WireFields
-                },
-                litchi_iwa_core::LimitKind::HeaderNesting => {
-                    ChartLegendVisibilityLimitKind::WireNesting
-                },
-                litchi_iwa_core::LimitKind::SnappyFrames => {
-                    ChartLegendVisibilityLimitKind::WireWork
-                },
+                | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes => LimitKind::WireBytes,
+                litchi_iwa_core::LimitKind::HeaderFields => LimitKind::WireFields,
+                litchi_iwa_core::LimitKind::HeaderNesting => LimitKind::WireNesting,
+                litchi_iwa_core::LimitKind::SnappyFrames => LimitKind::WireWork,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         },
         litchi_iwa_core::Error::Allocation { requested, .. } => {
-            ChartLegendVisibilityError::Allocation { amount: requested }
+            Error::Allocation { amount: requested }
         },
-        _ => ChartLegendVisibilityError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_wire_error(error: litchi_iwa_common::Error) -> ChartLegendVisibilityError {
+fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
     match error {
         litchi_iwa_common::Error::LimitExceeded {
             kind,
             observed,
             limit,
-        } => ChartLegendVisibilityError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_common::LimitKind::InputBytes => {
-                    ChartLegendVisibilityLimitKind::WireBytes
-                },
-                litchi_iwa_common::LimitKind::OutputBytes => {
-                    ChartLegendVisibilityLimitKind::OutputBytes
-                },
+                litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
+                litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,
                 litchi_iwa_common::LimitKind::Fields
                 | litchi_iwa_common::LimitKind::TableRows
                 | litchi_iwa_common::LimitKind::TableColumns
                 | litchi_iwa_common::LimitKind::TableCells
-                | litchi_iwa_common::LimitKind::MaterializedCells => {
-                    ChartLegendVisibilityLimitKind::WireFields
-                },
-                litchi_iwa_common::LimitKind::Nesting => {
-                    ChartLegendVisibilityLimitKind::WireNesting
-                },
-                litchi_iwa_common::LimitKind::RewriteWork => {
-                    ChartLegendVisibilityLimitKind::WireWork
-                },
+                | litchi_iwa_common::LimitKind::MaterializedCells => LimitKind::WireFields,
+                litchi_iwa_common::LimitKind::Nesting => LimitKind::WireNesting,
+                litchi_iwa_common::LimitKind::RewriteWork => LimitKind::WireWork,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
-        litchi_iwa_common::Error::Allocation { amount, .. } => {
-            ChartLegendVisibilityError::Allocation { amount }
-        },
-        _ => ChartLegendVisibilityError::InvalidSource,
+        litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
@@ -1666,8 +1643,8 @@ mod tests {
         .expect_err("a non-empty legend rewrite requires one allocation");
         assert_eq!(
             map_legend_codec_error(error),
-            ChartLegendVisibilityError::LimitExceeded {
-                kind: ChartLegendVisibilityLimitKind::Allocations,
+            Error::Limit {
+                kind: LimitKind::Allocations,
                 observed: 1,
                 maximum: 0,
             }

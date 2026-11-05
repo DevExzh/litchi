@@ -3,12 +3,12 @@
 #[cfg(feature = "encryption")]
 use super::WriterEncryption;
 use super::{
-    HyperlinkCollection, Pictures, ShapeProperties, ShapeType, TextAlignment, WritableShape,
-    WritableSlide, WriteError, Writer, WriterModifyPassword,
+    Builder, HyperlinkCollection, Pictures, ShapeProperties, ShapeType, TextAlignment,
+    WritableShape, WritableSlide, WriteError, WriterModifyPassword,
 };
 use crate::animation::AnimationInfo;
 #[cfg(feature = "encryption")]
-use crate::encryption::{EncryptionProfile, validate_writer_password};
+use crate::encryption::{EncryptionEntropy, EncryptionProfile, validate_writer_password};
 use crate::font::{
     EmbeddedFont, Facet as FontFacet, Font, FontCollection, FontCollections, FontEmbeddingFlags,
     Scope as FontScope,
@@ -32,11 +32,11 @@ use crate::writer::smart_tags::{SmartTagDefinition, SmartTagIndex};
 use crate::writer::table::{PositionedTable, Table};
 use crate::writer::text_format::{FontEntity, Paragraph, TextAlign};
 use litchi_core::unit::pt_to_emu_i32;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use zeroize::Zeroizing;
 
-impl Writer {
+impl Builder {
     /// Create a new PPT writer with standard 4:3 slide dimensions
     #[must_use]
     pub fn new() -> Self {
@@ -59,7 +59,7 @@ impl Writer {
     pub fn with_dimensions(width: i32, height: i32) -> Self {
         Self {
             slides: Vec::new(),
-            properties: HashMap::new(),
+            properties: litchi_ole_common::property_set::SummaryProperties::new(),
             slide_width: width,
             slide_height: height,
             blip_store: Pictures::new(),
@@ -76,6 +76,8 @@ impl Writer {
             main_master_header_footer: None,
             #[cfg(feature = "encryption")]
             encryption: None,
+            #[cfg(feature = "encryption")]
+            encryption_entropy: None,
             modify_password: None,
             vba_project: None,
         }
@@ -102,6 +104,17 @@ impl Writer {
             password: protected_password,
         });
         Ok(())
+    }
+
+    /// Supply one-use salt and verifier bytes for a subsequent encrypted build.
+    ///
+    /// PPT CryptoAPI RC4 authoring never consults ambient randomness. The token
+    /// is consumed by the next encrypted build attempt, including attempts
+    /// that fail during validation or package admission. Plain builds leave a
+    /// pending token untouched.
+    #[cfg(feature = "encryption")]
+    pub fn set_encryption_entropy(&mut self, entropy: EncryptionEntropy) {
+        self.encryption_entropy = Some(entropy);
     }
 
     /// Remove password-to-open protection and wipe the stored password.
@@ -281,7 +294,7 @@ impl Writer {
     }
 }
 
-impl Writer {
+impl Builder {
     /// Add a new blank slide
     ///
     /// # Returns
@@ -371,7 +384,7 @@ impl Writer {
     }
 }
 
-impl Writer {
+impl Builder {
     /// Set presentation-wide header/footer defaults for ordinary slides.
     ///
     /// # Errors
@@ -753,6 +766,55 @@ impl Writer {
         Ok(())
     }
 
+    /// Add a straight connector to a slide
+    ///
+    /// # Arguments
+    ///
+    /// * `slide` - Slide index
+    /// * `x1`, `y1` - Start point (in points)
+    /// * `x2`, `y2` - End point (in points)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn add_connector(
+        &mut self,
+        slide: usize,
+        x1: i32,
+        y1: i32,
+        x2: i32,
+        y2: i32,
+    ) -> Result<(), WriteError> {
+        let slide_data = self
+            .slides
+            .get_mut(slide)
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {slide} does not exist")))?;
+
+        let x = x1.min(x2);
+        let y = y1.min(y2);
+        let width = (x2 - x1).abs();
+        let height = (y2 - y1).abs();
+
+        let shape = WritableShape {
+            properties: ShapeProperties {
+                shape_type: ShapeType::Connector,
+                x: pt_to_emu_i32(x),
+                y: pt_to_emu_i32(y),
+                width: pt_to_emu_i32(width),
+                height: pt_to_emu_i32(height),
+                fill: Some(FillStyle::none()),
+                line: Some(LineStyleConfig::default_line()),
+                flip_h: x2 < x1,
+                flip_v: y2 < y1,
+                ..Default::default()
+            },
+            animation_info: None,
+        };
+
+        slide_data.shapes.push(shape);
+        Ok(())
+    }
+
     /// Add an arrow line to a slide
     ///
     /// # Arguments
@@ -996,7 +1058,7 @@ impl Writer {
     }
 }
 
-impl Writer {
+impl Builder {
     /// Add a picture to a slide
     ///
     /// # Arguments
@@ -1134,7 +1196,7 @@ impl Writer {
     }
 }
 
-impl Writer {
+impl Builder {
     /// Set the rotation of the last shape on a slide, in degrees.
     ///
     /// # Errors
@@ -1340,7 +1402,7 @@ impl Writer {
     ///
     /// Returns an error if the operation fails.
     #[cfg(feature = "fonts")]
-    pub fn set_prepared_font_with_limits(
+    pub(crate) fn set_prepared_font_with_limits(
         &mut self,
         scope: FontScope,
         index: u16,
@@ -1692,7 +1754,7 @@ impl Writer {
     /// Set the slide transition effect.
     ///
     /// The transition owns the slide's `SSSlideInfoAtom` record (MS-PPT 2.6.6),
-    /// so per-slide timing set via [`Writer::set_slide_timing`] is emitted only
+    /// so per-slide timing set via [`Builder::set_slide_timing`] is emitted only
     /// for slides without a transition; a hidden-slide flag is preserved either
     /// way.
     ///
@@ -1754,15 +1816,56 @@ impl Writer {
     }
 }
 
-impl Writer {
-    /// Set a presentation property
+impl Builder {
+    /// Replaces the presentation's metadata with `metadata`.
     ///
-    /// # Arguments
+    /// The fields are written to the `\x05SummaryInformation` and
+    /// `\x05DocumentSummaryInformation` streams by the shared
+    /// [`SummaryProperties`](litchi_ole_common::property_set::SummaryProperties)
+    /// conversion
+    /// ([`SummaryProperties::merge_metadata`](litchi_ole_common::property_set::SummaryProperties::merge_metadata)
+    /// lists the mapping). It replaces every property set earlier, including
+    /// custom ones, so set custom properties through
+    /// [`Self::summary_properties_mut`] afterwards. Empty metadata keeps the
+    /// fixed blank property streams, exactly as a builder that never set one.
+    /// Nothing reads the clock: a creation or save time is written only when
+    /// given. Properties cannot be combined with password-to-open encryption.
     ///
-    /// * `name` - Property name (e.g., "Title", "Author", "Subject")
-    /// * `value` - Property value
-    pub fn set_property(&mut self, name: &str, value: &str) {
-        self.properties.insert(name.to_string(), value.to_string());
+    /// ```
+    /// let mut builder = litchi_ppt::Builder::new();
+    /// builder.set_metadata(litchi_core::Metadata {
+    ///     title: Some("Roadmap".to_owned()),
+    ///     ..litchi_core::Metadata::default()
+    /// })?;
+    /// let package = builder.build()?;
+    /// assert_eq!(package.metadata()?.title.as_deref(), Some("Roadmap"));
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WriteError::Metadata`], leaving the properties unchanged, for
+    /// a field the property sets cannot store (`identifier`,
+    /// `hyperlink_base`, unzoned timestamps) or a refused value.
+    pub fn set_metadata(&mut self, metadata: litchi_core::Metadata) -> Result<(), WriteError> {
+        self.properties =
+            litchi_ole_common::property_set::SummaryProperties::from_metadata(&metadata)?;
+        Ok(())
+    }
+
+    /// The presentation properties the builder writes, including typed counts
+    /// and custom properties that [`litchi_core::Metadata`] does not carry.
+    #[must_use]
+    pub const fn summary_properties(&self) -> &litchi_ole_common::property_set::SummaryProperties {
+        &self.properties
+    }
+
+    /// Mutable access to the presentation properties, for custom properties
+    /// and typed section edits.
+    pub fn summary_properties_mut(
+        &mut self,
+    ) -> &mut litchi_ole_common::property_set::SummaryProperties {
+        &mut self.properties
     }
 
     /// Get the number of slides
@@ -1772,7 +1875,7 @@ impl Writer {
     }
 }
 
-impl Default for Writer {
+impl Default for Builder {
     fn default() -> Self {
         Self::new()
     }

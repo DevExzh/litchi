@@ -1,11 +1,12 @@
 //! Semantic workbook revision values and invariants.
 
-use crate::error::Result;
+use super::LimitKind;
+use crate::error::{Error, Result};
 use chrono::{DateTime, NaiveDateTime};
 use litchi_ooxml_common::custom_xml::valid_guid as is_valid_guid;
 use std::collections::{HashMap, HashSet};
 
-use super::{invalid, limit};
+use super::invalid;
 
 pub(super) const NS: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 pub(super) const STRICT_NS: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
@@ -236,7 +237,7 @@ pub struct Revisions {
 
 pub(super) fn validate_users(v: &RevisionUsers) -> Result<()> {
     if v.users.len() > MAX_USERS {
-        return Err(limit("revision users"));
+        return Err(Error::limit(LimitKind::Users, v.users.len(), MAX_USERS));
     }
     let (mut ids, mut guids) = (HashSet::new(), HashSet::new());
     for u in &v.users {
@@ -258,7 +259,11 @@ pub(super) fn validate_headers(v: &RevisionHeaders) -> Result<()> {
         validate_guid(g)?;
     }
     if v.headers.len() > MAX_HEADERS {
-        return Err(limit("revision headers"));
+        return Err(Error::limit(
+            LimitKind::Headers,
+            v.headers.len(),
+            MAX_HEADERS,
+        ));
     }
     let (mut gs, mut rs) = (HashSet::new(), HashSet::new());
     for h in &v.headers {
@@ -268,7 +273,14 @@ pub(super) fn validate_headers(v: &RevisionHeaders) -> Result<()> {
         if h.relationship_id.is_empty() || !gs.insert(&h.guid) || !rs.insert(&h.relationship_id) {
             return Err(invalid("duplicate/empty revision header identifier"));
         }
-        if h.sheet_ids.len() > MAX_SHEET_IDS || h.sheet_ids.iter().any(|id| *id >= h.max_sheet_id) {
+        if h.sheet_ids.len() > MAX_SHEET_IDS {
+            return Err(Error::limit(
+                LimitKind::SheetIds,
+                h.sheet_ids.len(),
+                MAX_SHEET_IDS,
+            ));
+        }
+        if h.sheet_ids.iter().any(|id| *id >= h.max_sheet_id) {
             return Err(invalid("invalid revision header sheet map"));
         }
         if h.min_revision_id
@@ -291,7 +303,11 @@ pub(super) fn validate_headers(v: &RevisionHeaders) -> Result<()> {
 }
 pub(super) fn validate_log(v: &RevisionLog) -> Result<()> {
     if v.records.len() > MAX_RECORDS_PER_LOG {
-        return Err(limit("revision records"));
+        return Err(Error::limit(
+            LimitKind::Records,
+            v.records.len(),
+            MAX_RECORDS_PER_LOG,
+        ));
     }
     for r in &v.records {
         validate_attrs(&r.attributes)?;
@@ -305,7 +321,10 @@ pub(super) fn validate_log(v: &RevisionLog) -> Result<()> {
 pub(super) fn validate_package(v: &Revisions) -> Result<()> {
     validate_users(&v.users)?;
     validate_headers(&v.headers)?;
-    if v.logs.len() > MAX_LOGS || v.logs.len() != v.headers.headers.len() {
+    if v.logs.len() > MAX_LOGS {
+        return Err(Error::limit(LimitKind::Logs, v.logs.len(), MAX_LOGS));
+    }
+    if v.logs.len() != v.headers.headers.len() {
         return Err(invalid("revision log/header count mismatch"));
     }
     if v.users_relationship_id.is_empty()
@@ -341,9 +360,13 @@ pub(super) fn validate_package(v: &Revisions) -> Result<()> {
         validate_log(&p.log)?;
         total = total
             .checked_add(p.log.records.len())
-            .ok_or_else(|| limit("revision records"))?;
+            .ok_or_else(|| Error::limit(LimitKind::TotalRecords, usize::MAX, MAX_TOTAL_RECORDS))?;
         if total > MAX_TOTAL_RECORDS {
-            return Err(limit("total revision records"));
+            return Err(Error::limit(
+                LimitKind::TotalRecords,
+                total,
+                MAX_TOTAL_RECORDS,
+            ));
         }
         for r in &p.log.records {
             if let Some(id) = r.revision_id {
@@ -365,7 +388,10 @@ pub(super) fn validate_package(v: &Revisions) -> Result<()> {
 }
 
 pub(super) fn validate_element(e: &RevisionXmlElement, depth: usize) -> Result<()> {
-    if depth > MAX_DEPTH || !ncname(&e.name) {
+    if depth > MAX_DEPTH {
+        return Err(Error::limit(LimitKind::XmlDepth, depth, MAX_DEPTH));
+    }
+    if !ncname(&e.name) {
         return Err(invalid("invalid revision payload element/depth"));
     }
     bounded(&e.text)?;
@@ -409,7 +435,11 @@ fn ncname(v: &str) -> bool {
 }
 pub(super) fn bounded(v: &str) -> Result<()> {
     if v.len() > MAX_STRING_BYTES {
-        Err(limit("revision string bytes"))
+        Err(Error::limit(
+            LimitKind::TextBytes,
+            v.len(),
+            MAX_STRING_BYTES,
+        ))
     } else {
         Ok(())
     }

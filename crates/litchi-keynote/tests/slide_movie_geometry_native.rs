@@ -4,7 +4,10 @@ use litchi_keynote::slide::media::{
     Point, Size,
     geometry::{MovieFlipAxis, MovieGeometry, MovieTransform},
 };
-use litchi_keynote::{MovieKind, MovieSelector, Package, SlideMovieGeometryError, SlideSelector};
+use litchi_keynote::{
+    MovieKind, MovieSelector, Package, SlideSelector,
+    slide::movie::geometry::Error as SlideMovieGeometryError,
+};
 
 type R<T = ()> = Result<T, Box<dyn std::error::Error>>;
 const SOURCE: &[u8] = include_bytes!(
@@ -25,11 +28,14 @@ fn assert_native_locality(before: &[u8], after: &[u8]) -> R {
     use std::collections::BTreeMap;
     fn messages(source: &[u8]) -> R<BTreeMap<(u64, usize), (u32, Vec<u8>)>> {
         let mut messages = BTreeMap::new();
-        for entry in Catalog::from_bytes(source)?
+        for entry in Catalog::from_bytes(source, Default::default())?
             .iter()
             .filter(|entry| entry.name().ends_with(".iwa"))
         {
-            let archive = Archive::parse(&SnappyStream::decompress(entry.data())?.into_bytes())?;
+            let archive = Archive::parse(
+                &SnappyStream::decompress(entry.data(), Default::default())?.into_bytes(),
+                Default::default(),
+            )?;
             for object in archive.objects {
                 let identifier = object.archive_info.identifier.expect("native identifier");
                 for (index, message) in object.messages.into_iter().enumerate() {
@@ -65,8 +71,8 @@ fn assert_native_locality(before: &[u8], after: &[u8]) -> R {
         assert_eq!(old_movie, new_movie);
     }
     assert_eq!(changed_movies, 1);
-    let old_catalog = Catalog::from_bytes(before)?;
-    let new_catalog = Catalog::from_bytes(after)?;
+    let old_catalog = Catalog::from_bytes(before, Default::default())?;
+    let new_catalog = Catalog::from_bytes(after, Default::default())?;
     let data = |catalog: &Catalog| {
         catalog
             .iter()
@@ -87,11 +93,14 @@ fn native_arrange_oracle_retains_original_size_rotation_and_reflection() -> R {
     let source =
         include_bytes!("../../../test-data/iwork/keynote/slide-movie-geometry-source-native.key");
     let mut matches = 0;
-    for entry in Catalog::from_bytes(source)?
+    for entry in Catalog::from_bytes(source, Default::default())?
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let archive = Archive::parse(&SnappyStream::decompress(entry.data())?.into_bytes())?;
+        let archive = Archive::parse(
+            &SnappyStream::decompress(entry.data(), Default::default())?.into_bytes(),
+            Default::default(),
+        )?;
         for message in archive
             .objects
             .iter()
@@ -109,7 +118,7 @@ fn native_arrange_oracle_retains_original_size_rotation_and_reflection() -> R {
             assert_ne!(geometry.flags.unwrap_or_default() & 4, 0);
             let size = geometry.size.expect("native displayed size");
             assert_eq!((size.width, size.height), (320.0, 180.0));
-            assert_eq!(movie.original_size, Some(size.clone()));
+            assert_eq!(movie.original_size, Some(size));
             assert_eq!(movie.natural_size, Some(size));
         }
     }
@@ -139,7 +148,9 @@ fn native_movie_geometry_composition_preserves_media_and_inverse() -> R {
     for index in [0, 1] {
         assert_eq!(
             package.slide_movie_geometry(slide, MovieSelector::index(index)),
-            Err(SlideMovieGeometryError::UnsupportedDependency)
+            Err(SlideMovieGeometryError::Refused(
+                litchi_keynote::slide::movie::geometry::Refusal::UnsupportedDependency
+            ))
         );
     }
     let edit = package
@@ -281,8 +292,8 @@ fn native_geometry_saved_candidates_remain_editable_and_reversible() -> R {
             &baseline.slides()?[0].movies()[..4]
         );
         for part in [
-            litchi_keynote::MediaPart::Content,
-            litchi_keynote::MediaPart::Poster,
+            litchi_keynote::slide::media::data::MediaPart::Content,
+            litchi_keynote::slide::media::data::MediaPart::Poster,
         ] {
             assert_eq!(
                 package.slide_media_data(slide, movie, part)?,

@@ -7,11 +7,11 @@
 //! Run with:
 //!
 //! ```bash
-//! cargo run --example sheet_eval_stat_financial --features ooxml -- sheet_eval_stat_financial.xlsx
+//! cargo run --example sheet_eval_stat_financial --features xlsx,eval -- sheet_eval_stat_financial.xlsx
 //! ```
 
-use litchi::sheet::{FormulaEvaluator, functions::open_workbook};
-use litchi::xlsx::{Formula, Number, Workbook};
+use litchi::sheet::FormulaEvaluator;
+use litchi::xlsx::{Formula, Number, Package};
 use std::env;
 use std::error::Error;
 
@@ -28,8 +28,11 @@ async fn main() -> ExampleResult<()> {
 
     build_sample_xlsx(path)?;
 
-    let xlsx_wb = open_workbook(path)?;
-    let evaluator = FormulaEvaluator::new(xlsx_wb.as_ref());
+    // Reopen the workbook with `litchi::open`. Its workbook view implements
+    // `WorkbookTrait` by static dispatch, so the evaluator borrows it directly.
+    let file = litchi::open(path)?;
+    let workbook = file.workbook()?;
+    let evaluator = FormulaEvaluator::new(&workbook);
 
     println!("Evaluating statistical and financial functions in {}", path);
 
@@ -60,7 +63,7 @@ async fn main() -> ExampleResult<()> {
 }
 
 fn build_sample_xlsx(path: &str) -> ExampleResult<()> {
-    let wb = Workbook::create()?;
+    let wb = Package::new()?;
     let mut edit = wb.edit()?;
 
     // Statistical functions sheet
@@ -146,7 +149,7 @@ fn build_sample_xlsx(path: &str) -> ExampleResult<()> {
         ws.set("B10", Formula::new("DURATION(0,365,0.05,0.10,2,0)")?)?;
     }
 
-    edit.commit()?.into_workbook().save(path)?;
+    edit.commit()?.into_package().save(path)?;
     println!("Created statistical/financial test workbook at {}", path);
 
     Ok(())

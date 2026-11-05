@@ -9,7 +9,7 @@
 use litchi_core::Error;
 use litchi_odf_common::core::{
     GeneratedXmlEnvelope, GeneratedXmlLimitResource as Resource, GeneratedXmlLimits,
-    GeneratedXmlReport, PackageWriter, PackageWriterError, PackageWriterLimits,
+    GeneratedXmlReport, PackageWriter, PackageWriterError, StreamingArchiveLimits,
 };
 use soapberry_zip::office::ArchiveReader;
 use std::cell::{Cell, RefCell};
@@ -80,7 +80,10 @@ fn publish(
     fragments: Vec<&[u8]>,
 ) -> Result<(Vec<u8>, GeneratedXmlReport), (PackageWriterError, u64, usize)> {
     let accepted = Rc::new(RefCell::new(Vec::new()));
-    let mut writer = PackageWriter::with_writer(SharedSink(Rc::clone(&accepted)));
+    let mut writer = PackageWriter::with_writer(
+        SharedSink(Rc::clone(&accepted)),
+        StreamingArchiveLimits::default(),
+    );
     writer
         .set_mimetype_streaming(MIME)
         .expect("fixed MIME preflight");
@@ -146,7 +149,11 @@ fn prelude_zero_fragments_publishes_exact_fixed_shell_and_full_audit() {
     let expected = expected_bytes(&[]);
     let (archive_bytes, report) = publish(GeneratedXmlLimits::default(), 1, Vec::new())
         .expect("zero-fragment prelude publication");
-    let archive = ArchiveReader::new(&archive_bytes).unwrap();
+    let archive = ArchiveReader::new(
+        &archive_bytes,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
     assert_eq!(archive.read("content.xml").unwrap(), expected);
     assert_eq!(report.fragments(), 0);
     assert_report_matches_audit(report, &expected);
@@ -162,7 +169,11 @@ fn prelude_two_fragments_preserve_order_and_every_audit_counter() {
         fragments,
     )
     .expect("two-fragment prelude publication");
-    let archive = ArchiveReader::new(&archive_bytes).unwrap();
+    let archive = ArchiveReader::new(
+        &archive_bytes,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
     assert_eq!(archive.read("content.xml").unwrap(), expected);
     assert_eq!(report.fragments(), 2);
     assert_report_matches_audit(report, &expected);
@@ -223,7 +234,7 @@ fn fixed_children_under_open_ancestors_precede_the_final_start_sequence() {
 fn fixed_shell_depth_can_dominate_a_shallow_fragment() {
     let prefix = b"<root><fixed><a><b><c/></b></a></fixed><slot>";
     let suffix = b"</slot></root>";
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
     writer.set_mimetype_streaming(MIME).unwrap();
     let mut emitted = false;
     let report = writer
@@ -248,10 +259,13 @@ fn fixed_shell_depth_can_dominate_a_shallow_fragment() {
     assert_report_matches_audit(report, &expected);
     let archive = writer.finish_to_writer().unwrap();
     assert_eq!(
-        ArchiveReader::new(archive.get_ref())
-            .unwrap()
-            .read("content.xml")
-            .unwrap(),
+        ArchiveReader::new(
+            archive.get_ref(),
+            soapberry_zip::office::ArchiveLimits::default()
+        )
+        .unwrap()
+        .read("content.xml")
+        .unwrap(),
         expected
     );
 }
@@ -339,7 +353,11 @@ fn assert_shell_limit(resource: Resource, exact: usize) {
     assert!(exact > 0);
     let exact_result = publish(narrowed(resource, exact), 1, Vec::new())
         .expect("inclusive fixed-prelude shell limit");
-    let archive = ArchiveReader::new(&exact_result.0).unwrap();
+    let archive = ArchiveReader::new(
+        &exact_result.0,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
     assert_eq!(archive.read("content.xml").unwrap(), expected_bytes(&[]));
     let under = publish(narrowed(resource, exact - 1), 1, Vec::new());
     assert_limit_failure(under, resource, exact, exact - 1, Some(0));
@@ -382,7 +400,9 @@ fn composed_prelude_limits_are_inclusive_and_one_under() {
         )
         .expect("inclusive composed prelude limit");
         assert_eq!(success.1, report);
-        let archive = ArchiveReader::new(&success.0).unwrap();
+        let archive =
+            ArchiveReader::new(&success.0, soapberry_zip::office::ArchiveLimits::default())
+                .unwrap();
         assert_eq!(archive.read("content.xml").unwrap(), expected);
 
         let under = publish(
@@ -396,13 +416,12 @@ fn composed_prelude_limits_are_inclusive_and_one_under() {
 
 #[test]
 fn archive_admission_refusal_does_not_pull_a_prelude_fragment() {
-    let limits = PackageWriterLimits {
+    let limits = StreamingArchiveLimits {
         max_entries: 1,
-        ..PackageWriterLimits::default()
+        ..StreamingArchiveLimits::default()
     };
     let accepted = Rc::new(RefCell::new(Vec::new()));
-    let mut writer =
-        PackageWriter::with_writer_and_limits(SharedSink(Rc::clone(&accepted)), limits);
+    let mut writer = PackageWriter::with_writer(SharedSink(Rc::clone(&accepted)), limits);
     writer.set_mimetype_streaming(MIME).unwrap();
     let mime_bytes = accepted.borrow().len();
     let calls = Rc::new(Cell::new(0usize));
@@ -439,7 +458,7 @@ fn error_chain_contains(error: &dyn StdError, needle: &str) -> bool {
 
 #[test]
 fn first_and_later_prelude_producer_errors_keep_source_and_poison_writer() {
-    let mut first_writer = PackageWriter::new();
+    let mut first_writer = PackageWriter::new(StreamingArchiveLimits::default());
     first_writer.set_mimetype_streaming(MIME).unwrap();
     let first_error = first_writer
         .add_generated_xml(
@@ -455,7 +474,7 @@ fn first_and_later_prelude_producer_errors_keep_source_and_poison_writer() {
     assert!(first_error.written().is_some_and(|written| written > 0));
     assert!(first_writer.finish_to_writer().is_err());
 
-    let mut later_writer = PackageWriter::new();
+    let mut later_writer = PackageWriter::new(StreamingArchiveLimits::default());
     later_writer.set_mimetype_streaming(MIME).unwrap();
     let mut calls = 0usize;
     let later_error = later_writer
@@ -527,9 +546,12 @@ fn short_sink_crossing_fixed_prelude_reports_exact_accepted_progress() {
         accepted: Rc::new(Cell::new(0)),
         fail_after: Rc::new(Cell::new(None)),
     };
-    let mut writer = PackageWriter::with_writer(ShortSink {
-        control: control.clone(),
-    });
+    let mut writer = PackageWriter::with_writer(
+        ShortSink {
+            control: control.clone(),
+        },
+        StreamingArchiveLimits::default(),
+    );
     writer.set_mimetype_streaming(MIME).unwrap();
     control
         .fail_after

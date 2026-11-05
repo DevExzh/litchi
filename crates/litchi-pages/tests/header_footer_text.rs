@@ -70,7 +70,11 @@ fn reference(identifier: u64) -> tsp::Reference {
 }
 
 fn field_info(path: &[u32], references: &[u64]) -> FieldInfo {
-    let mut field = FieldInfo::new(path.to_vec());
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(path.to_vec(), litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     field.object_references.extend_from_slice(references);
     field
 }
@@ -79,11 +83,15 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
 fn compressed(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn add_graph_metadata(object: &mut ArchiveObject, references: &[u64], fields: &[(&[u32], &[u64])]) {
@@ -178,16 +186,19 @@ fn metadata_payload() -> TestResult<Vec<u8>> {
             DOCUMENT_SAVE_TOKEN,
             FIRST_STORAGE_IDENTIFIER..=LAST_STORAGE_IDENTIFIER,
         )?,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     append_length_delimited_field(
         &mut payload,
         3,
         &metadata_component(2, "ViewState", VIEW_STATE_SAVE_TOKEN, std::iter::empty())?,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     append_length_delimited_field(
         &mut payload,
         3,
         &metadata_component(3, "Unrelated", UNRELATED_SAVE_TOKEN, std::iter::empty())?,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     append_length_delimited_field(
         &mut payload,
@@ -198,6 +209,7 @@ fn metadata_payload() -> TestResult<Vec<u8>> {
             VERSIONED_SAVE_TOKEN,
             std::iter::empty(),
         )?,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     append_varint_field(&mut payload, UNKNOWN_ROOT_FIELD, 0xdead_beef)?;
     Ok(payload)
@@ -363,12 +375,15 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn metadata_payload_from_bytes(bytes: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(bytes)?;
+    let catalog = Catalog::from_bytes(bytes, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or_else(|| io::Error::other("metadata member is missing"))?;
-    let archive = Archive::parse(&SnappyStream::decompress(entry.data())?.into_bytes())?;
+    let archive = Archive::parse(
+        &SnappyStream::decompress(entry.data(), Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
     archive
         .objects
         .first()
@@ -385,7 +400,7 @@ fn metadata(bytes: &[u8]) -> TestResult<tsp::PackageMetadata> {
 
 fn metadata_component_raw(bytes: &[u8], identifier: u64) -> TestResult<Vec<Vec<u8>>> {
     let payload = metadata_payload_from_bytes(bytes)?;
-    let view = WireView::parse(&payload)?;
+    let view = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     Ok(view
         .fields()
         .filter(|field| field.number() == 3)
@@ -407,7 +422,7 @@ fn component(metadata: &tsp::PackageMetadata, identifier: u64) -> TestResult<&ts
 }
 
 fn member_bytes(bytes: &[u8], member: &str) -> TestResult<Vec<u8>> {
-    Ok(Catalog::from_bytes(bytes)?
+    Ok(Catalog::from_bytes(bytes, Default::default())?
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| io::Error::other("member is missing"))?
@@ -416,12 +431,15 @@ fn member_bytes(bytes: &[u8], member: &str) -> TestResult<Vec<u8>> {
 }
 
 fn object_payload(bytes: &[u8], member: &str, identifier: u64) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(bytes)?;
+    let catalog = Catalog::from_bytes(bytes, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| io::Error::other("member is missing"))?;
-    let archive = Archive::parse(&SnappyStream::decompress(entry.data())?.into_bytes())?;
+    let archive = Archive::parse(
+        &SnappyStream::decompress(entry.data(), Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
     archive
         .object(identifier)
         .and_then(|object| object.messages.first())
@@ -430,7 +448,7 @@ fn object_payload(bytes: &[u8], member: &str, identifier: u64) -> TestResult<Vec
 }
 
 fn has_member(bytes: &[u8], member: &str) -> TestResult<bool> {
-    Ok(Catalog::from_bytes(bytes)?
+    Ok(Catalog::from_bytes(bytes, Default::default())?
         .iter()
         .any(|entry| entry.name() == member))
 }
@@ -440,14 +458,18 @@ fn rewrite_member(
     member: &str,
     edit: impl FnOnce(&mut Archive) -> TestResult,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| io::Error::other("member is missing"))?;
-    let mut archive = Archive::parse(&SnappyStream::decompress(entry.data())?.into_bytes())?;
+    let mut archive = Archive::parse(
+        &SnappyStream::decompress(entry.data(), Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
     edit(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(member, compressed.as_slice())],
         Limits::default(),
@@ -471,14 +493,18 @@ fn rewrite_object_payload(
             .first()
             .ok_or_else(|| io::Error::other("message is missing"))?;
         let (type_, data) = edit(message.type_, message.data.clone())?;
-        object.replace_message_preserving_header(0, RawMessage { type_, data })?;
+        object.replace_message_preserving_header(
+            0,
+            RawMessage { type_, data },
+            Default::default(),
+        )?;
         Ok(())
     })
 }
 
 fn remove_member(source: &[u8], member: &str) -> TestResult<Vec<u8>> {
     Ok(
-        Catalog::from_bytes(source)?.reassemble_with_deletions_to_bytes(
+        Catalog::from_bytes(source, Default::default())?.reassemble_with_deletions_to_bytes(
             &[],
             &[member],
             Limits::default(),
@@ -494,31 +520,34 @@ fn assert_alias_text(package: &Package, expected: &str) -> TestResult {
     assert_eq!(
         package
             .edit_header_footer_text(selector(0, Template::First, Kind::Header))?
-            .text(),
+            .text()?,
         expected
     );
     assert_eq!(
         package
             .edit_header_footer_text(selector(0, Template::Even, Kind::Footer))?
-            .text(),
+            .text()?,
         expected
     );
     assert_eq!(
         package
             .edit_header_footer_text(selector(1, Template::Odd, Kind::Footer))?
-            .text(),
+            .text()?,
         expected
     );
     Ok(())
 }
 
 fn assert_unknown_storage_fields(bytes: &[u8], identifier: u64) -> TestResult {
-    let catalog = Catalog::from_bytes(bytes)?;
+    let catalog = Catalog::from_bytes(bytes, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("document member is missing"))?;
-    let archive = Archive::parse(&SnappyStream::decompress(entry.data())?.into_bytes())?;
+    let archive = Archive::parse(
+        &SnappyStream::decompress(entry.data(), Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("storage object is missing"))?;
@@ -527,7 +556,7 @@ fn assert_unknown_storage_fields(bytes: &[u8], identifier: u64) -> TestResult {
         .first()
         .ok_or_else(|| io::Error::other("storage message is missing"))?
         .data;
-    let view = WireView::parse(payload)?;
+    let view = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     assert!(
         view.fields()
             .any(|field| field.number() == UNKNOWN_STORAGE_FIELD)
@@ -537,13 +566,13 @@ fn assert_unknown_storage_fields(bytes: &[u8], identifier: u64) -> TestResult {
 
 fn assert_metadata_unknown_fields(bytes: &[u8]) -> TestResult {
     let payload = metadata_payload_from_bytes(bytes)?;
-    let view = WireView::parse(&payload)?;
+    let view = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     assert!(
         view.fields()
             .any(|field| field.number() == UNKNOWN_ROOT_FIELD)
     );
     for field in view.fields().filter(|field| field.number() == 3) {
-        let nested = WireView::parse(field.payload())?;
+        let nested = WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
         assert!(
             nested
                 .fields()
@@ -580,7 +609,12 @@ fn wrong_storage_kind_wire(source: &[u8]) -> TestResult<Vec<u8>> {
         DOCUMENT_MEMBER,
         FIRST_STORAGE_IDENTIFIER,
         |_type_, mut data| {
-            append_length_delimited_field(&mut data, 1, &[0])?;
+            append_length_delimited_field(
+                &mut data,
+                1,
+                &[0],
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
             Ok((STORAGE_MESSAGE_TYPE, data))
         },
     )
@@ -621,7 +655,8 @@ fn wrong_template_reference_path(source: &[u8]) -> TestResult<Vec<u8>> {
             .iter_mut()
             .find(|field| field.path.as_slice() == [1])
             .ok_or_else(|| io::Error::other("header FieldInfo is missing"))?;
-        field.path = vec![99].into();
+        field.path =
+            litchi_iwa_core::FieldPath::new(vec![99], litchi_iwa_core::Limits::default()).unwrap();
         Ok(())
     })
 }
@@ -689,12 +724,15 @@ fn add_metadata_storage_owner(source: &[u8], kind: MetadataOwnerKind) -> TestRes
 }
 
 fn duplicate_root_body_identifier(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let document = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("document member is missing"))?;
-    let archive = Archive::parse(&SnappyStream::decompress(document.data())?.into_bytes())?;
+    let archive = Archive::parse(
+        &SnappyStream::decompress(document.data(), Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
     let duplicate = archive
         .objects
         .iter()
@@ -737,6 +775,7 @@ fn duplicate_metadata_component(source: &[u8]) -> TestResult<Vec<u8>> {
             DOCUMENT_SAVE_TOKEN,
             std::iter::empty(),
         )?,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     rewrite_object_payload(
         source,
@@ -759,7 +798,12 @@ fn duplicate_metadata_save_token(source: &[u8]) -> TestResult<Vec<u8>> {
 
 fn wrong_metadata_save_token_wire(source: &[u8]) -> TestResult<Vec<u8>> {
     let mut payload = metadata_payload_from_bytes(source)?;
-    append_length_delimited_field(&mut payload, 8, &[1])?;
+    append_length_delimited_field(
+        &mut payload,
+        8,
+        &[1],
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     rewrite_object_payload(
         source,
         METADATA_MEMBER,
@@ -817,6 +861,7 @@ fn cross_component_storage(source: &[u8]) -> TestResult<Vec<u8>> {
             8,
             std::iter::once(CROSS_STORAGE_IDENTIFIER),
         )?,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     changed = rewrite_object_payload(
         &changed,
@@ -829,7 +874,7 @@ fn cross_component_storage(source: &[u8]) -> TestResult<Vec<u8>> {
         STORAGE_MESSAGE_TYPE,
         storage_payload(SHARED_TEXT)?,
     )?])?;
-    let catalog = Catalog::from_bytes(&changed)?;
+    let catalog = Catalog::from_bytes(&changed, Default::default())?;
     let mut entries = catalog
         .iter()
         .map(|entry| (entry.name(), entry.data()))
@@ -853,7 +898,7 @@ fn enumeration_selectors_and_aliases_are_semantic() -> TestResult {
     assert_eq!(
         package
             .edit_header_footer_text(selector(0, Template::First, Kind::Header))?
-            .text(),
+            .text()?,
         SHARED_TEXT
     );
     assert_alias_text(&package, SHARED_TEXT)?;
@@ -865,14 +910,11 @@ fn enumeration_selectors_and_aliases_are_semantic() -> TestResult {
                 Kind::Header,
                 Position::new(0),
             ))?
-            .text(),
+            .text()?,
         SHARED_TEXT
     );
-    assert!(
-        package
-            .edit_header_footer_text(selector(8, Template::Odd, Kind::Header))
-            .is_err()
-    );
+    let mut missing = package.edit_header_footer_text(selector(8, Template::Odd, Kind::Header))?;
+    assert!(missing.text().is_err());
     Ok(())
 }
 
@@ -987,7 +1029,7 @@ fn no_op_and_patch_conflict_are_exact_and_atomic() -> TestResult {
     let mut edit = package.edit_header_footer_text(selector(0, Template::First, Kind::Header))?;
     edit.set("conflict")?;
     let changed = edit.commit()?;
-    let tampered_source = Catalog::from_bytes(&source)?.reassemble_to_bytes(
+    let tampered_source = Catalog::from_bytes(&source, Default::default())?.reassemble_to_bytes(
         &[EntryEdit::new(SENTINEL_MEMBER, b"tampered")],
         Limits::default(),
     )?;
@@ -1076,7 +1118,7 @@ fn cross_component_storage_is_a_supported_exact_owner() -> TestResult {
     let selected = selector(0, Template::First, Kind::Header);
 
     assert_eq!(
-        package.edit_header_footer_text(selected)?.text(),
+        package.edit_header_footer_text(selected)?.text()?,
         SHARED_TEXT
     );
     // The other two logical aliases still point at the original Document
@@ -1084,13 +1126,13 @@ fn cross_component_storage_is_a_supported_exact_owner() -> TestResult {
     assert_eq!(
         package
             .edit_header_footer_text(selector(0, Template::Even, Kind::Footer))?
-            .text(),
+            .text()?,
         SHARED_TEXT
     );
     assert_eq!(
         package
             .edit_header_footer_text(selector(1, Template::Odd, Kind::Footer))?
-            .text(),
+            .text()?,
         SHARED_TEXT
     );
 
@@ -1098,21 +1140,21 @@ fn cross_component_storage_is_a_supported_exact_owner() -> TestResult {
     edit.set("Cross component — 北区")?;
     let commit = edit.commit()?;
     assert_eq!(
-        commit.package().edit_header_footer_text(selected)?.text(),
+        commit.package().edit_header_footer_text(selected)?.text()?,
         "Cross component — 北区"
     );
     assert_eq!(
         commit
             .package()
             .edit_header_footer_text(selector(0, Template::Even, Kind::Footer))?
-            .text(),
+            .text()?,
         SHARED_TEXT
     );
     assert_eq!(
         commit
             .package()
             .edit_header_footer_text(selector(1, Template::Odd, Kind::Footer))?
-            .text(),
+            .text()?,
         SHARED_TEXT
     );
     let target = exact_bytes(commit.package())?;
@@ -1201,7 +1243,10 @@ fn archive_limits_fail_before_publication() -> TestResult {
     let source = build_fixture()?;
     let archive_limits = litchi_iwa_core::Limits::default().with_header_fields(1)?;
     let limits = Limits::default().with_archive_limits(archive_limits)?;
-    if let Ok(package) = Package::from_bytes_with_limits(&source, limits) {
+    if let Ok(package) = Package::from_bytes_with_options(
+        &source,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    ) {
         let before = exact_bytes(&package)?;
         let result = package
             .edit_header_footer_text(selector(0, Template::First, Kind::Header))
@@ -1226,7 +1271,10 @@ fn output_ceiling_rejects_growth_after_ingress_and_preserves_source() -> TestRes
         defaults.max_total_bytes(),
         defaults.max_iwa_stream_bytes(),
     )?;
-    let package = Package::from_bytes_with_limits(&source, limits)?;
+    let package = Package::from_bytes_with_options(
+        &source,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    )?;
     let before = exact_bytes(&package)?;
     let mut state = 0x9e37_79b9_7f4a_7c15u64;
     let replacement: String = (0..65_536)
@@ -1276,11 +1324,23 @@ fn physical_entry_stream_total_and_nesting_limits_fail_closed() -> TestResult {
         )?,
     ];
     for limits in profiles {
-        assert!(Package::from_bytes_with_limits(&source, limits).is_err());
+        assert!(
+            Package::from_bytes_with_options(
+                &source,
+                litchi_pages::OpenOptions::new().__archive_limits(limits)
+            )
+            .is_err()
+        );
     }
     let archive_limits = litchi_iwa_core::Limits::default().with_header_nesting(1)?;
     let limits = Limits::default().with_archive_limits(archive_limits)?;
-    assert!(Package::from_bytes_with_limits(&source, limits).is_err());
+    assert!(
+        Package::from_bytes_with_options(
+            &source,
+            litchi_pages::OpenOptions::new().__archive_limits(limits)
+        )
+        .is_err()
+    );
     Ok(())
 }
 
@@ -1289,10 +1349,10 @@ fn public_transaction_types_are_send_sync_and_debug_redacted() -> TestResult {
     fn assert_send_sync_debug<T: Send + Sync + std::fmt::Debug>() {}
     assert_send_sync_debug::<Package>();
     assert_send_sync_debug::<HeaderFooterSelector<'static>>();
-    assert_send_sync_debug::<litchi_pages::HeaderFooterTextEdit<'static>>();
-    assert_send_sync_debug::<litchi_pages::HeaderFooterTextPatch>();
-    assert_send_sync_debug::<litchi_pages::HeaderFooterTextCommit>();
-    assert_send_sync_debug::<litchi_pages::HeaderFooterTextDiagnostics>();
+    assert_send_sync_debug::<litchi_pages::header_footer::text::Edit<'static>>();
+    assert_send_sync_debug::<litchi_pages::header_footer::text::Patch>();
+    assert_send_sync_debug::<litchi_pages::header_footer::text::Commit>();
+    assert_send_sync_debug::<litchi_pages::header_footer::text::Diagnostics>();
     let package = Package::from_bytes(&build_fixture()?)?;
     let edit = package.edit_header_footer_text(selector(0, Template::First, Kind::Header))?;
     let debug = format!("{edit:?}");

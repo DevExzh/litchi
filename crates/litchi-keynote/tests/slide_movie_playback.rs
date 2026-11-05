@@ -6,7 +6,7 @@ use litchi_iwa_common::wire::{append_length_delimited_field, append_varint_field
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsd, tsk, tsp};
 use litchi_keynote::slide::media::{MediaLoopMode, MediaPlaybackSettings, MediaVolume};
-use litchi_keynote::{MovieSelector, Package, SlideSelector};
+use litchi_keynote::{MovieSelector, Package, SlideSelector, SourceLimits};
 use prost::Message as _;
 
 const DOCUMENT_MEMBER: &str = "Index/Document.iwa";
@@ -46,6 +46,7 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
@@ -101,8 +102,13 @@ fn movie_payload(movie: usize, full_playback: bool) -> Vec<u8> {
         value.end_time = Some(7.0);
     }
     let mut payload = value.encode_to_vec();
-    append_length_delimited_field(&mut payload, UNKNOWN_FIELD, UNKNOWN_MARKER)
-        .expect("unknown playback field");
+    append_length_delimited_field(
+        &mut payload,
+        UNKNOWN_FIELD,
+        UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .expect("unknown playback field");
     payload
 }
 
@@ -145,8 +151,13 @@ fn audio_payload() -> Vec<u8> {
         ..Default::default()
     };
     let mut payload = value.encode_to_vec();
-    append_length_delimited_field(&mut payload, UNKNOWN_FIELD, UNKNOWN_MARKER)
-        .expect("unknown playback field");
+    append_length_delimited_field(
+        &mut payload,
+        UNKNOWN_FIELD,
+        UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .expect("unknown playback field");
     payload
 }
 
@@ -175,7 +186,12 @@ fn metadata_component_payload(
         ..Default::default()
     }
     .encode_to_vec();
-    append_length_delimited_field(&mut payload, UNKNOWN_FIELD, UNKNOWN_MARKER)?;
+    append_length_delimited_field(
+        &mut payload,
+        UNKNOWN_FIELD,
+        UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -214,16 +230,39 @@ fn metadata_payload(last_identifier: u64) -> TestResult<Vec<u8>> {
     .encode_to_vec();
     let mut payload = Vec::new();
     append_varint_field(&mut payload, 1, last_identifier)?;
-    append_length_delimited_field(&mut payload, 3, &document)?;
-    append_length_delimited_field(&mut payload, 3, &unrelated)?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &document,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &unrelated,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut payload, 8, 10)?;
-    append_length_delimited_field(&mut payload, 11, &versioned)?;
-    append_length_delimited_field(&mut payload, UNKNOWN_FIELD, UNKNOWN_MARKER)?;
+    append_length_delimited_field(
+        &mut payload,
+        11,
+        &versioned,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut payload,
+        UNKNOWN_FIELD,
+        UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
 fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn synthetic_package() -> TestResult<Vec<u8>> {
@@ -330,21 +369,24 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn document_stream(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("missing document"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn metadata_stream(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or_else(|| io::Error::other("missing metadata"))?;
-    let archive = Archive::parse(&SnappyStream::decompress(entry.data())?.into_bytes())?;
+    let archive = Archive::parse(
+        &SnappyStream::decompress(entry.data(), Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
     archive
         .object(METADATA_OBJECT)
         .and_then(|object| {
@@ -358,7 +400,7 @@ fn metadata_stream(package: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn movie_payload_from_package(package: &[u8], movie: u64) -> TestResult<Vec<u8>> {
-    let archive = Archive::parse(&document_stream(package)?)?;
+    let archive = Archive::parse(&document_stream(package)?, Default::default())?;
     archive
         .object(movie)
         .and_then(|object| {
@@ -372,8 +414,9 @@ fn movie_payload_from_package(package: &[u8], movie: u64) -> TestResult<Vec<u8>>
 }
 
 fn replace_document_archive(source: &[u8], archive: Archive) -> TestResult<Vec<u8>> {
-    let replacement = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(source)?;
+    let replacement =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entries = catalog
         .iter()
         .map(|entry| {
@@ -391,7 +434,7 @@ fn replace_document_archive(source: &[u8], archive: Archive) -> TestResult<Vec<u
 }
 
 fn with_movie_payload(source: &[u8], movie: u64, payload: Vec<u8>) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     archive
         .object_mut(movie)
         .ok_or_else(|| io::Error::other("missing movie"))?
@@ -416,7 +459,12 @@ fn append_fixed32(payload: &mut Vec<u8>, field: u32, value: f32) {
 }
 
 fn append_unknown_extensions(payload: &mut Vec<u8>) -> TestResult<()> {
-    append_length_delimited_field(payload, 4_090, b"unknown overlong/group carrier")?;
+    append_length_delimited_field(
+        payload,
+        4_090,
+        b"unknown overlong/group carrier",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     // Unknown scalar values retain their non-canonical varint framing.
     payload.extend_from_slice(&[0xd0, 0x05, 0x96, 0x81, 0x00]);
     Ok(())
@@ -461,7 +509,7 @@ fn reads_file_movie_playback_and_preserves_media_graph() -> TestResult<()> {
         movie_payload(0, true)
     );
     assert_eq!(
-        Catalog::from_bytes(&source)?
+        Catalog::from_bytes(&source, Default::default())?
             .iter()
             .find(|entry| entry.name() == "Data/movie.mov")
             .map(|entry| entry.data()),
@@ -515,14 +563,14 @@ fn replacement_updates_all_playback_fields_inverse_and_apply_exactly() -> TestRe
         movie_payload(1, true)
     );
     assert_eq!(
-        Catalog::from_bytes(&candidate)?
+        Catalog::from_bytes(&candidate, Default::default())?
             .iter()
             .find(|entry| entry.name() == "Data/poster.png")
             .map(|entry| entry.data()),
         Some(b"synthetic poster bytes".as_slice())
     );
-    let source_catalog = Catalog::from_bytes(&source)?;
-    let candidate_catalog = Catalog::from_bytes(&candidate)?;
+    let source_catalog = Catalog::from_bytes(&source, Default::default())?;
+    let candidate_catalog = Catalog::from_bytes(&candidate, Default::default())?;
     for name in ["preview.jpg", "preview-micro.jpg", "preview-web.jpg"] {
         assert_eq!(
             candidate_catalog
@@ -677,7 +725,7 @@ fn unknown_fields_are_retained_and_unsupported_media_are_refused() -> TestResult
 #[test]
 fn missing_metadata_and_ingress_limits_are_atomic() -> TestResult<()> {
     let source = synthetic_package()?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let no_metadata = litchi_iwa_archive::package::to_bytes(
         catalog
             .iter()
@@ -694,7 +742,7 @@ fn missing_metadata_and_ingress_limits_are_atomic() -> TestResult<()> {
         .and_then(|edit| edit.commit())?;
     let candidate = exact_bytes(commit.package())?;
     assert!(
-        Catalog::from_bytes(&candidate)?
+        Catalog::from_bytes(&candidate, Default::default())?
             .iter()
             .all(|entry| entry.name() != METADATA_MEMBER)
     );
@@ -704,17 +752,17 @@ fn missing_metadata_and_ingress_limits_are_atomic() -> TestResult<()> {
     assert_eq!(exact_bytes(restored.package())?, no_metadata);
 
     let defaults = Limits::default();
-    let tight = Limits::new(
-        u64::try_from(source.len().saturating_sub(1))?,
-        defaults.max_entries(),
-        defaults.max_entry_bytes(),
-        defaults.max_total_bytes(),
-        defaults.max_iwa_stream_bytes(),
-    )?;
+    let tight = SourceLimits::builder()
+        .max_input_bytes(u64::try_from(source.len().saturating_sub(1))?)?
+        .max_entries(defaults.max_entries())?
+        .max_entry_bytes(defaults.max_entry_bytes())?
+        .max_aggregate_bytes(defaults.max_total_bytes())?
+        .max_component_bytes(defaults.max_iwa_stream_bytes())?
+        .build()?;
     assert!(
         Package::from_bytes_with_options(
             &source,
-            litchi_keynote::ReadOptions::new(tight, litchi_keynote::SemanticLimits::default()),
+            litchi_keynote::OpenOptions::new().source_limits(tight),
         )
         .is_err()
     );

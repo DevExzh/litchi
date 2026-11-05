@@ -11,6 +11,7 @@
 //! ```
 
 use litchi_opc::OpcPackage;
+use litchi_opc::SourceLimits;
 use std::io::Write as _;
 use std::path::PathBuf;
 
@@ -23,7 +24,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     writeln!(out, "Opening OPC package: {}", path.display())?;
-    let pkg = OpcPackage::open(&path)?;
+    let pkg = OpcPackage::open(&path, SourceLimits::default())?;
 
     writeln!(out, "\nPackage contains {} parts:", pkg.part_count())?;
     writeln!(out, "{:-<100}", "")?;

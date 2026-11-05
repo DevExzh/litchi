@@ -1,4 +1,5 @@
-use litchi_ods::{Cell, CellValue, CellView, FlatLimits, FlatSpreadsheet};
+use litchi_ods::flat::Workbook as FlatSpreadsheet;
+use litchi_ods::{Cell, CellValue, CellView, OpenOptions, SemanticLimits, SourceLimits};
 use std::sync::Arc;
 
 const FLAT_SAMPLE: &str = include_str!("fixtures/odfdo-test-flat-lo-compact.fods");
@@ -8,7 +9,7 @@ const PACKAGED: &[u8] = include_bytes!("../../../test-data/odf/corpus/calc-formu
 
 #[test]
 fn reads_real_flat_calc_sheets_cells_metadata_and_source_exactly() {
-    let flat = FlatSpreadsheet::from_bytes(FLAT_SAMPLE.as_bytes().to_vec())
+    let flat = FlatSpreadsheet::from_bytes(FLAT_SAMPLE.as_bytes())
         .expect("test fixture or operation should succeed");
     assert_eq!(flat.sheets().len(), 2);
     assert_eq!(
@@ -71,7 +72,7 @@ fn repeated_cells_are_logically_addressable_without_expansion() {
         r#"<table:table-cell office:value-type="string"><text:p>end</text:p></table:table-cell>"#,
         r#"</table:table-row></table:table></office:spreadsheet></office:body></office:document>"#,
     );
-    let flat = FlatSpreadsheet::from_bytes(xml.as_bytes().to_vec())
+    let flat = FlatSpreadsheet::from_bytes(xml.as_bytes())
         .expect("test fixture or operation should succeed");
     let sheet = flat
         .sheet("R")
@@ -99,26 +100,26 @@ fn repeated_cells_are_logically_addressable_without_expansion() {
 #[test]
 fn wrappers_reject_wrong_family_package_and_garbage() {
     let presentation = br#"<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" office:mimetype="application/vnd.oasis.opendocument.presentation"><office:body><office:presentation/></office:body></office:document>"#;
-    assert!(FlatSpreadsheet::from_bytes(presentation.to_vec()).is_err());
-    assert!(FlatSpreadsheet::from_bytes(PACKAGED.to_vec()).is_err());
-    assert!(FlatSpreadsheet::from_bytes(Vec::new()).is_err());
-    assert!(FlatSpreadsheet::from_bytes(b"not XML".to_vec()).is_err());
+    assert!(FlatSpreadsheet::from_bytes(presentation).is_err());
+    assert!(FlatSpreadsheet::from_bytes(PACKAGED).is_err());
+    assert!(FlatSpreadsheet::from_bytes(&[]).is_err());
+    assert!(FlatSpreadsheet::from_bytes(b"not XML").is_err());
 }
 
 #[test]
 fn real_flat_cell_edit_preserves_linked_shape_and_reopens() {
-    let original = FlatSpreadsheet::from_bytes(FLAT_IMAGE.as_bytes().to_vec())
+    let original = FlatSpreadsheet::from_bytes(FLAT_IMAGE.as_bytes())
         .expect("test fixture or operation should succeed");
     let mut edit = original
-        .transaction()
+        .edit()
         .expect("test fixture or operation should succeed");
     edit.set_cell("Sheet1", 0, 1, Cell::new(CellValue::Number(42.0), "42"))
         .expect("test fixture or operation should succeed");
     let commit = edit
         .commit()
         .expect("test fixture or operation should succeed");
-    assert!(commit.changed());
-    let edited = commit.into_spreadsheet();
+    assert!(commit.diagnostics().changed());
+    let edited = commit.into_package();
     assert!(String::from_utf8_lossy(edited.as_bytes()).contains("tracking-pixel.png"));
     assert_eq!(
         edited
@@ -145,10 +146,10 @@ fn real_flat_cell_edit_preserves_linked_shape_and_reopens() {
 
 #[test]
 fn odfpy_dde_edit_preserves_inert_source_without_inventing_metadata() {
-    let original = FlatSpreadsheet::from_bytes(FLAT_DDE.as_bytes().to_vec())
+    let original = FlatSpreadsheet::from_bytes(FLAT_DDE.as_bytes())
         .expect("test fixture or operation should succeed");
     let mut edit = original
-        .transaction()
+        .edit()
         .expect("test fixture or operation should succeed");
     edit.set_cell(
         "Live Data",
@@ -160,7 +161,7 @@ fn odfpy_dde_edit_preserves_inert_source_without_inventing_metadata() {
     let edited = edit
         .commit()
         .expect("test fixture or operation should succeed")
-        .into_spreadsheet();
+        .into_package();
     let output = String::from_utf8_lossy(edited.as_bytes());
     assert!(output.contains("never/contacted.ods"));
     assert!(!output.contains("<office:meta>"));
@@ -187,24 +188,24 @@ fn odfpy_dde_edit_preserves_inert_source_without_inventing_metadata() {
 
 #[test]
 fn no_op_is_byte_exact_and_unmodeled_changed_rows_are_refused() {
-    let original = FlatSpreadsheet::from_bytes(FLAT_IMAGE.as_bytes().to_vec())
+    let original = FlatSpreadsheet::from_bytes(FLAT_IMAGE.as_bytes())
         .expect("test fixture or operation should succeed");
     let commit = original
-        .transaction()
+        .edit()
         .expect("test fixture or operation should succeed")
         .commit()
         .expect("test fixture or operation should succeed");
-    assert!(!commit.changed());
-    assert_eq!(commit.spreadsheet().as_bytes(), FLAT_IMAGE.as_bytes());
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().as_bytes(), FLAT_IMAGE.as_bytes());
 
     let annotated = FLAT_IMAGE.replace(
         "<text:p>test</text:p>",
         "<text:p>test</text:p><office:annotation><text:p>keep</text:p></office:annotation>",
     );
-    let source = FlatSpreadsheet::from_bytes(annotated.as_bytes().to_vec())
+    let source = FlatSpreadsheet::from_bytes(annotated.as_bytes())
         .expect("test fixture or operation should succeed");
     let mut edit = source
-        .transaction()
+        .edit()
         .expect("test fixture or operation should succeed");
     edit.set_cell("Sheet1", 0, 0, Cell::new(CellValue::Number(1.0), "1"))
         .expect("test fixture or operation should succeed");
@@ -222,7 +223,7 @@ fn duplicate_names_require_an_unambiguous_selector() {
         r#"<table:table table:name="Same"><table:table-row/></table:table>"#,
         r#"</office:spreadsheet></office:body></office:document>"#,
     );
-    let snapshot = FlatSpreadsheet::from_bytes(xml.as_bytes().to_vec())
+    let snapshot = FlatSpreadsheet::from_bytes(xml.as_bytes())
         .expect("test fixture or operation should succeed");
     assert!(snapshot.sheet("Same").is_err());
     assert_eq!(
@@ -249,7 +250,7 @@ fn duplicate_names_require_an_unambiguous_selector() {
     );
 
     let mut ambiguous = snapshot
-        .transaction()
+        .edit()
         .expect("test fixture or operation should succeed");
     assert!(
         ambiguous
@@ -257,7 +258,7 @@ fn duplicate_names_require_an_unambiguous_selector() {
             .is_err()
     );
     let mut indexed = snapshot
-        .transaction()
+        .edit()
         .expect("test fixture or operation should succeed");
     indexed
         .set_cell(1usize, 0, 0, Cell::new(CellValue::Number(2.0), "2"))
@@ -267,7 +268,7 @@ fn duplicate_names_require_an_unambiguous_selector() {
         .expect("test fixture or operation should succeed");
     assert_eq!(
         committed
-            .snapshot()
+            .package()
             .sheet(1usize)
             .expect("test fixture or operation should succeed")
             .expect("test fixture or operation should succeed")
@@ -280,10 +281,10 @@ fn duplicate_names_require_an_unambiguous_selector() {
 
 #[test]
 fn patch_is_exact_source_checked_reversible_and_stale_safe() {
-    let source = FlatSpreadsheet::from_bytes(FLAT_DDE.as_bytes().to_vec())
+    let source = FlatSpreadsheet::from_bytes(FLAT_DDE.as_bytes())
         .expect("test fixture or operation should succeed");
     let mut transaction = source
-        .transaction()
+        .edit()
         .expect("test fixture or operation should succeed");
     transaction
         .set_cell(
@@ -296,45 +297,42 @@ fn patch_is_exact_source_checked_reversible_and_stale_safe() {
     let commit = transaction
         .commit()
         .expect("test fixture or operation should succeed");
-    assert!(commit.changed());
-    let applied = commit
-        .patch()
-        .apply(&source)
+    assert!(commit.diagnostics().changed());
+    let applied = source
+        .apply(commit.patch())
         .expect("test fixture or operation should succeed");
-    assert_eq!(applied.as_bytes(), commit.snapshot().as_bytes());
-    assert!(commit.patch().apply(commit.snapshot()).is_err());
+    assert_eq!(applied.package().as_bytes(), commit.package().as_bytes());
+    assert!(matches!(
+        commit.package().apply(commit.patch()),
+        Err(litchi_ods::flat::Error::PatchConflict { .. })
+    ));
 
     let inverse = commit.patch().inverse();
-    let restored = inverse
-        .apply(commit.snapshot())
+    let restored = commit
+        .package()
+        .apply(&inverse)
         .expect("test fixture or operation should succeed");
-    assert_eq!(restored.as_bytes(), source.as_bytes());
-    assert!(inverse.apply(&source).is_err());
+    assert_eq!(restored.package().as_bytes(), source.as_bytes());
+    assert!(source.apply(&inverse).is_err());
 }
 
 #[test]
 fn input_output_and_patch_limits_enforce_exact_n_and_n_plus_one() {
     let input_len = FLAT_DDE.len();
     assert!(
-        FlatSpreadsheet::from_bytes_with(
-            FLAT_DDE.as_bytes().to_vec(),
-            FlatLimits::default().with_input_bytes(input_len),
-        )
-        .is_ok()
+        FlatSpreadsheet::from_bytes_with_options(FLAT_DDE.as_bytes(), input_limit(input_len))
+            .is_ok()
     );
     assert!(
-        FlatSpreadsheet::from_bytes_with(
-            FLAT_DDE.as_bytes().to_vec(),
-            FlatLimits::default().with_input_bytes(input_len - 1),
-        )
-        .is_err()
+        FlatSpreadsheet::from_bytes_with_options(FLAT_DDE.as_bytes(), input_limit(input_len - 1))
+            .is_err()
     );
 
-    let source = FlatSpreadsheet::from_bytes(FLAT_DDE.as_bytes().to_vec())
-        .expect("test fixture or operation should succeed");
-    let stage = |limits| {
+    let stage = |options| {
+        let source = FlatSpreadsheet::from_bytes_with_options(FLAT_DDE.as_bytes(), options)
+            .expect("test fixture or operation should succeed");
         let mut transaction = source
-            .transaction_with(limits)
+            .edit()
             .expect("test fixture or operation should succeed");
         transaction
             .set_cell(
@@ -346,40 +344,35 @@ fn input_output_and_patch_limits_enforce_exact_n_and_n_plus_one() {
             .expect("test fixture or operation should succeed");
         transaction.commit()
     };
-    let reference = stage(FlatLimits::default()).expect("test fixture or operation should succeed");
-    let output_len = reference.snapshot().as_bytes().len();
+    let reference = stage(OpenOptions::new()).expect("test fixture or operation should succeed");
+    let output_len = reference.package().as_bytes().len();
     assert!(
-        stage(FlatLimits::default().with_output_bytes(output_len)).is_ok(),
+        stage(output_limit(output_len)).is_ok(),
         "N bytes must be accepted"
     );
     assert!(
-        stage(FlatLimits::default().with_output_bytes(output_len - 1)).is_err(),
+        stage(output_limit(output_len - 1)).is_err(),
         "N+1 observed bytes must be rejected by an N-byte limit"
     );
-    assert!(
-        reference
-            .patch()
-            .apply_with(
-                &source,
-                FlatLimits::default().with_output_bytes(output_len - 1),
-            )
-            .is_err()
-    );
+    let bounded_source =
+        FlatSpreadsheet::from_bytes_with_options(FLAT_DDE.as_bytes(), output_limit(output_len - 1))
+            .expect("test fixture or operation should succeed");
+    assert!(bounded_source.apply(reference.patch()).is_err());
 }
 
 #[test]
 fn trailing_content_is_rejected_and_formatted_source_is_read_only() {
-    assert!(FlatSpreadsheet::from_bytes(format!("{FLAT_DDE}trailing").into_bytes()).is_err());
+    assert!(FlatSpreadsheet::from_bytes(&format!("{FLAT_DDE}trailing").into_bytes()).is_err());
     assert!(
-        FlatSpreadsheet::from_bytes(format!("{FLAT_DDE}<![CDATA[trailing]]>").into_bytes())
+        FlatSpreadsheet::from_bytes(&format!("{FLAT_DDE}<![CDATA[trailing]]>").into_bytes())
             .is_err()
     );
 
     let formatted = FLAT_DDE.replacen("><", ">\n<", 1);
-    let snapshot = FlatSpreadsheet::from_bytes(formatted.as_bytes().to_vec())
+    let snapshot = FlatSpreadsheet::from_bytes(formatted.as_bytes())
         .expect("test fixture or operation should succeed");
     let mut transaction = snapshot
-        .transaction()
+        .edit()
         .expect("test fixture or operation should succeed");
     transaction
         .set_cell(0usize, 0, 0, Cell::new(CellValue::Number(9.0), "9"))
@@ -399,10 +392,10 @@ fn changed_publication_uses_quote_aware_shared_compactness_rules() {
         format!(" {FLAT_DDE}"),
     ];
     for source in formatted {
-        let snapshot = FlatSpreadsheet::from_bytes(source.as_bytes().to_vec())
+        let snapshot = FlatSpreadsheet::from_bytes(source.as_bytes())
             .expect("test fixture or operation should succeed");
         let mut transaction = snapshot
-            .transaction()
+            .edit()
             .expect("test fixture or operation should succeed");
         assert_eq!(
             transaction
@@ -415,10 +408,10 @@ fn changed_publication_uses_quote_aware_shared_compactness_rules() {
     }
 
     let quoted = FLAT_DDE.replacen("<office:document ", "<office:document quoted=\"> <\" ", 1);
-    let snapshot = FlatSpreadsheet::from_bytes(quoted.as_bytes().to_vec())
+    let snapshot = FlatSpreadsheet::from_bytes(quoted.as_bytes())
         .expect("test fixture or operation should succeed");
     let mut transaction = snapshot
-        .transaction()
+        .edit()
         .expect("test fixture or operation should succeed");
     assert_eq!(
         transaction
@@ -429,19 +422,19 @@ fn changed_publication_uses_quote_aware_shared_compactness_rules() {
     let commit = transaction
         .commit()
         .expect("test fixture or operation should succeed");
-    assert!(commit.changed());
-    assert!(String::from_utf8_lossy(commit.snapshot().as_bytes()).contains("quoted=\"> <\""));
+    assert!(commit.diagnostics().changed());
+    assert!(String::from_utf8_lossy(commit.package().as_bytes()).contains("quoted=\"> <\""));
 }
 
 #[test]
 fn transaction_shares_source_and_reports_absent_selectors() {
-    let snapshot = FlatSpreadsheet::from_bytes(FLAT_DDE.as_bytes().to_vec())
+    let snapshot = FlatSpreadsheet::from_bytes(FLAT_DDE.as_bytes())
         .expect("test fixture or operation should succeed");
     let first = snapshot.to_bytes();
     let second = snapshot.to_bytes();
     assert!(Arc::ptr_eq(&first, &second));
     let mut transaction = snapshot
-        .transaction()
+        .edit()
         .expect("test fixture or operation should succeed");
     let while_detached = snapshot.to_bytes();
     assert!(Arc::ptr_eq(&first, &while_detached));
@@ -468,10 +461,42 @@ fn transaction_shares_source_and_reports_absent_selectors() {
 
 #[test]
 fn content_events_outside_the_document_root_are_rejected() {
-    assert!(FlatSpreadsheet::from_bytes(format!("text{FLAT_DDE}").into_bytes()).is_err());
-    assert!(FlatSpreadsheet::from_bytes(format!("<![CDATA[]]>{FLAT_DDE}").into_bytes()).is_err());
-    assert!(FlatSpreadsheet::from_bytes(format!("{FLAT_DDE}<![CDATA[]]>").into_bytes()).is_err());
-    assert!(FlatSpreadsheet::from_bytes(format!("{FLAT_DDE}<!--outside-->").into_bytes()).is_err());
-    assert!(FlatSpreadsheet::from_bytes(format!("{FLAT_DDE} ").into_bytes()).is_err());
-    assert!(FlatSpreadsheet::from_bytes(format!(" \n{FLAT_DDE}").into_bytes()).is_ok());
+    assert!(FlatSpreadsheet::from_bytes(&format!("text{FLAT_DDE}").into_bytes()).is_err());
+    assert!(FlatSpreadsheet::from_bytes(&format!("<![CDATA[]]>{FLAT_DDE}").into_bytes()).is_err());
+    assert!(FlatSpreadsheet::from_bytes(&format!("{FLAT_DDE}<![CDATA[]]>").into_bytes()).is_err());
+    assert!(FlatSpreadsheet::from_bytes(&format!("{FLAT_DDE}text").into_bytes()).is_err());
+    assert!(FlatSpreadsheet::from_bytes(&format!(" \n{FLAT_DDE}").into_bytes()).is_ok());
+}
+
+/// XML 1.0 `Misc` (whitespace, comments, processing instructions) may
+/// follow the root; every LibreOffice flat document ends with a newline
+/// (record 0277).
+#[test]
+fn xml_misc_after_the_document_root_is_admitted() {
+    for tail in [" ", "\n", "<!--outside-->", "<?pi data?>\n"] {
+        assert!(
+            FlatSpreadsheet::from_bytes(&format!("{FLAT_DDE}{tail}").into_bytes()).is_ok(),
+            "{tail:?}"
+        );
+    }
+}
+
+fn input_limit(bytes: usize) -> OpenOptions {
+    OpenOptions::new().source_limits(
+        SourceLimits::builder()
+            .max_input_bytes(u64::try_from(bytes).unwrap())
+            .unwrap()
+            .build()
+            .unwrap(),
+    )
+}
+
+fn output_limit(bytes: usize) -> OpenOptions {
+    OpenOptions::new().semantic_limits(
+        SemanticLimits::builder()
+            .max_output_bytes(u64::try_from(bytes).unwrap())
+            .unwrap()
+            .build()
+            .unwrap(),
+    )
 }

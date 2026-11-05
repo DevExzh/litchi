@@ -1,6 +1,7 @@
 use super::{flatten_text, number, roundtrip, roundtrip_text, single, text, write_bare};
 use crate::ast::MatrixFence;
 use crate::ast::{AccentType, LineStyle, MathNode, Operator, Position, StyleType};
+use crate::mtef::Limits;
 use crate::mtef::writer::{MtefWriteError, MtefWriter};
 use std::borrow::Cow;
 
@@ -133,6 +134,51 @@ fn runs_round_trip_their_rules() {
 }
 
 #[test]
+fn ruled_runs_match_single_and_double_encoded_depth() {
+    let single = MathNode::Run {
+        content: vec![text("x")],
+        literal: None,
+        style: None,
+        font: None,
+        color: None,
+        underline: Some(LineStyle::Single),
+        overline: None,
+        strike_through: None,
+        double_strike_through: None,
+    };
+    let double = MathNode::Run {
+        content: vec![text("x")],
+        literal: None,
+        style: None,
+        font: None,
+        color: None,
+        underline: Some(LineStyle::Single),
+        overline: Some(LineStyle::Single),
+        strike_through: None,
+        double_strike_through: None,
+    };
+
+    let depth_three = Limits::new(4096, 3, 256, 256, 4096, 4096).unwrap();
+    MtefWriter::new(depth_three)
+        .write_nodes(&[single])
+        .expect("root line plus one ruled template and slot line fit");
+    let depth_four = Limits::new(4096, 4, 256, 256, 4096, 4096).unwrap();
+    assert!(matches!(
+        MtefWriter::new(depth_four).write_nodes(std::slice::from_ref(&double)),
+        Err(MtefWriteError::LimitExceeded {
+            kind: crate::mtef::LimitKind::Depth,
+            actual: 5,
+            ..
+        })
+    ));
+
+    let depth_five = Limits::new(4096, 5, 256, 256, 4096, 4096).unwrap();
+    MtefWriter::new(depth_five)
+        .write_nodes(&[double])
+        .expect("root line plus two ruled templates and slot lines fit at depth five");
+}
+
+#[test]
 fn runs_can_name_a_font() {
     let font_run = || MathNode::Run {
         content: vec![text("x")],
@@ -228,9 +274,118 @@ fn deeply_nested_formulas_are_rejected_rather_than_overflowing() {
     }
 
     assert!(matches!(
-        MtefWriter::new().write_nodes(&[node]),
-        Err(MtefWriteError::DepthExceeded { .. })
+        MtefWriter::new(Limits::DEFAULT).write_nodes(&[node]),
+        Err(MtefWriteError::LimitExceeded {
+            kind: crate::mtef::LimitKind::Depth,
+            ..
+        })
     ));
+}
+
+#[test]
+fn preflight_matches_line_break_framing_at_the_output_boundary() {
+    // A bare stream containing one break is exactly 20 bytes: the MTEF
+    // header/full framing (11), a PILE with two empty LINEs (8), and the
+    // outer END (1).
+    let exact = Limits::new(4096, 8, 256, 256, 4096, 20).unwrap();
+    let bytes = MtefWriter::with_options(
+        exact,
+        crate::mtef::writer::MtefWriteOptions::without_ole_header(),
+    )
+    .write_nodes(&[MathNode::LineBreak])
+    .expect("the exact output boundary is admitted");
+    assert_eq!(bytes.len(), 20);
+
+    let under = Limits::new(4096, 8, 256, 256, 4096, 19).unwrap();
+    assert!(matches!(
+        MtefWriter::with_options(
+            under,
+            crate::mtef::writer::MtefWriteOptions::without_ole_header(),
+        )
+        .write_nodes(&[MathNode::LineBreak]),
+        Err(MtefWriteError::LimitExceeded {
+            kind: crate::mtef::LimitKind::OutputBytes,
+            actual: 20,
+            ..
+        })
+    ));
+}
+
+#[test]
+fn preflight_and_emitter_share_the_exact_depth_boundary() {
+    let exact = Limits::new(4096, 1, 256, 256, 4096, 4096).unwrap();
+    MtefWriter::new(exact)
+        .write_nodes(&[text("x")])
+        .expect("a leaf fits at depth one");
+    MtefWriter::new(exact)
+        .write_nodes(&[MathNode::Row(vec![text("x")])])
+        .expect("transparent rows do not consume encoded depth");
+    assert!(matches!(
+        MtefWriter::new(exact).write_nodes(&[MathNode::LineBreak]),
+        Err(MtefWriteError::LimitExceeded {
+            kind: crate::mtef::LimitKind::Depth,
+            actual: 2,
+            ..
+        })
+    ));
+    let pile_exact = Limits::new(4096, 2, 256, 256, 4096, 4096).unwrap();
+    MtefWriter::new(pile_exact)
+        .write_nodes(&[MathNode::LineBreak])
+        .expect("a root pile and its row fit at depth two");
+
+    let nested = MathNode::Frac {
+        numerator: vec![text("x")],
+        denominator: vec![text("y")],
+        line_thickness: None,
+        frac_type: None,
+    };
+    let nested_under = Limits::new(4096, 2, 256, 256, 4096, 4096).unwrap();
+    assert!(matches!(
+        MtefWriter::new(nested_under).write_nodes(&[nested]),
+        Err(MtefWriteError::LimitExceeded {
+            kind: crate::mtef::LimitKind::Depth,
+            actual: 3,
+            ..
+        })
+    ));
+}
+
+#[test]
+fn nested_templates_and_matrix_cells_use_their_encoded_line_depth() {
+    let fraction = MathNode::Frac {
+        numerator: vec![text("x")],
+        denominator: vec![text("y")],
+        line_thickness: None,
+        frac_type: None,
+    };
+    let root = MathNode::Root {
+        base: vec![text("x")],
+        index: None,
+    };
+    let matrix = MathNode::Matrix {
+        rows: vec![vec![vec![text("x")]]],
+        fence_type: MatrixFence::None,
+        properties: None,
+    };
+
+    let under = Limits::new(4096, 2, 256, 256, 4096, 4096).unwrap();
+    for node in [fraction.clone(), root.clone(), matrix.clone()] {
+        assert!(matches!(
+            MtefWriter::new(under).write_nodes(&[node]),
+            Err(MtefWriteError::LimitExceeded {
+                kind: crate::mtef::LimitKind::Depth,
+                actual: 3,
+                ..
+            })
+        ));
+    }
+
+    let exact = Limits::new(4096, 3, 256, 256, 4096, 4096).unwrap();
+    for node in [fraction, root, matrix] {
+        MtefWriter::new(exact)
+            .write_nodes(&[node])
+            .expect("three encoded levels are sufficient");
+    }
 }
 
 #[test]
@@ -243,7 +398,7 @@ fn oversized_matrices_are_rejected() {
     };
 
     assert!(matches!(
-        MtefWriter::new().write_nodes(&[node]),
+        MtefWriter::new(Limits::DEFAULT).write_nodes(&[node]),
         Err(MtefWriteError::MatrixTooLarge { .. })
     ));
 }

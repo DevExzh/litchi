@@ -12,12 +12,12 @@ use std::fmt;
 use std::num::NonZeroU64;
 use std::sync::Arc;
 
-use litchi_iwa_archive::{ComponentCatalog, SourceCatalog, package::EntryEdit};
+use litchi_iwa_archive::{ComponentCatalog, package::EntryEdit};
 use litchi_iwa_common::{WireLimits, encode_varint_into, varint::encoded_len, wire::WireView};
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::pages_footnote_codec;
 use litchi_iwa_text_wire::RewriteError;
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::{
     FOOTNOTE_REFERENCE_MESSAGE_TYPE, MAX_BODY_FOOTNOTES, Package, PackageError,
@@ -34,7 +34,7 @@ const FOOTNOTE_MARK_KIND: i32 = 2;
 /// published.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum FootnoteTextLimitKind {
+pub enum LimitKind {
     /// Complete input package bytes.
     InputBytes,
     /// Complete rewritten package bytes.
@@ -59,7 +59,7 @@ pub enum FootnoteTextLimitKind {
     WireWork,
 }
 
-impl fmt::Display for FootnoteTextLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -82,32 +82,21 @@ impl fmt::Display for FootnoteTextLimitKind {
 ///
 /// Diagnostics intentionally omit authored text, native identifiers, member
 /// names, paths, raw bytes, and lower-layer error strings.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum FootnoteTextError {
-    /// No footnote matched the source-order selector.
-    #[error("the Pages body-footnote selector did not match a footnote")]
-    NotFound,
-    /// The requested replacement contains a native structural marker.
-    #[error("Pages footnote text cannot contain native anchor or attachment markers")]
-    StructuralMarker,
-    /// The replacement exceeds the semantic footnote text budget.
-    #[error("Pages footnote text exceeds its semantic byte budget")]
-    TextTooLarge,
-    /// The replacement exceeds the semantic custom-marker budget.
-    #[error("Pages footnote custom marker exceeds its semantic byte budget")]
-    CustomMarkTooLarge,
-    /// The snapshot has no exact physical source suitable for a changed edit.
-    #[error("this Pages source does not support physical footnote-text edits")]
-    UnsupportedSource,
+pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     /// The selected native footnote cannot be rewritten without ambiguity.
     #[error("the Pages source cannot be edited safely")]
     InvalidSource,
     /// A finite transaction resource ceiling was exceeded.
     #[error("Pages footnote-text {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
+    Limit {
         /// Resource category that exceeded its limit.
-        kind: FootnoteTextLimitKind,
+        kind: LimitKind,
         /// Observed or requested amount.
         observed: u64,
         /// Configured maximum.
@@ -127,72 +116,128 @@ pub enum FootnoteTextError {
     PatchConflict,
 }
 
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
+    /// No footnote matched the source-order selector.
+    #[error("the Pages body-footnote selector did not match a footnote")]
+    NotFound,
+    /// The requested replacement contains a native structural marker.
+    #[error("Pages footnote text cannot contain native anchor or attachment markers")]
+    StructuralMarker,
+    /// The replacement exceeds the semantic footnote text budget.
+    #[error("Pages footnote text exceeds its semantic byte budget")]
+    TextTooLarge,
+    /// The replacement exceeds the semantic custom-marker budget.
+    #[error("Pages footnote custom marker exceeds its semantic byte budget")]
+    CustomMarkTooLarge,
+    /// The snapshot has no exact physical source suitable for a changed edit.
+    #[error("this Pages source does not support physical footnote-text edits")]
+    UnsupportedSource,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::NotFound { .. } => RefusalKind::NotFound,
+            Self::StructuralMarker { .. } | Self::UnsupportedSource { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+            Self::TextTooLarge { .. } | Self::CustomMarkTooLarge { .. } => {
+                RefusalKind::InvalidValue
+            },
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
+}
+
 /// One mutable body-footnote text and custom-marker value staged against an
 /// immutable package.
-pub struct FootnoteTextEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
-    position: Position,
-    before: Footnote,
+    selector: Selector,
+    position: Option<Position>,
+    before: Option<Footnote>,
     text: String,
     custom_mark: Option<String>,
 }
 
-impl fmt::Debug for FootnoteTextEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("FootnoteTextEdit")
+            .debug_struct("Edit")
             .field("position", &self.position)
             .finish_non_exhaustive()
     }
 }
 
-impl<'a> FootnoteTextEdit<'a> {
-    fn new(source: &'a Package, selector: Selector) -> Result<Self, FootnoteTextError> {
-        let (position, before, _) = resolve_footnote(source, selector)?;
-        let text = try_owned_text(&before.text)?;
-        let custom_mark = before
-            .custom_mark
-            .as_deref()
-            .map(try_owned_text)
-            .transpose()?;
+impl<'a> Edit<'a> {
+    fn resolve(&mut self) -> Result<(), Error> {
+        if self.position.is_none() {
+            let (position, before, _) = resolve_footnote(self.source, self.selector)?;
+            self.text = try_owned_text(&before.text)?;
+            self.custom_mark = before
+                .custom_mark
+                .as_deref()
+                .map(try_owned_text)
+                .transpose()?;
+            self.position = Some(position);
+            self.before = Some(before);
+        }
+        Ok(())
+    }
+
+    fn new(source: &'a Package, selector: Selector) -> Result<Self, Error> {
         Ok(Self {
             source,
-            position,
-            before,
-            text,
-            custom_mark,
+            selector,
+            position: None,
+            before: None,
+            text: String::new(),
+            custom_mark: None,
         })
     }
 
-    /// Return the checked UTF-16 body-anchor position resolved at edit start.
-    #[must_use]
-    pub const fn position(&self) -> Position {
-        self.position
+    /// Return the checked UTF-16 body-anchor position, resolving on first access.
+    pub fn position(&mut self) -> Result<Position, Error> {
+        self.resolve()?;
+        self.position.ok_or(Error::InvalidSource)
     }
 
     /// Borrow the original semantic footnote value.
-    #[must_use]
-    pub const fn before(&self) -> &Footnote {
-        &self.before
+    pub fn before(&mut self) -> Result<&Footnote, Error> {
+        self.resolve()?;
+        self.before.as_ref().ok_or(Error::InvalidSource)
     }
 
     /// Borrow the text currently staged for publication.
-    #[must_use]
-    pub fn text(&self) -> &str {
-        &self.text
+    pub fn text(&mut self) -> Result<&str, Error> {
+        self.resolve()?;
+        Ok(&self.text)
     }
 
     /// Borrow the custom marker currently staged for publication.
-    #[must_use]
-    pub fn custom_mark(&self) -> Option<&str> {
-        self.custom_mark.as_deref()
+    pub fn custom_mark(&mut self) -> Result<Option<&str>, Error> {
+        self.resolve()?;
+        Ok(self.custom_mark.as_deref())
     }
 
     /// Stage replacement of the selected footnote's user-visible text.
     ///
     /// The native body anchor and footnote graph are not changed. Structural
     /// U+000E and U+FFFC markers remain reserved for native graph edges.
-    pub fn set(&mut self, text: &str) -> Result<&mut Self, FootnoteTextError> {
+    pub fn set(&mut self, text: &str) -> Result<&mut Self, Error> {
+        self.resolve()?;
         validate_text(text)?;
         let owned = try_owned_text(text)?;
         self.text = owned;
@@ -204,10 +249,8 @@ impl<'a> FootnoteTextEdit<'a> {
     /// `None` removes the native field while `Some("")` retains an explicitly
     /// present empty native string. The reference, storage, and marker graph
     /// identities are not changed.
-    pub fn set_custom_mark(
-        &mut self,
-        custom_mark: Option<&str>,
-    ) -> Result<&mut Self, FootnoteTextError> {
+    pub fn set_custom_mark(&mut self, custom_mark: Option<&str>) -> Result<&mut Self, Error> {
+        self.resolve()?;
         validate_custom_mark(custom_mark)?;
         self.custom_mark = custom_mark.map(try_owned_text).transpose()?;
         Ok(self)
@@ -220,27 +263,30 @@ impl<'a> FootnoteTextEdit<'a> {
     /// footnote storage and/or reference message through source-preserving
     /// wire editors, then reopen and verify the complete candidate before
     /// return.
-    pub fn commit(self) -> Result<FootnoteTextCommit, FootnoteTextError> {
+    pub fn commit(mut self) -> Result<Commit, Error> {
+        self.resolve()?;
         validate_text(&self.text)?;
         validate_custom_mark(self.custom_mark.as_deref())?;
         self.source.validate().map_err(map_package_error)?;
-        let (position, current, native_footnote) =
-            resolve_footnote(self.source, Selector::At(self.position))?;
-        if position != self.position || current != self.before {
-            return Err(FootnoteTextError::InvalidSource);
+        let position = self.position.ok_or(Error::InvalidSource)?;
+        let before_source = self.before.as_ref().ok_or(Error::InvalidSource)?;
+        let (current_position, current, native_footnote) =
+            resolve_footnote(self.source, Selector::Anchor(position))?;
+        if current_position != position || current != *before_source {
+            return Err(Error::InvalidSource);
         }
-        if current.text.as_ref() != self.before.text.as_ref() {
-            return Err(FootnoteTextError::InvalidSource);
+        if current.text.as_ref() != before_source.text.as_ref() {
+            return Err(Error::InvalidSource);
         }
-        if current.custom_mark != self.before.custom_mark {
-            return Err(FootnoteTextError::InvalidSource);
+        if current.custom_mark != before_source.custom_mark {
+            return Err(Error::InvalidSource);
         }
 
         let source_bytes = self.source.state.source.shared_source();
         let source_fingerprint = super::section_transaction::fingerprint(&source_bytes);
-        let before = clone_footnote(&self.before)?;
+        let before = clone_footnote(before_source)?;
         let after = Footnote::with_custom_mark(
-            self.position,
+            position,
             try_owned_text(&self.text)?.into_boxed_str(),
             self.custom_mark
                 .as_deref()
@@ -251,51 +297,51 @@ impl<'a> FootnoteTextEdit<'a> {
         .map_err(map_footnote_value_error)?;
 
         if before == after {
-            return Ok(FootnoteTextCommit {
-                package: self.source.snapshot(),
-                patch: FootnoteTextPatch {
+            return Ok(Commit {
+                package: self.source.clone(),
+                patch: Patch {
                     source_bytes: Arc::clone(&source_bytes),
                     target_bytes: source_bytes,
                     source_fingerprint,
                     target_fingerprint: source_fingerprint,
-                    position: self.position,
+                    position,
                     before,
                     after,
                 },
-                diagnostics: FootnoteTextDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         if !self.source.state.source.source_is_exact() {
-            return Err(FootnoteTextError::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
 
         let package = rewrite_package_footnote(
             self.source,
             native_footnote,
-            self.before.text.as_ref(),
+            before_source.text.as_ref(),
             self.text.as_str(),
-            self.before.custom_mark.as_deref(),
+            before_source.custom_mark.as_deref(),
             self.custom_mark.as_deref(),
-            self.position,
+            position,
         )?;
         let touched_components = changed_component_count(self.source, &package)?;
         if touched_components == 0 {
-            return Err(FootnoteTextError::Verification);
+            return Err(Error::Verification);
         }
         let target_bytes = package.state.source.shared_source();
         let target_fingerprint = super::section_transaction::fingerprint(&target_bytes);
-        Ok(FootnoteTextCommit {
+        Ok(Commit {
             package,
-            patch: FootnoteTextPatch {
+            patch: Patch {
                 source_bytes,
                 target_bytes,
                 source_fingerprint,
                 target_fingerprint,
-                position: self.position,
+                position,
                 before,
                 after,
             },
-            diagnostics: FootnoteTextDiagnostics::published(touched_components),
+            diagnostics: Diagnostics::published(touched_components),
         })
     }
 }
@@ -306,7 +352,7 @@ impl<'a> FootnoteTextEdit<'a> {
 /// private. Fingerprints are diagnostics only; exact byte comparison
 /// authorizes application.
 #[derive(Clone, PartialEq, Eq)]
-pub struct FootnoteTextPatch {
+pub struct Patch {
     source_bytes: Arc<[u8]>,
     target_bytes: Arc<[u8]>,
     source_fingerprint: u64,
@@ -316,16 +362,16 @@ pub struct FootnoteTextPatch {
     after: Footnote,
 }
 
-impl fmt::Debug for FootnoteTextPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("FootnoteTextPatch")
+            .debug_struct("Patch")
             .field("position", &self.position)
             .finish_non_exhaustive()
     }
 }
 
-impl FootnoteTextPatch {
+impl Patch {
     /// Return the semantic UTF-16 body-anchor position selected by this patch.
     #[must_use]
     pub const fn position(&self) -> Position {
@@ -381,13 +427,13 @@ impl FootnoteTextPatch {
 
 /// Compact evidence describing one footnote-text commit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct FootnoteTextDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     full_reparse_performed: bool,
 }
 
-impl FootnoteTextDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -426,13 +472,13 @@ impl FootnoteTextDiagnostics {
 /// The fully verified result of one immutable footnote-text transaction.
 #[must_use = "a Pages footnote-text commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct FootnoteTextCommit {
+pub struct Commit {
     package: Package,
-    patch: FootnoteTextPatch,
-    diagnostics: FootnoteTextDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl FootnoteTextCommit {
+impl Commit {
     /// Borrow the fully reopened immutable package snapshot.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -445,15 +491,21 @@ impl FootnoteTextCommit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the reversible exact-source patch.
     #[must_use]
-    pub const fn patch(&self) -> &FootnoteTextPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Borrow compact publication diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> &FootnoteTextDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
@@ -463,21 +515,15 @@ impl Package {
     ///
     /// This alias keeps mutation call sites close to the setter transaction;
     /// ordinary reads remain available through [`Package::body_footnotes`].
-    pub fn edit_body_footnote_text(
-        &self,
-        selector: Selector,
-    ) -> Result<FootnoteTextEdit<'_>, FootnoteTextError> {
-        FootnoteTextEdit::new(self, selector)
+    pub fn edit_body_footnote_text(&self, selector: Selector) -> Result<Edit<'_>, Error> {
+        Edit::new(self, selector)
     }
 
     /// Apply an exact-source-checked body-footnote text patch.
     ///
     /// The retained target is fully reopened and semantically verified under
     /// this package's original limits before it is published.
-    pub fn apply_body_footnote_text(
-        &self,
-        patch: &FootnoteTextPatch,
-    ) -> Result<FootnoteTextCommit, FootnoteTextError> {
+    pub fn apply_body_footnote_text(&self, patch: &Patch) -> Result<Commit, Error> {
         let source = &self.state.source;
         let source_bytes = source.shared_source();
         if super::section_transaction::fingerprint(source.source_bytes())
@@ -485,43 +531,41 @@ impl Package {
             || source.source_bytes() != patch.source_bytes.as_ref()
             || source_bytes.as_ref() != patch.source_bytes.as_ref()
         {
-            return Err(FootnoteTextError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         self.validate().map_err(map_package_error)?;
-        let (_, current, _) = resolve_footnote(self, Selector::At(patch.position))?;
+        let (_, current, _) = resolve_footnote(self, Selector::Anchor(patch.position))?;
         if current != patch.before {
-            return Err(FootnoteTextError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if patch.is_noop() {
-            return Ok(FootnoteTextCommit {
-                package: self.snapshot(),
+            return Ok(Commit {
+                package: self.clone(),
                 patch: patch.clone(),
-                diagnostics: FootnoteTextDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         if !source.source_is_exact()
             || super::section_transaction::fingerprint(&patch.target_bytes)
                 != patch.target_fingerprint
         {
-            return Err(FootnoteTextError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
-        let candidate_source = SourceCatalog::from_shared_bytes_with_limits(
-            Arc::clone(&patch.target_bytes),
-            source.limits(),
-        )
-        .map_err(map_archive_error)?;
+        let candidate_source = source
+            .reopen(Arc::clone(&patch.target_bytes))
+            .map_err(map_archive_error)?;
         let candidate =
             Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
         candidate.validate().map_err(map_package_error)?;
         let touched_components = changed_component_count(self, &candidate)?;
         if touched_components == 0 {
-            return Err(FootnoteTextError::Verification);
+            return Err(Error::Verification);
         }
         verify_candidate(self, &candidate, patch.position, &patch.after)?;
-        Ok(FootnoteTextCommit {
+        Ok(Commit {
             package: candidate,
             patch: patch.clone(),
-            diagnostics: FootnoteTextDiagnostics::published(touched_components),
+            diagnostics: Diagnostics::published(touched_components),
         })
     }
 }
@@ -551,21 +595,21 @@ impl<'source> FootnoteObjectLocations<'source> {
     fn new(
         components: &'source ComponentCatalog,
         budget: &mut FootnoteGraphBudget,
-    ) -> Result<Self, FootnoteTextError> {
+    ) -> Result<Self, Error> {
         let object_count = components.iter().try_fold(0usize, |count, component| {
-            count.checked_add(component.archive().objects.len()).ok_or(
-                FootnoteTextError::LimitExceeded {
-                    kind: FootnoteTextLimitKind::Entries,
+            count
+                .checked_add(component.archive().objects.len())
+                .ok_or(Error::Limit {
+                    kind: LimitKind::Entries,
                     observed: usize_to_u64(usize::MAX),
                     maximum: usize_to_u64(super::MAX_OBJECTS),
-                },
-            )
+                })
         })?;
         budget.charge_references(object_count)?;
         budget.charge_work(object_count)?;
         if object_count > super::MAX_OBJECTS {
-            return Err(FootnoteTextError::LimitExceeded {
-                kind: FootnoteTextLimitKind::Entries,
+            return Err(Error::Limit {
+                kind: LimitKind::Entries,
                 observed: usize_to_u64(object_count),
                 maximum: usize_to_u64(super::MAX_OBJECTS),
             });
@@ -574,7 +618,7 @@ impl<'source> FootnoteObjectLocations<'source> {
         let mut objects = HashMap::new();
         objects
             .try_reserve(object_count)
-            .map_err(|_error| FootnoteTextError::Allocation {
+            .map_err(|_error| Error::Allocation {
                 amount: object_count,
             })?;
         for component in components.iter() {
@@ -609,7 +653,7 @@ pub(super) struct FootnoteGraphBudget {
 }
 
 impl FootnoteGraphBudget {
-    pub(super) fn new(limits: super::Limits) -> Result<Self, FootnoteTextError> {
+    pub(super) fn new(limits: super::Limits) -> Result<Self, Error> {
         let archive = limits
             .effective_archive_limits()
             .map_err(map_archive_error)?;
@@ -635,30 +679,30 @@ impl FootnoteGraphBudget {
         })
     }
 
-    pub(super) fn charge_source(&mut self, amount: usize) -> Result<(), FootnoteTextError> {
+    pub(super) fn charge_source(&mut self, amount: usize) -> Result<(), Error> {
         charge_graph_counter(
             &mut self.source_bytes,
             amount,
             self.maximum_source_bytes,
-            FootnoteTextLimitKind::InputBytes,
+            LimitKind::InputBytes,
         )
     }
 
-    pub(super) fn charge_references(&mut self, amount: usize) -> Result<(), FootnoteTextError> {
+    pub(super) fn charge_references(&mut self, amount: usize) -> Result<(), Error> {
         charge_graph_counter(
             &mut self.references,
             amount,
             self.maximum_references,
-            FootnoteTextLimitKind::Entries,
+            LimitKind::Entries,
         )
     }
 
-    pub(super) fn charge_work(&mut self, amount: usize) -> Result<(), FootnoteTextError> {
+    pub(super) fn charge_work(&mut self, amount: usize) -> Result<(), Error> {
         charge_graph_counter(
             &mut self.work,
             amount,
             self.maximum_work,
-            FootnoteTextLimitKind::WireWork,
+            LimitKind::WireWork,
         )
     }
 
@@ -683,11 +727,11 @@ fn charge_graph_counter(
     current: &mut usize,
     amount: usize,
     maximum: usize,
-    kind: FootnoteTextLimitKind,
-) -> Result<(), FootnoteTextError> {
+    kind: LimitKind,
+) -> Result<(), Error> {
     let observed = current.checked_add(amount).unwrap_or(usize::MAX);
     if observed > maximum {
-        return Err(FootnoteTextError::LimitExceeded {
+        return Err(Error::Limit {
             kind,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
@@ -700,26 +744,22 @@ fn charge_graph_counter(
 fn resolve_footnote(
     package: &Package,
     selector: Selector,
-) -> Result<(Position, Footnote, NativeFootnote), FootnoteTextError> {
+) -> Result<(Position, Footnote, NativeFootnote), Error> {
     let graphs = native_footnotes(package)?;
     let index = match selector {
-        Selector::Index(index) => index,
-        Selector::At(position) => graphs
+        Selector::Position(position) => position.get(),
+        Selector::Anchor(position) => graphs
             .iter()
             .position(|graph| graph.position == position)
-            .ok_or(FootnoteTextError::NotFound)?,
+            .ok_or(Error::Refused(Refusal::NotFound))?,
     };
-    let graph = graphs.get(index).ok_or(FootnoteTextError::NotFound)?;
+    let graph = graphs.get(index).ok_or(Error::Refused(Refusal::NotFound))?;
     let footnotes = package.body_footnotes().map_err(map_package_error)?;
-    let footnote = footnotes
-        .get(index)
-        .ok_or(FootnoteTextError::InvalidSource)?;
+    let footnote = footnotes.get(index).ok_or(Error::InvalidSource)?;
     Ok((graph.position, clone_footnote(footnote)?, *graph))
 }
 
-pub(super) fn native_footnotes(
-    package: &Package,
-) -> Result<Vec<NativeFootnote>, FootnoteTextError> {
+pub(super) fn native_footnotes(package: &Package) -> Result<Vec<NativeFootnote>, Error> {
     let mut budget = FootnoteGraphBudget::new(package.state.source.limits())?;
     native_footnotes_with_budget(package, &mut budget)
 }
@@ -727,7 +767,7 @@ pub(super) fn native_footnotes(
 pub(super) fn native_footnotes_with_budget(
     package: &Package,
     budget: &mut FootnoteGraphBudget,
-) -> Result<Vec<NativeFootnote>, FootnoteTextError> {
+) -> Result<Vec<NativeFootnote>, Error> {
     let mut semantic_budget =
         super::FootnoteSemanticBudget::new(effective_text_limit(package.state.source.limits()));
     let components = package.state.source.components();
@@ -738,8 +778,7 @@ pub(super) fn native_footnotes_with_budget(
     let Some(body_identifier) = root.body else {
         return Ok(Vec::new());
     };
-    let body =
-        find_object(components, body_identifier.get()).ok_or(FootnoteTextError::InvalidSource)?;
+    let body = find_object(components, body_identifier.get()).ok_or(Error::InvalidSource)?;
     let body_payload =
         unique_text_payload(&body.messages, body_identifier).map_err(map_package_error)?;
     budget.charge_work(body_payload.len())?;
@@ -756,10 +795,10 @@ pub(super) fn native_footnotes_with_budget(
     budget.charge_work(body_payload.len())?;
     let entries =
         super::footnote_table_entries(body_payload, body_identifier, package.state.source.limits())
-            .map_err(|error| map_package_error_with_kind(error, FootnoteTextLimitKind::Entries))?;
+            .map_err(|error| map_package_error_with_kind(error, LimitKind::Entries))?;
     if entries.len() > MAX_BODY_FOOTNOTES {
-        return Err(FootnoteTextError::LimitExceeded {
-            kind: FootnoteTextLimitKind::Entries,
+        return Err(Error::Limit {
+            kind: LimitKind::Entries,
             observed: usize_to_u64(entries.len()),
             maximum: usize_to_u64(MAX_BODY_FOOTNOTES),
         });
@@ -769,7 +808,7 @@ pub(super) fn native_footnotes_with_budget(
     let mut output = Vec::new();
     output
         .try_reserve_exact(entries.len())
-        .map_err(|_error| FootnoteTextError::Allocation {
+        .map_err(|_error| Error::Allocation {
             amount: entries.len(),
         })?;
     let mut seen_references = Vec::new();
@@ -777,7 +816,7 @@ pub(super) fn native_footnotes_with_budget(
     let mut seen_markers = Vec::new();
     for seen in [&mut seen_references, &mut seen_storages, &mut seen_markers] {
         seen.try_reserve_exact(entries.len())
-            .map_err(|_error| FootnoteTextError::Allocation {
+            .map_err(|_error| Error::Allocation {
                 amount: entries.len(),
             })?;
     }
@@ -785,11 +824,11 @@ pub(super) fn native_footnotes_with_budget(
     let mut previous = None;
     for entry in entries {
         if previous.is_some_and(|position| position >= entry.character_index) {
-            return Err(FootnoteTextError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         previous = Some(entry.character_index);
         if seen_references.contains(&entry.identifier) {
-            return Err(FootnoteTextError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         seen_references.push(entry.identifier);
         super::validate_body_footnote_anchor(
@@ -800,7 +839,7 @@ pub(super) fn native_footnotes_with_budget(
         .map_err(map_package_error)?;
         let reference = object_locations
             .get(entry.identifier.get())
-            .ok_or(FootnoteTextError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let payload = unique_message_payload(
             &reference.messages,
             FOOTNOTE_REFERENCE_MESSAGE_TYPE,
@@ -813,24 +852,24 @@ pub(super) fn native_footnotes_with_budget(
             footnote_decode_options(payload, package.state.source.limits())
                 .map_err(map_package_error)?,
         )
-        .map_err(|_error| FootnoteTextError::InvalidSource)?;
+        .map_err(|_error| Error::InvalidSource)?;
         if decoded
             .super_kind()
             .is_some_and(|kind| kind != FOOTNOTE_MARK_KIND)
         {
-            return Err(FootnoteTextError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let storage_identifier = decoded
             .contained_storage()
             .map(|reference| reference.identifier())
-            .ok_or(FootnoteTextError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if storage_identifier == entry.identifier || seen_storages.contains(&storage_identifier) {
-            return Err(FootnoteTextError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         seen_storages.push(storage_identifier);
         let storage = object_locations
             .get(storage_identifier.get())
-            .ok_or(FootnoteTextError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let storage_payload = unique_text_payload(&storage.messages, storage_identifier)
             .map_err(map_package_error)?;
         budget.charge_work(storage_payload.len())?;
@@ -847,22 +886,22 @@ pub(super) fn native_footnotes_with_budget(
         let text = storage_value
             .text()
             .strip_prefix(STORAGE_TEXT_PREFIX)
-            .ok_or(FootnoteTextError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if text.len() > crate::footnote::body::MAX_TEXT_BYTES {
-            return Err(FootnoteTextError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let custom_mark = decoded.custom_mark_string();
         if custom_mark
             .is_some_and(|value| value.len() > crate::footnote::body::MAX_CUSTOM_MARK_BYTES)
         {
-            return Err(FootnoteTextError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         super::FootnoteSemanticBudget::charge(
             &mut semantic_budget,
             text.len(),
             custom_mark.map_or(0, str::len),
         )
-        .map_err(|error| map_package_error_with_kind(error, FootnoteTextLimitKind::TextBytes))?;
+        .map_err(|error| map_package_error_with_kind(error, LimitKind::TextBytes))?;
         let marker_identifier = footnote_marker_identifier(
             storage_payload,
             storage_identifier,
@@ -873,12 +912,12 @@ pub(super) fn native_footnotes_with_budget(
             || marker_identifier == storage_identifier
             || seen_markers.contains(&marker_identifier)
         {
-            return Err(FootnoteTextError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         seen_markers.push(marker_identifier);
         let marker = object_locations
             .get(marker_identifier.get())
-            .ok_or(FootnoteTextError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let marker_payload = unique_message_payload(
             &marker.messages,
             TEXTUAL_ATTACHMENT_MESSAGE_TYPE,
@@ -893,9 +932,9 @@ pub(super) fn native_footnotes_with_budget(
                 footnote_marker_decode_options(marker_payload, package.state.source.limits())
                     .map_err(map_package_error)?,
             )
-            .map_err(|_error| FootnoteTextError::InvalidSource)?;
+            .map_err(|_error| Error::InvalidSource)?;
         if marker_value.kind() != Some(FOOTNOTE_MARK_KIND) {
-            return Err(FootnoteTextError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let position = position_from_anchor(entry.character_index)?;
         output.push(NativeFootnote {
@@ -917,7 +956,7 @@ fn rewrite_package_footnote(
     before_custom_mark: Option<&str>,
     after_custom_mark: Option<&str>,
     position: Position,
-) -> Result<Package, FootnoteTextError> {
+) -> Result<Package, Error> {
     let source_catalog = &source.state.source;
     let text_component = (before_text != after_text)
         .then(|| component_name_for_object(source, native_footnote.storage_identifier))
@@ -926,7 +965,7 @@ fn rewrite_package_footnote(
         .then(|| component_name_for_object(source, native_footnote.reference_identifier))
         .transpose()?;
     let first_component = text_component.or(mark_component);
-    let first_component = first_component.ok_or(FootnoteTextError::InvalidSource)?;
+    let first_component = first_component.ok_or(Error::InvalidSource)?;
     let second_component = match (text_component, mark_component) {
         (Some(text), Some(mark)) if text != mark => Some(mark),
         _ => None,
@@ -952,7 +991,7 @@ fn rewrite_package_footnote(
     let component_count = if second_component.is_some() { 2 } else { 1 };
     rewritten_entries
         .try_reserve_exact(component_count)
-        .map_err(|_error| FootnoteTextError::Allocation {
+        .map_err(|_error| Error::Allocation {
             amount: component_count,
         })?;
     for component_name in [Some(first_component), second_component]
@@ -977,7 +1016,7 @@ fn rewrite_package_footnote(
     let mut edits = Vec::new();
     edits
         .try_reserve_exact(rewritten_entries.len())
-        .map_err(|_error| FootnoteTextError::Allocation {
+        .map_err(|_error| Error::Allocation {
             amount: rewritten_entries.len(),
         })?;
     for (component_name, compressed) in &rewritten_entries {
@@ -987,9 +1026,9 @@ fn rewrite_package_footnote(
         .package()
         .reassemble_to_bytes(&edits, physical_limits)
         .map_err(map_archive_error)?;
-    let candidate_source =
-        SourceCatalog::from_shared_bytes_with_limits(output.into(), physical_limits)
-            .map_err(map_archive_error)?;
+    let candidate_source = source_catalog
+        .reopen(output.into())
+        .map_err(map_archive_error)?;
     let candidate = Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
     candidate.validate().map_err(map_package_error)?;
     let _ = changed_component_count(source, &candidate)?;
@@ -1006,19 +1045,16 @@ fn rewrite_package_footnote(
     Ok(candidate)
 }
 
-fn component_name_for_object(
-    package: &Package,
-    identifier: NonZeroU64,
-) -> Result<&str, FootnoteTextError> {
+fn component_name_for_object(package: &Package, identifier: NonZeroU64) -> Result<&str, Error> {
     let mut matching = package
         .state
         .source
         .components()
         .iter()
         .filter(|component| component.archive().object(identifier.get()).is_some());
-    let component = matching.next().ok_or(FootnoteTextError::InvalidSource)?;
+    let component = matching.next().ok_or(Error::InvalidSource)?;
     if matching.next().is_some() {
-        return Err(FootnoteTextError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if package
         .state
@@ -1028,7 +1064,7 @@ fn component_name_for_object(
         .find(|entry| entry.name() == component.name())
         .is_some_and(|entry| entry.is_opaque())
     {
-        return Err(FootnoteTextError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(component.name())
 }
@@ -1041,12 +1077,9 @@ fn component_name_for_object(
 /// authority whose local and central ZIP names agree byte-for-byte.  This
 /// check is intentionally local to the capability so the generic archive
 /// owner does not acquire Pages policy.
-fn validate_mutation_component(
-    package: &Package,
-    component_name: &str,
-) -> Result<(), FootnoteTextError> {
+fn validate_mutation_component(package: &Package, component_name: &str) -> Result<(), Error> {
     if !is_canonical_component_name(component_name) {
-        return Err(FootnoteTextError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let entry = package
         .state
@@ -1054,9 +1087,9 @@ fn validate_mutation_component(
         .package()
         .iter()
         .find(|entry| entry.name() == component_name)
-        .ok_or(FootnoteTextError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(FootnoteTextError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let expected = component_name.as_bytes();
     if entry.raw_name() != expected
@@ -1065,7 +1098,7 @@ fn validate_mutation_component(
         || entry.metadata().local().compression_method()
             != entry.metadata().central().compression_method()
     {
-        return Err(FootnoteTextError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -1094,7 +1127,7 @@ pub(super) fn prove_footnote_ownership(
     package: &Package,
     native_footnote: NativeFootnote,
     budget: &mut FootnoteGraphBudget,
-) -> Result<(), FootnoteTextError> {
+) -> Result<(), Error> {
     let limits = package.state.source.limits();
     for component in package.state.source.components().iter() {
         budget.charge_work(component.archive().objects.len())?;
@@ -1104,7 +1137,7 @@ pub(super) fn prove_footnote_ownership(
                 .archive_info
                 .identifier
                 .and_then(NonZeroU64::new)
-                .ok_or(FootnoteTextError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
 
             for message_info in &object.archive_info.message_infos {
                 budget.charge_references(message_info.object_references.len())?;
@@ -1142,7 +1175,7 @@ pub(super) fn prove_footnote_ownership(
                             }
                         },
                         Err(_error) if owner == native_footnote.reference_identifier => {
-                            return Err(FootnoteTextError::InvalidSource);
+                            return Err(Error::InvalidSource);
                         },
                         Err(_error) => {},
                     }
@@ -1152,7 +1185,7 @@ pub(super) fn prove_footnote_ownership(
                     continue;
                 }
                 let Some(owner_identifier) = NonZeroU64::new(owner.get()) else {
-                    return Err(FootnoteTextError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 };
                 match super::footnote_table_entries(&message.data, owner_identifier, limits) {
                     Ok(entries) => {
@@ -1167,7 +1200,7 @@ pub(super) fn prove_footnote_ownership(
                         }
                     },
                     Err(_error) if owner == native_footnote.body_identifier => {
-                        return Err(FootnoteTextError::InvalidSource);
+                        return Err(Error::InvalidSource);
                     },
                     Err(_error) => {},
                 }
@@ -1190,7 +1223,7 @@ fn validate_graph_edge(
     owner: u64,
     referenced: u64,
     native_footnote: NativeFootnote,
-) -> Result<(), FootnoteTextError> {
+) -> Result<(), Error> {
     let expected_owner = if referenced == native_footnote.reference_identifier.get() {
         Some(native_footnote.body_identifier.get())
     } else if referenced == native_footnote.storage_identifier.get() {
@@ -1201,7 +1234,7 @@ fn validate_graph_edge(
         None
     };
     if expected_owner.is_some_and(|expected| expected != owner) {
-        return Err(FootnoteTextError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -1217,17 +1250,17 @@ fn rewrite_component(
     before_custom_mark: Option<&str>,
     after_custom_mark: Option<&str>,
     archive_limits: litchi_iwa_core::Limits,
-) -> Result<Vec<u8>, FootnoteTextError> {
+) -> Result<Vec<u8>, Error> {
     let source_catalog = &source.state.source;
     let entry = source_catalog
         .package()
         .iter()
         .find(|entry| entry.name() == component_name)
-        .ok_or(FootnoteTextError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(FootnoteTextError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         source_catalog
             .limits()
@@ -1235,8 +1268,7 @@ fn rewrite_component(
             .map_err(map_archive_error)?,
     )
     .map_err(map_core_error)?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     let rewrite_limits =
         storage_rewrite_limits(source_catalog.limits()).map_err(map_storage_wire_limits_error)?;
 
@@ -1244,16 +1276,15 @@ fn rewrite_component(
         let (message_index, message_type, rewritten_payload) = {
             let object = archive
                 .object(native_footnote.storage_identifier.get())
-                .ok_or(FootnoteTextError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             let mut messages = object
                 .messages
                 .iter()
                 .enumerate()
                 .filter(|(_index, message)| is_body_text_message_type(message.type_));
-            let (message_index, message) =
-                messages.next().ok_or(FootnoteTextError::InvalidSource)?;
+            let (message_index, message) = messages.next().ok_or(Error::InvalidSource)?;
             if messages.next().is_some() {
-                return Err(FootnoteTextError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             let rewritten =
                 rewrite_storage_payload(&message.data, before_text, after_text, rewrite_limits)?;
@@ -1261,8 +1292,8 @@ fn rewrite_component(
         };
         archive
             .object_mut(native_footnote.storage_identifier.get())
-            .ok_or(FootnoteTextError::InvalidSource)?
-            .replace_message_preserving_header_with_limits(
+            .ok_or(Error::InvalidSource)?
+            .replace_message_preserving_header(
                 message_index,
                 RawMessage {
                     type_: message_type,
@@ -1277,16 +1308,15 @@ fn rewrite_component(
         let (message_index, message_type, rewritten_payload) = {
             let object = archive
                 .object(native_footnote.reference_identifier.get())
-                .ok_or(FootnoteTextError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             let mut messages = object
                 .messages
                 .iter()
                 .enumerate()
                 .filter(|(_index, message)| message.type_ == FOOTNOTE_REFERENCE_MESSAGE_TYPE);
-            let (message_index, message) =
-                messages.next().ok_or(FootnoteTextError::InvalidSource)?;
+            let (message_index, message) = messages.next().ok_or(Error::InvalidSource)?;
             if messages.next().is_some() {
-                return Err(FootnoteTextError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             let rewritten = rewrite_reference_payload(
                 &message.data,
@@ -1300,8 +1330,8 @@ fn rewrite_component(
         };
         archive
             .object_mut(native_footnote.reference_identifier.get())
-            .ok_or(FootnoteTextError::InvalidSource)?
-            .replace_message_preserving_header_with_limits(
+            .ok_or(Error::InvalidSource)?
+            .replace_message_preserving_header(
                 message_index,
                 RawMessage {
                     type_: message_type,
@@ -1312,10 +1342,12 @@ fn rewrite_component(
             .map_err(map_core_error)?;
     }
 
-    let rewritten_archive = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
-    SnappyStream::compress(&rewritten_archive).map_err(map_core_error)
+    let rewritten_archive = archive.to_bytes(archive_limits).map_err(map_core_error)?;
+    let snappy_limits = source_catalog
+        .limits()
+        .snappy_limits()
+        .map_err(map_archive_error)?;
+    SnappyStream::compress(&rewritten_archive, snappy_limits).map_err(map_core_error)
 }
 
 /// Compare source and candidate logical members while allowing only decoded
@@ -1324,14 +1356,11 @@ fn rewrite_component(
 /// compression policy must remain disjoint and stable.  The returned count is
 /// also the truthful physical-component diagnostic for a text+custom-marker
 /// edit that happens to span two members.
-fn changed_component_count(
-    source: &Package,
-    candidate: &Package,
-) -> Result<usize, FootnoteTextError> {
+fn changed_component_count(source: &Package, candidate: &Package) -> Result<usize, Error> {
     let source_entry_count = source.state.source.package().iter().count();
     let candidate_entry_count = candidate.state.source.package().iter().count();
     if source_entry_count != candidate_entry_count {
-        return Err(FootnoteTextError::Verification);
+        return Err(Error::Verification);
     }
     let source_entries = source.state.source.package().iter();
     let candidate_entries = candidate.state.source.package().iter();
@@ -1348,12 +1377,10 @@ fn changed_component_count(
             || source_entry.metadata().central().compression_method()
                 != candidate_entry.metadata().central().compression_method()
         {
-            return Err(FootnoteTextError::Verification);
+            return Err(Error::Verification);
         }
         if source_entry.data() != candidate_entry.data() {
-            changed = changed
-                .checked_add(1)
-                .ok_or(FootnoteTextError::Verification)?;
+            changed = changed.checked_add(1).ok_or(Error::Verification)?;
         }
     }
     Ok(changed)
@@ -1364,28 +1391,27 @@ fn rewrite_storage_payload(
     before: &str,
     after: &str,
     rewrite_limits: litchi_iwa_text_wire::RewriteLimits,
-) -> Result<Vec<u8>, FootnoteTextError> {
-    let storage = litchi_iwa_text_wire::decode_storage_with_limits(payload, rewrite_limits)
+) -> Result<Vec<u8>, Error> {
+    let storage = litchi_iwa_text_wire::decode_storage(payload, rewrite_limits)
         .map_err(map_text_rewrite_error)?
         .into_storage();
     let full_text = storage.text();
     let content = full_text
         .strip_prefix(STORAGE_TEXT_PREFIX)
-        .ok_or(FootnoteTextError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if content != before {
-        return Err(FootnoteTextError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let prefix_units = checked_utf16_units(STORAGE_TEXT_PREFIX)?;
     let content_units = checked_utf16_units(content)?;
-    let content_end =
-        prefix_units
-            .checked_add(content_units)
-            .ok_or(FootnoteTextError::LimitExceeded {
-                kind: FootnoteTextLimitKind::TextUnits,
-                observed: u64::MAX,
-                maximum: u64::from(u32::MAX),
-            })?;
-    let rewritten = litchi_iwa_text_wire::rewrite_storage_text_with_limits(
+    let content_end = prefix_units
+        .checked_add(content_units)
+        .ok_or(Error::Limit {
+            kind: LimitKind::TextUnits,
+            observed: u64::MAX,
+            maximum: u64::from(u32::MAX),
+        })?;
+    let rewritten = litchi_iwa_text_wire::rewrite_storage_text(
         payload,
         prefix_units..content_end,
         after,
@@ -1396,8 +1422,8 @@ fn rewrite_storage_payload(
         || rewritten.after_utf16_len()
             != prefix_units
                 .checked_add(checked_utf16_units(after)?)
-                .ok_or(FootnoteTextError::LimitExceeded {
-                    kind: FootnoteTextLimitKind::TextUnits,
+                .ok_or(Error::Limit {
+                    kind: LimitKind::TextUnits,
                     observed: u64::MAX,
                     maximum: u64::from(u32::MAX),
                 })?
@@ -1407,7 +1433,7 @@ fn rewrite_storage_payload(
             != rewritten.object_reference_occurrences_after()
         || !rewritten.changed()
     {
-        return Err(FootnoteTextError::Verification);
+        return Err(Error::Verification);
     }
     Ok(rewritten.into_bytes())
 }
@@ -1419,19 +1445,19 @@ fn rewrite_reference_payload(
     after_custom_mark: Option<&str>,
     physical_limits: super::Limits,
     rewrite_limits: litchi_iwa_text_wire::RewriteLimits,
-) -> Result<Vec<u8>, FootnoteTextError> {
+) -> Result<Vec<u8>, Error> {
     let decoded = pages_footnote_codec::decode_footnote_reference(
         payload,
         footnote_decode_options(payload, physical_limits).map_err(map_package_error)?,
     )
-    .map_err(|_error| FootnoteTextError::InvalidSource)?;
+    .map_err(|_error| Error::InvalidSource)?;
     if decoded.super_kind() != Some(FOOTNOTE_MARK_KIND)
         || decoded
             .contained_storage()
             .is_none_or(|reference| reference.identifier() != native_footnote.storage_identifier)
         || decoded.custom_mark_string() != before_custom_mark
     {
-        return Err(FootnoteTextError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let wire_limits = WireLimits::default()
         .with_input_bytes(rewrite_limits.max_message_bytes())
@@ -1446,14 +1472,14 @@ fn rewrite_reference_payload(
         &rewritten,
         footnote_decode_options(&rewritten, physical_limits).map_err(map_package_error)?,
     )
-    .map_err(|_error| FootnoteTextError::Verification)?;
+    .map_err(|_error| Error::Verification)?;
     if readback.super_kind() != Some(FOOTNOTE_MARK_KIND)
         || readback
             .contained_storage()
             .is_none_or(|reference| reference.identifier() != native_footnote.storage_identifier)
         || readback.custom_mark_string() != after_custom_mark
     {
-        return Err(FootnoteTextError::Verification);
+        return Err(Error::Verification);
     }
     Ok(rewritten)
 }
@@ -1463,23 +1489,22 @@ fn rewrite_custom_mark_wire(
     before: Option<&str>,
     after: Option<&str>,
     limits: WireLimits,
-) -> Result<Vec<u8>, FootnoteTextError> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+) -> Result<Vec<u8>, Error> {
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut selected = None;
     for field in view.fields().filter(|field| field.number() == 3) {
         if selected.is_some() || field.wire_type() != 2 {
-            return Err(FootnoteTextError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field.validate_canonical_framing().map_err(map_wire_error)?;
-        let value = std::str::from_utf8(field.payload())
-            .map_err(|_error| FootnoteTextError::InvalidSource)?;
+        let value = std::str::from_utf8(field.payload()).map_err(|_error| Error::InvalidSource)?;
         if Some(value) != before {
-            return Err(FootnoteTextError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         selected = Some(field);
     }
     if selected.is_some() != before.is_some() {
-        return Err(FootnoteTextError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let selected_length = selected.map_or(0, |field| field.raw().len());
     let replacement_length = after
@@ -1490,10 +1515,10 @@ fn rewrite_custom_mark_wire(
         .len()
         .checked_sub(selected_length)
         .and_then(|length| length.checked_add(replacement_length))
-        .ok_or(FootnoteTextError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if output_length > limits.max_output_bytes() {
-        return Err(FootnoteTextError::LimitExceeded {
-            kind: FootnoteTextLimitKind::OutputBytes,
+        return Err(Error::Limit {
+            kind: LimitKind::OutputBytes,
             observed: usize_to_u64(output_length),
             maximum: usize_to_u64(limits.max_output_bytes()),
         });
@@ -1502,14 +1527,14 @@ fn rewrite_custom_mark_wire(
         .len()
         .checked_sub(usize::from(selected.is_some()))
         .and_then(|fields| fields.checked_add(usize::from(after.is_some())))
-        .ok_or(FootnoteTextError::LimitExceeded {
-            kind: FootnoteTextLimitKind::WireFields,
+        .ok_or(Error::Limit {
+            kind: LimitKind::WireFields,
             observed: u64::MAX,
             maximum: usize_to_u64(limits.max_fields()),
         })?;
     if output_fields > limits.max_fields() {
-        return Err(FootnoteTextError::LimitExceeded {
-            kind: FootnoteTextLimitKind::WireFields,
+        return Err(Error::Limit {
+            kind: LimitKind::WireFields,
             observed: usize_to_u64(output_fields),
             maximum: usize_to_u64(limits.max_fields()),
         });
@@ -1517,10 +1542,10 @@ fn rewrite_custom_mark_wire(
     let work = view
         .len()
         .checked_add(output_fields)
-        .ok_or(FootnoteTextError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if work > limits.max_rewrite_work() {
-        return Err(FootnoteTextError::LimitExceeded {
-            kind: FootnoteTextLimitKind::WireWork,
+        return Err(Error::Limit {
+            kind: LimitKind::WireWork,
             observed: usize_to_u64(work),
             maximum: usize_to_u64(limits.max_rewrite_work()),
         });
@@ -1528,7 +1553,7 @@ fn rewrite_custom_mark_wire(
     let mut output = Vec::new();
     output
         .try_reserve_exact(output_length)
-        .map_err(|_error| FootnoteTextError::Allocation {
+        .map_err(|_error| Error::Allocation {
             amount: output_length,
         })?;
     let mut emitted = false;
@@ -1548,7 +1573,7 @@ fn rewrite_custom_mark_wire(
         }
     }
     if output.len() != output_length {
-        return Err(FootnoteTextError::Verification);
+        return Err(Error::Verification);
     }
     Ok(output)
 }
@@ -1557,12 +1582,12 @@ fn encoded_bytes_field_length(
     number: u32,
     payload_length: usize,
     limits: WireLimits,
-) -> Result<usize, FootnoteTextError> {
+) -> Result<usize, Error> {
     encoded_len((u64::from(number) << 3) | 2)
         .checked_add(encoded_len(usize_to_u64(payload_length)))
         .and_then(|length| length.checked_add(payload_length))
-        .ok_or(FootnoteTextError::LimitExceeded {
-            kind: FootnoteTextLimitKind::OutputBytes,
+        .ok_or(Error::Limit {
+            kind: LimitKind::OutputBytes,
             observed: u64::MAX,
             maximum: usize_to_u64(limits.max_output_bytes()),
         })
@@ -1579,7 +1604,7 @@ fn verify_candidate(
     candidate: &Package,
     position: Position,
     expected: &Footnote,
-) -> Result<(), FootnoteTextError> {
+) -> Result<(), Error> {
     // Run the native graph projection first.  Besides checking that the
     // candidate retained the same private identities, this is the pass that
     // charges the aggregate footnote text/custom-marker budget with its
@@ -1611,11 +1636,11 @@ fn verify_candidate(
     )
     .map_err(map_body_footnote_projection_error)?;
     if before.len() != after.len() {
-        return Err(FootnoteTextError::Verification);
+        return Err(Error::Verification);
     }
     for (old, new) in before.iter().zip(&after) {
         if old.position != new.position {
-            return Err(FootnoteTextError::Verification);
+            return Err(Error::Verification);
         }
         let expected_text = if old.position == position {
             expected.text.as_ref()
@@ -1628,11 +1653,11 @@ fn verify_candidate(
             old.custom_mark.as_deref()
         };
         if new.text.as_ref() != expected_text || new.custom_mark.as_deref() != expected_mark {
-            return Err(FootnoteTextError::Verification);
+            return Err(Error::Verification);
         }
     }
     if source.stats().total_objects() != candidate.stats().total_objects() {
-        return Err(FootnoteTextError::Verification);
+        return Err(Error::Verification);
     }
     if source_graphs.len() != candidate_graphs.len()
         || source_graphs
@@ -1645,28 +1670,28 @@ fn verify_candidate(
                     || old.marker_identifier != new.marker_identifier
             })
     {
-        return Err(FootnoteTextError::Verification);
+        return Err(Error::Verification);
     }
     Ok(())
 }
 
-fn validate_text(text: &str) -> Result<(), FootnoteTextError> {
+fn validate_text(text: &str) -> Result<(), Error> {
     if text.contains('\u{000e}') || text.contains('\u{fffc}') {
-        return Err(FootnoteTextError::StructuralMarker);
+        return Err(Error::Refused(Refusal::StructuralMarker));
     }
     checked_utf16_units(text)?;
     if text.len() > crate::footnote::body::MAX_TEXT_BYTES {
-        return Err(FootnoteTextError::TextTooLarge);
+        return Err(Error::Refused(Refusal::TextTooLarge));
     }
     Ok(())
 }
 
-fn checked_utf16_units(text: &str) -> Result<usize, FootnoteTextError> {
+fn checked_utf16_units(text: &str) -> Result<usize, Error> {
     let units = text.encode_utf16().count();
     let maximum = usize::try_from(u32::MAX).unwrap_or(usize::MAX);
     if units > maximum {
-        return Err(FootnoteTextError::LimitExceeded {
-            kind: FootnoteTextLimitKind::TextUnits,
+        return Err(Error::Limit {
+            kind: LimitKind::TextUnits,
             observed: usize_to_u64(units),
             maximum: u64::from(u32::MAX),
         });
@@ -1674,23 +1699,23 @@ fn checked_utf16_units(text: &str) -> Result<usize, FootnoteTextError> {
     Ok(units)
 }
 
-fn position_from_anchor(anchor: u32) -> Result<Position, FootnoteTextError> {
-    let index = usize::try_from(anchor).map_err(|_error| FootnoteTextError::LimitExceeded {
-        kind: FootnoteTextLimitKind::TextUnits,
+fn position_from_anchor(anchor: u32) -> Result<Position, Error> {
+    let index = usize::try_from(anchor).map_err(|_error| Error::Limit {
+        kind: LimitKind::TextUnits,
         observed: u64::from(anchor),
         maximum: u64::from(u32::MAX),
     })?;
-    Position::from_utf16_index(index).map_err(|_error| FootnoteTextError::InvalidSource)
+    Position::from_utf16_index(index).map_err(|_error| Error::InvalidSource)
 }
 
-fn validate_custom_mark(custom_mark: Option<&str>) -> Result<(), FootnoteTextError> {
+fn validate_custom_mark(custom_mark: Option<&str>) -> Result<(), Error> {
     if custom_mark.is_some_and(|value| value.len() > crate::footnote::body::MAX_CUSTOM_MARK_BYTES) {
-        return Err(FootnoteTextError::CustomMarkTooLarge);
+        return Err(Error::Refused(Refusal::CustomMarkTooLarge));
     }
     Ok(())
 }
 
-fn clone_footnote(value: &Footnote) -> Result<Footnote, FootnoteTextError> {
+fn clone_footnote(value: &Footnote) -> Result<Footnote, Error> {
     Footnote::with_custom_mark(
         value.position,
         try_owned_text(&value.text)?.into_boxed_str(),
@@ -1704,82 +1729,77 @@ fn clone_footnote(value: &Footnote) -> Result<Footnote, FootnoteTextError> {
     .map_err(map_footnote_value_error)
 }
 
-fn try_owned_text(text: &str) -> Result<String, FootnoteTextError> {
+fn try_owned_text(text: &str) -> Result<String, Error> {
     let mut owned = String::new();
     owned
         .try_reserve_exact(text.len())
-        .map_err(|_error| FootnoteTextError::Allocation { amount: text.len() })?;
+        .map_err(|_error| Error::Allocation { amount: text.len() })?;
     owned.push_str(text);
     Ok(owned)
 }
 
-fn map_footnote_value_error(error: crate::footnote::body::Error) -> FootnoteTextError {
+fn map_footnote_value_error(error: crate::footnote::body::Error) -> Error {
     match error {
-        crate::footnote::body::Error::TextTooLarge => FootnoteTextError::TextTooLarge,
-        crate::footnote::body::Error::CustomMarkTooLarge => FootnoteTextError::CustomMarkTooLarge,
-        crate::footnote::body::Error::PositionOutOfRange => FootnoteTextError::InvalidSource,
+        crate::footnote::body::Error::TextTooLarge => Error::Refused(Refusal::TextTooLarge),
+        crate::footnote::body::Error::CustomMarkTooLarge => {
+            Error::Refused(Refusal::CustomMarkTooLarge)
+        },
+        crate::footnote::body::Error::PositionOutOfRange => Error::InvalidSource,
     }
 }
 
-fn map_wire_error(error: litchi_iwa_common::Error) -> FootnoteTextError {
+fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
     match error {
         litchi_iwa_common::Error::LimitExceeded {
             kind,
             observed,
             limit,
-        } => FootnoteTextError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_common::LimitKind::InputBytes => FootnoteTextLimitKind::InputBytes,
-                litchi_iwa_common::LimitKind::Fields => FootnoteTextLimitKind::WireFields,
-                litchi_iwa_common::LimitKind::OutputBytes => FootnoteTextLimitKind::OutputBytes,
-                litchi_iwa_common::LimitKind::Nesting => FootnoteTextLimitKind::WireNesting,
-                litchi_iwa_common::LimitKind::RewriteWork => FootnoteTextLimitKind::WireWork,
+                litchi_iwa_common::LimitKind::InputBytes => LimitKind::InputBytes,
+                litchi_iwa_common::LimitKind::Fields => LimitKind::WireFields,
+                litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_common::LimitKind::Nesting => LimitKind::WireNesting,
+                litchi_iwa_common::LimitKind::RewriteWork => LimitKind::WireWork,
                 litchi_iwa_common::LimitKind::TableRows
                 | litchi_iwa_common::LimitKind::TableColumns
                 | litchi_iwa_common::LimitKind::TableCells
-                | litchi_iwa_common::LimitKind::MaterializedCells => FootnoteTextLimitKind::Entries,
+                | litchi_iwa_common::LimitKind::MaterializedCells => LimitKind::Entries,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
-        litchi_iwa_common::Error::Allocation { amount, .. } => {
-            FootnoteTextError::Allocation { amount }
-        },
-        litchi_iwa_common::Error::InvalidFormat(_)
-        | litchi_iwa_common::Error::InvalidLimit { .. } => FootnoteTextError::InvalidSource,
+        litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_package_error(error: PackageError) -> FootnoteTextError {
-    map_package_error_with_kind(error, FootnoteTextLimitKind::WireBytes)
+fn map_package_error(error: PackageError) -> Error {
+    map_package_error_with_kind(error, LimitKind::WireBytes)
 }
 
-fn map_body_storage_decode_error(error: super::BodyStorageDecodeError) -> FootnoteTextError {
+fn map_body_storage_decode_error(error: super::BodyStorageDecodeError) -> Error {
     match error {
         super::BodyStorageDecodeError::Package(error) => map_package_error(error),
         super::BodyStorageDecodeError::Wire(error) => map_text_rewrite_error(error),
-        super::BodyStorageDecodeError::SemanticLimit { observed, limit } => {
-            FootnoteTextError::LimitExceeded {
-                kind: FootnoteTextLimitKind::TextBytes,
-                observed: usize_to_u64(observed),
-                maximum: usize_to_u64(limit),
-            }
+        super::BodyStorageDecodeError::SemanticLimit { observed, limit } => Error::Limit {
+            kind: LimitKind::TextBytes,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(limit),
         },
     }
 }
 
-fn map_body_footnote_projection_error(error: super::BodyStorageDecodeError) -> FootnoteTextError {
+fn map_body_footnote_projection_error(error: super::BodyStorageDecodeError) -> Error {
     match error {
-        super::BodyStorageDecodeError::SemanticLimit { observed, limit } => {
-            FootnoteTextError::LimitExceeded {
-                kind: FootnoteTextLimitKind::TextBytes,
-                observed: usize_to_u64(observed),
-                maximum: usize_to_u64(limit),
-            }
+        super::BodyStorageDecodeError::SemanticLimit { observed, limit } => Error::Limit {
+            kind: LimitKind::TextBytes,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(limit),
         },
         super::BodyStorageDecodeError::Package(PackageError::PayloadLimit { observed, limit }) => {
-            FootnoteTextError::LimitExceeded {
-                kind: FootnoteTextLimitKind::Entries,
+            Error::Limit {
+                kind: LimitKind::Entries,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(limit),
             }
@@ -1789,69 +1809,76 @@ fn map_body_footnote_projection_error(error: super::BodyStorageDecodeError) -> F
     }
 }
 
-fn map_package_error_with_kind(
-    error: PackageError,
-    payload_limit_kind: FootnoteTextLimitKind,
-) -> FootnoteTextError {
+fn map_package_error_with_kind(error: PackageError, payload_limit_kind: LimitKind) -> Error {
     match error {
         PackageError::Archive(error) => map_archive_error(error),
-        PackageError::PayloadLimit { observed, limit } => FootnoteTextError::LimitExceeded {
+        PackageError::PayloadLimit { observed, limit } => Error::Limit {
             kind: payload_limit_kind,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
-        PackageError::ObjectLimit { observed, limit } => FootnoteTextError::LimitExceeded {
-            kind: FootnoteTextLimitKind::Entries,
+        PackageError::ObjectLimit { observed, limit } => Error::Limit {
+            kind: LimitKind::Entries,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
-        PackageError::Allocation { amount } => FootnoteTextError::Allocation { amount },
-        PackageError::SectionNamesTooLarge { observed, limit } => {
-            FootnoteTextError::LimitExceeded {
-                kind: FootnoteTextLimitKind::TextBytes,
-                observed: usize_to_u64(observed),
-                maximum: usize_to_u64(limit),
-            }
+        PackageError::Allocation { amount } => Error::Allocation { amount },
+        PackageError::SectionNamesTooLarge { observed, limit } => Error::Limit {
+            kind: LimitKind::TextBytes,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(limit),
         },
-        PackageError::Semantic(crate::Error::TextTooLarge { observed, limit }) => {
-            FootnoteTextError::LimitExceeded {
-                kind: FootnoteTextLimitKind::TextBytes,
-                observed: usize_to_u64(observed),
-                maximum: usize_to_u64(limit),
-            }
+        PackageError::Semantic(crate::Error::TextTooLarge { observed, limit }) => Error::Limit {
+            kind: LimitKind::TextBytes,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(limit),
         },
         PackageError::Semantic(
             crate::Error::TooManySections { actual, limit }
             | crate::Error::TooManyBodyStorages { actual, limit },
-        ) => FootnoteTextError::LimitExceeded {
-            kind: FootnoteTextLimitKind::Entries,
+        ) => Error::Limit {
+            kind: LimitKind::Entries,
             observed: usize_to_u64(actual),
             maximum: usize_to_u64(limit),
         },
         PackageError::Io(_)
         | PackageError::Detection(_)
-        | PackageError::NotPages
+        | PackageError::UnexpectedFormat { .. }
+        | PackageError::NotOfficeFile
+        | PackageError::MissingIdentity
+        | PackageError::InvalidLanguage(_)
+        | PackageError::InvalidLocale
+        | PackageError::InvalidTable { .. }
+        | PackageError::InvalidLimit { .. }
+        | PackageError::Limit { .. }
         | PackageError::InvalidFormat(_)
-        | PackageError::Semantic(crate::Error::InvalidSectionIndex { .. }) => {
-            FootnoteTextError::InvalidSource
-        },
+        | PackageError::Semantic(crate::Error::InvalidSectionIndex { .. }) => Error::InvalidSource,
     }
 }
 
-fn map_storage_wire_limits_error(error: super::StorageWireLimitsError) -> FootnoteTextError {
+fn map_storage_wire_limits_error(error: super::StorageWireLimitsError) -> Error {
     match error {
         super::StorageWireLimitsError::Physical(error) => map_archive_error(error),
+        super::StorageWireLimitsError::Wire(RewriteError::InvalidLimit {
+            field: "nesting",
+            value,
+            ..
+        }) => Error::Limit {
+            kind: LimitKind::WireNesting,
+            observed: 4,
+            maximum: value as u64,
+        },
         super::StorageWireLimitsError::Wire(error) => map_text_rewrite_error(error),
     }
 }
 
-fn map_text_rewrite_error(error: RewriteError) -> FootnoteTextError {
+fn map_text_rewrite_error(error: RewriteError) -> Error {
     match error {
         RewriteError::LimitExceeded {
             resource,
             observed,
             limit,
-        } => FootnoteTextError::LimitExceeded {
+        } => Error::Limit {
             kind: text_limit_kind(resource),
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
@@ -1860,81 +1887,70 @@ fn map_text_rewrite_error(error: RewriteError) -> FootnoteTextError {
             field,
             value,
             maximum,
-        } => FootnoteTextError::LimitExceeded {
+        } => Error::Limit {
             kind: text_limit_kind(field),
             observed: usize_to_u64(value),
             maximum: usize_to_u64(maximum),
         },
-        RewriteError::Allocation { amount, .. } => FootnoteTextError::Allocation { amount },
-        _ => FootnoteTextError::InvalidSource,
+        RewriteError::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-fn text_limit_kind(resource: &str) -> FootnoteTextLimitKind {
+fn text_limit_kind(resource: &str) -> LimitKind {
     match resource {
-        "text bytes" => FootnoteTextLimitKind::TextBytes,
-        "text fragments" | "table entries" | "object references" => FootnoteTextLimitKind::Entries,
-        "nesting" => FootnoteTextLimitKind::WireNesting,
-        "fields" => FootnoteTextLimitKind::WireFields,
-        "rewrite work" | "aggregate nested scan bytes" => FootnoteTextLimitKind::WireWork,
-        _ => FootnoteTextLimitKind::WireBytes,
+        "text bytes" => LimitKind::TextBytes,
+        "text fragments" | "table entries" | "object references" => LimitKind::Entries,
+        "nesting" => LimitKind::WireNesting,
+        "fields" => LimitKind::WireFields,
+        "rewrite work" | "aggregate nested scan bytes" => LimitKind::WireWork,
+        _ => LimitKind::WireBytes,
     }
 }
 
-fn map_archive_error(error: litchi_iwa_archive::Error) -> FootnoteTextError {
+fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     match error {
         litchi_iwa_archive::Error::Limit {
             kind,
             observed,
             maximum,
-        } => FootnoteTextError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_archive::LimitKind::InputBytes => FootnoteTextLimitKind::InputBytes,
-                litchi_iwa_archive::LimitKind::OutputBytes => FootnoteTextLimitKind::OutputBytes,
-                litchi_iwa_archive::LimitKind::Entries => FootnoteTextLimitKind::Entries,
+                litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
+                litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_archive::LimitKind::Entries => LimitKind::Entries,
                 litchi_iwa_archive::LimitKind::MemberNameBytes
                 | litchi_iwa_archive::LimitKind::MetadataBytes
                 | litchi_iwa_archive::LimitKind::CompressedEntryBytes
                 | litchi_iwa_archive::LimitKind::EntryBytes
-                | litchi_iwa_archive::LimitKind::IwaStreamBytes => {
-                    FootnoteTextLimitKind::EntryBytes
-                },
+                | litchi_iwa_archive::LimitKind::IwaStreamBytes => LimitKind::EntryBytes,
                 litchi_iwa_archive::LimitKind::TotalBytes
-                | litchi_iwa_archive::LimitKind::IwaTotalBytes => FootnoteTextLimitKind::TotalBytes,
+                | litchi_iwa_archive::LimitKind::IwaTotalBytes => LimitKind::TotalBytes,
             },
             observed,
             maximum,
         },
-        litchi_iwa_archive::Error::Allocation { amount, .. } => {
-            FootnoteTextError::Allocation { amount }
-        },
+        litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
         litchi_iwa_archive::Error::Iwa(error) => map_core_error(error),
-        litchi_iwa_archive::Error::Io(_)
-        | litchi_iwa_archive::Error::Zip { .. }
-        | litchi_iwa_archive::Error::InvalidLimits(_)
-        | litchi_iwa_archive::Error::Encrypted
-        | litchi_iwa_archive::Error::SourceChanged { .. }
-        | litchi_iwa_archive::Error::DirectoryChanged { .. }
-        | litchi_iwa_archive::Error::Reassembly(_)
-        | litchi_iwa_archive::Error::InvalidBundle(_) => FootnoteTextError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_core_error(error: litchi_iwa_core::Error) -> FootnoteTextError {
+fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
             kind,
             observed,
             maximum,
-        } => FootnoteTextError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::Objects
                 | litchi_iwa_core::LimitKind::Messages
                 | litchi_iwa_core::LimitKind::MessagesPerObject
-                | litchi_iwa_core::LimitKind::MetadataItems => FootnoteTextLimitKind::Entries,
-                litchi_iwa_core::LimitKind::MessageBytes => FootnoteTextLimitKind::WireBytes,
-                litchi_iwa_core::LimitKind::HeaderFields => FootnoteTextLimitKind::WireFields,
-                litchi_iwa_core::LimitKind::HeaderNesting => FootnoteTextLimitKind::WireNesting,
+                | litchi_iwa_core::LimitKind::MetadataItems => LimitKind::Entries,
+                litchi_iwa_core::LimitKind::MessageBytes => LimitKind::WireBytes,
+                litchi_iwa_core::LimitKind::HeaderFields => LimitKind::WireFields,
+                litchi_iwa_core::LimitKind::HeaderNesting => LimitKind::WireNesting,
                 litchi_iwa_core::LimitKind::ArchiveBytes
                 | litchi_iwa_core::LimitKind::ObjectBytes
                 | litchi_iwa_core::LimitKind::HeaderBytes
@@ -1943,19 +1959,15 @@ fn map_core_error(error: litchi_iwa_core::Error) -> FootnoteTextError {
                 | litchi_iwa_core::LimitKind::SnappyStreamBytes
                 | litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
                 | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes
-                | litchi_iwa_core::LimitKind::SnappyFrames => FootnoteTextLimitKind::EntryBytes,
+                | litchi_iwa_core::LimitKind::SnappyFrames => LimitKind::EntryBytes,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         },
         litchi_iwa_core::Error::Allocation { requested, .. } => {
-            FootnoteTextError::Allocation { amount: requested }
+            Error::Allocation { amount: requested }
         },
-        litchi_iwa_core::Error::InvalidArchive { .. }
-        | litchi_iwa_core::Error::InvalidLimits { .. }
-        | litchi_iwa_core::Error::HeaderCodec { .. }
-        | litchi_iwa_core::Error::Io(_)
-        | litchi_iwa_core::Error::Snappy { .. } => FootnoteTextError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
@@ -1969,11 +1981,10 @@ mod tests {
     use std::sync::Arc;
 
     use super::{
-        FootnoteGraphBudget, FootnoteObjectLocations, FootnoteTextError, FootnoteTextLimitKind,
-        FootnoteTextPatch, checked_utf16_units, is_canonical_component_name,
-        map_body_footnote_projection_error, map_body_storage_decode_error,
-        map_package_error_with_kind, map_storage_wire_limits_error, position_from_anchor,
-        rewrite_custom_mark_wire,
+        Error, FootnoteGraphBudget, FootnoteObjectLocations, LimitKind, Patch, checked_utf16_units,
+        is_canonical_component_name, map_body_footnote_projection_error,
+        map_body_storage_decode_error, map_package_error_with_kind, map_storage_wire_limits_error,
+        position_from_anchor, rewrite_custom_mark_wire,
     };
     use crate::footnote::body::{Footnote, Position};
     use crate::package::{BodyStorageDecodeError, StorageWireLimitsError};
@@ -2008,8 +2019,8 @@ mod tests {
         ));
         assert!(!matches!(
             checked_utf16_units("native"),
-            Err(FootnoteTextError::LimitExceeded {
-                kind: FootnoteTextLimitKind::TextUnits,
+            Err(Error::Limit {
+                kind: LimitKind::TextUnits,
                 ..
             })
         ));
@@ -2035,12 +2046,12 @@ mod tests {
                 observed: 9,
                 limit: 8,
             }),
-            FootnoteTextLimitKind::WireBytes,
+            LimitKind::WireBytes,
         );
         assert_eq!(
             text_error,
-            FootnoteTextError::LimitExceeded {
-                kind: FootnoteTextLimitKind::TextBytes,
+            Error::Limit {
+                kind: LimitKind::TextBytes,
                 observed: 9,
                 maximum: 8,
             }
@@ -2051,12 +2062,12 @@ mod tests {
                 actual: 5,
                 limit: 4,
             }),
-            FootnoteTextLimitKind::WireBytes,
+            LimitKind::WireBytes,
         );
         assert_eq!(
             entries_error,
-            FootnoteTextError::LimitExceeded {
-                kind: FootnoteTextLimitKind::Entries,
+            Error::Limit {
+                kind: LimitKind::Entries,
                 observed: 5,
                 maximum: 4,
             }
@@ -2067,12 +2078,12 @@ mod tests {
                 observed: 19,
                 limit: 14,
             },
-            FootnoteTextLimitKind::TextBytes,
+            LimitKind::TextBytes,
         );
         assert_eq!(
             aggregate_error,
-            FootnoteTextError::LimitExceeded {
-                kind: FootnoteTextLimitKind::TextBytes,
+            Error::Limit {
+                kind: LimitKind::TextBytes,
                 observed: 19,
                 maximum: 14,
             }
@@ -2085,8 +2096,8 @@ mod tests {
         budget.charge_source(8).unwrap();
         assert!(matches!(
             budget.charge_source(1),
-            Err(FootnoteTextError::LimitExceeded {
-                kind: FootnoteTextLimitKind::InputBytes,
+            Err(Error::Limit {
+                kind: LimitKind::InputBytes,
                 observed: 9,
                 maximum: 8,
             })
@@ -2094,8 +2105,8 @@ mod tests {
         budget.charge_references(5).unwrap();
         assert!(matches!(
             budget.charge_references(1),
-            Err(FootnoteTextError::LimitExceeded {
-                kind: FootnoteTextLimitKind::Entries,
+            Err(Error::Limit {
+                kind: LimitKind::Entries,
                 observed: 6,
                 maximum: 5,
             })
@@ -2103,8 +2114,8 @@ mod tests {
         budget.charge_work(7).unwrap();
         assert!(matches!(
             budget.charge_work(1),
-            Err(FootnoteTextError::LimitExceeded {
-                kind: FootnoteTextLimitKind::WireWork,
+            Err(Error::Limit {
+                kind: LimitKind::WireWork,
                 observed: 8,
                 maximum: 7,
             })
@@ -2124,8 +2135,8 @@ mod tests {
         ));
         assert_eq!(
             entries,
-            FootnoteTextError::LimitExceeded {
-                kind: FootnoteTextLimitKind::Entries,
+            Error::Limit {
+                kind: LimitKind::Entries,
                 observed: 4097,
                 maximum: 4096,
             }
@@ -2137,8 +2148,8 @@ mod tests {
         });
         assert_eq!(
             aggregate,
-            FootnoteTextError::LimitExceeded {
-                kind: FootnoteTextLimitKind::TextBytes,
+            Error::Limit {
+                kind: LimitKind::TextBytes,
                 observed: 19,
                 maximum: 14,
             }
@@ -2152,8 +2163,8 @@ mod tests {
         ));
         assert_eq!(
             text,
-            FootnoteTextError::LimitExceeded {
-                kind: FootnoteTextLimitKind::TextBytes,
+            Error::Limit {
+                kind: LimitKind::TextBytes,
                 observed: 9,
                 maximum: 8,
             }
@@ -2168,8 +2179,8 @@ mod tests {
         ));
         assert_eq!(
             wire,
-            FootnoteTextError::LimitExceeded {
-                kind: FootnoteTextLimitKind::WireWork,
+            Error::Limit {
+                kind: LimitKind::WireWork,
                 observed: 33,
                 maximum: 32,
             }
@@ -2185,7 +2196,7 @@ mod tests {
                     observed: 17,
                     limit: 16,
                 },
-                FootnoteTextLimitKind::WireBytes,
+                LimitKind::WireBytes,
                 17,
                 16,
             ),
@@ -2195,7 +2206,7 @@ mod tests {
                     observed: 9,
                     limit: 8,
                 },
-                FootnoteTextLimitKind::Entries,
+                LimitKind::Entries,
                 9,
                 8,
             ),
@@ -2205,7 +2216,7 @@ mod tests {
                     observed: 33,
                     limit: 32,
                 },
-                FootnoteTextLimitKind::WireWork,
+                LimitKind::WireWork,
                 33,
                 32,
             ),
@@ -2213,7 +2224,7 @@ mod tests {
         for (error, kind, observed, maximum) in cases {
             assert_eq!(
                 map_body_storage_decode_error(BodyStorageDecodeError::Wire(error)),
-                FootnoteTextError::LimitExceeded {
+                Error::Limit {
                     kind,
                     observed,
                     maximum,
@@ -2227,8 +2238,8 @@ mod tests {
                     limit: 4,
                 },
             )),
-            FootnoteTextError::LimitExceeded {
-                kind: FootnoteTextLimitKind::WireBytes,
+            Error::Limit {
+                kind: LimitKind::WireBytes,
                 observed: 5,
                 maximum: 4,
             }
@@ -2246,8 +2257,8 @@ mod tests {
         ));
         assert_eq!(
             exceeded,
-            FootnoteTextError::LimitExceeded {
-                kind: FootnoteTextLimitKind::WireWork,
+            Error::Limit {
+                kind: LimitKind::WireWork,
                 observed: 9,
                 maximum: 8,
             }
@@ -2262,8 +2273,8 @@ mod tests {
         ));
         assert_eq!(
             invalid,
-            FootnoteTextError::LimitExceeded {
-                kind: FootnoteTextLimitKind::WireFields,
+            Error::Limit {
+                kind: LimitKind::WireFields,
                 observed: 0,
                 maximum: 1_000,
             }
@@ -2278,8 +2289,8 @@ mod tests {
         ));
         assert_eq!(
             text,
-            FootnoteTextError::LimitExceeded {
-                kind: FootnoteTextLimitKind::TextBytes,
+            Error::Limit {
+                kind: LimitKind::TextBytes,
                 observed: 17,
                 maximum: 16,
             }
@@ -2294,8 +2305,8 @@ mod tests {
         ));
         assert_eq!(
             entries,
-            FootnoteTextError::LimitExceeded {
-                kind: FootnoteTextLimitKind::Entries,
+            Error::Limit {
+                kind: LimitKind::Entries,
                 observed: 33,
                 maximum: 32,
             }
@@ -2304,11 +2315,11 @@ mod tests {
 
     #[test]
     fn borrowed_locations_keep_first_ordered_match_and_isolate_unrelated_ids() {
-        let first = ArchiveObject::new(7, Vec::new())
+        let first = ArchiveObject::new(7, Vec::new(), Default::default())
             .unwrap_or_else(|error| panic!("first object: {error}"));
-        let duplicate = ArchiveObject::new(7, Vec::new())
+        let duplicate = ArchiveObject::new(7, Vec::new(), Default::default())
             .unwrap_or_else(|error| panic!("duplicate object: {error}"));
-        let unrelated = ArchiveObject::new(8, Vec::new())
+        let unrelated = ArchiveObject::new(8, Vec::new(), Default::default())
             .unwrap_or_else(|error| panic!("unrelated object: {error}"));
         let mut objects = HashMap::new();
         objects
@@ -2340,7 +2351,7 @@ mod tests {
             .unwrap_or_else(|error| panic!("after footnote: {error}"));
         let source_bytes: Arc<[u8]> = Arc::from(&b"source"[..]);
         let target_bytes: Arc<[u8]> = Arc::from(&b"target"[..]);
-        let patch = FootnoteTextPatch {
+        let patch = Patch {
             source_bytes: Arc::clone(&source_bytes),
             target_bytes: Arc::clone(&target_bytes),
             source_fingerprint: 1,
@@ -2352,7 +2363,7 @@ mod tests {
         assert_eq!(patch.inverse().inverse(), patch);
         assert!(!patch.is_noop());
 
-        let noop = FootnoteTextPatch {
+        let noop = Patch {
             source_bytes: Arc::clone(&source_bytes),
             target_bytes: source_bytes,
             source_fingerprint: 1,

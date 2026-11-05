@@ -12,9 +12,12 @@ from tools import native_odf_resave
 
 
 ROOT = Path(__file__).resolve().parent.parent
+# LibreOffice filter registry fragments vendored unchanged under test-data/
+# (record 0257): the filter fragments this harness names and every type
+# fragment; see test-data/libreoffice-core/PROVENANCE.md.
 FILTER_DIRECTORY = (
     ROOT
-    / "3rdparty"
+    / "test-data"
     / "libreoffice-core"
     / "filter"
     / "source"

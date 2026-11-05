@@ -1,0 +1,45 @@
+{
+  "source": "c9bf9c8c40ecd0597f2b6cfc04f579e1787425b5",
+  "pid": 2336407,
+  "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation",
+  "command": [
+    "python3",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/run-semantic-checks-disk-guarded.py",
+    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/native-check-v2-commands.json",
+    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/native-check-v3"
+  ],
+  "started_unix_seconds": 1792769933.6276367,
+  "target": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target",
+  "lock_sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--all-targets",
+        "--all-features",
+        "--keep-going",
+        "-p",
+        "litchi-docx",
+        "-p",
+        "litchi-pptx",
+        "-p",
+        "litchi-xlsx",
+        "-p",
+        "litchi-xlsb",
+        "-p",
+        "litchi-ops"
+      ],
+      "exit": 101,
+      "seconds": 93.21191240000189,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/native-check-v3/check-0.log",
+      "bytes": 31514,
+      "sha256": "e7786be04d716741e90963833d89952d365f731730f1fd13a2ea999cd907e850",
+      "target_bytes_before": 615079935,
+      "completed_test_executables_pruned": []
+    }
+  ],
+  "note": "Combined check reached native implementations: PPTX10, XLSX6, DOCX4, XLSB1 compiler diagnostics. Complete narrow integration/compiler repair assigned from this exact source. Ops dependency compilation not reached."
+}

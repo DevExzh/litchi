@@ -31,7 +31,8 @@ const STYLES_REL: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles";
 
 fn dependency_xlsx(worksheet: &str) -> Vec<u8> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored(
             "[Content_Types].xml",

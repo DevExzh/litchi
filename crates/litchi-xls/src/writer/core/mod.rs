@@ -11,13 +11,13 @@
 //! # Example
 //!
 //! ```rust,no_run
-//! use litchi_xls::Writer;
+//! use litchi_xls::Builder;
 //!
-//! let mut writer = Writer::new();
-//! let sheet = writer.add_worksheet("Sheet1")?;
-//! writer.write_string(sheet, 0, 0, "Hello")?;
-//! writer.write_number(sheet, 0, 1, 42.0)?;
-//! writer.save("output.xls")?;
+//! let mut builder = Builder::new();
+//! let sheet = builder.add_worksheet("Sheet1")?;
+//! builder.write_string(sheet, 0, 0, "Hello")?;
+//! builder.write_number(sheet, 0, 1, 42.0)?;
+//! builder.build()?.save("output.xls")?;
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
@@ -45,6 +45,7 @@ use self::worksheet::{
     WritableWorksheet,
 };
 
+pub(crate) use self::comment::deterministic_comment_guid;
 pub use self::comment::{CommentTextRunWrite, CommentWriteOptions};
 pub use self::conditional_format::{
     ConditionalFormat, ConditionalFormat12Group, ConditionalFormat12Rule, ConditionalFormat12Type,
@@ -57,11 +58,11 @@ pub use self::data_validation::{
     DataValidationType,
 };
 pub use self::model::{
-    AddInFunctionOptions, CalculationSettings, CellValue, CustomTableStyles, DdeOrOleItemOptions,
-    DdeOrOleLinkOptions, ExternalCacheRowOptions, ExternalDefinedNameOptions, ExternalSheetOptions,
-    ExternalWorkbookOptions, FunctionGroupOptions, PageSetupOptions, PivotCacheValue,
-    PivotDataItemConfig, PivotFieldConfig, PivotItemConfig, PivotTableConfig,
-    WorkbookEnvironmentOptions, WorkbookWindowOptions, WorksheetLayoutOptions, Writer,
+    AddInFunctionOptions, Builder, CalculationSettings, CellValue, CustomTableStyles,
+    DdeOrOleItemOptions, DdeOrOleLinkOptions, ExternalCacheRowOptions, ExternalDefinedNameOptions,
+    ExternalSheetOptions, ExternalWorkbookOptions, FunctionGroupOptions, PageSetupOptions,
+    PivotCacheValue, PivotDataItemConfig, PivotFieldConfig, PivotItemConfig, PivotTableConfig,
+    WorkbookEnvironmentOptions, WorkbookWindowOptions, WorksheetLayoutOptions,
 };
 pub use self::named_range::{DefinedName, DefinedNameRecordOptions};
 pub use self::shape::{

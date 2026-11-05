@@ -18,7 +18,9 @@ use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::tsp;
 use litchi_pages::table::dimension::Dimension;
 use litchi_pages::{
-    BodyTableDimensionError, BodyTableNameError, BodyTableNameLimitKind, BodyTableSelector, Package,
+    BodyTableSelector, Package, table::dimension::transaction::Error as BodyTableDimensionError,
+    table::name::transaction::Error as BodyTableNameError,
+    table::name::transaction::LimitKind as BodyTableNameLimitKind,
 };
 use prost::Message as _;
 
@@ -174,7 +176,7 @@ fn assert_focused_name_readback(source: &[u8], label: &str) -> TestResult {
 }
 
 fn member_bytes(source: &[u8]) -> TestResult<BTreeMap<String, Vec<u8>>> {
-    Ok(Catalog::from_bytes(source)?
+    Ok(Catalog::from_bytes(source, Default::default())?
         .iter()
         .map(|entry| (entry.name().to_owned(), entry.data().to_vec()))
         .collect())
@@ -240,12 +242,15 @@ fn rewrite_metadata(
     source: &[u8],
     mutate: impl FnOnce(&mut tsp::PackageMetadata) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or("missing Metadata.iwa")?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     let object = archive
         .objects
         .iter_mut()
@@ -269,8 +274,10 @@ fn rewrite_metadata(
             type_: METADATA_MESSAGE_TYPE,
             data: metadata.encode_to_vec(),
         },
+        Default::default(),
     )?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(METADATA_MEMBER, compressed.as_slice())],
         ArchiveLimits::default(),
@@ -295,12 +302,15 @@ fn remove_uuid_registration(source: &[u8], identifier: u64) -> TestResult<(Vec<u
 }
 
 fn first_unrelated_uuid(source: &[u8], selected: u64) -> TestResult<u64> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or("missing Metadata.iwa")?;
-    let archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     let object = archive
         .objects
         .iter()
@@ -551,7 +561,10 @@ fn source_name_rename_budget_failure_is_typed_and_atomic() -> TestResult {
         1024 * 1024,
         1024 * 1024,
     )?;
-    let package = Package::from_bytes_with_limits(fixture.source, limits)?;
+    let package = Package::from_bytes_with_options(
+        fixture.source,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    )?;
     let before = exact_bytes(&package)?;
     let replacement = "x".repeat(4_096);
     let error = package
@@ -561,7 +574,7 @@ fn source_name_rename_budget_failure_is_typed_and_atomic() -> TestResult {
         .expect_err("the exact input ceiling must reject output growth");
     assert!(matches!(
         error,
-        BodyTableNameError::LimitExceeded {
+        BodyTableNameError::Limit {
             kind: BodyTableNameLimitKind::OutputBytes,
             ..
         }

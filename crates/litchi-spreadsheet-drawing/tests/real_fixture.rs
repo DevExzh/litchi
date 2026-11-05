@@ -3,8 +3,9 @@
 use litchi_drawingml::chart::{reader as drawingml_reader, writer as drawingml_writer};
 use litchi_opc::{OpcPackage, PackURI};
 use litchi_spreadsheet_drawing::chart::anchor::write_all;
-use litchi_spreadsheet_drawing::chart::{Anchor, read as read_chart, write};
-use litchi_spreadsheet_drawing::shape::{Object, read as read_drawing};
+use litchi_spreadsheet_drawing::chart::builder::Anchor;
+use litchi_spreadsheet_drawing::chart::{read as read_chart, write};
+use litchi_spreadsheet_drawing::shape::{Limits as ShapeLimits, Object, read as read_drawing};
 use std::path::{Path, PathBuf};
 
 fn fixture(path: &str) -> PathBuf {
@@ -14,12 +15,13 @@ fn fixture(path: &str) -> PathBuf {
 }
 
 fn part(path: &Path, name: &str) -> Vec<u8> {
-    let package = OpcPackage::open(path).unwrap_or_else(|error| {
-        panic!(
-            "{} must remain a readable OPC package: {error}",
-            path.display()
-        )
-    });
+    let package =
+        OpcPackage::open(path, litchi_opc::SourceLimits::default()).unwrap_or_else(|error| {
+            panic!(
+                "{} must remain a readable OPC package: {error}",
+                path.display()
+            )
+        });
     let name = PackURI::new(name).unwrap_or_else(|error| panic!("invalid test part name: {error}"));
     package
         .get_part(&name)
@@ -46,10 +48,12 @@ fn assert_minimal_xml(xml: &[u8]) {
 fn extracts_real_shape_and_chart_parts_without_copying_fixture_xml() {
     let shape_package = fixture("ooxml/xlsx/fontSize.xlsx");
     let drawing_xml = part(&shape_package, "/xl/drawings/drawing1.xml");
-    let objects =
-        read_drawing(std::str::from_utf8(&drawing_xml).expect("OOXML drawing XML must be UTF-8"))
-            .expect("real worksheet drawing must parse")
-            .expect("fixture must contain a drawing object");
+    let objects = read_drawing(
+        std::str::from_utf8(&drawing_xml).expect("OOXML drawing XML must be UTF-8"),
+        &ShapeLimits::DEFAULT,
+    )
+    .expect("real worksheet drawing must parse")
+    .expect("fixture must contain a drawing object");
     assert!(matches!(objects[0].object, Object::Shape(_)));
 
     let chart_xml = part(
@@ -76,13 +80,24 @@ fn extracts_and_canonically_emits_powerpoint_chart_through_shared_drawingml() {
         &fixture("ooxml/pptx/pie-chart.pptx"),
         "/ppt/charts/chart1.xml",
     );
-    let chart = drawingml_reader::read(chart_xml.as_slice())
-        .expect("real PowerPoint chart must parse through shared DrawingML");
+    let chart = drawingml_reader::read(
+        chart_xml.as_slice(),
+        &litchi_drawingml::chart::Limits::DEFAULT,
+    )
+    .expect("real PowerPoint chart must parse through shared DrawingML");
     assert!(!chart.plot_area.type_groups.is_empty());
 
     let mut emitted = Vec::new();
-    drawingml_writer::write(&mut emitted, &chart)
-        .expect("real PowerPoint chart must serialize through shared DrawingML");
+    drawingml_writer::write(
+        &mut emitted,
+        &chart,
+        &litchi_drawingml::chart::Limits::DEFAULT,
+    )
+    .expect("real PowerPoint chart must serialize through shared DrawingML");
     assert_minimal_xml(&emitted);
-    drawingml_reader::read(emitted.as_slice()).expect("canonical chart XML must reparse");
+    drawingml_reader::read(
+        emitted.as_slice(),
+        &litchi_drawingml::chart::Limits::DEFAULT,
+    )
+    .expect("canonical chart XML must reparse");
 }

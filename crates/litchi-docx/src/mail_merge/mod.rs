@@ -6,8 +6,15 @@
 
 mod adapter;
 mod codec;
+mod edit;
+mod limit;
 mod model;
 mod package;
+#[allow(
+    dead_code,
+    unreachable_pub,
+    reason = "the detached typed draft is exercised by unit tests; the family stages through the package"
+)]
 mod transaction;
 
 #[cfg(test)]
@@ -21,12 +28,14 @@ pub use codec::parse_settings_mail_merge;
 pub(crate) use codec::{
     parse_settings_mail_merge_processed, parse_settings_mail_merge_with_mce_limits,
 };
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
+pub(crate) use limit::mce_limits_for_source;
 pub use model::{
     Conformance, DataSourceObject, DataType, Destination, FieldMap, FieldMappingType,
     MainDocumentType, Recipient, Recipients, RelationshipId, Settings,
 };
 pub use package::{Source, Target};
-pub use transaction::{Commit, Patch, Revision, Snapshot, Transaction};
+pub use transaction::{Revision, Snapshot};
 
 /// Content type for the inert mail-merge recipient-data part.
 pub const RECIPIENT_CONTENT_TYPE: &str =

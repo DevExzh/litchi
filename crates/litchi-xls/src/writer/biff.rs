@@ -40,6 +40,37 @@ mod worksheet;
 pub(crate) use cells::write_table;
 pub(crate) use cells::{write_formula, write_formula_with_metadata};
 pub(crate) use comment::CommentConfig;
+
+/// The comment shape container (without its text box atom) and `Obj`
+/// record of a hidden note, for the worksheet-feature editor (record 0327).
+pub(crate) fn note_shape(
+    row: u16,
+    column: u8,
+    author: &str,
+    text: &str,
+    anchor: crate::writer::shape::Anchor,
+    guid: [u8; 16],
+    object_id: u16,
+    shape_id: u32,
+) -> Result<(Vec<u8>, Vec<u8>)> {
+    let config = CommentConfig {
+        row,
+        column,
+        author,
+        text,
+        visible: false,
+        shared: false,
+        anchor,
+        text_runs: &[],
+        font_when_empty: 0,
+        guid,
+        object_id,
+    };
+    let shape = comment::comment_shape(&config, shape_id);
+    let mut obj = Vec::with_capacity(56);
+    comment::write_obj(&mut obj, &config)?;
+    Ok((shape, obj))
+}
 pub(crate) use conditional_format::Cf12Config;
 pub(crate) use drawing::{PrimitiveShapeConfig, write_worksheet_drawing};
 pub(crate) use drawing_group::GroupShapeConfig;
@@ -94,7 +125,7 @@ pub(crate) fn write_record<W: Write>(
     record_type: u16,
     payload: &[u8],
 ) -> Result<()> {
-    let mut encoder = Encoder::new();
+    let mut encoder = Encoder::new(litchi_biff::Limits::default()).map_err(map_frame_error)?;
     encoder
         .push(record_kind(record_type)?, payload)
         .map_err(map_frame_error)?;

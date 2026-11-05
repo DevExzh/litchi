@@ -1,0 +1,138 @@
+{
+  "schema": "litchi.native-qualification.final-source-rebind.v1",
+  "status": "prepared",
+  "qualification_claim": false,
+  "source_candidate": {
+    "ref": "472b6705475b073e7fe08f6e11ee17fb1e29f838",
+    "tree": "ebc1cee05f124c0c63977aff07a23288c19e7d00",
+    "w4b_path": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source",
+    "w5_path": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source-w5",
+    "clean": true
+  },
+  "baseline": {
+    "w4b": {
+      "commit": "be644568846ad2fcf0622386f2f2438d0eac21c0",
+      "tree": "684a028b2ae30a3a110b87bf6743fc598c6691a2",
+      "status_paths": [
+        "crates/litchi-ops/examples/xlsb_w4b_probe.rs",
+        "tools/perf-baseline/src/bin/xlsb_crud.rs"
+      ]
+    },
+    "w5": {
+      "commit": "7afba5f146aa1a16eba73ebed2144dd041b33fb5",
+      "tree": "4940682589d406cfe0cfc38457143699eae45ab0",
+      "status_paths": [
+        "crates/litchi-ops/examples/legacy_w5_source_probe.rs",
+        "docs/unified-ops/results/0359a/routes_before.rs"
+      ]
+    }
+  },
+  "preparer": {
+    "path": "tools/native_qualification/prepare_w4b_w5_inputs.py",
+    "sha256": "bdd3409a82d29148cb4477a54fb86c21e1b871c2f175d33fad840adc6e7a9bd7"
+  },
+  "runner": {
+    "path": "tools/native_qualification_runner.py",
+    "sha256": "07fb47403d2fb27a560ba7afba9f59cefbce0b561bb6cc38161ab33b2ba3b62a"
+  },
+  "manifests": {
+    "w4b-xlsb.json": {
+      "sha256": "32374ee41072e86a7bee5f1a7fd13e172c74d85a17283a61e9b06b12ac244e8d",
+      "rounds": 31,
+      "abba_order": ["before", "after", "after", "before"],
+      "programs": ["probe", "sheet", "crud"],
+      "builds_per_leg": 3,
+      "fixture_sha256": "8c600e97d719b0266dcfb49c1872feb8d10c6ed12bc768ff16ace7dae555ebfc"
+    },
+    "legacy-w5.json": {
+      "sha256": "52eb232b64d33246b354f183071a53764a181d2120ea88c78c98d8bb8a0b246a",
+      "rounds": 31,
+      "abba_order": ["before", "after", "after", "before"],
+      "programs": ["source", "ops"],
+      "builds_per_leg": 1,
+      "probe_batch_rounds": 7,
+      "output_directory_variable": "not set by the current manifest"
+    }
+  },
+  "locks": {
+    "historical_root": {
+      "sha256": "cbe70791291d4a0830a8749985aa717230abf74d61c108fb284d25990c9ad681",
+      "bytes": 139442
+    },
+    "historical_perf": {
+      "sha256": "57c2a19ffeff395fdea95c33f295c85b08400b00e2fd9cec94d66cff56d1583f",
+      "bytes": 57028
+    },
+    "production_root": {
+      "sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
+      "bytes": 139606
+    },
+    "production_perf": {
+      "sha256": "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c",
+      "bytes": 57227
+    }
+  },
+  "w5_probe_rebind": {
+    "c796": {
+      "bytes": 19083,
+      "sha256": "83b5eb8bf31cee397aaffd3cd784d3da1596a4cc99eb7fdca259a85ff3256def"
+    },
+    "472b": {
+      "bytes": 19983,
+      "sha256": "b808e4dcba33dcafd4dff7dd22dc250e4170f2613839044fa8097263f5020965"
+    },
+    "c796_to_472b_diff": {
+      "bytes": 2382,
+      "sha256": "d28c3bac33f8b2a8f0b8f4cbcdfb731e5b47e7635c067b34b599efead56e67aa",
+      "stat": "18 insertions: optional LITCHI_PROBE_OUTPUT_DIR per-scenario output files"
+    },
+    "adapted_baseline_472b": {
+      "bytes": 20753,
+      "sha256": "224d2cd0b23261ec9b9b0d757e3b2c1f22c46b8bd9d820e9e01768ab5eb06a5e"
+    },
+    "ordinary_probe_472b": {
+      "bytes": 8734,
+      "sha256": "4d0bc094e6a876cfa01ce73e3356c345ccad2d9e3fbce44464db63996ceceadf"
+    },
+    "routes_before": {
+      "bytes": 5381,
+      "sha256": "237d7242d9fa4db2a3e1589f26b175eff564bb6de680bb217df24f021c698915"
+    }
+  },
+  "receipts": {
+    "source_preparation": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-final-472b/receipts/source-preparation-472b.json",
+      "bytes": 6404,
+      "sha256": "664fac47612eacc9c21caf5099785b8486e050b9dc4644ce55dc682c31d9f0b2"
+    },
+    "static_validation": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-final-472b/receipts/manifest-source-validation-472b.json",
+      "bytes": 36381,
+      "sha256": "1029b6e4f7c59ca72a0806b3f537cc2ce1f87f4e6e47c06ffd57adbbadf5e2f7"
+    },
+    "protocol_tests": {
+      "command": "python3 -m unittest -q tools.test_native_qualification_runner tools.test_legacy_native_qualification",
+      "tests_passed": 41,
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-final-472b/receipts/protocol-tests-472b.log",
+      "bytes": 332,
+      "sha256": "a54eaa63cff67d4408aa370450c3249bc90b3db8eba9e47e389684484c1ce022"
+    }
+  },
+  "preserved_c796_packet": {
+    "commit": "a1ffe12a048109bf23487e76a1b11523786327cc",
+    "path": "docs/unified-ops/results/0362ul16c/source-preparation.json",
+    "source_ref": "c796d0acc24c7c6e6fd08980b9e31af6bb86b18b"
+  },
+  "execution": {
+    "cargo_build": false,
+    "correctness_probe": false,
+    "quiet_abba": false,
+    "reason": "No Cargo/native heavy grant was available; source preparation, protocol tests and static command/source validation only.",
+    "deferred_commands": [
+      "python3 tools/native_qualification_runner.py --manifest tools/native_qualification/manifests/w4b-xlsb.json --phase build",
+      "python3 tools/native_qualification_runner.py --manifest tools/native_qualification/manifests/w4b-xlsb.json --phase abba --cpu <quiet-cpu>",
+      "python3 tools/native_qualification_runner.py --manifest tools/native_qualification/manifests/legacy-w5.json --phase build",
+      "python3 tools/native_qualification_runner.py --manifest tools/native_qualification/manifests/legacy-w5.json --phase abba --cpu <quiet-cpu>"
+    ]
+  }
+}

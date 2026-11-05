@@ -6,12 +6,14 @@ use crate::writer::fib::FibBuilder;
 use crate::writer::font_table::FontTableBuilder;
 use crate::writer::piece_table::{Piece, PieceTableBuilder};
 use litchi_cfb::writer::OleWriter;
+use litchi_ole_common::property_set::summary_properties::Streams;
+use std::io::Cursor;
 
 use super::super::{
     codec,
     model::{
-        CharacterFormatting, FloatingAnchorKind, MainReferenceKind, ParagraphFormatting,
-        TextStream, VBA_PROJECT_STORAGE_NAME, WORD_DOCUMENT_CLSID, WriteError, Writer, WriterShape,
+        Builder, CharacterFormatting, FloatingAnchorKind, MainReferenceKind, ParagraphFormatting,
+        TextStream, VBA_PROJECT_STORAGE_NAME, WORD_DOCUMENT_CLSID, WriteError, WriterShape,
         contains_field_character, pack_dttm, utf16_code_unit_len, utf16_units,
     },
 };
@@ -23,7 +25,7 @@ pub(in crate::writer::core) struct DocOutputStreams {
     data: Vec<u8>,
 }
 
-impl Writer {
+impl Builder {
     pub(in crate::writer::core) fn validate_as_attached_glossary(&self) -> Result<(), WriteError> {
         if self.glossary_metadata.is_none() {
             return Err(WriteError::InvalidData(
@@ -45,7 +47,36 @@ impl Writer {
                 "an attached DOC glossary cannot contain an independent VBA project".to_string(),
             ));
         }
+        if !self.properties.is_empty() {
+            return Err(WriteError::InvalidData(
+                "an attached DOC glossary cannot have independent document properties".to_string(),
+            ));
+        }
         Ok(())
+    }
+
+    /// Serializes the document-property streams, or `None` when no property
+    /// is set (the builder then emits no property stream, as it always did).
+    ///
+    /// The `CryptoAPI` RC4 header this builder emits declares the properties
+    /// encrypted (`fDocProps` clear), and protecting them needs the encrypted
+    /// summary stream ([MS-OFFCRYPTO] 2.3.5.4), which is not produced, so that
+    /// combination is refused instead of storing the properties in plaintext.
+    /// XOR obfuscation and Office binary RC4 have no encrypted form for the
+    /// property streams; there they are written in plaintext.
+    fn property_streams(&self) -> Result<Option<Streams>, WriteError> {
+        if self.properties.is_empty() {
+            return Ok(None);
+        }
+        if self.encryption.as_ref().is_some_and(|encryption| {
+            matches!(
+                encryption.profile,
+                crate::encryption::EncryptionProfile::CryptoApiRc4 { .. }
+            )
+        }) {
+            return Err(WriteError::EncryptedMetadata);
+        }
+        Ok(self.properties.to_streams()?)
     }
 
     fn encryption_table_header_len(&self) -> Result<usize, WriteError> {
@@ -82,6 +113,7 @@ impl Writer {
         &self,
         ole_writer: &mut OleWriter,
         streams: DocOutputStreams,
+        properties: Option<Streams>,
     ) -> Result<(), WriteError> {
         ole_writer.set_root_clsid(WORD_DOCUMENT_CLSID);
 
@@ -100,6 +132,9 @@ impl Writer {
         let ole_data = crate::writer::ole_metadata::generate_ole_stream();
         ole_writer.create_stream_owned(&["\x01CompObj"], compobj_data)?;
         ole_writer.create_stream_owned(&["\x01Ole"], ole_data)?;
+        if let Some(properties) = properties {
+            properties.write_into(ole_writer)?;
+        }
 
         if let Some(project) = &self.vba_project {
             ole_writer.create_storage(&[VBA_PROJECT_STORAGE_NAME])?;
@@ -108,35 +143,7 @@ impl Writer {
         Ok(())
     }
 }
-impl Writer {
-    pub fn save<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<(), WriteError> {
-        self.save_with_durability(path, litchi_core::Durability::Full)
-    }
-
-    /// Saves the document atomically at a caller-chosen
-    /// [`Durability`](litchi_core::Durability).
-    ///
-    /// [`Self::save`] is this method at `Durability::Full`. Every level
-    /// writes the same bytes through the same sibling temporary file and
-    /// atomic replacement; a weaker level only skips the parent-directory
-    /// sync (`FileOnly`) or both synchronizations (`NoSync`), with the crash
-    /// guarantees `Durability` states.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if serialization fails or the file cannot be written
-    /// or replaced. Only `Durability::Full` can report that the destination
-    /// was replaced but its directory could not be synchronized.
-    pub fn save_with_durability<P: AsRef<std::path::Path>>(
-        &mut self,
-        path: P,
-        durability: litchi_core::Durability,
-    ) -> Result<(), WriteError> {
-        self.build_ole_writer()?
-            .save_with_durability(path, durability)?;
-        Ok(())
-    }
-
+impl Builder {
     /// Capacity for the `WordDocument` stream, used only to allocate it once
     /// instead of growing it by doubling: the FIB placeholder of
     /// `text_start` bytes and an upper bound of the text, plus, when that text
@@ -331,6 +338,7 @@ impl Writer {
                         &entry.picture,
                         entry.shape_id,
                         &mut data_stream,
+                        litchi_odraw::image::Limits::default(),
                     )?;
                     if entry.floating.is_some() {
                         floating_anchors.push((
@@ -488,6 +496,7 @@ impl Writer {
                 &entry.picture,
                 entry.shape_id,
                 &mut data_stream,
+                litchi_odraw::image::Limits::default(),
             )?;
             header_pic_offsets.push(pic_offset);
         }
@@ -1111,6 +1120,7 @@ impl Writer {
                 &floating_shapes,
                 &header_floating_shapes,
                 total_shapes,
+                litchi_odraw::image::Limits::default(),
             )?;
             fib.set_dgg_info(table_offset, dgg_info.len() as u32);
             table_stream.extend_from_slice(&dgg_info);
@@ -1168,19 +1178,31 @@ impl Writer {
 
     /// Build the complete compound document after validating every staged structure.
     fn build_ole_writer(&mut self) -> Result<OleWriter, WriteError> {
+        let properties = self.property_streams()?;
         let streams = self.build_output_streams()?;
         let mut ole_writer = OleWriter::new();
-        self.populate_compound_document(&mut ole_writer, streams)?;
+        self.populate_compound_document(&mut ole_writer, streams, properties)?;
         Ok(ole_writer)
     }
 
-    /// Write the document to a seekable output.
-    pub fn write_to<W: std::io::Write + std::io::Seek>(
-        &mut self,
-        writer: &mut W,
-    ) -> Result<(), WriteError> {
-        self.build_ole_writer()?.write_to(writer)?;
-        Ok(())
+    /// Build and validate a fresh DOC package.
+    ///
+    /// The returned package owns a cursor-backed copy of the complete CFB
+    /// artifact.  Byte and filesystem publication are methods on that package
+    /// so every output path shares one validated owner boundary.
+    pub fn build(&mut self) -> Result<crate::Package, WriteError> {
+        let mut output = Cursor::new(Vec::new());
+        self.build_ole_writer()
+            .and_then(|mut writer| writer.write_to(&mut output).map_err(WriteError::from))?;
+        let options =
+            self.encryption
+                .as_ref()
+                .map_or_else(crate::OpenOptions::default, |encryption| {
+                    crate::OpenOptions::default().password(crate::Password::new(
+                        encryption.password.as_str().to_owned(),
+                    ))
+                });
+        crate::Package::from_owned_bytes(output.into_inner(), options).map_err(WriteError::Package)
     }
 
     // Helper methods for DOC writer:

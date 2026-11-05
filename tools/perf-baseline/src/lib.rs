@@ -11,18 +11,21 @@ mod cold_verified;
 mod corpus_manifest;
 pub mod docx_bounded_tail_append_compare;
 pub mod docx_edit_provider;
+mod docx_family_publication;
 pub mod docx_managed_edit;
 pub mod docx_managed_read_ahead;
 pub mod docx_owned_attribution;
 pub mod docx_plain_paragraph_tail_append;
 pub mod docx_provider_lifecycle;
+pub mod docx_raw_codec;
 mod docx_read_ahead;
 pub mod docx_replayable_tail_append;
 pub mod docx_section_retention;
 mod docx_story_hyperlink_publication;
 mod docx_story_hyperlinks;
 mod docx_streaming_create;
-mod facade_ole2;
+#[cfg(feature = "drawingml-probe")]
+pub mod drawingml_raw_probe;
 mod filesystem;
 mod marker_shape;
 pub mod odp_append_attribution;
@@ -36,9 +39,11 @@ mod opc_part_add;
 mod operation_metrics;
 mod ordinary_save;
 mod parallel_metrics;
+pub mod ppt_lazy_native;
 pub mod pptx_cache_retention;
 pub mod pptx_metadata_spool;
 pub mod pptx_native_image;
+pub mod pptx_notes_memo;
 mod pptx_owned_benchmark;
 mod pptx_owned_control;
 pub mod pptx_pair_lifecycle;
@@ -51,12 +56,18 @@ mod process_metrics;
 mod producer_shape;
 #[cfg(test)]
 mod security_corpus;
+mod unified_ops;
+mod xls_f3_corpus;
+pub mod xls_f3_qualification;
 mod xls_numeric;
 mod xlsx_attribute_fixtures;
 #[cfg(test)]
 mod xlsx_commit_metrics_tests;
 mod xlsx_managed_compression;
 pub mod xlsx_planning_guard;
+pub mod xlsx_raw_identity;
+#[path = "../../../crates/litchi-xlsx/tests/support/source_editors.rs"]
+mod xlsx_source_editors;
 pub mod xml_stream_audit;
 pub mod zip_directory_spool;
 
@@ -91,25 +102,26 @@ use litchi_core::{
 };
 use litchi_core::{OwnedSource, Position, Resource};
 use litchi_ole_common::object::{
-    Editor as OleObjectEditor, Limits as OleObjectLimits, Targets as OleObjectTargets,
+    Edit as OleObjectEditor, Limits as OleObjectLimits, OpenOptions as OleObjectOpenOptions,
+    Package as OleObjectPackage, Targets as OleObjectTargets,
 };
 use litchi_ooxml_common::xml::{
     OMML_NAMESPACE_URI, extract_omml_formulas, scan_omml_formula_ranges,
 };
 use litchi_opc::{
     BlobPart, DiagnosticSnapshot, OpcError, OpcOperationAccounting, OpcPackage, OpenSession,
-    Operation, PackURI, PackageWriter, Part, PartData, ReadLimits, Relationships,
-    SourceBackedPackage, SourceCacheCounterDelta, SourceCacheDiagnostics, SourceCacheLimits,
-    TargetMode,
+    Operation, PackURI, PackageWriter, Part, PartData, Relationships, SourceBackedPackage,
+    SourceCacheCounterDelta, SourceCacheDiagnostics, SourceCacheLimits, SourceLimits, TargetMode,
     constants::{content_type as opc_content_type, relationship_type},
 };
 use litchi_pptx::shape::text::{
     extract as extract_drawingml_text, scan_ranges as scan_drawingml_ranges,
 };
+use litchi_xlsx::Package as XlsxPackage;
 use litchi_xlsx::{
-    Cell as XlsxCell, MergeChoice, MergeLimits, Rect, RowIndex, SourceBackedWorkbook,
-    StreamingCell, StreamingCellValue, StreamingWorkbookLimits, StreamingWorkbookWriter,
-    Value as XlsxValue, Workbook,
+    Cell as XlsxCell, MergeChoice, MergeLimits, OpenOptions as XlsxOpenOptions, Rect, RowIndex,
+    SourceBackedWorkbook, StreamingCell, StreamingCellValue, StreamingWorkbookLimits,
+    StreamingWorkbookWriter, Value as XlsxValue,
 };
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesRef, Event};
@@ -722,7 +734,6 @@ impl RtfSemanticVariant {
                     | Case::RtfLogicalTailPlanNoopSave
             ) || matches!(self, Self::Plain))
             && (!matches!(case, Case::RtfSemanticTextToSink) || !matches!(self, Self::Watermark))
-            && (!case.is_rtf_root_file() || !matches!(self, Self::Watermark))
     }
 
     const fn supports_validation(self) -> bool {
@@ -1151,34 +1162,6 @@ enum Case {
     ProviderAtomicSave,
     CfbFileSameLengthOverlayAtomicSave,
     CfbFileOwnedSameLengthOverlayAtomicSave,
-    PptxFileEagerOpen,
-    PptxFileSourceOpen,
-    PptxFileEagerListSlides,
-    PptxFileSourceListSlides,
-    PptxFileEagerSlideCount,
-    PptxFileSourceSlideCount,
-    PptxFileEagerSelectedSlide,
-    PptxFileSourceSelectedSlide,
-    PptxFileEagerOpenSlideCountLifecycle,
-    PptxFileSourceOpenSlideCountLifecycle,
-    PptxFileEagerOpenSelectedSlideLifecycle,
-    PptxFileSourceOpenSelectedSlideLifecycle,
-    DocxFileEagerOpen,
-    DocxFileSourceOpen,
-    DocxFileEagerParagraphCount,
-    DocxFileSourceParagraphCount,
-    DocxFileEagerListParagraphs,
-    DocxFileSourceListParagraphs,
-    DocxFileEagerFullText,
-    DocxFileSourceFullText,
-    DocxFileEagerOpenParagraphCountLifecycle,
-    DocxFileSourceOpenParagraphCountLifecycle,
-    DocxFileEagerOpenFullTextLifecycle,
-    DocxFileSourceOpenFullTextLifecycle,
-    OdtFileEagerOpen,
-    OdtFileSourceOpen,
-    OdtFileEagerOpenFullTextLifecycle,
-    OdtFileSourceOpenFullTextLifecycle,
     DocxSourceBackedOneEditSave,
     DocxSourceBackedExistingSectionLayoutEditSave,
     DocxStoryHyperlinkPlan,
@@ -1363,17 +1346,39 @@ enum Case {
     PptRangeSourceOpenOneShapeText,
     PptOwnedSourceControlOpen,
     PptOwnedSourceControlOpenOneShapeText,
-    DocFacadeFileOpen,
-    DocFacadeFileFullText,
-    DocFacadeFileOneParagraph,
-    PptFacadeFileOpen,
-    PptFacadeFileFullText,
-    PptFacadeFileOneSlideText,
     PptSemanticFullText,
     PptSlideOrderSnapshotOpen,
     PptTextEditOneEditSave,
     PptSemanticNoopEditSave,
     PptSemanticOneEditSave,
+    PptTextAggregateEagerNative1,
+    PptTextAggregateEagerNative10,
+    PptTextAggregateEagerNative100,
+    PptTextAggregateEagerNative256,
+    PptTextAggregateEagerNative1000,
+    PptTextAggregateEagerNative4096,
+    PptTextAggregateEagerNative10000,
+    PptTextAggregateEagerUnified1,
+    PptTextAggregateEagerUnified10,
+    PptTextAggregateEagerUnified100,
+    PptTextAggregateEagerUnified256,
+    PptTextAggregateEagerUnified1000,
+    PptTextAggregateEagerUnified4096,
+    PptTextAggregateEagerUnified10000,
+    PptTextAggregatePositionalNative1,
+    PptTextAggregatePositionalNative10,
+    PptTextAggregatePositionalNative100,
+    PptTextAggregatePositionalNative256,
+    PptTextAggregatePositionalNative1000,
+    PptTextAggregatePositionalNative4096,
+    PptTextAggregatePositionalNative10000,
+    PptTextAggregatePositionalUnified1,
+    PptTextAggregatePositionalUnified10,
+    PptTextAggregatePositionalUnified100,
+    PptTextAggregatePositionalUnified256,
+    PptTextAggregatePositionalUnified1000,
+    PptTextAggregatePositionalUnified4096,
+    PptTextAggregatePositionalUnified10000,
     PptPicturesEagerOpen,
     PptPicturesSourceBackedOpen,
     PptPicturesEagerFirstImage,
@@ -1404,15 +1409,10 @@ enum Case {
     XlsxSourceListSheets,
     XlsxSourceFirstCell,
     XlsxSourceNarrowColumnRangeScan,
-    XlsxFileOpen,
-    XlsxFileOpenLifecycle,
-    XlsxFileSelectedCell,
     XlsxSourceRepeatedStoreMedium,
     XlsxSourceRepeatedStoreMediumReacquisitionControl,
     XlsxSourceRepeatedStoreOversized,
     XlsxSourceRepeatedStoreOversizedReacquisitionControl,
-    XlsxBytesOpen,
-    XlsxBytesOpenLifecycle,
     XlsxProducerMediumSourceOpen,
     XlsxProducerMediumSourceSelectedCell,
     XlsxProducerMediumSourceFullCellScan,
@@ -1491,8 +1491,6 @@ enum Case {
     XlsxRangeSourceNarrowColumnRangeScan,
     OpcOpenSessionScaling,
     CfbBulkReadScaling,
-    RtfFileOpen,
-    RtfFileOpenLifecycle,
     RtfSemanticOpen,
     RtfSemanticParagraphCount,
     RtfSemanticListParagraphs,
@@ -1627,17 +1625,11 @@ enum Case {
     DetectOdpReader,
     DetectOdpPolyglot,
     DetectOdpCatalogAlias,
-    OdpFileEagerOpen,
-    OdpFileSourceOpen,
-    OdpFileEagerSelectedSlide,
-    OdpFileSourceSelectedSlide,
     OdpSourceBackedRepeatedTextUncached,
     OdpSourceBackedRepeatedTextCached,
     OdpSourceBackedCatalogOpen,
     OdpSourceBackedCatalogList,
     OdpSourceBackedCatalogQuery,
-    OdsFileEagerOpen,
-    OdsFileSourceOpen,
     OdsFileEagerSelectedCell,
     OdsFileSourceSelectedCell,
     OdsFileEagerSelectedMedia,
@@ -1646,6 +1638,124 @@ enum Case {
     OdsFileSourceCellSweep,
     OdsFileEagerCellBatchSweep,
     OdsFileSourceCellBatchSweep,
+    DocxFileUnifiedEagerOpen,
+    DocxFileUnifiedSourceOpen,
+    DocxFileUnifiedEagerParagraphCount,
+    DocxFileUnifiedSourceParagraphCount,
+    DocxFileUnifiedEagerListParagraphs,
+    DocxFileUnifiedSourceListParagraphs,
+    DocxFileUnifiedEagerFullText,
+    DocxFileUnifiedSourceFullText,
+    DocxFileUnifiedEagerOpenParagraphCountLifecycle,
+    DocxFileUnifiedSourceOpenParagraphCountLifecycle,
+    DocxFileUnifiedEagerOpenFullTextLifecycle,
+    DocxFileUnifiedSourceOpenFullTextLifecycle,
+    DocxFileLeafEagerOpen,
+    DocxFileLeafSourceOpen,
+    DocxFileLeafEagerParagraphCount,
+    DocxFileLeafSourceParagraphCount,
+    DocxFileLeafEagerListParagraphs,
+    DocxFileLeafSourceListParagraphs,
+    DocxFileLeafEagerFullText,
+    DocxFileLeafSourceFullText,
+    DocxFileLeafEagerOpenParagraphCountLifecycle,
+    DocxFileLeafSourceOpenParagraphCountLifecycle,
+    DocxFileLeafEagerOpenFullTextLifecycle,
+    DocxFileLeafSourceOpenFullTextLifecycle,
+    PptxFileUnifiedEagerOpen,
+    PptxFileUnifiedSourceOpen,
+    PptxFileUnifiedEagerListSlides,
+    PptxFileUnifiedSourceListSlides,
+    PptxFileUnifiedEagerSlideCount,
+    PptxFileUnifiedSourceSlideCount,
+    PptxFileUnifiedEagerSelectedSlide,
+    PptxFileUnifiedSourceSelectedSlide,
+    PptxFileUnifiedEagerOpenSlideCountLifecycle,
+    PptxFileUnifiedSourceOpenSlideCountLifecycle,
+    PptxFileUnifiedEagerOpenSelectedSlideLifecycle,
+    PptxFileUnifiedSourceOpenSelectedSlideLifecycle,
+    PptxFileLeafEagerOpen,
+    PptxFileLeafSourceOpen,
+    PptxFileLeafEagerListSlides,
+    PptxFileLeafSourceListSlides,
+    PptxFileLeafEagerSlideCount,
+    PptxFileLeafSourceSlideCount,
+    PptxFileLeafEagerSelectedSlide,
+    PptxFileLeafSourceSelectedSlide,
+    PptxFileLeafEagerOpenSlideCountLifecycle,
+    PptxFileLeafSourceOpenSlideCountLifecycle,
+    PptxFileLeafEagerOpenSelectedSlideLifecycle,
+    PptxFileLeafSourceOpenSelectedSlideLifecycle,
+    XlsxFileUnifiedOpen,
+    XlsxFileUnifiedOpenLifecycle,
+    XlsxFileUnifiedSelectedCell,
+    XlsxFileLeafOpen,
+    XlsxFileLeafOpenLifecycle,
+    XlsxFileLeafSelectedCell,
+    XlsxBytesUnifiedOpen,
+    XlsxBytesUnifiedOpenLifecycle,
+    XlsxBytesLeafOpen,
+    XlsxBytesLeafOpenLifecycle,
+    DocxSemanticUnifiedOneParagraph,
+    DocxSemanticUnifiedOneParagraphText,
+    DocxSemanticLeafOneParagraph,
+    DocxSemanticLeafOneParagraphText,
+    DocxProducerUnifiedSourceSelectedParagraph,
+    DocxProducerLeafSourceSelectedParagraph,
+    DocFileUnifiedOpen,
+    DocFileUnifiedFullText,
+    DocFileUnifiedOneParagraph,
+    DocFileLeafOpen,
+    DocFileLeafFullText,
+    DocFileLeafOneParagraph,
+    PptFileUnifiedOpen,
+    PptFileUnifiedFullText,
+    PptFileUnifiedOneSlideText,
+    PptFileLeafOpen,
+    PptFileLeafFullText,
+    PptFileLeafOneSlideText,
+    RtfFileUnifiedOpen,
+    RtfFileUnifiedOpenLifecycle,
+    RtfFileLeafOpen,
+    RtfFileLeafOpenLifecycle,
+    OdtFileUnifiedEagerOpen,
+    OdtFileUnifiedSourceOpen,
+    OdtFileUnifiedEagerOpenFullTextLifecycle,
+    OdtFileUnifiedSourceOpenFullTextLifecycle,
+    OdtFileLeafEagerOpen,
+    OdtFileLeafSourceOpen,
+    OdtFileLeafEagerOpenFullTextLifecycle,
+    OdtFileLeafSourceOpenFullTextLifecycle,
+    OdpFileUnifiedEagerOpen,
+    OdpFileUnifiedSourceOpen,
+    OdpFileUnifiedEagerSelectedSlide,
+    OdpFileUnifiedSourceSelectedSlide,
+    OdpFileLeafEagerOpen,
+    OdpFileLeafSourceOpen,
+    OdpFileLeafEagerSelectedSlide,
+    OdpFileLeafSourceSelectedSlide,
+    OdsFileUnifiedEagerOpen,
+    OdsFileUnifiedSourceOpen,
+    OdsFileLeafEagerOpen,
+    OdsFileLeafSourceOpen,
+    DetectOdtUnifiedBytes,
+    DetectOdtUnifiedReader,
+    DetectOdtUnifiedPolyglot,
+    DetectOdtUnifiedCatalogAlias,
+    DetectOdtLeafBytes,
+    DetectOdtLeafReader,
+    DetectOdsUnifiedBytes,
+    DetectOdsUnifiedReader,
+    DetectOdsUnifiedPolyglot,
+    DetectOdsUnifiedCatalogAlias,
+    DetectOdsLeafBytes,
+    DetectOdsLeafReader,
+    DetectOdpUnifiedBytes,
+    DetectOdpUnifiedReader,
+    DetectOdpUnifiedPolyglot,
+    DetectOdpUnifiedCatalogAlias,
+    DetectOdpLeafBytes,
+    DetectOdpLeafReader,
 }
 
 impl Case {
@@ -1736,48 +1846,6 @@ impl Case {
             Self::CfbFileOwnedSameLengthOverlayAtomicSave => {
                 "cfb_file_owned_same_length_overlay_atomic_save"
             },
-            Self::PptxFileEagerOpen => "pptx_file_eager_open",
-            Self::PptxFileSourceOpen => "pptx_file_source_open",
-            Self::PptxFileEagerListSlides => "pptx_file_eager_list_slides",
-            Self::PptxFileSourceListSlides => "pptx_file_source_list_slides",
-            Self::PptxFileEagerSlideCount => "pptx_file_eager_slide_count",
-            Self::PptxFileSourceSlideCount => "pptx_file_source_slide_count",
-            Self::PptxFileEagerSelectedSlide => "pptx_file_eager_selected_slide",
-            Self::PptxFileSourceSelectedSlide => "pptx_file_source_selected_slide",
-            Self::PptxFileEagerOpenSlideCountLifecycle => {
-                "pptx_file_eager_open_slide_count_lifecycle"
-            },
-            Self::PptxFileSourceOpenSlideCountLifecycle => {
-                "pptx_file_source_open_slide_count_lifecycle"
-            },
-            Self::PptxFileEagerOpenSelectedSlideLifecycle => {
-                "pptx_file_eager_open_selected_slide_lifecycle"
-            },
-            Self::PptxFileSourceOpenSelectedSlideLifecycle => {
-                "pptx_file_source_open_selected_slide_lifecycle"
-            },
-            Self::DocxFileEagerOpen => "docx_file_eager_open",
-            Self::DocxFileSourceOpen => "docx_file_source_open",
-            Self::DocxFileEagerParagraphCount => "docx_file_eager_paragraph_count",
-            Self::DocxFileSourceParagraphCount => "docx_file_source_paragraph_count",
-            Self::DocxFileEagerListParagraphs => "docx_file_eager_list_paragraphs",
-            Self::DocxFileSourceListParagraphs => "docx_file_source_list_paragraphs",
-            Self::DocxFileEagerFullText => "docx_file_eager_full_text",
-            Self::DocxFileSourceFullText => "docx_file_source_full_text",
-            Self::DocxFileEagerOpenParagraphCountLifecycle => {
-                "docx_file_eager_open_paragraph_count_lifecycle"
-            },
-            Self::DocxFileSourceOpenParagraphCountLifecycle => {
-                "docx_file_source_open_paragraph_count_lifecycle"
-            },
-            Self::DocxFileEagerOpenFullTextLifecycle => "docx_file_eager_open_full_text_lifecycle",
-            Self::DocxFileSourceOpenFullTextLifecycle => {
-                "docx_file_source_open_full_text_lifecycle"
-            },
-            Self::OdtFileEagerOpen => "odt_file_eager_open",
-            Self::OdtFileSourceOpen => "odt_file_source_open",
-            Self::OdtFileEagerOpenFullTextLifecycle => "odt_file_eager_open_full_text_lifecycle",
-            Self::OdtFileSourceOpenFullTextLifecycle => "odt_file_source_open_full_text_lifecycle",
             Self::DocxSourceBackedOneEditSave => "docx_source_backed_one_edit_save",
             Self::DocxSourceBackedExistingSectionLayoutEditSave => {
                 "docx_source_backed_existing_section_layout_edit_save"
@@ -2048,17 +2116,83 @@ impl Case {
             Self::PptOwnedSourceControlOpenOneShapeText => {
                 "ppt_owned_source_control_open_one_shape_text"
             },
-            Self::DocFacadeFileOpen => "doc_facade_file_open",
-            Self::DocFacadeFileFullText => "doc_facade_file_full_text",
-            Self::DocFacadeFileOneParagraph => "doc_facade_file_one_paragraph",
-            Self::PptFacadeFileOpen => "ppt_facade_file_open",
-            Self::PptFacadeFileFullText => "ppt_facade_file_full_text",
-            Self::PptFacadeFileOneSlideText => "ppt_facade_file_one_slide_text",
             Self::PptSemanticFullText => "ppt_semantic_full_text",
             Self::PptSlideOrderSnapshotOpen => "ppt_slide_order_snapshot_open",
             Self::PptTextEditOneEditSave => "ppt_text_edit_one_edit_save",
             Self::PptSemanticNoopEditSave => "ppt_semantic_noop_edit_save",
             Self::PptSemanticOneEditSave => "ppt_semantic_one_edit_save",
+            Self::PptTextAggregateEagerNative1 => "ppt_text_batch_eager_native_1_aggregate_v3",
+            Self::PptTextAggregateEagerNative10 => "ppt_text_batch_eager_native_10_aggregate_v3",
+            Self::PptTextAggregateEagerNative100 => "ppt_text_batch_eager_native_100_aggregate_v3",
+            Self::PptTextAggregateEagerNative256 => "ppt_text_batch_eager_native_256_aggregate_v3",
+            Self::PptTextAggregateEagerNative1000 => {
+                "ppt_text_batch_eager_native_1000_aggregate_v3"
+            },
+            Self::PptTextAggregateEagerNative4096 => {
+                "ppt_text_batch_eager_native_4096_aggregate_v3"
+            },
+            Self::PptTextAggregateEagerNative10000 => {
+                "ppt_text_batch_eager_native_10000_aggregate_v3"
+            },
+            Self::PptTextAggregateEagerUnified1 => "ppt_text_batch_eager_unified_1_aggregate_v3",
+            Self::PptTextAggregateEagerUnified10 => "ppt_text_batch_eager_unified_10_aggregate_v3",
+            Self::PptTextAggregateEagerUnified100 => {
+                "ppt_text_batch_eager_unified_100_aggregate_v3"
+            },
+            Self::PptTextAggregateEagerUnified256 => {
+                "ppt_text_batch_eager_unified_256_aggregate_v3"
+            },
+            Self::PptTextAggregateEagerUnified1000 => {
+                "ppt_text_batch_eager_unified_1000_aggregate_v3"
+            },
+            Self::PptTextAggregateEagerUnified4096 => {
+                "ppt_text_batch_eager_unified_4096_aggregate_v3"
+            },
+            Self::PptTextAggregateEagerUnified10000 => {
+                "ppt_text_batch_eager_unified_10000_aggregate_v3"
+            },
+            Self::PptTextAggregatePositionalNative1 => {
+                "ppt_text_batch_positional_native_1_aggregate_v3"
+            },
+            Self::PptTextAggregatePositionalNative10 => {
+                "ppt_text_batch_positional_native_10_aggregate_v3"
+            },
+            Self::PptTextAggregatePositionalNative100 => {
+                "ppt_text_batch_positional_native_100_aggregate_v3"
+            },
+            Self::PptTextAggregatePositionalNative256 => {
+                "ppt_text_batch_positional_native_256_aggregate_v3"
+            },
+            Self::PptTextAggregatePositionalNative1000 => {
+                "ppt_text_batch_positional_native_1000_aggregate_v3"
+            },
+            Self::PptTextAggregatePositionalNative4096 => {
+                "ppt_text_batch_positional_native_4096_aggregate_v3"
+            },
+            Self::PptTextAggregatePositionalNative10000 => {
+                "ppt_text_batch_positional_native_10000_aggregate_v3"
+            },
+            Self::PptTextAggregatePositionalUnified1 => {
+                "ppt_text_batch_positional_unified_1_aggregate_v3"
+            },
+            Self::PptTextAggregatePositionalUnified10 => {
+                "ppt_text_batch_positional_unified_10_aggregate_v3"
+            },
+            Self::PptTextAggregatePositionalUnified100 => {
+                "ppt_text_batch_positional_unified_100_aggregate_v3"
+            },
+            Self::PptTextAggregatePositionalUnified256 => {
+                "ppt_text_batch_positional_unified_256_aggregate_v3"
+            },
+            Self::PptTextAggregatePositionalUnified1000 => {
+                "ppt_text_batch_positional_unified_1000_aggregate_v3"
+            },
+            Self::PptTextAggregatePositionalUnified4096 => {
+                "ppt_text_batch_positional_unified_4096_aggregate_v3"
+            },
+            Self::PptTextAggregatePositionalUnified10000 => {
+                "ppt_text_batch_positional_unified_10000_aggregate_v3"
+            },
             Self::PptPicturesEagerOpen => "ppt_pictures_eager_open",
             Self::PptPicturesSourceBackedOpen => "ppt_pictures_source_backed_open",
             Self::PptPicturesEagerFirstImage => "ppt_pictures_eager_first_image",
@@ -2091,9 +2225,6 @@ impl Case {
             Self::XlsxSourceListSheets => "xlsx_source_list_sheets",
             Self::XlsxSourceFirstCell => "xlsx_source_first_cell",
             Self::XlsxSourceNarrowColumnRangeScan => "xlsx_source_narrow_column_range_scan",
-            Self::XlsxFileOpen => "xlsx_file_open",
-            Self::XlsxFileOpenLifecycle => "xlsx_file_open_lifecycle",
-            Self::XlsxFileSelectedCell => "xlsx_file_selected_cell",
             Self::XlsxSourceRepeatedStoreMedium => "xlsx_source_repeated_store_medium",
             Self::XlsxSourceRepeatedStoreMediumReacquisitionControl => {
                 "xlsx_source_repeated_store_medium_reacquisition_control"
@@ -2102,8 +2233,6 @@ impl Case {
             Self::XlsxSourceRepeatedStoreOversizedReacquisitionControl => {
                 "xlsx_source_repeated_store_oversized_reacquisition_control"
             },
-            Self::XlsxBytesOpen => "xlsx_bytes_open",
-            Self::XlsxBytesOpenLifecycle => "xlsx_bytes_open_lifecycle",
             Self::XlsxProducerMediumSourceOpen => "xlsx_producer_medium_source_open",
             Self::XlsxProducerMediumSourceSelectedCell => {
                 "xlsx_producer_medium_source_selected_cell"
@@ -2222,8 +2351,6 @@ impl Case {
             },
             Self::OpcOpenSessionScaling => "opc_open_session_scaling",
             Self::CfbBulkReadScaling => "cfb_bulk_read_scaling",
-            Self::RtfFileOpen => "rtf_file_open",
-            Self::RtfFileOpenLifecycle => "rtf_file_open_lifecycle",
             Self::RtfSemanticOpen => "rtf_semantic_open",
             Self::RtfSemanticParagraphCount => "rtf_semantic_paragraph_count",
             Self::RtfSemanticListParagraphs => "rtf_semantic_list_paragraphs",
@@ -2360,17 +2487,11 @@ impl Case {
             Self::DetectOdpReader => "detect_odp_reader",
             Self::DetectOdpPolyglot => "detect_odp_polyglot",
             Self::DetectOdpCatalogAlias => "detect_odp_catalog_alias",
-            Self::OdpFileEagerOpen => "odp_file_eager_open",
-            Self::OdpFileSourceOpen => "odp_file_source_open",
-            Self::OdpFileEagerSelectedSlide => "odp_file_eager_selected_slide",
-            Self::OdpFileSourceSelectedSlide => "odp_file_source_selected_slide",
             Self::OdpSourceBackedRepeatedTextUncached => "odp_source_backed_repeated_text_uncached",
             Self::OdpSourceBackedRepeatedTextCached => "odp_source_backed_repeated_text_cached",
             Self::OdpSourceBackedCatalogOpen => "odp_source_backed_catalog_open",
             Self::OdpSourceBackedCatalogList => "odp_source_backed_catalog_list",
             Self::OdpSourceBackedCatalogQuery => "odp_source_backed_catalog_query",
-            Self::OdsFileEagerOpen => "ods_file_eager_open",
-            Self::OdsFileSourceOpen => "ods_file_source_open",
             Self::OdsFileEagerSelectedCell => "ods_file_eager_selected_cell",
             Self::OdsFileSourceSelectedCell => "ods_file_source_selected_cell",
             Self::OdsFileEagerSelectedMedia => "ods_file_eager_selected_media",
@@ -2379,6 +2500,168 @@ impl Case {
             Self::OdsFileSourceCellSweep => "ods_file_source_cell_sweep",
             Self::OdsFileEagerCellBatchSweep => "ods_file_eager_cell_batch_sweep",
             Self::OdsFileSourceCellBatchSweep => "ods_file_source_cell_batch_sweep",
+            Self::DocxFileUnifiedEagerOpen => "docx_file_unified_eager_open",
+            Self::DocxFileUnifiedSourceOpen => "docx_file_unified_source_open",
+            Self::DocxFileUnifiedEagerParagraphCount => "docx_file_unified_eager_paragraph_count",
+            Self::DocxFileUnifiedSourceParagraphCount => "docx_file_unified_source_paragraph_count",
+            Self::DocxFileUnifiedEagerListParagraphs => "docx_file_unified_eager_list_paragraphs",
+            Self::DocxFileUnifiedSourceListParagraphs => "docx_file_unified_source_list_paragraphs",
+            Self::DocxFileUnifiedEagerFullText => "docx_file_unified_eager_full_text",
+            Self::DocxFileUnifiedSourceFullText => "docx_file_unified_source_full_text",
+            Self::DocxFileUnifiedEagerOpenParagraphCountLifecycle => {
+                "docx_file_unified_eager_open_paragraph_count_lifecycle"
+            },
+            Self::DocxFileUnifiedSourceOpenParagraphCountLifecycle => {
+                "docx_file_unified_source_open_paragraph_count_lifecycle"
+            },
+            Self::DocxFileUnifiedEagerOpenFullTextLifecycle => {
+                "docx_file_unified_eager_open_full_text_lifecycle"
+            },
+            Self::DocxFileUnifiedSourceOpenFullTextLifecycle => {
+                "docx_file_unified_source_open_full_text_lifecycle"
+            },
+            Self::DocxFileLeafEagerOpen => "docx_file_leaf_eager_open",
+            Self::DocxFileLeafSourceOpen => "docx_file_leaf_source_open",
+            Self::DocxFileLeafEagerParagraphCount => "docx_file_leaf_eager_paragraph_count",
+            Self::DocxFileLeafSourceParagraphCount => "docx_file_leaf_source_paragraph_count",
+            Self::DocxFileLeafEagerListParagraphs => "docx_file_leaf_eager_list_paragraphs",
+            Self::DocxFileLeafSourceListParagraphs => "docx_file_leaf_source_list_paragraphs",
+            Self::DocxFileLeafEagerFullText => "docx_file_leaf_eager_full_text",
+            Self::DocxFileLeafSourceFullText => "docx_file_leaf_source_full_text",
+            Self::DocxFileLeafEagerOpenParagraphCountLifecycle => {
+                "docx_file_leaf_eager_open_paragraph_count_lifecycle"
+            },
+            Self::DocxFileLeafSourceOpenParagraphCountLifecycle => {
+                "docx_file_leaf_source_open_paragraph_count_lifecycle"
+            },
+            Self::DocxFileLeafEagerOpenFullTextLifecycle => {
+                "docx_file_leaf_eager_open_full_text_lifecycle"
+            },
+            Self::DocxFileLeafSourceOpenFullTextLifecycle => {
+                "docx_file_leaf_source_open_full_text_lifecycle"
+            },
+            Self::PptxFileUnifiedEagerOpen => "pptx_file_unified_eager_open",
+            Self::PptxFileUnifiedSourceOpen => "pptx_file_unified_source_open",
+            Self::PptxFileUnifiedEagerListSlides => "pptx_file_unified_eager_list_slides",
+            Self::PptxFileUnifiedSourceListSlides => "pptx_file_unified_source_list_slides",
+            Self::PptxFileUnifiedEagerSlideCount => "pptx_file_unified_eager_slide_count",
+            Self::PptxFileUnifiedSourceSlideCount => "pptx_file_unified_source_slide_count",
+            Self::PptxFileUnifiedEagerSelectedSlide => "pptx_file_unified_eager_selected_slide",
+            Self::PptxFileUnifiedSourceSelectedSlide => "pptx_file_unified_source_selected_slide",
+            Self::PptxFileUnifiedEagerOpenSlideCountLifecycle => {
+                "pptx_file_unified_eager_open_slide_count_lifecycle"
+            },
+            Self::PptxFileUnifiedSourceOpenSlideCountLifecycle => {
+                "pptx_file_unified_source_open_slide_count_lifecycle"
+            },
+            Self::PptxFileUnifiedEagerOpenSelectedSlideLifecycle => {
+                "pptx_file_unified_eager_open_selected_slide_lifecycle"
+            },
+            Self::PptxFileUnifiedSourceOpenSelectedSlideLifecycle => {
+                "pptx_file_unified_source_open_selected_slide_lifecycle"
+            },
+            Self::PptxFileLeafEagerOpen => "pptx_file_leaf_eager_open",
+            Self::PptxFileLeafSourceOpen => "pptx_file_leaf_source_open",
+            Self::PptxFileLeafEagerListSlides => "pptx_file_leaf_eager_list_slides",
+            Self::PptxFileLeafSourceListSlides => "pptx_file_leaf_source_list_slides",
+            Self::PptxFileLeafEagerSlideCount => "pptx_file_leaf_eager_slide_count",
+            Self::PptxFileLeafSourceSlideCount => "pptx_file_leaf_source_slide_count",
+            Self::PptxFileLeafEagerSelectedSlide => "pptx_file_leaf_eager_selected_slide",
+            Self::PptxFileLeafSourceSelectedSlide => "pptx_file_leaf_source_selected_slide",
+            Self::PptxFileLeafEagerOpenSlideCountLifecycle => {
+                "pptx_file_leaf_eager_open_slide_count_lifecycle"
+            },
+            Self::PptxFileLeafSourceOpenSlideCountLifecycle => {
+                "pptx_file_leaf_source_open_slide_count_lifecycle"
+            },
+            Self::PptxFileLeafEagerOpenSelectedSlideLifecycle => {
+                "pptx_file_leaf_eager_open_selected_slide_lifecycle"
+            },
+            Self::PptxFileLeafSourceOpenSelectedSlideLifecycle => {
+                "pptx_file_leaf_source_open_selected_slide_lifecycle"
+            },
+            Self::XlsxFileUnifiedOpen => "xlsx_file_unified_open",
+            Self::XlsxFileUnifiedOpenLifecycle => "xlsx_file_unified_open_lifecycle",
+            Self::XlsxFileUnifiedSelectedCell => "xlsx_file_unified_selected_cell",
+            Self::XlsxFileLeafOpen => "xlsx_file_leaf_open",
+            Self::XlsxFileLeafOpenLifecycle => "xlsx_file_leaf_open_lifecycle",
+            Self::XlsxFileLeafSelectedCell => "xlsx_file_leaf_selected_cell",
+            Self::XlsxBytesUnifiedOpen => "xlsx_bytes_unified_open",
+            Self::XlsxBytesUnifiedOpenLifecycle => "xlsx_bytes_unified_open_lifecycle",
+            Self::XlsxBytesLeafOpen => "xlsx_bytes_leaf_open",
+            Self::XlsxBytesLeafOpenLifecycle => "xlsx_bytes_leaf_open_lifecycle",
+            Self::DocxSemanticUnifiedOneParagraph => "docx_semantic_unified_one_paragraph",
+            Self::DocxSemanticUnifiedOneParagraphText => "docx_semantic_unified_one_paragraph_text",
+            Self::DocxSemanticLeafOneParagraph => "docx_semantic_leaf_one_paragraph",
+            Self::DocxSemanticLeafOneParagraphText => "docx_semantic_leaf_one_paragraph_text",
+            Self::DocxProducerUnifiedSourceSelectedParagraph => {
+                "docx_producer_unified_source_selected_paragraph"
+            },
+            Self::DocxProducerLeafSourceSelectedParagraph => {
+                "docx_producer_leaf_source_selected_paragraph"
+            },
+            Self::DocFileUnifiedOpen => "doc_file_unified_open",
+            Self::DocFileUnifiedFullText => "doc_file_unified_full_text",
+            Self::DocFileUnifiedOneParagraph => "doc_file_unified_one_paragraph",
+            Self::DocFileLeafOpen => "doc_file_leaf_open",
+            Self::DocFileLeafFullText => "doc_file_leaf_full_text",
+            Self::DocFileLeafOneParagraph => "doc_file_leaf_one_paragraph",
+            Self::PptFileUnifiedOpen => "ppt_file_unified_open",
+            Self::PptFileUnifiedFullText => "ppt_file_unified_full_text",
+            Self::PptFileUnifiedOneSlideText => "ppt_file_unified_one_slide_text",
+            Self::PptFileLeafOpen => "ppt_file_leaf_open",
+            Self::PptFileLeafFullText => "ppt_file_leaf_full_text",
+            Self::PptFileLeafOneSlideText => "ppt_file_leaf_one_slide_text",
+            Self::RtfFileUnifiedOpen => "rtf_file_unified_open",
+            Self::RtfFileUnifiedOpenLifecycle => "rtf_file_unified_open_lifecycle",
+            Self::RtfFileLeafOpen => "rtf_file_leaf_open",
+            Self::RtfFileLeafOpenLifecycle => "rtf_file_leaf_open_lifecycle",
+            Self::OdtFileUnifiedEagerOpen => "odt_file_unified_eager_open",
+            Self::OdtFileUnifiedSourceOpen => "odt_file_unified_source_open",
+            Self::OdtFileUnifiedEagerOpenFullTextLifecycle => {
+                "odt_file_unified_eager_open_full_text_lifecycle"
+            },
+            Self::OdtFileUnifiedSourceOpenFullTextLifecycle => {
+                "odt_file_unified_source_open_full_text_lifecycle"
+            },
+            Self::OdtFileLeafEagerOpen => "odt_file_leaf_eager_open",
+            Self::OdtFileLeafSourceOpen => "odt_file_leaf_source_open",
+            Self::OdtFileLeafEagerOpenFullTextLifecycle => {
+                "odt_file_leaf_eager_open_full_text_lifecycle"
+            },
+            Self::OdtFileLeafSourceOpenFullTextLifecycle => {
+                "odt_file_leaf_source_open_full_text_lifecycle"
+            },
+            Self::OdpFileUnifiedEagerOpen => "odp_file_unified_eager_open",
+            Self::OdpFileUnifiedSourceOpen => "odp_file_unified_source_open",
+            Self::OdpFileUnifiedEagerSelectedSlide => "odp_file_unified_eager_selected_slide",
+            Self::OdpFileUnifiedSourceSelectedSlide => "odp_file_unified_source_selected_slide",
+            Self::OdpFileLeafEagerOpen => "odp_file_leaf_eager_open",
+            Self::OdpFileLeafSourceOpen => "odp_file_leaf_source_open",
+            Self::OdpFileLeafEagerSelectedSlide => "odp_file_leaf_eager_selected_slide",
+            Self::OdpFileLeafSourceSelectedSlide => "odp_file_leaf_source_selected_slide",
+            Self::OdsFileUnifiedEagerOpen => "ods_file_unified_eager_open",
+            Self::OdsFileUnifiedSourceOpen => "ods_file_unified_source_open",
+            Self::OdsFileLeafEagerOpen => "ods_file_leaf_eager_open",
+            Self::OdsFileLeafSourceOpen => "ods_file_leaf_source_open",
+            Self::DetectOdtUnifiedBytes => "detect_odt_unified_bytes",
+            Self::DetectOdtUnifiedReader => "detect_odt_unified_reader",
+            Self::DetectOdtUnifiedPolyglot => "detect_odt_unified_polyglot",
+            Self::DetectOdtUnifiedCatalogAlias => "detect_odt_unified_catalog_alias",
+            Self::DetectOdtLeafBytes => "detect_odt_leaf_bytes",
+            Self::DetectOdtLeafReader => "detect_odt_leaf_reader",
+            Self::DetectOdsUnifiedBytes => "detect_ods_unified_bytes",
+            Self::DetectOdsUnifiedReader => "detect_ods_unified_reader",
+            Self::DetectOdsUnifiedPolyglot => "detect_ods_unified_polyglot",
+            Self::DetectOdsUnifiedCatalogAlias => "detect_ods_unified_catalog_alias",
+            Self::DetectOdsLeafBytes => "detect_ods_leaf_bytes",
+            Self::DetectOdsLeafReader => "detect_ods_leaf_reader",
+            Self::DetectOdpUnifiedBytes => "detect_odp_unified_bytes",
+            Self::DetectOdpUnifiedReader => "detect_odp_unified_reader",
+            Self::DetectOdpUnifiedPolyglot => "detect_odp_unified_polyglot",
+            Self::DetectOdpUnifiedCatalogAlias => "detect_odp_unified_catalog_alias",
+            Self::DetectOdpLeafBytes => "detect_odp_leaf_bytes",
+            Self::DetectOdpLeafReader => "detect_odp_leaf_reader",
         }
     }
 
@@ -2746,9 +3029,7 @@ impl Case {
     const fn uses_semantic_rtf(self) -> bool {
         matches!(
             self,
-            Self::RtfFileOpen
-                | Self::RtfFileOpenLifecycle
-                | Self::RtfSemanticOpen
+            Self::RtfSemanticOpen
                 | Self::RtfSemanticParagraphCount
                 | Self::RtfSemanticListParagraphs
                 | Self::RtfSemanticCollectParagraphs
@@ -2770,10 +3051,6 @@ impl Case {
                 | Self::RtfLogicalTailCommitNoopSave
                 | Self::RtfLogicalTailPlanNoopSave
         )
-    }
-
-    const fn is_rtf_root_file(self) -> bool {
-        matches!(self, Self::RtfFileOpen | Self::RtfFileOpenLifecycle)
     }
 
     const fn is_rtf_picture_crud(self) -> bool {
@@ -2897,16 +3174,6 @@ impl Case {
             Self::OdtSourceBackedCatalogOpen
                 | Self::OdtSourceBackedCatalogList
                 | Self::OdtSourceBackedCatalogQuery
-        )
-    }
-
-    const fn is_odt_root_file(self) -> bool {
-        matches!(
-            self,
-            Self::OdtFileEagerOpen
-                | Self::OdtFileSourceOpen
-                | Self::OdtFileEagerOpenFullTextLifecycle
-                | Self::OdtFileSourceOpenFullTextLifecycle
         )
     }
 
@@ -3314,41 +3581,173 @@ impl Case {
                 | Self::ProviderAtomicSave
                 | Self::CfbFileSameLengthOverlayAtomicSave
                 | Self::CfbFileOwnedSameLengthOverlayAtomicSave
-                | Self::PptxFileEagerOpen
-                | Self::PptxFileSourceOpen
-                | Self::PptxFileEagerListSlides
-                | Self::PptxFileSourceListSlides
-                | Self::PptxFileEagerSlideCount
-                | Self::PptxFileSourceSlideCount
-                | Self::PptxFileEagerSelectedSlide
-                | Self::PptxFileSourceSelectedSlide
-                | Self::PptxFileEagerOpenSlideCountLifecycle
-                | Self::PptxFileSourceOpenSlideCountLifecycle
-                | Self::PptxFileEagerOpenSelectedSlideLifecycle
-                | Self::PptxFileSourceOpenSelectedSlideLifecycle
-                | Self::DocxFileEagerOpen
-                | Self::DocxFileSourceOpen
-                | Self::DocxFileEagerParagraphCount
-                | Self::DocxFileSourceParagraphCount
-                | Self::DocxFileEagerListParagraphs
-                | Self::DocxFileSourceListParagraphs
-                | Self::DocxFileEagerFullText
-                | Self::DocxFileSourceFullText
-                | Self::DocxFileEagerOpenParagraphCountLifecycle
-                | Self::DocxFileSourceOpenParagraphCountLifecycle
-                | Self::DocxFileEagerOpenFullTextLifecycle
-                | Self::DocxFileSourceOpenFullTextLifecycle
-                | Self::XlsxFileOpen
-                | Self::XlsxFileOpenLifecycle
-                | Self::XlsxFileSelectedCell
                 | Self::XlsxSourceRepeatedStoreMedium
                 | Self::XlsxSourceRepeatedStoreMediumReacquisitionControl
                 | Self::XlsxSourceRepeatedStoreOversized
                 | Self::XlsxSourceRepeatedStoreOversizedReacquisitionControl
-                | Self::OdtFileEagerOpen
-                | Self::OdtFileSourceOpen
-                | Self::OdtFileEagerOpenFullTextLifecycle
-                | Self::OdtFileSourceOpenFullTextLifecycle
+        ) || self.is_unified_ops_filesystem()
+    }
+
+    /// The paired unified-API/leaf-API DOCX, PPTX and XLSX routes of M0a step
+    /// S8b (plan 0003 §5.3). `filesystem::run_selected` runs them in fresh
+    /// child processes, as it runs their predecessors.
+    const fn is_unified_ops_filesystem(self) -> bool {
+        matches!(
+            self,
+            Self::DocxFileUnifiedEagerOpen
+                | Self::DocxFileUnifiedSourceOpen
+                | Self::DocxFileUnifiedEagerParagraphCount
+                | Self::DocxFileUnifiedSourceParagraphCount
+                | Self::DocxFileUnifiedEagerListParagraphs
+                | Self::DocxFileUnifiedSourceListParagraphs
+                | Self::DocxFileUnifiedEagerFullText
+                | Self::DocxFileUnifiedSourceFullText
+                | Self::DocxFileUnifiedEagerOpenParagraphCountLifecycle
+                | Self::DocxFileUnifiedSourceOpenParagraphCountLifecycle
+                | Self::DocxFileUnifiedEagerOpenFullTextLifecycle
+                | Self::DocxFileUnifiedSourceOpenFullTextLifecycle
+                | Self::DocxFileLeafEagerOpen
+                | Self::DocxFileLeafSourceOpen
+                | Self::DocxFileLeafEagerParagraphCount
+                | Self::DocxFileLeafSourceParagraphCount
+                | Self::DocxFileLeafEagerListParagraphs
+                | Self::DocxFileLeafSourceListParagraphs
+                | Self::DocxFileLeafEagerFullText
+                | Self::DocxFileLeafSourceFullText
+                | Self::DocxFileLeafEagerOpenParagraphCountLifecycle
+                | Self::DocxFileLeafSourceOpenParagraphCountLifecycle
+                | Self::DocxFileLeafEagerOpenFullTextLifecycle
+                | Self::DocxFileLeafSourceOpenFullTextLifecycle
+                | Self::PptxFileUnifiedEagerOpen
+                | Self::PptxFileUnifiedSourceOpen
+                | Self::PptxFileUnifiedEagerListSlides
+                | Self::PptxFileUnifiedSourceListSlides
+                | Self::PptxFileUnifiedEagerSlideCount
+                | Self::PptxFileUnifiedSourceSlideCount
+                | Self::PptxFileUnifiedEagerSelectedSlide
+                | Self::PptxFileUnifiedSourceSelectedSlide
+                | Self::PptxFileUnifiedEagerOpenSlideCountLifecycle
+                | Self::PptxFileUnifiedSourceOpenSlideCountLifecycle
+                | Self::PptxFileUnifiedEagerOpenSelectedSlideLifecycle
+                | Self::PptxFileUnifiedSourceOpenSelectedSlideLifecycle
+                | Self::PptxFileLeafEagerOpen
+                | Self::PptxFileLeafSourceOpen
+                | Self::PptxFileLeafEagerListSlides
+                | Self::PptxFileLeafSourceListSlides
+                | Self::PptxFileLeafEagerSlideCount
+                | Self::PptxFileLeafSourceSlideCount
+                | Self::PptxFileLeafEagerSelectedSlide
+                | Self::PptxFileLeafSourceSelectedSlide
+                | Self::PptxFileLeafEagerOpenSlideCountLifecycle
+                | Self::PptxFileLeafSourceOpenSlideCountLifecycle
+                | Self::PptxFileLeafEagerOpenSelectedSlideLifecycle
+                | Self::PptxFileLeafSourceOpenSelectedSlideLifecycle
+                | Self::XlsxFileUnifiedOpen
+                | Self::XlsxFileUnifiedOpenLifecycle
+                | Self::XlsxFileUnifiedSelectedCell
+                | Self::XlsxFileLeafOpen
+                | Self::XlsxFileLeafOpenLifecycle
+                | Self::XlsxFileLeafSelectedCell
+        )
+    }
+
+    /// The paired unified-API/leaf-API routes of M0a step S8b that run in
+    /// process (`unified_ops::run_selected`).
+    const fn is_unified_ops_in_process(self) -> bool {
+        matches!(
+            self,
+            Self::XlsxBytesUnifiedOpen
+                | Self::XlsxBytesUnifiedOpenLifecycle
+                | Self::XlsxBytesLeafOpen
+                | Self::XlsxBytesLeafOpenLifecycle
+                | Self::DocxSemanticUnifiedOneParagraph
+                | Self::DocxSemanticUnifiedOneParagraphText
+                | Self::DocxSemanticLeafOneParagraph
+                | Self::DocxSemanticLeafOneParagraphText
+                | Self::DocxProducerUnifiedSourceSelectedParagraph
+                | Self::DocxProducerLeafSourceSelectedParagraph
+                | Self::DocFileUnifiedOpen
+                | Self::DocFileUnifiedFullText
+                | Self::DocFileUnifiedOneParagraph
+                | Self::DocFileLeafOpen
+                | Self::DocFileLeafFullText
+                | Self::DocFileLeafOneParagraph
+                | Self::PptFileUnifiedOpen
+                | Self::PptFileUnifiedFullText
+                | Self::PptFileUnifiedOneSlideText
+                | Self::PptFileLeafOpen
+                | Self::PptFileLeafFullText
+                | Self::PptFileLeafOneSlideText
+                | Self::PptTextAggregateEagerNative1
+                | Self::PptTextAggregateEagerNative10
+                | Self::PptTextAggregateEagerNative100
+                | Self::PptTextAggregateEagerNative256
+                | Self::PptTextAggregateEagerNative1000
+                | Self::PptTextAggregateEagerNative4096
+                | Self::PptTextAggregateEagerNative10000
+                | Self::PptTextAggregateEagerUnified1
+                | Self::PptTextAggregateEagerUnified10
+                | Self::PptTextAggregateEagerUnified100
+                | Self::PptTextAggregateEagerUnified256
+                | Self::PptTextAggregateEagerUnified1000
+                | Self::PptTextAggregateEagerUnified4096
+                | Self::PptTextAggregateEagerUnified10000
+                | Self::PptTextAggregatePositionalNative1
+                | Self::PptTextAggregatePositionalNative10
+                | Self::PptTextAggregatePositionalNative100
+                | Self::PptTextAggregatePositionalNative256
+                | Self::PptTextAggregatePositionalNative1000
+                | Self::PptTextAggregatePositionalNative4096
+                | Self::PptTextAggregatePositionalNative10000
+                | Self::PptTextAggregatePositionalUnified1
+                | Self::PptTextAggregatePositionalUnified10
+                | Self::PptTextAggregatePositionalUnified100
+                | Self::PptTextAggregatePositionalUnified256
+                | Self::PptTextAggregatePositionalUnified1000
+                | Self::PptTextAggregatePositionalUnified4096
+                | Self::PptTextAggregatePositionalUnified10000
+                | Self::RtfFileUnifiedOpen
+                | Self::RtfFileUnifiedOpenLifecycle
+                | Self::RtfFileLeafOpen
+                | Self::RtfFileLeafOpenLifecycle
+                | Self::OdtFileUnifiedEagerOpen
+                | Self::OdtFileUnifiedSourceOpen
+                | Self::OdtFileUnifiedEagerOpenFullTextLifecycle
+                | Self::OdtFileUnifiedSourceOpenFullTextLifecycle
+                | Self::OdtFileLeafEagerOpen
+                | Self::OdtFileLeafSourceOpen
+                | Self::OdtFileLeafEagerOpenFullTextLifecycle
+                | Self::OdtFileLeafSourceOpenFullTextLifecycle
+                | Self::OdpFileUnifiedEagerOpen
+                | Self::OdpFileUnifiedSourceOpen
+                | Self::OdpFileUnifiedEagerSelectedSlide
+                | Self::OdpFileUnifiedSourceSelectedSlide
+                | Self::OdpFileLeafEagerOpen
+                | Self::OdpFileLeafSourceOpen
+                | Self::OdpFileLeafEagerSelectedSlide
+                | Self::OdpFileLeafSourceSelectedSlide
+                | Self::OdsFileUnifiedEagerOpen
+                | Self::OdsFileUnifiedSourceOpen
+                | Self::OdsFileLeafEagerOpen
+                | Self::OdsFileLeafSourceOpen
+                | Self::DetectOdtUnifiedBytes
+                | Self::DetectOdtUnifiedReader
+                | Self::DetectOdtUnifiedPolyglot
+                | Self::DetectOdtUnifiedCatalogAlias
+                | Self::DetectOdtLeafBytes
+                | Self::DetectOdtLeafReader
+                | Self::DetectOdsUnifiedBytes
+                | Self::DetectOdsUnifiedReader
+                | Self::DetectOdsUnifiedPolyglot
+                | Self::DetectOdsUnifiedCatalogAlias
+                | Self::DetectOdsLeafBytes
+                | Self::DetectOdsLeafReader
+                | Self::DetectOdpUnifiedBytes
+                | Self::DetectOdpUnifiedReader
+                | Self::DetectOdpUnifiedPolyglot
+                | Self::DetectOdpUnifiedCatalogAlias
+                | Self::DetectOdpLeafBytes
+                | Self::DetectOdpLeafReader
         )
     }
 
@@ -3359,16 +3758,6 @@ impl Case {
                 | Self::ProviderAtomicSave
                 | Self::ProviderRangeReadAt
                 | Self::ProviderNonSeekWrite
-        )
-    }
-
-    const fn is_odp_root_file(self) -> bool {
-        matches!(
-            self,
-            Self::OdpFileEagerOpen
-                | Self::OdpFileSourceOpen
-                | Self::OdpFileEagerSelectedSlide
-                | Self::OdpFileSourceSelectedSlide
         )
     }
 
@@ -3391,9 +3780,7 @@ impl Case {
     const fn is_ods_root_file(self) -> bool {
         matches!(
             self,
-            Self::OdsFileEagerOpen
-                | Self::OdsFileSourceOpen
-                | Self::OdsFileEagerSelectedCell
+            Self::OdsFileEagerSelectedCell
                 | Self::OdsFileSourceSelectedCell
                 | Self::OdsFileEagerSelectedMedia
                 | Self::OdsFileSourceSelectedMedia
@@ -3402,17 +3789,6 @@ impl Case {
                 | Self::OdsFileEagerCellBatchSweep
                 | Self::OdsFileSourceCellBatchSweep
         )
-    }
-
-    const fn is_xlsx_root_file(self) -> bool {
-        matches!(
-            self,
-            Self::XlsxFileOpen | Self::XlsxFileOpenLifecycle | Self::XlsxFileSelectedCell
-        )
-    }
-
-    const fn is_xlsx_bytes_root_file(self) -> bool {
-        matches!(self, Self::XlsxBytesOpen | Self::XlsxBytesOpenLifecycle)
     }
 
     /// Opt-in producer-shape selectors (change 0601).  These run the ordinary
@@ -3471,28 +3847,6 @@ impl Case {
             Self::PptOwnedSourceControlOpenOneShapeText => {
                 Some((Scenario::PptOneShapeText, Transport::OwnedSource))
             },
-            _ => None,
-        }
-    }
-
-    /// Opt-in facade selectors for the OLE2 document and presentation routes
-    /// (change 0638).  Six run `litchi::Document::open` and
-    /// `litchi::Presentation::open` over a caller-named real file, which is
-    /// the first half of change 0587's evidence gap 5.  None is in
-    /// `Case::DEFAULT`, and every one needs `--ole2-file PATH`.
-    const fn is_facade_ole2(self) -> bool {
-        self.facade_ole2_scenario().is_some()
-    }
-
-    const fn facade_ole2_scenario(self) -> Option<facade_ole2::Scenario> {
-        use facade_ole2::Scenario;
-        match self {
-            Self::DocFacadeFileOpen => Some(Scenario::DocOpen),
-            Self::DocFacadeFileFullText => Some(Scenario::DocFullText),
-            Self::DocFacadeFileOneParagraph => Some(Scenario::DocOneParagraph),
-            Self::PptFacadeFileOpen => Some(Scenario::PptOpen),
-            Self::PptFacadeFileFullText => Some(Scenario::PptFullText),
-            Self::PptFacadeFileOneSlideText => Some(Scenario::PptOneSlideText),
             _ => None,
         }
     }
@@ -5539,8 +5893,6 @@ struct SourceSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     ole2_range_source: Option<Box<ole2_range_source::Ole2RangeSourceSummary>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    facade_ole2: Option<Box<facade_ole2::FacadeOle2Summary>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     ordinary_save: Option<Box<ordinary_save::OrdinarySaveSummary>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     opc_cache: Option<OpcCacheEvidenceSummary>,
@@ -5591,8 +5943,6 @@ struct SourceSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     odp_media: Option<OdpMediaSourceSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    odp_root: Option<OdpRootSourceSummary>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     odp_repeated_text: Option<OdpRepeatedTextSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     odp_catalog: Option<OdpCatalogSummary>,
@@ -5600,8 +5950,6 @@ struct SourceSummary {
     odt_repeated_text: Option<OdtRepeatedTextSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     odt_catalog: Option<OdtCatalogSummary>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    odt_root: Option<OdtFileRootSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     ods_root: Option<OdsRootSourceSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -5619,8 +5967,6 @@ struct SourceSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     rtf_tail_publication: Option<RtfTailPublicationSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    rtf_root: Option<RtfRootSummary>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     rtf_picture_crud: Option<RtfPictureCrudSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     rtf_paragraph_split_merge: Option<RtfParagraphSplitMergeSummary>,
@@ -5633,6 +5979,9 @@ struct SourceSummary {
         Option<docx_story_hyperlink_publication::DocxStoryHyperlinkPublicationSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     docx_section_layout: Option<DocxSectionLayoutSummary>,
+    /// Pairing and timing metadata of the M0a S8b unified/leaf routes.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    unified_ops: Option<Box<unified_ops::RouteSummary>>,
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
@@ -6096,36 +6445,6 @@ struct RtfTailPublicationSummary {
     expected_output_sha256: String,
 }
 
-/// Evidence for the opt-in unified `litchi::Document` owned-byte RTF ingress.
-/// The facade's semantic projection is compared with a separately opened
-/// native `litchi_rtf::Document` before the timed loop and again after every
-/// timed construction. Both seams deliberately use the same native RTF
-/// parser/model; this verifies facade adapter parity, not parser independence.
-/// The byte clone and all oracle setup stay outside the measured interval.
-/// This is scoped to the named synthetic RTF corpus and makes no generic
-/// latency, allocation, I/O, or producer claim.
-#[derive(Clone, Debug, Default, Serialize, PartialEq, Eq)]
-struct RtfRootSummary {
-    implementation: &'static str,
-    phase: &'static str,
-    timing_scope: &'static str,
-    performance_claim: &'static str,
-    transport_variant: &'static str,
-    source_bytes: u64,
-    source_sha256: String,
-    canonical_text_sha256: String,
-    paragraph_text_sha256: String,
-    paragraph_count: usize,
-    native_semantic_parity_verified: bool,
-    native_exact_source_roundtrip_verified: bool,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct RtfRootSemanticProjection {
-    text: String,
-    paragraphs: Vec<String>,
-}
-
 /// Positional-read evidence for the native PPT lazy `Pictures` selectors.
 ///
 /// The harness reports bytes observed in the exact stream payload range.  It
@@ -6190,42 +6509,6 @@ struct OdpMediaSourceSummary {
     pictures_uncompressed_payload_bytes: u64,
     pictures_uncompressed_payload_sha256: String,
     canonical_semantic_sha256: String,
-    source_read_calls: Vec<u64>,
-    source_read_bytes: Vec<u64>,
-    source_read_range_overlap_bytes: Vec<u64>,
-    pictures_read_calls: Vec<u64>,
-    pictures_read_compressed_range_bytes: Vec<u64>,
-    selected_media_read_calls: Vec<u64>,
-    selected_media_read_bytes: Vec<u64>,
-    selected_media_read_prior_range_overlap_bytes: Vec<u64>,
-    selected_media_read_compressed_range_overlap_bytes: Vec<u64>,
-    selected_media_read_non_picture_overlap_bytes: Vec<u64>,
-}
-
-/// Matched unified-root ODP filesystem evidence. The timed root operation is
-/// independent from the direct typed-facade replay used to prove positional
-/// source laziness; eager records intentionally leave replay vectors empty.
-#[derive(Clone, Debug, Default, Serialize)]
-struct OdpRootSourceSummary {
-    implementation: &'static str,
-    phase: &'static str,
-    timing_scope: &'static str,
-    timed_root_adapter: &'static str,
-    read_evidence_adapter: &'static str,
-    read_evidence_scope: &'static str,
-    source_path_bytes: u64,
-    source_path_sha256: String,
-    target_slide: usize,
-    canonical_semantic_sha256: String,
-    metadata_sha256: String,
-    selected_media_path: String,
-    selected_media_compressed_range_bytes: u64,
-    selected_media_uncompressed_bytes: u64,
-    selected_media_uncompressed_payload_sha256: String,
-    pictures_count: usize,
-    pictures_compressed_range_bytes: u64,
-    pictures_uncompressed_payload_bytes: u64,
-    pictures_uncompressed_payload_sha256: String,
     source_read_calls: Vec<u64>,
     source_read_bytes: Vec<u64>,
     source_read_range_overlap_bytes: Vec<u64>,
@@ -6531,84 +6814,6 @@ struct OdpCatalogSummary {
     observed_catalog_entries_sha256: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     observed_slide_text_sha256: Vec<String>,
-}
-
-/// Unified-root ODT filesystem ingress evidence over the fixed large
-/// media-rich source.  The four selectors below deliberately keep corpus
-/// creation, temporary-file setup, parity, archive identity, and the
-/// independent positional replay outside the elapsed interval.  This is
-/// correctness/source-range evidence only; it makes no latency, allocation,
-/// RSS, or physical-I/O claim.
-#[derive(Clone, Debug, Default, Serialize)]
-struct OdtFileRootSummary {
-    implementation: &'static str,
-    phase: &'static str,
-    timing_scope: &'static str,
-    timed_root_adapter: &'static str,
-    read_evidence_adapter: &'static str,
-    read_evidence_scope: &'static str,
-    source_path_bytes: u64,
-    source_path_sha256: String,
-    archive_member_count: usize,
-    archive_member_names_sha256: String,
-    pictures_count: usize,
-    pictures_member_names_sha256: String,
-    pictures_compressed_range_bytes: u64,
-    pictures_uncompressed_payload_bytes: u64,
-    pictures_uncompressed_payload_sha256: String,
-    canonical_text_sha256: String,
-    paragraph_count: usize,
-    paragraph_text_sha256: String,
-    table_count: usize,
-    element_count: usize,
-    element_text_sha256: String,
-    metadata_sha256: String,
-    semantic_parity_verified: bool,
-    archive_identity_verified: bool,
-    media_identity_verified: bool,
-    source_ranges_verified: bool,
-    zero_picture_payload_overlap_verified: bool,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    source_preparation_read_calls: Vec<u64>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    source_preparation_read_bytes: Vec<u64>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    source_preparation_content_read_calls: Vec<u64>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    source_preparation_content_read_bytes: Vec<u64>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    source_preparation_untouched_read_calls: Vec<u64>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    source_preparation_untouched_read_bytes: Vec<u64>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    source_preparation_pictures_read_calls: Vec<u64>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    source_preparation_pictures_read_bytes: Vec<u64>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    source_query_read_calls: Vec<u64>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    source_query_read_bytes: Vec<u64>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    source_query_content_read_calls: Vec<u64>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    source_query_content_read_bytes: Vec<u64>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    source_query_untouched_read_calls: Vec<u64>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    source_query_untouched_read_bytes: Vec<u64>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    source_query_pictures_read_calls: Vec<u64>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    source_query_pictures_read_bytes: Vec<u64>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct OdtRootSemanticProjection {
-    text: String,
-    paragraphs: Vec<String>,
-    tables: Vec<String>,
-    elements: Vec<String>,
-    metadata_sha256: String,
 }
 
 /// Matched ODS filesystem/root and typed selected-owner evidence. Root open
@@ -10566,7 +10771,6 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.uses_odt_media()
                     && !case.is_odt_repeated_text()
                     && !case.is_odt_source_backed_catalog()
-                    && !case.is_odt_root_file()
                     && !case.uses_odt_resource_batch()
                     && !case.uses_odf_content_cow()
                     && !case.uses_semantic_ods()
@@ -10575,22 +10779,19 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.uses_ods_media()
                     && !case.uses_semantic_odp()
                     && !case.uses_odp_media()
-                    && !case.is_odp_root_file()
                     && !case.is_odp_repeated_text()
                     && !case.is_odp_source_backed_catalog()
                     && !case.is_ods_root_file()
-                    && !case.is_xlsx_root_file()
-                    && !case.is_xlsx_bytes_root_file()
                     && !case.is_producer_shape()
                     && !case.is_marker_shape()
                     && !case.is_ole2_range_source()
-                    && !case.is_facade_ole2()
                     && !case.is_ordinary_save()
                     && !case.uses_odp_text_box_batch()
                     && !case.is_opc_source_overlay_save()
                     && !case.is_opc_source_cache_evidence()
                     && !case.is_opc_casefold_lookup()
                     && !case.is_filesystem()
+                    && !case.is_unified_ops_in_process()
                     && !case.is_docx_source_edit_save()
                     && !case.is_docx_section_layout_edit_save()
                     && !case.is_docx_story_hyperlink_plan()
@@ -12069,23 +12270,6 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    if options.cases.iter().any(|case| case.is_odt_root_file()) {
-        let corpus = build_odt_repeated_text_corpus()?;
-        for case in options
-            .cases
-            .iter()
-            .copied()
-            .filter(|case| case.is_odt_root_file())
-        {
-            results.push(run_odt_file_root(
-                case,
-                &corpus,
-                options.warmup_iterations,
-                options.samples,
-            )?);
-        }
-    }
-
     if options
         .cases
         .iter()
@@ -12303,24 +12487,6 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    if options.cases.iter().any(|case| case.is_odp_root_file()) {
-        let corpus = build_odp_media_corpus()?;
-        for case in options
-            .cases
-            .iter()
-            .copied()
-            .filter(|case| case.is_odp_root_file())
-        {
-            results.push(run_case_with_config(
-                case,
-                &corpus,
-                options.warmup_iterations,
-                options.samples,
-                options.range_simulation,
-            )?);
-        }
-    }
-
     if options.cases.iter().any(|case| case.is_odp_repeated_text()) {
         let corpus = build_odp_media_corpus()?;
         for case in options
@@ -12368,53 +12534,6 @@ pub fn run() -> Result<(), Box<dyn Error>> {
             .iter()
             .copied()
             .filter(|case| case.is_ods_root_file())
-        {
-            results.push(run_case_with_config(
-                case,
-                &corpus,
-                options.warmup_iterations,
-                options.samples,
-                options.range_simulation,
-            )?);
-        }
-    }
-
-    // Unified XLSX path selectors are fresh-child filesystem evidence. Keep
-    // this branch for any future non-filesystem root variant, but never route
-    // the current selectors through the legacy in-process temp-path loop.
-    if options
-        .cases
-        .iter()
-        .any(|case| case.is_xlsx_root_file() && !case.is_filesystem())
-    {
-        let corpus = build_xlsx_cell_crud_corpus(XlsxCellCrudShape::Medium)?;
-        for case in options
-            .cases
-            .iter()
-            .copied()
-            .filter(|case| case.is_xlsx_root_file() && !case.is_filesystem())
-        {
-            results.push(run_case_with_config(
-                case,
-                &corpus,
-                options.warmup_iterations,
-                options.samples,
-                options.range_simulation,
-            )?);
-        }
-    }
-
-    if options
-        .cases
-        .iter()
-        .any(|case| case.is_xlsx_bytes_root_file())
-    {
-        let corpus = build_xlsx_cell_crud_corpus(XlsxCellCrudShape::Medium)?;
-        for case in options
-            .cases
-            .iter()
-            .copied()
-            .filter(|case| case.is_xlsx_bytes_root_file())
         {
             results.push(run_case_with_config(
                 case,
@@ -12633,57 +12752,6 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    // Opt-in OLE2 facade selectors (change 0638).  They read the same
-    // `--ole2-file` inputs as change 0627's range-source family, because the
-    // flag is the single classification authority for a caller-named OLE2
-    // fixture, and they hand the path itself to the facade.
-    if options.cases.iter().any(|case| case.is_facade_ole2()) {
-        if options.ole2_files.is_empty() {
-            return Err("the OLE2 facade selectors require --ole2-file PATH (repeatable)".into());
-        }
-        let inputs = ole2_range_source::classify_inputs(&options.ole2_files)?;
-        let mut doc_corpus = None;
-        let mut ppt_corpus = None;
-        for case in options
-            .cases
-            .iter()
-            .copied()
-            .filter(|case| case.is_facade_ole2())
-        {
-            let scenario = case
-                .facade_ole2_scenario()
-                .ok_or("OLE2 facade case has no scenario")?;
-            let corpus =
-                match scenario.route() {
-                    facade_ole2::Route::Document => {
-                        if doc_corpus.is_none() {
-                            let path = inputs.doc.as_deref().ok_or(
-                                "the DOC facade selectors require an --ole2-file DOC fixture",
-                            )?;
-                            doc_corpus = Some(facade_ole2::build_doc_corpus(path)?);
-                        }
-                        doc_corpus.as_ref().ok_or("DOC facade corpus is absent")?
-                    },
-                    facade_ole2::Route::Presentation => {
-                        if ppt_corpus.is_none() {
-                            let path = inputs.ppt.as_deref().ok_or(
-                                "the PPT facade selectors require an --ole2-file PPT fixture",
-                            )?;
-                            ppt_corpus = Some(facade_ole2::build_ppt_corpus(path)?);
-                        }
-                        ppt_corpus.as_ref().ok_or("PPT facade corpus is absent")?
-                    },
-                };
-            results.push(facade_ole2::run_case(
-                case,
-                scenario,
-                corpus,
-                options.warmup_iterations,
-                options.samples,
-            )?);
-        }
-    }
-
     // Opt-in ordinary documented OOXML save selectors (change 0638).  Each
     // (format, origin) pair builds its corpus and its private workspace once;
     // the real-file half needs `--ooxml-file`.
@@ -12896,6 +12964,24 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                 )?);
             }
         }
+    }
+
+    // Paired unified-API (`litchi::open`, `litchi::File`) and leaf-API routes
+    // of M0a step S8b (plan 0003 §5.3). Their DOCX, PPTX and XLSX filesystem
+    // pairs already ran above, through `filesystem::run_selected`.
+    if options
+        .cases
+        .iter()
+        .any(|case| case.is_unified_ops_in_process())
+    {
+        results.extend(unified_ops::run_selected(&unified_ops::Selection {
+            cases: &options.cases,
+            semantic_shapes: &options.semantic_shapes,
+            rtf_variants: &options.rtf_variants,
+            ole2_files: &options.ole2_files,
+            warmup_iterations: options.warmup_iterations,
+            samples: options.samples,
+        })?);
     }
 
     promote_sink_operation_metrics(&mut results)?;
@@ -13372,52 +13458,6 @@ fn parse_case(value: &str) -> Option<Case> {
         "cfb_file_owned_same_length_overlay_atomic_save" => {
             Some(Case::CfbFileOwnedSameLengthOverlayAtomicSave)
         },
-        "pptx_file_eager_open" => Some(Case::PptxFileEagerOpen),
-        "pptx_file_source_open" => Some(Case::PptxFileSourceOpen),
-        "pptx_file_eager_list_slides" => Some(Case::PptxFileEagerListSlides),
-        "pptx_file_source_list_slides" => Some(Case::PptxFileSourceListSlides),
-        "pptx_file_eager_slide_count" => Some(Case::PptxFileEagerSlideCount),
-        "pptx_file_source_slide_count" => Some(Case::PptxFileSourceSlideCount),
-        "pptx_file_eager_selected_slide" => Some(Case::PptxFileEagerSelectedSlide),
-        "pptx_file_source_selected_slide" => Some(Case::PptxFileSourceSelectedSlide),
-        "pptx_file_eager_open_slide_count_lifecycle" => {
-            Some(Case::PptxFileEagerOpenSlideCountLifecycle)
-        },
-        "pptx_file_source_open_slide_count_lifecycle" => {
-            Some(Case::PptxFileSourceOpenSlideCountLifecycle)
-        },
-        "pptx_file_eager_open_selected_slide_lifecycle" => {
-            Some(Case::PptxFileEagerOpenSelectedSlideLifecycle)
-        },
-        "pptx_file_source_open_selected_slide_lifecycle" => {
-            Some(Case::PptxFileSourceOpenSelectedSlideLifecycle)
-        },
-        "docx_file_eager_open" => Some(Case::DocxFileEagerOpen),
-        "docx_file_source_open" => Some(Case::DocxFileSourceOpen),
-        "docx_file_eager_paragraph_count" => Some(Case::DocxFileEagerParagraphCount),
-        "docx_file_source_paragraph_count" => Some(Case::DocxFileSourceParagraphCount),
-        "docx_file_eager_list_paragraphs" => Some(Case::DocxFileEagerListParagraphs),
-        "docx_file_source_list_paragraphs" => Some(Case::DocxFileSourceListParagraphs),
-        "docx_file_eager_full_text" => Some(Case::DocxFileEagerFullText),
-        "docx_file_source_full_text" => Some(Case::DocxFileSourceFullText),
-        "docx_file_eager_open_paragraph_count_lifecycle" => {
-            Some(Case::DocxFileEagerOpenParagraphCountLifecycle)
-        },
-        "docx_file_source_open_paragraph_count_lifecycle" => {
-            Some(Case::DocxFileSourceOpenParagraphCountLifecycle)
-        },
-        "docx_file_eager_open_full_text_lifecycle" => {
-            Some(Case::DocxFileEagerOpenFullTextLifecycle)
-        },
-        "docx_file_source_open_full_text_lifecycle" => {
-            Some(Case::DocxFileSourceOpenFullTextLifecycle)
-        },
-        "odt_file_eager_open" => Some(Case::OdtFileEagerOpen),
-        "odt_file_source_open" => Some(Case::OdtFileSourceOpen),
-        "odt_file_eager_open_full_text_lifecycle" => Some(Case::OdtFileEagerOpenFullTextLifecycle),
-        "odt_file_source_open_full_text_lifecycle" => {
-            Some(Case::OdtFileSourceOpenFullTextLifecycle)
-        },
         "cfb_selective_mini_legacy_read" => Some(Case::CfbSelectiveMiniLegacyRead),
         "cfb_selective_mini_shared_read" => Some(Case::CfbSelectiveMiniSharedRead),
         "cfb_selective_mini_4095_legacy_read" => Some(Case::CfbSelectiveMini4095LegacyRead),
@@ -13702,17 +13742,89 @@ fn parse_case(value: &str) -> Option<Case> {
         "ppt_owned_source_control_open_one_shape_text" => {
             Some(Case::PptOwnedSourceControlOpenOneShapeText)
         },
-        "doc_facade_file_open" => Some(Case::DocFacadeFileOpen),
-        "doc_facade_file_full_text" => Some(Case::DocFacadeFileFullText),
-        "doc_facade_file_one_paragraph" => Some(Case::DocFacadeFileOneParagraph),
-        "ppt_facade_file_open" => Some(Case::PptFacadeFileOpen),
-        "ppt_facade_file_full_text" => Some(Case::PptFacadeFileFullText),
-        "ppt_facade_file_one_slide_text" => Some(Case::PptFacadeFileOneSlideText),
         "ppt_semantic_full_text" => Some(Case::PptSemanticFullText),
         "ppt_slide_order_snapshot_open" => Some(Case::PptSlideOrderSnapshotOpen),
         "ppt_text_edit_one_edit_save" => Some(Case::PptTextEditOneEditSave),
         "ppt_semantic_noop_edit_save" => Some(Case::PptSemanticNoopEditSave),
         "ppt_semantic_one_edit_save" => Some(Case::PptSemanticOneEditSave),
+        "ppt_text_batch_eager_native_1_aggregate_v3" => Some(Case::PptTextAggregateEagerNative1),
+        "ppt_text_batch_eager_native_10_aggregate_v3" => Some(Case::PptTextAggregateEagerNative10),
+        "ppt_text_batch_eager_native_100_aggregate_v3" => {
+            Some(Case::PptTextAggregateEagerNative100)
+        },
+        "ppt_text_batch_eager_native_256_aggregate_v3" => {
+            Some(Case::PptTextAggregateEagerNative256)
+        },
+        "ppt_text_batch_eager_native_1000_aggregate_v3" => {
+            Some(Case::PptTextAggregateEagerNative1000)
+        },
+        "ppt_text_batch_eager_native_4096_aggregate_v3" => {
+            Some(Case::PptTextAggregateEagerNative4096)
+        },
+        "ppt_text_batch_eager_native_10000_aggregate_v3" => {
+            Some(Case::PptTextAggregateEagerNative10000)
+        },
+        "ppt_text_batch_eager_unified_1_aggregate_v3" => Some(Case::PptTextAggregateEagerUnified1),
+        "ppt_text_batch_eager_unified_10_aggregate_v3" => {
+            Some(Case::PptTextAggregateEagerUnified10)
+        },
+        "ppt_text_batch_eager_unified_100_aggregate_v3" => {
+            Some(Case::PptTextAggregateEagerUnified100)
+        },
+        "ppt_text_batch_eager_unified_256_aggregate_v3" => {
+            Some(Case::PptTextAggregateEagerUnified256)
+        },
+        "ppt_text_batch_eager_unified_1000_aggregate_v3" => {
+            Some(Case::PptTextAggregateEagerUnified1000)
+        },
+        "ppt_text_batch_eager_unified_4096_aggregate_v3" => {
+            Some(Case::PptTextAggregateEagerUnified4096)
+        },
+        "ppt_text_batch_eager_unified_10000_aggregate_v3" => {
+            Some(Case::PptTextAggregateEagerUnified10000)
+        },
+        "ppt_text_batch_positional_native_1_aggregate_v3" => {
+            Some(Case::PptTextAggregatePositionalNative1)
+        },
+        "ppt_text_batch_positional_native_10_aggregate_v3" => {
+            Some(Case::PptTextAggregatePositionalNative10)
+        },
+        "ppt_text_batch_positional_native_100_aggregate_v3" => {
+            Some(Case::PptTextAggregatePositionalNative100)
+        },
+        "ppt_text_batch_positional_native_256_aggregate_v3" => {
+            Some(Case::PptTextAggregatePositionalNative256)
+        },
+        "ppt_text_batch_positional_native_1000_aggregate_v3" => {
+            Some(Case::PptTextAggregatePositionalNative1000)
+        },
+        "ppt_text_batch_positional_native_4096_aggregate_v3" => {
+            Some(Case::PptTextAggregatePositionalNative4096)
+        },
+        "ppt_text_batch_positional_native_10000_aggregate_v3" => {
+            Some(Case::PptTextAggregatePositionalNative10000)
+        },
+        "ppt_text_batch_positional_unified_1_aggregate_v3" => {
+            Some(Case::PptTextAggregatePositionalUnified1)
+        },
+        "ppt_text_batch_positional_unified_10_aggregate_v3" => {
+            Some(Case::PptTextAggregatePositionalUnified10)
+        },
+        "ppt_text_batch_positional_unified_100_aggregate_v3" => {
+            Some(Case::PptTextAggregatePositionalUnified100)
+        },
+        "ppt_text_batch_positional_unified_256_aggregate_v3" => {
+            Some(Case::PptTextAggregatePositionalUnified256)
+        },
+        "ppt_text_batch_positional_unified_1000_aggregate_v3" => {
+            Some(Case::PptTextAggregatePositionalUnified1000)
+        },
+        "ppt_text_batch_positional_unified_4096_aggregate_v3" => {
+            Some(Case::PptTextAggregatePositionalUnified4096)
+        },
+        "ppt_text_batch_positional_unified_10000_aggregate_v3" => {
+            Some(Case::PptTextAggregatePositionalUnified10000)
+        },
         "ppt_pictures_eager_open" => Some(Case::PptPicturesEagerOpen),
         "ppt_pictures_source_backed_open" => Some(Case::PptPicturesSourceBackedOpen),
         "ppt_pictures_eager_first_image" => Some(Case::PptPicturesEagerFirstImage),
@@ -13747,9 +13859,6 @@ fn parse_case(value: &str) -> Option<Case> {
         "xlsx_source_list_sheets" => Some(Case::XlsxSourceListSheets),
         "xlsx_source_first_cell" => Some(Case::XlsxSourceFirstCell),
         "xlsx_source_narrow_column_range_scan" => Some(Case::XlsxSourceNarrowColumnRangeScan),
-        "xlsx_file_open" => Some(Case::XlsxFileOpen),
-        "xlsx_file_open_lifecycle" => Some(Case::XlsxFileOpenLifecycle),
-        "xlsx_file_selected_cell" => Some(Case::XlsxFileSelectedCell),
         "xlsx_source_repeated_store_medium" => Some(Case::XlsxSourceRepeatedStoreMedium),
         "xlsx_source_repeated_store_medium_reacquisition_control" => {
             Some(Case::XlsxSourceRepeatedStoreMediumReacquisitionControl)
@@ -13758,8 +13867,6 @@ fn parse_case(value: &str) -> Option<Case> {
         "xlsx_source_repeated_store_oversized_reacquisition_control" => {
             Some(Case::XlsxSourceRepeatedStoreOversizedReacquisitionControl)
         },
-        "xlsx_bytes_open" => Some(Case::XlsxBytesOpen),
-        "xlsx_bytes_open_lifecycle" => Some(Case::XlsxBytesOpenLifecycle),
         "xlsx_producer_medium_source_open" => Some(Case::XlsxProducerMediumSourceOpen),
         "xlsx_producer_medium_source_selected_cell" => {
             Some(Case::XlsxProducerMediumSourceSelectedCell)
@@ -13888,8 +13995,6 @@ fn parse_case(value: &str) -> Option<Case> {
         },
         "opc_open_session_scaling" => Some(Case::OpcOpenSessionScaling),
         "cfb_bulk_read_scaling" => Some(Case::CfbBulkReadScaling),
-        "rtf_file_open" => Some(Case::RtfFileOpen),
-        "rtf_file_open_lifecycle" => Some(Case::RtfFileOpenLifecycle),
         "rtf_semantic_open" => Some(Case::RtfSemanticOpen),
         "rtf_semantic_paragraph_count" => Some(Case::RtfSemanticParagraphCount),
         "rtf_semantic_list_paragraphs" => Some(Case::RtfSemanticListParagraphs),
@@ -14034,10 +14139,6 @@ fn parse_case(value: &str) -> Option<Case> {
         "detect_odp_reader" => Some(Case::DetectOdpReader),
         "detect_odp_polyglot" => Some(Case::DetectOdpPolyglot),
         "detect_odp_catalog_alias" => Some(Case::DetectOdpCatalogAlias),
-        "odp_file_eager_open" => Some(Case::OdpFileEagerOpen),
-        "odp_file_source_open" => Some(Case::OdpFileSourceOpen),
-        "odp_file_eager_selected_slide" => Some(Case::OdpFileEagerSelectedSlide),
-        "odp_file_source_selected_slide" => Some(Case::OdpFileSourceSelectedSlide),
         "odp_source_backed_repeated_text_uncached" => {
             Some(Case::OdpSourceBackedRepeatedTextUncached)
         },
@@ -14045,8 +14146,6 @@ fn parse_case(value: &str) -> Option<Case> {
         "odp_source_backed_catalog_open" => Some(Case::OdpSourceBackedCatalogOpen),
         "odp_source_backed_catalog_list" => Some(Case::OdpSourceBackedCatalogList),
         "odp_source_backed_catalog_query" => Some(Case::OdpSourceBackedCatalogQuery),
-        "ods_file_eager_open" => Some(Case::OdsFileEagerOpen),
-        "ods_file_source_open" => Some(Case::OdsFileSourceOpen),
         "ods_file_eager_selected_cell" => Some(Case::OdsFileEagerSelectedCell),
         "ods_file_source_selected_cell" => Some(Case::OdsFileSourceSelectedCell),
         "ods_file_eager_selected_media" => Some(Case::OdsFileEagerSelectedMedia),
@@ -14055,6 +14154,174 @@ fn parse_case(value: &str) -> Option<Case> {
         "ods_file_source_cell_sweep" => Some(Case::OdsFileSourceCellSweep),
         "ods_file_eager_cell_batch_sweep" => Some(Case::OdsFileEagerCellBatchSweep),
         "ods_file_source_cell_batch_sweep" => Some(Case::OdsFileSourceCellBatchSweep),
+        "docx_file_unified_eager_open" => Some(Case::DocxFileUnifiedEagerOpen),
+        "docx_file_unified_source_open" => Some(Case::DocxFileUnifiedSourceOpen),
+        "docx_file_unified_eager_paragraph_count" => Some(Case::DocxFileUnifiedEagerParagraphCount),
+        "docx_file_unified_source_paragraph_count" => {
+            Some(Case::DocxFileUnifiedSourceParagraphCount)
+        },
+        "docx_file_unified_eager_list_paragraphs" => Some(Case::DocxFileUnifiedEagerListParagraphs),
+        "docx_file_unified_source_list_paragraphs" => {
+            Some(Case::DocxFileUnifiedSourceListParagraphs)
+        },
+        "docx_file_unified_eager_full_text" => Some(Case::DocxFileUnifiedEagerFullText),
+        "docx_file_unified_source_full_text" => Some(Case::DocxFileUnifiedSourceFullText),
+        "docx_file_unified_eager_open_paragraph_count_lifecycle" => {
+            Some(Case::DocxFileUnifiedEagerOpenParagraphCountLifecycle)
+        },
+        "docx_file_unified_source_open_paragraph_count_lifecycle" => {
+            Some(Case::DocxFileUnifiedSourceOpenParagraphCountLifecycle)
+        },
+        "docx_file_unified_eager_open_full_text_lifecycle" => {
+            Some(Case::DocxFileUnifiedEagerOpenFullTextLifecycle)
+        },
+        "docx_file_unified_source_open_full_text_lifecycle" => {
+            Some(Case::DocxFileUnifiedSourceOpenFullTextLifecycle)
+        },
+        "docx_file_leaf_eager_open" => Some(Case::DocxFileLeafEagerOpen),
+        "docx_file_leaf_source_open" => Some(Case::DocxFileLeafSourceOpen),
+        "docx_file_leaf_eager_paragraph_count" => Some(Case::DocxFileLeafEagerParagraphCount),
+        "docx_file_leaf_source_paragraph_count" => Some(Case::DocxFileLeafSourceParagraphCount),
+        "docx_file_leaf_eager_list_paragraphs" => Some(Case::DocxFileLeafEagerListParagraphs),
+        "docx_file_leaf_source_list_paragraphs" => Some(Case::DocxFileLeafSourceListParagraphs),
+        "docx_file_leaf_eager_full_text" => Some(Case::DocxFileLeafEagerFullText),
+        "docx_file_leaf_source_full_text" => Some(Case::DocxFileLeafSourceFullText),
+        "docx_file_leaf_eager_open_paragraph_count_lifecycle" => {
+            Some(Case::DocxFileLeafEagerOpenParagraphCountLifecycle)
+        },
+        "docx_file_leaf_source_open_paragraph_count_lifecycle" => {
+            Some(Case::DocxFileLeafSourceOpenParagraphCountLifecycle)
+        },
+        "docx_file_leaf_eager_open_full_text_lifecycle" => {
+            Some(Case::DocxFileLeafEagerOpenFullTextLifecycle)
+        },
+        "docx_file_leaf_source_open_full_text_lifecycle" => {
+            Some(Case::DocxFileLeafSourceOpenFullTextLifecycle)
+        },
+        "pptx_file_unified_eager_open" => Some(Case::PptxFileUnifiedEagerOpen),
+        "pptx_file_unified_source_open" => Some(Case::PptxFileUnifiedSourceOpen),
+        "pptx_file_unified_eager_list_slides" => Some(Case::PptxFileUnifiedEagerListSlides),
+        "pptx_file_unified_source_list_slides" => Some(Case::PptxFileUnifiedSourceListSlides),
+        "pptx_file_unified_eager_slide_count" => Some(Case::PptxFileUnifiedEagerSlideCount),
+        "pptx_file_unified_source_slide_count" => Some(Case::PptxFileUnifiedSourceSlideCount),
+        "pptx_file_unified_eager_selected_slide" => Some(Case::PptxFileUnifiedEagerSelectedSlide),
+        "pptx_file_unified_source_selected_slide" => Some(Case::PptxFileUnifiedSourceSelectedSlide),
+        "pptx_file_unified_eager_open_slide_count_lifecycle" => {
+            Some(Case::PptxFileUnifiedEagerOpenSlideCountLifecycle)
+        },
+        "pptx_file_unified_source_open_slide_count_lifecycle" => {
+            Some(Case::PptxFileUnifiedSourceOpenSlideCountLifecycle)
+        },
+        "pptx_file_unified_eager_open_selected_slide_lifecycle" => {
+            Some(Case::PptxFileUnifiedEagerOpenSelectedSlideLifecycle)
+        },
+        "pptx_file_unified_source_open_selected_slide_lifecycle" => {
+            Some(Case::PptxFileUnifiedSourceOpenSelectedSlideLifecycle)
+        },
+        "pptx_file_leaf_eager_open" => Some(Case::PptxFileLeafEagerOpen),
+        "pptx_file_leaf_source_open" => Some(Case::PptxFileLeafSourceOpen),
+        "pptx_file_leaf_eager_list_slides" => Some(Case::PptxFileLeafEagerListSlides),
+        "pptx_file_leaf_source_list_slides" => Some(Case::PptxFileLeafSourceListSlides),
+        "pptx_file_leaf_eager_slide_count" => Some(Case::PptxFileLeafEagerSlideCount),
+        "pptx_file_leaf_source_slide_count" => Some(Case::PptxFileLeafSourceSlideCount),
+        "pptx_file_leaf_eager_selected_slide" => Some(Case::PptxFileLeafEagerSelectedSlide),
+        "pptx_file_leaf_source_selected_slide" => Some(Case::PptxFileLeafSourceSelectedSlide),
+        "pptx_file_leaf_eager_open_slide_count_lifecycle" => {
+            Some(Case::PptxFileLeafEagerOpenSlideCountLifecycle)
+        },
+        "pptx_file_leaf_source_open_slide_count_lifecycle" => {
+            Some(Case::PptxFileLeafSourceOpenSlideCountLifecycle)
+        },
+        "pptx_file_leaf_eager_open_selected_slide_lifecycle" => {
+            Some(Case::PptxFileLeafEagerOpenSelectedSlideLifecycle)
+        },
+        "pptx_file_leaf_source_open_selected_slide_lifecycle" => {
+            Some(Case::PptxFileLeafSourceOpenSelectedSlideLifecycle)
+        },
+        "xlsx_file_unified_open" => Some(Case::XlsxFileUnifiedOpen),
+        "xlsx_file_unified_open_lifecycle" => Some(Case::XlsxFileUnifiedOpenLifecycle),
+        "xlsx_file_unified_selected_cell" => Some(Case::XlsxFileUnifiedSelectedCell),
+        "xlsx_file_leaf_open" => Some(Case::XlsxFileLeafOpen),
+        "xlsx_file_leaf_open_lifecycle" => Some(Case::XlsxFileLeafOpenLifecycle),
+        "xlsx_file_leaf_selected_cell" => Some(Case::XlsxFileLeafSelectedCell),
+        "xlsx_bytes_unified_open" => Some(Case::XlsxBytesUnifiedOpen),
+        "xlsx_bytes_unified_open_lifecycle" => Some(Case::XlsxBytesUnifiedOpenLifecycle),
+        "xlsx_bytes_leaf_open" => Some(Case::XlsxBytesLeafOpen),
+        "xlsx_bytes_leaf_open_lifecycle" => Some(Case::XlsxBytesLeafOpenLifecycle),
+        "docx_semantic_unified_one_paragraph" => Some(Case::DocxSemanticUnifiedOneParagraph),
+        "docx_semantic_unified_one_paragraph_text" => {
+            Some(Case::DocxSemanticUnifiedOneParagraphText)
+        },
+        "docx_semantic_leaf_one_paragraph" => Some(Case::DocxSemanticLeafOneParagraph),
+        "docx_semantic_leaf_one_paragraph_text" => Some(Case::DocxSemanticLeafOneParagraphText),
+        "docx_producer_unified_source_selected_paragraph" => {
+            Some(Case::DocxProducerUnifiedSourceSelectedParagraph)
+        },
+        "docx_producer_leaf_source_selected_paragraph" => {
+            Some(Case::DocxProducerLeafSourceSelectedParagraph)
+        },
+        "doc_file_unified_open" => Some(Case::DocFileUnifiedOpen),
+        "doc_file_unified_full_text" => Some(Case::DocFileUnifiedFullText),
+        "doc_file_unified_one_paragraph" => Some(Case::DocFileUnifiedOneParagraph),
+        "doc_file_leaf_open" => Some(Case::DocFileLeafOpen),
+        "doc_file_leaf_full_text" => Some(Case::DocFileLeafFullText),
+        "doc_file_leaf_one_paragraph" => Some(Case::DocFileLeafOneParagraph),
+        "ppt_file_unified_open" => Some(Case::PptFileUnifiedOpen),
+        "ppt_file_unified_full_text" => Some(Case::PptFileUnifiedFullText),
+        "ppt_file_unified_one_slide_text" => Some(Case::PptFileUnifiedOneSlideText),
+        "ppt_file_leaf_open" => Some(Case::PptFileLeafOpen),
+        "ppt_file_leaf_full_text" => Some(Case::PptFileLeafFullText),
+        "ppt_file_leaf_one_slide_text" => Some(Case::PptFileLeafOneSlideText),
+        "rtf_file_unified_open" => Some(Case::RtfFileUnifiedOpen),
+        "rtf_file_unified_open_lifecycle" => Some(Case::RtfFileUnifiedOpenLifecycle),
+        "rtf_file_leaf_open" => Some(Case::RtfFileLeafOpen),
+        "rtf_file_leaf_open_lifecycle" => Some(Case::RtfFileLeafOpenLifecycle),
+        "odt_file_unified_eager_open" => Some(Case::OdtFileUnifiedEagerOpen),
+        "odt_file_unified_source_open" => Some(Case::OdtFileUnifiedSourceOpen),
+        "odt_file_unified_eager_open_full_text_lifecycle" => {
+            Some(Case::OdtFileUnifiedEagerOpenFullTextLifecycle)
+        },
+        "odt_file_unified_source_open_full_text_lifecycle" => {
+            Some(Case::OdtFileUnifiedSourceOpenFullTextLifecycle)
+        },
+        "odt_file_leaf_eager_open" => Some(Case::OdtFileLeafEagerOpen),
+        "odt_file_leaf_source_open" => Some(Case::OdtFileLeafSourceOpen),
+        "odt_file_leaf_eager_open_full_text_lifecycle" => {
+            Some(Case::OdtFileLeafEagerOpenFullTextLifecycle)
+        },
+        "odt_file_leaf_source_open_full_text_lifecycle" => {
+            Some(Case::OdtFileLeafSourceOpenFullTextLifecycle)
+        },
+        "odp_file_unified_eager_open" => Some(Case::OdpFileUnifiedEagerOpen),
+        "odp_file_unified_source_open" => Some(Case::OdpFileUnifiedSourceOpen),
+        "odp_file_unified_eager_selected_slide" => Some(Case::OdpFileUnifiedEagerSelectedSlide),
+        "odp_file_unified_source_selected_slide" => Some(Case::OdpFileUnifiedSourceSelectedSlide),
+        "odp_file_leaf_eager_open" => Some(Case::OdpFileLeafEagerOpen),
+        "odp_file_leaf_source_open" => Some(Case::OdpFileLeafSourceOpen),
+        "odp_file_leaf_eager_selected_slide" => Some(Case::OdpFileLeafEagerSelectedSlide),
+        "odp_file_leaf_source_selected_slide" => Some(Case::OdpFileLeafSourceSelectedSlide),
+        "ods_file_unified_eager_open" => Some(Case::OdsFileUnifiedEagerOpen),
+        "ods_file_unified_source_open" => Some(Case::OdsFileUnifiedSourceOpen),
+        "ods_file_leaf_eager_open" => Some(Case::OdsFileLeafEagerOpen),
+        "ods_file_leaf_source_open" => Some(Case::OdsFileLeafSourceOpen),
+        "detect_odt_unified_bytes" => Some(Case::DetectOdtUnifiedBytes),
+        "detect_odt_unified_reader" => Some(Case::DetectOdtUnifiedReader),
+        "detect_odt_unified_polyglot" => Some(Case::DetectOdtUnifiedPolyglot),
+        "detect_odt_unified_catalog_alias" => Some(Case::DetectOdtUnifiedCatalogAlias),
+        "detect_odt_leaf_bytes" => Some(Case::DetectOdtLeafBytes),
+        "detect_odt_leaf_reader" => Some(Case::DetectOdtLeafReader),
+        "detect_ods_unified_bytes" => Some(Case::DetectOdsUnifiedBytes),
+        "detect_ods_unified_reader" => Some(Case::DetectOdsUnifiedReader),
+        "detect_ods_unified_polyglot" => Some(Case::DetectOdsUnifiedPolyglot),
+        "detect_ods_unified_catalog_alias" => Some(Case::DetectOdsUnifiedCatalogAlias),
+        "detect_ods_leaf_bytes" => Some(Case::DetectOdsLeafBytes),
+        "detect_ods_leaf_reader" => Some(Case::DetectOdsLeafReader),
+        "detect_odp_unified_bytes" => Some(Case::DetectOdpUnifiedBytes),
+        "detect_odp_unified_reader" => Some(Case::DetectOdpUnifiedReader),
+        "detect_odp_unified_polyglot" => Some(Case::DetectOdpUnifiedPolyglot),
+        "detect_odp_unified_catalog_alias" => Some(Case::DetectOdpUnifiedCatalogAlias),
+        "detect_odp_leaf_bytes" => Some(Case::DetectOdpLeafBytes),
+        "detect_odp_leaf_reader" => Some(Case::DetectOdpLeafReader),
         _ => None,
     }
 }
@@ -14176,25 +14443,93 @@ fn usage_text() -> String {
                                        provider_file_read_at,provider_atomic_save,\n\
                                        cfb_file_same_length_overlay_atomic_save,\n\
                                        cfb_file_owned_same_length_overlay_atomic_save,\n\
-                                       pptx_file_eager_open,pptx_file_source_open,\n\
-                                       pptx_file_eager_list_slides,pptx_file_source_list_slides,\n\
-                                       pptx_file_eager_slide_count,pptx_file_source_slide_count,\n\
-                                       pptx_file_eager_selected_slide,pptx_file_source_selected_slide,\n\
-                                       pptx_file_eager_open_slide_count_lifecycle,\n\
-                                       pptx_file_source_open_slide_count_lifecycle,\n\
-                                       pptx_file_eager_open_selected_slide_lifecycle,\n\
-                                       pptx_file_source_open_selected_slide_lifecycle,\n\
-                                       docx_file_eager_open,docx_file_source_open,\n\
-                                       docx_file_eager_paragraph_count,docx_file_source_paragraph_count,\n\
-                                       docx_file_eager_list_paragraphs,docx_file_source_list_paragraphs,\n\
-                                       docx_file_eager_full_text,docx_file_source_full_text,\n\
-                                       docx_file_eager_open_paragraph_count_lifecycle,\n\
-                                       docx_file_source_open_paragraph_count_lifecycle,\n\
-                                       docx_file_eager_open_full_text_lifecycle,\n\
-                                       docx_file_source_open_full_text_lifecycle,\n\
-                                       odt_file_eager_open,odt_file_source_open,\n\
-                                       odt_file_eager_open_full_text_lifecycle,\n\
-                                       odt_file_source_open_full_text_lifecycle,\n\
+                                       docx_file_unified_eager_open,docx_file_unified_source_open,\n\
+                                       docx_file_unified_eager_paragraph_count,\n\
+                                       docx_file_unified_source_paragraph_count,\n\
+                                       docx_file_unified_eager_list_paragraphs,\n\
+                                       docx_file_unified_source_list_paragraphs,\n\
+                                       docx_file_unified_eager_full_text,\n\
+                                       docx_file_unified_source_full_text,\n\
+                                       docx_file_unified_eager_open_paragraph_count_lifecycle,\n\
+                                       docx_file_unified_source_open_paragraph_count_lifecycle,\n\
+                                       docx_file_unified_eager_open_full_text_lifecycle,\n\
+                                       docx_file_unified_source_open_full_text_lifecycle,\n\
+                                       docx_file_leaf_eager_open,docx_file_leaf_source_open,\n\
+                                       docx_file_leaf_eager_paragraph_count,\n\
+                                       docx_file_leaf_source_paragraph_count,\n\
+                                       docx_file_leaf_eager_list_paragraphs,\n\
+                                       docx_file_leaf_source_list_paragraphs,\n\
+                                       docx_file_leaf_eager_full_text,\n\
+                                       docx_file_leaf_source_full_text,\n\
+                                       docx_file_leaf_eager_open_paragraph_count_lifecycle,\n\
+                                       docx_file_leaf_source_open_paragraph_count_lifecycle,\n\
+                                       docx_file_leaf_eager_open_full_text_lifecycle,\n\
+                                       docx_file_leaf_source_open_full_text_lifecycle,\n\
+                                       pptx_file_unified_eager_open,pptx_file_unified_source_open,\n\
+                                       pptx_file_unified_eager_list_slides,\n\
+                                       pptx_file_unified_source_list_slides,\n\
+                                       pptx_file_unified_eager_slide_count,\n\
+                                       pptx_file_unified_source_slide_count,\n\
+                                       pptx_file_unified_eager_selected_slide,\n\
+                                       pptx_file_unified_source_selected_slide,\n\
+                                       pptx_file_unified_eager_open_slide_count_lifecycle,\n\
+                                       pptx_file_unified_source_open_slide_count_lifecycle,\n\
+                                       pptx_file_unified_eager_open_selected_slide_lifecycle,\n\
+                                       pptx_file_unified_source_open_selected_slide_lifecycle,\n\
+                                       pptx_file_leaf_eager_open,pptx_file_leaf_source_open,\n\
+                                       pptx_file_leaf_eager_list_slides,\n\
+                                       pptx_file_leaf_source_list_slides,\n\
+                                       pptx_file_leaf_eager_slide_count,\n\
+                                       pptx_file_leaf_source_slide_count,\n\
+                                       pptx_file_leaf_eager_selected_slide,\n\
+                                       pptx_file_leaf_source_selected_slide,\n\
+                                       pptx_file_leaf_eager_open_slide_count_lifecycle,\n\
+                                       pptx_file_leaf_source_open_slide_count_lifecycle,\n\
+                                       pptx_file_leaf_eager_open_selected_slide_lifecycle,\n\
+                                       pptx_file_leaf_source_open_selected_slide_lifecycle,\n\
+                                       xlsx_file_unified_open,xlsx_file_unified_open_lifecycle,\n\
+                                       xlsx_file_unified_selected_cell,xlsx_file_leaf_open,\n\
+                                       xlsx_file_leaf_open_lifecycle,xlsx_file_leaf_selected_cell,\n\
+                                       xlsx_bytes_unified_open,xlsx_bytes_unified_open_lifecycle,\n\
+                                       xlsx_bytes_leaf_open,xlsx_bytes_leaf_open_lifecycle,\n\
+                                       docx_semantic_unified_one_paragraph,\n\
+                                       docx_semantic_unified_one_paragraph_text,\n\
+                                       docx_semantic_leaf_one_paragraph,\n\
+                                       docx_semantic_leaf_one_paragraph_text,\n\
+                                       docx_producer_unified_source_selected_paragraph,\n\
+                                       docx_producer_leaf_source_selected_paragraph,\n\
+                                       doc_file_unified_open,doc_file_unified_full_text,\n\
+                                       doc_file_unified_one_paragraph,doc_file_leaf_open,\n\
+                                       doc_file_leaf_full_text,doc_file_leaf_one_paragraph,\n\
+                                       ppt_file_unified_open,ppt_file_unified_full_text,\n\
+                                       ppt_file_unified_one_slide_text,ppt_file_leaf_open,\n\
+                                       ppt_file_leaf_full_text,ppt_file_leaf_one_slide_text,\n\
+                                       rtf_file_unified_open,rtf_file_unified_open_lifecycle,\n\
+                                       rtf_file_leaf_open,rtf_file_leaf_open_lifecycle,\n\
+                                       odt_file_unified_eager_open,odt_file_unified_source_open,\n\
+                                       odt_file_unified_eager_open_full_text_lifecycle,\n\
+                                       odt_file_unified_source_open_full_text_lifecycle,\n\
+                                       odt_file_leaf_eager_open,odt_file_leaf_source_open,\n\
+                                       odt_file_leaf_eager_open_full_text_lifecycle,\n\
+                                       odt_file_leaf_source_open_full_text_lifecycle,\n\
+                                       odp_file_unified_eager_open,odp_file_unified_source_open,\n\
+                                       odp_file_unified_eager_selected_slide,\n\
+                                       odp_file_unified_source_selected_slide,\n\
+                                       odp_file_leaf_eager_open,odp_file_leaf_source_open,\n\
+                                       odp_file_leaf_eager_selected_slide,\n\
+                                       odp_file_leaf_source_selected_slide,\n\
+                                       ods_file_unified_eager_open,ods_file_unified_source_open,\n\
+                                       ods_file_leaf_eager_open,ods_file_leaf_source_open,\n\
+                                       detect_odt_unified_bytes,detect_odt_unified_reader,\n\
+                                       detect_odt_unified_polyglot,\n\
+                                       detect_odt_unified_catalog_alias,detect_odt_leaf_bytes,\n\
+                                       detect_odt_leaf_reader,detect_ods_unified_bytes,\n\
+                                       detect_ods_unified_reader,detect_ods_unified_polyglot,\n\
+                                       detect_ods_unified_catalog_alias,detect_ods_leaf_bytes,\n\
+                                       detect_ods_leaf_reader,detect_odp_unified_bytes,\n\
+                                       detect_odp_unified_reader,detect_odp_unified_polyglot,\n\
+                                       detect_odp_unified_catalog_alias,detect_odp_leaf_bytes,\n\
+                                       detect_odp_leaf_reader,\n\
                                        docx_source_backed_one_edit_save,\n\
                                        docx_source_backed_existing_section_layout_edit_save,\n\
                                        docx_story_hyperlink_plan,\n\
@@ -14341,12 +14676,6 @@ fn usage_text() -> String {
                                        ppt_range_source_open_one_shape_text,\n\
                                        ppt_owned_source_control_open,\n\
                                        ppt_owned_source_control_open_one_shape_text,\n\
-                                       doc_facade_file_open,\n\
-                                       doc_facade_file_full_text,\n\
-                                       doc_facade_file_one_paragraph,\n\
-                                       ppt_facade_file_open,\n\
-                                       ppt_facade_file_full_text,\n\
-                                       ppt_facade_file_one_slide_text,\n\
                                        docx_ordinary_save_lifecycle,\n\
                                        docx_ordinary_save_edit,\n\
                                        docx_ordinary_save_atomic_publish,\n\
@@ -14400,6 +14729,22 @@ fn usage_text() -> String {
                                        ppt_slide_order_snapshot_open,\n\
                                        ppt_text_edit_one_edit_save,\n\
                                        ppt_semantic_noop_edit_save,ppt_semantic_one_edit_save,\n\
+                                       ppt_text_batch_eager_native_1_aggregate_v3,ppt_text_batch_eager_native_10_aggregate_v3,\n\
+                                       ppt_text_batch_eager_native_100_aggregate_v3,ppt_text_batch_eager_native_1000_aggregate_v3,\n\
+                                       ppt_text_batch_eager_native_256_aggregate_v3,ppt_text_batch_eager_native_4096_aggregate_v3,\n\
+                                       ppt_text_batch_eager_native_10000_aggregate_v3,\n\
+                                       ppt_text_batch_eager_unified_1_aggregate_v3,ppt_text_batch_eager_unified_10_aggregate_v3,\n\
+                                       ppt_text_batch_eager_unified_100_aggregate_v3,ppt_text_batch_eager_unified_1000_aggregate_v3,\n\
+                                       ppt_text_batch_eager_unified_256_aggregate_v3,ppt_text_batch_eager_unified_4096_aggregate_v3,\n\
+                                       ppt_text_batch_eager_unified_10000_aggregate_v3,\n\
+                                       ppt_text_batch_positional_native_1_aggregate_v3,ppt_text_batch_positional_native_10_aggregate_v3,\n\
+                                       ppt_text_batch_positional_native_100_aggregate_v3,ppt_text_batch_positional_native_1000_aggregate_v3,\n\
+                                       ppt_text_batch_positional_native_256_aggregate_v3,ppt_text_batch_positional_native_4096_aggregate_v3,\n\
+                                       ppt_text_batch_positional_native_10000_aggregate_v3,\n\
+                                       ppt_text_batch_positional_unified_1_aggregate_v3,ppt_text_batch_positional_unified_10_aggregate_v3,\n\
+                                       ppt_text_batch_positional_unified_100_aggregate_v3,ppt_text_batch_positional_unified_1000_aggregate_v3,\n\
+                                       ppt_text_batch_positional_unified_256_aggregate_v3,ppt_text_batch_positional_unified_4096_aggregate_v3,\n\
+                                       ppt_text_batch_positional_unified_10000_aggregate_v3,\n\
                                        ppt_pictures_eager_open,\n\
                                        ppt_pictures_source_backed_open,\n\
                                        ppt_pictures_eager_first_image,\n\
@@ -14443,13 +14788,10 @@ fn usage_text() -> String {
                                        xlsx_source_named_sheet_lookup_large,\n\
                                        xlsx_source_first_cell,\n\
                                        xlsx_source_narrow_column_range_scan,\n\
-                                       xlsx_file_open,xlsx_file_open_lifecycle,\n\
-                                       xlsx_file_selected_cell,\n\
                                        xlsx_source_repeated_store_medium,\n\
                                        xlsx_source_repeated_store_medium_reacquisition_control,\n\
                                        xlsx_source_repeated_store_oversized,\n\
                                        xlsx_source_repeated_store_oversized_reacquisition_control,\n\
-                                       xlsx_bytes_open,xlsx_bytes_open_lifecycle,\n\
                                        xlsx_producer_medium_source_open,\n\
                                        xlsx_producer_medium_source_selected_cell,\n\
                                        xlsx_producer_medium_source_full_cell_scan,\n\
@@ -14474,7 +14816,6 @@ fn usage_text() -> String {
                                        xlsx_range_source_first_cell,\n\
                                        xlsx_range_source_narrow_column_range_scan,\n\
                                        opc_open_session_scaling,cfb_bulk_read_scaling,\n\
-                                       rtf_file_open,rtf_file_open_lifecycle,\n\
                                        rtf_semantic_open,rtf_semantic_paragraph_count,\n\
                                        rtf_semantic_list_paragraphs,rtf_semantic_collect_paragraphs,\n\
                                        rtf_semantic_one_paragraph,rtf_semantic_full_text,\n\
@@ -14557,14 +14898,11 @@ fn usage_text() -> String {
                                        odp_media_eager_one_slide,odp_media_source_backed_one_slide,\n\
                                        detect_odp_bytes,detect_odp_reader,\n\
                                        detect_odp_polyglot,detect_odp_catalog_alias,\n\
-                                       odp_file_eager_open,odp_file_source_open,\n\
-                                       odp_file_eager_selected_slide,odp_file_source_selected_slide,\n\
                                        odp_source_backed_repeated_text_uncached,\n\
                                        odp_source_backed_repeated_text_cached,\n\
                                        odp_source_backed_catalog_open,\n\
                                        odp_source_backed_catalog_list,\n\
                                        odp_source_backed_catalog_query,\n\
-                                       ods_file_eager_open,ods_file_source_open,\n\
                                        ods_file_eager_selected_cell,ods_file_source_selected_cell,\n\
                                        ods_file_eager_selected_media,ods_file_source_selected_media,\n\
                                        ods_file_eager_cell_sweep,ods_file_source_cell_sweep,\n\
@@ -14650,7 +14988,10 @@ fn build_opc_corpus(
     )?;
 
     let archive = PackageWriter::to_bytes(&package)?;
-    let archive_member_count = ArchiveReader::new(&archive)?.file_names().count();
+    let archive_member_count =
+        ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?
+            .file_names()
+            .count();
     let target_payload = target_payload.ok_or("generated corpus has no target entry")?;
     let entry_count_u64 = u64::try_from(entry_count)?;
     let entry_bytes_u64 = u64::try_from(entry_bytes)?;
@@ -14827,14 +15168,15 @@ fn opc_casefold_class_lookup_digest(
 
 fn verify_opc_casefold_equivalent_name_gate() -> Result<(), Box<dyn Error>> {
     let package_relationships = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdCasefoldEquivalent" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="casefold/equivalent-00000.bin"/></Relationships>"#;
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer.write_stored("[Content_Types].xml", OPC_CASEFOLD_CONTENT_TYPES_XML)?;
     writer.write_stored("_rels/.rels", package_relationships)?;
     writer.write_stored("casefold/equivalent-00000.bin", b"equivalent-lower")?;
     writer.write_stored("casefold/EQUIVALENT-00000.bin", b"equivalent-upper")?;
     let archive = writer.finish_to_bytes()?;
 
-    let eager_error = match OpcPackage::from_bytes(&archive) {
+    let eager_error = match OpcPackage::from_bytes(&archive, litchi_opc::SourceLimits::default()) {
         Ok(_) => return Err("malformed OPC case-fold corpus was accepted eagerly".into()),
         Err(error) => error,
     };
@@ -14846,7 +15188,13 @@ fn verify_opc_casefold_equivalent_name_gate() -> Result<(), Box<dyn Error>> {
     }
 
     let source = Arc::new(InstrumentedSource::new(archive, Vec::new()));
-    let source_error = match SourceBackedPackage::from_read_at(source) {
+    let source_error = match SourceBackedPackage::from_read_at(
+        source,
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    ) {
         Ok(_) => {
             return Err("malformed OPC case-fold corpus was accepted by source-backed open".into());
         },
@@ -14867,7 +15215,8 @@ fn build_opc_casefold_corpus(part_count: usize) -> Result<OpcCasefoldCorpus, Box
     }
     verify_opc_casefold_equivalent_name_gate()?;
 
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer.write_stored("[Content_Types].xml", OPC_CASEFOLD_CONTENT_TYPES_XML)?;
     writer.write_stored("_rels/.rels", OPC_CASEFOLD_PACKAGE_RELS_XML)?;
     let mut part_names = Vec::with_capacity(part_count);
@@ -14892,7 +15241,8 @@ fn build_opc_casefold_corpus(part_count: usize) -> Result<OpcCasefoldCorpus, Box
         canonical_partnames.push(partname);
     }
     let archive = writer.finish_to_bytes()?;
-    let archive_reader = ArchiveReader::new(&archive)?;
+    let archive_reader =
+        ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?;
     let archive_member_count = archive_reader.file_names().count();
     if archive_member_count != part_count + 2 {
         return Err("OPC case-fold archive member count differs from fixed corpus identity".into());
@@ -14940,7 +15290,7 @@ fn build_opc_casefold_corpus(part_count: usize) -> Result<OpcCasefoldCorpus, Box
     let canonical_name_oracle_sha256 = opc_casefold_canonical_name_digest(&part_names);
     let mut expected_names = part_names.clone();
     expected_names.sort();
-    let eager = OpcPackage::from_bytes(&archive)?;
+    let eager = OpcPackage::from_bytes(&archive, litchi_opc::SourceLimits::default())?;
     let mut eager_names = eager
         .iter_parts()
         .map(|part| part.partname().as_str().trim_start_matches('/').to_owned())
@@ -14949,10 +15299,16 @@ fn build_opc_casefold_corpus(part_count: usize) -> Result<OpcCasefoldCorpus, Box
     if eager_names != expected_names {
         return Err("eager OPC case-fold corpus names differ from fixed archive names".into());
     }
-    let source = SourceBackedPackage::from_read_at(Arc::new(InstrumentedSource::new(
-        archive.clone(),
-        ordinary_payload_ranges.clone(),
-    )))?;
+    let source = SourceBackedPackage::from_read_at(
+        Arc::new(InstrumentedSource::new(
+            archive.clone(),
+            ordinary_payload_ranges.clone(),
+        )),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )?;
     let mut source_names = source
         .iter_parts()
         .map(|part| part.partname().as_str().trim_start_matches('/').to_owned())
@@ -15060,7 +15416,8 @@ fn build_opc_relationship_corpus() -> Result<OpcRelationshipCorpus, Box<dyn Erro
     )?;
 
     let archive = PackageWriter::to_bytes(&package)?;
-    let archive_reader = ArchiveReader::new(&archive)?;
+    let archive_reader =
+        ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?;
     let mut members = BTreeMap::new();
     for name in archive_reader.file_names() {
         let name = name.to_owned();
@@ -15072,7 +15429,11 @@ fn build_opc_relationship_corpus() -> Result<OpcRelationshipCorpus, Box<dyn Erro
     }
 
     let expected_names = members.keys().cloned().collect::<Vec<_>>();
-    let lazy_reader = LazyArchiveReader::new(&archive)?;
+    let lazy_reader = LazyArchiveReader::new(
+        &archive,
+        soapberry_zip::office::ArchiveLimits::default(),
+        soapberry_zip::office::LazyArchiveCacheLimits::default(),
+    )?;
     let mut lazy_names = lazy_reader
         .file_names()
         .map(str::to_owned)
@@ -15117,7 +15478,7 @@ fn build_opc_relationship_corpus() -> Result<OpcRelationshipCorpus, Box<dyn Erro
         );
     }
 
-    let parsed = OpcPackage::from_bytes(&archive)?;
+    let parsed = OpcPackage::from_bytes(&archive, litchi_opc::SourceLimits::default())?;
     let parsed_part_count = parsed.part_count();
     let parsed_relationship_count = parsed.rels().len()
         + parsed
@@ -15215,7 +15576,10 @@ fn build_opc_overlay_corpus(shape: OpcOverlayShape) -> Result<Corpus, Box<dyn Er
     )?;
 
     let archive = PackageWriter::to_bytes(&package)?;
-    let archive_member_count = ArchiveReader::new(&archive)?.file_names().count();
+    let archive_member_count =
+        ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?
+            .file_names()
+            .count();
     let target_payload = target_payload.ok_or("multi-Part OPC corpus has no target entry")?;
     let entry_count_u64 = u64::try_from(entry_count)?;
     let entry_bytes_u64 = u64::try_from(entry_bytes)?;
@@ -15272,7 +15636,10 @@ fn build_cfb_corpus(
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output)?;
     let archive = output.into_inner();
-    let mut parsed = OleFile::open(Cursor::new(archive.as_slice()))?;
+    let mut parsed = OleFile::open(
+        Cursor::new(archive.as_slice()),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
     let archive_member_count = parsed.list_streams().len();
     if archive_member_count != entry_count {
         return Err("CFB stream count differs from generated corpus specification".into());
@@ -15344,7 +15711,10 @@ fn build_cfb_selective_corpus(
     writer.write_to(&mut output)?;
     let archive = output.into_inner();
     let target_name = cfb_entry_name(target_index);
-    let mut parsed = OleFile::open(Cursor::new(archive.as_slice()))?;
+    let mut parsed = OleFile::open(
+        Cursor::new(archive.as_slice()),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
     if parsed.list_streams().len() != entry_count
         || parsed.open_stream(&[target_name.as_str()])? != target_payload
     {
@@ -15405,7 +15775,10 @@ fn build_ole_common_corpus(base: &Corpus) -> Result<Corpus, Box<dyn Error>> {
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output)?;
     let archive = output.into_inner();
-    let mut parsed = OleFile::open(Cursor::new(archive.as_slice()))?;
+    let mut parsed = OleFile::open(
+        Cursor::new(archive.as_slice()),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
     if parsed.list_streams().len() != entry_count
         || parsed.open_stream(&[OLE_COMMON_TARGET])? != OLE_COMMON_ORIGINAL
     {
@@ -15468,7 +15841,10 @@ fn build_writer_corpus(case: Case, shape: WriterShape) -> Result<Corpus, Box<dyn
         },
         _ => return Err("synthetic container case does not have a writer corpus".into()),
     };
-    let mut parsed = OleFile::open(Cursor::new(archive.as_slice()))?;
+    let mut parsed = OleFile::open(
+        Cursor::new(archive.as_slice()),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
     let archive_member_count = parsed.list_streams().len();
     let target_payload = parsed.open_stream(&[target_name])?;
     if archive_member_count == 0 || target_payload.is_empty() {
@@ -15509,7 +15885,7 @@ fn build_writer_corpus(case: Case, shape: WriterShape) -> Result<Corpus, Box<dyn
 fn write_fresh_doc(shape: WriterShape) -> Result<(Vec<u8>, usize, usize), Box<dyn Error>> {
     let paragraph_count = shape.doc_paragraph_count();
     let payload_bytes = (shape == WriterShape::PayloadHeavy).then_some(20_000);
-    let mut writer = litchi_doc::writer::Writer::new();
+    let mut writer = litchi_doc::builder::Builder::new();
     let mut content_bytes = 0;
     for paragraph in 0..paragraph_count {
         let text = payload_bytes.map_or_else(
@@ -15520,12 +15896,13 @@ fn write_fresh_doc(shape: WriterShape) -> Result<(Vec<u8>, usize, usize), Box<dy
         writer.add_paragraph(&text)?;
     }
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output)?;
+    let package = writer.build()?;
+    package.write_to(&mut output)?;
     Ok((output.into_inner(), paragraph_count, content_bytes))
 }
 
 fn write_fresh_xls(shape: WriterShape) -> Result<(Vec<u8>, usize, usize), Box<dyn Error>> {
-    let mut writer = litchi_xls::writer::Writer::new();
+    let mut builder = litchi_xls::writer::Builder::new();
     let mut content_bytes = 0;
     let mut cell_count = 0;
 
@@ -15535,14 +15912,14 @@ fn write_fresh_xls(shape: WriterShape) -> Result<(Vec<u8>, usize, usize), Box<dy
                 .xls_dimensions()
                 .ok_or("non-numeric writer shape reached numeric XLS corpus")?;
             for sheet in 0..sheet_count {
-                let worksheet = writer.add_worksheet(&format!("Bench{sheet:02}"))?;
+                let worksheet = builder.add_worksheet(&format!("Bench{sheet:02}"))?;
                 for row in 0..row_count {
                     for column in 0..column_count {
                         let value =
                             (sheet * row_count * column_count + row * column_count + column) as f64;
                         content_bytes += std::mem::size_of_val(&value);
                         cell_count += 1;
-                        writer.write_number(worksheet, row as u32, column as u16, value)?;
+                        builder.write_number(worksheet, row as u32, column as u16, value)?;
                     }
                 }
             }
@@ -15554,23 +15931,23 @@ fn write_fresh_xls(shape: WriterShape) -> Result<(Vec<u8>, usize, usize), Box<dy
             // That keeps exact output checks while placing ~4 MiB of legal,
             // distinct 32,700-byte strings in the shared-string table.
             for sheet in 0..128 {
-                let worksheet = writer.add_worksheet(&format!("Payload{sheet:03}"))?;
+                let worksheet = builder.add_worksheet(&format!("Payload{sheet:03}"))?;
                 let text = writer_payload_text("xls", sheet, 0, 0, 32_700);
                 content_bytes += text.len();
                 cell_count += 1;
-                writer.write_string(worksheet, 0, 0, &text)?;
+                builder.write_string(worksheet, 0, 0, &text)?;
             }
         },
     }
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output)?;
+    builder.build()?.write_to(&mut output)?;
     Ok((output.into_inner(), cell_count, content_bytes))
 }
 
 fn write_fresh_ppt(shape: WriterShape) -> Result<(Vec<u8>, usize, usize), Box<dyn Error>> {
     let (slide_count, boxes_per_slide) = shape.ppt_dimensions();
     let payload_bytes = (shape == WriterShape::PayloadHeavy).then_some(40_000);
-    let mut writer = litchi_ppt::writer::Writer::new();
+    let mut writer = litchi_ppt::writer::Builder::new();
     let mut content_bytes = 0;
     let mut text_box_count = 0;
     for slide_number in 0..slide_count {
@@ -15588,7 +15965,7 @@ fn write_fresh_ppt(shape: WriterShape) -> Result<(Vec<u8>, usize, usize), Box<dy
         }
     }
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output)?;
+    litchi_ppt::raw::encode(&mut writer, &mut output)?;
     Ok((output.into_inner(), text_box_count, content_bytes))
 }
 
@@ -15609,7 +15986,7 @@ fn ppt_picture_payload(index: usize) -> Vec<u8> {
 }
 
 fn build_ppt_pictures_corpus() -> Result<Corpus, Box<dyn Error>> {
-    let mut writer = litchi_ppt::writer::Writer::new();
+    let mut writer = litchi_ppt::writer::Builder::new();
     let slide_count = 8;
     let slides = (0..slide_count)
         .map(|_| writer.add_slide())
@@ -15627,14 +16004,17 @@ fn build_ppt_pictures_corpus() -> Result<Corpus, Box<dyn Error>> {
         )?;
     }
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output)?;
+    litchi_ppt::raw::encode(&mut writer, &mut output)?;
     let archive = output.into_inner();
-    let mut parsed = OleFile::open(Cursor::new(archive.as_slice()))?;
+    let mut parsed = OleFile::open(
+        Cursor::new(archive.as_slice()),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
     let pictures = parsed.open_stream(&["Pictures"])?;
     if pictures.len() <= 4 * 1024 || pictures.is_empty() {
         return Err("PPT Pictures corpus did not produce a regular stream".into());
     }
-    let mut package = litchi_ppt::Package::from_reader(Cursor::new(archive.clone()))?;
+    let mut package = litchi_ppt::raw::Reader::from_reader(Cursor::new(archive.clone()))?;
     let presentation = package.presentation()?;
     let images = presentation.images()?;
     if images.len() != PPT_PICTURE_COUNT {
@@ -15713,80 +16093,123 @@ fn ppt_picture_semantic_digest_from_images(
     Ok(fingerprint_hex(&bytes))
 }
 
-fn ppt_picture_record_limits(
+fn ppt_picture_source_limits(
     archive: &[u8],
     pictures_bytes: usize,
-) -> Result<litchi_ppt::RecordLimits, Box<dyn Error>> {
-    let parsed = OleFile::open(Cursor::new(archive))?;
-    let document_bytes = parsed.stream_len(&["PowerPoint Document"])?;
-    let current_user_bytes = parsed.stream_len(&["Current User"])?;
-    let aggregate = document_bytes
-        .checked_add(current_user_bytes)
-        .and_then(|value| value.checked_add(u64::try_from(pictures_bytes).ok()?))
-        .ok_or("PPT Pictures limit aggregate overflows u64")?;
-    Ok(litchi_ppt::RecordLimits {
-        max_package_bytes: archive.len(),
-        max_input_bytes: pictures_bytes,
-        max_aggregate_input_bytes: usize::try_from(aggregate)?,
-        ..litchi_ppt::RecordLimits::default()
-    })
+) -> Result<litchi_ppt::SourceLimits, Box<dyn Error>> {
+    let parsed = OleFile::open(Cursor::new(archive), litchi_cfb::OleFileLimits::default())?;
+    let mut aggregate = 0_u64;
+    for index in 0..parsed.directory_entry_count() {
+        let sid = u32::try_from(index)?;
+        let Some(entry) = parsed.directory_entry_by_sid(sid) else {
+            continue;
+        };
+        if entry.entry_type == litchi_cfb::consts::STGTY_STREAM {
+            aggregate = aggregate
+                .checked_add(entry.size)
+                .ok_or("PPT Pictures limit aggregate overflows u64")?;
+        }
+    }
+    Ok(litchi_ppt::SourceLimits::builder()
+        .max_input_bytes(archive.len())?
+        .max_entry_bytes(pictures_bytes)?
+        .max_aggregate_bytes(usize::try_from(aggregate)?)?
+        .build()?)
+}
+
+fn ppt_source_limits_with(
+    limits: litchi_ppt::SourceLimits,
+    input_bytes: usize,
+    entry_bytes: usize,
+    aggregate_bytes: usize,
+) -> Result<litchi_ppt::SourceLimits, Box<dyn Error>> {
+    Ok(limits
+        .to_builder()
+        .max_input_bytes(input_bytes)?
+        .max_entry_bytes(entry_bytes)?
+        .max_aggregate_bytes(aggregate_bytes)?
+        .build()?)
 }
 
 fn verify_ppt_picture_limit_gates(
     archive: &[u8],
     pictures_bytes: usize,
 ) -> Result<(), Box<dyn Error>> {
-    let exact = ppt_picture_record_limits(archive, pictures_bytes)?;
+    let exact = ppt_picture_source_limits(archive, pictures_bytes)?;
     let pictures_payload = {
-        let mut parsed = OleFile::open(Cursor::new(archive))?;
+        let mut parsed = OleFile::open(Cursor::new(archive), litchi_cfb::OleFileLimits::default())?;
         parsed.open_stream(&["Pictures"])?
     };
     let pictures_range = ppt_picture_payload_range(archive, &pictures_payload)?;
-    let mut eager =
-        litchi_ppt::Package::from_reader_with_limits(Cursor::new(archive.to_vec()), exact)?;
-    eager.presentation_with_limits(exact)?;
-    let source = litchi_ppt::SourceBackedPackage::from_read_at_with_limits(
-        Arc::new(InstrumentedSource::new(archive.to_vec(), Vec::new())),
-        exact,
+    let mut eager = litchi_ppt::raw::Reader::from_reader_with_options(
+        Cursor::new(archive.to_vec()),
+        litchi_ppt::OpenOptions::new().source_limits(exact),
     )?;
-    source.presentation_with_limits(exact)?;
+    eager.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(exact))?;
+    let source = litchi_ppt::SourceBackedPackage::from_read_at_with_options(
+        Arc::new(InstrumentedSource::new(archive.to_vec(), Vec::new())),
+        litchi_ppt::OpenOptions::new().source_limits(exact),
+    )?;
+    source.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(exact))?;
 
-    let mut package_under = exact;
-    package_under.max_package_bytes = package_under
-        .max_package_bytes
-        .checked_sub(1)
-        .ok_or("PPT package fixture is empty")?;
-    if litchi_ppt::Package::from_reader_with_limits(Cursor::new(archive.to_vec()), package_under)
-        .is_ok()
+    let package_under = ppt_source_limits_with(
+        exact,
+        exact
+            .max_input_bytes()
+            .checked_sub(1)
+            .ok_or("PPT package fixture is empty")?,
+        exact.max_entry_bytes(),
+        exact.max_aggregate_bytes(),
+    )?;
+    if litchi_ppt::raw::Reader::from_reader_with_options(
+        Cursor::new(archive.to_vec()),
+        litchi_ppt::OpenOptions::new().source_limits(package_under),
+    )
+    .is_ok()
     {
         return Err("PPT eager package limit accepted one byte under package size".into());
     }
-    if litchi_ppt::SourceBackedPackage::from_read_at_with_limits(
+    if litchi_ppt::SourceBackedPackage::from_read_at_with_options(
         Arc::new(InstrumentedSource::new(archive.to_vec(), Vec::new())),
-        package_under,
+        litchi_ppt::OpenOptions::new().source_limits(package_under),
     )
     .is_ok()
     {
         return Err("PPT source-backed package limit accepted one byte under package size".into());
     }
 
-    let mut pictures_under = exact;
-    pictures_under.max_input_bytes = pictures_under
-        .max_input_bytes
-        .checked_sub(1)
-        .ok_or("PPT Pictures fixture is empty")?;
-    let mut eager =
-        litchi_ppt::Package::from_reader_with_limits(Cursor::new(archive.to_vec()), exact)?;
-    if eager.presentation_with_limits(pictures_under).is_ok() {
+    let pictures_under = ppt_source_limits_with(
+        exact,
+        exact.max_input_bytes(),
+        exact
+            .max_entry_bytes()
+            .checked_sub(1)
+            .ok_or("PPT Pictures fixture is empty")?,
+        exact.max_aggregate_bytes(),
+    )?;
+    let mut eager = litchi_ppt::raw::Reader::from_reader_with_options(
+        Cursor::new(archive.to_vec()),
+        litchi_ppt::OpenOptions::new().source_limits(exact),
+    )?;
+    if eager
+        .presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(pictures_under))
+        .is_ok()
+    {
         return Err("PPT eager Pictures limit accepted one byte under stream size".into());
     }
     let source = Arc::new(InstrumentedSource::new(
         archive.to_vec(),
         vec![pictures_range],
     ));
-    let package = litchi_ppt::SourceBackedPackage::from_read_at_with_limits(source.clone(), exact)?;
+    let package = litchi_ppt::SourceBackedPackage::from_read_at_with_options(
+        source.clone(),
+        litchi_ppt::OpenOptions::new().source_limits(exact),
+    )?;
     source.reset();
-    if package.presentation_with_limits(pictures_under).is_ok() {
+    if package
+        .presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(pictures_under))
+        .is_ok()
+    {
         return Err("PPT source-backed Pictures limit accepted one byte under stream size".into());
     }
     let snapshot = source.snapshot();
@@ -15855,13 +16278,18 @@ fn time_ppt_pictures_eager(
     phase: &str,
     cached_repeat: bool,
     archive: &[u8],
-    record_limits: litchi_ppt::RecordLimits,
+    source_limits: litchi_ppt::SourceLimits,
 ) -> Result<Duration, Box<dyn Error>> {
     let cursor = Cursor::new(archive);
     if phase == "presentation_open_no_image_query" {
         let started = Instant::now();
-        let mut package = litchi_ppt::Package::from_reader_with_limits(cursor, record_limits)?;
-        let presentation = package.presentation_with_limits(record_limits)?;
+        let mut package = litchi_ppt::raw::Reader::from_reader_with_options(
+            cursor,
+            litchi_ppt::OpenOptions::new().source_limits(source_limits),
+        )?;
+        let presentation = package.presentation_with_options(
+            litchi_ppt::OpenOptions::new().source_limits(source_limits),
+        )?;
         std::hint::black_box(&presentation);
         let duration = started.elapsed();
         if !presentation.has_pictures() {
@@ -15872,8 +16300,13 @@ fn time_ppt_pictures_eager(
 
     if phase == "fresh_open_plus_cold_all_images_query" {
         let started = Instant::now();
-        let mut package = litchi_ppt::Package::from_reader_with_limits(cursor, record_limits)?;
-        let presentation = package.presentation_with_limits(record_limits)?;
+        let mut package = litchi_ppt::raw::Reader::from_reader_with_options(
+            cursor,
+            litchi_ppt::OpenOptions::new().source_limits(source_limits),
+        )?;
+        let presentation = package.presentation_with_options(
+            litchi_ppt::OpenOptions::new().source_limits(source_limits),
+        )?;
         let images = presentation.images()?;
         std::hint::black_box(&images);
         let duration = started.elapsed();
@@ -15881,8 +16314,12 @@ fn time_ppt_pictures_eager(
         return Ok(duration);
     }
 
-    let mut package = litchi_ppt::Package::from_reader_with_limits(cursor, record_limits)?;
-    let presentation = package.presentation_with_limits(record_limits)?;
+    let mut package = litchi_ppt::raw::Reader::from_reader_with_options(
+        cursor,
+        litchi_ppt::OpenOptions::new().source_limits(source_limits),
+    )?;
+    let presentation = package
+        .presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
     if cached_repeat {
         let first = presentation.images()?;
         verify_ppt_picture_images(&first)?;
@@ -15899,13 +16336,17 @@ fn time_ppt_pictures_source_backed(
     phase: &str,
     cached_repeat: bool,
     source: Arc<dyn ReadAt>,
-    record_limits: litchi_ppt::RecordLimits,
+    source_limits: litchi_ppt::SourceLimits,
 ) -> Result<Duration, Box<dyn Error>> {
     if phase == "presentation_open_no_image_query" {
         let started = Instant::now();
-        let package =
-            litchi_ppt::SourceBackedPackage::from_read_at_with_limits(source, record_limits)?;
-        let presentation = package.presentation_with_limits(record_limits)?;
+        let package = litchi_ppt::SourceBackedPackage::from_read_at_with_options(
+            source,
+            litchi_ppt::OpenOptions::new().source_limits(source_limits),
+        )?;
+        let presentation = package.presentation_with_options(
+            litchi_ppt::OpenOptions::new().source_limits(source_limits),
+        )?;
         std::hint::black_box(&presentation);
         let duration = started.elapsed();
         if !presentation.has_pictures() {
@@ -15916,9 +16357,13 @@ fn time_ppt_pictures_source_backed(
 
     if phase == "fresh_open_plus_cold_all_images_query" {
         let started = Instant::now();
-        let package =
-            litchi_ppt::SourceBackedPackage::from_read_at_with_limits(source, record_limits)?;
-        let presentation = package.presentation_with_limits(record_limits)?;
+        let package = litchi_ppt::SourceBackedPackage::from_read_at_with_options(
+            source,
+            litchi_ppt::OpenOptions::new().source_limits(source_limits),
+        )?;
+        let presentation = package.presentation_with_options(
+            litchi_ppt::OpenOptions::new().source_limits(source_limits),
+        )?;
         let images = presentation.images()?;
         std::hint::black_box(&images);
         let duration = started.elapsed();
@@ -15926,8 +16371,12 @@ fn time_ppt_pictures_source_backed(
         return Ok(duration);
     }
 
-    let package = litchi_ppt::SourceBackedPackage::from_read_at_with_limits(source, record_limits)?;
-    let presentation = package.presentation_with_limits(record_limits)?;
+    let package = litchi_ppt::SourceBackedPackage::from_read_at_with_options(
+        source,
+        litchi_ppt::OpenOptions::new().source_limits(source_limits),
+    )?;
+    let presentation = package
+        .presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
     if cached_repeat {
         let first = presentation.images()?;
         verify_ppt_picture_images(&first)?;
@@ -15945,7 +16394,7 @@ fn collect_ppt_pictures_source_evidence(
     cached_repeat: bool,
     archive: &[u8],
     picture_ranges: &[Range<u64>],
-    record_limits: litchi_ppt::RecordLimits,
+    source_limits: litchi_ppt::SourceLimits,
 ) -> Result<SourceSnapshot, Box<dyn Error>> {
     let source = Arc::new(InstrumentedSource::new(
         archive.to_vec(),
@@ -15953,20 +16402,25 @@ fn collect_ppt_pictures_source_evidence(
     ));
 
     if phase == "presentation_open_no_image_query" {
-        let package = litchi_ppt::SourceBackedPackage::from_read_at_with_limits(
+        let package = litchi_ppt::SourceBackedPackage::from_read_at_with_options(
             source.clone(),
-            record_limits,
+            litchi_ppt::OpenOptions::new().source_limits(source_limits),
         )?;
-        let presentation = package.presentation_with_limits(record_limits)?;
+        let presentation = package.presentation_with_options(
+            litchi_ppt::OpenOptions::new().source_limits(source_limits),
+        )?;
         if !presentation.has_pictures() {
             return Err("PPT source-backed evidence open lost Pictures descriptor".into());
         }
         return Ok(source.snapshot());
     }
 
-    let package =
-        litchi_ppt::SourceBackedPackage::from_read_at_with_limits(source.clone(), record_limits)?;
-    let presentation = package.presentation_with_limits(record_limits)?;
+    let package = litchi_ppt::SourceBackedPackage::from_read_at_with_options(
+        source.clone(),
+        litchi_ppt::OpenOptions::new().source_limits(source_limits),
+    )?;
+    let presentation = package
+        .presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
     if phase != "fresh_open_plus_cold_all_images_query" {
         source.reset();
     }
@@ -16039,7 +16493,7 @@ fn run_ppt_pictures(
     let (implementation, phase, cached_repeat) = ppt_pictures_case_parameters(case)?;
     let source_backed = implementation == "source_backed";
     let picture_stream_bytes = u64::try_from(corpus.target_payload.len())?;
-    let record_limits = ppt_picture_record_limits(&corpus.archive, corpus.target_payload.len())?;
+    let source_limits = ppt_picture_source_limits(&corpus.archive, corpus.target_payload.len())?;
     let picture_ranges = ppt_pictures_source_range(corpus)?;
     let picture_stream_sha256 = corpus.manifest.target_payload_sha256.clone();
     let canonical_semantic_sha256 = ppt_picture_semantic_digest();
@@ -16082,13 +16536,13 @@ fn run_ppt_pictures(
 
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let duration = if let Some(source) = timed_source.as_ref() {
-            time_ppt_pictures_source_backed(phase, cached_repeat, source.clone(), record_limits)?
+            time_ppt_pictures_source_backed(phase, cached_repeat, source.clone(), source_limits)?
         } else {
             time_ppt_pictures_eager(
                 phase,
                 cached_repeat,
                 corpus.archive.as_slice(),
-                record_limits,
+                source_limits,
             )?
         };
         record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
@@ -16101,7 +16555,7 @@ fn run_ppt_pictures(
                 cached_repeat,
                 corpus.archive.as_slice(),
                 &picture_ranges,
-                record_limits,
+                source_limits,
             )?;
             verify_ppt_pictures_source_evidence(phase, snapshot, picture_stream_bytes)?;
             source_summary.source_read_calls.push(snapshot.read_calls);
@@ -16233,7 +16687,7 @@ fn semantic_rtf_plain_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Err
     }
     source.push('}');
 
-    let document = litchi_rtf::Document::parse(&source)?;
+    let document = litchi_rtf::Package::parse(&source)?;
     let bytes = document.to_bytes()?;
     if bytes != source.as_bytes() {
         return Err("semantic RTF generator lost exact source identity".into());
@@ -16263,9 +16717,16 @@ fn semantic_rtf_bytes(
         },
         RtfSemanticVariant::Lzfu => {
             let plain = semantic_rtf_plain_bytes(shape)?;
-            let compressed = litchi_rtf::transport::compress(&plain, true)?;
+            let compressed = litchi_rtf::transport::compress(
+                &plain,
+                true,
+                litchi_rtf::transport::CompressionLimits::default(),
+            )?;
             if !litchi_rtf::transport::is_compressed_rtf(&compressed)
-                || litchi_rtf::transport::decompress(&compressed)? != plain
+                || litchi_rtf::transport::decompress(
+                    &compressed,
+                    litchi_rtf::transport::DecompressionLimits::default(),
+                )? != plain
             {
                 return Err("semantic RTF LZFu transport verification failed".into());
             }
@@ -16285,7 +16746,7 @@ fn semantic_rtf_bytes(
         },
     };
 
-    let document = litchi_rtf::Document::from_bytes(&archive)?;
+    let document = litchi_rtf::Package::from_bytes(&archive)?;
     if document.to_bytes()? != archive {
         return Err("semantic RTF variant lost exact source identity".into());
     }
@@ -16297,7 +16758,7 @@ fn build_semantic_rtf_corpus(
     variant: RtfSemanticVariant,
 ) -> Result<Corpus, Box<dyn Error>> {
     let archive = semantic_rtf_bytes(shape, variant)?;
-    let document = litchi_rtf::Document::from_bytes(&archive)?;
+    let document = litchi_rtf::Package::from_bytes(&archive)?;
     verify_semantic_rtf(&document, shape, variant, &[])?;
     let target_payload = semantic_rtf_variant_text(variant, 0, false).into_bytes();
     let content_bytes = semantic_rtf_expected_text(shape, variant, &[]).len();
@@ -16352,7 +16813,7 @@ fn build_rtf_lifecycle_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Er
     }
     source.push('}');
     let archive = source.into_bytes();
-    let document = litchi_rtf::Document::from_bytes(&archive)?;
+    let document = litchi_rtf::Package::from_bytes(&archive)?;
     if document.to_bytes()? != archive {
         return Err("RTF lifecycle corpus lost exact source identity".into());
     }
@@ -16476,7 +16937,7 @@ fn build_rtf_picture_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Erro
     if !archive.is_ascii() {
         return Err("RTF picture corpus is not ASCII transport".into());
     }
-    let document = litchi_rtf::Document::from_bytes(&archive)?;
+    let document = litchi_rtf::Package::from_bytes(&archive)?;
     if document.to_bytes()? != archive {
         return Err("RTF picture corpus lost exact source identity".into());
     }
@@ -16540,7 +17001,7 @@ fn rtf_logical_tail_limits(
     source_bytes: usize,
     input_bytes: usize,
     paragraph_count: usize,
-) -> Result<litchi_rtf::TailAppendLimits, Box<dyn Error>> {
+) -> Result<litchi_rtf::tail_append::SemanticLimits, Box<dyn Error>> {
     let paragraph_overhead = paragraph_count
         .checked_mul(32)
         .ok_or("RTF logical-tail paragraph bound overflows usize")?;
@@ -16555,29 +17016,32 @@ fn rtf_logical_tail_limits(
         .checked_mul(2)
         .and_then(|value| value.checked_add(4096))
         .ok_or("RTF logical-tail patch bound overflows usize")?;
-    Ok(litchi_rtf::TailAppendLimits::new(
-        paragraph_count,
-        paragraph_count,
-        input_bytes,
-        inserted_bound,
-        output_bound,
-        patch_bound,
-    ))
+    Ok(litchi_rtf::tail_append::SemanticLimits::builder()
+        .max_paragraphs(paragraph_count)?
+        .max_runs(paragraph_count)?
+        .max_input_bytes(input_bytes)?
+        .max_inserted_bytes(inserted_bound)?
+        .max_output_bytes(output_bound)?
+        .max_patch_bytes(patch_bound)?
+        .build()?)
 }
 
 fn stage_rtf_logical_tail(
-    source: &litchi_rtf::Document,
+    source: &litchi_rtf::Package,
     paragraphs: &[&str],
-    limits: litchi_rtf::TailAppendLimits,
-) -> Result<litchi_rtf::TailAppendCommit, Box<dyn Error>> {
-    let mut edit = source.tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
+    limits: litchi_rtf::tail_append::SemanticLimits,
+) -> Result<litchi_rtf::tail_append::Commit, Box<dyn Error>> {
+    let mut edit = source.edit_tail_append_with_options(
+        litchi_rtf::TailSelector::Body,
+        litchi_rtf::tail_append::EditOptions::new().semantic_limits(limits),
+    );
     edit.append_text_paragraphs(paragraphs)?;
     Ok(edit.commit()?)
 }
 
 fn verify_rtf_logical_tail_projection(
-    document: &litchi_rtf::Document,
-    source: &litchi_rtf::Document,
+    document: &litchi_rtf::Package,
+    source: &litchi_rtf::Package,
     appended: &[String],
 ) -> Result<(), Box<dyn Error>> {
     let mut expected = source
@@ -16612,11 +17076,11 @@ fn verify_rtf_logical_tail_projection(
 }
 
 fn verify_rtf_logical_tail_gates(
-    source: &litchi_rtf::Document,
-    changed: &litchi_rtf::TailAppendCommit,
-    noop: &litchi_rtf::TailAppendCommit,
+    source: &litchi_rtf::Package,
+    changed: &litchi_rtf::tail_append::Commit,
+    noop: &litchi_rtf::tail_append::Commit,
     appended: &[String],
-    limits: litchi_rtf::TailAppendLimits,
+    limits: litchi_rtf::tail_append::SemanticLimits,
     expected: &[u8],
 ) -> Result<(), Box<dyn Error>> {
     if !changed.diagnostics().changed()
@@ -16628,7 +17092,7 @@ fn verify_rtf_logical_tail_gates(
     }
     if noop.diagnostics().changed()
         || noop.diagnostics().operation_count() != 0
-        || !noop.snapshot().same_snapshot(source)
+        || !noop.package().same_snapshot(source)
     {
         return Err("RTF logical-tail empty append was not an exact no-op".into());
     }
@@ -16639,16 +17103,18 @@ fn verify_rtf_logical_tail_gates(
         return Err("RTF logical-tail sequential publication differs from candidate".into());
     }
     verify_rtf_logical_tail_projection(
-        &litchi_rtf::Document::from_bytes(expected)?,
+        &litchi_rtf::Package::from_bytes(expected)?,
         source,
         appended,
     )?;
 
-    let applied = changed.patch().apply(source)?;
+    let applied = source.apply_tail_append(changed.patch())?.into_package();
     if applied.to_bytes()? != expected {
         return Err("RTF logical-tail in-memory patch replay differs from publication".into());
     }
-    let restored = changed.patch().inverse().apply(&applied)?;
+    let restored = applied
+        .apply_tail_append(&changed.patch().inverse())?
+        .into_package();
     if restored.to_bytes()? != source.to_bytes()? {
         return Err("RTF logical-tail in-memory inverse did not restore exact source".into());
     }
@@ -16682,26 +17148,26 @@ fn verify_rtf_logical_tail_gates(
         return Err("RTF logical-tail durable no-op lost exact source identity".into());
     }
 
-    let foreign = litchi_rtf::Document::parse(r"{\rtf1\ansi foreign source}")?;
+    let foreign = litchi_rtf::Package::parse(r"{\rtf1\ansi foreign source}")?;
     if !matches!(
-        changed.patch().apply(&foreign),
-        Err(litchi_rtf::TailAppendError::PatchConflict)
+        foreign.apply_tail_append(changed.patch()),
+        Err(litchi_rtf::tail_append::Error::PatchConflict)
     ) || !matches!(
         decoded.apply(&foreign),
-        Err(litchi_rtf::TailAppendError::PatchConflict)
+        Err(litchi_rtf::tail_append::Error::PatchConflict)
     ) {
         return Err("RTF logical-tail source-conflict gate accepted a foreign source".into());
     }
 
     let mut stale_edit = source.edit();
-    stale_edit.replace_paragraph_text(0, "litchi-perf-baseline-rtf-stale-source")?;
-    let stale = stale_edit.commit()?.into_snapshot();
+    stale_edit.replace_paragraph_text(Position::new(0), "litchi-perf-baseline-rtf-stale-source")?;
+    let stale = stale_edit.commit()?.into_package();
     if !matches!(
-        changed.patch().apply(&stale),
-        Err(litchi_rtf::TailAppendError::PatchConflict)
+        stale.apply_tail_append(changed.patch()),
+        Err(litchi_rtf::tail_append::Error::PatchConflict)
     ) || !matches!(
         decoded.apply(&stale),
-        Err(litchi_rtf::TailAppendError::PatchConflict)
+        Err(litchi_rtf::tail_append::Error::PatchConflict)
     ) {
         return Err("RTF logical-tail stale-source gate accepted a changed source".into());
     }
@@ -16709,13 +17175,14 @@ fn verify_rtf_logical_tail_gates(
 }
 
 fn semantic_docx_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
-    let mut package = litchi_docx::Package::new()?;
-    let document = package.document_mut()?;
+    let mut builder = litchi_docx::Builder::new()?;
+    let document = builder.document()?;
     for index in 0..shape.docx_paragraphs() {
         document.add_paragraph_with_text(&semantic_docx_text(index, false));
     }
+    let package = builder.build()?;
     let mut output = Cursor::new(Vec::new());
-    package.to_stream(&mut output)?;
+    package.write_to(&mut output)?;
     Ok(output.into_inner())
 }
 
@@ -16723,7 +17190,10 @@ fn build_semantic_docx_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Er
     let archive = semantic_docx_bytes(shape)?;
     let package = litchi_docx::Package::from_reader(Cursor::new(archive.clone()))?;
     verify_semantic_docx(&package, shape, &[])?;
-    let archive_member_count = ArchiveReader::new(&archive)?.file_names().count();
+    let archive_member_count =
+        ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?
+            .file_names()
+            .count();
     let target_payload = semantic_docx_text(0, false).into_bytes();
     let content_bytes = (0..shape.docx_paragraphs())
         .try_fold(0usize, |total, index| {
@@ -16768,8 +17238,8 @@ fn docx_source_media_payload(index: usize) -> Vec<u8> {
 }
 
 fn docx_source_edit_bytes() -> Result<Vec<u8>, Box<dyn Error>> {
-    let mut package = litchi_docx::Package::new()?;
-    let document = package.document_mut()?;
+    let mut builder = litchi_docx::Builder::new()?;
+    let document = builder.document()?;
     for index in 0..SemanticShape::Medium.docx_paragraphs() {
         let paragraph = document.add_paragraph_with_text(&semantic_docx_text(index, false));
         if index < DOCX_SOURCE_MEDIA_ENTRY_COUNT {
@@ -16780,8 +17250,9 @@ fn docx_source_edit_bytes() -> Result<Vec<u8>, Box<dyn Error>> {
             )?;
         }
     }
+    let package = builder.build()?;
     let mut output = Cursor::new(Vec::new());
-    package.to_stream(&mut output)?;
+    package.write_to(&mut output)?;
     restore_docx_source_edit_v1(output.into_inner())
 }
 
@@ -16801,7 +17272,7 @@ fn restore_docx_source_edit_v1(bytes: Vec<u8>) -> Result<Vec<u8>, Box<dyn Error>
             );
         },
     }
-    let mut package = OpcPackage::from_bytes(&bytes)?;
+    let mut package = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default())?;
     let part = package.get_part_mut(&PackURI::new("/word/document.xml")?)?;
     let xml = std::str::from_utf8(part.blob())?;
     const LOCAL: &str =
@@ -16811,7 +17282,7 @@ fn restore_docx_source_edit_v1(bytes: Vec<u8>) -> Result<Vec<u8>, Box<dyn Error>
     }
     part.set_blob(xml.replace(LOCAL, "<w:sectPr>").into_bytes());
     let mut restored = Vec::new();
-    package.to_stream(&mut restored)?;
+    package.write_to(&mut restored)?;
     if sha256_hex(&restored) != ORIGINAL {
         return Err("DOCX v1 fixture restoration changed historical archive bytes".into());
     }
@@ -16948,7 +17419,7 @@ fn build_docx_section_layout_corpus() -> Result<Corpus, Box<dyn Error>> {
     )))?;
     let snapshot = source.section_layout_snapshot()?;
     verify_docx_section_layout_snapshot(&snapshot, [2, 2, 2])?;
-    let opc = OpcPackage::from_bytes(&archive)?;
+    let opc = OpcPackage::from_bytes(&archive, litchi_opc::SourceLimits::default())?;
     let main_xml = opc
         .get_part(&PackURI::new("/word/document.xml")?)?
         .blob()
@@ -16982,7 +17453,12 @@ fn build_docx_section_layout_corpus() -> Result<Corpus, Box<dyn Error>> {
             payload_kind: "deterministic-incompressible-media",
             compression: "deflate",
             entry_count: opc.part_count(),
-            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            archive_member_count: ArchiveReader::new(
+                &archive,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )?
+            .file_names()
+            .count(),
             entry_bytes: DOCX_SECTION_LAYOUT_MEDIA_ENTRY_BYTES,
             uncompressed_payload_bytes,
             archive_bytes: archive.len(),
@@ -17025,8 +17501,8 @@ fn pptx_cross_copy_bytes(
     media_slide: Option<usize>,
     title_prefix: &str,
 ) -> Result<Vec<u8>, Box<dyn Error>> {
-    let mut authored = litchi_pptx::Package::new()?;
-    let presentation = authored.presentation_mut()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
+    let presentation = builder.presentation()?;
     for slide_index in 0..slide_count {
         let slide = presentation.add_slide()?;
         slide.set_title(&format!(
@@ -17041,12 +17517,12 @@ fn pptx_cross_copy_bytes(
         );
     }
 
-    let mut package = litchi_pptx::Package::from_bytes(&authored.to_bytes()?)?;
+    let mut package = builder.build()?;
     if let Some(media_slide) = media_slide {
         if media_slide >= slide_count {
             return Err("PPTX cross-copy media owner is outside the slide corpus".into());
         }
-        let mut edit = package.opened_presentation_transaction()?;
+        let mut edit = package.edit()?;
         for index in 0..PPTX_CROSS_COPY_MEDIA_ENTRY_COUNT {
             let resource = litchi_pptx::media_parts::Resource::new(
                 format!("/ppt/media/litchi-perf-cross-copy-media-{index:02}.png"),
@@ -17061,19 +17537,19 @@ fn pptx_cross_copy_bytes(
             )?;
         }
         let commit = edit.commit()?;
-        if !commit.is_changed() {
+        if !commit.diagnostics().changed() {
             return Err(
                 "PPTX cross-copy media corpus transaction did not change the package".into(),
             );
         }
-        package.apply_opened_presentation_commit(commit)?;
+        package = commit.into_package();
     }
     Ok(package.to_bytes()?)
 }
 
 fn pptx_source_edit_bytes() -> Result<Vec<u8>, Box<dyn Error>> {
-    let mut authored = litchi_pptx::Package::new()?;
-    let presentation = authored.presentation_mut()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
+    let presentation = builder.presentation()?;
     for slide_index in 0..PPTX_SOURCE_SLIDE_COUNT {
         let slide = presentation.add_slide()?;
         for shape_index in 0..PPTX_SOURCE_TEXT_BOXES_PER_SLIDE {
@@ -17086,8 +17562,8 @@ fn pptx_source_edit_bytes() -> Result<Vec<u8>, Box<dyn Error>> {
             );
         }
     }
-    let mut package = litchi_pptx::Package::from_bytes(&authored.to_bytes()?)?;
-    let mut edit = package.opened_presentation_transaction()?;
+    let mut package = builder.build()?;
+    let mut edit = package.edit()?;
     for index in 0..PPTX_SOURCE_MEDIA_ENTRY_COUNT {
         let resource = litchi_pptx::media_parts::Resource::new(
             format!("/ppt/media/litchi-perf-source-media-{index:02}.png"),
@@ -17102,10 +17578,10 @@ fn pptx_source_edit_bytes() -> Result<Vec<u8>, Box<dyn Error>> {
         )?;
     }
     let commit = edit.commit()?;
-    if !commit.is_changed() {
+    if !commit.diagnostics().changed() {
         return Err("PPTX source-edit corpus media transaction did not change the package".into());
     }
-    package.apply_opened_presentation_commit(commit)?;
+    package = commit.into_package();
     Ok(package.to_bytes()?)
 }
 
@@ -17113,7 +17589,7 @@ fn build_docx_source_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     let archive = docx_source_edit_bytes()?;
     let package = litchi_docx::Package::from_reader(Cursor::new(archive.clone()))?;
     verify_semantic_docx(&package, SemanticShape::Medium, &[])?;
-    let opc = OpcPackage::from_bytes(&archive)?;
+    let opc = OpcPackage::from_bytes(&archive, litchi_opc::SourceLimits::default())?;
     let entry_count = opc.part_count();
     let uncompressed_payload_bytes = opc
         .try_iter_parts()
@@ -17129,7 +17605,10 @@ fn build_docx_source_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
             return Err("DOCX source-edit media payload differs from specification".into());
         }
     }
-    let archive_member_count = ArchiveReader::new(&archive)?.file_names().count();
+    let archive_member_count =
+        ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?
+            .file_names()
+            .count();
     let target = SemanticShape::Medium.docx_paragraphs() / 2;
     let target_payload = semantic_docx_text(target, false).into_bytes();
     Ok(Corpus {
@@ -17163,7 +17642,7 @@ fn build_pptx_source_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     let archive = pptx_source_edit_bytes()?;
     let package = litchi_pptx::Package::from_bytes(&archive)?;
     verify_pptx_source_edit_semantics(&package, 0)?;
-    let opc = OpcPackage::from_bytes(&archive)?;
+    let opc = OpcPackage::from_bytes(&archive, litchi_opc::SourceLimits::default())?;
     let entry_count = opc.part_count();
     let uncompressed_payload_bytes = opc
         .try_iter_parts()
@@ -17192,7 +17671,12 @@ fn build_pptx_source_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
             payload_kind: "deterministic-incompressible-media",
             compression: "deflate",
             entry_count,
-            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            archive_member_count: ArchiveReader::new(
+                &archive,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )?
+            .file_names()
+            .count(),
             entry_bytes: PPTX_SOURCE_MEDIA_ENTRY_BYTES,
             uncompressed_payload_bytes,
             archive_bytes: archive.len(),
@@ -17226,8 +17710,9 @@ fn build_pptx_cross_copy_corpus(case: Case) -> Result<PptxCrossCopyCorpus, Box<d
         media_rich.then_some(0),
         "destination",
     )?;
-    let source = litchi_pptx::Package::from_vec(source_archive.clone())?;
-    let destination = litchi_pptx::Package::from_vec(destination_archive.clone())?;
+    let source = litchi_pptx::Package::from_reader(std::io::Cursor::new(source_archive.clone()))?;
+    let destination =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.clone()))?;
     let source_snapshot = source.opened_presentation()?;
     let destination_snapshot = destination.opened_presentation()?;
     let source_slide_name = source_snapshot
@@ -17282,11 +17767,16 @@ fn build_pptx_cross_copy_corpus(case: Case) -> Result<PptxCrossCopyCorpus, Box<d
         return Err("media-rich PPTX cross-copy did not exercise a closure collision".into());
     }
 
-    let mut published_destination = litchi_pptx::Package::from_vec(destination_archive.clone())?;
-    let mut source_for_publication = litchi_pptx::Package::from_vec(source_archive.clone())?;
-    let published_snapshot =
-        published_destination.apply_cross_slide_copy_plan(&source_for_publication, &plan)?;
-    if published_snapshot.slides().len() != destination_snapshot.slides().len() + 1 {
+    let mut published_destination =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.clone()))?;
+    let source_for_publication =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(source_archive.clone()))?;
+    let mut publication = published_destination.edit()?;
+    publication.stage_cross_slide_copy(&source_for_publication, &plan)?;
+    published_destination = publication.commit()?.into_package();
+    if published_destination.presentation()?.slide_count()?
+        != destination_snapshot.slides().len() + 1
+    {
         return Err("PPTX cross-copy corpus publication changed the wrong slide count".into());
     }
     let expected_output = published_destination.to_bytes()?;
@@ -17343,9 +17833,12 @@ fn build_pptx_cross_copy_corpus(case: Case) -> Result<PptxCrossCopyCorpus, Box<d
         },
         compression: "deflate",
         entry_count: destination_opc.part_count(),
-        archive_member_count: ArchiveReader::new(&destination_archive)?
-            .file_names()
-            .count(),
+        archive_member_count: ArchiveReader::new(
+            &destination_archive,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )?
+        .file_names()
+        .count(),
         entry_bytes: target_payload.len(),
         uncompressed_payload_bytes,
         archive_bytes: destination_archive.len(),
@@ -17427,14 +17920,16 @@ fn build_pptx_source_backed_cross_copy_corpus(
         );
     }
 
-    let source_package = litchi_pptx::Package::from_vec(source_archive.clone())?;
+    let source_package =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(source_archive.clone()))?;
     let source_slides = source_package.presentation()?.slides()?;
     let source_slide = source_slides
         .get(PPTX_CROSS_COPY_SOURCE_SLIDE)
         .ok_or("source-backed PPTX source slide is missing")?;
     let source_slide_name = source_slide.name()?;
     let source_slide_text = source_slide.text()?;
-    let destination_package = litchi_pptx::Package::from_vec(destination_archive.clone())?;
+    let destination_package =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.clone()))?;
     let destination_slide_name = destination_package
         .presentation()?
         .slides()?
@@ -17442,7 +17937,7 @@ fn build_pptx_source_backed_cross_copy_corpus(
         .ok_or("source-backed PPTX destination slide is missing")?
         .name()?;
     let destination_slide_count = destination_package.presentation()?.slides()?.len();
-    let source_opc = OpcPackage::from_bytes(&source_archive)?;
+    let source_opc = OpcPackage::from_bytes(&source_archive, litchi_opc::SourceLimits::default())?;
     let source_slide_uri = PackURI::new(format!(
         "/ppt/slides/slide{}.xml",
         PPTX_CROSS_COPY_SOURCE_SLIDE + 1
@@ -17645,7 +18140,7 @@ fn build_pptx_source_image_query_corpus() -> Result<PptxSourceImageQueryCorpus, 
         .iter()
         .find_map(|(name, range)| (selected_media_member == name).then_some(range.clone()))
         .ok_or("PPTX source image corpus selected media member is missing")?;
-    let source_opc = OpcPackage::from_bytes(&archive)?;
+    let source_opc = OpcPackage::from_bytes(&archive, litchi_opc::SourceLimits::default())?;
     let uncompressed_payload_bytes = source_opc
         .try_iter_parts()
         .map(|part| part.expect("part payload decodes"))
@@ -17666,7 +18161,12 @@ fn build_pptx_source_image_query_corpus() -> Result<PptxSourceImageQueryCorpus, 
         payload_kind: "deterministic-incompressible-media-and-slide-text",
         compression: "deflate",
         entry_count: source_opc.part_count(),
-        archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+        archive_member_count: ArchiveReader::new(
+            &archive,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )?
+        .file_names()
+        .count(),
         entry_bytes: selected_payload.len(),
         uncompressed_payload_bytes,
         archive_bytes: archive.len(),
@@ -18190,9 +18690,10 @@ fn publish_pptx_source_backed_cross_copy(
     let source = litchi_pptx::SourceBackedPresentation::from_read_at(Arc::new(OwnedSource::new(
         source_archive.to_vec(),
     )))?;
-    let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at(Arc::new(
+    let editor_view = litchi_pptx::SourceBackedPresentation::from_read_at(Arc::new(
         OwnedSource::new(destination_archive.to_vec()),
     ))?;
+    let editor = litchi_pptx::source::Package::from_presentation(&editor_view)?;
     let plan = editor.plan_cross_slide_copy(
         &source,
         PPTX_CROSS_COPY_SOURCE_SLIDE,
@@ -18205,7 +18706,9 @@ fn publish_pptx_source_backed_cross_copy(
         );
     }
     let mut output = Vec::new();
-    let snapshot = editor.publish_cross_slide_copy_to_stream(&mut output, &plan)?;
+    let mut editor_copy = editor.edit_cross_slide_copy()?;
+    let snapshot = editor_copy.stage(&plan)?;
+    editor_copy.commit()?.package().write_to(&mut output)?;
     if snapshot.destination_slide_count() != PPTX_CROSS_COPY_DESTINATION_SLIDE_COUNT + 1
         || snapshot.insertion_position() != PPTX_CROSS_COPY_INSERTION_POSITION
     {
@@ -18223,9 +18726,10 @@ fn verify_pptx_source_backed_cross_copy_gates(
     destination_slide_count: usize,
     matched_existing_plain_corpus_verified: bool,
 ) -> Result<PptxSourceBackedCrossCopyGateSummary, Box<dyn Error>> {
-    let source = litchi_pptx::Package::from_vec(source_archive.to_vec())?;
-    let destination = litchi_pptx::Package::from_vec(destination_archive.to_vec())?;
-    let candidate = litchi_pptx::Package::from_vec(output.to_vec())?;
+    let source = litchi_pptx::Package::from_reader(std::io::Cursor::new(source_archive.to_vec()))?;
+    let destination =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.to_vec()))?;
+    let candidate = litchi_pptx::Package::from_reader(std::io::Cursor::new(output.to_vec()))?;
     let source_opc = source.opc()?;
     let destination_opc = destination.opc()?;
     let candidate_opc = candidate.opc()?;
@@ -18488,7 +18992,8 @@ fn verify_pptx_source_backed_cross_copy_gates(
     let source_read: Arc<dyn ReadAt> = source_probe.clone();
     let destination_read: Arc<dyn ReadAt> = destination_probe.clone();
     let source_view = litchi_pptx::SourceBackedPresentation::from_read_at(source_read)?;
-    let editor_probe = litchi_pptx::SourceBackedPresentationEditor::from_read_at(destination_read)?;
+    let editor_probe_view = litchi_pptx::SourceBackedPresentation::from_read_at(destination_read)?;
+    let editor_probe = litchi_pptx::source::Package::from_presentation(&editor_probe_view)?;
     let probe_plan = editor_probe.plan_cross_slide_copy(
         &source_view,
         PPTX_CROSS_COPY_SOURCE_SLIDE,
@@ -18506,7 +19011,12 @@ fn verify_pptx_source_backed_cross_copy_gates(
         .text_and_name()?;
     source_view.check_source()?;
     let mut probe_output = Vec::new();
-    editor_probe.publish_cross_slide_copy_to_stream(&mut probe_output, &probe_plan)?;
+    let mut editor_probe_copy = editor_probe.edit_cross_slide_copy()?;
+    editor_probe_copy.stage(&probe_plan)?;
+    editor_probe_copy
+        .commit()?
+        .package()
+        .write_to(&mut probe_output)?;
     let source_after = source_probe.bytes()?;
     let source_version_after = source_probe.version()?;
     let source_version_stability_verified =
@@ -18671,9 +19181,10 @@ fn verify_pptx_source_backed_lifecycle_output(
     output: &[u8],
     expectation: &PptxSourceBackedCrossCopyLifecycleExpectation<'_>,
 ) -> Result<PptxSourceBackedLifecycleOutputChecks, Box<dyn Error>> {
-    let source = litchi_pptx::Package::from_vec(source_archive.to_vec())?;
-    let destination = litchi_pptx::Package::from_vec(destination_archive.to_vec())?;
-    let candidate = litchi_pptx::Package::from_vec(output.to_vec())?;
+    let source = litchi_pptx::Package::from_reader(std::io::Cursor::new(source_archive.to_vec()))?;
+    let destination =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.to_vec()))?;
+    let candidate = litchi_pptx::Package::from_reader(std::io::Cursor::new(output.to_vec()))?;
     let source_opc = source.opc()?;
     let destination_opc = destination.opc()?;
     let candidate_opc = candidate.opc()?;
@@ -19080,8 +19591,9 @@ fn verify_pptx_source_backed_cross_copy_lifecycle_gates(
     output: &[u8],
     expectation: &PptxSourceBackedCrossCopyLifecycleExpectation<'_>,
 ) -> Result<PptxSourceBackedCrossCopyLifecycleGateSummary, Box<dyn Error>> {
-    let source = litchi_pptx::Package::from_vec(source_archive.to_vec())?;
-    let destination = litchi_pptx::Package::from_vec(destination_archive.to_vec())?;
+    let source = litchi_pptx::Package::from_reader(std::io::Cursor::new(source_archive.to_vec()))?;
+    let destination =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.to_vec()))?;
     let source_snapshot = source.opened_presentation()?;
     let destination_snapshot = destination.opened_presentation()?;
     let owned_plan = destination_snapshot.plan_cross_slide_copy(
@@ -19120,7 +19632,8 @@ fn verify_pptx_source_backed_cross_copy_lifecycle_gates(
     let source_read: Arc<dyn ReadAt> = source_probe.clone();
     let destination_read: Arc<dyn ReadAt> = destination_probe.clone();
     let source_view = litchi_pptx::SourceBackedPresentation::from_read_at(source_read)?;
-    let editor_probe = litchi_pptx::SourceBackedPresentationEditor::from_read_at(destination_read)?;
+    let editor_probe_view = litchi_pptx::SourceBackedPresentation::from_read_at(destination_read)?;
+    let editor_probe = litchi_pptx::source::Package::from_presentation(&editor_probe_view)?;
     let probe_plan = editor_probe.plan_cross_slide_copy(
         &source_view,
         PPTX_CROSS_COPY_SOURCE_SLIDE,
@@ -19138,7 +19651,12 @@ fn verify_pptx_source_backed_cross_copy_lifecycle_gates(
         .text_and_name()?;
     source_view.check_source()?;
     let mut probe_output = Vec::new();
-    editor_probe.publish_cross_slide_copy_to_stream(&mut probe_output, &probe_plan)?;
+    let mut editor_probe_copy = editor_probe.edit_cross_slide_copy()?;
+    editor_probe_copy.stage(&probe_plan)?;
+    editor_probe_copy
+        .commit()?
+        .package()
+        .write_to(&mut probe_output)?;
     let source_after = source_probe.bytes()?;
     let source_version_after = source_probe.version()?;
     let source_version_stability_verified = before == after
@@ -19210,7 +19728,8 @@ fn source_backed_cross_copy_revision_refusal(
     let source_read: Arc<dyn ReadAt> = source.clone();
     let destination_read: Arc<dyn ReadAt> = destination.clone();
     let source_view = litchi_pptx::SourceBackedPresentation::from_read_at(source_read)?;
-    let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at(destination_read)?;
+    let editor_view = litchi_pptx::SourceBackedPresentation::from_read_at(destination_read)?;
+    let editor = litchi_pptx::source::Package::from_presentation(&editor_view)?;
     let plan = editor.plan_cross_slide_copy(
         &source_view,
         PPTX_CROSS_COPY_SOURCE_SLIDE,
@@ -19223,10 +19742,15 @@ fn source_backed_cross_copy_revision_refusal(
         destination.replace(destination_archive.to_vec())?;
     }
     let mut output = Vec::new();
-    let result = editor.publish_cross_slide_copy_to_stream(&mut output, &plan);
+    let result = (|| -> litchi_pptx::Result<_> {
+        let mut copy = editor.edit_cross_slide_copy()?;
+        let copied = copy.stage(&plan)?;
+        copy.commit()?.package().write_to(&mut output)?;
+        Ok(copied)
+    })();
     let typed_refusal = matches!(
         result,
-        Err(litchi_pptx::Error::StaleSource)
+        Err(litchi_pptx::Error::PatchConflict)
             | Err(litchi_pptx::Error::Opc(
                 litchi_opc::OpcError::SourceChanged { .. }
             ))
@@ -19241,27 +19765,37 @@ fn source_backed_cross_copy_foreign_destination_refusal(
     let source = litchi_pptx::SourceBackedPresentation::from_read_at(Arc::new(OwnedSource::new(
         source_archive.to_vec(),
     )))?;
-    let editor_a = litchi_pptx::SourceBackedPresentationEditor::from_read_at(Arc::new(
+    let editor_a_view = litchi_pptx::SourceBackedPresentation::from_read_at(Arc::new(
         OwnedSource::new(destination_archive.to_vec()),
     ))?;
+    let editor_a = litchi_pptx::source::Package::from_presentation(&editor_a_view)?;
     let plan = editor_a.plan_cross_slide_copy(
         &source,
         PPTX_CROSS_COPY_SOURCE_SLIDE,
         PPTX_CROSS_COPY_DESTINATION_SLIDE,
         PPTX_CROSS_COPY_INSERTION_POSITION,
     )?;
-    let editor_b = litchi_pptx::SourceBackedPresentationEditor::from_read_at(Arc::new(
+    let editor_b_view = litchi_pptx::SourceBackedPresentation::from_read_at(Arc::new(
         OwnedSource::new(destination_archive.to_vec()),
     ))?;
+    let editor_b = litchi_pptx::source::Package::from_presentation(&editor_b_view)?;
     let mut output = Vec::new();
-    let result = editor_b.publish_cross_slide_copy_to_stream(&mut output, &plan);
-    Ok(matches!(result, Err(litchi_pptx::Error::StaleSource)) && output.is_empty())
+    let result = (|| -> litchi_pptx::Result<_> {
+        let mut copy = editor_b.edit_cross_slide_copy()?;
+        let copied = copy.stage(&plan)?;
+        copy.commit()?.package().write_to(&mut output)?;
+        Ok(copied)
+    })();
+    Ok(matches!(result, Err(litchi_pptx::Error::PatchConflict)) && output.is_empty())
 }
 
 fn pptx_cross_copy_archive_members(
     archive_bytes: &[u8],
 ) -> Result<BTreeMap<String, Vec<u8>>, Box<dyn Error>> {
-    let archive = ArchiveReader::new(archive_bytes)?;
+    let archive = ArchiveReader::new(
+        archive_bytes,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
     let mut members = BTreeMap::new();
     for name in archive.file_names() {
         let owned_name = name.to_owned();
@@ -19281,8 +19815,12 @@ fn rewrite_pptx_archive_member(
     target_member: &str,
     mut rewrite: impl FnMut(&[u8]) -> Result<Vec<u8>, Box<dyn Error>>,
 ) -> Result<Vec<u8>, Box<dyn Error>> {
-    let archive = ArchiveReader::new(archive_bytes)?;
-    let mut writer = StreamingArchiveWriter::new();
+    let archive = ArchiveReader::new(
+        archive_bytes,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     let mut found = false;
     for member in archive.file_names() {
         let bytes = archive.read(member)?;
@@ -19303,7 +19841,11 @@ fn rewrite_pptx_archive_member(
 fn raw_zip_layout(bytes: &[u8]) -> Result<(Vec<String>, Vec<String>, Vec<u8>), Box<dyn Error>> {
     let archive = ZipArchive::from_slice(bytes)?.into_zip_archive();
     let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer)?;
+    let index = PreservationIndex::new(
+        &archive,
+        &mut buffer,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
     let mut records = archive.entries(&mut buffer);
     let mut central_names = Vec::with_capacity(index.entries().len());
     for _ in index.entries() {
@@ -19446,7 +19988,7 @@ fn pptx_cross_copy_expected_content_types(opc: &OpcPackage) -> String {
 fn verify_pptx_cross_copy_part_relationships(
     source_part: &dyn litchi_opc::Part,
     candidate_part: &dyn litchi_opc::Part,
-    plan: &litchi_pptx::opened::CrossSlideCopyPlan,
+    plan: &litchi_pptx::cross_slide_copy::Plan,
     source_slide: &PackURI,
     source_layout: &PackURI,
     destination_layout: &PackURI,
@@ -19496,7 +20038,7 @@ fn verify_pptx_cross_copy_part_relationships(
 fn verify_pptx_cross_copy_presentation_relationships(
     destination_presentation: &dyn litchi_opc::Part,
     candidate_presentation: &dyn litchi_opc::Part,
-    plan: &litchi_pptx::opened::CrossSlideCopyPlan,
+    plan: &litchi_pptx::cross_slide_copy::Plan,
 ) -> Result<bool, Box<dyn Error>> {
     if candidate_presentation.rels().len() != destination_presentation.rels().len() + 1
         || destination_presentation
@@ -19555,12 +20097,13 @@ fn verify_pptx_cross_copy_output(
     source_archive: &[u8],
     destination_archive: &[u8],
     output: &[u8],
-    plan: &litchi_pptx::opened::CrossSlideCopyPlan,
+    plan: &litchi_pptx::cross_slide_copy::Plan,
     expectation: PptxCrossCopySemanticExpectation<'_>,
 ) -> Result<PptxCrossCopyOutputChecks, Box<dyn Error>> {
-    let source = litchi_pptx::Package::from_vec(source_archive.to_vec())?;
-    let destination = litchi_pptx::Package::from_vec(destination_archive.to_vec())?;
-    let candidate = litchi_pptx::Package::from_vec(output.to_vec())?;
+    let source = litchi_pptx::Package::from_reader(std::io::Cursor::new(source_archive.to_vec()))?;
+    let destination =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.to_vec()))?;
+    let candidate = litchi_pptx::Package::from_reader(std::io::Cursor::new(output.to_vec()))?;
     let source_opc = source.opc()?;
     let destination_opc = destination.opc()?;
     let candidate_opc = candidate.opc()?;
@@ -19742,21 +20285,31 @@ fn verify_pptx_cross_copy_output(
 fn verify_pptx_cross_copy_refusal_gates(
     source_archive: &[u8],
     destination_archive: &[u8],
-    plan: &litchi_pptx::opened::CrossSlideCopyPlan,
+    plan: &litchi_pptx::cross_slide_copy::Plan,
     output_checks: PptxCrossCopyOutputChecks,
     source_immutability_verified: bool,
 ) -> Result<PptxCrossCopyGateSummary, Box<dyn Error>> {
-    let mut patch_destination = litchi_pptx::Package::from_vec(destination_archive.to_vec())?;
-    let patch_source = litchi_pptx::Package::from_vec(source_archive.to_vec())?;
+    let mut patch_destination =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.to_vec()))?;
+    let patch_source =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(source_archive.to_vec()))?;
     let encoded = plan.patch().to_bytes()?;
-    let decoded = litchi_pptx::opened::CrossSlideCopyPatch::from_bytes(&encoded)?;
+    let decoded = litchi_pptx::cross_slide_copy::Patch::from_bytes(
+        &encoded,
+        litchi_pptx::opened::Limits::default(),
+    )?;
     if decoded != *plan.patch() {
         return Err("PPTX cross-copy durable patch did not round-trip".into());
     }
-    patch_destination.apply_cross_slide_copy_patch(&patch_source, &decoded)?;
+    patch_destination = patch_destination
+        .apply_cross_slide_copy(&patch_source, &decoded)?
+        .into_package();
     let published = patch_destination.to_bytes()?;
-    let mut inverse_destination = litchi_pptx::Package::from_vec(published)?;
-    inverse_destination.apply_cross_slide_copy_patch(&patch_source, &decoded.inverse())?;
+    let mut inverse_destination =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(published))?;
+    inverse_destination = inverse_destination
+        .apply_cross_slide_copy(&patch_source, &decoded.inverse())?
+        .into_package();
     let durable_patch_round_trip_verified = inverse_destination.to_bytes()? == destination_archive;
 
     let borrowed_source = litchi_pptx::Package::from_bytes(source_archive)?;
@@ -19771,14 +20324,15 @@ fn verify_pptx_cross_copy_refusal_gates(
         );
     let borrowed_provenance_refusal_verified = matches!(
         borrowed_result,
-        Err(litchi_pptx::Error::SlideCopyPlan {
-            kind: litchi_pptx::SlideCopyRefusal::UnknownPhysicalMember,
-            ..
-        })
+        Err(litchi_pptx::Error::Refused(refusal))
+            if refusal.kind()
+                == litchi_pptx::SlideCopyRefusal::UnknownPhysicalMember.kind()
     );
 
-    let mut stale_destination = litchi_pptx::Package::from_vec(destination_archive.to_vec())?;
-    let stale_source = litchi_pptx::Package::from_vec(source_archive.to_vec())?;
+    let mut stale_destination =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.to_vec()))?;
+    let stale_source =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(source_archive.to_vec()))?;
     let stale_destination_snapshot = stale_destination.opened_presentation()?;
     let stale_plan = stale_destination_snapshot.plan_cross_slide_copy(
         &stale_source.opened_presentation()?,
@@ -19792,15 +20346,18 @@ fn verify_pptx_cross_copy_refusal_gates(
         0_usize,
         "stale destination mutation",
     )?;
-    stale_destination.apply_opened_presentation_commit(stale_destination_edit.commit()?)?;
+    stale_destination = stale_destination_edit.commit()?.into_package();
     let stale_destination_before = stale_destination.to_bytes()?;
-    let stale_destination_result =
-        stale_destination.apply_cross_slide_copy_plan(&stale_source, &stale_plan);
+    let stale_destination_result = stale_destination
+        .edit()
+        .and_then(|mut edit| edit.stage_cross_slide_copy(&stale_source, &stale_plan));
     let stale_destination_refusal_verified = stale_destination_result.is_err()
         && stale_destination.to_bytes()? == stale_destination_before;
 
-    let clean_destination = litchi_pptx::Package::from_vec(destination_archive.to_vec())?;
-    let clean_source = litchi_pptx::Package::from_vec(source_archive.to_vec())?;
+    let clean_destination =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.to_vec()))?;
+    let clean_source =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(source_archive.to_vec()))?;
     let clean_destination_snapshot = clean_destination.opened_presentation()?;
     let clean_plan = clean_destination_snapshot.plan_cross_slide_copy(
         &clean_source.opened_presentation()?,
@@ -19808,7 +20365,8 @@ fn verify_pptx_cross_copy_refusal_gates(
         PPTX_CROSS_COPY_DESTINATION_SLIDE,
         PPTX_CROSS_COPY_INSERTION_POSITION,
     )?;
-    let mut stale_source = litchi_pptx::Package::from_vec(source_archive.to_vec())?;
+    let mut stale_source =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(source_archive.to_vec()))?;
     let stale_source_snapshot = stale_source.opened_presentation()?;
     let mut stale_source_edit = stale_source_snapshot.edit();
     stale_source_edit.set_shape_text(
@@ -19816,25 +20374,31 @@ fn verify_pptx_cross_copy_refusal_gates(
         0_usize,
         "stale source mutation",
     )?;
-    stale_source.apply_opened_presentation_commit(stale_source_edit.commit()?)?;
+    stale_source = stale_source_edit.commit()?.into_package();
     let stale_source_before = stale_source.to_bytes()?;
-    let mut stale_source_destination =
-        litchi_pptx::Package::from_vec(destination_archive.to_vec())?;
+    let stale_source_destination =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.to_vec()))?;
     let stale_source_destination_before = stale_source_destination.to_bytes()?;
-    let stale_source_result =
-        stale_source_destination.apply_cross_slide_copy_plan(&stale_source, &clean_plan);
+    let stale_source_result = stale_source_destination
+        .edit()
+        .and_then(|mut edit| edit.stage_cross_slide_copy(&stale_source, &clean_plan));
     let stale_source_refusal_verified = stale_source_result.is_err()
         && stale_source.to_bytes()? == stale_source_before
         && stale_source_destination.to_bytes()? == stale_source_destination_before;
 
-    let mut foreign_destination = litchi_pptx::Package::from_vec(destination_archive.to_vec())?;
+    let foreign_destination =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.to_vec()))?;
     let foreign_before = foreign_destination.to_bytes()?;
-    let foreign_source = litchi_pptx::Package::from_vec(destination_archive.to_vec())?;
-    let foreign_result = foreign_destination.apply_cross_slide_copy_plan(&foreign_source, plan);
+    let foreign_source =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.to_vec()))?;
+    let foreign_result = foreign_destination
+        .edit()
+        .and_then(|mut edit| edit.stage_cross_slide_copy(&foreign_source, plan));
     let foreign_source_refusal_verified =
         foreign_result.is_err() && foreign_destination.to_bytes()? == foreign_before;
 
-    let destination_for_collision = litchi_pptx::Package::from_vec(destination_archive.to_vec())?;
+    let destination_for_collision =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.to_vec()))?;
     let destination_for_collision_opc = destination_for_collision.opc()?;
     let collision_remap_verified = plan.parts().iter().all(|part| {
         destination_for_collision_opc
@@ -19892,13 +20456,11 @@ fn xlsx_calculation_media_payload(index: usize) -> Vec<u8> {
 }
 
 fn xlsx_calculation_metadata_edit_bytes() -> Result<Vec<u8>, Box<dyn Error>> {
-    let mut package = litchi_xlsx::Package::create()?;
-    let mut edit = package.edit_calculation_metadata()?;
+    let mut edit = litchi_xlsx::Package::new()?.edit_calculation_metadata()?;
     edit.set_properties(
         litchi_xlsx::calculation_properties::Properties::new().with_calculation_id(Some(7)),
-    );
-    edit.commit()?;
-    let mut opc = package.into_plain_opc();
+    )?;
+    let mut opc = edit.commit()?.into_package().into_plain_opc();
     let worksheet_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
     opc.get_part_mut(&worksheet_uri)?.set_blob(
         br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetData/><drawing r:id="rIdDrawing"/></worksheet>"#.to_vec(),
@@ -19954,7 +20516,7 @@ fn xlsx_calculation_metadata_edit_bytes() -> Result<Vec<u8>, Box<dyn Error>> {
 
 fn build_xlsx_calculation_metadata_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     let archive = xlsx_calculation_metadata_edit_bytes()?;
-    let package = litchi_xlsx::Package::from_slice(&archive)?;
+    let package = litchi_xlsx::Package::from_bytes(&archive)?;
     if package
         .calculation_metadata()?
         .properties()
@@ -19964,7 +20526,7 @@ fn build_xlsx_calculation_metadata_edit_corpus() -> Result<Corpus, Box<dyn Error
     {
         return Err("XLSX calculation corpus has unexpected calculation ID".into());
     }
-    let opc = OpcPackage::from_bytes(&archive)?;
+    let opc = OpcPackage::from_bytes(&archive, litchi_opc::SourceLimits::default())?;
     for index in 0..XLSX_CALC_MEDIA_ENTRY_COUNT {
         let uri = PackURI::new(format!("/xl/media/image{}.png", index + 1))?;
         if opc.get_part(&uri)?.blob() != xlsx_calculation_media_payload(index) {
@@ -19991,7 +20553,12 @@ fn build_xlsx_calculation_metadata_edit_corpus() -> Result<Corpus, Box<dyn Error
             payload_kind: "deterministic-incompressible-media",
             compression: "deflate",
             entry_count,
-            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            archive_member_count: ArchiveReader::new(
+                &archive,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )?
+            .file_names()
+            .count(),
             entry_bytes: XLSX_CALC_MEDIA_ENTRY_BYTES,
             uncompressed_payload_bytes,
             archive_bytes: archive.len(),
@@ -20020,7 +20587,7 @@ fn build_xlsx_defined_names_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
 fn build_xlsx_page_break_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     let mut corpus = build_xlsx_calculation_metadata_edit_corpus()?;
     let target_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
-    let opc = OpcPackage::from_bytes(&corpus.archive)?;
+    let opc = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     let target_payload = opc.get_part(&target_uri)?.blob().to_vec();
     corpus.manifest.name = "xlsx-page-break-media".to_owned();
     corpus.manifest.generator = XLSX_PAGE_BREAK_SOURCE_EDIT_CORPUS_GENERATOR;
@@ -20035,7 +20602,7 @@ fn build_xlsx_page_break_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
 fn build_xlsx_page_break_projection_corpus() -> Result<Corpus, Box<dyn Error>> {
     let mut corpus = build_xlsx_page_break_edit_corpus()?;
     let target_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
-    let mut opc = OpcPackage::from_bytes(&corpus.archive)?;
+    let mut opc = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     let replaced = xlsx_page_break_oracle_rewrite(opc.get_part(&target_uri)?.blob())?;
     opc.get_part_mut(&target_uri)?.set_blob(replaced);
     let archive = PackageWriter::to_bytes(&opc)?;
@@ -20051,7 +20618,10 @@ fn build_xlsx_page_break_projection_corpus() -> Result<Corpus, Box<dyn Error>> {
     corpus.manifest.name = "xlsx-page-break-projection-media".to_owned();
     corpus.manifest.generator = XLSX_PAGE_BREAK_PROJECTION_CORPUS_GENERATOR;
     corpus.manifest.entry_count = opc.part_count();
-    corpus.manifest.archive_member_count = ArchiveReader::new(&archive)?.file_names().count();
+    corpus.manifest.archive_member_count =
+        ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?
+            .file_names()
+            .count();
     corpus.manifest.uncompressed_payload_bytes = uncompressed_payload_bytes;
     corpus.manifest.archive_bytes = archive.len();
     corpus.manifest.archive_sha256 = sha256_hex(&archive);
@@ -20067,7 +20637,7 @@ fn build_xlsx_page_break_projection_corpus() -> Result<Corpus, Box<dyn Error>> {
 fn build_xlsx_page_margin_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     let mut corpus = build_xlsx_calculation_metadata_edit_corpus()?;
     let target_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
-    let opc = OpcPackage::from_bytes(&corpus.archive)?;
+    let opc = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     let target_payload = opc.get_part(&target_uri)?.blob().to_vec();
     corpus.manifest.name = "xlsx-page-margin-media".to_owned();
     corpus.manifest.generator = XLSX_PAGE_MARGIN_SOURCE_EDIT_CORPUS_GENERATOR;
@@ -20082,7 +20652,7 @@ fn build_xlsx_page_margin_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
 fn build_xlsx_page_setup_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     let mut corpus = build_xlsx_calculation_metadata_edit_corpus()?;
     let target_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
-    let opc = OpcPackage::from_bytes(&corpus.archive)?;
+    let opc = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     let target_payload = opc.get_part(&target_uri)?.blob().to_vec();
     corpus.manifest.name = "xlsx-page-setup-media".to_owned();
     corpus.manifest.generator = XLSX_PAGE_SETUP_SOURCE_EDIT_CORPUS_GENERATOR;
@@ -20097,7 +20667,7 @@ fn build_xlsx_page_setup_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
 fn build_xlsx_print_options_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     let mut corpus = build_xlsx_calculation_metadata_edit_corpus()?;
     let target_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
-    let opc = OpcPackage::from_bytes(&corpus.archive)?;
+    let opc = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     let target_payload = opc.get_part(&target_uri)?.blob().to_vec();
     corpus.manifest.name = "xlsx-print-options-media".to_owned();
     corpus.manifest.generator = XLSX_PRINT_OPTIONS_SOURCE_EDIT_CORPUS_GENERATOR;
@@ -20112,7 +20682,7 @@ fn build_xlsx_print_options_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
 fn build_xlsx_sheet_protection_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     let mut corpus = build_xlsx_calculation_metadata_edit_corpus()?;
     let target_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
-    let opc = OpcPackage::from_bytes(&corpus.archive)?;
+    let opc = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     let target_payload = opc.get_part(&target_uri)?.blob().to_vec();
     corpus.manifest.name = "xlsx-sheet-protection-media".to_owned();
     corpus.manifest.generator = XLSX_SHEET_PROTECTION_SOURCE_EDIT_CORPUS_GENERATOR;
@@ -20127,15 +20697,19 @@ fn build_xlsx_sheet_protection_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
 fn build_xlsx_data_validation_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     let mut corpus = build_xlsx_calculation_metadata_edit_corpus()?;
     let target_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
-    let mut opc = OpcPackage::from_bytes(&corpus.archive)?;
+    let mut opc = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     let seeded = litchi_xlsx::data_validation::replace_data_validation_collections(
         opc.get_part(&target_uri)?.blob(),
         &xlsx_data_validation_values(false)?,
     )?;
     opc.get_part_mut(&target_uri)?.set_blob(seeded);
     corpus.archive = PackageWriter::to_bytes(&opc)?;
-    corpus.manifest.archive_member_count =
-        ArchiveReader::new(&corpus.archive)?.file_names().count();
+    corpus.manifest.archive_member_count = ArchiveReader::new(
+        &corpus.archive,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?
+    .file_names()
+    .count();
     corpus.manifest.uncompressed_payload_bytes = opc
         .try_iter_parts()
         .map(|part| part.expect("part payload decodes"))
@@ -20160,15 +20734,19 @@ fn build_xlsx_data_validation_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
 fn build_xlsx_auto_filter_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     let mut corpus = build_xlsx_calculation_metadata_edit_corpus()?;
     let target_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
-    let mut opc = OpcPackage::from_bytes(&corpus.archive)?;
+    let mut opc = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     let seeded = litchi_xlsx::auto_filter::replace_auto_filter(
         opc.get_part(&target_uri)?.blob(),
         Some(&xlsx_auto_filter_value(false)?),
     )?;
     opc.get_part_mut(&target_uri)?.set_blob(seeded);
     corpus.archive = PackageWriter::to_bytes(&opc)?;
-    corpus.manifest.archive_member_count =
-        ArchiveReader::new(&corpus.archive)?.file_names().count();
+    corpus.manifest.archive_member_count = ArchiveReader::new(
+        &corpus.archive,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?
+    .file_names()
+    .count();
     corpus.manifest.uncompressed_payload_bytes = opc
         .try_iter_parts()
         .map(|part| part.expect("part payload decodes"))
@@ -20193,7 +20771,7 @@ fn build_xlsx_auto_filter_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
 fn build_xlsx_conditional_formatting_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     let mut corpus = build_xlsx_calculation_metadata_edit_corpus()?;
     let target_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
-    let mut opc = OpcPackage::from_bytes(&corpus.archive)?;
+    let mut opc = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     let seeded = litchi_xlsx::conditional_formatting::replace_conditional_formattings(
         opc.get_part(&target_uri)?.blob(),
         &xlsx_conditional_formatting_values(false)?,
@@ -20201,8 +20779,12 @@ fn build_xlsx_conditional_formatting_edit_corpus() -> Result<Corpus, Box<dyn Err
     )?;
     opc.get_part_mut(&target_uri)?.set_blob(seeded);
     corpus.archive = PackageWriter::to_bytes(&opc)?;
-    corpus.manifest.archive_member_count =
-        ArchiveReader::new(&corpus.archive)?.file_names().count();
+    corpus.manifest.archive_member_count = ArchiveReader::new(
+        &corpus.archive,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?
+    .file_names()
+    .count();
     corpus.manifest.uncompressed_payload_bytes = opc
         .try_iter_parts()
         .map(|part| part.expect("part payload decodes"))
@@ -20224,8 +20806,8 @@ fn build_xlsx_conditional_formatting_edit_corpus() -> Result<Corpus, Box<dyn Err
     Ok(corpus)
 }
 
-fn xlsx_merge_fixture() -> Result<(Workbook, Workbook), Box<dyn Error>> {
-    let workbook = Workbook::new()?;
+fn xlsx_merge_fixture() -> Result<(XlsxPackage, XlsxPackage), Box<dyn Error>> {
+    let workbook = XlsxPackage::new()?;
     let mut edit = workbook.edit()?;
     let mut sheet = edit
         .sheet("Sheet1")?
@@ -20233,14 +20815,14 @@ fn xlsx_merge_fixture() -> Result<(Workbook, Workbook), Box<dyn Error>> {
     sheet
         .set("A1", "litchi-xlsx-merge-anchor-v1")?
         .set("C1", "litchi-xlsx-merge-unrelated-v1")?;
-    let unmerged = edit.commit()?.into_workbook();
+    let unmerged = edit.commit()?.into_package();
 
     let mut merge_edit = unmerged.edit()?;
     merge_edit
         .sheet("Sheet1")?
         .ok_or("XLSX merge fixture is missing Sheet1")?
         .merge("A1:B2")?;
-    let merged = merge_edit.commit()?.into_workbook();
+    let merged = merge_edit.commit()?.into_package();
     Ok((unmerged, merged))
 }
 
@@ -20255,7 +20837,7 @@ fn build_xlsx_merge_edit_corpus(case: Case) -> Result<Corpus, Box<dyn Error>> {
         &merged
     };
     let archive = source.to_bytes()?;
-    let opc = OpcPackage::from_bytes(&archive)?;
+    let opc = OpcPackage::from_bytes(&archive, litchi_opc::SourceLimits::default())?;
     let worksheet_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
     let target_payload = opc.get_part(&worksheet_uri)?.blob().to_vec();
     let entry_count = opc.part_count();
@@ -20283,7 +20865,12 @@ fn build_xlsx_merge_edit_corpus(case: Case) -> Result<Corpus, Box<dyn Error>> {
             payload_kind: "deterministic-semantic-cells",
             compression: "deflate",
             entry_count,
-            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            archive_member_count: ArchiveReader::new(
+                &archive,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )?
+            .file_names()
+            .count(),
             entry_bytes: target_payload.len(),
             uncompressed_payload_bytes,
             archive_bytes: archive.len(),
@@ -20361,8 +20948,9 @@ fn rewrite_pptx_slide_names(
     archive: &[u8],
     mut replacement: impl FnMut(usize) -> Option<String>,
 ) -> Result<Vec<u8>, Box<dyn Error>> {
-    let reader = ArchiveReader::new(archive)?;
-    let mut writer = StreamingArchiveWriter::new();
+    let reader = ArchiveReader::new(archive, soapberry_zip::office::ArchiveLimits::default())?;
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for member in reader.file_names() {
         let payload = reader.read(member)?;
         let payload = match pptx_slide_member_index(member).and_then(&mut replacement) {
@@ -20375,8 +20963,8 @@ fn rewrite_pptx_slide_names(
 }
 
 fn semantic_pptx_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
-    let mut package = litchi_pptx::Package::new()?;
-    let presentation = package.presentation_mut()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
+    let presentation = builder.presentation()?;
     for slide_index in 0..shape.pptx_slides() {
         let slide = presentation.add_slide()?;
         for shape_index in 0..shape.pptx_text_boxes_per_slide() {
@@ -20389,7 +20977,7 @@ fn semantic_pptx_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> 
             );
         }
     }
-    Ok(package.to_bytes()?)
+    Ok(builder.build()?.to_bytes()?)
 }
 
 fn semantic_odt_text(index: usize, updated: bool) -> String {
@@ -20522,7 +21110,7 @@ fn append_projection_field(output: &mut Vec<u8>, value: &str) -> Result<(), Box<
 }
 
 fn odt_mixed_logical_result_sha256(
-    snapshot: &litchi_odt::transaction::Snapshot,
+    snapshot: &litchi_odt::Package,
 ) -> Result<String, Box<dyn Error>> {
     let document = snapshot.document()?;
     let paragraphs = document.paragraphs()?;
@@ -20566,7 +21154,7 @@ fn semantic_odt_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
     for index in 0..shape.docx_paragraphs() {
         builder.add_paragraph(&semantic_odt_text(index, false))?;
     }
-    Ok(builder.build()?)
+    Ok(builder.build()?.to_bytes()?)
 }
 
 fn odt_media_path(index: usize) -> String {
@@ -20617,13 +21205,14 @@ fn odt_resource_batch_image(
 }
 
 fn odt_media_archive_for_shape(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
-    let mut document = litchi_odt::mutable::MutableDocument::new();
+    let mut document = litchi_odt::Builder::new();
     for index in 0..shape.docx_paragraphs() {
         document.add_paragraph(&semantic_odt_text(index, false))?;
     }
-    let base = document.to_bytes()?;
-    let source = ArchiveReader::new(&base)?;
-    let mut writer = litchi_odt::core::PackageWriter::new();
+    let base = document.build()?.to_bytes()?;
+    let source = ArchiveReader::new(&base, soapberry_zip::office::ArchiveLimits::default())?;
+    let mut writer =
+        litchi_odt::core::PackageWriter::new(litchi_odt::core::StreamingArchiveLimits::default());
     writer.set_mimetype("application/vnd.oasis.opendocument.text")?;
     for path in source.file_names() {
         if matches!(path, "mimetype" | "META-INF/manifest.xml") || path.ends_with('/') {
@@ -20652,7 +21241,7 @@ fn odt_repeated_text_archive() -> Result<Vec<u8>, Box<dyn Error>> {
 
 fn odt_resource_batch_archive() -> Result<Vec<u8>, Box<dyn Error>> {
     let base = odt_media_archive()?;
-    let source = ArchiveReader::new(&base)?;
+    let source = ArchiveReader::new(&base, soapberry_zip::office::ArchiveLimits::default())?;
     let mut content = String::from_utf8(source.read("content.xml")?)?;
     let insertion = content
         .rfind("</office:text>")
@@ -20668,7 +21257,8 @@ fn odt_resource_batch_archive() -> Result<Vec<u8>, Box<dyn Error>> {
         .collect::<String>();
     content.insert_str(insertion, &frames);
 
-    let mut writer = litchi_odt::core::PackageWriter::new();
+    let mut writer =
+        litchi_odt::core::PackageWriter::new(litchi_odt::core::StreamingArchiveLimits::default());
     writer.set_mimetype("application/vnd.oasis.opendocument.text")?;
     for path in source.file_names() {
         if matches!(path, "mimetype" | "META-INF/manifest.xml" | "content.xml")
@@ -20713,7 +21303,7 @@ fn semantic_ods_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
         }
         builder.add_sheet(sheet)?;
     }
-    Ok(builder.build()?)
+    Ok(builder.build()?.to_bytes()?)
 }
 
 /// ODS uses a format-owned row matrix for the matched fresh-authoring cases.
@@ -20777,7 +21367,7 @@ fn ods_scalar_expected_semantic_sha256(shape: SemanticShape) -> String {
 }
 
 fn ods_scalar_semantic_sha256(
-    spreadsheet: &litchi_ods::Spreadsheet,
+    spreadsheet: &litchi_ods::Workbook,
     shape: SemanticShape,
 ) -> Result<String, Box<dyn Error>> {
     let rows = ods_scalar_row_count(shape);
@@ -20853,7 +21443,7 @@ fn verify_ods_buffered_archive(
     shape: SemanticShape,
     expected_semantic_sha256: &str,
 ) -> Result<(), Box<dyn Error>> {
-    let archive = ArchiveReader::new(bytes)?;
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())?;
     let names = archive.file_names().collect::<Vec<_>>();
     let expected_names = ["mimetype", "content.xml", "META-INF/manifest.xml"];
     let actual_set = names.iter().copied().collect::<BTreeSet<_>>();
@@ -20868,7 +21458,10 @@ fn verify_ods_buffered_archive(
         return Err("buffered ODS mimetype member differs from the ODS spreadsheet MIME".into());
     }
     let manifest_xml = String::from_utf8(archive.read("META-INF/manifest.xml")?)?;
-    let manifest = litchi_odf_common::core::Manifest::parse(&manifest_xml)?;
+    let manifest = litchi_odf_common::core::Manifest::parse(
+        &manifest_xml,
+        litchi_odf_common::XmlStreamLimits::owner_default_value(),
+    )?;
     let root = manifest
         .get_entry("/")
         .ok_or("buffered ODS manifest root entry is missing")?;
@@ -20886,7 +21479,7 @@ fn verify_ods_buffered_archive(
     {
         return Err("buffered ODS manifest root/content entries differ from specification".into());
     }
-    let spreadsheet = litchi_ods::Spreadsheet::from_bytes(bytes.to_vec())?;
+    let spreadsheet = litchi_ods::Package::from_bytes(bytes)?.workbook()?;
     let actual_semantic_sha256 = ods_scalar_semantic_sha256(&spreadsheet, shape)?;
     if actual_semantic_sha256 != expected_semantic_sha256 {
         return Err("buffered ODS normalized semantic digest differs from specification".into());
@@ -20903,7 +21496,7 @@ fn ods_buffered_bytes_for_rows(row_count: usize) -> Result<Vec<u8>, Box<dyn Erro
     sheet.rows = rows;
     let mut builder = litchi_ods::Builder::new();
     builder.add_sheet(sheet)?;
-    Ok(builder.build()?)
+    Ok(builder.build()?.to_bytes()?)
 }
 
 fn ods_buffered_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
@@ -20915,7 +21508,9 @@ fn build_ods_buffered_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Err
     let expected_semantic_sha256 = ods_scalar_expected_semantic_sha256(shape);
     let semantic_projection_bytes = ods_scalar_expected_projection(shape).len();
     verify_ods_buffered_archive(&archive, shape, &expected_semantic_sha256)?;
-    let target_payload = ArchiveReader::new(&archive)?.read("content.xml")?;
+    let target_payload =
+        ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?
+            .read("content.xml")?;
     let row_count = ods_scalar_row_count(shape);
     let entry_count = row_count
         .checked_mul(ODS_BUFFERED_COLUMN_COUNT)
@@ -20990,7 +21585,9 @@ fn build_ods_streaming_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Er
         return Err("streaming ODS provider report differs from scalar fixture".into());
     }
     verify_ods_buffered_archive(&archive, shape, &expected_semantic_sha256)?;
-    let target_payload = ArchiveReader::new(&archive)?.read("content.xml")?;
+    let target_payload =
+        ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?
+            .read("content.xml")?;
     if target_payload.len() != report.authored_content_xml_bytes() {
         return Err("streaming ODS authored content byte count differs from archive".into());
     }
@@ -21066,8 +21663,10 @@ fn odp_text_box_batch_page(index: usize) -> usize {
 
 fn ods_media_archive() -> Result<Vec<u8>, Box<dyn Error>> {
     let base = semantic_ods_bytes(SemanticShape::Medium)?;
-    let source = ArchiveReader::new(&base)?;
-    let mut writer = litchi_odf_common::core::PackageWriter::new();
+    let source = ArchiveReader::new(&base, soapberry_zip::office::ArchiveLimits::default())?;
+    let mut writer = litchi_odf_common::core::PackageWriter::new(
+        litchi_odf_common::core::StreamingArchiveLimits::default(),
+    );
     writer.set_mimetype("application/vnd.oasis.opendocument.spreadsheet")?;
     for path in source.file_names() {
         if matches!(path, "mimetype" | "META-INF/manifest.xml") || path.ends_with('/') {
@@ -21098,11 +21697,12 @@ fn semantic_odp_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
     // `meta.xml`. Keep its public authored content/style path, but rebuild the
     // generated package with fixed metadata so a benchmark corpus has one
     // stable identity across runs and machines.
-    let generated = builder.build()?;
-    let reader = ArchiveReader::new(&generated)?;
+    let generated = builder.build()?.to_bytes()?;
+    let reader = ArchiveReader::new(&generated, soapberry_zip::office::ArchiveLimits::default())?;
     let content = reader.read("content.xml")?;
     let styles = reader.read("styles.xml")?;
-    let mut writer = litchi_odp::core::PackageWriter::new();
+    let mut writer =
+        litchi_odp::core::PackageWriter::new(litchi_odp::core::StreamingArchiveLimits::default());
     writer.set_mimetype("application/vnd.oasis.opendocument.presentation")?;
     writer.add_file("content.xml", &content)?;
     writer.add_file("styles.xml", &styles)?;
@@ -21115,8 +21715,9 @@ fn semantic_odp_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
 
 fn odp_media_archive() -> Result<Vec<u8>, Box<dyn Error>> {
     let base = semantic_odp_bytes(SemanticShape::Medium)?;
-    let source = ArchiveReader::new(&base)?;
-    let mut writer = litchi_odp::core::PackageWriter::new();
+    let source = ArchiveReader::new(&base, soapberry_zip::office::ArchiveLimits::default())?;
+    let mut writer =
+        litchi_odp::core::PackageWriter::new(litchi_odp::core::StreamingArchiveLimits::default());
     writer.set_mimetype("application/vnd.oasis.opendocument.presentation")?;
     for path in source.file_names() {
         if matches!(path, "mimetype" | "META-INF/manifest.xml") || path.ends_with('/') {
@@ -21136,10 +21737,10 @@ fn odp_media_archive() -> Result<Vec<u8>, Box<dyn Error>> {
 }
 
 fn odp_text_box_batch_archive() -> Result<Vec<u8>, Box<dyn Error>> {
-    let source = litchi_odp::authoring::edit::Snapshot::from_bytes(semantic_odp_bytes(
+    let source = litchi_odp::authoring::edit::Package::from_bytes(&semantic_odp_bytes(
         SemanticShape::Medium,
     )?)?;
-    let mut transaction = source.transaction()?;
+    let mut transaction = source.edit()?;
     for index in 0..ODP_TEXT_BOX_BATCH_COUNT {
         let text_box = litchi_odp::content::TextBox::new(
             odp_text_box_batch_name(index),
@@ -21148,11 +21749,15 @@ fn odp_text_box_batch_archive() -> Result<Vec<u8>, Box<dyn Error>> {
         transaction.add_text_box(odp_text_box_batch_page(index), &text_box)?;
     }
     let commit = transaction.commit()?;
-    if !commit.changed() || commit.patch().is_noop() {
+    if !commit.diagnostics().changed() || commit.patch().is_noop() {
         return Err("ODP text-box batch corpus construction was an exact no-op".into());
     }
-    let staged = ArchiveReader::new(commit.snapshot().bytes())?;
-    let mut writer = litchi_odp::core::PackageWriter::new();
+    let staged = ArchiveReader::new(
+        commit.package().as_bytes(),
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
+    let mut writer =
+        litchi_odp::core::PackageWriter::new(litchi_odp::core::StreamingArchiveLimits::default());
     writer.set_mimetype("application/vnd.oasis.opendocument.presentation")?;
     for path in staged.file_names() {
         if matches!(path, "mimetype" | "META-INF/manifest.xml") || path.ends_with('/') {
@@ -21173,7 +21778,7 @@ fn odp_text_box_batch_archive() -> Result<Vec<u8>, Box<dyn Error>> {
 
 fn build_semantic_odt_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Error>> {
     let archive = semantic_odt_bytes(shape)?;
-    let document = litchi_odt::Document::from_bytes(archive.clone())?;
+    let document = litchi_odt::Package::from_bytes(&archive)?.document()?;
     verify_semantic_odt(&document, shape, &[])?;
     let target_payload = semantic_odt_text(0, false).into_bytes();
     let content_bytes = (0..shape.docx_paragraphs()).try_fold(0usize, |total, index| {
@@ -21190,7 +21795,12 @@ fn build_semantic_odt_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Err
             payload_kind: "deterministic-semantic-text",
             compression: "deflate",
             entry_count: shape.docx_paragraphs(),
-            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            archive_member_count: ArchiveReader::new(
+                &archive,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )?
+            .file_names()
+            .count(),
             entry_bytes: target_payload.len(),
             uncompressed_payload_bytes: content_bytes,
             archive_bytes: archive.len(),
@@ -21211,7 +21821,11 @@ fn build_semantic_odt_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Err
 fn build_odf_repair_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Error>> {
     let canonical = build_semantic_odt_corpus(shape)?;
     let archive = inject_mimetype_local_timestamp_extra(canonical.archive.clone())?;
-    let report = litchi_odf_common::validate_package(&archive)?;
+    let report = litchi_odf_common::validate_package(
+        &archive,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )?;
     if !report.is_complete()
         || report.issues().len() != 1
         || report.issues()[0].code() != litchi_odf_common::MIMETYPE_LOCAL_EXTRA_ISSUE
@@ -21350,7 +21964,12 @@ fn build_odt_media_corpus() -> Result<Corpus, Box<dyn Error>> {
             payload_kind: "deterministic-incompressible-media",
             compression: "deflate",
             entry_count,
-            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            archive_member_count: ArchiveReader::new(
+                &archive,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )?
+            .file_names()
+            .count(),
             entry_bytes: ODS_MEDIA_ENTRY_BYTES,
             uncompressed_payload_bytes: paragraph_bytes
                 .checked_add(media_bytes)
@@ -21397,7 +22016,12 @@ fn build_odt_repeated_text_corpus() -> Result<Corpus, Box<dyn Error>> {
             payload_kind: "deterministic-incompressible-media",
             compression: "deflate",
             entry_count,
-            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            archive_member_count: ArchiveReader::new(
+                &archive,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )?
+            .file_names()
+            .count(),
             entry_bytes: ODS_MEDIA_ENTRY_BYTES,
             uncompressed_payload_bytes: paragraph_bytes
                 .checked_add(media_bytes)
@@ -21447,7 +22071,12 @@ fn build_odt_resource_batch_corpus() -> Result<Corpus, Box<dyn Error>> {
             payload_kind: "deterministic-incompressible-media-and-image-resources",
             compression: "deflate",
             entry_count,
-            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            archive_member_count: ArchiveReader::new(
+                &archive,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )?
+            .file_names()
+            .count(),
             entry_bytes: ODT_RESOURCE_PAYLOAD_BYTES,
             uncompressed_payload_bytes: paragraph_bytes
                 .checked_add(retained_media_bytes)
@@ -21470,7 +22099,7 @@ fn build_odt_resource_batch_corpus() -> Result<Corpus, Box<dyn Error>> {
 
 fn build_semantic_ods_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Error>> {
     let archive = semantic_ods_bytes(shape)?;
-    let spreadsheet = litchi_ods::Spreadsheet::from_bytes(archive.clone())?;
+    let spreadsheet = litchi_ods::Package::from_bytes(&archive)?.workbook()?;
     verify_semantic_ods(&spreadsheet, shape, false)?;
     let target_payload = semantic_ods_text(0, 0, 0, false).into_bytes();
     let content_bytes = (0..shape.ods_sheet_count()).try_fold(0usize, |total, sheet| {
@@ -21491,7 +22120,12 @@ fn build_semantic_ods_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Err
             payload_kind: "deterministic-semantic-text",
             compression: "deflate",
             entry_count: shape.ods_cell_count(),
-            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            archive_member_count: ArchiveReader::new(
+                &archive,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )?
+            .file_names()
+            .count(),
             entry_bytes: target_payload.len(),
             uncompressed_payload_bytes: content_bytes,
             archive_bytes: archive.len(),
@@ -21539,7 +22173,12 @@ fn build_ods_media_corpus() -> Result<Corpus, Box<dyn Error>> {
             payload_kind: "deterministic-incompressible-media",
             compression: "deflate",
             entry_count,
-            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            archive_member_count: ArchiveReader::new(
+                &archive,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )?
+            .file_names()
+            .count(),
             entry_bytes: ODS_MEDIA_ENTRY_BYTES,
             uncompressed_payload_bytes: cell_bytes
                 .checked_add(media_bytes)
@@ -21561,7 +22200,7 @@ fn build_ods_media_corpus() -> Result<Corpus, Box<dyn Error>> {
 
 fn build_semantic_odp_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Error>> {
     let archive = semantic_odp_bytes(shape)?;
-    let presentation = litchi_odp::Presentation::from_bytes(archive.clone())?;
+    let presentation = litchi_odp::Package::from_bytes(&archive)?.presentation()?;
     verify_semantic_odp(&presentation, shape, false)?;
     let target_payload = semantic_odp_text(0, false).into_bytes();
     let content_bytes = (0..shape.pptx_slides()).try_fold(0usize, |total, index| {
@@ -21579,7 +22218,12 @@ fn build_semantic_odp_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Err
             payload_kind: "deterministic-semantic-text",
             compression: "deflate",
             entry_count: shape.pptx_slides(),
-            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            archive_member_count: ArchiveReader::new(
+                &archive,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )?
+            .file_names()
+            .count(),
             entry_bytes: target_payload.len(),
             uncompressed_payload_bytes: content_bytes,
             archive_bytes: archive.len(),
@@ -21624,7 +22268,8 @@ fn build_detection_corpus(case: Case, shape: SemanticShape) -> Result<Corpus, Bo
         DetectionMode::CatalogAlias => detection_catalog_alias_archive(family, &base.archive)?,
     };
     let expected = mode.expected_format(family);
-    let observed = litchi::common::detection::detect_file_format_from_bytes(&archive);
+    let limits = litchi::common::SourceLimits::default();
+    let observed = litchi::common::detection::detect_file_format_from_bytes(&archive, &limits);
     if observed != Some(expected) {
         return Err(format!(
             "{} detection corpus oracle differs: expected {}, observed {}",
@@ -21693,10 +22338,15 @@ fn detection_merge_ooxml_members(
     odf_archive: &[u8],
     include_catalog: bool,
 ) -> Result<Vec<u8>, Box<dyn Error>> {
-    let odf = ArchiveReader::new(odf_archive)?;
+    let odf = ArchiveReader::new(odf_archive, soapberry_zip::office::ArchiveLimits::default())?;
     let ooxml_archive = detection_ooxml_archive(family)?;
-    let ooxml = ArchiveReader::new(&ooxml_archive)?;
-    let mut writer = litchi_odf_common::core::PackageWriter::new();
+    let ooxml = ArchiveReader::new(
+        &ooxml_archive,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
+    let mut writer = litchi_odf_common::core::PackageWriter::new(
+        litchi_odf_common::core::StreamingArchiveLimits::default(),
+    );
     writer.set_mimetype(family.odf_mimetype())?;
     for path in odf.file_names() {
         if matches!(path, "mimetype" | "META-INF/manifest.xml") || path.ends_with('/') {
@@ -21913,7 +22563,12 @@ fn build_odp_media_corpus() -> Result<Corpus, Box<dyn Error>> {
             payload_kind: "deterministic-incompressible-media",
             compression: "deflate",
             entry_count,
-            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            archive_member_count: ArchiveReader::new(
+                &archive,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )?
+            .file_names()
+            .count(),
             entry_bytes: ODS_MEDIA_ENTRY_BYTES,
             uncompressed_payload_bytes: content_bytes
                 .checked_add(media_bytes)
@@ -21987,7 +22642,7 @@ fn odp_media_instrumented_source(
 fn odp_media_eager_semantics(
     archive: &[u8],
 ) -> Result<(Vec<litchi_odp::model::Slide>, String), Box<dyn Error>> {
-    let presentation = litchi_odp::Presentation::from_bytes(archive.to_vec())?;
+    let presentation = litchi_odp::Package::from_bytes(archive)?.presentation()?;
     let slides = presentation.slides()?;
     let digest = odp_media_semantic_digest(&slides)?;
     Ok((slides, digest))
@@ -22047,7 +22702,12 @@ fn build_odp_text_box_batch_corpus() -> Result<Corpus, Box<dyn Error>> {
             payload_kind: "deterministic-incompressible-media-and-rich-text",
             compression: "deflate",
             entry_count,
-            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            archive_member_count: ArchiveReader::new(
+                &archive,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )?
+            .file_names()
+            .count(),
             entry_bytes: ODS_MEDIA_ENTRY_BYTES,
             uncompressed_payload_bytes: slide_bytes
                 .checked_add(text_box_bytes)
@@ -22097,7 +22757,12 @@ fn build_semantic_pptx_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Er
             payload_kind: "deterministic-semantic-text",
             compression: "deflate",
             entry_count: count,
-            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            archive_member_count: ArchiveReader::new(
+                &archive,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )?
+            .file_names()
+            .count(),
             entry_bytes: semantic_pptx_text(0, 0, false).len(),
             uncompressed_payload_bytes: content_bytes,
             archive_bytes: archive.len(),
@@ -22226,7 +22891,7 @@ fn xlsb_names_digest(names: &[String]) -> Result<String, Box<dyn Error>> {
 fn xlsb_collect_cells_in_order(
     worksheets: &[litchi_xlsb::Worksheet],
 ) -> Result<Vec<XlsbCellRecord>, Box<dyn Error>> {
-    use litchi_core::sheet::Worksheet as _;
+    use litchi_core::sheet::{Cell as _, Worksheet as _};
 
     let mut cells = Vec::new();
     for (sheet, worksheet) in worksheets.iter().enumerate() {
@@ -22257,7 +22922,7 @@ fn xlsb_collect_cells_in_order(
 fn xlsb_scan_cells_in_order(
     worksheets: &[litchi_xlsb::Worksheet],
 ) -> Result<(usize, [u8; 32]), Box<dyn Error>> {
-    use litchi_core::sheet::Worksheet as _;
+    use litchi_core::sheet::{Cell as _, Worksheet as _};
 
     let mut digest = Sha256::new();
     digest.update(XLSB_CELL_DIGEST_DOMAIN);
@@ -22327,12 +22992,12 @@ fn verify_xlsb_corpus(corpus: &Corpus, shape: XlsbShape) -> Result<(), Box<dyn E
 }
 
 fn build_xlsb_corpus(shape: XlsbShape) -> Result<Corpus, Box<dyn Error>> {
-    use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
+    use litchi_xlsb::builder::{self, Builder};
 
     let expected = xlsb_expected_cells(shape)?;
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     for sheet in 0..shape.sheet_count() {
-        let mut worksheet = MutableWorksheet::new(format!("Sheet{sheet:02}"));
+        let mut worksheet = builder::Worksheet::new(format!("Sheet{sheet:02}"));
         for row in 0..shape.row_count() {
             for column in 0..shape.column_count() {
                 if shape.stores_cell(row, column) {
@@ -22347,7 +23012,7 @@ fn build_xlsb_corpus(shape: XlsbShape) -> Result<Corpus, Box<dyn Error>> {
         writer.add_worksheet(worksheet);
     }
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output)?;
+    writer.build()?.write_to(&mut output)?;
     let archive = output.into_inner();
     let target_payload = xlsb_cell_value(shape, 0, 0, 0)?
         .to_bits()
@@ -22366,7 +23031,12 @@ fn build_xlsb_corpus(shape: XlsbShape) -> Result<Corpus, Box<dyn Error>> {
             },
             compression: "deflate",
             entry_count: expected.len(),
-            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            archive_member_count: ArchiveReader::new(
+                &archive,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )?
+            .file_names()
+            .count(),
             entry_bytes: std::mem::size_of::<f64>(),
             uncompressed_payload_bytes: expected
                 .len()
@@ -22416,7 +23086,12 @@ fn build_pptx_slide_name_index_corpus(shape: SemanticShape) -> Result<Corpus, Bo
             payload_kind: "deterministic-named-slide-text",
             compression: "stored",
             entry_count: count,
-            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            archive_member_count: ArchiveReader::new(
+                &archive,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )?
+            .file_names()
+            .count(),
             entry_bytes: semantic_pptx_text(0, 0, false).len(),
             uncompressed_payload_bytes: content_bytes,
             archive_bytes: archive.len(),
@@ -22444,7 +23119,7 @@ fn build_xlsx_corpus(shape: XlsxShape) -> Result<Corpus, Box<dyn Error>> {
     };
     let workbook = build_xlsx_workbook(&spec)?;
     let archive = workbook.to_bytes()?;
-    let reopened = Workbook::from_bytes(archive.clone())?;
+    let reopened = XlsxPackage::from_bytes(&archive)?;
     verify_xlsx_cells(&reopened, &spec, &[])?;
 
     let cell_count = xlsx_cell_count(&spec)?;
@@ -22455,7 +23130,10 @@ fn build_xlsx_corpus(shape: XlsxShape) -> Result<Corpus, Box<dyn Error>> {
     };
     let target_name = xlsx_cell_name(target);
     let target_payload = xlsx_value(target).to_string().into_bytes();
-    let archive_member_count = ArchiveReader::new(&archive)?.file_names().count();
+    let archive_member_count =
+        ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?
+            .file_names()
+            .count();
     let (_source_ranges, source_members) = xlsx_source_layout(&archive, spec.sheet_count)?;
 
     Ok(Corpus {
@@ -22505,7 +23183,7 @@ fn build_xlsx_named_sheet_lookup_corpus(
     };
     let workbook = build_xlsx_workbook(&spec)?;
     let archive = workbook.to_bytes()?;
-    let reopened = Workbook::from_bytes(archive.clone())?;
+    let reopened = XlsxPackage::from_bytes(&archive)?;
     verify_xlsx_cells(&reopened, &spec, &[])?;
 
     let cell_count = xlsx_cell_count(&spec)?;
@@ -22516,7 +23194,10 @@ fn build_xlsx_named_sheet_lookup_corpus(
     };
     let target_name = xlsx_cell_name(target);
     let target_payload = xlsx_value(target).to_string().into_bytes();
-    let archive_member_count = ArchiveReader::new(&archive)?.file_names().count();
+    let archive_member_count =
+        ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?
+            .file_names()
+            .count();
     let (_source_ranges, source_members) = xlsx_source_layout(&archive, spec.sheet_count)?;
 
     Ok(Corpus {
@@ -22559,7 +23240,7 @@ fn build_xlsx_named_sheet_lookup_corpus(
 /// facades, while the duplicate check exercises the authoring-side invariant
 /// that makes the sorted production index unambiguous.
 fn verify_xlsx_named_sheet_lookup_oracle() -> Result<(), Box<dyn Error>> {
-    let workbook = Workbook::new()?;
+    let workbook = XlsxPackage::new()?;
     let mut edit = workbook.edit()?;
     {
         let mut first = edit
@@ -22569,14 +23250,15 @@ fn verify_xlsx_named_sheet_lookup_oracle() -> Result<(), Box<dyn Error>> {
     }
     edit.add("Στοιχεία")?;
     edit.add("数据")?;
-    let committed = edit.commit()?.workbook().clone();
+    let committed = edit.commit()?.package().clone();
     let bytes = committed.to_bytes()?;
-    let owned = Workbook::from_bytes(bytes.clone())?;
+    let owned = XlsxPackage::from_bytes(&bytes)?;
     let source = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(bytes.clone())))?;
-    // On native targets, the umbrella byte facade retains this same source-backed
+    // On native targets, `litchi::open_bytes` retains this same source-backed
     // catalog. Check its lightweight projection so the index stays compatible
-    // with that newly landed ingress path without adding another timed selector.
-    let facade = litchi::Workbook::from_bytes(bytes).map_err(|error| error.to_string())?;
+    // with that ingress path without adding another timed selector.
+    let facade = litchi::open_bytes(bytes)?;
+    let facade_view = facade.workbook()?;
     let expected = [
         "Résumé".to_owned(),
         "Στοιχεία".to_owned(),
@@ -22584,19 +23266,13 @@ fn verify_xlsx_named_sheet_lookup_oracle() -> Result<(), Box<dyn Error>> {
     ];
 
     let owned_names = owned
+        .workbook_ref()
         .sheets()
         .map(|sheet| sheet.name().to_owned())
         .collect::<Vec<_>>();
-    let source_names = source
-        .sheets()
-        .map(|sheet| sheet.name().to_owned())
-        .collect::<Vec<_>>();
-    let facade_names = facade
-        .worksheet_names()
-        .map_err(|error| error.to_string())?;
-    let facade_count = facade
-        .worksheet_count()
-        .map_err(|error| error.to_string())?;
+    let source_names = source.sheet_names().map(str::to_owned).collect::<Vec<_>>();
+    let facade_names = facade_view.worksheet_names()?;
+    let facade_count = facade_view.worksheet_count()?;
     if owned_names != expected
         || source_names != expected
         || facade_names != expected
@@ -22611,6 +23287,7 @@ fn verify_xlsx_named_sheet_lookup_oracle() -> Result<(), Box<dyn Error>> {
         ("数据", "数据"),
     ] {
         let owned_sheet = owned
+            .workbook_ref()
             .sheet(query)?
             .ok_or("XLSX eager selector oracle missed an existing sheet")?;
         let source_sheet = source
@@ -22620,11 +23297,13 @@ fn verify_xlsx_named_sheet_lookup_oracle() -> Result<(), Box<dyn Error>> {
             return Err("XLSX selector oracle changed case-folded Unicode matching".into());
         }
     }
-    if owned.sheet("missing-selector")?.is_some() || source.sheet("missing-selector")?.is_some() {
+    if owned.workbook_ref().sheet("missing-selector")?.is_some()
+        || source.sheet("missing-selector")?.is_some()
+    {
         return Err("XLSX selector oracle changed missing-name behavior".into());
     }
 
-    let duplicate = Workbook::new()?;
+    let duplicate = XlsxPackage::new()?;
     let mut duplicate_edit = duplicate.edit()?;
     duplicate_edit.add("Data")?;
     duplicate_edit.add("data")?;
@@ -22632,11 +23311,14 @@ fn verify_xlsx_named_sheet_lookup_oracle() -> Result<(), Box<dyn Error>> {
         return Err("XLSX selector oracle accepted duplicate canonical sheet names".into());
     }
 
-    let duplicate_seed = Workbook::new()?;
+    let duplicate_seed = XlsxPackage::new()?;
     let mut duplicate_seed_edit = duplicate_seed.edit()?;
     duplicate_seed_edit.add("Data")?;
-    let duplicate_seed = duplicate_seed_edit.commit()?.workbook().clone();
-    let mut duplicate_package = OpcPackage::from_bytes(&duplicate_seed.to_bytes()?)?;
+    let duplicate_seed = duplicate_seed_edit.commit()?.package().clone();
+    let mut duplicate_package = OpcPackage::from_bytes(
+        &duplicate_seed.to_bytes()?,
+        litchi_opc::SourceLimits::default(),
+    )?;
     let workbook_uri = PackURI::new("/xl/workbook.xml")?;
     let workbook_xml =
         String::from_utf8(duplicate_package.get_part(&workbook_uri)?.blob().to_vec())?;
@@ -22648,8 +23330,8 @@ fn verify_xlsx_named_sheet_lookup_oracle() -> Result<(), Box<dyn Error>> {
         .get_part_mut(&workbook_uri)?
         .set_blob(duplicate_xml.into_bytes());
     let duplicate_archive = PackageWriter::to_bytes(&duplicate_package)?;
-    if Workbook::from_bytes(duplicate_archive.clone()).is_ok()
-        || litchi::Workbook::from_bytes(duplicate_archive.clone()).is_ok()
+    if XlsxPackage::from_bytes(&duplicate_archive).is_ok()
+        || litchi::open_bytes(duplicate_archive.clone()).is_ok()
         || SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(duplicate_archive))).is_ok()
     {
         return Err("XLSX selector oracle accepted duplicate parsed catalog names".into());
@@ -22894,7 +23576,7 @@ fn build_xlsx_cell_crud_corpus(shape: XlsxCellCrudShape) -> Result<Corpus, Box<d
     };
     let workbook = build_xlsx_workbook(&spec)?;
     let mut archive = workbook.to_bytes()?;
-    let mut package = OpcPackage::from_bytes(&archive)?;
+    let mut package = OpcPackage::from_bytes(&archive, litchi_opc::SourceLimits::default())?;
     strip_xlsx_cell_crud_calc_properties(&mut package)?;
     if shape == XlsxCellCrudShape::Noncompact {
         for (sheet_index, cells) in spec
@@ -22919,9 +23601,9 @@ fn build_xlsx_cell_crud_corpus(shape: XlsxCellCrudShape) -> Result<Corpus, Box<d
     }
     verify_xlsx_vendor_extension_package(&package, shape == XlsxCellCrudShape::VendorExtension)?;
     archive = PackageWriter::to_bytes(&package)?;
-    let reopened = Workbook::from_bytes(archive.clone())?;
+    let reopened = XlsxPackage::from_bytes(&archive)?;
     verify_xlsx_cells(&reopened, &spec, &[])?;
-    let reopened_package = OpcPackage::from_bytes(&archive)?;
+    let reopened_package = OpcPackage::from_bytes(&archive, litchi_opc::SourceLimits::default())?;
     verify_xlsx_vendor_extension_package(
         &reopened_package,
         shape == XlsxCellCrudShape::VendorExtension,
@@ -22933,7 +23615,10 @@ fn build_xlsx_cell_crud_corpus(shape: XlsxCellCrudShape) -> Result<Corpus, Box<d
         .ok_or("XLSX cell CRUD corpus has no target cell")?;
     let target_name = xlsx_cell_name(target);
     let target_payload = xlsx_value(target).to_string().into_bytes();
-    let archive_member_count = ArchiveReader::new(&archive)?.file_names().count();
+    let archive_member_count =
+        ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?
+            .file_names()
+            .count();
     let (_source_ranges, source_members) = xlsx_source_layout(&archive, spec.sheet_count)?;
     let vendor_bytes = XLSX_VENDOR_EXTENSION_XML
         .len()
@@ -23023,7 +23708,7 @@ fn build_xlsx_row_visibility_corpus(
     let workbook = build_xlsx_workbook(&spec)?;
     let mut archive = workbook.to_bytes()?;
     if initially_hidden {
-        let workbook = Workbook::from_bytes(archive.clone())?;
+        let workbook = XlsxPackage::from_bytes(&archive)?;
         let mut edit = workbook.edit()?;
         let mut sheet = edit
             .sheet("Sheet1")?
@@ -23031,9 +23716,9 @@ fn build_xlsx_row_visibility_corpus(
         for row in 0..litchi_xlsx::row_visibility::MAX_BATCH_EDITS {
             sheet.row(u32::try_from(row)?)?.hide();
         }
-        archive = edit.commit()?.workbook().to_bytes()?;
+        archive = edit.commit()?.package().to_bytes()?;
     }
-    let mut package = OpcPackage::from_bytes(&archive)?;
+    let mut package = OpcPackage::from_bytes(&archive, litchi_opc::SourceLimits::default())?;
     strip_xlsx_cell_crud_calc_properties(&mut package)?;
     for index in 0..XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT {
         package.try_add_part(Box::new(BlobPart::new(
@@ -23043,9 +23728,10 @@ fn build_xlsx_row_visibility_corpus(
         )))?;
     }
     archive = PackageWriter::to_bytes(&package)?;
-    let reopened = Workbook::from_bytes(archive.clone())?;
+    let reopened = XlsxPackage::from_bytes(&archive)?;
     verify_xlsx_cells(&reopened, &spec, &[])?;
     let sheet = reopened
+        .workbook_ref()
         .sheet("Sheet1")?
         .ok_or("XLSX row-visibility corpus is missing Sheet1")?;
     for row in 0..litchi_xlsx::row_visibility::MAX_BATCH_EDITS {
@@ -23056,7 +23742,10 @@ fn build_xlsx_row_visibility_corpus(
     }
     let worksheet_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
     let target_payload = package.get_part(&worksheet_uri)?.blob().to_vec();
-    let archive_member_count = ArchiveReader::new(&archive)?.file_names().count();
+    let archive_member_count =
+        ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?
+            .file_names()
+            .count();
     let (_source_ranges, source_members) = xlsx_source_layout(&archive, spec.sheet_count)?;
     let media_bytes = XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT
         .checked_mul(XLSX_CELL_VALUES_MEDIA_ENTRY_BYTES)
@@ -23137,9 +23826,10 @@ fn xlsx_row_visibility_semantic_hash(
     initially_hidden: bool,
     updates: &[(RowIndex, bool)],
 ) -> Result<String, Box<dyn Error>> {
-    let workbook = Workbook::from_bytes(output.to_vec())?;
+    let workbook = XlsxPackage::from_bytes(output)?;
     verify_xlsx_cells(&workbook, spec, &[])?;
     let sheet = workbook
+        .workbook_ref()
         .sheet("Sheet1")?
         .ok_or("XLSX row-visibility output is missing Sheet1")?;
     let initial_hidden_limit = u32::try_from(litchi_xlsx::row_visibility::MAX_BATCH_EDITS)?;
@@ -23173,7 +23863,7 @@ fn xlsx_row_visibility_eager_output(
     corpus: &Corpus,
     updates: &[(RowIndex, bool)],
 ) -> Result<Vec<u8>, Box<dyn Error>> {
-    let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+    let workbook = XlsxPackage::from_bytes(&corpus.archive)?;
     let mut edit = workbook.edit()?;
     let mut sheet = edit
         .sheet("Sheet1")?
@@ -23187,7 +23877,7 @@ fn xlsx_row_visibility_eager_output(
         }
     }
     let commit = edit.commit()?;
-    let output = commit.workbook().to_bytes()?;
+    let output = commit.package().to_bytes()?;
     Ok(output)
 }
 
@@ -23195,20 +23885,20 @@ fn xlsx_row_visibility_source_output(
     corpus: &Corpus,
     updates: &[(RowIndex, bool)],
 ) -> Result<Vec<u8>, Box<dyn Error>> {
-    let editor = litchi_xlsx::row_visibility::SourceBackedEditor::from_read_at(Arc::new(
+    let editor = crate::xlsx_source_editors::RowVisibilityEditor::from_read_at(Arc::new(
         OwnedSource::new(corpus.archive.clone()),
     ))?;
     let mut edit = editor.edit("Sheet1")?;
     let operations = updates.iter().map(|(row, hidden)| {
         if *hidden {
-            litchi_xlsx::row_visibility::RowVisibilityEdit::hide(*row)
+            litchi_xlsx::row_visibility::Change::hide(*row)
         } else {
-            litchi_xlsx::row_visibility::RowVisibilityEdit::unhide(*row)
+            litchi_xlsx::row_visibility::Change::unhide(*row)
         }
     });
     edit.apply_batch(operations)?;
     let commit = edit.commit()?;
-    if !commit.changed() || commit.diagnostics().changed_rows() != updates.len() {
+    if !commit.diagnostics().changed() || commit.diagnostics().changed_rows() != updates.len() {
         return Err("XLSX row-visibility source output changed an unexpected row count".into());
     }
     let mut output = Vec::new();
@@ -23220,7 +23910,7 @@ fn xlsx_row_visibility_variant_bytes(
     corpus: &Corpus,
     variant: &str,
 ) -> Result<Vec<u8>, Box<dyn Error>> {
-    let mut package = OpcPackage::from_bytes(&corpus.archive)?;
+    let mut package = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     let worksheet = PackURI::new("/xl/worksheets/sheet1.xml")?;
     match variant {
         "protected" | "formula" | "markup-compatibility" => {
@@ -23331,7 +24021,7 @@ fn xlsx_row_visibility_variant_refused(
     // Opening an edit is lazy. Exercise a real change before deciding whether
     // the conservative source closure refused the operation.
     let publication = (|| -> litchi_xlsx::Result<()> {
-        let editor = litchi_xlsx::row_visibility::SourceBackedEditor::from_read_at(source.clone())?;
+        let editor = crate::xlsx_source_editors::RowVisibilityEditor::from_read_at(source.clone())?;
         let mut edit = editor.edit("Sheet1")?;
         let row = RowIndex::new(0).expect("row zero is within the XLSX grid");
         if initially_hidden {
@@ -23349,50 +24039,66 @@ fn xlsx_row_visibility_variant_refused(
     Ok(publication.is_err() && output.is_empty())
 }
 
+/// `archive` with one trailing newline after its workbook part's root: the
+/// same document to a reader, a different owner closure to a source-backed
+/// replay.
+fn xlsx_foreign_content_archive(archive: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {
+    let mut package = OpcPackage::from_bytes(archive, litchi_opc::SourceLimits::default())?;
+    let workbook = PackURI::new("/xl/workbook.xml")?;
+    let part = package.get_part_mut(&workbook)?;
+    let mut blob = part.blob().to_vec();
+    blob.push(b'\n');
+    part.set_blob(blob);
+    Ok(PackageWriter::to_bytes(&package)?)
+}
+
 fn xlsx_row_visibility_lifecycle_gates(
     corpus: &Corpus,
     updates: &[(RowIndex, bool)],
     initially_hidden: bool,
 ) -> Result<XlsxRowVisibilityGateSummary, Box<dyn Error>> {
     let source = Arc::new(OwnedSource::new(corpus.archive.clone()));
-    let editor = litchi_xlsx::row_visibility::SourceBackedEditor::from_read_at(source)?;
+    let editor = crate::xlsx_source_editors::RowVisibilityEditor::from_read_at(source)?;
     let mut noop = editor.edit("Sheet1")?;
     let noop_operations = updates.iter().map(|(row, _)| {
         if initially_hidden {
-            litchi_xlsx::row_visibility::RowVisibilityEdit::hide(*row)
+            litchi_xlsx::row_visibility::Change::hide(*row)
         } else {
-            litchi_xlsx::row_visibility::RowVisibilityEdit::unhide(*row)
+            litchi_xlsx::row_visibility::Change::unhide(*row)
         }
     });
     noop.apply_batch(noop_operations)?;
     let noop_commit = noop.commit()?;
     let mut noop_output = Vec::new();
     editor.publish_commit_to_stream(&mut noop_output, &noop_commit)?;
-    let exact_noop_verified =
-        !noop_commit.changed() && noop_commit.patch().is_empty() && noop_output == corpus.archive;
+    let exact_noop_verified = !noop_commit.diagnostics().changed()
+        && noop_commit.patch().is_noop()
+        && noop_output == corpus.archive;
     if !exact_noop_verified {
         return Err("XLSX row-visibility exact no-op gate failed".into());
     }
 
-    let source_editor = litchi_xlsx::row_visibility::SourceBackedEditor::from_read_at(Arc::new(
+    let source_editor = crate::xlsx_source_editors::RowVisibilityEditor::from_read_at(Arc::new(
         OwnedSource::new(corpus.archive.clone()),
     ))?;
     let mut staged = source_editor.edit("Sheet1")?;
     staged.apply_batch(updates.iter().map(|(row, hidden)| {
         if *hidden {
-            litchi_xlsx::row_visibility::RowVisibilityEdit::hide(*row)
+            litchi_xlsx::row_visibility::Change::hide(*row)
         } else {
-            litchi_xlsx::row_visibility::RowVisibilityEdit::unhide(*row)
+            litchi_xlsx::row_visibility::Change::unhide(*row)
         }
     }))?;
     let commit = staged.commit()?;
-    if !commit.changed() || commit.diagnostics().changed_rows() != updates.len() {
+    if !commit.diagnostics().changed() || commit.diagnostics().changed_rows() != updates.len() {
         return Err("XLSX row-visibility lifecycle commit gate changed an unexpected count".into());
     }
 
     let mut foreign_output = Vec::new();
-    let foreign_editor = litchi_xlsx::row_visibility::SourceBackedEditor::from_read_at(Arc::new(
-        OwnedSource::new(corpus.archive.clone()),
+    // Source-backed replays compare content (record 0360): a foreign source
+    // is one whose owner closure differs from the patch's.
+    let foreign_editor = crate::xlsx_source_editors::RowVisibilityEditor::from_read_at(Arc::new(
+        OwnedSource::new(xlsx_foreign_content_archive(&corpus.archive)?),
     ))?;
     let foreign_source_refusal_verified = foreign_editor
         .publish_commit_to_stream(&mut foreign_output, &commit)
@@ -23402,27 +24108,29 @@ fn xlsx_row_visibility_lifecycle_gates(
         return Err("XLSX row-visibility foreign-source gate accepted output".into());
     }
 
-    let mut stale_package = OpcPackage::from_bytes(&corpus.archive)?;
+    let mut stale_package =
+        OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     let worksheet = PackURI::new("/xl/worksheets/sheet1.xml")?;
     stale_package
         .get_part_mut(&worksheet)?
         .set_blob(b"<stale-row-visibility-source/>".to_vec());
     let stale_fixture = PackageWriter::to_bytes(&stale_package)?;
-    let stale_source_refusal_verified = commit.patch().apply(&mut stale_package).is_err()
-        && PackageWriter::to_bytes(&stale_package)? == stale_fixture;
+    let stale_source_refusal_verified =
+        crate::xlsx_source_editors::replay_patch(&mut stale_package, commit.patch()).is_err()
+            && PackageWriter::to_bytes(&stale_package)? == stale_fixture;
     if !stale_source_refusal_verified {
         return Err("XLSX row-visibility stale package gate failed".into());
     }
 
     let revision_source = Arc::new(PptxRevisionSource::new(corpus.archive.clone()));
     let revision_editor =
-        litchi_xlsx::row_visibility::SourceBackedEditor::from_read_at(revision_source.clone())?;
+        crate::xlsx_source_editors::RowVisibilityEditor::from_read_at(revision_source.clone())?;
     let mut revision_edit = revision_editor.edit("Sheet1")?;
     revision_edit.apply_batch(updates.iter().map(|(row, hidden)| {
         if *hidden {
-            litchi_xlsx::row_visibility::RowVisibilityEdit::hide(*row)
+            litchi_xlsx::row_visibility::Change::hide(*row)
         } else {
-            litchi_xlsx::row_visibility::RowVisibilityEdit::unhide(*row)
+            litchi_xlsx::row_visibility::Change::unhide(*row)
         }
     }))?;
     let revision_commit = revision_edit.commit()?;
@@ -23466,36 +24174,38 @@ fn xlsx_row_visibility_lifecycle_gates(
     }
 
     let signed_bytes = xlsx_row_visibility_variant_bytes(corpus, "signed")?;
-    let signed_editor = litchi_xlsx::row_visibility::SourceBackedEditor::from_read_at(Arc::new(
+    let signed_editor = crate::xlsx_source_editors::RowVisibilityEditor::from_read_at(Arc::new(
         OwnedSource::new(signed_bytes),
     ))?;
     let mut signed_edit = signed_editor.edit("Sheet1")?;
     signed_edit.apply_batch(updates.iter().map(|(row, hidden)| {
         if *hidden {
-            litchi_xlsx::row_visibility::RowVisibilityEdit::hide(*row)
+            litchi_xlsx::row_visibility::Change::hide(*row)
         } else {
-            litchi_xlsx::row_visibility::RowVisibilityEdit::unhide(*row)
+            litchi_xlsx::row_visibility::Change::unhide(*row)
         }
     }))?;
-    let signed_commit = signed_edit.commit()?;
-    let mut signed_output = Vec::new();
-    let signed_source_refusal_verified = signed_editor
-        .publish_commit_to_stream(&mut signed_output, &signed_commit)
-        .is_err()
-        && signed_output.is_empty();
+    // A changed commit over a signed source is refused before any output
+    // exists (record 0360).
+    let signed_source_refusal_verified = matches!(
+        signed_edit.commit(),
+        Err(litchi_xlsx::Error::Package(
+            OpcError::SignedSourceRequiresExplicitPolicy
+        ))
+    );
     if !signed_source_refusal_verified {
         return Err("XLSX row-visibility signed-source gate accepted output".into());
     }
 
-    let partial_editor = litchi_xlsx::row_visibility::SourceBackedEditor::from_read_at(Arc::new(
+    let partial_editor = crate::xlsx_source_editors::RowVisibilityEditor::from_read_at(Arc::new(
         OwnedSource::new(corpus.archive.clone()),
     ))?;
     let mut partial_edit = partial_editor.edit("Sheet1")?;
     partial_edit.apply_batch(updates.iter().map(|(row, hidden)| {
         if *hidden {
-            litchi_xlsx::row_visibility::RowVisibilityEdit::hide(*row)
+            litchi_xlsx::row_visibility::Change::hide(*row)
         } else {
-            litchi_xlsx::row_visibility::RowVisibilityEdit::unhide(*row)
+            litchi_xlsx::row_visibility::Change::unhide(*row)
         }
     }))?;
     let partial_commit = partial_edit.commit()?;
@@ -23508,15 +24218,15 @@ fn xlsx_row_visibility_lifecycle_gates(
         .is_err()
         && partial_sink.accepted > 0;
 
-    let zero_editor = litchi_xlsx::row_visibility::SourceBackedEditor::from_read_at(Arc::new(
+    let zero_editor = crate::xlsx_source_editors::RowVisibilityEditor::from_read_at(Arc::new(
         OwnedSource::new(corpus.archive.clone()),
     ))?;
     let mut zero_edit = zero_editor.edit("Sheet1")?;
     zero_edit.apply_batch(updates.iter().map(|(row, hidden)| {
         if *hidden {
-            litchi_xlsx::row_visibility::RowVisibilityEdit::hide(*row)
+            litchi_xlsx::row_visibility::Change::hide(*row)
         } else {
-            litchi_xlsx::row_visibility::RowVisibilityEdit::unhide(*row)
+            litchi_xlsx::row_visibility::Change::unhide(*row)
         }
     }))?;
     let zero_commit = zero_edit.commit()?;
@@ -23550,8 +24260,8 @@ fn xlsx_row_visibility_lifecycle_gates(
     })
 }
 
-fn build_xlsx_workbook(spec: &XlsxCorpus) -> Result<Workbook, Box<dyn Error>> {
-    let workbook = Workbook::new()?;
+fn build_xlsx_workbook(spec: &XlsxCorpus) -> Result<XlsxPackage, Box<dyn Error>> {
+    let workbook = XlsxPackage::new()?;
     let mut edit = workbook.edit()?;
     if let Some(inventory) = spec.cell_inventory.as_ref() {
         for sheet_index in 0..spec.sheet_count {
@@ -23610,7 +24320,7 @@ fn build_xlsx_workbook(spec: &XlsxCorpus) -> Result<Workbook, Box<dyn Error>> {
             }
         }
     }
-    Ok(edit.commit()?.workbook().clone())
+    Ok(edit.commit()?.package().clone())
 }
 
 fn xlsx_one_percent_updates(shape: XlsxShape) -> Result<Vec<XlsxCoordinate>, Box<dyn Error>> {
@@ -23791,7 +24501,7 @@ fn verify_xlsx_cell_crud_output(
     updated: &[XlsxCoordinate],
 ) -> Result<(), Box<dyn Error>> {
     let spec = xlsx_spec(corpus)?;
-    let workbook = Workbook::from_bytes(output.to_vec())?;
+    let workbook = XlsxPackage::from_bytes(output)?;
     verify_xlsx_cells(&workbook, spec, updated)?;
     verify_xlsx_cell_crud_package_identity(corpus, output)
 }
@@ -23877,8 +24587,8 @@ fn verify_xlsx_cell_crud_package_identity(
     corpus: &Corpus,
     output: &[u8],
 ) -> Result<(), Box<dyn Error>> {
-    let source = OpcPackage::from_bytes(&corpus.archive)?;
-    let candidate = OpcPackage::from_bytes(output)?;
+    let source = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+    let candidate = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     let has_vendor_extension = corpus.manifest.shape == XlsxCellCrudShape::VendorExtension.name();
     verify_xlsx_vendor_extension_package(&source, has_vendor_extension)?;
     verify_xlsx_vendor_extension_package(&candidate, has_vendor_extension)?;
@@ -23991,8 +24701,9 @@ fn xlsx_cell_crud_untouched_member_evidence(
     let allow_calculation_invalidation = corpus.manifest.generator
         == XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR
         && corpus.archive.as_slice() != output;
-    let source_package = OpcPackage::from_bytes(&corpus.archive)?;
-    let candidate_package = OpcPackage::from_bytes(output)?;
+    let source_package =
+        OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+    let candidate_package = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     let source_chain = xlsx_calc_chain_identity(&source_package)?;
     let candidate_chain = xlsx_calc_chain_identity(&candidate_package)?;
     let removed_chain = match (source_chain.as_ref(), candidate_chain.as_ref()) {
@@ -24105,7 +24816,7 @@ fn xlsx_cell_crud_untouched_member_evidence(
 }
 
 fn xlsx_cell_values_semantic_hash_from_workbook(
-    workbook: &Workbook,
+    workbook: &XlsxPackage,
     spec: &XlsxCorpus,
 ) -> Result<String, Box<dyn Error>> {
     let inventory = spec
@@ -24115,6 +24826,7 @@ fn xlsx_cell_values_semantic_hash_from_workbook(
     let mut semantic = Vec::new();
     for coordinate in inventory.iter().flatten() {
         let sheet = workbook
+            .workbook_ref()
             .sheet(xlsx_sheet_name(coordinate.sheet).as_str())?
             .ok_or("XLSX semantic hash target sheet is missing")?;
         let address = xlsx_address(coordinate.row, coordinate.column)?;
@@ -24139,7 +24851,7 @@ fn xlsx_cell_values_output_semantic_hash(
     output: &[u8],
     spec: &XlsxCorpus,
 ) -> Result<String, Box<dyn Error>> {
-    let workbook = Workbook::from_bytes(output.to_vec())?;
+    let workbook = XlsxPackage::from_bytes(output)?;
     xlsx_cell_values_semantic_hash_from_workbook(&workbook, spec)
 }
 
@@ -24151,10 +24863,10 @@ fn run_xlsx_cell_value_lifecycle_gates(
         .map(litchi_xlsx::Selector::from)
         .collect::<Vec<_>>();
     let source = Arc::new(OwnedSource::new(corpus.archive.clone()));
-    let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(source)?;
+    let editor = crate::xlsx_source_editors::SourceBackedEditor::from_read_at(source)?;
     let noop = editor.edit_sheets(selectors.clone())?;
     let noop_commit = noop.commit()?;
-    if noop_commit.changed() || !noop_commit.patch().is_empty() {
+    if noop_commit.diagnostics().changed() || !noop_commit.patch().is_noop() {
         return Err("XLSX cell CRUD exact no-op produced a change".into());
     }
     let mut noop_output = Vec::new();
@@ -24171,7 +24883,7 @@ fn run_xlsx_cell_value_lifecycle_gates(
         .ok_or("XLSX cell CRUD corpus has no lifecycle target")?;
     for remove in [false, true] {
         let source = Arc::new(OwnedSource::new(corpus.archive.clone()));
-        let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(source)?;
+        let editor = crate::xlsx_source_editors::SourceBackedEditor::from_read_at(source)?;
         let mut edit = editor.edit_sheets([litchi_xlsx::Selector::from(target.sheet)])?;
         let address =
             litchi_xlsx::Address::at(u32::try_from(target.row)?, u32::try_from(target.column)?)?;
@@ -24181,14 +24893,17 @@ fn run_xlsx_cell_value_lifecycle_gates(
             edit.clear(target.sheet, address)?;
         }
         let commit = edit.commit()?;
-        if !commit.changed() || commit.diagnostics().changed_cells() != 1 {
+        if !commit.diagnostics().changed() || commit.diagnostics().changed_cells() != 1 {
             return Err(
                 "XLSX cell CRUD clear/remove lifecycle gate did not change one cell".into(),
             );
         }
-        let foreign_editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(Arc::new(
-            OwnedSource::new(corpus.archive.clone()),
-        ))?;
+        // Source-backed replays compare content (record 0360): a foreign
+        // source is one whose owner closure differs from the patch's.
+        let foreign_editor =
+            crate::xlsx_source_editors::SourceBackedEditor::from_read_at(Arc::new(
+                OwnedSource::new(xlsx_foreign_content_archive(&corpus.archive)?),
+            ))?;
         let mut foreign_output = Vec::new();
         if foreign_editor
             .publish_multi_commit_to_stream(&mut foreign_output, &commit)
@@ -24200,29 +24915,30 @@ fn run_xlsx_cell_value_lifecycle_gates(
         let mut published = Vec::new();
         editor.publish_multi_commit_to_stream(&mut published, &commit)?;
         verify_xlsx_cell_crud_package_identity(corpus, &published)?;
-        let workbook = Workbook::from_bytes(published.clone())?;
+        let workbook = XlsxPackage::from_bytes(&published)?;
         verify_xlsx_cell_crud_lifecycle_state(&workbook, spec, target, remove)?;
-        let mut applied = OpcPackage::from_bytes(&corpus.archive)?;
-        commit.patch().apply(&mut applied)?;
+        let mut applied =
+            OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+        crate::xlsx_source_editors::replay_patch(&mut applied, commit.patch())?;
         let applied_bytes = PackageWriter::to_bytes(&applied)?;
         verify_xlsx_cell_crud_package_identity(corpus, &applied_bytes)?;
-        let applied_workbook = Workbook::from_bytes(applied_bytes)?;
+        let applied_workbook = XlsxPackage::from_bytes(&applied_bytes)?;
         verify_xlsx_cell_crud_lifecycle_state(&applied_workbook, spec, target, remove)?;
-        if commit.patch().apply(&mut applied).is_ok() {
+        if crate::xlsx_source_editors::replay_patch(&mut applied, commit.patch()).is_ok() {
             return Err("XLSX lifecycle stale source was accepted".into());
         }
-        commit.patch().inverse().apply(&mut applied)?;
+        crate::xlsx_source_editors::replay_patch(&mut applied, &commit.patch().inverse())?;
         let restored_bytes = PackageWriter::to_bytes(&applied)?;
         verify_xlsx_cell_crud_package_identity(corpus, &restored_bytes)?;
-        let restored_workbook = Workbook::from_bytes(restored_bytes)?;
+        let restored_workbook = XlsxPackage::from_bytes(&restored_bytes)?;
         verify_xlsx_cells(&restored_workbook, spec, &[])?;
     }
     let partial_sink_verified = if corpus.manifest.shape
         == XlsxCellCrudShape::VendorExtension.name()
     {
-        let partial_editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(Arc::new(
-            OwnedSource::new(corpus.archive.clone()),
-        ))?;
+        let partial_editor = crate::xlsx_source_editors::SourceBackedEditor::from_read_at(
+            Arc::new(OwnedSource::new(corpus.archive.clone())),
+        )?;
         let mut partial_edit =
             partial_editor.edit_sheets([litchi_xlsx::Selector::from(target.sheet)])?;
         partial_edit.set(
@@ -24231,7 +24947,9 @@ fn run_xlsx_cell_value_lifecycle_gates(
             xlsx_value(target) + 1,
         )?;
         let partial_commit = partial_edit.commit()?;
-        if !partial_commit.changed() || partial_commit.diagnostics().changed_cells() != 1 {
+        if !partial_commit.diagnostics().changed()
+            || partial_commit.diagnostics().changed_cells() != 1
+        {
             return Err("XLSX vendor-extension partial-sink replay did not change one cell".into());
         }
         let mut partial_sink = PrefixFailSink {
@@ -24263,12 +24981,13 @@ fn run_xlsx_cell_value_lifecycle_gates(
 }
 
 fn verify_xlsx_cell_crud_lifecycle_state(
-    workbook: &Workbook,
+    workbook: &XlsxPackage,
     spec: &XlsxCorpus,
     target: XlsxCoordinate,
     removed: bool,
 ) -> Result<(), Box<dyn Error>> {
     let sheet = workbook
+        .workbook_ref()
         .sheet(xlsx_sheet_name(target.sheet).as_str())?
         .ok_or("XLSX lifecycle state is missing its target sheet")?;
     let address = xlsx_address(target.row, target.column)?;
@@ -24300,7 +25019,7 @@ fn xlsx_value(coordinate: XlsxCoordinate) -> i32 {
 }
 
 fn prepare_xlsx_updates(
-    workbook: &Workbook,
+    workbook: &XlsxPackage,
     updates: &[XlsxCoordinate],
 ) -> Result<litchi_xlsx::Edit, Box<dyn Error>> {
     let mut edit = workbook.edit()?;
@@ -24318,16 +25037,17 @@ fn prepare_xlsx_updates(
 }
 
 fn verify_xlsx_cells(
-    workbook: &Workbook,
+    workbook: &XlsxPackage,
     spec: &XlsxCorpus,
     updated: &[XlsxCoordinate],
 ) -> Result<(), Box<dyn Error>> {
-    if workbook.len() != spec.sheet_count {
+    if workbook.workbook_ref().len() != spec.sheet_count {
         return Err("XLSX workbook sheet count differs from corpus specification".into());
     }
     for sheet_index in 0..spec.sheet_count {
         let name = xlsx_sheet_name(sheet_index);
         let sheet = workbook
+            .workbook_ref()
             .sheet(name.as_str())?
             .ok_or("XLSX workbook sheet is missing")?;
         let expected = spec.cell_inventory.as_ref().map_or_else(
@@ -24379,11 +25099,15 @@ fn verify_xlsx_cells(
     Ok(())
 }
 
-fn xlsx_typed_full_text(workbook: &Workbook, spec: &XlsxCorpus) -> Result<String, Box<dyn Error>> {
+fn xlsx_typed_full_text(
+    workbook: &XlsxPackage,
+    spec: &XlsxCorpus,
+) -> Result<String, Box<dyn Error>> {
     let mut output = String::new();
     for sheet_index in 0..spec.sheet_count {
         let name = xlsx_sheet_name(sheet_index);
         let sheet = workbook
+            .workbook_ref()
             .sheet(name.as_str())?
             .ok_or("typed eager XLSX text oracle is missing a worksheet")?;
         let extent = sheet
@@ -25169,38 +25893,8 @@ fn run_case_with_config(
         | Case::ProviderFileReadAt
         | Case::ProviderAtomicSave
         | Case::CfbFileSameLengthOverlayAtomicSave
-        | Case::CfbFileOwnedSameLengthOverlayAtomicSave
-        | Case::PptxFileEagerOpen
-        | Case::PptxFileSourceOpen
-        | Case::PptxFileEagerListSlides
-        | Case::PptxFileSourceListSlides
-        | Case::PptxFileEagerSlideCount
-        | Case::PptxFileSourceSlideCount
-        | Case::PptxFileEagerSelectedSlide
-        | Case::PptxFileSourceSelectedSlide
-        | Case::PptxFileEagerOpenSlideCountLifecycle
-        | Case::PptxFileSourceOpenSlideCountLifecycle
-        | Case::PptxFileEagerOpenSelectedSlideLifecycle
-        | Case::PptxFileSourceOpenSelectedSlideLifecycle
-        | Case::DocxFileEagerOpen
-        | Case::DocxFileSourceOpen
-        | Case::DocxFileEagerParagraphCount
-        | Case::DocxFileSourceParagraphCount
-        | Case::DocxFileEagerListParagraphs
-        | Case::DocxFileSourceListParagraphs
-        | Case::DocxFileEagerFullText
-        | Case::DocxFileSourceFullText
-        | Case::DocxFileEagerOpenParagraphCountLifecycle
-        | Case::DocxFileSourceOpenParagraphCountLifecycle
-        | Case::DocxFileEagerOpenFullTextLifecycle
-        | Case::DocxFileSourceOpenFullTextLifecycle => {
+        | Case::CfbFileOwnedSameLengthOverlayAtomicSave => {
             Err("filesystem cases are dispatched by the child-process evidence runner".into())
-        },
-        Case::OdtFileEagerOpen
-        | Case::OdtFileSourceOpen
-        | Case::OdtFileEagerOpenFullTextLifecycle
-        | Case::OdtFileSourceOpenFullTextLifecycle => {
-            run_odt_file_root(case, corpus, warmup_iterations, samples)
         },
         Case::DocxSourceBackedOneEditSave => {
             run_docx_source_backed_one_edit_save(corpus, warmup_iterations, samples)
@@ -25443,6 +26137,36 @@ fn run_case_with_config(
         Case::PptTextEditOneEditSave => {
             run_ppt_text_edit_one_edit_save(corpus, warmup_iterations, samples)
         },
+        Case::PptTextAggregateEagerNative1
+        | Case::PptTextAggregateEagerNative10
+        | Case::PptTextAggregateEagerNative100
+        | Case::PptTextAggregateEagerNative256
+        | Case::PptTextAggregateEagerNative1000
+        | Case::PptTextAggregateEagerNative4096
+        | Case::PptTextAggregateEagerNative10000
+        | Case::PptTextAggregateEagerUnified1
+        | Case::PptTextAggregateEagerUnified10
+        | Case::PptTextAggregateEagerUnified100
+        | Case::PptTextAggregateEagerUnified256
+        | Case::PptTextAggregateEagerUnified1000
+        | Case::PptTextAggregateEagerUnified4096
+        | Case::PptTextAggregateEagerUnified10000
+        | Case::PptTextAggregatePositionalNative1
+        | Case::PptTextAggregatePositionalNative10
+        | Case::PptTextAggregatePositionalNative100
+        | Case::PptTextAggregatePositionalNative256
+        | Case::PptTextAggregatePositionalNative1000
+        | Case::PptTextAggregatePositionalNative4096
+        | Case::PptTextAggregatePositionalNative10000
+        | Case::PptTextAggregatePositionalUnified1
+        | Case::PptTextAggregatePositionalUnified10
+        | Case::PptTextAggregatePositionalUnified100
+        | Case::PptTextAggregatePositionalUnified256
+        | Case::PptTextAggregatePositionalUnified1000
+        | Case::PptTextAggregatePositionalUnified4096
+        | Case::PptTextAggregatePositionalUnified10000 => {
+            Err("PPT text-batch cases use the dedicated paired unified-ops runner".into())
+        },
         Case::PptPicturesEagerOpen
         | Case::PptPicturesSourceBackedOpen
         | Case::PptPicturesEagerFirstImage
@@ -25514,17 +26238,11 @@ fn run_case_with_config(
         Case::XlsxSourceNarrowColumnRangeScan => {
             run_xlsx_source_narrow_column_range_scan(corpus, warmup_iterations, samples)
         },
-        Case::XlsxFileOpen
-        | Case::XlsxFileOpenLifecycle
-        | Case::XlsxFileSelectedCell
-        | Case::XlsxSourceRepeatedStoreMedium
+        Case::XlsxSourceRepeatedStoreMedium
         | Case::XlsxSourceRepeatedStoreMediumReacquisitionControl
         | Case::XlsxSourceRepeatedStoreOversized
         | Case::XlsxSourceRepeatedStoreOversizedReacquisitionControl => {
             Err("XLSX filesystem cases are dispatched by the child-process evidence runner".into())
-        },
-        Case::XlsxBytesOpen | Case::XlsxBytesOpenLifecycle => {
-            run_xlsx_bytes_root_access(case, corpus, warmup_iterations, samples)
         },
         Case::PptxMarkerEagerFullText
         | Case::PptxMarkerSourceFullText
@@ -25570,14 +26288,6 @@ fn run_case_with_config(
         | Case::PptOwnedSourceControlOpen
         | Case::PptOwnedSourceControlOpenOneShapeText => {
             Err("OLE2 range-source cases use their own corpus runner".into())
-        },
-        Case::DocFacadeFileOpen
-        | Case::DocFacadeFileFullText
-        | Case::DocFacadeFileOneParagraph
-        | Case::PptFacadeFileOpen
-        | Case::PptFacadeFileFullText
-        | Case::PptFacadeFileOneSlideText => {
-            Err("OLE2 facade cases use their own corpus runner".into())
         },
         Case::DocxOrdinarySaveLifecycle
         | Case::DocxOrdinarySaveEdit
@@ -25652,9 +26362,6 @@ fn run_case_with_config(
                 samples,
                 range_simulation,
             )
-        },
-        Case::RtfFileOpen | Case::RtfFileOpenLifecycle => {
-            run_rtf_root_access(case, corpus, warmup_iterations, samples)
         },
         Case::RtfSemanticOpen
         | Case::RtfSemanticParagraphCount
@@ -25864,12 +26571,6 @@ fn run_case_with_config(
         | Case::OdpMediaSourceBackedOneSlide => {
             run_odp_media_source_access(case, corpus, warmup_iterations, samples)
         },
-        Case::OdpFileEagerOpen
-        | Case::OdpFileSourceOpen
-        | Case::OdpFileEagerSelectedSlide
-        | Case::OdpFileSourceSelectedSlide => {
-            run_odp_root_file_access(case, corpus, warmup_iterations, samples)
-        },
         Case::OdpSourceBackedRepeatedTextUncached | Case::OdpSourceBackedRepeatedTextCached => {
             run_odp_repeated_text(case, corpus, warmup_iterations, samples)
         },
@@ -25878,9 +26579,7 @@ fn run_case_with_config(
         | Case::OdpSourceBackedCatalogQuery => {
             run_odp_source_backed_catalog(case, corpus, warmup_iterations, samples)
         },
-        Case::OdsFileEagerOpen
-        | Case::OdsFileSourceOpen
-        | Case::OdsFileEagerSelectedCell
+        Case::OdsFileEagerSelectedCell
         | Case::OdsFileSourceSelectedCell
         | Case::OdsFileEagerSelectedMedia
         | Case::OdsFileSourceSelectedMedia => {
@@ -25895,6 +26594,127 @@ fn run_case_with_config(
         Case::OpcOpenSessionScaling | Case::CfbBulkReadScaling => {
             Err("scaling case requires an explicit worker count".into())
         },
+        Case::DocxFileUnifiedEagerOpen
+        | Case::DocxFileUnifiedSourceOpen
+        | Case::DocxFileUnifiedEagerParagraphCount
+        | Case::DocxFileUnifiedSourceParagraphCount
+        | Case::DocxFileUnifiedEagerListParagraphs
+        | Case::DocxFileUnifiedSourceListParagraphs
+        | Case::DocxFileUnifiedEagerFullText
+        | Case::DocxFileUnifiedSourceFullText
+        | Case::DocxFileUnifiedEagerOpenParagraphCountLifecycle
+        | Case::DocxFileUnifiedSourceOpenParagraphCountLifecycle
+        | Case::DocxFileUnifiedEagerOpenFullTextLifecycle
+        | Case::DocxFileUnifiedSourceOpenFullTextLifecycle
+        | Case::DocxFileLeafEagerOpen
+        | Case::DocxFileLeafSourceOpen
+        | Case::DocxFileLeafEagerParagraphCount
+        | Case::DocxFileLeafSourceParagraphCount
+        | Case::DocxFileLeafEagerListParagraphs
+        | Case::DocxFileLeafSourceListParagraphs
+        | Case::DocxFileLeafEagerFullText
+        | Case::DocxFileLeafSourceFullText
+        | Case::DocxFileLeafEagerOpenParagraphCountLifecycle
+        | Case::DocxFileLeafSourceOpenParagraphCountLifecycle
+        | Case::DocxFileLeafEagerOpenFullTextLifecycle
+        | Case::DocxFileLeafSourceOpenFullTextLifecycle
+        | Case::PptxFileUnifiedEagerOpen
+        | Case::PptxFileUnifiedSourceOpen
+        | Case::PptxFileUnifiedEagerListSlides
+        | Case::PptxFileUnifiedSourceListSlides
+        | Case::PptxFileUnifiedEagerSlideCount
+        | Case::PptxFileUnifiedSourceSlideCount
+        | Case::PptxFileUnifiedEagerSelectedSlide
+        | Case::PptxFileUnifiedSourceSelectedSlide
+        | Case::PptxFileUnifiedEagerOpenSlideCountLifecycle
+        | Case::PptxFileUnifiedSourceOpenSlideCountLifecycle
+        | Case::PptxFileUnifiedEagerOpenSelectedSlideLifecycle
+        | Case::PptxFileUnifiedSourceOpenSelectedSlideLifecycle
+        | Case::PptxFileLeafEagerOpen
+        | Case::PptxFileLeafSourceOpen
+        | Case::PptxFileLeafEagerListSlides
+        | Case::PptxFileLeafSourceListSlides
+        | Case::PptxFileLeafEagerSlideCount
+        | Case::PptxFileLeafSourceSlideCount
+        | Case::PptxFileLeafEagerSelectedSlide
+        | Case::PptxFileLeafSourceSelectedSlide
+        | Case::PptxFileLeafEagerOpenSlideCountLifecycle
+        | Case::PptxFileLeafSourceOpenSlideCountLifecycle
+        | Case::PptxFileLeafEagerOpenSelectedSlideLifecycle
+        | Case::PptxFileLeafSourceOpenSelectedSlideLifecycle
+        | Case::XlsxFileUnifiedOpen
+        | Case::XlsxFileUnifiedOpenLifecycle
+        | Case::XlsxFileUnifiedSelectedCell
+        | Case::XlsxFileLeafOpen
+        | Case::XlsxFileLeafOpenLifecycle
+        | Case::XlsxFileLeafSelectedCell
+        | Case::XlsxBytesUnifiedOpen
+        | Case::XlsxBytesUnifiedOpenLifecycle
+        | Case::XlsxBytesLeafOpen
+        | Case::XlsxBytesLeafOpenLifecycle
+        | Case::DocxSemanticUnifiedOneParagraph
+        | Case::DocxSemanticUnifiedOneParagraphText
+        | Case::DocxSemanticLeafOneParagraph
+        | Case::DocxSemanticLeafOneParagraphText
+        | Case::DocxProducerUnifiedSourceSelectedParagraph
+        | Case::DocxProducerLeafSourceSelectedParagraph
+        | Case::DocFileUnifiedOpen
+        | Case::DocFileUnifiedFullText
+        | Case::DocFileUnifiedOneParagraph
+        | Case::DocFileLeafOpen
+        | Case::DocFileLeafFullText
+        | Case::DocFileLeafOneParagraph
+        | Case::PptFileUnifiedOpen
+        | Case::PptFileUnifiedFullText
+        | Case::PptFileUnifiedOneSlideText
+        | Case::PptFileLeafOpen
+        | Case::PptFileLeafFullText
+        | Case::PptFileLeafOneSlideText
+        | Case::RtfFileUnifiedOpen
+        | Case::RtfFileUnifiedOpenLifecycle
+        | Case::RtfFileLeafOpen
+        | Case::RtfFileLeafOpenLifecycle
+        | Case::OdtFileUnifiedEagerOpen
+        | Case::OdtFileUnifiedSourceOpen
+        | Case::OdtFileUnifiedEagerOpenFullTextLifecycle
+        | Case::OdtFileUnifiedSourceOpenFullTextLifecycle
+        | Case::OdtFileLeafEagerOpen
+        | Case::OdtFileLeafSourceOpen
+        | Case::OdtFileLeafEagerOpenFullTextLifecycle
+        | Case::OdtFileLeafSourceOpenFullTextLifecycle
+        | Case::OdpFileUnifiedEagerOpen
+        | Case::OdpFileUnifiedSourceOpen
+        | Case::OdpFileUnifiedEagerSelectedSlide
+        | Case::OdpFileUnifiedSourceSelectedSlide
+        | Case::OdpFileLeafEagerOpen
+        | Case::OdpFileLeafSourceOpen
+        | Case::OdpFileLeafEagerSelectedSlide
+        | Case::OdpFileLeafSourceSelectedSlide
+        | Case::OdsFileUnifiedEagerOpen
+        | Case::OdsFileUnifiedSourceOpen
+        | Case::OdsFileLeafEagerOpen
+        | Case::OdsFileLeafSourceOpen
+        | Case::DetectOdtUnifiedBytes
+        | Case::DetectOdtUnifiedReader
+        | Case::DetectOdtUnifiedPolyglot
+        | Case::DetectOdtUnifiedCatalogAlias
+        | Case::DetectOdtLeafBytes
+        | Case::DetectOdtLeafReader
+        | Case::DetectOdsUnifiedBytes
+        | Case::DetectOdsUnifiedReader
+        | Case::DetectOdsUnifiedPolyglot
+        | Case::DetectOdsUnifiedCatalogAlias
+        | Case::DetectOdsLeafBytes
+        | Case::DetectOdsLeafReader
+        | Case::DetectOdpUnifiedBytes
+        | Case::DetectOdpUnifiedReader
+        | Case::DetectOdpUnifiedPolyglot
+        | Case::DetectOdpUnifiedCatalogAlias
+        | Case::DetectOdpLeafBytes
+        | Case::DetectOdpLeafReader => Err(
+            "paired unified/leaf routes run through filesystem::run_selected or unified_ops::run_selected"
+                .into(),
+        ),
     }
 }
 
@@ -25939,7 +26759,7 @@ fn execution_context(
 }
 
 fn zip_logical_work(bytes: &[u8]) -> Result<(usize, u64), Box<dyn Error>> {
-    let archive = ArchiveReader::new(bytes)?;
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())?;
     let names = archive.file_names().map(str::to_owned).collect::<Vec<_>>();
     let mut logical_bytes = 0u64;
     for name in &names {
@@ -25988,7 +26808,7 @@ fn run_opc_open_session_scaling(
         )?;
         let session = OpenSession::new(context)?;
         let started = Instant::now();
-        let package = session.from_bytes(&corpus.archive, ReadLimits::default())?;
+        let package = session.from_bytes(&corpus.archive, SourceLimits::default())?;
         let duration = started.elapsed();
         verify_opc_scaling_package(&package, corpus, kind)?;
         std::hint::black_box(&package);
@@ -26045,7 +26865,7 @@ fn run_cfb_bulk_read_scaling(
     let mut elapsed = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let source = cfb_instrumented_source(corpus);
-        let ole = SharedOleFile::open_with_limits(source.clone(), cfb_shared_limits(corpus)?)?;
+        let ole = SharedOleFile::open(source.clone(), cfb_shared_limits(corpus)?)?;
         let context = execution_context(
             workers,
             logical_tasks,
@@ -26107,7 +26927,7 @@ fn xlsx_output_ceiling(bytes: usize) -> Result<u64, Box<dyn Error>> {
 }
 
 fn verify_semantic_rtf(
-    document: &litchi_rtf::Document,
+    document: &litchi_rtf::Package,
     shape: SemanticShape,
     variant: RtfSemanticVariant,
     updated: &[usize],
@@ -26153,149 +26973,6 @@ fn verify_semantic_rtf(
     Ok(())
 }
 
-fn rtf_root_semantic_projection(
-    document: &litchi::Document,
-) -> Result<RtfRootSemanticProjection, Box<dyn Error>> {
-    let text = document.text()?;
-    let paragraphs = document
-        .paragraphs()?
-        .into_iter()
-        .map(|paragraph| paragraph.text())
-        .collect::<Result<Vec<_>, _>>()?;
-    Ok(RtfRootSemanticProjection { text, paragraphs })
-}
-
-fn rtf_root_values_digest(values: &[String]) -> String {
-    let mut digest = Sha256::new();
-    for (index, value) in values.iter().enumerate() {
-        digest.update((index as u64).to_le_bytes());
-        digest.update((value.len() as u64).to_le_bytes());
-        digest.update(value.as_bytes());
-    }
-    fingerprint_hex(&digest.finalize().into())
-}
-
-fn rtf_root_case_parameters(case: Case) -> Result<bool, Box<dyn Error>> {
-    match case {
-        Case::RtfFileOpen => Ok(false),
-        Case::RtfFileOpenLifecycle => Ok(true),
-        _ => Err("non-root RTF case passed to RTF root case parameters".into()),
-    }
-}
-
-fn run_rtf_root_access(
-    case: Case,
-    corpus: &Corpus,
-    warmup_iterations: usize,
-    samples: usize,
-) -> Result<CaseResult, Box<dyn Error>> {
-    if !case.is_rtf_root_file() {
-        return Err("non-root RTF case passed to RTF root runner".into());
-    }
-    let shape = semantic_shape(corpus)?;
-    let variant = semantic_rtf_variant(corpus)?;
-    let lifecycle = rtf_root_case_parameters(case)?;
-
-    // Build the native typed seam oracle before timing. It deliberately does
-    // not use the unified facade, so a facade adapter regression cannot
-    // certify itself through its own projection. Both seams still share the
-    // native RTF parser/model; this is not an independent parser oracle.
-    let native = litchi_rtf::Document::from_bytes(&corpus.archive)?;
-    verify_semantic_rtf(&native, shape, variant, &[])?;
-    let expected_projection = RtfRootSemanticProjection {
-        text: native.text().to_owned(),
-        paragraphs: native
-            .body()
-            .paragraphs()
-            .map(|paragraph| paragraph.to_text())
-            .collect(),
-    };
-    if native.to_bytes()? != corpus.archive {
-        return Err("RTF root native oracle changed exact source bytes".into());
-    }
-    let source_sha256 = sha256_hex(&corpus.archive);
-    if source_sha256 != corpus.manifest.archive_sha256
-        || corpus.archive.len() != corpus.manifest.archive_bytes
-    {
-        return Err("RTF root source hash differs from deterministic manifest".into());
-    }
-
-    // This preflight is also the native semantic-parity gate for every
-    // selected transport. For the historical facade implementation, the
-    // default plain ASCII corpus succeeds; CP-1252/LZFu selectors become
-    // runnable as soon as the native byte ingress lands.
-    let facade = litchi::Document::from_bytes(corpus.archive.clone())?;
-    let facade_projection = rtf_root_semantic_projection(&facade)?;
-    if facade_projection != expected_projection {
-        return Err("RTF unified facade differs from native semantic oracle".into());
-    }
-    let paragraph_count = expected_projection.paragraphs.len();
-    if paragraph_count != semantic_rtf_paragraph_count(shape, variant)
-        || facade.paragraph_count()? != paragraph_count
-    {
-        return Err("RTF unified facade paragraph count differs from native oracle".into());
-    }
-
-    let mut elapsed = Vec::with_capacity(samples);
-    for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        // Keep the owned-byte clone outside the measured native ingress. This
-        // isolates `Document::from_bytes(Vec<u8>)` from caller setup/copy cost.
-        let owned = corpus.archive.clone();
-        let started = Instant::now();
-        let document = litchi::Document::from_bytes(owned)?;
-        let lifecycle_text = lifecycle.then(|| document.text()).transpose()?;
-        let duration = started.elapsed();
-
-        // Semantic verification is intentionally outside the clock. It both
-        // protects each timed construction and keeps the interval limited to
-        // the selected open/open-plus-text lifecycle.
-        let measured_projection = rtf_root_semantic_projection(&document)?;
-        if measured_projection != expected_projection {
-            return Err("RTF timed unified facade differs from native oracle".into());
-        }
-        if let Some(text) = lifecycle_text {
-            if text != expected_projection.text {
-                return Err("RTF timed unified lifecycle text differs from oracle".into());
-            }
-            std::hint::black_box(text);
-        }
-        std::hint::black_box(document);
-        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
-    }
-
-    let summary = RtfRootSummary {
-        implementation: "unified_owned_bytes_facade",
-        phase: if lifecycle {
-            "owned_bytes_open_and_full_text_lifecycle"
-        } else {
-            "owned_bytes_open_only"
-        },
-        timing_scope: if lifecycle {
-            "litchi::Document::from_bytes(Vec<u8>)+Document::text; corpus, clone/setup, native oracle, source hash, and parity checks outside timer"
-        } else {
-            "litchi::Document::from_bytes(Vec<u8>); corpus, clone/setup, native oracle, source hash, and parity checks outside timer"
-        },
-        performance_claim: "none: scoped synthetic RTF ingress evidence only; no generic, producer, allocation, I/O, or ABBA claim",
-        transport_variant: variant.name(),
-        source_bytes: u64::try_from(corpus.archive.len())?,
-        source_sha256,
-        canonical_text_sha256: sha256_hex(expected_projection.text.as_bytes()),
-        paragraph_text_sha256: rtf_root_values_digest(&expected_projection.paragraphs),
-        paragraph_count,
-        native_semantic_parity_verified: true,
-        native_exact_source_roundtrip_verified: true,
-    };
-    Ok(result_with_source(
-        case,
-        corpus,
-        elapsed,
-        SourceSummary {
-            rtf_root: Some(summary),
-            ..SourceSummary::default()
-        },
-    ))
-}
-
 fn semantic_rtf_lifecycle_projection(
     case: Case,
     shape: SemanticShape,
@@ -26323,7 +27000,7 @@ fn semantic_rtf_lifecycle_projection(
 
 fn stage_semantic_rtf_lifecycle(
     case: Case,
-    document: &litchi_rtf::Document,
+    document: &litchi_rtf::Package,
 ) -> Result<litchi_rtf::edit::Commit, Box<dyn Error>> {
     let paragraph_count = document.paragraph_count();
     if paragraph_count < 2 {
@@ -26333,10 +27010,10 @@ fn stage_semantic_rtf_lifecycle(
     let mut edit = document.edit();
     match case {
         Case::RtfSemanticRemoveParagraphSave => {
-            edit.remove_paragraph(selected)?;
+            edit.remove_paragraph(Position::new(selected))?;
         },
         Case::RtfSemanticMoveParagraphSave => {
-            edit.move_paragraph(0, paragraph_count - 1)?;
+            edit.move_paragraph(Position::new(0), Position::new(paragraph_count - 1))?;
         },
         _ => return Err("non-lifecycle RTF case reached lifecycle staging".into()),
     }
@@ -26355,7 +27032,7 @@ fn semantic_rtf_durable_limits() -> litchi_core::patch::PatchLimits {
 }
 
 fn verify_semantic_rtf_lifecycle_projection(
-    document: &litchi_rtf::Document,
+    document: &litchi_rtf::Package,
     expected: &[String],
 ) -> Result<(), Box<dyn Error>> {
     if document.paragraph_count() != expected.len() {
@@ -26374,7 +27051,7 @@ fn verify_semantic_rtf_lifecycle_projection(
 
 fn verify_semantic_rtf_lifecycle_commit(
     case: Case,
-    source: &litchi_rtf::Document,
+    source: &litchi_rtf::Package,
     commit: &litchi_rtf::edit::Commit,
     expected_projection: &[String],
     expected_bytes: &[u8],
@@ -26382,17 +27059,17 @@ fn verify_semantic_rtf_lifecycle_commit(
     if !commit.diagnostics().changed() || commit.diagnostics().operation_count() != 1 {
         return Err("semantic RTF lifecycle commit has unexpected diagnostics".into());
     }
-    if commit.snapshot().to_bytes()? != expected_bytes {
+    if commit.package().to_bytes()? != expected_bytes {
         return Err("semantic RTF lifecycle commit differs from expected bytes".into());
     }
-    let reopened = litchi_rtf::Document::from_bytes(expected_bytes)?;
+    let reopened = litchi_rtf::Package::from_bytes(expected_bytes)?;
     verify_semantic_rtf_lifecycle_projection(&reopened, expected_projection)?;
 
-    let applied = commit.patch().apply(source)?;
+    let applied = source.apply(commit.patch())?.into_package();
     if applied.to_bytes()? != expected_bytes {
         return Err("semantic RTF lifecycle patch replay differs from publication".into());
     }
-    let restored = commit.patch().inverse().apply(&applied)?;
+    let restored = applied.apply(&commit.patch().inverse())?.into_package();
     if restored.to_bytes()? != source.to_bytes()? {
         return Err("semantic RTF lifecycle inverse did not restore exact source bytes".into());
     }
@@ -26404,18 +27081,20 @@ fn verify_semantic_rtf_lifecycle_commit(
         litchi_core::patch::Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
             &encoded, limits,
         )?;
-    let durable_applied = source.apply_durable(&decoded)?;
+    let durable_applied = source.apply_durable(&decoded)?.into_package();
     if durable_applied.to_bytes()? != expected_bytes {
         return Err("semantic RTF durable lifecycle replay differs from publication".into());
     }
-    let durable_restored = durable_applied.apply_durable(&decoded.inverse())?;
+    let durable_restored = durable_applied
+        .apply_durable(&decoded.inverse())?
+        .into_package();
     if durable_restored.to_bytes()? != source.to_bytes()? {
         return Err("semantic RTF durable inverse did not restore exact source bytes".into());
     }
 
     let mut stale_edit = source.edit();
-    stale_edit.replace_paragraph_text(0, "litchi-perf-baseline-rtf-stale-source")?;
-    let stale = stale_edit.commit()?.into_snapshot();
+    stale_edit.replace_paragraph_text(Position::new(0), "litchi-perf-baseline-rtf-stale-source")?;
+    let stale = stale_edit.commit()?.into_package();
     if !matches!(
         stale.apply_durable(&decoded),
         Err(litchi_rtf::edit::Error::PatchConflict)
@@ -26425,12 +27104,12 @@ fn verify_semantic_rtf_lifecycle_commit(
 
     if case == Case::RtfSemanticMoveParagraphSave {
         let mut noop = source.edit();
-        noop.move_paragraph(0, 0)?;
+        noop.move_paragraph(Position::new(0), Position::new(0))?;
         let noop = noop.commit()?;
         if noop.diagnostics().changed()
             || noop.diagnostics().operation_count() != 1
-            || !noop.snapshot().same_snapshot(source)
-            || noop.snapshot().to_bytes()? != source.to_bytes()?
+            || !noop.package().same_snapshot(source)
+            || noop.package().to_bytes()? != source.to_bytes()?
             || !noop.patch().to_durable(limits)?.operations().is_empty()
         {
             return Err("semantic RTF equal-position move was not an exact no-op".into());
@@ -26542,7 +27221,7 @@ fn pptx_selector_edits(shape: SemanticShape, repeated: bool) -> Vec<PptxSelector
 
 fn verify_pptx_selector_error_oracle(corpus: &Corpus) -> Result<(), Box<dyn Error>> {
     let missing_name = "litchi-perf-pptx-slide-name-index-missing";
-    let package = litchi_pptx::Package::from_vec(corpus.archive.clone())?;
+    let package = litchi_pptx::Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?;
     let snapshot = package.opened_presentation()?;
     let mut missing_edit = snapshot.edit();
     match missing_edit.set_shape_text(missing_name, 0usize, "missing") {
@@ -26564,7 +27243,8 @@ fn verify_pptx_selector_error_oracle(corpus: &Corpus) -> Result<(), Box<dyn Erro
     let duplicate_archive = rewrite_pptx_slide_names(&corpus.archive, |index| {
         (index == 1).then(|| duplicate_name.clone())
     })?;
-    let duplicate_package = litchi_pptx::Package::from_vec(duplicate_archive)?;
+    let duplicate_package =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(duplicate_archive))?;
     let duplicate_snapshot = duplicate_package.opened_presentation()?;
     let mut duplicate_edit = duplicate_snapshot.edit();
     match duplicate_edit.set_shape_text(duplicate_name.as_str(), 0usize, "duplicate") {
@@ -26642,7 +27322,8 @@ fn build_pptx_selector_oracle(
     shape: SemanticShape,
     edits: &[PptxSelectorEdit],
 ) -> Result<Vec<u8>, Box<dyn Error>> {
-    let mut package = OpcPackage::from_vec(corpus.archive.clone())?;
+    let mut package =
+        OpcPackage::from_vec(corpus.archive.clone(), litchi_opc::SourceLimits::default())?;
     for operation in edits {
         let part_name = PackURI::new(format!(
             "/ppt/slides/slide{}.xml",
@@ -26758,7 +27439,7 @@ fn verify_semantic_odt(
 }
 
 fn verify_odt_media_archive(bytes: &[u8], updated: bool) -> Result<(), Box<dyn Error>> {
-    let document = litchi_odt::Document::from_bytes(bytes.to_vec())?;
+    let document = litchi_odt::Package::from_bytes(bytes)?.document()?;
     let updated = updated.then_some(SemanticShape::Medium.docx_paragraphs() / 2);
     verify_semantic_odt(&document, SemanticShape::Medium, updated.as_slice())?;
 
@@ -26777,7 +27458,7 @@ fn verify_odt_media_archive(bytes: &[u8], updated: bool) -> Result<(), Box<dyn E
 }
 
 fn verify_odt_repeated_text_archive(bytes: &[u8]) -> Result<(), Box<dyn Error>> {
-    let document = litchi_odt::Document::from_bytes(bytes.to_vec())?;
+    let document = litchi_odt::Package::from_bytes(bytes)?.document()?;
     verify_semantic_odt(&document, SemanticShape::Large, &[])?;
 
     let package = litchi_odf_common::core::OwnedPackage::from_bytes(bytes.to_vec())?;
@@ -26797,7 +27478,7 @@ fn verify_odt_repeated_text_archive(bytes: &[u8]) -> Result<(), Box<dyn Error>> 
 fn verify_odt_media_line_break_archive(bytes: &[u8]) -> Result<(), Box<dyn Error>> {
     let shape = SemanticShape::Medium;
     let target = shape.docx_paragraphs() / 2;
-    let document = litchi_odt::Document::from_bytes(bytes.to_vec())?;
+    let document = litchi_odt::Package::from_bytes(bytes)?.document()?;
     let paragraphs = document.paragraphs()?;
     if paragraphs.len() != shape.docx_paragraphs() {
         return Err("media-rich ODT line-break paragraph count differs from specification".into());
@@ -26834,7 +27515,7 @@ fn verify_odt_media_line_break_archive(bytes: &[u8]) -> Result<(), Box<dyn Error
 fn verify_odt_media_append_run_archive(bytes: &[u8]) -> Result<(), Box<dyn Error>> {
     let shape = SemanticShape::Medium;
     let target = shape.docx_paragraphs() / 2;
-    let document = litchi_odt::Document::from_bytes(bytes.to_vec())?;
+    let document = litchi_odt::Package::from_bytes(bytes)?.document()?;
     let paragraphs = document.paragraphs()?;
     if paragraphs.len() != shape.docx_paragraphs() {
         return Err("media-rich ODT append-run paragraph count differs from specification".into());
@@ -26871,7 +27552,7 @@ fn verify_odt_media_append_run_archive(bytes: &[u8]) -> Result<(), Box<dyn Error
 fn verify_odt_media_append_hyperlink_archive(bytes: &[u8]) -> Result<(), Box<dyn Error>> {
     let shape = SemanticShape::Medium;
     let target = shape.docx_paragraphs() / 2;
-    let document = litchi_odt::Document::from_bytes(bytes.to_vec())?;
+    let document = litchi_odt::Package::from_bytes(bytes)?.document()?;
     let paragraphs = document.paragraphs()?;
     if paragraphs.len() != shape.docx_paragraphs() {
         return Err(
@@ -26922,7 +27603,7 @@ fn verify_odt_media_structural_paragraph_archive(
     let shape = SemanticShape::Medium;
     let original_count = shape.docx_paragraphs();
     let target = original_count / 2;
-    let document = litchi_odt::Document::from_bytes(bytes.to_vec())?;
+    let document = litchi_odt::Package::from_bytes(bytes)?.document()?;
     let paragraphs = document.paragraphs()?;
     let expected_count = if inserted {
         original_count
@@ -26979,7 +27660,7 @@ fn verify_odt_resource_batch_archive(
     bytes: &[u8],
     updated: bool,
 ) -> Result<OdtResourceProjection, Box<dyn Error>> {
-    let document = litchi_odt::Document::from_bytes(bytes.to_vec())?;
+    let document = litchi_odt::Package::from_bytes(bytes)?.document()?;
     verify_semantic_odt(&document, SemanticShape::Medium, &[])?;
     if !document.embedded_objects()?.is_empty() {
         return Err("ODT embedded-resource corpus unexpectedly contains objects".into());
@@ -27062,7 +27743,9 @@ fn verify_odt_resource_batch_raw_members(
     if identical.contains("content.xml") {
         return Err("ODT embedded-resource content.xml remained raw-identical".into());
     }
-    for path in ArchiveReader::new(source)?.file_names() {
+    for path in
+        ArchiveReader::new(source, soapberry_zip::office::ArchiveLimits::default())?.file_names()
+    {
         if !matches!(path, "content.xml" | "META-INF/manifest.xml") && !identical.contains(path) {
             return Err(format!(
                 "ODT embedded-resource publication changed untouched raw member '{path}'; identical={identical:?}"
@@ -27074,7 +27757,7 @@ fn verify_odt_resource_batch_raw_members(
 }
 
 fn semantic_ods_full_cell_text(
-    spreadsheet: &litchi_ods::Spreadsheet,
+    spreadsheet: &litchi_ods::Workbook,
     shape: SemanticShape,
 ) -> Result<String, Box<dyn Error>> {
     let mut values = Vec::with_capacity(shape.ods_cell_count());
@@ -27096,7 +27779,7 @@ fn semantic_ods_full_cell_text(
 }
 
 fn semantic_ods_cell_sweep(
-    spreadsheet: &litchi_ods::Spreadsheet,
+    spreadsheet: &litchi_ods::Workbook,
     shape: SemanticShape,
 ) -> Result<usize, Box<dyn Error>> {
     let mut stored_cells = 0usize;
@@ -27177,7 +27860,7 @@ fn expected_semantic_ods_row_text(shape: SemanticShape, updated_indices: &[usize
 }
 
 fn verify_semantic_ods(
-    spreadsheet: &litchi_ods::Spreadsheet,
+    spreadsheet: &litchi_ods::Workbook,
     shape: SemanticShape,
     updated: bool,
 ) -> Result<(), Box<dyn Error>> {
@@ -27195,7 +27878,7 @@ fn verify_semantic_ods(
 }
 
 fn verify_semantic_ods_updates(
-    spreadsheet: &litchi_ods::Spreadsheet,
+    spreadsheet: &litchi_ods::Workbook,
     shape: SemanticShape,
     updated_indices: &[usize],
 ) -> Result<(), Box<dyn Error>> {
@@ -27237,7 +27920,7 @@ fn verify_semantic_ods_updates(
 }
 
 fn verify_ods_media_archive(bytes: &[u8], updated: bool) -> Result<(), Box<dyn Error>> {
-    let spreadsheet = litchi_ods::Spreadsheet::from_bytes(bytes.to_vec())?;
+    let spreadsheet = litchi_ods::Package::from_bytes(bytes)?.workbook()?;
     verify_semantic_ods(&spreadsheet, SemanticShape::Medium, updated)?;
 
     let package = litchi_odf_common::core::OwnedPackage::from_bytes(bytes.to_vec())?;
@@ -27296,7 +27979,8 @@ fn verify_semantic_odp(
 }
 
 fn verify_odp_media_archive(bytes: &[u8], text_box_added: bool) -> Result<(), Box<dyn Error>> {
-    let presentation = litchi_odp::Presentation::from_bytes(bytes.to_vec())?;
+    let odp_package = litchi_odp::Package::from_bytes(bytes)?;
+    let presentation = odp_package.presentation()?;
     if text_box_added {
         let slides = presentation.slides()?;
         if slides.len() != SemanticShape::Medium.pptx_slides() {
@@ -27318,7 +28002,7 @@ fn verify_odp_media_archive(bytes: &[u8], text_box_added: bool) -> Result<(), Bo
     } else {
         verify_semantic_odp(&presentation, SemanticShape::Medium, false)?;
     }
-    let snapshot = presentation.snapshot()?;
+    let snapshot = odp_package.clone();
     let inventory = snapshot.rich_content()?;
     let matching = inventory
         .text_boxes()
@@ -27351,7 +28035,8 @@ fn verify_odp_media_archive(bytes: &[u8], text_box_added: bool) -> Result<(), Bo
 }
 
 fn verify_odp_text_box_batch_archive(bytes: &[u8], updated: bool) -> Result<(), Box<dyn Error>> {
-    let presentation = litchi_odp::Presentation::from_bytes(bytes.to_vec())?;
+    let odp_package = litchi_odp::Package::from_bytes(bytes)?;
+    let presentation = odp_package.presentation()?;
     let slides = presentation.slides()?;
     if slides.len() != SemanticShape::Medium.pptx_slides() {
         return Err("ODP text-box batch slide count differs from specification".into());
@@ -27383,7 +28068,7 @@ fn verify_odp_text_box_batch_archive(bytes: &[u8], updated: bool) -> Result<(), 
         return Err("ODP text-box batch full text differs from slide scan".into());
     }
 
-    let snapshot = presentation.snapshot()?;
+    let snapshot = odp_package.clone();
     let inventory = snapshot.rich_content()?;
     for index in 0..ODP_TEXT_BOX_BATCH_COUNT {
         let name = odp_text_box_batch_name(index);
@@ -27435,7 +28120,9 @@ fn verify_odp_text_box_batch_raw_members(
     if !require_manifest && identical.contains("META-INF/manifest.xml") {
         return Err("ODP scalar text-box staging unexpectedly raw-preserved the manifest".into());
     }
-    for path in ArchiveReader::new(source)?.file_names() {
+    for path in
+        ArchiveReader::new(source, soapberry_zip::office::ArchiveLimits::default())?.file_names()
+    {
         if path != "content.xml"
             && (require_manifest || path != "META-INF/manifest.xml")
             && !identical.contains(path)
@@ -27454,11 +28141,11 @@ fn verify_semantic_doc(
     shape: WriterShape,
     updated: Option<usize>,
 ) -> Result<(), Box<dyn Error>> {
-    use litchi_doc::body_text::{Projection, Snapshot};
+    use litchi_doc::body_text::Projection;
 
     let count = shape.doc_paragraph_count();
-    let snapshot = Snapshot::from_bytes(bytes.to_vec())?;
-    let projected = snapshot.paragraphs(Projection::All)?;
+    let snapshot = litchi_doc::Package::from_bytes(bytes)?;
+    let projected = snapshot.body_paragraphs(Projection::All)?;
     if projected.len() != count {
         return Err("semantic DOC paragraph count differs from writer specification".into());
     }
@@ -27471,7 +28158,7 @@ fn verify_semantic_doc(
         }
     }
 
-    let mut package = litchi_doc::Package::from_reader(Cursor::new(bytes))?;
+    let mut package = litchi_doc::raw::Reader::from_reader(Cursor::new(bytes))?;
     let document = package.document()?;
     let paragraphs = document.paragraphs()?;
     if paragraphs.len() != count {
@@ -27509,18 +28196,20 @@ fn run_doc_body_snapshot_list_paragraphs(
     warmup_iterations: usize,
     samples: usize,
 ) -> Result<CaseResult, Box<dyn Error>> {
-    use litchi_doc::body_text::{Projection, Snapshot};
+    use litchi_doc::body_text::Projection;
 
     let shape = writer_shape(corpus)?;
     if shape == WriterShape::PayloadHeavy {
         return Err("payload-heavy DOC corpus is excluded from semantic cases".into());
     }
-    let snapshot = Snapshot::from_bytes(corpus.archive.clone())?;
+    // Record 0359a: the body-text engine is crate-private; its reads are the
+    // package-level body routes.
+    let snapshot = litchi_doc::Package::from_bytes(&corpus.archive)?;
     let count = shape.doc_paragraph_count();
     let mut elapsed = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let started = Instant::now();
-        let paragraphs = snapshot.paragraphs(Projection::All)?;
+        let paragraphs = snapshot.body_paragraphs(Projection::All)?;
         let duration = started.elapsed();
         if paragraphs.len() != count {
             return Err("DOC body snapshot paragraph count differs from specification".into());
@@ -27718,8 +28407,16 @@ impl DocPhaseRecorder {
 
 fn profile_doc_open(
     input: Vec<u8>,
-) -> Result<(litchi_doc::body_text::Snapshot, DocPhaseDurations, u64), Box<dyn Error>> {
-    use litchi_doc::body_text::{DiagnosticPhase, Snapshot, TransactionLimits};
+) -> Result<
+    (
+        litchi_doc::Package,
+        litchi_doc::Edit<'static>,
+        DocPhaseDurations,
+        u64,
+    ),
+    Box<dyn Error>,
+> {
+    use litchi_doc::body_text::DiagnosticPhase;
 
     let expected = [
         DiagnosticPhase::StrictOwnerValidation,
@@ -27728,20 +28425,29 @@ fn profile_doc_open(
     ];
     let mut recorder = DocPhaseRecorder::new(expected.len())?;
     let started = Instant::now();
-    let snapshot = Snapshot::open_bounded_profiled(
-        input,
-        litchi_doc::tracked_revision::Limits::default(),
-        TransactionLimits::default(),
+    // Record 0359a: the profiled body open is reached through
+    // `Package::edit_profiled` (the body-text engine is crate-private).
+    let package = litchi_doc::Package::from_bytes(&input)?;
+    let edit = package.edit_profiled(
+        litchi_doc::EditOptions::default(),
         |event| recorder.observe(event),
+        |_| {},
     )?;
+    // `edit_profiled` is lazy just like the ordinary edit. Deliberately make
+    // the first body access inside this measured open interval so the phase
+    // recorder observes the real owner/public-reader/source-retention work,
+    // rather than silently recording an empty open.
+    let mut edit = edit;
+    let _ = edit.source_bytes()?.len();
+    let edit = edit.into_unprofiled()?;
     let outer_ns = elapsed_ns(started.elapsed())?;
     let phases = recorder.finish(&expected)?;
-    Ok((snapshot, phases, outer_ns))
+    Ok((package, edit, phases, outer_ns))
 }
 
 fn profile_doc_changed_commit(
-    edit: litchi_doc::body_text::Edit,
-) -> Result<(litchi_doc::body_text::Commit, DocPhaseDurations, u64), Box<dyn Error>> {
+    edit: litchi_doc::Edit<'static>,
+) -> Result<(litchi_doc::Commit, DocPhaseDurations, u64), Box<dyn Error>> {
     use litchi_doc::body_text::DiagnosticPhase;
 
     let expected = [
@@ -27760,8 +28466,9 @@ fn profile_doc_changed_commit(
 }
 
 fn verify_doc_untouched_streams(source: &[u8], candidate: &[u8]) -> Result<(), Box<dyn Error>> {
-    let mut source_ole = OleFile::open(Cursor::new(source))?;
-    let mut candidate_ole = OleFile::open(Cursor::new(candidate))?;
+    let mut source_ole = OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default())?;
+    let mut candidate_ole =
+        OleFile::open(Cursor::new(candidate), litchi_cfb::OleFileLimits::default())?;
     let mut source_paths = source_ole.list_streams();
     let mut candidate_paths = candidate_ole.list_streams();
     source_paths.sort();
@@ -27803,12 +28510,14 @@ fn run_doc_owner_public_phases(
     warmup_iterations: usize,
     samples: usize,
 ) -> Result<CaseResult, Box<dyn Error>> {
-    use litchi_doc::body_text::{DiagnosticPhase, Error as DocBodyError, Refusal, Snapshot};
+    use litchi_doc::body_text::{DiagnosticPhase, Error as DocBodyError, Refusal};
+    use litchi_doc::package::edit::Error as DocEditError;
 
     let shape = writer_shape(corpus)?;
     let paragraph_count = shape.doc_paragraph_count();
     let selected = paragraph_count / 2;
-    let source = Snapshot::from_bytes(corpus.archive.clone())?;
+    let source = litchi_doc::Package::from_bytes(&corpus.archive)?;
+    let source_bytes = source.to_bytes()?;
 
     // All semantic, patch, refusal, hash, and preservation checks are
     // intentionally preflight work. They are not part of timed phase samples.
@@ -27819,49 +28528,53 @@ fn run_doc_owner_public_phases(
         &updated_writer_text("doc", 0, selected, 0),
     )?;
     let ordinary_commit = ordinary_edit.commit()?;
-    if !ordinary_commit.changed()
+    if !ordinary_commit.diagnostics().changed()
         || ordinary_commit.patch().is_noop()
         || ordinary_commit.patch().changes().len() != 1
     {
         return Err("DOC changed preflight did not produce one semantic change".into());
     }
-    let expected_changed = ordinary_commit.snapshot().finish();
+    let expected_changed = ordinary_commit.package().to_bytes()?;
     verify_semantic_doc(&expected_changed, shape, Some(selected))?;
 
-    let applied = ordinary_commit.patch().apply(&source)?;
-    if applied.bytes() != ordinary_commit.snapshot().bytes()
-        || applied.bytes() != expected_changed.as_slice()
+    let applied = source.apply(ordinary_commit.patch())?.into_package();
+    if applied.to_bytes()? != ordinary_commit.package().to_bytes()?
+        || applied.to_bytes()? != expected_changed
     {
         return Err("DOC changed patch replay differs from the expected output".into());
     }
-    let reopened_source = Snapshot::from_bytes(corpus.archive.clone())?;
-    let reopened_applied = ordinary_commit.patch().apply(&reopened_source)?;
-    if reopened_applied.bytes() != expected_changed.as_slice() {
+    let reopened_source = litchi_doc::Package::from_bytes(&corpus.archive)?;
+    let reopened_applied = reopened_source
+        .apply(ordinary_commit.patch())?
+        .into_package();
+    if reopened_applied.to_bytes()? != expected_changed {
         return Err(
             "DOC independently reopened source patch replay differs from the expected output"
                 .into(),
         );
     }
-    let restored = ordinary_commit.patch().inverse().apply(&applied)?;
-    if restored.bytes() != source.bytes() {
+    let restored = applied
+        .apply(&ordinary_commit.patch().inverse())?
+        .into_package();
+    if restored.to_bytes()? != source_bytes {
         return Err("DOC inverse patch did not restore exact source bytes".into());
     }
-    if ordinary_commit.patch().apply(&applied).is_ok() {
+    if applied.apply(ordinary_commit.patch()).is_ok() {
         return Err("DOC stale-source patch application was accepted".into());
     }
 
     let no_op = source.clone().edit()?.commit()?;
-    if no_op.changed()
+    if no_op.diagnostics().changed()
         || !no_op.patch().is_noop()
         || no_op.patch().changes().len() != 0
-        || no_op.snapshot().bytes() != source.bytes()
+        || no_op.package().to_bytes()? != source_bytes
     {
         return Err("DOC exact no-op preflight changed the source".into());
     }
 
     // Exercise the no-op diagnostic contract outside timed samples as well;
     // changed samples intentionally have a different event cardinality.
-    let no_op_profile_source = Snapshot::from_bytes(corpus.archive.clone())?;
+    let no_op_profile_source = litchi_doc::Package::from_bytes(&corpus.archive)?;
     let no_op_profile_edit = no_op_profile_source.edit()?;
     let no_op_expected = [
         DiagnosticPhase::Finish,
@@ -27872,9 +28585,9 @@ fn run_doc_owner_public_phases(
     let no_op_profile_commit =
         no_op_profile_edit.commit_profiled(|event| no_op_recorder.observe(event))?;
     no_op_recorder.validate(&no_op_expected)?;
-    if no_op_profile_commit.changed()
+    if no_op_profile_commit.diagnostics().changed()
         || !no_op_profile_commit.patch().is_noop()
-        || no_op_profile_commit.snapshot().bytes() != source.bytes()
+        || no_op_profile_commit.package().to_bytes()? != source_bytes
     {
         return Err("DOC profiled exact no-op contract changed the source".into());
     }
@@ -27882,22 +28595,24 @@ fn run_doc_owner_public_phases(
     let mut refusal_edit = source.clone().edit()?;
     if !matches!(
         refusal_edit.replace_paragraph(Position::new(paragraph_count), "out-of-range"),
-        Err(DocBodyError::Refused(Refusal::ParagraphNotFound))
+        Err(DocEditError::Body(DocBodyError::Refused(
+            Refusal::ParagraphNotFound
+        )))
     ) {
         return Err("DOC out-of-range edit did not return its typed refusal".into());
     }
-    if Snapshot::from_bytes(vec![0_u8; 8]).is_ok() {
+    if litchi_doc::Package::from_bytes(&[0_u8; 8]).is_ok() {
         return Err("DOC malformed source was accepted by the strict owner".into());
     }
     verify_doc_untouched_streams(&corpus.archive, &expected_changed)?;
     let expected_output_sha256 = sha256_hex(&expected_changed);
-    let expected_source_fingerprint = doc_body_text_fnv1a(source.bytes());
+    let expected_source_fingerprint = doc_body_text_fnv1a(&source_bytes);
     let expected_target_fingerprint = doc_body_text_fnv1a(&expected_changed);
 
     let mut elapsed = Vec::with_capacity(samples);
     let mut summary = DocOwnerPublicPhaseSummary {
-        implementation: "litchi-doc::body_text::Snapshot/Edit profiled owner-public seam",
-        timing_scope: "measured_total_ns covers native DOC owner/public validation, in-memory owner rendering, and output materialization; deterministic replacement text is prepared before the lifecycle timer; same-lineage patch apply and first source/target FNV-1a fingerprint demand are timed after that boundary as workflow extensions",
+        implementation: "litchi-doc::Package::edit_profiled/Edit::commit_profiled owner-public seam",
+        timing_scope: "measured_total_ns covers the profiled first body access (the lazy edit's owner/public-reader/source-retention open), native DOC owner/public commit validation, in-memory owner rendering, and output materialization; deterministic replacement text is prepared before the lifecycle timer; same-lineage patch apply and first source/target FNV-1a fingerprint demand are timed after that boundary as workflow extensions",
         performance_claim: "attribution-only correctness and deferred-work accounting; measured_total_ns is the established lifecycle boundary, synchronous observer overhead is included, and no speedup, I/O, allocation, RSS, cold-start, or producer claim is made",
         selected_paragraph: selected,
         source_bytes: u64::try_from(corpus.archive.len())?,
@@ -27913,10 +28628,9 @@ fn run_doc_owner_public_phases(
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let input = corpus.archive.clone();
         let lifecycle_started = Instant::now();
-        let (snapshot, open_phases, open_outer_ns) = profile_doc_open(input)?;
+        let (snapshot, mut edit, open_phases, open_outer_ns) = profile_doc_open(input)?;
 
         let edit_new_started = Instant::now();
-        let mut edit = snapshot.edit()?;
         let edit_new_ns = elapsed_ns(edit_new_started.elapsed())?;
 
         let replacement_started = Instant::now();
@@ -27928,7 +28642,7 @@ fn run_doc_owner_public_phases(
 
         let (commit, edit_phases, edit_commit_outer_ns) = profile_doc_changed_commit(edit)?;
         let output_started = Instant::now();
-        let output = commit.snapshot().finish();
+        let output = commit.package().to_bytes()?;
         let output_materialization_ns = elapsed_ns(output_started.elapsed())?;
         let measured_total_ns = elapsed_ns(lifecycle_started.elapsed())?;
 
@@ -27937,9 +28651,10 @@ fn run_doc_owner_public_phases(
         // explicit post-lifecycle workflow extensions rather than hidden in
         // `measured_total_ns`.
         let apply_started = Instant::now();
-        let applied = commit.patch().apply(&snapshot)?;
+        let applied = snapshot.apply(commit.patch())?.into_package();
         let same_lineage_apply_ns = elapsed_ns(apply_started.elapsed())?;
-        if applied.bytes() != expected_changed.as_slice() || applied.bytes() != output.as_slice() {
+        let applied_bytes = applied.to_bytes()?;
+        if applied_bytes != expected_changed || applied_bytes != output {
             return Err("DOC same-lineage patch replay differs from the expected output".into());
         }
 
@@ -27947,8 +28662,8 @@ fn run_doc_owner_public_phases(
         let source_fingerprint = commit.patch().source_fingerprint();
         let target_fingerprint = commit.patch().target_fingerprint();
         let deferred_fingerprint_ns = elapsed_ns(fingerprint_started.elapsed())?;
-        if commit.patch().before().bytes() != snapshot.bytes()
-            || commit.patch().after().bytes() != expected_changed.as_slice()
+        if commit.patch().before_bytes() != source_bytes.as_slice()
+            || commit.patch().after_bytes() != expected_changed.as_slice()
             || source_fingerprint != expected_source_fingerprint
             || target_fingerprint != expected_target_fingerprint
         {
@@ -27974,14 +28689,14 @@ fn run_doc_owner_public_phases(
             return Err("DOC deferred workflow duration arithmetic is inconsistent".into());
         }
         std::hint::black_box((
-            applied.bytes(),
+            applied_bytes,
             source_fingerprint,
             target_fingerprint,
             workflow_no_diagnostic_ns,
             workflow_with_fingerprint_demand_ns,
         ));
 
-        if !commit.changed()
+        if !commit.diagnostics().changed()
             || commit.patch().is_noop()
             || commit.patch().changes().len() != 1
             || output != expected_changed
@@ -28132,8 +28847,6 @@ fn run_semantic_doc(
     warmup_iterations: usize,
     samples: usize,
 ) -> Result<CaseResult, Box<dyn Error>> {
-    use litchi_doc::body_text::Snapshot;
-
     let shape = writer_shape(corpus)?;
     if shape == WriterShape::PayloadHeavy {
         return Err("payload-heavy DOC corpus is excluded from semantic cases".into());
@@ -28141,7 +28854,7 @@ fn run_semantic_doc(
     let selected = shape.doc_paragraph_count() / 2;
     let expected_paragraph_count = if case == Case::DocSemanticParagraphCount {
         let mut oracle_package =
-            litchi_doc::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+            litchi_doc::raw::Reader::from_reader(Cursor::new(corpus.archive.as_slice()))?;
         let oracle_document = oracle_package.document()?;
         let oracle_paragraphs = oracle_document.paragraphs()?;
         let expected = oracle_paragraphs.len();
@@ -28155,13 +28868,13 @@ fn run_semantic_doc(
         shape.doc_paragraph_count()
     };
     let expected_changed = if case == Case::DocSemanticOneEditSave {
-        let source = Snapshot::from_bytes(corpus.archive.clone())?;
+        let source = litchi_doc::Package::from_bytes(&corpus.archive)?;
         let mut edit = source.edit()?;
         edit.replace_paragraph(
             Position::new(selected),
             &updated_writer_text("doc", 0, selected, 0),
         )?;
-        edit.commit()?.snapshot().finish()
+        edit.commit()?.package().to_bytes()?
     } else {
         corpus.archive.clone()
     };
@@ -28171,7 +28884,7 @@ fn run_semantic_doc(
             Case::DocSemanticOpen => {
                 let owned = corpus.archive.clone();
                 let started = Instant::now();
-                let mut package = litchi_doc::Package::from_reader(Cursor::new(owned))?;
+                let mut package = litchi_doc::raw::Reader::from_reader(Cursor::new(owned))?;
                 let document = package.document()?;
                 let duration = started.elapsed();
                 verify_semantic_doc(&corpus.archive, shape, None)?;
@@ -28180,7 +28893,7 @@ fn run_semantic_doc(
             },
             Case::DocSemanticListParagraphs => {
                 let mut package =
-                    litchi_doc::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                    litchi_doc::raw::Reader::from_reader(Cursor::new(corpus.archive.as_slice()))?;
                 let document = package.document()?;
                 let started = Instant::now();
                 let paragraphs = document.paragraphs()?;
@@ -28196,7 +28909,7 @@ fn run_semantic_doc(
             },
             Case::DocSemanticParagraphCount => {
                 let mut package =
-                    litchi_doc::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                    litchi_doc::raw::Reader::from_reader(Cursor::new(corpus.archive.as_slice()))?;
                 let document = package.document()?;
                 let started = Instant::now();
                 let count = document.paragraph_count()?;
@@ -28213,7 +28926,7 @@ fn run_semantic_doc(
             },
             Case::DocSemanticOneParagraph => {
                 let mut package =
-                    litchi_doc::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                    litchi_doc::raw::Reader::from_reader(Cursor::new(corpus.archive.as_slice()))?;
                 let document = package.document()?;
                 let started = Instant::now();
                 let paragraph = document
@@ -28233,7 +28946,7 @@ fn run_semantic_doc(
             },
             Case::DocSemanticOneParagraphAt => {
                 let mut package =
-                    litchi_doc::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                    litchi_doc::raw::Reader::from_reader(Cursor::new(corpus.archive.as_slice()))?;
                 let document = package.document()?;
                 let started = Instant::now();
                 let paragraph = document
@@ -28251,7 +28964,7 @@ fn run_semantic_doc(
             },
             Case::DocSemanticFullText => {
                 let mut package =
-                    litchi_doc::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                    litchi_doc::raw::Reader::from_reader(Cursor::new(corpus.archive.as_slice()))?;
                 let document = package.document()?;
                 let started = Instant::now();
                 let text = document.text()?;
@@ -28261,7 +28974,7 @@ fn run_semantic_doc(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::DocSemanticNoopEditSave | Case::DocSemanticOneEditSave => {
-                let source = Snapshot::from_bytes(corpus.archive.clone())?;
+                let source = litchi_doc::Package::from_bytes(&corpus.archive)?;
                 let updated = case == Case::DocSemanticOneEditSave;
                 let started = Instant::now();
                 let mut edit = source.edit()?;
@@ -28272,21 +28985,21 @@ fn run_semantic_doc(
                     )?;
                 }
                 let commit = edit.commit()?;
-                let bytes = commit.snapshot().finish();
+                let bytes = commit.package().to_bytes()?;
                 let duration = started.elapsed();
-                if commit.changed() != updated
+                if commit.diagnostics().changed() != updated
                     || commit.patch().is_noop() == updated
                     || commit.patch().changes().len() != usize::from(updated)
                     || bytes != expected_changed
                 {
                     return Err("semantic DOC edit/save has unexpected publication state".into());
                 }
-                let applied = commit.patch().apply(&source)?;
-                if applied.bytes() != commit.snapshot().bytes() {
+                let applied = source.apply(commit.patch())?.into_package();
+                if applied.to_bytes()? != bytes {
                     return Err("semantic DOC exact patch replay differs from commit".into());
                 }
-                let restored = commit.patch().inverse().apply(&applied)?;
-                if restored.bytes() != source.bytes() {
+                let restored = applied.apply(&commit.patch().inverse())?.into_package();
+                if restored.to_bytes()? != corpus.archive {
                     return Err("semantic DOC inverse did not restore exact source bytes".into());
                 }
                 verify_semantic_doc(&bytes, shape, updated.then_some(selected))?;
@@ -28323,55 +29036,14 @@ fn xls_comment_value(
     )?)
 }
 
-fn xls_comment_opaque_stream_name(index: usize) -> String {
-    format!("Payload{index:03}")
-}
-
 fn build_xls_comments_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
-    let mut workbook_writer = litchi_xls::writer::Writer::new();
-    let comments = workbook_writer.add_worksheet("Comments")?;
-    for index in 0..XLS_COMMENTS_SOURCE_COUNT {
-        let value = xls_comment_value(index, false)?;
-        workbook_writer.add_comment(
-            comments,
-            u32::try_from(index)?,
-            1,
-            value.author(),
-            value.text(),
-        )?;
-    }
-    let untouched = workbook_writer.add_worksheet("Untouched")?;
-    workbook_writer.write_number(untouched, 20, 4, 42.0)?;
-    workbook_writer.add_comment(untouched, 4, 3, "Sentinel", "untouched sentinel")?;
-    let mut workbook_package = Cursor::new(Vec::new());
-    workbook_writer.write_to(&mut workbook_package)?;
-    let mut parsed = OleFile::open(Cursor::new(workbook_package.into_inner()))?;
-    let workbook_stream = parsed.open_stream(&["Workbook"])?;
-
-    let mut writer = OleWriter::new();
-    writer.create_stream_owned(&["Workbook"], workbook_stream)?;
-    writer.create_storage(&["OpaquePayloads"])?;
-    for index in 0..XLS_COMMENTS_OPAQUE_STREAM_COUNT {
-        let name = xls_comment_opaque_stream_name(index);
-        writer.create_stream_owned(
-            &["OpaquePayloads", name.as_str()],
-            payload_bytes(
-                PayloadKind::Incompressible,
-                10_000 + index,
-                XLS_COMMENTS_OPAQUE_STREAM_BYTES,
-            ),
-        )?;
-    }
-    writer.create_stream(
-        &["OpaqueMetadata"],
-        b"litchi-xls-comments-opaque-metadata-v1",
-    )?;
-    let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output)?;
-    let archive = output.into_inner();
+    let archive = xls_f3_corpus::build_xls_comments_fixture()?;
 
     verify_xls_comments_static_guards(&archive)?;
-    let mut parsed = OleFile::open(Cursor::new(archive.as_slice()))?;
+    let mut parsed = OleFile::open(
+        Cursor::new(archive.as_slice()),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
     let archive_member_count = parsed.list_streams().len();
     let target_payload = parsed.open_stream(&["Workbook"])?;
     let uncompressed_payload_bytes = target_payload
@@ -28408,6 +29080,16 @@ fn build_xls_comments_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
         target_payload,
         xlsx: None,
     })
+}
+
+/// The fixed comments archive used by the native XLS numeric selectors.
+///
+/// The F3 qualification example lives outside this module so it can be copied
+/// unchanged into the pre-reopen source snapshot. Keep this narrow handoff
+/// tied to the existing corpus builder instead of duplicating its opaque CFB
+/// construction in a second harness.
+pub(crate) fn xls_f3_number_fixture() -> Result<Vec<u8>, Box<dyn Error>> {
+    Ok(build_xls_comments_edit_corpus()?.archive)
 }
 
 #[derive(Clone, Debug)]
@@ -28911,7 +29593,7 @@ fn build_xls_source_layout(corpus: &Corpus) -> Result<XlsSourceLayout, Box<dyn E
     }
 
     use litchi_core::sheet::{Cell as _, Worksheet as _};
-    let eager = litchi_xls::Workbook::new(Cursor::new(corpus.archive.as_slice()))?;
+    let eager = litchi_xls::raw::Reader::new(Cursor::new(corpus.archive.as_slice()))?;
     let mut worksheet_names = Vec::new();
     let mut parsed_cell_count = 0_usize;
     for metadata in eager.sheets() {
@@ -29192,7 +29874,7 @@ fn run_xls_source_backed_case(
             let owned = corpus.archive.clone();
             let allocation_region = allocation_metrics::begin();
             let started = Instant::now();
-            let workbook = litchi_xls::Workbook::new(Cursor::new(owned))?;
+            let workbook = litchi_xls::raw::Reader::new(Cursor::new(owned))?;
             let operation = match case {
                 Case::XlsSemanticOpen => XlsMeasuredOperation::Open {
                     worksheet_count: std::hint::black_box(
@@ -29434,14 +30116,17 @@ fn xls_visibility_opaque_stream_name(index: usize) -> String {
 }
 
 fn build_xls_visibility_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
-    let mut workbook_writer = litchi_xls::writer::Writer::new();
+    let mut workbook_builder = litchi_xls::writer::Builder::new();
     for index in 0..XLS_VISIBILITY_SHEET_COUNT {
-        let worksheet = workbook_writer.add_worksheet(&format!("Visibility{index:02}"))?;
-        workbook_writer.write_number(worksheet, 0, 0, index as f64)?;
+        let worksheet = workbook_builder.add_worksheet(&format!("Visibility{index:02}"))?;
+        workbook_builder.write_number(worksheet, 0, 0, index as f64)?;
     }
     let mut workbook_package = Cursor::new(Vec::new());
-    workbook_writer.write_to(&mut workbook_package)?;
-    let mut parsed = OleFile::open(Cursor::new(workbook_package.into_inner()))?;
+    workbook_builder.build()?.write_to(&mut workbook_package)?;
+    let mut parsed = OleFile::open(
+        Cursor::new(workbook_package.into_inner()),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
     let workbook_stream = parsed.open_stream(&["Workbook"])?;
 
     let mut writer = OleWriter::new();
@@ -29467,7 +30152,10 @@ fn build_xls_visibility_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     let archive = output.into_inner();
 
     verify_xls_visibility_static_guards(&archive)?;
-    let mut parsed = OleFile::open(Cursor::new(archive.as_slice()))?;
+    let mut parsed = OleFile::open(
+        Cursor::new(archive.as_slice()),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
     let archive_member_count = parsed.list_streams().len();
     let target_payload = parsed.open_stream(&["Workbook"])?;
     let opaque_bytes = XLS_VISIBILITY_OPAQUE_STREAM_COUNT
@@ -29519,21 +30207,49 @@ fn xls_visibility_case_parameters(case: Case) -> Result<(bool, usize), Box<dyn E
     }
 }
 
+/// The `hide` verb shared by the primary and source-backed sheet-visibility
+/// edits, so one staging closure drives both routes.
+trait XlsVisibilityHide {
+    fn hide_position(&mut self, position: usize) -> Result<(), Box<dyn Error>>;
+}
+
+impl XlsVisibilityHide for litchi_xls::sheet_visibility::Edit {
+    fn hide_position(&mut self, position: usize) -> Result<(), Box<dyn Error>> {
+        self.hide(position.into())?;
+        Ok(())
+    }
+}
+
+impl XlsVisibilityHide for litchi_xls::source_backed::sheet_visibility::Edit {
+    fn hide_position(&mut self, position: usize) -> Result<(), Box<dyn Error>> {
+        self.hide(position.into())?;
+        Ok(())
+    }
+}
+
 fn stage_xls_visibility_updates(
-    transaction: &mut litchi_xls::sheet_visibility::Transaction,
+    transaction: &mut impl XlsVisibilityHide,
     update_count: usize,
 ) -> Result<(), Box<dyn Error>> {
     if update_count == 1 {
-        transaction.hide(1usize.into())?;
+        transaction.hide_position(1)?;
         return Ok(());
     }
     if update_count != XLS_VISIBILITY_BATCH_COUNT {
         return Err("XLS visibility benchmark update count is outside its fixed closure".into());
     }
     for position in 1..=XLS_VISIBILITY_BATCH_COUNT {
-        transaction.hide(position.into())?;
+        transaction.hide_position(position)?;
     }
     Ok(())
+}
+
+/// Open owned XLS bytes as the source-backed workbook that owns the
+/// source-backed edit families.
+fn xls_source_workbook(bytes: Vec<u8>) -> Result<litchi_xls::SourceBackedWorkbook, Box<dyn Error>> {
+    Ok(litchi_xls::SourceBackedWorkbook::from_read_at(Arc::new(
+        litchi_core::OwnedSource::new(bytes),
+    ))?)
 }
 
 enum XlsVisibilityPublication {
@@ -29542,7 +30258,7 @@ enum XlsVisibilityPublication {
         source_bytes: u64,
         source_workbook_bytes: u64,
     },
-    SourceBacked(litchi_xls::sheet_visibility::SourceBackedCommit),
+    SourceBacked(Box<litchi_xls::source_backed::sheet_visibility::Commit>),
 }
 
 impl XlsVisibilityPublication {
@@ -29552,13 +30268,13 @@ impl XlsVisibilityPublication {
     ) -> Result<Option<litchi_cfb::PublishReport>, Box<dyn Error>> {
         match self {
             Self::Eager { commit, .. } => {
-                for chunk in commit.snapshot().bytes().chunks(64 * 1024) {
+                for chunk in commit.package().to_bytes()?.chunks(64 * 1024) {
                     writer.write_all(chunk)?;
                 }
                 writer.flush()?;
                 Ok(None)
             },
-            Self::SourceBacked(commit) => Ok(Some(commit.write_to(writer)?)),
+            Self::SourceBacked(commit) => Ok(commit.package().write_to(writer)?),
         }
     }
 
@@ -29586,7 +30302,7 @@ impl XlsVisibilityPublication {
                     source_bytes: *source_bytes,
                     source_workbook_bytes: *source_workbook_bytes,
                     target_workbook_bytes: u64::try_from(
-                        commit.snapshot().workbook_stream().len(),
+                        commit.package().sheet_visibility()?.workbook_stream().len(),
                     )?,
                     splice_count: None,
                     replacement_bytes: None,
@@ -29629,13 +30345,17 @@ fn prepare_xls_visibility_publication(
 ) -> Result<XlsVisibilityPublication, Box<dyn Error>> {
     let source_bytes = u64::try_from(source.bytes().len())?;
     let source_workbook_bytes = u64::try_from(source.workbook_stream().len())?;
-    let mut transaction = source.transaction();
-    stage_xls_visibility_updates(&mut transaction, update_count)?;
     if source_backed {
-        Ok(XlsVisibilityPublication::SourceBacked(
-            transaction.commit_source_backed()?,
-        ))
+        let mut transaction =
+            xls_source_workbook(source.bytes().to_vec())?.edit_sheet_visibility()?;
+        stage_xls_visibility_updates(&mut transaction, update_count)?;
+        Ok(XlsVisibilityPublication::SourceBacked(Box::new(
+            transaction.commit()?,
+        )))
     } else {
+        let mut transaction =
+            litchi_xls::Package::from_bytes(source.bytes())?.edit_sheet_visibility()?;
+        stage_xls_visibility_updates(&mut transaction, update_count)?;
         Ok(XlsVisibilityPublication::Eager {
             commit: transaction.commit()?,
             source_bytes,
@@ -29763,23 +30483,25 @@ fn verify_xls_visibility_output(
 fn verify_xls_visibility_static_guards(source: &[u8]) -> Result<(), Box<dyn Error>> {
     use litchi_xls::SheetVisibility;
 
-    let snapshot = litchi_xls::sheet_visibility::Snapshot::from_bytes(source.to_vec())?;
+    let package = litchi_xls::Package::from_bytes(source)?;
+    let snapshot = package.sheet_visibility()?;
     if snapshot.worksheet_count() != XLS_VISIBILITY_SHEET_COUNT {
         return Err("XLS visibility source worksheet count differs from specification".into());
     }
-    let noop = snapshot.transaction().commit_source_backed()?;
-    if !noop.is_noop() || noop.diagnostics().changed_worksheets() != 0 {
+    let workbook = xls_source_workbook(source.to_vec())?;
+    let noop = workbook.edit_sheet_visibility()?.commit()?;
+    if !noop.patch().is_noop() || noop.diagnostics().changed_worksheets() != 0 {
         return Err("XLS visibility source-backed no-op was not exact".into());
     }
     let mut noop_bytes = Vec::new();
-    noop.write_to(&mut noop_bytes)?;
+    noop.package().write_to(&mut noop_bytes)?;
     if noop_bytes != source {
         return Err("XLS visibility source-backed no-op changed source bytes".into());
     }
 
-    let mut capped = snapshot.transaction();
+    let mut capped = workbook.edit_sheet_visibility()?;
     stage_xls_visibility_updates(&mut capped, XLS_VISIBILITY_BATCH_COUNT)?;
-    let capped = capped.commit_source_backed()?;
+    let capped = capped.commit()?;
     if capped.diagnostics().changed_worksheets() != XLS_VISIBILITY_BATCH_COUNT
         || capped.diagnostics().touched_streams() != 1
         || capped.diagnostics().splice_count() != XLS_VISIBILITY_BATCH_COUNT
@@ -29788,7 +30510,7 @@ fn verify_xls_visibility_static_guards(source: &[u8]) -> Result<(), Box<dyn Erro
         return Err("XLS visibility exact-cap plan has unexpected diagnostics".into());
     }
     let mut capped_bytes = Vec::new();
-    capped.write_to(&mut capped_bytes)?;
+    capped.package().write_to(&mut capped_bytes)?;
     verify_xls_visibility_output(
         &Corpus {
             manifest: CorpusManifest {
@@ -29819,7 +30541,7 @@ fn verify_xls_visibility_static_guards(source: &[u8]) -> Result<(), Box<dyn Erro
         XLS_VISIBILITY_BATCH_COUNT,
     )?;
 
-    let mut over_cap = snapshot.transaction();
+    let mut over_cap = workbook.edit_sheet_visibility()?;
     if over_cap
         .set_visibility_batch(
             (1..=XLS_VISIBILITY_BATCH_COUNT + 1)
@@ -29829,16 +30551,16 @@ fn verify_xls_visibility_static_guards(source: &[u8]) -> Result<(), Box<dyn Erro
     {
         return Err("XLS visibility cap-plus-one staging unexpectedly succeeded".into());
     }
-    if !over_cap.commit_source_backed()?.is_noop() {
+    if !over_cap.commit()?.patch().is_noop() {
         return Err("XLS visibility cap-plus-one refusal mutated its source".into());
     }
 
-    let mut protected_writer = litchi_xls::writer::Writer::new();
-    let sheet = protected_writer.add_worksheet("Protected")?;
-    protected_writer.write_number(sheet, 0, 0, 1.0)?;
-    protected_writer.protect_sheet(sheet, Some("password"), true, false)?;
+    let mut protected_builder = litchi_xls::writer::Builder::new();
+    let sheet = protected_builder.add_worksheet("Protected")?;
+    protected_builder.write_number(sheet, 0, 0, 1.0)?;
+    protected_builder.protect_sheet(sheet, Some("password"), true, false)?;
     let mut protected_bytes = Cursor::new(Vec::new());
-    protected_writer.write_to(&mut protected_bytes)?;
+    protected_builder.build()?.write_to(&mut protected_bytes)?;
     if litchi_xls::sheet_visibility::Snapshot::from_bytes(protected_bytes.into_inner()).is_ok() {
         return Err("XLS visibility protected source was accepted".into());
     }
@@ -29853,9 +30575,8 @@ fn verify_xls_visibility_prepared(
     match prepared {
         XlsVisibilityPublication::Eager { commit, .. } => {
             let applied = commit.patch().apply(source)?;
-            if applied.bytes() != commit.snapshot().bytes()
-                || commit.patch().apply(commit.snapshot()).is_ok()
-            {
+            let published = commit.package().sheet_visibility()?;
+            if applied.bytes() != published.bytes() || commit.patch().apply(&published).is_ok() {
                 return Err("XLS visibility eager patch did not enforce exact source".into());
             }
             let restored = commit.patch().inverse().apply(&applied)?;
@@ -29902,7 +30623,7 @@ fn run_xls_visibility_edit_save(
     verify_xls_visibility_output(corpus, &expected, update_count)?;
     verify_xls_visibility_prepared(&expected_source, &expected_prepared, &expected)?;
     if let Some(report) = expected_report
-        && (report.bytes() != u64::try_from(expected.len())? || report.changed_spans() == 0)
+        && (report.output_bytes() != u64::try_from(expected.len())? || report.changed_spans() == 0)
     {
         return Err("XLS visibility expected overlay report is incomplete".into());
     }
@@ -29962,7 +30683,7 @@ fn run_xls_visibility_edit_save(
             }
             let report = report.ok_or("XLS visibility source-backed publication has no report")?;
             if evidence.changed_spans != Some(report.changed_spans())
-                || report.bytes() != sink.summary().accepted_bytes
+                || report.output_bytes() != sink.summary().accepted_bytes
                 || evidence.source_fingerprint
                     != Some(fingerprint_hex(report.source_fingerprint().as_bytes()))
                 || evidence.target_fingerprint
@@ -30024,8 +30745,67 @@ fn xls_comments_case_parameters(case: Case) -> Result<(bool, usize), Box<dyn Err
     }
 }
 
+/// The comment replacement verbs shared by the primary and source-backed
+/// comment edits, so one staging closure drives both routes.
+trait XlsCommentReplace {
+    fn replace(
+        &mut self,
+        selector: litchi_xls::cell_values::Selector<'_>,
+        reference: litchi_xls::cell_values::Reference,
+        value: litchi_xls::comments::Value,
+    ) -> Result<(), Box<dyn Error>>;
+
+    fn replace_many(
+        &mut self,
+        selector: litchi_xls::cell_values::Selector<'_>,
+        updates: Vec<litchi_xls::comments::Update>,
+    ) -> Result<(), Box<dyn Error>>;
+}
+
+impl XlsCommentReplace for litchi_xls::comments::Edit {
+    fn replace(
+        &mut self,
+        selector: litchi_xls::cell_values::Selector<'_>,
+        reference: litchi_xls::cell_values::Reference,
+        value: litchi_xls::comments::Value,
+    ) -> Result<(), Box<dyn Error>> {
+        litchi_xls::comments::Edit::replace(self, selector, reference, value)?;
+        Ok(())
+    }
+
+    fn replace_many(
+        &mut self,
+        selector: litchi_xls::cell_values::Selector<'_>,
+        updates: Vec<litchi_xls::comments::Update>,
+    ) -> Result<(), Box<dyn Error>> {
+        litchi_xls::comments::Edit::replace_many(self, selector, updates)?;
+        Ok(())
+    }
+}
+
+impl XlsCommentReplace for litchi_xls::source_backed::comments::Edit {
+    fn replace(
+        &mut self,
+        selector: litchi_xls::cell_values::Selector<'_>,
+        reference: litchi_xls::cell_values::Reference,
+        value: litchi_xls::comments::Value,
+    ) -> Result<(), Box<dyn Error>> {
+        litchi_xls::source_backed::comments::Edit::replace(self, selector, reference, value)?;
+        Ok(())
+    }
+
+    fn replace_many(
+        &mut self,
+        selector: litchi_xls::cell_values::Selector<'_>,
+        updates: Vec<litchi_xls::comments::Update>,
+    ) -> Result<(), Box<dyn Error>> {
+        litchi_xls::source_backed::comments::Edit::replace_many(self, selector, updates)?;
+        Ok(())
+    }
+}
+
 fn stage_xls_comment_updates(
-    edit: &mut litchi_xls::comments::Edit,
+    edit: &mut impl XlsCommentReplace,
     update_count: usize,
 ) -> Result<(), Box<dyn Error>> {
     use litchi_xls::cell_values::{Reference, Selector};
@@ -30034,7 +30814,7 @@ fn stage_xls_comment_updates(
     if update_count == 1 {
         let index = XLS_COMMENTS_SOURCE_COUNT / 2;
         edit.replace(
-            Selector::Position(0),
+            Selector::Position(Position::new(0)),
             Reference::new(u32::try_from(index)?, 1)?,
             xls_comment_value(index, true)?,
         )?;
@@ -30051,7 +30831,7 @@ fn stage_xls_comment_updates(
             ))
         })
         .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
-    edit.replace_many(Selector::Position(0), updates)?;
+    edit.replace_many(Selector::Position(Position::new(0)), updates)?;
     Ok(())
 }
 
@@ -30061,7 +30841,7 @@ enum XlsCommentsPublication {
         source_bytes: u64,
         source_workbook_bytes: u64,
     },
-    SourceBacked(litchi_xls::comments::SourceBackedCommit),
+    SourceBacked(Box<litchi_xls::source_backed::comments::Commit>),
 }
 
 impl XlsCommentsPublication {
@@ -30071,13 +30851,13 @@ impl XlsCommentsPublication {
     ) -> Result<Option<litchi_cfb::PublishReport>, Box<dyn Error>> {
         match self {
             Self::Eager { commit, .. } => {
-                for chunk in commit.snapshot().bytes().chunks(64 * 1024) {
+                for chunk in commit.package().to_bytes()?.chunks(64 * 1024) {
                     writer.write_all(chunk)?;
                 }
                 writer.flush()?;
                 Ok(None)
             },
-            Self::SourceBacked(commit) => Ok(Some(commit.write_to(writer)?)),
+            Self::SourceBacked(commit) => Ok(commit.package().write_to(writer)?),
         }
     }
 
@@ -30105,7 +30885,7 @@ impl XlsCommentsPublication {
                     source_bytes: *source_bytes,
                     source_workbook_bytes: *source_workbook_bytes,
                     target_workbook_bytes: u64::try_from(
-                        commit.snapshot().workbook_stream().len(),
+                        commit.package().comments()?.workbook_stream().len(),
                     )?,
                     splice_count: None,
                     replacement_bytes: None,
@@ -30148,13 +30928,15 @@ fn prepare_xls_comments_publication(
 ) -> Result<XlsCommentsPublication, Box<dyn Error>> {
     let source_bytes = u64::try_from(source.bytes().len())?;
     let source_workbook_bytes = u64::try_from(source.workbook_stream().len())?;
-    let mut edit = source.edit();
-    stage_xls_comment_updates(&mut edit, update_count)?;
     if source_backed {
-        Ok(XlsCommentsPublication::SourceBacked(
-            edit.commit_source_backed()?,
-        ))
+        let mut edit = xls_source_workbook(source.bytes().to_vec())?.edit_comments()?;
+        stage_xls_comment_updates(&mut edit, update_count)?;
+        Ok(XlsCommentsPublication::SourceBacked(Box::new(
+            edit.commit()?,
+        )))
     } else {
+        let mut edit = litchi_xls::Package::from_bytes(source.bytes())?.edit_comments()?;
+        stage_xls_comment_updates(&mut edit, update_count)?;
         Ok(XlsCommentsPublication::Eager {
             commit: edit.commit()?,
             source_bytes,
@@ -30225,8 +31007,9 @@ fn verify_xls_untouched_streams(
     candidate: &[u8],
     require_equal_workbook_length: bool,
 ) -> Result<(), Box<dyn Error>> {
-    let mut source_ole = OleFile::open(Cursor::new(source))?;
-    let mut candidate_ole = OleFile::open(Cursor::new(candidate))?;
+    let mut source_ole = OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default())?;
+    let mut candidate_ole =
+        OleFile::open(Cursor::new(candidate), litchi_cfb::OleFileLimits::default())?;
     if cfb_directory_inventory(&source_ole)? != cfb_directory_inventory(&candidate_ole)? {
         return Err("XLS comment publication changed the complete CFB directory topology".into());
     }
@@ -30310,7 +31093,7 @@ fn verify_xls_comments_output(
     if sentinel.author() != "Sentinel" || sentinel.text() != "untouched sentinel" {
         return Err("XLS comment output changed the untouched sentinel".into());
     }
-    let workbook = litchi_xls::Workbook::new(Cursor::new(output))?;
+    let workbook = litchi_xls::raw::Reader::new(Cursor::new(output))?;
     let untouched_metadata = workbook
         .sheets()
         .iter()
@@ -30337,38 +31120,38 @@ fn verify_xls_comments_static_guards(source: &[u8]) -> Result<(), Box<dyn Error>
     use litchi_xls::cell_values::{Reference, Selector};
     use litchi_xls::comments::Value;
 
-    let snapshot = litchi_xls::comments::Snapshot::from_bytes(source.to_vec())?;
-    let mut rejected = snapshot.edit();
+    litchi_xls::comments::Snapshot::from_bytes(source.to_vec())?;
+    let mut rejected = xls_source_workbook(source.to_vec())?.edit_comments()?;
     rejected.replace(
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         Reference::new(0, 1)?,
         Value::new("Target 000", "comment target 000!")?,
     )?;
-    if rejected.commit_source_backed().is_ok() {
+    if rejected.commit().is_ok() {
         return Err("XLS source-backed comment edit accepted a length change".into());
     }
 
-    let mut rejected_width = snapshot.edit();
+    let mut rejected_width = xls_source_workbook(source.to_vec())?.edit_comments()?;
     rejected_width.replace(
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         Reference::new(0, 1)?,
         Value::new("Target 000", "作者作者作者作者作")?,
     )?;
-    if rejected_width.commit_source_backed().is_ok() {
+    if rejected_width.commit().is_ok() {
         return Err("XLS source-backed comment edit accepted an encoding-width change".into());
     }
 
-    let mut fallback = snapshot.edit();
+    let mut fallback = litchi_xls::Package::from_bytes(source)?.edit_comments()?;
     fallback.replace(
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         Reference::new(0, 1)?,
         Value::new("Target 000", "comment target 000!")?,
     )?;
     let fallback = fallback.commit()?;
-    verify_xls_untouched_streams(source, fallback.snapshot().bytes(), false)?;
+    verify_xls_untouched_streams(source, fallback.patch().after(), false)?;
+    let fallback = fallback.package().comments()?;
     let changed = fallback
-        .snapshot()
-        .worksheet(Selector::Position(0))?
+        .worksheet(Selector::Position(Position::new(0)))?
         .ok_or("XLS eager fallback lost its worksheet")?
         .comment(Reference::new(0, 1)?)?
         .ok_or("XLS eager fallback lost its comment")?;
@@ -30376,17 +31159,17 @@ fn verify_xls_comments_static_guards(source: &[u8]) -> Result<(), Box<dyn Error>
         return Err("XLS eager fallback did not publish the explicit length change".into());
     }
 
-    let mut protected_writer = litchi_xls::writer::Writer::new();
-    let sheet = protected_writer.add_worksheet("Protected")?;
-    protected_writer.add_comment(sheet, 0, 0, "Source", "source")?;
-    protected_writer.protect_sheet(sheet, Some("password"), true, false)?;
+    let mut protected_builder = litchi_xls::writer::Builder::new();
+    let sheet = protected_builder.add_worksheet("Protected")?;
+    protected_builder.add_comment(sheet, 0, 0, "Source", "source")?;
+    protected_builder.protect_sheet(sheet, Some("password"), true, false)?;
     let mut protected_bytes = Cursor::new(Vec::new());
-    protected_writer.write_to(&mut protected_bytes)?;
+    protected_builder.build()?.write_to(&mut protected_bytes)?;
     let protected = litchi_xls::comments::Snapshot::from_bytes(protected_bytes.into_inner())?;
-    let mut edit = protected.edit();
+    let mut edit = litchi_xls::Package::from_bytes(protected.bytes())?.edit_comments()?;
     if edit
         .replace(
-            Selector::Position(0),
+            Selector::Position(Position::new(0)),
             Reference::new(0, 0)?,
             Value::new("Target", "target")?,
         )
@@ -30405,9 +31188,8 @@ fn verify_xls_comments_prepared(
     match prepared {
         XlsCommentsPublication::Eager { commit, .. } => {
             let applied = commit.patch().apply(source)?;
-            if applied.bytes() != commit.snapshot().bytes()
-                || commit.patch().apply(commit.snapshot()).is_ok()
-            {
+            let published = commit.package().comments()?;
+            if applied.bytes() != published.bytes() || commit.patch().apply(&published).is_ok() {
                 return Err("XLS comment eager patch did not enforce its exact source".into());
             }
             let restored = commit.patch().inverse().apply(&applied)?;
@@ -30451,7 +31233,7 @@ fn run_xls_comments_edit_save(
     verify_xls_comments_output(corpus, &expected, update_count)?;
     verify_xls_comments_prepared(&expected_source, &expected_prepared, &expected)?;
     if let Some(report) = expected_report
-        && (report.bytes() != u64::try_from(expected.len())? || report.changed_spans() == 0)
+        && (report.output_bytes() != u64::try_from(expected.len())? || report.changed_spans() == 0)
     {
         return Err("XLS comment expected overlay report is incomplete".into());
     }
@@ -30516,7 +31298,7 @@ fn run_xls_comments_edit_save(
             }
             let report = report.ok_or("XLS comment source-backed publication has no report")?;
             if evidence.changed_spans != Some(report.changed_spans())
-                || report.bytes() != sink.summary().accepted_bytes
+                || report.output_bytes() != sink.summary().accepted_bytes
                 || evidence.source_fingerprint
                     != Some(fingerprint_hex(report.source_fingerprint().as_bytes()))
                 || evidence.target_fingerprint
@@ -30577,12 +31359,12 @@ fn verify_semantic_xls(
     shape: WriterShape,
     updated: Option<(usize, usize, usize)>,
 ) -> Result<(), Box<dyn Error>> {
-    use litchi_xls::cell_values::{Reference, Snapshot, Value};
+    use litchi_xls::cell_values::{Reference, Value};
 
     let (sheet_count, rows, columns) = shape
         .xls_dimensions()
         .ok_or("payload-heavy XLS corpus is excluded from semantic verification")?;
-    let snapshot = Snapshot::from_bytes(bytes.to_vec())?;
+    let snapshot = litchi_xls::Package::from_bytes(bytes)?.cell_values()?;
     if snapshot.worksheet_count() != sheet_count {
         return Err("semantic XLS worksheet count differs from writer specification".into());
     }
@@ -30618,7 +31400,7 @@ fn run_semantic_xls(
     samples: usize,
 ) -> Result<CaseResult, Box<dyn Error>> {
     use litchi_core::sheet::{Cell as _, Worksheet as _};
-    use litchi_xls::cell_values::{Reference, Snapshot};
+    use litchi_xls::cell_values::Reference;
 
     let shape = writer_shape(corpus)?;
     let (sheet_count, rows, columns) = shape
@@ -30628,10 +31410,10 @@ fn run_semantic_xls(
     let reference = Reference::new(selected.1 as u32, selected.2 as u32)?;
     let replacement = xls_expected_value(shape, selected.0, selected.1, selected.2)? + 0.5;
     let expected_changed = if case == Case::XlsSemanticOneEditSave {
-        let source = Snapshot::from_bytes(corpus.archive.clone())?;
-        let mut edit = source.edit();
-        edit.set_number(selected.0.into(), reference, replacement)?;
-        edit.commit()?.snapshot().bytes().to_vec()
+        let source = litchi_xls::Package::from_bytes(&corpus.archive)?;
+        let mut edit = source.edit()?;
+        edit.set_number(selected.0, reference, replacement)?;
+        edit.commit()?.patch().after().to_vec()
     } else {
         corpus.archive.clone()
     };
@@ -30643,14 +31425,15 @@ fn run_semantic_xls(
             Case::XlsSemanticOpen => {
                 let owned = corpus.archive.clone();
                 let started = Instant::now();
-                let workbook = litchi_xls::Workbook::new(Cursor::new(owned))?;
+                let workbook = litchi_xls::raw::Reader::new(Cursor::new(owned))?;
                 let duration = started.elapsed();
                 verify_semantic_xls(&corpus.archive, shape, None)?;
                 std::hint::black_box(workbook);
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::XlsSemanticListWorksheets => {
-                let workbook = litchi_xls::Workbook::new(Cursor::new(corpus.archive.as_slice()))?;
+                let workbook =
+                    litchi_xls::raw::Reader::new(Cursor::new(corpus.archive.as_slice()))?;
                 let started = Instant::now();
                 let names = workbook
                     .sheets()
@@ -30671,7 +31454,8 @@ fn run_semantic_xls(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::XlsSemanticOneCell => {
-                let workbook = litchi_xls::Workbook::new(Cursor::new(corpus.archive.as_slice()))?;
+                let workbook =
+                    litchi_xls::raw::Reader::new(Cursor::new(corpus.archive.as_slice()))?;
                 let started = Instant::now();
                 let metadata = workbook
                     .sheet(selected.0)
@@ -30701,7 +31485,8 @@ fn run_semantic_xls(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::XlsSemanticFullCellScan => {
-                let workbook = litchi_xls::Workbook::new(Cursor::new(corpus.archive.as_slice()))?;
+                let workbook =
+                    litchi_xls::raw::Reader::new(Cursor::new(corpus.archive.as_slice()))?;
                 let started = Instant::now();
                 let mut count = 0_usize;
                 let mut sum = 0.0_f64;
@@ -30730,18 +31515,19 @@ fn run_semantic_xls(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::XlsSemanticNoopEditSave | Case::XlsSemanticOneEditSave => {
-                let source = Snapshot::from_bytes(corpus.archive.clone())?;
+                let source = litchi_xls::Package::from_bytes(&corpus.archive)?;
                 let updated = case == Case::XlsSemanticOneEditSave;
                 let started = Instant::now();
-                let mut edit = source.edit();
+                let mut edit = source.edit()?;
                 if updated {
-                    edit.set_number(selected.0.into(), reference, replacement)?;
+                    edit.set_number(selected.0, reference, replacement)?;
                 }
                 let commit = edit.commit()?;
-                let bytes = commit.snapshot().bytes().to_vec();
+                let bytes = commit.patch().after().to_vec();
                 let duration = started.elapsed();
                 let diagnostics = commit.diagnostics();
-                if commit.patch().is_empty() == updated
+                if commit.patch().is_noop() == updated
+                    || diagnostics.changed() != updated
                     || diagnostics.changed_cells() != usize::from(updated)
                     || diagnostics.changed_number_fields() != usize::from(updated)
                     || diagnostics.touched_streams() != usize::from(updated)
@@ -30749,12 +31535,12 @@ fn run_semantic_xls(
                 {
                     return Err("semantic XLS edit/save has unexpected publication state".into());
                 }
-                let applied = commit.patch().apply(&source)?;
-                if applied.bytes() != commit.snapshot().bytes() {
+                let applied = source.apply(commit.patch())?;
+                if applied.patch().after() != commit.patch().after() {
                     return Err("semantic XLS exact patch replay differs from commit".into());
                 }
-                let restored = commit.patch().inverse().apply(&applied)?;
-                if restored.bytes() != source.bytes() {
+                let restored = applied.package().apply(&commit.patch().inverse())?;
+                if restored.patch().after() != corpus.archive.as_slice() {
                     return Err("semantic XLS inverse did not restore exact source bytes".into());
                 }
                 verify_semantic_xls(&bytes, shape, updated.then_some(selected))?;
@@ -30911,8 +31697,8 @@ fn run_xlsb_workbook_structure_edit_save(
 
     let mut elapsed = Vec::with_capacity(samples);
     let mut summary = XlsbWorkbookStructureSummary {
-        implementation: "litchi_xlsb::Workbook::edit_workbook_structure + apply_workbook_structure",
-        timing_scope: "total_ns encloses detached edit planning/commit, Workbook::apply_workbook_structure, and Workbook::save; workbook construction, semantic reopening, digesting, and all correctness checks are outside the clocks",
+        implementation: "litchi_xlsb::Package::edit + Commit::into_package",
+        timing_scope: "total_ns encloses detached package edit planning/commit, Commit::into_package, and Package::write_to; package construction, semantic reopening, digesting, and all correctness checks are outside the clocks",
         performance_claim: "attribution-only phase evidence; no speedup, allocation, RSS, physical-I/O, cold-cache, or producer claim",
         source_archive_sha256: corpus.manifest.archive_sha256.clone(),
         selected_operation: "rename_sheet(0, \"Renamed\")",
@@ -30927,25 +31713,27 @@ fn run_xlsb_workbook_structure_edit_save(
     };
 
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let mut workbook = litchi_xlsb::Workbook::new(Cursor::new(corpus.archive.as_slice()))?;
+        let workbook = litchi_xlsb::Workbook::new(Cursor::new(corpus.archive.as_slice()))?;
         if workbook.worksheet_names() != source_sheet_names.as_slice() {
             return Err("XLSB structure source worksheet names differ from specification".into());
         }
+        let package = workbook.into_package();
         let total_started = Instant::now();
 
         let started = Instant::now();
-        let mut edit = workbook.edit_workbook_structure()?;
-        edit.rename_sheet(0, "Renamed".to_owned())?;
+        let mut edit = package.edit()?;
+        edit.set_sheet_name(0, "Renamed".to_owned())?
+            .ok_or("native sheet selector unexpectedly missing")?;
         let commit = edit.commit()?;
         let planning_ns = elapsed_ns(started.elapsed())?;
 
         let started = Instant::now();
-        workbook.apply_workbook_structure(&commit)?;
+        let package = commit.into_package();
         let publication_ns = elapsed_ns(started.elapsed())?;
 
         let started = Instant::now();
         let mut output = Cursor::new(Vec::new());
-        workbook.save(&mut output)?;
+        package.write_to(&mut output)?;
         let output = output.into_inner();
         let save_ns = elapsed_ns(started.elapsed())?;
         let total_ns = elapsed_ns(total_started.elapsed())?;
@@ -30974,7 +31762,7 @@ fn run_xlsb_workbook_structure_edit_save(
             return Err("XLSB structure reopened target cell differs from specification".into());
         }
         let output_sha256 = sha256_hex(&output);
-        std::hint::black_box((&workbook, &output));
+        std::hint::black_box((&package, &output));
 
         if iteration >= warmup_iterations {
             elapsed.push(total_ns);
@@ -31032,7 +31820,7 @@ fn verify_semantic_ppt(
     updated: Option<(usize, usize)>,
 ) -> Result<(), Box<dyn Error>> {
     let (slide_count, boxes_per_slide) = shape.ppt_dimensions();
-    let mut package = litchi_ppt::Package::from_reader(Cursor::new(bytes))?;
+    let mut package = litchi_ppt::raw::Reader::from_reader(Cursor::new(bytes))?;
     let presentation = package.presentation()?;
     let slides = presentation.slides()?;
     if slides.len() != slide_count {
@@ -31177,7 +31965,7 @@ fn run_ppt_selected_shape_text(
         } else if fresh_open {
             let started = Instant::now();
             let mut package =
-                litchi_ppt::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                litchi_ppt::raw::Reader::from_reader(Cursor::new(corpus.archive.as_slice()))?;
             let presentation = package.presentation()?;
             let text = presentation
                 .slides()?
@@ -31192,7 +31980,7 @@ fn run_ppt_selected_shape_text(
             (text, started.elapsed())
         } else {
             let mut package =
-                litchi_ppt::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                litchi_ppt::raw::Reader::from_reader(Cursor::new(corpus.archive.as_slice()))?;
             let presentation = package.presentation()?;
             let started = Instant::now();
             let text = presentation
@@ -31377,7 +32165,7 @@ fn run_ppt_repeated_shape_text(
             started.elapsed()
         } else {
             let mut package =
-                litchi_ppt::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                litchi_ppt::raw::Reader::from_reader(Cursor::new(corpus.archive.as_slice()))?;
             let presentation = package.presentation()?;
             let started = Instant::now();
             for _ in 0..PPT_REPEATED_QUERY_COUNT {
@@ -31450,13 +32238,13 @@ fn run_semantic_ppt(
     let selected = (linear / boxes_per_slide, linear % boxes_per_slide);
     let target = Target::new(Position::new(selected.0), Position::new(selected.1));
     let expected_changed = if case == Case::PptSemanticOneEditSave {
-        let source = Snapshot::from_bytes(corpus.archive.clone())?;
+        let source = litchi_ppt::Package::from_bytes(&corpus.archive)?;
         let mut edit = source.edit()?;
         edit.set_shape_text(
             target,
             updated_writer_text("ppt", selected.0, selected.1, 0),
         )?;
-        edit.commit()?.snapshot().bytes().to_vec()
+        edit.commit()?.package().to_bytes()?
     } else {
         corpus.archive.clone()
     };
@@ -31467,7 +32255,7 @@ fn run_semantic_ppt(
             Case::PptSemanticOpen => {
                 let owned = corpus.archive.clone();
                 let started = Instant::now();
-                let mut package = litchi_ppt::Package::from_reader(Cursor::new(owned))?;
+                let mut package = litchi_ppt::raw::Reader::from_reader(Cursor::new(owned))?;
                 let presentation = package.presentation()?;
                 let duration = started.elapsed();
                 verify_semantic_ppt(&corpus.archive, shape, None)?;
@@ -31476,7 +32264,7 @@ fn run_semantic_ppt(
             },
             Case::PptSemanticListSlides => {
                 let mut package =
-                    litchi_ppt::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                    litchi_ppt::raw::Reader::from_reader(Cursor::new(corpus.archive.as_slice()))?;
                 let presentation = package.presentation()?;
                 let started = Instant::now();
                 let slides = presentation.slides()?;
@@ -31490,7 +32278,7 @@ fn run_semantic_ppt(
             },
             Case::PptSemanticOneShapeText => {
                 let mut package =
-                    litchi_ppt::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                    litchi_ppt::raw::Reader::from_reader(Cursor::new(corpus.archive.as_slice()))?;
                 let presentation = package.presentation()?;
                 let started = Instant::now();
                 let text = presentation
@@ -31514,7 +32302,7 @@ fn run_semantic_ppt(
             },
             Case::PptSemanticFullText => {
                 let mut package =
-                    litchi_ppt::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                    litchi_ppt::raw::Reader::from_reader(Cursor::new(corpus.archive.as_slice()))?;
                 let presentation = package.presentation()?;
                 let started = Instant::now();
                 let text = presentation.text()?;
@@ -31526,7 +32314,8 @@ fn run_semantic_ppt(
             Case::PptSlideOrderSnapshotOpen => {
                 let owned = corpus.archive.clone();
                 let started = Instant::now();
-                let snapshot = Snapshot::from_bytes(owned)?;
+                let snapshot =
+                    Snapshot::from_bytes_with_options(owned, litchi_ppt::OpenOptions::new())?;
                 let duration = started.elapsed();
                 if snapshot.slide_count() != slide_count {
                     return Err(
@@ -31538,7 +32327,9 @@ fn run_semantic_ppt(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::PptSemanticNoopEditSave | Case::PptSemanticOneEditSave => {
-                let source = Snapshot::from_bytes(corpus.archive.clone())?;
+                // Record 0357: the native slide-order owner is crate-private;
+                // the canonical primary edit drives the same publication.
+                let source = litchi_ppt::Package::from_bytes(&corpus.archive)?;
                 let updated = case == Case::PptSemanticOneEditSave;
                 let started = Instant::now();
                 let mut edit = source.edit()?;
@@ -31549,31 +32340,21 @@ fn run_semantic_ppt(
                     )?;
                 }
                 let commit = edit.commit()?;
-                let bytes = commit.snapshot().bytes().to_vec();
+                let bytes = commit.package().to_bytes()?;
                 let duration = started.elapsed();
-                if commit.patch().is_empty() == updated
-                    || commit.patch().shape_text_changes().len() != usize::from(updated)
+                if commit.patch().is_noop() == updated
+                    || commit.diagnostics().changed() != updated
+                    || commit.patch().operation_count() != usize::from(updated)
                     || bytes != expected_changed
                 {
                     return Err("semantic PPT edit/save has unexpected publication state".into());
                 }
-                if updated {
-                    let [change] = commit.patch().shape_text_changes() else {
-                        return Err("semantic PPT edit patch lacks its one shape change".into());
-                    };
-                    if change.target() != target
-                        || change.before() != writer_text("ppt", selected.0, selected.1, 0)
-                        || change.after() != updated_writer_text("ppt", selected.0, selected.1, 0)
-                    {
-                        return Err("semantic PPT shape change differs from specification".into());
-                    }
-                }
-                let applied = commit.patch().apply(&source)?;
-                if applied.bytes() != commit.snapshot().bytes() {
+                let applied = source.apply(commit.patch())?.into_package();
+                if applied.to_bytes()? != bytes {
                     return Err("semantic PPT exact patch replay differs from commit".into());
                 }
-                let restored = commit.patch().inverse().apply(&applied)?;
-                if restored.bytes() != source.bytes() {
+                let restored = applied.apply(&commit.patch().inverse())?.into_package();
+                if restored.to_bytes()? != corpus.archive {
                     return Err("semantic PPT inverse did not restore exact source bytes".into());
                 }
                 verify_semantic_ppt(&bytes, shape, updated.then_some(selected))?;
@@ -31594,7 +32375,7 @@ fn run_ppt_text_edit_one_edit_save(
     warmup_iterations: usize,
     samples: usize,
 ) -> Result<CaseResult, Box<dyn Error>> {
-    use litchi_ppt::text_edit::{Snapshot, Target};
+    use litchi_ppt::text_edit::Target;
 
     let shape = writer_shape(corpus)?;
     if shape == WriterShape::PayloadHeavy {
@@ -31607,54 +32388,66 @@ fn run_ppt_text_edit_one_edit_save(
     let source_text = writer_text("ppt", selected.0, selected.1, 0);
     let replacement = updated_writer_text("ppt", selected.0, selected.1, 0);
 
+    // Record 0357: the focused text owner is crate-private; the canonical
+    // primary edit's set_shape_text is the public text-edit transaction.
+    let shape_text = |package: &litchi_ppt::Package| -> Result<String, Box<dyn Error>> {
+        Ok(package
+            .presentation()?
+            .slide_at(selected.0)?
+            .ok_or("PPT text-edit selected slide is missing")?
+            .shapes()?
+            .get(selected.1)
+            .ok_or("PPT text-edit selected shape is missing")?
+            .text()?)
+    };
     let expected_changed = {
-        let source = Snapshot::from_bytes(corpus.archive.clone())?;
-        let mut edit = source.edit_text(target)?;
-        if edit.text() != source_text {
+        let source = litchi_ppt::Package::from_bytes(&corpus.archive)?;
+        if shape_text(&source)? != source_text {
             return Err("PPT text-edit source differs from writer specification".into());
         }
-        edit.set_text(replacement.clone())?;
-        edit.commit()?.snapshot().bytes().to_vec()
+        let mut edit = source.edit()?;
+        edit.set_shape_text(target, replacement.clone())?;
+        edit.commit()?.package().to_bytes()?
     };
 
     let mut elapsed = Vec::with_capacity(samples);
     let mut final_publication = None;
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        // Snapshot construction is deliberately outside the measured interval:
+        // Package construction is deliberately outside the measured interval:
         // this case attributes the public text-edit transaction itself.
-        let source = Snapshot::from_bytes(corpus.archive.clone())?;
+        let source = litchi_ppt::Package::from_bytes(&corpus.archive)?;
         let started = Instant::now();
-        let mut edit = source.edit_text(target)?;
-        edit.set_text(replacement.clone())?;
+        let mut edit = source.edit()?;
+        edit.set_shape_text(target, replacement.clone())?;
         let commit = edit.commit()?;
         let duration = started.elapsed();
 
-        if commit.patch().is_empty()
+        if commit.patch().is_noop()
             || commit.patch().before() != corpus.archive
             || commit.patch().after() != expected_changed
-            || commit.snapshot().bytes() != expected_changed
+            || commit.package().to_bytes()? != expected_changed
         {
             return Err("PPT text-edit publication differs from specification".into());
         }
-        std::hint::black_box(commit.snapshot());
+        std::hint::black_box(commit.package());
         final_publication = Some((source, commit));
         record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
     }
 
     let (source, commit) = final_publication.ok_or("PPT text-edit case produced no publication")?;
-    let applied = commit.patch().apply(&source)?;
-    if applied.bytes() != commit.snapshot().bytes() {
+    let published = commit.package().to_bytes()?;
+    let applied = source.apply(commit.patch())?.into_package();
+    if applied.to_bytes()? != published {
         return Err("PPT text-edit exact patch replay differs from commit".into());
     }
-    let restored = commit.patch().inverse().apply(&applied)?;
-    if restored.bytes() != source.bytes() {
+    let restored = applied.apply(&commit.patch().inverse())?.into_package();
+    if restored.to_bytes()? != corpus.archive {
         return Err("PPT text-edit inverse did not restore exact source bytes".into());
     }
-    let readback = commit.snapshot().edit_text(target)?;
-    if readback.target() != target || readback.text() != replacement {
+    if shape_text(commit.package())? != replacement {
         return Err("PPT text-edit public readback differs from replacement".into());
     }
-    verify_semantic_ppt(commit.snapshot().bytes(), shape, Some(selected))?;
+    verify_semantic_ppt(&published, shape, Some(selected))?;
 
     Ok(result(Case::PptTextEditOneEditSave, corpus, elapsed, None))
 }
@@ -31681,7 +32474,7 @@ fn run_semantic_rtf(
         .iter()
         .map(|&position| {
             litchi_rtf::edit::ParagraphTextReplacement::new(
-                position,
+                Position::new(position),
                 semantic_rtf_variant_text(variant, position, true),
             )
         })
@@ -31693,27 +32486,27 @@ fn run_semantic_rtf(
     .then(|| semantic_rtf_lifecycle_projection(case, shape))
     .transpose()?;
     let expected_changed = if lifecycle_projection.is_some() {
-        let document = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+        let document = litchi_rtf::Package::from_bytes(&corpus.archive)?;
         stage_semantic_rtf_lifecycle(case, &document)?
-            .snapshot()
+            .package()
             .to_bytes()?
     } else if !updated.is_empty() {
-        let document = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+        let document = litchi_rtf::Package::from_bytes(&corpus.archive)?;
         let mut edit = document.edit();
         if case == Case::RtfSemanticOnePercentEditSave {
             edit.replace_body_paragraph_texts(&replacements)?;
         } else {
             edit.replace_paragraph_text(
-                selected,
+                Position::new(selected),
                 semantic_rtf_variant_text(variant, selected, true),
             )?;
         }
-        edit.commit()?.snapshot().to_bytes()?
+        edit.commit()?.package().to_bytes()?
     } else {
         corpus.archive.clone()
     };
     if let Some(expected_projection) = lifecycle_projection.as_deref() {
-        let document = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+        let document = litchi_rtf::Package::from_bytes(&corpus.archive)?;
         let commit = stage_semantic_rtf_lifecycle(case, &document)?;
         verify_semantic_rtf_lifecycle_commit(
             case,
@@ -31737,14 +32530,14 @@ fn run_semantic_rtf(
             Case::RtfSemanticOpen => {
                 let owned = corpus.archive.clone();
                 let started = Instant::now();
-                let document = litchi_rtf::Document::from_bytes(&owned)?;
+                let document = litchi_rtf::Package::from_bytes(&owned)?;
                 let duration = started.elapsed();
                 verify_semantic_rtf(&document, shape, variant, &[])?;
                 std::hint::black_box(document);
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::RtfSemanticParagraphCount => {
-                let document = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+                let document = litchi_rtf::Package::from_bytes(&corpus.archive)?;
                 let started = Instant::now();
                 let count = document.paragraph_count();
                 let duration = started.elapsed();
@@ -31756,7 +32549,7 @@ fn run_semantic_rtf(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::RtfSemanticListParagraphs => {
-                let document = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+                let document = litchi_rtf::Package::from_bytes(&corpus.archive)?;
                 let started = Instant::now();
                 let count = document.body().paragraphs().count();
                 let duration = started.elapsed();
@@ -31768,7 +32561,7 @@ fn run_semantic_rtf(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::RtfSemanticCollectParagraphs => {
-                let document = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+                let document = litchi_rtf::Package::from_bytes(&corpus.archive)?;
                 let started = Instant::now();
                 let paragraphs = document.body().paragraphs().collect::<Vec<_>>();
                 let duration = started.elapsed();
@@ -31782,7 +32575,7 @@ fn run_semantic_rtf(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::RtfSemanticOneParagraph => {
-                let document = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+                let document = litchi_rtf::Package::from_bytes(&corpus.archive)?;
                 let started = Instant::now();
                 let paragraph = document
                     .body()
@@ -31799,7 +32592,7 @@ fn run_semantic_rtf(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::RtfSemanticFullText => {
-                let document = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+                let document = litchi_rtf::Package::from_bytes(&corpus.archive)?;
                 let started = Instant::now();
                 let text = document.text();
                 let duration = started.elapsed();
@@ -31811,7 +32604,7 @@ fn run_semantic_rtf(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::RtfSemanticTextToSink => {
-                let document = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+                let document = litchi_rtf::Package::from_bytes(&corpus.archive)?;
                 let mut sink = CountingSink::bounded(sink_ceiling, sink_ceiling);
                 sink.reserve_budget()?;
                 let options = litchi_core::TextOutputOptions::new(
@@ -31856,7 +32649,7 @@ fn run_semantic_rtf(
             | Case::RtfSemanticOnePercentEditSave
             | Case::RtfSemanticRemoveParagraphSave
             | Case::RtfSemanticMoveParagraphSave => {
-                let document = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+                let document = litchi_rtf::Package::from_bytes(&corpus.archive)?;
                 let mut sink = CountingSink::bounded(sink_ceiling, sink_ceiling);
                 sink.reserve_budget()?;
                 let started = Instant::now();
@@ -31866,16 +32659,16 @@ fn run_semantic_rtf(
                         let commit = document.edit().commit()?;
                         if commit.diagnostics().changed()
                             || commit.diagnostics().operation_count() != 0
-                            || !commit.snapshot().same_snapshot(&document)
+                            || !commit.package().same_snapshot(&document)
                         {
                             return Err("semantic RTF no-op commit changed its source".into());
                         }
-                        (commit.into_snapshot(), &[][..], None)
+                        (commit.into_package(), &[][..], None)
                     },
                     Case::RtfSemanticOneEditSave => {
                         let mut edit = document.edit();
                         edit.replace_paragraph_text(
-                            selected,
+                            Position::new(selected),
                             semantic_rtf_variant_text(variant, selected, true),
                         )?;
                         let commit = edit.commit()?;
@@ -31886,7 +32679,7 @@ fn run_semantic_rtf(
                                 "semantic RTF changed commit has unexpected diagnostics".into()
                             );
                         }
-                        let published = commit.snapshot().clone();
+                        let published = commit.package().clone();
                         (published, updated.as_slice(), Some(commit))
                     },
                     Case::RtfSemanticOnePercentEditSave => {
@@ -31900,7 +32693,7 @@ fn run_semantic_rtf(
                                 "semantic RTF one-percent commit has unexpected diagnostics".into(),
                             );
                         }
-                        let published = commit.snapshot().clone();
+                        let published = commit.package().clone();
                         (published, updated.as_slice(), Some(commit))
                     },
                     Case::RtfSemanticRemoveParagraphSave | Case::RtfSemanticMoveParagraphSave => {
@@ -31912,7 +32705,7 @@ fn run_semantic_rtf(
                                 "semantic RTF lifecycle commit has unexpected diagnostics".into()
                             );
                         }
-                        let published = commit.snapshot().clone();
+                        let published = commit.package().clone();
                         (published, &[][..], Some(commit))
                     },
                     _ => return Err("non-save RTF case reached save branch".into()),
@@ -31923,18 +32716,18 @@ fn run_semantic_rtf(
                 if sink.bytes != expected_changed {
                     return Err("semantic RTF save differs from deterministic output".into());
                 }
-                let reopened = litchi_rtf::Document::from_bytes(&sink.bytes)?;
+                let reopened = litchi_rtf::Package::from_bytes(&sink.bytes)?;
                 if let Some(expected_projection) = lifecycle_projection.as_deref() {
                     verify_semantic_rtf_lifecycle_projection(&reopened, expected_projection)?;
                 } else {
                     verify_semantic_rtf(&reopened, shape, variant, expected_updates)?;
                 }
                 if let Some(commit) = commit {
-                    let applied = commit.patch().apply(&document)?;
+                    let applied = document.apply(commit.patch())?.into_package();
                     if applied.to_bytes()? != sink.bytes {
                         return Err("semantic RTF patch replay differs from publication".into());
                     }
-                    let restored = commit.patch().inverse().apply(&applied)?;
+                    let restored = applied.apply(&commit.patch().inverse())?.into_package();
                     if restored.to_bytes()? != corpus.archive {
                         return Err(
                             "semantic RTF inverse did not restore exact source bytes".into()
@@ -31970,7 +32763,7 @@ struct RtfParagraphSplitMergeExpectation {
     output_changed: Range<usize>,
 }
 
-fn rtf_plain_paragraph_projection(document: &litchi_rtf::Document) -> Vec<String> {
+fn rtf_plain_paragraph_projection(document: &litchi_rtf::Package) -> Vec<String> {
     document
         .body()
         .paragraphs()
@@ -32005,7 +32798,7 @@ fn rtf_paragraph_split_merge_expectation(
     {
         return Err("RTF paragraph split/merge requires the plain lifecycle corpus".into());
     }
-    let source = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+    let source = litchi_rtf::Package::from_bytes(&corpus.archive)?;
     let source_projection = rtf_plain_paragraph_projection(&source);
     if source_projection.len() != source.paragraph_count()
         || source_projection.len() != corpus.manifest.entry_count
@@ -32129,21 +32922,24 @@ fn forge_rtf_result_artifact(value: &mut serde_json::Value) -> bool {
 
 fn stage_rtf_paragraph_split_merge(
     case: Case,
-    source: &litchi_rtf::Document,
+    source: &litchi_rtf::Package,
     expectation: &RtfParagraphSplitMergeExpectation,
 ) -> Result<litchi_rtf::edit::Commit, Box<dyn Error>> {
     let mut edit = source.edit();
     match case {
         Case::RtfSemanticSplitParagraphSave => {
             edit.split_paragraph(
-                expectation.selected_position,
+                Position::new(expectation.selected_position),
                 expectation
                     .split_offset
                     .ok_or("RTF split expectation has no offset")?,
             )?;
         },
         Case::RtfSemanticMergeParagraphSave => {
-            edit.merge_paragraphs(expectation.selected_position, expectation.adjacent_position)?;
+            edit.merge_paragraphs(
+                Position::new(expectation.selected_position),
+                Position::new(expectation.adjacent_position),
+            )?;
         },
         _ => return Err("non-split/merge case reached RTF staging".into()),
     }
@@ -32155,7 +32951,7 @@ fn verify_rtf_paragraph_split_merge_gates(
     corpus: &Corpus,
     expectation: &RtfParagraphSplitMergeExpectation,
 ) -> Result<RtfParagraphSplitMergeGateSummary, Box<dyn Error>> {
-    let source = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+    let source = litchi_rtf::Package::from_bytes(&corpus.archive)?;
     if source.to_bytes()? != corpus.archive
         || sha256_hex(&corpus.archive) != corpus.manifest.archive_sha256
     {
@@ -32182,7 +32978,7 @@ fn verify_rtf_paragraph_split_merge_gates(
     if !exact_source_splice_verified {
         return Err("RTF paragraph split/merge expected output changed unrelated bytes".into());
     }
-    let reopened = litchi_rtf::Document::from_bytes(&expectation.expected_output)?;
+    let reopened = litchi_rtf::Package::from_bytes(&expectation.expected_output)?;
     let semantic_reopen_verified = rtf_plain_paragraph_projection(&reopened)
         == expectation.expected_projection
         && reopened.text() == expectation.expected_projection.join("\n")
@@ -32193,7 +32989,7 @@ fn verify_rtf_paragraph_split_merge_gates(
     let commit = stage_rtf_paragraph_split_merge(case, &source, expectation)?;
     if !commit.diagnostics().changed()
         || commit.diagnostics().operation_count() != 1
-        || commit.snapshot().to_bytes()? != expectation.expected_output
+        || commit.package().to_bytes()? != expectation.expected_output
     {
         return Err("RTF paragraph split/merge commit differs from expected splice".into());
     }
@@ -32202,16 +32998,18 @@ fn verify_rtf_paragraph_split_merge_gates(
     let limits = semantic_rtf_durable_limits();
     let exact_noop_verified = !noop.diagnostics().changed()
         && noop.diagnostics().operation_count() == 0
-        && noop.snapshot().same_snapshot(&source)
-        && noop.snapshot().to_bytes()? == corpus.archive
+        && noop.package().same_snapshot(&source)
+        && noop.package().to_bytes()? == corpus.archive
         && noop.patch().to_durable(limits)?.operations().is_empty();
     if !exact_noop_verified {
         return Err("RTF paragraph split/merge exact no-op gate failed".into());
     }
 
-    let volatile_forward = commit.patch().apply(&source)?;
+    let volatile_forward = source.apply(commit.patch())?.into_package();
     let volatile_forward_verified = volatile_forward.to_bytes()? == expectation.expected_output;
-    let volatile_inverse = commit.patch().inverse().apply(&volatile_forward)?;
+    let volatile_inverse = volatile_forward
+        .apply(&commit.patch().inverse())?
+        .into_package();
     let volatile_inverse_verified = volatile_inverse.to_bytes()? == corpus.archive;
 
     let durable = commit.patch().to_durable(limits)?;
@@ -32220,9 +33018,11 @@ fn verify_rtf_paragraph_split_merge_gates(
         litchi_core::patch::Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
             &encoded, limits,
         )?;
-    let durable_forward = source.apply_durable(&decoded)?;
+    let durable_forward = source.apply_durable(&decoded)?.into_package();
     let durable_forward_verified = durable_forward.to_bytes()? == expectation.expected_output;
-    let durable_inverse = durable_forward.apply_durable(&decoded.inverse())?;
+    let durable_inverse = durable_forward
+        .apply_durable(&decoded.inverse())?
+        .into_package();
     let durable_inverse_verified = durable_inverse.to_bytes()? == corpus.archive;
     let durable_deterministic_verified = decoded.to_deterministic_json()? == encoded;
 
@@ -32235,10 +33035,10 @@ fn verify_rtf_paragraph_split_merge_gates(
             )?)
             .is_err();
     let mut stale_edit = source.edit();
-    stale_edit.replace_paragraph_text(0, "litchi-perf-baseline-rtf-stale-source")?;
-    let stale = stale_edit.commit()?.into_snapshot();
+    stale_edit.replace_paragraph_text(Position::new(0), "litchi-perf-baseline-rtf-stale-source")?;
+    let stale = stale_edit.commit()?.into_package();
     let stale_source_refusal_verified = stale.apply_durable(&decoded).is_err();
-    let foreign = litchi_rtf::Document::parse(r"{\rtf1\ansi Foreign\par Source}")?;
+    let foreign = litchi_rtf::Package::parse(r"{\rtf1\ansi Foreign\par Source}")?;
     let foreign_source_refusal_verified = foreign.apply_durable(&decoded).is_err();
     if !volatile_forward_verified
         || !volatile_inverse_verified
@@ -32260,61 +33060,80 @@ fn verify_rtf_paragraph_split_merge_gates(
                 .ok_or("RTF split target is missing for refusal gate")?;
             let mut edit = source.edit();
             matches!(
-                edit.split_paragraph(expectation.selected_position, text.len() + 1),
+                edit.split_paragraph(Position::new(expectation.selected_position), text.len() + 1),
                 Err(litchi_rtf::edit::Error::ParagraphSplitOffsetOutOfRange { .. })
             ) && edit.operation_count() == 0
         },
         Case::RtfSemanticMergeParagraphSave => {
             let mut edit = source.edit();
             matches!(
-                edit.merge_paragraphs(0, 2),
+                edit.merge_paragraphs(Position::new(0), Position::new(2)),
                 Err(litchi_rtf::edit::Error::ParagraphMergeNonAdjacent { .. })
             ) && edit.operation_count() == 0
         },
         _ => false,
     };
-    let mut limited = source.edit_with_limits(litchi_rtf::edit::Limits::new(0));
+    let profile = litchi_rtf::SemanticLimits::builder()
+        .max_operations(0)?
+        .build()?;
+    let mut limited =
+        source.edit_with_options(litchi_rtf::EditOptions::new().semantic_limits(profile));
     let limit_refusal_verified = match case {
         Case::RtfSemanticSplitParagraphSave => matches!(
             limited.split_paragraph(
-                expectation.selected_position,
+                Position::new(expectation.selected_position),
                 expectation
                     .split_offset
                     .ok_or("RTF split expectation has no offset")?,
             ),
-            Err(litchi_rtf::edit::Error::OperationLimit { .. })
+            Err(litchi_rtf::edit::Error::Limit {
+                kind: litchi_rtf::SemanticLimitKind::Operations,
+                ..
+            })
         ),
         Case::RtfSemanticMergeParagraphSave => matches!(
-            limited.merge_paragraphs(expectation.selected_position, expectation.adjacent_position,),
-            Err(litchi_rtf::edit::Error::OperationLimit { .. })
+            limited.merge_paragraphs(
+                Position::new(expectation.selected_position),
+                Position::new(expectation.adjacent_position),
+            ),
+            Err(litchi_rtf::edit::Error::Limit {
+                kind: litchi_rtf::SemanticLimitKind::Operations,
+                ..
+            })
         ),
         _ => false,
     } && limited.operation_count() == 0;
     let unsafe_source =
-        litchi_rtf::Document::parse(r"{\rtf1\ansi First{\b nested}Second\par Third}")?;
+        litchi_rtf::Package::parse(r"{\rtf1\ansi First{\b nested}Second\par Third}")?;
     let unsafe_refusal_verified = match case {
-        Case::RtfSemanticSplitParagraphSave => unsafe_source.edit().split_paragraph(0, 1).is_err(),
-        Case::RtfSemanticMergeParagraphSave => unsafe_source.edit().merge_paragraphs(0, 1).is_err(),
+        Case::RtfSemanticSplitParagraphSave => unsafe_source
+            .edit()
+            .split_paragraph(Position::new(0), 1)
+            .is_err(),
+        Case::RtfSemanticMergeParagraphSave => unsafe_source
+            .edit()
+            .merge_paragraphs(Position::new(0), Position::new(1))
+            .is_err(),
         _ => false,
     };
-    let protected = litchi_rtf::Document::parse(
+    let protected = litchi_rtf::Package::parse(
         r"{\rtf1\ansi\readprot\enforceprot1 First\par Second\par Third}",
     )?;
     let protected_refusal_verified = match case {
         Case::RtfSemanticSplitParagraphSave => {
             let mut edit = protected.edit();
-            edit.split_paragraph(0, 1)?;
+            edit.split_paragraph(Position::new(0), 1)?;
             matches!(
                 edit.commit(),
-                Err(litchi_rtf::edit::Error::ProtectedDocument { .. })
+                Err(litchi_rtf::edit::Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::Protected
             )
         },
         Case::RtfSemanticMergeParagraphSave => {
             let mut edit = protected.edit();
-            edit.merge_paragraphs(0, 1)?;
+            edit.merge_paragraphs(Position::new(0), Position::new(1))?;
             matches!(
                 edit.commit(),
-                Err(litchi_rtf::edit::Error::ProtectedDocument { .. })
+                Err(litchi_rtf::edit::Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::Protected
             )
         },
         _ => false,
@@ -32333,14 +33152,14 @@ fn verify_rtf_paragraph_split_merge_gates(
             .unwrap_or(1)
             .max(1),
     };
-    let partial_sink_verified = commit.snapshot().write_to(&mut partial).is_err()
+    let partial_sink_verified = commit.package().write_to(&mut partial).is_err()
         && partial.accepted > 0
         && partial.accepted < u64::try_from(expectation.expected_output.len())?;
     let mut zero = PrefixFailSink {
         accepted: 0,
         fail_after: 0,
     };
-    let zero_sink_verified = commit.snapshot().write_to(&mut zero).is_err() && zero.accepted == 0;
+    let zero_sink_verified = commit.package().write_to(&mut zero).is_err() && zero.accepted == 0;
     if !partial_sink_verified || !zero_sink_verified {
         return Err("RTF paragraph split/merge partial/zero sink gate failed".into());
     }
@@ -32396,20 +33215,21 @@ fn run_rtf_paragraph_split_merge(
         let mut sink = WindowedHashingSink::new(output_bytes, RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES)?;
         let lifecycle_started = Instant::now();
         let open_started = Instant::now();
-        let source = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+        let source = litchi_rtf::Package::from_bytes(&corpus.archive)?;
         let open_duration = open_started.elapsed();
         let stage_started = Instant::now();
         let mut edit = source.edit();
         match case {
             Case::RtfSemanticSplitParagraphSave => edit.split_paragraph(
-                expectation.selected_position,
+                Position::new(expectation.selected_position),
                 expectation
                     .split_offset
                     .ok_or("RTF split expectation has no offset")?,
             )?,
-            Case::RtfSemanticMergeParagraphSave => {
-                edit.merge_paragraphs(expectation.selected_position, expectation.adjacent_position)?
-            },
+            Case::RtfSemanticMergeParagraphSave => edit.merge_paragraphs(
+                Position::new(expectation.selected_position),
+                Position::new(expectation.adjacent_position),
+            )?,
             _ => return Err("non-split/merge case reached RTF timed staging".into()),
         };
         let stage_duration = stage_started.elapsed();
@@ -32417,14 +33237,14 @@ fn run_rtf_paragraph_split_merge(
         let commit = edit.commit()?;
         let commit_duration = commit_started.elapsed();
         let publication_started = Instant::now();
-        commit.snapshot().write_to(&mut sink)?;
+        commit.package().write_to(&mut sink)?;
         let publication_duration = publication_started.elapsed();
         let lifecycle_duration = lifecycle_started.elapsed();
         let (sink_summary, digest) = sink.finish();
         if digest != output_digest || sink_summary.accepted_bytes != output_bytes {
             return Err("RTF paragraph split/merge timed publication hash differs".into());
         }
-        std::hint::black_box(commit.snapshot());
+        std::hint::black_box(commit.package());
         record_elapsed(
             &mut elapsed,
             iteration,
@@ -32652,7 +33472,7 @@ fn verify_rtf_picture_crud_gates(
         return Err("non-picture case passed to RTF picture CRUD gates".into());
     }
     let shape = semantic_shape(corpus)?;
-    let source = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+    let source = litchi_rtf::Package::from_bytes(&corpus.archive)?;
     let picture_count = rtf_picture_count(shape);
     if source.pictures().len() != picture_count
         || source.to_bytes()? != corpus.archive
@@ -32726,18 +33546,18 @@ fn verify_rtf_picture_crud_gates(
             .collect::<Vec<_>>();
         let mut edit = source.edit();
         edit.replace_picture_payloads(&replacements)?;
-        edit.commit()?.snapshot().to_bytes()?
+        edit.commit()?.package().to_bytes()?
     } else {
         let mut edit = source.edit();
         edit.remove_pictures(&selected_positions)?;
-        edit.commit()?.snapshot().to_bytes()?
+        edit.commit()?.package().to_bytes()?
     };
     if api_output != expected_output {
         return Err(
             "RTF picture CRUD public commit differs from the independent exact splice".into(),
         );
     }
-    let reopened = litchi_rtf::Document::from_bytes(&expected_output)?;
+    let reopened = litchi_rtf::Package::from_bytes(&expected_output)?;
     if reopened.text() != source.text() {
         return Err("RTF picture CRUD semantic reopen changed visible text".into());
     }
@@ -32816,8 +33636,8 @@ fn verify_rtf_picture_crud_gates(
     };
     let exact_noop_verified = !noop.diagnostics().changed()
         && noop.diagnostics().operation_count() == expected_noop_operations
-        && noop.snapshot().same_snapshot(&source)
-        && noop.snapshot().to_bytes()? == corpus.archive;
+        && noop.package().same_snapshot(&source)
+        && noop.package().to_bytes()? == corpus.archive;
     if !exact_noop_verified {
         return Err("RTF picture CRUD exact no-op gate failed".into());
     }
@@ -32840,7 +33660,7 @@ fn verify_rtf_picture_crud_gates(
     let commit = changed_edit.commit()?;
     if !commit.diagnostics().changed()
         || commit.diagnostics().operation_count() != selected_positions.len()
-        || commit.snapshot().to_bytes()? != expected_output
+        || commit.package().to_bytes()? != expected_output
     {
         return Err("RTF picture CRUD commit diagnostics differ from expected output".into());
     }
@@ -32857,13 +33677,15 @@ fn verify_rtf_picture_crud_gates(
             &durable_json,
             durable_limits,
         )?;
-    let volatile_forward = commit.patch().apply(&source)?;
+    let volatile_forward = source.apply(commit.patch())?.into_package();
     let volatile_forward_verified = volatile_forward.to_bytes()? == expected_output;
-    let volatile_inverse = commit.patch().inverse().apply(&volatile_forward)?;
+    let volatile_inverse = volatile_forward
+        .apply(&commit.patch().inverse())?
+        .into_package();
     let volatile_inverse_verified = volatile_inverse.to_bytes()? == corpus.archive;
-    let forward = source.apply_durable(&decoded)?;
+    let forward = source.apply_durable(&decoded)?.into_package();
     let durable_forward_verified = forward.to_bytes()? == expected_output;
-    let inverse = forward.apply_durable(&decoded.inverse())?;
+    let inverse = forward.apply_durable(&decoded.inverse())?.into_package();
     let durable_inverse_verified = inverse.to_bytes()? == corpus.archive;
     if !volatile_forward_verified
         || !volatile_inverse_verified
@@ -32878,7 +33700,7 @@ fn verify_rtf_picture_crud_gates(
         .position(|byte| *byte == b'0')
         .ok_or("RTF picture CRUD source has no mutable stale byte")?;
     stale_bytes[stale_offset] = b'1';
-    let stale = litchi_rtf::Document::from_bytes(&stale_bytes)?;
+    let stale = litchi_rtf::Package::from_bytes(&stale_bytes)?;
     let stale_source_refusal_verified = stale.apply_durable(&decoded).is_err();
     let mut foreign_bytes = corpus.archive.clone();
     let foreign_offset = foreign_bytes
@@ -32886,7 +33708,7 @@ fn verify_rtf_picture_crud_gates(
         .position(|window| window == b"root0")
         .ok_or("RTF picture CRUD source has no foreign marker")?;
     foreign_bytes[foreign_offset + 4] = b'X';
-    let foreign = litchi_rtf::Document::from_bytes(&foreign_bytes)?;
+    let foreign = litchi_rtf::Package::from_bytes(&foreign_bytes)?;
     let foreign_source_refusal_verified = foreign.apply_durable(&decoded).is_err();
     if !stale_source_refusal_verified || !foreign_source_refusal_verified {
         return Err("RTF picture CRUD stale/foreign refusal gate failed".into());
@@ -32915,9 +33737,8 @@ fn verify_rtf_picture_crud_gates(
         let over_limit = (0..=litchi_rtf::edit::MAX_PICTURE_REMOVAL_OPERATIONS).collect::<Vec<_>>();
         source.edit().remove_pictures(&over_limit).is_err()
     };
-    let nested = litchi_rtf::Document::parse(
-        r"{\rtf1{\*\shppict{\pict\pngblip 89504e470d0a1a0a192a3b4c}}}",
-    )?;
+    let nested =
+        litchi_rtf::Package::parse(r"{\rtf1{\*\shppict{\pict\pngblip 89504e470d0a1a0a192a3b4c}}}")?;
     let nested_refusal = if case == Case::RtfPicturePayloadBatchReplace {
         nested
             .edit()
@@ -32936,12 +33757,12 @@ fn verify_rtf_picture_crud_gates(
         fail_after: 1,
     };
     let partial_sink_verified =
-        commit.snapshot().write_to(&mut partial).is_err() && partial.accepted == 1;
+        commit.package().write_to(&mut partial).is_err() && partial.accepted == 1;
     let mut zero = PrefixFailSink {
         accepted: 0,
         fail_after: 0,
     };
-    let zero_sink_verified = commit.snapshot().write_to(&mut zero).is_err() && zero.accepted == 0;
+    let zero_sink_verified = commit.package().write_to(&mut zero).is_err() && zero.accepted == 0;
     if !partial_sink_verified || !zero_sink_verified {
         return Err("RTF picture CRUD partial/zero sink gate failed".into());
     }
@@ -33006,7 +33827,7 @@ fn run_rtf_picture_crud(
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let lifecycle_started = Instant::now();
         let open_started = Instant::now();
-        let source = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+        let source = litchi_rtf::Package::from_bytes(&corpus.archive)?;
         let open_duration = open_started.elapsed();
         let stage_started = Instant::now();
         let mut edit = source.edit();
@@ -33025,14 +33846,14 @@ fn run_rtf_picture_crud(
         let commit_duration = commit_started.elapsed();
         let publication_started = Instant::now();
         let mut sink = HashingDiscardSink::without_authoring_window(output_bytes);
-        commit.snapshot().write_to(&mut sink)?;
+        commit.package().write_to(&mut sink)?;
         let publication_duration = publication_started.elapsed();
         let lifecycle_duration = lifecycle_started.elapsed();
         let (sink_summary, digest) = sink.finish();
         if digest != output_digest || sink_summary.accepted_bytes != output_bytes {
             return Err("RTF picture CRUD timed publication hash differs".into());
         }
-        std::hint::black_box(commit.snapshot());
+        std::hint::black_box(commit.package());
         record_elapsed(
             &mut elapsed,
             iteration,
@@ -33101,7 +33922,7 @@ fn run_rtf_logical_tail_append(
         return Err("RTF logical-tail cases require the plain uncompressed corpus".into());
     }
     let shape = semantic_shape(corpus)?;
-    let source = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+    let source = litchi_rtf::Package::from_bytes(&corpus.archive)?;
     let appended = (0..rtf_logical_tail_paragraph_count(shape))
         .map(|index| rtf_logical_tail_text(shape, index))
         .collect::<Vec<_>>();
@@ -33114,10 +33935,13 @@ fn run_rtf_logical_tail_append(
     let limits = rtf_logical_tail_limits(corpus.archive.len(), input_bytes, appended.len())?;
     let changed = stage_rtf_logical_tail(&source, &paragraph_inputs, limits)?;
     let noop = {
-        let edit = source.tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
+        let edit = source.edit_tail_append_with_options(
+            litchi_rtf::TailSelector::Body,
+            litchi_rtf::tail_append::EditOptions::new().semantic_limits(limits),
+        );
         edit.commit()?
     };
-    let expected = changed.snapshot().to_bytes()?;
+    let expected = changed.package().to_bytes()?;
     verify_rtf_logical_tail_gates(&source, &changed, &noop, &appended, limits, &expected)?;
     let expected_digest = sha256_hex(&expected);
     let source_bytes = u64::try_from(corpus.archive.len())?;
@@ -33137,7 +33961,10 @@ fn run_rtf_logical_tail_append(
                 commit.write_to(&mut sink, limits)?
             },
             Case::RtfLogicalTailNoopSave => {
-                let edit = source.tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
+                let edit = source.edit_tail_append_with_options(
+                    litchi_rtf::TailSelector::Body,
+                    litchi_rtf::tail_append::EditOptions::new().semantic_limits(limits),
+                );
                 let commit = edit.commit()?;
                 commit.write_to(&mut sink, limits)?
             },
@@ -33228,7 +34055,7 @@ fn run_rtf_logical_tail_append(
 }
 
 enum RtfTailPrepared {
-    Commit(litchi_rtf::TailAppendCommit),
+    Commit(litchi_rtf::tail_append::Commit),
     Plan {
         plan: litchi_rtf::TailAppendPublicationPlan,
         context: ExecutionContext,
@@ -33319,20 +34146,23 @@ fn rtf_tail_publication_context_with_token(
 }
 
 fn stage_rtf_tail_prepared(
-    source: &litchi_rtf::Document,
+    source: &litchi_rtf::Package,
     paragraphs: &[&str],
-    limits: litchi_rtf::TailAppendLimits,
+    limits: litchi_rtf::tail_append::SemanticLimits,
     publication_limits: litchi_rtf::TailAppendPublicationLimits,
     plan_based: bool,
     expected_output_bytes: u64,
     inserted_bytes: u64,
 ) -> Result<(RtfTailPrepared, u64), Box<dyn Error>> {
     let started = Instant::now();
-    let mut edit = source.tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
+    let mut edit = source.edit_tail_append_with_options(
+        litchi_rtf::TailSelector::Body,
+        litchi_rtf::tail_append::EditOptions::new().semantic_limits(limits),
+    );
     edit.append_text_paragraphs(paragraphs)?;
     let prepared = if plan_based {
         let context = rtf_tail_publication_context(expected_output_bytes, inserted_bytes)?;
-        let plan = edit.publication_plan_with_limits_and_context(publication_limits, &context)?;
+        let plan = edit.publication_plan_with_context(publication_limits, &context)?;
         RtfTailPrepared::Plan { plan, context }
     } else {
         RtfTailPrepared::Commit(edit.commit()?)
@@ -33343,7 +34173,7 @@ fn stage_rtf_tail_prepared(
 fn publish_rtf_tail_prepared<W: Write>(
     prepared: &RtfTailPrepared,
     sink: &mut W,
-    limits: litchi_rtf::TailAppendLimits,
+    limits: litchi_rtf::tail_append::SemanticLimits,
 ) -> Result<usize, Box<dyn Error>> {
     match prepared {
         RtfTailPrepared::Commit(commit) => Ok(commit.write_to(sink, limits)?),
@@ -33354,7 +34184,7 @@ fn publish_rtf_tail_prepared<W: Write>(
 fn digest_rtf_tail_prepared(
     prepared: &RtfTailPrepared,
     sink: &mut WindowedHashingSink,
-    limits: litchi_rtf::TailAppendLimits,
+    limits: litchi_rtf::tail_append::SemanticLimits,
     output_bytes: u64,
     inserted_bytes: u64,
 ) -> Result<usize, Box<dyn Error>> {
@@ -33369,11 +34199,11 @@ fn digest_rtf_tail_prepared(
 
 fn verify_rtf_tail_reopen_phase(
     expected: &[u8],
-    source: &litchi_rtf::Document,
+    source: &litchi_rtf::Package,
     appended: &[String],
 ) -> Result<u64, Box<dyn Error>> {
     let started = Instant::now();
-    let reopened = litchi_rtf::Document::from_bytes(expected)?;
+    let reopened = litchi_rtf::Package::from_bytes(expected)?;
     verify_rtf_logical_tail_projection(&reopened, source, appended)?;
     if appended.is_empty() && reopened.to_bytes()? != source.to_bytes()? {
         return Err("RTF publication-plan no-op reopen changed exact source bytes".into());
@@ -33382,11 +34212,11 @@ fn verify_rtf_tail_reopen_phase(
 }
 
 fn verify_rtf_tail_publication_plan_gates(
-    source: &litchi_rtf::Document,
+    source: &litchi_rtf::Package,
     plan: &litchi_rtf::TailAppendPublicationPlan,
     expected: &[u8],
     expected_digest: &str,
-    limits: litchi_rtf::TailAppendLimits,
+    limits: litchi_rtf::tail_append::SemanticLimits,
     publication_limits: litchi_rtf::TailAppendPublicationLimits,
     appended: &[String],
 ) -> Result<(), Box<dyn Error>> {
@@ -33412,12 +34242,12 @@ fn verify_rtf_tail_publication_plan_gates(
         return Err("RTF publication plan output differs from the exact candidate".into());
     }
     verify_rtf_logical_tail_projection(
-        &litchi_rtf::Document::from_bytes(&published)?,
+        &litchi_rtf::Package::from_bytes(&published)?,
         source,
         appended,
     )?;
 
-    let foreign = litchi_rtf::Document::from_bytes(&source.to_bytes()?)?;
+    let foreign = litchi_rtf::Package::from_bytes(&source.to_bytes()?)?;
     let foreign_context = rtf_tail_publication_context(
         u64::try_from(expected.len())?,
         u64::try_from(plan.inserted_bytes())?,
@@ -33432,8 +34262,11 @@ fn verify_rtf_tail_publication_plan_gates(
     }
 
     let mut stale_edit = source.edit();
-    stale_edit.replace_paragraph_text(0, "litchi-perf-baseline-rtf-publication-stale")?;
-    let stale = stale_edit.commit()?.into_snapshot();
+    stale_edit.replace_paragraph_text(
+        Position::new(0),
+        "litchi-perf-baseline-rtf-publication-stale",
+    )?;
+    let stale = stale_edit.commit()?.into_package();
     let stale_context = rtf_tail_publication_context(
         u64::try_from(expected.len())?,
         u64::try_from(plan.inserted_bytes())?,
@@ -33490,10 +34323,14 @@ fn verify_rtf_tail_publication_plan_gates(
         return Err("RTF publication plan did not honor pre-publication cancellation".into());
     }
 
-    let mut bounded_limits = limits;
-    bounded_limits.max_output_bytes = expected.len().saturating_sub(1);
-    let mut bounded_edit =
-        source.tail_append_with_limits(litchi_rtf::TailSelector::Body, bounded_limits);
+    let bounded_limits = limits
+        .into_builder()
+        .max_output_bytes(expected.len().saturating_sub(1))?
+        .build()?;
+    let mut bounded_edit = source.edit_tail_append_with_options(
+        litchi_rtf::TailSelector::Body,
+        litchi_rtf::tail_append::EditOptions::new().semantic_limits(bounded_limits),
+    );
     bounded_edit
         .append_text_paragraphs(&appended.iter().map(String::as_str).collect::<Vec<_>>())?;
     let bounded_context = rtf_tail_publication_context(
@@ -33501,11 +34338,10 @@ fn verify_rtf_tail_publication_plan_gates(
         u64::try_from(plan.inserted_bytes())?,
     )?;
     if !matches!(
-        bounded_edit
-            .publication_plan_with_limits_and_context(publication_limits, &bounded_context,),
+        bounded_edit.publication_plan_with_context(publication_limits, &bounded_context,),
         Err(litchi_rtf::TailAppendPublicationError::Plan(
-            litchi_rtf::TailAppendError::LimitExceeded {
-                resource: "output bytes",
+            litchi_rtf::tail_append::Error::Limit {
+                kind: litchi_rtf::tail_append::LimitKind::OutputBytes,
                 ..
             }
         ))
@@ -33513,7 +34349,10 @@ fn verify_rtf_tail_publication_plan_gates(
         return Err("RTF publication plan did not enforce the output limit gate".into());
     }
 
-    let mut invalid_edit = source.tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
+    let mut invalid_edit = source.edit_tail_append_with_options(
+        litchi_rtf::TailSelector::Body,
+        litchi_rtf::tail_append::EditOptions::new().semantic_limits(limits),
+    );
     invalid_edit
         .append_text_paragraphs(&appended.iter().map(String::as_str).collect::<Vec<_>>())?;
     let invalid_context = rtf_tail_publication_context(
@@ -33521,7 +34360,7 @@ fn verify_rtf_tail_publication_plan_gates(
         u64::try_from(plan.inserted_bytes())?,
     )?;
     if !matches!(
-        invalid_edit.publication_plan_with_limits_and_context(
+        invalid_edit.publication_plan_with_context(
             litchi_rtf::TailAppendPublicationLimits::new(0, 0),
             &invalid_context,
         ),
@@ -33533,13 +34372,13 @@ fn verify_rtf_tail_publication_plan_gates(
 }
 
 fn verify_rtf_tail_publication_lifecycle(
-    source: &litchi_rtf::Document,
-    changed: &litchi_rtf::TailAppendCommit,
-    noop: &litchi_rtf::TailAppendCommit,
+    source: &litchi_rtf::Package,
+    changed: &litchi_rtf::tail_append::Commit,
+    noop: &litchi_rtf::tail_append::Commit,
     plan: &litchi_rtf::TailAppendPublicationPlan,
     changed_appended: &[String],
     plan_appended: &[String],
-    limits: litchi_rtf::TailAppendLimits,
+    limits: litchi_rtf::tail_append::SemanticLimits,
     publication_limits: litchi_rtf::TailAppendPublicationLimits,
     changed_expected: &[u8],
     expected: &[u8],
@@ -33579,7 +34418,7 @@ fn run_rtf_logical_tail_publication(
     }
     let (implementation, append, plan_based) = rtf_tail_publication_parameters(case)?;
     let shape = semantic_shape(corpus)?;
-    let source = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+    let source = litchi_rtf::Package::from_bytes(&corpus.archive)?;
     let changed_appended = (0..rtf_logical_tail_paragraph_count(shape))
         .map(|index| rtf_logical_tail_text(shape, index))
         .collect::<Vec<_>>();
@@ -33614,10 +34453,13 @@ fn run_rtf_logical_tail_publication(
     );
     let changed = stage_rtf_logical_tail(&source, &changed_inputs, limits)?;
     let noop = {
-        let edit = source.tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
+        let edit = source.edit_tail_append_with_options(
+            litchi_rtf::TailSelector::Body,
+            litchi_rtf::tail_append::EditOptions::new().semantic_limits(limits),
+        );
         edit.commit()?
     };
-    let expected_changed = changed.snapshot().to_bytes()?;
+    let expected_changed = changed.package().to_bytes()?;
     let expected_output = if append {
         expected_changed.clone()
     } else {
@@ -33631,9 +34473,12 @@ fn run_rtf_logical_tail_publication(
         .ok_or("RTF publication output is smaller than its source")?;
 
     let correctness_plan = {
-        let mut edit = source.tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
+        let mut edit = source.edit_tail_append_with_options(
+            litchi_rtf::TailSelector::Body,
+            litchi_rtf::tail_append::EditOptions::new().semantic_limits(limits),
+        );
         edit.append_text_paragraphs(&paragraph_inputs)?;
-        edit.publication_plan_with_limits(publication_limits)?
+        edit.publication_plan(publication_limits)?
     };
     let lifecycle_duration = verify_rtf_tail_publication_lifecycle(
         &source,
@@ -33852,7 +34697,12 @@ fn run_xls_validation_report(
         corpus,
         warmup_iterations,
         samples,
-        |source| Ok(litchi_xls::validation::validate_source(source)?),
+        |source| {
+            Ok(litchi_xls::validation::validate_source(
+                source,
+                litchi_xls::validation::Limits::default(),
+            )?)
+        },
     )
 }
 
@@ -33866,7 +34716,14 @@ fn run_docx_validation_report(
         corpus,
         warmup_iterations,
         samples,
-        |source| Ok(litchi_docx::validate_read_at(source)?),
+        |source| {
+            Ok(litchi_docx::validation::validate_read_at(
+                source,
+                Default::default(),
+                Default::default(),
+                Default::default(),
+            )?)
+        },
     )
 }
 
@@ -33880,7 +34737,13 @@ fn run_pptx_validation_report(
         corpus,
         warmup_iterations,
         samples,
-        |source| Ok(litchi_pptx::validate_source(source)?),
+        |source| {
+            Ok(litchi_pptx::validation::validate_source(
+                source,
+                litchi_pptx::validation::Limits::default(),
+                litchi_core::ValidationLimits::default(),
+            )?)
+        },
     )
 }
 
@@ -33948,7 +34811,12 @@ fn run_rtf_validation_report(
         corpus,
         warmup_iterations,
         samples,
-        |bytes| Ok(litchi_rtf::ValidationReport::from_bytes(bytes)?),
+        |bytes| {
+            Ok(litchi_rtf::ValidationReport::from_bytes(
+                bytes,
+                litchi_rtf::OpenOptions::default(),
+            )?)
+        },
         rtf_validation_summary,
     )
 }
@@ -33963,7 +34831,13 @@ fn run_odf_validation_report(
         corpus,
         warmup_iterations,
         samples,
-        |bytes| Ok(litchi_odf_common::validate_package(bytes)?),
+        |bytes| {
+            Ok(litchi_odf_common::validate_package(
+                bytes,
+                litchi_odf_common::OdfValidationLimits::default(),
+                litchi_core::ValidationLimits::default(),
+            )?)
+        },
         |report, bytes| generic_validation_summary(report, bytes, None, None),
     )
 }
@@ -33973,7 +34847,11 @@ fn verify_odf_mimetype_repair(
 ) -> Result<(OdfRepairSummary, Vec<u8>), Box<dyn Error>> {
     let shape = semantic_shape(corpus)?;
     let canonical = semantic_odt_bytes(shape)?;
-    let report = litchi_odf_common::validate_package(&corpus.archive)?;
+    let report = litchi_odf_common::validate_package(
+        &corpus.archive,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )?;
     let plan = litchi_odf_common::plan_odf_repair(
         &corpus.archive,
         &report,
@@ -34022,7 +34900,11 @@ fn verify_odf_mimetype_repair(
         return Err("ODF repair patch did not refuse a stale source before output".into());
     }
 
-    let canonical_report = litchi_odf_common::validate_package(&canonical)?;
+    let canonical_report = litchi_odf_common::validate_package(
+        &canonical,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )?;
     if !canonical_report.is_complete()
         || canonical_report.has_errors()
         || !matches!(
@@ -34106,7 +34988,11 @@ fn run_odf_mimetype_repair_plan(
         // publisher's 64 KiB write request ceiling as a total memory bound.
         let mut sink = HashingDiscardSink::without_authoring_window(u64::try_from(expected.len())?);
         let started = Instant::now();
-        let report = litchi_odf_common::validate_package(&corpus.archive)?;
+        let report = litchi_odf_common::validate_package(
+            &corpus.archive,
+            litchi_odf_common::OdfValidationLimits::default(),
+            litchi_core::ValidationLimits::default(),
+        )?;
         let plan = litchi_odf_common::plan_odf_repair(
             &corpus.archive,
             &report,
@@ -34436,7 +35322,7 @@ fn run_semantic_docx(
                 let mut package =
                     litchi_docx::Package::from_reader(Cursor::new(corpus.archive.clone()))?;
                 let started = Instant::now();
-                let mut edit = package.edit_document()?;
+                let mut edit = package.edit()?;
                 if selected.len() > 1 {
                     let replacements = selected
                         .iter()
@@ -34457,10 +35343,11 @@ fn run_semantic_docx(
                     }
                 }
                 let mut sink = CountingSeekSink::default();
-                let commit = package.publish_document_edit(edit)?;
-                package.to_stream(&mut sink)?;
+                let commit = edit.commit()?;
+                package = commit.package().clone();
+                package.write_to(&mut sink)?;
                 let duration = started.elapsed();
-                if commit.patch().changed() == selected.is_empty()
+                if commit.patch().is_noop() != selected.is_empty()
                     || commit.diagnostics().operations() != selected.len()
                 {
                     return Err("semantic DOCX commit has an unexpected operation count".into());
@@ -34564,9 +35451,11 @@ fn run_semantic_pptx(
             Case::PptxSemanticNoopEditSave
             | Case::PptxSemanticOneEditSave
             | Case::PptxSemanticOnePercentEditSave => {
-                let mut package = litchi_pptx::Package::from_vec(corpus.archive.clone())?;
+                let mut package = litchi_pptx::Package::from_reader(std::io::Cursor::new(
+                    corpus.archive.clone(),
+                ))?;
                 let started = Instant::now();
-                let mut edit = package.opened_presentation_transaction()?;
+                let mut edit = package.edit()?;
                 for linear in &selected {
                     let slide = *linear / shape.pptx_text_boxes_per_slide();
                     let object = *linear % shape.pptx_text_boxes_per_slide();
@@ -34579,10 +35468,10 @@ fn run_semantic_pptx(
                     }
                 }
                 let commit = edit.commit()?;
-                if commit.is_changed() == selected.is_empty() {
+                if commit.diagnostics().changed() == selected.is_empty() {
                     return Err("semantic PPTX commit has unexpected changed state".into());
                 }
-                package.apply_opened_presentation_commit(commit)?;
+                package = commit.into_package();
                 let bytes = package.to_bytes()?;
                 let duration = started.elapsed();
                 let reopened = litchi_pptx::Package::from_bytes(&bytes)?;
@@ -34616,7 +35505,7 @@ fn run_pptx_opened_transaction_phases(
     let mut elapsed = Vec::with_capacity(samples);
     let mut summary = PptxOpenedTransactionPhaseSummary {
         implementation: "litchi-pptx::Package opened presentation transaction",
-        timing_scope: "total_ns encloses opened_presentation, Snapshot::edit, set_shape_text, Transaction::commit, apply_opened_presentation_commit, and Package::to_bytes; package construction, semantic reopening, digesting, and all correctness checks are outside the clocks",
+        timing_scope: "total_ns encloses opened_presentation, Snapshot::edit, set_shape_text, Edit::commit, Commit::into_package, and Package::to_bytes; package construction, semantic reopening, digesting, and all correctness checks are outside the clocks",
         performance_claim: "attribution-only phase evidence; no speedup, allocation, RSS, physical-I/O, cold-cache, or producer claim",
         source_archive_sha256: corpus.manifest.archive_sha256.clone(),
         selected_edit_count: selected.len(),
@@ -34632,7 +35521,8 @@ fn run_pptx_opened_transaction_phases(
     };
 
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let mut package = litchi_pptx::Package::from_vec(corpus.archive.clone())?;
+        let mut package =
+            litchi_pptx::Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?;
         let total_started = Instant::now();
 
         let started = Instant::now();
@@ -34656,12 +35546,12 @@ fn run_pptx_opened_transaction_phases(
         let started = Instant::now();
         let commit = edit.commit()?;
         let transaction_commit_ns = elapsed_ns(started.elapsed())?;
-        if !commit.is_changed() {
+        if !commit.diagnostics().changed() {
             return Err("PPTX phase edit did not produce a changed commit".into());
         }
 
         let started = Instant::now();
-        package.apply_opened_presentation_commit(commit)?;
+        package = commit.into_package();
         let apply_commit_ns = elapsed_ns(started.elapsed())?;
 
         let started = Instant::now();
@@ -34774,9 +35664,10 @@ fn run_pptx_slide_name_index(
     }
     let mut elapsed = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let mut package = litchi_pptx::Package::from_vec(corpus.archive.clone())?;
+        let mut package =
+            litchi_pptx::Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?;
         let started = Instant::now();
-        let mut edit = package.opened_presentation_transaction()?;
+        let mut edit = package.edit()?;
         for operation in &edits {
             let changed = if named {
                 edit.set_shape_text(
@@ -34796,10 +35687,10 @@ fn run_pptx_slide_name_index(
             }
         }
         let commit = edit.commit()?;
-        if !commit.is_changed() {
+        if !commit.diagnostics().changed() {
             return Err("PPTX selector edit did not produce a changed commit".into());
         }
-        package.apply_opened_presentation_commit(commit)?;
+        package = commit.into_package();
         let output = package.to_bytes()?;
         let duration = started.elapsed();
         if output != expected_output {
@@ -34840,7 +35731,7 @@ fn run_semantic_odt(
                 let started = Instant::now();
                 let bytes = semantic_odt_bytes(SemanticShape::Tiny)?;
                 let duration = started.elapsed();
-                let reopened = litchi_odt::Document::from_bytes(bytes.clone())?;
+                let reopened = litchi_odt::Package::from_bytes(&bytes)?.document()?;
                 verify_semantic_odt(&reopened, SemanticShape::Tiny, &[])?;
                 if bytes != corpus.archive && shape == SemanticShape::Tiny {
                     return Err(
@@ -34853,13 +35744,13 @@ fn run_semantic_odt(
             Case::OdtSemanticOpen => {
                 let owned = corpus.archive.clone();
                 let started = Instant::now();
-                let document = litchi_odt::Document::from_bytes(owned)?;
+                let document = litchi_odt::Package::from_bytes(&owned)?.document()?;
                 let duration = started.elapsed();
                 verify_semantic_odt(&document, shape, &[])?;
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::OdtSemanticListParagraphs => {
-                let document = litchi_odt::Document::from_bytes(corpus.archive.clone())?;
+                let document = litchi_odt::Package::from_bytes(&corpus.archive)?.document()?;
                 let started = Instant::now();
                 let paragraphs = document.paragraphs()?;
                 let duration = started.elapsed();
@@ -34871,7 +35762,7 @@ fn run_semantic_odt(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::OdtSemanticOneParagraph => {
-                let document = litchi_odt::Document::from_bytes(corpus.archive.clone())?;
+                let document = litchi_odt::Package::from_bytes(&corpus.archive)?.document()?;
                 let started = Instant::now();
                 let text = document
                     .paragraph(index)?
@@ -34885,7 +35776,7 @@ fn run_semantic_odt(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::OdtSemanticFullText => {
-                let document = litchi_odt::Document::from_bytes(corpus.archive.clone())?;
+                let document = litchi_odt::Package::from_bytes(&corpus.archive)?.document()?;
                 let started = Instant::now();
                 let text = document.text()?;
                 let duration = started.elapsed();
@@ -34896,14 +35787,14 @@ fn run_semantic_odt(
             Case::OdtSemanticNoopEditSave
             | Case::OdtSemanticOneEditSave
             | Case::OdtSemanticOnePercentEditSave => {
-                let document = litchi_odt::Document::from_bytes(corpus.archive.clone())?;
+                let document = litchi_odt::Package::from_bytes(&corpus.archive)?;
                 let started = Instant::now();
-                let mut edit = document.edit()?;
+                let mut edit = document.edit();
                 for index in &selected {
                     edit.replace_paragraph(Position::new(*index), semantic_odt_text(*index, true))?;
                 }
                 let commit = edit.commit()?;
-                let bytes = commit.snapshot().as_bytes().to_vec();
+                let bytes = commit.package().as_bytes().to_vec();
                 let duration = started.elapsed();
                 if (bytes != corpus.archive) == selected.is_empty()
                     || commit.results().len() != selected.len()
@@ -34913,7 +35804,7 @@ fn run_semantic_odt(
                             .into(),
                     );
                 }
-                let reopened = litchi_odt::Document::from_bytes(bytes.clone())?;
+                let reopened = litchi_odt::Package::from_bytes(&bytes)?.document()?;
                 verify_semantic_odt(&reopened, shape, &selected)?;
                 std::hint::black_box(bytes);
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
@@ -34938,7 +35829,7 @@ fn run_semantic_odt_text_to_sink(
     let expected_bytes = u64::try_from(expected_text.len())?;
     let expected_objects = u64::try_from(paragraph_count)?;
     let expected_digest = sha256_hex(expected_text.as_bytes());
-    let document = litchi_odt::Document::from_bytes(corpus.archive.clone())?;
+    let document = litchi_odt::Package::from_bytes(&corpus.archive)?.document()?;
 
     verify_semantic_odt(&document, shape, &[])?;
     if document.text()? != expected_text {
@@ -34992,9 +35883,9 @@ fn run_semantic_odt_text_to_sink(
 }
 
 fn execute_odt_mixed_scalar(
-    source: &litchi_odt::transaction::Snapshot,
+    source: &litchi_odt::Package,
     operations: &[OdtMixedOperation],
-) -> Result<(litchi_odt::transaction::Snapshot, usize, usize), Box<dyn Error>> {
+) -> Result<(litchi_odt::Package, usize, usize), Box<dyn Error>> {
     let mut snapshot = source.clone();
     let mut publications = 0usize;
     let mut result_count = 0usize;
@@ -35017,7 +35908,7 @@ fn execute_odt_mixed_scalar(
         publications = publications
             .checked_add(1)
             .ok_or("ODT mixed scalar publication count overflows usize")?;
-        snapshot = commit.into_snapshot();
+        snapshot = commit.into_package();
     }
 
     let inline_operations = &operations[plain_operation_count..];
@@ -35039,13 +35930,13 @@ fn execute_odt_mixed_scalar(
         publications = publications
             .checked_add(1)
             .ok_or("ODT mixed scalar publication count overflows usize")?;
-        snapshot = commit.into_snapshot();
+        snapshot = commit.into_package();
     }
     Ok((snapshot, publications, result_count))
 }
 
 fn execute_odt_mixed_batch(
-    source: &litchi_odt::transaction::Snapshot,
+    source: &litchi_odt::Package,
     operations: &[OdtMixedOperation],
 ) -> Result<litchi_odt::transaction::Commit, Box<dyn Error>> {
     let mut edit = source.edit();
@@ -35060,7 +35951,7 @@ fn execute_odt_mixed_batch(
 }
 
 fn verify_odt_mixed_projection(
-    snapshot: &litchi_odt::transaction::Snapshot,
+    snapshot: &litchi_odt::Package,
     shape: SemanticShape,
     operations: &[OdtMixedOperation],
 ) -> Result<String, Box<dyn Error>> {
@@ -35137,14 +36028,16 @@ fn verify_odt_mixed_projection(
 }
 
 fn verify_odt_mixed_raw_members(source: &[u8], published: &[u8]) -> Result<(), Box<dyn Error>> {
-    let source_members = ArchiveReader::new(source)?
-        .file_names()
-        .map(str::to_owned)
-        .collect::<BTreeSet<_>>();
-    let published_members = ArchiveReader::new(published)?
-        .file_names()
-        .map(str::to_owned)
-        .collect::<BTreeSet<_>>();
+    let source_members =
+        ArchiveReader::new(source, soapberry_zip::office::ArchiveLimits::default())?
+            .file_names()
+            .map(str::to_owned)
+            .collect::<BTreeSet<_>>();
+    let published_members =
+        ArchiveReader::new(published, soapberry_zip::office::ArchiveLimits::default())?
+            .file_names()
+            .map(str::to_owned)
+            .collect::<BTreeSet<_>>();
     if source_members != published_members {
         return Err(format!(
             "ODT mixed publication changed package member inventory: source={source_members:?}, published={published_members:?}"
@@ -35166,11 +36059,10 @@ fn verify_odt_mixed_raw_members(source: &[u8], published: &[u8]) -> Result<(), B
     Ok(())
 }
 
-fn signed_odt_mixed_snapshot(
-    source: &[u8],
-) -> Result<litchi_odt::transaction::Snapshot, Box<dyn Error>> {
-    let archive = ArchiveReader::new(source)?;
-    let mut writer = litchi_odt::core::PackageWriter::new();
+fn signed_odt_mixed_snapshot(source: &[u8]) -> Result<litchi_odt::Package, Box<dyn Error>> {
+    let archive = ArchiveReader::new(source, soapberry_zip::office::ArchiveLimits::default())?;
+    let mut writer =
+        litchi_odt::core::PackageWriter::new(litchi_odt::core::StreamingArchiveLimits::default());
     writer.set_mimetype("application/vnd.oasis.opendocument.text")?;
     for path in archive.file_names() {
         if matches!(path, "mimetype" | "META-INF/manifest.xml") || path.ends_with('/') {
@@ -35180,7 +36072,7 @@ fn signed_odt_mixed_snapshot(
     }
     writer.add_file("META-INF/documentsignatures.xml", b"<signatures/>")?;
     let signed = writer.finish_to_bytes()?;
-    let snapshot = litchi_odt::transaction::Snapshot::from_bytes(signed)?;
+    let snapshot = litchi_odt::Package::from_bytes(&signed)?;
     if !matches!(
         snapshot.envelope_kind()?,
         litchi_odt::transaction::EnvelopeKind::Signed
@@ -35191,38 +36083,38 @@ fn signed_odt_mixed_snapshot(
 }
 
 fn verify_odt_mixed_guardrails(
-    source: &litchi_odt::transaction::Snapshot,
+    source: &litchi_odt::Package,
     shape: SemanticShape,
     operations: &[OdtMixedOperation],
-    scalar: &litchi_odt::transaction::Snapshot,
+    scalar: &litchi_odt::Package,
     batch: &litchi_odt::transaction::Commit,
 ) -> Result<(), Box<dyn Error>> {
     let scalar_digest = verify_odt_mixed_projection(scalar, shape, operations)?;
-    let batch_digest = verify_odt_mixed_projection(batch.snapshot(), shape, operations)?;
+    let batch_digest = verify_odt_mixed_projection(batch.package(), shape, operations)?;
     if scalar_digest != batch_digest {
         return Err("ODT mixed scalar and batch logical result digests differ".into());
     }
     verify_odt_mixed_raw_members(source.as_bytes(), scalar.as_bytes())?;
-    verify_odt_mixed_raw_members(source.as_bytes(), batch.snapshot().as_bytes())?;
+    verify_odt_mixed_raw_members(source.as_bytes(), batch.package().as_bytes())?;
 
-    let replayed = batch.patch().apply(source)?;
-    if replayed.as_bytes() != batch.snapshot().as_bytes() {
+    let replayed = source.apply(batch.patch())?.into_package();
+    if replayed.as_bytes() != batch.package().as_bytes() {
         return Err("ODT mixed volatile patch replay differs from batch output".into());
     }
     let durable = batch.patch().durable()?;
     let wire = durable.to_deterministic_json()?;
     let decoded = litchi_odt::transaction::DurablePatch::from_deterministic_json(&wire)?;
-    if decoded.apply(source)?.as_bytes() != batch.snapshot().as_bytes()
-        || decoded.inverse().apply(batch.snapshot())?.as_bytes() != source.as_bytes()
-        || batch.patch().apply(batch.snapshot()).is_ok()
+    if decoded.apply(source)?.as_bytes() != batch.package().as_bytes()
+        || decoded.inverse().apply(batch.package())?.as_bytes() != source.as_bytes()
+        || batch.package().apply(batch.patch()).is_ok()
     {
         return Err("ODT mixed durable or stale patch lifecycle gate failed".into());
     }
 
     let mut foreign_edit = source.edit();
     foreign_edit.replace_paragraph(Position::new(0), "litchi-perf-odt-mixed-foreign")?;
-    let foreign = foreign_edit.commit()?.into_snapshot();
-    if batch.patch().apply(&foreign).is_ok() || decoded.apply(&foreign).is_ok() {
+    let foreign = foreign_edit.commit()?.into_package();
+    if foreign.apply(batch.patch()).is_ok() || decoded.apply(&foreign).is_ok() {
         return Err("ODT mixed patch accepted a foreign source".into());
     }
 
@@ -35237,9 +36129,9 @@ fn verify_odt_mixed_guardrails(
         .replace_paragraph(Position::new(0), "litchi-perf-odt-mixed-barrier")?;
     let barrier = barrier_edit.commit()?;
     if barrier.results().len() != 3
-        || barrier.snapshot().document()?.text()?.split('\n').next()
+        || barrier.package().document()?.text()?.split('\n').next()
             != Some("litchi-perf-odt-mixed-barrier")
-        || !barrier.snapshot().document()?.hyperlinks()?.is_empty()
+        || !barrier.package().document()?.hyperlinks()?.is_empty()
     {
         return Err("ODT mixed inline-to-plain barrier gate failed".into());
     }
@@ -35252,8 +36144,7 @@ fn verify_odt_mixed_guardrails(
             "https://example.invalid/litchi/odt/late",
             "missing",
         )?;
-    if late_error_edit.commit().is_ok() || source.as_bytes() != source.document()?.original_bytes()
-    {
+    if late_error_edit.commit().is_ok() || source.as_bytes() != source.to_bytes()?.as_slice() {
         return Err("ODT mixed late-error atomicity gate failed".into());
     }
 
@@ -35297,7 +36188,7 @@ fn run_odt_mixed_model_content(
 ) -> Result<CaseResult, Box<dyn Error>> {
     let shape = semantic_shape(corpus)?;
     let operations = odt_mixed_operations(shape)?;
-    let source = litchi_odt::transaction::Snapshot::from_bytes(corpus.archive.clone())?;
+    let source = litchi_odt::Package::from_bytes(&corpus.archive)?;
     let (scalar_baseline, scalar_publications, scalar_results) =
         execute_odt_mixed_scalar(&source, &operations)?;
     let batch_baseline = execute_odt_mixed_batch(&source, &operations)?;
@@ -35343,7 +36234,7 @@ fn run_odt_mixed_model_content(
         // Opening a fresh immutable source is intentionally outside the timed
         // transaction interval. It keeps both legs matched while ensuring the
         // measured work is publication work rather than corpus setup.
-        let source = litchi_odt::transaction::Snapshot::from_bytes(corpus.archive.clone())?;
+        let source = litchi_odt::Package::from_bytes(&corpus.archive)?;
         let started = Instant::now();
         let (snapshot, publications, result_count) = match case {
             Case::OdtMixedModelContentScalarEditSave => {
@@ -35351,7 +36242,7 @@ fn run_odt_mixed_model_content(
             },
             Case::OdtMixedModelContentBatchEditSave => {
                 let commit = execute_odt_mixed_batch(&source, &operations)?;
-                (commit.into_snapshot(), 1, operations.len())
+                (commit.into_package(), 1, operations.len())
             },
             _ => unreachable!("mixed case validated before the measurement loop"),
         };
@@ -35500,7 +36391,10 @@ fn odf_content_cow_case(
 }
 
 fn odf_content_xml(bytes: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {
-    Ok(ArchiveReader::new(bytes)?.read("content.xml")?)
+    Ok(
+        ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())?
+            .read("content.xml")?,
+    )
 }
 
 fn odf_content_cow_candidate(
@@ -35510,10 +36404,10 @@ fn odf_content_cow_candidate(
     match family {
         OdfContentCowFamily::Odt => {
             let target = SemanticShape::Medium.docx_paragraphs() / 2;
-            let source = litchi_odt::transaction::Snapshot::from_bytes(corpus.archive.clone())?;
+            let source = litchi_odt::Package::from_bytes(&corpus.archive)?;
             let mut edit = source.edit();
             edit.replace_paragraph(Position::new(target), semantic_odt_text(target, true))?;
-            Ok(edit.commit()?.snapshot().as_bytes().to_vec())
+            Ok(edit.commit()?.package().as_bytes().to_vec())
         },
         OdfContentCowFamily::Ods => {
             let shape = SemanticShape::Medium;
@@ -35521,8 +36415,8 @@ fn odf_content_cow_candidate(
             let row = shape.ods_rows_per_sheet() / 2;
             let column = shape.ods_columns_per_sheet() / 2;
             let sheet_name = semantic_ods_sheet_name(sheet);
-            let source = litchi_ods::document::Snapshot::from_bytes(corpus.archive.clone())?;
-            let mut edit = source.edit();
+            let source = litchi_ods::Package::from_bytes(&corpus.archive)?;
+            let mut edit = source.edit().unwrap();
             let text = semantic_ods_text(sheet, row, column, true);
             edit.worksheets(|worksheets| {
                 worksheets
@@ -35539,17 +36433,17 @@ fn odf_content_cow_candidate(
                     })?;
                 Ok(())
             })?;
-            Ok(edit.commit()?.snapshot().as_bytes().to_vec())
+            Ok(edit.commit()?.package().as_bytes().to_vec())
         },
         OdfContentCowFamily::Odp => {
             let text_box = litchi_odp::content::TextBox::new(
                 ODP_MEDIA_TEXT_BOX_NAME,
                 litchi_odp::content::RichText::plain(odp_media_text())?,
             )?;
-            let source = litchi_odp::authoring::edit::Snapshot::from_bytes(corpus.archive.clone())?;
-            let mut transaction = source.transaction()?;
+            let source = litchi_odp::authoring::edit::Package::from_bytes(&corpus.archive)?;
+            let mut transaction = source.edit()?;
             transaction.add_text_box(0usize, &text_box)?;
-            Ok(transaction.commit()?.snapshot().bytes().to_vec())
+            Ok(transaction.commit()?.package().as_bytes().to_vec())
         },
     }
 }
@@ -35567,10 +36461,12 @@ fn verify_odf_content_cow_output(
 }
 
 fn odf_content_cow_member_inventory(bytes: &[u8]) -> Result<BTreeSet<String>, Box<dyn Error>> {
-    Ok(ArchiveReader::new(bytes)?
-        .file_names()
-        .map(str::to_owned)
-        .collect())
+    Ok(
+        ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())?
+            .file_names()
+            .map(str::to_owned)
+            .collect(),
+    )
 }
 
 fn odf_content_cow_member_orders(
@@ -35578,7 +36474,11 @@ fn odf_content_cow_member_orders(
 ) -> Result<(Vec<Vec<u8>>, Vec<Vec<u8>>), Box<dyn Error>> {
     let archive = ZipArchive::from_slice(bytes)?.into_zip_archive();
     let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer)?;
+    let index = PreservationIndex::new(
+        &archive,
+        &mut buffer,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
     let central = index
         .entries()
         .iter()
@@ -36072,26 +36972,26 @@ fn run_odt_media_paragraph_edit_save(
     let mut elapsed = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let started = Instant::now();
-        let source = litchi_odt::transaction::Snapshot::from_bytes(corpus.archive.clone())?;
+        let source = litchi_odt::Package::from_bytes(&corpus.archive)?;
         let mut edit = source.edit();
         edit.replace_paragraph(Position::new(target), semantic_odt_text(target, true))?;
         let commit = edit.commit()?;
-        let bytes = commit.snapshot().as_bytes().to_vec();
+        let bytes = commit.package().as_bytes().to_vec();
         let duration = started.elapsed();
         if bytes == corpus.archive {
             return Err("media-rich ODT paragraph edit reported an exact no-op".into());
         }
 
         verify_odt_media_archive(&bytes, true)?;
-        let replayed = commit.patch().apply(&source)?;
+        let replayed = source.apply(commit.patch())?.into_package();
         if replayed.as_bytes() != bytes {
             return Err("media-rich ODT paragraph patch replay differs from commit".into());
         }
-        let restored = commit.patch().inverse().apply(&replayed)?;
+        let restored = replayed.apply(&commit.patch().inverse())?.into_package();
         if restored.as_bytes() != corpus.archive {
             return Err("media-rich ODT paragraph inverse did not restore the source".into());
         }
-        if commit.patch().apply(&replayed).is_ok() {
+        if replayed.apply(commit.patch()).is_ok() {
             return Err("media-rich ODT paragraph patch accepted a stale source".into());
         }
         let digest = sha256_hex(&bytes);
@@ -36123,28 +37023,28 @@ fn run_odt_media_line_break_edit_save(
     let mut elapsed = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let started = Instant::now();
-        let source = litchi_odt::transaction::Snapshot::from_bytes(corpus.archive.clone())?;
+        let source = litchi_odt::Package::from_bytes(&corpus.archive)?;
         let mut edit = source.edit();
         edit.append_line_break(litchi_odt::transaction::ParagraphSelector::position(
             Position::new(target),
         ))?;
         let commit = edit.commit()?;
-        let bytes = commit.snapshot().as_bytes().to_vec();
+        let bytes = commit.package().as_bytes().to_vec();
         let duration = started.elapsed();
         if bytes == corpus.archive {
             return Err("media-rich ODT line-break edit reported an exact no-op".into());
         }
 
         verify_odt_media_line_break_archive(&bytes)?;
-        let replayed = commit.patch().apply(&source)?;
+        let replayed = source.apply(commit.patch())?.into_package();
         if replayed.as_bytes() != bytes {
             return Err("media-rich ODT line-break patch replay differs from commit".into());
         }
-        let restored = commit.patch().inverse().apply(&replayed)?;
+        let restored = replayed.apply(&commit.patch().inverse())?.into_package();
         if restored.as_bytes() != corpus.archive {
             return Err("media-rich ODT line-break inverse did not restore the source".into());
         }
-        if commit.patch().apply(&replayed).is_ok() {
+        if replayed.apply(commit.patch()).is_ok() {
             return Err("media-rich ODT line-break patch accepted a stale source".into());
         }
         let digest = sha256_hex(&bytes);
@@ -36173,26 +37073,26 @@ fn run_odt_media_append_run_edit_save(
     let mut elapsed = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let started = Instant::now();
-        let source = litchi_odt::transaction::Snapshot::from_bytes(corpus.archive.clone())?;
+        let source = litchi_odt::Package::from_bytes(&corpus.archive)?;
         let mut edit = source.edit();
         edit.append_run(Position::new(target), ODT_MEDIA_APPEND_RUN_TEXT, None)?;
         let commit = edit.commit()?;
-        let bytes = commit.snapshot().as_bytes().to_vec();
+        let bytes = commit.package().as_bytes().to_vec();
         let duration = started.elapsed();
         if bytes == corpus.archive {
             return Err("media-rich ODT append-run edit reported an exact no-op".into());
         }
 
         verify_odt_media_append_run_archive(&bytes)?;
-        let replayed = commit.patch().apply(&source)?;
+        let replayed = source.apply(commit.patch())?.into_package();
         if replayed.as_bytes() != bytes {
             return Err("media-rich ODT append-run patch replay differs from commit".into());
         }
-        let restored = commit.patch().inverse().apply(&replayed)?;
+        let restored = replayed.apply(&commit.patch().inverse())?.into_package();
         if restored.as_bytes() != corpus.archive {
             return Err("media-rich ODT append-run inverse did not restore the source".into());
         }
-        if commit.patch().apply(&replayed).is_ok() {
+        if replayed.apply(commit.patch()).is_ok() {
             return Err("media-rich ODT append-run patch accepted a stale source".into());
         }
         let digest = sha256_hex(&bytes);
@@ -36221,7 +37121,7 @@ fn run_odt_media_append_hyperlink_edit_save(
     let mut elapsed = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let started = Instant::now();
-        let source = litchi_odt::transaction::Snapshot::from_bytes(corpus.archive.clone())?;
+        let source = litchi_odt::Package::from_bytes(&corpus.archive)?;
         let mut edit = source.edit();
         edit.append_hyperlink(
             Position::new(target),
@@ -36229,24 +37129,24 @@ fn run_odt_media_append_hyperlink_edit_save(
             ODT_MEDIA_APPEND_HYPERLINK_TEXT,
         )?;
         let commit = edit.commit()?;
-        let bytes = commit.snapshot().as_bytes().to_vec();
+        let bytes = commit.package().as_bytes().to_vec();
         let duration = started.elapsed();
         if bytes == corpus.archive {
             return Err("media-rich ODT append-hyperlink edit reported an exact no-op".into());
         }
 
         verify_odt_media_append_hyperlink_archive(&bytes)?;
-        let replayed = commit.patch().apply(&source)?;
+        let replayed = source.apply(commit.patch())?.into_package();
         if replayed.as_bytes() != bytes {
             return Err("media-rich ODT append-hyperlink patch replay differs from commit".into());
         }
-        let restored = commit.patch().inverse().apply(&replayed)?;
+        let restored = replayed.apply(&commit.patch().inverse())?.into_package();
         if restored.as_bytes() != corpus.archive {
             return Err(
                 "media-rich ODT append-hyperlink inverse did not restore the source".into(),
             );
         }
-        if commit.patch().apply(&replayed).is_ok() {
+        if replayed.apply(commit.patch()).is_ok() {
             return Err("media-rich ODT append-hyperlink patch accepted a stale source".into());
         }
         let digest = sha256_hex(&bytes);
@@ -36284,7 +37184,7 @@ fn run_odt_media_structural_paragraph_edit_save(
     let mut elapsed = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let started = Instant::now();
-        let source = litchi_odt::transaction::Snapshot::from_bytes(corpus.archive.clone())?;
+        let source = litchi_odt::Package::from_bytes(&corpus.archive)?;
         let mut edit = source.edit();
         if inserted {
             edit.insert_paragraph(Position::new(target), ODT_MEDIA_INSERT_PARAGRAPH_TEXT)?;
@@ -36292,7 +37192,7 @@ fn run_odt_media_structural_paragraph_edit_save(
             edit.remove_paragraph(Position::new(target))?;
         }
         let commit = edit.commit()?;
-        let bytes = commit.snapshot().as_bytes().to_vec();
+        let bytes = commit.package().as_bytes().to_vec();
         let duration = started.elapsed();
         if bytes == corpus.archive {
             return Err(
@@ -36301,21 +37201,21 @@ fn run_odt_media_structural_paragraph_edit_save(
         }
 
         verify_odt_media_structural_paragraph_archive(&bytes, inserted)?;
-        let replayed = commit.patch().apply(&source)?;
+        let replayed = source.apply(commit.patch())?.into_package();
         if replayed.as_bytes() != bytes {
             return Err(format!(
                 "media-rich ODT paragraph {operation} patch replay differs from commit"
             )
             .into());
         }
-        let restored = commit.patch().inverse().apply(&replayed)?;
+        let restored = replayed.apply(&commit.patch().inverse())?.into_package();
         if restored.as_bytes() != corpus.archive {
             return Err(format!(
                 "media-rich ODT paragraph {operation} inverse did not restore the source"
             )
             .into());
         }
-        if commit.patch().apply(&replayed).is_ok() {
+        if replayed.apply(commit.patch()).is_ok() {
             return Err(format!(
                 "media-rich ODT paragraph {operation} patch accepted a stale source"
             )
@@ -36342,7 +37242,7 @@ fn run_odt_media_structural_paragraph_edit_save(
 
 fn publish_odt_embedded_resources(
     case: Case,
-    source: &litchi_odt::transaction::Snapshot,
+    source: &litchi_odt::Package,
     replacements: &[litchi_odt::package::embedded::EmbeddedResource],
     changes: &[litchi_odt::package::embedded::EmbeddedResourceChange],
 ) -> Result<litchi_odt::transaction::Commit, Box<dyn Error>> {
@@ -36363,7 +37263,7 @@ fn publish_odt_embedded_resources(
 
 fn verify_odt_embedded_resource_commit(
     case: Case,
-    source: &litchi_odt::transaction::Snapshot,
+    source: &litchi_odt::Package,
     commit: &litchi_odt::transaction::Commit,
     expected: &[u8],
 ) -> Result<OdtResourceProjection, Box<dyn Error>> {
@@ -36380,10 +37280,10 @@ fn verify_odt_embedded_resource_commit(
         },
         _ => false,
     };
-    if commit.snapshot().as_bytes() != expected || expected == source.as_bytes() || !results_match {
+    if commit.package().as_bytes() != expected || expected == source.as_bytes() || !results_match {
         return Err(format!(
             "ODT embedded-resource commit differs: exact_output={}, changed={}, results={:?}",
-            commit.snapshot().as_bytes() == expected,
+            commit.package().as_bytes() == expected,
             expected != source.as_bytes(),
             commit.results()
         )
@@ -36392,14 +37292,19 @@ fn verify_odt_embedded_resource_commit(
     let projection = verify_odt_resource_batch_archive(expected, true)?;
     verify_odt_resource_batch_raw_members(source.as_bytes(), expected)?;
 
-    let replayed = commit.patch().apply(source)?;
+    let replayed = source.apply(commit.patch())?.into_package();
     if replayed.as_bytes() != expected {
         return Err("ODT embedded-resource volatile replay differs from publication".into());
     }
-    if commit.patch().inverse().apply(&replayed)?.as_bytes() != source.as_bytes() {
+    if replayed
+        .apply(&commit.patch().inverse())?
+        .into_package()
+        .as_bytes()
+        != source.as_bytes()
+    {
         return Err("ODT embedded-resource volatile inverse did not restore source".into());
     }
-    if commit.patch().apply(&replayed).is_ok() {
+    if replayed.apply(commit.patch()).is_ok() {
         return Err("ODT embedded-resource volatile patch accepted stale source".into());
     }
 
@@ -36427,7 +37332,7 @@ fn run_odt_embedded_resource_publication(
     if !case.uses_odt_resource_batch() {
         return Err("non-resource ODT case passed to resource publication runner".into());
     }
-    let source = litchi_odt::transaction::Snapshot::from_bytes(corpus.archive.clone())?;
+    let source = litchi_odt::Package::from_bytes(&corpus.archive)?;
     let replacements = (0..ODT_RESOURCE_BATCH_COUNT)
         .map(|index| odt_resource_batch_image(index, true))
         .collect::<Vec<_>>();
@@ -36448,7 +37353,7 @@ fn run_odt_embedded_resource_publication(
         &replacements,
         &changes,
     )?;
-    let expected_batch = batch.snapshot().as_bytes().to_vec();
+    let expected_batch = batch.package().as_bytes().to_vec();
     let batch_projection = verify_odt_embedded_resource_commit(
         Case::OdtEmbeddedResourceBatchReplaceSave,
         &source,
@@ -36461,7 +37366,7 @@ fn run_odt_embedded_resource_publication(
         &replacements,
         &changes,
     )?;
-    let expected_scalar = scalar.snapshot().as_bytes().to_vec();
+    let expected_scalar = scalar.package().as_bytes().to_vec();
     let scalar_projection = verify_odt_embedded_resource_commit(
         Case::OdtEmbeddedResourceScalarReplaceSave,
         &source,
@@ -36486,16 +37391,20 @@ fn run_odt_embedded_resource_publication(
         sink.reserve_budget()?;
         let started = Instant::now();
         let commit = publish_odt_embedded_resources(case, &source, &replacements, &changes)?;
-        sink.write_all(commit.snapshot().as_bytes())?;
+        sink.write_all(commit.package().as_bytes())?;
         let duration = started.elapsed();
 
         if sink.bytes != expected {
             return Err("measured ODT embedded-resource publication differs from oracle".into());
         }
-        let replayed = commit.patch().apply(&source)?;
+        let replayed = source.apply(commit.patch())?.into_package();
         if replayed.as_bytes() != expected
-            || commit.patch().inverse().apply(&replayed)?.as_bytes() != source.as_bytes()
-            || commit.patch().apply(&replayed).is_ok()
+            || replayed
+                .apply(&commit.patch().inverse())?
+                .into_package()
+                .as_bytes()
+                != source.as_bytes()
+            || replayed.apply(commit.patch()).is_ok()
         {
             return Err("measured ODT embedded-resource patch contract differs".into());
         }
@@ -36532,7 +37441,7 @@ fn run_semantic_ods(
                 let started = Instant::now();
                 let bytes = semantic_ods_bytes(SemanticShape::Tiny)?;
                 let duration = started.elapsed();
-                let reopened = litchi_ods::Spreadsheet::from_bytes(bytes.clone())?;
+                let reopened = litchi_ods::Package::from_bytes(&bytes)?.workbook()?;
                 verify_semantic_ods(&reopened, SemanticShape::Tiny, false)?;
                 if bytes != corpus.archive && shape == SemanticShape::Tiny {
                     return Err(
@@ -36545,13 +37454,13 @@ fn run_semantic_ods(
             Case::OdsSemanticOpen => {
                 let owned = corpus.archive.clone();
                 let started = Instant::now();
-                let spreadsheet = litchi_ods::Spreadsheet::from_bytes(owned)?;
+                let spreadsheet = litchi_ods::Package::from_bytes(&owned)?.workbook()?;
                 let duration = started.elapsed();
                 verify_semantic_ods(&spreadsheet, shape, false)?;
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::OdsSemanticListSheets => {
-                let spreadsheet = litchi_ods::Spreadsheet::from_bytes(corpus.archive.clone())?;
+                let spreadsheet = litchi_ods::Package::from_bytes(&corpus.archive)?.workbook()?;
                 let started = Instant::now();
                 let sheets = spreadsheet.sheets();
                 let duration = started.elapsed();
@@ -36563,7 +37472,7 @@ fn run_semantic_ods(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::OdsSemanticOneCell => {
-                let spreadsheet = litchi_ods::Spreadsheet::from_bytes(corpus.archive.clone())?;
+                let spreadsheet = litchi_ods::Package::from_bytes(&corpus.archive)?.workbook()?;
                 let started = Instant::now();
                 let cell = spreadsheet
                     .cell(&sheet_name, row, column)
@@ -36579,7 +37488,7 @@ fn run_semantic_ods(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::OdsSemanticCellSweep => {
-                let spreadsheet = litchi_ods::Spreadsheet::from_bytes(corpus.archive.clone())?;
+                let spreadsheet = litchi_ods::Package::from_bytes(&corpus.archive)?.workbook()?;
                 let started = Instant::now();
                 let stored_cells = semantic_ods_cell_sweep(&spreadsheet, shape)?;
                 let duration = started.elapsed();
@@ -36591,7 +37500,7 @@ fn run_semantic_ods(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::OdsSemanticFullCellText => {
-                let spreadsheet = litchi_ods::Spreadsheet::from_bytes(corpus.archive.clone())?;
+                let spreadsheet = litchi_ods::Package::from_bytes(&corpus.archive)?.workbook()?;
                 let started = Instant::now();
                 let text = semantic_ods_full_cell_text(&spreadsheet, shape)?;
                 let duration = started.elapsed();
@@ -36604,8 +37513,8 @@ fn run_semantic_ods(
             | Case::OdsSemanticOnePercentEditSave => {
                 let owned = corpus.archive.clone();
                 let started = Instant::now();
-                let snapshot = litchi_ods::document::Snapshot::from_bytes(owned)?;
-                let mut edit = snapshot.edit();
+                let snapshot = litchi_ods::Package::from_bytes(&owned)?;
+                let mut edit = snapshot.edit().unwrap();
                 let updated_indices = match case {
                     Case::OdsSemanticNoopEditSave => &[][..],
                     Case::OdsSemanticOneEditSave => &single_update[..],
@@ -36683,15 +37592,16 @@ fn run_semantic_ods(
                     })?;
                 }
                 let commit = edit.commit()?;
-                let bytes = commit.snapshot().as_bytes().to_vec();
+                let bytes = commit.package().as_bytes().to_vec();
                 let duration = started.elapsed();
                 let updated = !updated_indices.is_empty();
-                if (bytes != corpus.archive) != updated || commit.changed() != updated {
+                if (bytes != corpus.archive) != updated || commit.diagnostics().changed() != updated
+                {
                     return Err(
                         "semantic ODS edit/save changed-state differs from specification".into(),
                     );
                 }
-                let reopened = litchi_ods::Spreadsheet::from_bytes(bytes.clone())?;
+                let reopened = litchi_ods::Package::from_bytes(&bytes)?.workbook()?;
                 verify_semantic_ods_updates(&reopened, shape, updated_indices)?;
                 std::hint::black_box(bytes);
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
@@ -36712,7 +37622,7 @@ fn run_semantic_ods_text_to_sink(
     let expected_bytes = u64::try_from(expected_text.len())?;
     let expected_objects = u64::try_from(shape.ods_text_object_count())?;
     let expected_digest = sha256_hex(expected_text.as_bytes());
-    let spreadsheet = litchi_ods::Spreadsheet::from_bytes(corpus.archive.clone())?;
+    let spreadsheet = litchi_ods::Package::from_bytes(&corpus.archive)?.workbook()?;
 
     verify_semantic_ods(&spreadsheet, shape, false)?;
     let expected_cells = expected_semantic_ods_full_cell_text(shape, &[]);
@@ -36780,8 +37690,8 @@ fn run_ods_media_one_edit_save(
     let mut elapsed = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let started = Instant::now();
-        let snapshot = litchi_ods::document::Snapshot::from_bytes(corpus.archive.clone())?;
-        let mut edit = snapshot.edit();
+        let snapshot = litchi_ods::Package::from_bytes(&corpus.archive)?;
+        let mut edit = snapshot.edit().unwrap();
         let text = semantic_ods_text(sheet, row, column, true);
         edit.worksheets(|worksheets| {
             worksheets
@@ -36799,9 +37709,9 @@ fn run_ods_media_one_edit_save(
             Ok(())
         })?;
         let commit = edit.commit()?;
-        let bytes = commit.snapshot().as_bytes().to_vec();
+        let bytes = commit.package().as_bytes().to_vec();
         let duration = started.elapsed();
-        if !commit.changed() || bytes == corpus.archive {
+        if !commit.diagnostics().changed() || bytes == corpus.archive {
             return Err("media-rich ODS one-cell edit reported an exact no-op".into());
         }
 
@@ -36853,7 +37763,7 @@ fn ods_source_cell_value(sheet: usize, row: usize, column: usize) -> litchi_ods:
 }
 
 fn stage_ods_source_cell_changes(
-    edit: &mut litchi_ods::SourceCellEdit<'_>,
+    edit: &mut litchi_ods::source_backed::cells::Edit<'_>,
     updates: &[(usize, usize, usize)],
     one_percent: bool,
 ) -> Result<usize, Box<dyn Error>> {
@@ -36981,12 +37891,12 @@ fn expected_ods_source_cell_output(
     let mut edit = owner.edit_cells()?;
     let changed = stage_ods_source_cell_changes(&mut edit, updates, one_percent)?;
     let commit = edit.commit()?;
-    if changed != commit.changed_cells() {
+    if changed != commit.diagnostics().changed_cells() {
         return Err("ODS source cell commit changed an unexpected cell count".into());
     }
     let mut output = Vec::new();
-    let report = commit.write_to(&mut output)?;
-    if report.changed_cells() != updates.len() || report.bytes() != output.len() as u64 {
+    let report = commit.package().write_to(&mut output)?;
+    if report.bytes() != output.len() as u64 {
         return Err("ODS source cell publication report differs from output".into());
     }
     Ok(output)
@@ -36997,14 +37907,14 @@ fn expected_ods_owned_cell_output(
     updates: &[(usize, usize, usize)],
     one_percent: bool,
 ) -> Result<Vec<u8>, Box<dyn Error>> {
-    let snapshot = litchi_ods::document::Snapshot::from_bytes(corpus.archive.clone())?;
-    let mut edit = snapshot.edit();
+    let snapshot = litchi_ods::Package::from_bytes(&corpus.archive)?;
+    let mut edit = snapshot.edit().unwrap();
     stage_ods_owned_cell_changes(&mut edit, updates, one_percent)?;
     let commit = edit.commit()?;
-    if !commit.changed() {
+    if !commit.diagnostics().changed() {
         return Err("ODS owned cell edit unexpectedly reported an exact no-op".into());
     }
-    Ok(commit.snapshot().as_bytes().to_vec())
+    Ok(commit.package().as_bytes().to_vec())
 }
 
 fn verify_ods_source_cell_output(
@@ -37014,7 +37924,7 @@ fn verify_ods_source_cell_output(
     source_backed: bool,
 ) -> Result<(), Box<dyn Error>> {
     let indices = ods_source_cell_update_indices(updates);
-    let reopened = litchi_ods::Spreadsheet::from_bytes(output.to_vec())?;
+    let reopened = litchi_ods::Package::from_bytes(output)?.workbook()?;
     verify_semantic_ods_updates(&reopened, SemanticShape::Medium, &indices)?;
     let package = litchi_odf_common::core::OwnedPackage::from_bytes(output.to_vec())?;
     let package = package.package()?;
@@ -37039,7 +37949,12 @@ fn verify_ods_source_cell_output(
         if identical.contains("content.xml") {
             return Err("ODS source cell publication left content.xml raw-identical".into());
         }
-        for path in ArchiveReader::new(&corpus.archive)?.file_names() {
+        for path in ArchiveReader::new(
+            &corpus.archive,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )?
+        .file_names()
+        {
             if path != "content.xml" && !identical.contains(path) {
                 return Err(format!(
                     "ODS source cell publication changed untouched member '{path}'"
@@ -37059,42 +37974,40 @@ fn verify_ods_source_cell_gates(
 ) -> Result<(), Box<dyn Error>> {
     let source = Arc::new(OwnedSource::new(corpus.archive.clone()));
     let owner = litchi_ods::SourceBackedSpreadsheet::from_read_at(source)?;
-    let before = owner.cell_snapshot()?;
-    let mut edit = before.edit()?;
+    let mut edit = owner.edit_cells()?;
     stage_ods_source_cell_changes(&mut edit, updates, one_percent)?;
     let commit = edit.commit()?;
 
-    let applied = commit.patch().apply(&before)?;
-    if applied.content_xml() != commit.snapshot().content_xml()
-        || applied.sheets() != commit.snapshot().sheets()
+    let applied = owner.apply_cells(commit.patch())?;
+    if applied.package().content_xml()? != commit.package().content_xml()?
+        || applied.package().sheets()? != commit.package().sheets()?
     {
         return Err("ODS source cell forward patch differs from its commit".into());
     }
-    let restored = commit.patch().inverse().apply(&applied)?;
-    if restored.content_xml() != before.content_xml() || restored.sheets() != before.sheets() {
+    let restored = applied.package().apply_cells(&commit.patch().inverse())?;
+    if restored.package().content_xml()? != owner.content_xml()?
+        || restored.package().sheets()? != owner.sheets()?
+    {
         return Err("ODS source cell inverse patch did not restore its source".into());
     }
     let foreign_owner = litchi_ods::SourceBackedSpreadsheet::from_read_at(Arc::new(
         OwnedSource::new(corpus.archive.clone()),
     ))?;
-    if commit
-        .patch()
-        .apply(&foreign_owner.cell_snapshot()?)
-        .is_ok()
-    {
+    if foreign_owner.apply_cells(commit.patch()).is_ok() {
         return Err("ODS source cell patch accepted a foreign source snapshot".into());
     }
 
     let noop = owner.edit_cells()?.commit()?;
     let mut noop_output = Vec::new();
-    let report = noop.write_to(&mut noop_output)?;
+    let report = noop.package().write_to(&mut noop_output)?;
     if !report.is_no_op() || noop_output != corpus.archive {
         return Err("ODS source cell exact no-op gate failed".into());
     }
 
-    let replacement_limit = commit.snapshot().content_xml().len().saturating_sub(1) as u64;
+    let replacement_limit = commit.package().content_xml()?.len().saturating_sub(1) as u64;
     let mut limited = Vec::new();
     let limit_error = commit
+        .package()
         .write_to_with_options(
             &mut limited,
             litchi_odf_common::core::SourceContentPublicationOptions::new()
@@ -37114,6 +38027,7 @@ fn verify_ods_source_cell_gates(
         fail_after: 7,
     };
     let partial_error = commit
+        .package()
         .write_to(&mut partial)
         .expect_err("ODS source cell partial sink must fail after its accepted prefix");
     if !matches!(
@@ -37200,27 +38114,27 @@ fn run_ods_source_cell_edit_save(
             let commit_started = Instant::now();
             let commit = edit.commit()?;
             commit_duration = commit_started.elapsed();
-            if changed != commit.changed_cells() {
+            if changed != commit.diagnostics().changed_cells() {
                 return Err("ODS source cell timed commit changed an unexpected cell count".into());
             }
             let publication_started = Instant::now();
-            let report = commit.write_to(&mut sink)?;
-            if report.changed_cells() != updates.len() || report.bytes() != expected_bytes {
+            let report = commit.package().write_to(&mut sink)?;
+            if report.bytes() != expected_bytes {
                 return Err("ODS source cell timed publication report differs".into());
             }
             publication_duration = publication_started.elapsed();
-            std::hint::black_box(commit);
+            let _ = std::hint::black_box(commit);
         } else {
-            let snapshot = litchi_ods::document::Snapshot::from_bytes(corpus.archive.clone())?;
+            let snapshot = litchi_ods::Package::from_bytes(&corpus.archive)?;
             open_duration = open_started.elapsed();
             let stage_started = Instant::now();
-            let mut edit = snapshot.edit();
+            let mut edit = snapshot.edit().unwrap();
             stage_ods_owned_cell_changes(&mut edit, &updates, one_percent)?;
             stage_duration = stage_started.elapsed();
             let commit_started = Instant::now();
             let commit = edit.commit()?;
             commit_duration = commit_started.elapsed();
-            let bytes = commit.snapshot().as_bytes();
+            let bytes = commit.package().as_bytes();
             if u64::try_from(bytes.len())? != expected_bytes {
                 return Err("ODS owned timed output length differs from its oracle".into());
             }
@@ -37306,19 +38220,18 @@ fn run_ods_source_cell_edit_save(
             let mut edit = owner.edit_cells()?;
             let changed = stage_ods_source_cell_changes(&mut edit, &updates, one_percent)?;
             let commit = edit.commit()?;
-            if changed != commit.changed_cells() {
+            if changed != commit.diagnostics().changed_cells() {
                 return Err("ODS source cell replay changed an unexpected cell count".into());
             }
             let mut replay_sink =
                 WindowedHashingSink::new(expected_bytes, ODF_CONTENT_COW_SINK_WINDOW_BYTES)?;
-            let report = commit.write_to(&mut replay_sink)?;
+            let report = commit.package().write_to(&mut replay_sink)?;
             let (replay_sink_summary, replay_digest) = replay_sink.finish();
             let replay_snapshot = instrumented_source.snapshot();
             let version_calls = instrumented_source.version_calls();
             let source_unchanged =
                 sha256_hex(instrumented_source.bytes.as_slice()) == source_archive_sha256;
-            let replay_gates = report.changed_cells() == updates.len()
-                && report.bytes() == expected_bytes
+            let replay_gates = report.bytes() == expected_bytes
                 && replay_digest == expected_digest
                 && replay_sink_summary.accepted_bytes == expected_bytes
                 && replay_sink_summary.retained_output_bytes == Some(0)
@@ -37355,7 +38268,7 @@ fn run_ods_source_cell_edit_save(
             source_version_calls.push(version_calls);
             source_immutability_verified &= source_unchanged;
             source_replay_gates_verified &= replay_gates;
-            std::hint::black_box(commit);
+            let _ = std::hint::black_box(commit);
         }
     }
     if source_backed
@@ -37380,7 +38293,7 @@ fn run_ods_source_cell_edit_save(
     let source_hash_verified = sha256_hex(&corpus.archive) == source_archive_sha256;
     let output_hash_verified = sha256_hex(expected_output) == expected_digest;
     let semantic_hash_verified = {
-        let reopened = litchi_ods::Spreadsheet::from_bytes(expected_output.to_vec())?;
+        let reopened = litchi_ods::Package::from_bytes(expected_output)?.workbook()?;
         sha256_hex(semantic_ods_full_cell_text(&reopened, SemanticShape::Medium)?.as_bytes())
             == semantic_digest
     };
@@ -37475,8 +38388,10 @@ fn verify_ods_repeated_edit_media_identity(
     source: &[u8],
     output: &[u8],
 ) -> Result<(), Box<dyn Error>> {
-    let source_archive = ArchiveReader::new(source)?;
-    let output_archive = ArchiveReader::new(output)?;
+    let source_archive =
+        ArchiveReader::new(source, soapberry_zip::office::ArchiveLimits::default())?;
+    let output_archive =
+        ArchiveReader::new(output, soapberry_zip::office::ArchiveLimits::default())?;
     let mut picture_members = 0usize;
     for path in source_archive.file_names() {
         if !path.starts_with("Pictures/") {
@@ -37562,7 +38477,7 @@ fn run_ods_source_repeated_edit(
     let &(edited_sheet, edited_row, edited_column) = updates
         .first()
         .ok_or("ODS source repeated-edit has no selected cell")?;
-    let reopened = litchi_ods::Spreadsheet::from_bytes(expected_outputs[0].clone())?;
+    let reopened = litchi_ods::Package::from_bytes(&expected_outputs[0])?.workbook()?;
     let edited_name = semantic_ods_sheet_name(edited_sheet);
     let edited = reopened
         .cell(&edited_name, edited_row, edited_column)
@@ -37626,14 +38541,14 @@ fn run_ods_source_repeated_edit(
             let commit_started = Instant::now();
             let commit = edit.commit()?;
             commit_total += commit_started.elapsed();
-            if commit.changed_cells() != 1 {
+            if commit.diagnostics().changed_cells() != 1 {
                 return Err(
                     "ODS source repeated-edit commit changed an unexpected cell count".into(),
                 );
             }
             let publication_started = Instant::now();
-            let report = commit.write_to(&mut iteration_sinks[variant])?;
-            if report.changed_cells() != 1 || report.bytes() != expected_bytes[variant] {
+            let report = commit.package().write_to(&mut iteration_sinks[variant])?;
+            if report.bytes() != expected_bytes[variant] {
                 return Err(
                     "ODS source repeated-edit publication report differs from its oracle".into(),
                 );
@@ -37731,15 +38646,14 @@ fn run_ods_source_repeated_edit(
             return Err("ODS source repeated-edit replay did not change the selected cell".into());
         }
         let commit = edit.commit()?;
-        if commit.changed_cells() != 1 {
+        if commit.diagnostics().changed_cells() != 1 {
             return Err("ODS source repeated-edit replay changed an unexpected cell count".into());
         }
         let mut replay_sink =
             WindowedHashingSink::new(expected_bytes[variant], ODF_CONTENT_COW_SINK_WINDOW_BYTES)?;
-        let report = commit.write_to(&mut replay_sink)?;
+        let report = commit.package().write_to(&mut replay_sink)?;
         let (replay_sink_summary, replay_digest) = replay_sink.finish();
-        let replay_gates = report.changed_cells() == 1
-            && report.bytes() == expected_bytes[variant]
+        let replay_gates = report.bytes() == expected_bytes[variant]
             && replay_digest == expected_digests[variant]
             && replay_sink_summary.accepted_bytes == expected_bytes[variant]
             && replay_sink_summary.retained_output_bytes == Some(0)
@@ -37842,7 +38756,7 @@ fn run_semantic_odp(
                 let started = Instant::now();
                 let bytes = semantic_odp_bytes(SemanticShape::Tiny)?;
                 let duration = started.elapsed();
-                let reopened = litchi_odp::Presentation::from_bytes(bytes.clone())?;
+                let reopened = litchi_odp::Package::from_bytes(&bytes)?.presentation()?;
                 verify_semantic_odp(&reopened, SemanticShape::Tiny, false)?;
                 if bytes != corpus.archive && shape == SemanticShape::Tiny {
                     return Err(
@@ -37855,13 +38769,14 @@ fn run_semantic_odp(
             Case::OdpSemanticOpen => {
                 let owned = corpus.archive.clone();
                 let started = Instant::now();
-                let presentation = litchi_odp::Presentation::from_bytes(owned)?;
+                let presentation = litchi_odp::Package::from_bytes(&owned)?.presentation()?;
                 let duration = started.elapsed();
                 verify_semantic_odp(&presentation, shape, false)?;
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::OdpSemanticListSlides => {
-                let presentation = litchi_odp::Presentation::from_bytes(corpus.archive.clone())?;
+                let presentation =
+                    litchi_odp::Package::from_bytes(&corpus.archive)?.presentation()?;
                 let started = Instant::now();
                 let slides = presentation.slides()?;
                 let duration = started.elapsed();
@@ -37873,7 +38788,8 @@ fn run_semantic_odp(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::OdpSemanticOneSlide => {
-                let presentation = litchi_odp::Presentation::from_bytes(corpus.archive.clone())?;
+                let presentation =
+                    litchi_odp::Package::from_bytes(&corpus.archive)?.presentation()?;
                 let started = Instant::now();
                 let slide = presentation
                     .slide(index)?
@@ -37892,7 +38808,8 @@ fn run_semantic_odp(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::OdpSemanticFullText => {
-                let presentation = litchi_odp::Presentation::from_bytes(corpus.archive.clone())?;
+                let presentation =
+                    litchi_odp::Package::from_bytes(&corpus.archive)?.presentation()?;
                 let started = Instant::now();
                 let text = presentation.text()?;
                 let duration = started.elapsed();
@@ -37901,10 +38818,12 @@ fn run_semantic_odp(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::OdpSemanticNoopEditSave | Case::OdpSemanticOneEditSave => {
-                let presentation = litchi_odp::Presentation::from_bytes(corpus.archive.clone())?;
-                let snapshot = presentation.snapshot()?;
+                let snapshot = litchi_odp::Package::from_bytes(&corpus.archive)?;
+                // Parse the bounded editing projection before timing, as the
+                // former eager snapshot constructor did.
+                snapshot.slides()?;
                 let started = Instant::now();
-                let mut transaction = snapshot.transaction()?;
+                let mut transaction = snapshot.edit()?;
                 let updated = matches!(case, Case::OdpSemanticOneEditSave);
                 if updated {
                     let index = shape.pptx_slides();
@@ -37914,14 +38833,15 @@ fn run_semantic_odp(
                     )?;
                 }
                 let commit = transaction.commit()?;
-                let bytes = commit.snapshot().bytes().to_vec();
+                let bytes = commit.package().as_bytes().to_vec();
                 let duration = started.elapsed();
-                if (bytes != corpus.archive) != updated || commit.changed() != updated {
+                if (bytes != corpus.archive) != updated || commit.diagnostics().changed() != updated
+                {
                     return Err(
                         "semantic ODP edit/save changed-state differs from specification".into(),
                     );
                 }
-                let reopened = litchi_odp::Presentation::from_bytes(bytes.clone())?;
+                let reopened = litchi_odp::Package::from_bytes(&bytes)?.presentation()?;
                 verify_semantic_odp(&reopened, shape, updated)?;
                 std::hint::black_box(bytes);
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
@@ -37952,7 +38872,7 @@ fn run_semantic_odp_text_to_sink(
     let expected_bytes = u64::try_from(expected_text.len())?;
     let expected_objects = u64::try_from(slide_count)?;
     let expected_digest = sha256_hex(expected_text.as_bytes());
-    let presentation = litchi_odp::Presentation::from_bytes(corpus.archive.clone())?;
+    let presentation = litchi_odp::Package::from_bytes(&corpus.archive)?.presentation()?;
 
     verify_semantic_odp(&presentation, shape, false)?;
     if presentation.text()? != expected_text {
@@ -38019,26 +38939,26 @@ fn run_odp_media_textbox_edit_save(
     let mut elapsed = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let started = Instant::now();
-        let source = litchi_odp::authoring::edit::Snapshot::from_bytes(corpus.archive.clone())?;
-        let mut transaction = source.transaction()?;
+        let source = litchi_odp::authoring::edit::Package::from_bytes(&corpus.archive)?;
+        let mut transaction = source.edit()?;
         transaction.add_text_box(0usize, &text_box)?;
         let commit = transaction.commit()?;
-        let bytes = commit.snapshot().bytes().to_vec();
+        let bytes = commit.package().as_bytes().to_vec();
         let duration = started.elapsed();
-        if !commit.changed() || bytes == corpus.archive || commit.patch().is_noop() {
+        if !commit.diagnostics().changed() || bytes == corpus.archive || commit.patch().is_noop() {
             return Err("media-rich ODP text-box edit reported an exact no-op".into());
         }
 
         verify_odp_media_archive(&bytes, true)?;
-        let replayed = commit.patch().apply(&source)?;
-        if replayed.bytes() != bytes {
+        let replayed = source.apply(commit.patch())?.into_package();
+        if replayed.as_bytes() != bytes {
             return Err("media-rich ODP text-box patch replay differs from commit".into());
         }
-        let restored = commit.patch().inverse().apply(&replayed)?;
-        if restored.bytes() != corpus.archive {
+        let restored = replayed.apply(&commit.patch().inverse())?.into_package();
+        if restored.as_bytes() != corpus.archive {
             return Err("media-rich ODP text-box inverse did not restore the source".into());
         }
-        if commit.patch().apply(&replayed).is_ok() {
+        if replayed.apply(commit.patch()).is_ok() {
             return Err("media-rich ODP text-box patch accepted a stale source".into());
         }
         let digest = sha256_hex(&bytes);
@@ -38280,7 +39200,7 @@ fn run_odp_media_source_access(
                 duration
             }
         } else if query {
-            let presentation = litchi_odp::Presentation::from_bytes(corpus.archive.clone())?;
+            let presentation = litchi_odp::Package::from_bytes(&corpus.archive)?.presentation()?;
             let started = Instant::now();
             let slide = presentation
                 .slide(target_slide)?
@@ -38298,7 +39218,7 @@ fn run_odp_media_source_access(
         } else {
             let owned = corpus.archive.clone();
             let started = Instant::now();
-            let presentation = litchi_odp::Presentation::from_bytes(owned)?;
+            let presentation = litchi_odp::Package::from_bytes(&owned)?.presentation()?;
             let duration = started.elapsed();
             verify_odp_media_eager_semantics_and_media(
                 &presentation,
@@ -38400,391 +39320,6 @@ fn run_odp_media_source_access(
     Ok(result_with_source(case, corpus, elapsed, source))
 }
 
-fn odp_root_file_case_parameters(
-    case: Case,
-) -> Result<(&'static str, &'static str, bool), Box<dyn Error>> {
-    match case {
-        Case::OdpFileEagerOpen => Ok(("eager_root", "presentation_open_no_slide_query", false)),
-        Case::OdpFileSourceOpen => Ok((
-            "source_backed_root",
-            "presentation_open_no_slide_query",
-            false,
-        )),
-        Case::OdpFileEagerSelectedSlide => Ok(("eager_root", "one_middle_slide_query", true)),
-        Case::OdpFileSourceSelectedSlide => {
-            Ok(("source_backed_root", "one_middle_slide_query", true))
-        },
-        _ => Err("non-root ODP case passed to root ODP case parameters".into()),
-    }
-}
-
-fn odp_root_semantic_projection(
-    presentation: &litchi::Presentation,
-) -> Result<(Vec<String>, String), Box<dyn Error>> {
-    let slides = presentation.slides()?;
-    let mut texts = Vec::with_capacity(slides.len());
-    let mut digest = Sha256::new();
-    for (index, slide) in slides.iter().enumerate() {
-        let text = slide.text()?;
-        digest.update((index as u64).to_le_bytes());
-        digest.update((text.len() as u64).to_le_bytes());
-        digest.update(text.as_bytes());
-        texts.push(text);
-    }
-    Ok((texts, fingerprint_hex(&digest.finalize().into())))
-}
-
-fn odp_root_metadata_digest(
-    metadata: &Option<litchi_core::Metadata>,
-) -> Result<String, Box<dyn Error>> {
-    Ok(sha256_hex(&serde_json::to_vec(metadata)?))
-}
-
-fn create_odp_root_source_file(archive: &[u8]) -> Result<PathBuf, Box<dyn Error>> {
-    let stamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|error| format!("ODP root source timestamp is before epoch: {error}"))?
-        .as_nanos();
-    let path = std::env::temp_dir().join(format!(
-        "litchi-perf-baseline-odp-root-{}-{stamp}.odp",
-        std::process::id()
-    ));
-    let mut file = fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&path)?;
-    file.write_all(archive)?;
-    file.flush()?;
-    Ok(path)
-}
-
-fn verify_odp_root_postconditions(
-    presentation: &litchi::Presentation,
-    source_path: &std::path::Path,
-    corpus: &Corpus,
-    expected_texts: &[String],
-    expected_semantic_sha256: &str,
-    expected_metadata_sha256: &str,
-    expected_typed_slides: &[litchi_odp::model::Slide],
-    expected_typed_semantic_sha256: &str,
-    target_slide: usize,
-    selected_media_path: &str,
-    selected_media_payload: &[u8],
-) -> Result<(), Box<dyn Error>> {
-    let (texts, semantic_sha256) = odp_root_semantic_projection(presentation)?;
-    if texts != expected_texts || semantic_sha256 != expected_semantic_sha256 {
-        return Err("ODP unified root semantic projection differs from eager oracle".into());
-    }
-    let selected = presentation
-        .slide(target_slide)?
-        .ok_or("ODP unified root selected slide is missing")?;
-    if selected.text()? != expected_texts[target_slide] {
-        return Err("ODP unified root selected slide differs from corpus".into());
-    }
-    if odp_root_metadata_digest(&presentation.metadata()?)? != expected_metadata_sha256 {
-        return Err("ODP unified root metadata differs between matched controls".into());
-    }
-
-    let bytes = fs::read(source_path)?;
-    if bytes != corpus.archive
-        || sha256_hex(&bytes) != corpus.manifest.archive_sha256
-        || bytes.len() != corpus.manifest.archive_bytes
-    {
-        return Err("ODP unified root source file differs from deterministic archive".into());
-    }
-    verify_odp_media_archive(&bytes, false)?;
-    let typed = litchi_odp::Presentation::from_bytes(bytes)?;
-    verify_odp_media_eager_semantics_and_media(
-        &typed,
-        expected_typed_slides,
-        expected_typed_semantic_sha256,
-        selected_media_path,
-        selected_media_payload,
-    )?;
-    Ok(())
-}
-
-fn run_odp_root_file_access(
-    case: Case,
-    corpus: &Corpus,
-    warmup_iterations: usize,
-    samples: usize,
-) -> Result<CaseResult, Box<dyn Error>> {
-    if corpus.manifest.generator != ODP_MEDIA_CORPUS_GENERATOR {
-        return Err("ODP root filesystem cases require the fixed media-rich corpus".into());
-    }
-    let (implementation, phase, query) = odp_root_file_case_parameters(case)?;
-    let target_slide = SemanticShape::Medium.pptx_slides() / 2;
-    let expected_root = litchi::Presentation::from_bytes(corpus.archive.clone())?;
-    let (expected_texts, canonical_semantic_sha256) = odp_root_semantic_projection(&expected_root)?;
-    let canonical_metadata_sha256 = odp_root_metadata_digest(&expected_root.metadata()?)?;
-    let (expected_typed_slides, canonical_typed_semantic_sha256) =
-        odp_media_eager_semantics(&corpus.archive)?;
-    if canonical_semantic_sha256 != canonical_typed_semantic_sha256 {
-        return Err("ODP unified root and typed semantic digests differ".into());
-    }
-    if expected_texts.len() != SemanticShape::Medium.pptx_slides()
-        || expected_texts[target_slide]
-            != format!(
-                "{}\n{}",
-                semantic_odp_title(target_slide, false),
-                semantic_odp_text(target_slide, false)
-            )
-    {
-        return Err("ODP unified root canonical corpus projection differs".into());
-    }
-    let (picture_members, selected_range) = odp_media_payload_inventory(corpus)?;
-    let picture_ranges = picture_members
-        .iter()
-        .map(|(_name, range)| range.clone())
-        .collect::<Vec<_>>();
-    let selected_media_path = odp_media_path(ODS_MEDIA_ENTRY_COUNT / 2);
-    let selected_media_payload = odp_media_payload(ODS_MEDIA_ENTRY_COUNT / 2);
-    let selected_media_uncompressed_bytes = u64::try_from(selected_media_payload.len())?;
-    let selected_media_compressed_range_bytes =
-        selected_range.end.saturating_sub(selected_range.start);
-    let pictures_compressed_range_bytes =
-        picture_members
-            .iter()
-            .try_fold(0_u64, |total, (_name, range)| {
-                total
-                    .checked_add(range.end.saturating_sub(range.start))
-                    .ok_or("ODP compressed Pictures byte count overflows u64")
-            })?;
-    let pictures_uncompressed_payload_bytes = u64::try_from(
-        ODS_MEDIA_ENTRY_COUNT
-            .checked_mul(ODS_MEDIA_ENTRY_BYTES)
-            .ok_or("ODP uncompressed Pictures byte count overflows usize")?,
-    )?;
-    let pictures_uncompressed_payload_sha256 = odp_media_payload_digest();
-    let source_path = create_odp_root_source_file(&corpus.archive)?;
-    let result = (|| {
-        let mut elapsed = Vec::with_capacity(samples);
-        let mut source_summary = OdpRootSourceSummary {
-            implementation,
-            phase,
-            timing_scope: if query {
-                "one_middle_slide_query_after_untimed_root_open"
-            } else {
-                "unified_root_presentation_open"
-            },
-            timed_root_adapter: if implementation == "source_backed_root" {
-                "litchi::Presentation::open(Path)"
-            } else {
-                "litchi::Presentation::from_bytes(Vec<u8>)"
-            },
-            read_evidence_adapter: if implementation == "source_backed_root" {
-                "litchi_odp::SourceBackedPresentation+harness::InstrumentedSource"
-            } else {
-                "not_applicable"
-            },
-            read_evidence_scope: if implementation == "source_backed_root" {
-                "separate_untimed_direct_typed_replay_per_measured_sample"
-            } else {
-                "not_applicable"
-            },
-            source_path_bytes: u64::try_from(corpus.archive.len())?,
-            source_path_sha256: corpus.manifest.archive_sha256.clone(),
-            target_slide,
-            canonical_semantic_sha256: canonical_semantic_sha256.clone(),
-            metadata_sha256: canonical_metadata_sha256.clone(),
-            selected_media_path: selected_media_path.clone(),
-            selected_media_compressed_range_bytes,
-            selected_media_uncompressed_bytes,
-            selected_media_uncompressed_payload_sha256: sha256_hex(&selected_media_payload),
-            pictures_count: picture_members.len(),
-            pictures_compressed_range_bytes,
-            pictures_uncompressed_payload_bytes,
-            pictures_uncompressed_payload_sha256,
-            ..OdpRootSourceSummary::default()
-        };
-
-        for iteration in 0..iteration_count(warmup_iterations, samples)? {
-            let duration = if implementation == "source_backed_root" {
-                if query {
-                    let presentation = litchi::Presentation::open(&source_path)?;
-                    let started = Instant::now();
-                    let slide = presentation
-                        .slide(target_slide)?
-                        .ok_or("ODP unified source root selected slide is missing")?;
-                    let duration = started.elapsed();
-                    verify_odp_root_postconditions(
-                        &presentation,
-                        &source_path,
-                        corpus,
-                        &expected_texts,
-                        &canonical_semantic_sha256,
-                        &canonical_metadata_sha256,
-                        &expected_typed_slides,
-                        &canonical_typed_semantic_sha256,
-                        target_slide,
-                        &selected_media_path,
-                        &selected_media_payload,
-                    )?;
-                    if slide.text()? != expected_texts[target_slide] {
-                        return Err("ODP unified source root selected slide differs".into());
-                    }
-                    duration
-                } else {
-                    let started = Instant::now();
-                    let presentation = litchi::Presentation::open(&source_path)?;
-                    let duration = started.elapsed();
-                    verify_odp_root_postconditions(
-                        &presentation,
-                        &source_path,
-                        corpus,
-                        &expected_texts,
-                        &canonical_semantic_sha256,
-                        &canonical_metadata_sha256,
-                        &expected_typed_slides,
-                        &canonical_typed_semantic_sha256,
-                        target_slide,
-                        &selected_media_path,
-                        &selected_media_payload,
-                    )?;
-                    duration
-                }
-            } else if query {
-                let presentation = litchi::Presentation::from_bytes(corpus.archive.clone())?;
-                let started = Instant::now();
-                let slide = presentation
-                    .slide(target_slide)?
-                    .ok_or("ODP unified eager root selected slide is missing")?;
-                let duration = started.elapsed();
-                verify_odp_root_postconditions(
-                    &presentation,
-                    &source_path,
-                    corpus,
-                    &expected_texts,
-                    &canonical_semantic_sha256,
-                    &canonical_metadata_sha256,
-                    &expected_typed_slides,
-                    &canonical_typed_semantic_sha256,
-                    target_slide,
-                    &selected_media_path,
-                    &selected_media_payload,
-                )?;
-                if slide.text()? != expected_texts[target_slide] {
-                    return Err("ODP unified eager root selected slide differs".into());
-                }
-                duration
-            } else {
-                let owned = corpus.archive.clone();
-                let started = Instant::now();
-                let presentation = litchi::Presentation::from_bytes(owned)?;
-                let duration = started.elapsed();
-                verify_odp_root_postconditions(
-                    &presentation,
-                    &source_path,
-                    corpus,
-                    &expected_texts,
-                    &canonical_semantic_sha256,
-                    &canonical_metadata_sha256,
-                    &expected_typed_slides,
-                    &canonical_typed_semantic_sha256,
-                    target_slide,
-                    &selected_media_path,
-                    &selected_media_payload,
-                )?;
-                duration
-            };
-            record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
-        }
-
-        if implementation == "source_backed_root" {
-            let selected_range_len = selected_media_compressed_range_bytes;
-            let mut exact_phase = None;
-            let mut exact_media = None;
-            for _ in 0..samples {
-                let snapshot = collect_odp_media_source_phase(
-                    &corpus.archive,
-                    &picture_ranges,
-                    target_slide,
-                    query,
-                )?;
-                verify_odp_media_source_phase(snapshot, phase)?;
-                if let Some(expected) = exact_phase {
-                    if expected != snapshot {
-                        return Err("ODP root source phase counters are not deterministic".into());
-                    }
-                } else {
-                    exact_phase = Some(snapshot);
-                }
-                source_summary.source_read_calls.push(snapshot.read_calls);
-                source_summary.source_read_bytes.push(snapshot.read_bytes);
-                source_summary
-                    .source_read_range_overlap_bytes
-                    .push(snapshot.read_range_overlap_bytes);
-                source_summary
-                    .pictures_read_calls
-                    .push(snapshot.ordinary_payload_read_calls);
-                source_summary
-                    .pictures_read_compressed_range_bytes
-                    .push(snapshot.ordinary_payload_read_bytes);
-
-                let (all_snapshot, selected_snapshot) = collect_odp_media_selected_media(
-                    &corpus.archive,
-                    &picture_ranges,
-                    selected_range.clone(),
-                    &selected_media_path,
-                )?;
-                if all_snapshot.ordinary_payload_read_bytes != selected_range_len
-                    || selected_snapshot.ordinary_payload_read_bytes != selected_range_len
-                    || all_snapshot.ordinary_payload_read_calls == 0
-                    || selected_snapshot.ordinary_payload_read_calls == 0
-                {
-                    return Err(
-                        "ODP root selected media replay did not cover exactly one Pictures range"
-                            .into(),
-                    );
-                }
-                if let Some(expected) = exact_media {
-                    if expected != (all_snapshot, selected_snapshot) {
-                        return Err("ODP root selected media counters are not deterministic".into());
-                    }
-                } else {
-                    exact_media = Some((all_snapshot, selected_snapshot));
-                }
-                source_summary
-                    .selected_media_read_calls
-                    .push(all_snapshot.read_calls);
-                source_summary
-                    .selected_media_read_bytes
-                    .push(all_snapshot.read_bytes);
-                source_summary
-                    .selected_media_read_prior_range_overlap_bytes
-                    .push(all_snapshot.read_range_overlap_bytes);
-                source_summary
-                    .selected_media_read_compressed_range_overlap_bytes
-                    .push(all_snapshot.ordinary_payload_read_bytes);
-                source_summary
-                    .selected_media_read_non_picture_overlap_bytes
-                    .push(
-                        all_snapshot
-                            .read_bytes
-                            .saturating_sub(all_snapshot.ordinary_payload_read_bytes),
-                    );
-            }
-        }
-
-        Ok(result_with_source(
-            case,
-            corpus,
-            elapsed,
-            SourceSummary {
-                odp_root: Some(source_summary),
-                ..SourceSummary::default()
-            },
-        ))
-    })();
-    let cleanup = fs::remove_file(&source_path);
-    match (result, cleanup) {
-        (Ok(result), Ok(())) => Ok(result),
-        (Ok(_), Err(error)) => Err(error.into()),
-        (Err(error), _) => Err(error),
-    }
-}
-
 fn odt_repeated_text_ranges(
     corpus: &Corpus,
 ) -> Result<(Range<u64>, Vec<Range<u64>>, Vec<Range<u64>>), Box<dyn Error>> {
@@ -38800,439 +39335,6 @@ fn odt_repeated_text_ranges(
         return Err("ODT repeated-text source evidence found an empty Pictures range".into());
     }
     Ok((content_range, untouched_ranges, picture_ranges))
-}
-
-fn odt_root_case_parameters(case: Case) -> Result<(&'static str, bool), Box<dyn Error>> {
-    match case {
-        Case::OdtFileEagerOpen => Ok(("eager_root", false)),
-        Case::OdtFileSourceOpen => Ok(("source_backed_root", false)),
-        Case::OdtFileEagerOpenFullTextLifecycle => Ok(("eager_root", true)),
-        Case::OdtFileSourceOpenFullTextLifecycle => Ok(("source_backed_root", true)),
-        _ => Err("non-root ODT case passed to ODT root case parameters".into()),
-    }
-}
-
-fn odt_root_table_text(table: &litchi::document::Table) -> Result<String, Box<dyn Error>> {
-    let mut text = String::new();
-    for row in table.rows()? {
-        for cell in row.cells()? {
-            text.push_str(&cell.text()?);
-        }
-    }
-    Ok(text)
-}
-
-fn odt_root_semantic_projection(
-    document: &litchi::Document,
-) -> Result<OdtRootSemanticProjection, Box<dyn Error>> {
-    let text = document.text()?;
-    let paragraphs = document
-        .paragraphs()?
-        .into_iter()
-        .map(|paragraph| paragraph.text())
-        .collect::<Result<Vec<_>, _>>()?;
-    let tables = document
-        .tables()?
-        .into_iter()
-        .map(|table| odt_root_table_text(&table))
-        .collect::<Result<Vec<_>, _>>()?;
-    let elements = document
-        .elements()?
-        .into_iter()
-        .map(|element| {
-            if let Some(paragraph) = element.as_paragraph() {
-                Ok(format!("paragraph:{}", paragraph.text()?))
-            } else if let Some(table) = element.as_table() {
-                Ok(format!("table:{}", odt_root_table_text(table)?))
-            } else {
-                Err("ODT unified root returned an unsupported document element".into())
-            }
-        })
-        .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
-    let metadata_sha256 = sha256_hex(&serde_json::to_vec(&document.metadata()?)?);
-    Ok(OdtRootSemanticProjection {
-        text,
-        paragraphs,
-        tables,
-        elements,
-        metadata_sha256,
-    })
-}
-
-fn odt_root_values_digest(values: &[String]) -> String {
-    let mut digest = Sha256::new();
-    for (index, value) in values.iter().enumerate() {
-        digest.update((index as u64).to_le_bytes());
-        digest.update((value.len() as u64).to_le_bytes());
-        digest.update(value.as_bytes());
-    }
-    fingerprint_hex(&digest.finalize().into())
-}
-
-fn odt_root_names_digest(names: &[String]) -> String {
-    odt_root_values_digest(names)
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct OdtRootArchiveIdentity {
-    archive_member_count: usize,
-    archive_member_names_sha256: String,
-    pictures_count: usize,
-    pictures_member_names_sha256: String,
-    pictures_compressed_range_bytes: u64,
-    pictures_uncompressed_payload_bytes: u64,
-    pictures_uncompressed_payload_sha256: String,
-}
-
-fn odt_root_archive_identity(bytes: &[u8]) -> Result<OdtRootArchiveIdentity, Box<dyn Error>> {
-    let archive = ArchiveReader::new(bytes)?;
-    let mut member_names = archive.file_names().map(str::to_owned).collect::<Vec<_>>();
-    member_names.sort();
-
-    let mut picture_members = zip_member_ranges(bytes)?
-        .into_iter()
-        .filter(|(name, _range)| name.starts_with("Pictures/"))
-        .collect::<Vec<_>>();
-    picture_members.sort_by(|left, right| left.0.cmp(&right.0));
-    if picture_members.len() != ODS_MEDIA_ENTRY_COUNT {
-        return Err("ODT unified root archive has an unexpected Pictures count".into());
-    }
-    let picture_names = picture_members
-        .iter()
-        .map(|(name, _range)| name.clone())
-        .collect::<Vec<_>>();
-    let pictures_compressed_range_bytes =
-        picture_members
-            .iter()
-            .try_fold(0_u64, |total, (_name, range)| {
-                total
-                    .checked_add(range.end.saturating_sub(range.start))
-                    .ok_or("ODT unified root compressed Pictures byte count overflows u64")
-            })?;
-
-    let package = litchi_odf_common::core::OwnedPackage::from_bytes(bytes.to_vec())?;
-    let package = package.package()?;
-    for index in 0..ODS_MEDIA_ENTRY_COUNT {
-        let path = odt_media_path(index);
-        if package.manifest().get_media_type(&path) != Some("application/octet-stream") {
-            return Err(format!("ODT unified root manifest entry differs for '{path}'").into());
-        }
-        if package.get_file(&path)? != odt_media_payload(index) {
-            return Err(format!("ODT unified root payload differs for '{path}'").into());
-        }
-    }
-
-    Ok(OdtRootArchiveIdentity {
-        archive_member_count: member_names.len(),
-        archive_member_names_sha256: odt_root_names_digest(&member_names),
-        pictures_count: picture_members.len(),
-        pictures_member_names_sha256: odt_root_names_digest(&picture_names),
-        pictures_compressed_range_bytes,
-        pictures_uncompressed_payload_bytes: u64::try_from(
-            ODS_MEDIA_ENTRY_COUNT
-                .checked_mul(ODS_MEDIA_ENTRY_BYTES)
-                .ok_or("ODT unified root uncompressed Pictures byte count overflows usize")?,
-        )?,
-        pictures_uncompressed_payload_sha256: odt_repeated_text_media_payload_digest(),
-    })
-}
-
-fn create_odt_root_source_file(archive: &[u8]) -> Result<PathBuf, Box<dyn Error>> {
-    let stamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|error| format!("ODT root source timestamp is before epoch: {error}"))?
-        .as_nanos();
-    let path = std::env::temp_dir().join(format!(
-        "litchi-perf-baseline-odt-root-{}-{stamp}.odt",
-        std::process::id()
-    ));
-    let mut file = fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&path)?;
-    if let Err(error) = file.write_all(archive).and_then(|()| file.flush()) {
-        drop(file);
-        let _ = fs::remove_file(&path);
-        return Err(error.into());
-    }
-    Ok(path)
-}
-
-#[derive(Clone, Copy, Debug)]
-struct OdtRootReplay {
-    preparation: SourceSnapshot,
-    query: SourceSnapshot,
-}
-
-fn replay_odt_root_source(
-    corpus: &Corpus,
-    expected_text: &str,
-) -> Result<OdtRootReplay, Box<dyn Error>> {
-    let (content_range, untouched_ranges, picture_ranges) = odt_repeated_text_ranges(corpus)?;
-    let source = Arc::new(InstrumentedSource::new_odf(
-        corpus.archive.clone(),
-        vec![content_range],
-        untouched_ranges,
-        picture_ranges,
-    ));
-    let document = litchi_odt::SourceBackedDocument::from_read_at(source.clone())?;
-    let preparation = source.snapshot();
-    if preparation.read_calls == 0
-        || preparation.read_bytes == 0
-        || preparation.odf.content.read_calls == 0
-        || preparation.odf.content.read_bytes == 0
-        || preparation.odf.pictures.read_calls != 0
-        || preparation.odf.pictures.read_bytes != 0
-    {
-        return Err("ODT unified root source preparation failed source-range gates".into());
-    }
-    source.reset();
-    if document.text()? != expected_text {
-        return Err("ODT unified root source query differs from eager text".into());
-    }
-    let query = source.snapshot();
-    if query.odf.pictures.read_calls != 0 || query.odf.pictures.read_bytes != 0 {
-        return Err("ODT unified root source query overlapped Pictures payload".into());
-    }
-    Ok(OdtRootReplay { preparation, query })
-}
-
-fn run_odt_file_root(
-    case: Case,
-    corpus: &Corpus,
-    warmup_iterations: usize,
-    samples: usize,
-) -> Result<CaseResult, Box<dyn Error>> {
-    if !case.is_odt_root_file() {
-        return Err("non-root ODT case passed to ODT root runner".into());
-    }
-    if corpus.manifest.generator != ODT_REPEATED_TEXT_CORPUS_GENERATOR {
-        return Err("ODT root filesystem cases require the fixed large media-rich corpus".into());
-    }
-    let (implementation, lifecycle) = odt_root_case_parameters(case)?;
-    let source_path = create_odt_root_source_file(&corpus.archive)?;
-    let result = (|| {
-        let source_bytes = fs::read(&source_path)?;
-        if source_bytes != corpus.archive
-            || sha256_hex(&source_bytes) != corpus.manifest.archive_sha256
-            || source_bytes.len() != corpus.manifest.archive_bytes
-        {
-            return Err("ODT unified root source file differs from deterministic archive".into());
-        }
-        let archive_identity = odt_root_archive_identity(&corpus.archive)?;
-        let source_identity = odt_root_archive_identity(&source_bytes)?;
-        if source_identity != archive_identity
-            || archive_identity.archive_member_count != corpus.manifest.archive_member_count
-        {
-            return Err("ODT unified root source archive identity differs from corpus".into());
-        }
-
-        let eager = litchi::Document::from_bytes(corpus.archive.clone())?;
-        let source = litchi::Document::open(&source_path)?;
-        let eager_semantics = odt_root_semantic_projection(&eager)?;
-        let source_semantics = odt_root_semantic_projection(&source)?;
-        if source_semantics != eager_semantics {
-            return Err("ODT unified root eager/source semantic parity failed".into());
-        }
-        if eager_semantics.paragraphs.len() != SemanticShape::Large.docx_paragraphs()
-            || eager_semantics
-                .paragraphs
-                .iter()
-                .enumerate()
-                .any(|(index, value)| value != &semantic_odt_text(index, false))
-        {
-            return Err("ODT unified root paragraph content differs from corpus".into());
-        }
-        if eager_semantics.text != eager_semantics.paragraphs.join("\n") {
-            return Err("ODT unified root text differs from paragraph content".into());
-        }
-
-        let mut elapsed = Vec::with_capacity(samples);
-        let mut summary = OdtFileRootSummary {
-            implementation,
-            phase: if lifecycle {
-                "open_and_full_text_lifecycle"
-            } else {
-                "open_only"
-            },
-            timing_scope: if lifecycle {
-                "filesystem_read_or_path_open_and_unified_document_full_text_query_inside_timer; corpus, temporary-file setup, semantic parity, archive identity, and source replay outside timer"
-            } else {
-                "filesystem_read_or_path_open_and_unified_document_ownership_inside_timer; corpus, temporary-file setup, semantic parity, archive identity, and source replay outside timer"
-            },
-            timed_root_adapter: if implementation == "source_backed_root" {
-                if lifecycle {
-                    "litchi::Document::open(Path)+Document::text"
-                } else {
-                    "litchi::Document::open(Path)"
-                }
-            } else if lifecycle {
-                "fs::read(Path)+litchi::Document::from_bytes(Vec<u8>)+Document::text"
-            } else {
-                "fs::read(Path)+litchi::Document::from_bytes(Vec<u8>)"
-            },
-            read_evidence_adapter: if implementation == "source_backed_root" {
-                "litchi_odt::SourceBackedDocument+harness::InstrumentedSource"
-            } else {
-                "not_applicable"
-            },
-            read_evidence_scope: if implementation == "source_backed_root" {
-                "separate_untimed_instrumented_source_replay_per_measured_sample"
-            } else {
-                "not_applicable"
-            },
-            source_path_bytes: u64::try_from(source_bytes.len())?,
-            source_path_sha256: sha256_hex(&source_bytes),
-            archive_member_count: archive_identity.archive_member_count,
-            archive_member_names_sha256: archive_identity.archive_member_names_sha256.clone(),
-            pictures_count: archive_identity.pictures_count,
-            pictures_member_names_sha256: archive_identity.pictures_member_names_sha256.clone(),
-            pictures_compressed_range_bytes: archive_identity.pictures_compressed_range_bytes,
-            pictures_uncompressed_payload_bytes: archive_identity
-                .pictures_uncompressed_payload_bytes,
-            pictures_uncompressed_payload_sha256: archive_identity
-                .pictures_uncompressed_payload_sha256
-                .clone(),
-            canonical_text_sha256: sha256_hex(eager_semantics.text.as_bytes()),
-            paragraph_count: eager_semantics.paragraphs.len(),
-            paragraph_text_sha256: odt_root_values_digest(&eager_semantics.paragraphs),
-            table_count: eager_semantics.tables.len(),
-            element_count: eager_semantics.elements.len(),
-            element_text_sha256: odt_root_values_digest(&eager_semantics.elements),
-            metadata_sha256: eager_semantics.metadata_sha256.clone(),
-            semantic_parity_verified: true,
-            archive_identity_verified: true,
-            media_identity_verified: true,
-            source_ranges_verified: implementation != "source_backed_root",
-            zero_picture_payload_overlap_verified: implementation != "source_backed_root",
-            ..OdtFileRootSummary::default()
-        };
-
-        for iteration in 0..iteration_count(warmup_iterations, samples)? {
-            let started = Instant::now();
-            let document = if implementation == "source_backed_root" {
-                litchi::Document::open(&source_path)?
-            } else {
-                let bytes = fs::read(&source_path)?;
-                litchi::Document::from_bytes(bytes)?
-            };
-            let text = if lifecycle {
-                Some(document.text()?)
-            } else {
-                None
-            };
-            let duration = started.elapsed();
-            if let Some(text) = text.as_deref()
-                && text != eager_semantics.text
-            {
-                return Err(
-                    "ODT unified root timed full-text lifecycle differs from oracle".into(),
-                );
-            }
-            std::hint::black_box(document);
-            std::hint::black_box(text);
-            record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
-        }
-
-        if implementation == "source_backed_root" {
-            let mut expected_replay = None;
-            for _ in 0..samples {
-                let replay = replay_odt_root_source(corpus, &eager_semantics.text)?;
-                let tuple = (replay.preparation, replay.query);
-                if let Some(expected) = expected_replay {
-                    if expected != tuple {
-                        return Err(
-                            "ODT unified root source replay counters are not deterministic".into(),
-                        );
-                    }
-                } else {
-                    expected_replay = Some(tuple);
-                }
-                summary
-                    .source_preparation_read_calls
-                    .push(replay.preparation.read_calls);
-                summary
-                    .source_preparation_read_bytes
-                    .push(replay.preparation.read_bytes);
-                summary
-                    .source_preparation_content_read_calls
-                    .push(replay.preparation.odf.content.read_calls);
-                summary
-                    .source_preparation_content_read_bytes
-                    .push(replay.preparation.odf.content.read_bytes);
-                summary
-                    .source_preparation_untouched_read_calls
-                    .push(replay.preparation.odf.untouched.read_calls);
-                summary
-                    .source_preparation_untouched_read_bytes
-                    .push(replay.preparation.odf.untouched.read_bytes);
-                summary
-                    .source_preparation_pictures_read_calls
-                    .push(replay.preparation.odf.pictures.read_calls);
-                summary
-                    .source_preparation_pictures_read_bytes
-                    .push(replay.preparation.odf.pictures.read_bytes);
-                summary
-                    .source_query_read_calls
-                    .push(replay.query.read_calls);
-                summary
-                    .source_query_read_bytes
-                    .push(replay.query.read_bytes);
-                summary
-                    .source_query_content_read_calls
-                    .push(replay.query.odf.content.read_calls);
-                summary
-                    .source_query_content_read_bytes
-                    .push(replay.query.odf.content.read_bytes);
-                summary
-                    .source_query_untouched_read_calls
-                    .push(replay.query.odf.untouched.read_calls);
-                summary
-                    .source_query_untouched_read_bytes
-                    .push(replay.query.odf.untouched.read_bytes);
-                summary
-                    .source_query_pictures_read_calls
-                    .push(replay.query.odf.pictures.read_calls);
-                summary
-                    .source_query_pictures_read_bytes
-                    .push(replay.query.odf.pictures.read_bytes);
-            }
-            summary.source_ranges_verified = true;
-            summary.zero_picture_payload_overlap_verified = summary
-                .source_preparation_pictures_read_calls
-                .iter()
-                .chain(summary.source_query_pictures_read_calls.iter())
-                .all(|&calls| calls == 0)
-                && summary
-                    .source_preparation_pictures_read_bytes
-                    .iter()
-                    .chain(summary.source_query_pictures_read_bytes.iter())
-                    .all(|&bytes| bytes == 0);
-            if !summary.zero_picture_payload_overlap_verified {
-                return Err("ODT unified root source replay picture overlap gate failed".into());
-            }
-        }
-
-        Ok(result_with_source(
-            case,
-            corpus,
-            elapsed,
-            SourceSummary {
-                read_calls: summary.source_preparation_read_calls.clone(),
-                read_bytes: summary.source_preparation_read_bytes.clone(),
-                ordinary_payload_read_calls: vec![0; summary.source_preparation_read_calls.len()],
-                ordinary_payload_read_bytes: vec![0; summary.source_preparation_read_calls.len()],
-                odt_root: Some(summary),
-                ..SourceSummary::default()
-            },
-        ))
-    })();
-    let cleanup = fs::remove_file(&source_path);
-    match (result, cleanup) {
-        (Ok(result), Ok(())) => Ok(result),
-        (Ok(_), Err(error)) => Err(error.into()),
-        (Err(error), _) => Err(error),
-    }
 }
 
 fn odt_repeated_text_media_payload_digest() -> String {
@@ -39277,7 +39379,7 @@ fn run_odt_repeated_text(
         return Err("ODT repeated-text cases require the fixed large media-rich corpus".into());
     }
 
-    let eager = litchi_odt::Document::from_bytes(corpus.archive.clone())?;
+    let eager = litchi_odt::Package::from_bytes(&corpus.archive)?.document()?;
     let expected_text = eager.text()?;
     let expected_paragraph_count = eager.paragraph_count()?;
     if expected_paragraph_count != SemanticShape::Large.docx_paragraphs() {
@@ -39287,7 +39389,12 @@ fn run_odt_repeated_text(
     let canonical_text_sha256 = sha256_hex(expected_text.as_bytes());
     let content_xml_sha256 = sha256_hex(&content_xml);
     let (content_range, untouched_ranges, picture_ranges) = odt_repeated_text_ranges(corpus)?;
-    let archive_member_count = ArchiveReader::new(&corpus.archive)?.file_names().count();
+    let archive_member_count = ArchiveReader::new(
+        &corpus.archive,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?
+    .file_names()
+    .count();
     if archive_member_count != corpus.manifest.archive_member_count {
         return Err("ODT repeated-text archive member count differs from manifest".into());
     }
@@ -39756,7 +39863,7 @@ fn run_odt_source_backed_catalog(
         return Err("ODT source catalog cases require the fixed large media-rich corpus".into());
     }
     let (operation, selected_index) = odt_catalog_case_parameters(case)?;
-    let eager = litchi_odt::Document::from_bytes(corpus.archive.clone())?;
+    let eager = litchi_odt::Package::from_bytes(&corpus.archive)?.document()?;
     verify_semantic_odt(&eager, SemanticShape::Large, &[])?;
     let expected_text = eager.text()?;
     let expected_block_count = eager.paragraph_count()?;
@@ -39771,7 +39878,12 @@ fn run_odt_source_backed_catalog(
         selected_index.map(|index| sha256_hex(semantic_odt_text(index, false).as_bytes()));
     let content_xml = odf_content_xml(&corpus.archive)?;
     let (content_range, untouched_ranges, picture_ranges) = odt_repeated_text_ranges(corpus)?;
-    let archive_member_count = ArchiveReader::new(&corpus.archive)?.file_names().count();
+    let archive_member_count = ArchiveReader::new(
+        &corpus.archive,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?
+    .file_names()
+    .count();
     if archive_member_count != corpus.manifest.archive_member_count || archive_member_count != 13 {
         return Err("ODT source catalog archive member count differs from the fixed corpus".into());
     }
@@ -40314,7 +40426,7 @@ fn run_odp_source_backed_catalog(
         return Err("ODP source catalog cases require the fixed media-rich corpus".into());
     }
     let (operation, selected_index) = odp_catalog_case_parameters(case)?;
-    let eager = litchi_odp::Presentation::from_bytes(corpus.archive.clone())?;
+    let eager = litchi_odp::Package::from_bytes(&corpus.archive)?.presentation()?;
     verify_semantic_odp(&eager, SemanticShape::Medium, false)?;
     let expected_slides = eager.slides()?;
     let expected_text = eager.text()?;
@@ -40345,7 +40457,12 @@ fn run_odp_source_backed_catalog(
     {
         return Err("ODP source catalog source ranges differ from the fixed corpus".into());
     }
-    let archive_member_count = ArchiveReader::new(&corpus.archive)?.file_names().count();
+    let archive_member_count = ArchiveReader::new(
+        &corpus.archive,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?
+    .file_names()
+    .count();
     if archive_member_count != corpus.manifest.archive_member_count || archive_member_count != 13 {
         return Err("ODP source catalog archive member count differs from the fixed corpus".into());
     }
@@ -40853,7 +40970,12 @@ fn odp_repeated_text_digest(values: &[String]) -> String {
 }
 
 fn verify_odp_repeated_text_archive(corpus: &Corpus) -> Result<(), Box<dyn Error>> {
-    if ArchiveReader::new(&corpus.archive)?.file_names().count()
+    if ArchiveReader::new(
+        &corpus.archive,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?
+    .file_names()
+    .count()
         != corpus.manifest.archive_member_count
     {
         return Err("ODP repeated-text archive member topology differs from corpus".into());
@@ -40877,7 +40999,7 @@ fn run_odp_repeated_text(
         return Err("ODP repeated-text cases require the fixed media-rich corpus".into());
     }
 
-    let eager = litchi_odp::Presentation::from_bytes(corpus.archive.clone())?;
+    let eager = litchi_odp::Package::from_bytes(&corpus.archive)?.presentation()?;
     let expected_text = eager.text()?;
     let expected_slides = eager.slides()?;
     let expected_single_text_sha256 = sha256_hex(expected_text.as_bytes());
@@ -41223,8 +41345,6 @@ fn ods_root_file_case_parameters(
     case: Case,
 ) -> Result<(&'static str, &'static str, bool, bool), Box<dyn Error>> {
     match case {
-        Case::OdsFileEagerOpen => Ok(("eager_root", "workbook_open", false, false)),
-        Case::OdsFileSourceOpen => Ok(("source_backed_root", "workbook_open", false, false)),
         Case::OdsFileEagerSelectedCell => Ok(("eager_typed", "selected_cell_query", true, false)),
         Case::OdsFileSourceSelectedCell => {
             Ok(("source_backed_typed", "selected_cell_query", true, false))
@@ -41246,7 +41366,7 @@ fn ods_root_metadata_digest(metadata: &litchi_core::Metadata) -> Result<String, 
 }
 
 fn ods_root_typed_cell(
-    spreadsheet: &litchi_ods::Spreadsheet,
+    spreadsheet: &litchi_ods::Workbook,
     sheet: &str,
     row: usize,
     column: usize,
@@ -41327,7 +41447,7 @@ fn ods_cell_sweep_digest_field(digest: &mut Sha256, value: Option<&str>) -> usiz
 }
 
 fn ods_owned_cell_sweep_digest(
-    spreadsheet: &litchi_ods::Spreadsheet,
+    spreadsheet: &litchi_ods::Workbook,
     sheet_names: &[String],
     coordinates: &[OdsCellSweepCoordinate],
 ) -> Result<(usize, String), Box<dyn Error>> {
@@ -41383,7 +41503,7 @@ fn ods_source_cell_sweep_digest(
 }
 
 fn run_ods_owned_cell_sweep(
-    spreadsheet: &litchi_ods::Spreadsheet,
+    spreadsheet: &litchi_ods::Workbook,
     sheet_names: &[String],
     coordinates: &[OdsCellSweepCoordinate],
 ) -> Result<(), Box<dyn Error>> {
@@ -41419,7 +41539,7 @@ fn run_ods_source_cell_sweep(
 }
 
 fn ods_owned_cell_batch_sweep_digest(
-    spreadsheet: &litchi_ods::Spreadsheet,
+    spreadsheet: &litchi_ods::Workbook,
     coordinates: &[OdsCellSweepCoordinate],
     selectors: &[litchi_ods::CellSelector<'_>],
 ) -> Result<(usize, String), Box<dyn Error>> {
@@ -41475,7 +41595,7 @@ fn ods_source_cell_batch_sweep_digest(
 }
 
 fn run_ods_owned_cell_batch_sweep(
-    spreadsheet: &litchi_ods::Spreadsheet,
+    spreadsheet: &litchi_ods::Workbook,
     selectors: &[litchi_ods::CellSelector<'_>],
 ) -> Result<(), Box<dyn Error>> {
     for _ in 0..ODS_CELL_SWEEP_REPETITIONS {
@@ -41519,7 +41639,7 @@ fn run_ods_cell_sweep(
         .len()
         .checked_mul(ODS_CELL_SWEEP_REPETITIONS)
         .ok_or("ODS cell-sweep query count overflows usize")?;
-    let expected = litchi_ods::Spreadsheet::from_bytes(corpus.archive.clone())?;
+    let expected = litchi_ods::Package::from_bytes(&corpus.archive)?.workbook()?;
     let (expected_stored, expected_digest) =
         ods_owned_cell_sweep_digest(&expected, &sheet_names, &coordinates)?;
     if expected_stored != expected_stored_cells {
@@ -41555,14 +41675,14 @@ fn run_ods_cell_sweep(
             let duration;
             let (stored_cells, digest) = match case {
                 Case::OdsFileEagerCellSweep => {
-                    let owner = litchi_ods::Spreadsheet::from_bytes(corpus.archive.clone())?;
+                    let owner = litchi_ods::Package::from_bytes(&corpus.archive)?.workbook()?;
                     let started = Instant::now();
                     run_ods_owned_cell_sweep(&owner, &sheet_names, &coordinates)?;
                     duration = started.elapsed();
                     ods_owned_cell_sweep_digest(&owner, &sheet_names, &coordinates)?
                 },
                 Case::OdsFileSourceCellSweep => {
-                    let owner = litchi_ods::SourceBackedSpreadsheet::from_path(&source_path)?;
+                    let owner = litchi_ods::SourceBackedSpreadsheet::open(&source_path)?;
                     let started = Instant::now();
                     run_ods_source_cell_sweep(&owner, &sheet_names, &coordinates)?;
                     duration = started.elapsed();
@@ -41580,7 +41700,12 @@ fn run_ods_cell_sweep(
             {
                 return Err("ODS cell-sweep source archive changed during measurement".into());
             }
-            if ArchiveReader::new(&source_bytes)?.file_names().count()
+            if ArchiveReader::new(
+                &source_bytes,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )?
+            .file_names()
+            .count()
                 != corpus.manifest.archive_member_count
             {
                 return Err("ODS cell-sweep source member topology changed".into());
@@ -41676,7 +41801,7 @@ fn run_ods_cell_batch_sweep(
         .len()
         .checked_mul(ODS_CELL_SWEEP_REPETITIONS)
         .ok_or("ODS cell batch sweep result count overflows usize")?;
-    let expected = litchi_ods::Spreadsheet::from_bytes(corpus.archive.clone())?;
+    let expected = litchi_ods::Package::from_bytes(&corpus.archive)?.workbook()?;
     let (expected_stored, expected_digest) =
         ods_owned_cell_sweep_digest(&expected, &sheet_names, &coordinates)?;
     if expected_stored != expected_stored_cells {
@@ -41762,14 +41887,14 @@ fn run_ods_cell_batch_sweep(
             let duration;
             let (stored_cells, digest) = match case {
                 Case::OdsFileEagerCellBatchSweep => {
-                    let owner = litchi_ods::Spreadsheet::from_bytes(corpus.archive.clone())?;
+                    let owner = litchi_ods::Package::from_bytes(&corpus.archive)?.workbook()?;
                     let started = Instant::now();
                     run_ods_owned_cell_batch_sweep(&owner, &selectors)?;
                     duration = started.elapsed();
                     ods_owned_cell_batch_sweep_digest(&owner, &coordinates, &selectors)?
                 },
                 Case::OdsFileSourceCellBatchSweep => {
-                    let owner = litchi_ods::SourceBackedSpreadsheet::from_path(&source_path)?;
+                    let owner = litchi_ods::SourceBackedSpreadsheet::open(&source_path)?;
                     let started = Instant::now();
                     run_ods_source_cell_batch_sweep(&owner, &selectors)?;
                     duration = started.elapsed();
@@ -41789,7 +41914,12 @@ fn run_ods_cell_batch_sweep(
                     "ODS cell batch sweep source archive changed during measurement".into(),
                 );
             }
-            if ArchiveReader::new(&source_bytes)?.file_names().count()
+            if ArchiveReader::new(
+                &source_bytes,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )?
+            .file_names()
+            .count()
                 != corpus.manifest.archive_member_count
             {
                 return Err("ODS cell batch sweep source member topology changed".into());
@@ -42051,7 +42181,6 @@ struct OdsRootExpectations<'a> {
     worksheet_count: usize,
     text: &'a str,
     metadata_sha256: &'a str,
-    typed: &'a litchi_ods::Spreadsheet,
     target_sheet: &'a str,
     target_row: usize,
     target_column: usize,
@@ -42091,7 +42220,7 @@ fn verify_ods_typed_query_projection(
 }
 
 fn ods_typed_query_projection(
-    owner: &litchi_ods::Spreadsheet,
+    owner: &litchi_ods::Workbook,
     expected: &OdsRootExpectations<'_>,
 ) -> Result<OdsTypedQueryProjection, Box<dyn Error>> {
     Ok(OdsTypedQueryProjection {
@@ -42136,7 +42265,9 @@ fn verify_ods_source_identity_postconditions(
     {
         return Err("ODS unified root source file differs from deterministic archive".into());
     }
-    if ArchiveReader::new(&bytes)?.file_names().count()
+    if ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default())?
+        .file_names()
+        .count()
         != expected.corpus.manifest.archive_member_count
     {
         return Err("ODS unified root archive member count differs from corpus".into());
@@ -42147,53 +42278,6 @@ fn verify_ods_source_identity_postconditions(
     {
         return Err("ODS unified root selected media payload differs from corpus".into());
     }
-    Ok(())
-}
-
-fn verify_ods_root_postconditions(
-    workbook: &litchi::Workbook,
-    expected: &OdsRootExpectations<'_>,
-) -> Result<(), Box<dyn Error>> {
-    let names = workbook
-        .worksheet_names()
-        .map_err(|error| error.to_string())?;
-    if names != expected.worksheet_names {
-        return Err("ODS unified root worksheet names differ from eager oracle".into());
-    }
-    if workbook
-        .worksheet_count()
-        .map_err(|error| error.to_string())?
-        != expected.worksheet_count
-    {
-        return Err("ODS unified root worksheet count differs from eager oracle".into());
-    }
-    let text = workbook.text().map_err(|error| error.to_string())?;
-    if text != expected.text {
-        return Err("ODS unified root text differs from eager oracle".into());
-    }
-    if ods_root_metadata_digest(&workbook.metadata().map_err(|error| error.to_string())?)?
-        != expected.metadata_sha256
-    {
-        return Err("ODS unified root metadata differs from eager oracle".into());
-    }
-
-    verify_semantic_ods(expected.typed, SemanticShape::Medium, false)?;
-    let typed_cell = ods_root_typed_cell(
-        expected.typed,
-        expected.target_sheet,
-        expected.target_row,
-        expected.target_column,
-    )?;
-    if typed_cell != expected.cell_text {
-        return Err("ODS typed selected cell differs from canonical oracle".into());
-    }
-    if expected.cell_text
-        != semantic_ods_text(1, expected.target_row, expected.target_column, false)
-    {
-        return Err("ODS typed selected cell differs from deterministic corpus".into());
-    }
-
-    verify_ods_source_identity_postconditions(expected)?;
     Ok(())
 }
 
@@ -42212,21 +42296,15 @@ fn run_ods_root_file_access(
     let target_column = SemanticShape::Medium.ods_columns_per_sheet() / 2;
     let selected_media_path = ods_media_path(ODS_MEDIA_ENTRY_COUNT / 2);
     let selected_media_payload = ods_media_payload(ODS_MEDIA_ENTRY_COUNT / 2);
-    let expected_root =
-        litchi::Workbook::from_bytes(corpus.archive.clone()).map_err(|error| error.to_string())?;
-    let expected_names = expected_root
-        .worksheet_names()
-        .map_err(|error| error.to_string())?;
-    let expected_count = expected_root
-        .worksheet_count()
-        .map_err(|error| error.to_string())?;
-    let expected_text = expected_root.text().map_err(|error| error.to_string())?;
-    let expected_metadata_sha256 = ods_root_metadata_digest(
-        &expected_root
-            .metadata()
-            .map_err(|error| error.to_string())?,
-    )?;
-    let expected_typed = litchi_ods::Spreadsheet::from_bytes(corpus.archive.clone())?;
+    // The workbook-level expectations come from the typed owner. They are
+    // the values the facade workbook these routes were recorded against
+    // reported (M0a step S9 deleted it), which the unified ODS routes (S8b)
+    // check `litchi::File` against.
+    let expected_typed = litchi_ods::Package::from_bytes(&corpus.archive)?.workbook()?;
+    let expected_names = expected_typed.sheet_names();
+    let expected_count = expected_typed.sheet_count();
+    let expected_text = expected_typed.text()?;
+    let expected_metadata_sha256 = ods_root_metadata_digest(expected_typed.metadata())?;
     let expected_cell_text =
         ods_root_typed_cell(&expected_typed, &target_sheet, target_row, target_column)?;
     let (picture_members, selected_range) = ods_media_payload_inventory(corpus)?;
@@ -42257,7 +42335,6 @@ fn run_ods_root_file_access(
         worksheet_count: expected_count,
         text: &expected_text,
         metadata_sha256: &expected_metadata_sha256,
-        typed: &expected_typed,
         target_sheet: &target_sheet,
         target_row,
         target_column,
@@ -42272,16 +42349,10 @@ fn run_ods_root_file_access(
             phase,
             timing_scope: if media_query {
                 "selected_media_query_after_untimed_typed_owner_open"
-            } else if query {
-                "selected_cell_query_after_untimed_typed_owner_open"
             } else {
-                "unified_root_workbook_open"
+                "selected_cell_query_after_untimed_typed_owner_open"
             },
-            timed_root_adapter: match implementation {
-                "source_backed_root" => "litchi::Workbook::open(Path)",
-                "eager_root" => "litchi::Workbook::from_bytes(Vec<u8>)",
-                _ => "not_applicable",
-            },
+            timed_root_adapter: "not_applicable",
             typed_query_adapter: if media_query {
                 if implementation == "source_backed_typed" {
                     "litchi_ods::SourceBackedSpreadsheet::media_data"
@@ -42292,7 +42363,7 @@ fn run_ods_root_file_access(
                 if implementation == "source_backed_typed" {
                     "litchi_ods::SourceBackedSpreadsheet::cell"
                 } else {
-                    "litchi_ods::Spreadsheet::cell"
+                    "litchi_ods::Workbook::cell"
                 }
             } else {
                 "not_applicable"
@@ -42330,25 +42401,8 @@ fn run_ods_root_file_access(
 
         for iteration in 0..iteration_count(warmup_iterations, samples)? {
             let duration = match implementation {
-                "source_backed_root" => {
-                    let started = Instant::now();
-                    let workbook =
-                        litchi::Workbook::open(&source_path).map_err(|error| error.to_string())?;
-                    let duration = started.elapsed();
-                    verify_ods_root_postconditions(&workbook, &expectations)?;
-                    duration
-                },
-                "eager_root" => {
-                    let owned = corpus.archive.clone();
-                    let started = Instant::now();
-                    let workbook =
-                        litchi::Workbook::from_bytes(owned).map_err(|error| error.to_string())?;
-                    let duration = started.elapsed();
-                    verify_ods_root_postconditions(&workbook, &expectations)?;
-                    duration
-                },
                 "source_backed_typed" => {
-                    let owner = litchi_ods::SourceBackedSpreadsheet::from_path(&source_path)?;
+                    let owner = litchi_ods::SourceBackedSpreadsheet::open(&source_path)?;
                     let started = Instant::now();
                     let value = if media_query {
                         owner
@@ -42374,14 +42428,15 @@ fn run_ods_root_file_access(
                     duration
                 },
                 "eager_typed" => {
-                    let owner = litchi_ods::Spreadsheet::from_bytes(corpus.archive.clone())?;
+                    let ods_package = litchi_ods::Package::from_bytes(&corpus.archive)?;
+                    let owner = ods_package.workbook()?;
                     if media_query {
                         verify_ods_typed_query_projection(
                             ods_typed_query_projection(&owner, &expectations)?,
                             &expectations,
                         )?;
                         verify_ods_source_identity_postconditions(&expectations)?;
-                        let owned = owner.into_bytes();
+                        let owned = ods_package.to_bytes()?;
                         let package = litchi_odf_common::core::OwnedPackage::from_bytes(owned)?;
                         let package = package.package()?;
                         let started = Instant::now();
@@ -42509,7 +42564,7 @@ fn run_ods_root_file_access(
 }
 
 fn odp_text_box_batch_models(
-    source: &litchi_odp::authoring::edit::Snapshot,
+    source: &litchi_odp::authoring::edit::Package,
 ) -> Result<Vec<litchi_odp::content::TextBoxModel>, Box<dyn Error>> {
     let inventory = source.rich_content()?;
     let mut models = Vec::with_capacity(ODP_TEXT_BOX_BATCH_COUNT);
@@ -42540,10 +42595,10 @@ fn odp_text_box_batch_models(
 
 fn publish_odp_text_box_models(
     case: Case,
-    source: &litchi_odp::authoring::edit::Snapshot,
+    source: &litchi_odp::authoring::edit::Package,
     replacements: &[litchi_odp::content::TextBoxModelReplacement<'_>],
 ) -> Result<litchi_odp::authoring::edit::Commit, Box<dyn Error>> {
-    let mut transaction = source.transaction()?;
+    let mut transaction = source.edit()?;
     match case {
         Case::OdpMediaTextBoxScalarReplaceSave => {
             for replacement in replacements {
@@ -42563,55 +42618,55 @@ fn publish_odp_text_box_models(
 
 fn verify_odp_text_box_model_commit(
     case: Case,
-    source: &litchi_odp::authoring::edit::Snapshot,
+    source: &litchi_odp::authoring::edit::Package,
     commit: &litchi_odp::authoring::edit::Commit,
     expected: &[u8],
 ) -> Result<(), Box<dyn Error>> {
-    if !commit.changed()
+    if !commit.diagnostics().changed()
         || commit.patch().is_noop()
         || commit.patch().domains() != [litchi_odp::authoring::edit::Domain::Content]
-        || commit.snapshot().bytes() != expected
+        || commit.package().as_bytes() != expected
     {
         return Err(format!(
             "ODP text-box model commit differs: changed={}, noop={}, domains={:?}, exact_output={}",
-            commit.changed(),
+            commit.diagnostics().changed(),
             commit.patch().is_noop(),
             commit.patch().domains(),
-            commit.snapshot().bytes() == expected
+            commit.package().as_bytes() == expected
         )
         .into());
     }
     verify_odp_text_box_batch_archive(expected, true)?;
     verify_odp_text_box_batch_raw_members(
-        source.bytes(),
+        source.as_bytes(),
         expected,
         case == Case::OdpMediaTextBoxBatchReplaceSave,
     )?;
 
-    let replayed = commit.patch().apply(source)?;
-    if replayed.bytes() != expected {
+    let replayed = source.apply(commit.patch())?.into_package();
+    if replayed.as_bytes() != expected {
         return Err("ODP text-box model patch replay differs from publication".into());
     }
-    let restored = commit.patch().inverse().apply(&replayed)?;
-    if restored.bytes() != source.bytes() {
+    let restored = replayed.apply(&commit.patch().inverse())?.into_package();
+    if restored.as_bytes() != source.as_bytes() {
         return Err("ODP text-box model inverse did not restore exact source bytes".into());
     }
-    if commit.patch().apply(&replayed).is_ok() {
+    if replayed.apply(commit.patch()).is_ok() {
         return Err("ODP text-box model patch accepted a stale source".into());
     }
 
     let durable = litchi_odp::authoring::edit::Patch::from_durable_bytes(
         &commit.patch().to_durable_bytes()?,
     )?;
-    let durable_replayed = durable.apply(source)?;
-    if durable_replayed.bytes() != expected {
+    let durable_replayed = source.apply(&durable)?.into_package();
+    if durable_replayed.as_bytes() != expected {
         return Err("durable ODP text-box model replay differs from publication".into());
     }
-    let durable_restored = durable.inverse().apply(&durable_replayed)?;
-    if durable_restored.bytes() != source.bytes() {
+    let durable_restored = durable_replayed.apply(&durable.inverse())?.into_package();
+    if durable_restored.as_bytes() != source.as_bytes() {
         return Err("durable ODP text-box model inverse did not restore source".into());
     }
-    if durable.apply(&durable_replayed).is_ok() {
+    if durable_replayed.apply(&durable).is_ok() {
         return Err("durable ODP text-box model patch accepted a stale source".into());
     }
     Ok(())
@@ -42626,7 +42681,7 @@ fn run_odp_text_box_model_publication(
     if !case.uses_odp_text_box_batch() {
         return Err("non-model ODP case passed to text-box publication runner".into());
     }
-    let source = litchi_odp::authoring::edit::Snapshot::from_bytes(corpus.archive.clone())?;
+    let source = litchi_odp::authoring::edit::Package::from_bytes(&corpus.archive)?;
     let models = odp_text_box_batch_models(&source)?;
     let replacements = models
         .iter()
@@ -42645,7 +42700,7 @@ fn run_odp_text_box_model_publication(
         &source,
         &replacements,
     )?;
-    let expected_batch = batch.snapshot().bytes().to_vec();
+    let expected_batch = batch.package().as_bytes().to_vec();
     verify_odp_text_box_model_commit(
         Case::OdpMediaTextBoxBatchReplaceSave,
         &source,
@@ -42657,16 +42712,19 @@ fn run_odp_text_box_model_publication(
         &source,
         &replacements,
     )?;
-    let expected_scalar = scalar.snapshot().bytes().to_vec();
+    let expected_scalar = scalar.package().as_bytes().to_vec();
     verify_odp_text_box_model_commit(
         Case::OdpMediaTextBoxScalarReplaceSave,
         &source,
         &scalar,
         &expected_scalar,
     )?;
-    let scalar_projection =
-        litchi_odp::Presentation::from_bytes(expected_scalar.clone())?.text()?;
-    let batch_projection = litchi_odp::Presentation::from_bytes(expected_batch.clone())?.text()?;
+    let scalar_projection = litchi_odp::Package::from_bytes(&expected_scalar)?
+        .presentation()?
+        .text()?;
+    let batch_projection = litchi_odp::Package::from_bytes(&expected_batch)?
+        .presentation()?
+        .text()?;
     if scalar_projection != batch_projection {
         return Err("matched ODP scalar and batch semantic projections differ".into());
     }
@@ -42685,20 +42743,24 @@ fn run_odp_text_box_model_publication(
         sink.reserve_budget()?;
         let started = Instant::now();
         let commit = publish_odp_text_box_models(case, &source, &replacements)?;
-        sink.write_all(commit.snapshot().bytes())?;
+        sink.write_all(commit.package().as_bytes())?;
         let duration = started.elapsed();
 
-        if !commit.changed()
+        if !commit.diagnostics().changed()
             || commit.patch().is_noop()
             || commit.patch().domains() != [litchi_odp::authoring::edit::Domain::Content]
             || sink.bytes != expected
         {
             return Err("measured ODP text-box model publication differs from oracle".into());
         }
-        let replayed = commit.patch().apply(&source)?;
-        if replayed.bytes() != expected
-            || commit.patch().inverse().apply(&replayed)?.bytes() != source.bytes()
-            || commit.patch().apply(&replayed).is_ok()
+        let replayed = source.apply(commit.patch())?.into_package();
+        if replayed.as_bytes() != expected
+            || replayed
+                .apply(&commit.patch().inverse())?
+                .into_package()
+                .as_bytes()
+                != source.as_bytes()
+            || replayed.apply(commit.patch()).is_ok()
         {
             return Err("measured ODP text-box model patch contract differs".into());
         }
@@ -42724,10 +42786,15 @@ fn run_xlsx_open_owned(
         let owned = corpus.archive.clone();
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
-        let workbook = Workbook::from_bytes(owned)?;
+        // The owned-move route: the archive is moved into the OPC reader
+        // without a copy and validated once by the immutable package owner.
+        let workbook = XlsxPackage::from_opc(OpcPackage::from_vec(
+            owned,
+            litchi_opc::SourceLimits::default(),
+        )?)?;
         let duration = started.elapsed();
         let allocation_metrics = allocation_region.finish();
-        if workbook.len() != spec.sheet_count {
+        if workbook.workbook_ref().len() != spec.sheet_count {
             return Err("owned XLSX open sheet count differs from corpus specification".into());
         }
         std::hint::black_box(&workbook);
@@ -42821,11 +42888,12 @@ fn run_xlsx_named_sheet_lookup(
     } else {
         // Parse and catalog the owned workbook once; only the immutable named
         // selector itself belongs to the timed loop.
-        let workbook = Workbook::from_bytes(corpus.archive.clone())?;
-        if workbook.len() != spec.sheet_count {
+        let workbook = XlsxPackage::from_bytes(&corpus.archive)?;
+        if workbook.workbook_ref().len() != spec.sheet_count {
             return Err("owned named selector catalog has the wrong sheet count".into());
         }
         let target = workbook
+            .workbook_ref()
             .sheet(target_name.as_str())?
             .ok_or("owned named selector target sheet is missing")?;
         if target.name() != target_name
@@ -42841,6 +42909,7 @@ fn run_xlsx_named_sheet_lookup(
         for iteration in 0..iteration_count {
             let started = Instant::now();
             let sheet = workbook
+                .workbook_ref()
                 .sheet(std::hint::black_box(target_query.as_str()))?
                 .ok_or("owned named selector missed its target sheet")?;
             let duration = started.elapsed();
@@ -42863,10 +42932,11 @@ fn run_xlsx_list_sheets(
     let mut elapsed = Vec::with_capacity(samples);
     let mut observations = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+        let workbook = XlsxPackage::from_bytes(&corpus.archive)?;
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let names = workbook
+            .workbook_ref()
             .sheets()
             .map(|sheet| sheet.name().to_owned())
             .collect::<Vec<_>>();
@@ -42902,8 +42972,9 @@ fn run_xlsx_first_cell(
     let mut elapsed = Vec::with_capacity(samples);
     let mut observations = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+        let workbook = XlsxPackage::from_bytes(&corpus.archive)?;
         let sheet = workbook
+            .workbook_ref()
             .sheet("Sheet1")?
             .ok_or("XLSX first sheet is missing")?;
         let allocation_region = allocation_metrics::begin();
@@ -42941,8 +43012,9 @@ fn run_xlsx_full_cell_scan(
     let mut elapsed = Vec::with_capacity(samples);
     let mut observations = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+        let workbook = XlsxPackage::from_bytes(&corpus.archive)?;
         let sheet = workbook
+            .workbook_ref()
             .sheet("Sheet1")?
             .ok_or("XLSX first sheet is missing")?;
         let allocation_region = allocation_metrics::begin();
@@ -42979,8 +43051,9 @@ fn run_xlsx_narrow_column_range_scan(
     let mut elapsed = Vec::with_capacity(samples);
     let mut observations = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+        let workbook = XlsxPackage::from_bytes(&corpus.archive)?;
         let sheet = workbook
+            .workbook_ref()
             .sheet("Sheet1")?
             .ok_or("XLSX first sheet is missing")?;
         // Preload the full sparse store outside the timed traversal. The
@@ -43136,8 +43209,8 @@ fn run_xlsx_source_list_sheets(
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let names = workbook
-            .sheets()
-            .map(|sheet| sheet.name().to_owned())
+            .sheet_names()
+            .map(str::to_owned)
             .collect::<Vec<_>>();
         let duration = started.elapsed();
         let allocation_metrics = allocation_region.finish();
@@ -43315,110 +43388,11 @@ fn xlsx_root_metadata_oracle(
     if !report.is_clean() {
         return Err(format!("XLSX metadata oracle required tolerance repairs: {report:?}").into());
     }
-    Ok(properties
-        .map(litchi_core::Metadata::from)
-        .unwrap_or_default())
+    Ok(properties.unwrap_or_default())
 }
 
 fn xlsx_root_metadata_digest(metadata: &litchi_core::Metadata) -> Result<String, Box<dyn Error>> {
     Ok(sha256_hex(&serde_json::to_vec(metadata)?))
-}
-
-fn xlsx_bytes_root_case_parameters(case: Case) -> Result<bool, Box<dyn Error>> {
-    match case {
-        Case::XlsxBytesOpen => Ok(false),
-        Case::XlsxBytesOpenLifecycle => Ok(true),
-        _ => Err("non-bytes XLSX root case passed to XLSX bytes root case parameters".into()),
-    }
-}
-
-fn run_xlsx_bytes_root_access(
-    case: Case,
-    corpus: &Corpus,
-    warmup_iterations: usize,
-    samples: usize,
-) -> Result<CaseResult, Box<dyn Error>> {
-    let spec = xlsx_spec(corpus)?;
-    if corpus.manifest.generator != XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR {
-        return Err("XLSX bytes root cases require the deterministic cell-CRUD XLSX corpus".into());
-    }
-    let lifecycle = xlsx_bytes_root_case_parameters(case)?;
-
-    // Keep the eager owner as an independent semantic oracle. These checks are
-    // deliberately outside the timed facade lifecycle, as is the archive hash.
-    let eager = Workbook::from_bytes(corpus.archive.clone())?;
-    verify_xlsx_cells(&eager, spec, &[])?;
-    let expected_names = eager
-        .sheets()
-        .map(|sheet| sheet.name().to_owned())
-        .collect::<Vec<_>>();
-    let expected_count = eager.len();
-    if expected_names.len() != spec.sheet_count || expected_count != spec.sheet_count {
-        return Err("typed eager XLSX bytes oracle worksheet shape differs from corpus".into());
-    }
-    let expected_text = xlsx_typed_full_text(&eager, spec)?;
-    drop(eager);
-    if sha256_hex(&corpus.archive) != corpus.manifest.archive_sha256
-        || corpus.archive.len() != corpus.manifest.archive_bytes
-    {
-        return Err("XLSX bytes root archive differs from its deterministic manifest".into());
-    }
-
-    // Read metadata through an independently opened eager OPC/property path;
-    // the facade workbook is never used to manufacture its own oracle.
-    let package = OpcPackage::from_bytes(&corpus.archive)?;
-    let expected_metadata = xlsx_root_metadata_oracle(&package)?;
-    let expected_metadata_sha256 = xlsx_root_metadata_digest(&expected_metadata)?;
-    drop(expected_metadata);
-    drop(package);
-
-    let mut elapsed = Vec::with_capacity(samples);
-    for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        // Keep Vec ownership preparation outside the measurement interval.
-        let owned = corpus.archive.clone();
-        let started = Instant::now();
-        let workbook = litchi::Workbook::from_bytes(owned).map_err(|error| error.to_string())?;
-        let measured_projection = if lifecycle {
-            Some((
-                workbook
-                    .worksheet_names()
-                    .map_err(|error| error.to_string())?,
-                workbook
-                    .worksheet_count()
-                    .map_err(|error| error.to_string())?,
-                workbook.text().map_err(|error| error.to_string())?,
-            ))
-        } else {
-            None
-        };
-        let duration = started.elapsed();
-
-        let (names, count, text) = match measured_projection {
-            Some(projection) => projection,
-            None => (
-                workbook
-                    .worksheet_names()
-                    .map_err(|error| error.to_string())?,
-                workbook
-                    .worksheet_count()
-                    .map_err(|error| error.to_string())?,
-                workbook.text().map_err(|error| error.to_string())?,
-            ),
-        };
-        let metadata_sha256 =
-            xlsx_root_metadata_digest(&workbook.metadata().map_err(|error| error.to_string())?)?;
-        if names != expected_names
-            || count != expected_count
-            || text != expected_text
-            || metadata_sha256 != expected_metadata_sha256
-        {
-            return Err("XLSX bytes root projection differs from typed/eager oracle".into());
-        }
-        std::hint::black_box(&workbook);
-        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
-    }
-
-    Ok(result(case, corpus, elapsed, None))
 }
 
 fn verify_unselected_xlsx_ranges_untouched(
@@ -43499,8 +43473,8 @@ fn run_xlsx_range_source_list_sheets(
         source.reset()?;
         let started = Instant::now();
         let names = workbook
-            .sheets()
-            .map(|sheet| sheet.name().to_owned())
+            .sheet_names()
+            .map(str::to_owned)
             .collect::<Vec<_>>();
         let duration = started.elapsed();
         if names != expected {
@@ -43656,17 +43630,17 @@ fn run_xlsx_noop_commit(
     let mut elapsed = Vec::with_capacity(samples);
     let mut observations = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+        let workbook = XlsxPackage::from_bytes(&corpus.archive)?;
         let edit = workbook.edit()?;
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let commit = edit.commit()?;
         let duration = started.elapsed();
         let allocation_metrics = allocation_region.finish();
-        if !commit.patch().is_empty() {
+        if !commit.patch().is_noop() {
             return Err("XLSX no-op commit produced semantic changes".into());
         }
-        verify_xlsx_cells(commit.workbook(), spec, &[])?;
+        verify_xlsx_cells(commit.package(), spec, &[])?;
         std::hint::black_box(&commit);
         record_default_operation(
             &mut elapsed,
@@ -43694,20 +43668,20 @@ fn run_xlsx_noop_commit_save(
     let mut observations = Vec::with_capacity(samples);
     let mut sink_summaries = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+        let workbook = XlsxPackage::from_bytes(&corpus.archive)?;
         let edit = workbook.edit()?;
         let mut sink = CountingSink::bounded(maximum, 64 * 1024);
         sink.reserve_budget()?;
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let commit = edit.commit()?;
-        commit.workbook().write_to(&mut sink)?;
+        commit.package().write_to(&mut sink)?;
         let duration = started.elapsed();
         let allocation_metrics = allocation_region.finish();
-        if !commit.patch().is_empty() || sink.bytes != corpus.archive {
+        if !commit.patch().is_noop() || sink.bytes != corpus.archive {
             return Err("XLSX no-op commit/save is not byte-exact for generated corpus".into());
         }
-        let reopened = Workbook::from_bytes(sink.bytes.clone())?;
+        let reopened = XlsxPackage::from_bytes(&sink.bytes)?;
         verify_xlsx_cells(&reopened, spec, &[])?;
         if iteration >= warmup_iterations {
             sink_summaries.push(sink.summary());
@@ -43749,7 +43723,7 @@ fn run_xlsx_update_commit(
     let mut observations = Vec::with_capacity(samples);
     let mut final_commit = None;
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+        let workbook = XlsxPackage::from_bytes(&corpus.archive)?;
         let edit = prepare_xlsx_updates(&workbook, updates)?;
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
@@ -43759,7 +43733,7 @@ fn run_xlsx_update_commit(
             Some(sample) => Some(sample),
             None => Some(allocation_metrics::unavailable_sample()),
         };
-        if commit.patch().len() != updates.len() {
+        if commit.patch().operation_count() != updates.len() {
             return Err("XLSX update commit has an unexpected semantic change count".into());
         }
         std::hint::black_box(&commit);
@@ -43778,7 +43752,7 @@ fn run_xlsx_update_commit(
         final_commit
             .as_ref()
             .ok_or("XLSX update commit produced no final snapshot")?
-            .workbook(),
+            .package(),
         spec,
         updates,
     )?;
@@ -43805,12 +43779,13 @@ fn run_xlsx_one_cell_commit_first_read(
     let mut elapsed = Vec::with_capacity(samples);
     let mut final_commit = None;
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+        let workbook = XlsxPackage::from_bytes(&corpus.archive)?;
         let edit = prepare_xlsx_updates(&workbook, updates)?;
         let started = Instant::now();
         let commit = edit.commit()?;
         let sheet = commit
-            .workbook()
+            .package()
+            .workbook_ref()
             .sheet(sheet_name.as_str())?
             .ok_or("XLSX updated sheet is missing")?;
         let cell = sheet
@@ -43825,7 +43800,7 @@ fn run_xlsx_one_cell_commit_first_read(
         if actual.as_str() != expected {
             return Err("XLSX updated cell differs from deterministic expectation".into());
         }
-        if commit.patch().len() != 1 {
+        if commit.patch().operation_count() != 1 {
             return Err("XLSX update commit has an unexpected semantic change count".into());
         }
         final_commit = Some(commit);
@@ -43835,7 +43810,7 @@ fn run_xlsx_one_cell_commit_first_read(
         final_commit
             .as_ref()
             .ok_or("XLSX commit/read produced no final snapshot")?
-            .workbook(),
+            .package(),
         spec,
         updates,
     )?;
@@ -43855,7 +43830,7 @@ fn xlsx_commit_save_operation(
     sink: &mut CountingSink,
 ) -> Result<litchi_xlsx::edit::Commit, Box<dyn Error>> {
     let commit = edit.commit()?;
-    commit.workbook().write_to(sink)?;
+    commit.package().write_to(sink)?;
     Ok(commit)
 }
 
@@ -43882,7 +43857,7 @@ fn run_xlsx_update_commit_save(
     let mut observations = Vec::with_capacity(samples);
     let mut sink_summaries = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+        let workbook = XlsxPackage::from_bytes(&corpus.archive)?;
         let edit = prepare_xlsx_updates(&workbook, updates)?;
         let mut sink = CountingSink::bounded(maximum, 64 * 1024);
         sink.reserve_budget()?;
@@ -43899,7 +43874,7 @@ fn run_xlsx_update_commit_save(
                 "XLSX changed commit/save differs from deterministic expected output".into(),
             );
         }
-        let reopened = Workbook::from_bytes(sink.bytes.clone())?;
+        let reopened = XlsxPackage::from_bytes(&sink.bytes)?;
         verify_xlsx_cells(&reopened, spec, updates)?;
         std::hint::black_box(&commit);
         if iteration >= warmup_iterations {
@@ -43936,7 +43911,7 @@ fn xlsx_cell_crud_eager_output(
     corpus: &Corpus,
     updates: &[XlsxCoordinate],
 ) -> Result<Vec<u8>, Box<dyn Error>> {
-    let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+    let workbook = XlsxPackage::from_bytes(&corpus.archive)?;
     let mut edit = workbook.edit()?;
     for coordinate in updates {
         let mut sheet = edit
@@ -43948,7 +43923,7 @@ fn xlsx_cell_crud_eager_output(
         )?;
     }
     let commit = edit.commit()?;
-    let output = commit.workbook().to_bytes()?;
+    let output = commit.package().to_bytes()?;
     verify_xlsx_cell_crud_output(corpus, &output, updates)?;
     Ok(output)
 }
@@ -43963,12 +43938,12 @@ fn xlsx_cell_lifecycle_target(spec: &XlsxCorpus) -> Result<XlsxCoordinate, Box<d
 }
 
 fn verify_xlsx_cell_lifecycle_output(
-    workbook: &Workbook,
+    workbook: &XlsxPackage,
     spec: &XlsxCorpus,
     target: XlsxCoordinate,
     remove: bool,
 ) -> Result<(), Box<dyn Error>> {
-    if workbook.len() != spec.sheet_count {
+    if workbook.workbook_ref().len() != spec.sheet_count {
         return Err("XLSX cell lifecycle output changed worksheet count".into());
     }
     let inventory = spec
@@ -43977,6 +43952,7 @@ fn verify_xlsx_cell_lifecycle_output(
         .ok_or("XLSX cell lifecycle output has no cell inventory")?;
     for sheet_index in 0..spec.sheet_count {
         let sheet = workbook
+            .workbook_ref()
             .sheet(xlsx_sheet_name(sheet_index).as_str())?
             .ok_or("XLSX cell lifecycle output is missing a worksheet")?;
         let expected_count = inventory
@@ -44023,7 +43999,7 @@ fn xlsx_cell_lifecycle_semantic_hash(
     target: XlsxCoordinate,
     remove: bool,
 ) -> Result<String, Box<dyn Error>> {
-    let workbook = Workbook::from_bytes(output.to_vec())?;
+    let workbook = XlsxPackage::from_bytes(output)?;
     verify_xlsx_cell_lifecycle_output(&workbook, spec, target, remove)?;
     let inventory = spec
         .cell_inventory
@@ -44051,7 +44027,7 @@ fn xlsx_cell_lifecycle_eager_output(
     target: XlsxCoordinate,
     remove: bool,
 ) -> Result<Vec<u8>, Box<dyn Error>> {
-    let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+    let workbook = XlsxPackage::from_bytes(&corpus.archive)?;
     let mut edit = workbook.edit()?;
     let mut sheet = edit
         .sheet(xlsx_sheet_name(target.sheet).as_str())?
@@ -44063,8 +44039,8 @@ fn xlsx_cell_lifecycle_eager_output(
         sheet.clear(address)?;
     }
     let commit = edit.commit()?;
-    let output = commit.workbook().to_bytes()?;
-    let reopened = Workbook::from_bytes(output.clone())?;
+    let output = commit.package().to_bytes()?;
+    let reopened = XlsxPackage::from_bytes(&output)?;
     verify_xlsx_cell_lifecycle_output(&reopened, spec, target, remove)?;
     verify_xlsx_cell_crud_package_identity(corpus, &output)?;
     Ok(output)
@@ -44077,7 +44053,7 @@ fn xlsx_cell_lifecycle_source_output(
     remove: bool,
 ) -> Result<Vec<u8>, Box<dyn Error>> {
     let source = Arc::new(OwnedSource::new(corpus.archive.clone()));
-    let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(source)?;
+    let editor = crate::xlsx_source_editors::SourceBackedEditor::from_read_at(source)?;
     let mut edit = editor.edit_sheets([litchi_xlsx::Selector::from(target.sheet)])?;
     let address =
         litchi_xlsx::Address::at(u32::try_from(target.row)?, u32::try_from(target.column)?)?;
@@ -44087,12 +44063,12 @@ fn xlsx_cell_lifecycle_source_output(
         edit.clear(target.sheet, address)?;
     }
     let commit = edit.commit()?;
-    if !commit.changed() || commit.diagnostics().changed_cells() != 1 {
+    if !commit.diagnostics().changed() || commit.diagnostics().changed_cells() != 1 {
         return Err("XLSX source cell lifecycle did not produce one change".into());
     }
     let mut output = Vec::new();
     editor.publish_multi_commit_to_stream(&mut output, &commit)?;
-    let reopened = Workbook::from_bytes(output.clone())?;
+    let reopened = XlsxPackage::from_bytes(&output)?;
     verify_xlsx_cell_lifecycle_output(&reopened, spec, target, remove)?;
     verify_xlsx_cell_crud_package_identity(corpus, &output)?;
     Ok(output)
@@ -44156,7 +44132,7 @@ fn run_xlsx_cell_lifecycle_edit_save(
                 .clone()
                 .expect("XLSX lifecycle source backing is present");
             let open_started = Instant::now();
-            let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(read_at)?;
+            let editor = crate::xlsx_source_editors::SourceBackedEditor::from_read_at(read_at)?;
             let open_duration = open_started.elapsed();
             let open_ns = elapsed_ns(open_duration)?;
             duration += open_duration;
@@ -44181,7 +44157,7 @@ fn run_xlsx_cell_lifecycle_edit_save(
             let commit_duration = commit_started.elapsed();
             let commit_ns = elapsed_ns(commit_duration)?;
             duration += commit_duration;
-            if !commit.changed() || commit.diagnostics().changed_cells() != 1 {
+            if !commit.diagnostics().changed() || commit.diagnostics().changed_cells() != 1 {
                 return Err("XLSX source lifecycle sample did not change one cell".into());
             }
             let diagnostics = editor.cache_diagnostics();
@@ -44238,7 +44214,7 @@ fn run_xlsx_cell_lifecycle_edit_save(
             }
         } else {
             let open_started = Instant::now();
-            let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+            let workbook = XlsxPackage::from_bytes(&corpus.archive)?;
             let open_duration = open_started.elapsed();
             let open_ns = elapsed_ns(open_duration)?;
             duration += open_duration;
@@ -44262,7 +44238,7 @@ fn run_xlsx_cell_lifecycle_edit_save(
             let commit_ns = elapsed_ns(commit_duration)?;
             duration += commit_duration;
             let publication_started = Instant::now();
-            commit.workbook().write_to(&mut sink)?;
+            commit.package().write_to(&mut sink)?;
             let publication_duration = publication_started.elapsed();
             let publication_ns = elapsed_ns(publication_duration)?;
             duration += publication_duration;
@@ -44312,7 +44288,7 @@ fn run_xlsx_cell_lifecycle_edit_save(
             return Err("XLSX cell lifecycle publication exceeded the fixed sink bound".into());
         }
         let reopen_started = Instant::now();
-        let reopened = Workbook::from_bytes(expected.clone())?;
+        let reopened = XlsxPackage::from_bytes(&expected)?;
         verify_xlsx_cell_lifecycle_output(&reopened, spec, target, remove)?;
         let reopen_ns = elapsed_ns(reopen_started.elapsed())?;
         source_evidence.reopen_ns = reopen_ns;
@@ -44425,7 +44401,7 @@ fn run_xlsx_row_visibility_edit_save(
                 .clone()
                 .expect("XLSX row-visibility source backing is present");
             let started = Instant::now();
-            let editor = litchi_xlsx::row_visibility::SourceBackedEditor::from_read_at(read_at)?;
+            let editor = crate::xlsx_source_editors::RowVisibilityEditor::from_read_at(read_at)?;
             let open_duration = started.elapsed();
             open_ns = elapsed_ns(open_duration)?;
             duration += open_duration;
@@ -44434,9 +44410,9 @@ fn run_xlsx_row_visibility_edit_save(
             let mut edit = editor.edit("Sheet1")?;
             edit.apply_batch(updates.iter().map(|(row, hidden)| {
                 if *hidden {
-                    litchi_xlsx::row_visibility::RowVisibilityEdit::hide(*row)
+                    litchi_xlsx::row_visibility::Change::hide(*row)
                 } else {
-                    litchi_xlsx::row_visibility::RowVisibilityEdit::unhide(*row)
+                    litchi_xlsx::row_visibility::Change::unhide(*row)
                 }
             }))?;
             let stage_duration = started.elapsed();
@@ -44448,7 +44424,9 @@ fn run_xlsx_row_visibility_edit_save(
             let commit_duration = started.elapsed();
             commit_ns = elapsed_ns(commit_duration)?;
             duration += commit_duration;
-            if !commit.changed() || commit.diagnostics().changed_rows() != updates.len() {
+            if !commit.diagnostics().changed()
+                || commit.diagnostics().changed_rows() != updates.len()
+            {
                 return Err("XLSX row-visibility sample changed an unexpected row count".into());
             }
             diagnostics = editor.cache_diagnostics();
@@ -44473,7 +44451,7 @@ fn run_xlsx_row_visibility_edit_save(
             source_version_calls = backing.version_calls();
         } else {
             let started = Instant::now();
-            let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+            let workbook = XlsxPackage::from_bytes(&corpus.archive)?;
             let open_duration = started.elapsed();
             open_ns = elapsed_ns(open_duration)?;
             duration += open_duration;
@@ -44501,7 +44479,7 @@ fn run_xlsx_row_visibility_edit_save(
             commit_ns = elapsed_ns(commit_duration)?;
             duration += commit_duration;
             let started = Instant::now();
-            commit.workbook().write_to(&mut sink)?;
+            commit.package().write_to(&mut sink)?;
             let publication_duration = started.elapsed();
             publication_ns = elapsed_ns(publication_duration)?;
             duration += publication_duration;
@@ -44761,19 +44739,23 @@ fn run_xlsx_cell_values_edit_save(
                 let payload_budget =
                     payload_budget.ok_or("XLSX managed cell CRUD payload budget is missing")?;
                 let (budget, context) = xlsx_cell_values_managed_context(payload_budget, maximum)?;
-                let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                    read_at,
-                    ReadLimits::default(),
-                    cache_limits,
-                    context,
-                )?;
+                let editor =
+                    crate::xlsx_source_editors::SourceBackedEditor::from_read_at_with_options(
+                        read_at,
+                        XlsxOpenOptions::new()
+                            .source_limits(SourceLimits::default())
+                            .cache_limits(cache_limits)
+                            .execution_context(context),
+                    )?;
                 (editor, Some(budget))
             } else {
-                let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at_with_limits_and_cache_limits(
-                    read_at,
-                    ReadLimits::default(),
-                    cache_limits,
-                )?;
+                let editor =
+                    crate::xlsx_source_editors::SourceBackedEditor::from_read_at_with_options(
+                        read_at,
+                        XlsxOpenOptions::new()
+                            .source_limits(SourceLimits::default())
+                            .cache_limits(cache_limits),
+                    )?;
                 (editor, None)
             };
             let open_duration = open_started.elapsed();
@@ -44889,6 +44871,8 @@ fn run_xlsx_cell_values_edit_save(
             if managed && budget_used_after_package_drop == 0 {
                 return Err("XLSX managed cell CRUD retained no payload reservation".into());
             }
+            // The workbook pins its catalog until it is dropped (record 0360).
+            drop(editor);
             let budget_used_after_handles_drop = opc_cache_budget_used(budget.as_ref());
             let budget_objects_used_after_handles_drop =
                 opc_cache_budget_objects_used(budget.as_ref());
@@ -44965,7 +44949,7 @@ fn run_xlsx_cell_values_edit_save(
             });
         } else {
             let open_started = Instant::now();
-            let workbook = Workbook::from_bytes(eager_source.expect("eager source exists"))?;
+            let workbook = XlsxPackage::from_bytes(&eager_source.expect("eager source exists"))?;
             duration += open_started.elapsed();
             let plan_started = Instant::now();
             let mut edit = workbook.edit()?;
@@ -44982,7 +44966,7 @@ fn run_xlsx_cell_values_edit_save(
             let commit = edit.commit()?;
             duration += commit_started.elapsed();
             let publication_started = Instant::now();
-            commit.workbook().write_to(&mut sink)?;
+            commit.package().write_to(&mut sink)?;
             duration += publication_started.elapsed();
         }
         if sink.bytes.is_empty() {
@@ -45052,7 +45036,7 @@ fn run_xlsx_cell_values_edit_save(
 }
 
 fn prepare_xlsx_merge_edit(
-    workbook: &Workbook,
+    workbook: &XlsxPackage,
     merge: bool,
 ) -> Result<litchi_xlsx::Edit, Box<dyn Error>> {
     let mut edit = workbook.edit()?;
@@ -45068,8 +45052,9 @@ fn prepare_xlsx_merge_edit(
 }
 
 fn verify_xlsx_merge_output(output: &[u8], merged: bool) -> Result<(), Box<dyn Error>> {
-    let workbook = Workbook::from_bytes(output.to_vec())?;
+    let workbook = XlsxPackage::from_bytes(output)?;
     let sheet = workbook
+        .workbook_ref()
         .sheet("Sheet1")?
         .ok_or("XLSX merge output is missing Sheet1")?;
     let ranges = sheet.merges()?.map(Rect::a1).collect::<Vec<_>>();
@@ -45114,11 +45099,11 @@ fn verify_xlsx_merge_output(output: &[u8], merged: bool) -> Result<(), Box<dyn E
 }
 
 fn verify_xlsx_merge_durable_patch(
-    source: &Workbook,
+    source: &XlsxPackage,
     commit: &litchi_xlsx::Commit,
     expected: &[u8],
 ) -> Result<(), Box<dyn Error>> {
-    if commit.patch().is_empty() || commit.patch().len() != 1 {
+    if commit.patch().is_noop() || commit.patch().operation_count() != 1 {
         return Err("XLSX merge edit produced an unexpected semantic patch".into());
     }
     let durable = commit.patch().durable()?;
@@ -45141,7 +45126,7 @@ fn verify_xlsx_merge_durable_patch(
         .sheet("Sheet1")?
         .ok_or("XLSX merge fixture is missing Sheet1")?
         .set("C1", "litchi-xlsx-merge-stale-v1")?;
-    let stale = stale_edit.commit()?.into_workbook();
+    let stale = stale_edit.commit()?.into_package();
     if parsed.apply(&stale).is_ok() {
         return Err("XLSX merge durable patch accepted a stale source".into());
     }
@@ -45167,7 +45152,7 @@ fn run_xlsx_merge_edit_save(
         return Err("XLSX merge corpus source bytes differ from its fixture".into());
     }
     let expected_commit = prepare_xlsx_merge_edit(&source, merge)?.commit()?;
-    let expected = expected_commit.workbook().to_bytes()?;
+    let expected = expected_commit.package().to_bytes()?;
     verify_xlsx_merge_output(&expected, merge)?;
     verify_xlsx_merge_durable_patch(&source, &expected_commit, &expected)?;
     let expected_digest = sha256_hex(&expected);
@@ -45176,13 +45161,13 @@ fn run_xlsx_merge_edit_save(
     let mut sink_summaries = Vec::with_capacity(samples);
 
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let workbook = Workbook::from_bytes(source_bytes.clone())?;
+        let workbook = XlsxPackage::from_bytes(&source_bytes)?;
         let edit = prepare_xlsx_merge_edit(&workbook, merge)?;
         let mut sink = CountingSink::bounded(maximum, 64 * 1024);
         sink.reserve_budget()?;
         let started = Instant::now();
         let commit = edit.commit()?;
-        commit.workbook().write_to(&mut sink)?;
+        commit.package().write_to(&mut sink)?;
         let duration = started.elapsed();
         if sink.bytes != expected {
             return Err("XLSX merge commit/save differs from deterministic output".into());
@@ -45248,7 +45233,7 @@ fn xlsx_edit_composition_coordinates(
 }
 
 fn prepare_xlsx_composition_branch(
-    workbook: &Workbook,
+    workbook: &XlsxPackage,
     coordinate: XlsxCoordinate,
     value: i32,
 ) -> Result<litchi_xlsx::Edit, Box<dyn Error>> {
@@ -45260,7 +45245,7 @@ fn prepare_xlsx_composition_branch(
 }
 
 fn prepare_xlsx_composition_branches(
-    workbook: &Workbook,
+    workbook: &XlsxPackage,
     left_coordinate: XlsxCoordinate,
     left_value: i32,
     right_coordinate: XlsxCoordinate,
@@ -45293,8 +45278,8 @@ fn verify_xlsx_edit_composition_cells(
     expected: &[(XlsxCoordinate, i32)],
 ) -> Result<(), Box<dyn Error>> {
     let spec = xlsx_spec(corpus)?;
-    let workbook = Workbook::from_bytes(output.to_vec())?;
-    if workbook.len() != spec.sheet_count {
+    let workbook = XlsxPackage::from_bytes(output)?;
+    if workbook.workbook_ref().len() != spec.sheet_count {
         return Err("XLSX composition output changed sheet count".into());
     }
     let inventory = spec
@@ -45303,6 +45288,7 @@ fn verify_xlsx_edit_composition_cells(
         .ok_or("XLSX composition corpus has no cell inventory")?;
     for sheet_index in 0..spec.sheet_count {
         let sheet = workbook
+            .workbook_ref()
             .sheet(xlsx_sheet_name(sheet_index).as_str())?
             .ok_or("XLSX composition output is missing source sheet")?;
         let coordinates = inventory
@@ -45334,7 +45320,7 @@ fn verify_xlsx_edit_composition_cells(
 
 fn verify_xlsx_edit_composition_commit(
     corpus: &Corpus,
-    source: &Workbook,
+    source: &XlsxPackage,
     commit: &litchi_xlsx::Commit,
     output: &[u8],
     expected: &[u8],
@@ -45344,7 +45330,7 @@ fn verify_xlsx_edit_composition_commit(
         return Err("XLSX composition output differs from deterministic output".into());
     }
     verify_xlsx_edit_composition_cells(corpus, output, expected_cells)?;
-    let reopened = Workbook::from_bytes(output.to_vec())?;
+    let reopened = XlsxPackage::from_bytes(output)?;
     verify_xlsx_edit_composition_cells(corpus, &reopened.to_bytes()?, expected_cells)?;
 
     let durable = commit.patch().durable()?;
@@ -45365,7 +45351,7 @@ fn verify_xlsx_edit_composition_commit(
     let stale =
         prepare_xlsx_composition_branch(source, expected_cells[0].0, expected_cells[0].1 + 99)?
             .commit()?
-            .into_workbook();
+            .into_package();
     if parsed.apply(&stale).is_ok() {
         return Err("XLSX composition durable patch accepted a stale source".into());
     }
@@ -45382,7 +45368,7 @@ fn verify_xlsx_edit_composition_commit(
         xlsx_value(foreign_coordinate) + 77,
     )?
     .commit()?
-    .into_workbook();
+    .into_package();
     if parsed.apply(&foreign).is_ok() {
         return Err("XLSX composition durable patch accepted a foreign source".into());
     }
@@ -45415,11 +45401,11 @@ fn run_xlsx_edit_composition(
             (right_coordinate, right_value),
         ]
     };
-    let source = Workbook::from_bytes(corpus.archive.clone())?;
+    let source = XlsxPackage::from_bytes(&corpus.archive)?;
     if source.to_bytes()? != corpus.archive {
         return Err("XLSX composition source round trip changed source bytes".into());
     }
-    let noop = source.edit()?.commit()?.into_workbook();
+    let noop = source.edit()?.commit()?.into_package();
     if noop.to_bytes()? != corpus.archive {
         return Err("XLSX composition exact no-op changed source bytes".into());
     }
@@ -45431,10 +45417,10 @@ fn run_xlsx_edit_composition(
         empty
             .join(incoming)
             .map_err(|error| format!("XLSX empty-transaction join identity failed: {error}"))?;
-        let joined_bytes = empty.commit()?.workbook().to_bytes()?;
+        let joined_bytes = empty.commit()?.package().to_bytes()?;
         let single_bytes = prepare_xlsx_composition_branch(&source, left_coordinate, left_value)?
             .commit()?
-            .workbook()
+            .package()
             .to_bytes()?;
         joined_bytes == single_bytes
     };
@@ -45443,7 +45429,7 @@ fn run_xlsx_edit_composition(
     }
     let different_snapshot_refusal_verified = {
         let mut local = prepare_xlsx_composition_branch(&source, left_coordinate, left_value)?;
-        let foreign_source = Workbook::from_bytes(corpus.archive.clone())?;
+        let foreign_source = XlsxPackage::from_bytes(&corpus.archive)?;
         let foreign =
             prepare_xlsx_composition_branch(&foreign_source, right_coordinate, right_value)?;
         let join_refused = match local.join(foreign) {
@@ -45452,7 +45438,7 @@ fn run_xlsx_edit_composition(
         };
 
         let local = prepare_xlsx_composition_branch(&source, left_coordinate, left_value)?;
-        let foreign_source = Workbook::from_bytes(corpus.archive.clone())?;
+        let foreign_source = XlsxPackage::from_bytes(&corpus.archive)?;
         let foreign =
             prepare_xlsx_composition_branch(&foreign_source, right_coordinate, right_value)?;
         let plan_refused = local.plan_three_way(foreign, merge_limits).is_err();
@@ -45478,8 +45464,8 @@ fn run_xlsx_edit_composition(
         }
         plan.resolve(MergeChoice::Neither);
         let commit = plan.finish()?.commit()?;
-        let bytes = commit.workbook().to_bytes()?;
-        Some(bytes == corpus.archive && commit.patch().is_empty())
+        let bytes = commit.package().to_bytes()?;
+        Some(bytes == corpus.archive && commit.patch().is_noop())
     } else {
         None
     };
@@ -45512,7 +45498,7 @@ fn run_xlsx_edit_composition(
             }
             right_plan.resolve(MergeChoice::Right);
             let right_commit = right_plan.finish()?.commit()?;
-            let right_output = right_commit.workbook().to_bytes()?;
+            let right_output = right_commit.package().to_bytes()?;
             let right_expected_cells = vec![(right_coordinate, right_value)];
             verify_xlsx_edit_composition_cells(corpus, &right_output, &right_expected_cells)?;
             let right_resolution_verified = right_output != corpus.archive;
@@ -45543,7 +45529,7 @@ fn run_xlsx_edit_composition(
                 left.join(right)
                     .map_err(|error| format!("XLSX disjoint join preflight failed: {error}"))?;
                 let commit = left.commit()?;
-                let expected = commit.workbook().to_bytes()?;
+                let expected = commit.package().to_bytes()?;
                 verify_xlsx_edit_composition_commit(
                     corpus,
                     &source,
@@ -45586,7 +45572,7 @@ fn run_xlsx_edit_composition(
                     return Err("XLSX disjoint three-way plan was not automatic".into());
                 }
                 let commit = plan.finish()?.commit()?;
-                let expected = commit.workbook().to_bytes()?;
+                let expected = commit.package().to_bytes()?;
                 verify_xlsx_edit_composition_commit(
                     corpus,
                     &source,
@@ -45611,7 +45597,7 @@ fn run_xlsx_edit_composition(
                 }
                 plan.resolve(MergeChoice::Left);
                 let commit = plan.finish()?.commit()?;
-                let expected = commit.workbook().to_bytes()?;
+                let expected = commit.package().to_bytes()?;
                 verify_xlsx_edit_composition_commit(
                     corpus,
                     &source,
@@ -45689,7 +45675,7 @@ fn run_xlsx_edit_composition(
                     CountingSink::bounded(maximum.ok_or("missing XLSX output ceiling")?, 64 * 1024);
                 sink.reserve_budget()?;
                 let started = Instant::now();
-                commit.workbook().write_to(&mut sink)?;
+                commit.package().write_to(&mut sink)?;
                 let duration = started.elapsed();
                 timed_ns = timed_ns
                     .checked_add(u128::from(elapsed_ns(duration)?))
@@ -45758,7 +45744,7 @@ fn run_xlsx_edit_composition(
                     CountingSink::bounded(maximum.ok_or("missing XLSX output ceiling")?, 64 * 1024);
                 sink.reserve_budget()?;
                 let started = Instant::now();
-                commit.workbook().write_to(&mut sink)?;
+                commit.package().write_to(&mut sink)?;
                 let duration = started.elapsed();
                 timed_ns = timed_ns
                     .checked_add(u128::from(elapsed_ns(duration)?))
@@ -45814,7 +45800,7 @@ fn run_xlsx_edit_composition(
                     CountingSink::bounded(maximum.ok_or("missing XLSX output ceiling")?, 64 * 1024);
                 sink.reserve_budget()?;
                 let started = Instant::now();
-                commit.workbook().write_to(&mut sink)?;
+                commit.package().write_to(&mut sink)?;
                 let duration = started.elapsed();
                 timed_ns = timed_ns
                     .checked_add(u128::from(elapsed_ns(duration)?))
@@ -45843,7 +45829,7 @@ fn run_xlsx_edit_composition(
                 if output != expected {
                     return Err("XLSX composition output digest gate failed".into());
                 }
-                let reopened = Workbook::from_bytes(output.to_vec())?;
+                let reopened = XlsxPackage::from_bytes(output)?;
                 verify_xlsx_edit_composition_cells(corpus, &reopened.to_bytes()?, &expected_cells)?;
                 Some(started.elapsed())
             } else {
@@ -46000,9 +45986,9 @@ fn xlsx_expected_output(
     corpus: &Corpus,
     updates: &[XlsxCoordinate],
 ) -> Result<Vec<u8>, Box<dyn Error>> {
-    let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+    let workbook = XlsxPackage::from_bytes(&corpus.archive)?;
     let commit = prepare_xlsx_updates(&workbook, updates)?.commit()?;
-    Ok(commit.workbook().to_bytes()?)
+    Ok(commit.package().to_bytes()?)
 }
 
 fn deterministic_sink_summary(
@@ -46030,7 +46016,10 @@ fn run_zip_index(
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
-        let archive = ArchiveReader::new(&corpus.archive)?;
+        let archive = ArchiveReader::new(
+            &corpus.archive,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )?;
         let observed = archive.file_names().count();
         std::hint::black_box(observed);
         let duration = started.elapsed();
@@ -46080,7 +46069,9 @@ fn run_detection_case(
         .detection_spec()
         .ok_or("non-detection case passed to detection runner")?;
     let expected = mode.expected_format(family);
-    let preflight = litchi::common::detection::detect_file_format_from_bytes(&corpus.archive);
+    let limits = litchi::common::SourceLimits::default();
+    let preflight =
+        litchi::common::detection::detect_file_format_from_bytes(&corpus.archive, &limits);
     if preflight != Some(expected) {
         return Err(format!(
             "{} detection preflight differs from expected {}: {:?}",
@@ -46102,7 +46093,8 @@ fn run_detection_case(
                 let mut reader = Cursor::new(corpus.archive.as_slice());
                 reader.set_position(original_position);
                 let started = Instant::now();
-                let observed = litchi::common::detection::detect_format_from_reader(&mut reader);
+                let observed =
+                    litchi::common::detection::detect_format_from_reader(&mut reader, &limits);
                 let duration = started.elapsed();
                 (
                     observed,
@@ -46112,8 +46104,10 @@ fn run_detection_case(
             },
             DetectionMode::Bytes | DetectionMode::Polyglot | DetectionMode::CatalogAlias => {
                 let started = Instant::now();
-                let observed =
-                    litchi::common::detection::detect_file_format_from_bytes(&corpus.archive);
+                let observed = litchi::common::detection::detect_file_format_from_bytes(
+                    &corpus.archive,
+                    &limits,
+                );
                 let duration = started.elapsed();
                 (observed, duration, None)
             },
@@ -46147,7 +46141,10 @@ fn run_zip_read_one(
     warmup_iterations: usize,
     samples: usize,
 ) -> Result<CaseResult, Box<dyn Error>> {
-    let archive = ArchiveReader::new(&corpus.archive)?;
+    let archive = ArchiveReader::new(
+        &corpus.archive,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
     let mut elapsed = Vec::with_capacity(samples);
     let mut observations = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
@@ -46291,7 +46288,7 @@ fn xlsx_cell_values_payload_budget(
     corpus: &Corpus,
     updates: &[XlsxCoordinate],
 ) -> Result<usize, Box<dyn Error>> {
-    let package = OpcPackage::from_bytes(&corpus.archive)?;
+    let package = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     let mut names = BTreeSet::new();
     names.insert("/xl/workbook.xml".to_owned());
     for coordinate in updates {
@@ -46456,13 +46453,13 @@ fn xlsx_cell_values_output_refusal_replay(
     let probe_version = probe_source.version()?;
     let (probe_budget, probe_context) =
         xlsx_cell_values_managed_probe_context(payload_budget, successful_output_ceiling)?;
-    let probe_editor =
-        litchi_xlsx::cell_values::SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            probe_source.clone(),
-            ReadLimits::default(),
-            cache_limits,
-            probe_context,
-        )?;
+    let probe_editor = crate::xlsx_source_editors::SourceBackedEditor::from_read_at_with_options(
+        probe_source.clone(),
+        XlsxOpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .cache_limits(cache_limits)
+            .execution_context(probe_context),
+    )?;
     let selectors = xlsx_update_sheet_selectors(updates);
     let mut probe_edit = probe_editor.edit_sheets(selectors)?;
     for coordinate in updates {
@@ -46488,6 +46485,7 @@ fn xlsx_cell_values_output_refusal_replay(
         return Err("XLSX managed output refusal probe changed source identity".into());
     }
     drop(probe_commit);
+    drop(probe_editor);
     if probe_budget.used(Resource::OutputBytes) != 0 {
         return Err("XLSX managed output refusal probe charged rejected output".into());
     }
@@ -46505,13 +46503,13 @@ fn xlsx_cell_values_output_refusal_replay(
     let refusal_version = refusal_source.version()?;
     let (refusal_budget, refusal_context) =
         xlsx_cell_values_managed_probe_context(payload_budget, one_under_output_limit)?;
-    let refusal_editor =
-        litchi_xlsx::cell_values::SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            refusal_source.clone(),
-            ReadLimits::default(),
-            cache_limits,
-            refusal_context,
-        )?;
+    let refusal_editor = crate::xlsx_source_editors::SourceBackedEditor::from_read_at_with_options(
+        refusal_source.clone(),
+        XlsxOpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .cache_limits(cache_limits)
+            .execution_context(refusal_context),
+    )?;
     let selectors = xlsx_update_sheet_selectors(updates);
     let mut refusal_edit = refusal_editor.edit_sheets(selectors)?;
     for coordinate in updates {
@@ -47362,24 +47360,24 @@ fn opc_cache_package(
 ) -> Result<(Arc<SourceBackedPackage>, Option<Budget>), Box<dyn Error>> {
     match mode {
         OpcCacheMode::Control => Ok((
-            Arc::new(
-                SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
-                    source,
-                    ReadLimits::default(),
-                    cache_limits,
-                )?,
-            ),
+            Arc::new(SourceBackedPackage::from_read_at(
+                source,
+                SourceLimits::default(),
+                cache_limits,
+                litchi_opc::SourceReadPolicy::exact(),
+                None,
+            )?),
             None,
         )),
         OpcCacheMode::Managed => {
             let (budget, context) = opc_cache_context(memory_limit, worker_count)?;
-            let package =
-                SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                    source,
-                    ReadLimits::default(),
-                    cache_limits,
-                    context,
-                )?;
+            let package = SourceBackedPackage::from_read_at(
+                source,
+                SourceLimits::default(),
+                cache_limits,
+                litchi_opc::SourceReadPolicy::exact(),
+                Some(context),
+            )?;
             Ok((Arc::new(package), Some(budget)))
         },
     }
@@ -48284,8 +48282,13 @@ fn run_opc_range_source_open(
         let (backing, _target_range) = opc_instrumented_source(corpus)?;
         let source = simulated_source(backing.clone(), config);
         let started = Instant::now();
-        let package =
-            SourceBackedPackage::from_read_at_with_cache_limits(source.clone(), cache_limits)?;
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            litchi_opc::SourceLimits::default(),
+            cache_limits,
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         if package.iter_parts().count() != corpus.manifest.entry_count {
             return Err("simulated OPC source open part count differs from manifest".into());
         }
@@ -48424,8 +48427,13 @@ fn run_opc_source_open(
         let (source, _target_range) = opc_instrumented_source(corpus)?;
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
-        let package =
-            SourceBackedPackage::from_read_at_with_cache_limits(source.clone(), cache_limits)?;
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            litchi_opc::SourceLimits::default(),
+            cache_limits,
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         if package.iter_parts().count() != corpus.manifest.entry_count {
             return Err("source-backed OPC part count differs from corpus manifest".into());
         }
@@ -48805,7 +48813,7 @@ fn run_opc_serial_eager_open(
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
-        let package = OpcPackage::from_bytes(&corpus.archive)?;
+        let package = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
         let duration = started.elapsed();
         let allocation_metrics = match allocation_region.finish() {
             Some(sample) => Some(sample),
@@ -48947,8 +48955,13 @@ fn run_opc_source_materialize_variant(
 
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let (source, _target_range) = opc_instrumented_source(corpus)?;
-        let package =
-            SourceBackedPackage::from_read_at_with_cache_limits(source.clone(), cache_limits)?;
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            litchi_opc::SourceLimits::default(),
+            cache_limits,
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         if package.iter_parts().count() != corpus.manifest.entry_count {
             return Err("OPC source materialization opened an unexpected part count".into());
         }
@@ -49059,8 +49072,13 @@ fn run_opc_source_cached_main_read(
     let mut source_summary = SourceSummary::default();
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let (source, _target_range) = opc_instrumented_source(corpus)?;
-        let package =
-            SourceBackedPackage::from_read_at_with_cache_limits(source.clone(), cache_limits)?;
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            litchi_opc::SourceLimits::default(),
+            cache_limits,
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         let cold = verify_opc_main_payload(&package, corpus)?;
         source.reset();
         let allocation_region = allocation_metrics::begin();
@@ -49109,8 +49127,13 @@ fn run_opc_source_concurrent_same_part(
     let mut source_summary = SourceSummary::default();
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let (source, _target_range) = opc_instrumented_source(corpus)?;
-        let package =
-            SourceBackedPackage::from_read_at_with_cache_limits(source.clone(), cache_limits)?;
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            litchi_opc::SourceLimits::default(),
+            cache_limits,
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         if package.main_document_part()?.partname().membername() != corpus.target_name {
             return Err("source-backed OPC main relationship resolved the wrong part".into());
         }
@@ -49195,7 +49218,7 @@ fn expected_opc_overlay_output(
     replacement: &[u8],
 ) -> Result<Vec<u8>, Box<dyn Error>> {
     let target_uri = PackURI::new(format!("/{}", corpus.target_name))?;
-    let mut package = OpcPackage::from_bytes(&corpus.archive)?;
+    let mut package = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     package
         .get_part_mut(&target_uri)?
         .set_blob(replacement.to_vec());
@@ -49207,7 +49230,7 @@ fn verify_opc_overlay_output(
     output: &[u8],
     replacement: &[u8],
 ) -> Result<(), Box<dyn Error>> {
-    let package = OpcPackage::from_bytes(output)?;
+    let package = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     if package.part_count() != corpus.manifest.entry_count {
         return Err("OPC overlay output part count differs from source corpus".into());
     }
@@ -49271,8 +49294,13 @@ fn run_opc_source_overlay_one_part_save(
         let mut sink = CountingSink::bounded(maximum, 64 * 1024);
         sink.reserve_budget()?;
         let started = Instant::now();
-        let source_package =
-            SourceBackedPackage::from_read_at_with_cache_limits(source.clone(), cache_limits)?;
+        let source_package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            litchi_opc::SourceLimits::default(),
+            cache_limits,
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         source_package.write_part_overlay_to_stream_with_accounting(
             &mut sink,
             &target_uri,
@@ -49400,7 +49428,7 @@ fn expected_opc_multi_overlay_output(
     if !replacements.iter().any(|replacement| replacement.changed) {
         return Ok(corpus.archive.clone());
     }
-    let mut package = OpcPackage::from_bytes(&corpus.archive)?;
+    let mut package = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     for replacement in replacements {
         package
             .get_part_mut(&replacement.partname)?
@@ -49413,8 +49441,8 @@ fn verify_opc_multi_overlay_semantics(
     expected: &[u8],
     output: &[u8],
 ) -> Result<(), Box<dyn Error>> {
-    let expected_package = OpcPackage::from_bytes(expected)?;
-    let output_package = OpcPackage::from_bytes(output)?;
+    let expected_package = OpcPackage::from_bytes(expected, litchi_opc::SourceLimits::default())?;
+    let output_package = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     if output_package.part_count() != expected_package.part_count() {
         return Err("multi-Part OPC overlay output part count differs from eager artifact".into());
     }
@@ -49449,8 +49477,9 @@ fn verify_opc_multi_overlay_changes(
     output: &[u8],
     replacements: &[OpcOverlayReplacement],
 ) -> Result<(), Box<dyn Error>> {
-    let source_package = OpcPackage::from_bytes(&corpus.archive)?;
-    let output_package = OpcPackage::from_bytes(output)?;
+    let source_package =
+        OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+    let output_package = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     let mut changed_count = 0usize;
     for replacement in replacements {
         let source_payload = source_package.get_part(&replacement.partname)?.blob();
@@ -49608,8 +49637,13 @@ fn run_opc_source_overlay_multi_part(
         let preparation_duration = preparation_started.elapsed();
 
         let open_started = Instant::now();
-        let source_package =
-            SourceBackedPackage::from_read_at_with_cache_limits(source.clone(), cache_limits)?;
+        let source_package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            litchi_opc::SourceLimits::default(),
+            cache_limits,
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         if source_package.iter_parts().count() != corpus.manifest.entry_count {
             return Err("multi-Part OPC source open part count differs from corpus".into());
         }
@@ -49672,8 +49706,13 @@ fn run_opc_source_overlay_multi_part(
         verify_opc_multi_overlay_semantics(&expected, &sink.bytes)?;
         verify_opc_multi_overlay_changes(corpus, &sink.bytes, &replacements)?;
         verify_opc_multi_overlay_preservation(corpus, &sink.bytes, &replacements)?;
-        let source_cache_probe =
-            SourceBackedPackage::from_read_at_with_cache_limits(source.clone(), cache_limits)?;
+        let source_cache_probe = SourceBackedPackage::from_read_at(
+            source.clone(),
+            litchi_opc::SourceLimits::default(),
+            cache_limits,
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         for replacement in &replacements {
             let data = source_cache_probe.part(&replacement.partname)?.data()?;
             std::hint::black_box(data.as_bytes());
@@ -49693,9 +49732,12 @@ fn run_opc_source_overlay_multi_part(
         }
         let reopened_output_source: Arc<dyn ReadAt> =
             Arc::new(OwnedSource::new(sink.bytes.clone()));
-        let reopened_output_package = SourceBackedPackage::from_read_at_with_cache_limits(
+        let reopened_output_package = SourceBackedPackage::from_read_at(
             reopened_output_source,
+            litchi_opc::SourceLimits::default(),
             cache_limits,
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
         )?;
         let reopened_output_cache = reopened_output_package.cache_diagnostics();
         if reopened_output_cache.hits != 0
@@ -49921,8 +49963,8 @@ fn verify_docx_source_edit_output(corpus: &Corpus, output: &[u8]) -> Result<(), 
     let document = litchi_docx::Package::from_reader(Cursor::new(output))?;
     verify_semantic_docx(&document, SemanticShape::Medium, &[target])?;
 
-    let source = OpcPackage::from_bytes(&corpus.archive)?;
-    let candidate = OpcPackage::from_bytes(output)?;
+    let source = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+    let candidate = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     if source.part_count() != corpus.manifest.entry_count
         || candidate.part_count() != source.part_count()
         || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
@@ -50016,8 +50058,8 @@ fn verify_docx_section_layout_output(
     let snapshot = reopened.section_layout_snapshot()?;
     verify_docx_section_layout_snapshot(&snapshot, expected_columns)?;
 
-    let source = OpcPackage::from_bytes(&corpus.archive)?;
-    let candidate = OpcPackage::from_bytes(output)?;
+    let source = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+    let candidate = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     if source.part_count() != corpus.manifest.entry_count
         || candidate.part_count() != source.part_count()
         || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
@@ -50140,20 +50182,28 @@ fn verify_docx_section_layout_output(
 fn publish_docx_source_edit<W: Write>(
     source: Arc<dyn ReadAt>,
     writer: W,
-) -> Result<(usize, litchi_docx::document::Commit), Box<dyn Error>> {
+) -> Result<
+    (
+        usize,
+        litchi_docx::document::Commit<litchi_docx::source_backed::Package>,
+    ),
+    Box<dyn Error>,
+> {
     let package = litchi_docx::source_backed::Package::from_read_at(source)?;
     let target = SemanticShape::Medium.docx_paragraphs() / 2;
-    let mut edit = package.edit_document()?;
+    let mut edit = package.edit()?;
     edit.replace_paragraph_text(Position::new(target), semantic_docx_text(target, true))?;
     let commit = edit.commit()?;
-    if !commit.patch().changed() || commit.diagnostics().operations() != 1 {
+    if commit.patch().is_noop() || commit.diagnostics().operations() != 1 {
         return Err("DOCX source edit produced unexpected commit diagnostics".into());
     }
     let materializations = usize::try_from(package.cache_diagnostics().successful_loads)?;
-    let published = package.publish_document_commit_to_stream(writer, &commit)?;
-    if published.xml_bytes() != commit.snapshot().xml_bytes() {
-        return Err("DOCX source edit published a different snapshot".into());
-    }
+    // Record 0355a: the detached commit replays onto the package, and the
+    // committed package is written; callers compare the output bytes.
+    package
+        .apply(commit.patch())?
+        .into_package()
+        .write_to(writer)?;
     Ok((materializations, commit))
 }
 
@@ -50203,14 +50253,14 @@ fn run_docx_source_backed_one_edit_save(
             return Err("DOCX source edit differs between iterations".into());
         }
         let replayed = commit.patch().apply(commit.patch().source())?;
-        if replayed.xml_bytes() != commit.snapshot().xml_bytes() {
+        if replayed.xml_bytes() != commit.patch().target().xml_bytes() {
             return Err("DOCX source-edit patch replay differs from commit".into());
         }
-        let restored = commit.patch().inverse().apply(commit.snapshot())?;
+        let restored = commit.patch().inverse().apply(commit.patch().target())?;
         if restored.xml_bytes() != commit.patch().source().xml_bytes() {
             return Err("DOCX source-edit inverse did not restore main XML".into());
         }
-        if commit.patch().apply(commit.snapshot()).is_ok() {
+        if commit.patch().apply(commit.patch().target()).is_ok() {
             return Err("DOCX source-edit patch accepted a stale target".into());
         }
         verify_docx_source_edit_output(corpus, &sink.bytes)?;
@@ -50278,8 +50328,12 @@ fn docx_section_layout_signed_archive(corpus: &Corpus) -> Result<Vec<u8>, Box<dy
     // This is an explicitly test-only signed fixture builder.  It rewrites the
     // raw ZIP rather than invoking PackageWriter, whose normal authoring path
     // must reject introducing signature infrastructure without a policy.
-    let archive = ArchiveReader::new(&corpus.archive)?;
-    let mut writer = StreamingArchiveWriter::new();
+    let archive = ArchiveReader::new(
+        &corpus.archive,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     let root_relationship = format!(
         r#"<Relationship Id="rIdSectionLayoutSignature" Type="{}" Target="_xmlsignatures/origin.sigs"/>"#,
         relationship_type::DIGITAL_SIGNATURE_ORIGIN
@@ -50321,7 +50375,7 @@ fn docx_section_layout_signed_archive(corpus: &Corpus) -> Result<Vec<u8>, Box<dy
     }
     writer.write_stored("_xmlsignatures/origin.sigs", b"<origin/>")?;
     let signed = writer.finish_to_bytes()?;
-    if !OpcPackage::from_bytes(&signed)?.is_signed() {
+    if !OpcPackage::from_bytes(&signed, litchi_opc::SourceLimits::default())?.is_signed() {
         return Err("DOCX section-layout signed fixture was not classified as signed".into());
     }
     Ok(signed)
@@ -50329,23 +50383,22 @@ fn docx_section_layout_signed_archive(corpus: &Corpus) -> Result<Vec<u8>, Box<dy
 
 fn verify_docx_section_layout_controls(
     corpus: &Corpus,
-    commit: &litchi_docx::section::layout::Commit,
-    publication: &litchi_docx::section::layout::Publication,
+    publication: &litchi_docx::source_backed::section_layout::Commit,
 ) -> Result<(), Box<dyn Error>> {
     let noop_package = litchi_docx::source_backed::Package::from_read_at(Arc::new(
         OwnedSource::new(corpus.archive.clone()),
     ))?;
-    let noop_snapshot = noop_package.section_layout_snapshot()?;
-    let noop = noop_snapshot
-        .edit(litchi_docx::section::Selector::paragraph(Position::new(
-            DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0],
-        )))?
-        .commit()?;
+    let noop_edit = noop_package.edit_section_layout(litchi_docx::section::Selector::paragraph(
+        Position::new(DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0]),
+    ))?;
+    let noop = noop_edit.commit()?;
     if !noop.patch().is_noop() {
         return Err("DOCX section-layout no-op control produced a changed patch".into());
     }
     let mut noop_output = Vec::new();
-    noop_package.publish_section_layout_commit_to_stream(&mut noop_output, &noop)?;
+    noop_package
+        .apply_section_layout(noop.patch())
+        .and_then(|committed| committed.package().write_to(&mut noop_output))?;
     if noop_output != corpus.archive {
         return Err("DOCX section-layout no-op publication changed source bytes".into());
     }
@@ -50353,13 +50406,16 @@ fn verify_docx_section_layout_controls(
     let foreign = litchi_docx::source_backed::Package::from_read_at(Arc::new(OwnedSource::new(
         corpus.archive.clone(),
     )))?;
+    // Record 0355a: a detached record patch replays by content, so another
+    // package holding the same source bytes publishes the same artifact.
     let mut foreign_output = Vec::new();
-    if !matches!(
-        foreign.publish_section_layout_commit_to_stream(&mut foreign_output, commit),
-        Err(litchi_docx::Error::SectionLayoutForeignSource)
-    ) || !foreign_output.is_empty()
-    {
-        return Err("DOCX section-layout foreign-source refusal is not typed".into());
+    foreign
+        .apply_section_layout(publication.patch())
+        .and_then(|committed| committed.package().write_to(&mut foreign_output))?;
+    let mut expected_output = Vec::new();
+    publication.package().write_to(&mut expected_output)?;
+    if foreign_output != expected_output {
+        return Err("DOCX section-layout content replay differs from the commit".into());
     }
 
     let stale = litchi_docx::source_backed::Package::from_read_at(Arc::new(OwnedSource::new(
@@ -50367,8 +50423,10 @@ fn verify_docx_section_layout_controls(
     )))?;
     let mut stale_output = Vec::new();
     if !matches!(
-        stale.publish_section_layout_inverse_to_stream(&mut stale_output, publication),
-        Err(litchi_docx::Error::SectionLayoutStaleSource)
+        stale
+            .apply_section_layout(&publication.patch().inverse())
+            .and_then(|committed| committed.package().write_to(&mut stale_output)),
+        Err(litchi_docx::Error::PatchConflict { .. })
     ) || !stale_output.is_empty()
     {
         return Err("DOCX section-layout stale-source refusal is not typed".into());
@@ -50378,18 +50436,18 @@ fn verify_docx_section_layout_controls(
     let signed_noop = litchi_docx::source_backed::Package::from_read_at(Arc::new(
         OwnedSource::new(signed_archive.clone()),
     ))?;
-    let signed_noop_snapshot = signed_noop.section_layout_snapshot()?;
-    let signed_noop_commit = signed_noop_snapshot
-        .edit(litchi_docx::section::Selector::paragraph(Position::new(
-            DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0],
-        )))?
-        .commit()?;
+    let signed_noop_edit =
+        signed_noop.edit_section_layout(litchi_docx::section::Selector::paragraph(
+            Position::new(DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0]),
+        ))?;
+    let signed_noop_commit = signed_noop_edit.commit()?;
     if !signed_noop_commit.patch().is_noop() {
         return Err("DOCX section-layout signed no-op control produced a changed patch".into());
     }
     let mut signed_noop_output = Vec::new();
     signed_noop
-        .publish_section_layout_commit_to_stream(&mut signed_noop_output, &signed_noop_commit)?;
+        .apply_section_layout(signed_noop_commit.patch())
+        .and_then(|committed| committed.package().write_to(&mut signed_noop_output))?;
     if signed_noop_output != signed_archive {
         return Err("DOCX section-layout signed no-op changed source bytes".into());
     }
@@ -50397,8 +50455,7 @@ fn verify_docx_section_layout_controls(
     let signed = litchi_docx::source_backed::Package::from_read_at(Arc::new(OwnedSource::new(
         signed_archive,
     )))?;
-    let signed_snapshot = signed.section_layout_snapshot()?;
-    let mut signed_edit = signed_snapshot.edit(litchi_docx::section::Selector::paragraph(
+    let mut signed_edit = signed.edit_section_layout(litchi_docx::section::Selector::paragraph(
         Position::new(DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0]),
     ))?;
     signed_edit.set_columns(Some(litchi_docx::section::Columns {
@@ -50411,7 +50468,9 @@ fn verify_docx_section_layout_controls(
     let signed_commit = signed_edit.commit()?;
     let mut signed_output = Vec::new();
     if !matches!(
-        signed.publish_section_layout_commit_to_stream(&mut signed_output, &signed_commit),
+        signed
+            .apply_section_layout(signed_commit.patch())
+            .and_then(|committed| committed.package().write_to(&mut signed_output)),
         Err(litchi_docx::Error::Opc(
             OpcError::SignedSourceRequiresExplicitPolicy
         ))
@@ -50424,10 +50483,14 @@ fn verify_docx_section_layout_controls(
         corpus.archive.clone(),
     )))?;
     if !matches!(
-        limited.section_layout_snapshot_with_limits(&litchi_docx::section::Limits {
-            max_section_bytes: 1,
-            ..litchi_docx::section::Limits::default()
-        }),
+        limited
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().sections(
+                litchi_docx::section::Limits {
+                    max_section_bytes: 1,
+                    ..litchi_docx::section::Limits::default()
+                }
+            ))
+            .section_layout_snapshot(),
         Err(litchi_docx::Error::SectionInventoryLimit { .. })
     ) {
         return Err("DOCX section-layout section limit refusal is not typed".into());
@@ -50436,10 +50499,10 @@ fn verify_docx_section_layout_controls(
     let partial = litchi_docx::source_backed::Package::from_read_at(Arc::new(OwnedSource::new(
         corpus.archive.clone(),
     )))?;
-    let partial_snapshot = partial.section_layout_snapshot()?;
-    let mut partial_edit = partial_snapshot.edit(litchi_docx::section::Selector::paragraph(
-        Position::new(DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0]),
-    ))?;
+    let mut partial_edit =
+        partial.edit_section_layout(litchi_docx::section::Selector::paragraph(Position::new(
+            DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0],
+        )))?;
     partial_edit.set_columns(Some(litchi_docx::section::Columns {
         equal_width: true,
         count: 3,
@@ -50453,7 +50516,9 @@ fn verify_docx_section_layout_controls(
         limit: 128,
     };
     if !matches!(
-        partial.publish_section_layout_commit_to_stream(&mut partial_sink, &partial_commit),
+        partial
+            .apply_section_layout(partial_commit.patch())
+            .and_then(|committed| committed.package().write_to(&mut partial_sink)),
         Err(litchi_docx::Error::Opc(OpcError::IncompleteOutput { .. }))
     ) || partial_sink.accepted != 128
     {
@@ -50782,9 +50847,10 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
     ))?;
     let expected_snapshot = expected_package.section_layout_snapshot()?;
     verify_docx_section_layout_snapshot(&expected_snapshot, [2, 2, 2])?;
-    let mut expected_edit = expected_snapshot.edit(litchi_docx::section::Selector::paragraph(
-        Position::new(DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0]),
-    ))?;
+    let mut expected_edit =
+        expected_package.edit_section_layout(litchi_docx::section::Selector::paragraph(
+            Position::new(DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0]),
+        ))?;
     expected_edit.set_columns(Some(litchi_docx::section::Columns {
         equal_width: true,
         count: 3,
@@ -50793,14 +50859,16 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
         columns: Vec::new(),
     }))?;
     let expected_commit = expected_edit.commit()?;
-    if !expected_commit.patch().changed() || expected_commit.patch().is_noop() {
+    if expected_commit.patch().is_noop() {
         return Err("DOCX section-layout expected commit is not changed".into());
     }
     let mut expected_output = Vec::new();
-    let expected_publication = expected_package
-        .publish_section_layout_commit_to_stream(&mut expected_output, &expected_commit)?;
+    let expected_publication = expected_package.apply_section_layout(expected_commit.patch())?;
+    expected_publication
+        .package()
+        .write_to(&mut expected_output)?;
     verify_docx_section_layout_output(corpus, &expected_output, [3, 2, 2])?;
-    verify_docx_section_layout_controls(corpus, &expected_commit, &expected_publication)?;
+    verify_docx_section_layout_controls(corpus, &expected_publication)?;
     let expected_digest = sha256_hex(&expected_output);
     let maximum = u64::try_from(expected_output.len())?
         .checked_mul(2)
@@ -51008,6 +51076,9 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
             DocxIngressRoute::OwnedVec => {
                 let opc = SourceBackedPackage::from_vec(
                     owned_input.expect("owned-vector route prepares its input"),
+                    litchi_opc::SourceLimits::default(),
+                    litchi_opc::SourceCacheLimits::default(),
+                    None,
                 )?;
                 litchi_docx::source_backed::Package::from_source_backed_package(opc)?
             },
@@ -51037,9 +51108,9 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
         let query_ns = elapsed_ns(query_started.elapsed())?;
 
         let edit_started = Instant::now();
-        let mut edit = snapshot.edit(litchi_docx::section::Selector::paragraph(Position::new(
-            DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0],
-        )))?;
+        let mut edit = package.edit_section_layout(litchi_docx::section::Selector::paragraph(
+            Position::new(DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0]),
+        ))?;
         edit.set_columns(Some(litchi_docx::section::Columns {
             equal_width: true,
             count: 3,
@@ -51057,7 +51128,8 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
         let before_publication_after_commit = package.cache_diagnostics();
 
         let publication_started = Instant::now();
-        let publication = package.publish_section_layout_commit_to_stream(&mut sink, &commit)?;
+        let publication = package.apply_section_layout(commit.patch())?;
+        publication.package().write_to(&mut sink)?;
         std::hint::black_box(&publication);
         let publication_ns = elapsed_ns(publication_started.elapsed())?;
         let total_ns = preparation_ns
@@ -51120,28 +51192,37 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
         let operation_end_source_observation = source.as_ref().map(|source| source.snapshot());
 
         verify_docx_section_layout_snapshot(&snapshot, [2, 2, 2])?;
-        if !commit.patch().changed()
-            || commit.patch().is_noop()
-            || commit.snapshot().inventory().sections()[0]
+        if commit.patch().is_noop()
+            || publication
+                .package()
+                .section_layout_snapshot()?
+                .inventory()
+                .sections()[0]
                 .columns()
                 .map(|columns| columns.count)
                 != Some(3)
         {
             return Err("DOCX section-layout commit changed an unexpected section".into());
         }
-        let replayed = commit.patch().apply(&snapshot)?;
-        let restored = commit.patch().inverse().apply(&replayed)?;
-        if restored.inventory().sections() != snapshot.inventory().sections()
-            || commit.patch().apply(commit.snapshot()).is_ok()
-        {
-            return Err("DOCX section-layout patch forward/inverse/stale oracle failed".into());
-        }
-        if publication
-            .inverse_patch()
-            .apply(publication.snapshot())
-            .is_err()
-        {
-            return Err("DOCX section-layout publication inverse patch is not applicable".into());
+        let raw_patch = snapshot.raw_tree_at(
+            litchi_docx::section::Selector::paragraph(Position::new(
+                DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0],
+            )),
+            &litchi_docx::section::Limits::default(),
+        )?;
+        let mut raw_patch = raw_patch;
+        raw_patch.set_columns(Some(litchi_docx::section::Columns {
+            equal_width: true,
+            count: 3,
+            space: Some(litchi_docx::section::Emu::from_twips(240)),
+            separator: true,
+            columns: Vec::new(),
+        }))?;
+        let raw_patch = raw_patch.patch()?;
+        let replayed = raw_patch.apply(&snapshot)?;
+        let restored = raw_patch.inverse().apply(&replayed)?;
+        if restored.inventory().sections() != snapshot.inventory().sections() {
+            return Err("DOCX section-layout raw patch forward/inverse oracle failed".into());
         }
         if sink.bytes != expected_output {
             return Err("DOCX section-layout publication differs from expected output".into());
@@ -51151,7 +51232,10 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
             OwnedSource::new(sink.bytes.clone()),
         ))?;
         let mut restored_output = Vec::new();
-        reopened.publish_section_layout_inverse_to_stream(&mut restored_output, &publication)?;
+        reopened
+            .apply_section_layout(&publication.patch().inverse())?
+            .package()
+            .write_to(&mut restored_output)?;
         if restored_output != corpus.archive {
             return Err("DOCX section-layout inverse publication did not restore source".into());
         }
@@ -51489,8 +51573,8 @@ fn verify_pptx_source_edit_output(
     let reopened = litchi_pptx::Package::from_bytes(output)?;
     verify_pptx_source_edit_semantics(&reopened, updated_shapes)?;
 
-    let source = OpcPackage::from_bytes(&corpus.archive)?;
-    let candidate = OpcPackage::from_bytes(output)?;
+    let source = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+    let candidate = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     if source.part_count() != corpus.manifest.entry_count
         || candidate.part_count() != source.part_count()
         || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
@@ -51541,8 +51625,8 @@ fn verify_pptx_multi_slide_edit_output(
     let reopened = litchi_pptx::Package::from_bytes(output)?;
     verify_pptx_source_edit_semantics_for(&reopened, &updated)?;
 
-    let source = OpcPackage::from_bytes(&corpus.archive)?;
-    let candidate = OpcPackage::from_bytes(output)?;
+    let source = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+    let candidate = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     if source.part_count() != corpus.manifest.entry_count
         || candidate.part_count() != source.part_count()
         || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
@@ -51584,26 +51668,31 @@ fn publish_pptx_source_edit<W: Write>(
     source: Arc<dyn ReadAt>,
     writer: &mut W,
 ) -> Result<usize, Box<dyn Error>> {
-    let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at(source)?;
+    let presentation = litchi_pptx::SourceBackedPresentation::from_read_at(source)?;
+    let package = litchi_pptx::source::Package::from_presentation(&presentation)?;
     let target_slide = PPTX_SOURCE_SLIDE_COUNT / 2;
-    let mut edit = editor.edit_slide(target_slide)?;
-    if !edit.set_shape_text(0, semantic_pptx_text(target_slide, 0, true))? {
+    let mut edit = package.edit()?;
+    if !edit.set_shape_text(
+        target_slide,
+        0_usize,
+        semantic_pptx_text(target_slide, 0, true),
+    )? {
         return Err("PPTX source edit unexpectedly reported no change".into());
     }
-    let commit = edit.commit();
-    if !commit.is_changed() {
+    let commit = edit.commit()?;
+    if !commit.diagnostics().changed() {
         return Err("PPTX source edit produced an unchanged commit".into());
     }
-    let replayed = commit.patch().apply(commit.patch().source())?;
-    if commit.patch().inverse().apply(&replayed).is_err() {
+    let replayed = package.apply(commit.patch())?.into_package();
+    if replayed.apply(&commit.patch().inverse()).is_err() {
         return Err("PPTX source edit inverse rejected its candidate".into());
     }
-    let materializations = usize::try_from(editor.cache_diagnostics().successful_loads)?;
-    let published = editor.publish_slide_commit_to_stream(writer, &commit)?;
-    if commit.patch().inverse().apply(&published).is_err()
-        || commit.patch().apply(&published).is_ok()
+    let materializations = usize::try_from(presentation.cache_diagnostics().successful_loads)?;
+    commit.package().write_to(&mut *writer)?;
+    if commit.package().apply(&commit.patch().inverse()).is_err()
+        || commit.package().apply(commit.patch()).is_ok()
     {
-        return Err("PPTX source edit published a different slide snapshot".into());
+        return Err("PPTX source edit published a different slide revision".into());
     }
     Ok(materializations)
 }
@@ -51714,45 +51803,53 @@ fn publish_pptx_batch_edit<W: Write>(
         .collect::<Vec<_>>();
     let replacements = pptx_batch_replacements(&texts);
     if source_backed {
-        let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at(source)?;
-        let mut edit = editor.edit_slide(target_slide)?;
-        if edit.set_shape_texts(&replacements)? != PPTX_SOURCE_TEXT_BOXES_PER_SLIDE {
+        let presentation = litchi_pptx::SourceBackedPresentation::from_read_at(source)?;
+        let package = litchi_pptx::source::Package::from_presentation(&presentation)?;
+        let mut edit = package.edit()?;
+        if edit.set_shape_texts(target_slide, &replacements)? != PPTX_SOURCE_TEXT_BOXES_PER_SLIDE {
             return Err("PPTX source-backed batch changed an unexpected shape count".into());
         }
-        let commit = edit.commit();
-        if !commit.is_changed() {
+        let commit = edit.commit()?;
+        if !commit.diagnostics().changed() {
             return Err("PPTX source-backed batch produced an unchanged commit".into());
         }
-        let replayed = commit.patch().apply(commit.patch().source())?;
-        if commit.patch().inverse().apply(&replayed).is_err() {
+        let replayed = package.apply(commit.patch())?.into_package();
+        if replayed.apply(&commit.patch().inverse()).is_err() {
             return Err("PPTX source-backed batch inverse rejected its candidate".into());
         }
-        let materializations = usize::try_from(editor.cache_diagnostics().successful_loads)?;
-        let published = editor.publish_slide_commit_to_stream(writer, &commit)?;
-        if commit.patch().inverse().apply(&published).is_err()
-            || commit.patch().apply(&published).is_ok()
+        let materializations = usize::try_from(presentation.cache_diagnostics().successful_loads)?;
+        commit.package().write_to(&mut *writer)?;
+        if commit.package().apply(&commit.patch().inverse()).is_err()
+            || commit.package().apply(commit.patch()).is_ok()
         {
-            return Err("PPTX source-backed batch published another snapshot".into());
+            return Err("PPTX source-backed batch published another revision".into());
         }
         Ok(materializations)
     } else {
-        let package = SourceBackedPackage::from_read_at(source)?;
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         let opc = package.into_opc_package()?;
         let materializations = opc.part_count();
         let mut package = litchi_pptx::Package::from_opc_package(opc)?;
-        let mut edit = package.opened_presentation_transaction()?;
+        let mut edit = package.edit()?;
         if edit.set_shape_texts(target_slide, &replacements)? != PPTX_SOURCE_TEXT_BOXES_PER_SLIDE {
             return Err("PPTX eager batch changed an unexpected shape count".into());
         }
         let commit = edit.commit()?;
-        if !commit.is_changed() {
+        if !commit.diagnostics().changed() {
             return Err("PPTX eager batch produced an unchanged commit".into());
         }
         let inverse = commit.patch().inverse();
-        let published = package.apply_opened_presentation_commit(commit)?;
+        package = commit.into_package();
+        let published = package.opened_presentation()?;
         if package
-            .apply_opened_presentation_patch(&inverse)
-            .and_then(|_| package.apply_opened_presentation_patch(&inverse.inverse()))
+            .apply(&inverse)
+            .and_then(|restored| restored.into_package().apply(&inverse.inverse()))
             .is_err()
         {
             return Err("PPTX eager batch inverse/forward replay failed".into());
@@ -51872,8 +51969,9 @@ fn publish_pptx_multi_slide_batch_edit<W: Write>(
     source_backed: bool,
 ) -> Result<usize, Box<dyn Error>> {
     if source_backed {
-        let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at(source)?;
-        let mut edit = editor.edit_slides();
+        let presentation = litchi_pptx::SourceBackedPresentation::from_read_at(source)?;
+        let package = litchi_pptx::source::Package::from_presentation(&presentation)?;
+        let mut edit = package.edit()?;
         for slide_position in pptx_multi_slide_positions() {
             let texts = (0..PPTX_SOURCE_TEXT_BOXES_PER_SLIDE)
                 .map(|shape| semantic_pptx_text(slide_position, shape, true))
@@ -51888,28 +51986,34 @@ fn publish_pptx_multi_slide_batch_edit<W: Write>(
             }
         }
         let commit = edit.commit()?;
-        if !commit.is_changed() {
+        if !commit.diagnostics().changed() {
             return Err("PPTX source-backed multi-slide batch produced no changes".into());
         }
-        let replayed = commit.patch().apply(commit.patch().source())?;
-        if commit.patch().inverse().apply(&replayed).is_err() {
+        let replayed = package.apply(commit.patch())?.into_package();
+        if replayed.apply(&commit.patch().inverse()).is_err() {
             return Err("PPTX source-backed multi-slide inverse rejected its candidate".into());
         }
-        let materializations = usize::try_from(editor.cache_diagnostics().successful_loads)?;
-        let published = editor.publish_slide_batch_commit_to_stream(writer, &commit)?;
-        if commit.patch().inverse().apply(&published).is_err()
-            || commit.patch().apply(&published).is_ok()
+        let materializations = usize::try_from(presentation.cache_diagnostics().successful_loads)?;
+        commit.package().write_to(&mut *writer)?;
+        if commit.package().apply(&commit.patch().inverse()).is_err()
+            || commit.package().apply(commit.patch()).is_ok()
         {
-            return Err("PPTX source-backed multi-slide published another snapshot".into());
+            return Err("PPTX source-backed multi-slide published another revision".into());
         }
         return Ok(materializations);
     }
 
-    let package = SourceBackedPackage::from_read_at(source)?;
+    let package = SourceBackedPackage::from_read_at(
+        source,
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )?;
     let opc = package.into_opc_package()?;
     let materializations = opc.part_count();
     let mut package = litchi_pptx::Package::from_opc_package(opc)?;
-    let mut edit = package.opened_presentation_transaction()?;
+    let mut edit = package.edit()?;
     for slide_position in pptx_multi_slide_positions() {
         let texts = (0..PPTX_SOURCE_TEXT_BOXES_PER_SLIDE)
             .map(|shape| semantic_pptx_text(slide_position, shape, true))
@@ -51921,14 +52025,15 @@ fn publish_pptx_multi_slide_batch_edit<W: Write>(
         }
     }
     let commit = edit.commit()?;
-    if !commit.is_changed() {
+    if !commit.diagnostics().changed() {
         return Err("PPTX eager multi-slide batch produced an unchanged commit".into());
     }
     let inverse = commit.patch().inverse();
-    let published = package.apply_opened_presentation_commit(commit)?;
+    package = commit.into_package();
+    let published = package.opened_presentation()?;
     if package
-        .apply_opened_presentation_patch(&inverse)
-        .and_then(|_| package.apply_opened_presentation_patch(&inverse.inverse()))
+        .apply(&inverse)
+        .and_then(|restored| restored.into_package().apply(&inverse.inverse()))
         .is_err()
     {
         return Err("PPTX eager multi-slide batch inverse/forward replay failed".into());
@@ -52092,7 +52197,8 @@ fn run_pptx_cross_copy(
     let mut sink_summaries = Vec::with_capacity(samples);
     let mut output_digests = Vec::with_capacity(samples);
     let source_text = {
-        let source = litchi_pptx::Package::from_vec(corpus.source_archive.clone())?;
+        let source =
+            litchi_pptx::Package::from_reader(std::io::Cursor::new(corpus.source_archive.clone()))?;
         source
             .presentation()?
             .slides()?
@@ -52102,8 +52208,11 @@ fn run_pptx_cross_copy(
     };
 
     for iteration in 0..iterations {
-        let mut source = litchi_pptx::Package::from_vec(corpus.source_archive.clone())?;
-        let mut destination = litchi_pptx::Package::from_vec(corpus.destination_archive.clone())?;
+        let source =
+            litchi_pptx::Package::from_reader(std::io::Cursor::new(corpus.source_archive.clone()))?;
+        let mut destination = litchi_pptx::Package::from_reader(std::io::Cursor::new(
+            corpus.destination_archive.clone(),
+        ))?;
         let source_snapshot = source.opened_presentation()?;
         let destination_snapshot = destination.opened_presentation()?;
 
@@ -52133,9 +52242,11 @@ fn run_pptx_cross_copy(
         }
 
         let started = Instant::now();
-        let published = destination.apply_cross_slide_copy_plan(&source, &plan)?;
+        let mut publication = destination.edit()?;
+        publication.stage_cross_slide_copy(&source, &plan)?;
+        destination = publication.commit()?.into_package();
         let commit_duration = started.elapsed();
-        if published.slides().len() != corpus.destination_slide_count + 1 {
+        if destination.presentation()?.slide_count()? != corpus.destination_slide_count + 1 {
             return Err("PPTX cross-copy commit changed the wrong slide count".into());
         }
 
@@ -52143,7 +52254,7 @@ fn run_pptx_cross_copy(
         sink.reserve_budget()?;
         let destination_opc = destination.opc()?;
         let started = Instant::now();
-        destination_opc.to_stream(&mut sink)?;
+        destination_opc.write_to(&mut sink)?;
         let publication_duration = started.elapsed();
         if sink.bytes != corpus.expected_output
             || sink.summary().accepted_bytes != u64::try_from(sink.bytes.len())?
@@ -52208,7 +52319,7 @@ fn run_pptx_cross_copy(
         return Err("PPTX cross-copy measured output digests are not stable".into());
     }
     let cross_copy = PptxCrossCopySummary {
-        implementation: "opened::CrossSlideCopyPlan + Package::apply_cross_slide_copy_plan + OpcPackage::to_stream",
+        implementation: "cross_slide_copy::Plan + opened::Edit::stage_cross_slide_copy + OpcPackage::write_to",
         timing_scope: "plan only; commit only; OPC sequential publication only; setup, reopen, semantic/package/closure/refusal verification excluded",
         performance_claim: "none: opt-in correctness/evidence only; no release ABBA, speedup, allocation, RSS, or physical-I/O claim",
         source_archive_sha256: sha256_hex(&corpus.source_archive),
@@ -52253,7 +52364,7 @@ fn run_pptx_cross_copy(
 /// Measure the complete owned PPTX cross-copy lifecycle. The input Vec clones
 /// and bounded sink reservation happen before both brackets. `lifecycle_ns`
 /// and the allocator observation begin immediately before `Package::from_vec`
-/// ingress and end immediately after final `OpcPackage::to_stream`
+/// ingress and end immediately after final `OpcPackage::write_to`
 /// publication. Plan/commit/publication vectors are nested phase diagnostics;
 /// reopen, semantic/package/closure/refusal validation, and source immutability
 /// checks happen after the brackets. Package and sink teardown also happens
@@ -52303,7 +52414,8 @@ fn run_pptx_cross_copy_lifecycle(
         .and_then(|value| value.checked_add(64 * 1024))
         .ok_or("PPTX cross-copy lifecycle sequential output ceiling overflows u64")?;
     let source_text = {
-        let source = litchi_pptx::Package::from_vec(corpus.source_archive.clone())?;
+        let source =
+            litchi_pptx::Package::from_reader(std::io::Cursor::new(corpus.source_archive.clone()))?;
         source
             .presentation()?
             .slides()?
@@ -52334,8 +52446,9 @@ fn run_pptx_cross_copy_lifecycle(
         let process_before = process_metrics::Snapshot::read().ok();
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
-        let mut source = litchi_pptx::Package::from_vec(source_input)?;
-        let mut destination = litchi_pptx::Package::from_vec(destination_input)?;
+        let source = litchi_pptx::Package::from_reader(std::io::Cursor::new(source_input))?;
+        let mut destination =
+            litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_input))?;
         let source_snapshot = source.opened_presentation()?;
         let destination_snapshot = destination.opened_presentation()?;
 
@@ -52349,11 +52462,13 @@ fn run_pptx_cross_copy_lifecycle(
         let plan_duration = plan_started.elapsed();
 
         let commit_started = Instant::now();
-        let published = destination.apply_cross_slide_copy_plan(&source, &plan)?;
+        let mut publication = destination.edit()?;
+        publication.stage_cross_slide_copy(&source, &plan)?;
+        destination = publication.commit()?.into_package();
         let commit_duration = commit_started.elapsed();
 
         let publication_started = Instant::now();
-        destination.opc()?.to_stream(&mut sink)?;
+        destination.opc()?.write_to(&mut sink)?;
         let publication_duration = publication_started.elapsed();
         let duration = started.elapsed();
         let allocation_metrics = match allocation_region.finish() {
@@ -52384,7 +52499,7 @@ fn run_pptx_cross_copy_lifecycle(
         {
             return Err("PPTX cross-copy lifecycle plan metadata is not deterministic".into());
         }
-        if published.slides().len() != corpus.destination_slide_count + 1 {
+        if destination.presentation()?.slide_count()? != corpus.destination_slide_count + 1 {
             return Err("PPTX cross-copy lifecycle commit changed the wrong slide count".into());
         }
         if sink.bytes != corpus.expected_output
@@ -52466,7 +52581,7 @@ fn run_pptx_cross_copy_lifecycle(
     reorder_sample_vector(&mut reopen_ns, &sample_order)?;
     reorder_sample_vector(&mut output_digests, &sample_order)?;
     let cross_copy = PptxCrossCopySummary {
-        implementation: "Package::from_vec + opened::CrossSlideCopyPlan + Package::apply_cross_slide_copy_plan + OpcPackage::to_stream",
+        implementation: "Package::from_vec + cross_slide_copy::Plan + opened::Edit::stage_cross_slide_copy + OpcPackage::write_to",
         timing_scope: "lifecycle_ns and operation_metrics cover owned source/destination ingress, opened snapshots, plan, atomic cross-copy commit, and final OPC sequential publication; corpus clones and sink reservation are outside; plan/commit/publication are nested diagnostics; reopen and all semantic/package/closure/refusal/source checks are outside",
         performance_claim: "none: opt-in correctness, lifecycle, and operation-allocation evidence only; no release ABBA, speedup, RSS, physical-I/O, or full-retention memory claim",
         source_archive_sha256: sha256_hex(&corpus.source_archive),
@@ -52600,9 +52715,10 @@ fn run_pptx_source_backed_cross_copy(
         let source_read: Arc<dyn ReadAt> = source.clone();
         let destination_read: Arc<dyn ReadAt> = destination.clone();
         let source_view = litchi_pptx::SourceBackedPresentation::from_read_at(source_read)?;
-        let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at(destination_read)?;
+        let editor_view = litchi_pptx::SourceBackedPresentation::from_read_at(destination_read)?;
+        let editor = litchi_pptx::source::Package::from_presentation(&editor_view)?;
         if source_view.slide_count() != PPTX_CROSS_COPY_SOURCE_SLIDE_COUNT
-            || editor.slide_count() != corpus.destination_slide_count
+            || editor_view.slide_count() != corpus.destination_slide_count
         {
             return Err("source-backed PPTX cross-copy setup changed slide counts".into());
         }
@@ -52631,7 +52747,9 @@ fn run_pptx_source_backed_cross_copy(
         let mut sink = CountingSink::bounded(maximum, 64 * 1024);
         sink.reserve_budget()?;
         let started = Instant::now();
-        let snapshot = editor.publish_cross_slide_copy_to_stream(&mut sink, &plan)?;
+        let mut editor_copy = editor.edit_cross_slide_copy()?;
+        let snapshot = editor_copy.stage(&plan)?;
+        editor_copy.commit()?.package().write_to(&mut sink)?;
         let publication_duration = started.elapsed();
         if snapshot.destination_slide_count() != corpus.destination_slide_count + 1
             || snapshot.insertion_position() != corpus.insertion_position
@@ -52706,9 +52824,9 @@ fn run_pptx_source_backed_cross_copy(
         return Err("source-backed PPTX cross-copy measured output digests are not stable".into());
     }
     let cross_copy = PptxSourceBackedCrossCopySummary {
-        implementation: "presentation::SourceBackedPresentationEditor + SourceTopologyPlan + publish_cross_slide_copy_to_stream",
+        implementation: "source::Package::plan_cross_slide_copy + cross_slide_copy::Edit::stage + commit + write_to (record 0356b)",
         workload: "matched plain corpus / existing pptx_cross_copy_plain input",
-        timing_scope: "source-backed plan only + public publish_cross_slide_copy_to_stream; setup, reopen, verification, topology gates, and cache diagnostics excluded",
+        timing_scope: "source-backed plan only + stage + commit + write_to; setup, reopen, verification, topology gates, and cache diagnostics excluded",
         performance_claim: "none: opt-in correctness/counter evidence only; no eager/source speedup, ABBA, allocation, RSS, physical-I/O, or cold-cache claim",
         source_archive_sha256: sha256_hex(&corpus.source_archive),
         destination_archive_sha256: sha256_hex(&corpus.destination_archive),
@@ -52850,7 +52968,8 @@ fn run_pptx_source_backed_cross_copy_lifecycle(
         let started = Instant::now();
         let open_started = Instant::now();
         let source_view = litchi_pptx::SourceBackedPresentation::from_read_at(source_read)?;
-        let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at(destination_read)?;
+        let editor_view = litchi_pptx::SourceBackedPresentation::from_read_at(destination_read)?;
+        let editor = litchi_pptx::source::Package::from_presentation(&editor_view)?;
         let open_duration = open_started.elapsed();
         let plan_started = Instant::now();
         let plan = editor.plan_cross_slide_copy(
@@ -52861,7 +52980,9 @@ fn run_pptx_source_backed_cross_copy_lifecycle(
         )?;
         let plan_duration = plan_started.elapsed();
         let publication_started = Instant::now();
-        let snapshot = editor.publish_cross_slide_copy_to_stream(&mut sink, &plan)?;
+        let mut editor_copy = editor.edit_cross_slide_copy()?;
+        let snapshot = editor_copy.stage(&plan)?;
+        editor_copy.commit()?.package().write_to(&mut sink)?;
         let publication_duration = publication_started.elapsed();
         let duration = started.elapsed();
         let allocation_metrics = match allocation_region.finish() {
@@ -52993,7 +53114,7 @@ fn run_pptx_source_backed_cross_copy_lifecycle(
         .checked_mul(PPTX_CROSS_COPY_MEDIA_ENTRY_BYTES)
         .ok_or("source-backed PPTX lifecycle media byte count overflows usize")?;
     let cross_copy = PptxSourceBackedCrossCopyLifecycleSummary {
-        implementation: "SourceBackedPresentation::from_read_at + SourceBackedPresentationEditor::from_read_at + SourceTopologyPlan::publish_cross_slide_copy_to_stream",
+        implementation: "SourceBackedPresentation::from_read_at + source::Package::from_presentation + cross_slide_copy::Edit::stage + write_to (record 0356b)",
         workload: if corpus.media_rich {
             "matched media-rich owned cross-copy corpus"
         } else {
@@ -53087,8 +53208,8 @@ fn verify_xlsx_defined_names_edit_output(
     corpus: &Corpus,
     output: &[u8],
 ) -> Result<(), Box<dyn Error>> {
-    let reopened = litchi_xlsx::Package::from_slice(output)?;
-    if reopened.workbook()?.defined_names() != xlsx_defined_names_target() {
+    let reopened = litchi_xlsx::Package::from_bytes(output)?;
+    if reopened.workbook().defined_names() != xlsx_defined_names_target() {
         return Err("XLSX defined-name output has unexpected catalog semantics".into());
     }
     if reopened
@@ -53101,8 +53222,8 @@ fn verify_xlsx_defined_names_edit_output(
         return Err("XLSX defined-name output changed calculation metadata".into());
     }
 
-    let source = OpcPackage::from_bytes(&corpus.archive)?;
-    let candidate = OpcPackage::from_bytes(output)?;
+    let source = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+    let candidate = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     if source.part_count() != corpus.manifest.entry_count
         || candidate.part_count() != source.part_count()
         || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
@@ -53144,37 +53265,44 @@ fn publish_xlsx_defined_names_edit<W: Write>(
     source_backed: bool,
 ) -> Result<usize, Box<dyn Error>> {
     if source_backed {
-        let editor = litchi_xlsx::defined_names::SourceBackedEditor::from_read_at(source)?;
-        let mut edit = editor.edit();
+        let editor = litchi_xlsx::SourceBackedWorkbook::from_read_at(source)?;
+        let mut edit = editor.edit_defined_names()?;
         if !edit.replace(xlsx_defined_names_target())? {
             return Err("XLSX source-backed defined-name edit reported an exact no-op".into());
         }
         let commit = edit.commit()?;
-        if !commit.changed()
-            || commit.patch().is_empty()
+        if !commit.diagnostics().changed()
+            || commit.patch().is_noop()
             || commit.patch().inverse().after() != commit.patch().before()
         {
             return Err("XLSX source-backed defined-name edit produced an invalid patch".into());
         }
         let materializations = usize::try_from(editor.cache_diagnostics().successful_loads)?;
-        let published = editor.publish_commit_to_stream(writer, &commit)?;
-        if published != *commit.snapshot() {
+        commit.package().write_to(writer)?;
+        let published = commit.patch().after().clone();
+        if published != *commit.patch().after() {
             return Err("XLSX source-backed defined-name edit published another snapshot".into());
         }
         Ok(materializations)
     } else {
-        let source_backed = SourceBackedPackage::from_read_at(source)?;
+        let source_backed = SourceBackedPackage::from_read_at(
+            source,
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         let opc = source_backed.into_opc_package()?;
         let materializations = opc.part_count();
         let package = litchi_xlsx::Package::from_opc(opc)?;
-        let workbook = package.into_workbook()?;
+        let workbook = package;
         let mut edit = workbook.edit()?;
         edit.replace_defined_names(xlsx_defined_names_target())?;
         let commit = edit.commit()?;
-        if commit.patch().is_empty() {
+        if commit.patch().is_noop() {
             return Err("XLSX eager defined-name edit produced an empty patch".into());
         }
-        commit.workbook().write_to(writer)?;
+        commit.package().write_to(writer)?;
         Ok(materializations)
     }
 }
@@ -53275,7 +53403,7 @@ fn verify_xlsx_calculation_metadata_edit_output(
     corpus: &Corpus,
     output: &[u8],
 ) -> Result<(), Box<dyn Error>> {
-    let reopened = litchi_xlsx::Package::from_slice(output)?;
+    let reopened = litchi_xlsx::Package::from_bytes(output)?;
     if reopened
         .calculation_metadata()?
         .properties()
@@ -53286,8 +53414,8 @@ fn verify_xlsx_calculation_metadata_edit_output(
         return Err("XLSX calculation-edit output has unexpected calculation ID".into());
     }
 
-    let source = OpcPackage::from_bytes(&corpus.archive)?;
-    let candidate = OpcPackage::from_bytes(output)?;
+    let source = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+    let candidate = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     if source.part_count() != corpus.manifest.entry_count
         || candidate.part_count() != source.part_count()
         || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
@@ -53331,38 +53459,45 @@ fn publish_xlsx_calculation_metadata_edit<W: Write>(
     let properties =
         litchi_xlsx::calculation_properties::Properties::new().with_calculation_id(Some(91));
     if source_backed {
-        let editor = litchi_xlsx::calculation_properties::SourceBackedEditor::from_read_at(source)?;
-        let mut edit = editor.edit();
+        let editor = litchi_xlsx::SourceBackedWorkbook::from_read_at(source)?;
+        let mut edit = editor.edit_calculation_metadata()?;
         if !edit.set_properties(properties) {
             return Err("XLSX source-backed calculation edit reported an exact no-op".into());
         }
         let commit = edit.commit()?;
-        if !commit.changed()
-            || commit.patch().is_empty()
+        if !commit.diagnostics().changed()
+            || commit.patch().is_noop()
             || commit.patch().inverse().after() != commit.patch().before()
         {
             return Err("XLSX source-backed calculation edit produced an invalid patch".into());
         }
         let materializations = usize::try_from(editor.cache_diagnostics().successful_loads)?;
-        let published = editor.publish_commit_to_stream(writer, &commit)?;
-        if published != *commit.snapshot() {
+        commit.package().write_to(writer)?;
+        let published = commit.patch().after().clone();
+        if published != *commit.patch().after() {
             return Err("XLSX source-backed calculation edit published another snapshot".into());
         }
         Ok(materializations)
     } else {
-        let package = SourceBackedPackage::from_read_at(source)?;
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         let opc = package.into_opc_package()?;
         let materializations = opc.part_count();
-        let mut package = litchi_xlsx::Package::from_opc(opc)?;
+        let package = litchi_xlsx::Package::from_opc(opc)?;
         let mut edit = package.edit_calculation_metadata()?;
-        if !edit.set_properties(properties) {
+        if !edit.set_properties(properties)? {
             return Err("XLSX eager calculation edit reported an exact no-op".into());
         }
         let commit = edit.commit()?;
-        if !commit.changed() || commit.patch().is_empty() {
+        if !commit.diagnostics().changed() || commit.patch().is_noop() {
             return Err("XLSX eager calculation edit produced an invalid patch".into());
         }
-        package.write_to(writer)?;
+        commit.package().write_to(writer)?;
         Ok(materializations)
     }
 }
@@ -54315,7 +54450,7 @@ fn xlsx_page_break_expected_output(corpus: &Corpus) -> Result<Vec<u8>, Box<dyn E
     // Construct the expected package from independently rewritten worksheet
     // bytes; do not call either page-break publication implementation here.
     let target_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
-    let mut package = OpcPackage::from_bytes(&corpus.archive)?;
+    let mut package = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     let rewritten = xlsx_page_break_oracle_rewrite(package.get_part(&target_uri)?.blob())?;
     package.get_part_mut(&target_uri)?.set_blob(rewritten);
     PackageWriter::to_bytes(&package).map_err(Into::into)
@@ -54456,7 +54591,7 @@ fn verify_xlsx_page_break_edit_output(
     corpus: &Corpus,
     output: &[u8],
 ) -> Result<(), Box<dyn Error>> {
-    let reopened = litchi_xlsx::Package::from_slice(output)?;
+    let reopened = litchi_xlsx::Package::from_bytes(output)?;
     if reopened
         .calculation_metadata()?
         .properties()
@@ -54467,8 +54602,8 @@ fn verify_xlsx_page_break_edit_output(
         return Err("XLSX page-break output changed calculation metadata".into());
     }
 
-    let source = OpcPackage::from_bytes(&corpus.archive)?;
-    let candidate = OpcPackage::from_bytes(output)?;
+    let source = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+    let candidate = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     if source.part_count() != corpus.manifest.entry_count
         || candidate.part_count() != source.part_count()
         || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
@@ -54520,37 +54655,44 @@ fn publish_xlsx_page_break_edit<W: Write>(
 ) -> Result<usize, Box<dyn Error>> {
     let horizontal = xlsx_page_break_target()?;
     if source_backed {
-        let editor = litchi_xlsx::page_breaks::SourceBackedEditor::from_read_at(source)?;
-        let mut edit = editor.edit("Sheet1")?;
+        let editor = litchi_xlsx::SourceBackedWorkbook::from_read_at(source)?;
+        let mut edit = editor.edit_page_breaks("Sheet1")?;
         if !edit.set_horizontal(horizontal)? {
             return Err("XLSX source-backed page-break edit reported an exact no-op".into());
         }
         let commit = edit.commit()?;
-        if !commit.changed() || commit.patch().is_empty() {
+        if !commit.diagnostics().changed() || commit.patch().is_noop() {
             return Err("XLSX source-backed page-break edit produced an invalid patch".into());
         }
         let materializations = usize::try_from(editor.cache_diagnostics().successful_loads)?;
-        let published = editor.publish_commit_to_stream(writer, &commit)?;
-        if published.source_xml() != commit.snapshot().source_xml()
-            || published.page_breaks() != commit.snapshot().page_breaks()
+        commit.package().write_to(writer)?;
+        let published = commit.patch().after().clone();
+        if published.source_xml() != commit.patch().after().source_xml()
+            || published.page_breaks() != commit.patch().after().page_breaks()
         {
             return Err("XLSX source-backed page-break edit published another snapshot".into());
         }
         Ok(materializations)
     } else {
-        let package = SourceBackedPackage::from_read_at(source)?;
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         let opc = package.into_opc_package()?;
         let materializations = opc.part_count();
-        let mut package = litchi_xlsx::Package::from_opc(opc)?;
+        let package = litchi_xlsx::Package::from_opc(opc)?;
         let mut edit = package.edit_page_breaks("Sheet1")?;
         if !edit.set_horizontal(horizontal)? {
             return Err("XLSX eager page-break edit reported an exact no-op".into());
         }
         let commit = edit.commit()?;
-        if !commit.changed() || commit.patch().is_empty() {
+        if !commit.diagnostics().changed() || commit.patch().is_noop() {
             return Err("XLSX eager page-break edit produced an invalid patch".into());
         }
-        package.write_to(writer)?;
+        commit.package().write_to(writer)?;
         Ok(materializations)
     }
 }
@@ -54665,19 +54807,19 @@ fn run_xlsx_page_break_projection(
         return Err("XLSX page-break projection case requires its fixed projection corpus".into());
     }
     let target_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
-    let opc = OpcPackage::from_bytes(&corpus.archive)?;
+    let opc = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     let expected = xlsx_page_break_oracle_parse(opc.get_part(&target_uri)?.blob())?;
     let expected_digest = xlsx_repeated_page_break_digest(&expected)?;
 
     // Verify both public entry points against the independent raw-XML oracle
     // before any timed work. This makes the Package path an explicit control
     // and ensures the direct Worksheet selector cannot hide a semantic drift.
-    let package = litchi_xlsx::Package::from_slice(&corpus.archive)?;
+    let package = litchi_xlsx::Package::from_bytes(&corpus.archive)?;
     let package_projection = package.page_breaks("Sheet1")?;
     if !xlsx_page_break_oracle_matches_public(package_projection.page_breaks(), &expected) {
         return Err("XLSX Package page-break projection differs from raw oracle".into());
     }
-    let workbook = package.workbook()?;
+    let workbook = package.workbook();
     let worksheet = workbook
         .sheet("Sheet1")?
         .ok_or("XLSX worksheet page-break oracle has no Sheet1")?;
@@ -54688,11 +54830,11 @@ fn run_xlsx_page_break_projection(
 
     let mut elapsed = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let package = litchi_xlsx::Package::from_slice(&corpus.archive)?;
+        let package = litchi_xlsx::Package::from_bytes(&corpus.archive)?;
         let mut outputs = Vec::with_capacity(XLSX_REPEATED_PAGE_BREAK_CALLS);
         let started = match case {
             Case::XlsxWorksheetRepeatedPageBreaks => {
-                let workbook = package.workbook()?;
+                let workbook = package.workbook();
                 let worksheet = workbook
                     .sheet("Sheet1")?
                     .ok_or("XLSX Worksheet repeated-query setup has no Sheet1")?;
@@ -54754,8 +54896,8 @@ fn verify_xlsx_page_margin_edit_output(
     corpus: &Corpus,
     output: &[u8],
 ) -> Result<(), Box<dyn Error>> {
-    let reopened = litchi_xlsx::Package::from_slice(output)?;
-    let workbook = reopened.workbook()?;
+    let reopened = litchi_xlsx::Package::from_bytes(output)?;
+    let workbook = reopened.workbook();
     let sheet = workbook
         .sheet("Sheet1")?
         .ok_or("XLSX page-margin output has no Sheet1")?;
@@ -54772,8 +54914,8 @@ fn verify_xlsx_page_margin_edit_output(
         return Err("XLSX page-margin output changed calculation metadata".into());
     }
 
-    let source = OpcPackage::from_bytes(&corpus.archive)?;
-    let candidate = OpcPackage::from_bytes(output)?;
+    let source = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+    let candidate = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     if source.part_count() != corpus.manifest.entry_count
         || candidate.part_count() != source.part_count()
         || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
@@ -54816,38 +54958,45 @@ fn publish_xlsx_page_margin_edit<W: Write>(
 ) -> Result<usize, Box<dyn Error>> {
     let margins = xlsx_page_margin_target()?;
     if source_backed {
-        let editor = litchi_xlsx::page_margins::SourceBackedEditor::from_read_at(source)?;
-        let mut edit = editor.edit("Sheet1")?;
-        if !edit.set(margins) {
+        let editor = litchi_xlsx::SourceBackedWorkbook::from_read_at(source)?;
+        let mut edit = editor.edit_page_margins("Sheet1")?;
+        if !edit.set(margins)? {
             return Err("XLSX source-backed page-margin edit reported an exact no-op".into());
         }
         let commit = edit.commit()?;
-        if !commit.changed() || commit.patch().is_empty() {
+        if !commit.diagnostics().changed() || commit.patch().is_noop() {
             return Err("XLSX source-backed page-margin edit produced an invalid patch".into());
         }
         let materializations = usize::try_from(editor.cache_diagnostics().successful_loads)?;
-        let published = editor.publish_commit_to_stream(writer, &commit)?;
-        if published.source_xml() != commit.snapshot().source_xml()
-            || published.page_margins() != commit.snapshot().page_margins()
+        commit.package().write_to(writer)?;
+        let published = commit.patch().after().clone();
+        if published.source_xml() != commit.patch().after().source_xml()
+            || published.page_margins() != commit.patch().after().page_margins()
         {
             return Err("XLSX source-backed page-margin edit published another snapshot".into());
         }
         Ok(materializations)
     } else {
-        let package = SourceBackedPackage::from_read_at(source)?;
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         let opc = package.into_opc_package()?;
         let materializations = opc.part_count();
         let package = litchi_xlsx::Package::from_opc(opc)?;
-        let workbook = package.into_workbook()?;
+        let workbook = package;
         let mut edit = workbook.edit()?;
         if edit.put_page_margins("Sheet1", margins)?.is_none() {
             return Err("XLSX eager page-margin worksheet selector did not resolve".into());
         }
         let commit = edit.commit()?;
-        if commit.patch().is_empty() {
+        if commit.patch().is_noop() {
             return Err("XLSX eager page-margin edit produced an empty patch".into());
         }
-        commit.workbook().write_to(writer)?;
+        commit.package().write_to(writer)?;
         Ok(materializations)
     }
 }
@@ -54959,8 +55108,8 @@ fn verify_xlsx_page_setup_edit_output(
     corpus: &Corpus,
     output: &[u8],
 ) -> Result<(), Box<dyn Error>> {
-    let reopened = litchi_xlsx::Package::from_slice(output)?;
-    let workbook = reopened.workbook()?;
+    let reopened = litchi_xlsx::Package::from_bytes(output)?;
+    let workbook = reopened.workbook();
     let sheet = workbook
         .sheet("Sheet1")?
         .ok_or("XLSX page-setup output has no Sheet1")?;
@@ -54977,8 +55126,8 @@ fn verify_xlsx_page_setup_edit_output(
         return Err("XLSX page-setup output changed calculation metadata".into());
     }
 
-    let source = OpcPackage::from_bytes(&corpus.archive)?;
-    let candidate = OpcPackage::from_bytes(output)?;
+    let source = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+    let candidate = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     if source.part_count() != corpus.manifest.entry_count
         || candidate.part_count() != source.part_count()
         || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
@@ -55028,38 +55177,45 @@ fn publish_xlsx_page_setup_edit<W: Write>(
 ) -> Result<usize, Box<dyn Error>> {
     let setup = xlsx_page_setup_target()?;
     if source_backed {
-        let editor = litchi_xlsx::page_setup::SourceBackedEditor::from_read_at(source)?;
-        let mut edit = editor.edit("Sheet1")?;
-        if !edit.set(setup) {
+        let editor = litchi_xlsx::SourceBackedWorkbook::from_read_at(source)?;
+        let mut edit = editor.edit_page_setup("Sheet1")?;
+        if !edit.set(setup)? {
             return Err("XLSX source-backed page-setup edit reported an exact no-op".into());
         }
         let commit = edit.commit()?;
-        if !commit.changed() || commit.patch().is_empty() {
+        if !commit.diagnostics().changed() || commit.patch().is_noop() {
             return Err("XLSX source-backed page-setup edit produced an invalid patch".into());
         }
         let materializations = usize::try_from(editor.cache_diagnostics().successful_loads)?;
-        let published = editor.publish_commit_to_stream(writer, &commit)?;
-        if published.source_xml() != commit.snapshot().source_xml()
-            || published.page_setup() != commit.snapshot().page_setup()
+        commit.package().write_to(writer)?;
+        let published = commit.patch().after().clone();
+        if published.source_xml() != commit.patch().after().source_xml()
+            || published.page_setup() != commit.patch().after().page_setup()
         {
             return Err("XLSX source-backed page-setup edit published another snapshot".into());
         }
         Ok(materializations)
     } else {
-        let package = SourceBackedPackage::from_read_at(source)?;
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         let opc = package.into_opc_package()?;
         let materializations = opc.part_count();
         let package = litchi_xlsx::Package::from_opc(opc)?;
-        let workbook = package.into_workbook()?;
+        let workbook = package;
         let mut edit = workbook.edit()?;
         if edit.put_page_setup("Sheet1", setup)?.is_none() {
             return Err("XLSX eager page-setup worksheet selector did not resolve".into());
         }
         let commit = edit.commit()?;
-        if commit.patch().is_empty() {
+        if commit.patch().is_noop() {
             return Err("XLSX eager page-setup edit produced an empty patch".into());
         }
-        commit.workbook().write_to(writer)?;
+        commit.package().write_to(writer)?;
         Ok(materializations)
     }
 }
@@ -55169,8 +55325,8 @@ fn verify_xlsx_print_options_edit_output(
     corpus: &Corpus,
     output: &[u8],
 ) -> Result<(), Box<dyn Error>> {
-    let reopened = litchi_xlsx::Package::from_slice(output)?;
-    let workbook = reopened.workbook()?;
+    let reopened = litchi_xlsx::Package::from_bytes(output)?;
+    let workbook = reopened.workbook();
     let sheet = workbook
         .sheet("Sheet1")?
         .ok_or("XLSX print-options output has no Sheet1")?;
@@ -55187,8 +55343,8 @@ fn verify_xlsx_print_options_edit_output(
         return Err("XLSX print-options output changed calculation metadata".into());
     }
 
-    let source = OpcPackage::from_bytes(&corpus.archive)?;
-    let candidate = OpcPackage::from_bytes(output)?;
+    let source = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+    let candidate = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     if source.part_count() != corpus.manifest.entry_count
         || candidate.part_count() != source.part_count()
         || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
@@ -55231,38 +55387,45 @@ fn publish_xlsx_print_options_edit<W: Write>(
 ) -> Result<usize, Box<dyn Error>> {
     let options = xlsx_print_options_target();
     if source_backed {
-        let editor = litchi_xlsx::print_options::SourceBackedEditor::from_read_at(source)?;
-        let mut edit = editor.edit("Sheet1")?;
+        let editor = litchi_xlsx::SourceBackedWorkbook::from_read_at(source)?;
+        let mut edit = editor.edit_print_options("Sheet1")?;
         if !edit.set(options) {
             return Err("XLSX source-backed print-options edit reported an exact no-op".into());
         }
         let commit = edit.commit()?;
-        if !commit.changed() || commit.patch().is_empty() {
+        if !commit.diagnostics().changed() || commit.patch().is_noop() {
             return Err("XLSX source-backed print-options edit produced an invalid patch".into());
         }
         let materializations = usize::try_from(editor.cache_diagnostics().successful_loads)?;
-        let published = editor.publish_commit_to_stream(writer, &commit)?;
-        if published.source_xml() != commit.snapshot().source_xml()
-            || published.print_options() != commit.snapshot().print_options()
+        commit.package().write_to(writer)?;
+        let published = commit.patch().after().clone();
+        if published.source_xml() != commit.patch().after().source_xml()
+            || published.print_options() != commit.patch().after().print_options()
         {
             return Err("XLSX source-backed print-options edit published another snapshot".into());
         }
         Ok(materializations)
     } else {
-        let package = SourceBackedPackage::from_read_at(source)?;
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         let opc = package.into_opc_package()?;
         let materializations = opc.part_count();
         let package = litchi_xlsx::Package::from_opc(opc)?;
-        let workbook = package.into_workbook()?;
+        let workbook = package;
         let mut edit = workbook.edit()?;
         if edit.put_print_options("Sheet1", options)?.is_none() {
             return Err("XLSX eager print-options worksheet selector did not resolve".into());
         }
         let commit = edit.commit()?;
-        if commit.patch().is_empty() {
+        if commit.patch().is_noop() {
             return Err("XLSX eager print-options edit produced an empty patch".into());
         }
-        commit.workbook().write_to(writer)?;
+        commit.package().write_to(writer)?;
         Ok(materializations)
     }
 }
@@ -55408,8 +55571,8 @@ fn verify_xlsx_sheet_protection_edit_output(
     corpus: &Corpus,
     output: &[u8],
 ) -> Result<(), Box<dyn Error>> {
-    let reopened = litchi_xlsx::Package::from_slice(output)?;
-    let workbook = reopened.workbook()?;
+    let reopened = litchi_xlsx::Package::from_bytes(output)?;
+    let workbook = reopened.workbook();
     let sheet = workbook
         .sheet("Sheet1")?
         .ok_or("XLSX sheet-protection output has no Sheet1")?;
@@ -55426,8 +55589,8 @@ fn verify_xlsx_sheet_protection_edit_output(
         return Err("XLSX sheet-protection output changed calculation metadata".into());
     }
 
-    let source = OpcPackage::from_bytes(&corpus.archive)?;
-    let candidate = OpcPackage::from_bytes(output)?;
+    let source = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+    let candidate = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     if source.part_count() != corpus.manifest.entry_count
         || candidate.part_count() != source.part_count()
         || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
@@ -55470,21 +55633,22 @@ fn publish_xlsx_sheet_protection_edit<W: Write>(
 ) -> Result<usize, Box<dyn Error>> {
     let metadata = xlsx_sheet_protection_target()?;
     if source_backed {
-        let editor = litchi_xlsx::sheet_protection::SourceBackedEditor::from_read_at(source)?;
-        let mut edit = editor.edit("Sheet1")?;
+        let editor = litchi_xlsx::SourceBackedWorkbook::from_read_at(source)?;
+        let mut edit = editor.edit_sheet_protection("Sheet1")?;
         if !edit.set(metadata)? {
             return Err("XLSX source-backed sheet-protection edit reported an exact no-op".into());
         }
         let commit = edit.commit()?;
-        if !commit.changed() || commit.patch().is_empty() {
+        if !commit.diagnostics().changed() || commit.patch().is_noop() {
             return Err(
                 "XLSX source-backed sheet-protection edit produced an invalid patch".into(),
             );
         }
         let materializations = usize::try_from(editor.cache_diagnostics().successful_loads)?;
-        let published = editor.publish_commit_to_stream(writer, &commit)?;
-        if published.source_xml() != commit.snapshot().source_xml()
-            || published.metadata() != commit.snapshot().metadata()
+        commit.package().write_to(writer)?;
+        let published = commit.patch().after().clone();
+        if published.source_xml() != commit.patch().after().source_xml()
+            || published.metadata() != commit.patch().after().metadata()
         {
             return Err(
                 "XLSX source-backed sheet-protection edit published another snapshot".into(),
@@ -55492,7 +55656,13 @@ fn publish_xlsx_sheet_protection_edit<W: Write>(
         }
         Ok(materializations)
     } else {
-        let package = SourceBackedPackage::from_read_at(source)?;
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         let mut opc = package.into_opc_package()?;
         let materializations = opc.part_count();
         let worksheet_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
@@ -55501,7 +55671,7 @@ fn publish_xlsx_sheet_protection_edit<W: Write>(
             &metadata,
         )?;
         opc.get_part_mut(&worksheet_uri)?.set_blob(updated);
-        PackageWriter::write_to_stream(writer, &opc)?;
+        PackageWriter::write_to(writer, &opc)?;
         Ok(materializations)
     }
 }
@@ -55704,8 +55874,8 @@ fn verify_xlsx_auto_filter_edit_output(
     corpus: &Corpus,
     output: &[u8],
 ) -> Result<(), Box<dyn Error>> {
-    let reopened = litchi_xlsx::Package::from_slice(output)?;
-    let workbook = reopened.workbook()?;
+    let reopened = litchi_xlsx::Package::from_bytes(output)?;
+    let workbook = reopened.workbook();
     let sheet = workbook
         .sheet("Sheet1")?
         .ok_or("XLSX auto-filter output has no Sheet1")?;
@@ -55722,8 +55892,8 @@ fn verify_xlsx_auto_filter_edit_output(
         return Err("XLSX auto-filter output changed calculation metadata".into());
     }
 
-    let source = OpcPackage::from_bytes(&corpus.archive)?;
-    let candidate = OpcPackage::from_bytes(output)?;
+    let source = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+    let candidate = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     if source.part_count() != corpus.manifest.entry_count
         || candidate.part_count() != source.part_count()
         || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
@@ -55766,25 +55936,32 @@ fn publish_xlsx_auto_filter_edit<W: Write>(
 ) -> Result<usize, Box<dyn Error>> {
     let value = xlsx_auto_filter_value(true)?;
     if source_backed {
-        let editor = litchi_xlsx::auto_filter::SourceBackedEditor::from_read_at(source)?;
-        let mut edit = editor.edit("Sheet1")?;
+        let editor = litchi_xlsx::SourceBackedWorkbook::from_read_at(source)?;
+        let mut edit = editor.edit_auto_filter("Sheet1")?;
         if !edit.set(value)? {
             return Err("XLSX source-backed auto-filter edit reported an exact no-op".into());
         }
         let commit = edit.commit()?;
-        if !commit.changed() || commit.patch().is_empty() {
+        if !commit.diagnostics().changed() || commit.patch().is_noop() {
             return Err("XLSX source-backed auto-filter edit produced an invalid patch".into());
         }
         let materializations = usize::try_from(editor.cache_diagnostics().successful_loads)?;
-        let published = editor.publish_commit_to_stream(writer, &commit)?;
-        if published.source_xml() != commit.snapshot().source_xml()
-            || published.auto_filter() != commit.snapshot().auto_filter()
+        commit.package().write_to(writer)?;
+        let published = commit.patch().after().clone();
+        if published.source_xml() != commit.patch().after().source_xml()
+            || published.auto_filter() != commit.patch().after().auto_filter()
         {
             return Err("XLSX source-backed auto-filter edit published another snapshot".into());
         }
         Ok(materializations)
     } else {
-        let package = SourceBackedPackage::from_read_at(source)?;
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         let mut opc = package.into_opc_package()?;
         let materializations = opc.part_count();
         let worksheet_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
@@ -55797,7 +55974,7 @@ fn publish_xlsx_auto_filter_edit<W: Write>(
             Some(&value),
         )?;
         opc.get_part_mut(&worksheet_uri)?.set_blob(updated);
-        PackageWriter::write_to_stream(writer, &opc)?;
+        PackageWriter::write_to(writer, &opc)?;
         Ok(materializations)
     }
 }
@@ -56541,8 +56718,10 @@ fn verify_xlsx_calc_chain_content_type_topology(
     source_chain: Option<&XlsxCalcChainIdentity>,
     candidate_chain: Option<&XlsxCalcChainIdentity>,
 ) -> Result<(), Box<dyn Error>> {
-    let source_archive = ArchiveReader::new(source)?;
-    let candidate_archive = ArchiveReader::new(output)?;
+    let source_archive =
+        ArchiveReader::new(source, soapberry_zip::office::ArchiveLimits::default())?;
+    let candidate_archive =
+        ArchiveReader::new(output, soapberry_zip::office::ArchiveLimits::default())?;
     let source_content_types = source_archive.read(XLSX_CONTENT_TYPES_MEMBER)?;
     let candidate_content_types = candidate_archive.read(XLSX_CONTENT_TYPES_MEMBER)?;
     let source_count = xlsx_calc_chain_content_type_override_count(source_content_types.as_ref())?;
@@ -56601,8 +56780,12 @@ fn verify_xlsx_cell_crud_workbook_calculation_closure(
     output: &[u8],
     require_invalidation: bool,
 ) -> Result<(), Box<dyn Error>> {
-    let source_archive = ArchiveReader::new(&corpus.archive)?;
-    let candidate_archive = ArchiveReader::new(output)?;
+    let source_archive = ArchiveReader::new(
+        &corpus.archive,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
+    let candidate_archive =
+        ArchiveReader::new(output, soapberry_zip::office::ArchiveLimits::default())?;
     let source_workbook = source_archive.read(XLSX_WORKBOOK_MEMBER)?;
     let candidate_workbook = candidate_archive.read(XLSX_WORKBOOK_MEMBER)?;
     let (source_without_calc_pr, source_count) =
@@ -56624,8 +56807,8 @@ fn verify_xlsx_cell_crud_workbook_calculation_closure(
         .into());
     }
     if effective_invalidation {
-        let source_package = litchi_xlsx::Package::from_slice(&corpus.archive)?;
-        let candidate_package = litchi_xlsx::Package::from_slice(output)?;
+        let source_package = litchi_xlsx::Package::from_bytes(&corpus.archive)?;
+        let candidate_package = litchi_xlsx::Package::from_bytes(output)?;
         let mut expected = source_package
             .calculation_metadata()?
             .properties()
@@ -56652,8 +56835,10 @@ fn verify_xlsx_cell_crud_raw_calculation_chain_removal(
     output: &[u8],
     chain: &XlsxCalcChainIdentity,
 ) -> Result<(), Box<dyn Error>> {
-    let source_archive = ArchiveReader::new(source)?;
-    let candidate_archive = ArchiveReader::new(output)?;
+    let source_archive =
+        ArchiveReader::new(source, soapberry_zip::office::ArchiveLimits::default())?;
+    let candidate_archive =
+        ArchiveReader::new(output, soapberry_zip::office::ArchiveLimits::default())?;
     let source_relationships = source_archive.read(XLSX_WORKBOOK_RELATIONSHIPS_MEMBER)?;
     let candidate_relationships = candidate_archive.read(XLSX_WORKBOOK_RELATIONSHIPS_MEMBER)?;
     let (source_without_chain, source_relationship_count) = xlsx_xml_strip_direct_element(
@@ -56840,7 +57025,11 @@ fn insert_raw_zip_member(
 fn raw_zip_members(bytes: &[u8]) -> Result<BTreeMap<String, RawZipMember>, Box<dyn Error>> {
     let archive = ZipArchive::from_slice(bytes)?.into_zip_archive();
     let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer)?;
+    let index = PreservationIndex::new(
+        &archive,
+        &mut buffer,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
     let mut records = archive.entries(&mut buffer);
     let mut members = BTreeMap::new();
     for preserved in index.entries() {
@@ -56888,11 +57077,11 @@ fn verify_xlsx_conditional_formatting_raw_preservation(
 }
 
 fn verify_xlsx_conditional_formatting_patch(corpus: &Corpus) -> Result<(), Box<dyn Error>> {
-    let editor = litchi_xlsx::conditional_formatting::SourceBackedEditor::from_read_at(Arc::new(
-        OwnedSource::new(corpus.archive.clone()),
-    ))?;
-    let mut edit = editor.edit("Sheet1")?;
-    if edit.collections() != xlsx_conditional_formatting_values(false)? {
+    let editor = litchi_xlsx::SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(
+        corpus.archive.clone(),
+    )))?;
+    let mut edit = editor.edit_conditional_formats("Sheet1")?;
+    if edit.collections()? != xlsx_conditional_formatting_values(false)? {
         return Err("XLSX conditional-formatting patch source differs from specification".into());
     }
     if !edit.set_collections(xlsx_conditional_formatting_values(true)?)? {
@@ -56900,8 +57089,8 @@ fn verify_xlsx_conditional_formatting_patch(corpus: &Corpus) -> Result<(), Box<d
     }
     let commit = edit.commit()?;
     let inverse = commit.patch().inverse();
-    if !commit.changed()
-        || commit.patch().is_empty()
+    if !commit.diagnostics().changed()
+        || commit.patch().is_noop()
         || inverse.before().source_xml() != commit.patch().after().source_xml()
         || inverse.after().source_xml() != commit.patch().before().source_xml()
         || inverse.before().collections() != commit.patch().after().collections()
@@ -56910,15 +57099,28 @@ fn verify_xlsx_conditional_formatting_patch(corpus: &Corpus) -> Result<(), Box<d
         return Err("XLSX conditional-formatting patch/inverse is not exact".into());
     }
 
-    let source = OpcPackage::from_bytes(&corpus.archive)?;
-    let mut replay = source.clone();
-    commit.patch().apply(&mut replay)?;
+    let source = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+    // Source-backed patches replay onto source-backed workbooks (record
+    // 0360): forward onto a second open of the corpus, inverse onto a
+    // reopened copy of that output.
+    let forward = litchi_xlsx::SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(
+        corpus.archive.clone(),
+    )))?
+    .apply_conditional_formats(commit.patch())?
+    .into_package()
+    .to_bytes()?;
+    let replay = OpcPackage::from_bytes(&forward, litchi_opc::SourceLimits::default())?;
     if litchi_xlsx::conditional_formatting::Snapshot::load(&replay, "Sheet1")?.collections()
         != xlsx_conditional_formatting_values(true)?
     {
         return Err("XLSX conditional-formatting patch replay changed its target".into());
     }
-    inverse.apply(&mut replay)?;
+    let restored =
+        litchi_xlsx::SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(forward)))?
+            .apply_conditional_formats(&inverse)?
+            .into_package()
+            .to_bytes()?;
+    let replay = OpcPackage::from_bytes(&restored, litchi_opc::SourceLimits::default())?;
     for source_part in source
         .try_iter_parts()
         .map(|part| part.expect("part payload decodes"))
@@ -56939,8 +57141,8 @@ fn verify_xlsx_conditional_formatting_edit_output(
     corpus: &Corpus,
     output: &[u8],
 ) -> Result<(), Box<dyn Error>> {
-    let reopened = litchi_xlsx::Package::from_slice(output)?;
-    let workbook = reopened.workbook()?;
+    let reopened = litchi_xlsx::Package::from_bytes(output)?;
+    let workbook = reopened.workbook();
     let sheet = workbook
         .sheet("Sheet1")?
         .ok_or("XLSX conditional-formatting output has no Sheet1")?;
@@ -56959,8 +57161,8 @@ fn verify_xlsx_conditional_formatting_edit_output(
         return Err("XLSX conditional-formatting output changed calculation metadata".into());
     }
 
-    let source = OpcPackage::from_bytes(&corpus.archive)?;
-    let candidate = OpcPackage::from_bytes(output)?;
+    let source = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+    let candidate = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     if source.part_count() != corpus.manifest.entry_count
         || candidate.part_count() != source.part_count()
         || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
@@ -57005,9 +57207,9 @@ fn publish_xlsx_conditional_formatting_edit<W: Write>(
 ) -> Result<usize, Box<dyn Error>> {
     let values = xlsx_conditional_formatting_values(true)?;
     if source_backed {
-        let editor = litchi_xlsx::conditional_formatting::SourceBackedEditor::from_read_at(source)?;
-        let mut edit = editor.edit("Sheet1")?;
-        if edit.collections() != xlsx_conditional_formatting_values(false)? {
+        let editor = litchi_xlsx::SourceBackedWorkbook::from_read_at(source)?;
+        let mut edit = editor.edit_conditional_formats("Sheet1")?;
+        if edit.collections()? != xlsx_conditional_formatting_values(false)? {
             return Err(
                 "XLSX source-backed conditional-formatting source differs from specification"
                     .into(),
@@ -57019,15 +57221,16 @@ fn publish_xlsx_conditional_formatting_edit<W: Write>(
             );
         }
         let commit = edit.commit()?;
-        if !commit.changed() || commit.patch().is_empty() {
+        if !commit.diagnostics().changed() || commit.patch().is_noop() {
             return Err(
                 "XLSX source-backed conditional-formatting edit produced an invalid patch".into(),
             );
         }
         let materializations = usize::try_from(editor.cache_diagnostics().successful_loads)?;
-        let published = editor.publish_commit_to_stream(writer, &commit)?;
-        if published.source_xml() != commit.snapshot().source_xml()
-            || published.collections() != commit.snapshot().collections()
+        commit.package().write_to(writer)?;
+        let published = commit.patch().after().clone();
+        if published.source_xml() != commit.patch().after().source_xml()
+            || published.collections() != commit.patch().after().collections()
         {
             return Err(
                 "XLSX source-backed conditional-formatting edit published another snapshot".into(),
@@ -57035,7 +57238,13 @@ fn publish_xlsx_conditional_formatting_edit<W: Write>(
         }
         Ok(materializations)
     } else {
-        let package = SourceBackedPackage::from_read_at(source)?;
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         let mut opc = package.into_opc_package()?;
         let materializations = opc.part_count();
         let worksheet_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
@@ -57051,7 +57260,7 @@ fn publish_xlsx_conditional_formatting_edit<W: Write>(
             0,
         )?;
         opc.get_part_mut(&worksheet_uri)?.set_blob(updated);
-        PackageWriter::write_to_stream(writer, &opc)?;
+        PackageWriter::write_to(writer, &opc)?;
         Ok(materializations)
     }
 }
@@ -57169,8 +57378,8 @@ fn verify_xlsx_data_validation_edit_output(
     corpus: &Corpus,
     output: &[u8],
 ) -> Result<(), Box<dyn Error>> {
-    let reopened = litchi_xlsx::Package::from_slice(output)?;
-    let workbook = reopened.workbook()?;
+    let reopened = litchi_xlsx::Package::from_bytes(output)?;
+    let workbook = reopened.workbook();
     let sheet = workbook
         .sheet("Sheet1")?
         .ok_or("XLSX data-validation output has no Sheet1")?;
@@ -57187,8 +57396,8 @@ fn verify_xlsx_data_validation_edit_output(
         return Err("XLSX data-validation output changed calculation metadata".into());
     }
 
-    let source = OpcPackage::from_bytes(&corpus.archive)?;
-    let candidate = OpcPackage::from_bytes(output)?;
+    let source = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+    let candidate = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     if source.part_count() != corpus.manifest.entry_count
         || candidate.part_count() != source.part_count()
         || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
@@ -57231,19 +57440,20 @@ fn publish_xlsx_data_validation_edit<W: Write>(
 ) -> Result<usize, Box<dyn Error>> {
     let values = xlsx_data_validation_values(true)?;
     if source_backed {
-        let editor = litchi_xlsx::data_validation::SourceBackedEditor::from_read_at(source)?;
-        let mut edit = editor.edit("Sheet1")?;
+        let editor = litchi_xlsx::SourceBackedWorkbook::from_read_at(source)?;
+        let mut edit = editor.edit_data_validations("Sheet1")?;
         if !edit.set_collections(values)? {
             return Err("XLSX source-backed data-validation edit reported an exact no-op".into());
         }
         let commit = edit.commit()?;
-        if !commit.changed() || commit.patch().is_empty() {
+        if !commit.diagnostics().changed() || commit.patch().is_noop() {
             return Err("XLSX source-backed data-validation edit produced an invalid patch".into());
         }
         let materializations = usize::try_from(editor.cache_diagnostics().successful_loads)?;
-        let published = editor.publish_commit_to_stream(writer, &commit)?;
-        if published.source_xml() != commit.snapshot().source_xml()
-            || published.collections() != commit.snapshot().collections()
+        commit.package().write_to(writer)?;
+        let published = commit.patch().after().clone();
+        if published.source_xml() != commit.patch().after().source_xml()
+            || published.collections() != commit.patch().after().collections()
         {
             return Err(
                 "XLSX source-backed data-validation edit published another snapshot".into(),
@@ -57251,7 +57461,13 @@ fn publish_xlsx_data_validation_edit<W: Write>(
         }
         Ok(materializations)
     } else {
-        let package = SourceBackedPackage::from_read_at(source)?;
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         let mut opc = package.into_opc_package()?;
         let materializations = opc.part_count();
         let worksheet_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
@@ -57260,7 +57476,7 @@ fn publish_xlsx_data_validation_edit<W: Write>(
             &values,
         )?;
         opc.get_part_mut(&worksheet_uri)?.set_blob(updated);
-        PackageWriter::write_to_stream(writer, &opc)?;
+        PackageWriter::write_to(writer, &opc)?;
         Ok(materializations)
     }
 }
@@ -57370,7 +57586,7 @@ fn run_opc_open(
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
-        let package = OpcPackage::from_bytes(&corpus.archive)?;
+        let package = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
         let count = package.part_count();
         if count != corpus.manifest.entry_count {
             return Err("OPC open part count differs from generated corpus manifest".into());
@@ -57600,7 +57816,7 @@ fn run_opc_casefold_eager_open(
         let owned = corpus.archive.clone();
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
-        let package = OpcPackage::from_bytes(&owned)?;
+        let package = OpcPackage::from_bytes(&owned, litchi_opc::SourceLimits::default())?;
         std::hint::black_box(&package);
         let duration = started.elapsed();
         let allocation_metrics = allocation_region.finish();
@@ -57632,7 +57848,7 @@ fn run_opc_casefold_owned_open(
         let owned = corpus.archive.clone();
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
-        let package = OpcPackage::from_vec(owned)?;
+        let package = OpcPackage::from_vec(owned, litchi_opc::SourceLimits::default())?;
         std::hint::black_box(&package);
         let duration = started.elapsed();
         let allocation_metrics = allocation_region.finish();
@@ -57694,7 +57910,13 @@ fn run_opc_casefold_source_open(
         let read_at: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(corpus.archive.clone()));
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
-        let package = SourceBackedPackage::from_read_at(read_at)?;
+        let package = SourceBackedPackage::from_read_at(
+            read_at,
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         std::hint::black_box(&package);
         let duration = started.elapsed();
         let allocation_metrics = allocation_region.finish();
@@ -57711,7 +57933,13 @@ fn run_opc_casefold_source_open(
                 corpus.ordinary_payload_ranges.clone(),
             ));
             let replay_read_at: Arc<dyn ReadAt> = source.clone();
-            let replay_package = SourceBackedPackage::from_read_at(replay_read_at)?;
+            let replay_package = SourceBackedPackage::from_read_at(
+                replay_read_at,
+                litchi_opc::SourceLimits::default(),
+                litchi_opc::SourceCacheLimits::default(),
+                litchi_opc::SourceReadPolicy::exact(),
+                None,
+            )?;
             let snapshot = source.snapshot();
             let version_calls = source.version_calls();
             let replay_digest = opc_casefold_source_name_digest(&replay_package, corpus)?;
@@ -57740,7 +57968,7 @@ fn run_opc_casefold_eager_lookup(
     samples: usize,
 ) -> Result<OpcCasefoldRunEvidence, Box<dyn Error>> {
     let owned = corpus.archive.clone();
-    let package = OpcPackage::from_bytes(&owned)?;
+    let package = OpcPackage::from_bytes(&owned, litchi_opc::SourceLimits::default())?;
     let setup_digest = opc_casefold_eager_name_digest(&package, corpus)?;
     if setup_digest != corpus.canonical_name_oracle_sha256 {
         return Err("eager OPC case-fold lookup setup differs from corpus oracle".into());
@@ -57777,7 +58005,13 @@ fn run_opc_casefold_source_lookup(
     samples: usize,
 ) -> Result<OpcCasefoldRunEvidence, Box<dyn Error>> {
     let read_at: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(corpus.archive.clone()));
-    let package = SourceBackedPackage::from_read_at(read_at)?;
+    let package = SourceBackedPackage::from_read_at(
+        read_at,
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )?;
     let setup_digest = opc_casefold_source_name_digest(&package, corpus)?;
     if setup_digest != corpus.canonical_name_oracle_sha256 {
         return Err("source-backed OPC case-fold lookup setup differs from corpus oracle".into());
@@ -57788,7 +58022,13 @@ fn run_opc_casefold_source_lookup(
         corpus.ordinary_payload_ranges.clone(),
     ));
     let replay_read_at: Arc<dyn ReadAt> = replay_source.clone();
-    let replay_package = SourceBackedPackage::from_read_at(replay_read_at)?;
+    let replay_package = SourceBackedPackage::from_read_at(
+        replay_read_at,
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )?;
     let replay_setup_digest = opc_casefold_source_name_digest(&replay_package, corpus)?;
     if replay_setup_digest != setup_digest {
         return Err("source-backed OPC case-fold replay setup differs from timed setup".into());
@@ -57903,7 +58143,13 @@ fn run_opc_casefold_source_class_lookup(
         .iter()
         .collect::<Vec<_>>();
     let read_at: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(corpus.archive.clone()));
-    let package = SourceBackedPackage::from_read_at(read_at)?;
+    let package = SourceBackedPackage::from_read_at(
+        read_at,
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )?;
     let setup_digest = opc_casefold_source_name_digest(&package, corpus)?;
     if setup_digest != corpus.canonical_name_oracle_sha256 {
         return Err(
@@ -57916,7 +58162,13 @@ fn run_opc_casefold_source_class_lookup(
         corpus.ordinary_payload_ranges.clone(),
     ));
     let replay_read_at: Arc<dyn ReadAt> = replay_source.clone();
-    let replay_package = SourceBackedPackage::from_read_at(replay_read_at)?;
+    let replay_package = SourceBackedPackage::from_read_at(
+        replay_read_at,
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )?;
     let replay_setup_digest = opc_casefold_source_name_digest(&replay_package, corpus)?;
     if replay_setup_digest != setup_digest {
         return Err(
@@ -58107,7 +58359,7 @@ fn run_opc_casefold_lookup(
         },
         timing_scope: if open {
             if owned_open {
-                "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded"
+                "OpcPackage::from_vec(owned, litchi_opc::SourceLimits::default()) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded"
             } else if source_backed {
                 "SourceBackedPackage::from_read_at over litchi_core::OwnedSource only; source ownership, instrumented replay, and post-open name oracle excluded"
             } else {
@@ -58191,7 +58443,8 @@ fn run_opc_relationship_open(
 
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let started = Instant::now();
-        let package = OpcPackage::from_bytes(&corpus.corpus.archive)?;
+        let package =
+            OpcPackage::from_bytes(&corpus.corpus.archive, litchi_opc::SourceLimits::default())?;
         std::hint::black_box(&package);
         let duration = started.elapsed();
         record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
@@ -58284,7 +58537,7 @@ fn run_opc_open_owned(
         let owned = corpus.archive.clone();
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
-        let package = OpcPackage::from_vec(owned)?;
+        let package = OpcPackage::from_vec(owned, litchi_opc::SourceLimits::default())?;
         let count = package.part_count();
         if count != corpus.manifest.entry_count {
             return Err("owned OPC open part count differs from generated corpus manifest".into());
@@ -58312,7 +58565,8 @@ fn run_opc_noop_save(
     warmup_iterations: usize,
     samples: usize,
 ) -> Result<CaseResult, Box<dyn Error>> {
-    let package = OpcPackage::from_vec(corpus.archive.clone())?;
+    let package =
+        OpcPackage::from_vec(corpus.archive.clone(), litchi_opc::SourceLimits::default())?;
     let maximum = u64::try_from(corpus.archive.len())?
         .checked_mul(2)
         .and_then(|value| value.checked_add(64 * 1024))
@@ -58326,7 +58580,7 @@ fn run_opc_noop_save(
         sink.reserve_budget()?;
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
-        PackageWriter::write_to_stream(&mut sink, &package)?;
+        PackageWriter::write_to(&mut sink, &package)?;
         let duration = started.elapsed();
         let allocation_metrics = allocation_region.finish();
         record_default_operation(
@@ -58384,8 +58638,8 @@ fn run_provider_nonseek_write(
     }
     let mut provider = ProviderAxisSummary {
         axis: "non_seek_sink",
-        implementation: "PackageWriter::write_to_stream + CountingSink",
-        timing_scope: "PackageWriter::write_to_stream into a pre-reserved non-seek sink; corpus parsing, exact-byte oracle, and sink finalization are outside elapsed_ns",
+        implementation: "PackageWriter::write_to + CountingSink",
+        timing_scope: "PackageWriter::write_to into a pre-reserved non-seek sink; corpus parsing, exact-byte oracle, and sink finalization are outside elapsed_ns",
         sample_order: sample_order.clone(),
         simulation_config: None,
         logical_counter_scope: "not_applicable: owned OPC package is already in memory",
@@ -58431,7 +58685,8 @@ fn run_opc_mutated_save(
         .ok_or("OPC mutation target is empty")?;
     *first ^= 0xff;
 
-    let mut package = OpcPackage::from_vec(corpus.archive.clone())?;
+    let mut package =
+        OpcPackage::from_vec(corpus.archive.clone(), litchi_opc::SourceLimits::default())?;
     package.get_part_mut(&target_uri)?.set_blob(changed_payload);
     let expected = PackageWriter::to_bytes(&package)?;
     let maximum = u64::try_from(expected.len())?
@@ -58447,7 +58702,7 @@ fn run_opc_mutated_save(
         sink.reserve_budget()?;
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
-        PackageWriter::write_to_stream(&mut sink, &package)?;
+        PackageWriter::write_to(&mut sink, &package)?;
         let duration = started.elapsed();
         let allocation_metrics = allocation_region.finish();
         record_default_operation(
@@ -58489,7 +58744,10 @@ fn run_cfb_open(
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
-        let ole = OleFile::open(Cursor::new(corpus.archive.as_slice()))?;
+        let ole = OleFile::open(
+            Cursor::new(corpus.archive.as_slice()),
+            litchi_cfb::OleFileLimits::default(),
+        )?;
         let duration = started.elapsed();
         let allocation_metrics = match allocation_region.finish() {
             Some(sample) => Some(sample),
@@ -58519,7 +58777,10 @@ fn run_cfb_list_streams(
     warmup_iterations: usize,
     samples: usize,
 ) -> Result<CaseResult, Box<dyn Error>> {
-    let ole = OleFile::open(Cursor::new(corpus.archive.as_slice()))?;
+    let ole = OleFile::open(
+        Cursor::new(corpus.archive.as_slice()),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
     let mut elapsed = Vec::with_capacity(samples);
     let mut observations = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
@@ -58552,7 +58813,10 @@ fn run_cfb_read_one(
     warmup_iterations: usize,
     samples: usize,
 ) -> Result<CaseResult, Box<dyn Error>> {
-    let mut ole = OleFile::open(Cursor::new(corpus.archive.as_slice()))?;
+    let mut ole = OleFile::open(
+        Cursor::new(corpus.archive.as_slice()),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
     let path = [corpus.target_name.as_str()];
     let mut elapsed = Vec::with_capacity(samples);
     let mut observations = Vec::with_capacity(samples);
@@ -58605,7 +58869,7 @@ fn run_cfb_shared_open(
         let source = cfb_instrumented_source(corpus);
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
-        let ole = SharedOleFile::open_with_limits(source.clone(), limits)?;
+        let ole = SharedOleFile::open(source.clone(), limits)?;
         let duration = started.elapsed();
         let allocation_metrics = allocation_region.finish();
         if ole.file_size() != expected_size {
@@ -58646,7 +58910,7 @@ fn run_cfb_shared_read_one(
     let mut source_summary = SourceSummary::default();
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let source = cfb_instrumented_source(corpus);
-        let ole = SharedOleFile::open_with_limits(source.clone(), limits)?;
+        let ole = SharedOleFile::open(source.clone(), limits)?;
         source.reset();
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
@@ -58716,7 +58980,7 @@ fn run_cfb_selective_read(
         let open_started = Instant::now();
         let selected = if shared {
             let source = Arc::new(SelectiveReadAt::new(bytes, Arc::clone(&metrics)));
-            let ole = SharedOleFile::open_with_limits(source, limits)?;
+            let ole = SharedOleFile::open(source, limits)?;
             let open_duration = open_started.elapsed();
             let open_snapshot = metrics.snapshot()?;
             metrics.reset()?;
@@ -58730,7 +58994,7 @@ fn run_cfb_selective_read(
             (payload, open_duration, read_duration, open_snapshot)
         } else {
             let cursor = SelectiveCursor::new(bytes, Arc::clone(&metrics));
-            let mut ole = OleFile::open(cursor)?;
+            let mut ole = OleFile::open(cursor, litchi_cfb::OleFileLimits::default())?;
             let open_duration = open_started.elapsed();
             let open_snapshot = metrics.snapshot()?;
             metrics.reset()?;
@@ -58816,7 +59080,10 @@ fn run_cfb_selective_read(
 }
 
 fn cfb_open_stream_identity(corpus: &Corpus) -> Result<(usize, u32, bool, u64), Box<dyn Error>> {
-    let parsed = OleFile::open(Cursor::new(corpus.archive.as_slice()))?;
+    let parsed = OleFile::open(
+        Cursor::new(corpus.archive.as_slice()),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
     let root_ministream_bytes = parsed
         .root_entry()
         .ok_or("CFB open_stream source has no root directory entry")?
@@ -58963,7 +59230,7 @@ fn run_cfb_open_stream(
         let mut outputs = Vec::with_capacity(invocation_count);
         let source = Arc::new(SelectiveReadAt::new(bytes, Arc::clone(&metrics)));
         let open_started = Instant::now();
-        let ole = SharedOleFile::open_with_limits(source, limits)?;
+        let ole = SharedOleFile::open(source, limits)?;
         let open_duration = open_started.elapsed();
         let open_snapshot = metrics.snapshot()?;
         metrics.reset()?;
@@ -59244,7 +59511,7 @@ fn run_cfb_open_stream_bulk(
         let metrics = Arc::new(SelectiveReadMetrics::default());
         let source = Arc::new(SelectiveReadAt::new(bytes, Arc::clone(&metrics)));
         let open_started = Instant::now();
-        let ole = SharedOleFile::open_with_limits(source, limits)?;
+        let ole = SharedOleFile::open(source, limits)?;
         let open_duration = open_started.elapsed();
         let open_snapshot = metrics.snapshot()?;
         metrics.reset()?;
@@ -59437,7 +59704,7 @@ fn run_cfb_open_stream_concurrent(
             target_len,
         ));
         let open_started = Instant::now();
-        let ole = SharedOleFile::open_with_limits(source, limits)?;
+        let ole = SharedOleFile::open(source, limits)?;
         let open_duration = open_started.elapsed();
         let open_snapshot = metrics.snapshot()?;
         metrics.reset()?;
@@ -59666,7 +59933,7 @@ fn run_cfb_open_stream_simulated(
             metrics: Arc::clone(&metrics),
         });
         let open_started = Instant::now();
-        let ole = SharedOleFile::open_with_limits(source.clone(), limits)?;
+        let ole = SharedOleFile::open(source.clone(), limits)?;
         let open_duration = open_started.elapsed();
         let open_snapshot = source.snapshot()?;
         metrics.reset()?;
@@ -60115,7 +60382,7 @@ fn run_cfb_selective_simulated_read(
         let open_started = Instant::now();
         let selected = if shared {
             let source = shared_source.ok_or("simulated shared CFB source is absent")?;
-            let ole = SharedOleFile::open_with_limits(source.clone(), limits)?;
+            let ole = SharedOleFile::open(source.clone(), limits)?;
             let open_duration = open_started.elapsed();
             let open_snapshot = source.snapshot()?;
             metrics.reset()?;
@@ -60129,7 +60396,7 @@ fn run_cfb_selective_simulated_read(
             (payload, open_duration, read_duration, open_snapshot)
         } else {
             let cursor = legacy_cursor.ok_or("simulated legacy CFB cursor is absent")?;
-            let mut ole = OleFile::open(cursor)?;
+            let mut ole = OleFile::open(cursor, litchi_cfb::OleFileLimits::default())?;
             let open_duration = open_started.elapsed();
             let open_snapshot = metrics.snapshot()?;
             metrics.reset()?;
@@ -60245,7 +60512,7 @@ fn run_cfb_shared_concurrent_reads(
     let mut source_summary = SourceSummary::default();
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let source = cfb_instrumented_source(corpus);
-        let ole = SharedOleFile::open_with_limits(source.clone(), limits)?;
+        let ole = SharedOleFile::open(source.clone(), limits)?;
         source.reset();
         let start = Arc::new(Barrier::new(3));
         let allocation_region = allocation_metrics::begin();
@@ -60360,9 +60627,9 @@ fn run_ole_common_one_edit_save(
         let replacement = OLE_COMMON_REPLACEMENT.to_vec();
         let targets = targets.clone();
         let started = Instant::now();
-        let mut editor = OleObjectEditor::open(source, targets, limits)?;
+        let mut editor = ole_common_open_editor(source, targets, limits)?;
         editor.put_stream(&path, replacement)?;
-        let output = editor.finish()?;
+        let output = ole_object_editor_bytes(editor)?;
         let duration = started.elapsed();
         if output != expected {
             return Err("OLE common edit/save output is not deterministic".into());
@@ -60396,11 +60663,8 @@ fn run_ole_common_open(
         let source = corpus.archive.clone();
         let targets = targets.clone();
         let started = Instant::now();
-        let editor = OleObjectEditor::open(source, targets, limits)?;
+        let editor = ole_common_open_editor(source, targets, limits)?;
         let duration = started.elapsed();
-        if editor.is_changed() {
-            return Err("fresh OLE common editor unexpectedly reports a change".into());
-        }
         std::hint::black_box(&editor);
         final_editor = Some(editor);
         record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
@@ -60423,26 +60687,25 @@ fn run_ole_common_put_stream_publish(
     let corpus = build_ole_common_corpus(corpus)?;
     let expected = ole_common_changed_output(&corpus)?;
     let path = vec![corpus.target_name.clone()];
-    let opened = OleObjectEditor::open(
+    let source = OleObjectPackage::open_with_options(
         corpus.archive.clone(),
-        OleObjectTargets::default(),
-        ole_common_limits(&corpus)?,
+        OleObjectOpenOptions::new()
+            .targets(OleObjectTargets::default())
+            .limits(ole_common_limits(&corpus)?),
     )?;
-    let source = opened.snapshot();
     let mut elapsed = Vec::with_capacity(samples);
     let mut final_editor = None;
 
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let mut editor = source.edit();
+        let mut editor = source.edit()?;
         let replacement = OLE_COMMON_REPLACEMENT.to_vec();
         let started = Instant::now();
         editor.put_stream(&path, replacement)?;
         let duration = started.elapsed();
-        if !editor.is_changed()
-            || editor
-                .stream(&path)
-                .ok_or("OLE common target disappeared")?
-                != OLE_COMMON_REPLACEMENT
+        if editor
+            .stream(&path)
+            .ok_or("OLE common target disappeared")?
+            != OLE_COMMON_REPLACEMENT
         {
             return Err("OLE common candidate publication did not retain the replacement".into());
         }
@@ -60451,9 +60714,9 @@ fn run_ole_common_put_stream_publish(
         record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
     }
 
-    let output = final_editor
-        .ok_or("OLE common candidate publication produced no final editor")?
-        .finish()?;
+    let output = ole_object_editor_bytes(
+        final_editor.ok_or("OLE common candidate publication produced no final editor")?,
+    )?;
     if output != expected {
         return Err("OLE common candidate publication changed deterministic output".into());
     }
@@ -60474,20 +60737,20 @@ fn run_ole_common_finish_render(
     let corpus = build_ole_common_corpus(corpus)?;
     let expected = ole_common_changed_output(&corpus)?;
     let path = vec![corpus.target_name.clone()];
-    let mut editor = OleObjectEditor::open(
+    let mut editor = ole_common_open_editor(
         corpus.archive.clone(),
         OleObjectTargets::default(),
         ole_common_limits(&corpus)?,
     )?;
     editor.put_stream(&path, OLE_COMMON_REPLACEMENT.to_vec())?;
-    let changed = editor.snapshot();
+    let changed = editor.commit()?.into_package();
     let mut elapsed = Vec::with_capacity(samples);
     let mut final_output = None;
 
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let editor = changed.edit();
+        let editor = changed.edit()?;
         let started = Instant::now();
-        let output = editor.finish()?;
+        let output = ole_object_editor_bytes(editor)?;
         let duration = started.elapsed();
         std::hint::black_box(&output);
         final_output = Some(output);
@@ -60536,17 +60799,36 @@ fn verify_ole_common_source_editor(
     Ok(())
 }
 
+fn ole_common_open_editor(
+    source: Vec<u8>,
+    targets: OleObjectTargets,
+    limits: OleObjectLimits,
+) -> Result<OleObjectEditor, Box<dyn Error>> {
+    Ok(OleObjectPackage::open_with_options(
+        source,
+        OleObjectOpenOptions::new().targets(targets).limits(limits),
+    )?
+    .edit()?)
+}
+
 fn ole_common_changed_output(corpus: &Corpus) -> Result<Vec<u8>, Box<dyn Error>> {
     let path = vec![corpus.target_name.clone()];
-    let mut editor = OleObjectEditor::open(
+    let mut editor = ole_common_open_editor(
         corpus.archive.clone(),
         OleObjectTargets::default(),
         ole_common_limits(corpus)?,
     )?;
     editor.put_stream(&path, OLE_COMMON_REPLACEMENT.to_vec())?;
-    let output = editor.finish()?;
+    let output = ole_object_editor_bytes(editor)?;
     verify_ole_common_changed_output(corpus, &output)?;
     Ok(output)
+}
+
+fn ole_object_editor_bytes(editor: OleObjectEditor) -> Result<Vec<u8>, Box<dyn Error>> {
+    let package = editor.commit()?.into_package();
+    let mut bytes = Vec::new();
+    package.write_to(&mut bytes)?;
+    Ok(bytes)
 }
 
 fn ole_common_limits(corpus: &Corpus) -> Result<OleObjectLimits, Box<dyn Error>> {
@@ -60569,7 +60851,7 @@ fn ole_common_limits(corpus: &Corpus) -> Result<OleObjectLimits, Box<dyn Error>>
 
 fn verify_ole_common_changed_output(corpus: &Corpus, output: &[u8]) -> Result<(), Box<dyn Error>> {
     let kind = corpus_payload_kind(corpus)?;
-    let mut ole = OleFile::open(Cursor::new(output))?;
+    let mut ole = OleFile::open(Cursor::new(output), litchi_cfb::OleFileLimits::default())?;
     let streams = ole.list_streams();
     if streams.len() != corpus.manifest.entry_count {
         return Err("OLE common output stream count differs from its corpus".into());
@@ -60728,14 +61010,14 @@ fn write_streaming_rtf<W: Write>(
         objects,
         work,
     )?;
-    let limits = litchi_rtf::write::StreamingRtfLimits::new(
+    let limits = litchi_rtf::streaming::Limits::new(
         input_bytes,
         max_output_bytes,
         paragraphs,
         runs,
         RTF_STREAMING_SCRATCH_BYTES,
     );
-    let mut writer = litchi_rtf::write::StreamingRtfWriter::new(sink, context, limits)?;
+    let mut writer = litchi_rtf::streaming::Writer::new(sink, context, limits)?;
     for paragraph in 0..shape.streaming_units() {
         let text = streaming_rtf_text(paragraph);
         writer.start_paragraph()?;
@@ -60770,10 +61052,11 @@ fn write_streaming_rtf<W: Write>(
 }
 
 fn verify_streaming_xlsx(bytes: Vec<u8>, shape: SemanticShape) -> Result<(), Box<dyn Error>> {
-    let archive_member_names = ArchiveReader::new(&bytes)?
-        .file_names()
-        .map(str::to_owned)
-        .collect::<Vec<_>>();
+    let archive_member_names =
+        ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default())?
+            .file_names()
+            .map(str::to_owned)
+            .collect::<Vec<_>>();
     let expected_archive_members = [
         "[Content_Types].xml".to_owned(),
         "_rels/.rels".to_owned(),
@@ -60793,11 +61076,12 @@ fn verify_streaming_xlsx(bytes: Vec<u8>, shape: SemanticShape) -> Result<(), Box
     {
         return Err("streaming XLSX archive member set differs from its six-part shape".into());
     }
-    let workbook = Workbook::from_bytes(bytes)?;
-    if workbook.len() != 1 {
+    let workbook = XlsxPackage::from_bytes(&bytes)?;
+    if workbook.workbook_ref().len() != 1 {
         return Err("streaming XLSX workbook does not contain exactly one sheet".into());
     }
     let sheet = workbook
+        .workbook_ref()
         .sheet("Sheet1")?
         .ok_or("streaming XLSX Sheet1 is missing")?;
     if sheet.rows()?.count() != shape.streaming_units() {
@@ -60842,7 +61126,7 @@ fn verify_streaming_xlsx(bytes: Vec<u8>, shape: SemanticShape) -> Result<(), Box
 }
 
 fn verify_streaming_rtf(bytes: &[u8], shape: SemanticShape) -> Result<(), Box<dyn Error>> {
-    let document = litchi_rtf::Document::from_bytes(bytes)?;
+    let document = litchi_rtf::Package::from_bytes(bytes)?;
     if document.paragraph_count() != shape.streaming_units() {
         return Err("streaming RTF paragraph count differs from its shape".into());
     }
@@ -60891,7 +61175,8 @@ fn build_streaming_corpus(
             _ => return Err("non-streaming case requested a streaming corpus".into()),
         };
     let target = if case == Case::XlsxStreamingCreate {
-        ArchiveReader::new(&artifact)?.read(&target_entry)?
+        ArchiveReader::new(&artifact, soapberry_zip::office::ArchiveLimits::default())?
+            .read(&target_entry)?
     } else {
         artifact.clone()
     };
@@ -61820,13 +62105,17 @@ mod tests {
                 .unwrap(),
             super::xlsx_root_metadata_digest(&litchi_core::Metadata::default()).unwrap()
         );
-        litchi_ooxml_common::properties::write(
-            &mut package,
-            litchi_ooxml_common::Props::new().title("Benchmark title"),
+        let expected = litchi_core::Metadata {
+            title: Some("Benchmark title".to_owned()),
+            ..litchi_core::Metadata::default()
+        };
+        let mut edit = litchi_ooxml_common::properties::Edit::new(
+            &package,
+            litchi_ooxml_common::custom::Host::Word,
         )
         .unwrap();
-        let expected =
-            litchi_core::Metadata::from(litchi_ooxml_common::Props::new().title("Benchmark title"));
+        edit.set_metadata(expected.clone());
+        package = edit.commit().unwrap().into_package();
         assert_eq!(
             super::xlsx_root_metadata_digest(&super::xlsx_root_metadata_oracle(&package).unwrap())
                 .unwrap(),
@@ -61886,9 +62175,8 @@ mod tests {
         RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES, RangeSimulationConfig, RequestSizeBuckets,
         RtfSemanticVariant, SemanticShape, SimulatedCursor, SimulatedRangeMetrics,
         SimulatedRangeSource, SinkSummary, SourceBackedPackage, TransferDelayPolicy,
-        WindowedHashingSink, Workbook, WriteSizeBuckets, WriterShape,
-        XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT, XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR,
-        XLSX_PAGE_BREAK_PROJECTION_CORPUS_GENERATOR,
+        WindowedHashingSink, WriteSizeBuckets, WriterShape, XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT,
+        XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR, XLSX_PAGE_BREAK_PROJECTION_CORPUS_GENERATOR,
         XLSX_ROW_VISIBILITY_SOURCE_EDIT_CORPUS_GENERATOR, XlsbShape, XlsxCellCrudShape,
         XlsxRowVisibilityShape, XlsxShape, build_cfb_corpus, build_cfb_selective_corpus,
         build_detection_corpus, build_docx_section_layout_corpus, build_docx_source_edit_corpus,
@@ -61934,9 +62222,9 @@ mod tests {
         validate_opc_serial_eager_open_options, validate_pptx_source_image_query_options,
         validate_provider_axis_options, validate_xls_source_locality, validate_xls_source_options,
         verify_opc_materialized_package, verify_opc_serial_eager_fixed_corpus_preflight,
-        verify_xlsx_cells, writer_shape, xls_owned_source_dispatch_cases,
-        xls_source_family_dispatch_cases, xls_writer_semantic_dispatch_selected, xlsb_cells_digest,
-        xlsb_expected_cells, xlsx_cell_count, xlsx_spec, zip_member_ranges,
+        writer_shape, xls_owned_source_dispatch_cases, xls_source_family_dispatch_cases,
+        xls_writer_semantic_dispatch_selected, xlsb_cells_digest, xlsb_expected_cells,
+        xlsx_cell_count, zip_member_ranges,
     };
 
     #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, serde::Serialize)]
@@ -62069,10 +62357,9 @@ mod tests {
         let package = litchi_docx::source_backed::Package::from_read_at(Arc::new(
             OwnedSource::new(corpus.archive.clone()),
         ))?;
-        let snapshot = package.section_layout_snapshot()?;
-        let mut edit = snapshot.edit(litchi_docx::section::Selector::paragraph(Position::new(
-            super::DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0],
-        )))?;
+        let mut edit = package.edit_section_layout(litchi_docx::section::Selector::paragraph(
+            Position::new(super::DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0]),
+        ))?;
         edit.set_columns(Some(litchi_docx::section::Columns {
             equal_width: true,
             count: 3,
@@ -62082,7 +62369,9 @@ mod tests {
         }))?;
         let commit = edit.commit()?;
         let mut output = Vec::new();
-        package.publish_section_layout_commit_to_stream(&mut output, &commit)?;
+        package
+            .apply_section_layout(commit.patch())
+            .and_then(|committed| committed.package().write_to(&mut output))?;
         Ok(output)
     }
 
@@ -62112,15 +62401,14 @@ mod tests {
             docx_read_diagnostic_snapshot(&range_source, &provider_counter)?
         }));
 
-        let snapshot = package.section_layout_snapshot()?;
         snapshots.push((
             "query",
             docx_read_diagnostic_snapshot(&range_source, &provider_counter)?,
         ));
 
-        let mut edit = snapshot.edit(litchi_docx::section::Selector::paragraph(Position::new(
-            super::DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0],
-        )))?;
+        let mut edit = package.edit_section_layout(litchi_docx::section::Selector::paragraph(
+            Position::new(super::DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0]),
+        ))?;
         edit.set_columns(Some(litchi_docx::section::Columns {
             equal_width: true,
             count: 3,
@@ -62145,7 +62433,8 @@ mod tests {
             .ok_or("DOCX section-layout diagnostic output ceiling overflows u64")?;
         let mut sink = super::CountingSink::bounded(maximum, 64 * 1024);
         sink.reserve_budget()?;
-        let publication = package.publish_section_layout_commit_to_stream(&mut sink, &commit)?;
+        let publication = package.apply_section_layout(commit.patch())?;
+        publication.package().write_to(&mut sink)?;
         let publication_snapshot = docx_read_diagnostic_snapshot(&range_source, &provider_counter)?;
         snapshots.push(("publication", publication_snapshot));
         let provider_version_at_publication = range_source.version()?;
@@ -62158,7 +62447,10 @@ mod tests {
             OwnedSource::new(sink.bytes.clone()),
         ))?;
         let mut restored_output = Vec::new();
-        reopened.publish_section_layout_inverse_to_stream(&mut restored_output, &publication)?;
+        reopened
+            .apply_section_layout(&publication.patch().inverse())?
+            .package()
+            .write_to(&mut restored_output)?;
         let inverse_source_restored = restored_output == corpus.archive;
         if !inverse_source_restored {
             return Err("DOCX section-layout diagnostic inverse did not restore source".into());
@@ -62231,6 +62523,7 @@ mod tests {
 
     #[test]
     fn detection_selectors_are_opt_in_with_exact_oracles() {
+        let limits = litchi::common::SourceLimits::default();
         let cases = [
             Case::DetectOdtBytes,
             Case::DetectOdtReader,
@@ -62255,14 +62548,14 @@ mod tests {
             let corpus = build_detection_corpus(case, SemanticShape::Tiny)
                 .expect("detection corpus has a deterministic oracle");
             assert_eq!(
-                litchi::common::detection::detect_file_format_from_bytes(&corpus.archive),
+                litchi::common::detection::detect_file_format_from_bytes(&corpus.archive, &limits),
                 Some(expected)
             );
             if mode == super::DetectionMode::Reader {
                 let mut reader = std::io::Cursor::new(corpus.archive.as_slice());
                 reader.set_position(7);
                 assert_eq!(
-                    litchi::common::detection::detect_format_from_reader(&mut reader),
+                    litchi::common::detection::detect_format_from_reader(&mut reader, &limits),
                     Some(expected)
                 );
                 assert_eq!(reader.position(), 7);
@@ -62573,10 +62866,13 @@ mod tests {
             first.manifest.archive_sha256,
             "1e28b8a9049a82f07e8ea88b2d492ef522d2da793d22fa50e2fe7f354dca3e2a"
         );
-        let source_package = SourceBackedPackage::from_read_at(Arc::new(InstrumentedSource::new(
-            first.archive.clone(),
-            Vec::new(),
-        )))
+        let source_package = SourceBackedPackage::from_read_at(
+            Arc::new(InstrumentedSource::new(first.archive.clone(), Vec::new())),
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )
         .unwrap();
         assert_eq!(
             source_package
@@ -63116,7 +63412,7 @@ mod tests {
             assert_eq!(summary.operation, "owned_open");
             assert_eq!(
                 summary.timing_scope,
-                "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded"
+                "OpcPackage::from_vec(owned, litchi_opc::SourceLimits::default()) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded"
             );
             assert_eq!(
                 summary.source_counter_scope,
@@ -63417,14 +63713,80 @@ mod tests {
     }
 
     #[test]
+    fn m0a_s9_deleted_the_facade_predecessor_selectors() {
+        // M0a step S9 deleted the facade types these 47 selectors timed. Their
+        // frozen records keep the names, and the unified-API and leaf-API
+        // pairs of step S8b re-measure their scenarios; the names must not
+        // select anything again.
+        let deleted = [
+            "docx_file_eager_open",
+            "docx_file_source_open",
+            "docx_file_eager_paragraph_count",
+            "docx_file_source_paragraph_count",
+            "docx_file_eager_list_paragraphs",
+            "docx_file_source_list_paragraphs",
+            "docx_file_eager_full_text",
+            "docx_file_source_full_text",
+            "docx_file_eager_open_paragraph_count_lifecycle",
+            "docx_file_source_open_paragraph_count_lifecycle",
+            "docx_file_eager_open_full_text_lifecycle",
+            "docx_file_source_open_full_text_lifecycle",
+            "pptx_file_eager_open",
+            "pptx_file_source_open",
+            "pptx_file_eager_list_slides",
+            "pptx_file_source_list_slides",
+            "pptx_file_eager_slide_count",
+            "pptx_file_source_slide_count",
+            "pptx_file_eager_selected_slide",
+            "pptx_file_source_selected_slide",
+            "pptx_file_eager_open_slide_count_lifecycle",
+            "pptx_file_source_open_slide_count_lifecycle",
+            "pptx_file_eager_open_selected_slide_lifecycle",
+            "pptx_file_source_open_selected_slide_lifecycle",
+            "xlsx_file_open",
+            "xlsx_file_open_lifecycle",
+            "xlsx_file_selected_cell",
+            "xlsx_bytes_open",
+            "xlsx_bytes_open_lifecycle",
+            "doc_facade_file_open",
+            "doc_facade_file_full_text",
+            "doc_facade_file_one_paragraph",
+            "ppt_facade_file_open",
+            "ppt_facade_file_full_text",
+            "ppt_facade_file_one_slide_text",
+            "rtf_file_open",
+            "rtf_file_open_lifecycle",
+            "odt_file_eager_open",
+            "odt_file_source_open",
+            "odt_file_eager_open_full_text_lifecycle",
+            "odt_file_source_open_full_text_lifecycle",
+            "odp_file_eager_open",
+            "odp_file_source_open",
+            "odp_file_eager_selected_slide",
+            "odp_file_source_selected_slide",
+            "ods_file_eager_open",
+            "ods_file_source_open",
+        ];
+        assert_eq!(deleted.len(), 47);
+        for name in deleted {
+            assert_eq!(parse_case(name), None, "{name}");
+        }
+    }
+
+    #[test]
     fn selectable_case_count_matches_current_enumeration() {
         // `Case` is the central selectable-name enumeration. Keep the
         // documented current count mechanically tied to that enum until a
         // generated registry replaces the exhaustive `Case::name` match. The
         // four provider-axis controls below are deliberately opt-in: they
         // increase the selectable registry without changing the default
-        // cases or the separate default allocator contract.
-        const EXPECTED_SELECTABLE_CASE_COUNT: usize = 534;
+        // cases or the separate default allocator contract. M0a step S9
+        // removed the 47 predecessor selectors that timed the deleted facade
+        // types (652 -> 605). Record 0220 added the 28 opt-in PPT aggregate
+        // text-batch routes ({eager,positional} x {native,unified} x seven
+        // counts; 605 -> 633), audited in record 0272, which renamed them
+        // `_aggregate_v2` -> `_aggregate_v3` without changing the count.
+        const EXPECTED_SELECTABLE_CASE_COUNT: usize = 633;
         let source = include_str!("lib.rs");
         let case_body = source
             .split_once("enum Case {")
@@ -64031,7 +64393,11 @@ mod tests {
     }
 
     fn cfb_expected_minifat_physical_start(archive: &[u8], target_name: &str) -> u64 {
-        let parsed = super::OleFile::open(std::io::Cursor::new(archive)).unwrap();
+        let parsed = super::OleFile::open(
+            std::io::Cursor::new(archive),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let sector_size = parsed.sector_size();
         let read_u16 = |bytes: &[u8]| u16::from_le_bytes(bytes.try_into().unwrap());
         let read_u32 = |bytes: &[u8]| u32::from_le_bytes(bytes.try_into().unwrap());
@@ -64455,50 +64821,6 @@ mod tests {
         assert!(!Case::DEFAULT.contains(&Case::PptxValidationReport));
         assert!(!Case::DEFAULT.contains(&Case::OdfValidationReport));
         assert!(!Case::DEFAULT.contains(&Case::OdfMimetypeRepairPlan));
-    }
-
-    #[test]
-    fn docx_root_filesystem_matrix_is_opt_in_and_complete() {
-        let names = [
-            "docx_file_eager_open",
-            "docx_file_source_open",
-            "docx_file_eager_paragraph_count",
-            "docx_file_source_paragraph_count",
-            "docx_file_eager_list_paragraphs",
-            "docx_file_source_list_paragraphs",
-            "docx_file_eager_full_text",
-            "docx_file_source_full_text",
-            "docx_file_eager_open_paragraph_count_lifecycle",
-            "docx_file_source_open_paragraph_count_lifecycle",
-            "docx_file_eager_open_full_text_lifecycle",
-            "docx_file_source_open_full_text_lifecycle",
-        ];
-        for name in names {
-            let case = parse_case(name).expect("DOCX root selector parses");
-            assert_eq!(case.name(), name);
-            assert!(case.is_filesystem());
-            assert!(!Case::DEFAULT.contains(&case));
-        }
-        assert_eq!(names.len(), 12);
-        assert_eq!(Case::DEFAULT.len(), 41);
-    }
-
-    #[test]
-    fn pptx_root_filesystem_lifecycle_matrix_is_opt_in_and_complete() {
-        let names = [
-            "pptx_file_eager_open_slide_count_lifecycle",
-            "pptx_file_source_open_slide_count_lifecycle",
-            "pptx_file_eager_open_selected_slide_lifecycle",
-            "pptx_file_source_open_selected_slide_lifecycle",
-        ];
-        for name in names {
-            let case = parse_case(name).expect("PPTX lifecycle selector parses");
-            assert_eq!(case.name(), name);
-            assert!(case.is_filesystem());
-            assert!(!Case::DEFAULT.contains(&case));
-        }
-        assert_eq!(names.len(), 4);
-        assert_eq!(Case::DEFAULT.len(), 41);
     }
 
     #[test]
@@ -65400,7 +65722,9 @@ mod tests {
     #[test]
     fn ods_buffered_oracle_rejects_mutated_content_and_extra_members() {
         let archive = super::ods_buffered_bytes(SemanticShape::Tiny).unwrap();
-        let reader = super::ArchiveReader::new(&archive).unwrap();
+        let reader =
+            super::ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())
+                .unwrap();
         let expected_semantic_sha256 =
             super::ods_scalar_expected_semantic_sha256(SemanticShape::Tiny);
         let content = reader.read("content.xml").unwrap();
@@ -65412,7 +65736,9 @@ mod tests {
         let mut mutated_content = content.clone();
         mutated_content[marker_start + marker.len() - 1] = b"X"[0];
 
-        let mut writer = super::StreamingArchiveWriter::new();
+        let mut writer = super::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         for name in reader.file_names() {
             if name == "content.xml" {
                 writer.write_stored(name, &mutated_content).unwrap();
@@ -65434,7 +65760,9 @@ mod tests {
             "mutated content failed for the wrong reason: {error}"
         );
 
-        let mut writer = super::StreamingArchiveWriter::new();
+        let mut writer = super::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         for name in reader.file_names() {
             let payload = reader.read(name).unwrap();
             writer.write_stored(name, &payload).unwrap();
@@ -65711,7 +66039,8 @@ mod tests {
         let (artifact, _) = super::write_streaming_xlsx(Vec::new(), SemanticShape::Tiny).unwrap();
         super::verify_streaming_xlsx(artifact.clone(), SemanticShape::Tiny).unwrap();
 
-        let mut package = super::OpcPackage::from_bytes(&artifact).unwrap();
+        let mut package =
+            super::OpcPackage::from_bytes(&artifact, litchi_opc::SourceLimits::default()).unwrap();
         let worksheet_uri = super::PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
         let sheet_xml = package.get_part(&worksheet_uri).unwrap().blob().to_vec();
         let row_end = sheet_xml
@@ -65735,8 +66064,12 @@ mod tests {
             "unexpected E1 cell failed for the wrong reason: {error}"
         );
 
-        let archive = super::ArchiveReader::new(&artifact).unwrap();
-        let mut writer = super::StreamingArchiveWriter::new();
+        let archive =
+            super::ArchiveReader::new(&artifact, soapberry_zip::office::ArchiveLimits::default())
+                .unwrap();
+        let mut writer = super::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         for name in archive.file_names() {
             let payload = archive.read(name).unwrap();
             writer.write_stored(name, &payload).unwrap();
@@ -65909,7 +66242,8 @@ mod tests {
         let oracle = prepare_opc_materialization_oracle(&corpus).unwrap();
         let first_uri = PackURI::new(format!("/{}", super::entry_name(0))).unwrap();
 
-        let mut corrupted_payload = OpcPackage::from_bytes(&corpus.archive).unwrap();
+        let mut corrupted_payload =
+            OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default()).unwrap();
         let mut payload = corrupted_payload
             .get_part(&first_uri)
             .unwrap()
@@ -65924,7 +66258,8 @@ mod tests {
             .expect_err("payload corruption must fail the prepared oracle");
         assert!(error.to_string().contains("Part benchmark/parts/00000.bin"));
 
-        let mut corrupted_metadata = OpcPackage::from_bytes(&corpus.archive).unwrap();
+        let mut corrupted_metadata =
+            OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default()).unwrap();
         corrupted_metadata
             .get_part_mut(&first_uri)
             .unwrap()
@@ -65934,7 +66269,8 @@ mod tests {
             .expect_err("content-type corruption must fail the prepared oracle");
         assert!(error.to_string().contains("Part benchmark/parts/00000.bin"));
 
-        let mut corrupted_relationships = OpcPackage::from_bytes(&corpus.archive).unwrap();
+        let mut corrupted_relationships =
+            OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default()).unwrap();
         corrupted_relationships.rels_mut().add_relationship(
             "urn:litchi:corrupt".to_owned(),
             super::entry_name(0),
@@ -65945,7 +66281,8 @@ mod tests {
             .expect_err("relationship corruption must fail the prepared oracle");
         assert!(error.to_string().contains("package relationships"));
 
-        let source = OpcPackage::from_bytes(&corpus.archive).unwrap();
+        let source =
+            OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default()).unwrap();
         let mut wrong_main_target = OpcPackage::new();
         for part in source.try_iter_parts() {
             wrong_main_target
@@ -66883,7 +67220,8 @@ mod tests {
             expected_collision_remapped_parts: corpus.matched_owned_collision_remapped_parts,
         };
 
-        let candidate = litchi_pptx::Package::from_vec(output.clone()).unwrap();
+        let candidate =
+            litchi_pptx::Package::from_reader(std::io::Cursor::new(output.clone())).unwrap();
         let candidate_opc = candidate.opc().unwrap();
         let candidate_presentation = candidate_opc.main_document_part().unwrap();
         let candidate_refs =
@@ -67706,8 +68044,7 @@ mod tests {
             doc_body_text_fnv1a(&corpus.archive)
         );
         let selected = writer_shape(&corpus).unwrap().doc_paragraph_count() / 2;
-        let source_snapshot =
-            litchi_doc::body_text::Snapshot::from_bytes(corpus.archive.clone()).unwrap();
+        let source_snapshot = litchi_doc::Package::from_bytes(&corpus.archive).unwrap();
         let mut expected_edit = source_snapshot.edit().unwrap();
         expected_edit
             .replace_paragraph(
@@ -67715,7 +68052,12 @@ mod tests {
                 &updated_writer_text("doc", 0, selected, 0),
             )
             .unwrap();
-        let expected_target = expected_edit.commit().unwrap().snapshot().finish();
+        let expected_target = expected_edit
+            .commit()
+            .unwrap()
+            .package()
+            .to_bytes()
+            .unwrap();
         assert_eq!(
             evidence.expected_target_fingerprint,
             doc_body_text_fnv1a(&expected_target)
@@ -67814,59 +68156,6 @@ mod tests {
 
         assert_eq!(result.case, "docx_semantic_one_percent_edit_save");
         assert!(result.sink.is_some());
-    }
-
-    #[test]
-    fn unified_rtf_owned_byte_selectors_are_opt_in_and_native_oracles_are_exact() {
-        let cases = [Case::RtfFileOpen, Case::RtfFileOpenLifecycle];
-        for case in cases {
-            assert_eq!(parse_case(case.name()), Some(case));
-            assert!(case.is_rtf_root_file());
-            assert!(case.uses_semantic_rtf());
-            assert!(!Case::DEFAULT.contains(&case));
-        }
-
-        let plain =
-            build_semantic_rtf_corpus(SemanticShape::Tiny, RtfSemanticVariant::Plain).unwrap();
-        for case in cases {
-            let result = run_case(case, &plain, 0, 1).unwrap();
-            assert_eq!(result.elapsed_ns.samples.len(), 1);
-            let evidence = result
-                .source
-                .unwrap()
-                .rtf_root
-                .expect("unified RTF root evidence");
-            assert_eq!(evidence.transport_variant, "plain");
-            assert_eq!(evidence.source_bytes, plain.archive.len() as u64);
-            assert_eq!(evidence.source_sha256, plain.manifest.archive_sha256);
-            assert!(evidence.native_semantic_parity_verified);
-            assert!(evidence.native_exact_source_roundtrip_verified);
-            assert!(evidence.performance_claim.starts_with("none:"));
-            assert_eq!(
-                evidence.paragraph_count,
-                SemanticShape::Tiny.rtf_paragraphs()
-            );
-        }
-
-        // Keep transport correctness independently testable on the historical
-        // control tree, where the unified facade still rejects non-UTF-8 RTF
-        // before the native byte-ingress change. Post-change runs can promote
-        // these same corpora to facade parity without changing the timed plain
-        // selector's scope.
-        for variant in [RtfSemanticVariant::Byte1252, RtfSemanticVariant::Lzfu] {
-            let corpus = build_semantic_rtf_corpus(SemanticShape::Tiny, variant).unwrap();
-            let native = litchi_rtf::Document::from_bytes(&corpus.archive).unwrap();
-            super::verify_semantic_rtf(&native, SemanticShape::Tiny, variant, &[]).unwrap();
-            assert_eq!(native.to_bytes().unwrap(), corpus.archive);
-            assert_eq!(sha256_hex(&corpus.archive), corpus.manifest.archive_sha256);
-        }
-        for case in cases {
-            assert!(RtfSemanticVariant::Plain.supports_case(case));
-            assert!(RtfSemanticVariant::Byte1252.supports_case(case));
-            assert!(RtfSemanticVariant::Lzfu.supports_case(case));
-            assert!(!RtfSemanticVariant::Watermark.supports_case(case));
-        }
-        assert_eq!(Case::DEFAULT.len(), 41);
     }
 
     #[test]
@@ -68169,7 +68458,7 @@ mod tests {
     #[test]
     fn semantic_rtf_lifecycle_cases_are_matched_durable_and_transport_bounded() {
         let corpus = build_rtf_lifecycle_corpus(SemanticShape::Tiny).unwrap();
-        let source = litchi_rtf::Document::from_bytes(&corpus.archive).unwrap();
+        let source = litchi_rtf::Package::from_bytes(&corpus.archive).unwrap();
 
         for case in [
             Case::RtfSemanticRemoveParagraphSave,
@@ -68197,64 +68486,70 @@ mod tests {
         }
 
         let mut noop = source.edit();
-        noop.move_paragraph(0, 0).unwrap();
+        noop.move_paragraph(Position::new(0), Position::new(0))
+            .unwrap();
         let noop = noop.commit().unwrap();
         assert!(!noop.diagnostics().changed());
-        assert!(noop.snapshot().same_snapshot(&source));
-        assert_eq!(noop.snapshot().to_bytes().unwrap(), corpus.archive);
+        assert!(noop.package().same_snapshot(&source));
+        assert_eq!(noop.package().to_bytes().unwrap(), corpus.archive);
 
         for variant in [RtfSemanticVariant::Byte1252, RtfSemanticVariant::Lzfu] {
             let corpus = build_semantic_rtf_corpus(SemanticShape::Tiny, variant).unwrap();
-            let document = litchi_rtf::Document::from_bytes(&corpus.archive).unwrap();
+            let document = litchi_rtf::Package::from_bytes(&corpus.archive).unwrap();
             let exact = document.to_bytes().unwrap();
             let selected = document.paragraph_count() / 2;
 
             let mut remove = document.edit();
-            remove.remove_paragraph(selected).unwrap();
+            remove.remove_paragraph(Position::new(selected)).unwrap();
             assert!(matches!(
                 remove.commit(),
-                Err(litchi_rtf::edit::Error::UnsupportedSource(_))
+                Err(litchi_rtf::edit::Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
             ));
             assert_eq!(document.to_bytes().unwrap(), exact);
 
             let mut reorder = document.edit();
             reorder
-                .move_paragraph(0, document.paragraph_count() - 1)
+                .move_paragraph(
+                    Position::new(0),
+                    Position::new(document.paragraph_count() - 1),
+                )
                 .unwrap();
             assert!(matches!(
                 reorder.commit(),
-                Err(litchi_rtf::edit::Error::UnsupportedSource(_))
+                Err(litchi_rtf::edit::Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
             ));
             assert_eq!(document.to_bytes().unwrap(), exact);
 
             let mut noop = document.edit();
-            noop.move_paragraph(0, 0).unwrap();
+            noop.move_paragraph(Position::new(0), Position::new(0))
+                .unwrap();
             let noop = noop.commit().unwrap();
             assert!(!noop.diagnostics().changed());
-            assert!(noop.snapshot().same_snapshot(&document));
-            assert_eq!(noop.snapshot().to_bytes().unwrap(), exact);
+            assert!(noop.package().same_snapshot(&document));
+            assert_eq!(noop.package().to_bytes().unwrap(), exact);
         }
 
         let watermark =
             build_semantic_rtf_corpus(SemanticShape::Tiny, RtfSemanticVariant::Watermark).unwrap();
-        let watermark = litchi_rtf::Document::from_bytes(&watermark.archive).unwrap();
+        let watermark = litchi_rtf::Package::from_bytes(&watermark.archive).unwrap();
         let exact = watermark.to_bytes().unwrap();
         let mut remove = watermark.edit();
-        remove.remove_paragraph(0).unwrap();
+        remove.remove_paragraph(Position::new(0)).unwrap();
         assert!(matches!(
             remove.commit(),
-            Err(litchi_rtf::edit::Error::UnsupportedSource(_))
+            Err(litchi_rtf::edit::Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
         ));
         assert_eq!(watermark.to_bytes().unwrap(), exact);
         let mut noop = watermark.edit();
-        noop.move_paragraph(0, 0).unwrap();
+        noop.move_paragraph(Position::new(0), Position::new(0))
+            .unwrap();
         let noop = noop.commit().unwrap();
         assert!(!noop.diagnostics().changed());
-        assert!(noop.snapshot().same_snapshot(&watermark));
-        assert_eq!(noop.snapshot().to_bytes().unwrap(), exact);
+        assert!(noop.package().same_snapshot(&watermark));
+        assert_eq!(noop.package().to_bytes().unwrap(), exact);
 
         let opaque =
-            litchi_rtf::Document::parse(r"{\rtf1\ansi First\par \b Opaque\b0\par Third}").unwrap();
+            litchi_rtf::Package::parse(r"{\rtf1\ansi First\par \b Opaque\b0\par Third}").unwrap();
         let exact = opaque.to_bytes().unwrap();
         for case in [
             Case::RtfSemanticRemoveParagraphSave,
@@ -68263,25 +68558,28 @@ mod tests {
             let mut edit = opaque.edit();
             match case {
                 Case::RtfSemanticRemoveParagraphSave => {
-                    edit.remove_paragraph(1).unwrap();
+                    edit.remove_paragraph(Position::new(1)).unwrap();
                 },
                 Case::RtfSemanticMoveParagraphSave => {
-                    edit.move_paragraph(0, 2).unwrap();
+                    edit.move_paragraph(Position::new(0), Position::new(2))
+                        .unwrap();
                 },
                 _ => unreachable!(),
             }
             assert!(matches!(
                 edit.commit(),
-                Err(litchi_rtf::edit::Error::UnsupportedSource(_))
+                Err(litchi_rtf::edit::Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
             ));
             assert_eq!(opaque.to_bytes().unwrap(), exact);
         }
         let mut opaque_noop = opaque.edit();
-        opaque_noop.move_paragraph(0, 0).unwrap();
+        opaque_noop
+            .move_paragraph(Position::new(0), Position::new(0))
+            .unwrap();
         let opaque_noop = opaque_noop.commit().unwrap();
         assert!(!opaque_noop.diagnostics().changed());
-        assert!(opaque_noop.snapshot().same_snapshot(&opaque));
-        assert_eq!(opaque_noop.snapshot().to_bytes().unwrap(), exact);
+        assert!(opaque_noop.package().same_snapshot(&opaque));
+        assert_eq!(opaque_noop.package().to_bytes().unwrap(), exact);
     }
 
     #[test]
@@ -68484,25 +68782,25 @@ mod tests {
         assert_eq!(result.case, "rtf_semantic_one_percent_edit_save");
         assert!(result.sink.is_some());
 
-        let source = litchi_rtf::Document::from_bytes(&corpus.archive).unwrap();
+        let source = litchi_rtf::Package::from_bytes(&corpus.archive).unwrap();
         let mut invalid = super::semantic_update_indices(source.paragraph_count())
             .unwrap()
             .into_iter()
             .map(|position| {
                 litchi_rtf::edit::ParagraphTextReplacement::new(
-                    position,
+                    Position::new(position),
                     super::semantic_rtf_variant_text(RtfSemanticVariant::Plain, position, true),
                 )
             })
             .collect::<Vec<_>>();
         invalid.push(litchi_rtf::edit::ParagraphTextReplacement::new(
-            source.paragraph_count(),
+            Position::new(source.paragraph_count()),
             "out-of-range",
         ));
         let mut edit = source.edit();
         assert!(edit.replace_body_paragraph_texts(&invalid).is_err());
         assert_eq!(edit.operation_count(), 0);
-        assert!(edit.commit().unwrap().snapshot().same_snapshot(&source));
+        assert!(edit.commit().unwrap().package().same_snapshot(&source));
     }
 
     #[test]
@@ -68515,20 +68813,20 @@ mod tests {
             "957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e"
         );
 
-        let source = litchi_rtf::Document::from_bytes(&corpus.archive).unwrap();
+        let source = litchi_rtf::Package::from_bytes(&corpus.archive).unwrap();
         let replacements = super::semantic_update_indices(source.paragraph_count())
             .unwrap()
             .into_iter()
             .map(|position| {
                 litchi_rtf::edit::ParagraphTextReplacement::new(
-                    position,
+                    Position::new(position),
                     super::semantic_rtf_variant_text(variant, position, true),
                 )
             })
             .collect::<Vec<_>>();
         let mut edit = source.edit();
         edit.replace_body_paragraph_texts(&replacements).unwrap();
-        let output = edit.commit().unwrap().snapshot().to_bytes().unwrap();
+        let output = edit.commit().unwrap().package().to_bytes().unwrap();
         assert_eq!(output.len(), 540_151);
         assert_eq!(
             sha256_hex(&output),
@@ -68669,8 +68967,8 @@ mod tests {
         assert_eq!(result.case, "ods_media_one_edit_save");
         assert_eq!(result.elapsed_ns.samples.len(), 1);
 
-        let snapshot = litchi_ods::document::Snapshot::from_bytes(first.archive.clone()).unwrap();
-        let mut edit = snapshot.edit();
+        let snapshot = litchi_ods::Package::from_bytes(&first.archive).unwrap();
+        let mut edit = snapshot.edit().unwrap();
         edit.worksheets(|worksheets| {
             let text = super::semantic_ods_text(1, 16, 16, true);
             worksheets
@@ -68691,7 +68989,7 @@ mod tests {
         let output = edit.commit().unwrap();
         let identical = litchi_odf_common::package::raw_identical_members(
             &first.archive,
-            output.snapshot().as_bytes(),
+            output.package().as_bytes(),
         )
         .unwrap();
         assert!(!identical.contains("content.xml"));
@@ -68924,7 +69222,7 @@ mod tests {
         assert_eq!(result.case, "odt_media_paragraph_edit_save");
         assert_eq!(result.elapsed_ns.samples.len(), 1);
 
-        let source = litchi_odt::transaction::Snapshot::from_bytes(first.archive.clone()).unwrap();
+        let source = litchi_odt::Package::from_bytes(&first.archive).unwrap();
         let target = SemanticShape::Medium.docx_paragraphs() / 2;
         let mut edit = source.edit();
         edit.replace_paragraph(
@@ -68935,7 +69233,7 @@ mod tests {
         let commit = edit.commit().unwrap();
         let identical = litchi_odf_common::package::raw_identical_members(
             &first.archive,
-            commit.snapshot().as_bytes(),
+            commit.package().as_bytes(),
         )
         .unwrap();
         assert!(!identical.contains("content.xml"));
@@ -69371,75 +69669,6 @@ mod tests {
     }
 
     #[test]
-    fn large_odt_unified_root_filesystem_selectors_are_opt_in_and_matched() {
-        let cases = [
-            Case::OdtFileEagerOpen,
-            Case::OdtFileSourceOpen,
-            Case::OdtFileEagerOpenFullTextLifecycle,
-            Case::OdtFileSourceOpenFullTextLifecycle,
-        ];
-        for case in cases {
-            assert_eq!(parse_case(case.name()), Some(case));
-            assert!(!Case::DEFAULT.contains(&case));
-            assert!(case.is_filesystem());
-            assert!(case.is_odt_root_file());
-        }
-        assert_eq!(Case::DEFAULT.len(), 41);
-
-        let corpus = build_odt_repeated_text_corpus().unwrap();
-        let results = cases
-            .into_iter()
-            .map(|case| run_case(case, &corpus, 0, 1).unwrap())
-            .collect::<Vec<_>>();
-        let evidence = results
-            .iter()
-            .map(|result| result.source.as_ref().unwrap().odt_root.as_ref().unwrap())
-            .collect::<Vec<_>>();
-        for current in &evidence {
-            assert!(current.semantic_parity_verified);
-            assert!(current.archive_identity_verified);
-            assert!(current.media_identity_verified);
-            assert_eq!(
-                current.archive_member_count,
-                corpus.manifest.archive_member_count
-            );
-            assert_eq!(current.source_path_sha256, corpus.manifest.archive_sha256);
-            assert_eq!(
-                current.paragraph_count,
-                SemanticShape::Large.docx_paragraphs()
-            );
-        }
-        assert_eq!(
-            evidence[0].canonical_text_sha256,
-            evidence[1].canonical_text_sha256
-        );
-        assert_eq!(
-            evidence[0].canonical_text_sha256,
-            evidence[2].canonical_text_sha256
-        );
-        assert_eq!(
-            evidence[0].canonical_text_sha256,
-            evidence[3].canonical_text_sha256
-        );
-        assert_eq!(
-            evidence[0].archive_member_names_sha256,
-            evidence[1].archive_member_names_sha256
-        );
-        assert_eq!(
-            evidence[0].pictures_member_names_sha256,
-            evidence[1].pictures_member_names_sha256
-        );
-        assert!(evidence[1].source_ranges_verified);
-        assert!(evidence[1].zero_picture_payload_overlap_verified);
-        assert_eq!(evidence[1].source_preparation_pictures_read_calls, vec![0]);
-        assert_eq!(evidence[1].source_query_pictures_read_calls, vec![0]);
-        assert!(evidence[3].source_ranges_verified);
-        assert!(evidence[3].zero_picture_payload_overlap_verified);
-        assert_eq!(evidence[3].source_preparation_pictures_read_calls, vec![0]);
-        assert_eq!(evidence[3].source_query_pictures_read_calls, vec![0]);
-    }
-
-    #[test]
     fn media_rich_odt_line_break_is_deterministic_and_preserves_untouched_members() {
         let corpus = build_odt_media_corpus().unwrap();
         let result = run_case(Case::OdtMediaLineBreakEditSave, &corpus, 0, 1).unwrap();
@@ -69447,7 +69676,7 @@ mod tests {
         assert_eq!(result.elapsed_ns.samples.len(), 1);
         assert!(result.output_sha256.is_some());
 
-        let source = litchi_odt::transaction::Snapshot::from_bytes(corpus.archive.clone()).unwrap();
+        let source = litchi_odt::Package::from_bytes(&corpus.archive).unwrap();
         let target = SemanticShape::Medium.docx_paragraphs() / 2;
         let mut edit = source.edit();
         edit.append_line_break(litchi_odt::transaction::ParagraphSelector::position(
@@ -69455,10 +69684,10 @@ mod tests {
         ))
         .unwrap();
         let commit = edit.commit().unwrap();
-        super::verify_odt_media_line_break_archive(commit.snapshot().as_bytes()).unwrap();
+        super::verify_odt_media_line_break_archive(commit.package().as_bytes()).unwrap();
         let identical = litchi_odf_common::package::raw_identical_members(
             &corpus.archive,
-            commit.snapshot().as_bytes(),
+            commit.package().as_bytes(),
         )
         .unwrap();
         assert!(!identical.contains("content.xml"));
@@ -69483,7 +69712,7 @@ mod tests {
         assert_eq!(result.elapsed_ns.samples.len(), 1);
         assert!(result.output_sha256.is_some());
 
-        let source = litchi_odt::transaction::Snapshot::from_bytes(corpus.archive.clone()).unwrap();
+        let source = litchi_odt::Package::from_bytes(&corpus.archive).unwrap();
         let target = SemanticShape::Medium.docx_paragraphs() / 2;
         let mut edit = source.edit();
         edit.append_run(
@@ -69493,10 +69722,10 @@ mod tests {
         )
         .unwrap();
         let commit = edit.commit().unwrap();
-        super::verify_odt_media_append_run_archive(commit.snapshot().as_bytes()).unwrap();
+        super::verify_odt_media_append_run_archive(commit.package().as_bytes()).unwrap();
         let identical = litchi_odf_common::package::raw_identical_members(
             &corpus.archive,
-            commit.snapshot().as_bytes(),
+            commit.package().as_bytes(),
         )
         .unwrap();
         assert!(!identical.contains("content.xml"));
@@ -69521,7 +69750,7 @@ mod tests {
         assert_eq!(result.elapsed_ns.samples.len(), 1);
         assert!(result.output_sha256.is_some());
 
-        let source = litchi_odt::transaction::Snapshot::from_bytes(corpus.archive.clone()).unwrap();
+        let source = litchi_odt::Package::from_bytes(&corpus.archive).unwrap();
         let target = SemanticShape::Medium.docx_paragraphs() / 2;
         let mut edit = source.edit();
         edit.append_hyperlink(
@@ -69531,10 +69760,10 @@ mod tests {
         )
         .unwrap();
         let commit = edit.commit().unwrap();
-        super::verify_odt_media_append_hyperlink_archive(commit.snapshot().as_bytes()).unwrap();
+        super::verify_odt_media_append_hyperlink_archive(commit.package().as_bytes()).unwrap();
         let identical = litchi_odf_common::package::raw_identical_members(
             &corpus.archive,
-            commit.snapshot().as_bytes(),
+            commit.package().as_bytes(),
         )
         .unwrap();
         assert!(!identical.contains("content.xml"));
@@ -69564,8 +69793,7 @@ mod tests {
             assert_eq!(result.elapsed_ns.samples.len(), 1);
             assert!(result.output_sha256.is_some());
 
-            let source =
-                litchi_odt::transaction::Snapshot::from_bytes(corpus.archive.clone()).unwrap();
+            let source = litchi_odt::Package::from_bytes(&corpus.archive).unwrap();
             let mut edit = source.edit();
             if inserted {
                 edit.insert_paragraph(
@@ -69579,13 +69807,13 @@ mod tests {
             }
             let commit = edit.commit().unwrap();
             super::verify_odt_media_structural_paragraph_archive(
-                commit.snapshot().as_bytes(),
+                commit.package().as_bytes(),
                 inserted,
             )
             .unwrap();
             let identical = litchi_odf_common::package::raw_identical_members(
                 &corpus.archive,
-                commit.snapshot().as_bytes(),
+                commit.package().as_bytes(),
             )
             .unwrap();
             assert!(!identical.contains("content.xml"));
@@ -69642,7 +69870,10 @@ mod tests {
             assert_eq!(sink.largest_write, expected_bytes);
         }
 
-        let document = litchi_odt::Document::from_bytes(first.archive.clone()).unwrap();
+        let document = litchi_odt::Package::from_bytes(&first.archive)
+            .unwrap()
+            .document()
+            .unwrap();
         assert_eq!(document.images().unwrap().len(), ODT_RESOURCE_BATCH_COUNT);
         assert!(document.images().unwrap().iter().all(|image| {
             image
@@ -69669,9 +69900,8 @@ mod tests {
         assert_eq!(result.case, "odp_media_textbox_edit_save");
         assert_eq!(result.elapsed_ns.samples.len(), 1);
 
-        let source =
-            litchi_odp::authoring::edit::Snapshot::from_bytes(first.archive.clone()).unwrap();
-        let mut transaction = source.transaction().unwrap();
+        let source = litchi_odp::authoring::edit::Package::from_bytes(&first.archive).unwrap();
+        let mut transaction = source.edit().unwrap();
         transaction
             .add_text_box(
                 0usize,
@@ -69685,7 +69915,7 @@ mod tests {
         let commit = transaction.commit().unwrap();
         let identical = litchi_odf_common::package::raw_identical_members(
             &first.archive,
-            commit.snapshot().bytes(),
+            commit.package().as_bytes(),
         )
         .unwrap();
         assert!(!identical.contains("content.xml"));
@@ -69841,101 +70071,6 @@ mod tests {
     }
 
     #[test]
-    fn media_rich_odp_unified_root_file_selectors_are_matched_and_lazy() {
-        for (name, case) in [
-            ("odp_file_eager_open", Case::OdpFileEagerOpen),
-            ("odp_file_source_open", Case::OdpFileSourceOpen),
-            (
-                "odp_file_eager_selected_slide",
-                Case::OdpFileEagerSelectedSlide,
-            ),
-            (
-                "odp_file_source_selected_slide",
-                Case::OdpFileSourceSelectedSlide,
-            ),
-        ] {
-            assert_eq!(parse_case(name), Some(case));
-            assert!(!Case::DEFAULT.contains(&case));
-        }
-        assert_eq!(Case::DEFAULT.len(), 41);
-
-        let corpus = build_odp_media_corpus().unwrap();
-        let eager_open = run_case(Case::OdpFileEagerOpen, &corpus, 0, 2)
-            .unwrap()
-            .source
-            .unwrap()
-            .odp_root
-            .unwrap();
-        let source_open = run_case(Case::OdpFileSourceOpen, &corpus, 0, 2)
-            .unwrap()
-            .source
-            .unwrap()
-            .odp_root
-            .unwrap();
-        let eager_slide = run_case(Case::OdpFileEagerSelectedSlide, &corpus, 0, 2)
-            .unwrap()
-            .source
-            .unwrap()
-            .odp_root
-            .unwrap();
-        let source_slide = run_case(Case::OdpFileSourceSelectedSlide, &corpus, 0, 2)
-            .unwrap()
-            .source
-            .unwrap()
-            .odp_root
-            .unwrap();
-
-        assert_eq!(
-            eager_open.canonical_semantic_sha256,
-            source_open.canonical_semantic_sha256
-        );
-        assert_eq!(
-            eager_slide.canonical_semantic_sha256,
-            source_slide.canonical_semantic_sha256
-        );
-        assert_eq!(eager_open.metadata_sha256, source_open.metadata_sha256);
-        assert_eq!(eager_slide.metadata_sha256, source_slide.metadata_sha256);
-        assert_eq!(
-            eager_open.source_path_sha256,
-            corpus.manifest.archive_sha256
-        );
-        assert_eq!(
-            source_open.source_path_sha256,
-            corpus.manifest.archive_sha256
-        );
-        assert_eq!(
-            eager_open.selected_media_uncompressed_payload_sha256,
-            source_open.selected_media_uncompressed_payload_sha256
-        );
-        assert_eq!(
-            eager_slide.selected_media_uncompressed_payload_sha256,
-            source_slide.selected_media_uncompressed_payload_sha256
-        );
-        assert!(eager_open.source_read_calls.is_empty());
-        assert!(eager_slide.source_read_calls.is_empty());
-        assert!(eager_open.selected_media_read_calls.is_empty());
-        assert!(eager_slide.selected_media_read_calls.is_empty());
-        assert_eq!(source_open.source_read_calls.len(), 2);
-        assert_eq!(source_open.source_read_bytes.len(), 2);
-        assert_eq!(source_slide.source_read_calls, vec![0, 0]);
-        assert_eq!(source_slide.source_read_bytes, vec![0, 0]);
-        assert_eq!(
-            source_slide.pictures_read_compressed_range_bytes,
-            vec![0, 0]
-        );
-        assert_eq!(source_slide.pictures_read_calls, vec![0, 0]);
-        let selected_compressed_bytes = source_open.selected_media_compressed_range_bytes;
-        for source in [source_open, source_slide] {
-            assert_eq!(source.selected_media_read_calls.len(), 2);
-            assert_eq!(source.selected_media_read_bytes.len(), 2);
-            assert_eq!(
-                source.selected_media_read_compressed_range_overlap_bytes,
-                vec![selected_compressed_bytes; 2]
-            );
-        }
-    }
-
-    #[test]
     fn media_rich_odp_repeated_text_selectors_are_matched_and_source_fresh() {
         for (name, case) in [
             (
@@ -69950,7 +70085,6 @@ mod tests {
             assert_eq!(parse_case(name), Some(case));
             assert_eq!(case.name(), name);
             assert!(!Case::DEFAULT.contains(&case));
-            assert!(!case.is_odp_root_file());
             assert!(case.is_odp_repeated_text());
         }
         assert_eq!(Case::DEFAULT.len(), 41);
@@ -70061,8 +70195,6 @@ mod tests {
     #[test]
     fn media_rich_ods_unified_root_file_selectors_are_matched_and_lazy() {
         for (name, case) in [
-            ("ods_file_eager_open", Case::OdsFileEagerOpen),
-            ("ods_file_source_open", Case::OdsFileSourceOpen),
             (
                 "ods_file_eager_selected_cell",
                 Case::OdsFileEagerSelectedCell,
@@ -70086,18 +70218,6 @@ mod tests {
         assert_eq!(Case::DEFAULT.len(), 41);
 
         let corpus = build_ods_media_corpus().unwrap();
-        let eager_open = run_case(Case::OdsFileEagerOpen, &corpus, 0, 2)
-            .unwrap()
-            .source
-            .unwrap()
-            .ods_root
-            .unwrap();
-        let source_open = run_case(Case::OdsFileSourceOpen, &corpus, 0, 2)
-            .unwrap()
-            .source
-            .unwrap()
-            .ods_root
-            .unwrap();
         let eager_cell = run_case(Case::OdsFileEagerSelectedCell, &corpus, 0, 2)
             .unwrap()
             .source
@@ -70123,21 +70243,22 @@ mod tests {
             .ods_root
             .unwrap();
 
-        assert_eq!(eager_open.worksheet_names, source_open.worksheet_names);
-        assert_eq!(eager_open.worksheet_count, source_open.worksheet_count);
-        assert_eq!(
-            eager_open.canonical_text_sha256,
-            source_open.canonical_text_sha256
-        );
-        assert_eq!(eager_open.metadata_sha256, source_open.metadata_sha256);
-        assert_eq!(
-            eager_open.source_path_sha256,
-            corpus.manifest.archive_sha256
-        );
-        assert_eq!(
-            source_open.source_path_sha256,
-            corpus.manifest.archive_sha256
-        );
+        // The workbook-level expectations every route records come from one
+        // oracle (M0a step S9 moved it from the deleted facade workbook to the
+        // typed owner, which reports the same values).
+        for summary in [&source_cell, &eager_media, &source_media] {
+            assert_eq!(summary.worksheet_names, eager_cell.worksheet_names);
+            assert_eq!(summary.worksheet_count, eager_cell.worksheet_count);
+            assert_eq!(
+                summary.canonical_text_sha256,
+                eager_cell.canonical_text_sha256
+            );
+            assert_eq!(summary.metadata_sha256, eager_cell.metadata_sha256);
+        }
+        for summary in [&eager_cell, &source_cell, &eager_media, &source_media] {
+            assert_eq!(summary.source_path_sha256, corpus.manifest.archive_sha256);
+            assert_eq!(summary.timed_root_adapter, "not_applicable");
+        }
         assert_eq!(
             eager_cell.target_cell_text_sha256,
             source_cell.target_cell_text_sha256
@@ -70154,12 +70275,11 @@ mod tests {
             eager_media.selected_media_compressed_range_bytes,
             source_media.selected_media_compressed_range_bytes
         );
-        for eager in [eager_open, eager_cell, eager_media] {
+        for eager in [eager_cell, eager_media] {
             assert!(eager.source_read_calls.is_empty());
             assert!(eager.pictures_read_calls.is_empty());
             assert!(eager.selected_media_read_calls.is_empty());
         }
-        assert_eq!(source_open.source_read_calls.len(), 2);
         assert_eq!(source_cell.source_read_calls, vec![0, 0]);
         assert_eq!(source_cell.pictures_read_compressed_range_bytes, vec![0, 0]);
         assert_eq!(source_cell.selected_media_read_calls.len(), 0);
@@ -70199,23 +70319,6 @@ mod tests {
     }
 
     #[test]
-    fn xlsx_unified_root_selectors_are_fresh_filesystem_cases() {
-        for (name, case) in [
-            ("xlsx_file_open", Case::XlsxFileOpen),
-            ("xlsx_file_open_lifecycle", Case::XlsxFileOpenLifecycle),
-            ("xlsx_file_selected_cell", Case::XlsxFileSelectedCell),
-        ] {
-            assert_eq!(parse_case(name), Some(case));
-            assert_eq!(case.name(), name);
-            assert!(case.is_xlsx_root_file());
-            assert!(case.is_filesystem());
-            assert!(!case.uses_xlsx());
-            assert!(!Case::DEFAULT.contains(&case));
-        }
-        assert_eq!(Case::DEFAULT.len(), 41);
-    }
-
-    #[test]
     fn xlsx_repeated_store_selectors_are_in_usage_and_roundtrip() {
         for name in [
             "xlsx_source_repeated_store_medium",
@@ -70230,39 +70333,6 @@ mod tests {
             assert!(!Case::DEFAULT.contains(&case));
         }
         assert_eq!(Case::DEFAULT.len(), 41);
-    }
-
-    #[test]
-    fn xlsx_unified_bytes_selectors_use_facade_bytes_lifecycle() {
-        for (name, case) in [
-            ("xlsx_bytes_open", Case::XlsxBytesOpen),
-            ("xlsx_bytes_open_lifecycle", Case::XlsxBytesOpenLifecycle),
-        ] {
-            assert_eq!(parse_case(name), Some(case));
-            assert_eq!(case.name(), name);
-            assert!(case.is_xlsx_bytes_root_file());
-            assert!(!case.is_xlsx_root_file());
-            assert!(!case.uses_xlsx());
-            assert!(!Case::DEFAULT.contains(&case));
-        }
-        assert_eq!(Case::DEFAULT.len(), 41);
-
-        let corpus = build_xlsx_cell_crud_corpus(XlsxCellCrudShape::Medium).unwrap();
-        let eager = Workbook::from_bytes(corpus.archive.clone()).unwrap();
-        verify_xlsx_cells(&eager, xlsx_spec(&corpus).unwrap(), &[]).unwrap();
-        for case in [Case::XlsxBytesOpen, Case::XlsxBytesOpenLifecycle] {
-            let result = run_case(case, &corpus, 0, 2).unwrap();
-            assert_eq!(result.elapsed_ns.samples.len(), 2);
-            assert!(
-                result.source.is_none(),
-                "the selector keeps the existing schema"
-            );
-            assert_eq!(
-                result.corpus.generator,
-                XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR
-            );
-            assert_eq!(result.corpus.archive_sha256, corpus.manifest.archive_sha256);
-        }
     }
 
     #[test]
@@ -70486,8 +70556,7 @@ mod tests {
             assert_eq!(sink.accepted_bytes, sink.largest_write);
         }
 
-        let source =
-            litchi_odp::authoring::edit::Snapshot::from_bytes(first.archive.clone()).unwrap();
+        let source = litchi_odp::authoring::edit::Package::from_bytes(&first.archive).unwrap();
         let inventory = source.rich_content().unwrap();
         assert_eq!(
             inventory
@@ -70578,8 +70647,11 @@ mod tests {
             assert_eq!(operation.source.status, MetricStatus::NotApplicable);
             assert!(operation.source.logical_read_calls.values.is_none());
 
-            let mut reopened =
-                litchi_cfb::OleFile::open(std::io::Cursor::new(corpus.archive.as_slice())).unwrap();
+            let mut reopened = litchi_cfb::OleFile::open(
+                std::io::Cursor::new(corpus.archive.as_slice()),
+                litchi_cfb::OleFileLimits::default(),
+            )
+            .unwrap();
             assert_eq!(reopened.file_size(), corpus.archive.len() as u64);
             assert_eq!(reopened.list_streams().len(), corpus.manifest.entry_count);
             assert_eq!(
@@ -71501,7 +71573,9 @@ mod tests {
         assert_eq!(spec.row_count, 48);
         assert_eq!(spec.column_count, 48);
 
-        let package = super::OpcPackage::from_bytes(&first.archive).unwrap();
+        let package =
+            super::OpcPackage::from_bytes(&first.archive, litchi_opc::SourceLimits::default())
+                .unwrap();
         let contains =
             |xml: &[u8], needle: &[u8]| xml.windows(needle.len()).any(|window| window == needle);
         for sheet_index in 0..spec.sheet_count {
@@ -71542,7 +71616,7 @@ mod tests {
             );
         }
 
-        let workbook = super::Workbook::from_bytes(first.archive.clone()).unwrap();
+        let workbook = super::XlsxPackage::from_bytes(&first.archive).unwrap();
         super::verify_xlsx_cells(&workbook, spec, &[]).unwrap();
         let measured = run_case(Case::XlsxSourceBackedCellValuesOneEditSave, &first, 0, 1).unwrap();
         assert_eq!(
@@ -71614,8 +71688,12 @@ mod tests {
                 + super::XLSX_VENDOR_EXTENSION_BIN.len()
         );
 
-        let source_package = super::OpcPackage::from_bytes(&first.archive).unwrap();
-        let medium_package = super::OpcPackage::from_bytes(&medium.archive).unwrap();
+        let source_package =
+            super::OpcPackage::from_bytes(&first.archive, litchi_opc::SourceLimits::default())
+                .unwrap();
+        let medium_package =
+            super::OpcPackage::from_bytes(&medium.archive, litchi_opc::SourceLimits::default())
+                .unwrap();
         assert_eq!(source_package.part_count(), medium_package.part_count() + 2);
         super::verify_xlsx_vendor_extension_package(&source_package, true).unwrap();
         let raw = super::raw_zip_members(&first.archive).unwrap();
@@ -71638,7 +71716,7 @@ mod tests {
         let vendor_budget = super::xlsx_cell_values_payload_budget(&first, &target).unwrap();
         assert_eq!(vendor_budget, medium_budget);
 
-        let source_editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(Arc::new(
+        let source_editor = crate::xlsx_source_editors::SourceBackedEditor::from_read_at(Arc::new(
             super::OwnedSource::new(first.archive.clone()),
         ))
         .unwrap();
@@ -71674,7 +71752,9 @@ mod tests {
         assert_eq!(noop_count, first.manifest.archive_member_count);
         assert!(!noop_digest.is_empty());
 
-        let mut mutated = super::OpcPackage::from_bytes(&first.archive).unwrap();
+        let mut mutated =
+            super::OpcPackage::from_bytes(&first.archive, litchi_opc::SourceLimits::default())
+                .unwrap();
         let styles_uri = super::PackURI::new("/xl/styles.xml").unwrap();
         let mut styles = mutated.get_part(&styles_uri).unwrap().blob().to_vec();
         // Keep the negative-control mutation publishable under the authored
@@ -71693,7 +71773,8 @@ mod tests {
         assert!(
             super::xlsx_cell_crud_untouched_member_evidence(&first, &mutated_bytes, &[],).is_err()
         );
-        let candidate_package = super::OpcPackage::from_bytes(&expected).unwrap();
+        let candidate_package =
+            super::OpcPackage::from_bytes(&expected, litchi_opc::SourceLimits::default()).unwrap();
         super::verify_xlsx_vendor_extension_package(&candidate_package, true).unwrap();
 
         let measured = run_case(Case::XlsxSourceBackedCellValuesOneEditSave, &first, 0, 1).unwrap();

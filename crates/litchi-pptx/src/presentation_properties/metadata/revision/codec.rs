@@ -7,9 +7,9 @@ use super::model::{Client, Info, Namespace, Part};
 use crate::{Error, Result};
 use chrono::{DateTime, NaiveDateTime};
 use litchi_core::xml::ReaderOrigin;
-use litchi_ooxml_common::mce::process_ooxml;
+use litchi_ooxml_common::mce::{Capabilities, Limits as MceLimits, process_markup_compatibility};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
-use litchi_opc::{BlobPart, OpcPackage, PackURI};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, SourceLimits};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
@@ -30,21 +30,177 @@ const MAX_CLIENTS: usize = 65_536;
 const MAX_EXTENSIONS: usize = 4_096;
 const MAX_STRING_BYTES: usize = 1024 * 1024;
 
+/// Caller-selected bounds for one Revision Information XML operation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub struct Limits {
+    max_input_bytes: usize,
+    max_output_bytes: usize,
+    max_depth: usize,
+    max_nodes: usize,
+    max_clients: usize,
+    max_extensions: usize,
+    max_string_bytes: usize,
+}
+
+impl Limits {
+    /// The historical Revision Information safety profile.
+    pub const DEFAULT: Self = Self {
+        max_input_bytes: MAX_BYTES,
+        max_output_bytes: MAX_BYTES,
+        max_depth: MAX_DEPTH,
+        max_nodes: MAX_NODES,
+        max_clients: MAX_CLIENTS,
+        max_extensions: MAX_EXTENSIONS,
+        max_string_bytes: MAX_STRING_BYTES,
+    };
+
+    /// Construct a finite policy no wider than the format safety ceilings.
+    #[must_use]
+    pub const fn new(
+        max_input_bytes: usize,
+        max_output_bytes: usize,
+        max_depth: usize,
+        max_nodes: usize,
+        max_clients: usize,
+        max_extensions: usize,
+        max_string_bytes: usize,
+    ) -> Option<Self> {
+        let default = Self::DEFAULT;
+        if max_input_bytes == 0
+            || max_input_bytes > default.max_input_bytes
+            || max_output_bytes == 0
+            || max_output_bytes > default.max_output_bytes
+            || max_depth == 0
+            || max_depth > default.max_depth
+            || max_nodes == 0
+            || max_nodes > default.max_nodes
+            || max_clients == 0
+            || max_clients > default.max_clients
+            || max_extensions == 0
+            || max_extensions > default.max_extensions
+            || max_string_bytes == 0
+            || max_string_bytes > default.max_string_bytes
+        {
+            return None;
+        }
+        Some(Self {
+            max_input_bytes,
+            max_output_bytes,
+            max_depth,
+            max_nodes,
+            max_clients,
+            max_extensions,
+            max_string_bytes,
+        })
+    }
+
+    #[must_use]
+    pub const fn max_input_bytes(self) -> usize {
+        self.max_input_bytes
+    }
+
+    #[must_use]
+    pub const fn max_output_bytes(self) -> usize {
+        self.max_output_bytes
+    }
+
+    #[must_use]
+    pub const fn max_depth(self) -> usize {
+        self.max_depth
+    }
+
+    #[must_use]
+    pub const fn max_nodes(self) -> usize {
+        self.max_nodes
+    }
+
+    #[must_use]
+    pub const fn max_clients(self) -> usize {
+        self.max_clients
+    }
+
+    #[must_use]
+    pub const fn max_extensions(self) -> usize {
+        self.max_extensions
+    }
+
+    #[must_use]
+    pub const fn max_string_bytes(self) -> usize {
+        self.max_string_bytes
+    }
+
+    /// Derive a profile from the retained physical source policy.
+    pub fn from_source_limits(source: SourceLimits) -> Self {
+        let default = Self::DEFAULT;
+        let part = usize::try_from(source.max_part_bytes()).unwrap_or(usize::MAX);
+        let events = source.max_events();
+        let depth = source.max_depth();
+        let strings = source.max_xml_attribute_bytes();
+        Self {
+            max_input_bytes: default.max_input_bytes.min(part),
+            max_output_bytes: default.max_output_bytes.min(part),
+            max_depth: default.max_depth.min(depth),
+            max_nodes: default.max_nodes.min(events),
+            max_clients: default.max_clients.min(events),
+            max_extensions: default.max_extensions.min(events),
+            max_string_bytes: default.max_string_bytes.min(strings),
+        }
+    }
+
+    /// Intersect this semantic profile with physical source bounds.
+    pub(crate) fn constrained_by_source(self, source: SourceLimits) -> Self {
+        let physical = Self::from_source_limits(source);
+        Self {
+            max_input_bytes: self.max_input_bytes.min(physical.max_input_bytes),
+            max_output_bytes: self.max_output_bytes.min(physical.max_output_bytes),
+            max_depth: self.max_depth.min(physical.max_depth),
+            max_nodes: self.max_nodes.min(physical.max_nodes),
+            max_clients: self.max_clients.min(physical.max_clients),
+            max_extensions: self.max_extensions.min(physical.max_extensions),
+            max_string_bytes: self.max_string_bytes.min(physical.max_string_bytes),
+        }
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
 impl Info {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(xml: &[u8]) -> Result<Self> {
-        parse_revision_information(xml)
+    pub fn parse(xml: &[u8], limits: Limits) -> Result<Self> {
+        parse_revision_information(xml, limits)
     }
 
     /// # Errors
     ///
     /// Returns an error if the output cannot be encoded or written.
-    pub fn to_xml(&self) -> Result<Vec<u8>> {
-        validate_model(self)?;
+    pub fn to_xml(&self, limits: Limits) -> Result<Vec<u8>> {
+        let mut model_limits = limits;
+        model_limits.max_input_bytes = model_limits
+            .max_input_bytes
+            .max(model_limits.max_output_bytes);
+        validate_model(self, model_limits)?;
         let root_prefix = unused_root_prefix(&self.namespace_declarations);
+        let output_len = serialized_len(self, &root_prefix)?;
+        if output_len > limits.max_output_bytes() {
+            return Err(limit(
+                crate::error::CodecLimitKind::OutputBytes,
+                output_len,
+                limits.max_output_bytes(),
+            ));
+        }
         let mut out = Vec::new();
+        out.try_reserve_exact(output_len)
+            .map_err(|source| Error::Allocation {
+                resource: "Revision Information XML",
+                source,
+            })?;
         out.extend_from_slice(br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
         out.extend_from_slice(b"<");
         out.extend_from_slice(root_prefix.as_bytes());
@@ -98,11 +254,15 @@ impl Info {
             out.extend_from_slice(root_prefix.as_bytes());
             out.extend_from_slice(b":revInfo>");
         }
-        if out.len() > MAX_BYTES {
-            return Err(limit("serialized Revision Information bytes"));
+        if out.len() != output_len {
+            return Err(invalid(
+                "Revision Information output length changed during emission",
+            ));
         }
         // Validate programmatically supplied opaque XML in its inherited context.
-        parse_revision_information(&out)?;
+        let mut parse_limits = limits;
+        parse_limits.max_input_bytes = parse_limits.max_input_bytes.max(out.len());
+        parse_revision_information(&out, parse_limits)?;
         Ok(out)
     }
 }
@@ -110,7 +270,7 @@ impl Info {
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn load(package: &OpcPackage) -> Result<Option<Part>> {
+pub fn load(package: &OpcPackage, limits: Limits) -> Result<Option<Part>> {
     let presentation = package.main_document_part()?;
     require_presentation_content_type(presentation.content_type())?;
     let presentation_name = presentation.partname().to_string();
@@ -186,7 +346,7 @@ pub fn load(package: &OpcPackage) -> Result<Option<Part>> {
     Ok(Some(Part {
         relationship_id: relationship.r_id().to_string(),
         part_name: target.to_string(),
-        revision_information: Info::parse(part.blob())?,
+        revision_information: Info::parse(part.blob(), limits)?,
     }))
 }
 
@@ -196,8 +356,8 @@ pub fn load(package: &OpcPackage) -> Result<Option<Part>> {
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
-pub fn store(package: &mut OpcPackage, value: &Part) -> Result<()> {
-    if load(package)?.is_some() {
+pub(crate) fn store(package: &mut OpcPackage, value: &Part, limits: Limits) -> Result<()> {
+    if load(package, limits)?.is_some() {
         return Err(invalid("package already contains Revision Information"));
     }
     validate_relationship_id(&value.relationship_id)?;
@@ -216,7 +376,7 @@ pub fn store(package: &mut OpcPackage, value: &Part) -> Result<()> {
     {
         return Err(invalid(format!("part '{part_name}' already exists")));
     }
-    let xml = value.revision_information.to_xml()?;
+    let xml = value.revision_information.to_xml(limits)?;
     let target = part_name.relative_ref(presentation_name.base_uri());
     package.try_add_part(Box::new(BlobPart::new(part_name, CONTENT_TYPE.into(), xml)))?;
     package
@@ -242,13 +402,24 @@ enum Frame {
     Opaque,
 }
 
-fn parse_revision_information(xml: &[u8]) -> Result<Info> {
-    if xml.len() > MAX_BYTES {
-        return Err(limit("Revision Information part bytes"));
+fn parse_revision_information(xml: &[u8], limits: Limits) -> Result<Info> {
+    if xml.len() > limits.max_input_bytes() {
+        return Err(limit(
+            crate::error::CodecLimitKind::InputBytes,
+            xml.len(),
+            limits.max_input_bytes(),
+        ));
     }
-    let selected = process_ooxml(xml)?;
-    if selected.len() > MAX_BYTES {
-        return Err(limit("MCE-processed Revision Information bytes"));
+    // Bound the potentially expanding MCE selection before the revision
+    // parser receives it; a post-expansion check would be too late.
+    let mce_limits = mce_limits(limits);
+    let selected = process_markup_compatibility(xml, &Capabilities::default(), &mce_limits)?.xml;
+    if selected.len() > limits.max_input_bytes() {
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            selected.len(),
+            limits.max_input_bytes(),
+        ));
     }
     let bytes = selected.as_ref();
     let mut reader = NsReader::from_reader(bytes);
@@ -281,11 +452,19 @@ fn parse_revision_information(xml: &[u8]) -> Result<Info> {
         let empty_event = matches!(&event, Event::Empty(_));
         match event {
             Event::Start(element) | Event::Empty(element) => {
-                node_count = node_count
-                    .checked_add(1)
-                    .ok_or_else(|| limit("Revision Information nodes"))?;
-                if node_count > MAX_NODES {
-                    return Err(limit("Revision Information nodes"));
+                node_count = node_count.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_nodes(),
+                    )
+                })?;
+                if node_count > limits.max_nodes() {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        node_count,
+                        limits.max_nodes(),
+                    ));
                 }
                 let local = element.local_name();
                 let frame = if stack.is_empty() {
@@ -294,7 +473,7 @@ fn parse_revision_information(xml: &[u8]) -> Result<Info> {
                     }
                     expect_namespace_name(&namespace, P1510, local.as_ref(), b"revInfo")?;
                     let root_prefix = element_prefix(&element)?;
-                    namespaces = root_namespaces(&element, reader.decoder(), &root_prefix)?;
+                    namespaces = root_namespaces(&element, reader.decoder(), &root_prefix, limits)?;
                     root_seen = true;
                     Frame::Root
                 } else {
@@ -307,7 +486,7 @@ fn parse_revision_information(xml: &[u8]) -> Result<Info> {
                                 if seen_list || seen_extensions {
                                     return Err(invalid("revLst is duplicated or out of order"));
                                 }
-                                no_attributes(&element, reader.decoder())?;
+                                no_attributes(&element, reader.decoder(), limits)?;
                                 seen_list = true;
                                 Frame::RevisionList
                             } else if namespace_name(&namespace, P, local.as_ref(), b"extLst") {
@@ -316,7 +495,7 @@ fn parse_revision_information(xml: &[u8]) -> Result<Info> {
                                         "Revision Information has duplicate extLst",
                                     ));
                                 }
-                                no_attributes(&element, reader.decoder())?;
+                                no_attributes(&element, reader.decoder(), limits)?;
                                 seen_extensions = true;
                                 extension_start = Some(start);
                                 Frame::ExtensionList
@@ -326,10 +505,21 @@ fn parse_revision_information(xml: &[u8]) -> Result<Info> {
                         },
                         Frame::RevisionList => {
                             expect_namespace_name(&namespace, P1510, local.as_ref(), b"client")?;
-                            if clients.len() >= MAX_CLIENTS {
-                                return Err(limit("Revision Information clients"));
+                            let next_clients = clients.len().checked_add(1).ok_or_else(|| {
+                                limit(
+                                    crate::error::CodecLimitKind::References,
+                                    usize::MAX,
+                                    limits.max_clients(),
+                                )
+                            })?;
+                            if next_clients > limits.max_clients() {
+                                return Err(limit(
+                                    crate::error::CodecLimitKind::References,
+                                    next_clients,
+                                    limits.max_clients(),
+                                ));
                             }
-                            clients.push(parse_client(&element, reader.decoder())?);
+                            clients.push(parse_client(&element, reader.decoder(), limits)?);
                             Frame::Client
                         },
                         Frame::Client => {
@@ -337,11 +527,21 @@ fn parse_revision_information(xml: &[u8]) -> Result<Info> {
                         },
                         Frame::ExtensionList => {
                             expect_namespace_name(&namespace, P, local.as_ref(), b"ext")?;
-                            extension_count += 1;
-                            if extension_count > MAX_EXTENSIONS {
-                                return Err(limit("Revision Information extensions"));
+                            extension_count = extension_count.checked_add(1).ok_or_else(|| {
+                                limit(
+                                    crate::error::CodecLimitKind::Extensions,
+                                    usize::MAX,
+                                    limits.max_extensions(),
+                                )
+                            })?;
+                            if extension_count > limits.max_extensions() {
+                                return Err(limit(
+                                    crate::error::CodecLimitKind::Extensions,
+                                    extension_count,
+                                    limits.max_extensions(),
+                                ));
                             }
-                            extension_attributes(&element, reader.decoder())?;
+                            extension_attributes(&element, reader.decoder(), limits)?;
                             Frame::Extension { payloads: 0 }
                         },
                         Frame::Extension { payloads } => {
@@ -351,18 +551,29 @@ fn parse_revision_information(xml: &[u8]) -> Result<Info> {
                                 ));
                             }
                             *payloads = 1;
-                            validate_any_attributes(&element, reader.decoder())?;
+                            validate_any_attributes(&element, reader.decoder(), limits)?;
                             Frame::Payload
                         },
                         Frame::Payload | Frame::Opaque => {
-                            validate_any_attributes(&element, reader.decoder())?;
+                            validate_any_attributes(&element, reader.decoder(), limits)?;
                             Frame::Opaque
                         },
                     }
                 };
 
-                if stack.len() + 1 > MAX_DEPTH {
-                    return Err(limit("Revision Information XML depth"));
+                let depth = stack.len().checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        limits.max_depth(),
+                    )
+                })?;
+                if depth > limits.max_depth() {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        limits.max_depth(),
+                    ));
                 }
                 if empty_event {
                     close_empty_frame(&frame)?;
@@ -434,12 +645,24 @@ fn parse_revision_information(xml: &[u8]) -> Result<Info> {
         namespace_declarations: namespaces,
         extension_xml,
     };
-    validate_model(&value)?;
+    validate_model(&value, limits)?;
     Ok(value)
 }
 
-fn parse_client(element: &BytesStart<'_>, decoder: Decoder) -> Result<Client> {
-    let attributes = known_attributes(element, decoder, &["id", "v", "vWet", "dt"])?;
+fn mce_limits(limits: Limits) -> MceLimits {
+    MceLimits {
+        max_input_bytes: limits.max_input_bytes(),
+        max_output_bytes: limits.max_output_bytes(),
+        max_depth: limits.max_depth(),
+        max_namespace_bindings: 4096.min(limits.max_nodes()),
+        max_directive_tokens: 4096.min(limits.max_nodes()),
+        max_choices_per_alternate: 1024.min(limits.max_nodes()),
+        max_attributes_per_element: litchi_ooxml_common::mce::DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT,
+    }
+}
+
+fn parse_client(element: &BytesStart<'_>, decoder: Decoder, limits: Limits) -> Result<Client> {
+    let attributes = known_attributes(element, decoder, &["id", "v", "vWet", "dt"], limits)?;
     let required = |name: &str| {
         attributes
             .iter()
@@ -449,8 +672,8 @@ fn parse_client(element: &BytesStart<'_>, decoder: Decoder) -> Result<Client> {
     };
     let client_id = required("id")?;
     let date_time = required("dt")?;
-    bounded(&client_id)?;
-    validate_date_time(&date_time)?;
+    bounded(&client_id, limits)?;
+    validate_date_time(&date_time, limits)?;
     Ok(Client {
         client_id,
         revision: optional_u32(&attributes, "v")?,
@@ -475,6 +698,7 @@ fn root_namespaces(
     element: &BytesStart<'_>,
     decoder: Decoder,
     root_prefix: &str,
+    limits: Limits,
 ) -> Result<Vec<Namespace>> {
     let mut output = Vec::new();
     let mut seen = HashSet::new();
@@ -492,7 +716,7 @@ fn root_namespaces(
             .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
             .map_err(xml_error)?
             .into_owned();
-        bounded(&uri)?;
+        bounded(&uri, limits)?;
         if prefix != root_prefix {
             output.push(Namespace { prefix, uri });
         }
@@ -504,6 +728,7 @@ fn known_attributes(
     element: &BytesStart<'_>,
     decoder: Decoder,
     known: &[&str],
+    limits: Limits,
 ) -> Result<Vec<(String, String)>> {
     let mut output = Vec::new();
     let mut seen = HashSet::new();
@@ -522,18 +747,18 @@ fn known_attributes(
             .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
             .map_err(xml_error)?
             .into_owned();
-        bounded(&value)?;
+        bounded(&value, limits)?;
         output.push((key.to_string(), value));
     }
     Ok(output)
 }
 
-fn no_attributes(element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
-    known_attributes(element, decoder, &[]).map(|_| ())
+fn no_attributes(element: &BytesStart<'_>, decoder: Decoder, limits: Limits) -> Result<()> {
+    known_attributes(element, decoder, &[], limits).map(|_| ())
 }
 
-fn extension_attributes(element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
-    let values = known_attributes(element, decoder, &["uri"])?;
+fn extension_attributes(element: &BytesStart<'_>, decoder: Decoder, limits: Limits) -> Result<()> {
+    let values = known_attributes(element, decoder, &["uri"], limits)?;
     let uri = values
         .iter()
         .find(|(key, _)| key == "uri")
@@ -545,13 +770,17 @@ fn extension_attributes(element: &BytesStart<'_>, decoder: Decoder) -> Result<()
     Ok(())
 }
 
-fn validate_any_attributes(element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
+fn validate_any_attributes(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    limits: Limits,
+) -> Result<()> {
     for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let value = attribute
             .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
             .map_err(xml_error)?;
-        bounded(&value)?;
+        bounded(&value, limits)?;
     }
     Ok(())
 }
@@ -577,13 +806,17 @@ fn validate_end(namespace: &ResolveResult<'_>, local: &[u8], frame: &Frame) -> R
     }
 }
 
-fn validate_model(value: &Info) -> Result<()> {
-    if value.clients.len() > MAX_CLIENTS {
-        return Err(limit("Revision Information clients"));
+fn validate_model(value: &Info, limits: Limits) -> Result<()> {
+    if value.clients.len() > limits.max_clients() {
+        return Err(limit(
+            crate::error::CodecLimitKind::References,
+            value.clients.len(),
+            limits.max_clients(),
+        ));
     }
     for client in &value.clients {
-        bounded(&client.client_id)?;
-        validate_date_time(&client.date_time)?;
+        bounded(&client.client_id, limits)?;
+        validate_date_time(&client.date_time, limits)?;
     }
     let mut prefixes = HashSet::new();
     for declaration in &value.namespace_declarations {
@@ -596,20 +829,95 @@ fn validate_model(value: &Info) -> Result<()> {
                 "invalid or duplicate preserved namespace declaration",
             ));
         }
-        bounded(&declaration.uri)?;
+        bounded(&declaration.uri, limits)?;
     }
     if value
         .extension_xml
         .as_ref()
-        .is_some_and(|extension| extension.len() > MAX_BYTES)
+        .is_some_and(|extension| extension.len() > limits.max_input_bytes())
     {
-        return Err(limit("Revision Information extension bytes"));
+        return Err(limit(
+            crate::error::CodecLimitKind::ExtensionBytes,
+            value.extension_xml.as_ref().map_or(0, Vec::len),
+            limits.max_input_bytes(),
+        ));
     }
     Ok(())
 }
 
-fn validate_date_time(value: &str) -> Result<()> {
-    bounded(value)?;
+fn serialized_len(value: &Info, root_prefix: &str) -> Result<usize> {
+    let mut length = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#.len();
+    add_len(&mut length, 1 + root_prefix.len())?;
+    add_len(&mut length, b":revInfo xmlns:".len() + root_prefix.len())?;
+    add_len(&mut length, 2 + escaped_len(P1510_TEXT)? + 1)?;
+    for declaration in &value.namespace_declarations {
+        add_len(&mut length, b" xmlns".len())?;
+        if !declaration.prefix.is_empty() {
+            add_len(&mut length, 1 + declaration.prefix.len())?;
+        }
+        add_len(&mut length, 3 + escaped_len(&declaration.uri)?)?;
+    }
+    if value.clients.is_empty() && value.extension_xml.is_none() {
+        add_len(&mut length, 2)?;
+        return Ok(length);
+    }
+    add_len(&mut length, 1)?;
+    if !value.clients.is_empty() {
+        add_len(&mut length, 1 + root_prefix.len() + b":revLst>".len())?;
+        for client in &value.clients {
+            add_len(&mut length, 1 + root_prefix.len() + b":client id=\"".len())?;
+            add_len(&mut length, escaped_len(&client.client_id)?)?;
+            add_len(
+                &mut length,
+                b"\" dt=\"".len() + escaped_len(&client.date_time)? + 1,
+            )?;
+            if let Some(revision) = client.revision {
+                add_len(&mut length, u32_attr_len("v", revision))?;
+            }
+            if let Some(revision) = client.wet_revision {
+                add_len(&mut length, u32_attr_len("vWet", revision))?;
+            }
+            add_len(&mut length, 2)?;
+        }
+        add_len(&mut length, 2 + root_prefix.len() + b":revLst>".len())?;
+    }
+    if let Some(extension) = &value.extension_xml {
+        add_len(&mut length, extension.len())?;
+    }
+    add_len(&mut length, 2 + root_prefix.len() + b":revInfo>".len())?;
+    Ok(length)
+}
+
+fn u32_attr_len(name: &str, value: u32) -> usize {
+    1 + name.len() + 2 + value.to_string().len() + 1
+}
+
+fn escaped_len(value: &str) -> Result<usize> {
+    let mut length = 0usize;
+    for character in value.chars() {
+        let bytes = match character {
+            '&' => 5,
+            '<' => 4,
+            '"' => 6,
+            '\t' | '\n' | '\r' => 5,
+            _ => character.len_utf8(),
+        };
+        add_len(&mut length, bytes)?;
+    }
+    Ok(length)
+}
+
+fn add_len(length: &mut usize, additional: usize) -> Result<()> {
+    *length = length
+        .checked_add(additional)
+        .ok_or(Error::CapacityOverflow {
+            resource: "serialized Revision Information bytes",
+        })?;
+    Ok(())
+}
+
+fn validate_date_time(value: &str, limits: Limits) -> Result<()> {
+    bounded(value, limits)?;
     if DateTime::parse_from_rfc3339(value).is_ok()
         || NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M:%S%.f").is_ok()
     {
@@ -709,9 +1017,13 @@ fn ncname(value: &str) -> bool {
         })
 }
 
-fn bounded(value: &str) -> Result<()> {
-    if value.len() > MAX_STRING_BYTES {
-        Err(limit("Revision Information string bytes"))
+fn bounded(value: &str, limits: Limits) -> Result<()> {
+    if value.len() > limits.max_string_bytes() {
+        Err(limit(
+            crate::error::CodecLimitKind::StringBytes,
+            value.len(),
+            limits.max_string_bytes(),
+        ))
     } else {
         Ok(())
     }
@@ -750,8 +1062,12 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-fn limit(label: &str) -> Error {
-    invalid(format!("{label} exceed configured limit"))
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }
 
 #[cfg(test)]
@@ -806,9 +1122,12 @@ mod tests {
     #[test]
     fn loads_real_powerpoint_and_libreoffice_revision_parts() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let powerpoint =
-            OpcPackage::open(root.join("test-data/poi/test-data/slideshow/bug65551.pptx")).unwrap();
-        let loaded = load(&powerpoint).unwrap().unwrap();
+        let powerpoint = OpcPackage::open(
+            root.join("test-data/poi/test-data/slideshow/bug65551.pptx"),
+            SourceLimits::default(),
+        )
+        .unwrap();
+        let loaded = load(&powerpoint, Limits::DEFAULT).unwrap().unwrap();
         assert_eq!(loaded.part_name, "/ppt/revisionInfo.xml");
         assert_eq!(loaded.revision_information.clients.len(), 2);
         assert_eq!(loaded.revision_information.clients[0].revision, Some(12));
@@ -816,9 +1135,10 @@ mod tests {
 
         let libreoffice = OpcPackage::open(
             root.join("test-data/libreoffice-core/sd/qa/unit/data/pptx/tdf114821.pptx"),
+            SourceLimits::default(),
         )
         .unwrap();
-        let loaded = load(&libreoffice).unwrap().unwrap();
+        let loaded = load(&libreoffice, Limits::DEFAULT).unwrap().unwrap();
         assert!(loaded.revision_information.clients.is_empty());
     }
 
@@ -826,10 +1146,11 @@ mod tests {
     fn package_store_load_round_trip_keeps_extensions_inert() {
         let expected = value();
         let mut package = base_package();
-        store(&mut package, &expected).unwrap();
-        let loaded = load(&package).unwrap().unwrap();
+        store(&mut package, &expected, Limits::DEFAULT).unwrap();
+        let loaded = load(&package, Limits::DEFAULT).unwrap().unwrap();
         assert_eq!(loaded, expected);
-        let text = String::from_utf8(loaded.revision_information.to_xml().unwrap()).unwrap();
+        let text = String::from_utf8(loaded.revision_information.to_xml(Limits::DEFAULT).unwrap())
+            .unwrap();
         assert!(text.contains("rIdNeverFetched"));
         assert!(text.contains("https://example.invalid/not-opened"));
     }
@@ -856,7 +1177,10 @@ mod tests {
             format!(r"<!DOCTYPE x>{}", wrap("")),
         ];
         for xml in cases {
-            assert!(Info::parse(xml.as_bytes()).is_err(), "accepted {xml}");
+            assert!(
+                Info::parse(xml.as_bytes(), Limits::DEFAULT).is_err(),
+                "accepted {xml}"
+            );
         }
     }
 
@@ -873,18 +1197,18 @@ mod tests {
                 "rIdRevision".into(),
                 true,
             );
-        assert!(load(&external).is_err());
+        assert!(load(&external, Limits::DEFAULT).is_err());
 
         let mut orphan = base_package();
         orphan.add_part(Box::new(BlobPart::new(
             PackURI::new("/ppt/revisionInfo.xml").unwrap(),
             CONTENT_TYPE.into(),
-            Info::default().to_xml().unwrap(),
+            Info::default().to_xml(Limits::DEFAULT).unwrap(),
         )));
-        assert!(load(&orphan).is_err());
+        assert!(load(&orphan, Limits::DEFAULT).is_err());
 
         let mut outbound = base_package();
-        store(&mut outbound, &value()).unwrap();
+        store(&mut outbound, &value(), Limits::DEFAULT).unwrap();
         outbound
             .get_part_mut(&PackURI::new("/ppt/revisionInfo.xml").unwrap())
             .unwrap()
@@ -895,14 +1219,26 @@ mod tests {
                 "rId1".into(),
                 false,
             );
-        assert!(load(&outbound).is_err());
+        assert!(load(&outbound, Limits::DEFAULT).is_err());
 
         let mut invalid_value = value();
         invalid_value.revision_information.clients[0].date_time = "not-a-date".into();
         let mut package = base_package();
         let before = package.part_count();
-        assert!(store(&mut package, &invalid_value).is_err());
+        assert!(store(&mut package, &invalid_value, Limits::DEFAULT).is_err());
         assert_eq!(package.part_count(), before);
-        assert!(load(&package).unwrap().is_none());
+        assert!(load(&package, Limits::DEFAULT).unwrap().is_none());
+    }
+
+    #[test]
+    fn selected_profile_bounds_mce_admission() {
+        let limits = Limits::new(512, 768, 7, 19, 11, 3, 23).unwrap();
+        let mce = mce_limits(limits);
+        assert_eq!(mce.max_input_bytes, 512);
+        assert_eq!(mce.max_output_bytes, 768);
+        assert_eq!(mce.max_depth, 7);
+        assert_eq!(mce.max_namespace_bindings, 19);
+        assert_eq!(mce.max_directive_tokens, 19);
+        assert_eq!(mce.max_choices_per_alternate, 19);
     }
 }

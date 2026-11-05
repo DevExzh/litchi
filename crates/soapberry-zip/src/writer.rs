@@ -36,7 +36,7 @@ fn io_error_is_interrupted(error: &io::Error) -> bool {
 fn zip_error_is_interrupted(error: &Error) -> bool {
     matches!(
         error.kind(),
-        ErrorKind::IO(source) | ErrorKind::Io(source)
+        ErrorKind::IO(source)
             if source.kind() == io::ErrorKind::Interrupted
     )
 }
@@ -1955,16 +1955,6 @@ where
         self.start_file_owned_with_options(name, options)
     }
 
-    /// Alias for [`Self::start_file_owned`] using the entry-oriented name used
-    /// by higher-level package writers.
-    pub fn start_entry_owned(
-        self,
-        name: &str,
-        compression_method: CompressionMethod,
-    ) -> Result<ZipOwnedEntryWriter<W>, Error> {
-        self.start_file_owned(name, compression_method)
-    }
-
     /// Starts an owned streaming entry with explicit ZIP64 framing.
     ///
     /// This is the consuming counterpart of [`ZipFileBuilder::zip64`]. The
@@ -1995,16 +1985,6 @@ where
             extra_fields: ExtraFieldsContainer::new(),
         };
         self.start_file_owned_with_options(name, options)
-    }
-
-    /// Alias for [`Self::start_file_owned_zip64`] using the entry-oriented
-    /// name used by higher-level package writers.
-    pub fn start_entry_owned_zip64(
-        self,
-        name: &str,
-        compression_method: CompressionMethod,
-    ) -> Result<ZipOwnedEntryWriter<W>, Error> {
-        self.start_file_owned_zip64(name, compression_method)
     }
 
     fn start_file_owned_with_options(
@@ -3768,6 +3748,7 @@ struct ZipEntryOptions {
 mod tests {
     use super::*;
     use crate::ZipArchive;
+    use crate::office::ArchiveLimits;
     use flate2::{Compression, write::DeflateEncoder};
     use std::io::{Cursor, Write};
 
@@ -3821,7 +3802,7 @@ mod tests {
             .unwrap();
         archive.finish().unwrap();
         let bytes = output.into_inner();
-        let reader = crate::office::ArchiveReader::new(&bytes).unwrap();
+        let reader = crate::office::ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
         assert_eq!(reader.read("generated.bin").unwrap(), generated_payload);
         assert_eq!(
             reader.read("precompressed.bin").unwrap(),
@@ -4156,7 +4137,8 @@ mod tests {
             payload.len() as u64
         );
 
-        let reader = crate::office::ArchiveReader::new(&bytes).expect("archive reader");
+        let reader = crate::office::ArchiveReader::new(&bytes, ArchiveLimits::default())
+            .expect("archive reader");
         assert_eq!(reader.read("small.txt").expect("inflate payload"), payload);
     }
 
@@ -4171,7 +4153,8 @@ mod tests {
         let archive = entry.finish().expect("entry finish");
         let bytes = archive.finish().expect("archive finish");
 
-        let reader = crate::office::ArchiveReader::new(&bytes).expect("archive reader");
+        let reader = crate::office::ArchiveReader::new(&bytes, ArchiveLimits::default())
+            .expect("archive reader");
         assert_eq!(reader.read("owned.txt").expect("inflate payload"), payload);
         let archive = ZipArchive::from_slice(&bytes).expect("reopen ZIP64 archive");
         assert!(archive.is_zip64());
@@ -4273,7 +4256,7 @@ mod tests {
             .new_file("x")
             .start()
             .expect_err("offset overflow before local header");
-        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
         assert_eq!(archive.stream_offset(), u64::MAX);
         drop(archive);
         assert!(output.is_empty());
@@ -4373,7 +4356,7 @@ mod tests {
             )
             .unwrap_err();
 
-        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
         assert_eq!(accounting.precompressed_payload_bytes_emitted(), 3);
         assert_eq!(accounting.generated_deflate_payload_bytes_emitted(), 0);
         assert_eq!(accounting.stored_payload_bytes_emitted(), 0);
@@ -4618,12 +4601,13 @@ mod tests {
         let archive = entry.finish().unwrap();
 
         let mut entry = archive
-            .start_entry_owned("deflated.txt", CompressionMethod::Deflate)
+            .start_file_owned("deflated.txt", CompressionMethod::Deflate)
             .unwrap();
         entry.write_all(b"deflated payload").unwrap();
         let archive = entry.finish().unwrap();
         archive.finish().unwrap();
-        let reader = crate::office::ArchiveReader::new(output.get_ref()).unwrap();
+        let reader =
+            crate::office::ArchiveReader::new(output.get_ref(), ArchiveLimits::default()).unwrap();
         assert_eq!(reader.read("stored.txt").unwrap(), b"stored payload");
         assert_eq!(reader.read("deflated.txt").unwrap(), b"deflated payload");
     }
@@ -4758,7 +4742,7 @@ mod tests {
 
         // The reader verifies every member's recorded CRC-32 and size.
         let bytes = output.into_inner();
-        let reader = crate::office::ArchiveReader::new(&bytes).unwrap();
+        let reader = crate::office::ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
         for (index, payload) in payloads.iter().enumerate() {
             let name = format!("member-{index}");
             assert_eq!(&reader.read(&name).unwrap(), payload, "{name}");

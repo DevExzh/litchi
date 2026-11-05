@@ -183,7 +183,7 @@ impl Tag {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn new_with_limits(
+    pub(crate) fn new_with_limits(
         name: impl Into<String>,
         value: impl Into<String>,
         limits: Limits,
@@ -214,8 +214,11 @@ impl Tag {
             .len()
             .checked_add(self.value.len())
             .ok_or(Error::Limit {
-                resource: "designer tag aggregate bytes",
-                limit: usize::MAX,
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::DesignerTagBytes,
+                ),
+                observed: usize::MAX,
+                maximum: usize::MAX,
             })
     }
 
@@ -249,11 +252,8 @@ impl Tags {
     }
 
     /// Construct an ordered tag collection under caller-supplied bounds.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_iter_with_limits(
+    #[cfg(test)]
+    pub(crate) fn from_iter_with_limits(
         entries: impl IntoIterator<Item = Tag>,
         limits: Limits,
     ) -> Result<Self> {
@@ -314,7 +314,7 @@ impl Tags {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn push_with_limits(&mut self, entry: Tag, limits: Limits) -> Result<()> {
+    pub(crate) fn push_with_limits(&mut self, entry: Tag, limits: Limits) -> Result<()> {
         self.check_add(&entry, limits)?;
         self.entries
             .try_reserve(1)
@@ -323,19 +323,21 @@ impl Tags {
                 source,
             })?;
         self.bytes = self.bytes.checked_add(entry.bytes()?).ok_or(Error::Limit {
-            resource: "designer tag aggregate bytes",
-            limit: limits.aggregate_bytes,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::DesignerTagBytes),
+            observed: usize::MAX,
+            maximum: limits.aggregate_bytes,
         })?;
         self.entries.push(entry);
         Ok(())
     }
 
-    /// Insert a tag at a source-order position under caller-supplied bounds.
+    /// Insert a tag at a source-order position under the default bounds.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn insert_with_limits(&mut self, index: usize, entry: Tag, limits: Limits) -> Result<()> {
+    pub fn insert(&mut self, index: usize, entry: Tag) -> Result<()> {
+        let limits = Limits::default();
         if index > self.entries.len() {
             return Err(Error::IndexOutOfBounds {
                 index,
@@ -350,37 +352,45 @@ impl Tags {
                 source,
             })?;
         self.bytes = self.bytes.checked_add(entry.bytes()?).ok_or(Error::Limit {
-            resource: "designer tag aggregate bytes",
-            limit: limits.aggregate_bytes,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::DesignerTagBytes),
+            observed: usize::MAX,
+            maximum: limits.aggregate_bytes,
         })?;
         self.entries.insert(index, entry);
         Ok(())
     }
 
-    /// Replace one tag, returning the previous entry.
+    /// Replace one tag under the default bounds, returning the previous entry.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn replace_with_limits(&mut self, index: usize, entry: Tag, limits: Limits) -> Result<Tag> {
+    pub fn replace(&mut self, index: usize, entry: Tag) -> Result<Tag> {
+        let limits = Limits::default();
         let previous = self.entries.get(index).ok_or(Error::IndexOutOfBounds {
             index,
             len: self.entries.len(),
         })?;
         let previous_bytes = previous.bytes()?;
         let entry_bytes = entry.validate(limits)?;
-        let reduced = self.bytes.checked_sub(previous_bytes).ok_or(Error::Limit {
-            resource: "designer tag aggregate bytes",
-            limit: limits.aggregate_bytes,
+        let reduced = self.bytes.checked_sub(previous_bytes).ok_or_else(|| {
+            Error::internal(
+                "designer_tags_replace",
+                "retained tag bytes are below the replaced entry bytes",
+            )
         })?;
         let bytes = reduced.checked_add(entry_bytes).ok_or(Error::Limit {
-            resource: "designer tag aggregate bytes",
-            limit: limits.aggregate_bytes,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::DesignerTagBytes),
+            observed: usize::MAX,
+            maximum: limits.aggregate_bytes,
         })?;
         if bytes > limits.aggregate_bytes {
             return Err(Error::Limit {
-                resource: "designer tag aggregate bytes",
-                limit: limits.aggregate_bytes,
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::DesignerTagBytes,
+                ),
+                observed: bytes,
+                maximum: limits.aggregate_bytes,
             });
         }
         self.bytes = bytes;
@@ -397,9 +407,11 @@ impl Tags {
             index,
             len: self.entries.len(),
         })?;
-        self.bytes = self.bytes.checked_sub(entry.bytes()?).ok_or(Error::Limit {
-            resource: "designer tag aggregate bytes",
-            limit: usize::MAX,
+        self.bytes = self.bytes.checked_sub(entry.bytes()?).ok_or_else(|| {
+            Error::internal(
+                "designer_tags_remove",
+                "retained tag bytes are below the removed entry bytes",
+            )
         })?;
         Ok(self.entries.remove(index))
     }
@@ -414,8 +426,9 @@ impl Tags {
     pub(crate) fn validate(&self, limits: Limits) -> Result<()> {
         if self.entries.len() > limits.tag_count {
             return Err(Error::Limit {
-                resource: "designer tag count",
-                limit: limits.tag_count,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::DesignerTags),
+                observed: self.entries.len(),
+                maximum: limits.tag_count,
             });
         }
         let mut bytes = 0usize;
@@ -423,13 +436,19 @@ impl Tags {
             bytes = bytes
                 .checked_add(entry.validate(limits)?)
                 .ok_or(Error::Limit {
-                    resource: "designer tag aggregate bytes",
-                    limit: limits.aggregate_bytes,
+                    kind: crate::opened::LimitKind::Codec(
+                        crate::opened::CodecLimitKind::DesignerTagBytes,
+                    ),
+                    observed: usize::MAX,
+                    maximum: limits.aggregate_bytes,
                 })?;
             if bytes > limits.aggregate_bytes {
                 return Err(Error::Limit {
-                    resource: "designer tag aggregate bytes",
-                    limit: limits.aggregate_bytes,
+                    kind: crate::opened::LimitKind::Codec(
+                        crate::opened::CodecLimitKind::DesignerTagBytes,
+                    ),
+                    observed: bytes,
+                    maximum: limits.aggregate_bytes,
                 });
             }
         }
@@ -444,19 +463,24 @@ impl Tags {
     fn check_add(&self, entry: &Tag, limits: Limits) -> Result<()> {
         if self.entries.len() >= limits.tag_count {
             return Err(Error::Limit {
-                resource: "designer tag count",
-                limit: limits.tag_count,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::DesignerTags),
+                observed: self.entries.len().checked_add(1).unwrap_or(usize::MAX),
+                maximum: limits.tag_count,
             });
         }
         let entry_bytes = entry.validate(limits)?;
         let bytes = self.bytes.checked_add(entry_bytes).ok_or(Error::Limit {
-            resource: "designer tag aggregate bytes",
-            limit: limits.aggregate_bytes,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::DesignerTagBytes),
+            observed: usize::MAX,
+            maximum: limits.aggregate_bytes,
         })?;
         if bytes > limits.aggregate_bytes {
             return Err(Error::Limit {
-                resource: "designer tag aggregate bytes",
-                limit: limits.aggregate_bytes,
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::DesignerTagBytes,
+                ),
+                observed: bytes,
+                maximum: limits.aggregate_bytes,
             });
         }
         Ok(())
@@ -568,8 +592,11 @@ impl Opaque {
         }
         if xml.len() > MAX_UNKNOWN_EXTENSION_BYTES {
             return Err(Error::Limit {
-                resource: "designer opaque extension bytes",
-                limit: MAX_UNKNOWN_EXTENSION_BYTES,
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::ExtensionBytes,
+                ),
+                observed: xml.len(),
+                maximum: MAX_UNKNOWN_EXTENSION_BYTES,
             });
         }
         Ok(Self { xml })
@@ -612,13 +639,6 @@ impl Snapshot {
         &self.unknown_extensions
     }
 
-    /// Start a detached atomic edit of this snapshot.
-    #[inline]
-    #[must_use]
-    pub fn edit(&self) -> crate::shape::designer::Editor {
-        crate::shape::designer::Editor::new(self.clone())
-    }
-
     pub(crate) fn from_wire(value: Option<bool>, unknown_extensions: Vec<Opaque>) -> Result<Self> {
         let snapshot = Self {
             value,
@@ -631,26 +651,36 @@ impl Snapshot {
     pub(crate) fn validate(&self) -> Result<()> {
         if self.unknown_extensions.len() > MAX_UNKNOWN_EXTENSIONS {
             return Err(Error::Limit {
-                resource: "designer opaque extensions",
-                limit: MAX_UNKNOWN_EXTENSIONS,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Extensions),
+                observed: self.unknown_extensions.len(),
+                maximum: MAX_UNKNOWN_EXTENSIONS,
             });
         }
         let mut total = 0usize;
         for extension in &self.unknown_extensions {
             if extension.xml.is_empty() || extension.xml.len() > MAX_UNKNOWN_EXTENSION_BYTES {
                 return Err(Error::Limit {
-                    resource: "designer opaque extension bytes",
-                    limit: MAX_UNKNOWN_EXTENSION_BYTES,
+                    kind: crate::opened::LimitKind::Codec(
+                        crate::opened::CodecLimitKind::ExtensionBytes,
+                    ),
+                    observed: extension.xml.len(),
+                    maximum: MAX_UNKNOWN_EXTENSION_BYTES,
                 });
             }
             total = total.checked_add(extension.xml.len()).ok_or(Error::Limit {
-                resource: "designer opaque extension bytes",
-                limit: MAX_UNKNOWN_BYTES,
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::ExtensionBytes,
+                ),
+                observed: usize::MAX,
+                maximum: MAX_UNKNOWN_BYTES,
             })?;
             if total > MAX_UNKNOWN_BYTES {
                 return Err(Error::Limit {
-                    resource: "designer opaque extension bytes",
-                    limit: MAX_UNKNOWN_BYTES,
+                    kind: crate::opened::LimitKind::Codec(
+                        crate::opened::CodecLimitKind::ExtensionBytes,
+                    ),
+                    observed: total,
+                    maximum: MAX_UNKNOWN_BYTES,
                 });
             }
         }
@@ -698,8 +728,9 @@ mod tests {
         assert!(matches!(
             Tag::new_with_limits("abc", "", tight),
             Err(Error::Limit {
-                resource: "designer tag name",
-                limit: 2,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::StringBytes),
+                observed: 3,
+                maximum: 2,
             })
         ));
 
@@ -709,8 +740,9 @@ mod tests {
         assert!(matches!(
             tags.push_with_limits(Tag::new("", "").unwrap(), tight),
             Err(Error::Limit {
-                resource: "designer tag count",
-                limit: 1,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::DesignerTags),
+                observed: 2,
+                maximum: 1,
             })
         ));
 
@@ -718,8 +750,11 @@ mod tests {
         assert!(matches!(
             Tags::from_iter_with_limits([Tag::new("ab", "cd").unwrap()], aggregate),
             Err(Error::Limit {
-                resource: "designer tag aggregate bytes",
-                limit: 3,
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::DesignerTagBytes,
+                ),
+                observed: 4,
+                maximum: 3,
             })
         ));
     }

@@ -1,4 +1,4 @@
-//! Failure-atomic typed Custom XML store transactions.
+//! Failure-atomic typed Custom XML store edits.
 
 use std::sync::Arc;
 
@@ -8,13 +8,15 @@ use super::patch::Patch;
 use super::snapshot::Snapshot;
 
 /// An isolated typed edit over one immutable Custom XML store snapshot.
+///
+/// Dropping the edit discards it; the source snapshot is never changed.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub struct Edit {
     source: Snapshot,
     draft: Store,
 }
 
-impl Transaction {
+impl Edit {
     pub(super) fn new(source: Snapshot) -> Self {
         Self {
             draft: source.store().clone(),
@@ -22,7 +24,7 @@ impl Transaction {
         }
     }
 
-    /// Borrow the immutable source used to start this transaction.
+    /// Borrow the immutable source used to start this edit.
     #[must_use]
     pub const fn source(&self) -> &Snapshot {
         &self.source
@@ -46,12 +48,6 @@ impl Transaction {
         self.draft.promotion
     }
 
-    /// Whether the staged typed or opaque source state differs from its base.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.draft != *self.source.store()
-    }
-
     /// Change the store's promotion marker state.
     ///
     /// # Errors
@@ -72,9 +68,10 @@ impl Transaction {
     /// Returns an error if `index` is absent, `xml` is malformed, or the
     /// resulting store violates its source limits.
     pub fn set_xml(&mut self, index: usize, xml: Vec<u8>) -> Result<bool> {
+        let limits = self.source.limits();
         self.stage(|store| {
             let item = item_mut(store, index)?;
-            item.set_xml(xml)
+            item.set_xml_with_limits(xml, &limits)
         })
     }
 
@@ -272,7 +269,7 @@ impl Transaction {
     }
 
     /// Apply a custom store edit to a cloned candidate and validate the whole
-    /// dependency closure before publishing it into this transaction.
+    /// dependency closure before publishing it into this edit.
     ///
     /// # Errors
     ///
@@ -286,21 +283,6 @@ impl Transaction {
         Ok(self)
     }
 
-    /// Capture the current validated candidate without publishing it.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the staged store violates its source limits.
-    pub fn snapshot(&self) -> Result<Snapshot> {
-        self.materialize()
-    }
-
-    /// Discard this transaction and recover its immutable source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
-    }
-
     /// Validate and publish a reversible source-checked commit.
     ///
     /// # Errors
@@ -309,7 +291,13 @@ impl Transaction {
     pub fn commit(self) -> Result<Commit> {
         let snapshot = self.materialize()?;
         let patch = Patch::new(self.source, snapshot.clone());
-        Ok(Commit { snapshot, patch })
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(snapshot, patch, diagnostics))
+    }
+
+    /// Discard every staged change, returning to the source store.
+    pub fn reset(&mut self) {
+        self.draft = self.source.store().clone();
     }
 
     fn stage<F>(&mut self, edit: F) -> Result<bool>
@@ -338,50 +326,12 @@ impl Transaction {
     }
 }
 
-/// The successful result of a typed Custom XML store publication.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
+/// The successful result of a typed Custom XML store publication: the
+/// published store snapshot, its reversible patch and diagnostics.
+pub type Commit = litchi_core::edit::Commit<Snapshot, Patch>;
 
-impl Commit {
-    /// Whether the exact retained store source changed.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        !self.patch.is_noop()
-    }
-
-    /// Borrow the immutable published snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Borrow the reversible source-checked patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consume the commit into its published snapshot.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
-    }
-
-    /// Consume the commit into its reversible patch.
-    #[must_use]
-    pub fn into_patch(self) -> Patch {
-        self.patch
-    }
-
-    /// Split the commit into its snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
-    }
-}
+/// Content-free diagnostics of one Custom XML store commit.
+pub use litchi_core::edit::Diagnostics;
 
 /// Run one isolated edit and publish it atomically.
 ///
@@ -391,11 +341,11 @@ impl Commit {
 /// limits.
 pub fn update<F>(snapshot: &Snapshot, edit: F) -> Result<Commit>
 where
-    F: FnOnce(&mut Transaction) -> Result<()>,
+    F: FnOnce(&mut Edit) -> Result<()>,
 {
-    let mut transaction = snapshot.edit();
-    edit(&mut transaction)?;
-    transaction.commit()
+    let mut staged = snapshot.edit();
+    edit(&mut staged)?;
+    staged.commit()
 }
 
 fn item_mut(store: &mut Store, index: usize) -> Result<&mut Item> {

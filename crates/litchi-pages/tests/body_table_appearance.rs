@@ -15,7 +15,7 @@ use litchi_iwa_protos::{tsp, tst};
 use litchi_pages::table::appearance::{
     Appearance, Banding, GridlineVisibility, Gridlines, RowSizing,
 };
-use litchi_pages::{BodyTableAppearanceError as Error, BodyTableSelector, Package};
+use litchi_pages::{BodyTableSelector, Package, table::appearance::transaction::Error};
 use prost::Message as _;
 
 #[path = "body_table_header_settings.rs"]
@@ -103,7 +103,11 @@ mod body_fixture {
         )?;
         let info = &mut object.archive_info.message_infos[0];
         info.object_references = vec![STYLESHEET_ID];
-        let mut field = FieldInfo::new(vec![5]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![5], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references.push(STYLESHEET_ID);
         info.field_infos.push(field);
         Ok(object)
@@ -218,6 +222,7 @@ mod body_fixture {
                         type_: message_type,
                         data,
                     },
+                    Default::default(),
                 )?;
                 let info = &mut model.archive_info.message_infos[0];
                 info.object_references.clear();
@@ -229,7 +234,15 @@ mod body_fixture {
                 }
                 info.field_infos.clear();
                 if style != 0 {
-                    let mut field = FieldInfo::new(vec![3]);
+                    let mut field = FieldInfo::new(
+                        litchi_iwa_core::FieldPath::new(
+                            vec![3],
+                            litchi_iwa_core::Limits::default(),
+                        )
+                        .unwrap(),
+                        litchi_iwa_core::Limits::default(),
+                    )
+                    .unwrap();
                     field.object_references.push(style);
                     info.field_infos.push(field);
                 }
@@ -265,13 +278,15 @@ mod body_fixture {
     }
 
     fn metadata_package(source: &[u8]) -> Result<Vec<u8>, Box<dyn StdError>> {
-        let source_catalog = Catalog::from_bytes(source)?;
+        let source_catalog = Catalog::from_bytes(source, Default::default())?;
         let document = source_catalog
             .iter()
             .find(|entry| entry.name() == DOCUMENT_MEMBER)
             .ok_or("missing document member")?;
-        let document_archive =
-            Archive::parse(SnappyStream::decompress(document.data())?.as_bytes())?;
+        let document_archive = Archive::parse(
+            SnappyStream::decompress(document.data(), Default::default())?.as_bytes(),
+            Default::default(),
+        )?;
         let mut identifiers = document_archive
             .objects
             .iter()
@@ -302,9 +317,10 @@ mod body_fixture {
             &Archive {
                 objects: vec![object(METADATA_OBJECT_ID, 11_006, metadata, &[])?],
             }
-            .to_bytes()?,
+            .to_bytes(Default::default())?,
+            Default::default(),
         )?;
-        let catalog = Catalog::from_bytes(source)?;
+        let catalog = Catalog::from_bytes(source, Default::default())?;
         let mut members = catalog
             .iter()
             .filter(|entry| entry.name() != METADATA_MEMBER)
@@ -325,12 +341,15 @@ mod body_fixture {
         source: &[u8],
         mutate: impl FnOnce(&mut tsp::PackageMetadata) -> Result<(), Box<dyn StdError>>,
     ) -> Result<Vec<u8>, Box<dyn StdError>> {
-        let catalog = Catalog::from_bytes(source)?;
+        let catalog = Catalog::from_bytes(source, Default::default())?;
         let entry = catalog
             .iter()
             .find(|entry| entry.name() == METADATA_MEMBER)
             .ok_or("missing metadata member")?;
-        let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+        let mut archive = Archive::parse(
+            SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+            Default::default(),
+        )?;
         let metadata_object = archive
             .object_mut(METADATA_OBJECT_ID)
             .ok_or("missing metadata object")?;
@@ -349,8 +368,10 @@ mod body_fixture {
                 type_: message_type,
                 data: metadata.encode_to_vec(),
             },
+            Default::default(),
         )?;
-        let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+        let compressed =
+            SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
         Ok(catalog.reassemble_to_bytes(
             &[EntryEdit::new(METADATA_MEMBER, compressed.as_slice())],
             Limits::default(),
@@ -358,12 +379,15 @@ mod body_fixture {
     }
 
     fn append_metadata_unknown(source: &[u8]) -> Result<Vec<u8>, Box<dyn StdError>> {
-        let catalog = Catalog::from_bytes(source)?;
+        let catalog = Catalog::from_bytes(source, Default::default())?;
         let entry = catalog
             .iter()
             .find(|entry| entry.name() == METADATA_MEMBER)
             .ok_or("missing metadata member")?;
-        let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+        let mut archive = Archive::parse(
+            SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+            Default::default(),
+        )?;
         let metadata_object = archive
             .object_mut(METADATA_OBJECT_ID)
             .ok_or("missing metadata object")?;
@@ -381,8 +405,10 @@ mod body_fixture {
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
-        let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+        let compressed =
+            SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
         Ok(catalog.reassemble_to_bytes(
             &[EntryEdit::new(METADATA_MEMBER, compressed.as_slice())],
             Limits::default(),
@@ -391,7 +417,7 @@ mod body_fixture {
 
     pub(crate) fn without_metadata_member(source: &[u8]) -> Result<Vec<u8>, Box<dyn StdError>> {
         Ok(
-            Catalog::from_bytes(source)?.reassemble_with_deletions_to_bytes(
+            Catalog::from_bytes(source, Default::default())?.reassemble_with_deletions_to_bytes(
                 &[],
                 &[METADATA_MEMBER],
                 Limits::default(),
@@ -401,12 +427,15 @@ mod body_fixture {
 
     pub(crate) fn split_style_component(source: &[u8]) -> Result<Vec<u8>, Box<dyn StdError>> {
         const FOREIGN_MEMBER: &str = "Index/ForeignStyles.iwa";
-        let catalog = Catalog::from_bytes(source)?;
+        let catalog = Catalog::from_bytes(source, Default::default())?;
         let document = catalog
             .iter()
             .find(|entry| entry.name() == DOCUMENT_MEMBER)
             .ok_or("missing document member")?;
-        let mut archive = Archive::parse(SnappyStream::decompress(document.data())?.as_bytes())?;
+        let mut archive = Archive::parse(
+            SnappyStream::decompress(document.data(), Default::default())?.as_bytes(),
+            Default::default(),
+        )?;
         let mut kept = Vec::new();
         let mut moved = Vec::new();
         for object in archive.objects {
@@ -421,8 +450,12 @@ mod body_fixture {
             }
         }
         archive.objects = kept;
-        let document_data = SnappyStream::compress(&archive.to_bytes()?)?;
-        let foreign_data = SnappyStream::compress(&Archive { objects: moved }.to_bytes()?)?;
+        let document_data =
+            SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+        let foreign_data = SnappyStream::compress(
+            &Archive { objects: moved }.to_bytes(Default::default())?,
+            Default::default(),
+        )?;
         let mut members = catalog
             .iter()
             .map(|entry| {
@@ -625,6 +658,7 @@ mod body_fixture {
                     type_: TABLE_MODEL_MESSAGE_TYPE,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -680,19 +714,21 @@ mod body_fixture {
                     type_: TABLE_INFO_MESSAGE_TYPE,
                     data: native.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })
     }
 
     pub(crate) fn add_cross_component_inbound(source: &[u8]) -> Result<Vec<u8>, Box<dyn StdError>> {
-        let catalog = Catalog::from_bytes(source)?;
+        let catalog = Catalog::from_bytes(source, Default::default())?;
         let inbound = object(7_000, 7_001, vec![0x08, 0x01], &[PARENT_STYLE_ID])?;
         let component = SnappyStream::compress(
             &Archive {
                 objects: vec![inbound],
             }
-            .to_bytes()?,
+            .to_bytes(Default::default())?,
+            Default::default(),
         )?;
         let mut members = catalog
             .iter()
@@ -761,7 +797,7 @@ fn expected_child() -> Appearance {
 }
 
 fn member_bytes(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
-    Ok(Catalog::from_bytes(package)?
+    Ok(Catalog::from_bytes(package, Default::default())?
         .iter()
         .find(|entry| entry.name() == name)
         .ok_or_else(|| format!("missing package member {name}"))?
@@ -770,13 +806,14 @@ fn member_bytes(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
 }
 
 fn document_archive(package: &[u8]) -> TestResult<Archive> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document member")?;
     Ok(Archive::parse(
-        SnappyStream::decompress(entry.data())?.as_bytes(),
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
     )?)
 }
 
@@ -814,7 +851,12 @@ fn assert_rejected(source: &[u8]) -> TestResult {
     };
     let before = package.exact_bytes();
     assert!(package.body_table_appearance(0usize).is_err());
-    assert!(package.edit_body_table_appearance(0usize).is_err());
+    assert!(
+        package
+            .edit_body_table_appearance(0usize)
+            .and_then(|mut edit| edit.appearance())
+            .is_err()
+    );
     assert_eq!(package.exact_bytes(), before);
     Ok(())
 }
@@ -903,10 +945,13 @@ fn exact_no_op_skips_changed_target_resolution_but_changes_fail_closed() -> Test
     // changed-path resolution, providing a deterministic no-op ordering gate.
     let archive_limits = litchi_iwa_core::Limits::default().with_header_fields(75)?;
     let limits = Limits::default().with_archive_limits(archive_limits)?;
-    let package = Package::from_bytes_with_limits(&source, limits)?;
-    let edit = package.edit_body_table_appearance(0usize)?;
+    let package = Package::from_bytes_with_options(
+        &source,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    )?;
+    let mut edit = package.edit_body_table_appearance(0usize)?;
     let before = package.exact_bytes();
-    let appearance = edit.appearance();
+    let appearance = edit.appearance()?;
     let noop = edit.set(appearance).commit()?;
     assert!(noop.patch().is_noop());
     assert_eq!(
@@ -919,7 +964,7 @@ fn exact_no_op_skips_changed_target_resolution_but_changes_fail_closed() -> Test
 
     let changed_edit = package.edit_body_table_appearance(0usize)?;
     let changed = changed_edit.set(changed_appearance()).commit();
-    assert!(matches!(changed, Err(Error::LimitExceeded { .. })));
+    assert!(matches!(changed, Err(Error::Limit { .. })));
     assert_eq!(package.exact_bytes(), before);
     Ok(())
 }
@@ -932,8 +977,11 @@ fn apply_rejects_semantic_prepared_source_but_keeps_noop_exact() -> TestResult {
     use litchi_iwa_detect::PreparedSource;
 
     let source: Arc<[u8]> = body_fixture::direct_package()?.into();
-    let exact_prepared = PreparedSource::from_shared_bytes(Arc::clone(&source))?
-        .ok_or("fixture was not detected as Pages")?;
+    let exact_prepared = PreparedSource::from_shared_bytes(
+        Arc::clone(&source),
+        litchi_iwa_detect::Limits::default(),
+    )?
+    .ok_or("fixture was not detected as Pages")?;
     let exact_package = Package::__from_prepared_source(exact_prepared)?;
     let semantic_prepared = PreparedSource::__from_shared_bytes_with_pages_metadata(
         Arc::clone(&source),
@@ -1003,12 +1051,12 @@ fn changed_appearance_cows_shared_style_preserves_unknowns_and_locality() -> Tes
     assert_ne!(source, target);
     let model = model_payload(&target, FIRST_MODEL_IDENTIFIER)?;
     assert!(
-        WireView::parse(&model)?
+        WireView::parse(&model, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .any(|field| field.number() == UNKNOWN_MODEL_FIELD)
     );
     assert!(style_payloads(&target)?.iter().any(|payload| {
-        WireView::parse(payload)
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
             .map(|view| view.fields().any(|field| field.number() == 90))
             .unwrap_or(false)
     }));
@@ -1067,7 +1115,10 @@ fn locked_table_allows_exact_noop_but_refuses_change_atomically() -> TestResult 
         .expect_err("locked appearance must reject changes");
     assert!(matches!(
         error,
-        Error::TableLocked { .. } | Error::UnsupportedDependency { .. }
+        Error::Refused(litchi_pages::table::appearance::transaction::Refusal::TableLocked { .. })
+            | Error::Refused(
+                litchi_pages::table::appearance::transaction::Refusal::UnsupportedDependency { .. }
+            )
     ));
     assert_eq!(package.exact_bytes(), before);
     Ok(())
@@ -1085,6 +1136,7 @@ fn malformed_unknown_duplicate_wrong_wire_and_noncanonical_fields_fail_closed() 
             ..tsp::Reference::default()
         }
         .encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     let cases = [
         ("duplicate known", duplicate_known),
@@ -1187,14 +1239,17 @@ fn finite_ingress_and_semantic_limits_refuse_before_publication() -> TestResult 
     for fields in 1..=4_096 {
         let archive_limits = litchi_iwa_core::Limits::default().with_header_fields(fields)?;
         let limits = Limits::default().with_archive_limits(archive_limits)?;
-        let Ok(package) = Package::from_bytes_with_limits(&source, limits) else {
+        let Ok(package) = Package::from_bytes_with_options(
+            &source,
+            litchi_pages::OpenOptions::new().__archive_limits(limits),
+        ) else {
             continue;
         };
         let before = package.exact_bytes();
         let result = package
             .edit_body_table_appearance(0usize)
             .and_then(|edit| edit.set(changed_appearance()).commit());
-        if matches!(result, Err(Error::LimitExceeded { .. })) {
+        if matches!(result, Err(Error::Limit { .. })) {
             assert_eq!(package.exact_bytes(), before);
             refused = true;
             break;
@@ -1216,13 +1271,13 @@ fn public_transaction_values_are_archive_free_send_sync_and_redacted() -> TestRe
     assert_traits::<GridlineVisibility>();
     assert_traits::<Gridlines>();
     assert_traits::<RowSizing>();
-    assert_traits::<litchi_pages::BodyTableAppearanceEdit<'static>>();
-    assert_traits::<litchi_pages::BodyTableAppearancePatch>();
-    assert_traits::<litchi_pages::BodyTableAppearanceCommit>();
-    assert_traits::<litchi_pages::BodyTableAppearanceDiagnostics>();
-    assert_traits::<litchi_pages::BodyTableAppearanceError>();
-    assert_traits::<litchi_pages::BodyTableAppearanceLimitKind>();
-    assert_traits::<litchi_pages::BodyTableAppearancePath>();
+    assert_traits::<litchi_pages::table::appearance::transaction::Edit<'static>>();
+    assert_traits::<litchi_pages::table::appearance::transaction::Patch>();
+    assert_traits::<litchi_pages::table::appearance::transaction::Commit>();
+    assert_traits::<litchi_pages::table::appearance::transaction::Diagnostics>();
+    assert_traits::<Error>();
+    assert_traits::<litchi_pages::table::appearance::transaction::LimitKind>();
+    assert_traits::<litchi_pages::table::appearance::transaction::Path>();
 
     let package = Package::from_bytes(&body_fixture::direct_package()?)?;
     let edit = package.edit_body_table_appearance(0usize)?;

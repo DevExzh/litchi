@@ -4,12 +4,14 @@ use super::model::{
     AutoReloadMetadata, DocumentStatistics, HyperlinkBehaviourMetadata, Metadata, TemplateMetadata,
     UserDefinedMetadata, UserDefinedValueType,
 };
+use crate::core::{ResolvedReader, XmlStreamLimits};
+use crate::map_resolved_reader_error;
 use litchi_core::{Error, Metadata as CoreMetadata, Result, xml::escape_xml};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::name::{Namespace, ResolveResult};
-use quick_xml::reader::NsReader;
 use quick_xml::writer::Writer;
+use std::io::{self, Write};
 
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const META_NAMESPACE_STR: &str = "urn:oasis:names:tc:opendocument:xmlns:meta:1.0";
@@ -29,6 +31,78 @@ const PATCH_INSERTION_ORDER: [PatchField; PATCH_FIELD_COUNT] = [
     PatchField::Creator,
     PatchField::ModificationDate,
 ];
+const METADATA_OUTPUT_SCOPE: &str = "ODF metadata output";
+
+#[derive(Debug)]
+struct MetadataOutputLimit {
+    observed: u64,
+    maximum: u64,
+}
+
+impl std::fmt::Display for MetadataOutputLimit {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            formatter,
+            "metadata output exceeds {} bytes (observed {})",
+            self.maximum, self.observed
+        )
+    }
+}
+
+impl std::error::Error for MetadataOutputLimit {}
+
+/// A fallible, output-admitted buffer for the retained metadata writer.
+///
+/// The XML reader's input ceiling is also the maximum metadata replacement
+/// output accepted by this low-level patcher. Keeping the bound on the writer
+/// prevents a changed value from growing an unbounded `Vec` while the source
+/// package is retained by its owner.
+struct BoundedMetadataWriter {
+    bytes: Vec<u8>,
+    maximum: usize,
+}
+
+impl BoundedMetadataWriter {
+    fn new(capacity: usize, maximum: usize) -> Result<Self> {
+        let capacity = capacity.min(maximum);
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(capacity)
+            .map_err(|source| Error::Allocation {
+                resource: METADATA_OUTPUT_SCOPE,
+                source,
+            })?;
+        Ok(Self { bytes, maximum })
+    }
+
+    fn into_inner(self) -> Vec<u8> {
+        self.bytes
+    }
+}
+
+impl Write for BoundedMetadataWriter {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        let observed = self.bytes.len().saturating_add(bytes.len());
+        if observed > self.maximum {
+            return Err(io::Error::other(MetadataOutputLimit {
+                observed: u64::try_from(observed).unwrap_or(u64::MAX),
+                maximum: u64::try_from(self.maximum).unwrap_or(u64::MAX),
+            }));
+        }
+        self.bytes.try_reserve(bytes.len()).map_err(|source| {
+            io::Error::other(Error::Allocation {
+                resource: METADATA_OUTPUT_SCOPE,
+                source,
+            })
+        })?;
+        self.bytes.extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
 
 fn try_copy_string(value: &str, resource: &'static str) -> Result<String> {
     let mut output = String::new();
@@ -68,8 +142,9 @@ impl Metadata {
     ///
     /// Returns an error when the XML is malformed or contains invalid ODF
     /// metadata values.
-    pub fn from_xml(xml_content: &str) -> Result<Self> {
-        let mut reader = NsReader::from_str(xml_content);
+    pub fn from_xml(xml_content: &str, limits: XmlStreamLimits) -> Result<Self> {
+        let mut reader = ResolvedReader::from_xml(xml_content, limits)
+            .map_err(|error| map_resolved_reader_error(error, "XML parsing error in metadata"))?;
         let mut buf = Vec::new();
         let mut metadata = Metadata::default();
         let mut depth = 0usize;
@@ -78,7 +153,7 @@ impl Metadata {
         loop {
             let (resolved_namespace, event) = reader
                 .read_resolved_event_into(&mut buf)
-                .map_err(metadata_xml_error)?;
+                .map_err(metadata_reader_error)?;
             let namespace = known_namespace(&resolved_namespace);
             match event {
                 Event::Start(ref element) => {
@@ -206,8 +281,9 @@ enum KnownNamespace {
 enum MetaFieldEdit {
     /// Keep the source element, or its absence, untouched.
     Preserve,
-    /// Set the element text, inserting the element when it is absent.
-    Set(String),
+    /// Set the element texts (one element per text; `meta:keyword` takes
+    /// one per keyword), inserting the elements when they are absent.
+    Set(Vec<String>),
     /// Remove the element from the source meta.xml.
     Remove,
 }
@@ -252,9 +328,21 @@ impl MetaFieldEdit {
         if expected == current {
             Self::Preserve
         } else if let Some(value) = current {
-            Self::Set(value.to_string())
+            Self::Set(vec![value.to_string()])
         } else {
             Self::Remove
+        }
+    }
+
+    /// The edit between two keyword lists; an empty list removes every
+    /// keyword.
+    fn between_lists(expected: &[String], current: &[String]) -> Self {
+        if expected == current {
+            Self::Preserve
+        } else if current.is_empty() {
+            Self::Remove
+        } else {
+            Self::Set(current.to_vec())
         }
     }
 }
@@ -282,8 +370,8 @@ impl MetaXmlPatch {
         generator: &str,
         modification_date: String,
     ) -> Self {
-        self.generator = MetaFieldEdit::Set(generator.to_string());
-        self.modification_date = MetaFieldEdit::Set(modification_date);
+        self.generator = MetaFieldEdit::Set(vec![generator.to_string()]);
+        self.modification_date = MetaFieldEdit::Set(vec![modification_date]);
         self
     }
 
@@ -302,8 +390,7 @@ impl MetaXmlPatch {
             expected.description.as_deref(),
             current.description.as_deref(),
         );
-        self.keywords =
-            MetaFieldEdit::between(expected.keywords.as_deref(), current.keywords.as_deref());
+        self.keywords = MetaFieldEdit::between_lists(&expected.keywords, &current.keywords);
         self
     }
 
@@ -371,7 +458,7 @@ impl PatchField {
 
 impl MetaNamespacePrefixes {
     /// Record the relevant bindings declared on the root element.
-    fn observe(&mut self, element: &BytesStart<'_>, reader: &NsReader<&[u8]>) -> Result<()> {
+    fn observe(&mut self, element: &BytesStart<'_>, reader: &ResolvedReader<'_>) -> Result<()> {
         for raw_attribute in element.attributes() {
             let attribute = raw_attribute.map_err(metadata_xml_error)?;
             let bound_prefix = if attribute.key.as_ref() == b"xmlns" {
@@ -537,6 +624,53 @@ fn patch_field(namespace: KnownNamespace, local_name: &[u8]) -> Option<PatchFiel
     }
 }
 
+fn escaped_metadata_value_len(value: &str) -> Result<usize> {
+    value.as_bytes().iter().try_fold(0usize, |length, byte| {
+        let replacement = match byte {
+            b'&' => 5,
+            b'<' | b'>' => 4,
+            b'"' | b'\'' => 6,
+            _ => 1,
+        };
+        length
+            .checked_add(replacement)
+            .ok_or_else(|| Error::InvalidFormat("metadata output length overflow".to_string()))
+    })
+}
+
+fn metadata_output_limit(observed: usize, maximum: usize) -> Error {
+    Error::ResourceLimit(litchi_core::ResourceLimit {
+        resource: litchi_core::Resource::OutputBytes,
+        observed: u64::try_from(observed).unwrap_or(u64::MAX),
+        limit: u64::try_from(maximum).unwrap_or(u64::MAX),
+        scope: METADATA_OUTPUT_SCOPE.into(),
+    })
+}
+
+/// Admit all caller-owned replacement values before cloning the patch or
+/// allocating escaped XML. The bounded writer remains the final exact check
+/// because source elements can be replaced with a different number of values.
+fn admit_patch_values(patch: &MetaXmlPatch, maximum: usize) -> Result<()> {
+    let mut escaped = 0usize;
+    for field in PATCH_INSERTION_ORDER {
+        if let MetaFieldEdit::Set(values) = patch.edit(field) {
+            for value in values {
+                let length = escaped_metadata_value_len(value)?;
+                if length > maximum {
+                    return Err(metadata_output_limit(length, maximum));
+                }
+                escaped = escaped.checked_add(length).ok_or_else(|| {
+                    Error::InvalidFormat("metadata output length overflow".to_string())
+                })?;
+                if escaped > maximum {
+                    return Err(metadata_output_limit(escaped, maximum));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Apply field-level edits to a retained source meta.xml.
 ///
 /// Elements and attributes not named by an edit are copied through unchanged
@@ -551,10 +685,17 @@ fn patch_field(namespace: KnownNamespace, local_name: &[u8]) -> Option<PatchFiel
 ///
 /// Returns an error when the source XML cannot be read or the rewritten XML
 /// cannot be emitted as UTF-8.
-pub fn patch_meta_xml(source: &str, patch: &MetaXmlPatch) -> Result<Option<String>> {
-    let mut reader = NsReader::from_str(source);
+pub fn patch_meta_xml(
+    source: &str,
+    patch: &MetaXmlPatch,
+    limits: XmlStreamLimits,
+) -> Result<Option<String>> {
+    let maximum = usize::try_from(limits.max_bytes()).unwrap_or(usize::MAX);
+    admit_patch_values(patch, maximum)?;
+    let mut reader = ResolvedReader::from_xml(source, limits)
+        .map_err(|error| map_resolved_reader_error(error, "XML parsing error in metadata"))?;
     let mut buffer = Vec::new();
-    let mut writer = Writer::new(Vec::with_capacity(source.len()));
+    let mut writer = Writer::new(BoundedMetadataWriter::new(source.len(), maximum)?);
     let mut edits = patch.clone();
     let mut consumed = [false; PATCH_FIELD_COUNT];
     let mut prefixes = MetaNamespacePrefixes::default();
@@ -565,7 +706,7 @@ pub fn patch_meta_xml(source: &str, patch: &MetaXmlPatch) -> Result<Option<Strin
     loop {
         let (resolved_namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
-            .map_err(metadata_xml_error)?;
+            .map_err(metadata_reader_error)?;
         let namespace = known_namespace(&resolved_namespace);
         match event {
             Event::Start(ref element) => {
@@ -583,18 +724,21 @@ pub fn patch_meta_xml(source: &str, patch: &MetaXmlPatch) -> Result<Option<Strin
                     write_event(&mut writer, event.clone())?;
                 } else if meta_depth == Some(depth)
                     && let Some(field) = patch_field(namespace, local_name.as_ref())
-                    && !matches!(edits.edit(field), MetaFieldEdit::Preserve)
+                    && (consumed[field.index()]
+                        || !matches!(edits.edit(field), MetaFieldEdit::Preserve))
                 {
                     if consumed[field.index()] {
                         // Drop duplicate occurrences of a managed element.
                         skip_element_body(&mut reader)?;
                     } else {
                         consumed[field.index()] = true;
-                        if let MetaFieldEdit::Set(value) = edits.take(field) {
-                            write_event(&mut writer, event.clone())?;
-                            write_text(&mut writer, &value)?;
+                        if let MetaFieldEdit::Set(values) = edits.take(field) {
                             let end = skip_element_body(&mut reader)?;
-                            write_event(&mut writer, Event::End(end))?;
+                            for value in &values {
+                                write_event(&mut writer, event.clone())?;
+                                write_text(&mut writer, value)?;
+                                write_event(&mut writer, Event::End(end.clone()))?;
+                            }
                         } else {
                             skip_element_body(&mut reader)?;
                         }
@@ -625,15 +769,18 @@ pub fn patch_meta_xml(source: &str, patch: &MetaXmlPatch) -> Result<Option<Strin
                     }
                 } else if meta_depth == Some(depth)
                     && let Some(field) = patch_field(namespace, local_name.as_ref())
-                    && !matches!(edits.edit(field), MetaFieldEdit::Preserve)
+                    && (consumed[field.index()]
+                        || !matches!(edits.edit(field), MetaFieldEdit::Preserve))
                 {
                     if !consumed[field.index()] {
                         consumed[field.index()] = true;
-                        if let MetaFieldEdit::Set(value) = edits.take(field) {
+                        if let MetaFieldEdit::Set(values) = edits.take(field) {
                             let name = element_name(element)?;
-                            write_event(&mut writer, Event::Start(element.clone()))?;
-                            write_text(&mut writer, &value)?;
-                            write_event(&mut writer, Event::End(BytesEnd::new(name)))?;
+                            for value in &values {
+                                write_event(&mut writer, Event::Start(element.clone()))?;
+                                write_text(&mut writer, value)?;
+                                write_event(&mut writer, Event::End(BytesEnd::new(name.clone())))?;
+                            }
                         }
                     }
                     // Removed fields and duplicates drop the empty element.
@@ -672,23 +819,25 @@ pub fn patch_meta_xml(source: &str, patch: &MetaXmlPatch) -> Result<Option<Strin
     if !patched {
         return Ok(None);
     }
-    String::from_utf8(writer.into_inner())
+    String::from_utf8(writer.into_inner().into_inner())
         .map(Some)
         .map_err(|error| Error::InvalidFormat(format!("patched metadata is not UTF-8: {error}")))
 }
 
 /// Write elements for every `Set` edit that no source element consumed,
 /// following the ODF schema sequence for simple metadata.
-fn write_pending_insertions(
-    writer: &mut Writer<Vec<u8>>,
+fn write_pending_insertions<W: Write>(
+    writer: &mut Writer<W>,
     edits: &MetaXmlPatch,
     prefixes: &MetaNamespacePrefixes,
 ) -> Result<()> {
     for field in PATCH_INSERTION_ORDER {
-        if let MetaFieldEdit::Set(value) = edits.edit(field) {
+        if let MetaFieldEdit::Set(values) = edits.edit(field) {
             let (namespace, local_name) = field.element();
             let (name, declaration) = prefixes.qualified(namespace, local_name);
-            write_text_element(writer, &name, declaration, value)?;
+            for value in values {
+                write_text_element(writer, &name, declaration, value)?;
+            }
         }
     }
     Ok(())
@@ -696,8 +845,8 @@ fn write_pending_insertions(
 
 /// Write a simple text element, declaring its namespace locally when the
 /// source document bound no prefix for it.
-fn write_text_element(
-    writer: &mut Writer<Vec<u8>>,
+fn write_text_element<W: Write>(
+    writer: &mut Writer<W>,
     name: &str,
     namespace_declaration: Option<&'static str>,
     value: &str,
@@ -714,7 +863,7 @@ fn write_text_element(
 }
 
 /// Write an already-escaped text node.
-fn write_text(writer: &mut Writer<Vec<u8>>, value: &str) -> Result<()> {
+fn write_text<W: Write>(writer: &mut Writer<W>, value: &str) -> Result<()> {
     write_event(
         writer,
         Event::Text(BytesText::from_escaped(escape_xml(value))),
@@ -722,19 +871,19 @@ fn write_text(writer: &mut Writer<Vec<u8>>, value: &str) -> Result<()> {
 }
 
 /// Write an event unchanged.
-fn write_event(writer: &mut Writer<Vec<u8>>, event: Event<'_>) -> Result<()> {
-    writer.write_event(event).map_err(metadata_xml_error)
+fn write_event<W: Write>(writer: &mut Writer<W>, event: Event<'_>) -> Result<()> {
+    writer.write_event(event).map_err(metadata_writer_error)
 }
 
 /// Skip events through the end tag of the element whose start tag was just
 /// consumed, returning that end tag.
-fn skip_element_body(reader: &mut NsReader<&[u8]>) -> Result<BytesEnd<'static>> {
+fn skip_element_body(reader: &mut ResolvedReader<'_>) -> Result<BytesEnd<'static>> {
     let mut buffer = Vec::new();
     let mut depth = 1usize;
     loop {
-        let event = reader
-            .read_event_into(&mut buffer)
-            .map_err(metadata_xml_error)?;
+        let (_, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(metadata_reader_error)?;
         match event {
             Event::Start(_) => depth = checked_depth_add(depth)?,
             Event::End(end) => {
@@ -769,13 +918,13 @@ fn element_name(element: &BytesStart<'_>) -> Result<String> {
     try_copy_string(name, "ODF metadata element name")
 }
 
-fn extract_text_content(reader: &mut NsReader<&[u8]>) -> Result<String> {
+fn extract_text_content(reader: &mut ResolvedReader<'_>) -> Result<String> {
     let mut buffer = Vec::new();
     let mut content = String::new();
     loop {
-        let event = reader
-            .read_event_into(&mut buffer)
-            .map_err(metadata_xml_error)?;
+        let (_, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(metadata_reader_error)?;
         match event {
             Event::Text(text) => {
                 let value = text
@@ -849,7 +998,7 @@ fn parse_metadata_attributes(
     namespace: KnownNamespace,
     local_name: &[u8],
     element: &BytesStart<'_>,
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
 ) -> Result<()> {
     if namespace != KnownNamespace::Meta {
         return Ok(());
@@ -892,7 +1041,7 @@ fn parse_metadata_attributes(
 
 fn parse_document_statistics(
     element: &BytesStart<'_>,
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
 ) -> Result<DocumentStatistics> {
     let mut statistics = DocumentStatistics::default();
     for raw_attribute in element.attributes() {
@@ -936,7 +1085,7 @@ fn parse_document_statistics(
 
 fn parse_user_defined_property(
     element: &BytesStart<'_>,
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     value: String,
 ) -> Result<UserDefinedMetadata> {
     let name = attribute_value(element, reader, META_NAMESPACE, b"name")?.ok_or_else(|| {
@@ -966,7 +1115,7 @@ fn parse_user_defined_property(
 
 fn attribute_value(
     element: &BytesStart<'_>,
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     expected_namespace: &[u8],
     expected_local_name: &[u8],
 ) -> Result<Option<String>> {
@@ -993,4 +1142,21 @@ fn checked_depth_add(depth: usize) -> Result<usize> {
 
 fn metadata_xml_error(error: impl std::fmt::Display) -> Error {
     Error::InvalidFormat(format!("XML parsing error in metadata: {error}"))
+}
+
+fn metadata_writer_error(error: io::Error) -> Error {
+    if let Some(limit) = error
+        .get_ref()
+        .and_then(|source| source.downcast_ref::<MetadataOutputLimit>())
+    {
+        return metadata_output_limit(
+            usize::try_from(limit.observed).unwrap_or(usize::MAX),
+            usize::try_from(limit.maximum).unwrap_or(usize::MAX),
+        );
+    }
+    metadata_xml_error(error)
+}
+
+fn metadata_reader_error(error: crate::Error) -> Error {
+    map_resolved_reader_error(error, "XML parsing error in metadata")
 }

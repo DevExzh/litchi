@@ -16,7 +16,7 @@ const WORD: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main
 const WORD_STRICT: &str = "http://purl.oclc.org/ooxml/wordprocessingml/main";
 
 /// One scan's complete observable outcome.
-fn outcome(result: TransactionResult<Layout>) -> String {
+fn outcome(result: Result<Layout>) -> String {
     match result {
         Ok(layout) => format!(
             "ok paragraphs={:?} tables={:?} controls={:?} end={} conformance={}",
@@ -186,7 +186,11 @@ fn fixture_documents() -> Vec<(std::path::PathBuf, Vec<u8>)> {
         .into_iter()
         .filter_map(|path| {
             let bytes = std::fs::read(&path).ok()?;
-            let reader = soapberry_zip::office::ArchiveReader::new(&bytes).ok()?;
+            let reader = soapberry_zip::office::ArchiveReader::new(
+                &bytes,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )
+            .ok()?;
             let xml = reader.read("word/document.xml").ok()?;
             Some((path, xml))
         })
@@ -411,9 +415,34 @@ fn an_exact_no_op_commit_still_shares_its_source_allocation() {
     let xml = document("<w:p><w:r><w:t>a</w:t></w:r></w:p><w:sectPr/>");
     let base = Snapshot::from_shared_xml(Arc::new(xml)).unwrap();
     let commit = base.edit().commit().unwrap();
-    assert!(!commit.patch().changed());
+    assert!(commit.patch().is_noop());
     assert!(std::ptr::eq(
         commit.snapshot().xml_bytes(),
         base.xml_bytes()
     ));
+}
+
+/// Record 0293: producers import `w:altChunk` content after the body-final
+/// section properties. That tail is admitted as untouched bytes outside the
+/// content region; body content after the section properties stays refused.
+#[test]
+fn an_alt_chunk_after_the_final_section_properties_is_an_untouched_tail() {
+    let admitted = document(r#"<w:p/><w:sectPr/><w:altChunk r:id="rId9" xmlns:r="urn:r"/>"#);
+    let verdict = assert_scan_parity(&admitted);
+    assert!(verdict.starts_with("ok "), "{verdict}");
+    let layout = scan_document(&admitted).unwrap();
+    let section = admitted
+        .windows(b"<w:sectPr/>".len())
+        .position(|window| window == b"<w:sectPr/>")
+        .unwrap();
+    assert_eq!(layout.content_end as usize, section);
+
+    for refused in [
+        document("<w:p/><w:sectPr/><w:p/>"),
+        document("<w:sectPr/><w:tbl/>"),
+        document("<w:sectPr></w:sectPr><w:sdt></w:sdt>"),
+    ] {
+        let verdict = assert_scan_parity(&refused);
+        assert!(verdict.contains("not the final body child"), "{verdict}");
+    }
 }

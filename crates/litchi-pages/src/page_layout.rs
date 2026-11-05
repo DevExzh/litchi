@@ -666,3 +666,10 @@ mod tests {
         assert_eq!(layout.left_margin(), Some(10.0));
     }
 }
+
+/// Exact-source transactions for the document page layout.
+pub mod transaction {
+    pub use crate::package::page_layout::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+}

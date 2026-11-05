@@ -1,0 +1,1 @@
+{"libreoffice": "26.2.6.3", "variants": 20, "pptx_titles_missing": 0, "xlsx_titles_missing": 0, "add_failures": 0, "command": "bash docs/unified-ops/results/0270/lo_check.sh target/debug/litchi <scratch dir>"}

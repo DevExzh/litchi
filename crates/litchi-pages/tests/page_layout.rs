@@ -1,13 +1,19 @@
 use std::io;
 use std::sync::Arc;
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::{Catalog, EntryEdit};
 use litchi_iwa_common::{decode_varint_from_bytes, encode_varint_into, wire::WireView};
-use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, SnappyStream};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tp, tsa, tsk, tsp, tswp};
 use litchi_pages::{
-    Limits, Package, PageLayoutCommit, PageLayoutDiagnostics, PageLayoutEdit, PageLayoutError,
-    PageLayoutLimitKind, PageLayoutPatch,
+    Package,
+    page_layout::transaction::Commit as PageLayoutCommit,
+    page_layout::transaction::Diagnostics as PageLayoutDiagnostics,
+    page_layout::transaction::Edit as PageLayoutEdit,
+    page_layout::transaction::Error as PageLayoutError,
+    page_layout::transaction::LimitKind as PageLayoutLimitKind,
+    page_layout::transaction::Patch as PageLayoutPatch,
     page_layout::{Layout, Orientation},
 };
 use prost::Message as _;
@@ -58,19 +64,23 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
 fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn component_with_unknown_header(
     objects: Vec<ArchiveObject>,
     target_identifier: u64,
 ) -> TestResult<Vec<u8>> {
-    let bytes = Archive { objects }.to_bytes()?;
-    let parsed = Archive::parse(&bytes)?;
+    let bytes = Archive { objects }.to_bytes(Default::default())?;
+    let parsed = Archive::parse(&bytes, Default::default())?;
     let object = parsed
         .object(target_identifier)
         .ok_or_else(|| io::Error::other("synthetic target object is missing"))?;
@@ -91,8 +101,11 @@ fn component_with_unknown_header(
     encode_varint_into(&mut rewritten, u64::try_from(header.len())?);
     rewritten.extend_from_slice(&header);
     rewritten.extend_from_slice(&bytes[data_offset..]);
-    assert_eq!(Archive::parse(&rewritten)?.to_bytes()?, rewritten);
-    Ok(SnappyStream::compress(&rewritten)?)
+    assert_eq!(
+        Archive::parse(&rewritten, Default::default())?.to_bytes(Default::default())?,
+        rewritten
+    );
+    Ok(SnappyStream::compress(&rewritten, Default::default())?)
 }
 
 fn full_layout() -> TestResult<Layout> {
@@ -171,6 +184,7 @@ fn synthetic_package_with_view_location(
                 data: b"after-document".to_vec(),
             },
         ],
+        Default::default(),
     )?;
     document.archive_info.message_infos[1].object_references =
         vec![BODY_IDENTIFIER, SECTION_IDENTIFIER];
@@ -178,7 +192,12 @@ fn synthetic_package_with_view_location(
         document.archive_info.message_infos[1]
             .object_references
             .push(VIEW_STATE_IDENTIFIER);
-        let mut field = FieldInfo::new(vec![15, 5]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![15, 5], litchi_iwa_core::Limits::default())
+                .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references = vec![VIEW_STATE_IDENTIFIER];
         document.archive_info.message_infos[1]
             .field_infos
@@ -225,7 +244,11 @@ fn synthetic_package_with_view_location(
             .encode_to_vec(),
         )?;
         bridge.archive_info.message_infos[0].object_references = vec![VIEW_STATE_ROOT_IDENTIFIER];
-        let mut bridge_field = FieldInfo::new(vec![1]);
+        let mut bridge_field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         bridge_field.object_references = vec![VIEW_STATE_ROOT_IDENTIFIER];
         bridge.archive_info.message_infos[0]
             .field_infos
@@ -252,10 +275,15 @@ fn synthetic_package_with_view_location(
                     data: b"after-view-state".to_vec(),
                 },
             ],
+            Default::default(),
         )?;
         let message_info = &mut view_state.archive_info.message_infos[1];
         message_info.object_references = vec![LAYOUT_STATE_IDENTIFIER];
-        let mut field = FieldInfo::new(vec![1]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references = vec![LAYOUT_STATE_IDENTIFIER];
         message_info.field_infos.push(field);
         let mut detached_payload = tp::ViewStateRootArchive {
@@ -271,7 +299,11 @@ fn synthetic_package_with_view_location(
         )?;
         detached.archive_info.message_infos[0].object_references =
             vec![DETACHED_LAYOUT_STATE_IDENTIFIER];
-        let mut detached_field = FieldInfo::new(vec![1]);
+        let mut detached_field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         detached_field.object_references = vec![DETACHED_LAYOUT_STATE_IDENTIFIER];
         detached.archive_info.message_infos[0]
             .field_infos
@@ -322,7 +354,7 @@ fn synthetic_package_with_view_location(
 }
 
 fn legacy_package(flat: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(flat)?;
+    let catalog = Catalog::from_bytes(flat, Default::default())?;
     let inner_entries = catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
@@ -342,12 +374,12 @@ fn legacy_package(flat: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn component_stream(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == name)
         .ok_or_else(|| io::Error::other("missing synthetic Pages component"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn rewrite_document(
@@ -355,7 +387,7 @@ fn rewrite_document(
     mutate: impl FnOnce(&mut ArchiveObject, usize) -> TestResult,
 ) -> TestResult<Vec<u8>> {
     let stream = component_stream(package, DOCUMENT_MEMBER)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object_mut(DOCUMENT_IDENTIFIER)
         .ok_or_else(|| io::Error::other("missing synthetic Pages document"))?;
@@ -365,8 +397,9 @@ fn rewrite_document(
         .position(|message| message.type_ == DOCUMENT_MESSAGE_TYPE)
         .ok_or_else(|| io::Error::other("missing Pages document message"))?;
     mutate(object, message_index)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(package)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(DOCUMENT_MEMBER, &compressed)],
         Limits::default(),
@@ -379,10 +412,11 @@ fn rewrite_component(
     mutate: impl FnOnce(&mut Archive) -> TestResult,
 ) -> TestResult<Vec<u8>> {
     let stream = component_stream(package, component)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     mutate(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(package)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(
         catalog
             .reassemble_to_bytes(&[EntryEdit::new(component, &compressed)], Limits::default())?,
@@ -395,7 +429,7 @@ fn with_overlong_object_length_prefix(
     identifier: u64,
 ) -> TestResult<Vec<u8>> {
     let mut stream = component_stream(package, component)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic Pages object"))?;
@@ -406,9 +440,9 @@ fn with_overlong_object_length_prefix(
     }
     stream[offset] |= 0x80;
     stream.insert(offset + 1, 0);
-    Archive::parse(&stream)?;
-    let compressed = SnappyStream::compress(&stream)?;
-    let catalog = Catalog::from_bytes(package)?;
+    Archive::parse(&stream, Default::default())?;
+    let compressed = SnappyStream::compress(&stream, Default::default())?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(
         catalog
             .reassemble_to_bytes(&[EntryEdit::new(component, &compressed)], Limits::default())?,
@@ -429,6 +463,7 @@ fn with_unknown_group(package: &[u8]) -> TestResult<Vec<u8>> {
                 type_: DOCUMENT_MESSAGE_TYPE,
                 data: payload,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -444,7 +479,7 @@ fn message_payload_in(
     identifier: u64,
     message_type: u32,
 ) -> TestResult<Vec<u8>> {
-    let archive = Archive::parse(&component_stream(package, component)?)?;
+    let archive = Archive::parse(&component_stream(package, component)?, Default::default())?;
     Ok(archive
         .object(identifier)
         .and_then(|object| {
@@ -460,7 +495,7 @@ fn message_payload_in(
 
 fn object_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
     let stream = component_stream(package, DOCUMENT_MEMBER)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic Pages object"))?;
@@ -474,23 +509,25 @@ fn object_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
 }
 
 fn raw_fields(payload: &[u8], number: u32) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(payload)?
-        .fields()
-        .filter(|field| field.number() == number)
-        .map(|field| field.raw().to_vec())
-        .collect())
+    Ok(
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .filter(|field| field.number() == number)
+            .map(|field| field.raw().to_vec())
+            .collect(),
+    )
 }
 
 fn entry_names(package: &[u8]) -> TestResult<Vec<String>> {
-    Ok(Catalog::from_bytes(package)?
+    Ok(Catalog::from_bytes(package, Default::default())?
         .iter()
         .map(|entry| entry.name().to_owned())
         .collect())
 }
 
 fn assert_only_layout_components_and_previews_changed(before: &[u8], after: &[u8]) -> TestResult {
-    let before = Catalog::from_bytes(before)?;
-    let after = Catalog::from_bytes(after)?;
+    let before = Catalog::from_bytes(before, Default::default())?;
+    let after = Catalog::from_bytes(after, Default::default())?;
     for old in before.iter() {
         if PREVIEW_NAMES.contains(&old.name()) {
             assert!(after.iter().all(|entry| entry.name() != old.name()));
@@ -698,7 +735,10 @@ fn changed_layout_invalidates_view_state_and_preserves_unknowns_and_locality() -
         )?,
         source_detached_cache
     );
-    let changed_archive = Archive::parse(&component_stream(&changed_bytes, VIEW_STATE_MEMBER)?)?;
+    let changed_archive = Archive::parse(
+        &component_stream(&changed_bytes, VIEW_STATE_MEMBER)?,
+        Default::default(),
+    )?;
     let view_object = changed_archive
         .object(VIEW_STATE_ROOT_IDENTIFIER)
         .ok_or_else(|| io::Error::other("changed view-state root is missing"))?;
@@ -773,12 +813,15 @@ fn shared_component_rooted_view_state_is_invalidated_but_detached_collision_is_p
 fn malformed_duplicate_and_wrong_wire_layout_fields_fail_closed() -> TestResult {
     let bytes = synthetic_package(full_layout()?, true, true)?;
     let duplicate = rewrite_document(&bytes, |object, index| {
-        let field = WireView::parse(&object.messages[index].data)?
-            .fields()
-            .find(|field| field.number() == 30)
-            .ok_or_else(|| io::Error::other("synthetic page width is missing"))?
-            .raw()
-            .to_vec();
+        let field = WireView::parse(
+            &object.messages[index].data,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?
+        .fields()
+        .find(|field| field.number() == 30)
+        .ok_or_else(|| io::Error::other("synthetic page width is missing"))?
+        .raw()
+        .to_vec();
         let mut payload = object.messages[index].data.clone();
         payload.extend_from_slice(&field);
         object.replace_message_preserving_header(
@@ -787,6 +830,7 @@ fn malformed_duplicate_and_wrong_wire_layout_fields_fail_closed() -> TestResult 
                 type_: DOCUMENT_MESSAGE_TYPE,
                 data: payload,
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -799,11 +843,12 @@ fn malformed_duplicate_and_wrong_wire_layout_fields_fail_closed() -> TestResult 
                 type_: DOCUMENT_MESSAGE_TYPE,
                 data: payload,
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
     let duplicate_message = rewrite_document(&bytes, |object, index| {
-        object.push_message(object.messages[index].clone())?;
+        object.push_message(object.messages[index].clone(), Default::default())?;
         Ok(())
     })?;
 
@@ -848,7 +893,8 @@ fn rooted_view_state_header_reference_proof_fails_closed_at_every_hop() -> TestR
             .field_infos
             .first_mut()
             .ok_or_else(|| io::Error::other("missing rooted layout field metadata"))?;
-        field.path = FieldPath::new(vec![2]);
+        field.path =
+            litchi_iwa_core::FieldPath::new(vec![2], litchi_iwa_core::Limits::default()).unwrap();
         Ok(())
     })?;
 
@@ -885,13 +931,18 @@ fn noncanonical_metadata_groups_and_deprecated_cache_edges_fail_changed_admissio
         Ok(())
     })?;
     let diff_path = rewrite_document(&bytes, |object, index| {
-        object.archive_info.message_infos[index].diff_field_path = Some(FieldPath::new(vec![30]));
+        object.archive_info.message_infos[index].diff_field_path = Some(
+            litchi_iwa_core::FieldPath::new(vec![30], litchi_iwa_core::Limits::default()).unwrap(),
+        );
         Ok(())
     })?;
     let remove = rewrite_document(&bytes, |object, index| {
         object.archive_info.message_infos[index]
             .fields_to_remove
-            .push(FieldPath::new(vec![30]));
+            .push(
+                litchi_iwa_core::FieldPath::new(vec![30], litchi_iwa_core::Limits::default())
+                    .unwrap(),
+            );
         Ok(())
     })?;
     let read_version = rewrite_document(&bytes, |object, index| {
@@ -905,6 +956,7 @@ fn noncanonical_metadata_groups_and_deprecated_cache_edges_fail_changed_admissio
             &mut payload,
             11,
             &reference(7_001).encode_to_vec(),
+            litchi_iwa_common::WireLimits::DEFAULT,
         )?;
         object.replace_message_preserving_header(
             index,
@@ -912,6 +964,7 @@ fn noncanonical_metadata_groups_and_deprecated_cache_edges_fail_changed_admissio
                 type_: DOCUMENT_MESSAGE_TYPE,
                 data: payload,
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -921,6 +974,7 @@ fn noncanonical_metadata_groups_and_deprecated_cache_edges_fail_changed_admissio
             &mut payload,
             12,
             &reference(7_002).encode_to_vec(),
+            litchi_iwa_common::WireLimits::DEFAULT,
         )?;
         object.replace_message_preserving_header(
             index,
@@ -928,6 +982,7 @@ fn noncanonical_metadata_groups_and_deprecated_cache_edges_fail_changed_admissio
                 type_: DOCUMENT_MESSAGE_TYPE,
                 data: payload,
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -981,7 +1036,9 @@ fn legacy_nested_source_allows_noop_but_refuses_changed_layout() -> TestResult {
     edit.set_layout(changed_layout(before)?)?;
     assert!(matches!(
         edit.commit(),
-        Err(PageLayoutError::UnsupportedSource)
+        Err(PageLayoutError::Refused(
+            litchi_pages::page_layout::transaction::Refusal::UnsupportedSource
+        ))
     ));
     assert_eq!(exact_bytes(&package)?, bytes);
     Ok(())
@@ -1005,7 +1062,7 @@ fn stale_tampered_replayed_and_inverse_patches_conflict() -> TestResult {
         Err(PageLayoutError::PatchConflict)
     ));
 
-    let catalog = Catalog::from_bytes(&bytes)?;
+    let catalog = Catalog::from_bytes(&bytes, Default::default())?;
     let tampered_bytes = catalog.reassemble_to_bytes(
         &[EntryEdit::new("Data/sentinel.bin", b"tampered sentinel")],
         Limits::default(),
@@ -1035,12 +1092,15 @@ fn output_limit_is_typed_and_failure_atomic() -> TestResult {
         1024 * 1024,
         1024 * 1024,
     )?;
-    let package = Package::from_bytes_with_limits(&bytes, limits)?;
+    let package = Package::from_bytes_with_options(
+        &bytes,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    )?;
     let mut edit = package.edit_page_layout()?;
     edit.set_layout(full_layout()?)?;
     assert!(matches!(
         edit.commit(),
-        Err(PageLayoutError::LimitExceeded {
+        Err(PageLayoutError::Limit {
             kind: PageLayoutLimitKind::OutputBytes,
             ..
         })

@@ -21,7 +21,7 @@ pub enum Kind {
 ///
 /// [`Limits::default`] is the safe general-purpose policy. Callers that know
 /// their workload may explicitly tighten or loosen either independent budget
-/// with [`scan_with`](super::scan_with). Payload relationships are charged
+/// with [`scan`](super::scan). Payload relationships are charged
 /// once per unique internal target, even when several source relationships
 /// reference it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -63,16 +63,16 @@ impl Limits {
     pub const fn validate(self) -> Result<Self> {
         if self.relationships > Self::MAX_RELATIONSHIPS {
             return Err(Error::Limit {
-                resource: "embedded relationships",
-                max: Self::MAX_RELATIONSHIPS,
-                actual: self.relationships,
+                kind: crate::LimitKind::EmbeddedRelationships,
+                maximum: Self::MAX_RELATIONSHIPS,
+                observed: self.relationships,
             });
         }
         if self.payload_relationships > Self::MAX_PAYLOAD_RELATIONSHIPS {
             return Err(Error::Limit {
-                resource: "embedded payload relationships",
-                max: Self::MAX_PAYLOAD_RELATIONSHIPS,
-                actual: self.payload_relationships,
+                kind: crate::LimitKind::EmbeddedPayloadRelationships,
+                maximum: Self::MAX_PAYLOAD_RELATIONSHIPS,
+                observed: self.payload_relationships,
             });
         }
         Ok(self)

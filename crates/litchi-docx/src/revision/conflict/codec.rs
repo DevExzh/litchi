@@ -86,7 +86,11 @@ struct Open {
 
 pub(crate) fn parse(source: &[u8], limits: Limits) -> Result<Inventory> {
     if source.len() > limits.max_source_bytes {
-        return Err(invalid("conflict source exceeds configured byte limit"));
+        return Err(Error::ConflictLimit {
+            kind: crate::revision::conflict::LimitKind::SourceBytes,
+            actual: source.len(),
+            maximum: limits.max_source_bytes,
+        });
     }
     let active = active_starts(source, limits)?;
     let mut reader = NsReader::from_reader(source);
@@ -135,7 +139,11 @@ pub(crate) fn parse(source: &[u8], limits: Limits) -> Result<Inventory> {
             .checked_add(1)
             .ok_or_else(|| invalid("conflict XML event counter overflow"))?;
         if events > limits.max_events {
-            return Err(invalid("conflict XML exceeds configured event limit"));
+            return Err(Error::ConflictLimit {
+                kind: crate::revision::conflict::LimitKind::Events,
+                actual: events,
+                maximum: limits.max_events,
+            });
         }
         match event {
             Event::Start(element) => {
@@ -144,7 +152,11 @@ pub(crate) fn parse(source: &[u8], limits: Limits) -> Result<Inventory> {
                     .checked_add(1)
                     .ok_or_else(|| invalid("conflict XML depth overflow"))?;
                 if depth > limits.max_depth {
-                    return Err(invalid("conflict XML exceeds configured nesting limit"));
+                    return Err(Error::ConflictLimit {
+                        kind: crate::revision::conflict::LimitKind::Depth,
+                        actual: depth,
+                        maximum: limits.max_depth,
+                    });
                 }
                 let (kind, range) = classify(&namespace, &element);
                 let selected = active.contains(&begin);
@@ -171,7 +183,11 @@ pub(crate) fn parse(source: &[u8], limits: Limits) -> Result<Inventory> {
                         &mut metadata_bytes,
                     )?;
                     if inventory.conflicts.len() >= limits.max_conflicts {
-                        return Err(invalid("conflict count exceeds configured limit"));
+                        return Err(Error::ConflictLimit {
+                            kind: crate::revision::conflict::LimitKind::Conflicts,
+                            actual: (inventory.conflicts.len()).saturating_add(1),
+                            maximum: limits.max_conflicts,
+                        });
                     }
                     inventory
                         .conflicts
@@ -303,7 +319,11 @@ pub(crate) fn parse(source: &[u8], limits: Limits) -> Result<Inventory> {
                         &mut metadata_bytes,
                     )?;
                     if inventory.conflicts.len() >= limits.max_conflicts {
-                        return Err(invalid("conflict count exceeds configured limit"));
+                        return Err(Error::ConflictLimit {
+                            kind: crate::revision::conflict::LimitKind::Conflicts,
+                            actual: (inventory.conflicts.len()).saturating_add(1),
+                            maximum: limits.max_conflicts,
+                        });
                     }
                     inventory
                         .conflicts
@@ -458,7 +478,11 @@ fn process_content_directives(
                 .checked_add(1)
                 .ok_or_else(|| invalid("mc:ProcessContent token counter overflow"))?;
             if tokens > per_directive_limit {
-                return Err(invalid("mc:ProcessContent exceeds configured token limit"));
+                return Err(Error::ConflictLimit {
+                    kind: crate::revision::conflict::LimitKind::ProcessContentTokens,
+                    actual: tokens,
+                    maximum: per_directive_limit,
+                });
             }
             let (namespace, name) = resolver.resolve_element(QName(token.as_bytes()));
             let ResolveResult::Bound(Namespace(namespace)) = namespace else {
@@ -488,7 +512,11 @@ fn push_process_directives(
                 .ok_or_else(|| invalid("mc:ProcessContent reference counter overflow"))?;
         } else {
             if active.len() >= max_targets {
-                return Err(invalid("mc:ProcessContent exceeds active target limit"));
+                return Err(Error::ConflictLimit {
+                    kind: crate::revision::conflict::LimitKind::ProcessContentTargets,
+                    actual: (active.len()).saturating_add(1),
+                    maximum: max_targets,
+                });
             }
             active
                 .try_reserve(1)
@@ -563,7 +591,11 @@ fn retain_text_span(
         .checked_add(retained_bytes)
         .ok_or_else(|| invalid("conflict text counter overflow"))?;
     if next_bytes > limits.max_text_bytes {
-        return Err(invalid("conflict text exceeds configured limit"));
+        return Err(Error::ConflictLimit {
+            kind: crate::revision::conflict::LimitKind::TextBytes,
+            actual: next_bytes,
+            maximum: limits.max_text_bytes,
+        });
     }
     let next_segments = text_segments
         .checked_add(references)
@@ -626,9 +658,11 @@ fn active_starts(source: &[u8], limits: Limits) -> Result<HashSet<usize>> {
             .checked_add(1)
             .ok_or_else(|| invalid("conflict MCE event counter overflow"))?;
         if events > limits.max_events {
-            return Err(invalid(
-                "conflict MCE prepass exceeds configured event limit",
-            ));
+            return Err(Error::ConflictLimit {
+                kind: crate::revision::conflict::LimitKind::MceEvents,
+                actual: events,
+                maximum: limits.max_events,
+            });
         }
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
@@ -639,9 +673,11 @@ fn active_starts(source: &[u8], limits: Limits) -> Result<HashSet<usize>> {
                     .checked_add(1)
                     .ok_or_else(|| invalid("conflict MCE depth overflow"))?;
                 if depth > limits.max_depth {
-                    return Err(invalid(
-                        "conflict MCE prepass exceeds configured nesting limit",
-                    ));
+                    return Err(Error::ConflictLimit {
+                        kind: crate::revision::conflict::LimitKind::MceDepth,
+                        actual: depth,
+                        maximum: limits.max_depth,
+                    });
                 }
                 validate_lexical_attributes(&element, limits)?;
                 let declared = namespace_declarations(&element, max_namespace_bindings)?;
@@ -737,9 +773,11 @@ fn active_starts(source: &[u8], limits: Limits) -> Result<HashSet<usize>> {
         )
         .ok_or_else(|| invalid("conflict MCE marker budget overflow"))?;
     if marked_bytes > MAX_MCE_MARKED_BYTES {
-        return Err(invalid(
-            "conflict MCE marked source exceeds hard byte limit",
-        ));
+        return Err(Error::ConflictLimit {
+            kind: crate::revision::conflict::LimitKind::MceMarkedBytes,
+            actual: marked_bytes,
+            maximum: MAX_MCE_MARKED_BYTES,
+        });
     }
     // MCE may repeat effective namespace maps while serializing, but it must
     // not receive an event-times-source budget: that rejects shallow input
@@ -788,9 +826,11 @@ fn active_starts(source: &[u8], limits: Limits) -> Result<HashSet<usize>> {
 
 fn push_offset(offsets: &mut Vec<u32>, start: usize, max: usize) -> Result<()> {
     if offsets.len() >= max {
-        return Err(invalid(
-            "conflict MCE candidate count exceeds configured limit",
-        ));
+        return Err(Error::ConflictLimit {
+            kind: crate::revision::conflict::LimitKind::MceCandidates,
+            actual: (offsets.len()).saturating_add(1),
+            maximum: max,
+        });
     }
     offsets
         .try_reserve(1)
@@ -813,7 +853,11 @@ fn validate_lexical_attributes(element: &BytesStart<'_>, limits: Limits) -> Resu
             return Err(invalid("XML element has too many attributes"));
         }
         if attribute.value.len() > limits.max_attribute_bytes {
-            return Err(invalid("XML attribute exceeds configured byte limit"));
+            return Err(Error::ConflictLimit {
+                kind: crate::revision::conflict::LimitKind::XmlAttributeBytes,
+                actual: attribute.value.len(),
+                maximum: limits.max_attribute_bytes,
+            });
         }
     }
     Ok(())
@@ -884,7 +928,11 @@ fn range_marker(
             ));
         };
         if inventory.ranges.len() >= limits.max_ranges {
-            return Err(invalid("conflict range count exceeds configured limit"));
+            return Err(Error::ConflictLimit {
+                kind: crate::revision::conflict::LimitKind::Ranges,
+                actual: (inventory.ranges.len()).saturating_add(1),
+                maximum: limits.max_ranges,
+            });
         }
         inventory
             .ranges
@@ -927,9 +975,11 @@ fn range_end_id(
             return Err(invalid("conflict range end has too many attributes"));
         }
         if attribute.value.len() > limits.max_attribute_bytes {
-            return Err(invalid(
-                "conflict range-end attribute exceeds configured byte limit",
-            ));
+            return Err(Error::ConflictLimit {
+                kind: crate::revision::conflict::LimitKind::RangeEndAttributeBytes,
+                actual: attribute.value.len(),
+                maximum: limits.max_attribute_bytes,
+            });
         }
         if is_namespace_declaration(attribute.key.as_ref()) {
             continue;
@@ -999,7 +1049,11 @@ fn metadata(
             return Err(invalid("conflict element has too many attributes"));
         }
         if attribute.value.len() > limits.max_attribute_bytes {
-            return Err(invalid("conflict attribute exceeds configured byte limit"));
+            return Err(Error::ConflictLimit {
+                kind: crate::revision::conflict::LimitKind::AttributeBytes,
+                actual: attribute.value.len(),
+                maximum: limits.max_attribute_bytes,
+            });
         }
         let (ns, _) = resolver.resolve_attribute(attribute.key);
         if !is_word(&ns) {
@@ -1025,7 +1079,11 @@ fn metadata(
                     .checked_add(value.len())
                     .ok_or_else(|| invalid("metadata byte counter overflow"))?;
                 if *total > limits.max_metadata_bytes {
-                    return Err(invalid("conflict metadata exceeds configured limit"));
+                    return Err(Error::ConflictLimit {
+                        kind: crate::revision::conflict::LimitKind::MetadataBytes,
+                        actual: *total,
+                        maximum: limits.max_metadata_bytes,
+                    });
                 }
                 author = Some(value);
                 author_span = Some(span);
@@ -1038,7 +1096,11 @@ fn metadata(
                     .checked_add(value.len())
                     .ok_or_else(|| invalid("metadata byte counter overflow"))?;
                 if *total > limits.max_metadata_bytes {
-                    return Err(invalid("conflict metadata exceeds configured limit"));
+                    return Err(Error::ConflictLimit {
+                        kind: crate::revision::conflict::LimitKind::MetadataBytes,
+                        actual: *total,
+                        maximum: limits.max_metadata_bytes,
+                    });
                 }
                 date = Some(value);
                 date_span = Some(span);
@@ -1274,9 +1336,11 @@ fn namespace_declarations(
         };
         if let Some(prefix) = prefix {
             if declarations.len() >= max {
-                return Err(invalid(
-                    "conflict MCE prepass exceeds namespace declaration limit",
-                ));
+                return Err(Error::ConflictLimit {
+                    kind: crate::revision::conflict::LimitKind::MceNamespaceDeclarations,
+                    actual: (declarations.len()).saturating_add(1),
+                    maximum: max,
+                });
             }
             declarations
                 .try_reserve(1)
@@ -1305,9 +1369,11 @@ fn push_namespace_declarations(
                 .checked_add(1)
                 .ok_or_else(|| invalid("conflict MCE namespace counter overflow"))?;
             if count > max {
-                return Err(invalid(
-                    "conflict MCE prepass exceeds namespace declaration limit",
-                ));
+                return Err(Error::ConflictLimit {
+                    kind: crate::revision::conflict::LimitKind::MceNamespaceDeclarations,
+                    actual: count,
+                    maximum: max,
+                });
             }
         } else if before && !after {
             count = count

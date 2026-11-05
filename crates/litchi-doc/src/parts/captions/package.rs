@@ -1,21 +1,28 @@
 //! DOC/OLE package ownership for caption and `AutoCaption` metadata.
 
+#![allow(
+    dead_code,
+    reason = "the byte-level editor keeps its record-level API for its unit tests; the package family drives a subset"
+)]
+
 use super::codec::{AUTO_CAPTION_FIB_INDEX, CAPTION_FIB_INDEX};
 use super::semantic::Tables;
 use super::transaction::{
-    Commit as TransactionCommit, Error as TransactionError, Snapshot as TransactionSnapshot,
-    Transaction,
+    Edit as RecordEdit, Error as TransactionError, Patch as RecordPatch,
+    Snapshot as TransactionSnapshot,
 };
 use super::validation;
 use super::{AutoTable, LabelTable};
 use crate::package::{Error as PackageError, Result};
 use crate::parts::fib::FileInformationBlock;
 use crate::parts::protection::{EditProtection, PackagePatch, ProtectionPolicy, classify};
-use litchi_ole_common::object::{Editor as ObjectEditor, Limits, Targets};
+use litchi_ole_common::object::{
+    Edit as ObjectEditor, Limits, OpenOptions, Package as ObjectPackage, Targets,
+};
 
 /// An immutable DOC package snapshot carrying its caption metadata.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Snapshot {
+pub(crate) struct Snapshot {
     bytes: Vec<u8>,
     captions: TransactionSnapshot,
 }
@@ -27,65 +34,65 @@ impl Snapshot {
 
     /// Returns the immutable caption snapshot.
     #[must_use]
-    pub fn captions(&self) -> &TransactionSnapshot {
+    pub(crate) fn captions(&self) -> &TransactionSnapshot {
         &self.captions
     }
 
     /// Returns the paired caption tables.
     #[must_use]
-    pub fn tables(&self) -> &Tables {
+    pub(crate) fn tables(&self) -> &Tables {
         self.captions.tables()
     }
 
     /// Returns the rendered package bytes.
-    pub fn finish(&self) -> Result<Vec<u8>> {
+    pub(crate) fn finish(&self) -> Result<Vec<u8>> {
         Ok(self.bytes.clone())
     }
 
     /// Starts an independent semantic transaction.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
+    pub(crate) fn edit(&self) -> RecordEdit {
         self.captions.edit()
     }
 }
 
 /// A package commit containing semantic and reversible OLE byte patches.
 #[derive(Debug, Clone)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
-    patch: TransactionCommit,
+    patch: RecordPatch,
     package_patch: PackagePatch,
 }
 
 impl Commit {
     /// The immutable post-edit package snapshot.
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// The reversible semantic caption patch.
     #[must_use]
-    pub fn patch(&self) -> &TransactionCommit {
+    pub(crate) fn patch(&self) -> &RecordPatch {
         &self.patch
     }
 
     /// The reversible whole-CFB byte patch.
     #[must_use]
-    pub fn package_patch(&self) -> &PackagePatch {
+    pub(crate) fn package_patch(&self) -> &PackagePatch {
         &self.package_patch
     }
 
     /// Splits the commit into its snapshot, semantic patch, and byte patch.
     #[must_use]
-    pub fn into_parts(self) -> (Snapshot, TransactionCommit, PackagePatch) {
+    pub(crate) fn into_parts(self) -> (Snapshot, RecordPatch, PackagePatch) {
         (self.snapshot, self.patch, self.package_patch)
     }
 }
 
 /// Transactional package editor for the two Normal-template caption ranges.
 #[derive(Debug, Clone)]
-pub struct Editor {
+pub(crate) struct Editor {
     package: ObjectEditor,
     table_name: String,
     original: TransactionSnapshot,
@@ -97,29 +104,41 @@ pub struct Editor {
 
 impl Editor {
     /// Opens an unencrypted Word 97+ Normal template from CFB bytes.
-    pub fn open(bytes: Vec<u8>) -> Result<Self> {
-        Self::open_with_limits(bytes, Limits::default())
+    pub(crate) fn open(bytes: Vec<u8>) -> Result<Self> {
+        Self::open_bounded(bytes, Limits::default(), ProtectionPolicy::default())
     }
 
     /// Opens a package with an explicit policy for changed protected content.
-    pub fn open_with_policy(bytes: Vec<u8>, policy: ProtectionPolicy) -> Result<Self> {
-        Self::open_with_limits_and_policy(bytes, Limits::default(), policy)
+    pub(crate) fn open_with_policy(bytes: Vec<u8>, policy: ProtectionPolicy) -> Result<Self> {
+        Self::open_bounded(bytes, Limits::default(), policy)
     }
 
-    /// Opens a package with an explicit bounded OLE resource profile.
-    pub fn open_with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
-        Self::open_with_limits_and_policy(bytes, limits, ProtectionPolicy::default())
+    /// Opens a package under one edit profile: its revision limits bound the
+    /// compound-file parse and its protection policy governs changed
+    /// protected content.
+    pub(crate) fn open_with_options(bytes: Vec<u8>, options: &crate::EditOptions) -> Result<Self> {
+        Self::open_bounded(
+            bytes,
+            options.revision_limits_value(),
+            options.protection_policy_value(),
+        )
     }
 
     /// Opens a package with both bounded resources and an explicit protection policy.
-    pub fn open_with_limits_and_policy(
+    fn open_bounded(
         bytes: Vec<u8>,
         limits: Limits,
         protection_policy: ProtectionPolicy,
     ) -> Result<Self> {
-        let package =
-            ObjectEditor::open(bytes, Targets::new([]).map_err(PackageError::from)?, limits)
-                .map_err(PackageError::from)?;
+        let package = ObjectPackage::open_with_options(
+            bytes,
+            OpenOptions::new()
+                .targets(Targets::new([]).map_err(PackageError::from)?)
+                .limits(limits),
+        )
+        .map_err(PackageError::from)?
+        .edit()
+        .map_err(PackageError::from)?;
         let word = package
             .stream(&["WordDocument".to_owned()])
             .ok_or_else(|| PackageError::StreamNotFound("WordDocument".into()))?;
@@ -148,35 +167,35 @@ impl Editor {
 
     /// Returns the current immutable caption snapshot.
     #[must_use]
-    pub fn captions(&self) -> &TransactionSnapshot {
+    pub(crate) fn captions(&self) -> &TransactionSnapshot {
         &self.captions
     }
 
     /// Returns the current paired caption tables.
     #[must_use]
-    pub fn tables(&self) -> &Tables {
+    pub(crate) fn tables(&self) -> &Tables {
         self.captions.tables()
     }
 
     /// Whether this editor has published a changed package state.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
+    pub(crate) fn is_changed(&self) -> bool {
         self.changed
     }
 
     /// Starts an independent semantic transaction.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
+    pub(crate) fn edit(&self) -> RecordEdit {
         self.captions.edit()
     }
 
     /// Sets or replaces both caption tables atomically.
-    pub fn set(&mut self, tables: Tables) -> Result<Commit> {
+    pub(crate) fn set(&mut self, tables: Tables) -> Result<Commit> {
         self.install(TransactionSnapshot::new(tables)?)
     }
 
     /// Replaces existing caption metadata, rejecting an absent pair.
-    pub fn replace(&mut self, tables: Tables) -> Result<Commit> {
+    pub(crate) fn replace(&mut self, tables: Tables) -> Result<Commit> {
         if !self.captions.is_present() {
             return Err(PackageError::InvalidFormat(
                 "cannot replace missing caption metadata".into(),
@@ -186,18 +205,18 @@ impl Editor {
     }
 
     /// Applies a semantic transaction and publishes it atomically.
-    pub fn apply(&mut self, transaction: Transaction) -> Result<Commit> {
+    pub(crate) fn apply(&mut self, transaction: RecordEdit) -> Result<Commit> {
         let commit = transaction.commit().map_err(transaction_error)?;
-        if commit.before() != &self.captions {
+        if commit.patch().before() != &self.captions {
             return Err(PackageError::InvalidFormat(
                 "caption transaction snapshot conflict".into(),
             ));
         }
-        self.install(commit.snapshot().clone())
+        self.install(commit.package().clone())
     }
 
     /// Replaces the label table while retaining automatic-caption rules.
-    pub fn replace_labels(&mut self, labels: LabelTable) -> Result<Commit> {
+    pub(crate) fn replace_labels(&mut self, labels: LabelTable) -> Result<Commit> {
         let mut transaction = self.edit();
         transaction
             .replace_labels(labels)
@@ -206,71 +225,72 @@ impl Editor {
     }
 
     /// Replaces automatic-caption rules while retaining labels.
-    pub fn replace_auto(&mut self, auto: AutoTable) -> Result<Commit> {
+    pub(crate) fn replace_auto(&mut self, auto: AutoTable) -> Result<Commit> {
         let mut transaction = self.edit();
         transaction.replace_auto(auto).map_err(transaction_error)?;
         self.apply(transaction)
     }
 
     /// Removes only the label range, rejecting rules that would dangle.
-    pub fn clear_labels(&mut self) -> Result<Commit> {
+    pub(crate) fn clear_labels(&mut self) -> Result<Commit> {
         let mut transaction = self.edit();
         transaction.clear_labels().map_err(transaction_error)?;
         self.apply(transaction)
     }
 
     /// Removes only the automatic-caption range while retaining labels.
-    pub fn clear_auto(&mut self) -> Result<Commit> {
+    pub(crate) fn clear_auto(&mut self) -> Result<Commit> {
         let mut transaction = self.edit();
         transaction.clear_auto().map_err(transaction_error)?;
         self.apply(transaction)
     }
 
     /// Removes both caption table ranges while preserving their old bytes.
-    pub fn clear(&mut self) -> Result<Commit> {
+    pub(crate) fn clear(&mut self) -> Result<Commit> {
         let mut transaction = self.edit();
         transaction.clear();
         self.apply(transaction)
     }
 
     /// Captures the current package as an immutable snapshot.
-    pub fn snapshot(&self) -> Result<Snapshot> {
-        let bytes = self.package.clone().finish().map_err(PackageError::from)?;
+    pub(crate) fn snapshot(&self) -> Result<Snapshot> {
+        let bytes = crate::package::object_edit_bytes(&self.package)?;
         Ok(Snapshot::new(bytes, self.captions.clone()))
     }
 
     /// Finishes the edit and returns rendered DOC bytes.
-    pub fn finish(self) -> Result<Vec<u8>> {
+    pub(crate) fn finish(self) -> Result<Vec<u8>> {
         if self.changed {
             self.protection_policy.authorize(self.protection)?;
         }
-        self.package.finish().map_err(PackageError::from)
+        crate::package::object_edit_bytes(&self.package)
     }
 
     /// Commits the package as an immutable snapshot with reversible patches.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
         if self.changed {
             self.protection_policy.authorize(self.protection)?;
         }
-        let patch = TransactionCommit::new(self.original, self.captions.clone());
+        let patch = RecordPatch::new(self.original, self.captions.clone());
         let object_commit = self.package.commit().map_err(PackageError::from)?;
         let bytes = object_commit.patch().after().to_vec();
         Ok(Commit {
             snapshot: Snapshot::new(bytes, self.captions),
             patch,
-            package_patch: PackagePatch::new(object_commit.into_patch(), self.protection),
+            package_patch: PackagePatch::new(object_commit.into_parts().1, self.protection),
         })
     }
 
     fn install(&mut self, snapshot: TransactionSnapshot) -> Result<Commit> {
-        let patch = TransactionCommit::new(self.captions.clone(), snapshot.clone());
+        let patch = RecordPatch::new(self.captions.clone(), snapshot.clone());
         if patch.is_noop() {
             let package_patch = self
                 .package
                 .clone()
                 .commit()
                 .map_err(PackageError::from)?
-                .into_patch();
+                .into_parts()
+                .1;
             let package_patch = PackagePatch::new(package_patch, self.protection);
             let package_snapshot = self.snapshot()?;
             return Ok(Commit {
@@ -292,7 +312,7 @@ impl Editor {
             .commit()
             .map_err(PackageError::from)?;
         let bytes = package_commit.patch().after().to_vec();
-        let package_patch = PackagePatch::new(package_commit.into_patch(), candidate.protection);
+        let package_patch = PackagePatch::new(package_commit.into_parts().1, candidate.protection);
         let package_snapshot = Snapshot::new(bytes, candidate.captions.clone());
         *self = candidate;
         Ok(Commit {

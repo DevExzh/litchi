@@ -9,8 +9,7 @@ use litchi_iwa_common::{
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tn, tsce, tsd, tsp, tst};
 use litchi_numbers::{
-    MAX_MATERIALIZED_CELLS, Package, PackageReadOptions, PackageSemanticLimits, SheetSelector,
-    TableSelector, cell::Value, names,
+    MAX_MATERIALIZED_CELLS, Package, SheetSelector, TableSelector, cell::Value, names,
 };
 use prost::Message as _;
 
@@ -43,6 +42,7 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
@@ -69,8 +69,18 @@ fn table_info_payload(model: u64, locked: bool) -> TestResult<Vec<u8>> {
     }
     .encode_to_vec();
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, 1, &drawable)?;
-    append_length_delimited_field(&mut payload, 2, &reference(model).encode_to_vec())?;
+    append_length_delimited_field(
+        &mut payload,
+        1,
+        &drawable,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut payload,
+        2,
+        &reference(model).encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -98,11 +108,15 @@ fn sidecars() -> TestResult<ArchiveObject> {
             .encode_to_vec(),
         })
         .collect(),
+        Default::default(),
     )?)
 }
 
 fn compressed(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn append_unknown_varint(data: &mut Vec<u8>, field_number: u32, value: u64) -> TestResult {
@@ -148,21 +162,29 @@ fn metadata_payload(include_tables: bool) -> TestResult<Vec<u8>> {
         &mut payload,
         3,
         &metadata_component(100, "Document", 9, 901)?,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     if include_tables {
         append_length_delimited_field(
             &mut payload,
             3,
             &metadata_component(101, "Tables", 8, 902)?,
+            litchi_iwa_common::WireLimits::DEFAULT,
         )?;
     }
     append_length_delimited_field(
         &mut payload,
         3,
         &metadata_component(102, "ViewState", 7, 903)?,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     let versioned = metadata_component(100, "Document", 3, 904)?;
-    append_length_delimited_field(&mut payload, 11, &versioned)?;
+    append_length_delimited_field(
+        &mut payload,
+        11,
+        &versioned,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_unknown_varint(&mut payload, 90, 900)?;
     Ok(payload)
 }
@@ -178,11 +200,13 @@ fn metadata_payload_with_absent_document_token() -> TestResult<Vec<u8>> {
         &mut payload,
         3,
         &metadata_component_optional(100, "Document", None, 901)?,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     append_length_delimited_field(
         &mut payload,
         3,
         &metadata_component(102, "ViewState", 7, 903)?,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     append_unknown_varint(&mut payload, 90, 900)?;
     Ok(payload)
@@ -197,50 +221,69 @@ fn metadata_entry(include_tables: bool) -> TestResult<Vec<u8>> {
 }
 
 fn replace_metadata_payload(source: &[u8], payload: Vec<u8>) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA)
         .ok_or_else(|| io::Error::other("metadata entry is missing"))?;
-    let mut archive = Archive::parse(&SnappyStream::decompress(entry.data())?.into_bytes())?;
+    let mut archive = Archive::parse(
+        &SnappyStream::decompress(entry.data(), Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
     archive.objects[0].replace_message_preserving_header(
         0,
         RawMessage {
             type_: PACKAGE_METADATA_TYPE,
             data: payload,
         },
+        Default::default(),
     )?;
-    let rewritten = SnappyStream::compress(&archive.to_bytes()?)?;
+    let rewritten =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(&[EntryEdit::new(METADATA, &rewritten)], Limits::default())?)
 }
 
 fn with_metadata_component(source: &[u8], component: Vec<u8>) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA)
         .ok_or_else(|| io::Error::other("metadata entry is missing"))?;
-    let mut archive = Archive::parse(&SnappyStream::decompress(entry.data())?.into_bytes())?;
-    append_length_delimited_field(&mut archive.objects[0].messages[0].data, 3, &component)?;
+    let mut archive = Archive::parse(
+        &SnappyStream::decompress(entry.data(), Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
+    append_length_delimited_field(
+        &mut archive.objects[0].messages[0].data,
+        3,
+        &component,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     replace_metadata_payload(source, archive.objects[0].messages[0].data.clone())
 }
 
 fn metadata_payload_from_bytes(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA)
         .ok_or_else(|| io::Error::other("metadata entry is missing"))?;
-    let archive = Archive::parse(&SnappyStream::decompress(entry.data())?.into_bytes())?;
+    let archive = Archive::parse(
+        &SnappyStream::decompress(entry.data(), Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
     Ok(archive.objects[0].messages[0].data.clone())
 }
 
 fn metadata_component_payloads(source: &[u8]) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(&metadata_payload_from_bytes(source)?)?
-        .fields()
-        .filter(|field| field.number() == 3)
-        .map(|field| field.payload().to_owned())
-        .collect())
+    Ok(WireView::parse(
+        &metadata_payload_from_bytes(source)?,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?
+    .fields()
+    .filter(|field| field.number() == 3)
+    .map(|field| field.payload().to_owned())
+    .collect())
 }
 
 fn package_bytes(locked: bool, pivot: bool, previews: usize) -> TestResult<Vec<u8>> {
@@ -333,12 +376,17 @@ fn bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn sheet_name(package: &Package, position: usize) -> &str {
-    package.document().sheets().get(position).unwrap().name()
+    package
+        .workbook_ref()
+        .sheets()
+        .get(position)
+        .unwrap()
+        .name()
 }
 
 fn table_name(package: &Package, sheet: usize, table: usize) -> &str {
     package
-        .document()
+        .workbook_ref()
         .sheets()
         .get(sheet)
         .unwrap()
@@ -352,14 +400,18 @@ fn rewrite_document(
     source: &[u8],
     mutate: impl FnOnce(&mut Archive) -> TestResult,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT)
         .unwrap();
-    let mut archive = Archive::parse(&SnappyStream::decompress(entry.data())?.into_bytes())?;
+    let mut archive = Archive::parse(
+        &SnappyStream::decompress(entry.data(), Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
     mutate(&mut archive)?;
-    let payload = SnappyStream::compress(&archive.to_bytes()?)?;
+    let payload =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(&[EntryEdit::new(DOCUMENT, &payload)], Limits::default())?)
 }
 
@@ -385,6 +437,7 @@ fn calculation_engine_package(source: &[u8], volatile: bool) -> TestResult<Vec<u
                     type_: 1,
                     data: document.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             root.archive_info.message_infos[0]
                 .object_references
@@ -457,6 +510,7 @@ fn malformed_calculation_engine_package(source: &[u8]) -> TestResult<Vec<u8>> {
                     type_: 1,
                     data: document.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             root.archive_info.message_infos[0]
                 .object_references
@@ -486,6 +540,7 @@ fn malformed_formula_owner_package(source: &[u8]) -> TestResult<Vec<u8>> {
                 type_: 4_008,
                 data: vec![0xff],
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -500,7 +555,12 @@ fn malformed_root_calculation_reference_package(source: &[u8]) -> TestResult<Vec
         let root = archive
             .object_mut(1)
             .ok_or_else(|| io::Error::other("Numbers root is missing"))?;
-        append_length_delimited_field(&mut root.messages[0].data, 3, &[0x08])?;
+        append_length_delimited_field(
+            &mut root.messages[0].data,
+            3,
+            &[0x08],
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         Ok(())
     })
 }
@@ -519,10 +579,16 @@ fn form_first_sheet(source: &[u8]) -> TestResult<Vec<u8>> {
                 }
                 .encode_to_vec(),
             },
+            Default::default(),
         )?;
         let info = &mut sheet.archive_info.message_infos[0];
         info.field_infos.clear();
-        let mut drawables = FieldInfo::new(vec![1, 2]);
+        let mut drawables = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![1, 2], litchi_iwa_core::Limits::default())
+                .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         drawables.object_references = vec![FIRST_INFO, SECOND_INFO];
         info.field_infos.push(drawables);
         Ok(())
@@ -538,18 +604,22 @@ fn legacy_model(source: &[u8]) -> TestResult<Vec<u8>> {
                 type_: 6_000,
                 data: model.messages[0].data.clone(),
             },
+            Default::default(),
         )?;
         Ok(())
     })
 }
 
 fn split_components(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let document = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT)
         .ok_or_else(|| io::Error::other("synthetic document is missing"))?;
-    let archive = Archive::parse(&SnappyStream::decompress(document.data())?.into_bytes())?;
+    let archive = Archive::parse(
+        &SnappyStream::decompress(document.data(), Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
     let (document_objects, table_objects): (Vec<_>, Vec<_>) =
         archive.objects.into_iter().partition(|object| {
             object
@@ -579,7 +649,12 @@ fn duplicate_selected_name_field(source: &[u8]) -> TestResult<Vec<u8>> {
         let model = archive
             .object_mut(FIRST_MODEL)
             .ok_or_else(|| io::Error::other("selected model is missing"))?;
-        append_length_delimited_field(&mut model.messages[0].data, 8, b"duplicate")?;
+        append_length_delimited_field(
+            &mut model.messages[0].data,
+            8,
+            b"duplicate",
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         Ok(())
     })
 }
@@ -608,6 +683,7 @@ fn empty_first_sheet(source: &[u8]) -> TestResult<Vec<u8>> {
                 type_: 2,
                 data: decoded.encode_to_vec(),
             },
+            Default::default(),
         )?;
         sheet.archive_info.message_infos[0]
             .object_references
@@ -617,13 +693,13 @@ fn empty_first_sheet(source: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn mismatched_selected_message_info(source: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT)
         .ok_or_else(|| io::Error::other("synthetic document is missing"))?;
-    let stream = SnappyStream::decompress(entry.data())?.into_bytes();
-    let archive = Archive::parse(&stream)?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("selected object is missing"))?;
@@ -645,7 +721,7 @@ fn mismatched_selected_message_info(source: &[u8], identifier: u64) -> TestResul
     encode_varint_into(&mut rewritten, u64::try_from(header.len())?);
     rewritten.extend_from_slice(&header);
     rewritten.extend_from_slice(&stream[data_offset..]);
-    let compressed = SnappyStream::compress(&rewritten)?;
+    let compressed = SnappyStream::compress(&rewritten, Default::default())?;
     Ok(catalog.reassemble_to_bytes(&[EntryEdit::new(DOCUMENT, &compressed)], Limits::default())?)
 }
 
@@ -660,6 +736,7 @@ fn cross_sheet_shared_model(source: &[u8]) -> TestResult<Vec<u8>> {
                 type_: 6_000,
                 data: table_info_payload(FIRST_MODEL, false)?,
             },
+            Default::default(),
         )?;
         info.archive_info.message_infos[0].object_references = vec![FIRST_MODEL];
         Ok(())
@@ -710,19 +787,19 @@ fn sheet_table_and_combined_batches_are_atomic_and_preserve_view_state() -> Test
     assert_eq!(combined.diagnostics().operations(), 3);
     assert!(combined.diagnostics().changed());
     assert_eq!(
-        Catalog::from_bytes(&source)?
+        Catalog::from_bytes(&source, Default::default())?
             .iter()
             .find(|entry| entry.name() == VIEW_STATE)
             .unwrap()
             .data(),
-        Catalog::from_bytes(&bytes(combined.package())?)?
+        Catalog::from_bytes(&bytes(combined.package())?, Default::default())?
             .iter()
             .find(|entry| entry.name() == VIEW_STATE)
             .unwrap()
             .data()
     );
     assert!(
-        Catalog::from_bytes(&bytes(combined.package())?)?
+        Catalog::from_bytes(&bytes(combined.package())?, Default::default())?
             .iter()
             .all(|entry| !entry.name().starts_with("preview"))
     );
@@ -744,52 +821,52 @@ fn selectors_unicode_invalid_names_and_final_collisions_are_typed() -> TestResul
     assert_eq!(sheet_name(commit.package(), 1), decomposed);
     assert!(matches!(
         package.edit_names().rename_sheet("missing", "x"),
-        Err(names::Error::SheetNotFound)
+        Err(names::Error::Refused(names::Refusal::SheetNotFound))
     ));
     assert!(matches!(
         package.edit_names().rename_table("Alpha", "missing", "x"),
-        Err(names::Error::TableNotFound)
+        Err(names::Error::Refused(names::Refusal::TableNotFound))
     ));
     assert!(matches!(
         package.edit_names().rename_sheet("Alpha", ""),
-        Err(names::Error::InvalidName {
+        Err(names::Error::Refused(names::Refusal::InvalidName {
             reason: names::InvalidReason::Empty
-        })
+        }))
     ));
     assert!(matches!(
         package
             .edit_names()
             .rename_table("Alpha", "One", "bad\0name"),
-        Err(names::Error::InvalidName {
+        Err(names::Error::Refused(names::Refusal::InvalidName {
             reason: names::InvalidReason::ContainsNul
-        })
+        }))
     ));
     assert!(matches!(
         package
             .edit_names()
             .rename_sheet("Alpha", "same")?
             .rename_sheet("Beta", "same"),
-        Err(names::Error::DuplicateName {
+        Err(names::Error::Refused(names::Refusal::DuplicateName {
             path: names::Path::Sheet { position: 1 }
-        })
+        }))
     ));
     assert!(matches!(
         package
             .edit_names()
             .rename_table("Alpha", "One", "same")?
             .rename_table("Alpha", "Two", "same"),
-        Err(names::Error::DuplicateName {
+        Err(names::Error::Refused(names::Refusal::DuplicateName {
             path: names::Path::Table { sheet: 0, table: 1 }
-        })
+        }))
     ));
     assert!(matches!(
         package
             .edit_names()
             .rename_sheet("Alpha", "first")?
             .rename_sheet("Alpha", "second"),
-        Err(names::Error::DuplicateTarget {
+        Err(names::Error::Refused(names::Refusal::DuplicateTarget {
             path: names::Path::Sheet { position: 0 }
-        })
+        }))
     ));
 
     let swapped = package
@@ -818,13 +895,13 @@ fn names_selectors_are_case_sensitive_and_failed_selection_preserves_source() ->
 
     assert!(matches!(
         package.edit_names().rename_sheet("alpha", "Changed"),
-        Err(names::Error::SheetNotFound)
+        Err(names::Error::Refused(names::Refusal::SheetNotFound))
     ));
     assert_eq!(bytes(&package)?, before);
 
     assert!(matches!(
         package.edit_names().rename_table("Alpha", "one", "Changed"),
-        Err(names::Error::TableNotFound)
+        Err(names::Error::Refused(names::Refusal::TableNotFound))
     ));
     assert_eq!(bytes(&package)?, before);
 
@@ -841,11 +918,14 @@ fn names_selectors_are_case_sensitive_and_failed_selection_preserves_source() ->
 fn staged_name_bytes_accept_exact_limit_reject_one_over_and_bound_multiple_operations() -> TestResult
 {
     let maximum = 256;
-    let semantic =
-        PackageSemanticLimits::default().with_projection_limits(MAX_MATERIALIZED_CELLS, maximum)?;
+    let semantic = litchi_numbers::SemanticLimits::DEFAULT
+        .to_builder()
+        .max_materialized_cells(MAX_MATERIALIZED_CELLS)
+        .and_then(|b| b.max_output_text_bytes(maximum))
+        .and_then(|b| b.build())?;
     let package = Package::from_bytes_with_options(
         &package_bytes(false, false, 0)?,
-        PackageReadOptions::new(Limits::default(), semantic),
+        litchi_numbers::OpenOptions::new().semantic_limits(semantic),
     )?;
 
     let exact = package
@@ -864,7 +944,7 @@ fn staged_name_bytes_accept_exact_limit_reject_one_over_and_bound_multiple_opera
         .expect_err("the third staged name must exceed the aggregate retained budget");
     assert!(matches!(
         error,
-        names::Error::LimitExceeded {
+        names::Error::Limit {
             kind: names::LimitKind::NameBytes,
             observed: 257,
             maximum: 256,
@@ -955,9 +1035,9 @@ fn form_legacy_lock_and_pivot_dependencies_fail_closed_without_publishing() -> T
             .edit_names()
             .rename_table("Alpha", "One", "Denied")?
             .commit(),
-        Err(names::Error::TableLocked {
+        Err(names::Error::Refused(names::Refusal::TableLocked {
             path: names::Path::Table { sheet: 0, table: 0 }
-        })
+        }))
     ));
     assert_eq!(table_name(&locked, 0, 0), "One");
 
@@ -967,9 +1047,11 @@ fn form_legacy_lock_and_pivot_dependencies_fail_closed_without_publishing() -> T
             .edit_names()
             .rename_table("Alpha", "One", "Denied")?
             .commit(),
-        Err(names::Error::UnsupportedDependency {
-            path: names::Path::Table { sheet: 0, table: 0 }
-        })
+        Err(names::Error::Refused(
+            names::Refusal::UnsupportedDependency {
+                path: names::Path::Table { sheet: 0, table: 0 }
+            }
+        ))
     ));
     Ok(())
 }
@@ -999,9 +1081,9 @@ fn calculation_engine_dependencies_are_checked_after_root_projection() -> TestRe
         .expect_err("volatile formula-owner dependencies must be fail-closed");
     assert!(matches!(
         error,
-        names::Error::UnsupportedDependency {
+        names::Error::Refused(names::Refusal::UnsupportedDependency {
             path: names::Path::Table { sheet: 0, table: 0 }
-        }
+        })
     ));
     assert_eq!(bytes(&volatile)?, before);
     Ok(())
@@ -1044,7 +1126,12 @@ fn names_root_projection_keeps_unknown_fields_and_rejects_duplicate_optional_rou
             .ok_or_else(|| io::Error::other("Numbers root is missing"))?;
         // Unknown root data belongs to the source owner and must not be
         // normalized by the generated-free sheet-order projection.
-        append_length_delimited_field(&mut root.messages[0].data, 90, b"root-opaque")?;
+        append_length_delimited_field(
+            &mut root.messages[0].data,
+            90,
+            b"root-opaque",
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         // Two occurrences of the optional calculation-engine route are
         // ambiguous even though the rooted sheet projection does not select
         // this field.
@@ -1052,11 +1139,13 @@ fn names_root_projection_keeps_unknown_fields_and_rejects_duplicate_optional_rou
             &mut root.messages[0].data,
             3,
             &reference(CALCULATION_ENGINE).encode_to_vec(),
+            litchi_iwa_common::WireLimits::DEFAULT,
         )?;
         append_length_delimited_field(
             &mut root.messages[0].data,
             3,
             &reference(CALCULATION_ENGINE + 1).encode_to_vec(),
+            litchi_iwa_common::WireLimits::DEFAULT,
         )?;
         Ok(())
     })?;
@@ -1077,7 +1166,12 @@ fn names_root_projection_keeps_unknown_fields_and_rejects_duplicate_optional_rou
         let root = archive
             .object_mut(1)
             .ok_or_else(|| io::Error::other("Numbers root is missing"))?;
-        append_length_delimited_field(&mut root.messages[0].data, 90, b"root-opaque")?;
+        append_length_delimited_field(
+            &mut root.messages[0].data,
+            90,
+            b"root-opaque",
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         Ok(())
     })?;
     let clean_package = Package::from_bytes(&clean)?;
@@ -1085,8 +1179,8 @@ fn names_root_projection_keeps_unknown_fields_and_rejects_duplicate_optional_rou
         .edit_names()
         .rename_sheet("Alpha", "Changed")?
         .commit()?;
-    let source_catalog = Catalog::from_bytes(&clean)?;
-    let target_catalog = Catalog::from_bytes(&bytes(commit.package())?)?;
+    let source_catalog = Catalog::from_bytes(&clean, Default::default())?;
+    let target_catalog = Catalog::from_bytes(&bytes(commit.package())?, Default::default())?;
     let source_archive = Archive::parse(
         &SnappyStream::decompress(
             source_catalog
@@ -1094,8 +1188,10 @@ fn names_root_projection_keeps_unknown_fields_and_rejects_duplicate_optional_rou
                 .find(|entry| entry.name() == DOCUMENT)
                 .unwrap()
                 .data(),
+            Default::default(),
         )?
         .into_bytes(),
+        Default::default(),
     )?;
     let target_archive = Archive::parse(
         &SnappyStream::decompress(
@@ -1104,8 +1200,10 @@ fn names_root_projection_keeps_unknown_fields_and_rejects_duplicate_optional_rou
                 .find(|entry| entry.name() == DOCUMENT)
                 .unwrap()
                 .data(),
+            Default::default(),
         )?
         .into_bytes(),
+        Default::default(),
     )?;
     assert_eq!(
         source_archive.object(1).unwrap().messages[0].data,
@@ -1124,10 +1222,14 @@ fn names_work_limit_rejects_before_reassembly_and_publication() -> TestResult {
     // 2,597 is the pre-selector-charge total for this fixed fixture; the
     // two selected component groups each add one decompressed metadata
     // payload bound to the caller-owned work total.
-    let semantic = PackageSemanticLimits::default().with_formula_render_limits(2_597, 1)?;
+    let semantic = litchi_numbers::SemanticLimits::DEFAULT
+        .to_builder()
+        .max_formula_render_work(2_597)
+        .and_then(|b| b.max_formula_render_depth(1))
+        .and_then(|b| b.build())?;
     let package = Package::from_bytes_with_options(
         &source,
-        PackageReadOptions::new(Limits::default(), semantic),
+        litchi_numbers::OpenOptions::new().semantic_limits(semantic),
     )?;
     let before = bytes(&package)?;
     let error = package
@@ -1138,7 +1240,7 @@ fn names_work_limit_rejects_before_reassembly_and_publication() -> TestResult {
         .expect_err("the conservative changed-work guard must run before native rewrite");
     assert!(matches!(
         error,
-        names::Error::LimitExceeded {
+        names::Error::Limit {
             kind: names::LimitKind::WireWork,
             ..
         }
@@ -1154,7 +1256,12 @@ fn selected_name_wire_is_strict_and_unknown_bytes_stay_opaque() -> TestResult {
         let sheet = archive.object_mut(FIRST_SHEET).unwrap();
         append_varint_field(&mut sheet.messages[0].data, 91, 1234)?;
         let model = archive.object_mut(FIRST_MODEL).unwrap();
-        append_length_delimited_field(&mut model.messages[0].data, 92, b"opaque")?;
+        append_length_delimited_field(
+            &mut model.messages[0].data,
+            92,
+            b"opaque",
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         Ok(())
     })?;
     let package = Package::from_bytes(&padded)?;
@@ -1162,8 +1269,8 @@ fn selected_name_wire_is_strict_and_unknown_bytes_stay_opaque() -> TestResult {
         .edit_names()
         .rename_table("Alpha", "One", "Known")?
         .commit()?;
-    let before = Catalog::from_bytes(&padded)?;
-    let after = Catalog::from_bytes(&bytes(commit.package())?)?;
+    let before = Catalog::from_bytes(&padded, Default::default())?;
+    let after = Catalog::from_bytes(&bytes(commit.package())?, Default::default())?;
     let before_document = before
         .iter()
         .find(|entry| entry.name() == DOCUMENT)
@@ -1175,12 +1282,18 @@ fn selected_name_wire_is_strict_and_unknown_bytes_stay_opaque() -> TestResult {
         .unwrap()
         .data();
     assert_ne!(before_document, after_document);
-    let parsed = Archive::parse(&SnappyStream::decompress(after_document)?.into_bytes())?;
+    let parsed = Archive::parse(
+        &SnappyStream::decompress(after_document, Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
     let model = parsed.object(FIRST_MODEL).unwrap();
     assert!(
-        WireView::parse(&model.messages[0].data)?
-            .fields()
-            .any(|field| field.number() == 92)
+        WireView::parse(
+            &model.messages[0].data,
+            litchi_iwa_common::WireLimits::DEFAULT
+        )?
+        .fields()
+        .any(|field| field.number() == 92)
     );
     Ok(())
 }
@@ -1202,7 +1315,7 @@ fn split_components_and_every_preview_cardinality_publish_once() -> TestResult {
         assert_eq!(sheet_name(commit.package(), 0), "Split sheet");
         assert_eq!(table_name(commit.package(), 0, 0), "Split table");
         let output = bytes(commit.package())?;
-        let catalog = Catalog::from_bytes(&output)?;
+        let catalog = Catalog::from_bytes(&output, Default::default())?;
         assert_eq!(
             catalog
                 .iter()
@@ -1216,7 +1329,7 @@ fn split_components_and_every_preview_cardinality_publish_once() -> TestResult {
                 .find(|entry| entry.name() == VIEW_STATE)
                 .unwrap()
                 .data(),
-            Catalog::from_bytes(&source)?
+            Catalog::from_bytes(&source, Default::default())?
                 .iter()
                 .find(|entry| entry.name() == VIEW_STATE)
                 .unwrap()
@@ -1280,19 +1393,19 @@ fn changed_names_advance_metadata_tokens_and_inverse_restores_exact_source() -> 
         Some(3)
     );
     assert!(
-        WireView::parse(&target_payload)?
+        WireView::parse(&target_payload, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .any(|field| field.number() == 90)
     );
     for component in metadata_component_payloads(&target_bytes)? {
         assert!(
-            WireView::parse(&component)?
+            WireView::parse(&component, litchi_iwa_common::WireLimits::DEFAULT)?
                 .fields()
                 .any(|field| field.number() == 90)
         );
     }
     assert!(source_components.iter().all(|component| {
-        WireView::parse(component)
+        WireView::parse(component, litchi_iwa_common::WireLimits::DEFAULT)
             .map(|view| view.fields().any(|field| field.number() == 90))
             .unwrap_or(false)
     }));
@@ -1346,7 +1459,7 @@ fn metadata_absent_selected_token_is_added_and_inverse_is_exact() -> TestResult 
 #[test]
 fn changed_names_fail_closed_for_missing_duplicate_or_overflow_metadata() -> TestResult {
     let source = package_bytes(false, false, 0)?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let missing =
         catalog.reassemble_with_deletions_to_bytes(&[], &[METADATA], Limits::default())?;
     let missing_package = Package::from_bytes(&missing)?;
@@ -1374,7 +1487,12 @@ fn changed_names_fail_closed_for_missing_duplicate_or_overflow_metadata() -> Tes
     assert_eq!(bytes(&duplicate)?, duplicate_before);
 
     let mut wrong_wire_payload = metadata_payload(false)?;
-    append_length_delimited_field(&mut wrong_wire_payload, 8, b"wrong wire")?;
+    append_length_delimited_field(
+        &mut wrong_wire_payload,
+        8,
+        b"wrong wire",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let wrong_wire_source = replace_metadata_payload(&source, wrong_wire_payload)?;
     let wrong_wire = Package::from_bytes(&wrong_wire_source)?;
     let wrong_wire_before = bytes(&wrong_wire)?;
@@ -1440,7 +1558,7 @@ fn native_fixture_combined_rename_reopens_and_inverse_restores_exact_bytes() -> 
     assert_eq!(sheet_name(commit.package(), 0), "Líneas 你好 🧪");
     assert_eq!(table_name(commit.package(), 0, 0), "表 Café №42");
     assert!(matches!(
-        commit.package().document().sheets()[0].tables().next().unwrap().get_a1("B2")?,
+        commit.package().workbook_ref().sheets()[0].tables().next().unwrap().get_a1("B2")?,
         Some(Value::Text(value)) if value == "Litchi native Numbers fixture"
     ));
     assert_eq!(
@@ -1459,7 +1577,7 @@ fn native_fixture_combined_rename_reopens_and_inverse_restores_exact_bytes() -> 
 fn empty_sheet_name_changes_and_empty_batches_have_exact_noop_diagnostics() -> TestResult {
     let source = empty_first_sheet(&package_bytes(false, false, 1)?)?;
     let package = Package::from_bytes(&source)?;
-    assert_eq!(package.document().sheets()[0].table_count(), 0);
+    assert_eq!(package.workbook_ref().sheets()[0].table_count(), 0);
     let changed = package
         .edit_names()
         .rename_sheet("Alpha", "Empty")?

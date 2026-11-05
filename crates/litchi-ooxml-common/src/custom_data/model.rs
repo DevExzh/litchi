@@ -57,9 +57,6 @@ impl CustomData {
     }
 }
 
-/// Compatibility name for a complete Custom Data storage.
-pub type Store = CustomData;
-
 /// Immutable Custom Data metadata and payload backed by shared allocations.
 ///
 /// The fields remain public for the existing XLSX adapter's source-bound

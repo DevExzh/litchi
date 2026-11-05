@@ -16,8 +16,10 @@
 //! depth, text, object, group, and anchor budgets; unmodeled fragments are
 //! retained as bounded opaque values.
 
+use std::ops::Range;
 use std::str::FromStr;
 
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -25,9 +27,11 @@ use quick_xml::name::{Namespace, NamespaceResolver, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 use quick_xml::writer::Writer;
 
-use crate::{Error, Result};
+use crate::{Error, LimitKind, Result};
 use litchi_drawingml::geometry::reader::{CustomGeometryBuilder, GeometryElement};
+use litchi_drawingml::text::body::reader::{self as text_reader, Builder as TextBuilder};
 use litchi_drawingml::text::parse_bool;
+use litchi_ooxml_common::XmlError;
 use litchi_ooxml_common::relationships::attribute_value;
 use litchi_ooxml_common::xml::{
     decode_xml_reference, is_drawingml_name, unqualified_attribute_value, xsd_token_atom,
@@ -51,12 +55,24 @@ const STRICT_SPREADSHEET_DRAWING_NAMESPACE: &[u8] =
 /// # Errors
 ///
 /// Returns an error for malformed XML, invalid drawing markup, or configured limits.
-pub fn read(xml: &str) -> Result<Option<Vec<AnchoredObject>>> {
-    if xml.len() > MAX_DRAWING_PART_BYTES {
-        return Err(limit("drawing part bytes"));
+pub fn read(xml: &str, limits: &Limits) -> Result<Option<Vec<AnchoredObject>>> {
+    let limits = limits.validate()?;
+    if xml.len() > limits.max_drawing_part_bytes {
+        return Err(limit(
+            LimitKind::DrawingBytes,
+            xml.len(),
+            limits.max_drawing_part_bytes,
+        ));
     }
     let xml = litchi_ooxml_common::mce::process_str(xml)?;
-    Parser::parse(xml.as_ref())
+    if xml.len() > limits.max_drawing_part_bytes {
+        return Err(limit(
+            LimitKind::DrawingBytes,
+            xml.len(),
+            limits.max_drawing_part_bytes,
+        ));
+    }
+    Parser::parse(xml.as_ref(), limits)
 }
 
 /// Decode a relationship-namespace attribute while rejecting duplicates.
@@ -67,7 +83,7 @@ fn relationship_attribute_value(
     resolver: &NamespaceResolver,
 ) -> Result<Option<String>> {
     attribute_value(element, name, decoder, resolver)
-        .map_err(|error| Error::Invalid(error.to_string()))
+        .map_err(|_| malformed_xml("malformed relationship attribute"))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -173,10 +189,22 @@ enum BuilderKind {
 #[derive(Default)]
 struct BodyBuilder {
     properties: Properties,
+    /// Paragraphs the shared text-body reader produced for `xdr:txBody`.
     paragraphs: Vec<Paragraph>,
-    paragraph: Option<Paragraph>,
-    run: Option<Run>,
     in_text_body: bool,
+}
+
+/// The shared `DrawingML` text-body reader for the open `xdr:txBody`.
+///
+/// Every event inside the body reaches it, including the ones this parser
+/// also retains as opaque markup, so the paragraphs, runs and their local
+/// properties come from the one shared implementation. It uses the strict
+/// shared contract: modeled values are validated, fields are semantic runs,
+/// and the host still retains the original field markup as opaque data.
+struct TextBody<'x> {
+    builder: TextBuilder<'x>,
+    /// Parser stack length while `xdr:txBody` is open.
+    depth: usize,
 }
 
 struct ObjectBuilder {
@@ -251,7 +279,9 @@ impl ObjectBuilder {
     }
 }
 
-struct Parser {
+struct Parser<'x> {
+    document: &'x [u8],
+    limits: Limits,
     objects: Vec<AnchoredObject>,
     object_count: usize,
     text_bytes: usize,
@@ -259,13 +289,18 @@ struct Parser {
     builders: Vec<ObjectBuilder>,
     marker_text: String,
     unknown: Option<UnknownCapture>,
+    text: Option<TextBody<'x>>,
 }
 
-impl Parser {
-    fn parse(xml: &str) -> Result<Option<Vec<AnchoredObject>>> {
-        let mut reader = NsReader::from_reader(xml.as_bytes());
+impl<'x> Parser<'x> {
+    fn parse(xml: &'x str, limits: Limits) -> Result<Option<Vec<AnchoredObject>>> {
+        let document = xml.as_bytes();
+        let mut reader = NsReader::from_reader(document);
         reader.config_mut().trim_text(false);
+        let origin = ReaderOrigin::of(document);
         let mut parser = Self {
+            document,
+            limits,
             objects: Vec::new(),
             object_count: 0,
             text_bytes: 0,
@@ -273,15 +308,18 @@ impl Parser {
             builders: Vec::new(),
             marker_text: String::new(),
             unknown: None,
+            text: None,
         };
         let mut stack = Vec::new();
         let mut closed_root = false;
         loop {
             let decoder = reader.decoder();
+            let start = position(&reader, origin)?;
             let event = reader
                 .read_event()
-                .map_err(|error| Error::Invalid(error.to_string()))?
+                .map_err(|_| malformed_xml("malformed SpreadsheetML drawing XML"))?
                 .into_owned();
+            let span = start..position(&reader, origin)?;
             let resolver = reader.resolver().clone();
             let (namespace, event) = resolver.resolve_event(event);
             if parser.unknown.is_some() {
@@ -297,6 +335,12 @@ impl Parser {
                     }
                     parser.finish(context)?;
                 }
+                // Captured markup inside a text body still reaches the
+                // shared reader, which models paragraph properties, fields,
+                // line breaks and end-of-paragraph properties. Character
+                // data is forwarded as well so a captured field retains its
+                // semantic cached result while its original XML stays raw.
+                parser.forward_markup(&event, &namespace, &resolver, decoder, span)?;
                 continue;
             }
             match event {
@@ -322,8 +366,18 @@ impl Parser {
                     let context =
                         parser.start(parent, &namespace, &element, decoder, &resolver, false)?;
                     stack.push(context);
-                    if stack.len() > MAX_XML_DEPTH {
-                        return Err(limit("drawing XML depth"));
+                    if stack.len() > parser.limits.max_xml_depth {
+                        return Err(limit(
+                            LimitKind::XmlDepth,
+                            stack.len(),
+                            parser.limits.max_xml_depth,
+                        ));
+                    }
+                    if context == Context::Body {
+                        parser.open_text(stack.len())?;
+                    } else {
+                        parser
+                            .forward_start(&element, &namespace, &resolver, decoder, span, false)?;
                     }
                 },
                 Event::Empty(element) => {
@@ -333,11 +387,15 @@ impl Parser {
                     let context =
                         parser.start(parent, &namespace, &element, decoder, &resolver, true)?;
                     parser.finish(context)?;
+                    if context != Context::Body {
+                        parser
+                            .forward_start(&element, &namespace, &resolver, decoder, span, true)?;
+                    }
                 },
                 Event::Text(text) => {
                     let decoded = text
                         .xml_content(XmlVersion::Explicit1_0)
-                        .map_err(|error| Error::Invalid(error.to_string()))?;
+                        .map_err(|_| encoding_error("invalid SpreadsheetML drawing text"))?;
                     match stack.last() {
                         Some(Context::Marker(_, _)) => parser.marker_text.push_str(&decoded),
                         Some(Context::Text) => parser.push_run_text(&decoded)?,
@@ -347,7 +405,7 @@ impl Parser {
                 Event::CData(text) => {
                     let decoded = text
                         .xml_content(XmlVersion::Explicit1_0)
-                        .map_err(|error| Error::Invalid(error.to_string()))?;
+                        .map_err(|_| encoding_error("invalid SpreadsheetML drawing text"))?;
                     match stack.last() {
                         Some(Context::Marker(_, _)) => parser.marker_text.push_str(&decoded),
                         Some(Context::Text) => parser.push_run_text(&decoded)?,
@@ -355,7 +413,8 @@ impl Parser {
                     }
                 },
                 Event::GeneralRef(reference) => {
-                    let decoded = decode_xml_reference(&reference)?;
+                    let decoded = decode_xml_reference(&reference)
+                        .map_err(|_| malformed_xml("invalid SpreadsheetML drawing reference"))?;
                     match stack.last() {
                         Some(Context::Marker(_, _)) => parser.marker_text.push_str(&decoded),
                         Some(Context::Text) => parser.push_run_text(&decoded)?,
@@ -363,10 +422,17 @@ impl Parser {
                     }
                 },
                 Event::End(element) => {
+                    let closes_text = parser
+                        .text
+                        .as_ref()
+                        .is_some_and(|text| text.depth == stack.len());
                     let context = stack
                         .pop()
                         .ok_or_else(|| invalid("drawing XML closes outside its root"))?;
                     parser.finish(context)?;
+                    if !closes_text {
+                        parser.forward_end(span.end)?;
+                    }
                     if context == Context::Root {
                         if !is_xdr_name(&namespace, element.name(), b"wsDr") {
                             return Err(invalid("drawing XML has an invalid root closing element"));
@@ -387,19 +453,119 @@ impl Parser {
         Ok(Some(parser.objects))
     }
 
+    /// Charge run text against the drawing's text budget and hand it to the
+    /// shared text-body reader.
     fn push_run_text(&mut self, text: &str) -> Result<()> {
         self.text_bytes = self
             .text_bytes
             .checked_add(text.len())
-            .ok_or_else(|| limit("shape text bytes"))?;
-        if self.text_bytes > MAX_TEXT_BYTES {
-            return Err(limit("shape text bytes"));
+            .ok_or_else(|| limit(LimitKind::TextBytes, usize::MAX, self.limits.max_text_bytes))?;
+        if self.text_bytes > self.limits.max_text_bytes {
+            return Err(limit(
+                LimitKind::TextBytes,
+                self.text_bytes,
+                self.limits.max_text_bytes,
+            ));
         }
-        if let Some(builder) = self.builders.last_mut()
-            && let Some(run) = builder.text_body.run.as_mut()
-        {
-            run.text.push_str(text);
+        if let Some(body) = self.text.as_mut() {
+            body.builder.text(text).map_err(text_error)?;
         }
+        Ok(())
+    }
+
+    /// Start the shared text-body reader for the `xdr:txBody` just opened at
+    /// parser stack length `depth`.
+    fn open_text(&mut self, depth: usize) -> Result<()> {
+        self.text = Some(TextBody {
+            builder: TextBuilder::new(self.document, text_limits(self.limits)?)?,
+            depth,
+        });
+        Ok(())
+    }
+
+    /// Hand one start tag or empty element inside the open text body to the
+    /// shared reader.
+    fn forward_start(
+        &mut self,
+        element: &BytesStart<'_>,
+        namespace: &ResolveResult<'_>,
+        resolver: &NamespaceResolver,
+        decoder: Decoder,
+        span: Range<usize>,
+        empty: bool,
+    ) -> Result<()> {
+        let Some(body) = self.text.as_mut() else {
+            return Ok(());
+        };
+        body.builder
+            .start(element, namespace, resolver, decoder, span, empty)
+            .map_err(text_error)
+    }
+
+    /// Hand one end tag inside the open text body to the shared reader.
+    fn forward_end(&mut self, end: usize) -> Result<()> {
+        let Some(body) = self.text.as_mut() else {
+            return Ok(());
+        };
+        body.builder.end(end).map_err(text_error)
+    }
+
+    /// Hand one event of markup this parser captures as opaque to the shared
+    /// reader when it lies inside the open text body. This preserves semantic
+    /// field text while retaining the original event in the opaque payload.
+    fn forward_markup(
+        &mut self,
+        event: &Event<'_>,
+        namespace: &ResolveResult<'_>,
+        resolver: &NamespaceResolver,
+        decoder: Decoder,
+        span: Range<usize>,
+    ) -> Result<()> {
+        match event {
+            Event::Start(element) => {
+                self.forward_start(element, namespace, resolver, decoder, span, false)
+            },
+            Event::Empty(element) => {
+                self.forward_start(element, namespace, resolver, decoder, span, true)
+            },
+            Event::End(_) => self.forward_end(span.end),
+            Event::Text(text) => {
+                let decoded = text
+                    .xml_content(XmlVersion::Explicit1_0)
+                    .map_err(|_| encoding_error("invalid SpreadsheetML drawing text"))?;
+                self.forward_text(&decoded)
+            },
+            Event::CData(text) => {
+                let decoded = text
+                    .xml_content(XmlVersion::Explicit1_0)
+                    .map_err(|_| encoding_error("invalid SpreadsheetML drawing text"))?;
+                self.forward_text(&decoded)
+            },
+            Event::GeneralRef(reference) => {
+                let decoded = decode_xml_reference(reference)
+                    .map_err(|_| malformed_xml("invalid SpreadsheetML drawing reference"))?;
+                self.forward_text(&decoded)
+            },
+            _ => Ok(()),
+        }
+    }
+
+    fn forward_text(&mut self, text: &str) -> Result<()> {
+        let Some(body) = self.text.as_mut() else {
+            return Ok(());
+        };
+        body.builder.text(text).map_err(text_error)
+    }
+
+    /// Finish the shared text-body reader when `xdr:txBody` closes.
+    fn close_text(&mut self) -> Result<()> {
+        let Some(body) = self.text.take() else {
+            return Ok(());
+        };
+        let body = body.builder.finish().map_err(text_error)?;
+        let text_body = &mut self.builder_mut()?.text_body;
+        text_body.properties = body.properties;
+        text_body.paragraphs = body.paragraphs;
         Ok(())
     }
 
@@ -410,12 +576,15 @@ impl Parser {
             .ok_or_else(|| invalid("missing unknown drawing capture"))?;
         match event {
             Event::Start(_) => {
-                capture.depth = capture
-                    .depth
-                    .checked_add(1)
-                    .ok_or_else(|| limit("unknown drawing element depth"))?;
-                if capture.depth > MAX_XML_DEPTH {
-                    return Err(limit("unknown drawing element depth"));
+                capture.depth = capture.depth.checked_add(1).ok_or_else(|| {
+                    limit(LimitKind::XmlDepth, usize::MAX, self.limits.max_xml_depth)
+                })?;
+                if capture.depth > self.limits.max_xml_depth {
+                    return Err(limit(
+                        LimitKind::XmlDepth,
+                        capture.depth,
+                        self.limits.max_xml_depth,
+                    ));
                 }
             },
             Event::End(_) => {
@@ -432,9 +601,13 @@ impl Parser {
         capture
             .writer
             .write_event(event.clone())
-            .map_err(|error| Error::Invalid(error.to_string()))?;
-        if capture.writer.get_ref().len() > MAX_DRAWING_PART_BYTES {
-            return Err(limit("unknown drawing element bytes"));
+            .map_err(|_| malformed_xml("could not retain SpreadsheetML drawing markup"))?;
+        if capture.writer.get_ref().len() > self.limits.max_drawing_part_bytes {
+            return Err(limit(
+                LimitKind::DrawingBytes,
+                capture.writer.get_ref().len(),
+                self.limits.max_drawing_part_bytes,
+            ));
         }
         Ok(capture.depth == 0)
     }
@@ -455,8 +628,12 @@ impl Parser {
         if self.anchor.is_none() {
             return Err(invalid("drawing object outside an anchor"));
         }
-        if self.builders.len() >= MAX_GROUP_DEPTH {
-            return Err(limit("shape group depth"));
+        if self.builders.len() >= self.limits.max_group_depth {
+            return Err(limit(
+                LimitKind::GroupDepth,
+                self.builders.len().saturating_add(1),
+                self.limits.max_group_depth,
+            ));
         }
         self.builders.push(ObjectBuilder::new(kind));
         Ok(Context::Object)
@@ -677,14 +854,11 @@ impl Parser {
                 b"prstGeom" => {
                     let preset = unqualified_attribute_value(element, b"prst", decoder)?
                         .ok_or_else(|| invalid("DrawingML prstGeom is missing required prst"))?;
-                    let token = xsd_token_atom(&preset).ok_or_else(|| {
-                        invalid(format!("invalid DrawingML shape preset '{preset}'"))
-                    })?;
-                    let parsed = token.parse().map_err(|error| {
-                        invalid(format!(
-                            "invalid DrawingML shape preset '{preset}': {error}"
-                        ))
-                    })?;
+                    let token = xsd_token_atom(&preset)
+                        .ok_or_else(|| invalid("invalid DrawingML shape preset"))?;
+                    let parsed = token
+                        .parse()
+                        .map_err(|_| invalid("invalid DrawingML shape preset"))?;
                     let builder = self.builder_mut()?;
                     if builder.geometry.is_some() || builder.geometry_builder.is_some() {
                         return Err(invalid(
@@ -727,51 +901,20 @@ impl Parser {
                     self.apply_group_transform(local, element, decoder)?;
                 },
                 b"bodyPr" => {
-                    self.parse_properties(element, decoder)?;
                     return Ok(Context::Properties);
                 },
-                b"noAutofit" if parent == Context::Properties => {
-                    self.builder_mut()?.text_body.properties.autofit = Autofit::None;
+                _local if parent == Context::Properties => {
+                    // The shared reader owns all body-property decoding.
+                    // Keep these elements in the host stack without parsing
+                    // them a second time here.
                 },
-                b"spAutoFit" if parent == Context::Properties => {
-                    self.builder_mut()?.text_body.properties.autofit = Autofit::Shape;
-                },
-                b"normAutofit" if parent == Context::Properties => {
-                    self.builder_mut()?.text_body.properties.autofit = Autofit::Normal;
-                },
-                b"p" if parent == Context::Body => {
-                    let builder = self.builder_mut()?;
-                    if builder.text_body.paragraph.is_some() {
-                        return Err(invalid("nested drawing text paragraphs"));
-                    }
-                    builder.text_body.paragraph = Some(Paragraph::default());
-                    return Ok(Context::Paragraph);
-                },
-                b"r" if parent == Context::Paragraph => {
-                    let builder = self.builder_mut()?;
-                    if builder.text_body.run.is_some() {
-                        return Err(invalid("nested drawing text runs"));
-                    }
-                    builder.text_body.run = Some(Run::default());
-                    return Ok(Context::Run);
-                },
-                b"rPr" if parent == Context::Run => {
-                    self.parse_run_properties(element, decoder)?;
-                    return Ok(Context::RunProperties);
-                },
-                b"t" if parent == Context::Run => {
-                    return Ok(Context::Text);
-                },
-                b"br" if parent == Context::Paragraph => {
-                    // A DrawingML break contributes a newline to the paragraph.
-                    let builder = self.builder_mut()?;
-                    if let Some(paragraph) = builder.text_body.paragraph.as_mut() {
-                        paragraph.runs.push(Run {
-                            text: "\n".to_string(),
-                            ..Run::default()
-                        });
-                    }
-                },
+                // The shared text-body reader builds paragraphs and runs
+                // from the forwarded events; these contexts only steer which
+                // markup this parser also retains as opaque.
+                b"p" if parent == Context::Body => return Ok(Context::Paragraph),
+                b"r" if parent == Context::Paragraph => return Ok(Context::Run),
+                b"rPr" if parent == Context::Run => return Ok(Context::RunProperties),
+                b"t" if parent == Context::Run => return Ok(Context::Text),
                 _ => {},
             }
         }
@@ -838,9 +981,13 @@ impl Parser {
         };
         writer
             .write_event(event)
-            .map_err(|error| Error::Invalid(error.to_string()))?;
-        if writer.get_ref().len() > MAX_DRAWING_PART_BYTES {
-            return Err(limit("unknown drawing element bytes"));
+            .map_err(|_| malformed_xml("could not retain SpreadsheetML drawing markup"))?;
+        if writer.get_ref().len() > self.limits.max_drawing_part_bytes {
+            return Err(limit(
+                LimitKind::DrawingBytes,
+                writer.get_ref().len(),
+                self.limits.max_drawing_part_bytes,
+            ));
         }
         self.unknown = Some(UnknownCapture {
             depth: usize::from(!empty),
@@ -884,7 +1031,8 @@ impl Parser {
     ) -> Result<()> {
         let mut unknown = Vec::new();
         for attribute in element.checked_attributes() {
-            let attribute = attribute.map_err(|error| Error::Invalid(error.to_string()))?;
+            let attribute = attribute
+                .map_err(|_| malformed_xml("malformed SpreadsheetML drawing attribute"))?;
             let key = attribute.key.as_ref();
             if key == b"xmlns" || key.starts_with(b"xmlns:") {
                 continue;
@@ -897,7 +1045,7 @@ impl Parser {
             }
             let value = attribute
                 .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
-                .map_err(|error| Error::Invalid(error.to_string()))?;
+                .map_err(|_| malformed_xml("malformed SpreadsheetML drawing attribute"))?;
             unknown.push(UnknownAttribute::new(
                 String::from_utf8_lossy(key).into_owned(),
                 value.into_owned(),
@@ -914,9 +1062,13 @@ impl Parser {
         self.object_count = self
             .object_count
             .checked_add(1)
-            .ok_or_else(|| limit("objects per drawing"))?;
-        if self.object_count > MAX_OBJECTS_PER_DRAWING {
-            return Err(limit("objects per drawing"));
+            .ok_or_else(|| limit(LimitKind::Objects, usize::MAX, self.limits.max_objects))?;
+        if self.object_count > self.limits.max_objects {
+            return Err(limit(
+                LimitKind::Objects,
+                self.object_count,
+                self.limits.max_objects,
+            ));
         }
         if let Some(parent) = self.builders.last_mut() {
             parent.children.push(object);
@@ -931,13 +1083,14 @@ impl Parser {
 
     /// Open the `a:custGeom` element of the current shape.
     fn open_custom_geometry(&mut self) -> Result<Context> {
+        let geometry_limits = self.limits.geometry;
         let builder = self.builder_mut()?;
         if builder.geometry.is_some() || builder.geometry_builder.is_some() {
             return Err(invalid(
                 "drawing shape contains competing or duplicate geometries",
             ));
         }
-        builder.geometry_builder = Some(CustomGeometryBuilder::new());
+        builder.geometry_builder = Some(CustomGeometryBuilder::new(geometry_limits)?);
         Ok(Context::CustomGeometry(GeometryElement::CustomGeometry))
     }
 
@@ -954,10 +1107,15 @@ impl Parser {
         let Some(geometry) = builder.geometry_builder.as_mut() else {
             return Ok(Context::Other);
         };
-        Ok(match geometry.open(parent, local, element, decoder)? {
-            Some(child) => Context::CustomGeometry(child),
-            None => Context::Other,
-        })
+        Ok(
+            match geometry
+                .open(parent, local, element, decoder)
+                .map_err(geometry_error)?
+            {
+                Some(child) => Context::CustomGeometry(child),
+                None => Context::Other,
+            },
+        )
     }
 
     /// Close one custom geometry element; the `a:custGeom` close finalizes
@@ -966,12 +1124,12 @@ impl Parser {
         let builder = self.builder_mut()?;
         if element == GeometryElement::CustomGeometry {
             if let Some(geometry) = builder.geometry_builder.take() {
-                builder.geometry = Some(geometry.finish()?.into());
+                builder.geometry = Some(geometry.finish().map_err(geometry_error)?.into());
             }
             return Ok(());
         }
         if let Some(geometry) = builder.geometry_builder.as_mut() {
-            geometry.close(element)?;
+            geometry.close(element).map_err(geometry_error)?;
         }
         Ok(())
     }
@@ -1014,63 +1172,6 @@ impl Parser {
         Ok(())
     }
 
-    fn parse_properties(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
-        let body = &mut self.builder_mut()?.text_body.properties;
-        if let Some(value) = unqualified_attribute_value(element, b"lIns", decoder)? {
-            body.insets.left = parse_value(&value, "left text inset")?;
-        }
-        if let Some(value) = unqualified_attribute_value(element, b"tIns", decoder)? {
-            body.insets.top = parse_value(&value, "top text inset")?;
-        }
-        if let Some(value) = unqualified_attribute_value(element, b"rIns", decoder)? {
-            body.insets.right = parse_value(&value, "right text inset")?;
-        }
-        if let Some(value) = unqualified_attribute_value(element, b"bIns", decoder)? {
-            body.insets.bottom = parse_value(&value, "bottom text inset")?;
-        }
-        if let Some(value) = unqualified_attribute_value(element, b"anchor", decoder)? {
-            body.vertical_anchor = parse_value(&value, "text anchor")?;
-        }
-        if let Some(value) = unqualified_attribute_value(element, b"anchorCtr", decoder)? {
-            body.anchor_center = parse_dml_bool(&value, "anchorCtr")?;
-        }
-        if let Some(value) = unqualified_attribute_value(element, b"vert", decoder)? {
-            body.direction = parse_value(&value, "text direction")?;
-        }
-        if let Some(value) = unqualified_attribute_value(element, b"wrap", decoder)? {
-            body.wrap = parse_value(&value, "text wrap")?;
-        }
-        if let Some(value) = unqualified_attribute_value(element, b"numCol", decoder)? {
-            body.column_count = parse_value(&value, "text column count")?;
-        }
-        if let Some(value) = unqualified_attribute_value(element, b"spcFirstLastPara", decoder)? {
-            body.space_first_last_paragraph = parse_dml_bool(&value, "spcFirstLastPara")?;
-        }
-        Ok(())
-    }
-
-    fn parse_run_properties(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
-        let builder = self.builder_mut()?;
-        let Some(run) = builder.text_body.run.as_mut() else {
-            return Ok(());
-        };
-        if let Some(value) = unqualified_attribute_value(element, b"b", decoder)? {
-            run.bold = Some(parse_dml_bool(&value, "run bold")?);
-        }
-        if let Some(value) = unqualified_attribute_value(element, b"i", decoder)? {
-            run.italic = Some(parse_dml_bool(&value, "run italic")?);
-        }
-        if let Some(value) = unqualified_attribute_value(element, b"u", decoder)? {
-            run.underline = Some(Underline::from_dml(&value).map_err(|error| {
-                invalid(format!("invalid DrawingML underline '{value}': {error}"))
-            })?);
-        }
-        if let Some(value) = unqualified_attribute_value(element, b"sz", decoder)? {
-            run.font_size = Some(parse_value(&value, "text size")?);
-        }
-        Ok(())
-    }
-
     fn finish(&mut self, context: Context) -> Result<()> {
         match context {
             Context::Marker(target, field) => self.finish_marker(target, field),
@@ -1078,25 +1179,7 @@ impl Parser {
             Context::Object => self.close_object(),
             Context::Unknown => self.finish_unknown(),
             Context::CustomGeometry(element) => self.finish_geometry(element),
-            Context::Run => {
-                if let Some(builder) = self.builders.last_mut()
-                    && let (Some(run), Some(paragraph)) = (
-                        builder.text_body.run.take(),
-                        builder.text_body.paragraph.as_mut(),
-                    )
-                {
-                    paragraph.runs.push(run);
-                }
-                Ok(())
-            },
-            Context::Paragraph => {
-                if let Some(builder) = self.builders.last_mut()
-                    && let Some(paragraph) = builder.text_body.paragraph.take()
-                {
-                    builder.text_body.paragraphs.push(paragraph);
-                }
-                Ok(())
-            },
+            Context::Body => self.close_text(),
             _ => Ok(()),
         }
     }
@@ -1185,8 +1268,9 @@ impl Parser {
                 Anchor::Absolute { position, extent }
             },
         };
-        if self.objects.len() >= MAX_ANCHORS_PER_DRAWING {
-            return Err(limit("anchors per drawing"));
+        let next = self.objects.len().saturating_add(1);
+        if next > self.limits.max_anchors {
+            return Err(limit(LimitKind::Anchors, next, self.limits.max_anchors));
         }
         self.objects.push(AnchoredObject {
             anchor,
@@ -1293,11 +1377,7 @@ fn is_known_object_element(namespace: &ResolveResult<'_>, local: &[u8]) -> bool 
 }
 
 fn parse_dml_bool(value: &str, attribute: &str) -> Result<bool> {
-    parse_bool(value).map_err(|error| {
-        invalid(format!(
-            "invalid DrawingML {attribute} boolean '{value}': {error}"
-        ))
-    })
+    parse_bool(value).map_err(|_| invalid(format!("invalid DrawingML {attribute} boolean")))
 }
 
 fn emu_attribute(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -> Result<i64> {
@@ -1309,7 +1389,7 @@ fn emu_attribute(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -> Res
     })?;
     value
         .parse()
-        .map_err(|_| invalid(format!("invalid drawing coordinate value '{value}'")))
+        .map_err(|_| invalid("invalid drawing coordinate value"))
 }
 
 fn required_u32_attribute(
@@ -1322,7 +1402,7 @@ fn required_u32_attribute(
         .ok_or_else(|| invalid(format!("{description} attribute is missing")))?;
     value
         .parse()
-        .map_err(|_| invalid(format!("invalid {description} '{value}'")))
+        .map_err(|_| invalid(format!("invalid {description}")))
 }
 
 fn bool_attribute(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -> Result<Option<bool>> {
@@ -1334,13 +1414,53 @@ fn bool_attribute(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -> Re
 fn any_truthy_attribute(element: &BytesStart<'_>, decoder: Decoder) -> Result<bool> {
     let mut any = false;
     for attribute in element.checked_attributes() {
-        let attribute = attribute.map_err(|error| Error::Invalid(error.to_string()))?;
+        let attribute =
+            attribute.map_err(|_| malformed_xml("malformed SpreadsheetML drawing attribute"))?;
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
-            .map_err(|error| Error::Invalid(error.to_string()))?;
+            .map_err(|_| malformed_xml("malformed SpreadsheetML drawing attribute"))?;
         any |= parse_dml_bool(&value, "lock")?;
     }
     Ok(any)
+}
+
+/// The shared text-body reader's limits inside a drawing. The host's drawing
+/// limits and the shared semantic text limits are deliberately finite and
+/// use the same source budgets.
+fn text_limits(limits: Limits) -> Result<text_reader::Limits> {
+    text_reader::Limits::new(
+        limits.max_drawing_part_bytes,
+        limits.max_xml_depth.saturating_mul(2),
+        limits.max_text_elements,
+        limits.max_text_bytes,
+    )
+    .ok_or_else(|| invalid("invalid SpreadsheetDrawing text limits"))
+}
+
+/// Preserve the shared reader's content-free typed error source.
+fn text_error(error: litchi_drawingml::Error) -> Error {
+    Error::Drawing(error)
+}
+
+fn geometry_error(error: litchi_drawingml::Error) -> Error {
+    use litchi_drawingml::Error as DrawingError;
+    Error::Drawing(match error {
+        DrawingError::Invalid(_) => DrawingError::Invalid("invalid custom geometry value".into()),
+        DrawingError::Xml(_) => DrawingError::Xml("malformed custom geometry XML".into()),
+        DrawingError::Common(XmlError::Invalid(_)) => {
+            DrawingError::Common(XmlError::Invalid("invalid custom geometry XML".into()))
+        },
+        DrawingError::Common(XmlError::Malformed(_)) => {
+            DrawingError::Common(XmlError::Malformed("malformed custom geometry XML".into()))
+        },
+        other => other,
+    })
+}
+
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("drawing XML position does not fit usize"))
 }
 
 fn set_once<T>(target: &mut Option<T>, value: T, description: &str) -> Result<()> {
@@ -1353,13 +1473,21 @@ fn set_once<T>(target: &mut Option<T>, value: T, description: &str) -> Result<()
 fn parse_value<T: FromStr>(value: &str, description: &str) -> Result<T> {
     value
         .parse()
-        .map_err(|_| invalid(format!("invalid {description} '{value}'")))
+        .map_err(|_| invalid(format!("invalid {description}")))
 }
 
 fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-fn limit(name: &str) -> Error {
-    invalid(format!("XLSX drawing shape {name} limit exceeded"))
+fn malformed_xml(message: &'static str) -> Error {
+    Error::Xml(XmlError::Malformed(message.to_owned()))
+}
+
+fn encoding_error(message: &'static str) -> Error {
+    Error::Encoding(message.to_owned())
+}
+
+fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::limit(kind, observed, maximum)
 }

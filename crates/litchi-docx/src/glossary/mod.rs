@@ -4,17 +4,25 @@
 )]
 //! Layered `WordprocessingML` glossary / `AutoText` catalog owner.
 
-mod codec;
+pub(crate) mod codec;
+mod edit;
 mod graph;
+mod limit;
 mod model;
-mod package;
+pub(crate) mod package;
+#[allow(
+    dead_code,
+    unreachable_pub,
+    reason = "the OPC-level draft stages the family edit; its patch accessors serve unit tests"
+)]
 mod transaction;
 
 #[cfg(test)]
 mod tests;
 
-pub(super) use crate::{Error, Result};
 pub(super) use caseless::Caseless;
+pub use edit::Error;
+pub(crate) use edit::Result;
 pub(super) use litchi_opc::constants::content_type as ct;
 pub(super) use litchi_opc::part::{BlobPart, Part};
 pub(super) use litchi_opc::{ContentType, OpcError, OpcPackage, PackURI};
@@ -85,8 +93,9 @@ const MAX_GRAPH_BYTES: usize = 256 * 1024 * 1024;
 /// Aggregate ceiling for raw graph names, content types, and relationship metadata.
 const MAX_GRAPH_METADATA_BYTES: usize = 32 * 1024 * 1024;
 
-pub use codec::{read, write};
+pub use edit::{Commit, Diagnostics, Edit, LimitKind, Patch};
 pub use graph::raw;
+pub use limit::{GraphLimits, Limits};
 pub use model::{Catalog, Category, Conformance, Entry, Gallery, Id, Insert, Kind, Name, Props};
-pub use package::{load, put, remove};
-pub use transaction::{Commit, Patch, Revision, Snapshot, Transaction};
+pub use package::load;
+pub use transaction::{Revision, Snapshot};

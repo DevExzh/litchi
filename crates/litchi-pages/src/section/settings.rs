@@ -193,42 +193,13 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// More than one section matched an exact-name selector.
-    #[error(
-        "the Pages section-settings selector is ambiguous at positions {first:?} and {duplicate:?}"
-    )]
-    AmbiguousSelector {
-        /// First matching semantic source position.
-        first: Position,
-        /// Next matching semantic source position.
-        duplicate: Position,
-    },
-    /// No section matched an exact-name selector.
-    #[error("the Pages section-settings selector did not match a section")]
-    NameNotFound,
-    /// No section exists at the requested semantic source position.
-    #[error("the Pages section position {position:?} does not exist")]
-    PositionNotFound {
-        /// Requested checked source position.
-        position: Position,
-    },
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     /// The replacement violates an archive-free section invariant.
     #[error("invalid Pages section settings: {0}")]
     InvalidSettings(#[source] super::Error),
-    /// The physical source cannot publish a preservation-safe changed edit.
-    #[error("the Pages {path} does not support exact section-settings editing")]
-    UnsupportedSource {
-        /// Content-free semantic location of the unsupported owner.
-        path: Path,
-    },
-    /// A required, otherwise valid native relationship is absent.
-    #[error("the Pages {path} is missing its required {kind}")]
-    UnsupportedDependency {
-        /// Content-free semantic location requiring the relationship.
-        path: Path,
-        /// Kind of missing relationship.
-        kind: DependencyKind,
-    },
     /// The rooted native owner is malformed or ambiguous.
     #[error("the Pages {path} has no unambiguous editable section settings")]
     InvalidSource {
@@ -239,7 +210,7 @@ pub enum Error {
     #[error(
         "Pages section-settings {kind} limit exceeded at {path}: observed {observed}, maximum {maximum}"
     )]
-    LimitExceeded {
+    Limit {
         /// Content-free semantic location where the ceiling was exceeded.
         path: Path,
         /// Resource category that exceeded its ceiling.
@@ -264,6 +235,67 @@ pub enum Error {
     /// The supplied patch was not created from this exact package artifact.
     #[error("the Pages section-settings patch does not match the exact source package")]
     PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
+    /// More than one section matched an exact-name selector.
+    #[error(
+        "the Pages section-settings selector is ambiguous at positions {first:?} and {duplicate:?}"
+    )]
+    AmbiguousSelector {
+        /// First matching semantic source position.
+        first: Position,
+        /// Next matching semantic source position.
+        duplicate: Position,
+    },
+    /// No section matched an exact-name selector.
+    #[error("the Pages section-settings selector did not match a section")]
+    NameNotFound,
+    /// No section exists at the requested semantic source position.
+    #[error("the Pages section position {position:?} does not exist")]
+    PositionNotFound {
+        /// Requested checked source position.
+        position: Position,
+    },
+    /// The physical source cannot publish a preservation-safe changed edit.
+    #[error("the Pages {path} does not support exact section-settings editing")]
+    UnsupportedSource {
+        /// Content-free semantic location of the unsupported owner.
+        path: Path,
+    },
+    /// A required, otherwise valid native relationship is absent.
+    #[error("the Pages {path} is missing its required {kind}")]
+    UnsupportedDependency {
+        /// Content-free semantic location requiring the relationship.
+        path: Path,
+        /// Kind of missing relationship.
+        kind: DependencyKind,
+    },
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::AmbiguousSelector { .. } => RefusalKind::InvalidValue,
+            Self::NameNotFound { .. } | Self::PositionNotFound { .. } => RefusalKind::NotFound,
+            Self::UnsupportedSource { .. } | Self::UnsupportedDependency { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// One complete section-settings value staged against an immutable package.
@@ -574,6 +606,12 @@ impl Commit {
     #[must_use]
     pub fn into_package(self) -> Package {
         self.package
+    }
+
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
     }
 
     /// Borrow the reversible exact-source patch.

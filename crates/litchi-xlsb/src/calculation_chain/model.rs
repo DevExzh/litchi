@@ -19,7 +19,7 @@ pub const HARD_MAX_GRAPH_PARTS: usize = 1_000_000;
 /// Caller-controlled finite limits for Calculation Chain inspection and
 /// source-bound removal.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ReadLimits {
+pub struct SemanticLimits {
     /// Maximum encoded bytes in the Workbook or Calculation Chain stream and
     /// in each captured relationship/content-types source token.
     pub max_part_bytes: usize,
@@ -35,7 +35,7 @@ pub struct ReadLimits {
     pub max_graph_parts: usize,
 }
 
-impl ReadLimits {
+impl SemanticLimits {
     /// Conservative finite limits for ordinary Calculation Chain inspection.
     pub const DEFAULT: Self = Self {
         max_part_bytes: 16 * 1024 * 1024,
@@ -47,38 +47,38 @@ impl ReadLimits {
     /// Validate caller limits against implementation hard ceilings.
     pub const fn validate(self) -> Result<Self> {
         if self.max_part_bytes > HARD_MAX_PART_BYTES {
-            return Err(Error::LimitExceeded {
-                resource: "Calculation Chain part bytes",
-                actual: self.max_part_bytes,
-                maximum: HARD_MAX_PART_BYTES,
-            });
+            return Err(invalid_limit(
+                super::LimitKind::PartBytes,
+                self.max_part_bytes,
+                HARD_MAX_PART_BYTES,
+            ));
         }
         if self.max_records > HARD_MAX_RECORDS {
-            return Err(Error::LimitExceeded {
-                resource: "Calculation Chain records",
-                actual: self.max_records,
-                maximum: HARD_MAX_RECORDS,
-            });
+            return Err(invalid_limit(
+                super::LimitKind::Records,
+                self.max_records,
+                HARD_MAX_RECORDS,
+            ));
         }
         if self.max_relationships > HARD_MAX_RELATIONSHIPS {
-            return Err(Error::LimitExceeded {
-                resource: "Calculation Chain relationships",
-                actual: self.max_relationships,
-                maximum: HARD_MAX_RELATIONSHIPS,
-            });
+            return Err(invalid_limit(
+                super::LimitKind::Relationships,
+                self.max_relationships,
+                HARD_MAX_RELATIONSHIPS,
+            ));
         }
         if self.max_graph_parts > HARD_MAX_GRAPH_PARTS {
-            return Err(Error::LimitExceeded {
-                resource: "Calculation Chain graph parts",
-                actual: self.max_graph_parts,
-                maximum: HARD_MAX_GRAPH_PARTS,
-            });
+            return Err(invalid_limit(
+                super::LimitKind::GraphParts,
+                self.max_graph_parts,
+                HARD_MAX_GRAPH_PARTS,
+            ));
         }
         Ok(self)
     }
 }
 
-impl Default for ReadLimits {
+impl Default for SemanticLimits {
     fn default() -> Self {
         Self::DEFAULT
     }
@@ -148,18 +148,18 @@ impl ChainPart {
     /// before the next record is yielded.
     pub fn record_count(&self) -> Result<usize> {
         let raw_limits = RawLimits::new(self.bytes.len(), 0);
-        let mut records = Records::try_with_limits(self.bytes.as_slice(), raw_limits)?;
+        let mut records = Records::bounded(self.bytes.as_slice(), raw_limits)?;
         let mut count = 0usize;
         while records.next().transpose()?.is_some() {
             count = count.checked_add(1).ok_or(Error::CapacityOverflow {
                 resource: "Calculation Chain records",
             })?;
             if count > self.max_records {
-                return Err(Error::LimitExceeded {
-                    resource: "Calculation Chain records",
-                    actual: count,
-                    maximum: self.max_records,
-                });
+                return Err(Error::limit(
+                    crate::calculation_chain::LimitKind::Records,
+                    count,
+                    self.max_records,
+                ));
             }
         }
         Ok(count)
@@ -169,5 +169,13 @@ impl ChainPart {
     #[must_use]
     pub fn to_vec(&self) -> Vec<u8> {
         self.bytes.as_ref().clone()
+    }
+}
+
+const fn invalid_limit(kind: super::LimitKind, value: usize, maximum: usize) -> Error {
+    Error::InvalidLimit {
+        kind: crate::package::LimitKind::CalculationChain(kind),
+        value,
+        maximum,
     }
 }

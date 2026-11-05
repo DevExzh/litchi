@@ -61,6 +61,9 @@
 //!   duplicated `TextRulerAtom` or round-trip shape atom keeps its first
 //!   occurrence, and an undefined round-trip placeholder ID reads as absent.
 //!   A shape whose host-record framing is broken still fails the slide.
+//!   An outline text reference that selects no readable slide-list text
+//!   body leaves its shape with empty text
+//!   ([`ShapeDefect::UnresolvedOutlineTextRef`], L-PPT-R1).
 //! - **F5.4** ([`SlideListDefect`]) — the slide directory degrades per
 //!   entry instead of failing the open: a nonconforming `SlidePersistAtom`
 //!   header is read by field offset (POI/LibreOffice), a truncated atom or a
@@ -398,6 +401,16 @@ pub enum ShapeDefect {
     /// POI never validates these IDs. The context is
     /// `(record type << 16) | placeholder ID`.
     UnknownRoundTripPlaceholderId,
+    /// A shape's `ClientTextbox` held an `OutlineTextRefAtom` (MS-PPT
+    /// 2.9.78) that selects no readable body of its slide's slide-list text:
+    /// the index is negative or past the slide's last body, the slide's
+    /// slide-list text could not be read, the atom is not four bytes, or the
+    /// selected body's records cannot be traversed. The shape is kept with
+    /// empty text, as POI (`HSLFTextParagraph`) and LibreOffice leave it
+    /// (L-PPT-R1). Notes and master shapes have no slide-list text, so any
+    /// reference on them is recorded too. The context is the atom's index
+    /// field reinterpreted as unsigned, or `u32::MAX` for a malformed atom.
+    UnresolvedOutlineTextRef,
 }
 
 impl ShapeDefect {
@@ -416,6 +429,9 @@ impl ShapeDefect {
             },
             Self::UnknownRoundTripPlaceholderId => {
                 "treated a round-trip placeholder atom with an undefined placeholder ID as absent"
+            },
+            Self::UnresolvedOutlineTextRef => {
+                "kept a shape whose outline text reference selects no readable slide-list text with empty text"
             },
         }
     }
@@ -480,11 +496,14 @@ pub enum SlideListDefect {
     /// accrete duplicates. The context is the dropped list's one-based
     /// ordinal among the instance-0 lists (2 for the first duplicate).
     DuplicateSlideList,
-    /// The slide-list text of one slide (its text interactions or outline
-    /// text references) could not be read; that slide keeps empty outline
-    /// interactions and references and every other slide is unaffected, as
+    /// The slide-list text of one slide (its text interactions, outline
+    /// text references, or text bodies) could not be read; that slide keeps
+    /// empty outline interactions and references, or empty text bodies when
+    /// only the bodies failed, and every other slide is unaffected, as
     /// LibreOffice ignores slide-list text it cannot map (finding F5.10).
-    /// Resource limits stay fatal. The context is the `slideId`.
+    /// A shape that references a body of such a slide keeps empty text
+    /// ([`ShapeDefect::UnresolvedOutlineTextRef`]). Resource limits stay
+    /// fatal. The context is the `slideId`.
     UnreadableSlideListText,
 }
 
@@ -519,7 +538,7 @@ impl SlideListDefect {
                 "kept the first presentation SlideListWithTextContainer and ignored the duplicate"
             },
             Self::UnreadableSlideListText => {
-                "left a slide's unreadable slide-list text interactions and outline references empty"
+                "left a slide's unreadable slide-list text interactions, outline references, or text bodies empty"
             },
         }
     }
@@ -882,8 +901,10 @@ impl ToleranceReport {
         &mut self,
         mut read: impl FnMut(
             &[&str],
-        )
-            -> Result<litchi_ole_common::property_set::Stream, litchi_cfb::OleError>,
+        ) -> Result<
+            litchi_ole_common::property_set::Stream,
+            litchi_ole_common::Error,
+        >,
     ) {
         for name in PROPERTY_SET_STREAMS {
             let Ok(stream) = read(&[name]) else {
@@ -1111,6 +1132,7 @@ mod tests {
             Defect::from(ShapeDefect::DuplicateTextRuler),
             Defect::from(ShapeDefect::DuplicateRoundTripAtom),
             Defect::from(ShapeDefect::UnknownRoundTripPlaceholderId),
+            Defect::from(ShapeDefect::UnresolvedOutlineTextRef),
             Defect::from(litchi_cfb::Defect::Allocation(
                 litchi_cfb::AllocationDefect::ChainLongerThanSize,
             )),
@@ -1133,7 +1155,7 @@ mod tests {
     fn a_conformant_presentation_opens_with_a_clean_report() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../test-data/ole/ppt/SampleShow.ppt");
-        let mut package = crate::Package::open(path).unwrap();
+        let mut package = crate::raw::Reader::open(path).unwrap();
         let presentation = package.presentation().unwrap();
 
         let report = presentation.tolerance_report();

@@ -8,6 +8,11 @@
 mod codec;
 mod model;
 mod package;
+#[allow(
+    dead_code,
+    unreachable_pub,
+    reason = "the detached commit and patch are exercised by unit tests; Section publishes snapshots"
+)]
 mod transaction;
 mod validation;
 
@@ -16,4 +21,4 @@ mod tests;
 
 pub use model::Layout;
 pub use package::parse_part;
-pub use transaction::{Commit, Patch, Snapshot, Transaction};
+pub use transaction::Snapshot;

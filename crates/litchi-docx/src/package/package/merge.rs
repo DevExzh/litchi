@@ -21,11 +21,14 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn mail_merge_settings(&self) -> Result<Option<MailMergeSettings>> {
+        let mce_limits = mail_merge::mce_limits_for_source(&self.opc.read_limits());
         let snapshot = self.settings_part_snapshot()?;
         let part = settings_part_from_snapshot(&snapshot, snapshot.xml.clone(), None);
-        Ok(DocumentSettings::extract_from_part(&part)?
-            .mail_merge()
-            .cloned())
+        Ok(
+            DocumentSettings::extract_from_part_with_mce_limits(&part, &mce_limits)?
+                .mail_merge()
+                .cloned(),
+        )
     }
 
     /// Resolve a mail-merge relationship without opening or fetching its target.
@@ -68,10 +71,16 @@ impl Package {
 
     /// Set or replace the complete mail-merge graph atomically.
     ///
+    /// Setting always republishes the settings part and its sources, so a
+    /// signed package is refused with
+    /// [`litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy`] before
+    /// anything is changed (ADR 0006): remove the signature explicitly first
+    /// with [`Package::unsign`].
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn set_mail_merge(
+    pub(crate) fn set_mail_merge(
         &mut self,
         mut settings: MailMergeSettings,
         data_source: Option<Source>,
@@ -79,9 +88,10 @@ impl Package {
         recipients: Option<Recipients>,
         conformance: mail_merge::Conformance,
     ) -> Result<()> {
+        let mce_limits = mail_merge::mce_limits_for_source(&self.opc.read_limits());
         let snapshot = self.settings_part_snapshot()?;
         let original = settings_part_from_snapshot(&snapshot, snapshot.xml.clone(), None);
-        DocumentSettings::extract_from_part(&original)?;
+        DocumentSettings::extract_from_part_with_mce_limits(&original, &mce_limits)?;
         let old_targets = self.mail_merge_internal_targets(&snapshot)?;
         let mut used_ids = snapshot
             .relationships
@@ -128,7 +138,7 @@ impl Package {
         };
         let recipient_id = if let Some(recipients) = recipients {
             let xml = recipients
-                .to_xml(conformance)
+                .to_xml(conformance, &mce_limits)
                 .map_err(map_docx_error)?
                 .into_bytes();
             let id = allocate_mail_merge_relationship_id("Recipients", &mut used_ids)?;
@@ -150,7 +160,7 @@ impl Package {
             None
         };
         settings.assign_package_relationships(data_id, header_id, recipient_id);
-        let patched = patch_mail_merge(&snapshot.xml, Some(&settings), conformance)?;
+        let patched = patch_mail_merge(&snapshot.xml, Some(&settings), conformance, &mce_limits)?;
         let mut replacement = settings_part_from_snapshot(&snapshot, patched, None);
         let old_ids = replacement
             .rels()
@@ -169,8 +179,9 @@ impl Package {
                 relationship.external,
             );
         }
-        DocumentSettings::extract_from_part(&replacement)?;
+        DocumentSettings::extract_from_part_with_mce_limits(&replacement, &mce_limits)?;
 
+        crate::signature_policy::ensure_unsigned(&self.opc)?;
         let mut installed = Vec::new();
         for part in staged_parts {
             let name = part.partname().clone();
@@ -189,20 +200,21 @@ impl Package {
             return Err(error);
         }
         for old_target in old_targets {
-            if !self.part_is_referenced(&old_target) {
+            if !self.part_is_referenced(&old_target)? {
                 self.opc.remove_part(&old_target);
             }
         }
-        self.opc.unsign();
         Ok(())
     }
 
     /// Update settings and sources using the same atomic replacement semantics.
     ///
+    /// The signature policy is [`Self::set_mail_merge`]'s.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn update_mail_merge(
+    pub(crate) fn update_mail_merge(
         &mut self,
         settings: MailMergeSettings,
         data_source: Option<Source>,
@@ -221,10 +233,12 @@ impl Package {
 
     /// Replace recipient inclusion flags while retaining inert source targets and settings.
     ///
+    /// The signature policy is [`Self::set_mail_merge`]'s.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn update_mail_merge_recipients(
+    pub(crate) fn update_mail_merge_recipients(
         &mut self,
         recipients: Recipients,
         conformance: mail_merge::Conformance,
@@ -257,20 +271,32 @@ impl Package {
 
     /// Clear mail-merge XML, relationships, and unreachable owned targets.
     ///
+    /// A document without mail merge is left untouched and returns `false`,
+    /// signed or not. Clearing changes the package, so a signed package is
+    /// refused with [`litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy`]
+    /// (ADR 0006): remove the signature explicitly first with
+    /// [`Package::unsign`].
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn clear_mail_merge(&mut self) -> Result<bool> {
+    pub(crate) fn clear_mail_merge(&mut self) -> Result<bool> {
+        let mce_limits = mail_merge::mce_limits_for_source(&self.opc.read_limits());
         let snapshot = self.settings_part_snapshot()?;
         let original = settings_part_from_snapshot(&snapshot, snapshot.xml.clone(), None);
-        if DocumentSettings::extract_from_part(&original)?
+        if DocumentSettings::extract_from_part_with_mce_limits(&original, &mce_limits)?
             .mail_merge()
             .is_none()
         {
             return Ok(false);
         }
         let old_targets = self.mail_merge_internal_targets(&snapshot)?;
-        let patched = patch_mail_merge(&snapshot.xml, None, mail_merge::Conformance::Transitional)?;
+        let patched = patch_mail_merge(
+            &snapshot.xml,
+            None,
+            mail_merge::Conformance::Transitional,
+            &mce_limits,
+        )?;
         let mut replacement = settings_part_from_snapshot(&snapshot, patched, None);
         let ids = replacement
             .rels()
@@ -281,14 +307,14 @@ impl Package {
         for id in ids {
             replacement.rels_mut().remove(&id);
         }
-        DocumentSettings::extract_from_part(&replacement)?;
+        DocumentSettings::extract_from_part_with_mce_limits(&replacement, &mce_limits)?;
+        crate::signature_policy::ensure_unsigned(&self.opc)?;
         self.commit_settings_part(&snapshot, replacement)?;
         for old_target in old_targets {
-            if !self.part_is_referenced(&old_target) {
+            if !self.part_is_referenced(&old_target)? {
                 self.opc.remove_part(&old_target);
             }
         }
-        self.opc.unsign();
         Ok(true)
     }
 
@@ -440,7 +466,8 @@ mod tests {
             ct::WML_DOCUMENT_MAIN,
             ct::WML_SETTINGS
         );
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         for (name, payload) in [
             ("[Content_Types].xml", content_types.as_bytes()),
             (
@@ -472,8 +499,11 @@ mod tests {
                 .expect("stored settings payload");
             bytes[offset] ^= 1;
         }
-        Package::from_opc_package(OpcPackage::from_vec(bytes).expect("deferred open"))
-            .expect("the main document decodes")
+        Package::from_opc_package(
+            OpcPackage::from_vec(bytes, litchi_opc::SourceLimits::default())
+                .expect("deferred open"),
+        )
+        .expect("the main document decodes")
     }
 
     // Review of the 0759 merge: the helper decoded the settings part only to

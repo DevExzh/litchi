@@ -323,12 +323,11 @@ impl EntryStoreState {
     fn rebuild_positions(&mut self) {
         self.positions.clear();
         for (position, entry) in self.entries.iter().enumerate() {
-            debug_assert!(
-                self.positions
-                    .insert(Arc::clone(&entry.name), position)
-                    .is_none(),
-                "entry names must be unique"
-            );
+            // The insertion must stay outside the assertion: release builds
+            // compile `debug_assert!` away, which left the name index empty
+            // and every by-name lookup missing (record 0300).
+            let previous = self.positions.insert(Arc::clone(&entry.name), position);
+            debug_assert!(previous.is_none(), "entry names must be unique");
         }
     }
 }

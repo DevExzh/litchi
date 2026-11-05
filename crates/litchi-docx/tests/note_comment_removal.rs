@@ -1,11 +1,11 @@
-use litchi_docx::Package;
+use litchi_docx::{Builder, Package};
 use std::io::Cursor;
 
 #[test]
 fn removing_notes_strips_references_and_keeps_ids_unique() {
-    let mut package = Package::new().unwrap();
+    let mut builder = Builder::new().unwrap();
     {
-        let doc = package.document_mut().unwrap();
+        let doc = builder.document().unwrap();
         doc.add_paragraph_with_text("body");
         let (first, _) = doc.add_footnote();
         let (second, second_note) = doc.add_footnote();
@@ -35,9 +35,10 @@ fn removing_notes_strips_references_and_keeps_ids_unique() {
         assert_eq!(removed_endnote.id(), 1);
         assert!(!doc.has_endnotes());
     }
+    let package = builder.build().unwrap();
 
     let mut bytes = Cursor::new(Vec::new());
-    package.to_stream(&mut bytes).unwrap();
+    package.write_to(&mut bytes).unwrap();
     bytes.set_position(0);
     let reopened = Package::from_reader(bytes).unwrap();
     let document = reopened.document().unwrap();
@@ -49,9 +50,9 @@ fn removing_notes_strips_references_and_keeps_ids_unique() {
 
 #[test]
 fn removing_comments_updates_the_comments_part() {
-    let mut package = Package::new().unwrap();
+    let mut builder = Builder::new().unwrap();
     {
-        let doc = package.document_mut().unwrap();
+        let doc = builder.document().unwrap();
         doc.add_paragraph_with_text("annotated");
         let (first, _) = doc.add_comment("Alice", "drop me");
         doc.add_comment("Bob", "keep me");
@@ -65,9 +66,10 @@ fn removing_comments_updates_the_comments_part() {
         let (third, _) = doc.add_comment("Carol", "fresh");
         assert_eq!(third, 3);
     }
+    let package = builder.build().unwrap();
 
     let mut bytes = Cursor::new(Vec::new());
-    package.to_stream(&mut bytes).unwrap();
+    package.write_to(&mut bytes).unwrap();
     bytes.set_position(0);
     let reopened = Package::from_reader(bytes).unwrap();
     let document = reopened.document().unwrap();

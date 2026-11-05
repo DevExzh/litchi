@@ -1,0 +1,19 @@
+--- a/crates/litchi-ops/src/format/docx/write.rs
++++ b/crates/litchi-ops/src/format/docx/write.rs
+@@ -582,14 +582,13 @@
+     let mut targets = Vec::with_capacity(nodes.len());
+     // Every node comes from one resolve_targets call on one immutable owner.
+     // Cache only within this admission; later operations may have a new body.
+-    let mut body = None;
+     for node in nodes {
+         let (kind, selection) = match node.element_kind() {
+             Kind::Paragraph => (
+                 TargetKind::Paragraph,
+-                node.write_selection_cached(&mut body)?,
++                node.write_selection()?,
+             ),
+-            Kind::Run => (TargetKind::Run, node.write_selection_cached(&mut body)?),
++            Kind::Run => (TargetKind::Run, node.write_selection()?),
+             _ => {
+                 return Err(Error::new(
+                     Code::UnsupportedElement,

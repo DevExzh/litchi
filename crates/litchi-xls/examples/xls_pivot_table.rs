@@ -1,6 +1,6 @@
-//! Pivot Table Writer — XLS Example
+//! Pivot Table Builder — XLS Example
 //!
-//! Demonstrates the `add_pivot_table` API on `Writer`. Generates an XLS
+//! Demonstrates the `add_pivot_table` API on `Builder`. Generates an XLS
 //! file with a source data sheet and a second sheet containing a pivot table
 //! definition (SXVS/SXVIEW/SXVD/SXVI/SXDI records).
 //!
@@ -8,7 +8,7 @@
 //!
 //! The file is saved to `output/xls_pivot_table.xls`.
 
-use litchi_xls::Writer;
+use litchi_xls::Builder;
 use litchi_xls::writer::{
     Column, PivotCacheValue, PivotDataItemConfig, PivotFieldConfig, PivotItemConfig,
     PivotTableConfig,
@@ -19,7 +19,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::fs::create_dir_all(output_dir)?;
     let output_path = output_dir.join("xls_pivot_table.xls");
 
-    let mut w = Writer::new();
+    let mut w = Builder::new();
 
     // ================================================================
     // Sheet 1 — Source Data
@@ -279,7 +279,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ================================================================
     // Save
     // ================================================================
-    w.save(&output_path)?;
+    w.build()?.save(&output_path)?;
     println!("\nSaved to: {}", output_path.display());
     println!("Open in Excel to inspect the pivot table SX* records.");
 

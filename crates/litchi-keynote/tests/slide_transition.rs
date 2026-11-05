@@ -8,6 +8,7 @@
 use std::io;
 use std::sync::Arc;
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_common::wire::WireView;
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
@@ -18,7 +19,7 @@ use litchi_iwa_protos::{
     kn, tsa, tsd, tsk, tsp,
 };
 use litchi_keynote::{
-    Limits, Package, Position, SlideSelector,
+    OpenOptions, Package, Position, SlideSelector, SourceLimits,
     transition::{
         Acceleration, AnimationParameters, Commit, CustomParameters, Diagnostics, Direction, Edit,
         Effect, Error, LimitKind, MosaicType, Patch, Settings, TextDelivery, TimingCurveSlot,
@@ -81,6 +82,7 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
@@ -96,7 +98,10 @@ fn object_with_references(
 }
 
 fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 #[allow(clippy::cast_possible_truncation, reason = "protobuf varint byte")]
@@ -274,24 +279,28 @@ fn native_transition(
         return Ok(canonical);
     }
     if matches!(malformation, Malformation::None) {
-        let root = WireView::parse(&canonical)?;
+        let root = WireView::parse(&canonical, litchi_iwa_common::WireLimits::DEFAULT)?;
         let envelope_attributes = root
             .fields()
             .find(|field| field.number() == 2)
             .ok_or_else(|| io::Error::other("transition has no attributes"))?;
         return transition_with_unknown_records(envelope_attributes.payload());
     }
-    let root = WireView::parse(&canonical)?;
+    let root = WireView::parse(&canonical, litchi_iwa_common::WireLimits::DEFAULT)?;
     let envelope_attributes = root
         .fields()
         .find(|field| field.number() == 2)
         .ok_or_else(|| io::Error::other("transition has no attributes"))?;
-    let view = WireView::parse(envelope_attributes.payload())?;
+    let view = WireView::parse(
+        envelope_attributes.payload(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let animation = view
         .fields()
         .find(|field| field.number() == 8)
         .ok_or_else(|| io::Error::other("transition has no animation"))?;
-    let animation_view = WireView::parse(animation.payload())?;
+    let animation_view =
+        WireView::parse(animation.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut rewritten_animation = Vec::new();
     for field in animation_view.fields() {
         if field.number() == 2 {
@@ -330,7 +339,7 @@ fn native_transition(
 }
 
 fn transition_with_unknown_records(attributes: &[u8]) -> TestResult<Vec<u8>> {
-    let attributes_view = WireView::parse(attributes)?;
+    let attributes_view = WireView::parse(attributes, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut rewritten_attributes = Vec::with_capacity(attributes.len().saturating_add(16));
     for field in attributes_view.fields() {
         if field.number() == 8 {
@@ -362,7 +371,7 @@ fn slide(
     }
     .encode_to_vec();
     let transition = native_transition(settings, malformation)?;
-    let view = WireView::parse(&canonical)?;
+    let view = WireView::parse(&canonical, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut payload = Vec::with_capacity(canonical.len().saturating_add(transition.len()));
     for field in view.fields() {
         if field.number() == 4 {
@@ -395,8 +404,8 @@ fn component_with_unknown_header(
     objects: Vec<ArchiveObject>,
     target_identifier: u64,
 ) -> TestResult<Vec<u8>> {
-    let bytes = Archive { objects }.to_bytes()?;
-    let archive = Archive::parse(&bytes)?;
+    let bytes = Archive { objects }.to_bytes(Default::default())?;
+    let archive = Archive::parse(&bytes, Default::default())?;
     let object = archive
         .object(target_identifier)
         .ok_or_else(|| io::Error::other("synthetic object is missing"))?;
@@ -424,8 +433,8 @@ fn component_with_unknown_header(
     litchi_iwa_common::encode_varint_into(&mut output, u64::try_from(header.len())?);
     output.extend_from_slice(&header);
     output.extend_from_slice(&bytes[data_offset..]);
-    Archive::parse(&output)?;
-    Ok(SnappyStream::compress(&output)?)
+    Archive::parse(&output, Default::default())?;
+    Ok(SnappyStream::compress(&output, Default::default())?)
 }
 
 fn package_bytes(
@@ -484,6 +493,7 @@ fn package_bytes(
                     data: b"after-transition".to_vec(),
                 },
             ],
+            Default::default(),
         )?],
         FIRST_SLIDE,
     )?;
@@ -552,7 +562,7 @@ fn co_located_package_bytes(
 }
 
 fn legacy_package_bytes(flat: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(flat)?;
+    let catalog = Catalog::from_bytes(flat, Default::default())?;
     let inner_entries = catalog
         .iter()
         .filter(|entry| {
@@ -573,12 +583,12 @@ fn legacy_package_bytes(flat: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn malformed_node_package(source: &[u8], malformation: NodeMalformation) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut entries = Vec::with_capacity(catalog.len());
     for entry in catalog.iter() {
         let replacement = if entry.name() == DOCUMENT_MEMBER {
-            let stream = SnappyStream::decompress(entry.data())?;
-            let mut archive = Archive::parse(stream.as_bytes())?;
+            let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+            let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
             let object = archive
                 .object_mut(FIRST_NODE)
                 .ok_or_else(|| io::Error::other("synthetic node is missing"))?;
@@ -587,7 +597,7 @@ fn malformed_node_package(source: &[u8], malformation: NodeMalformation) -> Test
                 .iter_mut()
                 .find(|message| message.type_ == 4)
                 .ok_or_else(|| io::Error::other("synthetic node payload is missing"))?;
-            let view = WireView::parse(&message.data)?;
+            let view = WireView::parse(&message.data, litchi_iwa_common::WireLimits::DEFAULT)?;
             let mut output = Vec::with_capacity(message.data.len().saturating_add(8));
             for field in view.fields() {
                 if field.number() != 7 {
@@ -608,7 +618,7 @@ fn malformed_node_package(source: &[u8], malformation: NodeMalformation) -> Test
                 }
             }
             message.data = output;
-            SnappyStream::compress(&archive.to_bytes()?)?
+            SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?
         } else {
             entry.data().to_vec()
         };
@@ -627,19 +637,19 @@ fn mutate_component(
     member: &str,
     mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut mutation = Some(mutate);
     let mut entries = Vec::with_capacity(catalog.len());
     for entry in catalog.iter() {
         let data = if entry.name() == member {
-            let stream = SnappyStream::decompress(entry.data())?;
-            let mut archive = Archive::parse(stream.as_bytes())?;
+            let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+            let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
             mutation
                 .take()
                 .ok_or_else(|| io::Error::other("test component was mutated twice"))?(
                 &mut archive,
             )?;
-            SnappyStream::compress(&archive.to_bytes()?)?
+            SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?
         } else {
             entry.data().to_vec()
         };
@@ -666,14 +676,15 @@ fn mixed_modern_legacy_package(source: &[u8]) -> TestResult<Vec<u8>> {
             .iter_mut()
             .find(|message| message.type_ == SLIDE_MESSAGE_TYPE)
             .ok_or_else(|| io::Error::other("synthetic slide payload is missing"))?;
-        let root = WireView::parse(&message.data)?;
+        let root = WireView::parse(&message.data, litchi_iwa_common::WireLimits::DEFAULT)?;
         let mut rewritten_slide = Vec::with_capacity(message.data.len().saturating_add(16));
         for field in root.fields() {
             if field.number() != 4 {
                 rewritten_slide.extend_from_slice(field.raw());
                 continue;
             }
-            let transition = WireView::parse(field.payload())?;
+            let transition =
+                WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
             let mut rewritten_transition = Vec::with_capacity(field.payload().len() + 16);
             for nested in transition.fields() {
                 if nested.number() == 2 {
@@ -711,13 +722,13 @@ fn duplicate_rooted_node_package(source: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn aliased_node_slide_package(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let slide_entry = catalog
         .iter()
         .find(|entry| entry.name() == "Index/Slide-4.iwa")
         .ok_or_else(|| io::Error::other("synthetic slide component is missing"))?;
-    let stream = SnappyStream::decompress(slide_entry.data())?;
-    let slide_archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(slide_entry.data(), Default::default())?;
+    let slide_archive = Archive::parse(stream.as_bytes(), Default::default())?;
     let slide = slide_archive
         .object(FIRST_SLIDE)
         .ok_or_else(|| io::Error::other("synthetic slide is missing"))?;
@@ -807,12 +818,12 @@ fn metadata_or_framing_package(
 }
 
 fn noncanonical_object_length_prefix(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut entries = Vec::with_capacity(catalog.len());
     for entry in catalog.iter() {
         let data = if entry.name() == "Index/Slide-4.iwa" {
-            let stream = SnappyStream::decompress(entry.data())?;
-            let archive = Archive::parse(stream.as_bytes())?;
+            let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+            let archive = Archive::parse(stream.as_bytes(), Default::default())?;
             let object = archive
                 .object(FIRST_SLIDE)
                 .ok_or_else(|| io::Error::other("synthetic slide is missing"))?;
@@ -830,8 +841,8 @@ fn noncanonical_object_length_prefix(source: &[u8]) -> TestResult<Vec<u8>> {
             let mut raw = stream.as_bytes().to_vec();
             raw[last] |= 0x80;
             raw.insert(last + 1, 0);
-            Archive::parse(&raw)?;
-            SnappyStream::compress(&raw)?
+            Archive::parse(&raw, Default::default())?;
+            SnappyStream::compress(&raw, Default::default())?
         } else {
             entry.data().to_vec()
         };
@@ -846,12 +857,12 @@ fn noncanonical_object_length_prefix(source: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn wrong_message_info_type_package(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut entries = Vec::with_capacity(catalog.len());
     for entry in catalog.iter() {
         let data = if entry.name() == "Index/Slide-4.iwa" {
-            let stream = SnappyStream::decompress(entry.data())?;
-            let archive = Archive::parse(stream.as_bytes())?;
+            let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+            let archive = Archive::parse(stream.as_bytes(), Default::default())?;
             let object = archive
                 .object(FIRST_SLIDE)
                 .ok_or_else(|| io::Error::other("synthetic slide is missing"))?;
@@ -872,7 +883,10 @@ fn wrong_message_info_type_package(source: &[u8]) -> TestResult<Vec<u8>> {
             if header_end != data_offset {
                 return Err(io::Error::other("test header offsets disagree").into());
             }
-            let archive_info = WireView::parse(&stream.as_bytes()[header_start..header_end])?;
+            let archive_info = WireView::parse(
+                &stream.as_bytes()[header_start..header_end],
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
             let mut rewritten_header = Vec::with_capacity(header_end - header_start);
             let mut changed = false;
             for field in archive_info.fields() {
@@ -880,7 +894,8 @@ fn wrong_message_info_type_package(source: &[u8]) -> TestResult<Vec<u8>> {
                     rewritten_header.extend_from_slice(field.raw());
                     continue;
                 }
-                let message_info = WireView::parse(field.payload())?;
+                let message_info =
+                    WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
                 let is_selected = message_info.fields().any(|nested| {
                     nested.number() == 1 && nested.payload() == [SLIDE_MESSAGE_TYPE as u8]
                 });
@@ -914,8 +929,8 @@ fn wrong_message_info_type_package(source: &[u8]) -> TestResult<Vec<u8>> {
             litchi_iwa_common::encode_varint_into(&mut raw, u64::try_from(rewritten_header.len())?);
             raw.extend_from_slice(&rewritten_header);
             raw.extend_from_slice(&stream.as_bytes()[data_offset..]);
-            Archive::parse(&raw)?;
-            SnappyStream::compress(&raw)?
+            Archive::parse(&raw, Default::default())?;
+            SnappyStream::compress(&raw, Default::default())?
         } else {
             entry.data().to_vec()
         };
@@ -930,13 +945,13 @@ fn wrong_message_info_type_package(source: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn component_payload(package: &[u8], member: &str, identifier: u64) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| io::Error::other("missing test component"))?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let archive = Archive::parse(stream.as_bytes(), Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing test object"))?;
@@ -950,13 +965,13 @@ fn component_payload(package: &[u8], member: &str, identifier: u64) -> TestResul
 }
 
 fn object_header(package: &[u8], member: &str, identifier: u64) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| io::Error::other("missing test component"))?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let archive = Archive::parse(stream.as_bytes(), Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing test object"))?;
@@ -982,13 +997,13 @@ fn object_header(package: &[u8], member: &str, identifier: u64) -> TestResult<Ve
 }
 
 fn raw_node_has_transition(package: &[u8], identifier: u64) -> TestResult<bool> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let component = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("missing document component"))?;
-    let stream = SnappyStream::decompress(component.data())?;
-    let archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(component.data(), Default::default())?;
+    let archive = Archive::parse(stream.as_bytes(), Default::default())?;
     let payload = archive
         .object(identifier)
         .and_then(|object| object.messages.iter().find(|message| message.type_ == 4))
@@ -1003,7 +1018,7 @@ fn raw_node_has_transition(package: &[u8], identifier: u64) -> TestResult<bool> 
 }
 
 fn normalize_message_length(header: &[u8]) -> TestResult<Vec<u8>> {
-    let view = WireView::parse(header)?;
+    let view = WireView::parse(header, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(header.len());
     for field in view.fields() {
         if field.number() != 2 || field.wire_type() != 2 {
@@ -1012,7 +1027,7 @@ fn normalize_message_length(header: &[u8]) -> TestResult<Vec<u8>> {
         }
         output.extend_from_slice(field.key());
         output.extend_from_slice(b"<message-info>");
-        let message = WireView::parse(field.payload())?;
+        let message = WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
         for nested in message.fields() {
             output.extend_from_slice(nested.key());
             if nested.number() == 3 && nested.wire_type() == 0 {
@@ -1027,8 +1042,8 @@ fn normalize_message_length(header: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn assert_untouched_members(source: &[u8], target: &[u8]) -> TestResult<()> {
-    let source_catalog = Catalog::from_bytes(source)?;
-    let target_catalog = Catalog::from_bytes(target)?;
+    let source_catalog = Catalog::from_bytes(source, Default::default())?;
+    let target_catalog = Catalog::from_bytes(target, Default::default())?;
     assert_eq!(source_catalog.len(), target_catalog.len());
     let mut changed = 0usize;
     for (left, right) in source_catalog.iter().zip(target_catalog.iter()) {
@@ -1078,8 +1093,8 @@ fn native_fixture_reads_and_selector_edit_preserves_semantics() -> TestResult<()
     );
     assert!(commit.diagnostics().changed());
     let target = commit.package().exact_bytes().to_vec();
-    let source_catalog = Catalog::from_bytes(&source)?;
-    let target_catalog = Catalog::from_bytes(&target)?;
+    let source_catalog = Catalog::from_bytes(&source, Default::default())?;
+    let target_catalog = Catalog::from_bytes(&target, Default::default())?;
     let changed = source_catalog
         .iter()
         .zip(target_catalog.iter())
@@ -1376,14 +1391,18 @@ fn selector_malformed_legacy_and_limits_fail_without_publication() -> TestResult
     )?)?;
     assert!(matches!(
         duplicate_names.edit_slide_transition("Missing"),
-        Err(Error::SlideNameNotFound)
+        Err(Error::Refused(
+            litchi_keynote::transition::Refusal::SlideNameNotFound
+        ))
     ));
     assert!(
-        matches!(duplicate_names.edit_slide_transition(99usize), Err(Error::SlidePositionNotFound { position }) if position == Position::new(99))
+        matches!(duplicate_names.edit_slide_transition(99usize), Err(Error::Refused(litchi_keynote::transition::Refusal::SlidePositionNotFound { position })) if position == Position::new(99))
     );
     assert!(matches!(
         duplicate_names.edit_slide_transition("Same"),
-        Err(Error::AmbiguousSelector)
+        Err(Error::Refused(
+            litchi_keynote::transition::Refusal::AmbiguousSelector
+        ))
     ));
 
     let flat = package_bytes(
@@ -1398,7 +1417,9 @@ fn selector_malformed_legacy_and_limits_fail_without_publication() -> TestResult
     assert_eq!(no_modern_edit.settings(), None);
     assert!(matches!(
         no_modern_edit.set(full_settings()?),
-        Err(Error::UnsupportedTransition)
+        Err(Error::Refused(
+            litchi_keynote::transition::Refusal::UnsupportedTransition
+        ))
     ));
 
     for malformed in [
@@ -1453,7 +1474,12 @@ fn selector_malformed_legacy_and_limits_fail_without_publication() -> TestResult
     let changed = legacy
         .edit_slide_transition("Alpha")?
         .set(full_settings()?)?;
-    assert!(matches!(changed.commit(), Err(Error::UnsupportedSource)));
+    assert!(matches!(
+        changed.commit(),
+        Err(Error::Refused(
+            litchi_keynote::transition::Refusal::UnsupportedSource
+        ))
+    ));
 
     let unrestricted = Package::from_bytes(&flat)?;
     let target_len = unrestricted
@@ -1463,21 +1489,19 @@ fn selector_malformed_legacy_and_limits_fail_without_publication() -> TestResult
         .package()
         .exact_bytes()
         .len();
-    let limits = Limits::new(
-        u64::try_from(target_len - 1)?,
-        8,
-        1024 * 1024,
-        1024 * 1024,
-        1024 * 1024,
-    )?;
-    let limited = Package::from_bytes_with_limits(&flat, limits)?;
+    let limits = SourceLimits::builder()
+        .max_input_bytes(u64::try_from(target_len - 1)?)?
+        .max_entries(8)?
+        .max_entry_bytes(1024 * 1024)?
+        .max_aggregate_bytes(1024 * 1024)?
+        .max_component_bytes(1024 * 1024)?
+        .build()?;
+    let limited =
+        Package::from_bytes_with_options(&flat, OpenOptions::new().source_limits(limits))?;
     let limited_edit = limited
         .edit_slide_transition("Alpha")?
         .set(full_settings()?)?;
-    assert!(matches!(
-        limited_edit.commit(),
-        Err(Error::LimitExceeded { .. })
-    ));
+    assert!(matches!(limited_edit.commit(), Err(Error::Limit { .. })));
     Ok(())
 }
 

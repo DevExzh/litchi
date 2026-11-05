@@ -33,11 +33,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         Some(selector) if selector == std::ffi::OsStr::new("pptx-pair-lifecycle") => {
             return litchi_perf_baseline::pptx_pair_lifecycle::run_from_args(args);
         },
+        Some(selector) if selector == std::ffi::OsStr::new("pptx-notes-memo") => {
+            return litchi_perf_baseline::pptx_notes_memo::run_from_args(args);
+        },
         Some(selector) if selector == std::ffi::OsStr::new("native-image-lifecycle") => {
             return litchi_perf_baseline::pptx_native_image::run_from_args(args);
         },
         Some(selector) if selector == std::ffi::OsStr::new("odp-append-attribution") => {
             return litchi_perf_baseline::odp_append_attribution::run_from_args(args);
+        },
+        Some(selector) if selector == std::ffi::OsStr::new("xlsx-raw-identity") => {
+            return litchi_perf_baseline::xlsx_raw_identity::run_from_args(args);
         },
         _ => {},
     }

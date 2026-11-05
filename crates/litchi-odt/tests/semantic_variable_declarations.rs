@@ -1,7 +1,6 @@
 use litchi_odt::{
-    Document,
     core::PackageWriter,
-    generic::{FlatDocument, Package},
+    generic::{Package, flat::Document as FlatDocument},
     variable_declaration::{Declaration, Kind, Value},
 };
 
@@ -100,12 +99,14 @@ fn packaged_content_and_styles_are_exposed_by_current_odt_facades() {
         r#"<o:text>{declaration}<t:p><t:variable-get t:name="body">1</t:variable-get></t:p></o:text>"#
     ));
     let bytes = package(&text_content, Some(&styles));
-    let generic = Package::from_bytes(bytes.clone()).unwrap();
+    let generic = Package::from_bytes(&bytes).unwrap();
     let declarations = generic.variable_declarations().unwrap();
     assert_eq!(declarations.groups.len(), 2);
     assert!(declarations.find(Kind::User, "header").is_some());
     assert_eq!(
-        Document::from_bytes(bytes)
+        litchi_odt::Package::from_bytes(&bytes)
+            .unwrap()
+            .document()
             .unwrap()
             .variable_declarations()
             .unwrap()
@@ -158,7 +159,7 @@ fn parses_compact_odt_package_oracles() {
     ] {
         let xml = content(body);
         let bytes = package(&xml, None);
-        let generic = Package::from_bytes(bytes.clone()).unwrap();
+        let generic = Package::from_bytes(&bytes).unwrap();
         assert!(
             generic
                 .variable_declarations()
@@ -166,7 +167,10 @@ fn parses_compact_odt_package_oracles() {
                 .find(kind, name)
                 .is_some()
         );
-        let document = Document::from_bytes(bytes).unwrap();
+        let document = litchi_odt::Package::from_bytes(&bytes)
+            .unwrap()
+            .document()
+            .unwrap();
         assert!(
             document
                 .variable_declarations()
@@ -218,7 +222,7 @@ fn flat(inner: &str) -> Vec<u8> {
 }
 
 fn package(content: &str, styles: Option<&str>) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.text")
         .unwrap();

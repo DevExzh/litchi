@@ -301,7 +301,7 @@ pub(crate) fn check_duplicate_sheet_names<'a>(
         .try_reserve(names.len())
         .map_err(|_error| Error::Allocation("BoundSheet8 names"))?;
     for (index, name) in (0_u32..).zip(names) {
-        match first_index.entry(name.to_lowercase()) {
+        match first_index.entry(crate::sheet_name::key(name)) {
             std::collections::hash_map::Entry::Vacant(slot) => {
                 slot.insert(index);
             },
@@ -1662,11 +1662,12 @@ mod sst_measure_tests {
     const LOSSY_SURROGATE: &str = "lossy: unpaired surrogate repaired";
 
     fn frame(kind: u16, payload: &[u8]) -> Frame {
-        let mut encoder = Encoder::new();
+        let mut encoder = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
         encoder
             .push(Kind::from_wire(kind), payload)
             .expect("test frame fits the BIFF wire limit");
-        Frame::open(encoder.finish()).expect("test frame is complete")
+        Frame::open(encoder.finish(), litchi_biff::Limits::default())
+            .expect("test frame is complete")
     }
 
     /// Frames `payloads` as one `SST` record followed by `Continue` records.
@@ -2211,8 +2212,11 @@ mod sst_measure_tests {
     }
 
     pub(super) fn workbook_stream(bytes: Vec<u8>) -> Result<Vec<u8>, String> {
-        let file = SharedOleFile::open(Arc::new(OwnedSource::new(bytes)))
-            .map_err(|error| format!("container: {error}"))?;
+        let file = SharedOleFile::open(
+            Arc::new(OwnedSource::new(bytes)),
+            litchi_cfb::SharedOleFileLimits::default(),
+        )
+        .map_err(|error| format!("container: {error}"))?;
         let mut last = String::from("no workbook stream name matched");
         for name in ["Workbook", "Book", "WORKBOOK", "BOOK"] {
             match file.open_stream(&[name]) {
@@ -2268,7 +2272,9 @@ mod sst_measure_tests {
             };
             with_sst += 1;
             let span = &stream[begin..end];
-            let Ok(records) = Records::new(span).collect::<Result<Vec<RecordRef<'_>>, _>>() else {
+            let Ok(records) = Records::new(span, litchi_biff::Limits::default())
+                .and_then(|records| records.collect::<Result<Vec<RecordRef<'_>>, _>>())
+            else {
                 no_container.push(format!("{relative}: SST span does not reframe"));
                 continue;
             };
@@ -2371,8 +2377,8 @@ mod sst_measure_tests {
             let Some((begin, end)) = locate_sst(&stream) else {
                 continue;
             };
-            let Ok(records) =
-                Records::new(&stream[begin..end]).collect::<Result<Vec<RecordRef<'_>>, _>>()
+            let Ok(records) = Records::new(&stream[begin..end], litchi_biff::Limits::default())
+                .and_then(|records| records.collect::<Result<Vec<RecordRef<'_>>, _>>())
             else {
                 continue;
             };
@@ -2420,11 +2426,12 @@ mod shared_string_tests {
     use litchi_biff::{Encoder, Kind, Record as Frame, RecordRef, Records};
 
     fn record(record_type: u16, data: Vec<u8>) -> Frame {
-        let mut encoder = Encoder::new();
+        let mut encoder = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
         encoder
             .push(Kind::from_wire(record_type), &data)
             .expect("test frame fits the BIFF wire limit");
-        Frame::open(encoder.finish()).expect("test frame is complete")
+        Frame::open(encoder.finish(), litchi_biff::Limits::default())
+            .expect("test frame is complete")
     }
 
     fn record_refs(records: &[Frame]) -> Vec<RecordRef<'_>> {
@@ -2690,7 +2697,10 @@ mod shared_string_tests {
         let expected = vec!["a".repeat(9000), "漢".repeat(5000)];
         let mut bytes = Vec::new();
         crate::writer::biff::write_sst(&mut bytes, &expected, 2).unwrap();
-        let records: Vec<RecordRef<'_>> = Records::new(&bytes).collect::<Result<_, _>>().unwrap();
+        let records: Vec<RecordRef<'_>> = Records::new(&bytes, litchi_biff::Limits::default())
+            .expect("valid BIFF limits")
+            .collect::<Result<_, _>>()
+            .unwrap();
 
         let table = SharedStringTable::parse_from_records(&records, &Encoding::Utf16Le).unwrap();
 
@@ -2700,7 +2710,8 @@ mod shared_string_tests {
     #[test]
     fn maps_truncated_shared_frame_errors_at_the_xls_boundary() {
         let truncated = [0xFC, 0x00, 0x04, 0x00, 0x01, 0x02];
-        let error = Records::new(&truncated)
+        let error = Records::new(&truncated, litchi_biff::Limits::default())
+            .expect("valid BIFF limits")
             .next()
             .expect("the malformed input yields one framing error")
             .expect_err("the payload is shorter than its declared length");
@@ -3173,10 +3184,13 @@ impl CellRecord {
         })
     }
 
-    pub(crate) fn parse_formula_preserving_defect(
+    /// Parses a Formula and reports its stale `fShrFmla` flag, preserved in
+    /// the metadata when `preserve` holds and ignored otherwise.
+    pub(crate) fn parse_formula_reporting_defect(
         data: &[u8],
+        preserve: bool,
     ) -> Result<(Self, Option<crate::formula_metadata::FlagDefect>)> {
-        let (parsed, defect) = crate::formula_metadata::parse_record_preserving(data)?;
+        let (parsed, defect) = crate::formula_metadata::parse_record_reporting(data, preserve)?;
         Ok((
             CellRecord::Formula {
                 row: parsed.row,
@@ -3693,7 +3707,7 @@ mod cell_measure_tests {
             &formula(&[0x1E, 0x2A, 0x00], 0xFFFF, &[], number),
             "reserved flags",
         );
-        // `shared Formula metadata requires a leading PtgExp token`.
+        // A stale `fShrFmla` on a complete token stream is ignored (record 0316).
         agree(
             0x0006,
             &formula(&[0x1E, 0x2A, 0x00], 0x0008, &[], number),

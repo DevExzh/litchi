@@ -12,6 +12,7 @@
 )]
 
 use super::*;
+use crate::codec::limits::OpenOptions;
 use std::borrow::Cow;
 
 fn exercise_field_views(instruction: &str) {
@@ -180,7 +181,7 @@ fn story_validation_rejects_missing_drawing_references() {
     .expect_err("an unresolved drawing reference must be rejected");
     assert!(matches!(
         error,
-        crate::RtfError::MalformedDocument(message)
+        crate::Error::MalformedDocument(message)
             if message.contains("invalid drawing reference")
     ));
 }
@@ -256,11 +257,11 @@ fn writer_operand_cannot_inject_switches_and_round_trips_specials() {
     assert!(code.bookmark.is_none());
 
     let mut rtf = br"{\rtf1\ansi ".to_vec();
-    crate::RtfWriter::new(&mut rtf)
+    crate::write::Writer::new(&mut rtf)
         .write_hyperlink(target, "safe link")
         .unwrap();
     rtf.push(b'}');
-    let document = crate::RtfDocument::from_bytes(&rtf).unwrap();
+    let document = crate::Tree::from_bytes(&rtf, OpenOptions::default()).unwrap();
     let ParsedFieldCode::Hyperlink(code) = document.fields()[0].parsed_code() else {
         panic!("expected serialized hyperlink");
     };
@@ -3399,8 +3400,8 @@ fn mail_merge_recipient_fields_preserve_layout_metadata_without_merging() {
 
 #[test]
 fn document_discovers_document_variable_fields_without_resolving_them() {
-    let document = crate::RtfDocument::parse(
-        r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst DOCVARIABLE CustomerName \\* MERGEFORMAT}{\fldrslt cached customer}}After}",
+    let document = crate::Tree::parse(
+        r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst DOCVARIABLE CustomerName \\* MERGEFORMAT}{\fldrslt cached customer}}After}", OpenOptions::default()
     )
     .unwrap();
 
@@ -3417,8 +3418,8 @@ fn document_discovers_document_variable_fields_without_resolving_them() {
 
 #[test]
 fn document_discovers_document_property_fields_without_resolving_them() {
-    let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst DOCPROPERTY "Project Name" \\* MERGEFORMAT \\@ "MMMM d, yyyy"}{\fldrslt cached project}}After}"#,
+    let document = crate::Tree::parse(
+        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst DOCPROPERTY "Project Name" \\* MERGEFORMAT \\@ "MMMM d, yyyy"}{\fldrslt cached project}}After}"#, OpenOptions::default()
     )
     .unwrap();
 
@@ -3437,8 +3438,8 @@ fn document_discovers_document_property_fields_without_resolving_them() {
 
 #[test]
 fn document_discovers_info_fields_without_reading_or_modifying_properties() {
-    let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst INFO TITLE "Stored title override" \\* MERGEFORMAT}{\fldrslt cached title}}Middle {\field\flddirty\fldlock{\*\fldinst info COMMENTS "Stored comment" \\@ "opaque format"}{\fldrslt cached comment}}After}"#,
+    let document = crate::Tree::parse(
+        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst INFO TITLE "Stored title override" \\* MERGEFORMAT}{\fldrslt cached title}}Middle {\field\flddirty\fldlock{\*\fldinst info COMMENTS "Stored comment" \\@ "opaque format"}{\fldrslt cached comment}}After}"#, OpenOptions::default()
     )
     .unwrap();
 
@@ -3470,8 +3471,8 @@ fn document_discovers_info_fields_without_reading_or_modifying_properties() {
 
 #[test]
 fn document_discovers_document_information_fields_without_reading_or_calculating_values() {
-    let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst TITLE \\* MERGEFORMAT}{\fldrslt cached title}}Middle {\field{\*\fldinst author \\@ "opaque format"}{\fldrslt cached author}}After}"#,
+    let document = crate::Tree::parse(
+        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst TITLE \\* MERGEFORMAT}{\fldrslt cached title}}Middle {\field{\*\fldinst author \\@ "opaque format"}{\fldrslt cached author}}After}"#, OpenOptions::default()
     )
     .unwrap();
 
@@ -3495,8 +3496,8 @@ fn document_discovers_document_information_fields_without_reading_or_calculating
 
 #[test]
 fn document_discovers_document_information_statistics_without_calculating() {
-    let document = crate::RtfDocument::parse(
-        r"{\rtf1\ansi {\field\flddirty\fldlock{\*\fldinst NUMWORDS \\* MERGEFORMAT}{\fldrslt cached words}}}",
+    let document = crate::Tree::parse(
+        r"{\rtf1\ansi {\field\flddirty\fldlock{\*\fldinst NUMWORDS \\* MERGEFORMAT}{\fldrslt cached words}}}", OpenOptions::default()
     )
     .unwrap();
 
@@ -3520,8 +3521,8 @@ fn document_discovers_document_information_statistics_without_calculating() {
 
 #[test]
 fn document_discovers_document_context_fields_without_reading_or_calculating_values() {
-    let document = crate::RtfDocument::parse(
-        r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst FILENAME \\p}{\fldrslt cached file name}}Middle {\field{\*\fldinst TEMPLATE \\* MERGEFORMAT}{\fldrslt cached template}}After}",
+    let document = crate::Tree::parse(
+        r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst FILENAME \\p}{\fldrslt cached file name}}Middle {\field{\*\fldinst TEMPLATE \\* MERGEFORMAT}{\fldrslt cached template}}After}", OpenOptions::default()
     )
     .unwrap();
 
@@ -3545,8 +3546,8 @@ fn document_discovers_document_context_fields_without_reading_or_calculating_val
 
 #[test]
 fn document_discovers_document_context_page_fields_without_calculation() {
-    let document = crate::RtfDocument::parse(
-        r"{\rtf1\ansi {\field\flddirty\fldlock{\*\fldinst PAGE \\* MERGEFORMAT}{\fldrslt cached page}}}",
+    let document = crate::Tree::parse(
+        r"{\rtf1\ansi {\field\flddirty\fldlock{\*\fldinst PAGE \\* MERGEFORMAT}{\fldrslt cached page}}}", OpenOptions::default()
     )
     .unwrap();
 
@@ -3566,8 +3567,8 @@ fn document_discovers_document_context_page_fields_without_calculation() {
 
 #[test]
 fn document_discovers_runtime_context_fields_without_file_or_layout_reads() {
-    let document = crate::RtfDocument::parse(
-        r"{\rtf1\ansi {\field\flddirty\fldlock{\*\fldinst FILESIZE \\* MERGEFORMAT}{\fldrslt cached size}}{\field\flddirty\fldlock{\*\fldinst SECTION \\* MERGEFORMAT}{\fldrslt cached section}}{\field\flddirty\fldlock{\*\fldinst SECTIONPAGES \\* MERGEFORMAT}{\fldrslt cached section pages}}}",
+    let document = crate::Tree::parse(
+        r"{\rtf1\ansi {\field\flddirty\fldlock{\*\fldinst FILESIZE \\* MERGEFORMAT}{\fldrslt cached size}}{\field\flddirty\fldlock{\*\fldinst SECTION \\* MERGEFORMAT}{\fldrslt cached section}}{\field\flddirty\fldlock{\*\fldinst SECTIONPAGES \\* MERGEFORMAT}{\fldrslt cached section pages}}}", OpenOptions::default()
     )
     .unwrap();
 
@@ -3590,8 +3591,8 @@ fn document_discovers_runtime_context_fields_without_file_or_layout_reads() {
 
 #[test]
 fn document_discovers_quote_fields_without_inserting_or_transforming_text() {
-    let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst QUOTE "Stored literal" \\* MERGEFORMAT}{\fldrslt cached literal}}After}"#,
+    let document = crate::Tree::parse(
+        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst QUOTE "Stored literal" \\* MERGEFORMAT}{\fldrslt cached literal}}After}"#, OpenOptions::default()
     )
     .unwrap();
 
@@ -3612,8 +3613,8 @@ fn document_discovers_quote_fields_without_inserting_or_transforming_text() {
 
 #[test]
 fn document_discovers_symbol_fields_without_mapping_codes_or_inserting_glyphs() {
-    let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst SYMBOL 0xA9 \\f "Symbol" \\s 12 \\u}{\fldrslt cached copyright}}After}"#,
+    let document = crate::Tree::parse(
+        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst SYMBOL 0xA9 \\f "Symbol" \\s 12 \\u}{\fldrslt cached copyright}}After}"#, OpenOptions::default()
     )
     .unwrap();
 
@@ -3636,8 +3637,8 @@ fn document_discovers_symbol_fields_without_mapping_codes_or_inserting_glyphs() 
 
 #[test]
 fn document_discovers_print_fields_without_interpreting_or_sending_printer_commands() {
-    let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst PRINT "ESC&l1O"}{\fldrslt cached printer}}{\field\flddirty\fldlock{\*\fldinst print \\p 2 "0 0 moveto"}{\fldrslt cached PostScript}}After}"#,
+    let document = crate::Tree::parse(
+        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst PRINT "ESC&l1O"}{\fldrslt cached printer}}{\field\flddirty\fldlock{\*\fldinst print \\p 2 "0 0 moveto"}{\fldrslt cached PostScript}}After}"#, OpenOptions::default()
     )
     .unwrap();
 
@@ -3657,8 +3658,8 @@ fn document_discovers_print_fields_without_interpreting_or_sending_printer_comma
 
 #[test]
 fn document_discovers_embed_fields_without_loading_or_activating_objects() {
-    let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst EMBED Excel.Sheet.12 \\* MERGEFORMAT}{\fldrslt cached worksheet object}}{\field\flddirty\fldlock{\*\fldinst embed "Equation.DSMT4" \\d}{\fldrslt cached equation object}}After}"#,
+    let document = crate::Tree::parse(
+        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst EMBED Excel.Sheet.12 \\* MERGEFORMAT}{\fldrslt cached worksheet object}}{\field\flddirty\fldlock{\*\fldinst embed "Equation.DSMT4" \\d}{\fldrslt cached equation object}}After}"#, OpenOptions::default()
     )
     .unwrap();
 
@@ -3681,8 +3682,8 @@ fn document_discovers_embed_fields_without_loading_or_activating_objects() {
 
 #[test]
 fn document_discovers_barcode_fields_without_decoding_or_rendering() {
-    let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst BARCODE "4901234567894" EAN13 \\h 1440}{\fldrslt cached EAN13 barcode}}{\field\flddirty\fldlock{\*\fldinst barcode "ABC-123" CODE39 \\d}{\fldrslt cached Code39 barcode}}After}"#,
+    let document = crate::Tree::parse(
+        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst BARCODE "4901234567894" EAN13 \\h 1440}{\fldrslt cached EAN13 barcode}}{\field\flddirty\fldlock{\*\fldinst barcode "ABC-123" CODE39 \\d}{\fldrslt cached Code39 barcode}}After}"#, OpenOptions::default()
     )
     .unwrap();
 
@@ -3705,8 +3706,8 @@ fn document_discovers_barcode_fields_without_decoding_or_rendering() {
 
 #[test]
 fn document_discovers_bidi_outline_fields_without_resolving_numbering_or_layout() {
-    let document = crate::RtfDocument::parse(
-        r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst BIDIOUTLINE \\* MERGEFORMAT}{\fldrslt cached bidi outline number}}{\field\flddirty\fldlock{\*\fldinst bidioutline}{\fldrslt cached bare bidi outline}}After}",
+    let document = crate::Tree::parse(
+        r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst BIDIOUTLINE \\* MERGEFORMAT}{\fldrslt cached bidi outline number}}{\field\flddirty\fldlock{\*\fldinst bidioutline}{\fldrslt cached bare bidi outline}}After}", OpenOptions::default()
     )
     .unwrap();
 
@@ -3729,8 +3730,8 @@ fn document_discovers_bidi_outline_fields_without_resolving_numbering_or_layout(
 
 #[test]
 fn document_discovers_shape_fields_without_linking_or_rendering_drawings() {
-    let document = crate::RtfDocument::parse(
-        r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst SHAPE \\* MERGEFORMAT}{\fldrslt cached drawing anchor}}{\field\flddirty\fldlock{\*\fldinst shape}{\fldrslt cached bare drawing anchor}}After}",
+    let document = crate::Tree::parse(
+        r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst SHAPE \\* MERGEFORMAT}{\fldrslt cached drawing anchor}}{\field\flddirty\fldlock{\*\fldinst shape}{\fldrslt cached bare drawing anchor}}After}", OpenOptions::default()
     )
     .unwrap();
 
@@ -3753,8 +3754,8 @@ fn document_discovers_shape_fields_without_linking_or_rendering_drawings() {
 
 #[test]
 fn document_discovers_legacy_form_fields_without_filling_or_executing() {
-    let document = crate::RtfDocument::parse(
-        r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst FORMTEXT \\* MERGEFORMAT}{\fldrslt cached text field}}{\field\flddirty\fldlock{\*\fldinst formcheckbox}{\fldrslt cached checkbox}}{\field\flddirty\fldlock{\*\fldinst FORMDROPDOWN \\* MERGEFORMAT}{\fldrslt cached drop-down selection}}After}",
+    let document = crate::Tree::parse(
+        r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst FORMTEXT \\* MERGEFORMAT}{\fldrslt cached text field}}{\field\flddirty\fldlock{\*\fldinst formcheckbox}{\fldrslt cached checkbox}}{\field\flddirty\fldlock{\*\fldinst FORMDROPDOWN \\* MERGEFORMAT}{\fldrslt cached drop-down selection}}After}", OpenOptions::default()
     )
     .unwrap();
 
@@ -3784,8 +3785,8 @@ fn document_discovers_legacy_form_fields_without_filling_or_executing() {
 
 #[test]
 fn document_discovers_private_fields_without_conversion_or_layout() {
-    let document = crate::RtfDocument::parse(
-        r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst PRIVATE \\* MERGEFORMAT}{\fldrslt opaque converter payload}}{\field\flddirty\fldlock{\*\fldinst private}{\fldrslt cached bare private payload}}After}",
+    let document = crate::Tree::parse(
+        r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst PRIVATE \\* MERGEFORMAT}{\fldrslt opaque converter payload}}{\field\flddirty\fldlock{\*\fldinst private}{\fldrslt cached bare private payload}}After}", OpenOptions::default()
     )
     .unwrap();
 
@@ -3808,8 +3809,9 @@ fn document_discovers_private_fields_without_conversion_or_layout() {
 
 #[test]
 fn document_discovers_automatic_number_fields_without_calculating_numbers_or_layout() {
-    let document = crate::RtfDocument::parse(
+    let document = crate::Tree::parse(
         r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst AUTONUM \\s "." \\* MERGEFORMAT}{\fldrslt 7.}}{\field\flddirty\fldlock{\*\fldinst AUTONUMLGL \\e \\s ")" }{\fldrslt 2.4}}{\field{\*\fldinst AUTONUMOUT}{\fldrslt III}}After}"#,
+        OpenOptions::default(),
     )
     .unwrap();
 
@@ -3835,8 +3837,8 @@ fn document_discovers_automatic_number_fields_without_calculating_numbers_or_lay
 
 #[test]
 fn document_discovers_list_number_fields_without_reading_lists_or_calculating_numbers() {
-    let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst LISTNUM NumberDefault \\l 6 \\s 3 \\* MERGEFORMAT}{\fldrslt (iii)}}{\field\flddirty\fldlock{\*\fldinst LISTNUM "Outline Default" \\l 4}{\fldrslt c}}{\field{\*\fldinst LISTNUM \\l 2}{\fldrslt i}}After}"#,
+    let document = crate::Tree::parse(
+        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst LISTNUM NumberDefault \\l 6 \\s 3 \\* MERGEFORMAT}{\fldrslt (iii)}}{\field\flddirty\fldlock{\*\fldinst LISTNUM "Outline Default" \\l 4}{\fldrslt c}}{\field{\*\fldinst LISTNUM \\l 2}{\fldrslt i}}After}"#, OpenOptions::default()
     )
     .unwrap();
 
@@ -3864,8 +3866,8 @@ fn document_discovers_list_number_fields_without_reading_lists_or_calculating_nu
 
 #[test]
 fn document_discovers_merge_fields_without_opening_data_sources() {
-    let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst MERGEFIELD "Customer Region" \\b "Dear " \\* MERGEFORMAT}{\fldrslt cached customer}}After}"#,
+    let document = crate::Tree::parse(
+        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst MERGEFIELD "Customer Region" \\b "Dear " \\* MERGEFORMAT}{\fldrslt cached customer}}After}"#, OpenOptions::default()
     )
     .unwrap();
 
@@ -3883,8 +3885,8 @@ fn document_discovers_merge_fields_without_opening_data_sources() {
 
 #[test]
 fn document_discovers_mail_merge_data_fields_without_opening_sources_or_merging() {
-    let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst DATA "recipients source.csv" "headers source.csv" \\* MERGEFORMAT}{\fldrslt cached mail-merge source}}{\field{\*\fldinst data recipients.csv}{\fldrslt cached bare source}}After}"#,
+    let document = crate::Tree::parse(
+        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst DATA "recipients source.csv" "headers source.csv" \\* MERGEFORMAT}{\fldrslt cached mail-merge source}}{\field{\*\fldinst data recipients.csv}{\fldrslt cached bare source}}After}"#, OpenOptions::default()
     )
     .unwrap();
 
@@ -3909,8 +3911,8 @@ fn document_discovers_mail_merge_data_fields_without_opening_sources_or_merging(
 
 #[test]
 fn document_discovers_database_fields_without_connecting_or_executing() {
-    let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst DATABASE \\d "unavailable.csv" \\c "DSN=NeverConnect" \\s "SELECT * FROM Customers" \\h}{\fldrslt cached database table}}{\field\flddirty\fldlock{\*\fldinst database}{\fldrslt cached bare database table}}After}"#,
+    let document = crate::Tree::parse(
+        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst DATABASE \\d "unavailable.csv" \\c "DSN=NeverConnect" \\s "SELECT * FROM Customers" \\h}{\fldrslt cached database table}}{\field\flddirty\fldlock{\*\fldinst database}{\fldrslt cached bare database table}}After}"#, OpenOptions::default()
     )
     .unwrap();
 
@@ -3936,8 +3938,8 @@ fn document_discovers_database_fields_without_connecting_or_executing() {
 
 #[test]
 fn document_discovers_referenced_documents_without_opening_sources() {
-    let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst RD "chapters/Chapter 1.doc" \\f \\* MERGEFORMAT}{\fldrslt cached relative reference}}Middle {\field{\*\fldinst rd "archive.doc" \\p}{\fldrslt cached absolute reference}}After}"#,
+    let document = crate::Tree::parse(
+        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst RD "chapters/Chapter 1.doc" \\f \\* MERGEFORMAT}{\fldrslt cached relative reference}}Middle {\field{\*\fldinst rd "archive.doc" \\p}{\fldrslt cached absolute reference}}After}"#, OpenOptions::default()
     )
     .unwrap();
 
@@ -3971,8 +3973,8 @@ fn document_discovers_referenced_documents_without_opening_sources() {
 
 #[test]
 fn document_discovers_mail_merge_counters_without_merging() {
-    let document = crate::RtfDocument::parse(
-        r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst MERGEREC}{\fldrslt 12}}Middle {\field{\*\fldinst mergeSEQ}{\fldrslt 3}}After}",
+    let document = crate::Tree::parse(
+        r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst MERGEREC}{\fldrslt 12}}Middle {\field{\*\fldinst mergeSEQ}{\fldrslt 3}}After}", OpenOptions::default()
     )
     .unwrap();
 
@@ -3990,8 +3992,8 @@ fn document_discovers_mail_merge_counters_without_merging() {
 
 #[test]
 fn document_discovers_mail_merge_next_fields_without_advancing_records() {
-    let document = crate::RtfDocument::parse(
-        r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst NEXT}{\fldrslt cached next}}After}",
+    let document = crate::Tree::parse(
+        r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst NEXT}{\fldrslt cached next}}After}", OpenOptions::default()
     )
     .unwrap();
 
@@ -4006,8 +4008,8 @@ fn document_discovers_mail_merge_next_fields_without_advancing_records() {
 
 #[test]
 fn document_discovers_conditional_mail_merge_controls_without_merging() {
-    let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst NEXTIF Customer = "Ada"}{\fldrslt cached nextif}}Middle {\field{\*\fldinst skipif MERGEFIELD Order < 100}{\fldrslt cached skipif}}After}"#,
+    let document = crate::Tree::parse(
+        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst NEXTIF Customer = "Ada"}{\fldrslt cached nextif}}Middle {\field{\*\fldinst skipif MERGEFIELD Order < 100}{\fldrslt cached skipif}}After}"#, OpenOptions::default()
     )
     .unwrap();
 
@@ -4027,8 +4029,8 @@ fn document_discovers_conditional_mail_merge_controls_without_merging() {
 
 #[test]
 fn document_discovers_if_fields_without_evaluation() {
-    let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst IF "A" = "A" "yes" "no"}{\fldrslt yes}}After}"#,
+    let document = crate::Tree::parse(
+        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst IF "A" = "A" "yes" "no"}{\fldrslt yes}}After}"#, OpenOptions::default()
     )
     .unwrap();
 
@@ -4044,8 +4046,8 @@ fn document_discovers_if_fields_without_evaluation() {
 
 #[test]
 fn document_discovers_compare_fields_without_evaluation() {
-    let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst COMPARE "CustomerNumber" >= 4}{\fldrslt 1}}Middle {\field{\*\fldinst compare MERGEFIELD CustomerRating <= 9}{\fldrslt 0}}After}"#,
+    let document = crate::Tree::parse(
+        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst COMPARE "CustomerNumber" >= 4}{\fldrslt 1}}Middle {\field{\*\fldinst compare MERGEFIELD CustomerRating <= 9}{\fldrslt 0}}After}"#, OpenOptions::default()
     )
     .unwrap();
 
@@ -4063,8 +4065,8 @@ fn document_discovers_compare_fields_without_evaluation() {
 
 #[test]
 fn document_discovers_prompt_fields_without_displaying_prompts() {
-    let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst ASK AskResponse "What is your first name?" \\d "" \\o}{\fldrslt cached ask response}}Middle {\field{\*\fldinst FILLIN "Enter appointment time" \\d "09:00"}{\fldrslt 10:30}}After}"#,
+    let document = crate::Tree::parse(
+        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst ASK AskResponse "What is your first name?" \\d "" \\o}{\fldrslt cached ask response}}Middle {\field{\*\fldinst FILLIN "Enter appointment time" \\d "09:00"}{\fldrslt 10:30}}After}"#, OpenOptions::default()
     )
     .unwrap();
 
@@ -4089,8 +4091,8 @@ fn document_discovers_prompt_fields_without_displaying_prompts() {
 
 #[test]
 fn document_discovers_user_identity_fields_without_reading_host_identity() {
-    let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst USERADDRESS "10 Top Secret Lane" \\* Upper}{\fldrslt 10 TOP SECRET LANE}}Middle {\field{\*\fldinst USERINITIALS \\* Lower}{\fldrslt dw}}After {\field{\*\fldinst USERNAME "Ada Lovelace" \\* FirstCap}{\fldrslt Ada Lovelace}}}"#,
+    let document = crate::Tree::parse(
+        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst USERADDRESS "10 Top Secret Lane" \\* Upper}{\fldrslt 10 TOP SECRET LANE}}Middle {\field{\*\fldinst USERINITIALS \\* Lower}{\fldrslt dw}}After {\field{\*\fldinst USERNAME "Ada Lovelace" \\* FirstCap}{\fldrslt Ada Lovelace}}}"#, OpenOptions::default()
     )
     .unwrap();
 
@@ -4119,8 +4121,8 @@ fn document_discovers_user_identity_fields_without_reading_host_identity() {
 
 #[test]
 fn document_discovers_advance_fields_without_changing_layout() {
-    let document = crate::RtfDocument::parse(
-        r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst ADVANCE \\u 6 \\d 12 \\l 20 \\r -4 \\x 150 \\y 72}{\fldrslt cached placement}}After}",
+    let document = crate::Tree::parse(
+        r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst ADVANCE \\u 6 \\d 12 \\l 20 \\r -4 \\x 150 \\y 72}{\fldrslt cached placement}}After}", OpenOptions::default()
     )
     .unwrap();
 
@@ -4151,8 +4153,8 @@ fn document_discovers_advance_fields_without_changing_layout() {
 
 #[test]
 fn document_discovers_recipient_fields_without_merging() {
-    let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst ADDRESSBLOCK \\c 2 \\d \\e "United States" \\e Canada \\f "<<_FIRST0_>> <<_LAST0_>>" \\l 1033}{\fldrslt cached address}}Middle {\field{\*\fldinst GREETINGLINE \\f "Dear <<_FIRST0_>>," \\e "To Whom It May Concern" \\l en-US}{\fldrslt Dear Ada,}}After}"#,
+    let document = crate::Tree::parse(
+        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst ADDRESSBLOCK \\c 2 \\d \\e "United States" \\e Canada \\f "<<_FIRST0_>> <<_LAST0_>>" \\l 1033}{\fldrslt cached address}}Middle {\field{\*\fldinst GREETINGLINE \\f "Dear <<_FIRST0_>>," \\e "To Whom It May Concern" \\l en-US}{\fldrslt Dear Ada,}}After}"#, OpenOptions::default()
     )
     .unwrap();
 
@@ -4180,8 +4182,8 @@ fn document_discovers_recipient_fields_without_merging() {
 
 #[test]
 fn document_discovers_bibliography_fields_without_loading_sources() {
-    let document = crate::RtfDocument::parse(
-        r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst CITATION Ecma01 \\l 1033 \\n \\m Ecma02}{\fldrslt cached citation}}Middle {\field{\*\fldinst BIBLIOGRAPHY \\l 1033 \\f en-US \\m Ecma01}{\fldrslt cached bibliography}}After}",
+    let document = crate::Tree::parse(
+        r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst CITATION Ecma01 \\l 1033 \\n \\m Ecma02}{\fldrslt cached citation}}Middle {\field{\*\fldinst BIBLIOGRAPHY \\l 1033 \\f en-US \\m Ecma01}{\fldrslt cached bibliography}}After}", OpenOptions::default()
     )
     .unwrap();
 
@@ -4221,8 +4223,9 @@ fn document_discovers_bibliography_fields_without_loading_sources() {
 
 #[test]
 fn document_discovers_eq_fields_without_calculating_them() {
-    let document = crate::RtfDocument::parse(
+    let document = crate::Tree::parse(
         r"{\rtf1\ansi Before {\field{\*\fldinst EQ \\f(1,2)}{\fldrslt }}After}",
+        OpenOptions::default(),
     )
     .unwrap();
 
@@ -4236,8 +4239,8 @@ fn document_discovers_eq_fields_without_calculating_them() {
 
 #[test]
 fn document_discovers_dde_fields_without_starting_conversations() {
-    let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty{\*\fldinst DDE Excel "missing.xlsx" "Sheet1!A1" \\a \\p}{\fldrslt cached DDE}}Middle {\field{\*\fldinst DDEAUTO Excel "missing.xlsx" "Sheet1!A2" \\t}{\fldrslt cached auto}}After}"#,
+    let document = crate::Tree::parse(
+        r#"{\rtf1\ansi Before {\field\flddirty{\*\fldinst DDE Excel "missing.xlsx" "Sheet1!A1" \\a \\p}{\fldrslt cached DDE}}Middle {\field{\*\fldinst DDEAUTO Excel "missing.xlsx" "Sheet1!A2" \\t}{\fldrslt cached auto}}After}"#, OpenOptions::default()
     )
     .unwrap();
 
@@ -4261,8 +4264,8 @@ fn document_discovers_dde_fields_without_starting_conversations() {
 
 #[test]
 fn document_discovers_link_fields_without_activating_ole_servers() {
-    let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst LINK Excel.Sheet.8 "missing.xlsx" "Sheet1!A1" \\a \\f 4 \\p}{\fldrslt cached LINK}}Middle {\field{\*\fldinst LINK Word.Document.8 "missing.docx" Bookmark \\t}{\fldrslt cached text}}After}"#,
+    let document = crate::Tree::parse(
+        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst LINK Excel.Sheet.8 "missing.xlsx" "Sheet1!A1" \\a \\f 4 \\p}{\fldrslt cached LINK}}Middle {\field{\*\fldinst LINK Word.Document.8 "missing.docx" Bookmark \\t}{\fldrslt cached text}}After}"#, OpenOptions::default()
     )
     .unwrap();
 
@@ -4296,8 +4299,8 @@ fn document_discovers_link_fields_without_activating_ole_servers() {
 
 #[test]
 fn document_discovers_external_includes_without_opening_sources() {
-    let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty{\*\fldinst INCLUDETEXT "missing.docx" Summary \\!}{\fldrslt cached text}}Middle {\field{\*\fldinst INCLUDEPICTURE "missing.gif" \\d}{\fldrslt cached picture}}Legacy {\field{\*\fldinst INCLUDE "legacy.docx" LegacySection \\!}{\fldrslt cached legacy text}}Older {\field{\*\fldinst IMPORT "legacy.wmf" \\c GraphicsFilter \\d}{\fldrslt cached legacy picture}}After}"#,
+    let document = crate::Tree::parse(
+        r#"{\rtf1\ansi Before {\field\flddirty{\*\fldinst INCLUDETEXT "missing.docx" Summary \\!}{\fldrslt cached text}}Middle {\field{\*\fldinst INCLUDEPICTURE "missing.gif" \\d}{\fldrslt cached picture}}Legacy {\field{\*\fldinst INCLUDE "legacy.docx" LegacySection \\!}{\fldrslt cached legacy text}}Older {\field{\*\fldinst IMPORT "legacy.wmf" \\c GraphicsFilter \\d}{\fldrslt cached legacy picture}}After}"#, OpenOptions::default()
     )
     .unwrap();
 
@@ -4325,8 +4328,8 @@ fn document_discovers_external_includes_without_opening_sources() {
 
 #[test]
 fn document_discovers_table_of_contents_without_regenerating_it() {
-    let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst TOC \\o "1-3" \\h \\z}{\fldrslt cached TOC}}After}"#,
+    let document = crate::Tree::parse(
+        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst TOC \\o "1-3" \\h \\z}{\fldrslt cached TOC}}After}"#, OpenOptions::default()
     )
     .unwrap();
 
@@ -4349,8 +4352,8 @@ fn document_discovers_table_of_contents_without_regenerating_it() {
 
 #[test]
 fn document_discovers_table_of_contents_entries_without_generating_a_table() {
-    let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst TC "Illustration 1" \\f i \\l 4 \\n}{\fldrslt cached entry}}After}"#,
+    let document = crate::Tree::parse(
+        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst TC "Illustration 1" \\f i \\l 4 \\n}{\fldrslt cached entry}}After}"#, OpenOptions::default()
     )
     .unwrap();
 
@@ -4374,8 +4377,8 @@ fn document_discovers_table_of_contents_entries_without_generating_a_table() {
 
 #[test]
 fn document_discovers_table_of_authorities_entries_without_generating_a_table() {
-    let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst TA \\l "Baldwin v. Alberti" \\c 1 \\b}{\fldrslt cached authority}}After}"#,
+    let document = crate::Tree::parse(
+        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst TA \\l "Baldwin v. Alberti" \\c 1 \\b}{\fldrslt cached authority}}After}"#, OpenOptions::default()
     )
     .unwrap();
 
@@ -4398,8 +4401,8 @@ fn document_discovers_table_of_authorities_entries_without_generating_a_table() 
 
 #[test]
 fn document_discovers_table_of_authorities_without_generating_it() {
-    let document = crate::RtfDocument::parse(
-        r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst TOA \\b Authorities \\c 2 \\f \\h \\p}{\fldrslt cached authorities}}After}",
+    let document = crate::Tree::parse(
+        r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst TOA \\b Authorities \\c 2 \\f \\h \\p}{\fldrslt cached authorities}}After}", OpenOptions::default()
     )
     .unwrap();
 
@@ -4424,8 +4427,8 @@ fn document_discovers_table_of_authorities_without_generating_it() {
 
 #[test]
 fn document_discovers_index_fields_without_generating_an_index() {
-    let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst INDEX \\f Intro \\r}{\fldrslt cached index}}Middle {\field\flddirty{\*\fldinst XE "syntax:fields" \\f Intro \\t "See references"}{\fldrslt cached entry}}After}"#,
+    let document = crate::Tree::parse(
+        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst INDEX \\f Intro \\r}{\fldrslt cached index}}Middle {\field\flddirty{\*\fldinst XE "syntax:fields" \\f Intro \\t "See references"}{\fldrslt cached entry}}After}"#, OpenOptions::default()
     )
     .unwrap();
 
@@ -4462,8 +4465,8 @@ fn document_discovers_index_fields_without_generating_an_index() {
 
 #[test]
 fn document_discovers_macro_buttons_without_invoking_them() {
-    let document = crate::RtfDocument::parse(
-        r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst MACROBUTTON NoMacro Click here}{\fldrslt Click here}}After}",
+    let document = crate::Tree::parse(
+        r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst MACROBUTTON NoMacro Click here}{\fldrslt Click here}}After}", OpenOptions::default()
     )
     .unwrap();
 
@@ -4480,8 +4483,8 @@ fn document_discovers_macro_buttons_without_invoking_them() {
 
 #[test]
 fn document_discovers_go_to_buttons_without_activating_them() {
-    let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst GOTOBUTTON MyBookmark "Jump here"}{\fldrslt cached button}}After}"#,
+    let document = crate::Tree::parse(
+        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst GOTOBUTTON MyBookmark "Jump here"}{\fldrslt cached button}}After}"#, OpenOptions::default()
     )
     .unwrap();
 
@@ -4498,8 +4501,8 @@ fn document_discovers_go_to_buttons_without_activating_them() {
 
 #[test]
 fn document_discovers_active_content_fields_without_activation() {
-    let document = crate::RtfDocument::parse(
-        r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst ADDIN opaque-add-in-data}{\fldrslt cached add-in result}}{\field{\*\fldinst CONTROL opaque-ocx-metadata}{\fldrslt cached control result}}{\field{\*\fldinst HTMLCONTROL opaque-html-control-metadata}{\fldrslt cached html result}}After}",
+    let document = crate::Tree::parse(
+        r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst ADDIN opaque-add-in-data}{\fldrslt cached add-in result}}{\field{\*\fldinst CONTROL opaque-ocx-metadata}{\fldrslt cached control result}}{\field{\*\fldinst HTMLCONTROL opaque-html-control-metadata}{\fldrslt cached html result}}After}", OpenOptions::default()
     )
     .unwrap();
 
@@ -4519,8 +4522,8 @@ fn document_discovers_active_content_fields_without_activation() {
 
 #[test]
 fn document_discovers_auto_text_fields_without_lookup_or_insertion() {
-    let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst GLOSSARY "Legacy Clause"}{\fldrslt cached glossary entry}}{\field{\*\fldinst AUTOTEXT ReusableClause}{\fldrslt cached auto text entry}}After}"#,
+    let document = crate::Tree::parse(
+        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst GLOSSARY "Legacy Clause"}{\fldrslt cached glossary entry}}{\field{\*\fldinst AUTOTEXT ReusableClause}{\fldrslt cached auto text entry}}After}"#, OpenOptions::default()
     )
     .unwrap();
 
@@ -4540,8 +4543,8 @@ fn document_discovers_auto_text_fields_without_lookup_or_insertion() {
 
 #[test]
 fn document_discovers_auto_text_list_fields_without_selection_or_insertion() {
-    let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst AUTOTEXTLIST "Choose a name" \\s "Name Style" \\t "Right-click to select" \\* MERGEFORMAT \\q opaque}{\fldrslt cached selection}}{\field{\*\fldinst AUTOTEXTLIST \\s NameStyle}{\fldrslt cached style-only selection}}After}"#,
+    let document = crate::Tree::parse(
+        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst AUTOTEXTLIST "Choose a name" \\s "Name Style" \\t "Right-click to select" \\* MERGEFORMAT \\q opaque}{\fldrslt cached selection}}{\field{\*\fldinst AUTOTEXTLIST \\s NameStyle}{\fldrslt cached style-only selection}}After}"#, OpenOptions::default()
     )
     .unwrap();
 
@@ -4579,9 +4582,11 @@ fn parses_libreoffice_internal_hyperlink_fixtures() {
         ("fdo86750.rtf", "anchor"),
         ("tdf134614_toc_indent.rtf", "_Toc1"),
     ] {
-        let document =
-            crate::RtfDocument::from_bytes(&std::fs::read(fixture_root.join(fixture)).unwrap())
-                .unwrap();
+        let document = crate::Tree::from_bytes(
+            &std::fs::read(fixture_root.join(fixture)).unwrap(),
+            OpenOptions::default(),
+        )
+        .unwrap();
         assert!(
             document.fields().iter().any(|field| {
                 field.extract_bookmark().as_deref() == Some(expected)
@@ -4592,17 +4597,20 @@ fn parses_libreoffice_internal_hyperlink_fixtures() {
         );
     }
 
-    let formatted =
-        crate::RtfDocument::from_bytes(&std::fs::read(fixture_root.join("fdo82071.rtf")).unwrap())
-            .unwrap();
+    let formatted = crate::Tree::from_bytes(
+        &std::fs::read(fixture_root.join("fdo82071.rtf")).unwrap(),
+        OpenOptions::default(),
+    )
+    .unwrap();
     assert!(formatted.fields().iter().any(|field| matches!(
         field.parsed_code(),
         ParsedFieldCode::PageReference(ReferenceCode { ref bookmark, hyperlink: true, .. })
             if bookmark == "_Toc363816075"
     )));
 
-    let backslashes = crate::RtfDocument::from_bytes(
+    let backslashes = crate::Tree::from_bytes(
         &std::fs::read(fixture_root.join("hyperlink-with-backslashes.rtf")).unwrap(),
+        OpenOptions::default(),
     )
     .unwrap();
     assert_eq!(
@@ -4610,8 +4618,9 @@ fn parses_libreoffice_internal_hyperlink_fixtures() {
         Some(r"c:\temp\doc1.doc")
     );
 
-    let target = crate::RtfDocument::from_bytes(
+    let target = crate::Tree::from_bytes(
         &std::fs::read(fixture_root.join("hyperlink-target.rtf")).unwrap(),
+        OpenOptions::default(),
     )
     .unwrap();
     let ParsedFieldCode::Hyperlink(code) = target.fields()[0].parsed_code() else {

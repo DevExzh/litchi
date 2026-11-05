@@ -1,0 +1,57 @@
+[
+  {
+    "median_us": 347076.57800000004,
+    "min_us": 343266.92100000003,
+    "output_bytes": 4461175,
+    "output_siphash": "1f1eb07c14698826",
+    "peak_heap_bytes": 173260855,
+    "route": "before (former stream routes)",
+    "samples": 15,
+    "scenario": "ods/cells1",
+    "source_bytes": 4461076
+  },
+  {
+    "median_us": 1472611.43,
+    "min_us": 1466346.974,
+    "output_bytes": 4491708,
+    "output_siphash": "95add1fad039987a",
+    "peak_heap_bytes": 177662058,
+    "route": "before (former stream routes)",
+    "samples": 15,
+    "scenario": "ods/cells100",
+    "source_bytes": 4461076
+  },
+  {
+    "median_us": 241232.77500000002,
+    "min_us": 239960.819,
+    "output_bytes": 4461103,
+    "output_siphash": "9e36ed2a335f8d7e",
+    "peak_heap_bytes": 78645881,
+    "route": "before (former stream routes)",
+    "samples": 15,
+    "scenario": "ods/dde",
+    "source_bytes": 4461076
+  },
+  {
+    "median_us": 404423.783,
+    "min_us": 395315.00200000004,
+    "output_bytes": 4461285,
+    "output_siphash": "d8f5eef33434688c",
+    "peak_heap_bytes": 277738418,
+    "route": "before (former stream routes)",
+    "samples": 15,
+    "scenario": "ods/sheet_metadata",
+    "source_bytes": 4461076
+  },
+  {
+    "median_us": 13131.943,
+    "min_us": 13103.594,
+    "output_bytes": 4215645,
+    "output_siphash": "4cf78f925d7faf0d",
+    "peak_heap_bytes": 5513403,
+    "route": "before (former stream routes)",
+    "samples": 15,
+    "scenario": "odp/tail_append",
+    "source_bytes": 4215428
+  }
+]

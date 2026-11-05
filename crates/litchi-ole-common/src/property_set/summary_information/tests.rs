@@ -5,9 +5,9 @@ use chrono::{DateTime, Duration, Utc};
 
 fn populated(page: CodePage) -> Snapshot {
     let mut snapshot = Snapshot::new(page).unwrap();
-    let mut transaction = snapshot.transaction().unwrap();
+    let mut transaction = snapshot.edit().unwrap();
     {
-        let mut edit = transaction.edit();
+        let edit = &mut transaction;
         edit.set_title("Title").unwrap();
         edit.set_subject("").unwrap();
         edit.set_author("Author").unwrap();
@@ -31,7 +31,7 @@ fn populated(page: CodePage) -> Snapshot {
         )
         .unwrap();
     }
-    snapshot = Snapshot::from_section(&transaction.commit().unwrap().into_section()).unwrap();
+    snapshot = Snapshot::from_section(&transaction.commit().unwrap().into_package()).unwrap();
     snapshot
 }
 
@@ -78,16 +78,16 @@ fn typed_pid_values_round_trip_without_reimplementing_wire_grammar() {
 #[test]
 fn unicode_codepage_uses_the_codepage_aware_lpwstr_variant() {
     let snapshot = Snapshot::new(CodePage::Utf16Le).unwrap();
-    let mut transaction = snapshot.transaction().unwrap();
-    transaction.edit().set_title("界").unwrap();
+    let mut transaction = snapshot.edit().unwrap();
+    transaction.set_title("界").unwrap();
     let committed = transaction.commit().unwrap();
     assert!(matches!(
-        committed.section().property(TITLE),
+        committed.package().property(TITLE),
         Some(Value::Lpwstr(value)) if value == "界"
     ));
 
     let parsed =
-        Stream::parse(&Stream::new(committed.section().clone()).to_bytes().unwrap()).unwrap();
+        Stream::parse(&Stream::new(committed.package().clone()).to_bytes().unwrap()).unwrap();
     assert_eq!(Snapshot::from_stream(&parsed).unwrap().title(), Some("界"));
 }
 
@@ -105,10 +105,10 @@ fn absence_is_distinct_from_explicit_empty_zero_and_false_like_values() {
     assert_eq!(explicit.document_security().unwrap().bits(), 0x0000_0003);
     assert_eq!(explicit.thumbnail().unwrap().len(), 0);
 
-    let mut transaction = explicit.transaction().unwrap();
-    transaction.edit().remove(SUBJECT).unwrap();
+    let mut transaction = explicit.edit().unwrap();
+    transaction.remove(SUBJECT).unwrap();
     assert_eq!(
-        transaction.commit().unwrap().section().property(SUBJECT),
+        transaction.commit().unwrap().package().property(SUBJECT),
         None
     );
 }
@@ -130,16 +130,16 @@ fn unknown_properties_survive_typed_edits_and_round_trip_in_order() {
     let source_order: Vec<_> = section.property_ids().collect();
     let snapshot = Snapshot::from_section(&section).unwrap();
 
-    let mut transaction = snapshot.transaction().unwrap();
-    transaction.edit().set_title("after").unwrap();
+    let mut transaction = snapshot.edit().unwrap();
+    transaction.set_title("after").unwrap();
     let commit = transaction.commit().unwrap();
-    assert_eq!(commit.section().property(0x20), section.property(0x20));
+    assert_eq!(commit.package().property(0x20), section.property(0x20));
     assert_eq!(
-        commit.section().property_ids().collect::<Vec<_>>(),
+        commit.package().property_ids().collect::<Vec<_>>(),
         source_order
     );
 
-    let bytes = Stream::new(commit.section().clone()).to_bytes().unwrap();
+    let bytes = Stream::new(commit.package().clone()).to_bytes().unwrap();
     let parsed = Stream::parse(&bytes).unwrap();
     let typed = Snapshot::from_stream(&parsed).unwrap();
     assert_eq!(typed.property(0x20), section.property(0x20));
@@ -149,14 +149,14 @@ fn unknown_properties_survive_typed_edits_and_round_trip_in_order() {
 #[test]
 fn codepage_and_typed_values_are_checked_before_publication() {
     let snapshot = Snapshot::new(CodePage::WINDOWS_1252).unwrap();
-    let mut transaction = snapshot.transaction().unwrap();
-    assert!(transaction.edit().set_title("界").is_err());
-    assert_eq!(transaction.commit().unwrap().changed(), false);
+    let mut transaction = snapshot.edit().unwrap();
+    assert!(transaction.set_title("界").is_err());
+    assert_eq!(transaction.commit().unwrap().diagnostics().changed(), false);
 
     let oversized = "x".repeat(MAX_TEXT_BYTES + 1);
-    let mut transaction = snapshot.transaction().unwrap();
-    assert!(transaction.edit().set_title(&oversized).is_err());
-    assert!(!transaction.commit().unwrap().changed());
+    let mut transaction = snapshot.edit().unwrap();
+    assert!(transaction.set_title(&oversized).is_err());
+    assert!(!transaction.commit().unwrap().diagnostics().changed());
 
     let mut wrong_type = Section::new(SUMMARY_INFORMATION_FMTID);
     wrong_type.set_page(CodePage::WINDOWS_1252);
@@ -189,12 +189,19 @@ fn filetime_conversions_and_reversible_patches_are_source_checked() {
 
     let snapshot = Snapshot::new(CodePage::WINDOWS_1252).unwrap();
     let source = snapshot.section().clone();
-    let mut transaction = snapshot.transaction().unwrap();
-    transaction.edit().set_title("changed").unwrap();
+    let mut transaction = snapshot.edit().unwrap();
+    transaction.set_title("changed").unwrap();
     let commit = transaction.commit().unwrap();
     let patch = commit.patch();
     let forward = patch.apply(&source).unwrap();
-    assert_eq!(forward, *commit.section());
+    assert_eq!(forward, *commit.package());
+
+    // A separately decoded section with the same content is still a valid
+    // replay target; the patch is bound to bytes, not to an allocation.
+    let reparsed_stream = Stream::parse(&Stream::new(source.clone()).to_bytes().unwrap()).unwrap();
+    let reparsed = Snapshot::from_stream(&reparsed_stream).unwrap();
+    assert_eq!(patch.apply(reparsed.section()).unwrap(), *commit.package());
+
     assert_eq!(patch.revert(&forward).unwrap(), source);
 
     let mut different = forward.clone();
@@ -202,7 +209,10 @@ fn filetime_conversions_and_reversible_patches_are_source_checked() {
         .add(SUBJECT, Value::Lpstr("wrong".into()))
         .unwrap();
     assert!(patch.revert(&different).is_err());
-    assert!(patch.apply(&different).is_err());
+    assert!(matches!(
+        patch.apply(&different),
+        Err(crate::Error::PatchConflict)
+    ));
 }
 
 #[test]

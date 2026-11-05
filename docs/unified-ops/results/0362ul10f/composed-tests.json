@@ -1,0 +1,25 @@
+{
+  "at_utc": "2026-10-24T12:27:52.772636+00:00",
+  "source_index": "5d8fd9df658e2d13ef76f16168b2f82d8425e455",
+  "leaf": "89142c8518d6e8d5738a992eb8e8e6063b4bfb2e",
+  "command": [
+    "python3",
+    "-m",
+    "unittest",
+    "tools.test_prepare_ole_owner_inputs",
+    "tools.test_ole_owner_paired_runner",
+    "tools.test_validate_ole_owner_run",
+    "tools.test_prepare_xlsx_raw_inputs",
+    "tools.test_xlsx_raw_native_qualification",
+    "tools.test_native_qualification_runner",
+    "tools.test_legacy_native_qualification",
+    "tools.test_ppt_lazy_native_qualification",
+    "tools.test_no_3rdparty_references"
+  ],
+  "exit": 0,
+  "seconds": 24.226530220999848,
+  "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/ole-owner-protocol-merge/combined-tests.log",
+  "log_bytes": 423,
+  "log_sha256": "9b887f70dd0a9dc5b55b54adf84aa09d6987dc8eb934751ceca8f4beaeb438f3",
+  "scope": "Composed Python protocol validation only; no Cargo/native measurement"
+}

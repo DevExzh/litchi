@@ -5,6 +5,7 @@ const MAXIMUM_DEGREES_EXCLUSIVE: f32 = 360.0;
 
 /// Validation failures for a chart-axis label angle.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     /// The angle was NaN or infinite.
     #[error("chart axis label angle must be finite")]

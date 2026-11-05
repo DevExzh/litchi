@@ -6,7 +6,7 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::mem::size_of;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use litchi_core::Position;
 use litchi_iwa_archive::package::{Catalog, Entry, EntryEdit};
@@ -30,6 +30,7 @@ use litchi_iwa_protos::package_metadata_codec::{
 use litchi_iwa_protos::{table_appearance_codec as appearance_codec, table_info_codec};
 use thiserror::Error as ThisError;
 
+use super::edit::{OwnedSlideSelector, SelectorError};
 use super::{Package, PhysicalSource, ReadError, SemanticLimitKind};
 use crate::selector::SlideSelector;
 use crate::slide::table::{
@@ -45,6 +46,10 @@ const TABLE_STYLE_MESSAGE_TYPE: u32 = 6_003;
 const TABLE_STYLE_PRESET_MESSAGE_TYPE: u32 = 6_008;
 const TABLE_STYLE_NETWORK_MESSAGE_TYPE: u32 = 6_247;
 const TABLE_STYLESHEET_MESSAGE_TYPE: u32 = 401;
+/// `TSWP.StorageArchive`.
+const TEXT_STORAGE_MESSAGE_TYPE: u32 = 2_001;
+/// `TSWP.StorageArchive.style_sheet`.
+const TEXT_STORAGE_STYLESHEET_FIELD: u32 = 2;
 const METADATA_MESSAGE_TYPE: u32 = 11_006;
 const SLIDE_OWNED_DRAWABLES_FIELD: u32 = 7;
 const SLIDE_Z_ORDER_FIELD: u32 = 42;
@@ -56,14 +61,14 @@ const MAX_STYLE_INHERITANCE_DEPTH: usize = 64;
 /// A content-free location associated with a slide-table appearance operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum SlideTableAppearancePath {
+pub enum Path {
     /// The complete Keynote package.
     Package,
     /// One checked zero-based slide/table location.
     Table { slide: Position, table: Position },
 }
 
-impl fmt::Display for SlideTableAppearancePath {
+impl fmt::Display for Path {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Package => formatter.write_str("package"),
@@ -77,7 +82,7 @@ impl fmt::Display for SlideTableAppearancePath {
 /// A finite resource governed by an appearance transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum SlideTableAppearanceLimitKind {
+pub enum LimitKind {
     InputBytes,
     OutputBytes,
     Entries,
@@ -98,10 +103,14 @@ pub enum SlideTableAppearanceLimitKind {
     Retained,
     Scratch,
     TransactionWork,
+    SelectorBytes,
 }
 
-impl fmt::Display for SlideTableAppearanceLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if matches!(self, Self::SelectorBytes) {
+            return formatter.write_str("selector bytes");
+        }
         write!(formatter, "{self:?}")
     }
 }
@@ -109,7 +118,34 @@ impl fmt::Display for SlideTableAppearanceLimitKind {
 /// Failure from a Keynote slide-table appearance read or transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum SlideTableAppearanceError {
+pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    #[error("the selected Keynote slide-table appearance source is invalid")]
+    InvalidSource,
+    #[error(
+        "Keynote slide-table appearance {kind} limit exceeded: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        kind: LimitKind,
+        observed: u64,
+        maximum: u64,
+    },
+    #[error("could not allocate {amount} units for the Keynote appearance transaction")]
+    Allocation { amount: usize },
+    #[error("the edited Keynote slide-table appearance failed semantic verification")]
+    Verification,
+    #[error("the slide-table appearance patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     #[error("this Keynote source does not support exact slide-table appearance editing")]
     UnsupportedSource,
     #[error("the selected Keynote slide-table appearance has an unsupported dependency")]
@@ -128,22 +164,32 @@ pub enum SlideTableAppearanceError {
     TablePositionNotFound { position: Position },
     #[error("the selected Keynote slide table is locked")]
     Locked,
-    #[error("the selected Keynote slide-table appearance source is invalid")]
-    InvalidSource,
-    #[error(
-        "Keynote slide-table appearance {kind} limit exceeded: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        kind: SlideTableAppearanceLimitKind,
-        observed: u64,
-        maximum: u64,
-    },
-    #[error("could not allocate {amount} units for the Keynote appearance transaction")]
-    Allocation { amount: usize },
-    #[error("the edited Keynote slide-table appearance failed semantic verification")]
-    Verification,
-    #[error("the slide-table appearance patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. }
+            | Self::UnsupportedDependency { .. }
+            | Self::UnsupportedTopology { .. } => RefusalKind::UnsupportedContent,
+            Self::AmbiguousSelector { .. } | Self::EmptySlideName { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::TablePositionNotFound { .. } => RefusalKind::NotFound,
+            Self::Locked { .. } => RefusalKind::Protected,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// One operation-local accounting ledger for appearance reads and writes.
@@ -199,22 +245,18 @@ struct AppearanceBudget {
 }
 
 impl AppearanceBudget {
-    fn new(package: &Package) -> Result<Self, SlideTableAppearanceError> {
+    fn new(package: &Package) -> Result<Self, Error> {
         let wire = package.wire_limits().map_err(map_wire_error)?;
         let archive = package.state.options.archive();
         let source_limit = usize::try_from(archive.max_input_bytes())
-            .map_err(|_| SlideTableAppearanceError::InvalidSource)?
+            .map_err(|_| Error::InvalidSource)?
             .max(1);
         let total_limit = usize::try_from(archive.max_total_bytes())
             .unwrap_or(usize::MAX)
             .max(source_limit);
-        let aggregate = source_limit
-            .checked_mul(8)
-            .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        let aggregate = source_limit.checked_mul(8).ok_or(Error::InvalidSource)?;
         let components = package.state.source.components().len().max(1);
-        let component_budget = components
-            .checked_mul(8)
-            .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        let component_budget = components.checked_mul(8).ok_or(Error::InvalidSource)?;
         Ok(Self {
             max_input: aggregate,
             max_output: total_limit.min(aggregate.max(1)),
@@ -258,9 +300,7 @@ impl AppearanceBudget {
             max_allocations: aggregate,
             max_retained: total_limit.min(aggregate.max(1)),
             max_scratch: aggregate,
-            max_transaction_work: aggregate
-                .checked_mul(4)
-                .ok_or(SlideTableAppearanceError::InvalidSource)?,
+            max_transaction_work: aggregate.checked_mul(4).ok_or(Error::InvalidSource)?,
             input: 0,
             output: 0,
             entries: 0,
@@ -288,13 +328,11 @@ impl AppearanceBudget {
         current: &mut usize,
         amount: usize,
         maximum: usize,
-        kind: SlideTableAppearanceLimitKind,
-    ) -> Result<(), SlideTableAppearanceError> {
-        let observed = current
-            .checked_add(amount)
-            .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        kind: LimitKind,
+    ) -> Result<(), Error> {
+        let observed = current.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > maximum {
-            return Err(SlideTableAppearanceError::LimitExceeded {
+            return Err(Error::Limit {
                 kind,
                 observed: observed as u64,
                 maximum: maximum as u64,
@@ -304,174 +342,164 @@ impl AppearanceBudget {
         Ok(())
     }
 
-    fn input(&mut self, amount: usize) -> Result<(), SlideTableAppearanceError> {
+    fn input(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.input,
             amount,
             self.max_input,
-            SlideTableAppearanceLimitKind::InputBytes,
+            LimitKind::InputBytes,
         )
     }
 
-    fn output(&mut self, amount: usize) -> Result<(), SlideTableAppearanceError> {
+    fn output(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.output,
             amount,
             self.max_output,
-            SlideTableAppearanceLimitKind::OutputBytes,
+            LimitKind::OutputBytes,
         )
     }
 
-    fn entries(&mut self, amount: usize) -> Result<(), SlideTableAppearanceError> {
+    fn entries(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.entries,
             amount,
             self.max_entries,
-            SlideTableAppearanceLimitKind::Entries,
+            LimitKind::Entries,
         )
     }
 
-    fn entry_bytes(&mut self, amount: usize) -> Result<(), SlideTableAppearanceError> {
+    fn entry_bytes(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.entry_bytes,
             amount,
             self.max_entry_bytes,
-            SlideTableAppearanceLimitKind::EntryBytes,
+            LimitKind::EntryBytes,
         )
     }
 
-    fn total_bytes(&mut self, amount: usize) -> Result<(), SlideTableAppearanceError> {
+    fn total_bytes(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.total_bytes,
             amount,
             self.max_total_bytes,
-            SlideTableAppearanceLimitKind::TotalBytes,
+            LimitKind::TotalBytes,
         )
     }
 
-    fn objects(&mut self, amount: usize) -> Result<(), SlideTableAppearanceError> {
+    fn objects(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.objects,
             amount,
             self.max_objects,
-            SlideTableAppearanceLimitKind::PayloadObjects,
+            LimitKind::PayloadObjects,
         )
     }
 
-    fn messages(&mut self, amount: usize) -> Result<(), SlideTableAppearanceError> {
+    fn messages(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.messages,
             amount,
             self.max_messages,
-            SlideTableAppearanceLimitKind::PayloadMessages,
+            LimitKind::PayloadMessages,
         )
     }
 
-    fn items(&mut self, amount: usize) -> Result<(), SlideTableAppearanceError> {
+    fn items(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.items,
             amount,
             self.max_items,
-            SlideTableAppearanceLimitKind::PayloadItems,
+            LimitKind::PayloadItems,
         )
     }
 
-    fn references(&mut self, amount: usize) -> Result<(), SlideTableAppearanceError> {
+    fn references(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.references,
             amount,
             self.max_references,
-            SlideTableAppearanceLimitKind::References,
+            LimitKind::References,
         )
     }
 
-    fn wire_bytes(&mut self, amount: usize) -> Result<(), SlideTableAppearanceError> {
+    fn wire_bytes(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.wire_bytes,
             amount,
             self.max_wire_bytes,
-            SlideTableAppearanceLimitKind::WireBytes,
+            LimitKind::WireBytes,
         )
     }
 
-    fn wire_output(&mut self, amount: usize) -> Result<(), SlideTableAppearanceError> {
+    fn wire_output(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.wire_output,
             amount,
             self.max_wire_output,
-            SlideTableAppearanceLimitKind::WireOutputBytes,
+            LimitKind::WireOutputBytes,
         )
     }
 
-    fn fields(&mut self, amount: usize) -> Result<(), SlideTableAppearanceError> {
+    fn fields(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.fields,
             amount,
             self.max_fields,
-            SlideTableAppearanceLimitKind::WireFields,
+            LimitKind::WireFields,
         )
     }
 
-    fn work(&mut self, amount: usize) -> Result<(), SlideTableAppearanceError> {
-        Self::add(
-            &mut self.work,
-            amount,
-            self.max_work,
-            SlideTableAppearanceLimitKind::WireWork,
-        )
+    fn work(&mut self, amount: usize) -> Result<(), Error> {
+        Self::add(&mut self.work, amount, self.max_work, LimitKind::WireWork)
     }
 
-    fn styles(&mut self, amount: usize) -> Result<(), SlideTableAppearanceError> {
-        Self::add(
-            &mut self.styles,
-            amount,
-            self.max_styles,
-            SlideTableAppearanceLimitKind::Styles,
-        )
+    fn styles(&mut self, amount: usize) -> Result<(), Error> {
+        Self::add(&mut self.styles, amount, self.max_styles, LimitKind::Styles)
     }
 
-    fn components(&mut self, amount: usize) -> Result<(), SlideTableAppearanceError> {
+    fn components(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.components,
             amount,
             self.max_components,
-            SlideTableAppearanceLimitKind::Components,
+            LimitKind::Components,
         )
     }
 
-    fn allocations(&mut self, amount: usize) -> Result<(), SlideTableAppearanceError> {
+    fn allocations(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.allocations,
             amount,
             self.max_allocations,
-            SlideTableAppearanceLimitKind::Allocations,
+            LimitKind::Allocations,
         )
     }
 
-    fn retained(&mut self, amount: usize) -> Result<(), SlideTableAppearanceError> {
+    fn retained(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.retained,
             amount,
             self.max_retained,
-            SlideTableAppearanceLimitKind::Retained,
+            LimitKind::Retained,
         )
     }
 
-    fn scratch(&mut self, amount: usize) -> Result<(), SlideTableAppearanceError> {
+    fn scratch(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.scratch,
             amount,
             self.max_scratch,
-            SlideTableAppearanceLimitKind::Scratch,
+            LimitKind::Scratch,
         )
     }
 
-    fn transaction_work(&mut self, amount: usize) -> Result<(), SlideTableAppearanceError> {
+    fn transaction_work(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.transaction_work,
             amount,
             self.max_transaction_work,
-            SlideTableAppearanceLimitKind::TransactionWork,
+            LimitKind::TransactionWork,
         )
     }
 
@@ -479,7 +507,7 @@ impl AppearanceBudget {
         &mut self,
         package: &Package,
         catalog: &litchi_iwa_archive::SourceCatalog,
-    ) -> Result<(), SlideTableAppearanceError> {
+    ) -> Result<(), Error> {
         let source_bytes = catalog.shared_source().len();
         self.input(source_bytes)?;
         self.wire_bytes(source_bytes)?;
@@ -494,11 +522,11 @@ impl AppearanceBudget {
         for component in package.state.source.components().iter() {
             objects = objects
                 .checked_add(component.archive().objects.len())
-                .ok_or(SlideTableAppearanceError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             for object in &component.archive().objects {
                 messages = messages
                     .checked_add(object.messages.len())
-                    .ok_or(SlideTableAppearanceError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
                 items = items
                     .checked_add(
                         object
@@ -507,14 +535,14 @@ impl AppearanceBudget {
                             .filter(|message| message.type_ == SLIDE_MESSAGE_TYPE)
                             .count(),
                     )
-                    .ok_or(SlideTableAppearanceError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
                 for info in &object.archive_info.message_infos {
                     references = references
                         .checked_add(info.object_references.len())
-                        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+                        .ok_or(Error::InvalidSource)?;
                     fields = fields
                         .checked_add(info.field_infos.len())
-                        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+                        .ok_or(Error::InvalidSource)?;
                 }
             }
         }
@@ -529,18 +557,18 @@ impl AppearanceBudget {
                 .and_then(|value| value.checked_add(messages))
                 .and_then(|value| value.checked_add(references))
                 .and_then(|value| value.checked_add(fields))
-                .ok_or(SlideTableAppearanceError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )
     }
 
-    fn physical(&mut self, amount: usize) -> Result<(), SlideTableAppearanceError> {
+    fn physical(&mut self, amount: usize) -> Result<(), Error> {
         self.input(amount)?;
         self.wire_bytes(amount)?;
         self.work(amount)?;
         self.transaction_work(amount)
     }
 
-    fn residual_wire(&self, package: &Package) -> Result<WireLimits, SlideTableAppearanceError> {
+    fn residual_wire(&self, package: &Package) -> Result<WireLimits, Error> {
         let base = package.wire_limits().map_err(map_wire_error)?;
         base.with_input_bytes(
             base.max_input_bytes()
@@ -566,7 +594,7 @@ impl AppearanceBudget {
         &self,
         package: &Package,
         source: &[u8],
-    ) -> Result<appearance_codec::DecodeOptions, SlideTableAppearanceError> {
+    ) -> Result<appearance_codec::DecodeOptions, Error> {
         let base = appearance_codec::DecodeOptions::for_source(source);
         let limits = self.residual_wire(package)?;
         Ok(base
@@ -598,10 +626,7 @@ impl AppearanceBudget {
             .with_max_allocations(self.max_allocations.saturating_sub(self.allocations).max(1)))
     }
 
-    fn codec_report(
-        &mut self,
-        report: appearance_codec::DecodeReport,
-    ) -> Result<(), SlideTableAppearanceError> {
+    fn codec_report(&mut self, report: appearance_codec::DecodeReport) -> Result<(), Error> {
         self.input(report.input_bytes())?;
         self.wire_bytes(report.input_bytes())?;
         self.wire_output(report.output_bytes())?;
@@ -610,8 +635,8 @@ impl AppearanceBudget {
         self.allocations(report.allocations())?;
         self.nesting = self.nesting.max(report.max_depth() as usize);
         if self.nesting > self.max_nesting {
-            return Err(SlideTableAppearanceError::LimitExceeded {
-                kind: SlideTableAppearanceLimitKind::WireNesting,
+            return Err(Error::Limit {
+                kind: LimitKind::WireNesting,
                 observed: self.nesting as u64,
                 maximum: self.max_nesting as u64,
             });
@@ -620,7 +645,7 @@ impl AppearanceBudget {
             report
                 .input_bytes()
                 .checked_add(report.output_bytes())
-                .ok_or(SlideTableAppearanceError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )
     }
 
@@ -628,7 +653,7 @@ impl AppearanceBudget {
         &mut self,
         report: appearance_codec::DecodeReport,
         requirements: appearance_codec::RewriteExecutionRequirements,
-    ) -> Result<(), SlideTableAppearanceError> {
+    ) -> Result<(), Error> {
         self.output(requirements.output_bytes())?;
         self.wire_output(requirements.output_bytes())?;
         self.fields(requirements.fields().saturating_sub(report.fields()))?;
@@ -644,8 +669,8 @@ impl AppearanceBudget {
         )?;
         self.nesting = self.nesting.max(requirements.max_depth() as usize);
         if self.nesting > self.max_nesting {
-            return Err(SlideTableAppearanceError::LimitExceeded {
-                kind: SlideTableAppearanceLimitKind::WireNesting,
+            return Err(Error::Limit {
+                kind: LimitKind::WireNesting,
                 observed: self.nesting as u64,
                 maximum: self.max_nesting as u64,
             });
@@ -684,10 +709,7 @@ impl AppearanceBudget {
         )
     }
 
-    fn metadata_report(
-        &mut self,
-        report: metadata_codec::RewriteReport,
-    ) -> Result<(), SlideTableAppearanceError> {
+    fn metadata_report(&mut self, report: metadata_codec::RewriteReport) -> Result<(), Error> {
         self.input(report.input_bytes())?;
         self.wire_bytes(report.input_bytes())?;
         self.wire_output(report.output_bytes())?;
@@ -701,8 +723,8 @@ impl AppearanceBudget {
         self.scratch(report.scratch_bytes())?;
         self.nesting = self.nesting.max(report.max_depth() as usize);
         if self.nesting > self.max_nesting {
-            return Err(SlideTableAppearanceError::LimitExceeded {
-                kind: SlideTableAppearanceLimitKind::WireNesting,
+            return Err(Error::Limit {
+                kind: LimitKind::WireNesting,
                 observed: self.nesting as u64,
                 maximum: self.max_nesting as u64,
             });
@@ -712,7 +734,7 @@ impl AppearanceBudget {
                 .input_bytes()
                 .checked_add(report.output_bytes())
                 .and_then(|value| value.checked_add(report.work_bytes()))
-                .ok_or(SlideTableAppearanceError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )
     }
 
@@ -720,7 +742,7 @@ impl AppearanceBudget {
         &mut self,
         report: metadata_codec::RewriteReport,
         requirements: metadata_codec::RewriteExecutionRequirements,
-    ) -> Result<(), SlideTableAppearanceError> {
+    ) -> Result<(), Error> {
         self.output(requirements.output_bytes())?;
         self.wire_output(requirements.output_bytes())?;
         self.fields(requirements.fields().saturating_sub(report.fields()))?;
@@ -765,7 +787,7 @@ impl AppearanceBudget {
     fn reassembly(
         &mut self,
         requirements: litchi_iwa_archive::package::ReassemblyExecutionRequirements,
-    ) -> Result<(), SlideTableAppearanceError> {
+    ) -> Result<(), Error> {
         self.output(requirements.output_bytes())?;
         self.total_bytes(requirements.output_bytes())?;
         self.allocations(requirements.allocations())?;
@@ -776,14 +798,11 @@ impl AppearanceBudget {
                 .output_bytes()
                 .checked_add(requirements.scratch_bytes())
                 .and_then(|value| value.checked_add(requirements.retained_bytes()))
-                .ok_or(SlideTableAppearanceError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )
     }
 
-    fn candidate_reopen(
-        &mut self,
-        candidate_bytes: usize,
-    ) -> Result<(), SlideTableAppearanceError> {
+    fn candidate_reopen(&mut self, candidate_bytes: usize) -> Result<(), Error> {
         self.input(candidate_bytes)?;
         self.wire_bytes(candidate_bytes)?;
         self.retained(candidate_bytes)?;
@@ -794,54 +813,68 @@ impl AppearanceBudget {
 }
 
 /// Immutable appearance settings staged against one exact package snapshot.
-pub struct SlideTableAppearanceEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
-    path: SlideTableAppearancePath,
-    before: Appearance,
-    after: Appearance,
-    #[allow(dead_code)]
-    selection: AppearanceSelection,
+    slide: OwnedSlideSelector,
+    table: TableSelector,
+    selection: OnceLock<AppearanceSelection>,
+    after: Option<Appearance>,
 }
 
-impl fmt::Debug for SlideTableAppearanceEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SlideTableAppearanceEdit")
-            .field("path", &self.path)
-            .field("before", &self.before)
-            .field("after", &self.after)
+            .debug_struct("Edit")
+            .field("has_selection", &self.selection.get().is_some())
+            .field("has_staged", &self.after.is_some())
             .finish_non_exhaustive()
     }
 }
 
-impl SlideTableAppearanceEdit<'_> {
-    #[must_use]
-    pub const fn path(&self) -> SlideTableAppearancePath {
-        self.path
+impl Edit<'_> {
+    fn resolve(&self) -> Result<&AppearanceSelection, Error> {
+        if let Some(selection) = self.selection.get() {
+            return Ok(selection);
+        }
+        let mut budget = AppearanceBudget::new(self.source)?;
+        let catalog = physical_source(self.source)?;
+        budget.source_catalog(self.source, catalog)?;
+        let selection = select_table_with_budget(
+            self.source,
+            self.slide.as_selector(),
+            self.table,
+            &mut budget,
+        )?;
+        let _ = self.selection.set(selection);
+        self.selection.get().ok_or(Error::InvalidSource)
+    }
+
+    pub fn path(&self) -> Result<Path, Error> {
+        Ok(self.resolve()?.path())
+    }
+
+    pub fn before(&self) -> Result<Appearance, Error> {
+        Ok(self.resolve()?.before)
+    }
+
+    pub fn after(&self) -> Result<Appearance, Error> {
+        if let Some(after) = self.after {
+            return Ok(after);
+        }
+        Ok(self.resolve()?.before)
+    }
+
+    pub fn appearance(&self) -> Result<Appearance, Error> {
+        self.after()
     }
 
     #[must_use]
-    pub const fn before(&self) -> Appearance {
-        self.before
-    }
-
-    #[must_use]
-    pub const fn after(&self) -> Appearance {
-        self.after
-    }
-
-    #[must_use]
-    pub const fn appearance(&self) -> Appearance {
-        self.after
-    }
-
-    #[must_use]
-    pub const fn set(mut self, appearance: Appearance) -> Self {
-        self.after = appearance;
+    pub fn set(mut self, appearance: Appearance) -> Self {
+        self.after = Some(appearance);
         self
     }
 
-    pub fn commit(self) -> Result<SlideTableAppearanceCommit, SlideTableAppearanceError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         commit_edit(self)
     }
 }
@@ -908,12 +941,21 @@ struct AppearanceSelection {
     locked: bool,
 }
 
+impl AppearanceSelection {
+    const fn path(&self) -> Path {
+        Path::Table {
+            slide: self.slide_position,
+            table: self.table_position,
+        }
+    }
+}
+
 /// A reversible process-local exact-source appearance patch.
 #[derive(Clone, PartialEq, Eq)]
-pub struct SlideTableAppearancePatch {
+pub struct Patch {
     source: Arc<[u8]>,
     target: Arc<[u8]>,
-    path: SlideTableAppearancePath,
+    path: Path,
     before: Appearance,
     after: Appearance,
     touched_components: usize,
@@ -922,10 +964,10 @@ pub struct SlideTableAppearancePatch {
     preview_names: Arc<[&'static str]>,
 }
 
-impl fmt::Debug for SlideTableAppearancePatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SlideTableAppearancePatch")
+            .debug_struct("Patch")
             .field("path", &self.path)
             .field("before", &self.before)
             .field("after", &self.after)
@@ -933,9 +975,9 @@ impl fmt::Debug for SlideTableAppearancePatch {
     }
 }
 
-impl SlideTableAppearancePatch {
+impl Patch {
     #[must_use]
-    pub const fn path(&self) -> SlideTableAppearancePath {
+    pub const fn path(&self) -> Path {
         self.path
     }
 
@@ -982,14 +1024,14 @@ impl SlideTableAppearancePatch {
 
 /// Content-free publication diagnostics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SlideTableAppearanceDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     deleted_previews: usize,
     full_reparse_performed: bool,
 }
 
-impl SlideTableAppearanceDiagnostics {
+impl Diagnostics {
     #[must_use]
     pub const fn changed(self) -> bool {
         self.changed
@@ -1014,13 +1056,13 @@ impl SlideTableAppearanceDiagnostics {
 /// One fully validated immutable appearance publication.
 #[must_use = "an appearance commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct SlideTableAppearanceCommit {
+pub struct Commit {
     package: Package,
-    patch: SlideTableAppearancePatch,
-    diagnostics: SlideTableAppearanceDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl SlideTableAppearanceCommit {
+impl Commit {
     #[must_use]
     pub const fn package(&self) -> &Package {
         &self.package
@@ -1031,13 +1073,19 @@ impl SlideTableAppearanceCommit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
     #[must_use]
-    pub const fn patch(&self) -> &SlideTableAppearancePatch {
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
+    #[must_use]
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     #[must_use]
-    pub const fn diagnostics(&self) -> &SlideTableAppearanceDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
@@ -1048,7 +1096,7 @@ impl Package {
         &self,
         slide: impl Into<SlideSelector<'slide>>,
         table: impl Into<TableSelector>,
-    ) -> Result<Appearance, SlideTableAppearanceError> {
+    ) -> Result<Appearance, Error> {
         let mut budget = AppearanceBudget::new(self)?;
         let catalog = physical_source(self)?;
         budget.source_catalog(self, catalog)?;
@@ -1064,10 +1112,7 @@ impl Package {
     /// every table in a listing.
     #[cfg(feature = "internal-iwork-source")]
     #[doc(hidden)]
-    pub fn __slide_table_appearances(
-        &self,
-        slide_index: usize,
-    ) -> Result<Vec<Appearance>, SlideTableAppearanceError> {
+    pub fn __slide_table_appearances(&self, slide_index: usize) -> Result<Vec<Appearance>, Error> {
         let mut budget = AppearanceBudget::new(self)?;
         let catalog = physical_source(self)?;
         budget.source_catalog(self, catalog)?;
@@ -1087,56 +1132,71 @@ impl Package {
     }
 
     /// Start a selector-first immutable appearance edit.
+    ///
+    /// Entry retains only the source and archive-free selectors. Table graph
+    /// selection and appearance decoding are deferred until a value is read
+    /// or the edit is committed. Selector names are admitted against the
+    /// package's finite selector-byte limit at entry.
     pub fn edit_slide_table_appearance<'slide>(
         &self,
         slide: impl Into<SlideSelector<'slide>>,
         table: impl Into<TableSelector>,
-    ) -> Result<SlideTableAppearanceEdit<'_>, SlideTableAppearanceError> {
-        let mut budget = AppearanceBudget::new(self)?;
-        let catalog = physical_source(self)?;
-        budget.source_catalog(self, catalog)?;
-        let selection = select_table_with_budget(self, slide.into(), table.into(), &mut budget)?;
-        Ok(SlideTableAppearanceEdit {
+    ) -> Result<Edit<'_>, Error> {
+        let mut selector_bytes = 0;
+        let slide = OwnedSlideSelector::from_selector(
+            slide.into(),
+            self.semantic_limits().max_text_bytes(),
+            &mut selector_bytes,
+        )
+        .map_err(map_selector_error)?;
+        Ok(Edit {
             source: self,
-            path: SlideTableAppearancePath::Table {
-                slide: selection.slide_position,
-                table: selection.table_position,
-            },
-            before: selection.before,
-            after: selection.before,
-            selection,
+            slide,
+            table: table.into(),
+            selection: OnceLock::new(),
+            after: None,
         })
     }
 
     /// Apply an exact-source reversible appearance patch.
-    pub fn apply_slide_table_appearance(
-        &self,
-        patch: &SlideTableAppearancePatch,
-    ) -> Result<SlideTableAppearanceCommit, SlideTableAppearanceError> {
+    pub fn apply_slide_table_appearance(&self, patch: &Patch) -> Result<Commit, Error> {
         apply_patch(self, patch)
     }
 }
 
-fn commit_edit(
-    edit: SlideTableAppearanceEdit<'_>,
-) -> Result<SlideTableAppearanceCommit, SlideTableAppearanceError> {
+fn map_selector_error(error: SelectorError) -> Error {
+    match error {
+        SelectorError::Limit { observed, maximum } => Error::Limit {
+            kind: LimitKind::SelectorBytes,
+            observed: u64::try_from(observed).unwrap_or(u64::MAX),
+            maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+        },
+        SelectorError::Allocation { amount } => Error::Allocation { amount },
+    }
+}
+
+fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
+    let selection = edit.resolve()?.clone();
+    let before = selection.before;
+    let after = edit.after.unwrap_or(before);
+    let path = selection.path();
     let source_catalog = physical_source(edit.source)?;
     let source_bytes = source_catalog.shared_source();
-    if edit.before == edit.after {
-        return Ok(SlideTableAppearanceCommit {
+    if before == after {
+        return Ok(Commit {
             package: edit.source.snapshot(),
-            patch: SlideTableAppearancePatch {
+            patch: Patch {
                 source: Arc::clone(&source_bytes),
                 target: source_bytes,
-                path: edit.path,
-                before: edit.before,
-                after: edit.after,
+                path,
+                before,
+                after,
                 touched_components: 0,
                 deleted_previews: 0,
                 changed_members: empty_changed_members(),
                 preview_names: empty_preview_names(),
             },
-            diagnostics: SlideTableAppearanceDiagnostics {
+            diagnostics: Diagnostics {
                 changed: false,
                 touched_components: 0,
                 deleted_previews: 0,
@@ -1145,37 +1205,32 @@ fn commit_edit(
         });
     }
     if !source_catalog.source_is_exact() {
-        return Err(SlideTableAppearanceError::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
-    if edit.selection.locked {
-        return Err(SlideTableAppearanceError::Locked);
+    if selection.locked {
+        return Err(Error::Refused(Refusal::Locked));
     }
     let mut budget = AppearanceBudget::new(edit.source)?;
     budget.source_catalog(edit.source, source_catalog)?;
-    let (mut edits, new_style, new_uuid) = rewrite_native_appearance(
-        edit.source,
-        &edit.selection,
-        edit.after,
-        edit.path,
-        &mut budget,
-    )?;
+    let (mut edits, new_style, new_uuid) =
+        rewrite_native_appearance(edit.source, &selection, after, path, &mut budget)?;
     budget.allocations(1)?;
     budget.scratch(size_of::<NativeAppearanceEdit>())?;
     edits
         .try_reserve_exact(1)
-        .map_err(|_| SlideTableAppearanceError::Allocation { amount: 1 })?;
+        .map_err(|_| Error::Allocation { amount: 1 })?;
     let metadata_edit = rewrite_metadata_for_style(
         edit.source,
-        &edit.selection,
+        &selection,
         new_style,
         new_uuid,
-        edit.path,
+        path,
         &mut budget,
     )?;
     edits.push(metadata_edit);
     let preview_plan =
         super::rendering_invalidation::root_preview_deletions(source_catalog.package())
-            .map_err(|_| SlideTableAppearanceError::InvalidSource)?;
+            .map_err(|_| Error::InvalidSource)?;
     let deleted_previews = preview_plan.len();
     let preview_names: Arc<[&'static str]> = Arc::from(preview_plan.names());
     let changed_members = changed_member_names(&edits, &mut budget)?;
@@ -1187,21 +1242,21 @@ fn commit_edit(
             .iter()
             .map(|edit| edit.data.len())
             .try_fold(0usize, |total, size| total.checked_add(size))
-            .ok_or(SlideTableAppearanceError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     budget.allocations(1)?;
     budget.scratch(
         edits
             .len()
             .checked_mul(size_of::<EntryEdit<'_>>())
-            .ok_or(SlideTableAppearanceError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     let mut entry_edits = Vec::new();
-    entry_edits.try_reserve_exact(edits.len()).map_err(|_| {
-        SlideTableAppearanceError::Allocation {
+    entry_edits
+        .try_reserve_exact(edits.len())
+        .map_err(|_| Error::Allocation {
             amount: edits.len(),
-        }
-    })?;
+        })?;
     for edit in &edits {
         entry_edits.push(EntryEdit::new(edit.name.as_str(), edit.data.as_slice()));
     }
@@ -1226,12 +1281,12 @@ fn commit_edit(
     budget.source_catalog(&candidate, candidate_catalog)?;
     let selected = select_table_with_budget(
         &candidate,
-        SlideSelector::Position(edit.selection.slide_position),
-        TableSelector::index(edit.selection.table_position.get()),
+        SlideSelector::Position(selection.slide_position),
+        TableSelector::index(selection.table_position.get()),
         &mut budget,
     )?;
-    if selected.before != edit.after {
-        return Err(SlideTableAppearanceError::Verification);
+    if selected.before != after {
+        return Err(Error::Verification);
     }
     verify_candidate_locality(
         edit.source,
@@ -1240,20 +1295,20 @@ fn commit_edit(
         preview_names.as_ref(),
         &mut budget,
     )?;
-    Ok(SlideTableAppearanceCommit {
+    Ok(Commit {
         package: candidate,
-        patch: SlideTableAppearancePatch {
+        patch: Patch {
             source: source_bytes,
             target: target_bytes,
-            path: edit.path,
-            before: edit.before,
-            after: edit.after,
+            path,
+            before,
+            after,
             touched_components,
             deleted_previews,
             changed_members,
             preview_names,
         },
-        diagnostics: SlideTableAppearanceDiagnostics {
+        diagnostics: Diagnostics {
             changed: true,
             touched_components,
             deleted_previews,
@@ -1262,20 +1317,17 @@ fn commit_edit(
     })
 }
 
-fn apply_patch(
-    package: &Package,
-    patch: &SlideTableAppearancePatch,
-) -> Result<SlideTableAppearanceCommit, SlideTableAppearanceError> {
+fn apply_patch(package: &Package, patch: &Patch) -> Result<Commit, Error> {
     let source_catalog = physical_source(package)?;
     let current_source = source_catalog.shared_source();
     if current_source.as_ref() != patch.source.as_ref() {
-        return Err(SlideTableAppearanceError::PatchConflict);
+        return Err(Error::PatchConflict);
     }
     if patch.is_noop() {
-        return Ok(SlideTableAppearanceCommit {
+        return Ok(Commit {
             package: package.snapshot(),
             patch: patch.clone(),
-            diagnostics: SlideTableAppearanceDiagnostics {
+            diagnostics: Diagnostics {
                 changed: false,
                 touched_components: 0,
                 deleted_previews: 0,
@@ -1288,19 +1340,19 @@ fn apply_patch(
     let current = select_table_with_budget(
         package,
         SlideSelector::Position(match patch.path {
-            SlideTableAppearancePath::Table { slide, .. } => slide,
-            SlideTableAppearancePath::Package => {
-                return Err(SlideTableAppearanceError::PatchConflict);
+            Path::Table { slide, .. } => slide,
+            Path::Package => {
+                return Err(Error::PatchConflict);
             },
         }),
         TableSelector::index(match patch.path {
-            SlideTableAppearancePath::Table { table, .. } => table.get(),
-            SlideTableAppearancePath::Package => unreachable!(),
+            Path::Table { table, .. } => table.get(),
+            Path::Package => unreachable!(),
         }),
         &mut budget,
     )?;
     if current.before != patch.before {
-        return Err(SlideTableAppearanceError::PatchConflict);
+        return Err(Error::PatchConflict);
     }
     let target_bytes = Arc::clone(&patch.target);
     budget.candidate_reopen(target_bytes.len())?;
@@ -1315,7 +1367,7 @@ fn apply_patch(
         &mut budget,
     )?;
     if selected.before != patch.after {
-        return Err(SlideTableAppearanceError::Verification);
+        return Err(Error::Verification);
     }
     verify_candidate_locality(
         package,
@@ -1324,10 +1376,10 @@ fn apply_patch(
         patch.preview_names.as_ref(),
         &mut budget,
     )?;
-    Ok(SlideTableAppearanceCommit {
+    Ok(Commit {
         package: candidate,
         patch: patch.clone(),
-        diagnostics: SlideTableAppearanceDiagnostics {
+        diagnostics: Diagnostics {
             changed: true,
             touched_components: patch.touched_components,
             deleted_previews: patch.deleted_previews,
@@ -1346,21 +1398,21 @@ fn rewrite_native_appearance(
     source: &Package,
     selection: &AppearanceSelection,
     appearance: Appearance,
-    path: SlideTableAppearancePath,
+    path: Path,
     budget: &mut AppearanceBudget,
-) -> Result<(Vec<NativeAppearanceEdit>, u64, UuidBits), SlideTableAppearanceError> {
+) -> Result<(Vec<NativeAppearanceEdit>, u64, UuidBits), Error> {
     let old_style = selection.style_identifier;
     if old_style == 0 || selection.model_style_identifier == 0 {
-        return Err(SlideTableAppearanceError::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     let style_component = selection
         .style_component
         .as_deref()
-        .ok_or(SlideTableAppearanceError::UnsupportedDependency)?;
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
     let stylesheet_identifier = selection
         .stylesheet_identifier
         .filter(|identifier| *identifier != 0)
-        .ok_or(SlideTableAppearanceError::UnsupportedDependency)?;
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
     let stylesheet_component =
         component_name_for_identifier(source, stylesheet_identifier, path, budget)?;
     let model_payload = message_data(
@@ -1372,13 +1424,13 @@ fn rewrite_native_appearance(
     let style_payload = style_message_data(source, old_style, path)?;
     let (_, old_style_object) = source
         .object_with_component(old_style)
-        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let (old_style_message_index, _) = unique_message(old_style_object, TABLE_STYLE_MESSAGE_TYPE)?;
     let old_style_message_info = old_style_object
         .archive_info
         .message_infos
         .get(old_style_message_index)
-        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let old_style_parent = (selection.style_count > 1).then_some(selection.style_ids[1]);
     let stylesheet_payload = stylesheet_message_data(source, stylesheet_identifier, path)?;
     let new_style = next_identifier(source, path, budget)?;
@@ -1387,14 +1439,14 @@ fn rewrite_native_appearance(
         new_style.rotate_left(29) ^ 0xd1b5_4a32_d192_ed03,
     );
     if new_uuid.lower() == 0 && new_uuid.upper() == 0 {
-        return Err(SlideTableAppearanceError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let codec_work = model_payload
         .len()
         .checked_add(style_payload.len())
         .and_then(|size| size.checked_add(stylesheet_payload.len()))
         .and_then(|size| size.checked_mul(16))
-        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.transaction_work(codec_work)?;
     budget.scratch(codec_work)?;
     let options = budget.codec_options(source, model_payload)?;
@@ -1433,7 +1485,7 @@ fn rewrite_native_appearance(
         || model_report.work_bytes() != model_requirements.work_bytes()
         || model_report.allocations() != model_requirements.allocations()
     {
-        return Err(SlideTableAppearanceError::Verification);
+        return Err(Error::Verification);
     }
     let stylesheet_plan = appearance_codec::prepare_stylesheet_append(
         stylesheet_payload,
@@ -1456,7 +1508,7 @@ fn rewrite_native_appearance(
         || stylesheet_report.work_bytes() != stylesheet_requirements.work_bytes()
         || stylesheet_report.allocations() != stylesheet_requirements.allocations()
     {
-        return Err(SlideTableAppearanceError::Verification);
+        return Err(Error::Verification);
     }
     budget.allocations(4)?;
     budget.scratch(
@@ -1465,23 +1517,19 @@ fn rewrite_native_appearance(
             .and_then(|size| size.checked_add(selection.model_component.len()))
             .and_then(|size| size.checked_add(style_component.len()))
             .and_then(|size| size.checked_add(stylesheet_component.len()))
-            .ok_or(SlideTableAppearanceError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     let mut component_names = Vec::new();
     component_names
         .try_reserve_exact(3)
-        .map_err(|_| SlideTableAppearanceError::Allocation { amount: 3 })?;
+        .map_err(|_| Error::Allocation { amount: 3 })?;
     component_names.push(selection.model_component.to_string());
     component_names.push(style_component.to_owned());
     component_names.push(stylesheet_component.clone());
     component_names.sort_unstable();
     component_names.dedup();
     let physical = physical_source(source)?;
-    let entries = entry_index(
-        physical.package(),
-        budget,
-        SlideTableAppearanceError::InvalidSource,
-    )?;
+    let entries = entry_index(physical.package(), budget, Error::InvalidSource)?;
     let archive_limits = source
         .state
         .options
@@ -1503,26 +1551,26 @@ fn rewrite_native_appearance(
     let mut edits = Vec::new();
     edits
         .try_reserve_exact(component_names.len())
-        .map_err(|_| SlideTableAppearanceError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: component_names.len(),
         })?;
     for name in component_names {
         let entry = entries
             .get(name.as_str())
             .copied()
-            .ok_or(SlideTableAppearanceError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if entry.is_opaque() {
-            return Err(SlideTableAppearanceError::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         budget.physical(entry.data().len())?;
         budget.scratch(entry.data().len())?;
         budget.allocations(2)?;
-        let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
-            .map_err(map_core_error)?;
+        let stream =
+            SnappyStream::decompress(entry.data(), snappy_limits).map_err(map_core_error)?;
         budget.physical(stream.as_bytes().len())?;
         budget.retained(stream.as_bytes().len())?;
-        let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
-            .map_err(map_core_error)?;
+        let mut archive =
+            Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
         budget.objects(archive.objects.len())?;
         budget.messages(
             archive
@@ -1530,10 +1578,10 @@ fn rewrite_native_appearance(
                 .iter()
                 .map(|object| object.messages.len())
                 .try_fold(0usize, |total, count| total.checked_add(count))
-                .ok_or(SlideTableAppearanceError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )?;
         archive
-            .validate_canonical_object_framing(stream.as_bytes())
+            .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
             .map_err(map_core_error)?;
         if name == selection.model_component.as_ref() {
             replace_model_in_archive(
@@ -1573,26 +1621,24 @@ fn rewrite_native_appearance(
             )?;
         }
         let encoded_len = archive
-            .encoded_len_with_limits(archive_limits)
+            .encoded_len(archive_limits)
             .map_err(map_core_error)?;
         budget.output(encoded_len)?;
         budget.entry_bytes(encoded_len)?;
         budget.total_bytes(encoded_len)?;
-        let compressed_bound =
-            SnappyStream::maximum_compressed_len(encoded_len).map_err(map_core_error)?;
+        let compressed_bound = SnappyStream::maximum_compressed_len(encoded_len, snappy_limits)
+            .map_err(map_core_error)?;
         budget.output(compressed_bound)?;
         budget.wire_output(compressed_bound)?;
         budget.entry_bytes(compressed_bound)?;
         budget.scratch(compressed_bound)?;
-        let bytes = archive
-            .to_bytes_with_limits(archive_limits)
-            .map_err(map_core_error)?;
+        let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
         if bytes.len() != encoded_len {
-            return Err(SlideTableAppearanceError::Verification);
+            return Err(Error::Verification);
         }
-        let data = SnappyStream::compress(&bytes).map_err(map_core_error)?;
+        let data = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
         if data.len() > compressed_bound {
-            return Err(SlideTableAppearanceError::Verification);
+            return Err(Error::Verification);
         }
         budget.retained(data.len())?;
         edits.push(NativeAppearanceEdit { name, data });
@@ -1603,19 +1649,19 @@ fn rewrite_native_appearance(
 fn changed_member_names(
     edits: &[NativeAppearanceEdit],
     budget: &mut AppearanceBudget,
-) -> Result<Arc<[String]>, SlideTableAppearanceError> {
+) -> Result<Arc<[String]>, Error> {
     budget.allocations(1)?;
     budget.scratch(
         edits
             .len()
             .checked_mul(size_of::<String>())
-            .ok_or(SlideTableAppearanceError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     budget.allocations(edits.len())?;
     let mut names = Vec::new();
     names
         .try_reserve_exact(edits.len())
-        .map_err(|_| SlideTableAppearanceError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: edits.len(),
         })?;
     for edit in edits {
@@ -1665,12 +1711,12 @@ fn appearance_overrides(appearance: Appearance) -> appearance_codec::AppearanceO
 fn component_name_for_identifier(
     source: &Package,
     identifier: u64,
-    _path: SlideTableAppearancePath,
+    _path: Path,
     budget: &mut AppearanceBudget,
-) -> Result<String, SlideTableAppearanceError> {
+) -> Result<String, Error> {
     let (name, _) = source
         .object_with_component(identifier)
-        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.allocations(1)?;
     budget.scratch(name.len())?;
     Ok(name.to_owned())
@@ -1680,68 +1726,60 @@ fn message_data(
     source: &Package,
     identifier: u64,
     message_index: usize,
-    _path: SlideTableAppearancePath,
-) -> Result<&[u8], SlideTableAppearanceError> {
+    _path: Path,
+) -> Result<&[u8], Error> {
     let (_, object) = source
         .object_with_component(identifier)
-        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let message = object
         .messages
         .get(message_index)
-        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if message.type_ != TABLE_MODEL_MESSAGE_TYPE {
-        return Err(SlideTableAppearanceError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(message.data.as_slice())
 }
 
-fn style_message_data(
-    source: &Package,
-    identifier: u64,
-    _path: SlideTableAppearancePath,
-) -> Result<&[u8], SlideTableAppearanceError> {
+fn style_message_data(source: &Package, identifier: u64, _path: Path) -> Result<&[u8], Error> {
     let (_, object) = source
         .object_with_component(identifier)
-        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let mut messages = object
         .messages
         .iter()
         .filter(|message| message.type_ == TABLE_STYLE_MESSAGE_TYPE);
     let message = messages
         .next()
-        .ok_or(SlideTableAppearanceError::UnsupportedDependency)?;
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
     if messages.next().is_some() {
-        return Err(SlideTableAppearanceError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(message.data.as_slice())
 }
 
-fn stylesheet_message_data(
-    source: &Package,
-    identifier: u64,
-    _path: SlideTableAppearancePath,
-) -> Result<&[u8], SlideTableAppearanceError> {
+fn stylesheet_message_data(source: &Package, identifier: u64, _path: Path) -> Result<&[u8], Error> {
     let (_, object) = source
         .object_with_component(identifier)
-        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let mut messages = object
         .messages
         .iter()
         .filter(|message| message.type_ == TABLE_STYLESHEET_MESSAGE_TYPE);
     let message = messages
         .next()
-        .ok_or(SlideTableAppearanceError::UnsupportedDependency)?;
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
     if messages.next().is_some() {
-        return Err(SlideTableAppearanceError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(message.data.as_slice())
 }
 
 fn next_identifier(
     source: &Package,
-    path: SlideTableAppearancePath,
+    path: Path,
     budget: &mut AppearanceBudget,
-) -> Result<u64, SlideTableAppearanceError> {
+) -> Result<u64, Error> {
     budget.transaction_work(
         source
             .state
@@ -1750,17 +1788,12 @@ fn next_identifier(
             .iter()
             .map(|component| component.archive().objects.len())
             .try_fold(0usize, |total, count| total.checked_add(count))
-            .ok_or(SlideTableAppearanceError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     let mut maximum = 0u64;
     for component in source.state.source.components().iter() {
         for object in &component.archive().objects {
-            maximum = maximum.max(
-                object
-                    .archive_info
-                    .identifier
-                    .ok_or(SlideTableAppearanceError::InvalidSource)?,
-            );
+            maximum = maximum.max(object.archive_info.identifier.ok_or(Error::InvalidSource)?);
         }
     }
     let metadata = metadata_payload(source, path, budget)?;
@@ -1777,7 +1810,7 @@ fn next_identifier(
     .map_err(map_metadata_error)?;
     budget.metadata_report(inspection.report())?;
     if facts.unknown {
-        return Err(SlideTableAppearanceError::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     maximum = maximum
         .max(inspection.last_object_identifier())
@@ -1785,8 +1818,8 @@ fn next_identifier(
     maximum
         .checked_add(1)
         .filter(|identifier| *identifier != 0)
-        .ok_or(SlideTableAppearanceError::LimitExceeded {
-            kind: SlideTableAppearanceLimitKind::PayloadObjects,
+        .ok_or(Error::Limit {
+            kind: LimitKind::PayloadObjects,
             observed: u64::MAX,
             maximum: u64::MAX - 1,
         })
@@ -1801,9 +1834,9 @@ struct MetadataRoute {
 
 fn metadata_route(
     source: &Package,
-    _path: SlideTableAppearancePath,
+    _path: Path,
     budget: &mut AppearanceBudget,
-) -> Result<MetadataRoute, SlideTableAppearanceError> {
+) -> Result<MetadataRoute, Error> {
     let mut found = None;
     for component in source.state.source.components().iter() {
         for object in &component.archive().objects {
@@ -1811,10 +1844,8 @@ fn metadata_route(
                 if message.type_ != METADATA_MESSAGE_TYPE {
                     continue;
                 }
-                let object_identifier = object
-                    .archive_info
-                    .identifier
-                    .ok_or(SlideTableAppearanceError::InvalidSource)?;
+                let object_identifier =
+                    object.archive_info.identifier.ok_or(Error::InvalidSource)?;
                 budget.allocations(1)?;
                 budget.scratch(component.name().len())?;
                 if found
@@ -1825,37 +1856,37 @@ fn metadata_route(
                     })
                     .is_some()
                 {
-                    return Err(SlideTableAppearanceError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
             }
         }
     }
-    found.ok_or(SlideTableAppearanceError::InvalidSource)
+    found.ok_or(Error::InvalidSource)
 }
 
 fn metadata_payload_at<'source>(
     source: &'source Package,
     route: &MetadataRoute,
-) -> Result<&'source [u8], SlideTableAppearanceError> {
+) -> Result<&'source [u8], Error> {
     let (component, object) = source
         .object_with_component(route.object_identifier)
-        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if component != route.component_name {
-        return Err(SlideTableAppearanceError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     object
         .messages
         .get(route.message_index)
         .filter(|message| message.type_ == METADATA_MESSAGE_TYPE)
         .map(|message| message.data.as_slice())
-        .ok_or(SlideTableAppearanceError::InvalidSource)
+        .ok_or(Error::InvalidSource)
 }
 
 fn metadata_payload<'source>(
     source: &'source Package,
-    path: SlideTableAppearancePath,
+    path: Path,
     budget: &mut AppearanceBudget,
-) -> Result<&'source [u8], SlideTableAppearanceError> {
+) -> Result<&'source [u8], Error> {
     let route = metadata_route(source, path, budget)?;
     metadata_payload_at(source, &route)
 }
@@ -1910,51 +1941,47 @@ struct MetadataFacts {
 }
 
 impl MetadataFacts {
-    fn reservation_slots(source_bytes: usize) -> Result<usize, SlideTableAppearanceError> {
+    fn reservation_slots(source_bytes: usize) -> Result<usize, Error> {
         source_bytes
             .checked_div(2)
             .and_then(|slots| slots.checked_add(1))
-            .ok_or(SlideTableAppearanceError::InvalidSource)
+            .ok_or(Error::InvalidSource)
     }
 
-    fn reservation_scratch(source_bytes: usize) -> Result<usize, SlideTableAppearanceError> {
+    fn reservation_scratch(source_bytes: usize) -> Result<usize, Error> {
         let slots = Self::reservation_slots(source_bytes)?;
-        let identifier_slots = slots
-            .checked_mul(5)
-            .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        let identifier_slots = slots.checked_mul(5).ok_or(Error::InvalidSource)?;
         let fact_bytes = size_of::<MetadataComponentFact>()
             .checked_add(size_of::<MetadataUuidFact>())
             .and_then(|size| size.checked_add(size_of::<MetadataExternalFact>()))
-            .ok_or(SlideTableAppearanceError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         slots
             .checked_mul(fact_bytes)
             .and_then(|size| size.checked_add(identifier_slots.checked_mul(size_of::<u64>())?))
             .and_then(|size| size.checked_add(source_bytes))
-            .ok_or(SlideTableAppearanceError::InvalidSource)
+            .ok_or(Error::InvalidSource)
     }
 
-    fn reserve_for_source(&mut self, source_bytes: usize) -> Result<(), SlideTableAppearanceError> {
+    fn reserve_for_source(&mut self, source_bytes: usize) -> Result<(), Error> {
         let slots = Self::reservation_slots(source_bytes)?;
         self.components
             .try_reserve_exact(slots)
-            .map_err(|_| SlideTableAppearanceError::Allocation { amount: slots })?;
+            .map_err(|_| Error::Allocation { amount: slots })?;
         self.uuids
             .try_reserve_exact(slots)
-            .map_err(|_| SlideTableAppearanceError::Allocation { amount: slots })?;
+            .map_err(|_| Error::Allocation { amount: slots })?;
         self.external
             .try_reserve_exact(slots)
-            .map_err(|_| SlideTableAppearanceError::Allocation { amount: slots })?;
-        let identifier_slots = slots
-            .checked_mul(5)
-            .ok_or(SlideTableAppearanceError::InvalidSource)?;
+            .map_err(|_| Error::Allocation { amount: slots })?;
+        let identifier_slots = slots.checked_mul(5).ok_or(Error::InvalidSource)?;
         self.identifiers
             .try_reserve_exact(identifier_slots)
-            .map_err(|_| SlideTableAppearanceError::Allocation {
+            .map_err(|_| Error::Allocation {
                 amount: identifier_slots,
             })?;
         self.data_identifiers
             .try_reserve_exact(slots)
-            .map_err(|_| SlideTableAppearanceError::Allocation { amount: slots })?;
+            .map_err(|_| Error::Allocation { amount: slots })?;
         Ok(())
     }
 }
@@ -2002,25 +2029,25 @@ fn unique_metadata_component<'a>(
 fn validate_metadata_uuid_registry(
     facts: &MetadataFacts,
     budget: &mut AppearanceBudget,
-) -> Result<(), SlideTableAppearanceError> {
+) -> Result<(), Error> {
     budget.allocations(1)?;
     budget.scratch(
         facts
             .uuids
             .len()
             .checked_mul(size_of::<UuidBits>())
-            .ok_or(SlideTableAppearanceError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     budget.transaction_work(facts.uuids.len())?;
     let mut uuids = HashSet::new();
     uuids
         .try_reserve(facts.uuids.len())
-        .map_err(|_| SlideTableAppearanceError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: facts.uuids.len(),
         })?;
     for binding in &facts.uuids {
         if !uuids.insert(binding.uuid) {
-            return Err(SlideTableAppearanceError::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
     }
     Ok(())
@@ -2030,21 +2057,21 @@ fn require_current_metadata_uuid(
     facts: &MetadataFacts,
     component_identifier: u64,
     object_identifier: u64,
-) -> Result<(), SlideTableAppearanceError> {
+) -> Result<(), Error> {
     let mut current = 0usize;
     for binding in &facts.uuids {
         if binding.object_identifier != object_identifier {
             continue;
         }
         if !binding.current || binding.component_identifier != component_identifier {
-            return Err(SlideTableAppearanceError::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         current = current.saturating_add(1);
     }
     if current == 1 {
         Ok(())
     } else {
-        Err(SlideTableAppearanceError::UnsupportedDependency)
+        Err(Error::Refused(Refusal::UnsupportedDependency))
     }
 }
 
@@ -2052,7 +2079,7 @@ fn require_optional_current_metadata_uuid(
     facts: &MetadataFacts,
     component_identifier: u64,
     object_identifier: u64,
-) -> Result<(), SlideTableAppearanceError> {
+) -> Result<(), Error> {
     let mut current = 0usize;
     let mut registered = 0usize;
     for binding in &facts.uuids {
@@ -2061,14 +2088,14 @@ fn require_optional_current_metadata_uuid(
         }
         registered = registered.saturating_add(1);
         if !binding.current || binding.component_identifier != component_identifier {
-            return Err(SlideTableAppearanceError::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         current = current.saturating_add(1);
     }
     if registered == 0 || (registered == 1 && current == 1) {
         Ok(())
     } else {
-        Err(SlideTableAppearanceError::UnsupportedDependency)
+        Err(Error::Refused(Refusal::UnsupportedDependency))
     }
 }
 
@@ -2184,9 +2211,9 @@ fn rewrite_metadata_for_style(
     selection: &AppearanceSelection,
     new_style: u64,
     uuid: UuidBits,
-    path: SlideTableAppearancePath,
+    path: Path,
     budget: &mut AppearanceBudget,
-) -> Result<NativeAppearanceEdit, SlideTableAppearanceError> {
+) -> Result<NativeAppearanceEdit, Error> {
     // Keep the inspected physical route as part of the rewrite authority.
     // Re-scanning by a broad `*Metadata.iwa` suffix later could otherwise
     // silently rewrite a decoy while the validated entry remains untouched.
@@ -2205,31 +2232,31 @@ fn rewrite_metadata_for_style(
     .map_err(map_metadata_error)?;
     budget.metadata_report(inspection.report())?;
     if facts.unknown {
-        return Err(SlideTableAppearanceError::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     if selection.metadata_component.as_deref() != Some(metadata_route.component_name.as_str()) {
-        return Err(SlideTableAppearanceError::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     let model_locator = metadata_locator(selection.model_component.as_ref());
     let style_component = selection
         .style_component
         .as_deref()
-        .ok_or(SlideTableAppearanceError::UnsupportedDependency)?;
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
     let style_locator = metadata_locator(style_component);
     let stylesheet_identifier = selection
         .stylesheet_identifier
         .filter(|identifier| *identifier != 0)
-        .ok_or(SlideTableAppearanceError::UnsupportedDependency)?;
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
     let stylesheet_component =
         component_name_for_identifier(source, stylesheet_identifier, path, budget)?;
     let stylesheet_locator = metadata_locator(&stylesheet_component);
     let model_component = unique_metadata_component(&facts.components, model_locator)
-        .ok_or(SlideTableAppearanceError::UnsupportedDependency)?;
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
     let style_component_fact = unique_metadata_component(&facts.components, style_locator)
-        .ok_or(SlideTableAppearanceError::UnsupportedDependency)?;
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
     let stylesheet_component_fact =
         unique_metadata_component(&facts.components, stylesheet_locator)
-            .ok_or(SlideTableAppearanceError::UnsupportedDependency)?;
+            .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
     let model_selector = ComponentSelector::new(model_component.identifier, model_locator);
     let style_selector = ComponentSelector::new(style_component_fact.identifier, style_locator);
     let stylesheet_selector =
@@ -2249,7 +2276,7 @@ fn rewrite_metadata_for_style(
         || selection.style_ids[0] != selection.style_identifier
         || selection.style_count > MAX_STYLE_INHERITANCE_DEPTH
     {
-        return Err(SlideTableAppearanceError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     for style_identifier in &selection.style_ids[..selection.style_count] {
         let style_component_name =
@@ -2257,11 +2284,11 @@ fn rewrite_metadata_for_style(
         let style_component_locator = metadata_locator(&style_component_name);
         let style_component_fact =
             unique_metadata_component(&facts.components, style_component_locator)
-                .ok_or(SlideTableAppearanceError::UnsupportedDependency)?;
+                .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
         require_current_metadata_uuid(&facts, style_component_fact.identifier, *style_identifier)?;
     }
     if facts.identifiers.contains(&new_style) {
-        return Err(SlideTableAppearanceError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let old_style = selection.style_identifier;
     if facts
@@ -2269,7 +2296,7 @@ fn rewrite_metadata_for_style(
         .iter()
         .any(|binding| binding.object_identifier == new_style || binding.uuid == uuid)
     {
-        return Err(SlideTableAppearanceError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let model_style_cross_component = model_selector.identifier() != style_selector.identifier();
     budget.allocations(2)?;
@@ -2277,7 +2304,7 @@ fn rewrite_metadata_for_style(
     let mut model_style_objects = HashSet::new();
     model_style_objects
         .try_reserve(facts.external.len())
-        .map_err(|_| SlideTableAppearanceError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: facts.external.len(),
         })?;
     let mut selected_model_style_edges = 0usize;
@@ -2290,7 +2317,7 @@ fn rewrite_metadata_for_style(
         let object_identifier = reference
             .object_identifier
             .filter(|identifier| *identifier != 0)
-            .ok_or(SlideTableAppearanceError::UnsupportedDependency)?;
+            .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
         if !reference.source_current
             || reference.versioned
             || reference.weak == Some(true)
@@ -2299,7 +2326,7 @@ fn rewrite_metadata_for_style(
                 .object_with_component(object_identifier)
                 .is_none_or(|(component, _)| component != style_component)
         {
-            return Err(SlideTableAppearanceError::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         if object_identifier == old_style {
             selected_model_style_edges = selected_model_style_edges.saturating_add(1);
@@ -2309,14 +2336,14 @@ fn rewrite_metadata_for_style(
     if selected_model_style_edges != usize::from(model_style_cross_component)
         || (!model_style_cross_component && !model_style_objects.is_empty())
     {
-        return Err(SlideTableAppearanceError::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     let stylesheet_cross_component =
         style_selector.identifier() != stylesheet_selector.identifier();
     let mut style_stylesheet_objects = HashSet::new();
     style_stylesheet_objects
         .try_reserve(facts.external.len())
-        .map_err(|_| SlideTableAppearanceError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: facts.external.len(),
         })?;
     let mut selected_style_stylesheet_edges = 0usize;
@@ -2328,7 +2355,7 @@ fn rewrite_metadata_for_style(
         let object_identifier = reference
             .object_identifier
             .filter(|identifier| *identifier != 0)
-            .ok_or(SlideTableAppearanceError::UnsupportedDependency)?;
+            .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
         if !reference.source_current
             || reference.versioned
             || reference.weak == Some(true)
@@ -2337,7 +2364,7 @@ fn rewrite_metadata_for_style(
                 .object_with_component(object_identifier)
                 .is_none_or(|(component, _)| component != stylesheet_component)
         {
-            return Err(SlideTableAppearanceError::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         if object_identifier == stylesheet_identifier {
             selected_style_stylesheet_edges = selected_style_stylesheet_edges.saturating_add(1);
@@ -2346,7 +2373,7 @@ fn rewrite_metadata_for_style(
     if selected_style_stylesheet_edges != usize::from(stylesheet_cross_component)
         || (!stylesheet_cross_component && !style_stylesheet_objects.is_empty())
     {
-        return Err(SlideTableAppearanceError::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     budget.allocations(4)?;
     budget.scratch(
@@ -2356,18 +2383,18 @@ fn rewrite_metadata_for_style(
             .and_then(|size| {
                 size.checked_add(3usize.saturating_mul(size_of::<ComponentSelector<'_>>()))
             })
-            .ok_or(SlideTableAppearanceError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     let mut uuid_additions = Vec::new();
     uuid_additions
         .try_reserve_exact(1)
-        .map_err(|_| SlideTableAppearanceError::Allocation { amount: 1 })?;
+        .map_err(|_| Error::Allocation { amount: 1 })?;
     uuid_additions.push(ObjectUuidAddition::new(style_selector, new_style, uuid));
     let mut external_additions = Vec::new();
     if model_selector.identifier() != style_selector.identifier() {
         external_additions
             .try_reserve_exact(1)
-            .map_err(|_| SlideTableAppearanceError::Allocation { amount: 1 })?;
+            .map_err(|_| Error::Allocation { amount: 1 })?;
         external_additions.push(ExternalReferenceAddition::new(
             model_selector,
             style_selector,
@@ -2379,7 +2406,7 @@ fn rewrite_metadata_for_style(
     if model_style_cross_component {
         external_removals
             .try_reserve_exact(1)
-            .map_err(|_| SlideTableAppearanceError::Allocation { amount: 1 })?;
+            .map_err(|_| Error::Allocation { amount: 1 })?;
         external_removals.push(ExternalReferenceRemoval::new(
             model_selector,
             style_selector,
@@ -2390,7 +2417,7 @@ fn rewrite_metadata_for_style(
     let mut selectors = Vec::new();
     selectors
         .try_reserve_exact(3)
-        .map_err(|_| SlideTableAppearanceError::Allocation { amount: 2 })?;
+        .map_err(|_| Error::Allocation { amount: 2 })?;
     selectors.push(model_selector);
     for selector in [style_selector, stylesheet_selector] {
         if !selectors
@@ -2438,7 +2465,7 @@ fn rewrite_metadata_for_style(
         || report.retained_bytes() != requirements.retained_bytes()
         || report.scratch_bytes() > requirements.scratch_bytes()
     {
-        return Err(SlideTableAppearanceError::Verification);
+        return Err(Error::Verification);
     }
     rewrite_metadata_entry(source, output.into_bytes(), &metadata_route, path, budget)
 }
@@ -2447,15 +2474,15 @@ fn rewrite_metadata_entry(
     source: &Package,
     payload: Vec<u8>,
     route: &MetadataRoute,
-    _path: SlideTableAppearancePath,
+    _path: Path,
     budget: &mut AppearanceBudget,
-) -> Result<NativeAppearanceEdit, SlideTableAppearanceError> {
+) -> Result<NativeAppearanceEdit, Error> {
     let physical = physical_source(source)?;
     let entry = physical
         .package()
         .iter()
         .find(|entry| entry.name() == route.component_name && !entry.is_opaque())
-        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.physical(entry.data().len())?;
     budget.scratch(entry.data().len())?;
     budget.allocations(2)?;
@@ -2471,12 +2498,10 @@ fn rewrite_metadata_entry(
         .archive()
         .snappy_limits()
         .map_err(map_archive_error)?;
-    let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
-        .map_err(map_core_error)?;
+    let stream = SnappyStream::decompress(entry.data(), snappy_limits).map_err(map_core_error)?;
     budget.physical(stream.as_bytes().len())?;
     budget.retained(stream.as_bytes().len())?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     budget.objects(archive.objects.len())?;
     budget.messages(
         archive
@@ -2484,23 +2509,23 @@ fn rewrite_metadata_entry(
             .iter()
             .map(|object| object.messages.len())
             .try_fold(0usize, |total, count| total.checked_add(count))
-            .ok_or(SlideTableAppearanceError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     archive
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
         .map_err(map_core_error)?;
     let object = archive
         .object_mut(route.object_identifier)
-        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if object
         .messages
         .get(route.message_index)
         .is_none_or(|message| message.type_ != METADATA_MESSAGE_TYPE)
     {
-        return Err(SlideTableAppearanceError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             route.message_index,
             RawMessage {
                 type_: METADATA_MESSAGE_TYPE,
@@ -2510,26 +2535,24 @@ fn rewrite_metadata_entry(
         )
         .map_err(map_core_error)?;
     let encoded_len = archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_core_error)?;
     budget.output(encoded_len)?;
     budget.entry_bytes(encoded_len)?;
     budget.total_bytes(encoded_len)?;
     let compressed_bound =
-        SnappyStream::maximum_compressed_len(encoded_len).map_err(map_core_error)?;
+        SnappyStream::maximum_compressed_len(encoded_len, snappy_limits).map_err(map_core_error)?;
     budget.output(compressed_bound)?;
     budget.wire_output(compressed_bound)?;
     budget.entry_bytes(compressed_bound)?;
     budget.scratch(compressed_bound)?;
-    let bytes = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
+    let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     if bytes.len() != encoded_len {
-        return Err(SlideTableAppearanceError::Verification);
+        return Err(Error::Verification);
     }
-    let data = SnappyStream::compress(&bytes).map_err(map_core_error)?;
+    let data = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
     if data.len() > compressed_bound {
-        return Err(SlideTableAppearanceError::Verification);
+        return Err(Error::Verification);
     }
     budget.retained(data.len())?;
     budget.allocations(1)?;
@@ -2547,12 +2570,10 @@ fn replace_model_in_archive(
     new_style: u64,
     replacement: &[u8],
     limits: litchi_iwa_core::Limits,
-    path: SlideTableAppearancePath,
+    path: Path,
     budget: &mut AppearanceBudget,
-) -> Result<(), SlideTableAppearanceError> {
-    let object = archive
-        .object_mut(identifier)
-        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+) -> Result<(), Error> {
+    let object = archive.object_mut(identifier).ok_or(Error::InvalidSource)?;
     let mut indexes = object
         .messages
         .iter()
@@ -2561,42 +2582,42 @@ fn replace_model_in_archive(
     let message_index = indexes
         .next()
         .map(|(index, _)| index)
-        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if indexes.next().is_some() {
-        return Err(SlideTableAppearanceError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let info = object
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let before_len = info.object_references.len();
     budget.allocations(1)?;
     budget.scratch(
         before_len
             .checked_mul(size_of::<u64>())
-            .ok_or(SlideTableAppearanceError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     let before = info.object_references.clone();
     let frequencies = reference_frequencies(&before, budget)?;
     if frequencies.get(&old_style).copied() != Some(1) || before.contains(&new_style) {
-        return Err(SlideTableAppearanceError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let after_len = before_len;
     budget.allocations(1)?;
     budget.scratch(
         after_len
             .checked_mul(size_of::<u64>())
-            .ok_or(SlideTableAppearanceError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     let mut after = Vec::new();
     after
         .try_reserve_exact(after_len)
-        .map_err(|_| SlideTableAppearanceError::Allocation { amount: after_len })?;
+        .map_err(|_| Error::Allocation { amount: after_len })?;
     after.extend(before.iter().copied().filter(|value| *value != old_style));
     after.push(new_style);
     if after.len() != after_len {
-        return Err(SlideTableAppearanceError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     budget.allocations(1)?;
     budget.scratch(replacement.len())?;
@@ -2630,19 +2651,19 @@ fn append_style_object(
     stylesheet: u64,
     payload: &[u8],
     limits: litchi_iwa_core::Limits,
-    _path: SlideTableAppearancePath,
+    _path: Path,
     budget: &mut AppearanceBudget,
-) -> Result<(), SlideTableAppearanceError> {
+) -> Result<(), Error> {
     if archive
         .objects
         .iter()
         .any(|object| object.archive_info.identifier == Some(identifier))
     {
-        return Err(SlideTableAppearanceError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     budget.allocations(2)?;
     budget.scratch(payload.len())?;
-    let mut object = ArchiveObject::new_with_limits(
+    let mut object = ArchiveObject::new(
         identifier,
         vec![RawMessage {
             type_: TABLE_STYLE_MESSAGE_TYPE,
@@ -2654,12 +2675,11 @@ fn append_style_object(
     budget.allocations(
         8usize
             .checked_add(source_message_info.field_infos.len().saturating_mul(6))
-            .ok_or(SlideTableAppearanceError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     budget.scratch(message_info_clone_scratch(source_message_info)?)?;
     let mut cloned_info = source_message_info.clone();
-    cloned_info.length =
-        u32::try_from(payload.len()).map_err(|_| SlideTableAppearanceError::InvalidSource)?;
+    cloned_info.length = u32::try_from(payload.len()).map_err(|_| Error::InvalidSource)?;
     if !cloned_info.object_references.is_empty() {
         cloned_info.object_references.clear();
         cloned_info.object_references.push(new_parent);
@@ -2678,9 +2698,14 @@ fn append_style_object(
                 size_of::<litchi_iwa_core::FieldInfo>()
                     .checked_add(size_of::<u64>())
                     .and_then(|size| size.checked_add(2usize.saturating_mul(size_of::<u32>())))
-                    .ok_or(SlideTableAppearanceError::InvalidSource)?,
+                    .ok_or(Error::InvalidSource)?,
             )?;
-            let mut field = litchi_iwa_core::FieldInfo::new(vec![1, 3]);
+            let mut field = litchi_iwa_core::FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(vec![1, 3], litchi_iwa_core::Limits::default())
+                    .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap();
             field.r#type = Some(FieldType::ObjectReference);
             field.object_references.push(new_parent);
             cloned_info.field_infos.insert(0, field);
@@ -2691,14 +2716,12 @@ fn append_style_object(
     archive
         .objects
         .try_reserve_exact(1)
-        .map_err(|_| SlideTableAppearanceError::Allocation { amount: 1 })?;
+        .map_err(|_| Error::Allocation { amount: 1 })?;
     archive.objects.push(object);
     Ok(())
 }
 
-fn message_info_clone_scratch(
-    info: &litchi_iwa_core::MessageInfo,
-) -> Result<usize, SlideTableAppearanceError> {
+fn message_info_clone_scratch(info: &litchi_iwa_core::MessageInfo) -> Result<usize, Error> {
     let u32_items = info
         .versions
         .len()
@@ -2714,7 +2737,7 @@ fn message_info_clone_scratch(
                 .as_ref()
                 .map_or(Some(count), |path| count.checked_add(path.as_slice().len()))
         })
-        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let u64_items = info
         .object_references
         .len()
@@ -2726,7 +2749,7 @@ fn message_info_clone_scratch(
                     .and_then(|value| value.checked_add(field.data_references.len()))
             })
         })
-        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let field_u32_items = info
         .field_infos
         .iter()
@@ -2735,7 +2758,7 @@ fn message_info_clone_scratch(
                 .checked_add(field.path.as_slice().len())
                 .and_then(|value| value.checked_add(field.known_field_version.len()))
         })
-        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let text_bytes = info
         .field_infos
         .iter()
@@ -2747,7 +2770,7 @@ fn message_info_clone_scratch(
                     .map_or(0, String::len),
             )
         })
-        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     size_of::<litchi_iwa_core::MessageInfo>()
         .checked_add(
             info.field_infos
@@ -2758,7 +2781,7 @@ fn message_info_clone_scratch(
         .and_then(|size| size.checked_add(field_u32_items.saturating_mul(size_of::<u32>())))
         .and_then(|size| size.checked_add(u64_items.saturating_mul(size_of::<u64>())))
         .and_then(|size| size.checked_add(text_bytes))
-        .ok_or(SlideTableAppearanceError::InvalidSource)
+        .ok_or(Error::InvalidSource)
 }
 
 fn replace_stylesheet_in_archive(
@@ -2767,12 +2790,10 @@ fn replace_stylesheet_in_archive(
     new_style: u64,
     replacement: &[u8],
     limits: litchi_iwa_core::Limits,
-    path: SlideTableAppearancePath,
+    path: Path,
     budget: &mut AppearanceBudget,
-) -> Result<(), SlideTableAppearanceError> {
-    let object = archive
-        .object_mut(identifier)
-        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+) -> Result<(), Error> {
+    let object = archive.object_mut(identifier).ok_or(Error::InvalidSource)?;
     let mut indexes = object
         .messages
         .iter()
@@ -2781,39 +2802,37 @@ fn replace_stylesheet_in_archive(
     let message_index = indexes
         .next()
         .map(|(index, _)| index)
-        .ok_or(SlideTableAppearanceError::UnsupportedDependency)?;
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
     if indexes.next().is_some() {
-        return Err(SlideTableAppearanceError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let info = object
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let before_len = info.object_references.len();
     budget.allocations(1)?;
     budget.scratch(
         before_len
             .checked_mul(size_of::<u64>())
-            .ok_or(SlideTableAppearanceError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     let before = info.object_references.clone();
     if before.contains(&new_style) {
-        return Err(SlideTableAppearanceError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
-    let after_len = before_len
-        .checked_add(1)
-        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+    let after_len = before_len.checked_add(1).ok_or(Error::InvalidSource)?;
     budget.allocations(1)?;
     budget.scratch(
         after_len
             .checked_mul(size_of::<u64>())
-            .ok_or(SlideTableAppearanceError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     let mut after = Vec::new();
     after
         .try_reserve_exact(after_len)
-        .map_err(|_| SlideTableAppearanceError::Allocation { amount: after_len })?;
+        .map_err(|_| Error::Allocation { amount: after_len })?;
     after.extend(before.iter().copied());
     after.push(new_style);
     budget.allocations(1)?;
@@ -2846,14 +2865,14 @@ fn replace_message_with_reference_transition(
     field_references: Option<(&[u64], &[u64])>,
     required_field_path: bool,
     limits: litchi_iwa_core::Limits,
-    _path: SlideTableAppearancePath,
+    _path: Path,
     budget: &mut AppearanceBudget,
-) -> Result<(), SlideTableAppearanceError> {
+) -> Result<(), Error> {
     let fields = object
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(SlideTableAppearanceError::InvalidSource)?
+        .ok_or(Error::InvalidSource)?
         .field_infos
         .as_slice();
     let expected_before = field_references.map_or(before, |(old, _)| old);
@@ -2865,26 +2884,26 @@ fn replace_message_with_reference_transition(
         .try_fold(0usize, |total, count| total.checked_add(count))
         .and_then(|count| count.checked_add(expected_after.len()))
         .and_then(|count| count.checked_mul(size_of::<u64>()))
-        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.scratch(field_scratch)?;
     let mut field_indices = Vec::new();
-    field_indices.try_reserve_exact(fields.len()).map_err(|_| {
-        SlideTableAppearanceError::Allocation {
+    field_indices
+        .try_reserve_exact(fields.len())
+        .map_err(|_| Error::Allocation {
             amount: fields.len(),
-        }
-    })?;
+        })?;
     let mut field_before = Vec::new();
-    field_before.try_reserve_exact(fields.len()).map_err(|_| {
-        SlideTableAppearanceError::Allocation {
+    field_before
+        .try_reserve_exact(fields.len())
+        .map_err(|_| Error::Allocation {
             amount: fields.len(),
-        }
-    })?;
+        })?;
     let mut field_after = Vec::new();
-    field_after.try_reserve_exact(fields.len()).map_err(|_| {
-        SlideTableAppearanceError::Allocation {
+    field_after
+        .try_reserve_exact(fields.len())
+        .map_err(|_| Error::Allocation {
             amount: fields.len(),
-        }
-    })?;
+        })?;
     for (index, field) in fields.iter().enumerate() {
         if field.path.as_slice() != field_path {
             let references_changed = field.object_references.iter().any(|identifier| {
@@ -2892,33 +2911,33 @@ fn replace_message_with_reference_transition(
                     || (after.contains(identifier) && !before.contains(identifier))
             });
             if references_changed {
-                return Err(SlideTableAppearanceError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             continue;
         }
         if !field_indices.is_empty() {
-            return Err(SlideTableAppearanceError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if field
             .r#type
             .is_some_and(|kind| kind != FieldType::ObjectReference)
         {
-            return Err(SlideTableAppearanceError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if field.object_references.as_slice() != expected_before {
-            return Err(SlideTableAppearanceError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field_indices.push(index);
         field_before.push(field.object_references.clone());
         field_after.push(expected_after.to_vec());
     }
     if required_field_path && field_indices.len() != 1 {
-        return Err(SlideTableAppearanceError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut transitions = Vec::new();
     transitions
         .try_reserve_exact(field_indices.len())
-        .map_err(|_| SlideTableAppearanceError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: field_indices.len(),
         })?;
     for index in 0..field_indices.len() {
@@ -2930,7 +2949,7 @@ fn replace_message_with_reference_transition(
         });
     }
     object
-        .replace_message_transitioning_object_references_preserving_header_with_limits(
+        .replace_message_transitioning_object_references_preserving_header(
             message_index,
             message,
             ObjectReferenceTransition {
@@ -2950,14 +2969,14 @@ fn verify_candidate_locality(
     expected_members: &[String],
     expected_preview_names: &[&'static str],
     budget: &mut AppearanceBudget,
-) -> Result<(), SlideTableAppearanceError> {
+) -> Result<(), Error> {
     let source_catalog = physical_source(source)?;
     let candidate_catalog = physical_source(candidate)?;
     let scan_bytes = source_catalog
         .shared_source()
         .len()
         .checked_add(candidate_catalog.shared_source().len())
-        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.transaction_work(scan_bytes)?;
     budget.work(scan_bytes)?;
     budget.allocations(1)?;
@@ -2966,42 +2985,34 @@ fn verify_candidate_locality(
             .len()
             .checked_mul(size_of::<String>())
             .and_then(|size| size.checked_add(scan_bytes))
-            .ok_or(SlideTableAppearanceError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     let source_previews =
         super::rendering_invalidation::root_preview_deletions(source_catalog.package())
-            .map_err(|_| SlideTableAppearanceError::Verification)?;
+            .map_err(|_| Error::Verification)?;
     let candidate_previews =
         super::rendering_invalidation::root_preview_deletions(candidate_catalog.package())
-            .map_err(|_| SlideTableAppearanceError::Verification)?;
+            .map_err(|_| Error::Verification)?;
     let preview_transition_is_forward =
         source_previews.names() == expected_preview_names && candidate_previews.names().is_empty();
     let preview_transition_is_inverse =
         source_previews.names().is_empty() && candidate_previews.names() == expected_preview_names;
     if !preview_transition_is_forward && !preview_transition_is_inverse {
-        return Err(SlideTableAppearanceError::Verification);
+        return Err(Error::Verification);
     }
-    let source_entries = entry_index(
-        source_catalog.package(),
-        budget,
-        SlideTableAppearanceError::Verification,
-    )?;
-    let candidate_entries = entry_index(
-        candidate_catalog.package(),
-        budget,
-        SlideTableAppearanceError::Verification,
-    )?;
+    let source_entries = entry_index(source_catalog.package(), budget, Error::Verification)?;
+    let candidate_entries = entry_index(candidate_catalog.package(), budget, Error::Verification)?;
     let mut expected_set = HashSet::new();
     expected_set
         .try_reserve(expected_members.len())
-        .map_err(|_| SlideTableAppearanceError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: expected_members.len(),
         })?;
     budget.retained(
         expected_members
             .len()
             .checked_mul(size_of::<&str>())
-            .ok_or(SlideTableAppearanceError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     for name in expected_members {
         expected_set.insert(name.as_str());
@@ -3020,11 +3031,11 @@ fn verify_candidate_locality(
                 let indexed_before = source_entries
                     .get(before.name())
                     .copied()
-                    .ok_or(SlideTableAppearanceError::Verification)?;
+                    .ok_or(Error::Verification)?;
                 let indexed_after = candidate_entries
                     .get(after.name())
                     .copied()
-                    .ok_or(SlideTableAppearanceError::Verification)?;
+                    .ok_or(Error::Verification)?;
                 let changed = indexed_before.raw_name() != indexed_after.raw_name()
                     || indexed_before.data() != indexed_after.data()
                     || indexed_before.metadata() != indexed_after.metadata()
@@ -3034,11 +3045,11 @@ fn verify_candidate_locality(
                         != indexed_after.raw_record().compressed_data();
                 let expected = expected_set.contains(before.name());
                 if changed != expected {
-                    return Err(SlideTableAppearanceError::Verification);
+                    return Err(Error::Verification);
                 }
             },
             (None, None) => break,
-            _ => return Err(SlideTableAppearanceError::Verification),
+            _ => return Err(Error::Verification),
         }
     }
     Ok(())
@@ -3049,7 +3060,7 @@ fn select_table_with_budget(
     slide_selector: SlideSelector<'_>,
     table_selector: TableSelector,
     budget: &mut AppearanceBudget,
-) -> Result<AppearanceSelection, SlideTableAppearanceError> {
+) -> Result<AppearanceSelection, Error> {
     let table_position = table_selector.as_position();
     let mut selected = None;
     let context = scan_tables_with_budget(
@@ -3061,9 +3072,9 @@ fn select_table_with_budget(
             selected: &mut selected,
         },
     )?;
-    let candidate = selected.ok_or(SlideTableAppearanceError::TablePositionNotFound {
+    let candidate = selected.ok_or(Error::Refused(Refusal::TablePositionNotFound {
         position: table_position,
-    })?;
+    }))?;
     let metadata_component = find_metadata_component(package, budget)?;
     Ok(appearance_selection_from_candidate(
         package,
@@ -3117,19 +3128,19 @@ fn scan_tables_with_budget(
     slide_selector: SlideSelector<'_>,
     budget: &mut AppearanceBudget,
     mode: &mut TableScanMode<'_>,
-) -> Result<SlideSelectionContext, SlideTableAppearanceError> {
+) -> Result<SlideSelectionContext, Error> {
     physical_source(package)?;
     budget.items(1)?;
     let slide_position = resolve_slide_position(package, slide_selector, budget)?;
     let record = package
         .slide_record_at(slide_position.get())
         .map_err(map_read_error)?
-        .ok_or(SlideTableAppearanceError::SlidePositionNotFound {
+        .ok_or(Error::Refused(Refusal::SlidePositionNotFound {
             position: slide_position,
-        })?;
+        }))?;
     let (_slide_component, slide) = package
         .object_with_component(record.slide_identifier)
-        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let (slide_message_index, slide_payload) = unique_message(slide, SLIDE_MESSAGE_TYPE)?;
     let limits = budget.residual_wire(package)?;
     let owned = repeated_references(slide_payload, SLIDE_OWNED_DRAWABLES_FIELD, limits, budget)?;
@@ -3137,8 +3148,8 @@ fn scan_tables_with_budget(
     if owned.len() > package.semantic_limits().max_references()
         || z_order.len() > package.semantic_limits().max_references()
     {
-        return Err(SlideTableAppearanceError::LimitExceeded {
-            kind: SlideTableAppearanceLimitKind::References,
+        return Err(Error::Limit {
+            kind: LimitKind::References,
             observed: owned.len().saturating_add(z_order.len()) as u64,
             maximum: package.semantic_limits().max_references() as u64,
         });
@@ -3188,7 +3199,7 @@ fn scan_tables_with_budget(
                         Appearance,
                         bool,
                     )>())
-                    .ok_or(SlideTableAppearanceError::InvalidSource)?,
+                    .ok_or(Error::InvalidSource)?,
             )?;
         },
         #[cfg(feature = "internal-iwork-source")]
@@ -3198,13 +3209,13 @@ fn scan_tables_with_budget(
                 z_order
                     .len()
                     .checked_mul(size_of::<Appearance>())
-                    .ok_or(SlideTableAppearanceError::InvalidSource)?,
+                    .ok_or(Error::InvalidSource)?,
             )?;
-            appearances.try_reserve_exact(z_order.len()).map_err(|_| {
-                SlideTableAppearanceError::Allocation {
+            appearances
+                .try_reserve_exact(z_order.len())
+                .map_err(|_| Error::Allocation {
                     amount: z_order.len(),
-                }
-            })?;
+                })?;
         },
     }
     let mut table_count = 0usize;
@@ -3212,7 +3223,7 @@ fn scan_tables_with_budget(
         let Some((table_info_component, table_info_object)) =
             package.object_with_component(table_info_identifier)
         else {
-            return Err(SlideTableAppearanceError::InvalidSource);
+            return Err(Error::InvalidSource);
         };
         if !table_info_object
             .messages
@@ -3224,12 +3235,12 @@ fn scan_tables_with_budget(
                 .iter()
                 .any(|message| is_appearance_role_message(message.type_))
             {
-                return Err(SlideTableAppearanceError::UnsupportedTopology);
+                return Err(Error::Refused(Refusal::UnsupportedTopology));
             }
             continue;
         }
         if !owned_set.contains(&table_info_identifier) {
-            return Err(SlideTableAppearanceError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         validate_role(
             table_info_object,
@@ -3247,7 +3258,7 @@ fn scan_tables_with_budget(
         let info = decode_table_info(info_payload, limits)?;
         let parent = table_parent(info_payload, limits)?;
         if parent != record.slide_identifier {
-            return Err(SlideTableAppearanceError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let model_identifier = info.table_model().identifier().get();
         validate_table_info_metadata(
@@ -3261,7 +3272,7 @@ fn scan_tables_with_budget(
         ensure_unique_identity(package, model_identifier, budget)?;
         let Some((model_component, model_object)) = package.object_with_component(model_identifier)
         else {
-            return Err(SlideTableAppearanceError::InvalidSource);
+            return Err(Error::InvalidSource);
         };
         // Type 6000 is the historical TableInfo/model role and is not a
         // canonical model when it appears on the model object itself.
@@ -3341,9 +3352,7 @@ fn scan_tables_with_budget(
             #[cfg(feature = "internal-iwork-source")]
             TableScanMode::Batch { appearances } => appearances.push(resolved.appearance),
         }
-        table_count = table_count
-            .checked_add(1)
-            .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        table_count = table_count.checked_add(1).ok_or(Error::InvalidSource)?;
     }
     Ok(SlideSelectionContext {
         slide_position,
@@ -3354,12 +3363,10 @@ fn scan_tables_with_budget(
     })
 }
 
-fn physical_source(
-    package: &Package,
-) -> Result<&litchi_iwa_archive::SourceCatalog, SlideTableAppearanceError> {
+fn physical_source(package: &Package) -> Result<&litchi_iwa_archive::SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
-        PhysicalSource::Semantic(_) => Err(SlideTableAppearanceError::UnsupportedSource),
+        PhysicalSource::Semantic(_) => Err(Error::Refused(Refusal::UnsupportedSource)),
     }
 }
 
@@ -3367,12 +3374,12 @@ fn resolve_slide_position(
     package: &Package,
     selector: SlideSelector<'_>,
     budget: &mut AppearanceBudget,
-) -> Result<Position, SlideTableAppearanceError> {
+) -> Result<Position, Error> {
     match selector {
         SlideSelector::Position(position) => Ok(position),
         SlideSelector::Name(name) => {
             if name.is_empty() {
-                return Err(SlideTableAppearanceError::EmptySlideName);
+                return Err(Error::Refused(Refusal::EmptySlideName));
             }
             let limits = budget.residual_wire(package)?;
             let mut selected = None;
@@ -3383,27 +3390,24 @@ fn resolve_slide_position(
                 };
                 let (_, slide) = package
                     .object_with_component(record.slide_identifier)
-                    .ok_or(SlideTableAppearanceError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
                 let (_, payload) = unique_message(slide, SLIDE_MESSAGE_TYPE)?;
                 budget.work(payload.len())?;
                 budget.wire_bytes(payload.len())?;
                 if slide_name(payload, limits)? == Some(name) {
                     if selected.replace(Position::new(index)).is_some() {
-                        return Err(SlideTableAppearanceError::AmbiguousSelector);
+                        return Err(Error::Refused(Refusal::AmbiguousSelector));
                     }
                 }
             }
-            selected.ok_or(SlideTableAppearanceError::SlideNameNotFound)
+            selected.ok_or(Error::Refused(Refusal::SlideNameNotFound))
         },
     }
 }
 
-fn unique_message(
-    object: &ArchiveObject,
-    message_type: u32,
-) -> Result<(usize, &[u8]), SlideTableAppearanceError> {
+fn unique_message(object: &ArchiveObject, message_type: u32) -> Result<(usize, &[u8]), Error> {
     if object.messages.len() != object.archive_info.message_infos.len() {
-        return Err(SlideTableAppearanceError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut selected = None;
     for (index, message) in object.messages.iter().enumerate() {
@@ -3411,25 +3415,19 @@ fn unique_message(
         if message.type_ == message_type
             && selected.replace((index, message.data.as_slice())).is_some()
         {
-            return Err(SlideTableAppearanceError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
-    selected.ok_or(SlideTableAppearanceError::InvalidSource)
+    selected.ok_or(Error::InvalidSource)
 }
 
-fn validate_message_header(
-    object: &ArchiveObject,
-    index: usize,
-) -> Result<(), SlideTableAppearanceError> {
-    let message = object
-        .messages
-        .get(index)
-        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+fn validate_message_header(object: &ArchiveObject, index: usize) -> Result<(), Error> {
+    let message = object.messages.get(index).ok_or(Error::InvalidSource)?;
     let info = object
         .archive_info
         .message_infos
         .get(index)
-        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if message.type_ != info.type_
         || usize::try_from(info.length).ok() != Some(message.data.len())
         || object.archive_info.should_merge == Some(true)
@@ -3439,7 +3437,7 @@ fn validate_message_header(
         || !info.fields_to_remove.is_empty()
         || !info.diff_read_version.is_empty()
     {
-        return Err(SlideTableAppearanceError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -3449,8 +3447,8 @@ fn repeated_references(
     field_number: u32,
     limits: WireLimits,
     budget: &mut AppearanceBudget,
-) -> Result<Vec<u64>, SlideTableAppearanceError> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+) -> Result<Vec<u64>, Error> {
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let field_count = fields.fields().count();
     budget.fields(field_count)?;
     budget.work(payload.len())?;
@@ -3464,7 +3462,7 @@ fn repeated_references(
     let mut values = Vec::new();
     values
         .try_reserve_exact(count)
-        .map_err(|_| SlideTableAppearanceError::Allocation { amount: count })?;
+        .map_err(|_| Error::Allocation { amount: count })?;
     budget.references(count)?;
     for field in fields
         .fields()
@@ -3472,32 +3470,29 @@ fn repeated_references(
     {
         field.validate_canonical_key().map_err(map_wire_error)?;
         if field.wire_type() != 2 {
-            return Err(SlideTableAppearanceError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         values.push(strict_reference(field.payload(), limits)?);
     }
     Ok(values)
 }
 
-fn slide_name(
-    payload: &[u8],
-    limits: WireLimits,
-) -> Result<Option<&str>, SlideTableAppearanceError> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+fn slide_name(payload: &[u8], limits: WireLimits) -> Result<Option<&str>, Error> {
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut name = None;
     for field in fields.fields().filter(|field| field.number() == 10) {
         field.validate_canonical_framing().map_err(map_wire_error)?;
         if field.wire_type() != 2 || name.replace(field.payload()).is_some() {
-            return Err(SlideTableAppearanceError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     name.map(str::from_utf8)
         .transpose()
-        .map_err(|_| SlideTableAppearanceError::InvalidSource)
+        .map_err(|_| Error::InvalidSource)
 }
 
-fn table_parent(payload: &[u8], limits: WireLimits) -> Result<u64, SlideTableAppearanceError> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+fn table_parent(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut super_payload = None;
     for field in fields
         .fields()
@@ -3505,12 +3500,12 @@ fn table_parent(payload: &[u8], limits: WireLimits) -> Result<u64, SlideTableApp
     {
         field.validate_canonical_key().map_err(map_wire_error)?;
         if field.wire_type() != 2 || super_payload.is_some() {
-            return Err(SlideTableAppearanceError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         super_payload = Some(field.payload());
     }
-    let super_payload = super_payload.ok_or(SlideTableAppearanceError::InvalidSource)?;
-    let drawable = WireView::parse_with_limits(super_payload, limits).map_err(map_wire_error)?;
+    let super_payload = super_payload.ok_or(Error::InvalidSource)?;
+    let drawable = WireView::parse(super_payload, limits).map_err(map_wire_error)?;
     let mut parent_payload = None;
     for field in drawable
         .fields()
@@ -3518,53 +3513,47 @@ fn table_parent(payload: &[u8], limits: WireLimits) -> Result<u64, SlideTableApp
     {
         field.validate_canonical_key().map_err(map_wire_error)?;
         if field.wire_type() != 2 || parent_payload.is_some() {
-            return Err(SlideTableAppearanceError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         parent_payload = Some(field.payload());
     }
-    strict_reference(
-        parent_payload.ok_or(SlideTableAppearanceError::InvalidSource)?,
-        limits,
-    )
+    strict_reference(parent_payload.ok_or(Error::InvalidSource)?, limits)
 }
 
-fn strict_reference(payload: &[u8], limits: WireLimits) -> Result<u64, SlideTableAppearanceError> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+fn strict_reference(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut identifier = None;
     for field in fields.fields() {
         field.validate_canonical_key().map_err(map_wire_error)?;
         if field.number() != 1 || field.wire_type() != 0 || identifier.is_some() {
-            return Err(SlideTableAppearanceError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
-        let (value, width) = decode_varint_from_bytes(field.payload())
-            .map_err(|_| SlideTableAppearanceError::InvalidSource)?;
+        let (value, width) =
+            decode_varint_from_bytes(field.payload()).map_err(|_| Error::InvalidSource)?;
         if value == 0 || width != encoded_len(value) {
-            return Err(SlideTableAppearanceError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         identifier = Some(value);
     }
-    identifier.ok_or(SlideTableAppearanceError::InvalidSource)
+    identifier.ok_or(Error::InvalidSource)
 }
 
-fn reject_duplicates(
-    values: &[u64],
-    budget: &mut AppearanceBudget,
-) -> Result<HashSet<u64>, SlideTableAppearanceError> {
+fn reject_duplicates(values: &[u64], budget: &mut AppearanceBudget) -> Result<HashSet<u64>, Error> {
     budget.allocations(1)?;
     budget.scratch(
         values
             .len()
             .checked_mul(size_of::<u64>())
-            .ok_or(SlideTableAppearanceError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     let mut seen = HashSet::new();
     seen.try_reserve(values.len())
-        .map_err(|_| SlideTableAppearanceError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: values.len(),
         })?;
     for value in values {
         if !seen.insert(*value) {
-            return Err(SlideTableAppearanceError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(seen)
@@ -3578,26 +3567,26 @@ fn reject_duplicates(
 fn entry_index<'a>(
     catalog: &'a Catalog,
     budget: &mut AppearanceBudget,
-    duplicate_error: SlideTableAppearanceError,
-) -> Result<HashMap<&'a str, &'a Entry>, SlideTableAppearanceError> {
+    duplicate_error: Error,
+) -> Result<HashMap<&'a str, &'a Entry>, Error> {
     let count = catalog.iter().count();
     budget.allocations(usize::from(count != 0))?;
     budget.retained(
         count
             .checked_mul(size_of::<(&str, &Entry)>())
-            .ok_or(SlideTableAppearanceError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     let mut index = HashMap::new();
     index
         .try_reserve(count)
-        .map_err(|_| SlideTableAppearanceError::Allocation { amount: count })?;
+        .map_err(|_| Error::Allocation { amount: count })?;
     for entry in catalog.iter() {
         budget.transaction_work(
             entry
                 .name()
                 .len()
                 .checked_add(1)
-                .ok_or(SlideTableAppearanceError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )?;
         if index.insert(entry.name(), entry).is_some() {
             return Err(duplicate_error);
@@ -3611,26 +3600,24 @@ fn entry_index<'a>(
 fn reference_frequencies(
     values: &[u64],
     budget: &mut AppearanceBudget,
-) -> Result<HashMap<u64, usize>, SlideTableAppearanceError> {
+) -> Result<HashMap<u64, usize>, Error> {
     budget.transaction_work(values.len())?;
     budget.allocations(usize::from(!values.is_empty()))?;
     budget.retained(
         values
             .len()
             .checked_mul(size_of::<(u64, usize)>())
-            .ok_or(SlideTableAppearanceError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     let mut frequencies = HashMap::new();
     frequencies
         .try_reserve(values.len())
-        .map_err(|_| SlideTableAppearanceError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: values.len(),
         })?;
     for value in values {
         let count = frequencies.entry(*value).or_insert(0usize);
-        *count = count
-            .checked_add(1)
-            .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        *count = count.checked_add(1).ok_or(Error::InvalidSource)?;
     }
     Ok(frequencies)
 }
@@ -3647,11 +3634,7 @@ fn is_appearance_role_message(message_type: u32) -> bool {
     )
 }
 
-fn validate_role(
-    object: &ArchiveObject,
-    expected_type: u32,
-    aliases: &[u32],
-) -> Result<(), SlideTableAppearanceError> {
+fn validate_role(object: &ArchiveObject, expected_type: u32, aliases: &[u32]) -> Result<(), Error> {
     let count = object
         .messages
         .iter()
@@ -3665,7 +3648,7 @@ fn validate_role(
                 .any(|message| message.type_ == *alias)
         })
     {
-        return Err(SlideTableAppearanceError::UnsupportedTopology);
+        return Err(Error::Refused(Refusal::UnsupportedTopology));
     }
     Ok(())
 }
@@ -3677,36 +3660,36 @@ fn validate_slide_metadata(
     owned: &[u64],
     z_order: &[u64],
     budget: &mut AppearanceBudget,
-) -> Result<(), SlideTableAppearanceError> {
+) -> Result<(), Error> {
     validate_message_header(object, index)?;
     let info = object
         .archive_info
         .message_infos
         .get(index)
-        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     validate_resolvable_aggregate_references(package, info, budget)?;
     let expected_capacity = owned
         .len()
         .checked_add(z_order.len())
-        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.allocations(2)?;
     budget.scratch(
         expected_capacity
             .checked_mul(size_of::<u64>())
-            .ok_or(SlideTableAppearanceError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     let mut expected = Vec::new();
-    expected.try_reserve_exact(expected_capacity).map_err(|_| {
-        SlideTableAppearanceError::Allocation {
+    expected
+        .try_reserve_exact(expected_capacity)
+        .map_err(|_| Error::Allocation {
             amount: expected_capacity,
-        }
-    })?;
+        })?;
     let mut expected_set = HashSet::new();
-    expected_set.try_reserve(expected_capacity).map_err(|_| {
-        SlideTableAppearanceError::Allocation {
+    expected_set
+        .try_reserve(expected_capacity)
+        .map_err(|_| Error::Allocation {
             amount: expected_capacity,
-        }
-    })?;
+        })?;
     for identifier in owned.iter().chain(z_order) {
         if expected_set.insert(*identifier) {
             expected.push(*identifier);
@@ -3717,7 +3700,7 @@ fn validate_slide_metadata(
         .iter()
         .any(|identifier| frequencies.get(identifier).copied() != Some(1))
     {
-        return Err(SlideTableAppearanceError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut owned_fields = 0usize;
     let mut z_order_fields = 0usize;
@@ -3729,10 +3712,10 @@ fn validate_slide_metadata(
                     .r#type
                     .is_some_and(|kind| kind != FieldType::ObjectReference)
                 {
-                    return Err(SlideTableAppearanceError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 if field.object_references.as_slice() != owned {
-                    return Err(SlideTableAppearanceError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
             },
             [SLIDE_Z_ORDER_FIELD] => {
@@ -3741,10 +3724,10 @@ fn validate_slide_metadata(
                     .r#type
                     .is_some_and(|kind| kind != FieldType::ObjectReference)
                 {
-                    return Err(SlideTableAppearanceError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 if field.object_references.as_slice() != z_order {
-                    return Err(SlideTableAppearanceError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
             },
             _ if field
@@ -3752,7 +3735,7 @@ fn validate_slide_metadata(
                 .iter()
                 .any(|identifier| expected_set.contains(identifier)) =>
             {
-                return Err(SlideTableAppearanceError::InvalidSource);
+                return Err(Error::InvalidSource);
             },
             _ => {},
         }
@@ -3762,7 +3745,7 @@ fn validate_slide_metadata(
     // must still occur exactly once, and any emitted route FieldInfos must be
     // complete and exact.
     if owned_fields > 1 || z_order_fields > 1 {
-        return Err(SlideTableAppearanceError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -3773,13 +3756,13 @@ fn validate_table_info_metadata(
     index: usize,
     model_identifier: u64,
     budget: &mut AppearanceBudget,
-) -> Result<(), SlideTableAppearanceError> {
+) -> Result<(), Error> {
     validate_message_header(object, index)?;
     let info = &object.archive_info.message_infos[index];
     validate_resolvable_aggregate_references(package, info, budget)?;
     let frequencies = reference_frequencies(&info.object_references, budget)?;
     if frequencies.get(&model_identifier).copied() != Some(1) {
-        return Err(SlideTableAppearanceError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut model_fields = 0usize;
     for field in &info.field_infos {
@@ -3790,14 +3773,14 @@ fn validate_table_info_metadata(
                 .is_some_and(|kind| kind != FieldType::ObjectReference)
                 || field.object_references.as_slice() != [model_identifier]
             {
-                return Err(SlideTableAppearanceError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         } else if field.object_references.contains(&model_identifier) {
-            return Err(SlideTableAppearanceError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     if model_fields > 1 {
-        return Err(SlideTableAppearanceError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -3809,7 +3792,7 @@ fn validate_model_metadata(
     style_identifier: u64,
     style_preset_identifier: Option<u64>,
     budget: &mut AppearanceBudget,
-) -> Result<(), SlideTableAppearanceError> {
+) -> Result<(), Error> {
     validate_message_header(object, index)?;
     let info = &object.archive_info.message_infos[index];
     validate_resolvable_aggregate_references(package, info, budget)?;
@@ -3821,7 +3804,7 @@ fn validate_model_metadata(
     if let Some((identifier, path)) = expected {
         let frequencies = reference_frequencies(&info.object_references, budget)?;
         if frequencies.get(&identifier).copied() != Some(1) {
-            return Err(SlideTableAppearanceError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let mut selected_fields = 0usize;
         for field in &info.field_infos {
@@ -3832,14 +3815,14 @@ fn validate_model_metadata(
                     .is_some_and(|kind| kind != FieldType::ObjectReference)
                     || field.object_references.as_slice() != [identifier]
                 {
-                    return Err(SlideTableAppearanceError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
             } else if field.object_references.contains(&identifier) {
-                return Err(SlideTableAppearanceError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
         if selected_fields > 1 {
-            return Err(SlideTableAppearanceError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(())
@@ -3853,7 +3836,7 @@ fn validate_style_metadata(
     stylesheet_identifier: u64,
     allow_aggregate_omission: bool,
     budget: &mut AppearanceBudget,
-) -> Result<(), SlideTableAppearanceError> {
+) -> Result<(), Error> {
     validate_message_header(object, index)?;
     let info = &object.archive_info.message_infos[index];
     validate_resolvable_aggregate_references(package, info, budget)?;
@@ -3864,10 +3847,10 @@ fn validate_style_metadata(
     expected.push(stylesheet_identifier);
     let aggregate_omitted = info.object_references.is_empty();
     if aggregate_omitted && !allow_aggregate_omission {
-        return Err(SlideTableAppearanceError::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     if !aggregate_omitted && info.object_references.as_slice() != expected.as_slice() {
-        return Err(SlideTableAppearanceError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut parent_field_count = 0usize;
     let mut stylesheet_field_count = 0usize;
@@ -3881,7 +3864,7 @@ fn validate_style_metadata(
                     .r#type
                     .is_some_and(|kind| kind != FieldType::ObjectReference)
             {
-                return Err(SlideTableAppearanceError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         } else if field.path.as_slice() == [1, 5] {
             stylesheet_field_count += 1;
@@ -3891,10 +3874,10 @@ fn validate_style_metadata(
                     .r#type
                     .is_some_and(|kind| kind != FieldType::ObjectReference)
             {
-                return Err(SlideTableAppearanceError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         } else {
-            return Err(SlideTableAppearanceError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     // Some native producers omit style aggregate metadata entirely.  The
@@ -3903,13 +3886,13 @@ fn validate_style_metadata(
     // aggregate/FieldInfo shape is narrow enough to copy to the fresh COW
     // style without inventing or dropping producer metadata.
     if aggregate_omitted && (parent_field_count != 0 || stylesheet_field_count != 0) {
-        return Err(SlideTableAppearanceError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if (parent_field_count != 0 || stylesheet_field_count != 0)
         && (parent_field_count != usize::from(parent_identifier.is_some())
             || stylesheet_field_count != 1)
     {
-        return Err(SlideTableAppearanceError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -3918,7 +3901,7 @@ fn validate_resolvable_aggregate_references(
     package: &Package,
     info: &litchi_iwa_core::MessageInfo,
     budget: &mut AppearanceBudget,
-) -> Result<(), SlideTableAppearanceError> {
+) -> Result<(), Error> {
     let max_field_references = info
         .field_infos
         .iter()
@@ -3937,12 +3920,12 @@ fn validate_resolvable_aggregate_references(
             .checked_add(info.data_references.len())
             .and_then(|count| count.checked_add(max_field_references))
             .and_then(|count| count.checked_mul(size_of::<u64>()))
-            .ok_or(SlideTableAppearanceError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     let mut object_references = HashSet::new();
     object_references
         .try_reserve(info.object_references.len())
-        .map_err(|_| SlideTableAppearanceError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: info.object_references.len(),
         })?;
     // Native producers can repeat unrelated references in aggregate and
@@ -3951,7 +3934,7 @@ fn validate_resolvable_aggregate_references(
     // occur exactly once and reject it on every unrelated field path.
     for identifier in &info.object_references {
         if *identifier == 0 {
-            return Err(SlideTableAppearanceError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if object_references.insert(*identifier) {
             ensure_unique_identity(package, *identifier, budget)?;
@@ -3960,26 +3943,26 @@ fn validate_resolvable_aggregate_references(
     let mut data_references = HashSet::new();
     data_references
         .try_reserve(info.data_references.len())
-        .map_err(|_| SlideTableAppearanceError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: info.data_references.len(),
         })?;
     for identifier in &info.data_references {
         if *identifier == 0 {
-            return Err(SlideTableAppearanceError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         data_references.insert(*identifier);
     }
     let mut field_references = HashSet::new();
     field_references
         .try_reserve(max_field_references)
-        .map_err(|_| SlideTableAppearanceError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: max_field_references,
         })?;
     for field in &info.field_infos {
         field_references.clear();
         for identifier in &field.object_references {
             if *identifier == 0 {
-                return Err(SlideTableAppearanceError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             if field_references.insert(*identifier) {
                 ensure_unique_identity(package, *identifier, budget)?;
@@ -3988,7 +3971,7 @@ fn validate_resolvable_aggregate_references(
         field_references.clear();
         for identifier in &field.data_references {
             if *identifier == 0 {
-                return Err(SlideTableAppearanceError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             field_references.insert(*identifier);
         }
@@ -4006,7 +3989,7 @@ fn validate_stylesheet_registry(
     style_ids: &[u64],
     limits: WireLimits,
     budget: &mut AppearanceBudget,
-) -> Result<(), SlideTableAppearanceError> {
+) -> Result<(), Error> {
     let (snapshot, report) = appearance_codec::decode_stylesheet_with_report(
         payload,
         budget.codec_options(package, payload)?,
@@ -4015,30 +3998,30 @@ fn validate_stylesheet_registry(
     budget.codec_report(report)?;
     budget.styles(snapshot.style_count())?;
     if snapshot.style_count() == 0 || snapshot.style_count() < style_ids.len() {
-        return Err(SlideTableAppearanceError::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     budget.allocations(1)?;
     budget.scratch(
         snapshot
             .style_count()
             .checked_mul(size_of::<u64>())
-            .ok_or(SlideTableAppearanceError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     let mut registered = HashSet::new();
     registered
         .try_reserve(snapshot.style_count())
-        .map_err(|_| SlideTableAppearanceError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: snapshot.style_count(),
         })?;
     for field in fields.fields().filter(|field| field.number() == 1) {
         field.validate_canonical_framing().map_err(map_wire_error)?;
         if field.wire_type() != 2 {
-            return Err(SlideTableAppearanceError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let identifier = strict_reference(field.payload(), limits)?;
         if !registered.insert(identifier) {
-            return Err(SlideTableAppearanceError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     if registered.len() != snapshot.style_count()
@@ -4046,7 +4029,7 @@ fn validate_stylesheet_registry(
             .iter()
             .any(|identifier| !registered.contains(identifier))
     {
-        return Err(SlideTableAppearanceError::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     Ok(())
 }
@@ -4056,17 +4039,17 @@ fn validate_stylesheet_archive_metadata(
     identifier: u64,
     _limits: WireLimits,
     budget: &mut AppearanceBudget,
-) -> Result<(), SlideTableAppearanceError> {
+) -> Result<(), Error> {
     let (_, object) = package
         .object_with_component(identifier)
-        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let (message_index, _payload) = unique_message(object, TABLE_STYLESHEET_MESSAGE_TYPE)?;
     validate_message_header(object, message_index)?;
     let info = object
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     validate_resolvable_aggregate_references(package, info, budget)?;
     let mut registry_fields = 0usize;
     for field in &info.field_infos {
@@ -4077,12 +4060,12 @@ fn validate_stylesheet_archive_metadata(
                 .is_some_and(|kind| kind != FieldType::ObjectReference)
                 || field.object_references.as_slice() != info.object_references.as_slice()
             {
-                return Err(SlideTableAppearanceError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
     }
     if registry_fields > 1 {
-        return Err(SlideTableAppearanceError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -4104,7 +4087,7 @@ fn resolve_effective_appearance(
     style_preset_identifier: Option<u64>,
     limits: WireLimits,
     budget: &mut AppearanceBudget,
-) -> Result<ResolvedAppearance, SlideTableAppearanceError> {
+) -> Result<ResolvedAppearance, Error> {
     let mut preset_identifier = None;
     let mut network_identifier = None;
     let first_style_identifier = if style_identifier != 0 {
@@ -4113,7 +4096,7 @@ fn resolve_effective_appearance(
         ensure_unique_identity(package, preset, budget)?;
         let (_, preset_object) = package
             .object_with_component(preset)
-            .ok_or(SlideTableAppearanceError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         validate_role(
             preset_object,
             TABLE_STYLE_PRESET_MESSAGE_TYPE,
@@ -4137,12 +4120,12 @@ fn resolve_effective_appearance(
         let network = preset_snapshot
             .style_network_identifier()
             .filter(|value| *value != 0)
-            .ok_or(SlideTableAppearanceError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         validate_reference_metadata(preset_object, preset_index, &[network], &[3])?;
         ensure_unique_identity(package, network, budget)?;
         let (_, network_object) = package
             .object_with_component(network)
-            .ok_or(SlideTableAppearanceError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         validate_role(
             network_object,
             TABLE_STYLE_NETWORK_MESSAGE_TYPE,
@@ -4166,7 +4149,7 @@ fn resolve_effective_appearance(
         let network_references = network_reference_targets(network_payload, limits, budget)?;
         let style = network_snapshot.table_style_identifier();
         if style == 0 {
-            return Err(SlideTableAppearanceError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         validate_reference_metadata(network_object, network_index, &network_references, &[9])?;
         preset_identifier = Some(preset);
@@ -4201,11 +4184,11 @@ fn resolve_effective_appearance(
     let mut style_component_name = None;
     while let Some(identifier) = current {
         if style_ids[..style_count].contains(&identifier) {
-            return Err(SlideTableAppearanceError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if style_count == style_ids.len() {
-            return Err(SlideTableAppearanceError::LimitExceeded {
-                kind: SlideTableAppearanceLimitKind::WireNesting,
+            return Err(Error::Limit {
+                kind: LimitKind::WireNesting,
                 observed: (style_count + 1) as u64,
                 maximum: MAX_STYLE_INHERITANCE_DEPTH as u64,
             });
@@ -4213,9 +4196,9 @@ fn resolve_effective_appearance(
         ensure_unique_identity(package, identifier, budget)?;
         let (style_component, style_object) = package
             .object_with_component(identifier)
-            .ok_or(SlideTableAppearanceError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if style_component_name.is_some_and(|name| name != style_component) {
-            return Err(SlideTableAppearanceError::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         style_component_name = Some(style_component);
         validate_role(
@@ -4237,20 +4220,20 @@ fn resolve_effective_appearance(
         .map_err(map_appearance_codec_error)?;
         budget.codec_report(style_report)?;
         if style.is_variation() != style.parent_identifier().is_some() {
-            return Err(SlideTableAppearanceError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let sheet = style
             .stylesheet_identifier()
             .filter(|value| *value != 0)
-            .ok_or(SlideTableAppearanceError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if stylesheet_identifier.is_some_and(|previous| previous != sheet) {
-            return Err(SlideTableAppearanceError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         stylesheet_identifier = Some(sheet);
         ensure_unique_identity(package, sheet, budget)?;
         let (stylesheet_component, stylesheet_object) = package
             .object_with_component(sheet)
-            .ok_or(SlideTableAppearanceError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         validate_role(
             stylesheet_object,
             TABLE_STYLESHEET_MESSAGE_TYPE,
@@ -4284,13 +4267,9 @@ fn resolve_effective_appearance(
         style_count += 1;
         current = style.parent_identifier().filter(|value| *value != 0);
     }
-    let stylesheet_identifier =
-        stylesheet_identifier.ok_or(SlideTableAppearanceError::InvalidSource)?;
-    let stylesheet_payload = stylesheet_message_data(
-        package,
-        stylesheet_identifier,
-        SlideTableAppearancePath::Package,
-    )?;
+    let stylesheet_identifier = stylesheet_identifier.ok_or(Error::InvalidSource)?;
+    let stylesheet_payload =
+        stylesheet_message_data(package, stylesheet_identifier, Path::Package)?;
     validate_stylesheet_registry(
         package,
         stylesheet_payload,
@@ -4360,11 +4339,11 @@ fn validate_reference_metadata(
     index: usize,
     expected: &[u64],
     expected_path: &[u32],
-) -> Result<(), SlideTableAppearanceError> {
+) -> Result<(), Error> {
     validate_message_header(object, index)?;
     let info = &object.archive_info.message_infos[index];
     if info.object_references.as_slice() != expected {
-        return Err(SlideTableAppearanceError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut selected_fields = 0usize;
     for field in &info.field_infos {
@@ -4375,14 +4354,14 @@ fn validate_reference_metadata(
                 .is_some_and(|kind| kind != FieldType::ObjectReference)
                 || field.object_references.as_slice() != expected
             {
-                return Err(SlideTableAppearanceError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         } else if !field.object_references.is_empty() {
-            return Err(SlideTableAppearanceError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     if selected_fields > 1 {
-        return Err(SlideTableAppearanceError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -4391,21 +4370,21 @@ fn network_reference_targets(
     payload: &[u8],
     limits: WireLimits,
     budget: &mut AppearanceBudget,
-) -> Result<Vec<u64>, SlideTableAppearanceError> {
+) -> Result<Vec<u64>, Error> {
     budget.allocations(1)?;
     budget.scratch(
         9usize
             .checked_mul(size_of::<u64>())
-            .ok_or(SlideTableAppearanceError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     let mut references = Vec::new();
     references
         .try_reserve_exact(9)
-        .map_err(|_| SlideTableAppearanceError::Allocation { amount: 9 })?;
+        .map_err(|_| Error::Allocation { amount: 9 })?;
     for field_number in 1..=9 {
         let values = repeated_references(payload, field_number, limits, budget)?;
         if values.len() != 1 {
-            return Err(SlideTableAppearanceError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         references.push(values[0]);
     }
@@ -4416,7 +4395,7 @@ fn ensure_unique_identity(
     package: &Package,
     identifier: u64,
     budget: &mut AppearanceBudget,
-) -> Result<(), SlideTableAppearanceError> {
+) -> Result<(), Error> {
     let object_count = package
         .state
         .source
@@ -4424,7 +4403,7 @@ fn ensure_unique_identity(
         .iter()
         .map(|component| component.archive().objects.len())
         .try_fold(0usize, |total, count| total.checked_add(count))
-        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.transaction_work(object_count)?;
     let mut count = 0usize;
     for component in package.state.source.components().iter() {
@@ -4437,7 +4416,7 @@ fn ensure_unique_identity(
     if count == 1 {
         Ok(())
     } else {
-        Err(SlideTableAppearanceError::UnsupportedDependency)
+        Err(Error::Refused(Refusal::UnsupportedDependency))
     }
 }
 
@@ -4448,7 +4427,7 @@ fn ensure_unique_table_owner(
     z_order: &[u64],
     limits: WireLimits,
     budget: &mut AppearanceBudget,
-) -> Result<(), SlideTableAppearanceError> {
+) -> Result<(), Error> {
     let object_count = package
         .state
         .source
@@ -4456,10 +4435,10 @@ fn ensure_unique_table_owner(
         .iter()
         .map(|component| component.archive().objects.len())
         .try_fold(0usize, |total, count| total.checked_add(count))
-        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let scan_work = object_count
         .checked_add(z_order.len())
-        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.transaction_work(scan_work)?;
     budget.allocations(3)?;
     budget.scratch(
@@ -4472,12 +4451,12 @@ fn ensure_unique_table_owner(
                     .checked_mul(size_of::<usize>())
                     .and_then(|extra| size.checked_add(extra))
             })
-            .ok_or(SlideTableAppearanceError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     let mut z_order_set = HashSet::new();
     z_order_set
         .try_reserve(z_order.len())
-        .map_err(|_| SlideTableAppearanceError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: z_order.len(),
         })?;
     z_order_set.extend(z_order.iter().copied());
@@ -4485,7 +4464,7 @@ fn ensure_unique_table_owner(
         count + usize::from(z_order_set.contains(identifier))
     });
     if selected_table_count != z_order.len() {
-        return Err(SlideTableAppearanceError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut slide_owned_count = 0usize;
     let mut slide_z_order_count = 0usize;
@@ -4493,14 +4472,14 @@ fn ensure_unique_table_owner(
         z_order
             .len()
             .checked_mul(size_of::<(u64, usize)>())
-            .ok_or(SlideTableAppearanceError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     let mut model_owner_count = HashMap::new();
-    model_owner_count.try_reserve(z_order.len()).map_err(|_| {
-        SlideTableAppearanceError::Allocation {
+    model_owner_count
+        .try_reserve(z_order.len())
+        .map_err(|_| Error::Allocation {
             amount: z_order.len(),
-        }
-    })?;
+        })?;
     for component in package.state.source.components().iter() {
         for object in &component.archive().objects {
             for message in &object.messages {
@@ -4520,12 +4499,12 @@ fn ensure_unique_table_owner(
                         .checked_add(current_owned.iter().fold(0usize, |count, value| {
                             count + usize::from(z_order_set.contains(value))
                         }))
-                        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+                        .ok_or(Error::InvalidSource)?;
                     slide_z_order_count = slide_z_order_count
                         .checked_add(current_z.iter().fold(0usize, |count, value| {
                             count + usize::from(z_order_set.contains(value))
                         }))
-                        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+                        .ok_or(Error::InvalidSource)?;
                 }
             }
             if object
@@ -4536,9 +4515,7 @@ fn ensure_unique_table_owner(
                 if let Some(identifier) = object.archive_info.identifier {
                     if z_order_set.contains(&identifier) {
                         let count = model_owner_count.entry(identifier).or_insert(0usize);
-                        *count = count
-                            .checked_add(1)
-                            .ok_or(SlideTableAppearanceError::InvalidSource)?;
+                        *count = count.checked_add(1).ok_or(Error::InvalidSource)?;
                     }
                 }
             }
@@ -4559,7 +4536,7 @@ fn ensure_unique_table_owner(
                 .unwrap_or(true)
         })
     {
-        return Err(SlideTableAppearanceError::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     Ok(())
 }
@@ -4567,7 +4544,7 @@ fn ensure_unique_table_owner(
 fn find_metadata_component(
     package: &Package,
     budget: &mut AppearanceBudget,
-) -> Result<Option<Arc<str>>, SlideTableAppearanceError> {
+) -> Result<Option<Arc<str>>, Error> {
     package
         .state
         .source
@@ -4658,6 +4635,9 @@ impl ArchiveReferenceVisitor for AppearanceInboundVisitor<'_> {
         let source_is_show = source_message_type == SHOW_MESSAGE_TYPE;
         let source_is_show_aggregate =
             source_is_show && matches!(occurrence.scope, ArchiveReferenceScope::Message);
+        // A cell's rich-text storage names the stylesheet its paragraph
+        // styles live in (`TSWP.StorageArchive.style_sheet`, record 0412).
+        let source_is_storage = source_message_type == TEXT_STORAGE_MESSAGE_TYPE;
         let target = occurrence.referenced_identifier;
         if target == self.model_identifier {
             if occurrence.object_identifier != self.table_info_identifier
@@ -4717,11 +4697,20 @@ impl ArchiveReferenceVisitor for AppearanceInboundVisitor<'_> {
                 self.invalid = true;
             }
         } else if self.stylesheet_identifier == Some(target)
-            && (!source_is_style && !source_is_stylesheet && !source_is_show_aggregate
+            && (!source_is_style
+                && !source_is_stylesheet
+                && !source_is_show_aggregate
+                && !source_is_storage
                 || (source_is_style
                     && !self.occurrence_matches_field_path(occurrence, target, &[1, 5]))
                 || (source_is_stylesheet
-                    && !self.occurrence_matches_field_path(occurrence, target, &[1])))
+                    && !self.occurrence_matches_field_path(occurrence, target, &[1]))
+                || (source_is_storage
+                    && !self.occurrence_matches_field_path(
+                        occurrence,
+                        target,
+                        &[TEXT_STORAGE_STYLESHEET_FIELD],
+                    )))
         {
             self.invalid = true;
         }
@@ -4798,8 +4787,8 @@ fn validate_global_inbound_references(
     model_message_index: usize,
     resolved: &ResolvedAppearance,
     budget: &mut AppearanceBudget,
-) -> Result<(), SlideTableAppearanceError> {
-    let metadata = metadata_payload(package, SlideTableAppearancePath::Package, budget)?;
+) -> Result<(), Error> {
+    let metadata = metadata_payload(package, Path::Package, budget)?;
     budget.physical(metadata.len())?;
     budget.allocations(5)?;
     let mut metadata_facts = MetadataFacts::default();
@@ -4813,24 +4802,24 @@ fn validate_global_inbound_references(
     .map_err(map_metadata_error)?;
     budget.metadata_report(metadata_inspection.report())?;
     if metadata_facts.unknown {
-        return Err(SlideTableAppearanceError::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     budget.scratch(
         metadata_facts
             .data_identifiers
             .len()
             .checked_mul(size_of::<u64>())
-            .ok_or(SlideTableAppearanceError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     let mut data_identifiers = HashSet::new();
     data_identifiers
         .try_reserve(metadata_facts.data_identifiers.len())
-        .map_err(|_| SlideTableAppearanceError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: metadata_facts.data_identifiers.len(),
         })?;
     for identifier in metadata_facts.data_identifiers {
         if identifier == 0 {
-            return Err(SlideTableAppearanceError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         data_identifiers.insert(identifier);
     }
@@ -4842,12 +4831,12 @@ fn validate_global_inbound_references(
         .map_err(map_archive_error)?;
     let (_, table_info_object) = package
         .object_with_component(table_info_identifier)
-        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let table_info_message = table_info_object
         .archive_info
         .message_infos
         .get(table_info_message_index)
-        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let expected_model_edges = 1usize.saturating_add(
         table_info_message
             .field_infos
@@ -4885,7 +4874,7 @@ fn validate_global_inbound_references(
                     .iter()
                     .map(|object| object.messages.len())
                     .try_fold(0usize, |total, count| total.checked_add(count))
-                    .ok_or(SlideTableAppearanceError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
                 let component_references = component
                     .archive()
                     .objects
@@ -4893,17 +4882,17 @@ fn validate_global_inbound_references(
                     .flat_map(|object| object.archive_info.message_infos.iter())
                     .map(|message| message.object_references.len())
                     .try_fold(0usize, |total, count| total.checked_add(count))
-                    .ok_or(SlideTableAppearanceError::InvalidSource)?;
-                Ok::<_, SlideTableAppearanceError>((
+                    .ok_or(Error::InvalidSource)?;
+                Ok::<_, Error>((
                     objects
                         .checked_add(component_objects)
-                        .ok_or(SlideTableAppearanceError::InvalidSource)?,
+                        .ok_or(Error::InvalidSource)?,
                     messages
                         .checked_add(component_messages)
-                        .ok_or(SlideTableAppearanceError::InvalidSource)?,
+                        .ok_or(Error::InvalidSource)?,
                     references
                         .checked_add(component_references)
-                        .ok_or(SlideTableAppearanceError::InvalidSource)?,
+                        .ok_or(Error::InvalidSource)?,
                 ))
             },
         )?;
@@ -4911,14 +4900,14 @@ fn validate_global_inbound_references(
         scan_objects
             .checked_add(scan_messages)
             .and_then(|value| value.checked_add(scan_references))
-            .ok_or(SlideTableAppearanceError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     budget.allocations(scan_references)?;
     budget.scratch(scan_references.saturating_mul(size_of::<u32>()))?;
     for component in package.state.source.components().iter() {
         for object in &component.archive().objects {
             object
-                .inspect_references_with_policy_and_limits(
+                .inspect_references_with_policy(
                     &mut visitor,
                     ArchiveReferencePolicy::RejectUnknownMetadata,
                     archive_limits,
@@ -4927,8 +4916,8 @@ fn validate_global_inbound_references(
         }
     }
     if visitor.references > package.semantic_limits().max_references() {
-        return Err(SlideTableAppearanceError::LimitExceeded {
-            kind: SlideTableAppearanceLimitKind::References,
+        return Err(Error::Limit {
+            kind: LimitKind::References,
             observed: visitor.references as u64,
             maximum: package.semantic_limits().max_references() as u64,
         });
@@ -4943,7 +4932,7 @@ fn validate_global_inbound_references(
         model_identifier,
     )?;
     if visitor.invalid || visitor.model_edges != visitor.expected_model_edges || !selected_paths {
-        return Err(SlideTableAppearanceError::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     Ok(())
 }
@@ -4955,7 +4944,7 @@ fn validate_selected_edge_paths(
     table_info_identifier: u64,
     table_info_message_index: usize,
     model_identifier: u64,
-) -> Result<bool, SlideTableAppearanceError> {
+) -> Result<bool, Error> {
     let Some((_slide_component, slide)) = package.object_with_component(slide_identifier) else {
         return Ok(false);
     };
@@ -4991,138 +4980,120 @@ fn validate_selected_edge_paths(
     Ok(true)
 }
 
-fn map_read_error(error: ReadError) -> SlideTableAppearanceError {
+fn map_read_error(error: ReadError) -> Error {
     match error {
         ReadError::SemanticLimit {
             kind,
             observed,
             maximum,
             ..
-        } => SlideTableAppearanceError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                SemanticLimitKind::References => SlideTableAppearanceLimitKind::References,
-                SemanticLimitKind::Objects => SlideTableAppearanceLimitKind::PayloadObjects,
-                SemanticLimitKind::Slides => SlideTableAppearanceLimitKind::PayloadItems,
-                _ => SlideTableAppearanceLimitKind::WireWork,
+                SemanticLimitKind::References => LimitKind::References,
+                SemanticLimitKind::Objects => LimitKind::PayloadObjects,
+                SemanticLimitKind::Slides => LimitKind::PayloadItems,
+                _ => LimitKind::WireWork,
             },
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        ReadError::Allocation { amount, .. } => SlideTableAppearanceError::Allocation { amount },
-        _ => SlideTableAppearanceError::InvalidSource,
+        ReadError::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_metadata_error(error: metadata_codec::RewriteError) -> SlideTableAppearanceError {
+fn map_metadata_error(error: metadata_codec::RewriteError) -> Error {
     if let Some(limit) = error.resource_limit() {
         let (kind, observed, maximum) = match limit {
             metadata_codec::RewriteLimit::InputBytes { observed, maximum } => {
-                (SlideTableAppearanceLimitKind::InputBytes, observed, maximum)
+                (LimitKind::InputBytes, observed, maximum)
             },
-            metadata_codec::RewriteLimit::OutputBytes { observed, maximum } => (
-                SlideTableAppearanceLimitKind::OutputBytes,
-                observed,
-                maximum,
-            ),
+            metadata_codec::RewriteLimit::OutputBytes { observed, maximum } => {
+                (LimitKind::OutputBytes, observed, maximum)
+            },
             metadata_codec::RewriteLimit::Fields { observed, maximum } => {
-                (SlideTableAppearanceLimitKind::WireFields, observed, maximum)
+                (LimitKind::WireFields, observed, maximum)
             },
             metadata_codec::RewriteLimit::Work { observed, maximum } => {
-                (SlideTableAppearanceLimitKind::WireWork, observed, maximum)
+                (LimitKind::WireWork, observed, maximum)
             },
             metadata_codec::RewriteLimit::Nesting { observed, maximum } => (
-                SlideTableAppearanceLimitKind::WireNesting,
+                LimitKind::WireNesting,
                 usize::try_from(observed).unwrap_or(usize::MAX),
                 usize::try_from(maximum).unwrap_or(usize::MAX),
             ),
             metadata_codec::RewriteLimit::Components { observed, maximum } => {
-                (SlideTableAppearanceLimitKind::Components, observed, maximum)
+                (LimitKind::Components, observed, maximum)
             },
             metadata_codec::RewriteLimit::References { observed, maximum } => {
-                (SlideTableAppearanceLimitKind::References, observed, maximum)
+                (LimitKind::References, observed, maximum)
             },
-            metadata_codec::RewriteLimit::Additions { observed, maximum } => (
-                SlideTableAppearanceLimitKind::PayloadItems,
-                observed,
-                maximum,
-            ),
-            _ => return SlideTableAppearanceError::InvalidSource,
+            metadata_codec::RewriteLimit::Additions { observed, maximum } => {
+                (LimitKind::PayloadItems, observed, maximum)
+            },
+            _ => return Error::InvalidSource,
         };
-        return SlideTableAppearanceError::LimitExceeded {
+        return Error::Limit {
             kind,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some(amount) = error.allocation_request() {
-        return SlideTableAppearanceError::Allocation { amount };
+        return Error::Allocation { amount };
     }
-    SlideTableAppearanceError::InvalidSource
+    Error::InvalidSource
 }
 
-fn map_appearance_codec_error(error: appearance_codec::DecodeError) -> SlideTableAppearanceError {
+fn map_appearance_codec_error(error: appearance_codec::DecodeError) -> Error {
     if let Some(amount) = error.allocation_requested() {
-        return SlideTableAppearanceError::Allocation { amount };
+        return Error::Allocation { amount };
     }
     match error.resource_limit() {
-        Some(appearance_codec::DecodeLimit::InputBytes { observed, maximum }) => {
-            SlideTableAppearanceError::LimitExceeded {
-                kind: SlideTableAppearanceLimitKind::WireBytes,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        Some(appearance_codec::DecodeLimit::InputBytes { observed, maximum }) => Error::Limit {
+            kind: LimitKind::WireBytes,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        Some(appearance_codec::DecodeLimit::OutputBytes { observed, maximum }) => {
-            SlideTableAppearanceError::LimitExceeded {
-                kind: SlideTableAppearanceLimitKind::WireOutputBytes,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        Some(appearance_codec::DecodeLimit::OutputBytes { observed, maximum }) => Error::Limit {
+            kind: LimitKind::WireOutputBytes,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        Some(appearance_codec::DecodeLimit::Fields { observed, maximum }) => {
-            SlideTableAppearanceError::LimitExceeded {
-                kind: SlideTableAppearanceLimitKind::WireFields,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        Some(appearance_codec::DecodeLimit::Fields { observed, maximum }) => Error::Limit {
+            kind: LimitKind::WireFields,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        Some(appearance_codec::DecodeLimit::WorkBytes { observed, maximum }) => {
-            SlideTableAppearanceError::LimitExceeded {
-                kind: SlideTableAppearanceLimitKind::WireWork,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        Some(appearance_codec::DecodeLimit::WorkBytes { observed, maximum }) => Error::Limit {
+            kind: LimitKind::WireWork,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        Some(appearance_codec::DecodeLimit::Nesting { observed, maximum }) => {
-            SlideTableAppearanceError::LimitExceeded {
-                kind: SlideTableAppearanceLimitKind::WireNesting,
-                observed: u64::from(observed),
-                maximum: u64::from(maximum),
-            }
+        Some(appearance_codec::DecodeLimit::Nesting { observed, maximum }) => Error::Limit {
+            kind: LimitKind::WireNesting,
+            observed: u64::from(observed),
+            maximum: u64::from(maximum),
         },
-        Some(appearance_codec::DecodeLimit::Styles { observed, maximum }) => {
-            SlideTableAppearanceError::LimitExceeded {
-                kind: SlideTableAppearanceLimitKind::Styles,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        Some(appearance_codec::DecodeLimit::Styles { observed, maximum }) => Error::Limit {
+            kind: LimitKind::Styles,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        Some(appearance_codec::DecodeLimit::Allocations { observed, maximum }) => {
-            SlideTableAppearanceError::LimitExceeded {
-                kind: SlideTableAppearanceLimitKind::Allocations,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        Some(appearance_codec::DecodeLimit::Allocations { observed, maximum }) => Error::Limit {
+            kind: LimitKind::Allocations,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        Some(_) => SlideTableAppearanceError::InvalidSource,
-        None => SlideTableAppearanceError::InvalidSource,
+        Some(_) => Error::InvalidSource,
+        None => Error::InvalidSource,
     }
 }
 
 fn decode_table_info(
     payload: &[u8],
     limits: WireLimits,
-) -> Result<table_info_codec::TableInfoSnapshot, SlideTableAppearanceError> {
+) -> Result<table_info_codec::TableInfoSnapshot, Error> {
     table_info_codec::decode_table_info(
         payload,
         table_info_codec::DecodeOptions::new(
@@ -5135,167 +5106,125 @@ fn decode_table_info(
     .map_err(map_table_info_error)
 }
 
-fn map_table_info_error(error: table_info_codec::DecodeError) -> SlideTableAppearanceError {
+fn map_table_info_error(error: table_info_codec::DecodeError) -> Error {
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return SlideTableAppearanceError::LimitExceeded {
-            kind: SlideTableAppearanceLimitKind::WireFields,
+        return Error::Limit {
+            kind: LimitKind::WireFields,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return SlideTableAppearanceError::LimitExceeded {
-            kind: SlideTableAppearanceLimitKind::WireWork,
+        return Error::Limit {
+            kind: LimitKind::WireWork,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some(limit) = error.wire_resource_limit() {
         return match limit {
-            table_info_codec::WireResourceLimit::Bytes { observed, maximum } => {
-                SlideTableAppearanceError::LimitExceeded {
-                    kind: SlideTableAppearanceLimitKind::WireBytes,
-                    observed: observed.unwrap_or(0) as u64,
-                    maximum: maximum.unwrap_or(0) as u64,
-                }
+            table_info_codec::WireResourceLimit::Bytes { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireBytes,
+                observed: observed.unwrap_or(0) as u64,
+                maximum: maximum.unwrap_or(0) as u64,
             },
-            table_info_codec::WireResourceLimit::Nesting { observed, maximum } => {
-                SlideTableAppearanceError::LimitExceeded {
-                    kind: SlideTableAppearanceLimitKind::WireNesting,
-                    observed: observed.unwrap_or(0) as u64,
-                    maximum: maximum.unwrap_or(0) as u64,
-                }
+            table_info_codec::WireResourceLimit::Nesting { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireNesting,
+                observed: observed.unwrap_or(0) as u64,
+                maximum: maximum.unwrap_or(0) as u64,
             },
-            _ => SlideTableAppearanceError::InvalidSource,
+            _ => Error::InvalidSource,
         };
     }
-    SlideTableAppearanceError::InvalidSource
+    Error::InvalidSource
 }
 
-fn map_wire_error(error: litchi_iwa_common::Error) -> SlideTableAppearanceError {
+fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
     match error {
         litchi_iwa_common::Error::LimitExceeded {
             kind,
             observed,
             limit,
-        } => SlideTableAppearanceError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_common::LimitKind::InputBytes => {
-                    SlideTableAppearanceLimitKind::WireBytes
-                },
-                litchi_iwa_common::LimitKind::Fields => SlideTableAppearanceLimitKind::WireFields,
-                litchi_iwa_common::LimitKind::OutputBytes => {
-                    SlideTableAppearanceLimitKind::WireOutputBytes
-                },
-                litchi_iwa_common::LimitKind::Nesting => SlideTableAppearanceLimitKind::WireNesting,
-                litchi_iwa_common::LimitKind::RewriteWork => {
-                    SlideTableAppearanceLimitKind::WireWork
-                },
+                litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
+                litchi_iwa_common::LimitKind::Fields => LimitKind::WireFields,
+                litchi_iwa_common::LimitKind::OutputBytes => LimitKind::WireOutputBytes,
+                litchi_iwa_common::LimitKind::Nesting => LimitKind::WireNesting,
+                litchi_iwa_common::LimitKind::RewriteWork => LimitKind::WireWork,
                 litchi_iwa_common::LimitKind::TableRows
                 | litchi_iwa_common::LimitKind::TableColumns
                 | litchi_iwa_common::LimitKind::TableCells
-                | litchi_iwa_common::LimitKind::MaterializedCells => {
-                    SlideTableAppearanceLimitKind::PayloadItems
-                },
+                | litchi_iwa_common::LimitKind::MaterializedCells => LimitKind::PayloadItems,
             },
             observed: observed as u64,
             maximum: limit as u64,
         },
-        litchi_iwa_common::Error::Allocation { amount, .. } => {
-            SlideTableAppearanceError::Allocation { amount }
-        },
-        _ => SlideTableAppearanceError::InvalidSource,
+        litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_archive_error(error: litchi_iwa_archive::Error) -> SlideTableAppearanceError {
+fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     match error {
         litchi_iwa_archive::Error::Limit {
             kind,
             observed,
             maximum,
-        } => SlideTableAppearanceError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_archive::LimitKind::InputBytes => {
-                    SlideTableAppearanceLimitKind::InputBytes
-                },
-                litchi_iwa_archive::LimitKind::OutputBytes => {
-                    SlideTableAppearanceLimitKind::OutputBytes
-                },
-                litchi_iwa_archive::LimitKind::Entries => SlideTableAppearanceLimitKind::Entries,
+                litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
+                litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_archive::LimitKind::Entries => LimitKind::Entries,
                 litchi_iwa_archive::LimitKind::EntryBytes
                 | litchi_iwa_archive::LimitKind::CompressedEntryBytes
                 | litchi_iwa_archive::LimitKind::MemberNameBytes
-                | litchi_iwa_archive::LimitKind::MetadataBytes => {
-                    SlideTableAppearanceLimitKind::EntryBytes
-                },
-                litchi_iwa_archive::LimitKind::TotalBytes => {
-                    SlideTableAppearanceLimitKind::TotalBytes
-                },
-                litchi_iwa_archive::LimitKind::IwaStreamBytes => {
-                    SlideTableAppearanceLimitKind::WireBytes
-                },
-                litchi_iwa_archive::LimitKind::IwaTotalBytes => {
-                    SlideTableAppearanceLimitKind::TotalBytes
-                },
+                | litchi_iwa_archive::LimitKind::MetadataBytes => LimitKind::EntryBytes,
+                litchi_iwa_archive::LimitKind::TotalBytes => LimitKind::TotalBytes,
+                litchi_iwa_archive::LimitKind::IwaStreamBytes => LimitKind::WireBytes,
+                litchi_iwa_archive::LimitKind::IwaTotalBytes => LimitKind::TotalBytes,
             },
             observed,
             maximum,
         },
-        litchi_iwa_archive::Error::Allocation { amount, .. } => {
-            SlideTableAppearanceError::Allocation { amount }
-        },
+        litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
         litchi_iwa_archive::Error::Iwa(error) => map_core_error(error),
-        _ => SlideTableAppearanceError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_core_error(error: litchi_iwa_core::Error) -> SlideTableAppearanceError {
+fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
             kind,
             observed,
             maximum,
-        } => SlideTableAppearanceError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_core::LimitKind::Objects => {
-                    SlideTableAppearanceLimitKind::PayloadObjects
-                },
+                litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
                 litchi_iwa_core::LimitKind::Messages
-                | litchi_iwa_core::LimitKind::MessagesPerObject => {
-                    SlideTableAppearanceLimitKind::PayloadMessages
-                },
-                litchi_iwa_core::LimitKind::HeaderNesting => {
-                    SlideTableAppearanceLimitKind::WireNesting
-                },
-                litchi_iwa_core::LimitKind::HeaderFields => {
-                    SlideTableAppearanceLimitKind::WireFields
-                },
+                | litchi_iwa_core::LimitKind::MessagesPerObject => LimitKind::PayloadMessages,
+                litchi_iwa_core::LimitKind::HeaderNesting => LimitKind::WireNesting,
+                litchi_iwa_core::LimitKind::HeaderFields => LimitKind::WireFields,
                 litchi_iwa_core::LimitKind::ArchiveBytes
                 | litchi_iwa_core::LimitKind::ObjectBytes
                 | litchi_iwa_core::LimitKind::MessageBytes
                 | litchi_iwa_core::LimitKind::HeaderBytes
-                | litchi_iwa_core::LimitKind::HeaderMemoryBytes => {
-                    SlideTableAppearanceLimitKind::WireBytes
-                },
-                litchi_iwa_core::LimitKind::MetadataItems => {
-                    SlideTableAppearanceLimitKind::PayloadItems
-                },
+                | litchi_iwa_core::LimitKind::HeaderMemoryBytes => LimitKind::WireBytes,
+                litchi_iwa_core::LimitKind::MetadataItems => LimitKind::PayloadItems,
                 litchi_iwa_core::LimitKind::SnappyChunkBytes
                 | litchi_iwa_core::LimitKind::SnappyStreamBytes
                 | litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
-                | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes => {
-                    SlideTableAppearanceLimitKind::EntryBytes
-                },
-                litchi_iwa_core::LimitKind::SnappyFrames => SlideTableAppearanceLimitKind::Entries,
+                | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes => LimitKind::EntryBytes,
+                litchi_iwa_core::LimitKind::SnappyFrames => LimitKind::Entries,
             },
             observed: observed as u64,
             maximum: maximum as u64,
         },
         litchi_iwa_core::Error::Allocation { requested, .. } => {
-            SlideTableAppearanceError::Allocation { amount: requested }
+            Error::Allocation { amount: requested }
         },
-        _ => SlideTableAppearanceError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 

@@ -5,8 +5,8 @@
 )]
 
 use litchi_iwa_core::{
-    Archive, ArchiveLimits, ArchiveObject, Error, FieldInfo, FieldPath, FieldType, LimitKind,
-    RawMessage,
+    Archive, ArchiveObject, Error, FieldInfo, FieldPath, FieldType, LimitKind,
+    Limits as ArchiveLimits, RawMessage,
 };
 
 const ROOT_UNKNOWN: &[u8] = &[
@@ -33,15 +33,16 @@ fn clone_remap_scratch_obeys_header_memory_limit_for_a_small_source() -> Result<
             type_: 7,
             data: vec![1],
         }],
+        Default::default(),
     )?;
     let before = archive_object_bytes(&source)?;
     let limits = ArchiveLimits::default().with_header_memory_bytes(4096)?;
-    source.validate_with_limits(limits)?;
+    source.validate(limits)?;
     let remap = (100_u64..2100)
         .map(|identifier| (identifier, identifier + 10_000))
         .collect::<Vec<_>>();
     let error = source
-        .clone_with_identity_remap_with_limits(2, &remap, &source.messages, limits)
+        .clone_with_identity_remap(2, &remap, &source.messages, limits)
         .expect_err("the remap scratch exceeds the budget although the source fits");
     assert!(matches!(
         error,
@@ -77,7 +78,8 @@ fn clone_remaps_aggregate_and_field_objects_preserves_data_and_raw_header_spans(
         (47, 407),
     ];
 
-    let cloned = source.clone_with_identity_remap(401, &remap, &replacement_messages)?;
+    let cloned =
+        source.clone_with_identity_remap(401, &remap, &replacement_messages, Default::default())?;
 
     // The source is borrowed by the clone operation and remains byte-exact.
     assert_eq!(archive_object_bytes(&source)?, source_bytes);
@@ -121,7 +123,7 @@ fn clone_remaps_aggregate_and_field_objects_preserves_data_and_raw_header_spans(
             "retained raw header marker missing: {marker:?}"
         );
     }
-    let reparsed = Archive::parse(&cloned_bytes)?;
+    let reparsed = Archive::parse(&cloned_bytes, Default::default())?;
     assert_eq!(reparsed.objects.len(), 1);
     assert_eq!(reparsed.objects[0].messages, replacement_messages);
     assert_eq!(reparsed.objects[0].archive_info.identifier, Some(401));
@@ -148,6 +150,7 @@ fn clone_identity_self_map_is_byte_consistent_and_does_not_mutate_source() -> Re
         41,
         &[(41, 41), (42, 42), (44, 44), (45, 45), (46, 46), (47, 47)],
         &replacement_messages,
+        Default::default(),
     )?;
 
     assert_eq!(archive_object_bytes(&source)?, source_bytes);
@@ -181,7 +184,7 @@ fn clone_rejects_invalid_remaps_and_replacement_arity_atomically() -> Result<(),
     for remap in invalid_remaps {
         assert!(
             source
-                .clone_with_identity_remap(401, remap, &replacement_messages)
+                .clone_with_identity_remap(401, remap, &replacement_messages, Default::default())
                 .is_err()
         );
         assert_eq!(archive_object_bytes(&source)?, source_bytes);
@@ -190,7 +193,7 @@ fn clone_rejects_invalid_remaps_and_replacement_arity_atomically() -> Result<(),
     let too_few_messages = vec![replacement_messages[0].clone()];
     assert!(
         source
-            .clone_with_identity_remap(401, &valid_remap, &too_few_messages)
+            .clone_with_identity_remap(401, &valid_remap, &too_few_messages, Default::default())
             .is_err()
     );
     assert_eq!(archive_object_bytes(&source)?, source_bytes);
@@ -199,7 +202,7 @@ fn clone_rejects_invalid_remaps_and_replacement_arity_atomically() -> Result<(),
     wrong_type[1].type_ = 203;
     assert!(
         source
-            .clone_with_identity_remap(401, &valid_remap, &wrong_type)
+            .clone_with_identity_remap(401, &valid_remap, &wrong_type, Default::default())
             .is_err()
     );
     assert_eq!(archive_object_bytes(&source)?, source_bytes);
@@ -230,7 +233,7 @@ fn clone_with_finite_limits_fails_before_mutating_the_source() -> Result<(), Err
 
     let limits = ArchiveLimits::default().with_message_bytes(3)?;
     let error = source
-        .clone_with_identity_remap_with_limits(401, &remap, &replacement_messages, limits)
+        .clone_with_identity_remap(401, &remap, &replacement_messages, limits)
         .err();
     assert!(matches!(
         error,
@@ -243,7 +246,7 @@ fn clone_with_finite_limits_fails_before_mutating_the_source() -> Result<(), Err
 
     let limits = ArchiveLimits::default().with_metadata_items(1)?;
     let error = source
-        .clone_with_identity_remap_with_limits(401, &remap, &replacement_messages, limits)
+        .clone_with_identity_remap(401, &remap, &replacement_messages, limits)
         .err();
     assert!(matches!(
         error,
@@ -256,7 +259,7 @@ fn clone_with_finite_limits_fails_before_mutating_the_source() -> Result<(), Err
 
     let limits = ArchiveLimits::default().with_header_memory_bytes(1)?;
     let error = source
-        .clone_with_identity_remap_with_limits(401, &remap, &replacement_messages, limits)
+        .clone_with_identity_remap(401, &remap, &replacement_messages, limits)
         .err();
     assert!(matches!(
         error,
@@ -281,12 +284,7 @@ fn clone_with_finite_limits_fails_before_mutating_the_source() -> Result<(), Err
         (47, 407),
     ];
     let error = source
-        .clone_with_identity_remap_with_limits(
-            wide_identifier,
-            &wide_remap,
-            &replacement_messages,
-            limits,
-        )
+        .clone_with_identity_remap(wide_identifier, &wide_remap, &replacement_messages, limits)
         .err();
     assert!(matches!(
         error,
@@ -313,7 +311,7 @@ fn clone_with_finite_limits_fails_before_mutating_the_source() -> Result<(), Err
     ];
     let limits = ArchiveLimits::default().with_object_bytes(source_bytes.len())?;
     let error = source
-        .clone_with_identity_remap_with_limits(401, &remap, &grown_messages, limits)
+        .clone_with_identity_remap(401, &remap, &grown_messages, limits)
         .err();
     assert!(matches!(
         error,
@@ -342,7 +340,7 @@ fn clone_refuses_merge_and_diff_metadata_without_mutating_source() -> Result<(),
         let (source, source_bytes) = source;
         assert!(
             source
-                .clone_with_identity_remap(401, &remap, &replacement_messages)
+                .clone_with_identity_remap(401, &remap, &replacement_messages, Default::default())
                 .is_err()
         );
         assert_eq!(archive_object_bytes(&source)?, source_bytes);
@@ -363,20 +361,21 @@ fn source_object_with_adversarial_header() -> Result<(ArchiveObject, Vec<u8>), E
                 data: vec![0x22; 130],
             },
         ],
+        Default::default(),
     )?;
     let first = &mut object.archive_info.message_infos[0];
     first.object_references = vec![41, 42, 43];
     first.data_references = vec![9001];
     first.field_infos = vec![
         FieldInfo {
-            path: FieldPath::new(vec![7, 1]),
+            path: FieldPath::new(vec![7, 1], litchi_iwa_core::Limits::default()).unwrap(),
             r#type: Some(FieldType::ObjectReference),
             object_references: vec![44, 45],
             data_references: vec![901],
             ..FieldInfo::default()
         },
         FieldInfo {
-            path: FieldPath::new(vec![7, 2]),
+            path: FieldPath::new(vec![7, 2], litchi_iwa_core::Limits::default()).unwrap(),
             object_references: vec![46, 43],
             data_references: vec![902],
             ..FieldInfo::default()
@@ -386,17 +385,17 @@ fn source_object_with_adversarial_header() -> Result<(ArchiveObject, Vec<u8>), E
     second.object_references = vec![47, 48];
     second.data_references = vec![9002];
     second.field_infos = vec![FieldInfo {
-        path: FieldPath::new(vec![8]),
+        path: FieldPath::new(vec![8], litchi_iwa_core::Limits::default()).unwrap(),
         object_references: vec![41, 49],
         data_references: vec![903],
         ..FieldInfo::default()
     }];
-    object.validate()?;
+    object.validate(Default::default())?;
 
     let archive = Archive {
         objects: vec![object],
     };
-    let canonical = archive.to_bytes()?;
+    let canonical = archive.to_bytes(Default::default())?;
     let mut message_zero_suffix = vec![
         0x08, 0xe5, 0x00, // duplicate type = 101, overlong value
         0x18, 0x83, 0x00, // duplicate length = 3, overlong value
@@ -411,7 +410,7 @@ fn source_object_with_adversarial_header() -> Result<(ArchiveObject, Vec<u8>), E
     let with_message_zero =
         append_to_nested_message_info(&with_message_zero, 1, &message_one_suffix);
     let modified = append_to_archive_header(&with_message_zero, ROOT_UNKNOWN);
-    let parsed = Archive::parse(&modified)?;
+    let parsed = Archive::parse(&modified, Default::default())?;
     assert_eq!(parsed.objects.len(), 1);
     assert_eq!(archive_object_bytes(&parsed.objects[0])?, modified);
     Ok((
@@ -435,6 +434,7 @@ fn source_object_with_merge_metadata(
             type_: 101,
             data: vec![0x11; 3],
         }],
+        Default::default(),
     )?;
     object.archive_info.should_merge = should_merge.then_some(true);
     if diff_metadata {
@@ -443,7 +443,7 @@ fn source_object_with_merge_metadata(
     if base_metadata {
         object.archive_info.message_infos[0].base_message_index = Some(0);
     }
-    object.validate()?;
+    object.validate(Default::default())?;
     let bytes = archive_object_bytes(&object)?;
     Ok((object, bytes))
 }
@@ -452,7 +452,7 @@ fn archive_object_bytes(object: &ArchiveObject) -> Result<Vec<u8>, Error> {
     Archive {
         objects: vec![object.clone()],
     }
-    .to_bytes()
+    .to_bytes(Default::default())
 }
 
 fn archive_header(bytes: &[u8]) -> &[u8] {

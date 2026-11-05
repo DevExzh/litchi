@@ -1,3 +1,4 @@
+use super::LimitKind;
 use super::{Limits, RevisionType, parse_revisions_with_limits};
 use crate::Error;
 
@@ -141,7 +142,7 @@ fn numbering_original_and_grid_identifiers_are_charged_to_metadata_limits() {
             }
         ),
         Err(Error::RevisionLimit {
-            resource: "metadata bytes",
+            kind: LimitKind::MetadataBytes,
             ..
         })
     ));
@@ -155,7 +156,7 @@ fn numbering_original_and_grid_identifiers_are_charged_to_metadata_limits() {
             }
         ),
         Err(Error::RevisionLimit {
-            resource: "records",
+            kind: LimitKind::Records,
             ..
         })
     ));
@@ -169,7 +170,7 @@ fn numbering_original_and_grid_identifiers_are_charged_to_metadata_limits() {
             }
         ),
         Err(Error::RevisionLimit {
-            resource: "value bytes",
+            kind: LimitKind::ValueBytes,
             ..
         })
     ));

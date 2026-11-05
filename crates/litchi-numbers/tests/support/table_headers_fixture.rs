@@ -37,6 +37,7 @@ fn object(identifier: u64, message_type: u32, data: Vec<u8>) -> FixtureResult<Ar
             type_: message_type,
             data,
         }],
+        Default::default(),
     )?)
 }
 
@@ -72,6 +73,7 @@ fn sidecars() -> FixtureResult<ArchiveObject> {
             .encode_to_vec(),
         })
         .collect(),
+        Default::default(),
     )?)
 }
 
@@ -102,7 +104,8 @@ pub(crate) fn synthetic_package() -> FixtureResult<Vec<u8>> {
         &Archive {
             objects: vec![document, sheet],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
 
     let mut table_info_payload = Vec::new();
@@ -110,11 +113,13 @@ pub(crate) fn synthetic_package() -> FixtureResult<Vec<u8>> {
         &mut table_info_payload,
         1,
         &tsd::DrawableArchive::default().encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     append_length_delimited_field(
         &mut table_info_payload,
         2,
         &reference(TABLE_MODEL).encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     let mut table_info = object(TABLE_INFO, TABLE_INFO_MESSAGE_TYPE, table_info_payload)?;
     table_info.archive_info.message_infos[0].object_references = vec![TABLE_MODEL];
@@ -130,7 +135,8 @@ pub(crate) fn synthetic_package() -> FixtureResult<Vec<u8>> {
                 sidecars()?,
             ],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
 
     Ok(litchi_iwa_archive::package::to_bytes(
@@ -153,15 +159,16 @@ pub(crate) fn rewrite_tables(
     package: &[u8],
     mutate: impl FnOnce(&mut Archive) -> FixtureResult,
 ) -> FixtureResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == TABLES_MEMBER)
         .ok_or_else(|| io::Error::other("synthetic table component is missing"))?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let mut archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
     mutate(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(TABLES_MEMBER, &compressed)],
         Limits::default(),
@@ -185,6 +192,7 @@ pub(crate) fn append_reference_field(
         &mut data,
         field_number,
         &reference(identifier).encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     object.replace_message_preserving_header(
         message_index,
@@ -192,6 +200,7 @@ pub(crate) fn append_reference_field(
             type_: message_type,
             data,
         },
+        Default::default(),
     )?;
     if declare {
         object.archive_info.message_infos[message_index]
@@ -219,6 +228,7 @@ pub(crate) fn append_selected_model_raw(package: &[u8], raw: &[u8]) -> FixtureRe
                 type_: TABLE_MODEL_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -255,7 +265,7 @@ pub(crate) fn push_object(archive: &mut Archive, object: ArchiveObject) {
 }
 
 pub(crate) fn transaction_work_precharge(source: &[u8], target: &[u8]) -> FixtureResult<usize> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut observed = source.len().saturating_mul(2);
     if source != target {
         observed = observed.saturating_add(target.len().saturating_mul(2));
@@ -264,8 +274,8 @@ pub(crate) fn transaction_work_precharge(source: &[u8], target: &[u8]) -> Fixtur
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
         for object in &archive.objects {
             for message in &object.messages {
                 observed = observed.saturating_add(message.data.len().saturating_mul(16));

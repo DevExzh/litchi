@@ -2,20 +2,20 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::error::Result;
+use crate::error::{Error, Result};
 use litchi_ooxml_common::external_link::{
     EXTERNAL_WORKBOOK_RELATIONSHIP_TYPES, is_external_workbook_relationship,
 };
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::part::BlobPart;
-use litchi_opc::{OpcPackage, PackURI, Part};
+use litchi_opc::{OpcPackage, PackURI, Part, SourceLimits};
 
 use super::codec::{parse_external_link, patch_source};
 use super::model::{
     AlternateUrl, AlternateUrls, Conformance, Link, MAX_CACHE_TEXT_BYTES,
-    MAX_EXTERNAL_TARGET_BYTES, Target,
+    MAX_EXTERNAL_TARGET_BYTES, MAX_RELATIONSHIP_ID_BYTES, Target,
 };
-use super::{invalid, limit, validation};
+use super::{invalid, validation};
 
 /// One external-link part together with its workbook package relationship.
 ///
@@ -29,16 +29,21 @@ pub struct Entry {
     pub link: Link,
 }
 
-pub fn build_external_link_part(part_uri: PackURI, kind: &Link) -> Result<BlobPart> {
-    build_external_link_part_with_conformance(part_uri, kind, Conformance::Transitional)
+pub fn build_external_link_part(
+    part_uri: PackURI,
+    kind: &Link,
+    limits: &SourceLimits,
+) -> Result<BlobPart> {
+    build_external_link_part_with_conformance(part_uri, kind, Conformance::Transitional, limits)
 }
 
 pub fn build_external_link_part_with_conformance(
     part_uri: PackURI,
     kind: &Link,
     conformance: Conformance,
+    limits: &SourceLimits,
 ) -> Result<BlobPart> {
-    let xml = kind.to_xml_with_conformance(conformance)?;
+    let xml = kind.to_xml_with_conformance(conformance, limits)?;
     let mut part = BlobPart::new(
         part_uri,
         litchi_opc::constants::content_type::SML_EXTERNAL_LINK.into(),
@@ -151,7 +156,11 @@ fn validate_external_target(
         return Err(invalid(format!("{description} target must not be empty")));
     }
     if target.target().len() > MAX_EXTERNAL_TARGET_BYTES {
-        return Err(limit(&format!("{description} target URI")));
+        return Err(Error::limit(
+            super::LimitKind::TargetUri,
+            target.target().len(),
+            MAX_EXTERNAL_TARGET_BYTES,
+        ));
     }
     if target.target().chars().any(|character| {
         character.is_control() || character == '\u{fffe}' || character == '\u{ffff}'
@@ -160,9 +169,14 @@ fn validate_external_target(
             "{description} target URI contains an invalid character"
         )));
     }
-    if target.relationship_id().len() > 1024
-        || target.relationship_id().chars().any(char::is_control)
-    {
+    if target.relationship_id().len() > MAX_RELATIONSHIP_ID_BYTES {
+        return Err(Error::limit(
+            super::LimitKind::RelationshipIdBytes,
+            target.relationship_id().len(),
+            MAX_RELATIONSHIP_ID_BYTES,
+        ));
+    }
+    if target.relationship_id().chars().any(char::is_control) {
         return Err(invalid(format!("{description} relationship ID is invalid")));
     }
     if !allowed_types.contains(&target.relationship_type()) {
@@ -178,11 +192,17 @@ pub fn load_external_link(
     part: &dyn Part,
     workbook_relationship_id: String,
     index: u32,
+    limits: &SourceLimits,
 ) -> Result<Entry> {
-    if part.blob().len() > MAX_CACHE_TEXT_BYTES {
-        return Err(limit("external-link XML"));
+    let maximum = limits.max_part_bytes().min(MAX_CACHE_TEXT_BYTES as u64) as usize;
+    if part.blob().len() > maximum {
+        return Err(Error::limit(
+            super::LimitKind::XmlBytes,
+            part.blob().len(),
+            maximum,
+        ));
     }
-    let mut kind = parse_external_link(part.blob())?;
+    let mut kind = parse_external_link(part.blob(), limits)?;
     match &mut kind {
         Link::Workbook(book) => {
             resolve_external_target(part, &mut book.target, "externalBook")?;
@@ -281,7 +301,11 @@ fn resolve_external_target(
     }
     let target_ref = relationship.target_ref();
     if target_ref.len() > MAX_EXTERNAL_TARGET_BYTES {
-        return Err(limit(&format!("{description} target URI")));
+        return Err(Error::limit(
+            super::LimitKind::TargetUri,
+            target_ref.len(),
+            MAX_EXTERNAL_TARGET_BYTES,
+        ));
     }
     if target_ref.chars().any(|character| {
         character.is_control() || character == '\u{fffe}' || character == '\u{ffff}'
@@ -295,8 +319,8 @@ fn resolve_external_target(
 }
 
 /// Load every external-link part owned by the workbook.
-pub fn load_external_links(package: &OpcPackage) -> Result<Vec<Entry>> {
-    validate_graph(package)?;
+pub fn load_external_links(package: &OpcPackage, limits: &SourceLimits) -> Result<Vec<Entry>> {
+    validate_graph(package, limits)?;
     let workbook = package.main_document_part()?;
     require_workbook(workbook.content_type())?;
 
@@ -330,46 +354,30 @@ pub fn load_external_links(package: &OpcPackage) -> Result<Vec<Entry>> {
             part,
             relationship.r_id().to_owned(),
             index,
+            limits,
         )?);
     }
     Ok(entries)
 }
 
-/// Store an initial external-link catalog on a workbook with no existing
-/// external-link owner. Every target remains an inert OPC relationship.
-pub fn store_external_links(
-    package: &mut OpcPackage,
-    links: &[Link],
-    conformance: Conformance,
-) -> Result<Vec<Entry>> {
-    let before = load_external_links(package)?;
-    if !before.is_empty() {
-        return Err(invalid(
-            "workbook already contains external links; use a transaction to edit the catalog",
-        ));
-    }
-    let entries = allocate_entries(package, links)?;
-    validation::entries(&entries, conformance)?;
-    apply_entries(package, &[], &entries, conformance)?;
-    load_external_links(package)
-}
-
 /// Add one external link to the workbook and return its physical entry.
-pub fn add_external_link(
+#[cfg(test)]
+pub(crate) fn add_external_link(
     package: &mut OpcPackage,
     link: Link,
     conformance: Conformance,
 ) -> Result<Entry> {
-    let before = load_external_links(package)?;
+    let limits = package.read_limits();
+    let before = load_external_links(package, &limits)?;
     let mut after = before.clone();
     let entry = allocate_entries(package, std::slice::from_ref(&link))?
         .into_iter()
         .next()
         .ok_or_else(|| invalid("failed to allocate external-link entry"))?;
     after.push(entry.clone());
-    validation::entries(&after, conformance)?;
+    validation::entries(&after, conformance, &limits)?;
     apply_entries(package, &before, &after, conformance)?;
-    load_external_links(package)?
+    load_external_links(package, &limits)?
         .into_iter()
         .find(|candidate| candidate.relationship_id == entry.relationship_id)
         .ok_or_else(|| invalid("published external-link entry is absent"))
@@ -377,29 +385,36 @@ pub fn add_external_link(
 
 /// Replace one external link while retaining its workbook relationship and
 /// part identity.
-pub fn replace_external_link(
+#[cfg(test)]
+pub(crate) fn replace_external_link(
     package: &mut OpcPackage,
     index: usize,
     link: Link,
     conformance: Conformance,
 ) -> Result<Entry> {
-    let before = load_external_links(package)?;
+    let limits = package.read_limits();
+    let before = load_external_links(package, &limits)?;
     let mut after = before.clone();
     let entry = after
         .get_mut(index)
         .ok_or_else(|| invalid(format!("external-link index {index} is absent")))?;
     entry.link = link;
-    validation::entries(&after, conformance)?;
+    validation::entries(&after, conformance, &limits)?;
     apply_entries(package, &before, &after, conformance)?;
-    load_external_links(package)?
+    load_external_links(package, &limits)?
         .into_iter()
         .nth(index)
         .ok_or_else(|| invalid("published external-link entry is absent"))
 }
 
 /// Remove one external link and its unreferenced owned part.
-pub fn remove_external_link(package: &mut OpcPackage, index: usize) -> Result<Option<Entry>> {
-    let before = load_external_links(package)?;
+#[cfg(test)]
+pub(crate) fn remove_external_link(
+    package: &mut OpcPackage,
+    index: usize,
+) -> Result<Option<Entry>> {
+    let limits = package.read_limits();
+    let before = load_external_links(package, &limits)?;
     if index >= before.len() {
         return Ok(None);
     }
@@ -412,7 +427,7 @@ pub fn remove_external_link(package: &mut OpcPackage, index: usize) -> Result<Op
 
 /// Validate workbook ownership, nested target relationships, and orphan link
 /// parts without opening or refreshing any external target.
-pub fn validate_graph(package: &OpcPackage) -> Result<()> {
+pub fn validate_graph(package: &OpcPackage, limits: &SourceLimits) -> Result<()> {
     if package
         .rels()
         .iter()
@@ -457,7 +472,7 @@ pub fn validate_graph(package: &OpcPackage) -> Result<()> {
                 part.content_type()
             )));
         }
-        load_external_link(part, relationship.r_id().to_owned(), 0)?;
+        load_external_link(part, relationship.r_id().to_owned(), 0, limits)?;
     }
 
     for part in package.iter_parts().filter(|part| {
@@ -494,7 +509,8 @@ fn apply_entries_in_place(
     after: &[Entry],
     conformance: Conformance,
 ) -> Result<()> {
-    validation::entries(after, conformance)?;
+    let limits = package.read_limits();
+    validation::entries(after, conformance, &limits)?;
     let workbook_uri = package.main_document_part()?.partname().clone();
     let workbook = package.get_part(&workbook_uri)?;
     require_workbook(workbook.content_type())?;
@@ -530,7 +546,7 @@ fn apply_entries_in_place(
         let identity = (entry.relationship_id.clone(), entry.part_uri.clone());
         if let Some(previous) = before_by_identity.get(&identity) {
             if previous.link != entry.link {
-                replace_existing_part(package, previous, entry, conformance)?;
+                replace_existing_part(package, previous, entry, conformance, &limits)?;
             }
             continue;
         }
@@ -549,6 +565,7 @@ fn apply_entries_in_place(
             entry.part_uri.clone(),
             &entry.link,
             conformance,
+            &limits,
         )?;
         package.try_add_part(Box::new(part))?;
         if package
@@ -573,7 +590,7 @@ fn apply_entries_in_place(
             );
     }
 
-    validate_graph(package)
+    validate_graph(package, &limits)
 }
 
 fn replace_existing_part(
@@ -581,17 +598,23 @@ fn replace_existing_part(
     before: &Entry,
     after: &Entry,
     conformance: Conformance,
+    limits: &SourceLimits,
 ) -> Result<()> {
-    validation::link(&after.link, conformance)?;
+    validation::link(&after.link, conformance, limits)?;
     let part = package.get_part(&before.part_uri)?;
     if part.content_type() != litchi_opc::constants::content_type::SML_EXTERNAL_LINK {
         return Err(invalid("external-link replacement targets a non-link part"));
     }
-    if part.blob().len() > MAX_CACHE_TEXT_BYTES {
-        return Err(limit("external-link XML"));
+    let maximum = limits.max_part_bytes().min(MAX_CACHE_TEXT_BYTES as u64) as usize;
+    if part.blob().len() > maximum {
+        return Err(Error::limit(
+            super::LimitKind::XmlBytes,
+            part.blob().len(),
+            maximum,
+        ));
     }
     let source = part.blob().to_vec();
-    let updated = patch_source(&source, &before.link, &after.link, conformance)?;
+    let updated = patch_source(&source, &before.link, &after.link, conformance, limits)?;
     let current_targets = target_map(&before.link)?;
     let next_targets = target_map(&after.link)?;
 
@@ -662,6 +685,7 @@ fn update_target_relationships(
     Ok(())
 }
 
+#[cfg(test)]
 fn allocate_entries(package: &OpcPackage, links: &[Link]) -> Result<Vec<Entry>> {
     let workbook = package.main_document_part()?;
     let mut relationship_number = 1u32;

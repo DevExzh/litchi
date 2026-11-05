@@ -1,0 +1,96 @@
+{
+  "status": "slice verification; W4 acceptance remains pending",
+  "date": "2026-10-21",
+  "base_commit": "00b8074574",
+  "environment": "../.coord/w4-xlsx/env.sh, memory-capped cargo shim; no concurrent cargo job",
+  "checks": [
+    {
+      "name": "check",
+      "command": "cargo check -p litchi-xlsx -p litchi-ooxml-common -p litchi-ops -p litchi -p litchi-py --all-targets --all-features",
+      "exit_code": 0,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/restart-check.log",
+      "bytes": 5474,
+      "sha256": "8b9b6d66cff20f7b797004516674110ed4d1a02f194d17e0be77655376b88ac6"
+    },
+    {
+      "name": "libs",
+      "command": "cargo test -p litchi-xlsx -p litchi-ooxml-common --all-features --lib",
+      "exit_code": 0,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/restart-libs.log",
+      "bytes": 217062,
+      "sha256": "02740a54f2d26810de932330a2aec4994dacef1b9c78786c778ad9c9ed99bb03"
+    },
+    {
+      "name": "sources",
+      "command": "cargo test -p litchi-xlsx --all-features --test source_backed_cell_values --test source_backed_row_visibility --test byte_order_marked_parts",
+      "exit_code": 0,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/restart-sources.log",
+      "bytes": 8469,
+      "sha256": "955e99e36a1a316f2cecdcd772fb576debf6ed409fbb725a0b4dc797f042a13d"
+    },
+    {
+      "name": "clippy",
+      "command": "cargo clippy -p litchi-xlsx -p litchi-ooxml-common -p litchi-ops -p litchi -p litchi-py --all-targets --all-features -- -D warnings",
+      "exit_code": 0,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/restart-clippy.log",
+      "bytes": 443,
+      "sha256": "e4276e26b82a8fc9d6946ff7ac142aab6ced835d5a6dcd3ee2a82b2c934bdfbf"
+    },
+    {
+      "name": "docs",
+      "command": "RUSTDOCFLAGS=-Dwarnings cargo doc -p litchi-xlsx -p litchi-ooxml-common --no-deps --all-features",
+      "exit_code": 0,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/restart-docs.log",
+      "bytes": 1550,
+      "sha256": "70e2140d355b50c9af158e7e4c02f6b9b019f773fdc89f7483bc4acf3a86a4c8"
+    },
+    {
+      "name": "harness",
+      "command": "cargo check --manifest-path tools/perf-baseline/Cargo.toml --locked --all-targets",
+      "exit_code": 0,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/restart-harness.log",
+      "bytes": 2913,
+      "sha256": "de667bed3fbb143bf5c88ae1c820e35e1013f86f42e88f30e7c4ea59ff3526c4"
+    },
+    {
+      "name": "xlsx-minimal",
+      "command": "python3 tools/check_api_glossary.py --profile xlsx-minimal --target-dir target/gate",
+      "exit_code": 0,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/restart-xlsx-minimal.log",
+      "bytes": 1035,
+      "sha256": "d5c48c6bbf7804b89a82ff8972616667d6342e15e56cb4b6214f101ec35dffe0"
+    },
+    {
+      "name": "xlsx-full",
+      "command": "python3 tools/check_api_glossary.py --profile xlsx-full --target-dir target/gate",
+      "exit_code": 0,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/restart-xlsx-full.log",
+      "bytes": 1443,
+      "sha256": "d712a9934aa3a4ba9b405db27878cf902c9437acf168a5c79f277609872a091c"
+    },
+    {
+      "name": "ooxml-common-minimal",
+      "command": "python3 tools/check_api_glossary.py --profile ooxml-common-minimal --target-dir target/gate",
+      "exit_code": 0,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/restart-ooxml-common-minimal.log",
+      "bytes": 396,
+      "sha256": "405d274505f797987ee9d3f3354be17e764a8a0fcc9dc47d0f4bad5a34b1ebdd"
+    },
+    {
+      "name": "ooxml-common-full",
+      "command": "python3 tools/check_api_glossary.py --profile ooxml-common-full --target-dir target/gate",
+      "exit_code": 0,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/restart-ooxml-common-full.log",
+      "bytes": 299,
+      "sha256": "93ef756b868b6889dd41b06226b21e671cacc97af3e8303029b2d1a61e732bcf"
+    }
+  ],
+  "library_tests": {
+    "litchi-ooxml-common": 468,
+    "litchi-xlsx": 1801
+  },
+  "integration_tests": 97,
+  "tool_unit_tests": 35,
+  "inventory_flagged_rows": 0,
+  "inventory_limitation": "The inventory does not identify convenience aliases or empty LimitKind variants; those remain under manual review."
+}

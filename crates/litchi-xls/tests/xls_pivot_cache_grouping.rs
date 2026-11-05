@@ -2,12 +2,12 @@ use std::io::Cursor;
 use std::path::PathBuf;
 
 use litchi_xls::writer::{
-    PivotCacheValue, PivotFieldConfig, PivotItemConfig, PivotTableConfig, Writer,
+    Builder, PivotCacheValue, PivotFieldConfig, PivotItemConfig, PivotTableConfig,
 };
 use litchi_xls::{
     PivotCacheDateGroupUnit, PivotCacheDateGrouping, PivotCacheDateTime,
     PivotCacheDiscreteGrouping, PivotCacheGrouping, PivotCacheItem, PivotCacheNumericGrouping,
-    Workbook,
+    raw::Reader,
 };
 
 fn item(index: u16) -> PivotItemConfig {
@@ -55,13 +55,13 @@ fn config(
 }
 
 fn write_configs(configs: Vec<(&str, PivotTableConfig)>) -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     for (sheet_name, config) in configs {
         let sheet = writer.add_worksheet(sheet_name).unwrap();
         writer.add_pivot_table(sheet, config).unwrap();
     }
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 
@@ -171,7 +171,9 @@ fn discrete_config(sheet: &str) -> PivotTableConfig {
 }
 
 fn cache_records(bytes: &[u8], id: u16) -> Vec<(u16, Vec<u8>)> {
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     let stream = ole
         .open_stream(&["_SX_DB_CUR", &format!("{id:04X}")])
         .unwrap();
@@ -189,7 +191,9 @@ fn cache_records(bytes: &[u8], id: u16) -> Vec<(u16, Vec<u8>)> {
 }
 
 fn cache_stream(bytes: &[u8], id: u16) -> Vec<u8> {
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     ole.open_stream(&["_SX_DB_CUR", &format!("{id:04X}")])
         .unwrap()
 }
@@ -220,7 +224,7 @@ fn emits_and_reopens_exact_numeric_date_and_discrete_grouping_records() {
     assert_eq!(u16::from_le_bytes(sxdb.1[10..12].try_into().unwrap()), 1);
     assert_eq!(u16::from_le_bytes(sxdb.1[12..14].try_into().unwrap()), 2);
 
-    let workbook = Workbook::new(Cursor::new(bytes)).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes)).unwrap();
     assert_eq!(
         workbook
             .pivot_caches()
@@ -251,7 +255,7 @@ fn reads_libreoffice_number_and_date_grouping_fixtures() {
         "pivottable_number_grouping.xls",
         "pivottable_dates_grouping.xls",
     ] {
-        let workbook = Workbook::new(std::fs::File::open(root.join(file)).unwrap()).unwrap();
+        let workbook = Reader::new(std::fs::File::open(root.join(file)).unwrap()).unwrap();
         assert!(
             workbook
                 .pivot_caches()
@@ -264,7 +268,7 @@ fn reads_libreoffice_number_and_date_grouping_fixtures() {
 
 #[test]
 fn invalid_grouping_is_rejected_without_mutating_writer() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Atomic").unwrap();
     let mut invalid = numeric_config("Atomic");
     if let Some(PivotCacheGrouping::Numeric(grouping)) = &mut invalid.fields[0].grouping {
@@ -272,9 +276,9 @@ fn invalid_grouping_is_rejected_without_mutating_writer() {
     }
     assert!(writer.add_pivot_table(sheet, invalid).is_err());
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     assert!(
-        Workbook::new(Cursor::new(output.into_inner()))
+        Reader::new(Cursor::new(output.into_inner()))
             .unwrap()
             .pivot_caches()
             .is_empty()

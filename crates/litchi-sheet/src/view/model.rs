@@ -1,5 +1,6 @@
 //! Semantic worksheet-view model.
 
+use std::mem::size_of;
 use thiserror::Error as ThisError;
 
 use crate::{Cell, Column, Rect, Row};
@@ -398,6 +399,13 @@ impl Selection {
     #[must_use]
     pub fn ranges(&self) -> &[Rect] {
         &self.ranges
+    }
+
+    /// Return the exact heap allocation retained by the selected ranges.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn retained_bytes(&self) -> usize {
+        self.ranges.capacity().saturating_mul(size_of::<Rect>())
     }
 }
 

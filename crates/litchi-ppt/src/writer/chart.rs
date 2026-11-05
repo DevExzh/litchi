@@ -15,9 +15,9 @@
 //! # Example
 //!
 //! ```rust,no_run
-//! use litchi_ppt::writer::{Chart, ChartKind, Writer};
+//! use litchi_ppt::builder::{Builder, Chart, ChartKind};
 //!
-//! let mut writer = Writer::new();
+//! let mut writer = Builder::new();
 //! let slide = writer.add_slide()?;
 //!
 //! let mut chart = Chart::new(ChartKind::Bar);
@@ -32,7 +32,7 @@ use std::sync::Arc;
 
 use litchi_core::unit::emu_i32_to_ppt_master_i16_round;
 use litchi_ograph::chart::{
-    Ai, Binding, Cache, Chart as GraphChart, Count, DataKind, GraphFamily, Link, Owner, Role,
+    Ai, Binding, Cache, Count, DataKind, GraphFamily, Link, Model as GraphChart, Owner, Role,
     RowCol, Series, Source, Value,
 };
 use litchi_ograph::{Limits as GraphLimits, Package as GraphPackage};
@@ -217,8 +217,8 @@ impl Chart {
         if data_values > limits.max_cached_values {
             let observed = u64::try_from(data_values).unwrap_or(u64::MAX);
             let maximum = u64::try_from(limits.max_cached_values).unwrap_or(u64::MAX);
-            return Err(litchi_ograph::Error::LimitExceeded {
-                resource: "cached value count",
+            return Err(litchi_ograph::Error::Limit {
+                kind: litchi_ograph::LimitKind::CachedValues,
                 observed,
                 maximum,
             }
@@ -315,9 +315,11 @@ impl Chart {
                 ))?;
             }
         }
-        Ok(GraphPackage::from_chart_with_limits(graph, limits)?
-            .finish()
-            .into_bytes())
+        Ok(
+            GraphPackage::from_chart(graph, litchi_ograph::OpenOptions::new().limits(limits))?
+                .finish()
+                .into_bytes(),
+        )
     }
 }
 
@@ -352,6 +354,11 @@ pub(crate) struct ChartPlan {
 impl ChartPlan {
     /// The `ExOleEmbedContainer` record declaring this chart object.
     fn embed_container_bytes(&self) -> Result<Vec<u8>, WriteError> {
+        // Chart plans are fresh writer input: unlike an opened presentation,
+        // they have no retained source profile to propagate.  Use the
+        // canonical authoring profile here; source-backed object edits pass
+        // their opened profile through `Editor::source_limits`.
+        let authoring_limits = crate::SourceLimits::default();
         Definition {
             kind: ContainerKind::Embedded(EmbedPreferences {
                 color_follow: ColorFollow::EntireScheme,
@@ -373,7 +380,7 @@ impl ChartPlan {
             clipboard_name: None,
             metafile: None,
         }
-        .to_record_bytes()
+        .to_record_bytes(&authoring_limits)
         .map_err(|error| invalid(format!("chart object container is invalid: {error}")))
     }
 }
@@ -561,10 +568,12 @@ mod tests {
             persist_id: 7,
         }];
         let bytes = build_ex_obj_list(&hyperlinks, &plans).unwrap();
-        let (record, _) = crate::records::Record::parse(&bytes, 0).unwrap();
-        let collection = crate::embedded::object::Collection::parse(&record)
-            .unwrap()
-            .expect("chart object list");
+        let (record, _) =
+            crate::records::Record::parse(&bytes, 0, &crate::SourceLimits::default()).unwrap();
+        let collection =
+            crate::embedded::object::Collection::parse(&record, &crate::SourceLimits::default())
+                .unwrap()
+                .expect("chart object list");
         assert_eq!(collection.objects.len(), 1);
         let crate::embedded::object::ExternalObject::Object(definition) = &collection.objects[0]
         else {
@@ -583,9 +592,10 @@ mod tests {
         let frame =
             ChartFrame::new(914_400, 914_400, 3_657_600, 2_743_200, 42).expect("valid frame");
         let bytes = build_chart_sp_container(&frame, 1027).unwrap();
-        let (record, consumed) = litchi_odraw::Record::parse(&bytes, 0).unwrap();
+        let (record, consumed) =
+            litchi_odraw::Record::parse(&bytes, 0, litchi_odraw::Limits::default()).unwrap();
         assert_eq!(consumed, bytes.len());
-        let shape = litchi_odraw::shape::Shape::try_from(record).unwrap();
+        let shape = litchi_odraw::shape::Shape::from_record(record, Default::default()).unwrap();
         assert_eq!(shape.external_object_id().unwrap(), Some(42));
     }
 

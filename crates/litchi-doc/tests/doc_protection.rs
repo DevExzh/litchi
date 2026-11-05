@@ -35,7 +35,7 @@
 //! Tests for Word 2003 range-level protection tables (`SttbfBkmkProt`,
 //! `PlcfBkfProt`, `PlcfBklProt`, `SttbProtUser`; MS-DOC 2.9.283 and 2.9.293).
 //!
-//! No fixture in `test-data/` (or its `3rdparty/` sources) carries these
+//! No fixture in `test-data/` (or the upstream corpora it was drawn from) carries these
 //! tables — the only candidate hits were encrypted or fuzz-corrupted files —
 //! so the typed parsing itself is covered by synthesized table streams in the
 //! module's unit tests. These integration tests verify that real documents
@@ -54,7 +54,11 @@ fn fixture(relative: &str) -> PathBuf {
 }
 
 fn parse_protection(relative: &str) -> Option<Ranges> {
-    let mut ole = OleFile::open(File::open(fixture(relative)).unwrap()).unwrap();
+    let mut ole = OleFile::open(
+        File::open(fixture(relative)).unwrap(),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let word_document = ole.open_stream(&["WordDocument"]).unwrap();
     let fib = FileInformationBlock::parse(&word_document).unwrap();
     let table_name = if fib.which_table_stream() {
@@ -78,7 +82,7 @@ fn word_97_document_predating_the_tables_reports_none() {
 
 #[test]
 fn exposes_no_protected_ranges_through_the_document_api() {
-    let mut package = litchi_doc::Package::from_reader(
+    let mut package = litchi_doc::raw::Reader::from_reader(
         File::open(fixture("test-data/poi/test-data/document/47950_normal.doc")).unwrap(),
     )
     .unwrap();

@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+# The `officecli` stand-in of the OfficeCLI example-corpus harness (record
+# 0265). `tests/officecli_corpus.rs` puts this file first on PATH as
+# `officecli`, so a replayed example script reaches it for every `officecli`
+# call, including `$CLI` and `command officecli`. It translates the command
+# line to the `litchi` binary, runs it, records the call and returns
+# litchi's exit status.
+#
+# Environment (set by the test):
+#   LITCHI_CORPUS_BIN  the litchi binary under test
+#   LITCHI_CORPUS_LOG  the directory receiving one record per call
+#   OFFICECLI_LINE     the calling script line (exported by a DEBUG trap)
+#
+# Each record is a directory `<log>/<sequence>` holding `line`, `argv`
+# (NUL-separated OfficeCLI arguments), `status`, `stderr` and, when the line
+# needed a documented translation, `translated` (the delta's id).
+#
+# Translation (record 0265 §3; anything not listed passes through unchanged):
+#   open, close         resident-mode verbs: no-ops here (record 0256 D5),
+#                       recorded with status `skip`
+#   batch FILE          without --input/--commands reads stdin: `--input -`
+#   add F / --type slide
+#                       without a layout: OfficeCLI picks the deck's first
+#                       layout, Litchi requires a name (0256 D4), so the
+#                       first layout of Litchi's blank deck is named
+#                       (`layout=Title Slide`); the layout-type aliases
+#                       `blank` and `title` become the layout names
+#                       `Blank` and `Title Slide` (OfficeCLI matches layout
+#                       types too). Tagged `D4`.
+#   set, add, batch     gain `--unsupported warn` (record 0269): OfficeCLI
+#                       applies the supported properties of a command and
+#                       warns about the rest by default, Litchi only when
+#                       asked. A call that skipped properties exits 9 with
+#                       `warning[...]` lines and is recorded as `warned`.
+set -u
+log=${LITCHI_CORPUS_LOG:?LITCHI_CORPUS_LOG is not set}
+bin=${LITCHI_CORPUS_BIN:?LITCHI_CORPUS_BIN is not set}
+count=0
+[ -f "$log/count" ] && read -r count <"$log/count"
+count=$((count + 1))
+printf '%s\n' "$count" >"$log/count"
+record=$(printf '%s/%05d' "$log" "$count")
+mkdir "$record"
+printf '%s' "${OFFICECLI_LINE:-0}" >"$record/line"
+printf '%s\0' "$@" >"$record/argv"
+
+args=("$@")
+case "${1-}" in
+    set | add | batch) args+=(--unsupported warn) ;;
+esac
+case "${1-}" in
+    open | close)
+        printf 'skip' >"$record/status"
+        exit 0
+        ;;
+    batch)
+        stdin=1
+        for arg in "$@"; do
+            case "$arg" in
+                --input | --input=* | --commands | --commands=*) stdin=0 ;;
+            esac
+        done
+        if [ "$stdin" -eq 1 ]; then
+            args+=(--input -)
+        fi
+        ;;
+    add)
+        kind='' layout=-1
+        for ((i = 0; i < ${#args[@]}; i++)); do
+            case "${args[i]}" in
+                --type) kind=${args[i + 1]-} ;;
+                --type=*) kind=${args[i]#--type=} ;;
+                --prop) case "${args[i + 1]-}" in layout=*) layout=$((i + 1)) ;; esac ;;
+            esac
+        done
+        if [ "$kind" = slide ] || [ "$kind" = Slide ]; then
+            if [ "$layout" -lt 0 ]; then
+                args+=(--prop 'layout=Title Slide')
+                printf 'D4' >"$record/translated"
+            else
+                alias=''
+                case "${args[layout]}" in
+                    layout=blank) alias='layout=Blank' ;;
+                    layout=title) alias='layout=Title Slide' ;;
+                esac
+                if [ -n "$alias" ]; then
+                    args[layout]=$alias
+                    printf 'D4' >"$record/translated"
+                fi
+            fi
+        fi
+        ;;
+esac
+
+status=0
+"$bin" "${args[@]}" 2>"$record/stderr" || status=$?
+printf '%s' "$status" >"$record/status"
+exit "$status"

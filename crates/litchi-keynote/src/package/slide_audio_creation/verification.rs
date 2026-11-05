@@ -30,7 +30,9 @@ use super::{
     MOVIE_MESSAGE_TYPE, PACKAGE_METADATA_MESSAGE_TYPE, Package, SLIDE_MESSAGE_TYPE,
     SLIDE_NODE_MESSAGE_TYPE, STANDIN_CAPTION_MESSAGE_TYPE, STYLESHEET_MESSAGE_TYPE,
 };
-use crate::slide::audio::creation::{SlideAudioCreationError, SlideAudioCreationLimitKind};
+use crate::slide::audio::creation::{
+    Error as SlideAudioCreationError, LimitKind as SlideAudioCreationLimitKind,
+};
 
 const STANDARD_MESSAGE_VERSION: [u32; 3] = [1, 0, 5];
 const STANDIN_CAPTION_MESSAGE_VERSION: [u32; 3] = [10, 1, 0];
@@ -191,7 +193,7 @@ enum BuildEffect {
 /// Verify the complete graph produced by one fresh slide-audio publication.
 ///
 /// This witness is intentionally used for the initial candidate assembled by
-/// [`Package::add_slide_audio`].  A replay of an already-authorized exact
+/// [`crate::slide::audio::creation::Edit`].  A replay of an already-authorized exact
 /// artifact does not need to retain these private native identifiers: the
 /// artifact fingerprint and the package-level semantic checks are its source
 /// of truth.
@@ -872,7 +874,7 @@ fn verify_metadata(
 
 fn preserve_resource_error(error: SlideAudioCreationError) -> SlideAudioCreationError {
     match error {
-        error @ (SlideAudioCreationError::LimitExceeded { .. }
+        error @ (SlideAudioCreationError::Limit { .. }
         | SlideAudioCreationError::Allocation { .. }) => error,
         _ => SlideAudioCreationError::Verification,
     }
@@ -1222,7 +1224,7 @@ fn verify_message_header(
         .message_infos
         .first()
         .ok_or(SlideAudioCreationError::Verification)?;
-    if info.versions != versions
+    if info.versions.as_slice() != versions
         || info.object_references != object_references
         || info.data_references != data_references
     {
@@ -1449,8 +1451,8 @@ fn wire_view<'a>(
     limits: WireLimits,
     budget: &mut CreationBudget,
 ) -> Result<WireView<'a>, SlideAudioCreationError> {
-    let view = WireView::parse_with_limits(payload, limits)
-        .map_err(|_| SlideAudioCreationError::Verification)?;
+    let view =
+        WireView::parse(payload, limits).map_err(|_| SlideAudioCreationError::Verification)?;
     budget.charge_wire_fields(view.len())?;
     budget.charge_work(payload.len().max(1))?;
     for field in view.fields() {

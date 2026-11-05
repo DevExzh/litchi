@@ -38,21 +38,21 @@ const MARK: &str = "\u{feff}";
 
 #[test]
 fn test_create_empty_document() {
-    let doc = MutableDocument::new();
+    let doc = Document::new();
     assert_eq!(doc.paragraph_count(), 0);
     assert_eq!(doc.table_count(), 0);
 }
 
 #[test]
 fn test_add_paragraph() {
-    let mut doc = MutableDocument::new();
+    let mut doc = Document::new();
     doc.add_paragraph_with_text("Hello, World!");
     assert_eq!(doc.paragraph_count(), 1);
 }
 
 #[test]
 fn removing_alt_chunk_keeps_pending_toc_insertion_in_bounds() {
-    let mut doc = MutableDocument::new();
+    let mut doc = Document::new();
     let chunk = Chunk::new(Rel::new("rIdAlt1").unwrap(), None);
     doc.insert_alt(0, chunk, Conformance::Transitional).unwrap();
     doc.add_toc(TableOfContents::new()).unwrap();
@@ -67,7 +67,7 @@ fn removing_alt_chunk_keeps_pending_toc_insertion_in_bounds() {
 
 #[test]
 fn headings_use_style_ids_instead_of_display_names() {
-    let mut doc = MutableDocument::new();
+    let mut doc = Document::new();
     for level in 0..=9 {
         doc.add_heading(&format!("Level {level}"), level).unwrap();
     }
@@ -83,7 +83,7 @@ fn headings_use_style_ids_instead_of_display_names() {
 
 #[test]
 fn test_add_table() {
-    let mut doc = MutableDocument::new();
+    let mut doc = Document::new();
     let table = doc.add_table(2, 3);
     assert_eq!(table.row_count(), 2);
     table.cell(0, 0).unwrap().set_text("Cell 1");
@@ -92,7 +92,7 @@ fn test_add_table() {
 
 #[test]
 fn test_xml_generation() {
-    let mut doc = MutableDocument::new();
+    let mut doc = Document::new();
     doc.add_paragraph_with_text("Test paragraph");
 
     let xml = doc.to_xml().unwrap();
@@ -104,7 +104,7 @@ fn test_xml_generation() {
 
 #[test]
 fn test_run_formatting() {
-    let mut doc = MutableDocument::new();
+    let mut doc = Document::new();
     let para = doc.add_paragraph();
     para.add_run_with_text("Bold text").bold(true);
     para.add_run_with_text("Italic text").italic(true);
@@ -122,7 +122,7 @@ fn appending_preserves_existing_body_xml_exactly() {
   <x:custom><![CDATA[opaque <xml>]]></x:custom>
   <q:sectPr><q:pgSz q:w="20000" q:h="10000"/></q:sectPr>
 </q:body></q:document>"#;
-    let mut document = MutableDocument::from_xml(input).unwrap();
+    let mut document = Document::from_xml(input).unwrap();
     assert_eq!(document.paragraph_count(), 1);
     assert_eq!(document.table_count(), 1);
 
@@ -150,8 +150,8 @@ fn appending_preserves_existing_body_xml_exactly() {
 
 #[test]
 fn existing_document_parser_rejects_missing_or_truncated_body() {
-    assert!(MutableDocument::from_xml("<w:document/>").is_err());
-    assert!(MutableDocument::from_xml(
+    assert!(Document::from_xml("<w:document/>").is_err());
+    assert!(Document::from_xml(
             r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>"#
         )
         .is_err());
@@ -160,7 +160,7 @@ fn existing_document_parser_rejects_missing_or_truncated_body() {
 #[test]
 fn protection_patching_preserves_unrelated_settings_exactly() {
     let input = br#"<?xml version="1.0"?><q:settings xmlns:q="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:x="urn:extension"><!--before--><q:smartTagType q:namespaceuri="urn:test" q:name="person" q:url="https://example.test"/><q:documentProtection q:edit="readOnly" q:enforcement="1" x:keep="yes"/><x:opaque><![CDATA[a < b]]></x:opaque><q:doNotEmbedSmartTags/></q:settings>"#;
-    let mut document = MutableDocument::new();
+    let mut document = Document::new();
     document.set_protection_with_password(
         ProtectionType::Comments,
         "hash&\"value".into(),
@@ -179,7 +179,7 @@ fn protection_patching_preserves_unrelated_settings_exactly() {
 #[test]
 fn protection_patching_removes_only_protection_and_handles_empty_roots() {
     let input = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:zoom w:percent="125"/><w:documentProtection w:edit="forms"/><w:savePreviewPicture/></w:settings>"#;
-    let mut document = MutableDocument::new();
+    let mut document = Document::new();
     document.remove_protection();
     let output = document.generate_settings_xml(Some(input)).unwrap();
     assert_eq!(
@@ -212,8 +212,8 @@ fn protection_patching_removes_only_protection_and_handles_empty_roots() {
 #[test]
 fn a_byte_order_mark_shifts_no_preserved_body_range() {
     let marked = format!("{MARK}{INDENTED_BODY}");
-    let plain = MutableDocument::from_xml(INDENTED_BODY).unwrap();
-    let with_mark = MutableDocument::from_xml(&marked).unwrap();
+    let plain = Document::from_xml(INDENTED_BODY).unwrap();
+    let with_mark = Document::from_xml(&marked).unwrap();
 
     assert_eq!(with_mark.paragraph_count(), plain.paragraph_count());
     assert_eq!(with_mark.table_count(), plain.table_count());
@@ -227,7 +227,7 @@ fn a_byte_order_mark_shifts_no_preserved_body_range() {
 
 #[test]
 fn a_byte_order_mark_survives_one_appended_paragraph() {
-    let mut document = MutableDocument::from_xml(&format!("{MARK}{INDENTED_BODY}")).unwrap();
+    let mut document = Document::from_xml(&format!("{MARK}{INDENTED_BODY}")).unwrap();
     document.add_paragraph_with_text("appended");
 
     let output = document.to_xml().unwrap();
@@ -240,7 +240,7 @@ fn a_byte_order_mark_survives_one_appended_paragraph() {
 
 #[test]
 fn body_final_section_properties_must_remain_the_last_body_child() {
-    let refusal = match MutableDocument::from_xml(SECTION_BEFORE_ALT) {
+    let refusal = match Document::from_xml(SECTION_BEFORE_ALT) {
         Ok(_) => panic!("out-of-order section properties were admitted"),
         Err(error) => error.to_string(),
     };
@@ -249,7 +249,7 @@ fn body_final_section_properties_must_remain_the_last_body_child() {
         "{refusal}"
     );
     let marked = format!("{MARK}{SECTION_BEFORE_ALT}");
-    let marked_refusal = match MutableDocument::from_xml(&marked) {
+    let marked_refusal = match Document::from_xml(&marked) {
         Ok(_) => panic!("a byte order mark admitted out-of-order section properties"),
         Err(error) => error.to_string(),
     };

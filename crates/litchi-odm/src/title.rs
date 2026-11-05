@@ -1,28 +1,46 @@
-//! Source-checked master-document title transactions.
+//! Source-checked master-document title edits: the `title` family.
+//!
+//! [`Package::edit_title`](crate::Package::edit_title) stages an [`Edit`];
+//! [`Edit::commit`] publishes a new [`Package`] with its
+//! [`Patch`] and [`Diagnostics`];
+//! [`Package::apply_title`](crate::Package::apply_title) replays a patch onto
+//! its exact source.
 
-use litchi_core::{Error, Metadata, Result};
+use litchi_core::{Error as CoreError, Metadata, Result};
 use litchi_odf_common::core::{MetaXmlPatch, metadata::Metadata as OdfMetadata, patch_meta_xml};
-use std::sync::Arc;
+use std::{borrow::Cow, sync::Arc};
 
-use crate::Master;
+use crate::Package;
+
+type FamilyResult<T> = std::result::Result<T, Error>;
+
+/// Whether a commit changed the package bytes.
+pub use litchi_core::edit::Diagnostics;
+/// The family error: typed limits, refusals and patch conflicts plus the
+/// common-core payload.
+pub use litchi_odf_common::Error;
+/// The dimension named by [`Error::Limit`] and [`Error::InvalidLimit`].
+pub use litchi_odf_common::LimitKind;
+
+/// A committed title edit: the published package, its patch and diagnostics.
+pub type Commit = litchi_core::edit::Commit<Package, Patch>;
 
 const MAX_TITLE_BYTES: usize = 16 * 1024;
 
 /// An isolated title edit derived from one immutable master-document snapshot.
 pub struct Edit<'source> {
-    source: &'source Master,
-    source_meta_xml: Option<String>,
-    before: Option<String>,
-    after: Option<String>,
+    source: &'source Package,
+    before: Option<&'source str>,
+    after: Option<Cow<'source, str>>,
 }
 
 impl<'source> Edit<'source> {
-    pub(crate) fn new(source: &'source Master) -> Result<Self> {
+    pub(crate) fn new(source: &'source Package) -> Result<Self> {
+        let before = source.title();
         Ok(Self {
             source,
-            source_meta_xml: source.meta_xml()?,
-            before: source.title().map(str::to_owned),
-            after: source.title().map(str::to_owned),
+            after: before.map(Cow::Borrowed),
+            before,
         })
     }
 
@@ -38,10 +56,10 @@ impl<'source> Edit<'source> {
     ///
     /// Returns an error when the value is too large or cannot be represented
     /// as XML 1.0 text.
-    pub fn set(&mut self, value: impl Into<String>) -> Result<()> {
+    pub fn set(&mut self, value: impl Into<String>) -> FamilyResult<()> {
         let title = value.into();
         validate_title(&title)?;
-        self.after = Some(title);
+        self.after = Some(Cow::Owned(title));
         Ok(())
     }
 
@@ -60,19 +78,25 @@ impl<'source> Edit<'source> {
     ///
     /// Returns an error when the source metadata cannot be patched, the
     /// candidate package cannot be validated, or title readback differs.
-    pub fn commit(self) -> Result<Commit> {
-        if self.before == self.after {
+    pub fn commit(self) -> std::result::Result<Commit, Error> {
+        Ok(self.commit_core()?)
+    }
+
+    fn commit_core(self) -> Result<Commit> {
+        if self.before == self.after.as_deref() {
             let snapshot = self.source.clone();
-            return Ok(Commit::new(self.source, snapshot));
+            return Ok(commit(self.source, snapshot));
         }
         let source_meta_xml = self
-            .source_meta_xml
+            .source
+            .meta_xml()?
             .ok_or_else(|| invalid("ODM title editing requires an existing UTF-8 meta.xml part"))?;
-        let source_metadata = OdfMetadata::from_xml(&source_meta_xml)?;
+        let source_metadata =
+            OdfMetadata::from_xml(&source_meta_xml, self.source.xml_limits_value())?;
         let mut current = Metadata::from(source_metadata.clone());
-        current.title.clone_from(&self.after);
+        current.title = self.after.as_deref().map(str::to_owned);
         let patch = MetaXmlPatch::preserve_all().diff_simple_fields(&source_metadata, &current);
-        let meta_xml = patch_meta_xml(&source_meta_xml, &patch)?
+        let meta_xml = patch_meta_xml(&source_meta_xml, &patch, self.source.xml_limits_value())?
             .ok_or_else(|| invalid("ODM title editing requires an office:meta container"))?;
         if meta_xml.len() > source_meta_xml.len().saturating_add(MAX_TITLE_BYTES * 5) {
             return Err(invalid("ODM patched meta.xml exceeds the title edit limit"));
@@ -84,44 +108,17 @@ impl<'source> Edit<'source> {
                 "ODM title transaction readback differs from the staged title",
             ));
         }
-        Ok(Commit::new(self.source, snapshot))
+        Ok(commit(self.source, snapshot))
     }
 }
 
-/// A validated publication result containing a new master snapshot and patch.
-pub struct Commit {
-    snapshot: Master,
-    patch: Patch,
-}
-
-impl Commit {
-    fn new(before: &Master, snapshot: Master) -> Self {
-        Self {
-            patch: Patch {
-                before: before.shared_bytes(),
-                after: snapshot.shared_bytes(),
-            },
-            snapshot,
-        }
-    }
-
-    /// Returns the committed immutable snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Master {
-        &self.snapshot
-    }
-
-    /// Returns the exact-source-checked reversible patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consumes this result and returns the committed immutable snapshot.
-    #[must_use]
-    pub fn into_snapshot(self) -> Master {
-        self.snapshot
-    }
+fn commit(before: &Package, snapshot: Package) -> Commit {
+    let patch = Patch {
+        before: before.shared_bytes(),
+        after: snapshot.shared_bytes(),
+    };
+    let diagnostics = Diagnostics::new(!patch.is_noop());
+    Commit::new(snapshot, patch, diagnostics)
 }
 
 /// An exact-source-checked reversible master-document title patch.
@@ -134,7 +131,7 @@ pub struct Patch {
 impl Patch {
     /// Returns whether this patch applies to the exact source artifact.
     #[must_use]
-    pub fn is_applicable_to(&self, source: &Master) -> bool {
+    pub fn is_applicable_to(&self, source: &Package) -> bool {
         source.as_bytes() == self.before.as_slice()
     }
 
@@ -144,13 +141,19 @@ impl Patch {
     ///
     /// Returns an error when `source` is not byte-for-byte identical to the
     /// source snapshot accepted by this patch.
-    pub fn apply(&self, source: &Master) -> Result<Master> {
+    pub(crate) fn apply(&self, source: &Package) -> std::result::Result<Commit, Error> {
         if !self.is_applicable_to(source) {
-            return Err(invalid(
-                "ODM title patch source does not match its expected snapshot",
+            return Err(Error::patch_conflict(
+                "title.apply",
+                "the package is not the patch source",
             ));
         }
-        Master::from_shared_bytes(Arc::clone(&self.after))
+        let package = Package::from_shared_bytes(Arc::clone(&self.after))?;
+        Ok(Commit::new(
+            package,
+            self.clone(),
+            Diagnostics::new(!self.is_noop()),
+        ))
     }
 
     /// Returns the patch that restores the exact source package bytes.
@@ -184,6 +187,6 @@ pub(crate) fn validate_title(title: &str) -> Result<()> {
     Ok(())
 }
 
-fn invalid(message: &str) -> Error {
-    Error::InvalidFormat(message.to_owned())
+fn invalid(message: &str) -> CoreError {
+    CoreError::InvalidFormat(message.to_owned())
 }

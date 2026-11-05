@@ -8,9 +8,10 @@ use litchi_numbers_wire::table_merges;
 
 use super::super::table_lock;
 use super::{
-    BodyTableMergesError, map_lock_error, map_merge_error, map_package_error,
-    model_message_from_components, read_limits, select_reader_target,
+    Error, map_lock_error, map_merge_error, map_package_error, model_message_from_components,
+    read_limits, select_reader_target,
 };
+use crate::OpenOptions;
 use crate::selector::BodyTableSelector;
 use crate::table::merge::Region;
 
@@ -79,23 +80,21 @@ impl MergeReader {
     ///
     /// Returns a typed error when the path cannot be read, physical ingress
     /// exceeds its limits, or the source is not a valid Pages package.
-    pub fn open(path: impl AsRef<Path>) -> Result<Self, BodyTableMergesError> {
-        Self::open_with_limits(path, Limits::default())
+    pub fn open(path: impl AsRef<Path>) -> Result<Self, Error> {
+        Self::open_with_options(path, OpenOptions::default())
     }
 
-    /// Open a Pages package for lazy merged-cell queries under explicit
-    /// physical limits.
+    /// Open a Pages package for lazy merged-cell queries under the physical
+    /// source limits of `options`.
     ///
     /// # Errors
     ///
-    /// Returns the same typed failures as [`Self::from_bytes_with_limits`],
+    /// Returns the same typed failures as [`Self::from_bytes_with_options`],
     /// plus bounded filesystem ingress failures.
-    pub fn open_with_limits(
-        path: impl AsRef<Path>,
-        limits: Limits,
-    ) -> Result<Self, BodyTableMergesError> {
+    pub fn open_with_options(path: impl AsRef<Path>, options: OpenOptions) -> Result<Self, Error> {
+        let limits = archive_limits(options)?;
         let bytes = super::super::read_path(path.as_ref(), limits).map_err(map_package_error)?;
-        Self::from_shared_bytes_with_limits(bytes, limits)
+        Self::from_shared_bytes_with_archive_limits(bytes, limits)
     }
 
     /// Parse a Pages package for lazy merged-cell queries with default limits.
@@ -108,22 +107,20 @@ impl MergeReader {
     ///
     /// Returns a typed error when physical ingress, Pages root qualification,
     /// or the component object inventory is malformed.
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, BodyTableMergesError> {
-        Self::from_bytes_with_limits(bytes, Limits::default())
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+        Self::from_bytes_with_options(bytes, OpenOptions::default())
     }
 
-    /// Parse a Pages package for lazy merged-cell queries under explicit
-    /// physical limits.
+    /// Parse a Pages package for lazy merged-cell queries under the physical
+    /// source limits of `options`.
     ///
     /// # Errors
     ///
     /// Returns a typed error when physical ingress, Pages root qualification,
     /// or the component object inventory is malformed.
-    pub fn from_bytes_with_limits(
-        bytes: &[u8],
-        limits: Limits,
-    ) -> Result<Self, BodyTableMergesError> {
-        let source = SourceCatalog::from_bytes_with_limits(bytes, limits)
+    pub fn from_bytes_with_options(bytes: &[u8], options: OpenOptions) -> Result<Self, Error> {
+        let limits = archive_limits(options)?;
+        let source = SourceCatalog::from_bytes(bytes, limits)
             .map_err(|error| map_lock_error(table_lock::map_archive_error(error)))?;
         Self::from_components_with_limits(source.into_components(), limits)
     }
@@ -137,22 +134,29 @@ impl MergeReader {
     ///
     /// # Errors
     ///
-    /// Returns the same typed failures as [`Self::from_bytes_with_limits`].
-    pub fn from_shared_bytes(bytes: Arc<[u8]>) -> Result<Self, BodyTableMergesError> {
-        Self::from_shared_bytes_with_limits(bytes, Limits::default())
+    /// Returns the same typed failures as [`Self::from_bytes_with_options`].
+    pub fn from_shared_bytes(bytes: Arc<[u8]>) -> Result<Self, Error> {
+        Self::from_shared_bytes_with_options(bytes, OpenOptions::default())
     }
 
-    /// Parse an already-owned immutable Pages package under explicit physical
-    /// limits.
+    /// Parse an already-owned immutable Pages package under the physical
+    /// source limits of `options`.
     ///
     /// # Errors
     ///
-    /// Returns the same typed failures as [`Self::from_bytes_with_limits`].
-    pub fn from_shared_bytes_with_limits(
+    /// Returns the same typed failures as [`Self::from_bytes_with_options`].
+    pub fn from_shared_bytes_with_options(
+        bytes: Arc<[u8]>,
+        options: OpenOptions,
+    ) -> Result<Self, Error> {
+        Self::from_shared_bytes_with_archive_limits(bytes, archive_limits(options)?)
+    }
+
+    fn from_shared_bytes_with_archive_limits(
         bytes: Arc<[u8]>,
         limits: Limits,
-    ) -> Result<Self, BodyTableMergesError> {
-        let source = SourceCatalog::from_shared_bytes_with_limits(bytes, limits)
+    ) -> Result<Self, Error> {
+        let source = SourceCatalog::from_shared_bytes(bytes, limits)
             .map_err(|error| map_lock_error(table_lock::map_archive_error(error)))?;
         Self::from_components_with_limits(source.into_components(), limits)
     }
@@ -174,21 +178,21 @@ impl MergeReader {
     pub fn __from_shared_catalog(
         components: Arc<ComponentCatalog>,
         limits: Limits,
-    ) -> Result<Self, BodyTableMergesError> {
+    ) -> Result<Self, Error> {
         Self::from_shared_components_with_limits(components, limits)
     }
 
     fn from_components_with_limits(
         components: ComponentCatalog,
         limits: Limits,
-    ) -> Result<Self, BodyTableMergesError> {
+    ) -> Result<Self, Error> {
         Self::from_shared_components_with_limits(Arc::new(components), limits)
     }
 
     fn from_shared_components_with_limits(
         components: Arc<ComponentCatalog>,
         limits: Limits,
-    ) -> Result<Self, BodyTableMergesError> {
+    ) -> Result<Self, Error> {
         limits
             .effective_archive_limits()
             .map_err(|error| map_lock_error(table_lock::map_archive_error(error)))?;
@@ -214,10 +218,7 @@ impl MergeReader {
     /// Returns a typed selector, source, or finite-resource error. Malformed
     /// or overlapping merge regions are rejected before any partial result is
     /// published.
-    pub fn body_table_merges<'table, S>(
-        &self,
-        selector: S,
-    ) -> Result<Vec<Region>, BodyTableMergesError>
+    pub fn body_table_merges<'table, S>(&self, selector: S) -> Result<Vec<Region>, Error>
     where
         S: Into<BodyTableSelector<'table>>,
     {
@@ -246,9 +247,14 @@ impl MergeReader {
         for region in &read.regions {
             if region.end_row() >= target.table_rows || region.end_column() >= target.table_columns
             {
-                return Err(BodyTableMergesError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
         Ok(read.regions)
     }
+}
+
+/// The archive profile `options` selects for physical merge-reader ingress.
+fn archive_limits(options: OpenOptions) -> Result<Limits, Error> {
+    options.archive().map_err(map_package_error)
 }

@@ -40,28 +40,28 @@ pub(crate) const MAX_TEXT_BYTES: usize = 1024 * 1024;
 
 /// A mutable text box being authored in a document.
 ///
-/// Built with [`MutableTextBox::new`] or [`MutableTextBox::with_shape`], then
+/// Built with [`TextBox::new`] or [`TextBox::with_shape`], then
 /// attached to a paragraph via
-/// [`crate::writer::MutableParagraph::add_text_box`].
+/// [`crate::builder::Paragraph::add_text_box`].
 ///
 /// # Examples
 ///
 /// ```rust,no_run
-/// use litchi_docx::Package;
+/// use litchi_docx::Builder;
 /// use litchi_docx::textbox::TextBoxAutofit;
-/// use litchi_docx::writer::MutableTextBox;
+/// use litchi_docx::builder::TextBox;
 ///
-/// let mut package = Package::new()?;
-/// let mut text_box = MutableTextBox::new("Greeting", 1828800, 914_400)?;
+/// let mut builder = Builder::new()?;
+/// let mut text_box = TextBox::new("Greeting", 1828800, 914_400)?;
 /// text_box.add_run("Hello ")?.bold = Some(true);
 /// text_box.add_run("world")?;
 /// text_box.body_properties_mut().autofit = TextBoxAutofit::Shape;
-/// package.document_mut()?.add_text_box(text_box);
-/// package.save("out.docx")?;
+/// builder.document()?.add_text_box(text_box);
+/// builder.build()?.save("out.docx")?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-#[derive(Debug)]
-pub struct MutableTextBox {
+#[derive(Debug, Clone)]
+pub struct TextBox {
     /// Drawing element ID written to `wp:docPr@id`.
     pub(crate) id: u32,
     /// Shape name written to `wp:docPr@name`.
@@ -82,7 +82,7 @@ pub struct MutableTextBox {
     text_bytes: usize,
 }
 
-impl MutableTextBox {
+impl TextBox {
     /// Create a rectangular text box with the given name and EMU extents.
     ///
     /// # Arguments
@@ -407,7 +407,7 @@ mod tests {
     use super::*;
     use crate::textbox::{Coordinate32, TextBoxAnchor, TextUnderline, load_text_boxes};
 
-    fn authored_xml(text_box: &MutableTextBox) -> String {
+    fn authored_xml(text_box: &TextBox) -> String {
         let mut xml = String::new();
         text_box.to_xml(&mut xml).unwrap();
         format!(
@@ -421,7 +421,7 @@ mod tests {
 
     #[test]
     fn serializes_inline_text_box_with_body_properties() {
-        let mut text_box = MutableTextBox::new("My Box", 1828800, 914_400).unwrap();
+        let mut text_box = TextBox::new("My Box", 1828800, 914_400).unwrap();
         text_box.set_id(42);
         text_box.add_run("rich text").unwrap();
         {
@@ -455,7 +455,7 @@ mod tests {
     #[test]
     fn serializes_preset_shape_and_formatted_runs() {
         let mut text_box =
-            MutableTextBox::with_shape("Round", Preset::RoundRect, 914_400, 457200).unwrap();
+            TextBox::with_shape("Round", Preset::RoundRect, 914_400, 457200).unwrap();
         text_box.add_run("bold").unwrap().bold = Some(true);
         text_box.add_run("italic-off").unwrap().italic = Some(false);
         text_box.add_run("under").unwrap().underline = Some(TextUnderline::WavyDouble);
@@ -479,7 +479,7 @@ mod tests {
 
     #[test]
     fn defaults_match_read_model_defaults() {
-        let text_box = MutableTextBox::new("Plain", 914_400, 914_400).unwrap();
+        let text_box = TextBox::new("Plain", 914_400, 914_400).unwrap();
         text_box.to_xml(&mut String::new()).unwrap();
         let inventory = load_text_boxes(authored_xml(&text_box).as_bytes()).unwrap();
         let parsed = &inventory[0];
@@ -490,13 +490,13 @@ mod tests {
 
     #[test]
     fn rejects_invalid_extents() {
-        assert!(MutableTextBox::new("Bad", 0, 914_400).is_err());
-        assert!(MutableTextBox::new("Bad", 914_400, -1).is_err());
+        assert!(TextBox::new("Bad", 0, 914_400).is_err());
+        assert!(TextBox::new("Bad", 914_400, -1).is_err());
     }
 
     #[test]
     fn escapes_markup_in_text_and_name() {
-        let mut text_box = MutableTextBox::new("A & <B>", 914_400, 914_400).unwrap();
+        let mut text_box = TextBox::new("A & <B>", 914_400, 914_400).unwrap();
         text_box.add_run("x < y & \"z\"").unwrap();
         let document_xml = authored_xml(&text_box);
         assert!(document_xml.contains("name=\"A &amp; &lt;B&gt;\""));
@@ -511,11 +511,11 @@ mod tests {
         use tempfile::NamedTempFile;
 
         let file = NamedTempFile::with_suffix(".docx").unwrap();
-        let mut package = Package::new().unwrap();
+        let mut builder = crate::Builder::new().unwrap();
         {
-            let document = package.document_mut().unwrap();
+            let document = builder.document().unwrap();
             document.add_paragraph_with_text("before the box");
-            let mut text_box = MutableTextBox::new("Round Trip Box", 1828800, 914_400).unwrap();
+            let mut text_box = TextBox::new("Round Trip Box", 1828800, 914_400).unwrap();
             text_box.set_id(11);
             text_box.add_run("Hello ").unwrap().bold = Some(true);
             text_box.add_run("world").unwrap().italic = Some(true);
@@ -533,6 +533,7 @@ mod tests {
             document.add_text_box(text_box);
             document.add_paragraph_with_text("after the box");
 
+            let package = builder.build().unwrap();
             package.save(file.path()).unwrap();
 
             let reopened = Package::open(file.path()).unwrap();
@@ -567,10 +568,10 @@ mod tests {
         const PNG_HEADER: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 
         let file = NamedTempFile::with_suffix(".docx").unwrap();
-        let mut package = Package::new().unwrap();
+        let mut builder = crate::Builder::new().unwrap();
         {
-            let document = package.document_mut().unwrap();
-            let mut first = MutableTextBox::new("First Box", 914_400, 457200).unwrap();
+            let document = builder.document().unwrap();
+            let mut first = TextBox::new("First Box", 914_400, 457200).unwrap();
             first.set_id(21);
             first.add_run("first story").unwrap();
             document.add_text_box(first);
@@ -581,12 +582,13 @@ mod tests {
                 .unwrap();
 
             let mut second =
-                MutableTextBox::with_shape("Second Box", Preset::Ellipse, 457200, 457200).unwrap();
+                TextBox::with_shape("Second Box", Preset::Ellipse, 457200, 457200).unwrap();
             second.set_id(22);
             second.body_properties_mut().wrap = TextWrap::None;
             second.add_paragraph_with_text("second story").unwrap();
             document.add_text_box(second);
 
+            let package = builder.build().unwrap();
             package.save(file.path()).unwrap();
 
             let reopened = Package::open(file.path()).unwrap();
@@ -630,7 +632,7 @@ mod tests {
 
     #[test]
     fn append_limits_leave_the_story_unchanged() {
-        let mut text_box = MutableTextBox::new("Bounded", 914_400, 914_400).unwrap();
+        let mut text_box = TextBox::new("Bounded", 914_400, 914_400).unwrap();
         let too_much_text = "x".repeat(MAX_TEXT_BYTES + 1);
 
         assert!(text_box.add_run(&too_much_text).is_err());

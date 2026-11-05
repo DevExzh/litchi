@@ -1,7 +1,7 @@
 //! Typed ODF paragraph drop-cap style support.
 
 use crate::style::paragraph::tab_stop::Style as TabStyle;
-use crate::{FlatDocument, Package};
+use crate::{FlatDocument, GenericPackage as Package};
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::XmlVersion;
 use quick_xml::{

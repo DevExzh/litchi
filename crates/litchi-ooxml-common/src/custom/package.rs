@@ -1,14 +1,14 @@
-//! Package graph discovery and mutation for custom document properties.
+//! Package graph discovery for custom document properties.
 
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::part::BlobPart;
-use litchi_opc::{OpcPackage, PackURI};
+use litchi_opc::{OpcPackage, PackURI, Relationships, SourceBackedPackage};
 
 use super::codec;
 use super::model::Props;
 use super::reserved::{self, Host};
-use super::schema::{PART_NAME, PART_TARGET, invalid};
+use super::schema::{PART_NAME, invalid};
 use crate::leniency::CustomPropertiesDefect;
+use crate::properties::package_graph::GraphPart;
 use crate::{Error, Result};
 
 impl Props {
@@ -53,10 +53,23 @@ impl Props {
     /// property scoped to another host, or one whose value lacks the inferred
     /// format, is skipped and recorded as
     /// [`ReservedProperty`](crate::leniency::CustomPropertiesDefect::ReservedProperty)
-    /// rather than failing the document. [`Self::write_for`] still validates
-    /// strictly.
+    /// rather than failing the document. The semantic metadata transaction
+    /// validates the host scope again before publication.
     pub fn read_for(package: &OpcPackage, host: Host) -> Result<Self> {
-        let (mut properties, part_name) = Self::read_selected(package)?;
+        let (properties, part_name) = Self::read_selected(package)?;
+        properties.admit_for(part_name.as_ref(), host)
+    }
+
+    /// Decode the bytes of the relationship-selected part `part_name` as
+    /// [`Self::read_for`] decodes them.
+    pub(crate) fn decode_for(bytes: &[u8], part_name: &PackURI, host: Host) -> Result<Self> {
+        codec::decode_tolerant(bytes, part_name.as_str())?.admit_for(Some(part_name), host)
+    }
+
+    /// Skip and record the reserved properties of another host, then
+    /// validate the host's own reserved properties ([`Self::read_for`]).
+    fn admit_for(self, part_name: Option<&PackURI>, host: Host) -> Result<Self> {
+        let mut properties = self;
         let rejected: Vec<String> = properties
             .properties
             .iter()
@@ -65,7 +78,7 @@ impl Props {
             })
             .map(|(name, _)| name.clone())
             .collect();
-        let part = part_name.as_ref().map_or(PART_NAME, PackURI::as_str);
+        let part = part_name.map_or(PART_NAME, PackURI::as_str);
         for name in rejected {
             properties.remove(&name);
             properties.tolerance_report.record(
@@ -78,109 +91,73 @@ impl Props {
         properties.validate_for(host)?;
         Ok(properties)
     }
-
-    /// Writes this collection to a package.
-    ///
-    /// Empty properties remove both the target part and its package-level
-    /// relationship. Non-empty properties update the existing validated target
-    /// or create the canonical `/docProps/custom.xml` part and relationship.
-    /// # Errors
-    ///
-    /// Returns an error when input violates OOXML constraints, exceeds a configured
-    /// bound, or an underlying XML or package operation fails.
-    pub fn write(&self, package: &mut OpcPackage) -> Result<()> {
-        let graph = inspect_graph(package)?;
-        if self.is_empty() {
-            if graph.part_name.is_none() && graph.relationship_id.is_none() {
-                return Ok(());
-            }
-            package.unsign();
-            if let Some(part_name) = graph.part_name {
-                let removed = package.remove_part(&part_name);
-                if !removed {
-                    return Err(Error::Missing(part_name.to_string()));
-                }
-            }
-            if let Some(relationship_id) = graph.relationship_id {
-                let removed = package.rels_mut().remove(&relationship_id);
-                if removed.is_none() {
-                    return Err(Error::Relationship(format!(
-                        "custom-properties relationship '{relationship_id}' disappeared during removal"
-                    )));
-                }
-            }
-            return Ok(());
-        }
-
-        let xml = codec::encode(self)?;
-        if let Some(part_name) = graph.part_name {
-            if package.get_part(&part_name)?.blob() == xml.as_slice() {
-                return Ok(());
-            }
-            package.get_part_mut(&part_name)?.set_blob(xml);
-            package.unsign();
-        } else {
-            let part_name = custom_part_name()?;
-            package.validate_new_part_name(&part_name)?;
-            let part = BlobPart::new(part_name, ct::OFC_CUSTOM_PROPERTIES.to_owned(), xml);
-            package.unsign();
-            package.add_part(Box::new(part));
-            package.relate_to(PART_TARGET, rt::CUSTOM_PROPERTIES);
-        }
-        Ok(())
-    }
-
-    /// Validates reserved names for `host` and writes this collection.
-    /// # Errors
-    ///
-    /// Returns an error when input violates OOXML constraints, exceeds a configured
-    /// bound, or an underlying XML or package operation fails.
-    pub fn write_for(&self, package: &mut OpcPackage, host: Host) -> Result<()> {
-        self.validate_for(host)?;
-        self.write(package)
-    }
 }
 
-struct PackageGraph {
-    part_name: Option<PackURI>,
-    relationship_id: Option<String>,
+/// The validated custom-properties graph of a package.
+pub(crate) struct PackageGraph {
+    /// The relationship-selected part, when present.
+    pub(crate) part_name: Option<PackURI>,
+    /// The package-level relationship selecting it, when present.
+    pub(crate) relationship_id: Option<String>,
 }
 
-fn inspect_graph(package: &OpcPackage) -> Result<PackageGraph> {
+/// Inspect the custom-properties graph of an owning package; every anomaly
+/// is an error.
+pub(crate) fn inspect_graph(package: &OpcPackage) -> Result<PackageGraph> {
+    inspect_graph_parts(|| package.iter_parts(), package.rels())
+}
+
+/// [`inspect_graph`] over the metadata-only catalog of a source-backed
+/// package. No part payload is read.
+pub(crate) fn inspect_source_graph(package: &SourceBackedPackage) -> Result<PackageGraph> {
+    package.source_version()?;
+    let graph = inspect_graph_parts(|| package.iter_parts(), package.rels())?;
+    package.source_version()?;
+    Ok(graph)
+}
+
+fn inspect_graph_parts<F, I, P>(
+    parts: F,
+    package_relationships: &Relationships,
+) -> Result<PackageGraph>
+where
+    F: Fn() -> I,
+    I: IntoIterator<Item = P>,
+    P: GraphPart,
+{
     let canonical = custom_part_name()?;
     let mut custom_parts = Vec::new();
-    for part in package.iter_parts() {
+    for part in parts() {
         if part
-            .partname()
+            .part_name()
             .as_str()
             .eq_ignore_ascii_case(canonical.as_str())
-            && part.content_type() != ct::OFC_CUSTOM_PROPERTIES
+            && part.part_content_type() != ct::OFC_CUSTOM_PROPERTIES
         {
             return Err(Error::ContentType {
                 expected: ct::OFC_CUSTOM_PROPERTIES.to_owned(),
-                actual: part.content_type().to_owned(),
+                actual: part.part_content_type().to_owned(),
             });
         }
-        if part.content_type() == ct::OFC_CUSTOM_PROPERTIES {
-            custom_parts.push(part.partname().clone());
+        if part.part_content_type() == ct::OFC_CUSTOM_PROPERTIES {
+            custom_parts.push(part.part_name().clone());
             if custom_parts.len() > 1 {
                 return Err(invalid("package contains multiple custom-properties parts"));
             }
         }
         if part
-            .rels()
+            .part_relationships()
             .iter()
             .any(|relationship| relationship.reltype() == rt::CUSTOM_PROPERTIES)
         {
             return Err(Error::Relationship(format!(
                 "custom-properties relationship must be package-level, not owned by '{}'",
-                part.partname().as_str()
+                part.part_name().as_str()
             )));
         }
     }
 
-    let relationships: Vec<_> = package
-        .rels()
+    let relationships: Vec<_> = package_relationships
         .iter()
         .filter(|relationship| relationship.reltype() == rt::CUSTOM_PROPERTIES)
         .collect();
@@ -217,21 +194,21 @@ fn inspect_graph(package: &OpcPackage) -> Result<PackageGraph> {
             "invalid custom-properties relationship target: {error}"
         ))
     })?;
-    let target_part = package
-        .iter_parts()
+    let target_part = parts()
+        .into_iter()
         .find(|part| {
-            part.partname()
+            part.part_name()
                 .as_str()
                 .eq_ignore_ascii_case(target.as_str())
         })
         .ok_or_else(|| Error::Missing(target.to_string()))?;
-    if target_part.content_type() != ct::OFC_CUSTOM_PROPERTIES {
+    if target_part.part_content_type() != ct::OFC_CUSTOM_PROPERTIES {
         return Err(Error::ContentType {
             expected: ct::OFC_CUSTOM_PROPERTIES.to_owned(),
-            actual: target_part.content_type().to_owned(),
+            actual: target_part.part_content_type().to_owned(),
         });
     }
-    let part_name = target_part.partname().clone();
+    let part_name = target_part.part_name().clone();
     if custom_parts
         .first()
         .is_some_and(|candidate| !candidate.as_str().eq_ignore_ascii_case(part_name.as_str()))

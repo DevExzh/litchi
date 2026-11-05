@@ -1,17 +1,17 @@
-use litchi::{docx::Package, fonts::embedding::Mode};
+use litchi::{docx::Builder, fonts::embedding::Mode};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating minimal DOCX with single embedded font...");
 
     // Create document
-    let mut pkg = Package::new()?;
+    let mut builder = Builder::new()?;
 
     // Enable font embedding
-    pkg.set_font_embedding(Mode::Subset)?;
+    builder.font_embedding(Mode::Subset)?;
 
     // Add simple paragraph with Liberation Sans
     {
-        let doc = pkg.document_mut()?;
+        let doc = builder.document()?;
         let p = doc.add_paragraph();
         let run = p.add_run();
         run.set_text("Test with Liberation Sans font - ABCDEFGHIJKLMNOPQRSTUVWXYZ");
@@ -19,7 +19,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         run.font_size(24);
     }
 
-    // Save
+    // Finalize and save
+    let pkg = builder.build()?;
     pkg.save("minimal_font_test.docx")?;
 
     println!("✓ Created: minimal_font_test.docx");

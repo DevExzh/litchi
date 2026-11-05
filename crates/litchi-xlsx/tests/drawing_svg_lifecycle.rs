@@ -20,7 +20,7 @@ use litchi_xlsx::drawing::{
     DrawingAnchor, DrawingDialect, EditAs, PictureSelector, RelationshipDialect, ScanLimits,
     SourceDrawing, SvgInput, SvgOwnerState, parse,
 };
-use litchi_xlsx::{Error, Hyperlink, HyperlinkReference, Package, ReadLimits, Workbook};
+use litchi_xlsx::{Error, Hyperlink, HyperlinkReference, Package, SourceLimits};
 use quick_xml::events::Event;
 use quick_xml::reader::Reader;
 
@@ -250,7 +250,7 @@ fn worksheet_xml(strict: bool) -> Vec<u8> {
 }
 
 fn package_bytes(options: DrawingOptions) -> Vec<u8> {
-    let mut package = Package::create().unwrap().into_plain_opc();
+    let mut package = Package::new().unwrap().into_plain_opc();
     package
         .get_part_mut(&PackURI::new(SHEET).unwrap())
         .unwrap()
@@ -432,7 +432,7 @@ fn empty_drawing_xml() -> Vec<u8> {
 }
 
 fn two_worksheet_fixture(shared_svg: bool) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&raster_fixture()).unwrap();
+    let mut package = OpcPackage::from_bytes(&raster_fixture(), SourceLimits::default()).unwrap();
     let options = DrawingOptions {
         anchors: false,
         admitted_svg: shared_svg,
@@ -550,7 +550,8 @@ fn two_worksheet_fixture(shared_svg: bool) -> Vec<u8> {
 }
 
 fn two_worksheet_detach_attach_fixture() -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&two_worksheet_fixture(false)).unwrap();
+    let mut package =
+        OpcPackage::from_bytes(&two_worksheet_fixture(false), SourceLimits::default()).unwrap();
     package
         .try_add_part(Box::new(BlobPart::new(
             PackURI::new(SVG).unwrap(),
@@ -590,7 +591,7 @@ fn svg_mixed_width_relationship_fixture() -> Vec<u8> {
 }
 
 fn svg_relationship_width_fixture(existing_svg_ids: usize) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&raster_fixture()).unwrap();
+    let mut package = OpcPackage::from_bytes(&raster_fixture(), SourceLimits::default()).unwrap();
     let drawing = package
         .get_part_mut(&PackURI::new(DRAWING).unwrap())
         .unwrap();
@@ -619,7 +620,7 @@ fn two_worksheet_single_svg_owner_fixture() -> Vec<u8> {
         assert_eq!(xml.matches(opaque).count(), 1);
         xml.replace(opaque, "")
     });
-    let mut package = OpcPackage::from_bytes(&source).unwrap();
+    let mut package = OpcPackage::from_bytes(&source, SourceLimits::default()).unwrap();
     let sheet2 = package
         .get_part_mut(&PackURI::new(SHEET2).unwrap())
         .unwrap();
@@ -651,7 +652,7 @@ fn self_closing_sheet2_relationship_fixture() -> Vec<u8> {
 }
 
 fn orphan_relationship_fixture() -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&raster_fixture()).unwrap();
+    let mut package = OpcPackage::from_bytes(&raster_fixture(), SourceLimits::default()).unwrap();
     package
         .try_add_part(Box::new(BlobPart::new(
             PackURI::new(ORPHAN_DRAWING).unwrap(),
@@ -674,7 +675,7 @@ fn orphan_relationship_fixture() -> Vec<u8> {
 }
 
 fn part(bytes: &[u8], name: &str) -> Vec<u8> {
-    OpcPackage::from_bytes(bytes)
+    OpcPackage::from_bytes(bytes, SourceLimits::default())
         .unwrap()
         .get_part(&PackURI::new(name).unwrap())
         .unwrap()
@@ -683,14 +684,14 @@ fn part(bytes: &[u8], name: &str) -> Vec<u8> {
 }
 
 fn has_part(bytes: &[u8], name: &str) -> bool {
-    OpcPackage::from_bytes(bytes)
+    OpcPackage::from_bytes(bytes, SourceLimits::default())
         .unwrap()
         .get_part(&PackURI::new(name).unwrap())
         .is_ok()
 }
 
 fn content_type(bytes: &[u8], name: &str) -> String {
-    OpcPackage::from_bytes(bytes)
+    OpcPackage::from_bytes(bytes, SourceLimits::default())
         .unwrap()
         .get_part(&PackURI::new(name).unwrap())
         .unwrap()
@@ -699,7 +700,7 @@ fn content_type(bytes: &[u8], name: &str) -> String {
 }
 
 fn part_name_with_content_type(bytes: &[u8], wanted: &str) -> String {
-    OpcPackage::from_bytes(bytes)
+    OpcPackage::from_bytes(bytes, SourceLimits::default())
         .unwrap()
         .iter_parts()
         .find(|part| part.content_type() == wanted)
@@ -710,7 +711,7 @@ fn part_name_with_content_type(bytes: &[u8], wanted: &str) -> String {
 }
 
 fn part_names_with_content_type(bytes: &[u8], wanted: &str) -> Vec<String> {
-    let mut names = OpcPackage::from_bytes(bytes)
+    let mut names = OpcPackage::from_bytes(bytes, SourceLimits::default())
         .unwrap()
         .iter_parts()
         .filter(|part| part.content_type() == wanted)
@@ -721,7 +722,7 @@ fn part_names_with_content_type(bytes: &[u8], wanted: &str) -> Vec<String> {
 }
 
 fn has_content_type(bytes: &[u8], wanted: &str) -> bool {
-    OpcPackage::from_bytes(bytes)
+    OpcPackage::from_bytes(bytes, SourceLimits::default())
         .unwrap()
         .iter_parts()
         .any(|part| part.content_type() == wanted)
@@ -731,14 +732,14 @@ fn rels(bytes: &[u8], name: &str) -> Vec<u8> {
     let name = name.trim_start_matches('/');
     let (directory, file) = name.rsplit_once('/').unwrap();
     let member = format!("{directory}/_rels/{file}.rels");
-    PhysPkgReader::new(bytes)
+    PhysPkgReader::new(bytes, SourceLimits::default())
         .unwrap()
         .read_member(&member)
         .unwrap()
 }
 
 fn content_types_member(bytes: &[u8]) -> Vec<u8> {
-    PhysPkgReader::new(bytes)
+    PhysPkgReader::new(bytes, SourceLimits::default())
         .unwrap()
         .read_member("[Content_Types].xml")
         .unwrap()
@@ -749,7 +750,7 @@ fn rewrite_physical_member(
     wanted: &str,
     rewrite: impl FnOnce(Vec<u8>) -> Vec<u8>,
 ) -> Vec<u8> {
-    let reader = PhysPkgReader::new(bytes).unwrap();
+    let reader = PhysPkgReader::new(bytes, SourceLimits::default()).unwrap();
     let members = reader.member_names().unwrap();
     let mut writer = PhysPkgWriter::new();
     let mut rewrite = Some(rewrite);
@@ -767,7 +768,7 @@ fn rewrite_physical_member(
 }
 
 fn append_physical_member(bytes: &[u8], member: &str, payload: &[u8]) -> Vec<u8> {
-    let reader = PhysPkgReader::new(bytes).unwrap();
+    let reader = PhysPkgReader::new(bytes, SourceLimits::default()).unwrap();
     let members = reader.member_names().unwrap();
     assert!(!members.iter().any(|name| name == member));
     let mut writer = PhysPkgWriter::new();
@@ -783,7 +784,7 @@ fn append_physical_member(bytes: &[u8], member: &str, payload: &[u8]) -> Vec<u8>
 }
 
 fn remove_physical_member(bytes: &[u8], member: &str) -> Vec<u8> {
-    let reader = PhysPkgReader::new(bytes).unwrap();
+    let reader = PhysPkgReader::new(bytes, SourceLimits::default()).unwrap();
     let members = reader.member_names().unwrap();
     assert!(members.iter().any(|name| name == member));
     let mut writer = PhysPkgWriter::new();
@@ -800,7 +801,7 @@ fn remove_physical_member(bytes: &[u8], member: &str) -> Vec<u8> {
 }
 
 fn has_physical_member(bytes: &[u8], member: &str) -> bool {
-    PhysPkgReader::new(bytes)
+    PhysPkgReader::new(bytes, SourceLimits::default())
         .unwrap()
         .member_names()
         .unwrap()
@@ -955,7 +956,7 @@ fn incoming_root_svg_edge_fixture(bytes: &[u8]) -> Vec<u8> {
 }
 
 fn incoming_new_part_svg_edge_fixture(bytes: &[u8]) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).unwrap();
+    let mut package = OpcPackage::from_bytes(bytes, SourceLimits::default()).unwrap();
     package
         .try_add_part(Box::new(BlobPart::new(
             PackURI::new(NEW_INCOMING_OWNER).unwrap(),
@@ -1002,13 +1003,13 @@ fn changed_svg_payload_fixture(bytes: &[u8]) -> Vec<u8> {
 }
 
 fn missing_svg_part_fixture(bytes: &[u8]) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).unwrap();
+    let mut package = OpcPackage::from_bytes(bytes, SourceLimits::default()).unwrap();
     assert!(package.remove_part(&PackURI::new(SVG).unwrap()));
     PackageWriter::to_bytes(&package).unwrap()
 }
 
 fn outbound_svg_edge_fixture(bytes: &[u8]) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).unwrap();
+    let mut package = OpcPackage::from_bytes(bytes, SourceLimits::default()).unwrap();
     package
         .get_part_mut(&PackURI::new(SVG).unwrap())
         .unwrap()
@@ -1043,7 +1044,7 @@ fn general_ref_whitespace_fixture() -> Vec<u8> {
 }
 
 fn rewrite_drawing(bytes: &[u8], rewrite: impl FnOnce(String) -> String) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).unwrap();
+    let mut package = OpcPackage::from_bytes(bytes, SourceLimits::default()).unwrap();
     let uri = PackURI::new(DRAWING).unwrap();
     let drawing = package.get_part_mut(&uri).unwrap();
     let source = String::from_utf8(drawing.blob().to_vec()).unwrap();
@@ -1052,7 +1053,7 @@ fn rewrite_drawing(bytes: &[u8], rewrite: impl FnOnce(String) -> String) -> Vec<
 }
 
 fn rewrite_sheet(bytes: &[u8], rewrite: impl FnOnce(String) -> String) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).unwrap();
+    let mut package = OpcPackage::from_bytes(bytes, SourceLimits::default()).unwrap();
     let uri = PackURI::new(SHEET).unwrap();
     let sheet = package.get_part_mut(&uri).unwrap();
     let source = String::from_utf8(sheet.blob().to_vec()).unwrap();
@@ -1127,30 +1128,36 @@ fn namespace_only_fixture() -> Vec<u8> {
 }
 
 fn edit_attach(bytes: &[u8], selector: PictureSelector, svg: &[u8]) -> Result<Vec<u8>, Error> {
-    let workbook = Workbook::from_bytes(bytes.to_vec())?;
+    let workbook = Package::from_bytes(bytes)?;
     let mut edit = workbook.edit()?;
     edit.sheet("Sheet1")?
         .ok_or_else(|| Error::Invalid("Sheet1 is missing".into()))?
         .attach_svg(selector, SvgInput::borrowed(svg))?;
-    edit.commit()?.into_workbook().to_plain_bytes()
+    edit.commit()?.into_package().to_plain_bytes()
 }
 
 fn edit_attach_with_limits(
     bytes: &[u8],
     selector: PictureSelector,
     svg: &[u8],
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<Vec<u8>, Error> {
-    let workbook = Workbook::from_bytes_with_limits(bytes.to_vec(), limits)?;
+    let workbook = Package::from_bytes_with_options(
+        bytes,
+        litchi_xlsx::OpenOptions::new().source_limits(limits),
+    )?;
     let mut edit = workbook.edit()?;
     edit.sheet("Sheet1")?
         .ok_or_else(|| Error::Invalid("Sheet1 is missing".into()))?
         .attach_svg(selector, SvgInput::borrowed(svg))?;
-    edit.commit()?.into_workbook().to_plain_bytes()
+    edit.commit()?.into_package().to_plain_bytes()
 }
 
-fn edit_attach_two_with_limits(bytes: &[u8], limits: ReadLimits) -> Result<Vec<u8>, Error> {
-    let workbook = Workbook::from_bytes_with_limits(bytes.to_vec(), limits)?;
+fn edit_attach_two_with_limits(bytes: &[u8], limits: SourceLimits) -> Result<Vec<u8>, Error> {
+    let workbook = Package::from_bytes_with_options(
+        bytes,
+        litchi_xlsx::OpenOptions::new().source_limits(limits),
+    )?;
     let mut edit = workbook.edit()?;
     {
         let mut sheet = edit
@@ -1160,24 +1167,26 @@ fn edit_attach_two_with_limits(bytes: &[u8], limits: ReadLimits) -> Result<Vec<u
             .attach_svg(selector(0), SvgInput::borrowed(NEW_SVG))?
             .attach_svg(selector(1), SvgInput::borrowed(NEW_SVG))?;
     }
-    edit.commit()?.into_workbook().to_plain_bytes()
+    edit.commit()?.into_package().to_plain_bytes()
 }
 
 fn edit_detach(bytes: &[u8], selector: PictureSelector) -> Result<Vec<u8>, Error> {
-    let workbook = Workbook::from_bytes(bytes.to_vec())?;
+    let workbook = Package::from_bytes(bytes)?;
     let mut edit = workbook.edit()?;
     edit.sheet("Sheet1")?
         .ok_or_else(|| Error::Invalid("Sheet1 is missing".into()))?
         .detach_svg(selector)?;
-    edit.commit()?.into_workbook().to_plain_bytes()
+    edit.commit()?.into_package().to_plain_bytes()
 }
 
 fn materialized_part_count(bytes: &[u8]) -> usize {
-    OpcPackage::from_bytes(bytes).unwrap().part_count()
+    OpcPackage::from_bytes(bytes, SourceLimits::default())
+        .unwrap()
+        .part_count()
 }
 
 fn materialized_part_bytes(bytes: &[u8]) -> usize {
-    OpcPackage::from_bytes(bytes)
+    OpcPackage::from_bytes(bytes, SourceLimits::default())
         .unwrap()
         .try_iter_parts()
         .map(|part| part.expect("part payload decodes"))
@@ -1186,7 +1195,7 @@ fn materialized_part_bytes(bytes: &[u8]) -> usize {
 }
 
 fn largest_materialized_part_bytes(bytes: &[u8]) -> usize {
-    OpcPackage::from_bytes(bytes)
+    OpcPackage::from_bytes(bytes, SourceLimits::default())
         .unwrap()
         .try_iter_parts()
         .map(|part| part.expect("part payload decodes"))
@@ -1195,8 +1204,8 @@ fn largest_materialized_part_bytes(bytes: &[u8]) -> usize {
         .unwrap_or(1)
 }
 
-fn exact_package_limits(bytes: &[u8]) -> ReadLimits {
-    ReadLimits::builder()
+fn exact_package_limits(bytes: &[u8]) -> SourceLimits {
+    SourceLimits::builder()
         .max_parts(materialized_part_count(bytes))
         .unwrap()
         .max_total_part_bytes(materialized_part_bytes(bytes) as u64)
@@ -1207,8 +1216,8 @@ fn exact_package_limits(bytes: &[u8]) -> ReadLimits {
         .unwrap()
 }
 
-fn exact_part_and_aggregate_limits(source_bytes: &[u8], final_bytes: &[u8]) -> ReadLimits {
-    ReadLimits::builder()
+fn exact_part_and_aggregate_limits(source_bytes: &[u8], final_bytes: &[u8]) -> SourceLimits {
+    SourceLimits::builder()
         .max_parts(materialized_part_count(source_bytes).max(materialized_part_count(final_bytes)))
         .unwrap()
         .max_total_part_bytes(
@@ -1224,10 +1233,10 @@ fn exact_part_and_aggregate_limits(source_bytes: &[u8], final_bytes: &[u8]) -> R
         .unwrap()
 }
 
-fn exact_resource_limits(bytes: &[u8]) -> ReadLimits {
+fn exact_resource_limits(bytes: &[u8]) -> SourceLimits {
     let max_part_bytes =
         largest_materialized_part_bytes(bytes).max(content_types_member(bytes).len());
-    ReadLimits::builder()
+    SourceLimits::builder()
         .max_parts(materialized_part_count(bytes))
         .unwrap()
         .max_total_part_bytes(materialized_part_bytes(bytes) as u64)
@@ -1246,8 +1255,8 @@ fn exact_resource_limits(bytes: &[u8]) -> ReadLimits {
         .unwrap()
 }
 
-fn exact_part_and_relationship_limits(bytes: &[u8]) -> ReadLimits {
-    ReadLimits::builder()
+fn exact_part_and_relationship_limits(bytes: &[u8]) -> SourceLimits {
+    SourceLimits::builder()
         .max_parts(materialized_part_count(bytes))
         .unwrap()
         .max_total_part_bytes(materialized_part_bytes(bytes) as u64)
@@ -1269,8 +1278,8 @@ fn cross_sheet_metadata_limits(
     final_bytes: &[u8],
     max_part_bytes: usize,
     max_content_types_bytes: usize,
-) -> ReadLimits {
-    ReadLimits::builder()
+) -> SourceLimits {
+    SourceLimits::builder()
         .max_parts(materialized_part_count(source_bytes).max(materialized_part_count(final_bytes)))
         .unwrap()
         .max_total_part_bytes(
@@ -1286,7 +1295,7 @@ fn cross_sheet_metadata_limits(
 }
 
 fn relationship_count(bytes: &[u8]) -> usize {
-    let package = OpcPackage::from_bytes(bytes).unwrap();
+    let package = OpcPackage::from_bytes(bytes, SourceLimits::default()).unwrap();
     package.rels().len()
         + package
             .iter_parts()
@@ -1295,7 +1304,7 @@ fn relationship_count(bytes: &[u8]) -> usize {
 }
 
 fn relationship_graph_node_count(bytes: &[u8]) -> usize {
-    let package = OpcPackage::from_bytes(bytes).unwrap();
+    let package = OpcPackage::from_bytes(bytes, SourceLimits::default()).unwrap();
     let mut nodes = HashSet::new();
     let mut visit = |relationships: &litchi_opc::Relationships| {
         for relationship in relationships.iter() {
@@ -1322,7 +1331,7 @@ fn relationship_member(name: &str) -> bool {
 }
 
 fn relationship_xml_bytes(bytes: &[u8]) -> usize {
-    let reader = PhysPkgReader::new(bytes).unwrap();
+    let reader = PhysPkgReader::new(bytes, SourceLimits::default()).unwrap();
     reader
         .member_names()
         .unwrap()
@@ -1333,7 +1342,7 @@ fn relationship_xml_bytes(bytes: &[u8]) -> usize {
 }
 
 fn largest_relationship_xml_bytes(bytes: &[u8]) -> usize {
-    let reader = PhysPkgReader::new(bytes).unwrap();
+    let reader = PhysPkgReader::new(bytes, SourceLimits::default()).unwrap();
     reader
         .member_names()
         .unwrap()
@@ -1359,7 +1368,7 @@ fn xml_event_count(bytes: &[u8]) -> usize {
 }
 
 fn relationship_xml_events(bytes: &[u8]) -> usize {
-    let reader = PhysPkgReader::new(bytes).unwrap();
+    let reader = PhysPkgReader::new(bytes, SourceLimits::default()).unwrap();
     reader
         .member_names()
         .unwrap()
@@ -1374,18 +1383,27 @@ fn content_type_mapping_count(bytes: &[u8]) -> usize {
     source.matches("<Default ").count() + source.matches("<Override ").count()
 }
 
-fn mixed_detach_attach_with_limits(bytes: &[u8], limits: ReadLimits) -> Result<Vec<u8>, Error> {
-    let workbook = Workbook::from_bytes_with_limits(bytes.to_vec(), limits)?;
+fn mixed_detach_attach_with_limits(bytes: &[u8], limits: SourceLimits) -> Result<Vec<u8>, Error> {
+    let workbook = Package::from_bytes_with_options(
+        bytes,
+        litchi_xlsx::OpenOptions::new().source_limits(limits),
+    )?;
     let mut edit = workbook.edit()?;
     edit.sheet("Sheet1")?
         .ok_or_else(|| Error::Invalid("Sheet1 is missing".into()))?
         .detach_svg(selector(0))?
         .attach_svg(selector(0), SvgInput::borrowed(NEW_SVG))?;
-    edit.commit()?.into_workbook().to_plain_bytes()
+    edit.commit()?.into_package().to_plain_bytes()
 }
 
-fn mixed_svg_and_hyperlink_with_limits(bytes: &[u8], limits: ReadLimits) -> Result<Vec<u8>, Error> {
-    let workbook = Workbook::from_bytes_with_limits(bytes.to_vec(), limits)?;
+fn mixed_svg_and_hyperlink_with_limits(
+    bytes: &[u8],
+    limits: SourceLimits,
+) -> Result<Vec<u8>, Error> {
+    let workbook = Package::from_bytes_with_options(
+        bytes,
+        litchi_xlsx::OpenOptions::new().source_limits(limits),
+    )?;
     let mut edit = workbook.edit()?;
     {
         edit.sheet("Sheet1")?
@@ -1402,29 +1420,35 @@ fn mixed_svg_and_hyperlink_with_limits(bytes: &[u8], limits: ReadLimits) -> Resu
             )
             .unwrap(),
         )?;
-    edit.commit()?.into_workbook().to_plain_bytes()
+    edit.commit()?.into_package().to_plain_bytes()
 }
 
 fn attach_then_detach_with_limits(
     bytes: &[u8],
     selector: PictureSelector,
     svg: &[u8],
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<Vec<u8>, Error> {
-    let workbook = Workbook::from_bytes_with_limits(bytes.to_vec(), limits)?;
+    let workbook = Package::from_bytes_with_options(
+        bytes,
+        litchi_xlsx::OpenOptions::new().source_limits(limits),
+    )?;
     let mut edit = workbook.edit()?;
     edit.sheet("Sheet1")?
         .ok_or_else(|| Error::Invalid("Sheet1 is missing".into()))?
         .attach_svg(selector, SvgInput::borrowed(svg))?
         .detach_svg(selector)?;
-    edit.commit()?.into_workbook().to_plain_bytes()
+    edit.commit()?.into_package().to_plain_bytes()
 }
 
 fn cross_sheet_detach_attach_with_limits(
     bytes: &[u8],
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<Vec<u8>, Error> {
-    let workbook = Workbook::from_bytes_with_limits(bytes.to_vec(), limits)?;
+    let workbook = Package::from_bytes_with_options(
+        bytes,
+        litchi_xlsx::OpenOptions::new().source_limits(limits),
+    )?;
     let mut edit = workbook.edit()?;
     {
         edit.sheet("Sheet1")?
@@ -1436,12 +1460,16 @@ fn cross_sheet_detach_attach_with_limits(
             .ok_or_else(|| Error::Invalid("Sheet2 is missing".into()))?
             .attach_svg(selector_at(0, 0), SvgInput::borrowed(NEW_SVG))?;
     }
-    edit.commit()?.into_workbook().to_plain_bytes()
+    edit.commit()?.into_package().to_plain_bytes()
 }
 
-fn assert_mixed_limit_rejects(before: &[u8], limits: ReadLimits, label: &str) {
+fn assert_mixed_limit_rejects(before: &[u8], limits: SourceLimits, label: &str) {
     assert!(
-        Workbook::from_bytes_with_limits(before.to_vec(), limits).is_ok(),
+        Package::from_bytes_with_options(
+            before,
+            litchi_xlsx::OpenOptions::new().source_limits(limits)
+        )
+        .is_ok(),
         "baseline does not open under retained {label} limit"
     );
     assert!(
@@ -1449,7 +1477,11 @@ fn assert_mixed_limit_rejects(before: &[u8], limits: ReadLimits, label: &str) {
         "mixed detach+attach exceeded {label} limit without a commit error"
     );
     assert!(
-        Workbook::from_bytes_with_limits(before.to_vec(), limits).is_ok(),
+        Package::from_bytes_with_options(
+            before,
+            litchi_xlsx::OpenOptions::new().source_limits(limits)
+        )
+        .is_ok(),
         "failed {label} publication made the original source unreadable"
     );
 }
@@ -1485,7 +1517,7 @@ fn scanner_matches_typed_inventory_for_all_anchor_forms_and_direct_svg_owner() {
         ..DrawingOptions::default()
     });
     let drawing_xml = part(&bytes, DRAWING);
-    let source = SourceDrawing::scan_with_ordinal(&drawing_xml, 4).unwrap();
+    let source = SourceDrawing::scan(&drawing_xml, 4, ScanLimits::default()).unwrap();
     assert_eq!(source.drawing_ordinal(), 4);
     assert_eq!(source.dialect(), DrawingDialect::Transitional);
     assert_eq!(
@@ -1494,7 +1526,7 @@ fn scanner_matches_typed_inventory_for_all_anchor_forms_and_direct_svg_owner() {
     );
     assert_eq!(source.pictures().len(), 3);
     let text = String::from_utf8(drawing_xml.clone()).unwrap();
-    let typed = parse(&text).unwrap().unwrap();
+    let typed = parse(&text, &SourceLimits::default()).unwrap().unwrap();
     let typed_anchors = typed
         .pictures()
         .map(|picture| *picture.drawing_anchor())
@@ -1583,7 +1615,7 @@ fn scanner_matches_typed_inventory_for_all_anchor_forms_and_direct_svg_owner() {
 fn scanner_preserves_direct_owner_ranges_inherited_prefixes_and_opaque_payload() {
     let bytes = svg_fixture();
     let drawing_xml = part(&bytes, DRAWING);
-    let source = SourceDrawing::scan(&drawing_xml).unwrap();
+    let source = SourceDrawing::scan(&drawing_xml, 0, ScanLimits::default()).unwrap();
     let picture = source.picture(0).unwrap();
     let owner = picture.svg_owner().owner().unwrap();
     assert_eq!(owner.embedded_relationship_id(), Some("rIdSvg"));
@@ -1643,9 +1675,9 @@ fn attach_save_reopen_detach_preserves_geometry_source_and_opaque_member() {
             .any(|window| window == b"source-manifest-comment")
     );
     let attached_drawing = part(&attached, DRAWING);
-    let attached_source = SourceDrawing::scan(&attached_drawing).unwrap();
+    let attached_source = SourceDrawing::scan(&attached_drawing, 0, ScanLimits::default()).unwrap();
     let before_drawing = part(&before, DRAWING);
-    let before_source = SourceDrawing::scan(&before_drawing).unwrap();
+    let before_source = SourceDrawing::scan(&before_drawing, 0, ScanLimits::default()).unwrap();
     assert_eq!(
         attached_source.picture(0).unwrap().anchor(),
         before_source.picture(0).unwrap().anchor()
@@ -1661,7 +1693,7 @@ fn attach_save_reopen_detach_preserves_geometry_source_and_opaque_member() {
     assert!(attached_xml.contains("<!--future-comment-->"));
     assert!(attached_xml.contains("<![CDATA[<?future-payload>]]>"));
     assert!(attached_xml.contains("<?future-processing?>"));
-    let reopened = Workbook::from_bytes(attached.clone()).unwrap();
+    let reopened = Package::from_bytes(&attached).unwrap();
     assert_eq!(reopened.to_plain_bytes().unwrap(), attached);
     let detached = edit_detach(&attached, selector(0)).unwrap();
     assert_eq!(part(&detached, DRAWING), part(&before, DRAWING));
@@ -1684,11 +1716,12 @@ fn namespace_only_and_opaque_extension_wrappers_survive_attach() {
 fn attach_each_selector_keeps_two_cell_one_cell_and_absolute_geometry() {
     let before = raster_fixture();
     let before_drawing = part(&before, DRAWING);
-    let before_source = SourceDrawing::scan(&before_drawing).unwrap();
+    let before_source = SourceDrawing::scan(&before_drawing, 0, ScanLimits::default()).unwrap();
     for index in 0..3 {
         let attached = edit_attach(&before, selector(index), NEW_SVG).unwrap();
         let attached_drawing = part(&attached, DRAWING);
-        let after_source = SourceDrawing::scan(&attached_drawing).unwrap();
+        let after_source =
+            SourceDrawing::scan(&attached_drawing, 0, ScanLimits::default()).unwrap();
         assert_eq!(
             after_source.picture(index).unwrap().anchor(),
             before_source.picture(index).unwrap().anchor()
@@ -1705,7 +1738,7 @@ fn attach_each_selector_keeps_two_cell_one_cell_and_absolute_geometry() {
 #[test]
 fn multiple_pictures_attach_and_detach_in_one_atomic_transaction() {
     let before = raster_fixture();
-    let workbook = Workbook::from_bytes(before.clone()).unwrap();
+    let workbook = Package::from_bytes(&before).unwrap();
     let mut edit = workbook.edit().unwrap();
     {
         let mut sheet = edit.sheet("Sheet1").unwrap().unwrap();
@@ -1716,12 +1749,12 @@ fn multiple_pictures_attach_and_detach_in_one_atomic_transaction() {
         }
     }
     assert_eq!(edit.len(), 3);
-    let attached = edit.commit().unwrap().into_workbook();
+    let attached = edit.commit().unwrap().into_package();
     let attached_bytes = attached.to_plain_bytes().unwrap();
     let svg_parts = part_names_with_content_type(&attached_bytes, "image/svg+xml");
     assert_eq!(svg_parts.len(), 3);
     let drawing = part(&attached_bytes, DRAWING);
-    let source = SourceDrawing::scan(&drawing).unwrap();
+    let source = SourceDrawing::scan(&drawing, 0, ScanLimits::default()).unwrap();
     assert!(
         source
             .pictures()
@@ -1740,7 +1773,7 @@ fn multiple_pictures_attach_and_detach_in_one_atomic_transaction() {
     let restored = detach_edit
         .commit()
         .unwrap()
-        .into_workbook()
+        .into_package()
         .to_plain_bytes()
         .unwrap();
     assert_eq!(part(&restored, DRAWING), part(&before, DRAWING));
@@ -1754,7 +1787,7 @@ fn multiple_pictures_attach_and_detach_in_one_atomic_transaction() {
 #[test]
 fn independent_worksheets_share_manifest_and_allocate_distinct_svg_parts() {
     let before = two_worksheet_fixture(false);
-    let workbook = Workbook::from_bytes(before.clone()).unwrap();
+    let workbook = Package::from_bytes(&before).unwrap();
     let mut edit = workbook.edit().unwrap();
     {
         let mut sheet = edit.sheet("Sheet1").unwrap().unwrap();
@@ -1772,7 +1805,7 @@ fn independent_worksheets_share_manifest_and_allocate_distinct_svg_parts() {
     let attached = edit
         .commit()
         .unwrap()
-        .into_workbook()
+        .into_package()
         .to_plain_bytes()
         .unwrap();
     let svg_parts = part_names_with_content_type(&attached, "image/svg+xml");
@@ -1792,7 +1825,7 @@ fn independent_worksheets_share_manifest_and_allocate_distinct_svg_parts() {
             >= 2
     );
 
-    let mut detach_edit = Workbook::from_bytes(attached).unwrap().edit().unwrap();
+    let mut detach_edit = Package::from_bytes(&attached).unwrap().edit().unwrap();
     {
         let mut sheet = detach_edit.sheet("Sheet1").unwrap().unwrap();
         sheet.detach_svg(selector(0)).unwrap();
@@ -1804,7 +1837,7 @@ fn independent_worksheets_share_manifest_and_allocate_distinct_svg_parts() {
     let restored = detach_edit
         .commit()
         .unwrap()
-        .into_workbook()
+        .into_package()
         .to_plain_bytes()
         .unwrap();
     assert_eq!(part(&restored, DRAWING), part(&before, DRAWING));
@@ -1819,7 +1852,7 @@ fn independent_worksheets_share_manifest_and_allocate_distinct_svg_parts() {
 #[test]
 fn cross_worksheet_detach_attach_fits_final_part_budget_after_media_reclamation() {
     let before = two_worksheet_detach_attach_fixture();
-    let attached = cross_sheet_detach_attach_with_limits(&before, ReadLimits::default()).unwrap();
+    let attached = cross_sheet_detach_attach_with_limits(&before, SourceLimits::default()).unwrap();
     assert_eq!(
         materialized_part_count(&attached),
         materialized_part_count(&before)
@@ -1837,7 +1870,7 @@ fn cross_worksheet_detach_attach_fits_final_part_budget_after_media_reclamation(
 #[test]
 fn cross_worksheet_detach_attach_accepts_exact_final_metadata_caps() {
     let before = two_worksheet_detach_attach_fixture();
-    let attached = cross_sheet_detach_attach_with_limits(&before, ReadLimits::default()).unwrap();
+    let attached = cross_sheet_detach_attach_with_limits(&before, SourceLimits::default()).unwrap();
 
     let max_part_bytes =
         largest_materialized_part_bytes(&before).max(largest_materialized_part_bytes(&attached));
@@ -1871,13 +1904,13 @@ fn cross_worksheet_detach_attach_accepts_exact_final_metadata_caps() {
 #[test]
 fn cross_worksheet_detach_attach_accepts_exact_final_relationship_graph_node_cap() {
     let before = two_worksheet_detach_attach_fixture();
-    let attached = cross_sheet_detach_attach_with_limits(&before, ReadLimits::default()).unwrap();
+    let attached = cross_sheet_detach_attach_with_limits(&before, SourceLimits::default()).unwrap();
     let source_nodes = relationship_graph_node_count(&before);
     let final_nodes = relationship_graph_node_count(&attached);
     assert_eq!(source_nodes, final_nodes);
     assert!(final_nodes > 1);
 
-    let exact = ReadLimits::builder()
+    let exact = SourceLimits::builder()
         .max_relationship_graph_nodes(final_nodes)
         .unwrap()
         .build()
@@ -1885,7 +1918,7 @@ fn cross_worksheet_detach_attach_accepts_exact_final_relationship_graph_node_cap
     let repeated = cross_sheet_detach_attach_with_limits(&before, exact).unwrap();
     assert_eq!(repeated, attached);
 
-    let under = ReadLimits::builder()
+    let under = SourceLimits::builder()
         .max_relationship_graph_nodes(final_nodes - 1)
         .unwrap()
         .build()
@@ -1897,10 +1930,7 @@ fn cross_worksheet_detach_attach_accepts_exact_final_relationship_graph_node_cap
 fn shared_svg_target_across_worksheets_is_removed_after_last_same_transaction_owner() {
     let before = two_worksheet_fixture(true);
     let baseline = two_worksheet_fixture(false);
-    let mut edit = Workbook::from_bytes(before.clone())
-        .unwrap()
-        .edit()
-        .unwrap();
+    let mut edit = Package::from_bytes(&before).unwrap().edit().unwrap();
     {
         let mut sheet = edit.sheet("Sheet1").unwrap().unwrap();
         sheet.detach_svg(selector(0)).unwrap();
@@ -1912,7 +1942,7 @@ fn shared_svg_target_across_worksheets_is_removed_after_last_same_transaction_ow
     let final_bytes = edit
         .commit()
         .unwrap()
-        .into_workbook()
+        .into_package()
         .to_plain_bytes()
         .unwrap();
     assert!(!has_part(&final_bytes, SVG));
@@ -1938,7 +1968,7 @@ fn shared_svg_target_across_worksheets_is_removed_after_last_same_transaction_ow
 #[test]
 fn mixed_cell_and_svg_changes_publish_as_one_ordinary_transaction() {
     let before = raster_fixture();
-    let mut edit = Workbook::from_bytes(before).unwrap().edit().unwrap();
+    let mut edit = Package::from_bytes(&before).unwrap().edit().unwrap();
     {
         let mut sheet = edit.sheet("Sheet1").unwrap().unwrap();
         sheet
@@ -1950,7 +1980,7 @@ fn mixed_cell_and_svg_changes_publish_as_one_ordinary_transaction() {
     let committed = edit
         .commit()
         .unwrap()
-        .into_workbook()
+        .into_package()
         .to_plain_bytes()
         .unwrap();
     assert!(
@@ -2034,7 +2064,7 @@ fn worksheet_extension_drawing_and_mce_lookalikes_remain_opaque() {
 #[test]
 fn same_picture_attach_then_detach_projects_back_to_an_exact_noop() {
     let before = raster_fixture();
-    let workbook = Workbook::from_bytes(before.clone()).unwrap();
+    let workbook = Package::from_bytes(&before).unwrap();
     let mut edit = workbook.edit().unwrap();
     {
         let mut sheet = edit.sheet("Sheet1").unwrap().unwrap();
@@ -2048,7 +2078,7 @@ fn same_picture_attach_then_detach_projects_back_to_an_exact_noop() {
     let after = edit
         .commit()
         .unwrap()
-        .into_workbook()
+        .into_package()
         .to_plain_bytes()
         .unwrap();
     assert_eq!(after, before);
@@ -2057,7 +2087,7 @@ fn same_picture_attach_then_detach_projects_back_to_an_exact_noop() {
 #[test]
 fn same_picture_detach_then_attach_projects_to_the_new_payload() {
     let before = svg_fixture();
-    let workbook = Workbook::from_bytes(before.clone()).unwrap();
+    let workbook = Package::from_bytes(&before).unwrap();
     let mut edit = workbook.edit().unwrap();
     {
         let mut sheet = edit.sheet("Sheet1").unwrap().unwrap();
@@ -2071,7 +2101,7 @@ fn same_picture_detach_then_attach_projects_to_the_new_payload() {
     let after = edit
         .commit()
         .unwrap()
-        .into_workbook()
+        .into_package()
         .to_plain_bytes()
         .unwrap();
     let svg_parts = part_names_with_content_type(&after, "image/svg+xml");
@@ -2084,7 +2114,7 @@ fn same_picture_detach_then_attach_projects_to_the_new_payload() {
 #[test]
 fn sole_owner_replacement_accepts_exact_final_package_and_relationship_budgets() {
     let before = svg_fixture();
-    let attached = mixed_detach_attach_with_limits(&before, ReadLimits::default()).unwrap();
+    let attached = mixed_detach_attach_with_limits(&before, SourceLimits::default()).unwrap();
     assert_eq!(
         materialized_part_count(&attached),
         materialized_part_count(&before)
@@ -2111,7 +2141,7 @@ fn strict_host_uses_strict_core_and_transitional_svg_attribute_namespace() {
     assert!(text.contains(STRICT_A));
     assert!(text.contains(STRICT_REL));
     assert!(text.contains(REL));
-    let source = SourceDrawing::scan(&xml).unwrap();
+    let source = SourceDrawing::scan(&xml, 0, ScanLimits::default()).unwrap();
     assert_eq!(source.dialect(), DrawingDialect::Strict);
     assert_eq!(source.relationship_dialect(), RelationshipDialect::Strict);
     assert_eq!(
@@ -2175,10 +2205,7 @@ fn incoming_other_part_edge_keeps_svg_media_after_last_picture_detach() {
 #[test]
 fn newly_added_root_incoming_svg_edge_refuses_or_retains_candidate_media() {
     let before = shared_svg_fixture(false);
-    let mut edit = Workbook::from_bytes(before.clone())
-        .unwrap()
-        .edit()
-        .unwrap();
+    let mut edit = Package::from_bytes(&before).unwrap().edit().unwrap();
     {
         let mut sheet = edit.sheet("Sheet1").unwrap().unwrap();
         for picture in 0..3 {
@@ -2186,15 +2213,15 @@ fn newly_added_root_incoming_svg_edge_refuses_or_retains_candidate_media() {
         }
     }
     let commit = edit.commit().unwrap();
-    let changed = Workbook::from_bytes(incoming_root_svg_edge_fixture(&before)).unwrap();
+    let changed = Package::from_bytes(&incoming_root_svg_edge_fixture(&before)).unwrap();
     match changed.apply(commit.patch()) {
         Err(Error::PatchConflict { .. }) => {},
         Ok(applied) => {
-            let candidate = applied.workbook().to_plain_bytes().unwrap();
+            let candidate = applied.package().to_plain_bytes().unwrap();
             assert!(has_part(&candidate, SVG));
             assert!(
                 String::from_utf8(
-                    PhysPkgReader::new(&candidate)
+                    PhysPkgReader::new(&candidate, SourceLimits::default())
                         .unwrap()
                         .read_member("_rels/.rels")
                         .unwrap(),
@@ -2210,10 +2237,7 @@ fn newly_added_root_incoming_svg_edge_refuses_or_retains_candidate_media() {
 #[test]
 fn newly_added_unrelated_part_incoming_svg_edge_refuses_or_retains_candidate_media() {
     let before = shared_svg_fixture(false);
-    let mut edit = Workbook::from_bytes(before.clone())
-        .unwrap()
-        .edit()
-        .unwrap();
+    let mut edit = Package::from_bytes(&before).unwrap().edit().unwrap();
     {
         let mut sheet = edit.sheet("Sheet1").unwrap().unwrap();
         for picture in 0..3 {
@@ -2222,11 +2246,11 @@ fn newly_added_unrelated_part_incoming_svg_edge_refuses_or_retains_candidate_med
     }
     let commit = edit.commit().unwrap();
     let candidate_bytes = incoming_new_part_svg_edge_fixture(&before);
-    let changed = Workbook::from_bytes(candidate_bytes).unwrap();
+    let changed = Package::from_bytes(&candidate_bytes).unwrap();
     match changed.apply(commit.patch()) {
         Err(Error::PatchConflict { .. }) => {},
         Ok(applied) => {
-            let candidate = applied.workbook().to_plain_bytes().unwrap();
+            let candidate = applied.package().to_plain_bytes().unwrap();
             assert!(has_part(&candidate, SVG));
             assert!(has_part(&candidate, NEW_INCOMING_OWNER));
             assert!(
@@ -2242,10 +2266,7 @@ fn newly_added_unrelated_part_incoming_svg_edge_refuses_or_retains_candidate_med
 #[test]
 fn forward_patch_rejects_changed_or_missing_retained_shared_svg_media() {
     let before = shared_svg_fixture(false);
-    let mut edit = Workbook::from_bytes(before.clone())
-        .unwrap()
-        .edit()
-        .unwrap();
+    let mut edit = Package::from_bytes(&before).unwrap().edit().unwrap();
     edit.sheet("Sheet1")
         .unwrap()
         .unwrap()
@@ -2257,7 +2278,7 @@ fn forward_patch_rejects_changed_or_missing_retained_shared_svg_media() {
         ("changed SVG payload", changed_svg_payload_fixture(&before)),
         ("missing SVG part", missing_svg_part_fixture(&before)),
     ] {
-        match Workbook::from_bytes(candidate_bytes) {
+        match Package::from_bytes(&candidate_bytes) {
             Err(_) => {},
             Ok(candidate) => assert!(
                 candidate.apply(commit.patch()).is_err(),
@@ -2270,10 +2291,7 @@ fn forward_patch_rejects_changed_or_missing_retained_shared_svg_media() {
 #[test]
 fn final_svg_removal_rejects_candidate_with_new_outbound_media_edge() {
     let before = svg_fixture();
-    let mut edit = Workbook::from_bytes(before.clone())
-        .unwrap()
-        .edit()
-        .unwrap();
+    let mut edit = Package::from_bytes(&before).unwrap().edit().unwrap();
     edit.sheet("Sheet1")
         .unwrap()
         .unwrap()
@@ -2281,17 +2299,14 @@ fn final_svg_removal_rejects_candidate_with_new_outbound_media_edge() {
         .unwrap();
     let commit = edit.commit().unwrap();
 
-    let candidate = Workbook::from_bytes(outbound_svg_edge_fixture(&before)).unwrap();
+    let candidate = Package::from_bytes(&outbound_svg_edge_fixture(&before)).unwrap();
     assert!(candidate.apply(commit.patch()).is_err());
 }
 
 #[test]
 fn same_transaction_relationship_change_cannot_bypass_candidate_svg_incoming_edge() {
     let before = two_worksheet_single_svg_owner_fixture();
-    let mut edit = Workbook::from_bytes(before.clone())
-        .unwrap()
-        .edit()
-        .unwrap();
+    let mut edit = Package::from_bytes(&before).unwrap().edit().unwrap();
     edit.sheet("Sheet1")
         .unwrap()
         .unwrap()
@@ -2310,11 +2325,11 @@ fn same_transaction_relationship_change_cannot_bypass_candidate_svg_incoming_edg
         .unwrap();
     let commit = edit.commit().unwrap();
 
-    let candidate = Workbook::from_bytes(incoming_second_sheet_svg_edge_fixture(&before)).unwrap();
+    let candidate = Package::from_bytes(&incoming_second_sheet_svg_edge_fixture(&before)).unwrap();
     match candidate.apply(commit.patch()) {
         Err(Error::PatchConflict { .. }) => {},
         Ok(applied) => {
-            let candidate = applied.workbook().to_plain_bytes().unwrap();
+            let candidate = applied.package().to_plain_bytes().unwrap();
             assert!(has_part(&candidate, SVG));
             assert!(
                 String::from_utf8(rels(&candidate, SHEET2))
@@ -2329,10 +2344,7 @@ fn same_transaction_relationship_change_cannot_bypass_candidate_svg_incoming_edg
 #[test]
 fn same_transaction_graph_add_cannot_bypass_candidate_svg_incoming_edge() {
     let before = two_worksheet_single_svg_owner_fixture();
-    let mut edit = Workbook::from_bytes(before.clone())
-        .unwrap()
-        .edit()
-        .unwrap();
+    let mut edit = Package::from_bytes(&before).unwrap().edit().unwrap();
     edit.copy_cells("Sheet1", "A1:C10", "Sheet2", "A1")
         .unwrap()
         .unwrap();
@@ -2343,11 +2355,11 @@ fn same_transaction_graph_add_cannot_bypass_candidate_svg_incoming_edge() {
         .unwrap();
     let commit = edit.commit().unwrap();
 
-    let candidate = Workbook::from_bytes(incoming_second_sheet_svg_edge_fixture(&before)).unwrap();
+    let candidate = Package::from_bytes(&incoming_second_sheet_svg_edge_fixture(&before)).unwrap();
     match candidate.apply(commit.patch()) {
         Err(Error::PatchConflict { .. }) => {},
         Ok(applied) => {
-            let candidate = applied.workbook().to_plain_bytes().unwrap();
+            let candidate = applied.package().to_plain_bytes().unwrap();
             assert!(has_part(&candidate, SVG));
             assert!(
                 String::from_utf8(rels(&candidate, SHEET2))
@@ -2367,23 +2379,20 @@ fn case_variant_svg_target_cleanup_and_inverse_use_canonical_media_part() {
             .unwrap()
             .contains(r#"Target="../media/IMAGE2.SVG""#)
     );
-    let mut edit = Workbook::from_bytes(before.clone())
-        .unwrap()
-        .edit()
-        .unwrap();
+    let mut edit = Package::from_bytes(&before).unwrap().edit().unwrap();
     edit.sheet("Sheet1")
         .unwrap()
         .unwrap()
         .detach_svg(selector(0))
         .unwrap();
     let commit = edit.commit().unwrap();
-    let after_first = commit.workbook().to_plain_bytes().unwrap();
+    let after_first = commit.package().to_plain_bytes().unwrap();
     let inverse = commit.patch().inverse();
-    let restored = Workbook::from_bytes(after_first.clone())
+    let restored = Package::from_bytes(&after_first)
         .unwrap()
         .apply(&inverse)
         .unwrap()
-        .into_workbook()
+        .into_package()
         .to_plain_bytes()
         .unwrap();
     assert_eq!(part(&restored, DRAWING), part(&before, DRAWING));
@@ -2407,22 +2416,19 @@ fn case_variant_svg_target_cleanup_and_inverse_use_canonical_media_part() {
 #[test]
 fn media_directory_case_equivalence_supports_attach_detach_and_inverse() {
     let before = media_directory_case_variant_fixture(&svg_fixture());
-    let mut edit = Workbook::from_bytes(before.clone())
-        .unwrap()
-        .edit()
-        .unwrap();
+    let mut edit = Package::from_bytes(&before).unwrap().edit().unwrap();
     edit.sheet("Sheet1")
         .unwrap()
         .unwrap()
         .detach_svg(selector(0))
         .unwrap();
     let commit = edit.commit().unwrap();
-    let detached = commit.workbook().to_plain_bytes().unwrap();
-    let restored = Workbook::from_bytes(detached)
+    let detached = commit.package().to_plain_bytes().unwrap();
+    let restored = Package::from_bytes(&detached)
         .unwrap()
         .apply(&commit.patch().inverse())
         .unwrap()
-        .into_workbook()
+        .into_package()
         .to_plain_bytes()
         .unwrap();
     assert_eq!(part(&restored, DRAWING), part(&before, DRAWING));
@@ -2491,10 +2497,7 @@ fn default_svg_content_type_survives_same_picture_detach_then_attach_without_ove
         r#"<Override PartName="{SVG}" ContentType="image/svg+xml"/>"#
     )));
 
-    let mut edit = Workbook::from_bytes(before.clone())
-        .unwrap()
-        .edit()
-        .unwrap();
+    let mut edit = Package::from_bytes(&before).unwrap().edit().unwrap();
     edit.sheet("Sheet1")
         .unwrap()
         .unwrap()
@@ -2505,7 +2508,7 @@ fn default_svg_content_type_survives_same_picture_detach_then_attach_without_ove
     let after = edit
         .commit()
         .unwrap()
-        .into_workbook()
+        .into_package()
         .to_plain_bytes()
         .unwrap();
     assert_eq!(content_types_member(&after), content_types_member(&before));
@@ -2543,7 +2546,7 @@ fn unknown_duplicate_mce_external_and_foreign_owners_are_safe_refusals() {
         ..DrawingOptions::default()
     });
     let unknown_drawing = part(&unknown, DRAWING);
-    let unknown_source = SourceDrawing::scan(&unknown_drawing).unwrap();
+    let unknown_source = SourceDrawing::scan(&unknown_drawing, 0, ScanLimits::default()).unwrap();
     assert!(matches!(
         unknown_source.picture(0).unwrap().svg_owner(),
         SvgOwnerState::Opaque | SvgOwnerState::None
@@ -2564,7 +2567,8 @@ fn unknown_duplicate_mce_external_and_foreign_owners_are_safe_refusals() {
         ..DrawingOptions::default()
     });
     let duplicate_drawing = part(&duplicate, DRAWING);
-    let duplicate_source = SourceDrawing::scan(&duplicate_drawing).unwrap();
+    let duplicate_source =
+        SourceDrawing::scan(&duplicate_drawing, 0, ScanLimits::default()).unwrap();
     assert!(matches!(
         duplicate_source.picture(0).unwrap().svg_owner(),
         SvgOwnerState::Ambiguous
@@ -2576,7 +2580,7 @@ fn unknown_duplicate_mce_external_and_foreign_owners_are_safe_refusals() {
         ..DrawingOptions::default()
     });
     let mce_drawing = part(&mce, DRAWING);
-    let mce_source = SourceDrawing::scan(&mce_drawing).unwrap();
+    let mce_source = SourceDrawing::scan(&mce_drawing, 0, ScanLimits::default()).unwrap();
     assert!(matches!(
         mce_source.picture(0).unwrap().svg_owner(),
         SvgOwnerState::Refused
@@ -2589,7 +2593,7 @@ fn unknown_duplicate_mce_external_and_foreign_owners_are_safe_refusals() {
         ..DrawingOptions::default()
     });
     let linked_drawing = part(&linked, DRAWING);
-    let linked_source = SourceDrawing::scan(&linked_drawing).unwrap();
+    let linked_source = SourceDrawing::scan(&linked_drawing, 0, ScanLimits::default()).unwrap();
     assert!(matches!(
         linked_source.picture(0).unwrap().svg_owner(),
         SvgOwnerState::Linked(_)
@@ -2603,10 +2607,7 @@ fn no_op_detach_exact_inverse_and_stale_patch_are_checked() {
     let before = raster_fixture();
     let detached = edit_detach(&before, selector(0)).unwrap();
     assert_eq!(detached, before);
-    let mut noop_edit = Workbook::from_bytes(before.clone())
-        .unwrap()
-        .edit()
-        .unwrap();
+    let mut noop_edit = Package::from_bytes(&before).unwrap().edit().unwrap();
     {
         noop_edit
             .sheet("Sheet1")
@@ -2621,12 +2622,12 @@ fn no_op_detach_exact_inverse_and_stale_patch_are_checked() {
         noop_edit
             .commit()
             .unwrap()
-            .into_workbook()
+            .into_package()
             .to_plain_bytes()
             .unwrap(),
         before
     );
-    let workbook = Workbook::from_bytes(before.clone()).unwrap();
+    let workbook = Package::from_bytes(&before).unwrap();
     let mut edit = workbook.edit().unwrap();
     edit.sheet("Sheet1")
         .unwrap()
@@ -2634,25 +2635,25 @@ fn no_op_detach_exact_inverse_and_stale_patch_are_checked() {
         .attach_svg(selector(0), SvgInput::borrowed(NEW_SVG))
         .unwrap();
     let commit = edit.commit().unwrap();
-    let after = commit.workbook().to_plain_bytes().unwrap();
+    let after = commit.package().to_plain_bytes().unwrap();
     let durable = commit.patch().durable().unwrap();
     let inverse = commit.patch().inverse().durable().unwrap();
     assert_eq!(
         inverse
-            .apply(&Workbook::from_bytes(after).unwrap())
+            .apply(&Package::from_bytes(&after).unwrap())
             .unwrap()
             .to_plain_bytes()
             .unwrap(),
         before
     );
-    let mut divergent = Workbook::from_bytes(before).unwrap().edit().unwrap();
+    let mut divergent = Package::from_bytes(&before).unwrap().edit().unwrap();
     divergent
         .sheet("Sheet1")
         .unwrap()
         .unwrap()
         .set("A1", "stale")
         .unwrap();
-    let divergent = divergent.commit().unwrap().into_workbook();
+    let divergent = divergent.commit().unwrap().into_package();
     assert!(matches!(
         durable.apply(&divergent),
         Err(Error::PatchConflict { .. })
@@ -2672,7 +2673,7 @@ fn attach_then_detach_exact_noop_fits_original_resource_budgets() {
 #[test]
 fn single_attach_accepts_exact_generated_drawing_cap_and_rejects_one_byte_under() {
     let before = raster_fixture();
-    let generous = ReadLimits::default();
+    let generous = SourceLimits::default();
     let attached = edit_attach_with_limits(&before, selector(0), NEW_SVG, generous)
         .expect("the fixture must admit one SVG attach under the generous profile");
     let drawing_len = part(&attached, DRAWING).len();
@@ -2688,7 +2689,7 @@ fn single_attach_accepts_exact_generated_drawing_cap_and_rejects_one_byte_under(
         .expect("an exact final drawing budget must admit the deterministic attach");
     assert_eq!(repeated, attached);
 
-    let under = ReadLimits::builder()
+    let under = SourceLimits::builder()
         .max_parts(exact.max_parts())
         .unwrap()
         .max_total_part_bytes(exact.max_total_part_bytes())
@@ -2698,11 +2699,21 @@ fn single_attach_accepts_exact_generated_drawing_cap_and_rejects_one_byte_under(
         .build()
         .unwrap();
     assert!(
-        Workbook::from_bytes_with_limits(before.clone(), under).is_ok(),
+        Package::from_bytes_with_options(
+            &before,
+            litchi_xlsx::OpenOptions::new().source_limits(under)
+        )
+        .is_ok(),
         "the source package must fit one byte below the generated drawing size"
     );
     assert!(edit_attach_with_limits(&before, selector(0), NEW_SVG, under).is_err());
-    assert!(Workbook::from_bytes_with_limits(before, under).is_ok());
+    assert!(
+        Package::from_bytes_with_options(
+            &before,
+            litchi_xlsx::OpenOptions::new().source_limits(under)
+        )
+        .is_ok()
+    );
 }
 
 #[test]
@@ -2712,7 +2723,7 @@ fn empty_blip_and_ext_list_attach_accept_exact_part_and_aggregate_caps() {
         ("empty a:extLst", empty_ext_list_fixture()),
     ] {
         let attached =
-            edit_attach_with_limits(&before, selector(0), NEW_SVG, ReadLimits::default())
+            edit_attach_with_limits(&before, selector(0), NEW_SVG, SourceLimits::default())
                 .unwrap_or_else(|error| panic!("{label} fixture must admit SVG attach: {error:?}"));
         let source_part = largest_materialized_part_bytes(&before);
         let final_part = largest_materialized_part_bytes(&attached);
@@ -2729,12 +2740,18 @@ fn empty_blip_and_ext_list_attach_accept_exact_part_and_aggregate_caps() {
         );
 
         let exact = exact_part_and_aggregate_limits(&before, &attached);
-        assert!(Workbook::from_bytes_with_limits(before.clone(), exact).is_ok());
+        assert!(
+            Package::from_bytes_with_options(
+                &before,
+                litchi_xlsx::OpenOptions::new().source_limits(exact)
+            )
+            .is_ok()
+        );
         let repeated = edit_attach_with_limits(&before, selector(0), NEW_SVG, exact)
             .unwrap_or_else(|error| panic!("{label} exact output caps rejected attach: {error:?}"));
         assert_eq!(repeated, attached);
 
-        let part_under = ReadLimits::builder()
+        let part_under = SourceLimits::builder()
             .max_parts(exact.max_parts())
             .unwrap()
             .max_total_part_bytes(exact.max_total_part_bytes())
@@ -2743,11 +2760,23 @@ fn empty_blip_and_ext_list_attach_accept_exact_part_and_aggregate_caps() {
             .unwrap()
             .build()
             .unwrap();
-        assert!(Workbook::from_bytes_with_limits(before.clone(), part_under).is_ok());
+        assert!(
+            Package::from_bytes_with_options(
+                &before,
+                litchi_xlsx::OpenOptions::new().source_limits(part_under)
+            )
+            .is_ok()
+        );
         assert!(edit_attach_with_limits(&before, selector(0), NEW_SVG, part_under).is_err());
-        assert!(Workbook::from_bytes_with_limits(before.clone(), part_under).is_ok());
+        assert!(
+            Package::from_bytes_with_options(
+                &before,
+                litchi_xlsx::OpenOptions::new().source_limits(part_under)
+            )
+            .is_ok()
+        );
 
-        let aggregate_under = ReadLimits::builder()
+        let aggregate_under = SourceLimits::builder()
             .max_parts(exact.max_parts())
             .unwrap()
             .max_total_part_bytes((final_total - 1) as u64)
@@ -2756,16 +2785,28 @@ fn empty_blip_and_ext_list_attach_accept_exact_part_and_aggregate_caps() {
             .unwrap()
             .build()
             .unwrap();
-        assert!(Workbook::from_bytes_with_limits(before.clone(), aggregate_under).is_ok());
+        assert!(
+            Package::from_bytes_with_options(
+                &before,
+                litchi_xlsx::OpenOptions::new().source_limits(aggregate_under)
+            )
+            .is_ok()
+        );
         assert!(edit_attach_with_limits(&before, selector(0), NEW_SVG, aggregate_under).is_err());
-        assert!(Workbook::from_bytes_with_limits(before, aggregate_under).is_ok());
+        assert!(
+            Package::from_bytes_with_options(
+                &before,
+                litchi_xlsx::OpenOptions::new().source_limits(aggregate_under)
+            )
+            .is_ok()
+        );
     }
 }
 
 #[test]
 fn generated_svg_relationship_id_decimal_width_fits_exact_xml_budgets() {
     let before = svg_decimal_width_relationship_fixture();
-    let attached = edit_attach_with_limits(&before, selector(0), NEW_SVG, ReadLimits::default())
+    let attached = edit_attach_with_limits(&before, selector(0), NEW_SVG, SourceLimits::default())
         .expect("the decimal-width fixture must admit one SVG attach");
     let drawing = part(&attached, DRAWING);
     assert!(
@@ -2781,7 +2822,7 @@ fn generated_svg_relationship_id_decimal_width_fits_exact_xml_budgets() {
         .expect("exact final drawing and relationship XML budgets must admit the attach");
     assert_eq!(repeated, attached);
 
-    let drawing_under = ReadLimits::builder()
+    let drawing_under = SourceLimits::builder()
         .max_parts(exact.max_parts())
         .unwrap()
         .max_total_part_bytes(exact.max_total_part_bytes())
@@ -2790,10 +2831,16 @@ fn generated_svg_relationship_id_decimal_width_fits_exact_xml_budgets() {
         .unwrap()
         .build()
         .unwrap();
-    assert!(Workbook::from_bytes_with_limits(before.clone(), drawing_under).is_ok());
+    assert!(
+        Package::from_bytes_with_options(
+            &before,
+            litchi_xlsx::OpenOptions::new().source_limits(drawing_under)
+        )
+        .is_ok()
+    );
     assert!(edit_attach_with_limits(&before, selector(0), NEW_SVG, drawing_under).is_err());
 
-    let relationship_under = ReadLimits::builder()
+    let relationship_under = SourceLimits::builder()
         .max_parts(exact.max_parts())
         .unwrap()
         .max_total_part_bytes(exact.max_total_part_bytes())
@@ -2810,14 +2857,20 @@ fn generated_svg_relationship_id_decimal_width_fits_exact_xml_budgets() {
         .unwrap()
         .build()
         .unwrap();
-    assert!(Workbook::from_bytes_with_limits(before.clone(), relationship_under).is_ok());
+    assert!(
+        Package::from_bytes_with_options(
+            &before,
+            litchi_xlsx::OpenOptions::new().source_limits(relationship_under)
+        )
+        .is_ok()
+    );
     assert!(edit_attach_with_limits(&before, selector(0), NEW_SVG, relationship_under).is_err());
 }
 
 #[test]
 fn same_drawing_multiple_attachments_use_actual_cross_decimal_id_widths() {
     let before = svg_mixed_width_relationship_fixture();
-    let attached = edit_attach_two_with_limits(&before, ReadLimits::default()).unwrap();
+    let attached = edit_attach_two_with_limits(&before, SourceLimits::default()).unwrap();
     let drawing = String::from_utf8(part(&attached, DRAWING)).unwrap();
     assert_eq!(drawing.matches("rIdSvg9").count(), 1);
     assert_eq!(drawing.matches("rIdSvg10").count(), 1);
@@ -2831,11 +2884,17 @@ fn same_drawing_multiple_attachments_use_actual_cross_decimal_id_widths() {
     assert_eq!(part(&attached, DRAWING).len(), final_part);
     assert!(final_total > source_total);
     let exact = exact_part_and_aggregate_limits(&before, &attached);
-    assert!(Workbook::from_bytes_with_limits(before.clone(), exact).is_ok());
+    assert!(
+        Package::from_bytes_with_options(
+            &before,
+            litchi_xlsx::OpenOptions::new().source_limits(exact)
+        )
+        .is_ok()
+    );
     let repeated = edit_attach_two_with_limits(&before, exact).unwrap();
     assert_eq!(repeated, attached);
 
-    let part_under = ReadLimits::builder()
+    let part_under = SourceLimits::builder()
         .max_parts(exact.max_parts())
         .unwrap()
         .max_total_part_bytes(exact.max_total_part_bytes())
@@ -2844,11 +2903,23 @@ fn same_drawing_multiple_attachments_use_actual_cross_decimal_id_widths() {
         .unwrap()
         .build()
         .unwrap();
-    assert!(Workbook::from_bytes_with_limits(before.clone(), part_under).is_ok());
+    assert!(
+        Package::from_bytes_with_options(
+            &before,
+            litchi_xlsx::OpenOptions::new().source_limits(part_under)
+        )
+        .is_ok()
+    );
     assert!(edit_attach_two_with_limits(&before, part_under).is_err());
-    assert!(Workbook::from_bytes_with_limits(before.clone(), part_under).is_ok());
+    assert!(
+        Package::from_bytes_with_options(
+            &before,
+            litchi_xlsx::OpenOptions::new().source_limits(part_under)
+        )
+        .is_ok()
+    );
 
-    let aggregate_under = ReadLimits::builder()
+    let aggregate_under = SourceLimits::builder()
         .max_parts(exact.max_parts())
         .unwrap()
         .max_total_part_bytes((final_total - 1) as u64)
@@ -2857,22 +2928,34 @@ fn same_drawing_multiple_attachments_use_actual_cross_decimal_id_widths() {
         .unwrap()
         .build()
         .unwrap();
-    assert!(Workbook::from_bytes_with_limits(before.clone(), aggregate_under).is_ok());
+    assert!(
+        Package::from_bytes_with_options(
+            &before,
+            litchi_xlsx::OpenOptions::new().source_limits(aggregate_under)
+        )
+        .is_ok()
+    );
     assert!(edit_attach_two_with_limits(&before, aggregate_under).is_err());
-    assert!(Workbook::from_bytes_with_limits(before, aggregate_under).is_ok());
+    assert!(
+        Package::from_bytes_with_options(
+            &before,
+            litchi_xlsx::OpenOptions::new().source_limits(aggregate_under)
+        )
+        .is_ok()
+    );
 }
 
 #[test]
 fn source_less_relationship_member_accepts_exact_final_event_cap() {
     let before = source_less_sheet2_relationship_fixture();
     assert!(!has_physical_member(&before, SHEET2_RELS_MEMBER));
-    let attached = mixed_svg_and_hyperlink_with_limits(&before, ReadLimits::default()).unwrap();
+    let attached = mixed_svg_and_hyperlink_with_limits(&before, SourceLimits::default()).unwrap();
     assert!(has_physical_member(&attached, SHEET2_RELS_MEMBER));
 
     let source_events = relationship_xml_events(&before);
     let final_events = relationship_xml_events(&attached);
     assert!(final_events > source_events);
-    let exact = ReadLimits::builder()
+    let exact = SourceLimits::builder()
         .max_total_relationship_xml_events(final_events)
         .unwrap()
         .build()
@@ -2880,14 +2963,26 @@ fn source_less_relationship_member_accepts_exact_final_event_cap() {
     let repeated = mixed_svg_and_hyperlink_with_limits(&before, exact).unwrap();
     assert_eq!(repeated, attached);
 
-    let under = ReadLimits::builder()
+    let under = SourceLimits::builder()
         .max_total_relationship_xml_events(final_events - 1)
         .unwrap()
         .build()
         .unwrap();
-    assert!(Workbook::from_bytes_with_limits(before.clone(), under).is_ok());
+    assert!(
+        Package::from_bytes_with_options(
+            &before,
+            litchi_xlsx::OpenOptions::new().source_limits(under)
+        )
+        .is_ok()
+    );
     assert!(mixed_svg_and_hyperlink_with_limits(&before, under).is_err());
-    assert!(Workbook::from_bytes_with_limits(before, under).is_ok());
+    assert!(
+        Package::from_bytes_with_options(
+            &before,
+            litchi_xlsx::OpenOptions::new().source_limits(under)
+        )
+        .is_ok()
+    );
 }
 
 #[test]
@@ -2896,7 +2991,7 @@ fn self_closing_relationship_root_expansion_accepts_exact_final_event_cap() {
     assert!(has_physical_member(&before, SHEET2_RELS_MEMBER));
     assert!(
         String::from_utf8(
-            PhysPkgReader::new(&before)
+            PhysPkgReader::new(&before, SourceLimits::default())
                 .unwrap()
                 .read_member(SHEET2_RELS_MEMBER)
                 .unwrap(),
@@ -2906,7 +3001,7 @@ fn self_closing_relationship_root_expansion_accepts_exact_final_event_cap() {
     );
     assert!(
         String::from_utf8(
-            PhysPkgReader::new(&before)
+            PhysPkgReader::new(&before, SourceLimits::default())
                 .unwrap()
                 .read_member(SHEET2_RELS_MEMBER)
                 .unwrap(),
@@ -2915,9 +3010,9 @@ fn self_closing_relationship_root_expansion_accepts_exact_final_event_cap() {
         .contains("/>")
     );
 
-    let attached = mixed_svg_and_hyperlink_with_limits(&before, ReadLimits::default()).unwrap();
+    let attached = mixed_svg_and_hyperlink_with_limits(&before, SourceLimits::default()).unwrap();
     let output_sheet2_rels = String::from_utf8(
-        PhysPkgReader::new(&attached)
+        PhysPkgReader::new(&attached, SourceLimits::default())
             .unwrap()
             .read_member(SHEET2_RELS_MEMBER)
             .unwrap(),
@@ -2928,7 +3023,7 @@ fn self_closing_relationship_root_expansion_accepts_exact_final_event_cap() {
     let source_events = relationship_xml_events(&before);
     let final_events = relationship_xml_events(&attached);
     assert!(final_events > source_events);
-    let exact = ReadLimits::builder()
+    let exact = SourceLimits::builder()
         .max_total_relationship_xml_events(final_events)
         .unwrap()
         .build()
@@ -2936,30 +3031,39 @@ fn self_closing_relationship_root_expansion_accepts_exact_final_event_cap() {
     let repeated = mixed_svg_and_hyperlink_with_limits(&before, exact).unwrap();
     assert_eq!(repeated, attached);
 
-    let under = ReadLimits::builder()
+    let under = SourceLimits::builder()
         .max_total_relationship_xml_events(final_events - 1)
         .unwrap()
         .build()
         .unwrap();
-    assert!(Workbook::from_bytes_with_limits(before.clone(), under).is_ok());
+    assert!(
+        Package::from_bytes_with_options(
+            &before,
+            litchi_xlsx::OpenOptions::new().source_limits(under)
+        )
+        .is_ok()
+    );
     assert!(mixed_svg_and_hyperlink_with_limits(&before, under).is_err());
-    assert!(Workbook::from_bytes_with_limits(before, under).is_ok());
+    assert!(
+        Package::from_bytes_with_options(
+            &before,
+            litchi_xlsx::OpenOptions::new().source_limits(under)
+        )
+        .is_ok()
+    );
 }
 
 #[test]
 fn in_memory_svg_patch_refuses_changed_worksheet_xml_readset() {
     let before = raster_fixture();
-    let mut edit = Workbook::from_bytes(before.clone())
-        .unwrap()
-        .edit()
-        .unwrap();
+    let mut edit = Package::from_bytes(&before).unwrap().edit().unwrap();
     edit.sheet("Sheet1")
         .unwrap()
         .unwrap()
         .attach_svg(selector(0), SvgInput::borrowed(NEW_SVG))
         .unwrap();
     let commit = edit.commit().unwrap();
-    let changed = Workbook::from_bytes(changed_worksheet_xml_fixture(&before)).unwrap();
+    let changed = Package::from_bytes(&changed_worksheet_xml_fixture(&before)).unwrap();
     assert!(matches!(
         changed.apply(commit.patch()),
         Err(Error::PatchConflict { .. })
@@ -2969,17 +3073,14 @@ fn in_memory_svg_patch_refuses_changed_worksheet_xml_readset() {
 #[test]
 fn in_memory_svg_patch_refuses_changed_worksheet_relationship_readset() {
     let before = raster_fixture();
-    let mut edit = Workbook::from_bytes(before.clone())
-        .unwrap()
-        .edit()
-        .unwrap();
+    let mut edit = Package::from_bytes(&before).unwrap().edit().unwrap();
     edit.sheet("Sheet1")
         .unwrap()
         .unwrap()
         .attach_svg(selector(0), SvgInput::borrowed(NEW_SVG))
         .unwrap();
     let commit = edit.commit().unwrap();
-    let changed = Workbook::from_bytes(changed_worksheet_relationships_fixture(&before)).unwrap();
+    let changed = Package::from_bytes(&changed_worksheet_relationships_fixture(&before)).unwrap();
     assert!(matches!(
         changed.apply(commit.patch()),
         Err(Error::PatchConflict { .. })
@@ -2989,7 +3090,7 @@ fn in_memory_svg_patch_refuses_changed_worksheet_relationship_readset() {
 #[test]
 fn invalid_input_selector_and_custom_scan_limits_fail_before_publication() {
     let before = raster_fixture();
-    let workbook = Workbook::from_bytes(before.clone()).unwrap();
+    let workbook = Package::from_bytes(&before).unwrap();
     let mut edit = workbook.edit().unwrap();
     assert!(
         edit.sheet("Sheet1")
@@ -3008,7 +3109,7 @@ fn invalid_input_selector_and_custom_scan_limits_fail_before_publication() {
     let unchanged = edit
         .commit()
         .unwrap()
-        .into_workbook()
+        .into_package()
         .to_plain_bytes()
         .unwrap();
     assert_eq!(unchanged, before);
@@ -3017,13 +3118,13 @@ fn invalid_input_selector_and_custom_scan_limits_fail_before_publication() {
         max_xml_bytes: drawing.len() - 1,
         ..ScanLimits::default()
     };
-    assert!(SourceDrawing::scan_with_limits(&drawing, 0, limited).is_err());
+    assert!(SourceDrawing::scan(&drawing, 0, limited).is_err());
     let limited_nodes = ScanLimits {
         max_nodes: 2,
         ..ScanLimits::default()
     };
-    assert!(SourceDrawing::scan_with_limits(&drawing, 0, limited_nodes).is_err());
-    let source = SourceDrawing::scan(&drawing).unwrap();
+    assert!(SourceDrawing::scan(&drawing, 0, limited_nodes).is_err());
+    let source = SourceDrawing::scan(&drawing, 0, ScanLimits::default()).unwrap();
     let owner = source.picture(0).unwrap();
     assert!(owner.namespace_complete_picture(&drawing, 1).is_err());
     let foreign_source = drawing.clone();
@@ -3033,14 +3134,14 @@ fn invalid_input_selector_and_custom_scan_limits_fail_before_publication() {
     // the authored extension exceed that same per-part output ceiling. The
     // transaction must reject the publication before it can expose a partial
     // drawing, relationship, or content-types change.
-    let output_cap = ReadLimits::builder()
+    let output_cap = SourceLimits::builder()
         .max_part_bytes(drawing.len() as u64)
         .unwrap()
         .build()
         .unwrap();
     assert!(edit_attach_with_limits(&before, selector(0), NEW_SVG, output_cap).is_err());
     assert_eq!(
-        Workbook::from_bytes(before.clone())
+        Package::from_bytes(&before)
             .unwrap()
             .to_plain_bytes()
             .unwrap(),
@@ -3054,14 +3155,14 @@ fn mixed_svg_replacement_respects_retained_part_and_aggregate_byte_limits() {
     let part_count = materialized_part_count(&before);
     let part_bytes = materialized_part_bytes(&before);
 
-    let max_parts = ReadLimits::builder()
+    let max_parts = SourceLimits::builder()
         .max_parts(part_count)
         .unwrap()
         .build()
         .unwrap();
     assert_mixed_limit_rejects(&before, max_parts, "materialized part count");
 
-    let fits_payload_not_drawing_growth = ReadLimits::builder()
+    let fits_payload_not_drawing_growth = SourceLimits::builder()
         .max_total_part_bytes((part_bytes + NEW_SVG.len()) as u64)
         .unwrap()
         .build()
@@ -3081,14 +3182,14 @@ fn mixed_svg_replacement_respects_relationship_and_content_type_limits() {
     let relationship_events = relationship_xml_events(&before);
     let content_type_mappings = content_type_mapping_count(&before);
 
-    let max_relationships = ReadLimits::builder()
+    let max_relationships = SourceLimits::builder()
         .max_total_relationships(relationships)
         .unwrap()
         .build()
         .unwrap();
     assert_mixed_limit_rejects(&before, max_relationships, "aggregate relationship count");
 
-    let max_relationship_bytes = ReadLimits::builder()
+    let max_relationship_bytes = SourceLimits::builder()
         .max_total_relationship_xml_bytes(relationship_bytes)
         .unwrap()
         .build()
@@ -3099,7 +3200,7 @@ fn mixed_svg_replacement_respects_relationship_and_content_type_limits() {
         "aggregate relationship XML bytes",
     );
 
-    let max_relationship_events = ReadLimits::builder()
+    let max_relationship_events = SourceLimits::builder()
         .max_total_relationship_xml_events(relationship_events)
         .unwrap()
         .build()
@@ -3110,7 +3211,7 @@ fn mixed_svg_replacement_respects_relationship_and_content_type_limits() {
         "aggregate relationship XML events",
     );
 
-    let max_content_types = ReadLimits::builder()
+    let max_content_types = SourceLimits::builder()
         .max_content_type_mappings(content_type_mappings)
         .unwrap()
         .build()
@@ -3151,13 +3252,13 @@ fn source_relationship_ranges_and_content_type_are_stable_across_inverse() {
     let before = raster_fixture();
     let before_content_types = content_types_member(&before);
     let before_drawing = part(&before, DRAWING);
-    let source = SourceDrawing::scan(&before_drawing).unwrap();
+    let source = SourceDrawing::scan(&before_drawing, 0, ScanLimits::default()).unwrap();
     let picture = source.picture(0).unwrap();
     assert_eq!(picture.blip_range().prefix(), b"a");
     assert!(picture.blip_range().start_end() <= picture.blip_range().range().end);
     assert!(picture.ext_list_range().is_some());
     assert_eq!(content_type(&before, RASTER), "image/png");
-    let workbook = Workbook::from_bytes(before.clone()).unwrap();
+    let workbook = Package::from_bytes(&before).unwrap();
     let mut edit = workbook.edit().unwrap();
     edit.sheet("Sheet1")
         .unwrap()

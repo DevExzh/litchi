@@ -15,10 +15,8 @@ use std::{
 use litchi_core::{
     CheckStatus, EvidenceValue, OwnedSource, ReadAt, SourceVersion, ValidationLimits,
 };
-use litchi_docx::{
-    DocxValidationError, DocxValidationLimits, source_backed, validate_read_at,
-    validate_read_at_with_limits,
-};
+use litchi_docx::source_backed;
+use litchi_docx::validation::{Error, Limits, validate_read_at};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, Part};
 use soapberry_zip::office::StreamingArchiveWriter;
@@ -49,7 +47,8 @@ fn malformed_fixture(main_xml: &str) -> Vec<u8> {
         r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="{}" Target="word/document.xml"/></Relationships>"#,
         rt::OFFICE_DOCUMENT
     );
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .unwrap();
@@ -235,7 +234,13 @@ impl ReadAt for TestSource {
 fn valid_main_document_is_complete_without_retaining_content() {
     let bytes = valid_fixture();
     let original = bytes.clone();
-    let report = validate_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
+    let report = validate_read_at(
+        Arc::new(OwnedSource::new(bytes)),
+        Default::default(),
+        Default::default(),
+        Default::default(),
+    )
+    .unwrap();
 
     assert!(report.is_complete());
     assert!(!report.has_errors());
@@ -265,7 +270,13 @@ fn valid_main_document_is_complete_without_retaining_content() {
 #[test]
 fn malformed_and_unsupported_main_semantics_are_content_free_findings() {
     let malformed = malformed_fixture(&format!(r#"<w:document xmlns:w="{WORD_NS}"><w:body><w:p>"#));
-    let malformed_report = validate_read_at(Arc::new(OwnedSource::new(malformed))).unwrap();
+    let malformed_report = validate_read_at(
+        Arc::new(OwnedSource::new(malformed)),
+        Default::default(),
+        Default::default(),
+        Default::default(),
+    )
+    .unwrap();
     assert!(malformed_report.has_errors());
     assert_eq!(
         status(&malformed_report, "docx.main_document.markup_compatibility"),
@@ -287,7 +298,13 @@ fn malformed_and_unsupported_main_semantics_are_content_free_findings() {
         ct::WML_DOCUMENT_MAIN,
         false,
     );
-    let unsupported_report = validate_read_at(Arc::new(OwnedSource::new(unsupported))).unwrap();
+    let unsupported_report = validate_read_at(
+        Arc::new(OwnedSource::new(unsupported)),
+        Default::default(),
+        Default::default(),
+        Default::default(),
+    )
+    .unwrap();
     assert!(unsupported_report.has_errors());
     assert!(
         unsupported_report
@@ -304,7 +321,13 @@ fn security_presence_is_inert_and_external_targets_are_not_fetched() {
         ct::WML_DOCUMENT_MACRO_MAIN,
         true,
     );
-    let report = validate_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
+    let report = validate_read_at(
+        Arc::new(OwnedSource::new(bytes)),
+        Default::default(),
+        Default::default(),
+        Default::default(),
+    )
+    .unwrap();
 
     assert_eq!(
         status(&report, "docx.security.macro_presence"),
@@ -331,10 +354,10 @@ fn security_presence_is_inert_and_external_targets_are_not_fetched() {
 #[test]
 fn semantic_limits_block_without_materializing_an_unbounded_payload() {
     let bytes = valid_fixture();
-    let report = validate_read_at_with_limits(
+    let report = validate_read_at(
         Arc::new(OwnedSource::new(bytes)),
-        litchi_opc::ReadLimits::default(),
-        DocxValidationLimits::default().with_max_main_document_bytes(1),
+        litchi_opc::SourceLimits::default(),
+        Limits::default().with_max_main_document_bytes(1),
         ValidationLimits::default(),
     )
     .unwrap();
@@ -359,10 +382,16 @@ fn package_source_backed_open_remains_available_for_follow_up_queries() {
 
 #[test]
 fn source_io_is_not_reclassified_as_a_structural_zip_finding() {
-    let error = validate_read_at(Arc::new(TestSource::failing(valid_fixture()))).unwrap_err();
+    let error = validate_read_at(
+        Arc::new(TestSource::failing(valid_fixture())),
+        Default::default(),
+        Default::default(),
+        Default::default(),
+    )
+    .unwrap_err();
     assert!(matches!(
         error,
-        DocxValidationError::Ingress(OpcError::IoError(error))
+        Error::Ingress(OpcError::IoError(error))
             if error.kind() == io::ErrorKind::Other
     ));
 }
@@ -373,10 +402,16 @@ fn main_part_io_is_reported_as_ingress_failure_after_catalog_open() {
         format!(r#"<w:document xmlns:w="{WORD_NS}"><w:body><w:p/></w:body></w:document>"#);
     let bytes = malformed_fixture(&main_xml);
     let source = TestSource::counted_payload(bytes, main_xml.as_bytes());
-    let error = validate_read_at(Arc::new(source)).unwrap_err();
+    let error = validate_read_at(
+        Arc::new(source),
+        Default::default(),
+        Default::default(),
+        Default::default(),
+    )
+    .unwrap_err();
     assert!(matches!(
         error,
-        DocxValidationError::Ingress(OpcError::IoError(error))
+        Error::Ingress(OpcError::IoError(error))
             if error.kind() == io::ErrorKind::Other
     ));
 }
@@ -387,11 +422,10 @@ fn declared_main_size_is_rejected_before_payload_read() {
         format!(r#"<w:document xmlns:w="{WORD_NS}"><w:body><w:p/></w:body></w:document>"#);
     let bytes = malformed_fixture(&main_xml);
     let source = TestSource::counted_payload(bytes, main_xml.as_bytes());
-    let report = validate_read_at_with_limits(
+    let report = validate_read_at(
         Arc::new(source.clone()),
-        litchi_opc::ReadLimits::default(),
-        DocxValidationLimits::default()
-            .with_max_main_document_bytes(u64::try_from(main_xml.len() - 1).unwrap()),
+        litchi_opc::SourceLimits::default(),
+        Limits::default().with_max_main_document_bytes(u64::try_from(main_xml.len() - 1).unwrap()),
         ValidationLimits::default(),
     )
     .unwrap();
@@ -427,7 +461,13 @@ fn visible_xml_rejects_special_events_invalid_references_and_extra_roots() {
         format!(r#"<w:document xmlns:w="{WORD_NS}"><w:body><w:p/></w:body><w:body/></w:document>"#),
     ];
     for xml in cases {
-        let report = validate_read_at(Arc::new(OwnedSource::new(malformed_fixture(&xml)))).unwrap();
+        let report = validate_read_at(
+            Arc::new(OwnedSource::new(malformed_fixture(&xml))),
+            Default::default(),
+            Default::default(),
+            Default::default(),
+        )
+        .unwrap();
         assert!(
             has_issue(&report, "docx.main_document.malformed_xml"),
             "{xml}"
@@ -442,20 +482,20 @@ fn visible_xml_rejects_special_events_invalid_references_and_extra_roots() {
 #[test]
 fn xml_depth_is_bounded_before_namespace_reader_and_public_limit_is_safe() {
     assert_eq!(
-        DocxValidationLimits::default()
+        Limits::default()
             .with_max_xml_depth(usize::MAX)
             .max_xml_depth(),
         u16::MAX as usize - 1
     );
     let xml = format!(r#"<w:document xmlns:w="{WORD_NS}"><w:body><w:p/></w:body></w:document>"#);
-    let report = validate_read_at_with_limits(
+    let report = validate_read_at(
         Arc::new(OwnedSource::new(fixture(
             &xml,
             ct::WML_DOCUMENT_MAIN,
             false,
         ))),
-        litchi_opc::ReadLimits::default(),
-        DocxValidationLimits::default().with_max_xml_depth(1),
+        litchi_opc::SourceLimits::default(),
+        Limits::default().with_max_xml_depth(1),
         ValidationLimits::default(),
     )
     .unwrap();
@@ -475,11 +515,16 @@ fn predefined_and_numeric_references_remain_valid() {
     let xml = format!(
         r#"<w:document xmlns:w="{WORD_NS}"><w:body><w:p>&amp;&#x41;&#65;</w:p></w:body></w:document>"#
     );
-    let report = validate_read_at(Arc::new(OwnedSource::new(fixture(
-        &xml,
-        ct::WML_DOCUMENT_MAIN,
-        false,
-    ))))
+    let report = validate_read_at(
+        Arc::new(OwnedSource::new(fixture(
+            &xml,
+            ct::WML_DOCUMENT_MAIN,
+            false,
+        ))),
+        Default::default(),
+        Default::default(),
+        Default::default(),
+    )
     .unwrap();
     assert!(!has_issue(&report, "docx.main_document.malformed_xml"));
     assert_eq!(
@@ -493,14 +538,14 @@ fn mce_preprocessing_obeys_the_xml_event_ceiling() {
     let xml = format!(
         r#"<w:document xmlns:w="{WORD_NS}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><w:body><w:p/><w:p/><w:p/></w:body></w:document>"#
     );
-    let report = validate_read_at_with_limits(
+    let report = validate_read_at(
         Arc::new(OwnedSource::new(fixture(
             &xml,
             ct::WML_DOCUMENT_MAIN,
             false,
         ))),
-        litchi_opc::ReadLimits::default(),
-        DocxValidationLimits::default().with_max_xml_events(2),
+        litchi_opc::SourceLimits::default(),
+        Limits::default().with_max_xml_events(2),
         ValidationLimits::default(),
     )
     .unwrap();
@@ -516,7 +561,13 @@ fn mce_preprocessing_obeys_the_xml_event_ceiling() {
 
 #[test]
 fn main_relationship_closure_reports_missing_and_incompatible_targets_at_main_uri() {
-    let report = validate_read_at(Arc::new(OwnedSource::new(relationship_fixture()))).unwrap();
+    let report = validate_read_at(
+        Arc::new(OwnedSource::new(relationship_fixture())),
+        Default::default(),
+        Default::default(),
+        Default::default(),
+    )
+    .unwrap();
     let missing = report
         .issues()
         .iter()
@@ -547,7 +598,13 @@ fn main_relationship_closure_reports_missing_and_incompatible_targets_at_main_ur
 
 #[test]
 fn macro_main_is_counted_once_and_dangling_activex_is_visible() {
-    let report = validate_read_at(Arc::new(OwnedSource::new(macro_and_activex_fixture()))).unwrap();
+    let report = validate_read_at(
+        Arc::new(OwnedSource::new(macro_and_activex_fixture())),
+        Default::default(),
+        Default::default(),
+        Default::default(),
+    )
+    .unwrap();
     assert_eq!(
         count_evidence(&report, "docx.macro.storage_present", "observations"),
         Some(1)

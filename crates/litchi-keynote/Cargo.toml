@@ -14,6 +14,14 @@ name = "keynote_edit_chart_arrangement"
 path = "examples/edit_chart_arrangement.rs"
 
 [[example]]
+name = "keynote_duplicate_slide"
+path = "examples/duplicate_slide.rs"
+
+[[example]]
+name = "keynote_edit_slide_drawables"
+path = "examples/edit_slide_drawables.rs"
+
+[[example]]
 name = "edit_chart_caption"
 path = "examples/edit_chart_caption.rs"
 
@@ -94,6 +102,10 @@ name = "remove_slide"
 path = "examples/remove_slide.rs"
 
 [[example]]
+name = "keynote_new_presentation"
+path = "examples/new_presentation.rs"
+
+[[example]]
 name = "keynote_save_package"
 path = "examples/save_package.rs"
 
@@ -112,6 +124,8 @@ litchi-iwa-common = { workspace = true }
 litchi-iwa-core   = { workspace = true }
 litchi-iwa-detect = { workspace = true }
 litchi-iwa-protos = { workspace = true }
+litchi-iwa-style = { workspace = true }
+litchi-iwa-table = { workspace = true }
 litchi-iwa-text = { workspace = true }
 litchi-iwa-text-wire = { workspace = true }
 litchi-numbers-wire = { workspace = true }

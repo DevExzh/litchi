@@ -5,31 +5,59 @@
 //! Semantic glossary projection and typed document-part encoding.
 
 use super::super::graph::relationship_references;
+use super::super::limit::Limits;
 use super::super::model::{
     Catalog, Category, Conformance, Entry, EntryAnalysis, Gallery, Id, Insert, Kind, Name,
     ProducerEntry, Props,
 };
 use super::super::{Arc, Error, HashMap, HashSet, Result};
-use super::super::{MAX, MAX_PARTS, MAX_VALUES, MC, VML};
+use super::super::{MAX, MAX_PARTS, MC, VML};
 use super::validation::{
-    INSERT_VALUES, KIND_VALUES, bounded, expect, expect_w, invalid, kids, leaf, name_key, noattrs,
-    only_w, onoff, parse_behavior, parse_type, validate_catalog_fields, validate_entry_fields,
-    validate_name, wattr_get, wval, xml_error,
+    INSERT_VALUES, KIND_VALUES, bounded_with_limits, expect, expect_w, invalid, kids, leaf,
+    name_key_with_limits, noattrs, only_w, onoff_with_limits, parse_behavior, parse_type,
+    validate_catalog_fields, validate_entry_limits, validate_name, wattr_get_with_limits,
+    wval_with_limits, xml_error,
 };
-use super::xml::{Attr, Content, Node, XmlSink, XmlSize, esc, node_write, node_xml, parse_dom};
+use super::xml::{
+    Attr, Content, Node, XmlSink, XmlSize, esc, node_write, node_xml_with_limits,
+    parse_dom_with_limits,
+};
 
-pub(in crate::glossary) fn project(n: &Node) -> Result<Catalog> {
+pub(in crate::glossary) fn project(
+    n: &Node,
+    limits: &Limits,
+    producer_entries: Option<&[ProducerEntry]>,
+) -> Result<Catalog> {
     expect(n, "glossaryDocument")?;
     noattrs(n)?;
     let c = kids(n)?;
     let mut out = Catalog::default();
+    out.bind_limits(limits);
     let mut semantic_bytes = 0usize;
+    if let Some(producers) = producer_entries {
+        for producer in producers {
+            add_semantic_xml_bytes(&mut semantic_bytes, producer.xml.len(), limits)?;
+        }
+    }
     let mut index = 0;
     if let Some(background) = c.first().filter(|node| node.l == "background") {
         expect(background, "background")?;
-        let xml = node_xml(background, false)?;
-        add_semantic_xml_bytes(&mut semantic_bytes, xml.len())?;
+        let xml = node_xml_with_limits(background, false, limits, semantic_bytes)?;
+        add_semantic_xml_bytes(&mut semantic_bytes, xml.len(), limits)?;
         out.background = Some(xml);
+        out.background_refs = relationship_references(background)?;
+        for conformance in [Conformance::Transitional, Conformance::Strict] {
+            let mut size = XmlSize::default();
+            node_write(&mut size, background, conformance == Conformance::Strict)?;
+            if size.bytes > limits.xml_bytes() {
+                return Err(crate::Error::GlossaryLimit {
+                    kind: crate::glossary::LimitKind::XmlBytes,
+                    actual: size.bytes,
+                    maximum: limits.xml_bytes(),
+                });
+            }
+            out.state.background_bytes[conformance.index()] = size.bytes;
+        }
         index = 1;
     }
     if index < c.len() {
@@ -39,11 +67,46 @@ pub(in crate::glossary) fn project(n: &Node) -> Result<Catalog> {
             .ok_or_else(|| invalid("glossary child index is out of bounds"))?;
         expect(parts, "docParts")?;
         noattrs(parts)?;
-        for p in kids(parts)? {
+        let part_count = parts
+            .content
+            .iter()
+            .filter(|content| matches!(content, Content::Node(_)))
+            .count();
+        if part_count > limits.values() {
+            return Err(crate::Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::Entry,
+                actual: part_count,
+                maximum: limits.values(),
+            });
+        }
+        let part_nodes = kids(parts)?;
+        if part_nodes.len() > limits.values() {
+            return Err(crate::Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::Entry,
+                actual: part_nodes.len(),
+                maximum: limits.values(),
+            });
+        }
+        out.entries
+            .try_reserve_exact(part_nodes.len())
+            .map_err(|source| Error::Allocation {
+                resource: "glossary semantic entries",
+                source,
+            })?;
+        let producers = producer_entries.filter(|values| values.len() == part_nodes.len());
+        for (entry_index, p) in part_nodes.into_iter().enumerate() {
             if out.entries.len() >= MAX_PARTS {
-                return Err(invalid("glossary entry limit exceeded"));
+                return Err(crate::Error::GlossaryLimit {
+                    kind: crate::glossary::LimitKind::Entry,
+                    actual: (out.entries.len()).saturating_add(1),
+                    maximum: MAX_PARTS,
+                });
             }
-            out.entries.push(parse_entry(p, &mut semantic_bytes)?);
+            let producer = producers
+                .and_then(|values| values.get(entry_index))
+                .cloned();
+            out.entries
+                .push(parse_entry(p, &mut semantic_bytes, limits, producer)?);
         }
         index += 1;
     }
@@ -51,17 +114,24 @@ pub(in crate::glossary) fn project(n: &Node) -> Result<Catalog> {
         return Err(invalid("unexpected glossary root child"));
     }
     validate_catalog_fields(&out)?;
+    out.rebuild_state_from_cached(limits)?;
     Ok(out)
 }
 
-pub(in crate::glossary) fn add_semantic_xml_bytes(total: &mut usize, bytes: usize) -> Result<()> {
+pub(in crate::glossary) fn add_semantic_xml_bytes(
+    total: &mut usize,
+    bytes: usize,
+    limits: &Limits,
+) -> Result<()> {
     *total = total
         .checked_add(bytes)
         .ok_or_else(|| invalid("glossary semantic XML size overflow"))?;
-    if *total > MAX {
-        return Err(invalid(
-            "glossary semantic XML exceeds the 32 MiB aggregate limit",
-        ));
+    if *total > MAX || *total > limits.graph_bytes() {
+        return Err(crate::Error::GlossaryLimit {
+            kind: crate::glossary::LimitKind::GraphBytes,
+            actual: *total,
+            maximum: limits.graph_bytes().min(MAX),
+        });
     }
     Ok(())
 }
@@ -69,6 +139,7 @@ pub(in crate::glossary) fn add_semantic_xml_bytes(total: &mut usize, bytes: usiz
 pub(in crate::glossary) fn extract_producer_entries(
     root: Node,
     conformance: Conformance,
+    limits: &Limits,
 ) -> Result<Option<Vec<ProducerEntry>>> {
     let mut inherited_mce = Vec::new();
     merge_mce_attributes(&mut inherited_mce, &root)?;
@@ -97,8 +168,12 @@ pub(in crate::glossary) fn extract_producer_entries(
             Content::Node(node)
                 if node.ns.as_ref() == conformance.word() && node.l == "docPart" =>
             {
-                if producer_nodes.len() >= MAX_PARTS {
-                    return Err(invalid("glossary producer entry limit exceeded"));
+                if producer_nodes.len() >= limits.values().min(MAX_PARTS) {
+                    return Err(crate::Error::GlossaryLimit {
+                        kind: crate::glossary::LimitKind::ProducerEntry,
+                        actual: (producer_nodes.len()).saturating_add(1),
+                        maximum: limits.values().min(MAX_PARTS),
+                    });
                 }
                 producer_nodes
                     .try_reserve(1)
@@ -157,15 +232,22 @@ pub(in crate::glossary) fn extract_producer_entries(
         for attribute in missing {
             node.attrs.push(attribute.clone());
         }
-        let xml = String::from_utf8(node_xml(&node, conformance == Conformance::Strict)?)
-            .map_err(xml_error)?;
+        let xml = String::from_utf8(node_xml_with_limits(
+            &node,
+            conformance == Conformance::Strict,
+            limits,
+            total_bytes,
+        )?)
+        .map_err(xml_error)?;
         total_bytes = total_bytes
             .checked_add(xml.len())
             .ok_or_else(|| invalid("glossary producer snapshot size overflow"))?;
-        if total_bytes > MAX {
-            return Err(invalid(
-                "glossary producer snapshots exceed the 32 MiB aggregate limit",
-            ));
+        if total_bytes > MAX || total_bytes > limits.graph_bytes() {
+            return Err(crate::Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::GraphBytes,
+                actual: total_bytes,
+                maximum: limits.graph_bytes().min(MAX),
+            });
         }
         let refs = relationship_references(&node)?;
         snapshots.push(ProducerEntry {
@@ -175,21 +257,6 @@ pub(in crate::glossary) fn extract_producer_entries(
         });
     }
     Ok(Some(snapshots))
-}
-
-pub(in crate::glossary) fn attach_producer_entries(
-    catalog: &mut Catalog,
-    producer_entries: Option<Vec<ProducerEntry>>,
-) {
-    let Some(producer_entries) = producer_entries else {
-        return;
-    };
-    if producer_entries.len() != catalog.entries.len() {
-        return;
-    }
-    for (entry, producer) in catalog.entries.iter_mut().zip(producer_entries) {
-        entry.producer = Some(Box::new(producer));
-    }
 }
 
 pub(in crate::glossary) fn merge_mce_attributes(output: &mut Vec<Attr>, node: &Node) -> Result<()> {
@@ -233,7 +300,12 @@ pub(in crate::glossary) fn merge_mce_attributes(output: &mut Vec<Attr>, node: &N
     Ok(())
 }
 
-pub(in crate::glossary) fn parse_entry(n: &Node, semantic_bytes: &mut usize) -> Result<Entry> {
+pub(in crate::glossary) fn parse_entry(
+    n: &Node,
+    semantic_bytes: &mut usize,
+    limits: &Limits,
+    producer: Option<ProducerEntry>,
+) -> Result<Entry> {
     expect(n, "docPart")?;
     noattrs(n)?;
     let c = kids(n)?;
@@ -242,35 +314,63 @@ pub(in crate::glossary) fn parse_entry(n: &Node, semantic_bytes: &mut usize) -> 
     }
     let mut props = None;
     let mut body = None;
+    let mut body_node = None;
     let mut i = 0;
     if let Some(properties) = c.first().filter(|node| node.l == "docPartPr") {
-        props = Some(parse_props(properties)?);
+        props = Some(parse_props(properties, limits)?);
         i = 1;
     }
     if i < c.len() {
-        let body_node = c
+        let body_candidate = c
             .get(i)
             .copied()
             .ok_or_else(|| invalid("document-part child index is out of bounds"))?;
-        expect(body_node, "docPartBody")?;
-        let xml = node_xml(body_node, false)?;
-        add_semantic_xml_bytes(semantic_bytes, xml.len())?;
+        expect(body_candidate, "docPartBody")?;
+        let xml = node_xml_with_limits(body_candidate, false, limits, *semantic_bytes)?;
+        add_semantic_xml_bytes(semantic_bytes, xml.len(), limits)?;
         body = Some(xml);
+        body_node = Some(body_candidate);
         i += 1;
     }
     if i != c.len() {
         return Err(invalid("invalid docPart child order"));
     }
-    Ok(Entry {
+    let mut entry = Entry {
         props,
         body,
-        producer: None,
+        producer: producer.map(Box::new),
         sizes: [0; 2],
-        refs: Arc::from([]),
+        refs: body_node
+            .map(relationship_references)
+            .transpose()?
+            .unwrap_or_else(|| Arc::from([])),
         lineage: None,
-    })
+    };
+    let mut sizes = [0; 2];
+    for conformance in [Conformance::Transitional, Conformance::Strict] {
+        let mut size = XmlSize::default();
+        if let Some(producer) = entry
+            .producer
+            .as_deref()
+            .filter(|producer| producer.conformance == conformance)
+        {
+            size.push_str(&producer.xml)?;
+        } else {
+            write_entry(&mut size, &entry, body_node, conformance)?;
+        }
+        if size.bytes > limits.xml_bytes() {
+            return Err(crate::Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::XmlBytes,
+                actual: size.bytes,
+                maximum: limits.xml_bytes(),
+            });
+        }
+        sizes[conformance.index()] = size.bytes;
+    }
+    entry.sizes = sizes;
+    Ok(entry)
 }
-pub(in crate::glossary) fn parse_props(n: &Node) -> Result<Props> {
+pub(in crate::glossary) fn parse_props(n: &Node, limits: &Limits) -> Result<Props> {
     expect(n, "docPartPr")?;
     noattrs(n)?;
     let mut name_node = None;
@@ -295,13 +395,13 @@ pub(in crate::glossary) fn parse_props(n: &Node) -> Result<Props> {
     }
     let name = name_node
         .map(|name_node| {
-            let value = wattr_get(name_node, "val")?
+            let value = wattr_get_with_limits(name_node, "val", limits)?
                 .ok_or_else(|| invalid("building-block name is missing w:val"))?;
-            bounded(&value)?;
+            bounded_with_limits(&value, limits)?;
             let name = Name {
-                key: Arc::from(name_key(&value)?),
+                key: Arc::from(name_key_with_limits(&value, limits)?),
                 value,
-                decorated: onoff(name_node, "decorated")?,
+                decorated: onoff_with_limits(name_node, "decorated", limits)?,
             };
             only_w(name_node, &["val", "decorated"])?;
             leaf(name_node)?;
@@ -309,7 +409,9 @@ pub(in crate::glossary) fn parse_props(n: &Node) -> Result<Props> {
         })
         .transpose()?;
 
-    let style = style_node.map(wval).transpose()?;
+    let style = style_node
+        .map(|node| wval_with_limits(node, limits))
+        .transpose()?;
     let category = category_node
         .map(|node| {
             noattrs(node)?;
@@ -320,22 +422,26 @@ pub(in crate::glossary) fn parse_props(n: &Node) -> Result<Props> {
             expect(category_name, "name")?;
             expect(gallery, "gallery")?;
             Ok::<Category, Error>(Category {
-                name: wval(category_name)?,
-                gallery: Gallery::new(wval(gallery)?)?,
+                name: wval_with_limits(category_name, limits)?,
+                gallery: Gallery::new(wval_with_limits(gallery, limits)?)?,
             })
         })
         .transpose()?;
     let (all_kinds, kinds) = if let Some(node) = types_node {
-        let all = onoff(node, "all")?;
+        let all = onoff_with_limits(node, "all", limits)?;
         only_w(node, &["all"])?;
         let mut values = Kind::empty();
         let children = kids(node)?;
         for (count, child) in children.into_iter().enumerate() {
-            if count >= MAX_VALUES {
-                return Err(invalid("type limit exceeded"));
+            if count >= limits.values() {
+                return Err(crate::Error::GlossaryLimit {
+                    kind: crate::glossary::LimitKind::Type,
+                    actual: (count).saturating_add(1),
+                    maximum: limits.values(),
+                });
             }
             expect(child, "type")?;
-            let value = parse_type(&wval(child)?)?;
+            let value = parse_type(&wval_with_limits(child, limits)?)?;
             values.insert(value);
         }
         (all, values)
@@ -352,21 +458,27 @@ pub(in crate::glossary) fn parse_props(n: &Node) -> Result<Props> {
             ));
         }
         for (count, child) in children.into_iter().enumerate() {
-            if count >= MAX_VALUES {
-                return Err(invalid("behavior limit exceeded"));
+            if count >= limits.values() {
+                return Err(crate::Error::GlossaryLimit {
+                    kind: crate::glossary::LimitKind::Behavior,
+                    actual: (count).saturating_add(1),
+                    maximum: limits.values(),
+                });
             }
             expect(child, "behavior")?;
-            let value = parse_behavior(&wval(child)?)?;
+            let value = parse_behavior(&wval_with_limits(child, limits)?)?;
             values.insert(value);
         }
         values
     } else {
         Insert::empty()
     };
-    let description = description_node.map(wval).transpose()?;
+    let description = description_node
+        .map(|node| wval_with_limits(node, limits))
+        .transpose()?;
     let id = id_node
         .map(|node| {
-            let value = wattr_get(node, "val")?;
+            let value = wattr_get_with_limits(node, "val", limits)?;
             only_w(node, &["val"])?;
             leaf(node)?;
             value.map(Id::new).transpose()
@@ -385,12 +497,15 @@ pub(in crate::glossary) fn parse_props(n: &Node) -> Result<Props> {
     })
 }
 
-pub(in crate::glossary) fn entry_analysis(entry: &Entry) -> Result<EntryAnalysis> {
-    validate_entry_fields(entry)?;
+pub(in crate::glossary) fn entry_analysis_with_limits(
+    entry: &Entry,
+    limits: &Limits,
+) -> Result<EntryAnalysis> {
+    validate_entry_limits(entry, limits)?;
     let body = entry
         .body
         .as_deref()
-        .map(|xml| prepare_opaque(xml, "docPartBody"))
+        .map(|xml| prepare_opaque_with_limits(xml, "docPartBody", limits))
         .transpose()?;
     let refs = body
         .as_ref()
@@ -405,16 +520,33 @@ pub(in crate::glossary) fn entry_analysis(entry: &Entry) -> Result<EntryAnalysis
             .as_deref()
             .filter(|producer| producer.conformance == conformance)
         {
+            if producer.xml.len() > limits.xml_bytes() {
+                return Err(crate::Error::GlossaryLimit {
+                    kind: crate::glossary::LimitKind::XmlBytes,
+                    actual: producer.xml.len(),
+                    maximum: limits.xml_bytes(),
+                });
+            }
             size.push_str(&producer.xml)?;
         } else {
             write_entry(&mut size, entry, body.as_ref(), conformance)?;
+        }
+        if size.bytes > limits.xml_bytes() {
+            return Err(crate::Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::XmlBytes,
+                actual: size.bytes,
+                maximum: limits.xml_bytes(),
+            });
         }
         sizes[conformance.index()] = size.bytes;
     }
     Ok(EntryAnalysis { sizes, refs })
 }
 
-pub(in crate::glossary) fn background_analysis(background: Option<&[u8]>) -> Result<EntryAnalysis> {
+pub(in crate::glossary) fn background_analysis_with_limits(
+    background: Option<&[u8]>,
+    limits: &Limits,
+) -> Result<EntryAnalysis> {
     let mut sizes = [0usize; 2];
     let Some(background) = background else {
         return Ok(EntryAnalysis {
@@ -422,11 +554,18 @@ pub(in crate::glossary) fn background_analysis(background: Option<&[u8]>) -> Res
             refs: Arc::from([]),
         });
     };
-    let node = prepare_opaque(background, "background")?;
+    let node = prepare_opaque_with_limits(background, "background", limits)?;
     let refs = relationship_references(&node)?;
     for conformance in [Conformance::Transitional, Conformance::Strict] {
         let mut size = XmlSize::default();
         node_write(&mut size, &node, conformance == Conformance::Strict)?;
+        if size.bytes > limits.xml_bytes() {
+            return Err(crate::Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::XmlBytes,
+                actual: size.bytes,
+                maximum: limits.xml_bytes(),
+            });
+        }
         sizes[conformance.index()] = size.bytes;
     }
     Ok(EntryAnalysis { sizes, refs })
@@ -524,26 +663,32 @@ pub(in crate::glossary) fn validate_authored_name(entry: &Entry) -> Result<()> {
     validate_name(name.as_str())
 }
 
-pub(in crate::glossary) fn authored_analysis(entry: &Entry) -> Result<EntryAnalysis> {
+pub(in crate::glossary) fn authored_analysis_with_limits(
+    entry: &Entry,
+    limits: &Limits,
+) -> Result<EntryAnalysis> {
     validate_authored_name(entry)?;
-    entry_analysis(entry)
+    entry_analysis_with_limits(entry, limits)
 }
 
-pub(in crate::glossary) fn prepare_opaque(xml: &[u8], local: &str) -> Result<Node> {
-    if xml.len() > MAX {
-        return Err(invalid(format!("glossary {local} payload exceeds 32 MiB")));
-    }
-    let root = parse_dom(xml)?;
+pub(in crate::glossary) fn prepare_opaque_with_limits(
+    xml: &[u8],
+    local: &str,
+    limits: &Limits,
+) -> Result<Node> {
+    super::super::graph::raw::admit_xml(xml, limits)?;
+    let root = parse_dom_with_limits(xml, limits)?;
     expect(&root, local)?;
     Ok(root)
 }
 
-pub(in crate::glossary) fn prepare_opaque_for(
+pub(in crate::glossary) fn prepare_opaque_for_with_limits(
     xml: &[u8],
     local: &str,
     conformance: Conformance,
+    limits: &Limits,
 ) -> Result<Node> {
-    let root = prepare_opaque(xml, local)?;
+    let root = prepare_opaque_with_limits(xml, local, limits)?;
     if conformance == Conformance::Strict {
         reject_vml(&root)?;
     }

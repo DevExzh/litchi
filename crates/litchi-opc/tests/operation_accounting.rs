@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use litchi_core::OwnedSource;
 use litchi_opc::{OpcError, OpcOperationAccounting, PackURI, SourceBackedPackage};
+use litchi_opc::{SourceCacheLimits, SourceLimits, SourceReadPolicy};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const CONTENT_TYPES: &[u8] = br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#;
@@ -18,7 +19,8 @@ const ROOT_RELS: &[u8] = br#"<Relationships xmlns="http://schemas.openxmlformats
 const PART: &[u8] = b"<document><paragraph>accounted</paragraph></document>";
 
 fn source_bytes(deflated: bool) -> Vec<u8> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", CONTENT_TYPES)
         .unwrap();
@@ -32,7 +34,14 @@ fn source_bytes(deflated: bool) -> Vec<u8> {
 }
 
 fn open(bytes: Vec<u8>) -> SourceBackedPackage {
-    SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes))).unwrap()
+    SourceBackedPackage::from_read_at(
+        Arc::new(OwnedSource::new(bytes)),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap()
 }
 
 fn document_uri() -> PackURI {
@@ -114,7 +123,7 @@ fn exact_source_publication_reports_actual_raw_and_output_acceptance() {
     let mut output = Vec::new();
     let mut accounting = OpcOperationAccounting::default();
     artifact
-        .write_to_stream_with_accounting(&mut output, &mut accounting)
+        .write_to_with_accounting(&mut output, &mut accounting)
         .unwrap();
     assert_eq!(output, source);
     assert_eq!(
@@ -183,7 +192,7 @@ fn exact_source_partial_sink_preserves_checked_progress() {
     };
     let mut accounting = OpcOperationAccounting::default();
     let error = artifact
-        .write_to_stream_with_accounting(&mut sink, &mut accounting)
+        .write_to_with_accounting(&mut sink, &mut accounting)
         .unwrap_err();
     assert!(matches!(
         error,

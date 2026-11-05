@@ -93,6 +93,20 @@ fn inserts_replaces_and_removes_without_touching_opaque_bytes() {
         before_noop
     );
 
+    // Removing the tags refuses the signed package (ADR 0006) and leaves it
+    // untouched; it is published after the signature is removed explicitly.
+    assert!(matches!(
+        remove(&mut package, 256),
+        Err(Error::Opc(
+            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
+        ))
+    ));
+    assert!(package.is_signed());
+    assert_eq!(
+        package.main_document_part().unwrap().blob_arc(),
+        before_noop
+    );
+    package.unsign();
     assert_eq!(remove(&mut package, 256).unwrap(), Some(tags));
     assert!(!package.is_signed());
     let xml = String::from_utf8_lossy(package.main_document_part().unwrap().blob());

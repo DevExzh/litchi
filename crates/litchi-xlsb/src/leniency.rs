@@ -36,9 +36,10 @@
 //! [`CachedNumberDefect`] class (MS-XLSB 2.5.153 `Xnum` caches that are NaN,
 //! infinite, denormalized, or negative zero, audit finding F3.10): a NaN cache
 //! has no unambiguous ground truth, so the repair is never applied by
-//! default. Select it with [`Workbook::new_with_leniency`](crate::Workbook::new_with_leniency),
-//! [`Workbook::from_opc_package_with_leniency`](crate::Workbook::from_opc_package_with_leniency),
-//! or [`SourceBackedWorkbook::from_reader_with_leniency`](crate::SourceBackedWorkbook::from_reader_with_leniency).
+//! default. Select it with [`OpenOptions::leniency`](crate::OpenOptions::leniency)
+//! on any configured open route, for example
+//! [`Package::open_with_options`](crate::Package::open_with_options) or
+//! [`SourceBackedWorkbook::from_reader_with_options`](crate::SourceBackedWorkbook::from_reader_with_options).
 //!
 //! **Structural corruption and security limits stay hard errors** under every
 //! variant: BIFF12 record framing (header varints, declared lengths, truncated
@@ -69,6 +70,12 @@
 //!   contributes its repairs exactly once. Each binary-index lookup through
 //!   `SourceBackedIndexedWorksheet::cached_value` that performs a repair
 //!   records it here as well.
+//! - [`SourceBackedWorkbook::read_tolerance_report`](crate::SourceBackedWorkbook::read_tolerance_report)
+//!   explicitly adds the reports of successfully materialized worksheets to
+//!   that workbook-scope snapshot. Each retained worksheet report contributes
+//!   once, even after semantic-cache eviction and reparse; a failed or
+//!   cancelled materialization contributes nothing. The accessor also applies
+//!   the source and execution fences around the snapshot.
 //! - [`cell_values::Snapshot::tolerance_report`](crate::cell_values::Snapshot::tolerance_report)
 //!   covers the worksheet stream behind one cell-value edit snapshot.
 //!
@@ -101,6 +108,8 @@
 //! a report (for example [`styles::parse_border`](crate::styles::parse_border))
 //! remain strict, so a repair can never happen without being recorded; the
 //! write path keeps validating authored payloads strictly as well.
+
+use std::mem::size_of;
 
 /// Upper bound on individually recorded defects.
 ///
@@ -459,6 +468,15 @@ struct PackageLocation {
     value: Option<Box<str>>,
 }
 
+impl PackageLocation {
+    fn retained_bytes(&self) -> usize {
+        size_of::<Self>()
+            .saturating_add(self.part.len())
+            .saturating_add(self.item.as_deref().map_or(0, str::len))
+            .saturating_add(self.value.as_deref().map_or(0, str::len))
+    }
+}
+
 /// One repaired defect, with enough context to locate it in the workbook.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ToleratedDefect {
@@ -537,6 +555,12 @@ impl ToleratedDefect {
             .as_deref()
             .and_then(|location| location.value.as_deref())
     }
+
+    fn retained_bytes(&self) -> usize {
+        self.package
+            .as_deref()
+            .map_or(0, PackageLocation::retained_bytes)
+    }
 }
 
 /// Everything a read repaired, in the order the defects were found.
@@ -589,6 +613,18 @@ impl ToleranceReport {
     #[must_use]
     pub fn total(&self) -> u64 {
         self.defects.len() as u64 + u64::from(self.unrecorded)
+    }
+
+    /// Return all heap allocations owned by this report.
+    pub(crate) fn retained_bytes(&self) -> usize {
+        let mut total = self
+            .defects
+            .capacity()
+            .saturating_mul(size_of::<ToleratedDefect>());
+        for defect in &self.defects {
+            total = total.saturating_add(defect.retained_bytes());
+        }
+        total
     }
 
     /// How many individually recorded defects belong to `defect`.
@@ -1168,7 +1204,7 @@ mod tests {
     fn value_encodings_are_repaired_when_recording_and_refused_otherwise() {
         // "A", an unpaired high surrogate, "B".
         let data = [3, 0, 0, 0, 0x41, 0, 0x00, 0xD8, 0x42, 0];
-        let mut cursor = crate::raw::Cursor::new(&data, "test");
+        let mut cursor = crate::raw::Cursor::new(&data, "test", crate::raw::Limits::DEFAULT);
         assert!(
             Tolerance::refusing()
                 .read_wide_string(&mut cursor, kind::CELL_ST, 0)
@@ -1177,7 +1213,7 @@ mod tests {
 
         let mut report = ToleranceReport::default();
         let mut tolerance = Tolerance::recording(&mut report);
-        let mut cursor = crate::raw::Cursor::new(&data, "test");
+        let mut cursor = crate::raw::Cursor::new(&data, "test", crate::raw::Limits::DEFAULT);
         assert_eq!(
             tolerance
                 .read_wide_string(&mut cursor, kind::CELL_ST, 4)
@@ -1185,14 +1221,14 @@ mod tests {
             "A\u{FFFD}B"
         );
         let null = [0xFF; 4];
-        let mut cursor = crate::raw::Cursor::new(&null, "test");
+        let mut cursor = crate::raw::Cursor::new(&null, "test", crate::raw::Limits::DEFAULT);
         assert_eq!(
             tolerance
                 .read_nullable_wide_string(&mut cursor, kind::NAME, 0)
                 .unwrap(),
             None
         );
-        let mut cursor = crate::raw::Cursor::new(&[5], "test");
+        let mut cursor = crate::raw::Cursor::new(&[5], "test", crate::raw::Limits::DEFAULT);
         assert!(
             tolerance
                 .read_bool8(&mut cursor, kind::CELL_BOOL, 6)

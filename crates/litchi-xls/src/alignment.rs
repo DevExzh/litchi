@@ -232,6 +232,35 @@ fn record(tolerance: &mut ToleranceLog, defect: CellFormatDefect, xf_index: u16,
         .record(defect, u32::from(xf_index), u32::from(value));
 }
 
+impl HorizontalAlignment {
+    /// The BIFF8 `alc` code.
+    pub(crate) const fn code(self) -> u8 {
+        match self {
+            Self::General => 0,
+            Self::Left => 1,
+            Self::Center => 2,
+            Self::Right => 3,
+            Self::Fill => 4,
+            Self::Justify => 5,
+            Self::CenterAcrossSelection => 6,
+            Self::Distributed => 7,
+        }
+    }
+}
+
+impl VerticalAlignment {
+    /// The BIFF8 `alcV` code.
+    pub(crate) const fn code(self) -> u8 {
+        match self {
+            Self::Top => 0,
+            Self::Center => 1,
+            Self::Bottom => 2,
+            Self::Justify => 3,
+            Self::Distributed => 4,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

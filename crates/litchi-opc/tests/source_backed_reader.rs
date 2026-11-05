@@ -13,7 +13,8 @@ use std::sync::{
 };
 
 use litchi_core::{OwnedSource, ReadAt};
-use litchi_opc::{OpcError, PackURI, ReadLimits, ReadResource, SourceBackedPackage};
+use litchi_opc::{OpcError, PackURI, SourceBackedPackage, SourceLimitKind, SourceLimits};
+use litchi_opc::{SourceCacheLimits, SourceReadPolicy};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const CONTENT_TYPES_NS: &str = "http://schemas.openxmlformats.org/package/2006/content-types";
@@ -41,7 +42,8 @@ fn archive_bytes() -> Vec<u8> {
         r#"<Relationships xmlns="{RELATIONSHIPS_NS}"><Relationship Id="rId1" Type="{OFFICE_DOCUMENT_REL}" Target="{DOCUMENT_MEMBER}"/></Relationships>"#
     );
 
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .unwrap();
@@ -132,14 +134,16 @@ impl Read for InvalidCountReader {
 fn reader_ingress_consumes_once_and_keeps_ordinary_payloads_cold() {
     let source = archive_bytes();
     let input_length = source.len();
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_input_bytes(input_length as u64)
         .unwrap()
         .build()
         .unwrap();
     let mut reader = SinglePassReader::new(source);
 
-    let package = SourceBackedPackage::from_reader_with_limits(&mut reader, limits).unwrap();
+    let package =
+        SourceBackedPackage::from_reader(&mut reader, limits, SourceCacheLimits::default(), None)
+            .unwrap();
 
     assert_eq!(reader.bytes_read, input_length);
     assert_eq!(reader.offset, input_length);
@@ -159,22 +163,23 @@ fn reader_ingress_consumes_once_and_keeps_ordinary_payloads_cold() {
 fn reader_ingress_rejects_input_above_max_input_bytes() {
     let source = archive_bytes();
     let configured_max = source.len() - 1;
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_input_bytes(configured_max as u64)
         .unwrap()
         .build()
         .unwrap();
     let mut reader = SinglePassReader::new(source);
 
-    let error = SourceBackedPackage::from_reader_with_limits(&mut reader, limits)
-        .err()
-        .expect("input larger than max_input_bytes must be rejected");
+    let error =
+        SourceBackedPackage::from_reader(&mut reader, limits, SourceCacheLimits::default(), None)
+            .err()
+            .expect("input larger than max_input_bytes must be rejected");
 
     assert!(matches!(
         error,
-        OpcError::ReadLimit {
-            resource: ReadResource::InputBytes,
-            actual,
+        OpcError::Limit {
+            kind: SourceLimitKind::InputBytes,
+            observed: actual,
             maximum,
         }
         if actual == configured_max as u64 + 1 && maximum == configured_max as u64
@@ -187,15 +192,16 @@ fn reader_ingress_rejects_input_above_max_input_bytes() {
 fn reader_ingress_retries_one_interrupted_read() {
     let source = archive_bytes();
     let input_length = source.len();
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_input_bytes(input_length as u64)
         .unwrap()
         .build()
         .unwrap();
     let mut reader = InterruptOnceReader::new(source);
 
-    let package = SourceBackedPackage::from_reader_with_limits(&mut reader, limits)
-        .expect("a transient interrupted read must be retried");
+    let package =
+        SourceBackedPackage::from_reader(&mut reader, limits, SourceCacheLimits::default(), None)
+            .expect("a transient interrupted read must be retried");
 
     assert!(reader.interrupted);
     assert_eq!(reader.inner.bytes_read, input_length);
@@ -206,7 +212,12 @@ fn reader_ingress_retries_one_interrupted_read() {
 #[test]
 fn reader_ingress_rejects_invalid_read_count_without_panicking() {
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        SourceBackedPackage::from_reader_with_limits(InvalidCountReader, ReadLimits::default())
+        SourceBackedPackage::from_reader(
+            InvalidCountReader,
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            None,
+        )
     }));
     let result = result.expect("an invalid Read count must not panic public ingress");
     let error = match result {
@@ -222,36 +233,44 @@ fn reader_ingress_rejects_invalid_read_count_without_panicking() {
 
 fn assert_index_limit_is_typed_for_both_sources(
     source: &[u8],
-    limits: ReadLimits,
-    expected: ReadResource,
+    limits: SourceLimits,
+    expected: SourceLimitKind,
     expected_actual: u64,
     expected_maximum: u64,
 ) {
-    let from_vec = match SourceBackedPackage::from_vec_with_limits(source.to_vec(), limits) {
+    let from_vec = match SourceBackedPackage::from_vec(
+        source.to_vec(),
+        limits,
+        SourceCacheLimits::default(),
+        None,
+    ) {
         Ok(_) => panic!("the vec source must exceed {expected:?}"),
         Err(error) => error,
     };
     assert!(matches!(
         from_vec,
-        OpcError::ReadLimit {
-            resource,
-            actual,
+        OpcError::Limit {
+            kind: resource,
+            observed: actual,
             maximum,
         } if resource == expected && actual == expected_actual && maximum == expected_maximum
     ));
 
-    let from_read_at = match SourceBackedPackage::from_read_at_with_limits(
+    let from_read_at = match SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(source.to_vec())),
         limits,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
     ) {
         Ok(_) => panic!("the read-at source must exceed {expected:?}"),
         Err(error) => error,
     };
     assert!(matches!(
         from_read_at,
-        OpcError::ReadLimit {
-            resource,
-            actual,
+        OpcError::Limit {
+            kind: resource,
+            observed: actual,
             maximum,
         } if resource == expected && actual == expected_actual && maximum == expected_maximum
     ));
@@ -260,8 +279,8 @@ fn assert_index_limit_is_typed_for_both_sources(
 #[test]
 fn indexed_archive_limits_remain_typed_for_vec_and_read_at_ingress() {
     let source = archive_bytes();
-    let member_limits = ReadLimits::builder()
-        .max_archive_members(1)
+    let member_limits = SourceLimits::builder()
+        .max_members(1)
         .unwrap()
         .max_parts(1)
         .unwrap()
@@ -270,54 +289,54 @@ fn indexed_archive_limits_remain_typed_for_vec_and_read_at_ingress() {
         .build()
         .unwrap();
     let profiles = [
-        (member_limits, ReadResource::ArchiveMembers, 2, 1),
+        (member_limits, SourceLimitKind::Members, 2, 1),
         (
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_archive_metadata_bytes(1)
                 .unwrap()
                 .build()
                 .unwrap(),
-            ReadResource::ArchiveMetadataBytes,
+            SourceLimitKind::ArchiveMetadataBytes,
             46,
             1,
         ),
         (
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_archive_member_name_bytes(1)
                 .unwrap()
                 .build()
                 .unwrap(),
-            ReadResource::ArchiveMemberNameBytes,
+            SourceLimitKind::ArchiveMemberNameBytes,
             19,
             1,
         ),
         (
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_archive_compressed_bytes(1)
                 .unwrap()
                 .build()
                 .unwrap(),
-            ReadResource::ArchiveCompressedBytes,
+            SourceLimitKind::ArchiveCompressedBytes,
             383,
             1,
         ),
         (
-            ReadLimits::builder()
-                .max_archive_entry_bytes(1)
+            SourceLimits::builder()
+                .max_entry_bytes(1)
                 .unwrap()
                 .build()
                 .unwrap(),
-            ReadResource::ArchiveEntryBytes,
+            SourceLimitKind::EntryBytes,
             383,
             1,
         ),
         (
-            ReadLimits::builder()
-                .max_archive_total_bytes(1)
+            SourceLimits::builder()
+                .max_aggregate_bytes(1)
                 .unwrap()
                 .build()
                 .unwrap(),
-            ReadResource::ArchiveTotalBytes,
+            SourceLimitKind::AggregateBytes,
             383,
             1,
         ),
@@ -377,10 +396,16 @@ impl Write for FailingSink {
 #[test]
 fn stream_to_keeps_raw_source_and_sink_io_errors_typed() {
     let fail = Arc::new(AtomicBool::new(false));
-    let package = SourceBackedPackage::from_read_at(Arc::new(ToggleReadAt {
-        source: OwnedSource::new(archive_bytes()),
-        fail: Arc::clone(&fail),
-    }))
+    let package = SourceBackedPackage::from_read_at(
+        Arc::new(ToggleReadAt {
+            source: OwnedSource::new(archive_bytes()),
+            fail: Arc::clone(&fail),
+        }),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
     .unwrap();
     fail.store(true, Ordering::Release);
     let part = package.part(&pack(DOCUMENT_URI)).unwrap();
@@ -391,7 +416,13 @@ fn stream_to_keeps_raw_source_and_sink_io_errors_typed() {
         OpcError::IoError(error) if error.kind() == io::ErrorKind::BrokenPipe
     ));
 
-    let package = SourceBackedPackage::from_vec(archive_bytes()).unwrap();
+    let package = SourceBackedPackage::from_vec(
+        archive_bytes(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let part = package.part(&pack(DOCUMENT_URI)).unwrap();
     let mut sink = FailingSink;
     let error = part.stream_to(&mut sink).unwrap_err();

@@ -1,3 +1,7 @@
+#![allow(
+    clippy::redundant_closure_call,
+    reason = "raw OPC test edits stage one closure over the edit's graph"
+)]
 use litchi_docx::{Package, Result};
 use litchi_opc::PackURI;
 use tempfile::NamedTempFile;
@@ -8,17 +12,22 @@ const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 /// the document accessor battery over it. A panic anywhere fails the test.
 fn with_document_blob(blob: &[u8]) -> (Result<usize>, Result<usize>, Result<String>) {
     let output = NamedTempFile::with_suffix(".docx").unwrap();
-    let mut package = Package::new().unwrap();
+    let package = Package::new().unwrap();
     package.save(output.path()).unwrap();
 
     let mut package = Package::open(output.path()).unwrap();
     let part_name = PackURI::new("/word/document.xml").unwrap();
-    package
-        .edit_opc(|opc| {
-            opc.get_part_mut(&part_name)?.set_blob(blob.to_vec());
-            Ok(())
-        })
+    package = {
+        let mut edit = package.edit_opc();
+        (|opc: &mut litchi_opc::OpcPackage| -> Result<_> {
+            {
+                opc.get_part_mut(&part_name)?.set_blob(blob.to_vec());
+                Ok(())
+            }
+        })(edit.package_mut())
         .unwrap();
+        edit.commit().unwrap().into_package()
+    };
 
     let document = package.document().unwrap();
     (

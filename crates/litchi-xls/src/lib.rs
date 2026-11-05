@@ -63,12 +63,19 @@
 //! The implementation is based on the BIFF (Binary Interchange File Format)
 //! specification and draws inspiration from other spreadsheet libraries.
 
+/// Immutable XLS package ownership and read-only projections.
+pub mod package;
+pub use package::edit::Error as EditError;
+pub use package::{Commit, Diagnostics, Edit, EditOptions, LimitKind, Patch};
+pub use package::{Package, Workbook};
+
 /// Error types for XLS parsing
 #[allow(
     clippy::wildcard_enum_match_arm,
     reason = "error conversion preserves unknown dependency error variants as inert InvalidData"
 )]
 mod error;
+pub mod sheet_name;
 
 /// BIFF8 password-to-open encryption support
 #[allow(
@@ -105,7 +112,16 @@ mod cell;
 )]
 pub mod cell_values;
 /// Lossless, source-backed BIFF8 worksheet visibility transactions.
+mod scoped;
+
+#[cfg(test)]
+extern crate self as litchi_xls;
+#[cfg(test)]
+mod internal_tests;
 pub mod sheet_visibility;
+pub mod source_backed;
+/// Finite physical source limits shared by the eager XLS owners.
+pub mod source_limits;
 
 /// BIFF8 worksheet data-validation records.
 #[allow(
@@ -491,6 +507,8 @@ pub mod hyperlinks;
 )]
 pub mod comments;
 pub mod compatibility;
+/// Worksheet features of opened workbooks (record 0327).
+pub mod sheet_features;
 
 /// Inert BIFF8 Office Toolbars stream (`XCB`) metadata.
 pub mod toolbar;
@@ -542,13 +560,11 @@ mod pivot_olap;
 )]
 mod user_routing;
 
-#[forbid(unsafe_code)]
 #[allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "pivot editing indexes only validated owner and stream structures"
+    clippy::wildcard_enum_match_arm,
+    reason = "OLE semantic projections preserve unrelated and unknown Obj variants inertly"
 )]
-mod pivot_editor;
+pub mod ole_object;
 /// Pivot table parsing (SXVIEW, SXVD, SXVI, SXDI, SXVS, SXPI)
 #[forbid(unsafe_code)]
 #[allow(
@@ -558,14 +574,15 @@ mod pivot_editor;
     reason = "pivot codecs retain bounded legacy invariants and inert unmatched variants"
 )]
 pub mod pivot_table;
-pub use pivot_editor::PivotViewEditor;
+#[forbid(unsafe_code)]
 #[allow(
-    clippy::wildcard_enum_match_arm,
-    reason = "OLE semantic projections preserve unrelated and unknown Obj variants inertly"
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "pivot editing indexes only validated owner and stream structures"
 )]
-pub mod ole_object;
+pub mod pivot_view;
 pub use ole_object::{
-    CheckState, DropDownStyle, EditBoxValidation, Editor, EmbeddedObjectDraft, EmbeddedPayload,
+    CheckState, DropDownStyle, EditBoxValidation, EmbeddedObjectDraft, EmbeddedPayload,
     FormControl, FtCblsData, FtCf, FtCmo, FtEdoData, FtGboData, FtLbsData, FtPictFmla, FtPioGrbit,
     FtRboData, FtSbs, LbsDropData, LbsItem, ListBehaviorClass, ListSelectionType, ObjSubrecord,
     ObjectType, OleObjectRecord,
@@ -651,7 +668,7 @@ pub use differential_format::{
     XfGradient, XfGradientStop, XfProperties, XfProperty,
 };
 pub use drawing_metadata::{AnchorBehavior, AnchorPoint, SheetAnchor};
-pub use encryption::{EncryptionProfile, WeakEncryptionPolicy};
+pub use encryption::{EncryptionEntropy, EncryptionProfile, WeakEncryptionPolicy};
 pub use ent_ex_u2::EntExU2;
 pub use environment::{LinkUpdateMode, ObjectDisplayMode, WorkbookEnvironment};
 pub use error::{EncryptionKind, Error, Result};
@@ -673,6 +690,7 @@ pub use layout::{Column, Row};
 pub use leniency::{
     CellFormatDefect, Defect, EncodingDefect, FormattingDefect, Leniency, PaletteDefect,
     SharedStringDefect, SheetDefect, SheetNameDefect, ToleranceReport, ToleratedDefect,
+    WorksheetDefect,
 };
 pub use list_object::{
     CachedDiskHeader, ExternalTableField, ExternalTableMetadata, ExternalTableVersion,
@@ -732,6 +750,7 @@ pub use shapes::Shape;
 pub use shared_string_index::{SharedStringBucket, SharedStringIndex};
 pub use sheet_ext::{SheetExt, SheetExtOptional};
 pub use sheet_metadata::{SheetKind, SheetMetadata, SheetVisibility};
+pub use source_limits::{SourceLimits, SourceLimitsBuilder};
 pub use style_ext::{StyleCategory, StyleExt};
 pub use sxview_link::SXViewLink;
 pub use table_styles::{
@@ -740,28 +759,28 @@ pub use table_styles::{
 pub use theme::Theme;
 pub use toolbar::{Control, Toolbar, ToolbarSet, VisualData, Wrapper};
 pub use user_names::{
-    Commit as UserNamesCommit, Limits as UserNamesLimits, PackageCommit as UserNamesPackageCommit,
-    PackagePatch as UserNamesPackagePatch, PackageSnapshot as UserNamesPackageSnapshot,
-    PackageTransaction as UserNamesPackageTransaction, Patch as UserNamesPatch,
-    Snapshot as UserNamesSnapshot, Transaction as UserNamesTransaction, USER_NAMES_STREAM_NAME,
-    UserCheck, UserEntry, UserGuid, UserNames,
+    Limits as UserNamesLimits, USER_NAMES_STREAM_NAME, UserCheck, UserEntry, UserGuid, UserNames,
 };
 pub use user_routing::{CUsr, CbUsr, DocRoute, RecipName, RoutingDelivery, UsrInfo};
 pub use uses_elfs::UsesElfs;
 pub use vba::{VbaMetadata, VbaProjectStorage};
 pub use web_pub::{WebPageType, WebPub, WebPubRange, WebSourceType};
 pub use workbook::{
-    OpenOptions, SourceBackedCell, SourceBackedError, SourceBackedLimits, SourceBackedOptions,
-    SourceBackedWorkbook, SourceBackedWorksheet, SourceBackedWorksheetDescriptor, Workbook,
+    CellCursor, OpenOptions, SourceBackedCell, SourceBackedError, SourceBackedLimits,
+    SourceBackedOptions, SourceBackedWorkbook, SourceBackedWorksheet,
+    SourceBackedWorksheetDescriptor, StyleTables,
 };
 pub use workbook_view::{WorkbookView, WorkbookWindow};
 pub use worksheet::Worksheet;
 pub use worksheet::layout::Layout;
 pub use writer::{
-    ShapeColor, ShapeFill, ShapeKind, ShapeLine, ShapeText, ShapeTextRun, ShapeWrite, Writer,
+    Builder, ShapeColor, ShapeFill, ShapeKind, ShapeLine, ShapeText, ShapeTextRun, ShapeWrite,
 };
 pub use xf_ext::{ExtProp, FullColorExt, FullColorType, XfExt};
 pub use xml_map::{
     DataBinding, LoadMode, Map, MapId, MapInfo, NamespaceDeclaration, OpaqueXml, Schema, SchemaId,
     XPath,
 };
+
+/// Fresh XLS workbook authoring.
+pub mod builder;

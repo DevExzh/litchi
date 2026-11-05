@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, reason = "focused semantic projection assertions")]
 
-use litchi_oth::{Builder, Template, change, frame, index, note, table};
+use litchi_oth::{Builder, change, frame, index, note, table};
 
 const CONTENT: &str = concat!(
     r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
@@ -26,9 +26,8 @@ const CONTENT: &str = concat!(
 
 #[test]
 fn projects_all_oth_body_structure_families() {
-    let template =
-        Template::from_bytes(Builder::new().content_xml(CONTENT).build().unwrap()).unwrap();
-    let body = template.text_body().unwrap();
+    let template = Builder::new().content_xml(CONTENT).build().unwrap();
+    let body = template.document().text_body().unwrap();
 
     let sections = body.sections().unwrap();
     assert_eq!(sections.len(), 1);
@@ -80,9 +79,8 @@ fn office_forms_may_precede_tracking_prelude() {
         r#"<office:body><office:text><text:tracked-changes>"#,
         r#"<office:body><office:text><office:forms/><text:tracked-changes>"#,
     );
-    let template =
-        Template::from_bytes(Builder::new().content_xml(content).build().unwrap()).unwrap();
-    let body = template.text_body().unwrap();
+    let template = Builder::new().content_xml(content).build().unwrap();
+    let body = template.document().text_body().unwrap();
     assert!(body.forms().is_empty());
     assert!(body.change_tracking().unwrap().is_some());
     assert_eq!(body.changes().unwrap().len(), 3);
@@ -103,9 +101,17 @@ fn structure_projection_ignores_same_named_foreign_content() {
         r#"<text:p>section text</text:p>"#,
         r#"<text:p>section text</text:p><foreign:wrapper><table:table table:name="nested-foreign-spoof"/></foreign:wrapper>"#,
     );
-    let template =
-        Template::from_bytes(Builder::new().content_xml(content).build().unwrap()).unwrap();
-    assert_eq!(template.text_body().unwrap().tables().unwrap().len(), 1);
+    let template = Builder::new().content_xml(content).build().unwrap();
+    assert_eq!(
+        template
+            .document()
+            .text_body()
+            .unwrap()
+            .tables()
+            .unwrap()
+            .len(),
+        1
+    );
 }
 
 #[test]
@@ -114,9 +120,8 @@ fn nested_sections_and_tables_remain_projected_without_expansion() {
         r#"<text:section text:name="Intro" text:protected="true"><text:p>section text</text:p></text:section>"#,
         r#"<text:section text:name="Intro" text:protected="true"><text:p>section text</text:p><text:section text:name="Nested"><table:table table:name="NestedTable"><table:table-row><table:table-cell><text:p>nested cell</text:p></table:table-cell></table:table-row></table:table></text:section></text:section>"#,
     );
-    let template =
-        Template::from_bytes(Builder::new().content_xml(content).build().unwrap()).unwrap();
-    let body = template.text_body().unwrap();
+    let template = Builder::new().content_xml(content).build().unwrap();
+    let body = template.document().text_body().unwrap();
     let sections = body.sections().unwrap();
     assert_eq!(sections.len(), 2);
     assert_eq!(sections[1].depth(), 2);
@@ -135,9 +140,8 @@ fn grouped_table_rows_and_columns_are_projected() {
         r#"</office:text>"#,
         r#"<table:table table:name="Grouped"><table:table-column-group><table:table-column table:number-columns-repeated="4"/></table:table-column-group><table:table-row-group><table:table-row><table:table-cell><text:p>grouped</text:p></table:table-cell></table:table-row></table:table-row-group></table:table></office:text>"#,
     );
-    let template =
-        Template::from_bytes(Builder::new().content_xml(content).build().unwrap()).unwrap();
-    let body = template.text_body().unwrap();
+    let template = Builder::new().content_xml(content).build().unwrap();
+    let body = template.document().text_body().unwrap();
     let tables = body.tables().unwrap();
     let grouped = tables
         .iter()
@@ -155,9 +159,8 @@ fn structure_projection_is_deferred_until_typed_body_access() {
         r#"table:number-columns-repeated="2""#,
         r#"table:number-columns-repeated="bogus""#,
     );
-    let template =
-        Template::from_bytes(Builder::new().content_xml(content).build().unwrap()).unwrap();
-    let body = template.text_body().unwrap();
+    let template = Builder::new().content_xml(content).build().unwrap();
+    let body = template.document().text_body().unwrap();
     assert!(body.tables().is_err());
     assert!(body.tables().is_err());
 }
@@ -174,9 +177,14 @@ fn huge_table_repeats_stay_compact_and_checked() {
             r#"table:number-rows-repeated="3""#,
             r#"table:number-rows-repeated="1000000""#,
         );
-    let template =
-        Template::from_bytes(Builder::new().content_xml(content).build().unwrap()).unwrap();
-    let tables = template.text_body().unwrap().tables().unwrap().to_vec();
+    let template = Builder::new().content_xml(content).build().unwrap();
+    let tables = template
+        .document()
+        .text_body()
+        .unwrap()
+        .tables()
+        .unwrap()
+        .to_vec();
     let table = tables
         .iter()
         .find(|table| table.name() == Some("Data"))
@@ -190,9 +198,8 @@ fn huge_table_repeats_stay_compact_and_checked() {
         r#"<table:table table:name="Data">"#,
         r#"<table:table table:name="Data"><table:table-column table:number-columns-repeated="1000000"/><table:table-column table:number-columns-repeated="2"/>"#,
     );
-    let template =
-        Template::from_bytes(Builder::new().content_xml(overflowing).build().unwrap()).unwrap();
-    assert!(template.text_body().unwrap().tables().is_err());
+    let template = Builder::new().content_xml(overflowing).build().unwrap();
+    assert!(template.document().text_body().unwrap().tables().is_err());
 }
 
 #[test]
@@ -202,27 +209,29 @@ fn change_markers_are_inert_without_tracked_changes_and_text_change_is_projected
             r#"<text:tracked-changes><text:changed-region xml:id="r1" text:id="r1"><text:insertion><office:change-info><dc:creator>Ada</dc:creator><dc:date>2026-09-02T03:04:05Z</dc:date><text:p>inserted</text:p></office:change-info></text:insertion></text:changed-region></text:tracked-changes>"#,
             "",
         );
-    let template = Template::from_bytes(
-        Builder::new()
-            .content_xml(without_tracking)
-            .build()
-            .unwrap(),
-    )
-    .unwrap();
-    assert!(template.text_body().unwrap().changes().unwrap().is_empty());
+    let template = Builder::new()
+        .content_xml(without_tracking)
+        .build()
+        .unwrap();
+    assert!(
+        template
+            .document()
+            .text_body()
+            .unwrap()
+            .changes()
+            .unwrap()
+            .is_empty()
+    );
 
     let with_point_marker = CONTENT.replace(
         r#"<text:change-end text:change-id="r1"/>"#,
         r#"<text:change text:change-id="r1"/>"#,
     );
-    let template = Template::from_bytes(
-        Builder::new()
-            .content_xml(with_point_marker)
-            .build()
-            .unwrap(),
-    )
-    .unwrap();
-    let body = template.text_body().unwrap();
+    let template = Builder::new()
+        .content_xml(with_point_marker)
+        .build()
+        .unwrap();
+    let body = template.document().text_body().unwrap();
     let changes = body.changes().unwrap();
     assert_eq!(changes.len(), 3);
     assert!(matches!(changes[2].kind(), change::Kind::Other(value) if value == "change"));
@@ -234,9 +243,8 @@ fn foreign_wrappers_keep_typed_descendants_inert() {
         r#"</text:tracked-changes>"#,
         r#"</text:tracked-changes><foreign:wrapper><text:section text:name="foreign-section"><text:p>foreign</text:p></text:section><text:change text:change-id="foreign"/></foreign:wrapper>"#,
     );
-    let template =
-        Template::from_bytes(Builder::new().content_xml(content).build().unwrap()).unwrap();
-    let body = template.text_body().unwrap();
+    let template = Builder::new().content_xml(content).build().unwrap();
+    let body = template.document().text_body().unwrap();
     assert_eq!(body.sections().unwrap().len(), 1);
     assert_eq!(body.changes().unwrap().len(), 3);
 }
@@ -247,9 +255,8 @@ fn additional_index_and_frame_families_remain_inert_projections() {
         r#"</office:text>"#,
         r#"<text:illustration-index text:name="ExtraIllustrations"><text:illustration-index-source/><text:index-body/></text:illustration-index><text:alphabetical-index text:name="ExtraAlphabetical"><text:alphabetical-index-source/><text:index-body/></text:alphabetical-index><text:bibliography text:name="ExtraBibliography"><text:bibliography-source/><text:index-body/></text:bibliography><draw:frame draw:name="Image"><draw:image xlink:href="Pictures/image"/></draw:frame><draw:frame draw:name="Object"><draw:object xlink:href="Object 1"/></draw:frame></office:text>"#,
     );
-    let template =
-        Template::from_bytes(Builder::new().content_xml(content).build().unwrap()).unwrap();
-    let body = template.text_body().unwrap();
+    let template = Builder::new().content_xml(content).build().unwrap();
+    let body = template.document().text_body().unwrap();
     let indexes = body.indexes().unwrap();
     assert_eq!(indexes.len(), 4);
     assert!(

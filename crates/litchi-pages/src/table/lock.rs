@@ -3,9 +3,9 @@
 /// Canonical iWork interactive table-lock state.
 pub use litchi_iwa_common::table::lock::State;
 
-/// Semantic spelling used by Pages callers that prefer an application-owned
-/// type name. It carries no native object or wire representation.
-pub type BodyTableLockState = State;
+/// Exact-source transaction types for one rooted Pages body table's
+/// interactive lock.
+pub use crate::package::table_lock::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal};
 
 #[cfg(test)]
 mod tests {

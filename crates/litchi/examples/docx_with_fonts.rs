@@ -4,20 +4,20 @@
 //! font embedding and subsetting. Open the generated file in Microsoft Word
 //! to verify that fonts are properly embedded.
 
-use litchi::{docx::Package, fonts::embedding::Mode};
+use litchi::{docx::Builder, fonts::embedding::Mode};
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!("Creating DOCX file with embedded fonts...");
 
     // Create a new document
-    let mut pkg = Package::new()?;
+    let mut builder = Builder::new()?;
 
     // Enable font embedding with subsetting
-    pkg.set_font_embedding(Mode::Subset)?;
+    builder.font_embedding(Mode::Subset)?;
 
-    // Get mutable document
-    let doc = pkg.document_mut()?;
+    // Get the document being authored
+    let doc = builder.document()?;
 
     // Add title
     doc.add_heading("Font Embedding Demo", 1)?;
@@ -67,6 +67,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Save the document
     let output_path = "output_docx_with_fonts.docx";
+    let pkg = builder.build()?;
     pkg.save(output_path)?;
 
     println!("✓ Successfully created: {}", output_path);

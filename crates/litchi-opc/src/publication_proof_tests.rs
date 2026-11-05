@@ -16,6 +16,7 @@
 
 use super::*;
 use crate::source_backed::SourceBackedPackage;
+use crate::{SourceCacheLimits, SourceReadPolicy};
 use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits,
     OwnedSource, ReadAt, Resource, SourceVersion,
@@ -56,7 +57,8 @@ fn archive_bytes(document: &[u8]) -> Vec<u8> {
     let relationships = format!(
         r#"<Relationships xmlns="{RELATIONSHIPS_NS}"><Relationship Id="rId1" Type="{OFFICE_DOCUMENT_REL}" Target="{DOCUMENT_MEMBER}"/></Relationships>"#
     );
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .expect("content types fixture must be writable");
@@ -97,14 +99,16 @@ fn managed_context(
 
 fn managed_package(
     document: &[u8],
-    limits: ReadLimits,
+    limits: SourceLimits,
     scope: &'static str,
 ) -> (SourceBackedPackage, Budget, CancellationSource) {
     let (budget, cancellation_source, context) = managed_context(scope, 128 * 1024 * 1024, 1 << 40);
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(archive_bytes(document))),
         limits,
-        context,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .expect("managed fixture package must open");
     (package, budget, cancellation_source)
@@ -149,7 +153,7 @@ fn assert_work_charge(budget: &Budget, before: u64, bytes: &[u8]) {
 #[test]
 fn equal_original_and_derived_proofs_cover_replacement_and_addition() {
     let (package, budget, _cancellation) =
-        managed_package(SOURCE_XML, ReadLimits::default(), "proof-equal");
+        managed_package(SOURCE_XML, SourceLimits::default(), "proof-equal");
     let original = capture(&package);
     let source_partname = original.source_partname.clone();
     let source_content_type = original.source_content_type.clone();
@@ -203,7 +207,7 @@ fn equal_original_and_derived_proofs_cover_replacement_and_addition() {
 #[test]
 fn equal_limit_proof_hit_needs_no_parser_memory_but_keeps_work_bounded() {
     let (package, budget, _cancellation) =
-        managed_package(SOURCE_XML, ReadLimits::default(), "proof-memory");
+        managed_package(SOURCE_XML, SourceLimits::default(), "proof-memory");
     let source = capture(&package);
     let payload_len = source.bytes().len() as u64;
     let before = budget.used(Resource::Work);
@@ -240,9 +244,9 @@ fn equal_limit_proof_hit_needs_no_parser_memory_but_keeps_work_bounded() {
 #[test]
 fn different_limits_still_require_the_validator_memory_reservation() {
     let (package, budget, _cancellation) =
-        managed_package(SOURCE_XML, ReadLimits::default(), "proof-memory-miss");
+        managed_package(SOURCE_XML, SourceLimits::default(), "proof-memory-miss");
     let source = capture(&package);
-    let changed = ReadLimits::builder()
+    let changed = SourceLimits::builder()
         .max_parts(source.limits.max_parts() - 1)
         .expect("changed non-XML limit must be valid")
         .build()
@@ -279,10 +283,10 @@ fn different_limits_still_require_the_validator_memory_reservation() {
 #[test]
 fn lower_xml_limits_take_the_full_validator_path() {
     let (package, budget, _cancellation) =
-        managed_package(SOURCE_XML, ReadLimits::default(), "proof-limits");
+        managed_package(SOURCE_XML, SourceLimits::default(), "proof-limits");
     let source = capture(&package);
-    let lower = ReadLimits::builder()
-        .max_xml_depth(1)
+    let lower = SourceLimits::builder()
+        .max_depth(1)
         .expect("lower depth limit must be valid")
         .build()
         .expect("lower limits must build");
@@ -293,8 +297,8 @@ fn lower_xml_limits_take_the_full_validator_path() {
         .expect_err("a nested source must fail the lower destination depth limit");
     assert!(matches!(
         error,
-        OpcError::ReadLimit {
-            resource: ReadResource::XmlDepth,
+        OpcError::Limit {
+            kind: SourceLimitKind::Depth,
             ..
         }
     ));
@@ -312,7 +316,7 @@ fn lower_xml_limits_take_the_full_validator_path() {
 #[test]
 fn proof_work_refusal_is_typed_and_does_not_partially_charge() {
     let (package, budget, _cancellation) =
-        managed_package(SOURCE_XML, ReadLimits::default(), "proof-work-limit");
+        managed_package(SOURCE_XML, SourceLimits::default(), "proof-work-limit");
     let source = capture(&package);
     let payload_len = source.bytes().len() as u64;
     let remaining = budget
@@ -344,7 +348,7 @@ fn proof_work_refusal_is_typed_and_does_not_partially_charge() {
 #[test]
 fn content_type_and_lineage_guards_precede_proof_reuse() {
     let (package, budget, _cancellation) =
-        managed_package(SOURCE_XML, ReadLimits::default(), "proof-guards");
+        managed_package(SOURCE_XML, SourceLimits::default(), "proof-guards");
     let source = capture(&package);
     let before = budget.used(Resource::Work);
     let content_error = source
@@ -357,9 +361,14 @@ fn content_type_and_lineage_guards_precede_proof_reuse() {
     assert_eq!(budget.used(Resource::Work), before);
 
     let mut foreign = source.clone();
-    foreign.source_lineage = SourceBackedPackage::from_vec(archive_bytes(SOURCE_XML))
-        .expect("foreign package must open")
-        .source_lineage();
+    foreign.source_lineage = SourceBackedPackage::from_vec(
+        archive_bytes(SOURCE_XML),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .expect("foreign package must open")
+    .source_lineage();
     let lineage_error = foreign
         .check_for_publication(foreign.content_type(), foreign.limits)
         .expect_err("an inconsistent source lineage must remain refused");
@@ -426,8 +435,14 @@ impl ReadAt for MutableSource {
 #[test]
 fn source_revision_invalidates_a_previously_valid_publication_proof() {
     let source = Arc::new(MutableSource::new(archive_bytes(SOURCE_XML)));
-    let package = SourceBackedPackage::from_read_at(source.clone())
-        .expect("mutable fixture package must open");
+    let package = SourceBackedPackage::from_read_at(
+        source.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .expect("mutable fixture package must open");
     let proof = capture(&package);
     source.replace_bytes(archive_bytes(SOURCE_XML));
     let error = proof
@@ -438,10 +453,20 @@ fn source_revision_invalidates_a_previously_valid_publication_proof() {
 
 #[test]
 fn destination_identity_is_checked_for_replacements() {
-    let first =
-        SourceBackedPackage::from_vec(archive_bytes(SOURCE_XML)).expect("first package must open");
-    let second =
-        SourceBackedPackage::from_vec(archive_bytes(SOURCE_XML)).expect("second package must open");
+    let first = SourceBackedPackage::from_vec(
+        archive_bytes(SOURCE_XML),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .expect("first package must open");
+    let second = SourceBackedPackage::from_vec(
+        archive_bytes(SOURCE_XML),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .expect("second package must open");
     let first_proof = capture(&first);
     let second_proof = capture(&second);
     let error = first_proof
@@ -457,4 +482,95 @@ fn destination_identity_is_checked_for_replacements() {
         error,
         OpcError::SourceBackedOverlayUnavailable { .. }
     ));
+}
+
+#[test]
+fn logical_revisions_keep_physical_source_change_fences() {
+    let source = Arc::new(MutableSource::new(archive_bytes(SOURCE_XML)));
+    let package = SourceBackedPackage::from_read_at(
+        source.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
+    let original = capture(&package);
+    let revision = original.begin_revision().unwrap();
+    let publication = revision.clone().into_publication().unwrap();
+    source.replace_bytes(archive_bytes(SOURCE_XML));
+    assert!(matches!(
+        original.begin_revision(),
+        Err(OpcError::SourceChanged { .. })
+    ));
+    assert!(matches!(
+        revision.checked_range(0..0, b""),
+        Err(OpcError::SourceChanged { .. })
+    ));
+    assert!(matches!(
+        revision.into_publication(),
+        Err(OpcError::SourceChanged { .. })
+    ));
+    assert!(matches!(
+        publication.finish(),
+        Err(OpcError::SourceChanged { .. })
+    ));
+}
+
+#[test]
+fn range_proofs_check_content_type_as_well_as_revision() {
+    let package = SourceBackedPackage::from_vec(
+        archive_bytes(SOURCE_XML),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
+    let original = capture(&package).begin_revision().unwrap();
+    let mut different_type = original.clone();
+    different_type.source_content_type =
+        Arc::new(ContentType::new("application/other+xml").unwrap());
+    let proof = different_type.checked_range(0..0, b"").unwrap();
+    let mut publication = original.into_publication().unwrap();
+    assert!(
+        publication
+            .replace(proof, AuthoredXmlFragment::empty())
+            .is_err()
+    );
+}
+
+#[test]
+fn retained_candidate_edits_recheck_physical_sources_after_callbacks() {
+    let source = Arc::new(MutableSource::new(archive_bytes(SOURCE_XML)));
+    let package = SourceBackedPackage::from_read_at(
+        source.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
+    let root = package
+        .prepare_topology(crate::SourceTopologyPlan::new())
+        .unwrap();
+    let first = root
+        .edit_xml(&document_uri(), |xml, edit| {
+            edit.replace(
+                xml.checked_range(0..xml.bytes().len(), xml.bytes())?,
+                AuthoredXmlFragment::markup(b"<document/>".to_vec())?,
+            )
+        })
+        .unwrap();
+    let result = first.edit_xml(&document_uri(), |xml, edit| {
+        edit.replace(
+            xml.checked_range(0..xml.bytes().len(), xml.bytes())?,
+            AuthoredXmlFragment::markup(b"<changed/>".to_vec())?,
+        )?;
+        source.replace_bytes(archive_bytes(SOURCE_XML));
+        Ok(())
+    });
+    assert!(matches!(result, Err(OpcError::SourceChanged { .. })));
+    let mut output = Vec::new();
+    assert!(first.publish_to_stream(&mut output).is_err());
+    assert!(output.is_empty());
 }

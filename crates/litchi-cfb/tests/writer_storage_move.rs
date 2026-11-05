@@ -64,7 +64,11 @@ fn moves_complete_subtree_without_reallocating_or_reordering_stream_payloads() {
         .create_stream_owned(&["Unrelated", "Third"], unrelated.clone())
         .unwrap();
 
-    let before = OleFile::open(Cursor::new(serialize(&mut writer))).unwrap();
+    let before = OleFile::open(
+        Cursor::new(serialize(&mut writer)),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let before_first_sector = child(&before, &["Source"], "First").start_sector;
     let before_second_sector = child(&before, &["Source", "Nested"], "Second").start_sector;
     let before_third = child(&before, &["Unrelated"], "Third");
@@ -74,10 +78,18 @@ fn moves_complete_subtree_without_reallocating_or_reordering_stream_payloads() {
     let before_nested_clsid = child(&before, &["Source"], "Nested").clsid.clone();
 
     writer
-        .move_storage(&["sOURCE"], &["dESTINATION", "Renamed"])
+        .move_storage(
+            &["sOURCE"],
+            &["dESTINATION", "Renamed"],
+            StorageMoveLimits::default(),
+        )
         .unwrap();
 
-    let mut after = OleFile::open(Cursor::new(serialize(&mut writer))).unwrap();
+    let mut after = OleFile::open(
+        Cursor::new(serialize(&mut writer)),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     assert!(!after.directory_exists(&["Source"]));
     assert!(after.directory_exists(&["Destination", "Renamed"]));
     assert!(after.directory_exists(&["Destination", "Renamed", "Nested"]));
@@ -131,8 +143,14 @@ fn accepts_case_only_rename_but_refuses_other_case_insensitive_collisions() {
     rename
         .create_stream(&["Reports", "Data"], b"retained")
         .unwrap();
-    rename.move_storage(&["Reports"], &["rEPORTS"]).unwrap();
-    let mut renamed = OleFile::open(Cursor::new(serialize(&mut rename))).unwrap();
+    rename
+        .move_storage(&["Reports"], &["rEPORTS"], StorageMoveLimits::default())
+        .unwrap();
+    let mut renamed = OleFile::open(
+        Cursor::new(serialize(&mut rename)),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     assert_eq!(child(&renamed, &[], "rEPORTS").name, "rEPORTS");
     assert_eq!(
         renamed.open_stream(&["rEPORTS", "Data"]).unwrap(),
@@ -150,7 +168,11 @@ fn accepts_case_only_rename_but_refuses_other_case_insensitive_collisions() {
         .unwrap();
     let before = serialize(&mut collision);
     let error = collision
-        .move_storage(&["sOURCE"], &["tARGET", "Taken"])
+        .move_storage(
+            &["sOURCE"],
+            &["tARGET", "Taken"],
+            StorageMoveLimits::default(),
+        )
         .unwrap_err();
     assert!(error.to_string().contains("collides"));
     assert_eq!(serialize(&mut collision), before);
@@ -161,22 +183,34 @@ fn root_self_descendant_and_missing_parent_refusals_are_atomic() {
     let mut writer = bounded_writer();
     let before = serialize(&mut writer);
 
-    let root_error = writer.move_storage(&[], &["Moved"]).unwrap_err();
+    let root_error = writer
+        .move_storage(&[], &["Moved"], StorageMoveLimits::default())
+        .unwrap_err();
     assert!(root_error.to_string().contains("root"));
     assert_eq!(serialize(&mut writer), before);
 
-    let root_destination_error = writer.move_storage(&["Source"], &[]).unwrap_err();
+    let root_destination_error = writer
+        .move_storage(&["Source"], &[], StorageMoveLimits::default())
+        .unwrap_err();
     assert!(root_destination_error.to_string().contains("root"));
     assert_eq!(serialize(&mut writer), before);
 
     let self_error = writer
-        .move_storage(&["Source"], &["source", "Child"])
+        .move_storage(
+            &["Source"],
+            &["source", "Child"],
+            StorageMoveLimits::default(),
+        )
         .unwrap_err();
     assert!(self_error.to_string().contains("own subtree"));
     assert_eq!(serialize(&mut writer), before);
 
     let parent_error = writer
-        .move_storage(&["Source"], &["Missing", "Moved"])
+        .move_storage(
+            &["Source"],
+            &["Missing", "Moved"],
+            StorageMoveLimits::default(),
+        )
         .unwrap_err();
     assert!(parent_error.to_string().contains("parent"));
     assert_eq!(serialize(&mut writer), before);
@@ -189,7 +223,11 @@ fn refuses_oversized_untrusted_names_before_admitting_a_move() {
     let oversized = "x".repeat(1_000_000);
 
     let error = writer
-        .move_storage(&[oversized.as_str()], &["Moved"])
+        .move_storage(
+            &[oversized.as_str()],
+            &["Moved"],
+            StorageMoveLimits::default(),
+        )
         .unwrap_err();
     assert!(error.to_string().contains("31 UTF-16"));
     assert_eq!(serialize(&mut writer), before);
@@ -203,14 +241,22 @@ fn refuses_an_oversized_existing_path_before_canonical_allocation() {
         .create_storage(&[oversized.as_str()])
         .expect("the legacy creation API defers directory-name validation");
 
-    let error = writer.move_storage(&["Source"], &["Moved"]).unwrap_err();
+    let error = writer
+        .move_storage(&["Source"], &["Moved"], StorageMoveLimits::default())
+        .unwrap_err();
     assert!(error.to_string().contains("31 UTF-16"));
 
     // The failed move did not consume or rename the source. Once the invalid
     // unrelated entry is removed, the same source still moves successfully.
     writer.delete_storage(&[oversized.as_str()]).unwrap();
-    writer.move_storage(&["Source"], &["Moved"]).unwrap();
-    let mut reopened = OleFile::open(Cursor::new(serialize(&mut writer))).unwrap();
+    writer
+        .move_storage(&["Source"], &["Moved"], StorageMoveLimits::default())
+        .unwrap();
+    let mut reopened = OleFile::open(
+        Cursor::new(serialize(&mut writer)),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     assert_eq!(
         reopened
             .open_stream(&["Moved", "Nested", "Payload"])
@@ -229,9 +275,13 @@ fn explicit_limits_accept_exact_bounds_and_refuse_one_less_atomically() {
 
     let mut accepted = bounded_writer();
     accepted
-        .move_storage_with_limits(&["Source"], &["Moved"], exact)
+        .move_storage(&["Source"], &["Moved"], exact)
         .unwrap();
-    let mut reopened = OleFile::open(Cursor::new(serialize(&mut accepted))).unwrap();
+    let mut reopened = OleFile::open(
+        Cursor::new(serialize(&mut accepted)),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     assert_eq!(
         reopened
             .open_stream(&["Moved", "Nested", "Payload"])
@@ -248,7 +298,7 @@ fn explicit_limits_accept_exact_bounds_and_refuse_one_less_atomically() {
         let mut refused = bounded_writer();
         let before = serialize(&mut refused);
         let error = refused
-            .move_storage_with_limits(&["Source"], &["Moved"], limits)
+            .move_storage(&["Source"], &["Moved"], limits)
             .unwrap_err();
         assert!(error.to_string().contains("limit"));
         assert_eq!(serialize(&mut refused), before);

@@ -15,10 +15,12 @@ mod codec;
 mod model;
 mod validation;
 
+pub(crate) use validation::parse_scaled;
+
 #[cfg(test)]
 mod tests;
 
-pub use codec::{MAX_DEPTH, MAX_NODES, MAX_TRANSFORMS, MAX_XML_BYTES, read, write};
+pub use codec::{Limits, MAX_DEPTH, MAX_NODES, MAX_TRANSFORMS, MAX_XML_BYTES, read, write};
 pub use model::{
     Angle, Base, FixedPercentage, Hsl, Percentage, PositiveAngle, PositiveFixedPercentage,
     PositivePercentage, Preset, Rgb, ScRgb, Scheme, System, Transform, Transformed, Unknown, Value,

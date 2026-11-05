@@ -6,7 +6,7 @@
 )]
 
 use litchi_xlsb::calc::{self, Delta, Error, Mode, Opts, Props, Threads};
-use litchi_xlsb::raw::{Error as RawError, Stage, Writer};
+use litchi_xlsb::raw::{Encoder, Error as RawError, Stage};
 
 fn payload(id: u32, mode: u32, iters: u32, delta: f64, threads: i32, opts: u16) -> [u8; calc::LEN] {
     let mut bytes = [0_u8; calc::LEN];
@@ -24,7 +24,7 @@ fn exact_payload_round_trip_preserves_every_field() {
     let opts = Opts::all();
     let bytes = payload(0xDEAD_BEEF, 2, u32::MAX, -1.25, 1024, opts.bits());
 
-    let props = calc::read(&bytes).unwrap();
+    let props = calc::read(&bytes, litchi_xlsb::raw::Limits::DEFAULT).unwrap();
     assert_eq!(props.id(), 0xDEAD_BEEF);
     assert_eq!(props.mode(), Mode::AutoNoTables);
     assert_eq!(props.iters(), u32::MAX);
@@ -33,7 +33,11 @@ fn exact_payload_round_trip_preserves_every_field() {
     assert_eq!(props.opts(), opts);
 
     let mut written = Vec::new();
-    calc::write(&props, &mut Writer::new(&mut written)).unwrap();
+    calc::write(
+        &props,
+        &mut Encoder::new(&mut written, litchi_xlsb::raw::Limits::DEFAULT),
+    )
+    .unwrap();
     assert_eq!(written, bytes);
 }
 
@@ -49,13 +53,17 @@ fn accepts_excel_12_single_byte_options_and_writes_canonical_form() {
     );
     let legacy = &full[..calc::LEN - 1];
 
-    let props = calc::read(legacy).unwrap();
+    let props = calc::read(legacy, litchi_xlsb::raw::Limits::DEFAULT).unwrap();
     assert_eq!(props.id(), 0x0001_DD63);
     assert!(props.has(Opts::A1 | Opts::FULL_PRECISION | Opts::RECALC_ON_SAVE | Opts::MTR));
     assert!(!props.has(Opts::IGNORE_DEPS));
 
     let mut canonical = Vec::new();
-    calc::write(&props, &mut Writer::new(&mut canonical)).unwrap();
+    calc::write(
+        &props,
+        &mut Encoder::new(&mut canonical, litchi_xlsb::raw::Limits::DEFAULT),
+    )
+    .unwrap();
     assert_eq!(canonical, full);
 }
 
@@ -63,7 +71,7 @@ fn accepts_excel_12_single_byte_options_and_writes_canonical_form() {
 fn rejects_payload_lengths_outside_supported_forms() {
     let full = payload(1, 1, 100, 0.001, 1, Opts::A1.bits());
     assert!(matches!(
-        calc::read(&full[..calc::LEN - 2]),
+        calc::read(&full[..calc::LEN - 2], litchi_xlsb::raw::Limits::DEFAULT),
         Err(Error::Wire(RawError::Truncated {
             stage: Stage::Value,
             ..
@@ -73,7 +81,7 @@ fn rejects_payload_lengths_outside_supported_forms() {
     let mut trailing = full.to_vec();
     trailing.push(0);
     assert!(matches!(
-        calc::read(&trailing),
+        calc::read(&trailing, litchi_xlsb::raw::Limits::DEFAULT),
         Err(Error::Wire(RawError::Trailing {
             context: "BrtCalcProp",
             remaining: 1,
@@ -83,16 +91,36 @@ fn rejects_payload_lengths_outside_supported_forms() {
 }
 
 #[test]
+fn required_raw_limits_bound_the_standalone_payload() {
+    let bytes = payload(1, 1, 100, 0.001, 1, Opts::A1.bits());
+    assert!(matches!(
+        calc::read(&bytes, litchi_xlsb::raw::Limits::new(calc::LEN - 1, 1024)),
+        Err(Error::Wire(RawError::PayloadLimit {
+            length: calc::LEN,
+            limit: 25,
+            offset: 0,
+        }))
+    ));
+    assert!(
+        calc::read(
+            &bytes[..calc::LEN - 1],
+            litchi_xlsb::raw::Limits::new(calc::LEN - 1, 1024),
+        )
+        .is_ok()
+    );
+}
+
+#[test]
 fn rejects_unknown_modes_and_reserved_bits() {
     let unknown_mode = payload(1, 3, 100, 0.001, 1, 0);
     assert!(matches!(
-        calc::read(&unknown_mode),
+        calc::read(&unknown_mode, litchi_xlsb::raw::Limits::DEFAULT),
         Err(Error::Mode { value: 3 })
     ));
 
     let reserved = payload(1, 1, 100, 0.001, 1, 0x0200);
     assert!(matches!(
-        calc::read(&reserved),
+        calc::read(&reserved, litchi_xlsb::raw::Limits::DEFAULT),
         Err(Error::ReservedOpts { bits: 0x0200 })
     ));
 
@@ -119,7 +147,7 @@ fn xnum_delta_follows_ms_xlsb_section_2_5_172() {
         ));
         let bytes = payload(1, 1, 100, value, 1, 0);
         assert!(matches!(
-            calc::read(&bytes),
+            calc::read(&bytes, litchi_xlsb::raw::Limits::DEFAULT),
             Err(Error::Delta { bits }) if bits == value.to_bits()
         ));
     }
@@ -134,17 +162,20 @@ fn thread_count_follows_ms_xlsb_section_2_4_318() {
     for value in [1, 1024] {
         assert_eq!(Threads::new(value).unwrap().get(), value);
         assert_eq!(
-            calc::read(&payload(1, 1, 100, 0.001, i32::from(value), 0))
-                .unwrap()
-                .threads()
-                .get(),
+            calc::read(
+                &payload(1, 1, 100, 0.001, i32::from(value), 0),
+                litchi_xlsb::raw::Limits::DEFAULT
+            )
+            .unwrap()
+            .threads()
+            .get(),
             value
         );
     }
 
     for value in [0_i32, -1, 1025, i32::MAX] {
         assert!(matches!(
-            calc::read(&payload(1, 1, 100, 0.001, value, 0)),
+            calc::read(&payload(1, 1, 100, 0.001, value, 0), litchi_xlsb::raw::Limits::DEFAULT),
             Err(Error::Threads { value: found }) if found == value
         ));
     }

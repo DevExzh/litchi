@@ -1,3 +1,5 @@
+use super::limits::LimitKind;
+
 /// Errors that can occur during OMML parsing
 #[derive(Debug)]
 #[non_exhaustive]
@@ -8,7 +10,6 @@ pub enum OmmlError {
     ValidationError(String),
     UnsupportedFeature(String),
     EncodingError(String),
-    DepthLimitExceeded(usize),
     MalformedElement(String),
     MissingRequiredElement(String),
     InvalidAttribute(String),
@@ -16,6 +17,15 @@ pub enum OmmlError {
     /// The formula AST cannot be serialized to OMML (e.g. it contains an
     /// `Error` node produced by a failed parse).
     SerializationError(String),
+    /// A caller-selected resource policy rejected parsing or serialization.
+    LimitExceeded {
+        /// Resource that exceeded the selected policy.
+        kind: LimitKind,
+        /// Selected maximum.
+        limit: usize,
+        /// Observed or conservatively admitted amount.
+        actual: usize,
+    },
 }
 
 impl std::fmt::Display for OmmlError {
@@ -27,9 +37,6 @@ impl std::fmt::Display for OmmlError {
             OmmlError::ValidationError(msg) => write!(f, "OMML validation error: {}", msg),
             OmmlError::UnsupportedFeature(msg) => write!(f, "Unsupported OMML feature: {}", msg),
             OmmlError::EncodingError(msg) => write!(f, "Text encoding error: {}", msg),
-            OmmlError::DepthLimitExceeded(limit) => {
-                write!(f, "XML depth limit exceeded: {}", limit)
-            },
             OmmlError::MalformedElement(msg) => write!(f, "Malformed element: {}", msg),
             OmmlError::MissingRequiredElement(msg) => {
                 write!(f, "Missing required element: {}", msg)
@@ -37,6 +44,11 @@ impl std::fmt::Display for OmmlError {
             OmmlError::InvalidAttribute(msg) => write!(f, "Invalid attribute: {}", msg),
             OmmlError::ArenaAllocationError(msg) => write!(f, "Arena allocation error: {}", msg),
             OmmlError::SerializationError(msg) => write!(f, "OMML serialization error: {}", msg),
+            OmmlError::LimitExceeded {
+                kind,
+                limit,
+                actual,
+            } => write!(f, "OMML {kind} limit {limit} exceeded by {actual}"),
         }
     }
 }
@@ -86,10 +98,6 @@ mod tests {
 
         let err = OmmlError::EncodingError("encoding test".to_string());
         assert!(err.to_string().contains("Text encoding error"));
-
-        let err = OmmlError::DepthLimitExceeded(100);
-        assert!(err.to_string().contains("XML depth limit exceeded"));
-        assert!(err.to_string().contains("100"));
 
         let err = OmmlError::MalformedElement("malformed test".to_string());
         assert!(err.to_string().contains("Malformed element"));

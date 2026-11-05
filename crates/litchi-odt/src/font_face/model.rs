@@ -5,6 +5,7 @@ use super::{
     MAX_VALUE_BYTES, invalid,
 };
 use litchi_core::{Error, Result};
+use litchi_odf_common::XmlStreamLimits;
 use std::collections::HashSet;
 
 /// Generic CSS font family used by `style:font-family-generic`.
@@ -485,8 +486,8 @@ impl Declarations {
         Ok(())
     }
 
-    pub fn to_xml(&self) -> Result<String> {
-        super::codec::write_declarations(self)
+    pub fn to_xml(&self, limits: &XmlStreamLimits) -> Result<String> {
+        super::codec::write_declarations(self, limits)
     }
 }
 

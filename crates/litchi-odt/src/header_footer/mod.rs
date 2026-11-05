@@ -18,10 +18,8 @@ pub use model::MasterRegion as Region;
 pub use model::{
     Block, Child, ChildKind, Column, Field, FieldKind, Inline, Kind, Master, SenderKind,
 };
-pub use transaction::{
-    Commit, Dependency, DurablePatch, History, HistoryLimits, MergePlan, Patch, Resolution,
-    SectionLayout, SectionTransfer, Snapshot, Target, Transaction, Transfer,
-};
+pub(crate) use transaction::Transaction;
+pub use transaction::{Dependency, SectionLayout, SectionTransfer, Snapshot, Transfer};
 
 pub use codec::parse_page_layout_header_footer_properties;
 pub(crate) use codec::{read, replace_range, set_text, set_xml};

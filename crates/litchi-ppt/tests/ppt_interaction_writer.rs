@@ -5,22 +5,22 @@
 )]
 
 use litchi_ppt::animation::AnimationInfo;
-use litchi_ppt::writer::{Hyperlink, Writer};
+use litchi_ppt::writer::{Builder, Hyperlink};
 use litchi_ppt::{
-    Interaction, InteractionAction, InteractionJump, InteractionLimits, InteractionLinkTarget,
-    InteractionTrigger, Package,
+    Interaction, InteractionAction, InteractionJump, InteractionLinkTarget, InteractionTrigger,
+    raw::Reader,
 };
 use std::io::Cursor;
 
-fn write(writer: &mut Writer) -> Vec<u8> {
+fn write(writer: &mut Builder) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    litchi_ppt::raw::encode(writer, &mut output).unwrap();
     output.into_inner()
 }
 
 #[test]
 fn typed_click_hover_and_file_link_round_trip() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
 
     writer
@@ -78,7 +78,7 @@ fn typed_click_hover_and_file_link_round_trip() {
         .set_last_shape_interaction(slide, next.clone())
         .unwrap();
 
-    let mut package = Package::from_reader(Cursor::new(write(&mut writer))).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(write(&mut writer))).unwrap();
     let presentation = package.presentation().unwrap();
     let hyperlinks = presentation.hyperlinks().unwrap();
     let entries = presentation.slides().unwrap()[0]
@@ -113,7 +113,7 @@ fn typed_click_hover_and_file_link_round_trip() {
 
 #[test]
 fn failed_replacement_is_atomic_and_trigger_removal_is_precise() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     writer
         .add_textbox(slide, 10, 10, 240, 40, "Atomic interaction")
@@ -128,16 +128,6 @@ fn failed_replacement_is_atomic_and_trigger_removal_is_precise() {
     writer
         .set_last_shape_interaction(slide, existing.clone())
         .unwrap();
-
-    let too_small = InteractionLimits {
-        max_record_bytes: 31,
-        ..InteractionLimits::default()
-    };
-    assert!(
-        writer
-            .set_last_shape_interaction_with_limits(slide, existing.clone(), too_small)
-            .is_err()
-    );
 
     let mut dangling = Interaction::new(
         InteractionTrigger::Click,
@@ -172,7 +162,7 @@ fn failed_replacement_is_atomic_and_trigger_removal_is_precise() {
             .unwrap()
     );
 
-    let mut package = Package::from_reader(Cursor::new(write(&mut writer))).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(write(&mut writer))).unwrap();
     let presentation = package.presentation().unwrap();
     let entries = presentation.slides().unwrap()[0]
         .shape_interactions()

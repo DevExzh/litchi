@@ -4,12 +4,14 @@ use litchi_xls::writer::sort::{
     Axis, CONTINUE_FRT12_RECORD_TYPE, Config, Dxf, Icon, IconSet, Key, Method, On, Parent, Range,
     SORT_DATA_RECORD_TYPE,
 };
-use litchi_xls::{Workbook, Writer};
+use litchi_xls::{Builder, raw::Reader};
 
 const LEGACY_SORT_RECORD_TYPE: u16 = 0x0090;
 
 fn workbook_record_types(bytes: &[u8]) -> Vec<u16> {
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     let stream = ole.open_stream(&["Workbook"]).unwrap();
     let mut record_types = Vec::new();
     let mut offset = 0usize;
@@ -68,13 +70,13 @@ fn extended_sort() -> Config {
 #[test]
 fn writer_stream_round_trip_preserves_extended_sort_and_record_order() {
     let expected = extended_sort();
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Sorted").unwrap();
     writer.set_sort(sheet, true, true, &[(0, true)]).unwrap();
     assert_eq!(writer.put_sort(sheet, expected.clone()).unwrap(), None);
 
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     let bytes = output.into_inner();
     let record_types = workbook_record_types(&bytes);
     let sort_position = record_types
@@ -87,7 +89,7 @@ fn writer_stream_round_trip_preserves_extended_sort_and_record_order() {
         &[CONTINUE_FRT12_RECORD_TYPE; 3]
     );
 
-    let workbook = Workbook::new(Cursor::new(bytes)).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes)).unwrap();
     let parsed = workbook.xls_worksheet(0).unwrap().sort().unwrap();
     assert_eq!(parsed, &expected);
 }
@@ -95,13 +97,13 @@ fn writer_stream_round_trip_preserves_extended_sort_and_record_order() {
 #[test]
 fn writer_and_parser_support_zero_condition_sort_data() {
     let expected = Config::new(Range::new(0..=0, 0..=0).unwrap(), Parent::AutoFilter);
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Empty sort").unwrap();
     assert_eq!(writer.put_sort(sheet, expected.clone()).unwrap(), None);
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
 
-    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     assert_eq!(workbook.xls_worksheet(0).unwrap().sort(), Some(&expected));
 }
 
@@ -120,7 +122,7 @@ fn writer_sort_crud_is_move_first_idempotent_and_failure_atomic() {
         )
         .unwrap();
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("CRUD").unwrap();
     assert_eq!(writer.put_sort(sheet, first.clone()).unwrap(), None);
     assert_eq!(
@@ -137,7 +139,7 @@ fn writer_sort_crud_is_move_first_idempotent_and_failure_atomic() {
     assert_eq!(writer.remove_sort(sheet).unwrap(), None);
 
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
-    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
+    let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     assert_eq!(workbook.xls_worksheet(0).unwrap().sort(), None);
 }

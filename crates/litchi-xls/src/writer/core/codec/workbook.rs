@@ -1,7 +1,7 @@
 use super::super::{
-    AddInFunctionOptions, CalculationSettings, DdeOrOleLinkOptions, ExternalDefinedNameOptions,
-    ExternalWorkbookOptions, FunctionGroupOptions, VbaWriteMetadata, WorkbookEnvironmentOptions,
-    WorkbookWindowOptions, Writer,
+    AddInFunctionOptions, Builder, CalculationSettings, DdeOrOleLinkOptions,
+    ExternalDefinedNameOptions, ExternalWorkbookOptions, FunctionGroupOptions, VbaWriteMetadata,
+    WorkbookEnvironmentOptions, WorkbookWindowOptions,
 };
 use crate::error::{Error, Result};
 use crate::external_link::MAX_EXTERNAL_REFERENCES;
@@ -16,7 +16,7 @@ pub(super) const fn xfcrc_capacity_error() -> Error {
     }
 }
 
-impl Writer {
+impl Builder {
     /// Return the internal `ExternSheet` contribution that the workbook
     /// stream writer emits for the current workbook state.
     pub(super) fn internal_external_reference_count(&self) -> usize {

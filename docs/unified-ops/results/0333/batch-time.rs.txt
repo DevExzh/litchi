@@ -1,0 +1,38 @@
+//! Median time of one atomic 1,000-item run-formatting batch (record 0333
+//! before/after).
+use litchi_ops::{BatchItem, BatchMode, OpenOptions, Props, SourceMode};
+use std::time::Instant;
+
+fn main() {
+    let n: usize = std::env::args().nth(1).and_then(|v| v.parse().ok()).unwrap_or(1000);
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    let slide = builder.presentation().unwrap().add_slide().unwrap();
+    for index in 0..n {
+        slide.add_text_box(&format!("text-{index}"), index as i64 * 100, 0, 914_400, 914_400);
+    }
+    let bytes = builder.build().unwrap().to_bytes().unwrap();
+    for eager in [true, false] {
+        let file = litchi_ops::open_bytes_with(
+            bytes.clone(),
+            &OpenOptions::new().source_mode(if eager { SourceMode::Eager } else { SourceMode::Auto }),
+        )
+        .unwrap();
+        let items: Vec<BatchItem<'static>> = (1..=n)
+            .map(|index| {
+                let mut item = BatchItem::new("set");
+                item.path = Some(format!("/slide[1]/shape[{index}]/paragraph[1]/run[1]").into());
+                item.props = Some(Props::new().with("bold", true).with("size", "20pt").with("color", "1F4E79"));
+                item
+            })
+            .collect();
+        let mut samples = Vec::new();
+        for _ in 0..5 {
+            let started = Instant::now();
+            let commit = file.batch(items.clone(), BatchMode::Atomic).unwrap();
+            samples.push(started.elapsed().as_secs_f64() * 1e3);
+            assert_eq!(commit.results.len(), n);
+        }
+        samples.sort_by(f64::total_cmp);
+        println!("{} n={n} median_ms={:.2}", if eager { "eager" } else { "source" }, samples[2]);
+    }
+}

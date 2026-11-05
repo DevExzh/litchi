@@ -1,0 +1,6 @@
+# comment view probe (not committed; public File API): get /comments/comment[1] + view().format() on a 200-paragraph create() document, comment at p[150], eager warm handle, 1800 samples, median
+# base 926cbde41e (git archive) vs branch, alternated, taskset -c 13
+base: 6690 / 6680 / 6620 ns
+branch, anchor walk per view (first version): 15910 / 15690 / 15900 ns
+branch, memmem prefilter: 11420 / 11501 ns
+branch, anchors and commentsExtended cached per handle (final): 6550 / 6800 ns

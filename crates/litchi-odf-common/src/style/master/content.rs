@@ -1,13 +1,15 @@
 //! Typed, ordered content extracted from ODF master-page regions.
 
+use crate::core::{ResolvedReader, XmlStreamLimits};
 use std::collections::HashMap;
+
+type OdfResult<T> = std::result::Result<T, crate::Error>;
 
 use litchi_core::{Error, Result};
 use quick_xml::{
     XmlVersion,
     events::{BytesRef, BytesStart, Event},
     name::{Namespace, ResolveResult},
-    reader::NsReader,
 };
 
 use super::region::Kind;
@@ -273,7 +275,7 @@ impl Region {
 
     fn start_element(
         &mut self,
-        reader: &NsReader<&[u8]>,
+        reader: &ResolvedReader<'_>,
         namespace: Option<&[u8]>,
         element: &BytesStart<'_>,
         depth: usize,
@@ -470,7 +472,7 @@ impl Region {
 
     fn append_field_control(
         &mut self,
-        reader: &NsReader<&[u8]>,
+        reader: &ResolvedReader<'_>,
         element: &BytesStart<'_>,
     ) -> Result<()> {
         match element.local_name().as_ref() {
@@ -525,8 +527,11 @@ impl Region {
     }
 }
 
-pub(crate) fn parse(xml: &str) -> Result<HashMap<(String, Kind), Vec<Block>>> {
-    let mut reader = NsReader::from_str(xml);
+pub(crate) fn parse(
+    xml: &str,
+    limits: XmlStreamLimits,
+) -> OdfResult<HashMap<(String, Kind), Vec<Block>>> {
+    let mut reader = ResolvedReader::from_xml(xml, limits)?;
     let mut buffer = Vec::new();
     let mut depth = 0usize;
     let mut master: Option<Master> = None;
@@ -534,9 +539,7 @@ pub(crate) fn parse(xml: &str) -> Result<HashMap<(String, Kind), Vec<Block>>> {
     let mut regions = HashMap::new();
 
     loop {
-        let (resolved, parsed_event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(|error| Error::InvalidFormat(format!("styles.xml parsing error: {error}")))?;
+        let (resolved, parsed_event) = reader.read_resolved_event_into(&mut buffer)?;
         let resolved_bytes = resolved_namespace(&resolved).map(<[u8]>::to_vec);
         let namespace = resolved_bytes.as_deref();
         let event = parsed_event.into_owned();
@@ -544,15 +547,15 @@ pub(crate) fn parse(xml: &str) -> Result<HashMap<(String, Kind), Vec<Block>>> {
             Event::Start(element) => {
                 let element_depth = depth.checked_add(1).ok_or_else(depth_error)?;
                 if element_depth > MAX_XML_DEPTH {
-                    return Err(depth_error());
+                    return Err(crate::Error::from(depth_error()));
                 }
                 if namespace == Some(STYLE_NAMESPACE)
                     && element.local_name().as_ref() == b"master-page"
                 {
                     if master.is_some() {
-                        return Err(Error::InvalidFormat(
+                        return Err(crate::Error::from(Error::InvalidFormat(
                             "nested style:master-page element".to_string(),
-                        ));
+                        )));
                     }
                     let name = namespaced_attr(&reader, &element, STYLE_NAMESPACE, b"name")?
                         .ok_or_else(|| {
@@ -580,7 +583,7 @@ pub(crate) fn parse(xml: &str) -> Result<HashMap<(String, Kind), Vec<Block>>> {
             Event::Empty(element) => {
                 let element_depth = depth.checked_add(1).ok_or_else(depth_error)?;
                 if element_depth > MAX_XML_DEPTH {
-                    return Err(depth_error());
+                    return Err(crate::Error::from(depth_error()));
                 }
                 if let (Some(master_page), Some(kind)) =
                     (master.as_ref(), Kind::parse(element.local_name().as_ref()))
@@ -628,16 +631,16 @@ pub(crate) fn parse(xml: &str) -> Result<HashMap<(String, Kind), Vec<Block>>> {
                         Error::InvalidFormat("missing active header/footer region".to_string())
                     })?;
                     if active.active_column.is_some() || active.block.is_some() {
-                        return Err(Error::InvalidFormat(
+                        return Err(crate::Error::from(Error::InvalidFormat(
                             "unterminated header/footer column region or block".to_string(),
-                        ));
+                        )));
                     }
                     if namespace != Some(STYLE_NAMESPACE)
                         || Kind::parse(element.local_name().as_ref()) != Some(active.kind)
                     {
-                        return Err(Error::InvalidFormat(
+                        return Err(crate::Error::from(Error::InvalidFormat(
                             "malformed header/footer region nesting".to_string(),
-                        ));
+                        )));
                     }
                     insert_region(
                         &mut regions,
@@ -652,9 +655,9 @@ pub(crate) fn parse(xml: &str) -> Result<HashMap<(String, Kind), Vec<Block>>> {
                 depth = depth.checked_sub(1).ok_or_else(depth_error)?;
             },
             Event::DocType(_) => {
-                return Err(Error::InvalidFormat(
+                return Err(crate::Error::from(Error::InvalidFormat(
                     "DTD is not allowed in ODF styles.xml".to_string(),
-                ));
+                )));
             },
             Event::Eof => break,
             Event::Decl(_) | Event::PI(_) | Event::Comment(_) => {},
@@ -662,14 +665,18 @@ pub(crate) fn parse(xml: &str) -> Result<HashMap<(String, Kind), Vec<Block>>> {
         buffer.clear();
     }
     if master.is_some() || region.is_some() || depth != 0 {
-        return Err(Error::InvalidFormat(
+        return Err(crate::Error::from(Error::InvalidFormat(
             "unterminated master-page header/footer".to_string(),
-        ));
+        )));
     }
     Ok(regions)
 }
 
-fn parse_field(reader: &NsReader<&[u8]>, element: &BytesStart<'_>, local: &[u8]) -> Result<Field> {
+fn parse_field(
+    reader: &ResolvedReader<'_>,
+    element: &BytesStart<'_>,
+    local: &[u8],
+) -> Result<Field> {
     let mut attributes = Vec::new();
     let mut fixed = None;
     let mut data_style_name = None;
@@ -846,7 +853,7 @@ fn insert_region(
 }
 
 fn namespaced_attr(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     expected_namespace: &[u8],
     local_name: &[u8],
@@ -870,7 +877,10 @@ fn namespaced_attr(
     Ok(None)
 }
 
-fn text_space_count(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Option<usize>> {
+fn text_space_count(
+    reader: &ResolvedReader<'_>,
+    element: &BytesStart<'_>,
+) -> Result<Option<usize>> {
     let count_lexical = namespaced_attr(reader, element, TEXT_NAMESPACE, b"c")?;
     count_lexical
         .map(|lexical_value| {
@@ -948,6 +958,10 @@ fn limit_error(resource: &str) -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn parse(xml: &str) -> Result<HashMap<(String, Kind), Vec<Block>>> {
+        Ok(super::parse(xml, XmlStreamLimits::default())?)
+    }
 
     fn test_ok<T>(result: Result<T>) -> T {
         match result {

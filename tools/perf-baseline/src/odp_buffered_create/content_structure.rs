@@ -836,7 +836,7 @@ mod tests {
     #[test]
     fn fixed_content_gate_rejects_structural_and_semantic_mutations() {
         let archive = super::super::odp_buffered_bytes(SemanticShape::Tiny).unwrap();
-        let content = ArchiveReader::new(&archive)
+        let content = ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())
             .unwrap()
             .read("content.xml")
             .unwrap();

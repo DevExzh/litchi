@@ -51,7 +51,7 @@ fn main() -> Result<()> {
     std::fs::create_dir_all(&directory)?;
 
     let package = Package::open(SOURCE)?;
-    let mut graph = package.opc()?.clone();
+    let graph = package.opc()?.clone();
     let source = font::load(&graph)?.ok_or_else(|| missing("source embedded-font collection"))?;
     let source_font = source.get("boldonse")?;
     let source_face = source_font
@@ -89,16 +89,19 @@ fn main() -> Result<()> {
     let _ = fonts.remove("DELETE PROBE UPDATED")?;
     fonts.reorder(&[0usize])?;
 
-    let removed =
-        font::remove(&mut graph)?.ok_or_else(|| missing("removed source font collection"))?;
-    if removed.len() != 1 || !font::put(&mut graph, fonts)? {
+    let package = Package::from_opc_package(graph)?;
+    let mut edit = package.edit_fonts()?;
+    let removed = edit
+        .remove()?
+        .ok_or_else(|| missing("removed source font collection"))?;
+    if removed.len() != 1 || !edit.set(fonts)? {
         return Err(missing("fresh font graph publication").into());
     }
-    let mut package = Package::from_opc_package(graph)?;
+    let package = edit.commit()?.into_package();
     let unchanged =
         font::load(package.opc()?)?.ok_or_else(|| missing("published font collection"))?;
-    let mut no_op_graph = package.opc()?.clone();
-    if font::put(&mut no_op_graph, unchanged)? {
+    let mut no_op = package.edit_fonts()?;
+    if no_op.set(unchanged)? {
         return Err(invalid("semantic no-op unexpectedly changed package").into());
     }
 

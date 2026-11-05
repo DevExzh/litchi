@@ -68,7 +68,10 @@ pub(super) fn locate(bytes: &[u8], limits: SlideLimits) -> Result<Parts> {
                         "PPDrawing sibling has an unsupported record envelope",
                     ));
                 }
-                crate::odraw::parse_drawing(&bytes[child.data.clone()])?;
+                crate::odraw::parse_drawing(
+                    &bytes[child.data.clone()],
+                    &crate::odraw::Limits::default(),
+                )?;
                 drawing = Some(child.data);
             } else if child.record_type == RecordType::ProgTags.as_u16() {
                 if child.version != 0x0F || child.instance != 0 {

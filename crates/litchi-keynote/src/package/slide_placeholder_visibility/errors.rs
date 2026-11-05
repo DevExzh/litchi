@@ -33,34 +33,36 @@ pub(super) fn root_preview_count(package: &Package) -> Result<usize, Error> {
 pub(super) fn physical_catalog(package: &Package) -> Result<&SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
-        PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
+        PhysicalSource::Semantic(_) => Err(Error::Refused(
+            crate::slide::placeholder::Refusal::UnsupportedSource,
+        )),
     }
 }
 
 pub(super) fn map_placeholder_error(error: keynote_placeholder_text_codec::DecodeError) -> Error {
     if let Some((observed, maximum)) = error.message_byte_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireBytes,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some((observed, maximum)) = error.recursion_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireNesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),
         };
     }
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireFields,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireWork,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -99,7 +101,7 @@ pub(super) fn map_read_error(read_error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 crate::package::SemanticLimitKind::Objects => LimitKind::Entries,
                 crate::package::SemanticLimitKind::Slides => LimitKind::Slides,
@@ -114,7 +116,7 @@ pub(super) fn map_read_error(read_error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 crate::package::PayloadLimitKind::Bytes => LimitKind::WireBytes,
                 crate::package::PayloadLimitKind::Fields => LimitKind::WireFields,
@@ -136,7 +138,7 @@ pub(super) fn map_archive_error(archive_error: litchi_iwa_archive::Error) -> Err
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -160,7 +162,7 @@ pub(super) fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::MessageBytes => LimitKind::WireBytes,
                 litchi_iwa_core::LimitKind::HeaderFields => LimitKind::WireFields,
@@ -183,7 +185,7 @@ pub(super) fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
                 litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,

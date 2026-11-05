@@ -18,17 +18,14 @@ impl Definition {
         columns: Vec<String>,
     ) -> Result<Self> {
         if table_id == 0 || table_id == u32::MAX {
-            return Err(Error::InvalidFormula(format!(
-                "table identifier {table_id} is outside 1..=4294967294"
-            )));
+            return Err(Error::InvalidFormula(
+                "table identifier is outside 14294967294",
+            ));
         }
         let display_name = display_name.into();
         validate_table_name(&display_name)?;
         if columns.is_empty() || columns.len() > 16_384 {
-            return Err(Error::InvalidFormula(format!(
-                "table {display_name:?} has {} columns, outside 1..=16384",
-                columns.len()
-            )));
+            return Err(Error::InvalidFormula("table has columns, outside 116384"));
         }
         for (index, column) in columns.iter().enumerate() {
             validate_table_column_name(column, index)?;
@@ -36,9 +33,7 @@ impl Definition {
                 .iter()
                 .any(|existing| excel_name_eq(existing, column))
             {
-                return Err(Error::InvalidFormula(format!(
-                    "table {display_name:?} contains duplicate column {column:?}"
-                )));
+                return Err(Error::InvalidFormula("table contains duplicate column"));
             }
         }
         Ok(Self {

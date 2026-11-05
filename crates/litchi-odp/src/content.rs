@@ -173,6 +173,14 @@ pub(crate) enum Operation {
     AddResources {
         resources: Vec<ResourceDependency>,
     },
+    /// Checked splices of the presentation pages (record 0278).
+    SpliceScene {
+        changes: Vec<crate::scene::Change>,
+    },
+    /// A retained-source `meta.xml` patch (record 0278).
+    SetMetadata {
+        metadata: Box<litchi_core::Metadata>,
+    },
 }
 
 #[derive(Clone)]
@@ -2227,6 +2235,14 @@ fn resolve_package_href(base_path: &str, href: &str) -> Result<String> {
 }
 
 pub(crate) fn apply(source: &crate::core::OwnedPackage, operation: &Operation) -> Result<Vec<u8>> {
+    if let Operation::SpliceScene { changes } = operation {
+        return crate::scene::apply_changes(source, changes)
+            .map(|bytes| bytes.unwrap_or_else(|| source.as_bytes().to_vec()));
+    }
+    if let Operation::SetMetadata { metadata } = operation {
+        return crate::authoring::metadata::apply(source, metadata)
+            .map(|bytes| bytes.unwrap_or_else(|| source.as_bytes().to_vec()));
+    }
     if let Operation::ReplaceTextBoxModels { replacements } = operation {
         return apply_text_box_model_replacements(source, replacements)
             .map(|(bytes, _changed)| bytes.unwrap_or_else(|| source.as_bytes().to_vec()));
@@ -2249,8 +2265,10 @@ pub(crate) fn apply(source: &crate::core::OwnedPackage, operation: &Operation) -
             replace_object(&content, *kind, name, new_name, xml)?,
             Vec::new(),
         ),
-        Operation::ReplaceTextBoxModels { .. } => {
-            return invalid("ODP text-box batch dispatch reached an invalid internal state");
+        Operation::ReplaceTextBoxModels { .. }
+        | Operation::SpliceScene { .. }
+        | Operation::SetMetadata { .. } => {
+            return invalid("ODP content dispatch reached an invalid internal state");
         },
         Operation::RemoveObject { kind, name } => {
             (remove_object(&content, *kind, name)?, Vec::new())
@@ -3602,9 +3620,11 @@ fn inject_automatic_styles(content: &str, fragments: &str) -> Result<String> {
             &format!("<office:automatic-styles>{fragments}</office:automatic-styles>"),
         );
     }
-    Err(Error::Unsupported(
-        "ODP content has no transferable automatic-style owner".to_string(),
-    ))
+    Err(Error::Refused(litchi_core::edit::Refusal::new(
+        litchi_core::edit::RefusalKind::UnsupportedOperation,
+        "odp.content",
+        "ODP content has no transferable automatic-style owner",
+    )))
 }
 
 fn rewrite_known_attributes(

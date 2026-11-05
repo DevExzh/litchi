@@ -1,0 +1,94 @@
+{
+  "schema": "litchi.native-qualification.final-source-preparation.v1",
+  "status": "prepared",
+  "qualification_claim": false,
+  "source_candidate_ref": "c796d0acc24c7c6e6fd08980b9e31af6bb86b18b",
+  "preparer": {
+    "path": "tools/native_qualification/prepare_w4b_w5_inputs.py",
+    "sha256": "bdd3409a82d29148cb4477a54fb86c21e1b871c2f175d33fad840adc6e7a9bd7"
+  },
+  "runner": {
+    "path": "tools/native_qualification_runner.py",
+    "sha256": "07fb47403d2fb27a560ba7afba9f59cefbce0b561bb6cc38161ab33b2ba3b62a"
+  },
+  "manifests": {
+    "w4b-xlsb.json": {
+      "sha256": "32374ee41072e86a7bee5f1a7fd13e172c74d85a17283a61e9b06b12ac244e8d",
+      "rounds": 31,
+      "abba_order": ["before", "after", "after", "before"],
+      "programs": ["probe", "sheet", "crud"],
+      "builds_per_leg": 3,
+      "fixture": "test-data/poi/test-data/spreadsheet/testVarious.xlsb"
+    },
+    "legacy-w5.json": {
+      "sha256": "52eb232b64d33246b354f183071a53764a181d2120ea88c78c98d8bb8a0b246a",
+      "rounds": 31,
+      "abba_order": ["before", "after", "after", "before"],
+      "programs": ["source", "ops"],
+      "builds_per_leg": 1,
+      "probe_batch_rounds": 7
+    }
+  },
+  "w4b": {
+    "baseline_commit": "be644568846ad2fcf0622386f2f2438d0eac21c0",
+    "baseline_tree": "684a028b2ae30a3a110b87bf6743fc598c6691a2",
+    "candidate_tree": "6fe4f6f68046d2ee99dc7ca982004c406e484336",
+    "candidate_clean": true,
+    "overlay_probe_sha256": "ec922a2001ba4605bc112b9a1fe1efa81fae7e4eefbd100ed2ffbe0371b126ea",
+    "overlay_crud_sha256": "870c7324e1fa99e0aaea7fda4318509946301733d5b6771e7ab8cb738ae70055",
+    "baseline_status_paths": [
+      "crates/litchi-ops/examples/xlsb_w4b_probe.rs",
+      "tools/perf-baseline/src/bin/xlsb_crud.rs"
+    ]
+  },
+  "w5": {
+    "baseline_commit": "7afba5f146aa1a16eba73ebed2144dd041b33fb5",
+    "baseline_tree": "4940682589d406cfe0cfc38457143699eae45ab0",
+    "candidate_tree": "6fe4f6f68046d2ee99dc7ca982004c406e484336",
+    "candidate_clean": true,
+    "overlay_probe_sha256": "1b581040b65a5baedd0368c026599a2c6746415afc2d8a67d622091112d928f8",
+    "routes_before_sha256": "237d7242d9fa4db2a3e1589f26b175eff564bb6de680bb217df24f021c698915",
+    "baseline_status_paths": [
+      "crates/litchi-ops/examples/legacy_w5_source_probe.rs",
+      "docs/unified-ops/results/0359a/routes_before.rs"
+    ]
+  },
+  "locks": {
+    "historical_baseline_root_lock_sha256": "cbe70791291d4a0830a8749985aa717230abf74d61c108fb284d25990c9ad681",
+    "historical_baseline_root_lock_bytes": 139442,
+    "perf_baseline_lock_sha256": "57c2a19ffeff395fdea95c33f295c85b08400b00e2fd9cec94d66cff56d1583f",
+    "perf_baseline_lock_bytes": 57028,
+    "note": "The synthetic baseline commits do not track a root Cargo.lock. The generated pre-wave root lock was reused byte-for-byte from the previously verified baseline endpoint; the current manifests still bind and hash both required W4b locks and the W5 root lock."
+  },
+  "receipts": {
+    "source_preparation": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-final/receipts/source-preparation-c796.json",
+      "bytes": 6532,
+      "sha256": "dcd01ffdb8d1947e9e5f57e94d48b46b1aeae8372b633af379599a4110d88639"
+    },
+    "manifest_source_validation": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-final/receipts/manifest-source-validation-c796.json",
+      "bytes": 33283,
+      "sha256": "1d47716fdba5029a0e791bf66abf7fb771a27daf7f13821ceb43c6e9f8c9141d"
+    },
+    "protocol_tests": {
+      "command": "python3 -m unittest -q tools.test_native_qualification_runner tools.test_legacy_native_qualification",
+      "tests_passed": 41,
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-final/receipts/protocol-tests.log",
+      "bytes": 332,
+      "sha256": "744067b4ee12d09a8353ced5d9c89d19608ab311e78548ad08b07d2ce503c708"
+    }
+  },
+  "execution": {
+    "cargo_build": false,
+    "correctness_probe": false,
+    "quiet_abba": false,
+    "reason": "No Cargo/native heavy grant was available. The static receipt validates the executable build, analyzer and ABBA command bindings without invoking them.",
+    "commands": [
+      "python3 tools/native_qualification_runner.py --manifest tools/native_qualification/manifests/w4b-xlsb.json --phase build",
+      "python3 tools/native_qualification_runner.py --manifest tools/native_qualification/manifests/w4b-xlsb.json --phase abba --cpu <quiet-cpu>",
+      "python3 tools/native_qualification_runner.py --manifest tools/native_qualification/manifests/legacy-w5.json --phase build",
+      "python3 tools/native_qualification_runner.py --manifest tools/native_qualification/manifests/legacy-w5.json --phase abba --cpu <quiet-cpu>"
+    ]
+  }
+}

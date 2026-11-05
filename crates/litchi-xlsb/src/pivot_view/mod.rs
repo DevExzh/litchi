@@ -30,7 +30,7 @@ pub enum Error {
     InvalidLength { expected: usize, found: usize },
     /// A PivotTable framing or identity invariant is invalid.
     #[error("invalid PivotTable view: {0}")]
-    Invalid(String),
+    Invalid(&'static str),
 }
 
 pub use model::Part;

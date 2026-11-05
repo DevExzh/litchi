@@ -108,8 +108,12 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(build_list: impl AsRef<[u8]>, drawing: impl AsRef<[u8]>) -> Result<Self> {
-        Self::parse_with_limits(build_list, drawing, EditLimits::default())
+    pub fn parse(
+        build_list: impl AsRef<[u8]>,
+        drawing: impl AsRef<[u8]>,
+        limits: &EditLimits,
+    ) -> Result<Self> {
+        Self::parse_with_limits(build_list, drawing, *limits)
     }
 
     /// Parse with explicit source and graph resource ceilings.
@@ -117,7 +121,7 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_with_limits(
+    pub(crate) fn parse_with_limits(
         build_list: impl AsRef<[u8]>,
         drawing: impl AsRef<[u8]>,
         limits: EditLimits,
@@ -132,7 +136,8 @@ impl Snapshot {
             return invalid("OfficeArt drawing exceeds the configured transaction byte limit");
         }
 
-        let parsed_drawing = crate::odraw::parse_drawing(drawing_bytes)?;
+        let parsed_drawing =
+            crate::odraw::parse_drawing(drawing_bytes, &crate::odraw::Limits::default())?;
         let mut shape_ids = validation::shape_ids(&parsed_drawing, limits.max_shapes)?;
         shape_ids.sort_unstable();
         let build_list_arc = Arc::<[u8]>::from(build_list_bytes.to_vec().into_boxed_slice());
@@ -233,8 +238,8 @@ impl Snapshot {
 
     /// Start an isolated edit over this exact source.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub(crate) fn edit(&self) -> RecordEdit {
+        RecordEdit {
             source: self.clone(),
             candidate: self.build_list.to_vec(),
             builds: self.builds.clone(),
@@ -245,35 +250,23 @@ impl Snapshot {
 
 /// Failure-atomic semantic editor over one diagram `BuildList` snapshot.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub(crate) struct RecordEdit {
     source: Snapshot,
     candidate: Vec<u8>,
     builds: Vec<LocatedBuild>,
     changes: Vec<Change>,
 }
 
-impl Transaction {
-    /// Borrow the immutable source snapshot.
-    #[must_use]
-    pub const fn source(&self) -> &Snapshot {
-        &self.source
-    }
-
+impl RecordEdit {
     /// Iterate the currently staged typed builds.
     #[must_use]
-    pub fn builds(&self) -> impl ExactSizeIterator<Item = Build> + '_ {
+    pub(crate) fn builds(&self) -> impl ExactSizeIterator<Item = Build> + '_ {
         self.builds.iter().map(|entry| entry.build)
-    }
-
-    /// Whether staged bytes differ from the source bytes.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.candidate.as_slice() != self.source.bytes()
     }
 
     /// Borrow ordered semantic changes staged so far.
     #[must_use]
-    pub fn changes(&self) -> &[Change] {
+    pub(crate) fn changes(&self) -> &[Change] {
         &self.changes
     }
 
@@ -283,7 +276,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_mode(&mut self, id: Id, mode: BuildType) -> Result<()> {
+    pub(crate) fn set_mode(&mut self, id: Id, mode: BuildType) -> Result<()> {
         let entry = self.entry(id)?;
         let before = entry.build.mode();
         if before == mode {
@@ -310,7 +303,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_shape_id(&mut self, id: Id, shape_id: u32) -> Result<Id> {
+    pub(crate) fn set_shape_id(&mut self, id: Id, shape_id: u32) -> Result<Id> {
         if self.source.shape_ids.binary_search(&shape_id).is_err() {
             return invalid("diagram shape identity does not exist in the OfficeArt graph");
         }
@@ -341,26 +334,8 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_shape(&mut self, id: Id, shape: ShapeRef) -> Result<Id> {
+    pub(crate) fn set_shape(&mut self, id: Id, shape: ShapeRef) -> Result<Id> {
         self.set_shape_id(id, shape.id())
-    }
-
-    /// Capture the current candidate without publishing a patch.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn snapshot(&self) -> Result<Snapshot> {
-        if self.candidate.as_slice() == self.source.bytes() {
-            return Ok(self.source.clone());
-        }
-        let bytes = Arc::<[u8]>::from(self.candidate.clone().into_boxed_slice());
-        Snapshot::from_graph(
-            bytes,
-            self.source.drawing.clone(),
-            self.source.shape_ids.clone(),
-            self.source.limits,
-        )
     }
 
     /// Validate and publish the candidate with its reversible source patch.
@@ -368,7 +343,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<RecordCommit> {
         let unchanged = self.candidate.as_slice() == self.source.bytes();
         let snapshot = if unchanged {
             self.source.clone()
@@ -382,7 +357,7 @@ impl Transaction {
             )?
         };
         let changes = if unchanged { Vec::new() } else { self.changes };
-        let patch = Patch {
+        let patch = RecordPatch {
             base: self.source.revision,
             target: snapshot.revision,
             before: self.source.build_list.clone(),
@@ -391,22 +366,7 @@ impl Transaction {
             changes,
             limits: self.source.limits,
         };
-        Ok(Commit { snapshot, patch })
-    }
-
-    /// Alias for move-owned writer terminology.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn finish(self) -> Result<Commit> {
-        self.commit()
-    }
-
-    /// Discard staged edits and recover the source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
+        Ok(RecordCommit { snapshot, patch })
     }
 
     fn entry(&self, id: Id) -> Result<LocatedBuild> {
@@ -420,34 +380,34 @@ impl Transaction {
 
 /// A successful target snapshot and its source-checked patch.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
+pub(crate) struct RecordCommit {
     snapshot: Snapshot,
-    patch: Patch,
+    patch: RecordPatch,
 }
 
-impl Commit {
+impl RecordCommit {
     /// Published target snapshot.
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Reversible patch from the source to the target.
     #[must_use]
-    pub const fn patch(&self) -> &Patch {
+    pub(crate) const fn patch(&self) -> &RecordPatch {
         &self.patch
     }
 
     /// Split the target and patch.
     #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
+    pub(crate) fn into_parts(self) -> (Snapshot, RecordPatch) {
         (self.snapshot, self.patch)
     }
 }
 
 /// Reversible, source-checked `BuildList` byte patch.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Patch {
+pub(crate) struct RecordPatch {
     base: Revision,
     target: Revision,
     before: Arc<[u8]>,
@@ -457,40 +417,40 @@ pub struct Patch {
     limits: EditLimits,
 }
 
-impl Patch {
+impl RecordPatch {
     /// Source revision required by [`Self::apply`].
     #[must_use]
-    pub const fn base(&self) -> Revision {
+    pub(crate) const fn base(&self) -> Revision {
         self.base
     }
 
     /// Target revision produced by [`Self::apply`].
     #[must_use]
-    pub const fn target(&self) -> Revision {
+    pub(crate) const fn target(&self) -> Revision {
         self.target
     }
 
     /// Ordered semantic operations represented by this patch.
     #[must_use]
-    pub fn changes(&self) -> &[Change] {
+    pub(crate) fn changes(&self) -> &[Change] {
         &self.changes
     }
 
     /// Exact source `BuildList` bytes.
     #[must_use]
-    pub fn before(&self) -> &[u8] {
+    pub(crate) fn before(&self) -> &[u8] {
         &self.before
     }
 
     /// Exact target `BuildList` bytes.
     #[must_use]
-    pub fn after(&self) -> &[u8] {
+    pub(crate) fn after(&self) -> &[u8] {
         &self.after
     }
 
     /// Whether this patch is a semantic and byte-level no-op.
     #[must_use]
-    pub const fn is_empty(&self) -> bool {
+    pub(crate) const fn is_empty(&self) -> bool {
         self.changes.is_empty()
     }
 
@@ -499,7 +459,7 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn apply(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn apply(&self, current: &Snapshot) -> Result<Snapshot> {
         if current.revision != self.base
             || current.build_list.as_ref() != self.before.as_ref()
             || current.drawing.as_ref() != self.drawing.as_ref()
@@ -522,7 +482,7 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.inverse().apply(current)
     }
 
@@ -531,13 +491,13 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.apply(current)
     }
 
     /// Build a source-checked inverse patch.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             base: self.target,
             target: self.base,

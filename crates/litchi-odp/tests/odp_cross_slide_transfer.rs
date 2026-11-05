@@ -4,7 +4,7 @@
 )]
 
 use litchi_odp::core::{OwnedPackage, PackageWriter};
-use litchi_odp::edit;
+use litchi_odp::{Package, edit};
 
 const MIME: &str = "application/vnd.oasis.opendocument.presentation";
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -20,7 +20,7 @@ fn content(pages: &str) -> String {
 }
 
 fn package(content_xml: &str, with_macro: bool) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer
         .add_file("content.xml", content_xml.as_bytes())
@@ -49,7 +49,7 @@ fn package(content_xml: &str, with_macro: bool) -> Vec<u8> {
 }
 
 fn package_with_extra(content_xml: &str, path: &str, payload: &[u8], media_type: &str) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer
         .add_file("content.xml", content_xml.as_bytes())
@@ -88,9 +88,9 @@ fn foreign_blank_transfer_is_source_bound_reversible_and_raw_preserving() {
         ),
         false,
     );
-    let donor = edit::Snapshot::from_bytes(donor_bytes.clone()).unwrap();
-    let destination = edit::Snapshot::from_bytes(destination_bytes.clone()).unwrap();
-    let mut transaction = destination.transaction().unwrap();
+    let donor = Package::from_bytes(&donor_bytes).unwrap();
+    let destination = Package::from_bytes(&destination_bytes).unwrap();
+    let mut transaction = destination.edit().unwrap();
 
     assert_eq!(
         transaction
@@ -99,14 +99,14 @@ fn foreign_blank_transfer_is_source_bound_reversible_and_raw_preserving() {
         Some(3)
     );
     let commit = transaction.commit().unwrap();
-    assert!(commit.changed());
-    assert_eq!(donor.bytes(), donor_bytes);
-    assert_eq!(destination.bytes(), destination_bytes);
-    assert_eq!(commit.snapshot().slides().len(), 4);
+    assert!(commit.diagnostics().changed());
+    assert_eq!(donor.as_bytes(), donor_bytes);
+    assert_eq!(destination.as_bytes(), destination_bytes);
+    assert_eq!(commit.package().slides().unwrap().len(), 4);
     assert_eq!(
         commit
-            .snapshot()
-            .to_presentation()
+            .package()
+            .presentation()
             .unwrap()
             .pages()
             .unwrap()
@@ -116,13 +116,13 @@ fn foreign_blank_transfer_is_source_bound_reversible_and_raw_preserving() {
             .collect::<Vec<_>>(),
         ["Host", "Donor", "Donor Copy", "Donor Copy 2"]
     );
-    let published_content = content_bytes(commit.snapshot().bytes());
+    let published_content = content_bytes(commit.package().as_bytes());
     assert!(
         String::from_utf8_lossy(&published_content)
             .contains(r#"<draw:page draw:name="Donor Copy 2"/>"#)
     );
     assert_eq!(
-        OwnedPackage::from_bytes(commit.snapshot().bytes().to_vec())
+        OwnedPackage::from_bytes(commit.package().as_bytes().to_vec())
             .unwrap()
             .get_file("Producer/opaque.bin")
             .unwrap(),
@@ -132,32 +132,41 @@ fn foreign_blank_transfer_is_source_bound_reversible_and_raw_preserving() {
     let durable =
         edit::Patch::from_durable_bytes(&commit.patch().to_durable_bytes().unwrap()).unwrap();
     assert_eq!(
-        durable.apply(&destination).unwrap().bytes(),
-        commit.snapshot().bytes()
+        destination
+            .apply(&durable)
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        commit.package().as_bytes()
     );
     assert_eq!(
-        durable.inverse().apply(commit.snapshot()).unwrap().bytes(),
-        destination.bytes()
+        commit
+            .package()
+            .apply(&durable.inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        destination.as_bytes()
     );
-    let stale = edit::Snapshot::from_bytes(package(
+    let stale = Package::from_bytes(&package(
         &content(r#"<draw:page draw:name="Different"/><draw:page draw:name="Host"/>"#),
         false,
     ))
     .unwrap();
-    assert!(durable.apply(&stale).is_err());
-    assert!(durable.inverse().apply(&stale).is_err());
+    assert!(stale.apply(&durable).is_err());
+    assert!(stale.apply(&durable.inverse()).is_err());
 }
 
 #[test]
 fn missing_foreign_selector_is_an_exact_noop() {
-    let donor = edit::Snapshot::from_bytes(package(
+    let donor = Package::from_bytes(&package(
         &content(r#"<draw:page draw:name="Donor"/>"#),
         false,
     ))
     .unwrap();
     let destination_bytes = package(&content(r#"<draw:page draw:name="Host"/>"#), false);
-    let destination = edit::Snapshot::from_bytes(destination_bytes.clone()).unwrap();
-    let mut transaction = destination.transaction().unwrap();
+    let destination = Package::from_bytes(&destination_bytes).unwrap();
+    let mut transaction = destination.edit().unwrap();
     assert_eq!(
         transaction
             .transfer_dependency_free_blank_slide_from(&donor, 99)
@@ -165,20 +174,20 @@ fn missing_foreign_selector_is_an_exact_noop() {
         None
     );
     let commit = transaction.commit().unwrap();
-    assert!(!commit.changed());
+    assert!(!commit.diagnostics().changed());
     assert!(commit.patch().is_noop());
-    assert_eq!(commit.snapshot().bytes(), destination_bytes);
+    assert_eq!(commit.package().as_bytes(), destination_bytes);
 }
 
 #[test]
 fn foreign_blank_transfer_supports_an_empty_retained_destination() {
-    let donor = edit::Snapshot::from_bytes(package(
+    let donor = Package::from_bytes(&package(
         &content(r#"<draw:page draw:name="Donor"/>"#),
         false,
     ))
     .unwrap();
-    let destination = edit::Snapshot::from_bytes(package(&content(""), false)).unwrap();
-    let mut transaction = destination.transaction().unwrap();
+    let destination = Package::from_bytes(&package(&content(""), false)).unwrap();
+    let mut transaction = destination.edit().unwrap();
     assert_eq!(
         transaction
             .transfer_dependency_free_blank_slide_from(&donor, 0)
@@ -186,16 +195,16 @@ fn foreign_blank_transfer_supports_an_empty_retained_destination() {
         Some(0)
     );
     let commit = transaction.commit().unwrap();
-    assert_eq!(commit.snapshot().slides().len(), 1);
+    assert_eq!(commit.package().slides().unwrap().len(), 1);
     assert!(
-        String::from_utf8_lossy(&content_bytes(commit.snapshot().bytes()))
+        String::from_utf8_lossy(&content_bytes(commit.package().as_bytes()))
             .contains(r#"<draw:page draw:name="Donor"/>"#)
     );
 }
 
 #[test]
 fn foreign_transfer_rejects_self_closing_presentation_destination() {
-    let donor = edit::Snapshot::from_bytes(package(
+    let donor = Package::from_bytes(&package(
         &content(r#"<draw:page draw:name="Donor"/>"#),
         false,
     ))
@@ -204,21 +213,21 @@ fn foreign_transfer_rejects_self_closing_presentation_destination() {
         r#"<?xml version="1.0"?><office:document-content xmlns:office="{OFFICE}" xmlns:draw="{DRAW}" xmlns:xlink="{XLINK}"><office:body><office:presentation/></office:body></office:document-content>"#
     );
     let destination_bytes = package(&destination_content, false);
-    let destination = edit::Snapshot::from_bytes(destination_bytes.clone()).unwrap();
-    let mut transaction = destination.transaction().unwrap();
+    let destination = Package::from_bytes(&destination_bytes).unwrap();
+    let mut transaction = destination.edit().unwrap();
     assert!(
         transaction
             .transfer_dependency_free_blank_slide_from(&donor, 0)
             .is_err()
     );
     let commit = transaction.commit().unwrap();
-    assert!(!commit.changed());
-    assert_eq!(commit.snapshot().bytes(), destination_bytes);
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().as_bytes(), destination_bytes);
 }
 
 #[test]
 fn foreign_transfer_rejects_nested_namespace_rebindings_at_all_insertions() {
-    let donor = edit::Snapshot::from_bytes(package(
+    let donor = Package::from_bytes(&package(
         &content(r#"<draw:page draw:name="Donor"/>"#),
         false,
     ))
@@ -239,16 +248,16 @@ fn foreign_transfer_rejects_nested_namespace_rebindings_at_all_insertions() {
     ];
     for destination_content in cases {
         let destination_bytes = package(&destination_content, false);
-        let destination = edit::Snapshot::from_bytes(destination_bytes.clone()).unwrap();
-        let mut transaction = destination.transaction().unwrap();
+        let destination = Package::from_bytes(&destination_bytes).unwrap();
+        let mut transaction = destination.edit().unwrap();
         assert!(
             transaction
                 .transfer_dependency_free_blank_slide_from(&donor, 0)
                 .is_err()
         );
         let commit = transaction.commit().unwrap();
-        assert!(!commit.changed());
-        assert_eq!(commit.snapshot().bytes(), destination_bytes);
+        assert!(!commit.diagnostics().changed());
+        assert_eq!(commit.package().as_bytes(), destination_bytes);
     }
 }
 
@@ -284,10 +293,10 @@ fn foreign_transfer_audits_case_insensitive_macro_and_all_xml_media_parts() {
     ];
     for (path, payload, media_type) in cases {
         let donor_bytes = package_with_extra(&donor_content, path, payload, media_type);
-        let donor = edit::Snapshot::from_bytes(donor_bytes).unwrap();
+        let donor = Package::from_bytes(&donor_bytes).unwrap();
         let destination_bytes = package(&content(r#"<draw:page draw:name="Host"/>"#), false);
-        let destination = edit::Snapshot::from_bytes(destination_bytes).unwrap();
-        let mut transaction = destination.transaction().unwrap();
+        let destination = Package::from_bytes(&destination_bytes).unwrap();
+        let mut transaction = destination.edit().unwrap();
         assert!(
             transaction
                 .transfer_dependency_free_blank_slide_from(&donor, 0)
@@ -306,50 +315,54 @@ fn foreign_transfer_rejects_dependencies_macros_and_oversized_names_atomically()
         r#"<draw:page draw:name="Donor" xlink:href="https://example.invalid/"/>"#,
     ];
     for page in cases {
-        let donor = edit::Snapshot::from_bytes(package(&content(page), false)).unwrap();
+        let donor = Package::from_bytes(&package(&content(page), false)).unwrap();
         let destination_bytes = package(&content(r#"<draw:page draw:name="Host"/>"#), false);
-        let destination = edit::Snapshot::from_bytes(destination_bytes.clone()).unwrap();
-        let mut transaction = destination.transaction().unwrap();
+        let destination = Package::from_bytes(&destination_bytes).unwrap();
+        let mut transaction = destination.edit().unwrap();
         assert!(
             transaction
                 .transfer_dependency_free_blank_slide_from(&donor, 0)
                 .is_err()
         );
         let commit = transaction.commit().unwrap();
-        assert!(!commit.changed());
-        assert_eq!(commit.snapshot().bytes(), destination_bytes);
+        assert!(!commit.diagnostics().changed());
+        assert_eq!(commit.package().as_bytes(), destination_bytes);
     }
 
-    let donor =
-        edit::Snapshot::from_bytes(package(&content(r#"<draw:page draw:name="Donor"/>"#), true))
-            .unwrap();
-    let destination =
-        edit::Snapshot::from_bytes(package(&content(r#"<draw:page draw:name="Host"/>"#), false))
-            .unwrap();
-    let mut transaction = destination.transaction().unwrap();
+    let donor = Package::from_bytes(&package(
+        &content(r#"<draw:page draw:name="Donor"/>"#),
+        true,
+    ))
+    .unwrap();
+    let destination = Package::from_bytes(&package(
+        &content(r#"<draw:page draw:name="Host"/>"#),
+        false,
+    ))
+    .unwrap();
+    let mut transaction = destination.edit().unwrap();
     assert!(
         transaction
             .transfer_dependency_free_blank_slide_from(&donor, 0)
             .is_err()
     );
-    assert!(!transaction.commit().unwrap().changed());
+    assert!(!transaction.commit().unwrap().diagnostics().changed());
 
     let oversized = "x".repeat(4 * 1024 + 1);
-    let donor = edit::Snapshot::from_bytes(package(
+    let donor = Package::from_bytes(&package(
         &content(&format!(r#"<draw:page draw:name="{oversized}"/>"#)),
         false,
     ))
     .unwrap();
     let destination_bytes = package(&content(r#"<draw:page draw:name="Host"/>"#), false);
-    let destination = edit::Snapshot::from_bytes(destination_bytes.clone()).unwrap();
-    let mut transaction = destination.transaction().unwrap();
+    let destination = Package::from_bytes(&destination_bytes).unwrap();
+    let mut transaction = destination.edit().unwrap();
     assert!(
         transaction
             .transfer_dependency_free_blank_slide_from(&donor, 0)
             .is_err()
     );
     assert_eq!(
-        transaction.commit().unwrap().snapshot().bytes(),
+        transaction.commit().unwrap().package().as_bytes(),
         destination_bytes
     );
 }

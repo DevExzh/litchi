@@ -100,7 +100,7 @@ impl Hash10 {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_bytes_with_limits(bytes: &[u8], limits: Hash10Limits) -> Result<Self> {
+    pub(crate) fn parse_bytes_with_limits(bytes: &[u8], limits: Hash10Limits) -> Result<Self> {
         if bytes.len() > limits.max_record_bytes {
             return corrupted("HashCode10Atom exceeds the configured record size limit");
         }

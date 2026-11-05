@@ -86,7 +86,8 @@ fn inventories_all_contexts_without_prefix_expanded_types() {
 
 #[test]
 fn snapshot_round_trip_preserves_unknown_records() {
-    let source = Snapshot::from_record(Context::Main, layout(Context::Main)).unwrap();
+    let source =
+        Snapshot::from_record(Context::Main, layout(Context::Main), &Limits::default()).unwrap();
     let original = source.bytes().to_vec();
     let unknown_before = source
         .record()
@@ -117,7 +118,8 @@ fn snapshot_round_trip_preserves_unknown_records() {
 
 #[test]
 fn remove_and_replace_are_transactional() {
-    let source = Snapshot::from_record(Context::Main, layout(Context::Main)).unwrap();
+    let source =
+        Snapshot::from_record(Context::Main, layout(Context::Main), &Limits::default()).unwrap();
     let original = source.bytes().to_vec();
     let mut edit = source.edit();
     let removed = edit.remove(Path::from(2usize)).unwrap();
@@ -135,7 +137,8 @@ fn remove_and_replace_are_transactional() {
 
 #[test]
 fn failed_commit_never_changes_source_snapshot() {
-    let source = Snapshot::from_record(Context::Main, layout(Context::Main)).unwrap();
+    let source =
+        Snapshot::from_record(Context::Main, layout(Context::Main), &Limits::default()).unwrap();
     let original = source.bytes().to_vec();
     let mut edit = source.edit();
     edit.remove(Path::from(0usize)).unwrap();
@@ -152,21 +155,24 @@ fn failed_commit_never_changes_source_snapshot() {
 
 #[test]
 fn contextual_validation_rejects_wrong_geometry_and_wrong_root() {
-    assert!(Snapshot::from_record(Context::Title, layout(Context::Main)).is_err());
+    assert!(
+        Snapshot::from_record(Context::Title, layout(Context::Main), &Limits::default()).is_err()
+    );
 
     let mut title = layout(Context::Title);
     title.children[0].data[..4].copy_from_slice(&0x10u32.to_le_bytes());
     title.children[0].data_length = 24;
-    assert!(Snapshot::from_record(Context::Title, title).is_err());
+    assert!(Snapshot::from_record(Context::Title, title, &Limits::default()).is_err());
 
     let mut missing_reference = layout(Context::Title);
     missing_reference.children[0].data[12..16].fill(0);
-    assert!(Snapshot::from_record(Context::Title, missing_reference).is_err());
+    assert!(Snapshot::from_record(Context::Title, missing_reference, &Limits::default()).is_err());
 }
 
 #[test]
 fn failed_path_operation_is_non_mutating() {
-    let source = Snapshot::from_record(Context::Main, layout(Context::Main)).unwrap();
+    let source =
+        Snapshot::from_record(Context::Main, layout(Context::Main), &Limits::default()).unwrap();
     let mut edit = source.edit();
     let before = edit.revision();
     assert!(edit.add(Path::root(), usize::MAX, unknown()).is_err());
@@ -176,7 +182,8 @@ fn failed_path_operation_is_non_mutating() {
 
 #[test]
 fn committed_changes_can_be_undone_and_redone() {
-    let source = Snapshot::from_record(Context::Main, layout(Context::Main)).unwrap();
+    let source =
+        Snapshot::from_record(Context::Main, layout(Context::Main), &Limits::default()).unwrap();
     let mut edit = source.edit();
     edit.add(Path::root(), 1, atom(0x7abd, 0, 0, &[9, 8, 7]))
         .unwrap();
@@ -187,4 +194,46 @@ fn committed_changes_can_be_undone_and_redone() {
     let redone = commit.changes().redo(&undone).unwrap();
     assert_eq!(redone.bytes(), commit.snapshot().bytes());
     assert!(commit.changes().undo(&source).is_err());
+}
+
+fn notes_layout(slide_id: u32, flags: u16) -> Record {
+    let mut data = [0u8; 8];
+    data[..4].copy_from_slice(&slide_id.to_le_bytes());
+    data[4..6].copy_from_slice(&flags.to_le_bytes());
+    // The reserved field is ignored: real decks carry nonzero bytes there.
+    data[6..8].copy_from_slice(&0x3012u16.to_le_bytes());
+    container(
+        RecordType::Notes.as_u16(),
+        vec![atom(RecordType::NotesAtom.as_u16(), 1, 0, &data), drawing()],
+    )
+}
+
+/// `[MS-PPT]` 2.5.12 asks for a null `slideIdRef` in the notes master;
+/// PowerPoint writes 0x80000000 (and other producers 0x80000001) with
+/// `fMasterScheme` set. Both are notes masters; a slide reference is a
+/// notes slide.
+#[test]
+fn notes_masters_accept_null_and_master_domain_slide_references() {
+    for (slide_id, flags) in [(0, 0), (0x8000_0000, 0), (0x8000_0000, 2), (0x8000_0001, 7)] {
+        let record = notes_layout(slide_id, flags);
+        assert!(Snapshot::from_record(Context::Notes, record.clone(), &Limits::default()).is_ok());
+        let document = container(RecordType::Document.as_u16(), vec![record]);
+        assert_eq!(
+            inventory(&document).unwrap().entries()[0].context(),
+            Context::Notes
+        );
+    }
+    for (slide_id, flags) in [(0, 1), (0x100, 0), (0x7fff_ffff, 2), (1, 0)] {
+        assert!(
+            Snapshot::from_record(
+                Context::Notes,
+                notes_layout(slide_id, flags),
+                &Limits::default(),
+            )
+            .is_err()
+        );
+    }
+    // A notes slide (a SlideId reference) is not a master.
+    let document = container(RecordType::Document.as_u16(), vec![notes_layout(0x100, 0)]);
+    assert_eq!(inventory(&document).unwrap().len(), 0);
 }

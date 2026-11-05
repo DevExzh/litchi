@@ -26,6 +26,131 @@ use litchi_ooxml_common::xml::attributes::first_wins;
 
 const MAX_NAMESPACE_DECLARATIONS: usize = 256;
 const MAX_ATTRIBUTES_PER_ELEMENT: usize = 256;
+const MAX_REFERENCE_BYTES: usize = 4096;
+
+/// Caller-selected bounds for raw InkML source and output operations.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub struct Limits {
+    /// Maximum retained source bytes accepted by a reader.
+    pub max_source_bytes: usize,
+    /// Maximum serialized bytes emitted by a writer.
+    pub max_output_bytes: usize,
+    /// Maximum XML nodes scanned.
+    pub max_xml_nodes: usize,
+    /// Maximum XML depth scanned.
+    pub max_xml_depth: usize,
+    /// Maximum contexts retained.
+    pub max_contexts: usize,
+    /// Maximum traces retained.
+    pub max_traces: usize,
+    /// Maximum brush properties retained.
+    pub max_brush_properties: usize,
+    /// Maximum attributes admitted on one element.
+    pub max_attributes_per_element: usize,
+    /// Maximum decoded bytes in one XML attribute value.
+    pub max_attribute_value_bytes: usize,
+    /// Maximum bytes in one typed identifier.
+    pub max_identifier_bytes: usize,
+    /// Maximum bytes in one typed reference value.
+    pub max_reference_bytes: usize,
+    /// Maximum bytes in one trace lexical value.
+    pub max_trace_text_bytes: usize,
+}
+
+impl Limits {
+    /// Historical bounded InkML policy.
+    pub const DEFAULT: Self = Self {
+        max_source_bytes: MAX_SOURCE_BYTES,
+        max_output_bytes: MAX_SOURCE_BYTES,
+        max_xml_nodes: MAX_NODES,
+        max_xml_depth: MAX_DEPTH,
+        max_contexts: MAX_CONTEXTS,
+        max_traces: MAX_TRACES,
+        max_brush_properties: MAX_BRUSH_PROPERTIES,
+        max_attributes_per_element: MAX_ATTRIBUTES_PER_ELEMENT,
+        max_attribute_value_bytes: MAX_ATTRIBUTE_VALUE_BYTES,
+        max_identifier_bytes: MAX_TOKEN_BYTES,
+        max_reference_bytes: MAX_REFERENCE_BYTES,
+        max_trace_text_bytes: MAX_ATTRIBUTE_VALUE_BYTES,
+    };
+
+    /// Construct a policy with a caller-selected source/output byte cap.
+    #[must_use]
+    pub const fn new(max_source_bytes: usize, max_output_bytes: usize) -> Self {
+        Self {
+            max_source_bytes,
+            max_output_bytes,
+            ..Self::DEFAULT
+        }
+    }
+
+    fn validate(self) -> Result<Self> {
+        check_limit(
+            crate::LimitKind::InkMlSourceBytes,
+            self.max_source_bytes,
+            MAX_SOURCE_BYTES,
+        )?;
+        check_limit(
+            crate::LimitKind::InkMlOutputBytes,
+            self.max_output_bytes,
+            MAX_SOURCE_BYTES,
+        )?;
+        check_limit(
+            crate::LimitKind::InkMlXmlNodes,
+            self.max_xml_nodes,
+            MAX_NODES,
+        )?;
+        check_limit(
+            crate::LimitKind::InkMlXmlDepth,
+            self.max_xml_depth,
+            MAX_DEPTH,
+        )?;
+        check_limit(
+            crate::LimitKind::InkMlContextNodes,
+            self.max_contexts,
+            MAX_CONTEXTS,
+        )?;
+        check_limit(crate::LimitKind::InkMlTraces, self.max_traces, MAX_TRACES)?;
+        check_limit(
+            crate::LimitKind::InkMlBrushProperties,
+            self.max_brush_properties,
+            MAX_BRUSH_PROPERTIES,
+        )?;
+        check_limit(
+            crate::LimitKind::InkMlAttributesPerElement,
+            self.max_attributes_per_element,
+            MAX_ATTRIBUTES_PER_ELEMENT,
+        )?;
+        check_limit(
+            crate::LimitKind::InkMlAttributeValueBytes,
+            self.max_attribute_value_bytes,
+            MAX_ATTRIBUTE_VALUE_BYTES,
+        )?;
+        check_limit(
+            crate::LimitKind::InkMlIdentifierBytes,
+            self.max_identifier_bytes,
+            MAX_TOKEN_BYTES,
+        )?;
+        check_limit(
+            crate::LimitKind::InkMlReferenceBytes,
+            self.max_reference_bytes,
+            MAX_REFERENCE_BYTES,
+        )?;
+        check_limit(
+            crate::LimitKind::InkMlTraceTextBytes,
+            self.max_trace_text_bytes,
+            MAX_ATTRIBUTE_VALUE_BYTES,
+        )?;
+        Ok(self)
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum NamespaceId {
@@ -47,9 +172,10 @@ enum NamespaceId {
 ///
 /// Returns an error for malformed XML, a wrong root, invalid typed metadata,
 /// or an exhausted resource budget.
-pub fn read(xml: &[u8]) -> Result<Document> {
-    enforce_source_limit(xml.len())?;
-    let metadata = scan(xml, Projection::all())?.into_metadata();
+pub fn read(xml: &[u8], limits: Limits) -> Result<Document> {
+    let limits = limits.validate()?;
+    enforce_source_limit(xml.len(), limits.max_source_bytes)?;
+    let metadata = scan(xml, Projection::all(), limits)?.into_metadata();
     let source = copy_source(xml)?;
     Document::new(source, metadata).map_err(value_error)
 }
@@ -71,9 +197,10 @@ pub fn read(xml: &[u8]) -> Result<Document> {
 /// Returns an error for malformed XML, a wrong root, invalid typed metadata,
 /// or an exhausted resource budget. The source allocation is retained only
 /// on success.
-pub fn read_shared(xml: Arc<Vec<u8>>) -> Result<Document> {
-    enforce_source_limit(xml.len())?;
-    let metadata = scan(xml.as_slice(), Projection::all())?.into_metadata();
+pub fn read_shared(xml: Arc<Vec<u8>>, limits: Limits) -> Result<Document> {
+    let limits = limits.validate()?;
+    enforce_source_limit(xml.len(), limits.max_source_bytes)?;
+    let metadata = scan(xml.as_slice(), Projection::all(), limits)?.into_metadata();
     Document::new(xml, metadata).map_err(value_error)
 }
 
@@ -89,9 +216,20 @@ pub fn read_shared(xml: Arc<Vec<u8>>) -> Result<Document> {
 /// Returns an error for malformed XML, a wrong root, invalid typed metadata,
 /// or an exhausted resource budget. The input slice is borrowed only during
 /// validation and is never retained by the returned projection.
-pub fn read_metadata(xml: &[u8]) -> Result<Metadata> {
-    enforce_source_limit(xml.len())?;
-    Ok(scan(xml, Projection::all())?.into_metadata())
+pub fn read_metadata(xml: &[u8], limits: Limits) -> Result<Metadata> {
+    let limits = limits.validate()?;
+    enforce_source_limit(xml.len(), limits.max_source_bytes)?;
+    Ok(scan(xml, Projection::all(), limits)?.into_metadata())
+}
+
+/// Validate source-backed InkML for a replay policy without rebuilding the
+/// retained metadata projection.  The visitor still decodes every recognized
+/// typed element and applies all structural, lexical, and resource bounds,
+/// but it retains only bounded counters needed for the admission decision.
+fn validate_source(xml: &[u8], limits: Limits) -> Result<()> {
+    enforce_source_limit(xml.len(), limits.max_source_bytes)?;
+    let _ = scan(xml, Projection::validation(), limits)?;
+    Ok(())
 }
 
 /// Read a source-backed document while retaining only the semantic elements
@@ -109,10 +247,12 @@ pub fn read_shared_with_source_spans(
     traces: &[SourceSpan],
     brush_properties: &[SourceSpan],
     links: &[SourceSpan],
+    limits: Limits,
 ) -> Result<Document> {
-    enforce_source_limit(xml.len())?;
+    let limits = limits.validate()?;
+    enforce_source_limit(xml.len(), limits.max_source_bytes)?;
     let projection = Projection::filtered(xml.len(), contexts, traces, brush_properties, links)?;
-    let metadata = scan(xml.as_slice(), projection)?.into_metadata();
+    let metadata = scan(xml.as_slice(), projection, limits)?.into_metadata();
     Document::new(xml, metadata).map_err(value_error)
 }
 
@@ -129,10 +269,12 @@ pub fn read_metadata_with_source_spans(
     traces: &[SourceSpan],
     brush_properties: &[SourceSpan],
     links: &[SourceSpan],
+    limits: Limits,
 ) -> Result<Metadata> {
-    enforce_source_limit(xml.len())?;
+    let limits = limits.validate()?;
+    enforce_source_limit(xml.len(), limits.max_source_bytes)?;
     let projection = Projection::filtered(xml.len(), contexts, traces, brush_properties, links)?;
-    Ok(scan(xml, projection)?.into_metadata())
+    Ok(scan(xml, projection, limits)?.into_metadata())
 }
 
 #[derive(Debug)]
@@ -165,11 +307,19 @@ struct SelectedSpan {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ProjectionToken {
     All,
+    Validate(SemanticKind),
     Selected(SelectedSpan),
+}
+
+impl ProjectionToken {
+    fn is_validation(self) -> bool {
+        matches!(self, Self::Validate(_))
+    }
 }
 
 struct Projection<'a> {
     all: bool,
+    validate_only: bool,
     contexts: &'a [SourceSpan],
     traces: &'a [SourceSpan],
     brush_properties: &'a [SourceSpan],
@@ -178,12 +328,16 @@ struct Projection<'a> {
     matched_traces: usize,
     matched_brush_properties: usize,
     matched_links: usize,
+    validated_contexts: usize,
+    validated_traces: usize,
+    validated_brush_properties: usize,
 }
 
 impl<'a> Projection<'a> {
     fn all() -> Self {
         Self {
             all: true,
+            validate_only: false,
             contexts: &[],
             traces: &[],
             brush_properties: &[],
@@ -192,6 +346,27 @@ impl<'a> Projection<'a> {
             matched_traces: 0,
             matched_brush_properties: 0,
             matched_links: 0,
+            validated_contexts: 0,
+            validated_traces: 0,
+            validated_brush_properties: 0,
+        }
+    }
+
+    fn validation() -> Self {
+        Self {
+            all: true,
+            validate_only: true,
+            contexts: &[],
+            traces: &[],
+            brush_properties: &[],
+            links: &[],
+            matched_contexts: 0,
+            matched_traces: 0,
+            matched_brush_properties: 0,
+            matched_links: 0,
+            validated_contexts: 0,
+            validated_traces: 0,
+            validated_brush_properties: 0,
         }
     }
 
@@ -212,6 +387,7 @@ impl<'a> Projection<'a> {
         validate_selected_spans(source_len, "InkML link projection", links)?;
         Ok(Self {
             all: false,
+            validate_only: false,
             contexts,
             traces,
             brush_properties,
@@ -220,10 +396,16 @@ impl<'a> Projection<'a> {
             matched_traces: 0,
             matched_brush_properties: 0,
             matched_links: 0,
+            validated_contexts: 0,
+            validated_traces: 0,
+            validated_brush_properties: 0,
         })
     }
 
     fn select(&self, kind: SemanticKind, start: usize) -> Option<ProjectionToken> {
+        if self.validate_only {
+            return Some(ProjectionToken::Validate(kind));
+        }
         if self.all {
             return Some(ProjectionToken::All);
         }
@@ -245,6 +427,18 @@ impl<'a> Projection<'a> {
     }
 
     fn complete(&mut self, token: ProjectionToken, actual: SourceSpan) -> Result<()> {
+        if let ProjectionToken::Validate(kind) = token {
+            let matched = match kind {
+                SemanticKind::Context => &mut self.validated_contexts,
+                SemanticKind::Trace => &mut self.validated_traces,
+                SemanticKind::BrushProperty => &mut self.validated_brush_properties,
+                SemanticKind::Link => return Ok(()),
+            };
+            *matched = matched
+                .checked_add(1)
+                .ok_or_else(|| invalid("InkML validation count overflowed"))?;
+            return Ok(());
+        }
         let ProjectionToken::Selected(selected) = token else {
             return Ok(());
         };
@@ -279,6 +473,14 @@ impl<'a> Projection<'a> {
             ))
         }
     }
+
+    fn validation_counts(&self) -> (usize, usize, usize) {
+        (
+            self.validated_contexts,
+            self.validated_traces,
+            self.validated_brush_properties,
+        )
+    }
 }
 
 fn validate_selected_spans(
@@ -301,7 +503,7 @@ fn validate_selected_spans(
     Ok(())
 }
 
-fn scan(xml: &[u8], mut projection: Projection<'_>) -> Result<Parsed> {
+fn scan(xml: &[u8], mut projection: Projection<'_>, limits: Limits) -> Result<Parsed> {
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
@@ -335,11 +537,11 @@ fn scan(xml: &[u8], mut projection: Projection<'_>) -> Result<Parsed> {
                 declaration_seen = true;
             },
             Event::Start(element) if !root_seen => {
-                validate_element(&element, &reader)?;
+                validate_element(&element, &reader, limits)?;
                 legacy_fragment = require_root(&element, &resolved)?;
                 root_seen = true;
-                increment_nodes(&mut nodes)?;
-                enforce_depth(1)?;
+                increment_nodes(&mut nodes, limits.max_xml_nodes)?;
+                enforce_depth(1, limits.max_xml_depth)?;
                 let frame = frame_for_start(
                     &element,
                     &resolved,
@@ -351,17 +553,18 @@ fn scan(xml: &[u8], mut projection: Projection<'_>) -> Result<Parsed> {
                     &mut traces,
                     &mut brush_properties,
                     &mut projection,
+                    limits,
                 )?;
                 reserve_one(&mut stack, "InkML XML stack")?;
                 stack.push(frame);
             },
             Event::Empty(element) if !root_seen => {
-                validate_element(&element, &reader)?;
+                validate_element(&element, &reader, limits)?;
                 legacy_fragment = require_root(&element, &resolved)?;
                 root_seen = true;
                 root_closed = true;
-                increment_nodes(&mut nodes)?;
-                enforce_depth(1)?;
+                increment_nodes(&mut nodes, limits.max_xml_nodes)?;
+                enforce_depth(1, limits.max_xml_depth)?;
                 parse_empty(
                     &element,
                     &resolved,
@@ -373,13 +576,14 @@ fn scan(xml: &[u8], mut projection: Projection<'_>) -> Result<Parsed> {
                     &mut traces,
                     &mut brush_properties,
                     &mut projection,
+                    limits,
                 )?;
             },
             Event::Start(element) if root_seen && !root_closed => {
-                validate_element(&element, &reader)?;
+                validate_element(&element, &reader, limits)?;
                 validate_unknown_prefix(&resolved, &element, legacy_fragment)?;
-                increment_nodes(&mut nodes)?;
-                enforce_depth(stack.len().saturating_add(1))?;
+                increment_nodes(&mut nodes, limits.max_xml_nodes)?;
+                enforce_depth(stack.len().saturating_add(1), limits.max_xml_depth)?;
                 let frame = frame_for_start(
                     &element,
                     &resolved,
@@ -391,15 +595,16 @@ fn scan(xml: &[u8], mut projection: Projection<'_>) -> Result<Parsed> {
                     &mut traces,
                     &mut brush_properties,
                     &mut projection,
+                    limits,
                 )?;
                 reserve_one(&mut stack, "InkML XML stack")?;
                 stack.push(frame);
             },
             Event::Empty(element) if root_seen && !root_closed => {
-                validate_element(&element, &reader)?;
+                validate_element(&element, &reader, limits)?;
                 validate_unknown_prefix(&resolved, &element, legacy_fragment)?;
-                increment_nodes(&mut nodes)?;
-                enforce_depth(stack.len().saturating_add(1))?;
+                increment_nodes(&mut nodes, limits.max_xml_nodes)?;
+                enforce_depth(stack.len().saturating_add(1), limits.max_xml_depth)?;
                 parse_empty(
                     &element,
                     &resolved,
@@ -411,6 +616,7 @@ fn scan(xml: &[u8], mut projection: Projection<'_>) -> Result<Parsed> {
                     &mut traces,
                     &mut brush_properties,
                     &mut projection,
+                    limits,
                 )?;
             },
             Event::Start(_) | Event::Empty(_) if root_closed => {
@@ -428,6 +634,11 @@ fn scan(xml: &[u8], mut projection: Projection<'_>) -> Result<Parsed> {
                     contexts[index].source = SourceSpan::new(frame.start, end);
                 }
                 if let Some(index) = frame.trace {
+                    ensure_typed_limit(
+                        crate::LimitKind::InkMlTraceTextBytes,
+                        start.saturating_sub(frame.data_start),
+                        limits.max_trace_text_bytes,
+                    )?;
                     traces[index].source = SourceSpan::new(frame.start, end);
                     traces[index].data = SourceSpan::new(frame.data_start, start);
                 }
@@ -489,14 +700,43 @@ fn scan(xml: &[u8], mut projection: Projection<'_>) -> Result<Parsed> {
     if !root_seen || !root_closed || !stack.is_empty() {
         return Err(invalid("InkML document root is absent or unterminated"));
     }
-    if contexts.len() > MAX_CONTEXTS {
-        return Err(limit("InkML context nodes", MAX_CONTEXTS));
+    let (validated_contexts, validated_traces, validated_brush_properties) =
+        projection.validation_counts();
+    let context_count = if projection.validate_only {
+        validated_contexts
+    } else {
+        contexts.len()
+    };
+    let trace_count = if projection.validate_only {
+        validated_traces
+    } else {
+        traces.len()
+    };
+    let brush_property_count = if projection.validate_only {
+        validated_brush_properties
+    } else {
+        brush_properties.len()
+    };
+    if context_count > limits.max_contexts {
+        return Err(limit(
+            crate::LimitKind::InkMlContextNodes,
+            context_count,
+            limits.max_contexts,
+        ));
     }
-    if traces.len() > MAX_TRACES {
-        return Err(limit("InkML traces", MAX_TRACES));
+    if trace_count > limits.max_traces {
+        return Err(limit(
+            crate::LimitKind::InkMlTraces,
+            trace_count,
+            limits.max_traces,
+        ));
     }
-    if brush_properties.len() > MAX_BRUSH_PROPERTIES {
-        return Err(limit("InkML brush properties", MAX_BRUSH_PROPERTIES));
+    if brush_property_count > limits.max_brush_properties {
+        return Err(limit(
+            crate::LimitKind::InkMlBrushProperties,
+            brush_property_count,
+            limits.max_brush_properties,
+        ));
     }
     projection.finish()?;
     Ok(Parsed {
@@ -511,9 +751,27 @@ fn scan(xml: &[u8], mut projection: Projection<'_>) -> Result<Parsed> {
 /// # Errors
 ///
 /// Returns an error when source validation fails or the sink write fails.
-pub fn write(document: &Document) -> Result<Vec<u8>> {
+pub fn write(document: &Document, limits: Limits) -> Result<Vec<u8>> {
+    let limits = limits.validate()?;
     super::validation::validate(document).map_err(value_error)?;
-    Ok(document.source().to_vec())
+    // A document may have been admitted under a wider policy. Re-run the
+    // bounded scanner before reserving the output so every selected source,
+    // structural, decoded-value, and typed-payload dimension applies to this
+    // writer call rather than only the output-byte cap.
+    validate_source(document.source(), limits)?;
+    if document.source().len() > limits.max_output_bytes {
+        return Err(limit(
+            crate::LimitKind::InkMlOutputBytes,
+            document.source().len(),
+            limits.max_output_bytes,
+        ));
+    }
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(document.source().len())
+        .map_err(|_| invalid("InkML output allocation failed"))?;
+    output.extend_from_slice(document.source());
+    Ok(output)
 }
 
 /// Write an InkML document to a caller-provided sink.
@@ -521,8 +779,18 @@ pub fn write(document: &Document) -> Result<Vec<u8>> {
 /// # Errors
 ///
 /// Returns an error when source validation fails or the sink write fails.
-pub fn write_to<W: Write>(writer: &mut W, document: &Document) -> Result<()> {
-    writer.write_all(&write(document)?)?;
+pub fn write_to<W: Write>(writer: &mut W, document: &Document, limits: Limits) -> Result<()> {
+    let limits = limits.validate()?;
+    super::validation::validate(document).map_err(value_error)?;
+    validate_source(document.source(), limits)?;
+    if document.source().len() > limits.max_output_bytes {
+        return Err(limit(
+            crate::LimitKind::InkMlOutputBytes,
+            document.source().len(),
+            limits.max_output_bytes,
+        ));
+    }
+    writer.write_all(document.source())?;
     Ok(())
 }
 
@@ -548,6 +816,7 @@ fn frame_for_start<R: std::io::BufRead>(
     traces: &mut Vec<Trace>,
     brush_properties: &mut Vec<BrushProperty>,
     projection: &mut Projection<'_>,
+    limits: Limits,
 ) -> Result<Frame> {
     let local = element.name().local_name();
     let is_link = is_namespace(
@@ -560,7 +829,7 @@ fn frame_for_start<R: std::io::BufRead>(
     let mut projection_token = None;
     if is_link {
         if let Some(token) = projection.select(SemanticKind::Link, start) {
-            validate_link(element, reader)?;
+            validate_link(element, reader, limits)?;
             projection_token = Some(token);
         }
     }
@@ -574,12 +843,29 @@ fn frame_for_start<R: std::io::BufRead>(
     {
         let token = projection.select(SemanticKind::Context, start);
         if let Some(token) = token {
-            if contexts.len() >= MAX_CONTEXTS {
-                return Err(limit("InkML context nodes", MAX_CONTEXTS));
+            if token.is_validation() {
+                let _ = parse_context(element, start, reader, limits)?;
+                projection_token = Some(token);
+                return Ok(Frame {
+                    namespace: namespace_id(resolved)?,
+                    start,
+                    data_start,
+                    context: None,
+                    trace: None,
+                    brush_property: None,
+                    projection: projection_token,
+                });
+            }
+            if contexts.len() >= limits.max_contexts {
+                return Err(limit(
+                    crate::LimitKind::InkMlContextNodes,
+                    contexts.len() + 1,
+                    limits.max_contexts,
+                ));
             }
             let index = contexts.len();
             reserve_one(contexts, "InkML context records")?;
-            contexts.push(parse_context(element, start, reader)?);
+            contexts.push(parse_context(element, start, reader, limits)?);
             projection_token = Some(token);
             Some(index)
         } else {
@@ -598,12 +884,31 @@ fn frame_for_start<R: std::io::BufRead>(
     {
         let token = projection.select(SemanticKind::Trace, start);
         if let Some(token) = token {
-            if traces.len() >= MAX_TRACES {
-                return Err(limit("InkML traces", MAX_TRACES));
+            if token.is_validation() {
+                let _ = parse_trace(element, start, data_start, false, reader, limits)?;
+                projection_token = Some(token);
+                return Ok(Frame {
+                    namespace: namespace_id(resolved)?,
+                    start,
+                    data_start,
+                    context: None,
+                    trace: None,
+                    brush_property: None,
+                    projection: projection_token,
+                });
+            }
+            if traces.len() >= limits.max_traces {
+                return Err(limit(
+                    crate::LimitKind::InkMlTraces,
+                    traces.len() + 1,
+                    limits.max_traces,
+                ));
             }
             let index = traces.len();
             reserve_one(traces, "InkML trace records")?;
-            traces.push(parse_trace(element, start, data_start, false, reader)?);
+            traces.push(parse_trace(
+                element, start, data_start, false, reader, limits,
+            )?);
             projection_token = Some(token);
             Some(index)
         } else {
@@ -622,13 +927,30 @@ fn frame_for_start<R: std::io::BufRead>(
     {
         let token = projection.select(SemanticKind::BrushProperty, start);
         if let Some(token) = token {
-            if brush_properties.len() >= MAX_BRUSH_PROPERTIES {
-                return Err(limit("InkML brush properties", MAX_BRUSH_PROPERTIES));
+            if token.is_validation() {
+                let _ = parse_brush_property(element, start, data_start, false, reader, limits)?;
+                projection_token = Some(token);
+                return Ok(Frame {
+                    namespace: namespace_id(resolved)?,
+                    start,
+                    data_start,
+                    context: None,
+                    trace: None,
+                    brush_property: None,
+                    projection: projection_token,
+                });
+            }
+            if brush_properties.len() >= limits.max_brush_properties {
+                return Err(limit(
+                    crate::LimitKind::InkMlBrushProperties,
+                    brush_properties.len() + 1,
+                    limits.max_brush_properties,
+                ));
             }
             let index = brush_properties.len();
             reserve_one(brush_properties, "InkML brush-property records")?;
             brush_properties.push(parse_brush_property(
-                element, start, data_start, false, reader,
+                element, start, data_start, false, reader, limits,
             )?);
             projection_token = Some(token);
             Some(index)
@@ -660,6 +982,7 @@ fn parse_empty<R: std::io::BufRead>(
     traces: &mut Vec<Trace>,
     brush_properties: &mut Vec<BrushProperty>,
     projection: &mut Projection<'_>,
+    limits: Limits,
 ) -> Result<()> {
     let local = element.name().local_name();
     let is_link = is_namespace(
@@ -678,10 +1001,19 @@ fn parse_empty<R: std::io::BufRead>(
     ) && local.as_ref() == b"context"
     {
         if let Some(token) = projection.select(SemanticKind::Context, start) {
-            if contexts.len() >= MAX_CONTEXTS {
-                return Err(limit("InkML context nodes", MAX_CONTEXTS));
+            if token.is_validation() {
+                let _ = parse_context(element, start, reader, limits)?;
+                projection.complete(token, SourceSpan::new(start, end))?;
+                return Ok(());
             }
-            let mut context = parse_context(element, start, reader)?;
+            if contexts.len() >= limits.max_contexts {
+                return Err(limit(
+                    crate::LimitKind::InkMlContextNodes,
+                    contexts.len() + 1,
+                    limits.max_contexts,
+                ));
+            }
+            let mut context = parse_context(element, start, reader, limits)?;
             context.source = SourceSpan::new(start, end);
             reserve_one(contexts, "InkML context records")?;
             contexts.push(context);
@@ -689,7 +1021,7 @@ fn parse_empty<R: std::io::BufRead>(
         }
     } else if is_link {
         if let Some(token) = projection.select(SemanticKind::Link, start) {
-            validate_link(element, reader)?;
+            validate_link(element, reader, limits)?;
             projection.complete(token, SourceSpan::new(start, end))?;
         }
     } else if is_namespace(
@@ -701,10 +1033,19 @@ fn parse_empty<R: std::io::BufRead>(
     ) && local.as_ref() == b"trace"
     {
         if let Some(token) = projection.select(SemanticKind::Trace, start) {
-            if traces.len() >= MAX_TRACES {
-                return Err(limit("InkML traces", MAX_TRACES));
+            if token.is_validation() {
+                let _ = parse_trace(element, start, end, true, reader, limits)?;
+                projection.complete(token, SourceSpan::new(start, end))?;
+                return Ok(());
             }
-            let mut trace = parse_trace(element, start, end, true, reader)?;
+            if traces.len() >= limits.max_traces {
+                return Err(limit(
+                    crate::LimitKind::InkMlTraces,
+                    traces.len() + 1,
+                    limits.max_traces,
+                ));
+            }
+            let mut trace = parse_trace(element, start, end, true, reader, limits)?;
             trace.source = SourceSpan::new(start, end);
             trace.data = SourceSpan::new(end, end);
             reserve_one(traces, "InkML trace records")?;
@@ -720,10 +1061,19 @@ fn parse_empty<R: std::io::BufRead>(
     ) && local.as_ref() == b"brushProperty"
     {
         if let Some(token) = projection.select(SemanticKind::BrushProperty, start) {
-            if brush_properties.len() >= MAX_BRUSH_PROPERTIES {
-                return Err(limit("InkML brush properties", MAX_BRUSH_PROPERTIES));
+            if token.is_validation() {
+                let _ = parse_brush_property(element, start, end, true, reader, limits)?;
+                projection.complete(token, SourceSpan::new(start, end))?;
+                return Ok(());
             }
-            let mut property = parse_brush_property(element, start, end, true, reader)?;
+            if brush_properties.len() >= limits.max_brush_properties {
+                return Err(limit(
+                    crate::LimitKind::InkMlBrushProperties,
+                    brush_properties.len() + 1,
+                    limits.max_brush_properties,
+                ));
+            }
+            let mut property = parse_brush_property(element, start, end, true, reader, limits)?;
             property.source = SourceSpan::new(start, end);
             reserve_one(brush_properties, "InkML brush-property records")?;
             brush_properties.push(property);
@@ -737,14 +1087,27 @@ fn parse_context<R: std::io::BufRead>(
     element: &BytesStart<'_>,
     start: usize,
     reader: &NsReader<R>,
+    limits: Limits,
 ) -> Result<Context> {
-    let kind = attr(element, b"type", reader)?
+    let kind = attr(element, b"type", reader, limits)?
         .ok_or_else(|| value_error(ValueError::MissingAttribute { name: "type" }))?;
     let kind = ContextKind::parse(&kind).map_err(value_error)?;
-    let id = attr(element, b"id", reader)?
-        .map(|value| Guid::new(value).map_err(value_error))
+    let id = attr(element, b"id", reader, limits)?
+        .map(|value| {
+            ensure_typed_limit(
+                crate::LimitKind::InkMlIdentifierBytes,
+                value.len(),
+                limits.max_identifier_bytes,
+            )?;
+            Guid::new(value).map_err(value_error)
+        })
         .transpose()?;
-    if let Some(value) = attr(element, b"customRecognizerId", reader)? {
+    if let Some(value) = attr(element, b"customRecognizerId", reader, limits)? {
+        ensure_typed_limit(
+            crate::LimitKind::InkMlIdentifierBytes,
+            value.len(),
+            limits.max_identifier_bytes,
+        )?;
         let _ = Guid::new(value).map_err(value_error)?;
     }
     for (name, required_type) in [
@@ -757,7 +1120,7 @@ fn parse_context<R: std::io::BufRead>(
         (b"centroid".as_slice(), "centroid"),
         (b"shapeGeometry".as_slice(), "shapeGeometry"),
     ] {
-        if let Some(value) = attr(element, name, reader)? {
+        if let Some(value) = attr(element, name, reader, limits)? {
             let valid = if name == b"centroid" {
                 validate_point(&value)
             } else {
@@ -770,10 +1133,19 @@ fn parse_context<R: std::io::BufRead>(
             })?;
         }
     }
-    let alignment_level = parse_int(attr(element, b"alignmentLevel", reader)?, "alignmentLevel")?;
-    let content_type = parse_int(attr(element, b"contentType", reader)?, "contentType")?;
-    let rotation_angle = parse_int(attr(element, b"rotationAngle", reader)?, "rotationAngle")?;
-    let semantic_type = attr(element, b"semanticType", reader)?
+    let alignment_level = parse_int(
+        attr(element, b"alignmentLevel", reader, limits)?,
+        "alignmentLevel",
+    )?;
+    let content_type = parse_int(
+        attr(element, b"contentType", reader, limits)?,
+        "contentType",
+    )?;
+    let rotation_angle = parse_int(
+        attr(element, b"rotationAngle", reader, limits)?,
+        "rotationAngle",
+    )?;
+    let semantic_type = attr(element, b"semanticType", reader, limits)?
         .map(|value| SemanticType::parse(&value).map_err(value_error))
         .transpose()?;
     Ok(Context {
@@ -793,12 +1165,13 @@ fn parse_trace<R: std::io::BufRead>(
     data_start: usize,
     empty: bool,
     reader: &NsReader<R>,
+    limits: Limits,
 ) -> Result<Trace> {
-    let context_ref = attr(element, b"contextRef", reader)?
-        .map(validate_reference_text)
+    let context_ref = attr(element, b"contextRef", reader, limits)?
+        .map(|value| validate_reference_text(value, limits.max_reference_bytes))
         .transpose()?;
-    let brush_ref = attr(element, b"brushRef", reader)?
-        .map(validate_reference_text)
+    let brush_ref = attr(element, b"brushRef", reader, limits)?
+        .map(|value| validate_reference_text(value, limits.max_reference_bytes))
         .transpose()?;
     let data = if empty {
         SourceSpan::new(data_start, data_start)
@@ -819,14 +1192,19 @@ fn parse_brush_property<R: std::io::BufRead>(
     data_start: usize,
     empty: bool,
     reader: &NsReader<R>,
+    limits: Limits,
 ) -> Result<BrushProperty> {
-    let name = attr(element, b"name", reader)?
+    let name = attr(element, b"name", reader, limits)?
         .ok_or_else(|| value_error(ValueError::MissingAttribute { name: "name" }))?;
-    if name.len() > MAX_TOKEN_BYTES {
-        return Err(limit("InkML brush property name", MAX_TOKEN_BYTES));
+    if name.len() > limits.max_identifier_bytes {
+        return Err(limit(
+            crate::LimitKind::InkMlIdentifierBytes,
+            name.len(),
+            limits.max_identifier_bytes,
+        ));
     }
-    let value = attr(element, b"value", reader)?.unwrap_or_default();
-    let units = attr(element, b"units", reader)?;
+    let value = attr(element, b"value", reader, limits)?.unwrap_or_default();
+    let units = attr(element, b"units", reader, limits)?;
     let _ = (data_start, empty);
     Ok(BrushProperty {
         name: BrushPropertyName::parse(&name),
@@ -839,13 +1217,19 @@ fn parse_brush_property<R: std::io::BufRead>(
 fn validate_link<R: std::io::BufRead>(
     element: &BytesStart<'_>,
     reader: &NsReader<R>,
+    limits: Limits,
 ) -> Result<()> {
-    if let Some(direction) = attr(element, b"direction", reader)? {
+    if let Some(direction) = attr(element, b"direction", reader, limits)? {
         if !matches!(direction.as_str(), "to" | "from" | "with") {
             return Err(invalid("InkML link direction is invalid"));
         }
     }
-    if let Some(reference) = attr(element, b"ref", reader)? {
+    if let Some(reference) = attr(element, b"ref", reader, limits)? {
+        ensure_typed_limit(
+            crate::LimitKind::InkMlReferenceBytes,
+            reference.len(),
+            limits.max_reference_bytes,
+        )?;
         if reference.starts_with('{') {
             let _ = Guid::new(reference).map_err(value_error)?;
         } else {
@@ -857,11 +1241,25 @@ fn validate_link<R: std::io::BufRead>(
     Ok(())
 }
 
-fn validate_reference_text(value: String) -> Result<Box<str>> {
-    if value.is_empty() || value.len() > 4096 || value.bytes().any(|byte| byte == 0) {
-        return Err(invalid("InkML reference text is invalid or overlong"));
+fn validate_reference_text(value: String, maximum: usize) -> Result<Box<str>> {
+    if value.len() > maximum {
+        return Err(limit(
+            crate::LimitKind::InkMlReferenceBytes,
+            value.len(),
+            maximum,
+        ));
+    }
+    if value.is_empty() || value.bytes().any(|byte| byte == 0) {
+        return Err(invalid("InkML reference text is invalid"));
     }
     Ok(value.into_boxed_str())
+}
+
+fn ensure_typed_limit(kind: crate::LimitKind, observed: usize, maximum: usize) -> Result<()> {
+    if observed > maximum {
+        return Err(limit(kind, observed, maximum));
+    }
+    Ok(())
 }
 
 fn parse_int(value: Option<String>, name: &'static str) -> Result<Option<i32>> {
@@ -905,6 +1303,7 @@ fn attr<R: std::io::BufRead>(
     element: &BytesStart<'_>,
     name: &[u8],
     reader: &NsReader<R>,
+    limits: Limits,
 ) -> Result<Option<String>> {
     let mut result = None;
     for attribute in element.checked_attributes() {
@@ -923,13 +1322,32 @@ fn attr<R: std::io::BufRead>(
         }
         if attribute.value.len() > MAX_ATTRIBUTE_VALUE_BYTES {
             return Err(limit(
-                "InkML attribute value bytes",
+                crate::LimitKind::InkMlAttributeValueBytes,
+                attribute.value.len(),
                 MAX_ATTRIBUTE_VALUE_BYTES,
             ));
         }
+        let is_namespace_declaration = attribute.key.as_ref() == b"xmlns"
+            || attribute.key.as_ref().strip_prefix(b"xmlns:").is_some();
+        crate::preflight_attribute_value_bytes_with_kind(
+            attribute.value.as_ref(),
+            if is_namespace_declaration {
+                MAX_ATTRIBUTE_VALUE_BYTES
+            } else {
+                limits.max_attribute_value_bytes
+            },
+            crate::LimitKind::InkMlAttributeValueBytes,
+        )?;
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
             .map_err(xml_error)?;
+        if !is_namespace_declaration && value.len() > limits.max_attribute_value_bytes {
+            return Err(limit(
+                crate::LimitKind::InkMlAttributeValueBytes,
+                value.len(),
+                limits.max_attribute_value_bytes,
+            ));
+        }
         validate_xml_characters(&value, "InkML attribute")?;
         let mut owned = String::new();
         owned
@@ -1034,6 +1452,7 @@ fn validate_end_name(
 fn validate_element<R: std::io::BufRead>(
     element: &BytesStart<'_>,
     reader: &NsReader<R>,
+    limits: Limits,
 ) -> Result<()> {
     let element_name = element.name();
     let name = std::str::from_utf8(element_name.as_ref()).map_err(xml_error)?;
@@ -1043,10 +1462,11 @@ fn validate_element<R: std::io::BufRead>(
     let mut attribute_keys = Vec::new();
     for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
-        if attribute_keys.len() >= MAX_ATTRIBUTES_PER_ELEMENT {
+        if attribute_keys.len() >= limits.max_attributes_per_element {
             return Err(limit(
-                "InkML attributes per element",
-                MAX_ATTRIBUTES_PER_ELEMENT,
+                crate::LimitKind::InkMlAttributesPerElement,
+                attribute_keys.len() + 1,
+                limits.max_attributes_per_element,
             ));
         }
         let name = std::str::from_utf8(attribute.key.as_ref()).map_err(xml_error)?;
@@ -1055,13 +1475,32 @@ fn validate_element<R: std::io::BufRead>(
         }
         if attribute.value.len() > MAX_ATTRIBUTE_VALUE_BYTES {
             return Err(limit(
-                "InkML attribute value bytes",
+                crate::LimitKind::InkMlAttributeValueBytes,
+                attribute.value.len(),
                 MAX_ATTRIBUTE_VALUE_BYTES,
             ));
         }
+        let is_namespace_declaration = attribute.key.as_ref() == b"xmlns"
+            || attribute.key.as_ref().strip_prefix(b"xmlns:").is_some();
+        crate::preflight_attribute_value_bytes_with_kind(
+            attribute.value.as_ref(),
+            if is_namespace_declaration {
+                MAX_ATTRIBUTE_VALUE_BYTES
+            } else {
+                limits.max_attribute_value_bytes
+            },
+            crate::LimitKind::InkMlAttributeValueBytes,
+        )?;
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
             .map_err(xml_error)?;
+        if !is_namespace_declaration && value.len() > limits.max_attribute_value_bytes {
+            return Err(limit(
+                crate::LimitKind::InkMlAttributeValueBytes,
+                value.len(),
+                limits.max_attribute_value_bytes,
+            ));
+        }
         validate_xml_characters(&value, "InkML attribute")?;
         if let Some(prefix) = attribute.key.prefix()
             && !matches!(prefix.as_ref(), b"xml" | b"xmlns")
@@ -1285,9 +1724,13 @@ fn reserve_one<T>(values: &mut Vec<T>, resource: &'static str) -> Result<()> {
         .map_err(|_| invalid(format!("{resource} allocation failed")))
 }
 
-fn enforce_source_limit(source_len: usize) -> Result<()> {
-    if source_len > MAX_SOURCE_BYTES {
-        Err(limit("InkML source bytes", MAX_SOURCE_BYTES))
+fn enforce_source_limit(source_len: usize, maximum: usize) -> Result<()> {
+    if source_len > maximum {
+        Err(limit(
+            crate::LimitKind::InkMlSourceBytes,
+            source_len,
+            maximum,
+        ))
     } else {
         Ok(())
     }
@@ -1312,26 +1755,26 @@ fn position<R: std::io::BufRead>(
         .ok_or_else(|| invalid(format!("{what} offset exceeds usize")))
 }
 
-fn increment_nodes(nodes: &mut usize) -> Result<()> {
+fn increment_nodes(nodes: &mut usize, maximum: usize) -> Result<()> {
     let next = nodes
         .checked_add(1)
-        .ok_or_else(|| limit("InkML XML nodes", MAX_NODES))?;
-    enforce_nodes(next)?;
+        .ok_or_else(|| invalid("InkML XML node count overflow"))?;
+    enforce_nodes(next, maximum)?;
     *nodes = next;
     Ok(())
 }
 
-fn enforce_nodes(nodes: usize) -> Result<()> {
-    if nodes > MAX_NODES {
-        Err(limit("InkML XML nodes", MAX_NODES))
+fn enforce_nodes(nodes: usize, maximum: usize) -> Result<()> {
+    if nodes > maximum {
+        Err(limit(crate::LimitKind::InkMlXmlNodes, nodes, maximum))
     } else {
         Ok(())
     }
 }
 
-fn enforce_depth(depth: usize) -> Result<()> {
-    if depth > MAX_DEPTH {
-        Err(limit("InkML XML depth", MAX_DEPTH))
+fn enforce_depth(depth: usize, maximum: usize) -> Result<()> {
+    if depth > maximum {
+        Err(limit(crate::LimitKind::InkMlXmlDepth, depth, maximum))
     } else {
         Ok(())
     }
@@ -1340,12 +1783,25 @@ fn enforce_depth(depth: usize) -> Result<()> {
 fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
-fn limit(resource: &'static str, limit: usize) -> Error {
-    Error::Limit { resource, limit }
+fn limit(kind: crate::LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::limit(kind, observed, maximum)
+}
+fn check_limit(kind: crate::LimitKind, value: usize, maximum: usize) -> Result<()> {
+    if value == 0 || value > maximum {
+        return Err(Error::invalid_limit(kind, value, maximum));
+    }
+    Ok(())
 }
 fn xml_error(error: impl fmt::Display) -> Error {
     Error::Xml(error.to_string())
 }
-fn value_error(error: impl fmt::Display) -> Error {
-    Error::Invalid(error.to_string())
+fn value_error(error: ValueError) -> Error {
+    match error {
+        ValueError::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::limit(kind, observed, maximum),
+        error => Error::Invalid(error.to_string()),
+    }
 }

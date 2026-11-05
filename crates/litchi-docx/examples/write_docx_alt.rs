@@ -6,8 +6,8 @@
 
 use std::path::PathBuf;
 
-use litchi_docx::Package;
 use litchi_docx::alt::{Data, Import};
+use litchi_docx::{Builder, Package};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let path = std::env::args_os()
@@ -18,17 +18,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::fs::create_dir_all(parent)?;
     }
 
-    let mut package = Package::new()?;
-    package
-        .document_mut()?
+    let mut builder = Builder::new()?;
+    builder
+        .document()?
         .add_heading("Litchi altChunk verification", 1)?;
 
     let html = br#"<!doctype html><html><head><meta charset="utf-8"></head><body><h2>Imported HTML</h2><p>Word imported this move-owned payload.</p></body></html>"#;
-    package.add_alt(Import::data(Data::Html(html.to_vec())), Some(true))?;
-    package
-        .document_mut()?
+    builder.add_alt(Import::data(Data::Html(html.to_vec())), Some(true))?;
+    builder
+        .document()?
         .add_paragraph()
         .add_run_with_text("Content after the imported block.");
+    let package = builder.build()?;
     package.save(&path)?;
 
     let reopened = Package::open(&path)?;

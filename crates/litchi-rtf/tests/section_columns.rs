@@ -7,15 +7,12 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
-use litchi_rtf::{
-    MAX_SECTION_COLUMNS, RtfDocument, RtfWriter, Section, SectionColumn, SectionColumns,
-};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{MAX_SECTION_COLUMNS, Section, SectionColumn, SectionColumns, write::Writer};
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
@@ -25,7 +22,7 @@ fn parses_variable_columns_with_group_inheritance_and_round_trips_canonically() 
         r#"{\rtf1\sectd\cols2\linebetcol\colno1"#,
         r#"{\colw3000\colsr240}\colno2\colw4000 Body}"#,
     );
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let columns = &document.sections()[0].properties.columns;
     assert_eq!(columns.count, 2);
     assert!(columns.separator);
@@ -48,7 +45,7 @@ fn parses_variable_columns_with_group_inheritance_and_round_trips_canonically() 
     assert!(
         serialized.contains(r"\cols2\linebetcol\colsx720\colno1\colw3000\colsr240\colno2\colw4000")
     );
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.sections()[0].properties.columns, *columns);
 }
 
@@ -58,7 +55,7 @@ fn parses_bundled_libreoffice_equal_and_variable_column_fixtures() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/rtf/column-break.rtf"
     ));
-    let equal = RtfDocument::parse_bytes(equal).unwrap();
+    let equal = Tree::parse_bytes(equal, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(equal.sections()[0].properties.columns.count, 2);
     assert!(!equal.sections()[0].properties.columns.is_variable());
 
@@ -66,7 +63,7 @@ fn parses_bundled_libreoffice_equal_and_variable_column_fixtures() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf100507.rtf"
     ));
-    let variable = RtfDocument::parse_bytes(variable).unwrap();
+    let variable = Tree::parse_bytes(variable, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert!(variable.sections().iter().any(|section| {
         section.properties.columns.explicit
             == [SectionColumn {
@@ -78,10 +75,13 @@ fn parses_bundled_libreoffice_equal_and_variable_column_fixtures() {
 
 #[test]
 fn sectd_resets_columns_and_ignorable_destinations_are_inert() {
-    let document = RtfDocument::parse(concat!(
-        r#"{\rtf1{\*\unknown\cols3\linebetcol\colno1\colw100}"#,
-        r#"\cols2\colsx200\linebetcol\sectd Body}"#,
-    ))
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1{\*\unknown\cols3\linebetcol\colno1\colw100}"#,
+            r#"\cols2\colsx200\linebetcol\sectd Body}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     assert_eq!(
         document.sections()[0].properties.columns,
@@ -111,7 +111,7 @@ fn public_builders_and_writer_enforce_column_bounds() {
         space_after: None,
     }];
     let mut output = Vec::new();
-    assert!(RtfWriter::new(&mut output).write_section(&section).is_err());
+    assert!(Writer::new(&mut output).write_section(&section).is_err());
 }
 
 #[test]
@@ -130,6 +130,9 @@ fn rejects_malformed_or_incomplete_explicit_column_sequences() {
         r"{\rtf1\cols2\colno1\colw100 X}",
         r"{\rtf1\cols2\colno1{\colno2}\colw100\colno2\colw200 X}",
     ] {
-        assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
+        assert!(
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted {source}"
+        );
     }
 }

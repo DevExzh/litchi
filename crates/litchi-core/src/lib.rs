@@ -8,12 +8,17 @@
 //! and OOXML (modern) implementations, ensuring a consistent API for users.
 
 // Submodule declarations
+/// Format-neutral sibling-temporary atomic filesystem publication.
+pub mod atomic;
 pub mod binary;
 pub mod bom;
 pub mod bounded;
 pub mod budget;
+/// Canonical JSON bytes that do not depend on `serde_json` features.
+pub mod canonical_json;
 pub mod detection;
 pub mod durability;
+pub mod edit;
 pub mod error;
 /// Runtime-neutral execution policy, cancellation, and resource charging.
 pub mod execution;

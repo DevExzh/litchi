@@ -90,7 +90,7 @@ impl NamedShows {
     /// canonical record cannot be re-parsed.
     pub fn to_record(&self) -> Result<Record> {
         let bytes = self.to_record_bytes()?;
-        let (record, end) = Record::parse(&bytes, 0)?;
+        let (record, end) = Record::parse(&bytes, 0, &crate::SourceLimits::default())?;
         if end != bytes.len() {
             return corrupted("canonical NamedShowsContainer did not consume its record bytes");
         }
@@ -288,7 +288,9 @@ mod tests {
     }
 
     fn parsed_record(bytes: &[u8]) -> Record {
-        Record::parse(bytes, 0).unwrap().0
+        Record::parse(bytes, 0, &crate::SourceLimits::default())
+            .unwrap()
+            .0
     }
 
     #[test]

@@ -11,14 +11,17 @@
 mod error;
 
 pub mod alt;
+pub mod attached_template;
 pub mod bibliography;
 pub mod bookmark;
+pub mod builder;
 pub mod chart;
 pub mod color;
 pub mod comment;
 pub mod content_control;
 pub mod custom_xml;
 pub mod document;
+pub mod document_variables;
 pub mod drawing;
 pub mod field;
 pub mod font;
@@ -33,20 +36,29 @@ pub mod leniency;
 pub mod list;
 pub mod mail_merge;
 pub mod math;
+pub mod metadata;
 pub mod modern_comments;
 mod namespace;
 pub mod numbering;
 pub mod object;
+pub mod opc;
+mod open_options;
 pub mod package;
 pub mod paragraph;
+mod part_scan;
 pub mod parts;
+mod picture_spans;
+pub mod properties;
 pub mod redact;
 pub mod revision;
+pub mod ribbon;
 pub mod run_effects;
 pub mod run_symbols;
 pub mod sanitize;
 pub mod section;
+mod semantic_limits;
 pub mod settings;
+mod signature_policy;
 pub mod smart_tag;
 pub mod smartart;
 pub mod source_backed;
@@ -58,6 +70,7 @@ pub mod story_hyperlinks;
 pub mod streaming;
 pub mod styles;
 pub mod table;
+pub mod task_panes;
 pub mod template;
 pub mod textbox;
 pub mod theme;
@@ -65,19 +78,22 @@ pub mod theme;
 pub mod validation;
 pub mod variables;
 #[cfg(feature = "vba-inspection")]
+pub mod vba;
+#[cfg(feature = "vba-inspection")]
 pub mod vba_project;
 pub mod web;
 /// Inert Office Add-in and persisted task-pane models, limits and graph patches.
 ///
-/// These shared types are used by [`Package::task_panes`] and
-/// [`Package::plan_task_panes`]. DOCX web-output settings remain in [`web`].
+/// These shared types are used by [`Package::task_panes`],
+/// [`Package::plan_task_panes`] and the [`task_panes`] family. DOCX
+/// web-output settings remain in [`web`].
 ///
 /// ```
 /// use litchi_core::patch::{BlobLimits, Patch as DurablePatch, PatchLimits, Reversible};
 /// use litchi_docx::{Package, web_extensions as extensions};
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// let mut package = Package::new()?;
+/// let package = Package::new()?;
 /// let reference = extensions::Reference::new("addin", "1.0", extensions::Store::Omex)?;
 /// let mut add_in = extensions::AddIn::new("addin-instance", reference)?;
 /// let mut functions = extensions::CustomFunctions::new();
@@ -87,24 +103,29 @@ pub mod web;
 /// add_in.set_custom_functions(Some(functions))?;
 /// let mut panes = extensions::Panes::new();
 /// panes.push(extensions::Pane::new(add_in))?;
-/// let patch = package.plan_task_panes(panes, extensions::Conformance::Transitional)?;
-/// package.apply_task_panes_patch(&patch)?;
-/// package.apply_task_panes_patch(&patch.inverse())?;
+/// let plan = package.plan_task_panes(panes, extensions::Conformance::Transitional)?;
+/// let mut edit = package.edit_task_panes();
+/// edit.apply_plan(&plan)?;
+/// let changed = edit.commit()?.into_package();
+/// let mut edit = changed.edit_task_panes();
+/// edit.apply_plan(&plan.inverse())?;
+/// assert!(edit.commit()?.package().task_panes()?.is_none());
 ///
 /// // Choose finite wire limits for the expected document workload.
 /// let wire_limits = PatchLimits::new(
 ///     BlobLimits::new(2, 1_048_576, 2_097_152),
 ///     4_194_304, 1, 8, 1_024, 1_024,
 /// );
-/// let wire = patch.to_durable(wire_limits)?.to_deterministic_json()?;
+/// let wire = plan.to_durable(wire_limits)?.to_deterministic_json()?;
 /// let durable = DurablePatch::<Reversible>::from_deterministic_json(&wire, wire_limits)?;
-/// package.apply_durable_task_panes_patch(&durable)?;
-/// package.apply_durable_task_panes_patch(&durable.inverse())?;
+/// let mut edit = package.edit_task_panes();
+/// edit.apply_durable(&durable)?;
+/// assert!(edit.commit()?.package().task_panes()?.is_some());
 /// # Ok(())
 /// # }
 /// ```
 pub use litchi_ooxml_common::web as web_extensions;
-pub mod writer;
+mod writer;
 
 #[cfg(feature = "encryption")]
 pub use litchi_crypto::ooxml as encryption;
@@ -116,6 +137,7 @@ pub use bibliography::{
     OOXML_BIBLIOGRAPHY_NAMESPACE, STRICT_OOXML_BIBLIOGRAPHY_NAMESPACE, is_bibliography_namespace,
     is_bibliography_node, is_bibliography_root, parse_bibliography_source_store,
 };
+pub use builder::Builder;
 pub use error::{Error, Result};
 pub use field::{
     ActiveContent, ActiveContentKind, Advance, AdvanceAdjustment, AdvanceOperation, AutoNumber,
@@ -137,7 +159,7 @@ pub use leniency::{
     ToleranceReport, ToleratedDefect,
 };
 /// Resource policy for package ingestion through [`Package`].
-pub use litchi_opc::ReadLimits;
+pub use litchi_opc::{SourceCacheLimits, SourceLimitKind, SourceLimits, SourceReadPolicy};
 pub use mail_merge::{
     DataSourceObject, DataType, Destination, FieldMap, FieldMappingType, MainDocumentType,
     RECIPIENT_CONTENT_TYPE, Recipient, Recipients, RelationshipId, Source, Target,
@@ -167,24 +189,26 @@ pub use statistics::{
     Statistics, count_characters, count_characters_no_spaces, count_words, estimate_line_count,
     estimate_page_count,
 };
-pub use validation::{
-    DEFAULT_DOCX_VALIDATION_LIMITS, DocxValidationError, DocxValidationLimits, validate_read_at,
-    validate_read_at_with_limits,
-};
 pub use variables::{Variables, parse_variables};
 
 // Concrete document entry points are available through their contextual
 // modules. These root exports keep the standalone facade concise without
 // collapsing the owner modules back into host aliases.
-pub use document::{Block, Document, Element, ImageWatermarkPart, OpaqueBlock};
+pub use document::{
+    Block, BlockContentControl, BlockKind, Blocks, Document, Element, ImageWatermarkPart,
+    IndexedBlock, OpaqueBlock,
+};
 pub use math::{OfficeMath, OfficeMathParagraph};
+pub use open_options::{OpenOptions, OpenPolicy};
 pub use package::Package;
 pub use paragraph::{
-    Collapsed, Inline, InlineHyperlink, OpaqueInline, OpaqueRunContent, Paragraph, Run, RunBreak,
-    RunBreakClear, RunBreakType, RunContent, RunProperties, RunUnderline, RunUnderlineColor,
+    Collapsed, Inline, InlineHyperlink, InlineKind, OpaqueInline, OpaqueRunContent, Paragraph, Run,
+    RunBreak, RunBreakClear, RunBreakType, RunContent, RunProperties, RunUnderline,
+    RunUnderlineColor,
 };
 pub use run_effects::{Effect, Effects, OpaqueExtension};
 pub use section::{Emu, Margins, PageSize, Section, Sections};
+pub use semantic_limits::SemanticLimits;
 pub use streaming::{
     StreamingDocumentError, StreamingDocumentErrorSource, StreamingDocumentLimits,
     StreamingDocumentWriter,

@@ -1,4 +1,4 @@
-//! Source-checked PIDDSI transactions and typed mutation facade.
+//! Source-checked PIDDSI edits and typed mutation facade.
 
 use super::super::model::{
     CodePage, DocParts, HeadingPairs, Section, Value, invalid, try_clone_property_set,
@@ -15,26 +15,23 @@ use super::validation::validate_section;
 use crate::vba_signature;
 use litchi_cfb::OleError;
 
-/// A source-bound, isolated Document Summary Information edit.
-pub struct Transaction<'source> {
+/// Content-free diagnostics of one property-set commit.
+pub use litchi_core::edit::Diagnostics;
+
+/// A source-bound, isolated Document Summary Information edit: its setters stage changes on a
+/// draft section; [`Edit::commit`] validates and publishes it. Dropping the
+/// edit discards it.
+pub struct Edit<'source> {
     source: &'source Section,
-    draft: Section,
+    section: Section,
 }
 
-impl<'source> Transaction<'source> {
+impl<'source> Edit<'source> {
     pub(super) fn from_snapshot(snapshot: &'source Snapshot) -> Result<Self, OleError> {
         Ok(Self {
             source: &snapshot.section,
-            draft: try_clone_property_set(&snapshot.section)?,
+            section: try_clone_property_set(&snapshot.section)?,
         })
-    }
-
-    /// Borrows the current draft through the typed mutation facade.
-    #[must_use]
-    pub fn edit(&mut self) -> Edit<'_> {
-        Edit {
-            section: &mut self.draft,
-        }
     }
 
     /// Publishes the draft after rechecking the complete PIDDSI invariant set.
@@ -44,28 +41,21 @@ impl<'source> Transaction<'source> {
     /// Returns an error if the draft no longer satisfies the typed Document
     /// Summary Information invariants.
     pub fn commit(self) -> Result<Commit<'source>, OleError> {
-        validate_section(&self.draft)?;
-        let changed = self.source != &self.draft;
+        validate_section(&self.section)?;
+        let changed = self.source != &self.section;
         Ok(Commit {
             patch: Patch {
                 source: self.source,
-                replacement: self.draft,
+                replacement: self.section,
             },
-            changed,
+            diagnostics: Diagnostics::new(changed),
         })
     }
-}
 
-/// A typed mutation facade borrowing one transaction draft.
-pub struct Edit<'transaction> {
-    section: &'transaction mut Section,
-}
-
-impl Edit<'_> {
     /// Borrows the full draft for opaque or extension-specific inspection.
     #[must_use]
     pub const fn section(&self) -> &Section {
-        self.section
+        &self.section
     }
 
     /// Changes the section code page while retaining all properties.
@@ -401,13 +391,11 @@ impl Patch<'_> {
     ///
     /// Returns an error if `source` differs from the recorded source or the
     /// replacement cannot be cloned.
-    pub fn apply(&self, source: &Section) -> Result<Section, OleError> {
+    pub fn apply(&self, source: &Section) -> Result<Section, crate::Error> {
         if source != self.source {
-            return Err(invalid(
-                "Document Summary Information patch source does not match",
-            ));
+            return Err(crate::Error::PatchConflict);
         }
-        try_clone_property_set(&self.replacement)
+        try_clone_property_set(&self.replacement).map_err(crate::Error::from)
     }
 
     /// Returns the original source section.
@@ -423,22 +411,23 @@ impl Patch<'_> {
     }
 }
 
-/// The result of committing a Document Summary Information transaction.
+/// The result of committing a Document Summary Information edit.
 pub struct Commit<'source> {
     patch: Patch<'source>,
-    changed: bool,
+    diagnostics: Diagnostics,
 }
 
 impl<'source> Commit<'source> {
-    /// Whether the typed draft differs from its source section.
+    /// The commit's content-free diagnostics: whether the typed draft
+    /// differs from its source section.
     #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
+    pub const fn diagnostics(&self) -> &Diagnostics {
+        &self.diagnostics
     }
 
     /// Borrows the complete replacement section.
     #[must_use]
-    pub const fn section(&self) -> &Section {
+    pub const fn package(&self) -> &Section {
         self.patch.replacement()
     }
 
@@ -450,7 +439,7 @@ impl<'source> Commit<'source> {
 
     /// Consumes the commit into its replacement section.
     #[must_use]
-    pub fn into_section(self) -> Section {
+    pub fn into_package(self) -> Section {
         self.patch.replacement
     }
 
@@ -458,6 +447,13 @@ impl<'source> Commit<'source> {
     #[must_use]
     pub fn into_patch(self) -> Patch<'source> {
         self.patch
+    }
+
+    /// Consumes the commit into its replacement section and its
+    /// source-checked patch (which keeps its own copy of the replacement).
+    #[must_use]
+    pub fn into_parts(self) -> (Section, Patch<'source>) {
+        (self.patch.replacement.clone(), self.patch)
     }
 }
 

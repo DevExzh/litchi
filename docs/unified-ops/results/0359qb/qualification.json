@@ -1,0 +1,125 @@
+{
+  "record": "0359qb",
+  "date": "2026-10-22",
+  "scenario": "doc/leaf_write",
+  "probe": {
+    "commit": "428bf4d44a237bc56207b07a220a3d1da3043f04",
+    "source_sha256": "9e1cd649268ad5eefe4314b76493f61cd047bf6ec4114c7e7872b2182b1af689",
+    "environment": {
+      "LITCHI_PROBE_ONLY": "doc/leaf_write",
+      "LITCHI_PROBE_BATCH_ROUNDS": "1 for Massif and Callgrind; 3 for native",
+      "argv": ["legacy_w5_source_probe", "1 or 3"],
+      "runner": "/home/zhuhe/code/litchi-worktrees/.coord/doc-toggle/tmp/runner/legacy_w5_source_probe"
+    }
+  },
+  "source_assemblies": {
+    "before": {
+      "implementation_commit": "81323113be7e166d1b37ea185e9fd712d8748a62",
+      "implementation_files": {
+        "crates/litchi-doc/src/body_text.rs": "ae044d85d99a987ac34d08c8f6d8f605e85f5443bb66573964a88a422e047d46",
+        "crates/litchi-doc/src/tracked_revision/package.rs": "613beaf162033c6153906ef2b1299d21e0ece58b4283a43400924c2503dbe40a"
+      },
+      "probe_overlay": "428bf4d44a237bc56207b07a220a3d1da3043f04"
+    },
+    "after": {
+      "implementation_commit": "160a00559bb7edb905b1315753e33aedc74c3733",
+      "implementation_files": {
+        "crates/litchi-doc/src/body_text.rs": "b6b23536a8a73f44f49ae1d961784b92e8fa68524f0c744875b4934f78afccf3",
+        "crates/litchi-doc/src/tracked_revision/package.rs": "722d5ce021ce14bc1228ead31e6992d495e6054974edbc15bacab330c05d3eb4"
+      },
+      "probe_overlay": "428bf4d44a237bc56207b07a220a3d1da3043f04"
+    }
+  },
+  "build": {
+    "command": "cargo build --offline --locked --release -p litchi-ops --features doc,xls,rtf --example legacy_w5_source_probe",
+    "cargo_target_dir": "/home/zhuhe/code/litchi-worktrees/uo2-doc-toggle/target",
+    "cargo_build_jobs": 1,
+    "cargo_incremental": 0,
+    "memory_cap": "20G for profilers; cargo shim was on PATH",
+    "before": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/doc-toggle/before-qualified-legacy_w5_source_probe",
+      "bytes": 13346048,
+      "sha256": "0c4392e6cbf5a65b5e3901fdc860cec80ce29518b11e47b70620641df405c92a"
+    },
+    "after": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/doc-toggle/after-qualified-legacy_w5_source_probe",
+      "bytes": 13346080,
+      "sha256": "cfdf1e3040b9b742551d80cd583fc28de4f366f9f9bc9fb7198e91aa3352384f"
+    }
+  },
+  "output": {
+    "sha256": "6bb97058e47f747c29e568395eea01db1226aa5ab8962087e1d78a1b9b82ff11",
+    "before_json": "qualified-ordinary-before.json",
+    "after_json": "qualified-ordinary-after.json"
+  },
+  "massif": {
+    "command": "valgrind --tool=massif --pages-as-heap=no --massif-out-file=<leg>.massif <runner> 1",
+    "before": {
+      "peak_heap_bytes": 8182107,
+      "peak_extra_bytes": 46541,
+      "peak_total_bytes": 8228648,
+      "artifact": "qualified-ordinary-before.massif",
+      "sha256": "1461820dd6ac7b7c99e3b4232925068ab11e8765ea2cab10a23e12dd76668b75"
+    },
+    "after": {
+      "peak_heap_bytes": 7573945,
+      "peak_extra_bytes": 46207,
+      "peak_total_bytes": 7620152,
+      "artifact": "qualified-ordinary-after.massif",
+      "sha256": "b06f68779f5cdf3923254a47fa95b86bd8efec4f13211cff249b46a76f755b76"
+    },
+    "ratio_after_before": 0.926051521,
+    "peak_tree_scope": "routes::doc_leaf_write; no doc_batch1k_leaf_write frame"
+  },
+  "callgrind": {
+    "command": "valgrind --tool=callgrind --callgrind-out-file=<leg>.callgrind <runner> 1",
+    "annotate": "callgrind_annotate --auto=no --inclusive=yes --tree=calling --show-percs=no --threshold=99",
+    "calls": 4,
+    "rows": [
+      {"operation": "routes::doc_leaf_write", "before_ir": 256566637, "after_ir": 258771387, "ratio_after_before": 1.008593284},
+      {"operation": "Package::edit", "before_ir": 87950819, "after_ir": 92226703, "ratio_after_before": 1.048616762},
+      {"operation": "body_text::Edit::set_character_property_override", "before_ir": 32187392, "after_ir": 22491847, "ratio_after_before": 0.698778174},
+      {"operation": "litchi_doc::package::edit::Edit::commit", "before_ir": 73309585, "after_ir": 80778169, "ratio_after_before": 1.101877319},
+      {"operation": "Package::write_to", "before_ir": 2284447, "after_ir": 2413559, "ratio_after_before": 1.056517836},
+      {"operation": "package open (from_bytes_with_options/from_owned_bytes)", "before_ir": 60176893, "after_ir": 59526823, "ratio_after_before": 0.989197349}
+    ],
+    "before_artifact": {
+      "name": "qualified-ordinary-before.callgrind",
+      "bytes": 313941,
+      "sha256": "63e21a13fe16eb81755ad20b1c1bcda30f1d1e9d0c7b0b752731fcaee1042ee3"
+    },
+    "after_artifact": {
+      "name": "qualified-ordinary-after.callgrind",
+      "bytes": 313464,
+      "sha256": "b9c3e9303ec771de4c05e278a25c39bcd6419ac5ae71c59c479bdacf4d7c6165"
+    }
+  },
+  "native": {
+    "status": "diagnostic_rejected",
+    "reason": "The host retained unrelated cargo/rustc/ninja work and load averages of 117.52 to 126.85; these blocks are retained but are not an isolated qualification.",
+    "blocks": [
+      {
+        "id": "N1",
+        "cpu": 29,
+        "load_before_each": [123.66, 125.52, 126.52, 126.85],
+        "medians_us_abba": [3306.838, 3470.709, 3400.668, 3245.517],
+        "a_average_us": 3276.178,
+        "b_average_us": 3435.689,
+        "b_over_a": 1.048688143,
+        "receipts": ["native-abba-a1-before.json", "native-abba-a1-after1.json", "native-abba-a1-after2.json", "native-abba-a1-before2.json"]
+      },
+      {
+        "id": "N2",
+        "cpu": 19,
+        "load_before_each": [121.35, 120.61, 120.32, 117.52],
+        "medians_us_abba": [3314.258, 3428.518, 3498.488, 3417.757],
+        "a_average_us": 3366.007,
+        "b_average_us": 3463.503,
+        "b_over_a": 1.028964730,
+        "receipts": ["native-abba-a2-before.json", "native-abba-a2-after1.json", "native-abba-a2-after2.json", "native-abba-a2-before2.json"]
+      }
+    ],
+    "all_output_sha256": "6bb97058e47f747c29e568395eea01db1226aa5ab8962087e1d78a1b9b82ff11"
+  },
+  "historical_boundary": "0359qa's 0.988216 route-local value remains the attribution for its original binary pair; this corrected-probe rerun is separately controlled because the selector repair changes the litchi-ops executable and code generation."
+}

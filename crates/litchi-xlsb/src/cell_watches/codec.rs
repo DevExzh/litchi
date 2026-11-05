@@ -4,7 +4,7 @@ use super::model::{Item, UnknownRecord, Watch};
 use super::phonetic::{Alignment, Info, Type};
 use super::validation;
 use crate::package::error::{Error, Result};
-use crate::raw::{Cursor, Kind, Limits, Records, Writer, kind};
+use crate::raw::{Cursor, Encoder, Kind, Limits, Records, kind};
 use std::sync::Arc;
 
 /// One source record span. The source allocation is shared by snapshots and
@@ -39,36 +39,39 @@ pub(crate) struct Parsed {
     pub(crate) end_sheet_index: usize,
 }
 
-pub(crate) fn parse_watch(payload: &[u8]) -> Result<Watch> {
+pub(crate) fn parse_watch(payload: &[u8], limits: Limits) -> Result<Watch> {
+    check_fixed_payload(payload, limits)?;
     if payload.len() != 8 {
         return Err(Error::InvalidLength {
             expected: 8,
             found: payload.len(),
         });
     }
-    let mut cursor = Cursor::with_limits(payload, "BrtCellWatch", Limits::DEFAULT);
+    let mut cursor = Cursor::new(payload, "BrtCellWatch", limits);
     let row = cursor.read_u32()?;
     let column = cursor.read_u32()?;
     cursor.finish()?;
     Watch::new(row, column)
 }
 
-pub(crate) fn write_watch(watch: Watch) -> Result<Vec<u8>> {
+pub(crate) fn write_watch(watch: Watch, limits: Limits) -> Result<Vec<u8>> {
+    check_fixed_size(8, limits)?;
     let mut payload = Vec::with_capacity(8);
-    let mut writer = Writer::new(&mut payload);
+    let mut writer = Encoder::new(&mut payload, limits);
     writer.write_u32(watch.row())?;
     writer.write_u32(watch.column())?;
     Ok(payload)
 }
 
-pub(crate) fn parse_phonetic(payload: &[u8]) -> Result<Info> {
+pub(crate) fn parse_phonetic(payload: &[u8], limits: Limits) -> Result<Info> {
+    check_fixed_payload(payload, limits)?;
     if payload.len() != 10 {
         return Err(Error::InvalidLength {
             expected: 10,
             found: payload.len(),
         });
     }
-    let mut cursor = Cursor::with_limits(payload, "BrtPhoneticInfo", Limits::DEFAULT);
+    let mut cursor = Cursor::new(payload, "BrtPhoneticInfo", limits);
     let font_index = cursor.read_u16()?;
     let phonetic_type = Type::from_wire(cursor.read_u32()?)?;
     let alignment = Alignment::from_wire(cursor.read_u32()?)?;
@@ -76,24 +79,26 @@ pub(crate) fn parse_phonetic(payload: &[u8]) -> Result<Info> {
     Ok(Info::new(font_index, phonetic_type, alignment))
 }
 
-pub(crate) fn write_phonetic(info: Info) -> Result<Vec<u8>> {
+pub(crate) fn write_phonetic(info: Info, limits: Limits) -> Result<Vec<u8>> {
+    check_fixed_size(10, limits)?;
     let mut payload = Vec::with_capacity(10);
-    let mut writer = Writer::new(&mut payload);
+    let mut writer = Encoder::new(&mut payload, limits);
     writer.write_u16(info.font_index())?;
     writer.write_u32(info.phonetic_type().wire())?;
     writer.write_u32(info.alignment().wire())?;
     Ok(payload)
 }
 
-pub(crate) fn encode_record(record_kind: Kind, payload: &[u8]) -> Result<Vec<u8>> {
+pub(crate) fn encode_record(record_kind: Kind, payload: &[u8], limits: Limits) -> Result<Vec<u8>> {
     let mut output = Vec::with_capacity(payload.len().saturating_add(5));
-    Writer::new(&mut output).write_record(record_kind, payload)?;
+    Encoder::new(&mut output, limits).write_record(record_kind, payload)?;
     Ok(output)
 }
 
-pub(crate) fn parse_stream(data: &[u8]) -> Result<Parsed> {
+pub(crate) fn parse_stream(data: &[u8], limits: Limits) -> Result<Parsed> {
+    let limits = limits.validate()?;
     let source: Arc<[u8]> = Arc::from(data);
-    let mut iterator = Records::with_limits(&source, Limits::DEFAULT);
+    let mut iterator = Records::new(&source, limits);
     let mut records = Vec::new();
     let mut watch_begin = None;
     let mut watch_end = None;
@@ -171,7 +176,7 @@ pub(crate) fn parse_stream(data: &[u8]) -> Result<Parsed> {
                         "record occurs outside the watch collection",
                     ));
                 }
-                items.push(Item::Watch(parse_watch(record.payload())?));
+                items.push(Item::Watch(parse_watch(record.payload(), limits)?));
             },
             kind::PHONETIC_INFO => {
                 if end_sheet_data.is_none() {
@@ -183,7 +188,7 @@ pub(crate) fn parse_stream(data: &[u8]) -> Result<Parsed> {
                 if phonetic_index.replace(index).is_some() {
                     return Err(validation::invalid("BrtPhoneticInfo", "duplicate record"));
                 }
-                phonetic = Some(parse_phonetic(record.payload())?);
+                phonetic = Some(parse_phonetic(record.payload(), limits)?);
             },
             kind::END_SHEET_DATA => {
                 if end_sheet_data.replace(index).is_some() {
@@ -229,10 +234,8 @@ pub(crate) fn parse_stream(data: &[u8]) -> Result<Parsed> {
         }
     }
 
-    let end_sheet_data = end_sheet_data
-        .ok_or_else(|| Error::UnexpectedEndOfStream("BrtEndSheetData".to_string()))?;
-    let end_sheet_index =
-        end_sheet_index.ok_or_else(|| Error::UnexpectedEndOfStream("BrtEndSheet".to_string()))?;
+    let end_sheet_data = end_sheet_data.ok_or(Error::UnexpectedEndOfStream("BrtEndSheetData"))?;
+    let end_sheet_index = end_sheet_index.ok_or(Error::UnexpectedEndOfStream("BrtEndSheet"))?;
     if end_sheet_index <= end_sheet_data {
         return Err(validation::invalid(
             "BrtEndSheet",
@@ -240,9 +243,7 @@ pub(crate) fn parse_stream(data: &[u8]) -> Result<Parsed> {
         ));
     }
     if watch_begin.is_some() != watch_end.is_some() {
-        return Err(Error::UnexpectedEndOfStream(
-            "BrtEndCellWatches".to_string(),
-        ));
+        return Err(Error::UnexpectedEndOfStream("BrtEndCellWatches"));
     }
     if let (Some(begin), Some(end)) = (watch_begin, watch_end) {
         if begin >= end {
@@ -278,4 +279,22 @@ pub(crate) fn opaque_record(parsed: &Parsed, index: usize) -> Result<UnknownReco
         validation::invalid("opaque BIFF12 record", "record index is out of bounds")
     })?;
     UnknownRecord::new(span.kind.get(), span.payload(&parsed.source))
+}
+
+fn check_fixed_payload(payload: &[u8], limits: Limits) -> Result<()> {
+    limits.validate()?;
+    check_fixed_size(payload.len(), limits)
+}
+
+fn check_fixed_size(size: usize, limits: Limits) -> Result<()> {
+    let limits = limits.validate()?;
+    if size > limits.payload() {
+        return Err(crate::raw::Error::PayloadLimit {
+            length: size,
+            limit: limits.payload(),
+            offset: 0,
+        }
+        .into());
+    }
+    Ok(())
 }

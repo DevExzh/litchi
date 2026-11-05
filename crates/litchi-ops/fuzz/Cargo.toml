@@ -1,0 +1,85 @@
+[package]
+name = "litchi-ops-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[features]
+# `batch_apply` executes decoded batches against blank DOCX, XLSX and PPTX
+# documents, so it needs those adapters (record 0334).
+apply = ["litchi-ops/docx", "litchi-ops/xlsx", "litchi-ops/pptx"]
+
+[dependencies]
+libfuzzer-sys = "0.4"
+litchi-core = { path = "../../litchi-core" }
+litchi-ops = { path = "..", default-features = false, features = ["test-support"] }
+serde_json = "1"
+
+[[bin]]
+name = "values"
+path = "fuzz_targets/values.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "smoke_values"
+path = "fuzz_targets/smoke_values.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]
+
+[[bin]]
+name = "paths"
+path = "fuzz_targets/paths.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "smoke_paths"
+path = "fuzz_targets/smoke_paths.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "query_plan"
+path = "fuzz_targets/query_plan.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "smoke_queries"
+path = "fuzz_targets/smoke_queries.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "batch_payload"
+path = "fuzz_targets/batch_payload.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "batch_apply"
+path = "fuzz_targets/batch_apply.rs"
+test = false
+doc = false
+bench = false
+required-features = ["apply"]
+
+[[bin]]
+name = "smoke_batch_payload"
+path = "fuzz_targets/smoke_batch_payload.rs"
+test = false
+doc = false
+bench = false

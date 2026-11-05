@@ -18,10 +18,11 @@ use crate::records::{
     MeasuredCell, SharedStringEntryLocation, SharedStringScanError, SharedStringSstScan,
     SharedStringSstSegment, SheetType, decode_shared_string_entry, scan_shared_string_records,
 };
-use crate::{SheetKind, SheetVisibility, Workbook};
+use crate::{SheetKind, SheetVisibility, raw::Reader};
 use litchi_biff::{Limits as BiffLimits, RecordRef, Records as BiffRecords};
 use litchi_cfb::{
-    OleError, SharedOleFile, SharedOleFileLimits, SharedOleStreamCursor, StreamChainHint,
+    ArtifactFingerprint, OleError, SharedOleFile, SharedOleFileLimits, SharedOleStreamCursor,
+    StreamChainHint, ValidatedOverlayPlan,
 };
 #[cfg(any(unix, windows))]
 use litchi_core::FileSource;
@@ -270,26 +271,26 @@ impl SourceBackedOptions {
 
     /// Current finite scan limits.
     #[must_use]
-    pub const fn limits(&self) -> SourceBackedLimits {
+    pub const fn limits_value(&self) -> SourceBackedLimits {
         self.limits
     }
 
     /// Sets the finite scan limits.
     #[must_use]
-    pub const fn with_limits(mut self, limits: SourceBackedLimits) -> Self {
+    pub const fn limits(mut self, limits: SourceBackedLimits) -> Self {
         self.limits = limits;
         self
     }
 
     /// Current formatting-defect policy.
     #[must_use]
-    pub const fn leniency(&self) -> Leniency {
+    pub const fn leniency_value(&self) -> Leniency {
         self.leniency
     }
 
     /// Sets the formatting-defect policy.
     #[must_use]
-    pub const fn with_leniency(mut self, leniency: Leniency) -> Self {
+    pub const fn leniency(mut self, leniency: Leniency) -> Self {
         self.leniency = leniency;
         self
     }
@@ -308,6 +309,9 @@ pub enum SourceBackedError {
     Io(io::Error),
     /// A CFB validation or range-read error.
     Cfb(OleError),
+    /// A shared property-set or object operation failed with typed
+    /// refusal/conflict information.
+    Object(litchi_ole_common::Error),
     /// An existing XLS semantic codec rejected the source.
     Parse(Error),
     /// The source changed between two consistency fences.
@@ -352,6 +356,7 @@ impl fmt::Display for SourceBackedError {
         match self {
             Self::Io(error) => write!(formatter, "source I/O error: {error}"),
             Self::Cfb(error) => write!(formatter, "source CFB error: {error}"),
+            Self::Object(error) => write!(formatter, "source XLS object error: {error}"),
             Self::Parse(error) => write!(formatter, "source XLS parse error: {error}"),
             Self::SourceChanged { expected, observed } => write!(
                 formatter,
@@ -398,6 +403,7 @@ impl std::error::Error for SourceBackedError {
         match self {
             Self::Io(error) => Some(error),
             Self::Cfb(error) => Some(error),
+            Self::Object(error) => Some(error),
             Self::Parse(error) => Some(error),
             Self::Execution(error) => Some(error),
             Self::SourceChanged { .. }
@@ -438,6 +444,12 @@ impl From<OleError> for SourceBackedError {
     }
 }
 
+impl From<litchi_ole_common::Error> for SourceBackedError {
+    fn from(error: litchi_ole_common::Error) -> Self {
+        Self::Object(error)
+    }
+}
+
 impl From<Error> for SourceBackedError {
     fn from(error: Error) -> Self {
         Self::Parse(error)
@@ -463,22 +475,49 @@ struct SheetEntry {
     end: u64,
 }
 
+/// The dynamic source identity retained when a deferred target is handed to
+/// another owner (for example `Package::from_source`). The target's composed
+/// source reports a source mutation as I/O, so the handoff keeps the original
+/// positional source and CFB view for typed freshness checks.
+struct SourceFence {
+    source: Arc<dyn ReadAt>,
+    cfb: Arc<SharedOleFile>,
+    expected_version: SourceVersion,
+}
+
 struct SourceInner {
     source: Arc<dyn ReadAt>,
     cfb: Arc<SharedOleFile>,
     expected_version: SourceVersion,
+    source_fence: Option<Arc<SourceFence>>,
     workbook_path: Arc<[String]>,
     workbook_stream_len: u64,
     sheets: Box<[SheetEntry]>,
     worksheet_names: Box<[String]>,
     sst: Arc<SharedStringSstScan>,
     formatting: Arc<Formatting>,
+    styles: Option<Arc<StyleTables>>,
     encoding: Encoding,
     limits: SourceBackedLimits,
+    leniency: Leniency,
     query_cache: Arc<QueryIndexCache>,
     /// Repairs applied so far: the globals repairs the open made, plus the
     /// cell-XF repairs lazy worksheet scans record as queries run.
     tolerance: Mutex<ToleranceReport>,
+    /// Per sheet, what the cell cursor's validating scan found, kept so a
+    /// later cursor over the same immutable snapshot skips it (record 0267).
+    cursor_checks: Box<[std::sync::OnceLock<cursor::Check>]>,
+    /// The checked overlay plan a committed source-backed family edit
+    /// (`crate::source_backed`) writes. A committed owner keeps its original
+    /// parsed globals until a read needs the composed source.
+    pending: Option<Arc<ValidatedOverlayPlan>>,
+    /// Lazily opened target owner for a pending same-length overlay. The
+    /// source-backed commit has already validated the composed worksheet; the
+    /// complete target owner is therefore a read-time cache, not part of the
+    /// commit-time allocation path.
+    materialized: std::sync::OnceLock<Arc<SourceInner>>,
+    /// Whether this owner is the shallow deferred cell publication wrapper.
+    deferred: bool,
 }
 
 impl SourceInner {
@@ -604,12 +643,41 @@ impl SourceBackedWorksheetDescriptor {
 /// An owned result of one selected-cell lookup.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SourceBackedCell {
+    formula: bool,
+    formula_text: Option<Arc<str>>,
+    xf: u16,
     row: u32,
     column: u32,
     value: litchi_core::sheet::CellValue,
 }
 
 impl SourceBackedCell {
+    /// Whether this stored cell is a formula with a cached result.
+    #[must_use]
+    pub const fn is_formula(&self) -> bool {
+        self.formula
+    }
+
+    /// The record's `ixfe` cell format index; resolve it with
+    /// [`crate::Formatting::resolved_cell_format`].
+    #[must_use]
+    pub const fn xf_index(&self) -> u16 {
+        self.xf
+    }
+
+    /// Formula text rendered from the cell's BIFF tokens, with its leading
+    /// `=`.
+    ///
+    /// The positional owner renders without the workbook's name and
+    /// external-sheet tables, so a formula that needs them (a 3-D or named
+    /// reference) returns `None` here although [`Self::is_formula`] is true;
+    /// the eager reader's `Cell::formula` renders those with the full
+    /// workbook context.
+    #[must_use]
+    pub fn formula(&self) -> Option<&str> {
+        self.formula_text.as_deref()
+    }
+
     /// Zero-based row.
     #[must_use]
     pub const fn row(&self) -> u32 {
@@ -865,17 +933,29 @@ fn retained_text_bytes(value: &litchi_core::sheet::CellValue) -> u64 {
 }
 
 impl SourceBackedWorkbook {
+    /// Returns the exact shared CFB view retained by this source owner.
+    ///
+    /// This crate-private handoff lets the canonical XLS package owner adopt
+    /// the same source catalog and provenance without accepting a separately
+    /// supplied, potentially forged CFB/source pair.
+    pub(crate) fn shared_cfb(&self) -> Arc<SharedOleFile> {
+        Arc::clone(&self.inner.cfb)
+    }
+
+    /// Returns the finite limits retained when this source owner was opened.
+    pub(crate) fn retained_limits(&self) -> SourceBackedLimits {
+        self.inner.limits
+    }
+
+    /// Returns the formatting-defect policy retained when this source owner
+    /// was opened.
+    pub(crate) fn retained_leniency(&self) -> Leniency {
+        self.inner.leniency
+    }
+
     /// Opens a positional source with default finite limits.
     pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
         Self::from_read_at_with_options(source, SourceBackedOptions::default())
-    }
-
-    /// Opens a positional source with explicit finite limits.
-    pub fn from_read_at_with_limits(
-        source: Arc<dyn ReadAt>,
-        limits: SourceBackedLimits,
-    ) -> Result<Self> {
-        Self::from_read_at_with_options(source, SourceBackedOptions::default().with_limits(limits))
     }
 
     /// Opens a positional source with explicit options.
@@ -883,37 +963,25 @@ impl SourceBackedWorkbook {
         source: Arc<dyn ReadAt>,
         options: SourceBackedOptions,
     ) -> Result<Self> {
-        let limits = options.limits();
+        let limits = options.limits_value();
         limits.validate()?;
         let cfb_limits =
             SharedOleFileLimits::new(limits.max_input_bytes).map_err(SourceBackedError::Cfb)?;
-        let cfb = SharedOleFile::open_with_limits(Arc::clone(&source), cfb_limits)
+        let cfb = SharedOleFile::open(Arc::clone(&source), cfb_limits)
             .map_err(SourceBackedError::from)?;
         Self::from_shared_ole_file_with_options(Arc::new(cfb), options)
     }
 
     /// Opens a filesystem path through the positional `FileSource` adapter.
     #[cfg(any(unix, windows))]
-    pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
+    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let source = Arc::new(FileSource::open(path).map_err(SourceBackedError::Io)?);
         Self::from_read_at(source)
     }
 
-    /// Opens a filesystem path with explicit finite limits.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits(
-        path: impl AsRef<Path>,
-        limits: SourceBackedLimits,
-    ) -> Result<Self> {
-        Self::from_path_with_options(path, SourceBackedOptions::default().with_limits(limits))
-    }
-
     /// Opens a filesystem path with explicit options.
     #[cfg(any(unix, windows))]
-    pub fn from_path_with_options(
-        path: impl AsRef<Path>,
-        options: SourceBackedOptions,
-    ) -> Result<Self> {
+    pub fn open_with_options(path: impl AsRef<Path>, options: SourceBackedOptions) -> Result<Self> {
         let source = Arc::new(FileSource::open(path).map_err(SourceBackedError::Io)?);
         Self::from_read_at_with_options(source, options)
     }
@@ -954,6 +1022,11 @@ impl SourceBackedWorkbook {
     }
 
     fn text_impl(&self, execution: Option<&ExecutionContext>) -> Result<String> {
+        let result = self.text_impl_inner(execution);
+        self.finish_deferred(result)
+    }
+
+    fn text_impl_inner(&self, execution: Option<&ExecutionContext>) -> Result<String> {
         let mut collector = FallibleTextCollector::default();
         let report = match self.write_text_to_impl(
             &mut collector,
@@ -967,14 +1040,15 @@ impl SourceBackedWorkbook {
             },
         };
         if report.objects_written() != 0 {
-            check_text_state(&self.inner, execution)?;
+            let owner = self.effective_inner()?;
+            check_text_state(&owner, execution)?;
             collector.push_terminal_newline(
                 report.bytes_written(),
                 TextOutputOptions::default().max_output_bytes(),
             )?;
-            check_text_state(&self.inner, execution)?;
+            check_text_state(&owner, execution)?;
         }
-        self.inner.ensure_current()?;
+        self.effective_inner()?.ensure_current()?;
         String::from_utf8(collector.take_bytes())
             .map_err(|_error| SourceBackedError::InvalidData("text output was not UTF-8".into()))
     }
@@ -986,18 +1060,23 @@ impl SourceBackedWorkbook {
         execution: Option<&ExecutionContext>,
     ) -> std::result::Result<TextOutputReport, TextOutputError<SourceBackedError>> {
         let failure = Arc::new(Mutex::new(None));
+        let owner = match self.effective_inner() {
+            Ok(owner) => owner,
+            Err(source) => {
+                let writer = SequentialTextWriter::new(output, options);
+                return Err(writer.document_error(source));
+            },
+        };
         let mut checked_output = SourceCheckedTextSink {
             output,
-            owner: &self.inner,
+            owner: &owner,
             execution,
             failure: Arc::clone(&failure),
         };
         let mut writer = SequentialTextWriter::new(&mut checked_output, options);
         let conversion = (|| {
-            check_text_state(&self.inner, execution)
-                .map_err(|source| writer.document_error(source))?;
-            let refs = self
-                .inner
+            check_text_state(&owner, execution).map_err(|source| writer.document_error(source))?;
+            let refs = owner
                 .workbook_path
                 .iter()
                 .map(String::as_str)
@@ -1006,24 +1085,23 @@ impl SourceBackedWorkbook {
             // position carries across sheets because every sheet resolves out
             // of the same string table; a position that does not apply to a
             // resolve is discarded by the reader, which then walks cold.
-            let mut strings = SharedStringResolver::new(&self.inner, &refs);
+            let mut strings = SharedStringResolver::new(&owner, &refs);
             // One worksheet-region chain position for the whole document,
             // disjoint from the resolver's. `BoundSheet8` positions ascend, so
             // each sheet's cursor resumes from the previous sheet's start
             // instead of re-walking the chain from the stream's first sector;
             // a position that does not apply is discarded by the reader, which
             // then walks cold exactly as before.
-            let mut sheet_chain = self.inner.cfb.chain_hint();
-            for sheet in self
-                .inner
+            let mut sheet_chain = owner.cfb.chain_hint();
+            for sheet in owner
                 .sheets
                 .iter()
                 .filter(|sheet| sheet.worksheet_index.is_some())
             {
-                check_text_state(&self.inner, execution)
+                check_text_state(&owner, execution)
                     .map_err(|source| writer.document_error(source))?;
                 let collected = scan_text_sheet(
-                    &self.inner,
+                    &owner,
                     sheet,
                     &refs,
                     execution,
@@ -1031,7 +1109,7 @@ impl SourceBackedWorkbook {
                     &mut sheet_chain,
                 )
                 .map_err(|source| writer.document_error(source))?;
-                check_text_state(&self.inner, execution)
+                check_text_state(&owner, execution)
                     .map_err(|source| writer.document_error(source))?;
                 write_text_sheet(&collected, &mut writer, execution)?;
             }
@@ -1039,9 +1117,15 @@ impl SourceBackedWorkbook {
         })();
 
         let progress = writer.progress();
-        let source = take_source_text_failure(&failure)
+        let original_freshness = if self.inner.needs_source_fence() {
+            self.inner.ensure_current().err()
+        } else {
+            None
+        };
+        let source = original_freshness
+            .or_else(|| take_source_text_failure(&failure))
             .or_else(|| execution.and_then(|context| context.check().err().map(Into::into)))
-            .or_else(|| self.inner.ensure_current().err());
+            .or_else(|| owner.ensure_current().err());
         if let Some(source) = source {
             return Err(TextOutputError::Document { source, progress });
         }
@@ -1054,8 +1138,8 @@ impl SourceBackedWorkbook {
     /// reopening the path or exposing raw CFB bytes. The copy is bounded by
     /// [`SourceBackedLimits::max_materialize_bytes`]. It is not ordinary
     /// source-backed CRUD; callers should prefer the source-backed selectors
-    /// when they do not specifically need the eager `Workbook` API.
-    pub fn materialize_eager(&self) -> Result<Workbook<Cursor<Vec<u8>>>> {
+    /// when they do not specifically need the eager `raw::Reader` API.
+    pub fn materialize_eager(&self) -> Result<Reader<Cursor<Vec<u8>>>> {
         self.materialize_eager_impl(None)
     }
 
@@ -1069,25 +1153,34 @@ impl SourceBackedWorkbook {
     pub fn materialize_eager_with_execution(
         &self,
         execution: &ExecutionContext,
-    ) -> Result<Workbook<Cursor<Vec<u8>>>> {
+    ) -> Result<Reader<Cursor<Vec<u8>>>> {
         self.materialize_eager_impl(Some(execution))
     }
 
     fn materialize_eager_impl(
         &self,
         execution: Option<&ExecutionContext>,
-    ) -> Result<Workbook<Cursor<Vec<u8>>>> {
+    ) -> Result<Reader<Cursor<Vec<u8>>>> {
+        let result = self.materialize_eager_inner(execution);
+        self.finish_deferred(result)
+    }
+
+    fn materialize_eager_inner(
+        &self,
+        execution: Option<&ExecutionContext>,
+    ) -> Result<Reader<Cursor<Vec<u8>>>> {
+        let owner = self.effective_inner()?;
         if let Some(execution) = execution {
             execution.check()?;
         }
-        self.inner.ensure_current()?;
-        let source_len = self.inner.source.len()?;
-        self.inner.ensure_current()?;
-        if source_len > self.inner.limits.max_materialize_bytes {
+        owner.ensure_current()?;
+        let source_len = owner.source.len()?;
+        owner.ensure_current()?;
+        if source_len > owner.limits.max_materialize_bytes {
             return Err(SourceBackedError::ResourceLimit {
                 resource: "materialization bytes",
                 observed: source_len,
-                maximum: self.inner.limits.max_materialize_bytes,
+                maximum: owner.limits.max_materialize_bytes,
             });
         }
         let length =
@@ -1109,7 +1202,7 @@ impl SourceBackedWorkbook {
                 if let Some(execution) = execution {
                     execution.check()?;
                 }
-                let read = match self.inner.source.read_at(
+                let read = match owner.source.read_at(
                     u64::try_from(offset + filled).map_err(|_error| {
                         SourceBackedError::InvalidData(
                             "materialization offset does not fit u64".into(),
@@ -1119,25 +1212,25 @@ impl SourceBackedWorkbook {
                 ) {
                     Ok(read) => read,
                     Err(error) => {
-                        self.inner.ensure_current()?;
+                        owner.ensure_current()?;
                         return Err(SourceBackedError::Io(error));
                     },
                 };
                 if read == 0 {
-                    self.inner.ensure_current()?;
+                    owner.ensure_current()?;
                     return Err(SourceBackedError::InvalidData(
                         "source ended during eager materialization".into(),
                     ));
                 }
                 let remaining = count - filled;
                 if read > remaining {
-                    self.inner.ensure_current()?;
+                    owner.ensure_current()?;
                     return Err(SourceBackedError::InvalidData(
                         "source returned more bytes than requested".into(),
                     ));
                 }
                 filled += read;
-                self.inner.ensure_current()?;
+                owner.ensure_current()?;
             }
             offset += count;
         }
@@ -1145,18 +1238,51 @@ impl SourceBackedWorkbook {
         if let Some(execution) = execution {
             execution.check()?;
         }
-        self.inner.ensure_current()?;
-        let workbook = match Workbook::new(Cursor::new(bytes)) {
+        owner.ensure_current()?;
+        // This owner was admitted under SourceBackedLimits. Preserve its
+        // physical CFB input ceiling during materialization instead of
+        // introducing the eager reader's separate default SourceLimits after
+        // copying the input. The worksheet scan budget is intentionally not
+        // adapted here: it is a logical positional-read policy and must not
+        // become the per-entry CFB stream ceiling used by raw codecs.
+        let selected = owner.cfb.limits();
+        let cfb_limits = litchi_cfb::OleFileLimits::new(selected.max_input_bytes())?
+            .with_max_directory_bytes(selected.max_directory_bytes())?
+            .with_max_allocation_table_bytes(selected.max_allocation_table_bytes())?;
+        let source_limits = crate::SourceLimits::from_physical_profile(
+            owner.limits.max_input_bytes,
+        )
+        .map_err(|error| match error {
+            Error::InvalidLimit { value, maximum, .. } => SourceBackedError::ResourceLimit {
+                resource: "raw source input bytes",
+                observed: value,
+                maximum,
+            },
+            _ => SourceBackedError::InvalidData(
+                "source-backed raw physical profile is invalid".into(),
+            ),
+        })?;
+        let parsed = litchi_cfb::OleFile::open(Cursor::new(bytes), cfb_limits)
+            .map_err(Error::from)
+            .and_then(|ole| {
+                Reader::from_admitted_ole_file(
+                    ole,
+                    crate::OpenOptions::default()
+                        .source_limits(source_limits)
+                        .leniency(owner.leniency),
+                )
+            });
+        let workbook = match parsed {
             Ok(workbook) => workbook,
             Err(error) => {
-                self.inner.ensure_current()?;
+                owner.ensure_current()?;
                 return Err(SourceBackedError::Parse(error));
             },
         };
         if let Some(execution) = execution {
             execution.check()?;
         }
-        self.inner.ensure_current()?;
+        owner.ensure_current()?;
         Ok(workbook)
     }
 
@@ -1165,7 +1291,7 @@ impl SourceBackedWorkbook {
         cfb: Arc<SharedOleFile>,
         options: SourceBackedOptions,
     ) -> Result<Self> {
-        let limits = options.limits();
+        let limits = options.limits_value();
         limits.validate()?;
         let source = cfb.source_arc();
         // `SharedOleFile::source_version` already observes the source this view
@@ -1191,7 +1317,7 @@ impl SourceBackedWorkbook {
             &workbook_path,
             workbook_stream_len,
             limits,
-            options.leniency(),
+            options.leniency_value(),
         )?;
         validate_sheet_offsets(workbook_stream_len, parsed.global_end, &mut parsed.sheets)?;
         let mut worksheet_names = Vec::new();
@@ -1217,22 +1343,240 @@ impl SourceBackedWorkbook {
             source,
             cfb,
             expected_version,
+            source_fence: None,
             workbook_path: workbook_path.into_boxed_slice().into(),
             workbook_stream_len,
             sheets: parsed.sheets.into_boxed_slice(),
             worksheet_names: worksheet_names.into_boxed_slice(),
             sst: Arc::new(parsed.sst),
             formatting: Arc::new(parsed.formatting),
+            styles: parsed.styles.map(Arc::new),
             encoding: parsed.encoding,
             limits,
+            leniency: options.leniency_value(),
             query_cache: Arc::new(QueryIndexCache::new(
                 limits.max_query_index_bytes,
                 cache_sheet_count,
             )),
             tolerance: Mutex::new(tolerance),
+            cursor_checks: (0..cache_sheet_count)
+                .map(|_| std::sync::OnceLock::new())
+                .collect(),
+            pending: None,
+            materialized: std::sync::OnceLock::new(),
+            deferred: false,
         });
         inner.ensure_current()?;
         Ok(Self { inner })
+    }
+
+    /// Publishes a fixed-width cell overlay without opening the composed
+    /// workbook until a semantic read needs it. The numeric cell publisher
+    /// has already validated the target over a positional reader, so retaining
+    /// the original parsed globals is sufficient for the write-only path.
+    pub(crate) fn committed_deferred(&self, plan: ValidatedOverlayPlan) -> Result<Self> {
+        if plan.is_noop() {
+            return Ok(self.clone());
+        }
+        Ok(Self {
+            inner: Arc::new(self.inner.clone_for_pending(Arc::new(plan))),
+        })
+    }
+
+    /// Returns the owner whose parsed globals and worksheet scans describe the
+    /// bytes this handle reads. A committed source-backed owner keeps the
+    /// original globals during `commit`; the composed CFB is opened once when
+    /// the first semantic read asks for it. Publication and replay continue to
+    /// use the retained pending plan directly.
+    fn effective_inner(&self) -> Result<Arc<SourceInner>> {
+        effective_inner(&self.inner)
+    }
+
+    /// Finish an operation that read a deferred or handed-off target with a
+    /// fence on the original dynamic source. The composed target maps its
+    /// source-change error to I/O, so this trailing fence promotes an
+    /// in-flight mutation to the typed source-change error. Ordinary owners
+    /// keep their existing operation fences and pay no extra observation.
+    fn finish_deferred<T>(&self, result: Result<T>) -> Result<T> {
+        if self.inner.needs_source_fence() {
+            self.inner.ensure_current()?;
+        }
+        result
+    }
+
+    /// Finish a retained workbook projection. Metadata and worksheet catalog
+    /// lookups need a target fence on ordinary owners; cell queries already
+    /// fence their target internally, so callers mark those as complete. A
+    /// deferred or handed-off owner always fences the retained original
+    /// source instead.
+    fn finish_projection<T>(
+        &self,
+        owner: &SourceInner,
+        result: Result<T>,
+        target_already_fenced: bool,
+    ) -> Result<T> {
+        if self.inner.needs_source_fence() {
+            self.inner.ensure_current()?;
+        } else if !target_already_fenced {
+            owner.ensure_current()?;
+        }
+        result
+    }
+
+    pub(crate) fn materialized(&self) -> Result<Self> {
+        let inner = self.effective_inner()?;
+        let inner = if self.inner.deferred {
+            let source_fence = self
+                .inner
+                .handoff_source_fence()
+                .expect("a deferred source-backed owner always has an original-source fence");
+            Arc::new(inner.clone_with_source_fence(source_fence))
+        } else {
+            inner
+        };
+        self.finish_deferred(Ok(Self { inner }))
+    }
+
+    /// Whether two handles are shares of one opened (or committed) workbook.
+    pub(crate) fn same_workbook(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.inner, &other.inner)
+    }
+
+    /// Authenticate the exact artifact this owner would publish without
+    /// retaining a second workbook buffer. The identity includes the complete
+    /// artifact length and SHA-256 digest. Committed owners stream their
+    /// checked overlay; opened owners use the CFB identity scan bracketed by
+    /// the owner source fences.
+    pub(crate) fn replay_identity(&self) -> crate::Result<(u64, ArtifactFingerprint)> {
+        self.ensure_current()
+            .map_err(crate::source_backed::workbook_error)?;
+        let identity = (|| {
+            Ok::<_, Error>(match &self.inner.pending {
+                Some(plan) => {
+                    let mut sink = io::sink();
+                    let fingerprint = plan
+                        .write_to(&mut sink)
+                        .map_err(crate::source_backed::overlay_error)?
+                        .target_fingerprint();
+                    (plan.operation_shape().source_bytes, fingerprint)
+                },
+                None => {
+                    let first = self
+                        .inner
+                        .cfb
+                        .caller_bracketed_identity_fingerprint()
+                        .map_err(crate::source_backed::overlay_error)?;
+                    let second = self
+                        .inner
+                        .cfb
+                        .caller_bracketed_identity_fingerprint()
+                        .map_err(crate::source_backed::overlay_error)?;
+                    if first != second {
+                        return Err(Error::Io(io::Error::other(
+                            "source changed during source-backed replay",
+                        )));
+                    }
+                    (self.inner.cfb.file_size(), first)
+                },
+            })
+        })();
+        if self.inner.needs_source_fence() || identity.is_ok() {
+            self.ensure_current()
+                .map_err(crate::source_backed::workbook_error)?;
+        }
+        identity
+    }
+
+    pub(crate) fn pending_plan(&self) -> Option<&ValidatedOverlayPlan> {
+        self.inner.pending.as_deref()
+    }
+
+    /// Rebase a source-backed overlay onto this workbook's source and policy.
+    pub(crate) fn rebase_plan(
+        &self,
+        plan: &ValidatedOverlayPlan,
+        inverse: bool,
+    ) -> crate::Result<Self> {
+        let plan = if inverse {
+            plan.inverse_rebased_to(&self.inner.cfb)
+        } else {
+            plan.rebase_to(&self.inner.cfb)
+        }
+        .map_err(crate::source_backed::overlay_error)?;
+        self.committed_deferred(plan)
+            .map_err(crate::source_backed::workbook_error)
+    }
+
+    /// Streams this workbook's exact bytes: the source for an opened
+    /// workbook, the checked overlay output for a committed one. A committed
+    /// workbook returns the overlay publication report.
+    ///
+    /// # Errors
+    ///
+    /// Returns a source-changed, overlay or sink error; a sink failure may
+    /// leave a prefix in the sink.
+    pub fn write_to<W: Write>(
+        &self,
+        writer: &mut W,
+    ) -> std::result::Result<Option<litchi_cfb::PublishReport>, crate::source_backed::OutputError>
+    {
+        match &self.inner.pending {
+            Some(plan) => {
+                self.ensure_current().map_err(source_output_error)?;
+                let result = plan.write_to(writer);
+                let freshness = self.ensure_current();
+                match freshness {
+                    Err(error) => Err(source_output_error(error)),
+                    Ok(()) => result.map(Some).map_err(Into::into),
+                }
+            },
+            None => {
+                crate::Package::from_source(self.clone())?.write_to(writer)?;
+                Ok(None)
+            },
+        }
+    }
+
+    /// Atomically replaces `path` with this workbook's exact bytes.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::write_to`], plus the atomic-rename errors.
+    pub fn save<P: AsRef<Path>>(
+        &self,
+        path: P,
+    ) -> std::result::Result<Option<litchi_cfb::PublishReport>, crate::source_backed::OutputError>
+    {
+        self.save_with_durability(path, litchi_core::Durability::Full)
+    }
+
+    /// [`Self::save`] at a caller-chosen durability.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::save`].
+    pub fn save_with_durability<P: AsRef<Path>>(
+        &self,
+        path: P,
+        durability: litchi_core::Durability,
+    ) -> std::result::Result<Option<litchi_cfb::PublishReport>, crate::source_backed::OutputError>
+    {
+        match &self.inner.pending {
+            Some(plan) => {
+                self.ensure_current().map_err(source_output_error)?;
+                let result = plan.save_with_durability(path, durability);
+                let freshness = self.ensure_current();
+                match freshness {
+                    Err(error) => Err(source_output_error(error)),
+                    Ok(()) => result.map(Some).map_err(Into::into),
+                }
+            },
+            None => {
+                crate::Package::from_source(self.clone())?
+                    .save_with_durability(path, durability)?;
+                Ok(None)
+            },
+        }
     }
 
     /// Repairs this owner has applied so far, in discovery order.
@@ -1255,6 +1599,68 @@ impl SourceBackedWorkbook {
     /// Number of all workbook tabs, including chart and macro sheets.
     pub fn sheet_count(&self) -> Result<usize> {
         self.metadata(|inner| inner.sheets.len())
+    }
+
+    /// Select one workbook tab by its semantic name or checked zero-based
+    /// position and return its owned catalog metadata.
+    ///
+    /// The position is in the complete `BoundSheet8` tab catalog, while the
+    /// metadata's optional worksheet index remains the ordinal used by the
+    /// worksheet payload APIs.
+    pub fn sheet<'a>(
+        &self,
+        selector: impl Into<litchi_core::selector::Selector<'a, std::convert::Infallible>>,
+    ) -> Result<Option<crate::SheetMetadata>> {
+        let selector = selector.into();
+        self.metadata(|inner| {
+            let sheet = match selector {
+                litchi_core::selector::Selector::Name(name) => inner
+                    .sheets
+                    .iter()
+                    .find(|sheet| crate::sheet_name::equivalent(&sheet.name, name.as_ref())),
+                litchi_core::selector::Selector::Position(position) => {
+                    inner.sheets.get(position.get())
+                },
+                litchi_core::selector::Selector::Id(id) => match id {},
+                _ => {
+                    return Err(SourceBackedError::InvalidData(
+                        "unsupported sheet selector".into(),
+                    ));
+                },
+            };
+            Ok(sheet.map(|sheet| {
+                crate::SheetMetadata::from_parts(
+                    sheet.workbook_index,
+                    sheet.name.clone(),
+                    sheet.visibility,
+                    sheet.kind,
+                    sheet.worksheet_index,
+                )
+            }))
+        })?
+    }
+
+    /// Complete workbook-tab metadata, including non-worksheet tabs.
+    ///
+    /// Metadata access retains the source-version fence without parsing any
+    /// worksheet payload. Parsed worksheet indices use the same ordinal as
+    /// `worksheet_by_index`; tab indices remain in complete workbook order.
+    pub fn sheet_metadata(&self) -> Result<Vec<crate::SheetMetadata>> {
+        self.metadata(|inner| {
+            inner
+                .sheets
+                .iter()
+                .map(|sheet| {
+                    crate::SheetMetadata::from_parts(
+                        sheet.workbook_index,
+                        sheet.name.clone(),
+                        sheet.visibility,
+                        sheet.kind,
+                        sheet.worksheet_index,
+                    )
+                })
+                .collect()
+        })
     }
 
     /// Number of ordinary worksheet tabs.
@@ -1299,16 +1705,19 @@ impl SourceBackedWorkbook {
 
     /// Returns one ordinary worksheet by zero-based worksheet index.
     pub fn worksheet_by_index(&self, index: usize) -> Result<Option<SourceBackedWorksheet>> {
-        self.metadata(|inner| {
-            let sheet_index = inner
-                .sheets
-                .iter()
-                .position(|sheet| sheet.worksheet_index == Some(index));
-            sheet_index.map(|sheet_index| SourceBackedWorksheet {
-                owner: Arc::clone(&self.inner),
-                sheet_index,
-            })
-        })
+        let owner = self.effective_inner()?;
+        let sheet_index = owner
+            .sheets
+            .iter()
+            .position(|sheet| sheet.worksheet_index == Some(index));
+        let result = Ok(sheet_index.map(|sheet_index| SourceBackedWorksheet {
+            // Keep the deferred publication owner on the projection. Its
+            // effective target is a cache, while the original owner carries
+            // the dynamic-source freshness fence.
+            owner: Arc::clone(&self.inner),
+            sheet_index,
+        }));
+        self.finish_projection(&owner, result, false)
     }
 
     /// Alias for [`Self::worksheet_by_index`].
@@ -1318,32 +1727,32 @@ impl SourceBackedWorkbook {
 
     /// Returns one ordinary worksheet by case-insensitive name.
     pub fn worksheet_by_name(&self, name: &str) -> Result<Option<SourceBackedWorksheet>> {
-        self.metadata(|inner| {
-            let sheet_index = inner.sheets.iter().position(|sheet| {
-                sheet.worksheet_index.is_some() && sheet.name.eq_ignore_ascii_case(name)
-            });
-            sheet_index.map(|sheet_index| SourceBackedWorksheet {
-                owner: Arc::clone(&self.inner),
-                sheet_index,
-            })
-        })
+        let owner = self.effective_inner()?;
+        let sheet_index = owner.sheets.iter().position(|sheet| {
+            sheet.worksheet_index.is_some() && crate::sheet_name::equivalent(&sheet.name, name)
+        });
+        let result = Ok(sheet_index.map(|sheet_index| SourceBackedWorksheet {
+            owner: Arc::clone(&self.inner),
+            sheet_index,
+        }));
+        self.finish_projection(&owner, result, false)
     }
 
     /// Iterates ordinary worksheet handles without reading worksheet payloads.
     pub fn worksheets(&self) -> Result<Vec<SourceBackedWorksheet>> {
-        self.metadata(|inner| {
-            inner
-                .sheets
-                .iter()
-                .enumerate()
-                .filter_map(|(sheet_index, sheet)| {
-                    sheet.worksheet_index.map(|_| SourceBackedWorksheet {
-                        owner: Arc::clone(&self.inner),
-                        sheet_index,
-                    })
+        let owner = self.effective_inner()?;
+        let worksheets = owner
+            .sheets
+            .iter()
+            .enumerate()
+            .filter_map(|(sheet_index, sheet)| {
+                sheet.worksheet_index.map(|_| SourceBackedWorksheet {
+                    owner: Arc::clone(&self.inner),
+                    sheet_index,
                 })
-                .collect()
-        })
+            })
+            .collect();
+        self.finish_projection(&owner, Ok(worksheets), false)
     }
 
     /// Looks up one cell by worksheet index and zero-based coordinates.
@@ -1353,10 +1762,46 @@ impl SourceBackedWorkbook {
         row: u32,
         column: u32,
     ) -> Result<Option<SourceBackedCell>> {
-        let worksheet = self
-            .worksheet_by_index(worksheet_index)?
-            .ok_or_else(|| SourceBackedError::WorksheetNotFound(worksheet_index.to_string()))?;
-        worksheet.cell(row, column)
+        // The cell query owns the target's trailing fence (record 0287); a
+        // deferred owner adds the original-source fence below so an
+        // in-flight mutation is not reported as composed-source I/O. A
+        // missing worksheet still checks before it reports.
+        let owner = self.effective_inner()?;
+        let Some(sheet_index) = owner
+            .sheets
+            .iter()
+            .position(|sheet| sheet.worksheet_index == Some(worksheet_index))
+        else {
+            let result = Err(SourceBackedError::WorksheetNotFound(
+                worksheet_index.to_string(),
+            ));
+            return self.finish_projection(&owner, result, false);
+        };
+        let result = query_cell(&owner, sheet_index, row, column, None);
+        self.finish_projection(&owner, result, true)
+    }
+
+    /// The workbook's number formats and XF table.
+    ///
+    /// # Errors
+    ///
+    /// Returns a source-change error when the source no longer matches.
+    pub fn formatting(&self) -> Result<Arc<Formatting>> {
+        self.metadata(|inner| Arc::clone(&inner.formatting))
+    }
+
+    /// The workbook's font table and color palette.
+    ///
+    /// # Errors
+    ///
+    /// Returns a source-change error, or a typed refusal when the open could
+    /// not read the `Font` or `Palette` records under its leniency policy.
+    pub fn style_tables(&self) -> Result<Arc<StyleTables>> {
+        self.metadata(|inner| inner.styles.clone())?.ok_or_else(|| {
+            SourceBackedError::InvalidData(
+                "the workbook's Font or Palette records are not readable".into(),
+            )
+        })
     }
 
     /// Looks up one cell value by worksheet index and zero-based coordinates.
@@ -1482,12 +1927,35 @@ impl SourceBackedWorkbook {
 
     /// Returns the source version captured at open after a consistency check.
     pub fn source_version(&self) -> Result<SourceVersion> {
+        if let Some(plan) = self.inner.pending.as_ref() {
+            // A deferred owner still reads the original source through the
+            // retained overlay plan. Fence that source before and after
+            // asking the composed view for its version.
+            self.ensure_current()?;
+            let composed = plan.composed_source().map_err(deferred_overlay_error)?;
+            let version = composed.version().map_err(SourceBackedError::Io);
+            self.ensure_current()?;
+            return version;
+        }
         self.ensure_current()?;
         Ok(self.inner.expected_version)
     }
 
-    fn ensure_current(&self) -> Result<()> {
+    /// Checks the original source retained by this owner for source-backed
+    /// family commit paths. The deferred composed owner must not be used for
+    /// this check: its source is the dynamic original that can change after
+    /// the staged cell snapshot was captured.
+    pub(crate) fn ensure_original_source_current(&self) -> crate::Result<()> {
+        self.ensure_current()
+            .map_err(crate::source_backed::workbook_error)
+    }
+
+    pub(crate) fn ensure_current(&self) -> std::result::Result<(), SourceBackedError> {
         self.inner.ensure_current()
+    }
+
+    pub(crate) fn needs_source_fence(&self) -> bool {
+        self.inner.needs_source_fence()
     }
 
     /// Reads retained in-memory workbook metadata behind one trailing fence.
@@ -1497,9 +1965,9 @@ impl SourceBackedWorkbook {
     /// observations around it proved, and it is the trailing one that bounds
     /// what the caller receives.
     fn metadata<T>(&self, operation: impl FnOnce(&SourceInner) -> T) -> Result<T> {
-        let value = operation(&self.inner);
-        self.ensure_current()?;
-        Ok(value)
+        let owner = self.effective_inner()?;
+        let value = operation(&owner);
+        self.finish_projection(&owner, Ok(value), false)
     }
 }
 
@@ -1533,8 +2001,165 @@ mod materialization_tests {
 }
 
 impl SourceInner {
+    fn clone_for_pending(&self, pending: Arc<ValidatedOverlayPlan>) -> Self {
+        let tolerance = self
+            .tolerance
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone();
+        Self {
+            source: Arc::clone(&self.source),
+            cfb: Arc::clone(&self.cfb),
+            expected_version: self.expected_version,
+            source_fence: self.source_fence.clone(),
+            workbook_path: Arc::clone(&self.workbook_path),
+            workbook_stream_len: self.workbook_stream_len,
+            sheets: self.sheets.clone(),
+            worksheet_names: self.worksheet_names.clone(),
+            sst: Arc::clone(&self.sst),
+            formatting: Arc::clone(&self.formatting),
+            styles: self.styles.clone(),
+            encoding: self.encoding.clone(),
+            limits: self.limits,
+            leniency: self.leniency,
+            query_cache: Arc::clone(&self.query_cache),
+            tolerance: Mutex::new(tolerance),
+            cursor_checks: Vec::new().into_boxed_slice(),
+            pending: Some(pending),
+            materialized: std::sync::OnceLock::new(),
+            deferred: true,
+        }
+    }
+
+    fn clone_with_source_fence(&self, source_fence: Arc<SourceFence>) -> Self {
+        let tolerance = self
+            .tolerance
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone();
+        Self {
+            source: Arc::clone(&self.source),
+            cfb: Arc::clone(&self.cfb),
+            expected_version: self.expected_version,
+            source_fence: Some(source_fence),
+            workbook_path: Arc::clone(&self.workbook_path),
+            workbook_stream_len: self.workbook_stream_len,
+            sheets: self.sheets.clone(),
+            worksheet_names: self.worksheet_names.clone(),
+            sst: Arc::clone(&self.sst),
+            formatting: Arc::clone(&self.formatting),
+            styles: self.styles.clone(),
+            encoding: self.encoding.clone(),
+            limits: self.limits,
+            leniency: self.leniency,
+            query_cache: Arc::clone(&self.query_cache),
+            tolerance: Mutex::new(tolerance),
+            cursor_checks: Vec::new().into_boxed_slice(),
+            pending: self.pending.clone(),
+            materialized: std::sync::OnceLock::new(),
+            deferred: self.deferred,
+        }
+    }
+
+    fn needs_source_fence(&self) -> bool {
+        self.deferred || self.source_fence.is_some()
+    }
+
+    fn handoff_source_fence(&self) -> Option<Arc<SourceFence>> {
+        self.source_fence.clone().or_else(|| {
+            self.deferred.then(|| {
+                Arc::new(SourceFence {
+                    source: Arc::clone(&self.source),
+                    cfb: Arc::clone(&self.cfb),
+                    expected_version: self.expected_version,
+                })
+            })
+        })
+    }
+
     fn ensure_current(&self) -> Result<()> {
+        if let Some(fence) = &self.source_fence {
+            ensure_current_parts(&fence.source, &fence.cfb, fence.expected_version)?;
+            // A composed target can observe an original-source mutation as an
+            // I/O-shaped failure after the leading original check. Recheck
+            // the retained source before returning that target error so the
+            // handoff owner preserves the typed freshness contract; if the
+            // original is still current, retain the target error boundary.
+            return match ensure_current_parts(&self.source, &self.cfb, self.expected_version) {
+                Ok(()) => Ok(()),
+                Err(target_error) => {
+                    match ensure_current_parts(&fence.source, &fence.cfb, fence.expected_version) {
+                        Err(original_error) => Err(original_error),
+                        Ok(()) => Err(target_error),
+                    }
+                },
+            };
+        }
         ensure_current_parts(&self.source, &self.cfb, self.expected_version)
+    }
+}
+
+fn effective_inner(owner: &Arc<SourceInner>) -> Result<Arc<SourceInner>> {
+    if !owner.deferred {
+        return Ok(Arc::clone(owner));
+    }
+    // The cached target and the original parsed globals are both derived from
+    // the source captured by this deferred owner. Check that dynamic source
+    // before using either path so the first read cannot observe stale bytes.
+    // The non-deferred path above intentionally keeps its existing fast path.
+    owner.ensure_current()?;
+    if let Some(materialized) = owner.materialized.get() {
+        return Ok(Arc::clone(materialized));
+    }
+    let Some(plan) = owner.pending.as_ref().cloned() else {
+        return Ok(Arc::clone(owner));
+    };
+    let target = (|| -> Result<Arc<SourceInner>> {
+        let composed = plan.composed_source().map_err(deferred_overlay_error)?;
+        let target = SourceBackedWorkbook::from_read_at_with_options(
+            Arc::new(composed),
+            SourceBackedOptions::new()
+                .limits(owner.limits)
+                .leniency(owner.leniency),
+        )?;
+        Ok(target.inner)
+    })();
+    // The composed reader reports an original-source mutation as I/O while
+    // opening its target. Always run the original fence before propagating
+    // that result so cold materialization has the same typed error promotion
+    // as the cached projection path.
+    owner.ensure_current()?;
+    let target = target?;
+    let _ = owner.materialized.set(Arc::clone(&target));
+    Ok(owner.materialized.get().cloned().unwrap_or(target))
+}
+
+fn source_output_error(error: SourceBackedError) -> crate::source_backed::OutputError {
+    crate::source_backed::OutputError::Package(crate::package::Error::Source(error))
+}
+
+fn deferred_overlay_error(error: litchi_cfb::OverlayError) -> SourceBackedError {
+    match error {
+        litchi_cfb::OverlayError::Ole(error) => SourceBackedError::from(error),
+        litchi_cfb::OverlayError::Io(error)
+        | litchi_cfb::OverlayError::Committed { source: error } => SourceBackedError::Io(error),
+        litchi_cfb::OverlayError::SourceChanged { expected, observed } => {
+            SourceBackedError::SourceChanged { expected, observed }
+        },
+        litchi_cfb::OverlayError::Allocation { resource, .. } => SourceBackedError::Allocation {
+            resource,
+            requested: u64::MAX,
+        },
+        litchi_cfb::OverlayError::IncompleteOutput { source, .. } => {
+            deferred_overlay_error(*source)
+        },
+        litchi_cfb::OverlayError::Unavailable { reason } => SourceBackedError::InvalidData(reason),
+        litchi_cfb::OverlayError::SourceFingerprintChanged { .. }
+        | litchi_cfb::OverlayError::PreconditionFailed { .. }
+        | litchi_cfb::OverlayError::TargetFingerprintChanged { .. } => {
+            SourceBackedError::InvalidData("source-backed overlay identity changed".into())
+        },
+        _ => SourceBackedError::InvalidData("source-backed overlay failed".into()),
     }
 }
 
@@ -1568,6 +2193,25 @@ fn ensure_current_parts(
 }
 
 impl SourceBackedWorksheet {
+    fn effective_owner(&self) -> Result<Arc<SourceInner>> {
+        effective_inner(&self.owner)
+    }
+
+    /// Finish one projection operation with the owner that still observes the
+    /// caller's dynamic source. A deferred or handed-off target is backed by
+    /// a composed source whose version error is only an I/O-shaped projection
+    /// of the original change; fence the original owner after the target
+    /// operation so that a mutation in that window is promoted to typed
+    /// `SourceChanged`.
+    /// The fence runs before the operation result is returned, so freshness
+    /// keeps the same precedence as the workbook-level projection fences.
+    fn finish_projection<T>(&self, result: Result<T>) -> Result<T> {
+        if self.owner.needs_source_fence() {
+            self.owner.ensure_current()?;
+        }
+        result
+    }
+
     /// Zero-based worksheet index.
     pub fn index(&self) -> Result<usize> {
         self.metadata(|sheet| sheet.worksheet_index.unwrap_or_default())
@@ -1600,7 +2244,9 @@ impl SourceBackedWorksheet {
 
     /// Reads one cell by zero-based row and column.
     pub fn cell(&self, row: u32, column: u32) -> Result<Option<SourceBackedCell>> {
-        query_cell(&self.owner, self.sheet_index, row, column, None)
+        let owner = self.effective_owner()?;
+        let result = query_cell(&owner, self.sheet_index, row, column, None);
+        self.finish_projection(result)
     }
 
     /// Reads one cell by zero-based row and column with cooperative
@@ -1611,7 +2257,9 @@ impl SourceBackedWorksheet {
         column: u32,
         execution: &ExecutionContext,
     ) -> Result<Option<SourceBackedCell>> {
-        query_cell(&self.owner, self.sheet_index, row, column, Some(execution))
+        let owner = self.effective_owner()?;
+        let result = query_cell(&owner, self.sheet_index, row, column, Some(execution));
+        self.finish_projection(result)
     }
 
     /// Reads one cell value by zero-based row and column.
@@ -1664,7 +2312,9 @@ impl SourceBackedWorksheet {
     where
         F: FnMut(SourceBackedCell) -> Result<()>,
     {
-        visit_worksheet_cells(&self.owner, self.sheet_index, None, visitor)
+        let owner = self.effective_owner()?;
+        let result = visit_worksheet_cells(&owner, self.sheet_index, None, visitor);
+        self.finish_projection(result)
     }
 
     /// Reports every stored cell of this worksheet from one validated scan,
@@ -1684,7 +2334,9 @@ impl SourceBackedWorksheet {
     where
         F: FnMut(SourceBackedCell) -> Result<()>,
     {
-        visit_worksheet_cells(&self.owner, self.sheet_index, Some(execution), visitor)
+        let owner = self.effective_owner()?;
+        let result = visit_worksheet_cells(&owner, self.sheet_index, Some(execution), visitor);
+        self.finish_projection(result)
     }
 
     /// Reads one retained worksheet descriptor behind one trailing fence.
@@ -1695,25 +2347,95 @@ impl SourceBackedWorksheet {
     /// before reporting so a changed source still takes precedence over
     /// `WorksheetNotFound`, which is the order the leading fence produced.
     fn metadata<T>(&self, operation: impl FnOnce(&SheetEntry) -> T) -> Result<T> {
-        let Some(sheet) = self.owner.sheets.get(self.sheet_index) else {
-            self.owner.ensure_current()?;
-            return Err(SourceBackedError::WorksheetNotFound(
+        let owner = self.effective_owner()?;
+        let Some(sheet) = owner.sheets.get(self.sheet_index) else {
+            let result = Err(SourceBackedError::WorksheetNotFound(
                 self.sheet_index.to_string(),
             ));
+            if !self.owner.needs_source_fence() {
+                owner.ensure_current()?;
+            }
+            return self.finish_projection(result);
         };
         let value = operation(sheet);
-        self.owner.ensure_current()?;
-        Ok(value)
+        if !self.owner.needs_source_fence() {
+            owner.ensure_current()?;
+        }
+        self.finish_projection(Ok(value))
     }
 }
+
+mod cursor;
+pub use cursor::CellCursor;
 
 struct ParsedGlobals {
     global_end: u64,
     sheets: Vec<SheetEntry>,
     sst: SharedStringSstScan,
     formatting: Formatting,
+    styles: Option<StyleTables>,
     encoding: Encoding,
     tolerance: ToleranceReport,
+}
+
+/// The workbook's font table and color palette, for cell formatting reads.
+#[derive(Debug, Clone, Default)]
+pub struct StyleTables {
+    fonts: Vec<crate::font::Font>,
+    palette: crate::Palette,
+}
+
+impl StyleTables {
+    /// Fonts in record order.
+    #[must_use]
+    pub fn fonts(&self) -> &[crate::font::Font] {
+        &self.fonts
+    }
+
+    /// The font an XF's logical font index names.
+    #[must_use]
+    pub fn font(&self, index: u16) -> Option<&crate::font::Font> {
+        self.fonts.iter().find(|font| font.index() == index)
+    }
+
+    /// The workbook color palette.
+    #[must_use]
+    pub const fn palette(&self) -> &crate::Palette {
+        &self.palette
+    }
+
+    /// Parse `Font` and `Palette` records from the globals the open already
+    /// read. The scratch tolerance log keeps the open's own repair report and
+    /// refusal behavior unchanged; a table this parse cannot read is reported
+    /// when a caller asks for it.
+    fn parse(records: &[RecordRef<'_>], leniency: Leniency) -> Option<Self> {
+        let mut tolerance = ToleranceLog::new(leniency);
+        let mut fonts = Vec::new();
+        let mut palette = crate::Palette::default();
+        let mut palette_seen = 0_u32;
+        for record in records {
+            match record.kind().get() {
+                crate::font::FONT_RECORD_TYPE => {
+                    let index = crate::font::logical_font_index(fonts.len()).ok()?;
+                    fonts.push(
+                        crate::font::Font::parse_record(index, record.payload(), &mut tolerance)
+                            .ok()?,
+                    );
+                },
+                0x0092 => {
+                    palette = crate::Palette::parse_unique_record(
+                        record.payload(),
+                        u32::try_from(record.offset()).unwrap_or(u32::MAX),
+                        &mut palette_seen,
+                        tolerance.report_mut(),
+                    )
+                    .ok()?;
+                },
+                _ => {},
+            }
+        }
+        Some(Self { fonts, palette })
+    }
 }
 
 fn descriptor(sheet: &SheetEntry) -> SourceBackedWorksheetDescriptor {
@@ -2089,7 +2811,7 @@ fn parse_globals(
             resource: "global records",
             requested: record_count as u64,
         })?;
-    for record in BiffRecords::with_limits(&bytes, biff_limits).map_err(map_biff_error)? {
+    for record in BiffRecords::new(&bytes, biff_limits).map_err(map_biff_error)? {
         records.push(record.map_err(map_biff_error)?);
     }
     let first = records
@@ -2271,6 +2993,7 @@ fn parse_globals(
     })?;
     let formatting =
         Formatting::parse_globals(&records, &mut tolerance).map_err(SourceBackedError::Parse)?;
+    let styles = StyleTables::parse(&records, leniency);
     let sst = scan_shared_string_records(&sst_refs, tolerance.report_mut())
         .map_err(map_shared_string_error)?;
 
@@ -2316,6 +3039,7 @@ fn parse_globals(
         sheets,
         sst,
         formatting,
+        styles,
         encoding,
         tolerance: tolerance.into_report(),
     })
@@ -2442,6 +3166,16 @@ impl<'a> WorksheetScan<'a> {
             execution,
             scratch: Vec::new(),
         })
+    }
+
+    /// Continue the scan of a sheet starting at `sheet_start` that a sink
+    /// stopped: the limits count from the sheet start, as they did.
+    fn resume(&mut self, sheet_start: u64, resume: ScanResume) {
+        self.scanned_bytes = resume.scanned_bytes;
+        self.scanned_records = resume.scanned_records;
+        self.fill_bound = sheet_start
+            .saturating_add(self.limits.max_worksheet_scan_bytes)
+            .min(self.upper_bound);
     }
 
     /// One past the last stream offset resident in the window, which is also
@@ -2692,6 +3426,22 @@ impl<'a> WorksheetScan<'a> {
         Ok(())
     }
 
+    /// Advances past an embedded substream whose BOF was just framed and
+    /// skipped, through its matching EOF (nested substreams included).
+    fn skip_embedded_substream(&mut self) -> Result<()> {
+        let mut depth = 1_usize;
+        while depth > 0 {
+            let frame = self.next_frame()?;
+            match frame.kind {
+                BOF => depth += 1,
+                EOF => depth -= 1,
+                _ => {},
+            }
+            self.skip_payload(&frame)?;
+        }
+        Ok(())
+    }
+
     /// Honours the caller's cooperative cancellation, twice per framed record.
     ///
     /// Most callers pass no execution context, and that case is a null test
@@ -2845,6 +3595,15 @@ fn scan_text_sheet(
             ));
         }
 
+        if frame.kind == BOF {
+            // An embedded chart substream (`[MS-XLS]` 2.1.7.20.6 OBJECTS):
+            // its data-cache Number and Label records are the chart's, not
+            // cells of this worksheet, as the eager parser reads them
+            // (records 0293, 0316).
+            scan.skip_payload(&frame)?;
+            scan.skip_embedded_substream()?;
+            continue;
+        }
         match frame.kind {
             0x0200 => {
                 let payload = scan.read_payload(&frame)?;
@@ -3099,6 +3858,13 @@ trait CellSink {
     /// change which bytes are checked.
     fn wants(&self, row: u16, col: u16) -> bool;
 
+    /// [`CellSink::wants`] for a `FORMULA` record. The cell cursor's
+    /// validating scan parses formulas only, to learn whether one needs the
+    /// workbook's name tables to render (record 0267).
+    fn wants_formula(&self, row: u16, col: u16) -> bool {
+        self.wants(row, col)
+    }
+
     /// Consumes one validated cell record the sink does not want.
     ///
     /// Every implementation applies the Excel-compatible cell-XF repair,
@@ -3116,6 +3882,23 @@ trait CellSink {
             .check_cell_xf(scan.formatting, measured.xf_index, measured.row);
         Ok(())
     }
+
+    /// Whether the scan may stop at the next record boundary that leaves no
+    /// string-valued `FORMULA` waiting for its `STRING` (the cell cursor's
+    /// batch is full, record 0267). Every other sink scans to the EOF.
+    fn stop(&self) -> bool {
+        false
+    }
+}
+
+/// Where a scan a sink stopped resumes: the next record boundary, with the
+/// scan's limit counters, so a resumed scan charges the worksheet's byte and
+/// record limits exactly as one uninterrupted scan does (record 0267).
+#[derive(Debug, Clone, Copy)]
+struct ScanResume {
+    position: u64,
+    scanned_bytes: u64,
+    scanned_records: usize,
 }
 
 /// The per-scan constants every sink needs, gathered once so that the frame
@@ -3176,7 +3959,7 @@ impl<const COLLECT_INDEX: bool> CellSink for TargetCell<'_, COLLECT_INDEX> {
         if record.row() != self.row || record.col() != self.column {
             return Ok(());
         }
-        if let Some(value) = target_cell_value(record, scan.owner, scan.execution, strings)? {
+        if let Some(target) = target_cell_value(record, scan.owner, scan.execution, strings)? {
             if COLLECT_INDEX
                 && matches!(record, CellRecord::LabelSst { .. })
                 && let Some(index) = self.index.as_mut()
@@ -3186,9 +3969,12 @@ impl<const COLLECT_INDEX: bool> CellSink for TargetCell<'_, COLLECT_INDEX> {
                 index.set_sst_chain_checkpoint(&strings.chain);
             }
             self.found = Some(SourceBackedCell {
+                formula: matches!(record, CellRecord::Formula { .. }),
+                formula_text: target.formula,
+                xf: cell_xf_index(record),
                 row: u32::from(self.row),
                 column: u32::from(self.column),
-                value,
+                value: target.value,
             });
         }
         Ok(())
@@ -3237,14 +4023,23 @@ fn target_cell_value(
     owner: &SourceInner,
     execution: Option<&ExecutionContext>,
     strings: &mut SharedStringResolver<'_>,
-) -> Result<Option<litchi_core::sheet::CellValue>> {
+) -> Result<Option<SelectedCell>> {
     let cell = Cell::from_record_with_formula_context(record, None, None, Some(&owner.formatting));
     let value = if let Some(string_index) = cell.shared_string_index() {
         resolve_shared_string(owner, string_index, execution, strings)?
     } else {
         cell.value().clone()
     };
-    Ok(Some(value))
+    Ok(Some(SelectedCell {
+        value,
+        formula: cell.formula_arc(),
+    }))
+}
+
+/// One selected cell's semantic value and context-free rendered formula.
+struct SelectedCell {
+    value: litchi_core::sheet::CellValue,
+    formula: Option<Arc<str>>,
 }
 
 /// The whole-sheet sink: reports every stored cell in stream order and retains
@@ -3274,6 +4069,9 @@ where
             cell.value().clone()
         };
         (self.visitor)(SourceBackedCell {
+            formula: matches!(record, CellRecord::Formula { .. }),
+            formula_text: cell.formula_arc(),
+            xf: cell_xf_index(record),
             row: u32::from(record.row()),
             column: u32::from(record.col()),
             value,
@@ -3310,6 +4108,16 @@ fn wants_record<S: CellSink + ?Sized>(sink: &S, payload: &[u8]) -> bool {
     })
 }
 
+/// [`wants_record`] for a `FORMULA` record.
+fn wants_formula_record<S: CellSink + ?Sized>(sink: &S, payload: &[u8]) -> bool {
+    payload.get(..4).is_none_or(|head| {
+        sink.wants_formula(
+            u16::from_le_bytes([head[0], head[1]]),
+            u16::from_le_bytes([head[2], head[3]]),
+        )
+    })
+}
+
 /// Scans one worksheet substream to its EOF, handing every parsed cell record
 /// to `sink`.
 ///
@@ -3323,6 +4131,19 @@ fn scan_worksheet<S: CellSink>(
     execution: Option<&ExecutionContext>,
     sink: &mut S,
 ) -> Result<()> {
+    scan_worksheet_from(owner, sheet_index, execution, sink, None).map(|_| ())
+}
+
+/// [`scan_worksheet`] from the sheet's BOF, or from where a stopped scan
+/// left off. Returns where to resume when the sink stopped the scan, `None`
+/// once the scan reached the worksheet's EOF.
+fn scan_worksheet_from<S: CellSink>(
+    owner: &Arc<SourceInner>,
+    sheet_index: usize,
+    execution: Option<&ExecutionContext>,
+    sink: &mut S,
+    resume: Option<ScanResume>,
+) -> Result<Option<ScanResume>> {
     let sheet = owner
         .sheets
         .get(sheet_index)
@@ -3346,15 +4167,26 @@ fn scan_worksheet<S: CellSink>(
     let mut scan = WorksheetScan::new(
         &owner.cfb,
         &refs,
-        sheet.start,
+        resume.map_or(sheet.start, |resume| resume.position),
         sheet.end,
         owner.limits,
         execution,
         &mut sheet_chain,
     )?;
+    if let Some(resume) = resume {
+        scan.resume(sheet.start, resume);
+    }
     sink.started(&sheet_chain);
-    let mut first = true;
+    let mut first = resume.is_none();
     loop {
+        if pending_formula.is_none() && sink.stop() {
+            finish_scan(owner, execution)?;
+            return Ok(Some(ScanResume {
+                position: scan.position,
+                scanned_bytes: scan.scanned_bytes,
+                scanned_records: scan.scanned_records,
+            }));
+        }
         let frame = scan.next_frame()?;
         let frame_offset = scan.position.saturating_sub(4);
         if first {
@@ -3379,7 +4211,7 @@ fn scan_worksheet<S: CellSink>(
                     "string-valued FORMULA lacks STRING result".into(),
                 ));
             }
-            return finish_scan(owner, execution);
+            return finish_scan(owner, execution).map(|()| None);
         }
         if let Some((mut formula, occurrence)) = pending_formula.take() {
             if frame.kind == STRING {
@@ -3422,10 +4254,19 @@ fn scan_worksheet<S: CellSink>(
             pending_formula = Some((formula, occurrence));
         }
 
+        if frame.kind == BOF {
+            // An embedded chart substream (`[MS-XLS]` 2.1.7.20.6 OBJECTS):
+            // its data-cache Number and Label records are the chart's, not
+            // cells of this worksheet, as the eager parser reads them
+            // (records 0293, 0316).
+            scan.skip_payload(&frame)?;
+            scan.skip_embedded_substream()?;
+            continue;
+        }
         match frame.kind {
             0x0006 => {
                 let payload = scan.read_payload(&frame)?;
-                if !wants_record(sink, payload) {
+                if !wants_formula_record(sink, payload) {
                     let measured = CellRecord::measure(frame.kind, payload, &owner.encoding)
                         .map_err(SourceBackedError::Parse)?;
                     sink.accept_measured(
@@ -3596,7 +4437,6 @@ fn query_cell(
     if let Some(context) = execution {
         context.check().map_err(SourceBackedError::from)?;
     }
-    owner.ensure_current()?;
     if row > u32::from(u16::MAX) || column > u32::from(u8::MAX) {
         owner.ensure_current()?;
         return Ok(None);
@@ -3605,6 +4445,9 @@ fn query_cell(
         .query_cache
         .lookup(sheet_index, owner.expected_version)
     {
+        // The replay publishes nothing, and each of its reads and its
+        // trailing check observe the source, so a leading check would only
+        // repeat them (record 0287).
         return replay_indexed_cell(
             owner,
             sheet_index,
@@ -3614,6 +4457,8 @@ fn query_cell(
             execution,
         );
     }
+    // A scan updates the cache's miss state before it reads: check first.
+    owner.ensure_current()?;
     let index_candidate = owner
         .query_cache
         .observe_miss(sheet_index)
@@ -3707,13 +4552,16 @@ fn replay_indexed_cell(
             .cfb
             .stream_cursor_at_hinted(&refs, slot.stream_offset, &mut chain)
             .map_err(SourceBackedError::from)?;
-        if let Some(value) =
+        if let Some(target) =
             replay_indexed_slot(owner, sheet.end, slot, &mut cursor, execution, &mut strings)?
         {
             found = Some(SourceBackedCell {
+                formula: slot.kind == 0x0006,
+                formula_text: target.formula,
+                xf: slot.xf,
                 row: u32::from(row),
                 column: u32::from(column),
-                value,
+                value: target.value,
             });
         }
     }
@@ -3734,7 +4582,7 @@ fn replay_indexed_slot(
     cursor: &mut SharedOleStreamCursor<'_>,
     execution: Option<&ExecutionContext>,
     strings: &mut SharedStringResolver<'_>,
-) -> Result<Option<litchi_core::sheet::CellValue>> {
+) -> Result<Option<SelectedCell>> {
     let (kind, payload) = read_indexed_frame(cursor, upper_bound)?;
     if kind != slot.kind {
         return Err(SourceBackedError::InvalidData(
@@ -3843,11 +4691,26 @@ fn read_indexed_frame(
         ));
     }
     let mut header = [0_u8; 4];
+    // The payload read below fences the header as well (record 0287); every
+    // error between the two reads is fenced, so a changed source still wins.
     cursor
-        .read_exact(&mut header)
+        .read_exact_deferred(&mut header)
         .map_err(SourceBackedError::from)?;
     let kind = u16::from_le_bytes([header[0], header[1]]);
     let payload_len = usize::from(u16::from_le_bytes([header[2], header[3]]));
+    let payload = indexed_payload(offset, payload_len, upper_bound)
+        .map_err(|error| fence_error(cursor, error))?;
+    let mut payload = payload;
+    cursor
+        .read_exact(&mut payload)
+        .map_err(SourceBackedError::from)?;
+    Ok((kind, payload))
+}
+
+/// The zeroed buffer for an indexed frame's payload of `payload_len` bytes
+/// whose header starts at `offset`, after checking it against the record
+/// limit and `upper_bound`.
+fn indexed_payload(offset: u64, payload_len: usize, upper_bound: u64) -> Result<Vec<u8>> {
     if payload_len > litchi_biff::MAX_RECORD_BYTES {
         return Err(SourceBackedError::ResourceLimit {
             resource: "BIFF record bytes",
@@ -3874,10 +4737,18 @@ fn read_indexed_frame(
             requested: payload_len as u64,
         })?;
     payload.resize(payload_len, 0);
-    cursor
-        .read_exact(&mut payload)
-        .map_err(SourceBackedError::from)?;
-    Ok((kind, payload))
+    Ok(payload)
+}
+
+/// `error`, unless the source changed since the cursor's last fenced read,
+/// whose `SourceChanged` error wins.
+fn fence_error(cursor: &SharedOleStreamCursor<'_>, error: SourceBackedError) -> SourceBackedError {
+    match cursor.check_source() {
+        Err(OleError::SourceChanged { expected, observed }) => {
+            SourceBackedError::SourceChanged { expected, observed }
+        },
+        _ => error,
+    }
 }
 
 fn replay_mul_rk_record(payload: &[u8], slot: &CellSlot) -> Result<CellRecord> {
@@ -4650,7 +5521,7 @@ mod tests {
     fn the_globals_scan_reads_identically_with_and_without_its_chain_hint() {
         let bytes = ole_fixture("SimpleWithImages-mac.xls");
         let source = Arc::new(RecordingSource::new(bytes));
-        let cfb = SharedOleFile::open(erased(&source)).unwrap();
+        let cfb = SharedOleFile::open(erased(&source), SharedOleFileLimits::default()).unwrap();
         let stream_len = cfb.stream_len(&["Workbook"]).unwrap();
         assert!(
             stream_len > FILL_SCHEDULE.last().unwrap().0,
@@ -4668,7 +5539,8 @@ mod tests {
         let filled = globals.filled;
 
         let plain_source = Arc::new(RecordingSource::new(source.bytes.clone()));
-        let plain_cfb = SharedOleFile::open(erased(&plain_source)).unwrap();
+        let plain_cfb =
+            SharedOleFile::open(erased(&plain_source), SharedOleFileLimits::default()).unwrap();
         let mut plain_bytes = vec![0u8; usize::try_from(filled).unwrap()];
         let _ = plain_source.take();
         for (start, end) in fill_extents(&globals_extents(stream_len)) {

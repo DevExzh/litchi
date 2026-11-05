@@ -11,7 +11,7 @@ fn parse(body: &str) -> Result<Option<Settings>> {
 }
 
 fn parse_fixture(path: &str) -> Settings {
-    let package = OpcPackage::open(path).unwrap();
+    let package = OpcPackage::open(path, litchi_opc::SourceLimits::default()).unwrap();
     let uri = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
     parse_worksheet_header_footer(package.get_part(&uri).unwrap().blob())
         .unwrap()

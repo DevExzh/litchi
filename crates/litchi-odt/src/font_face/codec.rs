@@ -10,11 +10,11 @@ use super::{
     XLINK_NAMESPACE, invalid, xml_error,
 };
 use litchi_core::{Error, Result};
+use litchi_odf_common::{ResolvedReader, XmlStreamLimits};
 use quick_xml::{
     XmlVersion,
     events::{BytesStart, Event},
     name::ResolveResult,
-    reader::NsReader,
 };
 use std::collections::HashSet;
 
@@ -24,9 +24,14 @@ fn namespace_text(namespace: &[u8]) -> Result<&str> {
     })
 }
 
-pub(super) fn write_declarations(declarations: &Declarations) -> Result<String> {
+pub(super) fn write_declarations(
+    declarations: &Declarations,
+    limits: &XmlStreamLimits,
+) -> Result<String> {
     declarations.validate()?;
-    let mut output = String::with_capacity(256 + declarations.faces.len() * 128);
+    let capacity = declarations_size(declarations)?;
+    ensure_output_size(capacity, limits)?;
+    let mut output = String::with_capacity(capacity);
     output.push_str("<office:font-face-decls xmlns:office=\"");
     output.push_str(namespace_text(OFFICE_NAMESPACE)?);
     output.push_str("\" xmlns:style=\"");
@@ -136,25 +141,31 @@ pub(super) fn write_declarations(declarations: &Declarations) -> Result<String> 
         output.push_str("</style:font-face>");
     }
     output.push_str("</office:font-face-decls>");
+    if u64::try_from(output.len()).unwrap_or(u64::MAX) > limits.max_bytes() {
+        return invalid("serialized font-face declarations exceed the configured XML limit");
+    }
     Ok(output)
 }
 
 /// Parse an optional direct `office:font-face-decls` child from ODF XML.
-pub fn parse(xml: &str) -> Result<Option<Declarations>> {
-    if xml.len() > MAX_DOCUMENT_XML_BYTES {
+pub fn parse(xml: &str, limits: &XmlStreamLimits) -> Result<Option<Declarations>> {
+    if xml.len() > MAX_DOCUMENT_XML_BYTES
+        || u64::try_from(xml.len()).unwrap_or(u64::MAX) > limits.max_bytes()
+    {
         return invalid(format!(
             "ODF XML exceeds the {MAX_DOCUMENT_XML_BYTES} byte font-face limit"
         ));
     }
-    let mut reader = NsReader::from_str(xml);
+    let mut reader = ResolvedReader::from_xml_document(xml, *limits).map_err(|error| {
+        litchi_odf_common::map_resolved_reader_error(error, "invalid ODF font-face XML")
+    })?;
     reader.config_mut().trim_text(false);
-    let mut buffer = Vec::new();
     let mut depth = 0usize;
     let mut result = None;
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(xml_error)?;
+        let (namespace, event) = reader.read_resolved_event().map_err(|error| {
+            litchi_odf_common::map_resolved_reader_error(error, "invalid ODF font-face XML")
+        })?;
         let namespace = namespace_kind(&namespace);
         match event {
             Event::Start(element)
@@ -184,7 +195,7 @@ pub fn parse(xml: &str) -> Result<Option<Declarations>> {
                 depth = depth
                     .checked_add(1)
                     .ok_or_else(|| Error::InvalidFormat("ODF XML depth overflow".to_string()))?;
-                if depth > MAX_XML_DEPTH {
+                if depth > MAX_XML_DEPTH.min(limits.max_depth()) {
                     return invalid(format!("ODF XML exceeds the {MAX_XML_DEPTH} depth limit"));
                 }
             },
@@ -197,20 +208,18 @@ pub fn parse(xml: &str) -> Result<Option<Declarations>> {
             Event::Eof => break,
             _ => {},
         }
-        buffer.clear();
     }
     Ok(result)
 }
 
-fn parse_declarations(reader: &mut NsReader<&[u8]>) -> Result<Declarations> {
+fn parse_declarations(reader: &mut ResolvedReader<'_>) -> Result<Declarations> {
     let mut faces = Vec::new();
     let mut names = HashSet::new();
     let mut text_bytes = 0usize;
-    let mut buffer = Vec::new();
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(xml_error)?;
+        let (namespace, event) = reader.read_resolved_event().map_err(|error| {
+            litchi_odf_common::map_resolved_reader_error(error, "invalid ODF font-face XML")
+        })?;
         let namespace = namespace_kind(&namespace);
         match event {
             Event::Start(element)
@@ -252,13 +261,12 @@ fn parse_declarations(reader: &mut NsReader<&[u8]>) -> Result<Declarations> {
             Event::Eof => return invalid("unterminated office:font-face-decls"),
             _ => return invalid("unsupported child in office:font-face-decls"),
         }
-        buffer.clear();
     }
     Ok(Declarations { faces })
 }
 
 fn parse_face_attributes(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     text_bytes: &mut usize,
 ) -> Result<Face> {
@@ -318,17 +326,16 @@ fn parse_face_attributes(
 }
 
 fn parse_face_children(
-    reader: &mut NsReader<&[u8]>,
+    reader: &mut ResolvedReader<'_>,
     face: &mut Face,
     text_bytes: &mut usize,
 ) -> Result<()> {
     let mut source_seen = false;
     let mut definition_seen = false;
-    let mut buffer = Vec::new();
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(xml_error)?;
+        let (namespace, event) = reader.read_resolved_event().map_err(|error| {
+            litchi_odf_common::map_resolved_reader_error(error, "invalid ODF font-face XML")
+        })?;
         let namespace = namespace_kind(&namespace);
         match event {
             Event::Start(element)
@@ -385,18 +392,16 @@ fn parse_face_children(
             Event::Eof => return invalid("unterminated style:font-face"),
             _ => return invalid("unsupported child in style:font-face"),
         }
-        buffer.clear();
     }
     Ok(())
 }
 
-fn parse_sources(reader: &mut NsReader<&[u8]>, text_bytes: &mut usize) -> Result<Vec<Source>> {
+fn parse_sources(reader: &mut ResolvedReader<'_>, text_bytes: &mut usize) -> Result<Vec<Source>> {
     let mut sources = Vec::new();
-    let mut buffer = Vec::new();
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(xml_error)?;
+        let (namespace, event) = reader.read_resolved_event().map_err(|error| {
+            litchi_odf_common::map_resolved_reader_error(error, "invalid ODF font-face XML")
+        })?;
         let namespace = namespace_kind(&namespace);
         match event {
             Event::Start(element)
@@ -457,7 +462,6 @@ fn parse_sources(reader: &mut NsReader<&[u8]>, text_bytes: &mut usize) -> Result
             Event::Eof => return invalid("unterminated svg:font-face-src"),
             _ => return invalid("unsupported child in svg:font-face-src"),
         }
-        buffer.clear();
     }
     if sources.is_empty() {
         return invalid("svg:font-face-src requires at least one source");
@@ -466,15 +470,14 @@ fn parse_sources(reader: &mut NsReader<&[u8]>, text_bytes: &mut usize) -> Result
 }
 
 fn parse_formats(
-    reader: &mut NsReader<&[u8]>,
+    reader: &mut ResolvedReader<'_>,
     text_bytes: &mut usize,
 ) -> Result<Vec<Option<String>>> {
     let mut formats = Vec::new();
-    let mut buffer = Vec::new();
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(xml_error)?;
+        let (namespace, event) = reader.read_resolved_event().map_err(|error| {
+            litchi_odf_common::map_resolved_reader_error(error, "invalid ODF font-face XML")
+        })?;
         let namespace = namespace_kind(&namespace);
         match event {
             Event::Empty(element)
@@ -521,12 +524,11 @@ fn parse_formats(
             Event::Eof => return invalid("unterminated svg:font-face-uri"),
             _ => return invalid("unsupported child in svg:font-face-uri"),
         }
-        buffer.clear();
     }
     Ok(formats)
 }
 
-fn parse_link(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Link> {
+fn parse_link(reader: &ResolvedReader<'_>, element: &BytesStart<'_>) -> Result<Link> {
     let mut kind = None;
     let mut href = None;
     let mut actuate = None;
@@ -560,7 +562,7 @@ fn parse_link(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Link
 }
 
 fn optional_single_svg_attribute(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     expected: &[u8],
 ) -> Result<Option<String>> {
@@ -583,15 +585,14 @@ fn optional_single_svg_attribute(
 }
 
 fn require_empty(
-    reader: &mut NsReader<&[u8]>,
+    reader: &mut ResolvedReader<'_>,
     expected_namespace: NamespaceKind,
     expected_local: &[u8],
 ) -> Result<()> {
-    let mut buffer = Vec::new();
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(xml_error)?;
+        let (namespace, event) = reader.read_resolved_event().map_err(|error| {
+            litchi_odf_common::map_resolved_reader_error(error, "invalid ODF font-face XML")
+        })?;
         let namespace = namespace_kind(&namespace);
         match event {
             Event::End(element)
@@ -607,12 +608,11 @@ fn require_empty(
             Event::Eof => return invalid("unterminated empty font source element"),
             _ => return invalid("font source element must be empty"),
         }
-        buffer.clear();
     }
 }
 
 fn attributes(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
 ) -> Result<Vec<(NamespaceKind, Vec<u8>, String)>> {
     let mut output = Vec::new();
@@ -676,6 +676,163 @@ fn write_link_attrs(output: &mut String, link: &Link) {
     if link.actuate_on_request {
         output.push_str(" xlink:actuate=\"onRequest\"");
     }
+}
+
+fn declarations_size(declarations: &Declarations) -> Result<usize> {
+    let mut size = 0usize;
+    add_size(&mut size, b"<office:font-face-decls xmlns:office=\"".len())?;
+    add_size(&mut size, namespace_text(OFFICE_NAMESPACE)?.len())?;
+    add_size(&mut size, b"\" xmlns:style=\"".len())?;
+    add_size(&mut size, namespace_text(STYLE_NAMESPACE)?.len())?;
+    add_size(&mut size, b"\" xmlns:svg=\"".len())?;
+    add_size(&mut size, namespace_text(SVG_NAMESPACE)?.len())?;
+    add_size(&mut size, b"\" xmlns:xlink=\"".len())?;
+    add_size(&mut size, namespace_text(XLINK_NAMESPACE)?.len())?;
+    add_size(&mut size, b"\">".len())?;
+    for face in &declarations.faces {
+        add_size(&mut size, b"<style:font-face".len())?;
+        add_attr_size(&mut size, "style:name", Some(&face.name))?;
+        add_attr_size(
+            &mut size,
+            "style:font-adornments",
+            face.font_adornments.as_deref(),
+        )?;
+        add_attr_size(
+            &mut size,
+            "style:font-family-generic",
+            face.generic_family.map(Family::as_str),
+        )?;
+        add_attr_size(&mut size, "style:font-pitch", face.pitch.map(Pitch::as_str))?;
+        add_attr_size(&mut size, "style:font-charset", face.charset.as_deref())?;
+        add_attr_size(&mut size, "svg:font-family", face.family.as_deref())?;
+        add_attr_size(&mut size, "svg:font-style", face.style.map(Style::as_str))?;
+        add_attr_size(
+            &mut size,
+            "svg:font-variant",
+            face.variant.map(Variant::as_str),
+        )?;
+        add_attr_size(
+            &mut size,
+            "svg:font-weight",
+            face.weight.map(Weight::as_str),
+        )?;
+        add_attr_size(
+            &mut size,
+            "svg:font-stretch",
+            face.stretch.map(Stretch::as_str),
+        )?;
+        add_attr_size(
+            &mut size,
+            "svg:font-size",
+            face.size.as_ref().map(Length::as_str),
+        )?;
+        add_attr_size(
+            &mut size,
+            "svg:unicode-range",
+            face.unicode_range.as_deref(),
+        )?;
+        let mut metrics: Vec<_> = face.metrics.iter().collect();
+        metrics.sort_unstable_by_key(|metric| metric.kind.order());
+        for metric in metrics {
+            add_size(&mut size, b" svg:".len())?;
+            add_size(&mut size, metric.kind.as_str().len())?;
+            add_size(&mut size, b"=\"".len())?;
+            add_size(&mut size, metric.value.to_string().len())?;
+            add_size(&mut size, 1)?;
+        }
+        add_attr_size(&mut size, "svg:panose-1", face.panose_1.as_deref())?;
+        add_attr_size(&mut size, "svg:widths", face.widths.as_deref())?;
+        add_attr_size(&mut size, "svg:bbox", face.bounding_box.as_deref())?;
+
+        if face.sources.is_empty() && face.definition_source.is_none() {
+            add_size(&mut size, b"/>".len())?;
+            continue;
+        }
+        add_size(&mut size, 1)?;
+        if !face.sources.is_empty() {
+            add_size(&mut size, b"<svg:font-face-src>".len())?;
+            for source in &face.sources {
+                match source {
+                    Source::Uri { link, formats } => {
+                        add_size(&mut size, b"<svg:font-face-uri".len())?;
+                        add_link_attrs_size(&mut size, link)?;
+                        if formats.is_empty() {
+                            add_size(&mut size, b"/>".len())?;
+                        } else {
+                            add_size(&mut size, 1)?;
+                            for format in formats {
+                                add_size(&mut size, b"<svg:font-face-format".len())?;
+                                add_attr_size(&mut size, "svg:string", format.as_deref())?;
+                                add_size(&mut size, b"/>".len())?;
+                            }
+                            add_size(&mut size, b"</svg:font-face-uri>".len())?;
+                        }
+                    },
+                    Source::LocalName(name) => {
+                        add_size(&mut size, b"<svg:font-face-name".len())?;
+                        add_attr_size(&mut size, "svg:name", name.as_deref())?;
+                        add_size(&mut size, b"/>".len())?;
+                    },
+                }
+            }
+            add_size(&mut size, b"</svg:font-face-src>".len())?;
+        }
+        if let Some(link) = &face.definition_source {
+            add_size(&mut size, b"<svg:definition-src".len())?;
+            add_link_attrs_size(&mut size, link)?;
+            add_size(&mut size, b"/>".len())?;
+        }
+        add_size(&mut size, b"</style:font-face>".len())?;
+    }
+    add_size(&mut size, b"</office:font-face-decls>".len())?;
+    Ok(size)
+}
+
+fn add_link_attrs_size(size: &mut usize, link: &Link) -> Result<()> {
+    add_size(size, b" xlink:type=\"simple\"".len())?;
+    add_attr_size(size, "xlink:href", Some(&link.href))?;
+    if link.actuate_on_request {
+        add_size(size, b" xlink:actuate=\"onRequest\"".len())?;
+    }
+    Ok(())
+}
+
+fn add_attr_size(size: &mut usize, name: &str, value: Option<&str>) -> Result<()> {
+    let Some(value) = value else { return Ok(()) };
+    add_size(size, 1)?;
+    add_size(size, name.len())?;
+    add_size(size, 2)?;
+    add_size(size, escaped_attribute_len(value)?)?;
+    add_size(size, 1)
+}
+
+fn escaped_attribute_len(value: &str) -> Result<usize> {
+    value.chars().try_fold(0usize, |size, character| {
+        let encoded = match character {
+            '&' => 5,
+            '<' => 4,
+            '"' => 6,
+            '\r' | '\n' => 5,
+            '\t' => 4,
+            _ => character.len_utf8(),
+        };
+        size.checked_add(encoded)
+            .ok_or_else(|| Error::InvalidFormat("font-face output size overflow".to_string()))
+    })
+}
+
+fn add_size(size: &mut usize, amount: usize) -> Result<()> {
+    *size = size
+        .checked_add(amount)
+        .ok_or_else(|| Error::InvalidFormat("font-face output size overflow".to_string()))?;
+    Ok(())
+}
+
+fn ensure_output_size(size: usize, limits: &XmlStreamLimits) -> Result<()> {
+    if u64::try_from(size).unwrap_or(u64::MAX) > limits.max_bytes() {
+        return invalid("serialized font-face declarations exceed the configured XML limit");
+    }
+    Ok(())
 }
 
 fn write_attr(output: &mut String, name: &str, value: Option<&str>) {

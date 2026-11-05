@@ -46,13 +46,22 @@ pub(super) fn parse_link(record: RecordRef<'_>, context: Context, limits: Limits
                 );
             }
             if formula_len > limits.max_formula_bytes {
-                return limit("formula bytes", formula_len, limits.max_formula_bytes);
+                return limit(
+                    crate::LimitKind::FormulaBytes,
+                    formula_len,
+                    limits.max_formula_bytes,
+                );
             }
             let tokens = data.get(8..).ok_or(Error::InvalidChart {
                 offset: record.offset(),
                 reason: "Excel BRAI formula is truncated",
             })?;
-            let formula = copy(tokens, "formula tokens", limits.max_formula_bytes)?;
+            let formula = copy(
+                tokens,
+                "formula tokens",
+                crate::LimitKind::FormulaBytes,
+                limits.max_formula_bytes,
+            )?;
             let refs = parse_refs(tokens, record)?;
             let link = Link::Excel {
                 role: parse_role(byte_at(data, 0, record)?, record)?,
@@ -159,11 +168,15 @@ pub(super) fn validate_link(link: &Link, context: Context, limits: Limits) -> Re
             },
         ) => {
             if formula.len() > limits.max_formula_bytes {
-                return limit("formula bytes", formula.len(), limits.max_formula_bytes);
+                return limit(
+                    crate::LimitKind::FormulaBytes,
+                    formula.len(),
+                    limits.max_formula_bytes,
+                );
             }
             let maximum = limits.biff.max_record_bytes.saturating_sub(8);
             if formula.len() > maximum {
-                return limit("formula bytes", formula.len(), maximum);
+                return limit(crate::LimitKind::FormulaBytes, formula.len(), maximum);
             }
             if *source == Source::Automatic && !formula.is_empty() {
                 return invalid_model("link", "automatic Excel BRAI has a nonempty formula");

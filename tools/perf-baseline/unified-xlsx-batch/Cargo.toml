@@ -1,0 +1,17 @@
+[package]
+name = "unified-xlsx-batch-baseline"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+litchi-core = { path = "../../../crates/litchi-core" }
+litchi-ops = { path = "../../../crates/litchi-ops", features = ["xlsx"] }
+litchi-xlsx = { path = "../../../crates/litchi-xlsx" }
+serde_json = "1"
+sha2 = "0.11"
+
+[profile.release]
+debug = 1
+
+[workspace]

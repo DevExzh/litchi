@@ -3,7 +3,8 @@
 #[cfg(feature = "numbers")]
 #[test]
 fn numbers_merge_reader_is_available_without_the_migration_host() {
-    use litchi::numbers::{MergeReader, SheetSelector, TableMergesError, TableSelector};
+    use litchi::numbers::table::merge::transaction::Error as TableMergesError;
+    use litchi::numbers::{MergeReader, SheetSelector, TableSelector};
     let source = include_bytes!("../../../test-data/iwork/numbers/table-merges-native.numbers");
     let reader = MergeReader::from_bytes(source).unwrap();
     let regions = reader
@@ -15,7 +16,9 @@ fn numbers_merge_reader_is_available_without_the_migration_host() {
     );
     assert!(matches!(
         reader.table_merges(SheetSelector::index(999), TableSelector::index(0)),
-        Err(TableMergesError::SheetNotFound)
+        Err(TableMergesError::Refused(
+            litchi::numbers::table::merge::transaction::Refusal::SheetNotFound
+        ))
     ));
 }
 
@@ -37,7 +40,9 @@ fn pages_merge_reader_is_available_without_the_migration_host() {
 #[cfg(feature = "keynote")]
 #[test]
 fn keynote_merge_reader_is_available_without_the_migration_host() {
-    use litchi::keynote::{MergeReader, SlideSelector, TableSelector};
+    use litchi::keynote::{
+        SlideSelector, TableSelector, slide::table::merge::transaction::MergeReader,
+    };
     let source = include_bytes!("../../../test-data/iwork/keynote/slide-table-merges-native.key");
     let reader = MergeReader::from_bytes(source).unwrap();
     let regions = reader

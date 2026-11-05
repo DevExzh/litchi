@@ -13,6 +13,7 @@ use super::{
     MAX_XML_BYTES, MCE_NS, PML, STRICT_PML, invalid, limit,
 };
 use crate::error::{Error, Result};
+use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::{Capabilities, Limits, OffsetLimits, active_offsets};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
@@ -82,13 +83,25 @@ pub(super) fn load_raw(package: &OpcPackage) -> Result<Option<RawFonts>> {
                 )));
             }
             if part.blob().len() > MAX_FONT_BYTES {
-                return Err(limit("individual font bytes"));
+                return Err(limit(
+                    crate::error::CodecLimitKind::FontBytes,
+                    part.blob().len(),
+                    MAX_FONT_BYTES,
+                ));
             }
-            total_bytes = total_bytes
-                .checked_add(part.blob().len())
-                .ok_or_else(|| limit("total font bytes"))?;
+            total_bytes = total_bytes.checked_add(part.blob().len()).ok_or_else(|| {
+                limit(
+                    crate::error::CodecLimitKind::TotalFontBytes,
+                    usize::MAX,
+                    MAX_TOTAL_FONT_BYTES,
+                )
+            })?;
             if total_bytes > MAX_TOTAL_FONT_BYTES {
-                return Err(limit("total font bytes"));
+                return Err(limit(
+                    crate::error::CodecLimitKind::TotalFontBytes,
+                    total_bytes,
+                    MAX_TOTAL_FONT_BYTES,
+                ));
             }
             let resource = RawResource {
                 part_name: target_name.clone(),
@@ -248,8 +261,9 @@ pub(super) fn put_raw(
         }
     }
 
+    refuse_signed_change(package)?;
     let mut candidate = package.clone();
-    candidate.unsign();
+    settle_unsigned_change(&mut candidate)?;
     let existing_font_relationships = candidate
         .get_part(&presentation_name)?
         .rels()
@@ -317,14 +331,21 @@ pub fn load(package: &OpcPackage) -> Result<Option<Fonts>> {
 
 /// Atomically publish a complete collection, consuming its owned values.
 ///
-/// Returns `false` for an exact semantic and physical no-op, preserving any
-/// valid package signatures. A real mutation invalidates signatures only after
-/// every bounded validation and staging operation succeeds.
+/// Returns `false` for an exact semantic and physical no-op. A real mutation
+/// is published only after every bounded validation and staging operation
+/// succeeds.
+///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
 ///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn put(package: &mut OpcPackage, fonts: Fonts) -> Result<bool> {
+pub(crate) fn put(package: &mut OpcPackage, fonts: Fonts) -> Result<bool> {
     validate_fonts(&fonts, true)?;
     let current = load_raw(package)?;
     let presentation = package.main_document_part()?;
@@ -340,10 +361,17 @@ pub fn put(package: &mut OpcPackage, fonts: Fonts) -> Result<bool> {
 /// Remove the complete embedded-font graph and return its previous semantic
 /// value. Absence is an exact no-op.
 ///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn remove(package: &mut OpcPackage) -> Result<Option<Fonts>> {
+pub(crate) fn remove(package: &mut OpcPackage) -> Result<Option<Fonts>> {
     let Some(current) = load_raw(package)? else {
         return Ok(None);
     };
@@ -535,7 +563,11 @@ pub(super) fn next_font_relationship_id(used: &HashSet<String>) -> Result<String
             return Ok(candidate);
         }
     }
-    Err(limit("relationship IDs"))
+    Err(limit(
+        crate::error::CodecLimitKind::Relationships,
+        u32::MAX as usize,
+        u32::MAX as usize,
+    ))
 }
 
 pub(super) fn next_font_part_name(used: &HashSet<String>, format: Format) -> Result<String> {
@@ -549,7 +581,11 @@ pub(super) fn next_font_part_name(used: &HashSet<String>, format: Format) -> Res
             return Ok(candidate);
         }
     }
-    Err(limit("part names"))
+    Err(limit(
+        crate::error::CodecLimitKind::Parts,
+        u32::MAX as usize,
+        u32::MAX as usize,
+    ))
 }
 
 pub(super) fn embedding_enabled(xml: &[u8]) -> Result<bool> {
@@ -606,12 +642,20 @@ pub(super) fn patch_embedding_flag(xml: &[u8], enabled: bool) -> Result<Vec<u8>>
         if tag.get(value_start..value_end) == Some(replacement) {
             return Ok(xml.to_vec());
         }
-        let absolute_start = start
-            .checked_add(value_start)
-            .ok_or_else(|| limit("updated presentation XML bytes"))?;
-        let absolute_end = start
-            .checked_add(value_end)
-            .ok_or_else(|| limit("updated presentation XML bytes"))?;
+        let absolute_start = start.checked_add(value_start).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                usize::MAX,
+                MAX_XML_BYTES,
+            )
+        })?;
+        let absolute_end = start.checked_add(value_end).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                usize::MAX,
+                MAX_XML_BYTES,
+            )
+        })?;
         return replace_bytes(xml, absolute_start, absolute_end, replacement);
     }
     if !enabled {
@@ -735,9 +779,19 @@ pub(super) fn replace_bytes(
         .len()
         .checked_sub(end - start)
         .and_then(|length| length.checked_add(replacement.len()))
-        .ok_or_else(|| limit("updated presentation XML bytes"))?;
+        .ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                usize::MAX,
+                MAX_XML_BYTES,
+            )
+        })?;
     if length > MAX_XML_BYTES {
-        return Err(limit("updated presentation XML bytes"));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            length,
+            MAX_XML_BYTES,
+        ));
     }
     let mut output = Vec::new();
     output
@@ -798,7 +852,11 @@ pub(super) struct DirectFrame {
 
 pub(super) fn active_direct_elements(xml: &[u8], conformance: Conformance) -> Result<DirectScan> {
     if xml.len() > MAX_XML_BYTES {
-        return Err(limit("presentation XML bytes"));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            xml.len(),
+            MAX_XML_BYTES,
+        ));
     }
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
@@ -815,12 +873,26 @@ pub(super) fn active_direct_elements(xml: &[u8], conformance: Conformance) -> Re
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         match event {
             Event::Start(element) => {
-                nodes = nodes.checked_add(1).ok_or_else(|| limit("XML nodes"))?;
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        MAX_NODES,
+                    )
+                })?;
                 if nodes > MAX_NODES {
-                    return Err(limit("XML nodes"));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        nodes,
+                        MAX_NODES,
+                    ));
                 }
                 if frames.len() >= MAX_DEPTH {
-                    return Err(limit("presentation XML depth"));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        frames.len().checked_add(1).unwrap_or(usize::MAX),
+                        MAX_DEPTH,
+                    ));
                 }
                 let is_pml = matches!(
                     namespace,
@@ -872,9 +944,19 @@ pub(super) fn active_direct_elements(xml: &[u8], conformance: Conformance) -> Re
                 });
             },
             Event::Empty(element) => {
-                nodes = nodes.checked_add(1).ok_or_else(|| limit("XML nodes"))?;
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        MAX_NODES,
+                    )
+                })?;
                 if nodes > MAX_NODES {
-                    return Err(limit("XML nodes"));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        nodes,
+                        MAX_NODES,
+                    ));
                 }
                 if frames.is_empty() {
                     return Err(invalid("presentation root cannot be empty"));
@@ -976,12 +1058,19 @@ pub(super) fn insert_font_list(xml: &[u8], fragment: &[u8], scan: &DirectScan) -
         .map(|element| element.start)
         .min()
         .unwrap_or(scan.root_close);
-    let length = xml
-        .len()
-        .checked_add(fragment.len())
-        .ok_or_else(|| limit("updated presentation XML bytes"))?;
+    let length = xml.len().checked_add(fragment.len()).ok_or_else(|| {
+        limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            usize::MAX,
+            MAX_XML_BYTES,
+        )
+    })?;
     if length > MAX_XML_BYTES {
-        return Err(limit("updated presentation XML bytes"));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            length,
+            MAX_XML_BYTES,
+        ));
     }
     let mut output = Vec::new();
     output

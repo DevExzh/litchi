@@ -1,8 +1,9 @@
 //! Malformed-input hardening for format-neutral ODF parsers.
 
 use litchi_core::Error;
-use litchi_odf_common::package::{Archive, parse_manifest, read_manifest};
-use litchi_odf_common::{chart, embedded, media};
+use litchi_odf_common::core::metadata::Metadata as OdfMetadata;
+use litchi_odf_common::package::{Archive, ArchiveLimits, parse_manifest, read_manifest};
+use litchi_odf_common::{Error as OdfError, XmlStreamLimits, chart, drawing, embedded, media};
 use std::io::{Cursor, Write as _};
 
 const CHART_SEED: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.3"><office:body><office:chart><chart:chart chart:class="chart:bar"><chart:title><text:p>Revenue</text:p></chart:title><chart:legend chart:legend-position="end"/><chart:plot-area><chart:axis chart:dimension="x" chart:name="primary-x"/><chart:axis chart:dimension="y" chart:name="primary-y"/><chart:series chart:values-cell-range-address="Sheet1.$B$1:.$B$3"><chart:data-point chart:repeated="2"/></chart:series><table:table table:name="local-table"/></chart:plot-area></chart:chart></office:chart></office:body></office:document-content>"#;
@@ -34,24 +35,24 @@ fn package() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
 }
 
 fn exercise_archive(bytes: &[u8]) {
-    if let Ok(archive) = Archive::new(bytes) {
-        drop(read_manifest(&archive));
+    if let Ok(archive) = Archive::new(bytes, ArchiveLimits::default()) {
+        drop(read_manifest(&archive, XmlStreamLimits::default()));
     }
 }
 
 #[test]
 fn chart_truncation_and_mutation_sweeps_never_panic() -> Result<(), Error> {
     for end in 0..CHART_SEED.len() {
-        drop(chart::read(&CHART_SEED[..end]));
+        drop(chart_read(&CHART_SEED[..end]));
     }
     for position in 0..CHART_SEED.len() {
         let mut mutated = CHART_SEED.as_bytes().to_vec();
         mutated[position] ^= 1;
         if let Ok(xml) = std::str::from_utf8(&mutated) {
-            drop(chart::read(xml));
+            drop(chart_read(xml));
         }
     }
-    let parsed = chart::read(CHART_SEED)?;
+    let parsed = chart_read(CHART_SEED)?;
     assert_eq!(parsed.kind(), chart::Kind::Chart);
     assert_eq!(parsed.all_text(), "Revenue");
     Ok(())
@@ -60,22 +61,112 @@ fn chart_truncation_and_mutation_sweeps_never_panic() -> Result<(), Error> {
 #[test]
 fn chart_malformed_inputs_yield_typed_errors() {
     assert_invalid(
-        chart::read(
+        chart_read(
             r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0"><office:body><office:chart><chart:chart><chart:plot-area></chart:chart></chart:plot-area></office:chart></office:body></office:document-content>"#,
         ),
         "mismatched chart close",
     );
     assert_invalid(
-        chart::read(
+        chart_read(
             r#"<!DOCTYPE office [<!ENTITY x "y">]><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0"><office:body><office:chart><chart:chart/></office:chart></office:body></office:document-content>"#,
         ),
         "chart DTD",
     );
     assert_invalid(
-        chart::read(
+        chart_read(
             r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0"><office:body><chart:chart/></office:body></office:document-content>"#,
         ),
         "misplaced chart",
+    );
+}
+
+#[test]
+fn drawing_resource_parsers_report_the_required_raw_xml_policy() {
+    let xml = "<draw:gradient/><draw:hatch/><draw:marker/><draw:stroke-dash/><draw:opacity/><draw:fill-image/>"
+        .repeat(2);
+    let limits =
+        XmlStreamLimits::new(64, 256, 4_000, 1_000, 64 * 1024).expect("test policy is finite");
+    let expected = |error: OdfError, input_len: usize| {
+        assert!(matches!(
+            error,
+            OdfError::Limit {
+                kind: litchi_odf_common::LimitKind::RawXml(
+                    litchi_odf_common::RawXmlLimitKind::InputBytes
+                ),
+                observed,
+                maximum,
+            } if observed == input_len as u64 && maximum == 64
+        ));
+    };
+    expected(
+        drawing::resources::gradient::parse_drawing_gradients(&xml, limits)
+            .expect_err("gradient input must be bounded"),
+        xml.len(),
+    );
+    expected(
+        drawing::resources::hatch::parse_drawing_hatches(&xml, limits)
+            .expect_err("hatch input must be bounded"),
+        xml.len(),
+    );
+    expected(
+        drawing::resources::marker::parse_drawing_markers(&xml, limits)
+            .expect_err("marker input must be bounded"),
+        xml.len(),
+    );
+    expected(
+        drawing::resources::stroke_dash::parse_drawing_stroke_dashes(&xml, limits)
+            .expect_err("stroke-dash input must be bounded"),
+        xml.len(),
+    );
+    expected(
+        drawing::resources::opacity::parse_drawing_opacities(&xml, limits)
+            .expect_err("opacity input must be bounded"),
+        xml.len(),
+    );
+    expected(
+        drawing::resources::fill_image::parse_drawing_fill_images(&xml, limits)
+            .expect_err("fill-image input must be bounded"),
+        xml.len(),
+    );
+
+    let unrelated = "x".repeat(65);
+    expected(
+        drawing::resources::gradient::parse_drawing_gradients(&unrelated, limits)
+            .expect_err("unrelated input must still be bounded"),
+        unrelated.len(),
+    );
+}
+
+#[test]
+fn metadata_and_manifest_report_the_required_raw_xml_policy() {
+    let metadata_xml = r#"<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:meta/></office:document-meta>"#;
+    let manifest_xml = r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="/"/></m:manifest>"#;
+    let limits =
+        XmlStreamLimits::new(64, 256, 4_000, 1_000, 64 * 1024).expect("test policy is finite");
+    let expected = |error: OdfError, input_len: usize| {
+        assert!(matches!(
+            error,
+            OdfError::Limit {
+                kind: litchi_odf_common::LimitKind::RawXml(
+                    litchi_odf_common::RawXmlLimitKind::InputBytes
+                ),
+                observed,
+                maximum,
+            } if observed == input_len as u64 && maximum == 64
+        ));
+    };
+    expected(
+        OdfError::from(
+            OdfMetadata::from_xml(metadata_xml, limits)
+                .expect_err("metadata input must be bounded"),
+        ),
+        metadata_xml.len(),
+    );
+    expected(
+        OdfError::from(
+            parse_manifest(manifest_xml, limits).expect_err("manifest input must be bounded"),
+        ),
+        manifest_xml.len(),
     );
 }
 
@@ -121,14 +212,20 @@ fn archive_and_manifest_malformed_sweeps_never_panic() -> Result<(), Box<dyn std
     assert_invalid(
         parse_manifest(
             r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="x"/><m:file-entry m:full-path="x"/></m:manifest>"#,
+            XmlStreamLimits::default(),
         ),
         "duplicate manifest path",
     );
     assert_invalid(
         parse_manifest(
             r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="x" m:size="invalid"/></m:manifest>"#,
+            XmlStreamLimits::default(),
         ),
         "invalid manifest size",
     );
     Ok(())
+}
+
+fn chart_read(xml: &str) -> Result<chart::Element, Error> {
+    chart::read(xml, XmlStreamLimits::default()).map_err(Error::from)
 }

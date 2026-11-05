@@ -1,4 +1,3 @@
-use litchi_xlsx::Workbook;
 use std::path::PathBuf;
 
 fn fixture(relative: &str) -> PathBuf {
@@ -13,16 +12,18 @@ fn standalone_reader_accepts_producer_external_link_variants() {
         "test-data/ooxml/xlsx/external-link-path-missing.xlsx",
         "test-data/ooxml/xlsx/external-link-path-startup.xlsx",
     ] {
-        let workbook =
-            Workbook::open(fixture(name)).unwrap_or_else(|error| panic!("{name}: {error}"));
-        assert_eq!(workbook.len(), 1, "{name}");
+        let workbook = litchi_xlsx::Package::open(fixture(name))
+            .unwrap_or_else(|error| panic!("{name}: {error}"));
+        assert_eq!(workbook.workbook_ref().len(), 1, "{name}");
     }
 }
 
 #[test]
 fn standalone_reader_retains_sheet_names_from_tolerated_input() {
-    let workbook = Workbook::open(fixture("test-data/ooxml/xlsx/sheet-state-show.xlsx")).unwrap();
+    let workbook =
+        litchi_xlsx::Package::open(fixture("test-data/ooxml/xlsx/sheet-state-show.xlsx")).unwrap();
     let names = workbook
+        .workbook_ref()
         .sheets()
         .map(|sheet| sheet.name().to_owned())
         .collect::<Vec<_>>();
@@ -32,11 +33,12 @@ fn standalone_reader_retains_sheet_names_from_tolerated_input() {
 #[test]
 fn standalone_reader_opens_duplicate_names_and_malformed_string_hints() {
     let duplicate =
-        Workbook::open(fixture("test-data/ooxml/xlsx/duplicate-defined-names.xlsx")).unwrap();
-    assert!(!duplicate.is_empty());
-    let strings = Workbook::open(fixture(
+        litchi_xlsx::Package::open(fixture("test-data/ooxml/xlsx/duplicate-defined-names.xlsx"))
+            .unwrap();
+    assert!(!duplicate.workbook_ref().is_empty());
+    let strings = litchi_xlsx::Package::open(fixture(
         "test-data/ooxml/xlsx/shared-strings-malformed-count.xlsx",
     ))
     .unwrap();
-    assert!(!strings.is_empty());
+    assert!(!strings.workbook_ref().is_empty());
 }

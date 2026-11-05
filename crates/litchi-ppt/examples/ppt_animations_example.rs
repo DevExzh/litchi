@@ -10,7 +10,7 @@
 //!
 //! Run with: cargo run --example `ppt_animations_example`
 
-use litchi_ppt::Writer;
+use litchi_ppt::Builder;
 use litchi_ppt::animation::{
     AnimationEffect, AnimationInfo, AnimationTrigger, BuildInfo, BuildLevel, BuildType,
     EffectDirection, EffectSpeed,
@@ -20,9 +20,12 @@ use std::error::Error;
 fn main() -> Result<(), Box<dyn Error>> {
     println!("Creating PPT animation showcase...");
 
-    let mut writer = Writer::new_widescreen();
-    writer.set_property("Title", "Animation Effects Showcase");
-    writer.set_property("Author", "Litchi PPT Demo");
+    let mut writer = Builder::new_widescreen();
+    writer.set_metadata(litchi_core::Metadata {
+        title: Some("Animation Effects Showcase".to_owned()),
+        author: Some("Litchi PPT Demo".to_owned()),
+        ..litchi_core::Metadata::default()
+    })?;
 
     // Slide 1: Basic entrance animations
     println!("Creating slide: Entrance Animations");
@@ -97,7 +100,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     anim4.build_list = Some(build4);
     writer.set_shape_animation(slide, 4, anim4)?;
 
-    writer.save("ppt_animations_example.ppt")?;
+    writer.build()?.save("ppt_animations_example.ppt")?;
     println!("✅ Animation example created successfully!");
     println!("   File: ppt_animations_example.ppt");
     println!("   Effects: Appear, Fly In, Wipe, Blinds");

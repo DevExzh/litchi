@@ -35,14 +35,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::fs::create_dir_all(parent)?;
     }
 
-    let mut package = Package::new()?;
-    package
-        .document_mut()?
+    let mut builder = litchi_docx::Builder::new()?;
+    builder
+        .document()?
         .add_heading("Litchi encrypted DOCX verification", 1)?;
-    package
-        .document_mut()?
+    builder
+        .document()?
         .add_paragraph()
         .add_run_with_text("This package was encrypted by litchi-crypto.");
+    let package = builder.build()?;
     package.save_encrypted(&output, &password, mode)?;
 
     let reopened = Package::open_with_password(&output, &password)?;

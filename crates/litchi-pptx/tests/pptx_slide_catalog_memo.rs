@@ -11,6 +11,9 @@
 //! moves a refusal — in particular it must not lend `slide_count`'s
 //! package-graph validation to `slide`, which has never performed it.
 
+mod in_place;
+use in_place::InPlace as _;
+
 use litchi_core::TextOutputOptions;
 use litchi_opc::PackURI;
 use litchi_pptx::Package;
@@ -20,9 +23,9 @@ use tempfile::NamedTempFile;
 /// writer so the catalog and the slide parts are physically present.
 fn authored(slides: usize) -> Package {
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
-    let mut package = Package::new().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
     {
-        let presentation = package.presentation_mut().unwrap();
+        let presentation = builder.presentation().unwrap();
         for index in 0..slides {
             presentation
                 .add_slide()
@@ -30,6 +33,7 @@ fn authored(slides: usize) -> Package {
                 .set_title(&format!("Slide {index}"));
         }
     }
+    let package = builder.build().unwrap();
     package.save(output.path()).unwrap();
     Package::open(output.path()).unwrap()
 }
@@ -39,7 +43,7 @@ fn authored(slides: usize) -> Package {
 fn with_presentation_blob(package: &mut Package, blob: Vec<u8>) {
     let part_name = PackURI::new("/ppt/presentation.xml").unwrap();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             opc.get_part_mut(&part_name)?.set_blob(blob.clone());
             Ok(())
         })

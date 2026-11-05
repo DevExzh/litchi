@@ -13,30 +13,30 @@ use super::cursor::decode_rk;
 use super::{Error, Kind, Limits, Result};
 
 /// Forward-only BIFF12 writer.
-pub struct Writer<W: Write> {
+pub struct Encoder<W: Write> {
     writer: W,
     limits: Limits,
 }
 
-impl<W: Write> Writer<W> {
-    /// Write with safe default limits.
-    #[must_use]
-    pub const fn new(writer: W) -> Self {
-        Self::with_limits(writer, Limits::DEFAULT)
-    }
-
+impl<W: Write> Encoder<W> {
     /// Write with explicit finite limits.
     #[must_use]
-    pub const fn with_limits(writer: W, limits: Limits) -> Self {
+    pub const fn new(writer: W, limits: Limits) -> Self {
         Self { writer, limits }
     }
 
     /// Construct a writer after validating its raw limit profile.
-    pub fn try_with_limits(writer: W, limits: Limits) -> Result<Self> {
+    pub fn bounded(writer: W, limits: Limits) -> Result<Self> {
         match limits.validate() {
-            Ok(limits) => Ok(Self::with_limits(writer, limits)),
+            Ok(limits) => Ok(Self::new(writer, limits)),
             Err(error) => Err(error),
         }
+    }
+
+    /// Return the finite policy used for every record and scalar write.
+    #[must_use]
+    pub const fn limits(&self) -> Limits {
+        self.limits
     }
 
     /// Write one complete record.

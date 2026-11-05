@@ -1,0 +1,75 @@
+{
+  "source": "4470ecce163bb53fc5314cc00c39dbb09301d1fe",
+  "pid": 967106,
+  "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation",
+  "command": [
+    "python3",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/run-semantic-checks-disk-guarded.py",
+    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/native-runtime-v11-commands.json",
+    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/native-runtime-v11"
+  ],
+  "started_unix_seconds": 1792779434.9155402,
+  "target": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target",
+  "lock_sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-xlsx",
+        "--all-features",
+        "--lib",
+        "metadata::tests",
+        "--message-format=json-render-diagnostics",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 73.79637210900182,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/native-runtime-v11/check-0.log",
+      "bytes": 138013,
+      "sha256": "43a8ec3e43acaa73ec129e3cd3e0a395adcd13ca3baffb6bd38e778e86fea3cf",
+      "target_bytes_before": 1361962930,
+      "completed_test_executables_pruned": [
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/litchi_xlsx-d9f14220abb11437",
+          "bytes": 105794616,
+          "sha256": "ac4f0cc1487a5842708bf8e464d0d6698f0aadc6be71a5f950023d47752e594c"
+        }
+      ]
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-ops",
+        "--all-features",
+        "--lib",
+        "format::pptx::tests",
+        "--message-format=json-render-diagnostics",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 877.5303028870003,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/native-runtime-v11/check-1.log",
+      "bytes": 345346,
+      "sha256": "9f4176ab36503fdd035980e165e9ed97c66a9503c832d7729155630e058f7ed0",
+      "target_bytes_before": 1361962930,
+      "completed_test_executables_pruned": [
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/litchi_ops-1281d387699cc94f",
+          "bytes": 279816072,
+          "sha256": "e69a9c4abe9b92aebb1abd145ee258bd87ff86b35177bb2123381974708abaff"
+        }
+      ]
+    }
+  ],
+  "note": "Strict combined source: all 11 metadata-focused XLSX library tests and all 27 PPTX facade tests pass. This closes the empty metadata fixture setup failure and the two PPTX runtime failures. Shared XLSX cell normalization remains returned, and complete native/facade runtime, full source gates and performance qualification remain required."
+}

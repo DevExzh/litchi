@@ -1795,7 +1795,7 @@ pub(crate) fn map_preflight_zip_error(
         ZipErrorKind::UnsupportedCompressionMethod(method) => {
             unsupported(format!("unsupported source compression method {method}"))
         },
-        ZipErrorKind::IO(source) | ZipErrorKind::Io(source) => map_owned_io_error(
+        ZipErrorKind::IO(source) => map_owned_io_error(
             source,
             SourceContentPublicationProgress::Untouched,
             UnmarkedIo::Source,
@@ -1825,7 +1825,7 @@ fn map_zip_error(
                 reason: format!("unsupported generated compression method {method}"),
             }
         },
-        ZipErrorKind::IO(source) | ZipErrorKind::Io(source) => {
+        ZipErrorKind::IO(source) => {
             let default = if progress == SourceContentPublicationProgress::Untouched {
                 UnmarkedIo::Archive
             } else {
@@ -2036,7 +2036,7 @@ mod tests {
     const TARGET: &[u8] = br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:body><office:text/></office:body></office:document-content>"#;
 
     fn package_bytes() -> Vec<u8> {
-        let mut writer = PackageWriter::new();
+        let mut writer = PackageWriter::new(crate::core::StreamingArchiveLimits::default());
         writer.set_mimetype(MIME).expect("mimetype");
         writer.add_file("content.xml", SOURCE).expect("content");
         writer
@@ -2181,7 +2181,12 @@ mod tests {
             .unwrap()
             .into_zip_archive();
         let mut scratch = vec![0; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-        let index = PreservationIndex::new(&archive, &mut scratch).unwrap();
+        let index = PreservationIndex::new(
+            &archive,
+            &mut scratch,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
         let entry = index
             .entries()
             .iter()
@@ -2219,7 +2224,12 @@ mod tests {
         // The physical archive is valid and admitted; ODF's narrower raw
         // publication contract must refuse before writing to the caller sink.
         let promoted = ZipArchive::from_slice(&bytes).unwrap().into_zip_archive();
-        PreservationIndex::new(&promoted, &mut scratch).unwrap();
+        PreservationIndex::new(
+            &promoted,
+            &mut scratch,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
         let package = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes)))
             .expect("open valid local-only ZIP64 source");
         let mut output = Vec::new();

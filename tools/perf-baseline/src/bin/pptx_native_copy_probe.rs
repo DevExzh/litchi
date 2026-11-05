@@ -4,7 +4,7 @@
 //! the destination position's following slot, and reports whether the bounded
 //! native PPTX path publishes or refuses the selected slide.
 
-use litchi_pptx::{SourceBackedPresentation, SourceBackedPresentationEditor};
+use litchi_pptx::SourceBackedPresentation;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -13,8 +13,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "expected source-path source-position destination-path destination-position".into(),
         );
     }
-    let source = SourceBackedPresentation::from_path(&args[0])?;
-    let editor = SourceBackedPresentationEditor::from_path(&args[2])?;
+    let source = SourceBackedPresentation::open(&args[0])?;
+    let editor_view = litchi_pptx::SourceBackedPresentation::open(&args[2])?;
+    let editor = litchi_pptx::source::Package::from_presentation(&editor_view)?;
     let source_position: usize = args[1].parse()?;
     let destination_position: usize = args[3].parse()?;
     let insertion_position = destination_position.checked_add(1).ok_or_else(|| {
@@ -31,7 +32,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ) {
         Ok(plan) => {
             let mut output = Vec::new();
-            let copied = editor.publish_cross_slide_copy_to_stream(&mut output, &plan)?;
+            let mut editor_copy = editor.edit_cross_slide_copy()?;
+            let copied = editor_copy.stage(&plan)?;
+            editor_copy.commit()?.package().write_to(&mut output)?;
             println!(
                 "PUBLISHED bytes={} slides={} name={:?}",
                 output.len(),

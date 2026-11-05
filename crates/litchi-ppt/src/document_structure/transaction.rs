@@ -34,7 +34,7 @@ impl Revision {
 
 /// Kind of semantic operation staged by a document-structure transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ChangeKind {
+pub(crate) enum ChangeKind {
     SlidesReordered,
     SlideNonOutlineDataChanged,
     SlideInserted,
@@ -48,7 +48,7 @@ pub enum ChangeKind {
 
 /// One reversible semantic operation over the document's structural lists.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Change {
+pub(crate) enum Change {
     /// Reorder slide groups while retaining each group's text and opaque atoms.
     SlidesReordered { before: Vec<u32>, after: Vec<u32> },
     /// Change whether one slide contains non-outline data while retaining every other flag.
@@ -89,7 +89,7 @@ pub enum Change {
 impl Change {
     /// Semantic category of this operation.
     #[must_use]
-    pub const fn kind(&self) -> ChangeKind {
+    pub(crate) const fn kind(&self) -> ChangeKind {
         match self {
             Self::SlidesReordered { .. } => ChangeKind::SlidesReordered,
             Self::SlideNonOutlineDataChanged { .. } => ChangeKind::SlideNonOutlineDataChanged,
@@ -175,8 +175,8 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(bytes: impl AsRef<[u8]>) -> Result<Self> {
-        Self::parse_with_limits(bytes, Limits::default())
+    pub fn parse(bytes: impl AsRef<[u8]>, limits: &Limits) -> Result<Self> {
+        Self::parse_with_limits(bytes, *limits)
     }
 
     /// Parse one document structure with explicit resource bounds.
@@ -184,7 +184,7 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_with_limits(bytes: impl AsRef<[u8]>, limits: Limits) -> Result<Self> {
+    pub(crate) fn parse_with_limits(bytes: impl AsRef<[u8]>, limits: Limits) -> Result<Self> {
         let validated_limits = limits.validate()?;
         let input = bytes.as_ref();
         if input.len() > validated_limits.max_bytes {
@@ -213,13 +213,13 @@ impl Snapshot {
         ))
     }
 
-    /// Capture a parsed record tree using the default resource bounds.
+    /// Capture a parsed record tree under `limits`.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn from_record(root: Record) -> Result<Self> {
-        Self::from_record_with_limits(root, Limits::default())
+    pub fn from_record(root: Record, limits: &Limits) -> Result<Self> {
+        Self::from_record_with_limits(root, *limits)
     }
 
     /// Capture a parsed record tree with explicit resource bounds.
@@ -227,7 +227,7 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn from_record_with_limits(mut root: Record, limits: Limits) -> Result<Self> {
+    pub(crate) fn from_record_with_limits(mut root: Record, limits: Limits) -> Result<Self> {
         let validated_limits = limits.validate()?;
         codec::synchronize(&mut root)?;
         let bytes = codec::encode_document(&root)?;
@@ -307,7 +307,7 @@ impl Snapshot {
 
     /// Start an isolated semantic edit over this snapshot.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
+    pub(crate) fn edit(&self) -> Transaction {
         Transaction {
             source: self.clone(),
             candidate: self.root.clone(),
@@ -318,7 +318,7 @@ impl Snapshot {
 
 /// Isolated, failure-atomic semantic edit over one document structure.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub(crate) struct Transaction {
     source: Snapshot,
     candidate: Record,
     changes: Vec<Change>,
@@ -327,13 +327,13 @@ pub struct Transaction {
 impl Transaction {
     /// Immutable source snapshot used for optimistic conflict checks.
     #[must_use]
-    pub const fn source(&self) -> &Snapshot {
+    pub(crate) const fn source(&self) -> &Snapshot {
         &self.source
     }
 
     /// Current transaction-local record tree.
     #[must_use]
-    pub const fn record(&self) -> &Record {
+    pub(crate) const fn record(&self) -> &Record {
         &self.candidate
     }
 
@@ -342,7 +342,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn structure(&self) -> Result<DocumentStructure> {
+    pub(crate) fn structure(&self) -> Result<DocumentStructure> {
         validation::validate_document(&self.candidate, self.source.limits)
     }
 
@@ -351,7 +351,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn masters(&self) -> Result<Vec<Master>> {
+    pub(crate) fn masters(&self) -> Result<Vec<Master>> {
         Ok(self.structure()?.masters().to_vec())
     }
 
@@ -360,19 +360,19 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn slides(&self) -> Result<Vec<Slide>> {
+    pub(crate) fn slides(&self) -> Result<Vec<Slide>> {
         Ok(self.structure()?.slides().to_vec())
     }
 
     /// Whether any staged operation changes the candidate tree.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
+    pub(crate) fn is_changed(&self) -> bool {
         self.candidate != self.source.root
     }
 
     /// Semantic operations staged in call order.
     #[must_use]
-    pub fn changes(&self) -> &[Change] {
+    pub(crate) fn changes(&self) -> &[Change] {
         &self.changes
     }
 
@@ -381,7 +381,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn move_slide(&mut self, from: usize, destination: usize) -> Result<()> {
+    pub(crate) fn move_slide(&mut self, from: usize, destination: usize) -> Result<()> {
         let count = self.slides()?.len();
         if from >= count || destination >= count {
             return invalid("slide position is out of range");
@@ -397,7 +397,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn move_slide_id(&mut self, slide_id: u32, destination: usize) -> Result<()> {
+    pub(crate) fn move_slide_id(&mut self, slide_id: u32, destination: usize) -> Result<()> {
         let index = self
             .slides()?
             .iter()
@@ -417,7 +417,11 @@ impl Transaction {
     ///
     /// Returns an error when the position is absent or the resulting document
     /// violates the structural invariants.
-    pub fn set_slide_non_outline_data(&mut self, position: usize, present: bool) -> Result<()> {
+    pub(crate) fn set_slide_non_outline_data(
+        &mut self,
+        position: usize,
+        present: bool,
+    ) -> Result<()> {
         const NON_OUTLINE_DATA_FLAG: u32 = 1 << 2;
 
         let slide = self
@@ -470,7 +474,7 @@ impl Transaction {
     ///
     /// Returns an error when the position is absent or the slide list is
     /// malformed.
-    pub fn slide_group(&self, position: usize) -> Result<Vec<Record>> {
+    pub(crate) fn slide_group(&self, position: usize) -> Result<Vec<Record>> {
         let list_index = validation::list_index(&self.candidate, 0)?
             .ok_or_else(|| Error::InvalidFormat("the presentation slide list is absent".into()))?;
         grouped_children(&self.candidate.children[list_index])?
@@ -487,11 +491,21 @@ impl Transaction {
     /// Returns an error when the position is outside the insertion range, the
     /// group does not begin with exactly one `SlidePersistAtom`, or the
     /// resulting document violates identifier and outline-text invariants.
-    pub fn insert_slide_group(&mut self, position: usize, group: Vec<Record>) -> Result<()> {
+    pub(crate) fn insert_slide_group(&mut self, position: usize, group: Vec<Record>) -> Result<()> {
         validate_slide_group(&group)?;
-        let list_index = validation::list_index(&self.candidate, 0)?
-            .ok_or_else(|| Error::InvalidFormat("the presentation slide list is absent".into()))?;
         let mut candidate = self.candidate.clone();
+        let list_index = match validation::list_index(&candidate, 0)? {
+            Some(index) => index,
+            // A presentation without slides may have no slide list at all
+            // (POI's `createSlide` adds one); the first inserted slide
+            // creates it.
+            None if position == 0 => insert_empty_slide_list(&mut candidate),
+            None => {
+                return Err(Error::InvalidFormat(
+                    "the presentation slide list is absent".into(),
+                ));
+            },
+        };
         let groups = grouped_children_allow_empty(&candidate.children[list_index])?;
         if position > groups.groups.len() {
             return invalid("slide insertion position is out of range");
@@ -514,7 +528,7 @@ impl Transaction {
     ///
     /// Returns an error when the position is absent or publication would
     /// violate the document invariants.
-    pub fn remove_slide(&mut self, position: usize) -> Result<Vec<Record>> {
+    pub(crate) fn remove_slide(&mut self, position: usize) -> Result<Vec<Record>> {
         let list_index = validation::list_index(&self.candidate, 0)?
             .ok_or_else(|| Error::InvalidFormat("the presentation slide list is absent".into()))?;
         let mut candidate = self.candidate.clone();
@@ -542,7 +556,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn reorder_slides(&mut self, order: &[usize]) -> Result<()> {
+    pub(crate) fn reorder_slides(&mut self, order: &[usize]) -> Result<()> {
         let structure = self.structure()?;
         let before = structure
             .slides()
@@ -564,7 +578,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn move_master(&mut self, from: usize, destination: usize) -> Result<()> {
+    pub(crate) fn move_master(&mut self, from: usize, destination: usize) -> Result<()> {
         let count = self.masters()?.len();
         if from >= count || destination >= count {
             return invalid("master position is out of range");
@@ -580,7 +594,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn move_master_id(&mut self, master_id: u32, destination: usize) -> Result<()> {
+    pub(crate) fn move_master_id(&mut self, master_id: u32, destination: usize) -> Result<()> {
         let index = self
             .masters()?
             .iter()
@@ -596,7 +610,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn reorder_masters(&mut self, order: &[usize]) -> Result<()> {
+    pub(crate) fn reorder_masters(&mut self, order: &[usize]) -> Result<()> {
         let structure = self.structure()?;
         let before = structure
             .masters()
@@ -619,7 +633,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn move_custom_table_styles(
+    pub(crate) fn move_custom_table_styles(
         &mut self,
         placement: CustomTableStylesPlacement,
     ) -> Result<()> {
@@ -656,7 +670,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn insert_custom_table_styles(
+    pub(crate) fn insert_custom_table_styles(
         &mut self,
         record: Record,
         placement: CustomTableStylesPlacement,
@@ -687,7 +701,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn remove_custom_table_styles(&mut self) -> Result<Record> {
+    pub(crate) fn remove_custom_table_styles(&mut self) -> Result<Record> {
         let placement = self.structure()?.custom_table_styles.ok_or_else(|| {
             Error::InvalidFormat("the document has no custom table-style atom".into())
         })?;
@@ -707,7 +721,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn replace_custom_table_styles(&mut self, record: Record) -> Result<Record> {
+    pub(crate) fn replace_custom_table_styles(&mut self, record: Record) -> Result<Record> {
         validate_custom_styles_record(&record)?;
         let placement = self.structure()?.custom_table_styles.ok_or_else(|| {
             Error::InvalidFormat("the document has no custom table-style atom".into())
@@ -733,7 +747,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn snapshot(&self) -> Result<Snapshot> {
+    pub(crate) fn snapshot(&self) -> Result<Snapshot> {
         let bytes = self.encoded_candidate()?;
         if bytes.as_slice() == self.source.bytes.as_ref() {
             return Ok(self.source.clone());
@@ -746,7 +760,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
         let bytes = self.encoded_candidate()?;
         let source = self.source;
         let snapshot = if bytes.as_slice() == source.bytes.as_ref() {
@@ -768,21 +782,6 @@ impl Transaction {
             limits: source.limits,
         };
         Ok(Commit { snapshot, patch })
-    }
-
-    /// Alias for move-owned writer terminology.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn finish(self) -> Result<Commit> {
-        self.commit()
-    }
-
-    /// Discard all staged edits and recover the exact source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
     }
 
     fn reorder_list(&mut self, instance: u16, order: &[usize]) -> Result<Vec<Vec<Record>>> {
@@ -830,9 +829,44 @@ impl Transaction {
     }
 }
 
-/// Successful immutable target and its source-checked patch.
+/// Inserts an empty slide `SlideListWithTextContainer` (instance 0) where
+/// MS-PPT 2.4.1 orders it: after every record that precedes the slide list
+/// and before the notes list and the records that follow it. Returns its
+/// index.
+fn insert_empty_slide_list(document: &mut Record) -> usize {
+    // The notes list, SlideShowDocInfoAtom, NamedShows, SummaryContainer,
+    // DocRoutingSlipAtom, PrintOptionsAtom, RoundTripCustomTableStyles12Atom
+    // and EndDocumentAtom follow the slide list.
+    let follows = |record: &Record| {
+        (record.record_type == RecordType::SlideListWithText && record.instance == 2)
+            || matches!(
+                record.record_type_raw,
+                0x0401 | 0x0410 | 0x0402 | 0x0406 | 0x1770 | 0x0428 | 0x03EA
+            )
+    };
+    let index = document
+        .children
+        .iter()
+        .position(follows)
+        .unwrap_or(document.children.len());
+    document.children.insert(
+        index,
+        Record {
+            record_type: RecordType::SlideListWithText,
+            record_type_raw: RecordType::SlideListWithText as u16,
+            version: 0x0F,
+            instance: 0,
+            data_length: 0,
+            data: Vec::new().into(),
+            children: Vec::new(),
+        },
+    );
+    index
+}
+
+/// Successful immutable target and its source-checked patch./// Successful immutable target and its source-checked patch.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     patch: Patch,
 }
@@ -840,13 +874,13 @@ pub struct Commit {
 impl Commit {
     /// Published target snapshot.
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Reversible patch from the source to this target.
     #[must_use]
-    pub const fn patch(&self) -> &Patch {
+    pub(crate) const fn patch(&self) -> &Patch {
         &self.patch
     }
 
@@ -855,7 +889,7 @@ impl Commit {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.patch.undo(current)
     }
 
@@ -864,20 +898,20 @@ impl Commit {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.patch.redo(current)
     }
 
     /// Split the published target and patch.
     #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
+    pub(crate) fn into_parts(self) -> (Snapshot, Patch) {
         (self.snapshot, self.patch)
     }
 }
 
 /// A reversible patch bound to the exact source bytes that produced it.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Patch {
+pub(crate) struct Patch {
     base: Revision,
     target: Revision,
     before: Arc<[u8]>,
@@ -889,49 +923,49 @@ pub struct Patch {
 impl Patch {
     /// Source revision required for forward application.
     #[must_use]
-    pub const fn base(&self) -> Revision {
+    pub(crate) const fn base(&self) -> Revision {
         self.base
     }
 
     /// Target revision produced by forward application.
     #[must_use]
-    pub const fn target(&self) -> Revision {
+    pub(crate) const fn target(&self) -> Revision {
         self.target
     }
 
     /// Semantic operations represented by this patch.
     #[must_use]
-    pub fn changes(&self) -> &[Change] {
+    pub(crate) fn changes(&self) -> &[Change] {
         &self.changes
     }
 
     /// Exact source bytes bound to this patch.
     #[must_use]
-    pub fn before(&self) -> &[u8] {
+    pub(crate) fn before(&self) -> &[u8] {
         &self.before
     }
 
     /// Exact target bytes bound to this patch.
     #[must_use]
-    pub fn after(&self) -> &[u8] {
+    pub(crate) fn after(&self) -> &[u8] {
         &self.after
     }
 
     /// Compatibility-free explicit aliases for byte-oriented callers.
     #[must_use]
-    pub fn before_bytes(&self) -> &[u8] {
+    pub(crate) fn before_bytes(&self) -> &[u8] {
         self.before()
     }
 
     /// Exact target bytes bound to this patch.
     #[must_use]
-    pub fn after_bytes(&self) -> &[u8] {
+    pub(crate) fn after_bytes(&self) -> &[u8] {
         self.after()
     }
 
     /// Whether this patch is an exact byte-for-byte no-op.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.before.as_ref() == self.after.as_ref()
     }
 
@@ -940,7 +974,7 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn apply(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn apply(&self, current: &Snapshot) -> Result<Snapshot> {
         if current.revision != self.base || current.bytes.as_ref() != self.before.as_ref() {
             return Err(Error::InvalidFormat(
                 "document-structure patch source does not match its base snapshot".into(),
@@ -957,7 +991,7 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.inverse().apply(current)
     }
 
@@ -966,13 +1000,13 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.apply(current)
     }
 
     /// Build a source-checked inverse patch.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             base: self.target,
             target: self.base,

@@ -9,6 +9,7 @@
 //! selected entry body range is spliced back, preserving the root and all
 //! sibling entries byte-for-byte.
 
+use std::cell::RefCell;
 use std::collections::TryReserveError;
 use std::io::{self, Write};
 use std::sync::Arc;
@@ -21,8 +22,7 @@ use litchi_core::{
 use litchi_ooxml_common::xml::decode_xml_reference;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    PackURI, PartData, PartView, SourceArtifact, SourceArtifactFingerprint, SourceBackedPackage,
-    SourceLineage,
+    PackURI, PartData, PartView, SourceArtifactFingerprint, SourceBackedPackage, SourceLineage,
 };
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::QName;
@@ -30,8 +30,9 @@ use quick_xml::reader::Reader;
 use sha2::{Digest as _, Sha256};
 use thiserror::Error as ThisError;
 
+use crate::document::raw::Tree as DocumentEdit;
 use crate::document::{
-    Edit as DocumentEdit, MAX_DOCUMENT_XML_BYTES, Snapshot as DocumentSnapshot, TransactionError,
+    Error as TransactionError, MAX_DOCUMENT_XML_BYTES, Snapshot as DocumentSnapshot,
     validate_paragraph_text,
 };
 
@@ -149,7 +150,7 @@ impl GlossaryBatchSelector {
     pub fn try_new(selectors: Vec<GlossarySelector>) -> Result<Self> {
         if selectors.is_empty() {
             return Err(Error::Limit {
-                resource: "glossary batch selectors",
+                kind: LimitKind::GlossaryBatchSelectors,
                 actual: 0,
                 maximum: 1,
             });
@@ -268,12 +269,12 @@ pub enum Error {
     Document(#[from] crate::Error),
     /// The reusable main-document transaction refused the selected edit.
     #[error(transparent)]
-    Transaction(#[from] TransactionError),
+    DocumentEdit(#[from] TransactionError),
     /// A bounded story operation exceeded one finite resource ceiling.
-    #[error("source-backed story text {resource} limit exceeded: {actual} > {maximum}")]
+    #[error("source-backed story text {kind} limit exceeded: {actual} > {maximum}")]
     Limit {
-        /// Bounded resource name.
-        resource: &'static str,
+        /// The exceeded budget (record 0355a).
+        kind: LimitKind,
         /// Observed value.
         actual: usize,
         /// Maximum accepted value.
@@ -281,10 +282,7 @@ pub enum Error {
     },
     /// A patch was applied to a source with different selected-part bytes.
     #[error("source-backed story text patch source is stale")]
-    StaleSource,
-    /// A patch was applied to a package lineage other than its source.
-    #[error("source-backed story text patch belongs to a different source lineage")]
-    ForeignSource,
+    PatchConflict,
     /// A patch was applied to a different selected story or package topology.
     #[error("source-backed story text patch conflicts with the selected story topology")]
     TopologyConflict,
@@ -334,9 +332,6 @@ pub enum Error {
         /// Direct paragraph index within that entry.
         paragraph_index: usize,
     },
-    /// A publication inverse was applied to a foreign complete artifact.
-    #[error("source-backed story text publication conflicts with the complete source artifact")]
-    ArtifactConflict,
     /// A bounded allocation failed before publication began.
     #[error("source-backed story text allocation failed for {resource}: {source}")]
     Allocation {
@@ -385,17 +380,17 @@ impl Limits {
         max_replacement_text_bytes: usize,
     ) -> Result<Self> {
         let values = [
-            ("XML bytes", max_xml_bytes),
-            ("paragraphs", max_paragraphs),
-            ("XML events", max_events),
-            ("XML depth", max_depth),
-            ("output bytes", max_output_bytes),
-            ("replacements", max_replacements),
-            ("replacement text bytes", max_replacement_text_bytes),
+            (LimitKind::XmlBytes, max_xml_bytes),
+            (LimitKind::Paragraphs, max_paragraphs),
+            (LimitKind::XmlEvents, max_events),
+            (LimitKind::XmlDepth, max_depth),
+            (LimitKind::OutputBytes, max_output_bytes),
+            (LimitKind::Replacements, max_replacements),
+            (LimitKind::ReplacementTextBytes, max_replacement_text_bytes),
         ];
         if let Some((resource, _)) = values.iter().find(|(_, value)| *value == 0) {
             return Err(Error::Limit {
-                resource,
+                kind: *resource,
                 actual: 0,
                 maximum: 1,
             });
@@ -423,13 +418,13 @@ impl Limits {
         max_namespace_bindings: usize,
     ) -> Result<Self> {
         let values = [
-            ("story entries", max_entries),
-            ("selected entry bytes", max_entry_bytes),
-            ("namespace bindings", max_namespace_bindings),
+            (LimitKind::Entries, max_entries),
+            (LimitKind::SelectedEntryBytes, max_entry_bytes),
+            (LimitKind::NamespaceBindings, max_namespace_bindings),
         ];
         if let Some((resource, _)) = values.iter().find(|(_, value)| *value == 0) {
             return Err(Error::Limit {
-                resource,
+                kind: *resource,
                 actual: 0,
                 maximum: 1,
             });
@@ -510,13 +505,33 @@ impl Limits {
     pub fn with_max_namespace_bytes(mut self, max_namespace_bytes: usize) -> Result<Self> {
         if max_namespace_bytes == 0 {
             return Err(Error::Limit {
-                resource: "namespace bytes",
+                kind: LimitKind::NamespaceBytes,
                 actual: 0,
                 maximum: 1,
             });
         }
         self.max_namespace_bytes = max_namespace_bytes;
         Ok(self)
+    }
+
+    fn intersect(self, other: Self) -> Self {
+        Self {
+            max_xml_bytes: self.max_xml_bytes.min(other.max_xml_bytes),
+            max_paragraphs: self.max_paragraphs.min(other.max_paragraphs),
+            max_events: self.max_events.min(other.max_events),
+            max_depth: self.max_depth.min(other.max_depth),
+            max_output_bytes: self.max_output_bytes.min(other.max_output_bytes),
+            max_replacements: self.max_replacements.min(other.max_replacements),
+            max_replacement_text_bytes: self
+                .max_replacement_text_bytes
+                .min(other.max_replacement_text_bytes),
+            max_entries: self.max_entries.min(other.max_entries),
+            max_entry_bytes: self.max_entry_bytes.min(other.max_entry_bytes),
+            max_namespace_bindings: self
+                .max_namespace_bindings
+                .min(other.max_namespace_bindings),
+            max_namespace_bytes: self.max_namespace_bytes.min(other.max_namespace_bytes),
+        }
     }
 }
 
@@ -588,6 +603,13 @@ struct Envelope {
 #[derive(Clone)]
 enum Payload {
     Owned(Arc<Vec<u8>>),
+    /// A validated view into the transaction XML.  Main-story projections
+    /// already own the complete document buffer; retaining its range avoids
+    /// copying that buffer merely to construct the raw story snapshot.
+    OwnedRange {
+        bytes: Arc<Vec<u8>>,
+        range: Range,
+    },
     Managed(PartData),
 }
 
@@ -595,6 +617,7 @@ impl Payload {
     fn as_bytes(&self) -> &[u8] {
         match self {
             Self::Owned(bytes) => bytes.as_slice(),
+            Self::OwnedRange { bytes, range } => &bytes[range.start..range.end],
             Self::Managed(data) => data.as_bytes(),
         }
     }
@@ -662,6 +685,12 @@ impl Snapshot {
         self.part_fingerprint
     }
 
+    /// Return the policy under which this snapshot was admitted.
+    #[must_use]
+    pub const fn limits_value(&self) -> Limits {
+        self.limits
+    }
+
     /// Return the number of direct paragraphs in the selected story.
     pub fn paragraph_count(&self) -> Result<usize> {
         self.check_execution()?;
@@ -688,7 +717,7 @@ impl Snapshot {
             bytes,
             &mut text,
             self.limits.max_output_bytes,
-            "story paragraph text",
+            LimitKind::ParagraphText,
         )?;
         self.check_execution()?;
         Ok(Some(text))
@@ -712,7 +741,7 @@ impl Snapshot {
                 bytes,
                 &mut output,
                 self.limits.max_output_bytes,
-                "story text output",
+                LimitKind::TextOutput,
             )?;
             if index % 64 == 0 {
                 self.check_execution()?;
@@ -787,7 +816,7 @@ impl Snapshot {
                 ) {
                     Err(error) => Err(error),
                     Ok(()) => Err(writer.document_error(Error::Limit {
-                        resource: "story text output",
+                        kind: LimitKind::TextOutput,
                         actual: usize::try_from(required_output_bytes).unwrap_or(usize::MAX),
                         maximum: bounded_options
                             .max_output_bytes()
@@ -809,7 +838,7 @@ impl Snapshot {
                 bytes,
                 &mut text,
                 remaining_output_bytes,
-                "story paragraph text",
+                LimitKind::ParagraphText,
             )
             .map_err(|error| writer.document_error(error))?;
             writer.write_object::<Error>(TextObjectKind::Paragraph, &text)?;
@@ -820,20 +849,25 @@ impl Snapshot {
         Ok(writer.finish())
     }
 
-    /// Start a staged direct-paragraph text edit.
+    /// Open the selected story as a bounded mutable raw codec model.
     ///
-    /// Managed source-backed packages support bounded read and stream access,
-    /// but edits are refused rather than detaching a second owned XML buffer
-    /// from the managed `PartData` reservation. This matches the established
-    /// main-document transaction boundary.
-    pub fn edit(&self) -> Result<Edit> {
+    /// The supplied policy is intersected with the policy retained by this
+    /// admitted snapshot. Raw models publish [`Patch`] values rather than
+    /// package owners; source-backed package edits use the private consuming
+    /// transaction engine instead.
+    pub fn raw_tree(&self, limits: Limits) -> Result<raw::Tree> {
+        let base = self.with_raw_limits(limits)?;
+        Ok(raw::Tree::from_engine(base.edit_engine()?))
+    }
+
+    pub(crate) fn edit_engine(&self) -> Result<Edit> {
         self.check_execution()?;
         if self.payload.is_managed() {
-            return Err(Error::Document(crate::Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "source-backed story text edit",
-                reason: "managed source-backed story edits require an owned edit snapshot; use an unmanaged compatibility constructor",
-            }));
+            return Err(Error::Document(crate::Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "source-backed story text edit",
+                "managed source-backed story edits require an owned edit snapshot; use an unmanaged compatibility constructor",
+            )));
         }
         let mut base = self.clone();
         let transaction = if let Some(transaction) = self.transaction.clone() {
@@ -845,7 +879,15 @@ impl Snapshot {
             base.envelope = Some(envelope);
             DocumentSnapshot::from_xml(document_xml)?
         } else {
-            let document_xml = checked_vec_clone(self.raw_bytes(), "story transaction XML")?;
+            let source_bytes = self.raw_bytes();
+            if source_bytes.len() > self.limits.max_output_bytes {
+                return Err(Error::Limit {
+                    kind: LimitKind::TransactionXml,
+                    actual: source_bytes.len(),
+                    maximum: self.limits.max_output_bytes,
+                });
+            }
+            let document_xml = checked_vec_clone(source_bytes, "story transaction XML")?;
             DocumentSnapshot::from_xml(document_xml)?
         };
         base.transaction = Some(transaction.clone());
@@ -861,9 +903,29 @@ impl Snapshot {
         self.payload.as_bytes()
     }
 
+    fn with_raw_limits(&self, requested: Limits) -> Result<Self> {
+        let limits = self.limits.intersect(requested);
+        if limits == self.limits {
+            return Ok(self.clone());
+        }
+        let layout = scan_selected_story(
+            self.raw_bytes(),
+            &self.selector,
+            Some(self.layout.word_namespace.as_ref()),
+            limits,
+            self.execution.as_ref(),
+        )?;
+        let mut base = self.clone();
+        base.layout = layout;
+        base.limits = limits;
+        base.transaction = None;
+        base.envelope = None;
+        Ok(base)
+    }
+
     fn with_transaction_snapshot(&self, transaction: DocumentSnapshot) -> Result<Self> {
-        let (raw, envelope) = if let Some(envelope) = self.envelope {
-            let wrapped = transaction.shared_xml().map_err(Error::Transaction)?;
+        let (payload, envelope) = if let Some(envelope) = self.envelope {
+            let wrapped = transaction.shared_xml().map_err(Error::DocumentEdit)?;
             let wrapped_end = wrapped
                 .len()
                 .checked_sub(envelope.wrapped_suffix_len)
@@ -897,13 +959,13 @@ impl Snapshot {
                 .checked_add(inner.len())
                 .and_then(|value| value.checked_add(after.len()))
                 .ok_or(Error::Limit {
-                    resource: "story output bytes",
+                    kind: LimitKind::OutputBytes,
                     actual: usize::MAX,
                     maximum: self.limits.max_output_bytes,
                 })?;
             if total > self.limits.max_output_bytes {
                 return Err(Error::Limit {
-                    resource: "story output bytes",
+                    kind: LimitKind::OutputBytes,
                     actual: total,
                     maximum: self.limits.max_output_bytes,
                 });
@@ -917,21 +979,22 @@ impl Snapshot {
             raw.extend_from_slice(before);
             raw.extend_from_slice(inner);
             raw.extend_from_slice(after);
-            (raw, Some(envelope))
+            (Payload::Owned(Arc::new(raw)), Some(envelope))
         } else {
-            (
-                checked_story_output_clone(
-                    transaction
-                        .shared_xml()
-                        .map_err(Error::Transaction)?
-                        .as_ref(),
-                    &self.limits,
-                    "story transaction XML",
-                )?,
-                None,
-            )
+            let bytes = transaction.shared_xml().map_err(Error::DocumentEdit)?;
+            if bytes.len() > self.limits.max_output_bytes {
+                return Err(Error::Limit {
+                    kind: LimitKind::TransactionXml,
+                    actual: bytes.len(),
+                    maximum: self.limits.max_output_bytes,
+                });
+            }
+            let range = Range {
+                start: 0,
+                end: bytes.len(),
+            };
+            (Payload::OwnedRange { bytes, range }, None)
         };
-        let payload = Payload::Owned(Arc::new(raw));
         let layout = scan_selected_story(
             payload.as_bytes(),
             &self.selector,
@@ -960,16 +1023,12 @@ impl Snapshot {
             execution: self.execution.clone(),
         })
     }
-
-    fn with_artifact_fingerprint(&self, fingerprint: SourceArtifactFingerprint) -> Self {
-        let mut snapshot = self.clone();
-        snapshot.artifact_fingerprint = Some(fingerprint);
-        snapshot
-    }
 }
 
-/// A staged selected-story direct-paragraph edit.
-pub struct Edit {
+/// Private transaction engine for the raw codec model and source-backed owner
+/// family. The public raw model wraps this engine with a bounded projection
+/// cache; the owner family consumes it directly.
+pub(crate) struct Edit {
     base: Snapshot,
     projected: DocumentEdit,
     replacements: usize,
@@ -979,31 +1038,31 @@ pub struct Edit {
 impl Edit {
     /// Borrow the immutable source snapshot.
     #[must_use]
-    pub const fn source(&self) -> &Snapshot {
+    pub(crate) const fn source(&self) -> &Snapshot {
         &self.base
     }
 
     /// Borrow the current projected selected-story snapshot.
-    pub fn projected(&self) -> Result<Snapshot> {
+    pub(crate) fn projected(&self) -> Result<Snapshot> {
         self.base
             .with_transaction_snapshot(self.projected.projected().clone())
     }
 
     /// Replace all text in one direct selected-story paragraph.
-    pub fn replace_paragraph_text(
+    pub(crate) fn replace_paragraph_text(
         &mut self,
         position: Position,
         authored_text: impl AsRef<str>,
     ) -> Result<&mut Self> {
         self.base.check_execution()?;
         let next_replacements = self.replacements.checked_add(1).ok_or(Error::Limit {
-            resource: "replacements",
+            kind: LimitKind::Replacements,
             actual: usize::MAX,
             maximum: self.base.limits.max_replacements,
         })?;
         if next_replacements > self.base.limits.max_replacements {
             return Err(Error::Limit {
-                resource: "replacements",
+                kind: LimitKind::Replacements,
                 actual: next_replacements,
                 maximum: self.base.limits.max_replacements,
             });
@@ -1013,23 +1072,23 @@ impl Edit {
             .replacement_text_bytes
             .checked_add(authored_text.len())
             .ok_or(Error::Limit {
-                resource: "replacement text bytes",
+                kind: LimitKind::ReplacementTextBytes,
                 actual: usize::MAX,
                 maximum: self.base.limits.max_replacement_text_bytes,
             })?;
         if next_bytes > self.base.limits.max_replacement_text_bytes {
             return Err(Error::Limit {
-                resource: "replacement text bytes",
+                kind: LimitKind::ReplacementTextBytes,
                 actual: next_bytes,
                 maximum: self.base.limits.max_replacement_text_bytes,
             });
         }
-        validate_paragraph_text(position, authored_text).map_err(Error::Transaction)?;
+        validate_paragraph_text(position, authored_text).map_err(Error::DocumentEdit)?;
         let text = checked_string_clone(authored_text, "story replacement text")?;
-        let mut candidate = self.projected.try_clone().map_err(Error::Transaction)?;
+        let mut candidate = self.projected.try_clone().map_err(Error::DocumentEdit)?;
         candidate
             .replace_paragraph_text(position, text)
-            .map_err(Error::Transaction)?;
+            .map_err(Error::DocumentEdit)?;
         self.base.check_execution()?;
         let _validated = self
             .base
@@ -1041,15 +1100,24 @@ impl Edit {
         Ok(self)
     }
 
-    /// Finish the staged edit as a source-bound reversible patch.
-    pub fn commit(self) -> Result<Commit> {
+    fn target(&self) -> Result<Snapshot> {
         self.base.check_execution()?;
-        // The document transaction commit intentionally compacts changed
-        // main-document XML. Collection stories use an envelope, however:
-        // their projected snapshot already contains the exact raw paragraph
-        // range replacements produced by the validated transaction. Reusing
-        // that projection avoids normalizing unrelated bytes inside the
-        // selected entry while preserving the outer source splice.
+        // The staged transaction has already validated every replacement and
+        // `with_transaction_snapshot` below performs the selected-story
+        // admission again.  Reusing its projected snapshot keeps raw output
+        // source-preserving and avoids cloning the complete transaction just
+        // to call its consuming owner commit.  The owner family still uses
+        // `finish`, which consumes the transaction at publication time.
+        let transaction_snapshot = self.projected.projected().clone();
+        self.base.check_execution()?;
+        let target = self.base.with_transaction_snapshot(transaction_snapshot)?;
+        Ok(target)
+    }
+}
+
+impl Edit {
+    pub(crate) fn finish(self) -> Result<Patch> {
+        self.base.check_execution()?;
         let transaction_snapshot = if self.base.envelope.is_some() {
             self.projected.projected().clone()
         } else {
@@ -1057,39 +1125,16 @@ impl Edit {
         };
         self.base.check_execution()?;
         let target = self.base.with_transaction_snapshot(transaction_snapshot)?;
-        let patch = Patch {
+        Ok(Patch {
             before: self.base,
-            after: target.clone(),
-        };
-        Ok(Commit {
-            snapshot: target,
-            patch,
+            after: target,
         })
     }
 }
 
-/// A completed selected-story edit.
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
-
-impl Commit {
-    /// Borrow the projected selected-story snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Borrow the source-bound reversible patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-}
-
-/// A reversible selected-story patch bound to one source lineage, revision,
-/// selected part, and exact selected-part bytes.
+/// A reversible selected-story patch carrying the selected-part identity and
+/// exact before and after bytes. Owner publication adds its complete-artifact
+/// and source-freshness proof; raw replay matches the selected content.
 #[derive(Clone)]
 pub struct Patch {
     before: Snapshot,
@@ -1097,7 +1142,7 @@ pub struct Patch {
 }
 
 impl Patch {
-    /// Borrow the exact source snapshot required by this patch.
+    /// Borrow the before snapshot represented by this patch.
     #[must_use]
     pub const fn source(&self) -> &Snapshot {
         &self.before
@@ -1124,69 +1169,228 @@ impl Patch {
         }
     }
 
-    /// Apply only to an equivalent selected-story source snapshot.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
-        if source.selector != self.before.selector
-            || !same_part_name(&source.partname, &self.before.partname)
-        {
-            return Err(Error::TopologyConflict);
-        }
-        if source.source_lineage != self.before.source_lineage {
-            return Err(Error::ForeignSource);
-        }
-        if source.source_version != self.before.source_version {
-            return Err(Error::StaleSource);
-        }
-        if source.part_fingerprint != self.before.part_fingerprint
-            || source.raw_bytes() != self.before.raw_bytes()
-        {
-            return Err(Error::StaleSource);
-        }
+    /// Apply to a selected-story snapshot with the patch's exact selector,
+    /// part and before bytes, from any source (record 0355a: a package
+    /// replay reads the snapshot it applies to).
+    pub(crate) fn apply_content(&self, source: &Snapshot) -> Result<Snapshot> {
+        self.check_content(source)?;
         Ok(if self.is_noop() {
             source.clone()
         } else {
             self.after.clone()
         })
     }
-}
 
-/// Exact publication evidence for one selected-story overlay.
-pub struct Publication {
-    snapshot: Snapshot,
-    original_snapshot: Snapshot,
-    original_artifact: SourceArtifact,
-    published_fingerprint: SourceArtifactFingerprint,
-    inverse_patch: Patch,
-}
-
-impl Publication {
-    /// Borrow the selected-story snapshot represented by the emitted package.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
+    fn check_content(&self, source: &Snapshot) -> Result<()> {
+        if source.selector != self.before.selector
+            || !same_part_name(&source.partname, &self.before.partname)
+        {
+            return Err(Error::TopologyConflict);
+        }
+        if !same_content(
+            source.part_fingerprint,
+            source.raw_bytes(),
+            self.before.raw_bytes(),
+            self.before.part_fingerprint,
+        ) {
+            return Err(Error::PatchConflict);
+        }
+        Ok(())
     }
 
-    /// Borrow the inverse patch authorized for the emitted snapshot.
-    #[must_use]
-    pub const fn inverse_patch(&self) -> &Patch {
-        &self.inverse_patch
+    /// Replay this raw patch on an independently opened matching snapshot.
+    ///
+    /// Raw codec replay is scoped to the selected XML member. The owning
+    /// package family performs its separate complete-artifact and source
+    /// freshness checks before publication. The returned snapshot is
+    /// admitted under the recipient policy and carries the recipient source
+    /// identity, so a subsequent raw edit cannot inherit the author's fence.
+    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+        source.check_execution()?;
+        self.check_content(source)?;
+        self.rebased_target(source)
     }
 
-    /// Return the complete emitted-artifact fingerprint.
-    #[must_use]
-    pub const fn published_fingerprint(&self) -> SourceArtifactFingerprint {
-        self.published_fingerprint
+    fn rebased_target(&self, source: &Snapshot) -> Result<Snapshot> {
+        if self.is_noop() {
+            return Ok(source.clone());
+        }
+        let bytes = self.after.raw_bytes();
+        if bytes.len() > source.limits.max_output_bytes {
+            return Err(Error::Limit {
+                kind: LimitKind::OutputBytes,
+                actual: bytes.len(),
+                maximum: source.limits.max_output_bytes,
+            });
+        }
+        let layout = scan_selected_story(
+            bytes,
+            &source.selector,
+            Some(source.layout.word_namespace.as_ref()),
+            source.limits,
+            source.execution.as_ref(),
+        )?;
+        let mut target = self.after.clone();
+        target.selector = source.selector.clone();
+        target.partname = source.partname.clone();
+        target.layout = layout;
+        target.transaction = None;
+        target.envelope = None;
+        target.source_version = source.source_version;
+        target.source_lineage = source.source_lineage.clone();
+        target.part_fingerprint = digest(bytes);
+        target.artifact_fingerprint = source.artifact_fingerprint;
+        target.limits = source.limits;
+        target.execution = source.execution.clone();
+        Ok(target)
+    }
+
+    pub(crate) fn selector(&self) -> Selector {
+        self.before.selector.clone()
+    }
+}
+
+/// Raw mutable codec models for selected-story and glossary text records.
+pub mod raw {
+    use super::{
+        Edit, GlossaryBatchEdit, GlossaryBatchPatch, GlossaryBatchSnapshot, Patch, Position,
+        RefCell, Result, Snapshot,
+    };
+
+    /// A mutable raw selected-story text model.
+    ///
+    /// The model keeps only the private transaction engine and one cached
+    /// projection. Repeated output calls borrow the cached snapshot; they do
+    /// not clone the complete transaction. The consuming engine remains
+    /// private to the source-backed owner family.
+    pub struct Tree {
+        inner: Edit,
+        projected: RefCell<Option<Snapshot>>,
+    }
+
+    impl Tree {
+        pub(super) fn from_engine(inner: Edit) -> Self {
+            Self {
+                inner,
+                projected: RefCell::new(None),
+            }
+        }
+
+        /// Borrow the immutable source snapshot.
+        #[must_use]
+        pub const fn source(&self) -> &Snapshot {
+            self.inner.source()
+        }
+
+        /// Return the current bounded projection.
+        pub fn projected(&self) -> Result<Snapshot> {
+            if let Some(projected) = self.projected.borrow().as_ref() {
+                return Ok(projected.clone());
+            }
+            let projected = self.inner.target()?;
+            *self.projected.borrow_mut() = Some(projected.clone());
+            Ok(projected)
+        }
+
+        /// Replace all text in one direct paragraph.
+        pub fn replace_paragraph_text(
+            &mut self,
+            position: Position,
+            authored_text: impl AsRef<str>,
+        ) -> Result<&mut Self> {
+            self.inner.replace_paragraph_text(position, authored_text)?;
+            self.projected.borrow_mut().take();
+            Ok(self)
+        }
+
+        /// Produce the source-bound raw patch without publishing a package.
+        pub fn patch(&self) -> Result<Patch> {
+            let target = self.projected()?;
+            Ok(Patch {
+                before: self.inner.source().clone(),
+                after: target,
+            })
+        }
+
+        /// Replay a selected-story patch against this model's source.
+        ///
+        /// The returned snapshot is a raw projection; no package is
+        /// published and no source lineage is required.
+        pub fn apply(&self, patch: &Patch) -> Result<Snapshot> {
+            patch.apply(self.source())
+        }
+    }
+
+    /// A mutable raw glossary-entry batch model.
+    pub struct GlossaryTree {
+        inner: GlossaryBatchEdit,
+        projected: RefCell<Option<GlossaryBatchSnapshot>>,
+    }
+
+    impl GlossaryTree {
+        pub(super) fn from_engine(inner: GlossaryBatchEdit) -> Self {
+            Self {
+                inner,
+                projected: RefCell::new(None),
+            }
+        }
+
+        /// Borrow the immutable source snapshot.
+        #[must_use]
+        pub const fn source(&self) -> &GlossaryBatchSnapshot {
+            self.inner.source()
+        }
+
+        /// Return the current bounded projection.
+        pub fn projected(&self) -> Result<GlossaryBatchSnapshot> {
+            if let Some(projected) = self.projected.borrow().as_ref() {
+                return Ok(projected.clone());
+            }
+            let projected = self.inner.projected()?;
+            *self.projected.borrow_mut() = Some(projected.clone());
+            Ok(projected)
+        }
+
+        /// Replace all text in one direct paragraph of one selected entry.
+        pub fn replace_paragraph_text(
+            &mut self,
+            entry_index: usize,
+            position: Position,
+            authored_text: impl AsRef<str>,
+        ) -> Result<&mut Self> {
+            self.inner
+                .replace_paragraph_text(entry_index, position, authored_text)?;
+            self.projected.borrow_mut().take();
+            Ok(self)
+        }
+
+        /// Produce the source-bound raw patch without publishing a package.
+        pub fn patch(&self) -> Result<GlossaryBatchPatch> {
+            let target = self.projected()?;
+            Ok(GlossaryBatchPatch {
+                before: self.inner.source().clone(),
+                after: target,
+            })
+        }
+
+        /// Replay a glossary batch patch against this model's source.
+        ///
+        /// The returned snapshot is a raw projection; no package is
+        /// published and no source lineage is required.
+        pub fn apply(&self, patch: &GlossaryBatchPatch) -> Result<GlossaryBatchSnapshot> {
+            patch.apply(self.source())
+        }
     }
 }
 
 impl Package {
     /// Capture one bounded source-backed Word text story.
     pub fn story_text_snapshot(&self, selector: Selector) -> Result<Snapshot> {
-        self.story_text_snapshot_with_limits(selector, Limits::default())
+        self.story_text_snapshot_bounded(selector, self.semantic_limits.story_text_value())
     }
 
     /// Capture one selected story under explicit finite bounds.
-    pub fn story_text_snapshot_with_limits(
+    pub(crate) fn story_text_snapshot_bounded(
         &self,
         selector: Selector,
         limits: Limits,
@@ -1194,122 +1398,71 @@ impl Package {
         capture(self, selector, limits)
     }
 
-    /// Start one staged selected-story text edit.
-    pub fn edit_story_text(&self, selector: Selector) -> Result<Edit> {
-        self.story_text_snapshot(selector)?.edit()
-    }
-
-    /// Start one staged selected-story text edit under explicit bounds.
-    pub fn edit_story_text_with_limits(&self, selector: Selector, limits: Limits) -> Result<Edit> {
-        self.story_text_snapshot_with_limits(selector, limits)?
-            .edit()
-    }
-
-    /// Publish one selected-story commit through the existing one-Part shared
-    /// overlay path. Unchanged members are copied in their original physical
-    /// form, and an exact no-op copies the complete source artifact.
-    pub fn publish_story_text_commit_to_stream<W: Write>(
-        self,
-        writer: W,
-        commit: &Commit,
-    ) -> Result<Publication> {
-        self.publish_story_text_patch_to_stream(writer, commit.patch())
-    }
-
-    /// Publish one source-bound selected-story patch.
-    pub fn publish_story_text_patch_to_stream<W: Write>(
-        self,
-        writer: W,
-        patch: &Patch,
-    ) -> Result<Publication> {
+    /// Check a selected-story patch against this package and return the part
+    /// and its rewritten bytes (record 0355a).
+    pub(crate) fn story_text_target(&self, patch: &Patch) -> Result<(PackURI, Arc<Vec<u8>>)> {
         self.trim_clean_paragraph_index_for_operation();
-        self.package.check_execution()?;
-        let execution = self.package.execution_context();
-        let current = capture(&self, patch.before.selector.clone(), patch.before.limits)?;
-        let target = patch.apply(&current)?;
-        let original_artifact = self.package.source_artifact();
-        let mut output = FingerprintingWriter::new(writer);
-        if patch.is_noop() {
-            let mut cancellation_writer = CancellationWriter {
-                writer: &mut output,
-                execution: execution.as_ref(),
-            };
-            original_artifact.write_to_stream(&mut cancellation_writer)?;
-            check_execution_context(execution.as_ref())?;
-        } else {
-            self.package.validate_topology_source_boundary()?;
-            if target.raw_bytes().len() > patch.before.limits.max_output_bytes {
-                return Err(Error::Limit {
-                    resource: "story output bytes",
-                    actual: target.raw_bytes().len(),
-                    maximum: patch.before.limits.max_output_bytes,
-                });
-            }
-            let replacement = Arc::new(checked_vec_clone(
-                target.raw_bytes(),
-                "story publication replacement",
-            )?);
-            self.package.write_part_overlay_shared_to_stream(
-                &mut output,
-                &current.partname,
-                replacement,
-            )?;
-        }
-        let published_fingerprint = output.finish();
-        let published_snapshot = target.with_artifact_fingerprint(published_fingerprint);
-        let inverse_patch = Patch {
-            before: published_snapshot.clone(),
-            after: current.clone(),
-        };
-        Ok(Publication {
-            snapshot: published_snapshot,
-            original_snapshot: current,
-            original_artifact,
-            published_fingerprint,
-            inverse_patch,
-        })
+        self.physical_package()?.check_execution()?;
+        let recipient_limits = self.semantic_limits.story_text_value();
+        let current = capture(self, patch.selector(), recipient_limits)?;
+        let target = patch.apply_content(&current)?;
+        story_replacement(
+            self,
+            patch.is_noop(),
+            &current.partname,
+            target.raw_bytes(),
+            recipient_limits,
+            LimitKind::OutputBytes,
+            "story publication replacement",
+        )
     }
+}
 
-    /// Restore the exact source artifact from a selected-story publication.
-    pub fn publish_story_text_inverse_to_stream<W: Write>(
-        self,
-        writer: W,
-        publication: &Publication,
-    ) -> Result<Snapshot> {
-        self.trim_clean_paragraph_index_for_operation();
-        self.package.check_execution()?;
-        let execution = self.package.execution_context();
-        let current = self.package.source_artifact().fingerprint()?;
-        if current != publication.published_fingerprint {
-            return Err(Error::ArtifactConflict);
-        }
-        let mut writer = writer;
-        let mut cancellation_writer = CancellationWriter {
-            writer: &mut writer,
-            execution: execution.as_ref(),
-        };
-        publication
-            .original_artifact
-            .write_to_stream(&mut cancellation_writer)?;
-        check_execution_context(execution.as_ref())?;
-        Ok(publication.original_snapshot.clone())
+/// The replacement bytes of one changed story part, after the output and
+/// topology checks of a publication.
+fn story_replacement(
+    package: &Package,
+    noop: bool,
+    partname: &PackURI,
+    bytes: &[u8],
+    limits: Limits,
+    kind: LimitKind,
+    resource: &'static str,
+) -> Result<(PackURI, Arc<Vec<u8>>)> {
+    if noop {
+        return Ok((partname.clone(), Arc::new(Vec::new())));
     }
+    package
+        .physical_package()?
+        .validate_topology_source_boundary()?;
+    if bytes.len() > limits.max_output_bytes {
+        return Err(Error::Limit {
+            kind,
+            actual: bytes.len(),
+            maximum: limits.max_output_bytes,
+        });
+    }
+    Ok((
+        partname.clone(),
+        Arc::new(checked_vec_clone(bytes, resource)?),
+    ))
 }
 
 fn capture(package: &Package, selector: Selector, limits: Limits) -> Result<Snapshot> {
     package.trim_clean_paragraph_index_for_operation();
-    package.package.check_execution()?;
+    package.physical_package()?.check_execution()?;
     if let Selector::Glossary(glossary) = &selector {
         validate_glossary_selector(glossary)?;
     }
-    let source_version = package.package.source_version()?;
-    let source_lineage = package.package.source_lineage();
-    let execution = package.package.execution_context();
-    let (partname, part, relationship_word_namespace) = resolve_part(&package.package, &selector)?;
+    let source_version = package.physical_package()?.source_version()?;
+    let source_lineage = package.physical_package()?.source_lineage();
+    let execution = package.physical_package()?.execution_context();
+    let (partname, part, relationship_word_namespace) =
+        resolve_part(package.physical_package()?, &selector)?;
     let declared = part.declared_uncompressed_size()?;
     if declared > limits.max_xml_bytes as u64 {
         return Err(Error::Limit {
-            resource: "XML bytes",
+            kind: LimitKind::XmlBytes,
             actual: usize::try_from(declared).unwrap_or(usize::MAX),
             maximum: limits.max_xml_bytes,
         });
@@ -1317,12 +1470,15 @@ fn capture(package: &Package, selector: Selector, limits: Limits) -> Result<Snap
     let data = part.data()?;
     if data.as_bytes().len() > limits.max_xml_bytes {
         return Err(Error::Limit {
-            resource: "XML bytes",
+            kind: LimitKind::XmlBytes,
             actual: data.as_bytes().len(),
             maximum: limits.max_xml_bytes,
         });
     }
-    let managed = package.package.cache_diagnostics().budget_managed;
+    let managed = package
+        .physical_package()?
+        .cache_diagnostics()
+        .budget_managed;
     let payload = if managed {
         Payload::Managed(data)
     } else {
@@ -1337,7 +1493,7 @@ fn capture(package: &Package, selector: Selector, limits: Limits) -> Result<Snap
     )?;
     let (envelope, transaction) = (None, None);
     let part_fingerprint = digest(payload.as_bytes());
-    let observed = package.package.source_version()?;
+    let observed = package.physical_package()?.source_version()?;
     if observed != source_version {
         return Err(Error::Document(crate::Error::Opc(
             litchi_opc::OpcError::SourceChanged {
@@ -1346,7 +1502,7 @@ fn capture(package: &Package, selector: Selector, limits: Limits) -> Result<Snap
             },
         )));
     }
-    package.package.check_execution()?;
+    package.physical_package()?.check_execution()?;
     Ok(Snapshot {
         selector,
         partname,
@@ -1367,7 +1523,7 @@ fn extract_story_paragraph_text(
     xml: &[u8],
     output: &mut String,
     maximum: usize,
-    output_resource: &'static str,
+    output_resource: LimitKind,
 ) -> Result<()> {
     let mut paragraph_bytes = 0usize;
     crate::paragraph::for_each_word_text_chunk(xml, |chunk| {
@@ -1375,25 +1531,25 @@ fn extract_story_paragraph_text(
             paragraph_bytes
                 .checked_add(chunk.len())
                 .ok_or(Error::Limit {
-                    resource: "story paragraph text",
+                    kind: LimitKind::ParagraphText,
                     actual: usize::MAX,
                     maximum,
                 })?;
         if next_paragraph_bytes > maximum {
             return Err(Error::Limit {
-                resource: "story paragraph text",
+                kind: LimitKind::ParagraphText,
                 actual: next_paragraph_bytes,
                 maximum,
             });
         }
         let next_output_bytes = output.len().checked_add(chunk.len()).ok_or(Error::Limit {
-            resource: output_resource,
+            kind: output_resource,
             actual: usize::MAX,
             maximum,
         })?;
         if next_output_bytes > maximum {
             return Err(Error::Limit {
-                resource: output_resource,
+                kind: output_resource,
                 actual: next_output_bytes,
                 maximum,
             });
@@ -1401,7 +1557,7 @@ fn extract_story_paragraph_text(
         output
             .try_reserve(chunk.len())
             .map_err(|source| Error::Allocation {
-                resource: output_resource,
+                resource: output_resource.as_str(),
                 source,
             })?;
         output.push_str(chunk);
@@ -1414,7 +1570,7 @@ fn measure_story_paragraph_text(xml: &[u8]) -> Result<usize> {
     let mut output_bytes = 0usize;
     crate::paragraph::for_each_word_text_chunk(xml, |chunk| {
         output_bytes = output_bytes.checked_add(chunk.len()).ok_or(Error::Limit {
-            resource: "story paragraph text",
+            kind: LimitKind::ParagraphText,
             actual: usize::MAX,
             maximum: usize::MAX,
         })?;
@@ -1441,7 +1597,7 @@ fn validate_story_general_reference(reference: &quick_xml::events::BytesRef<'_>)
     let bytes = reference.as_ref();
     if bytes.len() > MAX_STORY_REFERENCE_BYTES {
         return Err(Error::Limit {
-            resource: "XML reference bytes",
+            kind: LimitKind::XmlReferenceBytes,
             actual: bytes.len(),
             maximum: MAX_STORY_REFERENCE_BYTES,
         });
@@ -2056,7 +2212,7 @@ fn resolve_header_footer<'package>(
 
         if targets.len() >= target_limit {
             return Err(Error::Limit {
-                resource: "story relationship targets",
+                kind: LimitKind::RelationshipTargets,
                 actual: targets.len().saturating_add(1),
                 maximum: target_limit,
             });
@@ -2117,11 +2273,11 @@ struct NamespaceContext {
     raw_namespace_bytes: usize,
 }
 
-fn preflight_attribute_value(value: &[u8], maximum: usize, resource: &'static str) -> Result<()> {
+fn preflight_attribute_value(value: &[u8], maximum: usize, resource: LimitKind) -> Result<()> {
     let raw_maximum = maximum.checked_mul(4).unwrap_or(usize::MAX);
     if value.len() > raw_maximum {
         return Err(Error::Limit {
-            resource,
+            kind: resource,
             actual: value.len(),
             maximum: raw_maximum,
         });
@@ -2133,12 +2289,12 @@ fn preflight_attribute_value(value: &[u8], maximum: usize, resource: &'static st
 fn checked_decoded_attribute_value_length(
     value: &[u8],
     maximum: usize,
-    resource: &'static str,
+    resource: LimitKind,
 ) -> Result<usize> {
     let raw_maximum = maximum.checked_mul(4).unwrap_or(usize::MAX);
     if value.len() > raw_maximum {
         return Err(Error::Limit {
-            resource,
+            kind: resource,
             actual: value.len(),
             maximum: raw_maximum,
         });
@@ -2148,7 +2304,7 @@ fn checked_decoded_attribute_value_length(
     while offset < value.len() {
         if value[offset] != b'&' {
             decoded_length = decoded_length.checked_add(1).ok_or(Error::Limit {
-                resource,
+                kind: resource,
                 actual: usize::MAX,
                 maximum,
             })?;
@@ -2214,13 +2370,13 @@ fn checked_decoded_attribute_value_length(
         decoded_length = decoded_length
             .checked_add(replacement_length)
             .ok_or(Error::Limit {
-                resource,
+                kind: resource,
                 actual: usize::MAX,
                 maximum,
             })?;
         if decoded_length > maximum {
             return Err(Error::Limit {
-                resource,
+                kind: resource,
                 actual: decoded_length,
                 maximum,
             });
@@ -2232,7 +2388,7 @@ fn checked_decoded_attribute_value_length(
 
 fn decode_attribute_value(value: &[u8]) -> Result<Vec<u8>> {
     let decoded_length =
-        checked_decoded_attribute_value_length(value, usize::MAX, "story attribute value")?;
+        checked_decoded_attribute_value_length(value, usize::MAX, LimitKind::AttributeValue)?;
     let value = std::str::from_utf8(value).map_err(|error| {
         Error::Document(crate::Error::InvalidFormat(format!(
             "invalid XML attribute UTF-8: {error}"
@@ -2353,14 +2509,14 @@ impl NamespaceContext {
     ) -> Result<(Self, Vec<u8>)> {
         if parent.bindings.len() > max_bindings {
             return Err(Error::Limit {
-                resource: "namespace bindings",
+                kind: LimitKind::NamespaceBindings,
                 actual: parent.bindings.len(),
                 maximum: max_bindings,
             });
         }
         if parent.raw_namespace_bytes > max_namespace_bytes {
             return Err(Error::Limit {
-                resource: "namespace bytes",
+                kind: LimitKind::NamespaceBytes,
                 actual: parent.raw_namespace_bytes,
                 maximum: max_namespace_bytes,
             });
@@ -2395,7 +2551,7 @@ impl NamespaceContext {
                 let prefix = namespace_declared_prefix(key).unwrap_or_default();
                 let raw_declaration_bytes =
                     prefix.len().checked_add(value.len()).ok_or(Error::Limit {
-                        resource: "namespace bytes",
+                        kind: LimitKind::NamespaceBytes,
                         actual: usize::MAX,
                         maximum: max_namespace_bytes,
                     })?;
@@ -2403,18 +2559,22 @@ impl NamespaceContext {
                     .raw_namespace_bytes
                     .checked_add(raw_declaration_bytes)
                     .ok_or(Error::Limit {
-                        resource: "namespace bytes",
+                        kind: LimitKind::NamespaceBytes,
                         actual: usize::MAX,
                         maximum: max_namespace_bytes,
                     })?;
                 if raw_namespace_bytes > max_namespace_bytes {
                     return Err(Error::Limit {
-                        resource: "namespace bytes",
+                        kind: LimitKind::NamespaceBytes,
                         actual: raw_namespace_bytes,
                         maximum: max_namespace_bytes,
                     });
                 }
-                preflight_attribute_value(value, max_namespace_bytes, "namespace attribute value")?;
+                preflight_attribute_value(
+                    value,
+                    max_namespace_bytes,
+                    LimitKind::NamespaceAttributeValue,
+                )?;
                 let decoded_value = decode_attribute_value(value)?;
                 if decoded_value.as_slice() == MCE_NAMESPACE {
                     return Err(unsupported_xml(
@@ -2423,7 +2583,7 @@ impl NamespaceContext {
                 }
                 if context.bindings.len() >= max_bindings {
                     return Err(Error::Limit {
-                        resource: "namespace bindings",
+                        kind: LimitKind::NamespaceBindings,
                         actual: context.bindings.len().saturating_add(1),
                         maximum: max_bindings,
                     });
@@ -2445,7 +2605,7 @@ impl NamespaceContext {
                     .and_then(|size| size.checked_add(3))
                     .and_then(|size| size.checked_add(value.len()))
                     .ok_or(Error::Limit {
-                        resource: "story namespace attributes",
+                        kind: LimitKind::NamespaceAttributes,
                         actual: usize::MAX,
                         maximum: usize::MAX,
                     })?;
@@ -2484,7 +2644,11 @@ impl NamespaceContext {
                         .is_some_and(|namespace| namespace == MCE_NAMESPACE)
                     || value == MCE_NAMESPACE;
                 if mce_attribute {
-                    preflight_attribute_value(value, max_namespace_bytes, "story attribute value")?;
+                    preflight_attribute_value(
+                        value,
+                        max_namespace_bytes,
+                        LimitKind::AttributeValue,
+                    )?;
                     return Err(unsupported_xml(
                         "markup-compatibility attributes are not accepted in a source-bound story",
                     ));
@@ -2576,7 +2740,7 @@ fn append_namespace_attribute(
             _ => 1,
         };
         total.checked_add(byte_len).ok_or(Error::Limit {
-            resource: "story namespace attributes",
+            kind: LimitKind::NamespaceAttributes,
             actual: usize::MAX,
             maximum,
         })
@@ -2585,7 +2749,7 @@ fn append_namespace_attribute(
         0
     } else {
         prefix.len().checked_add(1).ok_or(Error::Limit {
-            resource: "story namespace attributes",
+            kind: LimitKind::NamespaceAttributes,
             actual: usize::MAX,
             maximum,
         })?
@@ -2597,7 +2761,7 @@ fn append_namespace_attribute(
         .and_then(|value| value.checked_add(escaped_namespace_bytes))
         .and_then(|value| value.checked_add(1))
         .ok_or(Error::Limit {
-            resource: "story namespace attributes",
+            kind: LimitKind::NamespaceAttributes,
             actual: usize::MAX,
             maximum,
         })?;
@@ -2605,13 +2769,13 @@ fn append_namespace_attribute(
         .len()
         .checked_add(declaration_bytes)
         .ok_or(Error::Limit {
-            resource: "story namespace attributes",
+            kind: LimitKind::NamespaceAttributes,
             actual: usize::MAX,
             maximum,
         })?;
     if projected > maximum {
         return Err(Error::Limit {
-            resource: "story namespace attributes",
+            kind: LimitKind::NamespaceAttributes,
             actual: projected,
             maximum,
         });
@@ -2734,7 +2898,7 @@ fn word_attribute(
         if let Err(error) = preflight_attribute_value(
             attribute.value.as_ref(),
             MAX_GLOSSARY_SELECTOR_NAME_BYTES,
-            "story attribute value",
+            LimitKind::AttributeValue,
         ) {
             return Some(Err(error));
         }
@@ -2761,7 +2925,7 @@ fn validate_glossary_selector(selector: &GlossarySelector) -> Result<()> {
 fn validate_glossary_selector_id(id: &crate::glossary::Id) -> Result<()> {
     if id.as_str().len() > MAX_GLOSSARY_SELECTOR_ID_BYTES {
         return Err(Error::Limit {
-            resource: "glossary selector ID bytes",
+            kind: LimitKind::GlossarySelectorIdBytes,
             actual: id.as_str().len(),
             maximum: MAX_GLOSSARY_SELECTOR_ID_BYTES,
         });
@@ -2772,7 +2936,7 @@ fn validate_glossary_selector_id(id: &crate::glossary::Id) -> Result<()> {
 fn glossary_name_key(value: &str) -> Result<String> {
     if value.len() > MAX_GLOSSARY_SELECTOR_NAME_BYTES {
         return Err(Error::Limit {
-            resource: "glossary selector name bytes",
+            kind: LimitKind::GlossarySelectorNameBytes,
             actual: value.len(),
             maximum: MAX_GLOSSARY_SELECTOR_NAME_BYTES,
         });
@@ -2791,13 +2955,13 @@ fn glossary_name_key(value: &str) -> Result<String> {
             .len()
             .checked_add(character.len_utf8())
             .ok_or(Error::Limit {
-                resource: "glossary selector name key",
+                kind: LimitKind::GlossarySelectorNameKey,
                 actual: usize::MAX,
                 maximum: MAX_GLOSSARY_SELECTOR_NAME_BYTES,
             })?;
         if next > MAX_GLOSSARY_SELECTOR_NAME_BYTES {
             return Err(Error::Limit {
-                resource: "glossary selector name key",
+                kind: LimitKind::GlossarySelectorNameKey,
                 actual: next,
                 maximum: MAX_GLOSSARY_SELECTOR_NAME_BYTES,
             });
@@ -2825,7 +2989,7 @@ fn glossary_metadata_text(
     };
     if value.len() > MAX_GLOSSARY_SELECTOR_NAME_BYTES {
         return Err(Error::Limit {
-            resource: "glossary selector metadata bytes",
+            kind: LimitKind::GlossarySelectorMetadataBytes,
             actual: value.len(),
             maximum: MAX_GLOSSARY_SELECTOR_NAME_BYTES,
         });
@@ -2936,7 +3100,7 @@ fn scan_glossary_many(
 ) -> Result<Vec<Layout>> {
     if xml.len() > limits.max_xml_bytes {
         return Err(Error::Limit {
-            resource: "XML bytes",
+            kind: LimitKind::XmlBytes,
             actual: xml.len(),
             maximum: limits.max_xml_bytes,
         });
@@ -3013,13 +3177,13 @@ fn scan_glossary_many(
             )))
         })?;
         event_count = event_count.checked_add(1).ok_or(Error::Limit {
-            resource: "XML events",
+            kind: LimitKind::XmlEvents,
             actual: usize::MAX,
             maximum: limits.max_events,
         })?;
         if event_count > limits.max_events {
             return Err(Error::Limit {
-                resource: "XML events",
+                kind: LimitKind::XmlEvents,
                 actual: event_count,
                 maximum: limits.max_events,
             });
@@ -3033,13 +3197,13 @@ fn scan_glossary_many(
                 let event_start = before;
                 let parent_depth = depth;
                 let logical_depth = parent_depth.checked_add(1).ok_or(Error::Limit {
-                    resource: "XML depth",
+                    kind: LimitKind::XmlDepth,
                     actual: usize::MAX,
                     maximum: limits.max_depth,
                 })?;
                 if logical_depth > limits.max_depth {
                     return Err(Error::Limit {
-                        resource: "XML depth",
+                        kind: LimitKind::XmlDepth,
                         actual: logical_depth,
                         maximum: limits.max_depth,
                     });
@@ -3110,13 +3274,13 @@ fn scan_glossary_many(
                         return Err(unsupported_xml("glossary docPart nesting is invalid"));
                     }
                     entry_count = entry_count.checked_add(1).ok_or(Error::Limit {
-                        resource: "story entries",
+                        kind: LimitKind::Entries,
                         actual: usize::MAX,
                         maximum: limits.max_entries,
                     })?;
                     if entry_count > limits.max_entries {
                         return Err(Error::Limit {
-                            resource: "story entries",
+                            kind: LimitKind::Entries,
                             actual: entry_count,
                             maximum: limits.max_entries,
                         });
@@ -3156,7 +3320,7 @@ fn scan_glossary_many(
                         }
                         current_body_count =
                             current_body_count.checked_add(1).ok_or(Error::Limit {
-                                resource: "glossary entry bodies",
+                                kind: LimitKind::GlossaryEntryBodies,
                                 actual: usize::MAX,
                                 maximum: 1,
                             })?;
@@ -3226,13 +3390,13 @@ fn scan_glossary_many(
                 let event_start = before;
                 let parent_depth = depth;
                 let logical_depth = parent_depth.checked_add(1).ok_or(Error::Limit {
-                    resource: "XML depth",
+                    kind: LimitKind::XmlDepth,
                     actual: usize::MAX,
                     maximum: limits.max_depth,
                 })?;
                 if logical_depth > limits.max_depth {
                     return Err(Error::Limit {
-                        resource: "XML depth",
+                        kind: LimitKind::XmlDepth,
                         actual: logical_depth,
                         maximum: limits.max_depth,
                     });
@@ -3308,13 +3472,13 @@ fn scan_glossary_many(
                             ));
                         }
                         entry_count = entry_count.checked_add(1).ok_or(Error::Limit {
-                            resource: "story entries",
+                            kind: LimitKind::Entries,
                             actual: usize::MAX,
                             maximum: limits.max_entries,
                         })?;
                         if entry_count > limits.max_entries {
                             return Err(Error::Limit {
-                                resource: "story entries",
+                                kind: LimitKind::Entries,
                                 actual: entry_count,
                                 maximum: limits.max_entries,
                             });
@@ -3343,7 +3507,7 @@ fn scan_glossary_many(
                             }
                             current_body_count =
                                 current_body_count.checked_add(1).ok_or(Error::Limit {
-                                    resource: "glossary entry bodies",
+                                    kind: LimitKind::GlossaryEntryBodies,
                                     actual: usize::MAX,
                                     maximum: 1,
                                 })?;
@@ -3468,7 +3632,7 @@ fn scan_glossary_many(
                         if !matching_selectors.is_empty() {
                             if entry_bytes > limits.max_entry_bytes {
                                 return Err(Error::Limit {
-                                    resource: "selected entry bytes",
+                                    kind: LimitKind::SelectedEntryBytes,
                                     actual: entry_bytes,
                                     maximum: limits.max_entry_bytes,
                                 });
@@ -3608,14 +3772,14 @@ fn validate_glossary_batch_selector_limits(
 ) -> Result<()> {
     if selectors.is_empty() {
         return Err(Error::Limit {
-            resource: "glossary batch selectors",
+            kind: LimitKind::GlossaryBatchSelectors,
             actual: 0,
             maximum: 1,
         });
     }
     if selectors.len() > limits.max_entries {
         return Err(Error::Limit {
-            resource: "glossary batch selectors",
+            kind: LimitKind::GlossaryBatchSelectors,
             actual: selectors.len(),
             maximum: limits.max_entries,
         });
@@ -3626,7 +3790,7 @@ fn validate_glossary_batch_selector_limits(
             GlossarySelector::ByName(name) => {
                 if name.len() > MAX_GLOSSARY_SELECTOR_NAME_BYTES {
                     return Err(Error::Limit {
-                        resource: "glossary selector name bytes",
+                        kind: LimitKind::GlossarySelectorNameBytes,
                         actual: name.len(),
                         maximum: MAX_GLOSSARY_SELECTOR_NAME_BYTES,
                     });
@@ -3640,7 +3804,7 @@ fn validate_glossary_batch_selector_limits(
             GlossarySelector::ByNameAndId { name, id } => {
                 if name.len() > MAX_GLOSSARY_SELECTOR_NAME_BYTES {
                     return Err(Error::Limit {
-                        resource: "glossary selector name bytes",
+                        kind: LimitKind::GlossarySelectorNameBytes,
                         actual: name.len(),
                         maximum: MAX_GLOSSARY_SELECTOR_NAME_BYTES,
                     });
@@ -3649,7 +3813,7 @@ fn validate_glossary_batch_selector_limits(
                 name.len()
                     .checked_add(id.as_str().len())
                     .ok_or(Error::Limit {
-                        resource: "glossary selector bytes",
+                        kind: LimitKind::GlossarySelectorBytes,
                         actual: usize::MAX,
                         maximum: limits.max_xml_bytes,
                     })?
@@ -3657,13 +3821,13 @@ fn validate_glossary_batch_selector_limits(
             GlossarySelector::ByIndex(_) => 0,
         };
         total = total.checked_add(bytes).ok_or(Error::Limit {
-            resource: "glossary selector bytes",
+            kind: LimitKind::GlossarySelectorBytes,
             actual: usize::MAX,
             maximum: limits.max_xml_bytes,
         })?;
         if total > limits.max_xml_bytes {
             return Err(Error::Limit {
-                resource: "glossary selector bytes",
+                kind: LimitKind::GlossarySelectorBytes,
                 actual: total,
                 maximum: limits.max_xml_bytes,
             });
@@ -3681,7 +3845,7 @@ fn scan_story(
 ) -> Result<Layout> {
     if xml.len() > limits.max_xml_bytes {
         return Err(Error::Limit {
-            resource: "XML bytes",
+            kind: LimitKind::XmlBytes,
             actual: xml.len(),
             maximum: limits.max_xml_bytes,
         });
@@ -3736,13 +3900,13 @@ fn scan_story(
             )))
         })?;
         event_count = event_count.checked_add(1).ok_or(Error::Limit {
-            resource: "XML events",
+            kind: LimitKind::XmlEvents,
             actual: usize::MAX,
             maximum: limits.max_events,
         })?;
         if event_count > limits.max_events {
             return Err(Error::Limit {
-                resource: "XML events",
+                kind: LimitKind::XmlEvents,
                 actual: event_count,
                 maximum: limits.max_events,
             });
@@ -3796,13 +3960,13 @@ fn scan_story(
                     })
                 {
                     entry_count = entry_count.checked_add(1).ok_or(Error::Limit {
-                        resource: "story entries",
+                        kind: LimitKind::Entries,
                         actual: usize::MAX,
                         maximum: limits.max_entries,
                     })?;
                     if entry_count > limits.max_entries {
                         return Err(Error::Limit {
-                            resource: "story entries",
+                            kind: LimitKind::Entries,
                             actual: entry_count,
                             maximum: limits.max_entries,
                         });
@@ -3817,7 +3981,7 @@ fn scan_story(
                         selected_entry_count = 1;
                         selected_entry_depth =
                             Some(parent_depth.checked_add(1).ok_or(Error::Limit {
-                                resource: "XML depth",
+                                kind: LimitKind::XmlDepth,
                                 actual: usize::MAX,
                                 maximum: limits.max_depth,
                             })?);
@@ -3834,7 +3998,7 @@ fn scan_story(
                     && is_word_element(start.name(), &context, &word_namespace, b"body")
                 {
                     body_count = body_count.checked_add(1).ok_or(Error::Limit {
-                        resource: "story body elements",
+                        kind: LimitKind::BodyElements,
                         actual: usize::MAX,
                         maximum: 1,
                     })?;
@@ -3842,7 +4006,7 @@ fn scan_story(
                         return Err(unsupported_xml("main story contains multiple bodies"));
                     }
                     body_depth = Some(parent_depth.checked_add(1).ok_or(Error::Limit {
-                        resource: "XML depth",
+                        kind: LimitKind::XmlDepth,
                         actual: usize::MAX,
                         maximum: limits.max_depth,
                     })?);
@@ -3865,7 +4029,7 @@ fn scan_story(
                     )?;
                     reserve_one(&mut paragraphs, "story paragraph ranges")?;
                     let paragraph_depth = depth.checked_add(1).ok_or(Error::Limit {
-                        resource: "XML depth",
+                        kind: LimitKind::XmlDepth,
                         actual: usize::MAX,
                         maximum: limits.max_depth,
                     })?;
@@ -3873,13 +4037,13 @@ fn scan_story(
                     paragraph_stack.push((paragraph_depth, event_start));
                 }
                 depth = depth.checked_add(1).ok_or(Error::Limit {
-                    resource: "XML depth",
+                    kind: LimitKind::XmlDepth,
                     actual: usize::MAX,
                     maximum: limits.max_depth,
                 })?;
                 if depth > limits.max_depth {
                     return Err(Error::Limit {
-                        resource: "XML depth",
+                        kind: LimitKind::XmlDepth,
                         actual: depth,
                         maximum: limits.max_depth,
                     });
@@ -3891,13 +4055,13 @@ fn scan_story(
                 let event_start = before;
                 let parent_depth = depth;
                 let logical_depth = parent_depth.checked_add(1).ok_or(Error::Limit {
-                    resource: "XML depth",
+                    kind: LimitKind::XmlDepth,
                     actual: usize::MAX,
                     maximum: limits.max_depth,
                 })?;
                 if logical_depth > limits.max_depth {
                     return Err(Error::Limit {
-                        resource: "XML depth",
+                        kind: LimitKind::XmlDepth,
                         actual: logical_depth,
                         maximum: limits.max_depth,
                     });
@@ -3946,13 +4110,13 @@ fn scan_story(
                         })
                     {
                         entry_count = entry_count.checked_add(1).ok_or(Error::Limit {
-                            resource: "story entries",
+                            kind: LimitKind::Entries,
                             actual: usize::MAX,
                             maximum: limits.max_entries,
                         })?;
                         if entry_count > limits.max_entries {
                             return Err(Error::Limit {
-                                resource: "story entries",
+                                kind: LimitKind::Entries,
                                 actual: entry_count,
                                 maximum: limits.max_entries,
                             });
@@ -3971,7 +4135,7 @@ fn scan_story(
                                 })?;
                             if selected_bytes > limits.max_entry_bytes {
                                 return Err(Error::Limit {
-                                    resource: "selected entry bytes",
+                                    kind: LimitKind::SelectedEntryBytes,
                                     actual: selected_bytes,
                                     maximum: limits.max_entry_bytes,
                                 });
@@ -3993,7 +4157,7 @@ fn scan_story(
                         && is_word_element(start.name(), &context, &word_namespace, b"body")
                     {
                         body_count = body_count.checked_add(1).ok_or(Error::Limit {
-                            resource: "story body elements",
+                            kind: LimitKind::BodyElements,
                             actual: usize::MAX,
                             maximum: 1,
                         })?;
@@ -4041,7 +4205,7 @@ fn scan_story(
                         }
                         if paragraphs.len() >= limits.max_paragraphs {
                             return Err(Error::Limit {
-                                resource: "paragraphs",
+                                kind: LimitKind::Paragraphs,
                                 actual: paragraphs.len().saturating_add(1),
                                 maximum: limits.max_paragraphs,
                             });
@@ -4057,7 +4221,7 @@ fn scan_story(
                         .ok_or_else(|| unsupported_xml("selected story entry range is inverted"))?;
                     if selected_bytes > limits.max_entry_bytes {
                         return Err(Error::Limit {
-                            resource: "selected entry bytes",
+                            kind: LimitKind::SelectedEntryBytes,
                             actual: selected_bytes,
                             maximum: limits.max_entry_bytes,
                         });
@@ -4213,7 +4377,7 @@ fn make_wrapped_document(
             .checked_add(layout.word_namespace.len())
             .and_then(|value| value.checked_add(1))
             .ok_or(Error::Limit {
-                resource: "wrapped story XML bytes",
+                kind: LimitKind::WrappedStoryXmlBytes,
                 actual: usize::MAX,
                 maximum,
             })?
@@ -4224,7 +4388,7 @@ fn make_wrapped_document(
         .and_then(|value| value.checked_add(extra_namespace))
         .and_then(|value| value.checked_add(b"><w:body>".len()))
         .ok_or(Error::Limit {
-            resource: "wrapped story XML bytes",
+            kind: LimitKind::WrappedStoryXmlBytes,
             actual: usize::MAX,
             maximum,
         })?;
@@ -4233,13 +4397,13 @@ fn make_wrapped_document(
         .checked_add(inner.len())
         .and_then(|value| value.checked_add(suffix.len()))
         .ok_or(Error::Limit {
-            resource: "wrapped story XML bytes",
+            kind: LimitKind::WrappedStoryXmlBytes,
             actual: usize::MAX,
             maximum,
         })?;
     if total > maximum {
         return Err(Error::Limit {
-            resource: "wrapped story XML bytes",
+            kind: LimitKind::WrappedStoryXmlBytes,
             actual: total,
             maximum,
         });
@@ -4409,11 +4573,11 @@ fn reject_word_dialect_attributes(
 }
 
 fn unsupported_xml(reason: &'static str) -> Error {
-    Error::Document(crate::Error::UnsafeEdit {
-        format: "DOCX",
-        operation: "source-backed story text",
+    Error::Document(crate::Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
+        "source-backed story text",
         reason,
-    })
+    ))
 }
 
 fn check_execution_context(context: Option<&ExecutionContext>) -> Result<()> {
@@ -4436,13 +4600,13 @@ fn reserve_one<T>(items: &mut Vec<T>, resource: &'static str) -> Result<()> {
 
 fn ensure_paragraph_capacity(committed: usize, pending: usize, maximum: usize) -> Result<()> {
     let actual = committed.checked_add(pending).ok_or(Error::Limit {
-        resource: "paragraphs",
+        kind: LimitKind::Paragraphs,
         actual: usize::MAX,
         maximum,
     })?;
     if actual >= maximum {
         return Err(Error::Limit {
-            resource: "paragraphs",
+            kind: LimitKind::Paragraphs,
             actual: actual.saturating_add(1),
             maximum,
         });
@@ -4466,21 +4630,6 @@ fn checked_string_clone(value: &str, resource: &'static str) -> Result<String> {
     Ok(copy)
 }
 
-fn checked_story_output_clone(
-    bytes: &[u8],
-    limits: &Limits,
-    resource: &'static str,
-) -> Result<Vec<u8>> {
-    if bytes.len() > limits.max_output_bytes {
-        return Err(Error::Limit {
-            resource,
-            actual: bytes.len(),
-            maximum: limits.max_output_bytes,
-        });
-    }
-    checked_vec_clone(bytes, resource)
-}
-
 fn digest(bytes: &[u8]) -> [u8; 32] {
     Sha256::digest(bytes).into()
 }
@@ -4489,33 +4638,18 @@ fn same_part_name(left: &PackURI, right: &PackURI) -> bool {
     left.as_str().eq_ignore_ascii_case(right.as_str())
 }
 
-fn error_to_io(error: Error) -> io::Error {
-    io::Error::new(io::ErrorKind::Interrupted, error.to_string())
-}
-
-struct CancellationWriter<'a, W> {
-    writer: &'a mut W,
-    execution: Option<&'a ExecutionContext>,
-}
-
-impl<'a, W: Write> Write for CancellationWriter<'a, W> {
-    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        check_execution_context(self.execution).map_err(error_to_io)?;
-        let accepted = self.writer.write(bytes)?;
-        if accepted > bytes.len() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "writer accepted more bytes than supplied",
-            ));
-        }
-        check_execution_context(self.execution).map_err(error_to_io)?;
-        Ok(accepted)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        check_execution_context(self.execution).map_err(error_to_io)?;
-        self.writer.flush()
-    }
+fn same_content(
+    actual_fingerprint: [u8; 32],
+    actual: &[u8],
+    expected: &[u8],
+    expected_fingerprint: [u8; 32],
+) -> bool {
+    // Snapshots are immutable and their fingerprint was computed when the
+    // source was admitted. Reusing that authenticated value avoids hashing
+    // the same payload again on every owner publication.
+    actual.len() == expected.len()
+        && actual_fingerprint == expected_fingerprint
+        && actual == expected
 }
 
 #[derive(Debug)]
@@ -4590,42 +4724,6 @@ impl<W: Write + ?Sized> Write for BoundedStoryWriter<'_, W> {
     }
 }
 
-struct FingerprintingWriter<W> {
-    inner: W,
-    hasher: Sha256,
-}
-
-impl<W> FingerprintingWriter<W> {
-    fn new(inner: W) -> Self {
-        Self {
-            inner,
-            hasher: Sha256::new(),
-        }
-    }
-
-    fn finish(self) -> SourceArtifactFingerprint {
-        SourceArtifactFingerprint::from_sha256(self.hasher.finalize().into())
-    }
-}
-
-impl<W: Write> Write for FingerprintingWriter<W> {
-    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        let accepted = self.inner.write(bytes)?;
-        if accepted > bytes.len() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "story publication sink reported more bytes than supplied",
-            ));
-        }
-        self.hasher.update(&bytes[..accepted]);
-        Ok(accepted)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        self.inner.flush()
-    }
-}
-
 const STRICT_HEADER: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/header";
 const STRICT_FOOTER: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/footer";
 const STRICT_FOOTNOTES: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/footnotes";
@@ -4692,6 +4790,12 @@ impl GlossaryBatchSnapshot {
         self.part_fingerprint
     }
 
+    /// Return the policy under which this batch was admitted.
+    #[must_use]
+    pub const fn limits_value(&self) -> Limits {
+        self.limits
+    }
+
     /// Return the direct paragraph count for one selected entry.
     pub fn paragraph_count(&self, entry_index: usize) -> Result<Option<usize>> {
         self.check_execution()?;
@@ -4727,7 +4831,7 @@ impl GlossaryBatchSnapshot {
             bytes,
             &mut text,
             self.limits.max_output_bytes,
-            "glossary batch paragraph text",
+            LimitKind::GlossaryBatchParagraphText,
         )?;
         self.check_execution()?;
         Ok(Some(text))
@@ -4753,7 +4857,7 @@ impl GlossaryBatchSnapshot {
                 bytes,
                 &mut output,
                 self.limits.max_output_bytes,
-                "glossary batch text output",
+                LimitKind::GlossaryBatchTextOutput,
             )?;
             if index % 64 == 0 {
                 self.check_execution()?;
@@ -4763,15 +4867,24 @@ impl GlossaryBatchSnapshot {
         Ok(Some(output))
     }
 
-    /// Start one atomic direct-paragraph edit spanning the selected entries.
-    pub fn edit(&self) -> Result<GlossaryBatchEdit> {
+    /// Open the selected entries as a bounded mutable raw codec model.
+    ///
+    /// The supplied policy is intersected with the policy retained by this
+    /// admitted snapshot. The model publishes a raw
+    /// [`GlossaryBatchPatch`] and never a detached package owner.
+    pub fn raw_tree(&self, limits: Limits) -> Result<raw::GlossaryTree> {
+        let base = self.with_raw_limits(limits)?;
+        Ok(raw::GlossaryTree::from_engine(base.edit_engine()?))
+    }
+
+    pub(crate) fn edit_engine(&self) -> Result<GlossaryBatchEdit> {
         self.check_execution()?;
         if self.payload.is_managed() {
-            return Err(Error::Document(crate::Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "source-backed glossary batch text edit",
-                reason: "managed source-backed story edits require an owned edit snapshot; use an unmanaged compatibility constructor",
-            }));
+            return Err(Error::Document(crate::Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "source-backed glossary batch text edit",
+                "managed source-backed story edits require an owned edit snapshot; use an unmanaged compatibility constructor",
+            )));
         }
         Ok(GlossaryBatchEdit {
             base: self.clone(),
@@ -4789,10 +4902,47 @@ impl GlossaryBatchSnapshot {
         self.payload.as_bytes()
     }
 
-    fn with_artifact_fingerprint(&self, fingerprint: SourceArtifactFingerprint) -> Self {
-        let mut snapshot = self.clone();
-        snapshot.artifact_fingerprint = Some(fingerprint);
-        snapshot
+    fn with_raw_limits(&self, requested: Limits) -> Result<Self> {
+        let limits = self.limits.intersect(requested);
+        if limits == self.limits {
+            return Ok(self.clone());
+        }
+        let expected_word_namespace = self
+            .entries
+            .first()
+            .map(|entry| entry.layout.word_namespace.as_ref());
+        let layouts = scan_glossary_many(
+            self.raw_bytes(),
+            &self.selector.selectors,
+            expected_word_namespace,
+            limits,
+            self.execution.as_ref(),
+        )?;
+        if layouts.len() != self.entries.len() {
+            return Err(Error::TopologyConflict);
+        }
+        let mut entries = Vec::new();
+        entries
+            .try_reserve_exact(layouts.len())
+            .map_err(|source| Error::Allocation {
+                resource: "glossary raw tree entries",
+                source,
+            })?;
+        for (selector_index, layout) in layouts.into_iter().enumerate() {
+            entries.push(GlossaryBatchEntry {
+                selector_index,
+                layout,
+            });
+        }
+        entries.sort_unstable_by_key(|entry| entry.layout.root_start_end);
+        validate_batch_ranges(&entries, self.raw_bytes().len())?;
+        for (canonical_index, entry) in entries.iter_mut().enumerate() {
+            entry.selector_index = canonical_index;
+        }
+        let mut base = self.clone();
+        base.entries = entries;
+        base.limits = limits;
+        Ok(base)
     }
 }
 
@@ -4808,7 +4958,7 @@ struct GlossaryBatchEditIntent {
 /// Only compact replacement intents are retained. During projection one
 /// selected entry is wrapped and edited at a time, so the batch does not hold
 /// one full document wrapper or XML payload per selected entry.
-pub struct GlossaryBatchEdit {
+pub(crate) struct GlossaryBatchEdit {
     base: GlossaryBatchSnapshot,
     intents: Vec<GlossaryBatchEditIntent>,
     replacements: usize,
@@ -4818,12 +4968,12 @@ pub struct GlossaryBatchEdit {
 impl GlossaryBatchEdit {
     /// Borrow the immutable batch source snapshot.
     #[must_use]
-    pub const fn source(&self) -> &GlossaryBatchSnapshot {
+    pub(crate) const fn source(&self) -> &GlossaryBatchSnapshot {
         &self.base
     }
 
     /// Return the current projected batch after atomically validating intents.
-    pub fn projected(&self) -> Result<GlossaryBatchSnapshot> {
+    pub(crate) fn projected(&self) -> Result<GlossaryBatchSnapshot> {
         self.base.check_execution()?;
         let target = assemble_batch_snapshot(&self.base, &self.intents)?;
         self.base.check_execution()?;
@@ -4835,7 +4985,7 @@ impl GlossaryBatchEdit {
     /// A paragraph may be addressed only once in one staged batch. This
     /// removes overlapping intent ambiguity and leaves every failed operation
     /// free to return without changing counters or stored intents.
-    pub fn replace_paragraph_text(
+    pub(crate) fn replace_paragraph_text(
         &mut self,
         entry_index: usize,
         position: Position,
@@ -4871,13 +5021,13 @@ impl GlossaryBatchEdit {
             Err(index) => index,
         };
         let next_replacements = self.replacements.checked_add(1).ok_or(Error::Limit {
-            resource: "replacements",
+            kind: LimitKind::Replacements,
             actual: usize::MAX,
             maximum: self.base.limits.max_replacements,
         })?;
         if next_replacements > self.base.limits.max_replacements {
             return Err(Error::Limit {
-                resource: "replacements",
+                kind: LimitKind::Replacements,
                 actual: next_replacements,
                 maximum: self.base.limits.max_replacements,
             });
@@ -4887,18 +5037,18 @@ impl GlossaryBatchEdit {
             .replacement_text_bytes
             .checked_add(authored_text.len())
             .ok_or(Error::Limit {
-                resource: "replacement text bytes",
+                kind: LimitKind::ReplacementTextBytes,
                 actual: usize::MAX,
                 maximum: self.base.limits.max_replacement_text_bytes,
             })?;
         if next_bytes > self.base.limits.max_replacement_text_bytes {
             return Err(Error::Limit {
-                resource: "replacement text bytes",
+                kind: LimitKind::ReplacementTextBytes,
                 actual: next_bytes,
                 maximum: self.base.limits.max_replacement_text_bytes,
             });
         }
-        validate_paragraph_text(position, authored_text).map_err(Error::Transaction)?;
+        validate_paragraph_text(position, authored_text).map_err(Error::DocumentEdit)?;
         self.intents
             .try_reserve(1)
             .map_err(|source| Error::Allocation {
@@ -4923,44 +5073,20 @@ impl GlossaryBatchEdit {
         Ok(self)
     }
 
-    /// Finish the staged intents as one source-bound reversible patch.
-    pub fn commit(self) -> Result<GlossaryBatchCommit> {
+    pub(crate) fn finish(self) -> Result<GlossaryBatchPatch> {
         self.base.check_execution()?;
         let target = self.projected()?;
         self.base.check_execution()?;
-        let patch = GlossaryBatchPatch {
+        Ok(GlossaryBatchPatch {
             before: self.base,
-            after: target.clone(),
-        };
-        Ok(GlossaryBatchCommit {
-            snapshot: target,
-            patch,
+            after: target,
         })
     }
 }
 
-/// A completed atomic glossary batch edit.
-pub struct GlossaryBatchCommit {
-    snapshot: GlossaryBatchSnapshot,
-    patch: GlossaryBatchPatch,
-}
-
-impl GlossaryBatchCommit {
-    /// Borrow the projected batch snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &GlossaryBatchSnapshot {
-        &self.snapshot
-    }
-
-    /// Borrow the source-bound reversible batch patch.
-    #[must_use]
-    pub const fn patch(&self) -> &GlossaryBatchPatch {
-        &self.patch
-    }
-}
-
-/// A reversible source-bound patch for a glossary Part containing a bounded
-/// set of selected entries.
+/// A reversible patch for a glossary Part containing a bounded set of selected
+/// entries. Owner publication adds its complete-artifact and source-freshness
+/// proof; raw replay matches the selected content.
 #[derive(Clone)]
 pub struct GlossaryBatchPatch {
     before: GlossaryBatchSnapshot,
@@ -4968,7 +5094,7 @@ pub struct GlossaryBatchPatch {
 }
 
 impl GlossaryBatchPatch {
-    /// Borrow the exact batch source required by this patch.
+    /// Borrow the before batch snapshot represented by this patch.
     #[must_use]
     pub const fn source(&self) -> &GlossaryBatchSnapshot {
         &self.before
@@ -4996,57 +5122,101 @@ impl GlossaryBatchPatch {
     }
 
     /// Apply only to an equivalent source-backed batch snapshot.
-    pub fn apply(&self, source: &GlossaryBatchSnapshot) -> Result<GlossaryBatchSnapshot> {
-        if self.before.selector != source.selector
-            || !same_part_name(&self.before.partname, &source.partname)
-        {
-            return Err(Error::TopologyConflict);
-        }
-        if source.source_lineage != self.before.source_lineage {
-            return Err(Error::ForeignSource);
-        }
-        if source.source_version != self.before.source_version {
-            return Err(Error::StaleSource);
-        }
-        if source.part_fingerprint != self.before.part_fingerprint
-            || source.raw_bytes() != self.before.raw_bytes()
-        {
-            return Err(Error::StaleSource);
-        }
+    /// [`Patch::apply_content`] for a glossary batch.
+    pub(crate) fn apply_content(
+        &self,
+        source: &GlossaryBatchSnapshot,
+    ) -> Result<GlossaryBatchSnapshot> {
+        self.check_content(source)?;
         Ok(if self.is_noop() {
             source.clone()
         } else {
             self.after.clone()
         })
     }
-}
 
-/// Exact publication evidence for one atomic glossary batch overlay.
-pub struct GlossaryBatchPublication {
-    snapshot: GlossaryBatchSnapshot,
-    original_snapshot: GlossaryBatchSnapshot,
-    original_artifact: SourceArtifact,
-    published_fingerprint: SourceArtifactFingerprint,
-    inverse_patch: GlossaryBatchPatch,
-}
-
-impl GlossaryBatchPublication {
-    /// Borrow the batch snapshot represented by the emitted package.
-    #[must_use]
-    pub const fn snapshot(&self) -> &GlossaryBatchSnapshot {
-        &self.snapshot
+    fn check_content(&self, source: &GlossaryBatchSnapshot) -> Result<()> {
+        if self.before.selector != source.selector
+            || !same_part_name(&self.before.partname, &source.partname)
+        {
+            return Err(Error::TopologyConflict);
+        }
+        if !same_content(
+            source.part_fingerprint,
+            source.raw_bytes(),
+            self.before.raw_bytes(),
+            self.before.part_fingerprint,
+        ) {
+            return Err(Error::PatchConflict);
+        }
+        Ok(())
     }
 
-    /// Borrow the inverse patch authorized for the emitted package.
-    #[must_use]
-    pub const fn inverse_patch(&self) -> &GlossaryBatchPatch {
-        &self.inverse_patch
+    /// Replay this raw glossary patch on an independently opened matching
+    /// batch snapshot. Replay is scoped to the selected glossary XML part;
+    /// package publication performs complete-artifact and source-freshness
+    /// checks separately.
+    pub fn apply(&self, source: &GlossaryBatchSnapshot) -> Result<GlossaryBatchSnapshot> {
+        source.check_execution()?;
+        self.check_content(source)?;
+        self.rebased_target(source)
     }
 
-    /// Return the complete emitted-artifact fingerprint.
-    #[must_use]
-    pub const fn published_fingerprint(&self) -> SourceArtifactFingerprint {
-        self.published_fingerprint
+    fn rebased_target(&self, source: &GlossaryBatchSnapshot) -> Result<GlossaryBatchSnapshot> {
+        if self.is_noop() {
+            return Ok(source.clone());
+        }
+        let bytes = self.after.raw_bytes();
+        if bytes.len() > source.limits.max_output_bytes {
+            return Err(Error::Limit {
+                kind: LimitKind::GlossaryBatchOutputBytes,
+                actual: bytes.len(),
+                maximum: source.limits.max_output_bytes,
+            });
+        }
+        let expected_word_namespace = source
+            .entries
+            .first()
+            .map(|entry| entry.layout.word_namespace.as_ref());
+        let layouts = scan_glossary_many(
+            bytes,
+            &source.selector.selectors,
+            expected_word_namespace,
+            source.limits,
+            source.execution.as_ref(),
+        )?;
+        if layouts.len() != source.entries.len() {
+            return Err(Error::TopologyConflict);
+        }
+        let mut entries = Vec::new();
+        entries
+            .try_reserve_exact(layouts.len())
+            .map_err(|source| Error::Allocation {
+                resource: "glossary raw replay entries",
+                source,
+            })?;
+        for (selector_index, layout) in layouts.into_iter().enumerate() {
+            entries.push(GlossaryBatchEntry {
+                selector_index,
+                layout,
+            });
+        }
+        entries.sort_unstable_by_key(|entry| entry.layout.root_start_end);
+        validate_batch_ranges(&entries, bytes.len())?;
+        for (canonical_index, entry) in entries.iter_mut().enumerate() {
+            entry.selector_index = canonical_index;
+        }
+        let mut target = self.after.clone();
+        target.selector = source.selector.clone();
+        target.entries = entries;
+        target.partname = source.partname.clone();
+        target.source_version = source.source_version;
+        target.source_lineage = source.source_lineage.clone();
+        target.part_fingerprint = digest(bytes);
+        target.artifact_fingerprint = source.artifact_fingerprint;
+        target.limits = source.limits;
+        target.execution = source.execution.clone();
+        Ok(target)
     }
 }
 
@@ -5056,11 +5226,11 @@ impl Package {
         &self,
         selector: GlossaryBatchSelector,
     ) -> Result<GlossaryBatchSnapshot> {
-        self.glossary_text_batch_snapshot_with_limits(selector, Limits::default())
+        self.glossary_text_batch_snapshot_bounded(selector, self.semantic_limits.story_text_value())
     }
 
     /// Capture a glossary-entry batch under explicit finite bounds.
-    pub fn glossary_text_batch_snapshot_with_limits(
+    pub(crate) fn glossary_text_batch_snapshot_bounded(
         &self,
         selector: GlossaryBatchSelector,
         limits: Limits,
@@ -5068,111 +5238,27 @@ impl Package {
         capture_glossary_batch(self, selector, limits)
     }
 
-    /// Start one staged atomic edit spanning selected glossary entries.
-    pub fn edit_glossary_text_batch(
+    /// Check a glossary batch patch against this package and return the part
+    /// and its rewritten bytes (record 0355a).
+    pub(crate) fn glossary_text_batch_target(
         &self,
-        selector: GlossaryBatchSelector,
-    ) -> Result<GlossaryBatchEdit> {
-        self.glossary_text_batch_snapshot(selector)?.edit()
-    }
-
-    /// Start one bounded atomic edit spanning selected glossary entries.
-    pub fn edit_glossary_text_batch_with_limits(
-        &self,
-        selector: GlossaryBatchSelector,
-        limits: Limits,
-    ) -> Result<GlossaryBatchEdit> {
-        self.glossary_text_batch_snapshot_with_limits(selector, limits)?
-            .edit()
-    }
-
-    /// Publish one glossary batch commit through a one-Part shared overlay.
-    pub fn publish_glossary_text_batch_commit_to_stream<W: Write>(
-        self,
-        writer: W,
-        commit: &GlossaryBatchCommit,
-    ) -> Result<GlossaryBatchPublication> {
-        self.publish_glossary_text_batch_patch_to_stream(writer, commit.patch())
-    }
-
-    /// Publish one source-bound glossary batch patch.
-    pub fn publish_glossary_text_batch_patch_to_stream<W: Write>(
-        self,
-        writer: W,
         patch: &GlossaryBatchPatch,
-    ) -> Result<GlossaryBatchPublication> {
+    ) -> Result<(PackURI, Arc<Vec<u8>>)> {
         self.trim_clean_paragraph_index_for_operation();
-        self.package.check_execution()?;
-        let execution = self.package.execution_context();
+        self.physical_package()?.check_execution()?;
+        let recipient_limits = self.semantic_limits.story_text_value();
         let current =
-            capture_glossary_batch(&self, patch.before.selector.clone(), patch.before.limits)?;
-        let target = patch.apply(&current)?;
-        let original_artifact = self.package.source_artifact();
-        let mut output = FingerprintingWriter::new(writer);
-        if patch.is_noop() {
-            let mut cancellation_writer = CancellationWriter {
-                writer: &mut output,
-                execution: execution.as_ref(),
-            };
-            original_artifact.write_to_stream(&mut cancellation_writer)?;
-            check_execution_context(execution.as_ref())?;
-        } else {
-            self.package.validate_topology_source_boundary()?;
-            if target.raw_bytes().len() > patch.before.limits.max_output_bytes {
-                return Err(Error::Limit {
-                    resource: "glossary batch output bytes",
-                    actual: target.raw_bytes().len(),
-                    maximum: patch.before.limits.max_output_bytes,
-                });
-            }
-            let replacement = Arc::new(checked_vec_clone(
-                target.raw_bytes(),
-                "glossary batch publication replacement",
-            )?);
-            self.package.write_part_overlay_shared_to_stream(
-                &mut output,
-                &current.partname,
-                replacement,
-            )?;
-        }
-        let published_fingerprint = output.finish();
-        let published_snapshot = target.with_artifact_fingerprint(published_fingerprint);
-        let inverse_patch = GlossaryBatchPatch {
-            before: published_snapshot.clone(),
-            after: current.clone(),
-        };
-        Ok(GlossaryBatchPublication {
-            snapshot: published_snapshot,
-            original_snapshot: current,
-            original_artifact,
-            published_fingerprint,
-            inverse_patch,
-        })
-    }
-
-    /// Restore the exact source artifact from a glossary batch publication.
-    pub fn publish_glossary_text_batch_inverse_to_stream<W: Write>(
-        self,
-        writer: W,
-        publication: &GlossaryBatchPublication,
-    ) -> Result<GlossaryBatchSnapshot> {
-        self.trim_clean_paragraph_index_for_operation();
-        self.package.check_execution()?;
-        let execution = self.package.execution_context();
-        let current = self.package.source_artifact().fingerprint()?;
-        if current != publication.published_fingerprint {
-            return Err(Error::ArtifactConflict);
-        }
-        let mut writer = writer;
-        let mut cancellation_writer = CancellationWriter {
-            writer: &mut writer,
-            execution: execution.as_ref(),
-        };
-        publication
-            .original_artifact
-            .write_to_stream(&mut cancellation_writer)?;
-        check_execution_context(execution.as_ref())?;
-        Ok(publication.original_snapshot.clone())
+            capture_glossary_batch(self, patch.before.selector.clone(), recipient_limits)?;
+        let target = patch.apply_content(&current)?;
+        story_replacement(
+            self,
+            patch.is_noop(),
+            &current.partname,
+            target.raw_bytes(),
+            recipient_limits,
+            LimitKind::GlossaryBatchOutputBytes,
+            "glossary batch publication replacement",
+        )
     }
 }
 
@@ -5182,12 +5268,12 @@ fn capture_glossary_batch(
     limits: Limits,
 ) -> Result<GlossaryBatchSnapshot> {
     package.trim_clean_paragraph_index_for_operation();
-    package.package.check_execution()?;
+    package.physical_package()?.check_execution()?;
     validate_glossary_batch_selector_limits(&selector.selectors, limits)?;
 
-    let source_version = package.package.source_version()?;
-    let source_lineage = package.package.source_lineage();
-    let execution = package.package.execution_context();
+    let source_version = package.physical_package()?.source_version()?;
+    let source_lineage = package.physical_package()?.source_lineage();
+    let execution = package.physical_package()?.execution_context();
     let first_selector = Selector::Glossary(
         selector
             .selectors
@@ -5198,11 +5284,11 @@ fn capture_glossary_batch(
     // Resolve the package topology and materialize the glossary Part once.
     // One semantic inventory scan resolves every selector against those bytes.
     let (partname, part, relationship_word_namespace) =
-        resolve_part(&package.package, &first_selector)?;
+        resolve_part(package.physical_package()?, &first_selector)?;
     let declared = part.declared_uncompressed_size()?;
     if declared > limits.max_xml_bytes as u64 {
         return Err(Error::Limit {
-            resource: "XML bytes",
+            kind: LimitKind::XmlBytes,
             actual: usize::try_from(declared).unwrap_or(usize::MAX),
             maximum: limits.max_xml_bytes,
         });
@@ -5210,12 +5296,15 @@ fn capture_glossary_batch(
     let data = part.data()?;
     if data.as_bytes().len() > limits.max_xml_bytes {
         return Err(Error::Limit {
-            resource: "XML bytes",
+            kind: LimitKind::XmlBytes,
             actual: data.as_bytes().len(),
             maximum: limits.max_xml_bytes,
         });
     }
-    let managed = package.package.cache_diagnostics().budget_managed;
+    let managed = package
+        .physical_package()?
+        .cache_diagnostics()
+        .budget_managed;
     let payload = if managed {
         Payload::Managed(data)
     } else {
@@ -5248,13 +5337,13 @@ fn capture_glossary_batch(
         selected_bytes = selected_bytes
             .checked_add(entry_bytes)
             .ok_or(Error::Limit {
-                resource: "glossary batch entry bytes",
+                kind: LimitKind::GlossaryBatchEntryBytes,
                 actual: usize::MAX,
                 maximum: limits.max_output_bytes,
             })?;
         if selected_bytes > limits.max_output_bytes {
             return Err(Error::Limit {
-                resource: "glossary batch entry bytes",
+                kind: LimitKind::GlossaryBatchEntryBytes,
                 actual: selected_bytes,
                 maximum: limits.max_output_bytes,
             });
@@ -5264,7 +5353,7 @@ fn capture_glossary_batch(
             layout,
         });
     }
-    let observed = package.package.source_version()?;
+    let observed = package.physical_package()?.source_version()?;
     if observed != source_version {
         return Err(Error::Document(crate::Error::Opc(
             litchi_opc::OpcError::SourceChanged {
@@ -5273,7 +5362,7 @@ fn capture_glossary_batch(
             },
         )));
     }
-    package.package.check_execution()?;
+    package.physical_package()?.check_execution()?;
 
     entries.sort_unstable_by_key(|entry| entry.layout.root_start_end);
     validate_batch_ranges(&entries, payload.as_bytes().len())?;
@@ -5334,14 +5423,14 @@ fn assemble_batch_snapshot(
     base.check_execution()?;
     if intents.len() > base.limits.max_replacements {
         return Err(Error::Limit {
-            resource: "replacements",
+            kind: LimitKind::Replacements,
             actual: intents.len(),
             maximum: base.limits.max_replacements,
         });
     }
     if base.raw_bytes().len() > base.limits.max_output_bytes {
         return Err(Error::Limit {
-            resource: "glossary batch output bytes",
+            kind: LimitKind::GlossaryBatchOutputBytes,
             actual: base.raw_bytes().len(),
             maximum: base.limits.max_output_bytes,
         });
@@ -5351,7 +5440,7 @@ fn assemble_batch_snapshot(
         authored_bytes = authored_bytes
             .checked_add(intent.text.len())
             .ok_or(Error::Limit {
-                resource: "glossary batch transient bytes",
+                kind: LimitKind::GlossaryBatchTransientBytes,
                 actual: usize::MAX,
                 maximum: base.limits.max_output_bytes,
             })?;
@@ -5360,13 +5449,13 @@ fn assemble_batch_snapshot(
         .checked_mul(6)
         .and_then(|value| base.raw_bytes().len().checked_add(value))
         .ok_or(Error::Limit {
-            resource: "glossary batch transient bytes",
+            kind: LimitKind::GlossaryBatchTransientBytes,
             actual: usize::MAX,
             maximum: base.limits.max_output_bytes,
         })?;
     if transient_bound > base.limits.max_output_bytes {
         return Err(Error::Limit {
-            resource: "glossary batch transient bytes",
+            kind: LimitKind::GlossaryBatchTransientBytes,
             actual: transient_bound,
             maximum: base.limits.max_output_bytes,
         });
@@ -5403,13 +5492,13 @@ fn assemble_batch_snapshot(
         aggregate_replacement_bytes = aggregate_replacement_bytes
             .checked_add(projection.length)
             .ok_or(Error::Limit {
-                resource: "glossary batch replacement bytes",
+                kind: LimitKind::GlossaryBatchReplacementBytes,
                 actual: usize::MAX,
                 maximum: base.limits.max_output_bytes,
             })?;
         if aggregate_replacement_bytes > base.limits.max_output_bytes {
             return Err(Error::Limit {
-                resource: "glossary batch replacement bytes",
+                kind: LimitKind::GlossaryBatchReplacementBytes,
                 actual: aggregate_replacement_bytes,
                 maximum: base.limits.max_output_bytes,
             });
@@ -5441,14 +5530,14 @@ fn assemble_batch_snapshot(
             .checked_sub(old_len)
             .and_then(|value| value.checked_add(measurement.length))
             .ok_or(Error::Limit {
-                resource: "glossary batch output bytes",
+                kind: LimitKind::GlossaryBatchOutputBytes,
                 actual: usize::MAX,
                 maximum: base.limits.max_output_bytes,
             })?;
     }
     if final_len > base.limits.max_output_bytes {
         return Err(Error::Limit {
-            resource: "glossary batch output bytes",
+            kind: LimitKind::GlossaryBatchOutputBytes,
             actual: final_len,
             maximum: base.limits.max_output_bytes,
         });
@@ -5589,19 +5678,19 @@ fn project_batch_entry(
         authored_bytes = authored_bytes
             .checked_add(intent.text.len())
             .ok_or(Error::Limit {
-                resource: "glossary batch transient bytes",
+                kind: LimitKind::GlossaryBatchTransientBytes,
                 actual: usize::MAX,
                 maximum: base.limits.max_output_bytes,
             })?;
     }
     let transient_estimate = source_len.checked_add(authored_bytes).ok_or(Error::Limit {
-        resource: "glossary batch transient bytes",
+        kind: LimitKind::GlossaryBatchTransientBytes,
         actual: usize::MAX,
         maximum: base.limits.max_output_bytes,
     })?;
     if transient_estimate > base.limits.max_output_bytes {
         return Err(Error::Limit {
-            resource: "glossary batch transient bytes",
+            kind: LimitKind::GlossaryBatchTransientBytes,
             actual: transient_estimate,
             maximum: base.limits.max_output_bytes,
         });
@@ -5616,17 +5705,17 @@ fn project_batch_entry(
             return Err(Error::TopologyConflict);
         }
         base.check_execution()?;
-        validate_paragraph_text(intent.position, &intent.text).map_err(Error::Transaction)?;
+        validate_paragraph_text(intent.position, &intent.text).map_err(Error::DocumentEdit)?;
         let text = checked_string_clone(&intent.text, "glossary batch replacement text")?;
         projected
             .replace_paragraph_text(intent.position, text)
-            .map_err(Error::Transaction)?;
+            .map_err(Error::DocumentEdit)?;
     }
     base.check_execution()?;
     let wrapped = projected
         .projected()
         .shared_xml()
-        .map_err(Error::Transaction)?;
+        .map_err(Error::DocumentEdit)?;
     let wrapped_end = wrapped
         .len()
         .checked_sub(envelope.wrapped_suffix_len)
@@ -5644,7 +5733,7 @@ fn project_batch_entry(
         })?;
     if inner.len() > base.limits.max_entry_bytes {
         return Err(Error::Limit {
-            resource: "selected entry bytes",
+            kind: LimitKind::SelectedEntryBytes,
             actual: inner.len(),
             maximum: base.limits.max_entry_bytes,
         });
@@ -5682,7 +5771,7 @@ fn validate_batch_ranges(entries: &[GlossaryBatchEntry], xml_len: usize) -> Resu
 
 fn batch_entry_index_error(index: usize, len: usize) -> Error {
     Error::Limit {
-        resource: "glossary batch entry index",
+        kind: LimitKind::GlossaryBatchEntryIndex,
         actual: index.saturating_add(1),
         maximum: len,
     }
@@ -5690,8 +5779,140 @@ fn batch_entry_index_error(index: usize, len: usize) -> Error {
 
 fn batch_paragraph_index_error(_entry_index: usize, index: usize, len: usize) -> Error {
     Error::Limit {
-        resource: "glossary batch paragraph index",
+        kind: LimitKind::GlossaryBatchParagraphIndex,
         actual: index.saturating_add(1),
         maximum: len,
+    }
+}
+
+/// The bounded resources of source-backed story-text edits, carried by [`Error::Limit`] (record 0355a).
+///
+/// Each variant names one bounded resource; [`std::fmt::Display`] gives its
+/// human-readable name, the one the error messages print.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Story attribute value.
+    AttributeValue,
+    /// Story body elements.
+    BodyElements,
+    /// Story entries.
+    Entries,
+    /// Glossary batch entry bytes.
+    GlossaryBatchEntryBytes,
+    /// Glossary batch entry index.
+    GlossaryBatchEntryIndex,
+    /// Glossary batch output bytes.
+    GlossaryBatchOutputBytes,
+    /// Glossary batch paragraph index.
+    GlossaryBatchParagraphIndex,
+    /// Glossary batch paragraph text.
+    GlossaryBatchParagraphText,
+    /// Glossary batch replacement bytes.
+    GlossaryBatchReplacementBytes,
+    /// Glossary batch selectors.
+    GlossaryBatchSelectors,
+    /// Glossary batch text output.
+    GlossaryBatchTextOutput,
+    /// Glossary batch transient bytes.
+    GlossaryBatchTransientBytes,
+    /// Glossary entry bodies.
+    GlossaryEntryBodies,
+    /// Glossary selector bytes.
+    GlossarySelectorBytes,
+    /// Glossary selector ID bytes.
+    GlossarySelectorIdBytes,
+    /// Glossary selector metadata bytes.
+    GlossarySelectorMetadataBytes,
+    /// Glossary selector name bytes.
+    GlossarySelectorNameBytes,
+    /// Glossary selector name key.
+    GlossarySelectorNameKey,
+    /// Namespace attribute value.
+    NamespaceAttributeValue,
+    /// Story namespace attributes.
+    NamespaceAttributes,
+    /// Namespace bindings.
+    NamespaceBindings,
+    /// Namespace bytes.
+    NamespaceBytes,
+    /// Story output bytes.
+    OutputBytes,
+    /// Story paragraph text.
+    ParagraphText,
+    /// Paragraphs.
+    Paragraphs,
+    /// Story relationship targets.
+    RelationshipTargets,
+    /// Replacement text bytes.
+    ReplacementTextBytes,
+    /// Replacements.
+    Replacements,
+    /// Selected entry bytes.
+    SelectedEntryBytes,
+    /// Story text output.
+    TextOutput,
+    /// Story transaction XML.
+    TransactionXml,
+    /// Wrapped story XML bytes.
+    WrappedStoryXmlBytes,
+    /// XML bytes.
+    XmlBytes,
+    /// XML depth.
+    XmlDepth,
+    /// XML events.
+    XmlEvents,
+    /// XML reference bytes.
+    XmlReferenceBytes,
+}
+
+impl LimitKind {
+    /// The resource's human-readable name.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::AttributeValue => "story attribute value",
+            Self::BodyElements => "story body elements",
+            Self::Entries => "story entries",
+            Self::GlossaryBatchEntryBytes => "glossary batch entry bytes",
+            Self::GlossaryBatchEntryIndex => "glossary batch entry index",
+            Self::GlossaryBatchOutputBytes => "glossary batch output bytes",
+            Self::GlossaryBatchParagraphIndex => "glossary batch paragraph index",
+            Self::GlossaryBatchParagraphText => "glossary batch paragraph text",
+            Self::GlossaryBatchReplacementBytes => "glossary batch replacement bytes",
+            Self::GlossaryBatchSelectors => "glossary batch selectors",
+            Self::GlossaryBatchTextOutput => "glossary batch text output",
+            Self::GlossaryBatchTransientBytes => "glossary batch transient bytes",
+            Self::GlossaryEntryBodies => "glossary entry bodies",
+            Self::GlossarySelectorBytes => "glossary selector bytes",
+            Self::GlossarySelectorIdBytes => "glossary selector ID bytes",
+            Self::GlossarySelectorMetadataBytes => "glossary selector metadata bytes",
+            Self::GlossarySelectorNameBytes => "glossary selector name bytes",
+            Self::GlossarySelectorNameKey => "glossary selector name key",
+            Self::NamespaceAttributeValue => "namespace attribute value",
+            Self::NamespaceAttributes => "story namespace attributes",
+            Self::NamespaceBindings => "namespace bindings",
+            Self::NamespaceBytes => "namespace bytes",
+            Self::OutputBytes => "story output bytes",
+            Self::ParagraphText => "story paragraph text",
+            Self::Paragraphs => "paragraphs",
+            Self::RelationshipTargets => "story relationship targets",
+            Self::ReplacementTextBytes => "replacement text bytes",
+            Self::Replacements => "replacements",
+            Self::SelectedEntryBytes => "selected entry bytes",
+            Self::TextOutput => "story text output",
+            Self::TransactionXml => "story transaction XML",
+            Self::WrappedStoryXmlBytes => "wrapped story XML bytes",
+            Self::XmlBytes => "XML bytes",
+            Self::XmlDepth => "XML depth",
+            Self::XmlEvents => "XML events",
+            Self::XmlReferenceBytes => "XML reference bytes",
+        }
+    }
+}
+
+impl std::fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
     }
 }

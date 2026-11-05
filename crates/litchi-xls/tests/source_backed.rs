@@ -1,12 +1,15 @@
 use litchi_cfb::{OleWriter, SharedOleFile};
-use litchi_core::sheet::{Cell as CellTrait, CellValue, WorkbookTrait};
+use litchi_core::sheet::{Cell as CellTrait, CellValue, WorkbookTrait, Worksheet as _};
 use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits,
-    OwnedSource, ReadAt, SourceVersion, TextOutputError, TextOutputOptions,
+    OwnedSource, Position, ReadAt, SourceVersion, TextOutputError, TextOutputOptions,
 };
 use litchi_xls::{
     CellFormatDefect, Defect, FormattingDefect, Leniency, SourceBackedCell, SourceBackedError,
-    SourceBackedLimits, SourceBackedOptions, SourceBackedWorkbook, Workbook,
+    SourceBackedLimits, SourceBackedOptions, SourceBackedWorkbook, SourceBackedWorksheet,
+    cell_values::Reference,
+    package::{Error as PackageError, Package},
+    raw::Reader,
 };
 use std::io::{self, Cursor};
 use std::num::{NonZeroU64, NonZeroUsize};
@@ -41,10 +44,13 @@ fn libreoffice_fixture(name: &str) -> Vec<u8> {
 }
 
 fn workbook_stream(bytes: Vec<u8>, name: &str) -> Vec<u8> {
-    SharedOleFile::open(Arc::new(OwnedSource::new(bytes)))
-        .unwrap()
-        .open_stream(&[name])
-        .unwrap()
+    SharedOleFile::open(
+        Arc::new(OwnedSource::new(bytes)),
+        litchi_cfb::SharedOleFileLimits::default(),
+    )
+    .unwrap()
+    .open_stream(&[name])
+    .unwrap()
 }
 
 fn cfb_with_streams(streams: &[(&str, &[u8])]) -> Vec<u8> {
@@ -498,7 +504,13 @@ fn globals_reads_with_limits(
     limits: SourceBackedLimits,
 ) -> (Vec<(u64, usize)>, Result<(), SourceBackedError>) {
     let retained: Arc<dyn ReadAt> = source.clone();
-    let cfb = Arc::new(SharedOleFile::open(Arc::clone(&retained)).unwrap());
+    let cfb = Arc::new(
+        SharedOleFile::open(
+            Arc::clone(&retained),
+            litchi_cfb::SharedOleFileLimits::default(),
+        )
+        .unwrap(),
+    );
     source.clear_ranges();
     let result = litchi_xls::raw::source_backed_workbook_from_shared_ole_file(cfb, limits);
     let ranges = source.ranges();
@@ -1340,7 +1352,7 @@ fn a_changed_source_outranks_a_missing_workbook_stream() {
     );
     let cfb_observations = {
         let counter = Arc::new(CountingSource::new(bytes.clone()));
-        SharedOleFile::open(counter.clone()).unwrap();
+        SharedOleFile::open(counter.clone(), litchi_cfb::SharedOleFileLimits::default()).unwrap();
         counter.version_calls()
     };
 
@@ -1374,7 +1386,11 @@ fn physical_ranges_for_stream_range(
     length: usize,
 ) -> Vec<(u64, usize)> {
     source.clear_ranges();
-    let cfb = SharedOleFile::open(Arc::new(source.clone())).unwrap();
+    let cfb = SharedOleFile::open(
+        Arc::new(source.clone()),
+        litchi_cfb::SharedOleFileLimits::default(),
+    )
+    .unwrap();
     source.clear_ranges();
     let mut output = vec![0; length];
     cfb.read_stream_range(&["Workbook"], offset, &mut output)
@@ -1415,7 +1431,11 @@ fn physical_ranges_for_workbook_sheets(
     let positions = workbook_bound_sheet_positions(stream);
     let mut boundaries = positions.clone();
     boundaries.sort_unstable();
-    let cfb = SharedOleFile::open(Arc::new(source.clone())).unwrap();
+    let cfb = SharedOleFile::open(
+        Arc::new(source.clone()),
+        litchi_cfb::SharedOleFileLimits::default(),
+    )
+    .unwrap();
     source.clear_ranges();
     let mut all_ranges = Vec::with_capacity(positions.len());
     for start in positions {
@@ -1474,7 +1494,7 @@ fn opens_without_worksheet_payload_and_matches_eager_selected_cells() {
     assert_eq!(owner.worksheet_names().unwrap().len(), worksheet_count);
     assert!(source.bytes_read() < bytes.len());
 
-    let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+    let eager = Reader::new(Cursor::new(bytes)).unwrap();
     let mut saw_string = false;
     for worksheet_index in 0..worksheet_count {
         let eager_sheet = eager.xls_worksheet(worksheet_index).unwrap();
@@ -1506,7 +1526,7 @@ fn column_beyond_biff8_visible_range_returns_none_without_reading_worksheet() {
 fn materialize_eager_returns_typed_semantic_workbook_with_matching_values() {
     let bytes = fixture("Simple.xls");
     let owner = SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(bytes))).unwrap();
-    let materialized: Workbook<Cursor<Vec<u8>>> = owner.materialize_eager().unwrap();
+    let materialized: Reader<Cursor<Vec<u8>>> = owner.materialize_eager().unwrap();
     let sheet = materialized.xls_worksheet(0).unwrap();
     for row in 0..4 {
         for column in 0..4 {
@@ -1521,7 +1541,11 @@ fn materialize_eager_returns_typed_semantic_workbook_with_matching_values() {
 fn materialize_eager_limit_is_typed_and_independent() {
     let source = Arc::new(CountingSource::new(fixture("Simple.xls")));
     let limits = SourceBackedLimits::default().with_max_materialize_bytes(1);
-    let owner = SourceBackedWorkbook::from_read_at_with_limits(source, limits).unwrap();
+    let owner = SourceBackedWorkbook::from_read_at_with_options(
+        source,
+        SourceBackedOptions::new().limits(limits),
+    )
+    .unwrap();
     assert!(matches!(
         owner.materialize_eager(),
         Err(SourceBackedError::ResourceLimit {
@@ -1538,7 +1562,7 @@ fn late_codepage_bound_sheet_names_match_eager_workbook() {
     let bytes = cfb_with_streams(&[("Workbook", &modified)]);
     let owner =
         SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(bytes.clone()))).unwrap();
-    let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+    let eager = Reader::new(Cursor::new(bytes)).unwrap();
     let expected = eager.sheet(0).unwrap().name().to_owned();
     assert_eq!(owner.worksheet_names().unwrap()[0], expected);
 }
@@ -1551,7 +1575,7 @@ fn split_global_sst_continue_matches_eager_workbook() {
     let bytes = cfb_with_streams(&[("Workbook", &modified)]);
     let source = Arc::new(CountingSource::new(bytes.clone()));
     let owner = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
-    let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+    let eager = Reader::new(Cursor::new(bytes)).unwrap();
     let expected = eager
         .xls_worksheet(0)
         .unwrap()
@@ -1601,9 +1625,10 @@ fn exact_sst_entry_limit_is_allowed_and_one_over_is_rejected() {
     let maximum = usize::try_from(total.max(unique)).unwrap();
     let exact = cfb_with_streams(&[("Workbook", &original)]);
     assert!(
-        SourceBackedWorkbook::from_read_at_with_limits(
+        SourceBackedWorkbook::from_read_at_with_options(
             Arc::new(CountingSource::new(exact)),
-            SourceBackedLimits::default().with_max_sst_entries(maximum),
+            SourceBackedOptions::new()
+                .limits(SourceBackedLimits::default().with_max_sst_entries(maximum),)
         )
         .is_ok()
     );
@@ -1616,9 +1641,10 @@ fn exact_sst_entry_limit_is_allowed_and_one_over_is_rejected() {
         &over_stream,
     )])));
     assert!(matches!(
-        SourceBackedWorkbook::from_read_at_with_limits(
+        SourceBackedWorkbook::from_read_at_with_options(
             source,
-            SourceBackedLimits::default().with_max_sst_entries(maximum),
+            SourceBackedOptions::new()
+                .limits(SourceBackedLimits::default().with_max_sst_entries(maximum),)
         ),
         Err(SourceBackedError::ResourceLimit {
             resource: "SST entries",
@@ -1632,7 +1658,7 @@ fn formula_fixture_matches_eager_cached_values() {
     let bytes = ole_fixture("FormulaSheetRange.xls");
     let owner =
         SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(bytes.clone()))).unwrap();
-    let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+    let eager = Reader::new(Cursor::new(bytes)).unwrap();
     for worksheet_index in 0..owner.worksheet_count().unwrap() {
         let eager_sheet = eager.xls_worksheet(worksheet_index).unwrap();
         for row in 0..12 {
@@ -1652,7 +1678,7 @@ fn date_fixture_matches_eager_date_values() {
     let bytes = libreoffice_fixture("pivottable_dates_grouping.xls");
     let owner =
         SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(bytes.clone()))).unwrap();
-    let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+    let eager = Reader::new(Cursor::new(bytes)).unwrap();
     let mut dates = Vec::new();
     for worksheet_index in 0..owner.worksheet_count().unwrap() {
         let eager_sheet = eager.xls_worksheet(worksheet_index).unwrap();
@@ -1717,7 +1743,11 @@ fn selected_queries_are_bounded_to_the_selected_owner() {
     let sheet_tail = physical_ranges_from(&source, &workbook, smallest_sheet);
     assert!(!overlaps_any(&open_ranges, &sheet_tail));
     let catalog_probe = Arc::new(CountingSource::new(bytes.clone()));
-    let catalog = SharedOleFile::open(catalog_probe.clone()).unwrap();
+    let catalog = SharedOleFile::open(
+        catalog_probe.clone(),
+        litchi_cfb::SharedOleFileLimits::default(),
+    )
+    .unwrap();
     let catalog_bytes = catalog_probe.bytes_read();
     drop(catalog);
     let open_bytes: usize = open_ranges.iter().map(|(_, length)| *length).sum();
@@ -1759,12 +1789,20 @@ fn selected_scan_limits_are_enforced_incrementally() {
     let bytes = fixture("Simple.xls");
     let early_limit = SourceBackedLimits::default().with_max_worksheet_scan_records(32);
     let source = Arc::new(CountingSource::new(bytes.clone()));
-    let owner = SourceBackedWorkbook::from_read_at_with_limits(source, early_limit).unwrap();
+    let owner = SourceBackedWorkbook::from_read_at_with_options(
+        source,
+        SourceBackedOptions::new().limits(early_limit),
+    )
+    .unwrap();
     assert!(owner.cell_value_by_index(0, 0, 0).unwrap().is_some());
 
     let bytes_limit = SourceBackedLimits::default().with_max_worksheet_scan_bytes(8);
     let source = Arc::new(CountingSource::new(bytes.clone()));
-    let owner = SourceBackedWorkbook::from_read_at_with_limits(source, bytes_limit).unwrap();
+    let owner = SourceBackedWorkbook::from_read_at_with_options(
+        source,
+        SourceBackedOptions::new().limits(bytes_limit),
+    )
+    .unwrap();
     assert!(matches!(
         owner.cell_value_by_index(0, 0, 0),
         Err(SourceBackedError::ResourceLimit {
@@ -1775,7 +1813,11 @@ fn selected_scan_limits_are_enforced_incrementally() {
 
     let records_limit = SourceBackedLimits::default().with_max_worksheet_scan_records(1);
     let source = Arc::new(CountingSource::new(bytes));
-    let owner = SourceBackedWorkbook::from_read_at_with_limits(source, records_limit).unwrap();
+    let owner = SourceBackedWorkbook::from_read_at_with_options(
+        source,
+        SourceBackedOptions::new().limits(records_limit),
+    )
+    .unwrap();
     assert!(matches!(
         owner.cell_value_by_index(0, 0, 0),
         Err(SourceBackedError::ResourceLimit {
@@ -1792,7 +1834,7 @@ fn duplicate_scalar_keeps_the_latest_value_like_eager_workbook() {
     let bytes = cfb_with_streams(&[("Workbook", &modified)]);
     let owner =
         SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(bytes.clone()))).unwrap();
-    let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+    let eager = Reader::new(Cursor::new(bytes)).unwrap();
     let expected = eager
         .xls_worksheet(0)
         .unwrap()
@@ -1813,7 +1855,7 @@ fn duplicate_cached_formula_keeps_the_latest_value_like_eager_workbook() {
     let bytes = cfb_with_streams(&[("Workbook", &modified)]);
     let owner =
         SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(bytes.clone()))).unwrap();
-    let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+    let eager = Reader::new(Cursor::new(bytes)).unwrap();
     let expected = eager
         .xls_worksheet(0)
         .unwrap()
@@ -1838,7 +1880,7 @@ fn out_of_order_late_packed_duplicate_keeps_the_latest_value() {
     let bytes = cfb_with_streams(&[("Workbook", &modified)]);
     let owner =
         SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(bytes.clone()))).unwrap();
-    let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+    let eager = Reader::new(Cursor::new(bytes)).unwrap();
     let expected = eager
         .xls_worksheet(0)
         .unwrap()
@@ -1864,7 +1906,7 @@ fn synthetic_supported_cell_families_match_eager_values() {
     let bytes = cfb_with_streams(&[("Workbook", &modified)]);
     let owner =
         SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(bytes.clone()))).unwrap();
-    let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+    let eager = Reader::new(Cursor::new(bytes)).unwrap();
     let eager_sheet = eager.xls_worksheet(0).unwrap();
     for (row, column) in [
         (60_000, 1),
@@ -1892,7 +1934,7 @@ fn scalar_label_blank_and_error_boolerr_match_eager_values() {
     let bytes = cfb_with_streams(&[("Workbook", &modified)]);
     let owner =
         SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(bytes.clone()))).unwrap();
-    let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+    let eager = Reader::new(Cursor::new(bytes)).unwrap();
     let eager_sheet = eager.xls_worksheet(0).unwrap();
     for (row, column) in [(60_006, 7), (60_007, 8), (60_008, 9)] {
         let expected = eager_sheet.get_cell(row, column).map(CellTrait::value);
@@ -1929,7 +1971,7 @@ fn cached_formula_string_with_multiple_continues_matches_eager_value() {
     let bytes = cfb_with_streams(&[("Workbook", &modified)]);
     let owner =
         SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(bytes.clone()))).unwrap();
-    let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+    let eager = Reader::new(Cursor::new(bytes)).unwrap();
     let expected = eager
         .xls_worksheet(0)
         .unwrap()
@@ -2050,7 +2092,7 @@ fn supported_unknown_payload_is_skipped_without_a_read_of_its_own() {
 
     let actual = owner.cell_value_by_index(0, 0, 0).unwrap();
     let query_ranges = source.ranges();
-    let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+    let eager = Reader::new(Cursor::new(bytes)).unwrap();
     let expected = eager
         .xls_worksheet(0)
         .unwrap()
@@ -2119,6 +2161,557 @@ fn stale_sources_are_rejected_before_selected_reads() {
     ));
 }
 
+fn deferred_numeric_fixture() -> (
+    Arc<CountingSource>,
+    SourceBackedWorkbook,
+    usize,
+    Reference,
+    String,
+) {
+    // `Simple.xls` is intentionally a string-only corpus fixture.  Generate a
+    // small valid BIFF workbook here so the deferred edit and freshness tests
+    // always exercise a real numeric cell instead of depending on a corpus
+    // accident.  The writer emits the same CFB/Workbook source shape consumed
+    // by the source-backed reader, so all cold, cached, and handoff paths stay
+    // under test.
+    let mut builder = litchi_xls::Builder::new();
+    let sheet = builder.add_worksheet("Deferred").unwrap();
+    builder.write_number(sheet, 0, 0, 42.0).unwrap();
+    let bytes = builder.build().unwrap().to_bytes().unwrap();
+    let source = Arc::new(CountingSource::new(bytes));
+    let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let mut numeric = None;
+    for worksheet in workbook.worksheets().unwrap() {
+        let sheet_index = worksheet.index().unwrap();
+        let sheet_name = worksheet.name().unwrap();
+        worksheet
+            .visit_cells(|cell| {
+                if numeric.is_none() {
+                    numeric = match cell.value() {
+                        CellValue::Float(value) => Some((
+                            sheet_index,
+                            Reference::new(cell.row(), cell.column()).unwrap(),
+                            *value,
+                        )),
+                        CellValue::Int(value) => Some((
+                            sheet_index,
+                            Reference::new(cell.row(), cell.column()).unwrap(),
+                            *value as f64,
+                        )),
+                        CellValue::Empty
+                        | CellValue::Bool(_)
+                        | CellValue::DateTime(_)
+                        | CellValue::String(_)
+                        | CellValue::Error(_)
+                        | CellValue::Formula { .. } => None,
+                    };
+                }
+                Ok(())
+            })
+            .unwrap();
+        if numeric.is_some() {
+            let (index, reference, value) = numeric.take().unwrap();
+            let mut edit = workbook.edit_cells().unwrap();
+            edit.set_number(index, reference, value + 1.0).unwrap();
+            let committed = edit.commit().unwrap().into_package();
+            return (source, committed, index, reference, sheet_name);
+        }
+    }
+    panic!("generated deferred fixture has no numeric cell");
+}
+
+fn deferred_comment_fixture() -> (Arc<CountingSource>, SourceBackedWorkbook) {
+    let mut builder = litchi_xls::Builder::new();
+    let sheet = builder.add_worksheet("Comments").unwrap();
+    builder
+        .add_comment(sheet, 0, 0, "Author", "original")
+        .unwrap();
+    let bytes = builder.build().unwrap().to_bytes().unwrap();
+    let source = Arc::new(CountingSource::new(bytes));
+    let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    (source, workbook)
+}
+
+fn deferred_visibility_fixture() -> (Arc<CountingSource>, SourceBackedWorkbook) {
+    let mut builder = litchi_xls::Builder::new();
+    builder.add_worksheet("Visible").unwrap();
+    builder.add_worksheet("Other").unwrap();
+    let bytes = builder.build().unwrap().to_bytes().unwrap();
+    let source = Arc::new(CountingSource::new(bytes));
+    let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    (source, workbook)
+}
+
+#[test]
+fn source_backed_comments_fence_commit_output_replay_and_inverse() {
+    let (source, workbook) = deferred_comment_fixture();
+    let mut edit = workbook.edit_comments().unwrap();
+    edit.replace(
+        litchi_xls::cell_values::Selector::Position(Position::new(0)),
+        Reference::new(0, 0).unwrap(),
+        litchi_xls::comments::Value::new("Author", "changed!").unwrap(),
+    )
+    .unwrap();
+    source.bump();
+    assert!(matches!(edit.commit(), Err(litchi_xls::Error::Io(_))));
+
+    let (source, workbook) = deferred_comment_fixture();
+    let mut edit = workbook.edit_comments().unwrap();
+    edit.replace(
+        litchi_xls::cell_values::Selector::Position(Position::new(0)),
+        Reference::new(0, 0).unwrap(),
+        litchi_xls::comments::Value::new("Author", "changed!").unwrap(),
+    )
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    let target = commit.package().clone();
+    let mut output = Vec::new();
+    target.write_to(&mut output).unwrap();
+    assert!(!output.is_empty());
+    source.bump();
+    let mut output = Vec::new();
+    assert!(matches!(
+        target.write_to(&mut output),
+        Err(litchi_xls::source_backed::OutputError::Package(
+            PackageError::Source(SourceBackedError::SourceChanged { .. })
+        ))
+    ));
+    assert!(matches!(
+        workbook.apply_comments(commit.patch()),
+        Err(litchi_xls::Error::Io(_))
+    ));
+    assert!(matches!(
+        target.apply_comments(&commit.patch().inverse()),
+        Err(litchi_xls::Error::Io(_))
+    ));
+}
+
+#[test]
+fn source_backed_visibility_fences_commit_output_replay_and_inverse() {
+    let (source, workbook) = deferred_visibility_fixture();
+    let mut edit = workbook.edit_sheet_visibility().unwrap();
+    edit.hide(litchi_xls::sheet_visibility::Selector::Name("Other"))
+        .unwrap();
+    source.bump();
+    assert!(matches!(edit.commit(), Err(litchi_xls::Error::Io(_))));
+
+    let (source, workbook) = deferred_visibility_fixture();
+    let mut edit = workbook.edit_sheet_visibility().unwrap();
+    edit.hide(litchi_xls::sheet_visibility::Selector::Name("Other"))
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let target = commit.package().clone();
+    let mut output = Vec::new();
+    target.write_to(&mut output).unwrap();
+    assert!(!output.is_empty());
+    source.bump();
+    let mut output = Vec::new();
+    assert!(matches!(
+        target.write_to(&mut output),
+        Err(litchi_xls::source_backed::OutputError::Package(
+            PackageError::Source(SourceBackedError::SourceChanged { .. })
+        ))
+    ));
+    assert!(matches!(
+        workbook.apply_sheet_visibility(commit.patch()),
+        Err(litchi_xls::Error::Io(_))
+    ));
+    assert!(matches!(
+        target.apply_sheet_visibility(&commit.patch().inverse()),
+        Err(litchi_xls::Error::Io(_))
+    ));
+}
+
+#[test]
+fn source_backed_cross_copy_replay_retains_recipient_fence_for_output() {
+    let (source, workbook) = deferred_comment_fixture();
+    let original = source.bytes.as_ref().clone();
+    let mut edit = workbook.edit_comments().unwrap();
+    edit.replace(
+        litchi_xls::cell_values::Selector::Position(Position::new(0)),
+        Reference::new(0, 0).unwrap(),
+        litchi_xls::comments::Value::new("Author", "changed!").unwrap(),
+    )
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    let recipient_source = Arc::new(CountingSource::new(original));
+    let recipient = SourceBackedWorkbook::from_read_at(recipient_source.clone()).unwrap();
+    let applied = recipient.apply_comments(commit.patch()).unwrap();
+
+    recipient_source.bump();
+    let mut output = Vec::new();
+    assert!(matches!(
+        applied.package().write_to(&mut output),
+        Err(litchi_xls::source_backed::OutputError::Package(
+            PackageError::Source(SourceBackedError::SourceChanged { .. })
+        ))
+    ));
+    let path = source_fence_temp_path("litchi-xls-rebased-source-fence");
+    let result = applied.package().save(&path);
+    let _ = std::fs::remove_file(path);
+    assert!(matches!(
+        result,
+        Err(litchi_xls::source_backed::OutputError::Package(
+            PackageError::Source(SourceBackedError::SourceChanged { .. })
+        ))
+    ));
+}
+
+#[test]
+fn lazy_chart_and_pivot_editors_can_retry_after_capture_failure() {
+    let (source, workbook) = deferred_visibility_fixture();
+    let package = Package::from_source(workbook).unwrap();
+    let mut charts = package.edit_charts().unwrap();
+    source.bump();
+    assert!(matches!(
+        charts.charts(),
+        Err(litchi_xls::Error::Internal(_))
+    ));
+    assert!(matches!(
+        charts.charts(),
+        Err(litchi_xls::Error::Internal(_))
+    ));
+
+    let (source, workbook) = deferred_visibility_fixture();
+    let package = Package::from_source(workbook).unwrap();
+    let mut pivots = package.edit_pivot_views().unwrap();
+    source.bump();
+    assert!(matches!(
+        pivots.worksheet_count(),
+        Err(litchi_xls::Error::Internal(_))
+    ));
+    assert!(matches!(
+        pivots.worksheet_count(),
+        Err(litchi_xls::Error::Internal(_))
+    ));
+}
+
+fn assert_inflight_projection_source_change(
+    operation: impl FnOnce(&SourceBackedWorksheet) -> Result<(), SourceBackedError>,
+) {
+    let (source, package, sheet_index, _reference, _sheet_name) = deferred_numeric_fixture();
+    let worksheet = package.worksheet_by_index(sheet_index).unwrap().unwrap();
+    // Materialize the deferred target before arming the mutation. The next
+    // projection operation's leading original-owner fence then mutates the
+    // source immediately after its observation, leaving only its trailing
+    // fence to classify the target read's composed-source failure.
+    source.clear_version_calls();
+    source.bump_after_observation(1);
+    let error = operation(&worksheet).unwrap_err();
+    assert!(
+        matches!(error, SourceBackedError::SourceChanged { .. }),
+        "expected typed SourceChanged after an in-flight mutation, got {error:?}"
+    );
+}
+
+fn assert_inflight_workbook_source_change(
+    operation: impl FnOnce(
+        &SourceBackedWorkbook,
+        usize,
+        Reference,
+        &str,
+    ) -> Result<(), SourceBackedError>,
+) {
+    let (source, package, sheet_index, reference, sheet_name) = deferred_numeric_fixture();
+    // Open the deferred target once so the operation below takes the cached
+    // target path. Its leading original-source fence then mutates immediately
+    // after observation, forcing the operation's trailing promotion path.
+    package.worksheet_by_index(sheet_index).unwrap();
+    source.clear_version_calls();
+    source.bump_after_observation(1);
+    let error = operation(&package, sheet_index, reference, &sheet_name).unwrap_err();
+    assert!(
+        matches!(error, SourceBackedError::SourceChanged { .. }),
+        "expected typed SourceChanged after an in-flight workbook mutation, got {error:?}"
+    );
+}
+
+fn assert_cold_inflight_workbook_source_change(
+    operation: impl FnOnce(&SourceBackedWorkbook, usize, Reference) -> Result<(), SourceBackedError>,
+) {
+    let (source, package, sheet_index, reference, _sheet_name) = deferred_numeric_fixture();
+    // Do not materialize the deferred target first: the mutation lands after
+    // effective_inner's leading fence while from_read_at opens the composed
+    // source. That open may report I/O, so effective_inner must fence again
+    // before propagating its error.
+    source.clear_version_calls();
+    source.bump_after_observation(1);
+    let error = operation(&package, sheet_index, reference).unwrap_err();
+    assert!(
+        matches!(error, SourceBackedError::SourceChanged { .. }),
+        "expected typed SourceChanged after cold in-flight mutation, got {error:?}"
+    );
+}
+
+#[test]
+fn deferred_projection_handles_keep_the_original_source_fence() {
+    let (source, package, sheet_index, reference, sheet_name) = deferred_numeric_fixture();
+    let by_index = package.worksheet_by_index(sheet_index).unwrap().unwrap();
+    let by_name = package.worksheet_by_name(&sheet_name).unwrap().unwrap();
+    let from_list = package.worksheets().unwrap().into_iter().next().unwrap();
+
+    // The first read materializes the deferred target; all three projections
+    // must retain the original owner rather than only that cache.
+    assert!(
+        by_index
+            .cell_value(u32::from(reference.row()), u32::from(reference.column()))
+            .unwrap()
+            .is_some()
+    );
+    assert!(
+        by_name
+            .cell_value(u32::from(reference.row()), u32::from(reference.column()))
+            .unwrap()
+            .is_some()
+    );
+    assert!(
+        from_list
+            .cell_value(u32::from(reference.row()), u32::from(reference.column()))
+            .unwrap()
+            .is_some()
+    );
+
+    source.bump();
+    for worksheet in [by_index, by_name, from_list] {
+        assert!(matches!(
+            worksheet.cell_value(u32::from(reference.row()), u32::from(reference.column())),
+            Err(SourceBackedError::SourceChanged { .. })
+        ));
+    }
+}
+
+#[test]
+fn deferred_projection_promotes_inflight_source_changes_for_all_reads() {
+    assert_inflight_projection_source_change(|worksheet| worksheet.cell(0, 0).map(|_| ()));
+    assert_inflight_projection_source_change(|worksheet| {
+        let (_cancellation, execution) = execution_pair();
+        worksheet.cell_with_execution(0, 0, &execution).map(|_| ())
+    });
+    assert_inflight_projection_source_change(|worksheet| {
+        worksheet.visit_cells(|_cell| Ok(())).map(|_| ())
+    });
+    assert_inflight_projection_source_change(|worksheet| {
+        let (_cancellation, execution) = execution_pair();
+        worksheet
+            .visit_cells_with_execution(&execution, |_cell| Ok(()))
+            .map(|_| ())
+    });
+    assert_inflight_projection_source_change(|worksheet| worksheet.name().map(|_| ()));
+}
+
+#[test]
+fn deferred_workbook_facade_promotes_inflight_source_changes() {
+    assert_inflight_workbook_source_change(|workbook, sheet, reference, _name| {
+        workbook
+            .cell_by_index(
+                sheet,
+                u32::from(reference.row()),
+                u32::from(reference.column()),
+            )
+            .map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, sheet, reference, _name| {
+        workbook
+            .cell_value_by_index(
+                sheet,
+                u32::from(reference.row()),
+                u32::from(reference.column()),
+            )
+            .map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, sheet, reference, _name| {
+        let (_cancellation, execution) = execution_pair();
+        workbook
+            .cell_by_index_with_execution(
+                sheet,
+                u32::from(reference.row()),
+                u32::from(reference.column()),
+                &execution,
+            )
+            .map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, sheet, _reference, _name| {
+        workbook.worksheet_by_index(sheet).map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, _sheet, _reference, name| {
+        workbook.worksheet_by_name(name).map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, _sheet, _reference, _name| {
+        workbook.worksheets().map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, _sheet, _reference, _name| {
+        workbook.worksheet_count().map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, _sheet, _reference, _name| {
+        workbook.worksheet_names().map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, _sheet, _reference, _name| {
+        workbook.worksheet_descriptors().map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, _sheet, _reference, _name| {
+        workbook.sheet_count().map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, _sheet, _reference, _name| {
+        workbook.date_system().map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, _sheet, _reference, _name| {
+        workbook.formatting().map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, _sheet, _reference, _name| {
+        workbook.source_version().map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, _sheet, _reference, _name| {
+        workbook.materialize_eager().map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, _sheet, _reference, _name| {
+        workbook.text().map(|_| ())
+    });
+}
+
+#[test]
+fn deferred_materialized_package_handoff_keeps_the_original_source_fence() {
+    let (source, package, sheet_index, reference, _sheet_name) = deferred_numeric_fixture();
+    let package = Package::from_source(package).unwrap();
+    let workbook = package.workbook();
+    let source_backed = workbook.source_backed_ref().unwrap();
+
+    assert!(
+        source_backed
+            .cell_value_by_index(
+                sheet_index,
+                u32::from(reference.row()),
+                u32::from(reference.column()),
+            )
+            .unwrap()
+            .is_some()
+    );
+    source.bump();
+    assert!(matches!(
+        source_backed.cell_value_by_index(
+            sheet_index,
+            u32::from(reference.row()),
+            u32::from(reference.column()),
+        ),
+        Err(SourceBackedError::SourceChanged { .. })
+    ));
+}
+
+#[test]
+fn deferred_package_handoff_promotes_original_source_changes_for_primary_edit_and_replay() {
+    let (source, deferred, sheet_index, reference, _sheet_name) = deferred_numeric_fixture();
+    let handoff = Package::from_source(deferred).unwrap();
+
+    let edit = handoff.edit().unwrap();
+    source.bump();
+    assert!(matches!(
+        edit.source_cell(sheet_index, reference),
+        Err(litchi_xls::EditError::Package(PackageError::Source(
+            SourceBackedError::SourceChanged { .. }
+        )))
+    ));
+
+    let (source, deferred, _sheet_index, _reference, _sheet_name) = deferred_numeric_fixture();
+    let handoff = Package::from_source(deferred).unwrap();
+    let patch = handoff.edit().unwrap().commit().unwrap().patch().clone();
+    source.bump();
+    assert!(matches!(
+        handoff.apply(&patch),
+        Err(litchi_xls::EditError::Package(PackageError::Source(
+            SourceBackedError::SourceChanged { .. }
+        )))
+    ));
+}
+
+fn assert_handoff_package_source_change(
+    operation: impl FnOnce(&Package) -> Result<(), PackageError>,
+) {
+    let (source, deferred, _sheet_index, _reference, _sheet_name) = deferred_numeric_fixture();
+    let package = Package::from_source(deferred).unwrap();
+    source.clear_version_calls();
+    source.bump_after_observation(1);
+    let error = operation(&package).unwrap_err();
+    assert!(
+        matches!(
+            error,
+            PackageError::Source(SourceBackedError::SourceChanged { .. })
+        ),
+        "expected typed package SourceChanged after an in-flight output mutation, got {error:?}"
+    );
+}
+
+fn assert_handoff_source_owner_output_source_change(
+    operation: impl FnOnce(&SourceBackedWorkbook) -> Result<(), litchi_xls::source_backed::OutputError>,
+) {
+    let (source, deferred, _sheet_index, _reference, _sheet_name) = deferred_numeric_fixture();
+    let package = Package::from_source(deferred).unwrap();
+    let workbook = package.source_workbook().unwrap();
+    source.clear_version_calls();
+    source.bump_after_observation(1);
+    let error = operation(workbook).unwrap_err();
+    assert!(
+        matches!(
+            error,
+            litchi_xls::source_backed::OutputError::Package(PackageError::Source(
+                SourceBackedError::SourceChanged { .. }
+            ))
+        ),
+        "expected typed source-owner SourceChanged after an in-flight output mutation, got {error:?}"
+    );
+}
+
+fn source_fence_temp_path(prefix: &str) -> std::path::PathBuf {
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    std::env::temp_dir().join(format!(
+        "{prefix}-{}-{}.xls",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    ))
+}
+
+#[test]
+fn deferred_package_output_boundaries_promote_inflight_source_changes() {
+    assert_handoff_package_source_change(|package| package.source_bytes().map(|_| ()));
+    assert_handoff_package_source_change(|package| package.to_bytes().map(|_| ()));
+    assert_handoff_package_source_change(|package| {
+        let mut output = Vec::new();
+        package.write_to(&mut output)
+    });
+    assert_handoff_package_source_change(|package| package.reader_ref().map(|_| ()));
+    assert_handoff_package_source_change(|package| {
+        let path = source_fence_temp_path("litchi-xls-source-fence");
+        let result = package.save(&path);
+        let _ = std::fs::remove_file(path);
+        result
+    });
+}
+
+#[test]
+fn handed_off_source_owner_output_boundaries_promote_inflight_source_changes() {
+    assert_handoff_source_owner_output_source_change(|workbook| {
+        let mut output = Vec::new();
+        workbook.write_to(&mut output).map(|_| ())
+    });
+    assert_handoff_source_owner_output_source_change(|workbook| {
+        let path = source_fence_temp_path("litchi-xls-source-owner-fence");
+        let result = workbook.save(&path).map(|_| ());
+        let _ = std::fs::remove_file(path);
+        result
+    });
+}
+
+#[test]
+fn deferred_cold_materialization_promotes_inflight_source_changes() {
+    assert_cold_inflight_workbook_source_change(|workbook, sheet, reference| {
+        workbook
+            .cell_by_index(
+                sheet,
+                u32::from(reference.row()),
+                u32::from(reference.column()),
+            )
+            .map(|_| ())
+    });
+}
+
 #[test]
 fn execution_variants_honor_pre_and_mid_scan_cancellation() {
     let source = Arc::new(CountingSource::new(fixture("Simple.xls")));
@@ -2157,7 +2750,10 @@ fn explicit_limits_and_filepass_are_typed() {
     let source = Arc::new(CountingSource::new(fixture("Simple.xls")));
     let limits = SourceBackedLimits::default().with_max_global_bytes(1);
     assert!(matches!(
-        SourceBackedWorkbook::from_read_at_with_limits(source, limits),
+        SourceBackedWorkbook::from_read_at_with_options(
+            source,
+            SourceBackedOptions::new().limits(limits)
+        ),
         Err(SourceBackedError::ResourceLimit {
             resource: "global bytes",
             ..
@@ -2607,7 +3203,11 @@ fn worksheet_scan_byte_limit_is_a_read_fence() {
 
     let source = Arc::new(CountingSource::new(bytes));
     let limits = SourceBackedLimits::default().with_max_worksheet_scan_bytes(limit as u64);
-    let owner = SourceBackedWorkbook::from_read_at_with_limits(source.clone(), limits).unwrap();
+    let owner = SourceBackedWorkbook::from_read_at_with_options(
+        source.clone(),
+        SourceBackedOptions::new().limits(limits),
+    )
+    .unwrap();
     let fence_ranges =
         physical_ranges_for_stream_range(&source, at as u64, region.1 - region.0 - limit);
     source.clear_ranges();
@@ -2638,7 +3238,11 @@ fn worksheet_byte_limit_below_one_header_reports_the_header_it_does_not_read() {
     // taken and the scan issues no read at all.
     let source = Arc::new(CountingSource::new(fixture("Simple.xls")));
     let limits = SourceBackedLimits::default().with_max_worksheet_scan_bytes(2);
-    let owner = SourceBackedWorkbook::from_read_at_with_limits(source.clone(), limits).unwrap();
+    let owner = SourceBackedWorkbook::from_read_at_with_options(
+        source.clone(),
+        SourceBackedOptions::new().limits(limits),
+    )
+    .unwrap();
     source.clear_ranges();
     let result = owner.cell_value_by_index(0, 0, 0);
     assert!(
@@ -2701,7 +3305,7 @@ fn opaque_heavy_worksheet_falls_back_to_exact_fills() {
     let value = owner.cell_value_by_index(0, 0, 0).unwrap();
     let actual = source.ranges();
 
-    let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+    let eager = Reader::new(Cursor::new(bytes)).unwrap();
     let expected = eager
         .xls_worksheet(0)
         .unwrap()
@@ -2806,7 +3410,7 @@ fn worksheet_density_gate_releases_when_the_running_mean_falls() {
     let value = owner.cell_value_by_index(0, 0, 0).unwrap();
     let actual = source.ranges();
 
-    let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+    let eager = Reader::new(Cursor::new(bytes)).unwrap();
     let expected = eager
         .xls_worksheet(0)
         .unwrap()
@@ -2902,12 +3506,11 @@ fn append_eager_text_cell(output: &mut String, value: &CellValue) {
     }
 }
 
-fn eager_text(workbook: &Workbook<Cursor<Vec<u8>>>) -> String {
+fn eager_text(workbook: &Reader<Cursor<Vec<u8>>>) -> String {
     let mut output = String::new();
     for worksheet_index in 0..workbook.worksheet_count() {
         let worksheet = workbook.worksheet_by_index(worksheet_index).unwrap();
-        let mut rows = worksheet.rows();
-        while let Some(row) = rows.next() {
+        for row in worksheet.rows() {
             let row = row.unwrap();
             for (column, cell) in row.iter().enumerate() {
                 if column != 0 {
@@ -2924,7 +3527,7 @@ fn eager_text(workbook: &Workbook<Cursor<Vec<u8>>>) -> String {
 fn assert_source_text_matches_eager(bytes: Vec<u8>) {
     let owner =
         SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(bytes.clone()))).unwrap();
-    let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+    let eager = Reader::new(Cursor::new(bytes)).unwrap();
     assert_eq!(owner.text().unwrap(), eager_text(&eager));
 }
 
@@ -2992,9 +3595,9 @@ fn source_text_honors_valid_dimensions_and_retained_text_limits() {
     let modified = insert_before_worksheet_eof(&original, &frame_bytes(0x0200, &legacy_dimensions));
     assert_source_text_matches_eager(cfb_with_streams(&[("Workbook", &modified)]));
 
-    let owner = SourceBackedWorkbook::from_read_at_with_limits(
+    let owner = SourceBackedWorkbook::from_read_at_with_options(
         Arc::new(CountingSource::new(bytes.clone())),
-        SourceBackedLimits::default().with_max_text_cells(1),
+        SourceBackedOptions::new().limits(SourceBackedLimits::default().with_max_text_cells(1)),
     )
     .unwrap();
     assert!(matches!(
@@ -3005,9 +3608,9 @@ fn source_text_honors_valid_dimensions_and_retained_text_limits() {
         })
     ));
 
-    let owner = SourceBackedWorkbook::from_read_at_with_limits(
+    let owner = SourceBackedWorkbook::from_read_at_with_options(
         Arc::new(CountingSource::new(bytes)),
-        SourceBackedLimits::default().with_max_text_bytes(1),
+        SourceBackedOptions::new().limits(SourceBackedLimits::default().with_max_text_bytes(1)),
     )
     .unwrap();
     assert!(matches!(
@@ -3201,7 +3804,11 @@ fn the_whole_sheet_walk_costs_one_scan_not_one_per_cell() {
     // Compare the visitor with the uncached query scan. Retained-index query
     // savings are exercised separately in xls_query_index_cache.
     let limits = SourceBackedLimits::default().with_max_query_index_bytes(0);
-    let owner = SourceBackedWorkbook::from_read_at_with_limits(source.clone(), limits).unwrap();
+    let owner = SourceBackedWorkbook::from_read_at_with_options(
+        source.clone(),
+        SourceBackedOptions::new().limits(limits),
+    )
+    .unwrap();
     let worksheet = owner.worksheet_by_index(0).unwrap().unwrap();
 
     // One selected-cell query: the whole-substream scan every query pays for,
@@ -3316,28 +3923,26 @@ fn the_whole_sheet_walk_refuses_what_a_selected_cell_query_refuses() {
         "the walk must carry the query's error identity"
     );
 
-    // A real defect: three worksheets of the flagship fixture carry shared
-    // formula metadata this reader refuses, which is why its text extraction
-    // is refused (0568, 0585). The walk must refuse them identically.
+    // Three worksheets of the flagship fixture set `fShrFmla` on formulas
+    // that carry their own tokens. The stale flag is ignored (record 0316;
+    // 0568 and 0585 refused them), so the walk and a cell query both read
+    // every sheet.
     let owner = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(ole_fixture(
         "ConditionalFormattingSamples.xls",
     ))))
     .unwrap();
-    let mut refusals = 0_usize;
     for sheet in [6_usize, 7, 13] {
         let worksheet = owner.worksheet_by_index(sheet).unwrap().unwrap();
-        let walk = worksheet
-            .visit_cells(|_cell| Ok(()))
-            .unwrap_err()
-            .to_string();
-        // Find the position the query refuses at: the walk stops at the same
-        // record, so any query over the sheet refuses with the same message.
-        let query = worksheet.cell(0, 0).unwrap_err().to_string();
-        assert_eq!(walk, query, "sheet {sheet} refusals differ");
-        assert!(walk.contains("PtgExp"), "unexpected refusal: {walk}");
-        refusals += 1;
+        let mut cells = 0_usize;
+        worksheet
+            .visit_cells(|_cell| {
+                cells += 1;
+                Ok(())
+            })
+            .unwrap();
+        assert!(cells > 0, "sheet {sheet} has cells");
+        worksheet.cell(0, 0).unwrap();
     }
-    assert_eq!(refusals, 3);
 }
 
 #[test]
@@ -3454,7 +4059,7 @@ fn an_open_with_options_threads_leniency_into_the_source_backed_open() {
 
     let owner = SourceBackedWorkbook::from_read_at_with_options(
         Arc::new(OwnedSource::new(bytes)),
-        SourceBackedOptions::new().with_leniency(Leniency::TolerateFormattingDefects),
+        SourceBackedOptions::new().leniency(Leniency::TolerateFormattingDefects),
     )
     .expect("a lenient source-backed open repairs the defect");
     let report = owner.tolerance_report();
@@ -3468,6 +4073,17 @@ fn an_open_with_options_threads_leniency_into_the_source_backed_open() {
     assert_eq!(
         report.defects()[0].defect(),
         Defect::Formatting(FormattingDefect::ExtendedFormatCountMismatch)
+    );
+
+    let eager = owner
+        .materialize_eager()
+        .expect("materialization retains leniency");
+    assert!(!eager.tolerance_report().is_clean());
+    assert!(
+        eager
+            .tolerance_report()
+            .count(FormattingDefect::ExtendedFormatCountMismatch)
+            > 0
     );
 
     // Default options agree with the default constructors on a conforming

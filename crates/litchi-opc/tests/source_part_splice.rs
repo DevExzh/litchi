@@ -27,6 +27,7 @@ use litchi_opc::{
     OpcError, OpcOperationAccounting, PackURI, SourceBackedPackage, SourcePartSpliceLimits,
     SourcePartSpliceProof, SpliceResource,
 };
+use litchi_opc::{SourceCacheLimits, SourceLimits, SourceReadPolicy};
 use sha2::{Digest as _, Sha256};
 use soapberry_zip::office::StreamingArchiveWriter;
 
@@ -97,7 +98,8 @@ fn package_relationships_for(document_member: &str, signed: bool) -> Vec<u8> {
 }
 
 fn archive_bytes(source: &[u8], deflated: bool, signed: bool) -> Vec<u8> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", &content_types(signed))
         .expect("content types fixture must be writable");
@@ -129,7 +131,8 @@ fn archive_bytes(source: &[u8], deflated: bool, signed: bool) -> Vec<u8> {
 }
 
 fn binary_archive_bytes(source: &[u8], deflated: bool) -> Vec<u8> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", &content_types_for(true))
         .expect("binary content types fixture must be writable");
@@ -158,8 +161,13 @@ fn binary_archive_bytes(source: &[u8], deflated: bool) -> Vec<u8> {
 
 fn open(source: &[u8], deflated: bool, signed: bool) -> (SourceBackedPackage, Vec<u8>) {
     let archive = archive_bytes(source, deflated, signed);
-    let package =
-        SourceBackedPackage::from_vec(archive.clone()).expect("fixture package must open");
+    let package = SourceBackedPackage::from_vec(
+        archive.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .expect("fixture package must open");
     (package, archive)
 }
 
@@ -215,7 +223,13 @@ fn target_bytes(archive: &[u8]) -> Vec<u8> {
 }
 
 fn target_bytes_for(archive: &[u8], uri: &str) -> Vec<u8> {
-    let package = SourceBackedPackage::from_vec(archive.to_vec()).expect("published archive opens");
+    let package = SourceBackedPackage::from_vec(
+        archive.to_vec(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .expect("published archive opens");
     package
         .part(&pack(uri))
         .expect("published target exists")
@@ -304,7 +318,8 @@ fn central_record(bytes: &[u8], wanted: &str) -> Vec<u8> {
 
 #[test]
 fn central_record_oracle_detects_metadata_changes_outside_local_record() {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_deflated(DOCUMENT_MEMBER, VALID_SOURCE)
         .unwrap();
@@ -330,7 +345,8 @@ fn central_record_oracle_detects_metadata_changes_outside_local_record() {
 
 #[test]
 fn raw_record_oracle_includes_descriptor_mode_compressed_payload() {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_deflated(DOCUMENT_MEMBER, VALID_SOURCE)
         .expect("descriptor-mode fixture must write");
@@ -613,7 +629,7 @@ fn store_and_deflate_splices_preserve_opaque_members_without_caching_target() {
         );
         let mut output = Vec::new();
         let publication = plan
-            .write_to_stream(&mut output)
+            .write_to(&mut output)
             .expect("bounded decoded splice must publish");
 
         assert_eq!(target_bytes(&output), expected);
@@ -646,7 +662,7 @@ fn accounting_reports_two_fresh_decoded_reader_passes() {
         );
         let mut output = Vec::new();
         let mut accounting = OpcOperationAccounting::default();
-        plan.write_to_stream_with_accounting(&mut output, &mut accounting)
+        plan.write_to_with_accounting(&mut output, &mut accounting)
             .expect("accounted decoded splice must publish");
 
         let expected_decoded_reads = (VALID_SOURCE.len() as u64) * 2;
@@ -673,7 +689,13 @@ fn binary_part_splice_skips_xml_audit_but_keeps_decoded_proofs() {
     let offset = 6usize;
     for deflated in [false, true] {
         let archive = binary_archive_bytes(BINARY_SOURCE, deflated);
-        let package = SourceBackedPackage::from_vec(archive).expect("binary fixture must open");
+        let package = SourceBackedPackage::from_vec(
+            archive,
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            None,
+        )
+        .expect("binary fixture must open");
         let candidate = candidate_bytes(BINARY_SOURCE, offset, BINARY_FRAGMENT);
         let proof = SourcePartSpliceProof {
             source_version: package.source_version().expect("source version must exist"),
@@ -694,7 +716,7 @@ fn binary_part_splice_skips_xml_audit_but_keeps_decoded_proofs() {
             )
             .expect("binary Part must not be forced through XML audit");
         let mut output = Vec::new();
-        plan.write_to_stream(&mut output)
+        plan.write_to(&mut output)
             .expect("binary decoded splice must publish");
         assert_eq!(target_bytes_for(&output, BINARY_URI), candidate);
     }
@@ -717,7 +739,7 @@ fn exact_noop_copies_malformed_and_signed_source_byte_for_byte() {
         assert!(plan.is_noop());
         let mut output = Vec::new();
         let publication = plan
-            .write_to_stream(&mut output)
+            .write_to(&mut output)
             .expect("exact no-op must bypass XML and signature policy");
         assert!(publication.is_noop());
         assert_eq!(output, source_archive);
@@ -775,12 +797,12 @@ fn exact_noop_authenticates_source_and_candidate_hashes_and_archive_limit() {
         .expect("valid no-op proof must prepare");
     let mut output = Vec::new();
     let error = plan
-        .write_to_stream(&mut output)
+        .write_to(&mut output)
         .expect_err("physical archive limit must apply to an exact no-op");
     assert!(matches!(
         error,
-        OpcError::ReadLimit {
-            resource: litchi_opc::ReadResource::ArchiveTotalBytes,
+        OpcError::Limit {
+            kind: litchi_opc::SourceLimitKind::AggregateBytes,
             ..
         }
     ));
@@ -884,8 +906,14 @@ fn mismatched_proof_fields_are_refused_before_publication() {
 fn source_version_mutation_is_refused_before_output() {
     let source_archive = archive_bytes(VALID_SOURCE, false, false);
     let source = Arc::new(MutableSource::new(source_archive));
-    let package = SourceBackedPackage::from_read_at(source.clone())
-        .expect("mutable fixture package must open");
+    let package = SourceBackedPackage::from_read_at(
+        source.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .expect("mutable fixture package must open");
     let expected_version = package.source_version().expect("source version must exist");
     source.replace_bytes(archive_bytes(VALID_SOURCE, false, false));
     assert_ne!(source.version().unwrap(), expected_version);
@@ -918,8 +946,14 @@ fn source_version_mutation_is_refused_before_output() {
 fn source_mutation_after_the_first_sink_write_wins_over_publication() {
     let source_archive = archive_bytes(VALID_SOURCE, false, false);
     let source = Arc::new(MutableSource::new(source_archive.clone()));
-    let package = SourceBackedPackage::from_read_at(source.clone())
-        .expect("mutable fixture package must open");
+    let package = SourceBackedPackage::from_read_at(
+        source.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .expect("mutable fixture package must open");
     let plan = prepare(
         &package,
         VALID_SOURCE,
@@ -929,7 +963,7 @@ fn source_mutation_after_the_first_sink_write_wins_over_publication() {
     );
     let mut sink = MutatingSink::new(Arc::clone(&source), source_archive);
     let error = plan
-        .write_to_stream(&mut sink)
+        .write_to(&mut sink)
         .expect_err("source mutation during output must invalidate publication");
     assert!(
         contains_source_change(&error),
@@ -952,10 +986,12 @@ fn large_binary_fragment_refuses_scoped_work_before_preparation_succeeds() {
     let archive = binary_archive_bytes(BINARY_SOURCE, false);
     let (budget, _cancellation, context) =
         managed_context_with_limits(64 * 1024 * 1024, WORK_LIMIT, u64::MAX);
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(archive)),
-        litchi_opc::ReadLimits::default(),
-        context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .expect("managed binary fixture must open");
     let baseline = budget.used(Resource::Work);
@@ -998,10 +1034,12 @@ fn large_binary_fragment_observes_managed_cancellation_between_work_chunks() {
         budget.clone(),
         cancellation,
     ));
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         source.clone(),
-        litchi_opc::ReadLimits::default(),
-        context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .expect("managed binary fixture must open");
     let proof = proof_for(&package, BINARY_SOURCE, BINARY_SOURCE.len(), &fragment);
@@ -1042,8 +1080,8 @@ fn candidate_limit_is_refused_without_output() {
         .expect_err("candidate limit must reject the plan");
     assert!(matches!(
         error,
-        OpcError::ReadLimit {
-            actual,
+        OpcError::Limit {
+            observed: actual,
             maximum,
             ..
         } if actual == candidate_len && maximum == candidate_len - 1
@@ -1054,10 +1092,12 @@ fn candidate_limit_is_refused_without_output() {
 fn cancellation_is_observed_before_plan_and_write() {
     let archive = archive_bytes(VALID_SOURCE, false, false);
     let (cancellation, context) = managed_context();
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(archive)),
-        litchi_opc::ReadLimits::default(),
-        context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .expect("managed source fixture must open");
     cancellation.cancel();
@@ -1071,10 +1111,12 @@ fn cancellation_is_observed_before_plan_and_write() {
 
     let archive = archive_bytes(VALID_SOURCE, false, false);
     let (cancellation, context) = managed_context();
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(archive)),
-        litchi_opc::ReadLimits::default(),
-        context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .expect("managed source fixture must open");
     let plan = prepare(
@@ -1087,7 +1129,7 @@ fn cancellation_is_observed_before_plan_and_write() {
     cancellation.cancel();
     let mut output = Vec::new();
     let error = plan
-        .write_to_stream(&mut output)
+        .write_to(&mut output)
         .expect_err("cancellation must stop publication");
     assert!(matches!(error, OpcError::Cancelled));
     assert!(output.is_empty());
@@ -1105,7 +1147,7 @@ fn partial_and_flush_sink_failures_preserve_typed_progress() {
     );
     let mut partial = PrefixFailSink::after(17);
     let error = plan
-        .write_to_stream(&mut partial)
+        .write_to(&mut partial)
         .expect_err("partial sink must fail publication");
     assert_eq!(partial.bytes.len(), 17);
     assert_sink_failure_count(&error, 17);
@@ -1126,11 +1168,11 @@ fn partial_and_flush_sink_failures_preserve_typed_progress() {
         FRAGMENT,
         SourcePartSpliceLimits::default(),
     )
-    .write_to_stream(&mut expected_output)
+    .write_to(&mut expected_output)
     .expect("reference publication must succeed");
     let mut flush_failure = PrefixFailSink::flush_fails();
     let error = plan
-        .write_to_stream(&mut flush_failure)
+        .write_to(&mut flush_failure)
         .expect_err("flush failure must fail publication");
     assert_eq!(flush_failure.bytes.len(), expected_output.len());
     assert_sink_failure_count(&error, expected_output.len());
@@ -1148,10 +1190,15 @@ fn publication_inverse_requires_the_authenticated_candidate_artifact() {
     );
     let mut candidate_archive = Vec::new();
     let publication = plan
-        .write_to_stream(&mut candidate_archive)
+        .write_to(&mut candidate_archive)
         .expect("candidate publication must succeed");
-    let candidate = SourceBackedPackage::from_vec(candidate_archive.clone())
-        .expect("candidate package must reopen");
+    let candidate = SourceBackedPackage::from_vec(
+        candidate_archive.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .expect("candidate package must reopen");
     let mut inverse = Vec::new();
     publication
         .write_inverse_to_stream(&candidate, &mut inverse)
@@ -1168,10 +1215,15 @@ fn publication_inverse_requires_the_authenticated_candidate_artifact() {
     );
     let mut other_archive = Vec::new();
     other_plan
-        .write_to_stream(&mut other_archive)
+        .write_to(&mut other_archive)
         .expect("second candidate publication must succeed");
-    let other_candidate =
-        SourceBackedPackage::from_vec(other_archive).expect("second candidate package must reopen");
+    let other_candidate = SourceBackedPackage::from_vec(
+        other_archive,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .expect("second candidate package must reopen");
     let mut rejected = Vec::new();
     let error = publication
         .write_inverse_to_stream(&other_candidate, &mut rejected)
@@ -1197,7 +1249,7 @@ fn published_candidate() -> (litchi_opc::SourcePartSplicePublication, Vec<u8>, V
     );
     let mut candidate_archive = Vec::new();
     let publication = plan
-        .write_to_stream(&mut candidate_archive)
+        .write_to(&mut candidate_archive)
         .expect("candidate publication must succeed");
     (publication, candidate_archive, source_archive)
 }
@@ -1206,8 +1258,14 @@ fn published_candidate() -> (litchi_opc::SourcePartSplicePublication, Vec<u8>, V
 fn publication_inverse_rechecks_candidate_freshness_during_write_and_flush() {
     let (publication, candidate_archive, _) = published_candidate();
     let candidate_source = Arc::new(MutableSource::new(candidate_archive.clone()));
-    let candidate = SourceBackedPackage::from_read_at(candidate_source.clone())
-        .expect("mutable candidate package must open");
+    let candidate = SourceBackedPackage::from_read_at(
+        candidate_source.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .expect("mutable candidate package must open");
     let mut sink = MutatingSink::new(Arc::clone(&candidate_source), candidate_archive.clone());
     let error = publication
         .write_inverse_to_stream(&candidate, &mut sink)
@@ -1223,8 +1281,14 @@ fn publication_inverse_rechecks_candidate_freshness_during_write_and_flush() {
 
     let (publication, candidate_archive, _) = published_candidate();
     let candidate_source = Arc::new(MutableSource::new(candidate_archive.clone()));
-    let candidate = SourceBackedPackage::from_read_at(candidate_source.clone())
-        .expect("mutable candidate package must open");
+    let candidate = SourceBackedPackage::from_read_at(
+        candidate_source.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .expect("mutable candidate package must open");
     let mut sink = MutatingFlushSink::new(Arc::clone(&candidate_source), candidate_archive);
     let error = publication
         .write_inverse_to_stream(&candidate, &mut sink)
@@ -1243,10 +1307,12 @@ fn publication_inverse_rechecks_candidate_freshness_during_write_and_flush() {
 fn publication_inverse_observes_candidate_cancellation_during_write_and_flush() {
     let (publication, candidate_archive, _) = published_candidate();
     let (cancellation, context) = managed_context();
-    let candidate = SourceBackedPackage::from_read_at_with_execution_context(
+    let candidate = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(candidate_archive)),
-        litchi_opc::ReadLimits::default(),
-        context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .expect("managed candidate package must open");
     let mut sink = CancellingSink::on_write(cancellation);
@@ -1261,10 +1327,12 @@ fn publication_inverse_observes_candidate_cancellation_during_write_and_flush() 
 
     let (publication, candidate_archive, _) = published_candidate();
     let (cancellation, context) = managed_context();
-    let candidate = SourceBackedPackage::from_read_at_with_execution_context(
+    let candidate = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(candidate_archive)),
-        litchi_opc::ReadLimits::default(),
-        context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .expect("managed candidate package must open");
     let mut sink = CancellingSink::on_flush(cancellation);
@@ -1283,10 +1351,12 @@ fn publication_inverse_uses_current_candidate_output_budget() {
     let (publication, candidate_archive, _) = published_candidate();
     let (budget, _cancellation, context) =
         managed_context_with_limits(64 * 1024 * 1024, u64::MAX, 0);
-    let candidate = SourceBackedPackage::from_read_at_with_execution_context(
+    let candidate = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(candidate_archive)),
-        litchi_opc::ReadLimits::default(),
-        context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .expect("managed candidate package must open");
     let mut output = Vec::new();
@@ -1306,10 +1376,12 @@ fn publication_inverse_uses_current_candidate_output_budget() {
 fn publication_inverse_shared_context_charges_retained_archive_once() {
     let source_archive = archive_bytes(VALID_SOURCE, true, false);
     let (budget, _cancellation, context) = managed_context_with_budget();
-    let original = SourceBackedPackage::from_read_at_with_execution_context(
+    let original = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(source_archive.clone())),
-        litchi_opc::ReadLimits::default(),
-        context.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context.clone()),
     )
     .expect("managed original package must open");
     let plan = original
@@ -1322,14 +1394,16 @@ fn publication_inverse_shared_context_charges_retained_archive_once() {
         .expect("managed source splice must prepare");
     let mut candidate_archive = Vec::new();
     let publication = plan
-        .write_to_stream(&mut candidate_archive)
+        .write_to(&mut candidate_archive)
         .expect("managed candidate publication must succeed");
     let before_inverse = budget.used(Resource::OutputBytes);
 
-    let candidate = SourceBackedPackage::from_read_at_with_execution_context(
+    let candidate = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(candidate_archive)),
-        litchi_opc::ReadLimits::default(),
-        context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .expect("managed candidate package must open");
     let mut inverse = Vec::new();
@@ -1349,10 +1423,12 @@ fn publication_inverse_shared_context_charges_retained_archive_once() {
 fn splice_memory_quotas_are_typed_and_release_after_success_or_failure() {
     let archive = archive_bytes(VALID_SOURCE, false, false);
     let (budget, _cancellation, context) = managed_context_with_budget();
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(archive)),
-        litchi_opc::ReadLimits::default(),
-        context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .expect("managed source fixture must open");
     let baseline = budget.used(Resource::Memory);
@@ -1417,7 +1493,7 @@ fn splice_memory_quotas_are_typed_and_release_after_success_or_failure() {
         .expect("preservation quota is checked during writing");
     let mut output = Vec::new();
     let error = plan
-        .write_to_stream(&mut output)
+        .write_to(&mut output)
         .expect_err("preservation quota must be typed");
     assert!(matches!(
         error,
@@ -1439,7 +1515,7 @@ fn splice_memory_quotas_are_typed_and_release_after_success_or_failure() {
         .expect("replay quota is checked during writing");
     let mut output = Vec::new();
     let error = plan
-        .write_to_stream(&mut output)
+        .write_to(&mut output)
         .expect_err("replay quota must be typed");
     assert!(matches!(
         error,
@@ -1457,10 +1533,12 @@ fn authored_fragment_transfers_one_reservation_and_publishes_reversibly() {
     for deflated in [false, true] {
         let source_archive = archive_bytes(VALID_SOURCE, deflated, false);
         let (budget, _cancellation, context) = managed_context_with_budget();
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(OwnedSource::new(source_archive.clone())),
-            litchi_opc::ReadLimits::default(),
-            context,
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .expect("managed source must open");
         let baseline = budget.used(Resource::Memory);
@@ -1486,12 +1564,16 @@ fn authored_fragment_transfers_one_reservation_and_publishes_reversibly() {
             "preparation must retain exactly one fragment charge"
         );
         let mut output = Vec::new();
-        let publication = plan
-            .write_to_stream(&mut output)
-            .expect("splice must publish");
+        let publication = plan.write_to(&mut output).expect("splice must publish");
         assert_eq!(budget.used(Resource::Memory), baseline);
-        let candidate = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(output)))
-            .expect("candidate must reopen");
+        let candidate = SourceBackedPackage::from_read_at(
+            Arc::new(OwnedSource::new(output)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .expect("candidate must reopen");
         let mut inverse = Vec::new();
         publication
             .write_inverse_to_stream(&candidate, &mut inverse)
@@ -1510,14 +1592,22 @@ fn authored_fragment_transfers_one_reservation_and_publishes_reversibly() {
 fn authored_fragment_cannot_transfer_a_foreign_package_budget() {
     let source_archive = archive_bytes(VALID_SOURCE, false, false);
     let (budget, _cancellation, context) = managed_context_with_budget();
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(source_archive.clone())),
-        litchi_opc::ReadLimits::default(),
-        context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .expect("managed source must open");
-    let foreign = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(source_archive)))
-        .expect("identical foreign package must open");
+    let foreign = SourceBackedPackage::from_read_at(
+        Arc::new(OwnedSource::new(source_archive)),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .expect("identical foreign package must open");
     let baseline = budget.used(Resource::Memory);
     let mut fragment = package
         .allocate_source_part_splice_fragment(11, 11)
@@ -1537,13 +1627,78 @@ fn authored_fragment_cannot_transfer_a_foreign_package_budget() {
 }
 
 #[test]
+fn authored_fragment_transfers_between_clones_of_one_package() {
+    let source_archive = archive_bytes(VALID_SOURCE, true, false);
+    let (budget, _cancellation, context) = managed_context_with_budget();
+    let package = SourceBackedPackage::from_read_at(
+        Arc::new(OwnedSource::new(source_archive.clone())),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
+    )
+    .expect("managed source must open");
+    let clone = package.clone();
+    let baseline = budget.used(Resource::Memory);
+    let length = FRAGMENT.len() as u64;
+    let limits = SourcePartSpliceLimits::default();
+
+    // The same splice prepared by the package from its own fragment.
+    let mut own = package
+        .allocate_source_part_splice_fragment(length, length)
+        .expect("fragment must allocate");
+    own.as_mut_slice().copy_from_slice(FRAGMENT);
+    let mut expected = Vec::new();
+    package
+        .prepare_source_part_splice_with_fragment(
+            &pack(DOCUMENT_URI),
+            proof(&package, VALID_SOURCE, INSERTION_OFFSET, FRAGMENT),
+            own,
+            limits,
+        )
+        .expect("own fragment must transfer")
+        .write_to(&mut expected)
+        .expect("splice must publish");
+    assert_eq!(budget.used(Resource::Memory), baseline);
+
+    // A clone shares the package's execution budget, so a fragment it
+    // allocated may transfer into a plan of the original, and back.
+    for (allocator, planner) in [(&clone, &package), (&package, &clone)] {
+        let mut fragment = allocator
+            .allocate_source_part_splice_fragment(length, length)
+            .expect("clone fragment must allocate");
+        fragment.as_mut_slice().copy_from_slice(FRAGMENT);
+        assert_eq!(budget.used(Resource::Memory), baseline + length);
+        let plan = planner
+            .prepare_source_part_splice_with_fragment(
+                &pack(DOCUMENT_URI),
+                proof(planner, VALID_SOURCE, INSERTION_OFFSET, FRAGMENT),
+                fragment,
+                limits,
+            )
+            .expect("a clone's fragment belongs to the same opened package");
+        assert_eq!(
+            budget.used(Resource::Memory),
+            baseline + length + xml_workspace_requirement(limits),
+            "the transfer keeps exactly one fragment charge"
+        );
+        let mut output = Vec::new();
+        plan.write_to(&mut output).expect("splice must publish");
+        assert_eq!(output, expected);
+        assert_eq!(budget.used(Resource::Memory), baseline);
+    }
+}
+
+#[test]
 fn authored_fragment_refusals_release_memory_and_preserve_typed_limits() {
     let archive = archive_bytes(VALID_SOURCE, false, false);
     let (budget, cancellation, context) = managed_context_with_budget();
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(archive)),
-        litchi_opc::ReadLimits::default(),
-        context.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context.clone()),
     )
     .expect("managed source must open");
     let baseline = budget.used(Resource::Memory);
@@ -1593,10 +1748,12 @@ fn authored_fragment_zero_fill_checks_cancellation_between_work_chunks() {
         budget.clone(),
         cancellation,
     ));
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         source.clone(),
-        litchi_opc::ReadLimits::default(),
-        context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .expect("managed source must open");
     let memory = budget.used(Resource::Memory);
@@ -1657,10 +1814,12 @@ fn interrupted_splice_source_retries_without_double_charging_input() {
             armed: AtomicBool::new(false),
             cancellation: None,
         });
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source.clone(),
-            litchi_opc::ReadLimits::default(),
-            context,
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .expect("managed fixture must open");
         let input = budget.used(Resource::InputBytes);
@@ -1700,10 +1859,12 @@ fn interrupted_splice_source_observes_cancellation_before_retry() {
         armed: AtomicBool::new(false),
         cancellation: Some(cancellation),
     });
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         source.clone(),
-        litchi_opc::ReadLimits::default(),
-        context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .expect("managed fixture must open");
     let input = budget.used(Resource::InputBytes);

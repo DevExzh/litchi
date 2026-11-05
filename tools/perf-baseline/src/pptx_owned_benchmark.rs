@@ -280,10 +280,16 @@ fn timed_iteration(
 
         let ingress_start = Instant::now();
         let mut package = match route {
-            Route::Owned => litchi_pptx::Package::from_vec(input)?,
+            Route::Owned => litchi_pptx::Package::from_reader(std::io::Cursor::new(input))?,
             Route::Materialized => {
                 let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(input));
-                let package = SourceBackedPackage::from_read_at(source)?;
+                let package = SourceBackedPackage::from_read_at(
+                    source,
+                    litchi_opc::SourceLimits::default(),
+                    litchi_opc::SourceCacheLimits::default(),
+                    litchi_opc::SourceReadPolicy::exact(),
+                    None,
+                )?;
                 let opc = package.into_opc_package()?;
                 litchi_pptx::Package::from_opc_package(opc)?
             },
@@ -291,7 +297,7 @@ fn timed_iteration(
         let ingress_ns = elapsed_ns(ingress_start)?;
 
         let snapshot_start = Instant::now();
-        let mut edit = package.opened_presentation_transaction()?;
+        let mut edit = package.edit()?;
         let snapshot_ns = elapsed_ns(snapshot_start)?;
 
         let edit_start = Instant::now();
@@ -307,13 +313,13 @@ fn timed_iteration(
             }
         }
         let commit = edit.commit()?;
-        if !commit.is_changed() {
+        if !commit.diagnostics().changed() {
             return Err("PPTX owning benchmark produced an unchanged commit".into());
         }
         let edit_commit_ns = elapsed_ns(edit_start)?;
 
         let publish_start = Instant::now();
-        package.apply_opened_presentation_commit(commit)?;
+        package = commit.into_package();
         let output = package.to_bytes()?;
         for chunk in output.chunks(MAX_SINK_WRITE_BYTES) {
             sink.write_all(chunk)?;
@@ -459,7 +465,7 @@ fn run(
                 .checked_mul(PPTX_SOURCE_TEXT_BOXES_PER_SLIDE)
                 .ok_or("PPTX benchmark replacement count overflows usize")?,
             timing_scope: "one fresh Vec clone plus route ingress, opened transaction snapshot, 64 text replacements and commit, commit publication, Package::to_bytes, and the identical bounded sink writes; one route per process",
-            phase_scope: "clone_ns is source.to_vec; ingress_ns begins after the clone and ends after route package construction; snapshot_ns is opened_presentation_transaction; edit_commit_ns is all selected shape replacements plus commit; publish_ns is apply_opened_presentation_commit, to_bytes, and identical 64 KiB sequential sink writes",
+            phase_scope: "clone_ns is source.to_vec; ingress_ns begins after the clone and ends after route package construction; snapshot_ns is edit; edit_commit_ns is all selected shape replacements plus commit; publish_ns is Commit::into_package, to_bytes, and identical 64 KiB sequential sink writes",
             teardown_scope: "total_ns stops after the timed body drops the package, transaction, source owner, output Vec, and route-local state; the preallocated sink is retained after the boundary",
             verification_scope: "semantic output, digest stability, source identity, sink counters, and artifact writes occur outside measured timers",
             performance_claim: "none; descriptive paired phase evidence only, with no inferred speedup, allocation result, or production recommendation",

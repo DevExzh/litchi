@@ -13,6 +13,7 @@
 //! new text.  Corpus construction and all independent archive/semantic
 //! oracles are outside the measured lifecycle.
 
+use crate::docx_family_publication::{CopyPublish as _, TailPlanPublish as _};
 use std::{
     collections::BTreeMap,
     ffi::OsString,
@@ -28,15 +29,17 @@ use std::{
 };
 
 use litchi_core::{OwnedSource, Position, ReadAt, SourceVersion};
-use litchi_docx::source_backed::paragraph_copy::Limits as CopyLimits;
+use litchi_docx::source_backed::paragraph_copy::raw::{
+    Limits as CopyLimits, Patch as CopyRawPatch,
+};
 // The DOCX owner follows the source-backed ODF append shape: an edit retains
 // only caller text and the indexed source, `plan` proves the source/candidate,
 // and publication writes the preserved package to a sequential sink.  Keep
 // this import narrow so the benchmark does not reach into OPC internals.
 use litchi_docx::Package as OwnedDocxPackage;
 use litchi_docx::source_backed::tail_append::{
-    CandidateProof as TailAppendCandidateProof, Limits as TailAppendLimits,
-    SourceProof as TailAppendSourceProof,
+    CandidateProof as TailAppendCandidateProof, EditOptions as TailAppendEditOptions,
+    Limits as TailAppendLimits, SourceProof as TailAppendSourceProof,
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter};
@@ -766,7 +769,7 @@ fn limits_record(copy: CopyLimits, bounded: TailAppendLimits) -> LimitsRecord {
 
 fn member_identities(bytes: &[u8]) -> BenchResult<Vec<MemberIdentity>> {
     let archive = ZipArchive::from_slice(bytes)?;
-    let reader = ArchiveReader::new(bytes)?;
+    let reader = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())?;
     let mut records = Vec::new();
     for result in archive.entries() {
         let entry = result?;
@@ -929,21 +932,43 @@ fn build_materialized_candidate(
 ) -> BenchResult<(Vec<u8>, bool, bool)> {
     let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(source_archive_bytes.to_vec()));
     let package = litchi_docx::source_backed::Package::from_read_at(source)?;
-    let snapshot = package.plain_paragraph_copy_snapshot_with_limits(limits)?;
-    if snapshot.paragraph_count() != count || snapshot.xml_bytes() != source_xml_bytes {
+    let mut edit = package
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().paragraph_copy(limits))
+        .edit_plain_paragraph_copy()?;
+    let projected = edit.projected()?;
+    if projected.paragraph_count() != count || projected.xml_bytes() != source_xml_bytes {
         return Err("materialized source snapshot differs from generated XML".into());
     }
-    let mut edit = snapshot.edit();
     edit.copy_plain_paragraph(Position::new(0), Position::new(count))?;
-    let commit = edit.commit();
+    let commit = edit.commit()?;
     let expected = independent_candidate_xml(source_xml_bytes, &append_text(count))?;
-    let output_xml = commit.projected().xml_bytes();
+    let output_xml = commit
+        .package()
+        .edit_plain_paragraph_copy()?
+        .projected()?
+        .xml_bytes()
+        .to_vec();
     let candidate_xml_expected = output_xml == expected.as_slice();
-    let wire = commit.patch().to_bytes()?;
-    let durable = litchi_docx::source_backed::paragraph_copy::Patch::from_bytes(&wire)?;
-    let replayed = durable.apply(&snapshot)?;
-    let replay_verified = replayed.xml_bytes() == output_xml;
-    if !candidate_xml_expected || !replay_verified {
+    let wire = commit.patch().to_bytes(limits)?;
+    let durable = CopyRawPatch::from_bytes(&wire, limits)?;
+    let replayed = package.apply_plain_paragraph_copy(&durable.clone().into())?;
+    let replayed_xml = replayed
+        .package()
+        .edit_plain_paragraph_copy()?
+        .projected()?
+        .xml_bytes()
+        .to_vec();
+    let replay_verified = replayed_xml == output_xml;
+    let inverse_replayed = commit
+        .package()
+        .apply_plain_paragraph_copy(&commit.patch().inverse())?;
+    let inverse_verified = inverse_replayed
+        .package()
+        .edit_plain_paragraph_copy()?
+        .projected()?
+        .xml_bytes()
+        == source_xml_bytes;
+    if !candidate_xml_expected || !replay_verified || !inverse_verified {
         return Err("materialized candidate XML or patch replay oracle failed".into());
     }
     let mut output = Vec::new();
@@ -971,7 +996,9 @@ fn build_bounded_candidate(
     let source = litchi_docx::source_backed::Package::from_read_at(Arc::new(OwnedSource::new(
         source_archive_bytes.to_vec(),
     )))?;
-    let edit = source.tail_append_plain_paragraph_with_limits(append_text, limits)?;
+    let source =
+        source.with_semantic_limits(litchi_docx::SemanticLimits::default().tail_append(limits));
+    let edit = source.tail_append_plain_paragraph(append_text);
     let plan = edit.prepare()?;
     let source_proof = plan.source_proof();
     let candidate_proof = plan.candidate_proof();
@@ -982,7 +1009,7 @@ fn build_bounded_candidate(
         return Err("bounded candidate scalar proof is incomplete".into());
     }
     let mut output = Vec::new();
-    let publication = plan.write_to_stream(&mut output)?;
+    let publication = plan.write_to(&mut output)?;
     let replay_verified = publication.candidate_proof() == candidate_proof;
     let candidate_source = litchi_docx::source_backed::Package::from_read_at(Arc::new(
         OwnedSource::new(output.clone()),
@@ -1008,10 +1035,11 @@ fn materialized_stale_source_refusal(
     let source = Arc::new(MeasureSource::new(Arc::from(source_archive_bytes.to_vec())));
     let package =
         litchi_docx::source_backed::Package::from_read_at(Arc::clone(&source) as Arc<dyn ReadAt>)?;
-    let snapshot = package.plain_paragraph_copy_snapshot_with_limits(limits)?;
-    let mut edit = snapshot.edit();
+    let mut edit = package
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().paragraph_copy(limits))
+        .edit_plain_paragraph_copy()?;
     edit.copy_plain_paragraph(Position::new(0), Position::new(count))?;
-    let commit = edit.commit();
+    let commit = edit.commit()?;
     source.bump_revision();
     let mut output = Vec::new();
     let result = package.publish_plain_paragraph_copy_to_stream(&mut output, &commit);
@@ -1026,11 +1054,13 @@ fn bounded_stale_source_refusal(
     let source = Arc::new(MeasureSource::new(Arc::from(source_archive_bytes.to_vec())));
     let package =
         litchi_docx::source_backed::Package::from_read_at(Arc::clone(&source) as Arc<dyn ReadAt>)?;
-    let edit = package.tail_append_plain_paragraph_with_limits(append_text, limits)?;
+    let package =
+        package.with_semantic_limits(litchi_docx::SemanticLimits::default().tail_append(limits));
+    let edit = package.tail_append_plain_paragraph(append_text);
     let plan = edit.prepare()?;
     source.bump_revision();
     let mut output = Vec::new();
-    let result = plan.write_to_stream(&mut output);
+    let result = plan.write_to(&mut output);
     Ok(result.is_err() && output.is_empty())
 }
 
@@ -1038,12 +1068,15 @@ fn bounded_noop_oracle(source_archive_bytes: &[u8], limits: TailAppendLimits) ->
     let package = litchi_docx::source_backed::Package::from_read_at(Arc::new(OwnedSource::new(
         source_archive_bytes.to_vec(),
     )))?;
-    let plan = package.tail_append_noop().with_limits(limits).prepare()?;
+    let plan = package
+        .tail_append_noop()
+        .with_options(TailAppendEditOptions::new(limits))
+        .prepare()?;
     if !plan.is_noop() {
         return Ok(false);
     }
     let mut output = Vec::new();
-    let publication = plan.write_to_stream(&mut output)?;
+    let publication = plan.write_to(&mut output)?;
     if !publication.is_noop() || output != source_archive_bytes {
         return Ok(false);
     }
@@ -1067,7 +1100,8 @@ fn route_record(
     stale_source_refusal_verified: bool,
 ) -> BenchResult<RouteCorpusRecord> {
     let output_members = member_identities(output)?;
-    let output_reader = ArchiveReader::new(output)?;
+    let output_reader =
+        ArchiveReader::new(output, soapberry_zip::office::ArchiveLimits::default())?;
     let output_xml = output_reader.read(MAIN_PATH)?;
     let output_main_xml_expected_raw_verified = output_xml == expected_main_xml;
     let (output_semantic, output_texts) = semantic_record(output)?;
@@ -1126,7 +1160,10 @@ fn build_corpus(count: usize) -> BenchResult<Corpus> {
     let source_archive_vec = source_archive(&source_xml, 0)?;
     let source_guard = source_archive_vec.clone();
     let source_members = member_identities(&source_archive_vec)?;
-    let source_reader = ArchiveReader::new(&source_archive_vec)?;
+    let source_reader = ArchiveReader::new(
+        &source_archive_vec,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
     let source_main_xml_archive = source_reader.read(MAIN_PATH)?;
     let source_main_xml_archive_verified = source_main_xml_archive == source_xml;
     let source_opaque = find_member(&source_members, OPAQUE_PATH)?;
@@ -1301,10 +1338,13 @@ fn run_materialized_iteration(
         let package = litchi_docx::source_backed::Package::from_read_at(
             Arc::clone(&source) as Arc<dyn ReadAt>
         )?;
-        let snapshot = package.plain_paragraph_copy_snapshot_with_limits(corpus.copy_limits)?;
-        let mut edit = snapshot.edit();
+        let mut edit = package
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().paragraph_copy(corpus.copy_limits),
+            )
+            .edit_plain_paragraph_copy()?;
         edit.copy_plain_paragraph(Position::new(0), Position::new(corpus.count))?;
-        let commit = edit.commit();
+        let commit = edit.commit()?;
         let mut output = HashingSink::new();
         let _publication = package.publish_plain_paragraph_copy_to_stream(&mut output, &commit)?;
         let sink = output.finish();
@@ -1340,13 +1380,13 @@ fn run_bounded_iteration(
         let package = litchi_docx::source_backed::Package::from_read_at(
             Arc::clone(&source) as Arc<dyn ReadAt>
         )?;
-        let edit = package.tail_append_plain_paragraph_with_limits(
-            corpus.append_text.as_str(),
-            corpus.bounded_limits,
-        )?;
+        let package = package.with_semantic_limits(
+            litchi_docx::SemanticLimits::default().tail_append(corpus.bounded_limits),
+        );
+        let edit = package.tail_append_plain_paragraph(corpus.append_text.as_str());
         let plan = edit.prepare()?;
         let mut output = HashingSink::new();
-        let _publication = plan.write_to_stream(&mut output)?;
+        let _publication = plan.write_to(&mut output)?;
         let sink = output.finish();
         let reads = source.reads();
         (sink, reads)

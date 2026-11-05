@@ -1,9 +1,9 @@
 mod support;
 
-use litchi_core::{Error, Result};
+use litchi_odf_common::Error;
 use litchi_ods::{
-    Spreadsheet,
-    document::{NumberStyleNode, Snapshot, StyleGraph},
+    Package,
+    document::{NumberStyleNode, StyleGraph},
 };
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -42,12 +42,12 @@ fn replacement_graph() -> StyleGraph {
 }
 
 #[test]
-fn decimal_replacement_accepts_namespace_aliases() -> Result<()> {
-    let snapshot = Snapshot::from_bytes(package_with_style(decimal_source_style()))?;
-    let mut edit = snapshot.edit();
+fn decimal_replacement_accepts_namespace_aliases() -> Result<(), Error> {
+    let snapshot = Package::from_bytes(&package_with_style(decimal_source_style()))?;
+    let mut edit = snapshot.edit()?;
     edit.replace_style_graph(&replacement_graph())?;
     let commit = edit.commit()?;
-    let reopened = Spreadsheet::from_bytes(commit.snapshot().as_bytes().to_vec())?;
+    let reopened = Package::from_bytes(commit.package().as_bytes())?.workbook()?;
     let content = reopened.content_xml();
     assert!(content.contains("<number:number-style"));
     assert!(content.contains("number:decimal-places=\"3\""));
@@ -56,17 +56,17 @@ fn decimal_replacement_accepts_namespace_aliases() -> Result<()> {
 }
 
 #[test]
-fn modeled_character_data_events_remain_supported() -> Result<()> {
+fn modeled_character_data_events_remain_supported() -> Result<(), Error> {
     let sources = [
         "<n:number-style s:name=\"Decimal\"><n:text><![CDATA[$]]></n:text><n:number n:decimal-places=\"2\" n:min-integer-digits=\"1\"/><n:text>USD</n:text></n:number-style>",
         "<n:number-style s:name=\"Decimal\"><n:text>&amp;</n:text><n:number n:decimal-places=\"2\" n:min-integer-digits=\"1\"/><n:text>USD</n:text></n:number-style>",
     ];
     for source in sources {
-        let snapshot = Snapshot::from_bytes(package_with_style(source))?;
-        let mut edit = snapshot.edit();
+        let snapshot = Package::from_bytes(&package_with_style(source))?;
+        let mut edit = snapshot.edit()?;
         edit.replace_style_graph(&replacement_graph())?;
         let commit = edit.commit()?;
-        let reopened = Spreadsheet::from_bytes(commit.snapshot().as_bytes().to_vec())?;
+        let reopened = Package::from_bytes(commit.package().as_bytes())?.workbook()?;
         let content = reopened.content_xml();
         assert!(content.contains("<number:number-style"));
     }
@@ -74,7 +74,7 @@ fn modeled_character_data_events_remain_supported() -> Result<()> {
 }
 
 #[test]
-fn unsupported_source_payloads_refuse_atomically_after_pending_edit() -> Result<()> {
+fn unsupported_source_payloads_refuse_atomically_after_pending_edit() -> Result<(), Error> {
     let cases = [
         (
             "fraction",
@@ -131,15 +131,15 @@ fn unsupported_source_payloads_refuse_atomically_after_pending_edit() -> Result<
     ];
 
     for (label, style) in cases {
-        let snapshot = Snapshot::from_bytes(package_with_style(style))?;
-        let mut edit = snapshot.edit();
+        let snapshot = Package::from_bytes(&package_with_style(style))?;
+        let mut edit = snapshot.edit()?;
         edit.set_cell_style("Data", 0, 0, "Pending")?;
         let pending = edit.as_bytes().to_vec();
         let error = edit
             .replace_style_graph(&replacement_graph())
             .expect_err(label);
         assert!(
-            matches!(&error, Error::Unsupported(message) if message.contains("unsupported source")),
+            matches!(&error, Error::Refused(refusal) if refusal.reason().contains("unsupported source")),
             "{label}: {error}"
         );
         assert_eq!(edit.as_bytes(), pending.as_slice(), "{label}");
@@ -148,17 +148,18 @@ fn unsupported_source_payloads_refuse_atomically_after_pending_edit() -> Result<
 }
 
 #[test]
-fn empty_replacement_is_an_exact_noop_for_pending_work() -> Result<()> {
-    let snapshot = Snapshot::from_bytes(package_with_style(decimal_source_style()))?;
-    let mut edit = snapshot.edit();
+fn empty_replacement_is_an_exact_noop_for_pending_work() -> Result<(), Error> {
+    let snapshot = Package::from_bytes(&package_with_style(decimal_source_style()))?;
+    let mut edit = snapshot.edit()?;
     edit.set_cell_style("Data", 0, 0, "Pending")?;
     let pending = edit.as_bytes().to_vec();
     edit.replace_style_graph(&StyleGraph::default())?;
     assert_eq!(edit.as_bytes(), pending.as_slice());
     let commit = edit.commit()?;
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert!(
-        Spreadsheet::from_bytes(commit.snapshot().as_bytes().to_vec())?
+        Package::from_bytes(commit.package().as_bytes())?
+            .workbook()?
             .content_xml()
             .contains("Pending")
     );

@@ -1,0 +1,56 @@
+//! Byte-identity probe for record 0333: the same writes on the base tree
+//! and on the record's tree must publish the same bytes.
+use litchi_ops::{BatchItem, BatchMode, File, OpenOptions, Props, SourceMode};
+use sha2::{Digest, Sha256};
+
+fn digest(result: litchi_ops::Result<File>) -> String {
+    match result.and_then(|file| file.to_bytes()) {
+        Ok(bytes) => format!("{:x}", Sha256::digest(&bytes)),
+        Err(error) => format!("error {:?}", error.code()),
+    }
+}
+
+fn main() {
+    let root = std::env::args().nth(1).expect("test-data root");
+    let mut paths: Vec<_> = walk(std::path::Path::new(&root));
+    paths.sort();
+    for path in paths {
+        let bytes = std::fs::read(&path).unwrap();
+        for eager in [false, true] {
+            let Ok(file) = litchi_ops::open_bytes_with(
+                bytes.clone(),
+                &OpenOptions::new().source_mode(if eager { SourceMode::Eager } else { SourceMode::Auto }),
+            ) else {
+                continue;
+            };
+            let all = digest(file.set(litchi_ops::query::Query::parse("run").unwrap().with_scope(litchi_core::selector::Scope::Path(Box::new(litchi_core::selector::Path::parse("/slide[1]").unwrap()))), Props::new().with("bold", true).with("size", "13pt")));
+            let shape = digest(file.set("/slide[1]/shape[1]", Props::new().with("italic", true)));
+            let paragraph = digest(file.set("/slide[1]/shape[1]/paragraph[1]", Props::new().with("align", "center")));
+            let items: Vec<BatchItem<'static>> = (1..=8)
+                .flat_map(|shape| {
+                    [1, 2].into_iter().map(move |run| {
+                        let mut item = BatchItem::new("set");
+                        item.path = Some(format!("/slide[1]/shape[{shape}]/paragraph[1]/run[{run}]").into());
+                        item.props = Some(Props::new().with("color", "1F4E79"));
+                        item
+                    })
+                })
+                .collect();
+            let batch = digest(file.batch(items, BatchMode::BestEffort).map(|commit| commit.file));
+            println!("{}\t{eager}\t{all}\t{shape}\t{paragraph}\t{batch}", path.display());
+        }
+    }
+}
+
+fn walk(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
+    let mut out = Vec::new();
+    for entry in std::fs::read_dir(dir).unwrap().flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            out.extend(walk(&path));
+        } else if path.extension().is_some_and(|ext| ext == "pptx") {
+            out.push(path);
+        }
+    }
+    out
+}

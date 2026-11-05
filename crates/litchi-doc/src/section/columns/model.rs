@@ -74,6 +74,7 @@ pub enum Layout {
 
 /// Validation failure for a section column layout.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     InvalidCount(usize),
     InvalidWidth { index: usize, width_twips: u16 },

@@ -3,11 +3,11 @@ use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
 use litchi_xls::writer::{
-    AddInFunctionOptions, DdeOrOleItemOptions, DdeOrOleLinkOptions, ExternalDefinedNameOptions,
-    ExternalSheetOptions, ExternalWorkbookOptions, Writer,
+    AddInFunctionOptions, Builder, DdeOrOleItemOptions, DdeOrOleLinkOptions,
+    ExternalDefinedNameOptions, ExternalSheetOptions, ExternalWorkbookOptions,
 };
 use litchi_xls::{
-    CachedValue, ClipboardFormat, ErrorValue, NameBody, SupportingBook, ValueMatrix, Workbook,
+    CachedValue, ClipboardFormat, ErrorValue, NameBody, SupportingBook, ValueMatrix, raw::Reader,
 };
 
 fn fixture(name: &str) -> PathBuf {
@@ -18,7 +18,7 @@ fn fixture(name: &str) -> PathBuf {
 
 #[test]
 fn generated_external_names_round_trip_as_inert_metadata() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_worksheet("Local").unwrap();
     let book = writer
         .add_external_workbook_link(ExternalWorkbookOptions {
@@ -95,8 +95,8 @@ fn generated_external_names_round_trip_as_inert_metadata() {
         .unwrap();
 
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
-    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let links = workbook.external_links();
     assert_eq!(links.supporting_books().len(), 3);
     assert!(matches!(
@@ -129,7 +129,7 @@ fn generated_external_names_round_trip_as_inert_metadata() {
 
 #[test]
 fn reads_poi_external_and_add_in_names() {
-    let workbook = Workbook::new(File::open(fixture("external_name.xls")).unwrap()).unwrap();
+    let workbook = Reader::new(File::open(fixture("external_name.xls")).unwrap()).unwrap();
     let names = workbook.external_links().external_names();
     let NameBody::ExternalDefinedName {
         name,
@@ -143,7 +143,7 @@ fn reads_poi_external_and_add_in_names() {
     assert!(formula_bytes.is_empty());
 
     let workbook =
-        Workbook::new(File::open(fixture("externalFunctionExample.xls")).unwrap()).unwrap();
+        Reader::new(File::open(fixture("externalFunctionExample.xls")).unwrap()).unwrap();
     let names = workbook.external_links().external_names();
     assert_eq!(names.len(), 3);
     let NameBody::AddInFunction { name, unused_data } = names[0].body() else {

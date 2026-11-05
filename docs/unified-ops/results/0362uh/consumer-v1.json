@@ -1,0 +1,33 @@
+{
+  "record": "0362uh",
+  "base": "a814baa1de47c0844eb1ea092805b73e7d7bb4ae",
+  "branch": "uo2/odf-consumer-repair",
+  "scope": {
+    "crates": [
+      "litchi-odb",
+      "litchi-odp",
+      "litchi-ods",
+      "litchi-odt"
+    ],
+    "assembled_v6_diagnostics": 85,
+    "facade_diagnostics_excluded": true,
+    "generic_error_assertions_added": 0,
+    "error_aliases_added": 0
+  },
+  "validation": {
+    "rustfmt": {
+      "result": "pass",
+      "toolchain": "1.95.0",
+      "command": "rustfmt +1.95.0 --edition 2024 <changed Rust files>"
+    },
+    "diff_check": {
+      "result": "pass",
+      "command": "git diff --check"
+    },
+    "cargo": {
+      "result": "not_run",
+      "reason": "source-only lane instruction"
+    }
+  },
+  "performance_claim": false
+}

@@ -1,0 +1,204 @@
+[
+{
+  "path": "/sheet[1]/row[1]",
+  "type": "row",
+  "childCount": 4,
+  "format": {
+    "height": "20pt",
+    "customHeight": true
+  },
+  "children": [
+    {
+      "path": "/sheet[1]/A1",
+      "type": "cell",
+      "text": "Region",
+      "preview": "A1",
+      "childCount": 0,
+      "format": {
+        "type": "SharedString",
+        "font.bold": true,
+        "font.color": "dk1",
+        "font.size": "11pt",
+        "font.name": "Calibri"
+      },
+      "children": []
+    },
+    {
+      "path": "/sheet[1]/B1",
+      "type": "cell",
+      "text": "Sales",
+      "preview": "B1",
+      "childCount": 0,
+      "format": {
+        "type": "SharedString",
+        "font.bold": true,
+        "font.color": "dk1",
+        "font.size": "11pt",
+        "font.name": "Calibri"
+      },
+      "children": []
+    },
+    {
+      "path": "/sheet[1]/C1",
+      "type": "cell",
+      "text": "Status",
+      "preview": "C1",
+      "childCount": 0,
+      "format": {
+        "type": "SharedString",
+        "font.bold": true,
+        "font.color": "dk1",
+        "font.size": "11pt",
+        "font.name": "Calibri"
+      },
+      "children": []
+    },
+    {
+      "path": "/sheet[1]/E1",
+      "type": "cell",
+      "text": "Merged",
+      "preview": "E1",
+      "childCount": 0,
+      "format": {
+        "type": "SharedString",
+        "merge": "E1:F2",
+        "mergeAnchor": true
+      },
+      "children": []
+    }
+  ]
+},
+{
+  "path": "/sheet[1]/row[2]",
+  "type": "row",
+  "childCount": 5,
+  "format": {},
+  "children": [
+    {
+      "path": "/sheet[1]/A2",
+      "type": "cell",
+      "text": "West",
+      "preview": "A2",
+      "childCount": 0,
+      "format": {
+        "type": "SharedString"
+      },
+      "children": []
+    },
+    {
+      "path": "/sheet[1]/B2",
+      "type": "cell",
+      "text": "1200",
+      "preview": "B2",
+      "childCount": 0,
+      "format": {
+        "type": "Number",
+        "font.italic": true,
+        "underline": "single",
+        "font.color": "#FF0000",
+        "font.size": "14pt",
+        "font.name": "Arial",
+        "fill": "#FFFF00",
+        "border.left": "thin",
+        "border.left.color": "#000000",
+        "border.right": "thin",
+        "border.right.color": "#000000",
+        "border.top": "medium",
+        "border.bottom": "double",
+        "border.diagonal": "thin",
+        "border.diagonalUp": true,
+        "alignment.wrapText": true,
+        "alignment.horizontal": "center",
+        "alignment.vertical": "top",
+        "numberformat": "0.00%"
+      },
+      "children": []
+    },
+    {
+      "path": "/sheet[1]/C2",
+      "type": "cell",
+      "text": "open",
+      "preview": "C2",
+      "childCount": 0,
+      "format": {
+        "type": "SharedString"
+      },
+      "children": []
+    },
+    {
+      "path": "/sheet[1]/D2",
+      "type": "cell",
+      "text": "",
+      "preview": "D2",
+      "childCount": 0,
+      "format": {
+        "type": "Number",
+        "empty": true,
+        "font.italic": true,
+        "underline": "single",
+        "font.color": "#FF0000",
+        "font.size": "14pt",
+        "font.name": "Arial",
+        "fill": "#FFFF00",
+        "border.left": "thin",
+        "border.left.color": "#000000",
+        "border.right": "thin",
+        "border.right.color": "#000000",
+        "border.top": "medium",
+        "border.bottom": "double",
+        "border.diagonal": "thin",
+        "border.diagonalUp": true,
+        "alignment.wrapText": true,
+        "alignment.horizontal": "center",
+        "alignment.vertical": "top",
+        "numberformat": "0.00%"
+      },
+      "children": []
+    },
+    {
+      "path": "/sheet[1]/F2",
+      "type": "cell",
+      "text": "",
+      "preview": "F2",
+      "childCount": 0,
+      "format": {
+        "type": "Number",
+        "empty": true,
+        "merge": "E1:F2"
+      },
+      "children": []
+    }
+  ]
+},
+{
+  "path": "/sheet[1]/row[7]",
+  "type": "row",
+  "childCount": 1,
+  "format": {
+    "hidden": true,
+    "outlineLevel": 1
+  },
+  "children": [
+    {
+      "path": "/sheet[1]/A7",
+      "type": "cell",
+      "text": "West",
+      "preview": "A7",
+      "childCount": 0,
+      "format": {
+        "type": "SharedString"
+      },
+      "children": []
+    }
+  ]
+},
+{
+  "path": "/sheet[1]/row[50]",
+  "type": "row",
+  "text": "(empty)",
+  "preview": "row 50",
+  "childCount": 0,
+  "format": {},
+  "children": []
+}
+]

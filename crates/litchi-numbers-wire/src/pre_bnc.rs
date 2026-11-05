@@ -10,7 +10,7 @@ use std::fmt;
 
 use litchi_iwa_common::formula::FiniteF64;
 
-use crate::{Error, Result};
+use crate::{Error, Limits, Result};
 
 const MAX_SUPPORTED_VERSION: u8 = 4;
 const SHORT_HEADER_LEN: usize = 8;
@@ -125,7 +125,8 @@ impl<'source> PreBncCellView<'source> {
     /// Returns [`Error::ParseError`] for an empty/truncated payload,
     /// unsupported version, malformed fixed-width field, or non-finite number
     /// or date field.
-    pub fn parse(source: &'source [u8]) -> Result<Self> {
+    pub fn parse(source: &'source [u8], limits: &Limits) -> Result<Self> {
+        limits.check_input(source.len())?;
         let version = source
             .first()
             .copied()
@@ -157,6 +158,7 @@ impl<'source> PreBncCellView<'source> {
         };
 
         let mut cursor = header_length;
+        let mut field_count = 0usize;
         let mut number = None;
         let mut date = None;
         let mut string_identifier = None;
@@ -169,6 +171,10 @@ impl<'source> PreBncCellView<'source> {
             if flags & flag == 0 {
                 continue;
             }
+            field_count = field_count.checked_add(1).ok_or_else(|| {
+                Error::ParseError("Numbers pre-BNC field count overflow".to_owned())
+            })?;
+            limits.check_fields(field_count).map_err(Error::from)?;
             let field = take_field(source, &mut cursor, size, flag)?;
             match flag {
                 FLAG_FORMULA => formula_identifier = Some(read_u32(field, flag)?),
@@ -181,6 +187,10 @@ impl<'source> PreBncCellView<'source> {
                 _ => {},
             }
         }
+
+        limits
+            .check_tail(source.len().saturating_sub(cursor))
+            .map_err(Error::from)?;
 
         Ok(Self {
             source,

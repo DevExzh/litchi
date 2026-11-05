@@ -19,7 +19,7 @@ use quick_xml::{
 };
 use thiserror::Error as ThisError;
 
-use crate::{Error, Result};
+use crate::{Error, LimitKind, Result};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 /// Transitional `[MS-ODRAWXML]` SVG namespace.
@@ -56,6 +56,62 @@ pub const MAX_DEPTH: usize = 128;
 /// Maximum element count while validating unknown children.
 pub const MAX_NODES: usize = 100_000;
 
+/// Caller-selected bounds for one SVG blip operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[must_use]
+pub struct Limits {
+    /// Maximum source bytes inspected by a read operation.
+    pub max_input_bytes: usize,
+    /// Maximum serialized bytes admitted by a write operation.
+    pub max_output_bytes: usize,
+    /// Maximum inherited namespace bindings inspected by a contextual read.
+    pub max_context_bindings: usize,
+    /// Maximum inherited namespace depth inspected by a contextual read.
+    pub max_context_depth: usize,
+}
+
+impl Limits {
+    /// Historical SVG blip policy.
+    pub const DEFAULT: Self = Self {
+        max_input_bytes: MAX_XML_BYTES,
+        max_output_bytes: MAX_XML_BYTES,
+        max_context_bindings: MAX_CONTEXT_BINDINGS,
+        max_context_depth: MAX_CONTEXT_DEPTH,
+    };
+
+    /// Construct a byte policy with the historical contextual ceilings.
+    #[must_use]
+    pub const fn new(max_input_bytes: usize, max_output_bytes: usize) -> Self {
+        Self {
+            max_input_bytes,
+            max_output_bytes,
+            ..Self::DEFAULT
+        }
+    }
+
+    fn validate(self) -> Result<Self> {
+        validate_limit(LimitKind::InputBytes, self.max_input_bytes, MAX_XML_BYTES)?;
+        validate_limit(LimitKind::OutputBytes, self.max_output_bytes, MAX_XML_BYTES)?;
+        validate_limit(
+            LimitKind::NamespaceDeclarations,
+            self.max_context_bindings,
+            MAX_CONTEXT_BINDINGS,
+        )?;
+        validate_limit(
+            LimitKind::XmlDepth,
+            self.max_context_depth,
+            MAX_CONTEXT_DEPTH,
+        )?;
+        Ok(self)
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
 /// A checked `ST_RelationshipId` value.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[must_use]
@@ -71,9 +127,10 @@ impl RelationshipId {
     pub fn new(value: impl AsRef<str>) -> std::result::Result<Self, ValueError> {
         let value = value.as_ref();
         if value.len() > MAX_RELATIONSHIP_ID_BYTES {
-            return Err(ValueError::TooLong {
-                field: "relationship ID",
-                limit: MAX_RELATIONSHIP_ID_BYTES,
+            return Err(ValueError::Limit {
+                kind: LimitKind::AttributeValueBytes,
+                observed: value.len(),
+                maximum: MAX_RELATIONSHIP_ID_BYTES,
             });
         }
         if value.is_empty() || !is_ncname(value) {
@@ -202,9 +259,10 @@ impl Namespace {
             && (!prefix.is_empty() && (prefix.len() > MAX_NAMESPACE_BYTES || !is_ncname(prefix)))
         {
             if prefix.len() > MAX_NAMESPACE_BYTES {
-                return Err(ValueError::TooLong {
-                    field: "namespace prefix",
-                    limit: MAX_NAMESPACE_BYTES,
+                return Err(ValueError::Limit {
+                    kind: LimitKind::NamespacePrefixBytes,
+                    observed: prefix.len(),
+                    maximum: MAX_NAMESPACE_BYTES,
                 });
             }
             return Err(ValueError::NamespacePrefix {
@@ -219,9 +277,10 @@ impl Namespace {
             return Err(ValueError::EmptyNamespace);
         }
         if uri.len() > MAX_NAMESPACE_BYTES {
-            return Err(ValueError::TooLong {
-                field: "namespace URI",
-                limit: MAX_NAMESPACE_BYTES,
+            return Err(ValueError::Limit {
+                kind: LimitKind::NamespaceBytes,
+                observed: uri.len(),
+                maximum: MAX_NAMESPACE_BYTES,
             });
         }
         if uri == XMLNS_NAMESPACE
@@ -266,9 +325,9 @@ pub const MAX_CONTEXT_DEPTH: usize = 1_024;
 
 /// An immutable, persistent namespace scope for a source-backed fragment.
 ///
-/// [`codec::read`] remains the complete-document codec and retains its exact
-/// source fast path.  Hosts that index a nested element can instead retain a
-/// `NamespaceContext` handle and call [`codec::read_contextual`].  Cloning this
+/// [`crate::svg_blip::read`] remains the complete-document codec and retains
+/// its exact source fast path. Hosts that index a nested element can instead
+/// retain a `NamespaceContext` handle and call [`crate::svg_blip::read_contextual`]. Cloning this
 /// value is cheap: declarations are stored only on the scope that introduced
 /// them and each descendant shares its ancestors through `Arc`.
 #[derive(Clone)]
@@ -363,7 +422,8 @@ impl NamespaceContext {
             }
             if local.len() >= MAX_NAMESPACE_DECLARATIONS {
                 return Err(limit(
-                    "SVG namespace context declarations",
+                    LimitKind::NamespaceDeclarations,
+                    local.len() + 1,
                     MAX_NAMESPACE_DECLARATIONS,
                 ));
             }
@@ -383,19 +443,20 @@ impl NamespaceContext {
         let bindings = self
             .binding_count()
             .checked_add(local_count)
-            .ok_or_else(|| limit("SVG namespace context bindings", MAX_CONTEXT_BINDINGS))?;
+            .ok_or_else(|| invalid("SVG namespace context binding count overflows"))?;
         if bindings > MAX_CONTEXT_BINDINGS {
             return Err(limit(
-                "SVG namespace context bindings",
+                LimitKind::NamespaceDeclarations,
+                bindings,
                 MAX_CONTEXT_BINDINGS,
             ));
         }
         let depth = self
             .depth()
             .checked_add(1)
-            .ok_or_else(|| limit("SVG namespace context depth", MAX_CONTEXT_DEPTH))?;
+            .ok_or_else(|| invalid("SVG namespace context depth overflows"))?;
         if depth > MAX_CONTEXT_DEPTH {
-            return Err(limit("SVG namespace context depth", MAX_CONTEXT_DEPTH));
+            return Err(limit(LimitKind::XmlDepth, depth, MAX_CONTEXT_DEPTH));
         }
         Ok(Self {
             node: Arc::new(NamespaceContextNode {
@@ -531,9 +592,10 @@ impl Attribute {
     ) -> std::result::Result<Self, ValueError> {
         let name = name.as_ref();
         if name.len() > MAX_ATTRIBUTE_NAME_BYTES {
-            return Err(ValueError::TooLong {
-                field: "attribute name",
-                limit: MAX_ATTRIBUTE_NAME_BYTES,
+            return Err(ValueError::Limit {
+                kind: LimitKind::ScalarBytes,
+                observed: name.len(),
+                maximum: MAX_ATTRIBUTE_NAME_BYTES,
             });
         }
         if !litchi_ooxml_common::xml_name::is_qualified_name(name)
@@ -545,9 +607,10 @@ impl Attribute {
             });
         }
         if value.as_ref().len() > MAX_ATTRIBUTE_VALUE_BYTES {
-            return Err(ValueError::TooLong {
-                field: "attribute value",
-                limit: MAX_ATTRIBUTE_VALUE_BYTES,
+            return Err(ValueError::Limit {
+                kind: LimitKind::AttributeValueBytes,
+                observed: value.as_ref().len(),
+                maximum: MAX_ATTRIBUTE_VALUE_BYTES,
             });
         }
         Ok(Self {
@@ -604,8 +667,15 @@ pub enum ValueError {
     #[error("invalid reserved SVG namespace binding")]
     NamespaceBinding,
     /// A retained scalar exceeds its explicit memory bound.
-    #[error("SVG {field} exceeds the limit of {limit} bytes")]
-    TooLong { field: &'static str, limit: usize },
+    #[error("SVG {kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        /// Typed resource dimension.
+        kind: LimitKind,
+        /// First observed value beyond the bound.
+        observed: usize,
+        /// Maximum accepted value.
+        maximum: usize,
+    },
 }
 
 /// Typed and lossless metadata for one `asvg:svgBlip` element.
@@ -765,7 +835,7 @@ impl SvgBlip {
     ///
     /// A contextual fragment is intentionally not exposed through
     /// [`Self::source`]: its root may rely on declarations inherited from its
-    /// host.  Use [`crate::svg_blip::codec::write_contextual`] to export an
+    /// host. Use [`crate::svg_blip::write_contextual`] to export an
     /// independently readable fragment with those declarations completed.
     #[must_use]
     pub fn raw_source(&self) -> Option<&[u8]> {
@@ -852,8 +922,8 @@ fn contextual_equal(left: &Option<ContextualSource>, right: &Option<ContextualSo
 ///
 /// Returns an error for malformed XML, a wrong root namespace/name, invalid
 /// relationship IDs, or exhausted resource bounds.
-pub fn read(xml: &[u8]) -> Result<SvgBlip> {
-    codec::read(xml)
+pub fn read(xml: &[u8], limits: Limits) -> Result<SvgBlip> {
+    codec::read(xml, limits)
 }
 
 /// Read one `svgBlip` element whose namespace scope is inherited from a host.
@@ -863,8 +933,8 @@ pub fn read(xml: &[u8]) -> Result<SvgBlip> {
 /// explicitly exports the value as a standalone fragment, while
 /// [`SvgBlip::raw_source`] remains an exact source authority for host-level
 /// byte splicing.
-pub fn read_contextual(xml: &[u8], context: &NamespaceContext) -> Result<SvgBlip> {
-    codec::read_contextual(xml, context)
+pub fn read_contextual(xml: &[u8], context: &NamespaceContext, limits: Limits) -> Result<SvgBlip> {
+    codec::read_contextual(xml, context, limits)
 }
 
 /// Serialize one SVG blip fragment.
@@ -875,8 +945,11 @@ pub fn read_contextual(xml: &[u8], context: &NamespaceContext) -> Result<SvgBlip
 /// # Errors
 ///
 /// Returns an error when validation fails or the bounded output is too large.
-pub fn write(value: &SvgBlip) -> Result<Vec<u8>> {
-    codec::write(value)
+pub fn write(value: &SvgBlip, limits: Limits) -> Result<Vec<u8>> {
+    if value.contextual.is_some() {
+        return write_contextual(value, limits);
+    }
+    codec::write(value, limits)
 }
 
 /// Serialize one SVG blip fragment to a caller-provided sink.
@@ -884,8 +957,8 @@ pub fn write(value: &SvgBlip) -> Result<Vec<u8>> {
 /// # Errors
 ///
 /// Returns an error when validation or the sink write fails.
-pub fn write_to<W: Write>(writer: &mut W, value: &SvgBlip) -> Result<()> {
-    codec::write_to(writer, value)
+pub fn write_to<W: Write>(writer: &mut W, value: &SvgBlip, limits: Limits) -> Result<()> {
+    codec::write_to(writer, value, limits)
 }
 
 /// Serialize a contextual SVG fragment as an independently readable element.
@@ -894,8 +967,8 @@ pub fn write_to<W: Write>(writer: &mut W, value: &SvgBlip) -> Result<()> {
 /// contextual value's raw fragment remains unchanged after the root opening
 /// tag; inherited bindings are inserted only when the exported root does not
 /// already declare that prefix.
-pub fn write_contextual(value: &SvgBlip, max_output_bytes: usize) -> Result<Vec<u8>> {
-    codec::write_contextual(value, max_output_bytes)
+pub fn write_contextual(value: &SvgBlip, limits: Limits) -> Result<Vec<u8>> {
+    codec::write_contextual(value, limits)
 }
 
 /// Serialize a contextual SVG fragment to a caller-owned sink.
@@ -905,20 +978,25 @@ pub fn write_contextual(value: &SvgBlip, max_output_bytes: usize) -> Result<Vec<
 pub fn write_contextual_to<W: Write>(
     writer: &mut W,
     value: &SvgBlip,
-    max_output_bytes: usize,
+    limits: Limits,
 ) -> Result<()> {
-    codec::write_contextual_to(writer, value, max_output_bytes)
+    codec::write_contextual_to(writer, value, limits)
 }
 
 /// XML codec for [`SvgBlip`].
-pub mod codec {
+pub(crate) mod codec {
     use super::*;
     use litchi_ooxml_common::xml::attributes::SeenNames;
 
     /// Read one complete `svgBlip` element.
-    pub fn read(xml: &[u8]) -> Result<SvgBlip> {
-        if xml.len() > MAX_XML_BYTES {
-            return Err(limit("SVG blip XML bytes", MAX_XML_BYTES));
+    pub(crate) fn read(xml: &[u8], limits: Limits) -> Result<SvgBlip> {
+        let limits = limits.validate()?;
+        if xml.len() > limits.max_input_bytes {
+            return Err(limit(
+                LimitKind::InputBytes,
+                xml.len(),
+                limits.max_input_bytes,
+            ));
         }
         let mut reader = NsReader::from_reader(xml);
         let origin = ReaderOrigin::of(xml);
@@ -1022,18 +1100,32 @@ pub mod codec {
     /// The root and its attributes are resolved by a borrowed resolver over
     /// the persistent context chain, and the raw element is retained once as
     /// the contextual source authority.
-    pub fn read_contextual(xml: &[u8], context: &NamespaceContext) -> Result<SvgBlip> {
-        if xml.len() > MAX_XML_BYTES {
-            return Err(limit("SVG blip XML bytes", MAX_XML_BYTES));
-        }
-        if context.binding_count() > MAX_CONTEXT_BINDINGS {
+    pub(crate) fn read_contextual(
+        xml: &[u8],
+        context: &NamespaceContext,
+        limits: Limits,
+    ) -> Result<SvgBlip> {
+        let limits = limits.validate()?;
+        if xml.len() > limits.max_input_bytes {
             return Err(limit(
-                "SVG namespace context bindings",
-                MAX_CONTEXT_BINDINGS,
+                LimitKind::InputBytes,
+                xml.len(),
+                limits.max_input_bytes,
             ));
         }
-        if context.depth() > MAX_CONTEXT_DEPTH {
-            return Err(limit("SVG namespace context depth", MAX_CONTEXT_DEPTH));
+        if context.binding_count() > limits.max_context_bindings {
+            return Err(limit(
+                LimitKind::NamespaceDeclarations,
+                context.binding_count(),
+                limits.max_context_bindings,
+            ));
+        }
+        if context.depth() > limits.max_context_depth {
+            return Err(limit(
+                LimitKind::XmlDepth,
+                context.depth(),
+                limits.max_context_depth,
+            ));
         }
         let mut reader = Reader::from_reader(xml);
         let origin = ReaderOrigin::of(xml);
@@ -1135,27 +1227,17 @@ pub mod codec {
     }
 
     /// Serialize one SVG blip fragment.
-    pub fn write(value: &SvgBlip) -> Result<Vec<u8>> {
+    pub(crate) fn write(value: &SvgBlip, limits: Limits) -> Result<Vec<u8>> {
+        let limits = limits.validate()?;
         validate(value)?;
-        if let Some(source) = &value.source {
-            return Ok(source.to_vec());
-        }
-        if value.contextual.is_some() {
-            return write_contextual(value, MAX_XML_BYTES);
-        }
-        let plan = output_plan(value)?;
-        let size = serialized_size(value, &plan)?;
-        let mut output = Vec::new();
-        output.reserve_exact(size);
-        write_inner(&mut output, value, &plan)?;
-        debug_assert_eq!(output.len(), size);
-        Ok(output)
+        write_standalone_bounded(value, limits.max_output_bytes)
     }
 
     /// Serialize a contextual value with an explicit finite output cap.
-    pub fn write_contextual(value: &SvgBlip, max_output_bytes: usize) -> Result<Vec<u8>> {
+    pub(crate) fn write_contextual(value: &SvgBlip, limits: Limits) -> Result<Vec<u8>> {
+        let limits = limits.validate()?;
         validate(value)?;
-        let maximum = max_output_bytes.min(MAX_XML_BYTES);
+        let maximum = limits.max_output_bytes;
         let Some(contextual) = value.contextual.as_ref() else {
             return write_standalone_bounded(value, maximum);
         };
@@ -1174,17 +1256,18 @@ pub mod codec {
     }
 
     /// Stream a contextual value after checking the complete output size.
-    pub fn write_contextual_to<W: Write>(
+    pub(crate) fn write_contextual_to<W: Write>(
         writer: &mut W,
         value: &SvgBlip,
-        max_output_bytes: usize,
+        limits: Limits,
     ) -> Result<()> {
+        let limits = limits.validate()?;
         validate(value)?;
-        let maximum = max_output_bytes.min(MAX_XML_BYTES);
+        let maximum = limits.max_output_bytes;
         let Some(contextual) = value.contextual.as_ref() else {
             if let Some(source) = &value.source {
                 if source.len() > maximum {
-                    return Err(limit("SVG blip output bytes", maximum));
+                    return Err(limit(LimitKind::OutputBytes, source.len(), maximum));
                 }
                 writer.write_all(source)?;
                 return Ok(());
@@ -1208,15 +1291,18 @@ pub mod codec {
     }
 
     /// Serialize one SVG blip fragment to a caller-owned sink.
-    pub fn write_to<W: Write>(writer: &mut W, value: &SvgBlip) -> Result<()> {
-        writer.write_all(&write(value)?)?;
-        Ok(())
+    pub(crate) fn write_to<W: Write>(
+        writer: &mut W,
+        value: &SvgBlip,
+        limits: Limits,
+    ) -> Result<()> {
+        write_contextual_to(writer, value, limits)
     }
 
     fn write_standalone_bounded(value: &SvgBlip, maximum: usize) -> Result<Vec<u8>> {
         if let Some(source) = &value.source {
             if source.len() > maximum {
-                return Err(limit("SVG blip output bytes", maximum));
+                return Err(limit(LimitKind::OutputBytes, source.len(), maximum));
             }
             let mut output = Vec::new();
             output
@@ -1288,13 +1374,21 @@ pub mod codec {
         for suffix in 2..=MAX_NAMESPACE_DECLARATIONS + 2 {
             let candidate = format!("{base}{suffix}");
             if candidate.len() > MAX_NAMESPACE_BYTES {
-                return Err(limit("SVG namespace prefix", MAX_NAMESPACE_BYTES));
+                return Err(limit(
+                    LimitKind::NamespacePrefixBytes,
+                    candidate.len(),
+                    MAX_NAMESPACE_BYTES,
+                ));
             }
             if !has_any_namespace_prefix(value, Some(candidate.as_str()))? {
                 return Ok(candidate);
             }
         }
-        Err(limit("SVG namespace prefixes", MAX_NAMESPACE_DECLARATIONS))
+        Err(limit(
+            LimitKind::NamespaceDeclarations,
+            MAX_NAMESPACE_DECLARATIONS + 1,
+            MAX_NAMESPACE_DECLARATIONS,
+        ))
     }
 
     fn has_namespace_binding(value: &SvgBlip, prefix: Option<&str>, uri: &str) -> bool {
@@ -1420,7 +1514,7 @@ pub mod codec {
     ) -> Result<usize> {
         let size = serialized_size(value, plan)?;
         if size > maximum {
-            return Err(limit("SVG blip output bytes", maximum));
+            return Err(limit(LimitKind::OutputBytes, size, maximum));
         }
         Ok(size)
     }
@@ -1452,15 +1546,13 @@ pub mod codec {
     }
 
     fn add_namespace_count(count: &mut usize) -> Result<()> {
-        *count = count.checked_add(1).ok_or_else(|| {
-            limit(
-                "SVG blip namespace declarations",
-                MAX_NAMESPACE_DECLARATIONS,
-            )
-        })?;
+        *count = count
+            .checked_add(1)
+            .ok_or_else(|| invalid("SVG blip namespace declaration count overflows"))?;
         if *count > MAX_NAMESPACE_DECLARATIONS {
             return Err(limit(
-                "SVG blip namespace declarations",
+                LimitKind::NamespaceDeclarations,
+                *count,
                 MAX_NAMESPACE_DECLARATIONS,
             ));
         }
@@ -1489,10 +1581,7 @@ pub mod codec {
     fn add_size(size: &mut usize, addition: usize) -> Result<()> {
         *size = size
             .checked_add(addition)
-            .ok_or_else(|| limit("SVG blip output bytes", MAX_XML_BYTES))?;
-        if *size > MAX_XML_BYTES {
-            return Err(limit("SVG blip output bytes", MAX_XML_BYTES));
-        }
+            .ok_or_else(|| invalid("SVG blip output length overflows"))?;
         Ok(())
     }
 
@@ -1527,7 +1616,7 @@ pub mod codec {
     ) -> Result<CompleteRawPlan<'a>> {
         let fragment = contextual.raw.as_ref();
         if fragment.len() > maximum {
-            return Err(limit("SVG blip output bytes", maximum));
+            return Err(limit(LimitKind::OutputBytes, fragment.len(), maximum));
         }
         let mut reader = Reader::from_reader(fragment);
         let origin = ReaderOrigin::of(fragment);
@@ -1571,7 +1660,8 @@ pub mod codec {
         let mut namespace_count = declared.len();
         if namespace_count > MAX_NAMESPACE_DECLARATIONS {
             return Err(limit(
-                "SVG blip namespace declarations",
+                LimitKind::NamespaceDeclarations,
+                namespace_count,
                 MAX_NAMESPACE_DECLARATIONS,
             ));
         }
@@ -1586,7 +1676,8 @@ pub mod codec {
             }
             if namespace_count >= MAX_NAMESPACE_DECLARATIONS {
                 planning_error = Some(limit(
-                    "SVG blip namespace declarations",
+                    LimitKind::NamespaceDeclarations,
+                    namespace_count + 1,
                     MAX_NAMESPACE_DECLARATIONS,
                 ));
                 return;
@@ -1620,7 +1711,7 @@ pub mod codec {
             .checked_add(additions)
             .ok_or_else(|| invalid("SVG contextual output overflows"))?;
         if output_len > maximum {
-            return Err(limit("SVG blip output bytes", maximum));
+            return Err(limit(LimitKind::OutputBytes, output_len, maximum));
         }
         // Keep this argument in the plan so validation callers cannot
         // accidentally complete a value other than the contextual source.
@@ -1667,7 +1758,8 @@ pub mod codec {
         let namespaces = declarations(element, decoder, MAX_NAMESPACE_DECLARATIONS)?;
         if namespaces.len() > MAX_NAMESPACE_DECLARATIONS {
             return Err(limit(
-                "SVG blip namespace declarations",
+                LimitKind::NamespaceDeclarations,
+                namespaces.len(),
                 MAX_NAMESPACE_DECLARATIONS,
             ));
         }
@@ -1685,7 +1777,8 @@ pub mod codec {
             validate_attribute_namespace(attribute.key, reader.resolver(), prefix.as_deref())?;
             if attribute.value.len() > MAX_ATTRIBUTE_VALUE_BYTES {
                 return Err(limit(
-                    "SVG blip attribute value bytes",
+                    LimitKind::AttributeValueBytes,
+                    attribute.value.len(),
                     MAX_ATTRIBUTE_VALUE_BYTES,
                 ));
             }
@@ -1696,7 +1789,11 @@ pub mod codec {
                 .into_owned();
             attributes.push(Attribute::new(name, value).map_err(value_error)?);
             if attributes.len() > MAX_ATTRIBUTES {
-                return Err(limit("SVG blip attributes", MAX_ATTRIBUTES));
+                return Err(limit(
+                    LimitKind::XmlAttributes,
+                    attributes.len(),
+                    MAX_ATTRIBUTES,
+                ));
             }
         }
         let mut children = Vec::new();
@@ -1794,7 +1891,8 @@ pub mod codec {
         let decoder = reader.decoder();
         if resolver.local.len() > MAX_NAMESPACE_DECLARATIONS {
             return Err(limit(
-                "SVG blip namespace declarations",
+                LimitKind::NamespaceDeclarations,
+                resolver.local.len(),
                 MAX_NAMESPACE_DECLARATIONS,
             ));
         }
@@ -1812,7 +1910,8 @@ pub mod codec {
             validate_contextual_attribute_namespace(attribute.key, &resolver, prefix.as_deref())?;
             if attribute.value.len() > MAX_ATTRIBUTE_VALUE_BYTES {
                 return Err(limit(
-                    "SVG blip attribute value bytes",
+                    LimitKind::AttributeValueBytes,
+                    attribute.value.len(),
                     MAX_ATTRIBUTE_VALUE_BYTES,
                 ));
             }
@@ -1823,7 +1922,11 @@ pub mod codec {
                 .into_owned();
             attributes.push(Attribute::new(name, value).map_err(value_error)?);
             if attributes.len() > MAX_ATTRIBUTES {
-                return Err(limit("SVG blip attributes", MAX_ATTRIBUTES));
+                return Err(limit(
+                    LimitKind::XmlAttributes,
+                    attributes.len(),
+                    MAX_ATTRIBUTES,
+                ));
             }
         }
         let mut children = Vec::new();
@@ -1863,7 +1966,8 @@ pub mod codec {
             }
             if attribute.value.len() > MAX_RELATIONSHIP_ID_BYTES * 4 {
                 return Err(limit(
-                    "SVG relationship attribute bytes",
+                    LimitKind::AttributeValueBytes,
+                    attribute.value.len(),
                     MAX_RELATIONSHIP_ID_BYTES * 4,
                 ));
             }
@@ -2017,13 +2121,13 @@ pub mod codec {
                         .checked_add(1)
                         .ok_or_else(|| invalid("SVG contextual child nesting overflow"))?;
                     if depth > MAX_DEPTH {
-                        return Err(limit("SVG contextual child depth", MAX_DEPTH));
+                        return Err(limit(LimitKind::XmlDepth, depth, MAX_DEPTH));
                     }
                     nodes = nodes
                         .checked_add(1)
-                        .ok_or_else(|| limit("SVG contextual child nodes", MAX_NODES))?;
+                        .ok_or_else(|| invalid("SVG contextual child node count overflows"))?;
                     if nodes > MAX_NODES {
-                        return Err(limit("SVG contextual child nodes", MAX_NODES));
+                        return Err(limit(LimitKind::XmlNodes, nodes, MAX_NODES));
                     }
                     starts
                         .try_reserve(1)
@@ -2055,9 +2159,9 @@ pub mod codec {
                     }
                     nodes = nodes
                         .checked_add(1)
-                        .ok_or_else(|| limit("SVG contextual child nodes", MAX_NODES))?;
+                        .ok_or_else(|| invalid("SVG contextual child node count overflows"))?;
                     if nodes > MAX_NODES {
-                        return Err(limit("SVG contextual child nodes", MAX_NODES));
+                        return Err(limit(LimitKind::XmlNodes, nodes, MAX_NODES));
                     }
                 },
                 Event::End(_) => {
@@ -2203,7 +2307,11 @@ pub mod codec {
 
     fn retain_child(xml: &[u8], start: usize, end: usize, children: &mut Vec<Child>) -> Result<()> {
         if children.len() >= MAX_CHILDREN {
-            return Err(limit("SVG blip children", MAX_CHILDREN));
+            return Err(limit(
+                LimitKind::ModelChildren,
+                children.len() + 1,
+                MAX_CHILDREN,
+            ));
         }
         let raw = xml
             .get(start..end)
@@ -2426,7 +2534,8 @@ pub mod codec {
                 && attribute.value.len() > MAX_RELATIONSHIP_ID_BYTES * 4
             {
                 return Err(limit(
-                    "SVG relationship attribute bytes",
+                    LimitKind::AttributeValueBytes,
+                    attribute.value.len(),
                     MAX_RELATIONSHIP_ID_BYTES * 4,
                 ));
             }
@@ -2471,17 +2580,22 @@ pub mod codec {
             // attributes.
             let prefix = prefix.filter(|value| !value.is_empty());
             if result.len() >= maximum {
-                return Err(limit("SVG blip namespace declarations", maximum));
+                return Err(limit(
+                    LimitKind::NamespaceDeclarations,
+                    result.len() + 1,
+                    maximum,
+                ));
             }
             if !prefixes.insert(prefix) {
                 return Err(invalid("SVG blip has duplicate namespace declarations"));
             }
-            attribute
-                .value
-                .len()
-                .le(&MAX_NAMESPACE_BYTES)
-                .then_some(())
-                .ok_or_else(|| limit("SVG blip namespace URI bytes", MAX_NAMESPACE_BYTES))?;
+            if attribute.value.len() > MAX_NAMESPACE_BYTES {
+                return Err(limit(
+                    LimitKind::NamespaceBytes,
+                    attribute.value.len(),
+                    MAX_NAMESPACE_BYTES,
+                ));
+            }
             let uri = attribute
                 .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
                 .map_err(xml_error)?
@@ -2616,17 +2730,17 @@ pub mod codec {
                         .checked_add(1)
                         .ok_or_else(|| invalid("SVG blip XML nesting overflow"))?;
                     if depth > MAX_DEPTH {
-                        return Err(limit("SVG blip XML depth", MAX_DEPTH));
+                        return Err(limit(LimitKind::XmlDepth, depth, MAX_DEPTH));
                     }
                     nodes = nodes.saturating_add(1);
                     if nodes > MAX_NODES {
-                        return Err(limit("SVG blip XML nodes", MAX_NODES));
+                        return Err(limit(LimitKind::XmlNodes, nodes, MAX_NODES));
                     }
                 },
                 Event::Empty(_) => {
                     nodes = nodes.saturating_add(1);
                     if nodes > MAX_NODES {
-                        return Err(limit("SVG blip XML nodes", MAX_NODES));
+                        return Err(limit(LimitKind::XmlNodes, nodes, MAX_NODES));
                     }
                 },
                 Event::End(_) => {
@@ -2669,7 +2783,7 @@ pub mod codec {
                         .checked_add(1)
                         .ok_or_else(|| invalid("SVG blip child nesting overflow"))?;
                     if depth > MAX_DEPTH {
-                        return Err(limit("SVG blip child depth", MAX_DEPTH));
+                        return Err(limit(LimitKind::XmlDepth, depth, MAX_DEPTH));
                     }
                 },
                 Event::End(_) => {
@@ -2710,15 +2824,24 @@ pub mod codec {
         validate_reference(&value.reference)?;
         if value.namespaces.len() > MAX_NAMESPACE_DECLARATIONS {
             return Err(limit(
-                "SVG blip namespace declarations",
+                LimitKind::NamespaceDeclarations,
+                value.namespaces.len(),
                 MAX_NAMESPACE_DECLARATIONS,
             ));
         }
         if value.attributes.len() > MAX_ATTRIBUTES {
-            return Err(limit("SVG blip attributes", MAX_ATTRIBUTES));
+            return Err(limit(
+                LimitKind::XmlAttributes,
+                value.attributes.len(),
+                MAX_ATTRIBUTES,
+            ));
         }
         if value.children.len() > MAX_CHILDREN {
-            return Err(limit("SVG blip children", MAX_CHILDREN));
+            return Err(limit(
+                LimitKind::ModelChildren,
+                value.children.len(),
+                MAX_CHILDREN,
+            ));
         }
         for namespace in value.namespaces.iter() {
             let _ = Namespace::new(namespace.prefix(), namespace.uri()).map_err(value_error)?;
@@ -2731,7 +2854,7 @@ pub mod codec {
         }
         if let Some(source) = &value.source {
             if source.len() > MAX_XML_BYTES {
-                return Err(limit("SVG blip XML bytes", MAX_XML_BYTES));
+                return Err(limit(LimitKind::XmlBytes, source.len(), MAX_XML_BYTES));
             }
         }
         Ok(())
@@ -2739,7 +2862,11 @@ pub mod codec {
 
     fn validate_fragment(xml: &[u8]) -> Result<()> {
         if xml.is_empty() || xml.len() > MAX_XML_BYTES {
-            return Err(limit("SVG blip child bytes", MAX_XML_BYTES));
+            return Err(limit(
+                LimitKind::InertFragmentBytes,
+                xml.len(),
+                MAX_XML_BYTES,
+            ));
         }
         let mut reader = Reader::from_reader(xml);
         reader.config_mut().trim_text(false);
@@ -2763,8 +2890,11 @@ pub mod codec {
                     }
                     depth += 1;
                     nodes += 1;
-                    if depth > MAX_DEPTH || nodes > MAX_NODES {
-                        return Err(limit("SVG blip child nodes", MAX_NODES));
+                    if depth > MAX_DEPTH {
+                        return Err(limit(LimitKind::XmlDepth, depth, MAX_DEPTH));
+                    }
+                    if nodes > MAX_NODES {
+                        return Err(limit(LimitKind::XmlNodes, nodes, MAX_NODES));
                     }
                 },
                 Event::Empty(_) => {
@@ -2776,7 +2906,7 @@ pub mod codec {
                     }
                     nodes += 1;
                     if nodes > MAX_NODES {
-                        return Err(limit("SVG blip child nodes", MAX_NODES));
+                        return Err(limit(LimitKind::InertFragmentNodes, nodes, MAX_NODES));
                     }
                 },
                 Event::End(_) => {
@@ -2835,14 +2965,28 @@ fn allocation(resource: &'static str, source: std::collections::TryReserveError)
     Error::Invalid(format!("SVG {resource} allocation failed: {source}"))
 }
 
-fn limit(resource: &'static str, limit: usize) -> Error {
-    Error::Limit { resource, limit }
+fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::limit(kind, observed, maximum)
+}
+
+fn validate_limit(kind: LimitKind, value: usize, maximum: usize) -> Result<()> {
+    if value == 0 || value > maximum {
+        return Err(Error::invalid_limit(kind, value, maximum));
+    }
+    Ok(())
 }
 
 fn xml_error(error: impl fmt::Display) -> Error {
     Error::Xml(error.to_string())
 }
 
-fn value_error(error: impl fmt::Display) -> Error {
-    Error::Invalid(error.to_string())
+fn value_error(error: ValueError) -> Error {
+    match error {
+        ValueError::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::limit(kind, observed, maximum),
+        error => Error::Invalid(error.to_string()),
+    }
 }

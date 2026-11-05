@@ -73,8 +73,11 @@ fn exported_writer_is_deterministic_three_member_and_reopens_with_run_parity() {
     let first_hash = Sha256::digest(&first);
     assert_eq!(first_hash, Sha256::digest(&second));
 
-    let physical = litchi_opc::phys_pkg::OwnedPhysPkgReader::from_bytes(first.clone())
-        .expect("physical package");
+    let physical = litchi_opc::phys_pkg::OwnedPhysPkgReader::from_bytes(
+        first.clone(),
+        litchi_opc::SourceLimits::default(),
+    )
+    .expect("physical package");
     assert_eq!(
         physical.member_names().expect("member names"),
         vec![
@@ -283,8 +286,11 @@ fn package_bytes_do_not_depend_on_how_run_text_is_split() {
         })
         .collect();
     let whole = render_split(&paragraphs, &|_| usize::MAX);
-    let physical = litchi_opc::phys_pkg::OwnedPhysPkgReader::from_bytes(whole.clone())
-        .expect("physical package");
+    let physical = litchi_opc::phys_pkg::OwnedPhysPkgReader::from_bytes(
+        whole.clone(),
+        litchi_opc::SourceLimits::default(),
+    )
+    .expect("physical package");
     let document_xml = physical
         .blob_for(&PackURI::new("/word/document.xml").expect("document URI"))
         .expect("document XML");

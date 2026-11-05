@@ -17,6 +17,7 @@ impl From<crate::formula::Error> for Error {
                 Self::UnresolvedDependency(dependency)
             },
             crate::formula::Error::Encoding(message) => Self::Encoding(message),
+            crate::formula::Error::Wire(error) => Self::Wire(error),
         }
     }
 }

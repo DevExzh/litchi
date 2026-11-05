@@ -21,7 +21,7 @@ use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes,
     varint::encoded_len,
     wire::{
-        WireDescent, WireView, patch_length_delimited_field, preflight_wire_tree_with_limits,
+        WireDescent, WireView, patch_length_delimited_field, preflight_wire_tree,
         transform_length_delimited_field,
     },
 };
@@ -156,6 +156,42 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The selected rooted native graph cannot be edited without ambiguity.
+    #[error("the selected Numbers name owner is invalid")]
+    InvalidSource,
+    /// A finite transaction resource ceiling was exceeded.
+    #[error("Numbers names {kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        /// Resource category.
+        kind: LimitKind,
+        /// Observed or requested amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A bounded transaction allocation failed.
+    #[error("could not allocate {amount} units for the Numbers names transaction")]
+    Allocation {
+        /// Requested bytes or elements.
+        amount: usize,
+    },
+    /// Complete candidate reopening did not reproduce the requested final names.
+    #[error("the edited Numbers names failed semantic verification")]
+    Verification,
+    /// The supplied patch was not created from this exact package artifact.
+    #[error("the Numbers names patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// No rooted sheet matched a selector.
     #[error("the Numbers workbook has no sheet matching the requested selector")]
     SheetNotFound,
@@ -183,9 +219,6 @@ pub enum Error {
     /// The package source cannot publish a preservation-safe changed edit.
     #[error("the Numbers package source does not support exact name editing")]
     UnsupportedSource,
-    /// The selected rooted native graph cannot be edited without ambiguity.
-    #[error("the selected Numbers name owner is invalid")]
-    InvalidSource,
     /// A changed table-name operation targets an interactively locked table.
     #[error("the selected Numbers table is locked")]
     TableLocked {
@@ -198,28 +231,30 @@ pub enum Error {
         /// Selected name whose dependency blocks publication.
         path: Path,
     },
-    /// A finite transaction resource ceiling was exceeded.
-    #[error("Numbers names {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
-        /// Resource category.
-        kind: LimitKind,
-        /// Observed or requested amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-    },
-    /// A bounded transaction allocation failed.
-    #[error("could not allocate {amount} units for the Numbers names transaction")]
-    Allocation {
-        /// Requested bytes or elements.
-        amount: usize,
-    },
-    /// Complete candidate reopening did not reproduce the requested final names.
-    #[error("the edited Numbers names failed semantic verification")]
-    Verification,
-    /// The supplied patch was not created from this exact package artifact.
-    #[error("the Numbers names patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::SheetNotFound { .. } | Self::TableNotFound { .. } => RefusalKind::NotFound,
+            Self::InvalidName { .. }
+            | Self::DuplicateName { .. }
+            | Self::DuplicateTarget { .. } => RefusalKind::InvalidValue,
+            Self::UnsupportedSource { .. } | Self::UnsupportedDependency { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+            Self::TableLocked { .. } => RefusalKind::Protected,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -312,10 +347,10 @@ impl<'a> Edit<'a> {
         validate_requested_name(name)?;
         let sheet = self
             .source
-            .document()
+            .workbook_ref()
             .sheet(selector)
             .map_err(|_error| Error::InvalidSource)?
-            .ok_or(Error::SheetNotFound)?;
+            .ok_or(Error::Refused(Refusal::SheetNotFound))?;
         let location = Location::Sheet(sheet.index());
         self.stage(location, sheet.name(), name)?;
         Ok(self)
@@ -345,20 +380,26 @@ impl<'a> Edit<'a> {
         validate_requested_name(name)?;
         let sheet = self
             .source
-            .document()
+            .workbook_ref()
             .sheet(sheet)
             .map_err(|_error| Error::InvalidSource)?
-            .ok_or(Error::SheetNotFound)?;
+            .ok_or(Error::Refused(Refusal::SheetNotFound))?;
         let (position, semantic_table) = match table.into() {
-            TableSelector::Index(position) => (
-                position,
-                sheet.tables().nth(position).ok_or(Error::TableNotFound)?,
-            ),
+            TableSelector::Position(position) => {
+                let position = position.get();
+                (
+                    position,
+                    sheet
+                        .tables()
+                        .nth(position)
+                        .ok_or(Error::Refused(Refusal::TableNotFound))?,
+                )
+            },
             TableSelector::Name(requested_name) => sheet
                 .tables()
                 .enumerate()
                 .find(|(_position, candidate)| candidate.name() == requested_name)
-                .ok_or(Error::TableNotFound)?,
+                .ok_or(Error::Refused(Refusal::TableNotFound))?,
         };
         let location = Location::Table(sheet.index(), position);
         self.stage(location, semantic_table.name(), name)?;
@@ -367,9 +408,9 @@ impl<'a> Edit<'a> {
 
     fn stage(&mut self, location: Location, before: &str, after: &str) -> Result<(), Error> {
         if self.targets.contains(&location) {
-            return Err(Error::DuplicateTarget {
+            return Err(Error::Refused(Refusal::DuplicateTarget {
                 path: location.path(),
-            });
+            }));
         }
         let maximum = self
             .source
@@ -380,7 +421,7 @@ impl<'a> Edit<'a> {
             .saturating_add(self.source.state.options.semantic().max_tables());
         let observed = self.operations.len().saturating_add(1);
         if observed > maximum {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::Operations,
                 observed: usize_as_u64(observed),
                 maximum: usize_as_u64(maximum),
@@ -388,7 +429,7 @@ impl<'a> Edit<'a> {
         }
         let maximum_name_bytes = self.source.state.options.semantic().max_output_text_bytes();
         if after.len() > maximum_name_bytes {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::NameBytes,
                 observed: usize_as_u64(after.len()),
                 maximum: usize_as_u64(maximum_name_bytes),
@@ -414,9 +455,9 @@ impl<'a> Edit<'a> {
             name: Arc::clone(&after),
         };
         if self.destinations.contains(&destination) {
-            return Err(Error::DuplicateName {
+            return Err(Error::Refused(Refusal::DuplicateName {
                 path: location.path(),
-            });
+            }));
         }
         let operation = Operation {
             location,
@@ -637,6 +678,12 @@ impl Commit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the exact-source reversible patch.
     #[must_use]
     pub const fn patch(&self) -> &Patch {
@@ -728,16 +775,16 @@ impl Package {
     }
 }
 
-fn validate_requested_name(name: &str) -> Result<(), Error> {
+pub(crate) fn validate_requested_name(name: &str) -> Result<(), Error> {
     if name.is_empty() {
-        return Err(Error::InvalidName {
+        return Err(Error::Refused(Refusal::InvalidName {
             reason: InvalidReason::Empty,
-        });
+        }));
     }
     if name.contains('\0') {
-        return Err(Error::InvalidName {
+        return Err(Error::Refused(Refusal::InvalidName {
             reason: InvalidReason::ContainsNul,
-        });
+        }));
     }
     Ok(())
 }
@@ -781,7 +828,7 @@ fn commit_edit(source: &Package, mut operations: Vec<Operation>) -> Result<Commi
         });
     }
     if !source_catalog.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     validate_final_names(source, &operations)?;
     validate_changed_work_budget(source, &operations)?;
@@ -824,19 +871,19 @@ fn validate_final_names(source: &Package, operations: &[Operation]) -> Result<()
     let limits = source.state.options.semantic();
     let mut names = HashSet::new();
     names
-        .try_reserve(source.document().sheet_count())
+        .try_reserve(source.workbook_ref().sheet_count())
         .map_err(|_allocation| Error::Allocation {
-            amount: source.document().sheet_count(),
+            amount: source.workbook_ref().sheet_count(),
         })?;
     let mut total_name_bytes = 0usize;
-    for sheet in source.document().sheets() {
+    for sheet in source.workbook_ref().sheets() {
         let sheet_name = final_name(operations, Location::Sheet(sheet.index()), sheet.name());
         if !names.insert(sheet_name) {
-            return Err(Error::DuplicateName {
+            return Err(Error::Refused(Refusal::DuplicateName {
                 path: Path::Sheet {
                     position: sheet.index(),
                 },
-            });
+            }));
         }
         total_name_bytes = checked_name_bytes(
             total_name_bytes,
@@ -853,9 +900,9 @@ fn validate_final_names(source: &Package, operations: &[Operation]) -> Result<()
             let location = Location::Table(sheet.index(), table_position);
             let table_name = final_name(operations, location, table.name());
             if !tables.insert(table_name) {
-                return Err(Error::DuplicateName {
+                return Err(Error::Refused(Refusal::DuplicateName {
                     path: location.path(),
-                });
+                }));
             }
             total_name_bytes = checked_name_bytes(
                 total_name_bytes,
@@ -868,13 +915,13 @@ fn validate_final_names(source: &Package, operations: &[Operation]) -> Result<()
 }
 
 fn checked_name_bytes(current: usize, added: usize, maximum: usize) -> Result<usize, Error> {
-    let observed = current.checked_add(added).ok_or(Error::LimitExceeded {
+    let observed = current.checked_add(added).ok_or(Error::Limit {
         kind: LimitKind::NameBytes,
         observed: u64::MAX,
         maximum: usize_as_u64(maximum),
     })?;
     if observed > maximum {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::NameBytes,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
@@ -887,21 +934,18 @@ fn retained_name_bytes(before: &str, after: &str, maximum: usize) -> Result<usiz
     if before == after {
         Ok(before.len())
     } else {
-        before
-            .len()
-            .checked_add(after.len())
-            .ok_or(Error::LimitExceeded {
-                kind: LimitKind::NameBytes,
-                observed: u64::MAX,
-                maximum: usize_as_u64(maximum),
-            })
+        before.len().checked_add(after.len()).ok_or(Error::Limit {
+            kind: LimitKind::NameBytes,
+            observed: u64::MAX,
+            maximum: usize_as_u64(maximum),
+        })
     }
 }
 
 fn validate_changed_work_budget(source: &Package, operations: &[Operation]) -> Result<(), Error> {
-    let sheets = source.document().sheet_count();
+    let sheets = source.workbook_ref().sheet_count();
     let tables = source
-        .document()
+        .workbook_ref()
         .sheets()
         .iter()
         .fold(0usize, |count, sheet| {
@@ -970,7 +1014,7 @@ fn validate_changed_work_budget(source: &Package, operations: &[Operation]) -> R
     let observed = observed.saturating_add(publication_work);
     let maximum = source.state.options.semantic().max_formula_render_work();
     if observed > maximum {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireWork,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
@@ -1002,12 +1046,12 @@ fn verify_operation_state(
         };
         match operation.location {
             Location::Sheet(position) => package
-                .document()
+                .workbook_ref()
                 .sheets()
                 .get(position)
                 .is_some_and(|sheet| sheet.name() == expected),
             Location::Table(sheet, table) => package
-                .document()
+                .workbook_ref()
                 .sheets()
                 .get(sheet)
                 .and_then(|sheet| sheet.tables().nth(table))
@@ -1028,9 +1072,9 @@ fn validate_changed_guards(source: &Package, operations: &[Operation]) -> Result
                 .map_err(map_lock_error)?
                 == LockState::Locked
         {
-            return Err(Error::TableLocked {
+            return Err(Error::Refused(Refusal::TableLocked {
                 path: operation.location.path(),
-            });
+            }));
         }
     }
     validate_name_volatile_dependencies(source, operations)?;
@@ -1141,7 +1185,7 @@ fn validate_name_volatile_dependencies(
             None => false,
         };
         if nonempty {
-            return Err(Error::UnsupportedDependency { path });
+            return Err(Error::Refused(Refusal::UnsupportedDependency { path }));
         }
     }
     Ok(())
@@ -1220,7 +1264,7 @@ fn rooted_formula_dependency_identifiers(source: &Package) -> Result<HashSet<u64
 
 fn rooted_table_info_identifiers(source: &Package) -> Result<HashSet<u64>, Error> {
     let expected = source
-        .document()
+        .workbook_ref()
         .sheets()
         .iter()
         .fold(0usize, |count, sheet| {
@@ -1230,7 +1274,7 @@ fn rooted_table_info_identifiers(source: &Package) -> Result<HashSet<u64>, Error
     identifiers
         .try_reserve(expected)
         .map_err(|_allocation| Error::Allocation { amount: expected })?;
-    for (sheet_position, semantic_sheet) in source.document().sheets().iter().enumerate() {
+    for (sheet_position, semantic_sheet) in source.workbook_ref().sheets().iter().enumerate() {
         let target = resolve_native_sheet(source, sheet_position)?;
         let object = source
             .state
@@ -1285,11 +1329,11 @@ fn validate_rooted_pivot_dependencies(
     }) else {
         return Ok(());
     };
-    for (sheet_position, sheet) in source.document().sheets().iter().enumerate() {
+    for (sheet_position, sheet) in source.workbook_ref().sheets().iter().enumerate() {
         for table_position in 0..sheet.table_count() {
             let target = resolve_native_table(source, sheet_position, table_position)?;
             if pivot_owner_present(&target.model_message.data)? {
-                return Err(Error::UnsupportedDependency { path });
+                return Err(Error::Refused(Refusal::UnsupportedDependency { path }));
             }
         }
     }
@@ -1427,7 +1471,7 @@ fn resolve_native_sheet(source: &Package, sheet_position: usize) -> Result<Sheet
     let reference = document
         .sheet_references()
         .get(sheet_position)
-        .ok_or(Error::SheetNotFound)?;
+        .ok_or(Error::Refused(Refusal::SheetNotFound))?;
     if reference.identifier() == 0 || reference.deprecated_is_external() == Some(true) {
         return Err(Error::InvalidSource);
     }
@@ -1452,10 +1496,10 @@ fn resolve_native_sheet(source: &Package, sheet_position: usize) -> Result<Sheet
     )
     .map_err(map_read_error)?;
     let semantic = source
-        .document()
+        .workbook_ref()
         .sheets()
         .get(sheet_position)
-        .ok_or(Error::SheetNotFound)?;
+        .ok_or(Error::Refused(Refusal::SheetNotFound))?;
     if decoded.name != semantic.name()
         || decode_sheet_name(message.type_, &message.data)? != semantic.name()
     {
@@ -1555,11 +1599,11 @@ fn resolve_native_table(
         let model_object = resolved_object(source, model)?;
         validate_message_metadata(model_object, model_message_index)?;
         let semantic = source
-            .document()
+            .workbook_ref()
             .sheets()
             .get(sheet_position)
             .and_then(|semantic_sheet| semantic_sheet.tables().nth(table_position))
-            .ok_or(Error::TableNotFound)?;
+            .ok_or(Error::Refused(Refusal::TableNotFound))?;
         if decode_table_name(&model_message.data)? != semantic.name() {
             return Err(Error::InvalidSource);
         }
@@ -1572,7 +1616,7 @@ fn resolve_native_table(
             model_message,
         });
     }
-    Err(Error::TableNotFound)
+    Err(Error::Refused(Refusal::TableNotFound))
 }
 
 fn resolved_object<'a>(
@@ -1703,7 +1747,7 @@ fn require_declared_reference(
 }
 
 fn repeated_length_payloads(source: &[u8], field_number: u32) -> Result<Vec<&[u8]>, Error> {
-    let view = WireView::parse(source).map_err(map_wire_error)?;
+    let view = WireView::parse(source, WireLimits::DEFAULT).map_err(map_wire_error)?;
     let count = view
         .fields()
         .filter(|field| field.number() == field_number)
@@ -1745,7 +1789,7 @@ fn volatile_sheet_table_name_cells_present(source: &[u8]) -> Result<bool, Error>
     // opaque `CellCoordSetArchive`; we only need presence for the volatile-name
     // dependency guard, while the enclosing dependency codec has already
     // validated the owner payload and this nested message's framing.
-    let view = WireView::parse(source).map_err(map_wire_error)?;
+    let view = WireView::parse(source, WireLimits::DEFAULT).map_err(map_wire_error)?;
     let mut seen = false;
     let mut present = false;
     for field in view.fields() {
@@ -1760,7 +1804,8 @@ fn volatile_sheet_table_name_cells_present(source: &[u8]) -> Result<bool, Error>
         // `column_entries` is field 1 of the nested CellCoordSetArchive. An
         // empty envelope is semantically empty in the generated model, so
         // merely seeing the outer optional field is not sufficient.
-        let nested = WireView::parse(field.payload()).map_err(map_wire_error)?;
+        let nested =
+            WireView::parse(field.payload(), WireLimits::DEFAULT).map_err(map_wire_error)?;
         let mut has_column_entry = false;
         for nested_field in nested.fields() {
             if nested_field.number() != 1 {
@@ -1772,7 +1817,7 @@ fn volatile_sheet_table_name_cells_present(source: &[u8]) -> Result<bool, Error>
             nested_field
                 .validate_canonical_framing()
                 .map_err(map_wire_error)?;
-            WireView::parse(nested_field.payload()).map_err(map_wire_error)?;
+            WireView::parse(nested_field.payload(), WireLimits::DEFAULT).map_err(map_wire_error)?;
             has_column_entry = true;
         }
         present = has_column_entry;
@@ -1820,7 +1865,7 @@ pub(super) fn preflight_sheet_payload(
         .and_then(|limits| limits.with_fields(source.len().clamp(1, WireLimits::MAX_FIELDS)))
         .and_then(|limits| limits.with_nesting(2))
         .map_err(map_wire_error)?;
-    preflight_wire_tree_with_limits(source, wire_limits, |visit| {
+    preflight_wire_tree(source, wire_limits, |visit| {
         let is_drawable = match message_type {
             SHEET_MESSAGE_TYPE => visit.path().is_empty() && visit.field().number() == 2,
             FORM_BASED_SHEET_MESSAGE_TYPE => {
@@ -1869,7 +1914,7 @@ pub(super) fn preflight_sheet_payload(
             kind: litchi_iwa_common::LimitKind::MaterializedCells,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: LimitKind::PayloadReferences,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(limit),
@@ -1903,7 +1948,7 @@ fn local_reference_identifier_common(source: &[u8]) -> litchi_iwa_common::Result
         .with_input_bytes(source.len().clamp(1, WireLimits::MAX_INPUT_BYTES))?
         .with_fields(source.len().clamp(1, WireLimits::MAX_FIELDS))?
         .with_nesting(1)?;
-    preflight_wire_tree_with_limits(source, limits, |visit| {
+    preflight_wire_tree(source, limits, |visit| {
         let field = visit.field();
         match field.number() {
             1 => {
@@ -2032,7 +2077,7 @@ fn metadata_rewrite_options(
             .max_archive_bytes(),
     );
     if payload_length == 0 || payload_length > maximum_wire {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireBytes,
             observed: usize_as_u64(payload_length),
             maximum: usize_as_u64(maximum_wire),
@@ -2041,20 +2086,20 @@ fn metadata_rewrite_options(
     let token_fields = selected_components
         .checked_add(1)
         .and_then(|count| count.checked_mul(16))
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: LimitKind::WireBytes,
             observed: u64::MAX,
             maximum: usize_as_u64(maximum_wire),
         })?;
     let output_bytes = payload_length
         .checked_add(token_fields)
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: LimitKind::WireBytes,
             observed: u64::MAX,
             maximum: usize_as_u64(maximum_wire),
         })?;
     if output_bytes > maximum_wire {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireBytes,
             observed: usize_as_u64(output_bytes),
             maximum: usize_as_u64(maximum_wire),
@@ -2166,9 +2211,9 @@ fn rewrite_metadata_entry(
         .find(|entry| entry.name() == PACKAGE_METADATA_ENTRY)
         .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         source_catalog
             .limits()
@@ -2180,8 +2225,11 @@ fn rewrite_metadata_entry(
         .limits()
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let snappy_limits = source_catalog
+        .limits()
+        .snappy_limits()
+        .map_err(map_archive_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     let object = archive
         .objects
         .get_mut(route.object_index)
@@ -2194,7 +2242,7 @@ fn rewrite_metadata_entry(
         return Err(Error::InvalidSource);
     }
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             route.message_index,
             RawMessage {
                 type_: PACKAGE_METADATA_MESSAGE_TYPE,
@@ -2203,10 +2251,8 @@ fn rewrite_metadata_entry(
             archive_limits,
         )
         .map_err(map_core_error)?;
-    let rewritten = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
-    let compressed = SnappyStream::compress(&rewritten).map_err(map_core_error)?;
+    let rewritten = archive.to_bytes(archive_limits).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&rewritten, snappy_limits).map_err(map_core_error)?;
     Ok(OwnedEntryEdit {
         name: PACKAGE_METADATA_ENTRY,
         data: compressed,
@@ -2223,6 +2269,7 @@ fn rewrite_names(
     // allocating any rewritten native component payload.
     metadata_route(source)?;
     let physical_limits = source_catalog.limits();
+    let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(map_archive_error)?;
@@ -2252,25 +2299,24 @@ fn rewrite_names(
             .find(|entry| entry.name() == component_name)
             .ok_or(Error::InvalidSource)?;
         if entry.is_opaque() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
-        let stream = SnappyStream::decompress_with_limits(
+        let stream = SnappyStream::decompress(
             entry.data(),
             physical_limits.snappy_limits().map_err(map_archive_error)?,
         )
         .map_err(map_core_error)?;
-        let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
-            .map_err(map_core_error)?;
+        let mut archive =
+            Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
         validate_canonical_object_length_prefixes(stream.as_bytes(), &archive)?;
         drop(stream);
         for operation in &operations[begin..end] {
             rewrite_native_operation(&mut archive, operation, archive_limits)?;
         }
-        let rewritten = archive
-            .to_bytes_with_limits(archive_limits)
-            .map_err(map_core_error)?;
+        let rewritten = archive.to_bytes(archive_limits).map_err(map_core_error)?;
         drop(archive);
-        let compressed = SnappyStream::compress(&rewritten).map_err(map_core_error)?;
+        let compressed =
+            SnappyStream::compress(&rewritten, snappy_limits).map_err(map_core_error)?;
         drop(rewritten);
         rewritten_entries.push(OwnedEntryEdit {
             name: component_name,
@@ -2299,7 +2345,8 @@ fn rewrite_names(
         .map_err(map_archive_error)?;
     drop(edits);
     drop(rewritten_entries);
-    let candidate = Package::from_shared_bytes_with_options(output.into(), source.state.options)
+    let candidate = source
+        .reopen_candidate(output.into())
         .map_err(map_candidate_read_error)?;
     Ok((candidate, component_group_count(operations)))
 }
@@ -2701,7 +2748,7 @@ fn rewrite_native_operation(
     }
     let data = rewritten_operation_payload(message, operation, Direction::Forward)?;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             operation.message_index,
             RawMessage {
                 type_: operation.message_type,
@@ -2889,7 +2936,7 @@ fn physical_source(package: &Package) -> Result<&SourceCatalog, Error> {
         .state
         .components
         .physical()
-        .ok_or(Error::UnsupportedSource)
+        .ok_or(Error::Refused(Refusal::UnsupportedSource))
 }
 
 fn fingerprint(bytes: &[u8]) -> u64 {
@@ -2903,29 +2950,27 @@ fn fingerprint(bytes: &[u8]) -> u64 {
 
 fn map_names_codec_error(error: numbers_names_codec::DecodeError) -> Error {
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireFields,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireWork,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         };
     }
     match error.wire_resource_limit() {
-        Some(numbers_names_codec::WireResourceLimit::Bytes { observed, maximum }) => {
-            Error::LimitExceeded {
-                kind: LimitKind::WireBytes,
-                observed: usize_as_u64(observed),
-                maximum: usize_as_u64(maximum),
-            }
+        Some(numbers_names_codec::WireResourceLimit::Bytes { observed, maximum }) => Error::Limit {
+            kind: LimitKind::WireBytes,
+            observed: usize_as_u64(observed),
+            maximum: usize_as_u64(maximum),
         },
         Some(numbers_names_codec::WireResourceLimit::Nesting { observed, maximum }) => {
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: u64::from(observed),
                 maximum: u64::from(maximum),
@@ -2940,39 +2985,35 @@ fn map_dependency_codec_error(error: dependency_codec::DecodeError) -> Error {
         return Error::Allocation { amount };
     }
     match error.resource_limit() {
-        Some(dependency_codec::DecodeLimit::Bytes { observed, maximum }) => Error::LimitExceeded {
+        Some(dependency_codec::DecodeLimit::Bytes { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireBytes,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        Some(dependency_codec::DecodeLimit::References { observed, maximum }) => {
-            Error::LimitExceeded {
-                kind: LimitKind::PayloadReferences,
-                observed: usize_as_u64(observed),
-                maximum: usize_as_u64(maximum),
-            }
+        Some(dependency_codec::DecodeLimit::References { observed, maximum }) => Error::Limit {
+            kind: LimitKind::PayloadReferences,
+            observed: usize_as_u64(observed),
+            maximum: usize_as_u64(maximum),
         },
-        Some(dependency_codec::DecodeLimit::Text { observed, maximum }) => Error::LimitExceeded {
+        Some(dependency_codec::DecodeLimit::Text { observed, maximum }) => Error::Limit {
             kind: LimitKind::NameBytes,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        Some(dependency_codec::DecodeLimit::Fields { observed, maximum }) => Error::LimitExceeded {
+        Some(dependency_codec::DecodeLimit::Fields { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireFields,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        Some(dependency_codec::DecodeLimit::Work { observed, maximum }) => Error::LimitExceeded {
+        Some(dependency_codec::DecodeLimit::Work { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireWork,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        Some(dependency_codec::DecodeLimit::Nesting { observed, maximum }) => {
-            Error::LimitExceeded {
-                kind: LimitKind::WireNesting,
-                observed: u64::from(observed),
-                maximum: u64::from(maximum),
-            }
+        Some(dependency_codec::DecodeLimit::Nesting { observed, maximum }) => Error::Limit {
+            kind: LimitKind::WireNesting,
+            observed: u64::from(observed),
+            maximum: u64::from(maximum),
         },
         Some(_) | None => Error::InvalidSource,
     }
@@ -2988,7 +3029,7 @@ fn map_metadata_codec_error(
         Some(litchi_iwa_protos::package_metadata_codec::RewriteLimit::InputBytes {
             observed,
             maximum,
-        }) => Error::LimitExceeded {
+        }) => Error::Limit {
             kind: LimitKind::WireBytes,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
@@ -2996,7 +3037,7 @@ fn map_metadata_codec_error(
         Some(litchi_iwa_protos::package_metadata_codec::RewriteLimit::OutputBytes {
             observed,
             maximum,
-        }) => Error::LimitExceeded {
+        }) => Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
@@ -3004,7 +3045,7 @@ fn map_metadata_codec_error(
         Some(litchi_iwa_protos::package_metadata_codec::RewriteLimit::Fields {
             observed,
             maximum,
-        }) => Error::LimitExceeded {
+        }) => Error::Limit {
             kind: LimitKind::WireFields,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
@@ -3012,7 +3053,7 @@ fn map_metadata_codec_error(
         Some(litchi_iwa_protos::package_metadata_codec::RewriteLimit::Work {
             observed,
             maximum,
-        }) => Error::LimitExceeded {
+        }) => Error::Limit {
             kind: LimitKind::WireWork,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
@@ -3020,7 +3061,7 @@ fn map_metadata_codec_error(
         Some(litchi_iwa_protos::package_metadata_codec::RewriteLimit::Nesting {
             observed,
             maximum,
-        }) => Error::LimitExceeded {
+        }) => Error::Limit {
             kind: LimitKind::WireNesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),
@@ -3028,7 +3069,7 @@ fn map_metadata_codec_error(
         Some(litchi_iwa_protos::package_metadata_codec::RewriteLimit::Components {
             observed,
             maximum,
-        }) => Error::LimitExceeded {
+        }) => Error::Limit {
             kind: LimitKind::PayloadItems,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
@@ -3036,7 +3077,7 @@ fn map_metadata_codec_error(
         Some(litchi_iwa_protos::package_metadata_codec::RewriteLimit::References {
             observed,
             maximum,
-        }) => Error::LimitExceeded {
+        }) => Error::Limit {
             kind: LimitKind::PayloadReferences,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
@@ -3044,7 +3085,7 @@ fn map_metadata_codec_error(
         Some(litchi_iwa_protos::package_metadata_codec::RewriteLimit::Additions {
             observed,
             maximum,
-        }) => Error::LimitExceeded {
+        }) => Error::Limit {
             kind: LimitKind::PayloadItems,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
@@ -3055,14 +3096,14 @@ fn map_metadata_codec_error(
 
 fn map_table_info_error(error: table_info_codec::DecodeError) -> Error {
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireFields,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireWork,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
@@ -3072,7 +3113,7 @@ fn map_table_info_error(error: table_info_codec::DecodeError) -> Error {
         Some(table_info_codec::WireResourceLimit::Bytes {
             observed,
             maximum: Some(maximum),
-        }) => Error::LimitExceeded {
+        }) => Error::Limit {
             kind: LimitKind::WireBytes,
             observed: usize_as_u64(observed.unwrap_or_else(|| maximum.saturating_add(1))),
             maximum: usize_as_u64(maximum),
@@ -3080,7 +3121,7 @@ fn map_table_info_error(error: table_info_codec::DecodeError) -> Error {
         Some(table_info_codec::WireResourceLimit::Nesting {
             observed,
             maximum: Some(maximum),
-        }) => Error::LimitExceeded {
+        }) => Error::Limit {
             kind: LimitKind::WireNesting,
             observed: u64::from(observed.unwrap_or_else(|| maximum.saturating_add(1))),
             maximum: u64::from(maximum),
@@ -3089,24 +3130,30 @@ fn map_table_info_error(error: table_info_codec::DecodeError) -> Error {
     }
 }
 
-fn map_lock_error(error: super::TableLockError) -> Error {
+fn map_lock_error(error: crate::table::lock::Error) -> Error {
     match error {
-        super::TableLockError::SheetNotFound => Error::SheetNotFound,
-        super::TableLockError::TableNotFound => Error::TableNotFound,
-        super::TableLockError::UnsupportedSource => Error::UnsupportedSource,
-        super::TableLockError::LimitExceeded {
+        crate::table::lock::Error::Refused(crate::package::table_lock::Refusal::SheetNotFound) => {
+            Error::Refused(Refusal::SheetNotFound)
+        },
+        crate::table::lock::Error::Refused(crate::package::table_lock::Refusal::TableNotFound) => {
+            Error::Refused(Refusal::TableNotFound)
+        },
+        crate::table::lock::Error::Refused(
+            crate::package::table_lock::Refusal::UnsupportedSource,
+        ) => Error::Refused(Refusal::UnsupportedSource),
+        crate::table::lock::Error::Limit {
             kind: _,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: LimitKind::PayloadItems,
             observed,
             maximum,
         },
-        super::TableLockError::Allocation { amount } => Error::Allocation { amount },
-        super::TableLockError::InvalidSource
-        | super::TableLockError::Verification
-        | super::TableLockError::PatchConflict => Error::InvalidSource,
+        crate::table::lock::Error::Allocation { amount } => Error::Allocation { amount },
+        crate::table::lock::Error::InvalidSource
+        | crate::table::lock::Error::Verification
+        | crate::table::lock::Error::PatchConflict => Error::InvalidSource,
     }
 }
 
@@ -3117,7 +3164,7 @@ fn map_candidate_read_error(error: ReadError) -> Error {
             kind: litchi_iwa_archive::LimitKind::InputBytes,
             observed,
             maximum,
-        }) => Error::LimitExceeded {
+        }) => Error::Limit {
             kind: LimitKind::OutputBytes,
             observed,
             maximum,
@@ -3135,12 +3182,12 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 super::SemanticLimitKind::Objects => LimitKind::PayloadObjects,
                 super::SemanticLimitKind::References => LimitKind::PayloadReferences,
                 super::SemanticLimitKind::OutputTextBytes
-                | super::SemanticLimitKind::FormulaWireBytes
+                | super::SemanticLimitKind::FormulaCategoryBytes
                 | super::SemanticLimitKind::TextBytes => LimitKind::PayloadBytes,
                 super::SemanticLimitKind::FormulaRenderDepth
                 | super::SemanticLimitKind::FormulaDepth => LimitKind::WireNesting,
@@ -3153,7 +3200,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        ReadError::InputTooLarge { observed, maximum } => Error::LimitExceeded {
+        ReadError::InputTooLarge { observed, maximum } => Error::Limit {
             kind: LimitKind::InputBytes,
             observed,
             maximum,
@@ -3161,7 +3208,8 @@ fn map_read_error(error: ReadError) -> Error {
         ReadError::Io(_)
         | ReadError::Detection(_)
         | ReadError::MalformedPayload { .. }
-        | ReadError::NotNumbers
+        | ReadError::UnexpectedFormat { .. }
+        | ReadError::InvalidLimit { .. }
         | ReadError::InvalidFormat(_)
         | ReadError::ParseError(_)
         | ReadError::Semantic(_) => Error::InvalidSource,
@@ -3174,7 +3222,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -3191,15 +3239,9 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             maximum,
         },
         litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
-        litchi_iwa_archive::Error::Reassembly(_) => Error::UnsupportedSource,
+        litchi_iwa_archive::Error::Reassembly(_) => Error::Refused(Refusal::UnsupportedSource),
         litchi_iwa_archive::Error::Iwa(error) => map_core_error(error),
-        litchi_iwa_archive::Error::Io(_)
-        | litchi_iwa_archive::Error::Zip { .. }
-        | litchi_iwa_archive::Error::InvalidLimits(_)
-        | litchi_iwa_archive::Error::Encrypted
-        | litchi_iwa_archive::Error::SourceChanged { .. }
-        | litchi_iwa_archive::Error::DirectoryChanged { .. }
-        | litchi_iwa_archive::Error::InvalidBundle(_) => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
@@ -3209,7 +3251,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
                 litchi_iwa_core::LimitKind::Messages
@@ -3236,11 +3278,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
         litchi_iwa_core::Error::Allocation { requested, .. } => {
             Error::Allocation { amount: requested }
         },
-        litchi_iwa_core::Error::InvalidArchive { .. }
-        | litchi_iwa_core::Error::InvalidLimits { .. }
-        | litchi_iwa_core::Error::HeaderCodec { .. }
-        | litchi_iwa_core::Error::Io(_)
-        | litchi_iwa_core::Error::Snappy { .. } => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
@@ -3250,7 +3288,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes
                 | litchi_iwa_common::LimitKind::OutputBytes => LimitKind::WireBytes,
@@ -3266,8 +3304,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             maximum: usize_as_u64(limit),
         },
         litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
-        litchi_iwa_common::Error::InvalidFormat(_)
-        | litchi_iwa_common::Error::InvalidLimit { .. } => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 

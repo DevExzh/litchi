@@ -1,0 +1,78 @@
+{
+  "head": "0314261beb53838bbc5e5c46aa94c8515ee945c6",
+  "dirty_worktree": true,
+  "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+  "platform": "Linux-7.0.0-1013-aws-x86_64-with-glibc2.43",
+  "cpu": "AMD EPYC 9R45",
+  "affinity": [
+    0
+  ],
+  "rounds_per_invocation": 9,
+  "invocations_per_variant": {
+    "control": 2,
+    "candidate_preformat": 2,
+    "candidate_final": 2
+  },
+  "source_manifest": {
+    "bytes": 37542,
+    "sha256": "838c15fc25136ba92532a9c2fbccca748fba65c7546b2b89888eb4c18ab52dd7"
+  },
+  "source_files": 339,
+  "candidate_binary": {
+    "bytes": 124437832,
+    "sha256": "bf121ac2fe4cde80d24207c20ce85692ce1ab9486904b0287c707679b7216e48"
+  },
+  "control_binary": {
+    "bytes": 124437488,
+    "sha256": "e12c012c7addba91b234d38d993b8d5904b8e9e8f3d8d4dad58ab31c239339b2"
+  },
+  "lockfile": {
+    "bytes": 30746,
+    "sha256": "3850ee98dc52132741c4417219ee92a36bd6bfc931d0b21098fc8cc3e54b075e"
+  },
+  "control_patch": {
+    "bytes": 2965,
+    "sha256": "13a6cbbfb9b7d2c804e4fa3dbfd3ff34823ba2395d2f41b8943277fa7d99d363"
+  },
+  "build_command": "CARGO_NET_OFFLINE=true cargo build --release --locked --manifest-path tools/perf-baseline/unified-xlsx-batch/Cargo.toml",
+  "run_command": "taskset -c 0 tools/perf-baseline/unified-xlsx-batch/target/release/unified-xlsx-batch-baseline 9",
+  "scope": "Prepared in-memory blank workbook; scalar distinct cell commands; source promotion and serialization untimed. Control lacks promoted-owner target resolution, but already coalesces native edits.",
+  "measurement_files": {
+    "candidate-1.json": {
+      "bytes": 13432,
+      "sha256": "e0105008124ec21fea245d16dbb6f7985c30ac89c826e1c0269508b368a4a703"
+    },
+    "candidate-2.json": {
+      "bytes": 13433,
+      "sha256": "85364e2d03fac719692f0ac627a0ad635d457e791409b15241eae1ff355a2947"
+    },
+    "candidate-preformat-1.json": {
+      "bytes": 13429,
+      "sha256": "105d0689945f5899588eafcdfca1b76f5d503ec3b5246d989f225f1f45cade3e"
+    },
+    "candidate-preformat-2.json": {
+      "bytes": 13432,
+      "sha256": "522d4be14f0c1267f0a97741b9fc810461be4f0bad86e8a8205ed8866c7ce395"
+    },
+    "control-1.json": {
+      "bytes": 13431,
+      "sha256": "a48edf207ca2327d620e7a68c0d7f43a3e43b05d1732dd265e136b828db0d700"
+    },
+    "control-2.json": {
+      "bytes": 13436,
+      "sha256": "dd069095955a7be4daf6f2fe222a408b81d046415705cb5c95b9472f2fc94707"
+    }
+  },
+  "source_manifest_scope": "Changed tracked/staged/untracked crate and harness files against HEAD, plus root Cargo.toml, .cargo/config.toml and harness Cargo.lock; excludes README and build outputs. Unchanged sources are identified by HEAD.",
+  "preformat_candidate": {
+    "binary": {
+      "bytes": 124437824,
+      "sha256": "75d3cf131035ab86f3f86cff3adcec49b48e7ffb7ea6c2a7e7776b6ed0f87f39"
+    },
+    "source_manifest": {
+      "bytes": 37542,
+      "sha256": "83bedef9aa14ee26207ee24be8d5e3b3e32ed495d3866451b24b3340ed12b61a"
+    },
+    "note": "Two candidate invocations before rustfmt-only changes; retained to report every measured invocation. Final candidates rebuilt from formatted sources."
+  }
+}

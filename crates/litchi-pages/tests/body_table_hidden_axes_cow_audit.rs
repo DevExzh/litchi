@@ -29,7 +29,7 @@ mod fixture {
     }
 
     fn unchanged_entry_snapshots(package: &[u8]) -> TestResult<Vec<EntryPhysicalSnapshot>> {
-        Ok(Catalog::from_bytes(package)?
+        Ok(Catalog::from_bytes(package, Default::default())?
             .iter()
             .filter(|entry| entry.name() != DOCUMENT_MEMBER && !PREVIEWS.contains(&entry.name()))
             .map(|entry| EntryPhysicalSnapshot {
@@ -65,12 +65,15 @@ mod fixture {
     }
 
     fn metadata_payload(package: &[u8]) -> TestResult<Vec<u8>> {
-        let catalog = Catalog::from_bytes(package)?;
+        let catalog = Catalog::from_bytes(package, Default::default())?;
         let entry = catalog
             .iter()
             .find(|entry| entry.name() == AUDIT_METADATA_MEMBER)
             .ok_or("missing metadata member")?;
-        let archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+        let archive = Archive::parse(
+            SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+            Default::default(),
+        )?;
         Ok(archive
             .object(AUDIT_METADATA_OBJECT_ID)
             .ok_or("missing metadata object")?
@@ -83,13 +86,15 @@ mod fixture {
     }
 
     fn audit_metadata_package(source: &[u8]) -> TestResult<Vec<u8>> {
-        let catalog = Catalog::from_bytes(source)?;
+        let catalog = Catalog::from_bytes(source, Default::default())?;
         let document = catalog
             .iter()
             .find(|entry| entry.name() == DOCUMENT_MEMBER)
             .ok_or("missing document member")?;
-        let document_archive =
-            Archive::parse(SnappyStream::decompress(document.data())?.as_bytes())?;
+        let document_archive = Archive::parse(
+            SnappyStream::decompress(document.data(), Default::default())?.as_bytes(),
+            Default::default(),
+        )?;
         let mut identifiers = document_archive
             .objects
             .iter()
@@ -141,7 +146,8 @@ mod fixture {
             &Archive {
                 objects: vec![object(AUDIT_METADATA_OBJECT_ID, 11_006, metadata, &[])?],
             }
-            .to_bytes()?,
+            .to_bytes(Default::default())?,
+            Default::default(),
         )?;
         let mut members = catalog
             .iter()
@@ -167,11 +173,13 @@ mod fixture {
                     type_: AUDIT_EXTRA_MESSAGE_TYPE,
                     data: vec![0xde, 0xad, 0xbe, 0xef],
                 }],
+                Default::default(),
             )?],
         };
-        let compressed = SnappyStream::compress(&extra.to_bytes()?)?;
+        let compressed =
+            SnappyStream::compress(&extra.to_bytes(Default::default())?, Default::default())?;
         Ok(
-            Catalog::from_bytes(source)?.reassemble_with_insertions_to_bytes(
+            Catalog::from_bytes(source, Default::default())?.reassemble_with_insertions_to_bytes(
                 &[litchi_iwa_archive::package::EntryInsertion::new(
                     AUDIT_EXTRA_MEMBER,
                     compressed.as_slice(),
@@ -183,13 +191,17 @@ mod fixture {
 
     fn add_identifier(source: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
         rewrite_document_archive(source, |archive| {
-            archive.insert_object(ArchiveObject::new(
-                identifier,
-                vec![RawMessage {
-                    type_: AUDIT_EXTRA_MESSAGE_TYPE,
-                    data: Vec::new(),
-                }],
-            )?)?;
+            archive.insert_object(
+                ArchiveObject::new(
+                    identifier,
+                    vec![RawMessage {
+                        type_: AUDIT_EXTRA_MESSAGE_TYPE,
+                        data: Vec::new(),
+                    }],
+                    Default::default(),
+                )?,
+                Default::default(),
+            )?;
             Ok(())
         })
     }
@@ -220,6 +232,7 @@ mod fixture {
                     type_: TABLE_MODEL_MESSAGE_TYPE,
                     data: payload,
                 },
+                Default::default(),
             )?;
             let info = &mut model.archive_info.message_infos[message_index];
             for identifier in &mut info.object_references {
@@ -425,13 +438,13 @@ mod fixture {
             entry_snapshots_before,
             "unselected ZIP names, metadata, records, and payloads changed"
         );
-        let target_catalog = Catalog::from_bytes(&target)?;
+        let target_catalog = Catalog::from_bytes(&target, Default::default())?;
         let extra = target_catalog
             .iter()
             .find(|entry| entry.name() == AUDIT_EXTRA_MEMBER)
             .ok_or("missing extra component")?;
-        let decompressed = SnappyStream::decompress(extra.data())?;
-        let extra_archive = Archive::parse(decompressed.as_bytes())?;
+        let decompressed = SnappyStream::decompress(extra.data(), Default::default())?;
+        let extra_archive = Archive::parse(decompressed.as_bytes(), Default::default())?;
         assert!(extra_archive.object(AUDIT_EXTRA_OBJECT_ID).is_some());
         let target_ids = archive_object_ids(&document_archive(&target)?);
         assert_eq!(target_ids, source_document_ids);
@@ -478,7 +491,7 @@ mod fixture {
             .commit();
         assert!(matches!(
             result,
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: BodyTableHiddenAxesLimitKind::PayloadObjects,
                 ..
             })

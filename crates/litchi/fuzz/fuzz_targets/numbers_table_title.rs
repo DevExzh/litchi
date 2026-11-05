@@ -13,8 +13,7 @@ use std::{fmt::Debug, fmt::Display, hint::black_box, sync::OnceLock};
 
 use libfuzzer_sys::fuzz_target;
 use litchi::numbers::{
-    Package, PackageLimits, PackageReadOptions, PackageSemanticLimits, SheetSelector,
-    TableSelector,
+    Package, SheetSelector, TableSelector,
     table::title::{Error as TitleError, Path as TitlePath, Settings},
 };
 use litchi_iwa_archive::package::Catalog;
@@ -96,27 +95,32 @@ fn hex_nibble(byte: u8) -> Option<u8> {
     }
 }
 
-fn options() -> PackageReadOptions {
-    static OPTIONS: OnceLock<PackageReadOptions> = OnceLock::new();
+fn options() -> litchi::numbers::OpenOptions {
+    static OPTIONS: OnceLock<litchi::numbers::OpenOptions> = OnceLock::new();
     *OPTIONS.get_or_init(|| {
-        let archive = PackageLimits::new(
-            MAX_INPUT_BYTES,
-            MAX_ENTRIES,
-            MAX_ENTRY_BYTES,
-            MAX_EXPANDED_BYTES,
-            MAX_IWA_STREAM_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid Numbers title archive limits: {error}"));
-        let semantic =
-            PackageSemanticLimits::new(MAX_OBJECTS, MAX_SHEETS, MAX_TABLES, MAX_REFERENCES)
-                .unwrap_or_else(|error| {
-                    unreachable!("valid Numbers title semantic limits: {error}")
-                })
-                .with_projection_limits(MAX_MATERIALIZED_CELLS, MAX_TEXT_BYTES)
-                .unwrap_or_else(|error| {
-                    unreachable!("valid Numbers title projection limits: {error}")
-                });
-        PackageReadOptions::new(archive, semantic)
+        let archive = litchi::numbers::SourceLimits::builder()
+            .max_input_bytes(MAX_INPUT_BYTES)
+            .and_then(|b| b.max_members(MAX_ENTRIES))
+            .and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES))
+            .and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+            .and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid Numbers title archive limits: {error}"));
+        let semantic = litchi::numbers::SemanticLimits::builder()
+            .max_objects(MAX_OBJECTS)
+            .and_then(|b| b.max_sheets(MAX_SHEETS))
+            .and_then(|b| b.max_tables(MAX_TABLES))
+            .and_then(|b| b.max_references(MAX_REFERENCES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid Numbers title semantic limits: {error}"))
+            .to_builder()
+            .max_materialized_cells(MAX_MATERIALIZED_CELLS)
+            .and_then(|b| b.max_output_text_bytes(MAX_TEXT_BYTES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid Numbers title projection limits: {error}"));
+        litchi::numbers::OpenOptions::new()
+            .source_limits(archive)
+            .semantic_limits(semantic)
     })
 }
 
@@ -145,7 +149,7 @@ fn exercise_package(package: &Package, data: &[u8], check_native_locality: bool)
 
     // The explicit no-op is required to retain both optional-field presence
     // bits and the exact package snapshot without touching a component.
-    let no_op = match package.edit_table_title(0usize, 0usize) {
+    let mut no_op = match package.edit_table_title(0usize, 0usize) {
         Ok(edit) => edit.set(before),
         Err(error) => {
             observe_error(error);
@@ -153,8 +157,20 @@ fn exercise_package(package: &Package, data: &[u8], check_native_locality: bool)
             return;
         },
     };
-    assert_eq!(no_op.path(), TitlePath::Table { sheet: 0, table: 0 });
-    assert_eq!(no_op.settings(), before);
+    match no_op.path() {
+        Ok(path) => assert_eq!(path, TitlePath::Table { sheet: 0, table: 0 }),
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    }
+    match no_op.settings() {
+        Ok(settings) => assert_eq!(settings, before),
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    }
     let no_op_commit = match no_op.commit() {
         Ok(commit) => commit,
         Err(error) => {
@@ -195,7 +211,7 @@ fn exercise_selector_reads(package: &Package, data: &[u8]) {
         SheetSelector::index(usize::from(read_u16(data, 0))),
         TableSelector::index(usize::from(read_u16(data, 2))),
     ));
-    if let Some(sheet) = package.document().sheets().first()
+    if let Some(sheet) = package.workbook_ref().sheets().first()
         && let Some(table) = sheet.tables().next()
     {
         observe_result(package.table_title_settings(
@@ -206,11 +222,14 @@ fn exercise_selector_reads(package: &Package, data: &[u8]) {
 }
 
 fn exercise_selector_errors(package: &Package, source_bytes: &[u8]) {
-    let sheet_count = package.document().sheets().len();
+    let sheet_count = package.workbook_ref().sheets().len();
     if let Err(error) =
         package.table_title_settings(SheetSelector::index(sheet_count), TableSelector::index(0))
     {
-        assert!(matches!(error, TitleError::SheetNotFound));
+        assert!(matches!(
+            error,
+            TitleError::Refused(litchi::numbers::table::title::Refusal::SheetNotFound)
+        ));
     }
     if let Err(error) =
         package.table_title_settings(SheetSelector::name(PRIVATE_SHEET), TableSelector::index(0))
@@ -268,7 +287,7 @@ fn exercise_transition(
     after: Settings,
     check_native_locality: bool,
 ) {
-    let edit = match package.edit_table_title(0usize, 0usize) {
+    let mut edit = match package.edit_table_title(0usize, 0usize) {
         Ok(edit) => edit.set(after),
         Err(error) => {
             observe_error(error);
@@ -276,8 +295,21 @@ fn exercise_transition(
             return;
         },
     };
-    assert_eq!(edit.path(), TitlePath::Table { sheet: 0, table: 0 });
-    assert_eq!(edit.settings(), after);
+    match edit.path() {
+        Ok(path) => assert_eq!(path, TitlePath::Table { sheet: 0, table: 0 }),
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    }
+    let staged = match edit.settings() {
+        Ok(settings) => settings,
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    };
+    assert_eq!(staged, after);
     let commit = match edit.commit() {
         Ok(commit) => commit,
         Err(error) => {
@@ -391,9 +423,9 @@ fn observe_all_settings(before: Settings) {
 }
 
 fn assert_exact_preview_locality(source_bytes: &[u8], target_bytes: &[u8]) {
-    let source = Catalog::from_bytes(source_bytes)
+    let source = Catalog::from_bytes(source_bytes, Default::default())
         .unwrap_or_else(|error| panic!("title source catalog must reopen: {error}"));
-    let target = Catalog::from_bytes(target_bytes)
+    let target = Catalog::from_bytes(target_bytes, Default::default())
         .unwrap_or_else(|error| panic!("title target catalog must reopen: {error}"));
     let mut changed_members = Vec::new();
     let mut deleted_previews = 0usize;

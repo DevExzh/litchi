@@ -14,10 +14,10 @@
 
 use litchi_opc::{BlobPart, PackURI, TargetMode};
 use litchi_xlsb::Package;
-use litchi_xlsb::raw::{Kind, Records, Writer};
+use litchi_xlsb::raw::{Encoder, Kind, Records};
 use litchi_xlsb::volatile_dependencies::{
     CachedValue, CellReference, Commit, DEFAULT_PART_NAME, Dependencies, DependencyKind, MainTopic,
-    RELATIONSHIP_TYPE, ReadLimits, Topic, VolatileType,
+    RELATIONSHIP_TYPE, SemanticLimits, Topic, VolatileType,
 };
 
 fn sample_dependencies() -> Dependencies {
@@ -58,7 +58,7 @@ fn changed_dependencies() -> Dependencies {
 }
 
 fn package_with_dependencies(dependencies: Dependencies) -> Package {
-    let package = Package::create().expect("create workbook");
+    let package = Package::new().expect("create workbook");
     let mut transaction = package
         .edit_volatile_dependencies()
         .expect("start volatile dependency transaction");
@@ -69,7 +69,8 @@ fn package_with_dependencies(dependencies: Dependencies) -> Package {
     );
     let commit = transaction.commit().expect("commit volatile dependencies");
     package
-        .apply_volatile_dependencies(&commit)
+        .apply_volatile_dependencies(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("publish volatile dependencies")
 }
 
@@ -100,13 +101,13 @@ fn package_with_owner_bytes(package: &Package, bytes: Vec<u8>) -> Package {
 
 fn rewrite_records(bytes: &[u8], insert_at: usize, kind: Kind, payload: &[u8]) -> Vec<u8> {
     let mut records = Vec::new();
-    for record in Records::new(bytes) {
+    for record in Records::new(bytes, litchi_xlsb::raw::Limits::DEFAULT) {
         let record = record.expect("valid owner record");
         records.push((record.kind(), record.payload().to_vec()));
     }
     records.insert(insert_at.min(records.len()), (kind, payload.to_vec()));
     let mut output = Vec::new();
-    let mut writer = Writer::new(&mut output);
+    let mut writer = Encoder::new(&mut output, litchi_xlsb::raw::Limits::DEFAULT);
     for (record_kind, record_payload) in records {
         writer
             .write_record(record_kind, &record_payload)
@@ -123,7 +124,7 @@ fn changed_workbook_relationship_source(package: &Package) -> Package {
         .partname()
         .clone();
     let source = opc
-        .source_relationships(&workbook)
+        .source_relationships(&workbook, litchi_opc::SourceLimits::default())
         .expect("workbook relationship source");
     let relationship = opc
         .get_part(&workbook)
@@ -154,7 +155,7 @@ fn changed_workbook_relationship_source(package: &Package) -> Package {
             .expect("add lexical stale relationship token");
     }
     assert_ne!(replacement.bytes(), source.bytes());
-    opc.try_replace_relationships(&source, &replacement)
+    opc.try_replace_relationships(&source, &replacement, litchi_opc::SourceLimits::default())
         .expect("replace workbook relationship source");
     Package::from_opc(opc).expect("reopen relationship stale fixture")
 }
@@ -162,7 +163,9 @@ fn changed_workbook_relationship_source(package: &Package) -> Package {
 fn changed_content_types_source(package: &Package) -> Package {
     let original_bytes = package_bytes(package);
     let opc = package.clone().into_opc();
-    let source = opc.source_content_types().expect("content-types source");
+    let source = opc
+        .source_content_types(litchi_opc::SourceLimits::default())
+        .expect("content-types source");
     let candidates = opc
         .iter_parts()
         .map(|part| (part.partname().clone(), part.content_type().to_owned()))
@@ -179,7 +182,11 @@ fn changed_content_types_source(package: &Package) -> Package {
         }
         let mut candidate = opc.clone();
         if candidate
-            .try_replace_content_types(source.bytes(), &replacement)
+            .try_replace_content_types(
+                source.bytes(),
+                &replacement,
+                litchi_opc::SourceLimits::default(),
+            )
             .is_err()
         {
             continue;
@@ -244,10 +251,9 @@ fn relocate_owner(package: &Package) -> Package {
 }
 
 fn changed_commit(package: &Package) -> Commit {
-    let snapshot = package
-        .volatile_dependencies()
+    let mut transaction = package
+        .edit_volatile_dependencies()
         .expect("read volatile dependencies");
-    let mut transaction = snapshot.edit();
     transaction
         .set_dependencies(changed_dependencies())
         .expect("stage changed dependencies");
@@ -256,7 +262,7 @@ fn changed_commit(package: &Package) -> Commit {
 
 #[test]
 fn public_create_change_remove_save_reopen_and_exact_inverse() {
-    let empty = Package::create().expect("create empty workbook");
+    let empty = Package::new().expect("create empty workbook");
     assert!(
         !empty
             .volatile_dependencies()
@@ -269,7 +275,7 @@ fn public_create_change_remove_save_reopen_and_exact_inverse() {
     assert_eq!(snapshot.dependencies(), Some(&sample_dependencies()));
 
     let serialized = package_bytes(&package);
-    let reopened = Package::from_bytes(serialized.clone()).expect("save/reopen package");
+    let reopened = Package::from_bytes(&serialized).expect("save/reopen package");
     assert_eq!(package_bytes(&reopened), serialized);
     assert_eq!(
         reopened
@@ -280,7 +286,8 @@ fn public_create_change_remove_save_reopen_and_exact_inverse() {
     );
 
     let changed = package
-        .apply_volatile_dependencies(&changed_commit(&package))
+        .apply_volatile_dependencies(changed_commit(&package).patch())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("apply changed dependency owner");
     assert_eq!(
         changed
@@ -291,18 +298,19 @@ fn public_create_change_remove_save_reopen_and_exact_inverse() {
     );
     let changed_commit = changed_commit(&package);
     let restored = changed
-        .apply_volatile_dependencies_patch(&changed_commit.patch().inverse())
+        .apply_volatile_dependencies(&changed_commit.patch().inverse())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("inverse changed owner");
     assert_eq!(package_bytes(&restored), serialized);
 
     let mut remove = package
-        .volatile_dependencies()
-        .expect("read owner for removal")
-        .edit();
+        .edit_volatile_dependencies()
+        .expect("read owner for removal");
     assert!(remove.remove().expect("stage owner removal"));
     let removal = remove.commit().expect("commit owner removal");
     let removed = package
-        .apply_volatile_dependencies(&removal)
+        .apply_volatile_dependencies(removal.patch())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("apply owner removal");
     assert!(
         !removed
@@ -311,7 +319,8 @@ fn public_create_change_remove_save_reopen_and_exact_inverse() {
             .is_present()
     );
     let restored_empty = removed
-        .apply_volatile_dependencies_patch(&removal.patch().inverse())
+        .apply_volatile_dependencies(&removal.patch().inverse())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("inverse owner removal");
     assert_eq!(package_bytes(&restored_empty), serialized);
 }
@@ -320,37 +329,55 @@ fn public_create_change_remove_save_reopen_and_exact_inverse() {
 fn exact_noop_is_source_preserving_and_stale_workbook_relationship_is_atomic() {
     let package = package_with_dependencies(sample_dependencies());
     let before = package_bytes(&package);
-    let snapshot = package
-        .volatile_dependencies()
-        .expect("read owner for no-op");
-    let noop = snapshot.edit().commit().expect("commit no-op");
-    assert!(!noop.changed());
-    assert!(noop.patch().is_empty());
+    let noop = package
+        .edit_volatile_dependencies()
+        .expect("read volatile dependencies")
+        .commit()
+        .expect("commit no-op");
+    assert!(!noop.diagnostics().changed());
+    assert!(noop.patch().is_noop());
     let no_op_package = package
-        .apply_volatile_dependencies(&noop)
+        .apply_volatile_dependencies(noop.patch())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("apply no-op");
     assert_eq!(package_bytes(&no_op_package), before);
 
     let stale = changed_workbook_relationship_source(&package);
     let stale_before = package_bytes(&stale);
-    assert!(stale.apply_volatile_dependencies(&noop).is_err());
+    assert!(
+        stale
+            .apply_volatile_dependencies(noop.patch())
+            .map(litchi_core::edit::Commit::into_package)
+            .is_err()
+    );
     assert_eq!(package_bytes(&stale), stale_before);
 
     let changed = changed_commit(&package);
-    assert!(stale.apply_volatile_dependencies(&changed).is_err());
+    assert!(
+        stale
+            .apply_volatile_dependencies(changed.patch())
+            .map(litchi_core::edit::Commit::into_package)
+            .is_err()
+    );
     assert_eq!(package_bytes(&stale), stale_before);
 }
 
 #[test]
 fn stale_content_types_source_rejects_noop_without_mutating_package() {
     let package = package_with_dependencies(sample_dependencies());
-    let snapshot = package
-        .volatile_dependencies()
-        .expect("read owner for no-op");
-    let noop = snapshot.edit().commit().expect("commit no-op");
+    let noop = package
+        .edit_volatile_dependencies()
+        .expect("read volatile dependencies")
+        .commit()
+        .expect("commit no-op");
     let stale = changed_content_types_source(&package);
     let before = package_bytes(&stale);
-    assert!(stale.apply_volatile_dependencies(&noop).is_err());
+    assert!(
+        stale
+            .apply_volatile_dependencies(noop.patch())
+            .map(litchi_core::edit::Commit::into_package)
+            .is_err()
+    );
     assert_eq!(package_bytes(&stale), before);
 }
 
@@ -360,11 +387,14 @@ fn custom_owner_name_and_relationship_id_survive_remove_inverse_and_reopen() {
     let before = package_bytes(&package);
     let snapshot = package.volatile_dependencies().expect("read custom owner");
     assert!(snapshot.is_present());
-    let mut transaction = snapshot.edit();
+    let mut transaction = package
+        .edit_volatile_dependencies()
+        .expect("read volatile dependencies");
     assert!(transaction.remove().expect("stage custom owner removal"));
     let commit = transaction.commit().expect("commit custom owner removal");
     let removed = package
-        .apply_volatile_dependencies(&commit)
+        .apply_volatile_dependencies(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("remove custom owner");
     assert!(
         !removed
@@ -373,10 +403,11 @@ fn custom_owner_name_and_relationship_id_survive_remove_inverse_and_reopen() {
             .is_present()
     );
     let restored = removed
-        .apply_volatile_dependencies_patch(&commit.patch().inverse())
+        .apply_volatile_dependencies(&commit.patch().inverse())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("restore custom owner");
     assert_eq!(package_bytes(&restored), before);
-    let reopened = Package::from_bytes(package_bytes(&restored)).expect("reopen restored owner");
+    let reopened = Package::from_bytes(&package_bytes(&restored)).expect("reopen restored owner");
     assert_eq!(package_bytes(&reopened), before);
     assert_eq!(
         reopened
@@ -408,18 +439,25 @@ fn unknown_and_reserved_record_kinds_are_exact_noops_but_changed_edits_refuse() 
         );
         assert!(!snapshot.can_edit());
 
-        let noop = snapshot.edit().commit().expect("commit unsupported no-op");
-        assert!(!noop.changed());
+        let noop = unsupported
+            .edit_volatile_dependencies()
+            .expect("read volatile dependencies")
+            .commit()
+            .expect("commit unsupported no-op");
+        assert!(!noop.diagnostics().changed());
         let no_op = unsupported
-            .apply_volatile_dependencies(&noop)
+            .apply_volatile_dependencies(noop.patch())
+            .map(litchi_core::edit::Commit::into_package)
             .expect("apply unsupported no-op");
         assert_eq!(package_bytes(&no_op), before);
 
-        let mut changed = snapshot.edit();
+        let mut changed = unsupported
+            .edit_volatile_dependencies()
+            .expect("read volatile dependencies");
         let result = changed.set_dependencies(changed_dependencies());
         assert!(matches!(
             result,
-            Err(litchi_xlsb::volatile_dependencies::Error::UnsupportedFeature(_))
+            Err(litchi_xlsb::volatile_dependencies::Error::Refused(_))
         ));
         assert_eq!(package_bytes(&unsupported), before);
     }
@@ -430,26 +468,33 @@ fn caller_limits_refuse_before_publication_and_leave_source_unchanged() {
     let package = package_with_dependencies(sample_dependencies());
     let before = package_bytes(&package);
 
-    let mut part_limit = ReadLimits::DEFAULT;
+    let mut part_limit = SemanticLimits::DEFAULT;
     part_limit.max_part_bytes = owner_bytes(&package).len().saturating_sub(1);
     let part_error = package
-        .volatile_dependencies_with_limits(part_limit)
+        .with_semantic_limits(litchi_xlsb::SemanticLimits::new().volatile_dependencies(part_limit))
+        .volatile_dependencies()
         .expect_err("part-byte limit must reject owner");
     assert!(part_error.to_string().contains("limit"));
     assert_eq!(package_bytes(&package), before);
 
-    let mut record_limit = ReadLimits::DEFAULT;
+    let mut record_limit = SemanticLimits::DEFAULT;
     record_limit.max_records = 1;
     let record_error = package
-        .volatile_dependencies_with_limits(record_limit)
+        .with_semantic_limits(
+            litchi_xlsb::SemanticLimits::new().volatile_dependencies(record_limit),
+        )
+        .volatile_dependencies()
         .expect_err("record limit must reject owner");
     assert!(record_error.to_string().contains("limit"));
     assert_eq!(package_bytes(&package), before);
 
-    let mut relationship_limit = ReadLimits::DEFAULT;
+    let mut relationship_limit = SemanticLimits::DEFAULT;
     relationship_limit.max_relationships = 0;
     let relationship_error = package
-        .volatile_dependencies_with_limits(relationship_limit)
+        .with_semantic_limits(
+            litchi_xlsb::SemanticLimits::new().volatile_dependencies(relationship_limit),
+        )
+        .volatile_dependencies()
         .expect_err("relationship limit must reject source closure");
     assert!(relationship_error.to_string().contains("limit"));
     assert_eq!(package_bytes(&package), before);

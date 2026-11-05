@@ -9,18 +9,15 @@
 
 use std::borrow::Cow;
 
-use litchi_rtf::{
-    Annotation, Note, RtfDocument, RtfWriter, Shape, ShapeGroup, ShapeType, StoryDrawing,
-};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{Annotation, Note, Shape, ShapeGroup, ShapeType, StoryDrawing, write::Writer};
 
 const ROOT_SHAPE: &str = r"{\shp{\*\shpinst{\sp{\sn shapeType}{\sv 1}}}}";
 const ROOT_GROUP: &str = r"{\shpgrp{\*\shpinst{\shp{\*\shpinst{\sp{\sn shapeType}{\sv 1}}}}}}";
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
@@ -56,7 +53,7 @@ fn preserves_equal_offset_cross_kind_order_in_every_story() {
         r"}}Q}",
     ]
     .concat();
-    let document = RtfDocument::parse(&source).unwrap();
+    let document = Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         document.drawing_order(),
         &[
@@ -93,7 +90,8 @@ fn preserves_equal_offset_cross_kind_order_in_every_story() {
         [StoryDrawing::ShapeGroup(0), StoryDrawing::Shape(0)]
     );
 
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.drawing_order(), document.drawing_order());
     assert_eq!(
         reparsed.sections()[0].headers_footers[0].drawing_order,
@@ -132,7 +130,7 @@ fn root_drawings_round_trip_in_every_representable_story() {
         r"}}}Q}",
     ]
     .concat();
-    let document = RtfDocument::parse(&source).unwrap();
+    let document = Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(document.text(), "XYZQ");
     assert_eq!(document.shapes().len(), 1);
     assert_eq!(document.shape_groups().len(), 0);
@@ -156,7 +154,8 @@ fn root_drawings_round_trip_in_every_representable_story() {
     assert_eq!(text_box.text_shapes[0].position, 1);
     assert_eq!(text_box.text_shape_groups[0].position, "a你".len());
 
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.notes().len(), 2);
     assert_eq!(reparsed.notes()[0].shapes[0].position, 1);
@@ -169,7 +168,7 @@ fn root_drawings_round_trip_in_every_representable_story() {
 fn legacy_text_box_story_owns_root_drawings() {
     let story = unicode_drawing_story();
     let source = [r"{\rtf1 A{\*\do\dptxbx{\dptxbxtext ", &story, r"}}B}"].concat();
-    let document = RtfDocument::parse(&source).unwrap();
+    let document = Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(document.text(), "AB");
     assert!(document.shapes().is_empty());
     assert!(document.shape_groups().is_empty());
@@ -177,19 +176,21 @@ fn legacy_text_box_story_owns_root_drawings() {
     assert_eq!(text_box.text, "a你b");
     assert_eq!(text_box.shapes[0].position, 1);
     assert_eq!(text_box.shape_groups[0].position, "a你".len());
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.legacy_text_boxes(), document.legacy_text_boxes());
 }
 
 #[test]
 fn captures_note_drawings_after_text_inside_formatting_groups() {
     let source = format!(r"{{\rtf1 A{{\footnote pre{{\b mid{ROOT_SHAPE}tail}}post}}B}}");
-    let document = RtfDocument::parse(&source).unwrap();
+    let document = Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let note = &document.notes()[0];
     assert_eq!(note.content, "premidtailpost");
     assert_eq!(note.shapes[0].position, "premid".len());
     assert!(document.shapes().is_empty());
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.notes()[0].content, note.content);
     assert_eq!(reparsed.notes()[0].shapes[0].position, "premid".len());
 }
@@ -205,7 +206,11 @@ fn typed_story_apis_enforce_local_and_main_utf8_boundaries() {
     note.push_shape(shape.clone()).unwrap();
     note.position = 2;
 
-    let mut document = RtfDocument::parse(r"{\rtf1 A\u20320?B}").unwrap();
+    let mut document = Tree::parse(
+        r"{\rtf1 A\u20320?B}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert!(document.push_note(note.clone()).is_err());
     note.position = "A你".len();
     document.push_note(note).unwrap();
@@ -232,7 +237,10 @@ fn rejects_starred_story_drawings_and_recursive_text_story_abuse() {
         r"{\rtf1{\endnote{\*\shpgrp x}}}".to_string(),
         r"{\rtf1{\*\do\dptxbx{\dptxbxtext{\*\shp x}}}}".to_string(),
     ] {
-        assert!(RtfDocument::parse(&source).is_err(), "accepted {source}");
+        assert!(
+            Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted {source}"
+        );
     }
 
     let mut nested = Shape::text_box(Cow::Borrowed(""));
@@ -265,7 +273,8 @@ fn real_libreoffice_story_fixtures_round_trip_with_stable_ownership() {
         "../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/shptxt-pard.rtf",
     ] {
         let source = std::fs::read(manifest.join(relative)).unwrap();
-        let document = RtfDocument::parse_bytes(&source).unwrap();
+        let document =
+            Tree::parse_bytes(&source, litchi_rtf::read::OpenOptions::default()).unwrap();
         let note_count = document.notes().len();
         let annotation_count = document.annotations().len();
         let text_frame_count = document
@@ -273,7 +282,8 @@ fn real_libreoffice_story_fixtures_round_trip_with_stable_ownership() {
             .iter()
             .filter(|shape| shape.text_destination_present)
             .count();
-        let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+        let reparsed =
+            Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
         assert_eq!(reparsed.text(), document.text(), "{relative}");
         assert_eq!(reparsed.notes().len(), note_count, "{relative}");
         assert_eq!(reparsed.annotations().len(), annotation_count, "{relative}");

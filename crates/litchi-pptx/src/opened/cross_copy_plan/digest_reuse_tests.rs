@@ -29,7 +29,6 @@ use std::fmt::Write as _;
 use sha2::{Digest, Sha256};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
-use super::{CrossSlideCopyPatch, CrossSlideCopyPlan};
 use crate::media_parts::Resource;
 use crate::opened::Limits;
 use crate::{Package, Result};
@@ -76,19 +75,20 @@ fn flat(len: usize) -> Vec<u8> {
 }
 
 fn authored(prefix: &str, slides: usize) -> Result<Vec<u8>> {
-    let mut package = Package::new()?;
-    let presentation = package.presentation_mut()?;
+    let mut builder = crate::builder::Builder::new()?;
+    let presentation = builder.presentation()?;
     for index in 0..slides {
         presentation
             .add_slide()?
             .set_title(&format!("change-0751-{prefix}-{index}"));
     }
+    let package = builder.build()?;
     package.to_bytes()
 }
 
 fn with_pictures(bytes: &[u8], slide: usize, pictures: &[(&str, &str, &[u8])]) -> Result<Vec<u8>> {
     let mut package = Package::from_bytes(bytes)?;
-    let mut edit = package.opened_presentation_transaction()?;
+    let mut edit = package.edit()?;
     for (index, (part_name, content_type, data)) in pictures.iter().enumerate() {
         edit.add_picture(
             slide,
@@ -98,15 +98,17 @@ fn with_pictures(bytes: &[u8], slide: usize, pictures: &[(&str, &str, &[u8])]) -
         )?;
     }
     let commit = edit.commit()?;
-    package.apply_opened_presentation_commit(commit)?;
+    package = commit.into_package();
     package.to_bytes()
 }
 
 /// Rewrite every member through a fresh writer, storing the members `stored`
 /// selects and deflating the rest with known sizes.
 fn repack(bytes: &[u8], stored: impl Fn(&str) -> bool) -> Vec<u8> {
-    let reader = ArchiveReader::new(bytes).expect("fixture archive");
-    let mut writer = StreamingArchiveWriter::new();
+    let reader = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
+        .expect("fixture archive");
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in reader.file_names() {
         let payload = reader.read(name).expect("fixture member");
         if stored(name) {
@@ -142,7 +144,7 @@ fn plain_pair() -> Result<(Vec<u8>, Vec<u8>)> {
     ))
 }
 
-fn plan_copy(source: &Package, destination: &Package) -> Result<CrossSlideCopyPlan> {
+fn plan_copy(source: &Package, destination: &Package) -> Result<crate::cross_slide_copy::Plan> {
     destination.opened_presentation()?.plan_cross_slide_copy(
         &source.opened_presentation()?,
         SOURCE_SLIDE,
@@ -151,7 +153,11 @@ fn plan_copy(source: &Package, destination: &Package) -> Result<CrossSlideCopyPl
     )
 }
 
-fn record_patch(transcript: &mut String, label: &str, patch: &CrossSlideCopyPatch) -> Result<()> {
+fn record_patch(
+    transcript: &mut String,
+    label: &str,
+    patch: &crate::cross_slide_copy::Patch,
+) -> Result<()> {
     writeln!(transcript, "{label}.bytes={}", hex(&patch.to_bytes()?)).unwrap();
     writeln!(
         transcript,
@@ -218,8 +224,8 @@ fn record_outcome(
 /// Everything one pair publishes and refuses, by plan and by durable patch.
 fn pair_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8]) -> Result<String> {
     let mut transcript = String::new();
-    let source = Package::from_vec(source_bytes.to_vec())?;
-    let destination = Package::from_vec(destination_bytes.to_vec())?;
+    let source = Package::from_reader(std::io::Cursor::new(source_bytes.to_vec()))?;
+    let destination = Package::from_reader(std::io::Cursor::new(destination_bytes.to_vec()))?;
     let plan = plan_copy(&source, &destination)?;
     writeln!(
         transcript,
@@ -228,11 +234,12 @@ fn pair_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8]) -
     )
     .unwrap();
     record_patch(&mut transcript, &format!("{label}.plan"), plan.patch())?;
-    let durable = CrossSlideCopyPatch::from_bytes(&plan.patch().to_bytes()?)?;
+    let durable =
+        crate::cross_slide_copy::Patch::from_bytes(&plan.patch().to_bytes()?, Limits::default())?;
 
     // The plan, retained and released, into the destination it was planned
     // against and into a fresh open of the same bytes.
-    let mut retained = Package::from_vec(destination_bytes.to_vec())?;
+    let mut retained = Package::from_reader(std::io::Cursor::new(destination_bytes.to_vec()))?;
     let outcome = retained.apply_cross_slide_copy_plan(&source, &plan);
     record_outcome(
         &mut transcript,
@@ -242,7 +249,7 @@ fn pair_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8]) -
     )?;
     let mut released_plan = plan.clone();
     released_plan.release_retained_candidate();
-    let mut released = Package::from_vec(destination_bytes.to_vec())?;
+    let mut released = Package::from_reader(std::io::Cursor::new(destination_bytes.to_vec()))?;
     let outcome = released.apply_cross_slide_copy_plan(&source, &released_plan);
     record_outcome(
         &mut transcript,
@@ -263,7 +270,7 @@ fn pair_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8]) -
 
     // The durable patch forward, its inverse (undo) and the forward again
     // (redo), by patch; then redo by plan.
-    let mut patched = Package::from_vec(destination_bytes.to_vec())?;
+    let mut patched = Package::from_reader(std::io::Cursor::new(destination_bytes.to_vec()))?;
     let outcome = patched.apply_cross_slide_copy_patch(&source, &durable);
     record_outcome(
         &mut transcript,
@@ -310,12 +317,12 @@ fn pair_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8]) -
     )?;
 
     // A destination that moved after planning is refused.
-    let mut moved = Package::from_vec(destination_bytes.to_vec())?;
+    let mut moved = Package::from_reader(std::io::Cursor::new(destination_bytes.to_vec()))?;
     {
-        let mut edit = moved.opened_presentation_transaction()?;
+        let mut edit = moved.edit()?;
         edit.set_shape_text(0, crate::shape::Key::Index(0), "change-0751 moved")?;
         let commit = edit.commit()?;
-        moved.apply_opened_presentation_commit(commit)?;
+        moved = commit.into_package();
     }
     let outcome = moved.apply_cross_slide_copy_plan(&source, &plan);
     record_outcome(
@@ -326,14 +333,14 @@ fn pair_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8]) -
     )?;
 
     // A source that moved after planning, and a foreign source, are refused.
-    let mut moved_source = Package::from_vec(source_bytes.to_vec())?;
+    let mut moved_source = Package::from_reader(std::io::Cursor::new(source_bytes.to_vec()))?;
     {
-        let mut edit = moved_source.opened_presentation_transaction()?;
+        let mut edit = moved_source.edit()?;
         edit.set_shape_text(0, crate::shape::Key::Index(0), "change-0751 moved source")?;
         let commit = edit.commit()?;
-        moved_source.apply_opened_presentation_commit(commit)?;
+        moved_source = commit.into_package();
     }
-    let mut target = Package::from_vec(destination_bytes.to_vec())?;
+    let mut target = Package::from_reader(std::io::Cursor::new(destination_bytes.to_vec()))?;
     let outcome = target.apply_cross_slide_copy_plan(&moved_source, &plan);
     record_outcome(
         &mut transcript,
@@ -341,7 +348,7 @@ fn pair_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8]) -
         &mut target,
         outcome,
     )?;
-    let foreign = Package::from_vec(destination_bytes.to_vec())?;
+    let foreign = Package::from_reader(std::io::Cursor::new(destination_bytes.to_vec()))?;
     let outcome = target.apply_cross_slide_copy_plan(&foreign, &plan);
     record_outcome(
         &mut transcript,
@@ -353,7 +360,7 @@ fn pair_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8]) -
     // A destination with the same content and different archive bytes is
     // refused by the physical proof.
     let repacked = repack(destination_bytes, |_name| true);
-    let mut physical = Package::from_vec(repacked)?;
+    let mut physical = Package::from_reader(std::io::Cursor::new(repacked))?;
     let outcome = physical.apply_cross_slide_copy_plan(&source, &plan);
     record_outcome(
         &mut transcript,
@@ -364,8 +371,8 @@ fn pair_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8]) -
 
     // A destination whose exact-source authorization an edit revoked while
     // keeping its bytes accepts the copy and publishes the same output.
-    let mut revoked = Package::from_vec(destination_bytes.to_vec())?;
-    revoked.edit_opc(|opc| {
+    let mut revoked = Package::from_reader(std::io::Cursor::new(destination_bytes.to_vec()))?;
+    revoked.edit_opc_in_place(|opc| {
         opc.set_save_options(litchi_opc::SaveOptions::default());
         Ok(())
     })?;
@@ -378,12 +385,12 @@ fn pair_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8]) -
     )?;
 
     // A source edited back to its own bytes plans and publishes the same copy.
-    let mut resaved_source = Package::from_vec(source_bytes.to_vec())?;
-    resaved_source.edit_opc(|opc| {
+    let mut resaved_source = Package::from_reader(std::io::Cursor::new(source_bytes.to_vec()))?;
+    resaved_source.edit_opc_in_place(|opc| {
         opc.set_save_options(litchi_opc::SaveOptions::default());
         Ok(())
     })?;
-    let fresh = Package::from_vec(destination_bytes.to_vec())?;
+    let fresh = Package::from_reader(std::io::Cursor::new(destination_bytes.to_vec()))?;
     let replanned = plan_copy(&resaved_source, &fresh)?;
     record_patch(
         &mut transcript,
@@ -450,8 +457,8 @@ impl litchi_opc::Part for CallerPart {
 
 /// Open `bytes` and add a [`CallerPart`].
 fn with_caller_part(bytes: &[u8]) -> Result<Package> {
-    let mut package = Package::from_vec(bytes.to_vec())?;
-    package.opc.try_add_part(Box::new(CallerPart::new(
+    let mut package = Package::from_reader(std::io::Cursor::new(bytes.to_vec()))?;
+    std::sync::Arc::make_mut(&mut package.opc).try_add_part(Box::new(CallerPart::new(
         b"change-0751 caller-defined payload".to_vec(),
     )))?;
     Ok(package)
@@ -462,7 +469,7 @@ fn with_caller_part(bytes: &[u8]) -> Result<Package> {
 /// an ordinary destination with the same bytes, applied to it.
 fn caller_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8]) -> Result<String> {
     let mut transcript = String::new();
-    let source = Package::from_vec(source_bytes.to_vec())?;
+    let source = Package::from_reader(std::io::Cursor::new(source_bytes.to_vec()))?;
     let mut custom = with_caller_part(destination_bytes)?;
     let custom_bytes = litchi_opc::PackageWriter::to_bytes(&custom.opc)?;
     writeln!(transcript, "{label}.caller.bytes={}", hex(&custom_bytes)).unwrap();
@@ -472,7 +479,8 @@ fn caller_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8])
         &format!("{label}.caller.plan"),
         plan.patch(),
     )?;
-    let durable = CrossSlideCopyPatch::from_bytes(&plan.patch().to_bytes()?)?;
+    let durable =
+        crate::cross_slide_copy::Patch::from_bytes(&plan.patch().to_bytes()?, Limits::default())?;
     let outcome = custom.apply_cross_slide_copy_plan(&source, &plan);
     record_outcome(
         &mut transcript,
@@ -496,7 +504,7 @@ fn caller_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8])
         outcome,
     )?;
 
-    let ordinary = Package::from_vec(custom_bytes)?;
+    let ordinary = Package::from_reader(std::io::Cursor::new(custom_bytes))?;
     let ordinary_plan = plan_copy(&source, &ordinary)?;
     record_patch(
         &mut transcript,
@@ -511,7 +519,10 @@ fn caller_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8])
         &mut target,
         outcome,
     )?;
-    let ordinary_durable = CrossSlideCopyPatch::from_bytes(&ordinary_plan.patch().to_bytes()?)?;
+    let ordinary_durable = crate::cross_slide_copy::Patch::from_bytes(
+        &ordinary_plan.patch().to_bytes()?,
+        Limits::default(),
+    )?;
     let mut target = with_caller_part(destination_bytes)?;
     let outcome = target.apply_cross_slide_copy_patch(&source, &ordinary_durable);
     record_outcome(
@@ -528,8 +539,8 @@ fn caller_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8])
 /// applied when it plans.
 fn limits_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8]) -> Result<String> {
     let mut transcript = String::new();
-    let source = Package::from_vec(source_bytes.to_vec())?;
-    let destination = Package::from_vec(destination_bytes.to_vec())?;
+    let source = Package::from_reader(std::io::Cursor::new(source_bytes.to_vec()))?;
+    let destination = Package::from_reader(std::io::Cursor::new(destination_bytes.to_vec()))?;
     let bytes = plan_copy(&source, &destination)?.patch().to_bytes()?;
     for (name, bound) in [
         ("patch", bytes.len()),
@@ -542,9 +553,10 @@ fn limits_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8])
             .expect("finite nonzero limits");
         let stage = format!("{label}.limits.{name}");
         writeln!(transcript, "{stage}.bound={bound}").unwrap();
-        match CrossSlideCopyPatch::from_bytes_with_limits(&bytes, limits) {
+        match crate::cross_slide_copy::Patch::from_bytes(&bytes, limits) {
             Ok(patch) => {
-                let mut target = Package::from_vec(destination_bytes.to_vec())?;
+                let mut target =
+                    Package::from_reader(std::io::Cursor::new(destination_bytes.to_vec()))?;
                 let outcome = target.apply_cross_slide_copy_patch(&source, &patch);
                 record_outcome(
                     &mut transcript,
@@ -570,7 +582,8 @@ fn limits_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8])
         match planned {
             Ok(plan) => {
                 record_patch(&mut transcript, &format!("{stage}.plan"), plan.patch())?;
-                let mut target = Package::from_vec(destination_bytes.to_vec())?;
+                let mut target =
+                    Package::from_reader(std::io::Cursor::new(destination_bytes.to_vec()))?;
                 let outcome = target.apply_cross_slide_copy_plan(&source, &plan);
                 record_outcome(
                     &mut transcript,
@@ -639,15 +652,15 @@ media.patch.undo2.published=c1b8ae334472a75240e2590b9925f5fe50387d45e1c623b3d99d
 media.patch.undo2.revision=3b5d7eeaa2760d75a1f54329cca73475b9b14b67b4afe0c4ce6e836f63fd46a2
 media.plan.redo.published=6545174ab647b7e9bc2ed1cd9d032e5196f108b05f73d8b9a7e3e21d964c1771
 media.plan.redo.revision=eb7c1a3e673d5fe956bd8ece62baad39cd6c162a97d90c26f6f0feb77e803bb8
-media.patch.stale.refused=UnsafeEdit { operation: "apply_cross_slide_copy_patch", reason: "the complete destination package graph differs from the cross-slide patch source" }
+media.patch.stale.refused=PatchConflict
 media.patch.stale.untouched=6545174ab647b7e9bc2ed1cd9d032e5196f108b05f73d8b9a7e3e21d964c1771
-media.stale.destination.refused=UnsafeEdit { operation: "apply_cross_slide_copy_plan", reason: "the complete destination package graph changed after cross-slide planning" }
+media.stale.destination.refused=PatchConflict
 media.stale.destination.untouched=632b53ac43e445b7bbe04e91b572c73e8279692549fc847bd5e2d81f4e6649ba
-media.stale.source.refused=UnsafeEdit { operation: "apply_cross_slide_copy_plan", reason: "the complete source package graph changed after cross-slide planning" }
+media.stale.source.refused=PatchConflict
 media.stale.source.untouched=c1b8ae334472a75240e2590b9925f5fe50387d45e1c623b3d99d16baae91d58d
-media.foreign.source.refused=UnsafeEdit { operation: "apply_cross_slide_copy_plan", reason: "the complete source package graph changed after cross-slide planning" }
+media.foreign.source.refused=PatchConflict
 media.foreign.source.untouched=c1b8ae334472a75240e2590b9925f5fe50387d45e1c623b3d99d16baae91d58d
-media.stale.physical.refused=UnsafeEdit { operation: "apply_cross_slide_copy_plan", reason: "the serialized destination package changed after cross-slide planning" }
+media.stale.physical.refused=PatchConflict
 media.stale.physical.untouched=a02526ca7578418779cbb042e51a60e2c4c34927e36e894e42bdb4dbf879fdb2
 media.revoked.destination.published=6545174ab647b7e9bc2ed1cd9d032e5196f108b05f73d8b9a7e3e21d964c1771
 media.revoked.destination.revision=eb7c1a3e673d5fe956bd8ece62baad39cd6c162a97d90c26f6f0feb77e803bb8
@@ -688,15 +701,15 @@ plain.patch.undo2.published=6cdd00f339051b5f0a35d4809233fd3f64e7cbee86d9524bd8fe
 plain.patch.undo2.revision=a2d91ca61d9019c584e33862ae72549b48929004232ac67d61dae3dcf75a633b
 plain.plan.redo.published=15aa2b596658ca2baa30e0b9b2274ed69ee508a2a6da97a82982eb30bc4a530d
 plain.plan.redo.revision=0efbb26e7c5f17d10013ff269f43d1912a05037d809ab6c7eeab74e0b7e64632
-plain.patch.stale.refused=UnsafeEdit { operation: "apply_cross_slide_copy_patch", reason: "the complete destination package graph differs from the cross-slide patch source" }
+plain.patch.stale.refused=PatchConflict
 plain.patch.stale.untouched=15aa2b596658ca2baa30e0b9b2274ed69ee508a2a6da97a82982eb30bc4a530d
-plain.stale.destination.refused=UnsafeEdit { operation: "apply_cross_slide_copy_plan", reason: "the complete destination package graph changed after cross-slide planning" }
+plain.stale.destination.refused=PatchConflict
 plain.stale.destination.untouched=216a1dd43508078d378f461986537efed6c1ed31f874d67bdd1bc469715b3d9b
-plain.stale.source.refused=UnsafeEdit { operation: "apply_cross_slide_copy_plan", reason: "the complete source package graph changed after cross-slide planning" }
+plain.stale.source.refused=PatchConflict
 plain.stale.source.untouched=6cdd00f339051b5f0a35d4809233fd3f64e7cbee86d9524bd8fe748c44722db4
-plain.foreign.source.refused=UnsafeEdit { operation: "apply_cross_slide_copy_plan", reason: "the complete source package graph changed after cross-slide planning" }
+plain.foreign.source.refused=PatchConflict
 plain.foreign.source.untouched=6cdd00f339051b5f0a35d4809233fd3f64e7cbee86d9524bd8fe748c44722db4
-plain.stale.physical.refused=UnsafeEdit { operation: "apply_cross_slide_copy_plan", reason: "the serialized destination package changed after cross-slide planning" }
+plain.stale.physical.refused=PatchConflict
 plain.stale.physical.untouched=c7e61fcbbd418b98d29d47aed30a6e8202e697b4443440bf648e2f8501c83a7d
 plain.revoked.destination.published=15aa2b596658ca2baa30e0b9b2274ed69ee508a2a6da97a82982eb30bc4a530d
 plain.revoked.destination.revision=0efbb26e7c5f17d10013ff269f43d1912a05037d809ab6c7eeab74e0b7e64632
@@ -736,9 +749,9 @@ media.caller.ordinary.plan.source_physical=770d39d094ed3fbcad1778de65b02a4ad6ea7
 media.caller.ordinary.plan.destination_physical=14512ef6686232f1459e79c19c8f0dfd259ad2bbc653b699020435cfc512b30f
 media.caller.ordinary.plan.target_physical=71b1578456b8b11bc7a674b5ae91864cd56e3a9c4c9aa0fc7305292de12edc62
 media.caller.ordinary.plan.transfers=true
-media.caller.ordinary.apply.refused=SlideCopyPlan { kind: CallerDefinedPart, detail: "a cross-slide copy that frames source-compressed media publishes the reopen of the destination's bytes, which cannot keep its caller-defined parts; plan the copy against this destination to record the recompressing route" }
+media.caller.ordinary.apply.refused=Refused(Refusal { kind: UnsupportedOperation, operation: "slide_copy", reason: "the selected slide cannot be copied losslessly because the destination has caller-defined parts" })
 media.caller.ordinary.apply.untouched=0f9c088a35ff12285497a2c55156f57712059c4941f8405f26b2f7f0c7ba98f0
-media.caller.ordinary.patch.refused=SlideCopyPlan { kind: CallerDefinedPart, detail: "a cross-slide copy that frames source-compressed media publishes the reopen of the destination's bytes, which cannot keep its caller-defined parts; plan the copy against this destination to record the recompressing route" }
+media.caller.ordinary.patch.refused=Refused(Refusal { kind: UnsupportedOperation, operation: "slide_copy", reason: "the selected slide cannot be copied losslessly because the destination has caller-defined parts" })
 media.caller.ordinary.patch.untouched=0f9c088a35ff12285497a2c55156f57712059c4941f8405f26b2f7f0c7ba98f0
 plain.caller.bytes=0c13f8aaed85234850be3ba4c2e222d4345aabd98e71ce246ece2040816b7d5a
 plain.caller.plan.bytes=ff2463aaa8651275719ef8c22553c14583f5ecf984aafe4078bc88432d0f2c43
@@ -786,7 +799,7 @@ media.limits.destination-under.patch.refused=Limit { resource: "cross-slide seri
 media.limits.destination-under.patch.untouched=c1b8ae334472a75240e2590b9925f5fe50387d45e1c623b3d99d16baae91d58d
 media.limits.destination-under.plan.refused=Limit { resource: "cross-slide candidate patch bytes", limit: 72047 }
 media.limits.destination-exact.bound=72048
-media.limits.destination-exact.patch.refused=UnsafeEdit { operation: "apply_cross_slide_copy_patch", reason: "the durable cross-slide patch does not match a freshly proven candidate" }
+media.limits.destination-exact.patch.refused=PatchConflict
 media.limits.destination-exact.patch.untouched=c1b8ae334472a75240e2590b9925f5fe50387d45e1c623b3d99d16baae91d58d
 media.limits.destination-exact.plan.refused=Limit { resource: "cross-slide candidate patch bytes", limit: 72048 }
 plain.limits.patch.bound=4895
@@ -798,7 +811,7 @@ plain.limits.source-under.patch.refused=Limit { resource: "cross-slide serialize
 plain.limits.source-under.patch.untouched=6cdd00f339051b5f0a35d4809233fd3f64e7cbee86d9524bd8fe748c44722db4
 plain.limits.source-under.plan.refused=Limit { resource: "cross-slide serialized archive bytes", limit: 31374 }
 plain.limits.source-exact.bound=31375
-plain.limits.source-exact.patch.refused=UnsafeEdit { operation: "apply_cross_slide_copy_patch", reason: "the durable cross-slide patch does not match a freshly proven candidate" }
+plain.limits.source-exact.patch.refused=PatchConflict
 plain.limits.source-exact.patch.untouched=6cdd00f339051b5f0a35d4809233fd3f64e7cbee86d9524bd8fe748c44722db4
 plain.limits.source-exact.plan.refused=Limit { resource: "cross-slide serialized archive bytes", limit: 31375 }
 plain.limits.destination-under.bound=30460
@@ -811,14 +824,25 @@ plain.limits.destination-exact.patch.untouched=6cdd00f339051b5f0a35d4809233fd3f6
 plain.limits.destination-exact.plan.refused=Limit { resource: "cross-slide serialized archive bytes", limit: 30461 }
 "#;
 
-/// Every durable patch byte, recorded revision, published byte, snapshot
-/// revision and refusal of the scenarios equals the base's. Debug and test
-/// builds also re-derive every memoized digest these routes reuse.
+/// LPTX0003 changes wire hashes and size-dependent refusal points. The original
+/// transcript remains frozen; all its non-wire, non-limit outcomes still agree.
+/// The versioned transcript checks every current wire and refusal outcome too.
 #[test]
-fn every_patch_revision_output_and_refusal_matches_the_base() -> Result<()> {
+fn versioned_patch_wire_preserves_base_revisions_and_publication() -> Result<()> {
     let transcript = full_transcript()?;
     let actual: Vec<&str> = transcript.lines().collect();
-    let expected: Vec<&str> = GOLDEN.lines().collect();
+    let expected: Vec<&str> = include_str!("digest_reuse_lptx0003.golden.txt")
+        .lines()
+        .collect();
+    for legacy in GOLDEN.lines() {
+        let (key, _) = legacy.split_once('=').expect("golden row");
+        if !key.contains(".limits.") && !key.ends_with(".bytes") && !key.ends_with(".inverse") {
+            assert!(
+                actual.contains(&legacy),
+                "non-wire legacy outcome changed: {key}"
+            );
+        }
+    }
     for (index, (actual, expected)) in actual.iter().zip(&expected).enumerate() {
         assert_eq!(
             actual, expected,

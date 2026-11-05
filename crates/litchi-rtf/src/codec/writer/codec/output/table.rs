@@ -9,16 +9,15 @@ use std::ops::Range;
 use super::super::{
     Border, BorderStyle, Cell, CellStoryEvent, Field, FieldOwner, FloatingTablePosition,
     MAX_TABLE_CELLS_PER_ROW, MAX_TABLE_NESTING_DEPTH, NavigationEntry, Revision, RevisionType, Row,
-    RtfWriter, ShadingPattern, StoryDrawing, Table, TableAutoformatFlag, TableCellBorders,
-    TableCellMergeRole, TableCellTextFlow, TableCellVerticalAlignment, TableDistanceUnit,
-    TableEdgeDistances, TableHorizontalPosition, TableHorizontalReference, TableIndentUnit,
-    TablePreferredWidth, TablePreferredWidthUnit, TableRowAlignment, TableRowBandIndex,
-    TableRowBorders, TableRowCellDefaults, TableRowGeometry, TableRowHeight, TableShading,
-    TableVerticalPosition, TableVerticalReference, TextDirection, Write, invalid_story_reference,
-    io,
+    ShadingPattern, StoryDrawing, Table, TableAutoformatFlag, TableCellBorders, TableCellMergeRole,
+    TableCellTextFlow, TableCellVerticalAlignment, TableDistanceUnit, TableEdgeDistances,
+    TableHorizontalPosition, TableHorizontalReference, TableIndentUnit, TablePreferredWidth,
+    TablePreferredWidthUnit, TableRowAlignment, TableRowBandIndex, TableRowBorders,
+    TableRowCellDefaults, TableRowGeometry, TableRowHeight, TableShading, TableVerticalPosition,
+    TableVerticalReference, TextDirection, Write, Writer, invalid_story_reference, io,
 };
 
-impl<W: Write> RtfWriter<W> {
+impl<W: Write> Writer<W> {
     /// Write a table
     pub(in super::super) fn write_table(
         &mut self,

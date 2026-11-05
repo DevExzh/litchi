@@ -5,9 +5,10 @@
 //! OPC relationship graph loading and deterministic snapshot storage.
 
 use super::codec::{
-    add_total, document_references, invalid, is_chart_rel, limit, ownership, relationship_target,
-    require_content_type, scan_chart_xml, validate_companion_xml, validate_graph_value,
-    validate_id, validate_leaf_path,
+    add_total, document_references_with_limits, invalid, is_chart_rel, ownership,
+    relationship_target, require_content_type, scan_chart_xml_with_limits,
+    validate_companion_xml_with_limits, validate_graph_value_with_limits, validate_id,
+    validate_leaf_path,
 };
 use super::model::{
     CHART_CT, COLOR_STYLE_CT, COLOR_STYLE_REL, Companion, DOCUMENT_CT, EmbeddedWorkbook,
@@ -19,21 +20,24 @@ use litchi_opc::part::{BlobPart, Part};
 use litchi_opc::{OpcPackage, PackURI};
 use std::collections::{BTreeSet, HashSet};
 
-/// Load the complete bounded chart graph owned by a DOCX main document.
-///
-/// # Errors
-///
-/// Returns an error if the operation cannot be completed.
-pub fn load(package: &OpcPackage, document_name: &PackURI) -> Result<Graph> {
+pub(crate) fn load_with_limits(
+    package: &OpcPackage,
+    document_name: &PackURI,
+    limits: &super::Limits,
+) -> Result<Graph> {
     let document = package.get_part(document_name)?;
     if document.content_type() != DOCUMENT_CT {
         return Err(invalid(
             "classic chart graph requires a macro-free DOCX main part",
         ));
     }
-    let (conformance, references) = document_references(document.blob())?;
+    let (conformance, references) = document_references_with_limits(document.blob(), limits)?;
     if references.len() > MAX_CHARTS {
-        return Err(limit("chart count"));
+        return Err(Error::ChartLimit {
+            kind: crate::chart::LimitKind::Count,
+            actual: references.len(),
+            maximum: MAX_CHARTS,
+        });
     }
     let reference_set: BTreeSet<_> = references.iter().cloned().collect();
     if reference_set.len() != references.len() {
@@ -76,15 +80,19 @@ pub fn load(package: &OpcPackage, document_name: &PackURI) -> Result<Graph> {
         }
         let chart_part = package.get_part(&chart_name)?;
         require_content_type(chart_part, CHART_CT, "chart")?;
-        let scan = scan_chart_xml(chart_part.blob(), conformance)?;
+        let scan = scan_chart_xml_with_limits(chart_part.blob(), conformance, limits)?;
         add_total(
             &mut total,
             chart_part.blob().len(),
             super::model::MAX_CHART_XML,
-            "chart bytes",
+            crate::chart::LimitKind::Bytes,
         )?;
         if chart_part.rels().iter().count() > MAX_RELATIONSHIPS {
-            return Err(limit("chart relationship count"));
+            return Err(Error::ChartLimit {
+                kind: crate::chart::LimitKind::RelationshipCount,
+                actual: chart_part.rels().iter().count(),
+                maximum: MAX_RELATIONSHIPS,
+            });
         }
         let mut styles = Vec::new();
         let mut color_styles = Vec::new();
@@ -101,7 +109,11 @@ pub fn load(package: &OpcPackage, document_name: &PackURI) -> Result<Graph> {
             match child.reltype() {
                 STYLE_REL => {
                     if styles.len() >= MAX_COMPANIONS {
-                        return Err(limit("chart-style count"));
+                        return Err(Error::ChartLimit {
+                            kind: crate::chart::LimitKind::ChartStyleCount,
+                            actual: (styles.len()).saturating_add(1),
+                            maximum: MAX_COMPANIONS,
+                        });
                     }
                     let resource = load_companion(
                         package,
@@ -111,6 +123,7 @@ pub fn load(package: &OpcPackage, document_name: &PackURI) -> Result<Graph> {
                         "chartStyle",
                         "chart style",
                         &mut total,
+                        limits,
                     )?;
                     if !discovered_styles.insert(resource.part_name.clone()) {
                         return Err(invalid("chart-style part is shared or duplicated"));
@@ -119,7 +132,11 @@ pub fn load(package: &OpcPackage, document_name: &PackURI) -> Result<Graph> {
                 },
                 COLOR_STYLE_REL => {
                     if color_styles.len() >= MAX_COMPANIONS {
-                        return Err(limit("chart-color-style count"));
+                        return Err(Error::ChartLimit {
+                            kind: crate::chart::LimitKind::ChartColorStyleCount,
+                            actual: (color_styles.len()).saturating_add(1),
+                            maximum: MAX_COMPANIONS,
+                        });
                     }
                     let resource = load_companion(
                         package,
@@ -129,6 +146,7 @@ pub fn load(package: &OpcPackage, document_name: &PackURI) -> Result<Graph> {
                         "colorStyle",
                         "chart color style",
                         &mut total,
+                        limits,
                     )?;
                     if !discovered_colors.insert(resource.part_name.clone()) {
                         return Err(invalid("chart-color-style part is shared or duplicated"));
@@ -162,7 +180,7 @@ pub fn load(package: &OpcPackage, document_name: &PackURI) -> Result<Graph> {
                         &mut total,
                         part.blob().len(),
                         MAX_WORKBOOK_BYTES,
-                        "embedded workbook bytes",
+                        crate::chart::LimitKind::EmbeddedWorkbookBytes,
                     )?;
                     workbook = Some(EmbeddedWorkbook {
                         relationship_id: child.r_id().to_owned(),
@@ -217,22 +235,21 @@ pub fn load(package: &OpcPackage, document_name: &PackURI) -> Result<Graph> {
     })
 }
 
-/// Deterministically replace an already coherent, owned chart graph.
-/// All validation completes before package mutation.
-///
-/// # Errors
-///
-/// Returns an error if the operation cannot be completed.
-pub fn store(package: &mut OpcPackage, document_name: &PackURI, graph: &Graph) -> Result<()> {
-    let current = load(package, document_name)?;
-    validate_graph_value(graph)?;
+pub(crate) fn store_with_limits(
+    package: &mut OpcPackage,
+    document_name: &PackURI,
+    graph: &Graph,
+    limits: &super::Limits,
+) -> Result<()> {
+    let current = load_with_limits(package, document_name, limits)?;
+    validate_graph_value_with_limits(graph, limits)?;
     if ownership(&current) != ownership(graph) {
         return Err(invalid(
             "store cannot retarget or orphan existing chart resources",
         ));
     }
     let document = package.get_part(document_name)?;
-    let (conformance, references) = document_references(document.blob())?;
+    let (conformance, references) = document_references_with_limits(document.blob(), limits)?;
     if conformance != graph.conformance
         || references
             != graph
@@ -336,12 +353,19 @@ fn load_companion(
     root: &str,
     label: &str,
     total: &mut usize,
+    limits: &super::Limits,
 ) -> Result<Companion> {
     let target = relationship_target(source, relationship)?;
     validate_leaf_path(&target, "/word/charts/", label)?;
     let part = package.get_part(&target)?;
     require_content_type(part, content_type, label)?;
-    validate_companion_xml(part.blob(), MAX_COMPANION_XML, root, label)?;
+    validate_companion_xml_with_limits(
+        part.blob(),
+        limits.companion_xml_bytes(),
+        root,
+        label,
+        limits,
+    )?;
     if part.rels().iter().next().is_some() {
         return Err(invalid(format!(
             "{label} has unsupported outbound relationships"
@@ -351,7 +375,7 @@ fn load_companion(
         total,
         part.blob().len(),
         MAX_COMPANION_XML,
-        "chart companion bytes",
+        crate::chart::LimitKind::CompanionBytes,
     )?;
     Ok(Companion {
         relationship_id: relationship.r_id().to_owned(),

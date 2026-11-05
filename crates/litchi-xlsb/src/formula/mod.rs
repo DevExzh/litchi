@@ -21,22 +21,25 @@ pub const MAX_CELL_FORMULA_BYTES: usize = 16_384;
 pub enum Error {
     /// A formula or token violates the BIFF12 formula grammar.
     #[error("invalid formula: {0}")]
-    InvalidFormula(String),
+    InvalidFormula(&'static str),
     /// A cell or range coordinate is outside the Excel grid.
     #[error("invalid cell reference: {0}")]
-    InvalidCellReference(String),
+    InvalidCellReference(&'static str),
     /// A fixed-width payload is shorter than the required structure.
     #[error("invalid length: expected {expected}, found {found}")]
     InvalidLength { expected: usize, found: usize },
     /// A formula feature is valid but not supported by this codec.
     #[error("unsupported formula feature: {0}")]
-    UnsupportedFeature(String),
+    UnsupportedFeature(&'static str),
     /// Formula text requires workbook metadata that is missing or ambiguous.
     #[error("unresolved formula dependency: {0}")]
-    UnresolvedDependency(String),
+    UnresolvedDependency(&'static str),
     /// Text or primitive binary decoding failed.
     #[error("formula encoding: {0}")]
-    Encoding(String),
+    Encoding(&'static str),
+    /// The caller's raw payload or string-unit profile refused the input or output.
+    #[error(transparent)]
+    Wire(#[from] crate::raw::Error),
 }
 
 /// Result type for standalone formula codecs.

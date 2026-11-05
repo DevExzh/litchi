@@ -323,7 +323,7 @@ impl FileReplayStore {
     ) -> Result<Self, AuthoredReplayError> {
         if maximum == 0 || maximum == u64::MAX {
             return Err(AuthoredReplayError::Limit {
-                resource: "replay bytes",
+                kind: litchi_docx::source_backed::tail_append_stream::LimitKind::ReplayBytes,
                 actual: maximum,
                 maximum: maximum.saturating_sub(1),
             });
@@ -340,7 +340,7 @@ impl FileReplayStore {
     ) -> Result<Self, AuthoredReplayError> {
         if maximum == 0 || maximum == u64::MAX {
             return Err(AuthoredReplayError::Limit {
-                resource: "replay bytes",
+                kind: litchi_docx::source_backed::tail_append_stream::LimitKind::ReplayBytes,
                 actual: maximum,
                 maximum: maximum.saturating_sub(1),
             });
@@ -436,7 +436,7 @@ impl FileReplayStore {
         }
         if length > u64::MAX - 1 {
             return Err(AuthoredReplayError::Limit {
-                resource: "replay bytes",
+                kind: litchi_docx::source_backed::tail_append_stream::LimitKind::ReplayBytes,
                 actual: length,
                 maximum: u64::MAX - 1,
             });
@@ -483,18 +483,18 @@ impl FileReplayStore {
             .and_then(|value| value.checked_add(16 + 8 + 32))
             .and_then(|value| value.checked_add(32))
             .ok_or(AuthoredReplayError::Limit {
-                resource: "durable replay reference bytes",
+                kind: litchi_docx::source_backed::tail_append_stream::LimitKind::DurableReplayReferenceBytes,
                 actual: u64::MAX,
                 maximum: ABSOLUTE_REFERENCE_BYTES,
             })?;
         let total_u64 = u64::try_from(total).map_err(|_| AuthoredReplayError::Limit {
-            resource: "durable replay reference bytes",
+            kind: litchi_docx::source_backed::tail_append_stream::LimitKind::DurableReplayReferenceBytes,
             actual: u64::MAX,
             maximum: ABSOLUTE_REFERENCE_BYTES,
         })?;
         if total_u64 == 0 || total_u64 > ABSOLUTE_REFERENCE_BYTES || total_u64 > maximum {
             return Err(AuthoredReplayError::Limit {
-                resource: "durable replay reference bytes",
+                kind: litchi_docx::source_backed::tail_append_stream::LimitKind::DurableReplayReferenceBytes,
                 actual: total_u64,
                 maximum: maximum.min(ABSOLUTE_REFERENCE_BYTES),
             });
@@ -534,7 +534,7 @@ impl AuthoredReplayStore for FileReplayStore {
         }
         if self.maximum > limits.max_replay_bytes {
             return Err(AuthoredReplayError::Limit {
-                resource: "replay bytes",
+                kind: litchi_docx::source_backed::tail_append_stream::LimitKind::ReplayBytes,
                 actual: self.maximum,
                 maximum: limits.max_replay_bytes,
             });
@@ -570,7 +570,7 @@ impl AuthoredReplayStore for FileReplayStore {
             return Err(AuthoredReplayError::Changed);
         }
         let amount = u64::try_from(chunk.len()).map_err(|_| AuthoredReplayError::Limit {
-            resource: "replay bytes",
+            kind: litchi_docx::source_backed::tail_append_stream::LimitKind::ReplayBytes,
             actual: u64::MAX,
             maximum: self.maximum,
         })?;
@@ -578,13 +578,13 @@ impl AuthoredReplayStore for FileReplayStore {
             .logical_len
             .checked_add(amount)
             .ok_or(AuthoredReplayError::Limit {
-                resource: "replay bytes",
+                kind: litchi_docx::source_backed::tail_append_stream::LimitKind::ReplayBytes,
                 actual: u64::MAX,
                 maximum: self.maximum,
             })?;
         if next > self.maximum {
             return Err(AuthoredReplayError::Limit {
-                resource: "replay bytes",
+                kind: litchi_docx::source_backed::tail_append_stream::LimitKind::ReplayBytes,
                 actual: next,
                 maximum: self.maximum,
             });

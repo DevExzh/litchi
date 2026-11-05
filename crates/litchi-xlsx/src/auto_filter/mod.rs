@@ -5,15 +5,17 @@
 //! inert bounded data and replayed in its original child position.
 
 mod codec;
+pub mod edit;
 mod model;
 mod package;
 mod patch;
 mod snapshot;
-mod source;
+pub mod source;
 
 #[cfg(test)]
 mod tests;
 
+pub(crate) use codec::write_auto_filter_fragment_limited;
 pub use codec::{parse_auto_filter_fragment, write_auto_filter_fragment};
 pub use model::{
     Calendar, Color, Column, Condition, Custom, Customs, DateGroup, Definition, Dynamic,
@@ -21,6 +23,5 @@ pub use model::{
     UnknownAttribute, UnknownElement, Values,
 };
 pub use package::{parse_auto_filter, replace_auto_filter};
-pub use patch::{Commit, Diagnostics, Patch};
+pub(crate) use patch::Patch;
 pub use snapshot::Snapshot;
-pub use source::{SourceBackedEditor, SourceEdit};

@@ -67,28 +67,37 @@ pub fn parse_cell_reference(ref_str: &str) -> Result<(u32, u32)> {
         if ch.is_ascii_uppercase() {
             // Letters must come before digits
             if found_digit {
-                return Err(Error::InvalidCellReference(ref_str.to_string()));
+                return Err(Error::InvalidCellReference(
+                    "the cell reference is not valid",
+                ));
             }
             col_str.push(ch);
         } else if ch.is_ascii_digit() {
             found_digit = true;
             row_str.push(ch);
         } else {
-            return Err(Error::InvalidCellReference(ref_str.to_string()));
+            return Err(Error::InvalidCellReference(
+                "the cell reference is not valid",
+            ));
         }
     }
 
     if col_str.is_empty() || row_str.is_empty() {
-        return Err(Error::InvalidCellReference(ref_str.to_string()));
+        return Err(Error::InvalidCellReference(
+            "the cell reference is not valid",
+        ));
     }
 
-    let col = column_name_to_index(&col_str)
-        .ok_or_else(|| Error::InvalidCellReference(ref_str.to_string()))?;
+    let col = column_name_to_index(&col_str).ok_or(Error::InvalidCellReference(
+        "the cell reference is not valid",
+    ))?;
     let row: u32 = row_str
         .parse()
-        .map_err(|_| Error::InvalidCellReference(ref_str.to_string()))?;
+        .map_err(|_| Error::InvalidCellReference("the cell reference is not valid"))?;
     if row == 0 {
-        return Err(Error::InvalidCellReference(ref_str));
+        return Err(Error::InvalidCellReference(
+            "the cell reference is not valid",
+        ));
     }
 
     Ok((row - 1, col)) // Make 0-based

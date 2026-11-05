@@ -8,14 +8,14 @@ use crate::formula_metadata::{Cell as FormulaCell, Range as FormulaRange};
 
 #[test]
 fn test_create_writer() {
-    let writer = Writer::new();
+    let writer = Builder::new();
     assert_eq!(writer.worksheets.len(), 0);
     assert!(writer.shared_string_table().unwrap().strings().is_empty());
 }
 
 #[test]
 fn test_add_worksheet() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let idx = writer.add_worksheet("Sheet1").unwrap();
     assert_eq!(idx, 0);
     assert_eq!(writer.worksheets.len(), 1);
@@ -24,7 +24,7 @@ fn test_add_worksheet() {
 
 #[test]
 fn test_add_multiple_worksheets() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let idx1 = writer.add_worksheet("Sheet1").unwrap();
     let idx2 = writer.add_worksheet("Sheet2").unwrap();
     let idx3 = writer.add_worksheet("Sheet3").unwrap();
@@ -37,14 +37,14 @@ fn test_add_multiple_worksheets() {
 
 #[test]
 fn test_add_worksheet_empty_name() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let result = writer.add_worksheet("");
     assert!(result.is_err());
 }
 
 #[test]
 fn test_add_worksheet_long_name() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let long_name = "A".repeat(50);
     let result = writer.add_worksheet(&long_name);
     assert!(result.is_err()); // Name too long
@@ -52,7 +52,7 @@ fn test_add_worksheet_long_name() {
 
 #[test]
 fn test_add_worksheet_duplicate_name() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_worksheet("Sheet1").unwrap();
     let result = writer.add_worksheet("Sheet1");
     assert!(result.is_err());
@@ -60,7 +60,7 @@ fn test_add_worksheet_duplicate_name() {
 
 #[test]
 fn test_add_worksheet_duplicate_name_is_case_insensitive() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_worksheet("Sheet1").unwrap();
     let result = writer.add_worksheet("sheet1");
     assert!(result.is_err());
@@ -68,7 +68,7 @@ fn test_add_worksheet_duplicate_name_is_case_insensitive() {
 
 #[test]
 fn test_write_string() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();
     writer.write_string(sheet, 0, 0, "Hello").unwrap();
     assert_eq!(writer.worksheets[0].cells.len(), 1);
@@ -81,7 +81,7 @@ fn test_write_string() {
 
 #[test]
 fn test_write_number() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();
     writer.write_number(sheet, 0, 0, 42.5).unwrap();
     assert_eq!(writer.worksheets[0].cells.len(), 1);
@@ -92,7 +92,7 @@ fn test_write_number() {
 
 #[test]
 fn non_finite_cell_numbers_are_rejected_before_mutation() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();
 
     for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
@@ -110,14 +110,14 @@ fn non_finite_cell_numbers_are_rejected_before_mutation() {
 
 #[test]
 fn cell_grid_bounds_are_atomic_and_never_unwind() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();
 
     let max = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         writer.write_number(sheet, u32::from(u16::MAX), u16::from(u8::MAX), 42.5)
     }));
     assert!(matches!(max, Ok(Ok(()))));
-    let state = |writer: &Writer| {
+    let state = |writer: &Builder| {
         let worksheet = &writer.worksheets[sheet];
         (
             worksheet.cells.len(),
@@ -173,9 +173,9 @@ fn cell_grid_bounds_are_atomic_and_never_unwind() {
     assert!(writer.worksheets[sheet].data_tables.is_empty());
 
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.set_position(0);
-    let workbook = crate::Workbook::new(output).unwrap();
+    let workbook = crate::raw::Reader::new(output).unwrap();
     let cell = workbook
         .xls_worksheet(0)
         .unwrap()
@@ -189,7 +189,7 @@ fn cell_grid_bounds_are_atomic_and_never_unwind() {
 
 #[test]
 fn worksheet_location_bounds_are_atomic_and_never_unwind() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Grid").unwrap();
 
     writer.merge_cells(sheet, 65_534, 65_535, 254, 255).unwrap();
@@ -207,7 +207,7 @@ fn worksheet_location_bounds_are_atomic_and_never_unwind() {
         )
         .unwrap();
 
-    let state = |writer: &Writer| {
+    let state = |writer: &Builder| {
         let worksheet = &writer.worksheets[sheet];
         (
             worksheet.merged_ranges.len(),
@@ -380,9 +380,9 @@ fn worksheet_location_bounds_are_atomic_and_never_unwind() {
         .set_page_setup(sheet, PageSetupOptions::default())
         .unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.set_position(0);
-    let workbook = crate::Workbook::new(output).unwrap();
+    let workbook = crate::raw::Reader::new(output).unwrap();
     let worksheet = workbook.xls_worksheet(sheet).unwrap();
     assert!(
         worksheet
@@ -402,7 +402,7 @@ fn worksheet_location_bounds_are_atomic_and_never_unwind() {
 
 #[test]
 fn page_break_entry_limits_are_failure_atomic() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Break limits").unwrap();
 
     for row in 0..1_026 {
@@ -429,10 +429,10 @@ fn page_break_entry_limits_are_failure_atomic() {
 
 #[test]
 fn filter_sort_and_pivot_locations_fail_before_mutation() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Locations").unwrap();
     writer.set_auto_filter(sheet, 0, 65_535, 0, 255).unwrap();
-    let filter_state = |writer: &Writer| {
+    let filter_state = |writer: &Builder| {
         let worksheet = &writer.worksheets[sheet];
         (
             worksheet.auto_filter.map(|range| {
@@ -527,7 +527,7 @@ fn filter_sort_and_pivot_locations_fail_before_mutation() {
 
 #[test]
 fn test_write_boolean() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();
     writer.write_boolean(sheet, 0, 0, true).unwrap();
     writer.write_boolean(sheet, 1, 0, false).unwrap();
@@ -545,7 +545,7 @@ fn test_write_boolean() {
 
 #[test]
 fn test_write_formula() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();
     writer.write_formula(sheet, 0, 0, "SUM(A1:B1)").unwrap();
     let metadata = crate::FormulaMetadata::new()
@@ -570,10 +570,16 @@ fn test_write_formula() {
 #[test]
 fn invalid_formula_reference_returns_error_without_unwinding() {
     let outcome = std::panic::catch_unwind(|| -> Result<()> {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         let sheet = writer.add_worksheet("Sheet1")?;
         writer.write_formula(sheet, 0, 0, "ZZZZ1")?;
-        writer.write_to(&mut Cursor::new(Vec::new()))
+        match writer.build() {
+            Err(crate::package::Error::Reader(error)) => Err(error),
+            Err(error) => Err(Error::InvalidData(error.to_string())),
+            Ok(package) => package
+                .write_to(&mut Cursor::new(Vec::new()))
+                .map_err(|error| Error::InvalidData(error.to_string())),
+        }
     });
 
     assert!(matches!(
@@ -584,7 +590,7 @@ fn invalid_formula_reference_returns_error_without_unwinding() {
 
 #[test]
 fn test_formula_round_trips_through_xls_reader() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();
     writer.write_number(sheet, 0, 0, 2.0).unwrap();
     writer.write_number(sheet, 0, 1, 3.0).unwrap();
@@ -601,9 +607,9 @@ fn test_formula_round_trips_through_xls_reader() {
         .unwrap();
 
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.set_position(0);
-    let workbook = crate::Workbook::new(output).unwrap();
+    let workbook = crate::raw::Reader::new(output).unwrap();
     let formula_cell = workbook.xls_worksheet(0).unwrap().get_cell(0, 2).unwrap();
 
     assert!(formula_cell.is_formula());
@@ -628,7 +634,7 @@ fn test_formula_round_trips_through_xls_reader() {
 
 #[test]
 fn shared_formula_round_trips_with_inert_relative_references() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();
     let anchor = FormulaCell::new(0, 0);
     let participants = [anchor, FormulaCell::new(1, 0)];
@@ -643,9 +649,9 @@ fn shared_formula_round_trips_with_inert_relative_references() {
         .unwrap();
 
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.set_position(0);
-    let workbook = crate::Workbook::new(output).unwrap();
+    let workbook = crate::raw::Reader::new(output).unwrap();
     let worksheet = workbook.xls_worksheet(0).unwrap();
     let first = worksheet.get_cell(0, 0).unwrap();
     let second = worksheet.get_cell(1, 0).unwrap();
@@ -660,7 +666,7 @@ fn shared_formula_round_trips_with_inert_relative_references() {
 
 #[test]
 fn array_formula_staging_is_atomic_complete_and_protected() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();
     writer.write_number(sheet, 1, 1, 7.0).unwrap();
     let occupied = FormulaRange::try_new(0, 0, 1, 1).unwrap();
@@ -672,7 +678,13 @@ fn array_formula_staging_is_atomic_complete_and_protected() {
 
     let range = FormulaRange::try_new(3, 2, 4, 3).unwrap();
     writer
-        .write_array_formula_with_format(sheet, range, "A1+1", 0)
+        .write_array_formula_with_format(
+            sheet,
+            range,
+            "A1+1",
+            0,
+            crate::formula_metadata::array::Limits::default(),
+        )
         .unwrap();
     assert_eq!(writer.worksheets[sheet].cells.len(), 5);
     let owners: Vec<_> = [(3, 2), (3, 3), (4, 2), (4, 3)]
@@ -701,7 +713,7 @@ fn array_formula_staging_is_atomic_complete_and_protected() {
 
 #[test]
 fn array_formula_rejects_data_tables_and_cell_limit_without_mutation() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();
     let table = crate::DataTable::one_variable(
         crate::DataTableRange::new(1, 2, 1, 2).unwrap(),
@@ -733,7 +745,7 @@ fn array_formula_rejects_data_tables_and_cell_limit_without_mutation() {
 
 #[test]
 fn data_table_after_array_formula_is_rejected_atomically_and_retryable() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();
     writer
         .write_array_formula(sheet, FormulaRange::try_new(1, 1, 2, 2).unwrap(), "A1+1")
@@ -763,28 +775,28 @@ fn data_table_after_array_formula_is_rejected_atomically_and_retryable() {
 
 #[test]
 fn array_formula_explicit_limits_fail_without_mutation_and_can_retry() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();
     let range = FormulaRange::try_new(0, 0, 0, 1).unwrap();
     let one_cell = crate::formula_metadata::array::Limits::default()
         .with_max_cells(1)
         .unwrap();
     assert!(matches!(
-        writer.write_array_formula_with_limits(sheet, range, "A1+1", one_cell),
+        writer.write_array_formula_with_format(sheet, range, "A1+1", 0, one_cell),
         Err(Error::InvalidFormula(_))
     ));
     assert!(writer.worksheets[sheet].cells.is_empty());
 
     let two_cells = one_cell.with_max_cells(2).unwrap();
     writer
-        .write_array_formula_with_format_and_limits(sheet, range, "A1+1", 0, two_cells)
+        .write_array_formula_with_format(sheet, range, "A1+1", 0, two_cells)
         .unwrap();
     assert_eq!(writer.worksheets[sheet].cells.len(), 2);
 }
 
 #[test]
 fn test_write_multiple_cells() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();
 
     writer.write_string(sheet, 0, 0, "A1").unwrap();
@@ -797,7 +809,7 @@ fn test_write_multiple_cells() {
 
 #[test]
 fn test_shared_strings_build() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();
 
     writer.write_string(sheet, 0, 0, "Hello").unwrap();
@@ -814,13 +826,15 @@ fn test_shared_strings_build() {
 
 #[test]
 fn test_write_to_memory() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();
     writer.write_string(sheet, 0, 0, "Test").unwrap();
     writer.write_number(sheet, 0, 1, 123.45).unwrap();
 
     let mut cursor = Cursor::new(Vec::new());
-    let result = writer.write_to(&mut cursor);
+    let result = writer
+        .build()
+        .and_then(|package| package.write_to(&mut cursor));
     assert!(result.is_ok());
 
     let data = cursor.into_inner();
@@ -834,12 +848,12 @@ fn test_write_to_memory() {
 
 #[test]
 fn test_save_to_file() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();
     writer.write_string(sheet, 0, 0, "Hello").unwrap();
 
     let temp_path = std::env::temp_dir().join("test_xls_writer.xls");
-    let result = writer.save(&temp_path);
+    let result = writer.build().and_then(|package| package.save(&temp_path));
     assert!(result.is_ok());
 
     // Verify file was created
@@ -851,7 +865,7 @@ fn test_save_to_file() {
 
 #[test]
 fn test_xls_writer_default() {
-    let writer: Writer = Default::default();
+    let writer: Builder = Default::default();
     assert_eq!(writer.worksheets.len(), 0);
     assert!(writer.shared_string_table().unwrap().strings().is_empty());
 }
@@ -1097,7 +1111,7 @@ fn test_xls_defined_name_to_biff_formula_single() {
 /// before anything reaches the destination.
 #[test]
 fn a_string_cell_longer_than_an_sst_entry_is_refused_before_any_output() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();
     writer.write_string(sheet, 0, 0, "fits").unwrap();
     for value in ["x".repeat(0x1_0000), format!("{}😀", "a".repeat(0xFFFE))] {
@@ -1107,20 +1121,18 @@ fn a_string_cell_longer_than_an_sst_entry_is_refused_before_any_output() {
             0,
             None,
         ));
-        let mut output = Cursor::new(Vec::new());
-        let result = writer.write_to(&mut output);
+        let result = writer.build();
         assert!(
             matches!(
                 result,
-                Err(Error::StringTooLong {
+                Err(crate::package::Error::Reader(Error::StringTooLong {
                     field: "shared string",
                     utf16_units: 0x1_0000,
                     limit: 0xFFFF,
-                })
+                }))
             ),
             "{result:?}"
         );
-        assert!(output.get_ref().is_empty());
     }
 }
 
@@ -1129,7 +1141,7 @@ fn a_string_cell_longer_than_an_sst_entry_is_refused_before_any_output() {
 /// and column order must still take their own indices.
 #[test]
 fn string_cells_after_a_data_table_anchor_keep_their_shared_strings() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();
     let table = crate::DataTable::one_variable(
         crate::DataTableRange::new(1, 2, 1, 2).unwrap(),
@@ -1150,8 +1162,8 @@ fn string_cells_after_a_data_table_anchor_keep_their_shared_strings() {
     }
 
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
-    let workbook = crate::Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
+    let workbook = crate::raw::Reader::new(Cursor::new(output.into_inner())).unwrap();
     let worksheet = workbook.xls_worksheet(0).unwrap();
     assert!(worksheet.get_cell(0, 0).unwrap().formula_bytes().is_some());
     for (row, col, value) in expected {

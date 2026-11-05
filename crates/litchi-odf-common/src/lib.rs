@@ -17,34 +17,43 @@ pub mod datatype;
 pub mod detect;
 pub mod drawing;
 pub mod embedded;
+mod error;
+pub mod flat;
 pub mod leniency;
+pub mod limits;
 pub mod media;
+pub mod metadata;
 pub mod namespace;
 pub mod package;
+pub mod publish;
 pub mod rdf;
 pub mod repair;
 pub mod signature;
 pub mod style;
 pub mod validation;
 
-pub use core::ResolvedReader;
 pub use core::{
     ArchiveLimits, OwnedPackage, PreparedPackage, SourceBackedPackage, SourceMemberReaderError,
-    SourcePackageLimits,
 };
 pub use core::{
     GeneratedXmlEnvelope, GeneratedXmlLimitExceeded, GeneratedXmlLimitResource, GeneratedXmlLimits,
     GeneratedXmlReport, XmlStreamLimits,
 };
+pub use core::{ResolvedReader, map_resolved_reader_error};
 pub use core::{
     SourceContentInsertionCallbackError, SourceContentInsertionError, SourceContentInsertionPlan,
     SourceContentPublicationError, SourceContentPublicationOptions,
     SourceContentPublicationProgress, SourceContentPublicationReport, write_content_xml_to_stream,
     write_content_xml_to_stream_with_options,
 };
+pub use error::Error;
 pub use leniency::{
     ContentDefect, Defect, DefectLocation, Leniency, PackageDefect, ToleranceReport,
     ToleratedDefect,
+};
+pub use limits::{
+    LimitKind, OpenOptions, RawXmlLimitKind, SemanticLimitKind, SemanticLimits,
+    SemanticLimitsBuilder, SourceLimitKind, SourceLimits, SourceLimitsBuilder,
 };
 pub use repair::{
     Destructive, MIMETYPE_LOCAL_EXTRA_ISSUE, MIMETYPE_LOCAL_EXTRA_REPAIR,
@@ -56,5 +65,4 @@ pub use repair::{
 };
 pub use validation::{
     DEFAULT_ODF_VALIDATION_LIMITS, OdfValidationError, OdfValidationLimits, validate_package,
-    validate_package_with_limits,
 };

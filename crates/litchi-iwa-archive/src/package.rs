@@ -28,7 +28,7 @@ use crate::{Error, Limits, Result};
 #[doc(hidden)]
 pub use litchi_iwa_package::{
     Entry as PackageEntry, EntryChangeKind as PackageEntryChangeKind,
-    Error as PackageEntryStoreError, Patch as PackagePatch,
+    Error as PackageEntryStoreError, Patch,
 };
 
 #[allow(
@@ -1586,15 +1586,21 @@ impl CatalogStorageRequirements {
             retained_bytes: self
                 .retained_bytes
                 .checked_add(other.retained_bytes)
-                .ok_or_else(|| Error::InvalidBundle("catalog retained bytes overflow".to_owned()))?,
+                .ok_or_else(|| {
+                    Error::InvalidBundle("catalog retained bytes overflow".to_owned())
+                })?,
             traversal_bytes: self
                 .traversal_bytes
                 .checked_add(other.traversal_bytes)
-                .ok_or_else(|| Error::InvalidBundle("catalog traversal bytes overflow".to_owned()))?,
+                .ok_or_else(|| {
+                    Error::InvalidBundle("catalog traversal bytes overflow".to_owned())
+                })?,
             allocations: self
                 .allocations
                 .checked_add(other.allocations)
-                .ok_or_else(|| Error::InvalidBundle("catalog allocation count overflow".to_owned()))?,
+                .ok_or_else(|| {
+                    Error::InvalidBundle("catalog allocation count overflow".to_owned())
+                })?,
         })
     }
 
@@ -1709,6 +1715,11 @@ impl Catalog {
                     "canonical logical entry {authority} has mismatched local and central compression methods"
                 )));
             }
+            if entry.metadata().local().flags() != entry.metadata().central().flags() {
+                return Err(Error::InvalidBundle(format!(
+                    "canonical logical entry {authority} has mismatched local and central flags"
+                )));
+            }
             let value = PackageMetadataEntry {
                 data: entry.data(),
                 opaque: entry.is_opaque(),
@@ -1735,32 +1746,6 @@ impl Catalog {
         self.semantic_profile.is_some()
     }
 
-    /// Parse a package with the default physical limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the ZIP envelope or any configured physical
-    /// limit is invalid.
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, Limits::default())
-    }
-
-    /// Parse an immutable, already-owned package source with the default
-    /// physical limits.
-    ///
-    /// The catalog retains this exact [`Arc`] allocation for preserve-mode
-    /// writes and does not copy the source bytes. The shared byte slice is
-    /// immutable, so entries and raw ZIP records can safely borrow from it
-    /// for the lifetime of the catalog.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the ZIP envelope or any configured physical
-    /// limit is invalid.
-    pub fn from_shared_bytes(source: Arc<[u8]>) -> Result<Self> {
-        Self::from_shared_bytes_with_limits(source, Limits::default())
-    }
-
     /// Parse a package under caller-selected physical limits.
     ///
     /// A legacy package containing `.../Index.zip` is flattened into the
@@ -1772,7 +1757,7 @@ impl Catalog {
     ///
     /// Returns an error when the ZIP envelope, nested index, duplicate entry,
     /// or configured physical limit is invalid.
-    pub fn from_bytes_with_limits(bytes: &[u8], limits: Limits) -> Result<Self> {
+    pub fn from_bytes(bytes: &[u8], limits: Limits) -> Result<Self> {
         Self::from_bytes_with_optional_logical_entry_limits(bytes, limits, None)
     }
 
@@ -1781,7 +1766,7 @@ impl Catalog {
     ///
     /// # Errors
     ///
-    /// Returns the same errors as [`Self::from_bytes_with_limits`], plus a
+    /// Returns the same errors as [`Self::from_bytes`], plus a
     /// refusal when a selected logical authority has unsupported compression
     /// or exceeds its declared uncompressed-size ceiling.
     #[doc(hidden)]
@@ -1823,22 +1808,6 @@ impl Catalog {
         )
     }
 
-    /// Parse a package from an immutable positional source under the default
-    /// physical limits.
-    ///
-    /// The source is snapshotted through [`ReadAt`] without using a shared
-    /// cursor. Its [`litchi_core::SourceVersion`] must remain unchanged for
-    /// the complete bounded read; otherwise the package is rejected rather
-    /// than publishing a mixed-source snapshot.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the source cannot be read, changes during the
-    /// snapshot, exceeds the physical limits, or is not a valid package.
-    pub fn from_read_at(source: &dyn ReadAt) -> Result<Self> {
-        Self::from_read_at_with_limits(source, Limits::default())
-    }
-
     /// Parse an immutable, already-owned package source under caller-selected
     /// physical limits.
     ///
@@ -1853,7 +1822,7 @@ impl Catalog {
     ///
     /// Returns an error when the ZIP envelope, nested index, duplicate entry,
     /// or configured physical limit is invalid.
-    pub fn from_shared_bytes_with_limits(source: Arc<[u8]>, limits: Limits) -> Result<Self> {
+    pub fn from_shared_bytes(source: Arc<[u8]>, limits: Limits) -> Result<Self> {
         Self::from_shared_bytes_with_optional_logical_entry_limits(source, limits, None)
     }
 
@@ -1893,7 +1862,7 @@ impl Catalog {
     ///
     /// # Errors
     ///
-    /// Returns the same errors as [`Self::from_shared_bytes_with_limits`],
+    /// Returns the same errors as [`Self::from_shared_bytes`],
     /// plus a refusal when a selected logical authority has unsupported
     /// compression or exceeds its declared uncompressed-size ceiling.
     #[doc(hidden)]
@@ -1933,7 +1902,7 @@ impl Catalog {
     ///
     /// Returns an error when the source cannot be read, changes during the
     /// snapshot, exceeds the physical limits, or is not a valid package.
-    pub fn from_read_at_with_limits(source: &dyn ReadAt, limits: Limits) -> Result<Self> {
+    pub fn from_read_at(source: &dyn ReadAt, limits: Limits) -> Result<Self> {
         let checked_limits = limits.validate()?;
         let source_bytes = read_source(source, checked_limits)?;
         Self::from_source_with_checked_limits(
@@ -1992,8 +1961,8 @@ impl Catalog {
             (entries, semantic_profile.is_none(), None)
         } else if let Some(index_name) = nested_name {
             let prefix: Box<[u8]> = legacy_raw_outer_prefix(&archive, &index_name)?.into();
-            physical_storage = physical_storage
-                .add_owned(prefix.len(), usize::from(!prefix.is_empty()))?;
+            physical_storage =
+                physical_storage.add_owned(prefix.len(), usize::from(!prefix.is_empty()))?;
             let (entries, nested_storage) = if semantic_profile.is_some() {
                 collect_semantic_legacy(
                     &archive,
@@ -2365,8 +2334,13 @@ impl Catalog {
     ///
     /// # Errors
     ///
-    /// Returns an error when the caller-provided sink rejects the source bytes.
-    pub fn write_to<W: Write>(&self, mut sink: W) -> Result<()> {
+    /// Returns an error before writing when the source exceeds the output
+    /// ceiling, or when the caller-provided sink rejects the source bytes.
+    #[inline]
+    pub fn write_to<W: Write>(&self, mut sink: W, limits: Limits) -> Result<()> {
+        // Limits has private fields and validates every construction/update.
+        // This output path only needs to admit the artifact's actual size.
+        limits.check_output_size(self.source.len() as u64)?;
         sink.write_all(&self.source)?;
         Ok(())
     }
@@ -2375,8 +2349,13 @@ impl Catalog {
     ///
     /// # Errors
     ///
-    /// Returns an error if the source copy cannot be allocated.
-    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+    /// Returns an error before allocation when the source exceeds the output
+    /// ceiling, or if the source copy cannot be allocated.
+    #[inline]
+    pub fn to_bytes(&self, limits: Limits) -> Result<Vec<u8>> {
+        // Limits has private fields and validates every construction/update.
+        // This output path only needs to admit the artifact's actual size.
+        limits.check_output_size(self.source.len() as u64)?;
         let mut bytes = Vec::new();
         bytes
             .try_reserve_exact(self.source.len())
@@ -2787,7 +2766,7 @@ impl Catalog {
             checked_limits.check_input_size(source_size, "catalog source")?;
             self.check_source_total(checked_limits)?;
             checked_limits.check_output_size(source_size)?;
-            self.write_to(&mut sink)?;
+            self.write_to(&mut sink, limits)?;
             return Ok(());
         }
         let bytes =
@@ -3242,7 +3221,10 @@ where
     let checked_limits = limits.validate()?;
     validate_output(entries.clone(), checked_limits)?;
 
-    let mut writer = StreamingArchiveWriter::with_writer(sink);
+    let mut writer = StreamingArchiveWriter::with_writer(
+        sink,
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     for (name, data) in entries {
         writer.write_stored(name, data)?;
     }
@@ -4944,6 +4926,11 @@ fn preflight_semantic_supported_entry(
             "{label} {name} has mismatched local and central compression methods"
         )));
     }
+    if local.flags != central.flags {
+        return Err(Error::InvalidBundle(format!(
+            "{label} {name} has mismatched local and central flags"
+        )));
+    }
     if !matches!(central.compression_method, 0 | 8) {
         return Err(Error::InvalidBundle(format!(
             "{label} {name} uses unsupported ZIP compression"
@@ -5082,6 +5069,12 @@ fn preflight_logical_entry(
             String::from_utf8_lossy(logical_name)
         )));
     }
+    if local.flags != central.flags {
+        return Err(Error::InvalidBundle(format!(
+            "canonical logical entry {} has mismatched local and central flags",
+            String::from_utf8_lossy(logical_name)
+        )));
+    }
     if !matches!(central.compression_method, 0 | 8) {
         return Err(Error::InvalidBundle(format!(
             "canonical logical entry {} uses unsupported ZIP compression",
@@ -5195,16 +5188,14 @@ fn collect_legacy(
             Error::InvalidBundle(format!("legacy package index: {error}"))
         }
     })?;
-    let storage = index
-        .storage_requirements()?
-        .add_owned(
-            index_source
-                .as_ref()
-                .len()
-                .checked_add(usize::from(index_is_deflated))
-                .ok_or_else(|| Error::InvalidBundle("legacy index storage overflow".to_owned()))?,
-            2,
-        )?;
+    let storage = index.storage_requirements()?.add_owned(
+        index_source
+            .as_ref()
+            .len()
+            .checked_add(usize::from(index_is_deflated))
+            .ok_or_else(|| Error::InvalidBundle("legacy index storage overflow".to_owned()))?,
+        2,
+    )?;
 
     let mut entries = Vec::new();
     let mut seen = HashSet::new();
@@ -5289,16 +5280,14 @@ fn collect_semantic_legacy(
             Error::InvalidBundle(format!("legacy package index: {error}"))
         }
     })?;
-    let storage = index
-        .storage_requirements()?
-        .add_owned(
-            index_source
-                .as_ref()
-                .len()
-                .checked_add(usize::from(index_is_deflated))
-                .ok_or_else(|| Error::InvalidBundle("legacy index storage overflow".to_owned()))?,
-            2,
-        )?;
+    let storage = index.storage_requirements()?.add_owned(
+        index_source
+            .as_ref()
+            .len()
+            .checked_add(usize::from(index_is_deflated))
+            .ok_or_else(|| Error::InvalidBundle("legacy index storage overflow".to_owned()))?,
+        2,
+    )?;
 
     preflight_semantic_iwa_entries(&index, true)?;
 
@@ -5374,9 +5363,8 @@ fn entry_collection_storage(
         )
         .and_then(|bytes| bytes.checked_mul(2))
         .and_then(|bytes| {
-            seen.iter().try_fold(bytes, |total, name| {
-                total.checked_add(name.capacity())
-            })
+            seen.iter()
+                .try_fold(bytes, |total, name| total.checked_add(name.capacity()))
         })
         .ok_or_else(|| Error::InvalidBundle("entry census overflow".to_owned()))?;
     let entry_slack = entries_capacity
@@ -5384,11 +5372,7 @@ fn entry_collection_storage(
         .and_then(|bytes| bytes.checked_mul(size_of::<Entry>()))
         .ok_or_else(|| Error::InvalidBundle("entry census overflow".to_owned()))?;
     let allocations = usize::from(seen.capacity() != 0)
-        .checked_add(
-            seen.iter()
-                .filter(|name| name.capacity() != 0)
-                .count(),
-        )
+        .checked_add(seen.iter().filter(|name| name.capacity() != 0).count())
         .and_then(|value| value.checked_add(usize::from(entry_slack != 0)))
         .ok_or_else(|| Error::InvalidBundle("entry allocation census overflow".to_owned()))?;
     let retained = seen_bytes
@@ -5549,7 +5533,8 @@ mod tests {
     }
 
     fn zip(entries: &[(&str, &[u8])]) -> Result<Vec<u8>> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         for (name, data) in entries {
             writer.write_stored(name, data)?;
         }
@@ -5564,9 +5549,13 @@ mod tests {
                     type_: 6_000,
                     data: vec![1, 2, 3],
                 }],
+                Default::default(),
             )?],
         };
-        Ok(SnappyStream::compress(&archive.to_bytes()?)?)
+        Ok(SnappyStream::compress(
+            &archive.to_bytes(Default::default())?,
+            Default::default(),
+        )?)
     }
 
     fn push_u16(bytes: &mut Vec<u8>, value: u16) {
@@ -5846,7 +5835,7 @@ mod tests {
 
     #[test]
     fn catalog_storage_requirements_include_nested_physical_census() -> Result<()> {
-        let flat = Catalog::from_bytes(&physical_two_entry_zip())?;
+        let flat = Catalog::from_bytes(&physical_two_entry_zip(), Default::default())?;
         let flat_requirements = flat.storage_requirements();
         assert!(flat_requirements.retained_bytes() > 0);
         assert!(flat_requirements.traversal_bytes() > 0);
@@ -5854,7 +5843,7 @@ mod tests {
 
         let nested_index = zip(&[("Index/Document.iwa", b"nested component")])?;
         let nested_source = zip(&[("legacy.pages/Index.zip", nested_index.as_slice())])?;
-        let nested = Catalog::from_bytes(&nested_source)?;
+        let nested = Catalog::from_bytes(&nested_source, Default::default())?;
         let nested_requirements = nested.storage_requirements();
         assert!(nested_requirements.retained_bytes() > flat_requirements.retained_bytes());
         assert!(nested_requirements.allocations() > flat_requirements.allocations());
@@ -5866,12 +5855,15 @@ mod tests {
     fn nested_deflate_storage_keeps_the_reader_sentinel_and_arc_owner() -> Result<()> {
         let index = zip(&[("Index/Document.iwa", b"nested component")])?;
         let stored_source = zip(&[("legacy.pages/Index.zip", index.as_slice())])?;
-        let mut deflated_writer = StreamingArchiveWriter::new();
+        let mut deflated_writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         deflated_writer.write_deflated("legacy.pages/Index.zip", &index)?;
         let deflated_source = deflated_writer.finish_to_bytes()?;
 
-        let stored = Catalog::from_bytes(&stored_source)?.storage_requirements();
-        let deflated = Catalog::from_bytes(&deflated_source)?.storage_requirements();
+        let stored =
+            Catalog::from_bytes(&stored_source, Default::default())?.storage_requirements();
+        let deflated =
+            Catalog::from_bytes(&deflated_source, Default::default())?.storage_requirements();
         assert_eq!(
             deflated.retained_bytes(),
             stored
@@ -5959,7 +5951,7 @@ mod tests {
     fn reassembly_patch_applies_inverts_and_rejects_foreign_sources()
     -> std::result::Result<(), ReassemblyPatchError> {
         let bytes = physical_two_entry_zip();
-        let catalog = Catalog::from_bytes(&bytes)?;
+        let catalog = Catalog::from_bytes(&bytes, Default::default())?;
         let patch = catalog.reassemble_to_patch(
             &[EntryEdit::new(
                 "Opaque/entry.bin",
@@ -5970,7 +5962,7 @@ mod tests {
         assert!(!patch.is_noop());
 
         let target = patch.apply(&bytes)?;
-        let target_catalog = Catalog::from_bytes(&target)?;
+        let target_catalog = Catalog::from_bytes(&target, Default::default())?;
         let source_entries = catalog.iter().collect::<Vec<_>>();
         let target_entries = target_catalog.iter().collect::<Vec<_>>();
         assert_eq!(target_entries.len(), source_entries.len());
@@ -6023,7 +6015,7 @@ mod tests {
     fn reassembly_patch_preserves_typed_refusals() -> std::result::Result<(), ReassemblyPatchError>
     {
         let (opaque_bytes, _, _) = physical_zip(99);
-        let opaque_catalog = Catalog::from_bytes(&opaque_bytes)?;
+        let opaque_catalog = Catalog::from_bytes(&opaque_bytes, Default::default())?;
         assert!(matches!(
             opaque_catalog.reassemble_to_patch(
                 &[EntryEdit::new("Opaque/entry.bin", b"cannot edit")],
@@ -6040,7 +6032,7 @@ mod tests {
             ("legacy.pages/Index.zip", index.as_slice()),
             ("legacy.pages/Data/a", b"a"),
         ])?;
-        let legacy_catalog = Catalog::from_bytes(&legacy)?;
+        let legacy_catalog = Catalog::from_bytes(&legacy, Default::default())?;
         assert!(matches!(
             legacy_catalog.reassemble_with_deletions_to_patch(
                 &[],
@@ -6056,7 +6048,7 @@ mod tests {
             ("Metadata/signature.sig", b"signature bytes"),
             ("Data/plain", b"plain"),
         ])?;
-        let signature_catalog = Catalog::from_bytes(&signature_like)?;
+        let signature_catalog = Catalog::from_bytes(&signature_like, Default::default())?;
         let signature_no_op = signature_catalog.reassemble_to_patch(&[], Limits::default())?;
         assert!(signature_no_op.is_noop());
         assert_eq!(signature_no_op.apply(&signature_like)?, signature_like);
@@ -6073,7 +6065,7 @@ mod tests {
     #[test]
     fn preserves_flat_entry_order_and_payloads() -> Result<()> {
         let bytes = zip(&[("Metadata/a", b"a"), ("Index/Document.iwa", b"iwa")])?;
-        let catalog = Catalog::from_bytes(&bytes)?;
+        let catalog = Catalog::from_bytes(&bytes, Default::default())?;
         assert_eq!(
             catalog.iter().map(Entry::name).collect::<Vec<_>>(),
             ["Metadata/a", "Index/Document.iwa"]
@@ -6213,7 +6205,37 @@ mod tests {
                 if message.contains("mismatched local and central compression methods")
         ));
         assert_eq!(crate::zip::test_entry_read_count(), 0);
+
+        let flag_mismatch = with_local_central_flag_mismatch(raw_named_zip(
+            authority,
+            authority,
+            0,
+            0,
+            b"properties",
+        ))?;
+        crate::zip::reset_test_entry_read_count();
+        assert!(matches!(
+            Catalog::__from_bytes_with_logical_entry_limits(
+                &flag_mismatch,
+                Limits::default(),
+                LogicalEntryLimits::PAGES_METADATA,
+            ),
+            Err(Error::InvalidBundle(message))
+                if message.contains("mismatched local and central flags")
+        ));
+        assert_eq!(crate::zip::test_entry_read_count(), 0);
         Ok(())
+    }
+
+    // Set the data-descriptor flag in the local header only.
+    fn with_local_central_flag_mismatch(mut bytes: Vec<u8>) -> Result<Vec<u8>> {
+        let central = bytes
+            .windows(4)
+            .position(|window| window == b"PK\x01\x02")
+            .ok_or_else(|| Error::InvalidBundle("central test record is missing".to_owned()))?;
+        bytes[6..8].copy_from_slice(&0x0008_u16.to_le_bytes());
+        bytes[central + 8..central + 10].copy_from_slice(&0_u16.to_le_bytes());
+        Ok(bytes)
     }
 
     #[test]
@@ -6259,8 +6281,7 @@ mod tests {
         assert_eq!(semantic.source_provenance(), SourceProvenance::SemanticZip);
 
         crate::zip::reset_test_entry_read_count();
-        let generic =
-            Catalog::from_shared_bytes_with_limits(Arc::clone(&shared), Limits::default())?;
+        let generic = Catalog::from_shared_bytes(Arc::clone(&shared), Limits::default())?;
         assert_eq!(crate::zip::test_entry_read_count(), 8);
         assert_eq!(generic.len(), 8);
         assert!(generic.source_is_exact());
@@ -6364,7 +6385,7 @@ mod tests {
         );
 
         crate::zip::reset_test_entry_read_count();
-        let generic = Catalog::from_bytes(&bytes)?;
+        let generic = Catalog::from_bytes(&bytes, Default::default())?;
         assert_eq!(crate::zip::test_entry_read_count(), 8);
         assert_eq!(generic.len(), 8);
         assert_eq!(generic.source_provenance(), SourceProvenance::LegacyZip);
@@ -6538,7 +6559,8 @@ mod tests {
     #[test]
     fn semantic_detection_does_not_gather_high_count_non_root_names() -> Result<()> {
         let document = semantic_iwa(1)?;
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer.write_stored("Index/Document.iwa", &document)?;
         for index in 0..1_024 {
             writer.write_stored(&format!("Index/Foreign-{index}.iwa"), b"corrupt")?;
@@ -6616,7 +6638,7 @@ mod tests {
     fn writes_flat_entry_order_and_payloads_without_exposing_zip_types() -> Result<()> {
         let entries: [(&str, &[u8]); 2] = [("Metadata/a", b"a"), ("Index/Document.iwa", b"opaque")];
         let bytes = to_bytes(entries.iter().copied(), Limits::default())?;
-        let catalog = Catalog::from_bytes(&bytes)?;
+        let catalog = Catalog::from_bytes(&bytes, Default::default())?;
         assert_eq!(
             catalog
                 .into_iter()
@@ -6631,9 +6653,29 @@ mod tests {
     }
 
     #[test]
+    fn exact_copy_admits_output_before_allocation_or_writing() -> Result<()> {
+        let (source, _, _) = physical_zip(0);
+        let catalog = Catalog::from_bytes(&source, Limits::default())?;
+        let maximum = source.len() as u64 - 1;
+        let limits = Limits::new(maximum, 100, 1_000, 10_000, 10_000)?;
+        let mut sink = b"untouched".to_vec();
+        assert!(
+            matches!(catalog.write_to(&mut sink, limits), Err(Error::Limit {
+            kind: crate::LimitKind::OutputBytes, observed, maximum: bound,
+        }) if observed == source.len() as u64 && bound == maximum)
+        );
+        assert_eq!(sink, b"untouched");
+        assert!(matches!(catalog.to_bytes(limits), Err(Error::Limit {
+            kind: crate::LimitKind::OutputBytes, observed, maximum: bound,
+        }) if observed == source.len() as u64 && bound == maximum));
+        assert_eq!(catalog.to_bytes(Limits::default())?, source);
+        Ok(())
+    }
+
+    #[test]
     fn preserves_physical_metadata_and_exact_noop_bytes() -> Result<()> {
         let (bytes, central_offset, central_end) = physical_zip(0);
-        let catalog = Catalog::from_bytes(&bytes)?;
+        let catalog = Catalog::from_bytes(&bytes, Default::default())?;
         let entry = catalog.iter().next().ok_or_else(|| {
             Error::InvalidBundle("physical metadata test produced no entry".to_owned())
         })?;
@@ -6661,9 +6703,9 @@ mod tests {
             &bytes[central_offset..central_end]
         );
         assert_eq!(entry.raw_record().compressed_data(), b"opaque payload");
-        assert_eq!(catalog.to_bytes()?, bytes);
+        assert_eq!(catalog.to_bytes(Default::default())?, bytes);
         let mut streamed = Vec::new();
-        catalog.write_to(&mut streamed)?;
+        catalog.write_to(&mut streamed, Default::default())?;
         assert_eq!(streamed, bytes);
         Ok(())
     }
@@ -6672,7 +6714,7 @@ mod tests {
     fn accepts_shared_source_without_copying_input() -> Result<()> {
         let (bytes, _central_offset, _central_end) = physical_zip(0);
         let source: Arc<[u8]> = bytes.into();
-        let catalog = Catalog::from_shared_bytes(source.clone())?;
+        let catalog = Catalog::from_shared_bytes(source.clone(), Default::default())?;
 
         assert!(Arc::ptr_eq(
             &source,
@@ -6708,7 +6750,7 @@ mod tests {
         let limits = Limits::new(1, 10, 100, 100, 100)?;
 
         assert!(matches!(
-            Catalog::from_shared_bytes_with_limits(source, limits),
+            Catalog::from_shared_bytes(source, limits),
             Err(Error::Limit {
                 kind: crate::LimitKind::InputBytes,
                 ..
@@ -6723,7 +6765,7 @@ mod tests {
         let limits = Limits::new(1, 10, 100, 100, 100)?;
 
         assert!(matches!(
-            Catalog::from_bytes_with_limits(&bytes, limits),
+            Catalog::from_bytes(&bytes, limits),
             Err(Error::Limit {
                 kind: crate::LimitKind::InputBytes,
                 ..
@@ -6736,16 +6778,19 @@ mod tests {
     fn shared_source_preserves_opaque_zip_bytes_exactly() -> Result<()> {
         let (bytes, _central_offset, _central_end) = physical_zip(99);
         let source: Arc<[u8]> = bytes.into();
-        let catalog = Catalog::from_shared_bytes(source.clone())?;
+        let catalog = Catalog::from_shared_bytes(source.clone(), Default::default())?;
         let entry = catalog.iter().next().ok_or_else(|| {
             Error::InvalidBundle("shared source test produced no entry".to_owned())
         })?;
 
         assert!(entry.is_opaque());
         assert_eq!(entry.raw_record().compressed_data(), b"opaque payload");
-        assert_eq!(catalog.to_bytes()?.as_slice(), source.as_ref());
+        assert_eq!(
+            catalog.to_bytes(Default::default())?.as_slice(),
+            source.as_ref()
+        );
         let mut streamed = Vec::new();
-        catalog.write_to(&mut streamed)?;
+        catalog.write_to(&mut streamed, Default::default())?;
         assert_eq!(streamed.as_slice(), source.as_ref());
         Ok(())
     }
@@ -6754,10 +6799,10 @@ mod tests {
     fn snapshots_a_positional_source_in_bounded_reads() -> Result<()> {
         let bytes = zip(&[("Metadata/a", b"a"), ("Data/b", b"b")])?;
         let source = TestSource::new(bytes.clone(), 3, false);
-        let catalog = Catalog::from_read_at(&source)?;
+        let catalog = Catalog::from_read_at(&source, Default::default())?;
 
         assert!(source.reads.load(Ordering::Relaxed) > 1);
-        assert_eq!(catalog.to_bytes()?, bytes);
+        assert_eq!(catalog.to_bytes(Default::default())?, bytes);
         assert_eq!(
             catalog.iter().map(Entry::name).collect::<Vec<_>>(),
             ["Metadata/a", "Data/b"]
@@ -6772,7 +6817,7 @@ mod tests {
         let limits = Limits::new(1, 10, 100, 100, 100)?;
 
         assert!(matches!(
-            Catalog::from_read_at_with_limits(&source, limits),
+            Catalog::from_read_at(&source, limits),
             Err(Error::Limit {
                 kind: crate::LimitKind::InputBytes,
                 ..
@@ -6786,9 +6831,11 @@ mod tests {
     fn rejects_a_positional_source_that_changes_during_snapshot() -> Result<()> {
         let bytes = zip(&[("Data/a", b"a")])?;
         let source = TestSource::new(bytes, 4, true);
-        let error = Catalog::from_read_at(&source).err().ok_or_else(|| {
-            Error::InvalidBundle("changed source unexpectedly parsed successfully".to_owned())
-        })?;
+        let error = Catalog::from_read_at(&source, Default::default())
+            .err()
+            .ok_or_else(|| {
+                Error::InvalidBundle("changed source unexpectedly parsed successfully".to_owned())
+            })?;
 
         assert!(matches!(
             error,
@@ -6804,7 +6851,7 @@ mod tests {
     #[test]
     fn retains_unsupported_compression_as_opaque_raw_record() -> Result<()> {
         let (bytes, _central_offset, _central_end) = physical_zip(99);
-        let catalog = Catalog::from_bytes(&bytes)?;
+        let catalog = Catalog::from_bytes(&bytes, Default::default())?;
         let entry = catalog.iter().next().ok_or_else(|| {
             Error::InvalidBundle("opaque metadata test produced no entry".to_owned())
         })?;
@@ -6816,7 +6863,7 @@ mod tests {
             entry.payload(),
             EntryPayload::Opaque(record) if record.compressed_data() == b"opaque payload"
         ));
-        assert_eq!(catalog.to_bytes()?, bytes);
+        assert_eq!(catalog.to_bytes(Default::default())?, bytes);
         Ok(())
     }
 
@@ -6825,7 +6872,7 @@ mod tests {
         let (mut bytes, _central_offset, _central_end) = physical_zip(0);
         bytes[28..30].copy_from_slice(&u16::MAX.to_le_bytes());
         assert!(matches!(
-            Catalog::from_bytes(&bytes),
+            Catalog::from_bytes(&bytes, Default::default()),
             Err(Error::InvalidBundle(message)) if message.contains("local file header")
         ));
     }
@@ -6857,7 +6904,7 @@ mod tests {
             ("legacy.pages/Index.zip", &index),
             ("legacy.pages/Data/a", b"a"),
         ])?;
-        let catalog = Catalog::from_bytes(&bytes)?;
+        let catalog = Catalog::from_bytes(&bytes, Default::default())?;
         assert_eq!(
             catalog.iter().map(Entry::name).collect::<Vec<_>>(),
             ["Index/Document.iwa", "Data/a"]
@@ -6878,7 +6925,7 @@ mod tests {
         let limits = Limits::new(input, 1, input, input, 1024)?;
 
         assert!(matches!(
-            Catalog::from_bytes_with_limits(&bytes, limits),
+            Catalog::from_bytes(&bytes, limits),
             Err(Error::Limit {
                 kind: crate::LimitKind::Entries,
                 observed: 2,
@@ -6892,7 +6939,8 @@ mod tests {
     fn rejects_declared_nested_index_size_before_decompression() -> Result<()> {
         let repeated = vec![0u8; 64 * 1024];
         let index = zip(&[("Index/Document.iwa", repeated.as_slice())])?;
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer.write_deflated("legacy.pages/Index.zip", &index)?;
         let bytes = writer.finish_to_bytes()?;
         assert!(bytes.len() < index.len());
@@ -6905,7 +6953,7 @@ mod tests {
         let limits = Limits::new(input, 10, nested, nested, 1024)?;
 
         assert!(matches!(
-            Catalog::from_bytes_with_limits(&bytes, limits),
+            Catalog::from_bytes(&bytes, limits),
             Err(Error::Limit {
                 kind: crate::LimitKind::InputBytes,
                 observed,
@@ -6920,7 +6968,7 @@ mod tests {
         let index = zip(&[("Index/Document.iwa", b"iwa"), ("Metadata/a", b"bad")])?;
         let bytes = zip(&[("legacy.pages/Index.zip", &index)])?;
         assert!(matches!(
-            Catalog::from_bytes(&bytes),
+            Catalog::from_bytes(&bytes, Default::default()),
             Err(Error::InvalidBundle(message)) if message.contains("non-IWA")
         ));
         Ok(())
@@ -6934,7 +6982,7 @@ mod tests {
             ("Index/CalculationEngine.iwa", b"iwa"),
         ])?;
         assert!(matches!(
-            Catalog::from_bytes(&bytes),
+            Catalog::from_bytes(&bytes, Default::default()),
             Err(Error::InvalidBundle(message)) if message.contains("mixes direct IWA")
         ));
         Ok(())
@@ -6943,7 +6991,7 @@ mod tests {
     #[test]
     fn reassembles_stored_edit_while_preserving_physical_provenance() -> Result<()> {
         let bytes = physical_two_entry_zip();
-        let catalog = Catalog::from_bytes(&bytes)?;
+        let catalog = Catalog::from_bytes(&bytes, Default::default())?;
         let before = catalog.iter().collect::<Vec<_>>();
         let edited = catalog.reassemble_to_bytes(
             &[EntryEdit::new(
@@ -6952,7 +7000,7 @@ mod tests {
             )],
             Limits::default(),
         )?;
-        let after_catalog = Catalog::from_bytes(&edited)?;
+        let after_catalog = Catalog::from_bytes(&edited, Default::default())?;
         let after = after_catalog.iter().collect::<Vec<_>>();
 
         assert_eq!(
@@ -6990,11 +7038,12 @@ mod tests {
 
     #[test]
     fn reassembles_deflate_edit_and_round_trips_metadata() -> Result<()> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer.write_deflated("Compressed/data", b"old deflate payload")?;
         writer.write_stored("Untouched/data", b"keep")?;
         let bytes = writer.finish_to_bytes()?;
-        let catalog = Catalog::from_bytes(&bytes)?;
+        let catalog = Catalog::from_bytes(&bytes, Default::default())?;
         let before = catalog
             .iter()
             .next()
@@ -7008,7 +7057,7 @@ mod tests {
             )],
             Limits::default(),
         )?;
-        let after_catalog = Catalog::from_bytes(&edited)?;
+        let after_catalog = Catalog::from_bytes(&edited, Default::default())?;
         let after = after_catalog.iter().next().ok_or_else(|| {
             Error::InvalidBundle("reassembled deflate fixture has no first entry".to_owned())
         })?;
@@ -7038,11 +7087,12 @@ mod tests {
     #[test]
     fn deflate_patch_preserves_untouched_count_and_central_record()
     -> std::result::Result<(), Box<dyn std::error::Error>> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer.write_deflated("Compressed/data", b"old deflate payload")?;
         writer.write_stored("Untouched/data", b"untouched payload")?;
         let source = writer.finish_to_bytes()?;
-        let catalog = Catalog::from_bytes(&source)?;
+        let catalog = Catalog::from_bytes(&source, Default::default())?;
         let source_untouched = catalog
             .iter()
             .find(|entry| entry.name() == "Untouched/data")
@@ -7058,7 +7108,7 @@ mod tests {
             Limits::default(),
         )?;
         let target = patch.apply(&source)?;
-        let target_catalog = Catalog::from_bytes(&target)?;
+        let target_catalog = Catalog::from_bytes(&target, Default::default())?;
         let target_untouched = target_catalog
             .iter()
             .find(|entry| entry.name() == "Untouched/data")
@@ -7099,11 +7149,11 @@ mod tests {
     #[test]
     fn deletes_a_member_and_preserves_the_remaining_physical_record() -> Result<()> {
         let bytes = physical_two_entry_zip();
-        let catalog = Catalog::from_bytes(&bytes)?;
+        let catalog = Catalog::from_bytes(&bytes, Default::default())?;
         let before = catalog.iter().collect::<Vec<_>>();
         let rebuilt =
             catalog.reassemble_with_deletions_to_bytes(&[], &["Untouched/a"], Limits::default())?;
-        let after_catalog = Catalog::from_bytes(&rebuilt)?;
+        let after_catalog = Catalog::from_bytes(&rebuilt, Default::default())?;
         let after = after_catalog.iter().collect::<Vec<_>>();
 
         assert_eq!(after.len(), 1);
@@ -7141,13 +7191,13 @@ mod tests {
             ("Data/middle", b"2"),
             ("Data/last", b"3"),
         ])?;
-        let ordered_catalog = Catalog::from_bytes(&ordered)?;
+        let ordered_catalog = Catalog::from_bytes(&ordered, Default::default())?;
         let ordered_rebuilt = ordered_catalog.reassemble_with_deletions_to_bytes(
             &[],
             &["Data/middle"],
             Limits::default(),
         )?;
-        let retained = Catalog::from_bytes(&ordered_rebuilt)?;
+        let retained = Catalog::from_bytes(&ordered_rebuilt, Default::default())?;
         assert_eq!(
             retained.iter().map(Entry::name).collect::<Vec<_>>(),
             ["Data/first", "Data/last"]
@@ -7162,7 +7212,7 @@ mod tests {
     #[test]
     fn combines_an_edit_and_deletion_in_one_reassembly() -> Result<()> {
         let bytes = physical_two_entry_zip();
-        let catalog = Catalog::from_bytes(&bytes)?;
+        let catalog = Catalog::from_bytes(&bytes, Default::default())?;
         let before = catalog.iter().collect::<Vec<_>>();
         let rebuilt = catalog.reassemble_with_deletions_to_bytes(
             &[EntryEdit::new(
@@ -7172,7 +7222,7 @@ mod tests {
             &["Untouched/a"],
             Limits::default(),
         )?;
-        let after_catalog = Catalog::from_bytes(&rebuilt)?;
+        let after_catalog = Catalog::from_bytes(&rebuilt, Default::default())?;
         let after = after_catalog.iter().collect::<Vec<_>>();
 
         assert_eq!(after.len(), 1);
@@ -7197,7 +7247,7 @@ mod tests {
     #[test]
     fn deletion_can_remove_an_opaque_member_without_decoding_it() -> Result<()> {
         let (bytes, _central_offset, _central_end) = physical_zip(99);
-        let catalog = Catalog::from_bytes(&bytes)?;
+        let catalog = Catalog::from_bytes(&bytes, Default::default())?;
         assert!(catalog.iter().next().is_some_and(Entry::is_opaque));
 
         let rebuilt = catalog.reassemble_with_deletions_to_bytes(
@@ -7205,7 +7255,7 @@ mod tests {
             &["Opaque/entry.bin"],
             Limits::default(),
         )?;
-        let after = Catalog::from_bytes(&rebuilt)?;
+        let after = Catalog::from_bytes(&rebuilt, Default::default())?;
         assert!(after.is_empty());
         let eocd = rebuilt.len() - (22 + b"archive-comment\0\xfe".len());
         assert_eq!(raw_u16(&rebuilt[eocd..], 8), Some(0));
@@ -7217,7 +7267,7 @@ mod tests {
     #[test]
     fn deletion_selection_is_exact_unique_and_disjoint_from_edits() -> Result<()> {
         let bytes = physical_two_entry_zip();
-        let catalog = Catalog::from_bytes(&bytes)?;
+        let catalog = Catalog::from_bytes(&bytes, Default::default())?;
 
         let deletion_cases: [&[&str]; 3] = [
             &["Missing/entry"],
@@ -7248,7 +7298,7 @@ mod tests {
             ("legacy.pages/Index.zip", index.as_slice()),
             ("legacy.pages/Data/a", b"a"),
         ])?;
-        let legacy_catalog = Catalog::from_bytes(&legacy)?;
+        let legacy_catalog = Catalog::from_bytes(&legacy, Default::default())?;
         assert_eq!(
             legacy_catalog.reassemble_with_deletions_to_bytes(&[], &[], Limits::default())?,
             legacy
@@ -7299,7 +7349,7 @@ mod tests {
         let standard_eocd = with_zip64_locator.len();
         with_zip64_locator.extend_from_slice(tail);
         with_zip64_locator[standard_eocd + 8..standard_eocd + 12].copy_from_slice(&[0xff; 4]);
-        let zip64_catalog = Catalog::from_bytes(&with_zip64_locator)?;
+        let zip64_catalog = Catalog::from_bytes(&with_zip64_locator, Default::default())?;
         assert!(matches!(
             zip64_catalog.reassemble_with_deletions_to_bytes(
                 &[],
@@ -7314,7 +7364,7 @@ mod tests {
         })?;
         let limits = Limits::new(source_size, 10, 4096, 4096, 1024)?;
         assert!(matches!(
-            Catalog::from_bytes(&bytes)?.reassemble_with_deletions_to_bytes(
+            Catalog::from_bytes(&bytes, Default::default())?.reassemble_with_deletions_to_bytes(
                 &[EntryEdit::new("Opaque/entry.bin", &[b'x'; 1024])],
                 &["Untouched/a"],
                 limits
@@ -7330,7 +7380,7 @@ mod tests {
     #[test]
     fn empty_reassembly_uses_the_exact_noop_source_path() -> Result<()> {
         let bytes = physical_two_entry_zip();
-        let catalog = Catalog::from_bytes(&bytes)?;
+        let catalog = Catalog::from_bytes(&bytes, Default::default())?;
         assert_eq!(catalog.reassemble_to_bytes(&[], Limits::default())?, bytes);
         assert_eq!(
             catalog.reassemble_with_deletions_to_bytes(&[], &[], Limits::default())?,
@@ -7359,7 +7409,7 @@ mod tests {
     #[test]
     fn prepared_reassembly_reports_exact_final_workspace_and_executes() -> Result<()> {
         let bytes = physical_two_entry_zip();
-        let catalog = Catalog::from_bytes(&bytes)?;
+        let catalog = Catalog::from_bytes(&bytes, Default::default())?;
         let edits = [EntryEdit::new("Untouched/a", b"replacement payload")];
         let prepared = catalog.prepare_reassembly(&edits, Limits::default())?;
         let requirements = prepared.execution_requirements();
@@ -7384,7 +7434,7 @@ mod tests {
     #[test]
     fn prepared_reassembly_rejects_allocation_ceiling_before_execution() -> Result<()> {
         let bytes = physical_two_entry_zip();
-        let catalog = Catalog::from_bytes(&bytes)?;
+        let catalog = Catalog::from_bytes(&bytes, Default::default())?;
         let edits = [EntryEdit::new("Untouched/a", b"replacement payload")];
         let prepared = catalog.prepare_reassembly(&edits, Limits::default())?;
         let requirements = prepared.execution_requirements();
@@ -7416,7 +7466,7 @@ mod tests {
     #[test]
     fn prepared_noop_reassembly_retains_exact_source_and_needs_no_offsets() -> Result<()> {
         let bytes = physical_two_entry_zip();
-        let catalog = Catalog::from_bytes(&bytes)?;
+        let catalog = Catalog::from_bytes(&bytes, Default::default())?;
         let prepared = catalog.prepare_reassembly(&[], Limits::default())?;
         let requirements = prepared.execution_requirements();
         assert_eq!(requirements.output_bytes(), bytes.len());
@@ -7430,7 +7480,7 @@ mod tests {
     #[test]
     fn exact_noop_reassembly_enforces_the_total_uncompressed_limit() -> Result<()> {
         let bytes = physical_two_entry_zip();
-        let catalog = Catalog::from_bytes(&bytes)?;
+        let catalog = Catalog::from_bytes(&bytes, Default::default())?;
         let input = u64::try_from(bytes.len()).map_err(|_error| {
             Error::InvalidBundle("test ZIP length does not fit u64".to_owned())
         })?;
@@ -7462,11 +7512,12 @@ mod tests {
 
     #[test]
     fn identical_nonempty_edits_use_the_exact_source_for_store_and_deflate() -> Result<()> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer.write_stored("Stored/data", b"stored payload")?;
         writer.write_deflated("Deflated/data", b"deflated payload repeated")?;
         let bytes = writer.finish_to_bytes()?;
-        let catalog = Catalog::from_bytes(&bytes)?;
+        let catalog = Catalog::from_bytes(&bytes, Default::default())?;
         let edits = catalog
             .iter()
             .map(|entry| EntryEdit::new(entry.name(), entry.data()))
@@ -7486,7 +7537,7 @@ mod tests {
             ("legacy.pages/Index.zip", index.as_slice()),
             ("legacy.pages/Data/a", b"a"),
         ])?;
-        let catalog = Catalog::from_bytes(&bytes)?;
+        let catalog = Catalog::from_bytes(&bytes, Default::default())?;
         let edits = catalog
             .iter()
             .map(|entry| EntryEdit::new(entry.name(), entry.data()))
@@ -7502,7 +7553,7 @@ mod tests {
     #[test]
     fn rejected_edits_leave_the_sink_untouched() -> Result<()> {
         let bytes = physical_two_entry_zip();
-        let catalog = Catalog::from_bytes(&bytes)?;
+        let catalog = Catalog::from_bytes(&bytes, Default::default())?;
         let original_sink = vec![0xde, 0xad, 0xbe, 0xef];
 
         let cases = [
@@ -7522,7 +7573,7 @@ mod tests {
         }
 
         let (opaque_bytes, _central_offset, _central_end) = physical_zip(99);
-        let opaque_catalog = Catalog::from_bytes(&opaque_bytes)?;
+        let opaque_catalog = Catalog::from_bytes(&opaque_bytes, Default::default())?;
         let mut opaque_sink = original_sink.clone();
         assert!(matches!(
             opaque_catalog.write_reassembled_to(
@@ -7557,14 +7608,14 @@ mod tests {
     #[test]
     fn inserts_at_append_front_middle_and_equal_positions_deterministically() -> Result<()> {
         let source = zip(&[("Data/a", b"a"), ("Data/b", b"b"), ("Data/c", b"c")])?;
-        let catalog = Catalog::from_bytes(&source)?;
+        let catalog = Catalog::from_bytes(&source, Default::default())?;
 
         let append = catalog.reassemble_with_insertions_to_bytes(
             &[EntryInsertion::new("Data/append", b"append")],
             Limits::default(),
         )?;
         assert_eq!(
-            Catalog::from_bytes(&append)?
+            Catalog::from_bytes(&append, Default::default())?
                 .iter()
                 .map(Entry::name)
                 .collect::<Vec<_>>(),
@@ -7576,7 +7627,7 @@ mod tests {
             Limits::default(),
         )?;
         assert_eq!(
-            Catalog::from_bytes(&front)?
+            Catalog::from_bytes(&front, Default::default())?
                 .iter()
                 .map(Entry::name)
                 .collect::<Vec<_>>(),
@@ -7588,7 +7639,7 @@ mod tests {
             Limits::default(),
         )?;
         assert_eq!(
-            Catalog::from_bytes(&middle)?
+            Catalog::from_bytes(&middle, Default::default())?
                 .iter()
                 .map(Entry::name)
                 .collect::<Vec<_>>(),
@@ -7604,7 +7655,7 @@ mod tests {
             Limits::default(),
         )?;
         assert_eq!(
-            Catalog::from_bytes(&equal)?
+            Catalog::from_bytes(&equal, Default::default())?
                 .iter()
                 .map(Entry::name)
                 .collect::<Vec<_>>(),
@@ -7623,13 +7674,13 @@ mod tests {
     #[test]
     fn insertion_preserves_untouched_raw_records_and_metadata() -> Result<()> {
         let source = physical_two_entry_zip();
-        let catalog = Catalog::from_bytes(&source)?;
+        let catalog = Catalog::from_bytes(&source, Default::default())?;
         let before = catalog.iter().collect::<Vec<_>>();
         let rebuilt = catalog.reassemble_with_insertions_to_bytes(
             &[EntryInsertion::at(0, "Data/new", b"new payload")],
             Limits::default(),
         )?;
-        let after_catalog = Catalog::from_bytes(&rebuilt)?;
+        let after_catalog = Catalog::from_bytes(&rebuilt, Default::default())?;
         let after = after_catalog.iter().collect::<Vec<_>>();
 
         assert_eq!(
@@ -7669,14 +7720,14 @@ mod tests {
     #[test]
     fn insertion_combines_with_edit_and_delete_in_one_transaction() -> Result<()> {
         let source = physical_two_entry_zip();
-        let catalog = Catalog::from_bytes(&source)?;
+        let catalog = Catalog::from_bytes(&source, Default::default())?;
         let rebuilt = catalog.reassemble_with_changes_to_bytes(
             &[EntryInsertion::at(0, "Data/new", b"new")],
             &[EntryEdit::new("Opaque/entry.bin", b"edited")],
             &["Untouched/a"],
             Limits::default(),
         )?;
-        let after = Catalog::from_bytes(&rebuilt)?;
+        let after = Catalog::from_bytes(&rebuilt, Default::default())?;
         assert_eq!(
             after.iter().map(Entry::name).collect::<Vec<_>>(),
             ["Data/new", "Opaque/entry.bin"]
@@ -7688,16 +7739,17 @@ mod tests {
 
     #[test]
     fn insertion_supports_a_deflated_source_and_keeps_existing_compression() -> Result<()> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer.write_deflated("Compressed/data", b"old deflate payload")?;
         writer.write_stored("Untouched/data", b"old stored payload")?;
         let source = writer.finish_to_bytes()?;
-        let catalog = Catalog::from_bytes(&source)?;
+        let catalog = Catalog::from_bytes(&source, Default::default())?;
         let rebuilt = catalog.reassemble_with_insertions_to_bytes(
             &[EntryInsertion::new("Data/new", b"new")],
             Limits::default(),
         )?;
-        let after = Catalog::from_bytes(&rebuilt)?;
+        let after = Catalog::from_bytes(&rebuilt, Default::default())?;
         let entries = after.iter().collect::<Vec<_>>();
         assert_eq!(
             entries.iter().map(|entry| entry.name()).collect::<Vec<_>>(),
@@ -7715,7 +7767,7 @@ mod tests {
     #[test]
     fn insertion_rejects_collisions_unsafe_names_and_invalid_positions() -> Result<()> {
         let source = zip(&[("Data/a", b"a"), ("Data/b", b"b")])?;
-        let catalog = Catalog::from_bytes(&source)?;
+        let catalog = Catalog::from_bytes(&source, Default::default())?;
 
         assert!(matches!(
             catalog.reassemble_with_insertions_to_bytes(
@@ -7763,7 +7815,7 @@ mod tests {
     #[test]
     fn insertion_preflights_entry_name_data_total_and_output_limits() -> Result<()> {
         let source = zip(&[("Data/a", b"a"), ("Data/b", b"b")])?;
-        let catalog = Catalog::from_bytes(&source)?;
+        let catalog = Catalog::from_bytes(&source, Default::default())?;
         let source_size = u64::try_from(source.len()).map_err(|_error| {
             Error::InvalidBundle("test ZIP length does not fit u64".to_owned())
         })?;
@@ -7834,7 +7886,7 @@ mod tests {
     #[test]
     fn prepared_insertions_report_and_enforce_allocation_requirements() -> Result<()> {
         let source = zip(&[("Data/a", b"a"), ("Data/b", b"b")])?;
-        let catalog = Catalog::from_bytes(&source)?;
+        let catalog = Catalog::from_bytes(&source, Default::default())?;
         let insertions = [EntryInsertion::at(1, "Data/new", b"payload")];
         let prepared =
             catalog.prepare_reassembly_with_insertions(&insertions, Limits::default())?;
@@ -7843,7 +7895,7 @@ mod tests {
         assert_eq!(requirements.scratch_bytes(), 3 * size_of::<Option<u64>>());
         assert_eq!(requirements.allocations(), 2);
         let output = prepared.execute(requirements.exact_limits())?;
-        assert_eq!(Catalog::from_bytes(&output)?.len(), 3);
+        assert_eq!(Catalog::from_bytes(&output, Default::default())?.len(), 3);
 
         let prepared =
             catalog.prepare_reassembly_with_insertions(&insertions, Limits::default())?;
@@ -7901,7 +7953,7 @@ mod tests {
     #[test]
     fn insertion_failures_leave_sink_and_source_untouched_and_empty_is_exact_noop() -> Result<()> {
         let source = zip(&[("Data/a", b"a"), ("Data/b", b"b")])?;
-        let catalog = Catalog::from_bytes(&source)?;
+        let catalog = Catalog::from_bytes(&source, Default::default())?;
         let original_sink = vec![0xde, 0xad, 0xbe, 0xef];
         let mut sink = original_sink.clone();
         assert!(matches!(
@@ -7915,7 +7967,7 @@ mod tests {
             Err(Error::Reassembly(_))
         ));
         assert_eq!(sink, original_sink);
-        assert_eq!(catalog.to_bytes()?, source);
+        assert_eq!(catalog.to_bytes(Default::default())?, source);
 
         assert_eq!(
             catalog.reassemble_with_insertions_to_bytes(&[], Limits::default())?,

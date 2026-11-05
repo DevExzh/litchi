@@ -945,7 +945,7 @@ mod tests {
     fn conformant_fixture_opens_with_a_clean_report() {
         let fixture = include_bytes!("../../../test-data/ooxml/xlsx/DateFormatTests.xlsx");
 
-        let workbook = crate::Workbook::from_slice(fixture).unwrap();
+        let workbook = crate::Package::from_bytes(fixture).unwrap();
         assert!(workbook.tolerance_report().is_clean());
         for sheet in workbook.sheets() {
             assert!(sheet.tolerance_report().unwrap().is_clean());
@@ -955,13 +955,13 @@ mod tests {
         assert_eq!(report.total(), 0);
         assert_eq!(report.unrecorded(), 0);
 
-        let package = crate::Package::from_slice(fixture).unwrap();
-        assert!(package.workbook().unwrap().tolerance_report().is_clean());
+        let package = crate::Package::from_bytes(fixture).unwrap();
+        assert!(package.workbook().tolerance_report().is_clean());
 
         let source =
             crate::SourceBackedWorkbook::from_reader(std::io::Cursor::new(fixture.as_slice()))
                 .unwrap();
-        for sheet in source.sheets() {
+        for sheet in source.sheets().unwrap() {
             assert!(sheet.tolerance_report().unwrap().is_clean());
         }
         assert!(source.tolerance_report().is_clean());

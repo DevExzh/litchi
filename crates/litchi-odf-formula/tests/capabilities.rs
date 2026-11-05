@@ -5,8 +5,8 @@
 
 use litchi_odf_formula::authoring::{self, Display};
 use litchi_odf_formula::{
-    ChangeKind, DependencyConflictKind, Formula, History, MAX_COMMIT_HISTORY,
-    MAX_STARMATH_SOURCE_BYTES, NodePath, OpaqueStarMath, Patch, StarMathVersion, codec,
+    Builder, ChangeKind, DependencyConflictKind, History, MAX_COMMIT_HISTORY,
+    MAX_STARMATH_SOURCE_BYTES, NodePath, OpaqueStarMath, Package, Patch, StarMathVersion, codec,
 };
 
 const NS: &str = "http://www.w3.org/1998/Math/MathML";
@@ -23,13 +23,13 @@ fn mathml_two_content_arity_and_value_domains_are_enforced() {
         format!(r#"<math xmlns="{NS}"><unknown/></math>"#),
     ];
     for xml in malformed {
-        assert!(Formula::create(xml).is_err());
+        assert!(create(xml).is_err());
     }
 
     let valid = format!(
         r#"<math xmlns="{NS}" display="block"><mrow><mfrac linethickness="thin"><mi>x</mi><mn>2</mn></mfrac><mmultiscripts><mi>A</mi><none/><mi>n</mi><mprescripts/><mi>i</mi><none/></mmultiscripts></mrow></math>"#
     );
-    assert!(Formula::create(valid).is_ok());
+    assert!(create(valid).is_ok());
 }
 
 #[test]
@@ -49,7 +49,8 @@ fn checked_in_libreoffice_mathml_samples_validate() {
         include_str!("../../../test-data/libreoffice-core/starmath/qa/extras/data/tdf99556-1.mml"),
     ];
     for sample in samples {
-        let root = codec::parse(sample).expect("checked-in MathML fixture");
+        let root =
+            codec::parse(sample, &codec::Limits::default()).expect("checked-in MathML fixture");
         codec::validate(&root).expect("schema projection");
     }
 }
@@ -59,7 +60,7 @@ fn granular_edits_record_paths_and_round_trip_durable_history() {
     let xml = format!(
         r#"<math xmlns="{NS}"><semantics><mrow><mi>x</mi></mrow><annotation encoding="StarMath 5.0">x</annotation></semantics></math>"#
     );
-    let source = Formula::create(xml).expect("source");
+    let source = create(xml).expect("source");
     let row_path = NodePath::new([0, 0]);
     let identifier_path = row_path.child(0);
     let mut edit = source.edit();
@@ -76,7 +77,7 @@ fn granular_edits_record_paths_and_round_trip_durable_history() {
     assert_eq!(commit.patch().changes()[0].kind(), ChangeKind::SetText);
     assert_eq!(commit.patch().changes()[1].path().indices(), &[0, 0, 1]);
     assert_eq!(
-        commit.formula().starmath_annotations()[0]
+        commit.package().formula().starmath_annotations()[0]
             .opaque()
             .version(),
         StarMathVersion::V6
@@ -84,13 +85,16 @@ fn granular_edits_record_paths_and_round_trip_durable_history() {
 
     let durable = commit.patch().to_bytes().expect("encode patch");
     let reopened = Patch::from_bytes(&durable).expect("decode patch");
-    let target = reopened.apply(&source).expect("apply durable patch");
-    assert_eq!(target.as_bytes(), commit.formula().as_bytes());
+    let target = source
+        .apply(&reopened)
+        .expect("apply durable patch")
+        .into_package();
+    assert_eq!(target.as_bytes(), commit.package().as_bytes());
     assert_eq!(
-        reopened
-            .inverse()
-            .apply(&target)
+        target
+            .apply(&reopened.inverse())
             .expect("inverse")
+            .into_package()
             .as_bytes(),
         source.as_bytes()
     );
@@ -114,9 +118,9 @@ fn malformed_and_fuzz_like_inputs_fail_without_panics() {
         let children = "<mi>x</mi>".repeat(count);
         let xml = format!(r#"<math xmlns="{NS}"><mfrac>{children}</mfrac></math>"#);
         if count == 2 {
-            assert!(Formula::create(xml).is_ok());
+            assert!(create(xml).is_ok());
         } else {
-            assert!(Formula::create(xml).is_err());
+            assert!(create(xml).is_err());
         }
     }
 
@@ -124,9 +128,9 @@ fn malformed_and_fuzz_like_inputs_fail_without_panics() {
         let arguments = "<cn>1</cn>".repeat(count);
         let xml = format!(r#"<math xmlns="{NS}"><apply><divide/>{arguments}</apply></math>"#);
         if count == 2 {
-            assert!(Formula::create(xml).is_ok());
+            assert!(create(xml).is_ok());
         } else {
-            assert!(Formula::create(xml).is_err());
+            assert!(create(xml).is_err());
         }
     }
 
@@ -135,7 +139,10 @@ fn malformed_and_fuzz_like_inputs_fail_without_panics() {
         deep = authoring::row(vec![deep]);
     }
     let deep_document = authoring::document_root(deep, Display::Inline);
-    assert!(Formula::create(codec::serialize(&deep_document)).is_err());
+    assert!(
+        create(codec::serialize(&deep_document, &codec::Limits::default()).expect("deep XML"))
+            .is_err()
+    );
 }
 
 #[test]
@@ -171,7 +178,7 @@ fn content_mathml_schema_corpus_has_checked_structure_and_values() {
         ),
     ];
     for xml in valid {
-        assert!(Formula::create(xml).is_ok());
+        assert!(create(xml).is_ok());
     }
 
     let malformed = [
@@ -211,16 +218,13 @@ fn content_mathml_schema_corpus_has_checked_structure_and_values() {
         format!(r#"<math xmlns="{NS}"><condition><ci>x</ci></condition></math>"#),
     ];
     for xml in malformed {
-        assert!(
-            Formula::create(&xml).is_err(),
-            "unexpectedly accepted {xml}"
-        );
+        assert!(create(&xml).is_err(), "unexpectedly accepted {xml}");
     }
 }
 
 #[test]
 fn opaque_starmath_boundary_is_versioned_bounded_and_publishable() {
-    let source = Formula::create(format!(
+    let source = create(format!(
         r#"<math xmlns="{NS}"><semantics><mi>x</mi><annotation encoding="StarMath 5.0">x</annotation></semantics></math>"#
     ))
     .expect("source");
@@ -233,8 +237,9 @@ fn opaque_starmath_boundary_is_versioned_bounded_and_publishable() {
     let mut edit = source.edit();
     edit.set_starmath(&opaque).expect("stage StarMath");
     let commit = edit.commit().expect("publish StarMath");
-    let reopened = Formula::from_bytes(commit.formula().to_bytes()).expect("full reopen");
+    let reopened = Package::from_bytes(commit.package().as_bytes()).expect("full reopen");
     let annotation = reopened
+        .formula()
         .starmath_annotations()
         .into_iter()
         .next()
@@ -244,7 +249,7 @@ fn opaque_starmath_boundary_is_versioned_bounded_and_publishable() {
 
 #[test]
 fn independent_sub_edits_transfer_paths_join_atomically_and_report_conflicts() {
-    let source = Formula::create(format!(
+    let source = create(format!(
         r#"<math xmlns="{NS}"><mrow><mi>a</mi><mi>b</mi></mrow></math>"#
     ))
     .expect("source");
@@ -263,7 +268,7 @@ fn independent_sub_edits_transfer_paths_join_atomically_and_report_conflicts() {
     assert_eq!(transfer.operations()[0].path().indices(), &[0, 2]);
     insertion.join(&independent).expect("atomic join");
     let joined = insertion.commit().expect("publish join");
-    assert_eq!(joined.formula().root().all_text(), "-ay");
+    assert_eq!(joined.package().formula().root().all_text(), "-ay");
     assert_eq!(joined.patch().changes().len(), 2);
 
     let mut left = source.edit();
@@ -287,11 +292,11 @@ fn independent_sub_edits_transfer_paths_join_atomically_and_report_conflicts() {
 
 #[test]
 fn three_way_plan_is_non_mutating_and_publishes_reopenable_reversible_bytes() {
-    let base = Formula::create(format!(
+    let base = create(format!(
         r#"<math xmlns="{NS}"><mrow><mi>a</mi><mi>b</mi></mrow></math>"#
     ))
     .expect("base");
-    let base_bytes = base.to_bytes();
+    let base_bytes = base.to_bytes().expect("base bytes");
     let mut left_edit = base.edit();
     left_edit
         .set_text(&NodePath::new([0, 0]), "x")
@@ -310,39 +315,54 @@ fn three_way_plan_is_non_mutating_and_publishes_reopenable_reversible_bytes() {
     assert_eq!(base.as_bytes(), base_bytes);
     let commit = plan.publish().expect("publish");
     assert!(commit.diagnostics().candidate_reopened());
-    assert_eq!(commit.formula().root().all_text(), "xy");
-    assert_eq!(commit.record().expect("record").changes().len(), 2);
+    assert_eq!(commit.package().formula().root().all_text(), "xy");
+    assert_eq!(
+        commit
+            .package()
+            .formula()
+            .commit_history()
+            .last()
+            .expect("record")
+            .changes()
+            .len(),
+        2
+    );
 
     let durable = Patch::from_bytes(&commit.patch().to_bytes().expect("durable bytes"))
         .expect("durable reopen");
-    let published = durable.apply(&base).expect("durable apply");
-    let reopened = Formula::from_bytes(published.to_bytes()).expect("package reopen");
-    assert_eq!(reopened.root().all_text(), "xy");
-    assert!(durable.apply(left_commit.formula()).is_err());
-    let restored = durable.inverse().apply(&published).expect("inverse");
-    assert_eq!(restored.as_bytes(), base_bytes);
+    let published = base.apply(&durable).expect("durable apply").into_package();
+    let reopened = Package::from_bytes(published.as_bytes()).expect("package reopen");
+    assert_eq!(reopened.formula().root().all_text(), "xy");
+    assert!(left_commit.package().apply(&durable).is_err());
+    let restored = published.apply(&durable.inverse()).expect("inverse");
+    assert_eq!(restored.into_package().as_bytes(), base_bytes);
 }
 
 #[test]
 fn published_commit_history_is_coupled_and_bounded() {
-    let mut formula =
-        Formula::create(format!(r#"<math xmlns="{NS}"><mi>0</mi></math>"#)).expect("source");
+    let mut package = create(format!(r#"<math xmlns="{NS}"><mi>0</mi></math>"#)).expect("source");
     for index in 1..=MAX_COMMIT_HISTORY + 2 {
-        let source_revision = formula.revision();
-        let mut edit = formula.edit();
+        let source_revision = package.formula().revision();
+        let mut edit = package.edit();
         edit.set_text(&NodePath::new([0]), &index.to_string())
             .expect("stage history step");
         let commit = edit.commit().expect("publish history step");
-        let record = commit.record().expect("commit record");
+        let formula = commit.package().formula();
+        let record = formula.commit_history().last().expect("commit record");
         assert_eq!(record.source_revision(), source_revision);
-        assert_eq!(record.target_revision(), commit.formula().revision());
-        formula = commit.into_formula();
+        assert_eq!(record.target_revision(), formula.revision());
+        package = commit.into_package();
     }
-    assert_eq!(formula.commit_history().len(), MAX_COMMIT_HISTORY);
+    assert_eq!(package.formula().commit_history().len(), MAX_COMMIT_HISTORY);
     assert!(
-        formula
+        package
+            .formula()
             .commit_history()
             .windows(2)
             .all(|window| window[0].target_revision() == window[1].source_revision())
     );
+}
+
+fn create(mathml: impl Into<String>) -> Result<Package, litchi_odf_formula::Error> {
+    Builder::from_mathml(mathml).build()
 }

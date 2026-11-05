@@ -20,12 +20,12 @@ impl MutableDocument {
     /// the structural projection, so spans, hyperlinks, fields, and producer
     /// extensions already inside the paragraph remain byte-for-byte intact.
     #[deprecated(note = "use append_line_break_at with a checked semantic Position")]
-    pub fn append_line_break(&mut self, paragraph_index: usize) -> Result<()> {
+    pub(crate) fn append_line_break(&mut self, paragraph_index: usize) -> Result<()> {
         self.append_line_break_at(litchi_core::Position::new(paragraph_index))
     }
 
     /// Append a line break at a checked semantic paragraph position.
-    pub fn append_line_break_at(&mut self, paragraph: litchi_core::Position) -> Result<()> {
+    pub(crate) fn append_line_break_at(&mut self, paragraph: litchi_core::Position) -> Result<()> {
         self.edit_content_xml(|xml| append_line_break_xml(xml, paragraph.get()))
     }
 }

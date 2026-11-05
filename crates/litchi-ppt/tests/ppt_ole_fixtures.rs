@@ -4,7 +4,7 @@
     reason = "test assertions panic on failure by design"
 )]
 
-use litchi_ppt::Package;
+use litchi_ppt::raw::Reader;
 use std::path::PathBuf;
 
 fn fixture(name: &str) -> PathBuf {
@@ -20,7 +20,7 @@ fn bundled_poi_ole_presentations_expose_inert_metadata_and_storage() {
         "testPPT_oleWorkbook.ppt",
         "ole2-embedding-2003.ppt",
     ] {
-        let mut package = Package::open(fixture(name)).expect("open POI OLE fixture");
+        let mut package = Reader::open(fixture(name)).expect("open POI OLE fixture");
         let presentation = package.presentation().expect("parse POI OLE fixture");
         let objects = presentation
             .ole_objects()

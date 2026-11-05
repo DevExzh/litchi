@@ -1,9 +1,11 @@
 //! Common types and utilities
 
-use pyo3::exceptions::{PyException, PyIOError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
+use std::borrow::Cow;
 use std::path::PathBuf;
+
+use crate::errors::Failure;
 
 /// Registers common types with the Python module
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -15,25 +17,11 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     Ok(())
 }
 
-/// Converts a Rust litchi::Error to a Python exception
-pub fn to_py_err(err: litchi::Error) -> PyErr {
-    match err {
-        litchi::Error::Io(e) => PyIOError::new_err(e.to_string()),
-        litchi::Error::InvalidFormat(msg) => PyValueError::new_err(msg),
-        litchi::Error::Unsupported(msg) => PyValueError::new_err(msg),
-        _ => PyException::new_err(err.to_string()),
-    }
-}
-
-/// Converts a boxed error to a Python exception
-pub fn boxed_err_to_py_err(err: Box<dyn std::error::Error + Send + Sync>) -> PyErr {
-    PyException::new_err(err.to_string())
-}
-
 /// File format enumeration
 ///
-/// Represents the different Office file formats supported by Litchi.
-#[pyclass(skip_from_py_object)]
+/// Represents the different Office file formats supported by Litchi: one
+/// value per format detection can report.
+#[pyclass(skip_from_py_object, module = "litchi_py")]
 #[derive(Clone, Copy, Debug)]
 pub enum FileFormat {
     /// Microsoft Word 97-2003 (.doc)
@@ -76,11 +64,19 @@ pub enum FileFormat {
     Numbers,
     /// Rich Text Format (.rtf)
     Rtf,
+    /// OpenDocument Database Front End (.odb). Last, so the integer values
+    /// of the formats before it stay as they were.
+    Odb,
 }
 
-impl From<litchi::FileFormat> for FileFormat {
-    fn from(fmt: litchi::FileFormat) -> Self {
-        match fmt {
+impl FileFormat {
+    /// The Python value of a detected format.
+    ///
+    /// Every format of this Litchi build has a Python value; a format a
+    /// newer Litchi adds before these bindings learn it is reported as an
+    /// internal error instead of being given another format's name.
+    pub(crate) fn from_core(fmt: litchi::FileFormat) -> Result<Self, Failure> {
+        Ok(match fmt {
             litchi::FileFormat::Doc => FileFormat::Doc,
             litchi::FileFormat::Docx => FileFormat::Docx,
             litchi::FileFormat::Ppt => FileFormat::Ppt,
@@ -97,17 +93,92 @@ impl From<litchi::FileFormat> for FileFormat {
             litchi::FileFormat::Odi => FileFormat::Odi,
             litchi::FileFormat::Odm => FileFormat::Odm,
             litchi::FileFormat::Oth => FileFormat::Oth,
+            litchi::FileFormat::Odb => FileFormat::Odb,
             litchi::FileFormat::Pages => FileFormat::Pages,
             litchi::FileFormat::Keynote => FileFormat::Keynote,
             litchi::FileFormat::Numbers => FileFormat::Numbers,
             litchi::FileFormat::Rtf => FileFormat::Rtf,
-            // `litchi::FileFormat` is `#[non_exhaustive]`; map any future
-            // variants we don't yet expose in Python bindings to the closest
-            // match. Until a binding is added, fall back to `Doc` rather than
-            // panicking — callers can disambiguate via the format-specific
-            // detection APIs.
-            _ => FileFormat::Doc,
+            other => return Err(Failure::unknown_format(other)),
+        })
+    }
+}
+
+impl FileFormat {
+    /// Every value, for parsing a format name.
+    const ALL: [Self; 21] = [
+        Self::Doc,
+        Self::Docx,
+        Self::Ppt,
+        Self::Pptx,
+        Self::Xls,
+        Self::Xlsx,
+        Self::Xlsb,
+        Self::Odt,
+        Self::Ods,
+        Self::Odp,
+        Self::Odg,
+        Self::Odc,
+        Self::Odf,
+        Self::Odi,
+        Self::Odm,
+        Self::Oth,
+        Self::Pages,
+        Self::Keynote,
+        Self::Numbers,
+        Self::Rtf,
+        Self::Odb,
+    ];
+
+    /// The core format of this value.
+    pub(crate) fn to_core(self) -> litchi::FileFormat {
+        match self {
+            FileFormat::Doc => litchi::FileFormat::Doc,
+            FileFormat::Docx => litchi::FileFormat::Docx,
+            FileFormat::Ppt => litchi::FileFormat::Ppt,
+            FileFormat::Pptx => litchi::FileFormat::Pptx,
+            FileFormat::Xls => litchi::FileFormat::Xls,
+            FileFormat::Xlsx => litchi::FileFormat::Xlsx,
+            FileFormat::Xlsb => litchi::FileFormat::Xlsb,
+            FileFormat::Odt => litchi::FileFormat::Odt,
+            FileFormat::Ods => litchi::FileFormat::Ods,
+            FileFormat::Odp => litchi::FileFormat::Odp,
+            FileFormat::Odg => litchi::FileFormat::Odg,
+            FileFormat::Odc => litchi::FileFormat::Odc,
+            FileFormat::Odf => litchi::FileFormat::Odf,
+            FileFormat::Odi => litchi::FileFormat::Odi,
+            FileFormat::Odm => litchi::FileFormat::Odm,
+            FileFormat::Oth => litchi::FileFormat::Oth,
+            FileFormat::Odb => litchi::FileFormat::Odb,
+            FileFormat::Pages => litchi::FileFormat::Pages,
+            FileFormat::Keynote => litchi::FileFormat::Keynote,
+            FileFormat::Numbers => litchi::FileFormat::Numbers,
+            FileFormat::Rtf => litchi::FileFormat::Rtf,
         }
+    }
+
+    /// The format a `FileFormat` value or a name ("docx", "Docx", ".docx")
+    /// stands for.
+    pub(crate) fn extract(value: &Bound<'_, PyAny>) -> PyResult<Self> {
+        if let Ok(format) = value.cast::<Self>() {
+            return Ok(*format.borrow());
+        }
+        let Ok(name) = value.extract::<pyo3::pybacked::PyBackedStr>() else {
+            return Err(Failure::argument(
+                "format must be a FileFormat or a format name such as \"docx\"",
+            )
+            .into());
+        };
+        let bare = name.strip_prefix('.').unwrap_or(&name);
+        Self::ALL
+            .into_iter()
+            .find(|format| format.__str__().eq_ignore_ascii_case(bare))
+            .ok_or_else(|| {
+                Failure::argument(format!("unknown format name {:?}", &*name))
+                    .with_suggestion(
+                        "use a FileFormat value or a name such as \"docx\", \"xlsx\" or \"pptx\"",
+                    )
+                    .into()
+            })
     }
 }
 
@@ -132,6 +203,7 @@ impl FileFormat {
             FileFormat::Odi => "Odi",
             FileFormat::Odm => "Odm",
             FileFormat::Oth => "Oth",
+            FileFormat::Odb => "Odb",
             FileFormat::Pages => "Pages",
             FileFormat::Keynote => "Keynote",
             FileFormat::Numbers => "Numbers",
@@ -147,7 +219,7 @@ impl FileFormat {
 /// RGB color representation
 ///
 /// Represents a color in RGB format with values from 0-255.
-#[pyclass(skip_from_py_object)]
+#[pyclass(frozen, skip_from_py_object, module = "litchi_py")]
 #[derive(Clone, Debug)]
 pub struct RGBColor {
     inner: litchi::RGBColor,
@@ -198,7 +270,7 @@ impl RGBColor {
 /// Length with units
 ///
 /// Represents a measurement with associated units (EMUs, points, inches, etc.).
-#[pyclass(skip_from_py_object)]
+#[pyclass(frozen, skip_from_py_object, module = "litchi_py")]
 #[derive(Clone, Debug)]
 pub struct Length {
     inner: litchi::Length,
@@ -265,20 +337,27 @@ impl Length {
 
 /// Detect file format from file path
 ///
+/// Detection reads the file's content; the file name is not consulted.
+/// The GIL is released while the file is read.
+///
 /// Args:
 ///     path: Path to the file
 ///
 /// Returns:
 ///     The detected FileFormat, or None if format cannot be determined
 #[pyfunction]
-fn detect_file_format(path: PathBuf) -> PyResult<Option<FileFormat>> {
-    match litchi::detect_file_format(&path) {
-        Some(fmt) => Ok(Some(FileFormat::from(fmt))),
-        None => Ok(None),
-    }
+fn detect_file_format(py: Python<'_>, path: PathBuf) -> PyResult<Option<FileFormat>> {
+    py.detach(|| {
+        litchi::detect_file_format(&path, &litchi::common::detection::SourceLimits::default())
+    })
+    .map(FileFormat::from_core)
+    .transpose()
+    .map_err(PyErr::from)
 }
 
 /// Detect file format from bytes
+///
+/// The GIL is released while the bytes are inspected.
 ///
 /// Args:
 ///     data: File content as bytes
@@ -286,6 +365,48 @@ fn detect_file_format(path: PathBuf) -> PyResult<Option<FileFormat>> {
 /// Returns:
 ///     The detected FileFormat, or None if format cannot be determined
 #[pyfunction]
-fn detect_file_format_from_bytes(data: &[u8]) -> Option<FileFormat> {
-    litchi::detect_file_format_from_bytes(data).map(FileFormat::from)
+fn detect_file_format_from_bytes(py: Python<'_>, data: &[u8]) -> PyResult<Option<FileFormat>> {
+    py.detach(|| {
+        litchi::detect_file_format_from_bytes(
+            data,
+            &litchi::common::detection::SourceLimits::default(),
+        )
+    })
+    .map(FileFormat::from_core)
+    .transpose()
+    .map_err(PyErr::from)
+}
+
+/// A `repr()` preview of `text`: the text itself when it has at most
+/// `limit` characters, otherwise its first `limit` characters and `...`.
+///
+/// The cut is counted in characters, as Python slices a `str`, so it never
+/// falls inside a multi-byte character.
+pub(crate) fn preview(text: &str, limit: usize) -> Cow<'_, str> {
+    match text.char_indices().nth(limit) {
+        Some((end, _)) => Cow::Owned(format!("{}...", &text[..end])),
+        None => Cow::Borrowed(text),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::preview;
+
+    #[test]
+    fn preview_cuts_at_a_character_boundary() {
+        assert_eq!(preview("short", 30), "short");
+        assert_eq!(preview(&"a".repeat(30), 30), "a".repeat(30));
+        assert_eq!(
+            preview(&"a".repeat(31), 30),
+            format!("{}...", "a".repeat(30))
+        );
+        // Two-byte letters: a byte cut at 30 would split the 16th letter.
+        let russian = "Привет мир, это длинный абзац текста";
+        assert_eq!(
+            preview(russian, 30),
+            format!("{}...", russian.chars().take(30).collect::<String>())
+        );
+        assert_eq!(preview("😀😀😀", 2), "😀😀...");
+    }
 }

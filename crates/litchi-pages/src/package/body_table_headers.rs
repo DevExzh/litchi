@@ -18,14 +18,14 @@ use litchi_iwa_archive::{SourceCatalog, package::EntryEdit};
 use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes,
     varint::encoded_len,
-    wire::{WireDescent, WireView, preflight_wire_tree_with_limits},
+    wire::{WireDescent, WireView, preflight_wire_tree},
 };
 use litchi_iwa_core::RawMessage;
 use litchi_iwa_protos::table_header_settings_codec::{
     self, DecodeError, DecodeOptions, TableHeaderSettingsSnapshot, TableHeaderSettingsWrite,
     WireResourceLimit,
 };
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::{Package, PackageError, page_layout, table_lock};
 use crate::selector::BodyTableSelector;
@@ -38,7 +38,7 @@ const MAX_VARINT_BYTES: usize = 10;
 /// Finite resources charged by one body-table header transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum BodyTableHeaderSettingsLimitKind {
+pub enum LimitKind {
     /// Complete source package bytes.
     InputBytes,
     /// Complete candidate package bytes.
@@ -75,7 +75,7 @@ pub enum BodyTableHeaderSettingsLimitKind {
     TransactionWork,
 }
 
-impl fmt::Display for BodyTableHeaderSettingsLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -102,7 +102,7 @@ impl fmt::Display for BodyTableHeaderSettingsLimitKind {
 /// Content-free semantic reason for rejecting requested partitions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum BodyTableHeaderSettingsInvalidReason {
+pub enum InvalidReason {
     /// Header rows plus footer rows exceed the table's rows.
     RowSectionsExceedTable {
         /// Requested header rows.
@@ -121,7 +121,7 @@ pub enum BodyTableHeaderSettingsInvalidReason {
     },
 }
 
-impl fmt::Display for BodyTableHeaderSettingsInvalidReason {
+impl fmt::Display for InvalidReason {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::RowSectionsExceedTable {
@@ -146,43 +146,23 @@ impl fmt::Display for BodyTableHeaderSettingsInvalidReason {
 }
 
 /// Failure from a Pages body-table header read or transaction.
-#[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, ThisError, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum BodyTableHeaderSettingsError {
-    /// No rooted body table matched the selector.
-    #[error("the Pages body has no table matching the requested selector")]
-    TableNotFound,
-    /// A name selector matched more than one rooted table.
-    #[error("the Pages body has more than one table with the requested name")]
-    AmbiguousTableName,
-    /// The selector or rooted graph is ambiguous.
-    #[error("the Pages body-table header selector is ambiguous")]
-    AmbiguousSelector,
-    /// Requested settings violate table dimensions.
-    #[error("the requested Pages body-table header settings are invalid: {reason}")]
-    InvalidSettings {
-        /// Content-free reason.
-        reason: BodyTableHeaderSettingsInvalidReason,
-    },
-    /// The source has no exact physical provenance.
-    #[error("the Pages package source does not support exact body-table header editing")]
-    UnsupportedSource,
+pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     /// A rooted graph or selected payload is malformed.
     #[error("the selected Pages body-table header source is invalid")]
     InvalidSource,
-    /// A supported dependency would become stale.
-    #[error("the selected Pages body table has a dependent header topology")]
-    UnsupportedDependency,
-    /// The selected table is protected from editing.
-    #[error("the selected Pages body table is locked")]
-    TableLocked,
     /// A finite resource ceiling was exceeded.
     #[error(
         "Pages body-table headers {kind} limit exceeded: observed {observed}, maximum {maximum}"
     )]
-    LimitExceeded {
+    Limit {
         /// Resource category.
-        kind: BodyTableHeaderSettingsLimitKind,
+        kind: LimitKind,
         /// Observed amount.
         observed: u64,
         /// Maximum amount.
@@ -202,46 +182,116 @@ pub enum BodyTableHeaderSettingsError {
     PatchConflict,
 }
 
-/// Mutable semantic header settings staged against one immutable package.
-pub struct BodyTableHeaderSettingsEdit<'a> {
-    source: &'a Package,
-    target: table_lock::BodyTableTarget,
-    before: Settings,
-    settings: Settings,
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, ThisError, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Refusal {
+    /// No rooted body table matched the selector.
+    #[error("the Pages body has no table matching the requested selector")]
+    TableNotFound,
+    /// A name selector matched more than one rooted table.
+    #[error("the Pages body has more than one table with the requested name")]
+    AmbiguousTableName,
+    /// The selector or rooted graph is ambiguous.
+    #[error("the Pages body-table header selector is ambiguous")]
+    AmbiguousSelector,
+    /// Requested settings violate table dimensions.
+    #[error("the requested Pages body-table header settings are invalid: {reason}")]
+    InvalidSettings {
+        /// Content-free reason.
+        reason: InvalidReason,
+    },
+    /// The source has no exact physical provenance.
+    #[error("the Pages package source does not support exact body-table header editing")]
+    UnsupportedSource,
+    /// A supported dependency would become stale.
+    #[error("the selected Pages body table has a dependent header topology")]
+    UnsupportedDependency,
+    /// The selected table is protected from editing.
+    #[error("the selected Pages body table is locked")]
+    TableLocked,
 }
 
-impl fmt::Debug for BodyTableHeaderSettingsEdit<'_> {
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::TableNotFound { .. } => RefusalKind::NotFound,
+            Self::AmbiguousTableName { .. }
+            | Self::AmbiguousSelector { .. }
+            | Self::InvalidSettings { .. } => RefusalKind::InvalidValue,
+            Self::UnsupportedSource { .. } | Self::UnsupportedDependency { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+            Self::TableLocked { .. } => RefusalKind::Protected,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
+}
+
+/// Mutable semantic header settings staged against one immutable package.
+pub struct Edit<'a> {
+    source: &'a Package,
+    selector: table_lock::OwnedBodyTableSelector,
+    target: Option<table_lock::BodyTableTarget>,
+    before: Option<Settings>,
+    settings: Option<Settings>,
+}
+
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("BodyTableHeaderSettingsEdit")
-            .field("before", &self.before)
+        f.debug_struct("Edit")
+            .field("resolved", &self.target.is_some())
             .field("settings", &self.settings)
             .finish_non_exhaustive()
     }
 }
 
-impl BodyTableHeaderSettingsEdit<'_> {
+impl Edit<'_> {
+    fn resolve(&mut self) -> Result<(), Error> {
+        if self.target.is_none() {
+            let target = self.selector.resolve(self.source).map_err(map_lock_error)?;
+            let before = settings_at_target(self.source, &target)?;
+            if self.settings.is_none() {
+                self.settings = Some(before);
+            }
+            self.before = Some(before);
+            self.target = Some(target);
+        }
+        Ok(())
+    }
+
     /// Return the staged settings.
-    #[must_use]
-    pub const fn settings(&self) -> Settings {
-        self.settings
+    pub fn settings(&mut self) -> Result<Settings, Error> {
+        self.resolve()?;
+        self.settings.ok_or(Error::InvalidSource)
     }
 
     /// Replace the complete staged settings.
     #[must_use]
     pub fn set(mut self, settings: Settings) -> Self {
-        self.settings = settings;
+        self.settings = Some(settings);
         self
     }
 
     /// Validate and publish the staged settings atomically.
-    pub fn commit(self) -> Result<BodyTableHeaderSettingsCommit, BodyTableHeaderSettingsError> {
+    pub fn commit(mut self) -> Result<Commit, Error> {
+        self.resolve()?;
         commit_edit(self)
     }
 }
 
 /// Exact-source reversible header settings patch.
 #[derive(Clone, PartialEq, Eq)]
-pub struct BodyTableHeaderSettingsPatch {
+pub struct Patch {
     source: Arc<[u8]>,
     target: Arc<[u8]>,
     source_fingerprint: u64,
@@ -253,16 +303,16 @@ pub struct BodyTableHeaderSettingsPatch {
     target_preview_count: usize,
 }
 
-impl fmt::Debug for BodyTableHeaderSettingsPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("BodyTableHeaderSettingsPatch")
+        f.debug_struct("Patch")
             .field("before", &self.before)
             .field("after", &self.after)
             .finish_non_exhaustive()
     }
 }
 
-impl BodyTableHeaderSettingsPatch {
+impl Patch {
     /// Source settings required before applying this patch.
     #[must_use]
     pub const fn before(&self) -> Settings {
@@ -314,14 +364,14 @@ impl BodyTableHeaderSettingsPatch {
 
 /// Content-free publication diagnostics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct BodyTableHeaderSettingsDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     deleted_previews: usize,
     full_reparse_performed: bool,
 }
 
-impl BodyTableHeaderSettingsDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -368,13 +418,13 @@ impl BodyTableHeaderSettingsDiagnostics {
 /// Fully reopened immutable result of one header transaction.
 #[must_use = "a body-table header commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct BodyTableHeaderSettingsCommit {
+pub struct Commit {
     package: Package,
-    patch: BodyTableHeaderSettingsPatch,
-    diagnostics: BodyTableHeaderSettingsDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl BodyTableHeaderSettingsCommit {
+impl Commit {
     /// Borrow the validated package.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -387,15 +437,21 @@ impl BodyTableHeaderSettingsCommit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the reversible patch.
     #[must_use]
-    pub const fn patch(&self) -> &BodyTableHeaderSettingsPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Borrow publication diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> &BodyTableHeaderSettingsDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
@@ -405,7 +461,7 @@ impl Package {
     pub fn body_table_header_settings<'table>(
         &self,
         selector: impl Into<BodyTableSelector<'table>>,
-    ) -> Result<Settings, BodyTableHeaderSettingsError> {
+    ) -> Result<Settings, Error> {
         let target = resolve_target(self, selector.into())?;
         settings_at_target(self, &target)
     }
@@ -414,58 +470,55 @@ impl Package {
     pub fn edit_body_table_header_settings<'table>(
         &self,
         selector: impl Into<BodyTableSelector<'table>>,
-    ) -> Result<BodyTableHeaderSettingsEdit<'_>, BodyTableHeaderSettingsError> {
-        let target = resolve_target(self, selector.into())?;
-        let before = settings_at_target(self, &target)?;
-        Ok(BodyTableHeaderSettingsEdit {
+    ) -> Result<Edit<'_>, Error> {
+        Ok(Edit {
             source: self,
-            target,
-            before,
-            settings: before,
+            selector: table_lock::OwnedBodyTableSelector::try_from(self, selector.into())
+                .map_err(map_lock_error)?,
+            target: None,
+            before: None,
+            settings: None,
         })
     }
 
     /// Apply an exact-source-checked reversible header patch.
-    pub fn apply_body_table_header_settings(
-        &self,
-        patch: &BodyTableHeaderSettingsPatch,
-    ) -> Result<BodyTableHeaderSettingsCommit, BodyTableHeaderSettingsError> {
+    pub fn apply_body_table_header_settings(&self, patch: &Patch) -> Result<Commit, Error> {
         let mut budget =
             table_lock::WireBudget::new(self.state.source.limits()).map_err(map_lock_error)?;
         if fingerprint(self.source_bytes(), &mut budget)? != patch.source_fingerprint
             || !bytes_equal(self.source_bytes(), patch.source.as_ref(), &mut budget)?
         {
-            return Err(BodyTableHeaderSettingsError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if settings_at_target_with_budget(self, &patch.proof, &mut budget)? != patch.before {
-            return Err(BodyTableHeaderSettingsError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if patch.is_noop() {
             if patch.source_preview_count != patch.target_preview_count {
-                return Err(BodyTableHeaderSettingsError::PatchConflict);
+                return Err(Error::PatchConflict);
             }
-            return Ok(BodyTableHeaderSettingsCommit {
-                package: self.snapshot(),
+            return Ok(Commit {
+                package: self.clone(),
                 patch: patch.clone(),
-                diagnostics: BodyTableHeaderSettingsDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         if !self.state.source.source_is_exact()
             || preview_count(self, &mut budget)? != patch.source_preview_count
             || fingerprint(patch.target.as_ref(), &mut budget)? != patch.target_fingerprint
         {
-            return Err(BodyTableHeaderSettingsError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let candidate = reopen_target(self, Arc::clone(&patch.target), &mut budget)?;
         if settings_at_target_with_budget(&candidate, &patch.proof, &mut budget)? != patch.after
             || preview_count(&candidate, &mut budget)? != patch.target_preview_count
         {
-            return Err(BodyTableHeaderSettingsError::Verification);
+            return Err(Error::Verification);
         }
-        Ok(BodyTableHeaderSettingsCommit {
+        Ok(Commit {
             package: candidate,
             patch: patch.clone(),
-            diagnostics: BodyTableHeaderSettingsDiagnostics::published(
+            diagnostics: Diagnostics::published(
                 patch
                     .source_preview_count
                     .saturating_sub(patch.target_preview_count),
@@ -474,59 +527,54 @@ impl Package {
     }
 }
 
-fn commit_edit(
-    edit: BodyTableHeaderSettingsEdit<'_>,
-) -> Result<BodyTableHeaderSettingsCommit, BodyTableHeaderSettingsError> {
+fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     let source = edit.source;
+    let target = edit.target.ok_or(Error::InvalidSource)?;
+    let before = edit.before.ok_or(Error::InvalidSource)?;
+    let settings = edit.settings.ok_or(Error::InvalidSource)?;
     let source_bytes = source.state.source.shared_source();
     let mut budget =
         table_lock::WireBudget::new(source.state.source.limits()).map_err(map_lock_error)?;
     let source_fingerprint = fingerprint(source_bytes.as_ref(), &mut budget)?;
     let source_preview_count = preview_count(source, &mut budget)?;
-    if edit.before == edit.settings {
-        return Ok(BodyTableHeaderSettingsCommit {
-            package: source.snapshot(),
-            patch: BodyTableHeaderSettingsPatch {
+    if before == settings {
+        return Ok(Commit {
+            package: source.clone(),
+            patch: Patch {
                 source: Arc::clone(&source_bytes),
                 target: source_bytes,
                 source_fingerprint,
                 target_fingerprint: source_fingerprint,
-                proof: edit.target,
-                before: edit.before,
-                after: edit.settings,
+                proof: target,
+                before,
+                after: settings,
                 source_preview_count,
                 target_preview_count: source_preview_count,
             },
-            diagnostics: BodyTableHeaderSettingsDiagnostics::unchanged(),
+            diagnostics: Diagnostics::unchanged(),
         });
     }
     if !source.state.source.source_is_exact() {
-        return Err(BodyTableHeaderSettingsError::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
-    let package = rewrite_headers(
-        source,
-        &edit.target,
-        edit.before,
-        edit.settings,
-        &mut budget,
-    )?;
-    let target = package.state.source.shared_source();
-    let target_fingerprint = fingerprint(target.as_ref(), &mut budget)?;
+    let package = rewrite_headers(source, &target, before, settings, &mut budget)?;
+    let target_owner = package.state.source.shared_source();
+    let target_fingerprint = fingerprint(target_owner.as_ref(), &mut budget)?;
     let target_preview_count = preview_count(&package, &mut budget)?;
-    Ok(BodyTableHeaderSettingsCommit {
+    Ok(Commit {
         package,
-        patch: BodyTableHeaderSettingsPatch {
+        patch: Patch {
             source: source_bytes,
-            target,
+            target: target_owner,
             source_fingerprint,
             target_fingerprint,
-            proof: edit.target,
-            before: edit.before,
-            after: edit.settings,
+            proof: target,
+            before,
+            after: settings,
             source_preview_count,
             target_preview_count,
         },
-        diagnostics: BodyTableHeaderSettingsDiagnostics::published(
+        diagnostics: Diagnostics::published(
             source_preview_count.saturating_sub(target_preview_count),
         ),
     })
@@ -535,14 +583,14 @@ fn commit_edit(
 fn resolve_target(
     package: &Package,
     selector: BodyTableSelector<'_>,
-) -> Result<table_lock::BodyTableTarget, BodyTableHeaderSettingsError> {
+) -> Result<table_lock::BodyTableTarget, Error> {
     package.resolve_body_table(selector).map_err(map_lock_error)
 }
 
 fn settings_at_target(
     package: &Package,
     target: &table_lock::BodyTableTarget,
-) -> Result<Settings, BodyTableHeaderSettingsError> {
+) -> Result<Settings, Error> {
     let mut budget =
         table_lock::WireBudget::new(package.state.source.limits()).map_err(map_lock_error)?;
     settings_at_target_with_budget(package, target, &mut budget)
@@ -552,7 +600,7 @@ fn settings_at_target_with_budget(
     package: &Package,
     target: &table_lock::BodyTableTarget,
     budget: &mut table_lock::WireBudget,
-) -> Result<Settings, BodyTableHeaderSettingsError> {
+) -> Result<Settings, Error> {
     table_lock::validate_body_table_target(package, target, budget).map_err(map_lock_error)?;
     let message = model_message(package, target)?;
     let snapshot = decode_snapshot(&message.data, budget)?;
@@ -562,40 +610,40 @@ fn settings_at_target_with_budget(
 fn model_message<'a>(
     package: &'a Package,
     target: &table_lock::BodyTableTarget,
-) -> Result<&'a RawMessage, BodyTableHeaderSettingsError> {
+) -> Result<&'a RawMessage, Error> {
     let component = package
         .state
         .source
         .components()
         .get_index(target.model_component_index)
-        .ok_or(BodyTableHeaderSettingsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let object = component
         .archive()
         .objects
         .get(target.model_object_index)
-        .ok_or(BodyTableHeaderSettingsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if object.archive_info.identifier != Some(target.model_identifier.get()) {
-        return Err(BodyTableHeaderSettingsError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let message = object
         .messages
         .get(target.model_message_index)
         .filter(|message| message.type_ == target.model_message_type)
-        .ok_or(BodyTableHeaderSettingsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     object
         .archive_info
         .message_infos
         .get(target.model_message_index)
-        .ok_or(BodyTableHeaderSettingsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     Ok(message)
 }
 
 fn decode_snapshot(
     source: &[u8],
     budget: &mut table_lock::WireBudget,
-) -> Result<TableHeaderSettingsSnapshot, BodyTableHeaderSettingsError> {
+) -> Result<TableHeaderSettingsSnapshot, Error> {
     let limits = budget.wire_limits();
-    let preflight = preflight_wire_tree_with_limits(source, limits, |_| Ok(WireDescent::Skip))
+    let preflight = preflight_wire_tree(source, limits, |_| Ok(WireDescent::Skip))
         .map_err(map_common_wire_error)?;
     budget
         .charge_codec_report(
@@ -616,16 +664,14 @@ fn decode_snapshot(
     Ok(snapshot)
 }
 
-fn settings_from_snapshot(
-    snapshot: TableHeaderSettingsSnapshot,
-) -> Result<Settings, BodyTableHeaderSettingsError> {
+fn settings_from_snapshot(snapshot: TableHeaderSettingsSnapshot) -> Result<Settings, Error> {
     let count = |value: Option<u32>| {
         value
             .map(|value| {
                 usize::try_from(value)
                     .ok()
                     .and_then(|value| crate::table::headers::Count::new(value).ok())
-                    .ok_or(BodyTableHeaderSettingsError::InvalidSource)
+                    .ok_or(Error::InvalidSource)
             })
             .transpose()
     };
@@ -642,32 +688,28 @@ fn settings_from_snapshot(
     Ok(settings)
 }
 
-fn validate_requested(
-    settings: Settings,
-    rows: u32,
-    columns: u32,
-) -> Result<(), BodyTableHeaderSettingsError> {
+fn validate_requested(settings: Settings, rows: u32, columns: u32) -> Result<(), Error> {
     let header_rows = u8::try_from(settings.header_row_count()).unwrap_or(u8::MAX);
     let footer_rows = u8::try_from(settings.footer_row_count()).unwrap_or(u8::MAX);
     if u16::from(header_rows).saturating_add(u16::from(footer_rows))
         > u16::try_from(rows).unwrap_or(u16::MAX)
     {
-        return Err(BodyTableHeaderSettingsError::InvalidSettings {
-            reason: BodyTableHeaderSettingsInvalidReason::RowSectionsExceedTable {
+        return Err(Error::Refused(Refusal::InvalidSettings {
+            reason: InvalidReason::RowSectionsExceedTable {
                 header_rows,
                 footer_rows,
                 table_rows: rows,
             },
-        });
+        }));
     }
     let header_columns = u8::try_from(settings.header_column_count()).unwrap_or(u8::MAX);
     if u32::from(header_columns) > columns {
-        return Err(BodyTableHeaderSettingsError::InvalidSettings {
-            reason: BodyTableHeaderSettingsInvalidReason::HeaderColumnsExceedTable {
+        return Err(Error::Refused(Refusal::InvalidSettings {
+            reason: InvalidReason::HeaderColumnsExceedTable {
                 header_columns,
                 table_columns: columns,
             },
-        });
+        }));
     }
     Ok(())
 }
@@ -678,7 +720,7 @@ fn rewrite_headers(
     before: Settings,
     after: Settings,
     budget: &mut table_lock::WireBudget,
-) -> Result<Package, BodyTableHeaderSettingsError> {
+) -> Result<Package, Error> {
     let source_catalog = &source.state.source;
     let physical_limits = source_catalog.limits();
     budget
@@ -688,11 +730,11 @@ fn rewrite_headers(
     let source_message = model_message(source, target)?;
     let snapshot = decode_snapshot(&source_message.data, budget)?;
     if settings_from_snapshot(snapshot)? != before {
-        return Err(BodyTableHeaderSettingsError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     validate_requested(after, snapshot.rows(), snapshot.columns())?;
     if target.explicit_locked == Some(true) {
-        return Err(BodyTableHeaderSettingsError::TableLocked);
+        return Err(Error::Refused(Refusal::TableLocked));
     }
     validate_dependencies(source, target, before, after, budget)?;
     let (component_name, stream_length) =
@@ -701,17 +743,17 @@ fn rewrite_headers(
     let component = source_catalog
         .components()
         .get_index(target.model_component_index)
-        .ok_or(BodyTableHeaderSettingsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if component.name() != component_name {
-        return Err(BodyTableHeaderSettingsError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let entry = source_catalog
         .package()
         .iter()
         .find(|entry| entry.name() == component_name)
-        .ok_or(BodyTableHeaderSettingsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(BodyTableHeaderSettingsError::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     budget
         .charge_payload_work(entry.data().len())
@@ -719,9 +761,10 @@ fn rewrite_headers(
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(map_archive_error)?;
+    let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
     let original_message_length = source_message.data.len();
-    let rewritten_message_bound = table_header_rewrite_bound(original_message_length)
-        .ok_or(BodyTableHeaderSettingsError::InvalidSource)?;
+    let rewritten_message_bound =
+        table_header_rewrite_bound(original_message_length).ok_or(Error::InvalidSource)?;
     let message_count = component
         .archive()
         .objects
@@ -729,7 +772,7 @@ fn rewrite_headers(
         .try_fold(0usize, |count, object| {
             count.checked_add(object.messages.len())
         })
-        .ok_or(BodyTableHeaderSettingsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let archive_bound = stream_length
         .checked_sub(original_message_length)
         .and_then(|value| value.checked_add(rewritten_message_bound))
@@ -740,29 +783,26 @@ fn rewrite_headers(
                     .checked_add(MAX_VARINT_BYTES.saturating_mul(2))?,
             )
         })
-        .ok_or(BodyTableHeaderSettingsError::InvalidSource)?;
-    let compressed_bound = table_lock::snappy_compressed_bound(archive_bound)
-        .ok_or(BodyTableHeaderSettingsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
+    let compressed_bound =
+        table_lock::snappy_compressed_bound(archive_bound).ok_or(Error::InvalidSource)?;
     let old_compressed_size =
-        usize::try_from(entry.metadata().compressed_size()).map_err(|_| {
-            BodyTableHeaderSettingsError::LimitExceeded {
-                kind: BodyTableHeaderSettingsLimitKind::EntryBytes,
-                observed: u64::MAX,
-                maximum: physical_limits.max_entry_bytes(),
-            }
+        usize::try_from(entry.metadata().compressed_size()).map_err(|_| Error::Limit {
+            kind: LimitKind::EntryBytes,
+            observed: u64::MAX,
+            maximum: physical_limits.max_entry_bytes(),
         })?;
     let replacement_compressed_bound = match entry.metadata().central().compression_method() {
         0 => compressed_bound,
-        8 => table_lock::deflate_compressed_bound(compressed_bound)
-            .ok_or(BodyTableHeaderSettingsError::InvalidSource)?,
-        _ => return Err(BodyTableHeaderSettingsError::UnsupportedSource),
+        8 => table_lock::deflate_compressed_bound(compressed_bound).ok_or(Error::InvalidSource)?,
+        _ => return Err(Error::Refused(Refusal::UnsupportedSource)),
     };
     let package_output_bound = source_catalog
         .source_bytes()
         .len()
         .checked_sub(old_compressed_size)
         .and_then(|value| value.checked_add(replacement_compressed_bound))
-        .ok_or(BodyTableHeaderSettingsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget
         .charge_output_bytes(rewritten_message_bound)
         .and_then(|_| budget.charge_output_bytes(archive_bound))
@@ -799,26 +839,25 @@ fn rewrite_headers(
             budget.charge_payload_work(ROOT_PREVIEW_NAMES.iter().map(|name| name.len()).sum())
         })
         .map_err(map_lock_error)?;
-    let stream = litchi_iwa_core::SnappyStream::decompress_with_limits(
+    let stream = litchi_iwa_core::SnappyStream::decompress(
         entry.data(),
         physical_limits.snappy_limits().map_err(map_archive_error)?,
     )
     .map_err(map_core_error)?;
     if stream.as_bytes().len() != stream_length {
-        return Err(BodyTableHeaderSettingsError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
-    let mut archive =
-        litchi_iwa_core::Archive::parse_with_limits(stream.as_bytes(), archive_limits)
-            .map_err(map_core_error)?;
+    let mut archive = litchi_iwa_core::Archive::parse(stream.as_bytes(), archive_limits)
+        .map_err(map_core_error)?;
     archive
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
         .map_err(map_core_error)?;
     let object = archive
         .objects
         .get_mut(target.model_object_index)
-        .ok_or(BodyTableHeaderSettingsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if object.archive_info.identifier != Some(target.model_identifier.get()) {
-        return Err(BodyTableHeaderSettingsError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     page_layout::validate_selected_metadata(object, target.model_message_index)
         .map_err(map_page_layout_error)?;
@@ -826,9 +865,9 @@ fn rewrite_headers(
         .messages
         .get(target.model_message_index)
         .filter(|message| message.type_ == target.model_message_type)
-        .ok_or(BodyTableHeaderSettingsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if message.data != source_message.data {
-        return Err(BodyTableHeaderSettingsError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let after_write = TableHeaderSettingsWrite::new(
         after
@@ -876,10 +915,10 @@ fn rewrite_headers(
     let verified =
         settings_from_snapshot(decode_snapshot_after_reservation(&rewritten, wire_limits)?)?;
     if verified != after {
-        return Err(BodyTableHeaderSettingsError::Verification);
+        return Err(Error::Verification);
     }
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             target.model_message_index,
             RawMessage {
                 type_: target.model_message_type,
@@ -888,15 +927,14 @@ fn rewrite_headers(
             archive_limits,
         )
         .map_err(map_core_error)?;
-    let raw = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
+    let raw = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     if raw.len() > archive_bound {
-        return Err(BodyTableHeaderSettingsError::Verification);
+        return Err(Error::Verification);
     }
-    let compressed = litchi_iwa_core::SnappyStream::compress(&raw).map_err(map_core_error)?;
+    let compressed =
+        litchi_iwa_core::SnappyStream::compress(&raw, snappy_limits).map_err(map_core_error)?;
     if compressed.len() > compressed_bound {
-        return Err(BodyTableHeaderSettingsError::Verification);
+        return Err(Error::Verification);
     }
     let previews = root_preview_deletions(source_catalog, budget)?;
     let output = source_catalog
@@ -908,16 +946,16 @@ fn rewrite_headers(
         )
         .map_err(map_archive_error)?;
     if output.len() > package_output_bound {
-        return Err(BodyTableHeaderSettingsError::Verification);
+        return Err(Error::Verification);
     }
-    let candidate_source =
-        SourceCatalog::from_shared_bytes_with_limits(output.into(), physical_limits)
-            .map_err(map_archive_error)?;
+    let candidate_source = source_catalog
+        .reopen(output.into())
+        .map_err(map_archive_error)?;
     let candidate = Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
     if settings_at_rewritten_target(&candidate, target, wire_limits)? != after
         || preview_count_after_reservation(&candidate) != 0
     {
-        return Err(BodyTableHeaderSettingsError::Verification);
+        return Err(Error::Verification);
     }
     Ok(candidate)
 }
@@ -925,7 +963,7 @@ fn rewrite_headers(
 fn decode_snapshot_after_reservation(
     source: &[u8],
     limits: WireLimits,
-) -> Result<TableHeaderSettingsSnapshot, BodyTableHeaderSettingsError> {
+) -> Result<TableHeaderSettingsSnapshot, Error> {
     let options = DecodeOptions::new(
         source.len().max(1).min(limits.max_input_bytes()),
         limits.max_fields(),
@@ -940,7 +978,7 @@ fn settings_at_rewritten_target(
     package: &Package,
     target: &table_lock::BodyTableTarget,
     limits: WireLimits,
-) -> Result<Settings, BodyTableHeaderSettingsError> {
+) -> Result<Settings, Error> {
     settings_from_snapshot(decode_snapshot_after_reservation(
         &model_message(package, target)?.data,
         limits,
@@ -964,7 +1002,7 @@ fn preview_count_after_reservation(package: &Package) -> usize {
 fn charge_rewrite_report(
     budget: &mut table_lock::WireBudget,
     report: table_header_settings_codec::RewriteReport,
-) -> Result<(), BodyTableHeaderSettingsError> {
+) -> Result<(), Error> {
     budget
         .charge_codec_report(report.fields(), report.work_bytes(), report.max_depth(), 0)
         .map_err(map_lock_error)
@@ -984,7 +1022,7 @@ fn validate_dependencies(
     before: Settings,
     after: Settings,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableHeaderSettingsError> {
+) -> Result<(), Error> {
     let header_counts_changed =
         before.header_rows != after.header_rows || before.header_columns != after.header_columns;
     let section_counts_changed = header_counts_changed || before.footer_rows != after.footer_rows;
@@ -993,7 +1031,7 @@ fn validate_dependencies(
         || before.repeating_header_columns_enabled != after.repeating_header_columns_enabled;
     let model = model_message(package, target)?;
     let model_view =
-        WireView::parse(&model.data).map_err(|_| BodyTableHeaderSettingsError::InvalidSource)?;
+        WireView::parse(&model.data, WireLimits::DEFAULT).map_err(|_| Error::InvalidSource)?;
     budget
         .charge_payload_work(model.data.len())
         .map_err(map_lock_error)?;
@@ -1015,7 +1053,7 @@ fn validate_dependencies(
                 .message_infos
                 .get(target.model_message_index)
         })
-        .ok_or(BodyTableHeaderSettingsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if section_counts_changed {
         validate_known_reference_fields(model_info, &model_view, &[85, 86], target, budget)?;
     }
@@ -1033,14 +1071,14 @@ fn validate_dependencies(
         .components()
         .get_index(target.component_index)
         .and_then(|component| component.archive().objects.get(target.object_index))
-        .ok_or(BodyTableHeaderSettingsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let info_message = info_object
         .messages
         .get(target.info_message_index)
         .filter(|message| TABLE_INFO_MESSAGE_TYPES.contains(&message.type_))
-        .ok_or(BodyTableHeaderSettingsError::InvalidSource)?;
-    let info_view = WireView::parse(&info_message.data)
-        .map_err(|_| BodyTableHeaderSettingsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
+    let info_view = WireView::parse(&info_message.data, WireLimits::DEFAULT)
+        .map_err(|_| Error::InvalidSource)?;
     budget
         .charge_payload_work(info_message.data.len())
         .map_err(map_lock_error)?;
@@ -1053,7 +1091,7 @@ fn validate_dependencies(
         .archive_info
         .message_infos
         .get(target.info_message_index)
-        .ok_or(BodyTableHeaderSettingsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if section_counts_changed {
         validate_known_reference_fields(
             info_metadata,
@@ -1080,14 +1118,14 @@ fn validate_dependencies(
             .and_then(|component| component.archive().objects.get(target.sheet_object_index))
             .and_then(|object| object.messages.get(target.sheet_message_index))
             .filter(|message| message.type_ == target.sheet_message_type)
-            .ok_or(BodyTableHeaderSettingsError::InvalidSource)?;
-        let view = WireView::parse(&sheet.data)
-            .map_err(|_| BodyTableHeaderSettingsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
+        let view =
+            WireView::parse(&sheet.data, WireLimits::DEFAULT).map_err(|_| Error::InvalidSource)?;
         budget
             .charge_payload_work(sheet.data.len())
             .map_err(map_lock_error)?;
         if view.fields().any(|field| field.number() == 4) {
-            return Err(BodyTableHeaderSettingsError::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         reject_unsupported_metadata(
             package,
@@ -1106,7 +1144,7 @@ fn validate_known_dependency_fields(
     header_counts_changed: bool,
     section_counts_changed: bool,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableHeaderSettingsError> {
+) -> Result<(), Error> {
     let mut seen = [false; 5];
     let mut active_pivot_or_group = false;
     let mut header_count_dependency = false;
@@ -1124,9 +1162,9 @@ fn validate_known_dependency_fields(
         };
         field
             .validate_canonical_framing()
-            .map_err(|_| BodyTableHeaderSettingsError::InvalidSource)?;
+            .map_err(|_| Error::InvalidSource)?;
         if seen[slot] || field.wire_type() != 2 {
-            return Err(BodyTableHeaderSettingsError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         seen[slot] = true;
         if !field.payload().is_empty() {
@@ -1150,7 +1188,7 @@ fn validate_known_dependency_fields(
         || header_counts_changed && header_count_dependency
         || section_counts_changed && active_pivot_or_group
     {
-        return Err(BodyTableHeaderSettingsError::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     Ok(())
 }
@@ -1158,9 +1196,8 @@ fn validate_known_dependency_fields(
 fn category_owner_grouping_active(
     source: &[u8],
     budget: &mut table_lock::WireBudget,
-) -> Result<bool, BodyTableHeaderSettingsError> {
-    let view = WireView::parse_with_limits(source, budget.wire_limits())
-        .map_err(|_| BodyTableHeaderSettingsError::InvalidSource)?;
+) -> Result<bool, Error> {
+    let view = WireView::parse(source, budget.wire_limits()).map_err(|_| Error::InvalidSource)?;
     budget
         .charge_codec_report(view.len(), source.len().saturating_mul(2), 1, 0)
         .map_err(map_lock_error)?;
@@ -1172,13 +1209,13 @@ fn category_owner_grouping_active(
         }
         field
             .validate_canonical_framing()
-            .map_err(|_| BodyTableHeaderSettingsError::InvalidSource)?;
+            .map_err(|_| Error::InvalidSource)?;
         if field.wire_type() != 2 {
-            return Err(BodyTableHeaderSettingsError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         seen = true;
-        let group = WireView::parse_with_limits(field.payload(), budget.wire_limits())
-            .map_err(|_| BodyTableHeaderSettingsError::InvalidSource)?;
+        let group = WireView::parse(field.payload(), budget.wire_limits())
+            .map_err(|_| Error::InvalidSource)?;
         budget
             .charge_codec_report(group.len(), field.payload().len().saturating_mul(2), 2, 0)
             .map_err(map_lock_error)?;
@@ -1189,21 +1226,21 @@ fn category_owner_grouping_active(
             }
             nested
                 .validate_canonical_framing()
-                .map_err(|_| BodyTableHeaderSettingsError::InvalidSource)?;
+                .map_err(|_| Error::InvalidSource)?;
             if nested.wire_type() != 0 || enabled.is_some() {
-                return Err(BodyTableHeaderSettingsError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
-            let (value, length) = decode_varint_from_bytes(nested.payload())
-                .map_err(|_| BodyTableHeaderSettingsError::InvalidSource)?;
+            let (value, length) =
+                decode_varint_from_bytes(nested.payload()).map_err(|_| Error::InvalidSource)?;
             if length != nested.payload().len() || encoded_len(value) != length || value > 1 {
-                return Err(BodyTableHeaderSettingsError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             enabled = Some(value == 1);
         }
-        active |= enabled.ok_or(BodyTableHeaderSettingsError::InvalidSource)?;
+        active |= enabled.ok_or(Error::InvalidSource)?;
     }
     if !seen {
-        return Err(BodyTableHeaderSettingsError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(active)
 }
@@ -1212,7 +1249,7 @@ fn validate_table_info_dependency_fields(
     view: &WireView<'_>,
     header_counts_changed: bool,
     section_counts_changed: bool,
-) -> Result<(), BodyTableHeaderSettingsError> {
+) -> Result<(), Error> {
     let mut seen = [false; 7];
     for field in view.fields() {
         let Some(slot) = (match field.number() {
@@ -1229,14 +1266,14 @@ fn validate_table_info_dependency_fields(
         };
         field
             .validate_canonical_framing()
-            .map_err(|_| BodyTableHeaderSettingsError::InvalidSource)?;
+            .map_err(|_| Error::InvalidSource)?;
         if seen[slot] {
-            return Err(BodyTableHeaderSettingsError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         seen[slot] = true;
         let active = match field.number() {
             4 | 5 | 7 | 8 | 15 | 17 if field.wire_type() != 2 => {
-                return Err(BodyTableHeaderSettingsError::InvalidSource);
+                return Err(Error::InvalidSource);
             },
             4 | 7 | 8 => header_counts_changed && !field.payload().is_empty(),
             5 | 15 | 17 => {
@@ -1244,19 +1281,19 @@ fn validate_table_info_dependency_fields(
             },
             16 => {
                 if field.wire_type() != 0 {
-                    return Err(BodyTableHeaderSettingsError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
-                let (value, length) = decode_varint_from_bytes(field.payload())
-                    .map_err(|_| BodyTableHeaderSettingsError::InvalidSource)?;
+                let (value, length) =
+                    decode_varint_from_bytes(field.payload()).map_err(|_| Error::InvalidSource)?;
                 if length != field.payload().len() || encoded_len(value) != length || value > 1 {
-                    return Err(BodyTableHeaderSettingsError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 (header_counts_changed || section_counts_changed) && value == 1
             },
             _ => false,
         };
         if active {
-            return Err(BodyTableHeaderSettingsError::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
     }
     Ok(())
@@ -1269,7 +1306,7 @@ fn reject_unsupported_metadata(
     message_index: usize,
     changed: bool,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableHeaderSettingsError> {
+) -> Result<(), Error> {
     if !changed {
         return Ok(());
     }
@@ -1279,16 +1316,16 @@ fn reject_unsupported_metadata(
         .components()
         .get_index(component_index)
         .and_then(|component| component.archive().objects.get(object_index))
-        .ok_or(BodyTableHeaderSettingsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let info = object
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(BodyTableHeaderSettingsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let message = object
         .messages
         .get(message_index)
-        .ok_or(BodyTableHeaderSettingsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget
         .charge_payload_items(info.field_infos.len().saturating_add(1))
         .and_then(|_| {
@@ -1320,11 +1357,11 @@ fn reject_unsupported_metadata(
         || !info.diff_read_version.is_empty()
         || !info.data_references.is_empty()
     {
-        return Err(BodyTableHeaderSettingsError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     for field in &info.field_infos {
         if !field.data_references.is_empty() {
-            return Err(BodyTableHeaderSettingsError::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
     }
     Ok(())
@@ -1336,16 +1373,16 @@ fn validate_known_reference_fields(
     fields: &[u32],
     target: &table_lock::BodyTableTarget,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableHeaderSettingsError> {
+) -> Result<(), Error> {
     for field in view.fields() {
         if !fields.contains(&field.number()) {
             continue;
         }
         field
             .validate_canonical_framing()
-            .map_err(|_| BodyTableHeaderSettingsError::InvalidSource)?;
+            .map_err(|_| Error::InvalidSource)?;
         if field.wire_type() != 2 {
-            return Err(BodyTableHeaderSettingsError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let identifier = reference_identifier(field.payload(), budget)?;
         if identifier == 0
@@ -1354,7 +1391,7 @@ fn validate_known_reference_fields(
             || identifier == target.drawable_identifier.get()
             || identifier == target.model_identifier.get()
         {
-            return Err(BodyTableHeaderSettingsError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if info
             .object_references
@@ -1363,7 +1400,7 @@ fn validate_known_reference_fields(
             .count()
             != 1
         {
-            return Err(BodyTableHeaderSettingsError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let mut declarations = info.field_infos.iter().filter(|candidate| {
             candidate.path.as_slice() == [field.number()]
@@ -1371,7 +1408,7 @@ fn validate_known_reference_fields(
                 && candidate.data_references.is_empty()
         });
         if declarations.next().is_none() || declarations.next().is_some() {
-            return Err(BodyTableHeaderSettingsError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     // Check the reverse direction as well: a FieldInfo declaration on one of
@@ -1386,27 +1423,24 @@ fn validate_known_reference_fields(
             continue;
         };
         if declaration.object_references.len() != 1 || !declaration.data_references.is_empty() {
-            return Err(BodyTableHeaderSettingsError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let mut raw = view.fields().filter(|field| field.number() == field_number);
         let Some(raw_field) = raw.next() else {
-            return Err(BodyTableHeaderSettingsError::InvalidSource);
+            return Err(Error::InvalidSource);
         };
         if raw.next().is_some() || raw_field.wire_type() != 2 {
-            return Err(BodyTableHeaderSettingsError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let identifier = reference_identifier(raw_field.payload(), budget)?;
         if declaration.object_references[0] != identifier {
-            return Err(BodyTableHeaderSettingsError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(())
 }
 
-fn reference_identifier(
-    source: &[u8],
-    budget: &mut table_lock::WireBudget,
-) -> Result<u64, BodyTableHeaderSettingsError> {
+fn reference_identifier(source: &[u8], budget: &mut table_lock::WireBudget) -> Result<u64, Error> {
     table_lock::parse_local_reference(budget, source, 1)
         .map(NonZeroU64::get)
         .map_err(map_lock_error)
@@ -1415,11 +1449,11 @@ fn reference_identifier(
 fn root_preview_deletions(
     catalog: &SourceCatalog,
     budget: &mut table_lock::WireBudget,
-) -> Result<Vec<&'static str>, BodyTableHeaderSettingsError> {
+) -> Result<Vec<&'static str>, Error> {
     let mut deletions = Vec::new();
     deletions
         .try_reserve_exact(ROOT_PREVIEW_NAMES.len())
-        .map_err(|_| BodyTableHeaderSettingsError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: ROOT_PREVIEW_NAMES.len(),
         })?;
     for name in ROOT_PREVIEW_NAMES {
@@ -1433,10 +1467,7 @@ fn root_preview_deletions(
     Ok(deletions)
 }
 
-fn preview_count(
-    package: &Package,
-    budget: &mut table_lock::WireBudget,
-) -> Result<usize, BodyTableHeaderSettingsError> {
+fn preview_count(package: &Package, budget: &mut table_lock::WireBudget) -> Result<usize, Error> {
     let mut count = 0;
     for name in ROOT_PREVIEW_NAMES {
         budget
@@ -1455,10 +1486,7 @@ fn preview_count(
     Ok(count)
 }
 
-fn fingerprint(
-    bytes: &[u8],
-    budget: &mut table_lock::WireBudget,
-) -> Result<u64, BodyTableHeaderSettingsError> {
+fn fingerprint(bytes: &[u8], budget: &mut table_lock::WireBudget) -> Result<u64, Error> {
     budget.charge_input_source(bytes).map_err(map_lock_error)?;
     budget
         .charge_payload_work(bytes.len())
@@ -1475,7 +1503,7 @@ fn bytes_equal(
     left: &[u8],
     right: &[u8],
     budget: &mut table_lock::WireBudget,
-) -> Result<bool, BodyTableHeaderSettingsError> {
+) -> Result<bool, Error> {
     if left.len() != right.len() {
         return Ok(false);
     }
@@ -1489,13 +1517,15 @@ fn reopen_target(
     source: &Package,
     target: Arc<[u8]>,
     budget: &mut table_lock::WireBudget,
-) -> Result<Package, BodyTableHeaderSettingsError> {
+) -> Result<Package, Error> {
     budget
         .charge_input_source(target.as_ref())
         .map_err(map_lock_error)?;
-    let catalog =
-        SourceCatalog::from_shared_bytes_with_limits(target, source.state.source.limits())
-            .map_err(map_archive_error)?;
+    let catalog = source
+        .state
+        .source
+        .reopen(target)
+        .map_err(map_archive_error)?;
     budget
         .charge_source_catalog(&catalog)
         .map_err(map_lock_error)?;
@@ -1503,250 +1533,201 @@ fn reopen_target(
     Package::from_source_catalog(catalog).map_err(map_package_error)
 }
 
-fn map_lock_error(error: table_lock::BodyTableLockError) -> BodyTableHeaderSettingsError {
+fn map_lock_error(error: table_lock::Error) -> Error {
     match error {
-        table_lock::BodyTableLockError::TableNotFound => {
-            BodyTableHeaderSettingsError::TableNotFound
+        table_lock::Error::Refused(crate::table::lock::Refusal::TableNotFound) => {
+            Error::Refused(Refusal::TableNotFound)
         },
-        table_lock::BodyTableLockError::AmbiguousTableName => {
-            BodyTableHeaderSettingsError::AmbiguousTableName
+        table_lock::Error::Refused(crate::table::lock::Refusal::AmbiguousTableName) => {
+            Error::Refused(Refusal::AmbiguousTableName)
         },
-        table_lock::BodyTableLockError::AmbiguousSelector => {
-            BodyTableHeaderSettingsError::AmbiguousSelector
+        table_lock::Error::Refused(crate::table::lock::Refusal::AmbiguousSelector) => {
+            Error::Refused(Refusal::AmbiguousSelector)
         },
-        table_lock::BodyTableLockError::UnsupportedSource => {
-            BodyTableHeaderSettingsError::UnsupportedSource
+        table_lock::Error::Refused(crate::table::lock::Refusal::UnsupportedSource) => {
+            Error::Refused(Refusal::UnsupportedSource)
         },
-        table_lock::BodyTableLockError::InvalidSource => {
-            BodyTableHeaderSettingsError::InvalidSource
-        },
-        table_lock::BodyTableLockError::LimitExceeded {
+        table_lock::Error::InvalidSource => Error::InvalidSource,
+        table_lock::Error::Limit {
             kind,
             observed,
             maximum,
-        } => BodyTableHeaderSettingsError::LimitExceeded {
+        } => Error::Limit {
             kind: map_lock_limit(kind),
             observed,
             maximum,
         },
-        table_lock::BodyTableLockError::Allocation { amount } => {
-            BodyTableHeaderSettingsError::Allocation { amount }
-        },
-        table_lock::BodyTableLockError::Verification => BodyTableHeaderSettingsError::Verification,
-        table_lock::BodyTableLockError::PatchConflict => {
-            BodyTableHeaderSettingsError::PatchConflict
-        },
+        table_lock::Error::Allocation { amount } => Error::Allocation { amount },
+        table_lock::Error::Verification => Error::Verification,
+        table_lock::Error::PatchConflict => Error::PatchConflict,
     }
 }
 
-const fn map_lock_limit(
-    kind: table_lock::BodyTableLockLimitKind,
-) -> BodyTableHeaderSettingsLimitKind {
-    use table_lock::BodyTableLockLimitKind as Lock;
+const fn map_lock_limit(kind: table_lock::LimitKind) -> LimitKind {
+    use table_lock::LimitKind as Lock;
     match kind {
-        Lock::InputBytes => BodyTableHeaderSettingsLimitKind::InputBytes,
-        Lock::OutputBytes => BodyTableHeaderSettingsLimitKind::OutputBytes,
-        Lock::Entries => BodyTableHeaderSettingsLimitKind::Entries,
-        Lock::EntryBytes => BodyTableHeaderSettingsLimitKind::EntryBytes,
-        Lock::TotalEntryBytes => BodyTableHeaderSettingsLimitKind::TotalEntryBytes,
-        Lock::PackageBytes => BodyTableHeaderSettingsLimitKind::PayloadItems,
-        Lock::PayloadBytes => BodyTableHeaderSettingsLimitKind::PayloadBytes,
-        Lock::TotalPayloadBytes => BodyTableHeaderSettingsLimitKind::TotalPayloadBytes,
-        Lock::PayloadObjects => BodyTableHeaderSettingsLimitKind::PayloadObjects,
-        Lock::PayloadMessages => BodyTableHeaderSettingsLimitKind::PayloadMessages,
-        Lock::PayloadItems => BodyTableHeaderSettingsLimitKind::PayloadItems,
-        Lock::PayloadReferences => BodyTableHeaderSettingsLimitKind::PayloadReferences,
-        Lock::WireBytes => BodyTableHeaderSettingsLimitKind::WireBytes,
-        Lock::WireFields => BodyTableHeaderSettingsLimitKind::WireFields,
-        Lock::WireNesting => BodyTableHeaderSettingsLimitKind::WireNesting,
-        Lock::WireWork => BodyTableHeaderSettingsLimitKind::WireWork,
+        Lock::InputBytes => LimitKind::InputBytes,
+        Lock::OutputBytes => LimitKind::OutputBytes,
+        Lock::Entries => LimitKind::Entries,
+        Lock::EntryBytes => LimitKind::EntryBytes,
+        Lock::TotalEntryBytes => LimitKind::TotalEntryBytes,
+        Lock::PackageBytes => LimitKind::PayloadItems,
+        Lock::PayloadBytes => LimitKind::PayloadBytes,
+        Lock::TotalPayloadBytes => LimitKind::TotalPayloadBytes,
+        Lock::PayloadObjects => LimitKind::PayloadObjects,
+        Lock::PayloadMessages => LimitKind::PayloadMessages,
+        Lock::PayloadItems => LimitKind::PayloadItems,
+        Lock::PayloadReferences => LimitKind::PayloadReferences,
+        Lock::WireBytes => LimitKind::WireBytes,
+        Lock::WireFields => LimitKind::WireFields,
+        Lock::WireNesting => LimitKind::WireNesting,
+        Lock::WireWork => LimitKind::WireWork,
     }
 }
 
-fn map_common_wire_error(error: litchi_iwa_common::Error) -> BodyTableHeaderSettingsError {
+fn map_common_wire_error(error: litchi_iwa_common::Error) -> Error {
     match error {
         litchi_iwa_common::Error::LimitExceeded {
             kind,
             observed,
             limit,
-        } => BodyTableHeaderSettingsError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_common::LimitKind::InputBytes => {
-                    BodyTableHeaderSettingsLimitKind::WireBytes
-                },
-                litchi_iwa_common::LimitKind::Fields => {
-                    BodyTableHeaderSettingsLimitKind::WireFields
-                },
-                litchi_iwa_common::LimitKind::Nesting => {
-                    BodyTableHeaderSettingsLimitKind::WireNesting
-                },
-                litchi_iwa_common::LimitKind::RewriteWork => {
-                    BodyTableHeaderSettingsLimitKind::WireWork
-                },
+                litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
+                litchi_iwa_common::LimitKind::Fields => LimitKind::WireFields,
+                litchi_iwa_common::LimitKind::Nesting => LimitKind::WireNesting,
+                litchi_iwa_common::LimitKind::RewriteWork => LimitKind::WireWork,
                 litchi_iwa_common::LimitKind::OutputBytes
                 | litchi_iwa_common::LimitKind::TableRows
                 | litchi_iwa_common::LimitKind::TableColumns
                 | litchi_iwa_common::LimitKind::TableCells
-                | litchi_iwa_common::LimitKind::MaterializedCells => {
-                    BodyTableHeaderSettingsLimitKind::WireBytes
-                },
+                | litchi_iwa_common::LimitKind::MaterializedCells => LimitKind::WireBytes,
             },
             observed: observed as u64,
             maximum: limit as u64,
         },
-        litchi_iwa_common::Error::Allocation { amount, .. } => {
-            BodyTableHeaderSettingsError::Allocation { amount }
-        },
-        litchi_iwa_common::Error::InvalidFormat(_)
-        | litchi_iwa_common::Error::InvalidLimit { .. } => {
-            BodyTableHeaderSettingsError::InvalidSource
-        },
+        litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_codec_error(error: DecodeError) -> BodyTableHeaderSettingsError {
+fn map_codec_error(error: DecodeError) -> Error {
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return BodyTableHeaderSettingsError::LimitExceeded {
-            kind: BodyTableHeaderSettingsLimitKind::WireFields,
+        return Error::Limit {
+            kind: LimitKind::WireFields,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return BodyTableHeaderSettingsError::LimitExceeded {
-            kind: BodyTableHeaderSettingsLimitKind::WireWork,
+        return Error::Limit {
+            kind: LimitKind::WireWork,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some((observed, maximum)) = error.output_limit_values() {
-        return BodyTableHeaderSettingsError::LimitExceeded {
-            kind: BodyTableHeaderSettingsLimitKind::WireOutputBytes,
+        return Error::Limit {
+            kind: LimitKind::WireOutputBytes,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some(amount) = error.allocation_amount() {
-        return BodyTableHeaderSettingsError::Allocation { amount };
+        return Error::Allocation { amount };
     }
     match error.wire_resource_limit() {
-        Some(WireResourceLimit::Bytes { observed, maximum }) => {
-            BodyTableHeaderSettingsError::LimitExceeded {
-                kind: BodyTableHeaderSettingsLimitKind::WireBytes,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        Some(WireResourceLimit::Bytes { observed, maximum }) => Error::Limit {
+            kind: LimitKind::WireBytes,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        Some(WireResourceLimit::Nesting { observed, maximum }) => {
-            BodyTableHeaderSettingsError::LimitExceeded {
-                kind: BodyTableHeaderSettingsLimitKind::WireNesting,
-                observed: u64::from(observed),
-                maximum: u64::from(maximum),
-            }
+        Some(WireResourceLimit::Nesting { observed, maximum }) => Error::Limit {
+            kind: LimitKind::WireNesting,
+            observed: u64::from(observed),
+            maximum: u64::from(maximum),
         },
-        Some(_) => BodyTableHeaderSettingsError::InvalidSource,
-        None => BodyTableHeaderSettingsError::InvalidSource,
+        Some(_) => Error::InvalidSource,
+        None => Error::InvalidSource,
     }
 }
 
-fn map_page_layout_error(error: page_layout::PageLayoutError) -> BodyTableHeaderSettingsError {
+fn map_page_layout_error(error: page_layout::Error) -> Error {
     match error {
-        page_layout::PageLayoutError::UnsupportedSource => {
-            BodyTableHeaderSettingsError::UnsupportedSource
-        },
-        page_layout::PageLayoutError::InvalidSource => BodyTableHeaderSettingsError::InvalidSource,
-        page_layout::PageLayoutError::LimitExceeded {
+        page_layout::Error::Refused(
+            crate::page_layout::transaction::Refusal::UnsupportedSource,
+        ) => Error::Refused(Refusal::UnsupportedSource),
+        page_layout::Error::InvalidSource => Error::InvalidSource,
+        page_layout::Error::Limit {
             observed, maximum, ..
-        } => BodyTableHeaderSettingsError::LimitExceeded {
-            kind: BodyTableHeaderSettingsLimitKind::PayloadBytes,
+        } => Error::Limit {
+            kind: LimitKind::PayloadBytes,
             observed,
             maximum,
         },
-        page_layout::PageLayoutError::Allocation { amount } => {
-            BodyTableHeaderSettingsError::Allocation { amount }
-        },
-        _ => BodyTableHeaderSettingsError::InvalidSource,
+        page_layout::Error::Allocation { amount } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_archive_error(error: litchi_iwa_archive::Error) -> BodyTableHeaderSettingsError {
+fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     match error {
         litchi_iwa_archive::Error::Limit {
             kind,
             observed,
             maximum,
-        } => BodyTableHeaderSettingsError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_archive::LimitKind::InputBytes => {
-                    BodyTableHeaderSettingsLimitKind::InputBytes
-                },
-                litchi_iwa_archive::LimitKind::OutputBytes => {
-                    BodyTableHeaderSettingsLimitKind::OutputBytes
-                },
-                litchi_iwa_archive::LimitKind::Entries => BodyTableHeaderSettingsLimitKind::Entries,
+                litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
+                litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_archive::LimitKind::Entries => LimitKind::Entries,
                 litchi_iwa_archive::LimitKind::MemberNameBytes
-                | litchi_iwa_archive::LimitKind::MetadataBytes => {
-                    BodyTableHeaderSettingsLimitKind::PayloadItems
-                },
+                | litchi_iwa_archive::LimitKind::MetadataBytes => LimitKind::PayloadItems,
                 litchi_iwa_archive::LimitKind::CompressedEntryBytes
-                | litchi_iwa_archive::LimitKind::EntryBytes => {
-                    BodyTableHeaderSettingsLimitKind::EntryBytes
-                },
-                litchi_iwa_archive::LimitKind::TotalBytes => {
-                    BodyTableHeaderSettingsLimitKind::TotalEntryBytes
-                },
-                litchi_iwa_archive::LimitKind::IwaStreamBytes => {
-                    BodyTableHeaderSettingsLimitKind::PayloadBytes
-                },
-                litchi_iwa_archive::LimitKind::IwaTotalBytes => {
-                    BodyTableHeaderSettingsLimitKind::TotalPayloadBytes
-                },
+                | litchi_iwa_archive::LimitKind::EntryBytes => LimitKind::EntryBytes,
+                litchi_iwa_archive::LimitKind::TotalBytes => LimitKind::TotalEntryBytes,
+                litchi_iwa_archive::LimitKind::IwaStreamBytes => LimitKind::PayloadBytes,
+                litchi_iwa_archive::LimitKind::IwaTotalBytes => LimitKind::TotalPayloadBytes,
             },
             observed,
             maximum,
         },
-        litchi_iwa_archive::Error::Allocation { amount, .. } => {
-            BodyTableHeaderSettingsError::Allocation { amount }
-        },
+        litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
         litchi_iwa_archive::Error::Iwa(error) => map_core_error(error),
-        _ => BodyTableHeaderSettingsError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_core_error(error: litchi_iwa_core::Error) -> BodyTableHeaderSettingsError {
+fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
             observed, maximum, ..
-        } => BodyTableHeaderSettingsError::LimitExceeded {
-            kind: BodyTableHeaderSettingsLimitKind::PayloadBytes,
+        } => Error::Limit {
+            kind: LimitKind::PayloadBytes,
             observed: observed as u64,
             maximum: maximum as u64,
         },
         litchi_iwa_core::Error::Allocation { requested, .. } => {
-            BodyTableHeaderSettingsError::Allocation { amount: requested }
+            Error::Allocation { amount: requested }
         },
-        _ => BodyTableHeaderSettingsError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_package_error(error: PackageError) -> BodyTableHeaderSettingsError {
+fn map_package_error(error: PackageError) -> Error {
     match error {
         PackageError::Archive(error) => map_archive_error(error),
-        PackageError::Allocation { amount } => BodyTableHeaderSettingsError::Allocation { amount },
-        PackageError::ObjectLimit { observed, limit } => {
-            BodyTableHeaderSettingsError::LimitExceeded {
-                kind: BodyTableHeaderSettingsLimitKind::PayloadObjects,
-                observed: observed as u64,
-                maximum: limit as u64,
-            }
+        PackageError::Allocation { amount } => Error::Allocation { amount },
+        PackageError::ObjectLimit { observed, limit } => Error::Limit {
+            kind: LimitKind::PayloadObjects,
+            observed: observed as u64,
+            maximum: limit as u64,
         },
-        PackageError::PayloadLimit { observed, limit } => {
-            BodyTableHeaderSettingsError::LimitExceeded {
-                kind: BodyTableHeaderSettingsLimitKind::PayloadBytes,
-                observed: observed as u64,
-                maximum: limit as u64,
-            }
+        PackageError::PayloadLimit { observed, limit } => Error::Limit {
+            kind: LimitKind::PayloadBytes,
+            observed: observed as u64,
+            maximum: limit as u64,
         },
-        _ => BodyTableHeaderSettingsError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }

@@ -3,6 +3,7 @@
 use super::codec;
 use super::model::{DiffFlags, Entry, Limits, Review, ReviewingToolbarStates, Unknown};
 use super::validation;
+use crate::SourceLimits;
 use crate::package::{Error, Result};
 use crate::records::Record;
 use std::sync::Arc;
@@ -90,7 +91,7 @@ impl Change {
 
 /// A reversible revision-checked patch produced by a successful edit.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Patch {
+pub(crate) struct Patch {
     base: Revision,
     target: Revision,
     before: Arc<[u8]>,
@@ -99,25 +100,29 @@ pub struct Patch {
     limits: Limits,
 }
 
+#[allow(
+    dead_code,
+    reason = "the record-level owner behind the package-level Edit; its full surface stays exercised by the unit tests (record 0357)"
+)]
 impl Patch {
     #[must_use]
-    pub const fn base(&self) -> Revision {
+    pub(crate) const fn base(&self) -> Revision {
         self.base
     }
     #[must_use]
-    pub const fn target(&self) -> Revision {
+    pub(crate) const fn target(&self) -> Revision {
         self.target
     }
     #[must_use]
-    pub fn changes(&self) -> &[Change] {
+    pub(crate) fn changes(&self) -> &[Change] {
         &self.changes
     }
     #[must_use]
-    pub fn before_bytes(&self) -> &[u8] {
+    pub(crate) fn before_bytes(&self) -> &[u8] {
         &self.before
     }
     #[must_use]
-    pub fn after_bytes(&self) -> &[u8] {
+    pub(crate) fn after_bytes(&self) -> &[u8] {
         &self.after
     }
 
@@ -126,7 +131,7 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
         if current.revision() != self.target || current.bytes() != self.after.as_ref() {
             return Err(Error::InvalidFormat(
                 "cannot undo review edits against a different revision".into(),
@@ -140,7 +145,7 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
         if current.revision() != self.base || current.bytes() != self.before.as_ref() {
             return Err(Error::InvalidFormat(
                 "cannot redo review edits against a different revision".into(),
@@ -159,13 +164,25 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
+    fn record_limits(limits: Limits) -> Result<SourceLimits> {
+        SourceLimits::builder()
+            .max_input_bytes(limits.max_bytes)?
+            .max_entry_bytes(limits.max_bytes)?
+            .max_aggregate_bytes(limits.max_bytes)?
+            .max_record_bytes(limits.max_bytes)?
+            .max_events(limits.max_records)?
+            .max_record_payload_bytes(limits.max_bytes.saturating_sub(8))?
+            .max_aggregate_payload_bytes(limits.max_bytes)?
+            .build()
+    }
+
     /// Capture a validated document record.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn from_record(root: Record) -> Result<Self> {
-        Self::from_record_with_limits(root, Limits::default())
+    pub fn from_record(root: Record, limits: &Limits) -> Result<Self> {
+        Self::from_record_with_limits(root, *limits)
     }
 
     /// Capture a document record with explicit bounded-resource limits.
@@ -177,7 +194,7 @@ impl Snapshot {
         clippy::needless_pass_by_value,
         reason = "taking the record by value is the established public API; the snapshot stores a normalized re-parse, so the argument is only borrowed internally"
     )]
-    pub fn from_record_with_limits(root: Record, limits: Limits) -> Result<Self> {
+    pub(crate) fn from_record_with_limits(root: Record, limits: Limits) -> Result<Self> {
         let validated = limits.validate()?;
         validation::validate_document(&root, validated)?;
         let bytes = codec::encode_document(&root)?;
@@ -186,7 +203,8 @@ impl Snapshot {
                 "document-comparison snapshot exceeds the byte limit".into(),
             ));
         }
-        let (parsed, consumed) = Record::parse_strict(&bytes, 0)?;
+        let record_limits = Self::record_limits(validated)?;
+        let (parsed, consumed) = Record::parse_strict_with_limits(&bytes, 0, record_limits)?;
         if consumed != bytes.len() {
             return Err(Error::Corrupted(
                 "document-comparison snapshot has trailing bytes".into(),
@@ -201,13 +219,13 @@ impl Snapshot {
         })
     }
 
-    /// Parse exactly one complete `DocumentContainer` record.
+    /// Parse exactly one complete `DocumentContainer` record under `limits`.
     ///
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(bytes: &[u8]) -> Result<Self> {
-        Self::parse_with_limits(bytes, Limits::default())
+    pub fn parse(bytes: &[u8], limits: &Limits) -> Result<Self> {
+        Self::parse_with_limits(bytes, *limits)
     }
 
     /// Parse one document under explicit bounded-resource limits.
@@ -215,10 +233,11 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_with_limits(bytes: &[u8], limits: Limits) -> Result<Self> {
+    pub(crate) fn parse_with_limits(bytes: &[u8], limits: Limits) -> Result<Self> {
         let snapshot = Self::from_record_with_limits(
             {
-                let (record, consumed) = Record::parse_strict(bytes, 0)?;
+                let record_limits = Self::record_limits(limits)?;
+                let (record, consumed) = Record::parse_strict_with_limits(bytes, 0, record_limits)?;
                 if consumed != bytes.len() {
                     return Err(Error::Corrupted(
                         "document-comparison input contains trailing bytes".into(),
@@ -292,7 +311,7 @@ impl Snapshot {
 
     /// Start an isolated semantic edit.
     #[must_use]
-    pub fn edit(&self) -> Editor {
+    pub(crate) fn edit(&self) -> Editor {
         Editor {
             source: self.clone(),
             root: self.root.clone(),
@@ -303,15 +322,19 @@ impl Snapshot {
 
 /// An isolated atomic edit over one document's review metadata.
 #[derive(Debug, Clone)]
-pub struct Editor {
+pub(crate) struct Editor {
     source: Snapshot,
     root: Record,
     changes: Vec<Change>,
 }
 
+#[allow(
+    dead_code,
+    reason = "the record-level owner behind the package-level Edit; its full surface stays exercised by the unit tests (record 0357)"
+)]
 impl Editor {
     #[must_use]
-    pub const fn record(&self) -> &Record {
+    pub(crate) const fn record(&self) -> &Record {
         &self.root
     }
     /// Return the typed review records and opaque records in source order.
@@ -319,7 +342,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the inert review payload is missing or malformed.
-    pub fn review(&self) -> Result<Review> {
+    pub(crate) fn review(&self) -> Result<Review> {
         codec::read_review(&self.root, self.source.limits)
     }
     /// Return the typed reviewing-toolbar state, when present.
@@ -327,7 +350,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the inert review payload is missing or malformed.
-    pub fn toolbar(&self) -> Result<Option<ReviewingToolbarStates>> {
+    pub(crate) fn toolbar(&self) -> Result<Option<ReviewingToolbarStates>> {
         Ok(self.review()?.toolbar())
     }
     /// Return the `index`th reviewer tree in the document-comparison payload.
@@ -335,16 +358,12 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the inert review payload is missing or malformed.
-    pub fn diff_tree(&self, index: usize) -> Result<Option<super::model::DiffTree10>> {
+    pub(crate) fn diff_tree(&self, index: usize) -> Result<Option<super::model::DiffTree10>> {
         Ok(self.review()?.diff_tree(index).cloned())
     }
     #[must_use]
-    pub fn changes(&self) -> &[Change] {
+    pub(crate) fn changes(&self) -> &[Change] {
         &self.changes
-    }
-    #[must_use]
-    pub const fn is_changed(&self) -> bool {
-        !self.changes.is_empty()
     }
 
     /// Set or replace the reviewing toolbar atom without touching other records.
@@ -352,7 +371,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_toolbar(&mut self, value: ReviewingToolbarStates) -> Result<()> {
+    pub(crate) fn set_toolbar(&mut self, value: ReviewingToolbarStates) -> Result<()> {
         self.replace_toolbar(Some(value))
     }
 
@@ -361,7 +380,11 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_reviewer_name(&mut self, tree_index: usize, value: impl Into<String>) -> Result<()> {
+    pub(crate) fn set_reviewer_name(
+        &mut self,
+        tree_index: usize,
+        value: impl Into<String>,
+    ) -> Result<()> {
         let name = value.into();
         validation::validate_reviewer_name(&name)?;
         let mut review = self.review()?;
@@ -395,7 +418,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_document_flags(&mut self, tree_index: usize, value: DiffFlags) -> Result<()> {
+    pub(crate) fn set_document_flags(&mut self, tree_index: usize, value: DiffFlags) -> Result<()> {
         let mut review = self.review()?;
         let entry = review
             .entries
@@ -425,7 +448,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn clear_toolbar(&mut self) -> Result<bool> {
+    pub(crate) fn clear_toolbar(&mut self) -> Result<bool> {
         let before = self.toolbar()?;
         if before.is_none() {
             return Ok(false);
@@ -463,21 +486,12 @@ impl Editor {
         Ok(())
     }
 
-    /// Capture the candidate without publishing it.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn snapshot(&self) -> Result<Snapshot> {
-        Snapshot::from_record_with_limits(self.root.clone(), self.source.limits)
-    }
-
     /// Validate and publish the candidate and its reversible patch.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
         let snapshot = Snapshot::from_record_with_limits(self.root, self.source.limits)?;
         let patch = Patch {
             base: self.source.revision(),
@@ -489,27 +503,26 @@ impl Editor {
         };
         Ok(Commit { snapshot, patch })
     }
-
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
-    }
 }
 
 /// A successful immutable target and reversible review patch.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     patch: Patch,
 }
 
+#[allow(
+    dead_code,
+    reason = "the record-level owner behind the package-level Edit; its full surface stays exercised by the unit tests (record 0357)"
+)]
 impl Commit {
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
     #[must_use]
-    pub const fn patch(&self) -> &Patch {
+    pub(crate) const fn patch(&self) -> &Patch {
         &self.patch
     }
     /// Return the typed reviewing-toolbar state of the committed snapshot.
@@ -517,11 +530,11 @@ impl Commit {
     /// # Errors
     ///
     /// Returns an error if the inert review payload is missing or malformed.
-    pub fn toolbar(&self) -> Result<Option<ReviewingToolbarStates>> {
+    pub(crate) fn toolbar(&self) -> Result<Option<ReviewingToolbarStates>> {
         self.snapshot.toolbar()
     }
     #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
+    pub(crate) fn into_parts(self) -> (Snapshot, Patch) {
         (self.snapshot, self.patch)
     }
 }

@@ -1,10 +1,9 @@
 //! Read-side speaker-notes support for binary `PowerPoint` files.
 
-use super::directory::SlideDirectory;
 use super::types::Slide;
 use crate::consts::RecordType;
 use crate::odraw::ShapeExt as _;
-use crate::package::{Error, RecordLimits, Result};
+use crate::package::{Error, Result, SourceLimitKind, SourceLimits};
 use crate::persist::PersistMapping;
 use crate::records::{PayloadStore, Record};
 use crate::shapes::ShapeEnum;
@@ -24,33 +23,25 @@ pub(crate) struct NoteDescriptor {
     pub expected_slide_id: Option<u32>,
 }
 
-#[derive(Debug, Default)]
+/// The presentation's notes pages by `NotesId`, read once per presentation
+/// from the `NotesListWithTextContainer` (L-PPT-R2).
+///
+/// The slide directory builds it at open from the `DocumentContainer` it has
+/// already parsed, so selecting a slide never parses the document again. A
+/// notes list that cannot be read does not fail the open: the error is kept
+/// and returned by [`Self::descriptor`] for each slide that names a notes
+/// page.
+#[derive(Debug, Clone, Default)]
 pub(crate) struct NotesIndex {
     notes: HashMap<u32, u32>,
-    slide_ids: HashMap<u32, u32>,
     error: Option<String>,
 }
 
 impl NotesIndex {
-    #[cfg(all(test, feature = "vba-inspection"))]
-    #[allow(
-        dead_code,
-        reason = "retained for focused presentation fixture construction"
-    )]
-    pub(crate) fn build(document_data: &[u8], slide_directory: &SlideDirectory) -> Self {
-        Self::build_with_limits(
-            PayloadStore::Owned(document_data),
-            slide_directory,
-            RecordLimits::default(),
-        )
-    }
-
-    pub(crate) fn build_with_limits(
-        source: PayloadStore<'_>,
-        slide_directory: &SlideDirectory,
-        limits: RecordLimits,
-    ) -> Self {
-        match Self::try_build_with_limits(source, slide_directory, limits) {
+    /// Indexes the notes list of the live `DocumentContainer`, keeping a
+    /// malformed list as the deferred error.
+    pub(crate) fn from_document(document: &Record) -> Self {
+        match Self::try_from_document(document) {
             Ok(index) => index,
             Err(error) => Self {
                 error: Some(error.to_string()),
@@ -59,38 +50,13 @@ impl NotesIndex {
         }
     }
 
-    #[cfg(test)]
-    fn try_build(document_data: &[u8], slide_directory: &SlideDirectory) -> Result<Self> {
-        Self::try_build_with_limits(
-            PayloadStore::Owned(document_data),
-            slide_directory,
-            RecordLimits::default(),
-        )
-    }
-
-    fn try_build_with_limits(
-        source: PayloadStore<'_>,
-        slide_directory: &SlideDirectory,
-        limits: RecordLimits,
-    ) -> Result<Self> {
-        let (document, _) = Record::parse_from_store_with_limits(
-            source,
-            slide_directory.document_offset(),
-            limits,
-        )?;
+    fn try_from_document(document: &Record) -> Result<Self> {
         if document.record_type != RecordType::Document {
             return Err(Error::Corrupted(
                 "live document persist object is not a DocumentContainer".to_string(),
             ));
         }
         let mut index = Self::default();
-        index
-            .slide_ids
-            .try_reserve(slide_directory.entries().len())
-            .map_err(|_err| Error::AllocationFailed("PPT notes slide index"))?;
-        for entry in slide_directory.entries() {
-            index.slide_ids.insert(entry.persist_id(), entry.slide_id());
-        }
         let mut saw_notes_list = false;
 
         for list in document.extract_slide_list_with_texts() {
@@ -104,6 +70,10 @@ impl NotesIndex {
                 ));
             }
             saw_notes_list = true;
+            index
+                .notes
+                .try_reserve(list.children.len())
+                .map_err(|_err| Error::AllocationFailed("PPT notes index"))?;
 
             for atom in &list.children {
                 if atom.record_type != RecordType::SlidePersistAtom {
@@ -146,10 +116,12 @@ impl NotesIndex {
         Ok(())
     }
 
+    /// Locates the notes page of `slide`, whose directory entry names
+    /// `slide_id`, which the notes page's `NotesAtom.slideIdRef` must match.
     pub(crate) fn descriptor(
         &self,
         slide: &Record,
-        slide_persist_id: u32,
+        slide_id: u32,
         persist_mapping: &PersistMapping,
     ) -> std::result::Result<Option<NoteDescriptor>, String> {
         let Some(slide_atom) = slide.find_child(RecordType::SlideAtom) else {
@@ -186,7 +158,7 @@ impl NotesIndex {
             notes_id,
             persist_id,
             offset: offset_usize,
-            expected_slide_id: self.slide_ids.get(&slide_persist_id).copied(),
+            expected_slide_id: Some(slide_id),
         }))
     }
 }
@@ -201,6 +173,7 @@ pub struct SpeakerNotes {
     persist_id: u32,
     slide_id_ref: u32,
     record: Record,
+    source_limits: SourceLimits,
     /// Lazily parsed shapes, together with the non-structural defects
     /// repaired while they were parsed.
     shapes: OnceCell<(Vec<ShapeEnum<'static>>, crate::leniency::ToleranceReport)>,
@@ -211,7 +184,7 @@ impl SpeakerNotes {
     pub(crate) fn parse_with_limits(
         descriptor: NoteDescriptor,
         source: PayloadStore<'_>,
-        limits: RecordLimits,
+        limits: SourceLimits,
     ) -> Result<Self> {
         if descriptor
             .offset
@@ -265,6 +238,7 @@ impl SpeakerNotes {
             persist_id: descriptor.persist_id,
             slide_id_ref,
             record,
+            source_limits: limits,
             shapes: OnceCell::new(),
             text: OnceCell::new(),
         })
@@ -302,7 +276,7 @@ impl SpeakerNotes {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn programmable_tags_with_limits(
+    pub(crate) fn programmable_tags_with_limits(
         &self,
         limits: crate::ProgTagLimits,
     ) -> Result<Option<crate::ProgTags>> {
@@ -386,12 +360,19 @@ impl SpeakerNotes {
         let Some(drawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok((Vec::new(), report));
         };
-        let parsed = crate::odraw::parse(&drawing.data)?;
+        let parsed = crate::odraw::parse(
+            &drawing.data,
+            &crate::odraw::limits_for_source(self.source_limits),
+        )?;
         let mut shapes = Vec::with_capacity(parsed.len());
         for (index, shape) in parsed.iter().enumerate() {
-            if let Some(mut converted_shape) =
-                Slide::<'static>::convert_odraw_to_shape_enum(shape, index, &mut report)?
-            {
+            if let Some(mut converted_shape) = Slide::<'static>::convert_odraw_to_shape_enum(
+                shape,
+                index,
+                &[],
+                self.source_limits,
+                &mut report,
+            )? {
                 converted_shape.mark_source_bound_recursive();
                 shapes.push(converted_shape);
             }
@@ -406,14 +387,63 @@ impl SpeakerNotes {
         Ok((shapes, report))
     }
 
+    /// The `OfficeArt` shape identifiers of this notes page's body
+    /// placeholders (`PlaceholderKind::NotesBody`), in drawing order: the
+    /// shapes whose text [`Self::text`] joins.
+    pub(crate) fn body_shape_ids(&self) -> Result<Vec<u32>> {
+        let Some(drawing) = self.record.find_child(RecordType::PPDrawing) else {
+            return Ok(Vec::new());
+        };
+        let shapes = crate::odraw::parse(
+            &drawing.data,
+            &crate::odraw::limits_for_source(self.source_limits),
+        )?;
+        let mut ids = Vec::new();
+        let mut pending = shapes.iter().rev().collect::<Vec<_>>();
+        let mut visited = 0usize;
+        while let Some(current) = pending.pop() {
+            visited = visited.checked_add(1).ok_or(Error::Limit {
+                kind: SourceLimitKind::Events,
+                observed: usize::MAX,
+                maximum: self.source_limits.max_events(),
+            })?;
+            if visited > self.source_limits.max_events() {
+                return Err(Error::Limit {
+                    kind: SourceLimitKind::Events,
+                    observed: visited,
+                    maximum: self.source_limits.max_events(),
+                });
+            }
+            if current
+                .placeholder()?
+                .is_some_and(|placeholder| placeholder.kind == crate::PlaceholderKind::NotesBody)
+            {
+                ids.push(current.id());
+            }
+            pending.extend(current.children().iter().rev());
+        }
+        Ok(ids)
+    }
+
     fn extract_notes_body_text(&self) -> Result<String> {
         let Some(drawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok(String::new());
         };
-        let shapes = crate::odraw::parse(&drawing.data)?;
+        let shapes = crate::odraw::parse(
+            &drawing.data,
+            &crate::odraw::limits_for_source(self.source_limits),
+        )?;
         let mut text = Vec::new();
+        let mut visited = 0usize;
         for shape in &shapes {
-            collect_notes_body_text(shape, &mut text)?;
+            collect_notes_body_text(
+                shape,
+                &mut text,
+                &mut visited,
+                self.source_limits.max_events(),
+                self.source_limits.max_events().min(u32::MAX as usize) as u32,
+                self.source_limits.max_depth(),
+            )?;
         }
         Ok(text.join("\n"))
     }
@@ -422,24 +452,35 @@ impl SpeakerNotes {
 fn collect_notes_body_text(
     shape: &litchi_odraw::shape::Shape<'_>,
     text: &mut Vec<String>,
+    visited: &mut usize,
+    max_shapes: usize,
+    max_records: u32,
+    max_depth: usize,
 ) -> Result<()> {
-    const MAX_SHAPES: usize = 1_000_000;
-
     let mut pending = vec![shape];
-    let mut visited = 0usize;
     while let Some(current) = pending.pop() {
-        visited = visited
-            .checked_add(1)
-            .ok_or_else(|| Error::Corrupted("Notes shape count overflow".to_string()))?;
-        if visited > MAX_SHAPES {
-            return Err(Error::Corrupted(
-                "Notes page exceeds the PPT shape limit".to_string(),
-            ));
+        *visited = (*visited).checked_add(1).ok_or(Error::Limit {
+            kind: SourceLimitKind::Events,
+            observed: usize::MAX,
+            maximum: max_shapes,
+        })?;
+        if *visited > max_shapes {
+            return Err(Error::Limit {
+                kind: SourceLimitKind::Events,
+                observed: *visited,
+                maximum: max_shapes,
+            });
         }
         if current
             .placeholder()?
             .is_some_and(|placeholder| placeholder.kind == crate::PlaceholderKind::NotesBody)
-            && let Some(value) = current.text()?.filter(|value| !value.is_empty())
+            && let Some(textbox) = crate::odraw::textbox(current)?
+            && let Some(value) = crate::odraw::text_from_textbox_payload_bounded(
+                textbox.data(),
+                max_records,
+                max_depth,
+            )?
+            && !value.is_empty()
         {
             text.push(value);
         }
@@ -466,7 +507,7 @@ fn read_u32(data: &[u8], offset: usize, field: &str) -> Result<u32> {
 )]
 mod tests {
     use super::*;
-    use crate::Package;
+    use crate::raw::Reader;
 
     fn record(version: u16, instance: u16, record_type: u16, data: &[u8]) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(8 + data.len());
@@ -496,12 +537,16 @@ mod tests {
         record(0x0f, 0, 0x03e8, &notes_list)
     }
 
+    fn build(document: &[u8]) -> Result<NotesIndex> {
+        let (document, _) =
+            Record::parse(document, 0, &SourceLimits::default()).expect("parse synthetic document");
+        NotesIndex::try_from_document(&document)
+    }
+
     #[test]
     fn notes_index_uses_ids_not_list_order() {
-        let directory = SlideDirectory::new_for_test(0);
         let index =
-            NotesIndex::try_build(&document_with_notes(&[(9, 0x345), (7, 0x123)]), &directory)
-                .expect("valid notes index");
+            build(&document_with_notes(&[(9, 0x345), (7, 0x123)])).expect("valid notes index");
         assert_eq!(index.notes.get(&0x123), Some(&7));
         assert_eq!(index.notes.get(&0x345), Some(&9));
     }
@@ -509,25 +554,44 @@ mod tests {
     #[test]
     fn notes_index_rejects_duplicate_and_malformed_atoms() {
         let duplicate = document_with_notes(&[(7, 0x123), (9, 0x123)]);
-        let directory = SlideDirectory::new_for_test(0);
-        assert!(NotesIndex::try_build(&duplicate, &directory).is_err());
+        assert!(build(&duplicate).is_err());
 
         let malformed = record(0, 0, 0x03f3, &[0; 16]);
         let notes_list = record(0x0f, 2, 0x0ff0, &malformed);
         let document = record(0x0f, 0, 0x03e8, &notes_list);
-        assert!(NotesIndex::try_build(&document, &directory).is_err());
+        assert!(build(&document).is_err());
+
+        // A malformed list is kept as the error of every slide with notes,
+        // and slides without notes are unaffected.
+        let (document, _) = Record::parse(&document, 0, &SourceLimits::default()).unwrap();
+        let deferred = NotesIndex::from_document(&document);
+        let mut slide_atom_data = [0u8; SLIDE_ATOM_SIZE];
+        let without_notes = record(0x0f, 0, 0x03ee, &record(2, 0, 0x03ef, &slide_atom_data));
+        let (without_notes, _) =
+            Record::parse(&without_notes, 0, &SourceLimits::default()).unwrap();
+        assert!(matches!(
+            deferred.descriptor(&without_notes, 256, &PersistMapping::new()),
+            Ok(None)
+        ));
+        slide_atom_data[16..20].copy_from_slice(&0x345u32.to_le_bytes());
+        let with_notes = record(0x0f, 0, 0x03ee, &record(2, 0, 0x03ef, &slide_atom_data));
+        let (with_notes, _) = Record::parse(&with_notes, 0, &SourceLimits::default()).unwrap();
+        assert!(
+            deferred
+                .descriptor(&with_notes, 256, &PersistMapping::new())
+                .is_err()
+        );
     }
 
     #[test]
     fn notes_index_rejects_dangling_persist_reference() {
-        let directory = SlideDirectory::new_for_test(0);
-        let index = NotesIndex::try_build(&document_with_notes(&[(9, 0x345)]), &directory)
-            .expect("valid notes index");
+        let index = build(&document_with_notes(&[(9, 0x345)])).expect("valid notes index");
         let mut slide_atom_data = [0u8; SLIDE_ATOM_SIZE];
         slide_atom_data[16..20].copy_from_slice(&0x345u32.to_le_bytes());
         let slide_atom = record(2, 0, 0x03ef, &slide_atom_data);
         let slide_bytes = record(0x0f, 0, 0x03ee, &slide_atom);
-        let (slide, _) = Record::parse(&slide_bytes, 0).expect("parse synthetic slide");
+        let (slide, _) = Record::parse(&slide_bytes, 0, &SourceLimits::default())
+            .expect("parse synthetic slide");
         let error = index
             .descriptor(&slide, 4, &PersistMapping::new())
             .expect_err("dangling persist reference must fail");
@@ -540,7 +604,7 @@ mod tests {
             env!("CARGO_MANIFEST_DIR"),
             "/../../test-data/poi/test-data/slideshow/basic_test_ppt_file.ppt"
         );
-        let mut package = Package::open(path).expect("open POI fixture");
+        let mut package = Reader::open(path).expect("open POI fixture");
         let presentation = package.presentation().expect("parse POI fixture");
         let slides = presentation.slides().expect("read slides");
         let mut notes = Vec::new();
@@ -560,7 +624,7 @@ mod tests {
 
     #[test]
     fn writer_notes_round_trip_through_reader_api() {
-        let mut writer = crate::writer::Writer::new();
+        let mut writer = crate::writer::Builder::new();
         let slide = writer.add_slide().expect("add slide");
         let notes_page = crate::writer::NotesPage::simple(0, "reader writer notes round trip")
             .with_header("excluded notes header")
@@ -571,9 +635,13 @@ mod tests {
             std::process::id(),
             slide
         ));
-        writer.save(&path).expect("write presentation");
+        writer
+            .build()
+            .expect("build presentation")
+            .save(&path)
+            .expect("write presentation");
 
-        let mut package = Package::open(&path).expect("open written presentation");
+        let mut package = Reader::open(&path).expect("open written presentation");
         let presentation = package.presentation().expect("parse written presentation");
         let slides = presentation.slides().expect("read written slides");
         let notes = slides[0]
@@ -595,7 +663,7 @@ mod tests {
             env!("CARGO_MANIFEST_DIR"),
             "/../../test-data/poi/test-data/slideshow/basic_test_ppt_file.ppt"
         );
-        let package = Package::open(path);
+        let package = Reader::open(path);
         assert!(package.is_ok());
         let Ok(mut opened_package) = package else {
             return;

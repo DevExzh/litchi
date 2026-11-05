@@ -237,7 +237,7 @@ fn companion(id: &str, path: &str, content_type: &str, data: &[u8]) -> ChartComp
 
 #[test]
 fn real_libreoffice_chart_ex_fixture_round_trips_as_inert_resources() {
-    let source = OpcPackage::from_bytes(LO_CHART_EX).unwrap();
+    let source = OpcPackage::from_bytes(LO_CHART_EX, litchi_opc::SourceLimits::default()).unwrap();
     let blob = |path: &str| {
         source
             .get_part(&PackURI::new(path).unwrap())
@@ -386,7 +386,7 @@ fn rejects_chart_ex_drawing_shape_roots_cardinality_relationships_and_caps() {
 #[test]
 fn rejects_chart_ex_wrong_type_orphan_escape_outbound_and_companion_graphs() {
     let conformance = Conformance::Transitional;
-    let source = OpcPackage::from_bytes(LO_CHART_EX).unwrap();
+    let source = OpcPackage::from_bytes(LO_CHART_EX, litchi_opc::SourceLimits::default()).unwrap();
     let blob = |path: &str| {
         source
             .get_part(&PackURI::new(path).unwrap())
@@ -479,7 +479,8 @@ fn rejects_chart_ex_wrong_type_orphan_escape_outbound_and_companion_graphs() {
 }
 
 pub(super) fn chart_ex_user_shapes(conformance: Conformance) -> Package {
-    let source = OpcPackage::from_bytes(LO_USER_SHAPES_IMAGES).unwrap();
+    let source =
+        OpcPackage::from_bytes(LO_USER_SHAPES_IMAGES, litchi_opc::SourceLimits::default()).unwrap();
     let blob = |path: &str| {
         source
             .get_part(&PackURI::new(path).unwrap())
@@ -877,7 +878,7 @@ fn mce_fallback_selects_custom_chartsheet_views() {
 #[test]
 fn loads_both_poi_chartsheet_graphs() {
     for (bytes, name, zoom) in [(POI_ONE, "Chart2", 131), (POI_TWO, "Chart1", 84)] {
-        let package = OpcPackage::from_bytes(bytes).unwrap();
+        let package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
         let workbook = PackURI::new("/xl/workbook.xml").unwrap();
         let workbook_part = package.get_part(&workbook).unwrap();
         let id = workbook_part
@@ -1599,7 +1600,9 @@ mod chart_outbound_tests {
     };
 
     fn outbound_value(conformance: Conformance) -> Package {
-        let source = OpcPackage::from_bytes(LO_USER_SHAPES_IMAGES).unwrap();
+        let source =
+            OpcPackage::from_bytes(LO_USER_SHAPES_IMAGES, litchi_opc::SourceLimits::default())
+                .unwrap();
         let blob = |path: &str| {
             source
                 .get_part(&PackURI::new(path).unwrap())
@@ -1796,4 +1799,38 @@ mod chart_outbound_tests {
                 .is_err()
         );
     }
+}
+
+#[test]
+fn package_route_adds_a_chartsheet_and_replays_its_patch() {
+    let conformance = Conformance::Transitional;
+    let expected = value(conformance);
+    let source = crate::Package::new().unwrap();
+    let workbook = source
+        .opc()
+        .main_document_part()
+        .unwrap()
+        .partname()
+        .clone();
+    let mut edit = source.edit_chart_sheets().unwrap();
+    edit.add(&expected, conformance).unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    let after = commit.package();
+    assert_eq!(after.workbook_ref().sheets().count(), 2);
+    assert_eq!(
+        load_chartsheet(after.opc(), &workbook, "rIdChartSheet").unwrap(),
+        expected
+    );
+
+    let replayed = source.apply_chart_sheets(commit.patch()).unwrap();
+    assert_eq!(
+        replayed.package().to_bytes().unwrap(),
+        after.to_bytes().unwrap()
+    );
+    let restored = after.apply_chart_sheets(&commit.patch().inverse()).unwrap();
+    assert_eq!(
+        restored.package().to_bytes().unwrap(),
+        source.to_bytes().unwrap()
+    );
 }

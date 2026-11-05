@@ -5,13 +5,13 @@
 //! source values are committed through the standalone workbook facade.
 
 use litchi_xlsx::sheet::sparklines::{
-    AxisMinMax, Color, DisplayEmptyCellsAs, Group, Item, Type, write_groups_ext,
+    AxisType, Color, EmptyCells, Group, Item, SparklineType, write_groups_ext,
 };
-use litchi_xlsx::{Number, Workbook};
+use litchi_xlsx::{Number, Package};
 use std::env;
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let workbook = Workbook::create()?;
+    let workbook = Package::new()?;
     let mut edit = workbook.edit()?;
     edit.tab(0)?
         .ok_or("default worksheet is missing")?
@@ -35,8 +35,8 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         }
     }
 
-    let mut group = Group::new(Type::Column);
-    group.options.display_empty_cells_as = DisplayEmptyCellsAs::Gap;
+    let mut group = Group::new(SparklineType::Column);
+    group.options.display_empty_cells_as = EmptyCells::Gap;
     group.options.display_x_axis = true;
     group.options.markers = true;
     group.options.high = true;
@@ -44,8 +44,8 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     group.options.first = true;
     group.options.last = true;
     group.options.negative = true;
-    group.options.min_axis_type = AxisMinMax::Custom;
-    group.options.max_axis_type = AxisMinMax::Custom;
+    group.options.min_axis_type = AxisType::Custom;
+    group.options.max_axis_type = AxisType::Custom;
     group.options.manual_min = Some(0.0);
     group.options.manual_max = Some(40.0);
     group.options.line_weight = Some(0.75);
@@ -69,7 +69,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let output = env::args()
         .nth(1)
         .unwrap_or_else(|| "sparklines_output.xlsx".to_string());
-    edit.commit()?.into_workbook().save(&output)?;
+    edit.commit()?.into_package().save(&output)?;
     println!(
         "Wrote {output}; validated sparkline extension ({} bytes)",
         extension_xml.len()

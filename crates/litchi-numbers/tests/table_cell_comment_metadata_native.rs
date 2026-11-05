@@ -3,8 +3,8 @@
 use std::{fs, io::Read, path::PathBuf};
 
 use litchi_numbers::{
-    CellPosition, Package, SheetSelector, TableCellComment, TableSelector, cell::Value,
-    table::cells::Storage,
+    At, Package, SheetSelector, TableSelector, cell::Value,
+    cell::comment::Comment as TableCellComment, table::cells::Storage,
 };
 
 const SOURCE: &[u8] = include_bytes!("fixtures/comment-edit-root.numbers");
@@ -47,7 +47,7 @@ fn native_saved_root_preserves_semantic_metadata() -> Result<(), Box<dyn std::er
         .table_cell_comment(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(1, 1),
+            At::new(1, 1),
         )?
         .ok_or("source B2 comment missing")?;
     let native_root = native
@@ -94,7 +94,7 @@ fn optional_native_saved_root_readback_preserves_semantic_metadata()
         .table_cell_comment(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(1, 1),
+            At::new(1, 1),
         )?
         .ok_or("source B2 comment missing")?;
     let root = assert_native_root_metadata(&package)?;
@@ -179,7 +179,7 @@ fn native_multiroot_comments_preserve_independent_metadata_and_values()
             "Native compatibility sentinel",
         ),
     ] {
-        let position = CellPosition::new(row, 1);
+        let position = At::new(row, 1);
         let root = package
             .table_cell_comment("Sheet 1", "Table 1", position)?
             .ok_or("native root missing")?;

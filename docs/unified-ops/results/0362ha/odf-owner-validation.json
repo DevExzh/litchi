@@ -1,0 +1,272 @@
+{
+  "schema": "litchi.w8.odf-owner-errors.v1",
+  "parent": "17d4cf011d",
+  "status": "source candidate; native qualification and integrated gates remain required",
+  "source_files": [
+    {
+      "path": "crates/litchi-ops/src/detect/mod.rs",
+      "bytes": 10825,
+      "sha256": "78a0ed487364a44d85a9a7b792e5c3ddcd3a7a90ca73ac27421c6d9e078b5936"
+    },
+    {
+      "path": "crates/litchi-ops/src/open.rs",
+      "bytes": 29722,
+      "sha256": "cf13757cc83ef31e8acb2980404493ee5877962f288ed5baa23e658aae81804d"
+    },
+    {
+      "path": "crates/litchi-ops/src/open/bytes.rs",
+      "bytes": 11368,
+      "sha256": "b03fd06d695edb2a32d77b3f3f3fd2f205f8cd3922892df91f88629df8f6e152"
+    },
+    {
+      "path": "crates/litchi-ops/src/tests/document.rs",
+      "bytes": 79354,
+      "sha256": "db50a550bbc01a0e4402aad21258cb11e212e20a6c338eba17af9cc8e87deff1"
+    }
+  ],
+  "earlier_attempts": [
+    {
+      "attempt": 1,
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-ops",
+        "--all-features",
+        "--lib",
+        "owned_odt_source_limits_remain_typed"
+      ],
+      "exit": 101,
+      "reason": "input ceiling reported unsupported format",
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-owner-v1/regression.log",
+      "bytes": 1103,
+      "sha256": "3d7163b07e5e76829e0321721cef7f5e9b1600b066bdc60a4386c248cba8a7ea"
+    },
+    {
+      "attempt": 2,
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-ops",
+        "--all-features",
+        "--lib",
+        "owned_odt_source_limits_remain_typed"
+      ],
+      "exit": 101,
+      "reason": "error code fixed but common-core payload not converted to typed ODF limit",
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-owner-v2/regression.log",
+      "bytes": 1022,
+      "sha256": "131ea4fb15980d5d2496e402884eb33c0cbd1bf429873690b84f5215607af43f"
+    },
+    {
+      "attempt": 3,
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-ops",
+        "--all-features",
+        "--lib",
+        "odt_source_limits_remain_typed"
+      ],
+      "exit": 101,
+      "reason": "new member-boundary test passed u64 to usize builder",
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-owner-v3/regression.log",
+      "bytes": 1321,
+      "sha256": "3f4828af9d7163fe64a97b8376f2aebc83e3c73b46cab853a2517aa76bd86984"
+    }
+  ],
+  "validation": [
+    {
+      "attempt": 4,
+      "checks": [
+        {
+          "command": [
+            "cargo",
+            "test",
+            "--offline",
+            "--locked",
+            "-p",
+            "litchi-ops",
+            "--all-features",
+            "--lib"
+          ],
+          "exit": 0,
+          "seconds": 48.684039877029136,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-owner-v4/check-0.log",
+          "bytes": 76711,
+          "sha256": "3e6a7f0776ef71e16829c5a28d7d2b55d322ad96719865620debff9af066a396"
+        },
+        {
+          "command": [
+            "cargo",
+            "test",
+            "--offline",
+            "--locked",
+            "-p",
+            "litchi-ops",
+            "--all-features",
+            "--doc"
+          ],
+          "exit": 0,
+          "seconds": 38.86498833796941,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-owner-v4/check-1.log",
+          "bytes": 19058,
+          "sha256": "f9a2ffe5d4cd4d143a00624a832ea2778ea7babb61c4cc99010eba0a77a791b6"
+        },
+        {
+          "command": [
+            "cargo",
+            "clippy",
+            "--offline",
+            "--locked",
+            "-p",
+            "litchi-ops",
+            "--all-features",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 85.95044106303249,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-owner-v4/check-2.log",
+          "bytes": 172,
+          "sha256": "bfb1c4d7ad30e0c4cbf2112f413b9e19d2876debf003c2ea89bedc3f6d7c2dd3"
+        },
+        {
+          "command": [
+            "cargo",
+            "clippy",
+            "--offline",
+            "--locked",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--features",
+            "odt",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 101,
+          "seconds": 3.639611147926189,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-owner-v4/check-3.log",
+          "bytes": 657,
+          "sha256": "ffaf6152589e0e6517c433ed08c2db25a31185ff377a2db0ea95642e988a4ec2"
+        }
+      ]
+    },
+    {
+      "attempt": 5,
+      "checks": [
+        {
+          "command": [
+            "cargo",
+            "fmt",
+            "-p",
+            "litchi-ops",
+            "--",
+            "--check"
+          ],
+          "exit": 0,
+          "seconds": 2.4238741329172626,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-owner-v5/check-0.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "command": [
+            "cargo",
+            "clippy",
+            "--offline",
+            "--locked",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--features",
+            "odt",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 14.201667714980431,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-owner-v5/check-1.log",
+          "bytes": 172,
+          "sha256": "ed4fc54e122313a90ee267111cf3df323791df19911270b1962823f3e6a9d10d"
+        },
+        {
+          "command": [
+            "cargo",
+            "check",
+            "--offline",
+            "--locked",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--all-targets"
+          ],
+          "exit": 0,
+          "seconds": 0.5197090019937605,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-owner-v5/check-2.log",
+          "bytes": 171,
+          "sha256": "eb39e5ef3d254474aa59e8295aad3c0953e12cd8bcff94b945c37a19f7c75416"
+        }
+      ]
+    },
+    {
+      "attempt": 6,
+      "checks": [
+        {
+          "command": [
+            "cargo",
+            "test",
+            "--offline",
+            "--locked",
+            "-p",
+            "litchi-ops",
+            "--all-features",
+            "--lib",
+            "owned_docx_bytes_do_not_use_odf_limits"
+          ],
+          "exit": 0,
+          "seconds": 43.02428483602125,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-owner-v6/check-0.log",
+          "bytes": 493,
+          "sha256": "3e16c79c68be6addad6428f6abb24e95b403ce02f4b90d713941e999506ea292"
+        },
+        {
+          "command": [
+            "cargo",
+            "fmt",
+            "-p",
+            "litchi-ops",
+            "--",
+            "--check"
+          ],
+          "exit": 0,
+          "seconds": 2.737045398913324,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-owner-v6/check-1.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    }
+  ],
+  "validation_notes": [
+    "v4 full ops suite: 962 passed; documentation: 215 + 2 passed; all-feature all-target Clippy passed.",
+    "v4 ODT-only Clippy exposed a now-unused catalog helper; v5 narrows its cfg to the actual mixed-format callers and passes ODT-only Clippy and no-format all-target check. The all-feature configuration is unchanged by this cfg narrowing.",
+    "v6 adds and passes the DOCX/ODF policy isolation regression (ordinary DOCX and an ODF-marked DOCX polyglot) and final formatting.",
+    "No native timings or final workspace gate are claimed."
+  ]
+}

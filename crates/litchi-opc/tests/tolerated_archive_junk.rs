@@ -10,6 +10,7 @@
 //! actually inside it is reachable afterwards. Tolerating junk is only correct
 //! if nothing real is lost, and only acceptable if the junk is still reported.
 
+use litchi_opc::SourceLimits;
 use litchi_opc::{NonPartReason, OpcPackage, Part};
 use std::path::PathBuf;
 
@@ -31,7 +32,8 @@ fn fixture(relative: &str) -> PathBuf {
 fn open(relative: &str) -> OpcPackage {
     let path = fixture(relative);
     let bytes = std::fs::read(&path).unwrap_or_else(|error| panic!("read {relative}: {error}"));
-    OpcPackage::from_bytes(&bytes).unwrap_or_else(|error| panic!("open {relative}: {error}"))
+    OpcPackage::from_bytes(&bytes, SourceLimits::default())
+        .unwrap_or_else(|error| panic!("open {relative}: {error}"))
 }
 
 /// Return the part with the given name, or fail the test.

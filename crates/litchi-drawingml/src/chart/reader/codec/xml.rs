@@ -13,6 +13,7 @@ use super::validation::{
     bounded_u32_attr, parse_bool_attr, parse_display_blanks, required_string_attr,
 };
 
+use crate::chart::Limits;
 use crate::chart::model::{
     Chart, ExtensionList, ExternalData, PrintSettings, Protection, ShapeProperties, TextProperties,
     UserShapes, View3D, WallFloor,
@@ -26,25 +27,36 @@ use std::io::{BufRead, Read};
 ///
 /// Returns an error when input violates DrawingML constraints, exceeds a configured
 /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-pub fn read<R: BufRead>(reader: R) -> Result<Chart> {
-    let limits = litchi_ooxml_common::mce::Limits::default();
+pub fn read<R: BufRead>(reader: R, limits: &Limits) -> Result<Chart> {
+    let limits = limits.validate()?;
     let mut input = Vec::new();
     reader
         .take((limits.max_input_bytes as u64).saturating_add(1))
         .read_to_end(&mut input)?;
     if input.len() > limits.max_input_bytes {
-        return Err(Error::Mce(litchi_ooxml_common::mce::Error::LimitExceeded(
-            "input bytes".into(),
-        )));
+        return Err(Error::limit(
+            crate::LimitKind::InputBytes,
+            input.len(),
+            limits.max_input_bytes,
+        ));
     }
     let xml = litchi_ooxml_common::mce::process_markup_compatibility(
         &input,
         &litchi_ooxml_common::mce::Capabilities::default(),
-        &limits,
-    )?
+        &litchi_ooxml_common::mce::Limits {
+            max_input_bytes: limits.max_input_bytes,
+            max_output_bytes: limits.max_output_bytes,
+            max_depth: limits.max_xml_depth,
+            max_namespace_bindings: 4_096,
+            max_directive_tokens: 4_096,
+            max_choices_per_alternate: 1_024,
+            max_attributes_per_element: limits.max_xml_attributes,
+        },
+    )
+    .map_err(map_mce_error)?
     .xml
     .into_owned();
-    let mut xml_reader = ChartXmlReader::from_reader(std::io::Cursor::new(xml));
+    let mut xml_reader = ChartXmlReader::from_reader(std::io::Cursor::new(xml), limits);
     xml_reader.config_mut().trim_text(false);
 
     let mut chart = Chart::new();
@@ -64,6 +76,7 @@ pub fn read<R: BufRead>(reader: R) -> Result<Chart> {
                     e,
                     b"val",
                     xml_reader.decoder(),
+                    xml_reader.max_text_bytes(),
                     "chart language",
                 )?);
                 consume_empty_chart_element(&mut xml_reader, b"lang", "chart language")?;
@@ -78,6 +91,7 @@ pub fn read<R: BufRead>(reader: R) -> Result<Chart> {
                     e,
                     b"val",
                     xml_reader.decoder(),
+                    xml_reader.max_text_bytes(),
                     "chart language",
                 )?);
             },
@@ -404,7 +418,45 @@ pub fn read<R: BufRead>(reader: R) -> Result<Chart> {
         buf.clear();
     }
 
+    limits.validate_chart(&chart)?;
     Ok(chart)
+}
+
+fn map_mce_error(error: litchi_ooxml_common::mce::Error) -> Error {
+    match error {
+        litchi_ooxml_common::mce::Error::LimitExceeded {
+            kind,
+            observed,
+            maximum,
+        } => Error::limit(
+            match kind {
+                litchi_ooxml_common::mce::LimitKind::InputBytes => crate::LimitKind::InputBytes,
+                litchi_ooxml_common::mce::LimitKind::OutputBytes => crate::LimitKind::OutputBytes,
+                litchi_ooxml_common::mce::LimitKind::Depth => crate::LimitKind::XmlDepth,
+                litchi_ooxml_common::mce::LimitKind::Attributes => crate::LimitKind::XmlAttributes,
+                _ => crate::LimitKind::XmlNodes,
+            },
+            observed,
+            maximum,
+        ),
+        litchi_ooxml_common::mce::Error::InvalidLimit {
+            kind,
+            value,
+            maximum,
+            ..
+        } => Error::invalid_limit(
+            match kind {
+                litchi_ooxml_common::mce::LimitKind::InputBytes => crate::LimitKind::InputBytes,
+                litchi_ooxml_common::mce::LimitKind::OutputBytes => crate::LimitKind::OutputBytes,
+                litchi_ooxml_common::mce::LimitKind::Depth => crate::LimitKind::XmlDepth,
+                litchi_ooxml_common::mce::LimitKind::Attributes => crate::LimitKind::XmlAttributes,
+                _ => crate::LimitKind::XmlNodes,
+            },
+            value,
+            maximum,
+        ),
+        other => Error::Mce(other),
+    }
 }
 
 pub(super) fn consume_empty_chart_element<R: BufRead>(

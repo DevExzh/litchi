@@ -10,6 +10,10 @@ rust-version.workspace = true
 autoexamples = false
 
 [[example]]
+name = "mac_queue_native_routes"
+path = "examples/mac_queue_native_routes.rs"
+
+[[example]]
 name = "numbers_edit_chart_arrangement"
 path = "examples/edit_chart_arrangement.rs"
 
@@ -105,6 +109,50 @@ path = "examples/read_numbers.rs"
 name = "numbers_save_package"
 path = "examples/save_package.rs"
 
+[[example]]
+name = "create_numbers_table_hidden_axes"
+path = "examples/create_numbers_table_hidden_axes.rs"
+
+[[example]]
+name = "edit_numbers_hidden_table_topology"
+path = "examples/edit_numbers_hidden_table_topology.rs"
+
+[[example]]
+name = "edit_sheet_drawable_comment"
+path = "examples/edit_sheet_drawable_comment.rs"
+
+[[example]]
+name = "create_numbers_sparse_table"
+path = "examples/create_numbers_sparse_table.rs"
+
+[[example]]
+name = "add_numbers_table"
+path = "examples/add_numbers_table.rs"
+
+[[example]]
+name = "duplicate_numbers_table"
+path = "examples/duplicate_numbers_table.rs"
+
+[[example]]
+name = "resize_numbers_table"
+path = "examples/resize_numbers_table.rs"
+
+[[example]]
+name = "remove_numbers_table"
+path = "examples/remove_numbers_table.rs"
+
+[[example]]
+name = "add_numbers_sheet"
+path = "examples/add_numbers_sheet.rs"
+
+[[example]]
+name = "duplicate_numbers_sheet"
+path = "examples/duplicate_numbers_sheet.rs"
+
+[[example]]
+name = "remove_numbers_sheet"
+path = "examples/remove_numbers_sheet.rs"
+
 [features]
 default = []
 internal-iwork-source = []
@@ -115,12 +163,16 @@ litchi-iwa-common  = { workspace = true }
 litchi-iwa-core    = { workspace = true }
 litchi-iwa-detect  = { workspace = true }
 litchi-iwa-protos  = { workspace = true }
+litchi-iwa-style   = { workspace = true }
+litchi-iwa-table   = { workspace = true }
+litchi-iwa-text    = { workspace = true }
 litchi-iwa-text-wire = { workspace = true }
 litchi-core        = { workspace = true }
 litchi-numbers-wire = { workspace = true }
 phf                = { workspace = true }
 plist              = { workspace = true, features = ["enable_unstable_features_that_may_break_with_minor_version_bumps"] }
 ryu                = { workspace = true }
+sha1               = { workspace = true }
 thiserror          = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]

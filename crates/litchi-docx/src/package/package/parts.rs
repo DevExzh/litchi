@@ -17,11 +17,11 @@
 //! Word-owned XML part publication and lossless settings snapshots.
 
 use super::super::model::{
-    BlobPart, DocumentSettings, Error, MutableDocument, PackURI, Package, Result,
+    BlobPart, DocumentSettings, DraftDocument, Error, PackURI, Package, Result,
     SettingsPartSnapshot, StoredRelationship, ct,
 };
 
-use crate::numbering::{Patch as NumberingPatch, Snapshot as NumberingSnapshot};
+use crate::numbering::{DraftPatch as NumberingPatch, Snapshot as NumberingSnapshot};
 
 impl Package {
     /// Load the source-preserving numbering snapshot from the main document.
@@ -51,7 +51,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn apply_numbering_patch(
+    pub(crate) fn apply_numbering_patch(
         &mut self,
         source: &NumberingSnapshot,
         patch: &NumberingPatch,
@@ -66,7 +66,7 @@ impl Package {
         }
         let candidate = patch.apply(&current)?;
         let replacement = candidate.xml_bytes().to_vec();
-        self.edit_opc(|opc| {
+        self.edit_opc_in_place(|opc| {
             let target = {
                 let main = opc.main_document_part()?;
                 let relationship = main
@@ -158,14 +158,15 @@ impl Package {
     }
 
     /// Update the settings.xml part with new content.
-    pub(in crate::package) fn update_settings_part(&mut self, xml: Vec<u8>) -> Result<()> {
+    pub(crate) fn update_settings_part(&mut self, xml: Vec<u8>) -> Result<()> {
         let snapshot = self.settings_part_snapshot()?;
         let part = settings_part_from_snapshot(&snapshot, xml, None);
-        DocumentSettings::extract_from_part(&part)?;
+        let limits = crate::mail_merge::mce_limits_for_source(&self.opc.read_limits());
+        DocumentSettings::extract_from_part_with_mce_limits(&part, &limits)?;
         self.commit_settings_part(&snapshot, part)
     }
 
-    pub(super) fn settings_part_snapshot(&self) -> Result<SettingsPartSnapshot> {
+    pub(crate) fn settings_part_snapshot(&self) -> Result<SettingsPartSnapshot> {
         use litchi_opc::constants::relationship_type as rt;
 
         const STRICT_SETTINGS_RELATIONSHIP: &str =
@@ -292,7 +293,7 @@ impl Package {
     }
 
     #[allow(unused, reason = "package mutator is retained for planned integration")] // Kept for future use
-    fn update_watermark_headers(&mut self, mutable_doc: &MutableDocument) -> Result<()> {
+    fn update_watermark_headers(&mut self, mutable_doc: &DraftDocument) -> Result<()> {
         use litchi_opc::constants::content_type as ct;
         use litchi_opc::constants::relationship_type as rt;
         use litchi_opc::part::BlobPart;

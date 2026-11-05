@@ -38,12 +38,13 @@ fn slide_shape_placeholders_preserve_type_decoding_errors() {
 }
 
 fn package_with_slide(slide_xml: &[u8]) -> Package {
-    let mut package = Package::new().unwrap();
+    let package = Package::new().unwrap();
     let presentation_name = PackURI::new("/ppt/presentation.xml").unwrap();
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
 
     let package_bytes = package.to_bytes().unwrap();
-    let mut opc = OpcPackage::from_bytes(&package_bytes).unwrap();
+    let mut opc =
+        OpcPackage::from_bytes(&package_bytes, litchi_opc::SourceLimits::default()).unwrap();
     let presentation = opc.get_part_mut(&presentation_name).unwrap();
     presentation.set_blob(PRESENTATION_XML.to_vec());
     presentation.rels_mut().add_relationship(

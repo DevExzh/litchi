@@ -13,8 +13,10 @@ fn rewrite_archive_member(
     target: &str,
     rewrite: impl FnOnce(Vec<u8>) -> Vec<u8>,
 ) -> Vec<u8> {
-    let reader = ArchiveReader::new(archive).expect("archive reader");
-    let mut writer = StreamingArchiveWriter::new();
+    let reader = ArchiveReader::new(archive, soapberry_zip::office::ArchiveLimits::default())
+        .expect("archive reader");
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     let mut rewrite = Some(rewrite);
     for name in reader.file_names() {
         let payload = reader.read(name).expect("archive member");
@@ -70,7 +72,7 @@ fn forced_guard_rejects_unpublished_dirty_worksheet_after_clean_aggregate() {
             workbook.tolerance_report().is_clean(),
             "worksheet {index} has no published store before the guard"
         );
-        let sheets = workbook.sheets().collect::<Vec<_>>();
+        let sheets = workbook.sheets().unwrap().collect::<Vec<_>>();
         let error = force_full_cell_worksheet_tolerance_reports(&sheets)
             .expect_err("dirty worksheet passed the forced tolerance guard");
         assert!(
@@ -103,7 +105,7 @@ fn forced_guard_propagates_malformed_worksheet_store_error() {
     );
     let workbook = source_workbook(archive);
     assert!(workbook.tolerance_report().is_clean());
-    let sheets = workbook.sheets().collect::<Vec<_>>();
+    let sheets = workbook.sheets().unwrap().collect::<Vec<_>>();
     let error = force_full_cell_worksheet_tolerance_reports(&sheets)
         .expect_err("malformed worksheet store was accepted");
     assert!(

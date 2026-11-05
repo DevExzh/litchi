@@ -1,183 +1,134 @@
-//! Guarded page-break publication over an immutable positional source.
+//! Source-backed page-break edits of a [`SourceBackedWorkbook`] (record
+//! 0360, the 0355a §1 shape).
+//!
+//! [`SourceBackedWorkbook::edit_page_breaks`] stages one worksheet's row and
+//! column breaks without materializing any unselected part body;
+//! [`Edit::commit`] validates the edit and returns a [`Commit`] holding the
+//! new workbook, whose output is the byte-preserving splice the former
+//! stream publisher wrote: the selected worksheet XML is the only replaced
+//! member and every other ZIP member is raw-copied. An exact no-op returns
+//! the source workbook, which writes the complete source bytes. A changed
+//! edit of a signed source is refused at commit.
+//! [`SourceBackedWorkbook::apply_page_breaks`] replays a [`Patch`] onto a
+//! workbook holding its before state.
 
 use std::io::Write;
-use std::sync::Arc;
 
-use litchi_core::{ExecutionContext, ReadAt};
-use litchi_opc::{ReadLimits, SourceBackedPackage, SourceCacheLimits};
+use litchi_opc::SourceBackedPackage;
 
-use super::{Collection, Commit, PageBreaks, Patch, Snapshot};
-use crate::Selector;
+use super::{Collection, PageBreaks, Snapshot};
 use crate::error::{Result, invalid};
+use crate::{Selector, SourceBackedWorkbook};
 
-/// An owning source-backed page-break editor.
-///
-/// The editor is intentionally not cloneable. Publication consumes its
-/// deferred OPC source and may replace only one existing worksheet payload;
-/// the workbook catalog, relationships, other worksheets, drawings, and
-/// package topology are immutable under this capability.
-pub struct SourceBackedEditor {
-    package: SourceBackedPackage,
+pub use super::LimitKind;
+
+crate::workbook::source::deferred::source_family!("page-break", super::Patch, own_limits);
+
+impl Patch {
+    /// The exact worksheet state the patch requires.
+    #[must_use]
+    pub fn before(&self) -> &Snapshot {
+        self.0.before()
+    }
+
+    /// The exact worksheet state the patch produces.
+    #[must_use]
+    pub fn after(&self) -> &Snapshot {
+        self.0.after()
+    }
 }
 
-/// An isolated page-break edit over one exact source worksheet.
-pub struct SourceEdit {
+impl From<Patch> for super::edit::Patch {
+    /// Replay a source-backed page-break change onto an owning
+    /// [`crate::Package`] with [`crate::Package::apply_page_breaks`].
+    fn from(patch: Patch) -> Self {
+        Self(std::sync::Arc::unwrap_or_clone(patch.0))
+    }
+}
+
+impl crate::workbook::source::deferred::Change for super::Patch {
+    fn is_noop(&self) -> bool {
+        self.is_empty()
+    }
+
+    fn inverse(&self) -> Self {
+        super::Patch::inverse(self)
+    }
+
+    fn check(&self, package: &SourceBackedPackage) -> Result<()> {
+        let current = Snapshot::load_source_backed(package, self.before().sheet_position())?;
+        if !current.same_source(self.before()) {
+            return Err(Error::PatchConflict {
+                part: current.worksheet_part_name().to_string(),
+            });
+        }
+        Ok(())
+    }
+
+    fn write(&self, package: &SourceBackedPackage, writer: &mut dyn Write) -> Result<()> {
+        package.check_execution()?;
+        self.check(package)?;
+        package.clone().write_part_overlay_shared_to_stream(
+            writer,
+            self.after().worksheet_part_name(),
+            self.after().source_arc()?,
+        )?;
+        Ok(())
+    }
+
+    fn write_authenticated(
+        &self,
+        package: &SourceBackedPackage,
+        writer: &mut dyn Write,
+    ) -> Result<()> {
+        package.check_execution()?;
+        package.clone().write_part_overlay_shared_to_stream(
+            writer,
+            self.after().worksheet_part_name(),
+            self.after().source_arc()?,
+        )?;
+        Ok(())
+    }
+}
+
+impl SourceBackedWorkbook {
+    /// Begin an isolated page-break edit of one worksheet without
+    /// materializing any unselected part body.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the selector does not name a worksheet, its
+    /// page-break XML is invalid, or the source cannot be read.
+    pub fn edit_page_breaks<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Edit> {
+        let before = Snapshot::load_source_backed(self.edit_package()?, selector)?;
+        Ok(Edit {
+            workbook: self.clone(),
+            staged: before.page_breaks().clone(),
+            before,
+        })
+    }
+
+    /// Replay a page-break patch onto this workbook.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::PatchConflict`] when the selected worksheet
+    /// does not hold the patch's before state, and the signed-source refusal
+    /// for a changed patch on a signed source.
+    pub fn apply_page_breaks(&self, patch: &Patch) -> Result<Commit> {
+        apply_change(self, patch)
+    }
+}
+
+/// An isolated page-break edit over one exact source worksheet of a
+/// [`SourceBackedWorkbook`]. Dropping it discards it.
+pub struct Edit {
+    workbook: SourceBackedWorkbook,
     before: Snapshot,
     staged: PageBreaks,
 }
 
-impl SourceBackedEditor {
-    /// Open with the standard bounded OPC policy.
-    pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
-        Self::from_read_at_with_limits(source, ReadLimits::default())
-    }
-
-    /// Open with an explicit bounded OPC policy.
-    pub fn from_read_at_with_limits(
-        source: Arc<dyn ReadAt>,
-        read_limits: ReadLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_limits(
-            source,
-            read_limits,
-        )?)
-    }
-
-    /// Open with an explicit finite deferred-payload cache policy.
-    pub fn from_read_at_with_cache_limits(
-        source: Arc<dyn ReadAt>,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_cache_limits(
-            source,
-            cache_limits,
-        )?)
-    }
-
-    /// Open with explicit read and cache policies.
-    pub fn from_read_at_with_limits_and_cache_limits(
-        source: Arc<dyn ReadAt>,
-        read_limits: ReadLimits,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
-                source,
-                read_limits,
-                cache_limits,
-            )?,
-        )
-    }
-
-    /// Open with an explicit caller-owned execution context.
-    pub fn from_read_at_with_execution_context(
-        source: Arc<dyn ReadAt>,
-        read_limits: ReadLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_execution_context(
-            source,
-            read_limits,
-            context,
-        )?)
-    }
-
-    /// Open with explicit read and execution policies.
-    pub fn from_read_at_with_limits_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        read_limits: ReadLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_execution_context(source, read_limits, context)
-    }
-
-    /// Open with explicit read, cache, and caller-owned execution policies.
-    pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        read_limits: ReadLimits,
-        cache_limits: SourceCacheLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                source,
-                read_limits,
-                cache_limits,
-                context,
-            )?,
-        )
-    }
-
-    /// Build an editor from an already opened deferred OPC package.
-    pub fn from_source_backed_package(package: SourceBackedPackage) -> Result<Self> {
-        package.check_execution()?;
-        Ok(Self { package })
-    }
-
-    /// Capture exact source-bound page breaks for one selected worksheet.
-    pub fn snapshot<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Snapshot> {
-        self.package.check_execution()?;
-        Snapshot::load_source_backed(&self.package, selector)
-    }
-
-    /// Begin an isolated edit without materializing any unselected Part body.
-    pub fn edit<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<SourceEdit> {
-        self.package.check_execution()?;
-        Ok(SourceEdit::new(self.snapshot(selector)?))
-    }
-
-    /// Return content-free payload-cache activity for the deferred package.
-    #[must_use]
-    pub fn cache_diagnostics(&self) -> litchi_opc::SourceCacheDiagnostics {
-        self.package.cache_diagnostics()
-    }
-
-    /// Publish an exact-source-checked commit to a sequential sink.
-    ///
-    /// The selected worksheet XML is the only replaceable Part. Every other
-    /// physical ZIP member is raw-copied. Exact no-ops reproduce the complete
-    /// source bytes; changed signed sources and unsupported physical layouts
-    /// are refused by the OPC owner before output begins.
-    pub fn publish_commit_to_stream<W: Write>(
-        self,
-        writer: W,
-        commit: &Commit,
-    ) -> Result<Snapshot> {
-        self.package.check_execution()?;
-        let current =
-            Snapshot::load_source_backed(&self.package, commit.patch().before().sheet_position())?;
-        if !current.same_source(commit.patch().before()) {
-            return Err(crate::Error::PatchConflict {
-                part: current.worksheet_part_name().to_string(),
-            });
-        }
-        let target = if commit.patch().is_empty() {
-            current
-        } else {
-            commit.patch().after().clone()
-        };
-        if commit.patch().is_empty() {
-            self.package
-                .write_part_overlays_shared_to_stream(writer, Vec::new())?;
-        } else {
-            self.package.write_part_overlay_shared_to_stream(
-                writer,
-                target.worksheet_part_name(),
-                target.source_arc()?,
-            )?;
-        }
-        Ok(target)
-    }
-}
-
-impl SourceEdit {
-    fn new(before: Snapshot) -> Self {
-        Self {
-            staged: before.page_breaks().clone(),
-            before,
-        }
-    }
-
+impl Edit {
     /// Exact source state captured when this edit began.
     #[must_use]
     pub const fn before(&self) -> &Snapshot {
@@ -232,18 +183,23 @@ impl SourceEdit {
         self.staged.clear()
     }
 
-    /// Whether the exact authored semantic state differs from its source.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.before.page_breaks() != &self.staged
+    /// Discard every staged change in place.
+    pub fn reset(&mut self) {
+        self.staged = self.before.page_breaks().clone();
     }
 
-    /// Validate and freeze this isolated edit for source-backed publication.
+    /// Validate the edit and return the committed workbook, the exact patch
+    /// and the diagnostics.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid staged state, a rewrite that changed the
+    /// staged semantics, or a changed edit of a signed or encrypted source.
     pub fn commit(self) -> Result<Commit> {
         self.before.check_execution()?;
-        if !self.is_changed() {
-            let patch = Patch::new(self.before.clone(), self.before.clone());
-            return Ok(Commit::new(self.before, patch, false));
+        if self.before.page_breaks() == &self.staged {
+            let patch = super::Patch::new(self.before.clone(), self.before);
+            return commit_change(&self.workbook, patch);
         }
         let output = super::replace(self.before.source_xml(), &self.staged)?;
         let snapshot = Snapshot::from_rewritten_source(&self.before, output)?;
@@ -253,7 +209,6 @@ impl SourceEdit {
                 "page-break publication changed the staged semantic state",
             ));
         }
-        let patch = Patch::new(self.before, snapshot.clone());
-        Ok(Commit::new(snapshot, patch, true))
+        commit_change(&self.workbook, super::Patch::new(self.before, snapshot))
     }
 }

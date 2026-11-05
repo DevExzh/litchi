@@ -14,27 +14,27 @@ pub(super) fn map_sheet_order_codec_error(
         return Error::Allocation { amount };
     }
     match error.resource_limit() {
-        Some(DecodeLimit::Bytes { observed, maximum }) => Error::LimitExceeded {
+        Some(DecodeLimit::Bytes { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireBytes,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        Some(DecodeLimit::References { observed, maximum }) => Error::LimitExceeded {
+        Some(DecodeLimit::References { observed, maximum }) => Error::Limit {
             kind: LimitKind::PayloadReferences,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        Some(DecodeLimit::Fields { observed, maximum }) => Error::LimitExceeded {
+        Some(DecodeLimit::Fields { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireFields,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        Some(DecodeLimit::Work { observed, maximum }) => Error::LimitExceeded {
+        Some(DecodeLimit::Work { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireWork,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        Some(DecodeLimit::Nesting { observed, maximum }) => Error::LimitExceeded {
+        Some(DecodeLimit::Nesting { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireNesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),
@@ -54,7 +54,7 @@ pub(super) fn map_candidate_read_error(error: ReadError) -> Error {
             kind: litchi_iwa_archive::LimitKind::InputBytes,
             observed,
             maximum,
-        }) => Error::LimitExceeded {
+        }) => Error::Limit {
             kind: LimitKind::OutputBytes,
             observed,
             maximum,
@@ -72,7 +72,7 @@ pub(super) fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 SemanticLimitKind::Objects => LimitKind::PayloadObjects,
                 SemanticLimitKind::Sheets => LimitKind::Sheets,
@@ -84,14 +84,14 @@ pub(super) fn map_read_error(error: ReadError) -> Error {
                     LimitKind::WireWork
                 },
                 SemanticLimitKind::OutputTextBytes
-                | SemanticLimitKind::FormulaWireBytes
+                | SemanticLimitKind::FormulaCategoryBytes
                 | SemanticLimitKind::TextBytes => LimitKind::PayloadBytes,
                 _ => LimitKind::PayloadItems,
             },
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        ReadError::InputTooLarge { observed, maximum } => Error::LimitExceeded {
+        ReadError::InputTooLarge { observed, maximum } => Error::Limit {
             kind: LimitKind::InputBytes,
             observed,
             maximum,
@@ -106,7 +106,7 @@ pub(super) fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -123,7 +123,9 @@ pub(super) fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             maximum,
         },
         litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
-        litchi_iwa_archive::Error::Reassembly(_) => Error::UnsupportedSource,
+        litchi_iwa_archive::Error::Reassembly(_) => {
+            Error::Refused(crate::package::sheet_order::Refusal::UnsupportedSource)
+        },
         litchi_iwa_archive::Error::Iwa(core_error) => map_core_error(core_error),
         _ => Error::InvalidSource,
     }
@@ -139,7 +141,7 @@ pub(super) fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
                 litchi_iwa_core::LimitKind::Messages
@@ -170,7 +172,7 @@ pub(super) fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
                 litchi_iwa_common::LimitKind::OutputBytes => LimitKind::WireOutputBytes,

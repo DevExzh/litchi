@@ -170,24 +170,16 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// No rooted sheet matched the selector.
-    #[error("the Numbers workbook has no sheet matching the requested selector")]
-    SheetNotFound,
-    /// No table on the selected sheet matched the selector.
-    #[error("the selected Numbers sheet has no table matching the requested selector")]
-    TableNotFound,
-    /// The selected table is locked for a changed transaction.
-    #[error("the selected Numbers table is locked at {path:?}")]
-    TableLocked { path: Path },
-    /// This exact physical source cannot publish a changed model payload.
-    #[error("this Numbers source does not support exact persisted-sort editing")]
-    UnsupportedSource,
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     /// Rooted ownership or wire framing is invalid.
     #[error("the Numbers persisted-sort source is invalid at {path:?}")]
     InvalidSource { path: Path },
     /// A finite transaction resource ceiling was exceeded.
     #[error("Numbers persisted-sort {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
+    Limit {
         kind: LimitKind,
         observed: u64,
         maximum: u64,
@@ -202,6 +194,44 @@ pub enum Error {
     /// The patch was produced from a different exact source artifact.
     #[error("the Numbers persisted-sort patch does not match the exact source package")]
     PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
+    /// No rooted sheet matched the selector.
+    #[error("the Numbers workbook has no sheet matching the requested selector")]
+    SheetNotFound,
+    /// No table on the selected sheet matched the selector.
+    #[error("the selected Numbers sheet has no table matching the requested selector")]
+    TableNotFound,
+    /// The selected table is locked for a changed transaction.
+    #[error("the selected Numbers table is locked at {path:?}")]
+    TableLocked { path: Path },
+    /// This exact physical source cannot publish a changed model payload.
+    #[error("this Numbers source does not support exact persisted-sort editing")]
+    UnsupportedSource,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::SheetNotFound { .. } | Self::TableNotFound { .. } => RefusalKind::NotFound,
+            Self::TableLocked { .. } => RefusalKind::Protected,
+            Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -761,7 +791,7 @@ impl TransactionBudget {
     fn charge_nesting(&mut self, observed: u32, path: Path) -> Result<(), Error> {
         self.observed_nesting = self.observed_nesting.max(observed);
         if self.observed_nesting > self.maximum_nesting {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: u64::from(self.observed_nesting),
                 maximum: u64::from(self.maximum_nesting),
@@ -893,12 +923,13 @@ impl TransactionBudget {
         &mut self,
         entry_bytes: usize,
         archive_limits: litchi_iwa_core::Limits,
+        snappy_limits: litchi_iwa_core::SnappyLimits,
         path: Path,
     ) -> Result<(), Error> {
         self.charge_entry_bytes(entry_bytes, path)?;
         let archive_bytes = archive_limits.max_archive_bytes();
-        let compressed_bound =
-            SnappyStream::maximum_compressed_len(archive_bytes).map_err(map_core_error)?;
+        let compressed_bound = SnappyStream::maximum_compressed_len(archive_bytes, snappy_limits)
+            .map_err(map_core_error)?;
         self.charge_transaction_work(
             archive_bytes
                 .saturating_add(compressed_bound)
@@ -1025,6 +1056,12 @@ impl Commit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the reversible patch.
     #[must_use]
     pub const fn patch(&self) -> &Patch {
@@ -1148,9 +1185,12 @@ fn resolve<'sheet, 'table>(
         .document
         .sheet(sheet)
         .map_err(|_error| invalid_source())?
-        .ok_or(Error::SheetNotFound)?;
+        .ok_or(Error::Refused(Refusal::SheetNotFound))?;
     let table_position = match table.into() {
-        TableSelector::Index(index) => selected_sheet.tables().nth(index).map(|_| index),
+        TableSelector::Position(index) => {
+            let index = index.get();
+            selected_sheet.tables().nth(index).map(|_| index)
+        },
         TableSelector::Name(name) => {
             let mut matches = selected_sheet
                 .tables()
@@ -1163,7 +1203,7 @@ fn resolve<'sheet, 'table>(
             first
         },
     }
-    .ok_or(Error::TableNotFound)?;
+    .ok_or(Error::Refused(Refusal::TableNotFound))?;
     resolve_at(source, selected_sheet.index(), table_position, budget)
 }
 
@@ -1218,14 +1258,14 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     let mut budget = TransactionBudget::new(edit.source);
     budget.preflight_source(edit.source, edit.path())?;
     if edit.target.native.locked == LockState::Locked {
-        return Err(Error::TableLocked { path: edit.path() });
+        return Err(Error::Refused(Refusal::TableLocked { path: edit.path() }));
     }
     if let Some(order) = &edit.after {
         validate_order_columns(order, edit.target.native.columns)?;
     }
     let catalog = physical_source(edit.source)?;
     if !catalog.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     validate_selected_ownership(edit.source, edit.target.native, &mut budget, edit.path())?;
     let target = edit.target.clone();
@@ -1394,25 +1434,30 @@ fn rewrite(
         .find(|entry| entry.name() == component_name)
         .ok_or_else(invalid_source)?;
     if entry.is_opaque() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     table_headers::rewrite::preflight_transaction_work(source, None).map_err(map_header_error)?;
     let physical_limits = catalog.limits();
+    let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    budget.preflight_physical_entry(entry.data().len(), archive_limits, Path::Package)?;
-    let stream = SnappyStream::decompress_with_limits(
+    budget.preflight_physical_entry(
+        entry.data().len(),
+        archive_limits,
+        snappy_limits,
+        Path::Package,
+    )?;
+    let stream = SnappyStream::decompress(
         entry.data(),
         physical_limits.snappy_limits().map_err(map_archive_error)?,
     )
     .map_err(map_core_error)?;
     budget.charge_payload_bytes(stream.as_bytes().len(), Path::Package)?;
     budget.charge_total_payload_bytes(stream.as_bytes().len(), Path::Package)?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     archive
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
         .map_err(map_core_error)?;
     let object = archive
         .objects
@@ -1441,7 +1486,7 @@ fn rewrite(
         Path::Package,
     )?;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             target.native.message_index,
             RawMessage {
                 type_: TABLE_MODEL_MESSAGE_TYPE,
@@ -1451,26 +1496,16 @@ fn rewrite(
         )
         .map_err(map_core_error)?;
     let encoded_bound = archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_core_error)?;
     budget.charge_transaction_work(encoded_bound, Path::Package)?;
-    let rewritten = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
-    let compressed_bound =
-        SnappyStream::maximum_compressed_len(rewritten.len()).map_err(map_core_error)?;
+    let rewritten = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
-    if compressed_bound > snappy_limits.max_compressed_stream() {
-        return Err(Error::LimitExceeded {
-            kind: LimitKind::EntryBytes,
-            observed: u64::try_from(compressed_bound).unwrap_or(u64::MAX),
-            maximum: u64::try_from(snappy_limits.max_compressed_stream()).unwrap_or(u64::MAX),
-            path: Path::Package,
-        });
-    }
+    let compressed_bound = SnappyStream::maximum_compressed_len(rewritten.len(), snappy_limits)
+        .map_err(map_core_error)?;
     budget.charge_transaction_work(compressed_bound, Path::Package)?;
     budget.charge_scratch_bytes(compressed_bound, Path::Package)?;
-    let compressed = SnappyStream::compress(&rewritten).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&rewritten, snappy_limits).map_err(map_core_error)?;
     let edits = [EntryEdit::new(component_name, compressed.as_slice())];
     let prepared = catalog
         .package()
@@ -1582,27 +1617,33 @@ fn invalid_source() -> Error {
 
 pub(super) fn map_header_error(error: table_headers::Error) -> Error {
     match error {
-        table_headers::Error::SheetNotFound => Error::SheetNotFound,
-        table_headers::Error::TableNotFound => Error::TableNotFound,
-        table_headers::Error::UnsupportedSource => Error::UnsupportedSource,
-        table_headers::Error::TableLocked { path } => {
+        table_headers::Error::Refused(table_headers::Refusal::SheetNotFound) => {
+            Error::Refused(Refusal::SheetNotFound)
+        },
+        table_headers::Error::Refused(table_headers::Refusal::TableNotFound) => {
+            Error::Refused(Refusal::TableNotFound)
+        },
+        table_headers::Error::Refused(table_headers::Refusal::UnsupportedSource) => {
+            Error::Refused(Refusal::UnsupportedSource)
+        },
+        table_headers::Error::Refused(table_headers::Refusal::TableLocked { path }) => {
             let table_headers::Path::Table { sheet, table } = path else {
                 return invalid_source();
             };
-            Error::TableLocked {
+            Error::Refused(Refusal::TableLocked {
                 path: Path::Table { sheet, table },
-            }
+            })
         },
         table_headers::Error::Allocation { amount, .. } => Error::Allocation {
             amount,
             path: Path::Package,
         },
-        table_headers::Error::LimitExceeded {
+        table_headers::Error::Limit {
             kind,
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 table_headers::LimitKind::InputBytes => LimitKind::InputBytes,
                 table_headers::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -1621,6 +1662,9 @@ pub(super) fn map_header_error(error: table_headers::Error) -> Error {
                 table_headers::LimitKind::WireFields => LimitKind::WireFields,
                 table_headers::LimitKind::WireNesting => LimitKind::WireNesting,
                 table_headers::LimitKind::WireWork => LimitKind::WireWork,
+                table_headers::LimitKind::WireAllocations => LimitKind::WireAllocations,
+                table_headers::LimitKind::WireRetainedBytes => LimitKind::WireRetainedBytes,
+                table_headers::LimitKind::WireScratchBytes => LimitKind::WireScratchBytes,
                 table_headers::LimitKind::TransactionWork => LimitKind::TransactionWork,
             },
             observed,
@@ -1657,7 +1701,7 @@ pub(super) fn map_codec_error(error: codec::DecodeError) -> Error {
             (LimitKind::WireWork, observed, maximum)
         },
         codec::DecodeLimit::Nesting { observed, maximum } => {
-            return Error::LimitExceeded {
+            return Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: u64::from(observed),
                 maximum: u64::from(maximum),
@@ -1681,7 +1725,7 @@ pub(super) fn map_codec_error(error: codec::DecodeError) -> Error {
         },
         _ => return invalid_source(),
     };
-    Error::LimitExceeded {
+    Error::Limit {
         kind,
         observed: u64::try_from(observed).unwrap_or(u64::MAX),
         maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
@@ -1695,7 +1739,7 @@ pub(super) fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 ArchiveLimitKind::InputBytes => LimitKind::InputBytes,
                 ArchiveLimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -1728,7 +1772,7 @@ pub(super) fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 CoreLimitKind::ArchiveBytes => LimitKind::TotalPayloadBytes,
                 CoreLimitKind::Objects => LimitKind::PayloadObjects,
@@ -1770,7 +1814,7 @@ fn charge_budget(
     let consumed = maximum.saturating_sub(*remaining);
     let observed = consumed.saturating_add(amount);
     if observed > maximum {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind,
             observed: u64::try_from(observed).unwrap_or(u64::MAX),
             maximum: u64::try_from(maximum).unwrap_or(u64::MAX),

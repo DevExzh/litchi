@@ -61,6 +61,7 @@ use crate::settings::{
 };
 
 impl DocumentSettings {
+    #[cfg(test)]
     pub(super) fn extract_from_xml(xml_bytes: &[u8]) -> Result<Self> {
         Self::extract_from_xml_with_mce_limits(xml_bytes, &MceLimits::default())
     }
@@ -744,7 +745,7 @@ pub(crate) fn patch_font_embedding(xml: &[u8], subsetted: bool) -> Result<Vec<u8
 
 #[cfg(any(feature = "automatic-fonts", test))]
 fn patch_font_flag(xml: &[u8], flag: FontFlag, enabled: bool) -> Result<Vec<u8>> {
-    DocumentSettings::extract_from_xml(xml)?;
+    DocumentSettings::extract_from_xml_with_mce_limits(xml, &MceLimits::default())?;
     let layout = scan_settings_xml_layout(xml)?;
     let (range, current, insert_at) = match flag {
         FontFlag::EmbedTrueType => (
@@ -836,30 +837,56 @@ fn settings_patch_buffer(capacity: usize) -> Result<Vec<u8>> {
     Ok(output)
 }
 
+fn settings_patch_buffer_with_limits(capacity: usize, limits: &MceLimits) -> Result<Vec<u8>> {
+    if capacity > limits.max_output_bytes {
+        return Err(Error::MailMergeLimit {
+            kind: crate::mail_merge::LimitKind::XmlBytes,
+            actual: capacity,
+            maximum: limits.max_output_bytes,
+        });
+    }
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(capacity)
+        .map_err(|source| Error::Allocation {
+            resource: "Word settings XML patch",
+            source,
+        })?;
+    Ok(output)
+}
+
 pub(crate) fn patch_mail_merge(
     xml: &[u8],
     mail_merge: Option<&MailMergeSettings>,
     conformance: crate::mail_merge::Conformance,
+    mce_limits: &MceLimits,
 ) -> Result<Vec<u8>> {
-    DocumentSettings::extract_from_xml(xml)?;
+    DocumentSettings::extract_from_xml_with_mce_limits(xml, mce_limits)?;
     let layout = scan_settings_xml_layout(xml)?;
     let replacement = mail_merge
         .map(|value| {
             value
-                .to_xml(conformance)
+                .to_xml(conformance, mce_limits)
                 .map_err(crate::mail_merge::map_docx_error)
         })
         .transpose()?
         .unwrap_or_default();
     if let Some(range) = layout.mail_merge_range {
-        let mut output = Vec::with_capacity(xml.len() - range.len() + replacement.len());
+        let capacity = xml
+            .len()
+            .checked_sub(range.len())
+            .and_then(|size| size.checked_add(replacement.len()))
+            .ok_or_else(|| Error::InvalidFormat("settings patch size overflow".into()))?;
+        let mut output = settings_patch_buffer_with_limits(capacity, mce_limits)?;
         output.extend_from_slice(&xml[..range.start]);
         output.extend_from_slice(replacement.as_bytes());
         output.extend_from_slice(&xml[range.end..]);
         return Ok(output);
     }
     if replacement.is_empty() {
-        return Ok(xml.to_vec());
+        let mut output = settings_patch_buffer_with_limits(xml.len(), mce_limits)?;
+        output.extend_from_slice(xml);
+        return Ok(output);
     }
     if let Some(range) = layout.root_empty_range {
         let root = &xml[range.clone()];
@@ -867,8 +894,13 @@ pub(crate) fn patch_mail_merge(
             .windows(2)
             .rposition(|window| window == b"/>")
             .ok_or_else(|| Error::InvalidFormat("invalid empty settings root".into()))?;
-        let mut output =
-            Vec::with_capacity(xml.len() + replacement.len() + layout.root_qname.len() + 4);
+        let capacity = xml
+            .len()
+            .checked_add(replacement.len())
+            .and_then(|size| size.checked_add(layout.root_qname.len()))
+            .and_then(|size| size.checked_add(4))
+            .ok_or_else(|| Error::InvalidFormat("settings patch size overflow".into()))?;
+        let mut output = settings_patch_buffer_with_limits(capacity, mce_limits)?;
         output.extend_from_slice(&xml[..range.start]);
         output.extend_from_slice(&root[..slash]);
         output.push(b'>');
@@ -885,32 +917,49 @@ pub(crate) fn patch_mail_merge(
         .ok_or_else(|| {
             Error::InvalidFormat("settings root has no mailMerge insertion point".into())
         })?;
-    let mut output = Vec::with_capacity(xml.len() + replacement.len());
+    let capacity = xml
+        .len()
+        .checked_add(replacement.len())
+        .ok_or_else(|| Error::InvalidFormat("settings patch size overflow".into()))?;
+    let mut output = settings_patch_buffer_with_limits(capacity, mce_limits)?;
     output.extend_from_slice(&xml[..insert_at]);
     output.extend_from_slice(replacement.as_bytes());
     output.extend_from_slice(&xml[insert_at..]);
     Ok(output)
 }
 
-pub(crate) fn patch_document_variables(xml: &[u8], variables: &Variables) -> Result<Vec<u8>> {
-    variables.validate()?;
-    Variables::from_xml(xml)?;
+pub(crate) fn patch_document_variables(
+    xml: &[u8],
+    variables: &Variables,
+    mce_limits: &MceLimits,
+) -> Result<Vec<u8>> {
+    let variable_limits = super::package::variable_limits_for_mce(mce_limits)?;
+    variables.validate_with_limits(&variable_limits)?;
+    let processed = super::super::extensions::process_bytes_with_limits(xml, mce_limits)?;
+    Variables::from_xml(processed.as_ref(), &variable_limits)?;
     let layout = scan_settings_xml_layout(xml)?;
     let replacement = if variables.is_empty() {
         String::new()
     } else {
-        document_variables_element(&layout, variables)
+        document_variables_element(&layout, variables, &variable_limits)?
     };
 
     if let Some(range) = layout.doc_vars_range {
-        let mut output = Vec::with_capacity(xml.len() - range.len() + replacement.len());
+        let capacity = xml
+            .len()
+            .checked_sub(range.len())
+            .and_then(|size| size.checked_add(replacement.len()))
+            .ok_or_else(|| Error::InvalidFormat("settings patch size overflow".into()))?;
+        let mut output = settings_patch_buffer_with_limits(capacity, mce_limits)?;
         output.extend_from_slice(&xml[..range.start]);
         output.extend_from_slice(replacement.as_bytes());
         output.extend_from_slice(&xml[range.end..]);
         return Ok(output);
     }
     if replacement.is_empty() {
-        return Ok(xml.to_vec());
+        let mut output = settings_patch_buffer_with_limits(xml.len(), mce_limits)?;
+        output.extend_from_slice(xml);
+        return Ok(output);
     }
     if let Some(range) = layout.root_empty_range {
         let root = &xml[range.clone()];
@@ -918,8 +967,13 @@ pub(crate) fn patch_document_variables(xml: &[u8], variables: &Variables) -> Res
             .windows(2)
             .rposition(|window| window == b"/>")
             .ok_or_else(|| Error::InvalidFormat("invalid empty settings root".into()))?;
-        let mut output =
-            Vec::with_capacity(xml.len() + replacement.len() + layout.root_qname.len() + 4);
+        let capacity = xml
+            .len()
+            .checked_add(replacement.len())
+            .and_then(|size| size.checked_add(layout.root_qname.len()))
+            .and_then(|size| size.checked_add(4))
+            .ok_or_else(|| Error::InvalidFormat("settings patch size overflow".into()))?;
+        let mut output = settings_patch_buffer_with_limits(capacity, mce_limits)?;
         output.extend_from_slice(&xml[..range.start]);
         output.extend_from_slice(&root[..slash]);
         output.push(b'>');
@@ -934,7 +988,11 @@ pub(crate) fn patch_document_variables(xml: &[u8], variables: &Variables) -> Res
         .doc_vars_insert_at
         .or(layout.root_end)
         .ok_or_else(|| Error::InvalidFormat("settings root has no insertion point".into()))?;
-    let mut output = Vec::with_capacity(xml.len() + replacement.len());
+    let capacity = xml
+        .len()
+        .checked_add(replacement.len())
+        .ok_or_else(|| Error::InvalidFormat("settings patch size overflow".into()))?;
+    let mut output = settings_patch_buffer_with_limits(capacity, mce_limits)?;
     output.extend_from_slice(&xml[..insert_at]);
     output.extend_from_slice(replacement.as_bytes());
     output.extend_from_slice(&xml[insert_at..]);
@@ -944,19 +1002,27 @@ pub(crate) fn patch_document_variables(xml: &[u8], variables: &Variables) -> Res
 pub(crate) fn patch_attached_template(
     xml: &[u8],
     relationship_id: Option<&str>,
+    mce_limits: &MceLimits,
 ) -> Result<Vec<u8>> {
     // Validate the original tree and its direct-child cardinality before using offsets.
-    DocumentSettings::extract_from_xml(xml)?;
+    DocumentSettings::extract_from_xml_with_mce_limits(xml, mce_limits)?;
     let layout = scan_settings_xml_layout(xml)?;
     if relationship_id.is_none() && layout.attached_template_range.is_none() {
-        return Ok(xml.to_vec());
+        let mut output = settings_patch_buffer_with_limits(xml.len(), mce_limits)?;
+        output.extend_from_slice(xml);
+        return Ok(output);
     }
 
     let replacement = relationship_id
         .map(|id| attached_template_element(&layout, id))
         .unwrap_or_default();
     if let Some(range) = layout.attached_template_range {
-        let mut output = Vec::with_capacity(xml.len() - range.len() + replacement.len());
+        let capacity = xml
+            .len()
+            .checked_sub(range.len())
+            .and_then(|size| size.checked_add(replacement.len()))
+            .ok_or_else(|| Error::InvalidFormat("settings patch size overflow".into()))?;
+        let mut output = settings_patch_buffer_with_limits(capacity, mce_limits)?;
         output.extend_from_slice(&xml[..range.start]);
         output.extend_from_slice(replacement.as_bytes());
         output.extend_from_slice(&xml[range.end..]);
@@ -969,8 +1035,13 @@ pub(crate) fn patch_attached_template(
             .windows(2)
             .rposition(|window| window == b"/>")
             .ok_or_else(|| Error::InvalidFormat("invalid empty settings root".into()))?;
-        let mut output =
-            Vec::with_capacity(xml.len() + replacement.len() + layout.root_qname.len() + 4);
+        let capacity = xml
+            .len()
+            .checked_add(replacement.len())
+            .and_then(|size| size.checked_add(layout.root_qname.len()))
+            .and_then(|size| size.checked_add(4))
+            .ok_or_else(|| Error::InvalidFormat("settings patch size overflow".into()))?;
+        let mut output = settings_patch_buffer_with_limits(capacity, mce_limits)?;
         output.extend_from_slice(&xml[..range.start]);
         output.extend_from_slice(&root[..slash]);
         output.push(b'>');
@@ -985,7 +1056,11 @@ pub(crate) fn patch_attached_template(
     let insert_at = layout
         .root_end
         .ok_or_else(|| Error::InvalidFormat("settings root has no closing element".into()))?;
-    let mut output = Vec::with_capacity(xml.len() + replacement.len());
+    let capacity = xml
+        .len()
+        .checked_add(replacement.len())
+        .ok_or_else(|| Error::InvalidFormat("settings patch size overflow".into()))?;
+    let mut output = settings_patch_buffer_with_limits(capacity, mce_limits)?;
     output.extend_from_slice(&xml[..insert_at]);
     output.extend_from_slice(replacement.as_bytes());
     output.extend_from_slice(&xml[insert_at..]);
@@ -994,9 +1069,11 @@ pub(crate) fn patch_attached_template(
 
 fn scan_settings_xml_layout(xml: &[u8]) -> Result<SettingsXmlLayout> {
     if xml.len() > MAX_SETTINGS_XML_BYTES {
-        return Err(Error::InvalidFormat(format!(
-            "settings XML exceeds {MAX_SETTINGS_XML_BYTES} bytes"
-        )));
+        return Err(Error::SettingsLimit {
+            kind: crate::settings::LimitKind::XmlBytes,
+            actual: xml.len(),
+            maximum: MAX_SETTINGS_XML_BYTES,
+        });
     }
     std::str::from_utf8(xml).map_err(|_source_error| {
         Error::InvalidFormat("lossless settings mutation currently requires UTF-8 XML".into())
@@ -1055,9 +1132,11 @@ fn scan_settings_xml_layout(xml: &[u8]) -> Result<SettingsXmlLayout> {
                 .checked_add(1)
                 .ok_or_else(|| Error::InvalidFormat("settings XML node count overflow".into()))?;
             if nodes > MAX_SETTINGS_XML_NODES {
-                return Err(Error::InvalidFormat(format!(
-                    "settings XML exceeds {MAX_SETTINGS_XML_NODES} nodes"
-                )));
+                return Err(Error::SettingsLimit {
+                    kind: crate::settings::LimitKind::XmlNodes,
+                    actual: nodes,
+                    maximum: MAX_SETTINGS_XML_NODES,
+                });
             }
         }
 
@@ -1067,9 +1146,11 @@ fn scan_settings_xml_layout(xml: &[u8]) -> Result<SettingsXmlLayout> {
                     Error::InvalidFormat("settings XML nesting is too deep".into())
                 })?;
                 if depth > MAX_SETTINGS_XML_DEPTH {
-                    return Err(Error::InvalidFormat(format!(
-                        "settings XML exceeds depth {MAX_SETTINGS_XML_DEPTH}"
-                    )));
+                    return Err(Error::SettingsLimit {
+                        kind: crate::settings::LimitKind::XmlDepth,
+                        actual: depth,
+                        maximum: MAX_SETTINGS_XML_DEPTH,
+                    });
                 }
                 if depth == 1 {
                     capture_settings_root(
@@ -1155,9 +1236,11 @@ fn scan_settings_xml_layout(xml: &[u8]) -> Result<SettingsXmlLayout> {
                     Error::InvalidFormat("settings XML nesting is too deep".into())
                 })?;
                 if child_depth > MAX_SETTINGS_XML_DEPTH {
-                    return Err(Error::InvalidFormat(format!(
-                        "settings XML exceeds depth {MAX_SETTINGS_XML_DEPTH}"
-                    )));
+                    return Err(Error::SettingsLimit {
+                        kind: crate::settings::LimitKind::XmlDepth,
+                        actual: child_depth,
+                        maximum: MAX_SETTINGS_XML_DEPTH,
+                    });
                 }
                 if child_depth == 1 {
                     capture_settings_root(
@@ -1389,7 +1472,11 @@ fn is_after_doc_vars(local_name: &[u8]) -> bool {
     )
 }
 
-fn document_variables_element(layout: &SettingsXmlLayout, variables: &Variables) -> String {
+fn document_variables_element(
+    layout: &SettingsXmlLayout,
+    variables: &Variables,
+    variable_limits: &crate::variables::raw::Limits,
+) -> Result<String> {
     let prefix = layout
         .word_prefix
         .as_deref()
@@ -1407,9 +1494,9 @@ fn document_variables_element(layout: &SettingsXmlLayout, variables: &Variables)
         ));
     }
     output.push('>');
-    variables.write_entries(&mut output, &prefix);
+    variables.write_entries(&mut output, &prefix, variable_limits)?;
     output.push_str(&format!("</{prefix}:docVars>"));
-    output
+    Ok(output)
 }
 
 #[allow(

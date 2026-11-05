@@ -1,0 +1,2 @@
+crate	category	path	detail	target
+litchi-iwa-common	edit_type	litchi_iwa_common::wire::NestedFieldEdit		rename to the focused module's Edit

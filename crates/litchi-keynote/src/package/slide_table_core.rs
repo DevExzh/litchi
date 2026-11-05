@@ -448,6 +448,43 @@ impl Budget {
         Self::remaining(self.scratch, self.max_scratch, LimitKind::Scratch)
     }
 
+    pub(crate) fn preflight_allocations(&self, amount: usize) -> Result<()> {
+        let mut probe = *self;
+        probe.allocations(amount)
+    }
+
+    pub(crate) fn preflight_retained(&self, amount: usize) -> Result<()> {
+        let mut probe = *self;
+        probe.retained(amount)
+    }
+
+    pub(crate) fn preflight_scratch(&self, amount: usize) -> Result<()> {
+        let mut probe = *self;
+        probe.scratch(amount)
+    }
+
+    pub(crate) fn construction_limits(
+        &self,
+    ) -> Result<litchi_iwa_style::graph::ConstructionLimits> {
+        Ok(litchi_iwa_style::graph::ConstructionLimits::new(
+            self.remaining_work()?,
+            self.remaining_allocations()?,
+            self.remaining_retained()?,
+            self.remaining_scratch()?,
+        ))
+    }
+
+    pub(crate) fn charge_construction(
+        &mut self,
+        requirements: litchi_iwa_style::graph::ConstructionRequirements,
+    ) -> Result<()> {
+        self.work(requirements.total_work())?;
+        self.allocations(requirements.index_allocations())?;
+        self.retained(requirements.index_retained_bytes())?;
+        self.scratch(requirements.index_scratch_bytes())?;
+        Ok(())
+    }
+
     /// Build one residual table-model policy for either a read or prepared
     /// rewrite.  Every allocation-bearing ceiling is derived from the same
     /// operation ledger; callers must not substitute a source-sized or
@@ -1370,6 +1407,24 @@ pub(crate) fn select_table(
     select_table_after_inventory(package, slide_selector, table_selector, budget, false)
 }
 
+/// Resolve one slide of an exact source: its position and its slide
+/// object.
+pub(crate) fn select_slide(
+    package: &Package,
+    slide_selector: SlideSelector<'_>,
+    budget: &mut Budget,
+) -> Result<(Position, u64)> {
+    let catalog = physical_catalog(package)?;
+    budget.input(package.source_bytes().len())?;
+    budget.inventory(package, catalog)?;
+    let position = resolve_slide_position(package, slide_selector, budget)?;
+    let record = package
+        .slide_record_at(position.get())
+        .map_err(read_error)?
+        .ok_or(Error::SlidePositionNotFound(position))?;
+    Ok((position, record.slide_identifier))
+}
+
 /// Resolve a read-only table against an already checked component catalog.
 ///
 /// The semantic-only package source intentionally remains unsupported by the
@@ -2145,7 +2200,7 @@ fn parse_physical_model_fields(
     PhysicalUnsupportedFeatures,
 )> {
     let limits = budget.residual(package)?;
-    let fields = WireView::parse_with_limits(payload, limits).map_err(|_| Error::Wire)?;
+    let fields = WireView::parse(payload, limits).map_err(|_| Error::Wire)?;
     let mut seen = [false; 94];
     let mut header_rows = 0;
     let mut header_columns = 0;
@@ -2333,7 +2388,7 @@ fn validated_wire_view<'a>(
     budget: &mut Budget,
 ) -> Result<WireView<'a>> {
     let limits = budget.residual(package)?;
-    let fields = WireView::parse_with_limits(payload, limits).map_err(|_| Error::Wire)?;
+    let fields = WireView::parse(payload, limits).map_err(|_| Error::Wire)?;
     budget.fields(fields.fields().count())?;
     budget.work(payload.len())?;
     for field in fields.fields() {
@@ -3674,7 +3729,7 @@ fn validate_row_uid_map(
     )?;
     validate_physical_uid_map_wire(payload, package, budget)?;
     let limits = budget.residual(package)?;
-    let fields = WireView::parse_with_limits(payload, limits).map_err(|_| Error::Wire)?;
+    let fields = WireView::parse(payload, limits).map_err(|_| Error::Wire)?;
     let mut sorted_columns = Vec::new();
     let mut column_index_for_uid = Vec::new();
     let mut column_uid_for_index = Vec::new();
@@ -3925,7 +3980,7 @@ fn validate_mutable_root_aliases(
                     .ok_or(Error::InvalidSource)?,
             )?;
             object
-                .inspect_references_with_policy_and_limits(
+                .inspect_references_with_policy(
                     &mut census,
                     ArchiveReferencePolicy::RejectUnknownMetadata,
                     archive_limits,
@@ -4007,7 +4062,7 @@ fn parse_model_uid_reference(
     budget: &mut Budget,
 ) -> Result<Option<u64>> {
     let limits = budget.residual(package)?;
-    let fields = WireView::parse_with_limits(payload, limits).map_err(|_| Error::Wire)?;
+    let fields = WireView::parse(payload, limits).map_err(|_| Error::Wire)?;
     let mut identifier = None;
     for field in fields.fields() {
         budget.fields(1)?;
@@ -4026,7 +4081,7 @@ fn parse_model_uid_reference(
 }
 
 fn parse_uuid(payload: &[u8], limits: WireLimits, budget: &mut Budget) -> Result<(u64, u64)> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(|_| Error::Wire)?;
+    let fields = WireView::parse(payload, limits).map_err(|_| Error::Wire)?;
     let mut lower = None;
     let mut upper = None;
     for field in fields.fields() {
@@ -4153,7 +4208,7 @@ fn validate_empty_stroke_sidecar(
     let object = object_at(package, location)?;
     let (_, payload) = unique_mutable_message(object, &[STROKE_SIDECAR_MESSAGE_TYPE], budget)?;
     let limits = budget.residual(package)?;
-    let fields = WireView::parse_with_limits(payload, limits).map_err(|_| Error::Wire)?;
+    let fields = WireView::parse(payload, limits).map_err(|_| Error::Wire)?;
     let mut dimensions = [None; 3];
     let mut nonempty_layers = false;
     for field in fields.fields() {
@@ -4346,8 +4401,7 @@ fn validate_exclusive_model_reference(
                 if message.type_ != TABLE_MODEL_MESSAGE_TYPE {
                     continue;
                 }
-                let view = WireView::parse_with_limits(&message.data, wire_limits)
-                    .map_err(|_| Error::Wire)?;
+                let view = WireView::parse(&message.data, wire_limits).map_err(|_| Error::Wire)?;
                 for field in view.fields() {
                     if field.number() != MODEL_BASE_COLUMN_ROW_UIDS_FIELD {
                         continue;
@@ -4401,7 +4455,7 @@ fn validate_exclusive_model_reference(
                     .ok_or(Error::InvalidSource)?,
             )?;
             object
-                .inspect_references_with_policy_and_limits(
+                .inspect_references_with_policy(
                     &mut census,
                     ArchiveReferencePolicy::RejectUnknownMetadata,
                     archive_limits,
@@ -5126,14 +5180,12 @@ pub(crate) fn component_archive(
         .archive()
         .effective_archive_limits()
         .map_err(|_| Error::Archive)?;
-    let stream =
-        SnappyStream::decompress_with_limits(entry.data(), snappy).map_err(|_| Error::Archive)?;
+    let stream = SnappyStream::decompress(entry.data(), snappy).map_err(|_| Error::Archive)?;
     budget.preflight_decoded_archive(stream.as_bytes().len())?;
     budget.physical(stream.as_bytes().len())?;
-    let archive =
-        Archive::parse_with_limits(stream.as_bytes(), limits).map_err(|_| Error::Archive)?;
+    let archive = Archive::parse(stream.as_bytes(), limits).map_err(|_| Error::Archive)?;
     archive
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(stream.as_bytes(), limits)
         .map_err(|_| Error::Archive)?;
     charge_archive_inventory(&archive, budget)?;
     Ok(archive)
@@ -5255,7 +5307,7 @@ pub(crate) fn verify_locality(
             budget.retained(clone_cost)?;
             let mut expected = source_object.clone();
             expected
-                .replace_message_preserving_header_with_limits(
+                .replace_message_preserving_header(
                     target.model_message_index,
                     candidate_message.clone(),
                     limits,
@@ -5526,11 +5578,7 @@ fn verify_physical_object_delta(
         {
             if source_message.data != candidate_message.data {
                 expected
-                    .replace_message_preserving_header_with_limits(
-                        index,
-                        candidate_message.clone(),
-                        limits,
-                    )
+                    .replace_message_preserving_header(index, candidate_message.clone(), limits)
                     .map_err(|_| Error::Verification)?;
             }
         }
@@ -5565,7 +5613,7 @@ fn verify_physical_object_delta(
 /// Return the exact serialized object framing implied by its source-preserved
 /// ArchiveInfo header and current message payloads.
 ///
-/// `Archive::encoded_len_with_limits` follows the same retained-header rule
+/// `Archive::encoded_len` follows the same retained-header rule
 /// used by publication, including the canonical object-length varint.
 /// Subtracting the checked payload total therefore exposes the exact framed
 /// header length without accessing ArchiveObject's private raw-header fields.
@@ -5588,7 +5636,7 @@ fn physical_object_framing(
         .map_err(|_| Error::Allocation(1))?;
     archive.objects.push(object);
     let encoded_length = archive
-        .encoded_len_with_limits(limits)
+        .encoded_len(limits)
         .map_err(|_| Error::Verification)?;
     let header_length = encoded_length
         .checked_sub(payload_length)
@@ -5939,7 +5987,7 @@ fn repeated_references(
     budget: &mut Budget,
 ) -> Result<Vec<u64>> {
     budget.input(payload.len())?;
-    let fields = WireView::parse_with_limits(payload, limits).map_err(|_| Error::Wire)?;
+    let fields = WireView::parse(payload, limits).map_err(|_| Error::Wire)?;
     let all_fields = fields.fields().count();
     let count = fields
         .fields()
@@ -5967,7 +6015,7 @@ fn repeated_references(
 
 fn table_parent(payload: &[u8], limits: WireLimits, budget: &mut Budget) -> Result<u64> {
     budget.input(payload.len())?;
-    let fields = WireView::parse_with_limits(payload, limits).map_err(|_| Error::Wire)?;
+    let fields = WireView::parse(payload, limits).map_err(|_| Error::Wire)?;
     let mut super_field = None;
     for field in fields.fields() {
         budget.fields(1)?;
@@ -5981,8 +6029,7 @@ fn table_parent(payload: &[u8], limits: WireLimits, budget: &mut Budget) -> Resu
         }
     }
     let super_field = super_field.ok_or(Error::InvalidSource)?;
-    let drawable =
-        WireView::parse_with_limits(super_field.payload(), limits).map_err(|_| Error::Wire)?;
+    let drawable = WireView::parse(super_field.payload(), limits).map_err(|_| Error::Wire)?;
     let mut parent_field = None;
     for field in drawable.fields() {
         budget.fields(1)?;
@@ -6000,7 +6047,7 @@ fn table_parent(payload: &[u8], limits: WireLimits, budget: &mut Budget) -> Resu
 }
 
 fn strict_reference(payload: &[u8], limits: WireLimits, budget: &mut Budget) -> Result<u64> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(|_| Error::Wire)?;
+    let fields = WireView::parse(payload, limits).map_err(|_| Error::Wire)?;
     let mut identifier = None;
     for field in fields.fields() {
         budget.fields(1)?;
@@ -6250,7 +6297,7 @@ fn decode_table_info(
     .with_max_scratch_bytes(budget.remaining_scratch()?);
     let snapshot =
         table_info_codec::decode_table_info(payload, options).map_err(|_| Error::Codec)?;
-    let view = WireView::parse_with_limits(payload, limits).map_err(|_| Error::Wire)?;
+    let view = WireView::parse(payload, limits).map_err(|_| Error::Wire)?;
     budget.fields(view.fields().count())?;
     budget.work(payload.len())?;
     Ok(snapshot)
@@ -6307,8 +6354,7 @@ fn validate_model_storage(
     budget.storage_codec_report(store_report)?;
 
     let row_limits = budget.residual(package)?;
-    let row_view =
-        WireView::parse_with_limits(store.row_headers(), row_limits).map_err(|_| Error::Wire)?;
+    let row_view = WireView::parse(store.row_headers(), row_limits).map_err(|_| Error::Wire)?;
     let row_reference_count = row_view
         .fields()
         .filter(|field| field.number() == 2)
@@ -7349,7 +7395,7 @@ fn validate_global_inbound_references(
                     .ok_or(Error::InvalidSource)?,
             )?;
             object
-                .inspect_references_with_policy_and_limits(
+                .inspect_references_with_policy(
                     &mut census,
                     ArchiveReferencePolicy::RejectUnknownMetadata,
                     limits,
@@ -7586,6 +7632,7 @@ mod tests {
                 type_: TILE_MESSAGE_TYPE,
                 data: Vec::new(),
             }],
+            Default::default(),
         )
         .expect("canonical test object");
         assert!(has_exact_mutable_message_shape(&tile, &[TILE_MESSAGE_TYPE]));
@@ -7596,6 +7643,7 @@ mod tests {
                 type_: HEADER_BUCKET_MESSAGE_TYPE,
                 data: Vec::new(),
             }],
+            Default::default(),
         )
         .expect("canonical test object");
         assert!(!has_exact_mutable_message_shape(
@@ -7615,6 +7663,7 @@ mod tests {
                     data: Vec::new(),
                 },
             ],
+            Default::default(),
         )
         .expect("canonical test object");
         assert!(!has_exact_mutable_message_shape(

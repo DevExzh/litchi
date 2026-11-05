@@ -63,16 +63,7 @@ impl SlideAtomsSet<'_> {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn text_interactions(&self) -> Result<Vec<crate::TextBodyInteractions>> {
-        self.text_interactions_with_limits(crate::TextInteractionLimits::default())
-    }
-
-    /// Parse text actions with caller-supplied resource limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn text_interactions_with_limits(
+    pub fn text_interactions(
         &self,
         limits: crate::TextInteractionLimits,
     ) -> Result<Vec<crate::TextBodyInteractions>> {

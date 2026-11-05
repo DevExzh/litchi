@@ -1,0 +1,12 @@
+after opc-open ooxml/docx/drawing.docx n=10: ==1930652==   total heap usage: 10,853 allocs, 10,852 frees, 4,419,948 bytes allocated
+after opc-open ooxml/docx/drawing.docx n=20: ==1930656==   total heap usage: 20,703 allocs, 20,702 frees, 8,434,368 bytes allocated
+after docx-open-text ooxml/docx/drawing.docx n=10: ==1930662==   total heap usage: 186,468 allocs, 186,467 frees, 33,441,397 bytes allocated
+after docx-open-text ooxml/docx/drawing.docx n=20: ==1930685==   total heap usage: 355,968 allocs, 355,967 frees, 63,838,947 bytes allocated
+after pptx-open-text poi/test-data/slideshow/45545_Comment.pptx n=10: ==1930762==   total heap usage: 74,598 allocs, 74,597 frees, 21,654,839 bytes allocated
+after pptx-open-text poi/test-data/slideshow/45545_Comment.pptx n=20: ==1930766==   total heap usage: 142,398 allocs, 142,397 frees, 41,337,319 bytes allocated
+after opc-open poi/test-data/slideshow/45545_Comment.pptx n=10: ==1930789==   total heap usage: 43,754 allocs, 43,753 frees, 8,110,797 bytes allocated
+after opc-open poi/test-data/slideshow/45545_Comment.pptx n=20: ==1930819==   total heap usage: 83,514 allocs, 83,513 frees, 15,480,517 bytes allocated
+after opc-clone CLONES=0: ==1930829==   total heap usage: 1,990 allocs, 1,989 frees, 806,972 bytes allocated
+after opc-clone CLONES=1000: ==1930833==   total heap usage: 1,990 allocs, 1,989 frees, 806,978 bytes allocated
+after-clone opc-clone-ns-managed batches=1 (1,000 clones each): ==1986578==   total heap usage: 1,006 allocs, 1,005 frees, 498,046 bytes allocated
+after-clone opc-clone-ns-managed batches=2 (1,000 clones each): ==1986582==   total heap usage: 1,006 allocs, 1,005 frees, 498,054 bytes allocated

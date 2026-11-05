@@ -1,11 +1,11 @@
 //! Structural, semantic, and resource-limit validation for diagram data.
 
-use crate::{Error, Result};
+use crate::{Error, LimitKind, Result};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 
 use super::{
-    Conformance, Connection, ConnectionType, DiagramDataModel, Id, MAX_CONNECTIONS,
+    Conformance, Connection, ConnectionType, DiagramDataModel, Id, Limits, MAX_CONNECTIONS,
     MAX_DATA_MODEL_XML, MAX_POINTS, MAX_TEXT_BYTES, Point, PointType,
 };
 
@@ -16,17 +16,28 @@ impl DiagramDataModel {
     ///
     /// Returns an error when input violates DrawingML constraints, exceeds a configured
     /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-    pub fn validate(&self) -> Result<()> {
-        self.serialized_xml_len(Conformance::Transitional)
+    pub fn validate(&self, limits: &Limits) -> Result<()> {
+        limits.validate()?;
+        self.serialized_xml_len(Conformance::Transitional, limits)
             .map(|_| ())
     }
 
-    fn validated_xml_capacity(&self) -> Result<usize> {
-        if self.points.len() > MAX_POINTS {
-            return Err(limit("diagram point count"));
+    fn validated_xml_capacity(&self, limits: &Limits) -> Result<usize> {
+        let max_points = limits.points_value().min(MAX_POINTS);
+        if self.points.len() > max_points {
+            return Err(limit(
+                LimitKind::DiagramPoints,
+                self.points.len(),
+                max_points,
+            ));
         }
-        if self.connections.len() > MAX_CONNECTIONS {
-            return Err(limit("diagram connection count"));
+        let max_connections = limits.connections_value().min(MAX_CONNECTIONS);
+        if self.connections.len() > max_connections {
+            return Err(limit(
+                LimitKind::DiagramConnections,
+                self.connections.len(),
+                max_connections,
+            ));
         }
         let mut xml_capacity = 256usize;
         let mut model_ids = HashSet::with_capacity(self.points.len() + self.connections.len());
@@ -46,8 +57,13 @@ impl DiagramDataModel {
                 }
                 document_seen = true;
             }
-            if point.text.len() > MAX_TEXT_BYTES {
-                return Err(limit("diagram text bytes"));
+            let max_text_bytes = limits.data_text_bytes_value().min(MAX_TEXT_BYTES);
+            if point.text.len() > max_text_bytes {
+                return Err(limit(
+                    LimitKind::DiagramDataModelTextBytes,
+                    point.text.len(),
+                    max_text_bytes,
+                ));
             }
             let has_modeled_children = !point.text.is_empty()
                 || point.layout_type_id.is_some()
@@ -55,7 +71,7 @@ impl DiagramDataModel {
                 || point.color_style_type_id.is_some();
             xml_capacity = xml_capacity
                 .checked_add(if has_modeled_children { 320 } else { 128 })
-                .ok_or_else(|| limit("serialized data-model bytes"))?;
+                .ok_or_else(|| invalid("serialized data-model length overflows"))?;
             xml_capacity = add_xml_value(xml_capacity, &point.text, "diagram point text")?;
             for (value, description) in [
                 (
@@ -83,7 +99,7 @@ impl DiagramDataModel {
         for connection in &self.connections {
             xml_capacity = xml_capacity
                 .checked_add(512)
-                .ok_or_else(|| limit("serialized data-model bytes"))?;
+                .ok_or_else(|| invalid("serialized data-model length overflows"))?;
             if !model_ids.insert(connection.id) {
                 return Err(invalid(format!(
                     "duplicate diagram model identifier {}",
@@ -137,12 +153,17 @@ impl DiagramDataModel {
         }
         Ok(xml_capacity.min(MAX_DATA_MODEL_XML))
     }
-    pub(super) fn serialized_xml_len(&self, conformance: Conformance) -> Result<usize> {
-        self.validated_xml_capacity()?;
+    pub(super) fn serialized_xml_len(
+        &self,
+        conformance: Conformance,
+        limits: &Limits,
+    ) -> Result<usize> {
+        self.validated_xml_capacity(limits)?;
         let mut count = XmlByteCount::default();
         self.write_validated_xml(&mut count, conformance)?;
-        if count.0 > MAX_DATA_MODEL_XML {
-            return Err(limit("serialized data-model bytes"));
+        let max_output = limits.output_bytes_value().min(MAX_DATA_MODEL_XML);
+        if count.0 > max_output {
+            return Err(limit(LimitKind::DiagramDataModelBytes, count.0, max_output));
         }
         Ok(count.0)
     }
@@ -243,11 +264,11 @@ fn add_xml_value(total: usize, value: &str, description: &str) -> Result<usize> 
         };
         escaped = escaped
             .checked_add(bytes)
-            .ok_or_else(|| limit("serialized data-model bytes"))?;
+            .ok_or_else(|| invalid("serialized data-model value length overflows"))?;
     }
     total
         .checked_add(escaped)
-        .ok_or_else(|| limit("serialized data-model bytes"))
+        .ok_or_else(|| invalid("serialized data-model value length overflows"))
 }
 
 #[inline]
@@ -265,6 +286,6 @@ pub(super) fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-pub(super) fn limit(label: &str) -> Error {
-    invalid(format!("diagram {label} limit exceeded"))
+pub(super) fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::limit(kind, observed, maximum)
 }

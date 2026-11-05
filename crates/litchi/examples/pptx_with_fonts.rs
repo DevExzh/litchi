@@ -4,20 +4,20 @@
 //! font embedding and subsetting. Open the generated file in Microsoft PowerPoint
 //! to verify that fonts are properly embedded.
 
-use litchi::{fonts::embedding::Mode, pptx::Package};
+use litchi::fonts::embedding::Mode;
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!("Creating PPTX file with embedded fonts...");
 
     // Create a new presentation
-    let mut pkg = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
 
     // Enable font embedding with subsetting
-    pkg.set_font_embedding(Mode::Subset)?;
+    builder.font_embedding(Mode::Subset)?;
 
     // Get mutable presentation
-    let pres = pkg.presentation_mut()?;
+    let pres = builder.presentation()?;
 
     // Slide 1: Title slide
     let slide1 = pres.add_slide()?;
@@ -92,6 +92,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Save the presentation
     let output_path = "output_pptx_with_fonts.pptx";
+    let pkg = builder.build()?;
     pkg.save(output_path)?;
 
     println!("✓ Successfully created: {}", output_path);

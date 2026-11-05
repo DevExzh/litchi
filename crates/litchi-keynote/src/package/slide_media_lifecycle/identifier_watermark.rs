@@ -6,7 +6,7 @@
 //! removal set participate in this census like every other survivor.
 
 use super::budget::LifecycleBudget;
-use super::{Package, SlideMediaLifecycleError};
+use super::{Error, Package};
 
 /// Match the host allocation policy only when the current watermark itself is
 /// physically removed. An unused metadata-only suffix is otherwise preserved.
@@ -15,10 +15,10 @@ pub(super) fn plan_release(
     removed_ids: &[u64],
     expected_last_identifier: u64,
     budget: &mut LifecycleBudget,
-) -> Result<Option<u64>, SlideMediaLifecycleError> {
+) -> Result<Option<u64>, Error> {
     budget.charge_wire_work(removed_ids.len().max(1))?;
     if removed_ids.contains(&0) || removed_ids.windows(2).any(|window| window[0] >= window[1]) {
-        return Err(SlideMediaLifecycleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if removed_ids
         .binary_search(&expected_last_identifier)
@@ -35,26 +35,26 @@ pub(super) fn plan_release(
         let work = objects
             .len()
             .checked_mul(usize::BITS as usize)
-            .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         budget.charge_wire_work(work.max(1))?;
         for object in objects {
             let identifier = object
                 .archive_info
                 .identifier
                 .filter(|identifier| *identifier != 0)
-                .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             if removed_ids.binary_search(&identifier).is_ok() {
                 removed_last |= identifier == expected_last_identifier;
                 continue;
             }
             if identifier >= expected_last_identifier {
-                return Err(SlideMediaLifecycleError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             maximum_remaining = maximum_remaining.max(identifier);
         }
     }
     if !removed_last || maximum_remaining == 0 {
-        return Err(SlideMediaLifecycleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(Some(maximum_remaining))
 }
@@ -66,7 +66,7 @@ pub(super) fn verify_release(
     candidate: &Package,
     new_last_identifier: u64,
     budget: &mut LifecycleBudget,
-) -> Result<(), SlideMediaLifecycleError> {
+) -> Result<(), Error> {
     let mut maximum_remaining = 0;
     for component in candidate.state.source.components().iter() {
         let objects = &component.archive().objects;
@@ -77,12 +77,12 @@ pub(super) fn verify_release(
                 .archive_info
                 .identifier
                 .filter(|identifier| *identifier != 0)
-                .ok_or(SlideMediaLifecycleError::Verification)?;
+                .ok_or(Error::Verification)?;
             maximum_remaining = maximum_remaining.max(identifier);
         }
     }
     if maximum_remaining != new_last_identifier {
-        return Err(SlideMediaLifecycleError::Verification);
+        return Err(Error::Verification);
     }
     Ok(())
 }

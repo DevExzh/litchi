@@ -1,10 +1,15 @@
 //! Typed semantic model for inert ODF document script declarations.
 
 use litchi_core::Result;
+use litchi_odf_common::XmlStreamLimits;
 
 use super::{
     MAX_LISTENER_COUNT, MAX_SCRIPT_COUNT,
-    codec::{checked_text_bytes, validate_fragment, validate_required_value},
+    codec::{
+        FragmentContainer, checked_text_bytes, emitted_namespace_count, validate_empty_script,
+        validate_fragment, validate_required_value, validate_script_listener,
+        validate_static_output,
+    },
     invalid,
 };
 
@@ -66,6 +71,10 @@ impl Eq for Scripts {}
 impl Scripts {
     /// Validate resource limits, required values, and preserved XML fragments.
     pub fn validate(&self) -> Result<()> {
+        self.validate_for_output(&XmlStreamLimits::owner_default_value())
+    }
+
+    pub(super) fn validate_for_output(&self, limits: &XmlStreamLimits) -> Result<()> {
         if self.scripts.len() > MAX_SCRIPT_COUNT {
             return invalid(format!(
                 "office:scripts exceeds the {MAX_SCRIPT_COUNT} script limit"
@@ -78,11 +87,46 @@ impl Scripts {
         }
 
         let mut text_bytes = 0usize;
+        validate_static_output(&self.namespace_declarations, limits)?;
+        // The complete emitted fragment is parsed as one document: outer
+        // office:scripts start/end plus the final EOF event.
+        let mut stream_events = 3usize;
+        let mut stream_attributes = emitted_namespace_count(&self.namespace_declarations);
         for script in &self.scripts {
             validate_required_value(&script.language, "script:language")?;
             text_bytes = checked_text_bytes(text_bytes, script.language.len())?;
             text_bytes = checked_text_bytes(text_bytes, script.content_xml.len())?;
-            validate_fragment(&script.content_xml, &self.namespace_declarations)?;
+            let (fragment_events, fragment_attributes) = if script.content_xml.is_empty() {
+                validate_empty_script(&script.language, &self.namespace_declarations, limits)?;
+                (0, 0)
+            } else {
+                let report = validate_fragment(
+                    &script.content_xml,
+                    &self.namespace_declarations,
+                    limits,
+                    FragmentContainer::Script {
+                        language: &script.language,
+                    },
+                )?;
+                (report.events, report.attributes)
+            };
+            let script_events = if script.content_xml.is_empty() {
+                1
+            } else {
+                2usize
+                    .checked_add(fragment_events)
+                    .ok_or_else(|| invalid_error("office:scripts event count overflow"))?
+            };
+            stream_events =
+                checked_stream_count(stream_events, script_events, limits.max_events(), "events")?;
+            stream_attributes = checked_stream_count(
+                stream_attributes,
+                1usize
+                    .checked_add(fragment_attributes)
+                    .ok_or_else(|| invalid_error("office:scripts attribute count overflow"))?,
+                limits.max_attributes(),
+                "attributes",
+            )?;
         }
 
         for listener in &self.event_listeners {
@@ -98,36 +142,76 @@ impl Scripts {
                     };
                     validate_required_value(value, "script event target")?;
                     text_bytes = checked_text_bytes(text_bytes, value.len())?;
+                    let attributes = match &listener.binding {
+                        ScriptBinding::MacroName(_) => 3,
+                        ScriptBinding::Linked { .. } => 5,
+                    };
+                    validate_script_listener(listener, &self.namespace_declarations, limits)?;
+                    stream_events =
+                        checked_stream_count(stream_events, 1, limits.max_events(), "events")?;
+                    stream_attributes = checked_stream_count(
+                        stream_attributes,
+                        attributes,
+                        limits.max_attributes(),
+                        "attributes",
+                    )?;
                 },
                 EventListener::PresentationXml(xml) => {
                     text_bytes = checked_text_bytes(text_bytes, xml.len())?;
-                    validate_fragment(xml, &self.namespace_declarations)?;
+                    let report = validate_fragment(
+                        xml,
+                        &self.namespace_declarations,
+                        limits,
+                        FragmentContainer::Presentation,
+                    )?;
+                    let (fragment_events, fragment_attributes) = (report.events, report.attributes);
+                    stream_events = checked_stream_count(
+                        stream_events,
+                        fragment_events,
+                        limits.max_events(),
+                        "events",
+                    )?;
+                    stream_attributes = checked_stream_count(
+                        stream_attributes,
+                        fragment_attributes,
+                        limits.max_attributes(),
+                        "attributes",
+                    )?;
                 },
             }
+        }
+        if !self.event_listeners.is_empty() {
+            stream_events = checked_stream_count(stream_events, 2, limits.max_events(), "events")?;
+        }
+        if stream_events > limits.max_events() || stream_attributes > limits.max_attributes() {
+            return invalid("office:scripts exceeds the configured XML stream limits");
         }
         Ok(())
     }
 
     /// Serialize a namespace-complete, deterministic `office:scripts` element.
-    pub fn to_xml(&self) -> Result<String> {
-        super::codec::write_scripts(self)
+    pub fn to_xml(&self, limits: &XmlStreamLimits) -> Result<String> {
+        super::codec::write_scripts(self, limits)
     }
+}
 
-    pub(super) fn total_payload_bytes(&self) -> usize {
-        self.scripts
-            .iter()
-            .map(|script| script.language.len() + script.content_xml.len())
-            .chain(self.event_listeners.iter().map(|listener| match listener {
-                EventListener::Script(listener) => {
-                    listener.event_name.len()
-                        + listener.language.len()
-                        + match &listener.binding {
-                            ScriptBinding::MacroName(value) => value.len(),
-                            ScriptBinding::Linked { href } => href.len(),
-                        }
-                },
-                EventListener::PresentationXml(xml) => xml.len(),
-            }))
-            .sum()
+fn checked_stream_count(
+    current: usize,
+    additional: usize,
+    limit: usize,
+    dimension: &str,
+) -> Result<usize> {
+    let observed = current
+        .checked_add(additional)
+        .ok_or_else(|| invalid_error("office:scripts stream count overflow"))?;
+    if observed > limit {
+        return invalid(format!(
+            "office:scripts exceeds the configured XML {dimension} limit"
+        ));
     }
+    Ok(observed)
+}
+
+fn invalid_error(message: &str) -> litchi_core::Error {
+    litchi_core::Error::InvalidFormat(message.to_string())
 }

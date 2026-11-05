@@ -1,0 +1,104 @@
+{
+  "schema": "litchi_w8_final_source_preparation.v1",
+  "status": "candidate_protocol_only",
+  "acceptance_claim": false,
+  "build_performed": false,
+  "timing_performed": false,
+  "inventory_review_complete": false,
+  "baseline": {
+    "source_commit": "f2bbbc8d07ab5da26c180f1ff74813d39f632d54",
+    "source_archive": {
+      "bytes": 6614528000,
+      "sha256": "de625729ec8e6f8055e619443ad31bf1a91719cd31465975f951d54dbc1c2280"
+    },
+    "lock": {
+      "bytes": 139441,
+      "sha256": "1b9b10ae7a9fd65db3b8b29a5bedad1aa560473c10b462f8a7d654c169335b2c"
+    },
+    "source_assembly": {
+      "overlay": "consumer_only_compatibility_adapter",
+      "adapter_patch": {
+        "bytes": 153482,
+        "sha256": "3e05d33946c7a9a2fea5c84cda33c799fbf8cd3c92fbcf890812736641ed01cd"
+      }
+    },
+    "production_tree": {
+      "files": 459676,
+      "sha256": "23e332254abb024cbf9b038b8219b861e363fe474423bccc6122c3183b4d1437"
+    },
+    "projection": {
+      "bytes": 145931,
+      "sha256": "b070ddb516a0223f9f21509de6564c7c5690d26e955047a922d4d837b7522335"
+    }
+  },
+  "candidate": {
+    "source_commit": "472b6705475b073e7fe08f6e11ee17fb1e29f838",
+    "source_archive": {
+      "bytes": 6634147840,
+      "sha256": "44c11e933974c8fa3d6a67b46739bedeef866e60fbd4360ffe7f3bb8a4dc2274"
+    },
+    "source_assembly": {
+      "overlay": "none",
+      "bytes": 480,
+      "sha256": "db01f0577ace4d69d170d3bdfffe07351ea01a9ddd989a321e7bef39e274b47d"
+    },
+    "lock": {
+      "bytes": 139606,
+      "sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1"
+    },
+    "projection": {
+      "bytes": 146621,
+      "sha256": "2964946c802881909d5aaeea427fb32e85d0657f0987185ce21ff29e84c0d686"
+    }
+  },
+  "shared_workload": {
+    "probe": {
+      "bytes": 75035,
+      "sha256": "21c8e3833c96411a612a2631f98093bd70cf0a5c28b2952c3d15873f464e54b0"
+    },
+    "fixture": {
+      "bytes": 4231,
+      "sha256": "b7439d899a940b4135dd44081554a4aa9d7e70c19e2ccd3339440baad5ca7e09"
+    },
+    "target": "x86_64-unknown-linux-gnu",
+    "profile": "release",
+    "all_features": true,
+    "route_count": 109,
+    "toolchain_sha256": "e3a213e0d222e94d213cafbc20932eb3f76c643b4dd63756acf95192df2aa310",
+    "features": {
+      "before": ["default", "doc", "docx", "encryption", "eval", "formula", "iwork-adapter", "keynote", "markdown", "numbers", "odb", "odc", "odf-formula", "odf-objects", "odg", "odi", "odm", "odp", "ods", "odt", "opc", "oth", "pages", "ppt", "pptx", "rtf", "test-support", "xls", "xlsb", "xlsx", "yaml"],
+      "after": ["default", "doc", "docx", "encryption", "eval", "formula", "iwork-adapter", "keynote", "markdown", "numbers", "odb", "odc", "odf-formula", "odf-objects", "odg", "odi", "odm", "odp", "ods", "odt", "opc", "oth", "pages", "ppt", "pptx", "rtf", "sign", "test-support", "xls", "xlsb", "xlsx", "yaml"]
+    }
+  },
+  "graph": {
+    "registry_package_count": 518,
+    "registry_identities_checksums_dependencies_equal": true,
+    "local_edge_additions": [
+      {"package": "litchi-iwa-core", "added": ["smallvec 1.16.3"]},
+      {"package": "litchi-odraw", "added": ["litchi-core"]},
+      {"package": "litchi-ops", "added": ["litchi-biff", "litchi-ograph", "litchi-vba", "sha2 0.11.1", "soapberry-zip"]},
+      {"package": "litchi-ppt", "added": ["siphasher"]},
+      {"package": "litchi-xlsb", "added": ["sha2 0.11.1"]},
+      {"package": "litchi-xlsx", "added": ["sha2 0.11.1"]}
+    ],
+    "removed_edges": []
+  },
+  "stale_inputs_rejected": [
+    {
+      "kind": "f2_endpoint_receipt",
+      "adapter_patch": {
+        "bytes": 153188,
+        "sha256": "a6ffa1cc542caba1bac4d57fdf9a8e614300c8f3ac9a60716fe86dde74c7175e"
+      },
+      "reason": "does not bind the reviewed 153482-byte consumer-only adapter"
+    },
+    {
+      "kind": "b673_f2_workspace",
+      "lock": {
+        "bytes": 139591,
+        "sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6"
+      },
+      "reason": "uses the candidate lock instead of the immutable historical f2 lock"
+    }
+  ]
+}

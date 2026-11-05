@@ -208,23 +208,21 @@ impl From<RecordKind> for u16 {
 /// A checked, zero-copy view of one `OfficeArt` record.
 #[derive(Clone)]
 pub struct Record<'data> {
-    kind: RecordKind,
-    raw_kind: u16,
-    version: u8,
-    instance: u16,
-    len: u32,
     data: &'data [u8],
+    raw_kind: u16,
+    ver_inst: u16,
+    limits: crate::Limits,
 }
 
 impl core::fmt::Debug for Record<'_> {
     fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         formatter
             .debug_struct("Record")
-            .field("kind", &self.kind)
+            .field("kind", &self.kind())
             .field("raw_kind", &self.raw_kind)
-            .field("version", &self.version)
-            .field("instance", &self.instance)
-            .field("len", &self.len)
+            .field("version", &self.version())
+            .field("instance", &self.instance())
+            .field("len", &self.len())
             .finish_non_exhaustive()
     }
 }
@@ -236,17 +234,23 @@ impl<'data> Record<'data> {
         version: u8,
         instance: u16,
         data: &'data [u8],
+        limits: crate::Limits,
     ) -> Result<Self> {
         let len = u32::try_from(data.len()).map_err(|_err| Error::ArithmeticOverflow {
             context: "test record body length",
         })?;
+        if len > limits.max_record_bytes {
+            return Err(Error::LimitExceeded {
+                limit: crate::LimitKind::RecordBytes,
+                observed: u64::from(len),
+                maximum: limits.max_record_bytes,
+            });
+        }
         Ok(Self {
-            kind,
-            raw_kind: kind.raw(),
-            version: version & 0x0F,
-            instance: instance & 0x0FFF,
-            len,
             data,
+            raw_kind: kind.raw(),
+            ver_inst: u16::from(version & 0x0F) | ((instance & 0x0FFF) << 4),
+            limits,
         })
     }
 
@@ -261,7 +265,7 @@ impl<'data> Record<'data> {
     /// cannot be represented, `Error::TruncatedHeader` if fewer than eight
     /// header bytes remain at `offset`, or `Error::TruncatedPayload` if the
     /// declared `recLen` extends past the supplied slice.
-    pub fn parse(data: &'data [u8], offset: usize) -> Result<(Self, usize)> {
+    pub fn parse(data: &'data [u8], offset: usize, limits: crate::Limits) -> Result<(Self, usize)> {
         let header_end = offset.checked_add(8).ok_or(Error::ArithmeticOverflow {
             context: "record header extent",
         })?;
@@ -273,6 +277,13 @@ impl<'data> Record<'data> {
         let ver_inst = u16::from_le_bytes([header[0], header[1]]);
         let raw_kind = u16::from_le_bytes([header[2], header[3]]);
         let len = u32::from_le_bytes([header[4], header[5], header[6], header[7]]);
+        if len > limits.max_record_bytes {
+            return Err(Error::LimitExceeded {
+                limit: crate::LimitKind::RecordBytes,
+                observed: u64::from(len),
+                maximum: limits.max_record_bytes,
+            });
+        }
         let body_len = usize::try_from(len).map_err(|_err| Error::ArithmeticOverflow {
             context: "record body length",
         })?;
@@ -296,12 +307,10 @@ impl<'data> Record<'data> {
 
         Ok((
             Self {
-                kind: RecordKind::from_raw(raw_kind),
-                raw_kind,
-                version: (ver_inst & 0x000F) as u8,
-                instance: (ver_inst >> 4) & 0x0FFF,
-                len,
                 data: body,
+                raw_kind,
+                ver_inst,
+                limits,
             },
             consumed,
         ))
@@ -310,7 +319,7 @@ impl<'data> Record<'data> {
     /// Returns the semantic record kind.
     #[must_use]
     pub const fn kind(&self) -> RecordKind {
-        self.kind
+        RecordKind::from_raw(self.raw_kind)
     }
 
     /// Returns the exact record-kind value read from the wire.
@@ -322,25 +331,28 @@ impl<'data> Record<'data> {
     /// Returns the four-bit record version.
     #[must_use]
     pub const fn version(&self) -> u8 {
-        self.version
+        (self.ver_inst & 0x000F) as u8
     }
 
     /// Returns the twelve-bit record instance.
     #[must_use]
     pub const fn instance(&self) -> u16 {
-        self.instance
+        (self.ver_inst >> 4) & 0x0FFF
     }
 
     /// Returns the declared body length.
     #[must_use]
     pub const fn len(&self) -> u32 {
-        self.len
+        // `parse` and the test-only constructor both reject lengths that do
+        // not fit in the wire's u32 `recLen`; the borrowed body therefore
+        // remains a lossless source for this derived accessor.
+        self.data.len() as u32
     }
 
     /// Returns whether the record body is empty.
     #[must_use]
     pub const fn is_empty(&self) -> bool {
-        self.len == 0
+        self.data.is_empty()
     }
 
     /// Returns the borrowed body bytes.
@@ -349,16 +361,29 @@ impl<'data> Record<'data> {
         self.data
     }
 
+    /// Returns the finite policy under which this record was admitted.
+    #[must_use]
+    pub const fn limits(&self) -> crate::Limits {
+        self.limits
+    }
+
+    /// Rebinds this borrowed view to a narrower caller policy after the
+    /// record's wire admission has already succeeded.
+    pub(crate) const fn with_limits(mut self, limits: crate::Limits) -> Self {
+        self.limits = limits;
+        self
+    }
+
     /// Returns whether this record can contain child records.
     #[must_use]
     pub const fn is_container(&self) -> bool {
-        self.version == 0x0F
+        self.version() == 0x0F
     }
 
     /// Returns whether this record kind can contain text.
     #[must_use]
     pub const fn can_contain_text(&self) -> bool {
-        self.kind.can_contain_text()
+        self.kind().can_contain_text()
     }
 
     /// Returns the body offset when this record borrows from `parent`.
@@ -378,13 +403,15 @@ mod tests {
         reason = "test assertions panic on failure by design"
     )]
     use super::*;
+    use core::mem::size_of;
 
     #[test]
     fn parses_without_copying() {
         let bytes = [
             0x02, 0x00, 0x0A, 0xF0, 0x04, 0x00, 0x00, 0x00, 0xAA, 0xBB, 0xCC, 0xDD,
         ];
-        let (record, consumed) = Record::parse(&bytes, 0).expect("valid record");
+        let (record, consumed) =
+            Record::parse(&bytes, 0, crate::Limits::default()).expect("valid record");
 
         assert_eq!(record.kind(), RecordKind::Sp);
         assert_eq!(record.raw_kind(), 0xF00A);
@@ -396,7 +423,7 @@ mod tests {
     #[test]
     fn preserves_unknown_kinds() {
         let bytes = [0x00, 0x00, 0x34, 0x12, 0, 0, 0, 0];
-        let (record, _) = Record::parse(&bytes, 0).expect("valid record");
+        let (record, _) = Record::parse(&bytes, 0, crate::Limits::default()).expect("valid record");
 
         assert_eq!(record.kind(), RecordKind::Unknown(0x1234));
         assert_eq!(record.raw_kind(), 0x1234);
@@ -411,7 +438,7 @@ mod tests {
             bytes.extend_from_slice(&[1, 2]);
 
             assert!(matches!(
-                Record::parse(&bytes, 0),
+                Record::parse(&bytes, 0, crate::Limits::default()),
                 Err(Error::TruncatedPayload { .. })
             ));
         }
@@ -420,7 +447,7 @@ mod tests {
     #[test]
     fn rejects_offset_overflow() {
         assert!(matches!(
-            Record::parse(&[], usize::MAX),
+            Record::parse(&[], usize::MAX, crate::Limits::default()),
             Err(Error::ArithmeticOverflow { .. })
         ));
     }
@@ -431,16 +458,36 @@ mod tests {
         let unknown_container = [0x0F, 0x00, 0x34, 0x12, 0, 0, 0, 0];
 
         assert!(
-            !Record::parse(&wrong_version, 0)
+            !Record::parse(&wrong_version, 0, crate::Limits::default())
                 .expect("valid record")
                 .0
                 .is_container()
         );
         assert!(
-            Record::parse(&unknown_container, 0)
+            Record::parse(&unknown_container, 0, crate::Limits::default())
                 .expect("valid record")
                 .0
                 .is_container()
         );
+    }
+
+    #[test]
+    fn compact_layout_and_policy_are_lossless() {
+        assert!(size_of::<Record<'static>>() <= 32);
+        let limits = crate::Limits {
+            max_record_bytes: 17,
+            max_depth: 3,
+            max_records: 11,
+        };
+        let bytes = [0x35, 0x12, 0x34, 0x12, 3, 0, 0, 0, 1, 2, 3];
+        let (record, consumed) = Record::parse(&bytes, 0, limits).expect("valid record");
+
+        assert_eq!(record.kind(), RecordKind::Unknown(0x1234));
+        assert_eq!(record.raw_kind(), 0x1234);
+        assert_eq!(record.version(), 5);
+        assert_eq!(record.instance(), 0x123);
+        assert_eq!(record.len(), 3);
+        assert_eq!(record.limits(), limits);
+        assert_eq!(consumed, bytes.len());
     }
 }

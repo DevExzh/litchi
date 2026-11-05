@@ -1,6 +1,6 @@
 use super::{
-    Editor, FileInformationBlock, Limits, SmartTagBookmarkInfo, SmartTagOrigin,
-    SmartTagRecognizerState, Snapshot, TableKind, TransactionError,
+    Error as TransactionError, FileInformationBlock, Limits, SmartTagBookmarkInfo, SmartTagOrigin,
+    SmartTagRecognizerState, Snapshot, TableKind,
 };
 use crate::package::Error as PackageError;
 use crate::parts::protection::{EditProtection, ProtectionAuthorization, ProtectionPolicy};
@@ -165,10 +165,10 @@ fn edits_are_source_checked_and_preserve_opaque_table_bytes() {
         .set_recognizer_state(0, SmartTagRecognizerState::Dirty)
         .unwrap();
     let commit = transaction.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert!(!commit.patch().is_noop());
 
-    let edited = commit.snapshot();
+    let edited = commit.package();
     assert_eq!(edited.fib_bytes(), snapshot.fib_bytes());
     assert_eq!(edited.topology(), snapshot.topology());
     assert_eq!(edited.table_stream()[0..7], table[0..7]);
@@ -209,10 +209,10 @@ fn edits_are_source_checked_and_preserve_opaque_table_bytes() {
 #[test]
 fn no_op_and_failed_edits_are_atomic() {
     let (fib, table) = source();
-    let snapshot = Snapshot::parse_with_limits(&fib, &table, Limits::default()).unwrap();
+    let snapshot = Snapshot::parse_with_options(&fib, &table, None, Limits::default()).unwrap();
     let no_op = snapshot.edit().commit().unwrap();
-    assert!(!no_op.changed());
-    assert_eq!(no_op.snapshot().table_stream(), table.as_slice());
+    assert!(!no_op.diagnostics().changed());
+    assert_eq!(no_op.package().table_stream(), table.as_slice());
 
     let mut transaction = snapshot.edit();
     let before = transaction.metadata().clone();
@@ -233,24 +233,21 @@ fn no_op_and_failed_edits_are_atomic() {
 }
 
 #[test]
-fn package_editor_publishes_only_source_checked_transactions() {
+fn source_checked_commit_publishes_fixed_topology_table_bytes() {
     let (fib, table) = source();
-    let mut editor = Editor::open(&fib, &table).unwrap();
-    let mut transaction = editor.edit();
-    transaction
-        .set_recognizer_state(0, SmartTagRecognizerState::Pending)
+    let source = Snapshot::parse(&fib, &table).unwrap();
+    let mut edit = source.edit();
+    edit.set_recognizer_state(0, SmartTagRecognizerState::Pending)
         .unwrap();
-    let commit = editor.apply(transaction).unwrap();
-    assert_eq!(editor.snapshot(), commit.snapshot());
-    let (fib_bytes, table_bytes) = editor.finish();
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    let published = commit.patch().apply(&source).unwrap();
+    assert_eq!(&published, commit.package());
+    let (fib_bytes, table_bytes) = published.finish();
     assert_eq!(fib_bytes, fib.raw_data());
     assert_eq!(table_bytes.len(), table.len());
     assert_eq!(table_bytes[0..7], table[0..7]);
-    let factoid = editor
-        .snapshot()
-        .topology()
-        .range(TableKind::PropertyBags)
-        .unwrap();
+    let factoid = published.topology().range(TableKind::PropertyBags).unwrap();
     let factoid = factoid.offset as usize..factoid.end().unwrap() as usize;
     assert_eq!(&table_bytes[factoid.clone()], &table[factoid]);
 }
@@ -260,7 +257,7 @@ fn protected_smart_tag_edits_require_authorization_and_preserve_patch_capability
     let (fib, table) = protected_source();
     let snapshot = Snapshot::parse(&fib, &table).unwrap();
     assert_eq!(snapshot.protection(), EditProtection::Document);
-    assert!(!snapshot.edit().commit().unwrap().changed());
+    assert!(!snapshot.edit().commit().unwrap().diagnostics().changed());
 
     let mut denied = snapshot.edit();
     denied
@@ -282,10 +279,10 @@ fn protected_smart_tag_edits_require_authorization_and_preserve_patch_capability
         .set_recognizer_state(0, SmartTagRecognizerState::Pending)
         .unwrap();
     let commit = transaction.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert_eq!(
         commit.patch().apply(&allowed).unwrap(),
-        commit.snapshot().clone()
+        commit.package().clone()
     );
 }
 
@@ -312,10 +309,10 @@ fn smart_tag_patch_uses_the_destination_editor_policy() {
         Err(TransactionError::Invalid(PackageError::ProtectionDenied(_)))
     ));
 
-    let mut cross_editor_transaction = allowed.edit();
-    cross_editor_transaction
+    let mut cross_policy_edit = allowed.edit();
+    cross_policy_edit
         .set_recognizer_state(0, SmartTagRecognizerState::Pending)
         .unwrap();
-    let mut editor = Editor::open(&fib, &table).unwrap();
-    assert!(editor.apply(cross_editor_transaction).is_err());
+    let cross_policy = cross_policy_edit.commit().unwrap();
+    assert!(cross_policy.patch().apply(&enforcing).is_err());
 }

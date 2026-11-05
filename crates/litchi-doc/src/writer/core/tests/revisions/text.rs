@@ -10,7 +10,7 @@ fn tracked_text_revisions_round_trip_through_both_output_paths() {
         minute: 30,
         weekday: 3,
     };
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.set_section_formatting_revision(
         FormattingRevision::new("Section Editor").with_timestamp(timestamp),
     );
@@ -110,8 +110,8 @@ fn tracked_text_revisions_round_trip_through_both_output_paths() {
         .unwrap();
 
     let mut cursor = Cursor::new(Vec::new());
-    writer.write_to(&mut cursor).unwrap();
-    let mut package = crate::Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut cursor).unwrap();
+    let mut package = crate::raw::Reader::from_reader(Cursor::new(cursor.into_inner())).unwrap();
     let document = package.document().unwrap();
     assert_eq!(
         document.revision_authors(),
@@ -188,8 +188,8 @@ fn tracked_text_revisions_round_trip_through_both_output_paths() {
             .unwrap()
             .as_nanos()
     ));
-    writer.save(&path).unwrap();
-    let mut package = crate::Package::open(&path).unwrap();
+    writer.build().unwrap().save(&path).unwrap();
+    let mut package = crate::raw::Reader::open(&path).unwrap();
     let document = package.document().unwrap();
     assert_eq!(
         document.revision_authors(),

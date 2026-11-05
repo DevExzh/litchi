@@ -1,0 +1,101 @@
+{
+  "source": "5fbcfc45e7c5611f75d32968154a7aa11f6508c0",
+  "status": "partial: groups 0-2 passed; group 3 compile lint failed; groups 4-6 not run",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--all-features",
+        "--message-format",
+        "json-render-diagnostics",
+        "-p",
+        "litchi-doc",
+        "--lib"
+      ],
+      "exit": 0,
+      "seconds": 49.56483006908093,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/legacy-replay-combined-v2/check-0.log",
+      "bytes": 228478,
+      "sha256": "c5e1ee08d29bab78831cc05c264bba7ff40fd4c7fb31767cb6cad280104fde68",
+      "target_bytes_before": 18801302586,
+      "test_summaries": [
+        "test result: ok. 1229 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 5.52s"
+      ]
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--all-features",
+        "--message-format",
+        "json-render-diagnostics",
+        "-p",
+        "litchi-ole-common",
+        "--lib",
+        "--test",
+        "ole1"
+      ],
+      "exit": 0,
+      "seconds": 21.731281117070466,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/legacy-replay-combined-v2/check-1.log",
+      "bytes": 84609,
+      "sha256": "7233948c56099245a3de5bcbb0346f82fcca5459674b2a334399ffb418e54f46",
+      "target_bytes_before": 18801302586,
+      "test_summaries": [
+        "test result: ok. 227 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.17s",
+        "test result: ok. 15 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--all-features",
+        "--message-format",
+        "json-render-diagnostics",
+        "-p",
+        "litchi-crypto",
+        "--lib",
+        "spaces::"
+      ],
+      "exit": 0,
+      "seconds": 26.986629261053167,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/legacy-replay-combined-v2/check-2.log",
+      "bytes": 85603,
+      "sha256": "af1c8feb33149b32278b80103dea6810e129edb9400726c206f0b54e7c4b0db3",
+      "target_bytes_before": 18801300894,
+      "test_summaries": [
+        "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 58 filtered out; finished in 0.02s"
+      ]
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--all-features",
+        "--message-format",
+        "json-render-diagnostics",
+        "-p",
+        "litchi-ops",
+        "--lib",
+        "error::"
+      ],
+      "exit": 101,
+      "seconds": 233.9671625790652,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/legacy-replay-combined-v2/check-3.log",
+      "bytes": 330907,
+      "sha256": "1ded86e12c51cac4eaa31aba477c35fbe601c7337df15d22f6805ea203a4ced2",
+      "target_bytes_before": 18845543576,
+      "test_summaries": []
+    }
+  ]
+}

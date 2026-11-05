@@ -7,7 +7,7 @@
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
 
-use super::{Color, ColorKind, Guide, Guides, ListKind, Orientation, Snapshot};
+use super::{Color, ColorKind, Guide, Guides, Limits, ListKind, Orientation, Snapshot};
 
 const P: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
 const A: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
@@ -76,11 +76,11 @@ fn guide(id: u32) -> Guide {
 #[test]
 fn no_op_commit_keeps_exact_source_and_raw_payloads() {
     let source = source();
-    let snapshot = Snapshot::from_xml(&source).expect("guide source parses");
+    let snapshot = Snapshot::from_xml(&source, Limits::DEFAULT).expect("guide source parses");
     let commit = snapshot.edit().commit().expect("no-op commit");
 
-    assert!(!commit.is_changed());
-    assert!(commit.patch().is_empty());
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.patch().is_noop());
     assert_eq!(commit.snapshot().source_xml(), source.as_slice());
     assert!(
         std::str::from_utf8(
@@ -96,7 +96,7 @@ fn no_op_commit_keeps_exact_source_and_raw_payloads() {
 
 #[test]
 fn typed_edits_preserve_opaque_extensions_and_update_only_guides() {
-    let snapshot = Snapshot::from_xml(&source()).expect("guide source parses");
+    let snapshot = Snapshot::from_xml(&source(), Limits::DEFAULT).expect("guide source parses");
     let mut edit = snapshot.edit();
     edit.set_id(ListKind::Slide, 0, 7)
         .expect("ID edit is valid");
@@ -118,13 +118,14 @@ fn typed_edits_preserve_opaque_extensions_and_update_only_guides() {
     assert!(output.contains(r#"pos="2400"#));
     assert_eq!(output.matches(r"<p15:guide").count(), 2);
 
-    let parsed = Guides::from_xml(commit.snapshot().source_xml()).expect("committed XML parses");
+    let parsed = Guides::from_xml(commit.snapshot().source_xml(), Limits::DEFAULT)
+        .expect("committed XML parses");
     assert_eq!(parsed, *commit.snapshot().guides());
 }
 
 #[test]
 fn invalid_ids_and_bounds_leave_the_staged_value_unchanged() {
-    let snapshot = Snapshot::from_xml(&source()).expect("guide source parses");
+    let snapshot = Snapshot::from_xml(&source(), Limits::DEFAULT).expect("guide source parses");
     let mut edit = snapshot.edit();
     let before = edit.guides().clone();
 
@@ -142,7 +143,7 @@ fn invalid_ids_and_bounds_leave_the_staged_value_unchanged() {
 fn stale_publication_is_atomic_and_inverse_restores_the_source() {
     let name = presentation_name();
     let mut original = package();
-    let snapshot = super::load_snapshot(&original).expect("package snapshot");
+    let snapshot = super::load_snapshot(&original, Limits::DEFAULT).expect("package snapshot");
     let mut edit = snapshot.edit();
     edit.set_id(ListKind::Slide, 0, 7)
         .expect("ID edit is valid");
@@ -172,21 +173,44 @@ fn stale_publication_is_atomic_and_inverse_restores_the_source() {
 #[test]
 fn absent_extension_lists_are_created_and_xml_inverse_is_exact() {
     let source = format!(r#"<p:presentation xmlns:p="{P}" xmlns:a="{A}"/>"#).into_bytes();
-    let snapshot = Snapshot::from_xml(&source).expect("empty presentation parses");
+    let snapshot = Snapshot::from_xml(&source, Limits::DEFAULT).expect("empty presentation parses");
     let mut edit = snapshot.edit();
     edit.push(ListKind::Slide, guide(3))
         .expect("slide guide insertion is valid");
     let patch = edit.commit().expect("guide insertion commit").into_patch();
 
     let mut updated = source.clone();
-    patch.apply_xml(&mut updated).expect("forward XML patch");
-    let parsed = Guides::from_xml(&updated).expect("created guide extension parses");
+    patch
+        .apply_xml(&mut updated, Limits::DEFAULT)
+        .expect("forward XML patch");
+    let parsed =
+        Guides::from_xml(&updated, Limits::DEFAULT).expect("created guide extension parses");
     assert_eq!(parsed.slide.as_ref().unwrap().guides[0].id, 3);
     assert!(String::from_utf8_lossy(&updated).contains("sldGuideLst"));
 
     patch
         .inverse()
-        .apply_xml(&mut updated)
+        .apply_xml(&mut updated, Limits::DEFAULT)
         .expect("inverse XML patch");
     assert_eq!(updated, source);
+}
+
+#[test]
+fn missing_slide_and_notes_targets_keep_their_source_order() {
+    let source = format!(
+        r#"<p:presentation xmlns:p="{P}" xmlns:a="{A}"><p:extLst><p:ext uri="urn:opaque"><v:data xmlns:v="urn:future"/></p:ext></p:extLst></p:presentation>"#
+    )
+    .into_bytes();
+    let snapshot = Snapshot::from_xml(&source, Limits::DEFAULT).expect("guide source parses");
+    let mut edit = snapshot.edit();
+    edit.push(ListKind::Slide, guide(3))
+        .expect("slide guide insertion is valid");
+    edit.push(ListKind::Notes, guide(4))
+        .expect("notes guide insertion is valid");
+    let output =
+        String::from_utf8_lossy(edit.commit().expect("guide commit").snapshot().source_xml())
+            .into_owned();
+    let slide = output.find(SLIDE_URI).expect("slide extension inserted");
+    let notes = output.find(NOTES_URI).expect("notes extension inserted");
+    assert!(slide < notes, "slide and notes insertions changed order");
 }

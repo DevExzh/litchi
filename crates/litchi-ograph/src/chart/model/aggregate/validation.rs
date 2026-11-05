@@ -134,13 +134,13 @@ pub(super) fn reserve_one<T>(values: &mut Vec<T>, resource: &'static str) -> Res
         .ok_or(Error::Allocation { resource })
 }
 
-pub(super) fn check_add(current: usize, maximum: usize, resource: &'static str) -> Result<()> {
-    let observed = current
-        .checked_add(1)
-        .ok_or(Error::SizeOverflow { resource })?;
+pub(super) fn check_add(current: usize, maximum: usize, kind: crate::LimitKind) -> Result<()> {
+    let observed = current.checked_add(1).ok_or(Error::SizeOverflow {
+        resource: kind.description(),
+    })?;
     if observed > maximum {
-        return Err(Error::LimitExceeded {
-            resource,
+        return Err(Error::Limit {
+            kind,
             observed: crate::limits::as_u64(observed),
             maximum: crate::limits::as_u64(maximum),
         });

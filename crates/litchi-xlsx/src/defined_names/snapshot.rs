@@ -4,7 +4,9 @@ use std::sync::Arc;
 
 use litchi_core::{ExecutionContext, ExecutionError};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{OpcPackage, PackURI, PartView, Relationship, SourceBackedPackage, TargetMode};
+use litchi_opc::{
+    OpcPackage, PackURI, PartView, Relationship, SourceBackedPackage, SourceLimits, TargetMode,
+};
 
 use crate::error::{Error, Result, invalid};
 use crate::raw::{self, DefinedName};
@@ -13,9 +15,13 @@ use crate::source_payload::SourcePayload;
 /// Exact workbook owner state plus its inert defined-name catalog.
 #[derive(Clone, Debug)]
 pub struct Snapshot {
-    names: Box<[DefinedName]>,
+    /// Immutable catalog records shared with the deferred output and restore
+    /// endpoint. A defined-name edit replaces this Arc only when names change.
+    names: Arc<[DefinedName]>,
+    active_sheet: Option<usize>,
     source: SourceState,
     context: Option<ExecutionContext>,
+    pub(super) limits: SourceLimits,
 }
 
 impl Snapshot {
@@ -31,10 +37,19 @@ impl Snapshot {
             SourcePayload::Owned(workbook.blob_arc()),
             owner,
             None,
+            package.read_limits(),
+            None,
         )
     }
 
     pub(super) fn load_source_backed(package: &SourceBackedPackage) -> Result<Self> {
+        Self::load_source_backed_with_names(package, None)
+    }
+
+    pub(super) fn load_source_backed_with_names(
+        package: &SourceBackedPackage,
+        shared_names: Option<Arc<[DefinedName]>>,
+    ) -> Result<Self> {
         package.check_execution()?;
         let source_version = package.source_version()?;
         let workbook = package.main_document_part()?;
@@ -42,8 +57,14 @@ impl Snapshot {
         let bytes = SourcePayload::from_part_data(package, workbook.data()?)?;
         let owner = current_owner_relationship(package.rels())
             .ok_or_else(|| invalid("workbook has no unique officeDocument owner"))?;
-        let snapshot =
-            Self::from_source_backed_parts(&workbook, bytes, owner, package.execution_context())?;
+        let snapshot = Self::from_source_backed_parts(
+            &workbook,
+            bytes,
+            owner,
+            package.execution_context(),
+            package.read_limits(),
+            shared_names,
+        )?;
         package.check_execution()?;
         if package.source_version()? != source_version {
             return Err(invalid(
@@ -58,6 +79,8 @@ impl Snapshot {
         bytes: SourcePayload,
         owner: &Relationship,
         context: Option<ExecutionContext>,
+        limits: SourceLimits,
+        shared_names: Option<Arc<[DefinedName]>>,
     ) -> Result<Self> {
         Self::from_parts(
             workbook.partname().clone(),
@@ -65,6 +88,8 @@ impl Snapshot {
             bytes,
             owner,
             context,
+            limits,
+            shared_names,
         )
     }
 
@@ -74,12 +99,25 @@ impl Snapshot {
         bytes: SourcePayload,
         owner: &Relationship,
         context: Option<ExecutionContext>,
+        limits: SourceLimits,
+        shared_names: Option<Arc<[DefinedName]>>,
     ) -> Result<Self> {
-        let names = raw::parse_catalog(bytes.as_bytes())?
-            .defined_names
-            .into_boxed_slice();
+        let catalog = raw::parse_catalog(bytes.as_bytes(), &limits)?;
+        let active_sheet = (!catalog.sheets.is_empty()).then_some(catalog.active_sheet_index);
+        let names = match shared_names {
+            Some(shared) => {
+                if catalog.defined_names.as_slice() != shared.as_ref() {
+                    return Err(invalid(
+                        "defined-name source catalog changed during snapshot",
+                    ));
+                }
+                shared
+            },
+            None => Arc::from(catalog.defined_names.into_boxed_slice()),
+        };
         Ok(Self {
             names,
+            active_sheet,
             source: SourceState {
                 part_name,
                 content_type: copy_boxed(content_type, "defined-name workbook content type")?,
@@ -87,13 +125,17 @@ impl Snapshot {
                 owner_relationship: SourceRelationship::capture(owner)?,
             },
             context,
+            limits,
         })
     }
 
     pub(super) fn from_rewritten_source(source: &Self, bytes: Vec<u8>) -> Result<Self> {
-        let names = raw::parse_catalog(&bytes)?.defined_names.into_boxed_slice();
+        let catalog = raw::parse_catalog(&bytes, &source.limits)?;
+        let active_sheet = (!catalog.sheets.is_empty()).then_some(catalog.active_sheet_index);
+        let names = Arc::from(catalog.defined_names.into_boxed_slice());
         let mut rewritten = source.clone();
         rewritten.names = names;
+        rewritten.active_sheet = active_sheet;
         rewritten.source.bytes = SourcePayload::Owned(Arc::new(bytes));
         Ok(rewritten)
     }
@@ -102,6 +144,13 @@ impl Snapshot {
     #[must_use]
     pub fn defined_names(&self) -> &[DefinedName] {
         &self.names
+    }
+
+    pub(super) fn deferred_catalog(&self) -> crate::workbook::source::deferred::Catalog {
+        crate::workbook::source::deferred::Catalog {
+            defined_names: self.names.clone(),
+            active_sheet: self.active_sheet,
+        }
     }
 
     /// Resolved workbook Part name.
@@ -146,17 +195,6 @@ impl Snapshot {
     pub(super) fn same_source(&self, other: &Self) -> bool {
         self.source == other.source
     }
-
-    pub(super) fn matches_current_source(&self, package: &OpcPackage) -> bool {
-        let Ok(workbook) = package.main_document_part() else {
-            return false;
-        };
-        workbook.partname() == &self.source.part_name
-            && workbook.content_type() == self.source.content_type.as_ref()
-            && workbook.blob() == self.source.bytes.as_bytes()
-            && current_owner_relationship(package.rels())
-                .is_some_and(|owner| self.source.owner_relationship.matches(owner))
-    }
 }
 
 impl PartialEq for Snapshot {
@@ -197,13 +235,6 @@ impl SourceRelationship {
             )?,
             mode: relationship.target_mode(),
         })
-    }
-
-    fn matches(&self, relationship: &Relationship) -> bool {
-        relationship.r_id() == self.id.as_ref()
-            && relationship.reltype() == self.relationship_type.as_ref()
-            && relationship.target_ref() == self.target.as_ref()
-            && relationship.target_mode() == self.mode
     }
 }
 

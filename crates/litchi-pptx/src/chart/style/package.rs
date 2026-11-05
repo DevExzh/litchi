@@ -45,7 +45,10 @@ impl<'a> Part<'a> {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(&self) -> Result<Document> {
-        Ok(litchi_drawingml::chart::style::parse(self.part.blob())?)
+        Ok(litchi_drawingml::chart::style::parse(
+            self.part.blob(),
+            &litchi_drawingml::chart::Limits::DEFAULT,
+        )?)
     }
 
     /// The underlying OPC part.
@@ -83,6 +86,7 @@ impl<'a> ColorPart<'a> {
     pub fn parse(&self) -> Result<ColorDocument> {
         Ok(litchi_drawingml::chart::style::parse_color(
             self.part.blob(),
+            &litchi_drawingml::chart::Limits::DEFAULT,
         )?)
     }
 

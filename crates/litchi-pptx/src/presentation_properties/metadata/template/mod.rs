@@ -2,6 +2,7 @@
 
 mod codec;
 
+pub use super::Limits;
 pub use codec::{
     all_slide_layouts, default_app_props_xml, default_core_props_xml, default_pres_props_xml,
     default_presentation_xml, default_slide_master_xml, default_theme_xml, default_view_props_xml,

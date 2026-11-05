@@ -34,6 +34,53 @@ pub(crate) const BINARY_INDEX_RELATIONSHIP: &str =
     "http://schemas.microsoft.com/office/2006/relationships/xlBinaryIndex";
 pub(crate) const BINARY_INDEX_CONTENT_TYPE: &str = "application/vnd.ms-excel.binIndexWs";
 
+/// A bounded dimension of this family; an exceeded bound is reported as
+/// [`crate::package::PackageError::Limit`] with this kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Bytes of one binary-index part.
+    Bytes,
+    /// Records of one binary-index part.
+    Records,
+    /// Entries of one binary index.
+    Entries,
+    /// Blocks of one binary index.
+    Blocks,
+    /// Worksheet records scanned by one lookup.
+    LookupRecords,
+    /// Bytes of the indexed worksheet.
+    WorksheetBytes,
+    /// Records of the indexed worksheet.
+    WorksheetRecords,
+    /// Cells of the indexed worksheet.
+    WorksheetCells,
+    /// Bytes of one cached cell payload.
+    CachedCellPayload,
+    /// UTF-16 units of one indexed rich string.
+    RichStringUnits,
+    /// Bytes of one encoded binary index.
+    OutputBytes,
+}
+
+impl fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::Bytes => "binary-index bytes",
+            Self::Records => "binary-index records",
+            Self::Entries => "binary-index entries",
+            Self::Blocks => "binary-index blocks",
+            Self::LookupRecords => "binary-index lookup records",
+            Self::WorksheetBytes => "binary-index worksheet bytes",
+            Self::WorksheetRecords => "binary-index worksheet records",
+            Self::WorksheetCells => "binary-index worksheet cells",
+            Self::CachedCellPayload => "binary-index cached cell payload",
+            Self::RichStringUnits => "binary-index rich-string units",
+            Self::OutputBytes => "binary-index output bytes",
+        })
+    }
+}
+
 /// Finite resource limits for one binary-index operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Limits {
@@ -195,18 +242,10 @@ impl BinaryIndex {
     pub fn parse(bytes: &[u8], limits: Limits) -> Result<Self> {
         let limits = limits.validate()?;
         if bytes.len() > MAX_INDEX_STREAM_BYTES {
-            return Err(limit(
-                "binary-index bytes",
-                bytes.len(),
-                MAX_INDEX_STREAM_BYTES,
-            ));
+            return Err(limit(LimitKind::Bytes, bytes.len(), MAX_INDEX_STREAM_BYTES));
         }
         if bytes.len() > limits.source_bytes {
-            return Err(limit(
-                "binary-index bytes",
-                bytes.len(),
-                limits.source_bytes,
-            ));
+            return Err(limit(LimitKind::Bytes, bytes.len(), limits.source_bytes));
         }
         let source = Arc::new(copy_bytes(bytes, "binary-index bytes")?);
         Self::parse_shared(source, limits)
@@ -244,17 +283,13 @@ impl BinaryIndex {
         let mut previous_start = None;
         let mut previous_end = None;
 
-        for record_result in raw::Records::try_with_limits(source.as_slice(), limits.raw)? {
+        for record_result in raw::Records::bounded(source.as_slice(), limits.raw)? {
             let record = record_result?;
             record_count = record_count.checked_add(1).ok_or(Error::CapacityOverflow {
                 resource: "binary-index record count",
             })?;
             if record_count > limits.max_records {
-                return Err(limit(
-                    "binary-index records",
-                    record_count,
-                    limits.max_records,
-                ));
+                return Err(limit(LimitKind::Records, record_count, limits.max_records));
             }
             if ended && record.kind() != kind::INDEX_PART_END {
                 return Err(invalid("record follows BrtIndexPartEnd"));
@@ -300,7 +335,7 @@ impl BinaryIndex {
                         },
                     )?;
                     if entry_count > limits.max_cells {
-                        return Err(limit("binary-index entries", entry_count, limits.max_cells));
+                        return Err(limit(LimitKind::Entries, entry_count, limits.max_cells));
                     }
                     push_index_block(
                         &mut blocks,
@@ -364,7 +399,7 @@ fn empty_row_block() -> RowBlock {
 fn push_index_block(blocks: &mut Vec<IndexBlock>, limits: Limits, block: IndexBlock) -> Result<()> {
     if blocks.len() >= limits.max_blocks {
         return Err(limit(
-            "binary-index blocks",
+            LimitKind::Blocks,
             blocks.len() + 1,
             limits.max_blocks,
         ));
@@ -397,11 +432,6 @@ impl WorksheetBinaryIndex {
     pub fn from_parts(index: &[u8], worksheet: &[u8], limits: Limits) -> Result<Self> {
         let parsed = BinaryIndex::parse(index, limits)?;
         parsed.bind(worksheet, limits)
-    }
-
-    /// Parse and bind using safe defaults.
-    pub fn from_parts_default(index: &[u8], worksheet: &[u8]) -> Result<Self> {
-        Self::from_parts(index, worksheet, Limits::DEFAULT)
     }
 
     /// Return the validated standalone index.
@@ -469,14 +499,14 @@ impl WorksheetBinaryIndex {
         let mut current_row = row;
         let mut first = true;
         let mut record_count = 0usize;
-        for record_result in raw::Records::try_with_limits(tail, self.limits.raw)? {
+        for record_result in raw::Records::bounded(tail, self.limits.raw)? {
             let record = record_result?;
             record_count = record_count.checked_add(1).ok_or(Error::CapacityOverflow {
                 resource: "binary-index lookup records",
             })?;
             if record_count > self.limits.max_records {
                 return Err(limit(
-                    "binary-index lookup records",
+                    LimitKind::LookupRecords,
                     record_count,
                     self.limits.max_records,
                 ));
@@ -544,7 +574,7 @@ pub(crate) fn maintain_index(
     if let Some(bytes) = source_index {
         let maximum = MAX_INDEX_STREAM_BYTES.min(limits.source_bytes);
         if bytes.len() > maximum {
-            return Err(limit("binary-index bytes", bytes.len(), maximum));
+            return Err(limit(LimitKind::Bytes, bytes.len(), maximum));
         }
     }
     if before_worksheet == after_worksheet {
@@ -821,7 +851,7 @@ fn parse_row_block(
         return Err(invalid("BrtIndexRowBlock offset array length is invalid"));
     }
     if total_columns > max_entries {
-        return Err(limit("binary-index entries", total_columns, max_entries));
+        return Err(limit(LimitKind::Entries, total_columns, max_entries));
     }
     columns
         .try_reserve_exact(total_columns)
@@ -876,7 +906,7 @@ fn parse_row_block(
 fn scan_worksheet(worksheet: &[u8], limits: Limits) -> Result<WorksheetScan> {
     if worksheet.len() > limits.source_bytes {
         return Err(limit(
-            "binary-index worksheet bytes",
+            LimitKind::WorksheetBytes,
             worksheet.len(),
             limits.source_bytes,
         ));
@@ -890,13 +920,17 @@ fn scan_worksheet(worksheet: &[u8], limits: Limits) -> Result<WorksheetScan> {
     let mut previous_column = None;
     let mut cell_count = 0usize;
     let mut record_count = 0usize;
-    for record_result in raw::Records::try_with_limits(worksheet, limits.raw)? {
+    for record_result in raw::Records::bounded(worksheet, limits.raw)? {
         let record = record_result?;
         record_count = record_count.checked_add(1).ok_or(Error::CapacityOverflow {
             resource: "worksheet record count",
         })?;
         if record_count > limits.max_records {
-            return Err(limit("worksheet records", record_count, limits.max_records));
+            return Err(limit(
+                LimitKind::WorksheetRecords,
+                record_count,
+                limits.max_records,
+            ));
         }
         match record.kind() {
             kind::BEGIN_SHEET_DATA => {
@@ -955,7 +989,11 @@ fn scan_worksheet(worksheet: &[u8], limits: Limits) -> Result<WorksheetScan> {
                     resource: "worksheet cell count",
                 })?;
                 if cell_count > limits.max_cells {
-                    return Err(limit("worksheet cells", cell_count, limits.max_cells));
+                    return Err(limit(
+                        LimitKind::WorksheetCells,
+                        cell_count,
+                        limits.max_cells,
+                    ));
                 }
                 let anchor = CellOffset {
                     row,
@@ -987,7 +1025,7 @@ fn scan_worksheet(worksheet: &[u8], limits: Limits) -> Result<WorksheetScan> {
     })
 }
 
-fn is_cell_kind(kind_value: raw::Kind) -> bool {
+pub(crate) fn is_cell_kind(kind_value: raw::Kind) -> bool {
     (kind::CELL_BLANK.get()..=kind::FMLA_ERROR.get()).contains(&kind_value.get())
         || kind_value == kind::CELL_R_STRING
 }
@@ -1009,7 +1047,7 @@ pub(crate) fn decode_cached_value(
     limits.validate()?;
     if payload.len() > limits.payload() {
         return Err(limit(
-            "cached cell payload",
+            LimitKind::CachedCellPayload,
             payload.len(),
             limits.payload(),
         ));
@@ -1035,7 +1073,7 @@ pub(crate) fn decode_cached_value(
         },
         kind::CELL_RK => {
             require_cached_exact(payload, 12)?;
-            let mut cursor = raw::Cursor::with_limits(&payload[8..], "BrtCellRk", limits);
+            let mut cursor = raw::Cursor::new(&payload[8..], "BrtCellRk", limits);
             let value = cursor.read_rk()?;
             validate_cached_number(value)?;
             Ok(crate::cell_values::Value::RkNumber(value))
@@ -1074,8 +1112,7 @@ pub(crate) fn decode_cached_value(
             )
         },
         kind::CELL_ST => {
-            let mut cursor =
-                raw::Cursor::with_limits(&payload[8..], "BrtCellSt", cell_string_limits);
+            let mut cursor = raw::Cursor::new(&payload[8..], "BrtCellSt", cell_string_limits);
             let value = tolerance.read_wide_string(&mut cursor, kind_value, row)?;
             tolerance.finish(&cursor, kind_value, row)?;
             Ok(crate::cell_values::Value::InlineString(value))
@@ -1095,13 +1132,13 @@ pub(crate) fn decode_cached_value(
                     tolerance,
                     kind_value,
                     row,
+                    limits,
                 )?,
             ))
         },
         kind::FMLA_STRING => {
             require_cached_at_least(payload, 14)?;
-            let mut cursor =
-                raw::Cursor::with_limits(&payload[8..], "BrtFmlaString", cell_string_limits);
+            let mut cursor = raw::Cursor::new(&payload[8..], "BrtFmlaString", cell_string_limits);
             let value = tolerance.read_wide_string(&mut cursor, kind_value, row)?;
             if cursor.remaining() < 10 {
                 return Err(invalid("BrtFmlaString is missing formula metadata"));
@@ -1181,7 +1218,7 @@ fn validate_cached_number(value: f64) -> Result<()> {
 }
 
 fn preflight_cached_rich_string(bytes: &[u8], limits: raw::Limits) -> Result<()> {
-    let mut cursor = raw::Cursor::with_limits(bytes, "indexed RichStr", limits);
+    let mut cursor = raw::Cursor::new(bytes, "indexed RichStr", limits);
     let flags = cursor.read_u8()?;
     preflight_cached_string(&mut cursor, limits.string_units().min(32_767))?;
     if flags & 1 != 0 {
@@ -1202,7 +1239,7 @@ fn preflight_cached_string(cursor: &mut raw::Cursor<'_>, maximum: usize) -> Resu
     let units = usize::try_from(cursor.read_u32()?)
         .map_err(|_error| invalid("rich-string length exceeds platform size"))?;
     if units > maximum {
-        return Err(limit("indexed rich-string code units", units, maximum));
+        return Err(limit(LimitKind::RichStringUnits, units, maximum));
     }
     let bytes = units.checked_mul(2).ok_or(Error::CapacityOverflow {
         resource: "indexed rich-string bytes",
@@ -1236,7 +1273,7 @@ fn encode_anchors(scan: &WorksheetScan, limits: Limits) -> Result<Vec<u8>> {
     block_starts.extend(entries_by_block.keys().copied());
     if block_starts.len() > limits.max_blocks {
         return Err(limit(
-            "binary-index blocks",
+            LimitKind::Blocks,
             block_starts.len(),
             limits.max_blocks,
         ));
@@ -1362,7 +1399,7 @@ fn patch_offsets(source: &[u8], after: &WorksheetBinaryIndex, limits: Limits) ->
         .collect::<BTreeMap<_, _>>();
     let mut block_index = 0usize;
     let mut current_block = None;
-    for record_result in raw::Records::try_with_limits(source, limits.raw)? {
+    for record_result in raw::Records::bounded(source, limits.raw)? {
         let record = record_result?;
         match record.kind() {
             kind::INDEX_BLOCK => {
@@ -1533,12 +1570,12 @@ fn write_record(
             resource: "binary-index output bytes",
         })?;
     if new_len > maximum {
-        return Err(limit("binary-index output bytes", new_len, maximum));
+        return Err(limit(LimitKind::OutputBytes, new_len, maximum));
     }
     output
         .try_reserve(record_len)
         .map_err(|source| allocation("binary-index output bytes", source))?;
-    let mut writer = raw::Writer::with_limits(output, limits.raw);
+    let mut writer = raw::Encoder::new(output, limits.raw);
     writer.write_record(kind_value, payload)?;
     Ok(())
 }
@@ -1561,14 +1598,14 @@ fn record_wire_len(kind_value: raw::Kind, payload_len: usize) -> Result<usize> {
         })
 }
 
-fn invalid(message: &str) -> Error {
-    Error::InvalidFormat(format!("worksheet binary index: {message}"))
+fn invalid(message: &'static str) -> Error {
+    Error::InvalidFormat(message)
 }
 
-fn limit(resource: &'static str, actual: usize, maximum: usize) -> Error {
-    Error::LimitExceeded {
-        resource,
-        actual,
+const fn limit(kind: LimitKind, actual: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::package::LimitKind::BinaryIndex(kind),
+        observed: actual,
         maximum,
     }
 }
@@ -1605,7 +1642,7 @@ mod tests {
 
     fn worksheet_with_cells(cells: &[(u32, u32)]) -> Vec<u8> {
         let mut bytes = Vec::new();
-        let mut writer = raw::Writer::new(&mut bytes);
+        let mut writer = raw::Encoder::new(&mut bytes, raw::Limits::DEFAULT);
         writer
             .write_record(kind::BEGIN_SHEET_DATA, &[])
             .expect("begin");
@@ -1633,7 +1670,8 @@ mod tests {
     fn generated_index_binds_and_looks_up_exact_cells() {
         let worksheet = worksheet_with_cells(&[(0, 0), (0, 1024), (33, 2)]);
         let index = encode_for_worksheet(&worksheet, Limits::DEFAULT).expect("index");
-        let bound = WorksheetBinaryIndex::from_parts_default(&index, &worksheet).expect("bind");
+        let bound =
+            WorksheetBinaryIndex::from_parts(&index, &worksheet, Limits::DEFAULT).expect("bind");
         assert_eq!(
             bound
                 .lookup_record(&worksheet, 0, 0)
@@ -1677,7 +1715,7 @@ mod tests {
         // its base offset is at payload+4 and must point to the cell header.
         let base = 2 + 4;
         index[base..base + 8].copy_from_slice(&1_u64.to_le_bytes());
-        assert!(WorksheetBinaryIndex::from_parts_default(&index, &worksheet).is_err());
+        assert!(WorksheetBinaryIndex::from_parts(&index, &worksheet, Limits::DEFAULT).is_err());
     }
 
     #[test]
@@ -1685,7 +1723,7 @@ mod tests {
         let worksheet = worksheet_with_cells(&[(0, 0), (0, 1)]);
         let index = encode_for_worksheet(&worksheet, Limits::DEFAULT).expect("index");
         let mut shifted = Vec::new();
-        let mut writer = raw::Writer::new(&mut shifted);
+        let mut writer = raw::Encoder::new(&mut shifted, raw::Limits::DEFAULT);
         writer.write_record(kind::FRT_BEGIN, &[0; 4]).expect("frt");
         shifted.extend_from_slice(&worksheet);
 
@@ -1693,7 +1731,7 @@ mod tests {
             .expect("maintain")
             .expect("existing index");
         assert_ne!(maintained, index);
-        let bound = WorksheetBinaryIndex::from_parts_default(&maintained, &shifted)
+        let bound = WorksheetBinaryIndex::from_parts(&maintained, &shifted, Limits::DEFAULT)
             .expect("patched index binds");
         assert_eq!(
             bound
@@ -1723,7 +1761,7 @@ mod tests {
             .expect("second anchor")
             .offset;
         let mut index = Vec::new();
-        let mut writer = raw::Writer::new(&mut index);
+        let mut writer = raw::Encoder::new(&mut index, raw::Limits::DEFAULT);
         let mut block = Vec::new();
         block.extend_from_slice(&2_u32.to_le_bytes());
         block.extend_from_slice(&4_u32.to_le_bytes());
@@ -1752,21 +1790,21 @@ mod tests {
         drop(writer);
 
         let mut shifted = Vec::new();
-        raw::Writer::new(&mut shifted)
+        raw::Encoder::new(&mut shifted, raw::Limits::DEFAULT)
             .write_record(kind::FRT_BEGIN, &[0; 4])
             .expect("prefix");
         shifted.extend_from_slice(&worksheet);
         let maintained = maintain_index(Some(&index), &worksheet, &shifted, Limits::DEFAULT)
             .expect("maintain")
             .expect("existing index");
-        let first = raw::Records::new(&maintained)
+        let first = raw::Records::new(&maintained, raw::Limits::DEFAULT)
             .next()
             .expect("index block record")
             .expect("index block framing");
         assert_eq!(first.kind(), kind::INDEX_BLOCK);
         assert_eq!(read_u32(first.payload(), 0).expect("row start"), 2);
         assert_eq!(read_u32(first.payload(), 4).expect("row end"), 4);
-        WorksheetBinaryIndex::from_parts_default(&maintained, &shifted)
+        WorksheetBinaryIndex::from_parts(&maintained, &shifted, Limits::DEFAULT)
             .expect("patched native partition binds");
     }
 
@@ -1775,7 +1813,7 @@ mod tests {
         let worksheet = worksheet_with_cells(&[(0, 0)]);
         let canonical = encode_for_worksheet(&worksheet, Limits::DEFAULT).expect("index");
         let mut opaque = Vec::new();
-        raw::Writer::new(&mut opaque)
+        raw::Encoder::new(&mut opaque, raw::Limits::DEFAULT)
             .write_record(
                 raw::Kind::new(0x1234).expect("opaque kind"),
                 b"extension bytes",
@@ -1783,7 +1821,7 @@ mod tests {
             .expect("opaque record");
         opaque.extend_from_slice(&canonical);
 
-        let first_cell = raw::Records::new(&worksheet)
+        let first_cell = raw::Records::new(&worksheet, raw::Limits::DEFAULT)
             .find_map(|record| {
                 let record = record.expect("record");
                 (is_cell_kind(record.kind())).then_some(record)
@@ -1812,7 +1850,8 @@ mod tests {
                 0, 0x95, 0x02, 0,
             ]
         );
-        let bound = WorksheetBinaryIndex::from_parts_default(&index, &worksheet).expect("bind");
+        let bound =
+            WorksheetBinaryIndex::from_parts(&index, &worksheet, Limits::DEFAULT).expect("bind");
         assert!(
             bound
                 .lookup_record(&worksheet, 0, 0)
@@ -1837,9 +1876,9 @@ mod cached_value_tests {
             let result = super::maintain_index(Some(b"123456789"), b"a", after, limits);
             assert!(matches!(
                 result,
-                Err(super::Error::LimitExceeded {
-                    resource: "binary-index bytes",
-                    actual: 9,
+                Err(super::Error::Limit {
+                    kind: crate::package::LimitKind::BinaryIndex(super::LimitKind::Bytes),
+                    observed: 9,
                     maximum: 8,
                 })
             ));

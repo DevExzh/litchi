@@ -109,6 +109,44 @@ mod buffa_data_reference_generated {
     ));
 }
 
+/// Private Buffa lazy-view projection for the shared iWork theme wrapper and
+/// its singular base/extension edges. Repeated preset lists, all extension
+/// payload bytes, and unknown fields remain source-owned by `theme_codec`.
+#[doc(hidden)]
+mod buffa_theme_archive_generated {
+    #![allow(
+        elided_lifetimes_in_paths,
+        reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
+    )]
+    #![allow(
+        unreachable_pub,
+        reason = "The theme sidecar is intentionally private to this crate."
+    )]
+    #![allow(
+        clippy::allow_attributes_without_reason,
+        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
+    )]
+    #![allow(
+        clippy::map_err_ignore,
+        clippy::shadow_reuse,
+        clippy::shadow_same,
+        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
+    )]
+    #![allow(
+        non_snake_case,
+        clippy::all,
+        clippy::arbitrary_source_item_ordering,
+        clippy::module_name_repetitions,
+        clippy::pedantic,
+        reason = "Buffa generated theme views are private implementation detail."
+    )]
+
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-theme-archive/iwa_theme_archive_buffa_protos.rs"
+    ));
+}
+
 /// Private Buffa lazy-view projection for `TSWP.StorageArchive.text` only.
 ///
 /// It is generated in isolation with unknown retention disabled. The source
@@ -613,6 +651,47 @@ mod buffa_keynote_media_creation_generated {
     ));
 }
 
+/// Private Buffa view projection for fresh Keynote rectangle text boxes.
+///
+/// The generated closure is write-only in production. The focused Keynote
+/// package constructs borrowed views for the canonical shape/storage subset;
+/// source graph payloads remain the preservation authority for all other
+/// shape properties.
+#[doc(hidden)]
+mod buffa_keynote_shape_creation_generated {
+    #![allow(
+        elided_lifetimes_in_paths,
+        reason = "Buffa generated views elide explicit lifetimes."
+    )]
+    #![allow(
+        unreachable_pub,
+        reason = "The Buffa projection is intentionally private to this crate."
+    )]
+    #![allow(
+        clippy::allow_attributes_without_reason,
+        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
+    )]
+    #![allow(
+        clippy::map_err_ignore,
+        clippy::shadow_reuse,
+        clippy::shadow_same,
+        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
+    )]
+    #![allow(
+        non_snake_case,
+        clippy::all,
+        clippy::arbitrary_source_item_ordering,
+        clippy::module_name_repetitions,
+        clippy::pedantic,
+        reason = "Buffa generated views are private implementation detail."
+    )]
+
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-keynote-shape-creation/iwa_keynote_shape_creation_buffa_protos.rs"
+    ));
+}
+
 /// Private Buffa view projection for fresh Keynote build records.
 #[doc(hidden)]
 mod buffa_keynote_build_creation_generated {
@@ -1057,6 +1136,29 @@ mod buffa_keynote_slide_number_generated {
     include!(concat!(
         env!("OUT_DIR"),
         "/buffa-keynote-slide-number/iwa_keynote_slide_number_buffa_protos.rs"
+    ));
+}
+
+/// Private Buffa lazy view for the neutral TSWP number-attachment payload.
+#[doc(hidden)]
+mod buffa_number_attachment_generated {
+    #![allow(
+        elided_lifetimes_in_paths,
+        unreachable_pub,
+        clippy::all,
+        clippy::allow_attributes_without_reason,
+        clippy::arbitrary_source_item_ordering,
+        clippy::map_err_ignore,
+        clippy::module_name_repetitions,
+        clippy::pedantic,
+        clippy::shadow_reuse,
+        clippy::shadow_same,
+        non_snake_case,
+        reason = "Buffa generated projection is private implementation detail."
+    )]
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-number-attachment/iwa_number_attachment_buffa_protos.rs"
     ));
 }
 
@@ -1523,6 +1625,44 @@ mod buffa_keynote_show_generated {
     include!(concat!(
         env!("OUT_DIR"),
         "/buffa-keynote-show/iwa_keynote_show_buffa_protos.rs"
+    ));
+}
+
+/// Private Buffa lazy-view projection for the outer Keynote theme envelope.
+/// The shared TSS theme payload and repeated template references remain
+/// source-owned by `keynote_theme_codec`.
+#[doc(hidden)]
+mod buffa_keynote_theme_generated {
+    #![allow(
+        elided_lifetimes_in_paths,
+        reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
+    )]
+    #![allow(
+        unreachable_pub,
+        reason = "The Keynote theme sidecar is intentionally private."
+    )]
+    #![allow(
+        clippy::allow_attributes_without_reason,
+        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
+    )]
+    #![allow(
+        clippy::map_err_ignore,
+        clippy::shadow_reuse,
+        clippy::shadow_same,
+        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
+    )]
+    #![allow(
+        non_snake_case,
+        clippy::all,
+        clippy::arbitrary_source_item_ordering,
+        clippy::module_name_repetitions,
+        clippy::pedantic,
+        reason = "Buffa generated Keynote theme views are private implementation detail."
+    )]
+
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-keynote-theme/iwa_keynote_theme_buffa_protos.rs"
     ));
 }
 
@@ -2070,6 +2210,13 @@ mod buffa_keynote_slide_background_generated {
 #[doc(hidden)]
 pub mod archive_codec;
 
+/// Bounded source-preserving owner for the shared iWork theme wrapper.
+pub mod theme_codec;
+
+/// Internal bounded construction of typed theme preset extensions.
+#[doc(hidden)]
+pub mod theme_presets_codec;
+
 /// Internal raw-text projection codec implemented by the private Buffa
 /// sidecar. Generated types remain inaccessible to downstream crates.
 #[doc(hidden)]
@@ -2129,6 +2276,11 @@ pub mod image_adjustments_codec;
 #[doc(hidden)]
 pub mod keynote_movie_geometry_codec;
 
+/// Internal neutral geometry and shared drawable-property projection used by
+/// focused shape owners. Generated Buffa values remain private to this crate.
+#[doc(hidden)]
+pub mod shape_properties_codec;
+
 /// Internal strict source-preserving Keynote MovieArchive drawable-properties
 /// projection. Generated Buffa values remain private to this crate.
 #[doc(hidden)]
@@ -2138,6 +2290,11 @@ pub mod keynote_media_properties_codec;
 /// Generated projection types remain private to this crate.
 #[doc(hidden)]
 pub mod keynote_media_creation_codec;
+
+/// Internal bounded Buffa authoring for fresh Keynote rectangle text boxes.
+/// Generated projection types remain private to this crate.
+#[doc(hidden)]
+pub mod keynote_shape_creation_codec;
 
 /// Internal bounded Buffa authoring for fresh Keynote build records.
 /// Generated projection types remain private to this crate.
@@ -2170,6 +2327,17 @@ pub mod keynote_chart_title_codec;
 /// types remain private and source bytes remain the preservation authority.
 #[doc(hidden)]
 pub mod keynote_chart_legend_codec;
+
+/// Internal bounded property codec for the generated extensions of the eight
+/// TSCH chart style archives and the chart style-reference projection, shared
+/// by the Pages, Numbers and Keynote chart engines (record 0375).
+#[doc(hidden)]
+pub mod chart_style_codec;
+
+/// Internal bounded shape-geometry codec (native straight lines) shared by
+/// the Pages, Numbers and Keynote shape engines (record 0375).
+#[doc(hidden)]
+pub mod shape_style_codec;
 
 /// Internal strict shared chart Arrange-state projection. Generated types
 /// remain private and caller-owned source bytes remain the preservation
@@ -2231,6 +2399,10 @@ pub mod keynote_slide_drawables_codec;
 #[doc(hidden)]
 pub mod keynote_slide_number_codec;
 
+/// Internal strict neutral TSWP number-attachment projection.
+#[doc(hidden)]
+pub mod number_attachment_codec;
+
 /// Internal strict Keynote soundtrack-settings projection.
 #[doc(hidden)]
 pub mod keynote_soundtrack_settings_codec;
@@ -2255,6 +2427,11 @@ pub mod table_info_codec;
 /// Generated types remain inaccessible to downstream crates.
 #[doc(hidden)]
 pub mod keynote_show_codec;
+
+/// Internal source-preserving Keynote outer-theme projection. Generated
+/// values remain private and the shared TSS theme payload stays opaque.
+#[doc(hidden)]
+pub mod keynote_theme_codec;
 
 /// Internal Pages section-pagination projection implemented by a private
 /// Buffa lazy-view sidecar. Generated types remain inaccessible downstream.

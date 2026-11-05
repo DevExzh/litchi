@@ -57,9 +57,9 @@ fn native_read_noop_apply_and_selectors_are_exact() -> TestResult<()> {
     assert_eq!(by_index.visible(), Some(true));
     assert_eq!(by_index.outlined(), None);
 
-    let edit = package.edit_table_title(0usize, 0usize)?;
-    assert_eq!(edit.path(), Path::Table { sheet: 0, table: 0 });
-    assert_eq!(edit.settings(), by_index);
+    let mut edit = package.edit_table_title(0usize, 0usize)?;
+    assert_eq!(edit.path()?, Path::Table { sheet: 0, table: 0 });
+    assert_eq!(edit.settings()?, by_index);
     let commit = edit.set(by_index).commit()?;
     assert!(commit.patch().is_noop());
     assert_eq!(commit.patch().before(), by_index);
@@ -80,11 +80,15 @@ fn native_read_noop_apply_and_selectors_are_exact() -> TestResult<()> {
 
     assert!(matches!(
         package.table_title_settings("missing", 0usize),
-        Err(Error::SheetNotFound)
+        Err(Error::Refused(
+            litchi_numbers::table::title::Refusal::SheetNotFound
+        ))
     ));
     assert!(matches!(
         package.table_title_settings(0usize, "missing"),
-        Err(Error::TableNotFound)
+        Err(Error::Refused(
+            litchi_numbers::table::title::Refusal::TableNotFound
+        ))
     ));
     Ok(())
 }
@@ -264,8 +268,8 @@ fn native_explicit_outline_and_combined_changes_are_exact_and_reversible() -> Te
 }
 
 fn assert_exact_locality(source: &[u8], target: &[u8]) -> TestResult<()> {
-    let source = Catalog::from_bytes(source)?;
-    let target = Catalog::from_bytes(target)?;
+    let source = Catalog::from_bytes(source, Default::default())?;
+    let target = Catalog::from_bytes(target, Default::default())?;
     let mut changed_members = Vec::new();
 
     for before in source.iter() {

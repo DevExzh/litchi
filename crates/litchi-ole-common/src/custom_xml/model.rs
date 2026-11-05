@@ -38,6 +38,7 @@ impl Default for Limits {
 }
 
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     Ole(OleError),
     Invalid(String),
@@ -222,7 +223,7 @@ impl Item {
         super::codec::validate_storage_name(&name)?;
         let root_name = super::xml::validate_payload(&xml, &limits)?;
         super::codec::validate_properties(&properties, &limits)?;
-        let properties_xml = super::codec::write_properties(&properties)?;
+        let properties_xml = super::codec::write_properties(&properties, &limits)?;
         Ok(Self {
             storage_name: name,
             xml: Arc::from(xml),
@@ -276,7 +277,11 @@ impl Item {
     ///
     /// Returns an error if `xml` is malformed or exceeds the default limits.
     pub fn set_xml(&mut self, xml: Vec<u8>) -> Result<()> {
-        let root_name = super::xml::validate_payload(&xml, &Limits::default())?;
+        self.set_xml_with_limits(xml, &Limits::default())
+    }
+
+    pub(crate) fn set_xml_with_limits(&mut self, xml: Vec<u8>, limits: &Limits) -> Result<()> {
+        let root_name = super::xml::validate_payload(&xml, limits)?;
         self.xml = Arc::from(xml);
         self.root_name = root_name;
         Ok(())
@@ -289,7 +294,10 @@ impl Item {
     /// Returns an error if `properties` violates the default format limits.
     pub fn set_properties(&mut self, properties: Properties) -> Result<()> {
         super::codec::validate_properties(&properties, &Limits::default())?;
-        self.properties_xml = Arc::from(super::codec::write_properties(&properties)?);
+        self.properties_xml = Arc::from(super::codec::write_properties(
+            &properties,
+            &Limits::default(),
+        )?);
         self.properties = properties;
         Ok(())
     }

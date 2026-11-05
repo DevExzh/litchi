@@ -7,8 +7,8 @@
 //! # Implementation Progress
 //!
 //! ## ✅ Reading (`document.rs`, `parser.rs`) - COMPLETE
-//! - ✅ `Document::open()` - Load from file path
-//! - ✅ `Document::from_bytes()` - Load from memory
+//! - ✅ `Package::open().and_then(|package| package.document())` - Load from file path
+//! - ✅ `Package::from_bytes(&).and_then(|package| package.document())` - Load from memory
 //! - ✅ `text()` - Extract all text content
 //! - ✅ `paragraphs()` - Parse all paragraphs with formatting
 //! - ✅ `tables()` - Parse tables with nested structure support
@@ -124,6 +124,7 @@ pub enum CellValue {
 
 pub mod auto_mark_file;
 pub mod bibliography_configuration;
+pub mod body;
 pub mod chart_properties;
 pub mod content_metadata;
 pub mod content_validation;
@@ -145,6 +146,7 @@ pub mod list_label_alignment;
 pub mod list_style;
 pub mod master_page;
 pub mod media;
+pub mod metadata;
 pub mod notes_configuration;
 pub mod outline_style;
 pub mod package;
@@ -215,7 +217,7 @@ pub(crate) use embedded::Object;
     unused_imports,
     reason = "ODT facade exposes the canonical document package types"
 )]
-pub(crate) use generic::{Family, FlatDocument, Package};
+pub(crate) use generic::{Family, FlatDocument, Package as GenericPackage};
 #[allow(unused_imports, reason = "ODT facade exposes graphic style semantics")]
 pub(crate) use graphic_properties::{
     Child, ChildKind, Kind, Namespace, Properties, Property, Value, parse_graphic_style_properties,
@@ -306,13 +308,19 @@ mod dynamic_text;
 pub mod frame;
 pub mod header_footer;
 pub mod index;
+#[cfg(test)]
+mod internal_tests;
 #[allow(
     unused_imports,
     reason = "internal XML helper used by moved ODF modules"
 )]
 pub(crate) use index::expanded_attributes;
 pub mod index_mark;
-pub mod mutable;
+#[allow(
+    dead_code,
+    reason = "record 0358: `MutableDocument` is the crate-private model behind `Builder` and `Edit`; its read views serve the unit regressions"
+)]
+pub(crate) mod mutable;
 pub mod note;
 pub(crate) use note::parse_notes;
 pub mod page_layout;
@@ -329,7 +337,7 @@ pub use content_metadata::{
     TextMeta,
 };
 pub use document::{
-    Document, ReadLimits, SourceBackedDocument, SourceBackedDocumentCatalog, TextBlockCatalogEntry,
+    Document, SourceBackedDocument, SourceBackedDocumentCatalog, TextBlockCatalogEntry,
 };
 #[allow(unused_imports)]
 pub use dynamic_text::{
@@ -343,6 +351,10 @@ pub(crate) use index::{
 pub(crate) use index_mark::{
     TextIndexMark, insert_text_index_mark_xml, remove_text_index_mark_xml,
     replace_text_index_mark_xml,
+};
+pub use litchi_odf_common::{
+    Error, LimitKind, OpenOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsBuilder,
+    SourceLimitKind, SourceLimits, SourceLimitsBuilder,
 };
 pub(crate) use note::{Note, NoteClass, insert_note_xml, remove_note_xml, replace_note_xml};
 pub(crate) use page_layout::PageLayout;
@@ -359,6 +371,7 @@ pub(crate) use tracked_changes::{
     Position, mark_tracked_change_range_xml, mark_tracked_deletion_xml, set_tracked_changes_xml,
     unmark_tracked_change_xml,
 };
+pub use transaction::Package;
 pub use xforms::{
     Attribute as XFormsAttribute, Bind, Extension as XFormsExtension, Instance,
     Model as XFormsModel, ModelChild as XFormsModelChild,

@@ -6,7 +6,7 @@
 
 use std::{borrow::Cow, sync::Arc};
 
-use litchi_ooxml_common::mce::{self, Capabilities, Error, Limits, NAMESPACE, Report};
+use litchi_ooxml_common::mce::{self, Capabilities, Error, LimitKind, Limits, NAMESPACE, Report};
 use litchi_opc::{PackURI, XmlPart};
 
 fn assert_borrowed(input: &[u8], limits: &Limits) {
@@ -34,7 +34,10 @@ fn assert_owned_source(input: &[u8]) -> Report {
 
 fn assert_limit(input: &[u8], limits: &Limits, expected: &str) {
     match mce::process_markup_compatibility(input, &Capabilities::new(), limits) {
-        Err(Error::LimitExceeded(actual)) => assert_eq!(actual, expected),
+        Err(Error::LimitExceeded { kind, .. }) => assert!(matches!(
+            (kind, expected),
+            (LimitKind::InputBytes, "input bytes") | (LimitKind::OutputBytes, "output bytes")
+        )),
         _ => panic!("expected the {expected} limit error"),
     }
 }

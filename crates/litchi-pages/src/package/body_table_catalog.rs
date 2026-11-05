@@ -7,7 +7,7 @@
 
 use std::fmt;
 
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use crate::Position;
 use crate::package::{Package, table_lock};
@@ -18,7 +18,7 @@ use crate::table::name::{Error as NameError, Name};
 /// catalog.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum BodyTableCatalogLimitKind {
+pub enum LimitKind {
     /// Complete package input bytes.
     InputBytes,
     /// Complete package output bytes (reserved for shared package budgets).
@@ -53,7 +53,7 @@ pub enum BodyTableCatalogLimitKind {
     WireWork,
 }
 
-impl fmt::Display for BodyTableCatalogLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -77,9 +77,9 @@ impl fmt::Display for BodyTableCatalogLimitKind {
 }
 
 /// Failure while discovering or selecting a Pages body-table catalog.
-#[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, ThisError, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum BodyTableCatalogError {
+pub enum Error {
     /// More than one rooted body table has the requested exact name.
     #[error("the Pages body has more than one table with the requested name")]
     AmbiguousTableName,
@@ -93,9 +93,9 @@ pub enum BodyTableCatalogError {
     #[error(
         "Pages body-table catalog {kind} limit exceeded: observed {observed}, maximum {maximum}"
     )]
-    LimitExceeded {
+    Limit {
         /// Resource category.
-        kind: BodyTableCatalogLimitKind,
+        kind: LimitKind,
         /// Observed or requested amount.
         observed: u64,
         /// Configured maximum.
@@ -115,19 +115,16 @@ pub enum BodyTableCatalogError {
 /// position is the zero-based order among rooted body tables in the package;
 /// it is not a native object identifier.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct BodyTableSnapshot {
+pub struct Snapshot {
     position: Position,
     name: Name,
     rows: u32,
     columns: u32,
 }
 
-impl BodyTableSnapshot {
-    pub(crate) fn from_target(
-        entry: table_lock::BodyTableTarget,
-    ) -> Result<Self, BodyTableCatalogError> {
-        let name = Name::try_from(entry.table_name.into_string())
-            .map_err(BodyTableCatalogError::InvalidName)?;
+impl Snapshot {
+    pub(crate) fn from_target(entry: table_lock::BodyTableTarget) -> Result<Self, Error> {
+        let name = Name::try_from(entry.table_name.into_string()).map_err(Error::InvalidName)?;
         Ok(Self {
             position: Position::new(entry.table_position),
             name,
@@ -191,15 +188,15 @@ impl BodyTableSnapshot {
 
 /// Immutable, bounded semantic body-table catalog in rooted source order.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct BodyTableCatalog {
-    values: Vec<BodyTableSnapshot>,
+pub struct Catalog {
+    values: Vec<Snapshot>,
 }
 
-impl BodyTableCatalog {
+impl Catalog {
     pub(crate) fn from_targets(
         entries: Vec<table_lock::BodyTableTarget>,
         budget: &mut table_lock::WireBudget,
-    ) -> Result<Self, BodyTableCatalogError> {
+    ) -> Result<Self, Error> {
         budget
             .charge_payload_items(entries.len())
             .map_err(map_lock_error)?;
@@ -211,11 +208,11 @@ impl BodyTableCatalog {
         let mut values = Vec::new();
         values
             .try_reserve_exact(entries.len())
-            .map_err(|_| BodyTableCatalogError::Allocation {
+            .map_err(|_| Error::Allocation {
                 amount: entries.len(),
             })?;
         for entry in entries {
-            values.push(BodyTableSnapshot::from_target(entry)?);
+            values.push(Snapshot::from_target(entry)?);
         }
         Ok(Self { values })
     }
@@ -225,7 +222,7 @@ impl BodyTableCatalog {
     /// Package transactions use this when the catalog has already been
     /// charged and verified.  Moving the vector keeps one allocation per
     /// semantic snapshot and avoids an unbounded clone during publication.
-    pub(crate) fn into_values(self) -> Vec<BodyTableSnapshot> {
+    pub(crate) fn into_values(self) -> Vec<Snapshot> {
         self.values
     }
 
@@ -243,13 +240,13 @@ impl BodyTableCatalog {
 
     /// Borrow all semantic table snapshots in rooted source order.
     #[must_use]
-    pub fn as_slice(&self) -> &[BodyTableSnapshot] {
+    pub fn as_slice(&self) -> &[Snapshot] {
         &self.values
     }
 
     /// Borrow one table by zero-based rooted source order.
     #[must_use]
-    pub fn get(&self, index: usize) -> Option<&BodyTableSnapshot> {
+    pub fn get(&self, index: usize) -> Option<&Snapshot> {
         self.values.get(index)
     }
 
@@ -259,10 +256,7 @@ impl BodyTableCatalog {
     /// selectors return `None` for a missing name and an error when malformed
     /// input exposes duplicate exact names, matching the existing Pages
     /// selector policy.
-    pub fn select<'selector, S>(
-        &self,
-        selector: S,
-    ) -> Result<Option<&BodyTableSnapshot>, BodyTableCatalogError>
+    pub fn select<'selector, S>(&self, selector: S) -> Result<Option<&Snapshot>, Error>
     where
         S: Into<BodyTableSelector<'selector>>,
     {
@@ -274,7 +268,7 @@ impl BodyTableCatalog {
                     return Ok(None);
                 };
                 if matches.next().is_some() {
-                    return Err(BodyTableCatalogError::AmbiguousTableName);
+                    return Err(Error::AmbiguousTableName);
                 }
                 Ok(Some(first))
             },
@@ -282,14 +276,14 @@ impl BodyTableCatalog {
     }
 
     /// Iterate over semantic table snapshots in rooted source order.
-    pub fn iter(&self) -> std::slice::Iter<'_, BodyTableSnapshot> {
+    pub fn iter(&self) -> std::slice::Iter<'_, Snapshot> {
         self.values.iter()
     }
 }
 
-impl<'a> IntoIterator for &'a BodyTableCatalog {
-    type Item = &'a BodyTableSnapshot;
-    type IntoIter = std::slice::Iter<'a, BodyTableSnapshot>;
+impl<'a> IntoIterator for &'a Catalog {
+    type Item = &'a Snapshot;
+    type IntoIter = std::slice::Iter<'a, Snapshot>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
@@ -320,7 +314,7 @@ impl Package {
     ///
     /// The catalog is a read-only discovery snapshot.  A successful catalog
     /// read does not by itself admit every later mutation on that table.
-    pub fn body_tables(&self) -> Result<BodyTableCatalog, BodyTableCatalogError> {
+    pub fn body_tables(&self) -> Result<Catalog, Error> {
         let mut budget =
             table_lock::WireBudget::new(self.state.source.limits()).map_err(map_lock_error)?;
         budget
@@ -328,54 +322,52 @@ impl Package {
             .map_err(map_lock_error)?;
         let entries = table_lock::body_table_catalog_with_budget(self, &mut budget)
             .map_err(map_lock_error)?;
-        BodyTableCatalog::from_targets(entries, &mut budget)
+        Catalog::from_targets(entries, &mut budget)
     }
 }
 
-fn map_lock_error(error: table_lock::BodyTableLockError) -> BodyTableCatalogError {
+fn map_lock_error(error: table_lock::Error) -> Error {
     match error {
-        table_lock::BodyTableLockError::AmbiguousTableName => {
-            BodyTableCatalogError::AmbiguousTableName
+        table_lock::Error::Refused(crate::table::lock::Refusal::AmbiguousTableName) => {
+            Error::AmbiguousTableName
         },
-        table_lock::BodyTableLockError::LimitExceeded {
+        table_lock::Error::Limit {
             kind,
             observed,
             maximum,
-        } => BodyTableCatalogError::LimitExceeded {
+        } => Error::Limit {
             kind: map_lock_limit(kind),
             observed,
             maximum,
         },
-        table_lock::BodyTableLockError::Allocation { amount } => {
-            BodyTableCatalogError::Allocation { amount }
-        },
-        table_lock::BodyTableLockError::TableNotFound
-        | table_lock::BodyTableLockError::AmbiguousSelector
-        | table_lock::BodyTableLockError::UnsupportedSource
-        | table_lock::BodyTableLockError::InvalidSource
-        | table_lock::BodyTableLockError::Verification
-        | table_lock::BodyTableLockError::PatchConflict => BodyTableCatalogError::InvalidSource,
+        table_lock::Error::Allocation { amount } => Error::Allocation { amount },
+        table_lock::Error::Refused(crate::table::lock::Refusal::TableNotFound)
+        | table_lock::Error::Refused(crate::table::lock::Refusal::AmbiguousSelector)
+        | table_lock::Error::Refused(crate::table::lock::Refusal::UnsupportedSource)
+        | table_lock::Error::InvalidSource
+        | table_lock::Error::Verification
+        | table_lock::Error::PatchConflict => Error::InvalidSource,
     }
 }
 
-const fn map_lock_limit(kind: table_lock::BodyTableLockLimitKind) -> BodyTableCatalogLimitKind {
-    use table_lock::BodyTableLockLimitKind as Lock;
+const fn map_lock_limit(kind: table_lock::LimitKind) -> LimitKind {
+    use table_lock::LimitKind as Lock;
     match kind {
-        Lock::InputBytes => BodyTableCatalogLimitKind::InputBytes,
-        Lock::OutputBytes => BodyTableCatalogLimitKind::OutputBytes,
-        Lock::Entries => BodyTableCatalogLimitKind::Entries,
-        Lock::EntryBytes => BodyTableCatalogLimitKind::EntryBytes,
-        Lock::TotalEntryBytes => BodyTableCatalogLimitKind::TotalEntryBytes,
-        Lock::PackageBytes => BodyTableCatalogLimitKind::PackageBytes,
-        Lock::PayloadBytes => BodyTableCatalogLimitKind::PayloadBytes,
-        Lock::TotalPayloadBytes => BodyTableCatalogLimitKind::TotalPayloadBytes,
-        Lock::PayloadObjects => BodyTableCatalogLimitKind::PayloadObjects,
-        Lock::PayloadMessages => BodyTableCatalogLimitKind::PayloadMessages,
-        Lock::PayloadItems => BodyTableCatalogLimitKind::PayloadItems,
-        Lock::PayloadReferences => BodyTableCatalogLimitKind::PayloadReferences,
-        Lock::WireBytes => BodyTableCatalogLimitKind::WireBytes,
-        Lock::WireFields => BodyTableCatalogLimitKind::WireFields,
-        Lock::WireNesting => BodyTableCatalogLimitKind::WireNesting,
-        Lock::WireWork => BodyTableCatalogLimitKind::WireWork,
+        Lock::InputBytes => LimitKind::InputBytes,
+        Lock::OutputBytes => LimitKind::OutputBytes,
+        Lock::Entries => LimitKind::Entries,
+        Lock::EntryBytes => LimitKind::EntryBytes,
+        Lock::TotalEntryBytes => LimitKind::TotalEntryBytes,
+        Lock::PackageBytes => LimitKind::PackageBytes,
+        Lock::PayloadBytes => LimitKind::PayloadBytes,
+        Lock::TotalPayloadBytes => LimitKind::TotalPayloadBytes,
+        Lock::PayloadObjects => LimitKind::PayloadObjects,
+        Lock::PayloadMessages => LimitKind::PayloadMessages,
+        Lock::PayloadItems => LimitKind::PayloadItems,
+        Lock::PayloadReferences => LimitKind::PayloadReferences,
+        Lock::WireBytes => LimitKind::WireBytes,
+        Lock::WireFields => LimitKind::WireFields,
+        Lock::WireNesting => LimitKind::WireNesting,
+        Lock::WireWork => LimitKind::WireWork,
     }
 }

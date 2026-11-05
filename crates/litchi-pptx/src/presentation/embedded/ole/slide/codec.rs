@@ -53,14 +53,27 @@ pub(crate) struct Document {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Edit {
+pub(crate) struct Draft {
     pub(crate) range: Range<usize>,
     pub(crate) replacement: Vec<u8>,
 }
 
 pub(crate) fn locate(source: &[u8]) -> Result<Document> {
     if source.len() > MAX_XML_BYTES {
-        return Err(limit("OLE slide XML bytes", MAX_XML_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            source.len(),
+            MAX_XML_BYTES,
+        ));
+    }
+    // Branches are chosen below on namespace values as written; a declaration
+    // that spells the markup-compatibility namespace with references would
+    // hide them from that choice while preprocessing applies them
+    // (record 0011).
+    if litchi_ooxml_common::mce::binds_namespace_by_reference(source) {
+        return Err(invalid(
+            "OLE slide spells the markup-compatibility namespace with references",
+        ));
     }
     let root = parse(source)?;
     let insertion = find_shape_tree(&root)
@@ -69,7 +82,11 @@ pub(crate) fn locate(source: &[u8]) -> Result<Document> {
     let mut frames = Vec::new();
     collect_frames(&root, &mut frames)?;
     if frames.len() > super::validation::MAX_OBJECTS {
-        return Err(limit("OLE object count", super::validation::MAX_OBJECTS));
+        return Err(limit(
+            crate::error::CodecLimitKind::OleObjects,
+            frames.len(),
+            super::validation::MAX_OBJECTS,
+        ));
     }
     Ok(Document {
         frames,
@@ -100,7 +117,11 @@ fn parse(source: &[u8]) -> Result<Node> {
             Event::Start(element) => {
                 increment_nodes(&mut nodes)?;
                 if stack.len() >= MAX_XML_DEPTH {
-                    return Err(limit("OLE XML depth", MAX_XML_DEPTH));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        stack.len().checked_add(1).unwrap_or(usize::MAX),
+                        MAX_XML_DEPTH,
+                    ));
                 }
                 let node = make_node(
                     source, &element, before, after, decoder, &resolver, &namespace,
@@ -169,7 +190,11 @@ fn make_node(
     namespace: &ResolveResult<'_>,
 ) -> Result<Node> {
     if count_up_to(element, MAX_XML_ATTRIBUTES) > MAX_XML_ATTRIBUTES {
-        return Err(limit("OLE XML attributes", MAX_XML_ATTRIBUTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlAttributes,
+            count_up_to(element, MAX_XML_ATTRIBUTES),
+            MAX_XML_ATTRIBUTES,
+        ));
     }
     let namespace = resolve_namespace(namespace);
     let attributes = scan_attributes(source, start, open_end, decoder, resolver)?;
@@ -252,7 +277,7 @@ fn scan_attributes(
             .decode(&source[value_start..value_end])
             .map_err(|error| Error::Xml(error.to_string()))?
             .into_owned();
-        bounded(&value, "OLE XML attribute")?;
+        bounded(&value, crate::error::CodecLimitKind::XmlAttributeBytes)?;
         attributes.push(Attribute {
             local,
             namespace,
@@ -431,7 +456,7 @@ pub(crate) fn attribute_edit(
     local: &[u8],
     relationship: bool,
     value: Option<&str>,
-) -> Result<Option<Edit>> {
+) -> Result<Option<Draft>> {
     let found = node.attributes.iter().find(|attribute| {
         if attribute.local.as_slice() != local {
             return false;
@@ -445,7 +470,7 @@ pub(crate) fn attribute_edit(
         }
     });
     match (found, value) {
-        (Some(attribute), Some(value)) => Ok(Some(Edit {
+        (Some(attribute), Some(value)) => Ok(Some(Draft {
             range: attribute.value_start..attribute.value_end,
             replacement: escape(value).into_bytes(),
         })),
@@ -454,7 +479,7 @@ pub(crate) fn attribute_edit(
             while start > node.start + 1 && is_space(source[start - 1]) {
                 start -= 1;
             }
-            Ok(Some(Edit {
+            Ok(Some(Draft {
                 range: start..attribute.value_end + 1,
                 replacement: Vec::new(),
             }))
@@ -469,7 +494,7 @@ pub(crate) fn attribute_edit(
             } else {
                 String::from_utf8_lossy(local).into_owned()
             };
-            Ok(Some(Edit {
+            Ok(Some(Draft {
                 range: insert..insert,
                 replacement: format!(" {name}=\"{}\"", escape(value)).into_bytes(),
             }))
@@ -478,7 +503,7 @@ pub(crate) fn attribute_edit(
     }
 }
 
-pub(crate) fn apply_edits(source: &[u8], mut edits: Vec<Edit>) -> Result<Vec<u8>> {
+pub(crate) fn apply_edits(source: &[u8], mut edits: Vec<Draft>) -> Result<Vec<u8>> {
     if edits.is_empty() {
         return Ok(source.to_vec());
     }
@@ -502,16 +527,20 @@ pub(crate) fn apply_edits(source: &[u8], mut edits: Vec<Edit>) -> Result<Vec<u8>
         output.splice(edit.range, edit.replacement);
     }
     if output.len() > MAX_XML_BYTES {
-        return Err(limit("updated OLE slide XML bytes", MAX_XML_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::OutputBytes,
+            output.len(),
+            MAX_XML_BYTES,
+        ));
     }
     Ok(output)
 }
 
-pub(crate) fn append_fragment(source: &[u8], insertion: usize, fragment: &[u8]) -> Result<Edit> {
+pub(crate) fn append_fragment(source: &[u8], insertion: usize, fragment: &[u8]) -> Result<Draft> {
     if insertion > source.len() {
         return Err(invalid("OLE insertion point escapes the slide"));
     }
-    Ok(Edit {
+    Ok(Draft {
         range: insertion..insertion,
         replacement: fragment.to_vec(),
     })
@@ -553,13 +582,22 @@ mod tests {
             .collect()
     }
 
+    /// Record 0011: branches bound through a declaration that spells the
+    /// namespace with references are never chosen by this scan.
+    #[test]
+    fn escaped_markup_compatibility_is_refused() {
+        let xml = r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/200&#54;"><p:cSld><p:spTree><mc:AlternateContent><mc:Choice Requires="p"/></mc:AlternateContent></p:spTree></p:cSld></p:sld>"#;
+        assert!(locate(xml.as_bytes()).is_err());
+    }
+
     fn is_attribute_limit(result: &Result<Node>) -> bool {
         matches!(
             result,
             Err(Error::Limit {
-                resource: "OLE XML attributes",
-                limit: MAX_XML_ATTRIBUTES,
-            })
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlAttributes),
+                observed,
+                maximum: MAX_XML_ATTRIBUTES,
+            }) if *observed == MAX_XML_ATTRIBUTES + 1
         )
     }
 

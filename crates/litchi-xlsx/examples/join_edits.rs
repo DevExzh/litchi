@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::io;
 
-use litchi_xlsx::{Cell, Value, Workbook};
+use litchi_xlsx::{Cell, Value};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let arguments = std::env::args_os().skip(1).collect::<Vec<_>>();
@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .into());
         },
     };
-    let workbook = Workbook::new()?;
+    let workbook = litchi_xlsx::Package::new()?;
 
     let mut labels = workbook.edit()?;
     labels
@@ -33,7 +33,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     labels.join(values)?;
     let committed = labels.commit()?;
     let sheet = committed
-        .workbook()
+        .package()
+        .workbook_ref()
         .sheet("Sheet1")?
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Sheet1 is missing"))?;
     if !matches!(
@@ -49,7 +50,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Err(io::Error::new(io::ErrorKind::InvalidData, "B1 was not joined").into());
     }
     if let Some(output) = output {
-        committed.workbook().save(output)?;
+        committed.package().save(output)?;
     }
     Ok(())
 }

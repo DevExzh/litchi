@@ -2,12 +2,12 @@ use crate::engine::{EvalCtx, evaluate_expression, to_number};
 use crate::parser::Expr;
 use litchi_core::sheet::Result;
 
-pub(super) async fn number_arg(
+pub(super) fn number_arg(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     expr: &Expr,
 ) -> Result<Option<f64>> {
-    let v = evaluate_expression(ctx, current_sheet, expr).await?;
+    let v = evaluate_expression(ctx, current_sheet, expr)?;
     Ok(to_number(&v))
 }
 

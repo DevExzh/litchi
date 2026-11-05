@@ -857,9 +857,10 @@ fn xlsx_producer_archive(
         return Err("producer XLSX shape has no shared-string references".into());
     }
 
-    let reader = ArchiveReader::new(&skeleton)?;
+    let reader = ArchiveReader::new(&skeleton, soapberry_zip::office::ArchiveLimits::default())?;
     let names = reader.file_names().map(str::to_owned).collect::<Vec<_>>();
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     let mut rewritten_sheets = 0;
     for name in &names {
         let bytes = reader.read(name.as_str())?;
@@ -996,7 +997,7 @@ fn finish_xlsx_producer_corpus(
         None => "real-file",
     };
     let options = generated.map(|(_shape, variant)| ArchiveOptions::of(variant));
-    let reader = ArchiveReader::new(&archive)?;
+    let reader = ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?;
     let member_names = reader.file_names().map(str::to_owned).collect::<Vec<_>>();
     let archive_member_count = member_names.len();
 
@@ -1069,8 +1070,8 @@ fn finish_xlsx_producer_corpus(
     // code serves generated and real files.
     let selected_sheet = SELECTED_SHEET.min(sheet_count.saturating_sub(1));
     let sheet_names = workbook
-        .sheets()
-        .map(|sheet| sheet.name().to_owned())
+        .sheet_names()
+        .map(str::to_owned)
         .collect::<Vec<_>>();
     let selected_name = sheet_names
         .get(selected_sheet)
@@ -1180,11 +1181,11 @@ fn finish_xlsx_producer_corpus(
 /// The `Edit` variant exists because the value-only editor admits it; assert
 /// that, so the split stays honest if a gate moves.
 fn prove_edit_variant_is_admitted(archive: &[u8]) -> Result<(), Box<dyn Error>> {
-    let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(Arc::new(
+    let editor = crate::xlsx_source_editors::SourceBackedEditor::from_read_at(Arc::new(
         OwnedSource::new(archive.to_vec()),
     ))?;
     let transaction = editor.edit_sheets([litchi_xlsx::Selector::from(PLANNING_SHEET)])?;
-    if transaction.worksheet_count() != 1 {
+    if transaction.worksheet_count()? != 1 {
         return Err("producer XLSX edit variant planned an unexpected worksheet count".into());
     }
     Ok(())
@@ -1280,7 +1281,7 @@ fn refuse(
     sheet: usize,
     archive: &[u8],
 ) -> Result<ProvenRefusal, Box<dyn Error>> {
-    let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(Arc::new(
+    let editor = crate::xlsx_source_editors::SourceBackedEditor::from_read_at(Arc::new(
         OwnedSource::new(archive.to_vec()),
     ))?;
     let message = match editor.edit_sheets([litchi_xlsx::Selector::from(sheet)]) {
@@ -1387,7 +1388,7 @@ fn producer_xlsx_semantics(
         return Err("producer XLSX semantic oracle observed an unexpected sheet count".into());
     }
     workbook
-        .sheets()
+        .sheets()?
         .map(|sheet| {
             Ok(ProducerWorksheetSemantics {
                 name: sheet.name().to_owned(),
@@ -1478,8 +1479,10 @@ fn verify_producer_xlsx_worksheet_splice(
     address: litchi_xlsx::Address,
     replacement: usize,
 ) -> Result<(), Box<dyn Error>> {
-    let source_archive = ArchiveReader::new(source)?;
-    let output_archive = ArchiveReader::new(output)?;
+    let source_archive =
+        ArchiveReader::new(source, soapberry_zip::office::ArchiveLimits::default())?;
+    let output_archive =
+        ArchiveReader::new(output, soapberry_zip::office::ArchiveLimits::default())?;
     let source_xml = String::from_utf8(source_archive.read("xl/worksheets/sheet1.xml")?)?;
     let output_xml = output_archive.read("xl/worksheets/sheet1.xml")?;
     let original = numeric_value(PLANNING_SHEET, spec.row_count / 2, spec.column_count / 2);
@@ -1498,8 +1501,10 @@ fn verify_producer_xlsx_workbook_calculation_closure(
     source: &[u8],
     output: &[u8],
 ) -> Result<(), Box<dyn Error>> {
-    let source_archive = ArchiveReader::new(source)?;
-    let output_archive = ArchiveReader::new(output)?;
+    let source_archive =
+        ArchiveReader::new(source, soapberry_zip::office::ArchiveLimits::default())?;
+    let output_archive =
+        ArchiveReader::new(output, soapberry_zip::office::ArchiveLimits::default())?;
     let source_workbook = source_archive.read("xl/workbook.xml")?;
     let output_workbook = output_archive.read("xl/workbook.xml")?;
     let (source_without_calc_pr, source_count) =
@@ -1513,8 +1518,8 @@ fn verify_producer_xlsx_workbook_calculation_closure(
         return Err("producer XLSX edit changed workbook content outside calcPr".into());
     }
 
-    let source_package = litchi_xlsx::Package::from_slice(source)?;
-    let output_package = litchi_xlsx::Package::from_slice(output)?;
+    let source_package = litchi_xlsx::Package::from_bytes(source)?;
+    let output_package = litchi_xlsx::Package::from_bytes(output)?;
     let mut expected = source_package
         .calculation_metadata()?
         .properties()
@@ -1647,9 +1652,10 @@ fn document_root_attributes() -> String {
 pub(crate) fn build_docx_producer_corpus() -> Result<ProducerCorpus, Box<dyn Error>> {
     let shape = SemanticShape::Medium;
     let skeleton = semantic_docx_bytes(shape)?;
-    let reader = ArchiveReader::new(&skeleton)?;
+    let reader = ArchiveReader::new(&skeleton, soapberry_zip::office::ArchiveLimits::default())?;
     let names = reader.file_names().map(str::to_owned).collect::<Vec<_>>();
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     let mut rewritten = 0;
     let mut paragraph_edits = 0;
     for name in &names {
@@ -1689,7 +1695,7 @@ pub(crate) fn build_docx_producer_corpus() -> Result<ProducerCorpus, Box<dyn Err
     drop(document);
     drop(package);
 
-    let reader = ArchiveReader::new(&archive)?;
+    let reader = ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?;
     let main = reader.read("word/document.xml")?;
     let parts = vec![census_of(
         "word/document.xml",
@@ -1794,9 +1800,10 @@ fn producer_document_part(xml: &str) -> Result<(String, usize), Box<dyn Error>> 
 pub(crate) fn build_pptx_producer_corpus() -> Result<ProducerCorpus, Box<dyn Error>> {
     let shape = SemanticShape::Medium;
     let skeleton = semantic_pptx_bytes(shape)?;
-    let reader = ArchiveReader::new(&skeleton)?;
+    let reader = ArchiveReader::new(&skeleton, soapberry_zip::office::ArchiveLimits::default())?;
     let names = reader.file_names().map(str::to_owned).collect::<Vec<_>>();
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     let mut wrapped = 0;
     for name in &names {
         let bytes = reader.read(name.as_str())?;
@@ -1827,7 +1834,7 @@ pub(crate) fn build_pptx_producer_corpus() -> Result<ProducerCorpus, Box<dyn Err
         .text_and_name()?;
     drop(presentation);
 
-    let reader = ArchiveReader::new(&archive)?;
+    let reader = ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?;
     let archive_member_count = reader.file_names().count();
     let member = format!("ppt/slides/slide{}.xml", target_index + 1);
     let slide = reader.read(member.as_str())?;
@@ -2519,7 +2526,7 @@ fn run_xlsx_full_cell_scan(
         let started = std::time::Instant::now();
         let timed = (|| {
             let workbook = litchi_xlsx::SourceBackedWorkbook::from_read_at(source)?;
-            let sheets = workbook.sheets().collect::<Vec<_>>();
+            let sheets = workbook.sheets()?.collect::<Vec<_>>();
             if sheets.len() != spec.sheet_count {
                 return Err(format!(
                     "producer full-cell scan observed {} worksheets instead of {}",
@@ -2760,16 +2767,17 @@ fn run_xlsx_planning(
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         // Opening is deliberately outside the planning interval, exactly as
         // the XLSX planning guard measures it.
-        let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(source_of(corpus))?;
+        let editor =
+            crate::xlsx_source_editors::SourceBackedEditor::from_read_at(source_of(corpus))?;
         let started = Instant::now();
         let planned = editor.edit_sheets(selectors.iter().cloned());
         let duration = started.elapsed();
         let transaction = planned?;
-        if transaction.worksheet_count() != 1 {
+        if transaction.worksheet_count()? != 1 {
             return Err("producer XLSX planning selected an unexpected worksheet count".into());
         }
         let commit = transaction.commit()?;
-        if commit.changed() || !commit.patch().is_empty() {
+        if commit.diagnostics().changed() || !commit.patch().is_noop() {
             return Err("producer XLSX empty planning commit was not an exact no-op".into());
         }
         if sha256_hex(&corpus.corpus.archive) != before {
@@ -2804,7 +2812,8 @@ fn run_xlsx_one_edit_save(
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let mut sink = CountingSink::bounded(maximum, 64 * 1024);
         sink.reserve_budget()?;
-        let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(source_of(corpus))?;
+        let editor =
+            crate::xlsx_source_editors::SourceBackedEditor::from_read_at(source_of(corpus))?;
         let mut duration = Duration::ZERO;
         // The editor is opened before the clock. The timed interval includes
         // planning, set, commit and publication. Publication consumes the
@@ -2816,7 +2825,7 @@ fn run_xlsx_one_edit_save(
         let mut edit = editor.edit_sheets([litchi_xlsx::Selector::from(PLANNING_SHEET)])?;
         edit.set(PLANNING_SHEET, address, i32::try_from(replacement)?)?;
         let commit = edit.commit()?;
-        if !commit.changed() {
+        if !commit.diagnostics().changed() {
             return Err("producer XLSX one-cell edit produced no change".into());
         }
         editor.publish_multi_commit_to_stream(&mut sink, &commit)?;
@@ -2963,8 +2972,9 @@ mod tests {
             .expect("producer XLSX corpus has a specification");
         let (address, replacement) =
             producer_numeric_edit_target(spec).expect("producer edit target");
-        let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(source_of(corpus))
-            .expect("producer editor opens");
+        let editor =
+            crate::xlsx_source_editors::SourceBackedEditor::from_read_at(source_of(corpus))
+                .expect("producer editor opens");
         let mut edit = editor
             .edit_sheets([litchi_xlsx::Selector::from(PLANNING_SHEET)])
             .expect("producer edit plans");
@@ -2987,8 +2997,10 @@ mod tests {
         target: &str,
         rewrite: impl FnMut(Vec<u8>) -> Vec<u8>,
     ) -> Vec<u8> {
-        let reader = ArchiveReader::new(archive).expect("archive reader");
-        let mut writer = StreamingArchiveWriter::new();
+        let reader = ArchiveReader::new(archive, soapberry_zip::office::ArchiveLimits::default())
+            .expect("archive reader");
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         let mut rewrite = Some(rewrite);
         for name in reader.file_names() {
             let payload = reader.read(name).expect("archive member");
@@ -3421,10 +3433,13 @@ mod tests {
         assert_eq!(part.mc_ignorable.as_deref(), Some("w14 w15 wp14"));
         assert!(!part.source_stream_eligible);
         let xml = String::from_utf8(
-            ArchiveReader::new(&corpus.corpus.archive)
-                .expect("archive reads")
-                .read("word/document.xml")
-                .expect("document part reads"),
+            ArchiveReader::new(
+                &corpus.corpus.archive,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )
+            .expect("archive reads")
+            .read("word/document.xml")
+            .expect("document part reads"),
         )
         .expect("document part is UTF-8");
         assert!(

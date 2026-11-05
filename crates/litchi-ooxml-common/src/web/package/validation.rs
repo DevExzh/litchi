@@ -2,6 +2,7 @@ use super::super::codec::{invalid, limit};
 use super::super::model::Limits;
 use super::super::{BTreeSet, Error, HashSet, OpcPackage, PackURI, Part, Result};
 use super::{ExistingAddInGraph, PackageGraphIndex, PlannedPart, fold_part_name};
+use crate::web::LimitKind;
 pub(in crate::web) fn preflight_planned_parts(
     package: &OpcPackage,
     index: &PackageGraphIndex,
@@ -42,10 +43,11 @@ pub(in crate::web) fn preflight_planned_parts(
                 ));
             }
             if !planned_part_matches_existing(existing, part) && protected.contains(&folded) {
-                return Err(Error::Relationship(format!(
-                    "cannot replace protected shared web extension part '{}'",
-                    part.name.as_str()
-                )));
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "web_extensions.put",
+                    "the Web Extensions graph has a protected shared part",
+                ));
             }
         } else if index.conflicts(&part.name) {
             return invalid(format!(
@@ -106,7 +108,7 @@ pub(in crate::web) fn planned_deletions(
     }
     if deletions.len() > limits.part_deletions {
         return limit(
-            "web extension part deletions",
+            LimitKind::PartDeletions,
             limits.part_deletions,
             deletions.len(),
         );
@@ -127,7 +129,7 @@ pub(in crate::web) fn validate_plan_counts(
         .count();
     if new_parts > limits.part_allocations {
         return limit(
-            "web extension part allocations",
+            LimitKind::PartAllocations,
             limits.part_allocations,
             new_parts,
         );
@@ -137,12 +139,12 @@ pub(in crate::web) fn validate_plan_counts(
         .len()
         .checked_add(new_parts)
         .ok_or(Error::Limit {
-            resource: "package parts",
-            max: limits.package_parts,
-            actual: usize::MAX,
+            kind: crate::LimitKind::Web(LimitKind::PackageParts),
+            maximum: limits.package_parts,
+            observed: usize::MAX,
         })?;
     if peak_parts > limits.package_parts {
-        return limit("package parts", limits.package_parts, peak_parts);
+        return limit(LimitKind::PackageParts, limits.package_parts, peak_parts);
     }
 
     let mut relationships = index.relationships;
@@ -150,27 +152,29 @@ pub(in crate::web) fn validate_plan_counts(
         if let Some(canonical) = index.canonical(&part.name) {
             relationships = relationships
                 .checked_sub(package.get_part(canonical)?.rels().len())
-                .ok_or_else(|| Error::Invalid("relationship count underflow".into()))?;
+                .ok_or(Error::Internal(
+                    "Web Extensions relationship count underflow",
+                ))?;
         }
         relationships =
             relationships
                 .checked_add(part.relationships.len())
                 .ok_or(Error::Limit {
-                    resource: "package relationships",
-                    max: limits.package_relationships,
-                    actual: usize::MAX,
+                    kind: crate::LimitKind::Web(LimitKind::PackageRelationships),
+                    maximum: limits.package_relationships,
+                    observed: usize::MAX,
                 })?;
     }
     if existing_graph.is_none() {
         relationships = relationships.checked_add(1).ok_or(Error::Limit {
-            resource: "package relationships",
-            max: limits.package_relationships,
-            actual: usize::MAX,
+            kind: crate::LimitKind::Web(LimitKind::PackageRelationships),
+            maximum: limits.package_relationships,
+            observed: usize::MAX,
         })?;
     }
     if relationships > limits.package_relationships {
         return limit(
-            "package relationships",
+            LimitKind::PackageRelationships,
             limits.package_relationships,
             relationships,
         );

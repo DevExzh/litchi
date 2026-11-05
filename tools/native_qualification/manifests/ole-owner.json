@@ -1,0 +1,111 @@
+{
+  "schema": "litchi.ole-owner-qualification.manifest.v1",
+  "lane": "w5-ole-owner",
+  "candidate_commit": null,
+  "source_policy": {
+    "baseline_commit": "0ce4bb8b61f03a1e5497633f51b954e76f98aa8c",
+    "candidate_commit": "selected at preparation time",
+    "baseline_overlay": false,
+    "consumer_only_adapter": "reviewed explicit-CFB-limits arity adapter"
+  },
+  "input_pins": {
+    "reviewed_probe_sha256": "ad4c52c01333fbc13c7b3cca18e2c0a0d2ccf89d5c07972e2e453fa9bd8d713a",
+    "reviewed_probe_provenance": "external matched-harness artifact from 0359j; historical source a84650cd70390641f7734dc1f3362bcb9cd1e025 tools/perf-baseline/examples/ole_w5_probe.rs",
+    "candidate_adapter_sha256": "dc11e6533c43434c314bd359ad68e458555291f4c134b44b13c1f3ce29fb4508",
+    "candidate_adapter_policy": "CFB limits arity only; no implementation overlay",
+    "clone_probe_sha256": "0a23c99ed8958e0df1aa51e5f37e7a949328149074b2096613c972d2b8cf6e98",
+    "clone_probe_provenance": "external matched-harness artifact from 0359j; historical source a84650cd70390641f7734dc1f3362bcb9cd1e025 tools/perf-baseline/examples/ole_package_clone_probe.rs",
+    "reviewed_lock_sha256": "bc5a133f0668142d18d637b2b196097e855c8890697cb3bbf43aeb937145f04a",
+    "baseline_lock_sha256": "450f43c6b74536ef552bd5e9a19e321a3c0dea745f645fecc0aa9abe37868e14",
+    "candidate_lock_sha256": "5a07adc1d62dea06dbac60986faa020007882506523dde49e4605708e1276aaf",
+    "lock_provenance": "external matched-harness lock retained by 0359j W5 qualification; each driver lock is the reviewed base plus only its pinned local dependency edges",
+    "lock_patch_policy": {
+      "baseline": {
+        "litchi-perf-baseline": {"added": ["sha2 0.11.0"], "removed": []}
+      },
+      "candidate": {
+        "litchi-odraw": {"added": ["litchi-core"], "removed": []},
+        "litchi-perf-baseline": {"added": ["sha2 0.11.0"], "removed": []}
+      }
+    },
+    "oracle_source_sha256": "60b506c1bfc277c260933730ce2f754e59f4745d40c753ffa95900b49d276daf"
+  },
+  "routes": [
+    "open",
+    "begin_edit",
+    "noop_commit",
+    "replace_stream",
+    "read",
+    "edit",
+    "doc_tracked_revision",
+    "xls_cells",
+    "xls_cells_stage",
+    "doc_history",
+    "xls_history"
+  ],
+  "clone": {
+    "sizes": ["small", "large"],
+    "small_siblings": 1,
+    "large_siblings": 1024
+  },
+  "fixture": {
+    "kind": "probe-owned deterministic OLE/DOC/XLS corpus",
+    "generator_identity": "bound to the reviewed probe pins; no untracked fixture path"
+  },
+  "paired": {
+    "abba_order": ["before", "after", "after", "before"],
+    "blocks": 5,
+    "warmup": 2,
+    "samples": 3,
+    "calibration_target_ns": 500000000,
+    "minimum_span_ns": 250000000
+  },
+  "allocator": {
+    "routes": ["read", "edit", "xls_cells", "xls_cells_stage", "doc_history", "xls_history"],
+    "history_steps": 128,
+    "retained_packages": 129,
+    "retained_patches": 128,
+    "metrics": [
+      "delta_calls",
+      "delta_bytes",
+      "live_calls",
+      "live_bytes",
+      "peak_calls",
+      "peak_bytes",
+      "deallocation_path",
+      "reallocation_path"
+    ],
+    "oracle_evidence_file": "allocator.tsv",
+    "oracle_evidence_fields": [
+      "route",
+      "alloc_calls",
+      "alloc_bytes",
+      "dealloc_calls",
+      "dealloc_bytes",
+      "realloc_calls",
+      "realloc_old_bytes",
+      "realloc_new_bytes",
+      "base_live_calls",
+      "base_live_bytes",
+      "live_calls",
+      "live_bytes",
+      "peak_calls",
+      "peak_bytes",
+      "retained_packages",
+      "retained_patches"
+    ],
+    "conservation": "live_calls=base_live_calls+alloc_calls-dealloc_calls; live_bytes=base_live_bytes+alloc_bytes-dealloc_bytes-realloc_old_bytes+realloc_new_bytes; peak is at least live; retained history is 129 packages and 128 patches only on history routes",
+    "elapsed_claimable": false
+  },
+  "quiet": {
+    "process_guard": "tools.native_qualification_runner.ProcessGuard",
+    "cpu_affinity_required": true,
+    "resource_monitor": "loadavg+proc-descendants+target-bytes",
+    "target_preflight_bytes": 19200000000,
+    "target_hard_bytes": 20000000000,
+    "memory_bytes": 20000000000,
+    "cargo_jobs": 1,
+    "incremental": false
+  },
+  "claim_scope": "source-matched build and native evidence protocol only; no acceptance or performance claim"
+}

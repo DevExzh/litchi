@@ -519,8 +519,8 @@ impl List {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn xml(&self, conformance: Conformance) -> Result<Vec<u8>> {
-        write(self, conformance)
+    pub fn xml(&self, conformance: Conformance, limits: super::Limits) -> Result<Vec<u8>> {
+        write(self, conformance, limits)
     }
 
     fn offset(&self, key: Key<'_>) -> Result<usize> {
@@ -544,8 +544,9 @@ impl List {
         validate_tag_context(tag, &bound_prefixes(&self.namespaces, &["p", "xml"])?)?;
         if replaced.is_none() && self.tags.len() == MAX_TAGS {
             return Err(Error::Limit {
-                resource: "tag count",
-                limit: MAX_TAGS,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Tags),
+                observed: self.tags.len().checked_add(1).unwrap_or(usize::MAX),
+                maximum: MAX_TAGS,
             });
         }
         let matches = self
@@ -761,8 +762,9 @@ pub(crate) fn ensure_list_budget(wire_len: usize) -> Result<()> {
         Ok(())
     } else {
         Err(Error::Limit {
-            resource: "encoded tag-list bytes",
-            limit: MAX_PART_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: wire_len,
+            maximum: MAX_PART_BYTES,
         })
     }
 }
@@ -770,8 +772,9 @@ pub(crate) fn ensure_list_budget(wire_len: usize) -> Result<()> {
 pub(crate) fn validate_structure(value: &List) -> Result<()> {
     if value.tags.len() > MAX_TAGS {
         return Err(Error::Limit {
-            resource: "tag count",
-            limit: MAX_TAGS,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Tags),
+            observed: value.tags.len(),
+            maximum: MAX_TAGS,
         });
     }
     validate_element_attrs(&value.namespaces, &value.attrs, &["xmlns:p"])?;

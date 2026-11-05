@@ -1,6 +1,7 @@
 //! Conformance and representation tests for DrawingML coordinate domains.
 
 use super::*;
+use crate::LimitKind;
 use std::mem::size_of;
 
 #[test]
@@ -70,21 +71,23 @@ fn malformed_or_unbounded_spellings_are_rejected() {
     }
     assert!(matches!(
         Coordinate::parse(&format!("{}mm", "1".repeat(MAX_BYTES))),
-        Err(ParseError::TooLong { .. })
+        Err(ParseError::Limit { .. })
     ));
     let oversized = "1".repeat(MAX_BYTES + 1);
     assert_eq!(
         oversized.parse::<Coordinate>(),
-        Err(ParseError::TooLong {
-            len: MAX_BYTES + 1,
-            max: MAX_BYTES,
+        Err(ParseError::Limit {
+            kind: LimitKind::LexicalValueBytes,
+            observed: MAX_BYTES + 1,
+            maximum: MAX_BYTES,
         })
     );
     assert_eq!(
         Coordinate::try_from(oversized),
-        Err(ParseError::TooLong {
-            len: MAX_BYTES + 1,
-            max: MAX_BYTES,
+        Err(ParseError::Limit {
+            kind: LimitKind::LexicalValueBytes,
+            observed: MAX_BYTES + 1,
+            maximum: MAX_BYTES,
         })
     );
     assert!("".parse::<Unit>().is_err());

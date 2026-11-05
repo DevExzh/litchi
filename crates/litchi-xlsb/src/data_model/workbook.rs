@@ -1,88 +1,60 @@
 //! Workbook and package facades for the XLSB Data Model owner.
 
-use super::{Commit, Limits, Patch, Snapshot};
+use super::{Commit, Edit, EditOptions, Patch, Snapshot};
 use crate::package::error::Result;
+use litchi_core::edit::Diagnostics;
 
 impl crate::Workbook {
-    /// Read the workbook Data Model records and its lazy opaque model part.
+    /// Read the workbook Data Model records and its lazy opaque model part
+    /// under this projection's [`crate::SemanticLimits::data_model_value`].
     pub fn data_model(&self) -> Result<Snapshot> {
-        self.data_model_with_limits(Limits::DEFAULT)
-    }
-
-    /// Read the workbook Data Model using explicit finite limits.
-    pub fn data_model_with_limits(&self, limits: Limits) -> Result<Snapshot> {
-        Snapshot::read_with_limits(&self.package, limits)
-    }
-
-    /// Start a detached, source-bound Data Model transaction.
-    pub fn edit_data_model(&self) -> Result<super::Transaction> {
-        Ok(self.data_model()?.edit())
-    }
-
-    /// Start a detached Data Model transaction with explicit limits.
-    pub fn edit_data_model_with_limits(&self, limits: Limits) -> Result<super::Transaction> {
-        Ok(self.data_model_with_limits(limits)?.edit())
-    }
-
-    /// Atomically publish one detached Data Model commit.
-    pub fn apply_data_model(&mut self, commit: &Commit) -> Result<Snapshot> {
-        self.apply_data_model_patch(commit.patch())
-    }
-
-    /// Atomically publish one reversible, source-checked Data Model patch.
-    pub fn apply_data_model_patch(&mut self, patch: &Patch) -> Result<Snapshot> {
-        let current = patch.check_source(&self.package)?;
-        if patch.is_empty() {
-            return Ok(current);
-        }
-        if self.package.is_signed() || self.package.requires_signature_edit_policy() {
-            return Err(crate::package::error::Error::Opc(
-                litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy,
-            ));
-        }
-        self.edit_opc(|candidate| {
-            patch.materialize(candidate)?;
-            let resulting = Snapshot::read_with_limits(candidate, patch.before().limits())?;
-            if &resulting != patch.after() {
-                return Err(crate::package::error::Error::InvalidFormat(
-                    "Data Model publication changed the planned semantic or owned graph"
-                        .to_string(),
-                ));
-            }
-            Ok(resulting)
-        })
+        Snapshot::read_with_limits(&self.package, self.semantic_limits().data_model_value())
     }
 }
 
 impl crate::Package {
-    /// Read the workbook Data Model records and its lazy opaque model part.
+    /// Read the workbook Data Model records and its lazy opaque model part
+    /// under the package's [`crate::SemanticLimits::data_model_value`].
     pub fn data_model(&self) -> Result<Snapshot> {
-        Snapshot::read_with_limits(self.opc_package(), Limits::DEFAULT)
+        Snapshot::read_with_limits(
+            self.opc_package(),
+            self.semantic_limits().data_model_value(),
+        )
     }
 
-    /// Read the workbook Data Model using explicit finite limits.
-    pub fn data_model_with_limits(&self, limits: Limits) -> Result<Snapshot> {
-        Snapshot::read_with_limits(self.opc_package(), limits)
+    /// Start a Data Model edit under the package's limits.
+    pub fn edit_data_model(&self) -> Result<Edit> {
+        self.edit_data_model_with_options(EditOptions::default())
     }
 
-    /// Apply a Data Model patch to a cloned package and return the validated result.
-    pub fn apply_data_model_patch(&self, patch: &Patch) -> Result<Self> {
+    /// Start a Data Model edit with explicit options.
+    pub fn edit_data_model_with_options(&self, options: EditOptions) -> Result<Edit> {
+        let limits = options
+            .limits_value()
+            .unwrap_or_else(|| self.semantic_limits().data_model_value());
+        Ok(Edit::new(self.clone(), limits))
+    }
+
+    /// Apply a source-checked Data Model patch to a new package; this one is
+    /// unchanged.
+    ///
+    /// Changed signed packages are rejected until the caller explicitly
+    /// removes the package signature.
+    pub fn apply_data_model(&self, patch: &Patch) -> Result<Commit> {
         patch.check_source(self.opc_package())?;
-        if patch.is_empty() {
-            return Ok(self.clone());
-        }
-        if self.opc_package().is_signed() || self.opc_package().requires_signature_edit_policy() {
-            return Err(crate::package::error::Error::Opc(
-                litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy,
+        if patch.is_noop() {
+            return Ok(Commit::new(
+                self.clone(),
+                patch.clone(),
+                Diagnostics::UNCHANGED,
             ));
         }
-        let mut candidate = self.clone().into_opc();
+        let mut candidate = self.opc_package().clone();
         patch.apply(&mut candidate)?;
-        Self::from_opc_with_external_link_limits(candidate, self.external_link_limits())
-    }
-
-    /// Apply a detached Data Model commit to a cloned package.
-    pub fn apply_data_model(&self, commit: &Commit) -> Result<Self> {
-        self.apply_data_model_patch(commit.patch())
+        Ok(Commit::new(
+            self.reparse_candidate(candidate)?,
+            patch.clone(),
+            Diagnostics::CHANGED,
+        ))
     }
 }

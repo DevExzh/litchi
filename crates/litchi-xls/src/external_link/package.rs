@@ -3,6 +3,7 @@
 //! This layer owns the ordered SupBook/ExternName/XCT/CRN/ExternSheet
 //! sequence. It never resolves or opens an external target.
 
+use litchi_core::edit::RefusalKind;
 use std::collections::HashSet;
 
 use super::codec::{
@@ -190,9 +191,11 @@ impl Package {
             .get(index)
             .and_then(|record| self.records.get(*record).copied())
             .ok_or_else(|| {
-                Error::UnsafeEdit(format!(
-                    "supporting-book index {index} is outside the external-link collection"
-                ))
+                Error::refused(
+                    RefusalKind::InvalidValue,
+                    "edit external links",
+                    "supporting-book index is outside the external-link collection",
+                )
             })
     }
 
@@ -201,9 +204,11 @@ impl Package {
             .get(index)
             .and_then(|(record, _)| self.records.get(*record).copied())
             .ok_or_else(|| {
-                Error::UnsafeEdit(format!(
-                    "external-name index {index} is outside the external-link collection"
-                ))
+                Error::refused(
+                    RefusalKind::InvalidValue,
+                    "edit external links",
+                    "external-name index is outside the external-link collection",
+                )
             })
     }
 
@@ -218,14 +223,18 @@ impl Package {
             .copied()
             .filter(|cache| cache.book_index == book_index && cache.sheet_index == sheet_index);
         let cache = matches.next().ok_or_else(|| {
-            Error::UnsafeEdit(format!(
-                "external cache for supporting book {book_index}, sheet {sheet_index} is not declared"
-            ))
+            Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit external links",
+                "the external cache of this supporting-book sheet is not declared",
+            )
         })?;
         if matches.next().is_some() {
-            return Err(Error::UnsafeEdit(format!(
-                "external cache for supporting book {book_index}, sheet {sheet_index} is ambiguous"
-            )));
+            return Err(Error::refused(
+                RefusalKind::InvalidValue,
+                "edit external links",
+                "the external cache of this supporting-book sheet is ambiguous",
+            ));
         }
         Ok(cache)
     }
@@ -241,8 +250,10 @@ impl Package {
                 && candidate.record_type == record.record_type
                 && candidate.payload_end == record.payload_end
         }) {
-            return Err(Error::UnsafeEdit(
-                "external-link edit does not own the selected BIFF record".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit external links",
+                "external-link edit does not own the selected BIFF record",
             ));
         }
         replace_record(bytes, record, payload)

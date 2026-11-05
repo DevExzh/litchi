@@ -4,11 +4,21 @@
     reason = "transaction assertions intentionally panic on failure"
 )]
 
-use litchi_rtf::edit::{
-    CompositionError, DurableComposition, DurableMergePlan, Limits, MergeResolution,
+use litchi_core::Position;
+use litchi_rtf::edit::{CompositionError, DurableComposition, DurableMergePlan, MergeResolution};
+use litchi_rtf::{
+    Alignment, CharacterBaseline, EditOptions, Package, SemanticLimits, UnderlineStyle,
+    edit::TextSpan,
 };
-use litchi_rtf::{Alignment, CharacterBaseline, Document, UnderlineStyle, edit::TextSpan};
 use std::num::NonZeroU16;
+
+fn semantic_limits(max_operations: usize) -> SemanticLimits {
+    SemanticLimits::builder()
+        .max_operations(max_operations)
+        .unwrap()
+        .build()
+        .unwrap()
+}
 
 fn limits(max_operations: usize) -> litchi_core::patch::PatchLimits {
     litchi_core::patch::PatchLimits::new(
@@ -33,7 +43,7 @@ fn reversible_payload_limits() -> litchi_core::patch::PatchLimits {
 }
 
 fn replace(
-    source: &Document,
+    source: &Package,
     span: TextSpan,
     value: &str,
     max_operations: usize,
@@ -49,7 +59,7 @@ fn replace(
 
 #[test]
 fn durable_composition_replays_outline_and_composes_disjoint_or_rejects_overlap() {
-    let source = Document::parse(r"{\rtf1\ansi First Second}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi First Second}").unwrap();
     let mut outline_edit = source.edit();
     outline_edit
         .set_text_outline(TextSpan::new(0, 5).unwrap(), true)
@@ -77,7 +87,7 @@ fn durable_composition_replays_outline_and_composes_disjoint_or_rejects_overlap(
     disjoint.join(outline.clone()).unwrap();
     disjoint.join(underline).unwrap();
     let combined = disjoint.finish().unwrap();
-    let formatted = source.apply_durable(&combined).unwrap();
+    let formatted = source.apply_durable(&combined).unwrap().into_package();
     assert!(
         formatted
             .body()
@@ -97,7 +107,7 @@ fn durable_composition_replays_outline_and_composes_disjoint_or_rejects_overlap(
             .underline(),
         UnderlineStyle::Single
     );
-    let reopened = Document::from_bytes(&formatted.to_bytes().unwrap()).unwrap();
+    let reopened = Package::from_bytes(&formatted.to_bytes().unwrap()).unwrap();
     assert!(
         reopened
             .body()
@@ -108,7 +118,10 @@ fn durable_composition_replays_outline_and_composes_disjoint_or_rejects_overlap(
             .outline()
     );
 
-    let restored = formatted.apply_durable(&combined.inverse()).unwrap();
+    let restored = formatted
+        .apply_durable(&combined.inverse())
+        .unwrap()
+        .into_package();
     assert!(restored.body().runs().all(|run| !run.format().outline()));
     assert!(
         restored
@@ -116,7 +129,7 @@ fn durable_composition_replays_outline_and_composes_disjoint_or_rejects_overlap(
             .runs()
             .all(|run| run.format().underline() == UnderlineStyle::None)
     );
-    Document::from_bytes(&restored.to_bytes().unwrap()).unwrap();
+    Package::from_bytes(&restored.to_bytes().unwrap()).unwrap();
 
     let mut overlapping_edit = source.edit();
     overlapping_edit
@@ -138,7 +151,7 @@ fn durable_composition_replays_outline_and_composes_disjoint_or_rejects_overlap(
 
 #[test]
 fn disjoint_durable_join_replays_and_derives_combined_inverse() {
-    let source = Document::parse(r"{\rtf1\ansi First Second}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi First Second}").unwrap();
     let first = replace(&source, TextSpan::new(0, 5).unwrap(), "Alpha", 8);
     let second = replace(&source, TextSpan::new(6, 12).unwrap(), "Bravo", 8);
 
@@ -146,15 +159,18 @@ fn disjoint_durable_join_replays_and_derives_combined_inverse() {
     composition.join(first).unwrap();
     composition.join(second).unwrap();
     let combined = composition.finish().unwrap();
-    let target = source.apply_durable(&combined).unwrap();
+    let target = source.apply_durable(&combined).unwrap().into_package();
     assert_eq!(target.text(), "Alpha Bravo");
-    let restored = target.apply_durable(&combined.inverse()).unwrap();
+    let restored = target
+        .apply_durable(&combined.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
 }
 
 #[test]
 fn durable_join_is_order_independent_and_rejects_unequal_character_overlap() {
-    let source = Document::parse(r"{\rtf1\ansi First Second}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi First Second}").unwrap();
     let first = replace(&source, TextSpan::new(0, 5).unwrap(), "Alpha", 8);
     let second = replace(&source, TextSpan::new(6, 12).unwrap(), "Bravo", 8);
 
@@ -191,7 +207,7 @@ fn durable_join_is_order_independent_and_rejects_unequal_character_overlap() {
     let mut character = DurableComposition::new(&source, limits(8));
     character.join(bold.clone()).unwrap();
     let formatting = character.finish().unwrap();
-    let formatted = source.apply_durable(&formatting).unwrap();
+    let formatted = source.apply_durable(&formatting).unwrap().into_package();
     let inverse = formatting.inverse();
     let formatted_bytes = formatted.to_bytes().unwrap();
     let formatted_hash = litchi_core::patch::BlobId::of(&formatted_bytes).as_hex();
@@ -202,7 +218,7 @@ fn durable_join_is_order_independent_and_rejects_unequal_character_overlap() {
             .and_then(serde_json::Value::as_str)
             == Some(formatted_hash.as_str())
     }));
-    let restored = formatted.apply_durable(&inverse).unwrap();
+    let restored = formatted.apply_durable(&inverse).unwrap().into_package();
     assert_eq!(restored.text(), source.text());
     assert!(restored.body().runs().all(|run| !run.format().bold()));
 
@@ -213,7 +229,7 @@ fn durable_join_is_order_independent_and_rejects_unequal_character_overlap() {
 
 #[test]
 fn durable_composition_replays_and_inverts_exact_underline_styles() {
-    let source = Document::parse(r"{\rtf1\ansi First Second}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi First Second}").unwrap();
     let mut edit = source.edit();
     edit.set_text_underline(TextSpan::new(6, 12).unwrap(), UnderlineStyle::DoubleWave)
         .unwrap();
@@ -232,7 +248,7 @@ fn durable_composition_replays_and_inverts_exact_underline_styles() {
     let mut composition = DurableComposition::new(&source, limits(8));
     composition.join(branch).unwrap();
     let combined = composition.finish().unwrap();
-    let formatted = source.apply_durable(&combined).unwrap();
+    let formatted = source.apply_durable(&combined).unwrap().into_package();
     assert_eq!(
         formatted
             .body()
@@ -243,7 +259,10 @@ fn durable_composition_replays_and_inverts_exact_underline_styles() {
             .underline(),
         UnderlineStyle::DoubleWave
     );
-    let restored = formatted.apply_durable(&combined.inverse()).unwrap();
+    let restored = formatted
+        .apply_durable(&combined.inverse())
+        .unwrap()
+        .into_package();
     assert!(
         restored
             .body()
@@ -268,7 +287,7 @@ fn durable_composition_replays_and_inverts_exact_underline_styles() {
 
 #[test]
 fn durable_composition_replays_strike_and_composes_disjoint_or_rejects_overlap() {
-    let source = Document::parse(r"{\rtf1\ansi First Second}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi First Second}").unwrap();
     let mut strike_edit = source.edit();
     strike_edit
         .set_text_strike(TextSpan::new(0, 5).unwrap(), true)
@@ -296,7 +315,7 @@ fn durable_composition_replays_strike_and_composes_disjoint_or_rejects_overlap()
     disjoint.join(strike.clone()).unwrap();
     disjoint.join(underline.clone()).unwrap();
     let combined = disjoint.finish().unwrap();
-    let formatted = source.apply_durable(&combined).unwrap();
+    let formatted = source.apply_durable(&combined).unwrap().into_package();
     assert!(
         formatted
             .body()
@@ -316,7 +335,10 @@ fn durable_composition_replays_strike_and_composes_disjoint_or_rejects_overlap()
             .underline(),
         UnderlineStyle::Single
     );
-    let restored = formatted.apply_durable(&combined.inverse()).unwrap();
+    let restored = formatted
+        .apply_durable(&combined.inverse())
+        .unwrap()
+        .into_package();
     assert!(restored.body().runs().all(|run| !run.format().strike()));
     assert!(
         restored
@@ -342,7 +364,7 @@ fn durable_composition_replays_strike_and_composes_disjoint_or_rejects_overlap()
 
 #[test]
 fn durable_composition_replays_hidden_and_composes_disjoint_or_rejects_overlap() {
-    let source = Document::parse(r"{\rtf1\ansi First Second}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi First Second}").unwrap();
     let mut hidden_edit = source.edit();
     hidden_edit
         .set_text_hidden(TextSpan::new(0, 5).unwrap(), true)
@@ -370,7 +392,7 @@ fn durable_composition_replays_hidden_and_composes_disjoint_or_rejects_overlap()
     disjoint.join(hidden.clone()).unwrap();
     disjoint.join(underline).unwrap();
     let combined = disjoint.finish().unwrap();
-    let formatted = source.apply_durable(&combined).unwrap();
+    let formatted = source.apply_durable(&combined).unwrap().into_package();
     assert!(
         formatted
             .body()
@@ -390,7 +412,10 @@ fn durable_composition_replays_hidden_and_composes_disjoint_or_rejects_overlap()
             .underline(),
         UnderlineStyle::Single
     );
-    let restored = formatted.apply_durable(&combined.inverse()).unwrap();
+    let restored = formatted
+        .apply_durable(&combined.inverse())
+        .unwrap()
+        .into_package();
     assert!(restored.body().runs().all(|run| !run.format().hidden()));
     assert!(
         restored
@@ -416,7 +441,7 @@ fn durable_composition_replays_hidden_and_composes_disjoint_or_rejects_overlap()
 
 #[test]
 fn durable_composition_replays_small_caps_and_composes_disjoint_or_rejects_overlap() {
-    let source = Document::parse(r"{\rtf1\ansi First Second}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi First Second}").unwrap();
     let mut small_caps_edit = source.edit();
     small_caps_edit
         .set_text_small_caps(TextSpan::new(0, 5).unwrap(), true)
@@ -444,7 +469,7 @@ fn durable_composition_replays_small_caps_and_composes_disjoint_or_rejects_overl
     disjoint.join(small_caps.clone()).unwrap();
     disjoint.join(underline).unwrap();
     let combined = disjoint.finish().unwrap();
-    let formatted = source.apply_durable(&combined).unwrap();
+    let formatted = source.apply_durable(&combined).unwrap().into_package();
     assert!(
         formatted
             .body()
@@ -464,7 +489,10 @@ fn durable_composition_replays_small_caps_and_composes_disjoint_or_rejects_overl
             .underline(),
         UnderlineStyle::Single
     );
-    let restored = formatted.apply_durable(&combined.inverse()).unwrap();
+    let restored = formatted
+        .apply_durable(&combined.inverse())
+        .unwrap()
+        .into_package();
     assert!(restored.body().runs().all(|run| !run.format().small_caps()));
     assert!(
         restored
@@ -490,7 +518,7 @@ fn durable_composition_replays_small_caps_and_composes_disjoint_or_rejects_overl
 
 #[test]
 fn durable_composition_replays_all_caps_and_composes_disjoint_or_rejects_overlap() {
-    let source = Document::parse(r"{\rtf1\ansi First Second}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi First Second}").unwrap();
     let mut all_caps_edit = source.edit();
     all_caps_edit
         .set_text_all_caps(TextSpan::new(0, 5).unwrap(), true)
@@ -518,7 +546,7 @@ fn durable_composition_replays_all_caps_and_composes_disjoint_or_rejects_overlap
     disjoint.join(all_caps.clone()).unwrap();
     disjoint.join(underline).unwrap();
     let combined = disjoint.finish().unwrap();
-    let formatted = source.apply_durable(&combined).unwrap();
+    let formatted = source.apply_durable(&combined).unwrap().into_package();
     let all_caps_text = formatted
         .body()
         .runs()
@@ -534,10 +562,13 @@ fn durable_composition_replays_all_caps_and_composes_disjoint_or_rejects_overlap
     assert!(all_caps_text.contains("First"));
     assert!(!all_caps_text.contains("Second"));
     assert!(underlined_text.contains("Second"));
-    let reopened = Document::from_bytes(&formatted.to_bytes().unwrap()).unwrap();
+    let reopened = Package::from_bytes(&formatted.to_bytes().unwrap()).unwrap();
     assert_eq!(reopened.text(), source.text());
 
-    let restored = formatted.apply_durable(&combined.inverse()).unwrap();
+    let restored = formatted
+        .apply_durable(&combined.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.text(), source.text());
     assert!(restored.body().runs().all(|run| !run.format().all_caps()));
     assert!(
@@ -546,7 +577,7 @@ fn durable_composition_replays_all_caps_and_composes_disjoint_or_rejects_overlap
             .runs()
             .all(|run| run.format().underline() == UnderlineStyle::None)
     );
-    Document::from_bytes(&restored.to_bytes().unwrap()).unwrap();
+    Package::from_bytes(&restored.to_bytes().unwrap()).unwrap();
 
     let mut overlap = DurableComposition::new(&source, limits(8));
     overlap.join(all_caps).unwrap();
@@ -565,7 +596,7 @@ fn durable_composition_replays_all_caps_and_composes_disjoint_or_rejects_overlap
 
 #[test]
 fn durable_composition_replays_double_strike_and_composes_disjoint_or_rejects_overlap() {
-    let source = Document::parse(r"{\rtf1\ansi\strike First Second}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi\strike First Second}").unwrap();
     let mut double_strike_edit = source.edit();
     double_strike_edit
         .set_text_double_strike(TextSpan::new(0, 5).unwrap(), true)
@@ -596,7 +627,7 @@ fn durable_composition_replays_double_strike_and_composes_disjoint_or_rejects_ov
     disjoint.join(double_strike.clone()).unwrap();
     disjoint.join(underline).unwrap();
     let combined = disjoint.finish().unwrap();
-    let formatted = source.apply_durable(&combined).unwrap();
+    let formatted = source.apply_durable(&combined).unwrap().into_package();
     let double_strike_text = formatted
         .body()
         .runs()
@@ -620,10 +651,13 @@ fn durable_composition_replays_double_strike_and_composes_disjoint_or_rejects_ov
     assert!(single_strike_text.contains("First"));
     assert!(single_strike_text.contains("Second"));
     assert!(underlined_text.contains("Second"));
-    let reopened = Document::from_bytes(&formatted.to_bytes().unwrap()).unwrap();
+    let reopened = Package::from_bytes(&formatted.to_bytes().unwrap()).unwrap();
     assert_eq!(reopened.text(), source.text());
 
-    let restored = formatted.apply_durable(&combined.inverse()).unwrap();
+    let restored = formatted
+        .apply_durable(&combined.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.text(), source.text());
     assert!(restored.body().runs().all(|run| run.format().strike()));
     assert!(
@@ -638,7 +672,7 @@ fn durable_composition_replays_double_strike_and_composes_disjoint_or_rejects_ov
             .runs()
             .all(|run| run.format().underline() == UnderlineStyle::None)
     );
-    Document::from_bytes(&restored.to_bytes().unwrap()).unwrap();
+    Package::from_bytes(&restored.to_bytes().unwrap()).unwrap();
 
     let mut overlap = DurableComposition::new(&source, limits(8));
     overlap.join(double_strike).unwrap();
@@ -660,10 +694,11 @@ fn durable_join_preflights_combined_reversible_payload_before_mutation() {
     let left_text = "a".repeat(100_000);
     let right_text = "b".repeat(100_000);
     let input = format!(r"{{\rtf1\ansi {} {}}}", left_text, right_text);
-    let source = Document::parse(&input).unwrap();
+    let source = Package::parse(&input).unwrap();
     let second_start = left_text.len().saturating_add(1);
     let first = {
-        let mut edit = source.edit_with_limits(Limits::new(1));
+        let mut edit =
+            source.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(1)));
         edit.replace_text(TextSpan::new(0, left_text.len()).unwrap(), "A")
             .unwrap();
         edit.commit()
@@ -673,7 +708,8 @@ fn durable_join_preflights_combined_reversible_payload_before_mutation() {
             .unwrap()
     };
     let second = {
-        let mut edit = source.edit_with_limits(Limits::new(1));
+        let mut edit =
+            source.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(1)));
         edit.replace_text(
             TextSpan::new(second_start, second_start.saturating_add(right_text.len())).unwrap(),
             "B",
@@ -693,11 +729,12 @@ fn durable_join_preflights_combined_reversible_payload_before_mutation() {
 
 #[test]
 fn durable_inverse_projects_formatting_through_longer_and_shorter_replacements() {
-    let source = Document::parse(r"{\rtf1\ansi First Second}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi First Second}").unwrap();
     for (replacement, expected_text, bold) in
         [("Longer", "Longer Second", true), ("X", "X Second", false)]
     {
-        let mut edit = source.edit_with_limits(Limits::new(4));
+        let mut edit =
+            source.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(4)));
         edit.replace_text(TextSpan::new(0, 5).unwrap(), replacement)
             .unwrap();
         if bold {
@@ -717,9 +754,12 @@ fn durable_inverse_projects_formatting_through_longer_and_shorter_replacements()
         let mut composition = DurableComposition::new(&source, limits(8));
         composition.join(patch).unwrap();
         let combined = composition.finish().unwrap();
-        let target = source.apply_durable(&combined).unwrap();
+        let target = source.apply_durable(&combined).unwrap().into_package();
         assert_eq!(target.text(), expected_text);
-        let restored = target.apply_durable(&combined.inverse()).unwrap();
+        let restored = target
+            .apply_durable(&combined.inverse())
+            .unwrap()
+            .into_package();
         assert_eq!(restored.text(), source.text());
         if bold {
             assert!(restored.body().runs().all(|run| !run.format().bold()));
@@ -731,7 +771,7 @@ fn durable_inverse_projects_formatting_through_longer_and_shorter_replacements()
 
 #[test]
 fn durable_three_way_requires_explicit_choice_and_refuses_stale_or_foreign() {
-    let source = Document::parse(r"{\rtf1\ansi First Second}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi First Second}").unwrap();
     let left_patch = replace(&source, TextSpan::new(0, 5).unwrap(), "Left", 8);
     let right_patch = replace(&source, TextSpan::new(0, 5).unwrap(), "Right", 8);
     let mut left = DurableComposition::new(&source, limits(8));
@@ -743,10 +783,10 @@ fn durable_three_way_requires_explicit_choice_and_refuses_stale_or_foreign() {
     plan = *plan.finish().unwrap_err();
     plan.resolve(MergeResolution::Right);
     let merged = plan.finish().unwrap().finish().unwrap();
-    let result = source.apply_durable(&merged).unwrap();
+    let result = source.apply_durable(&merged).unwrap().into_package();
     assert_eq!(result.text(), "Right Second");
 
-    let foreign = Document::parse(r"{\rtf1\ansi Foreign}").unwrap();
+    let foreign = Package::parse(r"{\rtf1\ansi Foreign}").unwrap();
     assert!(matches!(
         foreign.apply_durable(&merged),
         Err(litchi_rtf::edit::Error::PatchConflict)
@@ -755,7 +795,7 @@ fn durable_three_way_requires_explicit_choice_and_refuses_stale_or_foreign() {
 
 #[test]
 fn durable_join_respects_combined_operation_limit_without_publishing() {
-    let source = Document::parse(r"{\rtf1\ansi First Second}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi First Second}").unwrap();
     let first = replace(&source, TextSpan::new(0, 5).unwrap(), "Alpha", 1);
     let second = replace(&source, TextSpan::new(6, 12).unwrap(), "Bravo", 1);
     let mut composition = DurableComposition::new(&source, limits(1));
@@ -769,8 +809,9 @@ fn durable_join_respects_combined_operation_limit_without_publishing() {
 fn durable_replay_uses_the_exact_patch_operation_limit() {
     const OPERATION_COUNT: usize = 257;
     let input = format!(r"{{\rtf1\ansi {}}}", "a".repeat(OPERATION_COUNT));
-    let source = Document::parse(&input).unwrap();
-    let mut edit = source.edit_with_limits(Limits::new(OPERATION_COUNT));
+    let source = Package::parse(&input).unwrap();
+    let mut edit = source
+        .edit_with_options(EditOptions::new().semantic_limits(semantic_limits(OPERATION_COUNT)));
     for position in 0..OPERATION_COUNT {
         edit.replace_text(TextSpan::new(position, position + 1).unwrap(), "b")
             .unwrap();
@@ -781,21 +822,25 @@ fn durable_replay_uses_the_exact_patch_operation_limit() {
         .patch()
         .to_durable(limits(OPERATION_COUNT))
         .unwrap();
-    let target = source.apply_durable(&patch).unwrap();
+    let target = source.apply_durable(&patch).unwrap().into_package();
     assert_eq!(target.text(), "b".repeat(OPERATION_COUNT));
-    let restored = target.apply_durable(&patch.inverse()).unwrap();
+    let restored = target
+        .apply_durable(&patch.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
 }
 
 #[test]
 fn empty_body_boundary_group_still_compares_alignment_conflicts() {
-    let source = Document::parse(r"{\rtf1\ansi First Second}").unwrap();
-    let mut left_edit = source.edit_with_limits(Limits::new(2));
+    let source = Package::parse(r"{\rtf1\ansi First Second}").unwrap();
+    let mut left_edit =
+        source.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(2)));
     left_edit
         .replace_text(TextSpan::new(5, 5).unwrap(), "Inserted")
         .unwrap();
     left_edit
-        .set_paragraph_alignment(0, Alignment::Right)
+        .set_paragraph_alignment(Position::new(0), Alignment::Right)
         .unwrap();
     let left_patch = left_edit
         .commit()
@@ -804,12 +849,13 @@ fn empty_body_boundary_group_still_compares_alignment_conflicts() {
         .to_durable(limits(4))
         .unwrap();
 
-    let mut right_edit = source.edit_with_limits(Limits::new(2));
+    let mut right_edit =
+        source.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(2)));
     right_edit
         .replace_text(TextSpan::new(0, 5).unwrap(), "Alpha")
         .unwrap();
     right_edit
-        .set_paragraph_alignment(0, Alignment::Right)
+        .set_paragraph_alignment(Position::new(0), Alignment::Right)
         .unwrap();
     let right_patch = right_edit
         .commit()
@@ -827,7 +873,7 @@ fn empty_body_boundary_group_still_compares_alignment_conflicts() {
     plan = *plan.finish().unwrap_err();
     plan.resolve(MergeResolution::Left);
     let merged = plan.finish().unwrap().finish().unwrap();
-    let result = source.apply_durable(&merged).unwrap();
+    let result = source.apply_durable(&merged).unwrap().into_package();
     assert_eq!(result.text(), "FirstInserted Second");
     assert_eq!(
         result
@@ -843,7 +889,7 @@ fn empty_body_boundary_group_still_compares_alignment_conflicts() {
 
 #[test]
 fn durable_positioning_schema_replays_inverses_and_rejects_stale_or_malformed() {
-    let source = Document::parse(r"{\rtf1\ansi\super First Second Third}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi\super First Second Third}").unwrap();
     let mut edit = source.edit();
     edit.set_text_expansion(
         TextSpan::new(0, 5).unwrap(),
@@ -884,7 +930,7 @@ fn durable_positioning_schema_replays_inverses_and_rejects_stale_or_malformed() 
     );
     assert_eq!(durable.operations()[2].value, serde_json::json!(8));
 
-    let formatted = source.apply_durable(&durable).unwrap();
+    let formatted = source.apply_durable(&durable).unwrap().into_package();
     let first = formatted
         .body()
         .runs()
@@ -910,7 +956,7 @@ fn durable_positioning_schema_replays_inverses_and_rejects_stale_or_malformed() 
     assert_eq!(third.format().kerning_half_points(), 8);
     assert_eq!(third.format().baseline(), CharacterBaseline::Superscript);
 
-    let reopened = Document::from_bytes(&formatted.to_bytes().unwrap()).unwrap();
+    let reopened = Package::from_bytes(&formatted.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .body()
@@ -942,7 +988,10 @@ fn durable_positioning_schema_replays_inverses_and_rejects_stale_or_malformed() 
         8
     );
 
-    let restored = formatted.apply_durable(&durable.inverse()).unwrap();
+    let restored = formatted
+        .apply_durable(&durable.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.text(), source.text());
     assert!(restored.body().runs().all(|run| {
         run.format().expansion() == litchi_rtf::CharacterExpansion::None
@@ -1043,7 +1092,7 @@ fn durable_positioning_schema_replays_inverses_and_rejects_stale_or_malformed() 
 
 #[test]
 fn durable_composition_replays_disjoint_positioning_and_rejects_overlap() {
-    let source = Document::parse(r"{\rtf1\ansi\super\kerning2 First Second Third}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi\super\kerning2 First Second Third}").unwrap();
     let mut expansion_edit = source.edit();
     expansion_edit
         .set_text_expansion(
@@ -1085,7 +1134,7 @@ fn durable_composition_replays_disjoint_positioning_and_rejects_overlap() {
     composition.join(scale).unwrap();
     composition.join(kerning).unwrap();
     let combined = composition.finish().unwrap();
-    let formatted = source.apply_durable(&combined).unwrap();
+    let formatted = source.apply_durable(&combined).unwrap().into_package();
     let first = formatted
         .body()
         .runs()
@@ -1113,7 +1162,10 @@ fn durable_composition_replays_disjoint_positioning_and_rejects_overlap() {
     assert_eq!(third.format().kerning_half_points(), 8);
     assert_eq!(third.format().baseline(), CharacterBaseline::Superscript);
 
-    let restored = formatted.apply_durable(&combined.inverse()).unwrap();
+    let restored = formatted
+        .apply_durable(&combined.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.text(), source.text());
     assert!(restored.body().runs().all(|run| {
         run.format().expansion() == litchi_rtf::CharacterExpansion::None
@@ -1139,7 +1191,7 @@ fn durable_composition_replays_disjoint_positioning_and_rejects_overlap() {
 
 #[test]
 fn durable_composition_replays_font_size_with_disjoint_facets_and_rejects_overlap() {
-    let source = Document::parse(r"{\rtf1\ansi First Second}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi First Second}").unwrap();
     let mut size_edit = source.edit();
     size_edit
         .set_text_font_size(TextSpan::new(0, 5).unwrap(), NonZeroU16::new(23).unwrap())
@@ -1171,7 +1223,7 @@ fn durable_composition_replays_font_size_with_disjoint_facets_and_rejects_overla
     composition.join(size.clone()).unwrap();
     composition.join(underline.clone()).unwrap();
     let combined = composition.finish().unwrap();
-    let formatted = source.apply_durable(&combined).unwrap();
+    let formatted = source.apply_durable(&combined).unwrap().into_package();
     let size_text = formatted
         .body()
         .runs()
@@ -1186,10 +1238,13 @@ fn durable_composition_replays_font_size_with_disjoint_facets_and_rejects_overla
         .map(|run| run.text())
         .collect::<String>();
     assert!(underlined_text.contains("Second"));
-    let reopened = Document::from_bytes(&formatted.to_bytes().unwrap()).unwrap();
+    let reopened = Package::from_bytes(&formatted.to_bytes().unwrap()).unwrap();
     assert_eq!(reopened.text(), source.text());
 
-    let restored = formatted.apply_durable(&combined.inverse()).unwrap();
+    let restored = formatted
+        .apply_durable(&combined.inverse())
+        .unwrap()
+        .into_package();
     assert!(
         restored
             .body()
@@ -1202,7 +1257,7 @@ fn durable_composition_replays_font_size_with_disjoint_facets_and_rejects_overla
             .runs()
             .all(|run| run.format().underline() == UnderlineStyle::None)
     );
-    let reopened_restored = Document::from_bytes(&restored.to_bytes().unwrap()).unwrap();
+    let reopened_restored = Package::from_bytes(&restored.to_bytes().unwrap()).unwrap();
     assert_eq!(reopened_restored.text(), source.text());
 
     let mut overlapping_underline_edit = source.edit();
@@ -1222,7 +1277,7 @@ fn durable_composition_replays_font_size_with_disjoint_facets_and_rejects_overla
 
 #[test]
 fn durable_composition_replays_baseline_and_rejects_overlapping_baseline_edits() {
-    let source = Document::parse(r"{\rtf1\ansi First Second}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi First Second}").unwrap();
     let mut baseline_edit = source.edit();
     baseline_edit
         .set_text_baseline(TextSpan::new(0, 5).unwrap(), CharacterBaseline::Superscript)
@@ -1250,7 +1305,7 @@ fn durable_composition_replays_baseline_and_rejects_overlapping_baseline_edits()
     disjoint.join(baseline.clone()).unwrap();
     disjoint.join(underline).unwrap();
     let combined = disjoint.finish().unwrap();
-    let formatted = source.apply_durable(&combined).unwrap();
+    let formatted = source.apply_durable(&combined).unwrap().into_package();
     assert_eq!(
         formatted
             .body()
@@ -1271,7 +1326,7 @@ fn durable_composition_replays_baseline_and_rejects_overlapping_baseline_edits()
             .underline(),
         UnderlineStyle::Single
     );
-    let reopened = Document::from_bytes(&formatted.to_bytes().unwrap()).unwrap();
+    let reopened = Package::from_bytes(&formatted.to_bytes().unwrap()).unwrap();
     assert_eq!(reopened.text(), source.text());
     assert_eq!(
         reopened
@@ -1293,7 +1348,10 @@ fn durable_composition_replays_baseline_and_rejects_overlapping_baseline_edits()
             .underline(),
         UnderlineStyle::Single
     );
-    let restored = formatted.apply_durable(&combined.inverse()).unwrap();
+    let restored = formatted
+        .apply_durable(&combined.inverse())
+        .unwrap()
+        .into_package();
     assert!(
         restored
             .body()

@@ -25,14 +25,15 @@
 //! contract this implements, in particular which refusals stay at `open()` and
 //! which become first-access refusals.
 
+use std::io;
 use std::sync::Arc;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use soapberry_zip::office::{IndexedArchive, VerifiedPrecompressedEntry};
+use soapberry_zip::office::{IndexedArchive, VerifiedEntryReaderError, VerifiedPrecompressedEntry};
 
-use crate::error::{OpcError, Result, replicate_deferred_error};
-use crate::limits::{ReadLimits, ReadResource};
+use crate::error::{OpcError, Result, map_io_error, replicate_deferred_error};
+use crate::limits::{SourceLimitKind, SourceLimits};
 
 /// The retained owned source archive that deferred payloads inflate from.
 ///
@@ -46,7 +47,7 @@ pub(crate) struct DeferredPartSource {
     /// holds as `source_archive`, so a deferred package retains one copy of
     /// the compressed bytes, not two.
     bytes: Arc<Vec<u8>>,
-    limits: ReadLimits,
+    limits: SourceLimits,
     /// The ZIP index over `bytes`, built on the first decode and never again.
     /// A package that decodes nothing never builds it.
     index: OnceLock<std::result::Result<IndexedArchive<Arc<Vec<u8>>>, OpcError>>,
@@ -60,7 +61,7 @@ pub(crate) struct DeferredPartSource {
 }
 
 impl DeferredPartSource {
-    pub(crate) fn new(bytes: Arc<Vec<u8>>, limits: ReadLimits) -> Self {
+    pub(crate) fn new(bytes: Arc<Vec<u8>>, limits: SourceLimits) -> Self {
         Self {
             bytes,
             limits,
@@ -79,7 +80,7 @@ impl DeferredPartSource {
     }
 
     /// The read limits the retained archive was opened under.
-    pub(crate) const fn limits(&self) -> ReadLimits {
+    pub(crate) const fn limits(&self) -> SourceLimits {
         self.limits
     }
 
@@ -102,12 +103,8 @@ impl DeferredPartSource {
         let bytes = &self.bytes;
         self.index
             .get_or_init(|| {
-                IndexedArchive::from_reader_with_limits(
-                    Arc::clone(bytes),
-                    end_offset,
-                    limits.zip_limits(),
-                )
-                .map_err(OpcError::from)
+                IndexedArchive::from_reader(Arc::clone(bytes), end_offset, limits.zip_limits())
+                    .map_err(OpcError::from)
             })
             .as_ref()
             .map_err(replicate_deferred_error)
@@ -116,22 +113,22 @@ impl DeferredPartSource {
     /// Charge one decoded payload against the aggregate actual-byte limit.
     ///
     /// This mirrors `pkgreader`'s `checked_add` for
-    /// [`ReadResource::TotalPartBytes`], including the overflow observation
+    /// [`SourceLimitKind::TotalPartBytes`], including the overflow observation
     /// value, so a lazy package's refusal is the value the eager path
     /// produces.
     fn charge_inflated(&self, bytes: u64) -> Result<()> {
         let maximum = self.limits.max_total_part_bytes();
         let mut current = self.inflated_bytes.load(Ordering::Relaxed);
         loop {
-            let actual = current.checked_add(bytes).ok_or(OpcError::ReadLimit {
-                resource: ReadResource::TotalPartBytes,
-                actual: u64::MAX,
+            let actual = current.checked_add(bytes).ok_or(OpcError::Limit {
+                kind: SourceLimitKind::TotalPartBytes,
+                observed: u64::MAX,
                 maximum,
             })?;
             if actual > maximum {
-                return Err(OpcError::ReadLimit {
-                    resource: ReadResource::TotalPartBytes,
-                    actual,
+                return Err(OpcError::Limit {
+                    kind: SourceLimitKind::TotalPartBytes,
+                    observed: actual,
                     maximum,
                 });
             }
@@ -157,6 +154,13 @@ pub(crate) struct DeferredPayload {
     source: Arc<DeferredPartSource>,
     /// The ZIP member name this payload inflates from.
     member: Box<str>,
+    /// The central-directory size admitted before this handle was created.
+    ///
+    /// Keeping the checked value with the deferred payload lets size-only
+    /// callers account for it without building the ZIP index or inflating the
+    /// member. The decoder still compares the retained archive metadata and
+    /// the actual output with this value before publishing bytes.
+    declared_len: u64,
     /// The decode outcome, recorded once. A failure is recorded too, so the
     /// refusal is stable and idempotent across repeated accesses: a limit
     /// failure that alternated with success would make the error identity
@@ -175,13 +179,36 @@ impl DeferredPayload {
         &self.member
     }
 
-    fn decode(&self) -> std::result::Result<Arc<Vec<u8>>, OpcError> {
-        let archive = self.source.index()?;
-        let blob = archive.read(&self.member).map_err(OpcError::from)?;
+    fn admitted_len(&self) -> Result<usize> {
         let limits = self.source.limits;
-        let inflated = blob.len() as u64;
-        limits.check(ReadResource::PartBytes, inflated, limits.max_part_bytes())?;
-        self.source.charge_inflated(inflated)?;
+        limits.check(
+            SourceLimitKind::PartBytes,
+            self.declared_len,
+            limits.max_part_bytes(),
+        )?;
+        usize::try_from(self.declared_len).map_err(|_| OpcError::Limit {
+            kind: SourceLimitKind::PartBytes,
+            observed: self.declared_len,
+            maximum: usize::MAX as u64,
+        })
+    }
+
+    fn decode(&self) -> std::result::Result<Arc<Vec<u8>>, OpcError> {
+        let admitted_len = self.admitted_len()?;
+        let archive = self.source.index()?;
+        let metadata = archive.metadata(&self.member).map_err(OpcError::from)?;
+        if metadata.uncompressed_size() != self.declared_len {
+            return Err(OpcError::ZipError(
+                "deferred OPC payload metadata changed".to_owned(),
+            ));
+        }
+        let blob = archive.read(&self.member).map_err(OpcError::from)?;
+        if blob.len() != admitted_len {
+            return Err(OpcError::ZipError(
+                "deferred OPC payload decoded size mismatch".to_owned(),
+            ));
+        }
+        self.source.charge_inflated(admitted_len as u64)?;
         Ok(Arc::new(blob))
     }
 
@@ -190,6 +217,59 @@ impl DeferredPayload {
             .get_or_init(|| self.decode())
             .as_ref()
             .map_err(replicate_deferred_error)
+    }
+
+    /// Compare a deferred member with a candidate without retaining the
+    /// decoded payload. The callback reader has a fixed scratch buffer, so a
+    /// same-length replacement can be distinguished from the source without
+    /// hydrating an unrelated part merely to decide whether its central
+    /// record may be copied.
+    fn same_bytes(&self, expected: &[u8]) -> Result<bool> {
+        if let Some(outcome) = self.cell.get() {
+            return outcome
+                .as_ref()
+                .map(|bytes| bytes.as_slice() == expected)
+                .map_err(replicate_deferred_error);
+        }
+        let admitted_len = self.admitted_len()?;
+        if admitted_len != expected.len() {
+            return Ok(false);
+        }
+        let archive = self.source.index()?;
+        let entry_id = archive
+            .entry_id(&self.member)
+            .ok_or_else(|| OpcError::PartNotFound(self.member.to_string()))?;
+        archive
+            .with_verified_entry_reader(entry_id, |reader| {
+                let mut offset = 0_usize;
+                let mut equal = true;
+                loop {
+                    let chunk_len = {
+                        let chunk = reader.fill_buf()?;
+                        if chunk.is_empty() {
+                            break;
+                        }
+                        let end = offset
+                            .checked_add(chunk.len())
+                            .ok_or_else(|| io::Error::other("deferred payload length overflow"))?;
+                        if expected.get(offset..end) != Some(chunk) {
+                            equal = false;
+                        }
+                        end - offset
+                    };
+                    offset += chunk_len;
+                    reader.consume(chunk_len);
+                }
+                Ok(equal && offset == expected.len())
+            })
+            .map_err(|error| match error {
+                VerifiedEntryReaderError::Archive { error, .. } => OpcError::from(error),
+                VerifiedEntryReaderError::Transport { error, .. }
+                | VerifiedEntryReaderError::Callback(error) => map_io_error(error),
+                _ => {
+                    OpcError::ZipError("unrecognized verified ZIP entry-reader failure".to_owned())
+                },
+            })
     }
 }
 
@@ -271,16 +351,44 @@ fn empty_payload() -> &'static Arc<Vec<u8>> {
 }
 
 impl PartPayload {
+    /// Compare this payload with candidate bytes without materializing a
+    /// deferred source member. Materialized forms use their existing shared
+    /// allocation; deferred forms stream through the retained ZIP member with
+    /// the fixed-size verified reader above.
+    pub(crate) fn same_bytes(&self, expected: &[u8]) -> Result<bool> {
+        match self {
+            Self::Ready(bytes) => Ok(bytes.as_slice() == expected),
+            Self::Deferred(deferred) => deferred.same_bytes(expected),
+            Self::Transferred(transferred) => Ok(transferred.decoded().as_slice() == expected),
+            Self::Verified(verified) => Ok(verified.bytes().as_slice() == expected),
+        }
+    }
+
     pub(crate) fn ready(bytes: Arc<Vec<u8>>) -> Self {
         Self::Ready(bytes)
     }
 
-    pub(crate) fn deferred(source: &Arc<DeferredPartSource>, member: Box<str>) -> Self {
+    pub(crate) fn deferred(
+        source: &Arc<DeferredPartSource>,
+        member: Box<str>,
+        declared_len: u64,
+    ) -> Self {
         Self::Deferred(Arc::new(DeferredPayload {
             source: Arc::clone(source),
             member,
+            declared_len,
             cell: OnceLock::new(),
         }))
+    }
+
+    /// Return the admitted payload length without decoding a deferred member.
+    pub(crate) fn payload_len(&self) -> Result<usize> {
+        match self {
+            Self::Ready(bytes) => Ok(bytes.len()),
+            Self::Deferred(deferred) => deferred.admitted_len(),
+            Self::Transferred(transferred) => Ok(transferred.decoded().len()),
+            Self::Verified(verified) => Ok(verified.bytes().len()),
+        }
     }
 
     /// Decode the payload if it is still deferred, reporting the typed
@@ -289,7 +397,7 @@ impl PartPayload {
     /// # Errors
     ///
     /// Returns the refusal the first decode produced: a
-    /// [`OpcError::ReadLimit`] for `PartBytes` or `TotalPartBytes`, an
+    /// [`OpcError::Limit`] for `PartBytes` or `TotalPartBytes`, an
     /// allocation failure, a cancellation, an I/O error, or a ZIP error for a
     /// corrupt Deflate stream or a CRC mismatch.
     pub(crate) fn force(&self) -> Result<&Arc<Vec<u8>>> {
@@ -414,5 +522,22 @@ pub struct PayloadHandle(pub(crate) PartPayload);
 impl PayloadHandle {
     pub(crate) fn payload(&self) -> &PartPayload {
         &self.0
+    }
+}
+
+impl PartPayload {
+    /// Whether both payloads are one allocation: the same ready, verified or
+    /// transferred bytes, or the same deferred source cell. Never decodes,
+    /// so two separately loaded copies of equal bytes compare unequal.
+    pub(crate) fn same_allocation(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Ready(left), Self::Ready(right)) => Arc::ptr_eq(left, right),
+            (Self::Deferred(left), Self::Deferred(right)) => Arc::ptr_eq(left, right),
+            (Self::Transferred(left), Self::Transferred(right)) => Arc::ptr_eq(left, right),
+            (Self::Verified(left), Self::Verified(right)) => {
+                Arc::ptr_eq(left.bytes(), right.bytes())
+            },
+            _ => false,
+        }
     }
 }

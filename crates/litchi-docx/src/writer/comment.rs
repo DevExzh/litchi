@@ -1,8 +1,4 @@
 #![expect(
-    clippy::module_name_repetitions,
-    reason = "public names retain established OOXML facade terminology"
-)]
-#![expect(
     clippy::shadow_reuse,
     reason = "parser bindings are intentionally refined after validation"
 )]
@@ -94,7 +90,7 @@ impl AsRef<str> for Date {
 ///
 /// Comments are annotations attached to specific locations in the document.
 #[derive(Debug, Clone)]
-pub struct MutableComment {
+pub struct Comment {
     /// Comment ID
     id: u32,
     /// Author name
@@ -107,7 +103,7 @@ pub struct MutableComment {
     initials: Option<String>,
 }
 
-impl MutableComment {
+impl Comment {
     /// Create a new comment without a timestamp.
     ///
     /// `WordprocessingML` makes `w:date` optional. Omitting it is the
@@ -257,12 +253,12 @@ fn requires_space_preservation(text: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{Date, DateError, MAX_DATE_BYTES, MutableComment};
+    use super::{Comment, Date, DateError, MAX_DATE_BYTES};
 
     #[test]
     fn creation_is_deterministic_without_ambient_time() {
-        let first = MutableComment::new(1, "John Doe".to_string(), "Test comment".to_string());
-        let second = MutableComment::new(1, "John Doe".to_string(), "Test comment".to_string());
+        let first = Comment::new(1, "John Doe".to_string(), "Test comment".to_string());
+        let second = Comment::new(1, "John Doe".to_string(), "Test comment".to_string());
         assert_eq!(first.id(), 1);
         assert_eq!(first.author(), "John Doe");
         assert_eq!(first.text(), "Test comment");
@@ -275,7 +271,7 @@ mod tests {
         let Ok(date) = Date::parse("2026-08-08T12:34:56+08:00") else {
             panic!("valid test timestamp must parse");
         };
-        let mut comment = MutableComment::new_with_date(
+        let mut comment = Comment::new_with_date(
             1,
             "Jane & Smith".to_string(),
             "Review this".to_string(),
@@ -297,7 +293,7 @@ mod tests {
 
     #[test]
     fn invalid_date_cannot_mutate_and_semantic_text_space_is_preserved() {
-        let mut comment = MutableComment::new(7, "A".to_string(), " keep ".to_string());
+        let mut comment = Comment::new(7, "A".to_string(), " keep ".to_string());
         let Ok(original) = Date::parse("2026-08-08T04:34:56Z") else {
             panic!("valid test timestamp must parse");
         };

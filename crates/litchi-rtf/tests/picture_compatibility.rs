@@ -7,15 +7,12 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
-use litchi_rtf::{
-    ImageType, PictureCompatibilityKind, PictureCompatibilityRecord, RtfDocument, RtfWriter,
-};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{ImageType, PictureCompatibilityKind, PictureCompatibilityRecord, write::Writer};
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
@@ -24,7 +21,7 @@ fn parses_real_libreoffice_body_wrapper_and_rewrites_positionally() {
     let source = include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/fdo76633.rtf"
     );
-    let document = RtfDocument::parse_bytes(source).unwrap();
+    let document = Tree::parse_bytes(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let records = document.picture_compatibility_records();
     assert_eq!(records.len(), 1);
     assert_eq!(records[0].kind, PictureCompatibilityKind::ShapePicture);
@@ -40,7 +37,7 @@ fn parses_real_libreoffice_body_wrapper_and_rewrites_positionally() {
 
     let output = write(&document);
     assert!(String::from_utf8_lossy(&output).contains("{\\*\\shppict{\\pict\\jpegblip"));
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.picture_compatibility_records().len(), 1);
     assert_eq!(
         reparsed
@@ -57,7 +54,7 @@ fn preferred_and_fallback_share_position_and_round_trip_in_order() {
         r#"{\rtf1 A{\*\shppict{\pict\pngblip 89504e470d0a1a0a}}"#,
         r#"{\nonshppict{\pict\jpegblip ffd8ffe0}}B}"#,
     );
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(document.text(), "AB");
     assert_eq!(document.picture_compatibility_records().len(), 2);
     assert!(
@@ -78,7 +75,7 @@ fn preferred_and_fallback_share_position_and_round_trip_in_order() {
     let first = write(&document);
     let serialized = String::from_utf8_lossy(&first);
     assert!(serialized.find("\\shppict").unwrap() < serialized.find("\\nonshppict").unwrap());
-    let reparsed = RtfDocument::parse_bytes(&first).unwrap();
+    let reparsed = Tree::parse_bytes(&first, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         reparsed.picture_compatibility_records(),
         document.picture_compatibility_records()
@@ -88,7 +85,11 @@ fn preferred_and_fallback_share_position_and_round_trip_in_order() {
 
 #[test]
 fn typed_mutation_references_and_clears_without_deleting_picture() {
-    let mut document = RtfDocument::parse(r"{\rtf1 A{\pict\pngblip 89504e470d0a1a0a}B}").unwrap();
+    let mut document = Tree::parse(
+        r"{\rtf1 A{\pict\pngblip 89504e470d0a1a0a}B}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     document
         .push_picture_compatibility_record(PictureCompatibilityRecord {
             position: 1,
@@ -115,7 +116,7 @@ fn typed_mutation_references_and_clears_without_deleting_picture() {
             .is_err()
     );
     assert_eq!(
-        RtfDocument::parse_bytes(&write(&document))
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default())
             .unwrap()
             .pictures()
             .len(),
@@ -141,7 +142,7 @@ fn rejects_hostile_wrapper_grammar() {
         r"{\rtf1{\*\shppict{\pict\pngblip 00}}{\*\shppict{\pict\pngblip 01}}}",
     ] {
         assert!(
-            RtfDocument::parse(source).is_err(),
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
             "accepted malformed {source}"
         );
     }

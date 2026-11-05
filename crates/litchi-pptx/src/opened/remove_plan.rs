@@ -1,4 +1,4 @@
-//! Bounded planning for atomic dependency-free whole-slide removal.
+//! Bounded planning for atomic whole-slide removal with the Parts the slide owns.
 
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcPackage, PackURI, Part};
@@ -8,13 +8,13 @@ use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use super::copy_plan::{
-    has_signature_infrastructure, reject_mce, reject_unknown_non_part_members, resolve_slide,
-    validate_registered_layout, validate_slide_surface,
+    has_signature_infrastructure, reject_unknown_non_part_members, resolve_slide,
+    validate_registered_layout,
 };
 use super::model::{Slide, Snapshot, invalid};
-use super::patch::Patch;
+use super::patch::Patch as OpenedPatch;
 use super::patch::SinglePartChange;
-use crate::{Error, Result, SlideCopyRefusal, SlideRemovalRefusal};
+use crate::{Error, Result, SlideRemovalRefusal};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const PML: &[u8] = b"http://schemas.openxmlformats.org/presentationml/2006/main";
@@ -39,13 +39,18 @@ const PATCH_HEADER_BYTES: usize = PATCH_MAGIC.len() + 32 + 32 + 8;
 /// proof across serialization: both forward and inverse publication require the
 /// exact complete-package revision captured during planning.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SlideRemovalPatch {
+pub struct Patch {
     source_revision: [u8; 32],
     target_revision: [u8; 32],
-    patch: Patch,
+    patch: OpenedPatch,
 }
 
-impl SlideRemovalPatch {
+impl Patch {
+    /// The generic exact-write-set patch this durable patch carries.
+    pub(crate) const fn opened_patch(&self) -> &OpenedPatch {
+        &self.patch
+    }
+
     /// Complete-package revision required before publication.
     #[must_use]
     pub const fn source_revision(&self) -> [u8; 32] {
@@ -101,8 +106,9 @@ impl SlideRemovalPatch {
             .ok_or_else(|| invalid("slide-removal durable patch limit overflow"))?;
         if length > limit {
             return Err(Error::Limit {
-                resource: "slide-removal durable patch bytes",
-                limit,
+                kind: crate::opened::LimitKind::PatchBytes,
+                observed: length,
+                maximum: limit,
             });
         }
         let payload_len = u64::try_from(payload.len())
@@ -122,17 +128,6 @@ impl SlideRemovalPatch {
         Ok(output)
     }
 
-    /// Parse a durable removal patch under conservative finite limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for malformed, trailing, or unbounded input, and
-    /// [`Error::DurablePatchRevisionFormat`] for a patch serialized under the
-    /// superseded `LPRM0001` format.
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, super::Limits::default())
-    }
-
     /// Parse a durable removal patch under caller-selected finite limits.
     ///
     /// A patch whose header carries the superseded `LPRM0001` magic is refused
@@ -145,17 +140,18 @@ impl SlideRemovalPatch {
     /// # Errors
     ///
     /// Returns an error for malformed, trailing, or unbounded input, and
-    /// [`Error::DurablePatchRevisionFormat`] for a patch serialized under the
-    /// superseded `LPRM0001` format.
-    pub fn from_bytes_with_limits(bytes: &[u8], limits: super::Limits) -> Result<Self> {
+    /// [`Error::PatchConflict`] for a patch serialized under the superseded
+    /// `LPRM0001` format.
+    pub fn from_bytes(bytes: &[u8], limits: super::Limits) -> Result<Self> {
         let limit = limits
             .max_patch_bytes()
             .checked_add(PATCH_HEADER_BYTES)
             .ok_or_else(|| invalid("slide-removal durable patch limit overflow"))?;
         if bytes.len() > limit {
             return Err(Error::Limit {
-                resource: "slide-removal durable patch bytes",
-                limit,
+                kind: crate::opened::LimitKind::PatchBytes,
+                observed: bytes.len(),
+                maximum: limit,
             });
         }
         // A patch serialized under the superseded magic carries revisions from
@@ -164,10 +160,7 @@ impl SlideRemovalPatch {
         // ever holds a patch whose public `source_revision` cannot be compared
         // against a snapshot of this build.
         if bytes.get(..SUPERSEDED_PATCH_MAGIC.len()) == Some(SUPERSEDED_PATCH_MAGIC.as_slice()) {
-            return Err(Error::DurablePatchRevisionFormat {
-                found: crate::DurablePatchFormat::SlideRemovalV1,
-                expected: crate::DurablePatchFormat::SlideRemovalV2,
-            });
+            return Err(Error::PatchConflict);
         }
         if bytes.len() < PATCH_HEADER_BYTES || &bytes[..PATCH_MAGIC.len()] != PATCH_MAGIC {
             return Err(invalid(
@@ -193,7 +186,7 @@ impl SlideRemovalPatch {
                 "slide-removal durable patch is truncated or has trailing bytes",
             ));
         }
-        let patch = Patch::from_bytes_with_limits(&bytes[position..end], limits)?;
+        let patch = OpenedPatch::from_bytes(&bytes[position..end], limits)?;
         if patch.exact_slide_removal_change().is_none() {
             return Err(invalid(
                 "slide-removal durable patch is not an exact presentation-and-slide change",
@@ -207,25 +200,25 @@ impl SlideRemovalPatch {
     }
 }
 
-/// Immutable source-bound plan for removing one dependency-free slide.
+/// Immutable source-bound plan for removing one slide.
 ///
-/// The supported deletion boundary is deliberately narrow: the selected slide
-/// may have exactly one internal relationship to a registered shared layout and
-/// no other outgoing relationship. No other package resource may target the
-/// slide. The durable patch therefore removes exactly the slide part and edits
+/// The selected slide has exactly one internal relationship to a registered
+/// shared layout. No package resource other than its presentation binding
+/// and the Parts it owns may target the slide. The durable patch removes the
+/// slide Part and the Parts it owns exclusively (record 0303) and edits
 /// exactly the presentation owner; every other resource remains outside the
 /// write set.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SlideRemovalPlan {
+pub struct Plan {
     source: Slide,
     position: usize,
     layout: PackURI,
     planned_bytes: usize,
     source_revision: [u8; 32],
-    patch: SlideRemovalPatch,
+    patch: Patch,
 }
 
-impl SlideRemovalPlan {
+impl Plan {
     /// Source semantic slide identity captured by the immutable snapshot.
     #[must_use]
     pub const fn source(&self) -> &Slide {
@@ -244,7 +237,7 @@ impl SlideRemovalPlan {
         &self.layout
     }
 
-    /// Bounded bytes in the two-resource removal write set before encoding.
+    /// Bounded bytes in the removal write set before encoding.
     #[must_use]
     pub const fn planned_bytes(&self) -> usize {
         self.planned_bytes
@@ -258,22 +251,23 @@ impl SlideRemovalPlan {
 
     /// Exact durable complete-revision-bound forward patch.
     ///
-    /// The patch can be serialized with [`SlideRemovalPatch::to_bytes`] and
-    /// restored after application with [`SlideRemovalPatch::inverse`].
+    /// The patch can be serialized with [`Patch::to_bytes`] and
+    /// restored after application with [`Patch::inverse`].
     #[must_use]
-    pub const fn patch(&self) -> &SlideRemovalPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 }
 
 impl Snapshot {
-    /// Plan removal of one dependency-free slide without mutation.
+    /// Plan removal of one slide without mutation.
     ///
     /// Signed, macro-enabled, protected, MCE-bearing, and final-slide packages
     /// are refused. The selected slide must have exactly one registered layout
-    /// relationship, no notes, charts, media, custom XML, external links, or
-    /// other dependencies, and no incoming owner except its one presentation
-    /// relationship.
+    /// relationship and no incoming owner except its one presentation
+    /// relationship and the Parts it owns. Its notes slide, charts, media and
+    /// other Parts that nothing else targets are removed with it; Parts that
+    /// another owner still targets stay (record 0303).
     ///
     /// # Errors
     ///
@@ -281,8 +275,8 @@ impl Snapshot {
     /// limit/allocation/OPC/XML error while constructing the exact candidate.
     pub fn plan_slide_removal<'s>(
         &self,
-        slide: impl Into<crate::slide::Key<'s>>,
-    ) -> Result<SlideRemovalPlan> {
+        slide: impl Into<crate::slide::Selector<'s>>,
+    ) -> Result<Plan> {
         let selected = resolve_slide(self, slide.into())?;
         let position = self
             .slides
@@ -297,8 +291,9 @@ impl Snapshot {
         }
         if self.package.part_count() > self.limits.max_parts() {
             return Err(Error::Limit {
-                resource: "slide-removal package parts",
-                limit: self.limits.max_parts(),
+                kind: crate::opened::LimitKind::Parts,
+                observed: self.package.part_count(),
+                maximum: self.limits.max_parts(),
             });
         }
         map_copy_refusal(reject_unknown_non_part_members(
@@ -320,11 +315,14 @@ impl Snapshot {
 
         let presentation = self.package.get_part(&self.presentation_name)?;
         crate::parts::validate_content_type(presentation, ct::PML_PRESENTATION_MAIN)?;
-        map_copy_refusal(reject_mce(presentation.blob(), "presentation owner"))?;
+        reject_presentation_mce_use(presentation.blob())?;
         let presentation_text = std::str::from_utf8(presentation.blob())
             .map_err(|error| Error::Xml(format!("presentation XML is not UTF-8: {error}")))?;
         if crate::presentation_properties::metadata::protection::Settings::parse_xml(
             presentation_text,
+            crate::presentation_properties::metadata::protection::Limits::from_source_limits(
+                self.package.read_limits(),
+            ),
         )?
         .is_protected()
         {
@@ -337,42 +335,60 @@ impl Snapshot {
 
         let owner = self.package.get_part(&selected.part_name)?;
         crate::parts::validate_content_type(owner, ct::PML_SLIDE)?;
-        map_copy_refusal(validate_slide_surface(owner.blob()))?;
+        validate_removal_slide_surface(owner.blob())?;
         let layout = dependency_free_layout(self.package.as_ref(), owner)?;
+        let max_relationships = self
+            .limits
+            .max_parts()
+            .checked_mul(16)
+            .ok_or_else(|| invalid("slide-removal relationship limit overflow"))?;
+        // The Parts the slide owns exclusively leave with it (record 0303).
+        let owned = if crate::presentation::owned_parts::may_own(owner.rels()) {
+            crate::presentation::owned_parts::Graph::from_opc(
+                self.package.as_ref(),
+                max_relationships,
+            )?
+            .owned_by(&selected.part_name)?
+        } else {
+            crate::presentation::owned_parts::Owned::none()
+        };
         crate::master_layout::validate_master_layout_graph(self.package.as_ref())?;
         map_copy_refusal(validate_registered_layout(
             self.package.as_ref(),
             presentation,
             &layout,
         ))?;
-        let max_relationships = self
-            .limits
-            .max_parts()
-            .checked_mul(16)
-            .ok_or_else(|| invalid("slide-removal relationship limit overflow"))?;
         validate_unique_incoming_owner(
             self.package.as_ref(),
             &self.presentation_name,
             &selected,
             max_relationships,
+            &owned,
         )?;
 
-        let planned_bytes = presentation
+        let mut planned_bytes = presentation
             .blob()
             .len()
             .checked_add(owner.blob().len())
             .and_then(|bytes| bytes.checked_add(self.presentation_name.as_str().len()))
             .and_then(|bytes| bytes.checked_add(selected.part_name.as_str().len()))
             .ok_or_else(|| invalid("slide-removal planned byte count overflow"))?;
+        for dependent in owned.parts() {
+            planned_bytes = planned_bytes
+                .checked_add(self.package.get_part(dependent)?.blob().len())
+                .and_then(|bytes| bytes.checked_add(dependent.as_str().len()))
+                .ok_or_else(|| invalid("slide-removal planned byte count overflow"))?;
+        }
         if planned_bytes > self.limits.max_patch_bytes() {
             return Err(Error::Limit {
-                resource: "slide-removal planned bytes",
-                limit: self.limits.max_patch_bytes(),
+                kind: crate::opened::LimitKind::PatchBytes,
+                observed: planned_bytes,
+                maximum: self.limits.max_patch_bytes(),
             });
         }
 
-        let candidate = build_candidate(self, &selected)?;
-        let exact_patch = Patch::capture(
+        let candidate = build_candidate(self, &selected, owned.parts())?;
+        let exact_patch = OpenedPatch::capture(
             self.package.as_ref(),
             &candidate,
             self.presentation_name.clone(),
@@ -380,20 +396,29 @@ impl Snapshot {
         )?;
         let mut resources: Vec<_> = exact_patch.resources().collect();
         resources.sort_unstable_by(|left, right| left.as_str().cmp(right.as_str()));
-        let mut expected = [&self.presentation_name, &selected.part_name];
+        let mut expected: Vec<&PackURI> = [&self.presentation_name, &selected.part_name]
+            .into_iter()
+            .chain(owned.parts())
+            .collect();
         expected.sort_unstable_by(|left, right| left.as_str().cmp(right.as_str()));
-        if resources != expected || !exact_patch.removes_resource(&selected.part_name) {
+        if resources != expected
+            || !exact_patch.removes_resource(&selected.part_name)
+            || !owned
+                .parts()
+                .iter()
+                .all(|dependent| exact_patch.removes_resource(dependent))
+        {
             return Err(invalid(
-                "slide-removal candidate escaped its exact two-resource write set",
+                "slide-removal candidate escaped its exact write set",
             ));
         }
         let target_revision = super::model::package_fingerprint(&candidate)?;
-        let patch = SlideRemovalPatch {
+        let patch = Patch {
             source_revision: self.revision,
             target_revision,
             patch: exact_patch,
         };
-        Ok(SlideRemovalPlan {
+        Ok(Plan {
             source: selected,
             position,
             layout,
@@ -404,59 +429,52 @@ impl Snapshot {
     }
 }
 
-pub(crate) fn apply_patch(
+pub(crate) fn apply_patch_with_semantic_limits(
     package: &mut OpcPackage,
-    patch: &SlideRemovalPatch,
-    operation: &'static str,
+    patch: &Patch,
     physical_source_provenance: bool,
+    semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
 ) -> Result<Snapshot> {
     if super::model::package_fingerprint(package)? != patch.source_revision {
-        return Err(Error::UnsafeEdit {
-            operation,
-            reason: "the complete package graph differs from the slide-removal patch source",
-        });
+        return Err(Error::PatchConflict);
     }
-    let (direction, slide_name) =
-        patch
-            .patch
-            .exact_slide_removal_change()
-            .ok_or(Error::UnsafeEdit {
-                operation,
-                reason: "the durable patch is not an exact presentation-and-slide change",
-            })?;
+    let (direction, slide_name) = patch
+        .patch
+        .exact_slide_removal_change()
+        .ok_or(Error::PatchConflict)?;
     let slide_name = slide_name.clone();
     match direction {
         SinglePartChange::Remove => {
-            let source =
-                super::model::capture(package, patch.patch.limits(), physical_source_provenance)?;
-            let proof = replan_exact_removal(&source, &slide_name, operation)?;
+            let source = super::model::capture_with_provenance_and_semantic_limits(
+                package,
+                patch.patch.limits(),
+                physical_source_provenance,
+                semantic_limits.clone(),
+            )?;
+            let proof = replan_exact_removal(&source, &slide_name)?;
             if !patch.has_same_semantics(proof.patch()) {
-                return Err(Error::UnsafeEdit {
-                    operation,
-                    reason: "the durable patch does not match a freshly proven slide removal",
-                });
+                return Err(Error::PatchConflict);
             }
-            super::patch::apply_exact_revision(
+            super::patch::apply_exact_revision_with_semantic_limits(
                 package,
                 &patch.patch,
                 patch.target_revision,
                 physical_source_provenance,
+                semantic_limits.clone(),
             )
         },
         SinglePartChange::Add => {
             let mut candidate = package.clone();
-            let restored = super::patch::apply_exact_revision(
+            let restored = super::patch::apply_exact_revision_with_semantic_limits(
                 &mut candidate,
                 &patch.patch,
                 patch.target_revision,
                 physical_source_provenance,
+                semantic_limits.clone(),
             )?;
-            let proof = replan_exact_removal(&restored, &slide_name, operation)?;
+            let proof = replan_exact_removal(&restored, &slide_name)?;
             if !patch.inverse().has_same_semantics(proof.patch()) {
-                return Err(Error::UnsafeEdit {
-                    operation,
-                    reason: "the durable inverse does not restore a freshly removable slide",
-                });
+                return Err(Error::PatchConflict);
             }
             *package = candidate;
             Ok(restored)
@@ -464,7 +482,7 @@ pub(crate) fn apply_patch(
     }
 }
 
-impl SlideRemovalPatch {
+impl Patch {
     fn has_same_semantics(&self, other: &Self) -> bool {
         self.source_revision == other.source_revision
             && self.target_revision == other.target_revision
@@ -472,19 +490,12 @@ impl SlideRemovalPatch {
     }
 }
 
-fn replan_exact_removal(
-    snapshot: &Snapshot,
-    slide_name: &PackURI,
-    operation: &'static str,
-) -> Result<SlideRemovalPlan> {
+fn replan_exact_removal(snapshot: &Snapshot, slide_name: &PackURI) -> Result<Plan> {
     let position = snapshot
         .slides()
         .iter()
         .position(|slide| slide.part_name() == slide_name)
-        .ok_or(Error::UnsafeEdit {
-            operation,
-            reason: "the durable patch slide is not owned by the presentation",
-        })?;
+        .ok_or(Error::PatchConflict)?;
     snapshot.plan_slide_removal(position)
 }
 
@@ -501,7 +512,11 @@ fn take_revision(bytes: &[u8], position: &mut usize) -> Result<[u8; 32]> {
     Ok(revision)
 }
 
-fn build_candidate(snapshot: &Snapshot, selected: &Slide) -> Result<OpcPackage> {
+fn build_candidate(
+    snapshot: &Snapshot,
+    selected: &Slide,
+    dependents: &[PackURI],
+) -> Result<OpcPackage> {
     let mut candidate = snapshot.package.as_ref().clone();
     let xml = super::xml::remove_slide(
         candidate.get_part(&snapshot.presentation_name)?.blob(),
@@ -524,11 +539,12 @@ fn build_candidate(snapshot: &Snapshot, selected: &Slide) -> Result<OpcPackage> 
     if !candidate.remove_part(&selected.part_name) {
         return Err(invalid("slide-removal selected part disappeared"));
     }
-    let captured = super::model::capture(
-        &candidate,
-        snapshot.limits,
-        snapshot.physical_source_provenance,
-    )?;
+    for dependent in dependents {
+        if !candidate.remove_part(dependent) {
+            return Err(invalid("slide-removal dependent part disappeared"));
+        }
+    }
+    let captured = super::model::capture_with_parent_snapshot(&candidate, snapshot)?;
     if captured.slides.len() + 1 != snapshot.slides.len()
         || captured
             .slides
@@ -548,30 +564,59 @@ fn build_candidate(snapshot: &Snapshot, selected: &Slide) -> Result<OpcPackage> 
     Ok(candidate)
 }
 
-fn dependency_free_layout(package: &OpcPackage, slide: &dyn Part) -> Result<PackURI> {
-    if slide.rels().len() != 1 {
-        return refusal(
-            SlideRemovalRefusal::UnsupportedRelationship,
-            "the selected slide must have only one layout relationship",
-        );
-    }
-    let relationship = slide
-        .rels()
-        .iter()
-        .next()
-        .ok_or_else(|| invalid("slide-removal relationship count changed"))?;
-    if relationship.is_external()
-        || !crate::parts::is_relationship_type(
+/// The removed slide's one layout edge, after admitting its other edges.
+///
+/// Removal deletes the slide Part with its relationship Part, so an edge
+/// whose target outlives the slide without depending on it is admitted:
+/// external targets (hyperlinks, linked media) and internal jumps to slides
+/// (`slide` relationships, which other slides keep owning). Any other
+/// internal edge names a Part the slide may own (a notes slide, a picture,
+/// a diagram, comments): [`crate::presentation::owned_parts`] removes it with
+/// the slide when nothing else targets it, and keeps it otherwise
+/// (record 0303).
+pub(crate) fn removal_layout_edge(
+    relationships: &litchi_opc::Relationships,
+) -> Result<&litchi_opc::Relationship> {
+    let mut layout = None;
+    for relationship in relationships.iter() {
+        if relationship.is_external() {
+            continue;
+        }
+        if crate::parts::is_relationship_type(
             relationship.reltype(),
             rt::SLIDE_LAYOUT,
             "slideLayout",
-        )
-    {
-        return refusal(
-            SlideRemovalRefusal::UnsupportedRelationship,
-            "the selected slide has a non-layout or external relationship",
-        );
+        ) {
+            if layout.replace(relationship).is_some() {
+                return refusal(
+                    SlideRemovalRefusal::UnsupportedRelationship,
+                    "the selected slide has more than one layout relationship",
+                );
+            }
+            continue;
+        }
+        if crate::parts::is_relationship_type(relationship.reltype(), rt::SLIDE, "slide") {
+            if relationship.target_query().is_some() || relationship.target_fragment().is_some() {
+                return refusal(
+                    SlideRemovalRefusal::AmbiguousTopology,
+                    "a slide jump of the selected slide contains a query or fragment",
+                );
+            }
+        }
     }
+    layout.map_or_else(
+        || {
+            refusal(
+                SlideRemovalRefusal::UnsupportedRelationship,
+                "the selected slide has no internal layout relationship",
+            )
+        },
+        Ok,
+    )
+}
+
+fn dependency_free_layout(package: &OpcPackage, slide: &dyn Part) -> Result<PackURI> {
+    let relationship = removal_layout_edge(slide.rels())?;
     if relationship.target_query().is_some() || relationship.target_fragment().is_some() {
         return refusal(
             SlideRemovalRefusal::AmbiguousTopology,
@@ -594,6 +639,7 @@ fn validate_unique_incoming_owner(
     presentation_name: &PackURI,
     selected: &Slide,
     max_relationships: usize,
+    owned: &crate::presentation::owned_parts::Owned,
 ) -> Result<()> {
     let mut scanned = 0_usize;
     let mut selected_owners = 0_usize;
@@ -616,9 +662,11 @@ fn validate_unique_incoming_owner(
         }
     }
     for owner in package.iter_parts() {
+        // The Parts the slide owns leave with it (record 0303).
+        let leaves = owned.contains(owner.partname());
         for relationship in owner.rels().iter() {
             scanned = checked_relationship_count(scanned, max_relationships)?;
-            if relationship.is_external() {
+            if relationship.is_external() || leaves {
                 continue;
             }
             if relationship.target_query().is_some() || relationship.target_fragment().is_some() {
@@ -660,23 +708,184 @@ fn checked_relationship_count(current: usize, limit: usize) -> Result<usize> {
         .ok_or_else(|| invalid("slide-removal relationship count overflow"))?;
     if next > limit {
         return Err(Error::Limit {
-            resource: "slide-removal relationship scan",
-            limit,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Relationships),
+            observed: next,
+            maximum: limit,
         });
     }
     Ok(next)
 }
 
 fn validate_presentation_owner(xml: &[u8], selected: &Slide) -> Result<()> {
+    validate_removal_presentation_owner(xml, &selected.relationship_id)
+}
+
+/// The removed slide's section entry leaves with it (record 0303), so the
+/// p14 section list is admitted as it is for insertion.
+pub(crate) fn validate_removal_presentation_owner(xml: &[u8], relationship_id: &str) -> Result<()> {
+    validate_presentation_bindings(xml, relationship_id, 1, true)
+}
+
+const MCE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
+
+/// Refuse markup-compatibility content in the presentation root. A bare
+/// namespace declaration (LibreOffice declares it on every root) carries no
+/// alternate content and is admitted, as on the source-backed path.
+fn reject_presentation_mce_use(xml: &[u8]) -> Result<()> {
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
-    let mut selected_bindings = 0_usize;
     loop {
         let (namespace, event) = reader
             .read_resolved_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
+                if matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == MCE) {
+                    return refusal(
+                        SlideRemovalRefusal::MarkupCompatibility,
+                        "the presentation contains markup-compatibility markup",
+                    );
+                }
+                for attribute in element.checked_attributes() {
+                    let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+                    let key = attribute.key.as_ref();
+                    if key == b"xmlns" || key.starts_with(b"xmlns:") {
+                        continue;
+                    }
+                    if matches!(
+                        reader.resolver().resolve_attribute(attribute.key).0,
+                        ResolveResult::Bound(Namespace(value)) if value == MCE
+                    ) {
+                        return refusal(
+                            SlideRemovalRefusal::MarkupCompatibility,
+                            "the presentation contains a markup-compatibility attribute",
+                        );
+                    }
+                }
+            },
+            Event::Eof => return Ok(()),
+            _ => {},
+        }
+    }
+}
+
+/// Admit the XML of a slide that removal deletes whole.
+///
+/// The removed Part and its relationship Part leave together and an inverse
+/// restores their exact bytes, so the slide's own content (extensions,
+/// tables, markup compatibility) cannot outlive it or be misread. Only its
+/// document element is checked: a `p:sld` in the transitional or strict
+/// PresentationML namespace, with no document type or processing
+/// instruction. Edges out of the slide are admitted by
+/// [`removal_layout_edge`]; edges into it by the incoming-owner proof.
+pub(crate) fn validate_removal_slide_surface(xml: &[u8]) -> Result<()> {
+    let mut reader = NsReader::from_reader(xml);
+    reader.config_mut().trim_text(false);
+    let mut root_seen = false;
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        match event {
+            Event::Start(element) | Event::Empty(element) if !root_seen => {
+                let pml = matches!(
+                    namespace,
+                    ResolveResult::Bound(Namespace(value)) if value == PML || value == STRICT_PML
+                );
+                if !pml || element.local_name().as_ref() != b"sld" {
+                    return refusal(
+                        SlideRemovalRefusal::UnknownSemanticSurface,
+                        "the selected slide has an unexpected document element",
+                    );
+                }
+                root_seen = true;
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return refusal(
+                    SlideRemovalRefusal::UnknownSemanticSurface,
+                    "the selected slide contains a document type or processing instruction",
+                );
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    if root_seen {
+        Ok(())
+    } else {
+        refusal(
+            SlideRemovalRefusal::UnknownSemanticSurface,
+            "the selected slide has no document element",
+        )
+    }
+}
+
+// Insertion must not activate an existing XML binding or shift a positional
+// slideshow range. Share the conservative source schema used for deletion.
+/// Insertion additionally admits the PowerPoint 2010 section list, whose
+/// membership the insertion maintains (record 0252).
+pub(crate) fn validate_insertion_owner(xml: &[u8], relationship_id: &str) -> Result<()> {
+    validate_presentation_bindings(xml, relationship_id, 0, true)
+}
+
+const P14: &[u8] = b"http://schemas.microsoft.com/office/powerpoint/2010/main";
+/// Presentation-level extensions that hold no slide identity or position:
+/// slide and notes drawing guides (p15), image editing and DPI defaults
+/// (p14) and chart data tracking (p15).
+pub(crate) const NON_POSITIONAL_EXTENSIONS: &[&str] = &[
+    "{EFAFB233-063F-42B5-8137-9DF3F51BA10A}",
+    "{2D200454-40CA-4A62-9FC3-DE9A4176ACB9}",
+    "{E76CE94A-603C-4142-B9EB-6D1370010A27}",
+    "{D31A062A-798A-4329-ABDD-BBA856620510}",
+    "{FD5EFAAD-0ECE-453E-9831-46B23BE46B34}",
+];
+const SECTION_EXTENSION_URI: &str = "{521415D9-36F7-43E2-AB2F-B90AF26B5E84}";
+
+fn validate_presentation_bindings(
+    xml: &[u8],
+    relationship_id: &str,
+    expected_bindings: usize,
+    sections: bool,
+) -> Result<()> {
+    let mut reader = NsReader::from_reader(xml);
+    reader.config_mut().trim_text(false);
+    let mut selected_bindings = 0_usize;
+    // Depth inside a subtree that cannot name slides: the default text style
+    // (DrawingML paragraph formatting) or a non-positional presentation
+    // extension. Only its relationship attributes are still checked.
+    let mut opaque_depth = 0_usize;
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        let empty = matches!(event, Event::Empty(_));
+        match event {
+            Event::Start(element) | Event::Empty(element) if opaque_depth > 0 => {
+                if !empty {
+                    opaque_depth += 1;
+                }
+                for attribute in element.checked_attributes() {
+                    let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+                    if matches!(
+                        reader.resolver().resolve_attribute(attribute.key).0,
+                        ResolveResult::Bound(Namespace(value)) if value == REL || value == STRICT_REL
+                    ) {
+                        let value = attribute
+                            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                            .map_err(|error| Error::Xml(error.to_string()))?;
+                        if value.as_ref() == relationship_id {
+                            return refusal(
+                                SlideRemovalRefusal::SharedOwner,
+                                "a presentation feature also references the selected slide",
+                            );
+                        }
+                    }
+                }
+            },
+            Event::End(_) if opaque_depth > 0 => opaque_depth -= 1,
+            Event::Start(element) | Event::Empty(element) => {
+                let section_namespace = sections
+                    && matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == P14);
                 let drawingml = match namespace {
                     ResolveResult::Bound(Namespace(value))
                         if value == PML || value == STRICT_PML =>
@@ -688,6 +897,7 @@ fn validate_presentation_owner(xml: &[u8], selected: &Slide) -> Result<()> {
                     {
                         true
                     },
+                    ResolveResult::Bound(Namespace(value)) if sections && value == P14 => false,
                     ResolveResult::Bound(_) => {
                         return refusal(
                             SlideRemovalRefusal::UnknownSemanticSurface,
@@ -701,14 +911,53 @@ fn validate_presentation_owner(xml: &[u8], selected: &Slide) -> Result<()> {
                         );
                     },
                 };
+                if !drawingml && !section_namespace && !empty {
+                    let local = element.local_name();
+                    let opaque = match local.as_ref() {
+                        b"defaultTextStyle" => true,
+                        b"ext" => litchi_ooxml_common::xml::unqualified_attribute_value(
+                            &element,
+                            b"uri",
+                            reader.decoder(),
+                        )?
+                        .as_deref()
+                        .is_some_and(|uri| NON_POSITIONAL_EXTENSIONS.contains(&uri)),
+                        _ => false,
+                    };
+                    if opaque {
+                        opaque_depth = 1;
+                        continue;
+                    }
+                }
                 let element_local = element.local_name();
+                // The p14 section list and its PresentationML extension
+                // wrapper, whose membership insertion maintains.
+                let section_element = section_namespace
+                    || (sections
+                        && !drawingml
+                        && match element_local.as_ref() {
+                            b"extLst" => true,
+                            b"ext" => {
+                                litchi_ooxml_common::xml::unqualified_attribute_value(
+                                    &element,
+                                    b"uri",
+                                    reader.decoder(),
+                                )?
+                                .as_deref()
+                                    == Some(SECTION_EXTENSION_URI)
+                            },
+                            _ => false,
+                        });
                 if drawingml && !known_drawingml_element(element_local.as_ref()) {
                     return refusal(
                         SlideRemovalRefusal::UnknownSemanticSurface,
                         "the presentation contains an unmodeled DrawingML element",
                     );
                 }
-                if !drawingml && !known_presentation_element(element_local.as_ref()) {
+                if !drawingml
+                    && !section_element
+                    && !known_presentation_element(element_local.as_ref())
+                {
                     return refusal(
                         SlideRemovalRefusal::UnknownSemanticSurface,
                         "the presentation contains an unmodeled PresentationML element",
@@ -738,7 +987,7 @@ fn validate_presentation_owner(xml: &[u8], selected: &Slide) -> Result<()> {
                                     reader.decoder(),
                                 )
                                 .map_err(|error| Error::Xml(error.to_string()))?;
-                            if value.as_ref() == selected.relationship_id {
+                            if value.as_ref() == relationship_id {
                                 if element.local_name().as_ref() != b"sldId" {
                                     return refusal(
                                         SlideRemovalRefusal::SharedOwner,
@@ -752,6 +1001,7 @@ fn validate_presentation_owner(xml: &[u8], selected: &Slide) -> Result<()> {
                             }
                         },
                         ResolveResult::Bound(Namespace(value)) if value == XML => {},
+                        ResolveResult::Unbound if section_element => {},
                         ResolveResult::Unbound => {
                             if !known_unqualified_presentation_attribute(
                                 drawingml,
@@ -783,7 +1033,7 @@ fn validate_presentation_owner(xml: &[u8], selected: &Slide) -> Result<()> {
             _ => {},
         }
     }
-    if selected_bindings != 1 {
+    if selected_bindings != expected_bindings {
         return refusal(
             SlideRemovalRefusal::AmbiguousTopology,
             "the selected presentation relationship is not bound exactly once",
@@ -835,6 +1085,7 @@ fn known_presentation_element(element: &[u8]) -> bool {
             | b"sld"
             | b"showPr"
             | b"sldRg"
+            | b"extLst"
     )
 }
 
@@ -911,42 +1162,15 @@ fn has_macro_infrastructure(package: &OpcPackage) -> bool {
 
 fn map_copy_refusal(value: Result<()>) -> Result<()> {
     match value {
-        Ok(()) => Ok(()),
-        Err(Error::SlideCopyPlan { kind, detail }) => {
-            let kind = match kind {
-                SlideCopyRefusal::SignedPackage => SlideRemovalRefusal::SignedPackage,
-                SlideCopyRefusal::ProtectedPresentation => {
-                    SlideRemovalRefusal::ProtectedPresentation
-                },
-                SlideCopyRefusal::MarkupCompatibility => SlideRemovalRefusal::MarkupCompatibility,
-                SlideCopyRefusal::UnknownSemanticSurface => {
-                    SlideRemovalRefusal::UnknownSemanticSurface
-                },
-                SlideCopyRefusal::SharedOwner | SlideCopyRefusal::GlobalTableStyle => {
-                    SlideRemovalRefusal::SharedOwner
-                },
-                SlideCopyRefusal::UnknownPhysicalMember => {
-                    SlideRemovalRefusal::UnknownPhysicalMember
-                },
-                SlideCopyRefusal::UnsupportedRelationship => {
-                    SlideRemovalRefusal::UnsupportedRelationship
-                },
-                SlideCopyRefusal::DependencyCycle | SlideCopyRefusal::AmbiguousTopology => {
-                    SlideRemovalRefusal::AmbiguousTopology
-                },
-                // Raised only when a cross-presentation copy is applied; the
-                // shared validators slide removal reuses never raise it.
-                SlideCopyRefusal::CallerDefinedPart => SlideRemovalRefusal::UnknownSemanticSurface,
-            };
-            refusal(kind, detail)
-        },
-        Err(error) => Err(error),
+        Err(Error::Refused(refusal)) if refusal.operation() == "slide_copy" => Err(Error::refused(
+            refusal.kind(),
+            "slide_removal",
+            refusal.reason(),
+        )),
+        other => other,
     }
 }
 
-fn refusal<T>(kind: SlideRemovalRefusal, detail: impl Into<String>) -> Result<T> {
-    Err(Error::SlideRemovalPlan {
-        kind,
-        detail: detail.into(),
-    })
+fn refusal<T>(kind: SlideRemovalRefusal, _detail: impl Into<String>) -> Result<T> {
+    Err(Error::slide_removal_refused(kind))
 }

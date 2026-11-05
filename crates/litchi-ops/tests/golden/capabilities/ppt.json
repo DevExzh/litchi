@@ -1,0 +1,2569 @@
+{
+  "format": "ppt",
+  "state": "open",
+  "verbs": {
+    "get": {
+      "supported": true
+    },
+    "find": {
+      "supported": true
+    },
+    "query": {
+      "supported": true
+    },
+    "view": {
+      "supported": true
+    },
+    "evaluate": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "none: import and evaluation are worksheet operations",
+      "reason": "this format has no worksheets"
+    },
+    "set": {
+      "supported": true
+    },
+    "add": {
+      "supported": true
+    },
+    "remove": {
+      "supported": true
+    },
+    "move": {
+      "supported": true
+    },
+    "swap": {
+      "supported": true
+    },
+    "edit": {
+      "supported": true
+    },
+    "batch": {
+      "supported": true
+    },
+    "import": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "none: import and evaluation are worksheet operations",
+      "reason": "this format has no worksheets"
+    },
+    "merge": {
+      "supported": true
+    },
+    "replace": {
+      "supported": true
+    },
+    "refresh": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0295 follow-up: field refresh for PPT, RTF and the ODF object formats",
+      "reason": "this format has no field refresh adapter"
+    },
+    "save": {
+      "supported": true
+    },
+    "create": {
+      "supported": true
+    },
+    "dump": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0336 follow-up: dump plans for the remaining formats",
+      "reason": "this format's write verbs cannot yet rebuild its node tree on a created document"
+    },
+    "raw": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0336: package parts exist in OOXML and packaged ODF only",
+      "reason": "this format has no package parts"
+    },
+    "validate": {
+      "supported": true
+    },
+    "add-part": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0336: package parts exist in OOXML and packaged ODF only",
+      "reason": "this format has no package parts"
+    },
+    "raw-set": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0336: package parts exist in OOXML and packaged ODF only",
+      "reason": "this format has no package parts"
+    }
+  },
+  "views": {
+    "text": {
+      "supported": true
+    },
+    "annotated": {
+      "supported": true
+    },
+    "outline": {
+      "supported": true
+    },
+    "stats": {
+      "supported": true
+    },
+    "issues": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    "forms": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    "html": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "svg": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "screenshot": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "pdf": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    }
+  },
+  "elements": [
+    {
+      "format": "ppt",
+      "element": "presentation",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/"
+        ]
+      },
+      "children": [
+        {
+          "element": "slide",
+          "pathSegment": "slide"
+        },
+        {
+          "element": "slideMaster",
+          "pathSegment": "slidemaster"
+        },
+        {
+          "element": "theme",
+          "pathSegment": "theme"
+        },
+        {
+          "element": "notesMaster",
+          "pathSegment": "notesMaster"
+        }
+      ],
+      "properties": {
+        "slideCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      }
+    },
+    {
+      "format": "ppt",
+      "element": "slide",
+      "parent": "presentation",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "shape",
+          "pathSegment": "shape"
+        },
+        {
+          "element": "placeholder",
+          "pathSegment": "placeholder"
+        },
+        {
+          "element": "picture",
+          "pathSegment": "picture"
+        },
+        {
+          "element": "table",
+          "pathSegment": "table"
+        },
+        {
+          "element": "chart",
+          "pathSegment": "chart"
+        },
+        {
+          "element": "group",
+          "pathSegment": "group"
+        },
+        {
+          "element": "connector",
+          "pathSegment": "connector"
+        },
+        {
+          "element": "smartart",
+          "pathSegment": "smartart"
+        },
+        {
+          "element": "ole",
+          "pathSegment": "ole"
+        },
+        {
+          "element": "video",
+          "pathSegment": "video"
+        },
+        {
+          "element": "audio",
+          "pathSegment": "audio"
+        },
+        {
+          "element": "media",
+          "pathSegment": "media"
+        },
+        {
+          "element": "notes",
+          "pathSegment": "notes"
+        },
+        {
+          "element": "comment",
+          "pathSegment": "comment"
+        },
+        {
+          "element": "equation",
+          "pathSegment": "equation"
+        },
+        {
+          "element": "zoom",
+          "pathSegment": "zoom"
+        },
+        {
+          "element": "model3d",
+          "pathSegment": "model3d"
+        },
+        {
+          "element": "modernComment",
+          "pathSegment": "moderncomment"
+        },
+        {
+          "element": "noteSlide",
+          "pathSegment": "noteSlide"
+        }
+      ],
+      "properties": {
+        "slideNumber": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "hidden": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "ppt",
+      "element": "shape",
+      "parent": [
+        "slide",
+        "group",
+        "slideMaster",
+        "slideLayout"
+      ],
+      "elementAliases": [
+        "textbox",
+        "title"
+      ],
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/shape[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "paragraph"
+        },
+        {
+          "element": "equation",
+          "pathSegment": "equation"
+        },
+        {
+          "element": "hyperlink",
+          "pathSegment": "hyperlink"
+        },
+        {
+          "element": "animation",
+          "pathSegment": "animation"
+        }
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "shapeType": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "rotation": {
+          "type": "number",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "hidden": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "ppt",
+      "element": "placeholder",
+      "parent": [
+        "slide",
+        "group",
+        "slideMaster",
+        "slideLayout"
+      ],
+      "elementAliases": [
+        "ph"
+      ],
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/placeholder[N]",
+          "/slide[N]/placeholder[TYPE]"
+        ]
+      },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "paragraph"
+        }
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "placeholderType": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "rotation": {
+          "type": "number",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "hidden": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "ppt",
+      "element": "picture",
+      "parent": [
+        "slide",
+        "group",
+        "slideMaster",
+        "slideLayout"
+      ],
+      "elementAliases": [
+        "image",
+        "img",
+        "pic"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/picture[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "frameKind": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "rotation": {
+          "type": "number",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "hidden": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "ppt",
+      "element": "table",
+      "parent": [
+        "slide",
+        "group",
+        "slideMaster",
+        "slideLayout"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/table[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "tr",
+          "pathSegment": "tr"
+        },
+        {
+          "element": "col",
+          "pathSegment": "col"
+        }
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "rows": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "columns": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "ppt",
+      "element": "tr",
+      "parent": "table",
+      "elementAliases": [
+        "row"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/table[N]/tr[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "tc",
+          "pathSegment": "tc"
+        }
+      ],
+      "properties": {
+        "height": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "ppt",
+      "element": "tc",
+      "parent": "tr",
+      "elementAliases": [
+        "cell"
+      ],
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/table[N]/tr[N]/tc[N]"
+        ]
+      },
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "ppt",
+      "element": "chart",
+      "parent": [
+        "slide",
+        "group",
+        "slideMaster",
+        "slideLayout"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/chart[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "series",
+          "pathSegment": "series"
+        },
+        {
+          "element": "axis",
+          "pathSegment": "axis"
+        },
+        {
+          "element": "animation",
+          "pathSegment": "animation"
+        }
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "chartType": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "title": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "ppt",
+      "element": "group",
+      "parent": [
+        "slide",
+        "group",
+        "slideMaster",
+        "slideLayout"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/group[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "shape",
+          "pathSegment": "shape"
+        },
+        {
+          "element": "placeholder",
+          "pathSegment": "placeholder"
+        },
+        {
+          "element": "picture",
+          "pathSegment": "picture"
+        },
+        {
+          "element": "table",
+          "pathSegment": "table"
+        },
+        {
+          "element": "chart",
+          "pathSegment": "chart"
+        },
+        {
+          "element": "group",
+          "pathSegment": "group"
+        },
+        {
+          "element": "connector",
+          "pathSegment": "connector"
+        },
+        {
+          "element": "smartart",
+          "pathSegment": "smartart"
+        },
+        {
+          "element": "ole",
+          "pathSegment": "ole"
+        },
+        {
+          "element": "video",
+          "pathSegment": "video"
+        },
+        {
+          "element": "audio",
+          "pathSegment": "audio"
+        },
+        {
+          "element": "media",
+          "pathSegment": "media"
+        }
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "ppt",
+      "element": "connector",
+      "parent": [
+        "slide",
+        "group",
+        "slideMaster",
+        "slideLayout"
+      ],
+      "elementAliases": [
+        "connection"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/connector[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "shapeType": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "length": {
+          "type": "number",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "ppt",
+      "element": "smartart",
+      "parent": [
+        "slide",
+        "group",
+        "slideMaster",
+        "slideLayout"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/smartart[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "0339-F3 (deferred-P1): PPT SmartArt and diagram groups",
+        "reason": "a legacy PPT file keeps SmartArt and PowerPoint 97 diagrams as drawn OfficeArt groups, which read as group and shape nodes; no semantic diagram model is projected"
+      }
+    },
+    {
+      "format": "ppt",
+      "element": "ole",
+      "parent": [
+        "slide",
+        "group",
+        "slideMaster",
+        "slideLayout"
+      ],
+      "elementAliases": [
+        "embed",
+        "object",
+        "oleobject"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/ole[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "progId": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "linked": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "ppt",
+      "element": "paragraph",
+      "parent": [
+        "shape",
+        "placeholder"
+      ],
+      "elementAliases": [
+        "p"
+      ],
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/shape[N]/paragraph[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "run",
+          "pathSegment": "run"
+        },
+        {
+          "element": "linebreak",
+          "pathSegment": "linebreak"
+        }
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "ppt",
+      "element": "run",
+      "parent": "paragraph",
+      "elementAliases": [
+        "r"
+      ],
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/shape[N]/paragraph[N]/run[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "hyperlink",
+          "pathSegment": "hyperlink"
+        }
+      ],
+      "properties": {
+        "font.latin": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "size": {
+          "type": "font-size",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "bold": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "italic": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "underline": {
+          "type": "enum",
+          "values": [
+            "single",
+            "none"
+          ],
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "ppt",
+      "element": "linebreak",
+      "parent": "paragraph",
+      "elementAliases": [
+        "br"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/shape[N]/paragraph[N]/linebreak[N]"
+        ]
+      },
+      "properties": {},
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "ppt",
+      "element": "notes",
+      "parent": "slide",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/notes"
+        ]
+      },
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "ppt",
+      "element": "comment",
+      "parent": "slide",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/comment[N]"
+        ]
+      },
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "author": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "initials": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "index": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "date": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "ppt",
+      "element": "video",
+      "parent": [
+        "slide",
+        "group",
+        "slideMaster",
+        "slideLayout"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/video[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "ppt",
+      "element": "audio",
+      "parent": [
+        "slide",
+        "group",
+        "slideMaster",
+        "slideLayout"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/audio[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "ppt",
+      "element": "media",
+      "parent": [
+        "slide",
+        "group",
+        "slideMaster",
+        "slideLayout"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/media[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "ppt",
+      "element": "equation",
+      "parent": [
+        "slide",
+        "shape"
+      ],
+      "elementAliases": [
+        "formula",
+        "math"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/shape[N]/equation[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "0323-F6 PPT Equation Editor objects",
+        "reason": "legacy PPT equations are Equation Editor OLE objects (Equation.3) whose MTEF payload the unified layer does not read as an equation element"
+      }
+    },
+    {
+      "format": "ppt",
+      "element": "zoom",
+      "parent": "slide",
+      "elementAliases": [
+        "slidezoom"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/zoom[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "wontfix: PPTX-only (record 0323)",
+        "reason": "slide and section zoom are PowerPoint 2016 OOXML objects; the legacy binary format has no zoom record"
+      }
+    },
+    {
+      "format": "ppt",
+      "element": "model3d",
+      "parent": "slide",
+      "elementAliases": [
+        "3dmodel"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/model3d[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "wontfix: PPTX-only (record 0323)",
+        "reason": "3D models are PowerPoint 2019 OOXML objects; the legacy binary format has no 3D-model record"
+      }
+    },
+    {
+      "format": "ppt",
+      "element": "slideMaster",
+      "parent": "presentation",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slidemaster[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "shape",
+          "pathSegment": "shape"
+        },
+        {
+          "element": "placeholder",
+          "pathSegment": "placeholder"
+        },
+        {
+          "element": "picture",
+          "pathSegment": "picture"
+        },
+        {
+          "element": "table",
+          "pathSegment": "table"
+        },
+        {
+          "element": "chart",
+          "pathSegment": "chart"
+        },
+        {
+          "element": "group",
+          "pathSegment": "group"
+        },
+        {
+          "element": "connector",
+          "pathSegment": "connector"
+        },
+        {
+          "element": "smartart",
+          "pathSegment": "smartart"
+        },
+        {
+          "element": "ole",
+          "pathSegment": "ole"
+        },
+        {
+          "element": "video",
+          "pathSegment": "video"
+        },
+        {
+          "element": "audio",
+          "pathSegment": "audio"
+        },
+        {
+          "element": "media",
+          "pathSegment": "media"
+        }
+      ],
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "0339-F4 (deferred-P1): PPT main and title masters as nodes",
+        "reason": "legacy PPT master records are not exposed as navigable nodes"
+      }
+    },
+    {
+      "format": "ppt",
+      "element": "slideLayout",
+      "parent": "slideMaster",
+      "elementAliases": [
+        "layout"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slidemaster[N]/slidelayout[N]",
+          "/slidelayout[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "shape",
+          "pathSegment": "shape"
+        },
+        {
+          "element": "placeholder",
+          "pathSegment": "placeholder"
+        },
+        {
+          "element": "picture",
+          "pathSegment": "picture"
+        },
+        {
+          "element": "table",
+          "pathSegment": "table"
+        },
+        {
+          "element": "chart",
+          "pathSegment": "chart"
+        },
+        {
+          "element": "group",
+          "pathSegment": "group"
+        },
+        {
+          "element": "connector",
+          "pathSegment": "connector"
+        },
+        {
+          "element": "smartart",
+          "pathSegment": "smartart"
+        },
+        {
+          "element": "ole",
+          "pathSegment": "ole"
+        },
+        {
+          "element": "video",
+          "pathSegment": "video"
+        },
+        {
+          "element": "audio",
+          "pathSegment": "audio"
+        },
+        {
+          "element": "media",
+          "pathSegment": "media"
+        }
+      ],
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "0339-F4 (deferred-P1): PPT layouts as nodes",
+        "reason": "a legacy PPT slide names a layout type in its slide atom (PowerPoint 2007 and later add one master per layout); there are no layout records to expose as navigable nodes yet"
+      }
+    },
+    {
+      "format": "ppt",
+      "element": "theme",
+      "parent": "presentation",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/theme"
+        ]
+      },
+      "properties": {
+        "dk1": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "lt1": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "dk2": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "lt2": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "accent1": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "accent2": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "accent3": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "accent4": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "accent5": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "accent6": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "hyperlink": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "followedhyperlink": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "headingFont": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "bodyFont": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "headingFont.ea": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "bodyFont.ea": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "headingFont.cs": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "bodyFont.cs": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "ppt",
+      "element": "modernComment",
+      "parent": "slide",
+      "elementAliases": [
+        "modern-comment",
+        "thread",
+        "threadedcomment"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/moderncomment[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "reply",
+          "pathSegment": "reply"
+        }
+      ],
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "wontfix: PPTX-only (record 0323)",
+        "reason": "modern threaded comments are a PowerPoint 2019 OOXML part; legacy PPT comments are Comment10Container records, read and written as comment elements"
+      }
+    },
+    {
+      "format": "ppt",
+      "element": "reply",
+      "parent": "modernComment",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/moderncomment[N]/reply[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "wontfix: PPTX-only (record 0323)",
+        "reason": "threaded-comment replies are a PowerPoint 2019 OOXML part; legacy PPT comments have no replies"
+      }
+    },
+    {
+      "format": "ppt",
+      "element": "hyperlink",
+      "parent": [
+        "shape",
+        "run"
+      ],
+      "elementAliases": [
+        "hlink"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/shape[N]/hyperlink",
+          "/slide[N]/shape[N]/paragraph[N]/run[N]/hyperlink"
+        ]
+      },
+      "properties": {
+        "link": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "tooltip": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "ppt",
+      "element": "animation",
+      "parent": [
+        "shape",
+        "chart"
+      ],
+      "elementAliases": [
+        "animate"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/shape[N]/animation[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "0323-F5 PPT animation nodes",
+        "reason": "the leaf animation codec reads the timing tree and the per-shape AnimationInfo atoms; they are not projected as per-shape nodes"
+      }
+    },
+    {
+      "format": "ppt",
+      "element": "series",
+      "parent": "chart",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/chart[N]/series[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "0323-F7 PPT chart series and axes",
+        "reason": "the MS-OGRAPH chart model reads series, but the unified layer projects a chart node only (type, title, frame)"
+      }
+    },
+    {
+      "format": "ppt",
+      "element": "axis",
+      "parent": "chart",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/chart[N]/axis[@role=ROLE]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "0323-F7 PPT chart series and axes",
+        "reason": "the MS-OGRAPH chart model reads axes, but the unified layer projects a chart node only (type, title, frame)"
+      }
+    },
+    {
+      "format": "ppt",
+      "element": "col",
+      "parent": "table",
+      "elementAliases": [
+        "column"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/table[N]/col[N]"
+        ]
+      },
+      "properties": {
+        "width": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "ppt",
+      "element": "noteSlide",
+      "parent": "slide",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/noteSlide"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended",
+        "reason": "legacy PPT notes slides are not exposed as navigable nodes"
+      }
+    },
+    {
+      "format": "ppt",
+      "element": "notesMaster",
+      "parent": "presentation",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/notesMaster"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended",
+        "reason": "legacy PPT notes masters are not exposed as navigable nodes"
+      }
+    }
+  ],
+  "gaps": [
+    {
+      "subject": "operation",
+      "verb": "create",
+      "element": "presentation",
+      "context": "template",
+      "code": "unsupported_capability",
+      "followUp": "use Flavor::Document; M2 PPT template creation",
+      "reason": "the PPT creator currently authors ordinary presentations and refuses template requests"
+    },
+    {
+      "subject": "operation",
+      "verb": "create",
+      "element": "presentation",
+      "context": "strict-conformance",
+      "code": "unsupported_capability",
+      "followUp": "CreateOptions::conformance(Conformance::Transitional)",
+      "reason": "legacy PPT has one canonical binary writer and refuses an OOXML Strict conformance request"
+    },
+    {
+      "subject": "operation",
+      "verb": "create",
+      "element": "presentation",
+      "context": "unrepresentable-initial-metadata",
+      "code": "unsupported_capability",
+      "followUp": "CreateOptions::metadata (OLE property sets, record 0254)",
+      "reason": "initial metadata is written to the OLE property sets; identifier, hyperlink_base and unzoned timestamps have no property-set slot and are refused rather than dropped"
+    },
+    {
+      "subject": "element",
+      "element": "smartart",
+      "code": "unsupported_capability",
+      "followUp": "0339-F3 (deferred-P1): PPT SmartArt and diagram groups",
+      "reason": "a legacy PPT file keeps SmartArt and PowerPoint 97 diagrams as drawn OfficeArt groups, which read as group and shape nodes; no semantic diagram model is projected"
+    },
+    {
+      "subject": "element",
+      "element": "equation",
+      "code": "unsupported_capability",
+      "followUp": "0323-F6 PPT Equation Editor objects",
+      "reason": "legacy PPT equations are Equation Editor OLE objects (Equation.3) whose MTEF payload the unified layer does not read as an equation element"
+    },
+    {
+      "subject": "element",
+      "element": "zoom",
+      "code": "unsupported_capability",
+      "followUp": "wontfix: PPTX-only (record 0323)",
+      "reason": "slide and section zoom are PowerPoint 2016 OOXML objects; the legacy binary format has no zoom record"
+    },
+    {
+      "subject": "element",
+      "element": "model3d",
+      "code": "unsupported_capability",
+      "followUp": "wontfix: PPTX-only (record 0323)",
+      "reason": "3D models are PowerPoint 2019 OOXML objects; the legacy binary format has no 3D-model record"
+    },
+    {
+      "subject": "element",
+      "element": "slideMaster",
+      "code": "unsupported_capability",
+      "followUp": "0339-F4 (deferred-P1): PPT main and title masters as nodes",
+      "reason": "legacy PPT master records are not exposed as navigable nodes"
+    },
+    {
+      "subject": "element",
+      "element": "slideLayout",
+      "code": "unsupported_capability",
+      "followUp": "0339-F4 (deferred-P1): PPT layouts as nodes",
+      "reason": "a legacy PPT slide names a layout type in its slide atom (PowerPoint 2007 and later add one master per layout); there are no layout records to expose as navigable nodes yet"
+    },
+    {
+      "subject": "element",
+      "element": "modernComment",
+      "code": "unsupported_capability",
+      "followUp": "wontfix: PPTX-only (record 0323)",
+      "reason": "modern threaded comments are a PowerPoint 2019 OOXML part; legacy PPT comments are Comment10Container records, read and written as comment elements"
+    },
+    {
+      "subject": "element",
+      "element": "reply",
+      "code": "unsupported_capability",
+      "followUp": "wontfix: PPTX-only (record 0323)",
+      "reason": "threaded-comment replies are a PowerPoint 2019 OOXML part; legacy PPT comments have no replies"
+    },
+    {
+      "subject": "element",
+      "element": "animation",
+      "code": "unsupported_capability",
+      "followUp": "0323-F5 PPT animation nodes",
+      "reason": "the leaf animation codec reads the timing tree and the per-shape AnimationInfo atoms; they are not projected as per-shape nodes"
+    },
+    {
+      "subject": "element",
+      "element": "series",
+      "code": "unsupported_capability",
+      "followUp": "0323-F7 PPT chart series and axes",
+      "reason": "the MS-OGRAPH chart model reads series, but the unified layer projects a chart node only (type, title, frame)"
+    },
+    {
+      "subject": "element",
+      "element": "axis",
+      "code": "unsupported_capability",
+      "followUp": "0323-F7 PPT chart series and axes",
+      "reason": "the MS-OGRAPH chart model reads axes, but the unified layer projects a chart node only (type, title, frame)"
+    },
+    {
+      "subject": "element",
+      "element": "noteSlide",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended",
+      "reason": "legacy PPT notes slides are not exposed as navigable nodes"
+    },
+    {
+      "subject": "element",
+      "element": "notesMaster",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended",
+      "reason": "legacy PPT notes masters are not exposed as navigable nodes"
+    },
+    {
+      "subject": "property",
+      "element": "picture",
+      "key": "mediaType",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended",
+      "reason": "legacy PPT frame classification is exposed as frameKind"
+    },
+    {
+      "subject": "property",
+      "element": "shape",
+      "key": "fill",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended",
+      "reason": "legacy PPT exposes only common geometry in the unified node view"
+    },
+    {
+      "subject": "element",
+      "element": "diagram",
+      "code": "unsupported_path",
+      "followUp": "none: out of scope (record 0332, design §10)",
+      "reason": "OfficeCLI's diagram renders Mermaid text into shapes or a picture; rendering is outside the unified API, and SmartArt is the smartart element"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "ole",
+      "context": "object-storage",
+      "code": "unsupported_capability",
+      "followUp": "0323-F8 PPT OLE object writes",
+      "reason": "embedding an OLE object needs a new ExOleObjStg storage, an ExOleEmbedContainer and a picture frame with its preview; OLE frames are read (progId, linked, frame) only"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "ole",
+      "context": "object-storage",
+      "code": "unsupported_capability",
+      "followUp": "0323-F8 PPT OLE object writes",
+      "reason": "OLE frame geometry and object replacement are not written; the frame is read only"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "media",
+      "context": "media-objects",
+      "code": "unsupported_capability",
+      "followUp": "0323-F9 PPT media writes",
+      "reason": "a movie or sound needs an external-media object, its sound collection entry and a media picture frame; media frames are read only"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "media",
+      "context": "media-objects",
+      "code": "unsupported_capability",
+      "followUp": "0323-F9 PPT media writes",
+      "reason": "media frame geometry and playback are not written through the media element; the frame is read only"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "theme",
+      "context": "theme-package",
+      "code": "unsupported_capability",
+      "followUp": "0323-F10 PPT theme writes",
+      "reason": "the theme is an OPC package inside each master's RoundTripThemeAtom; re-encoding it (and the masters' legacy color schemes that PowerPoint 97-2003 reads) is not modeled"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "chart",
+      "context": "graph-object",
+      "code": "unsupported_capability",
+      "followUp": "0323-F7 PPT chart series and axes",
+      "reason": "the embedded Graph object's chart stream is read through MS-OGRAPH; chart, series and axis writes are not integrated"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "run",
+      "context": "text-positions",
+      "code": "unsupported_capability",
+      "followUp": "0323-F4 PPT run and line-break insertion and removal",
+      "reason": "inserting or removing a run or line break changes the text length, which every position-dependent record (style, special-information and interaction runs, fields) of the body would have to follow; runs are formatted and their text replaced in place"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "run",
+      "context": "text-positions",
+      "code": "unsupported_capability",
+      "followUp": "0323-F4 PPT run and line-break insertion and removal",
+      "reason": "removing a run changes the text length that the body's position-dependent records hold"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "linebreak",
+      "context": "text-positions",
+      "code": "unsupported_capability",
+      "followUp": "0323-F4 PPT run and line-break insertion and removal",
+      "reason": "a line break is a vertical-tab character of the text atom; inserting one changes the text length that the body's position-dependent records hold"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "tr",
+      "context": "table-layout",
+      "code": "unsupported_capability",
+      "followUp": "0323-F1 PPT table re-layout",
+      "reason": "a legacy table is a group of positioned cell shapes and border lines; inserting a row would re-lay out every later cell, line and the group anchor, which the leaf does not model"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "col",
+      "context": "table-layout",
+      "code": "unsupported_capability",
+      "followUp": "0323-F1 PPT table re-layout",
+      "reason": "a legacy table is a group of positioned cell shapes and border lines; inserting a column would re-lay out every later cell, line and the group anchor, which the leaf does not model"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "tr",
+      "context": "table-layout",
+      "code": "unsupported_capability",
+      "followUp": "0323-F1 PPT table re-layout",
+      "reason": "removing a row would re-lay out the table group's later cells and border lines, which the leaf does not model"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "col",
+      "context": "table-layout",
+      "code": "unsupported_capability",
+      "followUp": "0323-F1 PPT table re-layout",
+      "reason": "removing a column would re-lay out the table group's later cells and border lines, which the leaf does not model"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "tc",
+      "context": "native-cell-text",
+      "code": "unsupported_capability",
+      "followUp": "0323-F2 PPT nested tables and rich cell text",
+      "reason": "cell text follows the shape-text closure rules (a changed length refuses over several formatting runs or position-dependent records); tables inside groups and merged-away cells are refused"
+    },
+    {
+      "subject": "operation",
+      "verb": "get",
+      "element": "metadata",
+      "context": "path-read",
+      "code": "unsupported_capability",
+      "followUp": "File::metadata(); /metadata node reads with the shared metadata vocabulary",
+      "reason": "`set(\"/metadata\", ..)` writes the OLE document properties (root-metadata keys and custom.<name>); the path is set-only, and reads go through File::metadata()"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "slide",
+      "context": "native-slide-dependencies",
+      "code": "unsupported_capability",
+      "followUp": "M2 PPT dependency-preserving slide removal",
+      "reason": "slide removal requires native closure admission; unsupported dependent records refuse atomically"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "slide",
+      "context": "native-visibility-record",
+      "code": "unsupported_capability",
+      "followUp": "M2 PPT visibility atom insertion",
+      "reason": "slide visibility writes require one native-admitted SSSlideInfoAtom; insertion of missing timing records is not integrated"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "shape",
+      "context": "native-shape-preservation",
+      "code": "unsupported_capability",
+      "followUp": "M2 PPT nested-shape and rich-text edits",
+      "reason": "top-level shape, outline placeholder, paragraph and notes text and shape anchors require native closure admission: a changed text length refuses where interactions, field metacharacters or several formatting or language runs hold character positions; nested groups, new text bodies and rich-text formatting remain unsupported"
+    },
+    {
+      "subject": "operation",
+      "verb": "batch",
+      "element": "presentation",
+      "context": "native-write-coalescing",
+      "code": "unsupported_capability",
+      "followUp": "M2 PPT broader native edit runs and performance qualification",
+      "reason": "distinct direct shape text/geometry sets share native transactions; selectors, repeated shapes, reads and structural edits close the run; broader coalescing and frozen-harness qualification remain open"
+    },
+    {
+      "subject": "view",
+      "mode": "issues",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "forms",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "html",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "svg",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "screenshot",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "pdf",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    }
+  ]
+}

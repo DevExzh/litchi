@@ -96,7 +96,6 @@ enum Mode {
     TrackedFile,
     FileSource,
     EagerFile,
-    FacadeFile,
 }
 
 impl Mode {
@@ -107,7 +106,6 @@ impl Mode {
             Self::TrackedFile => "tracked-file",
             Self::FileSource => "file-source",
             Self::EagerFile => "eager-file",
-            Self::FacadeFile => "facade-file",
         }
     }
 
@@ -126,9 +124,6 @@ impl Mode {
             Self::EagerFile => {
                 "counting Read/Seek wrapper around the eager raw CFB/XLS owner; logical reads only; warm page-cache and no physical-I/O counter"
             },
-            Self::FacadeFile => {
-                "facade file API; filesystem counters are not exposed; staged warm page-cache and no physical-I/O counter"
-            },
         }
     }
 
@@ -140,17 +135,11 @@ impl Mode {
             Self::EagerFile => {
                 "eager-file family: staged file open, CFB open, XLS owner construction, and query are inside elapsed_ns; compare elapsed_ns only within eager-file, never against source-backed or facade-file"
             },
-            Self::FacadeFile => {
-                "facade-file family: public facade open/detection and query are inside elapsed_ns; compare elapsed_ns only within facade-file, never against source-backed or eager-file"
-            },
         }
     }
 
     const fn limitation(self, operation: Operation) -> Option<&'static str> {
         match self {
-            Self::FacadeFile if !matches!(operation, Operation::Open | Operation::List) => Some(
-                "unsupported: the unified facade exposes worksheet listing but not selected-cell or whole-sheet access",
-            ),
             Self::EagerFile
                 if matches!(
                     operation,
@@ -161,9 +150,6 @@ impl Mode {
                     "unsupported: the eager control has no source-backed whole-sheet walk or source-backed text projection",
                 )
             },
-            Self::FacadeFile => Some(
-                "facade-file uses the unified public Workbook API; filesystem counters are not exposed; the staged fixture is immutable and warm-cache, so physical I/O is not measured",
-            ),
             Self::EagerFile => Some(
                 "eager compatibility control; source construction and timing scope are not paired with positional modes; the staged fixture is immutable and warm-cache",
             ),
@@ -742,7 +728,7 @@ fn make_source(mode: Mode, input: &InputSnapshot) -> Result<SourceRun, AnyError>
             "file-source mode requires a positional filesystem platform",
         )
         .into()),
-        Mode::EagerFile | Mode::FacadeFile => Err(io::Error::new(
+        Mode::EagerFile => Err(io::Error::new(
             io::ErrorKind::InvalidInput,
             "file-owner mode does not construct a ReadAt source",
         )
@@ -920,7 +906,7 @@ fn full_text_outcome(workbook: &litchi_xls::SourceBackedWorkbook) -> String {
 }
 
 fn eager_operation<R: Read + Seek>(
-    workbook: &litchi_xls::Workbook<R>,
+    workbook: &litchi_xls::raw::Reader<R>,
     operation: Operation,
     coordinates: Coordinates,
 ) -> Result<Observation, AnyError> {
@@ -960,7 +946,7 @@ fn eager_operation<R: Read + Seek>(
     }
 }
 
-fn eager_names<R: Read + Seek>(workbook: &litchi_xls::Workbook<R>) -> Vec<String> {
+fn eager_names<R: Read + Seek>(workbook: &litchi_xls::raw::Reader<R>) -> Vec<String> {
     workbook
         .sheets()
         .iter()
@@ -1077,7 +1063,7 @@ fn build_oracle(
         Operation::Open | Operation::List | Operation::OneCell => None,
     };
 
-    let eager_workbook = litchi_xls::Workbook::new(Cursor::new(input.to_vec()))?;
+    let eager_workbook = litchi_xls::raw::Reader::new(Cursor::new(input.to_vec()))?;
     let eager_worksheet_names = eager_names(&eager_workbook);
     let eager_selected_cell = if operation == Operation::OneCell {
         eager_workbook
@@ -1136,7 +1122,7 @@ fn validate_source_observation(
 }
 
 fn validate_eager_observation<R: Read + Seek>(
-    workbook: &litchi_xls::Workbook<R>,
+    workbook: &litchi_xls::raw::Reader<R>,
     observation: &Observation,
     oracle: &SemanticOracle,
 ) -> Result<(), AnyError> {
@@ -1169,35 +1155,6 @@ fn validate_eager_observation<R: Read + Seek>(
         },
     }
     Ok(())
-}
-
-fn validate_facade_parity(
-    observation: &Observation,
-    source_projection: &SemanticProjection,
-) -> Result<(), AnyError> {
-    match observation {
-        Observation::Open { worksheet_count }
-            if *worksheet_count == source_projection.worksheet_count =>
-        {
-            Ok(())
-        },
-        Observation::List { worksheet_names }
-            if worksheet_names == &source_projection.worksheet_names =>
-        {
-            Ok(())
-        },
-        Observation::OneCell { .. } | Observation::Outcome { .. } => Err(io::Error::new(
-            io::ErrorKind::Unsupported,
-            "facade/source parity is defined only for open and list",
-        )
-        .into()),
-        Observation::Open { .. } => {
-            Err(io::Error::other("facade/source worksheet-count parity mismatch").into())
-        },
-        Observation::List { .. } => {
-            Err(io::Error::other("facade/source worksheet-name parity mismatch").into())
-        },
-    }
 }
 
 fn duration_ns(duration: std::time::Duration) -> u64 {
@@ -1246,12 +1203,12 @@ fn run_eager_sample(
         file: File::open(&input.staged_path)?,
         metrics: Arc::clone(&metrics),
     };
-    let ole = OleFile::open(reader)?;
+    let ole = OleFile::open(reader, litchi_cfb::OleFileLimits::default())?;
     let cfb_open_ns = duration_ns(cfb_started.elapsed());
     let cfb_metrics = metrics.snapshot();
 
     let owner_started = Instant::now();
-    let workbook = litchi_xls::Workbook::from_ole_file(ole)?;
+    let workbook = litchi_xls::raw::Reader::from_ole_file(ole)?;
     let xls_owner_ns = duration_ns(owner_started.elapsed());
     let owner_metrics = metrics.snapshot();
 
@@ -1288,40 +1245,6 @@ fn run_eager_sample(
     })
 }
 
-fn run_facade_sample(
-    input: &InputSnapshot,
-    operation: Operation,
-    _coordinates: Coordinates,
-    oracle: &SemanticOracle,
-) -> Result<Sample, AnyError> {
-    let started = Instant::now();
-    let workbook = litchi::sheet::Workbook::open(&input.staged_path)?;
-    let observation = match operation {
-        Operation::Open => Observation::Open {
-            worksheet_count: std::hint::black_box(workbook.worksheet_count()?),
-        },
-        Operation::List => Observation::List {
-            worksheet_names: std::hint::black_box(workbook.worksheet_names()?),
-        },
-        Operation::OneCell | Operation::SecondCell | Operation::AllCells | Operation::FullText => {
-            return Err(io::Error::new(
-                io::ErrorKind::Unsupported,
-                "facade-file does not expose selected-cell or whole-sheet access",
-            )
-            .into());
-        },
-    };
-    let elapsed = duration_ns(started.elapsed());
-    validate_facade_parity(&observation, &oracle.source_implementation_projection)?;
-    Ok(Sample {
-        elapsed_ns: elapsed,
-        observation: observation.into_json(),
-        metrics: MetricsSnapshot::default(),
-        source_version_stable: None,
-        eager_phases: None,
-    })
-}
-
 fn run_one_sample(
     config: &Config,
     input: &InputSnapshot,
@@ -1339,7 +1262,6 @@ fn run_one_sample(
             run_source_sample(config.mode, input, config.operation, coordinates, oracle)
         },
         Mode::EagerFile => run_eager_sample(input, config.operation, coordinates, oracle),
-        Mode::FacadeFile => run_facade_sample(input, config.operation, coordinates, oracle),
     }
 }
 
@@ -1441,7 +1363,7 @@ fn revision() -> String {
 }
 
 fn usage() -> &'static str {
-    "usage: xls_source_attribution --input PATH [--mode owned-readat|atomic-file|tracked-file|file-source|eager-file|facade-file] [--operation open|list|one-cell|second-cell|all-cells|full-text] [--warmups N] [--samples N] [--worksheet-index N] [--row N] [--column N] [--all-cells-strategy scan|per-cell] [--per-cell-limit N]"
+    "usage: xls_source_attribution --input PATH [--mode owned-readat|atomic-file|tracked-file|file-source|eager-file] [--operation open|list|one-cell|second-cell|all-cells|full-text] [--warmups N] [--samples N] [--worksheet-index N] [--row N] [--column N] [--all-cells-strategy scan|per-cell] [--per-cell-limit N]"
 }
 
 fn parse_usize(value: Option<&str>, option: &str) -> Result<usize, String> {
@@ -1503,7 +1425,6 @@ where
                     "tracked-file" => Mode::TrackedFile,
                     "file-source" => Mode::FileSource,
                     "eager-file" => Mode::EagerFile,
-                    "facade-file" => Mode::FacadeFile,
                     value => return Err(format!("unknown mode {value:?}")),
                 };
             },
@@ -1687,7 +1608,7 @@ mod tests {
             cell_projection(&CellValue::Float(42.0)),
             "float:4045000000000000"
         );
-        assert!(Mode::FacadeFile.limitation(Operation::OneCell).is_some());
+        assert!(Mode::EagerFile.limitation(Operation::FullText).is_some());
         assert!(Mode::TrackedFile.counter_scope().contains("range-union"));
     }
 
@@ -1752,44 +1673,6 @@ mod tests {
         assert_ne!(
             Mode::OwnedReadAt.timing_scope(),
             Mode::EagerFile.timing_scope()
-        );
-        assert_ne!(
-            Mode::EagerFile.timing_scope(),
-            Mode::FacadeFile.timing_scope()
-        );
-    }
-
-    #[test]
-    fn facade_parity_is_limited_to_source_open_and_list() {
-        let projection = SemanticProjection {
-            worksheet_count: 2,
-            worksheet_names: vec!["One".to_owned(), "Two".to_owned()],
-            selected_cell: Some("string:4:Date".to_owned()),
-            outcome: None,
-        };
-        assert!(
-            validate_facade_parity(&Observation::Open { worksheet_count: 2 }, &projection,).is_ok()
-        );
-        assert!(
-            validate_facade_parity(
-                &Observation::List {
-                    worksheet_names: vec!["One".to_owned(), "Two".to_owned()],
-                },
-                &projection,
-            )
-            .is_ok()
-        );
-        assert!(validate_facade_parity(&Observation::OneCell { cell: None }, &projection).is_err());
-        assert!(
-            validate_facade_parity(
-                &Observation::Outcome {
-                    kind: "all-cells",
-                    outcome: "cells:0:".to_owned(),
-                    cells_reported: Some(0),
-                },
-                &projection,
-            )
-            .is_err()
         );
     }
 

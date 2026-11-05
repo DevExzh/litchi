@@ -8,10 +8,10 @@ pub mod package;
 pub mod part;
 
 pub use litchi_drawingml::theme::{Color, Face, FontSet, Override, Palette, Script, Slot, System};
-pub use package::{
-    Authored, add, attach, load, load_override, next_part_uri, put_colors, put_fonts, put_override,
-    remove_override, validate,
-};
+pub use package::{Authored, load, load_override, next_part_uri, presentation_theme, validate};
 pub use part::{
     Color as ParsedColor, Font as ParsedFont, Part as ThemePart, Summary as ThemeSummary,
 };
+
+mod edit;
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};

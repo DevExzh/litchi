@@ -39,7 +39,7 @@ impl SectionsTable {
     /// Parse the section PLC and every referenced SEPX once.
     ///
     /// Word-compatible per-SPRM repairs are applied but their record is
-    /// discarded; use [`Self::parse_recording`] to enumerate them.
+    /// discarded by this convenience parser.
     pub fn parse(
         fib: &FileInformationBlock,
         table_stream: &[u8],

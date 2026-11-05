@@ -1,0 +1,98 @@
+{
+  "schema": "litchi.native-qualification.v1",
+  "lane": "w5-legacy",
+  "output_dir": "$NATIVE_QUAL_OUTPUT",
+  "path_prepend": ["$LITCHI_COORD_BIN"],
+  "rounds": 31,
+  "abba_order": ["before", "after", "after", "before"],
+  "validators": [
+    {
+      "id": "historical-analyze",
+      "script": "$LITCHI_NATIVE_QUAL_ROOT/tools/native_qualification/w5_analyzer_adapter.py",
+      "argv": ["python3", "$LITCHI_NATIVE_QUAL_ROOT/tools/native_qualification/w5_analyzer_adapter.py", "$W5_ANALYZER", "{output_dir}"],
+      "cwd": "{output_dir}",
+      "outputs": ["{output_dir}/summary.json"],
+      "require_stdout": true
+    }
+  ],
+  "environment": {
+    "LITCHI_PROBE_BATCH_ROUNDS": "7"
+  },
+  "shared": {
+    "probe_paths": [
+      "crates/litchi-ops/examples/legacy_w5_source_probe.rs",
+      "crates/litchi-ops/examples/legacy_w5_probe.rs",
+      "docs/unified-ops/results/0359a/routes_before.rs"
+    ],
+    "fixture_paths": []
+  },
+  "legs": {
+    "before": {
+      "source_root": "$W5_BEFORE_SOURCE",
+      "target_dir": "$W5_TARGET_ROOT/before",
+      "allow_dirty": true,
+      "lock_paths": ["Cargo.lock"],
+      "build": [
+        {
+          "id": "legacy_w5_probes",
+          "argv": ["cargo", "build", "--release", "-p", "litchi-ops", "--features", "doc,xls,rtf", "--example", "legacy_w5_source_probe", "--example", "legacy_w5_probe"],
+          "artifacts": [
+            "{target_dir}/release/examples/legacy_w5_source_probe",
+            "{target_dir}/release/examples/legacy_w5_probe"
+          ]
+        }
+      ],
+      "programs": [
+        {
+          "id": "source",
+          "binary": "{target_dir}/release/examples/legacy_w5_source_probe",
+          "argv": ["{rounds}"],
+          "stdout": "{output_dir}/source-{leg}-{index}.json",
+          "stderr": "{output_dir}/source-{leg}-{index}.stderr",
+          "require_stdout": true
+        },
+        {
+          "id": "ops",
+          "binary": "{target_dir}/release/examples/legacy_w5_probe",
+          "argv": ["{rounds}"],
+          "stdout": "{output_dir}/ops-{leg}-{index}.json",
+          "stderr": "{output_dir}/ops-{leg}-{index}.stderr",
+          "require_stdout": true
+        }
+      ]
+    },
+    "after": {
+      "source_root": "$W5_AFTER_SOURCE",
+      "target_dir": "$W5_TARGET_ROOT/after",
+      "lock_paths": ["Cargo.lock"],
+      "build": [
+        {
+          "id": "legacy_w5_probes",
+          "argv": ["cargo", "build", "--release", "-p", "litchi-ops", "--features", "doc,xls,rtf", "--example", "legacy_w5_source_probe", "--example", "legacy_w5_probe"],
+          "artifacts": [
+            "{target_dir}/release/examples/legacy_w5_source_probe",
+            "{target_dir}/release/examples/legacy_w5_probe"
+          ]
+        }
+      ],
+      "programs": [
+        {
+          "id": "source",
+          "binary": "{target_dir}/release/examples/legacy_w5_source_probe",
+          "argv": ["{rounds}"],
+          "stdout": "{output_dir}/source-{leg}-{index}.json",
+          "stderr": "{output_dir}/source-{leg}-{index}.stderr",
+          "require_stdout": true
+        },
+        {
+          "id": "ops",
+          "binary": "{target_dir}/release/examples/legacy_w5_probe",
+          "argv": ["{rounds}"],
+          "stdout": "{output_dir}/ops-{leg}-{index}.json",
+          "stderr": "{output_dir}/ops-{leg}-{index}.stderr",
+          "require_stdout": true
+        }
+      ]
+    }
+  }
+}

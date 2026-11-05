@@ -5,7 +5,7 @@
 //! semantic candidate validation and it deliberately does not fall back to a
 //! topology-changing render.
 
-use crate::protection::reject_protected_shared_container;
+use crate::protection::{Limits as ProtectionLimits, reject_protected_shared_container};
 use litchi_cfb::{
     ComposedOverlaySource, OverlayError, OverlayLimits, SameLengthStreamOverlay,
     SameLengthStreamSplice, SharedOleFile, SharedOleFileLimits, StreamSpliceLimits,
@@ -33,15 +33,11 @@ impl std::fmt::Debug for SourceBackedOverlayPublisher {
 }
 
 impl SourceBackedOverlayPublisher {
-    /// Opens and fully validates a bounded positional CFB source, then applies
-    /// the common signed/encrypted/DRM mutation guard.
-    pub fn open(source: Arc<dyn ReadAt>) -> Result<Self, OverlayError> {
-        Self::open_with_limits(source, SharedOleFileLimits::default())
-    }
-
     /// Opens exact immutable bytes without erasing their owned provenance.
     ///
-    /// The common protected-container guard is identical to [`Self::open`].
+    /// The common protected-container guard is identical to [`Self::open`];
+    /// `limits` bound the physical CFB parse ([`SharedOleFileLimits::default`]
+    /// is the default profile).
     /// Only the low-level CFB owner may use the provenance to specialize a
     /// later planning and publication: a plan computes its source and target
     /// fingerprints once, at planning, and never recomputes them to re-prove
@@ -50,21 +46,71 @@ impl SourceBackedOverlayPublisher {
     /// views omit their preflight, and direct and atomic publication omit
     /// their outer fences and the emission hash. Atomic saves keep every
     /// flush, fsync, rename, and parent-sync durability step.
-    pub fn open_owned(source: Arc<[u8]>, version: SourceVersion) -> Result<Self, OverlayError> {
-        let cfb = SharedOleFile::open_owned(source, version)?;
-        reject_protected_shared_container(&cfb, "source-backed stream overlay publication")?;
+    pub fn open_owned(
+        source: Arc<[u8]>,
+        version: SourceVersion,
+        limits: SharedOleFileLimits,
+    ) -> Result<Self, OverlayError> {
+        let cfb = SharedOleFile::open_owned(source, version, limits)?;
+        Self::from_owned_cfb(cfb)
+    }
+
+    /// Opens an already shared immutable vector without converting it to an
+    /// `Arc<[u8]>`.  This keeps the exact source allocation available to
+    /// owners that already retain an `Arc<Vec<u8>>`, while preserving the
+    /// sealed-source planning path of [`Self::open_owned`].
+    pub fn open_owned_vec(
+        source: Arc<Vec<u8>>,
+        version: SourceVersion,
+        limits: SharedOleFileLimits,
+    ) -> Result<Self, OverlayError> {
+        let cfb = SharedOleFile::open_owned_vec(source, version, limits)?;
+        Self::from_owned_cfb(cfb)
+    }
+
+    fn from_owned_cfb(cfb: SharedOleFile) -> Result<Self, OverlayError> {
+        let max_entries = cfb.directory_entry_count();
+        reject_protected_shared_container(
+            &cfb,
+            "source-backed stream overlay publication",
+            ProtectionLimits { max_entries },
+        )?;
         Ok(Self { cfb: Arc::new(cfb) })
     }
 
-    /// Opens under a caller-selected positional CFB ingress ceiling, then
-    /// applies the common signed/encrypted/DRM mutation guard.
-    pub fn open_with_limits(
+    /// Opens and fully validates a bounded positional CFB source under
+    /// `limits` ([`SharedOleFileLimits::default`] is the default profile),
+    /// then applies the common signed/encrypted/DRM mutation guard.
+    pub fn open(
         source: Arc<dyn ReadAt>,
         limits: SharedOleFileLimits,
     ) -> Result<Self, OverlayError> {
-        let cfb = SharedOleFile::open_with_limits(source, limits)?;
-        reject_protected_shared_container(&cfb, "source-backed stream overlay publication")?;
+        let cfb = SharedOleFile::open(source, limits)?;
+        let max_entries = cfb.directory_entry_count();
+        reject_protected_shared_container(
+            &cfb,
+            "source-backed stream overlay publication",
+            ProtectionLimits { max_entries },
+        )?;
         Ok(Self { cfb: Arc::new(cfb) })
+    }
+
+    /// Adopts a positional CFB owner that is already open and validated, then
+    /// applies the common signed/encrypted/DRM mutation guard.
+    ///
+    /// No container index is built: the publisher shares `cfb`'s parsed
+    /// directory/FAT index, source-version capture and ownership provenance.
+    /// Sealed owned bytes keep the planning and publication specializations
+    /// described on [`Self::open_owned`]; any other source keeps the generic
+    /// fences.
+    pub fn from_shared(cfb: Arc<SharedOleFile>) -> Result<Self, OverlayError> {
+        let max_entries = cfb.directory_entry_count();
+        reject_protected_shared_container(
+            &cfb,
+            "source-backed stream overlay publication",
+            ProtectionLimits { max_entries },
+        )?;
+        Ok(Self { cfb })
     }
 
     /// Returns the validated positional CFB owner for repeated semantic reads.
@@ -158,8 +204,11 @@ mod tests {
             writer.create_stream(&["Target"], b"before").unwrap();
             writer.create_stream(&["Opaque"], b"unchanged").unwrap();
         });
-        let publisher =
-            SourceBackedOverlayPublisher::open(Arc::new(OwnedSource::new(bytes))).unwrap();
+        let publisher = SourceBackedOverlayPublisher::open(
+            Arc::new(OwnedSource::new(bytes)),
+            SharedOleFileLimits::default(),
+        )
+        .unwrap();
         let plan = publisher
             .plan(
                 vec![SameLengthStreamOverlay::new(
@@ -171,7 +220,8 @@ mod tests {
             .unwrap();
         let mut output = Vec::new();
         plan.write_to(&mut output).unwrap();
-        let mut ole = OleFile::open(Cursor::new(output)).unwrap();
+        let mut ole =
+            OleFile::open(Cursor::new(output), litchi_cfb::OleFileLimits::default()).unwrap();
         assert_eq!(ole.open_stream(&["Target"]).unwrap(), b"change");
         assert_eq!(ole.open_stream(&["Opaque"]).unwrap(), b"unchanged");
     }
@@ -182,8 +232,11 @@ mod tests {
             writer.create_stream(&["Target"], b"before").unwrap();
             writer.create_stream(&["Opaque"], b"unchanged").unwrap();
         });
-        let publisher =
-            SourceBackedOverlayPublisher::open(Arc::new(OwnedSource::new(bytes))).unwrap();
+        let publisher = SourceBackedOverlayPublisher::open(
+            Arc::new(OwnedSource::new(bytes)),
+            SharedOleFileLimits::default(),
+        )
+        .unwrap();
         let plan = publisher
             .plan_splices(
                 vec![SameLengthStreamSplice::new(
@@ -197,7 +250,8 @@ mod tests {
             .unwrap();
         let mut output = Vec::new();
         plan.write_to(&mut output).unwrap();
-        let mut ole = OleFile::open(Cursor::new(output)).unwrap();
+        let mut ole =
+            OleFile::open(Cursor::new(output), litchi_cfb::OleFileLimits::default()).unwrap();
         assert_eq!(ole.open_stream(&["Target"]).unwrap(), b"beXXre");
         assert_eq!(ole.open_stream(&["Opaque"]).unwrap(), b"unchanged");
     }
@@ -224,7 +278,7 @@ mod tests {
                 writer.create_stream(&["Ordinary"], b"bytes").unwrap();
             });
             assert!(matches!(
-                SourceBackedOverlayPublisher::open_with_limits(
+                SourceBackedOverlayPublisher::open(
                     Arc::new(OwnedSource::new(bytes.clone())),
                     SharedOleFileLimits::default(),
                 ),
@@ -234,9 +288,68 @@ mod tests {
                 SourceBackedOverlayPublisher::open_owned(
                     Arc::from(bytes),
                     SourceVersion::new(0x0181, 0),
+                    SharedOleFileLimits::default(),
                 ),
                 Err(OverlayError::Ole(litchi_cfb::OleError::InvalidFormat(_)))
             ));
+            assert!(matches!(
+                SourceBackedOverlayPublisher::open_owned_vec(
+                    Arc::new(bytes_for_shared(marker)),
+                    SourceVersion::new(0x0183, 0),
+                    SharedOleFileLimits::default(),
+                ),
+                Err(OverlayError::Ole(litchi_cfb::OleError::InvalidFormat(_)))
+            ));
+            let shared = SharedOleFile::open_owned_vec(
+                Arc::new(bytes_for_shared(marker)),
+                SourceVersion::new(0x0182, 0),
+                SharedOleFileLimits::default(),
+            )
+            .unwrap();
+            assert!(matches!(
+                SourceBackedOverlayPublisher::from_shared(Arc::new(shared)),
+                Err(OverlayError::Ole(litchi_cfb::OleError::InvalidFormat(_)))
+            ));
         }
+    }
+
+    fn bytes_for_shared(marker: &str) -> Vec<u8> {
+        write_cfb(|writer| {
+            writer.create_storage(&[marker]).unwrap();
+            writer.create_stream(&["Ordinary"], b"bytes").unwrap();
+        })
+    }
+
+    #[test]
+    fn adopted_shared_owner_publishes_without_a_second_index() {
+        let bytes = write_cfb(|writer| {
+            writer.create_stream(&["Target"], b"before").unwrap();
+        });
+        let shared = Arc::new(
+            SharedOleFile::open_owned_vec(
+                Arc::new(bytes),
+                SourceVersion::new(0x0183, 0),
+                SharedOleFileLimits::default(),
+            )
+            .unwrap(),
+        );
+        let publisher = SourceBackedOverlayPublisher::from_shared(Arc::clone(&shared)).unwrap();
+        assert!(Arc::ptr_eq(&publisher.shared(), &shared));
+        let plan = publisher
+            .plan_splices(
+                vec![SameLengthStreamSplice::new(
+                    vec!["Target".to_string()],
+                    0,
+                    Arc::from(b"be".as_slice()),
+                    Arc::from(b"BE".as_slice()),
+                )],
+                StreamSpliceLimits::default(),
+            )
+            .unwrap();
+        let mut output = Vec::new();
+        plan.write_to(&mut output).unwrap();
+        let mut ole =
+            OleFile::open(Cursor::new(output), litchi_cfb::OleFileLimits::default()).unwrap();
+        assert_eq!(ole.open_stream(&["Target"]).unwrap(), b"BEfore");
     }
 }

@@ -71,13 +71,13 @@ fn push_varint_width(mut value: u64, width: usize, output: &mut Vec<u8>) {
 }
 
 fn slide_header(source: &[u8], component_name: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == component_name)
         .ok_or_else(|| io::Error::other("native slide component is missing"))?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let archive = Archive::parse(stream.as_bytes(), Default::default())?;
     let object = archive
         .object(SLIDE_IDENTIFIER)
         .ok_or_else(|| io::Error::other("native slide object is missing"))?;
@@ -101,7 +101,7 @@ fn slide_header(source: &[u8], component_name: &str) -> TestResult<Vec<u8>> {
 }
 
 fn mutate_slide_header(source: &[u8]) -> TestResult<(Vec<u8>, String, Vec<u8>, Vec<u8>)> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut selected_component = None;
     let mut selected_data = None;
     let mut unknown_field = Vec::new();
@@ -110,8 +110,8 @@ fn mutate_slide_header(source: &[u8]) -> TestResult<(Vec<u8>, String, Vec<u8>, V
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = SnappyStream::decompress(entry.data())?;
-        let archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
         let Some(object) = archive.object(SLIDE_IDENTIFIER) else {
             continue;
         };
@@ -142,7 +142,7 @@ fn mutate_slide_header(source: &[u8]) -> TestResult<(Vec<u8>, String, Vec<u8>, V
         let header = &stream.as_bytes()[header_start..header_end];
         let mut rewritten_header = Vec::with_capacity(header.len() + 64);
         let mut rewrote_identifier = false;
-        for field in WireView::parse(header)?.fields() {
+        for field in WireView::parse(header, litchi_iwa_common::WireLimits::DEFAULT)?.fields() {
             if field.number() == 1 && field.wire_type() == 0 && !rewrote_identifier {
                 let (identifier, consumed) = decode_varint_from_bytes(field.payload())?;
                 if consumed != field.payload().len() {
@@ -195,10 +195,13 @@ fn mutate_slide_header(source: &[u8]) -> TestResult<(Vec<u8>, String, Vec<u8>, V
         );
         rewritten_stream.extend_from_slice(&rewritten_header);
         rewritten_stream.extend_from_slice(&stream.as_bytes()[header_end..]);
-        Archive::parse(&rewritten_stream)?;
+        Archive::parse(&rewritten_stream, Default::default())?;
 
         selected_component = Some(entry.name().to_owned());
-        selected_data = Some(SnappyStream::compress(&rewritten_stream)?);
+        selected_data = Some(SnappyStream::compress(
+            &rewritten_stream,
+            Default::default(),
+        )?);
         break;
     }
 
@@ -208,12 +211,15 @@ fn mutate_slide_header(source: &[u8]) -> TestResult<(Vec<u8>, String, Vec<u8>, V
     let edit = EntryEdit::new(&component_name, &compressed);
     let rewritten_package = catalog.reassemble_to_bytes(&[edit], Limits::default())?;
     let header = slide_header(&rewritten_package, &component_name)?;
-    if !WireView::parse(&header)?.fields().any(|field| {
-        field.number() == UNKNOWN_HEADER_FIELD && field.raw() == unknown_field.as_slice()
-    }) {
+    if !WireView::parse(&header, litchi_iwa_common::WireLimits::DEFAULT)?
+        .fields()
+        .any(|field| {
+            field.number() == UNKNOWN_HEADER_FIELD && field.raw() == unknown_field.as_slice()
+        })
+    {
         return Err(io::Error::other("rewritten slide header lost its unknown field").into());
     }
-    let identifier_field = WireView::parse(&header)?
+    let identifier_field = WireView::parse(&header, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == 1 && field.wire_type() == 0)
         .map(|field| field.raw().to_vec())
@@ -236,15 +242,19 @@ fn fresh_audio_preserves_unknown_and_noncanonical_slide_header_bytes() -> TestRe
     let source = Package::from_bytes(&source_bytes)?;
     assert_eq!(exact_bytes(&source)?, source_bytes);
 
-    let commit = source.add_slide_audio(
-        SlideSelector::index(0),
-        "fresh-pcm.wav",
-        &audio(),
-        options()?,
-    )?;
+    let commit = source
+        .edit_slide_audio_creation()
+        .add(
+            SlideSelector::index(0),
+            "fresh-pcm.wav",
+            &audio(),
+            options()?,
+        )
+        .and_then(|edit| edit.commit())?;
     let candidate_bytes = exact_bytes(commit.package())?;
     let candidate_header = slide_header(&candidate_bytes, &component_name)?;
-    let candidate_view = WireView::parse(&candidate_header)?;
+    let candidate_view =
+        WireView::parse(&candidate_header, litchi_iwa_common::WireLimits::DEFAULT)?;
     assert!(candidate_view.fields().any(|field| {
         field.number() == UNKNOWN_HEADER_FIELD && field.raw() == unknown_field.as_slice()
     }));

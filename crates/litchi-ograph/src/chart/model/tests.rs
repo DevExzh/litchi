@@ -6,7 +6,7 @@
 
 use super::super::{Kind, Ref, Stream, axis, cache, format, group};
 use super::{
-    Ai, Binding, Cache, Chart, Context, Count, DataKind, GraphFamily, Group, GroupId, Link, Order,
+    Ai, Binding, Cache, Context, Count, DataKind, GraphFamily, Group, GroupId, Link, Model, Order,
     Owner, Props, Role, Series, Source, Value, ValueRef, XlValue,
 };
 use crate::chart::RowCol;
@@ -39,9 +39,9 @@ fn area_format() -> format::Area {
     }
 }
 
-fn graph_authoring_chart(family: GraphFamily) -> Chart {
+fn graph_authoring_chart(family: GraphFamily) -> Model {
     let context = Context::graph();
-    let mut chart = Chart::new_graph_authoring(family, Limits::default()).expect("Graph scaffold");
+    let mut chart = Model::new_graph_authoring(family, Limits::default()).expect("Graph scaffold");
     let count = count(2);
     let row = RowCol::new(1).expect("series row");
     let mut series = Series::new(context);
@@ -105,12 +105,13 @@ fn standalone_graph_authoring_roundtrips_bar_line_and_pie_profiles() {
         let stream = chart.encode().expect("Graph chart encoding");
         let orient = stream
             .records()
+            .expect("validated records")
             .map(|item| item.expect("Graph record framing"))
             .find(|record| record.kind() == RecordKind::from_wire(0x1055))
             .expect("Graph Orient record");
         assert_eq!(orient.kind(), RecordKind::from_wire(0x1055));
         assert_eq!(orient.payload(), &[1, 0, 0, 0, 0, 1]);
-        let parsed = Chart::open(stream, Context::graph()).expect("Graph chart reopen");
+        let parsed = Model::open(stream, Context::graph()).expect("Graph chart reopen");
         assert_eq!(parsed.context().kind(), Kind::Graph);
         assert_eq!(parsed.parents().len(), 1);
         assert_eq!(parsed.groups().len(), 1);
@@ -125,12 +126,12 @@ fn standalone_graph_authoring_roundtrips_bar_line_and_pie_profiles() {
 
 #[test]
 fn standalone_graph_authoring_rejects_wrong_context_and_incomplete_series() {
-    let excel = Chart::new(Context::excel())
+    let excel = Model::new(Context::excel())
         .expect("Excel chart")
         .finish_graph_authoring();
-    assert!(matches!(excel, Err(Error::UnsupportedAuthoring { .. })));
+    assert!(matches!(excel, Err(Error::Refused(_))));
 
-    let incomplete = Chart::new_graph_authoring(GraphFamily::Pie, Limits::default())
+    let incomplete = Model::new_graph_authoring(GraphFamily::Pie, Limits::default())
         .expect("Pie scaffold")
         .finish_graph_authoring();
     assert!(matches!(
@@ -142,14 +143,16 @@ fn standalone_graph_authoring_rejects_wrong_context_and_incomplete_series() {
     ));
 }
 
-fn fixture(mut chart: Chart) -> Stream {
+fn fixture(mut chart: Model) -> Stream {
     chart.authoring_proven = true;
     chart.encode().expect("internal parser fixture")
 }
 
 fn omit(stream: &Stream, target: RecordKind) -> Vec<u8> {
-    let mut out = Encoder::new();
-    for item in Records::new(stream.as_bytes()) {
+    let mut out = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
+    for item in
+        Records::new(stream.as_bytes(), litchi_biff::Limits::default()).expect("valid BIFF limits")
+    {
         let record = item.expect("valid fixture record");
         if record.kind() != target {
             out.push_ref(record).expect("record replay");
@@ -159,12 +162,12 @@ fn omit(stream: &Stream, target: RecordKind) -> Vec<u8> {
 }
 
 fn excel_input(bytes: &[u8]) -> Ref<'_> {
-    Ref::open(bytes).expect("well-framed chart rewrite")
+    Ref::open(bytes, Limits::default()).expect("well-framed chart rewrite")
 }
 
-fn excel_chart() -> Chart {
+fn excel_chart() -> Model {
     let context = Context::excel().with_external_sheets(1);
-    let mut chart = Chart::new(context).expect("new chart");
+    let mut chart = Model::new(context).expect("new chart");
     let mut series = Series::new(context);
     series.category_kind = DataKind::Text;
     series.category_count = count(2);
@@ -225,14 +228,11 @@ fn excel_chart() -> Chart {
 
 #[test]
 fn fresh_encode_refuses_while_internal_fixture_replay_moves_original_stream() {
-    assert!(matches!(
-        excel_chart().encode(),
-        Err(Error::UnsupportedAuthoring { .. })
-    ));
+    assert!(matches!(excel_chart().encode(), Err(Error::Refused(_))));
     let stream = fixture(excel_chart());
     let pointer = stream.as_bytes().as_ptr();
     let parsed =
-        Chart::open(stream, Context::excel().with_external_sheets(1)).expect("semantic parse");
+        Model::open(stream, Context::excel().with_external_sheets(1)).expect("semantic parse");
     assert!(parsed.is_pristine());
     assert_eq!(parsed.title(), None);
     assert_eq!(parsed.series().len(), 1);
@@ -245,7 +245,7 @@ fn fresh_encode_refuses_while_internal_fixture_replay_moves_original_stream() {
 #[test]
 fn graph_and_excel_links_have_distinct_checked_wire_grammars() {
     let row_col = RowCol::new(7).expect("Graph coordinate");
-    let mut graph = Chart::new(Context::graph()).expect("Graph chart");
+    let mut graph = Model::new(Context::graph()).expect("Graph chart");
     let mut series = Series::new(Context::graph());
     series.ai.replace(Binding::new(
         Link::graph(Role::Values, Source::Literal, row_col),
@@ -261,14 +261,14 @@ fn graph_and_excel_links_have_distinct_checked_wire_grammars() {
         ))
         .expect("Graph blank");
     let stream = fixture(graph);
-    let parsed = Chart::open(stream, Context::graph()).expect("Graph parse");
+    let parsed = Model::open(stream, Context::graph()).expect("Graph parse");
     assert!(matches!(
         parsed.series()[0].ai.get(Role::Values).link(),
         Link::Graph { .. }
     ));
     assert!(matches!(parsed.caches()[0], Cache::Graph { .. }));
 
-    let mut wrong = Chart::new(Context::graph()).expect("Graph chart");
+    let mut wrong = Model::new(Context::graph()).expect("Graph chart");
     let mut wrong_series = Series::new(Context::graph());
     wrong_series.ai.replace(Binding::new(
         Link::excel(Role::Values, Source::Automatic, Vec::new()),
@@ -283,8 +283,10 @@ fn graph_and_excel_links_have_distinct_checked_wire_grammars() {
 #[test]
 fn parsed_mutation_is_refused_and_unknown_order_replays_exactly() {
     let original = fixture(excel_chart());
-    let mut out = Encoder::new();
-    for item in Records::new(original.as_bytes()) {
+    let mut out = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
+    for item in Records::new(original.as_bytes(), litchi_biff::Limits::default())
+        .expect("valid BIFF limits")
+    {
         let record = item.expect("valid record");
         if record.kind() == super::super::EOF {
             out.push(UNKNOWN, &[9, 8, 7]).expect("unknown record");
@@ -293,17 +295,17 @@ fn parsed_mutation_is_refused_and_unknown_order_replays_exactly() {
     }
     let bytes = out.finish();
     let pointer = bytes.as_ptr();
-    let stream = Stream::open(bytes).expect("raw chart");
+    let stream = Stream::open(bytes, Limits::default()).expect("raw chart");
     let parsed =
-        Chart::open(stream, Context::excel().with_external_sheets(1)).expect("semantic chart");
+        Model::open(stream, Context::excel().with_external_sheets(1)).expect("semantic chart");
     assert_eq!(parsed.unknown().len(), 1);
     assert_eq!(parsed.unknown()[0].kind(), UNKNOWN);
     let replay = parsed.encode().expect("exact replay");
     assert_eq!(replay.as_bytes().as_ptr(), pointer);
     let mut parsed =
-        Chart::open(replay, Context::excel().with_external_sheets(1)).expect("semantic chart");
+        Model::open(replay, Context::excel().with_external_sheets(1)).expect("semantic chart");
     parsed.set_title(Some("Changed".into()));
-    assert!(matches!(parsed.encode(), Err(Error::UnsafeEdit { .. })));
+    assert!(matches!(parsed.encode(), Err(Error::Refused(_))));
 }
 
 #[test]
@@ -311,7 +313,7 @@ fn rejects_context_mismatch_tighter_replay_limit_and_invalid_properties() {
     let stream = fixture(excel_chart());
     let bytes = stream.as_bytes().len();
     assert!(matches!(
-        Chart::open(stream, Context::graph()),
+        Model::open(stream, Context::graph()),
         Err(Error::InvalidModel {
             field: "context",
             ..
@@ -320,18 +322,18 @@ fn rejects_context_mismatch_tighter_replay_limit_and_invalid_properties() {
 
     let stream = fixture(excel_chart());
     let chart =
-        Chart::open(stream, Context::excel().with_external_sheets(1)).expect("parsed chart");
+        Model::open(stream, Context::excel().with_external_sheets(1)).expect("parsed chart");
     let mut limits = Limits::default();
     limits.biff.max_output_bytes = bytes.saturating_sub(1);
     assert!(matches!(
         chart.encode_with(limits),
-        Err(Error::LimitExceeded {
-            resource: "output bytes",
+        Err(Error::Limit {
+            kind: crate::LimitKind::Biff(litchi_biff::Resource::OutputBytes),
             ..
         })
     ));
 
-    let mut valid_blank_mode = Chart::new(Context::excel()).expect("chart");
+    let mut valid_blank_mode = Model::new(Context::excel()).expect("chart");
     valid_blank_mode.set_props(Props {
         flags: 2 | (2 << 16),
         plot_area: true,
@@ -339,7 +341,7 @@ fn rejects_context_mismatch_tighter_replay_limit_and_invalid_properties() {
     valid_blank_mode.authoring_proven = true;
     assert!(valid_blank_mode.encode().is_ok());
 
-    let mut not_size_with = Chart::new(Context::excel()).expect("chart");
+    let mut not_size_with = Model::new(Context::excel()).expect("chart");
     not_size_with.set_props(Props {
         flags: 1 << 2,
         plot_area: true,
@@ -347,7 +349,7 @@ fn rejects_context_mismatch_tighter_replay_limit_and_invalid_properties() {
     not_size_with.authoring_proven = true;
     assert!(not_size_with.encode().is_ok());
 
-    let mut reserved = Chart::new(Context::excel()).expect("chart");
+    let mut reserved = Model::new(Context::excel()).expect("chart");
     reserved.set_props(Props {
         flags: 1 << 5,
         plot_area: true,
@@ -355,7 +357,7 @@ fn rejects_context_mismatch_tighter_replay_limit_and_invalid_properties() {
     reserved.authoring_proven = true;
     assert!(matches!(reserved.encode(), Err(Error::InvalidModel { .. })));
 
-    let mut dependency = Chart::new(Context::excel()).expect("chart");
+    let mut dependency = Model::new(Context::excel()).expect("chart");
     dependency.set_props(Props {
         flags: 1 << 4,
         plot_area: true,
@@ -376,21 +378,21 @@ fn add_methods_enforce_authoring_limits_before_growth() {
         max_cached_values: 1,
         ..Limits::default()
     };
-    let mut chart = Chart::new_with(Context::excel(), limits).expect("bounded chart");
+    let mut chart = Model::new_with(Context::excel(), limits).expect("bounded chart");
     chart
         .add_series(Series::new(Context::excel()))
         .expect("first series");
     assert!(matches!(
         chart.add_series(Series::new(Context::excel())),
-        Err(Error::LimitExceeded {
-            resource: "series count",
+        Err(Error::Limit {
+            kind: crate::LimitKind::Series,
             ..
         })
     ));
     assert!(matches!(
         chart.add_group(Group::line()),
-        Err(Error::LimitExceeded {
-            resource: "group count",
+        Err(Error::Limit {
+            kind: crate::LimitKind::Groups,
             ..
         })
     ));
@@ -402,7 +404,7 @@ fn add_methods_enforce_authoring_limits_before_growth() {
 
 #[test]
 fn group_lines_and_drop_bars_emit_mandatory_owned_formats() {
-    let mut chart = Chart::new(Context::excel()).expect("chart");
+    let mut chart = Model::new(Context::excel()).expect("chart");
     let mut groups = chart.groups_mut();
     let group = groups.first_mut().expect("default line group");
     group
@@ -426,6 +428,7 @@ fn group_lines_and_drop_bars_emit_mandatory_owned_formats() {
     let stream = fixture(chart);
     let kinds = stream
         .records()
+        .expect("validated records")
         .map(|record| record.expect("valid record").kind())
         .collect::<Vec<_>>();
     let crt = kinds
@@ -446,7 +449,7 @@ fn group_lines_and_drop_bars_emit_mandatory_owned_formats() {
         )
     );
 
-    let parsed = Chart::open(stream, Context::excel()).expect("parse");
+    let parsed = Model::open(stream, Context::excel()).expect("parse");
     let group = parsed.groups().first().expect("group");
     assert_eq!(group.lines.len(), 1);
     assert_eq!(group.drop_bars.len(), 1);
@@ -456,10 +459,12 @@ fn group_lines_and_drop_bars_emit_mandatory_owned_formats() {
 #[test]
 fn rejects_missing_collection_begin_and_nesting_over_limit() {
     let stream = fixture(excel_chart());
-    let mut out = Encoder::new();
+    let mut out = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
     let mut after_series = false;
     let mut removed = false;
-    for item in Records::new(stream.as_bytes()) {
+    for item in
+        Records::new(stream.as_bytes(), litchi_biff::Limits::default()).expect("valid BIFF limits")
+    {
         let record = item.expect("valid record");
         if after_series && record.kind() == RecordKind::from_wire(0x1033) {
             removed = true;
@@ -471,9 +476,9 @@ fn rejects_missing_collection_begin_and_nesting_over_limit() {
     }
     assert!(removed);
     let malformed = out.finish();
-    let input = Ref::open(&malformed).expect("raw boundaries remain valid");
+    let input = Ref::open(&malformed, Limits::default()).expect("raw boundaries remain valid");
     assert!(matches!(
-        Chart::parse(input, Context::excel().with_external_sheets(1)),
+        Model::parse(input, Context::excel().with_external_sheets(1)),
         Err(Error::InvalidChart {
             reason: "collection-owning record is not followed immediately by Begin",
             ..
@@ -481,7 +486,7 @@ fn rejects_missing_collection_begin_and_nesting_over_limit() {
     ));
 
     assert!(matches!(
-        Chart::parse_with(
+        Model::parse_with(
             stream.as_ref(),
             Context::excel().with_external_sheets(1),
             Limits {
@@ -489,8 +494,8 @@ fn rejects_missing_collection_begin_and_nesting_over_limit() {
                 ..Limits::default()
             }
         ),
-        Err(Error::LimitExceeded {
-            resource: "chart nesting",
+        Err(Error::Limit {
+            kind: crate::LimitKind::Nesting,
             ..
         })
     ));
@@ -501,7 +506,7 @@ fn regular_series_requires_one_owner_and_series_text_remains_ai_local() {
     let stream = fixture(excel_chart());
     let missing = omit(&stream, RecordKind::from_wire(0x1045));
     assert!(matches!(
-        Chart::parse(
+        Model::parse(
             excel_input(&missing),
             Context::excel().with_external_sheets(1)
         ),
@@ -511,9 +516,11 @@ fn regular_series_requires_one_owner_and_series_text_remains_ai_local() {
         })
     ));
 
-    let mut out = Encoder::new();
+    let mut out = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
     let mut ai = 0usize;
-    for item in Records::new(stream.as_bytes()) {
+    for item in
+        Records::new(stream.as_bytes(), litchi_biff::Limits::default()).expect("valid BIFF limits")
+    {
         let record = item.expect("valid fixture record");
         out.push_ref(record).expect("record replay");
         if record.kind() == RecordKind::from_wire(0x1051) {
@@ -529,7 +536,7 @@ fn regular_series_requires_one_owner_and_series_text_remains_ai_local() {
     }
     let duplicate = out.finish();
     assert!(matches!(
-        Chart::parse(
+        Model::parse(
             excel_input(&duplicate),
             Context::excel().with_external_sheets(1)
         ),
@@ -550,7 +557,7 @@ fn auxiliary_owner_round_trips_and_series_removal_preserves_dependencies() {
         data: [0; 28],
     };
     chart.add_series(auxiliary).expect("auxiliary series");
-    let parsed = Chart::open(fixture(chart), context).expect("auxiliary parse");
+    let parsed = Model::open(fixture(chart), context).expect("auxiliary parse");
     assert!(matches!(parsed.series()[1].owner, Owner::Trend { .. }));
 
     let mut blocked = excel_chart();
@@ -569,7 +576,7 @@ fn auxiliary_owner_round_trips_and_series_removal_preserves_dependencies() {
     ));
     assert_eq!(blocked.series().len(), 2);
 
-    let mut shifted = Chart::new(context).expect("chart");
+    let mut shifted = Model::new(context).expect("chart");
     shifted
         .add_series(Series::new(context))
         .expect("first regular series");
@@ -622,7 +629,7 @@ fn cache_dimensions_and_bool_err_follow_the_typed_crud_model() {
             .is_err()
     );
 
-    let parsed = Chart::open(fixture(chart), Context::excel().with_external_sheets(1))
+    let parsed = Model::open(fixture(chart), Context::excel().with_external_sheets(1))
         .expect("BoolErr round trip");
     assert_eq!(parsed.caches()[3].value(), ValueRef::Bool(true));
     assert_eq!(
@@ -646,6 +653,7 @@ fn excel_cache_label_uses_xl_unicode_string_wire_format() {
     let stream = fixture(chart);
     let label = stream
         .records()
+        .expect("validated records")
         .map(|record| record.expect("valid fixture record"))
         .find(|record| record.kind() == RecordKind::from_wire(0x0204))
         .expect("Label record");
@@ -655,7 +663,7 @@ fn excel_cache_label_uses_xl_unicode_string_wire_format() {
     );
     assert_eq!(label.payload().len(), 6 + 3 + 300 * 2);
 
-    let parsed = Chart::open(stream, Context::excel().with_external_sheets(1))
+    let parsed = Model::open(stream, Context::excel().with_external_sheets(1))
         .expect("XLUnicodeString Label round trip");
     assert_eq!(parsed.caches()[1].value(), ValueRef::Text(&text));
 }
@@ -663,7 +671,7 @@ fn excel_cache_label_uses_xl_unicode_string_wire_format() {
 #[test]
 fn group_and_parent_crud_preserves_semantic_ownership() {
     let context = Context::excel();
-    let mut chart = Chart::new(context).expect("chart");
+    let mut chart = Model::new(context).expect("chart");
     let mut second = Group::line();
     second.order = Order::new(1).expect("drawing order");
     chart.add_group(second).expect("second group");
@@ -682,7 +690,7 @@ fn group_and_parent_crud_preserves_semantic_ownership() {
     chart
         .add_axis(axis::Axis::new(axis::Kind::Category))
         .expect("primary axis");
-    let parsed = Chart::open(fixture(chart), context).expect("parent ownership parse");
+    let parsed = Model::open(fixture(chart), context).expect("parent ownership parse");
     assert_eq!(parsed.groups()[0].parent, axis::ParentId::PRIMARY);
     assert_eq!(parsed.axes()[0].parent, axis::ParentId::PRIMARY);
 }
@@ -690,7 +698,7 @@ fn group_and_parent_crud_preserves_semantic_ownership() {
 #[test]
 fn mutable_borrow_marks_parsed_input_dirty_only_after_write() {
     let context = Context::excel().with_external_sheets(1);
-    let mut chart = Chart::open(fixture(excel_chart()), context).expect("parsed chart");
+    let mut chart = Model::open(fixture(excel_chart()), context).expect("parsed chart");
     {
         let groups = chart.groups_mut();
         assert_eq!(groups.len(), 1);
@@ -709,12 +717,14 @@ fn excel_rejects_proven_topology_violations_and_duplicate_siindex() {
     let stream = fixture(excel_chart());
     for kind in [0x00A0, 0x1022, 0x104F].map(RecordKind::from_wire) {
         let malformed = omit(&stream, kind);
-        assert!(Chart::parse(excel_input(&malformed), context).is_err());
+        assert!(Model::parse(excel_input(&malformed), context).is_err());
     }
 
-    let mut out = Encoder::new();
+    let mut out = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
     let mut section = 0usize;
-    for item in Records::new(stream.as_bytes()) {
+    for item in
+        Records::new(stream.as_bytes(), litchi_biff::Limits::default()).expect("valid BIFF limits")
+    {
         let record = item.expect("valid fixture record");
         if record.kind() == RecordKind::from_wire(0x1065) {
             section += 1;
@@ -728,15 +738,17 @@ fn excel_rejects_proven_topology_violations_and_duplicate_siindex() {
     }
     let malformed = out.finish();
     assert!(matches!(
-        Chart::parse(excel_input(&malformed), context),
+        Model::parse(excel_input(&malformed), context),
         Err(Error::InvalidChart {
             reason: "SIIndex section is duplicated",
             ..
         })
     ));
 
-    let mut out = Encoder::new();
-    for item in Records::new(stream.as_bytes()) {
+    let mut out = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
+    for item in
+        Records::new(stream.as_bytes(), litchi_biff::Limits::default()).expect("valid BIFF limits")
+    {
         let record = item.expect("valid fixture record");
         if record.kind() == RecordKind::from_wire(0x0200) {
             out.push(RecordKind::from_wire(0x1033), &[])
@@ -748,7 +760,7 @@ fn excel_rejects_proven_topology_violations_and_duplicate_siindex() {
     }
     let malformed = out.finish();
     assert!(matches!(
-        Chart::parse(excel_input(&malformed), context),
+        Model::parse(excel_input(&malformed), context),
         Err(Error::InvalidChart {
             reason: "Begin record has no chart-level collection owner",
             ..
@@ -758,10 +770,10 @@ fn excel_rejects_proven_topology_violations_and_duplicate_siindex() {
 
 #[test]
 fn graph_does_not_inherit_excel_outer_order_but_rejects_siindex() {
-    let stream = fixture(Chart::new(Context::graph()).expect("Graph chart"));
+    let stream = fixture(Model::new(Context::graph()).expect("Graph chart"));
     let without_excel_scl = omit(&stream, RecordKind::from_wire(0x00A0));
-    let parsed = Chart::parse(
-        Ref::open(&without_excel_scl).expect("Graph rewrite"),
+    let parsed = Model::parse(
+        Ref::open(&without_excel_scl, Limits::default()).expect("Graph rewrite"),
         Context::graph(),
     )
     .expect("Graph does not require Excel CHARTFOMATS order");
@@ -772,8 +784,8 @@ fn graph_does_not_inherit_excel_outer_order_but_rejects_siindex() {
     );
 
     let without_excel_crt_link = omit(&stream, RecordKind::from_wire(0x1022));
-    let parsed = Chart::parse(
-        Ref::open(&without_excel_crt_link).expect("Graph rewrite"),
+    let parsed = Model::parse(
+        Ref::open(&without_excel_crt_link, Limits::default()).expect("Graph rewrite"),
         Context::graph(),
     )
     .expect("Graph does not require the Excel-mandatory CrtLink");
@@ -782,8 +794,10 @@ fn graph_does_not_inherit_excel_outer_order_but_rejects_siindex() {
         without_excel_crt_link
     );
 
-    let mut out = Encoder::new();
-    for item in Records::new(stream.as_bytes()) {
+    let mut out = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
+    for item in
+        Records::new(stream.as_bytes(), litchi_biff::Limits::default()).expect("valid BIFF limits")
+    {
         let record = item.expect("valid fixture record");
         if record.kind() == super::super::EOF {
             out.push(RecordKind::from_wire(0x1065), &1u16.to_le_bytes())
@@ -792,9 +806,9 @@ fn graph_does_not_inherit_excel_outer_order_but_rejects_siindex() {
         out.push_ref(record).expect("record replay");
     }
     let malformed = out.finish();
-    let input = Ref::open(&malformed).expect("Graph SIIndex framing");
+    let input = Ref::open(&malformed, Limits::default()).expect("Graph SIIndex framing");
     assert!(matches!(
-        Chart::parse(input, Context::graph()),
+        Model::parse(input, Context::graph()),
         Err(Error::InvalidChart {
             reason: "SIIndex is not part of the standalone Graph grammar",
             ..

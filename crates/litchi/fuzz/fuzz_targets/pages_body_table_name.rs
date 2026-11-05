@@ -9,7 +9,8 @@
 use std::{fmt::Debug, fmt::Display, hint::black_box, sync::OnceLock};
 
 use libfuzzer_sys::fuzz_target;
-use litchi::pages::{BodyTableName, BodyTableSelector, Limits, Package};
+use litchi::pages::{BodyTableSelector, Package, table::name::Name as BodyTableName};
+use litchi_iwa_archive::Limits;
 
 const MAX_INPUT_BYTES: u64 = 256 * 1024;
 const MAX_ENTRIES: usize = 128;
@@ -63,7 +64,10 @@ const NATIVE_CATALOG: &[CatalogExpectation] = &[
 
 fuzz_target!(|data: &[u8]| {
     let command = command_input(data);
-    match Package::from_bytes_with_limits(data, fuzz_limits()) {
+    match Package::from_bytes_with_options(
+        data,
+        litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()),
+    ) {
         Ok(package) => exercise_package(&package, &command),
         Err(error) => observe_error(error),
     }
@@ -109,33 +113,48 @@ fn fuzz_limits() -> Limits {
 fn native_package() -> Option<&'static Package> {
     static PACKAGE: OnceLock<Option<Package>> = OnceLock::new();
     PACKAGE
-        .get_or_init(|| Package::from_bytes_with_limits(NATIVE_PAGES, fuzz_limits()).ok())
+        .get_or_init(|| {
+            Package::from_bytes_with_options(
+                NATIVE_PAGES,
+                litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()),
+            )
+            .ok()
+        })
         .as_ref()
 }
 
 fn native_visible_package() -> &'static Package {
     static PACKAGE: OnceLock<Package> = OnceLock::new();
     PACKAGE.get_or_init(|| {
-        Package::from_bytes_with_limits(NATIVE_VISIBLE_PAGES, fuzz_limits())
-            .unwrap_or_else(|error| panic!("qualified native Pages name seed must parse: {error}"))
+        Package::from_bytes_with_options(
+            NATIVE_VISIBLE_PAGES,
+            litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()),
+        )
+        .unwrap_or_else(|error| panic!("qualified native Pages name seed must parse: {error}"))
     })
 }
 
 fn source_built_before_package() -> &'static Package {
     static PACKAGE: OnceLock<Package> = OnceLock::new();
     PACKAGE.get_or_init(|| {
-        Package::from_bytes_with_limits(SOURCE_BUILT_BEFORE_PAGES, fuzz_limits()).unwrap_or_else(
-            |error| panic!("qualified source-built Pages name seed must parse: {error}"),
+        Package::from_bytes_with_options(
+            SOURCE_BUILT_BEFORE_PAGES,
+            litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()),
         )
+        .unwrap_or_else(|error| {
+            panic!("qualified source-built Pages name seed must parse: {error}")
+        })
     })
 }
 
 fn native_catalog_package() -> &'static Package {
     static PACKAGE: OnceLock<Package> = OnceLock::new();
     PACKAGE.get_or_init(|| {
-        Package::from_bytes_with_limits(NATIVE_CATALOG_PAGES, fuzz_limits()).unwrap_or_else(
-            |error| panic!("qualified native Pages catalog seed must parse: {error}"),
+        Package::from_bytes_with_options(
+            NATIVE_CATALOG_PAGES,
+            litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()),
         )
+        .unwrap_or_else(|error| panic!("qualified native Pages catalog seed must parse: {error}"))
     })
 }
 
@@ -252,9 +271,33 @@ fn exercise_package_with_source(
             return;
         },
     };
-    black_box(edit.path());
-    assert_eq!(edit.before().as_str(), before.as_str());
-    assert_eq!(edit.name().as_str(), before.as_str());
+    let path = match edit.path() {
+        Ok(path) => path,
+        Err(error) => {
+            observe_error(error);
+            assert_source_unchanged(package, &source_before);
+            return;
+        },
+    };
+    black_box(path);
+    let source_name = match edit.before() {
+        Ok(name) => name.as_str(),
+        Err(error) => {
+            observe_error(error);
+            assert_source_unchanged(package, &source_before);
+            return;
+        },
+    };
+    assert_eq!(source_name, before.as_str());
+    let staged_name = match edit.name() {
+        Ok(name) => name.as_str(),
+        Err(error) => {
+            observe_error(error);
+            assert_source_unchanged(package, &source_before);
+            return;
+        },
+    };
+    assert_eq!(staged_name, before.as_str());
 
     // Exercise both the typed Name setter and the validated string setter.
     // A no-op command preserves the exact source; all other commands use a
@@ -274,8 +317,16 @@ fn exercise_package_with_source(
             },
         };
     }
+    let staged_name = match edit.name() {
+        Ok(name) => name.as_str(),
+        Err(error) => {
+            observe_error(error);
+            assert_source_unchanged(package, &source_before);
+            return;
+        },
+    };
     assert_eq!(
-        edit.name().as_str(),
+        staged_name,
         if control(data, 0) & 3 == 0 {
             before.as_str()
         } else {
@@ -330,7 +381,10 @@ fn exercise_package_with_source(
         &patch,
     ));
 
-    let reopened = match Package::from_bytes_with_limits(&target_bytes, fuzz_limits()) {
+    let reopened = match Package::from_bytes_with_options(
+        &target_bytes,
+        litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()),
+    ) {
         Ok(package) => package,
         Err(error) => {
             observe_error(error);
@@ -528,7 +582,10 @@ fn exercise_semantic_values(data: &[u8]) {
 fn exercise_redacted_ingress() {
     for input in [PRIVATE_INPUT, b"PK\x03\x04", b"\x0a\x80", b"\xff\x00"] {
         let before = input.to_vec();
-        match Package::from_bytes_with_limits(input, fuzz_limits()) {
+        match Package::from_bytes_with_options(
+            input,
+            litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()),
+        ) {
             Err(error) => {
                 if input == PRIVATE_INPUT {
                     observe_redacted(error, PRIVATE_INPUT);
@@ -545,7 +602,10 @@ fn exercise_redacted_ingress() {
 fn exercise_input_limit() {
     static OVERSIZED: OnceLock<Box<[u8]>> = OnceLock::new();
     let bytes = OVERSIZED.get_or_init(|| vec![0; OVERSIZED_INPUT_BYTES].into_boxed_slice());
-    match Package::from_bytes_with_limits(bytes, fuzz_limits()) {
+    match Package::from_bytes_with_options(
+        bytes,
+        litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()),
+    ) {
         Err(error) => observe_error(error),
         Ok(_) => panic!("an oversized Pages name input must be rejected"),
     }
@@ -586,7 +646,10 @@ fn exercise_archive_limits() {
     for limits in profiles {
         let limits =
             limits.unwrap_or_else(|error| unreachable!("valid Pages name profile: {error}"));
-        match Package::from_bytes_with_limits(NATIVE_PAGES, limits) {
+        match Package::from_bytes_with_options(
+            NATIVE_PAGES,
+            litchi::pages::OpenOptions::new().__archive_limits(limits),
+        ) {
             Ok(package) => {
                 black_box(package.stats());
             },

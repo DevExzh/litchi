@@ -19,23 +19,12 @@ use litchi_core::{
 
 use crate::constants::{content_type, relationship_type};
 use crate::pkgreader::ValidationCatalogPhase;
-use crate::{OpcError, ReadLimits, Result, SourceBackedPackage};
+use crate::{OpcError, Result, SourceBackedPackage, SourceLimits};
 
 const INGRESS: &str = "opc.package.ingress";
 const CATALOG: &str = "opc.package.catalog";
 const LOADED_RELATIONSHIPS: &str = "opc.package.loaded_relationship_manifests";
 const SIGNATURE_PRESENCE: &str = "opc.package.signature_presence";
-
-/// Validate an immutable positional OPC source under the default finite read
-/// and report limits.
-///
-/// Ordinary part payloads are not materialized. Structural package rejection
-/// is returned as a complete ingress check plus a deterministic issue. A
-/// resource ceiling is a blocked check. I/O, source mutation, cancellation,
-/// allocation, invalid policy, and report-construction failures remain errors.
-pub fn validate_read_at(source: Arc<dyn ReadAt>) -> Result<ValidateReport> {
-    validate_read_at_with_limits(source, ReadLimits::default(), ValidationLimits::default())
-}
 
 /// Validate an immutable positional OPC source with explicit finite policies.
 ///
@@ -43,9 +32,9 @@ pub fn validate_read_at(source: Arc<dyn ReadAt>) -> Result<ValidateReport> {
 /// manifests loaded during catalog admission, and all bytes read by OPC
 /// ingress. `report_limits` bounds the retained diagnostic value. No operation
 /// mutates the source.
-pub fn validate_read_at_with_limits(
+pub fn validate_read_at(
     source: Arc<dyn ReadAt>,
-    read_limits: ReadLimits,
+    read_limits: SourceLimits,
     report_limits: ValidationLimits,
 ) -> Result<ValidateReport> {
     let expected = source.version()?;
@@ -57,7 +46,7 @@ pub fn validate_read_at_with_limits(
     }
     let report = match ingress {
         Ok(package) => successful_report(&package, report_limits),
-        Err(failure) if matches!(failure.error, OpcError::ReadLimit { .. }) => {
+        Err(failure) if matches!(failure.error, OpcError::Limit { .. }) => {
             blocked_report(failure.phase, report_limits)
         },
         Err(failure) if is_structural_rejection(&failure.error) => {
@@ -466,4 +455,176 @@ fn id(value: &str, limits: ValidationLimits) -> Result<CheckCapabilityId> {
 
 fn check(value: &str, status: CheckStatus, limits: ValidationLimits) -> Result<ValidationCheck> {
     Ok(ValidationCheck::new(id(value, limits)?, status))
+}
+
+const PART_RELATIONSHIPS: &str = "opc.package.relationship_targets";
+const PART_XML: &str = "opc.package.xml_well_formed";
+
+/// Validate an opened owning package's part graph: every internal
+/// relationship (package-level and part-level) must name a part the package
+/// holds, and every XML part must be well-formed XML with one root element.
+///
+/// This complements [`validate_read_at`], which checks ZIP ingress, the
+/// content-type catalog and the relationship manifests: here every part
+/// payload is decoded and scanned once, so the cost is proportional to the
+/// package. Nothing is mutated, no external target is fetched and the report
+/// retains only structural metadata (part names, relationship ids, byte
+/// offsets), never authored content. Parts are visited in name order, so the
+/// report is deterministic.
+///
+/// When more issues are found than `limits` admits, the affected check is
+/// reported as blocked and the remaining issues are dropped.
+///
+/// # Errors
+/// Returns payload decode, allocation and report-construction failures.
+pub fn validate_parts(
+    package: &crate::OpcPackage,
+    limits: ValidationLimits,
+) -> Result<ValidateReport> {
+    let mut names: Vec<&crate::PackURI> =
+        package.iter_parts().map(|part| part.partname()).collect();
+    names.sort_unstable_by(|left, right| left.as_str().cmp(right.as_str()));
+    let max_issues = limits.max_issues();
+    let mut issues = Vec::new();
+    let mut relationships_blocked = false;
+    let mut xml_blocked = false;
+
+    // Package-level relationships first, then each part's own.
+    let package_rels = package.rels();
+    let sources = std::iter::once((None, package_rels)).chain(names.iter().filter_map(|name| {
+        package
+            .part_metadata(name)
+            .map(|part| (Some(*name), part.rels()))
+    }));
+    'sources: for (source, rels) in sources {
+        let mut relationships: Vec<&crate::Relationship> = rels.iter().collect();
+        relationships.sort_unstable_by(|left, right| left.r_id().cmp(right.r_id()));
+        for relationship in relationships {
+            if relationship.is_external() {
+                continue;
+            }
+            let present = relationship
+                .target_partname()
+                .is_ok_and(|target| package.contains_part(&target));
+            if present {
+                continue;
+            }
+            if issues.len() >= max_issues {
+                relationships_blocked = true;
+                break 'sources;
+            }
+            issues.push(ValidationIssue::try_new(
+                id(PART_RELATIONSHIPS, limits)?,
+                "opc.relationship.target_missing",
+                IssueSeverity::Error,
+                "An internal relationship names a part the package does not hold.",
+                [IssueLocation::try_new(
+                    Some(source.map_or("/", |name| name.as_str())),
+                    Some(relationship.r_id()),
+                    None,
+                    None,
+                    None,
+                    limits,
+                )?],
+                [],
+                Some(SpecCitation::try_new("ECMA-376", "Part 2 §9.3", limits)?),
+                CompatibilityImpact::Interoperability,
+                RepairAvailability::Unavailable,
+                limits,
+            )?);
+        }
+    }
+
+    for name in &names {
+        let Some(metadata) = package.part_metadata(name) else {
+            continue;
+        };
+        if !xml_minifier::audit::package::is_xml_part(name.as_str(), metadata.content_type()) {
+            continue;
+        }
+        let part = package.get_part(name)?;
+        let Some(offset) = malformed_xml_offset(part.blob()) else {
+            continue;
+        };
+        if issues.len() >= max_issues {
+            xml_blocked = true;
+            break;
+        }
+        issues.push(ValidationIssue::try_new(
+            id(PART_XML, limits)?,
+            "opc.xml.malformed",
+            IssueSeverity::Error,
+            "An XML part is not well-formed.",
+            [IssueLocation::try_new(
+                Some(name.as_str()),
+                None,
+                Some(offset),
+                None,
+                None,
+                limits,
+            )?],
+            [],
+            Some(SpecCitation::try_new("W3C XML 1.0", "§2.1", limits)?),
+            CompatibilityImpact::DataLoss,
+            RepairAvailability::Unavailable,
+            limits,
+        )?);
+    }
+
+    let status = |blocked: bool| {
+        if blocked {
+            CheckStatus::blocked("the report's issue limit was reached", limits)
+        } else {
+            Ok(CheckStatus::Complete)
+        }
+    };
+    let checks = [
+        check(PART_RELATIONSHIPS, status(relationships_blocked)?, limits)?,
+        check(PART_XML, status(xml_blocked)?, limits)?,
+    ];
+    Ok(ValidateReport::try_new(checks, issues, limits)?)
+}
+
+/// The byte offset of the first well-formedness failure of `xml`, or `None`
+/// when it is one well-formed element (with an optional prolog and trailing
+/// comments or processing instructions).
+fn malformed_xml_offset(xml: &[u8]) -> Option<u64> {
+    use quick_xml::events::Event;
+    let mut reader = quick_xml::Reader::from_reader(xml);
+    reader.config_mut().check_end_names = true;
+    let mut depth = 0_usize;
+    let mut roots = 0_usize;
+    let position = |reader: &quick_xml::Reader<&[u8]>| reader.buffer_position();
+    loop {
+        match reader.read_event() {
+            Ok(Event::Start(_)) => {
+                if depth == 0 {
+                    roots += 1;
+                    if roots > 1 {
+                        return Some(position(&reader));
+                    }
+                }
+                depth += 1;
+            },
+            Ok(Event::Empty(_)) => {
+                if depth == 0 {
+                    roots += 1;
+                    if roots > 1 {
+                        return Some(position(&reader));
+                    }
+                }
+            },
+            Ok(Event::End(_)) => depth = depth.saturating_sub(1),
+            Ok(Event::Text(text)) if depth == 0 => {
+                if !text.iter().all(u8::is_ascii_whitespace) {
+                    return Some(position(&reader));
+                }
+            },
+            Ok(Event::Eof) => {
+                return (depth != 0 || roots == 0).then(|| position(&reader));
+            },
+            Ok(_) => {},
+            Err(_) => return Some(reader.error_position()),
+        }
+    }
 }

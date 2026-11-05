@@ -1003,7 +1003,7 @@ fn parse_alignment(element: &BytesStart<'_>, decoder: Decoder) -> Result<Alignme
             },
             b"justifyLastLine" => {
                 mark_property(&mut seen, 64, "justifyLastLine")?;
-                alignment.justify_last_line = parse_bool_value(&value, "justifyLastLine")?;
+                alignment.justify_last_line = Some(parse_bool_value(&value, "justifyLastLine")?);
             },
             b"shrinkToFit" => {
                 mark_property(&mut seen, 128, "shrinkToFit")?;
@@ -1426,7 +1426,7 @@ mod tests {
         assert_eq!(alignment.text_rotation.unwrap().get(), 45);
         assert_eq!(alignment.indent, Some(Indent::new(2)));
         assert_eq!(alignment.relative_indent, Some(-1));
-        assert!(alignment.justify_last_line);
+        assert_eq!(alignment.justify_last_line, Some(true));
     }
 
     #[test]
@@ -1559,6 +1559,38 @@ mod tests {
                 "accepted invalid styles XML: {xml}"
             );
         }
+    }
+
+    #[test]
+    fn preserves_explicit_false_alignment_justification() {
+        let xml = format!(
+            r#"<styleSheet xmlns="{S}"><cellXfs><xf><alignment justifyLastLine="0" relativeIndent="0"/></xf><xf><alignment/></xf></cellXfs></styleSheet>"#
+        );
+        let styles = parse_styles(&xml).unwrap();
+        let alignment = styles.cell_xfs[0].alignment.unwrap();
+        assert_eq!(alignment.justify_last_line, Some(false));
+        assert_eq!(alignment.relative_indent, Some(0));
+        assert!(alignment.has_settings());
+        assert_eq!(
+            styles.cell_xfs[1].alignment.unwrap().justify_last_line,
+            None
+        );
+        let bytes = super::super::writer::write(&styles).unwrap();
+        let reopened = parse_styles(std::str::from_utf8(&bytes).unwrap()).unwrap();
+        assert_eq!(reopened.cell_xfs[0].alignment, styles.cell_xfs[0].alignment);
+        assert_eq!(reopened.cell_xfs[1].alignment, styles.cell_xfs[1].alignment);
+    }
+
+    #[test]
+    fn retains_source_number_formats_outside_authoring_profile() {
+        let xml = format!(
+            r#"<styleSheet xmlns="{S}"><numFmts count="1"><numFmt numFmtId="164" formatCode="[unclosed"/></numFmts></styleSheet>"#
+        );
+        let styles = parse_styles(&xml).unwrap();
+        assert_eq!(styles.number_formats[&164].code(), "[unclosed");
+        let bytes = super::super::writer::write(&styles).unwrap();
+        let reopened = parse_styles(std::str::from_utf8(&bytes).unwrap()).unwrap();
+        assert_eq!(reopened.number_formats, styles.number_formats);
     }
 
     #[test]

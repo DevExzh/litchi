@@ -19,6 +19,27 @@ pub(in crate::package) fn validate_dependencies(
     before: Settings,
     after: Settings,
 ) -> Result<(), Error> {
+    validate_dependencies_with(source, target, before, after, false)
+}
+
+/// The cell route's dependency check (record 0424a): a pivot owner alone
+/// does not refuse a cell edit, which changes no header or section count;
+/// the host writes cells of pivot tables. Every count-change rule applies.
+pub(in crate::package) fn validate_cell_dependencies(
+    source: &Package,
+    target: Target,
+    settings: Settings,
+) -> Result<(), Error> {
+    validate_dependencies_with(source, target, settings, settings, true)
+}
+
+fn validate_dependencies_with(
+    source: &Package,
+    target: Target,
+    before: Settings,
+    after: Settings,
+    pivot_owner_permitted: bool,
+) -> Result<(), Error> {
     let path = Path::Table {
         sheet: target.sheet_position,
         table: target.table_position,
@@ -38,7 +59,8 @@ pub(in crate::package) fn validate_dependencies(
         .ok_or(Error::InvalidSource {
             path: Path::Package,
         })?;
-    let model_view = WireView::parse(&model.data).map_err(map_wire_error)?;
+    let model_view = WireView::parse(&model.data, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(map_wire_error)?;
     let header_counts_changed =
         before.header_rows != after.header_rows || before.header_columns != after.header_columns;
     let section_counts_changed = header_counts_changed || before.footer_rows != after.footer_rows;
@@ -108,14 +130,20 @@ pub(in crate::package) fn validate_dependencies(
             _ => {},
         }
     }
-    if unsupported_pivot_dependency {
-        return Err(Error::UnsupportedDependency { path });
+    if unsupported_pivot_dependency && !pivot_owner_permitted {
+        return Err(Error::Refused(
+            crate::package::table_headers::Refusal::UnsupportedDependency { path },
+        ));
     }
     if header_counts_changed && header_count_dependency {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_headers::Refusal::UnsupportedDependency { path },
+        ));
     }
     if section_counts_changed && active_pivot_or_group {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_headers::Refusal::UnsupportedDependency { path },
+        ));
     }
     if table_info_has_count_dependency(
         source,
@@ -123,7 +151,9 @@ pub(in crate::package) fn validate_dependencies(
         header_counts_changed,
         section_counts_changed,
     )? {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_headers::Refusal::UnsupportedDependency { path },
+        ));
     }
     let repeating_changed = before.repeating_header_rows_enabled
         != after.repeating_header_rows_enabled
@@ -144,16 +174,20 @@ pub(in crate::package) fn validate_dependencies(
         } else {
             &sheet.data
         };
-        if WireView::parse(payload)
+        if WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
             .map_err(map_wire_error)?
             .fields()
             .any(|field| field.number() == 4)
         {
-            return Err(Error::UnsupportedDependency { path });
+            return Err(Error::Refused(
+                crate::package::table_headers::Refusal::UnsupportedDependency { path },
+            ));
         }
     }
     if header_counts_changed && has_rooted_header_name_manager(source)? {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_headers::Refusal::UnsupportedDependency { path },
+        ));
     }
     Ok(())
 }
@@ -179,7 +213,8 @@ fn table_info_has_count_dependency(
         .ok_or(Error::InvalidSource {
             path: Path::Package,
         })?;
-    let view = WireView::parse(&message.data).map_err(map_wire_error)?;
+    let view = WireView::parse(&message.data, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(map_wire_error)?;
     let mut seen = [false; 7];
     let mut header_active = false;
     let mut section_active = false;
@@ -249,7 +284,8 @@ fn table_info_has_count_dependency(
 pub(in crate::package) fn deprecated_category_grouping_active(
     source: &[u8],
 ) -> Result<bool, Error> {
-    let view = WireView::parse(source).map_err(map_wire_error)?;
+    let view =
+        WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT).map_err(map_wire_error)?;
     let mut active = false;
     for field in view.fields() {
         field.validate_canonical_framing().map_err(map_wire_error)?;
@@ -268,7 +304,8 @@ pub(in crate::package) fn deprecated_category_grouping_active(
 }
 
 fn group_by_enabled(source: &[u8]) -> Result<Option<bool>, Error> {
-    let view = WireView::parse(source).map_err(map_wire_error)?;
+    let view =
+        WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT).map_err(map_wire_error)?;
     let mut enabled = None;
     for field in view.fields() {
         field.validate_canonical_framing().map_err(map_wire_error)?;

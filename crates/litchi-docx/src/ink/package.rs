@@ -1,3 +1,4 @@
+use crate::ink::LimitKind;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -41,7 +42,7 @@ impl Package {
     /// Returns an error for dirty facade state, invalid ownership, malformed
     /// Ink anchors/payloads, or exhausted resource budgets.
     pub fn ink(&self) -> Result<Snapshot> {
-        self.ink_with_limits(Limits::default())
+        self.ink_bounded(self.semantic_limits().ink_value())
     }
 
     /// Inventory InkML using an explicit finite resource policy.
@@ -50,9 +51,9 @@ impl Package {
     ///
     /// Returns an error for invalid limits, dirty state, malformed package/XML
     /// content, or exceeded limits. A failed inventory never changes the package.
-    pub fn ink_with_limits(&self, limits: Limits) -> Result<Snapshot> {
+    pub(crate) fn ink_bounded(&self, limits: Limits) -> Result<Snapshot> {
         let limits = limits.validate()?;
-        self.ensure_story_opc_current("ink_with_limits")?;
+        self.ensure_story_opc_current("ink_bounded")?;
         load(self.opc_package(), limits)
     }
 }
@@ -93,17 +94,31 @@ pub(crate) fn load_source(package: &SourceBackedPackage, limits: Limits) -> Resu
 
 fn check_catalog(package: PackageRef<'_>, limits: Limits) -> Result<()> {
     check(
-        "package parts",
+        LimitKind::PackageParts,
         package.part_count(),
         limits.stories.max_package_parts,
     )?;
     let mut relationships = package.rels().len();
-    check("relationships", relationships, limits.max_relationships)?;
+    check(
+        LimitKind::Relationships,
+        relationships,
+        limits.max_relationships,
+    )?;
     for part in package.parts() {
         relationships = relationships
             .checked_add(part.rels().len())
-            .ok_or_else(|| exceeded("relationships", usize::MAX, limits.max_relationships))?;
-        check("relationships", relationships, limits.max_relationships)?;
+            .ok_or_else(|| {
+                exceeded(
+                    LimitKind::Relationships,
+                    usize::MAX,
+                    limits.max_relationships,
+                )
+            })?;
+        check(
+            LimitKind::Relationships,
+            relationships,
+            limits.max_relationships,
+        )?;
     }
     Ok(())
 }
@@ -124,7 +139,7 @@ fn check_catalog(package: PackageRef<'_>, limits: Limits) -> Result<()> {
 /// decoded as typed metadata.
 pub(crate) fn validate_content_part(xml: &[u8]) -> Result<ProfileProjection> {
     check(
-        "DOCX Ink profile source bytes",
+        LimitKind::ProfileSourceBytes,
         xml.len(),
         shared::MAX_SOURCE_BYTES,
     )?;
@@ -749,7 +764,7 @@ fn observe_profile_element(
     let child_index = stack[parent_index].child_elements;
     stack[parent_index].child_elements = child_index.checked_add(1).ok_or_else(|| {
         exceeded(
-            "DOCX Ink profile child elements",
+            LimitKind::ProfileChildElements,
             usize::MAX,
             shared::MAX_NODES,
         )
@@ -767,7 +782,7 @@ fn observe_profile_element(
         {
             if definitions.len() >= shared::MAX_NODES {
                 return Err(exceeded(
-                    "DOCX Ink profile definition records",
+                    LimitKind::ProfileDefinitionRecords,
                     definitions.len().saturating_add(1),
                     shared::MAX_NODES,
                 ));
@@ -811,7 +826,7 @@ fn observe_profile_element(
             let context_definition = parent.definition;
             if definitions.len() >= shared::MAX_NODES {
                 return Err(exceeded(
-                    "DOCX Ink profile definition records",
+                    LimitKind::ProfileDefinitionRecords,
                     definitions.len().saturating_add(1),
                     shared::MAX_NODES,
                 ));
@@ -842,7 +857,7 @@ fn observe_profile_element(
             let context_definition = parent.context_definition;
             if formats.len() >= shared::MAX_NODES {
                 return Err(exceeded(
-                    "DOCX Ink traceFormat records",
+                    LimitKind::TraceFormatRecords,
                     formats.len().saturating_add(1),
                     shared::MAX_NODES,
                 ));
@@ -914,7 +929,7 @@ fn observe_profile_element(
             })?;
             if target.total_channels() >= shared::MAX_NODES {
                 return Err(exceeded(
-                    "DOCX Ink traceFormat channels",
+                    LimitKind::TraceFormatChannels,
                     target.total_channels().saturating_add(1),
                     shared::MAX_NODES,
                 ));
@@ -963,7 +978,7 @@ fn observe_profile_element(
         {
             if traces.len() >= shared::MAX_TRACES {
                 return Err(exceeded(
-                    "DOCX Ink profile trace references",
+                    LimitKind::ProfileTraceReferences,
                     traces.len().saturating_add(1),
                     shared::MAX_TRACES,
                 ));
@@ -1140,14 +1155,14 @@ fn validate_profile_attributes(element: &BytesStart<'_>) -> Result<()> {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         count = count.checked_add(1).ok_or_else(|| {
             exceeded(
-                "DOCX Ink profile attributes",
+                LimitKind::ProfileAttributes,
                 usize::MAX,
                 MAX_PROFILE_ATTRIBUTES,
             )
         })?;
-        check("DOCX Ink profile attributes", count, MAX_PROFILE_ATTRIBUTES)?;
+        check(LimitKind::ProfileAttributes, count, MAX_PROFILE_ATTRIBUTES)?;
         check(
-            "DOCX Ink profile attribute bytes",
+            LimitKind::ProfileAttributeBytes,
             attribute.value.len(),
             shared::MAX_ATTRIBUTE_VALUE_BYTES,
         )?;
@@ -1155,7 +1170,7 @@ fn validate_profile_attributes(element: &BytesStart<'_>) -> Result<()> {
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, element.decoder())
             .map_err(|error| Error::Xml(error.to_string()))?;
         check(
-            "DOCX Ink profile decoded attribute bytes",
+            LimitKind::ProfileDecodedAttributeBytes,
             value.len(),
             shared::MAX_ATTRIBUTE_VALUE_BYTES,
         )?;
@@ -1166,12 +1181,12 @@ fn validate_profile_attributes(element: &BytesStart<'_>) -> Result<()> {
 fn increment_profile_nodes(nodes: &mut usize) -> Result<()> {
     *nodes = nodes
         .checked_add(1)
-        .ok_or_else(|| exceeded("DOCX Ink profile XML nodes", usize::MAX, shared::MAX_NODES))?;
-    check("DOCX Ink profile XML nodes", *nodes, shared::MAX_NODES)
+        .ok_or_else(|| exceeded(LimitKind::ProfileXmlNodes, usize::MAX, shared::MAX_NODES))?;
+    check(LimitKind::ProfileXmlNodes, *nodes, shared::MAX_NODES)
 }
 
 fn enforce_profile_depth(depth: usize) -> Result<()> {
-    check("DOCX Ink profile XML depth", depth, shared::MAX_DEPTH)
+    check(LimitKind::ProfileXmlDepth, depth, shared::MAX_DEPTH)
 }
 
 fn record_projection(
@@ -1195,7 +1210,7 @@ fn record_projection(
     };
     if values.len() >= maximum {
         return Err(exceeded(
-            "DOCX Ink semantic projection",
+            LimitKind::SemanticProjection,
             values.len().saturating_add(1),
             maximum,
         ));
@@ -1326,8 +1341,8 @@ fn load_stories<'story>(
         )?;
         anchor_count = anchor_count
             .checked_add(anchors.len())
-            .ok_or_else(|| exceeded("annotations", usize::MAX, limits.max_annotations))?;
-        check("annotations", anchor_count, limits.max_annotations)?;
+            .ok_or_else(|| exceeded(LimitKind::Annotations, usize::MAX, limits.max_annotations))?;
+        check(LimitKind::Annotations, anchor_count, limits.max_annotations)?;
         let owner = package.part(story_part)?;
         for anchor in anchors {
             package.check()?;
@@ -1345,7 +1360,7 @@ fn load_stories<'story>(
                 ));
             }
             check(
-                "target reference bytes",
+                LimitKind::TargetReferenceBytes,
                 relationship.target_ref().len(),
                 4096,
             )?;
@@ -1379,22 +1394,22 @@ fn load_stories<'story>(
                 // Central-directory size is a preflight only. PartData checks
                 // decoded integrity/length before exposing immutable bytes.
                 let length = part.length()?;
-                check("payload bytes", length, limits.max_payload_bytes)?;
+                check(LimitKind::PayloadBytes, length, limits.max_payload_bytes)?;
                 total_payload_bytes = total_payload_bytes.checked_add(length).ok_or_else(|| {
                     exceeded(
-                        "total payload bytes",
+                        LimitKind::TotalPayloadBytes,
                         usize::MAX,
                         limits.max_total_payload_bytes,
                     )
                 })?;
                 check(
-                    "total payload bytes",
+                    LimitKind::TotalPayloadBytes,
                     total_payload_bytes,
                     limits.max_total_payload_bytes,
                 )?;
                 let bytes = part.data(session.as_deref_mut())?;
                 check(
-                    "payload bytes",
+                    LimitKind::PayloadBytes,
                     bytes.as_bytes().len(),
                     limits.max_payload_bytes,
                 )?;
@@ -1420,6 +1435,7 @@ fn load_stories<'story>(
                                 projection.traces(),
                                 projection.brush_properties(),
                                 projection.links(),
+                                shared::Limits::DEFAULT,
                             )?;
                             Payload::Owned(document)
                         },
@@ -1431,6 +1447,7 @@ fn load_stories<'story>(
                                 projection.traces(),
                                 projection.brush_properties(),
                                 projection.links(),
+                                shared::Limits::DEFAULT,
                             )?;
                             Payload::Pinned {
                                 metadata,
@@ -1648,7 +1665,7 @@ pub(crate) fn has_ink_root(xml: &[u8]) -> Result<bool> {
             },
         }
     }
-    Err(exceeded("payload prolog events", 257, 256))
+    Err(exceeded(LimitKind::PayloadPrologEvents, 257, 256))
 }
 
 fn position<R: std::io::BufRead>(reader: &NsReader<R>, origin: ReaderOrigin) -> Result<usize> {
@@ -1669,15 +1686,15 @@ const fn role_index(kind: StoryKind) -> usize {
     }
 }
 
-fn exceeded(resource: &'static str, actual: usize, maximum: usize) -> Error {
+fn exceeded(resource: LimitKind, actual: usize, maximum: usize) -> Error {
     Error::InkLimit {
-        resource,
+        kind: resource,
         actual,
         maximum,
     }
 }
 
-fn check(resource: &'static str, actual: usize, maximum: usize) -> Result<()> {
+fn check(resource: LimitKind, actual: usize, maximum: usize) -> Result<()> {
     if actual > maximum {
         Err(exceeded(resource, actual, maximum))
     } else {
@@ -1899,6 +1916,7 @@ mod tests {
             projection.traces(),
             projection.brush_properties(),
             projection.links(),
+            shared::Limits::DEFAULT,
         )
         .expect("recognized brush property");
         assert_eq!(document.brush_property_count(), 1);
@@ -1921,6 +1939,7 @@ mod tests {
             projection.traces(),
             projection.brush_properties(),
             projection.links(),
+            shared::Limits::DEFAULT,
         )
         .expect("recognized brush properties");
         let effective: Vec<_> = document
@@ -1952,6 +1971,7 @@ mod tests {
             projection.traces(),
             projection.brush_properties(),
             projection.links(),
+            shared::Limits::DEFAULT,
         )
         .unwrap();
         assert_eq!(filtered.source(), source);
@@ -1982,6 +2002,7 @@ mod tests {
             projection.traces(),
             projection.brush_properties(),
             projection.links(),
+            shared::Limits::DEFAULT,
         )
         .expect("ignored typed values must remain opaque");
         assert_eq!(document.context_count(), 1);
@@ -2010,6 +2031,7 @@ mod tests {
                     projection.traces(),
                     projection.brush_properties(),
                     projection.links(),
+                    shared::Limits::DEFAULT,
                 )
                 .is_err(),
                 "recognized context must be typed and rejected: {context}"
@@ -2025,6 +2047,7 @@ mod tests {
                 projection.traces(),
                 projection.brush_properties(),
                 projection.links(),
+                shared::Limits::DEFAULT,
             )
             .is_err()
         );

@@ -7,7 +7,7 @@ use super::support::task_panes;
 
 #[test]
 fn web_bindings_and_task_panes_commit_join_and_reverse_atomically() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let source_bytes = source.to_bytes().expect("source bytes");
 
     let mut pane_edit = source.edit().expect("pane edit");
@@ -33,7 +33,7 @@ fn web_bindings_and_task_panes_commit_join_and_reverse_atomically() {
     }));
     assert_eq!(
         committed
-            .workbook()
+            .package()
             .task_panes()
             .expect("task panes")
             .expect("present")
@@ -41,7 +41,7 @@ fn web_bindings_and_task_panes_commit_join_and_reverse_atomically() {
         1
     );
     let sheet = committed
-        .workbook()
+        .package()
         .sheet("Sheet1")
         .expect("lookup")
         .expect("worksheet");
@@ -54,8 +54,8 @@ fn web_bindings_and_task_panes_commit_join_and_reverse_atomically() {
         Some("Sheet1!$A$1:$B$4")
     );
 
-    let before_rename = committed.workbook().to_bytes().expect("pre-rename bytes");
-    let mut rename = committed.workbook().edit().expect("rename edit");
+    let before_rename = committed.package().to_bytes().expect("pre-rename bytes");
+    let mut rename = committed.package().edit().expect("rename edit");
     rename
         .tab("Sheet1")
         .expect("tab lookup")
@@ -65,7 +65,7 @@ fn web_bindings_and_task_panes_commit_join_and_reverse_atomically() {
     let renamed = rename.commit().expect("dependency-aware rename");
     assert_eq!(
         renamed
-            .workbook()
+            .package()
             .sheet("Data")
             .expect("renamed lookup")
             .expect("renamed worksheet")
@@ -77,22 +77,22 @@ fn web_bindings_and_task_panes_commit_join_and_reverse_atomically() {
     );
     assert_eq!(
         renamed
-            .workbook()
+            .package()
             .apply(&renamed.patch().inverse())
             .expect("inverse rename")
-            .workbook()
+            .package()
             .to_bytes()
             .expect("inverse rename bytes"),
         before_rename
     );
 
-    let mut left = committed.workbook().edit().expect("left web edit");
+    let mut left = committed.package().edit().expect("left web edit");
     left.sheet("Sheet1")
         .expect("left lookup")
         .expect("left worksheet")
         .bind(WebBinding::new("sheet-table", "Sheet1!A1").expect("left binding"))
         .expect("left stage");
-    let mut right = committed.workbook().edit().expect("right web edit");
+    let mut right = committed.package().edit().expect("right web edit");
     right
         .sheet("Sheet1")
         .expect("right lookup")
@@ -110,15 +110,15 @@ fn web_bindings_and_task_panes_commit_join_and_reverse_atomically() {
     );
 
     let restored = committed
-        .workbook()
+        .package()
         .apply(&committed.patch().inverse())
         .expect("inverse web patch");
     assert_eq!(
-        restored.workbook().to_bytes().expect("restored bytes"),
+        restored.package().to_bytes().expect("restored bytes"),
         source_bytes
     );
 
-    let mut unsafe_remove = committed.workbook().edit().expect("remove edit");
+    let mut unsafe_remove = committed.package().edit().expect("remove edit");
     unsafe_remove
         .remove_task_panes()
         .expect("stage unsafe removal");
@@ -128,7 +128,7 @@ fn web_bindings_and_task_panes_commit_join_and_reverse_atomically() {
             if sheet == "Sheet1" && app_ref == "sheet-table"
     ));
 
-    let mut safe_remove = committed.workbook().edit().expect("safe remove edit");
+    let mut safe_remove = committed.package().edit().expect("safe remove edit");
     safe_remove.remove_task_panes().expect("stage pane removal");
     assert!(
         safe_remove
@@ -141,14 +141,14 @@ fn web_bindings_and_task_panes_commit_join_and_reverse_atomically() {
     let removed = safe_remove.commit().expect("combined removal");
     assert!(
         removed
-            .workbook()
+            .package()
             .task_panes()
             .expect("task panes")
             .is_none()
     );
     assert!(
         removed
-            .workbook()
+            .package()
             .sheet("Sheet1")
             .expect("lookup")
             .expect("worksheet")
@@ -159,10 +159,10 @@ fn web_bindings_and_task_panes_commit_join_and_reverse_atomically() {
 }
 #[test]
 fn task_panes_and_sheet_removal_join_conflicts_are_symmetric() {
-    let baseline = Workbook::new().expect("baseline");
+    let baseline = crate::Package::new().expect("baseline");
     let mut create = baseline.edit().expect("create edit");
     create.add("Delete").expect("new worksheet");
-    let source = create.commit().expect("source").into_workbook();
+    let source = create.commit().expect("source").into_package();
 
     for panes_first in [true, false] {
         let mut panes = source.edit().expect("pane edit");
@@ -193,7 +193,7 @@ fn task_panes_and_sheet_removal_join_conflicts_are_symmetric() {
 
 #[test]
 fn web_patch_cross_graph_validation_is_atomic_on_alternate_snapshots() {
-    fn with_bindings(workbook: &Workbook, bindings: WebBindings) -> Workbook {
+    fn with_bindings(workbook: &crate::Package, bindings: WebBindings) -> crate::Package {
         let mut package = workbook.inner.package.clone();
         let uri = workbook.inner.sheets[0].part_uri.clone();
         let source = package
@@ -201,15 +201,16 @@ fn web_patch_cross_graph_validation_is_atomic_on_alternate_snapshots() {
             .expect("worksheet part")
             .blob()
             .to_vec();
-        let after = raw::web::replace(&source, &bindings).expect("write bindings");
+        let after = raw::web::replace(&source, &bindings, &litchi_opc::SourceLimits::default())
+            .expect("write bindings");
         package
             .get_part_mut(&uri)
             .expect("worksheet part")
             .set_blob(after);
-        Workbook::from_package(package).expect("reopen alternate workbook")
+        crate::Package::from_opc(package).expect("reopen alternate workbook")
     }
 
-    let baseline = Workbook::new().expect("baseline");
+    let baseline = crate::Package::new().expect("baseline");
     let mut install = baseline.edit().expect("install edit");
     install
         .put_task_panes(
@@ -217,7 +218,7 @@ fn web_patch_cross_graph_validation_is_atomic_on_alternate_snapshots() {
             common_web::Conformance::Transitional,
         )
         .expect("stage panes");
-    let with_panes = install.commit().expect("install panes").into_workbook();
+    let with_panes = install.commit().expect("install panes").into_package();
 
     let mut bind = with_panes.edit().expect("binding edit");
     bind.sheet("Sheet1")
@@ -226,7 +227,7 @@ fn web_patch_cross_graph_validation_is_atomic_on_alternate_snapshots() {
         .bind(WebBinding::new("sheet-table", "Sheet1!A1").expect("binding"))
         .expect("stage binding");
     let binding_commit = bind.commit().expect("binding commit");
-    let alternate = Workbook::new().expect("alternate without panes");
+    let alternate = crate::Package::new().expect("alternate without panes");
     let before = alternate.to_bytes().expect("alternate bytes");
     assert!(matches!(
         alternate.apply(binding_commit.patch()),

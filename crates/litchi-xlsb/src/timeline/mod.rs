@@ -6,15 +6,16 @@
 //! are deliberately outside the bounded transaction slice.
 
 mod codec;
+mod edit;
 mod model;
 pub mod package;
-pub(crate) mod transaction;
+mod transaction;
 mod validation;
 
 #[cfg(test)]
 mod tests;
 
 pub use codec::{parse_cache, parse_views, write_cache, write_views};
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 pub use model::{Cache, Filter, FilterType, Level, PivotTable, Range, State, View, Views};
 pub use package::{CachePart, ViewPart};
-pub use transaction::{Commit, Content, Patch, Snapshot, Transaction};

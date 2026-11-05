@@ -1,9 +1,12 @@
 //! Bounded, namespace-aware scene indexing.
 
-use std::{borrow::Cow, str};
+use std::{borrow::Cow, ops::Range, str};
 
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::{Capabilities, process_markup_compatibility};
+use litchi_ooxml_common::relationships::{
+    STRICT_NAMESPACE as STRICT_RELATIONSHIPS, TRANSITIONAL_NAMESPACE as RELATIONSHIPS,
+};
 use litchi_ooxml_common::xml::{
     DRAWINGML_CHART_NAMESPACE, DRAWINGML_NAMESPACE, STRICT_DRAWINGML_CHART_NAMESPACE,
     STRICT_DRAWINGML_NAMESPACE, decode_xml_reference, unqualified_attribute_value,
@@ -11,7 +14,7 @@ use litchi_ooxml_common::xml::{
 use quick_xml::{
     XmlVersion,
     events::{BytesStart, Event},
-    name::{Namespace, QName, ResolveResult},
+    name::{Namespace, NamespaceResolver, ResolveResult},
     reader::NsReader,
 };
 use thiserror::Error as ThisError;
@@ -20,8 +23,8 @@ use crate::leniency::{MarkupDefect, ShapeDefect, ToleranceReport};
 use crate::{Error, Result};
 
 use super::model::{
-    Bounds, Common, Kind, PLACEHOLDER_TYPE_EXTENSION_URI, PlaceholderRecord,
-    PlaceholderTypeExtension, Record, Shape, Shapes, Span, TextSpan,
+    Bounds, Common, Kind, PLACEHOLDER_TYPE_EXTENSION_URI, PayloadAttribute, PayloadRecord,
+    PlaceholderRecord, PlaceholderTypeExtension, Record, Shape, Shapes, Span, TextSpan,
 };
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
@@ -42,7 +45,7 @@ const OLE: u8 = 1 << 3;
 ///
 /// Exact semantic names are the convenient entry point. Numeric pre-order
 /// positions remain available for source-order and repair workflows.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Key<'a> {
     Name(&'a str),
     Index(usize),
@@ -61,12 +64,12 @@ impl From<usize> for Key<'_> {
 }
 
 /// Typed, non-panicking shape selection failures.
-#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[derive(Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum LookupError {
-    #[error("shape name '{name}' was not found")]
+    #[error("shape name was not found")]
     NameNotFound { name: String },
-    #[error("shape name '{name}' is ambiguous ({matches} exact matches)")]
+    #[error("shape name is ambiguous ({matches} exact matches)")]
     AmbiguousName { name: String, matches: usize },
     #[error("shape index {index} is outside a scene of length {len}")]
     IndexOutOfBounds { index: usize, len: usize },
@@ -172,7 +175,6 @@ impl Default for Limits {
 /// MCE-free input remains borrowed. If markup-compatibility processing must
 /// select or unwrap a branch, the scene owns exactly that processed owner XML;
 /// individual shape elements are never copied.
-#[derive(Debug)]
 pub struct Scene<'a> {
     xml: Cow<'a, [u8]>,
     records: Vec<Record>,
@@ -181,26 +183,52 @@ pub struct Scene<'a> {
     tolerance: ToleranceReport,
 }
 
-impl<'a> Scene<'a> {
-    /// Index a scene with conservative finite limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn read(xml: &'a [u8]) -> Result<Self> {
-        Self::read_with(xml, Limits::DEFAULT)
+impl std::fmt::Debug for Scene<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Scene")
+            .field("shapes", &self.records.len())
+            .finish_non_exhaustive()
     }
+}
 
+impl std::fmt::Debug for Key<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Name(_) => f.write_str("Name([redacted])"),
+            Self::Index(index) => f.debug_tuple("Index").field(index).finish(),
+        }
+    }
+}
+
+impl std::fmt::Debug for LookupError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NameNotFound { .. } => f.write_str("NameNotFound"),
+            Self::AmbiguousName { matches, .. } => f
+                .debug_struct("AmbiguousName")
+                .field("matches", matches)
+                .finish(),
+            Self::IndexOutOfBounds { index, len } => f
+                .debug_struct("IndexOutOfBounds")
+                .field("index", index)
+                .field("len", len)
+                .finish(),
+        }
+    }
+}
+
+impl<'a> Scene<'a> {
     /// Index a scene with caller-selected finite limits.
     ///
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn read_with(xml: &'a [u8], limits: Limits) -> Result<Self> {
+    pub fn read(xml: &'a [u8], limits: Limits) -> Result<Self> {
         if xml.len() > limits.input_bytes {
             return Err(Error::Limit {
-                resource: "shape owner input bytes",
-                limit: limits.input_bytes,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::InputBytes),
+                observed: xml.len(),
+                maximum: limits.input_bytes,
             });
         }
         if limits.output_bytes > u32::MAX as usize {
@@ -222,11 +250,20 @@ impl<'a> Scene<'a> {
         let output = process_markup_compatibility(xml, &capabilities, &mce_limits)?.xml;
         if output.len() > limits.output_bytes || output.len() > u32::MAX as usize {
             return Err(Error::Limit {
-                resource: "processed shape owner bytes",
-                limit: limits.output_bytes.min(u32::MAX as usize),
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                observed: output.len(),
+                maximum: limits.output_bytes.min(u32::MAX as usize),
             });
         }
 
+        // Markup compatibility that only follows the shape tree's `cSld`
+        // owner (a slide transition's `mc:AlternateContent`, record 0269)
+        // cannot change the scene: keep the source bytes, so spans stay
+        // source offsets and byte-splicing editors remain exact.
+        let output = match output {
+            Cow::Owned(processed) if scene_prefix_unchanged(xml, &processed) => Cow::Borrowed(xml),
+            other => other,
+        };
         let (records, strings, tolerance) = Scanner::new(output.as_ref(), limits).scan()?;
         Ok(Self {
             xml: output,
@@ -241,6 +278,19 @@ impl<'a> Scene<'a> {
     /// the owner XML is within them.
     pub(crate) const fn limits(&self) -> Limits {
         self.limits
+    }
+
+    /// Transfer the parsed owner and index into an independently retained scene.
+    pub(super) fn into_parts(
+        self,
+    ) -> (Cow<'a, [u8]>, Vec<Record>, String, Limits, ToleranceReport) {
+        (
+            self.xml,
+            self.records,
+            self.strings,
+            self.limits,
+            self.tolerance,
+        )
     }
 
     /// The repairs this read applied, in discovery order.
@@ -277,6 +327,14 @@ impl<'a> Scene<'a> {
         matches!(self.xml, Cow::Owned(_))
     }
 
+    /// The owner XML the shape spans are defined against: the source bytes,
+    /// or the MCE-processed replacement when [`Self::is_rewritten`].
+    #[inline]
+    #[must_use]
+    pub(crate) fn owner_xml(&self) -> &[u8] {
+        &self.xml
+    }
+
     /// Number of shapes in depth-first pre-order, including grouped children.
     #[inline]
     #[must_use]
@@ -297,6 +355,7 @@ impl<'a> Scene<'a> {
             xml: self.xml(),
             records: &self.records,
             strings: &self.strings,
+            limits: self.limits,
             cursor: 0,
             end: self.records.len(),
             parent: None,
@@ -311,6 +370,7 @@ impl<'a> Scene<'a> {
             xml: self.xml(),
             records: &self.records,
             strings: &self.strings,
+            limits: self.limits,
             cursor: 0,
             end: self.records.len(),
             parent: None,
@@ -376,6 +436,7 @@ impl<'a> Scene<'a> {
             xml: self.xml(),
             records: &self.records,
             strings: &self.strings,
+            limits: self.limits,
             record,
             index,
         }))
@@ -452,6 +513,32 @@ struct Active {
     seen_placeholder_type: bool,
     seen_placeholder_variant: bool,
     placeholder_type_extension: Option<PlaceholderTypeExtension>,
+    /// The shape's own transform element; its length is zero while the
+    /// element is open at `transform_depth` (zero once closed).
+    transform: Option<Span>,
+    transform_depth: u32,
+    transform_invalid: bool,
+    /// The relationship the shape's first payload element names, and which
+    /// payload element that was; the shape's final kind must match it.
+    payload: Option<PayloadRecord>,
+    payload_element: PayloadElement,
+    /// The shape's direct `p:txBody`, tracked alongside its transform.
+    text_body: Option<Span>,
+    text_body_depth: u32,
+    /// Competing direct bodies make the semantic body ambiguous.
+    text_body_invalid: bool,
+    /// A group whose start tag declares a namespace inherited by descendants.
+    declares_namespaces: bool,
+}
+
+/// The element a shape's payload relationship was read from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PayloadElement {
+    None,
+    Blip,
+    Chart,
+    Diagram,
+    Ole,
 }
 
 impl Active {
@@ -489,13 +576,17 @@ struct Scanner<'a> {
     retained_text: usize,
     depth: usize,
     nodes: usize,
-    /// One flag set per open element: [`PARENT_NV_PR`] / [`PARENT_XFRM`].
+    /// One flag set per open element: [`PARENT_NV_PR`] / [`PARENT_XFRM`] /
+    /// [`PARENT_TAB_LIST`].
     parent_stack: Vec<u8>,
     tolerance: ToleranceReport,
     seen_processing_instruction: bool,
     common_slide_depth: Option<usize>,
     tree_depth: Option<usize>,
     seen_tree: bool,
+    relationship_namespace: &'static [u8],
+    /// Whether shapes outside groups inherit only owner-root bindings.
+    tree_inherits_root_namespaces: bool,
 }
 
 impl<'a> Scanner<'a> {
@@ -515,6 +606,8 @@ impl<'a> Scanner<'a> {
             common_slide_depth: None,
             tree_depth: None,
             seen_tree: false,
+            relationship_namespace: RELATIONSHIPS,
+            tree_inherits_root_namespaces: true,
         }
     }
 
@@ -532,15 +625,19 @@ impl<'a> Scanner<'a> {
             // resolver would reproduce exactly these bytes and bindings.
             let event = reader.read_event()?;
             let end = position(&reader, origin)?;
-            let (namespace, event) = reader.resolver().resolve_event(event);
+            let resolver = reader.resolver();
+            let (namespace, event) = resolver.resolve_event(event);
             match event {
                 Event::Start(element) => {
                     self.count_node()?;
                     let event_depth = self.enter_depth()?;
                     let parent = self.parent_stack.last().copied().unwrap_or(0);
+                    // Split the qualified name once for every use below.
+                    let local_name = element.local_name().into_inner();
                     self.start_element(
                         &namespace,
                         &element,
+                        local_name,
                         decoder,
                         start,
                         event_depth,
@@ -548,17 +645,31 @@ impl<'a> Scanner<'a> {
                         false,
                         end,
                     )?;
-                    self.parent_stack
-                        .push(parent_flags(&namespace, element.local_name().into_inner()));
+                    // One local-name test keeps the record's span and
+                    // payload work (L-PPTX-R6, R7) off every other element.
+                    if is_shape_part_name(local_name) {
+                        self.note_shape_part(
+                            &namespace,
+                            resolver,
+                            &element,
+                            local_name,
+                            start..end,
+                            event_depth,
+                            false,
+                        )?;
+                    }
+                    self.parent_stack.push(parent_flags(&namespace, local_name));
                     self.depth = event_depth;
                 },
                 Event::Empty(element) => {
                     self.count_node()?;
                     let event_depth = self.enter_depth()?;
                     let parent = self.parent_stack.last().copied().unwrap_or(0);
+                    let local_name = element.local_name().into_inner();
                     self.start_element(
                         &namespace,
                         &element,
+                        local_name,
                         decoder,
                         start,
                         event_depth,
@@ -566,6 +677,17 @@ impl<'a> Scanner<'a> {
                         true,
                         end,
                     )?;
+                    if is_shape_part_name(local_name) {
+                        self.note_shape_part(
+                            &namespace,
+                            resolver,
+                            &element,
+                            local_name,
+                            start..end,
+                            event_depth,
+                            true,
+                        )?;
+                    }
                 },
                 Event::Text(text) => {
                     let checked =
@@ -578,9 +700,9 @@ impl<'a> Scanner<'a> {
                     {
                         let decoded = text
                             .xml_content(XmlVersion::Explicit1_0)
-                            .map_err(|error| Error::Xml(error.to_string()))?;
+                            .map_err(|_error| Error::Xml("malformed shape XML".into()))?;
                         let decoded = quick_xml::escape::unescape(&decoded)
-                            .map_err(|error| Error::Xml(error.to_string()))?;
+                            .map_err(|_error| Error::Xml("malformed shape XML".into()))?;
                         self.append_text(&decoded)?;
                     }
                 },
@@ -594,7 +716,7 @@ impl<'a> Scanner<'a> {
                     {
                         let decoded = text
                             .xml_content(XmlVersion::Explicit1_0)
-                            .map_err(|error| Error::Xml(error.to_string()))?;
+                            .map_err(|_error| Error::Xml("malformed shape XML".into()))?;
                         self.append_text(&decoded)?;
                     }
                 },
@@ -610,7 +732,11 @@ impl<'a> Scanner<'a> {
                     }
                 },
                 Event::End(element) => {
-                    self.end_element(&namespace, element.name(), end)?;
+                    let local_name = element.local_name().into_inner();
+                    if is_shape_span_name(local_name) {
+                        self.close_shape_part(end)?;
+                    }
+                    self.end_element(&namespace, local_name, end)?;
                     self.parent_stack.pop().ok_or_else(|| {
                         Error::Invalid("shape XML element stack became inconsistent".into())
                     })?;
@@ -734,6 +860,7 @@ impl<'a> Scanner<'a> {
         &mut self,
         namespace: &ResolveResult<'_>,
         element: &BytesStart<'_>,
+        local_name: &[u8],
         decoder: quick_xml::encoding::Decoder,
         start: usize,
         event_depth: usize,
@@ -742,11 +869,27 @@ impl<'a> Scanner<'a> {
         end: usize,
     ) -> Result<()> {
         let parent_is_nv_pr = parent_flags & PARENT_NV_PR != 0;
-        // Every classification below compares this element's local name;
-        // split the qualified name once rather than once per comparison.
-        let local_name = element.local_name().into_inner();
+        if event_depth == 1
+            && matches!(namespace, ResolveResult::Bound(Namespace(uri)) if *uri == STRICT_PML)
+        {
+            self.relationship_namespace = STRICT_RELATIONSHIPS;
+        }
+        if let Some(active) = self.active.last_mut()
+            && active.transform_depth != 0
+            && event_depth > active.transform_depth as usize
+            && !matches!(namespace, ResolveResult::Bound(Namespace(uri)) if *uri == DRAWINGML_NAMESPACE || *uri == STRICT_DRAWINGML_NAMESPACE)
+        {
+            active.transform_invalid = true;
+        }
+        // Every classification below compares this element's local name,
+        // split once by the caller rather than once per comparison.
         if is_pml(namespace, local_name, b"cSld") && self.common_slide_depth.is_none() {
             self.common_slide_depth = Some(event_depth);
+            // Shapes inherit only the root's bindings when `p:cSld` is the
+            // root or its child and declares nothing itself.
+            if event_depth > 2 || (event_depth == 2 && declares_namespaces(element)) {
+                self.tree_inherits_root_namespaces = false;
+            }
         }
 
         let is_tree = is_pml(namespace, local_name, b"spTree")
@@ -759,6 +902,9 @@ impl<'a> Scanner<'a> {
             }
             self.seen_tree = true;
             self.tree_depth = Some(event_depth);
+            if event_depth > 1 && declares_namespaces(element) {
+                self.tree_inherits_root_namespaces = false;
+            }
         }
 
         let parent = self.direct_shape_parent();
@@ -825,6 +971,9 @@ impl<'a> Scanner<'a> {
             })?;
             record.name = name;
             record.id = id;
+            // The start tag alone: alternative text, title and the hidden
+            // flag are decoded from it on request (L-PPTX-R6).
+            record.non_visual = Some(span_between(start, end)?);
         } else if is_pml(namespace, local_name, b"ph") && parent_is_nv_pr {
             let active = self
                 .active
@@ -937,7 +1086,7 @@ impl<'a> Scanner<'a> {
         } else {
             0
         };
-        if marker != 0 {
+        if marker != 0 && relative == 3 && self.in_graphic_data() {
             let active = self
                 .active
                 .get_mut(active_offset)
@@ -974,7 +1123,9 @@ impl<'a> Scanner<'a> {
             }
         } else if is_dml(namespace, local_name, b"br") {
             self.append_text("\n")?;
-        } else if is_dml(namespace, local_name, b"tab") {
+        } else if is_dml(namespace, local_name, b"tab") && parent_flags & PARENT_TAB_LIST == 0 {
+            // An `a:tab` of an `a:tabLst` defines a tab stop; only run
+            // content is a tab character.
             self.append_text("\t")?;
         }
         Ok(())
@@ -1255,7 +1406,7 @@ impl<'a> Scanner<'a> {
     fn end_element(
         &mut self,
         namespace: &ResolveResult<'_>,
-        name: QName<'_>,
+        local_name: &[u8],
         end: usize,
     ) -> Result<()> {
         if self.depth == 0 {
@@ -1263,7 +1414,6 @@ impl<'a> Scanner<'a> {
                 "shape XML contains an unmatched end tag".into(),
             ));
         }
-        let local_name = name.local_name().into_inner();
         let finished = self.finish_placeholder_extension(namespace, local_name);
         self.tolerate_placeholder_extension(finished)?;
         if is_dml(namespace, local_name, b"t")
@@ -1315,8 +1465,9 @@ impl<'a> Scanner<'a> {
     ) -> Result<u32> {
         if self.records.len() >= self.limits.shapes {
             return Err(Error::Limit {
-                resource: "shapes",
-                limit: self.limits.shapes,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Shapes),
+                observed: self.records.len().checked_add(1).unwrap_or(usize::MAX),
+                maximum: self.limits.shapes,
             });
         }
         self.records
@@ -1339,17 +1490,29 @@ impl<'a> Scanner<'a> {
         let source_name = str::from_utf8(qualified_name.as_ref())
             .map_err(|_err| Error::Invalid("shape element name is not UTF-8".into()))?;
         let source_name = Some(self.retain(source_name)?);
+        let inherits_root_namespaces = self.tree_inherits_root_namespaces
+            && !self.active.iter().any(|active| active.declares_namespaces);
+        // Every ancestor but the root is the tree's chain or a group, so
+        // the root's bindings are all a shape inherits unless one of them
+        // declares a namespace.
         self.records.push(Record {
             span: Span { start, len: 0 },
             subtree_end: index,
             parent,
             kind,
+            inherits_root_namespaces,
             name: None,
             id: None,
             bounds: None,
             placeholder: None,
             text: None,
             source_name,
+            non_visual: None,
+            transform: None,
+            transform_invalid: false,
+            payload: None,
+            text_body: None,
+            text_body_invalid: false,
         });
         self.active.push(Active {
             index,
@@ -1386,6 +1549,15 @@ impl<'a> Scanner<'a> {
             seen_placeholder_type: false,
             seen_placeholder_variant: false,
             placeholder_type_extension: None,
+            transform: None,
+            transform_invalid: false,
+            transform_depth: 0,
+            payload: None,
+            payload_element: PayloadElement::None,
+            text_body: None,
+            text_body_depth: 0,
+            text_body_invalid: false,
+            declares_namespaces: kind == Kind::Group && declares_namespaces(element),
         });
         Ok(index)
     }
@@ -1421,7 +1593,12 @@ impl<'a> Scanner<'a> {
         let text = active
             .text
             .as_deref()
-            .filter(|value| !value.is_empty())
+            .or_else(|| {
+                (active.text_body.is_some()
+                    && active.text_body_depth == 0
+                    && !active.text_body_invalid)
+                    .then_some("")
+            })
             .map(|value| self.retain(value))
             .transpose()?;
         let bounds = match (active.x, active.y, active.width, active.height) {
@@ -1446,27 +1623,328 @@ impl<'a> Scanner<'a> {
             placeholder.type_extension = active.placeholder_type_extension;
         }
         if record.kind == Kind::Frame {
+            if active.markers.count_ones() > 1 {
+                record.payload = Some(PayloadRecord {
+                    value: Span { start: 0, len: 0 },
+                    attribute: PayloadAttribute::Id,
+                    error: Some(super::raw::Error::Ambiguous),
+                });
+            }
             record.kind = match active.markers {
-                value if value & OLE != 0 => Kind::Ole,
+                OLE => Kind::Ole,
                 TABLE => Kind::Table,
                 CHART => Kind::Chart,
                 DIAGRAM_MARKER => Kind::Diagram,
                 _ => Kind::Frame,
             };
         }
+        // An element left open (impossible in well-formed input) records
+        // no span.
+        record.transform = active.transform.filter(|_| active.transform_depth == 0);
+        record.transform_invalid = active.transform_invalid;
+        record.text_body = active.text_body.filter(|_| active.text_body_depth == 0);
+        record.text_body_invalid = active.text_body_invalid;
+        // A content part's payload was taken from its start tag.
+        if record.kind != Kind::Content && record.payload.is_none() {
+            let expected = match record.kind {
+                Kind::Picture => PayloadElement::Blip,
+                Kind::Chart => PayloadElement::Chart,
+                Kind::Diagram => PayloadElement::Diagram,
+                Kind::Ole => PayloadElement::Ole,
+                Kind::Auto
+                | Kind::Table
+                | Kind::Frame
+                | Kind::Group
+                | Kind::Connector
+                | Kind::Content
+                | Kind::Unknown => PayloadElement::None,
+            };
+            record.payload = active.payload.filter(|payload| {
+                payload.error.is_some()
+                    || (expected != PayloadElement::None && active.payload_element == expected)
+            });
+        }
         Ok(())
+    }
+
+    /// Track the active shape's own transform (within two levels:
+    /// `p:spPr/a:xfrm`, `p:grpSpPr/a:xfrm`, a frame's `p:xfrm`), its direct
+    /// `p:txBody`, and the relationship its payload element names
+    /// (L-PPTX-R6, R7).
+    #[inline(never)]
+    fn note_shape_part(
+        &mut self,
+        namespace: &ResolveResult<'_>,
+        resolver: &NamespaceResolver,
+        element: &BytesStart<'_>,
+        local_name: &[u8],
+        span: Range<usize>,
+        event_depth: usize,
+        empty: bool,
+    ) -> Result<()> {
+        if local_name == b"contentPart" {
+            // A content part names its payload on its own start tag; an
+            // empty one is already finished, so the record takes it here.
+            let start = u32::try_from(span.start).ok();
+            let payload = self.relationship(element, b"id", resolver, PayloadAttribute::Id);
+            if let Some(record) = self.records.last_mut()
+                && record.kind == Kind::Content
+                && Some(record.span.start) == start
+            {
+                record.payload = payload;
+            }
+            return Ok(());
+        }
+        let Some(active_offset) = self.active.len().checked_sub(1) else {
+            return Ok(());
+        };
+        let Some(active) = self.active.get(active_offset) else {
+            return Ok(());
+        };
+        if active.depth == event_depth {
+            return Ok(());
+        }
+        let relative = event_depth.saturating_sub(active.depth);
+        let kind = self
+            .records
+            .get(active.index as usize)
+            .map(|record| record.kind);
+        let parent = self.parent_stack.last().copied().unwrap_or(0);
+        let transform = (relative == 2
+            && parent & PARENT_SHAPE_PROPERTIES != 0
+            && is_dml(namespace, local_name, b"xfrm"))
+            || (relative == 1
+                && kind == Some(Kind::Frame)
+                && is_pml(namespace, local_name, b"xfrm"));
+        let text_body = relative == 1 && is_pml(namespace, local_name, b"txBody");
+        if !transform && !text_body {
+            return self.note_payload(
+                namespace,
+                resolver,
+                element,
+                local_name,
+                relative,
+                active_offset,
+            );
+        }
+        let len = if empty {
+            span_between(span.start, span.end)?.len
+        } else {
+            0
+        };
+        let start = u32::try_from(span.start)
+            .map_err(|_err| Error::Invalid("shape offset exceeds the compact u32 domain".into()))?;
+        let depth = u32::try_from(event_depth)
+            .map_err(|_err| Error::Invalid("shape XML depth exceeds u32".into()))?;
+        let active = self
+            .active
+            .get_mut(active_offset)
+            .ok_or_else(|| Error::Invalid("shape stack became inconsistent".into()))?;
+        let (slot, open) = if transform {
+            (&mut active.transform, &mut active.transform_depth)
+        } else {
+            (&mut active.text_body, &mut active.text_body_depth)
+        };
+        if slot.is_none() {
+            *slot = Some(Span { start, len });
+            if !empty {
+                *open = depth;
+            }
+        } else if transform {
+            active.transform_invalid = true;
+        } else {
+            active.text_body_invalid = true;
+        }
+        Ok(())
+    }
+
+    /// Close the active shape's open transform or text body at `end`.
+    #[inline(never)]
+    fn close_shape_part(&mut self, end: usize) -> Result<()> {
+        let depth = u32::try_from(self.depth).unwrap_or(u32::MAX);
+        let Some(active) = self.active.last_mut() else {
+            return Ok(());
+        };
+        for (slot, open) in [
+            (&mut active.transform, &mut active.transform_depth),
+            (&mut active.text_body, &mut active.text_body_depth),
+        ] {
+            if *open != 0 && *open == depth {
+                *open = 0;
+                if let Some(span) = slot.as_mut() {
+                    let start = usize::try_from(span.start)
+                        .map_err(|_err| Error::Invalid("shape offset does not fit usize".into()))?;
+                    span.len = span_between(start, end)?.len;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Note the active shape's payload relationship, refusing competition:
+    /// a picture's own `a:blip`, or a frame's `c:chart`, `dgm:relIds` or
+    /// `p:oleObj` (L-PPTX-R6).
+    fn note_payload(
+        &mut self,
+        namespace: &ResolveResult<'_>,
+        resolver: &NamespaceResolver,
+        element: &BytesStart<'_>,
+        local_name: &[u8],
+        relative: usize,
+        active_offset: usize,
+    ) -> Result<()> {
+        let Some(active) = self.active.get(active_offset) else {
+            return Ok(());
+        };
+        let kind = self
+            .records
+            .get(active.index as usize)
+            .map(|record| record.kind);
+        let found = if kind == Some(Kind::Picture)
+            && relative == 2
+            && self
+                .parent_stack
+                .last()
+                .is_some_and(|flags| flags & PARENT_BLIP_FILL != 0)
+            && is_dml(namespace, local_name, b"blip")
+        {
+            // The picture's own `p:blipFill/a:blip`; an image fill of its
+            // shape properties lies deeper.
+            let embed = self.relationship(element, b"embed", resolver, PayloadAttribute::Embed);
+            let link = self.relationship(element, b"link", resolver, PayloadAttribute::Link);
+            let payload = match (embed, link) {
+                (Some(mut payload), Some(_)) => {
+                    payload.error = Some(super::raw::Error::Ambiguous);
+                    Some(payload)
+                },
+                (embed, link) => embed.or(link),
+            };
+            Some((PayloadElement::Blip, payload))
+        } else if kind == Some(Kind::Frame) && relative == 3 && self.in_graphic_data() {
+            if is_chart(namespace, local_name, b"chart") {
+                Some((
+                    PayloadElement::Chart,
+                    self.relationship(element, b"id", resolver, PayloadAttribute::Id),
+                ))
+            } else if is_diagram(namespace, local_name, b"relIds") {
+                Some((
+                    PayloadElement::Diagram,
+                    self.relationship(element, b"dm", resolver, PayloadAttribute::DataModel),
+                ))
+            } else if is_pml(namespace, local_name, b"oleObj") {
+                Some((
+                    PayloadElement::Ole,
+                    self.relationship(element, b"id", resolver, PayloadAttribute::Id),
+                ))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        let Some((element, payload)) = found else {
+            return Ok(());
+        };
+        let active = self
+            .active
+            .get_mut(active_offset)
+            .ok_or_else(|| Error::Invalid("shape stack became inconsistent".into()))?;
+        if active.payload_element != PayloadElement::None {
+            active.payload = Some(PayloadRecord {
+                value: Span { start: 0, len: 0 },
+                attribute: PayloadAttribute::Id,
+                error: Some(super::raw::Error::Ambiguous),
+            });
+        } else {
+            active.payload_element = element;
+            active.payload = payload;
+        }
+        Ok(())
+    }
+
+    fn in_graphic_data(&self) -> bool {
+        self.parent_stack
+            .last()
+            .is_some_and(|flags| flags & PARENT_GRAPHIC_DATA != 0)
+            && self
+                .parent_stack
+                .len()
+                .checked_sub(2)
+                .and_then(|index| self.parent_stack.get(index))
+                .is_some_and(|flags| flags & PARENT_GRAPHIC != 0)
+    }
+
+    /// The raw value span of `element`'s relationship attribute `name`
+    /// with the owning document's relationship namespace. Undeclared prefixes,
+    /// competing aliases and malformed attributes produce a typed raw error.
+    /// Absent attributes name no payload; this metadata never refuses a scene.
+    fn relationship(
+        &self,
+        element: &BytesStart<'_>,
+        name: &[u8],
+        resolver: &NamespaceResolver,
+        attribute_kind: PayloadAttribute,
+    ) -> Option<PayloadRecord> {
+        let invalid = |error| {
+            Some(PayloadRecord {
+                value: Span { start: 0, len: 0 },
+                attribute: attribute_kind,
+                error: Some(error),
+            })
+        };
+        let mut found = None;
+        for attribute in element.checked_attributes() {
+            let attribute = match attribute {
+                Ok(attribute) => attribute,
+                Err(_) => return invalid(super::raw::Error::InvalidAttribute),
+            };
+            if attribute.key.local_name().as_ref() != name || attribute.key.prefix().is_none() {
+                continue;
+            }
+            let (namespace, _) = resolver.resolve_attribute(attribute.key);
+            let relationship = match namespace {
+                ResolveResult::Bound(Namespace(uri)) if uri == self.relationship_namespace => true,
+                ResolveResult::Bound(Namespace(uri))
+                    if uri == RELATIONSHIPS || uri == STRICT_RELATIONSHIPS =>
+                {
+                    return invalid(super::raw::Error::InvalidNamespace);
+                },
+                ResolveResult::Unknown(_) => return invalid(super::raw::Error::InvalidNamespace),
+                _ => false,
+            };
+            if !relationship {
+                continue;
+            }
+            if found.is_some() {
+                return invalid(super::raw::Error::Ambiguous);
+            }
+            let value: &[u8] = attribute.value.as_ref();
+            let start = (value.as_ptr() as usize).wrapping_sub(self.xml.as_ptr() as usize);
+            let end = start.checked_add(value.len())?;
+            if self.xml.get(start..end)?.as_ptr() != value.as_ptr() {
+                return None;
+            }
+            found = Some(PayloadRecord {
+                value: span_between(start, end).ok()?,
+                attribute: attribute_kind,
+                error: None,
+            });
+        }
+        found
     }
 
     fn retain(&mut self, value: &str) -> Result<TextSpan> {
         let start = self.strings.len();
         let end = start.checked_add(value.len()).ok_or(Error::Limit {
-            resource: "shape retained strings",
-            limit: self.limits.retained_text_bytes,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::RetainedBytes),
+            observed: usize::MAX,
+            maximum: self.limits.retained_text_bytes,
         })?;
         if end > self.limits.retained_text_bytes || end > u32::MAX as usize {
             return Err(Error::Limit {
-                resource: "shape retained strings",
-                limit: self.limits.retained_text_bytes.min(u32::MAX as usize),
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::RetainedBytes),
+                observed: end,
+                maximum: self.limits.retained_text_bytes.min(u32::MAX as usize),
             });
         }
         self.strings
@@ -1489,13 +1967,15 @@ impl<'a> Scanner<'a> {
             .retained_text
             .checked_add(value.len())
             .ok_or(Error::Limit {
-                resource: "shape decoded text",
-                limit: self.limits.retained_text_bytes,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+                observed: usize::MAX,
+                maximum: self.limits.retained_text_bytes,
             })?;
         if next > self.limits.retained_text_bytes {
             return Err(Error::Limit {
-                resource: "shape decoded text",
-                limit: self.limits.retained_text_bytes,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+                observed: next,
+                maximum: self.limits.retained_text_bytes,
             });
         }
         let active = self
@@ -1515,13 +1995,15 @@ impl<'a> Scanner<'a> {
 
     fn count_node(&mut self) -> Result<()> {
         self.nodes = self.nodes.checked_add(1).ok_or(Error::Limit {
-            resource: "shape XML elements",
-            limit: self.limits.nodes,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
+            observed: usize::MAX,
+            maximum: self.limits.nodes,
         })?;
         if self.nodes > self.limits.nodes {
             Err(Error::Limit {
-                resource: "shape XML elements",
-                limit: self.limits.nodes,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
+                observed: self.nodes,
+                maximum: self.limits.nodes,
             })
         } else {
             Ok(())
@@ -1530,13 +2012,15 @@ impl<'a> Scanner<'a> {
 
     fn enter_depth(&self) -> Result<usize> {
         let depth = self.depth.checked_add(1).ok_or(Error::Limit {
-            resource: "shape XML nesting depth",
-            limit: self.limits.depth,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlDepth),
+            observed: usize::MAX,
+            maximum: self.limits.depth,
         })?;
         if depth > self.limits.depth {
             Err(Error::Limit {
-                resource: "shape XML nesting depth",
-                limit: self.limits.depth,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlDepth),
+                observed: depth,
+                maximum: self.limits.depth,
             })
         } else {
             Ok(depth)
@@ -1546,6 +2030,11 @@ impl<'a> Scanner<'a> {
 
 const PARENT_NV_PR: u8 = 1;
 const PARENT_XFRM: u8 = 1 << 1;
+const PARENT_TAB_LIST: u8 = 1 << 2;
+const PARENT_SHAPE_PROPERTIES: u8 = 1 << 3;
+const PARENT_BLIP_FILL: u8 = 1 << 4;
+const PARENT_GRAPHIC_DATA: u8 = 1 << 5;
+const PARENT_GRAPHIC: u8 = 1 << 6;
 
 /// The flags an open element contributes to its children's parent context.
 fn parent_flags(namespace: &ResolveResult<'_>, local_name: &[u8]) -> u8 {
@@ -1553,8 +2042,45 @@ fn parent_flags(namespace: &ResolveResult<'_>, local_name: &[u8]) -> u8 {
         PARENT_NV_PR
     } else if is_dml(namespace, local_name, b"xfrm") || is_pml(namespace, local_name, b"xfrm") {
         PARENT_XFRM
+    } else if is_dml(namespace, local_name, b"tabLst") {
+        PARENT_TAB_LIST
+    } else if is_pml(namespace, local_name, b"spPr") || is_pml(namespace, local_name, b"grpSpPr") {
+        PARENT_SHAPE_PROPERTIES
+    } else if is_pml(namespace, local_name, b"blipFill") {
+        PARENT_BLIP_FILL
+    } else if is_dml(namespace, local_name, b"graphicData") {
+        PARENT_GRAPHIC_DATA
+    } else if is_dml(namespace, local_name, b"graphic") {
+        PARENT_GRAPHIC
     } else {
         0
+    }
+}
+
+/// Whether a local name may be a span or payload element a shape record
+/// keeps: `xfrm`, `txBody`, `blip`, `chart`, `contentPart`, `relIds` or
+/// `oleObj`. The first byte selects at most two comparisons, so other
+/// elements pay one branch.
+#[inline]
+fn is_shape_part_name(local_name: &[u8]) -> bool {
+    match local_name.first() {
+        Some(b'x') => local_name == b"xfrm",
+        Some(b't') => local_name == b"txBody",
+        Some(b'b') => local_name == b"blip",
+        Some(b'c') => local_name == b"chart" || local_name == b"contentPart",
+        Some(b'r') => local_name == b"relIds",
+        Some(b'o') => local_name == b"oleObj",
+        _ => false,
+    }
+}
+
+/// Whether a local name may close a span a shape record keeps.
+#[inline]
+fn is_shape_span_name(local_name: &[u8]) -> bool {
+    match local_name.first() {
+        Some(b'x') => local_name == b"xfrm",
+        Some(b't') => local_name == b"txBody",
+        _ => false,
     }
 }
 
@@ -1590,27 +2116,36 @@ fn is_shape_like_extension(namespace: &ResolveResult<'_>, local_name: &[u8]) -> 
 
 // Each classifier takes the element's local name, split once per element by
 // the caller, and compares the namespace only when the local name matches.
+// They are always inlined: the element handlers test several per event, and
+// an out-of-line call per test is a measurable share of a scene read.
 
+#[inline(always)]
 fn is_pml(namespace: &ResolveResult<'_>, local_name: &[u8], local: &[u8]) -> bool {
     local_name == local
         && matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == PML || *value == STRICT_PML)
 }
 
+#[inline(always)]
 fn is_p232(namespace: &ResolveResult<'_>, local_name: &[u8], local: &[u8]) -> bool {
     local_name == local
         && matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == P232.as_bytes())
 }
 
+#[inline(always)]
 fn is_dml(namespace: &ResolveResult<'_>, local_name: &[u8], local: &[u8]) -> bool {
     local_name == local
         && matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == DRAWINGML_NAMESPACE || *value == STRICT_DRAWINGML_NAMESPACE)
 }
 
+#[inline(always)]
 fn is_chart(namespace: &ResolveResult<'_>, local_name: &[u8], local: &[u8]) -> bool {
     local_name == local
-        && matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == DRAWINGML_CHART_NAMESPACE || *value == STRICT_DRAWINGML_CHART_NAMESPACE)
+        && matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == DRAWINGML_CHART_NAMESPACE
+            || *value == STRICT_DRAWINGML_CHART_NAMESPACE
+            || *value == litchi_drawingml::chart::chartex::NAMESPACE.as_bytes())
 }
 
+#[inline(always)]
 fn is_diagram(namespace: &ResolveResult<'_>, local_name: &[u8], local: &[u8]) -> bool {
     local_name == local
         && matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == DIAGRAM || *value == STRICT_DIAGRAM)
@@ -1654,7 +2189,7 @@ fn read_extension_owner(
     let mut conforms = true;
     let mut seen_non_namespace = false;
     for attribute in element.checked_attributes() {
-        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        let attribute = attribute.map_err(|_error| Error::Xml("malformed shape XML".into()))?;
         let key = attribute.key.as_ref();
         if key == b"xmlns" || key.starts_with(b"xmlns:") {
             continue;
@@ -1673,6 +2208,17 @@ fn read_extension_owner(
 
 fn is_xml_whitespace(byte: &u8) -> bool {
     matches!(*byte, b' ' | b'\t' | b'\r' | b'\n')
+}
+
+/// Whether a start tag declares or undeclares a namespace prefix.
+fn declares_namespaces(element: &BytesStart<'_>) -> bool {
+    let raw = element.attributes_raw();
+    if !raw.windows(b"xmlns".len()).any(|window| window == b"xmlns") {
+        return false;
+    }
+    element.unchecked_attributes().any(|attribute| {
+        attribute.is_ok_and(|attribute| attribute.key.as_namespace_binding().is_some())
+    })
 }
 
 /// Apply the XML Schema `token` whitespace facet.  `token` uses XML whitespace
@@ -1706,7 +2252,7 @@ fn has_forbidden_attribute(
     _decoder: quick_xml::encoding::Decoder,
 ) -> Result<bool> {
     for attribute in element.checked_attributes() {
-        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        let attribute = attribute.map_err(|_error| Error::Xml("malformed shape XML".into()))?;
         let key = attribute.key.as_ref();
         if key == b"xmlns" || key.starts_with(b"xmlns:") {
             continue;
@@ -1716,8 +2262,62 @@ fn has_forbidden_attribute(
     Ok(false)
 }
 
+/// A compact span from two byte offsets of the processed owner.
+#[inline(always)]
+fn span_between(start: usize, end: usize) -> Result<Span> {
+    let len = end
+        .checked_sub(start)
+        .ok_or_else(|| Error::Invalid("shape element ends before it starts".into()))?;
+    Ok(Span {
+        start: u32::try_from(start)
+            .map_err(|_err| Error::Invalid("shape offset exceeds the compact u32 domain".into()))?,
+        len: u32::try_from(len)
+            .map_err(|_err| Error::Invalid("shape length exceeds the compact u32 domain".into()))?,
+    })
+}
+
 fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
     origin
         .offset(reader.buffer_position())
         .ok_or_else(|| Error::Invalid("shape XML position does not fit usize".into()))
+}
+
+/// Whether the source has no markup compatibility through the end of its
+/// `cSld` element, the owner of the shape tree: the markup-compatibility
+/// namespace must be declared before any use, so a prefix that never names
+/// it (directly or through character references) cannot select a branch,
+/// ignore content or require understanding inside the scene.
+fn scene_prefix_unchanged(source: &[u8], _processed: &[u8]) -> bool {
+    const MCE: &[u8] = b"schemas.openxmlformats.org/markup-compatibility/2006";
+    let Some(end) = csld_end(source) else {
+        return false;
+    };
+    let prefix = &source[..end];
+    !prefix.windows(MCE.len()).any(|window| window == MCE)
+        && !litchi_ooxml_common::mce::binds_namespace_by_reference(prefix)
+}
+
+/// The offset just past the last `</cSld>` or `</prefix:cSld>` end tag.
+fn csld_end(xml: &[u8]) -> Option<usize> {
+    const LOCAL: &[u8] = b"cSld>";
+    let mut search = xml.len();
+    while let Some(at) = xml[..search]
+        .windows(LOCAL.len())
+        .rposition(|window| window == LOCAL)
+    {
+        let open = xml[..at].iter().rposition(|byte| *byte == b'<')?;
+        let name = &xml[open + 1..at];
+        if let Some(prefix) = name.strip_prefix(b"/") {
+            let qualified = prefix.is_empty()
+                || (prefix.ends_with(b":")
+                    && prefix[..prefix.len() - 1].iter().all(|byte| {
+                        byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.')
+                    }));
+            if qualified {
+                return Some(at + LOCAL.len());
+            }
+        }
+        search = at;
+    }
+    None
 }

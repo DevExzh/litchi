@@ -5,7 +5,7 @@
 )]
 
 use litchi_odp::{
-    Presentation, constants,
+    Package, constants,
     handout_master::{Child, ChildKind, Master},
 };
 use std::path::PathBuf;
@@ -20,7 +20,8 @@ fn package(styles: &str) -> Vec<u8> {
     let content = format!(
         r#"<office:document-content xmlns:office="{OFFICE}" xmlns:draw="{DRAW}"><office:automatic-styles/><office:body><office:presentation><draw:page draw:name="Slide1"/></office:presentation></office:body></office:document-content>"#
     );
-    let mut writer = litchi_odp::core::PackageWriter::new();
+    let mut writer =
+        litchi_odp::core::PackageWriter::new(litchi_odp::core::StreamingArchiveLimits::default());
     writer.set_mimetype(constants::ODF_PRESENTATION).unwrap();
     writer.add_file("content.xml", content.as_bytes()).unwrap();
     writer.add_file("styles.xml", styles.as_bytes()).unwrap();
@@ -40,9 +41,20 @@ fn styles_xml(include_layout: bool, handout: &str) -> String {
     )
 }
 
+/// Apply one staged operation through the primary edit and adopt the commit.
+fn edit_with<T>(
+    package: &mut Package,
+    operation: impl FnOnce(&mut litchi_odp::edit::Edit) -> Result<T, litchi_odp::Error>,
+) -> Result<T, litchi_odp::Error> {
+    let mut edit = package.edit()?;
+    let value = operation(&mut edit)?;
+    *package = edit.commit()?.into_package();
+    Ok(value)
+}
+
 #[test]
 fn handout_master_facade_and_package_round_trip() {
-    let mut presentation = Presentation::from_bytes(package(&styles_xml(true, ""))).unwrap();
+    let mut presentation = Package::from_bytes(&package(&styles_xml(true, ""))).unwrap();
     let mut master = Master::new("physical").unwrap();
     master.presentation_page_layout_name = Some("handout-layout".to_string());
     master.drawing_style_name = Some("drawing".to_string());
@@ -53,9 +65,9 @@ fn handout_master_facade_and_package_round_trip() {
         ))
         .unwrap();
 
-    presentation.set_handout_master(&master).unwrap();
+    edit_with(&mut presentation, |edit| edit.set_handout_master(&master)).unwrap();
     let bytes = presentation.to_bytes().unwrap();
-    let reopened = Presentation::from_bytes(bytes).unwrap();
+    let reopened = Package::from_bytes(&bytes).unwrap().presentation().unwrap();
     let parsed = reopened.handout_master().unwrap().unwrap();
 
     assert_eq!(parsed, master);
@@ -78,14 +90,29 @@ fn handout_master_rejects_malformed_xml_and_missing_inheritance() {
     );
     assert!(Master::from_xml_fragment(&unsupported_child).is_err());
 
-    let mut presentation = Presentation::from_bytes(package(&styles_xml(false, ""))).unwrap();
+    let mut presentation = Package::from_bytes(&package(&styles_xml(false, ""))).unwrap();
     let mut master = Master::new("physical").unwrap();
     master.presentation_page_layout_name = Some("missing-layout".to_string());
-    let before = presentation.styles_xml().unwrap().to_string();
+    let before = presentation
+        .presentation()
+        .unwrap()
+        .styles_xml()
+        .unwrap()
+        .to_string();
 
-    assert!(presentation.set_handout_master(&master).is_err());
-    assert_eq!(presentation.styles_xml().unwrap(), before);
-    assert!(presentation.handout_master().unwrap().is_none());
+    assert!(edit_with(&mut presentation, |edit| edit.set_handout_master(&master)).is_err());
+    assert_eq!(
+        presentation.presentation().unwrap().styles_xml().unwrap(),
+        before
+    );
+    assert!(
+        presentation
+            .presentation()
+            .unwrap()
+            .handout_master()
+            .unwrap()
+            .is_none()
+    );
 }
 
 fn fixture(name: &str) -> PathBuf {
@@ -103,8 +130,10 @@ fn reads_handout_master_from_real_presentations() {
         "tdf169979.odp",
         "text-in-image.odp",
     ] {
-        let presentation = Presentation::open(fixture(name)).unwrap();
+        let presentation = Package::open(fixture(name)).unwrap();
         let master = presentation
+            .presentation()
+            .unwrap()
             .handout_master()
             .unwrap_or_else(|error| panic!("{name}: {error}"))
             .unwrap_or_else(|| panic!("{name} has no handout master"));
@@ -116,14 +145,16 @@ fn reads_handout_master_from_real_presentations() {
 
 #[test]
 fn bom_prefixed_styles_xml_keeps_fragments_exact() {
-    let presentation = Presentation::open(fixture("tdf169979.odp")).unwrap();
-    for page in presentation.master_pages().unwrap() {
+    let presentation = Package::open(fixture("tdf169979.odp")).unwrap();
+    for page in presentation.presentation().unwrap().master_pages().unwrap() {
         assert!(
             page.master_page.xml.starts_with("<style:master-page"),
             "BOM shifted master-page fragment"
         );
     }
     let fragment = presentation
+        .presentation()
+        .unwrap()
         .handout_master()
         .unwrap()
         .unwrap()

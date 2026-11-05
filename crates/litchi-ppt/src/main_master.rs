@@ -259,7 +259,7 @@ fn read_u32(record: &Record) -> u32 {
 )]
 mod tests {
     use super::*;
-    use crate::Package;
+    use crate::raw::Reader;
     use litchi_opc::{OpcPackage, PackURI, XmlPart};
     use std::io::Cursor;
 
@@ -299,7 +299,7 @@ mod tests {
             false,
         );
         let mut output = Cursor::new(Vec::new());
-        package.to_stream(&mut output).unwrap();
+        package.write_to(&mut output).unwrap();
         output.into_inner()
     }
 
@@ -517,7 +517,7 @@ mod tests {
             );
         }
         let mut output = Cursor::new(Vec::new());
-        package.to_stream(&mut output).unwrap();
+        package.write_to(&mut output).unwrap();
         let ambiguous = record(
             RecordType::RoundTripContentMasterInfo12Atom,
             0,
@@ -531,7 +531,7 @@ mod tests {
     fn presentation_exposes_real_main_master_round_trip_metadata() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../test-data/ole/ppt/SampleShow.ppt");
-        let mut package = Package::open(path).unwrap();
+        let mut package = Reader::open(path).unwrap();
         let presentation = package.presentation().unwrap();
         let masters = presentation.powerpoint12_main_master_metadata().unwrap();
 

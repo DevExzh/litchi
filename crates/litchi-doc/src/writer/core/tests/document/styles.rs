@@ -2,7 +2,7 @@ use super::super::support::*;
 
 #[test]
 fn writes_custom_styles_into_document_stylesheet() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let paragraph_style = writer
         .add_style(crate::writer::stylesheet::StyleDefinition::new(
             crate::StyleKind::Paragraph,
@@ -52,8 +52,8 @@ fn writes_custom_styles_into_document_stylesheet() {
         .unwrap();
 
     let mut cursor = Cursor::new(Vec::new());
-    writer.write_to(&mut cursor).unwrap();
-    let mut package = crate::Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut cursor).unwrap();
+    let mut package = crate::raw::Reader::from_reader(Cursor::new(cursor.into_inner())).unwrap();
     let document = package.document().unwrap();
     let stylesheet = document.stylesheet().unwrap();
     assert_eq!(stylesheet.styles().len(), 18);
@@ -97,7 +97,7 @@ fn writes_revision_marked_style_and_author_table() {
     };
     let previous_papx = [SPRM_P_F_KEEP.to_le_bytes().as_slice(), &[0]].concat();
     let previous_chpx = [SPRM_C_F_BOLD.to_le_bytes().as_slice(), &[0]].concat();
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let style_index = writer
         .add_style(
             crate::writer::stylesheet::StyleDefinition::new(
@@ -125,8 +125,8 @@ fn writes_revision_marked_style_and_author_table() {
         .unwrap();
 
     let mut cursor = Cursor::new(Vec::new());
-    writer.write_to(&mut cursor).unwrap();
-    let mut package = crate::Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut cursor).unwrap();
+    let mut package = crate::raw::Reader::from_reader(Cursor::new(cursor.into_inner())).unwrap();
     let document = package.document().unwrap();
     assert_eq!(document.revision_authors(), ["Unknown", "Style Editor"]);
     let stylesheet = document.stylesheet().unwrap();
@@ -153,7 +153,7 @@ fn writes_revision_marked_style_and_author_table() {
 #[test]
 fn rejects_undefined_or_wrong_kind_style_references() {
     let error_for_paragraph_style = |style_index| {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         writer
             .add_formatted_paragraph(
                 "text",
@@ -163,14 +163,11 @@ fn rejects_undefined_or_wrong_kind_style_references() {
                 },
             )
             .unwrap();
-        writer
-            .write_to(&mut Cursor::new(Vec::new()))
-            .unwrap_err()
-            .to_string()
+        writer.build().unwrap_err().to_string()
     };
     assert!(error_for_paragraph_style(14).contains("undefined DOC style index 14"));
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let character_style = writer
         .add_style(crate::writer::stylesheet::StyleDefinition::new(
             crate::StyleKind::Character,
@@ -186,9 +183,6 @@ fn rejects_undefined_or_wrong_kind_style_references() {
             },
         )
         .unwrap();
-    let error = writer
-        .write_to(&mut Cursor::new(Vec::new()))
-        .unwrap_err()
-        .to_string();
+    let error = writer.build().unwrap_err().to_string();
     assert!(error.contains("Character DOC style 15, expected Paragraph"));
 }

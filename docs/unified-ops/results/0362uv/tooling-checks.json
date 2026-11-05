@@ -1,0 +1,43 @@
+{
+  "tool_source_commit": "947b98f94f2b7a3b46d0e247f749796c45fb3d24",
+  "previous_commit": "a2f09847194f5b44e1cc01e49c118b8b425a2113",
+  "scope": "Build-free qualification tooling only; no native measurements, source gate or inventory capture.",
+  "source_note": "The native-tool suite ran while the documentation-only gate receipt was being committed. All tested tools and IWA fixture tools are byte-identical across the two listed commits; the IWA suite ran on the clean successor.",
+  "checks": [
+    {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "tools.test_native_qualification_runner",
+        "tools.test_odp_native_qualification",
+        "tools.test_w8_file_provenance",
+        "tools.test_w8_original_baseline",
+        "tools.test_xls_f3_qualification_abba",
+        "tools.test_xlsx_source_family_abba_batched"
+      ],
+      "tests_passed": 63,
+      "exit": 0,
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-tooling-0362uv/native-tooling.log",
+      "bytes": 750,
+      "sha256": "d0697b7a434b8c6bb1674bbcb59e8dfcbe26867718015b8f64c9fed002511c3c"
+    },
+    {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "docs/unified-ops/results/0361fda",
+        "-p",
+        "test_iwa_native_qualification.py"
+      ],
+      "tests_passed": 20,
+      "exit": 0,
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-tooling-0362uv/iwa-tooling.log",
+      "bytes": 119,
+      "sha256": "5ad39553da26ed0bc1640deba507feb05586b200903854aeafd97dd1fe7c59f9"
+    }
+  ]
+}

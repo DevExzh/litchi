@@ -1,0 +1,58 @@
+{
+  "record": "0359rb",
+  "status": "candidate-native-qualification-open",
+  "change": "RTF set_text_underline fast path for empty spans at guaranteed boundaries when operations is empty",
+  "shared_refusal_changed": false,
+  "build": {
+    "command": "cargo build --offline --locked --release -p litchi-rtf --example refusal_contract_bench",
+    "jobs": 1,
+    "targets": {
+      "current": "/home/zhuhe/code/litchi-worktrees/.coord/rtf-refusal-current-base-target",
+      "fast": "/home/zhuhe/code/litchi-worktrees/.coord/rtf-refusal-fast-target"
+    }
+  },
+  "probe": {
+    "path": "crates/litchi-rtf/examples/refusal_contract_bench.rs",
+    "scenarios": ["open_1k", "noop_1k", "text_commit_1k", "text_commit_save_1k", "replay_1k", "tail_commit_1k", "unsupported_content", "protected_commit"],
+    "unsupported_content_calls": 34000,
+    "samples": 34,
+    "warmups": 3,
+    "measured_samples": 31
+  },
+  "profiler": {
+    "tool": "valgrind callgrind",
+    "version": "3.26.0",
+    "events": "Ir",
+    "cpu": 7,
+    "command": "taskset -c 7 valgrind --tool=callgrind --dump-instr=yes --collect-jumps=yes --callgrind-out-file=<external> <binary>"
+  },
+  "binary": {
+    "current": {"size_bytes": 4145672, "sha256": "b9fccd840476aac1beaa35cb5e14d5410f6272493dab33e361d83fb4d9aed8aa"},
+    "fast": {"size_bytes": 4145800, "sha256": "126db1632fe150eae900782a98906933dec9aa3945542a0e1a99d22ae4758157"}
+  },
+  "refusal_route": {
+    "current": {"whole_ir": 627438818, "set_text_underline_ir": 1496000, "calls": 34000, "ir_per_call": 44},
+    "fast": {"whole_ir": 626418435, "set_text_underline_ir": 476000, "calls": 34000, "ir_per_call": 14},
+    "delta": {"whole_ir": -1020383, "set_text_underline_ir": -1020000, "ir_per_call": -30}
+  },
+  "normal_route_direct_ir": {
+    "replace_text": {"calls": 3469, "current": 569279, "fast": 569279},
+    "commit": {"calls": 6869, "current": 268167, "fast": 268167},
+    "commit_staged": {"calls": 6869, "current": 3553967, "fast": 3553967},
+    "tail_append_commit": {"calls": 34, "current": 14892, "fast": 14892},
+    "to_bytes": {"calls": 34, "current": 2652, "fast": 2652},
+    "apply": {"calls": 3400, "current": 1159400, "fast": 1159400}
+  },
+  "successful_route_controls": {
+    "probe_sha256": "c2f7ec5c3f121cabf3b143bd459cbed9dbfebe08a17e0ef7eca1520331a3a618",
+    "cold": {"calls": 34, "wrapper_ir_per_call_current": 200, "wrapper_ir_per_call_fast": 200, "whole_ir_current": 2639005, "whole_ir_fast": 2658053},
+    "warm": {"calls": 34000, "wrapper_ir_per_call_current": 194, "wrapper_ir_per_call_fast": 194, "whole_ir_current": 1581012112, "whole_ir_fast": 1576402637}
+  },
+  "correctness": {
+    "fmt": "cargo fmt --all -- --check",
+    "tests": "CARGO_TARGET_DIR=<external> cargo test --offline --locked -p litchi-rtf",
+    "result": "pass",
+    "native_abba": "not run; host busy",
+    "native_timing_waived": false
+  }
+}

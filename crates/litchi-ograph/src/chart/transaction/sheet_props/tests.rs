@@ -4,7 +4,7 @@
     reason = "test assertions panic by design"
 )]
 
-use super::super::super::{Cache, Chart, Context, Props, RowCol, Series, Value};
+use super::super::super::{Cache, Context, Model, Props, RowCol, Series, Value};
 use crate::Error;
 use crate::chart::Stream;
 use litchi_biff::{Encoder, Kind, Records};
@@ -15,7 +15,7 @@ const SHT_PROPS: Kind = Kind::from_wire(0x1044);
 
 fn graph_fixture() -> Stream {
     let context = Context::graph();
-    let mut chart = Chart::new(context).expect("chart");
+    let mut chart = Model::new(context).expect("chart");
     chart
         .add_series(Series::new(context))
         .expect("regular series");
@@ -37,7 +37,7 @@ fn graph_fixture() -> Stream {
 
 fn excel_fixture() -> Stream {
     let context = Context::excel();
-    let mut chart = Chart::new(context).expect("chart");
+    let mut chart = Model::new(context).expect("chart");
     chart.set_props(Props {
         flags: 1 | (1 << 1) | (1 << 3) | (1 << 4),
         plot_area: true,
@@ -47,8 +47,10 @@ fn excel_fixture() -> Stream {
 }
 
 fn with_unknown(source: &Stream) -> Stream {
-    let mut output = Encoder::new();
-    for item in Records::new(source.as_bytes()) {
+    let mut output = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
+    for item in
+        Records::new(source.as_bytes(), litchi_biff::Limits::default()).expect("valid BIFF limits")
+    {
         let record = item.expect("fixture record");
         if record.kind() == EOF {
             output
@@ -57,23 +59,26 @@ fn with_unknown(source: &Stream) -> Stream {
         }
         output.push_ref(record).expect("record replay");
     }
-    Stream::open(output.finish()).expect("framed fixture")
+    Stream::open(output.finish(), crate::Limits::default()).expect("framed fixture")
 }
 
 fn with_prefix_unknown(source: &Stream) -> Stream {
-    let mut output = Encoder::new();
-    for item in Records::new(source.as_bytes()) {
+    let mut output = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
+    for item in
+        Records::new(source.as_bytes(), litchi_biff::Limits::default()).expect("valid BIFF limits")
+    {
         let record = item.expect("fixture record");
         if record.kind() == SHT_PROPS {
             output.push(UNKNOWN, &[0xFE, 0xED]).expect("prefix record");
         }
         output.push_ref(record).expect("record replay");
     }
-    Stream::open(output.finish()).expect("framed fixture")
+    Stream::open(output.finish(), crate::Limits::default()).expect("framed fixture")
 }
 
 fn encoded_records(bytes: &[u8]) -> Vec<Vec<u8>> {
-    Records::new(bytes)
+    Records::new(bytes, litchi_biff::Limits::default())
+        .expect("valid BIFF limits")
         .map(|record| record.expect("encoded record").encoded().to_vec())
         .collect()
 }
@@ -91,7 +96,7 @@ fn graph_patches_only_existing_sht_props_and_preserves_unknown_order() {
     let original = source.as_bytes().to_vec();
     let pointer = source.as_bytes().as_ptr();
     let original_records = encoded_records(&original);
-    let chart = Chart::open(source, Context::graph()).expect("parsed Graph chart");
+    let chart = Model::open(source, Context::graph()).expect("parsed Graph chart");
     let before = chart.props();
     let after = target(before, 2);
 
@@ -103,7 +108,7 @@ fn graph_patches_only_existing_sht_props_and_preserves_unknown_order() {
     assert_eq!(change.before(), before);
     assert_eq!(change.after(), after);
 
-    let changed = commit.into_chart().encode().expect("round trip");
+    let changed = commit.into_package().encode().expect("round trip");
     assert_eq!(changed.as_bytes().as_ptr(), pointer);
     let changed_records = encoded_records(changed.as_bytes());
     assert_eq!(changed_records.len(), original_records.len());
@@ -114,7 +119,7 @@ fn graph_patches_only_existing_sht_props_and_preserves_unknown_order() {
             assert_eq!(before, after);
         }
     }
-    let reparsed = Chart::open(changed, Context::graph()).expect("reparse");
+    let reparsed = Model::open(changed, Context::graph()).expect("reparse");
     assert_eq!(reparsed.props(), after);
     assert_eq!(reparsed.unknown().len(), 1);
     assert_eq!(reparsed.unknown()[0].kind(), UNKNOWN);
@@ -125,17 +130,17 @@ fn excel_patches_sht_props_without_changing_plot_area_topology() {
     let source = with_unknown(&excel_fixture());
     let original = source.as_bytes().to_vec();
     let original_records = encoded_records(&original);
-    let chart = Chart::open(source, Context::excel()).expect("parsed Excel chart");
+    let chart = Model::open(source, Context::excel()).expect("parsed Excel chart");
     let before = chart.props();
     let after = target(before, 1);
 
     let mut edit = chart.edit().expect("transaction");
     edit.set_props(after).expect("stage");
     let commit = edit.commit().expect("commit");
-    assert_eq!(commit.patch().len(), 1);
-    assert_eq!(commit.chart().props(), after);
+    assert_eq!(commit.patch().change_count(), 1);
+    assert_eq!(commit.package().props(), after);
 
-    let changed = commit.into_chart().encode().expect("round trip");
+    let changed = commit.into_package().encode().expect("round trip");
     let changed_records = encoded_records(changed.as_bytes());
     assert_eq!(changed_records.len(), original_records.len());
     assert_eq!(
@@ -165,38 +170,38 @@ fn excel_patches_sht_props_without_changing_plot_area_topology() {
 fn inverse_and_source_identity_guards_restore_or_refuse_exactly() {
     let source = with_unknown(&graph_fixture());
     let original = source.as_bytes().to_vec();
-    let chart = Chart::open(source, Context::graph()).expect("parsed chart");
+    let chart = Model::open(source, Context::graph()).expect("parsed chart");
     let after = target(chart.props(), 1);
     let mut edit = chart.edit().expect("transaction");
     edit.set_props(after).expect("stage");
     let commit = edit.commit().expect("commit");
     let inverse = commit.patch().inverse();
     let restored = inverse
-        .apply(commit.into_chart())
+        .apply(commit.into_package())
         .expect("inverse commit")
-        .into_chart()
+        .into_package()
         .encode()
         .expect("restored stream");
     assert_eq!(restored.as_bytes(), original.as_slice());
 
-    let other = Chart::open(with_unknown(&excel_fixture()), Context::excel())
+    let other = Model::open(with_unknown(&excel_fixture()), Context::excel())
         .expect("different producer chart");
     assert!(matches!(
         inverse.apply(other),
-        Err(Error::UnsupportedMutation {
+        Err(Error::PatchConflict {
             operation: "sheet-props-patch",
             reason: "patch source ShtProps value does not match the target snapshot",
         })
     ));
 
-    let prefixed = Chart::open(with_prefix_unknown(&graph_fixture()), Context::graph())
+    let prefixed = Model::open(with_prefix_unknown(&graph_fixture()), Context::graph())
         .expect("same semantic chart with a shifted source record");
     let mut prefixed_edit = prefixed.edit().expect("transaction");
     prefixed_edit.set_props(after).expect("stage");
-    let prefixed_changed = prefixed_edit.commit().expect("commit").into_chart();
+    let prefixed_changed = prefixed_edit.commit().expect("commit").into_package();
     assert!(matches!(
         inverse.apply(prefixed_changed),
-        Err(Error::UnsupportedMutation {
+        Err(Error::PatchConflict {
             operation: "sheet-props-patch",
             reason: "source ShtProps record identity does not match the patch",
         })
@@ -207,7 +212,7 @@ fn inverse_and_source_identity_guards_restore_or_refuse_exactly() {
 fn invalid_flags_and_plot_area_changes_are_refused_before_publication() {
     let source = graph_fixture();
     let original = source.as_bytes().to_vec();
-    let chart = Chart::open(source, Context::graph()).expect("parsed chart");
+    let chart = Model::open(source, Context::graph()).expect("parsed chart");
     let before = chart.props();
     let mut edit = chart.edit().expect("transaction");
 
@@ -226,16 +231,14 @@ fn invalid_flags_and_plot_area_changes_are_refused_before_publication() {
             flags: before.flags,
             plot_area: !before.plot_area,
         }),
-        Err(Error::UnsupportedMutation {
-            operation: "sheet-props-patch",
-            reason: "PlotArea record presence cannot change in a fixed-record transaction",
-        })
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedOperation
+            && refusal.operation() == "sheet-props-patch"
     ));
     assert!(edit.is_empty());
     assert_eq!(
         edit.commit()
             .expect("no-op commit")
-            .into_chart()
+            .into_package()
             .encode()
             .expect("exact replay")
             .as_bytes(),

@@ -113,8 +113,8 @@ impl TryFrom<u32> for Type {
             2 => Ok(Self::Xml),
             3 => Ok(Self::QueryTable),
             _ => Err(Error::Unrecognized {
-                typ: "table type".to_string(),
-                val: format!("0x{value:08X}"),
+                typ: "table type",
+                val: "0x",
             }),
         }
     }
@@ -165,8 +165,8 @@ impl TryFrom<u32> for TotalsRowFunction {
             8 => Ok(Self::Var),
             9 => Ok(Self::Custom),
             _ => Err(Error::Unrecognized {
-                typ: "table totals-row function".to_string(),
-                val: format!("0x{value:08X}"),
+                typ: "table totals-row function",
+                val: "0x",
             }),
         }
     }

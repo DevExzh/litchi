@@ -1,7 +1,7 @@
-use litchi_xls::writer::Writer;
+use litchi_xls::writer::Builder;
 use litchi_xls::{
     Consolidation, ConsolidationBuiltInName, ConsolidationFile, ConsolidationFunction,
-    ConsolidationRange, ConsolidationSource, Workbook,
+    ConsolidationRange, ConsolidationSource, raw::Reader,
 };
 use std::fs::File;
 use std::io::Cursor;
@@ -10,7 +10,7 @@ use std::path::PathBuf;
 #[test]
 fn reads_poi_and_libreoffice_consolidation_directories() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let poi = Workbook::new(
+    let poi = Reader::new(
         File::open(root.join("test-data/poi/test-data/spreadsheet/54016.xls")).unwrap(),
     )
     .unwrap();
@@ -23,7 +23,7 @@ fn reads_poi_and_libreoffice_consolidation_directories() {
     assert_eq!((range.first_row(), range.last_row()), (1, 8));
     assert_eq!(file.encoded_path(), "\u{2}Sheet1");
 
-    let lo = Workbook::new(
+    let lo = Reader::new(
         File::open(
             root.join("test-data/libreoffice-core/sc/qa/extras/testdocuments/NamesSheetLocal.xls"),
         )
@@ -60,12 +60,12 @@ fn consolidation_round_trip_preserves_order_and_inert_paths() {
             file: Some(ConsolidationFile::new("\u{1}remote.xls\u{3}SheetA").unwrap()),
         })
         .unwrap();
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Output").unwrap();
     writer.set_consolidation(sheet, value).unwrap();
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
-    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let value = workbook.xls_worksheet(0).unwrap().consolidation().unwrap();
     assert_eq!(value.function(), ConsolidationFunction::Average);
     assert!(value.uses_left_labels() && value.creates_links());

@@ -8,13 +8,12 @@
 
 use litchi_iwa_text_wire::{
     RewriteBehavior, RewriteError, RewriteLimits, StorageRewrite, StorageRewriteExecutionLimits,
-    StorageRewriteExecutionReport, StorageRewritePrepareReport, StorageValidation,
-    decode_storage_with_limits, prepare_storage_text_rewrite_with_behavior_and_limits,
-    validate_storage_with_limits,
+    StorageRewriteExecutionReport, StorageRewritePrepareReport, StorageValidation, decode_storage,
+    prepare_storage_text_rewrite_with_behavior, validate_storage,
 };
 use std::num::NonZeroU64;
 
-use super::{BodyTableDeletionError, GraphPlan, MessageEdit, Package, table_lock};
+use super::{Error, GraphPlan, MessageEdit, Package, table_lock};
 
 const OBJECT_REPLACEMENT_CHARACTER: u16 = 0xfffc;
 const TABLE_ATTACHMENT_STORAGE_FIELD: u32 = 9;
@@ -30,39 +29,41 @@ pub(super) fn prepare(
     source: &Package,
     graph: &GraphPlan,
     budget: &mut table_lock::WireBudget,
-) -> Result<MessageEdit, BodyTableDeletionError> {
+) -> Result<MessageEdit, Error> {
     let target = &graph.request.target;
     let source_catalog = &source.state.source;
     if !source_catalog.source_is_exact() {
-        return Err(BodyTableDeletionError::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::table::deletion::Refusal::UnsupportedSource,
+        ));
     }
 
     let body_component = source_catalog
         .components()
         .get_index(target.body_component_index)
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let body_object = body_component
         .archive()
         .objects
         .get(target.body_object_index)
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if body_object.archive_info.identifier != Some(target.body_identifier.get()) {
-        return Err(BodyTableDeletionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let body_message = body_object
         .messages
         .get(target.body_message_index)
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if body_message.type_ != target.body_message_type {
-        return Err(BodyTableDeletionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let body_message_info = body_object
         .archive_info
         .message_infos
         .get(target.body_message_index)
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if body_message_info.type_ != body_message.type_ {
-        return Err(BodyTableDeletionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let attachment_identifier = target.attachment_identifier.get();
     prove_attachment_header(body_message_info, attachment_identifier, budget)?;
@@ -76,8 +77,7 @@ pub(super) fn prepare(
         .map_err(super::map_lock_error)?;
 
     let rewrite_limits = residual_rewrite_limits(source_catalog, budget)?;
-    let validation =
-        validate_storage_with_limits(payload, rewrite_limits).map_err(map_text_wire_error)?;
+    let validation = validate_storage(payload, rewrite_limits).map_err(map_text_wire_error)?;
     charge_validation(validation, rewrite_limits, budget)?;
 
     // Decode through text-wire's archive-free projection only to prove the
@@ -89,14 +89,13 @@ pub(super) fn prepare(
     // this already-proven validation; charging after it would leave the
     // temporary semantic text outside the cumulative transaction budget.
     charge_validation(validation, projection_limits, budget)?;
-    let decoded =
-        decode_storage_with_limits(payload, projection_limits).map_err(map_text_wire_error)?;
+    let decoded = decode_storage(payload, projection_limits).map_err(map_text_wire_error)?;
     let range_end = target
         .anchor_character_index
         .checked_add(1)
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if range_end > validation.utf16_len() {
-        return Err(BodyTableDeletionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     budget
         .charge_payload_work(range_end)
@@ -107,7 +106,7 @@ pub(super) fn prepare(
     // shared wire budget. Recompute the profile before the output-free plan so
     // a large source cannot borrow the full codec allowance twice.
     let rewrite_limits = residual_rewrite_limits(source_catalog, budget)?;
-    let prepared = prepare_storage_text_rewrite_with_behavior_and_limits(
+    let prepared = prepare_storage_text_rewrite_with_behavior(
         payload,
         target.anchor_character_index..range_end,
         "",
@@ -142,13 +141,13 @@ pub(super) fn prepare(
     )
 }
 
-fn prove_selected_anchor(text: &str, anchor: usize) -> Result<(), BodyTableDeletionError> {
+fn prove_selected_anchor(text: &str, anchor: usize) -> Result<(), Error> {
     text.encode_utf16()
         .enumerate()
         .find_map(|(index, unit)| (index == anchor).then_some(unit))
         .filter(|unit| *unit == OBJECT_REPLACEMENT_CHARACTER)
         .map(|_| ())
-        .ok_or(BodyTableDeletionError::InvalidSource)
+        .ok_or(Error::InvalidSource)
 }
 
 /// Prove the selected object's archive-header edge before decoding its body
@@ -159,26 +158,26 @@ fn prove_attachment_header(
     message: &litchi_iwa_core::MessageInfo,
     attachment: u64,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableDeletionError> {
+) -> Result<(), Error> {
     let mut object_references = message.object_references.len();
     let mut data_references = message.data_references.len();
     let mut scan_work = object_references
         .checked_add(message.field_infos.len())
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     for field in &message.field_infos {
         object_references = object_references
             .checked_add(field.object_references.len())
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         data_references = data_references
             .checked_add(field.data_references.len())
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         // Reserve the object membership/count and path comparison work before
         // any header scan starts. Data references are charged as inventory,
         // but deliberately never compared with the object identifier.
         scan_work = scan_work
             .checked_add(field.object_references.len())
             .and_then(|value| value.checked_add(field.path.path.len()))
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     budget
         .charge_payload_items(message.field_infos.len())
@@ -188,7 +187,7 @@ fn prove_attachment_header(
         .map_err(super::map_lock_error)?;
 
     if count_identifier(&message.object_references, attachment) != 1 {
-        return Err(BodyTableDeletionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut attachment_field_occurrences = 0usize;
     for field in &message.field_infos {
@@ -200,9 +199,9 @@ fn prove_attachment_header(
             // selected edge must occur once when field metadata declares it.
             attachment_field_occurrences = attachment_field_occurrences
                 .checked_add(occurrences)
-                .ok_or(BodyTableDeletionError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
         } else if occurrences != 0 {
-            return Err(BodyTableDeletionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     // Some valid native sources retain the selected attachment only in the
@@ -210,7 +209,7 @@ fn prove_attachment_header(
     // declares the selected edge, however, it must identify it exactly once
     // among the field-9 declarations.
     if attachment_field_occurrences > 1 {
-        return Err(BodyTableDeletionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -225,7 +224,7 @@ fn verify_anchor_rewrite(
     message_type: u32,
     object_identifier: NonZeroU64,
     budget: &mut table_lock::WireBudget,
-) -> Result<MessageEdit, BodyTableDeletionError> {
+) -> Result<MessageEdit, Error> {
     let occurrence_before = rewritten.object_reference_occurrences_before().len();
     let occurrence_after = rewritten.object_reference_occurrences_after().len();
     let removed_by_field = rewritten.removed_object_references_by_field().len();
@@ -235,18 +234,16 @@ fn verify_anchor_rewrite(
         .checked_add(
             occurrence_before
                 .checked_mul(2)
-                .ok_or(BodyTableDeletionError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )
         .and_then(|value| value.checked_add(occurrence_after.checked_mul(2)?))
         .and_then(|value| value.checked_add(removed_by_field.checked_add(4)?))
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget
         .charge_payload_work(verification_work)
         .map_err(super::map_lock_error)?;
     let expected_before = validation.utf16_len();
-    let expected_after = expected_before
-        .checked_sub(1)
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+    let expected_after = expected_before.checked_sub(1).ok_or(Error::InvalidSource)?;
     if !rewritten.changed()
         || rewritten.before_utf16_len() != expected_before
         || rewritten.after_utf16_len() != expected_after
@@ -256,7 +253,7 @@ fn verify_anchor_rewrite(
             .contains(&attachment.get())
         || rewritten.removed_object_references() != [attachment.get()]
     {
-        return Err(BodyTableDeletionError::Verification);
+        return Err(Error::Verification);
     }
 
     let removed = rewritten.removed_object_references_by_field();
@@ -277,7 +274,7 @@ fn verify_anchor_rewrite(
             attachment.get(),
         )
     {
-        return Err(BodyTableDeletionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
 
     budget
@@ -287,7 +284,7 @@ fn verify_anchor_rewrite(
     let mut remove_object_references = Vec::new();
     remove_object_references
         .try_reserve_exact(1)
-        .map_err(|_| BodyTableDeletionError::Allocation { amount: 1 })?;
+        .map_err(|_| Error::Allocation { amount: 1 })?;
     remove_object_references.push(attachment);
     let data = rewritten.into_bytes();
     Ok(MessageEdit {
@@ -312,7 +309,7 @@ fn count_identifier(values: &[u64], identifier: u64) -> usize {
 fn residual_rewrite_limits(
     source: &litchi_iwa_archive::SourceCatalog,
     budget: &table_lock::WireBudget,
-) -> Result<RewriteLimits, BodyTableDeletionError> {
+) -> Result<RewriteLimits, Error> {
     let base =
         super::super::storage_rewrite_limits(source.limits()).map_err(map_storage_limits_error)?;
     let wire = budget.wire_limits();
@@ -355,17 +352,17 @@ fn charge_validation(
     validation: StorageValidation,
     limits: RewriteLimits,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableDeletionError> {
+) -> Result<(), Error> {
     let max_depth = u32::try_from(limits.max_nesting()).unwrap_or(u32::MAX);
     let table_items = validation
         .fragments()
         .checked_add(validation.table_entries())
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let transaction_items = validation
         .utf8_len()
         .checked_add(validation.utf16_len())
         .and_then(|value| value.checked_add(validation.fragments()))
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget
         .charge_codec_report(
             validation.fields(),
@@ -381,11 +378,11 @@ fn charge_validation(
 fn charge_prepare_report(
     report: StorageRewritePrepareReport,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableDeletionError> {
+) -> Result<(), Error> {
     let items = report
         .fragments()
         .checked_add(report.table_entries())
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let transaction_work = report
         .text_bytes()
         .checked_add(report.text_units())
@@ -393,7 +390,7 @@ fn charge_prepare_report(
         .and_then(|value| value.checked_add(report.table_entries()))
         .and_then(|value| value.checked_add(report.max_nesting()))
         .and_then(|value| value.checked_add(usize::from(report.has_unknown_wire_fields())))
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget
         .charge_payload_work(report.input_bytes())
         .and_then(|_| {
@@ -412,7 +409,7 @@ fn charge_prepare_report(
 fn charge_execution_requirements(
     requirements: litchi_iwa_text_wire::StorageRewriteExecutionRequirements,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableDeletionError> {
+) -> Result<(), Error> {
     budget
         .charge_output_bytes(requirements.output_bytes())
         .and_then(|_| budget.charge_payload_work(requirements.work()))
@@ -426,7 +423,7 @@ fn charge_execution_requirements(
 fn verify_execution_report(
     rewritten: &StorageRewrite,
     requirements: litchi_iwa_text_wire::StorageRewriteExecutionRequirements,
-) -> Result<(), BodyTableDeletionError> {
+) -> Result<(), Error> {
     let report: StorageRewriteExecutionReport = rewritten.execution_report();
     if rewritten.bytes().len() != requirements.output_bytes()
         || report.retained_elements > requirements.retained_elements()
@@ -435,49 +432,47 @@ fn verify_execution_report(
         || report.allocations > requirements.allocations()
         || report.work > requirements.work()
     {
-        return Err(BodyTableDeletionError::Verification);
+        return Err(Error::Verification);
     }
     Ok(())
 }
 
-fn map_storage_limits_error(error: super::super::StorageWireLimitsError) -> BodyTableDeletionError {
+fn map_storage_limits_error(error: super::super::StorageWireLimitsError) -> Error {
     match error {
         super::super::StorageWireLimitsError::Physical(error) => super::map_archive_error(error),
         super::super::StorageWireLimitsError::Wire(error) => map_text_wire_error(error),
     }
 }
 
-fn map_text_wire_error(error: RewriteError) -> BodyTableDeletionError {
+fn map_text_wire_error(error: RewriteError) -> Error {
     match error {
         RewriteError::LimitExceeded {
             resource,
             observed,
             limit,
-        } => BodyTableDeletionError::LimitExceeded {
+        } => Error::Limit {
             kind: match resource {
-                "message bytes" => super::BodyTableDeletionLimitKind::WireBytes,
-                "fields" => super::BodyTableDeletionLimitKind::WireFields,
-                "nesting" => super::BodyTableDeletionLimitKind::WireNesting,
-                "text fragments" | "table entries" => {
-                    super::BodyTableDeletionLimitKind::PayloadItems
-                },
-                "text bytes" => super::BodyTableDeletionLimitKind::PayloadBytes,
-                "object references" => super::BodyTableDeletionLimitKind::PayloadReferences,
-                "output bytes" => super::BodyTableDeletionLimitKind::WireOutputBytes,
-                _ => super::BodyTableDeletionLimitKind::WireWork,
+                "message bytes" => super::LimitKind::WireBytes,
+                "fields" => super::LimitKind::WireFields,
+                "nesting" => super::LimitKind::WireNesting,
+                "text fragments" | "table entries" => super::LimitKind::PayloadItems,
+                "text bytes" => super::LimitKind::PayloadBytes,
+                "object references" => super::LimitKind::PayloadReferences,
+                "output bytes" => super::LimitKind::WireOutputBytes,
+                _ => super::LimitKind::WireWork,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
-        RewriteError::Allocation { amount, .. } => BodyTableDeletionError::Allocation { amount },
+        RewriteError::Allocation { amount, .. } => Error::Allocation { amount },
         RewriteError::InvalidLimit { .. }
         | RewriteError::ReversedRange { .. }
         | RewriteError::RangeOutOfBounds { .. }
         | RewriteError::SurrogateSplit { .. }
         | RewriteError::ArithmeticOverflow { .. }
         | RewriteError::InvalidFormat(_)
-        | RewriteError::Projection(_) => BodyTableDeletionError::InvalidSource,
-        _ => BodyTableDeletionError::InvalidSource,
+        | RewriteError::Projection(_) => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
@@ -493,10 +488,10 @@ mod tests {
     };
     use crate::package::table_lock;
     use litchi_iwa_common::varint::encode_varint_into;
-    use litchi_iwa_core::{FieldInfo, FieldPath, MessageInfo};
+    use litchi_iwa_core::{FieldInfo, MessageInfo};
     use litchi_iwa_text_wire::{
-        RewriteBehavior, RewriteLimits, StorageRewriteExecutionLimits, decode_storage_with_limits,
-        prepare_storage_text_rewrite_with_behavior_and_limits,
+        RewriteBehavior, RewriteLimits, StorageRewriteExecutionLimits, decode_storage,
+        prepare_storage_text_rewrite_with_behavior,
     };
 
     fn length_delimited(number: u32, payload: &[u8]) -> Vec<u8> {
@@ -552,10 +547,10 @@ mod tests {
         attachment: u64,
     ) -> litchi_iwa_text_wire::StorageRewrite {
         let limits = RewriteLimits::default();
-        let decoded = decode_storage_with_limits(source, limits).expect("valid storage");
+        let decoded = decode_storage(source, limits).expect("valid storage");
         prove_selected_anchor(decoded.storage().text(), anchor).expect("selected anchor");
         let end = anchor.checked_add(1).expect("anchor end");
-        let prepared = prepare_storage_text_rewrite_with_behavior_and_limits(
+        let prepared = prepare_storage_text_rewrite_with_behavior(
             source,
             anchor..end,
             "",
@@ -587,7 +582,7 @@ mod tests {
         let source = storage(&["before after"], &[(7, 44)]);
         assert!(prove_selected_anchor("before after", 7).is_err());
         let limits = RewriteLimits::default();
-        let decoded = decode_storage_with_limits(&source, limits).expect("valid storage");
+        let decoded = decode_storage(&source, limits).expect("valid storage");
         assert!(prove_selected_anchor(decoded.storage().text(), 7).is_err());
     }
 
@@ -601,17 +596,22 @@ mod tests {
 
     #[test]
     fn attachment_header_proof_keeps_data_namespace_collision_unrelated() {
-        let mut message = MessageInfo::new(2_001, 0);
+        let mut message = MessageInfo::new(2_001, 0, litchi_iwa_core::Limits::default()).unwrap();
         message.object_references = vec![44];
         message.data_references = vec![44];
         message.field_infos = vec![
             FieldInfo {
-                path: FieldPath::new(vec![TABLE_ATTACHMENT_STORAGE_FIELD]),
+                path: litchi_iwa_core::FieldPath::new(
+                    vec![TABLE_ATTACHMENT_STORAGE_FIELD],
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap(),
                 object_references: vec![44],
                 ..FieldInfo::default()
             },
             FieldInfo {
-                path: FieldPath::new(vec![17]),
+                path: litchi_iwa_core::FieldPath::new(vec![17], litchi_iwa_core::Limits::default())
+                    .unwrap(),
                 data_references: vec![44],
                 ..FieldInfo::default()
             },
@@ -625,10 +625,14 @@ mod tests {
 
     #[test]
     fn attachment_header_proof_allows_shared_field9_table_attachments() {
-        let mut message = MessageInfo::new(2_001, 0);
+        let mut message = MessageInfo::new(2_001, 0, litchi_iwa_core::Limits::default()).unwrap();
         message.object_references = vec![44, 55];
         message.field_infos = vec![FieldInfo {
-            path: FieldPath::new(vec![TABLE_ATTACHMENT_STORAGE_FIELD]),
+            path: litchi_iwa_core::FieldPath::new(
+                vec![TABLE_ATTACHMENT_STORAGE_FIELD],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
             object_references: vec![44, 55],
             ..FieldInfo::default()
         }];
@@ -641,16 +645,24 @@ mod tests {
 
     #[test]
     fn attachment_header_proof_allows_repeated_field9_sibling_declarations() {
-        let mut message = MessageInfo::new(2_001, 0);
+        let mut message = MessageInfo::new(2_001, 0, litchi_iwa_core::Limits::default()).unwrap();
         message.object_references = vec![44, 55];
         message.field_infos = vec![
             FieldInfo {
-                path: FieldPath::new(vec![TABLE_ATTACHMENT_STORAGE_FIELD]),
+                path: litchi_iwa_core::FieldPath::new(
+                    vec![TABLE_ATTACHMENT_STORAGE_FIELD],
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap(),
                 object_references: vec![44],
                 ..FieldInfo::default()
             },
             FieldInfo {
-                path: FieldPath::new(vec![TABLE_ATTACHMENT_STORAGE_FIELD]),
+                path: litchi_iwa_core::FieldPath::new(
+                    vec![TABLE_ATTACHMENT_STORAGE_FIELD],
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap(),
                 object_references: vec![55],
                 ..FieldInfo::default()
             },
@@ -664,7 +676,7 @@ mod tests {
 
     #[test]
     fn attachment_header_proof_allows_aggregate_only_native_inventory() {
-        let mut message = MessageInfo::new(2_001, 0);
+        let mut message = MessageInfo::new(2_001, 0, litchi_iwa_core::Limits::default()).unwrap();
         message.object_references = vec![44];
         let mut budget = table_lock::WireBudget::new(litchi_iwa_archive::Limits::default())
             .expect("default wire budget");
@@ -675,10 +687,11 @@ mod tests {
 
     #[test]
     fn attachment_header_proof_rejects_selected_object_on_wrong_path() {
-        let mut message = MessageInfo::new(2_001, 0);
+        let mut message = MessageInfo::new(2_001, 0, litchi_iwa_core::Limits::default()).unwrap();
         message.object_references = vec![44];
         message.field_infos = vec![FieldInfo {
-            path: FieldPath::new(vec![17]),
+            path: litchi_iwa_core::FieldPath::new(vec![17], litchi_iwa_core::Limits::default())
+                .unwrap(),
             object_references: vec![44],
             ..FieldInfo::default()
         }];
@@ -691,7 +704,7 @@ mod tests {
     #[test]
     fn malformed_storage_is_rejected_before_anchor_rewrite() {
         let malformed = [0x1a, 0x01, 0xff];
-        assert!(decode_storage_with_limits(&malformed, RewriteLimits::default()).is_err());
+        assert!(decode_storage(&malformed, RewriteLimits::default()).is_err());
     }
 
     #[test]
@@ -702,8 +715,8 @@ mod tests {
         assert_eq!(result.after_utf16_len(), 6);
         assert_eq!(result.removed_object_references(), [44]);
         assert_eq!(result.object_references_after(), [55]);
-        let decoded = decode_storage_with_limits(result.bytes(), RewriteLimits::default())
-            .expect("rewritten storage");
+        let decoded =
+            decode_storage(result.bytes(), RewriteLimits::default()).expect("rewritten storage");
         assert_eq!(decoded.storage().text(), "😀xy\u{fffc}z");
     }
 

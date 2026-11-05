@@ -1,8 +1,9 @@
 //! Owned chart snapshots, transactional edits, and reversible package patches.
 
 use super::{Limits, Part, Selector, inventory, model::Chart, package};
-use crate::package::Package;
+use crate::package::Archive;
 use litchi_core::{Error, Result};
+use litchi_odf_common::XmlStreamLimits;
 
 /// Immutable embedded-chart inventory tied to exact ODS package bytes.
 #[derive(Clone, Debug)]
@@ -10,6 +11,7 @@ pub struct Snapshot {
     source: Vec<u8>,
     limits: Limits,
     charts: Vec<Chart>,
+    xml_limits: XmlStreamLimits,
 }
 
 impl Snapshot {
@@ -26,12 +28,21 @@ impl Snapshot {
     /// # Errors
     /// Returns an error when the operation cannot be completed.
     pub fn from_bytes_with(source: Vec<u8>, limits: Limits) -> Result<Self> {
-        let package = Package::from_bytes(source.clone())?;
+        Self::from_bytes_with_xml_limits(source, limits, XmlStreamLimits::owner_default_value())
+    }
+
+    pub(crate) fn from_bytes_with_xml_limits(
+        source: Vec<u8>,
+        limits: Limits,
+        xml_limits: XmlStreamLimits,
+    ) -> Result<Self> {
+        let package = Archive::from_bytes_with_xml_limits(source.clone(), xml_limits)?;
         let charts = inventory(&package, limits)?.charts;
         Ok(Self {
             source,
             limits,
             charts,
+            xml_limits,
         })
     }
 
@@ -66,7 +77,7 @@ impl Snapshot {
 
     /// Start a source-checked, failure-atomic edit.
     #[must_use]
-    pub fn edit(&self) -> Edit {
+    pub(crate) fn edit(&self) -> Edit {
         Edit {
             before: self.clone(),
             draft: self.charts.clone(),
@@ -114,8 +125,8 @@ impl Edit {
         Ok(())
     }
 
-    /// Restore the exact source candidate.
-    pub fn rollback(&mut self) {
+    /// Discard every staged change in place.
+    pub fn reset(&mut self) {
         self.draft = self.before.charts.clone();
     }
 
@@ -123,12 +134,19 @@ impl Edit {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
         let changed = self.before.charts != self.draft;
         let snapshot = if changed {
-            let package_source = Package::from_bytes(self.before.source.clone())?;
+            let package_source = Archive::from_bytes_with_xml_limits(
+                self.before.source.clone(),
+                self.before.xml_limits,
+            )?;
             let bytes = package::replace(&package_source, &self.before.charts, &self.draft)?;
-            let result = Snapshot::from_bytes_with(bytes, self.before.limits)?;
+            let result = Snapshot::from_bytes_with_xml_limits(
+                bytes,
+                self.before.limits,
+                self.before.xml_limits,
+            )?;
             if result.charts != self.draft {
                 return Err(Error::InvalidFormat(
                     "ODS chart commit failed typed readback".to_string(),
@@ -138,87 +156,21 @@ impl Edit {
         } else {
             self.before.clone()
         };
-        Ok(Commit {
-            changed,
-            patch: Patch {
-                source: self.before.source,
-                target: snapshot.source.clone(),
-                limits: snapshot.limits,
-            },
-            snapshot,
-        })
-    }
-}
-
-/// Reversible patch guarded by exact complete-package source bytes.
-#[derive(Clone, Debug)]
-pub struct Patch {
-    source: Vec<u8>,
-    target: Vec<u8>,
-    limits: Limits,
-}
-
-impl Patch {
-    /// Whether this patch is physically empty.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.source == self.target
-    }
-
-    /// Return the patch restoring the exact accepted source package.
-    #[must_use]
-    pub fn inverse(&self) -> Self {
-        Self {
-            source: self.target.clone(),
-            target: self.source.clone(),
-            limits: self.limits,
-        }
-    }
-
-    /// Apply this patch only to its exact source snapshot.
-    ///
-    /// # Errors
-    /// Returns an error when the operation cannot be completed.
-    pub fn apply(&self, snapshot: &Snapshot) -> Result<Commit> {
-        if snapshot.source != self.source {
-            return Err(Error::InvalidFormat(
-                "ODS chart patch source snapshot does not match".to_string(),
-            ));
-        }
-        let target = Snapshot::from_bytes_with(self.target.clone(), self.limits)?;
-        Ok(Commit {
-            changed: !self.is_empty(),
-            patch: self.clone(),
-            snapshot: target,
-        })
+        Ok(Commit { snapshot })
     }
 }
 
 /// A fully rehydrated chart publication.
 #[derive(Clone, Debug)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
-    patch: Patch,
-    changed: bool,
 }
 
 impl Commit {
-    /// Whether package bytes changed.
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-
     /// Resulting immutable snapshot.
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
-    }
-
-    /// Reversible exact-source patch.
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
     }
 }
 

@@ -49,7 +49,7 @@ fn chart_style() -> String {
 #[test]
 fn parses_schema_owned_chart_style_without_package_types() {
     let xml = chart_style();
-    let document = style::parse(xml.as_bytes()).unwrap();
+    let document = style::parse(xml.as_bytes(), &litchi_drawingml::chart::Limits::DEFAULT).unwrap();
 
     assert_eq!(document.info().entries.len(), 30);
     assert_eq!(document.info().entries[0].kind, EntryKind::AxisTitle);
@@ -61,10 +61,17 @@ fn parses_color_style_and_rejects_invalid_color() {
     let xml = format!(
         r#"<cs:colorStyle xmlns:cs="{CS}" xmlns:a="{A}" meth="cycle" id="7"><a:srgbClr val="FF0000"><a:shade val="50000"/></a:srgbClr><cs:variation><a:tint val="20000"/></cs:variation></cs:colorStyle>"#
     );
-    let document = style::parse_color(xml.as_bytes()).unwrap();
+    let document =
+        style::parse_color(xml.as_bytes(), &litchi_drawingml::chart::Limits::DEFAULT).unwrap();
 
     assert_eq!(document.info().effective_method, ColorMethod::Cycle);
     assert_eq!(document.info().colors.len(), 1);
     assert_eq!(document.info().variations.len(), 1);
-    assert!(style::parse_color(xml.replace("FF0000", "GG0000").as_bytes()).is_err());
+    assert!(
+        style::parse_color(
+            xml.replace("FF0000", "GG0000").as_bytes(),
+            &litchi_drawingml::chart::Limits::DEFAULT,
+        )
+        .is_err()
+    );
 }

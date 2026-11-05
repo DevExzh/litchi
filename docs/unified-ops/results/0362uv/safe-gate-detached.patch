@@ -1,0 +1,241 @@
+--- a/run_safe_gate.py
++++ b/run_safe_gate.py
+@@ -12,0 +13 @@
++import ctypes
+@@ -20,0 +22 @@
++import threading
+@@ -33,0 +36,4 @@
++PRE_EXIT_POLL_SECONDS = 0.01
++PR_SET_CHILD_SUBREAPER = 36
++_SUBREAPER_ENABLED = False
++_SUBREAPER_ERROR: str | None = None
+@@ -85,4 +91,8 @@
+-            stat = (entry / "stat").read_text().split()
+-            ppid = int(stat[3])
+-            pgrp = int(stat[4])
+-        except (FileNotFoundError, PermissionError, ValueError):
++            stat = (entry / "stat").read_text()
++            close = stat.rfind(")")
++            fields = stat[close + 2 :].split()
++            ppid = int(fields[1])
++            pgrp = int(fields[2])
++            session = int(fields[3])
++            start_time = int(fields[19])
++        except (FileNotFoundError, PermissionError, ValueError, IndexError):
+@@ -93,0 +104,2 @@
++            "session": session,
++            "start_time": start_time,
+@@ -100,0 +113,37 @@
++def process_key(row: dict) -> tuple[int, int | None]:
++    return (int(row["pid"]), row.get("start_time"))
++
++
++def process_output(row: dict) -> dict:
++    return {
++        key: row.get(key)
++        for key in ("pid", "ppid", "pgrp", "session", "start_time", "executable", "cwd", "command")
++    }
++
++
++def enable_child_subreaper() -> None:
++    """Make this runner the reaper for descendants orphaned by a step.
++
++    ``start_new_session`` gives each step a private process group, but a
++    helper that calls ``setsid`` escapes that group. Linux subreaper adoption
++    keeps such a helper in this runner's observable process tree without
++    signalling or reaping any process that the runner did not start.
++    """
++    global _SUBREAPER_ENABLED, _SUBREAPER_ERROR
++    if _SUBREAPER_ENABLED:
++        return
++    if sys.platform != "linux":
++        raise RuntimeError("safe gate requires Linux child-subreaper support")
++    try:
++        libc = ctypes.CDLL(None, use_errno=True)
++        result = libc.prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0)
++        if result != 0:
++            error = ctypes.get_errno()
++            raise OSError(error, os.strerror(error))
++    except (OSError, AttributeError) as error:
++        _SUBREAPER_ERROR = repr(error)
++        raise RuntimeError(f"cannot enable child subreaper: {error}") from error
++    _SUBREAPER_ENABLED = True
++    _SUBREAPER_ERROR = None
++
++
+@@ -142,4 +191,16 @@
+-def owned_processes(process_pid: int, info: dict[int, dict] | None = None) -> list[dict]:
+-    """Return processes still in the child process group or subtree."""
+-    info = process_table() if info is None else info
+-    descendants = {process_pid}
++def _path_related(row: dict, root: Path, target: Path) -> bool:
++    root_text = str(root)
++    target_text = str(target)
++    return any(
++        value == root_text
++        or value.startswith(root_text + "/")
++        or value == target_text
++        or value.startswith(target_text + "/")
++        or root_text in value
++        or target_text in value
++        for value in (row.get("cwd", ""), row.get("command", ""))
++    )
++
++
++def _descendant_pids(info: dict[int, dict], roots: set[int]) -> set[int]:
++    descendants = set(roots)
+@@ -153 +214,41 @@
+-    rows = []
++    return descendants
++
++
++def new_ownership(
++    process_pid: int,
++    root: Path,
++    target: Path,
++    prelaunch: dict[int, dict],
++    launch: dict[int, dict],
++) -> dict:
++    """Create identities used to follow a step across reparenting and setsid."""
++    root_row = launch.get(process_pid)
++    return {
++        "process_pid": process_pid,
++        "runner_pid": os.getpid(),
++        "root_identity": process_key(root_row) if root_row else (process_pid, None),
++        "root_pgrps": {root_row["pgrp"]} if root_row else {process_pid},
++        "known": {},
++        "pgrps": set(),
++        "preexisting_runner_children": {
++            process_key(row)
++            for row in prelaunch.values()
++            if row["ppid"] == os.getpid()
++        },
++        "root": str(root),
++        "target": str(target),
++    }
++
++
++def _capture_owned(ownership: dict, info: dict[int, dict]) -> None:
++    """Capture live identities before a fast child can disappear or reparent."""
++    process_pid = ownership["process_pid"]
++    root_row = info.get(process_pid)
++    root_matches = root_row and process_key(root_row) == ownership["root_identity"]
++    if root_matches:
++        ownership["root_pgrps"].add(root_row["pgrp"])
++    roots = {process_pid} if root_matches else set()
++    descendants = _descendant_pids(info, roots)
++    root = Path(ownership["root"])
++    target = Path(ownership["target"])
++    runner_pid = ownership["runner_pid"]
+@@ -155,3 +256,26 @@
+-        if pid in descendants or row["pgrp"] == process_pid:
+-            rows.append({key: row[key] for key in ("pid", "ppid", "pgrp", "executable", "cwd", "command")})
+-    return rows
++        identity = process_key(row)
++        adopted = (
++            row["ppid"] == runner_pid
++            and identity not in ownership["preexisting_runner_children"]
++            and _path_related(row, root, target)
++        )
++        if pid in descendants or row["pgrp"] in ownership["root_pgrps"] or adopted:
++            ownership["known"][identity] = process_output(row)
++            ownership["pgrps"].add(row["pgrp"])
++
++    # A captured helper may fork after its original parent has exited. Follow
++    # that helper's current descendants as well, even after it changes session.
++    known_pids = {identity[0] for identity in ownership["known"]}
++    changed = True
++    while changed:
++        changed = False
++        for pid, row in info.items():
++            identity = process_key(row)
++            parent = info.get(row["ppid"])
++            parent_known = parent is not None and process_key(parent) in ownership["known"]
++            if parent_known and identity not in ownership["known"]:
++                ownership["known"][identity] = process_output(row)
++                ownership["pgrps"].add(row["pgrp"])
++                known_pids.add(pid)
++                changed = True
++
+@@ -158,0 +283,17 @@
++def owned_processes(
++    process_pid: int,
++    info: dict[int, dict] | None = None,
++    ownership: dict | None = None,
++) -> list[dict]:
++    """Return live processes owned by a step, including reparented helpers."""
++    info = process_table() if info is None else info
++    if ownership is None:
++        descendants = _descendant_pids(info, {process_pid})
++        return [process_output(row) for pid, row in info.items() if pid in descendants or row["pgrp"] == process_pid]
++    _capture_owned(ownership, info)
++    known = set(ownership["known"])
++    return [
++        process_output(row)
++        for row in info.values()
++        if process_key(row) in known or row["pgrp"] in ownership["pgrps"]
++    ]
+@@ -160 +301,8 @@
+-def owned_builders(process_pid: int, root: Path, target: Path, info: dict[int, dict] | None = None) -> list[dict]:
++
++def owned_builders(
++    process_pid: int,
++    root: Path,
++    target: Path,
++    info: dict[int, dict] | None = None,
++    ownership: dict | None = None,
++) -> list[dict]:
+@@ -163,3 +311 @@
+-    owned = {row["pid"]: row for row in owned_processes(process_pid, info)}
+-    root_text = str(root)
+-    target_text = str(target)
++    owned = {process_key(row) for row in owned_processes(process_pid, info, ownership)}
+@@ -167 +313 @@
+-    for pid, row in info.items():
++    for row in info.values():
+@@ -170,8 +316,2 @@
+-        rooted = (
+-            row["cwd"] == root_text
+-            or row["cwd"].startswith(root_text + "/")
+-            or root_text in row["command"]
+-            or target_text in row["command"]
+-        )
+-        if pid in owned or rooted:
+-            rows.append({key: row[key] for key in ("pid", "ppid", "pgrp", "executable", "cwd", "command")})
++        if process_key(row) in owned or _path_related(row, root, target):
++            rows.append(process_output(row))
+@@ -181 +321 @@
+-def post_exit_guard(process_pid: int, root: Path, target: Path) -> dict:
++def post_exit_guard(process_pid: int, root: Path, target: Path, ownership: dict | None = None) -> dict:
+@@ -189,2 +329,2 @@
+-        owned = owned_processes(process_pid, info)
+-        leaked = owned_builders(process_pid, root, target, info)
++        owned = owned_processes(process_pid, info, ownership)
++        leaked = owned_builders(process_pid, root, target, info, ownership)
+@@ -324,0 +465,13 @@
++def capture_step_identities(process: subprocess.Popen, ownership: dict) -> None:
++    """Poll while the top-level child lives so fast forks are not missed."""
++    try:
++        while True:
++            _capture_owned(ownership, process_table())
++            if process.poll() is not None:
++                _capture_owned(ownership, process_table())
++                return
++            time.sleep(PRE_EXIT_POLL_SECONDS)
++    except BaseException as error:
++        ownership["monitor_error"] = repr(error)
++
++
+@@ -334,0 +488,2 @@
++    prelaunch = process_table()
++    enable_child_subreaper()
+@@ -340,0 +496,3 @@
++    ownership = new_ownership(process.pid, root, target, prelaunch, process_table())
++    monitor = threading.Thread(target=capture_step_identities, args=(process, ownership), name=f"gate-owner-{process.pid}")
++    monitor.start()
+@@ -347 +505,4 @@
+-    post_exit = post_exit_guard(process.pid, root, target)
++    monitor.join()
++    if ownership.get("monitor_error"):
++        raise RuntimeError(f"process identity monitor failed: {ownership['monitor_error']}")
++    post_exit = post_exit_guard(process.pid, root, target, ownership)

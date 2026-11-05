@@ -19,7 +19,7 @@
     reason = "DrawingML authoring uses checked object IDs, offsets, sizes, and relationship identities"
 )]
 
-use crate::chart::Chart;
+use crate::builder::chart::Chart;
 use crate::package::error::{Error, Result};
 use crate::writer::Image;
 use crate::writer::shape::{ConnectionShapeSpec, Emitter, GroupSpec, ShapeSpec};
@@ -39,10 +39,13 @@ pub(crate) fn validate_chart(chart: &Chart) -> Result<()> {
 }
 
 /// Serialize the single absolute-anchored chart frame used by a chart sheet.
-pub(crate) fn serialize_chart_sheet_drawing(title: &str) -> Result<Vec<u8>> {
+pub(crate) fn serialize_chart_sheet_drawing(
+    title: &str,
+    xml_limits: litchi_core::Limits,
+) -> Result<Vec<u8>> {
     if title.encode_utf16().count() > 32_767 || title.contains('\0') {
         return Err(Error::InvalidFormula(
-            "chart-sheet drawing title is too long or contains NUL".to_string(),
+            "chart-sheet drawing title is too long or contains NUL",
         ));
     }
     let xml = format!(
@@ -55,7 +58,7 @@ pub(crate) fn serialize_chart_sheet_drawing(title: &str) -> Result<Vec<u8>> {
             found: xml.len(),
         });
     }
-    crate::package::drawing::parse_drawing_part(xml.as_bytes())?;
+    crate::package::drawing::parse_drawing_part(xml.as_bytes(), xml_limits)?;
     Ok(xml.into_bytes())
 }
 
@@ -65,7 +68,9 @@ pub(crate) fn serialize_drawing(
     shapes: &[ShapeSpec],
     groups: &[GroupSpec],
     connections: &[ConnectionShapeSpec],
+    xml_limits: litchi_core::Limits,
 ) -> Result<Vec<u8>> {
+    let shape_limits = crate::shapes::Limits::from_core(xml_limits);
     if images.is_empty()
         && charts.is_empty()
         && shapes.is_empty()
@@ -73,16 +78,15 @@ pub(crate) fn serialize_drawing(
         && connections.is_empty()
     {
         return Err(Error::InvalidFormula(
-            "worksheet drawing requires at least one drawing object".to_string(),
+            "worksheet drawing requires at least one drawing object",
         ));
     }
     if images.len() > crate::package::drawing_image::MAX_XLSB_WORKSHEET_IMAGES
         || charts.len() > MAX_CHARTS_PER_SHEET
     {
-        return Err(Error::InvalidFormula(format!(
-            "worksheet drawing exceeds the {} image or {MAX_CHARTS_PER_SHEET} chart safety limit",
-            crate::package::drawing_image::MAX_XLSB_WORKSHEET_IMAGES
-        )));
+        return Err(Error::InvalidFormula(
+            "worksheet drawing exceeds the image or chart safety limit",
+        ));
     }
     let mut total_image_bytes = 0usize;
     for image in images {
@@ -117,8 +121,16 @@ pub(crate) fn serialize_drawing(
         .checked_add(charts.len())
         .and_then(|count| count.checked_add(1))
         .and_then(|id| u32::try_from(id).ok())
-        .ok_or_else(|| Error::InvalidFormula("worksheet drawing object ID overflow".to_string()))?;
-    let mut emitter = Emitter::for_objects(first_shape_id, shapes, groups, connections)?;
+        .ok_or(Error::InvalidFormula(
+            "worksheet drawing object ID overflow",
+        ))?;
+    let mut emitter = Emitter::for_objects(
+        first_shape_id,
+        shapes,
+        groups,
+        connections,
+        shape_limits.geometry,
+    )?;
     for shape in shapes {
         emitter.write_anchored_shape(&mut xml, shape)?;
         ensure_drawing_size(xml.len())?;
@@ -135,11 +147,11 @@ pub(crate) fn serialize_drawing(
     ensure_drawing_size(xml.len())?;
     // The detailed shared reader verifies the complete shape/group/connector
     // grammar in addition to the lightweight XLSB drawing inventory below.
-    crate::shapes::read(&xml)?
-        .ok_or_else(|| Error::Encoding("authored drawing lacks an xdr:wsDr root".to_string()))?;
+    crate::shapes::read(&xml, &shape_limits)?
+        .ok_or(Error::Encoding("authored drawing lacks an xdr:wsDr root"))?;
     let bytes = xml.into_bytes();
     // The XLSB drawing inventory reader is the package-load oracle.
-    crate::package::drawing::parse_drawing_part(&bytes)?;
+    crate::package::drawing::parse_drawing_part(&bytes, xml_limits)?;
     Ok(bytes)
 }
 
@@ -157,7 +169,9 @@ fn write_image_anchor(xml: &mut String, image: &Image, index: usize) -> Result<(
     let object_id = index
         .checked_add(1)
         .and_then(|value| u32::try_from(value).ok())
-        .ok_or_else(|| Error::InvalidFormula("worksheet picture object ID overflow".to_string()))?;
+        .ok_or(Error::InvalidFormula(
+            "worksheet picture object ID overflow",
+        ))?;
     write_image_anchor_with_ids(xml, image, object_id, &format!("rId{object_id}"), false)
 }
 
@@ -166,9 +180,11 @@ pub(crate) fn append_image_anchor(
     image: &Image,
     object_id: u32,
     relationship_id: &str,
+    xml_limits: litchi_core::Limits,
 ) -> Result<Vec<u8>> {
+    let shape_limits = crate::shapes::Limits::from_core(xml_limits);
     image.validate()?;
-    let _inventory = crate::package::drawing::parse_drawing_part(source)?;
+    let _inventory = crate::package::drawing::parse_drawing_part(source, xml_limits)?;
     let root_end = drawing_root_end(source)?;
     let mut anchor = String::new();
     write_image_anchor_with_ids(&mut anchor, image, object_id, relationship_id, true)?;
@@ -184,18 +200,23 @@ pub(crate) fn append_image_anchor(
     output.extend_from_slice(&source[..root_end]);
     output.extend_from_slice(anchor.as_bytes());
     output.extend_from_slice(&source[root_end..]);
-    let _inventory = crate::package::drawing::parse_drawing_part(&output)?;
+    let _inventory = crate::package::drawing::parse_drawing_part(&output, xml_limits)?;
     let xml = std::str::from_utf8(&output)
-        .map_err(|error| Error::Encoding(format!("drawing XML is not UTF-8: {error}")))?;
-    crate::shapes::read(xml)?
-        .ok_or_else(|| Error::Encoding("appended drawing lacks an xdr:wsDr root".to_string()))?;
+        .map_err(|_error| Error::Encoding("drawing XML is not UTF-8"))?;
+    crate::shapes::read(xml, &shape_limits)?
+        .ok_or(Error::Encoding("appended drawing lacks an xdr:wsDr root"))?;
     Ok(output)
 }
 
 /// Append already validated, self-contained top-level anchors while retaining
 /// every byte of the existing drawing part.
-pub(crate) fn append_drawing_anchors(source: &[u8], anchors: &[Vec<u8>]) -> Result<Vec<u8>> {
-    let before = crate::package::drawing::parse_drawing_part(source)?;
+pub(crate) fn append_drawing_anchors(
+    source: &[u8],
+    anchors: &[Vec<u8>],
+    xml_limits: litchi_core::Limits,
+) -> Result<Vec<u8>> {
+    let shape_limits = crate::shapes::Limits::from_core(xml_limits);
+    let before = crate::package::drawing::parse_drawing_part(source, xml_limits)?;
     let root_end = drawing_root_end(source)?;
     let added = anchors.iter().try_fold(0usize, |total, anchor| {
         total
@@ -223,7 +244,7 @@ pub(crate) fn append_drawing_anchors(source: &[u8], anchors: &[Vec<u8>]) -> Resu
         output.extend_from_slice(anchor);
     }
     output.extend_from_slice(&source[root_end..]);
-    let after = crate::package::drawing::parse_drawing_part(&output)?;
+    let after = crate::package::drawing::parse_drawing_part(&output, xml_limits)?;
     let expected =
         before
             .anchors
@@ -234,33 +255,36 @@ pub(crate) fn append_drawing_anchors(source: &[u8], anchors: &[Vec<u8>]) -> Resu
             })?;
     if after.anchors.len() != expected {
         return Err(Error::InvalidFormat(
-            "appended drawing anchors failed inventory readback".to_string(),
+            "appended drawing anchors failed inventory readback",
         ));
     }
     let xml = std::str::from_utf8(&output)
-        .map_err(|error| Error::Encoding(format!("drawing XML is not UTF-8: {error}")))?;
-    crate::shapes::read(xml)?
-        .ok_or_else(|| Error::Encoding("appended drawing lacks an xdr:wsDr root".to_string()))?;
+        .map_err(|_error| Error::Encoding("drawing XML is not UTF-8"))?;
+    crate::shapes::read(xml, &shape_limits)?
+        .ok_or(Error::Encoding("appended drawing lacks an xdr:wsDr root"))?;
     Ok(output)
 }
 
-pub(crate) fn next_drawing_object_id(source: &[u8]) -> Result<u32> {
-    let _inventory = crate::package::drawing::parse_drawing_part(source)?;
+pub(crate) fn next_drawing_object_id(
+    source: &[u8],
+    xml_limits: litchi_core::Limits,
+) -> Result<u32> {
+    let _inventory = crate::package::drawing::parse_drawing_part(source, xml_limits)?;
     let mut reader = quick_xml::Reader::from_reader(source);
     let mut maximum = 0u32;
     loop {
         match reader
             .read_event()
-            .map_err(|error| Error::Encoding(format!("invalid drawing XML: {error}")))?
+            .map_err(|_error| Error::Encoding("invalid drawing XML"))?
         {
             quick_xml::events::Event::Start(element) | quick_xml::events::Event::Empty(element)
                 if element.local_name().as_ref() == b"cNvPr" =>
             {
                 if let Some(value) = unqualified_attribute_value(&element, b"id", reader.decoder())?
                 {
-                    let id = value.parse::<u32>().map_err(|error| {
-                        Error::Encoding(format!("drawing object ID is not u32: {error}"))
-                    })?;
+                    let id = value
+                        .parse::<u32>()
+                        .map_err(|_error| Error::Encoding("drawing object ID is not u32"))?;
                     maximum = maximum.max(id);
                 }
             },
@@ -279,7 +303,7 @@ pub(crate) fn next_drawing_object_id(source: &[u8]) -> Result<u32> {
     }
     maximum
         .checked_add(1)
-        .ok_or_else(|| Error::InvalidFormula("drawing object ID overflow".to_string()))
+        .ok_or(Error::InvalidFormula("drawing object ID overflow"))
 }
 
 fn drawing_root_end(source: &[u8]) -> Result<usize> {
@@ -291,28 +315,26 @@ fn drawing_root_end(source: &[u8]) -> Result<usize> {
     loop {
         let position = origin
             .offset(reader.buffer_position())
-            .ok_or_else(|| Error::Encoding("drawing XML position exceeds usize".to_string()))?;
+            .ok_or(Error::Encoding("drawing XML position exceeds usize"))?;
         match reader
             .read_event()
-            .map_err(|error| Error::Encoding(format!("invalid drawing XML: {error}")))?
+            .map_err(|_error| Error::Encoding("invalid drawing XML"))?
         {
             quick_xml::events::Event::Start(_) => {
-                depth = depth.checked_add(1).ok_or_else(|| {
-                    Error::Encoding("drawing XML nesting depth overflow".to_string())
-                })?;
+                depth = depth
+                    .checked_add(1)
+                    .ok_or(Error::Encoding("drawing XML nesting depth overflow"))?;
             },
             quick_xml::events::Event::End(element) => {
                 if depth == 1 && element.local_name().as_ref() == b"wsDr" {
                     return Ok(position);
                 }
-                depth = depth.checked_sub(1).ok_or_else(|| {
-                    Error::Encoding("drawing XML has an unmatched end element".to_string())
-                })?;
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or(Error::Encoding("drawing XML has an unmatched end element"))?;
             },
             quick_xml::events::Event::Eof => {
-                return Err(Error::Encoding(
-                    "drawing XML has no closing wsDr element".to_string(),
-                ));
+                return Err(Error::Encoding("drawing XML has no closing wsDr element"));
             },
             quick_xml::events::Event::Empty(_)
             | quick_xml::events::Event::Text(_)
@@ -349,7 +371,7 @@ fn write_image_anchor_with_ids(
         anchor.from_row,
         anchor.from_row_offset
     )
-    .map_err(|error| Error::Encoding(error.to_string()))?;
+    .map_err(|_error| Error::Encoding("the text cannot be decoded"))?;
     write!(
         xml,
         "<xdr:to><xdr:col>{}</xdr:col><xdr:colOff>{}</xdr:colOff><xdr:row>{}</xdr:row><xdr:rowOff>{}</xdr:rowOff></xdr:to>",
@@ -358,21 +380,21 @@ fn write_image_anchor_with_ids(
         anchor.to_row,
         anchor.to_row_offset
     )
-    .map_err(|error| Error::Encoding(error.to_string()))?;
+    .map_err(|_error| Error::Encoding("the text cannot be decoded"))?;
     write!(
         xml,
         r#"<xdr:pic><xdr:nvPicPr><xdr:cNvPr id="{object_id}" name="Picture {object_id}""#
     )
-    .map_err(|error| Error::Encoding(error.to_string()))?;
+    .map_err(|_error| Error::Encoding("the text cannot be decoded"))?;
     if let Some(description) = image.description() {
         write!(xml, r#" descr="{}""#, escape_xml(description))
-            .map_err(|error| Error::Encoding(error.to_string()))?;
+            .map_err(|_error| Error::Encoding("the text cannot be decoded"))?;
     }
     write!(
         xml,
         r#"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="{}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:twoCellAnchor>"#,
         escape_xml(relationship_id)
     )
-    .map_err(|error| Error::Encoding(error.to_string()))?;
+    .map_err(|_error| Error::Encoding("the text cannot be decoded"))?;
     Ok(())
 }

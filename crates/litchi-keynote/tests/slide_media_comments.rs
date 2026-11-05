@@ -20,7 +20,10 @@ use litchi_iwa_common::{
 };
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsd, tsp};
-use litchi_keynote::{MediaPart, MovieSelector, Package, SlideMediaLifecycleError, SlideSelector};
+use litchi_keynote::{
+    MovieSelector, Package, SlideSelector, slide::media::data::MediaPart,
+    slide::media::lifecycle::Error as SlideMediaLifecycleError,
+};
 use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -191,15 +194,15 @@ fn read_fixture_override(environment: &str, fixture: &[u8]) -> TestResult<Vec<u8
 
 fn native_component_archives(source: &[u8]) -> TestResult<Vec<(String, Archive)>> {
     let mut archives = Vec::new();
-    for entry in Catalog::from_bytes(source)?.iter() {
+    for entry in Catalog::from_bytes(source, Default::default())?.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = match SnappyStream::decompress(entry.data()) {
+        let stream = match SnappyStream::decompress(entry.data(), Default::default()) {
             Ok(stream) => stream.into_bytes(),
             Err(_) => continue,
         };
-        let archive = match Archive::parse(&stream) {
+        let archive = match Archive::parse(&stream, Default::default()) {
             Ok(archive) => archive,
             Err(_) => continue,
         };
@@ -331,15 +334,15 @@ fn native_component_stream_containing_object(
     source: &[u8],
     identifier: u64,
 ) -> TestResult<(String, Vec<u8>)> {
-    for entry in Catalog::from_bytes(source)?.iter() {
+    for entry in Catalog::from_bytes(source, Default::default())?.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = match SnappyStream::decompress(entry.data()) {
+        let stream = match SnappyStream::decompress(entry.data(), Default::default()) {
             Ok(stream) => stream.into_bytes(),
             Err(_) => continue,
         };
-        let archive = match Archive::parse(&stream) {
+        let archive = match Archive::parse(&stream, Default::default()) {
             Ok(archive) => archive,
             Err(_) => continue,
         };
@@ -353,11 +356,7 @@ fn native_component_stream_containing_object(
     .into())
 }
 
-fn native_object_message<'a>(
-    archive: &'a Archive,
-    identifier: u64,
-    type_: u32,
-) -> TestResult<&'a [u8]> {
+fn native_object_message(archive: &Archive, identifier: u64, type_: u32) -> TestResult<&[u8]> {
     archive
         .object(identifier)
         .and_then(|object| {
@@ -376,7 +375,7 @@ fn replace_native_component_archive(
     component_name: &str,
     archive: Archive,
 ) -> TestResult<Vec<u8>> {
-    let bytes = archive.to_bytes()?;
+    let bytes = archive.to_bytes(Default::default())?;
     replace_native_component_stream(source, component_name, &bytes)
 }
 
@@ -421,6 +420,7 @@ fn replace_native_object_payload(
             type_: message_type,
             data: payload,
         },
+        Default::default(),
     )?;
     replace_native_component_archive(source, &component_name, archive)
 }
@@ -432,7 +432,7 @@ fn with_unknown_archive_info_field(
     payload: &[u8],
 ) -> TestResult<Vec<u8>> {
     let (component_name, bytes) = native_component_stream_containing_object(source, identifier)?;
-    let archive = Archive::parse(&bytes)?;
+    let archive = Archive::parse(&bytes, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other(format!("missing archive object {identifier}")))?;
@@ -457,15 +457,20 @@ fn with_unknown_archive_info_field(
         .get(header_start..header_end)
         .ok_or_else(|| io::Error::other("archive object header range is invalid"))?
         .to_vec();
-    append_length_delimited_field(&mut header, field_number, payload)?;
+    append_length_delimited_field(
+        &mut header,
+        field_number,
+        payload,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
 
     let mut modified = Vec::with_capacity(bytes.len().saturating_add(header.len()));
     modified.extend_from_slice(&bytes[..header_offset]);
     encode_varint_into(&mut modified, u64::try_from(header.len())?);
     modified.extend_from_slice(&header);
     modified.extend_from_slice(&bytes[data_offset..]);
-    let reparsed = Archive::parse(&modified)?;
-    assert_eq!(reparsed.to_bytes()?, modified);
+    let reparsed = Archive::parse(&modified, Default::default())?;
+    assert_eq!(reparsed.to_bytes(Default::default())?, modified);
     replace_native_component_stream(source, &component_name, &modified)
 }
 
@@ -474,8 +479,8 @@ fn replace_native_component_stream(
     component_name: &str,
     bytes: &[u8],
 ) -> TestResult<Vec<u8>> {
-    let replacement = SnappyStream::compress(bytes)?;
-    let catalog = Catalog::from_bytes(source)?;
+    let replacement = SnappyStream::compress(bytes, Default::default())?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entries = catalog
         .iter()
         .map(|entry| {
@@ -499,7 +504,7 @@ fn with_native_movie_comment_reference_mutation(
     let (_, archive) = native_component_containing_object(source, NATIVE_COMMENT_MOVIE)?;
     let movie_payload =
         native_object_message(&archive, NATIVE_COMMENT_MOVIE, NATIVE_MOVIE_MESSAGE_TYPE)?.to_vec();
-    let root = WireView::parse(&movie_payload)?;
+    let root = WireView::parse(&movie_payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut rewritten_root = Vec::with_capacity(movie_payload.len().saturating_add(8));
     let mut changed = false;
     for root_field in root.fields() {
@@ -507,7 +512,8 @@ fn with_native_movie_comment_reference_mutation(
             rewritten_root.extend_from_slice(root_field.raw());
             continue;
         }
-        let drawable = WireView::parse(root_field.payload())?;
+        let drawable =
+            WireView::parse(root_field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
         let mut rewritten_drawable =
             Vec::with_capacity(root_field.payload().len().saturating_add(8));
         for drawable_field in drawable.fields() {
@@ -525,16 +531,27 @@ fn with_native_movie_comment_reference_mutation(
                         &mut reference,
                         99,
                         UNKNOWN_COMMENT_REFERENCE_MARKER,
+                        litchi_iwa_common::WireLimits::DEFAULT,
                     )?;
                 },
                 MovieCommentReferenceMutation::DeprecatedType => {
                     append_varint_field(&mut reference, 2, 1)?;
                 },
             }
-            append_length_delimited_field(&mut rewritten_drawable, 6, &reference)?;
+            append_length_delimited_field(
+                &mut rewritten_drawable,
+                6,
+                &reference,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
             changed = true;
         }
-        append_length_delimited_field(&mut rewritten_root, 1, &rewritten_drawable)?;
+        append_length_delimited_field(
+            &mut rewritten_root,
+            1,
+            &rewritten_drawable,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     if !changed {
         return Err(io::Error::other("native movie has no comment field").into());
@@ -558,7 +575,7 @@ fn with_native_shared_movie_comment(
         .position(|message| message.type_ == NATIVE_MOVIE_MESSAGE_TYPE)
         .ok_or_else(|| io::Error::other("native movie has no movie payload"))?;
     let payload = movie_object.messages[message_index].data.clone();
-    let root = WireView::parse(&payload)?;
+    let root = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut rewritten_root = Vec::with_capacity(payload.len().saturating_add(16));
     let mut drawable_count = 0usize;
     for root_field in root.fields() {
@@ -569,7 +586,8 @@ fn with_native_shared_movie_comment(
         drawable_count = drawable_count
             .checked_add(1)
             .ok_or_else(|| io::Error::other("native movie drawable count overflow"))?;
-        let drawable = WireView::parse(root_field.payload())?;
+        let drawable =
+            WireView::parse(root_field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
         let mut rewritten_drawable =
             Vec::with_capacity(root_field.payload().len().saturating_add(8));
         let mut comment_count = 0usize;
@@ -589,8 +607,18 @@ fn with_native_shared_movie_comment(
             ..Default::default()
         }
         .encode_to_vec();
-        append_length_delimited_field(&mut rewritten_drawable, 6, &reference)?;
-        append_length_delimited_field(&mut rewritten_root, 1, &rewritten_drawable)?;
+        append_length_delimited_field(
+            &mut rewritten_drawable,
+            6,
+            &reference,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
+        append_length_delimited_field(
+            &mut rewritten_root,
+            1,
+            &rewritten_drawable,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     if drawable_count != 1 {
         return Err(io::Error::other("native movie must have one drawable envelope").into());
@@ -610,6 +638,7 @@ fn with_native_shared_movie_comment(
             type_: NATIVE_MOVIE_MESSAGE_TYPE,
             data: rewritten_root,
         },
+        Default::default(),
     )?;
     replace_native_component_archive(source, &component_name, archive)
 }
@@ -667,7 +696,6 @@ fn with_native_unselected_comment_reply(
             ..Default::default()
         }],
         storage_uuid: Some(SYNTHETIC_SURVIVING_COMMENT_UUID),
-        ..Default::default()
     }
     .encode_to_vec();
     let mut object = ArchiveObject::new(
@@ -676,6 +704,7 @@ fn with_native_unselected_comment_reply(
             type_: COMMENT_STORAGE_MESSAGE_TYPE,
             data: payload,
         }],
+        Default::default(),
     )?;
     object.archive_info.message_infos[0]
         .object_references
@@ -685,7 +714,7 @@ fn with_native_unselected_comment_reply(
             .object_references
             .push(reply_identifier);
     }
-    archive.insert_object(object)?;
+    archive.insert_object(object, Default::default())?;
     replace_native_component_archive(source, &component_name, archive)
 }
 
@@ -992,9 +1021,15 @@ fn with_native_reply_graph(source: &[u8], unknown_fields: bool) -> TestResult<Ve
             ..Default::default()
         }
         .encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     if unknown_fields {
-        append_length_delimited_field(&mut root_payload, 199, UNKNOWN_COMMENT_MARKER)?;
+        append_length_delimited_field(
+            &mut root_payload,
+            199,
+            UNKNOWN_COMMENT_MARKER,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     root_object.replace_message(
         root_index,
@@ -1002,6 +1037,7 @@ fn with_native_reply_graph(source: &[u8], unknown_fields: bool) -> TestResult<Ve
             type_: COMMENT_STORAGE_MESSAGE_TYPE,
             data: root_payload,
         },
+        Default::default(),
     )?;
     root_object.archive_info.message_infos[root_index]
         .object_references
@@ -1019,7 +1055,12 @@ fn with_native_reply_graph(source: &[u8], unknown_fields: bool) -> TestResult<Ve
     }
     .encode_to_vec();
     if unknown_fields {
-        append_length_delimited_field(&mut reply_payload, 199, UNKNOWN_COMMENT_MARKER)?;
+        append_length_delimited_field(
+            &mut reply_payload,
+            199,
+            UNKNOWN_COMMENT_MARKER,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     let mut reply = ArchiveObject::new(
         SYNTHETIC_REPLY_ID,
@@ -1027,11 +1068,12 @@ fn with_native_reply_graph(source: &[u8], unknown_fields: bool) -> TestResult<Ve
             type_: COMMENT_STORAGE_MESSAGE_TYPE,
             data: reply_payload,
         }],
+        Default::default(),
     )?;
     reply.archive_info.message_infos[0]
         .object_references
         .push(author);
-    archive.insert_object(reply)?;
+    archive.insert_object(reply, Default::default())?;
     replace_native_component_archive(source, &component_name, archive)
 }
 
@@ -1052,6 +1094,7 @@ fn with_native_comment_cycle(source: &[u8]) -> TestResult<Vec<u8>> {
             ..Default::default()
         }
         .encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     replace_native_comment_payload(&source, root, payload)
 }
@@ -1083,6 +1126,7 @@ fn with_native_unknown_root_reply_reference(source: &[u8]) -> TestResult<Vec<u8>
             ..Default::default()
         }
         .encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     replace_native_comment_payload(&source, root, payload)
 }
@@ -1292,8 +1336,10 @@ fn native_comment_removal_oracles_retain_authors_and_cull_only_final_edge() -> T
 fn duplicate_selected_native_commented_movie_preserves_comment_graph() -> TestResult {
     let source_package = Package::from_bytes(NATIVE_COMMENT_BASELINE)?;
     let source = exact_bytes(&source_package)?;
-    let commit =
-        source_package.duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(2))?;
+    let commit = source_package
+        .edit_slide_media_lifecycle()
+        .duplicate_movie(SlideSelector::index(0), MovieSelector::index(2))
+        .and_then(|edit| edit.commit())?;
     let candidate = exact_bytes(commit.package())?;
     assert_eq!(exact_bytes(&source_package)?, source);
     let candidates = native_commented_media_ids(&candidate)?;
@@ -1358,8 +1404,10 @@ fn duplicate_and_remove_selected_native_commented_audio_preserves_comment_graph(
     let source_author_ids = native_annotation_author_ids(&source)?;
     let source_author_storage_ids = native_annotation_author_storage_ids(&source)?;
 
-    let duplicate =
-        source_package.duplicate_slide_audio(SlideSelector::index(0), MovieSelector::index(0))?;
+    let duplicate = source_package
+        .edit_slide_media_lifecycle()
+        .duplicate_audio(SlideSelector::index(0), MovieSelector::index(0))
+        .and_then(|edit| edit.commit())?;
     assert!(!duplicate.patch().is_noop());
     assert_eq!(exact_bytes(&source_package)?, source);
     let duplicate_bytes = exact_bytes(duplicate.package())?;
@@ -1410,7 +1458,9 @@ fn duplicate_and_remove_selected_native_commented_audio_preserves_comment_graph(
     // duplication appends the clone after the two existing movies.
     let removed = duplicate
         .package()
-        .remove_slide_audio(SlideSelector::index(0), MovieSelector::index(4))?;
+        .edit_slide_media_lifecycle()
+        .remove_audio(SlideSelector::index(0), MovieSelector::index(4))
+        .and_then(|edit| edit.commit())?;
     assert!(!removed.patch().is_noop());
     assert_eq!(exact_bytes(duplicate.package())?, duplicate_bytes);
     let removed_bytes = exact_bytes(removed.package())?;
@@ -1461,8 +1511,10 @@ fn duplicate_selected_commented_movie_clones_synthetic_replies() -> TestResult {
     let source = with_native_reply_graph(NATIVE_COMMENT_BASELINE, false)?;
     let source_package = Package::from_bytes(&source)?;
     let before = exact_bytes(&source_package)?;
-    let commit =
-        source_package.duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(2))?;
+    let commit = source_package
+        .edit_slide_media_lifecycle()
+        .duplicate_movie(SlideSelector::index(0), MovieSelector::index(2))
+        .and_then(|edit| edit.commit())?;
     let candidate = exact_bytes(commit.package())?;
     assert_eq!(exact_bytes(&source_package)?, before);
     let clone_movie = native_commented_media_ids(&candidate)?
@@ -1517,8 +1569,10 @@ fn selected_native_commented_movie_removal_culls_storage_and_reuses_author_until
     assert!(source_author_ids.contains(&NATIVE_COMMENT_AUTHOR));
     assert!(source_author_storage_ids.contains(&NATIVE_COMMENT_AUTHOR_STORAGE));
 
-    let duplicate =
-        source_package.duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(2))?;
+    let duplicate = source_package
+        .edit_slide_media_lifecycle()
+        .duplicate_movie(SlideSelector::index(0), MovieSelector::index(2))
+        .and_then(|edit| edit.commit())?;
     let duplicate_bytes = exact_bytes(duplicate.package())?;
     let clone_movie = native_commented_media_ids(&duplicate_bytes)?
         .into_iter()
@@ -1529,7 +1583,9 @@ fn selected_native_commented_movie_removal_culls_storage_and_reuses_author_until
 
     let shared = duplicate
         .package()
-        .remove_slide_movie(SlideSelector::index(0), MovieSelector::index(2))?;
+        .edit_slide_media_lifecycle()
+        .remove_movie(SlideSelector::index(0), MovieSelector::index(2))
+        .and_then(|edit| edit.commit())?;
     let shared_bytes = exact_bytes(shared.package())?;
     assert_eq!(
         native_media_ids(&shared_bytes)?,
@@ -1563,7 +1619,9 @@ fn selected_native_commented_movie_removal_culls_storage_and_reuses_author_until
 
     let final_removal = shared
         .package()
-        .remove_slide_movie(SlideSelector::index(0), MovieSelector::index(3))?;
+        .edit_slide_media_lifecycle()
+        .remove_movie(SlideSelector::index(0), MovieSelector::index(3))
+        .and_then(|edit| edit.commit())?;
     let final_bytes = exact_bytes(final_removal.package())?;
     assert_eq!(
         native_media_ids(&final_bytes)?,
@@ -1624,8 +1682,10 @@ fn remove_selected_commented_movie_with_synthetic_reply_graph_is_atomic_and_reve
         .find(|node| node.identifier == SYNTHETIC_REPLY_ID)
         .ok_or_else(|| io::Error::other("reply fixture has no synthetic reply"))?;
 
-    let removal =
-        source_package.remove_slide_movie(SlideSelector::index(0), MovieSelector::index(2))?;
+    let removal = source_package
+        .edit_slide_media_lifecycle()
+        .remove_movie(SlideSelector::index(0), MovieSelector::index(2))
+        .and_then(|edit| edit.commit())?;
     let candidate = exact_bytes(removal.package())?;
     assert_eq!(native_commented_media_ids(&candidate)?, Vec::<u64>::new());
     assert_eq!(
@@ -1671,8 +1731,10 @@ fn remove_shared_comment_root_preserves_replies_until_final_media_owner() -> Tes
         root_identifier
     );
 
-    let first_removal =
-        source_package.remove_slide_movie(SlideSelector::index(0), MovieSelector::index(2))?;
+    let first_removal = source_package
+        .edit_slide_media_lifecycle()
+        .remove_movie(SlideSelector::index(0), MovieSelector::index(2))
+        .and_then(|edit| edit.commit())?;
     let first_bytes = exact_bytes(first_removal.package())?;
     assert_eq!(
         native_media_ids(&first_bytes)?,
@@ -1709,7 +1771,9 @@ fn remove_shared_comment_root_preserves_replies_until_final_media_owner() -> Tes
 
     let final_removal = first_removal
         .package()
-        .remove_slide_movie(SlideSelector::index(0), MovieSelector::index(2))?;
+        .edit_slide_media_lifecycle()
+        .remove_movie(SlideSelector::index(0), MovieSelector::index(2))
+        .and_then(|edit| edit.commit())?;
     let final_bytes = exact_bytes(final_removal.package())?;
     assert_eq!(
         native_media_ids(&final_bytes)?,
@@ -1763,7 +1827,10 @@ fn remove_selected_comment_rejects_surviving_movie_payload_header_mismatch_atomi
     let package = Package::from_bytes(&source)?;
     let before = exact_bytes(&package)?;
     assert!(matches!(
-        package.remove_slide_movie(SlideSelector::index(0), MovieSelector::index(2)),
+        package
+            .edit_slide_media_lifecycle()
+            .remove_movie(SlideSelector::index(0), MovieSelector::index(2))
+            .and_then(|edit| edit.commit()),
         Err(SlideMediaLifecycleError::InvalidSource)
     ));
     assert_eq!(exact_bytes(&package)?, before);
@@ -1808,7 +1875,10 @@ fn remove_selected_comment_rejects_surviving_movie_payload_missing_target_atomic
     let package = Package::from_bytes(&source)?;
     let before = exact_bytes(&package)?;
     assert!(matches!(
-        package.remove_slide_movie(SlideSelector::index(0), MovieSelector::index(2)),
+        package
+            .edit_slide_media_lifecycle()
+            .remove_movie(SlideSelector::index(0), MovieSelector::index(2))
+            .and_then(|edit| edit.commit()),
         Err(SlideMediaLifecycleError::InvalidSource)
     ));
     assert_eq!(exact_bytes(&package)?, before);
@@ -1825,7 +1895,10 @@ fn remove_selected_comment_rejects_unselected_reply_payload_header_mismatch_atom
     let package = Package::from_bytes(&source)?;
     let before = exact_bytes(&package)?;
     assert!(matches!(
-        package.remove_slide_movie(SlideSelector::index(0), MovieSelector::index(2)),
+        package
+            .edit_slide_media_lifecycle()
+            .remove_movie(SlideSelector::index(0), MovieSelector::index(2))
+            .and_then(|edit| edit.commit()),
         Err(SlideMediaLifecycleError::InvalidSource)
     ));
     assert_eq!(exact_bytes(&package)?, before);
@@ -1857,7 +1930,10 @@ fn remove_selected_comment_rejects_unselected_reply_payload_missing_target_atomi
     let package = Package::from_bytes(&source)?;
     let before = exact_bytes(&package)?;
     assert!(matches!(
-        package.remove_slide_movie(SlideSelector::index(0), MovieSelector::index(2)),
+        package
+            .edit_slide_media_lifecycle()
+            .remove_movie(SlideSelector::index(0), MovieSelector::index(2))
+            .and_then(|edit| edit.commit()),
         Err(SlideMediaLifecycleError::InvalidSource)
     ));
     assert_eq!(exact_bytes(&package)?, before);
@@ -1870,7 +1946,10 @@ fn duplicate_selected_native_commented_movie_rejects_reply_cycles_atomically() -
     let package = Package::from_bytes(&source)?;
     let before = exact_bytes(&package)?;
     assert!(matches!(
-        package.duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(2)),
+        package
+            .edit_slide_media_lifecycle()
+            .duplicate_movie(SlideSelector::index(0), MovieSelector::index(2))
+            .and_then(|edit| edit.commit()),
         Err(SlideMediaLifecycleError::InvalidSource)
     ));
     assert_eq!(exact_bytes(&package)?, before);
@@ -1883,7 +1962,10 @@ fn duplicate_selected_native_commented_movie_rejects_malformed_reply_atomically(
     let package = Package::from_bytes(&source)?;
     let before = exact_bytes(&package)?;
     assert!(matches!(
-        package.duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(2)),
+        package
+            .edit_slide_media_lifecycle()
+            .duplicate_movie(SlideSelector::index(0), MovieSelector::index(2))
+            .and_then(|edit| edit.commit()),
         Err(SlideMediaLifecycleError::InvalidSource)
     ));
     assert_eq!(exact_bytes(&package)?, before);
@@ -1897,7 +1979,10 @@ fn duplicate_selected_native_commented_movie_rejects_unknown_root_reply_referenc
     let package = Package::from_bytes(&source)?;
     let before = exact_bytes(&package)?;
     assert!(matches!(
-        package.duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(2)),
+        package
+            .edit_slide_media_lifecycle()
+            .duplicate_movie(SlideSelector::index(0), MovieSelector::index(2))
+            .and_then(|edit| edit.commit()),
         Err(SlideMediaLifecycleError::InvalidSource)
     ));
     assert_eq!(exact_bytes(&package)?, before);
@@ -1921,7 +2006,10 @@ fn duplicate_selected_native_commented_movie_rejects_unknown_archive_info_atomic
     let package = Package::from_bytes(&source)?;
     let before = exact_bytes(&package)?;
     assert!(matches!(
-        package.duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(2)),
+        package
+            .edit_slide_media_lifecycle()
+            .duplicate_movie(SlideSelector::index(0), MovieSelector::index(2))
+            .and_then(|edit| edit.commit()),
         Err(SlideMediaLifecycleError::InvalidSource)
     ));
     assert_eq!(exact_bytes(&package)?, before);
@@ -1944,7 +2032,10 @@ fn remove_native_movie_rejects_unknown_surviving_archive_info_atomically() -> Te
     let package = Package::from_bytes(&source)?;
     let before = exact_bytes(&package)?;
     assert!(matches!(
-        package.remove_slide_movie(SlideSelector::index(0), MovieSelector::index(3)),
+        package
+            .edit_slide_media_lifecycle()
+            .remove_movie(SlideSelector::index(0), MovieSelector::index(3))
+            .and_then(|edit| edit.commit()),
         Err(SlideMediaLifecycleError::InvalidSource)
     ));
     assert_eq!(exact_bytes(&package)?, before);
@@ -1961,7 +2052,10 @@ fn duplicate_selected_native_commented_movie_rejects_unknown_comment_reference_a
     let package = Package::from_bytes(&source)?;
     let before = exact_bytes(&package)?;
     assert!(matches!(
-        package.duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(2)),
+        package
+            .edit_slide_media_lifecycle()
+            .duplicate_movie(SlideSelector::index(0), MovieSelector::index(2))
+            .and_then(|edit| edit.commit()),
         Err(SlideMediaLifecycleError::InvalidSource)
     ));
     assert_eq!(exact_bytes(&package)?, before);
@@ -1978,7 +2072,10 @@ fn duplicate_selected_native_commented_movie_rejects_deprecated_comment_referenc
     let package = Package::from_bytes(&source)?;
     let before = exact_bytes(&package)?;
     assert!(matches!(
-        package.duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(2)),
+        package
+            .edit_slide_media_lifecycle()
+            .duplicate_movie(SlideSelector::index(0), MovieSelector::index(2))
+            .and_then(|edit| edit.commit()),
         Err(SlideMediaLifecycleError::InvalidSource)
     ));
     assert_eq!(exact_bytes(&package)?, before);

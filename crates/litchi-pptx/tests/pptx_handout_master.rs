@@ -9,7 +9,7 @@ use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI};
 use litchi_pptx::Error;
 use litchi_pptx::Package;
-use litchi_pptx::presentation_properties::metadata::handout::Master;
+use litchi_pptx::presentation_properties::metadata::handout::{Limits, Master};
 use quick_xml::Reader;
 use quick_xml::events::Event;
 
@@ -142,7 +142,10 @@ fn load_handout_master(package: &OpcPackage) -> litchi_pptx::Result<Option<Maste
     }
     let xml = std::str::from_utf8(part.blob()).map_err(|error| Error::Xml(error.to_string()))?;
     validate_root(xml)?;
-    Ok(Some(Master::parse_xml(xml)?))
+    Ok(Some(Master::parse_xml(
+        xml,
+        Limits::from_source_limits(package.read_limits()),
+    )?))
 }
 
 fn validate_root(xml: &str) -> litchi_pptx::Result<()> {
@@ -163,9 +166,9 @@ fn validate_root(xml: &str) -> litchi_pptx::Result<()> {
 }
 
 fn package_with_handout_master() -> OpcPackage {
-    let mut package = Package::new().unwrap();
+    let package = Package::new().unwrap();
     let bytes = package.to_bytes().unwrap();
-    let mut package = OpcPackage::from_vec(bytes).unwrap();
+    let mut package = OpcPackage::from_vec(bytes, litchi_opc::SourceLimits::default()).unwrap();
     let presentation_name = PackURI::new("/ppt/presentation.xml").unwrap();
     let handout_name = PackURI::new("/ppt/handoutMasters/handoutMaster1.xml").unwrap();
 

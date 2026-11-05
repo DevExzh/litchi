@@ -84,13 +84,13 @@ fn master(extras: Vec<Record>) -> Record {
 fn authors_exactly_bounded_template_name_and_round_trips() {
     let value = "x".repeat(MAX_NAME_BYTES / 2);
     let name = Name::new(value.clone()).unwrap();
-    let source = Snapshot::from_record(master(Vec::new())).unwrap();
+    let source = Snapshot::from_record(master(Vec::new()), &Limits::default()).unwrap();
     let mut edit = source.edit();
     edit.set_name(name.as_str()).unwrap();
     let commit = edit.commit().unwrap();
     assert_eq!(commit.snapshot().name().unwrap().unwrap().as_str(), value);
 
-    let parsed = Snapshot::parse(commit.snapshot().bytes()).unwrap();
+    let parsed = Snapshot::parse(commit.snapshot().bytes(), &Limits::default()).unwrap();
     assert_eq!(parsed.bytes(), commit.snapshot().bytes());
     assert_eq!(parsed.name().unwrap(), commit.snapshot().name().unwrap());
 }
@@ -101,12 +101,15 @@ fn inserts_after_round_trip_and_preserves_unknown_and_slide_name_records() {
     let round_trip = atom(RecordType::RoundTripTheme12Atom, 0, 0, &[4, 5]);
     let slide_name = name_record(3, "master-display-name");
     let tail = unknown(0x7abd, &[9, 8]);
-    let source = Snapshot::from_record(master(vec![
-        first.clone(),
-        round_trip.clone(),
-        slide_name.clone(),
-        tail.clone(),
-    ]))
+    let source = Snapshot::from_record(
+        master(vec![
+            first.clone(),
+            round_trip.clone(),
+            slide_name.clone(),
+            tail.clone(),
+        ]),
+        &Limits::default(),
+    )
     .unwrap();
     let mut edit = source.edit();
     edit.set_name("design").unwrap();
@@ -125,9 +128,13 @@ fn inserts_after_round_trip_and_preserves_unknown_and_slide_name_records() {
 }
 
 #[test]
-fn replacement_clear_rollback_undo_and_redo_are_transactional() {
+fn replacement_clear_undo_and_redo_are_transactional() {
     let template = name_record(2, "old-design");
-    let source = Snapshot::from_record(master(vec![unknown(0x7abc, &[1]), template])).unwrap();
+    let source = Snapshot::from_record(
+        master(vec![unknown(0x7abc, &[1]), template]),
+        &Limits::default(),
+    )
+    .unwrap();
     let original = source.bytes().to_vec();
     let mut edit = source.edit();
     edit.set_name("new-design").unwrap();
@@ -143,9 +150,6 @@ fn replacement_clear_rollback_undo_and_redo_are_transactional() {
     let redone = commit.redo(&undone).unwrap();
     assert_eq!(redone.bytes(), commit.snapshot().bytes());
 
-    let rollback = source.edit().rollback();
-    assert_eq!(rollback.bytes(), source.bytes());
-
     let mut clear = commit.snapshot().edit();
     assert!(clear.clear_name().unwrap());
     let cleared = clear.commit().unwrap();
@@ -159,22 +163,26 @@ fn replacement_clear_rollback_undo_and_redo_are_transactional() {
 #[test]
 fn rejects_wrong_context_duplicate_headers_utf16_and_bounds() {
     assert!(
-        Snapshot::from_record(master(vec![name_record(2, "one"), name_record(2, "two"),])).is_err()
+        Snapshot::from_record(
+            master(vec![name_record(2, "one"), name_record(2, "two"),]),
+            &Limits::default()
+        )
+        .is_err()
     );
 
     let mut odd = name_record(2, "bad");
     odd.data = vec![0].into();
     odd.data_length = 1;
-    assert!(Snapshot::from_record(master(vec![odd])).is_err());
+    assert!(Snapshot::from_record(master(vec![odd]), &Limits::default()).is_err());
 
     let invalid_utf16 = atom(RecordType::CString, 0, 2, &[0, 0xd8]);
-    assert!(Snapshot::from_record(master(vec![invalid_utf16])).is_err());
+    assert!(Snapshot::from_record(master(vec![invalid_utf16]), &Limits::default()).is_err());
 
     let wrong_header = atom(RecordType::CString, 1, 2, &utf16("bad"));
-    assert!(Snapshot::from_record(master(vec![wrong_header])).is_err());
+    assert!(Snapshot::from_record(master(vec![wrong_header]), &Limits::default()).is_err());
 
     let oversized = atom(RecordType::CString, 0, 2, &vec![b'x'; MAX_NAME_BYTES + 2]);
-    assert!(Snapshot::from_record(master(vec![oversized])).is_err());
+    assert!(Snapshot::from_record(master(vec![oversized]), &Limits::default()).is_err());
 
     let title_children = vec![atom(RecordType::SlideAtom, 2, 0, &[0; 24])];
     let title = record(
@@ -184,16 +192,19 @@ fn rejects_wrong_context_duplicate_headers_utf16_and_bounds() {
         children_wire(&title_children),
         title_children,
     );
-    assert!(Snapshot::from_record(title).is_err());
+    assert!(Snapshot::from_record(title, &Limits::default()).is_err());
 }
 
 #[test]
 fn failed_authoring_does_not_change_source() {
-    let source = Snapshot::from_record(master(Vec::new())).unwrap();
+    let source = Snapshot::from_record(master(Vec::new()), &Limits::default()).unwrap();
     let original = source.bytes().to_vec();
     let mut edit = source.edit();
     assert!(edit.set_name("x".repeat(MAX_NAME_BYTES / 2 + 1)).is_err());
-    assert!(!edit.is_changed());
-    assert_eq!(edit.snapshot().unwrap().bytes(), original.as_slice());
+    assert!(edit.changes().is_empty());
+    assert_eq!(
+        edit.commit().unwrap().snapshot().bytes(),
+        original.as_slice()
+    );
     assert_eq!(source.bytes(), original.as_slice());
 }

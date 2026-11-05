@@ -3,6 +3,7 @@
 use super::package::{Error, Result};
 use super::records::Record;
 use super::slide_round_trip::{EmbeddedXmlPackage, parse_embedded_xml_package};
+use crate::SourceLimits;
 use crate::consts::RecordType;
 use litchi_opc::constants::content_type;
 
@@ -110,9 +111,9 @@ impl DocumentProperties10 {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(root: &Record) -> Result<Self> {
+    pub fn parse(root: &Record, limits: &SourceLimits) -> Result<Self> {
         let mut properties = Self::default();
-        for record in root.versioned_binary_tag_records(10)? {
+        for record in root.versioned_binary_tag_records(10, limits)? {
             match (record.record_type, record.instance) {
                 (RecordType::CString, 1) => {
                     if properties.copyright.is_some() {
@@ -187,7 +188,7 @@ impl DocumentProperties12 {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(root: &Record) -> Result<Self> {
+    pub fn parse(root: &Record, limits: &SourceLimits) -> Result<Self> {
         let mut properties = Self::default();
         for record in &root.children {
             if record.record_type != RecordType::RoundTripCustomTableStyles12Atom {
@@ -216,7 +217,7 @@ impl DocumentProperties12 {
                 )?,
             });
         }
-        for record in root.versioned_binary_tag_records(12)? {
+        for record in root.versioned_binary_tag_records(12, limits)? {
             if record.record_type != RecordType::RoundTripDocFlags12Atom {
                 continue;
             }
@@ -374,7 +375,7 @@ fn parse_photo_album(record: &Record) -> Result<PhotoAlbumSettings> {
 )]
 mod tests {
     use super::*;
-    use crate::Package;
+    use crate::raw::Reader;
     use litchi_opc::{OpcPackage, PackURI, XmlPart};
     use std::io::Cursor;
 
@@ -436,7 +437,7 @@ mod tests {
             false,
         );
         let mut output = Cursor::new(Vec::new());
-        package.to_stream(&mut output).unwrap();
+        package.write_to(&mut output).unwrap();
         output.into_inner()
     }
 
@@ -470,8 +471,11 @@ mod tests {
         records.extend_from_slice(&record_bytes(0, 0, 1037, &spacing));
         records.extend_from_slice(&record_bytes(0, 0, 0x36b2, &[2, 0, 6, 0xff, 6, 0]));
 
-        let properties =
-            DocumentProperties10::parse(&root(vec![prog_tags_record(10, &records)])).unwrap();
+        let properties = DocumentProperties10::parse(
+            &root(vec![prog_tags_record(10, &records)]),
+            &SourceLimits::default(),
+        )
+        .unwrap();
 
         assert_eq!(properties.copyright.as_deref(), Some("Copyright © 2026"));
         assert_eq!(properties.keywords.as_deref(), Some("rust; ooxml"));
@@ -494,10 +498,13 @@ mod tests {
         let copyright = record_bytes(0, 1, 4026, &utf16("old"));
         let keywords = record_bytes(0, 2, 4026, &utf16("current"));
         let password = record_bytes(0, 3, 4026, &utf16("old-password"));
-        let properties = DocumentProperties10::parse(&root(vec![
-            prog_tags_record(9, &[copyright, password].concat()),
-            prog_tags_record(10, &keywords),
-        ]))
+        let properties = DocumentProperties10::parse(
+            &root(vec![
+                prog_tags_record(9, &[copyright, password].concat()),
+                prog_tags_record(10, &keywords),
+            ]),
+            &SourceLimits::default(),
+        )
         .unwrap();
 
         assert_eq!(properties.copyright, None);
@@ -524,7 +531,7 @@ mod tests {
         ];
         for record in malformed {
             let document = root(vec![prog_tags_record(10, &record)]);
-            assert!(DocumentProperties10::parse(&document).is_err());
+            assert!(DocumentProperties10::parse(&document, &SourceLimits::default()).is_err());
         }
     }
 
@@ -541,7 +548,7 @@ mod tests {
             let mut duplicate = record.clone();
             duplicate.extend_from_slice(&record);
             let document = root(vec![prog_tags_record(10, &duplicate)]);
-            assert!(DocumentProperties10::parse(&document).is_err());
+            assert!(DocumentProperties10::parse(&document, &SourceLimits::default()).is_err());
         }
     }
 
@@ -562,19 +569,25 @@ mod tests {
         ];
         for record in malformed {
             let document = root(vec![prog_tags_record(10, &record)]);
-            assert!(DocumentProperties10::parse(&document).is_err());
+            assert!(DocumentProperties10::parse(&document, &SourceLimits::default()).is_err());
         }
     }
 
     #[test]
     fn parses_powerpoint12_document_flags_and_isolates_versions() {
         let flags = record_bytes(0, 0, 0x0425, &[1]);
-        let ppt12_properties =
-            DocumentProperties12::parse(&root(vec![prog_tags_record(12, &flags)])).unwrap();
+        let ppt12_properties = DocumentProperties12::parse(
+            &root(vec![prog_tags_record(12, &flags)]),
+            &SourceLimits::default(),
+        )
+        .unwrap();
         assert_eq!(ppt12_properties.compress_pictures_on_save, Some(true));
 
-        let ppt11_properties =
-            DocumentProperties12::parse(&root(vec![prog_tags_record(11, &flags)])).unwrap();
+        let ppt11_properties = DocumentProperties12::parse(
+            &root(vec![prog_tags_record(11, &flags)]),
+            &SourceLimits::default(),
+        )
+        .unwrap();
         assert_eq!(ppt11_properties.compress_pictures_on_save, None);
     }
 
@@ -587,23 +600,25 @@ mod tests {
             record_bytes(0, 0, 0x0425, &[2]),
         ] {
             let document = root(vec![prog_tags_record(12, &flags)]);
-            assert!(DocumentProperties12::parse(&document).is_err());
+            assert!(DocumentProperties12::parse(&document, &SourceLimits::default()).is_err());
         }
 
         let flags = record_bytes(0, 0, 0x0425, &[0]);
         let mut duplicate = flags.clone();
         duplicate.extend_from_slice(&flags);
         let document = root(vec![prog_tags_record(12, &duplicate)]);
-        assert!(DocumentProperties12::parse(&document).is_err());
+        assert!(DocumentProperties12::parse(&document, &SourceLimits::default()).is_err());
     }
 
     #[test]
     fn parses_custom_table_styles_and_retains_recommended_version_deviations() {
         let package = valid_table_styles_package();
         for version in [0, 0x0f] {
-            let parsed =
-                DocumentProperties12::parse(&root(vec![table_styles_record(version, 0, &package)]))
-                    .unwrap();
+            let parsed = DocumentProperties12::parse(
+                &root(vec![table_styles_record(version, 0, &package)]),
+                &SourceLimits::default(),
+            )
+            .unwrap();
             let styles = parsed.custom_table_styles.unwrap();
             assert_eq!(styles.record_version, version);
             assert_eq!(styles.package.data, package);
@@ -636,11 +651,17 @@ mod tests {
                 ),
             ),
         ] {
-            assert!(DocumentProperties12::parse(&root(vec![malformed])).is_err());
+            assert!(
+                DocumentProperties12::parse(&root(vec![malformed]), &SourceLimits::default())
+                    .is_err()
+            );
         }
         let mut wrong_declared = table_styles_record(0, 0, &package);
         wrong_declared.data_length -= 1;
-        assert!(DocumentProperties12::parse(&root(vec![wrong_declared])).is_err());
+        assert!(
+            DocumentProperties12::parse(&root(vec![wrong_declared]), &SourceLimits::default())
+                .is_err()
+        );
 
         let end_document = Record {
             record_type: RecordType::EndDocument,
@@ -652,11 +673,14 @@ mod tests {
             children: Vec::new(),
         };
         assert!(
-            DocumentProperties12::parse(&root(vec![
-                table_styles_record(0, 0, &package),
-                end_document,
-                table_styles_record(0x0f, 0, &package),
-            ]))
+            DocumentProperties12::parse(
+                &root(vec![
+                    table_styles_record(0, 0, &package),
+                    end_document,
+                    table_styles_record(0x0f, 0, &package),
+                ]),
+                &SourceLimits::default(),
+            )
             .is_err()
         );
     }
@@ -667,7 +691,7 @@ mod tests {
             let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
                 .join("../../test-data/ole/ppt")
                 .join(name);
-            let mut package = Package::open(path).unwrap();
+            let mut package = Reader::open(path).unwrap();
             let presentation = package.presentation().unwrap();
             let properties = presentation.powerpoint12_document_properties().unwrap();
             assert_eq!(

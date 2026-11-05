@@ -12,7 +12,8 @@ use litchi_iwa_common::wire::WireView;
 use litchi_iwa_core::{Archive, SnappyStream};
 use litchi_iwa_protos::tsch;
 use litchi_keynote::{
-    ChartArrangement, ChartArrangementError, ChartSelector, Package, SlideSelector,
+    ChartArrangement, ChartSelector, Package, SlideSelector,
+    chart::arrangement::Error as ChartArrangementError,
 };
 use prost::Message as _;
 
@@ -93,18 +94,18 @@ struct ChartPayload {
 }
 
 fn chart_payload(source: &[u8]) -> TestResult<ChartPayload> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut selected = None;
 
     for entry in catalog.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = match SnappyStream::decompress(entry.data()) {
+        let stream = match SnappyStream::decompress(entry.data(), Default::default()) {
             Ok(stream) => stream,
             Err(_) => continue,
         };
-        let archive = match Archive::parse(stream.as_bytes()) {
+        let archive = match Archive::parse(stream.as_bytes(), Default::default()) {
             Ok(archive) => archive,
             Err(_) => continue,
         };
@@ -113,7 +114,7 @@ fn chart_payload(source: &[u8]) -> TestResult<ChartPayload> {
                 if message.type_ != CHART_MESSAGE_TYPE {
                     continue;
                 }
-                let outer = WireView::parse(&message.data)?;
+                let outer = WireView::parse(&message.data, litchi_iwa_common::WireLimits::DEFAULT)?;
                 for field in outer.fields().filter(|field| {
                     field.number() == CHART_EXTENSION_FIELD && field.wire_type() == 2
                 }) {
@@ -153,8 +154,8 @@ fn assert_chart_data_unchanged(source: &[u8], target: &[u8]) -> TestResult {
 }
 
 fn assert_member_locality(source: &[u8], target: &[u8], changed_member: &str) -> TestResult {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     let mut changed = Vec::new();
     for entry in before.iter() {
         let candidate = after
@@ -193,8 +194,8 @@ fn assert_member_locality(source: &[u8], target: &[u8], changed_member: &str) ->
 }
 
 fn assert_data_assets_untouched(source: &[u8], target: &[u8]) -> TestResult {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     let mut assets = 0;
     for entry in before
         .iter()

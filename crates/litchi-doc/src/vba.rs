@@ -206,7 +206,7 @@ fn sort_case_insensitively(names: &mut [String]) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Package;
+    use crate::raw::Reader;
     use litchi_cfb::OleWriter;
     use std::io::Cursor;
 
@@ -292,7 +292,7 @@ mod tests {
         let mut bytes = Cursor::new(Vec::new());
         writer.write_to(&mut bytes).unwrap();
 
-        let package = Package::from_reader(Cursor::new(bytes.into_inner())).unwrap();
+        let package = Reader::from_reader(Cursor::new(bytes.into_inner())).unwrap();
         let projects = package.vba_project_storages();
         assert_eq!(projects.len(), 1);
         assert!(projects[0].has_dir_stream());

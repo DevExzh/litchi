@@ -20,7 +20,7 @@ impl Document {
     /// }
     /// ```
     pub fn hyperlinks(&self) -> Result<Vec<Hyperlink>> {
-        let table = match &self.hyperlinks_table {
+        let table = match &self.0.hyperlinks_table {
             Some(t) => t,
             None => return Ok(Vec::new()),
         };
@@ -34,7 +34,7 @@ impl Document {
 
     /// Find hyperlinks at a specific character position in the document.
     pub fn hyperlinks_at_position(&self, cp: u32) -> Vec<Hyperlink> {
-        match &self.hyperlinks_table {
+        match &self.0.hyperlinks_table {
             Some(t) => t
                 .find_at_position(cp)
                 .into_iter()

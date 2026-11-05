@@ -22,7 +22,7 @@ use std::path::Path;
 
 #[cfg(any(unix, windows))]
 use litchi_core::FileSource;
-use litchi_core::{Error, ReadAt, Result, SourceVersion};
+use litchi_core::{Error as CoreError, ReadAt, Result as CoreResult, SourceVersion};
 use litchi_odf_common::{
     ToleranceReport,
     core::{SourceBackedPackage, private::ContentDocumentValidator},
@@ -36,12 +36,13 @@ use quick_xml::{
 };
 use zeroize::Zeroizing;
 
-use super::ReadLimits;
 use crate::{
-    Spreadsheet,
     authoring::{ValidateHandler, is_office_namespace, validate_size},
     worksheet::{Sheet, codec::OFFICE_NAMESPACE, codec::TABLE_NAMESPACE},
 };
+use litchi_odf_common::{Error as OdfError, OpenOptions, XmlStreamLimits};
+
+type FamilyResult<T> = Result<T, OdfError>;
 
 const ODF_SPREADSHEET: &str = "application/vnd.oasis.opendocument.spreadsheet";
 const FAMILY_NAME: &str = "ODS";
@@ -164,7 +165,7 @@ impl SheetCatalogEntry {
 /// not parse or retain any [`Sheet`], styles, metadata, media, embedded
 /// object, or signature payload. [`Self::sheet_at`] and [`Self::sheet`] are
 /// the explicit semantic-read boundary. [`Self::materialize`] is the explicit
-/// transition to the complete owned/mutable [`Spreadsheet`] facade.
+/// transition to the complete immutable [`crate::Package`] owner.
 pub struct SourceBackedSpreadsheetCatalog {
     package: SourceBackedPackage,
     source: Arc<dyn ReadAt>,
@@ -177,6 +178,8 @@ pub struct SourceBackedSpreadsheetCatalog {
     /// Whether each worksheet's content repairs have joined `tolerance`; a
     /// worksheet re-read on the same source repairs the same defects.
     recorded: Box<[AtomicBool]>,
+    /// The caller-selected raw XML policy retained by this catalog owner.
+    xml_limits: XmlStreamLimits,
 }
 
 impl fmt::Debug for SourceBackedSpreadsheetCatalog {
@@ -190,103 +193,120 @@ impl fmt::Debug for SourceBackedSpreadsheetCatalog {
 }
 
 impl SourceBackedSpreadsheetCatalog {
-    /// Open an ODS catalog from a filesystem path without slurping the source.
+    /// Open an ODS catalog from a regular filesystem file without slurping it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`litchi_odf_common::Error::Limit`] for an exceeded dimension
+    /// and [`litchi_odf_common::Error::Core`] for I/O or validation failures.
     #[cfg(any(unix, windows))]
-    pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_read_at(file_source(path)?)
+    pub fn open(path: impl AsRef<Path>) -> Result<Self, OdfError> {
+        Self::open_with_options(path, OpenOptions::new())
     }
 
-    /// Open an ODS catalog from a filesystem path with explicit limits.
+    /// Open an ODS catalog from a filesystem file under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
     #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
-        Self::from_read_at_with_limits(file_source(path)?, limits)
+    pub fn open_with_options(
+        path: impl AsRef<Path>,
+        options: OpenOptions,
+    ) -> Result<Self, OdfError> {
+        Self::from_read_at_with_options(file_source(path)?, options)
     }
 
-    /// Open an encrypted ODS catalog from a filesystem path.
+    /// Open password-protected an ODS catalog from a filesystem file.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
     #[cfg(any(unix, windows))]
-    pub fn from_path_with_password(
+    pub fn open_with_password(
         path: impl AsRef<Path>,
         password: impl Into<String>,
-    ) -> Result<Self> {
-        let mut password = Zeroizing::new(password.into());
-        Self::from_read_at_with_password(file_source(path)?, std::mem::take(&mut *password))
+    ) -> Result<Self, OdfError> {
+        Self::open_with_password_and_options(path, password, OpenOptions::new())
     }
 
-    /// Open an encrypted ODS catalog from a filesystem path with limits.
+    /// Open password-protected an ODS catalog from a filesystem file under
+    /// caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
     #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits_and_password(
+    pub fn open_with_password_and_options(
         path: impl AsRef<Path>,
-        limits: ReadLimits,
         password: impl Into<String>,
-    ) -> Result<Self> {
+        options: OpenOptions,
+    ) -> Result<Self, OdfError> {
         let mut password = Zeroizing::new(password.into());
-        Self::from_read_at_with_limits_and_password(
-            file_source(path)?,
-            limits,
+        let source = file_source(path)?;
+        Self::from_read_at_with_password_and_options(
+            source,
             std::mem::take(&mut *password),
+            options,
         )
     }
 
-    /// Alias for [`Self::from_path`].
-    #[cfg(any(unix, windows))]
-    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_path(path)
-    }
-
-    /// Alias for [`Self::from_path_with_limits`].
-    #[cfg(any(unix, windows))]
-    pub fn open_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
-        Self::from_path_with_limits(path, limits)
-    }
-
-    /// Alias for [`Self::from_path_with_password`].
-    #[cfg(any(unix, windows))]
-    pub fn open_with_password(path: impl AsRef<Path>, password: impl Into<String>) -> Result<Self> {
-        Self::from_path_with_password(path, password)
-    }
-
-    /// Alias for [`Self::from_path_with_limits_and_password`].
-    #[cfg(any(unix, windows))]
-    pub fn open_with_limits_and_password(
-        path: impl AsRef<Path>,
-        limits: ReadLimits,
-        password: impl Into<String>,
-    ) -> Result<Self> {
-        Self::from_path_with_limits_and_password(path, limits, password)
-    }
-
     /// Open an ODS catalog from a caller-provided positional source.
-    pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
-        Self::from_read_at_with_limits(source, ReadLimits::default())
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self, OdfError> {
+        Self::from_read_at_with_options(source, OpenOptions::new())
     }
 
-    /// Open an encrypted ODS catalog from a caller-provided source.
+    /// Open an ODS catalog from a positional source under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_read_at_with_options(
+        source: Arc<dyn ReadAt>,
+        options: OpenOptions,
+    ) -> Result<Self, OdfError> {
+        Self::from_read_at_inner(source, options, None)
+    }
+
+    /// Open password-protected an ODS catalog from a caller-provided positional
+    /// source.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
     pub fn from_read_at_with_password(
         source: Arc<dyn ReadAt>,
         password: impl Into<String>,
-    ) -> Result<Self> {
-        Self::from_read_at_inner(source, ReadLimits::default(), Some(password.into()))
+    ) -> Result<Self, OdfError> {
+        Self::from_read_at_with_password_and_options(source, password, OpenOptions::new())
     }
 
-    /// Open an ODS catalog with explicit finite ZIP limits.
-    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: ReadLimits) -> Result<Self> {
-        Self::from_read_at_inner(source, limits, None)
-    }
-
-    /// Open an encrypted ODS catalog with explicit finite ZIP limits.
-    pub fn from_read_at_with_limits_and_password(
+    /// Open password-protected an ODS catalog from a positional source under
+    /// caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_read_at_with_password_and_options(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
         password: impl Into<String>,
-    ) -> Result<Self> {
-        Self::from_read_at_inner(source, limits, Some(password.into()))
+        options: OpenOptions,
+    ) -> Result<Self, OdfError> {
+        let mut password = Zeroizing::new(password.into());
+        Self::from_read_at_inner(source, options, Some(std::mem::take(&mut *password)))
     }
 
     fn from_read_at_inner(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
+        options: OpenOptions,
         password: Option<String>,
-    ) -> Result<Self> {
+    ) -> Result<Self, OdfError> {
+        let limits = options.source_limits_value();
+        let semantic = options.semantic_limits_value();
         let meter = Arc::new(ReadMeter::default());
         let metered: Arc<dyn ReadAt> = Arc::new(MeteredSource {
             source,
@@ -295,19 +315,30 @@ impl SourceBackedSpreadsheetCatalog {
         let package = match password {
             Some(password) => {
                 let mut password = Zeroizing::new(password);
-                SourceBackedPackage::from_read_at_with_limits_and_password(
+                SourceBackedPackage::from_read_at_with_password_and_options(
                     Arc::clone(&metered),
-                    limits,
                     std::mem::take(&mut *password),
+                    OpenOptions::new().source_limits(limits),
                 )?
             },
-            None => SourceBackedPackage::from_read_at_with_limits(Arc::clone(&metered), limits)?,
+            None => SourceBackedPackage::from_read_at_with_options(
+                Arc::clone(&metered),
+                OpenOptions::new().source_limits(limits),
+            )?,
         };
+        if !semantic.is_default() {
+            if let Some(size) = package.member_materialized_size("content.xml")? {
+                semantic.check(litchi_odf_common::SemanticLimitKind::ContentBytes, size)?;
+            }
+            if let Some(size) = package.member_materialized_size("styles.xml")? {
+                semantic.check(litchi_odf_common::SemanticLimitKind::StylesBytes, size)?;
+            }
+        }
         let source_version = package.source_version()?;
         let entries = (|| {
             let mimetype = package.mimetype()?;
             if mimetype != ODF_SPREADSHEET {
-                return Err(Error::InvalidFormat(format!(
+                return Err(CoreError::InvalidFormat(format!(
                     "expected {FAMILY_NAME} package MIME type '{ODF_SPREADSHEET}', found '{mimetype}'"
                 )));
             }
@@ -315,6 +346,10 @@ impl SourceBackedSpreadsheetCatalog {
             scan_catalog(&content)
         })();
         let entries = prefer_current(metered.as_ref(), source_version, entries)?;
+        semantic.check(
+            litchi_odf_common::SemanticLimitKind::Units,
+            u64::try_from(entries.len()).unwrap_or(u64::MAX),
+        )?;
         let tolerance = Mutex::new(package.tolerance_report().clone());
         let recorded = entries.iter().map(|_| AtomicBool::new(false)).collect();
         Ok(Self {
@@ -325,70 +360,91 @@ impl SourceBackedSpreadsheetCatalog {
             meter,
             tolerance,
             recorded,
+            xml_limits: options.xml_limits_value(),
         })
     }
 
     /// Check the positional source identity without reading a member.
-    pub fn check_source(&self) -> Result<()> {
-        ensure_current(self.source_version, self.source.version()?)
+    pub fn check_source(&self) -> FamilyResult<()> {
+        Ok(ensure_current(self.source_version, self.source.version()?)?)
     }
 
     /// Return the source version captured at open.
-    pub fn source_version(&self) -> Result<SourceVersion> {
+    pub fn source_version(&self) -> FamilyResult<SourceVersion> {
         self.check_source()?;
         Ok(self.source_version)
     }
 
     /// Return the physical source length captured at open.
-    pub fn source_len(&self) -> Result<u64> {
+    pub fn source_len(&self) -> FamilyResult<u64> {
         self.check_source()?;
         let length = self.package.len();
-        prefer_current(self.source.as_ref(), self.source_version, Ok(length))
+        Ok(prefer_current(
+            self.source.as_ref(),
+            self.source_version,
+            Ok(length),
+        )?)
     }
 
     /// Return a snapshot of positional source-read counters.
-    pub fn source_read_metrics(&self) -> Result<SourceReadMetrics> {
+    pub fn source_read_metrics(&self) -> FamilyResult<SourceReadMetrics> {
         self.check_source()?;
         let metrics = self.meter.snapshot();
-        prefer_current(self.source.as_ref(), self.source_version, Ok(metrics))
+        Ok(prefer_current(
+            self.source.as_ref(),
+            self.source_version,
+            Ok(metrics),
+        )?)
     }
 
     /// Reset positional source-read counters after a preparation phase.
     ///
     /// Resetting counters is an observational instrumentation operation and
     /// is intended for a quiescent owner or an explicitly coordinated query.
-    pub fn reset_source_read_metrics(&self) -> Result<()> {
+    pub fn reset_source_read_metrics(&self) -> FamilyResult<()> {
         self.check_source()?;
         self.meter.reset();
         self.check_source()
     }
 
     /// Borrow the retained worksheet catalog.
-    pub fn catalog(&self) -> Result<&[SheetCatalogEntry]> {
+    pub fn catalog(&self) -> FamilyResult<&[SheetCatalogEntry]> {
         self.check_source()?;
         let entries = self.entries.as_ref();
-        prefer_current(self.source.as_ref(), self.source_version, Ok(entries))
+        Ok(prefer_current(
+            self.source.as_ref(),
+            self.source_version,
+            Ok(entries),
+        )?)
     }
 
     /// Return worksheet names in document order.
-    pub fn sheet_names(&self) -> Result<Vec<String>> {
+    pub fn sheet_names(&self) -> FamilyResult<Vec<String>> {
         self.check_source()?;
         let mut names = Vec::new();
         names
             .try_reserve_exact(self.entries.len())
-            .map_err(|source| Error::Allocation {
+            .map_err(|source| CoreError::Allocation {
                 resource: "ODS source catalog worksheet names",
                 source,
             })?;
         names.extend(self.entries.iter().map(|entry| entry.name.clone()));
-        prefer_current(self.source.as_ref(), self.source_version, Ok(names))
+        Ok(prefer_current(
+            self.source.as_ref(),
+            self.source_version,
+            Ok(names),
+        )?)
     }
 
     /// Return the number of worksheets without parsing worksheet payloads.
-    pub fn sheet_count(&self) -> Result<usize> {
+    pub fn sheet_count(&self) -> FamilyResult<usize> {
         self.check_source()?;
         let count = self.entries.len();
-        prefer_current(self.source.as_ref(), self.source_version, Ok(count))
+        Ok(prefer_current(
+            self.source.as_ref(),
+            self.source_version,
+            Ok(count),
+        )?)
     }
 
     /// Everything repaired so far: the package repairs of the open, then the
@@ -407,14 +463,14 @@ impl SourceBackedSpreadsheetCatalog {
     /// Read one worksheet selected by its zero-based document position.
     ///
     /// Its content repairs join [`Self::tolerance_report`].
-    pub fn sheet_at(&self, index: usize) -> Result<Option<Sheet>> {
+    pub fn sheet_at(&self, index: usize) -> FamilyResult<Option<Sheet>> {
         self.check_source()?;
         if index >= self.entries.len() {
             return Ok(None);
         }
         let content = read_content(&self.package)?;
         let mut repairs = ToleranceReport::default();
-        let result = parse_selected_sheet(&content, index, &mut repairs);
+        let result = parse_selected_sheet(&content, index, &mut repairs, self.xml_limits);
         let result = prefer_current(self.source.as_ref(), self.source_version, result)?;
         // The selected table was parsed on its own, as sheet 0.
         repairs.locate_in_sheet(u32::try_from(index).unwrap_or(u32::MAX));
@@ -431,7 +487,7 @@ impl SourceBackedSpreadsheetCatalog {
     }
 
     /// Read one worksheet selected by its exact ODF name.
-    pub fn sheet(&self, name: &str) -> Result<Option<Sheet>> {
+    pub fn sheet(&self, name: &str) -> FamilyResult<Option<Sheet>> {
         self.check_source()?;
         let Some(entry) = self.entries.iter().find(|entry| entry.name == name) else {
             return Ok(None);
@@ -440,19 +496,27 @@ impl SourceBackedSpreadsheetCatalog {
     }
 
     /// List package members without reading their payloads.
-    pub fn files(&self) -> Result<Vec<String>> {
+    pub fn files(&self) -> FamilyResult<Vec<String>> {
         let result = self.package.files();
-        prefer_current(self.source.as_ref(), self.source_version, result)
+        Ok(prefer_current(
+            self.source.as_ref(),
+            self.source_version,
+            result,
+        )?)
     }
 
     /// List media members without reading their payloads.
-    pub fn media_files(&self) -> Result<Vec<String>> {
+    pub fn media_files(&self) -> FamilyResult<Vec<String>> {
         let result = self.package.media_files();
-        prefer_current(self.source.as_ref(), self.source_version, result)
+        Ok(prefer_current(
+            self.source.as_ref(),
+            self.source_version,
+            result,
+        )?)
     }
 
     /// Read one safe package member on demand.
-    pub fn member_data(&self, path: &str) -> Result<Option<Vec<u8>>> {
+    pub fn member_data(&self, path: &str) -> FamilyResult<Option<Vec<u8>>> {
         self.check_source()?;
         let result = (|| {
             let path = resolve_package_path(path)?;
@@ -461,59 +525,73 @@ impl SourceBackedSpreadsheetCatalog {
             }
             self.package.get_file(&path).map(Some)
         })();
-        prefer_current(self.source.as_ref(), self.source_version, result)
+        Ok(prefer_current(
+            self.source.as_ref(),
+            self.source_version,
+            result,
+        )?)
     }
 
     /// Read one safe package media member on demand.
-    pub fn media_data(&self, path: &str) -> Result<Option<Vec<u8>>> {
+    pub fn media_data(&self, path: &str) -> FamilyResult<Option<Vec<u8>>> {
         self.check_source()?;
-        let result = (|| {
-            let path = resolve_package_path(path)?;
-            if !is_media_path(&path) {
-                return Ok(None);
-            }
-            self.member_data(&path)
-        })();
-        prefer_current(self.source.as_ref(), self.source_version, result)
+        let path = resolve_package_path(path)?;
+        if !is_media_path(&path) {
+            return Ok(None);
+        }
+        self.member_data(&path)
     }
 
     /// Read inert document and macro signature metadata without executing it.
-    pub fn digital_signatures(&self) -> Result<litchi_odf_common::signature::DigitalSignatures> {
+    pub fn digital_signatures(
+        &self,
+    ) -> FamilyResult<litchi_odf_common::signature::DigitalSignatures> {
         let result = self.package.digital_signatures();
-        prefer_current(self.source.as_ref(), self.source_version, result)
+        Ok(prefer_current(
+            self.source.as_ref(),
+            self.source_version,
+            result,
+        )?)
     }
 
-    /// Materialize the exact source into the complete owned/mutable ODS owner.
-    pub fn materialize(self) -> Result<Spreadsheet> {
+    /// Materialize the exact source into an immutable [`crate::Package`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a source-changed, archive or family-validation failure.
+    pub fn materialize(self) -> FamilyResult<crate::Package> {
         self.check_source()?;
         let source = Arc::clone(&self.source);
         let version = self.source_version;
         let package = prefer_current(source.as_ref(), version, self.package.materialize())?;
-        prefer_current(
+        Ok(prefer_current(
             source.as_ref(),
             version,
-            Spreadsheet::from_owned_package(package),
-        )
+            crate::Package::from_materialized(
+                package,
+                OpenOptions::new().xml_limits(self.xml_limits),
+            ),
+        )?)
     }
 }
 
 #[cfg(any(unix, windows))]
-fn file_source(path: impl AsRef<Path>) -> Result<Arc<dyn ReadAt>> {
+fn file_source(path: impl AsRef<Path>) -> CoreResult<Arc<dyn ReadAt>> {
     Ok(Arc::new(FileSource::open(path)?))
 }
 
-fn read_content(package: &SourceBackedPackage) -> Result<String> {
+fn read_content(package: &SourceBackedPackage) -> CoreResult<String> {
     ContentDocumentValidator::check_materialized_size(
         package.member_materialized_size("content.xml")?,
         FAMILY_NAME,
     )?;
     let bytes = package.get_file("content.xml")?;
     String::from_utf8(bytes).map_err(|error| {
-        Error::InvalidFormat(format!("{FAMILY_NAME} content.xml is not UTF-8: {error}"))
+        CoreError::InvalidFormat(format!("{FAMILY_NAME} content.xml is not UTF-8: {error}"))
     })
 }
 
-fn scan_catalog(xml: &str) -> Result<Vec<SheetCatalogEntry>> {
+fn scan_catalog(xml: &str) -> CoreResult<Vec<SheetCatalogEntry>> {
     // Keep the mandatory ODS hierarchy validation and the worksheet catalog
     // scan on one tokenizer.  The catalog is deliberately narrower than the
     // semantic worksheet parser, but it must retain the same structural
@@ -537,7 +615,9 @@ fn scan_catalog(xml: &str) -> Result<Vec<SheetCatalogEntry>> {
     loop {
         let (resolved, event) = reader
             .read_resolved_event_into(&mut buffer)
-            .map_err(|error| Error::InvalidFormat(format!("invalid ODS content.xml: {error}")))?;
+            .map_err(|error| {
+                CoreError::InvalidFormat(format!("invalid ODS content.xml: {error}"))
+            })?;
         validate.on_event(is_office_namespace(&resolved), &event)?;
         let namespace = NamespaceKind::from_resolved(&resolved);
         match event {
@@ -561,14 +641,14 @@ fn scan_catalog(xml: &str) -> Result<Vec<SheetCatalogEntry>> {
                     if is_dde_cache {
                         if dde_cache_depth.is_none() {
                             dde_cache_depth = Some(depth.checked_add(1).ok_or_else(|| {
-                                Error::InvalidFormat(
+                                CoreError::InvalidFormat(
                                     "ODS DDE cache depth overflows usize".to_string(),
                                 )
                             })?);
                         }
                     } else if spreadsheet_depth != depth.checked_sub(1) {
                         catalog_error.get_or_insert_with(|| {
-                            Error::InvalidFormat(
+                            CoreError::InvalidFormat(
                                 "table:table must be a direct child of office:spreadsheet"
                                     .to_string(),
                             )
@@ -582,7 +662,7 @@ fn scan_catalog(xml: &str) -> Result<Vec<SheetCatalogEntry>> {
                     }
                 }
                 depth = depth.checked_add(1).ok_or_else(|| {
-                    Error::InvalidFormat("ODS XML nesting depth overflows usize".to_string())
+                    CoreError::InvalidFormat("ODS XML nesting depth overflows usize".to_string())
                 })?;
             },
             Event::Empty(element) => {
@@ -602,7 +682,7 @@ fn scan_catalog(xml: &str) -> Result<Vec<SheetCatalogEntry>> {
                         // excludes both their root and every descendant.
                     } else if spreadsheet_depth != depth.checked_sub(1) {
                         catalog_error.get_or_insert_with(|| {
-                            Error::InvalidFormat(
+                            CoreError::InvalidFormat(
                                 "table:table must be a direct child of office:spreadsheet"
                                     .to_string(),
                             )
@@ -627,7 +707,7 @@ fn scan_catalog(xml: &str) -> Result<Vec<SheetCatalogEntry>> {
                     dde_link_depth = None;
                 }
                 depth = depth.checked_sub(1).ok_or_else(|| {
-                    Error::InvalidFormat("ODS XML element stack underflow".to_string())
+                    CoreError::InvalidFormat("ODS XML element stack underflow".to_string())
                 })?;
                 if spreadsheet_depth == Some(depth) {
                     spreadsheet_depth = None;
@@ -679,9 +759,9 @@ fn add_catalog_entry(
     names: &mut HashSet<String>,
     element: &BytesStart<'_>,
     reader: &NsReader<&[u8]>,
-) -> Result<()> {
+) -> CoreResult<()> {
     if entries.len() >= crate::worksheet::validation::MAX_PHYSICAL_RUNS {
-        return Err(Error::InvalidFormat(format!(
+        return Err(CoreError::InvalidFormat(format!(
             "ODS sheet count exceeds the {} safety limit",
             crate::worksheet::validation::MAX_PHYSICAL_RUNS
         )));
@@ -689,23 +769,27 @@ fn add_catalog_entry(
     let name = table_name(element, reader)?;
     crate::worksheet::validation::validate_text(&name, "sheet name")?;
     if name.is_empty() {
-        return Err(Error::InvalidFormat(
+        return Err(CoreError::InvalidFormat(
             "ODS sheet names must be non-empty".to_string(),
         ));
     }
-    names.try_reserve(1).map_err(|source| Error::Allocation {
-        resource: "ODS source worksheet catalog names",
-        source,
-    })?;
+    names
+        .try_reserve(1)
+        .map_err(|source| CoreError::Allocation {
+            resource: "ODS source worksheet catalog names",
+            source,
+        })?;
     if !names.insert(name.clone()) {
-        return Err(Error::InvalidFormat(format!(
+        return Err(CoreError::InvalidFormat(format!(
             "ODS sheet name '{name}' is duplicated"
         )));
     }
-    entries.try_reserve(1).map_err(|source| Error::Allocation {
-        resource: "ODS source worksheet catalog",
-        source,
-    })?;
+    entries
+        .try_reserve(1)
+        .map_err(|source| CoreError::Allocation {
+            resource: "ODS source worksheet catalog",
+            source,
+        })?;
     entries.push(SheetCatalogEntry {
         index: entries.len(),
         name,
@@ -713,22 +797,22 @@ fn add_catalog_entry(
     Ok(())
 }
 
-fn table_name(element: &BytesStart<'_>, reader: &NsReader<&[u8]>) -> Result<String> {
+fn table_name(element: &BytesStart<'_>, reader: &NsReader<&[u8]>) -> CoreResult<String> {
     let mut name = None;
     for raw in element.attributes().with_checks(true) {
-        let raw =
-            raw.map_err(|error| Error::InvalidFormat(format!("invalid ODS attribute: {error}")))?;
+        let raw = raw
+            .map_err(|error| CoreError::InvalidFormat(format!("invalid ODS attribute: {error}")))?;
         let (namespace, local) = reader.resolver().resolve_attribute(raw.key);
         let value = raw
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
             .map_err(|error| {
-                Error::InvalidFormat(format!("invalid ODS attribute value: {error}"))
+                CoreError::InvalidFormat(format!("invalid ODS attribute value: {error}"))
             })?;
         let namespace = match namespace {
             ResolveResult::Bound(Namespace(uri)) => uri,
             ResolveResult::Unbound => b"",
             ResolveResult::Unknown(prefix) => {
-                return Err(Error::InvalidFormat(format!(
+                return Err(CoreError::InvalidFormat(format!(
                     "unbound ODS attribute prefix '{}'",
                     String::from_utf8_lossy(prefix.as_ref())
                 )));
@@ -745,18 +829,20 @@ fn parse_selected_sheet(
     xml: &str,
     index: usize,
     tolerance: &mut ToleranceReport,
-) -> Result<Option<Sheet>> {
+    xml_limits: XmlStreamLimits,
+) -> CoreResult<Option<Sheet>> {
     let (range, wrapper) = find_sheet_range(xml, index)?;
     let Some(range) = range else {
         return Ok(None);
     };
     let table = xml.get(range).ok_or_else(|| {
-        Error::InvalidFormat("ODS selected worksheet source range is invalid".to_string())
+        CoreError::InvalidFormat("ODS selected worksheet source range is invalid".to_string())
     })?;
     let wrapped = wrapper.wrap(table)?;
-    let mut sheets = crate::worksheet::codec::parse_recording(&wrapped, tolerance)?;
+    let mut sheets =
+        crate::worksheet::codec::parse_recording_with_xml_limits(&wrapped, tolerance, xml_limits)?;
     if sheets.len() != 1 {
-        return Err(Error::InvalidFormat(
+        return Err(CoreError::InvalidFormat(
             "ODS selected worksheet parser returned an unexpected sheet count".to_string(),
         ));
     }
@@ -773,15 +859,15 @@ struct Wrapper {
 }
 
 impl Wrapper {
-    fn wrap(&self, table: &str) -> Result<String> {
+    fn wrap(&self, table: &str) -> CoreResult<String> {
         let root_name = std::str::from_utf8(&self.root_name).map_err(|error| {
-            Error::InvalidFormat(format!("ODS root name is not UTF-8: {error}"))
+            CoreError::InvalidFormat(format!("ODS root name is not UTF-8: {error}"))
         })?;
         let body_name = std::str::from_utf8(&self.body_name).map_err(|error| {
-            Error::InvalidFormat(format!("ODS body name is not UTF-8: {error}"))
+            CoreError::InvalidFormat(format!("ODS body name is not UTF-8: {error}"))
         })?;
         let spreadsheet_name = std::str::from_utf8(&self.spreadsheet_name).map_err(|error| {
-            Error::InvalidFormat(format!("ODS spreadsheet name is not UTF-8: {error}"))
+            CoreError::InvalidFormat(format!("ODS spreadsheet name is not UTF-8: {error}"))
         })?;
         let suffix_size = spreadsheet_name
             .len()
@@ -789,12 +875,12 @@ impl Wrapper {
             .and_then(|size| size.checked_add(root_name.len()))
             .and_then(|size| size.checked_add(9))
             .ok_or_else(|| {
-                Error::InvalidFormat("ODS selected worksheet suffix overflows".to_string())
+                CoreError::InvalidFormat("ODS selected worksheet suffix overflows".to_string())
             })?;
         let mut suffix = String::new();
         suffix
             .try_reserve_exact(suffix_size)
-            .map_err(|source| Error::Allocation {
+            .map_err(|source| CoreError::Allocation {
                 resource: "ODS selected worksheet suffix",
                 source,
             })?;
@@ -813,23 +899,23 @@ impl Wrapper {
             .and_then(|size| size.checked_add(table.len()))
             .and_then(|size| size.checked_add(suffix.len()))
             .ok_or_else(|| {
-                Error::InvalidFormat("ODS selected worksheet wrapper overflows".to_string())
+                CoreError::InvalidFormat("ODS selected worksheet wrapper overflows".to_string())
             })?;
         let mut output = String::new();
         output
             .try_reserve_exact(size)
-            .map_err(|source| Error::Allocation {
+            .map_err(|source| CoreError::Allocation {
                 resource: "ODS selected worksheet wrapper",
                 source,
             })?;
         output.push_str(std::str::from_utf8(&self.root).map_err(|error| {
-            Error::InvalidFormat(format!("ODS root start tag is not UTF-8: {error}"))
+            CoreError::InvalidFormat(format!("ODS root start tag is not UTF-8: {error}"))
         })?);
         output.push_str(std::str::from_utf8(&self.body).map_err(|error| {
-            Error::InvalidFormat(format!("ODS body start tag is not UTF-8: {error}"))
+            CoreError::InvalidFormat(format!("ODS body start tag is not UTF-8: {error}"))
         })?);
         output.push_str(std::str::from_utf8(&self.spreadsheet).map_err(|error| {
-            Error::InvalidFormat(format!("ODS spreadsheet start tag is not UTF-8: {error}"))
+            CoreError::InvalidFormat(format!("ODS spreadsheet start tag is not UTF-8: {error}"))
         })?);
         output.push_str(table);
         output.push_str(&suffix);
@@ -837,7 +923,7 @@ impl Wrapper {
     }
 }
 
-fn find_sheet_range(xml: &str, target: usize) -> Result<(Option<Range<usize>>, Wrapper)> {
+fn find_sheet_range(xml: &str, target: usize) -> CoreResult<(Option<Range<usize>>, Wrapper)> {
     // `scan_catalog` validated this exact source before the catalog was
     // published.  The source version is checked before and after every public
     // read, so re-validating the entire document here would only repeat the
@@ -863,7 +949,7 @@ fn find_sheet_range(xml: &str, target: usize) -> Result<(Option<Range<usize>>, W
         let before = reader.buffer_position();
         let (resolved, event) = reader
             .read_resolved_event_into(&mut buffer)
-            .map_err(|error| Error::InvalidFormat(format!("invalid ODS XML: {error}")))?;
+            .map_err(|error| CoreError::InvalidFormat(format!("invalid ODS XML: {error}")))?;
         let namespace = NamespaceKind::from_resolved(&resolved);
         let after = reader.buffer_position();
         match event {
@@ -904,11 +990,11 @@ fn find_sheet_range(xml: &str, target: usize) -> Result<(Option<Range<usize>>, W
                         table_depth = Some(depth + 1);
                     }
                     table_index = table_index.checked_add(1).ok_or_else(|| {
-                        Error::InvalidFormat("ODS worksheet index overflows usize".to_string())
+                        CoreError::InvalidFormat("ODS worksheet index overflows usize".to_string())
                     })?;
                 }
                 depth = depth.checked_add(1).ok_or_else(|| {
-                    Error::InvalidFormat("ODS XML nesting depth overflows usize".to_string())
+                    CoreError::InvalidFormat("ODS XML nesting depth overflows usize".to_string())
                 })?;
             },
             Event::Empty(element) => {
@@ -921,7 +1007,7 @@ fn find_sheet_range(xml: &str, target: usize) -> Result<(Option<Range<usize>>, W
                         selected_range = Some(before as usize..after as usize);
                     }
                     table_index = table_index.checked_add(1).ok_or_else(|| {
-                        Error::InvalidFormat("ODS worksheet index overflows usize".to_string())
+                        CoreError::InvalidFormat("ODS worksheet index overflows usize".to_string())
                     })?;
                 }
             },
@@ -933,7 +1019,7 @@ fn find_sheet_range(xml: &str, target: usize) -> Result<(Option<Range<usize>>, W
                     }
                 }
                 depth = depth.checked_sub(1).ok_or_else(|| {
-                    Error::InvalidFormat("ODS XML element stack underflow".to_string())
+                    CoreError::InvalidFormat("ODS XML element stack underflow".to_string())
                 })?;
                 if spreadsheet_depth == Some(depth) {
                     spreadsheet_depth = None;
@@ -953,32 +1039,33 @@ fn find_sheet_range(xml: &str, target: usize) -> Result<(Option<Range<usize>>, W
 
     let wrapper = Wrapper {
         root: root
-            .ok_or_else(|| Error::InvalidFormat("ODS root start tag is missing".to_string()))?,
+            .ok_or_else(|| CoreError::InvalidFormat("ODS root start tag is missing".to_string()))?,
         body: body
-            .ok_or_else(|| Error::InvalidFormat("ODS body start tag is missing".to_string()))?,
+            .ok_or_else(|| CoreError::InvalidFormat("ODS body start tag is missing".to_string()))?,
         spreadsheet: spreadsheet.ok_or_else(|| {
-            Error::InvalidFormat("ODS spreadsheet start tag is missing".to_string())
+            CoreError::InvalidFormat("ODS spreadsheet start tag is missing".to_string())
         })?,
         root_name: root_name
-            .ok_or_else(|| Error::InvalidFormat("ODS root name is missing".to_string()))?,
+            .ok_or_else(|| CoreError::InvalidFormat("ODS root name is missing".to_string()))?,
         body_name: body_name
-            .ok_or_else(|| Error::InvalidFormat("ODS body name is missing".to_string()))?,
-        spreadsheet_name: spreadsheet_name
-            .ok_or_else(|| Error::InvalidFormat("ODS spreadsheet name is missing".to_string()))?,
+            .ok_or_else(|| CoreError::InvalidFormat("ODS body name is missing".to_string()))?,
+        spreadsheet_name: spreadsheet_name.ok_or_else(|| {
+            CoreError::InvalidFormat("ODS spreadsheet name is missing".to_string())
+        })?,
     };
     Ok((selected_range, wrapper))
 }
 
-fn start_tag(element: &BytesStart<'_>) -> Result<Vec<u8>> {
+fn start_tag(element: &BytesStart<'_>) -> CoreResult<Vec<u8>> {
     let raw: &[u8] = element.as_ref();
     let size = raw
         .len()
         .checked_add(2)
-        .ok_or_else(|| Error::InvalidFormat("ODS start tag size overflows".to_string()))?;
+        .ok_or_else(|| CoreError::InvalidFormat("ODS start tag size overflows".to_string()))?;
     let mut output = Vec::new();
     output
         .try_reserve_exact(size)
-        .map_err(|source| Error::Allocation {
+        .map_err(|source| CoreError::Allocation {
             resource: "ODS selected worksheet start tag",
             source,
         })?;
@@ -988,24 +1075,28 @@ fn start_tag(element: &BytesStart<'_>) -> Result<Vec<u8>> {
     Ok(output)
 }
 
-fn copy_bytes(value: &[u8], resource: &'static str) -> Result<Vec<u8>> {
+fn copy_bytes(value: &[u8], resource: &'static str) -> CoreResult<Vec<u8>> {
     let mut output = Vec::new();
     output
         .try_reserve_exact(value.len())
-        .map_err(|source| Error::Allocation { resource, source })?;
+        .map_err(|source| CoreError::Allocation { resource, source })?;
     output.extend_from_slice(value);
     Ok(output)
 }
 
-fn ensure_current(expected: SourceVersion, observed: SourceVersion) -> Result<()> {
+fn ensure_current(expected: SourceVersion, observed: SourceVersion) -> CoreResult<()> {
     if expected == observed {
         Ok(())
     } else {
-        Err(Error::SourceChanged { expected, observed })
+        Err(CoreError::SourceChanged { expected, observed })
     }
 }
 
-fn prefer_current<T>(source: &dyn ReadAt, expected: SourceVersion, result: Result<T>) -> Result<T> {
+fn prefer_current<T>(
+    source: &dyn ReadAt,
+    expected: SourceVersion,
+    result: CoreResult<T>,
+) -> CoreResult<T> {
     ensure_current(expected, source.version()?)?;
     result
 }

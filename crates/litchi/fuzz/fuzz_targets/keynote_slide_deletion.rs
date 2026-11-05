@@ -8,7 +8,9 @@ use std::sync::OnceLock;
 
 use libfuzzer_sys::fuzz_target;
 use litchi::keynote::slide::delete::{self, Error as DeletionError};
-use litchi::keynote::{Limits, Package, Position, ReadOptions, SemanticLimits, SlideSelector};
+use litchi::keynote::{
+    OpenOptions, Package, Position, SemanticLimits, SlideSelector, SourceLimits,
+};
 
 const MAX_INPUT_BYTES: u64 = 1024 * 1024;
 const OVERSIZED_INPUT_BYTES: usize = MAX_INPUT_BYTES as usize + 1;
@@ -39,27 +41,29 @@ fuzz_target!(|data: &[u8]| {
     }
 });
 
-fn fuzz_options() -> ReadOptions {
-    static OPTIONS: OnceLock<ReadOptions> = OnceLock::new();
+fn fuzz_options() -> OpenOptions {
+    static OPTIONS: OnceLock<OpenOptions> = OnceLock::new();
     *OPTIONS.get_or_init(|| {
-        let archive = Limits::new(
-            MAX_INPUT_BYTES,
-            MAX_ENTRIES,
-            MAX_ENTRY_BYTES,
-            MAX_EXPANDED_BYTES,
-            MAX_IWA_STREAM_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid Keynote fuzz archive limits: {error}"));
-        let semantic = SemanticLimits::new(
-            MAX_OBJECTS,
-            MAX_SLIDES,
-            MAX_REFERENCES,
-            MAX_TEXT_STORAGES,
-            MAX_TEXT_FRAGMENTS,
-            MAX_TEXT_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid Keynote fuzz semantic limits: {error}"));
-        ReadOptions::new(archive, semantic)
+        let archive = SourceLimits::builder()
+            .max_input_bytes(MAX_INPUT_BYTES)
+            .and_then(|limits| limits.max_entries(MAX_ENTRIES))
+            .and_then(|limits| limits.max_entry_bytes(MAX_ENTRY_BYTES))
+            .and_then(|limits| limits.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+            .and_then(|limits| limits.max_component_bytes(MAX_IWA_STREAM_BYTES))
+            .and_then(|limits| limits.build())
+            .unwrap_or_else(|error| unreachable!("valid Keynote fuzz archive limits: {error}"));
+        let semantic = SemanticLimits::builder()
+            .max_objects(MAX_OBJECTS)
+            .and_then(|limits| limits.max_slides(MAX_SLIDES))
+            .and_then(|limits| limits.max_references(MAX_REFERENCES))
+            .and_then(|limits| limits.max_text_storages(MAX_TEXT_STORAGES))
+            .and_then(|limits| limits.max_text_fragments(MAX_TEXT_FRAGMENTS))
+            .and_then(|limits| limits.max_text_bytes(MAX_TEXT_BYTES))
+            .and_then(|limits| limits.build())
+            .unwrap_or_else(|error| unreachable!("valid Keynote fuzz semantic limits: {error}"));
+        OpenOptions::new()
+            .source_limits(archive)
+            .semantic_limits(semantic)
     })
 }
 
@@ -130,7 +134,9 @@ fn exercise_selector_staging(package: &Package, data: &[u8]) {
     let missing_position = Position::new(slide_count.saturating_add(1));
     let mut missing_position_edit = package.edit_slide_deletion();
     match missing_position_edit.remove_slide(missing_position) {
-        Err(DeletionError::SlidePositionNotFound { position }) => {
+        Err(DeletionError::Refused(
+            litchi::keynote::slide::delete::Refusal::SlidePositionNotFound { position },
+        )) => {
             assert_eq!(position, missing_position);
         },
         Err(error) => observe_error(error),
@@ -145,7 +151,9 @@ fn exercise_selector_staging(package: &Package, data: &[u8]) {
         return;
     }
     match staged.remove_slide(SlideSelector::index(second)) {
-        Err(DeletionError::OperationAlreadyStaged) => {},
+        Err(DeletionError::Refused(
+            litchi::keynote::slide::delete::Refusal::OperationAlreadyStaged,
+        )) => {},
         Err(error) => observe_error(error),
         Ok(_) => panic!("a second slide deletion unexpectedly replaced the staged operation"),
     }
@@ -158,7 +166,8 @@ fn exercise_selector_staging(package: &Package, data: &[u8]) {
     assert_eq!(package_bytes(package), source);
 
     match package.edit_slide_deletion().commit() {
-        Err(DeletionError::NoStagedOperation) => {},
+        Err(DeletionError::Refused(litchi::keynote::slide::delete::Refusal::NoStagedOperation)) => {
+        },
         Err(error) => observe_error(error),
         Ok(_) => panic!("an empty slide deletion transaction unexpectedly committed"),
     }
@@ -250,16 +259,18 @@ fn exercise_successful_delete(package: &Package, data: &[u8]) {
 }
 
 fn exercise_semantic_limit(package: &Package) {
-    let semantic = SemanticLimits::new(
-        MAX_OBJECTS,
-        2,
-        MAX_REFERENCES,
-        MAX_TEXT_STORAGES,
-        MAX_TEXT_FRAGMENTS,
-        MAX_TEXT_BYTES,
-    )
-    .unwrap_or_else(|error| unreachable!("valid bounded semantic profile: {error}"));
-    let options = ReadOptions::new(fuzz_options().archive(), semantic);
+    let semantic = SemanticLimits::builder()
+        .max_objects(MAX_OBJECTS)
+        .and_then(|limits| limits.max_slides(2))
+        .and_then(|limits| limits.max_references(MAX_REFERENCES))
+        .and_then(|limits| limits.max_text_storages(MAX_TEXT_STORAGES))
+        .and_then(|limits| limits.max_text_fragments(MAX_TEXT_FRAGMENTS))
+        .and_then(|limits| limits.max_text_bytes(MAX_TEXT_BYTES))
+        .and_then(|limits| limits.build())
+        .unwrap_or_else(|error| unreachable!("valid bounded semantic profile: {error}"));
+    let options = OpenOptions::new()
+        .source_limits(fuzz_options().source_limits_value())
+        .semantic_limits(semantic);
     let source = package_bytes(package);
     let limited = match Package::from_bytes_with_options(&source, options) {
         Ok(package) => package,
@@ -294,7 +305,9 @@ fn exercise_final_slide(package: &Package) {
     let source = package_bytes(one_slide);
     let mut edit = one_slide.edit_slide_deletion();
     match edit.remove_slide(SlideSelector::index(0)) {
-        Err(DeletionError::CannotDeleteFinalSlide) => {},
+        Err(DeletionError::Refused(
+            litchi::keynote::slide::delete::Refusal::CannotDeleteFinalSlide,
+        )) => {},
         Err(error) => observe_error(error),
         Ok(_) => panic!("the final Keynote slide unexpectedly became deletable"),
     }

@@ -6,19 +6,19 @@ use super::codec::{
     PLCFATNBKF, PLCFATNBKL, PLCFBKF, PLCFBKL, PLCFBTE_CHPX, PLCFBTE_PAPX, PLCFFLD_MOM,
     ParsedMetadata, STTBFRMARK, align2, align512, append_table_block, build_papx_pages, corrupted,
     delete_piece_range, encode_revision, fib_pair, infer_moves, insert_piece, kind_order,
-    merge_adjacent, metadata_from_sprms, parse_authors, parse_chpx, parse_clx, parse_cp_table,
-    parse_papx, property_metadata, put_fib_pair, put_u32, read_units, replace_papx_revision_sprms,
-    replace_revision_sprms, restore_before_wall, retain_sprms, revision_opcodes, serialize_authors,
-    serialize_clx, slice, split_transform_chpx, split_transform_papx, strict_sprms, u16_at, u32_at,
-    validate_metadata, validate_range,
+    merge_adjacent, metadata_from_sprms, papx_sprms, parse_authors, parse_chpx, parse_clx,
+    parse_cp_table, parse_papx, property_metadata, put_fib_pair, put_u32, read_units,
+    replace_papx_revision_sprms, replace_revision_sprms, restore_before_wall, retain_sprms,
+    revision_opcodes, serialize_authors, serialize_clx, slice, split_transform_chpx,
+    split_transform_papx, strict_sprms, u16_at, u32_at, validate_metadata, validate_range,
 };
 use super::model::{CpTable, FcRun, PapxRun, RawPiece, Revision, RevisionKind, RevisionMetadata};
 use crate::package::{Error as PackageError, Result};
-use crate::parts::dofr::{DofrArray, DofrPatch};
+use crate::parts::dofr::{DofrArray, Patch as DofrPatch};
 use crate::parts::fib::FileInformationBlock;
 use crate::parts::protection::{EditProtection, ProtectionPolicy};
 use crate::parts::saved_selection::{
-    SavedSelection, SavedSelectionPatch, SavedSelectionSpliceError, table_range,
+    Patch as SavedSelectionPatch, SavedSelection, SavedSelectionSpliceError, table_range,
 };
 use crate::sprm_operations::{
     SPRM_C_DTTM_RMARK, SPRM_C_DTTM_RMARK_DEL, SPRM_C_F_BOLD, SPRM_C_F_ITALIC, SPRM_C_F_OBJ,
@@ -33,7 +33,9 @@ use crate::writer::ChpxFkpBuilder;
 use litchi_cfb::{OleFile, directory_names_equal};
 #[cfg(feature = "performance-diagnostics")]
 use litchi_ole_common::object::CfbParseEvent;
-use litchi_ole_common::object::{Editor as ObjectEditor, Targets};
+use litchi_ole_common::object::{
+    Edit as ObjectEditor, OpenOptions, Package as ObjectPackage, Targets,
+};
 use litchi_ole_common::property_set::{
     DOCUMENT_SUMMARY_INFORMATION_FMTID, Stream as PropertySetStream,
     document_summary::DIGITAL_SIGNATURE,
@@ -43,6 +45,10 @@ use smallvec::SmallVec;
 use std::collections::HashSet;
 use std::io::Cursor;
 use std::sync::Arc;
+
+mod properties;
+
+pub(crate) use properties::BookmarkRange;
 
 /// Exact, deliberately narrow picture dependency closure shared with the
 /// ordinary body transaction. The wire blocks are accepted only after they
@@ -106,11 +112,13 @@ impl PictureGraph {
                     position: &position,
                     text: None,
                 };
-                let expected =
-                    crate::writer::images::build_dgg_info(std::slice::from_ref(&shape), &[], 1)
-                        .map_err(|error| {
-                            corrupted(format!("re-homed Dgg cannot be encoded: {error}"))
-                        })?;
+                let expected = crate::writer::images::build_dgg_info(
+                    std::slice::from_ref(&shape),
+                    &[],
+                    1,
+                    litchi_odraw::image::Limits::default(),
+                )
+                .map_err(|error| corrupted(format!("re-homed Dgg cannot be encoded: {error}")))?;
                 if expected == self.dgg_info {
                     return Ok(());
                 }
@@ -198,8 +206,13 @@ fn canonical_picture_from_block(block: &[u8]) -> Result<(crate::writer::Picture,
             .map_err(|error| corrupted(format!("re-homed picture is invalid: {error}")))?;
     let shape_id = picture_shape_id(block)?;
     let mut expected = Vec::new();
-    crate::writer::images::write_picture_block(&picture, shape_id, &mut expected)
-        .map_err(|error| corrupted(format!("re-homed picture cannot be encoded: {error}")))?;
+    crate::writer::images::write_picture_block(
+        &picture,
+        shape_id,
+        &mut expected,
+        litchi_odraw::image::Limits::default(),
+    )
+    .map_err(|error| corrupted(format!("re-homed picture cannot be encoded: {error}")))?;
     if expected != block {
         return Err(corrupted("re-homed picture block is not canonical"));
     }
@@ -220,8 +233,9 @@ fn canonical_picture_from_block(block: &[u8]) -> Result<(crate::writer::Picture,
 fn picture_shape_id(block: &[u8]) -> Result<u32> {
     const PICF_HEADER_LEN: usize = 0x44;
 
-    let (record, consumed) = litchi_odraw::Record::parse(block, PICF_HEADER_LEN)
-        .map_err(|error| corrupted(format!("picture shape container is invalid: {error}")))?;
+    let (record, consumed) =
+        litchi_odraw::Record::parse(block, PICF_HEADER_LEN, litchi_odraw::Limits::default())
+            .map_err(|error| corrupted(format!("picture shape container is invalid: {error}")))?;
     if record.kind() != litchi_odraw::RecordKind::SpContainer {
         return Err(corrupted(
             "picture PICF is not followed by an OfficeArt shape container",
@@ -278,8 +292,9 @@ struct MainDrawing<'data> {
 }
 
 fn main_drawing(dgg_info: &[u8]) -> Result<MainDrawing<'_>> {
-    let (first, first_size) = litchi_odraw::Record::parse(dgg_info, 0)
-        .map_err(|error| corrupted(format!("drawing-group root is invalid: {error}")))?;
+    let (first, first_size) =
+        litchi_odraw::Record::parse(dgg_info, 0, litchi_odraw::Limits::default())
+            .map_err(|error| corrupted(format!("drawing-group root is invalid: {error}")))?;
     if first.kind() != litchi_odraw::RecordKind::DggContainer {
         return Err(corrupted(
             "OfficeArtContent does not start with a DggContainer",
@@ -300,8 +315,9 @@ fn main_drawing(dgg_info: &[u8]) -> Result<MainDrawing<'_>> {
         let record_offset = offset
             .checked_add(1)
             .ok_or_else(|| corrupted("OfficeArtWordDrawing offset overflow"))?;
-        let (drawing, drawing_size) = litchi_odraw::Record::parse(dgg_info, record_offset)
-            .map_err(|error| corrupted(format!("main OfficeArt drawing is invalid: {error}")))?;
+        let (drawing, drawing_size) =
+            litchi_odraw::Record::parse(dgg_info, record_offset, litchi_odraw::Limits::default())
+                .map_err(|error| corrupted(format!("main OfficeArt drawing is invalid: {error}")))?;
         if drawing.kind() != litchi_odraw::RecordKind::DgContainer {
             return Err(corrupted(
                 "OfficeArtWordDrawing does not contain a DgContainer",
@@ -313,7 +329,7 @@ fn main_drawing(dgg_info: &[u8]) -> Result<MainDrawing<'_>> {
         let drawing_bytes = dgg_info
             .get(record_offset..drawing_end)
             .ok_or_else(|| corrupted("OfficeArt drawing extends past DggInfo"))?;
-        let shapes = litchi_odraw::shape::parse(drawing_bytes)
+        let shapes = litchi_odraw::shape::parse(drawing_bytes, Default::default())
             .map_err(|error| corrupted(format!("OfficeArt shapes are invalid: {error}")))?;
         if label == 0 {
             if main
@@ -567,12 +583,13 @@ fn validate_picture_store(
     picture: &crate::writer::Picture,
 ) -> Result<()> {
     let pib = picture_pib(selected)?;
-    let (_drawing_group, drawing_group_size) = litchi_odraw::Record::parse(dgg_info, 0)
-        .map_err(|error| corrupted(format!("drawing-group root is invalid: {error}")))?;
+    let (_drawing_group, drawing_group_size) =
+        litchi_odraw::Record::parse(dgg_info, 0, litchi_odraw::Limits::default())
+            .map_err(|error| corrupted(format!("drawing-group root is invalid: {error}")))?;
     let drawing_group = dgg_info
         .get(..drawing_group_size)
         .ok_or_else(|| corrupted("drawing-group root extends past DggInfo"))?;
-    let store = litchi_odraw::image::store(drawing_group)
+    let store = litchi_odraw::image::store(drawing_group, litchi_odraw::image::Limits::default())
         .map_err(|error| corrupted(format!("drawing BStore is invalid: {error}")))?
         .ok_or_else(|| corrupted("floating picture drawing has no BStore"))?;
     let id = litchi_odraw::image::Id::new(pib)
@@ -598,7 +615,7 @@ struct NestedRewriteState {
 }
 
 fn rewrite_nested_picture_group(bytes: &mut [u8], source_pib: u32) -> Result<()> {
-    let (record, consumed) = litchi_odraw::Record::parse(bytes, 0)
+    let (record, consumed) = litchi_odraw::Record::parse(bytes, 0, litchi_odraw::Limits::default())
         .map_err(|error| corrupted(format!("nested image-group record is invalid: {error}")))?;
     if consumed != bytes.len() || record.kind() != litchi_odraw::RecordKind::SpgrContainer {
         return Err(corrupted(
@@ -763,11 +780,13 @@ fn build_nested_picture_dgg_info(
         std::slice::from_ref(&placeholder),
         &[],
         allocated,
+        litchi_odraw::image::Limits::default(),
     )
     .map_err(|error| corrupted(format!("nested image-group Dgg cannot be encoded: {error}")))?;
 
-    let (drawing_group_record, drawing_group_size) = litchi_odraw::Record::parse(&output, 0)
-        .map_err(|error| corrupted(format!("generated Dgg root is invalid: {error}")))?;
+    let (drawing_group_record, drawing_group_size) =
+        litchi_odraw::Record::parse(&output, 0, litchi_odraw::Limits::default())
+            .map_err(|error| corrupted(format!("generated Dgg root is invalid: {error}")))?;
     let dgg_meta = litchi_odraw::Container::try_new(drawing_group_record)
         .map_err(|error| corrupted(format!("generated Dgg root is invalid: {error}")))?
         .find(litchi_odraw::RecordKind::Dgg)
@@ -780,8 +799,9 @@ fn build_nested_picture_dgg_info(
     let dg_start = drawing_group_size
         .checked_add(1)
         .ok_or_else(|| corrupted("generated drawing offset overflows"))?;
-    let (drawing_record, drawing_size) = litchi_odraw::Record::parse(&output, dg_start)
-        .map_err(|error| corrupted(format!("generated drawing is invalid: {error}")))?;
+    let (drawing_record, drawing_size) =
+        litchi_odraw::Record::parse(&output, dg_start, litchi_odraw::Limits::default())
+            .map_err(|error| corrupted(format!("generated drawing is invalid: {error}")))?;
     if drawing_record.kind() != litchi_odraw::RecordKind::DgContainer {
         return Err(corrupted("generated drawing has no DgContainer"));
     }
@@ -888,6 +908,37 @@ fn containing_piece(pieces: &[RawPiece], cp: u32) -> Option<&RawPiece> {
     pieces.get(index).filter(|piece| cp < piece.end)
 }
 
+/// PlcfSed: section descriptors by main-story CP.
+const PLCFSED: usize = 6;
+
+/// One main-story paragraph's exact text (its mark included), character
+/// runs and paragraph formatting, captured for re-insertion.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ParagraphCopy {
+    units: Vec<u16>,
+    runs: Vec<(u32, Vec<u8>)>,
+    papx: Vec<u8>,
+    phe: crate::parts::fkp::ParagraphHeight,
+}
+
+impl ParagraphCopy {
+    /// The paragraph's UTF-16 length, its mark included.
+    pub(crate) fn len(&self) -> usize {
+        self.units.len()
+    }
+}
+
+/// The SPRMs of `grpprl` whose opcode is one of `opcodes`, in stored order.
+fn select_sprms(grpprl: &[u8], opcodes: &[u16]) -> Result<Vec<u8>> {
+    let mut output = Vec::new();
+    for sprm in strict_sprms(grpprl)? {
+        if opcodes.contains(&sprm.opcode) {
+            output.extend_from_slice(&grpprl[sprm.offset..sprm.offset + sprm.size]);
+        }
+    }
+    Ok(output)
+}
+
 fn containing_papx(runs: &[PapxRun], fc: u32) -> Option<&PapxRun> {
     let index = runs.partition_point(|run| run.start <= fc).checked_sub(1)?;
     runs.get(index).filter(|run| fc < run.end)
@@ -910,7 +961,7 @@ impl Clone for RetainedRender {
 }
 
 #[derive(Clone)]
-pub struct RevisionEditor {
+pub(crate) struct RevisionEditor {
     package: ObjectEditor,
     word_path: Vec<String>,
     table_path: Vec<String>,
@@ -920,6 +971,7 @@ pub struct RevisionEditor {
     data: Vec<u8>,
     pieces: Vec<RawPiece>,
     chpx: Vec<FcRun>,
+    chpx_dirty: bool,
     papx: Vec<PapxRun>,
     authors: Vec<String>,
     cp_tables: Vec<CpTable>,
@@ -939,7 +991,7 @@ pub struct RevisionEditor {
 }
 
 impl RevisionEditor {
-    pub fn open(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
+    pub(crate) fn open(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
         Self::open_with_ole_file(bytes, limits).map(|(editor, _ole)| editor)
     }
 
@@ -950,7 +1002,7 @@ impl RevisionEditor {
     /// carried by [`ProtectionPolicy`]. The capability records caller
     /// metadata; it does not authenticate a user or provide cryptographic
     /// audit.
-    pub fn open_with_policy(
+    pub(crate) fn open_with_policy(
         bytes: Vec<u8>,
         limits: Limits,
         policy: ProtectionPolicy,
@@ -970,23 +1022,49 @@ impl RevisionEditor {
         limits: Limits,
         policy: ProtectionPolicy,
     ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>)> {
-        let (package, mut ole) =
-            ObjectEditor::open_with_ole_file(bytes, Targets::default(), limits)
-                .map_err(PackageError::from)?;
-        let editor = Self::open_from_package(package, &mut ole, policy)?;
+        Self::open_with_ole_file_with_policy_and_admission(bytes, limits, policy, |_| Ok(()))
+    }
+
+    pub(crate) fn open_with_ole_file_with_policy_and_admission<F>(
+        bytes: Vec<u8>,
+        limits: Limits,
+        policy: ProtectionPolicy,
+        admission: F,
+    ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>)>
+    where
+        F: FnOnce(&OleFile<Cursor<Vec<u8>>>) -> Result<()>,
+    {
+        let (package, mut ole) = ObjectPackage::open_with_ole_file_with_admission(
+            bytes,
+            OpenOptions::new()
+                .targets(Targets::default())
+                .limits(limits),
+            admission,
+        )?;
+        let editor = Self::open_from_package(package.edit()?, &mut ole, policy)?;
         Ok((editor, ole))
     }
 
     #[cfg(feature = "performance-diagnostics")]
-    pub(crate) fn open_with_ole_file_profiled(
+    pub(crate) fn open_with_ole_file_profiled_with_admission<F>(
         bytes: Vec<u8>,
         limits: Limits,
+        policy: ProtectionPolicy,
         observer: impl FnMut(CfbParseEvent),
-    ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>)> {
-        let (package, mut ole) =
-            ObjectEditor::open_with_ole_file_profiled(bytes, Targets::default(), limits, observer)
-                .map_err(PackageError::from)?;
-        let editor = Self::open_from_package(package, &mut ole, ProtectionPolicy::default())?;
+        admission: F,
+    ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>)>
+    where
+        F: FnOnce(&OleFile<Cursor<Vec<u8>>>) -> Result<()>,
+    {
+        let (package, mut ole) = ObjectPackage::open_with_ole_file_profiled_with_admission(
+            bytes,
+            OpenOptions::new()
+                .targets(Targets::default())
+                .limits(limits),
+            observer,
+            admission,
+        )?;
+        let editor = Self::open_from_package(package.edit()?, &mut ole, policy)?;
         Ok((editor, ole))
     }
 
@@ -1098,6 +1176,7 @@ impl RevisionEditor {
             data,
             pieces,
             chpx,
+            chpx_dirty: false,
             papx,
             authors,
             cp_tables,
@@ -1118,11 +1197,6 @@ impl RevisionEditor {
             return Err(corrupted("revision count exceeds resource limit"));
         }
         Ok(editor)
-    }
-
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.changed
     }
 
     /// Configures the finite owner-side ceiling for one already-rendered
@@ -1160,7 +1234,7 @@ impl RevisionEditor {
     }
 
     #[must_use]
-    pub fn authors(&self) -> &[String] {
+    pub(crate) fn authors(&self) -> &[String] {
         &self.authors
     }
 
@@ -1190,7 +1264,7 @@ impl RevisionEditor {
     pub(crate) fn preflight_dofr_patch(&self, patch: &DofrPatch) -> Result<bool> {
         let fib = FileInformationBlock::parse(&self.word)?;
         patch.preflight_table_stream(&fib, &self.table)?;
-        Ok(patch.changed())
+        Ok(!patch.is_noop())
     }
 
     /// Whether this source carries inert binary VBA signature metadata in
@@ -1211,7 +1285,7 @@ impl RevisionEditor {
         let fib = FileInformationBlock::parse(&self.word)?;
         patch.preflight_table_stream(&fib, &self.table)?;
         patch.validate_main_story_bound(self.main_ccp)?;
-        Ok(patch.changed())
+        Ok(!patch.is_noop())
     }
 
     /// Applies a source-checked, same-length saved-selection patch and
@@ -1223,7 +1297,7 @@ impl RevisionEditor {
         let fib = FileInformationBlock::parse(&self.word)?;
         patch.preflight_table_stream(&fib, &self.table)?;
         patch.validate_main_story_bound(self.main_ccp)?;
-        if !patch.changed() {
+        if patch.is_noop() {
             return Ok(false);
         }
         if self.signed {
@@ -1239,7 +1313,7 @@ impl RevisionEditor {
     pub(crate) fn apply_dofr_patch(&mut self, patch: &DofrPatch) -> Result<bool> {
         let fib = FileInformationBlock::parse(&self.word)?;
         patch.preflight_table_stream(&fib, &self.table)?;
-        if !patch.changed() {
+        if patch.is_noop() {
             return Ok(false);
         }
         if self.signed {
@@ -1390,6 +1464,18 @@ impl RevisionEditor {
         &self.unmodeled_cp_tables
     }
 
+    /// The FIB index of the first modeled CP table (bookmark, smart tag,
+    /// comment range, field, note or proofing PLCF) with a position strictly
+    /// inside `start..end`. Replacing that text would collapse the range
+    /// boundary, so the text replacement refuses it instead.
+    #[must_use]
+    pub(crate) fn interior_range_boundary(&self, start: u32, end: u32) -> Option<usize> {
+        self.cp_tables
+            .iter()
+            .find(|table| table.cps.iter().any(|cp| *cp > start && *cp < end))
+            .map(|table| table.index)
+    }
+
     /// Whether all character runs in a non-empty range have byte-identical
     /// direct formatting. Length-changing replacement can preserve only this
     /// unambiguous dependency closure.
@@ -1463,28 +1549,61 @@ impl RevisionEditor {
         Ok(uniform)
     }
 
-    /// Replaces a non-empty main-story range by appending one Unicode piece,
-    /// shifting modeled CP tables, rebuilding CHPX FKPs, and publishing a new
-    /// CLX. Callers must first prove a uniform character-format closure.
+    /// Replaces a main-story range by appending one Unicode piece, shifting
+    /// modeled CP tables, rebuilding CHPX FKPs, and publishing a new CLX.
+    /// Callers must first prove a uniform character-format closure. A zero
+    /// width range is accepted only as an insertion immediately before a
+    /// character (the body facade uses this for an empty paragraph and copies
+    /// the paragraph mark's character formatting).
     pub(crate) fn replace_plain_text(
         &mut self,
         start: u32,
         end: u32,
         replacement: &str,
     ) -> Result<()> {
-        validate_range(start, end, self.main_ccp)?;
+        if start > end || end > self.main_ccp || (start == end && start >= self.main_ccp) {
+            return Err(corrupted(
+                "body replacement range is empty or exceeds the main story",
+            ));
+        }
+        if start == end {
+            let next = start
+                .checked_add(1)
+                .ok_or_else(|| corrupted("body insertion CP overflows"))?;
+            if read_units(&self.word, &self.pieces, start, next)?.as_slice() != [0x000D] {
+                return Err(corrupted(
+                    "zero-width body replacement is not before a paragraph mark",
+                ));
+            }
+            if !self.unmodeled_cp_tables.is_empty() {
+                return Err(corrupted(
+                    "zero-width body replacement has unmodeled CP-indexed dependencies",
+                ));
+            }
+        }
         self.reject_destructive_interactions(start, end)?;
-        if !self.has_uniform_character_format(start, end)? {
+        let formatting_end = if start == end {
+            start
+                .checked_add(1)
+                .filter(|value| *value <= self.main_ccp)
+                .ok_or_else(|| corrupted("body insertion has no following character"))?
+        } else {
+            end
+        };
+        if !self.has_uniform_character_format(start, formatting_end)? {
             return Err(corrupted(
                 "length-changing body replacement crosses character formatting runs",
             ));
         }
-        let groups = self.character_groups(start, end)?;
+        let groups = self.character_groups(start, formatting_end)?;
         let formatting = groups
             .first()
             .ok_or_else(|| corrupted("body replacement has no character formatting"))?
             .to_vec();
         let units = replacement.encode_utf16().collect::<Vec<_>>();
+        if start == end && units.is_empty() {
+            return Err(corrupted("body insertion text is empty"));
+        }
         if units.len() > MAX_TEXT_UNITS {
             return Err(corrupted("body replacement exceeds text resource limit"));
         }
@@ -1584,8 +1703,14 @@ impl RevisionEditor {
             self.pieces.last().map_or(self.main_ccp, |piece| piece.end),
         )?;
         let intervals = self.fc_intervals(start, end)?;
-        let mut candidate = self.clone();
-        split_transform_chpx(&mut candidate.chpx, &intervals, |group| {
+        // A body edit may stage hundreds of format changes before it renders
+        // its candidate.  Keep the semantic CHPX model current for the next
+        // validation, but defer the FKP rebuild and package publication until
+        // the edit is rendered.  Cloning just this vector preserves the
+        // operation's atomicity when a transformed group would exceed the
+        // one-byte FKP limit without cloning the complete DOC owner.
+        let mut chpx = self.chpx.clone();
+        split_transform_chpx(&mut chpx, &intervals, |group| {
             let mut output = retain_sprms(group, &[opcode])?;
             if let Some(enabled) = value {
                 output.extend_from_slice(&opcode.to_le_bytes());
@@ -1596,7 +1721,329 @@ impl RevisionEditor {
             }
             Ok(output)
         })?;
+        self.chpx = chpx;
+        self.chpx_dirty = true;
+        self.changed = true;
+        self.release_retained_render();
+        Ok(())
+    }
+
+    /// The direct SPRMs with one of `opcodes`, concatenated in stored order,
+    /// when every character group of the range carries the same ones; `None`
+    /// when the groups disagree.
+    pub(crate) fn uniform_character_sprms(
+        &self,
+        start: u32,
+        end: u32,
+        opcodes: &[u16],
+    ) -> Result<Option<Vec<u8>>> {
+        let groups = self.character_groups(start, end)?;
+        let mut uniform: Option<Vec<u8>> = None;
+        for group in groups {
+            let selected = select_sprms(group, opcodes)?;
+            match &uniform {
+                Some(previous) if *previous != selected => return Ok(None),
+                Some(_) => {},
+                None => uniform = Some(selected),
+            }
+        }
+        Ok(uniform)
+    }
+
+    /// Replaces every direct SPRM with one of `opcodes` by `fragment` on a
+    /// range, retaining every other character SPRM and rebuilding the
+    /// affected CHPX FKPs.
+    pub(crate) fn set_character_sprms(
+        &mut self,
+        start: u32,
+        end: u32,
+        opcodes: &[u16],
+        fragment: &[u8],
+    ) -> Result<()> {
+        validate_range(
+            start,
+            end,
+            self.pieces.last().map_or(self.main_ccp, |piece| piece.end),
+        )?;
+        if strict_sprms(fragment)?
+            .iter()
+            .any(|sprm| !opcodes.contains(&sprm.opcode))
+        {
+            return Err(corrupted("character SPRM fragment names another property"));
+        }
+        let intervals = self.fc_intervals(start, end)?;
+        let mut candidate = self.clone();
+        split_transform_chpx(&mut candidate.chpx, &intervals, |group| {
+            let mut output = retain_sprms(group, opcodes)?;
+            output.extend_from_slice(fragment);
+            if output.len() > 255 {
+                return Err(corrupted("edited CHPX exceeds one-byte FKP limit"));
+            }
+            Ok(output)
+        })?;
         candidate.rewrite_chpx()?;
+        candidate.commit()?;
+        *self = candidate;
+        Ok(())
+    }
+
+    /// The bytes of one FIB-pointed table-stream structure, `None` when the
+    /// FIB gives it no length.
+    pub(crate) fn table_slice(&self, index: usize) -> Result<Option<&[u8]>> {
+        let (offset, length) = fib_pair(&self.word, index)?;
+        if length == 0 {
+            return Ok(None);
+        }
+        slice(&self.table, offset, length, "FIB table structure").map(Some)
+    }
+
+    /// The physical FC of one main-story character.
+    fn fc_at_cp(&self, cp: u32) -> Result<u32> {
+        let piece = containing_piece(&self.pieces, cp)
+            .ok_or_else(|| corrupted("character has no text piece"))?;
+        let width = if piece.unicode { 2 } else { 1 };
+        cp.checked_sub(piece.start)
+            .and_then(|offset| offset.checked_mul(width))
+            .and_then(|offset| piece.fc.checked_add(offset))
+            .ok_or_else(|| corrupted("character FC overflow"))
+    }
+
+    /// The direct character formatting of one main-story character.
+    pub(crate) fn character_grpprl_at(&self, cp: u32) -> Result<Vec<u8>> {
+        let end = cp
+            .checked_add(1)
+            .ok_or_else(|| corrupted("character CP overflow"))?;
+        let groups = self.character_groups(cp, end)?;
+        groups
+            .first()
+            .map(|group| group.to_vec())
+            .ok_or_else(|| corrupted("character has no CHPX formatting"))
+    }
+
+    /// The paragraph formatting of the paragraph whose mark is at `mark`.
+    fn paragraph_papx_at(&self, mark: u32) -> Result<&PapxRun> {
+        let fc = self.fc_at_cp(mark)?;
+        containing_papx(&self.papx, fc).ok_or_else(|| corrupted("paragraph mark has no PAPX run"))
+    }
+
+    /// Whether any modeled CP-indexed table has a position strictly inside
+    /// `start..end`: a field, bookmark, note, comment, drawing or proofing
+    /// anchor that a deletion would collapse.
+    pub(crate) fn has_cp_dependency_inside(&self, start: u32, end: u32) -> bool {
+        self.cp_tables
+            .iter()
+            .any(|table| table.cps.iter().any(|cp| *cp > start && *cp < end))
+    }
+
+    /// Captures one ordinary main-story paragraph (`start..end`, its mark
+    /// included) with its exact character runs and paragraph formatting.
+    pub(crate) fn capture_paragraph(&self, start: u32, end: u32) -> Result<ParagraphCopy> {
+        if start >= end || end > self.main_ccp {
+            return Err(corrupted(
+                "captured paragraph range is outside the main story",
+            ));
+        }
+        let units = read_units(&self.word, &self.pieces, start, end)?;
+        if units.last() != Some(&0x000D) {
+            return Err(corrupted(
+                "captured range does not end with a paragraph mark",
+            ));
+        }
+        let mut chpx = self.chpx.iter().collect::<Vec<_>>();
+        chpx.sort_by_key(|run| run.start);
+        let mut runs: Vec<(u32, Vec<u8>)> = Vec::new();
+        for piece in &self.pieces {
+            let left = start.max(piece.start);
+            let right = end.min(piece.end);
+            if left >= right {
+                continue;
+            }
+            if piece.prm != [0, 0] {
+                return Err(corrupted(
+                    "captured paragraph uses a piece property modifier",
+                ));
+            }
+            let width = if piece.unicode { 2 } else { 1 };
+            let fc_start = piece
+                .fc
+                .checked_add((left - piece.start) * width)
+                .ok_or_else(|| corrupted("captured FC overflow"))?;
+            let fc_end = piece
+                .fc
+                .checked_add((right - piece.start) * width)
+                .ok_or_else(|| corrupted("captured FC overflow"))?;
+            let mut cursor = fc_start;
+            for run in &chpx {
+                let a = fc_start.max(run.start);
+                let b = fc_end.min(run.end);
+                if a >= b {
+                    continue;
+                }
+                if a > cursor || (b - a) % width != 0 || (a - fc_start) % width != 0 {
+                    return Err(corrupted("captured CHPX coverage is not character aligned"));
+                }
+                let length = (b - a) / width;
+                match runs.last_mut() {
+                    Some((count, grpprl)) if *grpprl == run.grpprl => *count += length,
+                    _ => runs.push((length, run.grpprl.clone())),
+                }
+                cursor = b;
+            }
+            if cursor < fc_end {
+                return Err(corrupted("captured paragraph is outside CHPX coverage"));
+            }
+        }
+        let mark = end - 1;
+        let papx = self.paragraph_papx_at(mark)?;
+        if papx.in_table() {
+            return Err(corrupted("captured paragraph belongs to a table"));
+        }
+        Ok(ParagraphCopy {
+            units,
+            runs,
+            papx: papx.grpprl.clone(),
+            phe: papx.phe,
+        })
+    }
+
+    /// A new paragraph holding `units` (its mark included) with the
+    /// paragraph formatting of the paragraph marked at `template_mark` and
+    /// that mark's character formatting.
+    pub(crate) fn template_paragraph(
+        &self,
+        template_mark: u32,
+        units: Vec<u16>,
+    ) -> Result<ParagraphCopy> {
+        if units.last() != Some(&0x000D) {
+            return Err(corrupted(
+                "new paragraph does not end with a paragraph mark",
+            ));
+        }
+        let papx = self.paragraph_papx_at(template_mark)?;
+        if papx.in_table() {
+            return Err(corrupted("template paragraph belongs to a table"));
+        }
+        let length = u32::try_from(units.len())
+            .map_err(|_error| corrupted("new paragraph length exceeds u32"))?;
+        Ok(ParagraphCopy {
+            runs: vec![(length, self.character_grpprl_at(template_mark)?)],
+            units,
+            papx: papx.grpprl.clone(),
+            phe: papx.phe,
+        })
+    }
+
+    /// Inserts a captured or templated paragraph at a main-story paragraph
+    /// boundary, appending its text as one Unicode piece, shifting modeled
+    /// CP tables, and rebuilding the CHPX/PAPX FKPs and the CLX.
+    pub(crate) fn insert_paragraph_copy(&mut self, at: u32, copy: &ParagraphCopy) -> Result<()> {
+        if at > self.main_ccp {
+            return Err(corrupted("paragraph insertion is outside the main story"));
+        }
+        if at != 0 {
+            let previous = read_units(&self.word, &self.pieces, at - 1, at)?;
+            if !matches!(previous.as_slice(), [0x000D | 0x0007]) {
+                return Err(corrupted(
+                    "paragraph insertion is not at a paragraph boundary",
+                ));
+            }
+        }
+        if !self.unmodeled_cp_tables.is_empty() {
+            return Err(corrupted(
+                "paragraph insertion has unmodeled CP-indexed dependencies",
+            ));
+        }
+        if copy.units.len() > MAX_TEXT_UNITS || copy.units.last() != Some(&0x000D) {
+            return Err(corrupted(
+                "inserted paragraph is empty or exceeds the text limit",
+            ));
+        }
+        let added = u32::try_from(copy.units.len())
+            .map_err(|_error| corrupted("inserted paragraph length exceeds u32"))?;
+        if copy.runs.iter().map(|(count, _)| *count).sum::<u32>() != added {
+            return Err(corrupted("inserted paragraph runs do not cover its text"));
+        }
+        let saved_selection = self.prepared_saved_selection_splice(at, at, added)?;
+        let mut candidate = self.clone();
+        let fc = align2(candidate.word.len())?;
+        candidate.word.resize(fc, 0);
+        for unit in &copy.units {
+            candidate.word.extend_from_slice(&unit.to_le_bytes());
+        }
+        let fc =
+            u32::try_from(fc).map_err(|_error| corrupted("inserted paragraph FC exceeds u32"))?;
+        insert_piece(&mut candidate.pieces, at, added, fc)?;
+        let mut cursor = fc;
+        for (count, grpprl) in &copy.runs {
+            let end = count
+                .checked_mul(2)
+                .and_then(|bytes| cursor.checked_add(bytes))
+                .ok_or_else(|| corrupted("inserted paragraph FC overflow"))?;
+            candidate.chpx.push(FcRun {
+                start: cursor,
+                end,
+                grpprl: grpprl.clone(),
+            });
+            cursor = end;
+        }
+        candidate
+            .papx
+            .push(PapxRun::new(fc, cursor, copy.papx.clone(), false, copy.phe));
+        candidate.shift_cp_tables(at, 0, added)?;
+        candidate.main_ccp = candidate
+            .main_ccp
+            .checked_add(added)
+            .ok_or_else(|| corrupted("main story CP insertion overflow"))?;
+        candidate.rewrite_chpx()?;
+        candidate.rewrite_papx()?;
+        candidate.append_clx_and_cp_tables()?;
+        candidate.patch_sizes()?;
+        if let Some(replacement) = saved_selection {
+            candidate.apply_saved_selection_splice(replacement)?;
+        }
+        candidate.commit()?;
+        *self = candidate;
+        Ok(())
+    }
+
+    /// Deletes one main-story range of whole paragraphs, shifting modeled CP
+    /// tables. Orphaned text and formatting bytes stay unreferenced.
+    pub(crate) fn delete_paragraph_range(&mut self, start: u32, end: u32) -> Result<()> {
+        if start >= end || end > self.main_ccp {
+            return Err(corrupted("paragraph deletion is outside the main story"));
+        }
+        if !self.unmodeled_cp_tables.is_empty() {
+            return Err(corrupted(
+                "paragraph deletion has unmodeled CP-indexed dependencies",
+            ));
+        }
+        if self.has_cp_dependency_inside(start, end) {
+            return Err(corrupted(
+                "paragraph deletion would collapse an anchored range",
+            ));
+        }
+        let saved_selection = self.prepared_saved_selection_splice(start, end, 0)?;
+        let removed = end - start;
+        let mut candidate = self.clone();
+        delete_piece_range(&mut candidate.pieces, start, end)?;
+        candidate.shift_cp_tables(start, removed, 0)?;
+        if candidate
+            .cp_tables
+            .iter()
+            .filter(|table| table.index == PLCFSED)
+            .any(|table| table.cps.windows(2).any(|pair| pair[0] >= pair[1]))
+        {
+            return Err(corrupted("paragraph deletion would empty a section"));
+        }
+        candidate.main_ccp = candidate
+            .main_ccp
+            .checked_sub(removed)
+            .ok_or_else(|| corrupted("main story CP deletion underflow"))?;
+        candidate.append_clx_and_cp_tables()?;
+        candidate.patch_sizes()?;
+        if let Some(replacement) = saved_selection {
+            candidate.apply_saved_selection_splice(replacement)?;
+        }
         candidate.commit()?;
         *self = candidate;
         Ok(())
@@ -1807,8 +2254,13 @@ impl RevisionEditor {
             crate::writer::images::FIRST_PICTURE_SHAPE_ID
         };
         let mut picture_block = Vec::new();
-        crate::writer::images::write_picture_block(&picture, rehomed_shape_id, &mut picture_block)
-            .map_err(|error| corrupted(format!("selected picture cannot be re-homed: {error}")))?;
+        crate::writer::images::write_picture_block(
+            &picture,
+            rehomed_shape_id,
+            &mut picture_block,
+            litchi_odraw::image::Limits::default(),
+        )
+        .map_err(|error| corrupted(format!("selected picture cannot be re-homed: {error}")))?;
         let (spa, dgg_info) = if let Some(mut spa) = selected_spa {
             spa.shape_id = rehomed_shape_id;
             let position = floating_position_from_spa(spa);
@@ -1824,12 +2276,17 @@ impl RevisionEditor {
             let dgg = if let Some(group) = nested_group.as_ref() {
                 build_nested_picture_dgg_info(&picture, spa, group)?
             } else {
-                crate::writer::images::build_dgg_info(std::slice::from_ref(&shape), &[], 1)
-                    .map_err(|error| {
-                        corrupted(format!(
-                            "selected drawing graph cannot be re-homed: {error}"
-                        ))
-                    })?
+                crate::writer::images::build_dgg_info(
+                    std::slice::from_ref(&shape),
+                    &[],
+                    1,
+                    litchi_odraw::image::Limits::default(),
+                )
+                .map_err(|error| {
+                    corrupted(format!(
+                        "selected drawing graph cannot be re-homed: {error}"
+                    ))
+                })?
             };
             (Some(spa), dgg)
         } else {
@@ -1932,8 +2389,13 @@ impl RevisionEditor {
                     ))
                 })?;
         let mut canonical_block = Vec::new();
-        crate::writer::images::write_picture_block(&picture, shape_id, &mut canonical_block)
-            .map_err(|error| corrupted(format!("picture graph cannot be encoded: {error}")))?;
+        crate::writer::images::write_picture_block(
+            &picture,
+            shape_id,
+            &mut canonical_block,
+            litchi_odraw::image::Limits::default(),
+        )
+        .map_err(|error| corrupted(format!("picture graph cannot be encoded: {error}")))?;
         if canonical_block != picture_block {
             return Err(corrupted(
                 "picture block is not the canonical OfficeArt graph for its shape ID",
@@ -2340,7 +2802,7 @@ impl RevisionEditor {
 
     /// Lists character and PAPX property revisions, merging adjacent runs with
     /// identical metadata even when the range crosses piece boundaries.
-    pub fn revisions(&self) -> Result<Vec<Revision>> {
+    pub(crate) fn revisions(&self) -> Result<Vec<Revision>> {
         let mut output = Vec::new();
         for run in &self.chpx {
             let sprms = strict_sprms(&run.grpprl)?;
@@ -2403,7 +2865,7 @@ impl RevisionEditor {
                 .grpprl
                 .get(2..)
                 .ok_or_else(|| corrupted("PAPX has no style index"))?;
-            let sprms = strict_sprms(body)?;
+            let sprms = papx_sprms(body)?;
             for (kind, op, rsid) in [
                 (
                     RevisionKind::ParagraphFormatting,
@@ -2448,7 +2910,7 @@ impl RevisionEditor {
     /// below `ccpText`: MS-DOC 2.3.1 requires the last character of the main
     /// document to be a paragraph mark, so text cannot follow it. To extend the
     /// last paragraph, insert at `ccpText - 1`, in front of its mark.
-    pub fn add_text(
+    pub(crate) fn add_text(
         &mut self,
         cp: u32,
         text: &str,
@@ -2521,7 +2983,7 @@ impl RevisionEditor {
     }
 
     /// Adds a revision mark to an existing main-story range.
-    pub fn add(
+    pub(crate) fn add(
         &mut self,
         start_cp: u32,
         end_cp: u32,
@@ -2540,7 +3002,7 @@ impl RevisionEditor {
     }
 
     /// Replaces revision metadata without touching unrelated formatting SPRMs.
-    pub fn update(&mut self, index: usize, metadata: RevisionMetadata) -> Result<Revision> {
+    pub(crate) fn update(&mut self, index: usize, metadata: RevisionMetadata) -> Result<Revision> {
         let revision = self
             .revisions()?
             .get(index)
@@ -2561,7 +3023,7 @@ impl RevisionEditor {
     }
 
     /// Removes a mark while retaining its text/current formatting.
-    pub fn remove(&mut self, index: usize) -> Result<Revision> {
+    pub(crate) fn remove(&mut self, index: usize) -> Result<Revision> {
         let revision = self
             .revisions()?
             .get(index)
@@ -2575,7 +3037,7 @@ impl RevisionEditor {
     }
 
     /// Accepts a revision using Word redline semantics.
-    pub fn accept(&mut self, index: usize) -> Result<Revision> {
+    pub(crate) fn accept(&mut self, index: usize) -> Result<Revision> {
         let revision = self
             .revisions()?
             .get(index)
@@ -2593,7 +3055,7 @@ impl RevisionEditor {
     }
 
     /// Rejects a revision using Word redline semantics.
-    pub fn reject(&mut self, index: usize) -> Result<Revision> {
+    pub(crate) fn reject(&mut self, index: usize) -> Result<Revision> {
         let revision = self
             .revisions()?
             .get(index)
@@ -2628,7 +3090,7 @@ impl RevisionEditor {
     /// revision save route; callers do not need to opt into the CFB policy.
     /// A changed edit is authorized under the editor's protection policy, and
     /// a signed source cannot publish changed bytes.
-    pub fn finish(self) -> Result<Vec<u8>> {
+    pub(crate) fn finish(self) -> Result<Vec<u8>> {
         if self.changed {
             self.protection_policy.authorize(self.protection)?;
         }
@@ -2652,10 +3114,28 @@ impl RevisionEditor {
     /// A validated render retained under the owner's ceiling is moved out
     /// instead of rendering the package again.
     pub(crate) fn finish_unchecked(mut self) -> Result<Vec<u8>> {
+        self.finish_unchecked_in_place()
+    }
+
+    /// Renders the current package while retaining this editor allocation.
+    ///
+    /// The final body commit consumes the transaction, so it can publish the
+    /// owned stream buffers in place instead of cloning the complete revision
+    /// editor before the consuming handoff. Intermediate candidate renders
+    /// continue to use [`Self::finish_unchecked`] on a clone and therefore
+    /// retain clone-first failure atomicity.
+    pub(crate) fn finish_unchecked_in_place(&mut self) -> Result<Vec<u8>> {
+        if self.chpx_dirty {
+            // `rewrite_chpx` updates the editor's stream buffers. Publish
+            // those buffers into the retained object owner before rendering;
+            // otherwise the render would still observe the pre-toggle
+            // package even though the semantic CHPX model is current.
+            self.commit_in_place()?;
+        }
         if let Some(rendered) = self.retained_render.0.take() {
             return Ok(rendered);
         }
-        self.package.finish().map_err(PackageError::from)
+        crate::package::object_edit_bytes(&self.package)
     }
 
     /// Apply this editor's protection policy to a rendered candidate while
@@ -2925,7 +3405,18 @@ impl RevisionEditor {
         for pn in pns {
             plc.extend_from_slice(&pn.to_le_bytes());
         }
-        append_table_block(&mut self.word, &mut self.table, PLCFBTE_CHPX, &plc)
+        let result = append_table_block(&mut self.word, &mut self.table, PLCFBTE_CHPX, &plc);
+        if result.is_ok() {
+            self.chpx_dirty = false;
+        }
+        result
+    }
+
+    fn flush_pending_chpx(&mut self) -> Result<()> {
+        if self.chpx_dirty {
+            self.rewrite_chpx()?;
+        }
+        Ok(())
     }
 
     fn rewrite_papx(&mut self) -> Result<()> {
@@ -3018,6 +3509,7 @@ impl RevisionEditor {
     }
 
     fn commit(&mut self) -> Result<()> {
+        self.flush_pending_chpx()?;
         self.protection_policy.authorize(self.protection)?;
         // The package mutation below invalidates every render for the prior
         // editor state, including the Data-stream add path. Mutation callers
@@ -3045,13 +3537,51 @@ impl RevisionEditor {
                     .map_err(PackageError::from)?;
             }
         }
-        let rendered = self
-            .package
-            .put_streams_shared_with_rendered(replacements)
+        self.package
+            .put_streams_shared(replacements)
             .map_err(PackageError::from)?;
-        self.retained_render.0 = rendered.filter(|bytes| {
-            self.retained_render_limit != 0 && bytes.capacity() <= self.retained_render_limit
-        });
+        if self.retained_render_limit != 0 {
+            let rendered = crate::package::object_edit_bytes(&self.package)?;
+            if rendered.capacity() <= self.retained_render_limit {
+                self.retained_render.0 = Some(rendered);
+            }
+        }
+        self.changed = true;
+        Ok(())
+    }
+
+    /// Publishes a final pending CHPX edit from the owned stream buffers.
+    /// This path is private to the consuming finish route. Reusable mutation
+    /// paths keep the failure-atomic clone-and-publish behavior of `commit`.
+    fn commit_in_place(&mut self) -> Result<()> {
+        self.flush_pending_chpx()?;
+        self.protection_policy.authorize(self.protection)?;
+        self.release_retained_render();
+
+        let mut replacements: SmallVec<[(&[String], Arc<[u8]>); 3]> = SmallVec::new();
+        let word = Arc::<[u8]>::from(std::mem::take(&mut self.word));
+        let table = Arc::<[u8]>::from(std::mem::take(&mut self.table));
+        replacements.push((self.word_path.as_slice(), word));
+        replacements.push((self.table_path.as_slice(), table));
+        if self.data_changed {
+            if self.package.stream(&self.data_path).is_some() {
+                let data = Arc::<[u8]>::from(std::mem::take(&mut self.data));
+                replacements.push((self.data_path.as_slice(), data));
+            } else {
+                self.package
+                    .add_stream(self.data_path.clone(), std::mem::take(&mut self.data))
+                    .map_err(PackageError::from)?;
+            }
+        }
+        self.package
+            .put_streams_shared(replacements)
+            .map_err(PackageError::from)?;
+        if self.retained_render_limit != 0 {
+            let rendered = crate::package::object_edit_bytes(&self.package)?;
+            if rendered.capacity() <= self.retained_render_limit {
+                self.retained_render.0 = Some(rendered);
+            }
+        }
         self.changed = true;
         Ok(())
     }
@@ -3311,8 +3841,9 @@ mod containment_tests {
 #[cfg(test)]
 mod papx_cache_tests {
     use super::*;
+    use crate::builder::Builder;
     use crate::sprm_operations::SPRM_P_F_IN_TABLE;
-    use crate::writer::{CharacterFormatting, ParagraphFormatting, Writer};
+    use crate::writer::{CharacterFormatting, ParagraphFormatting};
     use std::io::Cursor;
 
     fn table_sprm(value: u8) -> [u8; 3] {
@@ -3321,7 +3852,7 @@ mod papx_cache_tests {
     }
 
     fn doc_with_table_state(in_table: bool) -> Vec<u8> {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         writer
             .add_paragraph_runs(
                 vec![("cell".to_owned(), CharacterFormatting::default())],
@@ -3333,13 +3864,15 @@ mod papx_cache_tests {
             .expect("table-state fixture paragraph should be valid");
         let mut output = Cursor::new(Vec::new());
         writer
+            .build()
+            .unwrap()
             .write_to(&mut output)
             .expect("table-state fixture should serialize");
         output.into_inner()
     }
 
     fn simple_table_doc() -> Vec<u8> {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         let table = writer
             .add_table(1, 1)
             .expect("table fixture should be accepted");
@@ -3348,6 +3881,8 @@ mod papx_cache_tests {
             .expect("table cell fixture should be accepted");
         let mut output = Cursor::new(Vec::new());
         writer
+            .build()
+            .unwrap()
             .write_to(&mut output)
             .expect("table fixture should serialize");
         output.into_inner()
@@ -3442,8 +3977,15 @@ mod picture_group_tests {
         ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin, ShapeWrapSide,
     };
 
+    fn open_object(bytes: Vec<u8>, targets: Targets, limits: Limits) -> ObjectEditor {
+        ObjectPackage::open_with_options(bytes, OpenOptions::new().targets(targets).limits(limits))
+            .unwrap()
+            .edit()
+            .unwrap()
+    }
+
     fn normalize_word2002_dop(bytes: Vec<u8>) -> Vec<u8> {
-        let mut package = ObjectEditor::open(bytes, Targets::default(), Limits::default()).unwrap();
+        let mut package = open_object(bytes, Targets::default(), Limits::default());
         let word_path = ["WordDocument".to_string()];
         let word = package.stream(&word_path).unwrap();
         let fib = FileInformationBlock::parse(word).unwrap();
@@ -3483,7 +4025,7 @@ mod picture_group_tests {
         word[pointer + 4..pointer + 8].copy_from_slice(&(dop.len() as u32).to_le_bytes());
         package.put_stream(&word_path, word).unwrap();
         package.put_stream(&table_path, table).unwrap();
-        package.finish().unwrap()
+        crate::package::object_edit_bytes(&package).unwrap()
     }
 
     fn record(version: u16, instance: u16, kind: u16, payload: &[u8]) -> Vec<u8> {
@@ -3566,7 +4108,13 @@ mod picture_group_tests {
         assert!(normalized.is_some());
 
         let mut picture_block = Vec::new();
-        crate::writer::images::write_picture_block(&picture, shape_id, &mut picture_block).unwrap();
+        crate::writer::images::write_picture_block(
+            &picture,
+            shape_id,
+            &mut picture_block,
+            litchi_odraw::image::Limits::default(),
+        )
+        .unwrap();
         PictureGraph {
             floating: true,
             picture_block,
@@ -3582,7 +4130,8 @@ mod picture_group_tests {
     #[test]
     fn nested_image_group_transfers_through_the_body_transaction() {
         use crate::body_text::{Projection, Snapshot as BodySnapshot, TextTarget};
-        use crate::writer::{CharacterFormatting, FloatingPosition, ParagraphFormatting, Writer};
+        use crate::builder::Builder;
+        use crate::writer::{CharacterFormatting, FloatingPosition, ParagraphFormatting};
         use litchi_core::Position;
         use std::io::Cursor;
 
@@ -3592,12 +4141,12 @@ mod picture_group_tests {
         )
         .unwrap();
         let picture = crate::writer::Picture::new(bytes).unwrap();
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         writer
             .insert_floating_picture(picture, FloatingPosition::new(1440, 720))
             .unwrap();
         let mut donor_bytes = Cursor::new(Vec::new());
-        writer.write_to(&mut donor_bytes).unwrap();
+        writer.build().unwrap().write_to(&mut donor_bytes).unwrap();
 
         let donor_bytes = normalize_word2002_dop(donor_bytes.into_inner());
         let mut editor = RevisionEditor::open(donor_bytes, Limits::default()).unwrap();
@@ -3628,7 +4177,7 @@ mod picture_group_tests {
         editor.commit().unwrap();
         let donor = BodySnapshot::parse(&editor.finish().unwrap()).unwrap();
 
-        let mut receiver_writer = Writer::new();
+        let mut receiver_writer = Builder::new();
         receiver_writer
             .add_paragraph_runs(
                 vec![("placeholder".to_owned(), CharacterFormatting::default())],
@@ -3636,7 +4185,11 @@ mod picture_group_tests {
             )
             .unwrap();
         let mut receiver_bytes = Cursor::new(Vec::new());
-        receiver_writer.write_to(&mut receiver_bytes).unwrap();
+        receiver_writer
+            .build()
+            .unwrap()
+            .write_to(&mut receiver_bytes)
+            .unwrap();
         let receiver_bytes = normalize_word2002_dop(receiver_bytes.into_inner());
         let receiver = BodySnapshot::parse(&receiver_bytes).unwrap();
         let plan = receiver
@@ -3651,11 +4204,11 @@ mod picture_group_tests {
         edit.apply_picture_transfer(&plan).unwrap();
         let commit = edit.commit().unwrap();
         assert_eq!(
-            commit.snapshot().paragraphs(Projection::All).unwrap()[0].text(),
+            commit.package().paragraphs(Projection::All).unwrap()[0].text(),
             "\u{0008}"
         );
         assert_eq!(
-            commit.patch().inverse().apply(commit.snapshot()).unwrap(),
+            commit.patch().inverse().apply(commit.package()).unwrap(),
             receiver
         );
     }

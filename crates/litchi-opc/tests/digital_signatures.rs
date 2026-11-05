@@ -5,6 +5,7 @@
     reason = "test assertions panic on failure by design"
 )]
 
+use litchi_opc::SourceLimits;
 use litchi_opc::{OpcPackage, sign::Report};
 use litchi_sign::{Policy, Status};
 
@@ -25,15 +26,15 @@ fn assert_valid(reports: &[Report]) {
 fn digital_signature_accessors_verify_real_microsoft_packages() {
     let policy = Policy::compatible();
 
-    let docx = OpcPackage::from_bytes(DOCX).unwrap();
+    let docx = OpcPackage::from_bytes(DOCX, SourceLimits::default()).unwrap();
     assert!(docx.is_signed());
     assert_valid(&docx.signatures_with(&policy).unwrap());
 
-    let xlsx = OpcPackage::from_bytes(XLSX).unwrap();
+    let xlsx = OpcPackage::from_bytes(XLSX, SourceLimits::default()).unwrap();
     assert!(xlsx.is_signed());
     assert_valid(&xlsx.signatures_with(&policy).unwrap());
 
-    let pptx = OpcPackage::from_bytes(PPTX).unwrap();
+    let pptx = OpcPackage::from_bytes(PPTX, SourceLimits::default()).unwrap();
     assert!(pptx.is_signed());
     assert_valid(&pptx.signatures_with(&policy).unwrap());
 }
@@ -42,17 +43,17 @@ fn digital_signature_accessors_verify_real_microsoft_packages() {
 fn digital_signature_mutable_opc_access_drops_stale_signatures() {
     let policy = Policy::compatible();
 
-    let mut docx = OpcPackage::from_bytes(DOCX).unwrap();
+    let mut docx = OpcPackage::from_bytes(DOCX, SourceLimits::default()).unwrap();
     docx.unsign();
     assert!(!docx.is_signed());
     assert!(docx.signatures_with(&policy).unwrap().is_empty());
 
-    let mut xlsx = OpcPackage::from_bytes(XLSX).unwrap();
+    let mut xlsx = OpcPackage::from_bytes(XLSX, SourceLimits::default()).unwrap();
     xlsx.unsign();
     assert!(!xlsx.is_signed());
     assert!(xlsx.signatures_with(&policy).unwrap().is_empty());
 
-    let mut pptx = OpcPackage::from_bytes(PPTX).unwrap();
+    let mut pptx = OpcPackage::from_bytes(PPTX, SourceLimits::default()).unwrap();
     pptx.unsign();
     assert!(!pptx.is_signed());
     assert!(pptx.signatures_with(&policy).unwrap().is_empty());

@@ -1,0 +1,22 @@
+# odf_rtf_view_regression, before = git archive of fc274041da, after = branch; taskset -c 27; 15 rounds x 64 iterations after 3 warm-ups per leg; run 1 = B A A B B A, run 2 = A B B A A B (A before, B after); medians in ns
+scenario	before_ns(min-max)	after_ns(min-max)	after/before run1	run2
+odt_p1_format	1885-1918	1704-1731	0.908	0.904
+odt_root_children	164-195	172-222	1.052	1.099
+odt_body_children	360-465	396-532	1.126	1.191
+odt_p1_children	210-223	217-249	1.009	1.112
+odt_query_p_formats	34640-34893	30338-30762	0.880	0.881
+odt_view_text	1039-1081	1073-1114	1.021	1.043
+odt_p1_text_set	672545-682309	689960-694050	1.020	1.021
+odp_slide_children	304-344	328-352	1.070	1.124
+odp_shape_children	300-330	308-333	0.990	1.072
+odp_paragraph_children	385-397	394-421	1.008	1.061
+odp_shape_format	580-596	600-631	1.034	1.036
+odp_query_shape_formats	3634-3706	3697-3748	1.000	1.015
+odp_view_text	204-219	201-210	0.995	0.949
+rtf_p1_format	224-239	220-238	0.974	0.987
+rtf_root_children	126-150	135-156	1.046	1.109
+rtf_body_children	157-177	165-188	1.075	1.108
+rtf_p1_children	202-228	212-237	1.034	1.063
+rtf_query_p_formats	410-438	448-468	1.030	1.056
+rtf_view_text	32-33	33-33	1.000	1.000
+rtf_p1_text_set	2798-2956	2814-2856	0.977	1.018

@@ -4,7 +4,7 @@ use litchi_opc::OpcPackage;
 
 use super::package::apply_entries;
 use super::snapshot::Snapshot;
-use crate::error::{Error, Result};
+use crate::error::{Error as XlsxError, Result};
 
 /// A reversible replacement of the workbook's external-link graph.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -32,7 +32,7 @@ impl Patch {
 
     /// Whether this patch is an exact source no-op.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
@@ -47,14 +47,15 @@ impl Patch {
 
     /// Apply atomically after checking the workbook owner and every owned
     /// external-link part.
-    pub fn apply(&self, target: &mut OpcPackage) -> Result<()> {
-        let current = Snapshot::load(target)?;
+    pub(crate) fn apply(&self, target: &mut OpcPackage) -> Result<()> {
+        let limits = target.read_limits();
+        let current = Snapshot::load(target, &limits)?;
         if !current.same_source(&self.before) {
-            return Err(Error::PatchConflict {
+            return Err(XlsxError::PatchConflict {
                 part: self.before.workbook_part_name().to_owned(),
             });
         }
-        if self.is_empty() {
+        if self.is_noop() {
             return Ok(());
         }
 
@@ -65,9 +66,9 @@ impl Patch {
             self.after.entries(),
             self.after.conformance(),
         )?;
-        let resulting = Snapshot::load(&candidate)?;
+        let resulting = Snapshot::load(&candidate, &limits)?;
         if !resulting.same_source(&self.after) || resulting.entries() != self.after.entries() {
-            return Err(Error::PatchConflict {
+            return Err(XlsxError::PatchConflict {
                 part: self.after.workbook_part_name().to_owned(),
             });
         }
@@ -76,44 +77,34 @@ impl Patch {
     }
 }
 
-/// Successful publication of one external-link transaction.
-#[derive(Debug)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-    changed: bool,
-}
+crate::record::record_family!("external-link");
 
-impl Commit {
-    pub(crate) fn new(snapshot: Snapshot, patch: Patch, changed: bool) -> Self {
-        Self {
-            snapshot,
-            patch,
-            changed,
-        }
+crate::record::limit_kinds!("external-link", ExternalLinks {
+    XmlBytes => "external-link XML bytes",
+    Events => "external-link XML events",
+    Depth => "external-link XML depth",
+    TargetUri => "external-link target URI bytes",
+    SheetNames => "external-link sheet names",
+    DefinedNames => "external-link defined names",
+    CachedSheets => "external-link cached sheets",
+    CachedRows => "external-link cached rows",
+    CachedCells => "external-link cached cells",
+    Items => "external-link items",
+    MatrixCells => "external-link matrix cells",
+    CacheTextBytes => "external-link cache text bytes",
+    RelationshipIdBytes => "external-link relationship ID bytes",
+    AlternateUrlMetadataBytes => "external-link alternate URL metadata bytes",
+    CellColumn => "external-link cell column",
+    CellRow => "external-link cell row",
+    ColumnLetters => "external-link column letters",
+});
+
+impl crate::record::Record for Patch {
+    fn is_noop(&self) -> bool {
+        Self::is_noop(self)
     }
 
-    /// Whether the workbook external-link owner changed.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        self.changed
-    }
-
-    /// Resulting immutable source snapshot.
-    #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Reversible source-checked patch.
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consume the result into its snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
+    fn apply_to(&self, package: &mut OpcPackage) -> Result<()> {
+        self.apply(package)
     }
 }

@@ -50,7 +50,7 @@ fn conformant_streams_parse_with_a_clean_tolerance_report() {
     assert_eq!(reparsed, stream);
 
     let bytes = fixture("test-data/poi/test-data/hpsf/TestMickey.doc");
-    let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
     assert!(ole.tolerance_report().is_clean());
     for binding in [
         Binding::SummaryInformation,
@@ -231,7 +231,7 @@ fn unsupported_indirect_stream_properties_remain_inert_and_opaque() {
 #[test]
 fn reads_apache_poi_named_custom_properties() {
     let bytes = fixture("test-data/poi/test-data/hpsf/TestMickey.doc");
-    let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
     let metadata = PropertySetReader::get_metadata(&mut ole).unwrap();
     assert_eq!(metadata.title.as_deref(), Some("sample title"));
     assert_eq!(metadata.subject.as_deref(), Some("sample subject"));
@@ -251,7 +251,7 @@ fn reads_apache_poi_named_custom_properties() {
 #[test]
 fn reads_apache_poi_two_section_unicode_properties() {
     let bytes = fixture("test-data/poi/test-data/hpsf/TestUnicode.xls");
-    let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
     let stream =
         PropertySetReader::property_set_stream(&mut ole, &["\u{0005}DocumentSummaryInformation"])
             .unwrap();
@@ -276,7 +276,7 @@ fn reads_apache_poi_two_section_unicode_properties() {
 #[test]
 fn projects_existing_document_properties_fixture() {
     let bytes = fixture("test-data/ole/doc/documentProperties.doc");
-    let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
     let metadata = PropertySetReader::get_metadata(&mut ole).unwrap();
     assert_eq!(metadata.title.as_deref(), Some("This is document title"));
     assert_eq!(
@@ -294,7 +294,7 @@ fn projects_existing_document_properties_fixture() {
 #[test]
 fn reads_non_dword_and_zero_length_property_fixtures() {
     let bytes = fixture("test-data/poi/test-data/hpsf/TestNon4ByteBoundary.doc");
-    let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
     let metadata = PropertySetReader::get_metadata(&mut ole).unwrap();
     assert_eq!(
         metadata.creating_application.as_deref(),
@@ -305,7 +305,7 @@ fn reads_non_dword_and_zero_length_property_fixtures() {
     assert_eq!(metadata.company.as_deref(), Some("Cour de Justice"));
 
     let bytes = fixture("test-data/poi/test-data/hpsf/TestZeroLengthCodePage.mpp");
-    let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
     let metadata = PropertySetReader::get_metadata(&mut ole).unwrap();
     assert_eq!(metadata.creating_application.as_deref(), Some("MSProject"));
     assert_eq!(metadata.title.as_deref(), Some("project1"));
@@ -320,7 +320,7 @@ fn reads_non_dword_and_zero_length_property_fixtures() {
 #[test]
 fn reads_undefined_filetime_and_word90_fixtures() {
     let bytes = fixture("test-data/poi/test-data/hpsf/TestBug52117.doc");
-    let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
     let metadata = PropertySetReader::get_metadata(&mut ole).unwrap();
     assert_eq!(metadata.last_printed_time, None);
     assert_eq!(
@@ -329,7 +329,7 @@ fn reads_undefined_filetime_and_word90_fixtures() {
     );
 
     let bytes = fixture("test-data/poi/test-data/hpsf/TestGermanWord90.doc");
-    let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
     let stream =
         PropertySetReader::property_set_stream(&mut ole, &["\u{0005}SummaryInformation"]).unwrap();
     assert_eq!(stream.sections[0].properties.len(), 17);

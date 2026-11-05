@@ -11,7 +11,7 @@
 //! use litchi_ods::codec::formula::expression::{Expression, Kind, Limits};
 //!
 //! let limits = Limits::default().with_max_bytes(4096).with_max_nodes(512);
-//! let expression = Expression::parse_with_limits("of:==SUM([.A1];;2)", &limits)?;
+//! let expression = Expression::parse("of:==SUM([.A1];;2)", &limits)?;
 //! assert!(expression.is_force_recalculate());
 //! let call = expression.root();
 //! assert!(matches!(call.kind(), Kind::Function { name: "SUM" }));
@@ -317,13 +317,14 @@ pub struct Expression {
 }
 
 impl Expression {
-    /// Parse an expression using the default finite limits.
-    pub fn parse(source: &str) -> Result<Self> {
-        Self::parse_with_limits(source, &Limits::default())
-    }
-
-    /// Parse an expression using explicit finite limits.
-    pub fn parse_with_limits(source: &str, limits: &Limits) -> Result<Self> {
+    /// Parse an expression within explicit finite limits
+    /// (`&Limits::default()` for the default bounds).
+    ///
+    /// # Errors
+    ///
+    /// Returns a syntax error, or a resource-limit error when the source
+    /// exceeds `limits`.
+    pub fn parse(source: &str, limits: &Limits) -> Result<Self> {
         if source.len() > limits.max_bytes {
             return Err(limit_error(
                 Resource::InputBytes,
@@ -1775,7 +1776,7 @@ mod tests {
 
     #[test]
     fn parses_intro_numbers_strings_and_operator_precedence() {
-        let expression = Expression::parse("of:== -2^2+ .5e999 & \"a\"\"b\"")
+        let expression = Expression::parse("of:== -2^2+ .5e999 & \"a\"\"b\"", &Default::default())
             .expect("strict expression grammar");
         assert_eq!(expression.source(), "of:== -2^2+ .5e999 & \"a\"\"b\"");
         assert!(expression.is_force_recalculate());
@@ -1788,7 +1789,7 @@ mod tests {
 
     #[test]
     fn parses_functions_with_missing_arguments_and_nested_children() {
-        let expression = Expression::parse("F(;1;;\"x\")")
+        let expression = Expression::parse("F(;1;;\"x\")", &Default::default())
             .expect("missing function parameters are syntactically valid");
         let root = expression.root();
         assert!(matches!(root.kind(), Kind::Function { name: "F" }));
@@ -1799,7 +1800,7 @@ mod tests {
 
     #[test]
     fn parses_ragged_arrays_without_imposing_evaluator_rectangularity() {
-        let expression = Expression::parse("{1;2|3}").expect("ragged grammar");
+        let expression = Expression::parse("{1;2|3}", &Default::default()).expect("ragged grammar");
         let root = expression.root();
         let dimensions = root.array_dimensions().expect("array dimensions");
         assert_eq!(dimensions.rows(), 2);
@@ -1812,10 +1813,11 @@ mod tests {
 
     #[test]
     fn parses_reference_names_labels_and_errors_inertly() {
-        let reference = Expression::parse("[.A1]").expect("reference");
+        let reference = Expression::parse("[.A1]", &Default::default()).expect("reference");
         assert!(matches!(reference.root().kind(), Kind::Reference(_)));
 
-        let name = Expression::parse("'Sheet'.Rate").expect("sheet-local name");
+        let name =
+            Expression::parse("'Sheet'.Rate", &Default::default()).expect("sheet-local name");
         assert!(matches!(
             name.root().kind(),
             Kind::NamedExpression {
@@ -1824,7 +1826,8 @@ mod tests {
             }
         ));
 
-        let forced = Expression::parse("$$'Name'").expect("forced quoted name");
+        let forced =
+            Expression::parse("$$'Name'", &Default::default()).expect("forced quoted name");
         assert!(matches!(
             forced.root().kind(),
             Kind::NamedExpression {
@@ -1832,9 +1835,10 @@ mod tests {
                 ..
             }
         ));
-        assert!(Expression::parse("'Sheet'.'Name'").is_err());
+        assert!(Expression::parse("'Sheet'.'Name'", &Default::default()).is_err());
 
-        let absolute = Expression::parse("$'Sheet'.$$Name").expect("absolute sheet name");
+        let absolute =
+            Expression::parse("$'Sheet'.$$Name", &Default::default()).expect("absolute sheet name");
         assert!(matches!(
             absolute.root().kind(),
             Kind::NamedExpression {
@@ -1847,22 +1851,21 @@ mod tests {
             }
         ));
 
-        let label = Expression::parse("'row'!!'column'").expect("automatic intersection");
+        let label = Expression::parse("'row'!!'column'", &Default::default())
+            .expect("automatic intersection");
         assert!(matches!(label.root().kind(), Kind::AutomaticIntersection));
 
-        let error = Expression::parse("#N/A").expect("constant error");
+        let error = Expression::parse("#N/A", &Default::default()).expect("constant error");
         assert!(matches!(error.root().kind(), Kind::Error));
     }
 
     #[test]
     fn depth_and_array_limits_are_typed() {
-        let error =
-            Expression::parse_with_limits("((((1))))", &Limits::default().with_max_depth(1))
-                .expect_err("depth limit");
+        let error = Expression::parse("((((1))))", &Limits::default().with_max_depth(1))
+            .expect_err("depth limit");
         assert!(matches!(error, Error::ResourceLimit(limit) if limit.resource == Resource::Depth));
-        let error =
-            Expression::parse_with_limits("{1;2}", &Limits::default().with_max_array_cells(1))
-                .expect_err("array cell limit");
+        let error = Expression::parse("{1;2}", &Limits::default().with_max_array_cells(1))
+            .expect_err("array cell limit");
         assert!(
             matches!(error, Error::ResourceLimit(limit) if limit.resource == Resource::Objects)
         );
@@ -1873,7 +1876,7 @@ mod tests {
             ")".repeat(HARD_MAX_EXPRESSION_DEPTH + 1)
         );
         let unbounded = Limits::default().with_max_depth(usize::MAX);
-        let error = Expression::parse_with_limits(&hostile, &unbounded)
+        let error = Expression::parse(&hostile, &unbounded)
             .expect_err("the parser's hard depth ceiling must remain effective");
         assert!(matches!(error, Error::ResourceLimit(limit) if limit.resource == Resource::Depth));
     }

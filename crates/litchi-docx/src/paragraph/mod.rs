@@ -12,6 +12,7 @@
 mod codec;
 pub mod collapsed;
 pub mod extensions;
+mod kind;
 mod model;
 mod package;
 
@@ -21,8 +22,9 @@ mod tests;
 pub use crate::run_effects;
 pub use crate::run_effects::Effects;
 pub use crate::run_symbols::{Symbol, Symbols};
-pub use collapsed::{Collapsed, Commit, Patch, Snapshot, Transaction};
+pub use collapsed::{Collapsed, Snapshot};
 pub use extensions::{Extensions, Id, Ids};
+pub use kind::InlineKind;
 pub use model::{
     Inline, InlineHyperlink, LineSpacingRule, OpaqueInline, OpaqueRunContent, Paragraph,
     ParagraphSpacing, Run, RunBreak, RunBreakClear, RunBreakType, RunContent, RunProperties,
@@ -30,6 +32,7 @@ pub use model::{
 };
 
 pub(crate) use codec::{
-    DirectNumbering, extract_word_text, for_each_word_text_chunk, is_fragment_word_name,
-    semantic_text_raw_xml_limit, write_text_to, write_text_to_with_operation_check,
+    DirectNumbering, extract_word_paragraph_text, extract_word_text, for_each_word_text_chunk,
+    is_fragment_word_name, semantic_text_raw_xml_limit, write_text_to,
+    write_text_to_with_operation_check,
 };

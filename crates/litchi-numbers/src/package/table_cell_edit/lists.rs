@@ -11,7 +11,7 @@ use core::{cmp::Ordering, fmt, mem::size_of};
 use litchi_iwa_common::{
     WireLimits,
     varint::{encode_varint_into, encoded_len},
-    wire::{WireField, parse_wire_fields_with_limits},
+    wire::{WireField, parse_wire_fields},
 };
 use litchi_iwa_protos::{
     numbers_table_cell_storage_codec::{
@@ -818,7 +818,7 @@ pub(crate) fn preflight_string_assignments(
         });
     }
     let root_wire_limits = wire_limits(source_payload.len(), limits)?;
-    let root_fields = parse_wire_fields_with_limits(source_payload, root_wire_limits)?;
+    let root_fields = parse_wire_fields(source_payload, root_wire_limits)?;
     let entry_count = root_fields
         .iter()
         .filter(|field| field.number() == ENTRY_FIELD)
@@ -982,7 +982,7 @@ pub(crate) fn prepare_string_list<'source, 'batch, 'text>(
     // This compact locator is deliberately built before the streaming codec
     // plan: it supplies exact raw entry spans and lets the visitor reserve once
     // rather than allocate while callbacks are in flight.
-    let root_fields = parse_wire_fields_with_limits(source_payload, root_wire_limits)?;
+    let root_fields = parse_wire_fields(source_payload, root_wire_limits)?;
     let entry_count = root_fields
         .iter()
         .filter(|field| field.number() == ENTRY_FIELD)
@@ -1140,7 +1140,7 @@ pub(crate) fn prepare_string_list<'source, 'batch, 'text>(
             continue;
         }
         let raw = entry.raw.as_slice();
-        entry.rewrite_fields = parse_wire_fields_with_limits(raw, wire_limits(raw.len(), limits)?)?;
+        entry.rewrite_fields = parse_wire_fields(raw, wire_limits(raw.len(), limits)?)?;
         entry.rewritten_len = encoded_entry_length_from_fields(
             entry,
             raw,
@@ -1550,7 +1550,7 @@ pub(crate) fn preparation_requirements(
     max_entries: usize,
 ) -> Result<ListPreparationRequirements, Failure> {
     let entries = source_bytes.min(max_entries);
-    // `parse_wire_fields_with_limits` grows geometrically. A non-ZST Vec
+    // `parse_wire_fields` grows geometrically. A non-ZST Vec
     // capacity is strictly below twice its final length, so two retained
     // source-field indexes (root plus changed entry fields) fit in four source
     // byte slots. Every protobuf field consumes at least one source byte.

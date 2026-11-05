@@ -1,0 +1,352 @@
+#!/usr/bin/env python3
+"""Matched durable Ink ABBA; all attempts and host snapshots are retained."""
+import argparse
+import hashlib
+import json
+import math
+import os
+from pathlib import Path
+import re
+import shlex
+import statistics
+import subprocess
+import time
+
+TARGET_NS = 500_000_000
+MINIMUM_NS = 150_000_000
+CASES = ("forward", "inverse", "noop", "forward_write", "inverse_write", "noop_write")
+ROOT = Path(__file__).resolve().parents[4]
+QUALIFY_SCHEMA = "litchi.docx-durable-ink.qualify.v2"
+ABBA_SCHEMA = "litchi.docx-durable-ink-abba.v2"
+COMPARISON = "integrated-route"
+
+
+def artifact(path):
+    path = Path(path).resolve()
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        while chunk := stream.read(1024 * 1024):
+            digest.update(chunk)
+    return dict(path=str(path), bytes=path.stat().st_size, sha256=digest.hexdigest())
+
+
+def save(path, value):
+    Path(path).write_text(json.dumps(value, indent=2) + "\n")
+
+
+def load(path):
+    return json.loads(Path(path).read_text())
+
+
+def verify(row):
+    assert artifact(row["path"]) == row, row["path"]
+
+
+def verify_build(path):
+    path = Path(path).resolve()
+    assert not path.is_relative_to(ROOT), "build provenance must remain outside the checkout"
+    build = load(path)
+    assert build["schema"] == QUALIFY_SCHEMA
+    assert build["workload"] == "docx-durable-ink"
+    assert build["comparison"] == COMPARISON
+    delta = build["shared_source_delta"]
+    assert delta["base_commit"] == build["resolved_refs"]["base"]
+    assert delta["candidate_commit"] == build["resolved_refs"]["candidate"]
+    assert build["status"] == "complete"
+    for key in ("builder", "probe", "input_lock"):
+        verify(build[key])
+    assert set(build["endpoints"]) == {"base", "candidate"}
+    assert build["resolved_refs"]["base"] != build["resolved_refs"]["candidate"]
+    assert build["endpoints"]["base"]["source"]["commit"] == build["resolved_refs"]["base"]
+    assert build["endpoints"]["candidate"]["source"]["commit"] == build["resolved_refs"]["candidate"]
+    expected_outputs = None
+    expected_stream = None
+    for endpoint in build["endpoints"].values():
+        verify(endpoint["source"]["manifest"])
+        source = load(endpoint["source"]["manifest"]["path"])
+        assert source["commit"] == endpoint["source"]["commit"]
+        verify(source["archive"])
+        for key in ("project_manifest", "project_source", "lock"):
+            verify(endpoint[key])
+        assert endpoint["project_source"]["sha256"] == build["probe"]["sha256"]
+        for variant in ("native", "allocation"):
+            verify(endpoint["binaries"][variant])
+            for row in endpoint["validation"][variant]:
+                verify(row)
+            output_rows = {
+                Path(row["path"]).name: row for row in endpoint["validation"][variant]
+                if Path(row["path"]).name != "streaming.json"
+            }
+            if expected_outputs is None:
+                expected_outputs = {
+                    name: (row["bytes"], row["sha256"]) for name, row in output_rows.items()
+                }
+            else:
+                assert {
+                    name: (row["bytes"], row["sha256"]) for name, row in output_rows.items()
+                } == expected_outputs
+        stream_rows = {
+            Path(row["path"]).name: row for row in endpoint["validation"]["native"]
+        }
+        stream = load(stream_rows["streaming.json"]["path"])
+        assert stream["schema"] == "litchi.docx-durable-ink-stream.v1"
+        assert stream["read_chunk"] > 0
+        assert stream["sink_window"] > 0
+        assert stream["base_bytes"] > 0 and stream["target_bytes"] > 0
+        assert [row["route"] for row in stream["routes"]] == ["forward", "inverse", "noop"]
+        current_stream = (
+            stream["read_chunk"],
+            stream["sink_window"],
+            stream["base_bytes"],
+            stream["target_bytes"],
+            [(row["route"], row["bytes"], row["sha256"]) for row in stream["routes"]],
+        )
+        if expected_stream is None:
+            expected_stream = current_stream
+        else:
+            assert current_stream == expected_stream
+    return build, artifact(path)
+
+
+def program(arguments):
+    try:
+        words = shlex.split(arguments)
+    except ValueError:
+        words = arguments.split()
+    if not words:
+        return ""
+    name = os.path.basename(words[0])
+    if re.fullmatch(r"(?:python(?:3(?:\.\d+)?)?|bash|sh|dash)", name):
+        for word in words[1:]:
+            if word in ("-c", "-lc", "-ic"):
+                return name
+            if word.startswith("-"):
+                continue
+            return os.path.basename(word)
+    return name
+
+
+def _recheck_vanished(entry):
+    try:
+        entry.stat()
+    except FileNotFoundError:
+        return True
+    except PermissionError as error:
+        raise RuntimeError(f"cannot recheck process {entry}: permission denied") from error
+    except OSError as error:
+        raise RuntimeError(f"cannot recheck process {entry}: {error}") from error
+    return False
+
+
+def process_row(entry):
+    """Read one /proc row, tolerating only a proven process disappearance."""
+    for attempt in range(2):
+        try:
+            stat = (entry / "stat").read_text()
+            fields = stat[stat.rfind(")") + 2:].split()
+            if len(fields) < 2:
+                raise ValueError("truncated stat")
+            parent = int(fields[1])
+            arguments = (entry / "cmdline").read_bytes().replace(b"\0", b" ").decode(
+                errors="replace"
+            )
+            executable = os.readlink(entry / "exe")
+            return dict(pid=int(entry.name), parent=parent, exe=executable, args=arguments)
+        except (FileNotFoundError, ProcessLookupError) as error:
+            if _recheck_vanished(entry):
+                return None
+            if attempt == 0:
+                time.sleep(0.001)
+                continue
+            raise RuntimeError(f"process {entry} disappeared during inspection") from error
+        except PermissionError as error:
+            raise RuntimeError(f"cannot inspect process {entry}: permission denied") from error
+        except Exception as error:
+            raise RuntimeError(f"cannot inspect process {entry}: {error}") from error
+    raise AssertionError("unreachable process inspection retry")
+
+
+def process_snapshot(proc_root=Path("/proc")):
+    try:
+        entries = sorted(proc_root.iterdir(), key=lambda entry: entry.name)
+    except PermissionError as error:
+        raise RuntimeError(f"cannot enumerate {proc_root}: permission denied") from error
+    except OSError as error:
+        raise RuntimeError(f"cannot enumerate {proc_root}: {error}") from error
+    rows = []
+    for entry in entries:
+        if entry.name.isdigit():
+            row = process_row(entry)
+            if row is not None:
+                rows.append(row)
+    return rows
+
+
+def quiet(output, label, child=None):
+    rows = process_snapshot()
+    parents = {row["pid"]: row["parent"] for row in rows}
+    exempt = set()
+    current = os.getpid()
+    while current and current not in exempt:
+        exempt.add(current)
+        current = parents.get(current, 0)
+    if child is not None:
+        descendants = {child}
+        while True:
+            expanded = descendants | {pid for pid, parent in parents.items() if parent in descendants}
+            if expanded == descendants:
+                break
+            descendants = expanded
+        exempt |= descendants
+    forbidden = re.compile(
+        r"(?:^(?:cargo|rustc|rustdoc|rustfmt|clippy-driver|heaptrack|perf|valgrind|"
+        r"callgrind|clang\+\+|clang|gcc|g\+\+|cc|cmake|ninja|make|ld|lld|ld\.lld|"
+        r"mold|script_program|pytest|nextest)$|"
+        r"peculiar|test-adblock|scoped_patch_probe|char-style|char_style|constructor|docx-ink|ink-native|ink-allocation|odraw.*probe|"
+        r"file_w8_.*probe|ole_.*probe|xlsx_.*probe|litchi-perf-baseline|"
+        r"run-abba|run-matched-w5|run-counting-allocator)")
+    blockers = [row for row in rows if row["pid"] not in exempt
+                and row["exe"] != "/usr/local/bin/peculiar_shell"
+                and (forbidden.search(os.path.basename(row["exe"]))
+                     or forbidden.search(program(row["args"])))]
+    save(output / f"{label}.host.json", dict(time_ns=time.time_ns(),
+         exempt=sorted(exempt), blockers=blockers, processes=rows))
+    if blockers:
+        raise RuntimeError(f"host overlap at {label}: {blockers}")
+
+
+def invoke(output, label, binary, expected_binary, route, count, cpu):
+    verify(expected_binary)
+    assert artifact(binary) == expected_binary
+    quiet(output, label + "-before")
+    stdout, stderr = output / f"{label}.stdout", output / f"{label}.stderr"
+    command = ["taskset", "-c", str(cpu), str(binary), route, str(count)]
+    overlap = None
+    started = time.time_ns()
+    with stdout.open("w") as out, stderr.open("w") as err:
+        child = subprocess.Popen(command, stdout=out, stderr=err)
+        checks = 0
+        while True:
+            try:
+                status = child.wait(timeout=0.1)
+                break
+            except subprocess.TimeoutExpired:
+                checks += 1
+                try:
+                    quiet(output, f"{label}-during-{checks:04}", child.pid)
+                except RuntimeError as error:
+                    overlap = str(error)
+                    child.terminate()
+                    status = child.wait()
+                    break
+    receipt = dict(command=command, started_ns=started, finished_ns=time.time_ns(),
+                   exit_code=status, overlap=overlap,
+                   stdout=artifact(stdout), stderr=artifact(stderr))
+    save(output / f"{label}.receipt.json", receipt)
+    quiet(output, label + "-after")
+    if status or overlap:
+        raise RuntimeError(f"invalid attempt {label}: {receipt}")
+    value = json.loads(stdout.read_text())
+    if (value.get("route"), value.get("iterations")) != (route, count):
+        raise RuntimeError(f"probe identity mismatch {label}")
+    if not isinstance(value.get("ns"), int) or value["ns"] <= 0:
+        raise RuntimeError(f"missing timing {label}")
+    return value
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("base", type=Path)
+    parser.add_argument("candidate", type=Path)
+    parser.add_argument("out", type=Path)
+    parser.add_argument("--build-manifest", type=Path, required=True,
+                        help="the completed ink-qualify build.json for these binaries")
+    parser.add_argument("--cpu", type=int, default=29)
+    args = parser.parse_args()
+    assert args.cpu in os.sched_getaffinity(0)
+    out = args.out.resolve()
+    assert not out.is_relative_to(ROOT), "raw timing artifacts must remain outside the checkout"
+    out.mkdir(parents=True, exist_ok=False)
+    build, build_receipt = verify_build(args.build_manifest)
+    binaries = {"A": args.base.resolve(), "B": args.candidate.resolve()}
+    expected = {
+        "A": build["endpoints"]["base"]["binaries"]["native"],
+        "B": build["endpoints"]["candidate"]["binaries"]["native"],
+    }
+    for side in ("A", "B"):
+        if "owneddoc_toggle" in str(binaries[side]).lower():
+            raise ValueError("the DOC body-toggle binary is not the DOCX Ink workload")
+        assert binaries[side] == Path(expected[side]["path"]).resolve()
+        assert artifact(binaries[side]) == expected[side]
+    manifest = dict(
+        schema=ABBA_SCHEMA,
+        workload="docx-durable-ink",
+        build_manifest=build_receipt,
+        binaries=expected,
+        runner=artifact(__file__),
+        cpu=args.cpu,
+        target_ns=TARGET_NS,
+        minimum_ns=MINIMUM_NS,
+        cases=[],
+        status="running",
+    )
+    save(out / "manifest.json", manifest)
+    for route in CASES:
+        prefix = route
+        count = 1000
+        calibrations = []
+        while True:
+            results = {
+                side: invoke(
+                    out, f"{prefix}-cal-{count}-{side}", binary, expected[side],
+                    route, count, args.cpu
+                )
+                for side, binary in binaries.items()
+            }
+            calibrations.append(results)
+            assert len({row["checksum"] for row in results.values()}) == 1
+            assert len({row["output_bytes"] for row in results.values()}) == 1
+            assert len({row["output_sha256"] for row in results.values()}) == 1
+            fastest = min(row["ns"] for row in results.values())
+            if fastest >= TARGET_NS:
+                break
+            count = max(count + 1, math.ceil(count * TARGET_NS / fastest * 1.2))
+            if count > 1_000_000_000:
+                raise RuntimeError(f"calibration exceeds ceiling: {prefix}")
+        for warmup in range(2):
+            for side, binary in binaries.items():
+                invoke(
+                    out, f"{prefix}-warm-{warmup}-{side}", binary, expected[side],
+                    route, count, args.cpu
+                )
+        case = dict(route=route, count=count, calibrations=calibrations, blocks=[])
+        manifest["cases"].append(case)
+        save(out / "manifest.json", manifest)
+        for block in range(5):
+            legs = []
+            for index, side in enumerate("ABBA"):
+                label = f"{prefix}-b{block}-{index}-{side}"
+                value = invoke(
+                    out, label, binaries[side], expected[side], route, count, args.cpu
+                )
+                if value["ns"] < MINIMUM_NS:
+                    raise RuntimeError(f"sample below minimum: {label}")
+                legs.append(dict(side=side, label=label, value=value))
+            assert len({row["value"]["checksum"] for row in legs}) == 1
+            assert len({row["value"]["output_sha256"] for row in legs}) == 1
+            ratio = sum(row["value"]["ns"] for row in legs[1:3]) / sum(legs[i]["value"]["ns"] for i in (0, 3))
+            case["blocks"].append(dict(legs=legs, ratio=ratio))
+            save(out / "manifest.json", manifest)
+        case["median_ratio"] = statistics.median(row["ratio"] for row in case["blocks"])
+        save(out / "manifest.json", manifest)
+        print(prefix, case["median_ratio"], flush=True)
+    quiet(out, "final")
+    if {key: artifact(value) for key, value in binaries.items()} != manifest["binaries"]:
+        raise RuntimeError("protected binaries changed during measurement")
+    verify(manifest["build_manifest"])
+    manifest["status"] = "complete"
+    save(out / "manifest.json", manifest)
+
+
+if __name__ == "__main__":
+    main()

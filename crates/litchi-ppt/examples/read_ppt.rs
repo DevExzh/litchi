@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Opening PPT: {path}");
 
-    let mut package = Package::open(&path)?;
+    let package = Package::open(&path)?;
     let pres = package.presentation()?;
 
     println!("\n=== Presentation ===");

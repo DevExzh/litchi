@@ -13,8 +13,11 @@ use std::mem::size_of;
 
 fn fixture(relative: &str, sheet: u32) -> (Vec<Differential>, Vec<Formatting>) {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let package = litchi_opc::phys_pkg::OwnedPhysPkgReader::open(root.join(relative))
-        .unwrap_or_else(|error| panic!("failed to open {relative}: {error}"));
+    let package = litchi_opc::phys_pkg::OwnedPhysPkgReader::open(
+        root.join(relative),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap_or_else(|error| panic!("failed to open {relative}: {error}"));
     let styles_uri = PackURI::new("/xl/styles.xml").expect("valid styles URI");
     let styles_bytes = package
         .blob_for(&styles_uri)

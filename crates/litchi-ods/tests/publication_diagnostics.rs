@@ -1,7 +1,7 @@
 use litchi_core::Result;
-use litchi_ods::document::{LogicalRowEdit, PublicationRoute, Snapshot};
+use litchi_ods::document::{LogicalRowOperation, PublicationRoute};
 use litchi_ods::names::{Expression, Scope};
-use litchi_ods::{Builder, Cell, CellValue, Sheet};
+use litchi_ods::{Builder, Cell, CellValue, Package, Sheet};
 
 fn source() -> Result<Vec<u8>> {
     let mut builder = Builder::new();
@@ -12,14 +12,14 @@ fn source() -> Result<Vec<u8>> {
         0,
         Cell::new(CellValue::Text("before".to_string()), "before"),
     )?;
-    builder.build()
+    Ok(builder.build()?.to_bytes()?)
 }
 
 #[test]
 fn unified_commit_diagnostics_attribute_noop_splice_and_replay() -> Result<()> {
-    let snapshot = Snapshot::from_bytes(source()?)?;
+    let snapshot = Package::from_bytes(&source()?)?;
 
-    let unchanged = snapshot.edit().commit()?;
+    let unchanged = snapshot.edit()?.commit()?;
     let unchanged_diagnostics = unchanged.diagnostics();
     assert_eq!(
         unchanged_diagnostics.publication_route(),
@@ -29,7 +29,7 @@ fn unified_commit_diagnostics_attribute_noop_splice_and_replay() -> Result<()> {
     assert!(!unchanged_diagnostics.candidate_reopened());
     assert_eq!(unchanged_diagnostics.operation_count(), 0);
 
-    let mut edit = snapshot.edit();
+    let mut edit = snapshot.edit()?;
     edit.worksheets(|worksheets| {
         worksheets
             .set_cell(
@@ -52,23 +52,19 @@ fn unified_commit_diagnostics_attribute_noop_splice_and_replay() -> Result<()> {
     assert!(diagnostics.changed());
     assert!(diagnostics.candidate_reopened());
     assert_eq!(diagnostics.operation_count(), 1);
-    assert_ne!(commit.snapshot().as_bytes(), snapshot.as_bytes());
+    assert_ne!(commit.package().as_bytes(), snapshot.as_bytes());
 
-    let replay = commit.patch().apply(&snapshot)?;
-    assert_eq!(
-        replay.diagnostics().publication_route(),
-        PublicationRoute::PatchReplay
-    );
-    assert_eq!(replay.snapshot().as_bytes(), commit.snapshot().as_bytes());
-    let restored = commit.patch().inverse().apply(replay.snapshot())?;
-    assert_eq!(restored.snapshot().as_bytes(), snapshot.as_bytes());
+    let replay = snapshot.apply(commit.patch())?.into_package();
+    assert_eq!(replay.as_bytes(), commit.package().as_bytes());
+    let restored = replay.apply(&commit.patch().inverse())?;
+    assert_eq!(restored.into_package().as_bytes(), snapshot.as_bytes());
     Ok(())
 }
 
 #[test]
 fn logical_rebuild_is_not_reclassified_by_a_later_noop_splice() -> Result<()> {
-    let snapshot = Snapshot::from_bytes(source()?)?;
-    let mut edit = snapshot.edit();
+    let snapshot = Package::from_bytes(&source()?)?;
+    let mut edit = snapshot.edit()?;
     edit.definitions(|definitions| {
         definitions.add(Expression::new("Input", "of:=1+1", Scope::Global)?.into())
     })?;
@@ -77,7 +73,7 @@ fn logical_rebuild_is_not_reclassified_by_a_later_noop_splice() -> Result<()> {
     // helper therefore returns the current candidate bytes unchanged.
     edit.edit_logical_rows(
         "Data",
-        &[LogicalRowEdit::Move {
+        &[LogicalRowOperation::Move {
             at: 0,
             count: 1,
             to: 0,

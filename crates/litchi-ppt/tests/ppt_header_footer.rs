@@ -4,7 +4,7 @@
     reason = "test assertions panic on failure by design"
 )]
 
-use litchi_ppt::{HeaderFooterParent, HeaderFooterScope, Package};
+use litchi_ppt::{HeaderFooterParent, HeaderFooterScope, raw::Reader};
 use std::path::PathBuf;
 
 fn fixture(name: &str) -> PathBuf {
@@ -14,7 +14,7 @@ fn fixture(name: &str) -> PathBuf {
 }
 
 fn read(name: &str) -> litchi_ppt::HeaderFooters {
-    let mut package = Package::open(fixture(name)).expect("open POI fixture");
+    let mut package = Reader::open(fixture(name)).expect("open POI fixture");
     package
         .presentation()
         .expect("parse presentation")

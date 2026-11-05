@@ -22,7 +22,6 @@ use litchi_odf_common::{
     media::authoring::{allocate_picture_path, validate_payload},
 };
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
 
 pub(crate) use self::transition::{
     DEFAULT_DRAWING_PAGE_STYLE, DEFAULT_DRAWING_PAGE_STYLE_NAME, generate_transition_styles,
@@ -49,7 +48,7 @@ use self::xml::push_optional_attribute;
 /// let mut builder = Builder::new();
 /// builder.add_slide_with_title("Welcome", "This is my presentation")?;
 /// builder.add_slide_with_title("Slide 2", "More content here")?;
-/// builder.save("presentation.odp")?;
+/// builder.build()?.save("presentation.odp")?;
 /// # Ok(())
 /// # }
 /// ```
@@ -936,21 +935,13 @@ impl Builder {
 
         if let Some(created) = self.metadata.created.as_ref() {
             meta.push_str("<meta:creation-date>");
-            meta.push_str(&created.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true));
-            meta.push_str("</meta:creation-date>");
-        } else if let Some(created) = self.metadata.created_local.as_ref() {
-            meta.push_str("<meta:creation-date>");
-            meta.push_str(&created.format("%Y-%m-%dT%H:%M:%S%.f").to_string());
+            meta.push_str(&created.to_string());
             meta.push_str("</meta:creation-date>");
         }
 
         if let Some(modified) = self.metadata.modified.as_ref() {
             meta.push_str("<dc:date>");
-            meta.push_str(&modified.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true));
-            meta.push_str("</dc:date>");
-        } else if let Some(modified) = self.metadata.modified_local.as_ref() {
-            meta.push_str("<dc:date>");
-            meta.push_str(&modified.format("%Y-%m-%dT%H:%M:%S%.f").to_string());
+            meta.push_str(&modified.to_string());
             meta.push_str("</dc:date>");
         }
 
@@ -973,52 +964,31 @@ impl Builder {
         meta
     }
 
-    /// Build the presentation and return as bytes
+    /// Build the presentation into an immutable [`crate::Package`].
+    ///
+    /// Output (`save`, `save_with_durability`, `to_bytes`, `write_to`) lives
+    /// on the returned package. Building never consults the clock or any
+    /// other ambient state: two builders with equal inputs produce
+    /// byte-identical packages.
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```
     /// use litchi_odp::Builder;
     ///
-    /// # fn main() -> litchi_core::Result<()> {
+    /// # fn main() -> Result<(), litchi_odp::Error> {
     /// let mut builder = Builder::new();
     /// builder.add_slide("Slide content")?;
-    /// let bytes = builder.build()?;
+    /// let package = builder.build()?;
+    /// assert_eq!(package.presentation()?.slide_count()?, 1);
     /// # Ok(())
     /// # }
     /// ```
     ///
     /// # Errors
     /// Returns an error when a configured limit is exceeded or the package cannot be serialized.
-    pub fn build(self) -> Result<Vec<u8>> {
-        package::build(&self)
-    }
-
-    /// Build and save the presentation to a file
-    ///
-    /// # Arguments
-    ///
-    /// * `path` - Path where the ODP file should be saved
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use litchi_odp::Builder;
-    ///
-    /// # fn main() -> litchi_core::Result<()> {
-    /// let mut builder = Builder::new();
-    /// builder.add_slide("Slide content")?;
-    /// builder.save("output.odp")?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    ///
-    /// # Errors
-    /// Returns an error when a configured limit is exceeded or the package cannot be serialized.
-    pub fn save<P: AsRef<Path>>(self, path: P) -> Result<()> {
-        let bytes = self.build()?;
-        std::fs::write(path, bytes)?;
-        Ok(())
+    pub fn build(self) -> std::result::Result<crate::Package, crate::Error> {
+        Ok(crate::Package::from_authored(package::build(&self)?)?)
     }
 }
 
@@ -1041,8 +1011,8 @@ mod tests {
 
     #[test]
     fn fresh_builder_output_is_deterministic_without_ambient_timestamps() {
-        let first = Builder::new().build().unwrap();
-        let second = Builder::new().build().unwrap();
+        let first = Builder::new().build().unwrap().to_bytes().unwrap();
+        let second = Builder::new().build().unwrap().to_bytes().unwrap();
         assert_eq!(first, second);
 
         let package = OwnedPackage::from_bytes(first).unwrap();
@@ -1057,17 +1027,24 @@ mod tests {
         builder.set_metadata(Metadata {
             title: Some("Title & details".to_string()),
             author: Some("Ada <Lovelace>".to_string()),
-            created: Some(Utc.with_ymd_and_hms(2024, 1, 2, 3, 4, 5).single().unwrap()),
-            modified_local: Some(
+            created: Some(
+                Utc.with_ymd_and_hms(2024, 1, 2, 3, 4, 5)
+                    .single()
+                    .unwrap()
+                    .into(),
+            ),
+            modified: Some(
                 NaiveDate::from_ymd_opt(2024, 6, 7)
                     .unwrap()
                     .and_hms_opt(8, 9, 10)
-                    .unwrap(),
+                    .unwrap()
+                    .into(),
             ),
             ..Default::default()
         });
 
-        let package = OwnedPackage::from_bytes(builder.build().unwrap()).unwrap();
+        let package =
+            OwnedPackage::from_bytes(builder.build().unwrap().to_bytes().unwrap()).unwrap();
         let meta = String::from_utf8(package.get_file("meta.xml").unwrap()).unwrap();
         assert!(meta.contains("<meta:creation-date>2024-01-02T03:04:05Z</meta:creation-date>"));
         assert!(meta.contains("<dc:date>2024-06-07T08:09:10</dc:date>"));
@@ -1285,7 +1262,7 @@ mod tests {
         sound.xml_id = Some("transitionSound1".to_string());
         transition.set_sound(Some(sound));
 
-        let presentation = Presentation::from_bytes(builder.build().unwrap()).unwrap();
+        let presentation = builder.build().unwrap().presentation().unwrap();
         let slide = presentation.slides().unwrap().remove(0);
         let transition = slide.transition().unwrap();
         assert_eq!(transition.transition_type(), Some(Type::Automatic));
@@ -1329,7 +1306,7 @@ mod tests {
             })
             .unwrap();
 
-        let bytes = builder.build().unwrap();
+        let bytes = builder.build().unwrap().to_bytes().unwrap();
         let package = OwnedPackage::from_bytes(bytes.clone()).unwrap();
         assert_eq!(package.get_file("Media/demo.mp4").unwrap(), VIDEO);
         assert_eq!(
@@ -1408,7 +1385,7 @@ mod tests {
                 shapes: vec![shape],
             })
             .unwrap();
-        let bytes = builder.build().unwrap();
+        let bytes = builder.build().unwrap().to_bytes().unwrap();
         let package = OwnedPackage::from_bytes(bytes.clone()).unwrap();
         let content = String::from_utf8(package.get_file("content.xml").unwrap()).unwrap();
         assert!(content.contains(r##"<draw:a xlink:type="simple" xlink:href="#page2""##));

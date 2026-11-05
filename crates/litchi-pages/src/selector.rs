@@ -230,7 +230,7 @@ impl From<Position> for BodyTableSelector<'_> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ImageSelector {
     /// Select the image at this zero-based body source position.
-    Index(Position),
+    Position(Position),
 }
 
 /// Selects one chart anchored in the rooted Pages body by its zero-based
@@ -247,27 +247,27 @@ pub enum ImageSelector {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BodyChartSelector {
     /// Select the chart at this zero-based body source position.
-    Index(Position),
+    Position(Position),
 }
 
 impl BodyChartSelector {
     /// Create a selector from a zero-based body-chart index.
     #[must_use]
     pub const fn index(index: usize) -> Self {
-        Self::Index(Position::new(index))
+        Self::Position(Position::new(index))
     }
 
     /// Create a selector from a typed zero-based body-chart position.
     #[must_use]
     pub const fn position(position: Position) -> Self {
-        Self::Index(position)
+        Self::Position(position)
     }
 
     /// Return the selected typed body-chart position.
     #[must_use]
     pub const fn as_position(self) -> Position {
         match self {
-            Self::Index(position) => position,
+            Self::Position(position) => position,
         }
     }
 
@@ -294,20 +294,20 @@ impl ImageSelector {
     /// Create a selector from a zero-based body-image index.
     #[must_use]
     pub const fn index(index: usize) -> Self {
-        Self::Index(Position::new(index))
+        Self::Position(Position::new(index))
     }
 
     /// Create a selector from a typed zero-based body-image position.
     #[must_use]
     pub const fn position(position: Position) -> Self {
-        Self::Index(position)
+        Self::Position(position)
     }
 
     /// Return the selected typed body-image position.
     #[must_use]
     pub const fn as_position(self) -> Position {
         match self {
-            Self::Index(position) => position,
+            Self::Position(position) => position,
         }
     }
 
@@ -315,6 +315,85 @@ impl ImageSelector {
     #[must_use]
     pub const fn as_index(self) -> usize {
         self.as_position().get()
+    }
+}
+
+/// Selects one body-anchored image, movie, audio clip, shape or text box by
+/// its kind and its zero-based text-flow position among drawables of that
+/// kind.
+///
+/// Images are the ordinary `ImageArchive` attachments of the rooted body
+/// storage; movies and audio are its file-backed movie attachments, split by
+/// their audio-only flag (live video is neither); shapes are its text-bearing
+/// shapes that are not text boxes; text boxes are its shapes flagged as text
+/// boxes that own their storage. Native identifiers are not representable
+/// here.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "The selector name identifies the Pages body-drawable domain."
+)]
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DrawableSelector {
+    /// The image at this zero-based position among body images.
+    Image(Position),
+    /// The movie at this zero-based position among body movies.
+    Movie(Position),
+    /// The audio clip at this zero-based position among body audio clips.
+    Audio(Position),
+    /// The shape at this zero-based position among body shapes.
+    Shape(Position),
+    /// The text box at this zero-based position among body text boxes.
+    TextBox(Position),
+}
+
+impl DrawableSelector {
+    /// Select a body image by zero-based index.
+    #[must_use]
+    pub const fn image(index: usize) -> Self {
+        Self::Image(Position::new(index))
+    }
+
+    /// Select a body movie by zero-based index.
+    #[must_use]
+    pub const fn movie(index: usize) -> Self {
+        Self::Movie(Position::new(index))
+    }
+
+    /// Select a body audio clip by zero-based index.
+    #[must_use]
+    pub const fn audio(index: usize) -> Self {
+        Self::Audio(Position::new(index))
+    }
+
+    /// Select a body shape by zero-based index.
+    #[must_use]
+    pub const fn shape(index: usize) -> Self {
+        Self::Shape(Position::new(index))
+    }
+
+    /// Select a body text box by zero-based index.
+    #[must_use]
+    pub const fn text_box(index: usize) -> Self {
+        Self::TextBox(Position::new(index))
+    }
+
+    /// The selected position within its kind.
+    #[must_use]
+    pub const fn position(self) -> Position {
+        match self {
+            Self::Image(position)
+            | Self::Movie(position)
+            | Self::Audio(position)
+            | Self::Shape(position)
+            | Self::TextBox(position) => position,
+        }
+    }
+}
+
+impl From<ImageSelector> for DrawableSelector {
+    fn from(selector: ImageSelector) -> Self {
+        Self::Image(selector.as_position())
     }
 }
 

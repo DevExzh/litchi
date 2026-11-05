@@ -60,14 +60,14 @@ fn presentation_modern_comments_reject_external_author_relationships() {
 }
 
 fn package_with_modern_comments() -> Package {
-    let mut package = Package::new().unwrap();
+    let package = Package::new().unwrap();
     let presentation_name = PackURI::new("/ppt/presentation.xml").unwrap();
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
     let authors_name = PackURI::new("/ppt/commentAuthors.xml").unwrap();
     let comments_name = PackURI::new("/ppt/comments/comment1.xml").unwrap();
 
     let bytes = package.to_bytes().unwrap();
-    let mut opc = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut opc = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     {
         opc.get_part_mut(&presentation_name)
             .unwrap()
@@ -106,9 +106,9 @@ fn package_with_modern_comments() -> Package {
     Package::from_opc_package(opc).unwrap()
 }
 
-fn edit_package(mut package: Package, edit: impl FnOnce(&mut OpcPackage)) -> Package {
+fn edit_package(package: Package, edit: impl FnOnce(&mut OpcPackage)) -> Package {
     let bytes = package.to_bytes().unwrap();
-    let mut opc = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut opc = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     edit(&mut opc);
     Package::from_opc_package(opc).unwrap()
 }

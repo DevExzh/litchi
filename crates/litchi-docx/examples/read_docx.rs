@@ -53,7 +53,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // ----- Document properties (core.xml metadata) -----
-    let props = pkg.props();
+    let props = pkg.metadata();
     println!("\n--- Core document properties ---");
     println!(
         "Title           : {:?}",
@@ -64,14 +64,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         props.and_then(|p| p.subject.as_deref())
     );
     println!(
-        "Creator         : {:?}",
-        props.and_then(|p| p.creator.as_deref())
+        "Author          : {:?}",
+        props.and_then(|p| p.author.as_deref())
     );
     println!(
         "Keywords        : {:?}",
-        props
-            .and_then(|p| p.keywords.as_ref())
-            .map(ToString::to_string)
+        props.map(|p| p.keywords.as_slice()).unwrap_or_default()
     );
     println!(
         "Description     : {:?}",

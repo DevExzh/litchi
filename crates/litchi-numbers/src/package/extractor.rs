@@ -15,7 +15,7 @@
 //!
 //! `TableDataExtractor`, `Components`, and `Index` are implementation details
 //! of [`crate::Package`]. Applications should parse a native package through
-//! [`crate::Package`] and consume its archive-free [`crate::Document`] result;
+//! [`crate::Package`] and consume its archive-free [`crate::Workbook`] result;
 //! this decoder is intentionally not part of the public API.
 
 use super::Components;
@@ -26,7 +26,7 @@ use super::{
     table_info_decode_options,
 };
 use super::{Index, Resolved};
-use crate::DEFAULT_MAX_TEXT_BYTES;
+use crate::MAX_TEXT_BYTES;
 use crate::cell::FiniteF64;
 use crate::cell::Value as CellValue;
 use litchi_iwa_common::comment::{AuthorId, Comment, StorageId, Uuid};
@@ -34,7 +34,7 @@ use litchi_iwa_common::formula::FiniteF64 as CommonFiniteF64;
 use litchi_iwa_common::formula::render::FormulaRenderBudget;
 #[cfg(test)]
 use litchi_iwa_common::formula::render::{FormulaExpr, FormulaRenderer};
-use litchi_iwa_common::wire::{WireDescent, preflight_wire_tree_with_limits};
+use litchi_iwa_common::wire::{WireDescent, preflight_wire_tree};
 use litchi_iwa_common::{LimitKind, WireLimits};
 use litchi_iwa_protos::comment_storage_codec;
 use litchi_iwa_protos::group_node_category_codec::{self, CategoryValueView, GroupNodeView};
@@ -80,7 +80,7 @@ const MAX_ADDRESSABLE_CELLS: usize = 1 << 24;
 const MAX_TABLE_MATERIALIZED_CELLS: usize = 1 << 20;
 const MAX_FORMULA_CATEGORY_DEPTH: usize = 64;
 const MAX_FORMULA_WORK: usize = crate::MAX_REFERENCES;
-const MAX_FORMULA_WIRE_BYTES: usize = DEFAULT_MAX_TEXT_BYTES;
+const MAX_FORMULA_WIRE_BYTES: usize = MAX_TEXT_BYTES;
 const MAX_PAYLOAD_WORK: usize = WireLimits::MAX_REWRITE_WORK;
 
 /// Formula bytes retained by the table sidecar.
@@ -169,7 +169,7 @@ fn map_formula_envelope_wire_error(error: litchi_iwa_common::Error) -> Error {
             observed,
             limit,
         } => Error::SemanticLimit {
-            kind: SemanticLimitKind::FormulaWireBytes,
+            kind: SemanticLimitKind::FormulaCategoryBytes,
             observed,
             maximum: limit,
             path: SemanticPath::StructuredTables,
@@ -322,7 +322,7 @@ fn map_table_cell_decode_limit_with_offsets(
     use numbers_table_cell_storage_codec::DecodeLimit;
     let (kind, observed, maximum) = match limit {
         DecodeLimit::Bytes { observed, maximum } => {
-            (SemanticLimitKind::FormulaWireBytes, observed, maximum)
+            (SemanticLimitKind::FormulaCategoryBytes, observed, maximum)
         },
         DecodeLimit::References { observed, maximum } => (
             SemanticLimitKind::References,
@@ -382,7 +382,7 @@ fn map_comment_storage_codec_error(
     use comment_storage_codec::DecodeLimit;
     let (kind, observed, maximum) = match limit {
         DecodeLimit::Bytes { observed, maximum } => {
-            (SemanticLimitKind::FormulaWireBytes, observed, maximum)
+            (SemanticLimitKind::FormulaCategoryBytes, observed, maximum)
         },
         DecodeLimit::References { observed, maximum } => (
             SemanticLimitKind::References,
@@ -558,7 +558,7 @@ impl ProjectionBudget {
     }
 
     const fn remaining_staging_text_bytes(&self) -> usize {
-        DEFAULT_MAX_TEXT_BYTES.saturating_sub(self.staging_text_bytes)
+        MAX_TEXT_BYTES.saturating_sub(self.staging_text_bytes)
     }
 
     const fn remaining_formula_wire_bytes(&self) -> usize {
@@ -569,7 +569,7 @@ impl ProjectionBudget {
         self.staging_text_bytes = projection_charge(
             self.staging_text_bytes,
             amount,
-            DEFAULT_MAX_TEXT_BYTES,
+            MAX_TEXT_BYTES,
             SemanticLimitKind::TextBytes,
         )?;
         Ok(())
@@ -580,7 +580,7 @@ impl ProjectionBudget {
             self.formula_wire_bytes,
             amount,
             MAX_FORMULA_WIRE_BYTES,
-            SemanticLimitKind::FormulaWireBytes,
+            SemanticLimitKind::FormulaCategoryBytes,
         )?;
         Ok(())
     }
@@ -1526,7 +1526,7 @@ fn has_legacy_table_model_wire_shape(data: &[u8]) -> Result<bool> {
 
     let mut present = 0_u8;
     let mut ambiguous = false;
-    let preflight = preflight_wire_tree_with_limits(data, WireLimits::default(), |visit| {
+    let preflight = preflight_wire_tree(data, WireLimits::default(), |visit| {
         let field = visit.field();
         let required = match field.number() {
             4 => Some((DATA_STORE, 2)),
@@ -1552,9 +1552,7 @@ fn has_legacy_table_model_wire_shape(data: &[u8]) -> Result<bool> {
                 })
             },
             litchi_iwa_common::Error::InvalidFormat(_) => Ok(false),
-            common_error @ (litchi_iwa_common::Error::LimitExceeded { .. }
-            | litchi_iwa_common::Error::Allocation { .. }
-            | litchi_iwa_common::Error::InvalidLimit { .. }) => Err(Error::Common(common_error)),
+            common_error => Err(Error::Common(common_error)),
         };
     }
     if present != REQUIRED {
@@ -1603,7 +1601,7 @@ fn table_model_compatibility_shape(data: &[u8]) -> Option<TableModelCompatibilit
     let mut default_style_references = 0_u16;
     let mut invalid_default_style_shape = false;
     let mut invalid_shape = false;
-    let root_scan = preflight_wire_tree_with_limits(data, WireLimits::default(), |visit| {
+    let root_scan = preflight_wire_tree(data, WireLimits::default(), |visit| {
         // A sparse compatibility model omits the native DataStore metadata
         // envelopes. Complete native models carry row headers, column
         // headers, and style metadata (fields 1, 2, and 5), and must continue
@@ -3362,7 +3360,7 @@ impl<'a> TableDataExtractor<'a> {
         row_count: usize,
         column_count: usize,
     ) -> Result<ParsedCell> {
-        let decoded = decode_cell_value(data)
+        let decoded = decode_cell_value(data, &crate::cell::wire::limits_for_source(data))
             .map_err(|error| map_cell_value_decode_error(error, data, row, column))?;
         let comment_identifier = decoded.comment_identifier;
         let value = match decoded.value {
@@ -3879,9 +3877,8 @@ impl<'a> TableDataExtractor<'a> {
             .map_err(|_error| {
                 Error::InvalidFormat("Numbers rich-text limits are invalid".to_owned())
             })?;
-            let validation =
-                litchi_iwa_text_wire::validate_storage_with_limits(&message.data, rewrite_limits)
-                    .map_err(map_rich_text_rewrite_error)?;
+            let validation = litchi_iwa_text_wire::validate_storage(&message.data, rewrite_limits)
+                .map_err(map_rich_text_rewrite_error)?;
             budget.payload_fields = projection_charge(
                 budget.payload_fields,
                 validation.fields(),
@@ -3913,8 +3910,8 @@ impl<'a> TableDataExtractor<'a> {
         } else {
             None
         };
-        let storage = litchi_iwa_text_wire::from_bytes_with_limits(&message.data, limits)
-            .map_err(map_rich_text_error)?;
+        let storage =
+            litchi_iwa_text_wire::from_bytes(&message.data, limits).map_err(map_rich_text_error)?;
         if self.document_projection {
             if validated_text_len != Some(storage.len()) {
                 return Err(Error::InvalidFormat(
@@ -3938,7 +3935,7 @@ fn preflight_rich_text_payload(
         .with_nesting(1)?;
     let mut storage = None;
     let mut cell = false;
-    let report = preflight_wire_tree_with_limits(source, limits, |visit| {
+    let report = preflight_wire_tree(source, limits, |visit| {
         match visit.field().number() {
             1 => {
                 if storage.is_some() || visit.field().wire_type() != 2 {
@@ -4008,7 +4005,7 @@ fn map_rich_text_rewrite_error(error: litchi_iwa_text_wire::RewriteError) -> Err
             } else if resource.contains("work") {
                 SemanticLimitKind::FormulaWork
             } else {
-                SemanticLimitKind::FormulaWireBytes
+                SemanticLimitKind::FormulaCategoryBytes
             },
             observed,
             maximum: limit,
@@ -4122,14 +4119,14 @@ impl FormulaReferenceBudget {
         self.charge_work(bytes)?;
         self.wire_bytes = self.wire_bytes.checked_add(bytes).ok_or_else(|| {
             formula_semantic_limit(
-                SemanticLimitKind::FormulaWireBytes,
+                SemanticLimitKind::FormulaCategoryBytes,
                 usize::MAX,
                 self.maximum_wire_bytes,
             )
         })?;
         if self.wire_bytes > self.maximum_wire_bytes {
             return Err(formula_semantic_limit(
-                SemanticLimitKind::FormulaWireBytes,
+                SemanticLimitKind::FormulaCategoryBytes,
                 self.wire_bytes,
                 self.maximum_wire_bytes,
             ));
@@ -4477,7 +4474,7 @@ fn preflight_formula_uuid(
         .with_input_bytes(source.len().clamp(1, WireLimits::MAX_INPUT_BYTES))?
         .with_fields(maximum_work.clamp(1, WireLimits::MAX_FIELDS))?
         .with_nesting(1)?;
-    preflight_wire_tree_with_limits(source, limits, |visit| {
+    preflight_wire_tree(source, limits, |visit| {
         charge_formula_preflight_work(work, 1, maximum_work)?;
         let field = visit.field();
         if visit.path().is_empty() && matches!(field.number(), 1 | 2) {
@@ -4507,7 +4504,7 @@ fn preflight_formula_cell_value(
         .with_input_bytes(input_bytes)?
         .with_fields(maximum_work.clamp(1, WireLimits::MAX_FIELDS))?
         .with_nesting(1)?;
-    preflight_wire_tree_with_limits(source, limits, |visit| {
+    preflight_wire_tree(source, limits, |visit| {
         charge_formula_preflight_work(work, 1, maximum_work)?;
         let field = visit.field();
         if visit.path().is_empty() && matches!(field.number(), 2..=5) {
@@ -4585,7 +4582,7 @@ fn preflight_formula_category_payload(
     let work_before_projection = budget.work_items;
     let mut group_nodes = 1usize;
     let mut projection_work = 1usize;
-    let preflight = preflight_wire_tree_with_limits(source, limits, |visit| {
+    let preflight = preflight_wire_tree(source, limits, |visit| {
         let field = visit.field();
         charge_formula_preflight_work(&mut projection_work, 1, remaining_work)?;
         if !visit.path().iter().all(|path_field| *path_field == 3) {
@@ -4909,7 +4906,7 @@ fn preflight_formula_owner(
         .with_nesting(2)?;
     let mut owner_key = None;
     let mut table = None;
-    let report = preflight_wire_tree_with_limits(source, limits, |visit| {
+    let report = preflight_wire_tree(source, limits, |visit| {
         // Count every field before validating its schema role.  This keeps
         // the bounded work charge for a malformed field that aborts the
         // preflight, including malformed known fields and malformed trailing
@@ -4928,7 +4925,7 @@ fn preflight_formula_owner(
             // owner root.  Charge its bounded byte walk before entering it so
             // malformed nested wire cannot discard the cost on error.
             checked_formula_owner_work(work, visit.field().payload().len())?;
-            let nested = preflight_wire_tree_with_limits(
+            let nested = preflight_wire_tree(
                 visit.field().payload(),
                 WireLimits::default()
                     .with_input_bytes(
@@ -5348,7 +5345,7 @@ fn map_formula_render_decode_error(error: numbers_formula_codec::DecodeError) ->
     use numbers_formula_codec::DecodeLimit;
     match error.resource_limit() {
         Some(DecodeLimit::Bytes { observed, maximum }) => Error::SemanticLimit {
-            kind: SemanticLimitKind::FormulaWireBytes,
+            kind: SemanticLimitKind::FormulaCategoryBytes,
             observed,
             maximum,
             path: SemanticPath::StructuredTables,
@@ -5373,6 +5370,14 @@ fn map_formula_render_decode_error(error: numbers_formula_codec::DecodeError) ->
         },
         Some(DecodeLimit::Nodes { observed, maximum }) => Error::SemanticLimit {
             kind: SemanticLimitKind::FormulaRenderWork,
+            observed,
+            maximum,
+            path: SemanticPath::StructuredTables,
+        },
+        Some(DecodeLimit::Owners { observed, maximum }) => Error::SemanticLimit {
+            // Formula rendering exposes resolved owner entries through the
+            // existing semantic References dimension.
+            kind: SemanticLimitKind::References,
             observed,
             maximum,
             path: SemanticPath::StructuredTables,
@@ -6546,11 +6551,9 @@ mod tests {
     use crate::cell::Value as CellValue;
     use crate::cell::wire::{BncCell, decimal128_le};
     use crate::package::{
-        Components, Index, ReadOptions, SemanticPath, compatibility_tables_from_bytes_with_options,
+        Components, Index, SemanticPath, compatibility_tables_from_bytes_with_options,
     };
-    use crate::{
-        DEFAULT_MAX_TEXT_BYTES, Package, PackageSemanticLimits as SemanticLimits, SemanticLimitKind,
-    };
+    use crate::{MAX_TEXT_BYTES, OpenOptions, Package, SemanticLimitKind, SemanticLimits};
     use litchi_iwa_archive::Limits;
     use litchi_iwa_common::comment::{Comment, StorageId};
     use litchi_iwa_common::wire::{append_length_delimited_field, append_varint_field};
@@ -6653,8 +6656,15 @@ mod tests {
 
     fn formula_owner_wire(uuid: &[u8], table: &[u8]) -> Vec<u8> {
         let mut source = Vec::new();
-        append_length_delimited_field(&mut source, 1, uuid).expect("owner UUID field");
-        append_length_delimited_field(&mut source, 11, table).expect("owner table field");
+        append_length_delimited_field(&mut source, 1, uuid, litchi_iwa_common::WireLimits::DEFAULT)
+            .expect("owner UUID field");
+        append_length_delimited_field(
+            &mut source,
+            11,
+            table,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
+        .expect("owner table field");
         source
     }
 
@@ -6663,15 +6673,15 @@ mod tests {
     }
 
     fn archive_object(identifier: u64, messages: Vec<RawMessage>) -> super::Result<ArchiveObject> {
-        ArchiveObject::new(identifier, messages)
+        ArchiveObject::new(identifier, messages, Default::default())
             .map_err(|error| Error::InvalidFormat(error.to_string()))
     }
 
     fn compatibility_package(objects: Vec<ArchiveObject>) -> super::Result<Vec<u8>> {
         let archive = Archive { objects }
-            .to_bytes()
+            .to_bytes(Default::default())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
-        let stream = SnappyStream::compress(&archive)
+        let stream = SnappyStream::compress(&archive, Default::default())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         Ok(litchi_iwa_archive::package::to_bytes(
             [("Index/Document.iwa", stream.as_slice())],
@@ -6699,15 +6709,25 @@ mod tests {
         data_store: &[u8],
     ) -> Vec<u8> {
         let mut source = Vec::new();
-        append_length_delimited_field(&mut source, 4, data_store)
-            .expect("sparse model data-store field");
+        append_length_delimited_field(
+            &mut source,
+            4,
+            data_store,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
+        .expect("sparse model data-store field");
         if let Some((rows, columns)) = dimensions {
             append_varint_field(&mut source, 6, u64::from(rows)).expect("sparse model rows");
             append_varint_field(&mut source, 7, u64::from(columns)).expect("sparse model columns");
         }
         for name in names {
-            append_length_delimited_field(&mut source, 8, name.as_bytes())
-                .expect("sparse model name field");
+            append_length_delimited_field(
+                &mut source,
+                8,
+                name.as_bytes(),
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )
+            .expect("sparse model name field");
         }
         source
     }
@@ -6850,8 +6870,13 @@ mod tests {
         // dense fallback must retain the strict names projection and reject
         // the duplicate instead of applying sparse last-wins behavior.
         let mut data_store = Vec::new();
-        append_length_delimited_field(&mut data_store, 1, &[0x08, 0x01])
-            .expect("native header-storage envelope");
+        append_length_delimited_field(
+            &mut data_store,
+            1,
+            &[0x08, 0x01],
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
+        .expect("native header-storage envelope");
         let source = sparse_model_wire(&["first", "last"], Some((1, 1)), &data_store);
         with_list_extractor(Vec::new(), true, |extractor| {
             let mut budget = ProjectionBudget::new(SemanticLimits::default());
@@ -6890,12 +6915,27 @@ mod tests {
     #[test]
     fn native_sparse_fallback_keeps_malformed_tiles_strict() -> super::Result<()> {
         let mut data_store = Vec::new();
-        append_length_delimited_field(&mut data_store, 3, &[0xff])
-            .expect("malformed tile-storage field");
-        append_length_delimited_field(&mut data_store, 4, &reference(90).encode_to_vec())
-            .expect("string-table reference");
-        append_length_delimited_field(&mut data_store, 6, &reference(91).encode_to_vec())
-            .expect("formula-table reference");
+        append_length_delimited_field(
+            &mut data_store,
+            3,
+            &[0xff],
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
+        .expect("malformed tile-storage field");
+        append_length_delimited_field(
+            &mut data_store,
+            4,
+            &reference(90).encode_to_vec(),
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
+        .expect("string-table reference");
+        append_length_delimited_field(
+            &mut data_store,
+            6,
+            &reference(91).encode_to_vec(),
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
+        .expect("formula-table reference");
         let source = sparse_model_wire(&["tiles"], Some((1, 1)), &data_store);
         let result = with_list_extractor(
             vec![
@@ -7015,7 +7055,7 @@ mod tests {
     ) -> super::Result<T> {
         let bytes = compatibility_package(objects)?;
         let components = Components::from_bytes(&bytes, Limits::default())?;
-        let index = Index::from_components(&components, SemanticLimits::MAX_OBJECTS)?;
+        let index = Index::from_components(&components, crate::MAX_OBJECTS)?;
         let extractor = TableDataExtractor::new(&components, &index, SemanticLimits::default());
         if document_projection {
             visit(&extractor.without_comments())
@@ -7232,8 +7272,7 @@ mod tests {
         ])
         .expect("compatibility package");
         let components = Components::from_bytes(&bytes, Limits::default()).expect("components");
-        let index =
-            Index::from_components(&components, SemanticLimits::MAX_OBJECTS).expect("object index");
+        let index = Index::from_components(&components, crate::MAX_OBJECTS).expect("object index");
         let extractor = TableDataExtractor::new(&components, &index, SemanticLimits::default());
 
         let tables = extractor
@@ -7302,8 +7341,7 @@ mod tests {
         ])
         .expect("compatibility package");
         let components = Components::from_bytes(&bytes, Limits::default()).expect("components");
-        let index =
-            Index::from_components(&components, SemanticLimits::MAX_OBJECTS).expect("object index");
+        let index = Index::from_components(&components, crate::MAX_OBJECTS).expect("object index");
         let extractor = TableDataExtractor::new(&components, &index, SemanticLimits::default());
         let before = *extractor.projection_budget.borrow();
 
@@ -7352,8 +7390,7 @@ mod tests {
         ])
         .expect("compatibility package");
         let components = Components::from_bytes(&bytes, Limits::default()).expect("components");
-        let index =
-            Index::from_components(&components, SemanticLimits::MAX_OBJECTS).expect("object index");
+        let index = Index::from_components(&components, crate::MAX_OBJECTS).expect("object index");
         let extractor = TableDataExtractor::new(&components, &index, SemanticLimits::default());
 
         let error = extractor
@@ -7582,11 +7619,14 @@ mod tests {
             )?,
         ])?;
         let semantic = SemanticLimits::default()
-            .with_projection_limits(SemanticLimits::MAX_MATERIALIZED_CELLS, 1)
+            .to_builder()
+            .max_materialized_cells(SemanticLimits::MAXIMUM.max_materialized_cells())
+            .and_then(|b| b.max_output_text_bytes(1))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let result = compatibility_tables_from_bytes_with_options(
             &bytes,
-            ReadOptions::new(Limits::default(), semantic),
+            OpenOptions::new().semantic_limits(semantic),
         );
         let error = result
             .err()
@@ -7627,7 +7667,9 @@ mod tests {
 
     #[test]
     fn tile_projection_accepts_missing_slots_inside_the_table_width() -> super::Result<()> {
-        let cell = BncCell::minimal().encode();
+        let cell = BncCell::minimal()
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         let source = tile_source(
             vec![tile_row(
                 0,
@@ -7649,7 +7691,9 @@ mod tests {
 
     #[test]
     fn tile_projection_rejects_sparse_rows_with_a_false_declared_cell_count() {
-        let cell = BncCell::minimal().encode();
+        let cell = BncCell::minimal()
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         let source = tile_source(
             vec![tile_row(
                 0,
@@ -7692,7 +7736,9 @@ mod tests {
 
     #[test]
     fn tile_rows_use_modern_buffers_only_when_both_are_present() -> super::Result<()> {
-        let modern = BncCell::minimal().encode();
+        let modern = BncCell::minimal()
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         let source = tile_source(
             vec![tile_row(
                 0,
@@ -7734,7 +7780,9 @@ mod tests {
 
     #[test]
     fn tile_rows_honor_wide_offset_units() -> super::Result<()> {
-        let cell = BncCell::minimal().encode();
+        let cell = BncCell::minimal()
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         let mut storage = cell.clone();
         storage.extend_from_slice(&cell);
         let source = tile_source(
@@ -7760,7 +7808,7 @@ mod tests {
     fn repeated_comment_cells_charge_owned_materialization_before_insertion() -> super::Result<()> {
         let mut cell = BncCell::minimal();
         cell.set_comment_identifier(Some(7));
-        let cell = cell.encode();
+        let cell = cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
         let cell_end = u16::try_from(cell.len())
             .map_err(|_| Error::InvalidFormat("test comment cell is too large".to_owned()))?;
         let mut storage = cell.clone();
@@ -7818,7 +7866,10 @@ mod tests {
         let mut table = Table::with_dimensions("comments", 1, 2)?;
         let mut cell_budget = CellBudget::new();
         let limits = SemanticLimits::default()
-            .with_projection_limits(3, 8)
+            .to_builder()
+            .max_materialized_cells(3)
+            .and_then(|b| b.max_output_text_bytes(8))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let mut projection_budget = ProjectionBudget::new(limits);
 
@@ -7867,7 +7918,7 @@ mod tests {
     fn comment_text_budget_rejects_a_later_copy_before_map_insertion() -> super::Result<()> {
         let mut cell = BncCell::minimal();
         cell.set_comment_identifier(Some(7));
-        let cell = cell.encode();
+        let cell = cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
         let cell_end = u16::try_from(cell.len())
             .map_err(|_| Error::InvalidFormat("test comment cell is too large".to_owned()))?;
         let mut storage = cell.clone();
@@ -7924,7 +7975,10 @@ mod tests {
         let mut table = Table::with_dimensions("comments", 1, 2)?;
         let mut cell_budget = CellBudget::new();
         let limits = SemanticLimits::default()
-            .with_projection_limits(16, 5)
+            .to_builder()
+            .max_materialized_cells(16)
+            .and_then(|b| b.max_output_text_bytes(5))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let mut projection_budget = ProjectionBudget::new(limits);
         let error = TableDataExtractor::parse_tile_row(
@@ -7967,8 +8021,18 @@ mod tests {
         append_varint_field(&mut source, 2, 1)?;
         append_varint_field(&mut source, 3, 2)?;
         append_varint_field(&mut source, 4, 2)?;
-        append_length_delimited_field(&mut source, 5, &valid)?;
-        append_length_delimited_field(&mut source, 5, &malformed)?;
+        append_length_delimited_field(
+            &mut source,
+            5,
+            &valid,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
+        append_length_delimited_field(
+            &mut source,
+            5,
+            &malformed,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
 
         let options = numbers_table_cell_storage_codec::DecodeOptions::new(
             source.len().max(1),
@@ -7998,8 +8062,18 @@ mod tests {
         append_varint_field(&mut source, 2, 1)?;
         append_varint_field(&mut source, 3, 2)?;
         append_varint_field(&mut source, 4, 2)?;
-        append_length_delimited_field(&mut source, 5, &first)?;
-        append_length_delimited_field(&mut source, 5, &malformed)?;
+        append_length_delimited_field(
+            &mut source,
+            5,
+            &first,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
+        append_length_delimited_field(
+            &mut source,
+            5,
+            &malformed,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
 
         let (decode_result, table, _budget, semantic_error, materialized_cells) =
             run_tile_visitor(&source, 1, SemanticLimits::default())?;
@@ -8088,7 +8162,10 @@ mod tests {
             2,
         );
         let limits = SemanticLimits::default()
-            .with_projection_limits(1, SemanticLimits::MAX_OUTPUT_TEXT_BYTES)
+            .to_builder()
+            .max_materialized_cells(1)
+            .and_then(|b| b.max_output_text_bytes(SemanticLimits::MAXIMUM.max_output_text_bytes()))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let (decode_result, table, mut budget, semantic_error, materialized_cells) =
             run_tile_visitor(&source, 1, limits)?;
@@ -8153,9 +8230,11 @@ mod tests {
             &decimal128_le(-1_234.5)
                 .unwrap_or_else(|error| panic!("test decimal did not encode: {error}")),
         );
-        let round_tripped = BncCell::parse(&encoded)
-            .unwrap_or_else(|error| panic!("type-nine cell did not parse: {error}"))
-            .encode();
+        let round_tripped =
+            BncCell::parse(&encoded, &crate::cell::wire::limits_for_source(&encoded))
+                .unwrap_or_else(|error| panic!("type-nine cell did not parse: {error}"))
+                .encode(&litchi_numbers_wire::Limits::DEFAULT)
+                .unwrap();
 
         let mut budget = ProjectionBudget::new(SemanticLimits::default());
         let parsed = TableDataExtractor::parse_cell_storage(
@@ -8311,9 +8390,15 @@ mod tests {
         ]);
 
         let exact_limits = SemanticLimits::default()
-            .with_formula_render_limits(3, 64)
+            .to_builder()
+            .max_formula_render_work(3)
+            .and_then(|b| b.max_formula_render_depth(64))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?
-            .with_projection_limits(crate::MAX_MATERIALIZED_CELLS, 6)
+            .to_builder()
+            .max_materialized_cells(crate::MAX_MATERIALIZED_CELLS)
+            .and_then(|b| b.max_output_text_bytes(6))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let mut exact = ProjectionBudget::new(exact_limits);
         assert_eq!(
@@ -8322,7 +8407,10 @@ mod tests {
         );
 
         let tight_work = SemanticLimits::default()
-            .with_formula_render_limits(2, 64)
+            .to_builder()
+            .max_formula_render_work(2)
+            .and_then(|b| b.max_formula_render_depth(64))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let mut work_budget = ProjectionBudget::new(tight_work);
         assert!(matches!(
@@ -8336,7 +8424,10 @@ mod tests {
         ));
 
         let tight_text = SemanticLimits::default()
-            .with_projection_limits(crate::MAX_MATERIALIZED_CELLS, 5)
+            .to_builder()
+            .max_materialized_cells(crate::MAX_MATERIALIZED_CELLS)
+            .and_then(|b| b.max_output_text_bytes(5))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let mut text_budget = ProjectionBudget::new(tight_text);
         assert!(matches!(
@@ -8364,7 +8455,10 @@ mod tests {
             ..Default::default()
         };
         let depth_limits = SemanticLimits::default()
-            .with_formula_render_limits(4, 3)
+            .to_builder()
+            .max_formula_render_work(4)
+            .and_then(|b| b.max_formula_render_depth(3))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let mut depth_budget = ProjectionBudget::new(depth_limits);
         assert!(matches!(
@@ -8382,7 +8476,10 @@ mod tests {
     #[test]
     fn projection_budget_is_package_aggregate() -> super::Result<()> {
         let limits = SemanticLimits::default()
-            .with_projection_limits(3, 5)
+            .to_builder()
+            .max_materialized_cells(3)
+            .and_then(|b| b.max_output_text_bytes(5))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let mut budget = ProjectionBudget::new(limits);
         budget.charge_materialized_cells(2)?;
@@ -8414,13 +8511,13 @@ mod tests {
     fn rooted_table_call_graph_enforces_one_cumulative_reference_budget() -> super::Result<()> {
         fn extract(max_references: usize) -> super::Result<usize> {
             let package = Package::open(native_fixture())?;
-            let limits = SemanticLimits::new(
-                SemanticLimits::MAX_OBJECTS,
-                SemanticLimits::MAX_SHEETS,
-                SemanticLimits::MAX_TABLES,
-                max_references,
-            )
-            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+            let limits = SemanticLimits::builder()
+                .max_objects(crate::MAX_OBJECTS)
+                .and_then(|b| b.max_sheets(SemanticLimits::MAXIMUM.max_sheets()))
+                .and_then(|b| b.max_tables(SemanticLimits::MAXIMUM.max_tables()))
+                .and_then(|b| b.max_references(max_references))
+                .and_then(|b| b.build())
+                .map_err(|error| Error::InvalidFormat(error.to_string()))?;
             let extractor =
                 TableDataExtractor::new(&package.state.components, &package.state.index, limits)
                     .without_comments();
@@ -8447,7 +8544,7 @@ mod tests {
             Ok(extractor.projection_budget.borrow().references)
         }
 
-        let exact = extract(SemanticLimits::MAX_REFERENCES)?;
+        let exact = extract(SemanticLimits::MAXIMUM.max_references())?;
         assert!(
             exact > 3,
             "table/list/rich/tile projection must charge references"
@@ -8547,11 +8644,11 @@ mod tests {
                 |extractor| {
                     let mut budget = ProjectionBudget::new(SemanticLimits::default());
                     budget.references = budget.max_references;
-                    budget.staging_text_bytes = DEFAULT_MAX_TEXT_BYTES;
+                    budget.staging_text_bytes = MAX_TEXT_BYTES;
                     let table = load_string_list_with_budget(extractor, 90, &mut budget)?;
                     assert!(table.is_empty());
                     assert_eq!(budget.references, budget.max_references);
-                    assert_eq!(budget.staging_text_bytes, DEFAULT_MAX_TEXT_BYTES);
+                    assert_eq!(budget.staging_text_bytes, MAX_TEXT_BYTES);
                     assert!(budget.payload_work > 0);
                     Ok(())
                 },
@@ -8701,7 +8798,7 @@ mod tests {
             crate::MAX_REFERENCES,
             source_len * 4,
             source_len,
-            DEFAULT_MAX_TEXT_BYTES,
+            MAX_TEXT_BYTES,
         );
         exact.charge_table_info_payload(source_len)?;
         assert_eq!(exact.wire_bytes, source_len);
@@ -8711,7 +8808,7 @@ mod tests {
             crate::MAX_REFERENCES,
             source_len * 4 - 1,
             source_len,
-            DEFAULT_MAX_TEXT_BYTES,
+            MAX_TEXT_BYTES,
         );
         assert!(matches!(
             one_short.charge_table_info_payload(source_len),
@@ -8770,12 +8867,22 @@ mod tests {
 
         let mut overlong_owner_key = vec![0x8a, 0x00, uuid.len() as u8];
         overlong_owner_key.extend_from_slice(&uuid);
-        append_length_delimited_field(&mut overlong_owner_key, 11, &table)?;
+        append_length_delimited_field(
+            &mut overlong_owner_key,
+            11,
+            &table,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut work = 0;
         assert!(preflight_formula_owner(&overlong_owner_key, &mut work).is_err());
 
         let mut overlong_table_length = Vec::new();
-        append_length_delimited_field(&mut overlong_table_length, 1, &uuid)?;
+        append_length_delimited_field(
+            &mut overlong_table_length,
+            1,
+            &uuid,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         overlong_table_length.extend_from_slice(&[0x5a, 0x80 | table.len() as u8, 0x00]);
         overlong_table_length.extend_from_slice(&table);
         let mut work = 0;
@@ -8809,7 +8916,7 @@ mod tests {
         )?;
         let bytes = compatibility_package(vec![model_one, model_two])?;
         let components = Components::from_bytes(&bytes, Limits::default())?;
-        let index = Index::from_components(&components, SemanticLimits::MAX_OBJECTS)?;
+        let index = Index::from_components(&components, crate::MAX_OBJECTS)?;
         let table_info = |model_id| RawMessage {
             type_: 6_000,
             data: tst::TableInfoArchive {
@@ -8828,7 +8935,7 @@ mod tests {
                 crate::MAX_REFERENCES,
                 MAX_FORMULA_WORK,
                 MAX_FORMULA_WIRE_BYTES,
-                DEFAULT_MAX_TEXT_BYTES,
+                MAX_TEXT_BYTES,
             );
             assert!(matches!(
                 formula_table_name(&components, &index, &messages, &mut budget),
@@ -8846,7 +8953,7 @@ mod tests {
             crate::MAX_REFERENCES,
             MAX_FORMULA_WORK,
             MAX_FORMULA_WIRE_BYTES,
-            DEFAULT_MAX_TEXT_BYTES,
+            MAX_TEXT_BYTES,
         );
         let name = formula_table_name(
             &components,
@@ -8859,7 +8966,7 @@ mod tests {
             crate::MAX_REFERENCES,
             MAX_FORMULA_WORK,
             MAX_FORMULA_WIRE_BYTES,
-            DEFAULT_MAX_TEXT_BYTES,
+            MAX_TEXT_BYTES,
         );
         let name = formula_table_name(&components, &index, &[valid, malformed], &mut budget)?;
         assert_eq!(name.as_deref(), Some("one"));
@@ -8876,7 +8983,7 @@ mod tests {
             crate::MAX_REFERENCES,
             MAX_FORMULA_WORK,
             MAX_FORMULA_WIRE_BYTES,
-            DEFAULT_MAX_TEXT_BYTES,
+            MAX_TEXT_BYTES,
         );
         failed_map.charge_wire_bytes(5)?;
         failed_map.charge_text(11)?;
@@ -9353,7 +9460,10 @@ mod tests {
         let source = input.encode_to_vec();
 
         let exact_limits = SemanticLimits::default()
-            .with_formula_render_limits(2, 2)
+            .to_builder()
+            .max_formula_render_work(2)
+            .and_then(|b| b.max_formula_render_depth(2))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let mut exact_budget = ProjectionBudget::new(exact_limits);
         let exact_raw = FormulaArchiveBytes::from_wire(&source, &mut exact_budget)?;
@@ -9369,7 +9479,10 @@ mod tests {
         assert_eq!(actual, "=1");
 
         let tight_limits = SemanticLimits::default()
-            .with_formula_render_limits(2, 1)
+            .to_builder()
+            .max_formula_render_work(2)
+            .and_then(|b| b.max_formula_render_depth(1))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let mut tight_budget = ProjectionBudget::new(tight_limits);
         let tight_raw = FormulaArchiveBytes::from_wire(&source, &mut tight_budget)?;
@@ -9405,9 +9518,14 @@ mod tests {
         let mut node = number_node(1.25).encode_to_vec();
         append_varint_field(&mut node, 48, 1)?;
         let mut ast = Vec::new();
-        append_length_delimited_field(&mut ast, 1, &node)?;
+        append_length_delimited_field(&mut ast, 1, &node, litchi_iwa_common::WireLimits::DEFAULT)?;
         let mut source = Vec::new();
-        append_length_delimited_field(&mut source, 1, &ast)?;
+        append_length_delimited_field(
+            &mut source,
+            1,
+            &ast,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
 
         let mut budget = ProjectionBudget::new(SemanticLimits::default());
         let raw = FormulaArchiveBytes::from_wire(&source, &mut budget)?;
@@ -9465,7 +9583,10 @@ mod tests {
         assert_eq!(probe.scalar_visitor_node_count, 2);
 
         let exact_limits = SemanticLimits::default()
-            .with_formula_render_limits(2, 64)
+            .to_builder()
+            .max_formula_render_work(2)
+            .and_then(|b| b.max_formula_render_depth(64))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let mut exact_budget = ProjectionBudget::new(exact_limits);
         let exact_raw = FormulaArchiveBytes::from_wire(&source, &mut exact_budget)?;
@@ -9484,7 +9605,10 @@ mod tests {
         assert_eq!(exact_budget.formula_render_work, 2);
 
         let tight_limits = SemanticLimits::default()
-            .with_formula_render_limits(1, 64)
+            .to_builder()
+            .max_formula_render_work(1)
+            .and_then(|b| b.max_formula_render_depth(64))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let mut tight_budget = ProjectionBudget::new(tight_limits);
         let tight_raw = FormulaArchiveBytes::from_wire(&source, &mut tight_budget)?;
@@ -9542,7 +9666,10 @@ mod tests {
         assert_eq!(probe.lazy_traversal_entry_count, 3);
 
         let exact_limits = SemanticLimits::default()
-            .with_formula_render_limits(4, 64)
+            .to_builder()
+            .max_formula_render_work(4)
+            .and_then(|b| b.max_formula_render_depth(64))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let mut exact_budget = ProjectionBudget::new(exact_limits);
         let exact_raw = FormulaArchiveBytes::from_wire(&source, &mut exact_budget)?;
@@ -9559,7 +9686,7 @@ mod tests {
                 MAX_PAYLOAD_WORK,
                 render_depth,
                 exact_raw.scalar_visitor_node_count,
-                DEFAULT_MAX_TEXT_BYTES,
+                MAX_TEXT_BYTES,
             )
             .with_opaque_unknown_fields(true)
             .with_render_recursion_limit(render_depth),
@@ -9832,7 +9959,10 @@ mod tests {
         let input = formula(vec![number_node(1.0), number_node(2.0)]);
         let source = input.encode_to_vec();
         let limits = SemanticLimits::default()
-            .with_formula_render_limits(1, 64)
+            .to_builder()
+            .max_formula_render_work(1)
+            .and_then(|b| b.max_formula_render_depth(64))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let mut budget = ProjectionBudget::new(limits);
         let raw = FormulaArchiveBytes::from_wire(&source, &mut budget)?;
@@ -9888,14 +10018,29 @@ mod tests {
             // ASTNodeArchive field one has the wrong wire type.
             {
                 let mut node = Vec::new();
-                append_length_delimited_field(&mut node, 1, b"not-a-varint")?;
+                append_length_delimited_field(
+                    &mut node,
+                    1,
+                    b"not-a-varint",
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )?;
                 node
             },
         ] {
             let mut array = Vec::new();
-            append_length_delimited_field(&mut array, 1, &node)?;
+            append_length_delimited_field(
+                &mut array,
+                1,
+                &node,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
             let mut source = Vec::new();
-            append_length_delimited_field(&mut source, 1, &array)?;
+            append_length_delimited_field(
+                &mut source,
+                1,
+                &array,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
             let mut budget = ProjectionBudget::new(SemanticLimits::default());
             assert!(matches!(
                 FormulaArchiveBytes::from_wire(&source, &mut budget),
@@ -9911,8 +10056,18 @@ mod tests {
     #[test]
     fn raw_formula_archive_rejects_duplicate_root_and_ast_node_type_fields() -> super::Result<()> {
         let mut duplicate_root = Vec::new();
-        append_length_delimited_field(&mut duplicate_root, 1, &[])?;
-        append_length_delimited_field(&mut duplicate_root, 1, &[])?;
+        append_length_delimited_field(
+            &mut duplicate_root,
+            1,
+            &[],
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
+        append_length_delimited_field(
+            &mut duplicate_root,
+            1,
+            &[],
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut budget = ProjectionBudget::new(SemanticLimits::default());
         assert!(FormulaArchiveBytes::from_wire(&duplicate_root, &mut budget).is_err());
 
@@ -9920,9 +10075,19 @@ mod tests {
         append_varint_field(&mut duplicate_type, 1, 17)?;
         append_varint_field(&mut duplicate_type, 1, 17)?;
         let mut node_array = Vec::new();
-        append_length_delimited_field(&mut node_array, 1, &duplicate_type)?;
+        append_length_delimited_field(
+            &mut node_array,
+            1,
+            &duplicate_type,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut duplicate_node = Vec::new();
-        append_length_delimited_field(&mut duplicate_node, 1, &node_array)?;
+        append_length_delimited_field(
+            &mut duplicate_node,
+            1,
+            &node_array,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut budget = ProjectionBudget::new(SemanticLimits::default());
         assert!(FormulaArchiveBytes::from_wire(&duplicate_node, &mut budget).is_err());
         Ok(())
@@ -9941,9 +10106,19 @@ mod tests {
         append_varint_field(&mut duplicate_node, 2, 1)?;
         append_varint_field(&mut duplicate_node, 2, 1)?;
         let mut node_array = Vec::new();
-        append_length_delimited_field(&mut node_array, 1, &duplicate_node)?;
+        append_length_delimited_field(
+            &mut node_array,
+            1,
+            &duplicate_node,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut duplicate_nested = Vec::new();
-        append_length_delimited_field(&mut duplicate_nested, 1, &node_array)?;
+        append_length_delimited_field(
+            &mut duplicate_nested,
+            1,
+            &node_array,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut budget = ProjectionBudget::new(SemanticLimits::default());
         assert!(FormulaArchiveBytes::from_wire(&duplicate_nested, &mut budget).is_err());
 
@@ -9960,12 +10135,32 @@ mod tests {
         let mut node = Vec::new();
         append_varint_field(&mut node, 1, 67)?;
         let mut empty_range = Vec::new();
-        append_length_delimited_field(&mut empty_range, 1, &[])?;
-        append_length_delimited_field(&mut node, 40, &empty_range)?;
+        append_length_delimited_field(
+            &mut empty_range,
+            1,
+            &[],
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
+        append_length_delimited_field(
+            &mut node,
+            40,
+            &empty_range,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut node_array = Vec::new();
-        append_length_delimited_field(&mut node_array, 1, &node)?;
+        append_length_delimited_field(
+            &mut node_array,
+            1,
+            &node,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut source = Vec::new();
-        append_length_delimited_field(&mut source, 1, &node_array)?;
+        append_length_delimited_field(
+            &mut source,
+            1,
+            &node_array,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut budget = ProjectionBudget::new(SemanticLimits::default());
         assert!(FormulaArchiveBytes::from_wire(&source, &mut budget).is_err());
         Ok(())
@@ -9979,11 +10174,26 @@ mod tests {
         append_varint_field(&mut bad_tract_list, 2, 1)?;
         let mut tract_node = Vec::new();
         append_varint_field(&mut tract_node, 1, 48)?;
-        append_length_delimited_field(&mut tract_node, 38, &bad_tract_list)?;
+        append_length_delimited_field(
+            &mut tract_node,
+            38,
+            &bad_tract_list,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut tract_array = Vec::new();
-        append_length_delimited_field(&mut tract_array, 1, &tract_node)?;
+        append_length_delimited_field(
+            &mut tract_array,
+            1,
+            &tract_node,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut bad_tract_source = Vec::new();
-        append_length_delimited_field(&mut bad_tract_source, 1, &tract_array)?;
+        append_length_delimited_field(
+            &mut bad_tract_source,
+            1,
+            &tract_array,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut budget = ProjectionBudget::new(SemanticLimits::default());
         assert!(FormulaArchiveBytes::from_wire(&bad_tract_source, &mut budget).is_err());
 
@@ -9991,20 +10201,50 @@ mod tests {
         // length-delimited UUID with no required lower/upper fields must be
         // rejected after the new recursive descent.
         let mut bad_uuid_list = Vec::new();
-        append_length_delimited_field(&mut bad_uuid_list, 1, &[])?;
+        append_length_delimited_field(
+            &mut bad_uuid_list,
+            1,
+            &[],
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut category = Vec::new();
-        append_length_delimited_field(&mut category, 6, &bad_uuid_list)?;
+        append_length_delimited_field(
+            &mut category,
+            6,
+            &bad_uuid_list,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut category_node = Vec::new();
         append_varint_field(&mut category_node, 1, 66)?;
-        append_length_delimited_field(&mut category_node, 39, &{
-            let mut wrapper = Vec::new();
-            append_length_delimited_field(&mut wrapper, 1, &category)?;
-            wrapper
-        })?;
+        append_length_delimited_field(
+            &mut category_node,
+            39,
+            &{
+                let mut wrapper = Vec::new();
+                append_length_delimited_field(
+                    &mut wrapper,
+                    1,
+                    &category,
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )?;
+                wrapper
+            },
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut category_array = Vec::new();
-        append_length_delimited_field(&mut category_array, 1, &category_node)?;
+        append_length_delimited_field(
+            &mut category_array,
+            1,
+            &category_node,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut bad_category_source = Vec::new();
-        append_length_delimited_field(&mut bad_category_source, 1, &category_array)?;
+        append_length_delimited_field(
+            &mut bad_category_source,
+            1,
+            &category_array,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut budget = ProjectionBudget::new(SemanticLimits::default());
         assert!(FormulaArchiveBytes::from_wire(&bad_category_source, &mut budget).is_err());
         Ok(())
@@ -10015,8 +10255,18 @@ mod tests {
     {
         let uuid = tsp::Uuid { lower: 1, upper: 2 }.encode_to_vec();
         let mut category_ref = Vec::new();
-        append_length_delimited_field(&mut category_ref, 1, &uuid)?;
-        append_length_delimited_field(&mut category_ref, 2, &uuid)?;
+        append_length_delimited_field(
+            &mut category_ref,
+            1,
+            &uuid,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
+        append_length_delimited_field(
+            &mut category_ref,
+            2,
+            &uuid,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         append_varint_field(&mut category_ref, 3, 1)?;
         append_varint_field(&mut category_ref, 4, 0)?;
 
@@ -10024,14 +10274,34 @@ mod tests {
         // complete nested category as a control so the recursive checks do
         // not reject a valid category reference.
         let mut category_wrapper = Vec::new();
-        append_length_delimited_field(&mut category_wrapper, 1, &category_ref)?;
+        append_length_delimited_field(
+            &mut category_wrapper,
+            1,
+            &category_ref,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut category_node = Vec::new();
         append_varint_field(&mut category_node, 1, 66)?;
-        append_length_delimited_field(&mut category_node, 39, &category_wrapper)?;
+        append_length_delimited_field(
+            &mut category_node,
+            39,
+            &category_wrapper,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut category_array = Vec::new();
-        append_length_delimited_field(&mut category_array, 1, &category_node)?;
+        append_length_delimited_field(
+            &mut category_array,
+            1,
+            &category_node,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut valid_category = Vec::new();
-        append_length_delimited_field(&mut valid_category, 1, &category_array)?;
+        append_length_delimited_field(
+            &mut valid_category,
+            1,
+            &category_array,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut budget = ProjectionBudget::new(SemanticLimits::default());
         assert!(FormulaArchiveBytes::from_wire(&valid_category, &mut budget).is_ok());
 
@@ -10040,55 +10310,145 @@ mod tests {
         // because the enclosing AST node and array are structurally valid.
         let mut missing_category_node = Vec::new();
         append_varint_field(&mut missing_category_node, 1, 66)?;
-        append_length_delimited_field(&mut missing_category_node, 39, &[])?;
+        append_length_delimited_field(
+            &mut missing_category_node,
+            39,
+            &[],
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut missing_category_array = Vec::new();
-        append_length_delimited_field(&mut missing_category_array, 1, &missing_category_node)?;
+        append_length_delimited_field(
+            &mut missing_category_array,
+            1,
+            &missing_category_node,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut missing_category = Vec::new();
-        append_length_delimited_field(&mut missing_category, 1, &missing_category_array)?;
+        append_length_delimited_field(
+            &mut missing_category,
+            1,
+            &missing_category_array,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut budget = ProjectionBudget::new(SemanticLimits::default());
         assert!(FormulaArchiveBytes::from_wire(&missing_category, &mut budget).is_err());
 
         let mut incomplete_category_ref = Vec::new();
-        append_length_delimited_field(&mut incomplete_category_ref, 1, &uuid)?;
+        append_length_delimited_field(
+            &mut incomplete_category_ref,
+            1,
+            &uuid,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut incomplete_wrapper = Vec::new();
-        append_length_delimited_field(&mut incomplete_wrapper, 1, &incomplete_category_ref)?;
+        append_length_delimited_field(
+            &mut incomplete_wrapper,
+            1,
+            &incomplete_category_ref,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut incomplete_node = Vec::new();
         append_varint_field(&mut incomplete_node, 1, 66)?;
-        append_length_delimited_field(&mut incomplete_node, 39, &incomplete_wrapper)?;
+        append_length_delimited_field(
+            &mut incomplete_node,
+            39,
+            &incomplete_wrapper,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut incomplete_array = Vec::new();
-        append_length_delimited_field(&mut incomplete_array, 1, &incomplete_node)?;
+        append_length_delimited_field(
+            &mut incomplete_array,
+            1,
+            &incomplete_node,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut incomplete_source = Vec::new();
-        append_length_delimited_field(&mut incomplete_source, 1, &incomplete_array)?;
+        append_length_delimited_field(
+            &mut incomplete_source,
+            1,
+            &incomplete_array,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut budget = ProjectionBudget::new(SemanticLimits::default());
         assert!(FormulaArchiveBytes::from_wire(&incomplete_source, &mut budget).is_err());
 
         // The same malformed category UUID must be rejected through more
         // than one thunk/ASTNodeArray edge, not only at the root node path.
         let mut bad_uuid = Vec::new();
-        append_length_delimited_field(&mut bad_uuid, 1, &[])?;
+        append_length_delimited_field(
+            &mut bad_uuid,
+            1,
+            &[],
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut bad_uuid_list = Vec::new();
-        append_length_delimited_field(&mut bad_uuid_list, 1, &bad_uuid)?;
+        append_length_delimited_field(
+            &mut bad_uuid_list,
+            1,
+            &bad_uuid,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut bad_category_ref = Vec::new();
-        append_length_delimited_field(&mut bad_category_ref, 1, &bad_uuid_list)?;
-        append_length_delimited_field(&mut bad_category_ref, 2, &uuid)?;
+        append_length_delimited_field(
+            &mut bad_category_ref,
+            1,
+            &bad_uuid_list,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
+        append_length_delimited_field(
+            &mut bad_category_ref,
+            2,
+            &uuid,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         append_varint_field(&mut bad_category_ref, 3, 1)?;
         append_varint_field(&mut bad_category_ref, 4, 0)?;
         let mut bad_category_wrapper = Vec::new();
-        append_length_delimited_field(&mut bad_category_wrapper, 1, &bad_category_ref)?;
+        append_length_delimited_field(
+            &mut bad_category_wrapper,
+            1,
+            &bad_category_ref,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut leaf = Vec::new();
         append_varint_field(&mut leaf, 1, 66)?;
-        append_length_delimited_field(&mut leaf, 39, &bad_category_wrapper)?;
+        append_length_delimited_field(
+            &mut leaf,
+            39,
+            &bad_category_wrapper,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut deep_array = Vec::new();
-        append_length_delimited_field(&mut deep_array, 1, &leaf)?;
+        append_length_delimited_field(
+            &mut deep_array,
+            1,
+            &leaf,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         for _ in 0..3 {
             let mut thunk = Vec::new();
             append_varint_field(&mut thunk, 1, 26)?;
-            append_length_delimited_field(&mut thunk, 14, &deep_array)?;
+            append_length_delimited_field(
+                &mut thunk,
+                14,
+                &deep_array,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
             deep_array.clear();
-            append_length_delimited_field(&mut deep_array, 1, &thunk)?;
+            append_length_delimited_field(
+                &mut deep_array,
+                1,
+                &thunk,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         }
         let mut deep_source = Vec::new();
-        append_length_delimited_field(&mut deep_source, 1, &deep_array)?;
+        append_length_delimited_field(
+            &mut deep_source,
+            1,
+            &deep_array,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut budget = ProjectionBudget::new(SemanticLimits::default());
         assert!(FormulaArchiveBytes::from_wire(&deep_source, &mut budget).is_err());
         Ok(())
@@ -10098,40 +10458,100 @@ mod tests {
     fn raw_formula_archive_requires_preserve_flags_required_fields() -> super::Result<()> {
         let uuid = tsp::Uuid { lower: 1, upper: 2 }.encode_to_vec();
         let mut category_ref = Vec::new();
-        append_length_delimited_field(&mut category_ref, 1, &uuid)?;
-        append_length_delimited_field(&mut category_ref, 2, &uuid)?;
+        append_length_delimited_field(
+            &mut category_ref,
+            1,
+            &uuid,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
+        append_length_delimited_field(
+            &mut category_ref,
+            2,
+            &uuid,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         append_varint_field(&mut category_ref, 3, 1)?;
         append_varint_field(&mut category_ref, 4, 0)?;
 
         let mut missing_flags = Vec::new();
         append_varint_field(&mut missing_flags, 1, 1)?;
         let mut malformed_category_ref = category_ref.clone();
-        append_length_delimited_field(&mut malformed_category_ref, 7, &missing_flags)?;
+        append_length_delimited_field(
+            &mut malformed_category_ref,
+            7,
+            &missing_flags,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut malformed_category_wrapper = Vec::new();
-        append_length_delimited_field(&mut malformed_category_wrapper, 1, &malformed_category_ref)?;
+        append_length_delimited_field(
+            &mut malformed_category_wrapper,
+            1,
+            &malformed_category_ref,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut malformed_node = Vec::new();
         append_varint_field(&mut malformed_node, 1, 66)?;
-        append_length_delimited_field(&mut malformed_node, 39, &malformed_category_wrapper)?;
+        append_length_delimited_field(
+            &mut malformed_node,
+            39,
+            &malformed_category_wrapper,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut malformed_array = Vec::new();
-        append_length_delimited_field(&mut malformed_array, 1, &malformed_node)?;
+        append_length_delimited_field(
+            &mut malformed_array,
+            1,
+            &malformed_node,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut malformed_source = Vec::new();
-        append_length_delimited_field(&mut malformed_source, 1, &malformed_array)?;
+        append_length_delimited_field(
+            &mut malformed_source,
+            1,
+            &malformed_array,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut budget = ProjectionBudget::new(SemanticLimits::default());
         assert!(FormulaArchiveBytes::from_wire(&malformed_source, &mut budget).is_err());
 
         let mut complete_flags = missing_flags;
         append_varint_field(&mut complete_flags, 2, 0)?;
         let mut valid_category_ref = category_ref;
-        append_length_delimited_field(&mut valid_category_ref, 7, &complete_flags)?;
+        append_length_delimited_field(
+            &mut valid_category_ref,
+            7,
+            &complete_flags,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut valid_category_wrapper = Vec::new();
-        append_length_delimited_field(&mut valid_category_wrapper, 1, &valid_category_ref)?;
+        append_length_delimited_field(
+            &mut valid_category_wrapper,
+            1,
+            &valid_category_ref,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut valid_node = Vec::new();
         append_varint_field(&mut valid_node, 1, 66)?;
-        append_length_delimited_field(&mut valid_node, 39, &valid_category_wrapper)?;
+        append_length_delimited_field(
+            &mut valid_node,
+            39,
+            &valid_category_wrapper,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut valid_array = Vec::new();
-        append_length_delimited_field(&mut valid_array, 1, &valid_node)?;
+        append_length_delimited_field(
+            &mut valid_array,
+            1,
+            &valid_node,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut valid_source = Vec::new();
-        append_length_delimited_field(&mut valid_source, 1, &valid_array)?;
+        append_length_delimited_field(
+            &mut valid_source,
+            1,
+            &valid_array,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut budget = ProjectionBudget::new(SemanticLimits::default());
         assert!(FormulaArchiveBytes::from_wire(&valid_source, &mut budget).is_ok());
         Ok(())
@@ -10146,11 +10566,26 @@ mod tests {
         append_varint_field(&mut sticky, 4, 0)?;
         let mut node = Vec::new();
         append_varint_field(&mut node, 1, 17)?;
-        append_length_delimited_field(&mut node, 33, &sticky)?;
+        append_length_delimited_field(
+            &mut node,
+            33,
+            &sticky,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut array = Vec::new();
-        append_length_delimited_field(&mut array, 1, &node)?;
+        append_length_delimited_field(
+            &mut array,
+            1,
+            &node,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut source = Vec::new();
-        append_length_delimited_field(&mut source, 1, &array)?;
+        append_length_delimited_field(
+            &mut source,
+            1,
+            &array,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut budget = ProjectionBudget::new(SemanticLimits::default());
         assert!(FormulaArchiveBytes::from_wire(&source, &mut budget).is_ok());
 
@@ -10161,11 +10596,26 @@ mod tests {
         append_varint_field(&mut bad_bool, 4, 0)?;
         let mut bad_node = Vec::new();
         append_varint_field(&mut bad_node, 1, 17)?;
-        append_length_delimited_field(&mut bad_node, 33, &bad_bool)?;
+        append_length_delimited_field(
+            &mut bad_node,
+            33,
+            &bad_bool,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut bad_array = Vec::new();
-        append_length_delimited_field(&mut bad_array, 1, &bad_node)?;
+        append_length_delimited_field(
+            &mut bad_array,
+            1,
+            &bad_node,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut bad_source = Vec::new();
-        append_length_delimited_field(&mut bad_source, 1, &bad_array)?;
+        append_length_delimited_field(
+            &mut bad_source,
+            1,
+            &bad_array,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut budget = ProjectionBudget::new(SemanticLimits::default());
         assert!(FormulaArchiveBytes::from_wire(&bad_source, &mut budget).is_err());
 
@@ -10175,11 +10625,26 @@ mod tests {
         append_varint_field(&mut coordinate, 1, u64::from(u32::MAX) + 1)?;
         let mut coordinate_node = Vec::new();
         append_varint_field(&mut coordinate_node, 1, 36)?;
-        append_length_delimited_field(&mut coordinate_node, 26, &coordinate)?;
+        append_length_delimited_field(
+            &mut coordinate_node,
+            26,
+            &coordinate,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut coordinate_array = Vec::new();
-        append_length_delimited_field(&mut coordinate_array, 1, &coordinate_node)?;
+        append_length_delimited_field(
+            &mut coordinate_array,
+            1,
+            &coordinate_node,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut coordinate_source = Vec::new();
-        append_length_delimited_field(&mut coordinate_source, 1, &coordinate_array)?;
+        append_length_delimited_field(
+            &mut coordinate_source,
+            1,
+            &coordinate_array,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut budget = ProjectionBudget::new(SemanticLimits::default());
         assert!(FormulaArchiveBytes::from_wire(&coordinate_source, &mut budget).is_err());
         Ok(())
@@ -10192,9 +10657,19 @@ mod tests {
         // ASTNode.type = 17, encoded with an overlong scalar value.
         node.extend_from_slice(&[0x08, 0x91, 0x00]);
         let mut node_array = Vec::new();
-        append_length_delimited_field(&mut node_array, 1, &node)?;
+        append_length_delimited_field(
+            &mut node_array,
+            1,
+            &node,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut known_bad = Vec::new();
-        append_length_delimited_field(&mut known_bad, 1, &node_array)?;
+        append_length_delimited_field(
+            &mut known_bad,
+            1,
+            &node_array,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut budget = ProjectionBudget::new(SemanticLimits::default());
         assert!(FormulaArchiveBytes::from_wire(&known_bad, &mut budget).is_err());
 
@@ -10205,8 +10680,18 @@ mod tests {
         let mut node = Vec::new();
         append_varint_field(&mut node, 1, 17)?;
         let mut node_array = Vec::new();
-        append_length_delimited_field(&mut node_array, 1, &node)?;
-        append_length_delimited_field(&mut opaque, 1, &node_array)?;
+        append_length_delimited_field(
+            &mut node_array,
+            1,
+            &node,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
+        append_length_delimited_field(
+            &mut opaque,
+            1,
+            &node_array,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         opaque.extend_from_slice(&[0xd0, 0x05, 0x80, 0x00]);
         let mut budget = ProjectionBudget::new(SemanticLimits::default());
         assert!(FormulaArchiveBytes::from_wire(&opaque, &mut budget).is_ok());
@@ -10227,7 +10712,7 @@ mod tests {
         assert!(matches!(
             error,
             Error::SemanticLimit {
-                kind: SemanticLimitKind::FormulaWireBytes,
+                kind: SemanticLimitKind::FormulaCategoryBytes,
                 observed,
                 maximum,
                 ..
@@ -10300,7 +10785,7 @@ mod tests {
             )?,
         ])?;
         let components = Components::from_bytes(&bytes, Limits::default())?;
-        let index = Index::from_components(&components, SemanticLimits::MAX_OBJECTS)?;
+        let index = Index::from_components(&components, crate::MAX_OBJECTS)?;
         let extractor = TableDataExtractor::new(&components, &index, SemanticLimits::default());
         let model = tst::TableModelArchive {
             table_name: "wire".to_owned(),
@@ -10328,7 +10813,7 @@ mod tests {
         assert!(matches!(
             error,
             Error::SemanticLimit {
-                kind: SemanticLimitKind::FormulaWireBytes,
+                kind: SemanticLimitKind::FormulaCategoryBytes,
                 observed: 2,
                 maximum: 0,
                 path: SemanticPath::StructuredTables,
@@ -10496,7 +10981,7 @@ mod tests {
             )?,
         ])?;
         let components = Components::from_bytes(&bytes, Limits::default())?;
-        let index = Index::from_components(&components, SemanticLimits::MAX_OBJECTS)?;
+        let index = Index::from_components(&components, crate::MAX_OBJECTS)?;
         let extractor = TableDataExtractor::new(&components, &index, SemanticLimits::default())
             .without_comments();
 
@@ -10543,9 +11028,15 @@ mod tests {
     #[test]
     fn rejected_attempt_rolls_back_retained_values_but_not_formula_work() -> super::Result<()> {
         let limits = SemanticLimits::default()
-            .with_projection_limits(3, 5)
+            .to_builder()
+            .max_materialized_cells(3)
+            .and_then(|b| b.max_output_text_bytes(5))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?
-            .with_formula_render_limits(2, 1)
+            .to_builder()
+            .max_formula_render_work(2)
+            .and_then(|b| b.max_formula_render_depth(1))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let mut published = ProjectionBudget::new(limits);
         published.charge_materialized_cells(1)?;
@@ -10581,7 +11072,12 @@ mod tests {
         let mut deep_wire = Vec::new();
         for _ in 0..=MAX_FORMULA_CATEGORY_DEPTH {
             let mut parent = Vec::new();
-            append_length_delimited_field(&mut parent, 3, &deep_wire)?;
+            append_length_delimited_field(
+                &mut parent,
+                3,
+                &deep_wire,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
             deep_wire = parent;
         }
         let mut depth_names = HashMap::new();
@@ -10589,7 +11085,7 @@ mod tests {
             crate::MAX_REFERENCES,
             MAX_FORMULA_WORK,
             MAX_FORMULA_WIRE_BYTES,
-            DEFAULT_MAX_TEXT_BYTES,
+            MAX_TEXT_BYTES,
         );
         let depth_result =
             collect_formula_category_payload(&deep_wire, &mut depth_names, &mut depth_budget);
@@ -10624,7 +11120,7 @@ mod tests {
             1,
             MAX_FORMULA_WORK,
             MAX_FORMULA_WIRE_BYTES,
-            DEFAULT_MAX_TEXT_BYTES,
+            MAX_TEXT_BYTES,
         );
         assert!(matches!(
             collect_formula_category_payload(
@@ -10649,7 +11145,7 @@ mod tests {
             1,
             MAX_FORMULA_WORK,
             MAX_FORMULA_WIRE_BYTES,
-            DEFAULT_MAX_TEXT_BYTES,
+            MAX_TEXT_BYTES,
         );
         collect_formula_category_payload(
             &empty_fanout.encode_to_vec(),
@@ -10667,7 +11163,7 @@ mod tests {
             crate::MAX_REFERENCES,
             MAX_FORMULA_WORK,
             MAX_FORMULA_WIRE_BYTES,
-            DEFAULT_MAX_TEXT_BYTES,
+            MAX_TEXT_BYTES,
         );
         full_work_budget.work_items = MAX_FORMULA_WORK - 1;
         assert!(matches!(
@@ -10686,15 +11182,25 @@ mod tests {
 
         let boolean_wrapper = [0x08, 0x01];
         let mut cell_value = Vec::new();
-        append_length_delimited_field(&mut cell_value, 2, &boolean_wrapper)?;
+        append_length_delimited_field(
+            &mut cell_value,
+            2,
+            &boolean_wrapper,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut nested_projection = Vec::new();
-        append_length_delimited_field(&mut nested_projection, 7, &cell_value)?;
+        append_length_delimited_field(
+            &mut nested_projection,
+            7,
+            &cell_value,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut nested_names = HashMap::new();
         let mut nested_work_budget = FormulaReferenceBudget::new(
             crate::MAX_REFERENCES,
             MAX_FORMULA_WORK,
             MAX_FORMULA_WIRE_BYTES,
-            DEFAULT_MAX_TEXT_BYTES,
+            MAX_TEXT_BYTES,
         );
         nested_work_budget.work_items = MAX_FORMULA_WORK - 5;
         assert!(matches!(
@@ -10712,18 +11218,33 @@ mod tests {
         ));
 
         let mut string_wrapper = Vec::new();
-        append_length_delimited_field(&mut string_wrapper, 1, b"valid")?;
+        append_length_delimited_field(
+            &mut string_wrapper,
+            1,
+            b"valid",
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut malformed_cell = Vec::new();
-        append_length_delimited_field(&mut malformed_cell, 5, &string_wrapper)?;
+        append_length_delimited_field(
+            &mut malformed_cell,
+            5,
+            &string_wrapper,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         malformed_cell.extend_from_slice(&[0x20, 0x01]);
         let mut malformed_projection = Vec::new();
-        append_length_delimited_field(&mut malformed_projection, 7, &malformed_cell)?;
+        append_length_delimited_field(
+            &mut malformed_projection,
+            7,
+            &malformed_cell,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut malformed_names = HashMap::new();
         let mut malformed_budget = FormulaReferenceBudget::new(
             crate::MAX_REFERENCES,
             MAX_FORMULA_WORK,
             MAX_FORMULA_WIRE_BYTES,
-            DEFAULT_MAX_TEXT_BYTES,
+            MAX_TEXT_BYTES,
         );
         collect_formula_category_payload(
             &malformed_projection,
@@ -10756,7 +11277,7 @@ mod tests {
             1,
             MAX_FORMULA_WORK,
             MAX_FORMULA_WIRE_BYTES,
-            DEFAULT_MAX_TEXT_BYTES,
+            MAX_TEXT_BYTES,
         );
         collect_formula_category_payload(
             &duplicate.encode_to_vec(),
@@ -10794,7 +11315,7 @@ mod tests {
             crate::MAX_REFERENCES,
             1,
             MAX_FORMULA_WIRE_BYTES,
-            DEFAULT_MAX_TEXT_BYTES,
+            MAX_TEXT_BYTES,
         );
         collect_formula_category_payload(&[], &mut names, &mut exact_budget)
             .expect("the exact formula-work boundary must be admitted");
@@ -10823,14 +11344,19 @@ mod tests {
         // source wire charge. Its attempted projection work must still
         // consume the candidate budget, but no map entry or label is visible.
         let mut one_group = Vec::new();
-        append_length_delimited_field(&mut one_group, 3, &[])
-            .expect("test category wire must encode");
+        append_length_delimited_field(
+            &mut one_group,
+            3,
+            &[],
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
+        .expect("test category wire must encode");
         let mut names = HashMap::new();
         let mut rejected_budget = FormulaReferenceBudget::new(
             crate::MAX_REFERENCES,
             4,
             MAX_FORMULA_WIRE_BYTES,
-            DEFAULT_MAX_TEXT_BYTES,
+            MAX_TEXT_BYTES,
         );
         let error = collect_formula_category_payload(&one_group, &mut names, &mut rejected_budget)
             .expect_err("the category preflight must cross its exact work boundary");
@@ -10856,8 +11382,13 @@ mod tests {
             let mut source = Vec::new();
             for _ in 0..depth {
                 let mut parent = Vec::new();
-                append_length_delimited_field(&mut parent, 3, &source)
-                    .expect("test category wire must encode");
+                append_length_delimited_field(
+                    &mut parent,
+                    3,
+                    &source,
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )
+                .expect("test category wire must encode");
                 source = parent;
             }
             source
@@ -10868,7 +11399,7 @@ mod tests {
             crate::MAX_REFERENCES,
             MAX_FORMULA_WORK,
             MAX_FORMULA_WIRE_BYTES,
-            DEFAULT_MAX_TEXT_BYTES,
+            MAX_TEXT_BYTES,
         );
         let expected_nodes = preflight_formula_category_payload(&exact_source, &mut exact_budget)
             .expect("the exact category-depth boundary must be admitted");
@@ -10885,7 +11416,7 @@ mod tests {
             crate::MAX_REFERENCES,
             MAX_FORMULA_WORK,
             MAX_FORMULA_WIRE_BYTES,
-            DEFAULT_MAX_TEXT_BYTES,
+            MAX_TEXT_BYTES,
         );
         let error =
             collect_formula_category_payload(&over_source, &mut over_names, &mut over_budget)
@@ -10916,14 +11447,14 @@ mod tests {
             crate::MAX_REFERENCES,
             MAX_FORMULA_WORK,
             MAX_FORMULA_WIRE_BYTES,
-            DEFAULT_MAX_TEXT_BYTES,
+            MAX_TEXT_BYTES,
         );
         budget.wire_bytes = MAX_FORMULA_WIRE_BYTES;
 
         assert!(matches!(
             collect_formula_category_payload(&[0x08], &mut names, &mut budget),
             Err(Error::SemanticLimit {
-                kind: SemanticLimitKind::FormulaWireBytes,
+                kind: SemanticLimitKind::FormulaCategoryBytes,
                 observed,
                 maximum: MAX_FORMULA_WIRE_BYTES,
                 path: SemanticPath::StructuredTables,
@@ -11032,9 +11563,9 @@ mod tests {
         assert!(!expected.is_empty());
 
         let mut text_budget = ProjectionBudget::new(SemanticLimits::default());
-        text_budget.staging_text_bytes = DEFAULT_MAX_TEXT_BYTES - text;
+        text_budget.staging_text_bytes = MAX_TEXT_BYTES - text;
         assert_eq!(render(&mut text_budget)?, expected);
-        assert_eq!(text_budget.staging_text_bytes, DEFAULT_MAX_TEXT_BYTES);
+        assert_eq!(text_budget.staging_text_bytes, MAX_TEXT_BYTES);
         let text_before_refusal = text_budget;
         let text_error = render(&mut text_budget).expect_err("text residual must fail");
         assert!(matches!(

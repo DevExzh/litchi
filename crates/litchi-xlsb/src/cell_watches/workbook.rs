@@ -1,9 +1,7 @@
 //! Workbook/package traversal for worksheet cell-watch snapshots.
 
-use super::worksheet::{self, Commit, Snapshot};
-use crate::external_link::ExternalLinkLimits;
+use super::worksheet::{self, Snapshot};
 use crate::package::error::{Error, Result};
-use crate::workbook::DrawingLoadPolicy;
 use litchi_opc::{OpcPackage, PackURI, Part};
 
 const WORKSHEET_CONTENT_TYPE: &str = "application/vnd.ms-excel.worksheet";
@@ -18,14 +16,18 @@ pub struct Sheet {
 }
 
 /// Read one worksheet's cell-watch and phonetic owner.
-pub fn read(package: &OpcPackage, worksheet: &PackURI) -> Result<Snapshot> {
+pub fn read(
+    package: &OpcPackage,
+    worksheet: &PackURI,
+    limits: crate::raw::Limits,
+) -> Result<Snapshot> {
     let part = package.get_part(worksheet)?;
     require_worksheet(part)?;
-    worksheet::read(part.blob())
+    worksheet::read(part.blob(), limits)
 }
 
 /// Read every worksheet in deterministic part-name order.
-pub fn load(package: &OpcPackage) -> Result<Vec<Sheet>> {
+pub fn load(package: &OpcPackage, limits: crate::raw::Limits) -> Result<Vec<Sheet>> {
     let mut parts: Vec<PackURI> = package
         .iter_parts()
         .filter(|part| part.content_type() == WORKSHEET_CONTENT_TYPE)
@@ -35,7 +37,7 @@ pub fn load(package: &OpcPackage) -> Result<Vec<Sheet>> {
     parts
         .into_iter()
         .map(|part_name| {
-            let snapshot = read(package, &part_name)?;
+            let snapshot = read(package, &part_name, limits)?;
             Ok(Sheet {
                 part_name: part_name.to_string(),
                 snapshot,
@@ -44,112 +46,12 @@ pub fn load(package: &OpcPackage) -> Result<Vec<Sheet>> {
         .collect()
 }
 
-/// Atomically apply a source-checked worksheet commit to an OPC package.
-///
-/// The candidate package is cloned and reparsed through the XLSB workbook
-/// owner before publication. A failed parse or source guard leaves the input
-/// package unchanged.
-pub fn apply(package: &mut OpcPackage, worksheet: &PackURI, commit: &Commit) -> Result<Snapshot> {
-    apply_with_external_link_limits(package, worksheet, commit, ExternalLinkLimits::default())
-}
-
-/// Apply a cell-watch commit while validating candidate workbook reparses
-/// with an explicit external-link policy.
-pub fn apply_with_external_link_limits(
-    package: &mut OpcPackage,
-    worksheet: &PackURI,
-    commit: &Commit,
-    external_link_limits: ExternalLinkLimits,
-) -> Result<Snapshot> {
-    apply_with_external_link_limits_and_drawing_policy(
-        package,
-        worksheet,
-        commit,
-        external_link_limits,
-        DrawingLoadPolicy::Eager,
-    )
-}
-
-/// Apply a cell-watch commit while retaining the workbook's drawing
-/// projection boundary.
-pub(crate) fn apply_with_external_link_limits_and_drawing_policy(
-    package: &mut OpcPackage,
-    worksheet: &PackURI,
-    commit: &Commit,
-    external_link_limits: ExternalLinkLimits,
-    drawing_load_policy: DrawingLoadPolicy,
-) -> Result<Snapshot> {
-    let applied = apply_retaining_parse(
-        package,
-        worksheet,
-        commit,
-        external_link_limits,
-        drawing_load_policy,
-    )?;
-    match applied {
-        Applied::Unchanged(snapshot) => Ok(snapshot),
-        Applied::Published { snapshot, workbook } => {
-            *package = workbook.into_opc_package();
-            Ok(snapshot)
-        },
-    }
-}
-
-/// The outcome of one validated cell-watch publication.
-///
-/// The parsed workbook is returned to callers that already own a typed
-/// workbook, so publishing does not parse the same candidate twice.
-pub(crate) enum Applied {
-    /// The patch reproduced the stored worksheet bytes exactly.
-    Unchanged(Snapshot),
-    /// The changed candidate passed complete workbook validation.
-    Published {
-        /// Snapshot read from the validated worksheet bytes.
-        snapshot: Snapshot,
-        /// Workbook parse that validated the candidate package.
-        workbook: Box<crate::Workbook>,
-    },
-}
-
-/// Apply a cell-watch commit and retain the complete workbook parse used for
-/// candidate validation, parsed under the caller's drawing policy.
-pub(crate) fn apply_retaining_parse(
-    package: &OpcPackage,
-    worksheet: &PackURI,
-    commit: &Commit,
-    external_link_limits: ExternalLinkLimits,
-    drawing_load_policy: DrawingLoadPolicy,
-) -> Result<Applied> {
-    let part = package.get_part(worksheet)?;
-    require_worksheet(part)?;
-    let updated = commit.patch().apply(part.blob())?;
-    if updated.as_slice() == part.blob() {
-        return Ok(Applied::Unchanged(commit.snapshot().clone()));
-    }
-
-    let snapshot = worksheet::read(&updated)?;
-    let mut candidate = package.clone();
-    crate::worksheet_index::maintain(&mut candidate, worksheet, part.blob(), &updated)?;
-    candidate.get_part_mut(worksheet)?.set_blob(updated);
-    candidate.unsign();
-    let workbook = crate::Workbook::reparse_candidate_with_policy(
-        candidate,
-        external_link_limits,
-        drawing_load_policy,
-    )?;
-    Ok(Applied::Published {
-        snapshot,
-        workbook: Box::new(workbook),
-    })
-}
-
 fn require_worksheet(part: &dyn Part) -> Result<()> {
     if part.content_type() == WORKSHEET_CONTENT_TYPE {
         Ok(())
     } else {
         Err(Error::InvalidContentType {
-            expected: WORKSHEET_CONTENT_TYPE.to_string(),
-            got: part.content_type().to_string(),
+            expected: WORKSHEET_CONTENT_TYPE,
         })
     }
 }

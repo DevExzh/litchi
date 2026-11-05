@@ -24,19 +24,33 @@ pub struct Limits {
 
 impl Limits {
     fn add(&mut self, bytes: usize) -> Result<()> {
-        self.annotation_count = self
-            .annotation_count
-            .checked_add(1)
-            .ok_or_else(|| limit("InkML annotation count", MAX_ANNOTATIONS))?;
+        self.annotation_count = self.annotation_count.checked_add(1).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::Annotations,
+                usize::MAX,
+                MAX_ANNOTATIONS,
+            )
+        })?;
         if self.annotation_count > MAX_ANNOTATIONS {
-            return Err(limit("InkML annotation count", MAX_ANNOTATIONS));
+            return Err(limit(
+                crate::error::CodecLimitKind::Annotations,
+                self.annotation_count,
+                MAX_ANNOTATIONS,
+            ));
         }
-        self.total_bytes = self
-            .total_bytes
-            .checked_add(bytes)
-            .ok_or_else(|| limit("total InkML bytes", MAX_TOTAL_INK_BYTES))?;
+        self.total_bytes = self.total_bytes.checked_add(bytes).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                usize::MAX,
+                MAX_TOTAL_INK_BYTES,
+            )
+        })?;
         if self.total_bytes > MAX_TOTAL_INK_BYTES {
-            return Err(limit("total InkML bytes", MAX_TOTAL_INK_BYTES));
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                self.total_bytes,
+                MAX_TOTAL_INK_BYTES,
+            ));
         }
         Ok(())
     }
@@ -93,13 +107,17 @@ pub fn load_slide(
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
-pub fn store_slide(
+pub(crate) fn store_slide(
     package: &mut OpcPackage,
     slide_name: &PackURI,
     inkml: &[u8],
 ) -> Result<StoredAnnotation> {
     if inkml.len() > MAX_INK_BYTES {
-        return Err(limit("InkML part bytes", MAX_INK_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::PartBytes,
+            inkml.len(),
+            MAX_INK_BYTES,
+        ));
     }
     inspect(inkml)?;
     let slide = package.get_part(slide_name)?;
@@ -142,7 +160,11 @@ fn allocate_part(package: &OpcPackage) -> Result<PackURI> {
             Err(error) => return Err(error.into()),
         }
     }
-    Err(limit("InkML part namespace", 1_000_000))
+    Err(limit(
+        crate::error::CodecLimitKind::Parts,
+        1_000_000,
+        1_000_000,
+    ))
 }
 
 fn allocate_relationship(slide: &dyn Part) -> Result<String> {
@@ -152,17 +174,25 @@ fn allocate_relationship(slide: &dyn Part) -> Result<String> {
             return Ok(id);
         }
     }
-    Err(limit("InkML relationship namespace", 1_000_000))
+    Err(limit(
+        crate::error::CodecLimitKind::Relationships,
+        1_000_000,
+        1_000_000,
+    ))
 }
 
 fn insert_into_shape_tree(xml: &[u8], fragment: &[u8]) -> Result<Vec<u8>> {
-    if xml
-        .len()
-        .checked_add(fragment.len())
-        .is_none_or(|size| size > super::codec::MAX_SLIDE_BYTES)
-    {
+    let updated_len = xml.len().checked_add(fragment.len()).ok_or_else(|| {
+        limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            usize::MAX,
+            super::codec::MAX_SLIDE_BYTES,
+        )
+    })?;
+    if updated_len > super::codec::MAX_SLIDE_BYTES {
         return Err(limit(
-            "updated slide XML bytes",
+            crate::error::CodecLimitKind::XmlBytes,
+            updated_len,
             super::codec::MAX_SLIDE_BYTES,
         ));
     }
@@ -183,11 +213,19 @@ fn insert_into_shape_tree(xml: &[u8], fragment: &[u8]) -> Result<Vec<u8>> {
         match event {
             Event::Start(element) => {
                 increment_nodes(&mut nodes)?;
-                depth = depth
-                    .checked_add(1)
-                    .ok_or_else(|| limit("InkML slide depth", MAX_XML_DEPTH))?;
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        MAX_XML_DEPTH,
+                    )
+                })?;
                 if depth > MAX_XML_DEPTH {
-                    return Err(limit("InkML slide depth", MAX_XML_DEPTH));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        MAX_XML_DEPTH,
+                    ));
                 }
                 if depth == 1 {
                     crate::presentation::embedded::validate_root(

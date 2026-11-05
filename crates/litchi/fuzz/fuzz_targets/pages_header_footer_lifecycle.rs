@@ -4,8 +4,10 @@ use std::{fmt::Debug, fmt::Display, hint::black_box, sync::OnceLock};
 
 use libfuzzer_sys::fuzz_target;
 use litchi::pages::{
-    HeaderFooterSelector, HeaderFooterTextError, Kind, Limits, Package, SectionSelector, Template,
+    HeaderFooterSelector, Kind, Package, SectionSelector, Template,
+    header_footer::text::Error as HeaderFooterTextError,
 };
+use litchi_iwa_archive::Limits;
 
 const MAX_INPUT_BYTES: u64 = 256 * 1024;
 const OVERSIZED_INPUT_BYTES: usize = 256 * 1024 + 1;
@@ -17,7 +19,10 @@ const PRIVATE_SECTION: &str = "__litchi_private_header_footer_section_78__";
 const NATIVE_PAGES: &[u8] = include_bytes!("../../../../test-data/iwork/pages/basic.pages");
 
 fuzz_target!(|data: &[u8]| {
-    match Package::from_bytes_with_limits(data, fuzz_limits()) {
+    match Package::from_bytes_with_options(
+        data,
+        litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()),
+    ) {
         Ok(package) => exercise_package(&package, data),
         Err(error) => observe_error(error),
     }
@@ -48,8 +53,11 @@ fn fuzz_limits() -> Limits {
 fn native_package() -> &'static Package {
     static PACKAGE: OnceLock<Package> = OnceLock::new();
     PACKAGE.get_or_init(|| {
-        Package::from_bytes_with_limits(NATIVE_PAGES, fuzz_limits())
-            .unwrap_or_else(|error| panic!("native Pages header/footer seed must open: {error}"))
+        Package::from_bytes_with_options(
+            NATIVE_PAGES,
+            litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()),
+        )
+        .unwrap_or_else(|error| panic!("native Pages header/footer seed must open: {error}"))
     })
 }
 
@@ -109,7 +117,14 @@ fn exercise_package(package: &Package, data: &[u8]) {
         assert_source_unchanged(package, &source);
         return;
     }
-    let expected = edit.text().to_owned();
+    let expected = match edit.text() {
+        Ok(text) => text.to_owned(),
+        Err(error) => {
+            observe_error(error);
+            assert_source_unchanged(package, &source);
+            return;
+        },
+    };
     let commit = match edit.commit() {
         Ok(commit) => commit,
         Err(error) => {
@@ -194,10 +209,10 @@ fn exercise_aliases(
 }
 
 fn replace_middle(
-    edit: &mut litchi::pages::HeaderFooterTextEdit<'_>,
+    edit: &mut litchi::pages::header_footer::text::Edit<'_>,
     replacement: &str,
 ) -> Result<(), HeaderFooterTextError> {
-    let units = edit.text().encode_utf16().count();
+    let units = edit.text()?.encode_utf16().count();
     let end = units.min(usize::from(
         replacement.as_bytes().first().copied().unwrap_or(0),
     ));
@@ -226,7 +241,10 @@ fn exercise_redacted_selectors(package: &Package) {
 
 fn exercise_input_limit() {
     let oversized = vec![0_u8; OVERSIZED_INPUT_BYTES];
-    match Package::from_bytes_with_limits(&oversized, fuzz_limits()) {
+    match Package::from_bytes_with_options(
+        &oversized,
+        litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()),
+    ) {
         Ok(_) => panic!("oversized Pages header/footer input was accepted"),
         Err(error) => observe_error(error),
     }

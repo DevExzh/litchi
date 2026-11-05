@@ -11,7 +11,7 @@ impl MutableDocument {
     /// The model preserves only the ordered `text:master-page-name` values of
     /// the document's `text:page-sequence` (ODF 1.3 §5.3); litchi does not
     /// paginate or resolve the referenced master pages.
-    pub fn page_sequence(&self) -> Result<Option<Sequence>> {
+    pub(crate) fn page_sequence(&self) -> Result<Option<Sequence>> {
         self.with_content_xml(parse_page_sequence)
     }
 
@@ -21,22 +21,25 @@ impl MutableDocument {
     /// the element order of ODF 1.3 §5.1. Passing `None` removes an existing
     /// sequence and is a no-op when none exists. Master-page names are stored
     /// lexically and never resolved against `styles.xml`.
-    pub fn set_page_sequence(&mut self, sequence: Option<&Sequence>) -> Result<()> {
+    pub(crate) fn set_page_sequence(&mut self, sequence: Option<&Sequence>) -> Result<()> {
         let updated = self.with_content_xml(|xml| set_page_sequence_xml(xml, sequence))?;
         self.content_xml = Some(updated);
         Ok(())
     }
 
     /// Return validated variable, user-field, sequence, and DDE declarations.
-    pub fn variable_declarations(&self) -> Result<Declarations> {
+    pub(crate) fn variable_declarations(&self) -> Result<Declarations> {
         self.with_content_xml(|content| {
             if let Some(styles) = self.styles_xml.as_deref() {
-                crate::variable_declaration::parse_parts(&[
-                    (content, Part::Content),
-                    (styles, Part::Styles),
-                ])
+                crate::variable_declaration::parse_parts_with_xml_limits(
+                    &[(content, Part::Content), (styles, Part::Styles)],
+                    self.xml_limits,
+                )
             } else {
-                crate::variable_declaration::parse_parts(&[(content, Part::Content)])
+                crate::variable_declaration::parse_parts_with_xml_limits(
+                    &[(content, Part::Content)],
+                    self.xml_limits,
+                )
             }
         })
     }
@@ -45,7 +48,10 @@ impl MutableDocument {
     ///
     /// Content and styles are reparsed together before commit, preserving all
     /// cross-part declaration and field-reference invariants.
-    pub fn set_variable_declaration_group(&mut self, group: &Group) -> Result<Option<Group>> {
+    pub(crate) fn set_variable_declaration_group(
+        &mut self,
+        group: &Group,
+    ) -> Result<Option<Group>> {
         let current = self.variable_declarations()?;
         let old = current
             .groups
@@ -58,15 +64,23 @@ impl MutableDocument {
             .cloned();
         match group.part {
             Part::Content => {
-                let updated =
-                    self.with_content_xml(|xml| crate::variable_declaration::set_xml(xml, group))?;
+                let updated = self.with_content_xml(|xml| {
+                    crate::variable_declaration::set_xml_with_xml_limits(
+                        xml,
+                        group,
+                        self.xml_limits,
+                    )
+                })?;
                 if let Some(styles) = self.styles_xml.as_deref() {
-                    crate::variable_declaration::parse_parts(&[
-                        (&updated, Part::Content),
-                        (styles, Part::Styles),
-                    ])?;
+                    crate::variable_declaration::parse_parts_with_xml_limits(
+                        &[(&updated, Part::Content), (styles, Part::Styles)],
+                        self.xml_limits,
+                    )?;
                 } else {
-                    crate::variable_declaration::parse_parts(&[(&updated, Part::Content)])?;
+                    crate::variable_declaration::parse_parts_with_xml_limits(
+                        &[(&updated, Part::Content)],
+                        self.xml_limits,
+                    )?;
                 }
                 self.content_xml = Some(updated);
             },
@@ -74,12 +88,16 @@ impl MutableDocument {
                 let styles = self.styles_xml.as_deref().ok_or_else(|| {
                     litchi_core::Error::InvalidFormat("styles.xml is absent".to_string())
                 })?;
-                let updated = crate::variable_declaration::set_xml(styles, group)?;
+                let updated = crate::variable_declaration::set_xml_with_xml_limits(
+                    styles,
+                    group,
+                    self.xml_limits,
+                )?;
                 self.with_content_xml(|content| {
-                    crate::variable_declaration::parse_parts(&[
-                        (content, Part::Content),
-                        (&updated, Part::Styles),
-                    ])
+                    crate::variable_declaration::parse_parts_with_xml_limits(
+                        &[(content, Part::Content), (&updated, Part::Styles)],
+                        self.xml_limits,
+                    )
                 })?;
                 self.styles_xml = Some(updated);
             },
@@ -96,7 +114,7 @@ impl MutableDocument {
     ///
     /// Removal fails without mutation when any remaining field references a
     /// declaration from the removed container.
-    pub fn remove_variable_declaration_group(
+    pub(crate) fn remove_variable_declaration_group(
         &mut self,
         part: Part,
         scope: &Scope,
@@ -116,15 +134,23 @@ impl MutableDocument {
         match part {
             Part::Content => {
                 let updated = self.with_content_xml(|xml| {
-                    crate::variable_declaration::remove_xml(xml, scope, kind)
+                    crate::variable_declaration::remove_xml_with_xml_limits(
+                        xml,
+                        scope,
+                        kind,
+                        self.xml_limits,
+                    )
                 })?;
                 if let Some(styles) = self.styles_xml.as_deref() {
-                    crate::variable_declaration::parse_parts(&[
-                        (&updated, Part::Content),
-                        (styles, Part::Styles),
-                    ])?;
+                    crate::variable_declaration::parse_parts_with_xml_limits(
+                        &[(&updated, Part::Content), (styles, Part::Styles)],
+                        self.xml_limits,
+                    )?;
                 } else {
-                    crate::variable_declaration::parse_parts(&[(&updated, Part::Content)])?;
+                    crate::variable_declaration::parse_parts_with_xml_limits(
+                        &[(&updated, Part::Content)],
+                        self.xml_limits,
+                    )?;
                 }
                 self.content_xml = Some(updated);
             },
@@ -132,12 +158,17 @@ impl MutableDocument {
                 let styles = self.styles_xml.as_deref().ok_or_else(|| {
                     litchi_core::Error::InvalidFormat("styles.xml is absent".to_string())
                 })?;
-                let updated = crate::variable_declaration::remove_xml(styles, scope, kind)?;
+                let updated = crate::variable_declaration::remove_xml_with_xml_limits(
+                    styles,
+                    scope,
+                    kind,
+                    self.xml_limits,
+                )?;
                 self.with_content_xml(|content| {
-                    crate::variable_declaration::parse_parts(&[
-                        (content, Part::Content),
-                        (&updated, Part::Styles),
-                    ])
+                    crate::variable_declaration::parse_parts_with_xml_limits(
+                        &[(content, Part::Content), (&updated, Part::Styles)],
+                        self.xml_limits,
+                    )
                 })?;
                 self.styles_xml = Some(updated);
             },
@@ -151,19 +182,23 @@ impl MutableDocument {
     }
 
     /// Return typed nested sections from current authoritative content XML.
-    pub fn sections(&self) -> Result<Vec<crate::Section>> {
+    pub(crate) fn sections(&self) -> Result<Vec<crate::Section>> {
         self.with_content_xml(crate::parser::Parser::parse_sections)
     }
 
     /// Append a complete typed section without rewriting existing body content.
-    pub fn add_section(&mut self, section: &crate::Section) -> Result<()> {
+    pub(crate) fn add_section(&mut self, section: &crate::Section) -> Result<()> {
         let updated = self.with_content_xml(|xml| crate::add_section_xml(xml, section))?;
         self.content_xml = Some(updated);
         Ok(())
     }
 
     /// Atomically update section metadata/source while preserving enclosed XML bytes.
-    pub fn update_section(&mut self, name: &str, replacement: &crate::Section) -> Result<()> {
+    pub(crate) fn update_section(
+        &mut self,
+        name: &str,
+        replacement: &crate::Section,
+    ) -> Result<()> {
         let updated =
             self.with_content_xml(|xml| crate::update_section_xml(xml, name, replacement))?;
         self.content_xml = Some(updated);
@@ -171,28 +206,28 @@ impl MutableDocument {
     }
 
     /// Delete a named section together with its enclosed content.
-    pub fn remove_section(&mut self, name: &str) -> Result<()> {
+    pub(crate) fn remove_section(&mut self, name: &str) -> Result<()> {
         let updated = self.with_content_xml(|xml| crate::remove_section_xml(xml, name))?;
         self.content_xml = Some(updated);
         Ok(())
     }
 
     /// Remove one section wrapper/source while retaining all enclosed content bytes.
-    pub fn unwrap_section(&mut self, name: &str) -> Result<()> {
+    pub(crate) fn unwrap_section(&mut self, name: &str) -> Result<()> {
         let updated = self.with_content_xml(|xml| crate::unwrap_section_xml(xml, name))?;
         self.content_xml = Some(updated);
         Ok(())
     }
 
     /// Remove every section wrapper/source while retaining mixed nested content.
-    pub fn clear_sections(&mut self) -> Result<()> {
+    pub(crate) fn clear_sections(&mut self) -> Result<()> {
         let updated = self.with_content_xml(crate::clear_sections_xml)?;
         self.content_xml = Some(updated);
         Ok(())
     }
 
     /// Wrap an inclusive stable block range in a typed section.
-    pub fn wrap_section(
+    pub(crate) fn wrap_section(
         &mut self,
         section: &crate::Section,
         start: crate::Block,

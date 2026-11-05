@@ -2,12 +2,13 @@
 
 use std::error::Error as StdError;
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::{Catalog, EntryEdit};
 use litchi_iwa_common::{decode_varint_from_bytes, wire::WireView};
-use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, SnappyStream};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tp, tsa, tsd, tsp, tst, tswp};
 use litchi_pages::table::dimension::{Dimension, Points, Size};
-use litchi_pages::{BodyTableDimensionError as Error, BodyTableSelector, Limits, Package};
+use litchi_pages::{BodyTableSelector, Package, table::dimension::transaction::Error};
 use prost::Message as _;
 
 const DOCUMENT_MEMBER: &str = "Index/Document.iwa";
@@ -54,8 +55,12 @@ fn reference(identifier: u64) -> tsp::Reference {
     }
 }
 
-fn field_reference(path: impl Into<FieldPath>, identifier: u64) -> FieldInfo {
-    let mut field = FieldInfo::new(path);
+fn field_reference(path: Vec<u32>, identifier: u64) -> FieldInfo {
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(path, litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     field.object_references.push(identifier);
     field
 }
@@ -66,7 +71,11 @@ fn object(
     data: Vec<u8>,
     references: &[u64],
 ) -> TestResult<ArchiveObject> {
-    let mut object = ArchiveObject::new(identifier, vec![RawMessage { type_, data }])?;
+    let mut object = ArchiveObject::new(
+        identifier,
+        vec![RawMessage { type_, data }],
+        Default::default(),
+    )?;
     object.archive_info.message_infos[0]
         .object_references
         .extend_from_slice(references);
@@ -177,7 +186,12 @@ fn bucket_payload(headers: &[(u32, f32)], unknown_header: bool) -> TestResult<Ve
     let mut payload = Vec::new();
     litchi_iwa_common::wire::append_varint_field(&mut payload, 1, 1)?;
     for raw in raw_headers {
-        litchi_iwa_common::wire::append_length_delimited_field(&mut payload, 2, &raw)?;
+        litchi_iwa_common::wire::append_length_delimited_field(
+            &mut payload,
+            2,
+            &raw,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     litchi_iwa_common::wire::append_varint_field(
         &mut payload,
@@ -297,7 +311,8 @@ fn synthetic_package() -> TestResult<Vec<u8>> {
         objects.push(object(identifier, 2_022, vec![0x08, 0x01], &[])?);
     }
     let archive = Archive { objects };
-    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    let component =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     let mut members: Vec<(&str, &[u8])> = vec![
         ("Data/sentinel.bin", b"untouched-sentinel"),
         (DOCUMENT_MEMBER, component.as_slice()),
@@ -314,18 +329,19 @@ fn synthetic_package() -> TestResult<Vec<u8>> {
 }
 
 fn document_archive(package: &[u8]) -> TestResult<Archive> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document member")?;
     Ok(Archive::parse(
-        SnappyStream::decompress(entry.data())?.as_bytes(),
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
     )?)
 }
 
 fn member_bytes(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(catalog
         .iter()
         .find(|entry| entry.name() == name)
@@ -335,24 +351,29 @@ fn member_bytes(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
 }
 
 fn split_row_bucket_component(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let document_entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document member")?;
-    let mut document = Archive::parse(SnappyStream::decompress(document_entry.data())?.as_bytes())?;
+    let mut document = Archive::parse(
+        SnappyStream::decompress(document_entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     let bucket_index = document
         .objects
         .iter()
         .position(|object| object.archive_info.identifier == Some(ROW_BUCKET_IDENTIFIER))
         .ok_or("missing row bucket")?;
     let bucket = document.objects.remove(bucket_index);
-    let document_payload = SnappyStream::compress(&document.to_bytes()?)?;
+    let document_payload =
+        SnappyStream::compress(&document.to_bytes(Default::default())?, Default::default())?;
     let bucket_payload = SnappyStream::compress(
         &Archive {
             objects: vec![bucket],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     let mut entries = Vec::new();
     for entry in catalog.iter() {
@@ -376,7 +397,7 @@ fn split_row_bucket_component(package: &[u8]) -> TestResult<Vec<u8>> {
 
 fn without_previews(package: &[u8]) -> TestResult<Vec<u8>> {
     Ok(
-        Catalog::from_bytes(package)?.reassemble_with_deletions_to_bytes(
+        Catalog::from_bytes(package, Default::default())?.reassemble_with_deletions_to_bytes(
             &[],
             &PREVIEWS,
             Limits::default(),
@@ -401,14 +422,18 @@ fn rewrite_document_archive(
     package: &[u8],
     mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document member")?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     mutate(&mut archive)?;
-    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    let component =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(DOCUMENT_MEMBER, &component)],
         Limits::default(),
@@ -423,13 +448,18 @@ fn append_duplicate_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8
             .iter_mut()
             .find(|message| message.type_ == HEADER_BUCKET_MESSAGE_TYPE)
             .ok_or("missing bucket message")?;
-        let headers = WireView::parse(&message.data)?
+        let headers = WireView::parse(&message.data, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .filter(|field| field.number() == 2)
             .map(|field| field.payload().to_vec())
             .next()
             .ok_or("missing header")?;
-        litchi_iwa_common::wire::append_length_delimited_field(&mut message.data, 2, &headers)?;
+        litchi_iwa_common::wire::append_length_delimited_field(
+            &mut message.data,
+            2,
+            &headers,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         Ok(())
     })
 }
@@ -458,7 +488,7 @@ fn remove_bucket(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
 }
 
 fn sentinel(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(catalog
         .iter()
         .find(|entry| entry.name() == "Data/sentinel.bin")
@@ -540,7 +570,9 @@ fn no_op_is_exact_and_reset_restores_default() -> TestResult {
     );
     assert_eq!(sentinel(&reset_bytes)?, b"untouched-sentinel");
     assert_eq!(
-        Catalog::from_bytes(&reset_bytes)?.iter().count(),
+        Catalog::from_bytes(&reset_bytes, Default::default())?
+            .iter()
+            .count(),
         2,
         "a changed transaction invalidates the three preview members"
     );
@@ -637,7 +669,7 @@ fn unknown_bucket_and_header_fields_survive_size_rewrite() -> TestResult {
         .set(points(31.0)?)
         .commit()?;
     let after = bucket_bytes(&commit.package().exact_bytes(), ROW_BUCKET_IDENTIFIER)?;
-    let bucket_view = WireView::parse(&after)?;
+    let bucket_view = WireView::parse(&after, litchi_iwa_common::WireLimits::DEFAULT)?;
     let bucket_unknown = bucket_view
         .fields()
         .find(|field| field.number() == UNKNOWN_BUCKET_FIELD)
@@ -650,7 +682,7 @@ fn unknown_bucket_and_header_fields_survive_size_rewrite() -> TestResult {
         .fields()
         .find(|field| field.number() == 2)
         .ok_or("header was dropped")?;
-    let header_view = WireView::parse(header.payload())?;
+    let header_view = WireView::parse(header.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
     let header_unknown = header_view
         .fields()
         .find(|field| field.number() == UNKNOWN_HEADER_FIELD)
@@ -683,14 +715,17 @@ fn output_limit_rejects_growth_before_publication() -> TestResult {
         1024 * 1024,
         1024 * 1024,
     )?;
-    let bounded = Package::from_bytes_with_limits(&source, limits)?;
+    let bounded = Package::from_bytes_with_options(
+        &source,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    )?;
     let before = bounded.exact_bytes();
     let error = bounded
         .edit_body_table_dimension_size(0usize, Dimension::Row(0))?
         .set(points(32.0)?)
         .commit()
         .expect_err("output growth must be rejected at the physical ceiling");
-    assert!(matches!(error, Error::LimitExceeded { .. }));
+    assert!(matches!(error, Error::Limit { .. }));
     assert_eq!(bounded.exact_bytes(), before);
     Ok(())
 }
@@ -703,7 +738,10 @@ fn header_field_limit_has_a_prepublication_boundary() -> TestResult {
     for fields in 1..=4_096 {
         let archive_limits = litchi_iwa_core::Limits::default().with_header_fields(fields)?;
         let limits = Limits::default().with_archive_limits(archive_limits)?;
-        let Ok(package) = Package::from_bytes_with_limits(&source, limits) else {
+        let Ok(package) = Package::from_bytes_with_options(
+            &source,
+            litchi_pages::OpenOptions::new().__archive_limits(limits),
+        ) else {
             continue;
         };
         let result = package
@@ -718,12 +756,15 @@ fn header_field_limit_has_a_prepublication_boundary() -> TestResult {
     assert!(exact_fields > 1);
     let archive_limits = litchi_iwa_core::Limits::default().with_header_fields(exact_fields - 1)?;
     let limits = Limits::default().with_archive_limits(archive_limits)?;
-    if let Ok(package) = Package::from_bytes_with_limits(&source, limits) {
+    if let Ok(package) = Package::from_bytes_with_options(
+        &source,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    ) {
         let before = package.exact_bytes();
         let result = package
             .edit_body_table_dimension_size(0usize, Dimension::Row(1))
             .and_then(|edit| edit.set(requested).commit());
-        assert!(matches!(result, Err(Error::LimitExceeded { .. })));
+        assert!(matches!(result, Err(Error::Limit { .. })));
         assert_eq!(package.exact_bytes(), before);
     }
     Ok(())
@@ -746,8 +787,10 @@ fn lock_alias_missing_and_malformed_buckets_fail_atomically() -> TestResult {
         assert!(matches!(
             result,
             Err(Error::InvalidSource)
-                | Err(Error::UnsupportedSource)
-                | Err(Error::LimitExceeded { .. })
+                | Err(Error::Refused(
+                    litchi_pages::table::dimension::transaction::Refusal::UnsupportedSource
+                ))
+                | Err(Error::Limit { .. })
         ));
         assert_eq!(package.exact_bytes(), before);
     }
@@ -760,7 +803,10 @@ fn lock_alias_missing_and_malformed_buckets_fail_atomically() -> TestResult {
         .set(requested)
         .commit()
         .expect_err("locked table dimension must refuse");
-    assert!(matches!(error, Error::TableLocked));
+    assert!(matches!(
+        error,
+        Error::Refused(litchi_pages::table::dimension::transaction::Refusal::TableLocked)
+    ));
     Ok(())
 }
 
@@ -771,25 +817,25 @@ fn limits_and_public_values_are_typed_and_redacted() -> TestResult {
     assert_send_sync_debug::<Dimension>();
     assert_send_sync_debug::<Points>();
     assert_send_sync_debug::<Size>();
-    assert_send_sync_debug::<litchi_pages::BodyTableDimensionEdit<'static>>();
-    assert_send_sync_debug::<litchi_pages::BodyTableDimensionPatch>();
-    assert_send_sync_debug::<litchi_pages::BodyTableDimensionCommit>();
-    assert_send_sync_debug::<litchi_pages::BodyTableDimensionDiagnostics>();
-    assert_send_sync_debug::<litchi_pages::BodyTableDimensionLimitKind>();
+    assert_send_sync_debug::<litchi_pages::table::dimension::transaction::Edit<'static>>();
+    assert_send_sync_debug::<litchi_pages::table::dimension::transaction::Patch>();
+    assert_send_sync_debug::<litchi_pages::table::dimension::transaction::Commit>();
+    assert_send_sync_debug::<litchi_pages::table::dimension::transaction::Diagnostics>();
+    assert_send_sync_debug::<litchi_pages::table::dimension::transaction::LimitKind>();
     assert_send_sync_debug::<Error>();
     let source = synthetic_package()?;
     let archive_limits = litchi_iwa_core::Limits::default().with_header_fields(1)?;
     let limits = Limits::default().with_archive_limits(archive_limits)?;
-    if let Ok(package) = Package::from_bytes_with_limits(&source, limits) {
+    if let Ok(package) = Package::from_bytes_with_options(
+        &source,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    ) {
         let error = package
             .edit_body_table_dimension_size(0usize, Dimension::Row(0))?
             .set_points(Points::new(31.0)?)
             .commit()
             .expect_err("tight header limits must reject before publication");
-        assert!(matches!(
-            error,
-            Error::LimitExceeded { .. } | Error::InvalidSource
-        ));
+        assert!(matches!(error, Error::Limit { .. } | Error::InvalidSource));
     }
     let package = Package::from_bytes(&source)?;
     let edit = package.edit_body_table_dimension_size(0usize, Dimension::Row(0))?;

@@ -21,8 +21,11 @@ fn source_with_sheet1(sheet1: &str) -> Vec<u8> {
     // must reject.  PackageWriter validates XML eagerly, so use the same
     // lower-level ZIP construction as the existing error-order tests.
     let source = two_sheets();
-    let archive = ArchiveReader::new(&source).unwrap();
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let archive =
+        ArchiveReader::new(&source, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     for member in archive.file_names() {
         let bytes = if member == "xl/worksheets/sheet1.xml" {
             sheet1.as_bytes().to_vec()
@@ -93,9 +96,12 @@ fn compact_public_guard_preserves_late_unused_attribute_decode_errors() {
             .unwrap()
             .commit()
             .unwrap();
-        assert!(!unaffected.changed(), "{label}: unaffected sheet changed");
+        assert!(
+            !unaffected.diagnostics().changed(),
+            "{label}: unaffected sheet changed"
+        );
         assert_eq!(
-            unaffected.snapshot().value(0, address("A1")),
+            unaffected.patch().after().value(0, address("A1")),
             Some(&Value::Number(Number::new("20").unwrap())),
             "{label}: unaffected value"
         );
@@ -110,8 +116,11 @@ fn compact_public_guard_keeps_row_order_in_planning_and_cell_order_in_commit() {
     let row_bytes = fixture(row_order, false);
     let row_source = Arc::new(VersionedSource::new(row_bytes.clone()));
     let row_editor = SourceBackedEditor::from_read_at(row_source.clone()).unwrap();
-    let row_error = match row_editor.edit_sheets(["Sheet1".into()]) {
-        Ok(_) => panic!("out-of-order rows unexpectedly entered planning"),
+    let row_error = match row_editor
+        .edit_sheets(["Sheet1".into()])
+        .and_then(|edit| edit.commit())
+    {
+        Ok(_) => panic!("out-of-order rows unexpectedly committed"),
         Err(error) => error,
     };
     assert_invalid_exact(
@@ -154,7 +163,7 @@ fn compact_public_guard_keeps_row_order_in_planning_and_cell_order_in_commit() {
 #[test]
 fn compact_public_guard_handles_empty_sheet_data_inverse_and_recommit() {
     let bytes = fixture(worksheet(r#"<sheetData/>"#), false);
-    let original_sheet = OpcPackage::from_bytes(&bytes)
+    let original_sheet = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default())
         .unwrap()
         .get_part(&PackURI::new(SHEET).unwrap())
         .unwrap()
@@ -170,8 +179,8 @@ fn compact_public_guard_handles_empty_sheet_data_inverse_and_recommit() {
         .unwrap()
         .commit()
         .unwrap();
-    assert!(!noop.changed());
-    assert!(noop.patch().is_empty());
+    assert!(!noop.diagnostics().changed());
+    assert!(noop.patch().is_noop());
     let mut noop_output = Vec::new();
     noop_editor
         .publish_multi_commit_to_stream(&mut noop_output, &noop)
@@ -189,26 +198,26 @@ fn compact_public_guard_handles_empty_sheet_data_inverse_and_recommit() {
         .insert("Sheet1", address("A1"), Number::new("7").unwrap())
         .unwrap();
     let commit = insert.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert_eq!(
-        commit.snapshot().value(0, address("A1")),
+        commit.patch().after().value(0, address("A1")),
         Some(&Value::Number(Number::new("7").unwrap()))
     );
-    let cloned_snapshot = commit.snapshot().clone();
+    let cloned_snapshot = commit.patch().after().clone();
     assert_eq!(
         cloned_snapshot.value(0, address("A1")),
         Some(&Value::Number(Number::new("7").unwrap()))
     );
 
-    let mut replay = OpcPackage::from_bytes(&bytes).unwrap();
-    commit.patch().apply(&mut replay).unwrap();
+    let mut replay = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
+    replay_patch(&mut replay, commit.patch()).unwrap();
     assert_eq!(
         litchi_xlsx::cell_values::Snapshot::load_multi(&replay, "Sheet1")
             .unwrap()
             .value(address("A1")),
         Some(&Value::Number(Number::new("7").unwrap()))
     );
-    commit.patch().inverse().apply(&mut replay).unwrap();
+    replay_patch(&mut replay, &commit.patch().inverse()).unwrap();
     assert_eq!(
         replay
             .get_part(&PackURI::new(SHEET).unwrap())
@@ -232,7 +241,7 @@ fn compact_public_guard_handles_empty_sheet_data_inverse_and_recommit() {
     reedit.set("Sheet1", address("A1"), 9u32).unwrap();
     let recommit = reedit.commit().unwrap();
     assert_eq!(
-        recommit.snapshot().value(0, address("A1")),
+        recommit.patch().after().value(0, address("A1")),
         Some(&Value::Number(Number::new("9").unwrap()))
     );
 }
@@ -248,11 +257,11 @@ fn compact_public_guard_preserves_empty_rows_and_cells() {
     edit.set("Sheet1", address("C3"), 4u32).unwrap();
     let commit = edit.commit().unwrap();
 
-    assert!(commit.snapshot().contains_cell(0, address("B1")));
-    assert!(commit.snapshot().contains_cell(0, address("A3")));
-    assert_eq!(commit.snapshot().value(0, address("A3")), None);
+    assert!(commit.patch().after().contains_cell(0, address("B1")));
+    assert!(commit.patch().after().contains_cell(0, address("A3")));
+    assert_eq!(commit.patch().after().value(0, address("A3")), None);
     assert_eq!(
-        commit.snapshot().value(0, address("C3")),
+        commit.patch().after().value(0, address("C3")),
         Some(&Value::Number(Number::new("4").unwrap()))
     );
 
@@ -307,7 +316,7 @@ fn compact_public_guard_preserves_typed_prefixed_scalar_forms() {
         edit.set("Sheet1", address("A1"), false).unwrap();
         let commit = edit.commit().unwrap();
         assert_eq!(
-            commit.snapshot().value(0, address("A1")),
+            commit.patch().after().value(0, address("A1")),
             Some(&Value::Bool(false)),
             "{label}: typed semantic value"
         );
@@ -325,7 +334,7 @@ fn compact_public_guard_preserves_typed_prefixed_scalar_forms() {
         );
         assert!(xml.contains(r#"t="b""#), "{label}: boolean type");
 
-        let package = OpcPackage::from_bytes(&output).unwrap();
+        let package = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
         let snapshot = litchi_xlsx::cell_values::Snapshot::load_multi(&package, "Sheet1").unwrap();
         assert_eq!(snapshot.value(address("A1")), Some(&Value::Bool(false)));
     }

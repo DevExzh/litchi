@@ -277,12 +277,10 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// The source cannot support a changed exact-source transaction.
-    #[error("this Keynote source does not support physical soundtrack-settings edits")]
-    UnsupportedSource,
-    /// The presentation has no existing soundtrack settings to edit.
-    #[error("the Keynote presentation has no soundtrack")]
-    SoundtrackNotFound,
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     /// The selected soundtrack settings cannot safely support the request.
     #[error("the Keynote soundtrack source cannot be edited safely")]
     InvalidSource,
@@ -290,7 +288,7 @@ pub enum Error {
     #[error(
         "Keynote soundtrack-settings {kind} limit exceeded: observed {observed}, maximum {maximum}"
     )]
-    LimitExceeded {
+    Limit {
         /// Resource category that exceeded its limit.
         kind: LimitKind,
         /// Observed or requested amount.
@@ -310,6 +308,37 @@ pub enum Error {
     /// The patch does not belong to this exact immutable package snapshot.
     #[error("the Keynote soundtrack-settings patch does not match the exact source package")]
     PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
+    /// The source cannot support a changed exact-source transaction.
+    #[error("this Keynote source does not support physical soundtrack-settings edits")]
+    UnsupportedSource,
+    /// The presentation has no existing soundtrack settings to edit.
+    #[error("the Keynote presentation has no soundtrack")]
+    SoundtrackNotFound,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+            Self::SoundtrackNotFound { .. } => RefusalKind::NotFound,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// A soundtrack-settings value staged against one immutable package.
@@ -365,7 +394,7 @@ impl Edit<'_> {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::UnsupportedSource`] when changed exact-source
+    /// Returns [`Refusal::UnsupportedSource`] when changed exact-source
     /// publication is unavailable, or a typed source, resource, allocation,
     /// or verification error. Failures do not publish a partial package.
     pub fn commit(self) -> Result<Commit, Error> {
@@ -503,6 +532,12 @@ impl Commit {
     #[must_use]
     pub fn into_package(self) -> Package {
         self.package
+    }
+
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
     }
 
     /// Borrow the reversible exact-source patch.

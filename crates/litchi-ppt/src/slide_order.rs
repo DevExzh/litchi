@@ -7,6 +7,20 @@
 //! new append-only PPT user edit. The same root composes checked shape text
 //! and complete PowerPoint client-anchor geometry formatting. Slide payload
 //! records and unrelated CFB streams remain exact unless selected explicitly.
+//!
+//! The editing owner (its transaction, commit and patch) is crate-private
+//! since record 0357: [`crate::Package::edit`] is the one public edit route.
+//! This module keeps public the vocabulary those verbs take, the typed
+//! [`Error`](crate::slide_order::Error)/[`Refusal`](crate::slide_order::Refusal)
+//! they return, and [`Snapshot`](crate::slide_order::Snapshot), an immutable
+//! whole-artifact read view of the slide list and its slide-level state.
+//! Its durable patches, patch joins and three-way planning are reached
+//! through `package::edit::Patch::{to_durable, join}` and
+//! `Package::{apply_durable, plan_three_way}` (record 0357a).
+#![allow(
+    dead_code,
+    reason = "crate-private native owner of the primary edit (record 0357); its durable, join and three-way surfaces are public through package::edit (record 0357a), the rest stays exercised by the unit tests"
+)]
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
@@ -14,13 +28,10 @@ use std::io::Cursor;
 use std::sync::Arc;
 
 pub use litchi_core::Position;
-pub use litchi_core::patch::{CompositionLimits, HistoryLimits, SubEditJoinFailure};
 
 use crate::document_structure;
-use crate::package::{Error as PackageError, Package, RecordLimits};
-
-/// Explicit bounded undo/redo history for slide-order snapshots.
-pub type History = litchi_core::patch::History<Snapshot>;
+use crate::package::{Error as PackageError, OpenOptions, SourceLimits};
+use crate::raw::Reader;
 
 /// Maximum automatic slide-advance delay permitted by `[MS-PPT]` 2.6.6.
 pub const MAX_SLIDE_ADVANCE_MS: u32 = 86_399_000;
@@ -30,6 +41,20 @@ pub const MAX_SLIDE_ADVANCE_MS: u32 = 86_399_000;
 /// The bound is checked from the slice length before target resolution,
 /// package parsing, or replacement encoding.
 pub const MAX_SHAPE_TEXT_REPLACEMENTS: usize = 256;
+
+/// Maximum number of chunks accepted by one aggregate shape-text operation.
+///
+/// The bound includes empty chunks. It is checked before the source
+/// presentation or any selected target is resolved.
+pub const MAX_SHAPE_TEXT_CHUNKS: usize = 4096;
+
+/// Maximum number of globally selected shapes accepted by one aggregate
+/// shape-text operation.
+///
+/// Raised from 4096 with the primary edit bound (record 0264, owner approved
+/// 2026-10-14): verification no longer re-parses the slide, so one larger
+/// publication is linear where several smaller ones each rewrote the slide.
+pub const MAX_SHAPE_TEXT_CHUNK_SELECTIONS: usize = 16384;
 
 /// Fixed-width manual and automatic advance state from one
 /// `SlideShowSlideInfoAtom`.
@@ -217,9 +242,18 @@ impl fmt::Display for TransferDependency {
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Refusal {
-    /// The CFB is signed, encrypted, or contains storage metadata that the
-    /// stream-only incremental publisher cannot preserve faithfully.
+    /// The CFB is encrypted or contains storage metadata that the stream-only
+    /// incremental publisher cannot preserve faithfully. Signed sources have
+    /// the more precise [`Refusal::Signed`] policy below.
     UnsupportedSource,
+    /// The CFB carries a digital-signature component.  Read-only planning and
+    /// exact no-op transactions remain valid, but any changed publication
+    /// would invalidate the signature and is refused before a lower-level
+    /// writer can drop or rewrite it.
+    Signed,
+    /// The read path repaired a cyclic UserEdit chain.  The native append-only
+    /// editor still requires a strict chain, so this source is read-only.
+    RepairedUserEditChain,
     /// A source or destination position is outside the current slide list.
     SlideNotFound { position: Position },
     /// Reviewer diff trees associate their slide entries by list position.
@@ -246,6 +280,26 @@ pub enum Refusal {
     UncommittedSlideDependency,
     /// One semantic shape target appeared more than once in one batch.
     DuplicateShapeTextTarget { target: crate::text_edit::Target },
+    /// An element edit (record 0323) would need records whose layout it does
+    /// not model losslessly.
+    UnsupportedElement {
+        element: &'static str,
+        reason: &'static str,
+    },
+    /// An element edit selected an element that does not exist.
+    ElementNotFound { element: &'static str },
+    /// An element edit was given a value its records cannot hold.
+    InvalidElementValue {
+        element: &'static str,
+        reason: &'static str,
+    },
+    /// A patch operation (a join, or a durable conversion) is not supported
+    /// for the content of this patch (record 0357a).
+    UnsupportedPatch { reason: &'static str },
+    /// Two joined patches write the same semantic target (record 0357b),
+    /// named as a three-way plan names it (for example
+    /// `document/master-list`), so their order would decide the result.
+    JoinConflict { target: String },
 }
 
 impl fmt::Display for Refusal {
@@ -254,6 +308,11 @@ impl fmt::Display for Refusal {
             Self::UnsupportedSource => formatter.write_str(
                 "PPT source cannot be republished through the safe slide-order transaction",
             ),
+            Self::Signed => formatter.write_str(
+                "PPT signed source cannot be changed through the safe slide-order transaction",
+            ),
+            Self::RepairedUserEditChain => formatter
+                .write_str("PPT source contains a repaired UserEdit chain and is read-only"),
             Self::SlideNotFound { position } => {
                 write!(
                     formatter,
@@ -301,12 +360,59 @@ impl fmt::Display for Refusal {
                 target.slide().get(),
                 target.shape().get()
             ),
+            Self::UnsupportedElement { element, reason } => {
+                write!(formatter, "PPT {element} edit is not supported: {reason}")
+            },
+            Self::ElementNotFound { element } => {
+                write!(formatter, "PPT {element} was not found")
+            },
+            Self::InvalidElementValue { element, reason } => {
+                write!(formatter, "PPT {element} value is invalid: {reason}")
+            },
+            Self::UnsupportedPatch { reason } => {
+                write!(formatter, "PPT patch operation is not supported: {reason}")
+            },
+            Self::JoinConflict { target } => {
+                write!(formatter, "PPT joined patches both write {target}")
+            },
+        }
+    }
+}
+
+impl Refusal {
+    /// The shared refusal class of this reason (record 0351 §2.4 rule 2);
+    /// unified callers classify by this kind alone.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+
+        match self {
+            Self::Signed => RefusalKind::Protected,
+            Self::SlideNotFound { .. } | Self::ElementNotFound { .. } => RefusalKind::NotFound,
+            Self::DuplicateShapeTextTarget { .. } | Self::InvalidElementValue { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::MissingMasterDependency { .. }
+            | Self::MismatchedMasterDependency { .. }
+            | Self::TransferTargetMismatch
+            | Self::UnsupportedSlideAdvance { .. }
+            | Self::UnsupportedSlideVisibility { .. }
+            | Self::UnsupportedSlideTransitionVisual { .. } => RefusalKind::UnsupportedTarget,
+            Self::UncommittedSlideDependency
+            | Self::UnsupportedPatch { .. }
+            | Self::JoinConflict { .. } => RefusalKind::UnsupportedOperation,
+            Self::UnsupportedSource
+            | Self::RepairedUserEditChain
+            | Self::ReviewHistoryDependency
+            | Self::UnsupportedSlideDependency { .. }
+            | Self::UnsupportedElement { .. } => RefusalKind::UnsupportedContent,
         }
     }
 }
 
 /// Error returned by the opened-presentation slide-order owner.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// The package could not be opened, validated, or republished.
     Package(PackageError),
@@ -396,7 +502,7 @@ pub enum DiagnosticPhase {
     /// reports this phase: the patch retains its source and target artifacts
     /// but not that intermediate, so its digest is computed at commit. Every
     /// other artifact digest is computed on demand by durable serialization
-    /// ([`Patch::to_durable`]) rather than by commit.
+    /// rather than by commit.
     IntermediateArtifactHash,
     /// The staged live-document commit was an exact structural no-op; other
     /// formatting owners may still have staged changes in the root
@@ -451,15 +557,6 @@ where
         },
     });
     result
-}
-
-#[derive(Clone, PartialEq, Eq)]
-struct Lineage(Arc<[u8]>);
-
-impl fmt::Debug for Lineage {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("Lineage(..)")
-    }
 }
 
 mod artifact {
@@ -556,6 +653,10 @@ mod artifact {
 
 use artifact::Artifact;
 
+mod blank;
+mod elements;
+pub(crate) mod records;
+
 // Snapshots memoize their artifact digest through interior mutability
 // (`OnceLock`). Keep every shareable slide-order value `Send + Sync`; this
 // fails to compile if a future field breaks that.
@@ -567,14 +668,20 @@ const _: () = {
     assert_send_sync::<TransferPlan>();
 };
 
-/// Immutable exact whole-package snapshot used by slide-order edits.
+/// Immutable exact whole-package read view of the slide list and its
+/// slide-level state; edits go through [`crate::Package::edit`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Snapshot {
     artifact: Artifact,
     document: document_structure::Snapshot,
     document_persist_id: u32,
-    limits: RecordLimits,
+    limits: SourceLimits,
+    leniency: crate::leniency::Leniency,
+    #[cfg(feature = "vba-inspection")]
+    vba_project_limits: crate::VbaProjectLimits,
+    chain_repaired: bool,
     has_review_history: bool,
+    has_signature: bool,
 }
 
 impl Snapshot {
@@ -584,7 +691,7 @@ impl Snapshot {
     ///
     /// Returns an error when the complete package or its live slide directory
     /// is malformed.
-    pub fn parse(bytes: &[u8]) -> Result<Self> {
+    pub(crate) fn parse(bytes: &[u8]) -> Result<Self> {
         Self::from_bytes(bytes.to_vec())
     }
 
@@ -593,36 +700,98 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error when the complete package cannot be reopened.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, RecordLimits::default())
+    pub(crate) fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
+        Self::from_bytes_with_options(bytes, OpenOptions::new())
     }
 
-    /// Captures an owned exact PPT artifact under explicit finite limits.
+    /// Captures an owned exact PPT artifact under explicit source limits and
+    /// a selected leniency policy.
     ///
-    /// # Errors
-    ///
-    /// Returns an error when the artifact exceeds the limits or its live
-    /// presentation structure is malformed.
-    pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: RecordLimits) -> Result<Self> {
+    /// Strict remains the default.  The selected policy is retained by the
+    /// immutable snapshot and is reused by every native publication reopen,
+    /// so a canonical package edit cannot silently fall back to strict while
+    /// processing a caller-selected source.
+    pub fn from_bytes_with_options(bytes: Vec<u8>, options: OpenOptions<'_>) -> Result<Self> {
+        let limits = options.source_limits_value();
         if bytes.len() > limits.max_package_bytes {
-            return Err(PackageError::ResourceLimit(format!(
-                "PPT slide-order source size {} exceeds limit {}",
-                bytes.len(),
-                limits.max_package_bytes
-            ))
+            return Err(PackageError::Limit {
+                kind: crate::SourceLimitKind::InputBytes,
+                observed: bytes.len(),
+                maximum: limits.max_package_bytes,
+            }
             .into());
         }
-        let mut package = Package::from_reader_with_limits(Cursor::new(bytes.as_slice()), limits)?;
+        let mut package = Reader::from_reader_with_options(Cursor::new(bytes.as_slice()), options)?;
+        let has_signature = package.contains_signature_component()?;
+        let presentation = package.presentation_with_options(options)?;
+        drop(package);
+        let artifact = Arc::from(bytes.into_boxed_slice());
+        Self::from_admitted(artifact, presentation, has_signature, options)
+    }
+
+    /// Capture a native snapshot from an already admitted canonical package.
+    ///
+    /// The package has already validated and retained its CFB index and
+    /// presentation projection. Reusing that projection avoids opening the
+    /// same source container a second time when a package-level edit starts;
+    /// the exact bytes and the source freshness fence remain explicit.
+    pub(crate) fn from_package_with_options(
+        package: &crate::Package,
+        bytes: Arc<[u8]>,
+        options: OpenOptions<'_>,
+    ) -> Result<Self> {
+        #[cfg(feature = "vba-inspection")]
+        let options = options.inherit_vba_project_limits(package.vba_project_limits());
         let presentation = package.presentation()?;
+        let has_signature = package
+            .exact()
+            .signed(|| package.contains_signature_component())?;
+        Self::from_admitted(bytes, presentation, has_signature, options)
+    }
+
+    fn from_admitted(
+        artifact: Arc<[u8]>,
+        presentation: crate::presentation::Presentation,
+        has_signature: bool,
+        options: OpenOptions<'_>,
+    ) -> Result<Self> {
+        presentation.check_source()?;
+        let limits = options.source_limits_value();
+        if artifact.len() > limits.max_package_bytes {
+            return Err(PackageError::Limit {
+                kind: crate::SourceLimitKind::InputBytes,
+                observed: artifact.len(),
+                maximum: limits.max_package_bytes,
+            }
+            .into());
+        }
         let directory = presentation.slide_directory();
-        let (document_persist_id, document_bytes) =
-            crate::embedded::object::Editor::inspect_live_document_from_ole(package.ole_file())?;
-        if document_persist_id != directory.document_persist_id() {
+        // Resolve the live document through the already parsed presentation.
+        // The embedded append-only editor intentionally walks UserEdit chains
+        // strictly; using it here would discard a caller-selected tolerant
+        // read before we can record whether that repair is editable.
+        let document_persist_id = directory.document_persist_id();
+        let document_offset = directory.document_offset();
+        let document_stream = presentation.document_stream();
+        let (document_record, document_consumed) =
+            crate::Record::parse(document_stream, document_offset, &limits)?;
+        if document_record.record_type != crate::RecordType::Document {
             return Err(PackageError::Corrupted(
-                "PPT slide-order snapshot resolved inconsistent live document identities".into(),
+                "PPT slide-order snapshot resolved a non-document live record".into(),
             )
             .into());
         }
+        let document_end = document_offset
+            .checked_add(document_consumed)
+            .ok_or_else(|| {
+                PackageError::Corrupted("PPT live document record offset overflows".into())
+            })?;
+        let document_bytes = document_stream
+            .get(document_offset..document_end)
+            .ok_or_else(|| {
+                PackageError::Corrupted("PPT live document record exceeds its stream".into())
+            })?
+            .to_vec();
         let document_limits = document_structure::Limits {
             max_bytes: limits.max_record_bytes.min(limits.max_input_bytes),
             max_records: limits.max_records,
@@ -646,14 +815,24 @@ impl Snapshot {
         }
         let review = presentation.document_comparison()?.review()?;
         let has_review_history = review.diff_tree_count() != 0;
-        drop(presentation);
-        drop(package);
+        let chain_repaired = presentation
+            .tolerance_report()
+            .defects()
+            .iter()
+            .any(|defect| matches!(defect.defect, crate::leniency::Defect::UserEditChain(_)))
+            || presentation.tolerance_report().unrecorded() != 0;
+        presentation.check_source()?;
         Ok(Self {
-            artifact: Artifact::new(Arc::from(bytes.into_boxed_slice())),
+            artifact: Artifact::new(artifact),
             document,
             document_persist_id,
             limits,
+            leniency: options.leniency_value(),
+            #[cfg(feature = "vba-inspection")]
+            vba_project_limits: options.vba_project_limits_value(),
+            chain_repaired,
             has_review_history,
+            has_signature,
         })
     }
 
@@ -685,15 +864,15 @@ impl Snapshot {
         }
 
         let bytes = publication.into_output();
-        if self.limits != RecordLimits::default() {
-            return Self::from_bytes_with_limits(bytes.to_vec(), self.limits);
+        if self.limits != SourceLimits::default() {
+            return Self::from_bytes_with_options(bytes.to_vec(), self.open_options());
         }
         if bytes.len() > self.limits.max_package_bytes {
-            return Err(PackageError::ResourceLimit(format!(
-                "PPT slide-order source size {} exceeds limit {}",
-                bytes.len(),
-                self.limits.max_package_bytes
-            ))
+            return Err(PackageError::Limit {
+                kind: crate::SourceLimitKind::InputBytes,
+                observed: bytes.len(),
+                maximum: self.limits.max_package_bytes,
+            }
             .into());
         }
         Ok(Self {
@@ -701,7 +880,54 @@ impl Snapshot {
             document: self.document.clone(),
             document_persist_id: self.document_persist_id,
             limits: self.limits,
+            leniency: self.leniency,
+            #[cfg(feature = "vba-inspection")]
+            vba_project_limits: self.vba_project_limits,
+            chain_repaired: self.chain_repaired,
             has_review_history: self.has_review_history,
+            has_signature: self.has_signature,
+        })
+    }
+
+    fn adopt_notes_publication(
+        &self,
+        publication: crate::text_edit::RootNotesPublication,
+    ) -> Result<Self> {
+        if publication.source() != self.bytes() {
+            return Err(PackageError::Corrupted(
+                "PPT notes text publication source changed before adoption".into(),
+            )
+            .into());
+        }
+        if publication.notes_persist_id() == self.document_persist_id {
+            return Err(PackageError::Corrupted(
+                "PPT notes text publication targeted the live document record".into(),
+            )
+            .into());
+        }
+        let bytes = publication.into_output();
+        if self.limits != SourceLimits::default() {
+            return Self::from_bytes_with_options(bytes.to_vec(), self.open_options());
+        }
+        if bytes.len() > self.limits.max_package_bytes {
+            return Err(PackageError::Limit {
+                kind: crate::SourceLimitKind::InputBytes,
+                observed: bytes.len(),
+                maximum: self.limits.max_package_bytes,
+            }
+            .into());
+        }
+        Ok(Self {
+            artifact: Artifact::new(bytes),
+            document: self.document.clone(),
+            document_persist_id: self.document_persist_id,
+            limits: self.limits,
+            leniency: self.leniency,
+            #[cfg(feature = "vba-inspection")]
+            vba_project_limits: self.vba_project_limits,
+            chain_repaired: self.chain_repaired,
+            has_review_history: self.has_review_history,
+            has_signature: self.has_signature,
         })
     }
 
@@ -732,17 +958,30 @@ impl Snapshot {
             .into());
         }
 
+        let document_changed = publication.document_changed();
         let (bytes, changes) = publication.into_parts();
-        if self.limits != RecordLimits::default() {
-            let reopened = Self::from_bytes_with_limits(bytes.to_vec(), self.limits)?;
+        if document_changed {
+            // Outline-backed text lives in the live document: reopen so the
+            // retained document structure is the published one.
+            let reopened = Self::from_bytes_with_options(bytes.to_vec(), self.open_options())?;
+            if reopened.document.slides() != self.document.slides() {
+                return Err(PackageError::Corrupted(
+                    "PPT outline text publication changed slide structure".into(),
+                )
+                .into());
+            }
+            return Ok((reopened, changes));
+        }
+        if self.limits != SourceLimits::default() {
+            let reopened = Self::from_bytes_with_options(bytes.to_vec(), self.open_options())?;
             return Ok((reopened, changes));
         }
         if bytes.len() > self.limits.max_package_bytes {
-            return Err(PackageError::ResourceLimit(format!(
-                "PPT slide-order source size {} exceeds limit {}",
-                bytes.len(),
-                self.limits.max_package_bytes
-            ))
+            return Err(PackageError::Limit {
+                kind: crate::SourceLimitKind::InputBytes,
+                observed: bytes.len(),
+                maximum: self.limits.max_package_bytes,
+            }
             .into());
         }
         Ok((
@@ -751,7 +990,12 @@ impl Snapshot {
                 document: self.document.clone(),
                 document_persist_id: self.document_persist_id,
                 limits: self.limits,
+                leniency: self.leniency,
+                #[cfg(feature = "vba-inspection")]
+                vba_project_limits: self.vba_project_limits,
+                chain_repaired: self.chain_repaired,
                 has_review_history: self.has_review_history,
+                has_signature: self.has_signature,
             },
             changes,
         ))
@@ -771,9 +1015,12 @@ impl Snapshot {
 
     /// Whether one slide is hidden during the slide show.
     ///
+    /// A slide without a `SlideShowSlideInfoAtom` is shown (`false`).
+    ///
     /// # Errors
     ///
-    /// Returns a typed refusal when the position is absent.
+    /// Returns a typed refusal when the position is absent or the slide has
+    /// several or a malformed slide-show information atom.
     pub fn slide_hidden(&self, position: Position) -> Result<bool> {
         self.require_position(position)?;
         inspect_slide_hidden(self, position)
@@ -809,6 +1056,14 @@ impl Snapshot {
     /// not own exactly one supported `PowerPoint` client anchor.
     pub fn shape_anchor(&self, target: crate::text_edit::Target) -> Result<crate::Anchor> {
         self.require_position(target.slide())?;
+        if self.has_signature {
+            return crate::text_edit::inspect_shape_anchor_readonly(
+                self.bytes(),
+                target,
+                self.open_options(),
+            )
+            .map_err(Error::from);
+        }
         crate::text_edit::inspect_shape_anchor(self.bytes(), target).map_err(Error::from)
     }
 
@@ -846,17 +1101,34 @@ impl Snapshot {
 
     /// Resource bounds retained for commits and patch application.
     #[must_use]
-    pub const fn limits(&self) -> RecordLimits {
+    pub(crate) const fn limits(&self) -> SourceLimits {
         self.limits
+    }
+
+    /// Leniency policy retained by this immutable snapshot.
+    #[must_use]
+    pub const fn leniency(&self) -> crate::leniency::Leniency {
+        self.leniency
+    }
+
+    fn open_options(&self) -> OpenOptions<'static> {
+        let options = OpenOptions::new()
+            .source_limits(self.limits)
+            .leniency(self.leniency);
+        #[cfg(feature = "vba-inspection")]
+        let options = options.vba_project_limits(self.vba_project_limits);
+        options
     }
 
     /// Starts an isolated source-bound order edit.
     ///
     /// # Errors
     ///
-    /// Returns a typed refusal for signed/encrypted or metadata-bearing CFB
-    /// sources and for position-dependent reviewer history.
-    pub fn edit(&self) -> Result<Transaction> {
+    /// Returns a typed refusal for encrypted or metadata-bearing CFB sources
+    /// and for position-dependent reviewer history. Signed sources are
+    /// admitted for exact no-op planning; changed operations return
+    /// [`Refusal::Signed`] before publication.
+    pub(crate) fn edit(&self) -> Result<Transaction> {
         self.require_editable()?;
         Ok(Transaction {
             source: self.clone(),
@@ -874,61 +1146,10 @@ impl Snapshot {
             formatting: Vec::new(),
             inserted_records: BTreeMap::new(),
             inserted_pictures: BTreeMap::new(),
+            live_document_changed: false,
+            opened: None,
+            verified_shapes: None,
         })
-    }
-
-    /// Prepares one independently composable move against this exact source.
-    ///
-    /// Moves whose inclusive affected position ranges do not intersect can be
-    /// joined; overlapping moves produce the common deterministic conflict
-    /// set rather than using last-writer-wins behavior.
-    ///
-    /// # Errors
-    ///
-    /// Returns a typed source/position refusal or a common composition bound
-    /// error.
-    pub fn prepare_move(
-        &self,
-        limits: CompositionLimits,
-        identifier: impl Into<String>,
-        from: Position,
-        destination: Position,
-    ) -> Result<PreparedMove> {
-        self.require_editable()?;
-        self.require_position(from)?;
-        self.require_position(destination)?;
-        let move_ = Move { from, destination };
-        let start = from.get().min(destination.get());
-        let end = from.get().max(destination.get());
-        let writes = (start..=end).map(|position| format!("slide-order/position:{position}"));
-        let inner = litchi_core::patch::SubEdit::new(
-            self.lineage(),
-            limits,
-            identifier,
-            std::iter::empty(),
-            writes,
-            move_,
-        )?;
-        Ok(PreparedMove { inner })
-    }
-
-    /// Starts a bounded composition of independently prepared moves.
-    ///
-    /// # Errors
-    ///
-    /// Returns a typed refusal when this source cannot be safely republished.
-    pub fn compose(&self, limits: CompositionLimits) -> Result<Composition> {
-        self.require_editable()?;
-        Ok(Composition {
-            source: self.clone(),
-            joined: litchi_core::patch::JoinedSubEdits::new(self.lineage(), limits),
-        })
-    }
-
-    /// Starts explicit bounded undo/redo history at this snapshot.
-    #[must_use]
-    pub fn history(&self, limits: HistoryLimits) -> History {
-        History::new(self.clone(), limits)
     }
 
     /// Plans a dependency-checked transfer from `donor` without mutating
@@ -947,8 +1168,11 @@ impl Snapshot {
     ///
     /// Returns a typed dependency refusal, a position refusal, or a package
     /// error for malformed source records.
-    pub fn plan_transfer_from(&self, donor: &Self, slide: Position) -> Result<TransferPlan> {
+    pub(crate) fn plan_transfer_from(&self, donor: &Self, slide: Position) -> Result<TransferPlan> {
         self.require_editable()?;
+        if self.has_signature || donor.has_signature {
+            return Err(Error::Refused(Refusal::Signed));
+        }
         donor.require_position(slide)?;
         let donor_slide = donor.document.slides()[slide.get()];
         let group = donor.document.edit().slide_group(slide.get())?;
@@ -973,7 +1197,7 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error when either patch was not prepared from this base.
-    pub fn plan_three_way(&self, left: &Patch, right: &Patch) -> Result<ThreeWayPlan> {
+    pub(crate) fn plan_three_way(&self, left: &Patch, right: &Patch) -> Result<ThreeWayPlan> {
         if left.before() != self.bytes() || right.before() != self.bytes() {
             return Err(PackageError::InvalidFormat(
                 "PPT three-way planning requires two patches from the exact base artifact".into(),
@@ -989,7 +1213,10 @@ impl Snapshot {
     ///
     /// Returns an error for an unsupported vocabulary, malformed selector,
     /// failed exact-artifact/order precondition, or refused move.
-    pub fn apply_durable<Mode>(&self, patch: &litchi_core::patch::Patch<Mode>) -> Result<Self> {
+    pub(crate) fn apply_durable<Mode>(
+        &self,
+        patch: &litchi_core::patch::Patch<Mode>,
+    ) -> Result<Self> {
         if patch.format() != "litchi-ppt" {
             return Err(invalid_durable_patch("unsupported durable patch format"));
         }
@@ -1004,6 +1231,9 @@ impl Snapshot {
                 current = match operations[index].op.as_str() {
                     "presentation.shape-text.set" => {
                         apply_durable_text(&current, &operations[index])?
+                    },
+                    "presentation.notes-text.set" => {
+                        apply_durable_notes_text(&current, &operations[index])?
                     },
                     "presentation.shape-anchor.set" => {
                         apply_durable_anchor(&current, &operations[index])?
@@ -1022,6 +1252,9 @@ impl Snapshot {
                     },
                     "presentation.external-media-playback.set" => {
                         apply_durable_media_playback(&current, &operations[index])?
+                    },
+                    "presentation.element-records.set" => {
+                        records::apply_durable(&current, &operations[index], patch.blobs())?
                     },
                     _ => unreachable!("formatting vocabulary is checked by its predicate"),
                 };
@@ -1049,6 +1282,24 @@ impl Snapshot {
     }
 
     fn require_editable(&self) -> Result<()> {
+        // A signed source may still be opened for a read-only transaction.
+        // The individual operation owners perform the changed/no-op split so
+        // that an exact no-op can retain the original CFB, including nested
+        // signature storages, without invoking the mutation editor.  This
+        // admission also deliberately precedes history-closure refusals:
+        // returning the exact source does not depend on appending a new edit.
+        if self.has_signature {
+            return Ok(());
+        }
+        // The append-only native editor intentionally reads the UserEdit
+        // chain with strict semantics.  A tolerated cyclic chain is safe for
+        // read projection, but cannot yet be used as an edit base because
+        // appending a new edit would otherwise retain an ambiguous history.
+        // Clean packages opened under the same leniency policy remain
+        // editable; selecting a policy alone is not a refusal.
+        if self.chain_repaired {
+            return Err(Error::Refused(Refusal::RepairedUserEditChain));
+        }
         if self.has_review_history {
             return Err(Error::Refused(Refusal::ReviewHistoryDependency));
         }
@@ -1057,6 +1308,7 @@ impl Snapshot {
                 crate::embedded::object::Editor::open_records_arc_with_limit(
                     self.shared_bytes(),
                     self.limits.max_package_bytes,
+                    self.limits,
                 )
                 .map(|_editor| ())
             })
@@ -1068,10 +1320,6 @@ impl Snapshot {
             return Err(Error::Refused(Refusal::SlideNotFound { position }));
         }
         Ok(())
-    }
-
-    fn lineage(&self) -> Lineage {
-        Lineage(self.shared_bytes())
     }
 
     /// Lowercase hexadecimal SHA-256 of the exact artifact, computed on first
@@ -1088,7 +1336,7 @@ impl Snapshot {
 
 /// One semantic move staged in a transaction or durable patch.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Change {
+pub(crate) struct Change {
     from: Position,
     destination: Position,
     before_order: [u8; 32],
@@ -1098,13 +1346,13 @@ pub struct Change {
 impl Change {
     /// Source position resolved against the transaction-local order.
     #[must_use]
-    pub const fn from(&self) -> Position {
+    pub(crate) const fn from(&self) -> Position {
         self.from
     }
 
     /// Final destination position for the selected slide.
     #[must_use]
-    pub const fn destination(&self) -> Position {
+    pub(crate) const fn destination(&self) -> Position {
         self.destination
     }
 
@@ -1121,13 +1369,43 @@ impl Change {
 /// One checked text replacement preserving the selected shape's formatting
 /// and modeled dependency closure.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ShapeTextChange {
+pub(crate) struct ShapeTextChange {
     target: crate::text_edit::Target,
     before: String,
     after: String,
 }
 
-/// One contextual shape-text replacement for [`Transaction::set_shape_texts`].
+/// One checked speaker-notes text replacement on the slide at a source
+/// position.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NotesTextChange {
+    slide: Position,
+    before: String,
+    after: String,
+}
+
+impl NotesTextChange {
+    /// The slide whose notes changed, in the source slide order.
+    #[must_use]
+    pub(crate) const fn slide(&self) -> Position {
+        self.slide
+    }
+
+    /// The notes text before the change.
+    #[must_use]
+    pub(crate) fn before(&self) -> &str {
+        &self.before
+    }
+
+    /// The notes text after the change.
+    #[must_use]
+    pub(crate) fn after(&self) -> &str {
+        &self.after
+    }
+}
+
+/// One contextual shape-text replacement for
+/// [`Edit::set_shape_texts`](crate::package::edit::Edit::set_shape_texts).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShapeTextReplacement {
     target: crate::text_edit::Target,
@@ -1158,29 +1436,93 @@ impl ShapeTextReplacement {
     }
 }
 
+/// Flattens an aggregate shape-text plan only after all finite admission
+/// dimensions have been checked.
+///
+/// The returned descriptors borrow the caller's replacement strings. Keeping
+/// this admission separate from target resolution means an oversized or
+/// malformed chunk plan cannot trigger package parsing or proportional native
+/// work. The byte count is checked here as well as in the native publisher so
+/// a future caller cannot accidentally turn an aggregate sum into a wrapping
+/// counter.
+fn flatten_shape_text_chunks<'a>(
+    chunks: &[&'a [ShapeTextReplacement]],
+) -> Result<(Vec<(crate::text_edit::Target, &'a str)>, usize)> {
+    if chunks.len() > MAX_SHAPE_TEXT_CHUNKS {
+        return Err(PackageError::ResourceLimit(format!(
+            "PPT shape-text chunk count {} exceeds limit {}",
+            chunks.len(),
+            MAX_SHAPE_TEXT_CHUNKS
+        ))
+        .into());
+    }
+
+    let mut selection_count = 0usize;
+    let mut replacement_bytes = 0usize;
+    for chunk in chunks {
+        if chunk.len() > MAX_SHAPE_TEXT_REPLACEMENTS {
+            return Err(PackageError::ResourceLimit(format!(
+                "PPT shape-text chunk operation count {} exceeds limit {}",
+                chunk.len(),
+                MAX_SHAPE_TEXT_REPLACEMENTS
+            ))
+            .into());
+        }
+        selection_count = selection_count.checked_add(chunk.len()).ok_or_else(|| {
+            PackageError::ResourceLimit("PPT shape-text aggregate operation count overflow".into())
+        })?;
+        if selection_count > MAX_SHAPE_TEXT_CHUNK_SELECTIONS {
+            return Err(PackageError::ResourceLimit(format!(
+                "PPT shape-text aggregate operation count {} exceeds limit {}",
+                selection_count, MAX_SHAPE_TEXT_CHUNK_SELECTIONS
+            ))
+            .into());
+        }
+        for replacement in *chunk {
+            replacement_bytes = replacement_bytes
+                .checked_add(replacement.text().len())
+                .ok_or_else(|| {
+                    PackageError::ResourceLimit(
+                        "PPT shape-text aggregate replacement byte count overflow".into(),
+                    )
+                })?;
+        }
+    }
+
+    let mut flattened = Vec::with_capacity(selection_count);
+    for chunk in chunks {
+        flattened.extend(
+            chunk
+                .iter()
+                .map(|replacement| (replacement.target(), replacement.text())),
+        );
+    }
+    Ok((flattened, replacement_bytes))
+}
+
 impl ShapeTextChange {
     /// Semantic source-order shape target.
     #[must_use]
-    pub const fn target(&self) -> crate::text_edit::Target {
+    pub(crate) const fn target(&self) -> crate::text_edit::Target {
         self.target
     }
 
     /// Text required before the replacement.
     #[must_use]
-    pub fn before(&self) -> &str {
+    pub(crate) fn before(&self) -> &str {
         &self.before
     }
 
     /// Replacement text.
     #[must_use]
-    pub fn after(&self) -> &str {
+    pub(crate) fn after(&self) -> &str {
         &self.after
     }
 }
 
 /// One checked shape-geometry formatting replacement.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ShapeAnchorChange {
+pub(crate) struct ShapeAnchorChange {
     target: crate::text_edit::Target,
     before: crate::Anchor,
     after: crate::Anchor,
@@ -1188,7 +1530,7 @@ pub struct ShapeAnchorChange {
 
 /// One checked replacement of an inert external movie/audio path.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ExternalMediaPathChange {
+pub(crate) struct ExternalMediaPathChange {
     id: u32,
     before: Option<String>,
     after: Option<String>,
@@ -1197,26 +1539,26 @@ pub struct ExternalMediaPathChange {
 impl ExternalMediaPathChange {
     /// External-object identifier retained by the replacement.
     #[must_use]
-    pub const fn id(&self) -> u32 {
+    pub(crate) const fn id(&self) -> u32 {
         self.id
     }
 
     /// Path required before the replacement.
     #[must_use]
-    pub fn before(&self) -> Option<&str> {
+    pub(crate) fn before(&self) -> Option<&str> {
         self.before.as_deref()
     }
 
     /// Replacement path, or `None` to clear it.
     #[must_use]
-    pub fn after(&self) -> Option<&str> {
+    pub(crate) fn after(&self) -> Option<&str> {
         self.after.as_deref()
     }
 }
 
 /// One checked replacement of external-media playback flags.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ExternalMediaPlaybackChange {
+pub(crate) struct ExternalMediaPlaybackChange {
     id: u32,
     before: crate::external_media::Playback,
     after: crate::external_media::Playback,
@@ -1224,7 +1566,7 @@ pub struct ExternalMediaPlaybackChange {
 
 /// One fixed-width replacement of a slide's hidden flag.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SlideVisibilityChange {
+pub(crate) struct SlideVisibilityChange {
     position: Position,
     target: Position,
     slide_id: u32,
@@ -1235,26 +1577,26 @@ pub struct SlideVisibilityChange {
 impl SlideVisibilityChange {
     /// Semantic slide position resolved against the transaction-local order.
     #[must_use]
-    pub const fn position(self) -> Position {
+    pub(crate) const fn position(self) -> Position {
         self.position
     }
 
     /// Hidden state required before the replacement.
     #[must_use]
-    pub const fn before(self) -> bool {
+    pub(crate) const fn before(self) -> bool {
         self.before
     }
 
     /// Replacement hidden state.
     #[must_use]
-    pub const fn after(self) -> bool {
+    pub(crate) const fn after(self) -> bool {
         self.after
     }
 }
 
 /// One fixed-width replacement of slide-show advance timing and flags.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SlideAdvanceChange {
+pub(crate) struct SlideAdvanceChange {
     target: Position,
     slide_id: u32,
     before: SlideAdvance,
@@ -1264,26 +1606,26 @@ pub struct SlideAdvanceChange {
 impl SlideAdvanceChange {
     /// Semantic source-order slide target.
     #[must_use]
-    pub const fn target(self) -> Position {
+    pub(crate) const fn target(self) -> Position {
         self.target
     }
 
     /// Advance state required before replacement.
     #[must_use]
-    pub const fn before(self) -> SlideAdvance {
+    pub(crate) const fn before(self) -> SlideAdvance {
         self.before
     }
 
     /// Replacement advance state.
     #[must_use]
-    pub const fn after(self) -> SlideAdvance {
+    pub(crate) const fn after(self) -> SlideAdvance {
         self.after
     }
 }
 
 /// One fixed-width replacement of a slide's visual transition fields.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SlideTransitionVisualChange {
+pub(crate) struct SlideTransitionVisualChange {
     target: Position,
     slide_id: u32,
     before: SlideTransitionVisual,
@@ -1293,19 +1635,19 @@ pub struct SlideTransitionVisualChange {
 impl SlideTransitionVisualChange {
     /// Semantic source-order slide target.
     #[must_use]
-    pub const fn target(self) -> Position {
+    pub(crate) const fn target(self) -> Position {
         self.target
     }
 
     /// Visual transition required before replacement.
     #[must_use]
-    pub const fn before(self) -> SlideTransitionVisual {
+    pub(crate) const fn before(self) -> SlideTransitionVisual {
         self.before
     }
 
     /// Replacement visual transition.
     #[must_use]
-    pub const fn after(self) -> SlideTransitionVisual {
+    pub(crate) const fn after(self) -> SlideTransitionVisual {
         self.after
     }
 }
@@ -1313,19 +1655,19 @@ impl SlideTransitionVisualChange {
 impl ExternalMediaPlaybackChange {
     /// External-object identifier retained by the replacement.
     #[must_use]
-    pub const fn id(self) -> u32 {
+    pub(crate) const fn id(self) -> u32 {
         self.id
     }
 
     /// Playback flags required before the replacement.
     #[must_use]
-    pub const fn before(self) -> crate::external_media::Playback {
+    pub(crate) const fn before(self) -> crate::external_media::Playback {
         self.before
     }
 
     /// Replacement playback flags.
     #[must_use]
-    pub const fn after(self) -> crate::external_media::Playback {
+    pub(crate) const fn after(self) -> crate::external_media::Playback {
         self.after
     }
 }
@@ -1333,19 +1675,19 @@ impl ExternalMediaPlaybackChange {
 impl ShapeAnchorChange {
     /// Semantic source-order shape target.
     #[must_use]
-    pub const fn target(self) -> crate::text_edit::Target {
+    pub(crate) const fn target(self) -> crate::text_edit::Target {
         self.target
     }
 
     /// Anchor required before the replacement.
     #[must_use]
-    pub const fn before(self) -> crate::Anchor {
+    pub(crate) const fn before(self) -> crate::Anchor {
         self.before
     }
 
     /// Replacement anchor.
     #[must_use]
-    pub const fn after(self) -> crate::Anchor {
+    pub(crate) const fn after(self) -> crate::Anchor {
         self.after
     }
 }
@@ -1353,12 +1695,15 @@ impl ShapeAnchorChange {
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum FormattingChange {
     Text(ShapeTextChange),
+    NotesText(NotesTextChange),
     Anchor(ShapeAnchorChange),
     SlideVisibility(SlideVisibilityChange),
     SlideAdvance(SlideAdvanceChange),
     SlideTransitionVisual(SlideTransitionVisualChange),
     MediaPath(ExternalMediaPathChange),
     MediaPlayback(ExternalMediaPlaybackChange),
+    /// Persisted records an element edit replaced (record 0323).
+    Element(records::ElementChange),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1446,26 +1791,26 @@ impl TransferPlan {
 /// One deterministic semantic overlap found during non-mutating three-way
 /// planning.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ThreeWayConflict {
+pub(crate) struct ThreeWayConflict {
     target: String,
 }
 
 impl ThreeWayConflict {
     /// Stable semantic target shared by both branches.
     #[must_use]
-    pub fn target(&self) -> &str {
+    pub(crate) fn target(&self) -> &str {
         &self.target
     }
 }
 
 /// Read-only conflict result for two patches prepared from one exact base.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ThreeWayPlan {
+pub(crate) struct ThreeWayPlan {
     conflicts: Vec<ThreeWayConflict>,
 }
 
 impl ThreeWayPlan {
-    fn new(left: &Patch, right: &Patch) -> Self {
+    pub(crate) fn new(left: &Patch, right: &Patch) -> Self {
         let left_effects = patch_effects(left);
         let right_effects = patch_effects(right);
         let conflicts = left_effects
@@ -1480,13 +1825,13 @@ impl ThreeWayPlan {
 
     /// Whether the two branches have no overlapping semantic write effects.
     #[must_use]
-    pub fn is_clean(&self) -> bool {
+    pub(crate) fn is_clean(&self) -> bool {
         self.conflicts.is_empty()
     }
 
     /// Stable sorted conflict set.
     #[must_use]
-    pub fn conflicts(&self) -> &[ThreeWayConflict] {
+    pub(crate) fn conflicts(&self) -> &[ThreeWayConflict] {
         &self.conflicts
     }
 }
@@ -1504,11 +1849,124 @@ enum StructuralChange {
     Move(Change),
     Remove(ListChange),
     Insert(ListChange),
+    /// A `DocumentContainer` edit outside the slide list (record 0357a),
+    /// with the slide-order fingerprint it was staged at (record 0357b:
+    /// the edit leaves the slide order alone, so the fingerprint holds on
+    /// both sides and binds its durable operation in either direction).
+    Document(DocumentChange, [u8; 32]),
+}
+
+/// A staged `DocumentContainer` edit that leaves the slide list order alone:
+/// master order, the custom table-style atom and `fNonOutlineData`
+/// (record 0357a).
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum DocumentChange {
+    /// The master list became `order` (each entry a previous position).
+    Masters { order: Vec<usize> },
+    /// A custom table-style atom was inserted.
+    InsertStyles {
+        record: crate::Record,
+        placement: document_structure::CustomTableStylesPlacement,
+    },
+    /// The custom table-style atom was removed.
+    RemoveStyles {
+        record: crate::Record,
+        placement: document_structure::CustomTableStylesPlacement,
+    },
+    /// The custom table-style atom was replaced in place.
+    ReplaceStyles {
+        before: crate::Record,
+        after: crate::Record,
+    },
+    /// The custom table-style atom moved around the `EndDocumentAtom`.
+    MoveStyles {
+        before: document_structure::CustomTableStylesPlacement,
+        after: document_structure::CustomTableStylesPlacement,
+    },
+    /// One slide's `SlidePersistAtom.fNonOutlineData` changed.
+    NonOutlineData {
+        position: usize,
+        before: bool,
+        after: bool,
+    },
+}
+
+impl DocumentChange {
+    fn inverse(&self) -> Self {
+        match self {
+            Self::Masters { order } => {
+                let mut inverse = vec![0; order.len()];
+                for (position, previous) in order.iter().enumerate() {
+                    inverse[*previous] = position;
+                }
+                Self::Masters { order: inverse }
+            },
+            Self::InsertStyles { record, placement } => Self::RemoveStyles {
+                record: record.clone(),
+                placement: *placement,
+            },
+            Self::RemoveStyles { record, placement } => Self::InsertStyles {
+                record: record.clone(),
+                placement: *placement,
+            },
+            Self::ReplaceStyles { before, after } => Self::ReplaceStyles {
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::MoveStyles { before, after } => Self::MoveStyles {
+                before: *after,
+                after: *before,
+            },
+            Self::NonOutlineData {
+                position,
+                before,
+                after,
+            } => Self::NonOutlineData {
+                position: *position,
+                before: *after,
+                after: *before,
+            },
+        }
+    }
+
+    fn replay(&self, document: &mut document_structure::Transaction) -> Result<()> {
+        match self {
+            Self::Masters { order } => document.reorder_masters(order)?,
+            Self::InsertStyles { record, placement } => {
+                document.insert_custom_table_styles(record.clone(), *placement)?;
+            },
+            Self::RemoveStyles { .. } => {
+                document.remove_custom_table_styles()?;
+            },
+            Self::ReplaceStyles { after, .. } => {
+                document.replace_custom_table_styles(after.clone())?;
+            },
+            Self::MoveStyles { after, .. } => document.move_custom_table_styles(*after)?,
+            Self::NonOutlineData {
+                position, after, ..
+            } => document.set_slide_non_outline_data(*position, *after)?,
+        }
+        Ok(())
+    }
+
+    /// The semantic target this change writes, for three-way planning.
+    fn effect(&self) -> String {
+        match self {
+            Self::Masters { .. } => "document/master-list".to_owned(),
+            Self::InsertStyles { .. }
+            | Self::RemoveStyles { .. }
+            | Self::ReplaceStyles { .. }
+            | Self::MoveStyles { .. } => "document/custom-table-styles".to_owned(),
+            Self::NonOutlineData { position, .. } => {
+                format!("slide-list/position:{position}/non-outline-data")
+            },
+        }
+    }
 }
 
 /// Isolated failure-atomic edit over one opened presentation's slide order.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub(crate) struct Transaction {
     source: Snapshot,
     working: Snapshot,
     document: document_structure::Transaction,
@@ -1524,18 +1982,97 @@ pub struct Transaction {
     formatting: Vec<FormattingChange>,
     inserted_records: BTreeMap<u32, Vec<u8>>,
     inserted_pictures: BTreeMap<u32, Vec<u8>>,
+    /// Whether a staged text edit republished the live document (outline
+    /// text), so staged structure must be rebased over it at commit.
+    live_document_changed: bool,
+    /// The opened projection of exactly the source bytes, when the root
+    /// edit was started from an immutable package (record 0260).
+    opened: Option<OpenedProjection>,
+    /// Shapes of one slide of the working artifact, proven equal to a parse
+    /// by the last batch text publication's incremental readback (record
+    /// 0264).
+    verified_shapes: Option<VerifiedShapes>,
+}
+
+/// Shapes a parse of slide `persist_id` of exactly `bytes` returns.
+pub(crate) struct VerifiedSlideShapes {
+    /// The exact artifact the shapes describe.
+    pub(crate) bytes: Arc<[u8]>,
+    /// The slide's persist identifier in that artifact.
+    pub(crate) persist_id: u32,
+    /// What parsing that slide returns.
+    pub(crate) shapes: Arc<crate::slide::PatchedShapes>,
+}
+
+/// Shapes a parse of slide `persist_id` of exactly `bytes` returns.
+#[derive(Clone)]
+struct VerifiedShapes {
+    bytes: Arc<[u8]>,
+    persist_id: u32,
+    shapes: Arc<crate::slide::PatchedShapes>,
+}
+
+impl fmt::Debug for VerifiedShapes {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("VerifiedShapes")
+            .field("persist_id", &self.persist_id)
+            .finish_non_exhaustive()
+    }
+}
+
+/// An opened projection of a transaction's exact source bytes. It is used
+/// only while the working artifact is still the source allocation, so a
+/// target resolves against the parse the caller already holds.
+#[derive(Clone)]
+struct OpenedProjection(crate::Presentation);
+
+impl fmt::Debug for OpenedProjection {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("OpenedProjection")
+    }
 }
 
 impl Transaction {
+    /// Attach the opened projection of exactly this transaction's source
+    /// bytes, which target resolution reuses while nothing has been staged.
+    pub(crate) fn with_opened_projection(mut self, presentation: crate::Presentation) -> Self {
+        self.opened = Some(OpenedProjection(presentation));
+        self
+    }
+
+    /// The opened source projection, while the working artifact is still the
+    /// exact source allocation.
+    fn opened_source(&self) -> Option<&crate::Presentation> {
+        self.opened
+            .as_ref()
+            .filter(|_| Arc::ptr_eq(&self.working.shared_bytes(), &self.source.shared_bytes()))
+            .map(|opened| &opened.0)
+    }
+
+    /// The working artifact and the proven shapes of one of its slides, when
+    /// the last batch text publication verified exactly this working
+    /// artifact (record 0264).
+    pub(crate) fn verified_shapes(&self) -> Option<VerifiedSlideShapes> {
+        self.verified_shapes
+            .as_ref()
+            .filter(|verified| Arc::ptr_eq(&verified.bytes, &self.working.shared_bytes()))
+            .map(|verified| VerifiedSlideShapes {
+                bytes: Arc::clone(&verified.bytes),
+                persist_id: verified.persist_id,
+                shapes: Arc::clone(&verified.shapes),
+            })
+    }
+
     /// Immutable source snapshot.
     #[must_use]
-    pub const fn source(&self) -> &Snapshot {
+    pub(crate) const fn source(&self) -> &Snapshot {
         &self.source
     }
 
     /// Current number of slides.
     #[must_use]
-    pub fn slide_count(&self) -> usize {
+    pub(crate) fn slide_count(&self) -> usize {
         self.document
             .slides()
             .map_or(self.source.slide_count(), |slides| slides.len())
@@ -1543,49 +2080,49 @@ impl Transaction {
 
     /// Semantic moves staged in call order.
     #[must_use]
-    pub fn changes(&self) -> &[Change] {
+    pub(crate) fn changes(&self) -> &[Change] {
         &self.changes
     }
 
     /// Fixed-width slide visibility changes staged in call order.
     #[must_use]
-    pub fn slide_visibility_changes(&self) -> &[SlideVisibilityChange] {
+    pub(crate) fn slide_visibility_changes(&self) -> &[SlideVisibilityChange] {
         &self.visibility_changes
     }
 
     /// Fixed-width slide advance changes staged in call order.
     #[must_use]
-    pub fn slide_advance_changes(&self) -> &[SlideAdvanceChange] {
+    pub(crate) fn slide_advance_changes(&self) -> &[SlideAdvanceChange] {
         &self.advance_changes
     }
 
     /// Fixed-width visual transition changes staged in call order.
     #[must_use]
-    pub fn slide_transition_visual_changes(&self) -> &[SlideTransitionVisualChange] {
+    pub(crate) fn slide_transition_visual_changes(&self) -> &[SlideTransitionVisualChange] {
         &self.transition_visual_changes
     }
 
     /// Checked shape-text replacements staged in this root transaction.
     #[must_use]
-    pub fn shape_text_changes(&self) -> &[ShapeTextChange] {
+    pub(crate) fn shape_text_changes(&self) -> &[ShapeTextChange] {
         &self.text_changes
     }
 
     /// Checked shape-anchor formatting replacements staged in this root.
     #[must_use]
-    pub fn shape_anchor_changes(&self) -> &[ShapeAnchorChange] {
+    pub(crate) fn shape_anchor_changes(&self) -> &[ShapeAnchorChange] {
         &self.anchor_changes
     }
 
     /// External movie/audio path replacements staged in this root.
     #[must_use]
-    pub fn external_media_path_changes(&self) -> &[ExternalMediaPathChange] {
+    pub(crate) fn external_media_path_changes(&self) -> &[ExternalMediaPathChange] {
         &self.media_path_changes
     }
 
     /// External-media playback replacements staged in this root.
     #[must_use]
-    pub fn external_media_playback_changes(&self) -> &[ExternalMediaPlaybackChange] {
+    pub(crate) fn external_media_playback_changes(&self) -> &[ExternalMediaPlaybackChange] {
         &self.media_playback_changes
     }
 
@@ -1596,12 +2133,13 @@ impl Transaction {
     ///
     /// Returns a typed refusal when either position is absent, or a package
     /// error when the structural candidate is invalid.
-    pub fn move_slide(&mut self, from: Position, destination: Position) -> Result<()> {
+    pub(crate) fn move_slide(&mut self, from: Position, destination: Position) -> Result<()> {
         self.require_position(from)?;
         self.require_position(destination)?;
         if from == destination {
             return Ok(());
         }
+        self.require_change_allowed()?;
         let before_order = order_digest(&self.document)?;
         self.document
             .move_slide(from.get(), destination.get())
@@ -1618,6 +2156,221 @@ impl Transaction {
         Ok(())
     }
 
+    /// Reorders the main and title masters (record 0357a): the master list
+    /// becomes `order`, each entry a current zero-based master position.
+    ///
+    /// Slides, notes and title masters reference masters by `masterId`, which
+    /// is unchanged, so every reference keeps its master. The identity order
+    /// is an exact no-op.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::InvalidElementValue`] unless `order` is a permutation of
+    /// the master positions; [`Refusal::Signed`] for a change on a signed
+    /// source.
+    pub(crate) fn reorder_masters(&mut self, order: &[usize]) -> Result<()> {
+        let count = self.document.masters()?.len();
+        let mut seen = vec![false; count];
+        if order.len() != count
+            || !order
+                .iter()
+                .all(|index| *index < count && !std::mem::replace(&mut seen[*index], true))
+        {
+            return Err(Error::Refused(Refusal::InvalidElementValue {
+                element: "master order",
+                reason: "it is not a permutation of the master positions",
+            }));
+        }
+        if order
+            .iter()
+            .enumerate()
+            .all(|(position, index)| position == *index)
+        {
+            return Ok(());
+        }
+        self.require_change_allowed()?;
+        self.document.reorder_masters(order)?;
+        self.push_document(DocumentChange::Masters {
+            order: order.to_vec(),
+        })?;
+        Ok(())
+    }
+
+    /// Moves one master to a final zero-based position (record 0357a).
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::ElementNotFound`] for a position outside the master list.
+    pub(crate) fn move_master(&mut self, from: Position, destination: Position) -> Result<()> {
+        let count = self.document.masters()?.len();
+        if from.get() >= count || destination.get() >= count {
+            return Err(Error::Refused(Refusal::ElementNotFound {
+                element: "master",
+            }));
+        }
+        let mut order: Vec<_> = (0..count).collect();
+        let value = order.remove(from.get());
+        order.insert(destination.get(), value);
+        self.reorder_masters(&order)
+    }
+
+    /// Moves the master with `masterId` `master_id` to a final position
+    /// (record 0357a).
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::ElementNotFound`] when no master has that id.
+    pub(crate) fn move_master_id(&mut self, master_id: u32, destination: Position) -> Result<()> {
+        let from = self
+            .document
+            .masters()?
+            .iter()
+            .position(|master| master.master_id() == master_id)
+            .ok_or(Error::Refused(Refusal::ElementNotFound {
+                element: "master",
+            }))?;
+        self.move_master(Position::new(from), destination)
+    }
+
+    fn custom_table_styles(
+        &self,
+    ) -> Result<Option<document_structure::CustomTableStylesPlacement>> {
+        Ok(self.document.structure()?.custom_table_styles)
+    }
+
+    fn require_custom_table_styles(
+        &self,
+    ) -> Result<document_structure::CustomTableStylesPlacement> {
+        self.custom_table_styles()?
+            .ok_or(Error::Refused(Refusal::ElementNotFound {
+                element: "custom table styles",
+            }))
+    }
+
+    /// Inserts a `RoundTripCustomTableStyles12Atom` before or after the
+    /// `EndDocumentAtom` (record 0357a).
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::InvalidElementValue`] for a record that is not such an
+    /// atom, and [`Refusal::UnsupportedElement`] when the document already
+    /// has one.
+    pub(crate) fn insert_custom_table_styles(
+        &mut self,
+        record: crate::Record,
+        placement: document_structure::CustomTableStylesPlacement,
+    ) -> Result<()> {
+        require_custom_table_styles_record(&record)?;
+        if self.custom_table_styles()?.is_some() {
+            return Err(Error::Refused(Refusal::UnsupportedElement {
+                element: "custom table styles",
+                reason: "the document already has a custom table-style atom",
+            }));
+        }
+        self.require_change_allowed()?;
+        self.document
+            .insert_custom_table_styles(record.clone(), placement)?;
+        self.push_document(DocumentChange::InsertStyles { record, placement })?;
+        Ok(())
+    }
+
+    /// Removes the custom table-style atom and returns it (record 0357a).
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::ElementNotFound`] when the document has none.
+    pub(crate) fn remove_custom_table_styles(&mut self) -> Result<crate::Record> {
+        let placement = self.require_custom_table_styles()?;
+        self.require_change_allowed()?;
+        let record = self.document.remove_custom_table_styles()?;
+        self.push_document(DocumentChange::RemoveStyles {
+            record: record.clone(),
+            placement,
+        })?;
+        Ok(record)
+    }
+
+    /// Replaces the custom table-style atom in place and returns the
+    /// previous one (record 0357a). An equal record is an exact no-op.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::ElementNotFound`] when the document has none and
+    /// [`Refusal::InvalidElementValue`] for a record that is not such an
+    /// atom.
+    pub(crate) fn replace_custom_table_styles(
+        &mut self,
+        record: crate::Record,
+    ) -> Result<crate::Record> {
+        require_custom_table_styles_record(&record)?;
+        self.require_custom_table_styles()?;
+        let mut probe = self.document.clone();
+        let before = probe.replace_custom_table_styles(record.clone())?;
+        if before == record {
+            return Ok(before);
+        }
+        self.require_change_allowed()?;
+        self.document = probe;
+        self.push_document(DocumentChange::ReplaceStyles {
+            before: before.clone(),
+            after: record,
+        })?;
+        Ok(before)
+    }
+
+    /// Moves the custom table-style atom before or after the
+    /// `EndDocumentAtom` (record 0357a). Its current placement is an exact
+    /// no-op.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::ElementNotFound`] when the document has none.
+    pub(crate) fn move_custom_table_styles(
+        &mut self,
+        placement: document_structure::CustomTableStylesPlacement,
+    ) -> Result<()> {
+        let before = self.require_custom_table_styles()?;
+        if before == placement {
+            return Ok(());
+        }
+        self.require_change_allowed()?;
+        self.document.move_custom_table_styles(placement)?;
+        self.push_document(DocumentChange::MoveStyles {
+            before,
+            after: placement,
+        })?;
+        Ok(())
+    }
+
+    /// Sets one slide's `SlidePersistAtom.fNonOutlineData` flag
+    /// ([MS-PPT] 2.4.14.5; record 0357a). It does not hide the slide. The
+    /// current value is an exact no-op.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::SlideNotFound`] for a position outside the slide list.
+    pub(crate) fn set_slide_non_outline_data(
+        &mut self,
+        position: Position,
+        present: bool,
+    ) -> Result<()> {
+        self.require_position(position)?;
+        let slide = self.document.slides()?[position.get()];
+        let before = slide.flags() & (1 << 2) != 0;
+        if before == present {
+            return Ok(());
+        }
+        self.require_change_allowed()?;
+        self.document
+            .set_slide_non_outline_data(position.get(), present)?;
+        self.push_document(DocumentChange::NonOutlineData {
+            position: position.get(),
+            before,
+            after: present,
+        })?;
+        Ok(())
+    }
+
     /// Changes whether one slide is hidden during presentation.
     ///
     /// Only `SlideShowSlideInfoAtom.fHidden` (flags bit 2), defined by
@@ -1627,11 +2380,19 @@ impl Transaction {
     /// media changes and is carried by exact, inverse, durable, history, and
     /// merge surfaces.
     ///
+    /// A slide without a `SlideShowSlideInfoAtom` (producer slides, and
+    /// slides the PPT writer made without timing or a transition) gains one
+    /// directly after its `SlideAtom` ([MS-PPT] 2.5.1) when it is hidden: no
+    /// transition, no sound, manual advance, medium speed, `fHidden` set.
+    /// Showing such a slide is a no-op. Clearing the flag again later keeps
+    /// the atom; the exact inverse of the commit restores the source bytes.
+    ///
     /// # Errors
     ///
-    /// Returns a typed refusal when the position is absent or the slide has no
-    /// unique fixed-width slide-show information atom.
-    pub fn set_slide_hidden(&mut self, position: Position, hidden: bool) -> Result<()> {
+    /// Returns a typed refusal when the position is absent, or the slide has
+    /// several or a malformed slide-show information atom, or no leading
+    /// `SlideAtom` to insert one after.
+    pub(crate) fn set_slide_hidden(&mut self, position: Position, hidden: bool) -> Result<()> {
         self.require_position(position)?;
         let selected = self.document.slides()?[position.get()];
         let source_position = self
@@ -1646,6 +2407,7 @@ impl Transaction {
         if before == hidden {
             return Ok(());
         }
+        self.require_change_allowed()?;
         self.working = replace_slide_hidden(&self.working, source_position, hidden)?;
         let change = SlideVisibilityChange {
             position,
@@ -1671,7 +2433,11 @@ impl Transaction {
     ///
     /// Returns a typed refusal for an absent, ambiguous, malformed, or newly
     /// inserted slide-show information owner.
-    pub fn set_slide_advance(&mut self, position: Position, advance: SlideAdvance) -> Result<()> {
+    pub(crate) fn set_slide_advance(
+        &mut self,
+        position: Position,
+        advance: SlideAdvance,
+    ) -> Result<()> {
         self.require_position(position)?;
         let selected = self.document.slides()?[position.get()];
         let source_position = self
@@ -1686,6 +2452,7 @@ impl Transaction {
         if before == advance {
             return Ok(());
         }
+        self.require_change_allowed()?;
         self.working = replace_slide_advance(&self.working, source_position, advance)?;
         let change = SlideAdvanceChange {
             target: source_position,
@@ -1707,7 +2474,7 @@ impl Transaction {
     ///
     /// Returns a typed refusal for an absent, ambiguous, malformed, or newly
     /// inserted visual transition owner.
-    pub fn set_slide_transition_visual(
+    pub(crate) fn set_slide_transition_visual(
         &mut self,
         position: Position,
         visual: SlideTransitionVisual,
@@ -1726,6 +2493,7 @@ impl Transaction {
         if before == visual {
             return Ok(());
         }
+        self.require_change_allowed()?;
         self.working = replace_slide_transition_visual(&self.working, source_position, visual)?;
         let change = SlideTransitionVisualChange {
             target: source_position,
@@ -1749,7 +2517,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns a typed slide refusal or the checked shape-text owner's error.
-    pub fn set_shape_text(
+    pub(crate) fn set_shape_text(
         &mut self,
         target: crate::text_edit::Target,
         value: impl Into<String>,
@@ -1766,13 +2534,34 @@ impl Transaction {
             .map(Position::new)
             .ok_or(Error::Refused(Refusal::UncommittedSlideDependency))?;
         let source_target = crate::text_edit::Target::new(source_position, target.shape());
+        let after = value.into();
+        if self.source.has_signature {
+            let before = crate::text_edit::inspect_shape_text_readonly(
+                self.working.bytes(),
+                source_target,
+                self.source.open_options(),
+            )?;
+            if before == after {
+                return Ok(());
+            }
+            return Err(Error::Refused(Refusal::Signed));
+        }
         let text_snapshot =
             crate::text_edit::Snapshot::from_shared_bytes(self.working.shared_bytes())?;
-        let mut text_edit = text_snapshot.edit_text(source_target)?;
+        let mut text_edit = match text_snapshot.edit_text_in(source_target, self.opened_source()) {
+            Ok(text_edit) => text_edit,
+            Err(crate::text_edit::Error::Refused(crate::text_edit::Refusal::NoTextAtom)) => {
+                // Outline-backed placeholder text is owned by the live
+                // document; the batch owner publishes that body.
+                return self
+                    .set_shape_texts_mapped(&[(target, after.as_str())])
+                    .map(drop);
+            },
+            Err(error) => return Err(error.into()),
+        };
         let before = text_edit.text().to_string();
-        let after = value.into();
         text_edit.set_text(after.clone())?;
-        let commit = text_edit.commit()?;
+        let (commit, verified) = text_edit.commit_verified()?;
         if commit.patch().is_empty() {
             return Ok(());
         }
@@ -1782,6 +2571,12 @@ impl Transaction {
         self.working = self
             .working
             .adopt_text_edit_publication(publication, persist_id)?;
+        // As for batches: proven shapes describe exactly the adopted bytes.
+        self.verified_shapes = verified.map(|(persist_id, shapes)| VerifiedShapes {
+            bytes: self.working.shared_bytes(),
+            persist_id,
+            shapes: Arc::new(shapes),
+        });
         let change = ShapeTextChange {
             target: source_target,
             before,
@@ -1789,6 +2584,67 @@ impl Transaction {
         };
         self.text_changes.push(change.clone());
         self.formatting.push(FormattingChange::Text(change));
+        Ok(())
+    }
+
+    /// Replaces the speaker-notes text of the slide at a projected position.
+    ///
+    /// The slide's notes page must hold exactly one body placeholder; its
+    /// text body follows the shape-text dependency-closure rules. Equal text
+    /// is an exact no-op. The change publishes the notes persist object in
+    /// one append-only user edit and reopens the candidate for readback.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed refusal for a missing slide or notes page, a notes
+    /// page without one body placeholder, an unrepresentable or
+    /// position-dependent text change, a changed signed source, or a slide
+    /// inserted by this transaction.
+    pub(crate) fn set_notes_text(
+        &mut self,
+        position: Position,
+        value: impl Into<String>,
+    ) -> Result<()> {
+        self.require_position(position)?;
+        let projected = self.document.slides()?;
+        let persist_id = projected[position.get()].persist_id();
+        let source_position = self
+            .source
+            .document
+            .slides()
+            .iter()
+            .position(|slide| slide.persist_id() == persist_id)
+            .map(Position::new)
+            .ok_or(Error::Refused(Refusal::UncommittedSlideDependency))?;
+        let after = value.into();
+        if self.source.has_signature {
+            let before = crate::text_edit::inspect_notes_text_readonly(
+                self.working.bytes(),
+                source_position,
+                self.source.open_options(),
+            )?;
+            if before == after {
+                return Ok(());
+            }
+            return Err(Error::Refused(Refusal::Signed));
+        }
+        let Some(publication) = crate::text_edit::replace_notes_text(
+            self.working.shared_bytes(),
+            source_position,
+            &after,
+            self.source.limits.max_package_bytes,
+        )?
+        else {
+            return Ok(());
+        };
+        let before = publication.before().to_owned();
+        self.working = self.working.adopt_notes_publication(publication)?;
+        let change = NotesTextChange {
+            slide: source_position,
+            before,
+            after,
+        };
+        self.formatting.push(FormattingChange::NotesText(change));
         Ok(())
     }
 
@@ -1808,7 +2664,10 @@ impl Transaction {
     /// semantic targets, missing targets, incompatible encodings, unsafe
     /// dependency closures, and package publication failures leave this
     /// transaction unchanged.
-    pub fn set_shape_texts(&mut self, replacements: &[ShapeTextReplacement]) -> Result<usize> {
+    pub(crate) fn set_shape_texts(
+        &mut self,
+        replacements: &[ShapeTextReplacement],
+    ) -> Result<usize> {
         if replacements.len() > MAX_SHAPE_TEXT_REPLACEMENTS {
             return Err(PackageError::ResourceLimit(format!(
                 "PPT shape-text batch operation count {} exceeds limit {}",
@@ -1821,14 +2680,30 @@ impl Transaction {
             return Ok(0);
         }
 
+        let mapped = replacements
+            .iter()
+            .map(|replacement| (replacement.target(), replacement.text()))
+            .collect::<Vec<_>>();
+        self.set_shape_texts_mapped(&mapped)
+    }
+
+    fn set_shape_texts_mapped(
+        &mut self,
+        replacements: &[(crate::text_edit::Target, &str)],
+    ) -> Result<usize> {
+        if replacements.is_empty() {
+            return Ok(0);
+        }
+
         let projected = self.document.slides()?;
         let mut seen = BTreeSet::new();
         let mut mapped = Vec::with_capacity(replacements.len());
         let mut expected_persist_ids = BTreeMap::new();
-        for replacement in replacements {
-            let target = replacement.target();
+        for (target, replacement) in replacements {
             if !seen.insert((target.slide().get(), target.shape().get())) {
-                return Err(Error::Refused(Refusal::DuplicateShapeTextTarget { target }));
+                return Err(Error::Refused(Refusal::DuplicateShapeTextTarget {
+                    target: *target,
+                }));
             }
             let selected = projected.get(target.slide().get()).ok_or(Error::Refused(
                 Refusal::SlideNotFound {
@@ -1845,17 +2720,32 @@ impl Transaction {
                 .map(Position::new)
                 .ok_or(Error::Refused(Refusal::UncommittedSlideDependency))?;
             let source_target = crate::text_edit::Target::new(source_position, target.shape());
-            mapped.push((source_target, replacement.text()));
+            mapped.push((source_target, *replacement));
             expected_persist_ids.insert(
                 (source_target.slide().get(), source_target.shape().get()),
                 persist_id,
             );
         }
 
-        let Some(publication) = crate::text_edit::replace_shape_texts_batch(
+        if self.source.has_signature {
+            for (target, replacement) in &mapped {
+                let before = crate::text_edit::inspect_shape_text_readonly(
+                    self.working.bytes(),
+                    *target,
+                    self.source.open_options(),
+                )?;
+                if before != *replacement {
+                    return Err(Error::Refused(Refusal::Signed));
+                }
+            }
+            return Ok(0);
+        }
+
+        let Some(mut publication) = crate::text_edit::replace_shape_texts_batch(
             self.working.shared_bytes(),
             &mapped,
             self.source.limits.max_package_bytes,
+            self.opened_source(),
         )?
         else {
             return Ok(0);
@@ -1873,9 +2763,22 @@ impl Transaction {
             }
         }
 
+        let document_changed = publication.document_changed();
+        let verified = publication.take_verified_shapes();
         let (working, published_changes) = self
             .working
             .adopt_text_edit_batch_publication(publication)?;
+        // Proven shapes describe exactly the adopted bytes when adoption kept
+        // the publication's allocation; a reopened adoption drops them.
+        self.verified_shapes = verified
+            .into_iter()
+            .next_back()
+            .map(|(persist_id, shapes)| VerifiedShapes {
+                bytes: working.shared_bytes(),
+                persist_id,
+                shapes: Arc::new(shapes),
+            });
+        self.live_document_changed |= document_changed;
         let changes = published_changes
             .into_iter()
             .map(|change| ShapeTextChange {
@@ -1893,6 +2796,43 @@ impl Transaction {
         Ok(changed)
     }
 
+    /// Atomically replaces shape text from several bounded replacement
+    /// chunks.
+    ///
+    /// Each inner chunk retains the 256-target contract of
+    /// [`Self::set_shape_texts`]. The aggregate accepts at most
+    /// [`MAX_SHAPE_TEXT_CHUNKS`] chunks, including empty chunks, and at most
+    /// [`MAX_SHAPE_TEXT_CHUNK_SELECTIONS`] selected shapes. Targets must be
+    /// globally distinct across all chunks. The complete flattened plan is
+    /// admitted before target resolution, then all changed slide records are
+    /// grouped into one native publication and one candidate reopen/readback.
+    /// Exact no-ops retain the working allocation, and a failed call leaves
+    /// this transaction unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns a resource-limit error for a chunk, aggregate selection, or
+    /// replacement-byte limit; duplicate semantic targets, missing targets,
+    /// incompatible encodings, unsafe dependency closures, signed changes,
+    /// and publication failures are returned without partial state.
+    pub(crate) fn set_shape_text_chunks(
+        &mut self,
+        chunks: &[&[ShapeTextReplacement]],
+    ) -> Result<usize> {
+        let (flattened, replacement_bytes) = flatten_shape_text_chunks(chunks)?;
+        if replacement_bytes > self.source.limits.max_package_bytes {
+            return Err(PackageError::ResourceLimit(format!(
+                "PPT shape-text aggregate replacement bytes {} exceeds limit {}",
+                replacement_bytes, self.source.limits.max_package_bytes
+            ))
+            .into());
+        }
+        if flattened.is_empty() {
+            return Ok(0);
+        }
+        self.set_shape_texts_mapped(&flattened)
+    }
+
     /// Replaces an existing shape's complete checked `PowerPoint` client anchor.
     /// Every other `OfficeArt` record and CFB stream remains exact.
     ///
@@ -1900,7 +2840,7 @@ impl Transaction {
     ///
     /// Returns a typed refusal when the semantic target is missing,
     /// ambiguous, newly inserted, or lacks exactly one supported host anchor.
-    pub fn set_shape_anchor(
+    pub(crate) fn set_shape_anchor(
         &mut self,
         target: crate::text_edit::Target,
         anchor: crate::Anchor,
@@ -1917,12 +2857,24 @@ impl Transaction {
             .map(Position::new)
             .ok_or(Error::Refused(Refusal::UncommittedSlideDependency))?;
         let source_target = crate::text_edit::Target::new(source_position, target.shape());
+        if self.source.has_signature {
+            let before = crate::text_edit::inspect_shape_anchor_readonly(
+                self.working.bytes(),
+                source_target,
+                self.source.open_options(),
+            )?;
+            if before == anchor {
+                return Ok(());
+            }
+            return Err(Error::Refused(Refusal::Signed));
+        }
         let rewritten =
             crate::text_edit::replace_shape_anchor(self.working.bytes(), source_target, anchor)?;
         if rewritten.before == rewritten.after {
             return Ok(());
         }
-        self.working = Snapshot::from_bytes_with_limits(rewritten.bytes, self.source.limits)?;
+        self.working =
+            Snapshot::from_bytes_with_options(rewritten.bytes, self.source.open_options())?;
         let change = ShapeAnchorChange {
             target: source_target,
             before: rewritten.before,
@@ -1944,7 +2896,7 @@ impl Transaction {
     ///
     /// Returns a typed owner-order refusal or an external-media validation or
     /// package publication error.
-    pub fn set_external_media_path(&mut self, id: u32, path: Option<String>) -> Result<()> {
+    pub(crate) fn set_external_media_path(&mut self, id: u32, path: Option<String>) -> Result<()> {
         let media = external_media_snapshot(&self.working)?;
         let object = media
             .collection()
@@ -1953,6 +2905,12 @@ impl Transaction {
                 PackageError::InvalidFormat(format!("external media ID {id} was not found"))
             })?;
         let before = media_path_of(object)?;
+        if self.source.has_signature {
+            if before.as_deref() == path.as_deref() {
+                return Ok(());
+            }
+            return Err(Error::Refused(Refusal::Signed));
+        }
         let mut transaction = media.edit();
         transaction.set_path(id, path.clone())?;
         let commit = transaction.commit()?;
@@ -1983,7 +2941,7 @@ impl Transaction {
     ///
     /// Returns a typed owner-order refusal or an external-media validation or
     /// package publication error.
-    pub fn set_external_media_playback(
+    pub(crate) fn set_external_media_playback(
         &mut self,
         id: u32,
         playback: crate::external_media::Playback,
@@ -1995,6 +2953,12 @@ impl Transaction {
             .ok_or_else(|| {
                 PackageError::InvalidFormat(format!("external media ID {id} was not found"))
             })?;
+        if self.source.has_signature {
+            if before == playback {
+                return Ok(());
+            }
+            return Err(Error::Refused(Refusal::Signed));
+        }
         let mut transaction = media.edit();
         transaction.set_playback(id, playback)?;
         let commit = transaction.commit()?;
@@ -2025,8 +2989,9 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns a typed position refusal or a structural validation error.
-    pub fn remove_slide(&mut self, position: Position) -> Result<()> {
+    pub(crate) fn remove_slide(&mut self, position: Position) -> Result<()> {
         self.require_position(position)?;
+        self.require_change_allowed()?;
         let before_order = order_digest(&self.document)?;
         let slides = self.document.slides()?;
         let selected = slides[position.get()];
@@ -2046,6 +3011,64 @@ impl Transaction {
         Ok(())
     }
 
+    /// Inserts a blank slide at a projected position; `position ==
+    /// slide_count()` appends.
+    ///
+    /// The slide uses the blank layout and follows the master, color scheme
+    /// and background of its preceding slide (or the following slide when it
+    /// becomes the first, or the first main master of an empty deck). Its
+    /// drawing receives a new drawing identifier and shape-identifier
+    /// cluster, registered in the drawing group at commit.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed position or signed-source refusal, or a resource
+    /// error when the persist, slide, drawing or shape identifier space is
+    /// exhausted.
+    pub(crate) fn insert_slide(&mut self, position: Position) -> Result<()> {
+        self.require_change_allowed()?;
+        let count = self.slide_count();
+        if position.get() > count {
+            return Err(Error::Refused(Refusal::SlideNotFound { position }));
+        }
+        let slides = self.document.slides()?;
+        let neighbor = position
+            .get()
+            .checked_sub(1)
+            .or_else(|| (count > 0).then_some(0))
+            .map(|index| slides[index].persist_id());
+        let (master_id, color_scheme) = match neighbor {
+            Some(persist_id) => {
+                let record = match self.inserted_records.get(&persist_id) {
+                    Some(record) => record.clone(),
+                    None => persisted_record(&self.working, persist_id)?,
+                };
+                blank::master_and_scheme(&record)?
+            },
+            None => {
+                let master = self
+                    .document
+                    .masters()?
+                    .first()
+                    .copied()
+                    .ok_or(Error::Refused(Refusal::MissingMasterDependency {
+                        master_id: 0,
+                    }))?;
+                (master.master_id(), None)
+            },
+        };
+        require_master(&self.document, master_id)?;
+        let allocation = blank::allocate(self.working.document.bytes(), &self.inserted_records)?;
+        let record = blank::slide_record(master_id, color_scheme, allocation)?;
+        let payload = SlidePayload {
+            group: blank::slide_list_group(),
+            record,
+            master_id,
+            pictures: Vec::new(),
+        };
+        self.insert_payload(position, payload)
+    }
+
     /// Inserts a dependency-checked cross-presentation transfer plan.
     /// `position == slide_count()` appends the transferred slide.
     ///
@@ -2053,7 +3076,12 @@ impl Transaction {
     ///
     /// Returns a typed refusal for a stale/different target or a package error
     /// when identifier allocation or structural validation fails.
-    pub fn insert_transfer(&mut self, position: Position, plan: &TransferPlan) -> Result<()> {
+    pub(crate) fn insert_transfer(
+        &mut self,
+        position: Position,
+        plan: &TransferPlan,
+    ) -> Result<()> {
+        self.require_change_allowed()?;
         if plan.target_artifact != self.source.artifact_digest() {
             return Err(Error::Refused(Refusal::TransferTargetMismatch));
         }
@@ -2087,25 +3115,31 @@ impl Transaction {
                 },
             }
         }
+        self.insert_payload(position, plan.payload.clone())
+    }
+
+    /// Allocates the persist and slide identifiers of an inserted slide and
+    /// stages its slide-list group and persisted record.
+    fn insert_payload(&mut self, position: Position, payload: SlidePayload) -> Result<()> {
         let persist_id = next_persist_id(&self.source, &self.inserted_records)?;
         let slide_id = next_slide_id(&self.document)?;
-        let mut group = plan.payload.group.clone();
+        let mut group = payload.group;
         rewrite_slide_persist(&mut group, persist_id, slide_id)?;
         let before_order = order_digest(&self.document)?;
         self.document
             .insert_slide_group(position.get(), group.clone())?;
         let after_order = order_digest(&self.document)?;
         self.inserted_records
-            .insert(persist_id, plan.payload.record.clone());
+            .insert(persist_id, payload.record.clone());
         self.structural.push(StructuralChange::Insert(ListChange {
             position,
             before_order,
             after_order,
             payload: SlidePayload {
                 group,
-                record: plan.payload.record.clone(),
-                master_id: plan.payload.master_id,
-                pictures: plan.payload.pictures.clone(),
+                record: payload.record,
+                master_id: payload.master_id,
+                pictures: payload.pictures,
             },
         }));
         Ok(())
@@ -2118,9 +3152,14 @@ impl Transaction {
     ///
     /// Returns an error if publication, preservation checks, full reopen, or
     /// semantic readback fails.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
+        if self.source.has_signature && self.source.bytes() != self.working.bytes() {
+            return Err(Error::Refused(Refusal::Signed));
+        }
         let document_commit = if self.structural.is_empty()
-            || (self.media_path_changes.is_empty() && self.media_playback_changes.is_empty())
+            || (self.media_path_changes.is_empty()
+                && self.media_playback_changes.is_empty()
+                && !self.live_document_changed)
         {
             self.document.commit()?
         } else {
@@ -2130,6 +3169,11 @@ impl Transaction {
         };
         let source = self.source;
         let working = self.working;
+        if source.has_signature
+            && (!document_commit.patch().is_empty() || source.bytes() != working.bytes())
+        {
+            return Err(Error::Refused(Refusal::Signed));
+        }
         if document_commit.patch().is_empty() {
             // Any staged structural operations net to the published working
             // artifact, which the patch retains as its target.
@@ -2159,6 +3203,7 @@ impl Transaction {
         let mut editor = crate::embedded::object::Editor::open_records_arc_with_limit(
             working.shared_bytes(),
             source.limits.max_package_bytes,
+            source.limits,
         )?;
         // Nothing is staged yet, so the publishing editor reads exactly the
         // working artifact's persisted slide payloads.
@@ -2173,7 +3218,10 @@ impl Transaction {
         for (persist_id, record) in &self.inserted_records {
             editor.insert_persisted_record(*persist_id, record.clone())?;
         }
-        let mut document_bytes = document_commit.snapshot().bytes().to_vec();
+        let mut document_bytes = blank::register_inserted_drawings(
+            document_commit.snapshot().bytes(),
+            &self.inserted_records,
+        )?;
         let picture_stream = if self.inserted_pictures.is_empty() {
             None
         } else {
@@ -2192,14 +3240,18 @@ impl Transaction {
         } else {
             validate_unrelated_picture_publication(working.bytes(), &bytes)?;
         }
-        let snapshot = Snapshot::from_bytes_with_limits(bytes, source.limits)?;
+        let snapshot = Snapshot::from_bytes_with_options(bytes, source.open_options())?;
         if snapshot.document.slides() != document_commit.snapshot().slides() {
             return Err(PackageError::Corrupted(
                 "published PPT slide order did not round-trip through the live document".into(),
             )
             .into());
         }
-        let after_slides = persisted_slides(snapshot.artifact.shared(), &snapshot.document)?;
+        let after_slides = persisted_slides(
+            snapshot.artifact.shared(),
+            &snapshot.document,
+            snapshot.limits,
+        )?;
         let expected_slides = expected_persisted_slides(
             document_commit.snapshot().slides(),
             &before_slides,
@@ -2247,9 +3299,17 @@ impl Transaction {
     ///
     /// Returns the same typed error as [`Self::commit`].
     #[cfg(feature = "performance-diagnostics")]
-    pub fn commit_profiled(self, mut observer: impl FnMut(DiagnosticEvent)) -> Result<Commit> {
+    pub(crate) fn commit_profiled(
+        self,
+        mut observer: impl FnMut(DiagnosticEvent),
+    ) -> Result<Commit> {
+        if self.source.has_signature && self.source.bytes() != self.working.bytes() {
+            return Err(Error::Refused(Refusal::Signed));
+        }
         let document_commit = if self.structural.is_empty()
-            || (self.media_path_changes.is_empty() && self.media_playback_changes.is_empty())
+            || (self.media_path_changes.is_empty()
+                && self.media_playback_changes.is_empty()
+                && !self.live_document_changed)
         {
             observe_phase(&mut observer, DiagnosticPhase::DocumentCommit, || {
                 Ok(self.document.commit()?)
@@ -2263,6 +3323,11 @@ impl Transaction {
         };
         let source = self.source;
         let working = self.working;
+        if source.has_signature
+            && (!document_commit.patch().is_empty() || source.bytes() != working.bytes())
+        {
+            return Err(Error::Refused(Refusal::Signed));
+        }
 
         if document_commit.patch().is_empty() {
             observe_phase(&mut observer, DiagnosticPhase::StructuralNoOp, || Ok(()))?;
@@ -2294,6 +3359,7 @@ impl Transaction {
                 crate::embedded::object::Editor::open_records_arc_with_limit(
                     working.shared_bytes(),
                     source.limits.max_package_bytes,
+                    source.limits,
                 )?,
             )
         })?;
@@ -2314,7 +3380,10 @@ impl Transaction {
         for (persist_id, record) in &self.inserted_records {
             editor.insert_persisted_record(*persist_id, record.clone())?;
         }
-        let mut document_bytes = document_commit.snapshot().bytes().to_vec();
+        let mut document_bytes = blank::register_inserted_drawings(
+            document_commit.snapshot().bytes(),
+            &self.inserted_records,
+        )?;
         let picture_stream = if self.inserted_pictures.is_empty() {
             None
         } else {
@@ -2343,7 +3412,7 @@ impl Transaction {
             },
         )?;
         let snapshot = observe_phase(&mut observer, DiagnosticPhase::PublicReopen, || {
-            Snapshot::from_bytes_with_limits(bytes, source.limits)
+            Snapshot::from_bytes_with_options(bytes, source.open_options())
         })?;
         if snapshot.document.slides() != document_commit.snapshot().slides() {
             return Err(PackageError::Corrupted(
@@ -2353,7 +3422,11 @@ impl Transaction {
         }
         let after_slides =
             observe_phase(&mut observer, DiagnosticPhase::AfterPayloadCapture, || {
-                persisted_slides(snapshot.artifact.shared(), &snapshot.document)
+                persisted_slides(
+                    snapshot.artifact.shared(),
+                    &snapshot.document,
+                    snapshot.limits,
+                )
             })?;
         let expected_slides = expected_persisted_slides(
             document_commit.snapshot().slides(),
@@ -2397,12 +3470,6 @@ impl Transaction {
         Ok(Commit { snapshot, patch })
     }
 
-    /// Discards the candidate and recovers the exact source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
-    }
-
     fn require_position(&self, position: Position) -> Result<()> {
         if position.get() >= self.slide_count() {
             return Err(Error::Refused(Refusal::SlideNotFound { position }));
@@ -2410,14 +3477,106 @@ impl Transaction {
         Ok(())
     }
 
+    /// Stage one element edit over persisted records (record 0323).
+    ///
+    /// `slide` selects a slide by its projected position; `document` offers
+    /// the live document. The closure computes the complete replacement of
+    /// each record it changes from the exact current bytes. An empty
+    /// replacement is an exact no-op; a signed source refuses a changed
+    /// one. Returns whether anything changed.
+    pub(crate) fn stage_records(
+        &mut self,
+        slide: Option<Position>,
+        document: bool,
+        edit: impl FnOnce(records::View<'_>) -> Result<records::Replacement>,
+    ) -> Result<bool> {
+        let slide = match slide {
+            Some(position) => {
+                self.require_position(position)?;
+                let selected = self.document.slides()?[position.get()];
+                let source_position = self
+                    .source
+                    .document
+                    .slides()
+                    .iter()
+                    .position(|slide| slide.persist_id() == selected.persist_id())
+                    .map(Position::new)
+                    .ok_or(Error::Refused(Refusal::UncommittedSlideDependency))?;
+                let bytes =
+                    records::owner_record(&self.working, records::Owner::Slide(source_position))?;
+                Some((bytes, source_position))
+            },
+            None => None,
+        };
+        let document_bytes = document.then(|| self.working.document.bytes().to_vec());
+        let replacement = edit(records::View {
+            slide: slide
+                .as_ref()
+                .map(|(bytes, _)| records::SlideRecord { bytes }),
+            document: document_bytes.as_deref(),
+        })?;
+        if replacement.is_noop() {
+            return Ok(false);
+        }
+        self.require_change_allowed()?;
+        let mut rewrites = Vec::with_capacity(2);
+        if let (Some(after), Some((before, position))) = (replacement.slide, slide) {
+            rewrites.push(records::Rewrite {
+                owner: records::Owner::Slide(position),
+                before: Arc::from(before),
+                after: Arc::from(after),
+            });
+        }
+        let document_changed = replacement.document.is_some();
+        if let (Some(after), Some(before)) = (replacement.document, document_bytes) {
+            rewrites.push(records::Rewrite {
+                owner: records::Owner::Document,
+                before: Arc::from(before),
+                after: Arc::from(after),
+            });
+        }
+        if rewrites
+            .iter()
+            .all(|rewrite| rewrite.before == rewrite.after)
+        {
+            return Ok(false);
+        }
+        self.working = records::publish(&self.working, &rewrites)?;
+        if document_changed {
+            // Staged structure is rebased over the changed live document.
+            self.live_document_changed = true;
+        }
+        self.formatting
+            .push(FormattingChange::Element(records::ElementChange {
+                rewrites,
+            }));
+        Ok(true)
+    }
+
+    fn require_change_allowed(&self) -> Result<()> {
+        if self.source.has_signature {
+            return Err(Error::Refused(Refusal::Signed));
+        }
+        Ok(())
+    }
+
     fn order_fingerprint(&self) -> Result<String> {
         order_digest(&self.document).map(hex_digest)
+    }
+
+    /// Record a staged document-structure edit with the slide-order
+    /// fingerprint its durable operation binds (record 0357b).
+    fn push_document(&mut self, change: DocumentChange) -> Result<()> {
+        let order = order_digest(&self.document)?;
+        self.structural
+            .push(StructuralChange::Document(change, order));
+        Ok(())
     }
 }
 
 /// Successful immutable target and its reversible source-checked patch.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     patch: Patch,
 }
@@ -2425,26 +3584,26 @@ pub struct Commit {
 impl Commit {
     /// Published whole-package snapshot.
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Reversible patch from the exact source to the committed artifact.
     #[must_use]
-    pub const fn patch(&self) -> &Patch {
+    pub(crate) const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Splits the commit into its target and patch.
     #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
+    pub(crate) fn into_parts(self) -> (Snapshot, Patch) {
         (self.snapshot, self.patch)
     }
 }
 
 /// Reversible exact-source-checked whole-package slide-order patch.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Patch {
+pub(crate) struct Patch {
     before: Snapshot,
     after: Snapshot,
     changes: Vec<Change>,
@@ -2517,67 +3676,76 @@ impl StructuralArtifact {
 impl Patch {
     /// Semantic moves represented by this patch.
     #[must_use]
-    pub fn changes(&self) -> &[Change] {
+    pub(crate) fn changes(&self) -> &[Change] {
         &self.changes
     }
 
     /// Slide hidden-state replacements composed into this root patch.
     #[must_use]
-    pub fn slide_visibility_changes(&self) -> &[SlideVisibilityChange] {
+    pub(crate) fn slide_visibility_changes(&self) -> &[SlideVisibilityChange] {
         &self.visibility_changes
     }
 
     /// Slide advance replacements composed into this root patch.
     #[must_use]
-    pub fn slide_advance_changes(&self) -> &[SlideAdvanceChange] {
+    pub(crate) fn slide_advance_changes(&self) -> &[SlideAdvanceChange] {
         &self.advance_changes
     }
 
     /// Visual transition replacements composed into this root patch.
     #[must_use]
-    pub fn slide_transition_visual_changes(&self) -> &[SlideTransitionVisualChange] {
+    pub(crate) fn slide_transition_visual_changes(&self) -> &[SlideTransitionVisualChange] {
         &self.transition_visual_changes
+    }
+
+    /// Speaker-notes text replacements composed into this root patch, in
+    /// operation order.
+    pub(crate) fn notes_text_changes(&self) -> impl Iterator<Item = &NotesTextChange> {
+        self.formatting.iter().filter_map(|change| match change {
+            FormattingChange::NotesText(change) => Some(change),
+            _ => None,
+        })
     }
 
     /// Shape-text replacements composed into this root patch.
     #[must_use]
-    pub fn shape_text_changes(&self) -> &[ShapeTextChange] {
+    pub(crate) fn shape_text_changes(&self) -> &[ShapeTextChange] {
         &self.text_changes
     }
 
     /// Shape-anchor formatting replacements composed into this root patch.
     #[must_use]
-    pub fn shape_anchor_changes(&self) -> &[ShapeAnchorChange] {
+    pub(crate) fn shape_anchor_changes(&self) -> &[ShapeAnchorChange] {
         &self.anchor_changes
     }
 
     /// External movie/audio path replacements composed into this root patch.
     #[must_use]
-    pub fn external_media_path_changes(&self) -> &[ExternalMediaPathChange] {
+    pub(crate) fn external_media_path_changes(&self) -> &[ExternalMediaPathChange] {
         &self.media_path_changes
     }
 
     /// External-media playback replacements composed into this root patch.
     #[must_use]
-    pub fn external_media_playback_changes(&self) -> &[ExternalMediaPlaybackChange] {
+    pub(crate) fn external_media_playback_changes(&self) -> &[ExternalMediaPlaybackChange] {
         &self.media_playback_changes
     }
 
     /// Whether this patch changes no artifact bytes.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.before.bytes() == self.after.bytes()
     }
 
     /// Exact source artifact required for forward application.
     #[must_use]
-    pub fn before(&self) -> &[u8] {
+    pub(crate) fn before(&self) -> &[u8] {
         self.before.bytes()
     }
 
     /// Exact committed target artifact.
     #[must_use]
-    pub fn after(&self) -> &[u8] {
+    pub(crate) fn after(&self) -> &[u8] {
         self.after.bytes()
     }
 
@@ -2586,7 +3754,7 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error when `current` is not the exact source snapshot.
-    pub fn apply(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn apply(&self, current: &Snapshot) -> Result<Snapshot> {
         if current.bytes() != self.before.bytes() {
             return Err(PackageError::InvalidFormat(
                 "PPT slide-order patch source does not match its base artifact".into(),
@@ -2596,9 +3764,241 @@ impl Patch {
         Ok(self.after.clone())
     }
 
+    /// An exact byte patch from `before` to `after` that retains no semantic
+    /// operations (the result of a durable replay, record 0357a).
+    pub(crate) fn exact(before: Snapshot, after: Snapshot) -> Self {
+        Self {
+            before,
+            after,
+            changes: Vec::new(),
+            structural: Vec::new(),
+            visibility_changes: Vec::new(),
+            advance_changes: Vec::new(),
+            transition_visual_changes: Vec::new(),
+            text_changes: Vec::new(),
+            anchor_changes: Vec::new(),
+            media_path_changes: Vec::new(),
+            media_playback_changes: Vec::new(),
+            formatting: Vec::new(),
+            formatting_first: true,
+            structural_before: StructuralArtifact::Before,
+            structural_after: StructuralArtifact::After,
+        }
+    }
+
+    /// Refuses a patch whose operations a join cannot replay by value
+    /// (record 0357b): slide insertions and removals shift every later
+    /// position, element record edits replace persisted records the other
+    /// patch may also rewrite, and an inverse patch that edits both
+    /// formatting and structure resolves its formatting targets after its
+    /// structure.
+    fn require_joinable(&self) -> Result<()> {
+        let refuse = |reason| Err(Error::Refused(Refusal::UnsupportedPatch { reason }));
+        if self.structural.iter().any(|change| {
+            matches!(
+                change,
+                StructuralChange::Remove(_) | StructuralChange::Insert(_)
+            )
+        }) {
+            return refuse("slide insertions and removals cannot be joined");
+        }
+        if self
+            .formatting
+            .iter()
+            .any(|change| matches!(change, FormattingChange::Element(_)))
+        {
+            return refuse("element record edits cannot be joined");
+        }
+        if !self.formatting_first && !self.formatting.is_empty() && !self.structural.is_empty() {
+            return refuse("an inverse patch with formatting and structure cannot be joined");
+        }
+        Ok(())
+    }
+
+    /// The slide positions a patch permutes: the union of the inclusive
+    /// ranges of its moves. Positions outside it are fixed points of every
+    /// move.
+    fn moved_positions(&self) -> BTreeSet<usize> {
+        self.changes
+            .iter()
+            .flat_map(|change| {
+                let start = change.from.get().min(change.destination.get());
+                let end = change.from.get().max(change.destination.get());
+                start..=end
+            })
+            .collect()
+    }
+
+    /// The slide-list positions a patch's structure depends on: its moved
+    /// positions and the slides whose `fNonOutlineData` it sets. A
+    /// position outside the moved set reads the same slide in every frame
+    /// of the patch.
+    fn slide_list_positions(&self) -> BTreeSet<usize> {
+        let mut positions = self.moved_positions();
+        positions.extend(self.structural.iter().filter_map(|change| match change {
+            StructuralChange::Document(DocumentChange::NonOutlineData { position, .. }, _) => {
+                Some(*position)
+            },
+            _ => None,
+        }));
+        positions
+    }
+
+    /// The semantic targets a patch writes, as three-way plans name them,
+    /// plus its speaker-notes bodies.
+    fn join_effects(&self) -> BTreeSet<String> {
+        let mut effects = patch_effects(self);
+        effects.extend(self.formatting.iter().filter_map(|change| match change {
+            FormattingChange::NotesText(notes) => {
+                Some(format!("slide:{}/notes-text", notes.slide.get()))
+            },
+            _ => None,
+        }));
+        effects
+    }
+
+    /// Stage this patch's formatting changes, by value, in `transaction`
+    /// (whose structure is still the source's, so source positions are the
+    /// projected positions).
+    fn replay_formatting(&self, transaction: &mut Transaction) -> Result<()> {
+        for change in &self.formatting {
+            match change {
+                FormattingChange::Text(text) => {
+                    transaction.set_shape_text(text.target, text.after.clone())?;
+                },
+                FormattingChange::NotesText(notes) => {
+                    transaction.set_notes_text(notes.slide, notes.after.clone())?;
+                },
+                FormattingChange::Anchor(anchor) => {
+                    transaction.set_shape_anchor(anchor.target, anchor.after)?;
+                },
+                FormattingChange::SlideVisibility(visibility) => {
+                    transaction.set_slide_hidden(visibility.target, visibility.after)?;
+                },
+                FormattingChange::SlideAdvance(advance) => {
+                    transaction.set_slide_advance(advance.target, advance.after)?;
+                },
+                FormattingChange::SlideTransitionVisual(visual) => {
+                    transaction.set_slide_transition_visual(visual.target, visual.after)?;
+                },
+                FormattingChange::MediaPath(media) => {
+                    transaction.set_external_media_path(media.id, media.after.clone())?;
+                },
+                FormattingChange::MediaPlayback(media) => {
+                    transaction.set_external_media_playback(media.id, media.after)?;
+                },
+                FormattingChange::Element(_) => {
+                    return Err(Error::Refused(Refusal::UnsupportedPatch {
+                        reason: "element record edits cannot be joined",
+                    }));
+                },
+            }
+        }
+        Ok(())
+    }
+
+    /// Stage this patch's slide moves and document-structure edits, in
+    /// order, in `transaction`.
+    fn replay_structure(&self, transaction: &mut Transaction) -> Result<()> {
+        for change in &self.structural {
+            match change {
+                StructuralChange::Move(move_change) => {
+                    transaction.move_slide(move_change.from, move_change.destination)?;
+                },
+                StructuralChange::Document(document, _) => match document {
+                    DocumentChange::Masters { order } => transaction.reorder_masters(order)?,
+                    DocumentChange::InsertStyles { record, placement } => {
+                        transaction.insert_custom_table_styles(record.clone(), *placement)?;
+                    },
+                    DocumentChange::RemoveStyles { .. } => {
+                        transaction.remove_custom_table_styles()?;
+                    },
+                    DocumentChange::ReplaceStyles { after, .. } => {
+                        transaction.replace_custom_table_styles(after.clone())?;
+                    },
+                    DocumentChange::MoveStyles { after, .. } => {
+                        transaction.move_custom_table_styles(*after)?;
+                    },
+                    DocumentChange::NonOutlineData {
+                        position, after, ..
+                    } => {
+                        transaction.set_slide_non_outline_data(Position::new(*position), *after)?
+                    },
+                },
+                StructuralChange::Remove(_) | StructuralChange::Insert(_) => {
+                    return Err(Error::Refused(Refusal::UnsupportedPatch {
+                        reason: "slide insertions and removals cannot be joined",
+                    }));
+                },
+            }
+        }
+        Ok(())
+    }
+
+    /// Joins two independently prepared patches over this patch's exact
+    /// source into one patch (records 0357a, 0357b).
+    ///
+    /// Both patches must start from the same exact artifact. They may hold
+    /// slide moves, master reorders, custom table-style edits,
+    /// `fNonOutlineData` changes, and the formatting edits (shape and notes
+    /// text, anchors, slide visibility, advance and visual transition,
+    /// external media path and playback). The two must commute:
+    ///
+    /// - neither patch's slide-list positions (moved ranges and
+    ///   `fNonOutlineData` slides) may meet the other's moved positions, so
+    ///   every position reads the same slide in both patches;
+    /// - no semantic target is written by both (two master reorders, two
+    ///   custom table-style edits, the same shape's text, the same slide's
+    ///   flag or notes, ...), since their order would decide the result.
+    ///
+    /// The joined patch stages both patches' formatting changes by value on
+    /// the source (they name source slide positions), then `self`'s
+    /// structure and `other`'s, in one native commit.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::UnsupportedPatch`] for another source, an operation a join
+    /// cannot replay ([`Self::require_joinable`]), or positions that meet a
+    /// moved range; [`Refusal::JoinConflict`] for a target both write; the
+    /// native commit's error otherwise.
+    pub(crate) fn join(&self, other: &Self) -> Result<Self> {
+        if self.before.bytes() != other.before.bytes() {
+            return Err(Error::Refused(Refusal::UnsupportedPatch {
+                reason: "joined patches start from different artifacts",
+            }));
+        }
+        self.require_joinable()?;
+        other.require_joinable()?;
+        if !self
+            .slide_list_positions()
+            .is_disjoint(&other.moved_positions())
+            || !other
+                .slide_list_positions()
+                .is_disjoint(&self.moved_positions())
+        {
+            return Err(Error::Refused(Refusal::UnsupportedPatch {
+                reason: "joined slide moves overlap",
+            }));
+        }
+        let left = self.join_effects();
+        if let Some(target) = other
+            .join_effects()
+            .into_iter()
+            .find(|target| left.contains(target))
+        {
+            return Err(Error::Refused(Refusal::JoinConflict { target }));
+        }
+        let mut transaction = self.before.edit()?;
+        self.replay_formatting(&mut transaction)?;
+        other.replay_formatting(&mut transaction)?;
+        self.replay_structure(&mut transaction)?;
+        other.replay_structure(&mut transaction)?;
+        Ok(transaction.commit()?.patch)
+    }
+
     /// Returns the exact-source-checked inverse patch.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
@@ -2701,6 +4101,13 @@ impl Patch {
                             after: text_change.before.clone(),
                         })
                     },
+                    FormattingChange::NotesText(notes_change) => {
+                        FormattingChange::NotesText(NotesTextChange {
+                            slide: notes_change.slide,
+                            before: notes_change.after.clone(),
+                            after: notes_change.before.clone(),
+                        })
+                    },
                     FormattingChange::Anchor(anchor_change) => {
                         FormattingChange::Anchor(ShapeAnchorChange {
                             target: anchor_change.target,
@@ -2747,6 +4154,9 @@ impl Patch {
                             after: media_change.before,
                         })
                     },
+                    FormattingChange::Element(element_change) => {
+                        FormattingChange::Element(element_change.inverse())
+                    },
                 })
                 .collect(),
             formatting_first: !self.formatting_first,
@@ -2781,7 +4191,7 @@ impl Patch {
     ///
     /// Returns an error when caller-selected patch bounds cannot represent the
     /// semantic operations.
-    pub fn to_durable(
+    pub(crate) fn to_durable(
         &self,
         limits: litchi_core::patch::PatchLimits,
     ) -> std::result::Result<
@@ -2795,6 +4205,20 @@ impl Patch {
         let mut formatting_operations = Vec::new();
         for change in &self.formatting {
             let pair = match change {
+                FormattingChange::NotesText(notes_change) => ReversibleOperation::new(
+                    durable_notes_text_operation(
+                        limits,
+                        notes_change.slide,
+                        &notes_change.before,
+                        &notes_change.after,
+                    )?,
+                    durable_notes_text_operation(
+                        limits,
+                        notes_change.slide,
+                        &notes_change.after,
+                        &notes_change.before,
+                    )?,
+                ),
                 FormattingChange::Text(text_change) => ReversibleOperation::new(
                     durable_text_operation(
                         limits,
@@ -2893,6 +4317,14 @@ impl Patch {
                         media_change.before,
                     )?,
                 ),
+                FormattingChange::Element(element_change) => ReversibleOperation::new(
+                    records::durable_operation(limits, element_change, &mut forward_blobs)?,
+                    records::durable_operation(
+                        limits,
+                        &element_change.inverse(),
+                        &mut reverse_blobs,
+                    )?,
+                ),
             };
             formatting_operations.push(pair);
         }
@@ -2959,6 +4391,25 @@ impl Patch {
                         )?,
                     )
                 },
+                // Master order, custom table styles and fNonOutlineData
+                // (record 0357b): bound like the slide-list operations, to
+                // the structural artifact and the slide order they run at.
+                StructuralChange::Document(change, order) => (
+                    durable_document_operation(
+                        limits,
+                        change,
+                        self.structural_artifact_digest(&self.structural_before),
+                        *order,
+                        &mut forward_blobs,
+                    )?,
+                    durable_document_operation(
+                        limits,
+                        &change.inverse(),
+                        self.structural_artifact_digest(&self.structural_after),
+                        *order,
+                        &mut reverse_blobs,
+                    )?,
+                ),
             };
             structural_operations.push(ReversibleOperation::new(forward, inverse));
         }
@@ -2981,139 +4432,6 @@ impl Patch {
             forward_blobs,
             reverse_blobs,
         )
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct Move {
-    from: Position,
-    destination: Position,
-}
-
-/// One independently prepared move retaining its exact source lineage.
-pub struct PreparedMove {
-    inner: litchi_core::patch::SubEdit<Lineage, Move>,
-}
-
-impl PreparedMove {
-    /// Stable caller-selected composition identifier.
-    #[must_use]
-    pub fn identifier(&self) -> &str {
-        self.inner.id()
-    }
-
-    /// Source position in the immutable base order.
-    #[must_use]
-    pub const fn from(&self) -> Position {
-        self.inner.payload().from
-    }
-
-    /// Final destination in the immutable base order.
-    #[must_use]
-    pub const fn destination(&self) -> Position {
-        self.inner.payload().destination
-    }
-}
-
-impl fmt::Debug for PreparedMove {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("PreparedMove")
-            .field("identifier", &self.identifier())
-            .field("from", &self.from())
-            .field("destination", &self.destination())
-            .finish()
-    }
-}
-
-/// Recoverable failure to join one prepared slide move.
-pub struct JoinError {
-    failure: Box<SubEditJoinFailure>,
-    rejected: Box<PreparedMove>,
-}
-
-impl JoinError {
-    /// Structured common composition refusal.
-    #[must_use]
-    pub const fn failure(&self) -> &SubEditJoinFailure {
-        &self.failure
-    }
-
-    /// Recovers the rejected prepared move.
-    #[must_use]
-    pub fn into_rejected(self) -> PreparedMove {
-        *self.rejected
-    }
-}
-
-impl fmt::Debug for JoinError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("JoinError")
-            .field("failure", &self.failure)
-            .field("rejected", &self.rejected)
-            .finish()
-    }
-}
-
-/// Bounded deterministic composition of provably disjoint slide moves.
-pub struct Composition {
-    source: Snapshot,
-    joined: litchi_core::patch::JoinedSubEdits<Lineage, Move>,
-}
-
-impl Composition {
-    /// Joins a move when its source lineage and affected position range are
-    /// compatible with every accepted move.
-    ///
-    /// # Errors
-    ///
-    /// Returns the structured common refusal and retains the rejected work.
-    pub fn join(&mut self, incoming: PreparedMove) -> std::result::Result<&mut Self, JoinError> {
-        if let Err(error) = self.joined.join(incoming.inner) {
-            let (failure, rejected) = error.into_parts();
-            return Err(JoinError {
-                failure: Box::new(failure),
-                rejected: Box::new(PreparedMove { inner: rejected }),
-            });
-        }
-        Ok(self)
-    }
-
-    /// Number of accepted independently prepared moves.
-    #[must_use]
-    pub fn len(&self) -> usize {
-        self.joined.len()
-    }
-
-    /// Whether no move has been accepted.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.joined.is_empty()
-    }
-
-    /// Atomically commits every accepted move in deterministic identifier
-    /// order and returns one durable-capable patch.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if staging or whole-package publication fails.
-    pub fn commit(self) -> Result<Commit> {
-        let mut transaction = self.source.edit()?;
-        for edit in self.joined.into_sub_edits() {
-            let move_ = edit.into_payload();
-            transaction.move_slide(move_.from, move_.destination)?;
-        }
-        transaction.commit()
-    }
-}
-
-impl fmt::Debug for Composition {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("Composition")
-            .field("moves", &self.joined.len())
-            .finish_non_exhaustive()
     }
 }
 
@@ -3205,6 +4523,26 @@ fn durable_text_operation(
             target.slide().get(),
             target.shape().get()
         ),
+        preconditions,
+        serde_json::Value::String(after.to_string()),
+    )
+}
+
+fn durable_notes_text_operation(
+    limits: litchi_core::patch::PatchLimits,
+    slide: Position,
+    before: &str,
+    after: &str,
+) -> std::result::Result<litchi_core::patch::PatchOperation, litchi_core::patch::PatchError> {
+    let mut preconditions = BTreeMap::new();
+    preconditions.insert(
+        "text_sha256".to_string(),
+        serde_json::Value::String(artifact_hash(before.as_bytes())),
+    );
+    litchi_core::patch::PatchOperation::new(
+        limits,
+        "presentation.notes-text.set",
+        format!("slide:{}", slide.get()),
         preconditions,
         serde_json::Value::String(after.to_string()),
     )
@@ -3435,6 +4773,243 @@ fn durable_insert_operation(
     )
 }
 
+/// The durable name of a custom table-style placement.
+const fn placement_name(placement: document_structure::CustomTableStylesPlacement) -> &'static str {
+    match placement {
+        document_structure::CustomTableStylesPlacement::BeforeEndDocument => "before-end-document",
+        document_structure::CustomTableStylesPlacement::AfterEndDocument => "after-end-document",
+    }
+}
+
+fn parse_placement(
+    value: Option<&serde_json::Value>,
+) -> Result<document_structure::CustomTableStylesPlacement> {
+    match value.and_then(serde_json::Value::as_str) {
+        Some("before-end-document") => {
+            Ok(document_structure::CustomTableStylesPlacement::BeforeEndDocument)
+        },
+        Some("after-end-document") => {
+            Ok(document_structure::CustomTableStylesPlacement::AfterEndDocument)
+        },
+        _ => Err(invalid_durable_patch(
+            "custom table-style placement is invalid",
+        )),
+    }
+}
+
+/// One durable document-structure operation (record 0357b). Every one is
+/// bound to the structural artifact and the slide order it runs at, like
+/// the slide-list operations, and to the state it replaces where the change
+/// carries it: the SHA-256 of the custom table-style atom it removes or
+/// replaces, the placement it moves from, and the `fNonOutlineData` value it
+/// overwrites. Atoms travel as blobs. Master order is a permutation of
+/// zero-based master positions; no native identifier is serialized.
+fn durable_document_operation(
+    limits: litchi_core::patch::PatchLimits,
+    change: &DocumentChange,
+    artifact: &str,
+    order: [u8; 32],
+    blobs: &mut litchi_core::patch::BlobBundle,
+) -> std::result::Result<litchi_core::patch::PatchOperation, litchi_core::patch::PatchError> {
+    use serde_json::Value;
+
+    let encode = |record: &crate::Record| {
+        document_structure::encode_record(record, false).map_err(|_error| {
+            litchi_core::patch::PatchError::InvalidText {
+                field: "custom table-style atom",
+            }
+        })
+    };
+    let mut preconditions = structural_preconditions(artifact, order);
+    let document = "document".to_owned();
+    let (op, target, value) = match change {
+        DocumentChange::Masters { order: positions } => {
+            let positions = positions
+                .iter()
+                .map(|position| u64::try_from(*position).map(Value::from))
+                .collect::<std::result::Result<Vec<_>, _>>()
+                .map_err(|_error| litchi_core::patch::PatchError::InvalidText {
+                    field: "master position",
+                })?;
+            (
+                "document-structure.master-order.set",
+                document,
+                Value::Array(positions),
+            )
+        },
+        DocumentChange::InsertStyles { record, placement } => {
+            let blob = blobs.insert(encode(record)?)?;
+            (
+                "document-structure.custom-table-styles.insert",
+                document,
+                serde_json::json!({
+                    "placement": placement_name(*placement),
+                    "record": blob.as_hex(),
+                }),
+            )
+        },
+        DocumentChange::RemoveStyles { record, .. } => {
+            preconditions.insert(
+                "styles_sha256".to_owned(),
+                Value::String(artifact_hash(&encode(record)?)),
+            );
+            (
+                "document-structure.custom-table-styles.remove",
+                document,
+                Value::Null,
+            )
+        },
+        DocumentChange::ReplaceStyles { before, after } => {
+            preconditions.insert(
+                "styles_sha256".to_owned(),
+                Value::String(artifact_hash(&encode(before)?)),
+            );
+            let blob = blobs.insert(encode(after)?)?;
+            (
+                "document-structure.custom-table-styles.replace",
+                document,
+                Value::String(blob.as_hex()),
+            )
+        },
+        DocumentChange::MoveStyles { before, after } => {
+            preconditions.insert(
+                "placement".to_owned(),
+                Value::String(placement_name(*before).to_owned()),
+            );
+            (
+                "document-structure.custom-table-styles.move",
+                document,
+                Value::String(placement_name(*after).to_owned()),
+            )
+        },
+        DocumentChange::NonOutlineData {
+            position,
+            before,
+            after,
+        } => {
+            preconditions.insert("non_outline_data".to_owned(), Value::Bool(*before));
+            (
+                "document-structure.slide-non-outline-data.set",
+                format!("slide:{position}"),
+                Value::Bool(*after),
+            )
+        },
+    };
+    litchi_core::patch::PatchOperation::new(limits, op, target, preconditions, value)
+}
+
+/// Replay one durable document-structure operation (record 0357b) in the
+/// structural transaction, after its artifact and slide-order
+/// preconditions were checked.
+fn apply_durable_document(
+    transaction: &mut Transaction,
+    operation: &litchi_core::patch::PatchOperation,
+    blobs: &litchi_core::patch::BlobBundle,
+) -> Result<()> {
+    let mismatch = || {
+        Error::from(PackageError::InvalidFormat(
+            "PPT durable document-structure precondition does not match".into(),
+        ))
+    };
+    let precondition = |name: &str| operation.preconditions.get(name);
+    let styles_digest = || {
+        precondition("styles_sha256")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| invalid_durable_patch("missing custom table-style precondition"))
+    };
+    let check_styles = |record: &crate::Record, expected: &str| -> Result<()> {
+        let bytes = document_structure::encode_record(record, false)?;
+        if artifact_hash(&bytes) == expected {
+            Ok(())
+        } else {
+            Err(mismatch())
+        }
+    };
+    let styles_record = |value: Option<&serde_json::Value>| -> Result<crate::Record> {
+        let blob = value
+            .and_then(serde_json::Value::as_str)
+            .and_then(|hex| blob_by_hex(blobs, hex))
+            .ok_or_else(|| invalid_durable_patch("custom table-style blob is missing"))?;
+        let (record, consumed) = crate::Record::parse(blob, 0, &SourceLimits::default())
+            .map_err(|_error| invalid_durable_patch("custom table-style blob is not a record"))?;
+        if consumed != blob.len() {
+            return Err(invalid_durable_patch(
+                "custom table-style blob is not exactly one record",
+            ));
+        }
+        Ok(record)
+    };
+    let count = operation.preconditions.len();
+    let on_document = operation.target == "document";
+    let value = &operation.value;
+    match operation.op.as_str() {
+        "document-structure.master-order.set" if count == 2 && on_document => {
+            let order = value
+                .as_array()
+                .and_then(|positions| {
+                    positions
+                        .iter()
+                        .map(|position| {
+                            position
+                                .as_u64()
+                                .and_then(|position| usize::try_from(position).ok())
+                        })
+                        .collect::<Option<Vec<_>>>()
+                })
+                .ok_or_else(|| invalid_durable_patch("master order must be positions"))?;
+            transaction.reorder_masters(&order)
+        },
+        "document-structure.custom-table-styles.insert" if count == 2 && on_document => {
+            let object = value
+                .as_object()
+                .filter(|object| object.len() == 2)
+                .ok_or_else(|| invalid_durable_patch("custom table-style insertion is invalid"))?;
+            let placement = parse_placement(object.get("placement"))?;
+            let record = styles_record(object.get("record"))?;
+            transaction.insert_custom_table_styles(record, placement)
+        },
+        "document-structure.custom-table-styles.remove"
+            if count == 3 && on_document && value.is_null() =>
+        {
+            let expected = styles_digest()?;
+            let removed = transaction.remove_custom_table_styles()?;
+            check_styles(&removed, expected)
+        },
+        "document-structure.custom-table-styles.replace" if count == 3 && on_document => {
+            let expected = styles_digest()?;
+            let record = styles_record(Some(value))?;
+            let before = transaction.replace_custom_table_styles(record)?;
+            check_styles(&before, expected)
+        },
+        "document-structure.custom-table-styles.move" if count == 3 && on_document => {
+            let before = parse_placement(precondition("placement"))?;
+            let after = parse_placement(Some(value))?;
+            if transaction.require_custom_table_styles()? != before {
+                return Err(mismatch());
+            }
+            transaction.move_custom_table_styles(after)
+        },
+        "document-structure.slide-non-outline-data.set" if count == 3 => {
+            let position = parse_target(&operation.target)?;
+            let before = precondition("non_outline_data")
+                .and_then(serde_json::Value::as_bool)
+                .ok_or_else(|| invalid_durable_patch("missing fNonOutlineData precondition"))?;
+            let after = value
+                .as_bool()
+                .ok_or_else(|| invalid_durable_patch("fNonOutlineData value must be a flag"))?;
+            transaction.require_position(position)?;
+            let current = transaction.document.slides()?[position.get()].flags() & (1 << 2) != 0;
+            if current != before {
+                return Err(mismatch());
+            }
+            transaction.set_slide_non_outline_data(position, after)
+        },
+        _ => Err(invalid_durable_patch(
+            "unsupported document-structure operation vocabulary",
+        )),
+    }
+}
+
 fn structural_preconditions(
     artifact: &str,
     order: [u8; 32],
@@ -3470,8 +5045,46 @@ fn apply_durable_text(
         .get("text_sha256")
         .and_then(serde_json::Value::as_str)
         .ok_or_else(|| invalid_durable_patch("missing shape-text precondition"))?;
+    if snapshot.has_signature {
+        let current = crate::text_edit::inspect_shape_text_readonly(
+            snapshot.bytes(),
+            target,
+            snapshot.open_options(),
+        )?;
+        if artifact_hash(current.as_bytes()) != expected {
+            return Err(PackageError::InvalidFormat(
+                "PPT durable shape-text semantic precondition does not match".into(),
+            )
+            .into());
+        }
+        if current == replacement {
+            return Ok(snapshot.clone());
+        }
+        return Err(Error::Refused(Refusal::Signed));
+    }
     let text_snapshot = crate::text_edit::Snapshot::from_bytes(snapshot.bytes().to_vec())?;
-    let mut edit = text_snapshot.edit_text(target)?;
+    let mut edit = match text_snapshot.edit_text(target) {
+        Ok(edit) => edit,
+        Err(crate::text_edit::Error::Refused(crate::text_edit::Refusal::NoTextAtom)) => {
+            // Outline-backed placeholder text lives in the live document;
+            // the root transaction owns that publication.
+            let current = crate::text_edit::inspect_shape_text_readonly(
+                snapshot.bytes(),
+                target,
+                snapshot.open_options(),
+            )?;
+            if artifact_hash(current.as_bytes()) != expected {
+                return Err(PackageError::InvalidFormat(
+                    "PPT durable shape-text semantic precondition does not match".into(),
+                )
+                .into());
+            }
+            let mut transaction = snapshot.edit()?;
+            transaction.set_shape_text(target, replacement)?;
+            return Ok(transaction.commit()?.snapshot);
+        },
+        Err(error) => return Err(error.into()),
+    };
     if artifact_hash(edit.text().as_bytes()) != expected {
         return Err(PackageError::InvalidFormat(
             "PPT durable shape-text semantic precondition does not match".into(),
@@ -3480,19 +5093,59 @@ fn apply_durable_text(
     }
     edit.set_text(replacement)?;
     let committed = edit.commit()?;
-    Snapshot::from_bytes_with_limits(committed.snapshot().bytes().to_vec(), snapshot.limits)
+    Snapshot::from_bytes_with_options(
+        committed.snapshot().bytes().to_vec(),
+        snapshot.open_options(),
+    )
+}
+
+fn apply_durable_notes_text(
+    snapshot: &Snapshot,
+    operation: &litchi_core::patch::PatchOperation,
+) -> Result<Snapshot> {
+    if operation.preconditions.len() != 1 {
+        return Err(invalid_durable_patch(
+            "notes-text operation has unexpected preconditions",
+        ));
+    }
+    let slide = parse_target(&operation.target)?;
+    let replacement = operation
+        .value
+        .as_str()
+        .ok_or_else(|| invalid_durable_patch("notes-text value must be a string"))?;
+    let expected = operation
+        .preconditions
+        .get("text_sha256")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| invalid_durable_patch("missing notes-text precondition"))?;
+    let current = crate::text_edit::inspect_notes_text_readonly(
+        snapshot.bytes(),
+        slide,
+        snapshot.open_options(),
+    )?;
+    if artifact_hash(current.as_bytes()) != expected {
+        return Err(PackageError::InvalidFormat(
+            "PPT durable notes-text semantic precondition does not match".into(),
+        )
+        .into());
+    }
+    let mut transaction = snapshot.edit()?;
+    transaction.set_notes_text(slide, replacement)?;
+    Ok(transaction.commit()?.snapshot)
 }
 
 fn is_formatting_operation(operation: &str) -> bool {
     matches!(
         operation,
         "presentation.shape-text.set"
+            | "presentation.notes-text.set"
             | "presentation.shape-anchor.set"
             | "presentation.slide-hidden.set"
             | "presentation.slide-advance.set"
             | "presentation.slide-transition-visual.set"
             | "presentation.external-media-path.set"
             | "presentation.external-media-playback.set"
+            | "presentation.element-records.set"
     )
 }
 
@@ -3523,11 +5176,18 @@ fn apply_durable_media_path(
         .get("path_sha256")
         .and_then(serde_json::Value::as_str)
         .ok_or_else(|| invalid_durable_patch("missing external-media path precondition"))?;
-    if media_path_digest(snapshot.external_media_path(id)?.as_deref()) != expected {
+    let current = snapshot.external_media_path(id)?;
+    if media_path_digest(current.as_deref()) != expected {
         return Err(PackageError::InvalidFormat(
             "PPT durable external-media path precondition does not match".into(),
         )
         .into());
+    }
+    if snapshot.has_signature {
+        if current == replacement {
+            return Ok(snapshot.clone());
+        }
+        return Err(Error::Refused(Refusal::Signed));
     }
     let mut transaction = snapshot.edit()?;
     transaction.set_external_media_path(id, replacement)?;
@@ -3550,11 +5210,18 @@ fn apply_durable_media_playback(
         .get("playback_sha256")
         .and_then(serde_json::Value::as_str)
         .ok_or_else(|| invalid_durable_patch("missing external-media playback precondition"))?;
-    if playback_digest(snapshot.external_media_playback(id)?) != expected {
+    let current = snapshot.external_media_playback(id)?;
+    if playback_digest(current) != expected {
         return Err(PackageError::InvalidFormat(
             "PPT durable external-media playback precondition does not match".into(),
         )
         .into());
+    }
+    if snapshot.has_signature {
+        if current == replacement {
+            return Ok(snapshot.clone());
+        }
+        return Err(Error::Refused(Refusal::Signed));
     }
     let mut transaction = snapshot.edit()?;
     transaction.set_external_media_playback(id, replacement)?;
@@ -3638,6 +5305,24 @@ fn apply_durable_anchor(
         .get("anchor_sha256")
         .and_then(serde_json::Value::as_str)
         .ok_or_else(|| invalid_durable_patch("missing shape-anchor precondition"))?;
+    let replacement = parse_anchor_value(&operation.value)?;
+    if snapshot.has_signature {
+        let current = crate::text_edit::inspect_shape_anchor_readonly(
+            snapshot.bytes(),
+            target,
+            snapshot.open_options(),
+        )?;
+        if artifact_hash(&current.to_bytes()) != expected {
+            return Err(PackageError::InvalidFormat(
+                "PPT durable shape-anchor semantic precondition does not match".into(),
+            )
+            .into());
+        }
+        if current == replacement {
+            return Ok(snapshot.clone());
+        }
+        return Err(Error::Refused(Refusal::Signed));
+    }
     let current = crate::text_edit::inspect_shape_anchor(snapshot.bytes(), target)?;
     if artifact_hash(&current.to_bytes()) != expected {
         return Err(PackageError::InvalidFormat(
@@ -3645,9 +5330,8 @@ fn apply_durable_anchor(
         )
         .into());
     }
-    let replacement = parse_anchor_value(&operation.value)?;
     let rewritten = crate::text_edit::replace_shape_anchor(snapshot.bytes(), target, replacement)?;
-    Snapshot::from_bytes_with_limits(rewritten.bytes, snapshot.limits)
+    Snapshot::from_bytes_with_options(rewritten.bytes, snapshot.open_options())
 }
 
 fn apply_durable_slide_visibility(
@@ -3675,6 +5359,12 @@ fn apply_durable_slide_visibility(
         .value
         .as_bool()
         .ok_or_else(|| invalid_durable_patch("slide-hidden value must be boolean"))?;
+    if snapshot.has_signature {
+        if snapshot.slide_hidden(target)? == replacement {
+            return Ok(snapshot.clone());
+        }
+        return Err(Error::Refused(Refusal::Signed));
+    }
     replace_slide_hidden(snapshot, target, replacement)
 }
 
@@ -3700,11 +5390,14 @@ fn apply_durable_slide_advance(
         )
         .into());
     }
-    replace_slide_advance(
-        snapshot,
-        target,
-        parse_slide_advance_value(&operation.value)?,
-    )
+    let replacement = parse_slide_advance_value(&operation.value)?;
+    if snapshot.has_signature {
+        if current == replacement {
+            return Ok(snapshot.clone());
+        }
+        return Err(Error::Refused(Refusal::Signed));
+    }
+    replace_slide_advance(snapshot, target, replacement)
 }
 
 fn apply_durable_slide_transition_visual(
@@ -3729,11 +5422,14 @@ fn apply_durable_slide_transition_visual(
         )
         .into());
     }
-    replace_slide_transition_visual(
-        snapshot,
-        target,
-        parse_transition_visual_value(&operation.value)?,
-    )
+    let replacement = parse_transition_visual_value(&operation.value)?;
+    if snapshot.has_signature {
+        if current == replacement {
+            return Ok(snapshot.clone());
+        }
+        return Err(Error::Refused(Refusal::Signed));
+    }
+    replace_slide_transition_visual(snapshot, target, replacement)
 }
 
 fn parse_anchor_value(value: &serde_json::Value) -> Result<crate::Anchor> {
@@ -3798,6 +5494,9 @@ fn apply_durable_structural(
             "PPT durable slide-order semantic precondition does not match".into(),
         )
         .into());
+    }
+    if operation.op.starts_with("document-structure.") {
+        return apply_durable_document(transaction, operation, blobs);
     }
     let position = parse_target(&operation.target)?;
     match operation.op.as_str() {
@@ -3886,6 +5585,25 @@ fn parse_shape_target(value: &str) -> Result<crate::text_edit::Target> {
     Ok(crate::text_edit::Target::new(parse(slide)?, parse(shape)?))
 }
 
+/// A `RoundTripCustomTableStyles12Atom` header the document validator
+/// accepts (instance 0, no children, a consistent length).
+fn require_custom_table_styles_record(record: &crate::Record) -> Result<()> {
+    if record.record_type != crate::consts::RecordType::RoundTripCustomTableStyles12Atom
+        || record.record_type_raw
+            != crate::consts::RecordType::RoundTripCustomTableStyles12Atom.as_u16()
+        || record.instance != 0
+        || record.version > 0x000f
+        || !record.children.is_empty()
+        || usize::try_from(record.data_length).ok() != Some(record.data.len())
+    {
+        return Err(Error::Refused(Refusal::InvalidElementValue {
+            element: "custom table styles",
+            reason: "the record is not a RoundTripCustomTableStyles12Atom",
+        }));
+    }
+    Ok(())
+}
+
 fn order_digest(transaction: &document_structure::Transaction) -> Result<[u8; 32]> {
     let slides = transaction.slides()?;
     Ok(digest_slide_ids(
@@ -3915,7 +5633,9 @@ fn hex_digest(digest: [u8; 32]) -> String {
     text
 }
 
-fn external_media_snapshot(snapshot: &Snapshot) -> Result<crate::external_media::Snapshot> {
+pub(crate) fn external_media_snapshot(
+    snapshot: &Snapshot,
+) -> Result<crate::external_media::Snapshot> {
     let limits = crate::external_media::Limits {
         max_root_bytes: snapshot
             .limits
@@ -3946,6 +5666,7 @@ fn publish_live_document(snapshot: &Snapshot, document: &[u8]) -> Result<Snapsho
     let mut editor = crate::embedded::object::Editor::open_records_arc_with_limit(
         snapshot.shared_bytes(),
         snapshot.limits.max_package_bytes,
+        snapshot.limits,
     )?;
     let live = editor.persisted_record(snapshot.document_persist_id)?;
     if live.as_slice() != snapshot.document.bytes() {
@@ -3957,7 +5678,7 @@ fn publish_live_document(snapshot: &Snapshot, document: &[u8]) -> Result<Snapsho
     editor.replace_persisted_record(snapshot.document_persist_id, document.to_vec())?;
     let bytes = editor.finish()?;
     crate::font::validate_unrelated_streams(snapshot.bytes(), &bytes)?;
-    let published = Snapshot::from_bytes_with_limits(bytes, snapshot.limits)?;
+    let published = Snapshot::from_bytes_with_options(bytes, snapshot.open_options())?;
     if published.document.slides() != snapshot.document.slides() {
         return Err(PackageError::Corrupted(
             "PPT live-document owner publication changed slide structure".into(),
@@ -3978,10 +5699,12 @@ const fn hex_nibble(value: u8) -> u8 {
 fn persisted_slides(
     bytes: &Arc<[u8]>,
     document: &document_structure::Snapshot,
+    limits: SourceLimits,
 ) -> Result<BTreeMap<u32, Vec<u8>>> {
     let editor = crate::embedded::object::Editor::open_records_arc_with_limit(
         bytes.clone(),
         bytes.len().saturating_mul(4),
+        limits,
     )?;
     editor_persisted_slides(&editor, document)
 }
@@ -4003,12 +5726,97 @@ fn editor_persisted_slides(
 }
 
 fn persisted_record(snapshot: &Snapshot, persist_id: u32) -> Result<Vec<u8>> {
+    if snapshot.has_signature {
+        return persisted_record_readonly(snapshot, persist_id);
+    }
     crate::embedded::object::Editor::open_records_arc_with_limit(
         snapshot.shared_bytes(),
         snapshot.limits.max_package_bytes,
+        snapshot.limits,
     )?
     .persisted_record(persist_id)
     .map_err(Error::from)
+}
+
+/// Reads one persisted record without opening the mutation-capable editor.
+///
+/// A signed CFB can be projected through the normal presentation parser, but
+/// the append-only editor must reject it before it can publish a changed
+/// package.  The read-only path therefore resolves the selected persist ID
+/// from the presentation's retained mapping and slices the original record
+/// bytes directly from the PowerPoint Document stream.  This preserves the
+/// same source limits and leniency policy captured by the snapshot.
+fn persisted_record_readonly(snapshot: &Snapshot, persist_id: u32) -> Result<Vec<u8>> {
+    let mut package =
+        Reader::from_reader_with_options(Cursor::new(snapshot.bytes()), snapshot.open_options())?;
+    let presentation = package.presentation_with_options(snapshot.open_options())?;
+    let factory = crate::slide::SlideFactory::new_shared_with_limits(
+        &presentation.inner.powerpoint_document,
+        &presentation.inner.persist_mapping,
+        &presentation.inner.slide_directory,
+        presentation.source_limits(),
+    );
+    let slide = factory.parse_slide(persist_id)?;
+    let document = slide.doc_data();
+    let tail = document.get(slide.offset..).ok_or_else(|| {
+        PackageError::Corrupted(
+            "PPT selected persist record offset exceeds its document stream".into(),
+        )
+    })?;
+    let (_, consumed) = crate::Record::parse(tail, 0, &presentation.source_limits())?;
+    let end = slide.offset.checked_add(consumed).ok_or_else(|| {
+        PackageError::Corrupted("PPT selected persist record length overflows".into())
+    })?;
+    document
+        .get(slide.offset..end)
+        .map(ToOwned::to_owned)
+        .ok_or_else(|| {
+            PackageError::Corrupted(
+                "PPT selected persist record exceeds its document stream".into(),
+            )
+            .into()
+        })
+}
+
+/// Reads one persisted record of any kind, such as a master, by persist ID.
+///
+/// An unsigned package reads through the append-only editor, as
+/// [`persisted_record`] does; a signed one slices the record from the
+/// PowerPoint Document stream at its retained persist offset.
+fn persisted_object_record(snapshot: &Snapshot, persist_id: u32) -> Result<Vec<u8>> {
+    if !snapshot.has_signature {
+        return persisted_record(snapshot, persist_id);
+    }
+    let mut package =
+        Reader::from_reader_with_options(Cursor::new(snapshot.bytes()), snapshot.open_options())?;
+    let presentation = package.presentation_with_options(snapshot.open_options())?;
+    let offset = presentation
+        .inner
+        .persist_mapping
+        .get_offset(persist_id)
+        .and_then(|offset| usize::try_from(offset).ok())
+        .ok_or_else(|| {
+            PackageError::Corrupted("PPT selected persist record has no directory entry".into())
+        })?;
+    let document = presentation.document_stream();
+    let tail = document.get(offset..).ok_or_else(|| {
+        PackageError::Corrupted(
+            "PPT selected persist record offset exceeds its document stream".into(),
+        )
+    })?;
+    let (_, consumed) = crate::Record::parse(tail, 0, &presentation.source_limits())?;
+    let end = offset.checked_add(consumed).ok_or_else(|| {
+        PackageError::Corrupted("PPT selected persist record length overflows".into())
+    })?;
+    document
+        .get(offset..end)
+        .map(ToOwned::to_owned)
+        .ok_or_else(|| {
+            PackageError::Corrupted(
+                "PPT selected persist record exceeds its document stream".into(),
+            )
+            .into()
+        })
 }
 
 fn inspect_slide_hidden(snapshot: &Snapshot, position: Position) -> Result<bool> {
@@ -4019,30 +5827,54 @@ fn inspect_slide_hidden(snapshot: &Snapshot, position: Position) -> Result<bool>
         .copied()
         .ok_or(Error::Refused(Refusal::SlideNotFound { position }))?;
     let bytes = persisted_record(snapshot, slide.persist_id())?;
-    let (root, consumed) = crate::Record::parse_with_limits(&bytes, 0, snapshot.limits)?;
+    let (root, consumed) = crate::Record::parse(&bytes, 0, &snapshot.limits)?;
     if consumed != bytes.len() || root.record_type != crate::RecordType::Slide {
         return Err(PackageError::Corrupted(
             "PPT slide visibility owner is not one complete SlideContainer".into(),
         )
         .into());
     }
-    parse_slide_hidden_atom(unique_slide_hidden_atom(&root, position)?, position)
+    match optional_slide_hidden_atom(&root, position)? {
+        Some(atom) => parse_slide_hidden_atom(atom, position),
+        // A slide without slide-show information is shown ([MS-PPT] 2.5.1:
+        // the atom is optional; `fHidden` defaults to clear).
+        None => Ok(false),
+    }
 }
 
-fn unique_slide_hidden_atom(root: &crate::Record, position: Position) -> Result<&crate::Record> {
+/// The slide's unique `SlideShowSlideInfoAtom`, or `None` when it has none;
+/// several are a refusal.
+fn optional_slide_hidden_atom(
+    root: &crate::Record,
+    position: Position,
+) -> Result<Option<&crate::Record>> {
     let mut atoms = root
         .children
         .iter()
         .filter(|child| child.record_type == crate::RecordType::SSSlideInfoAtom);
-    let atom = atoms
-        .next()
-        .ok_or(Error::Refused(Refusal::UnsupportedSlideVisibility {
-            position,
-        }))?;
+    let atom = atoms.next();
     if atoms.next().is_some() {
         return Err(Error::Refused(Refusal::UnsupportedSlideVisibility {
             position,
         }));
+    }
+    Ok(atom)
+}
+
+/// A `SlideShowSlideInfoAtom` for a slide that had none: no transition, no
+/// sound, manual advance and medium speed, what the PPT writer emits for
+/// default slide timing. The caller sets `fHidden`.
+fn new_slide_hidden_atom(limits: SourceLimits) -> Result<crate::Record> {
+    let timing = crate::writer::slide_timing::SlideTiming::default();
+    let bytes = crate::writer::slide_timing::build_slide_timing(&timing).map_err(|error| {
+        PackageError::Corrupted(format!("PPT slide-show information atom: {error}"))
+    })?;
+    let (atom, consumed) = crate::Record::parse(&bytes, 0, &limits)?;
+    if consumed != bytes.len() {
+        return Err(PackageError::Corrupted(
+            "PPT slide-show information atom is not one complete record".into(),
+        )
+        .into());
     }
     Ok(atom)
 }
@@ -4078,8 +5910,7 @@ fn replace_slide_hidden(
         .copied()
         .ok_or(Error::Refused(Refusal::SlideNotFound { position }))?;
     let source_record = persisted_record(snapshot, slide.persist_id())?;
-    let (mut root, consumed) =
-        crate::Record::parse_with_limits(&source_record, 0, snapshot.limits)?;
+    let (mut root, consumed) = crate::Record::parse(&source_record, 0, &snapshot.limits)?;
     if consumed != source_record.len() || root.record_type != crate::RecordType::Slide {
         return Err(PackageError::Corrupted(
             "PPT slide visibility owner is not one complete SlideContainer".into(),
@@ -4092,16 +5923,39 @@ fn replace_slide_hidden(
         )
         .into());
     }
-    let atom_index = {
-        let _current =
-            parse_slide_hidden_atom(unique_slide_hidden_atom(&root, position)?, position)?;
-        root.children
-            .iter()
-            .position(|child| child.record_type == crate::RecordType::SSSlideInfoAtom)
-            .ok_or(Error::Refused(Refusal::UnsupportedSlideVisibility {
-                position,
-            }))?
+    let inserted = match optional_slide_hidden_atom(&root, position)? {
+        Some(atom) => {
+            let _current = parse_slide_hidden_atom(atom, position)?;
+            false
+        },
+        None => {
+            if !replacement {
+                // Absent slide-show information already reads as shown.
+                return Ok(snapshot.clone());
+            }
+            // [MS-PPT] 2.5.1 places the optional atom directly after the
+            // SlideAtom, which must be the container's first child.
+            if root
+                .children
+                .first()
+                .is_none_or(|child| child.record_type != crate::RecordType::SlideAtom)
+            {
+                return Err(Error::Refused(Refusal::UnsupportedSlideVisibility {
+                    position,
+                }));
+            }
+            let atom = new_slide_hidden_atom(snapshot.limits)?;
+            root.children.insert(1, atom);
+            true
+        },
     };
+    let atom_index = root
+        .children
+        .iter()
+        .position(|child| child.record_type == crate::RecordType::SSSlideInfoAtom)
+        .ok_or(Error::Refused(Refusal::UnsupportedSlideVisibility {
+            position,
+        }))?;
     let atom = &mut root.children[atom_index];
     let before = atom.data.clone();
     let mut flags = u16::from_le_bytes([atom.data[10], atom.data[11]]);
@@ -4118,20 +5972,24 @@ fn replace_slide_hidden(
         .into());
     }
     let rewritten_record = encode_record(&root)?;
-    if rewritten_record.len() != source_record.len() {
+    // An in-place flag change keeps the record length; an inserted atom adds
+    // exactly its 8-byte header and 16-byte payload.
+    let expected_len = source_record.len() + if inserted { 24 } else { 0 };
+    if rewritten_record.len() != expected_len {
         return Err(PackageError::Corrupted(
-            "PPT fixed-width slide visibility rewrite changed record length".into(),
+            "PPT slide visibility rewrite changed record length".into(),
         )
         .into());
     }
     let mut editor = crate::embedded::object::Editor::open_records_arc_with_limit(
         snapshot.shared_bytes(),
         snapshot.limits.max_package_bytes,
+        snapshot.limits,
     )?;
     editor.replace_persisted_record(slide.persist_id(), rewritten_record)?;
     let bytes = editor.finish()?;
     crate::font::validate_unrelated_streams(snapshot.bytes(), &bytes)?;
-    let published = Snapshot::from_bytes_with_limits(bytes, snapshot.limits)?;
+    let published = Snapshot::from_bytes_with_options(bytes, snapshot.open_options())?;
     if published.document != snapshot.document || published.slide_hidden(position)? != replacement {
         return Err(PackageError::Corrupted(
             "PPT slide visibility replacement did not round-trip exactly".into(),
@@ -4149,7 +6007,7 @@ fn inspect_slide_advance(snapshot: &Snapshot, position: Position) -> Result<Slid
         .copied()
         .ok_or(Error::Refused(Refusal::SlideNotFound { position }))?;
     let bytes = persisted_record(snapshot, slide.persist_id())?;
-    let (root, consumed) = crate::Record::parse_with_limits(&bytes, 0, snapshot.limits)?;
+    let (root, consumed) = crate::Record::parse(&bytes, 0, &snapshot.limits)?;
     if consumed != bytes.len() || root.record_type != crate::RecordType::Slide {
         return Err(PackageError::Corrupted(
             "PPT slide advance owner is not one complete SlideContainer".into(),
@@ -4210,8 +6068,7 @@ fn replace_slide_advance(
         .copied()
         .ok_or(Error::Refused(Refusal::SlideNotFound { position }))?;
     let source_record = persisted_record(snapshot, slide.persist_id())?;
-    let (mut root, consumed) =
-        crate::Record::parse_with_limits(&source_record, 0, snapshot.limits)?;
+    let (mut root, consumed) = crate::Record::parse(&source_record, 0, &snapshot.limits)?;
     if consumed != source_record.len() || root.record_type != crate::RecordType::Slide {
         return Err(PackageError::Corrupted(
             "PPT slide advance owner is not one complete SlideContainer".into(),
@@ -4258,11 +6115,12 @@ fn replace_slide_advance(
     let mut editor = crate::embedded::object::Editor::open_records_arc_with_limit(
         snapshot.shared_bytes(),
         snapshot.limits.max_package_bytes,
+        snapshot.limits,
     )?;
     editor.replace_persisted_record(slide.persist_id(), rewritten_record)?;
     let bytes = editor.finish()?;
     crate::font::validate_unrelated_streams(snapshot.bytes(), &bytes)?;
-    let published = Snapshot::from_bytes_with_limits(bytes, snapshot.limits)?;
+    let published = Snapshot::from_bytes_with_options(bytes, snapshot.open_options())?;
     if published.document != snapshot.document || published.slide_advance(position)? != replacement
     {
         return Err(PackageError::Corrupted(
@@ -4294,7 +6152,7 @@ fn inspect_slide_transition_visual(
         .copied()
         .ok_or(Error::Refused(Refusal::SlideNotFound { position }))?;
     let bytes = persisted_record(snapshot, slide.persist_id())?;
-    let (root, consumed) = crate::Record::parse_with_limits(&bytes, 0, snapshot.limits)?;
+    let (root, consumed) = crate::Record::parse(&bytes, 0, &snapshot.limits)?;
     if consumed != bytes.len() || root.record_type != crate::RecordType::Slide {
         return Err(PackageError::Corrupted(
             "PPT visual transition owner is not one complete SlideContainer".into(),
@@ -4355,8 +6213,7 @@ fn replace_slide_transition_visual(
         .copied()
         .ok_or(Error::Refused(Refusal::SlideNotFound { position }))?;
     let source_record = persisted_record(snapshot, slide.persist_id())?;
-    let (mut root, consumed) =
-        crate::Record::parse_with_limits(&source_record, 0, snapshot.limits)?;
+    let (mut root, consumed) = crate::Record::parse(&source_record, 0, &snapshot.limits)?;
     if consumed != source_record.len() || root.record_type != crate::RecordType::Slide {
         return Err(PackageError::Corrupted(
             "PPT visual transition owner is not one complete SlideContainer".into(),
@@ -4406,11 +6263,12 @@ fn replace_slide_transition_visual(
     let mut editor = crate::embedded::object::Editor::open_records_arc_with_limit(
         snapshot.shared_bytes(),
         snapshot.limits.max_package_bytes,
+        snapshot.limits,
     )?;
     editor.replace_persisted_record(slide.persist_id(), rewritten_record)?;
     let bytes = editor.finish()?;
     crate::font::validate_unrelated_streams(snapshot.bytes(), &bytes)?;
-    let published = Snapshot::from_bytes_with_limits(bytes, snapshot.limits)?;
+    let published = Snapshot::from_bytes_with_options(bytes, snapshot.open_options())?;
     if published.document != snapshot.document
         || published.slide_transition_visual(position)? != replacement
     {
@@ -4495,6 +6353,7 @@ fn next_persist_id(source: &Snapshot, inserted: &BTreeMap<u32, Vec<u8>>) -> Resu
     let editor = crate::embedded::object::Editor::open_records_arc_with_limit(
         source.shared_bytes(),
         source.limits.max_package_bytes,
+        source.limits,
     )?;
     editor
         .persist_ids()
@@ -4550,7 +6409,7 @@ fn slide_payload(group: Vec<crate::records::Record>, record: Vec<u8>) -> Result<
         )
         .into());
     }
-    let (root, consumed) = crate::Record::parse_with_limits(&record, 0, RecordLimits::default())?;
+    let (root, consumed) = crate::Record::parse(&record, 0, &SourceLimits::default())?;
     if consumed != record.len() || root.record_type != crate::RecordType::Slide {
         return Err(PackageError::Corrupted(
             "slide transfer persist record is not one SlideContainer".into(),
@@ -4592,8 +6451,8 @@ fn require_portable_slide(
     donor: &Snapshot,
     record: &mut Vec<u8>,
 ) -> Result<TransferClosure> {
-    let (mut root, consumed) =
-        crate::Record::parse_with_limits(record, 0, RecordLimits::default())?;
+    let source_limits = target.limits();
+    let (mut root, consumed) = crate::Record::parse(record, 0, &source_limits)?;
     if consumed != record.len() || root.record_type != crate::RecordType::Slide {
         return Err(PackageError::Corrupted(
             "slide transfer persist record is not one SlideContainer".into(),
@@ -4611,9 +6470,10 @@ fn require_portable_slide(
         }));
     }
     let mut reused = Vec::new();
-    let comments = crate::comments::parse_slide_comments(&root)?;
+    let comments = crate::comments::parse_slide_comments(&root, &source_limits)?;
     if !comments.is_empty() {
-        let target_authors = crate::comments::Authors::parse(target.document.record())?;
+        let target_authors =
+            crate::comments::Authors::parse(target.document.record(), &source_limits)?;
         if comments.iter().any(|comment| {
             target_authors
                 .find(&comment.author)
@@ -4923,8 +6783,9 @@ struct PictureInventory {
 }
 
 fn picture_inventory(snapshot: &Snapshot) -> Result<PictureInventory> {
-    let mut package = Package::from_reader(Cursor::new(snapshot.bytes()))?;
-    let presentation = package.presentation()?;
+    let mut package =
+        Reader::from_reader_with_options(Cursor::new(snapshot.bytes()), snapshot.open_options())?;
+    let presentation = package.presentation_with_options(snapshot.open_options())?;
     let slots = presentation
         .image_store()?
         .map_or(0, |store| u32::from(store.len()));
@@ -4937,8 +6798,12 @@ fn picture_inventory(snapshot: &Snapshot) -> Result<PictureInventory> {
             .ok_or_else(|| PackageError::Corrupted("PPT BLIP index exceeds u32".into()))?;
         let data = image.data().map_err(PackageError::from)?.to_vec();
         let mut blip = Vec::new();
-        litchi_odraw::image::write::copy(&mut blip, &image.blip().map_err(PackageError::from)?)
-            .map_err(PackageError::from)?;
+        litchi_odraw::image::write::copy(
+            &mut blip,
+            &image.blip().map_err(PackageError::from)?,
+            litchi_odraw::image::Limits::default(),
+        )
+        .map_err(PackageError::from)?;
         if resources
             .insert(
                 id,
@@ -4985,7 +6850,7 @@ fn picture_remaps(
             })
             .map(|(candidate_id, _candidate)| *candidate_id);
         let staged = pictures.iter().find_map(|picture| {
-            let blip = litchi_odraw::image::Blip::parse(&picture.blip).ok()?;
+            let blip = litchi_odraw::image::Blip::parse(&picture.blip, Default::default()).ok()?;
             (blip.kind() == source.kind && blip.data() == source.data).then_some(picture.target_id)
         });
         let target_id = if let Some(target_id) = existing.or(staged) {
@@ -5012,7 +6877,8 @@ fn picture_remaps(
 }
 
 fn build_picture_fbse(blip_bytes: &[u8], delay_offset: u32) -> Result<Vec<u8>> {
-    let blip = litchi_odraw::image::Blip::parse(blip_bytes).map_err(PackageError::from)?;
+    let blip = litchi_odraw::image::Blip::parse(blip_bytes, Default::default())
+        .map_err(PackageError::from)?;
     let kind = blip.kind();
     let uid = blip
         .uids()
@@ -5067,7 +6933,7 @@ fn append_transferred_pictures(
         delay.extend_from_slice(blip);
     }
 
-    let (mut root, consumed) = crate::Record::parse_with_limits(document, 0, snapshot.limits)?;
+    let (mut root, consumed) = crate::Record::parse(document, 0, &snapshot.limits)?;
     if consumed != document.len() || root.record_type != crate::RecordType::Document {
         return Err(PackageError::Corrupted(
             "PPT picture-store owner is not one DocumentContainer".into(),
@@ -5243,8 +7109,11 @@ fn append_raw_record(
 }
 
 fn picture_stream(snapshot: &Snapshot) -> Result<Vec<u8>> {
-    let mut ole =
-        litchi_cfb::OleFile::open(Cursor::new(snapshot.bytes())).map_err(PackageError::from)?;
+    let mut ole = litchi_cfb::OleFile::open(
+        Cursor::new(snapshot.bytes()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .map_err(PackageError::from)?;
     let paths = ole
         .list_streams()
         .into_iter()
@@ -5271,8 +7140,8 @@ fn validate_transferred_pictures(
     }
     let inventory = picture_inventory(snapshot)?;
     for (target_id, expected_blip) in pictures {
-        let expected =
-            litchi_odraw::image::Blip::parse(expected_blip).map_err(PackageError::from)?;
+        let expected = litchi_odraw::image::Blip::parse(expected_blip, Default::default())
+            .map_err(PackageError::from)?;
         let actual = inventory.resources.get(target_id).ok_or_else(|| {
             PackageError::Corrupted(format!(
                 "published PPT is missing transferred BLIP {target_id}"
@@ -5289,8 +7158,12 @@ fn validate_transferred_pictures(
 }
 
 fn validate_unrelated_picture_publication(before: &[u8], after: &[u8]) -> Result<()> {
-    let mut old = litchi_cfb::OleFile::open(Cursor::new(before)).map_err(PackageError::from)?;
-    let mut new = litchi_cfb::OleFile::open(Cursor::new(after)).map_err(PackageError::from)?;
+    let mut old =
+        litchi_cfb::OleFile::open(Cursor::new(before), litchi_cfb::OleFileLimits::default())
+            .map_err(PackageError::from)?;
+    let mut new =
+        litchi_cfb::OleFile::open(Cursor::new(after), litchi_cfb::OleFileLimits::default())
+            .map_err(PackageError::from)?;
     let mut old_paths = old.list_streams();
     let mut new_paths = new.list_streams();
     old_paths.retain(|path| path.last().is_none_or(|name| name != "Pictures"));
@@ -5363,6 +7236,7 @@ fn drawing_remaps(target: &Snapshot, donor: &SlideRelationships) -> Result<BTree
     let editor = crate::embedded::object::Editor::open_records_arc_with_limit(
         target.shared_bytes(),
         target.limits.max_package_bytes,
+        target.limits,
     )?;
     let mut live_shape_ids = BTreeSet::new();
     let mut available_shape_ids = BTreeSet::new();
@@ -5370,8 +7244,7 @@ fn drawing_remaps(target: &Snapshot, donor: &SlideRelationships) -> Result<BTree
         let Ok(bytes) = editor.persisted_record(persist_id) else {
             continue;
         };
-        let Ok((root, consumed)) = crate::Record::parse_with_limits(&bytes, 0, target.limits)
-        else {
+        let Ok((root, consumed)) = crate::Record::parse(&bytes, 0, &target.limits) else {
             continue;
         };
         if consumed != bytes.len() || root.record_type != crate::RecordType::Slide {
@@ -5529,8 +7402,8 @@ fn hyperlink_remaps(
     donor: &Snapshot,
     references: &BTreeSet<u32>,
 ) -> Result<BTreeMap<u32, u32>> {
-    let donor_links = crate::Hyperlinks::parse(donor.document.record())?;
-    let target_links = crate::Hyperlinks::parse(target.document.record())?;
+    let donor_links = crate::Hyperlinks::parse(donor.document.record(), &donor.limits)?;
+    let target_links = crate::Hyperlinks::parse(target.document.record(), &target.limits)?;
     references
         .iter()
         .map(|source_id| {
@@ -6236,6 +8109,9 @@ fn inverse_structural(structural_change: &StructuralChange) -> StructuralChange 
             after_order: list_change.before_order,
             payload: normalized_payload(&list_change.payload),
         }),
+        StructuralChange::Document(change, order) => {
+            StructuralChange::Document(change.inverse(), *order)
+        },
     }
 }
 
@@ -6263,6 +8139,7 @@ fn replay_structural_changes(
                     insert_change.payload.group.clone(),
                 )?;
             },
+            StructuralChange::Document(change, _) => change.replay(document)?,
         }
     }
     Ok(())
@@ -6313,11 +8190,9 @@ fn patch_effects(patch: &Patch) -> BTreeSet<String> {
                     "slide-list/position:{}",
                     list_change.position.get()
                 ));
-                if let Ok((root, consumed)) = crate::Record::parse_with_limits(
-                    &list_change.payload.record,
-                    0,
-                    RecordLimits::default(),
-                ) && consumed == list_change.payload.record.len()
+                if let Ok((root, consumed)) =
+                    crate::Record::parse(&list_change.payload.record, 0, &SourceLimits::default())
+                    && consumed == list_change.payload.record.len()
                     && let Ok(relationships) = scan_slide_relationships(&root)
                 {
                     effects.extend(
@@ -6327,6 +8202,9 @@ fn patch_effects(patch: &Patch) -> BTreeSet<String> {
                             .map(|shape_id| format!("drawing/shape-id:{shape_id}")),
                     );
                 }
+            },
+            StructuralChange::Document(change, _) => {
+                effects.insert(change.effect());
             },
         }
     }
@@ -6367,7 +8245,7 @@ fn encode_payload(payload: &SlidePayload) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
-fn decode_payload(bytes: &[u8], limits: RecordLimits) -> Result<SlidePayload> {
+fn decode_payload(bytes: &[u8], limits: SourceLimits) -> Result<SlidePayload> {
     let version = bytes.get(0..4);
     if bytes.len() > limits.max_input_bytes || !matches!(version, Some(b"LSP1" | b"LSP2")) {
         return Err(invalid_durable_patch(
@@ -6384,7 +8262,7 @@ fn decode_payload(bytes: &[u8], limits: RecordLimits) -> Result<SlidePayload> {
     let mut group = Vec::with_capacity(count);
     for _ in 0..count {
         let encoded = take_length_prefixed(bytes, &mut offset, limits.max_record_bytes)?;
-        let (record, consumed) = crate::Record::parse_with_limits(encoded, 0, limits)?;
+        let (record, consumed) = crate::Record::parse(encoded, 0, &limits)?;
         if consumed != encoded.len() {
             return Err(invalid_durable_patch(
                 "slide group blob record has trailing bytes",
@@ -6490,6 +8368,10 @@ fn take_length_prefixed<'a>(bytes: &'a [u8], offset: &mut usize, limit: usize) -
 )]
 mod tests {
     use super::*;
+    use litchi_cfb::OleError;
+    use litchi_cfb::{OleFile, OleWriter};
+    use litchi_core::{ReadAt, SourceVersion};
+    use std::sync::atomic::{AtomicU64, Ordering};
 
     fn fixture(name: &str) -> Vec<u8> {
         std::fs::read(
@@ -6501,7 +8383,7 @@ mod tests {
     }
 
     fn slide_texts(bytes: &[u8]) -> Vec<String> {
-        let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
+        let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
         package
             .presentation()
             .unwrap()
@@ -6513,7 +8395,7 @@ mod tests {
     }
 
     fn authored_fixture() -> Vec<u8> {
-        let mut writer = crate::writer::Writer::new();
+        let mut writer = crate::writer::Builder::new();
         let first = writer.add_slide().unwrap();
         writer
             .add_textbox(first, 10, 10, 240, 40, "first slide")
@@ -6523,12 +8405,133 @@ mod tests {
             .add_textbox(second, 10, 10, 240, 40, "second slide")
             .unwrap();
         let mut output = Cursor::new(Vec::new());
+        crate::raw::encode(&mut writer, &mut output).unwrap();
+        output.into_inner()
+    }
+
+    #[test]
+    fn package_backed_snapshot_matches_a_fresh_parse() {
+        let bytes = authored_fixture();
+        let limits = SourceLimits::builder()
+            .max_input_bytes(bytes.len())
+            .unwrap()
+            .max_events(10_000)
+            .unwrap()
+            .build()
+            .unwrap();
+        let options = OpenOptions::new()
+            .source_limits(limits)
+            .leniency(crate::leniency::Leniency::TolerateUserEditChainDefects);
+        let package = crate::Package::from_bytes_with_options(&bytes, options).unwrap();
+        let artifact = Arc::from(package.to_encrypted_bytes().unwrap().into_boxed_slice());
+        let admitted =
+            Snapshot::from_package_with_options(&package, Arc::clone(&artifact), options).unwrap();
+        let reparsed = Snapshot::from_bytes_with_options(bytes, options).unwrap();
+
+        assert_eq!(admitted.bytes(), reparsed.bytes());
+        assert_eq!(admitted.document, reparsed.document);
+        assert_eq!(admitted.document_persist_id, reparsed.document_persist_id);
+        assert_eq!(admitted.chain_repaired, reparsed.chain_repaired);
+        assert_eq!(admitted.has_review_history, reparsed.has_review_history);
+        assert_eq!(admitted.has_signature, reparsed.has_signature);
+        assert!(Arc::ptr_eq(admitted.artifact.shared(), &artifact));
+        assert_eq!(admitted.limits(), limits);
+        assert_eq!(
+            admitted.leniency(),
+            crate::leniency::Leniency::TolerateUserEditChainDefects
+        );
+    }
+
+    struct VersionedSource {
+        bytes: Vec<u8>,
+        revision: AtomicU64,
+    }
+
+    impl VersionedSource {
+        fn new(bytes: Vec<u8>) -> Self {
+            Self {
+                bytes,
+                revision: AtomicU64::new(0),
+            }
+        }
+
+        fn change(&self) {
+            self.revision.fetch_add(1, Ordering::AcqRel);
+        }
+    }
+
+    impl ReadAt for VersionedSource {
+        fn len(&self) -> std::io::Result<u64> {
+            Ok(self.bytes.len() as u64)
+        }
+
+        fn version(&self) -> std::io::Result<SourceVersion> {
+            Ok(SourceVersion::new(
+                0x5050,
+                self.revision.load(Ordering::Acquire),
+            ))
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> std::io::Result<usize> {
+            let offset = usize::try_from(offset)
+                .map_err(|_| std::io::Error::from(std::io::ErrorKind::InvalidInput))?;
+            let input = self.bytes.get(offset..).unwrap_or_default();
+            let count = input.len().min(output.len());
+            output[..count].copy_from_slice(&input[..count]);
+            Ok(count)
+        }
+    }
+
+    #[test]
+    fn package_backed_snapshot_rechecks_a_changed_positional_source() {
+        let bytes = authored_fixture();
+        let limits = SourceLimits::builder()
+            .max_input_bytes(bytes.len())
+            .unwrap()
+            .max_events(10_000)
+            .unwrap()
+            .build()
+            .unwrap();
+        let options = OpenOptions::new()
+            .source_limits(limits)
+            .leniency(crate::leniency::Leniency::TolerateUserEditChainDefects);
+        let source = Arc::new(VersionedSource::new(bytes));
+        let package = crate::Package::from_read_at_with_options(source.clone(), options).unwrap();
+        let artifact = Arc::from(package.to_encrypted_bytes().unwrap().into_boxed_slice());
+
+        // Populate the package's signed-component memo before changing the
+        // source. The freshness fence must still reject a later projection;
+        // a cached signature result cannot make a positional source current.
+        Snapshot::from_package_with_options(&package, Arc::clone(&artifact), options).unwrap();
+        source.change();
+
+        assert!(matches!(
+            Snapshot::from_package_with_options(&package, artifact, options),
+            Err(Error::Package(PackageError::Ole(
+                OleError::SourceChanged { .. }
+            )))
+        ));
+    }
+
+    fn signed_fixture(bytes: &[u8]) -> Vec<u8> {
+        let mut source =
+            OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
+        let mut writer = OleWriter::new();
+        for path in source.list_streams() {
+            let names: Vec<&str> = path.iter().map(String::as_str).collect();
+            let data = source.open_stream(&names).unwrap();
+            writer.create_stream(&names, &data).unwrap();
+        }
+        writer
+            .create_stream(&["_signatures"], b"opaque synthetic signature")
+            .unwrap();
+        let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output).unwrap();
         output.into_inner()
     }
 
     fn authored_batch_fixture() -> Vec<u8> {
-        let mut writer = crate::writer::Writer::new();
+        let mut writer = crate::writer::Builder::new();
         let first = writer.add_slide().unwrap();
         writer
             .add_textbox(first, 10, 10, 240, 40, "first shape")
@@ -6541,24 +8544,24 @@ mod tests {
             .add_textbox(second, 10, 10, 240, 40, "third shape")
             .unwrap();
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).unwrap();
+        crate::raw::encode(&mut writer, &mut output).unwrap();
         output.into_inner()
     }
 
     fn authored_many_shapes_fixture(count: usize) -> Vec<u8> {
-        let mut writer = crate::writer::Writer::new();
+        let mut writer = crate::writer::Builder::new();
         let slide = writer.add_slide().unwrap();
         for index in 0..count {
             let text = format!("shape {index}");
             writer.add_textbox(slide, 10, 10, 240, 40, &text).unwrap();
         }
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).unwrap();
+        crate::raw::encode(&mut writer, &mut output).unwrap();
         output.into_inner()
     }
 
     fn shape_text(bytes: &[u8], target: crate::text_edit::Target) -> String {
-        let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
+        let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
         let presentation = package.presentation().unwrap();
         presentation.slides().unwrap()[target.slide().get()]
             .shapes()
@@ -6572,7 +8575,11 @@ mod tests {
     fn open_ole_live_document_inspection_matches_byte_ingress() {
         let bytes = authored_fixture();
         let expected = crate::embedded::object::Editor::inspect_live_document(&bytes).unwrap();
-        let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes.as_slice())).unwrap();
+        let mut ole = OleFile::open(
+            Cursor::new(bytes.as_slice()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let actual =
             crate::embedded::object::Editor::inspect_live_document_from_ole(&mut ole).unwrap();
 
@@ -6584,14 +8591,14 @@ mod tests {
     }
 
     fn authored_table_fixture() -> Vec<u8> {
-        let mut writer = crate::writer::Writer::new();
+        let mut writer = crate::writer::Builder::new();
         let slide = writer.add_slide().unwrap();
         let mut table = crate::writer::Table::new(2, 2).unwrap();
         table.set_cell_text(0, 0, "A1").unwrap();
         table.set_cell_text(1, 1, "B2").unwrap();
         writer.add_table(slide, 50, 60, table).unwrap();
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).unwrap();
+        crate::raw::encode(&mut writer, &mut output).unwrap();
         output.into_inner()
     }
 
@@ -6683,8 +8690,7 @@ mod tests {
     fn advance_atom_data(snapshot: &Snapshot, position: Position) -> [u8; 16] {
         let slide = snapshot.document.slides()[position.get()];
         let bytes = persisted_record(snapshot, slide.persist_id()).unwrap();
-        let (root, consumed) =
-            crate::Record::parse_with_limits(&bytes, 0, snapshot.limits).unwrap();
+        let (root, consumed) = crate::Record::parse(&bytes, 0, &snapshot.limits).unwrap();
         assert_eq!(consumed, bytes.len());
         unique_slide_advance_atom(&root, position)
             .unwrap()
@@ -6717,7 +8723,7 @@ mod tests {
     }
 
     #[test]
-    fn real_fixture_reorders_reopens_and_round_trips_durable_history() {
+    fn real_fixture_reorders_reopens_and_round_trips_durable_undo_redo() {
         let bytes = fixture("basic_test_ppt_file.ppt");
         let original_text = slide_texts(&bytes);
         let source = Snapshot::from_bytes(bytes).unwrap();
@@ -6748,53 +8754,77 @@ mod tests {
         let durably_restored = commit.snapshot().apply_durable(&decoded.inverse()).unwrap();
         assert_eq!(slide_texts(durably_restored.bytes()), original_text);
 
-        let mut history = source.history(HistoryLimits::new(4, 4096));
-        history
-            .record(commit.snapshot().clone(), wire.len() as u64)
-            .unwrap();
-        assert!(history.undo());
-        assert_eq!(history.current(), &source);
-        assert!(history.redo());
-        assert_eq!(history.current(), commit.snapshot());
+        // Undo and redo are the inverse and the patch applied again.
+        let undone = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+        assert_eq!(undone, source);
+        assert_eq!(commit.patch().apply(&undone).unwrap(), *commit.snapshot());
     }
 
     #[test]
-    fn common_composition_joins_disjoint_moves_and_refuses_overlap() {
+    fn signed_durable_semantic_noop_replays_exactly_and_changed_replay_is_refused() {
+        use litchi_core::patch::{BlobBundle, Reversible, ReversibleOperation};
+
+        let source = Snapshot::from_bytes(signed_fixture(&authored_fixture())).unwrap();
+        let target = crate::text_edit::Target::new(Position::new(0), Position::new(0));
+        let limits = patch_limits();
+        let no_op = litchi_core::patch::Patch::<Reversible>::new(
+            limits,
+            "litchi-ppt",
+            [ReversibleOperation::new(
+                durable_text_operation(limits, target, "first slide", "first slide").unwrap(),
+                durable_text_operation(limits, target, "first slide", "first slide").unwrap(),
+            )],
+            BlobBundle::new(limits.blobs()),
+            BlobBundle::new(limits.blobs()),
+        )
+        .unwrap();
+        let replayed = source.apply_durable(&no_op).unwrap();
+        assert_eq!(replayed.bytes(), source.bytes());
+
+        let changed = litchi_core::patch::Patch::<Reversible>::new(
+            limits,
+            "litchi-ppt",
+            [ReversibleOperation::new(
+                durable_text_operation(limits, target, "first slide", "changed").unwrap(),
+                durable_text_operation(limits, target, "changed", "first slide").unwrap(),
+            )],
+            BlobBundle::new(limits.blobs()),
+            BlobBundle::new(limits.blobs()),
+        )
+        .unwrap();
+        assert!(matches!(
+            source.apply_durable(&changed),
+            Err(Error::Refused(Refusal::Signed))
+        ));
+    }
+
+    #[test]
+    fn joined_move_patches_commute_and_overlap_is_refused() {
         let source = Snapshot::from_bytes(fixture("45543.ppt")).unwrap();
-        let limits = CompositionLimits::new(8, 32, 64, 32);
-        let first = source
-            .prepare_move(
-                limits,
-                "move-opening-pair",
-                Position::new(0),
-                Position::new(1),
-            )
-            .unwrap();
-        let second = source
-            .prepare_move(
-                limits,
-                "move-later-pair",
-                Position::new(4),
-                Position::new(5),
-            )
-            .unwrap();
-        let overlapping = source
-            .prepare_move(
-                limits,
-                "overlap-opening-pair",
-                Position::new(1),
-                Position::new(2),
-            )
-            .unwrap();
-        let mut composition = source.compose(limits).unwrap();
-        composition.join(first).unwrap().join(second).unwrap();
-        let failure = composition.join(overlapping).unwrap_err();
-        assert!(matches!(failure.failure(), SubEditJoinFailure::Overlap(_)));
-        let commit = composition.commit().unwrap();
-        assert_eq!(commit.snapshot().slide_count(), source.slide_count());
-        assert_eq!(commit.patch().changes().len(), 2);
-        let durable = commit.patch().to_durable(patch_limits()).unwrap();
-        assert_eq!(source.apply_durable(&durable).unwrap(), *commit.snapshot());
+        let moved = |from: usize, destination: usize| {
+            let mut edit = source.edit().unwrap();
+            edit.move_slide(Position::new(from), Position::new(destination))
+                .unwrap();
+            edit.commit().unwrap().patch
+        };
+        let first = moved(0, 1);
+        let second = moved(4, 5);
+        let overlapping = moved(1, 2);
+        let joined = first.join(&second).unwrap();
+        assert_eq!(joined.changes().len(), 2);
+        assert_eq!(
+            slide_texts(joined.apply(&source).unwrap().bytes()),
+            slide_texts(second.join(&first).unwrap().apply(&source).unwrap().bytes())
+        );
+        assert!(matches!(
+            joined.join(&overlapping),
+            Err(Error::Refused(Refusal::UnsupportedPatch { .. }))
+        ));
+        let durable = joined.to_durable(patch_limits()).unwrap();
+        assert_eq!(
+            source.apply_durable(&durable).unwrap(),
+            joined.apply(&source).unwrap()
+        );
     }
 
     #[test]
@@ -6902,16 +8932,21 @@ mod tests {
     #[test]
     fn root_text_publication_with_custom_limits_retains_complete_reopen() {
         let bytes = authored_fixture();
-        let mut limits = RecordLimits::default();
+        let mut limits = SourceLimits::default();
         limits.max_records -= 1;
-        let source = Snapshot::from_bytes_with_limits(bytes, limits).unwrap();
+        let source =
+            Snapshot::from_bytes_with_options(bytes, OpenOptions::new().source_limits(limits))
+                .unwrap();
         let target = crate::text_edit::Target::new(Position::new(0), Position::new(0));
         let mut edit = source.edit().unwrap();
         edit.set_shape_text(target, "custom limits root text")
             .unwrap();
         let committed = edit.commit().unwrap().snapshot().clone();
-        let reopened =
-            Snapshot::from_bytes_with_limits(committed.bytes().to_vec(), limits).unwrap();
+        let reopened = Snapshot::from_bytes_with_options(
+            committed.bytes().to_vec(),
+            OpenOptions::new().source_limits(limits),
+        )
+        .unwrap();
 
         assert_eq!(committed, reopened);
         assert_eq!(committed.limits(), limits);
@@ -7168,11 +9203,13 @@ mod tests {
     #[test]
     fn shape_text_batch_oversized_late_replacement_is_atomic() {
         let bytes = authored_batch_fixture();
-        let limits = RecordLimits {
+        let limits = SourceLimits {
             max_package_bytes: bytes.len(),
             ..Default::default()
         };
-        let source = Snapshot::from_bytes_with_limits(bytes, limits).unwrap();
+        let source =
+            Snapshot::from_bytes_with_options(bytes, OpenOptions::new().source_limits(limits))
+                .unwrap();
         let first = crate::text_edit::Target::new(Position::new(0), Position::new(0));
         let second = crate::text_edit::Target::new(Position::new(0), Position::new(1));
         let oversized = "x".repeat(limits.max_package_bytes);
@@ -7234,9 +9271,11 @@ mod tests {
                 .any(|conflict| conflict.target() == "slide:0/shape:0/text")
         );
 
-        let mut limits = RecordLimits::default();
+        let mut limits = SourceLimits::default();
         limits.max_records -= 1;
-        let limited = Snapshot::from_bytes_with_limits(bytes, limits).unwrap();
+        let limited =
+            Snapshot::from_bytes_with_options(bytes, OpenOptions::new().source_limits(limits))
+                .unwrap();
         let mut limited_edit = limited.edit().unwrap();
         limited_edit
             .set_shape_texts(&[
@@ -7248,9 +9287,11 @@ mod tests {
             ])
             .unwrap();
         let limited_commit = limited_edit.commit().unwrap();
-        let fully_reopened =
-            Snapshot::from_bytes_with_limits(limited_commit.snapshot().bytes().to_vec(), limits)
-                .unwrap();
+        let fully_reopened = Snapshot::from_bytes_with_options(
+            limited_commit.snapshot().bytes().to_vec(),
+            OpenOptions::new().source_limits(limits),
+        )
+        .unwrap();
         assert_eq!(limited_commit.snapshot(), &fully_reopened);
         assert_eq!(limited_commit.snapshot().limits(), limits);
     }
@@ -7366,7 +9407,7 @@ mod tests {
             crate::text_edit::inspect_shape_anchor(commit.snapshot().bytes(), target).unwrap(),
             replacement
         );
-        let mut reopened = Package::from_reader(Cursor::new(commit.snapshot().bytes())).unwrap();
+        let mut reopened = Reader::from_reader(Cursor::new(commit.snapshot().bytes())).unwrap();
         assert_eq!(
             reopened.presentation().unwrap().slide_count(),
             source.slide_count()
@@ -7436,7 +9477,7 @@ mod tests {
             commit.patch().inverse().apply(commit.snapshot()).unwrap(),
             source
         );
-        let mut reopened = Package::from_reader(Cursor::new(commit.snapshot().bytes())).unwrap();
+        let mut reopened = Reader::from_reader(Cursor::new(commit.snapshot().bytes())).unwrap();
         assert_eq!(
             reopened.presentation().unwrap().slide_count(),
             commit.snapshot().slide_count()
@@ -7527,7 +9568,7 @@ mod tests {
             source.slide_count() - 1
         );
         let mut reopened =
-            Package::from_reader(Cursor::new(media_first_commit.snapshot().bytes())).unwrap();
+            Reader::from_reader(Cursor::new(media_first_commit.snapshot().bytes())).unwrap();
         assert_eq!(
             reopened.presentation().unwrap().slide_count(),
             source.slide_count() - 1
@@ -7632,7 +9673,7 @@ mod tests {
             slide_texts(commit.snapshot().bytes())[0],
             slide_texts(commit.snapshot().bytes())[1]
         );
-        let mut reopened = Package::from_reader(Cursor::new(commit.snapshot().bytes())).unwrap();
+        let mut reopened = Reader::from_reader(Cursor::new(commit.snapshot().bytes())).unwrap();
         assert_eq!(reopened.presentation().unwrap().slide_count(), 2);
 
         let durable = commit.patch().to_durable(transfer_patch_limits()).unwrap();
@@ -7665,7 +9706,7 @@ mod tests {
     #[test]
     fn novel_picture_transfer_appends_bstore_and_pictures_stream_atomically() {
         let png = vec![0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4];
-        let mut donor_writer = crate::writer::Writer::new();
+        let mut donor_writer = crate::writer::Builder::new();
         let donor_slide = donor_writer.add_slide().unwrap();
         donor_writer
             .add_picture_as(
@@ -7679,10 +9720,10 @@ mod tests {
             )
             .unwrap();
         let mut donor_bytes = Cursor::new(Vec::new());
-        donor_writer.write_to(&mut donor_bytes).unwrap();
+        crate::raw::encode(&mut donor_writer, &mut donor_bytes).unwrap();
         let donor = Snapshot::from_bytes(donor_bytes.into_inner()).unwrap();
 
-        let mut target_writer = crate::writer::Writer::new();
+        let mut target_writer = crate::writer::Builder::new();
         let live = target_writer.add_slide().unwrap();
         target_writer
             .add_textbox(live, 10, 10, 100, 30, "receiver")
@@ -7694,7 +9735,7 @@ mod tests {
                 .unwrap();
         }
         let mut target_bytes = Cursor::new(Vec::new());
-        target_writer.write_to(&mut target_bytes).unwrap();
+        crate::raw::encode(&mut target_writer, &mut target_bytes).unwrap();
         let target = Snapshot::from_bytes(target_bytes.into_inner()).unwrap();
         let mut remove = target.edit().unwrap();
         remove.remove_slide(Position::new(1)).unwrap();
@@ -7924,6 +9965,59 @@ mod tests {
         ));
     }
 
+    /// The slide container's child record types.
+    fn slide_children(snapshot: &Snapshot, position: usize) -> Vec<crate::RecordType> {
+        let slide = snapshot.document.slides()[position];
+        let bytes = persisted_record(snapshot, slide.persist_id()).unwrap();
+        let (root, _) = crate::Record::parse(&bytes, 0, &snapshot.limits).unwrap();
+        root.children
+            .iter()
+            .map(|child| child.record_type)
+            .collect()
+    }
+
+    /// Record 0290 F4: a slide without slide-show information (here, from
+    /// the PPT writer) gains a `SlideShowSlideInfoAtom` after its `SlideAtom`
+    /// when it is hidden; showing it is then a flag change, and the exact
+    /// patch and its inverse restore both states.
+    #[test]
+    fn slide_visibility_inserts_a_missing_slide_show_information_atom() {
+        let source = Snapshot::from_bytes(authored_fixture()).unwrap();
+        let atom = crate::RecordType::SSSlideInfoAtom;
+        assert!(!slide_children(&source, 0).contains(&atom));
+        assert!(!source.slide_hidden(Position::new(0)).unwrap());
+
+        let mut noop = source.edit().unwrap();
+        noop.set_slide_hidden(Position::new(0), false).unwrap();
+        assert_eq!(noop.commit().unwrap().snapshot().bytes(), source.bytes());
+
+        let mut edit = source.edit().unwrap();
+        edit.set_slide_hidden(Position::new(0), true).unwrap();
+        let commit = edit.commit().unwrap();
+        let hidden = commit.snapshot();
+        assert!(hidden.slide_hidden(Position::new(0)).unwrap());
+        assert!(!hidden.slide_hidden(Position::new(1)).unwrap());
+        let children = slide_children(hidden, 0);
+        assert_eq!(children[0], crate::RecordType::SlideAtom);
+        assert_eq!(children[1], atom);
+        assert_eq!(children.iter().filter(|kind| **kind == atom).count(), 1);
+        assert_eq!(slide_children(hidden, 1), slide_children(&source, 1));
+        assert_eq!(slide_texts(hidden.bytes()), slide_texts(source.bytes()));
+        // The inserted atom carries no transition, manual advance.
+        assert_eq!(
+            hidden.slide_advance(Position::new(0)).unwrap(),
+            SlideAdvance::on_click()
+        );
+        assert_eq!(commit.patch().apply(&source).unwrap(), *hidden);
+        assert_eq!(commit.patch().inverse().apply(hidden).unwrap(), source);
+
+        let mut shown = hidden.edit().unwrap();
+        shown.set_slide_hidden(Position::new(0), false).unwrap();
+        let shown = shown.commit().unwrap();
+        assert!(!shown.snapshot().slide_hidden(Position::new(0)).unwrap());
+        assert_eq!(slide_children(shown.snapshot(), 0), children);
+    }
+
     #[test]
     fn slide_visibility_composes_with_order_and_round_trips_durably() {
         let source = Snapshot::from_bytes(fixture("45543.ppt")).unwrap();
@@ -7969,7 +10063,7 @@ mod tests {
             slide_texts(visibility_restored.bytes()),
             slide_texts(source.bytes())
         );
-        let mut reopened = Package::from_reader(Cursor::new(visibility_restored.bytes())).unwrap();
+        let mut reopened = Reader::from_reader(Cursor::new(visibility_restored.bytes())).unwrap();
         assert_eq!(
             reopened.presentation().unwrap().slide_count(),
             source.slide_count()
@@ -8000,7 +10094,7 @@ mod tests {
     }
 
     #[test]
-    fn genuine_corpus_slide_advance_reopens_reverses_merges_and_uses_history() {
+    fn genuine_corpus_slide_advance_reopens_reverses_merges_and_undoes() {
         let cases = genuine_advance_cases();
         let producer_files = cases
             .iter()
@@ -8029,8 +10123,7 @@ mod tests {
             let after_atom = advance_atom_data(commit.snapshot(), *position);
             assert_eq!(&after_atom[4..10], &before_atom[4..10], "{family}/{name}");
             assert_eq!(&after_atom[12..16], &before_atom[12..16], "{family}/{name}");
-            let mut reopened =
-                Package::from_reader(Cursor::new(commit.snapshot().bytes())).unwrap();
+            let mut reopened = Reader::from_reader(Cursor::new(commit.snapshot().bytes())).unwrap();
             assert_eq!(
                 reopened.presentation().unwrap().slide_count(),
                 source.slide_count(),
@@ -8085,14 +10178,10 @@ mod tests {
         assert_eq!(restored.slide_advance(position).unwrap(), before);
         assert_eq!(slide_texts(restored.bytes()), slide_texts(source.bytes()));
 
-        let mut history = source.history(HistoryLimits::new(4, 64 * 1024));
-        history
-            .record(commit.snapshot().clone(), wire.len() as u64)
-            .unwrap();
-        assert!(history.undo());
-        assert_eq!(history.current(), &source);
-        assert!(history.redo());
-        assert_eq!(history.current(), commit.snapshot());
+        // Undo and redo are the inverse and the patch applied again.
+        let undone = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+        assert_eq!(undone, source);
+        assert_eq!(commit.patch().apply(&undone).unwrap(), *commit.snapshot());
 
         let mut competing_edit = source.edit().unwrap();
         competing_edit

@@ -8,7 +8,8 @@ use litchi_core::{
     SourceVersion, TextOutputError, TextOutputOptions,
 };
 use litchi_docx::source_backed::Package as SourceBackedPackage;
-use litchi_docx::{Defect, Package, ReadLimits, TextDefect};
+use litchi_docx::{Defect, Package, SourceLimits, TextDefect};
+use litchi_opc::SourceCacheLimits;
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
@@ -35,7 +36,8 @@ fn package_bytes(document: &[u8], with_media: bool) -> Vec<u8> {
     let content_types = format!(
         r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>{media_override}</Types>"#
     );
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .expect("content types");
@@ -128,6 +130,48 @@ fn separators_and_empty_paragraph_policy_are_explicit() {
     let (excluded, excluded_report) = source_text(bytes, options);
     assert_eq!(excluded, b"A::B");
     assert_eq!(excluded_report.objects_written(), 2);
+}
+
+/// The in-memory paragraph-separated text agrees with the semantic sink on
+/// both owners, and keeps a nested paragraph inside its anchor where the sink
+/// refuses it.
+#[test]
+fn paragraph_separated_text_matches_the_sink_on_both_owners() {
+    let bytes = package_bytes(
+        &document_xml(
+            r#"<w:p><w:r><w:t>one &amp; 世界</w:t><w:tab/><w:t>two</w:t></w:r></w:p><w:p/><w:tbl><w:tr><w:tc><w:p><w:r><w:t>cell</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p><w:r><w:t>last</w:t></w:r></w:p>"#,
+        ),
+        false,
+    );
+    let (sink, _) = eager_text(&bytes, parity_options(true));
+    let eager = eager_package(&bytes)
+        .document()
+        .expect("eager document")
+        .text_with_paragraph_separator("\n")
+        .expect("eager paragraph text");
+    let source = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes)))
+        .expect("source-backed package")
+        .document()
+        .expect("source document")
+        .extract_text_with_paragraph_separator("\n")
+        .expect("source paragraph text");
+    assert_eq!(eager, "one & 世界\ttwo\n\ncell\nlast");
+    assert_eq!(eager.as_bytes(), sink.as_slice());
+    assert_eq!(source, eager);
+
+    let nested = package_bytes(
+        &document_xml(
+            r#"<w:p><w:r><w:t>anchor </w:t></w:r><w:r><w:pict><w:txbxContent><w:p><w:r><w:t>box</w:t></w:r></w:p></w:txbxContent></w:pict></w:r></w:p><w:p><w:r><w:t>after</w:t></w:r></w:p>"#,
+        ),
+        false,
+    );
+    let source = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(nested)))
+        .expect("source-backed package")
+        .document()
+        .expect("source document")
+        .extract_text_with_paragraph_separator("\n")
+        .expect("nested paragraphs stay in their anchor");
+    assert_eq!(source, "anchor box\nafter");
 }
 
 #[test]
@@ -662,13 +706,14 @@ impl Write for CancelOnWrite {
 #[test]
 fn source_cancellation_before_and_after_output_is_document_progress() {
     let (cancellation, context) = execution_context();
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at_with_options(
         Arc::new(OwnedSource::new(package_bytes(
             &document_xml(r#"<w:p><w:r><w:t>cancel</w:t></w:r></w:p>"#),
             false,
         ))),
-        ReadLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .expect("managed source package");
     cancellation.cancel();
@@ -679,13 +724,14 @@ fn source_cancellation_before_and_after_output_is_document_progress() {
     ));
 
     let (cancellation, context) = execution_context();
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at_with_options(
         Arc::new(OwnedSource::new(package_bytes(
             &document_xml(r#"<w:p><w:r><w:t>cancel</w:t></w:r></w:p>"#),
             false,
         ))),
-        ReadLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .expect("managed source package");
     let mut sink = CancelOnWrite {
@@ -1061,4 +1107,195 @@ fn references_and_cdata_outside_text_are_accepted_without_repair() {
             "{body}"
         );
     }
+}
+
+#[test]
+fn committed_owner_streams_current_text_and_preserves_old_owner() {
+    for managed in [false, true] {
+        let source = Arc::new(OwnedSource::new(package_bytes(
+            &document_xml(r#"<w:p><w:r><w:t>before</w:t></w:r></w:p>"#),
+            true,
+        )));
+        let owner = if managed {
+            let (_, context) = execution_context();
+            SourceBackedPackage::from_read_at_with_options(
+                source,
+                litchi_docx::OpenOptions::default()
+                    .source_limits(SourceLimits::default())
+                    .execution_context(context),
+            )
+            .unwrap()
+        } else {
+            SourceBackedPackage::from_read_at(source).unwrap()
+        };
+        let mut edit = owner.edit().unwrap();
+        edit.replace_paragraph_text(litchi_core::Position::new(0), "after & current")
+            .unwrap();
+        let changed = edit.commit().unwrap().into_package();
+        for (package, expected) in [
+            (&owner, b"before".as_slice()),
+            (&changed, b"after & current"),
+        ] {
+            let mut output = Vec::new();
+            let report = package
+                .write_text_to(&mut output, parity_options(false))
+                .unwrap();
+            assert_eq!(output, expected);
+            assert_eq!(report.bytes_written(), expected.len() as u64);
+        }
+        let mut sink = FailAfter {
+            bytes: Vec::new(),
+            remaining: 3,
+        };
+        let error = changed
+            .write_text_to(&mut sink, parity_options(false))
+            .unwrap_err();
+        assert!(
+            matches!(error, TextOutputError::Sink { progress, .. } if progress.bytes_written() == 3)
+        );
+        assert_eq!(sink.bytes, b"aft");
+    }
+}
+
+#[test]
+fn effective_main_donor_cancellation_during_output_keeps_progress() {
+    let (cancellation, context) = execution_context();
+    let donor = litchi_opc::SourceBackedPackage::from_read_at(
+        Arc::new(OwnedSource::new(package_bytes(
+            &document_xml(r#"<w:p><w:r><w:t>donor</w:t></w:r></w:p>"#),
+            false,
+        ))),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        Some(context),
+    )
+    .unwrap();
+    let mut base = litchi_opc::OpcPackage::new();
+    base.add_part(Box::new(litchi_opc::BlobPart::new(
+        litchi_opc::PackURI::new("/word/document.xml").unwrap(),
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml".into(),
+        document_xml(r#"<w:p><w:r><w:t>base</w:t></w:r></w:p>"#),
+    )));
+    base.relate_to(
+        "word/document.xml",
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+    );
+    let physical = litchi_opc::SourceBackedPackage::from_vec(
+        litchi_opc::PackageWriter::to_bytes(&base).unwrap(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
+    let owner = SourceBackedPackage::from_source_backed_package(physical.clone()).unwrap();
+    let mut plan = litchi_opc::SourceTopologyPlan::new();
+    let target = litchi_opc::PackURI::new("/word/copied.xml").unwrap();
+    plan.try_add_source_xml_part(
+        target.clone(),
+        donor.main_document_part().unwrap().source_xml().unwrap(),
+    )
+    .unwrap();
+    plan.try_replace_internal_relationship(
+        litchi_opc::PackURI::new("/").unwrap(),
+        "rId1",
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+        target,
+    )
+    .unwrap();
+    let changed = owner
+        .with_prepared_topology(physical.prepare_topology(plan).unwrap())
+        .unwrap();
+    drop(donor);
+    let mut output = Vec::new();
+    changed
+        .write_text_to(&mut output, parity_options(false))
+        .unwrap();
+    assert_eq!(output, b"donor");
+    let mut sink = CancelOnWrite {
+        source: cancellation,
+        bytes: Vec::new(),
+        cancelled: false,
+    };
+    assert!(matches!(
+        changed.write_text_to(&mut sink, parity_options(false)),
+        Err(TextOutputError::Document { source: litchi_docx::Error::Opc(litchi_opc::OpcError::Cancelled), progress })
+            if progress.bytes_written() == 5 && progress.objects_written() == 1
+    ));
+    assert_eq!(sink.bytes, b"donor");
+    let mut output = Vec::new();
+    owner
+        .write_text_to(&mut output, parity_options(false))
+        .unwrap();
+    assert_eq!(output, b"base");
+}
+
+#[test]
+fn effective_declared_size_is_rejected_before_payload_read() {
+    let source = Arc::new(VersionedSource::new(oversized_declaration(package_bytes(
+        &document_xml(r#"<w:p><w:r><w:t>tiny</w:t></w:r></w:p>"#),
+        true,
+    ))));
+    let physical = litchi_opc::SourceBackedPackage::from_read_at(
+        source.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
+    let owner = SourceBackedPackage::from_source_backed_package(physical.clone()).unwrap();
+    let owner = owner
+        .with_prepared_topology(
+            physical
+                .prepare_topology(litchi_opc::SourceTopologyPlan::new())
+                .unwrap(),
+        )
+        .unwrap();
+    let before = source.reads.load(Ordering::SeqCst);
+    let mut output = Vec::new();
+    assert!(
+        matches!(owner.write_text_to(&mut output, parity_options(false)),
+        Err(TextOutputError::Document { progress, .. }) if progress.bytes_written() == 0)
+    );
+    assert!(output.is_empty());
+    assert_eq!(source.reads.load(Ordering::SeqCst), before);
+}
+
+#[test]
+fn effective_mce_stream_checks_source_after_sink_failure() {
+    let xml = format!(
+        r#"<w:document xmlns:w="{W}" xmlns:mc="{MCE}" xmlns:x="urn:unknown"><w:body><mc:AlternateContent><mc:Choice Requires="x"><w:p><w:r><w:t>hidden</w:t></w:r></w:p></mc:Choice><mc:Fallback><w:p><w:r><w:t>visible</w:t></w:r></w:p></mc:Fallback></mc:AlternateContent></w:body></w:document>"#
+    );
+    let source = Arc::new(VersionedSource::new(package_bytes(xml.as_bytes(), true)));
+    let physical = litchi_opc::SourceBackedPackage::from_read_at(
+        source.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
+    let owner = SourceBackedPackage::from_source_backed_package(physical.clone()).unwrap();
+    let owner = owner
+        .with_prepared_topology(
+            physical
+                .prepare_topology(litchi_opc::SourceTopologyPlan::new())
+                .unwrap(),
+        )
+        .unwrap();
+    let mut output = Vec::new();
+    owner
+        .write_text_to(&mut output, parity_options(false))
+        .unwrap();
+    assert_eq!(output, b"visible");
+    let mut sink = ChangeAndFail {
+        source,
+        changed: false,
+    };
+    assert!(
+        matches!(owner.write_text_to(&mut sink, parity_options(false)),
+        Err(TextOutputError::Document { source: litchi_docx::Error::Opc(litchi_opc::OpcError::SourceChanged { .. }), progress })
+            if progress.bytes_written() == 0)
+    );
 }

@@ -22,9 +22,10 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, FileSource, Limits, OwnedSource,
     ReadAt, Resource, SourceVersion,
 };
+use litchi_opc::SourceReadPolicy;
 use litchi_opc::{
-    OpcOperationAccounting, PackURI, PartBatch, PartData, ReadLimits, SourceBackedPackage,
-    SourceCacheDiagnostics, SourceCacheLimits,
+    OpcOperationAccounting, PackURI, PartBatch, PartData, SourceBackedPackage,
+    SourceCacheDiagnostics, SourceCacheLimits, SourceLimits,
 };
 use sha2::{Digest as _, Sha256};
 use soapberry_zip::office::StreamingArchiveWriter;
@@ -523,7 +524,8 @@ fn make_archive(kind: CorpusKind) -> Vec<u8> {
     let root_relationships = format!(
         r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="{RELATIONSHIPS_NS}"><Relationship Id="rId1" Type="{OFFICE_DOCUMENT_REL}" Target="{first_target}"/></Relationships>"#
     );
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .expect("benchmark manifest must be writable");
@@ -628,18 +630,19 @@ fn run_sample(
     };
     let cache_limits = SourceCacheLimits::new(512 * MIB, 1024)?;
     let package = match context {
-        Some(context) => {
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                source,
-                ReadLimits::default(),
-                cache_limits,
-                context,
-            )?
-        },
-        None => SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
+        Some(context) => SourceBackedPackage::from_read_at(
             source,
-            ReadLimits::default(),
+            SourceLimits::default(),
             cache_limits,
+            SourceReadPolicy::exact(),
+            Some(context),
+        )?,
+        None => SourceBackedPackage::from_read_at(
+            source,
+            SourceLimits::default(),
+            cache_limits,
+            SourceReadPolicy::exact(),
+            None,
         )?,
     };
     let selected = selected_names(corpus)

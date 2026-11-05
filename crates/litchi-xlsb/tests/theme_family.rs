@@ -27,6 +27,46 @@ use litchi_xlsb::theme::{
 };
 use litchi_xlsb::{SourceBackedWorkbook, Workbook};
 
+#[path = "support/projection.rs"]
+mod projection;
+use projection::{InPlace as _, OwnedWorkbook as _, Reprojected as _};
+
+/// Package-route steps on an owned workbook projection (record 0360b).
+trait ThemeSteps {
+    fn reprojected_theme(
+        &self,
+        limits: Limits,
+    ) -> litchi_xlsb::package::PackageResult<Option<litchi_xlsb::theme::Snapshot>>;
+    fn theme_edit(&self) -> litchi_xlsb::package::PackageResult<litchi_xlsb::theme::Edit>;
+    fn publish_theme(
+        &mut self,
+        patch: &litchi_xlsb::theme::Patch,
+    ) -> litchi_xlsb::package::PackageResult<Option<litchi_xlsb::theme::Snapshot>>;
+}
+
+impl ThemeSteps for Workbook {
+    fn reprojected_theme(
+        &self,
+        limits: Limits,
+    ) -> litchi_xlsb::package::PackageResult<Option<litchi_xlsb::theme::Snapshot>> {
+        self.reprojected(litchi_xlsb::SemanticLimits::new().theme(limits))?
+            .theme()
+    }
+
+    fn theme_edit(&self) -> litchi_xlsb::package::PackageResult<litchi_xlsb::theme::Edit> {
+        self.to_package().edit_theme()
+    }
+
+    fn publish_theme(
+        &mut self,
+        patch: &litchi_xlsb::theme::Patch,
+    ) -> litchi_xlsb::package::PackageResult<Option<litchi_xlsb::theme::Snapshot>> {
+        let published = self.to_package().apply_theme(patch)?.into_package();
+        *self = published.owned_workbook()?;
+        self.theme()
+    }
+}
+
 const NATIVE_FAMILY_FIXTURE: &str = "test-data/ooxml/xlsb/hyperlink.xlsb";
 const FAMILY_FREE_FIXTURE: &str = "test-data/ooxml/xlsb/62815.xlsb";
 const THEME_NAME: &str = "/xl/theme/theme1.xml";
@@ -85,7 +125,7 @@ fn family_value(name: &str) -> Family {
 
 fn replace_theme_blob(workbook: &mut Workbook, xml: Vec<u8>) {
     workbook
-        .edit_opc(|package| {
+        .edit_opc_in_place(|package| {
             package
                 .get_part_mut(&theme_uri())
                 .expect("Theme part")
@@ -423,13 +463,12 @@ fn supported_outer_uri_token_whitespace_resolves_and_keeps_lexical_uri() {
             "Office Theme"
         );
 
-        let before = theme_snapshot(&workbook);
-        let mut edit = before.edit();
+        let mut edit = workbook.theme_edit().expect("Theme edit");
         edit.set_family(family_value("Lexical URI Family"))
             .expect("stage URI-preserving edit");
         let commit = edit.commit().expect("commit URI-preserving edit");
         workbook
-            .apply_theme(&commit)
+            .publish_theme(commit.patch())
             .expect("publish URI-preserving edit");
         let changed = theme_bytes(&workbook);
         assert!(
@@ -463,7 +502,7 @@ fn adding_family_refuses_an_ignored_mce_extlst_branch_without_source_mutation() 
     let before = theme_snapshot(&workbook);
     assert!(before.family().is_none());
 
-    let mut edit = before.edit();
+    let mut edit = workbook.theme_edit().expect("Theme edit");
     edit.set_family(family_value("Fresh Direct Family"))
         .expect("stage direct family");
     assert!(
@@ -513,14 +552,15 @@ fn fresh_family_replacement_keeps_unknown_sibling_bytes() {
     )));
     let mut workbook = native_workbook();
     replace_theme_blob(&mut workbook, source.clone());
-    let snapshot = theme_snapshot(&workbook);
-    let mut edit = snapshot.edit();
+    let mut edit = workbook.theme_edit().expect("Theme edit");
     assert!(
         edit.set_family(family_value("Fresh Family"))
             .expect("stage fresh family")
     );
     let commit = edit.commit().expect("commit fresh family");
-    workbook.apply_theme(&commit).expect("publish fresh family");
+    workbook
+        .publish_theme(commit.patch())
+        .expect("publish fresh family");
     let changed = theme_bytes(&workbook);
     assert!(
         changed
@@ -555,11 +595,11 @@ fn family_edit_preserves_opaque_family_markup_and_inverse_is_exact() {
     let snapshot = theme_snapshot(&workbook);
     let mut family = snapshot.family().expect("opaque family").clone();
     family.set_name("Edited Family").expect("edit family name");
-    let mut edit = snapshot.edit();
+    let mut edit = workbook.theme_edit().expect("Theme edit");
     edit.set_family(family).expect("stage opaque family edit");
     let commit = edit.commit().expect("commit opaque family edit");
     workbook
-        .apply_theme(&commit)
+        .publish_theme(commit.patch())
         .expect("publish opaque family edit");
     let changed = theme_bytes(&workbook);
     assert!(
@@ -571,7 +611,7 @@ fn family_edit_preserves_opaque_family_markup_and_inverse_is_exact() {
     let after = theme_snapshot(&workbook);
     let inverse = commit.patch().inverse();
     workbook
-        .apply_theme_patch(&inverse)
+        .publish_theme(&inverse)
         .expect("publish family inverse");
     assert_eq!(theme_bytes(&workbook), source);
     assert_eq!(
@@ -587,26 +627,29 @@ fn absent_family_add_remove_noop_inverse_and_reopen_are_exact() {
     replace_theme_blob(&mut workbook, original.clone());
     assert!(theme_snapshot(&workbook).family().is_none());
 
-    let before = theme_snapshot(&workbook);
-    let mut noop_edit = before.edit();
+    let mut noop_edit = workbook.theme_edit().expect("Theme edit");
     assert!(
         !noop_edit
             .remove_family()
             .expect("absent family remove no-op")
     );
     let noop = noop_edit.commit().expect("absent family no-op");
-    assert!(!noop.changed());
-    workbook.apply_theme(&noop).expect("publish absent no-op");
+    assert!(!noop.diagnostics().changed());
+    workbook
+        .publish_theme(noop.patch())
+        .expect("publish absent no-op");
     assert_eq!(theme_bytes(&workbook), original);
 
-    let mut add_edit = before.edit();
+    let mut add_edit = workbook.theme_edit().expect("Theme edit");
     assert!(
         add_edit
             .set_family(family_value("Added Family"))
             .expect("stage family add")
     );
     let add = add_edit.commit().expect("commit family add");
-    workbook.apply_theme(&add).expect("publish family add");
+    workbook
+        .publish_theme(add.patch())
+        .expect("publish family add");
     assert!(theme_snapshot(&workbook).family().is_some());
     assert!(
         theme_bytes(&workbook)
@@ -623,19 +666,18 @@ fn absent_family_add_remove_noop_inverse_and_reopen_are_exact() {
         "Added Family"
     );
 
-    let current = theme_snapshot(&workbook);
-    let mut remove_edit = current.edit();
+    let mut remove_edit = workbook.theme_edit().expect("Theme edit");
     assert!(remove_edit.remove_family().expect("stage family remove"));
     let remove = remove_edit.commit().expect("commit family remove");
     workbook
-        .apply_theme(&remove)
+        .publish_theme(remove.patch())
         .expect("publish family remove");
     assert!(theme_snapshot(&workbook).family().is_none());
     workbook
-        .apply_theme_patch(&remove.patch().inverse())
+        .publish_theme(&remove.patch().inverse())
         .expect("reapply family through inverse remove");
     workbook
-        .apply_theme_patch(&add.patch().inverse())
+        .publish_theme(&add.patch().inverse())
         .expect("publish family inverse");
     assert!(theme_snapshot(&workbook).family().is_none());
     assert_eq!(theme_bytes(&workbook), original);
@@ -644,38 +686,37 @@ fn absent_family_add_remove_noop_inverse_and_reopen_are_exact() {
 #[test]
 fn stale_family_patch_is_atomic_and_limits_are_bounded() {
     let mut workbook = native_workbook();
-    let before = theme_snapshot(&workbook);
-    let mut edit = before.edit();
+    let mut edit = workbook.theme_edit().expect("Theme edit");
     edit.set_family(family_value("Stale Family"))
         .expect("stage stale family");
     let commit = edit.commit().expect("commit stale family");
 
     let replacement = familyless_source();
     replace_theme_blob(&mut workbook, replacement.clone());
-    assert!(workbook.apply_theme(&commit).is_err());
+    assert!(workbook.publish_theme(commit.patch()).is_err());
     assert_eq!(theme_bytes(&workbook), replacement);
 
     let exact = theme_bytes(&native_workbook()).len();
     let exact_limits = Limits::new(exact, 100_000, 128);
     assert!(
         workbook_from_fixture(NATIVE_FAMILY_FIXTURE)
-            .theme_with_limits(exact_limits)
+            .reprojected_theme(exact_limits)
             .expect("exact Theme source limit")
             .is_some()
     );
     assert!(
         workbook_from_fixture(NATIVE_FAMILY_FIXTURE)
-            .theme_with_limits(Limits::new(exact - 1, 100_000, 128))
+            .reprojected_theme(Limits::new(exact - 1, 100_000, 128))
             .is_err()
     );
     assert!(
         workbook_from_fixture(NATIVE_FAMILY_FIXTURE)
-            .theme_with_limits(Limits::new(exact, 1, 128))
+            .reprojected_theme(Limits::new(exact, 1, 128))
             .is_err()
     );
     assert!(
         workbook_from_fixture(NATIVE_FAMILY_FIXTURE)
-            .theme_with_limits(Limits::new(exact, 100_000, 1))
+            .reprojected_theme(Limits::new(exact, 100_000, 1))
             .is_err()
     );
 }
@@ -723,6 +764,7 @@ fn malformed_recognized_family_content_fails_closed() {
                 .copied()
                 .chain(Some(b'\0'))
                 .collect::<Vec<_>>(),
+            family::Limits::DEFAULT,
         )
         .is_err()
     );
@@ -733,23 +775,29 @@ fn signed_theme_family_noop_preserves_signature_but_change_requires_policy() {
     let mut signed = signed_workbook();
     assert!(signed.is_signed());
     let before_theme = theme_bytes(&signed);
-    let snapshot = theme_snapshot(&signed);
-    let noop = snapshot.edit().commit().expect("signed family no-op");
-    assert!(!noop.changed());
-    signed.apply_theme(&noop).expect("signed no-op");
+    let noop = signed
+        .theme_edit()
+        .expect("Theme edit")
+        .commit()
+        .expect("signed family no-op");
+    assert!(!noop.diagnostics().changed());
+    signed.publish_theme(noop.patch()).expect("signed no-op");
     assert!(signed.is_signed());
     assert_eq!(theme_bytes(&signed), before_theme);
 
-    let mut edit = snapshot.edit();
+    let mut edit = signed.theme_edit().expect("Theme edit");
     edit.set_family(family_value("Signed Change"))
         .expect("stage signed family");
-    let changed = edit.commit().expect("commit signed family");
-    assert!(signed.apply_theme(&changed).is_err());
-    signed.unsign();
-    signed
-        .apply_theme(&changed)
-        .expect("explicitly unsign before family edit");
-    assert!(!signed.is_signed());
+    assert!(edit.commit().is_err());
+    let unsigned = signed.to_package().unsign();
+    let mut edit = unsigned.edit_theme().expect("Theme edit");
+    edit.set_family(family_value("Signed Change"))
+        .expect("stage unsigned family");
+    let changed = edit
+        .commit()
+        .expect("explicitly unsign before family edit")
+        .into_package();
+    assert!(!changed.is_signed());
 }
 
 #[test]
@@ -774,7 +822,7 @@ fn source_backed_family_projection_does_not_materialize_theme_media() {
         .expect("Theme image edge");
     let mut bytes = Vec::new();
     package
-        .to_stream(&mut bytes)
+        .write_to(&mut bytes)
         .expect("serialized source package");
     let source = Arc::new(CountingSource {
         bytes,
@@ -801,6 +849,9 @@ fn source_backed_family_projection_does_not_materialize_theme_media() {
 
 fn saved_bytes(workbook: &Workbook) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).expect("save workbook");
+    workbook
+        .to_package()
+        .write_to(&mut output)
+        .expect("save workbook");
     output.into_inner()
 }

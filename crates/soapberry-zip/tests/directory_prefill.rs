@@ -91,7 +91,8 @@ fn names<R: ReaderAt>(archive: &IndexedArchive<R>) -> Vec<String> {
 }
 
 fn stored_archive(count: usize) -> Vec<u8> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for index in 0..count {
         writer
             .write_stored(&format!("member-{index:08}"), b"payload")
@@ -136,8 +137,12 @@ fn with_prefix(bytes: &[u8], prefix: usize) -> Vec<u8> {
 fn one_request_serves_the_probe_and_the_whole_directory_scan() {
     let bytes = stored_archive(8);
     let source = Counting::new(&bytes);
-    let archive =
-        IndexedArchive::from_reader(&source, bytes.len() as u64).expect("the archive opens");
+    let archive = IndexedArchive::from_reader(
+        &source,
+        bytes.len() as u64,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .expect("the archive opens");
 
     assert_eq!(archive.len(), 8);
     let log = source.log();
@@ -164,8 +169,12 @@ fn the_prefill_finds_exactly_what_a_separate_scan_finds() {
     for count in [0_usize, 1, 2, 17, 64] {
         let bytes = stored_archive(count);
         let source = Counting::new(&bytes);
-        let indexed =
-            IndexedArchive::from_reader(&source, bytes.len() as u64).expect("the archive opens");
+        let indexed = IndexedArchive::from_reader(
+            &source,
+            bytes.len() as u64,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .expect("the archive opens");
 
         // The same archive scanned through the untouched public entry
         // iterator, which takes no prefill.
@@ -198,8 +207,12 @@ fn a_directory_larger_than_the_window_is_read_in_two_requests() {
     );
 
     let source = Counting::new(&bytes);
-    let archive =
-        IndexedArchive::from_reader(&source, bytes.len() as u64).expect("the archive opens");
+    let archive = IndexedArchive::from_reader(
+        &source,
+        bytes.len() as u64,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .expect("the archive opens");
     assert_eq!(archive.len(), 1_600);
     assert_eq!(
         names(&archive).first().map(String::as_str),
@@ -233,8 +246,12 @@ fn a_zip64_archive_keeps_its_records_and_its_members() {
         ("many-small-central-local-signed", ZIP64_MANY_SMALL),
     ] {
         let source = Counting::new(bytes);
-        let archive =
-            IndexedArchive::from_reader(&source, bytes.len() as u64).expect("the archive opens");
+        let archive = IndexedArchive::from_reader(
+            &source,
+            bytes.len() as u64,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .expect("the archive opens");
         assert!(archive.archive_is_zip64(), "{label} is a ZIP64 archive");
 
         let mut scratch = vec![0_u8; RECOMMENDED_BUFFER_SIZE];
@@ -260,11 +277,19 @@ fn a_comment_bearing_archive_keeps_the_backwards_search_and_its_members() {
     let commented = with_comment(&plain, b"a deliberate ZIP archive comment");
 
     let source = Counting::new(&commented);
-    let archive =
-        IndexedArchive::from_reader(&source, commented.len() as u64).expect("the archive opens");
+    let archive = IndexedArchive::from_reader(
+        &source,
+        commented.len() as u64,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .expect("the archive opens");
     let plain_source = Counting::new(&plain);
-    let plain_archive =
-        IndexedArchive::from_reader(&plain_source, plain.len() as u64).expect("the archive opens");
+    let plain_archive = IndexedArchive::from_reader(
+        &plain_source,
+        plain.len() as u64,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .expect("the archive opens");
     assert_eq!(names(&archive), names(&plain_archive));
 
     // The comment pushes the EOCD off `len - 22`, so the locator falls back to
@@ -293,8 +318,12 @@ fn the_stack_probe_keeps_the_search_window_only_on_a_missed_probe() {
     assert!(declared_directory_size(&plain) > RECOMMENDED_BUFFER_SIZE as u64);
 
     let plain_source = Counting::new(&plain);
-    let plain_archive =
-        IndexedArchive::from_reader(&plain_source, plain.len() as u64).expect("plain opens");
+    let plain_archive = IndexedArchive::from_reader(
+        &plain_source,
+        plain.len() as u64,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .expect("plain opens");
     assert_eq!(plain_archive.len(), 1_600);
     let plain_log = plain_source.log();
     assert_eq!(plain_log[0].1, 22, "the fast path probes only the EOCD");
@@ -302,8 +331,12 @@ fn the_stack_probe_keeps_the_search_window_only_on_a_missed_probe() {
 
     let commented = with_comment(&plain, b"a deliberate ZIP archive comment");
     let comment_source = Counting::new(&commented);
-    let comment_archive = IndexedArchive::from_reader(&comment_source, commented.len() as u64)
-        .expect("commented archive opens");
+    let comment_archive = IndexedArchive::from_reader(
+        &comment_source,
+        commented.len() as u64,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .expect("commented archive opens");
     assert_eq!(comment_archive.len(), 1_600);
     let comment_log = comment_source.log();
     assert_eq!(comment_log[0].1, 22, "the missed fast probe is preserved");
@@ -325,8 +358,12 @@ fn a_comment_that_contains_an_eocd_signature_resolves_where_it_always_did() {
     let commented = with_comment(&plain, &comment);
 
     let source = Counting::new(&commented);
-    let archive =
-        IndexedArchive::from_reader(&source, commented.len() as u64).expect("the archive opens");
+    let archive = IndexedArchive::from_reader(
+        &source,
+        commented.len() as u64,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .expect("the archive opens");
 
     // The untouched public path, which takes no prefill, over the same bytes.
     let mut scratch = vec![0_u8; RECOMMENDED_BUFFER_SIZE];
@@ -352,13 +389,21 @@ fn a_prefixed_archive_still_reaches_the_base_offset_fallback() {
     let prefixed = with_prefix(&plain, 4_096);
 
     let source = Counting::new(&prefixed);
-    let archive =
-        IndexedArchive::from_reader(&source, prefixed.len() as u64).expect("the archive opens");
+    let archive = IndexedArchive::from_reader(
+        &source,
+        prefixed.len() as u64,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .expect("the archive opens");
     assert_eq!(archive.len(), 9);
 
     let plain_source = Counting::new(&plain);
-    let plain_archive =
-        IndexedArchive::from_reader(&plain_source, plain.len() as u64).expect("the archive opens");
+    let plain_archive = IndexedArchive::from_reader(
+        &plain_source,
+        plain.len() as u64,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .expect("the archive opens");
     assert_eq!(names(&archive), names(&plain_archive));
 
     // The declared offset misses, so two directory-head reads happen: one at
@@ -384,12 +429,23 @@ fn a_short_reading_source_is_served_the_same_members() {
     let bytes = stored_archive(24);
     let expected = {
         let source = Counting::new(&bytes);
-        names(&IndexedArchive::from_reader(&source, bytes.len() as u64).expect("opens"))
+        names(
+            &IndexedArchive::from_reader(
+                &source,
+                bytes.len() as u64,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )
+            .expect("opens"),
+        )
     };
     for cap in [1_usize, 7, 46, 64, 97, 512] {
         let source = Counting::capped(&bytes, cap);
-        let archive = IndexedArchive::from_reader(&source, bytes.len() as u64)
-            .unwrap_or_else(|error| panic!("cap={cap}: {error}"));
+        let archive = IndexedArchive::from_reader(
+            &source,
+            bytes.len() as u64,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap_or_else(|error| panic!("cap={cap}: {error}"));
         assert_eq!(names(&archive), expected, "cap={cap}");
     }
 }
@@ -409,8 +465,12 @@ fn a_directory_shorter_than_one_central_record_takes_no_prefill() {
     truncated[eocd + 10..eocd + 12].copy_from_slice(&0_u16.to_le_bytes());
     truncated[eocd + 12..eocd + 16].copy_from_slice(&20_u32.to_le_bytes());
     let source = Counting::new(&truncated);
-    let error = IndexedArchive::from_reader(&source, truncated.len() as u64)
-        .expect_err("a 20-byte directory cannot hold a record");
+    let error = IndexedArchive::from_reader(
+        &source,
+        truncated.len() as u64,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .expect_err("a 20-byte directory cannot hold a record");
     assert!(
         matches!(error.kind(), ErrorKind::Eof),
         "unexpected refusal: {:?}",
@@ -468,12 +528,16 @@ fn an_oversized_variable_field_keeps_its_typed_refusal() {
     };
 
     let source = Counting::new(&widened);
-    let error = IndexedArchive::from_reader_with_limits(
-        &source,
-        widened.len() as u64,
-        ArchiveLimits::default(),
-    )
-    .expect_err("an oversized variable field must fail closed");
+    let error =
+        IndexedArchive::from_reader(&source, widened.len() as u64, ArchiveLimits::default())
+            .expect_err("an oversized variable field must fail closed");
+    let requests = source.log();
+    assert!(
+        requests
+            .iter()
+            .all(|(_, requested, _)| *requested <= directory),
+        "the rejected variable field must not trigger an unbounded read: {requests:?}"
+    );
     assert_eq!(format!("{:?}", error.kind()), expected);
     assert!(
         matches!(error.kind(), ErrorKind::BufferTooSmall),
@@ -487,8 +551,12 @@ fn an_empty_archive_takes_no_prefill_and_opens() {
     let bytes = stored_archive(0);
     assert_eq!(declared_directory_size(&bytes), 0);
     let source = Counting::new(&bytes);
-    let archive =
-        IndexedArchive::from_reader(&source, bytes.len() as u64).expect("an empty archive opens");
+    let archive = IndexedArchive::from_reader(
+        &source,
+        bytes.len() as u64,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .expect("an empty archive opens");
     assert_eq!(archive.len(), 0);
     // Only the EOCD probe and the 46-byte central-record probe, which cannot
     // be satisfied and is not expected to be.

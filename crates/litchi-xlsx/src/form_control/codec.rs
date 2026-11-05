@@ -29,7 +29,7 @@ use super::model::{
     ScalarField, ScalarValue, SelectionType, SharedOption, SharedVec, TextHAlign, TextVAlign,
     is_xml_10_char, validate_multi_selection, validate_xml_text,
 };
-use super::{FORM_CONTROL_NAMESPACE, Limits, Result, allocation, invalid, limit};
+use super::{FORM_CONTROL_NAMESPACE, LimitKind, Limits, Result, allocation, invalid, limit};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const ROOT: &[u8] = b"formControlPr";
@@ -38,13 +38,9 @@ const ITEM: &[u8] = b"item";
 const EXT_LIST: &[u8] = b"extLst";
 const ARC_HEADER_BYTES: usize = 2 * size_of::<usize>();
 
-/// Parse one complete control-properties XML part.
-pub fn parse(xml: &[u8]) -> Result<Properties> {
-    parse_with_limits(xml, &Limits::default())
-}
-
-/// Parse one complete control-properties XML part under a caller policy.
-pub fn parse_with_limits(xml: &[u8], limits: &Limits) -> Result<Properties> {
+/// Parse one complete control-properties XML part under `limits`
+/// ([`Limits::default`] for the standard finite policy).
+pub fn parse(xml: &[u8], limits: &Limits) -> Result<Properties> {
     let source = owned_source(xml, *limits)?;
     let inspected = inspect_with_limits_owned(xml, *limits, Some(source), None)?;
     Ok(inspected.properties)
@@ -82,13 +78,10 @@ pub(crate) fn parse_source_with_limits_and_context(
     Ok(inspected.properties)
 }
 
-/// Inspect a source part while retaining a borrowed source view for splices.
-pub fn inspect(xml: &[u8]) -> Result<SourceView<'_>> {
-    inspect_with_limits(xml, Limits::default())
-}
-
-/// Inspect a source part under a caller policy.
-pub fn inspect_with_limits(xml: &[u8], limits: Limits) -> Result<SourceView<'_>> {
+/// Inspect a source part under `limits` while retaining a borrowed source
+/// view for splices.
+pub fn inspect<'a>(xml: &'a [u8], limits: &Limits) -> Result<SourceView<'a>> {
+    let limits = *limits;
     let inspected = inspect_with_limits_owned(xml, limits, None, None)?;
     Ok(SourceView {
         source: xml,
@@ -160,23 +153,28 @@ impl SourceProperties<'_> {
 
 /// Values accepted by the detached/source-backed writer.
 pub trait SourceWritable {
-    fn write_with_limits(&self, limits: &Limits) -> Result<Vec<u8>>;
+    /// Serialize this value under `limits`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed limit error when the output exceeds `limits`.
+    fn write(&self, limits: &Limits) -> Result<Vec<u8>>;
 }
 
 impl SourceWritable for Properties {
-    fn write_with_limits(&self, limits: &Limits) -> Result<Vec<u8>> {
+    fn write(&self, limits: &Limits) -> Result<Vec<u8>> {
         write_properties(self, limits)
     }
 }
 
 impl SourceWritable for &Properties {
-    fn write_with_limits(&self, limits: &Limits) -> Result<Vec<u8>> {
+    fn write(&self, limits: &Limits) -> Result<Vec<u8>> {
         write_properties(self, limits)
     }
 }
 
 impl<'a> SourceWritable for SourceProperties<'a> {
-    fn write_with_limits(&self, limits: &Limits) -> Result<Vec<u8>> {
+    fn write(&self, limits: &Limits) -> Result<Vec<u8>> {
         copy_bounded(
             self.source,
             limits.max_output_bytes(),
@@ -186,7 +184,7 @@ impl<'a> SourceWritable for SourceProperties<'a> {
 }
 
 impl<'a> SourceWritable for &SourceProperties<'a> {
-    fn write_with_limits(&self, limits: &Limits) -> Result<Vec<u8>> {
+    fn write(&self, limits: &Limits) -> Result<Vec<u8>> {
         copy_bounded(
             self.source,
             limits.max_output_bytes(),
@@ -292,14 +290,10 @@ impl<'a> SourceView<'a> {
     }
 }
 
-/// Write a detached or unchanged source-backed properties model.
-pub fn write<P: SourceWritable>(properties: P) -> Result<Vec<u8>> {
-    write_with_limits(properties, &Limits::default())
-}
-
-/// Write a detached or unchanged source-backed properties model under limits.
-pub fn write_with_limits<P: SourceWritable>(properties: P, limits: &Limits) -> Result<Vec<u8>> {
-    properties.write_with_limits(limits)
+/// Write a detached or unchanged source-backed properties model under
+/// `limits`.
+pub fn write<P: SourceWritable>(properties: P, limits: &Limits) -> Result<Vec<u8>> {
+    properties.write(limits)
 }
 
 fn write_properties(properties: &Properties, limits: &Limits) -> Result<Vec<u8>> {
@@ -326,11 +320,6 @@ pub fn replace_scalar(
     replace_scalar_with_limits(xml, field, value, Limits::default())
 }
 
-/// Alias for [`replace_scalar`].
-pub fn set_scalar(xml: &[u8], field: ScalarField, value: Option<ScalarValue>) -> Result<Vec<u8>> {
-    replace_scalar(xml, field, value)
-}
-
 /// Replace ordered list items by source-local splice.
 pub fn replace_items(xml: &[u8], values: &[Item]) -> Result<Vec<u8>> {
     replace_items_with_limits(xml, values, Limits::default())
@@ -352,7 +341,7 @@ fn replace_scalar_with_limits(
     value: Option<ScalarValue>,
     limits: Limits,
 ) -> Result<Vec<u8>> {
-    let inspected = inspect_with_limits(xml, limits)?;
+    let inspected = inspect(xml, &limits)?;
     replace_scalar_from_parts(
         xml,
         field,
@@ -400,7 +389,7 @@ fn replace_scalar_from_parts(
         };
         if output_len > limits.max_output_bytes() {
             return Err(limit(
-                "generated output bytes",
+                LimitKind::OutputBytes,
                 output_len,
                 limits.max_output_bytes(),
             ));
@@ -684,7 +673,7 @@ fn scalar_value_matches(
 }
 
 fn replace_items_with_limits(xml: &[u8], values: &[Item], limits: Limits) -> Result<Vec<u8>> {
-    let inspected = inspect_with_limits(xml, limits)?;
+    let inspected = inspect(xml, &limits)?;
     replace_items_from_parts(
         xml,
         values,
@@ -702,7 +691,7 @@ fn replace_items_from_parts(
     layout: &Layout,
 ) -> Result<Vec<u8>> {
     if values.len() > limits.max_items() {
-        return Err(limit("item count", values.len(), limits.max_items()));
+        return Err(limit(LimitKind::Items, values.len(), limits.max_items()));
     }
     let current = properties
         .item_list
@@ -818,7 +807,7 @@ fn preflight_item_xml_replacement(
     };
     if output_len > limits.max_output_bytes() {
         return Err(limit(
-            "generated output bytes",
+            LimitKind::OutputBytes,
             output_len,
             limits.max_output_bytes(),
         ));
@@ -840,7 +829,7 @@ fn replace_nonempty_item_list_source(
     let name_len = qname_len(prefix, ITEM)?;
     if name_len > limits.max_output_bytes() {
         return Err(limit(
-            "generated item name",
+            LimitKind::OutputBytes,
             name_len,
             limits.max_output_bytes(),
         ));
@@ -890,7 +879,7 @@ fn replace_nonempty_item_list_source(
         .ok_or_else(|| invalid("form-control item output size overflow"))?;
     if output_len > limits.max_output_bytes() {
         return Err(limit(
-            "generated output bytes",
+            LimitKind::OutputBytes,
             output_len,
             limits.max_output_bytes(),
         ));
@@ -949,7 +938,7 @@ fn splice_nonempty_item_list_edit(
         let name_len = qname_len(prefix, ITEM)?;
         if name_len > limits.max_output_bytes() {
             return Err(limit(
-                "generated item name",
+                LimitKind::OutputBytes,
                 name_len,
                 limits.max_output_bytes(),
             ));
@@ -969,7 +958,7 @@ fn splice_nonempty_item_list_edit(
             .ok_or_else(|| invalid("form-control item output size overflow"))?;
         if output_len > limits.max_output_bytes() {
             return Err(limit(
-                "generated output bytes",
+                LimitKind::OutputBytes,
                 output_len,
                 limits.max_output_bytes(),
             ));
@@ -994,7 +983,7 @@ fn splice_nonempty_item_list_edit(
     };
     if output_len > limits.max_output_bytes() {
         return Err(limit(
-            "generated output bytes",
+            LimitKind::OutputBytes,
             output_len,
             limits.max_output_bytes(),
         ));
@@ -1038,7 +1027,7 @@ fn replace_item_xml_from_parts(
                     .ok_or_else(|| invalid("form-control itemLst output size overflow"))?;
                 if output_len > limits.max_output_bytes() {
                     return Err(limit(
-                        "form-control itemLst output",
+                        LimitKind::OutputBytes,
                         output_len,
                         limits.max_output_bytes(),
                     ));
@@ -1099,7 +1088,7 @@ fn replace_item_xml_from_parts(
             };
             if replacement_len > limits.max_output_bytes() {
                 return Err(limit(
-                    "form-control itemLst output",
+                    LimitKind::OutputBytes,
                     replacement_len,
                     limits.max_output_bytes(),
                 ));
@@ -1116,7 +1105,7 @@ fn replace_item_xml_from_parts(
             };
             if output_len > limits.max_output_bytes() {
                 return Err(limit(
-                    "form-control itemLst output",
+                    LimitKind::OutputBytes,
                     output_len,
                     limits.max_output_bytes(),
                 ));
@@ -1165,7 +1154,7 @@ fn insert_item_with_limits(
     value: Item,
     limits: Limits,
 ) -> Result<Vec<u8>> {
-    let inspected = inspect_with_limits(xml, limits)?;
+    let inspected = inspect(xml, &limits)?;
     insert_item_from_parts(
         xml,
         index,
@@ -1177,7 +1166,7 @@ fn insert_item_with_limits(
 }
 
 fn remove_item_with_limits(xml: &[u8], index: usize, limits: Limits) -> Result<Vec<u8>> {
-    let inspected = inspect_with_limits(xml, limits)?;
+    let inspected = inspect(xml, &limits)?;
     remove_item_from_parts(xml, index, limits, &inspected.properties, &inspected.layout)
 }
 
@@ -1210,7 +1199,12 @@ fn insert_item_from_parts(
         ));
     }
     validate_item_for_splice(&value, limits)?;
-    validate_item_edit(properties, true, item_list.items().len() + 1, limits)?;
+    let item_count = item_list
+        .items()
+        .len()
+        .checked_add(1)
+        .ok_or_else(|| invalid("form-control item count overflow"))?;
+    validate_item_edit(properties, true, item_count, limits)?;
     if let Some(list) = layout.item_list.as_ref()
         && !list.empty
         && !list.items.is_empty()
@@ -1326,14 +1320,14 @@ struct ItemLayout {
 fn owned_source(xml: &[u8], limits: Limits) -> Result<SourcePayload> {
     if xml.len() > limits.max_part_bytes() {
         return Err(limit(
-            "source part bytes",
+            LimitKind::PartBytes,
             xml.len(),
             limits.max_part_bytes(),
         ));
     }
     if xml.len() > limits.max_retained_bytes() {
         return Err(limit(
-            "retained source bytes",
+            LimitKind::RetainedBytes,
             xml.len(),
             limits.max_retained_bytes(),
         ));
@@ -1354,7 +1348,7 @@ fn inspect_with_limits_owned(
 ) -> Result<Inspected> {
     if xml.len() > limits.max_part_bytes() {
         return Err(limit(
-            "source part bytes",
+            LimitKind::PartBytes,
             xml.len(),
             limits.max_part_bytes(),
         ));
@@ -1371,7 +1365,7 @@ fn inspect_with_limits_owned(
     }
     if source.is_some() && xml.len() > limits.max_retained_bytes() {
         return Err(limit(
-            "retained source bytes",
+            LimitKind::RetainedBytes,
             xml.len(),
             limits.max_retained_bytes(),
         ));
@@ -1435,7 +1429,7 @@ fn inspect_with_limits_owned(
             .checked_add(1)
             .ok_or_else(|| invalid("form-control XML event count overflow"))?;
         if events > limits.max_events() {
-            return Err(limit("XML event count", events, limits.max_events()));
+            return Err(limit(LimitKind::XmlEvents, events, limits.max_events()));
         }
         let start = position(&reader, origin)?;
         let event = reader.read_event().map_err(xml_error)?;
@@ -1518,7 +1512,7 @@ fn inspect_with_limits_owned(
                             )?;
                             if value.byte_len() > limits.max_opaque_bytes() {
                                 return Err(limit(
-                                    "opaque extension bytes",
+                                    LimitKind::OpaqueBytes,
                                     value.byte_len(),
                                     limits.max_opaque_bytes(),
                                 ));
@@ -1689,8 +1683,8 @@ fn inspect_with_limits_owned(
                             }
                             if item_values.len() >= limits.max_items() {
                                 return Err(limit(
-                                    "item count",
-                                    item_values.len().saturating_add(1),
+                                    LimitKind::Items,
+                                    item_values.len().checked_add(1).unwrap_or(usize::MAX),
                                     limits.max_items(),
                                 ));
                             }
@@ -1895,7 +1889,7 @@ fn inspect_with_limits_owned(
                                 )?;
                                 if value.byte_len() > limits.max_opaque_bytes() {
                                     return Err(limit(
-                                        "opaque extension bytes",
+                                        LimitKind::OpaqueBytes,
                                         value.byte_len(),
                                         limits.max_opaque_bytes(),
                                     ));
@@ -1920,8 +1914,8 @@ fn inspect_with_limits_owned(
                             }
                             if item_values.len() >= limits.max_items() {
                                 return Err(limit(
-                                    "item count",
-                                    item_values.len().saturating_add(1),
+                                    LimitKind::Items,
+                                    item_values.len().checked_add(1).unwrap_or(usize::MAX),
                                     limits.max_items(),
                                 ));
                             }
@@ -2017,7 +2011,7 @@ fn inspect_with_limits_owned(
                                 )?;
                                 if value.byte_len() > limits.max_opaque_bytes() {
                                     return Err(limit(
-                                        "opaque extension bytes",
+                                        LimitKind::OpaqueBytes,
                                         value.byte_len(),
                                         limits.max_opaque_bytes(),
                                     ));
@@ -2126,7 +2120,11 @@ fn inspect_with_limits_owned(
         return Err(invalid("form-control XML does not contain one closed root"));
     }
     if item_values.len() > limits.max_items() {
-        return Err(limit("item count", item_values.len(), limits.max_items()));
+        return Err(limit(
+            LimitKind::Items,
+            item_values.len(),
+            limits.max_items(),
+        ));
     }
     if let Some(layout) = item_list.as_mut() {
         if layout.first_content.is_none() {
@@ -2457,7 +2455,7 @@ impl RetainedBudget {
         self.charge(additional_bytes, resource)
     }
 
-    fn check_peak(&self, additional: usize, resource: &'static str) -> Result<()> {
+    fn check_peak(&self, additional: usize, _resource: &'static str) -> Result<()> {
         let peak = self
             .used
             .checked_add(self.temporary_used)
@@ -2467,7 +2465,7 @@ impl RetainedBudget {
             .checked_add(additional)
             .ok_or_else(|| invalid("form-control retained allocation length overflow"))?;
         if peak > self.maximum {
-            return Err(limit(resource, peak, self.maximum));
+            return Err(limit(LimitKind::RetainedBytes, peak, self.maximum));
         }
         Ok(())
     }
@@ -2483,11 +2481,7 @@ impl RetainedBudget {
             .and_then(|value| value.checked_add(self.namespace_temporary_used))
             .ok_or_else(|| invalid("form-control retained allocation length overflow"))?;
         if peak > self.maximum {
-            return Err(limit(
-                "form-control temporary retained allocation",
-                peak,
-                self.maximum,
-            ));
+            return Err(limit(LimitKind::TemporaryBytes, peak, self.maximum));
         }
         if let Some(lease) = self.lease.as_mut() {
             lease.reserve_temporary(amount)?;
@@ -2503,7 +2497,11 @@ impl RetainedBudget {
         }
     }
 
-    fn reserve_namespace_temporary(&mut self, amount: usize, resource: &'static str) -> Result<()> {
+    fn reserve_namespace_temporary(
+        &mut self,
+        amount: usize,
+        _resource: &'static str,
+    ) -> Result<()> {
         let namespace_temporary_used = self
             .namespace_temporary_used
             .checked_add(amount)
@@ -2514,7 +2512,7 @@ impl RetainedBudget {
             .and_then(|value| value.checked_add(namespace_temporary_used))
             .ok_or_else(|| invalid("form-control retained allocation length overflow"))?;
         if peak > self.maximum {
-            return Err(limit(resource, peak, self.maximum));
+            return Err(limit(LimitKind::NamespaceBytes, peak, self.maximum));
         }
         if let Some(lease) = self.lease.as_mut() {
             lease.reserve_namespace_temporary(amount)?;
@@ -2533,7 +2531,7 @@ impl RetainedBudget {
     fn charge_inner(
         &mut self,
         amount: usize,
-        resource: &'static str,
+        _resource: &'static str,
         charge_execution: bool,
     ) -> Result<()> {
         let used = self
@@ -2545,7 +2543,7 @@ impl RetainedBudget {
             .and_then(|value| value.checked_add(self.namespace_temporary_used))
             .ok_or_else(|| invalid("form-control retained allocation length overflow"))?;
         if peak > self.maximum {
-            return Err(limit(resource, peak, self.maximum));
+            return Err(limit(LimitKind::RetainedBytes, peak, self.maximum));
         }
         if charge_execution {
             if let Some(lease) = self.lease.as_mut() {
@@ -2702,13 +2700,13 @@ impl ScratchBudget {
         }
     }
 
-    fn charge(&mut self, amount: usize, resource: &'static str) -> Result<()> {
+    fn charge(&mut self, amount: usize, _resource: &'static str) -> Result<()> {
         self.used = self
             .used
             .checked_add(amount)
             .ok_or_else(|| invalid("form-control scratch allocation length overflow"))?;
         if self.used > self.maximum {
-            return Err(limit(resource, self.used, self.maximum));
+            return Err(limit(LimitKind::ScratchBytes, self.used, self.maximum));
         }
         if let Some(context) = self.context.as_ref() {
             if self.reservation.is_some() {
@@ -2787,7 +2785,11 @@ fn source_for_range(
     }
     let length = range.end - range.start;
     if length > limits.max_opaque_bytes() {
-        return Err(limit(resource, length, limits.max_opaque_bytes()));
+        return Err(limit(
+            LimitKind::OpaqueBytes,
+            length,
+            limits.max_opaque_bytes(),
+        ));
     }
     if let Some(source) = source {
         return Ok(Some(RetainedRange {
@@ -2801,7 +2803,7 @@ fn source_for_range(
 
 fn check_depth(depth: usize, limits: Limits) -> Result<()> {
     if depth > limits.max_depth() {
-        return Err(limit("XML depth", depth, limits.max_depth()));
+        return Err(limit(LimitKind::XmlDepth, depth, limits.max_depth()));
     }
     Ok(())
 }
@@ -2818,13 +2820,17 @@ fn charge_opaque_length(
     total: &mut usize,
     length: usize,
     limits: Limits,
-    resource: &'static str,
+    _resource: &'static str,
 ) -> Result<()> {
     *total = total
         .checked_add(length)
         .ok_or_else(|| invalid("form-control aggregate opaque bytes overflow"))?;
     if *total > limits.max_opaque_bytes() {
-        return Err(limit(resource, *total, limits.max_opaque_bytes()));
+        return Err(limit(
+            LimitKind::OpaqueBytes,
+            *total,
+            limits.max_opaque_bytes(),
+        ));
     }
     Ok(())
 }
@@ -3018,7 +3024,7 @@ fn parse_root_attributes(
             .checked_add(1)
             .ok_or_else(|| invalid("form-control attribute count overflow"))?;
         if count > limits.max_attributes() {
-            return Err(limit("attribute count", count, limits.max_attributes()));
+            return Err(limit(LimitKind::Attributes, count, limits.max_attributes()));
         }
         if let Some(binding) = attribute.key.as_namespace_binding() {
             let prefix = match binding {
@@ -3033,7 +3039,7 @@ fn parse_root_attributes(
             validate_xml_text(value.as_ref(), "form-control namespace URI")?;
             if value.len() > limits.max_opaque_bytes() {
                 return Err(limit(
-                    "namespace URI bytes",
+                    LimitKind::StringBytes,
                     value.len(),
                     limits.max_opaque_bytes(),
                 ));
@@ -3061,7 +3067,7 @@ fn parse_root_attributes(
         let key = attribute.key.as_ref();
         if attribute.value.len() > limits.max_opaque_bytes() {
             return Err(limit(
-                "attribute lexical value bytes",
+                LimitKind::StringBytes,
                 attribute.value.len(),
                 limits.max_opaque_bytes(),
             ));
@@ -3120,7 +3126,7 @@ fn parse_root_attributes(
             validate_xml_text(decoded.as_ref(), "form-control attribute value")?;
             if decoded.len() > limits.max_opaque_bytes() {
                 return Err(limit(
-                    "attribute value bytes",
+                    LimitKind::StringBytes,
                     decoded.len(),
                     limits.max_opaque_bytes(),
                 ));
@@ -3172,11 +3178,7 @@ fn parse_item_list_attributes(
             .checked_add(1)
             .ok_or_else(|| invalid("form-control itemLst attribute count overflow"))?;
         if count > limits.max_attributes() {
-            return Err(limit(
-                "itemLst attribute count",
-                count,
-                limits.max_attributes(),
-            ));
+            return Err(limit(LimitKind::Attributes, count, limits.max_attributes()));
         }
         if attribute.key.as_namespace_binding().is_some() {
             continue;
@@ -3232,11 +3234,7 @@ fn parse_item_attributes(
             .checked_add(1)
             .ok_or_else(|| invalid("form-control item attribute count overflow"))?;
         if count > limits.max_attributes() {
-            return Err(limit(
-                "item attribute count",
-                count,
-                limits.max_attributes(),
-            ));
+            return Err(limit(LimitKind::Attributes, count, limits.max_attributes()));
         }
         if attribute.key.as_namespace_binding().is_some() {
             // Namespace declarations are outside CT_FormControlPr's item
@@ -3263,7 +3261,7 @@ fn parse_item_attributes(
             }
             if attribute.value.len() > limits.max_item_value_bytes() {
                 return Err(limit(
-                    "item value lexical bytes",
+                    LimitKind::ItemValueBytes,
                     attribute.value.len(),
                     limits.max_item_value_bytes(),
                 ));
@@ -3286,7 +3284,7 @@ fn parse_item_attributes(
     let value = value.ok_or_else(|| invalid("x14:item requires an unqualified val attribute"))?;
     if value.len() > limits.max_item_value_bytes() {
         return Err(limit(
-            "item value bytes",
+            LimitKind::ItemValueBytes,
             value.len(),
             limits.max_item_value_bytes(),
         ));
@@ -3307,11 +3305,7 @@ fn check_opaque_attribute_budget(element: &BytesStart<'_>, limits: Limits) -> Re
             .checked_add(1)
             .ok_or_else(|| invalid("form-control opaque attribute count overflow"))?;
         if count > limits.max_attributes() {
-            return Err(limit(
-                "opaque element attribute count",
-                count,
-                limits.max_attributes(),
-            ));
+            return Err(limit(LimitKind::Attributes, count, limits.max_attributes()));
         }
     }
     Ok(())
@@ -3365,7 +3359,7 @@ fn validate_extension_element(
         uri_seen = true;
         if attribute.value.len() > limits.max_opaque_bytes() {
             return Err(limit(
-                "extension uri lexical bytes",
+                LimitKind::StringBytes,
                 attribute.value.len(),
                 limits.max_opaque_bytes(),
             ));
@@ -3383,7 +3377,7 @@ fn validate_extension_element(
         validate_xml_text(decoded.as_ref(), "form-control extension uri")?;
         if decoded.len() > limits.max_opaque_bytes() {
             return Err(limit(
-                "extension uri bytes",
+                LimitKind::StringBytes,
                 decoded.len(),
                 limits.max_opaque_bytes(),
             ));
@@ -3455,7 +3449,7 @@ fn namespace_context_for_element(
         validate_xml_text(value.as_ref(), "form-control namespace URI")?;
         if value.len() > limits.max_opaque_bytes() {
             return Err(limit(
-                "namespace URI bytes",
+                LimitKind::StringBytes,
                 value.len(),
                 limits.max_opaque_bytes(),
             ));
@@ -3995,7 +3989,10 @@ fn validate_scalar_value(field: ScalarField, value: Option<&ScalarValue>) -> Res
                 | ScalarField::Page
         ) && *value > 30_000
         {
-            return Err(limit(field.wire_name(), *value as usize, 30_000));
+            return Err(invalid(format!(
+                "{} exceeds the schema maximum 30000",
+                field.wire_name()
+            )));
         }
     }
     if let ScalarValue::String(value) = value {
@@ -4003,7 +4000,7 @@ fn validate_scalar_value(field: ScalarField, value: Option<&ScalarValue>) -> Res
         if field == ScalarField::MultiSel {
             if value.len() > super::MAX_OPAQUE_BYTES {
                 return Err(limit(
-                    "multiSel bytes",
+                    LimitKind::StringBytes,
                     value.len(),
                     super::MAX_OPAQUE_BYTES,
                 ));
@@ -4225,7 +4222,7 @@ fn scalar_lexical_value(value: &ScalarValue) -> std::borrow::Cow<'_, str> {
 
 fn copy_bounded(source: &[u8], maximum: usize, resource: &'static str) -> Result<Vec<u8>> {
     if source.len() > maximum {
-        return Err(limit(resource, source.len(), maximum));
+        return Err(limit(LimitKind::OutputBytes, source.len(), maximum));
     }
     let mut output = Vec::new();
     output
@@ -4277,7 +4274,7 @@ fn splice_ranges(
     }
     if output_len > limits.max_output_bytes() {
         return Err(limit(
-            "generated output bytes",
+            LimitKind::OutputBytes,
             output_len,
             limits.max_output_bytes(),
         ));
@@ -4327,7 +4324,7 @@ fn qname(prefix: Option<&[u8]>, local: &[u8]) -> Result<Vec<u8>> {
 fn validate_item_for_splice(item: &Item, limits: Limits) -> Result<()> {
     if item.value().len() > limits.max_item_value_bytes() {
         return Err(limit(
-            "item value bytes",
+            LimitKind::ItemValueBytes,
             item.value().len(),
             limits.max_item_value_bytes(),
         ));
@@ -4335,7 +4332,7 @@ fn validate_item_for_splice(item: &Item, limits: Limits) -> Result<()> {
     if let Some(raw) = item.raw.as_ref() {
         if raw.byte_len() > limits.max_opaque_bytes() {
             return Err(limit(
-                "opaque item bytes",
+                LimitKind::OpaqueBytes,
                 raw.byte_len(),
                 limits.max_opaque_bytes(),
             ));
@@ -4379,7 +4376,7 @@ fn validate_item_edit(
         }
     }
     if item_count > limits.max_items() {
-        return Err(limit("item count", item_count, limits.max_items()));
+        return Err(limit(LimitKind::Items, item_count, limits.max_items()));
     }
     Ok(())
 }
@@ -4394,12 +4391,12 @@ fn items_equal_by_value(left: &[Item], right: &[Item]) -> bool {
 
 fn write_items(prefix: Option<&[u8]>, values: &[Item], limits: Limits) -> Result<Vec<u8>> {
     if values.len() > limits.max_items() {
-        return Err(limit("item count", values.len(), limits.max_items()));
+        return Err(limit(LimitKind::Items, values.len(), limits.max_items()));
     }
     let name_len = qname_len(prefix, ITEM)?;
     if name_len > limits.max_output_bytes() {
         return Err(limit(
-            "generated item name",
+            LimitKind::OutputBytes,
             name_len,
             limits.max_output_bytes(),
         ));
@@ -4424,7 +4421,7 @@ fn append_items_direct(
     limits: Limits,
 ) -> Result<()> {
     if values.len() > limits.max_items() {
-        return Err(limit("item count", values.len(), limits.max_items()));
+        return Err(limit(LimitKind::Items, values.len(), limits.max_items()));
     }
     for item in values {
         validate_item_for_splice(item, limits)?;
@@ -4469,12 +4466,12 @@ fn write_items_with_source_edit(
         .and_then(|value| value.checked_sub(usize::from(removal.is_some())))
         .ok_or_else(|| invalid("form-control item edit count underflow"))?;
     if output_count > limits.max_items() {
-        return Err(limit("item count", output_count, limits.max_items()));
+        return Err(limit(LimitKind::Items, output_count, limits.max_items()));
     }
     let name_len = qname_len(prefix, ITEM)?;
     if name_len > limits.max_output_bytes() {
         return Err(limit(
-            "generated item name",
+            LimitKind::OutputBytes,
             name_len,
             limits.max_output_bytes(),
         ));
@@ -4534,7 +4531,7 @@ fn write_items_with_source_edit(
             .ok_or_else(|| invalid("generated item bytes length overflow"))?;
         if output_len > limits.max_output_bytes() {
             return Err(limit(
-                "generated item bytes",
+                LimitKind::OutputBytes,
                 output_len,
                 limits.max_output_bytes(),
             ));
@@ -4660,7 +4657,7 @@ fn items_output_len_with_name_len(
             .ok_or_else(|| invalid("generated item bytes length overflow"))?;
         if length > limits.max_output_bytes() {
             return Err(limit(
-                "generated item bytes",
+                LimitKind::OutputBytes,
                 length,
                 limits.max_output_bytes(),
             ));
@@ -4698,7 +4695,11 @@ fn append_escaped_prechecked(
         .checked_add(encoded_len)
         .ok_or_else(|| invalid("form-control escaped output length overflow"))?;
     if new_len > limits.max_output_bytes() {
-        return Err(limit(resource, new_len, limits.max_output_bytes()));
+        return Err(limit(
+            LimitKind::OutputBytes,
+            new_len,
+            limits.max_output_bytes(),
+        ));
     }
     output
         .try_reserve_exact(encoded_len)
@@ -4730,7 +4731,11 @@ fn append_checked(
         .checked_add(bytes.len())
         .ok_or_else(|| invalid("form-control generated output length overflow"))?;
     if new_len > limits.max_output_bytes() {
-        return Err(limit(resource, new_len, limits.max_output_bytes()));
+        return Err(limit(
+            LimitKind::OutputBytes,
+            new_len,
+            limits.max_output_bytes(),
+        ));
     }
     output
         .try_reserve_exact(bytes.len())
@@ -5071,13 +5076,17 @@ fn add_output_len(
     total: &mut usize,
     amount: usize,
     limits: Limits,
-    resource: &'static str,
+    _resource: &'static str,
 ) -> Result<()> {
     *total = total
         .checked_add(amount)
         .ok_or_else(|| invalid("form-control output length overflow"))?;
     if *total > limits.max_output_bytes() {
-        return Err(limit(resource, *total, limits.max_output_bytes()));
+        return Err(limit(
+            LimitKind::OutputBytes,
+            *total,
+            limits.max_output_bytes(),
+        ));
     }
     Ok(())
 }
@@ -5269,7 +5278,7 @@ fn append_opaque(
 ) -> Result<()> {
     if value.byte_len() > limits.max_opaque_bytes() {
         return Err(limit(
-            "opaque extension bytes",
+            LimitKind::OpaqueBytes,
             value.byte_len(),
             limits.max_opaque_bytes(),
         ));
@@ -5546,7 +5555,7 @@ fn detached_scalar_output_len(
         if matches {
             if attribute.raw_value.len() > limits.max_output_bytes() {
                 return Err(limit(
-                    "form-control scalar lexical value",
+                    LimitKind::OutputBytes,
                     attribute.raw_value.len(),
                     limits.max_output_bytes(),
                 ));
@@ -5626,7 +5635,7 @@ fn escape_bounded(value: &str, limits: Limits, resource: &'static str) -> Result
     Ok(output)
 }
 
-fn escaped_length(value: &str, limits: Limits, resource: &'static str) -> Result<usize> {
+fn escaped_length(value: &str, limits: Limits, _resource: &'static str) -> Result<usize> {
     let mut encoded_len = 0usize;
     for byte in value.bytes() {
         let additional = match byte {
@@ -5641,7 +5650,11 @@ fn escaped_length(value: &str, limits: Limits, resource: &'static str) -> Result
             .ok_or_else(|| invalid("form-control escaped output length overflow"))?;
     }
     if encoded_len > limits.max_output_bytes() {
-        return Err(limit(resource, encoded_len, limits.max_output_bytes()));
+        return Err(limit(
+            LimitKind::OutputBytes,
+            encoded_len,
+            limits.max_output_bytes(),
+        ));
     }
     Ok(encoded_len)
 }
@@ -5656,7 +5669,7 @@ mod tests {
         Budget, CancellationSource, ExecutionContext, ExecutionLimits, FileSource,
         Limits as CoreLimits,
     };
-    use litchi_opc::{OpcError, PackURI, ReadLimits, SourceBackedPackage};
+    use litchi_opc::{OpcError, PackURI, SourceBackedPackage, SourceLimits};
 
     use super::*;
     use crate::form_control::{
@@ -5731,7 +5744,11 @@ mod tests {
         drop(cloned);
         assert_eq!(budget.used(Resource::Memory), 0);
         assert_eq!(
-            write(parse(&xml).expect("standalone parse")).expect("standalone write"),
+            write(
+                parse(&xml, &Limits::default()).expect("standalone parse"),
+                &Limits::default()
+            )
+            .expect("standalone write"),
             xml
         );
     }
@@ -5772,10 +5789,12 @@ mod tests {
     fn managed_source_payload_keeps_reservation_and_exact_bytes_after_owner_drop() {
         let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("tests/fixtures/form_control_properties/tdf134769.xlsx");
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(FileSource::open(&fixture).expect("managed fixture source")),
-            ReadLimits::default(),
-            managed_test_context(),
+            SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            Some(managed_test_context()),
         )
         .expect("managed fixture package");
         let context = package
@@ -5808,7 +5827,7 @@ mod tests {
         drop(package);
         assert_eq!(properties.source_bytes(), Some(expected.as_slice()));
         assert_eq!(
-            write(&properties).expect("exact managed source write"),
+            write(&properties, &Limits::default()).expect("exact managed source write"),
             expected
         );
     }
@@ -5818,7 +5837,8 @@ mod tests {
         let xml = format!(
             "<?xml version=\"1.0\"?><formControlPr xmlns=\"{NS}\" objectType=\"CheckBox\" fmlaLink=\"#REF!\"/>"
         );
-        let properties = parse(xml.as_bytes()).expect("parse native form-control fragment");
+        let properties =
+            parse(xml.as_bytes(), &Limits::default()).expect("parse native form-control fragment");
         assert_eq!(
             properties.object_type(),
             Some(&KnownOrUnknown::Known(ObjectType::CheckBox))
@@ -5830,7 +5850,7 @@ mod tests {
             Some("#REF!")
         );
         assert_eq!(
-            write(&properties).expect("exact no-op write"),
+            write(&properties, &Limits::default()).expect("exact no-op write"),
             xml.as_bytes()
         );
     }
@@ -5857,12 +5877,18 @@ mod tests {
         let retained_extension =
             &retained[extension_start..extension_start + extension.xml().len()];
         assert!(std::ptr::eq::<[u8]>(retained_extension, extension.xml()));
-        assert_eq!(write(&properties).expect("exact source write"), xml);
+        assert_eq!(
+            write(&properties, &Limits::default()).expect("exact source write"),
+            xml
+        );
 
         let cloned = properties.clone();
         drop(properties);
         assert_eq!(cloned.source_bytes(), Some(xml.as_slice()));
-        assert_eq!(write(&cloned).expect("clone source write"), xml);
+        assert_eq!(
+            write(&cloned, &Limits::default()).expect("clone source write"),
+            xml
+        );
     }
 
     #[test]
@@ -5897,11 +5923,11 @@ mod tests {
     #[test]
     fn standalone_parse_still_detaches_input_source() {
         let xml = format!("<formControlPr xmlns=\"{NS}\" objectType=\"Button\"/>").into_bytes();
-        let properties = parse(&xml).expect("standalone parse");
+        let properties = parse(&xml, &Limits::default()).expect("standalone parse");
         let retained = properties.source_bytes().expect("retained source bytes");
         assert!(!std::ptr::eq::<[u8]>(retained, xml.as_slice()));
         assert_eq!(
-            write(&properties).expect("exact detached source write"),
+            write(&properties, &Limits::default()).expect("exact detached source write"),
             xml
         );
     }
@@ -5923,11 +5949,11 @@ mod tests {
         let mut properties = Properties::new();
         properties.set_object_type(Some(ObjectType::List));
         properties.set_item_list(Some(list)).expect("set list");
-        let output = write(&properties).expect("detached item output");
+        let output = write(&properties, &Limits::default()).expect("detached item output");
         let text = String::from_utf8(output.clone()).expect("UTF-8 XML");
         assert!(text.contains("a&#x9;b&#xA;c&#xD;d"));
         assert_eq!(
-            parse(&output)
+            parse(&output, &Limits::default())
                 .expect("reparse item output")
                 .item_list()
                 .expect("item list")
@@ -5942,13 +5968,13 @@ mod tests {
         let xml = format!(
             "<formControlPr xmlns=\"{NS}\" objectType='Drop' fmlaLink=\"#REF!\" colored = 'false'/>"
         );
-        let view = inspect(xml.as_bytes()).expect("inspect source");
+        let view = inspect(xml.as_bytes(), &Limits::default()).expect("inspect source");
         let edited = view
             .replace_scalar(ScalarField::Colored, Some(ScalarValue::Boolean(true)))
             .expect("replace colored");
         assert!(String::from_utf8_lossy(&edited).contains("colored = '1'"));
         assert!(String::from_utf8_lossy(&edited).contains("fmlaLink=\"#REF!\""));
-        let reparsed = parse(&edited).expect("parse edited source");
+        let reparsed = parse(&edited, &Limits::default()).expect("parse edited source");
         assert_eq!(reparsed.colored(), Some(true));
         assert_eq!(
             reparsed.fmla_link().map(FormControlFormula::as_str),
@@ -5961,7 +5987,7 @@ mod tests {
         let xml = format!(
             "<formControlPr xmlns=\"{NS}\" objectType=\"Drop\" fmlaLink=\"A1:B2\" colored=\"0\"/>"
         );
-        let view = inspect_with_limits(xml.as_bytes(), Limits::default())
+        let view = inspect(xml.as_bytes(), &Limits::default())
             .expect("read source-only field-shape diagnostic");
         assert_eq!(
             view.properties()
@@ -5992,7 +6018,7 @@ mod tests {
         let xml = format!(
             "<formControlPr xmlns=\"{NS}\" objectType=\"Drop\"><itemLst>\n  <item val=\"A &amp; B\"/>\n  <item val='C'/>\n</itemLst></formControlPr>"
         );
-        let properties = parse(xml.as_bytes()).expect("parse item list");
+        let properties = parse(xml.as_bytes(), &Limits::default()).expect("parse item list");
         let items = properties.item_list().expect("item list").items();
         assert_eq!(
             items.iter().map(Item::value).collect::<Vec<_>>(),
@@ -6002,7 +6028,7 @@ mod tests {
         let edited = replace_items(xml.as_bytes(), &replacement).expect("replace items");
         assert!(String::from_utf8_lossy(&edited).contains("<item val=\"X\"/>"));
         assert_eq!(
-            parse(&edited)
+            parse(&edited, &Limits::default())
                 .expect("parse replacement")
                 .item_list()
                 .unwrap()
@@ -6037,7 +6063,7 @@ mod tests {
         assert!(text.contains("<itemLst><item val=\"one\"/></itemLst>"));
         assert!(!text.contains("<itemLst/>"));
         assert_eq!(
-            parse(&edited)
+            parse(&edited, &Limits::default())
                 .expect("parse expanded list")
                 .item_list()
                 .unwrap()
@@ -6059,7 +6085,7 @@ mod tests {
                 && text.contains("<item val=\"one\"/></itemLst>")
         );
         assert_eq!(
-            parse(&edited)
+            parse(&edited, &Limits::default())
                 .expect("parse expanded attributed list")
                 .item_list()
                 .unwrap()
@@ -6073,15 +6099,16 @@ mod tests {
         let xml = format!(
             "<x14:formControlPr xmlns:x14=\"{NS}\" xmlns:foo=\"urn:future\" foo:state='A&amp;B' fmlaLink=\"#REF!\"><x14:extLst><foo:future/></x14:extLst></x14:formControlPr>"
         );
-        let mut properties = parse(xml.as_bytes()).expect("parse extension source");
+        let mut properties =
+            parse(xml.as_bytes(), &Limits::default()).expect("parse extension source");
         properties.set_colored(Some(true));
-        let edited = write(&properties).expect("detached edit");
+        let edited = write(&properties, &Limits::default()).expect("detached edit");
         let text = String::from_utf8_lossy(&edited);
         assert!(text.contains("foo:state='A&amp;B'"));
         assert!(text.contains("<x14:extLst>"));
         assert!(text.contains("<foo:future/>"));
         assert!(text.contains("colored=\"1\""));
-        parse(&edited).expect("parse detached extension edit");
+        parse(&edited, &Limits::default()).expect("parse detached extension edit");
     }
 
     #[test]
@@ -6089,13 +6116,14 @@ mod tests {
         let xml = format!(
             "<x14:formControlPr xmlns:x14=\"{NS}\" xmlns:c=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" objectType=\"Button\"><x14:extLst><c:ext uri=\"urn:future\"><opaque><child/></opaque></c:ext></x14:extLst></x14:formControlPr>"
         );
-        let mut properties = parse(xml.as_bytes()).expect("parse prefixed source");
+        let mut properties =
+            parse(xml.as_bytes(), &Limits::default()).expect("parse prefixed source");
         properties.set_lock_text(Some(true));
-        let output = write(&properties).expect("detached source edit");
+        let output = write(&properties, &Limits::default()).expect("detached source edit");
         let text = String::from_utf8(output.clone()).expect("UTF-8 XML");
         assert!(text.contains("xmlns=\"\""));
         assert!(text.contains("<opaque><child/></opaque>"));
-        parse(&output).expect("reparse detached source edit");
+        parse(&output, &Limits::default()).expect("reparse detached source edit");
     }
 
     #[test]
@@ -6103,15 +6131,15 @@ mod tests {
         let source = format!(
             "<x14:formControlPr xmlns:x14=\"{NS}\"><x14:itemLst><x14:item val=\"a\" foreign=\"b\"/></x14:itemLst></x14:formControlPr>"
         );
-        let view = inspect(source.as_bytes()).expect("borrowed source view");
+        let view = inspect(source.as_bytes(), &Limits::default()).expect("borrowed source view");
         let source_properties = view.properties();
         assert_eq!(
-            write(&source_properties).expect("source no-op"),
+            write(&source_properties, &Limits::default()).expect("source no-op"),
             source.as_bytes()
         );
 
         let detached = (*source_properties).clone();
-        assert!(write(&detached).is_err());
+        assert!(write(&detached, &Limits::default()).is_err());
     }
 
     #[test]
@@ -6119,9 +6147,9 @@ mod tests {
         let source = format!(
             "<x:formControlPr xmlns:x=\"{NS}\" xmlns=\"urn:outer\"><x:itemLst xmlns:x14=\"urn:other\"><x:item val=\"a\"/></x:itemLst></x:formControlPr>"
         );
-        let mut properties = parse(source.as_bytes()).expect("source parse");
+        let mut properties = parse(source.as_bytes(), &Limits::default()).expect("source parse");
         properties.set_colored(Some(true));
-        let output = write(&properties).expect("detached write");
+        let output = write(&properties, &Limits::default()).expect("detached write");
         assert!(
             output
                 .windows(b"<x14_1:formControlPr".len())
@@ -6132,21 +6160,21 @@ mod tests {
                 .windows(b"<x14_1:itemLst".len())
                 .any(|window| window == b"<x14_1:itemLst")
         );
-        assert!(parse(&output).is_ok());
+        assert!(parse(&output, &Limits::default()).is_ok());
     }
 
     #[test]
     fn namespace_and_bounds_fail_closed() {
         let wrong = b"<formControlPr xmlns=\"urn:not-x14\"/>";
-        assert!(parse(wrong).is_err());
+        assert!(parse(wrong, &Limits::default()).is_err());
         let xml = format!("<formControlPr xmlns=\"{NS}\"/>");
         let limits = Limits::new().with_max_part_bytes(xml.len() - 1);
-        assert!(parse_with_limits(xml.as_bytes(), &limits).is_err());
+        assert!(parse(xml.as_bytes(), &limits).is_err());
         let mut properties = Properties::new();
         properties.set_object_type(Some(ObjectType::CheckBox));
         assert!(FormControlFormula::new("#REF!").is_err());
         properties.set_fmla_link(Some(FormControlFormula::new("A1").expect("formula")));
-        assert!(write(&properties).is_ok());
+        assert!(write(&properties, &Limits::default()).is_ok());
         properties.set_checked(Some(Checked::Checked));
     }
 
@@ -6154,7 +6182,7 @@ mod tests {
     fn source_formula_and_detached_opaque_caps_fail_closed() {
         let formula = "A".repeat(super::super::MAX_FORMULA_BYTES + 1);
         let xml = format!("<formControlPr xmlns=\"{NS}\" fmlaLink=\"{formula}\"/>");
-        assert!(parse(xml.as_bytes()).is_err());
+        assert!(parse(xml.as_bytes(), &Limits::default()).is_err());
         let opaque = vec![b'x'; super::super::MAX_OPAQUE_BYTES + 1];
         assert!(OpaqueXml::new(opaque).is_err());
         assert!(OpaqueXml::new(b"<a><b/></a>".to_vec()).is_ok());
@@ -6169,7 +6197,7 @@ mod tests {
         let xml = format!(
             r#"<formControlPr xmlns="{NS}" objectType="Drop" {root_attribute}><itemLst>{item}</itemLst><extLst/></formControlPr>"#
         );
-        let owned = parse(xml.as_bytes()).expect("parse opaque source");
+        let owned = parse(xml.as_bytes(), &Limits::default()).expect("parse opaque source");
         assert!(owned.item_list().unwrap().items()[0].has_opaque_markup());
         let item_bytes = item.len();
         let root_attribute_bytes = root_attribute.len();
@@ -6177,11 +6205,11 @@ mod tests {
         let aggregate = item_bytes + root_attribute_bytes + extension_bytes;
         assert!(aggregate > item_bytes + extension_bytes);
         let exact = Limits::new().with_max_opaque_bytes(aggregate);
-        parse_with_limits(xml.as_bytes(), &exact).expect("exact opaque aggregate");
-        inspect_with_limits(xml.as_bytes(), exact).expect("borrowed exact opaque aggregate");
+        parse(xml.as_bytes(), &exact).expect("exact opaque aggregate");
+        inspect(xml.as_bytes(), &exact).expect("borrowed exact opaque aggregate");
         let one_under = Limits::new().with_max_opaque_bytes(aggregate - 1);
-        assert!(parse_with_limits(xml.as_bytes(), &one_under).is_err());
-        assert!(inspect_with_limits(xml.as_bytes(), one_under).is_err());
+        assert!(parse(xml.as_bytes(), &one_under).is_err());
+        assert!(inspect(xml.as_bytes(), &one_under).is_err());
     }
 
     #[test]
@@ -6190,7 +6218,8 @@ mod tests {
         let xml = format!(
             r#"<formControlPr xmlns="{NS}" objectType="Drop"><itemLst extra="{value}"><item val="one"/></itemLst></formControlPr>"#
         );
-        let properties = parse(xml.as_bytes()).expect("parse itemLst attribute");
+        let properties =
+            parse(xml.as_bytes(), &Limits::default()).expect("parse itemLst attribute");
         let attributes = properties.item_list().unwrap().unknown_attributes();
         assert_eq!(attributes.len(), 1);
         assert_eq!(
@@ -6198,19 +6227,19 @@ mod tests {
             format!("extra=\"{value}\"").as_bytes()
         );
         assert_eq!(
-            write(&properties).expect("exact itemLst write"),
+            write(&properties, &Limits::default()).expect("exact itemLst write"),
             xml.as_bytes()
         );
         let mut changed = properties.clone();
         changed.set_no_three_d(Some(true));
-        let changed = write(&changed).expect("detached itemLst write");
+        let changed = write(&changed, &Limits::default()).expect("detached itemLst write");
         assert!(String::from_utf8_lossy(&changed).contains(&format!("extra=\"{value}\"")));
         let opaque = attributes[0].lexical().len();
         let exact = Limits::new().with_max_opaque_bytes(opaque);
-        parse_with_limits(xml.as_bytes(), &exact).expect("exact itemLst opaque cap");
-        inspect_with_limits(xml.as_bytes(), exact).expect("borrowed exact itemLst cap");
+        parse(xml.as_bytes(), &exact).expect("exact itemLst opaque cap");
+        inspect(xml.as_bytes(), &exact).expect("borrowed exact itemLst cap");
         assert!(
-            parse_with_limits(
+            parse(
                 xml.as_bytes(),
                 &Limits::new().with_max_opaque_bytes(opaque - 1),
             )
@@ -6230,11 +6259,11 @@ mod tests {
             ));
         }
         xml.push_str("</itemLst></formControlPr>");
-        let view = inspect(xml.as_bytes()).expect("borrowed many-item source");
+        let view = inspect(xml.as_bytes(), &Limits::default()).expect("borrowed many-item source");
         assert!(view.properties().source_bytes().is_none());
         assert_eq!(view.properties().item_list().unwrap().len(), 64);
         assert_eq!(
-            write(view.properties()).expect("borrowed exact write"),
+            write(view.properties(), &Limits::default()).expect("borrowed exact write"),
             xml.as_bytes()
         );
     }
@@ -6248,7 +6277,7 @@ mod tests {
         let mut parse_high = Limits::default().max_retained_bytes();
         while parse_low < parse_high {
             let middle = parse_low + (parse_high - parse_low) / 2;
-            if parse_with_limits(
+            if parse(
                 xml.as_bytes(),
                 &Limits::new().with_max_retained_bytes(middle),
             )
@@ -6260,41 +6289,41 @@ mod tests {
             }
         }
         let parse_required = parse_low;
-        parse_with_limits(
+        parse(
             xml.as_bytes(),
             &Limits::new().with_max_retained_bytes(parse_required),
         )
         .expect("parse exact namespace retained boundary");
         assert!(
             parse_required == 0
-                || parse_with_limits(
+                || parse(
                     xml.as_bytes(),
                     &Limits::new().with_max_retained_bytes(parse_required - 1),
                 )
                 .is_err()
         );
 
-        let mut dirty = parse(xml.as_bytes()).expect("parse namespace context");
+        let mut dirty = parse(xml.as_bytes(), &Limits::default()).expect("parse namespace context");
         dirty.set_just_last_x(Some(true));
         let mut write_low = 0usize;
         let mut write_high = Limits::default().max_retained_bytes();
         while write_low < write_high {
             let middle = write_low + (write_high - write_low) / 2;
-            if write_with_limits(&dirty, &Limits::new().with_max_retained_bytes(middle)).is_ok() {
+            if write(&dirty, &Limits::new().with_max_retained_bytes(middle)).is_ok() {
                 write_high = middle;
             } else {
                 write_low = middle.saturating_add(1);
             }
         }
         let write_required = write_low;
-        write_with_limits(
+        write(
             &dirty,
             &Limits::new().with_max_retained_bytes(write_required),
         )
         .expect("write exact namespace retained boundary");
         assert!(
             write_required == 0
-                || write_with_limits(
+                || write(
                     &dirty,
                     &Limits::new().with_max_retained_bytes(write_required - 1),
                 )
@@ -6418,7 +6447,7 @@ mod tests {
         properties.set_fmla_link(Some(
             FormControlFormula::new("Sheet1!$A$1").expect("valid formula"),
         ));
-        assert!(write_with_limits(&properties, &Limits::new().with_max_output_bytes(1)).is_err());
+        assert!(write(&properties, &Limits::new().with_max_output_bytes(1)).is_err());
     }
 
     #[test]
@@ -6429,10 +6458,10 @@ mod tests {
         let value = Item::new("inserted").expect("item");
         let expected = insert_item(xml.as_bytes(), 1, value.clone()).expect("default item splice");
         let under = Limits::new().with_max_output_bytes(expected.len() - 1);
-        let view = inspect_with_limits(xml.as_bytes(), under).expect("inspect under output cap");
+        let view = inspect(xml.as_bytes(), &under).expect("inspect under output cap");
         assert!(view.insert_item(1, value.clone()).is_err());
         let exact = Limits::new().with_max_output_bytes(expected.len());
-        let view = inspect_with_limits(xml.as_bytes(), exact).expect("inspect exact output cap");
+        let view = inspect(xml.as_bytes(), &exact).expect("inspect exact output cap");
         assert_eq!(
             view.insert_item(1, value).expect("exact item splice"),
             expected

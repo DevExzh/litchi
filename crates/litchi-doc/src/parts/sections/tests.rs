@@ -10,7 +10,7 @@ use crate::section::{
     PageGrid, PageGridMode, PageOrientation, Protection, TextFlow, VerticalJustification,
     VerticalMargin,
 };
-use crate::{OpenOptions, Package};
+use crate::{OpenOptions, raw::Reader};
 use std::path::{Path, PathBuf};
 
 fn fixed_sprm(opcode: u16, operand: &[u8]) -> Vec<u8> {
@@ -419,7 +419,7 @@ fn poi_fixture(name: &str) -> PathBuf {
 
 #[test]
 fn opens_poi_bug53453_section_layout() {
-    let mut package = Package::open(poi_fixture("Bug53453Section.doc")).unwrap();
+    let mut package = Reader::open(poi_fixture("Bug53453Section.doc")).unwrap();
     let document = package.document().unwrap();
     assert_eq!(document.sections().len(), 2);
     for section in document.sections() {
@@ -438,9 +438,9 @@ fn exposes_layout_after_doc_decryption() {
         ("password_tika_binaryrc4.doc", "tika"),
         ("password_password_cryptoapi.doc", "password"),
     ] {
-        let mut package = Package::open(poi_fixture(name)).unwrap();
+        let mut package = Reader::open(poi_fixture(name)).unwrap();
         let document = package
-            .document_with_options(OpenOptions::default().with_password(password.to_owned().into()))
+            .document_with_options(OpenOptions::default().password(password.to_owned().into()))
             .unwrap();
         assert!(!document.sections().is_empty());
         assert!(document.sections().iter().all(|section| {

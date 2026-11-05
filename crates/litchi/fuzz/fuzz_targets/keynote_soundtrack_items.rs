@@ -17,7 +17,7 @@ use std::sync::OnceLock;
 
 use libfuzzer_sys::fuzz_target;
 use litchi::keynote::{
-    Limits, Package, Position, ReadOptions, SemanticLimits,
+    OpenOptions, Package, Position, SemanticLimits, SourceLimits,
     soundtrack::items::{AudioSource, Error as ItemError, Item, ItemSelector, OperationKind},
 };
 use litchi_iwa_archive::{Limits as ArchiveLimits, package::to_bytes};
@@ -108,27 +108,33 @@ fuzz_target!(|data: &[u8]| {
     exercise_input_limit();
 });
 
-fn fuzz_options() -> ReadOptions {
-    static OPTIONS: OnceLock<ReadOptions> = OnceLock::new();
+fn fuzz_options() -> OpenOptions {
+    static OPTIONS: OnceLock<OpenOptions> = OnceLock::new();
     *OPTIONS.get_or_init(|| {
-        let archive = Limits::new(
-            MAX_INPUT_BYTES,
-            MAX_ENTRIES,
-            MAX_ENTRY_BYTES,
-            MAX_EXPANDED_BYTES,
-            MAX_IWA_STREAM_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid Keynote item fuzz archive limits: {error}"));
-        let semantic = SemanticLimits::new(
-            MAX_OBJECTS,
-            MAX_SLIDES,
-            MAX_REFERENCES,
-            MAX_TEXT_STORAGES,
-            MAX_TEXT_FRAGMENTS,
-            MAX_TEXT_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid Keynote item fuzz semantic limits: {error}"));
-        ReadOptions::new(archive, semantic)
+        let archive = SourceLimits::builder()
+            .max_input_bytes(MAX_INPUT_BYTES)
+            .and_then(|limits| limits.max_entries(MAX_ENTRIES))
+            .and_then(|limits| limits.max_entry_bytes(MAX_ENTRY_BYTES))
+            .and_then(|limits| limits.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+            .and_then(|limits| limits.max_component_bytes(MAX_IWA_STREAM_BYTES))
+            .and_then(|limits| limits.build())
+            .unwrap_or_else(|error| {
+                unreachable!("valid Keynote item fuzz archive limits: {error}")
+            });
+        let semantic = SemanticLimits::builder()
+            .max_objects(MAX_OBJECTS)
+            .and_then(|limits| limits.max_slides(MAX_SLIDES))
+            .and_then(|limits| limits.max_references(MAX_REFERENCES))
+            .and_then(|limits| limits.max_text_storages(MAX_TEXT_STORAGES))
+            .and_then(|limits| limits.max_text_fragments(MAX_TEXT_FRAGMENTS))
+            .and_then(|limits| limits.max_text_bytes(MAX_TEXT_BYTES))
+            .and_then(|limits| limits.build())
+            .unwrap_or_else(|error| {
+                unreachable!("valid Keynote item fuzz semantic limits: {error}")
+            });
+        OpenOptions::new()
+            .source_limits(archive)
+            .semantic_limits(semantic)
     })
 }
 
@@ -254,9 +260,11 @@ fn exercise_fixture(fixture: Fixture, command: &[u8]) {
             edit.replace(selector, source_for_operation.clone())
         },
         2 => {
-            observe_error(ItemError::SourcePositionNotFound {
-                position: selected_position,
-            });
+            observe_error(ItemError::Refused(
+                litchi::keynote::soundtrack::items::Refusal::SourcePositionNotFound {
+                    position: selected_position,
+                },
+            ));
             return;
         },
         _ if count > 0 => {
@@ -268,9 +276,11 @@ fn exercise_fixture(fixture: Fixture, command: &[u8]) {
             edit.remove(selector)
         },
         _ => {
-            observe_error(ItemError::SourcePositionNotFound {
-                position: selected_position,
-            });
+            observe_error(ItemError::Refused(
+                litchi::keynote::soundtrack::items::Refusal::SourcePositionNotFound {
+                    position: selected_position,
+                },
+            ));
             return;
         },
     };
@@ -554,11 +564,11 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> FixtureResult<ArchiveOb
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
-    )?)
+     Default::default(),)?)
 }
 
 fn component(objects: Vec<ArchiveObject>) -> FixtureResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(&Archive { objects }.to_bytes(Default::default())?, Default::default())?)
 }
 
 type FixtureResult<T> = Result<T, Box<dyn std::error::Error>>;
@@ -600,7 +610,7 @@ fn build_fixture(count: usize, rooted: bool) -> FixtureResult<Vec<u8>> {
 
     let mut root = object(ROOT_OBJECT, 1, document.encode_to_vec())?;
     root.archive_info.message_infos[0].object_references = vec![SHOW_OBJECT];
-    let mut root_show_field = FieldInfo::new(vec![2]);
+    let mut root_show_field = FieldInfo::new(litchi_iwa_core::FieldPath::new(vec![2], litchi_iwa_core::Limits::default()).unwrap(), litchi_iwa_core::Limits::default()).unwrap();
     root_show_field.r#type = Some(FieldType::ObjectReference);
     root_show_field.object_references = vec![SHOW_OBJECT];
     root.archive_info.message_infos[0]
@@ -614,7 +624,7 @@ fn build_fixture(count: usize, rooted: bool) -> FixtureResult<Vec<u8>> {
         vec![THEME_OBJECT, STYLESHEET_OBJECT]
     };
     if rooted {
-        let mut show_soundtrack_field = FieldInfo::new(vec![17]);
+        let mut show_soundtrack_field = FieldInfo::new(litchi_iwa_core::FieldPath::new(vec![17], litchi_iwa_core::Limits::default()).unwrap(), litchi_iwa_core::Limits::default()).unwrap();
         show_soundtrack_field.r#type = Some(FieldType::ObjectReference);
         show_soundtrack_field.object_references = vec![SOUNDTRACK_OBJECT];
         show_object.archive_info.message_infos[0]
@@ -625,7 +635,7 @@ fn build_fixture(count: usize, rooted: bool) -> FixtureResult<Vec<u8>> {
     let document_component = if rooted {
         let mut soundtrack_object = object(SOUNDTRACK_OBJECT, 21, soundtrack.encode_to_vec())?;
         soundtrack_object.archive_info.message_infos[0].data_references = data_ids.to_vec();
-        let mut soundtrack_media_field = FieldInfo::new(vec![3]);
+        let mut soundtrack_media_field = FieldInfo::new(litchi_iwa_core::FieldPath::new(vec![3], litchi_iwa_core::Limits::default()).unwrap(), litchi_iwa_core::Limits::default()).unwrap();
         soundtrack_media_field.r#type = Some(FieldType::DataReference);
         soundtrack_media_field.data_references = data_ids.to_vec();
         soundtrack_object.archive_info.message_infos[0]

@@ -1,0 +1,43 @@
+diff --git a/crates/litchi-rtf/tests/logical_tail_append.rs b/crates/litchi-rtf/tests/logical_tail_append.rs
+index 184a9f8090..62c7882b06 100644
+--- a/crates/litchi-rtf/tests/logical_tail_append.rs
++++ b/crates/litchi-rtf/tests/logical_tail_append.rs
+@@ -1165,3 +1165,38 @@ fn native_replay_retains_distinct_admitting_recipient_profile() {
+     assert_eq!(restored.open_options(), options);
+     assert_eq!(restored.to_bytes().unwrap(), bytes);
+ }
++
++
++#[test]
++fn replay_commit_diagnostics_measure_forward_inverse_and_noop_output() {
++    let source_bytes = br"{\rtf1\ansi A\par}";
++    let source = Package::from_bytes(source_bytes).unwrap();
++    let mut edit = source.edit_tail_append(TailSelector::Body);
++    edit.append_text_paragraphs(&["B"]).unwrap();
++    let original = edit.commit().unwrap();
++    let forward = source.apply_tail_append(original.patch()).unwrap();
++    let output_bytes = forward.package().to_bytes().unwrap();
++    let facts = forward.diagnostics();
++    assert!(facts.changed());
++    assert_eq!(facts.source_bytes(), source_bytes.len());
++    assert_eq!(facts.output_bytes(), output_bytes.len());
++    assert_eq!(facts.inserted_bytes(), output_bytes.len() - source_bytes.len());
++
++    let inverse = forward.package().apply_tail_append(&forward.patch().inverse()).unwrap();
++    let facts = inverse.diagnostics();
++    assert!(facts.changed());
++    assert_eq!(facts.source_bytes(), output_bytes.len());
++    assert_eq!(facts.output_bytes(), source_bytes.len());
++    assert_eq!(facts.inserted_bytes(), 0, "inverse replay removes bytes");
++    assert_eq!(inverse.package().to_bytes().unwrap(), source_bytes);
++
++    let no_op = source.edit_tail_append(TailSelector::Body).commit().unwrap();
++    let replayed_no_op = source.apply_tail_append(no_op.patch()).unwrap();
++    let facts = replayed_no_op.diagnostics();
++    assert!(!facts.changed());
++    assert_eq!(facts.operation_count(), 0);
++    assert_eq!(facts.source_bytes(), source_bytes.len());
++    assert_eq!(facts.output_bytes(), source_bytes.len());
++    assert_eq!(facts.inserted_bytes(), 0);
++    assert!(replayed_no_op.package().same_snapshot(&source));
++}

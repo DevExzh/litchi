@@ -1,5 +1,6 @@
 //! MS-XLDM structural and cross-file validation rules.
 
+use super::Limits;
 use super::codec::{checked_usize, crc32, invalid, limit};
 use super::model::{
     BOM, BackupLog, CRC_SIZE, FileEntry, FileGroupClass, GeneratedNameKind, MAX_PATH_BYTES,
@@ -15,7 +16,9 @@ pub(super) fn validate_backup_log(
     backup: usize,
     bytes: &[u8],
     profile: StorageProfile,
+    limits: &Limits,
 ) -> Result<()> {
+    let _ = limits;
     if profile == StorageProfile::Tabular150 {
         return super::tabular_paths::validate_backup_log(
             log, directory, partitions, backup, bytes,
@@ -437,18 +440,24 @@ pub(super) fn kind_allowed_for_group(kind: GeneratedNameKind, class: FileGroupCl
     }
 }
 
-pub(super) fn validate_paths(files: &[FileEntry]) -> Result<()> {
+pub(super) fn validate_paths(files: &[FileEntry], limits: &Limits) -> Result<()> {
     let mut normalized = HashSet::new();
     for file in files {
         if file.path.is_empty()
-            || file.path.len() > MAX_PATH_BYTES
             || file
                 .path
                 .bytes()
                 .any(|byte| byte == 0 || byte.is_ascii_control())
         {
             return Err(invalid(
-                "virtual-directory path is empty, oversized, or contains control bytes",
+                "virtual-directory path is empty or contains control bytes",
+            ));
+        }
+        if file.path.len() > limits.max_path_bytes {
+            return Err(crate::error::limit(
+                crate::LimitKind::PathBytes,
+                file.path.len(),
+                limits.max_path_bytes,
             ));
         }
         if file.path.starts_with('/')

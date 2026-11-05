@@ -1,15 +1,26 @@
 //! Focused regression tests for the tracked-revision semantic layer.
 
-use super::{Error, Limits, RevisionEditor, RevisionKind, RevisionMetadata, Snapshot};
+use super::transaction::{Error, Snapshot};
+use super::{Limits, RevisionEditor, RevisionKind, RevisionMetadata};
+use crate::builder::Builder;
 use crate::package::Error as PackageError;
 use crate::parts::fib::FileInformationBlock;
 use crate::parts::protection::{ProtectionAuthorization, ProtectionPolicy};
-use crate::writer::{CharacterFormatting, ParagraphFormatting, TextRevision, Writer};
-use litchi_ole_common::object::{Editor as ObjectEditor, Targets};
+use crate::writer::{CharacterFormatting, ParagraphFormatting, TextRevision};
+use litchi_ole_common::object::{
+    Edit as ObjectEditor, OpenOptions, Package as ObjectPackage, Targets,
+};
 use std::io::Cursor;
 
+fn open_object(bytes: Vec<u8>, targets: Targets, limits: Limits) -> ObjectEditor {
+    ObjectPackage::open_with_options(bytes, OpenOptions::new().targets(targets).limits(limits))
+        .unwrap()
+        .edit()
+        .unwrap()
+}
+
 fn base_doc() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer
         .add_paragraph_runs(
             vec![
@@ -29,12 +40,12 @@ fn base_doc() -> Vec<u8> {
         )
         .unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     normalize_word2002_dop(output.into_inner())
 }
 
 fn normalize_word2002_dop(bytes: Vec<u8>) -> Vec<u8> {
-    let mut package = ObjectEditor::open(bytes, Targets::default(), Limits::default()).unwrap();
+    let mut package = open_object(bytes, Targets::default(), Limits::default());
     let word_path = ["WordDocument".to_string()];
     let word = package.stream(&word_path).unwrap();
     let fib = FileInformationBlock::parse(word).unwrap();
@@ -74,7 +85,7 @@ fn normalize_word2002_dop(bytes: Vec<u8>) -> Vec<u8> {
     word[pointer + 4..pointer + 8].copy_from_slice(&(dop.len() as u32).to_le_bytes());
     package.put_stream(&word_path, word).unwrap();
     package.put_stream(&table_path, table).unwrap();
-    package.finish().unwrap()
+    crate::package::object_edit_bytes(&package).unwrap()
 }
 
 #[test]
@@ -109,7 +120,7 @@ fn transaction_supports_revision_metadata_crud_and_replacement() {
 
     let mut transaction = source.edit().unwrap();
     let replacement = transaction
-        .replace_metadata(
+        .replace(
             index,
             RevisionMetadata::new("Replacement")
                 .with_reason(0x2b)
@@ -339,8 +350,7 @@ fn protected_patch_cannot_cross_into_an_enforcing_destination() {
 }
 
 fn protected_doc() -> Vec<u8> {
-    let mut package =
-        ObjectEditor::open(base_doc(), Targets::default(), Limits::default()).unwrap();
+    let mut package = open_object(base_doc(), Targets::default(), Limits::default());
     let word_path = ["WordDocument".to_string()];
     let table_name = {
         let word = package.stream(&word_path).unwrap();
@@ -366,7 +376,7 @@ fn protected_doc() -> Vec<u8> {
     word[pointer + 4..pointer + 8].copy_from_slice(&(dop.len() as u32).to_le_bytes());
     package.put_stream(&word_path, word).unwrap();
     package.put_stream(&table_path, table).unwrap();
-    package.finish().unwrap()
+    crate::package::object_edit_bytes(&package).unwrap()
 }
 
 /// Replaces a checked-in fixture's `Selsf` with a selection of the first
@@ -381,7 +391,7 @@ fn fixture_with_object_selection(name: &str, unit: u16, flags: u16) -> Option<(V
     let editor = RevisionEditor::open(bytes.clone(), Limits::default()).unwrap();
     let text = editor.main_story_text().unwrap();
     let cp = u32::try_from(text.encode_utf16().position(|value| value == unit)?).unwrap();
-    let mut package = ObjectEditor::open(bytes, Targets::default(), Limits::default()).unwrap();
+    let mut package = open_object(bytes, Targets::default(), Limits::default());
     let word_path = ["WordDocument".to_string()];
     let fib = FileInformationBlock::parse(package.stream(&word_path).unwrap()).unwrap();
     let table_path = [if fib.which_table_stream() {
@@ -405,7 +415,7 @@ fn fixture_with_object_selection(name: &str, unit: u16, flags: u16) -> Option<(V
     selsf[20..24].copy_from_slice(&cp.to_le_bytes());
     selsf[24..26].copy_from_slice(&1u16.to_le_bytes());
     package.put_stream(&table_path, table).unwrap();
-    Some((package.finish().unwrap(), cp))
+    Some((crate::package::object_edit_bytes(&package).unwrap(), cp))
 }
 
 /// Change 0768 review: text inserted at a selected inline picture (its

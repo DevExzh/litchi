@@ -1,0 +1,40 @@
+{
+  "source": "173dd5330476713714871007316794b9a3a1bdaa",
+  "pid": 3509933,
+  "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation",
+  "command": [
+    "python3",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/run-semantic-checks-disk-guarded.py",
+    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/clippy-composed-v22-commands.json",
+    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/clippy-composed-v22"
+  ],
+  "started_unix_seconds": 1792787348.162432,
+  "target": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target",
+  "lock_sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--keep-going",
+        "--message-format=json-render-diagnostics",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 101,
+      "seconds": 829.7478441740022,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/clippy-composed-v22/check-0.log",
+      "bytes": 1832833,
+      "sha256": "9e78e2985cb42e9ff1d7e93061e59697383039faf1d5b6183f108854ba99e4b1",
+      "target_bytes_before": 3987244210,
+      "completed_test_executables_pruned": []
+    }
+  ],
+  "note": "Full keep-going workspace all-target/all-feature Clippy completed with 15 XLSX library/test lints, one DOC redundant closure, and the Pages fixture example inner-doc/include plus unused-import compile errors. No lint waivers are accepted. DOC forwarding is corrected directly; XLSX and Pages corrections are assigned to their owners. Complete raw log remains external."
+}

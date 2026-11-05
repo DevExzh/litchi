@@ -22,14 +22,14 @@ use litchi_iwa_common::chart::kind::Kind;
 use litchi_iwa_common::chart::metadata::ChartMetadata;
 use litchi_iwa_protos::chart_metadata_codec as codec;
 use litchi_iwa_protos::keynote_chart_title_codec as title_codec;
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::Package;
 use super::chart_arrangement::{
-    self, ChartArrangementError, ChartBudget, ChartSelection, object_from_resolved,
-    parse_wire_view_with_budget, select_chart_with_budget, unique_typed_message,
-    validate_message_metadata,
+    self, ChartBudget, ChartSelection, object_from_resolved, parse_wire_view_with_budget,
+    select_chart_with_budget, unique_typed_message, validate_message_metadata,
 };
+use crate::sheet::chart::arrangement::Error as ChartArrangementError;
 use crate::{ChartSelector, SheetSelector};
 
 const CHART_NON_STYLE_MESSAGE_TYPE: u32 = 5_023;
@@ -38,7 +38,7 @@ const GENERATED_CHART_NON_STYLE_EXTENSION_FIELD: u32 = 10_000;
 /// Resource category reported by a focused Numbers chart-metadata read.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum ChartMetadataLimitKind {
+pub enum LimitKind {
     /// Source bytes inspected by the rooted graph or codec.
     WireBytes,
     /// Encoded fields visited by strict preflight or Buffa.
@@ -57,9 +57,11 @@ pub enum ChartMetadataLimitKind {
     RetainedBytes,
     /// Native references inspected by the selector.
     References,
+    /// Compressed IWA member bytes inspected by the rooted owner.
+    CompressedBytes,
 }
 
-impl fmt::Display for ChartMetadataLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::WireBytes => "wire bytes",
@@ -71,14 +73,15 @@ impl fmt::Display for ChartMetadataLimitKind {
             Self::Allocations => "allocations",
             Self::RetainedBytes => "retained bytes",
             Self::References => "references",
+            Self::CompressedBytes => "compressed bytes",
         })
     }
 }
 
 /// Failure from a semantic Numbers chart-metadata read.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum ChartMetadataError {
+pub enum Error {
     /// The package does not retain a supported physical source.
     #[error("this Numbers source does not support chart metadata reads")]
     UnsupportedSource,
@@ -108,9 +111,9 @@ pub enum ChartMetadataError {
     ForeignReference,
     /// A finite operation budget was exceeded.
     #[error("Numbers chart metadata {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
+    Limit {
         /// Resource that exceeded its ceiling.
-        kind: ChartMetadataLimitKind,
+        kind: LimitKind,
         /// Observed or requested amount.
         observed: u64,
         /// Configured maximum.
@@ -128,7 +131,7 @@ impl Package {
         &self,
         sheet_selector: impl Into<SheetSelector<'sheet>>,
         chart_selector: impl Into<ChartSelector>,
-    ) -> Result<ChartMetadata, ChartMetadataError> {
+    ) -> Result<ChartMetadata, Error> {
         let mut budget = ChartBudget::for_package(self).map_err(map_arrangement_error)?;
         let selection = select_chart_with_budget(
             self,
@@ -153,7 +156,7 @@ impl Package {
                 if let Some(limit) = map_metadata_codec_limit(&error) {
                     return Err(limit);
                 }
-                return Err(ChartMetadataError::InvalidSource);
+                return Err(Error::InvalidSource);
             },
         };
         budget
@@ -181,7 +184,7 @@ fn read_title<'source>(
     selection: &ChartSelection,
     identifier: Option<NonZeroU64>,
     budget: &mut ChartBudget,
-) -> Result<Option<&'source str>, ChartMetadataError> {
+) -> Result<Option<&'source str>, Error> {
     let Some(identifier) = identifier else {
         return Ok(None);
     };
@@ -190,37 +193,37 @@ fn read_title<'source>(
         .state
         .index
         .resolve_ref_id(&package.state.components, identifier)
-        .map_err(|_| ChartMetadataError::InvalidSource)?
-        .ok_or(ChartMetadataError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?
+        .ok_or(Error::InvalidSource)?;
     let chart_component = package
         .state
         .components
         .catalog()
         .get_index(selection.component_index)
-        .ok_or(ChartMetadataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let chart_object = chart_component
         .archive()
         .objects
         .get(selection.object_index)
-        .ok_or(ChartMetadataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let chart_info = chart_object
         .archive_info
         .message_infos
         .get(selection.message_index)
-        .ok_or(ChartMetadataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if !chart_non_style_reference_is_owned(chart_info, identifier) {
-        return Err(ChartMetadataError::ForeignReference);
+        return Err(Error::ForeignReference);
     }
     let object = object_from_resolved(package, resolved).map_err(map_arrangement_error)?;
     if object.archive_info.identifier != Some(identifier) {
-        return Err(ChartMetadataError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     validate_message_metadata(object).map_err(map_arrangement_error)?;
     let Some((_message_index, message)) =
         unique_typed_message(object, CHART_NON_STYLE_MESSAGE_TYPE)
             .map_err(map_arrangement_error)?
     else {
-        return Err(ChartMetadataError::InvalidSource);
+        return Err(Error::InvalidSource);
     };
     let view = parse_wire_view_with_budget(message.data.as_slice(), 1, budget)
         .map_err(map_arrangement_error)?;
@@ -230,11 +233,11 @@ fn read_title<'source>(
             continue;
         }
         if extension.is_some() || field.wire_type() != 2 {
-            return Err(ChartMetadataError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field
             .validate_canonical_framing()
-            .map_err(|_| ChartMetadataError::InvalidSource)?;
+            .map_err(|_| Error::InvalidSource)?;
         extension = Some(field.payload());
     }
     let Some(extension) = extension else {
@@ -253,9 +256,9 @@ fn read_title<'source>(
                 return Err(limit);
             }
             if let Some(amount) = error.allocation_amount() {
-                return Err(ChartMetadataError::Allocation { amount });
+                return Err(Error::Allocation { amount });
             }
-            return Err(ChartMetadataError::InvalidSource);
+            return Err(Error::InvalidSource);
         },
     };
     budget
@@ -309,20 +312,20 @@ fn chart_non_style_reference_is_owned(
 fn own_labels(
     labels: codec::LabelList<'_>,
     budget: &mut ChartBudget,
-) -> Result<Vec<String>, ChartMetadataError> {
+) -> Result<Vec<String>, Error> {
     let count = labels.len();
     let text_bytes = labels
         .iter()
         .try_fold(0usize, |total, value| total.checked_add(value.len()))
-        .ok_or(ChartMetadataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let retained = count
         .checked_mul(size_of::<String>())
         .and_then(|amount| amount.checked_add(text_bytes))
-        .ok_or(ChartMetadataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let string_allocations = labels.iter().filter(|value| !value.is_empty()).count();
     let allocations = usize::from(count != 0)
         .checked_add(string_allocations)
-        .ok_or(ChartMetadataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget
         .preflight_allocations(allocations)
         .map_err(map_arrangement_error)?;
@@ -332,12 +335,12 @@ fn own_labels(
     let mut output = Vec::new();
     output
         .try_reserve_exact(count)
-        .map_err(|_| ChartMetadataError::Allocation { amount: count })?;
+        .map_err(|_| Error::Allocation { amount: count })?;
     for value in labels.iter() {
         let mut owned = String::new();
         owned
             .try_reserve_exact(value.len())
-            .map_err(|_| ChartMetadataError::Allocation {
+            .map_err(|_| Error::Allocation {
                 amount: value.len(),
             })?;
         owned.push_str(value);
@@ -350,16 +353,13 @@ fn own_labels(
     Ok(output)
 }
 
-fn own_title(
-    title: Option<&str>,
-    budget: &mut ChartBudget,
-) -> Result<Option<String>, ChartMetadataError> {
+fn own_title(title: Option<&str>, budget: &mut ChartBudget) -> Result<Option<String>, Error> {
     let Some(title) = title else {
         return Ok(None);
     };
     let retained = size_of::<String>()
         .checked_add(title.len())
-        .ok_or(ChartMetadataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let allocations = usize::from(!title.is_empty());
     budget
         .preflight_allocations(allocations)
@@ -370,7 +370,7 @@ fn own_title(
     let mut value = String::new();
     value
         .try_reserve_exact(title.len())
-        .map_err(|_| ChartMetadataError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: title.len(),
         })?;
     value.push_str(title);
@@ -381,121 +381,110 @@ fn own_title(
     Ok(Some(value))
 }
 
-fn map_arrangement_error(error: ChartArrangementError) -> ChartMetadataError {
+fn map_arrangement_error(error: ChartArrangementError) -> Error {
     match error {
-        ChartArrangementError::UnsupportedSource => ChartMetadataError::UnsupportedSource,
-        ChartArrangementError::UnsupportedDependency => ChartMetadataError::UnsupportedDependency,
-        ChartArrangementError::AmbiguousSelector => ChartMetadataError::AmbiguousSelector,
-        ChartArrangementError::EmptySheetName => ChartMetadataError::EmptySheetName,
-        ChartArrangementError::SheetNameNotFound => ChartMetadataError::SheetNameNotFound,
-        ChartArrangementError::SheetPositionNotFound { position } => {
-            ChartMetadataError::SheetPositionNotFound { position }
+        ChartArrangementError::Refused(chart_arrangement::Refusal::UnsupportedSource) => {
+            Error::UnsupportedSource
         },
-        ChartArrangementError::ChartPositionNotFound { position } => {
-            ChartMetadataError::ChartPositionNotFound { position }
+        ChartArrangementError::Refused(chart_arrangement::Refusal::UnsupportedDependency) => {
+            Error::UnsupportedDependency
         },
-        ChartArrangementError::LimitExceeded {
+        ChartArrangementError::Refused(chart_arrangement::Refusal::AmbiguousSelector) => {
+            Error::AmbiguousSelector
+        },
+        ChartArrangementError::Refused(chart_arrangement::Refusal::EmptySheetName) => {
+            Error::EmptySheetName
+        },
+        ChartArrangementError::Refused(chart_arrangement::Refusal::SheetNameNotFound) => {
+            Error::SheetNameNotFound
+        },
+        ChartArrangementError::Refused(chart_arrangement::Refusal::SheetPositionNotFound {
+            position,
+        }) => Error::SheetPositionNotFound { position },
+        ChartArrangementError::Refused(chart_arrangement::Refusal::ChartPositionNotFound {
+            position,
+        }) => Error::ChartPositionNotFound { position },
+        ChartArrangementError::Limit {
             kind,
             observed,
             maximum,
-        } => ChartMetadataError::LimitExceeded {
+        } => Error::Limit {
             kind: map_limit_kind(kind),
             observed,
             maximum,
         },
-        ChartArrangementError::Allocation { amount } => ChartMetadataError::Allocation { amount },
+        ChartArrangementError::Allocation { amount } => Error::Allocation { amount },
         ChartArrangementError::InvalidSource
         | ChartArrangementError::Verification
-        | ChartArrangementError::PatchConflict => ChartMetadataError::InvalidSource,
+        | ChartArrangementError::PatchConflict => Error::InvalidSource,
     }
 }
 
-fn map_metadata_codec_limit(error: &codec::DecodeError) -> Option<ChartMetadataError> {
+fn map_metadata_codec_limit(error: &codec::DecodeError) -> Option<Error> {
     let (kind, observed, maximum) = match error.resource_limit()? {
         codec::DecodeLimit::Bytes { observed, maximum } => {
-            (ChartMetadataLimitKind::WireBytes, observed, maximum)
+            (LimitKind::WireBytes, observed, maximum)
         },
         codec::DecodeLimit::Fields { observed, maximum } => {
-            (ChartMetadataLimitKind::WireFields, observed, maximum)
+            (LimitKind::WireFields, observed, maximum)
         },
-        codec::DecodeLimit::Work { observed, maximum } => {
-            (ChartMetadataLimitKind::WireWork, observed, maximum)
+        codec::DecodeLimit::Work { observed, maximum } => (LimitKind::WireWork, observed, maximum),
+        codec::DecodeLimit::Nesting { observed, maximum } => {
+            (LimitKind::WireNesting, observed as usize, maximum as usize)
         },
-        codec::DecodeLimit::Nesting { observed, maximum } => (
-            ChartMetadataLimitKind::WireNesting,
-            observed as usize,
-            maximum as usize,
-        ),
-        codec::DecodeLimit::Labels { observed, maximum } => {
-            (ChartMetadataLimitKind::Labels, observed, maximum)
-        },
-        codec::DecodeLimit::Text { observed, maximum } => {
-            (ChartMetadataLimitKind::TextBytes, observed, maximum)
-        },
+        codec::DecodeLimit::Labels { observed, maximum } => (LimitKind::Labels, observed, maximum),
+        codec::DecodeLimit::Text { observed, maximum } => (LimitKind::TextBytes, observed, maximum),
         _ => return None,
     };
-    Some(ChartMetadataError::LimitExceeded {
+    Some(Error::Limit {
         kind,
         observed: observed as u64,
         maximum: maximum as u64,
     })
 }
 
-fn map_title_codec_limit(error: &title_codec::DecodeError) -> Option<ChartMetadataError> {
+fn map_title_codec_limit(error: &title_codec::DecodeError) -> Option<Error> {
     let (kind, observed, maximum) = match error.resource_limit()? {
         title_codec::DecodeLimit::Bytes { observed, maximum } => {
-            (ChartMetadataLimitKind::WireBytes, observed, maximum)
+            (LimitKind::WireBytes, observed, maximum)
         },
         title_codec::DecodeLimit::Fields { observed, maximum } => {
-            (ChartMetadataLimitKind::WireFields, observed, maximum)
+            (LimitKind::WireFields, observed, maximum)
         },
         title_codec::DecodeLimit::Work { observed, maximum } => {
-            (ChartMetadataLimitKind::WireWork, observed, maximum)
+            (LimitKind::WireWork, observed, maximum)
         },
         title_codec::DecodeLimit::Output { observed, maximum }
         | title_codec::DecodeLimit::Title { observed, maximum } => {
-            (ChartMetadataLimitKind::TextBytes, observed, maximum)
+            (LimitKind::TextBytes, observed, maximum)
         },
-        title_codec::DecodeLimit::Nesting { observed, maximum } => (
-            ChartMetadataLimitKind::WireNesting,
-            observed as usize,
-            maximum as usize,
-        ),
+        title_codec::DecodeLimit::Nesting { observed, maximum } => {
+            (LimitKind::WireNesting, observed as usize, maximum as usize)
+        },
         _ => return None,
     };
-    Some(ChartMetadataError::LimitExceeded {
+    Some(Error::Limit {
         kind,
         observed: observed as u64,
         maximum: maximum as u64,
     })
 }
 
-const fn map_limit_kind(
-    kind: chart_arrangement::ChartArrangementLimitKind,
-) -> ChartMetadataLimitKind {
+const fn map_limit_kind(kind: chart_arrangement::LimitKind) -> LimitKind {
     match kind {
-        chart_arrangement::ChartArrangementLimitKind::WireBytes
-        | chart_arrangement::ChartArrangementLimitKind::OutputBytes => {
-            ChartMetadataLimitKind::WireBytes
+        chart_arrangement::LimitKind::WireBytes | chart_arrangement::LimitKind::OutputBytes => {
+            LimitKind::WireBytes
         },
-        chart_arrangement::ChartArrangementLimitKind::WireFields => {
-            ChartMetadataLimitKind::WireFields
+        chart_arrangement::LimitKind::WireFields => LimitKind::WireFields,
+        chart_arrangement::LimitKind::WireNesting => LimitKind::WireNesting,
+        chart_arrangement::LimitKind::WireWork | chart_arrangement::LimitKind::ScratchBytes => {
+            LimitKind::WireWork
         },
-        chart_arrangement::ChartArrangementLimitKind::WireNesting => {
-            ChartMetadataLimitKind::WireNesting
+        chart_arrangement::LimitKind::Allocations => LimitKind::Allocations,
+        chart_arrangement::LimitKind::RetainedBytes => LimitKind::RetainedBytes,
+        chart_arrangement::LimitKind::References | chart_arrangement::LimitKind::Identifiers => {
+            LimitKind::References
         },
-        chart_arrangement::ChartArrangementLimitKind::WireWork
-        | chart_arrangement::ChartArrangementLimitKind::ScratchBytes => {
-            ChartMetadataLimitKind::WireWork
-        },
-        chart_arrangement::ChartArrangementLimitKind::Allocations => {
-            ChartMetadataLimitKind::Allocations
-        },
-        chart_arrangement::ChartArrangementLimitKind::RetainedBytes => {
-            ChartMetadataLimitKind::RetainedBytes
-        },
-        chart_arrangement::ChartArrangementLimitKind::References => {
-            ChartMetadataLimitKind::References
-        },
+        chart_arrangement::LimitKind::CompressedBytes => LimitKind::CompressedBytes,
     }
 }

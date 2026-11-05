@@ -331,12 +331,14 @@ pub(crate) fn parse_inline_images(xml_bytes: &[u8]) -> Result<SmallVec<[InlineIm
                             match attr.key.as_ref() {
                                 b"name" => {
                                     if let Ok(s) = std::str::from_utf8(&attr.value) {
-                                        name = s.to_string();
+                                        name = quick_xml::escape::unescape(s)
+                                            .map_or_else(|_| s.to_string(), Cow::into_owned);
                                     }
                                 },
                                 b"descr" => {
                                     if let Ok(s) = std::str::from_utf8(&attr.value) {
-                                        description = s.to_string();
+                                        description = quick_xml::escape::unescape(s)
+                                            .map_or_else(|_| s.to_string(), Cow::into_owned);
                                     }
                                 },
                                 _ => {},

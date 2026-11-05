@@ -25,14 +25,9 @@ pub struct Snapshot {
 impl Snapshot {
     /// Load and validate the revision graph from an OPC package.
     pub fn load(package: &OpcPackage) -> Result<Self> {
-        let revisions = load_workbook_revisions(package)?;
+        let revisions = load_workbook_revisions(package, &package.read_limits())?;
         let source = SourceState::capture(package, revisions.as_ref())?;
         Ok(Self { revisions, source })
-    }
-
-    /// Alias for [`Self::load`] that emphasizes the source-bound result.
-    pub fn read(package: &OpcPackage) -> Result<Self> {
-        Self::load(package)
     }
 
     /// Borrow the complete typed revision owner, when present.
@@ -71,12 +66,6 @@ impl Snapshot {
     #[must_use]
     pub fn workbook_part_name(&self) -> &str {
         &self.source.workbook_part_name
-    }
-
-    /// Return the workbook part that owns the revision relationships.
-    #[must_use]
-    pub fn workbook(&self) -> &str {
-        self.workbook_part_name()
     }
 
     /// Return the conformance used for writes, defaulting new owners to

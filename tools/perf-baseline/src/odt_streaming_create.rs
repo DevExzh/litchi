@@ -156,7 +156,7 @@ fn odt_buffered_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
         let paragraph = odt_buffered_paragraph_text(index);
         builder.add_paragraph(&paragraph)?;
     }
-    Ok(builder.build()?)
+    Ok(builder.build()?.to_bytes()?)
 }
 
 fn verify_odt_buffered_default_parts(
@@ -211,7 +211,10 @@ fn verify_odt_buffered_compression(bytes: &[u8]) -> Result<(), Box<dyn Error>> {
 
 fn verify_odt_buffered_manifest(archive: &ArchiveReader<'_>) -> Result<(), Box<dyn Error>> {
     let manifest_xml = String::from_utf8(archive.read("META-INF/manifest.xml")?)?;
-    let manifest = litchi_odf_common::core::Manifest::parse(&manifest_xml)?;
+    let manifest = litchi_odf_common::core::Manifest::parse(
+        &manifest_xml,
+        litchi_odf_common::XmlStreamLimits::owner_default_value(),
+    )?;
     let root = manifest
         .get_entry("/")
         .ok_or("buffered ODT manifest root entry is missing")?;
@@ -248,7 +251,7 @@ fn inspect_odt_buffered_archive(
     bytes: &[u8],
     shape: SemanticShape,
 ) -> Result<OdtBufferedIdentity, Box<dyn Error>> {
-    let archive = ArchiveReader::new(bytes)?;
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())?;
     let names = archive.file_names().collect::<Vec<_>>();
     let actual_set = names.iter().copied().collect::<BTreeSet<_>>();
     let expected_set = ODT_BUFFERED_MEMBER_NAMES
@@ -272,7 +275,7 @@ fn inspect_odt_buffered_archive(
     let meta_xml = archive.read("meta.xml")?;
     verify_odt_buffered_default_parts(&styles_xml, &meta_xml)?;
 
-    let document = litchi_odt::Document::from_bytes(bytes.to_vec())?;
+    let document = litchi_odt::Package::from_bytes(bytes)?.document()?;
     let paragraphs = document.paragraphs()?;
     let expected = odt_buffered_expected_paragraphs(shape);
     if paragraphs.len() != expected.len() {
@@ -316,7 +319,11 @@ fn verify_odt_paragraph_corpus_binding(
 ) -> Result<(), Box<dyn Error>> {
     let expected_semantic_sha256 =
         odt_buffered_semantic_digest(&odt_buffered_expected_paragraphs(shape))?;
-    let reopened_target = ArchiveReader::new(&corpus.archive)?.read("content.xml")?;
+    let reopened_target = ArchiveReader::new(
+        &corpus.archive,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?
+    .read("content.xml")?;
     if corpus.target_name != "content.xml"
         || corpus.manifest.target_entry != "content.xml"
         || corpus.target_payload != reopened_target
@@ -364,7 +371,9 @@ fn verify_odt_paragraph_corpus_binding(
 pub(crate) fn build_odt_buffered_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Error>> {
     let archive = odt_buffered_bytes(shape)?;
     let identity = inspect_odt_buffered_archive(&archive, shape)?;
-    let target_payload = ArchiveReader::new(&archive)?.read("content.xml")?;
+    let target_payload =
+        ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?
+            .read("content.xml")?;
     let entry_bytes = odt_buffered_paragraph_text(0).len();
     let corpus = Corpus {
         manifest: CorpusManifest {
@@ -625,7 +634,9 @@ pub(crate) fn build_odt_streaming_corpus(shape: SemanticShape) -> Result<Corpus,
             "streaming ODT corpus report differs from its semantic/package identity".into(),
         );
     }
-    let target_payload = ArchiveReader::new(&archive)?.read("content.xml")?;
+    let target_payload =
+        ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?
+            .read("content.xml")?;
     let corpus = Corpus {
         manifest: CorpusManifest {
             name: format!("odt-streaming-paragraphs-{}", shape.name()),
@@ -867,8 +878,13 @@ mod tests {
     #[test]
     fn buffered_oracle_rejects_manifest_binding_mutation() {
         let mut corpus = build_odt_buffered_corpus(SemanticShape::Tiny).unwrap();
-        let reader = ArchiveReader::new(&corpus.archive).unwrap();
-        let mut writer = StreamingArchiveWriter::new();
+        let reader = ArchiveReader::new(
+            &corpus.archive,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         for name in reader.file_names() {
             let mut payload = reader.read(name).unwrap();
             if name == "META-INF/manifest.xml" {

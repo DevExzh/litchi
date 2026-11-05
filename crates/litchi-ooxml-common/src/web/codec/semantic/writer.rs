@@ -7,6 +7,7 @@ use super::super::super::{TASK_PANES_NAMESPACE, WEB_EXTENSION_NAMESPACE};
 use super::super::xml::{element_children, parse_mce_xml};
 use super::parser::{parse_add_in_with, parse_panes_with};
 use super::support::{escape_attr, format_f64, invalid, limit};
+use crate::web::LimitKind;
 use crate::{Error, Result};
 use std::collections::HashSet;
 
@@ -102,7 +103,7 @@ pub(in crate::web) fn write_add_in_with(
     out.push_str("</we:webextension>");
     let output = out.into_bytes();
     if output.len() > limits.xml_bytes {
-        return limit("web extension XML bytes", limits.xml_bytes, output.len());
+        return limit(LimitKind::XmlBytes, limits.xml_bytes, output.len());
     }
     parse_add_in_with(&output, limits)?;
     Ok(output)
@@ -120,7 +121,7 @@ pub(in crate::web) fn splice_add_in_extension_list_with(
         return invalid("add-in source splice requires an add-in extLst".into());
     }
     if source.len() > limits.xml_bytes {
-        return limit("web extension XML bytes", limits.xml_bytes, source.len());
+        return limit(LimitKind::XmlBytes, limits.xml_bytes, source.len());
     }
     let document = parse_mce_xml(source, &[WEB_EXTENSION_NAMESPACE], limits)?;
     if document.xml.as_slice() != source {
@@ -151,12 +152,12 @@ pub(in crate::web) fn splice_add_in_extension_list_with(
         .checked_sub(fragment.end - fragment.start)
         .and_then(|length| length.checked_add(replacement.len()))
         .ok_or(Error::Limit {
-            resource: "web extension XML bytes",
-            max: limits.xml_bytes,
-            actual: usize::MAX,
+            kind: crate::LimitKind::Web(LimitKind::XmlBytes),
+            maximum: limits.xml_bytes,
+            observed: usize::MAX,
         })?;
     if output_len > limits.xml_bytes {
-        return limit("web extension XML bytes", limits.xml_bytes, output_len);
+        return limit(LimitKind::XmlBytes, limits.xml_bytes, output_len);
     }
     let mut output = Vec::new();
     output
@@ -229,7 +230,7 @@ pub(in crate::web) fn write_panes_with(
     out.push_str("</wetp:taskpanes>");
     let output = out.into_bytes();
     if output.len() > limits.xml_bytes {
-        return limit("task-pane XML bytes", limits.xml_bytes, output.len());
+        return limit(LimitKind::TaskPaneXmlBytes, limits.xml_bytes, output.len());
     }
     parse_panes_with(&output, limits)?;
     Ok(output)

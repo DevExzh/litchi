@@ -1,0 +1,13 @@
+Baseline at 80e24f8745, taskset -c 13, 2026-10-13 (raw outputs lost with scratch dir; medians transcribed)
+xlsx_batch_100_refuse_vs_warn: 361132 vs 17863116 ns = 49.46
+xlsx_apply_subset_vs_warn_one_refused 1.326; xlsx_apply_refuse_vs_warn 1.005
+pptx_add_formatted_text_box 1: 343082/477912 1.393; 100: 1.102; 1000: 1.049
+pptx_add_plain_text_box 1: 317772/451692 1.421; 100: 1.124; 1000: 1.069
+pptx set fill/geometry 1.002-1.025; transition 1.000-1.009
+docx cell_paragraph_align 161972/202448 1.250; cell_text 161199/197476 1.225; hyperlink_run_bold 1.059; table_add 1.050
+docx fanout 1 para 8581/10186 1.187; 100 para 1.073
+find docx 10k paras 1 match 15.82/17.69 ms 1.118; 1000 matches 1.084; pptx 1.050/1.028
+ooxml metadata: xlsx 1.046/1.047; pptx eager 1.008, source 1.016; xlsb eager 32220/35240 1.094; xlsb source 0.640; pptx open+first set 377832/495982 1.313
+xlsb_metadata_source: unified-eager/leaf-eager 1.097 (new), 1.097 (Simple), 1.061 (8x2000); source/source 1.02-1.03
+xls_read eager get ratios 3.11/4.04/3.61/2.38 (1/100/1k/10k); eager scan 4.97/2.10/1.98/1.58; positional get 1.48/1.71/1.68/1.52; positional scan 1.97/4.63/5.11/5.13
+xls_write set 1.00-1.06

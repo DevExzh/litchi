@@ -589,7 +589,7 @@ mod tests {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let package = OpcPackage::open(root.join(
             "test-data/poi/test-data/spreadsheet/workbookProtection-workbook_password-2013.xlsx",
-        ))
+        ), litchi_opc::SourceLimits::default())
         .unwrap();
         let part = package
             .get_part(&PackURI::new("/xl/workbook.xml").unwrap())

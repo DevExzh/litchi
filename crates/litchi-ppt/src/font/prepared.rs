@@ -48,7 +48,7 @@ pub(crate) fn restore_encoded(
     encoded: Vec<u8>,
     limits: litchi_fonts::embedding::powerpoint::Limits,
 ) -> Result<(), FontError> {
-    litchi_fonts::embedding::powerpoint::restore_with(font, encoded, limits)
+    litchi_fonts::embedding::powerpoint::restore(font, encoded, limits)
 }
 
 #[allow(
@@ -91,8 +91,8 @@ pub(crate) fn restore_staged(
     reason = "test assertions panic on failure by design"
 )]
 mod tests {
-    use super::super::{EotIntent, EotLimits, Facet, PreparedFont, Scope, Snapshot};
-    use crate::Writer;
+    use super::super::{EotIntent, EotLimits, Facet, PackageLimits, PreparedFont, Scope, Snapshot};
+    use crate::Builder;
     use litchi_fonts::{
         Charset, Family, FontProperties, License, Panose, Pitch, Signature, Style,
         embedding::powerpoint::View,
@@ -101,7 +101,7 @@ mod tests {
 
     #[test]
     fn writer_encodes_style_and_publishes_an_inert_facet() {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         let mut prepared = prepared_font(0, Style::Bold, false);
         let replaced = writer
             .set_prepared_font(
@@ -119,14 +119,16 @@ mod tests {
         assert_eq!(font.font_flags & 1, 0);
         let facet = font.facet(Facet::Bold).unwrap();
         assert_eq!(
-            View::parse(facet.bytes()).unwrap().font_data(),
+            View::parse(facet.bytes(), EotLimits::default())
+                .unwrap()
+                .font_data(),
             test_sfnt(0)
         );
     }
 
     #[test]
     fn license_and_intent_failure_leave_writer_and_transaction_unchanged() {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         let before = writer.font_collections().clone();
         let mut denied = prepared_font(0x0004, Style::Regular, false);
         let source_program = denied.data.clone();
@@ -183,13 +185,17 @@ mod tests {
         let font = commit.fonts().get_base(0).unwrap();
         assert!(font.embedded_subset);
         assert_eq!(font.font_flags & 1, 1);
-        let view = View::parse(font.facet(Facet::Italic).unwrap().bytes()).unwrap();
+        let view = View::parse(
+            font.facet(Facet::Italic).unwrap().bytes(),
+            EotLimits::default(),
+        )
+        .unwrap();
         assert!(view.subsetted());
     }
 
     #[test]
     fn serialization_failure_restores_writer_catalog_and_prepared_program() {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         let before = writer.font_collections().clone();
         let mut prepared = prepared_font(0, Style::Regular, false);
         prepared.data.reserve(1024);
@@ -244,10 +250,10 @@ mod tests {
     }
 
     fn snapshot() -> Snapshot {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).unwrap();
-        Snapshot::from_bytes(output.into_inner()).unwrap()
+        crate::raw::encode(&mut writer, &mut output).unwrap();
+        Snapshot::from_bytes(output.into_inner(), &PackageLimits::default()).unwrap()
     }
 
     fn prepared_font(fs_type: u16, style: Style, subsetted: bool) -> PreparedFont {

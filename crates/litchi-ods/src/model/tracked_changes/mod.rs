@@ -22,7 +22,8 @@ pub use model::{
     Dimension, Info, Insertion, Integer, Metadata, Movement, NestedDeletion, PositiveInteger,
     RangeAddress,
 };
-pub use transaction::{Commit, Patch, Snapshot, Transaction, update};
+pub(crate) use transaction::{Commit, update};
+pub use transaction::{Edit, Snapshot};
 
 #[allow(
     clippy::module_name_repetitions,

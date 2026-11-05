@@ -1,7 +1,6 @@
 //! Immutable image package ownership and bounded content-part rebuilding.
 
 use crate::{
-    FlatImage,
     active::{ActiveContent, ActiveContentLocation},
     frame::Frame,
     resource::{Edge, Graph, Node, Resource},
@@ -9,6 +8,7 @@ use crate::{
     surface::{Surface, SurfaceLocation},
 };
 use litchi_core::{Error, Metadata, Result};
+use litchi_odf_common::XmlStreamLimits;
 use litchi_odf_common::{
     compact_xml,
     core::{PackageWriter, family::Package},
@@ -18,7 +18,7 @@ use std::{collections::HashMap, path::Path, sync::Arc};
 
 pub(crate) const MIMETYPE: &str = "application/vnd.oasis.opendocument.image";
 // The shared package owner only needs a coarse non-empty XML marker here;
-// `FlatImage::from_content_xml` performs the namespace-aware ODI grammar check.
+// `crate::flat::Image::from_content_xml` performs the namespace-aware ODI grammar check.
 const BODY_MARKER: &str = "<";
 const MAX_OUTPUT_BYTES: usize = 256 * 1024 * 1024;
 
@@ -37,7 +37,8 @@ pub(crate) enum StylesReplacement<'a> {
 
 struct State {
     package: Package,
-    content: FlatImage,
+    xml_limits: XmlStreamLimits,
+    content: crate::flat::Image,
     resources: Vec<Resource>,
     resource_graph: Graph,
     active_content: Vec<ActiveContent>,
@@ -51,42 +52,105 @@ struct State {
 pub(crate) struct Snapshot(Arc<State>);
 
 impl Snapshot {
-    pub(crate) fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_package(Package::open(path, MIMETYPE, BODY_MARKER, "ODI")?)
+    /// The retained physical package (metadata transactions, record 0288).
+    pub(crate) fn owned_package(&self) -> &litchi_odf_common::OwnedPackage {
+        self.0.package.package()
     }
 
     pub(crate) fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_package(Package::from_bytes(bytes, MIMETYPE, BODY_MARKER, "ODI")?)
+        Self::from_package(
+            Package::from_bytes(bytes, MIMETYPE, BODY_MARKER, "ODI")?,
+            XmlStreamLimits::owner_default_value(),
+        )
     }
 
-    pub(crate) fn from_bytes_with_password(
-        bytes: Vec<u8>,
-        password: impl Into<String>,
-    ) -> Result<Self> {
-        Self::from_package(Package::from_bytes_with_password(
-            bytes,
-            password,
-            MIMETYPE,
-            BODY_MARKER,
-            "ODI",
+    pub(crate) fn open_with_options(
+        path: impl AsRef<Path>,
+        options: litchi_odf_common::OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        Ok(Self::from_package(
+            Package::open_with_options(path, options, MIMETYPE, BODY_MARKER, "ODI")?,
+            options.xml_limits_value(),
         )?)
     }
 
-    pub(crate) fn open_with_password(
+    pub(crate) fn open_with_password_and_options(
         path: impl AsRef<Path>,
         password: impl Into<String>,
-    ) -> Result<Self> {
-        Self::from_package(Package::open_with_password(
-            path,
-            password,
-            MIMETYPE,
-            BODY_MARKER,
-            "ODI",
+        options: litchi_odf_common::OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        Ok(Self::from_package(
+            Package::open_with_password_and_options(
+                path,
+                password,
+                options,
+                MIMETYPE,
+                BODY_MARKER,
+                "ODI",
+            )?,
+            options.xml_limits_value(),
         )?)
     }
 
-    fn from_package(package: Package) -> Result<Self> {
-        let content = FlatImage::from_content_xml(package.content_xml().as_bytes().to_vec())?;
+    pub(crate) fn from_bytes_with_options(
+        bytes: Vec<u8>,
+        options: litchi_odf_common::OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        Ok(Self::from_package(
+            Package::from_bytes_with_options(bytes, options, MIMETYPE, BODY_MARKER, "ODI")?,
+            options.xml_limits_value(),
+        )?)
+    }
+
+    pub(crate) fn from_bytes_with_password_and_options(
+        bytes: Vec<u8>,
+        password: impl Into<String>,
+        options: litchi_odf_common::OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        Ok(Self::from_package(
+            Package::from_bytes_with_password_and_options(
+                bytes,
+                password,
+                options,
+                MIMETYPE,
+                BODY_MARKER,
+                "ODI",
+            )?,
+            options.xml_limits_value(),
+        )?)
+    }
+
+    pub(crate) fn from_reader_with_options(
+        reader: impl std::io::Read,
+        options: litchi_odf_common::OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        Ok(Self::from_package(
+            Package::from_reader_with_options(reader, options, MIMETYPE, BODY_MARKER, "ODI")?,
+            options.xml_limits_value(),
+        )?)
+    }
+
+    pub(crate) fn from_owned_package_with_options(
+        archive: litchi_odf_common::core::OwnedPackage,
+        options: litchi_odf_common::OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        Ok(Self::from_package(
+            Package::from_owned_package_with_options(
+                archive,
+                options,
+                MIMETYPE,
+                BODY_MARKER,
+                "ODI",
+            )?,
+            options.xml_limits_value(),
+        )?)
+    }
+
+    fn from_package(package: Package, xml_limits: XmlStreamLimits) -> Result<Self> {
+        let content = crate::flat::Image::from_content_xml(
+            package.content_xml().as_bytes().to_vec(),
+            xml_limits,
+        )?;
         let resources = scan_resources(&package)?;
         let resource_graph = build_resource_graph(&package, &resources)?;
         let files = package.files()?;
@@ -140,6 +204,7 @@ impl Snapshot {
         }
         Ok(Self(Arc::new(State {
             package,
+            xml_limits,
             content,
             resources,
             resource_graph,
@@ -162,6 +227,10 @@ impl Snapshot {
         self.0.package.metadata()
     }
 
+    pub(crate) fn xml_limits_value(&self) -> XmlStreamLimits {
+        self.0.xml_limits
+    }
+
     pub(crate) fn meta_xml(&self) -> Result<Option<String>> {
         let archive = self.0.package.package();
         archive
@@ -176,6 +245,10 @@ impl Snapshot {
             .transpose()
     }
 
+    pub(crate) fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
+        self.0.package.tolerance_report()
+    }
+
     pub(crate) fn as_bytes(&self) -> &[u8] {
         self.0.package.as_bytes()
     }
@@ -184,18 +257,11 @@ impl Snapshot {
         self.0.package.files()
     }
 
-    pub(crate) fn into_bytes(self) -> Vec<u8> {
-        match Arc::try_unwrap(self.0) {
-            Ok(state) => state.package.into_bytes(),
-            Err(state) => state.package.as_bytes().to_vec(),
-        }
-    }
-
     pub(crate) fn frames(&self) -> &[Frame] {
         self.0.content.frames()
     }
 
-    pub(crate) fn content_snapshot(&self) -> FlatImage {
+    pub(crate) fn content_snapshot(&self) -> crate::flat::Image {
         self.0.content.clone()
     }
 
@@ -280,7 +346,10 @@ impl Snapshot {
                 continue;
             }
             match inspected.get_file(path) {
-                Ok(bytes) => noncompact_xml |= compact_xml::validate(&bytes).is_err(),
+                Ok(bytes) => {
+                    noncompact_xml |=
+                        compact_xml::validate(&bytes, compact_xml::Limits::default()).is_err()
+                },
                 Err(_) => unreadable_xml = true,
             }
         }
@@ -312,12 +381,16 @@ impl Snapshot {
             ));
         }
         ensure_compact_rewrite_source(self, &files)?;
-        let mut writer = PackageWriter::new_bounded(MAX_OUTPUT_BYTES);
+        let mut writer = PackageWriter::new_bounded(
+            MAX_OUTPUT_BYTES,
+            litchi_odf_common::core::StreamingArchiveLimits::default(),
+        );
         writer.set_mimetype(MIMETYPE)?;
         writer.add_file("content.xml", content.as_bytes())?;
         match replacement_styles_xml {
             StylesReplacement::Set(styles_xml) => {
-                compact_xml::validate(styles_xml.as_bytes()).map_err(Error::from)?;
+                compact_xml::validate(styles_xml.as_bytes(), compact_xml::Limits::default())
+                    .map_err(Error::from)?;
                 writer.add_file("styles.xml", styles_xml.as_bytes())?;
             },
             StylesReplacement::Preserve => {
@@ -337,7 +410,8 @@ impl Snapshot {
             )?;
         }
         if let Some(meta_xml) = replacement_meta_xml {
-            compact_xml::validate(meta_xml.as_bytes()).map_err(Error::from)?;
+            compact_xml::validate(meta_xml.as_bytes(), compact_xml::Limits::default())
+                .map_err(Error::from)?;
             writer.add_file("meta.xml", meta_xml.as_bytes())?;
         } else if self.0.package.package().has_file("meta.xml")? {
             writer.add_file("meta.xml", &self.0.package.package().get_file("meta.xml")?)?;
@@ -352,7 +426,11 @@ impl Snapshot {
                 writer.add_file_with_media_type(replacement.path, bytes, replacement.media_type)?;
             }
         }
-        Self::from_bytes(writer.finish_to_bounded_bytes()?)
+        Self::from_bytes_with_options(
+            writer.finish_to_bounded_bytes()?,
+            litchi_odf_common::OpenOptions::new().xml_limits(self.0.xml_limits),
+        )
+        .map_err(Error::from)
     }
 }
 
@@ -437,7 +515,8 @@ fn ensure_compact_rewrite_source(source: &Snapshot, files: &[String]) -> Result<
             .is_some_and(|extension| extension.eq_ignore_ascii_case("xml"))
             && path != "META-INF/manifest.xml"
         {
-            compact_xml::validate(&archive.get_file(path)?).map_err(Error::from)?;
+            compact_xml::validate(&archive.get_file(path)?, compact_xml::Limits::default())
+                .map_err(Error::from)?;
         }
     }
     Ok(())

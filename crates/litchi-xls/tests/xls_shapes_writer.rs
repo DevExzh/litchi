@@ -1,24 +1,29 @@
 use std::io::Cursor;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
+use litchi_xls::AnchorBehavior;
+use litchi_xls::PivotCacheItem;
 use litchi_xls::shapes::extract_shapes_from_workbook;
-use litchi_xls::writer::shape::{Anchor, Behavior, Point};
+use litchi_xls::writer::shape::{Anchor, Point};
 use litchi_xls::writer::{
+    Builder, PivotCacheValue, PivotDataItemConfig, PivotFieldConfig, PivotItemConfig,
     PivotTableConfig, ShapeColor, ShapeFill, ShapeKind, ShapeLine, ShapeText, ShapeTextRun,
-    ShapeWrite, Writer,
+    ShapeWrite,
 };
 
 fn anchor() -> Anchor {
     Anchor::new(
         Point::new(1, 1).unwrap().offset(20, 10).unwrap(),
         Point::new(6, 4).unwrap().offset(200, 900).unwrap(),
-        Behavior::MoveAndSize,
+        AnchorBehavior::Absolute,
     )
     .unwrap()
 }
 
 fn workbook_stream(bytes: Vec<u8>) -> Vec<u8> {
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     ole.open_stream(&["Workbook"]).unwrap()
 }
 
@@ -37,15 +42,18 @@ fn records(stream: &[u8]) -> Vec<(u16, Vec<u8>)> {
     records
 }
 
-fn write(writer: &mut Writer) -> Vec<u8> {
+fn write(writer: &mut Builder) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    let package = writer
+        .build()
+        .unwrap_or_else(|error| panic!("shape fixture build failed: {error} ({error:?})"));
+    package.write_to(&mut output).unwrap();
     workbook_stream(output.into_inner())
 }
 
 #[test]
 fn primitives_emit_exact_client_record_order_and_parse_after_write() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Shapes").unwrap();
 
     let mut rectangle = ShapeWrite::new(ShapeKind::Rectangle, anchor());
@@ -110,7 +118,7 @@ fn primitives_emit_exact_client_record_order_and_parse_after_write() {
 
 #[test]
 fn all_safe_primitive_types_use_unique_shape_and_object_ids() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Kinds").unwrap();
     for kind in [
         ShapeKind::Rectangle,
@@ -145,7 +153,7 @@ fn all_safe_primitive_types_use_unique_shape_and_object_ids() {
 
 #[test]
 fn mixed_pivot_shape_and_comment_ids_are_collision_free_in_one_cluster() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Mixed").unwrap();
     writer
         .add_pivot_table(
@@ -155,23 +163,62 @@ fn mixed_pivot_shape_and_comment_ids_are_collision_free_in_one_cluster() {
                 source_type: 1,
                 source_sheet_name: "Mixed".into(),
                 source_first_row: 0,
-                source_last_row: 0,
+                source_last_row: 1,
                 source_first_col: 0,
-                source_last_col: 0,
+                source_last_col: 1,
                 first_row: 4,
-                last_row: 4,
+                last_row: 5,
                 first_col: 0,
-                last_col: 0,
+                last_col: 1,
                 first_header_row: 4,
-                first_data_row: 4,
-                first_data_col: 0,
+                first_data_row: 5,
+                first_data_col: 1,
                 data_field_name: "Values".into(),
                 data_axis: 0,
                 data_position: 0,
-                fields: Vec::new(),
-                data_items: Vec::new(),
-                page_entries: vec![(0, 0, 1)],
-                source_data: Vec::new(),
+                fields: vec![
+                    PivotFieldConfig {
+                        axis: 8,
+                        subtotal_count: 0,
+                        subtotal_flags: 0,
+                        items: Vec::new(),
+                        name: None,
+                        cache_name: "Value".into(),
+                        cache_items: Vec::new(),
+                        is_numeric: true,
+                        grouping: None,
+                    },
+                    PivotFieldConfig {
+                        axis: 4,
+                        subtotal_count: 0,
+                        subtotal_flags: 0,
+                        items: vec![PivotItemConfig {
+                            item_type: 0,
+                            flags: 0,
+                            cache_index: 0,
+                            name: None,
+                        }],
+                        name: None,
+                        cache_name: "Filter".into(),
+                        cache_items: vec![PivotCacheItem::from("All")],
+                        is_numeric: false,
+                        grouping: None,
+                    },
+                ],
+                data_items: vec![PivotDataItemConfig {
+                    source_field_index: 0,
+                    function: 0,
+                    display_format: 0,
+                    base_field_index: 0,
+                    base_item_index: 0,
+                    num_format_index: 0,
+                    name: "Sum of Value".into(),
+                }],
+                page_entries: vec![(0, 1, 1)],
+                source_data: vec![vec![
+                    PivotCacheValue::Number(42.0),
+                    PivotCacheValue::StringIndex(0),
+                ]],
             },
         )
         .unwrap();
@@ -197,7 +244,7 @@ fn mixed_pivot_shape_and_comment_ids_are_collision_free_in_one_cluster() {
 
 #[test]
 fn shape_mutations_reject_malformed_input_and_are_atomic() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Atomic").unwrap();
 
     let mut first = ShapeWrite::new(ShapeKind::Rectangle, anchor());
@@ -226,7 +273,7 @@ fn shape_mutations_reject_malformed_input_and_are_atomic() {
 
 #[test]
 fn long_unicode_shape_text_respects_continue_record_limits() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Long").unwrap();
     let mut shape = ShapeWrite::new(ShapeKind::TextBox, anchor());
     shape.text = Some(ShapeText::new("😀".repeat(5000)));

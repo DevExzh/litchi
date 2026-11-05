@@ -2,7 +2,7 @@ use litchi_iwa_archive::{Limits as ArchiveLimits, package::to_bytes};
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tp, tsp, tswp};
 use litchi_pages::footnote::body::{Position, Selector};
-use litchi_pages::{FootnoteTextError, Package};
+use litchi_pages::{Package, footnote::text::Error as FootnoteTextError};
 use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -40,6 +40,7 @@ fn object(identifier: u64, message_type: u32, data: Vec<u8>) -> TestResult<Archi
             type_: message_type,
             data,
         }],
+        Default::default(),
     )?)
 }
 
@@ -149,8 +150,8 @@ fn build_fixture(malformed_reference: bool) -> TestResult<Fixture> {
         false,
     )?);
 
-    let decompressed = Archive { objects }.to_bytes()?;
-    let compressed = SnappyStream::compress(&decompressed)?;
+    let decompressed = Archive { objects }.to_bytes(Default::default())?;
+    let compressed = SnappyStream::compress(&decompressed, Default::default())?;
     let bytes = to_bytes(
         [("Index/Document.iwa", compressed.as_slice())],
         ArchiveLimits::default(),
@@ -180,20 +181,23 @@ fn selectors_read_and_stage_text_and_custom_marker_presence() -> TestResult {
     assert_eq!(footnotes[1].position, Position::from_utf16_index(5)?);
     assert_eq!(footnotes[1].custom_mark.as_deref(), Some("†"));
 
-    let by_index = package.edit_body_footnote_text(Selector::index(1))?;
-    assert_eq!(by_index.position(), Position::from_utf16_index(5)?);
-    assert_eq!(by_index.before(), &footnotes[1]);
-    assert_eq!(by_index.custom_mark(), Some("†"));
+    let mut by_index = package.edit_body_footnote_text(Selector::index(1))?;
+    assert_eq!(by_index.position()?, Position::from_utf16_index(5)?);
+    assert_eq!(by_index.before()?, &footnotes[1]);
+    assert_eq!(by_index.custom_mark()?, Some("†"));
 
     let mut by_position = package.edit_body_footnote_text(Selector::at(footnotes[1].position))?;
     by_position
         .set("UpdatedSecond")?
         .set_custom_mark(Some("‡"))?;
-    assert_eq!(by_position.text(), "UpdatedSecond");
-    assert_eq!(by_position.custom_mark(), Some("‡"));
+    assert_eq!(by_position.text()?, "UpdatedSecond");
+    assert_eq!(by_position.custom_mark()?, Some("‡"));
+    let mut missing = package.edit_body_footnote_text(Selector::index(2))?;
     assert!(matches!(
-        package.edit_body_footnote_text(Selector::index(2)),
-        Err(FootnoteTextError::NotFound)
+        missing.position(),
+        Err(FootnoteTextError::Refused(
+            litchi_pages::footnote::text::Refusal::NotFound
+        ))
     ));
     Ok(())
 }
@@ -243,9 +247,10 @@ fn malformed_graph_rejects_selection_without_mutating_source() -> TestResult {
     let package = Package::from_bytes(&fixture.bytes)?;
     let before = exact_bytes(&package)?;
 
-    let error = package
-        .edit_body_footnote_text(Selector::index(0))
-        .expect_err("a truncated reference field must not stage an edit");
+    let mut edit = package.edit_body_footnote_text(Selector::index(0))?;
+    let error = edit
+        .position()
+        .expect_err("a truncated reference field must fail on first access");
     assert!(matches!(error, FootnoteTextError::InvalidSource));
     assert_eq!(exact_bytes(&package)?, before);
     Ok(())
@@ -262,7 +267,10 @@ fn low_iwa_limit_rejects_commit_atomically() -> TestResult {
         defaults.max_total_bytes(),
         fixture.decompressed_iwa_bytes,
     )?;
-    let package = Package::from_bytes_with_limits(&fixture.bytes, limits)?;
+    let package = Package::from_bytes_with_options(
+        &fixture.bytes,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    )?;
     let before = exact_bytes(&package)?;
 
     let mut edit = package.edit_body_footnote_text(Selector::index(1))?;
@@ -270,7 +278,7 @@ fn low_iwa_limit_rejects_commit_atomically() -> TestResult {
     let error = edit
         .commit()
         .expect_err("the original decompressed-IWA ceiling must reject growth");
-    assert!(matches!(error, FootnoteTextError::LimitExceeded { .. }));
+    assert!(matches!(error, FootnoteTextError::Limit { .. }));
     assert_eq!(exact_bytes(&package)?, before);
     Ok(())
 }

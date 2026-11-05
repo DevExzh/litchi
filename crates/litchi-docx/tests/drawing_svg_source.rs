@@ -29,11 +29,11 @@ const SVG_URI: &str = "{96DAC541-7B7A-43D3-8B79-37D633B846F1}";
 
 const INLINE_FIXTURE: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../3rdparty/Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/svg.docx"
+    "/../../test-data/Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/svg.docx"
 );
 const FLOATING_FIXTURE: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../3rdparty/libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf164835_nonDummyLineHeight.docx"
+    "/../../test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf164835_nonDummyLineHeight.docx"
 );
 
 #[derive(Debug, Eq, PartialEq)]
@@ -239,7 +239,8 @@ fn openxml_sdk_inline_fixture_has_borrowed_source_owner_and_graph() {
         ]
     );
 
-    let source = SourceDrawing::scan_with_ordinal(&document, 12).expect("scan inline fixture");
+    let source =
+        SourceDrawing::scan(&document, 12, Default::default()).expect("scan inline fixture");
     assert_eq!(source.drawing_ordinal(), 12);
     assert_eq!(source.dialect(), DrawingDialect::Transitional);
     assert_eq!(
@@ -302,7 +303,8 @@ fn libreoffice_floating_fixture_preserves_anchor_geometry_and_source_provenance(
         ]
     );
 
-    let source = SourceDrawing::scan(&document).expect("scan floating fixture");
+    let source = SourceDrawing::scan(&document, Default::default(), Default::default())
+        .expect("scan floating fixture");
     assert_eq!(source.dialect(), DrawingDialect::Transitional);
     assert_eq!(
         source.relationship_dialect(),
@@ -341,7 +343,8 @@ fn libreoffice_floating_fixture_preserves_anchor_geometry_and_source_provenance(
     // a same-content copy is a different source provenance token.
     assert!(std::ptr::eq(source.source().as_ptr(), document.as_ptr()));
     let copied = document.clone();
-    let copied_source = SourceDrawing::scan(&copied).expect("scan copied source");
+    let copied_source = SourceDrawing::scan(&copied, Default::default(), Default::default())
+        .expect("scan copied source");
     assert!(std::ptr::eq(
         copied_source.source().as_ptr(),
         copied.as_ptr()
@@ -389,7 +392,8 @@ fn alias_unknown_duplicate_and_mce_owners_keep_direct_policy() {
                 .replace("{SVG_URI}", SVG_URI),
         ),
     );
-    let aliased_source = SourceDrawing::scan(&aliased).expect("scan aliased SVG owner");
+    let aliased_source = SourceDrawing::scan(&aliased, Default::default(), Default::default())
+        .expect("scan aliased SVG owner");
     let aliased_owner = aliased_source
         .picture(0)
         .unwrap()
@@ -413,7 +417,7 @@ fn alias_unknown_duplicate_and_mce_owners_keep_direct_policy() {
         r#"<a:ext uri="urn:future"><future:svgBlip xmlns:future="urn:future" r:embed="rIdForeign"/></a:ext>"#,
     ));
     assert!(matches!(
-        SourceDrawing::scan(&unknown)
+        SourceDrawing::scan(&unknown, Default::default(), Default::default())
             .unwrap()
             .picture(0)
             .unwrap()
@@ -425,7 +429,7 @@ fn alias_unknown_duplicate_and_mce_owners_keep_direct_policy() {
         r#"<a:ext uri="{SVG_URI}"><asvg:svgBlip r:embed="rIdOne"/></a:ext><a:ext uri="{SVG_URI}"><asvg:svgBlip r:embed="rIdTwo"/></a:ext>"#
     )));
     assert!(matches!(
-        SourceDrawing::scan(&duplicate)
+        SourceDrawing::scan(&duplicate, Default::default(), Default::default())
             .unwrap()
             .picture(0)
             .unwrap()
@@ -440,7 +444,7 @@ fn alias_unknown_duplicate_and_mce_owners_keep_direct_policy() {
         )),
     ));
     assert!(matches!(
-        SourceDrawing::scan(&mce)
+        SourceDrawing::scan(&mce, Default::default(), Default::default())
             .unwrap()
             .picture(0)
             .unwrap()
@@ -456,7 +460,8 @@ fn strict_host_keeps_canonical_mc_semantics_and_ignores_strict_mc_alias() {
     let picture = synthetic_picture(&extension);
 
     let strict_xml = strict_document(&picture);
-    let strict = SourceDrawing::scan(&strict_xml).expect("strict SVG source");
+    let strict = SourceDrawing::scan(&strict_xml, Default::default(), Default::default())
+        .expect("strict SVG source");
     assert_eq!(strict.dialect(), DrawingDialect::Strict);
     assert!(matches!(
         strict.picture(0).unwrap().svg_owner(),
@@ -466,7 +471,8 @@ fn strict_host_keeps_canonical_mc_semantics_and_ignores_strict_mc_alias() {
     let canonical_mce = strict_document(&format!(
         r#"<mc:AlternateContent><mc:Choice Requires="w14">{picture}</mc:Choice><mc:Fallback/></mc:AlternateContent>"#
     ));
-    let canonical = SourceDrawing::scan(&canonical_mce).expect("canonical MC source");
+    let canonical = SourceDrawing::scan(&canonical_mce, Default::default(), Default::default())
+        .expect("canonical MC source");
     assert!(matches!(
         canonical.picture(0).unwrap().svg_owner(),
         SvgOwnerState::Refused
@@ -475,7 +481,8 @@ fn strict_host_keeps_canonical_mc_semantics_and_ignores_strict_mc_alias() {
     let foreign_mce = strict_document(&format!(
         r#"<strictMc:AlternateContent xmlns:strictMc="{STRICT_MCE}"><strictMc:Choice Requires="w14">{picture}</strictMc:Choice><strictMc:Fallback/></strictMc:AlternateContent>"#
     ));
-    let foreign = SourceDrawing::scan(&foreign_mce).expect("foreign strict MC source");
+    let foreign = SourceDrawing::scan(&foreign_mce, Default::default(), Default::default())
+        .expect("foreign strict MC source");
     assert!(
         foreign.pictures().is_empty(),
         "the strict MC URI is foreign and must remain opaque/unselected"
@@ -489,15 +496,15 @@ fn source_scan_and_namespace_output_honor_explicit_bounds() {
         max_xml_bytes: document.len() - 1,
         ..ScanLimits::default()
     };
-    assert!(SourceDrawing::scan_with_limits(&document, 0, limits).is_err());
+    assert!(SourceDrawing::scan(&document, 0, limits).is_err());
 
     limits = ScanLimits {
         max_global_relationship_references: 1,
         ..ScanLimits::default()
     };
-    assert!(SourceDrawing::scan_with_limits(&document, 0, limits).is_err());
+    assert!(SourceDrawing::scan(&document, 0, limits).is_err());
 
-    let source = SourceDrawing::scan(&document).unwrap();
+    let source = SourceDrawing::scan(&document, Default::default(), Default::default()).unwrap();
     let owner = source.picture(0).unwrap().svg_owner().owner().unwrap();
     let complete = owner.namespace_complete(16 * 1024).unwrap();
     assert!(complete.len() > 1);
@@ -507,14 +514,14 @@ fn source_scan_and_namespace_output_honor_explicit_bounds() {
         max_pictures: 1,
         ..ScanLimits::default()
     };
-    let bounded = SourceDrawing::scan_with_limits(&document, 0, one_picture).unwrap();
+    let bounded = SourceDrawing::scan(&document, 0, one_picture).unwrap();
     assert_eq!(bounded.pictures().len(), 1);
 }
 
 #[test]
 fn native_relationship_ids_match_the_global_source_references() {
     let (document, _) = main_story(INLINE_FIXTURE);
-    let source = SourceDrawing::scan(&document).unwrap();
+    let source = SourceDrawing::scan(&document, Default::default(), Default::default()).unwrap();
     let mut global = source
         .relationship_references()
         .iter()

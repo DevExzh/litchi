@@ -1,5 +1,7 @@
 //! Semantic ODP model assembly from XML elements.
 
+use std::io::BufRead;
+
 use super::super::{
     Actuate, AnimationKind, BytesStart, DRAW_NAMESPACE, Direction, DrawingHyperlink,
     DrawingShapeKind, Element, Error, HashMap, HashSet, HyperlinkShow, Kind, NsClass, NsReader,
@@ -113,8 +115,8 @@ impl Parser {
         }
     }
 
-    pub(super) fn shape_builder(
-        reader: &NsReader<&[u8]>,
+    pub(super) fn shape_builder<R: BufRead>(
+        reader: &NsReader<R>,
         element: &BytesStart<'_>,
         shape_element: ShapeElement,
     ) -> Result<ShapeBuilder> {
@@ -191,8 +193,8 @@ impl Parser {
         Ok(builder)
     }
 
-    pub(super) fn media_reference(
-        reader: &NsReader<&[u8]>,
+    pub(super) fn media_reference<R: BufRead>(
+        reader: &NsReader<R>,
         element: &BytesStart<'_>,
     ) -> Result<Reference> {
         let mut attributes = ElementAttrs::new(element);
@@ -227,8 +229,8 @@ impl Parser {
         Ok(media)
     }
 
-    pub(super) fn media_parameter(
-        reader: &NsReader<&[u8]>,
+    pub(super) fn media_parameter<R: BufRead>(
+        reader: &NsReader<R>,
         element: &BytesStart<'_>,
     ) -> Result<Parameter> {
         let mut attributes = ElementAttrs::new(element);
@@ -255,8 +257,8 @@ impl Parser {
         }
     }
 
-    pub(super) fn drawing_hyperlink(
-        reader: &NsReader<&[u8]>,
+    pub(super) fn drawing_hyperlink<R: BufRead>(
+        reader: &NsReader<R>,
         element: &BytesStart<'_>,
     ) -> Result<DrawingHyperlink> {
         let mut attributes = ElementAttrs::new(element);
@@ -341,8 +343,8 @@ impl Parser {
         }
     }
 
-    pub(super) fn push_text_control(
-        reader: &NsReader<&[u8]>,
+    pub(super) fn push_text_control<R: BufRead>(
+        reader: &NsReader<R>,
         element: &BytesStart<'_>,
         element_type: Element,
         paragraph: &mut ParagraphText,
@@ -393,8 +395,8 @@ impl Parser {
         Ok(())
     }
 
-    pub(super) fn parse_transition_properties(
-        reader: &NsReader<&[u8]>,
+    pub(super) fn parse_transition_properties<R: BufRead>(
+        reader: &NsReader<R>,
         element: &BytesStart<'_>,
         transition: &mut Transition,
     ) -> Result<()> {
@@ -497,8 +499,8 @@ impl Parser {
         Ok((resolved, definitions.default))
     }
 
-    pub(super) fn parse_transition_sound(
-        reader: &NsReader<&[u8]>,
+    pub(super) fn parse_transition_sound<R: BufRead>(
+        reader: &NsReader<R>,
         element: &BytesStart<'_>,
     ) -> Result<Sound> {
         let mut attributes = ElementAttrs::new(element);

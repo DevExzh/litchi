@@ -10,7 +10,7 @@
 
 use std::fmt;
 use std::ops::Range;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use litchi_core::Position;
 use litchi_iwa_archive::{SourceCatalog, package::EntryEdit};
@@ -21,8 +21,9 @@ use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::{keynote_placeholder_text_codec, keynote_speaker_notes_codec};
 use litchi_iwa_text::{TextPosition, TextSpan};
 use litchi_iwa_text_wire::{RewriteBehavior, RewriteLimits};
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
+use super::edit::{OwnedSlideSelector, SelectorError};
 use super::{
     NOTE_MESSAGE_TYPE, PLACEHOLDER_MESSAGE_TYPE, Package, PhysicalSource, ReadError,
     SHAPE_INFO_MESSAGE_TYPE, SLIDE_MESSAGE_TYPE, STORAGE_MESSAGE_TYPE, SemanticBudget,
@@ -35,7 +36,7 @@ const PREVIEW_ENTRY_NAMES: [&str; 3] = ["preview.jpg", "preview-micro.jpg", "pre
 /// A finite resource governed while slide text is read or rewritten.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum SlideTextLimitKind {
+pub enum LimitKind {
     /// Complete input package bytes.
     InputBytes,
     /// Complete rewritten package bytes.
@@ -56,6 +57,8 @@ pub enum SlideTextLimitKind {
     TextFragments,
     /// Aggregate semantic text bytes.
     TextBytes,
+    /// Caller bytes retained by the deferred selector.
+    SelectorBytes,
     /// UTF-16 code units in one native text storage.
     TextUnits,
     /// Bytes in one protobuf payload.
@@ -68,7 +71,7 @@ pub enum SlideTextLimitKind {
     WireWork,
 }
 
-impl fmt::Display for SlideTextLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -81,6 +84,7 @@ impl fmt::Display for SlideTextLimitKind {
             Self::TextStorages => "text storages",
             Self::TextFragments => "text fragments",
             Self::TextBytes => "text bytes",
+            Self::SelectorBytes => "selector bytes",
             Self::TextUnits => "text UTF-16 units",
             Self::WireBytes => "wire bytes",
             Self::WireFields => "wire fields",
@@ -91,9 +95,45 @@ impl fmt::Display for SlideTextLimitKind {
 }
 
 /// A content-redacted failure raised by a slide-text transaction.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum SlideTextError {
+pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The source graph or selected storage cannot be decoded or rewritten safely.
+    #[error("the Keynote slide-text source cannot be edited safely")]
+    InvalidSource,
+    /// A finite transaction resource ceiling was exceeded.
+    #[error("Keynote slide-text {kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        /// Resource category that exceeded its limit.
+        kind: LimitKind,
+        /// Observed or requested amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A bounded destination allocation failed before publication.
+    #[error("could not allocate {amount} units for the Keynote slide-text transaction")]
+    Allocation {
+        /// Elements or bytes requested.
+        amount: usize,
+    },
+    /// Full semantic readback did not reproduce the requested change.
+    #[error("the edited Keynote slide text failed semantic verification")]
+    Verification,
+    /// The patch does not belong to this exact immutable package artifact.
+    #[error("the Keynote slide-text patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The source cannot support a changed exact-source slide-text transaction.
     #[error("this Keynote source does not support physical slide-text edits")]
     UnsupportedSource,
@@ -152,31 +192,34 @@ pub enum SlideTextError {
     /// A second operation was staged on an edit that already has one.
     #[error("a Keynote slide-text edit accepts exactly one staged operation")]
     OperationAlreadyStaged,
-    /// The source graph or selected storage cannot be decoded or rewritten safely.
-    #[error("the Keynote slide-text source cannot be edited safely")]
-    InvalidSource,
-    /// A finite transaction resource ceiling was exceeded.
-    #[error("Keynote slide-text {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
-        /// Resource category that exceeded its limit.
-        kind: SlideTextLimitKind,
-        /// Observed or requested amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-    },
-    /// A bounded destination allocation failed before publication.
-    #[error("could not allocate {amount} units for the Keynote slide-text transaction")]
-    Allocation {
-        /// Elements or bytes requested.
-        amount: usize,
-    },
-    /// Full semantic readback did not reproduce the requested change.
-    #[error("the edited Keynote slide text failed semantic verification")]
-    Verification,
-    /// The patch does not belong to this exact immutable package artifact.
-    #[error("the Keynote slide-text patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. }
+            | Self::UnsupportedKind { .. }
+            | Self::ObjectMarkerReplacement { .. }
+            | Self::DependentContent { .. } => RefusalKind::UnsupportedContent,
+            Self::AmbiguousSelector { .. }
+            | Self::EmptySlideName { .. }
+            | Self::SpanOutOfBounds { .. }
+            | Self::SurrogateBoundary { .. } => RefusalKind::InvalidValue,
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::TextStorageNotFound { .. } => RefusalKind::NotFound,
+            Self::OperationAlreadyStaged { .. } => RefusalKind::UnsupportedOperation,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 #[derive(Debug)]
@@ -185,7 +228,7 @@ struct Operation {
     replacement: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct TextSnapshot {
     placeholder_identifier: u64,
     storage_identifier: u64,
@@ -206,7 +249,7 @@ struct WireScanBudget {
 }
 
 impl WireScanBudget {
-    fn new(package: &Package) -> Result<Self, SlideTextError> {
+    fn new(package: &Package) -> Result<Self, Error> {
         Ok(Self {
             limits: package.wire_limits().map_err(map_wire_error)?,
             fields: 0,
@@ -214,24 +257,21 @@ impl WireScanBudget {
         })
     }
 
-    fn parse<'source>(
-        &mut self,
-        payload: &'source [u8],
-    ) -> Result<WireView<'source>, SlideTextError> {
+    fn parse<'source>(&mut self, payload: &'source [u8]) -> Result<WireView<'source>, Error> {
         let observed_work = self.work.saturating_add(payload.len());
         if observed_work > self.limits.max_rewrite_work() {
-            return Err(SlideTextError::LimitExceeded {
-                kind: SlideTextLimitKind::WireWork,
+            return Err(Error::Limit {
+                kind: LimitKind::WireWork,
                 observed: usize_to_u64(observed_work),
                 maximum: usize_to_u64(self.limits.max_rewrite_work()),
             });
         }
         self.work = observed_work;
-        let view = WireView::parse_with_limits(payload, self.limits).map_err(map_wire_error)?;
+        let view = WireView::parse(payload, self.limits).map_err(map_wire_error)?;
         let observed_fields = self.fields.saturating_add(view.len());
         if observed_fields > self.limits.max_fields() {
-            return Err(SlideTextError::LimitExceeded {
-                kind: SlideTextLimitKind::WireFields,
+            return Err(Error::Limit {
+                kind: LimitKind::WireFields,
                 observed: usize_to_u64(observed_fields),
                 maximum: usize_to_u64(self.limits.max_fields()),
             });
@@ -254,51 +294,67 @@ impl ReferenceSemantics {
 }
 
 /// One mutable storage-relative text operation staged against an immutable package.
-pub struct SlideTextEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
-    position: Position,
+    slide: OwnedSlideSelector,
     role: Kind,
-    placeholder_identifier: u64,
-    storage_identifier: u64,
-    before: String,
+    position: OnceLock<Position>,
+    snapshot: OnceLock<TextSnapshot>,
     operation: Option<Operation>,
 }
 
-impl fmt::Debug for SlideTextEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SlideTextEdit")
-            .field("position", &self.position)
+            .debug_struct("Edit")
+            .field("has_snapshot", &self.snapshot.get().is_some())
             .field("role", &self.role)
             .field("has_operation", &self.operation.is_some())
             .finish_non_exhaustive()
     }
 }
 
-impl<'a> SlideTextEdit<'a> {
+impl<'a> Edit<'a> {
     fn new<'selector>(
         source: &'a Package,
         selector: impl Into<SlideSelector<'selector>>,
         role: Kind,
-    ) -> Result<Self, SlideTextError> {
-        let position = resolve_position(source, selector.into())?;
-        let snapshot = text_snapshot_at(source, position, role)?
-            .ok_or(SlideTextError::TextStorageNotFound { role })?;
+    ) -> Result<Self, Error> {
+        let mut selector_bytes = 0;
+        let slide = OwnedSlideSelector::from_selector(
+            selector.into(),
+            source.semantic_limits().max_text_bytes(),
+            &mut selector_bytes,
+        )
+        .map_err(map_selector_error)?;
         Ok(Self {
             source,
-            position,
+            slide,
             role,
-            placeholder_identifier: snapshot.placeholder_identifier,
-            storage_identifier: snapshot.storage_identifier,
-            before: snapshot.text,
+            position: OnceLock::new(),
+            snapshot: OnceLock::new(),
             operation: None,
         })
     }
 
-    /// Return the semantic slide position resolved when this edit began.
-    #[must_use]
-    pub const fn position(&self) -> Position {
-        self.position
+    fn resolve(&self) -> Result<&TextSnapshot, Error> {
+        if let Some(snapshot) = self.snapshot.get() {
+            return Ok(snapshot);
+        }
+        let position = resolve_position(self.source, self.slide.as_selector())?;
+        let snapshot = text_snapshot_at(self.source, position, self.role)?.ok_or(
+            Error::Refused(Refusal::TextStorageNotFound { role: self.role }),
+        )?;
+        let _ = self.position.set(position);
+        let _ = self.snapshot.set(snapshot);
+        self.snapshot.get().ok_or(Error::InvalidSource)
+    }
+
+    /// Resolve and return the selected semantic slide position.
+    #[must_use = "handle the deferred slide-text result"]
+    pub fn position(&self) -> Result<Position, Error> {
+        self.resolve()?;
+        self.position.get().copied().ok_or(Error::InvalidSource)
     }
 
     /// Return the semantic placeholder role selected when this edit began.
@@ -307,10 +363,25 @@ impl<'a> SlideTextEdit<'a> {
         self.role
     }
 
-    /// Borrow the selected placeholder text from the immutable source snapshot.
-    #[must_use]
-    pub fn text(&self) -> &str {
-        &self.before
+    /// Resolve and borrow the selected placeholder text from the source snapshot.
+    #[must_use = "handle the deferred slide-text result"]
+    pub fn text(&self) -> Result<&str, Error> {
+        Ok(self.resolve()?.text.as_str())
+    }
+
+    /// Whether a sequence of edits of this text, each a splice within
+    /// `hull` (UTF-16 code units of [`Self::text`], both ends inclusive),
+    /// publishes exactly what one splice from the text before them to the
+    /// text after them publishes (record 0314): no attribute entry of the
+    /// storage lies where the two could differ. `false` asks the caller to
+    /// commit the edits one at a time. Whether a later edit follows an
+    /// emptied text is the caller's to check.
+    ///
+    /// # Errors
+    ///
+    /// A typed read or wire error for the selected storage.
+    pub fn admits_combined_splice(&self, hull: Range<usize>) -> Result<bool, Error> {
+        owned_storage_admits_combined_splice(self.source, self.resolve()?.storage_identifier, hull)
     }
 
     /// Return the staged storage-relative span, when present.
@@ -334,23 +405,17 @@ impl<'a> SlideTextEdit<'a> {
     ///
     /// Returns a typed span, dependency, limit, allocation, or staging error
     /// without modifying the source snapshot.
-    pub fn replace(
-        &mut self,
-        span: TextSpan,
-        replacement: &str,
-    ) -> Result<&mut Self, SlideTextError> {
+    pub fn replace(&mut self, span: TextSpan, replacement: &str) -> Result<&mut Self, Error> {
         if self.operation.is_some() {
-            return Err(SlideTextError::OperationAlreadyStaged);
+            return Err(Error::Refused(Refusal::OperationAlreadyStaged));
         }
+        let snapshot = self.resolve()?;
         validate_replacement(replacement)?;
-        let range = validate_span(&self.before, span)?;
-        let selected = self
-            .before
-            .get(range)
-            .ok_or(SlideTextError::InvalidSource)?;
+        let range = validate_span(&snapshot.text, span)?;
+        let selected = snapshot.text.get(range).ok_or(Error::InvalidSource)?;
         validate_consumed_text(selected)?;
         let is_semantic_noop = selected == replacement;
-        validate_candidate_text_memory(self.source, &self.before, span, replacement)?;
+        validate_candidate_text_memory(self.source, &snapshot.text, span, replacement)?;
         self.operation = Some(Operation {
             span,
             replacement: if is_semantic_noop {
@@ -371,13 +436,8 @@ impl<'a> SlideTextEdit<'a> {
     /// # Errors
     ///
     /// Returns the same failures as [`Self::replace`].
-    pub fn insert(
-        &mut self,
-        position: TextPosition,
-        text: &str,
-    ) -> Result<&mut Self, SlideTextError> {
-        let span =
-            TextSpan::new(position, position).map_err(|_error| SlideTextError::InvalidSource)?;
+    pub fn insert(&mut self, position: TextPosition, text: &str) -> Result<&mut Self, Error> {
+        let span = TextSpan::new(position, position).map_err(|_error| Error::InvalidSource)?;
         self.replace(span, text)
     }
 
@@ -390,7 +450,7 @@ impl<'a> SlideTextEdit<'a> {
     /// # Errors
     ///
     /// Returns the same failures as [`Self::replace`].
-    pub fn delete(&mut self, span: TextSpan) -> Result<&mut Self, SlideTextError> {
+    pub fn delete(&mut self, span: TextSpan) -> Result<&mut Self, Error> {
         self.replace(span, "")
     }
 
@@ -404,11 +464,10 @@ impl<'a> SlideTextEdit<'a> {
     /// # Errors
     ///
     /// Returns the same failures as [`Self::replace`].
-    pub fn set(&mut self, text: &str) -> Result<&mut Self, SlideTextError> {
-        let end = TextPosition::from_utf16_index(self.before.encode_utf16().count())
-            .map_err(|_error| SlideTextError::InvalidSource)?;
-        let span = TextSpan::new(TextPosition::ZERO, end)
-            .map_err(|_error| SlideTextError::InvalidSource)?;
+    pub fn set(&mut self, text: &str) -> Result<&mut Self, Error> {
+        let end = TextPosition::from_utf16_index(self.resolve()?.text.encode_utf16().count())
+            .map_err(|_error| Error::InvalidSource)?;
+        let span = TextSpan::new(TextPosition::ZERO, end).map_err(|_error| Error::InvalidSource)?;
         self.replace(span, text)
     }
 
@@ -421,7 +480,7 @@ impl<'a> SlideTextEdit<'a> {
     /// # Errors
     ///
     /// Returns the same failures as [`Self::set`].
-    pub fn clear(&mut self) -> Result<&mut Self, SlideTextError> {
+    pub fn clear(&mut self) -> Result<&mut Self, Error> {
         self.set("")
     }
 
@@ -439,51 +498,53 @@ impl<'a> SlideTextEdit<'a> {
     ///
     /// Returns a typed source, dependency, limit, allocation, or verification
     /// error before publishing any candidate.
-    pub fn commit(self) -> Result<SlideTextCommit, SlideTextError> {
+    pub fn commit(self) -> Result<Commit, Error> {
+        let position = self.position()?;
+        let snapshot = self.resolve()?.clone();
+        let before_text = snapshot.text;
+        let placeholder_identifier = snapshot.placeholder_identifier;
+        let storage_identifier = snapshot.storage_identifier;
         let operation = self.operation.unwrap_or(Operation {
             span: TextSpan::default(),
             replacement: None,
         });
-        let range = validate_span(&self.before, operation.span)?;
-        let selected = self
-            .before
-            .get(range.clone())
-            .ok_or(SlideTextError::InvalidSource)?;
+        let range = validate_span(&before_text, operation.span)?;
+        let selected = before_text.get(range.clone()).ok_or(Error::InvalidSource)?;
         let replacement = operation.replacement.as_deref().unwrap_or(selected);
         validate_replacement(replacement)?;
         validate_consumed_text(selected)?;
-        validate_candidate_text_memory(self.source, &self.before, operation.span, replacement)?;
+        validate_candidate_text_memory(self.source, &before_text, operation.span, replacement)?;
         let replacement_units = utf16_len(replacement)?;
         let inverse_end = operation
             .span
             .start()
             .utf16_index()
             .checked_add(replacement_units)
-            .ok_or(SlideTextError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let inverse_span = TextSpan::new(
             operation.span.start(),
             TextPosition::from_utf16_code_units(inverse_end),
         )
-        .map_err(|_error| SlideTextError::InvalidSource)?;
+        .map_err(|_error| Error::InvalidSource)?;
 
         let catalog = physical_catalog(self.source)?;
         let source_bytes = catalog.shared_source();
         let source_fingerprint = fingerprint(&source_bytes);
 
         if operation.replacement.is_none() {
-            let before = Arc::new(self.before);
+            let before = Arc::new(before_text);
             let after = Arc::clone(&before);
-            return Ok(SlideTextCommit {
+            return Ok(Commit {
                 package: self.source.snapshot(),
-                patch: SlideTextPatch {
+                patch: Patch {
                     source: Arc::clone(&source_bytes),
                     target: source_bytes,
                     source_fingerprint,
                     target_fingerprint: source_fingerprint,
-                    position: self.position,
+                    position,
                     role: self.role,
-                    placeholder_identifier: self.placeholder_identifier,
-                    storage_identifier: self.storage_identifier,
+                    placeholder_identifier,
+                    storage_identifier,
                     span: operation.span,
                     inverse_span,
                     before,
@@ -491,51 +552,51 @@ impl<'a> SlideTextEdit<'a> {
                     touched_components: 0,
                     target_requires_invalidated_previews: false,
                 },
-                diagnostics: SlideTextDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         self.source.validate().map_err(map_read_error)?;
-        let current = text_snapshot_at(self.source, self.position, self.role)?
-            .ok_or(SlideTextError::InvalidSource)?;
-        if current.placeholder_identifier != self.placeholder_identifier
-            || current.storage_identifier != self.storage_identifier
-            || current.text != self.before
+        let current =
+            text_snapshot_at(self.source, position, self.role)?.ok_or(Error::InvalidSource)?;
+        if current.placeholder_identifier != placeholder_identifier
+            || current.storage_identifier != storage_identifier
+            || current.text != before_text
         {
-            return Err(SlideTextError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if !catalog.source_is_exact() {
-            return Err(SlideTextError::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
 
         let changed_replacement = operation
             .replacement
             .as_deref()
-            .ok_or(SlideTextError::InvalidSource)?;
-        let after_text = replace_utf8_range(&self.before, range, changed_replacement)?;
-        let before = Arc::new(self.before);
+            .ok_or(Error::InvalidSource)?;
+        let after_text = replace_utf8_range(&before_text, range, changed_replacement)?;
+        let before = Arc::new(before_text);
         let after = Arc::new(after_text);
         let (package, touched_components) = rewrite_text(
             self.source,
-            self.position,
+            position,
             self.role,
-            self.placeholder_identifier,
-            self.storage_identifier,
+            placeholder_identifier,
+            storage_identifier,
             operation.span,
             changed_replacement,
             after.as_str(),
         )?;
         let target = physical_catalog(&package)?.shared_source();
         let target_fingerprint = fingerprint(&target);
-        Ok(SlideTextCommit {
-            patch: SlideTextPatch {
+        Ok(Commit {
+            patch: Patch {
                 source: source_bytes,
                 target,
                 source_fingerprint,
                 target_fingerprint,
-                position: self.position,
+                position,
                 role: self.role,
-                placeholder_identifier: self.placeholder_identifier,
-                storage_identifier: self.storage_identifier,
+                placeholder_identifier,
+                storage_identifier,
                 span: operation.span,
                 inverse_span,
                 before,
@@ -544,7 +605,7 @@ impl<'a> SlideTextEdit<'a> {
                 target_requires_invalidated_previews: true,
             },
             package,
-            diagnostics: SlideTextDiagnostics::published(touched_components),
+            diagnostics: Diagnostics::published(touched_components),
         })
     }
 }
@@ -555,7 +616,7 @@ impl<'a> SlideTextEdit<'a> {
 /// artifacts and to the before/after text. Cloning it is cheap, but keeping it
 /// alive keeps those allocations alive.
 #[derive(Clone, PartialEq, Eq)]
-pub struct SlideTextPatch {
+pub struct Patch {
     source: Arc<[u8]>,
     target: Arc<[u8]>,
     source_fingerprint: u64,
@@ -572,10 +633,10 @@ pub struct SlideTextPatch {
     target_requires_invalidated_previews: bool,
 }
 
-impl fmt::Debug for SlideTextPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SlideTextPatch")
+            .debug_struct("Patch")
             .field("position", &self.position)
             .field("role", &self.role)
             .field("span", &self.span)
@@ -583,7 +644,7 @@ impl fmt::Debug for SlideTextPatch {
     }
 }
 
-impl SlideTextPatch {
+impl Patch {
     /// Return the semantic slide position selected by this patch.
     #[must_use]
     pub const fn position(&self) -> Position {
@@ -659,13 +720,13 @@ impl SlideTextPatch {
 
 /// Compact publication evidence for one slide-text commit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct SlideTextDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     full_reparse_performed: bool,
 }
 
-impl SlideTextDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -704,13 +765,13 @@ impl SlideTextDiagnostics {
 /// The fully verified result of one slide title/body text transaction.
 #[must_use = "a Keynote slide-text commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct SlideTextCommit {
+pub struct Commit {
     package: Package,
-    patch: SlideTextPatch,
-    diagnostics: SlideTextDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl SlideTextCommit {
+impl Commit {
     /// Borrow the fully reopened immutable package snapshot.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -723,15 +784,21 @@ impl SlideTextCommit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the reversible exact-source patch.
     #[must_use]
-    pub const fn patch(&self) -> &SlideTextPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Borrow compact publication diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> &SlideTextDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
@@ -741,7 +808,7 @@ impl Package {
     ///
     /// `Ok(None)` means that the slide has no title/body role. `Some("")`
     /// denotes an existing empty storage. [`Kind::SlideNumber`] is not text
-    /// bearing for this API and returns [`SlideTextError::UnsupportedKind`];
+    /// bearing for this API and returns [`Refusal::UnsupportedKind`];
     /// use the per-slide placeholder-visibility transaction instead.
     ///
     /// # Costs
@@ -750,14 +817,14 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`SlideTextError::UnsupportedKind`] for
+    /// Returns [`Refusal::UnsupportedKind`] for
     /// [`Kind::SlideNumber`], or a typed selector, source, limit, allocation,
     /// or dependency error when title/body text cannot be read safely.
     pub fn slide_text<'selector>(
         &self,
         selector: impl Into<SlideSelector<'selector>>,
         role: Kind,
-    ) -> Result<Option<String>, SlideTextError> {
+    ) -> Result<Option<String>, Error> {
         let position = resolve_position(self, selector.into())?;
         Ok(text_snapshot_at(self, position, role)?.map(|snapshot| snapshot.text))
     }
@@ -774,7 +841,7 @@ impl Package {
     pub fn slide_title<'selector>(
         &self,
         selector: impl Into<SlideSelector<'selector>>,
-    ) -> Result<Option<String>, SlideTextError> {
+    ) -> Result<Option<String>, Error> {
         self.slide_text(selector, Kind::Title)
     }
 
@@ -790,33 +857,41 @@ impl Package {
     pub fn slide_body<'selector>(
         &self,
         selector: impl Into<SlideSelector<'selector>>,
-    ) -> Result<Option<String>, SlideTextError> {
+    ) -> Result<Option<String>, Error> {
         self.slide_text(selector, Kind::Body)
     }
 
     /// Start one selector-first title/body text edit.
     ///
     /// [`Kind::SlideNumber`] is visibility-only and returns
-    /// [`SlideTextError::UnsupportedKind`]. Use
+    /// [`Refusal::UnsupportedKind`]. Use
     /// [`Package::edit_slide_placeholder_visibility`] to show or hide that
     /// role on one selected slide; it does not modify the show-wide
     /// slide-number preference.
     ///
     /// # Costs
     ///
-    /// The edit owns one bounded copy of the selected placeholder text.
+    /// The edit retains only the source and selector at entry. The selector
+    /// name is admitted against the package's finite selector-byte limit;
+    /// resolution of the selected placeholder and ownership of one bounded
+    /// text copy wait for the first value read, staged operation, or commit.
     ///
     /// # Errors
     ///
-    /// Returns [`SlideTextError::UnsupportedKind`] for
-    /// [`Kind::SlideNumber`], or a typed selector, missing-placeholder, source,
-    /// limit, allocation, or dependency error.
+    /// Returns [`Refusal::UnsupportedKind`] for
+    /// [`Kind::SlideNumber`] at entry. Selector-resolution,
+    /// missing-placeholder, source, limit, allocation, and dependency errors
+    /// are deferred until the first value read, staged operation, or commit;
+    /// selector-byte admission is checked at entry.
     pub fn edit_slide_text<'selector>(
         &self,
         selector: impl Into<SlideSelector<'selector>>,
         role: Kind,
-    ) -> Result<SlideTextEdit<'_>, SlideTextError> {
-        SlideTextEdit::new(self, selector, role)
+    ) -> Result<Edit<'_>, Error> {
+        if role == Kind::SlideNumber {
+            return Err(Error::Refused(Refusal::UnsupportedKind { kind: role }));
+        }
+        Edit::new(self, selector, role)
     }
 
     /// Start one selector-first slide-title edit.
@@ -831,7 +906,7 @@ impl Package {
     pub fn edit_slide_title<'selector>(
         &self,
         selector: impl Into<SlideSelector<'selector>>,
-    ) -> Result<SlideTextEdit<'_>, SlideTextError> {
+    ) -> Result<Edit<'_>, Error> {
         self.edit_slide_text(selector, Kind::Title)
     }
 
@@ -847,7 +922,7 @@ impl Package {
     pub fn edit_slide_body<'selector>(
         &self,
         selector: impl Into<SlideSelector<'selector>>,
-    ) -> Result<SlideTextEdit<'_>, SlideTextError> {
+    ) -> Result<Edit<'_>, Error> {
         self.edit_slide_text(selector, Kind::Body)
     }
 
@@ -860,33 +935,30 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`SlideTextError::PatchConflict`] unless the patch belongs to
+    /// Returns [`Error::PatchConflict`] unless the patch belongs to
     /// this exact artifact, or another typed validation, limit, allocation,
     /// dependency, or verification error before publication.
-    pub fn apply_slide_text(
-        &self,
-        patch: &SlideTextPatch,
-    ) -> Result<SlideTextCommit, SlideTextError> {
+    pub fn apply_slide_text(&self, patch: &Patch) -> Result<Commit, Error> {
         let catalog = physical_catalog(self)?;
         if fingerprint(catalog.source_bytes()) != patch.source_fingerprint
             || catalog.source_bytes() != patch.source.as_ref()
         {
-            return Err(SlideTextError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if patch.is_noop() {
-            return Ok(SlideTextCommit {
+            return Ok(Commit {
                 package: self.snapshot(),
                 patch: patch.clone(),
-                diagnostics: SlideTextDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
-        let current = text_snapshot_at(self, patch.position, patch.role)?
-            .ok_or(SlideTextError::PatchConflict)?;
+        let current =
+            text_snapshot_at(self, patch.position, patch.role)?.ok_or(Error::PatchConflict)?;
         if current.placeholder_identifier != patch.placeholder_identifier
             || current.storage_identifier != patch.storage_identifier
             || current.text != patch.before()
         {
-            return Err(SlideTextError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         self.validate().map_err(map_read_error)?;
         prove_exclusive_text_ownership(
@@ -897,7 +969,7 @@ impl Package {
             patch.storage_identifier,
         )?;
         if !catalog.source_is_exact() || fingerprint(&patch.target) != patch.target_fingerprint {
-            return Err(SlideTextError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let candidate =
             Package::from_source_with_options(Arc::clone(&patch.target), self.state.options)
@@ -906,7 +978,7 @@ impl Package {
         let node_identifier = self
             .slide_record_at(patch.position.get())
             .map_err(map_read_error)?
-            .ok_or(SlideTextError::PatchConflict)?
+            .ok_or(Error::PatchConflict)?
             .node_identifier;
         verify_candidate(
             self,
@@ -917,38 +989,46 @@ impl Package {
             node_identifier,
             patch.target_requires_invalidated_previews,
         )?;
-        Ok(SlideTextCommit {
+        Ok(Commit {
             package: candidate,
             patch: patch.clone(),
-            diagnostics: SlideTextDiagnostics::published(patch.touched_components),
+            diagnostics: Diagnostics::published(patch.touched_components),
         })
     }
 }
 
-fn resolve_position(
-    package: &Package,
-    selector: SlideSelector<'_>,
-) -> Result<Position, SlideTextError> {
+fn resolve_position(package: &Package, selector: SlideSelector<'_>) -> Result<Position, Error> {
     match selector {
         SlideSelector::Position(position) => package
             .slide_record_at(position.get())
             .map_err(map_read_error)?
             .map(|_record| position)
-            .ok_or(SlideTextError::SlidePositionNotFound { position }),
+            .ok_or(Error::Refused(Refusal::SlidePositionNotFound { position })),
         SlideSelector::Name(_) => package
             .show()
             .map_err(map_read_error)?
             .select_slide(selector)
             .map_err(map_slide_selector_error)?
             .map(|slide| Position::new(slide.index()))
-            .ok_or(SlideTextError::SlideNameNotFound),
+            .ok_or(Error::Refused(Refusal::SlideNameNotFound)),
     }
 }
 
-fn map_slide_selector_error(error: SlideSelectorError) -> SlideTextError {
+fn map_selector_error(error: SelectorError) -> Error {
     match error {
-        SlideSelectorError::EmptySlideName => SlideTextError::EmptySlideName,
-        SlideSelectorError::DuplicateSlideName { .. } => SlideTextError::AmbiguousSelector,
+        SelectorError::Limit { observed, maximum } => Error::Limit {
+            kind: LimitKind::SelectorBytes,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(maximum),
+        },
+        SelectorError::Allocation { amount } => Error::Allocation { amount },
+    }
+}
+
+fn map_slide_selector_error(error: SlideSelectorError) -> Error {
+    match error {
+        SlideSelectorError::EmptySlideName => Error::Refused(Refusal::EmptySlideName),
+        SlideSelectorError::DuplicateSlideName { .. } => Error::Refused(Refusal::AmbiguousSelector),
     }
 }
 
@@ -956,14 +1036,14 @@ fn text_snapshot_at(
     package: &Package,
     position: Position,
     role: Kind,
-) -> Result<Option<TextSnapshot>, SlideTextError> {
+) -> Result<Option<TextSnapshot>, Error> {
     if role == Kind::SlideNumber {
-        return Err(SlideTextError::UnsupportedKind { kind: role });
+        return Err(Error::Refused(Refusal::UnsupportedKind { kind: role }));
     }
     let record = package
         .slide_record_at(position.get())
         .map_err(map_read_error)?
-        .ok_or(SlideTextError::SlidePositionNotFound { position })?;
+        .ok_or(Error::Refused(Refusal::SlidePositionNotFound { position }))?;
     let slide = package
         .required_object(record.slide_identifier, "Keynote slide")
         .map_err(map_read_error)?;
@@ -977,7 +1057,7 @@ fn text_snapshot_at(
     let placeholder = match role {
         Kind::Title => owner.title_placeholder(),
         Kind::Body => owner.body_placeholder(),
-        Kind::SlideNumber => return Err(SlideTextError::UnsupportedKind { kind: role }),
+        Kind::SlideNumber => return Err(Error::Refused(Refusal::UnsupportedKind { kind: role })),
     };
     let Some(placeholder_identifier) = placeholder.map(|reference| reference.identifier().get())
     else {
@@ -991,7 +1071,7 @@ fn text_snapshot_at(
         .iter()
         .any(|message| message.type_ == SHAPE_INFO_MESSAGE_TYPE)
     {
-        return Err(SlideTextError::DependentContent);
+        return Err(Error::Refused(Refusal::DependentContent));
     }
     let placeholder_payload = unique_payload(
         &placeholder_object.messages,
@@ -1007,19 +1087,19 @@ fn text_snapshot_at(
     validate_placeholder_kind(role, placeholder_owner.kind())?;
     let owned_storage = placeholder_owner
         .owned_storage()
-        .ok_or(SlideTextError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let owned_storage = ReferenceSemantics::from_placeholder_codec(owned_storage);
     let storage_identifier = owned_storage.identifier;
     let mut scan_budget = WireScanBudget::new(package)?;
     if nested_reference_snapshot(package, placeholder_payload, &[1, 2], &mut scan_budget)?
         .is_some_and(|deprecated| deprecated != owned_storage)
     {
-        return Err(SlideTextError::DependentContent);
+        return Err(Error::Refused(Refusal::DependentContent));
     }
     if nested_reference_identifier(package, placeholder_payload, &[1, 3], &mut scan_budget)?
         == Some(storage_identifier)
     {
-        return Err(SlideTextError::DependentContent);
+        return Err(Error::Refused(Refusal::DependentContent));
     }
     let storage = package
         .required_object(storage_identifier, "Keynote placeholder text storage")
@@ -1040,15 +1120,15 @@ fn text_snapshot_at(
     }))
 }
 
-fn validate_placeholder_kind(role: Kind, kind: Option<i32>) -> Result<(), SlideTextError> {
+fn validate_placeholder_kind(role: Kind, kind: Option<i32>) -> Result<(), Error> {
     // Absence and explicit zero both mean the native generic placeholder.
     // Any non-generic explicit kind must agree with the slide's role edge;
     // slide-number, object, opposite-role, and future tags are not writable
     // through this focused capability.
     match (role, kind) {
         (_, None | Some(0)) | (Kind::Title, Some(2)) | (Kind::Body, Some(3)) => Ok(()),
-        (Kind::SlideNumber, _) => Err(SlideTextError::UnsupportedKind { kind: role }),
-        _ => Err(SlideTextError::DependentContent),
+        (Kind::SlideNumber, _) => Err(Error::Refused(Refusal::UnsupportedKind { kind: role })),
+        _ => Err(Error::Refused(Refusal::DependentContent)),
     }
 }
 
@@ -1066,10 +1146,9 @@ const fn semantic_path(position: Position, role: Kind) -> SemanticPath {
 fn speaker_notes_decode_options(
     package: &Package,
     payload: &[u8],
-) -> Result<keynote_speaker_notes_codec::DecodeOptions, SlideTextError> {
+) -> Result<keynote_speaker_notes_codec::DecodeOptions, Error> {
     let limits = package.wire_limits().map_err(map_wire_error)?;
-    let recursion =
-        u32::try_from(limits.max_nesting()).map_err(|_error| SlideTextError::InvalidSource)?;
+    let recursion = u32::try_from(limits.max_nesting()).map_err(|_error| Error::InvalidSource)?;
     Ok(keynote_speaker_notes_codec::DecodeOptions::new(
         payload.len().min(limits.max_input_bytes()),
         limits.max_fields(),
@@ -1081,10 +1160,9 @@ fn speaker_notes_decode_options(
 fn placeholder_decode_options(
     package: &Package,
     payload: &[u8],
-) -> Result<keynote_placeholder_text_codec::DecodeOptions, SlideTextError> {
+) -> Result<keynote_placeholder_text_codec::DecodeOptions, Error> {
     let limits = package.wire_limits().map_err(map_wire_error)?;
-    let recursion =
-        u32::try_from(limits.max_nesting()).map_err(|_error| SlideTextError::InvalidSource)?;
+    let recursion = u32::try_from(limits.max_nesting()).map_err(|_error| Error::InvalidSource)?;
     Ok(keynote_placeholder_text_codec::DecodeOptions::new(
         payload.len().min(limits.max_input_bytes()),
         limits.max_fields(),
@@ -1093,21 +1171,19 @@ fn placeholder_decode_options(
     ))
 }
 
-fn map_speaker_notes_codec_error(
-    error: keynote_speaker_notes_codec::DecodeError,
-) -> SlideTextError {
+fn map_speaker_notes_codec_error(error: keynote_speaker_notes_codec::DecodeError) -> Error {
     if let Some(limit) = error.wire_resource_limit() {
         return match limit {
             keynote_speaker_notes_codec::WireResourceLimit::Bytes { observed, maximum } => {
-                SlideTextError::LimitExceeded {
-                    kind: SlideTextLimitKind::WireBytes,
+                Error::Limit {
+                    kind: LimitKind::WireBytes,
                     observed: observed.map_or(u64::MAX, usize_to_u64),
                     maximum: maximum.map_or(u64::MAX, usize_to_u64),
                 }
             },
             keynote_speaker_notes_codec::WireResourceLimit::Nesting { observed, maximum } => {
-                SlideTextError::LimitExceeded {
-                    kind: SlideTextLimitKind::WireNesting,
+                Error::Limit {
+                    kind: LimitKind::WireNesting,
                     observed: observed.map_or(u64::MAX, u64::from),
                     maximum: maximum.map_or(u64::MAX, u64::from),
                 }
@@ -1115,54 +1191,52 @@ fn map_speaker_notes_codec_error(
         };
     }
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return SlideTextError::LimitExceeded {
-            kind: SlideTextLimitKind::WireFields,
+        return Error::Limit {
+            kind: LimitKind::WireFields,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return SlideTextError::LimitExceeded {
-            kind: SlideTextLimitKind::WireWork,
+        return Error::Limit {
+            kind: LimitKind::WireWork,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
-    SlideTextError::InvalidSource
+    Error::InvalidSource
 }
 
-fn map_placeholder_codec_error(
-    error: keynote_placeholder_text_codec::DecodeError,
-) -> SlideTextError {
+fn map_placeholder_codec_error(error: keynote_placeholder_text_codec::DecodeError) -> Error {
     if let Some((observed, maximum)) = error.message_byte_limit_values() {
-        return SlideTextError::LimitExceeded {
-            kind: SlideTextLimitKind::WireBytes,
+        return Error::Limit {
+            kind: LimitKind::WireBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.recursion_limit_values() {
-        return SlideTextError::LimitExceeded {
-            kind: SlideTextLimitKind::WireNesting,
+        return Error::Limit {
+            kind: LimitKind::WireNesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),
         };
     }
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return SlideTextError::LimitExceeded {
-            kind: SlideTextLimitKind::WireFields,
+        return Error::Limit {
+            kind: LimitKind::WireFields,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return SlideTextError::LimitExceeded {
-            kind: SlideTextLimitKind::WireWork,
+        return Error::Limit {
+            kind: LimitKind::WireWork,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
-    SlideTextError::InvalidSource
+    Error::InvalidSource
 }
 
 fn rewrite_text(
@@ -1174,20 +1248,19 @@ fn rewrite_text(
     span: TextSpan,
     replacement: &str,
     expected: &str,
-) -> Result<(Package, usize), SlideTextError> {
+) -> Result<(Package, usize), Error> {
     let record = source
         .slide_record_at(position.get())
         .map_err(map_read_error)?
-        .ok_or(SlideTextError::SlidePositionNotFound { position })?;
+        .ok_or(Error::Refused(Refusal::SlidePositionNotFound { position }))?;
     if record.node_identifier == expected_storage_identifier {
-        return Err(SlideTextError::DependentContent);
+        return Err(Error::Refused(Refusal::DependentContent));
     }
-    let snapshot =
-        text_snapshot_at(source, position, role)?.ok_or(SlideTextError::InvalidSource)?;
+    let snapshot = text_snapshot_at(source, position, role)?.ok_or(Error::InvalidSource)?;
     if snapshot.placeholder_identifier != expected_placeholder_identifier
         || snapshot.storage_identifier != expected_storage_identifier
     {
-        return Err(SlideTextError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     prove_exclusive_text_ownership(
         source,
@@ -1197,10 +1270,9 @@ fn rewrite_text(
         expected_storage_identifier,
     )?;
     prove_slide_text_caches_absent(source, record.slide_identifier)?;
-    let start = usize::try_from(span.start().utf16_index())
-        .map_err(|_error| SlideTextError::InvalidSource)?;
-    let end = usize::try_from(span.end().utf16_index())
-        .map_err(|_error| SlideTextError::InvalidSource)?;
+    let start =
+        usize::try_from(span.start().utf16_index()).map_err(|_error| Error::InvalidSource)?;
+    let end = usize::try_from(span.end().utf16_index()).map_err(|_error| Error::InvalidSource)?;
     let (candidate, touched_components) = rewrite_owned_storage_text(
         source,
         expected_storage_identifier,
@@ -1226,7 +1298,7 @@ fn rewrite_text(
 pub(super) fn read_owned_storage_text(
     source: &Package,
     storage_identifier: u64,
-) -> Result<String, SlideTextError> {
+) -> Result<String, Error> {
     let object = source
         .required_object(storage_identifier, "Keynote text storage")
         .map_err(map_read_error)?;
@@ -1238,12 +1310,38 @@ pub(super) fn read_owned_storage_text(
         .archive()
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    let decoded = litchi_iwa_text_wire::decode_storage_with_limits(
+    let decoded = litchi_iwa_text_wire::decode_storage(
         &message.data,
         storage_rewrite_limits(source, archive_limits.max_message_bytes())?,
     )
     .map_err(map_text_rewrite_error)?;
     Ok(decoded.into_storage().into_text())
+}
+
+/// Whether splices within `hull` of the owned text storage
+/// `storage_identifier` publish what one combined splice publishes; see
+/// [`Edit::admits_combined_splice`].
+pub(super) fn owned_storage_admits_combined_splice(
+    source: &Package,
+    storage_identifier: u64,
+    hull: Range<usize>,
+) -> Result<bool, Error> {
+    let object = source
+        .required_object(storage_identifier, "Keynote text storage")
+        .map_err(map_read_error)?;
+    let (_, message) = one_message(&object.messages, STORAGE_MESSAGE_TYPE)?;
+    let archive_limits = source
+        .state
+        .options
+        .archive()
+        .effective_archive_limits()
+        .map_err(map_archive_error)?;
+    let boundaries = litchi_iwa_text_wire::storage_boundaries(
+        &message.data,
+        storage_rewrite_limits(source, archive_limits.max_message_bytes())?,
+    )
+    .map_err(map_text_rewrite_error)?;
+    Ok(boundaries.admits_combined_splice(hull))
 }
 
 /// Rewrite one already-proven, exclusively owned text storage and invalidate
@@ -1259,25 +1357,26 @@ pub(super) fn rewrite_owned_storage_text(
     slide_node_identifier: u64,
     span: Range<usize>,
     replacement: &str,
-) -> Result<(Package, usize), SlideTextError> {
+) -> Result<(Package, usize), Error> {
     validate_replacement(replacement)?;
     let catalog = physical_catalog(source)?;
     let physical_limits = source.state.options.archive();
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(map_archive_error)?;
+    let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
     let mut component_names = Vec::new();
     component_names
         .try_reserve_exact(2)
-        .map_err(|_allocation| SlideTextError::Allocation { amount: 2 })?;
+        .map_err(|_allocation| Error::Allocation { amount: 2 })?;
     for identifier in [storage_identifier, slide_node_identifier] {
         let mut matches = catalog
             .components()
             .iter()
             .filter(|component| component.archive().object(identifier).is_some());
-        let component = matches.next().ok_or(SlideTextError::InvalidSource)?;
+        let component = matches.next().ok_or(Error::InvalidSource)?;
         if matches.next().is_some() {
-            return Err(SlideTextError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if !component_names.contains(&component.name()) {
             component_names.push(component.name());
@@ -1286,7 +1385,7 @@ pub(super) fn rewrite_owned_storage_text(
     let mut compressed_components = Vec::new();
     compressed_components
         .try_reserve_exact(component_names.len())
-        .map_err(|_allocation| SlideTextError::Allocation {
+        .map_err(|_allocation| Error::Allocation {
             amount: component_names.len(),
         })?;
     let mut storage_changed = false;
@@ -1296,22 +1395,22 @@ pub(super) fn rewrite_owned_storage_text(
             .package()
             .iter()
             .find(|entry| entry.name() == *component_name)
-            .ok_or(SlideTextError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if entry.is_opaque() {
-            return Err(SlideTextError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
-        let stream = SnappyStream::decompress_with_limits(
+        let stream = SnappyStream::decompress(
             entry.data(),
             physical_limits.snappy_limits().map_err(map_archive_error)?,
         )
         .map_err(map_core_error)?;
-        let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
-            .map_err(map_core_error)?;
+        let mut archive =
+            Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
         validate_canonical_object_length_prefixes(stream.as_bytes(), &archive)?;
         if let Some(object) = archive.object(storage_identifier) {
             let (message_index, message) = one_message(&object.messages, STORAGE_MESSAGE_TYPE)?;
             validate_selected_storage_metadata(object, message_index)?;
-            let rewrite = litchi_iwa_text_wire::rewrite_storage_text_with_behavior_and_limits(
+            let rewrite = litchi_iwa_text_wire::rewrite_storage_text_with_behavior(
                 &message.data,
                 span.clone(),
                 replacement,
@@ -1324,15 +1423,15 @@ pub(super) fn rewrite_owned_storage_text(
                 || rewrite.object_reference_occurrences_before()
                     != rewrite.object_reference_occurrences_after()
             {
-                return Err(SlideTextError::DependentContent);
+                return Err(Error::Refused(Refusal::DependentContent));
             }
             if !rewrite.changed() || std::mem::replace(&mut storage_changed, true) {
-                return Err(SlideTextError::Verification);
+                return Err(Error::Verification);
             }
             archive
                 .object_mut(storage_identifier)
-                .ok_or(SlideTextError::InvalidSource)?
-                .replace_message_preserving_header_with_limits(
+                .ok_or(Error::InvalidSource)?
+                .replace_message_preserving_header(
                     message_index,
                     RawMessage {
                         type_: STORAGE_MESSAGE_TYPE,
@@ -1344,7 +1443,7 @@ pub(super) fn rewrite_owned_storage_text(
         }
         if let Some(node) = archive.object_mut(slide_node_identifier) {
             if std::mem::replace(&mut node_changed, true) {
-                return Err(SlideTextError::Verification);
+                return Err(Error::Verification);
             }
             super::slide_preview::invalidate(
                 node,
@@ -1353,19 +1452,18 @@ pub(super) fn rewrite_owned_storage_text(
             )
             .map_err(map_slide_preview_error)?;
         }
-        let archive_bytes = archive
-            .to_bytes_with_limits(archive_limits)
-            .map_err(map_core_error)?;
-        let compressed = SnappyStream::compress(&archive_bytes).map_err(map_core_error)?;
+        let archive_bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
+        let compressed =
+            SnappyStream::compress(&archive_bytes, snappy_limits).map_err(map_core_error)?;
         compressed_components.push((*component_name, compressed));
     }
     if !storage_changed || !node_changed {
-        return Err(SlideTextError::Verification);
+        return Err(Error::Verification);
     }
     let mut edits = Vec::new();
     edits
         .try_reserve_exact(compressed_components.len())
-        .map_err(|_allocation| SlideTextError::Allocation {
+        .map_err(|_allocation| Error::Allocation {
             amount: compressed_components.len(),
         })?;
     for (name, compressed) in &compressed_components {
@@ -1374,7 +1472,7 @@ pub(super) fn rewrite_owned_storage_text(
     let mut deleted_previews = Vec::new();
     deleted_previews
         .try_reserve_exact(PREVIEW_ENTRY_NAMES.len())
-        .map_err(|_allocation| SlideTextError::Allocation {
+        .map_err(|_allocation| Error::Allocation {
             amount: PREVIEW_ENTRY_NAMES.len(),
         })?;
     for name in PREVIEW_ENTRY_NAMES {
@@ -1399,19 +1497,16 @@ pub(super) fn rewrite_owned_storage_text(
     Ok((candidate, compressed_components.len()))
 }
 
-fn prove_slide_text_caches_absent(
-    package: &Package,
-    slide_identifier: u64,
-) -> Result<(), SlideTextError> {
+fn prove_slide_text_caches_absent(package: &Package, slide_identifier: u64) -> Result<(), Error> {
     let slide = package
         .required_object(slide_identifier, "Keynote slide")
         .map_err(map_read_error)?;
     let payload = unique_payload(&slide.messages, &[SLIDE_MESSAGE_TYPE], "Keynote slide")
         .map_err(map_read_error)?;
     let limits = package.wire_limits().map_err(map_wire_error)?;
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     if view.fields().any(|field| matches!(field.number(), 37 | 38)) {
-        return Err(SlideTextError::DependentContent);
+        return Err(Error::Refused(Refusal::DependentContent));
     }
     Ok(())
 }
@@ -1424,19 +1519,17 @@ fn verify_candidate(
     expected: &str,
     slide_node_identifier: u64,
     require_invalidated_previews: bool,
-) -> Result<(), SlideTextError> {
+) -> Result<(), Error> {
     if source.state.total_objects != candidate.state.total_objects {
-        return Err(SlideTextError::Verification);
+        return Err(Error::Verification);
     }
-    let source_text =
-        text_snapshot_at(source, position, role)?.ok_or(SlideTextError::Verification)?;
-    let candidate_text =
-        text_snapshot_at(candidate, position, role)?.ok_or(SlideTextError::Verification)?;
+    let source_text = text_snapshot_at(source, position, role)?.ok_or(Error::Verification)?;
+    let candidate_text = text_snapshot_at(candidate, position, role)?.ok_or(Error::Verification)?;
     if source_text.placeholder_identifier != candidate_text.placeholder_identifier
         || source_text.storage_identifier != candidate_text.storage_identifier
         || candidate_text.text != expected
     {
-        return Err(SlideTextError::Verification);
+        return Err(Error::Verification);
     }
     prove_exclusive_text_ownership(
         source,
@@ -1467,7 +1560,7 @@ fn verify_candidate(
                 .iter()
                 .any(|entry| entry.name() == *name)
         }) {
-            return Err(SlideTextError::Verification);
+            return Err(Error::Verification);
         }
     }
 
@@ -1476,12 +1569,12 @@ fn verify_candidate(
     let before = source.slides().map_err(map_read_error)?;
     let after = candidate.slides().map_err(map_read_error)?;
     if before.len() != after.len() {
-        return Err(SlideTextError::Verification);
+        return Err(Error::Verification);
     }
     for (index, (old, new)) in before.iter().zip(after).enumerate() {
         if index != position.get() {
             if old != new {
-                return Err(SlideTextError::Verification);
+                return Err(Error::Verification);
             }
             continue;
         }
@@ -1492,20 +1585,22 @@ fn verify_candidate(
             || old.transition() != new.transition()
             || old.notes() != new.notes()
         {
-            return Err(SlideTextError::Verification);
+            return Err(Error::Verification);
         }
         match role {
             Kind::Title => {
                 if new.title() != nonempty(expected) {
-                    return Err(SlideTextError::Verification);
+                    return Err(Error::Verification);
                 }
             },
             Kind::Body => {
                 if old.title() != new.title() {
-                    return Err(SlideTextError::Verification);
+                    return Err(Error::Verification);
                 }
             },
-            Kind::SlideNumber => return Err(SlideTextError::UnsupportedKind { kind: role }),
+            Kind::SlideNumber => {
+                return Err(Error::Refused(Refusal::UnsupportedKind { kind: role }));
+            },
         }
     }
     Ok(())
@@ -1517,11 +1612,11 @@ fn verify_untouched_objects(
     selected_storage_identifier: u64,
     slide_node_identifier: u64,
     require_invalidated_previews: bool,
-) -> Result<(), SlideTextError> {
+) -> Result<(), Error> {
     let source_catalog = physical_catalog(source)?;
     let candidate_catalog = physical_catalog(candidate)?;
     if source_catalog.components().len() != candidate_catalog.components().len() {
-        return Err(SlideTextError::Verification);
+        return Err(Error::Verification);
     }
     let mut previous_component_name = None;
     let mut selected_storage_seen = false;
@@ -1536,7 +1631,7 @@ fn verify_untouched_objects(
             || source_component.archive().objects.len()
                 != candidate_component.archive().objects.len()
         {
-            return Err(SlideTextError::Verification);
+            return Err(Error::Verification);
         }
         previous_component_name = Some(source_component.name());
         for (source_object, candidate_object) in source_component
@@ -1548,17 +1643,17 @@ fn verify_untouched_objects(
             let source_identifier = source_object
                 .archive_info
                 .identifier
-                .ok_or(SlideTextError::Verification)?;
+                .ok_or(Error::Verification)?;
             let candidate_identifier = candidate_object
                 .archive_info
                 .identifier
-                .ok_or(SlideTextError::Verification)?;
+                .ok_or(Error::Verification)?;
             if source_identifier != candidate_identifier {
-                return Err(SlideTextError::Verification);
+                return Err(Error::Verification);
             }
             if source_identifier == selected_storage_identifier {
                 if std::mem::replace(&mut selected_storage_seen, true) {
-                    return Err(SlideTextError::Verification);
+                    return Err(Error::Verification);
                 }
                 verify_selected_storage_object(source_object, candidate_object)?;
             } else if source_identifier == slide_node_identifier {
@@ -1570,17 +1665,17 @@ fn verify_untouched_objects(
                         )
                         .map_err(map_slide_preview_error)?)
                 {
-                    return Err(SlideTextError::Verification);
+                    return Err(Error::Verification);
                 }
             } else if !source_object.same_content_ignoring_offsets(candidate_object) {
-                return Err(SlideTextError::Verification);
+                return Err(Error::Verification);
             }
         }
     }
     if selected_storage_seen && slide_node_seen {
         Ok(())
     } else {
-        Err(SlideTextError::Verification)
+        Err(Error::Verification)
     }
 }
 
@@ -1592,7 +1687,7 @@ pub(super) fn verify_owned_storage_candidate(
     storage_identifier: u64,
     slide_node_identifier: u64,
     require_invalidated_previews: bool,
-) -> Result<(), SlideTextError> {
+) -> Result<(), Error> {
     verify_untouched_objects(
         source,
         candidate,
@@ -1608,7 +1703,7 @@ pub(super) fn verify_owned_storage_candidate(
                 .iter()
                 .any(|entry| entry.name() == *name)
         }) {
-            return Err(SlideTextError::Verification);
+            return Err(Error::Verification);
         }
     }
     Ok(())
@@ -1617,30 +1712,30 @@ pub(super) fn verify_owned_storage_candidate(
 fn verify_selected_storage_object(
     source: &litchi_iwa_core::ArchiveObject,
     candidate: &litchi_iwa_core::ArchiveObject,
-) -> Result<(), SlideTextError> {
+) -> Result<(), Error> {
     if source.messages.len() != candidate.messages.len()
         || source.archive_info.message_infos.len() != candidate.archive_info.message_infos.len()
     {
-        return Err(SlideTextError::Verification);
+        return Err(Error::Verification);
     }
     let mut selected = None;
     for (index, (old, new)) in source.messages.iter().zip(&candidate.messages).enumerate() {
         if old.type_ != new.type_ {
-            return Err(SlideTextError::Verification);
+            return Err(Error::Verification);
         }
         if old.type_ == STORAGE_MESSAGE_TYPE {
             if selected.replace(index).is_some() {
-                return Err(SlideTextError::Verification);
+                return Err(Error::Verification);
             }
         } else if old != new {
-            return Err(SlideTextError::Verification);
+            return Err(Error::Verification);
         }
     }
-    let selected = selected.ok_or(SlideTextError::Verification)?;
+    let selected = selected.ok_or(Error::Verification)?;
     if source.archive_info.identifier != candidate.archive_info.identifier
         || source.archive_info.should_merge != candidate.archive_info.should_merge
     {
-        return Err(SlideTextError::Verification);
+        return Err(Error::Verification);
     }
     for (index, (old, new)) in source
         .archive_info
@@ -1661,7 +1756,7 @@ fn verify_selected_storage_object(
             || old.fields_to_remove != new.fields_to_remove
             || old.diff_read_version != new.diff_read_version
         {
-            return Err(SlideTextError::Verification);
+            return Err(Error::Verification);
         }
     }
     Ok(())
@@ -1670,12 +1765,12 @@ fn verify_selected_storage_object(
 fn validate_selected_storage_metadata(
     object: &litchi_iwa_core::ArchiveObject,
     message_index: usize,
-) -> Result<(), SlideTextError> {
+) -> Result<(), Error> {
     let message = object
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(SlideTextError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if object.archive_info.should_merge == Some(true)
         || message.base_message_index.is_some()
         || !message.diff_merge_version.is_empty()
@@ -1683,7 +1778,7 @@ fn validate_selected_storage_metadata(
         || !message.fields_to_remove.is_empty()
         || !message.diff_read_version.is_empty()
     {
-        return Err(SlideTextError::DependentContent);
+        return Err(Error::Refused(Refusal::DependentContent));
     }
     Ok(())
 }
@@ -1698,12 +1793,12 @@ fn prove_exclusive_text_ownership(
     role: Kind,
     placeholder_identifier: u64,
     storage_identifier: u64,
-) -> Result<(), SlideTextError> {
+) -> Result<(), Error> {
     let mut scan_budget = WireScanBudget::new(package)?;
     let slide_identifier = package
         .slide_record_at(position.get())
         .map_err(map_read_error)?
-        .ok_or(SlideTextError::SlidePositionNotFound { position })?
+        .ok_or(Error::Refused(Refusal::SlidePositionNotFound { position }))?
         .slide_identifier;
     prove_metadata_ownership(
         package,
@@ -1717,10 +1812,7 @@ fn prove_exclusive_text_ownership(
     let mut storage_edges = 0usize;
     for component in package.state.source.components().iter() {
         for object in &component.archive().objects {
-            let owner_identifier = object
-                .archive_info
-                .identifier
-                .ok_or(SlideTextError::InvalidSource)?;
+            let owner_identifier = object.archive_info.identifier.ok_or(Error::InvalidSource)?;
             for message in &object.messages {
                 match message.type_ {
                     SLIDE_MESSAGE_TYPE => {
@@ -1745,7 +1837,7 @@ fn prove_exclusive_text_ownership(
                             || body == Some(placeholder_identifier)
                         {
                             if owner_identifier != slide_identifier {
-                                return Err(SlideTextError::DependentContent);
+                                return Err(Error::Refused(Refusal::DependentContent));
                             }
                             let owner = keynote_speaker_notes_codec::decode_slide_notes_owner(
                                 &message.data,
@@ -1768,14 +1860,14 @@ fn prove_exclusive_text_ownership(
                                         && projected_title != Some(placeholder_identifier)
                                 },
                                 Kind::SlideNumber => {
-                                    return Err(SlideTextError::UnsupportedKind { kind: role });
+                                    return Err(Error::Refused(Refusal::UnsupportedKind {
+                                        kind: role,
+                                    }));
                                 },
                             };
-                            role_edges = role_edges
-                                .checked_add(1)
-                                .ok_or(SlideTextError::InvalidSource)?;
+                            role_edges = role_edges.checked_add(1).ok_or(Error::InvalidSource)?;
                             if role_edges > 1 || !matches_role {
-                                return Err(SlideTextError::DependentContent);
+                                return Err(Error::Refused(Refusal::DependentContent));
                             }
                         }
                     },
@@ -1801,7 +1893,7 @@ fn prove_exclusive_text_ownership(
                         if scanned_text_flow
                             .is_some_and(|reference| reference.identifier == storage_identifier)
                         {
-                            return Err(SlideTextError::DependentContent);
+                            return Err(Error::Refused(Refusal::DependentContent));
                         }
                         if scanned_owned_storage
                             .is_none_or(|reference| reference.identifier != storage_identifier)
@@ -1816,7 +1908,7 @@ fn prove_exclusive_text_ownership(
                             continue;
                         }
                         if owner_identifier != placeholder_identifier {
-                            return Err(SlideTextError::DependentContent);
+                            return Err(Error::Refused(Refusal::DependentContent));
                         }
                         let owner = keynote_placeholder_text_codec::decode_placeholder_text_owner(
                             &message.data,
@@ -1838,7 +1930,7 @@ fn prove_exclusive_text_ownership(
                                 || owned_storage.map(|reference| reference.identifier)
                                     != Some(storage_identifier))
                         {
-                            return Err(SlideTextError::DependentContent);
+                            return Err(Error::Refused(Refusal::DependentContent));
                         }
                         if nested_reference_identifier(
                             package,
@@ -1847,7 +1939,7 @@ fn prove_exclusive_text_ownership(
                             &mut scan_budget,
                         )? == Some(storage_identifier)
                         {
-                            return Err(SlideTextError::DependentContent);
+                            return Err(Error::Refused(Refusal::DependentContent));
                         }
                         if owned_storage.map(|reference| reference.identifier)
                             != Some(storage_identifier)
@@ -1857,13 +1949,11 @@ fn prove_exclusive_text_ownership(
                         if deprecated_storage
                             .is_some_and(|deprecated| Some(deprecated) != owned_storage)
                         {
-                            return Err(SlideTextError::DependentContent);
+                            return Err(Error::Refused(Refusal::DependentContent));
                         }
-                        storage_edges = storage_edges
-                            .checked_add(1)
-                            .ok_or(SlideTextError::InvalidSource)?;
+                        storage_edges = storage_edges.checked_add(1).ok_or(Error::InvalidSource)?;
                         if storage_edges > 1 || owner_identifier != placeholder_identifier {
-                            return Err(SlideTextError::DependentContent);
+                            return Err(Error::Refused(Refusal::DependentContent));
                         }
                         validate_placeholder_kind(role, owner.kind())?;
                     },
@@ -1875,7 +1965,7 @@ fn prove_exclusive_text_ownership(
                             &mut scan_budget,
                         )? == Some(storage_identifier)
                         {
-                            return Err(SlideTextError::DependentContent);
+                            return Err(Error::Refused(Refusal::DependentContent));
                         }
                     },
                     SHAPE_INFO_MESSAGE_TYPE => {
@@ -1887,7 +1977,7 @@ fn prove_exclusive_text_ownership(
                                 &mut scan_budget,
                             )? == Some(storage_identifier)
                             {
-                                return Err(SlideTextError::DependentContent);
+                                return Err(Error::Refused(Refusal::DependentContent));
                             }
                         }
                     },
@@ -1899,7 +1989,7 @@ fn prove_exclusive_text_ownership(
     if role_edges == 1 && storage_edges == 1 {
         Ok(())
     } else {
-        Err(SlideTextError::InvalidSource)
+        Err(Error::InvalidSource)
     }
 }
 
@@ -1908,7 +1998,7 @@ fn nested_reference_identifier(
     payload: &[u8],
     path: &[u32],
     budget: &mut WireScanBudget,
-) -> Result<Option<u64>, SlideTextError> {
+) -> Result<Option<u64>, Error> {
     Ok(nested_reference_snapshot(package, payload, path, budget)?
         .map(|reference| reference.identifier))
 }
@@ -1918,7 +2008,7 @@ fn nested_reference_snapshot(
     payload: &[u8],
     path: &[u32],
     budget: &mut WireScanBudget,
-) -> Result<Option<ReferenceSemantics>, SlideTextError> {
+) -> Result<Option<ReferenceSemantics>, Error> {
     nested_reference_snapshot_with_zero(payload, path, false, budget)
 }
 
@@ -1927,7 +2017,7 @@ fn scan_nested_reference_snapshot(
     payload: &[u8],
     path: &[u32],
     budget: &mut WireScanBudget,
-) -> Result<Option<ReferenceSemantics>, SlideTextError> {
+) -> Result<Option<ReferenceSemantics>, Error> {
     nested_reference_snapshot_with_zero(payload, path, true, budget)
 }
 
@@ -1936,7 +2026,7 @@ fn scan_nested_reference_identifier(
     payload: &[u8],
     path: &[u32],
     budget: &mut WireScanBudget,
-) -> Result<Option<u64>, SlideTextError> {
+) -> Result<Option<u64>, Error> {
     Ok(
         nested_reference_snapshot_with_zero(payload, path, false, budget)?
             .map(|reference| reference.identifier),
@@ -1948,7 +2038,7 @@ fn nested_reference_snapshot_with_zero(
     path: &[u32],
     allow_zero: bool,
     budget: &mut WireScanBudget,
-) -> Result<Option<ReferenceSemantics>, SlideTextError> {
+) -> Result<Option<ReferenceSemantics>, Error> {
     let Some(reference) = unique_nested_payload(payload, path, budget)? else {
         return Ok(None);
     };
@@ -1959,10 +2049,10 @@ fn nested_reference_snapshot_with_zero(
     for field in view.fields() {
         field.validate_canonical_framing().map_err(map_wire_error)?;
         let value = if field.wire_type() == 0 {
-            let (value, bytes) = decode_varint_from_bytes(field.payload())
-                .map_err(|_error| SlideTextError::InvalidSource)?;
+            let (value, bytes) =
+                decode_varint_from_bytes(field.payload()).map_err(|_error| Error::InvalidSource)?;
             if bytes != field.payload().len() || bytes != encoded_len(value) {
-                return Err(SlideTextError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             Some(value)
         } else {
@@ -1970,29 +2060,29 @@ fn nested_reference_snapshot_with_zero(
         };
         match field.number() {
             1 => {
-                let value = value.ok_or(SlideTextError::InvalidSource)?;
+                let value = value.ok_or(Error::InvalidSource)?;
                 if identifier.replace(value).is_some() || (value == 0 && !allow_zero) {
-                    return Err(SlideTextError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
             },
             2 => {
-                let value = value.ok_or(SlideTextError::InvalidSource)?;
+                let value = value.ok_or(Error::InvalidSource)?;
                 if deprecated_type.is_some() {
-                    return Err(SlideTextError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 deprecated_type = Some(decode_canonical_int32(value)?);
             },
             3 => {
-                let value = value.ok_or(SlideTextError::InvalidSource)?;
+                let value = value.ok_or(Error::InvalidSource)?;
                 if deprecated_is_external.is_some() || value > 1 {
-                    return Err(SlideTextError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 deprecated_is_external = Some(value == 1);
             },
             _ => {},
         }
     }
-    let identifier = identifier.ok_or(SlideTextError::InvalidSource)?;
+    let identifier = identifier.ok_or(Error::InvalidSource)?;
     Ok(Some(ReferenceSemantics {
         identifier,
         deprecated_type,
@@ -2000,15 +2090,14 @@ fn nested_reference_snapshot_with_zero(
     }))
 }
 
-fn decode_canonical_int32(value: u64) -> Result<i32, SlideTextError> {
+fn decode_canonical_int32(value: u64) -> Result<i32, Error> {
     if value <= 2_147_483_647 {
-        return i32::try_from(value).map_err(|_error| SlideTextError::InvalidSource);
+        return i32::try_from(value).map_err(|_error| Error::InvalidSource);
     }
     if value < 0xffff_ffff_8000_0000 {
-        return Err(SlideTextError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
-    let bits = u32::try_from(value & u64::from(u32::MAX))
-        .map_err(|_error| SlideTextError::InvalidSource)?;
+    let bits = u32::try_from(value & u64::from(u32::MAX)).map_err(|_error| Error::InvalidSource)?;
     Ok(i32::from_ne_bytes(bits.to_ne_bytes()))
 }
 
@@ -2016,7 +2105,7 @@ fn unique_nested_payload<'a>(
     payload: &'a [u8],
     path: &[u32],
     budget: &mut WireScanBudget,
-) -> Result<Option<&'a [u8]>, SlideTextError> {
+) -> Result<Option<&'a [u8]>, Error> {
     let Some((&field_number, remaining)) = path.split_first() else {
         return Ok(Some(payload));
     };
@@ -2024,7 +2113,7 @@ fn unique_nested_payload<'a>(
     let mut selected = None;
     for field in view.fields().filter(|field| field.number() == field_number) {
         if selected.is_some() || field.wire_type() != 2 {
-            return Err(SlideTextError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         selected = Some(field.canonical_payload().map_err(map_wire_error)?);
     }
@@ -2040,15 +2129,12 @@ fn prove_metadata_ownership(
     role: Kind,
     placeholder_identifier: u64,
     storage_identifier: u64,
-) -> Result<(), SlideTextError> {
+) -> Result<(), Error> {
     let mut saw_placeholder_owner = false;
     let mut saw_storage_owner = false;
     for component in package.state.source.components().iter() {
         for object in &component.archive().objects {
-            let owner_identifier = object
-                .archive_info
-                .identifier
-                .ok_or(SlideTextError::InvalidSource)?;
+            let owner_identifier = object.archive_info.identifier.ok_or(Error::InvalidSource)?;
             for message in &object.archive_info.message_infos {
                 let mut aggregate_placeholder = false;
                 let mut aggregate_storage = false;
@@ -2056,12 +2142,12 @@ fn prove_metadata_ownership(
                     if *reference == placeholder_identifier
                         && std::mem::replace(&mut aggregate_placeholder, true)
                     {
-                        return Err(SlideTextError::DependentContent);
+                        return Err(Error::Refused(Refusal::DependentContent));
                     }
                     if *reference == storage_identifier
                         && std::mem::replace(&mut aggregate_storage, true)
                     {
-                        return Err(SlideTextError::DependentContent);
+                        return Err(Error::Refused(Refusal::DependentContent));
                     }
                 }
                 let mut role_path_seen = false;
@@ -2079,27 +2165,27 @@ fn prove_metadata_ownership(
                             match field.path.as_slice() {
                                 path if path == role_path => {
                                     if std::mem::replace(&mut role_path_seen, true) {
-                                        return Err(SlideTextError::DependentContent);
+                                        return Err(Error::Refused(Refusal::DependentContent));
                                     }
                                 },
                                 [7] => {
                                     if std::mem::replace(&mut owned_path_seen, true) {
-                                        return Err(SlideTextError::DependentContent);
+                                        return Err(Error::Refused(Refusal::DependentContent));
                                     }
                                 },
                                 [42] => {
                                     if std::mem::replace(&mut z_order_path_seen, true) {
-                                        return Err(SlideTextError::DependentContent);
+                                        return Err(Error::Refused(Refusal::DependentContent));
                                     }
                                 },
-                                _ => return Err(SlideTextError::DependentContent),
+                                _ => return Err(Error::Refused(Refusal::DependentContent)),
                             }
                         }
                         if *reference == storage_identifier
                             && (field.path.as_slice() != [1, 4]
                                 || std::mem::replace(&mut storage_path_seen, true))
                         {
-                            return Err(SlideTextError::DependentContent);
+                            return Err(Error::Refused(Refusal::DependentContent));
                         }
                     }
                 }
@@ -2110,7 +2196,7 @@ fn prove_metadata_ownership(
                         || owner_identifier != expected_slide_identifier
                         || message.type_ != SLIDE_MESSAGE_TYPE)
                 {
-                    return Err(SlideTextError::DependentContent);
+                    return Err(Error::Refused(Refusal::DependentContent));
                 }
                 let has_storage = aggregate_storage || storage_path_seen;
                 if has_storage
@@ -2118,28 +2204,25 @@ fn prove_metadata_ownership(
                         || owner_identifier != placeholder_identifier
                         || message.type_ != PLACEHOLDER_MESSAGE_TYPE)
                 {
-                    return Err(SlideTextError::DependentContent);
+                    return Err(Error::Refused(Refusal::DependentContent));
                 }
             }
         }
     }
     if !saw_placeholder_owner || !saw_storage_owner {
-        return Err(SlideTextError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
 
-fn one_message(
-    messages: &[RawMessage],
-    message_type: u32,
-) -> Result<(usize, &RawMessage), SlideTextError> {
+fn one_message(messages: &[RawMessage], message_type: u32) -> Result<(usize, &RawMessage), Error> {
     let mut matches = messages
         .iter()
         .enumerate()
         .filter(|(_index, message)| message.type_ == message_type);
-    let item = matches.next().ok_or(SlideTextError::InvalidSource)?;
+    let item = matches.next().ok_or(Error::InvalidSource)?;
     if matches.next().is_some() {
-        return Err(SlideTextError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(item)
 }
@@ -2147,38 +2230,36 @@ fn one_message(
 fn validate_canonical_object_length_prefixes(
     source: &[u8],
     archive: &Archive,
-) -> Result<(), SlideTextError> {
+) -> Result<(), Error> {
     for object in &archive.objects {
-        let offset = usize::try_from(object.header_offset)
-            .map_err(|_error| SlideTextError::InvalidSource)?;
-        let remaining = source.get(offset..).ok_or(SlideTextError::InvalidSource)?;
+        let offset =
+            usize::try_from(object.header_offset).map_err(|_error| Error::InvalidSource)?;
+        let remaining = source.get(offset..).ok_or(Error::InvalidSource)?;
         let (header_bytes, prefix_bytes) =
-            decode_varint_from_bytes(remaining).map_err(|_error| SlideTextError::InvalidSource)?;
+            decode_varint_from_bytes(remaining).map_err(|_error| Error::InvalidSource)?;
         if prefix_bytes != encoded_len(header_bytes) {
-            return Err(SlideTextError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let framed_header_bytes = header_bytes
-            .checked_add(
-                u64::try_from(prefix_bytes).map_err(|_error| SlideTextError::InvalidSource)?,
-            )
-            .ok_or(SlideTextError::InvalidSource)?;
+            .checked_add(u64::try_from(prefix_bytes).map_err(|_error| Error::InvalidSource)?)
+            .ok_or(Error::InvalidSource)?;
         if framed_header_bytes != object.header_length
             || object
                 .header_offset
                 .checked_add(object.header_length)
-                .ok_or(SlideTextError::InvalidSource)?
+                .ok_or(Error::InvalidSource)?
                 != object.data_offset
         {
-            return Err(SlideTextError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(())
 }
 
-fn storage_rewrite_limits(
+pub(super) fn storage_rewrite_limits(
     package: &Package,
     max_message_bytes: usize,
-) -> Result<RewriteLimits, SlideTextError> {
+) -> Result<RewriteLimits, Error> {
     let defaults = RewriteLimits::default();
     let message_bytes = defaults.max_message_bytes().min(max_message_bytes);
     RewriteLimits::new(
@@ -2200,16 +2281,16 @@ fn storage_rewrite_limits(
     .map_err(map_text_rewrite_error)
 }
 
-fn validate_replacement(replacement: &str) -> Result<(), SlideTextError> {
+fn validate_replacement(replacement: &str) -> Result<(), Error> {
     if contains_dependent_marker(replacement) {
-        return Err(SlideTextError::ObjectMarkerReplacement);
+        return Err(Error::Refused(Refusal::ObjectMarkerReplacement));
     }
     Ok(())
 }
 
-fn validate_consumed_text(text: &str) -> Result<(), SlideTextError> {
+fn validate_consumed_text(text: &str) -> Result<(), Error> {
     if contains_dependent_marker(text) {
-        return Err(SlideTextError::DependentContent);
+        return Err(Error::Refused(Refusal::DependentContent));
     }
     Ok(())
 }
@@ -2218,22 +2299,21 @@ fn contains_dependent_marker(text: &str) -> bool {
     text.contains('\u{000e}') || text.contains('\u{fffc}')
 }
 
-fn validate_span(text: &str, span: TextSpan) -> Result<Range<usize>, SlideTextError> {
+fn validate_span(text: &str, span: TextSpan) -> Result<Range<usize>, Error> {
     let length = text.encode_utf16().count();
     let length_position =
-        TextPosition::from_utf16_index(length).map_err(|_error| SlideTextError::InvalidSource)?;
+        TextPosition::from_utf16_index(length).map_err(|_error| Error::InvalidSource)?;
     if span.end() > length_position {
-        return Err(SlideTextError::SpanOutOfBounds {
+        return Err(Error::Refused(Refusal::SpanOutOfBounds {
             span,
             length: length_position,
-        });
+        }));
     }
     Ok(utf16_to_byte_index(text, span.start())?..utf16_to_byte_index(text, span.end())?)
 }
 
-fn utf16_to_byte_index(text: &str, position: TextPosition) -> Result<usize, SlideTextError> {
-    let target =
-        usize::try_from(position.utf16_index()).map_err(|_error| SlideTextError::InvalidSource)?;
+fn utf16_to_byte_index(text: &str, position: TextPosition) -> Result<usize, Error> {
+    let target = usize::try_from(position.utf16_index()).map_err(|_error| Error::InvalidSource)?;
     if target == 0 {
         return Ok(0);
     }
@@ -2244,15 +2324,15 @@ fn utf16_to_byte_index(text: &str, position: TextPosition) -> Result<usize, Slid
         }
         units = units
             .checked_add(character.len_utf16())
-            .ok_or(SlideTextError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if units > target {
-            return Err(SlideTextError::SurrogateBoundary { position });
+            return Err(Error::Refused(Refusal::SurrogateBoundary { position }));
         }
     }
     if units == target {
         Ok(text.len())
     } else {
-        Err(SlideTextError::InvalidSource)
+        Err(Error::InvalidSource)
     }
 }
 
@@ -2260,27 +2340,19 @@ fn replace_utf8_range(
     source: &str,
     range: Range<usize>,
     replacement: &str,
-) -> Result<String, SlideTextError> {
+) -> Result<String, Error> {
     let capacity = source
         .len()
         .checked_sub(range.end - range.start)
         .and_then(|length| length.checked_add(replacement.len()))
-        .ok_or(SlideTextError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let mut output = String::new();
     output
         .try_reserve_exact(capacity)
-        .map_err(|_allocation| SlideTextError::Allocation { amount: capacity })?;
-    output.push_str(
-        source
-            .get(..range.start)
-            .ok_or(SlideTextError::InvalidSource)?,
-    );
+        .map_err(|_allocation| Error::Allocation { amount: capacity })?;
+    output.push_str(source.get(..range.start).ok_or(Error::InvalidSource)?);
     output.push_str(replacement);
-    output.push_str(
-        source
-            .get(range.end..)
-            .ok_or(SlideTextError::InvalidSource)?,
-    );
+    output.push_str(source.get(range.end..).ok_or(Error::InvalidSource)?);
     Ok(output)
 }
 
@@ -2289,7 +2361,7 @@ fn validate_candidate_text_memory(
     before: &str,
     span: TextSpan,
     replacement: &str,
-) -> Result<(), SlideTextError> {
+) -> Result<(), Error> {
     let removed = validate_span(before, span)?;
     let observed = before
         .len()
@@ -2303,18 +2375,18 @@ fn validate_candidate_text_memory(
     Ok(())
 }
 
-fn try_owned_text(text: &str) -> Result<String, SlideTextError> {
+fn try_owned_text(text: &str) -> Result<String, Error> {
     let mut owned = String::new();
     owned
         .try_reserve_exact(text.len())
-        .map_err(|_allocation| SlideTextError::Allocation { amount: text.len() })?;
+        .map_err(|_allocation| Error::Allocation { amount: text.len() })?;
     owned.push_str(text);
     Ok(owned)
 }
 
-fn utf16_len(text: &str) -> Result<u32, SlideTextError> {
-    u32::try_from(text.encode_utf16().count()).map_err(|_error| SlideTextError::LimitExceeded {
-        kind: SlideTextLimitKind::TextUnits,
+fn utf16_len(text: &str) -> Result<u32, Error> {
+    u32::try_from(text.encode_utf16().count()).map_err(|_error| Error::Limit {
+        kind: LimitKind::TextUnits,
         observed: u64::MAX,
         maximum: u64::from(u32::MAX),
     })
@@ -2324,28 +2396,28 @@ fn utf16_len(text: &str) -> Result<u32, SlideTextError> {
     clippy::unnecessary_wraps,
     reason = "the semantic-only source feature adds a typed unsupported-source branch"
 )]
-fn physical_catalog(package: &Package) -> Result<&SourceCatalog, SlideTextError> {
+fn physical_catalog(package: &Package) -> Result<&SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
-        PhysicalSource::Semantic(_) => Err(SlideTextError::UnsupportedSource),
+        PhysicalSource::Semantic(_) => Err(Error::Refused(Refusal::UnsupportedSource)),
     }
 }
 
-fn map_read_error(error: ReadError) -> SlideTextError {
+fn map_read_error(error: ReadError) -> Error {
     match error {
         ReadError::SemanticLimit {
             kind,
             observed,
             maximum,
             ..
-        } => SlideTextError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                SemanticLimitKind::Objects => SlideTextLimitKind::Entries,
-                SemanticLimitKind::Slides => SlideTextLimitKind::Slides,
-                SemanticLimitKind::References => SlideTextLimitKind::References,
-                SemanticLimitKind::TextStorages => SlideTextLimitKind::TextStorages,
-                SemanticLimitKind::TextFragments => SlideTextLimitKind::TextFragments,
-                SemanticLimitKind::TextBytes => SlideTextLimitKind::TextBytes,
+                SemanticLimitKind::Objects => LimitKind::Entries,
+                SemanticLimitKind::Slides => LimitKind::Slides,
+                SemanticLimitKind::References => LimitKind::References,
+                SemanticLimitKind::TextStorages => LimitKind::TextStorages,
+                SemanticLimitKind::TextFragments => LimitKind::TextFragments,
+                SemanticLimitKind::TextBytes => LimitKind::TextBytes,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
@@ -2355,117 +2427,113 @@ fn map_read_error(error: ReadError) -> SlideTextError {
             observed,
             maximum,
             ..
-        } => SlideTextError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                super::PayloadLimitKind::Bytes => SlideTextLimitKind::WireBytes,
-                super::PayloadLimitKind::Fields => SlideTextLimitKind::WireFields,
-                super::PayloadLimitKind::Nesting => SlideTextLimitKind::WireNesting,
-                super::PayloadLimitKind::Work => SlideTextLimitKind::WireWork,
+                super::PayloadLimitKind::Bytes => LimitKind::WireBytes,
+                super::PayloadLimitKind::Fields => LimitKind::WireFields,
+                super::PayloadLimitKind::Nesting => LimitKind::WireNesting,
+                super::PayloadLimitKind::Work => LimitKind::WireWork,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         },
-        ReadError::Allocation { amount, .. } => SlideTextError::Allocation { amount },
+        ReadError::Allocation { amount, .. } => Error::Allocation { amount },
         ReadError::Archive(error) => map_archive_error(error),
-        _ => SlideTextError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_archive_error(error: litchi_iwa_archive::Error) -> SlideTextError {
+fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     match error {
         litchi_iwa_archive::Error::Limit {
             kind,
             observed,
             maximum,
-        } => SlideTextError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_archive::LimitKind::InputBytes => SlideTextLimitKind::InputBytes,
-                litchi_iwa_archive::LimitKind::OutputBytes => SlideTextLimitKind::OutputBytes,
-                litchi_iwa_archive::LimitKind::Entries => SlideTextLimitKind::Entries,
+                litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
+                litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_archive::LimitKind::Entries => LimitKind::Entries,
                 litchi_iwa_archive::LimitKind::TotalBytes
                 | litchi_iwa_archive::LimitKind::MetadataBytes
-                | litchi_iwa_archive::LimitKind::IwaTotalBytes => SlideTextLimitKind::TotalBytes,
-                _ => SlideTextLimitKind::EntryBytes,
+                | litchi_iwa_archive::LimitKind::IwaTotalBytes => LimitKind::TotalBytes,
+                _ => LimitKind::EntryBytes,
             },
             observed,
             maximum,
         },
-        litchi_iwa_archive::Error::Allocation { amount, .. } => {
-            SlideTextError::Allocation { amount }
-        },
+        litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
         litchi_iwa_archive::Error::Iwa(error) => map_core_error(error),
-        _ => SlideTextError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_core_error(error: litchi_iwa_core::Error) -> SlideTextError {
+fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
             kind,
             observed,
             maximum,
-        } => SlideTextError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::Objects
                 | litchi_iwa_core::LimitKind::Messages
                 | litchi_iwa_core::LimitKind::MessagesPerObject
                 | litchi_iwa_core::LimitKind::MetadataItems
-                | litchi_iwa_core::LimitKind::SnappyFrames => SlideTextLimitKind::Entries,
-                litchi_iwa_core::LimitKind::MessageBytes => SlideTextLimitKind::WireBytes,
-                litchi_iwa_core::LimitKind::HeaderFields => SlideTextLimitKind::WireFields,
-                litchi_iwa_core::LimitKind::HeaderNesting => SlideTextLimitKind::WireNesting,
-                _ => SlideTextLimitKind::EntryBytes,
+                | litchi_iwa_core::LimitKind::SnappyFrames => LimitKind::Entries,
+                litchi_iwa_core::LimitKind::MessageBytes => LimitKind::WireBytes,
+                litchi_iwa_core::LimitKind::HeaderFields => LimitKind::WireFields,
+                litchi_iwa_core::LimitKind::HeaderNesting => LimitKind::WireNesting,
+                _ => LimitKind::EntryBytes,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         },
         litchi_iwa_core::Error::Allocation { requested, .. } => {
-            SlideTextError::Allocation { amount: requested }
+            Error::Allocation { amount: requested }
         },
-        _ => SlideTextError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_slide_preview_error(error: super::slide_preview::InvalidationError) -> SlideTextError {
+fn map_slide_preview_error(error: super::slide_preview::InvalidationError) -> Error {
     match error {
-        super::slide_preview::InvalidationError::InvalidSource => SlideTextError::InvalidSource,
+        super::slide_preview::InvalidationError::InvalidSource => Error::InvalidSource,
         super::slide_preview::InvalidationError::Wire(error) => map_wire_error(error),
         super::slide_preview::InvalidationError::Archive(error) => map_core_error(error),
     }
 }
 
-fn map_wire_error(error: litchi_iwa_common::Error) -> SlideTextError {
+fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
     match error {
         litchi_iwa_common::Error::LimitExceeded {
             kind,
             observed,
             limit,
-        } => SlideTextError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_common::LimitKind::InputBytes => SlideTextLimitKind::WireBytes,
-                litchi_iwa_common::LimitKind::OutputBytes => SlideTextLimitKind::OutputBytes,
-                litchi_iwa_common::LimitKind::Nesting => SlideTextLimitKind::WireNesting,
-                litchi_iwa_common::LimitKind::RewriteWork => SlideTextLimitKind::WireWork,
-                litchi_iwa_common::LimitKind::Fields => SlideTextLimitKind::WireFields,
-                _ => SlideTextLimitKind::Entries,
+                litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
+                litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_common::LimitKind::Nesting => LimitKind::WireNesting,
+                litchi_iwa_common::LimitKind::RewriteWork => LimitKind::WireWork,
+                litchi_iwa_common::LimitKind::Fields => LimitKind::WireFields,
+                _ => LimitKind::Entries,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
-        litchi_iwa_common::Error::Allocation { amount, .. } => {
-            SlideTextError::Allocation { amount }
-        },
-        _ => SlideTextError::InvalidSource,
+        litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_text_rewrite_error(error: litchi_iwa_text_wire::RewriteError) -> SlideTextError {
+pub(super) fn map_text_rewrite_error(error: litchi_iwa_text_wire::RewriteError) -> Error {
     match error {
         litchi_iwa_text_wire::RewriteError::LimitExceeded {
             resource,
             observed,
             limit,
-        } => SlideTextError::LimitExceeded {
+        } => Error::Limit {
             kind: text_rewrite_limit_kind(resource),
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
@@ -2474,39 +2542,39 @@ fn map_text_rewrite_error(error: litchi_iwa_text_wire::RewriteError) -> SlideTex
             field,
             value,
             maximum,
-        } => SlideTextError::LimitExceeded {
+        } => Error::Limit {
             kind: text_rewrite_limit_kind(field),
             observed: usize_to_u64(value),
             maximum: usize_to_u64(maximum),
         },
         litchi_iwa_text_wire::RewriteError::Allocation { amount, .. } => {
-            SlideTextError::Allocation { amount }
+            Error::Allocation { amount }
         },
-        _ => SlideTextError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn text_rewrite_limit_kind(resource: &str) -> SlideTextLimitKind {
+fn text_rewrite_limit_kind(resource: &str) -> LimitKind {
     match resource {
-        "text bytes" => SlideTextLimitKind::TextBytes,
-        "text fragments" => SlideTextLimitKind::TextFragments,
-        "object references" | "object reference count" => SlideTextLimitKind::References,
-        "table entries" | "table entry count" => SlideTextLimitKind::Entries,
+        "text bytes" => LimitKind::TextBytes,
+        "text fragments" => LimitKind::TextFragments,
+        "object references" | "object reference count" => LimitKind::References,
+        "table entries" | "table entry count" => LimitKind::Entries,
         "output bytes" | "rewritten storage bytes" | "appended text field" => {
-            SlideTextLimitKind::OutputBytes
+            LimitKind::OutputBytes
         },
-        "nesting" => SlideTextLimitKind::WireNesting,
-        "rewrite work" | "aggregate nested scan bytes" => SlideTextLimitKind::WireWork,
+        "nesting" => LimitKind::WireNesting,
+        "rewrite work" | "aggregate nested scan bytes" => LimitKind::WireWork,
         "fields" | "aggregate field count" | "generated text fields" | "output field bound" => {
-            SlideTextLimitKind::WireFields
+            LimitKind::WireFields
         },
-        _ => SlideTextLimitKind::WireBytes,
+        _ => LimitKind::WireBytes,
     }
 }
 
-fn text_limit_error(observed: usize, maximum: usize) -> SlideTextError {
-    SlideTextError::LimitExceeded {
-        kind: SlideTextLimitKind::TextBytes,
+fn text_limit_error(observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: LimitKind::TextBytes,
         observed: usize_to_u64(observed),
         maximum: usize_to_u64(maximum),
     }

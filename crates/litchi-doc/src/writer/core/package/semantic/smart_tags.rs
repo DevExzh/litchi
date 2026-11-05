@@ -1,7 +1,7 @@
-use crate::writer::core::Writer;
+use crate::writer::core::Builder;
 use crate::writer::fib::FibBuilder;
 use crate::writer::smart_tags::SmartTagTableData;
-impl Writer {
+impl Builder {
     pub(in crate::writer::core::package) fn append_smart_tag_tables(
         fib: &mut FibBuilder,
         table_stream: &mut Vec<u8>,

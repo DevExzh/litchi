@@ -7,7 +7,7 @@
 //! disabled.
 
 pub use crate::package::slide_placeholder_visibility::{
-    Commit, Diagnostics, Edit, Error, LimitKind, Patch,
+    Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
 };
 
 /// Existing placeholder selected on one slide.

@@ -30,8 +30,9 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits, ReadAt,
     Resource, SourceVersion,
 };
+use litchi_opc::SourceReadPolicy;
 use litchi_opc::{
-    OpcError, PackURI, ReadLimits, ReadResource, SourceBackedPackage, SourceCacheLimits,
+    OpcError, PackURI, SourceBackedPackage, SourceCacheLimits, SourceLimitKind, SourceLimits,
 };
 use soapberry_zip::office::StreamingArchiveWriter;
 
@@ -76,7 +77,8 @@ fn archive_bytes(corrupt_member: Option<&str>) -> (Vec<u8>, Vec<(PackURI, Vec<u8
         (pack(GAMMA_URI), GAMMA_MEMBER, payload(0x71)),
     ];
 
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .unwrap();
@@ -156,7 +158,8 @@ fn deflated_archive_bytes() -> (Vec<u8>, Vec<(PackURI, Vec<u8>)>) {
         ),
     ];
 
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .unwrap();
@@ -612,6 +615,8 @@ struct GateState {
     active_calls: usize,
     overlap: bool,
     released: bool,
+    /// Keep admitted calls blocked even when two overlap, until `release`.
+    hold: bool,
 }
 
 #[derive(Debug, Default)]
@@ -625,6 +630,15 @@ impl ReadGate {
         let mut state = self.state.lock().unwrap();
         *state = GateState::default();
         state.armed = true;
+    }
+
+    /// Arm the gate so admitted calls stay blocked until [`Self::release`],
+    /// even when two of them overlap. A test that acts (for example,
+    /// cancels) while a load is in flight uses this, so the loads cannot
+    /// finish before the action however the threads are scheduled.
+    fn arm_holding(&self) {
+        self.arm();
+        self.state.lock().unwrap().hold = true;
     }
 
     fn before_read(&self) {
@@ -641,7 +655,7 @@ impl ReadGate {
         self.changed.notify_all();
         if state.active_calls >= 2 {
             state.overlap = true;
-            state.released = true;
+            state.released |= !state.hold;
             self.changed.notify_all();
         }
         while !state.released {
@@ -967,11 +981,12 @@ fn managed_context(
 }
 
 fn package_with_context(source: Arc<dyn ReadAt>, context: ExecutionContext) -> SourceBackedPackage {
-    SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
+    SourceBackedPackage::from_read_at(
         source,
-        ReadLimits::default(),
+        SourceLimits::default(),
         SourceCacheLimits::new(PART_BYTES * 8, 16).unwrap(),
-        context,
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap()
 }
@@ -996,7 +1011,13 @@ fn assert_batch_bytes(batch: &litchi_opc::PartBatch, expected: &[Vec<u8>]) {
 #[test]
 fn batch_preserves_request_order_duplicates_and_exact_serial_bytes() {
     let (archive, expected_parts) = archive_bytes(None);
-    let serial = SourceBackedPackage::from_vec(archive.clone()).unwrap();
+    let serial = SourceBackedPackage::from_vec(
+        archive.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let requests = vec![
         pack(BETA_URI),
         pack(ALPHA_URI),
@@ -1016,7 +1037,13 @@ fn batch_preserves_request_order_duplicates_and_exact_serial_bytes() {
         })
         .collect::<Vec<_>>();
 
-    let package = SourceBackedPackage::from_vec(archive).unwrap();
+    let package = SourceBackedPackage::from_vec(
+        archive,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let batch = package.read_parts_ordered(&requests).unwrap();
     assert_batch_bytes(&batch, &expected);
     assert_eq!(batch.get(0).unwrap().as_bytes(), expected[0].as_slice());
@@ -1042,7 +1069,14 @@ fn batch_short_read_provider_preserves_exact_bytes() {
         .collect::<Vec<_>>();
     let inner: Arc<dyn ReadAt> = Arc::new(litchi_core::OwnedSource::new(archive));
     let probe = ProbeSource::new(inner).with_short_reads(7);
-    let package = SourceBackedPackage::from_read_at(Arc::new(probe)).unwrap();
+    let package = SourceBackedPackage::from_read_at(
+        Arc::new(probe),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
     let requests = requested_uris();
     let batch = package.read_parts_ordered(&requests).unwrap();
     assert_batch_bytes(&batch, &expected);
@@ -1141,7 +1175,13 @@ fn batch_below_parallel_threshold_uses_serial_fallback() {
 #[test]
 fn batch_missing_and_corrupt_parts_fail_without_partial_results_or_flights() {
     let (archive, _) = archive_bytes(None);
-    let package = SourceBackedPackage::from_vec(archive).unwrap();
+    let package = SourceBackedPackage::from_vec(
+        archive,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let missing =
         package.read_parts_ordered(&[pack(ALPHA_URI), pack("/custom/missing.bin"), pack(BETA_URI)]);
     assert!(matches!(missing, Err(OpcError::PartNotFound(_))));
@@ -1167,10 +1207,17 @@ fn batch_missing_and_corrupt_parts_fail_without_partial_results_or_flights() {
 #[test]
 fn batch_request_count_limit_remains_a_typed_read_limit() {
     let (archive, _) = archive_bytes(None);
-    let limits = ReadLimits::builder().max_parts(4).unwrap().build().unwrap();
-    let package = SourceBackedPackage::from_read_at_with_limits(
+    let limits = SourceLimits::builder()
+        .max_parts(4)
+        .unwrap()
+        .build()
+        .unwrap();
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(litchi_core::OwnedSource::new(archive)),
         limits,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
     )
     .unwrap();
     let result = package.read_parts_ordered(&[
@@ -1182,9 +1229,9 @@ fn batch_request_count_limit_remains_a_typed_read_limit() {
     ]);
     assert!(matches!(
         result,
-        Err(OpcError::ReadLimit {
-            resource: ReadResource::Parts,
-            actual,
+        Err(OpcError::Limit {
+            kind: SourceLimitKind::Parts,
+            observed: actual,
             maximum,
         }) if actual == 5 && maximum == 4
     ));
@@ -1477,7 +1524,13 @@ fn warm_batch_holds_structural_memory_until_the_returned_batch_drops() {
 #[test]
 fn batch_empty_one_worker_and_oversized_single_part_use_serial_fallbacks() {
     let (archive, expected_parts) = archive_bytes(None);
-    let empty = SourceBackedPackage::from_vec(archive.clone()).unwrap();
+    let empty = SourceBackedPackage::from_vec(
+        archive.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let empty_batch = empty.read_parts_ordered(&[]).unwrap();
     assert!(empty_batch.is_empty());
     assert_eq!(empty_batch.len(), 0);
@@ -1624,7 +1677,7 @@ fn batch_cancellation_during_a_gated_load_returns_cancelled_and_joins_workers() 
     let (budget, cancellation, context) =
         managed_context(2, 2, u64::try_from(PART_BYTES * 2).unwrap(), 1, u64::MAX);
     let package = package_with_context(probe, context);
-    gate.arm();
+    gate.arm_holding();
     let worker = thread::spawn(move || {
         let result = package.read_parts_ordered(&requested_uris());
         (result, package)
@@ -1648,7 +1701,14 @@ fn batch_source_mutation_during_a_gated_load_returns_source_changed() {
     let inner: Arc<dyn ReadAt> = mutable.clone();
     let gate = Arc::new(ReadGate::default());
     let probe = Arc::new(ProbeSource::new(inner).with_gate(Arc::clone(&gate)));
-    let package = SourceBackedPackage::from_read_at(probe).unwrap();
+    let package = SourceBackedPackage::from_read_at(
+        probe,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
     gate.arm();
     let worker = thread::spawn(move || {
         let result = package.read_parts_ordered(&[pack(ALPHA_URI), pack(BETA_URI)]);

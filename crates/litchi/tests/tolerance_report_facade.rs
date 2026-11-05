@@ -1,9 +1,13 @@
-//! The unified facades expose the owning format crate's repair report.
+//! `File::tolerance_report` exposes the owning format crate's repair report.
 //!
-//! Each format family opens one defect-carrying file through
-//! `Document`/`Presentation`/`Workbook::open` and asserts the repair is
-//! listed, and one conformant file and asserts a clean report.
+//! Each format opens one defect-carrying file through `litchi::open` (and
+//! `litchi::open_bytes` where the facade test covered both routes) and
+//! asserts the repair is listed, and one conformant file and asserts a clean
+//! report. M0a step S8c ported these tests from the facade's `Document`,
+//! `Presentation` and `Workbook` types; the fixtures and expected repairs
+//! are unchanged.
 
+#![cfg(litchi_unified)]
 #![allow(
     clippy::expect_used,
     clippy::unwrap_used,
@@ -100,6 +104,17 @@ fn write_temp(directory: &tempfile::TempDir, name: &str, bytes: &[u8]) -> PathBu
     path
 }
 
+/// Open `path` through the unified opener.
+fn open(path: &Path) -> litchi::File {
+    litchi::open(path).unwrap_or_else(|error| panic!("{}: {error:?}", path.display()))
+}
+
+/// Open the bytes of `path` through the unified opener.
+fn open_bytes(path: &Path) -> litchi::File {
+    litchi::open_bytes(std::fs::read(path).expect("fixture"))
+        .unwrap_or_else(|error| panic!("{} (bytes): {error:?}", path.display()))
+}
+
 fn assert_clean(report: &litchi::ToleranceReport) {
     assert!(report.is_tracked());
     assert!(report.is_clean(), "{report:?}");
@@ -130,7 +145,7 @@ fn core_properties_defect(
 #[cfg(feature = "doc")]
 #[test]
 fn doc_repairs_are_reported_through_the_document_facade() {
-    let document = litchi::Document::open(fixture("ole/doc/watermark.doc")).expect("open");
+    let document = open(&fixture("ole/doc/watermark.doc"));
     let report = document.tolerance_report().expect("report");
     assert_eq!(report.format(), litchi::FileFormat::Doc);
     let litchi::ToleranceReport::Doc(doc) = &report else {
@@ -143,10 +158,9 @@ fn doc_repairs_are_reported_through_the_document_facade() {
         "{doc:?}"
     );
 
-    let clean = litchi::Document::open(fixture(
+    let clean = open(&fixture(
         "libreoffice-core/embeddedobj/qa/cppunit/data/insert-file-config.doc",
-    ))
-    .expect("open");
+    ));
     assert_clean(&clean.tolerance_report().expect("report"));
 }
 
@@ -158,10 +172,8 @@ fn docx_core_properties_repairs_are_reported_through_the_document_facade() {
     let path = fixture(
         "poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_NotPresentFAIL.docx",
     );
-    // Filesystem open (deferred parts) and byte open (eager package).
-    let opened = litchi::Document::open(&path).expect("open");
-    let from_bytes = litchi::Document::from_bytes(std::fs::read(&path).unwrap()).expect("bytes");
-    for document in [opened, from_bytes] {
+    // Filesystem open and byte open (both deferred, source-backed parts).
+    for document in [open(&path), open_bytes(&path)] {
         // Twice: a deferred metadata read is recorded once, not per call.
         let _ = document.metadata().expect("metadata");
         for _ in 0..2 {
@@ -184,19 +196,16 @@ fn docx_core_properties_repairs_are_reported_through_the_document_facade() {
     }
 
     let clean_path = fixture("libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx");
-    let clean = litchi::Document::open(&clean_path).expect("open");
-    assert_clean(&clean.tolerance_report().expect("report"));
-    let clean = litchi::Document::from_bytes(std::fs::read(&clean_path).unwrap()).expect("bytes");
-    assert_clean(&clean.tolerance_report().expect("report"));
+    assert_clean(&open(&clean_path).tolerance_report().expect("report"));
+    assert_clean(&open_bytes(&clean_path).tolerance_report().expect("report"));
 }
 
 #[cfg(feature = "rtf")]
 #[test]
 fn rtf_repairs_are_reported_through_the_document_facade() {
-    let document = litchi::Document::open(fixture(
+    let document = open(&fixture(
         "libreoffice-core/sw/qa/extras/rtfexport/data/tdf108955.rtf",
-    ))
-    .expect("open");
+    ));
     let report = document.tolerance_report().expect("report");
     assert!(matches!(report, litchi::ToleranceReport::Rtf(_)));
     assert_repaired(
@@ -204,10 +213,9 @@ fn rtf_repairs_are_reported_through_the_document_facade() {
         "ignored the content after the root group's closing brace",
     );
 
-    let clean = litchi::Document::open(fixture(
+    let clean = open(&fixture(
         "libreoffice-core/sw/qa/extras/layout/data/A020-min.rtf",
-    ))
-    .expect("open");
+    ));
     assert_clean(&clean.tolerance_report().expect("report"));
 }
 
@@ -232,25 +240,32 @@ fn odt_repairs_are_reported_through_the_document_facade() {
         "deflated.odt",
         &rezip(&source, zip::CompressionMethod::Deflated, |_, data| data),
     );
-    let document = litchi::Document::open(&deflated).expect("open");
-    let report = document.tolerance_report().expect("report");
+    let report = open(&deflated).tolerance_report().expect("report");
     let litchi::ToleranceReport::Odt(odt) = &report else {
         panic!("expected an ODT report: {report:?}");
     };
     assert_mimetype_deflated(odt);
 
-    assert_clean(
-        &litchi::Document::open(&source)
-            .expect("open")
-            .tolerance_report()
-            .expect("report"),
-    );
+    assert_clean(&open(&source).tolerance_report().expect("report"));
 }
 
+/// The Pages leaf keeps no repair report (records 0296 and 0306): a
+/// `File::Pages` reports an untracked report that names the format.
 #[cfg(feature = "pages")]
 #[test]
 fn pages_reports_are_untracked() {
-    let report = litchi::ToleranceReport::Untracked(litchi::FileFormat::Pages);
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../test-data/iwork/pages/basic.pages"
+    );
+    let report = litchi::open(path)
+        .unwrap()
+        .tolerance_report()
+        .expect("report");
+    assert_eq!(
+        report,
+        litchi::ToleranceReport::Untracked(litchi::FileFormat::Pages)
+    );
     assert!(!report.is_tracked());
     assert!(!report.is_clean());
     assert_eq!(report.total(), 0);
@@ -261,13 +276,12 @@ fn pages_reports_are_untracked() {
 #[cfg(feature = "ppt")]
 #[test]
 fn ppt_repairs_are_reported_through_the_presentation_facade() {
-    let presentation =
-        litchi::Presentation::open(fixture("poi/test-data/slideshow/45543.ppt")).expect("open");
+    let presentation = open(&fixture("poi/test-data/slideshow/45543.ppt"));
     let report = presentation.tolerance_report().expect("report");
     assert!(matches!(report, litchi::ToleranceReport::Ppt(_)));
     assert_repaired(&report, "ignored the nonzero reserved or padding bytes");
 
-    let clean = litchi::Presentation::open(fixture("ole/ppt/empty.ppt")).expect("open");
+    let clean = open(&fixture("ole/ppt/empty.ppt"));
     assert_clean(&clean.tolerance_report().expect("report"));
 }
 
@@ -288,8 +302,8 @@ fn pptx_core_properties_repairs_are_reported_through_the_presentation_facade() {
         CorePropertiesDefect::MissingDateType,
     ));
     for presentation in [
-        litchi::Presentation::open(&path).expect("open"),
-        litchi::Presentation::from_bytes(patched.clone()).expect("bytes"),
+        open(&path),
+        litchi::open_bytes(patched.clone()).expect("bytes"),
     ] {
         let _ = presentation.metadata().expect("metadata");
         let report = presentation.tolerance_report().expect("report");
@@ -304,18 +318,8 @@ fn pptx_core_properties_repairs_are_reported_through_the_presentation_facade() {
         assert_eq!(missing, 1, "{pptx:?}");
     }
 
-    assert_clean(
-        &litchi::Presentation::open(&source)
-            .expect("open")
-            .tolerance_report()
-            .expect("report"),
-    );
-    assert_clean(
-        &litchi::Presentation::from_bytes(std::fs::read(&source).unwrap())
-            .expect("bytes")
-            .tolerance_report()
-            .expect("report"),
-    );
+    assert_clean(&open(&source).tolerance_report().expect("report"));
+    assert_clean(&open_bytes(&source).tolerance_report().expect("report"));
 }
 
 #[cfg(feature = "odp")]
@@ -328,21 +332,13 @@ fn odp_repairs_are_reported_through_the_presentation_facade() {
         "deflated.odp",
         &rezip(&source, zip::CompressionMethod::Deflated, |_, data| data),
     );
-    let report = litchi::Presentation::open(&deflated)
-        .expect("open")
-        .tolerance_report()
-        .expect("report");
+    let report = open(&deflated).tolerance_report().expect("report");
     let litchi::ToleranceReport::Odp(odp) = &report else {
         panic!("expected an ODP report: {report:?}");
     };
     assert_mimetype_deflated(odp);
 
-    assert_clean(
-        &litchi::Presentation::open(&source)
-            .expect("open")
-            .tolerance_report()
-            .expect("report"),
-    );
+    assert_clean(&open(&source).tolerance_report().expect("report"));
 }
 
 // ---------------------------------------------------------------- workbooks
@@ -351,28 +347,15 @@ fn odp_repairs_are_reported_through_the_presentation_facade() {
 #[test]
 fn xls_repairs_are_reported_through_the_workbook_facade() {
     let path = fixture("ole/xls/WithCustomViews.xls");
-    for workbook in [
-        litchi::Workbook::open(&path).expect("open"),
-        litchi::Workbook::from_bytes(std::fs::read(&path).unwrap()).expect("bytes"),
-    ] {
+    for workbook in [open(&path), open_bytes(&path)] {
         let report = workbook.tolerance_report().expect("report");
         assert!(matches!(report, litchi::ToleranceReport::Xls(_)));
         assert_repaired(&report, "ignored the nonzero reserved or padding bytes");
     }
 
     let clean = fixture("libreoffice-core/chart2/qa/extras/data/xls/chart.xls");
-    assert_clean(
-        &litchi::Workbook::open(&clean)
-            .expect("open")
-            .tolerance_report()
-            .expect("report"),
-    );
-    assert_clean(
-        &litchi::Workbook::from_bytes(std::fs::read(&clean).unwrap())
-            .expect("bytes")
-            .tolerance_report()
-            .expect("report"),
-    );
+    assert_clean(&open(&clean).tolerance_report().expect("report"));
+    assert_clean(&open_bytes(&clean).tolerance_report().expect("report"));
 }
 
 #[cfg(feature = "xlsx")]
@@ -393,10 +376,7 @@ fn xlsx_core_properties_repairs_are_reported_through_the_workbook_facade() {
 
     // A core-properties part no relationship selects.
     let orphaned = fixture("ooxml/xlsx/universal-content.xlsx");
-    for workbook in [
-        litchi::Workbook::open(&orphaned).expect("open"),
-        litchi::Workbook::from_bytes(std::fs::read(&orphaned).unwrap()).expect("bytes"),
-    ] {
+    for workbook in [open(&orphaned), open_bytes(&orphaned)] {
         let report = workbook.tolerance_report().expect("report");
         assert_eq!(
             properties_count(&report, CorePropertiesDefect::OrphanedPart),
@@ -415,10 +395,11 @@ fn xlsx_core_properties_repairs_are_reported_through_the_workbook_facade() {
     let directory = tempfile::tempdir().unwrap();
     let path = write_temp(&directory, "missing-date-type.xlsx", &patched);
     for workbook in [
-        litchi::Workbook::open(&path).expect("open"),
-        litchi::Workbook::from_bytes(patched.clone()).expect("bytes"),
+        open(&path),
+        litchi::open_bytes(patched.clone()).expect("bytes"),
     ] {
-        assert!(workbook.metadata().expect("metadata").created.is_some());
+        let metadata = workbook.metadata().expect("metadata");
+        assert!(metadata.expect("XLSX metadata").created.is_some());
         let report = workbook.tolerance_report().expect("report");
         assert!(
             properties_count(&report, CorePropertiesDefect::MissingDateType) >= 1,
@@ -426,10 +407,7 @@ fn xlsx_core_properties_repairs_are_reported_through_the_workbook_facade() {
         );
     }
 
-    for workbook in [
-        litchi::Workbook::open(&clean).expect("open"),
-        litchi::Workbook::from_bytes(std::fs::read(&clean).unwrap()).expect("bytes"),
-    ] {
+    for workbook in [open(&clean), open_bytes(&clean)] {
         let _ = workbook.text().expect("text");
         assert_clean(&workbook.tolerance_report().expect("report"));
     }
@@ -444,10 +422,7 @@ fn xlsb_core_properties_repairs_are_reported_through_the_workbook_facade() {
     let expected = litchi::xlsb::Defect::Properties(core_properties_defect(
         CorePropertiesDefect::DuplicatePart,
     ));
-    for workbook in [
-        litchi::Workbook::open(&path).expect("open"),
-        litchi::Workbook::from_bytes(std::fs::read(&path).unwrap()).expect("bytes"),
-    ] {
+    for workbook in [open(&path), open_bytes(&path)] {
         let report = workbook.tolerance_report().expect("report");
         let litchi::ToleranceReport::Xlsb(xlsb) = &report else {
             panic!("expected an XLSB report: {report:?}");
@@ -467,10 +442,7 @@ fn xlsb_core_properties_repairs_are_reported_through_the_workbook_facade() {
     }
 
     let clean = fixture("libreoffice-core/sc/qa/unit/data/xlsb/tdf108017_calcProtection.xlsb");
-    for workbook in [
-        litchi::Workbook::open(&clean).expect("open"),
-        litchi::Workbook::from_bytes(std::fs::read(&clean).unwrap()).expect("bytes"),
-    ] {
+    for workbook in [open(&clean), open_bytes(&clean)] {
         let _ = workbook.text().expect("text");
         assert_clean(&workbook.tolerance_report().expect("report"));
     }
@@ -484,8 +456,8 @@ fn ods_repairs_are_reported_through_the_workbook_facade() {
     let directory = tempfile::tempdir().unwrap();
     let path = write_temp(&directory, "deflated.ods", &deflated);
     for workbook in [
-        litchi::Workbook::open(&path).expect("open"),
-        litchi::Workbook::from_bytes(deflated.clone()).expect("bytes"),
+        open(&path),
+        litchi::open_bytes(deflated.clone()).expect("bytes"),
     ] {
         let report = workbook.tolerance_report().expect("report");
         let litchi::ToleranceReport::Ods(ods) = &report else {
@@ -494,10 +466,5 @@ fn ods_repairs_are_reported_through_the_workbook_facade() {
         assert_mimetype_deflated(ods);
     }
 
-    assert_clean(
-        &litchi::Workbook::open(&source)
-            .expect("open")
-            .tolerance_report()
-            .expect("report"),
-    );
+    assert_clean(&open(&source).tolerance_report().expect("report"));
 }

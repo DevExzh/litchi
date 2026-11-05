@@ -54,7 +54,11 @@ fn fixture(relative: &str) -> PathBuf {
 const MERGE_FIXTURE: &str = "test-data/ole/doc/image-comment-at-char.doc";
 
 fn parse_fixture(relative: &str) -> (FileInformationBlock, Vec<u8>) {
-    let mut ole = OleFile::open(File::open(fixture(relative)).unwrap()).unwrap();
+    let mut ole = OleFile::open(
+        File::open(fixture(relative)).unwrap(),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let word_document = ole.open_stream(&["WordDocument"]).unwrap();
     let fib = FileInformationBlock::parse(&word_document).unwrap();
     let table_name = if fib.which_table_stream() {
@@ -107,7 +111,7 @@ fn reads_pms_from_a_mail_merge_document() {
 #[test]
 fn exposes_mail_merge_state_through_the_document_api() {
     let mut package =
-        litchi_doc::Package::from_reader(File::open(fixture(MERGE_FIXTURE)).unwrap()).unwrap();
+        litchi_doc::raw::Reader::from_reader(File::open(fixture(MERGE_FIXTURE)).unwrap()).unwrap();
     let document = package.document().unwrap();
 
     let mail_merge = document.mail_merge().expect("mail-merge state present");
@@ -126,7 +130,7 @@ fn exposes_mail_merge_state_through_the_document_api() {
 #[test]
 fn documents_without_merge_state_report_none() {
     // Word 97 era file without mail-merge state.
-    let mut package = litchi_doc::Package::from_reader(
+    let mut package = litchi_doc::raw::Reader::from_reader(
         File::open(fixture(
             "test-data/poi/test-data/document/saved-by-table.doc",
         ))

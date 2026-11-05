@@ -12,14 +12,14 @@ use litchi_iwa_common::wire::{
 };
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{numbers_names_codec, tsp, tst};
+use litchi_numbers::table::dimension::transaction::Error as TransactionError;
 use litchi_numbers::{
-    Package, PackageLimits, PackageReadOptions, PackageSemanticLimits, SheetSelector,
-    TableSelector,
+    Package, SheetSelector, TableSelector,
     cell::Value,
     table::{
         dimension::{
             Dimension, Points, Size,
-            transaction::{Commit, Diagnostics, Edit, LimitKind, Patch, Path, TransactionError},
+            transaction::{Commit, Diagnostics, Edit, LimitKind, Patch, Path},
         },
         lock::State as LockState,
     },
@@ -54,7 +54,7 @@ fn points(value: f32) -> TestResult<Size> {
 
 fn assert_native_invariants(package: &Package) -> TestResult {
     let table = package
-        .document()
+        .workbook_ref()
         .sheet(0)?
         .and_then(|sheet| sheet.tables().next())
         .ok_or_else(|| std::io::Error::other("native table is missing"))?;
@@ -75,8 +75,8 @@ fn assert_native_invariants(package: &Package) -> TestResult {
 }
 
 fn assert_changed_locality(source: &[u8], target: &[u8], expected_member: &str) -> TestResult {
-    let source = Catalog::from_bytes(source)?;
-    let target = Catalog::from_bytes(target)?;
+    let source = Catalog::from_bytes(source, Default::default())?;
+    let target = Catalog::from_bytes(target, Default::default())?;
     let mut changed = Vec::new();
     for before in source.iter() {
         let after = target
@@ -110,15 +110,16 @@ fn rewrite_component(
     member: &str,
     mutate: impl FnOnce(&mut Archive) -> TestResult,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| std::io::Error::other("selected component is missing"))?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let mut archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
     mutate(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(member, &compressed)],
         ArchiveLimits::default(),
@@ -198,14 +199,14 @@ fn rewrite_native_table_model(
     source: &[u8],
     mutate: impl FnOnce(&mut ArchiveObject, usize, &mut Vec<u8>) -> TestResult,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut selected = None;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
         if archive.objects.iter().any(|object| {
             object
                 .messages
@@ -242,8 +243,10 @@ fn rewrite_native_table_model(
             type_: 6_001,
             data: model,
         },
+        Default::default(),
     )?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(&member, &compressed)],
         ArchiveLimits::default(),
@@ -251,13 +254,13 @@ fn rewrite_native_table_model(
 }
 
 fn native_table_model(source: &[u8]) -> TestResult<tst::TableModelArchive> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
         for message in archive
             .objects
             .iter()
@@ -284,7 +287,12 @@ fn expand_native_to_second_row_bucket(source: &[u8], rows: u32) -> TestResult<Ve
         info.object_references.push(904_937);
         info.field_infos
             .retain(|field| field.path.as_slice() != [4, 1, 2]);
-        let mut field = FieldInfo::new(vec![4, 1, 2]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![4, 1, 2], litchi_iwa_core::Limits::default())
+                .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references = vec![904_855, 904_937];
         info.field_infos.push(field);
         Ok(())
@@ -292,13 +300,13 @@ fn expand_native_to_second_row_bucket(source: &[u8], rows: u32) -> TestResult<Ve
 }
 
 fn selected_bucket_payload(source: &[u8], member: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| std::io::Error::other("selected component is missing"))?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let archive = Archive::parse(stream.as_bytes(), Default::default())?;
     Ok(archive
         .objects
         .iter()
@@ -310,7 +318,7 @@ fn selected_bucket_payload(source: &[u8], member: &str) -> TestResult<Vec<u8>> {
 }
 
 fn transaction_work_precharge(source: &[u8], target: &[u8]) -> TestResult<usize> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut observed = source.len().saturating_mul(2);
     if source != target {
         observed = observed.saturating_add(target.len().saturating_mul(2));
@@ -319,8 +327,8 @@ fn transaction_work_precharge(source: &[u8], target: &[u8]) -> TestResult<usize>
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
         for object in &archive.objects {
             for message in &object.messages {
                 observed = observed.saturating_add(message.data.len().saturating_mul(16));
@@ -331,15 +339,15 @@ fn transaction_work_precharge(source: &[u8], target: &[u8]) -> TestResult<usize>
 }
 
 fn package_with_reference_limit(source: &[u8], maximum: usize) -> TestResult<Package> {
-    let semantic = PackageSemanticLimits::new(
-        PackageSemanticLimits::MAX_OBJECTS,
-        PackageSemanticLimits::MAX_SHEETS,
-        PackageSemanticLimits::MAX_TABLES,
-        maximum,
-    )?;
+    let semantic = litchi_numbers::SemanticLimits::builder()
+        .max_objects(litchi_numbers::SemanticLimits::MAXIMUM.max_objects())
+        .and_then(|b| b.max_sheets(litchi_numbers::SemanticLimits::MAXIMUM.max_sheets()))
+        .and_then(|b| b.max_tables(litchi_numbers::SemanticLimits::MAXIMUM.max_tables()))
+        .and_then(|b| b.max_references(maximum))
+        .and_then(|b| b.build())?;
     Ok(Package::from_bytes_with_options(
         source,
-        PackageReadOptions::new(PackageLimits::default(), semantic),
+        litchi_numbers::OpenOptions::new().semantic_limits(semantic),
     )?)
 }
 
@@ -348,7 +356,7 @@ fn minimum_reference_limit(
     succeeds: impl Fn(&Package) -> bool,
 ) -> TestResult<usize> {
     let mut lower = 1usize;
-    let mut upper = PackageSemanticLimits::MAX_REFERENCES;
+    let mut upper = litchi_numbers::SemanticLimits::MAXIMUM.max_references();
     while lower < upper {
         let middle = lower + (upper - lower) / 2;
         let success =
@@ -563,23 +571,27 @@ fn selector_bounds_locking_and_public_values_are_typed_and_redacted() -> TestRes
     let package = Package::open(fixture_path())?;
     assert!(matches!(
         package.table_dimension_size("private missing sheet", 0usize, Dimension::Row(0)),
-        Err(TransactionError::SheetNotFound)
+        Err(TransactionError::Refused(
+            litchi_numbers::table::dimension::transaction::Refusal::SheetNotFound
+        ))
     ));
     assert!(matches!(
         package.table_dimension_size(0usize, "private missing table", Dimension::Row(0)),
-        Err(TransactionError::TableNotFound)
+        Err(TransactionError::Refused(
+            litchi_numbers::table::dimension::transaction::Refusal::TableNotFound
+        ))
     ));
     for (dimension, length) in [(Dimension::Row(22), 22), (Dimension::Column(7), 7)] {
         assert!(matches!(
             package.table_dimension_size(0usize, 0usize, dimension),
-            Err(TransactionError::OutOfBounds {
+            Err(TransactionError::Refused(litchi_numbers::table::dimension::transaction::Refusal::OutOfBounds {
                 path: Path::Dimension {
                     sheet: 0,
                     table: 0,
                     dimension: actual,
                 },
                 length: actual_length,
-            }) if actual == dimension && actual_length == length
+            })) if actual == dimension && actual_length == length
         ));
     }
     for invalid in [0.0, -1.0, f32::INFINITY, f32::NEG_INFINITY, f32::NAN] {
@@ -603,13 +615,15 @@ fn selector_bounds_locking_and_public_values_are_typed_and_redacted() -> TestRes
         .expect_err("changed locked dimension must refuse");
     assert!(matches!(
         error,
-        TransactionError::TableLocked {
-            path: Path::Dimension {
-                sheet: 0,
-                table: 0,
-                dimension: Dimension::Row(0),
+        TransactionError::Refused(
+            litchi_numbers::table::dimension::transaction::Refusal::TableLocked {
+                path: Path::Dimension {
+                    sheet: 0,
+                    table: 0,
+                    dimension: Dimension::Row(0),
+                }
             }
-        }
+        )
     ));
     for rendered in [format!("{error:?}"), error.to_string()] {
         assert!(!rendered.contains(FIXTURE_MARKER));
@@ -690,6 +704,7 @@ fn clearing_canonical_and_nonminimal_headers_preserves_native_structure() -> Tes
                 type_: 6_006,
                 data: rewritten,
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -739,6 +754,7 @@ fn malformed_duplicate_wrong_wire_and_wrong_type_buckets_refuse_atomically() -> 
                 type_: 6_006,
                 data: bucket.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -762,6 +778,7 @@ fn malformed_duplicate_wrong_wire_and_wrong_type_buckets_refuse_atomically() -> 
                 type_: 6_006,
                 data: bucket.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -776,8 +793,11 @@ fn malformed_duplicate_wrong_wire_and_wrong_type_buckets_refuse_atomically() -> 
             .ok_or_else(|| std::io::Error::other("column bucket message is missing"))?;
         let mut data = object.messages[message_index].data.clone();
         append_varint_field(&mut data, 2, 1)?;
-        object
-            .replace_message_preserving_header(message_index, RawMessage { type_: 6_006, data })?;
+        object.replace_message_preserving_header(
+            message_index,
+            RawMessage { type_: 6_006, data },
+            Default::default(),
+        )?;
         Ok(())
     })?;
     let wrong_type = rewrite_component(&source, COLUMNS, |archive| {
@@ -790,7 +810,11 @@ fn malformed_duplicate_wrong_wire_and_wrong_type_buckets_refuse_atomically() -> 
             .position(|message| message.type_ == 6_006)
             .ok_or_else(|| std::io::Error::other("column bucket message is missing"))?;
         let data = object.messages[message_index].data.clone();
-        object.replace_message_preserving_header(message_index, RawMessage { type_: 777, data })?;
+        object.replace_message_preserving_header(
+            message_index,
+            RawMessage { type_: 777, data },
+            Default::default(),
+        )?;
         Ok(())
     })?;
     let duplicate_message = rewrite_component(&source, COLUMNS, |archive| {
@@ -853,6 +877,7 @@ fn malformed_duplicate_wrong_wire_and_wrong_type_buckets_refuse_atomically() -> 
                     type_: 6_006,
                     data: bucket.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -922,6 +947,7 @@ fn changed_commit_preserves_unknown_header_bytes_and_existing_source_order() -> 
                 type_: 6_006,
                 data: rewritten,
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -996,7 +1022,12 @@ fn row_bucket_authority_and_declared_reference_contradictions_refuse() -> TestRe
         })?;
     let wrong_field_authority =
         rewrite_native_table_model(&source, |object, message_index, _model| {
-            let mut field = FieldInfo::new(vec![4, 2]);
+            let mut field = FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(vec![4, 2], litchi_iwa_core::Limits::default())
+                    .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap();
             field.object_references.push(904_855);
             object.archive_info.message_infos[message_index]
                 .field_infos
@@ -1008,7 +1039,12 @@ fn row_bucket_authority_and_declared_reference_contradictions_refuse() -> TestRe
             object.archive_info.message_infos[message_index]
                 .object_references
                 .push(904_937);
-            let mut field = FieldInfo::new(vec![4, 1, 2]);
+            let mut field = FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(vec![4, 1, 2], litchi_iwa_core::Limits::default())
+                    .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap();
             field.object_references.push(904_937);
             object.archive_info.message_infos[message_index]
                 .field_infos
@@ -1133,6 +1169,7 @@ fn row_bucket_local_index_intervals_are_authoritative() -> TestResult {
                 type_: 6_006,
                 data: bucket.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -1158,6 +1195,7 @@ fn row_bucket_local_index_intervals_are_authoritative() -> TestResult {
                 type_: 6_006,
                 data: bucket.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -1186,13 +1224,7 @@ fn row_bucket_local_index_intervals_are_authoritative() -> TestResult {
 #[test]
 fn inverse_transaction_work_limit_is_inclusive_and_max_minus_one_is_atomic() -> TestResult {
     assert!(
-        PackageLimits::new(
-            PackageLimits::MAX_INPUT_BYTES,
-            PackageLimits::MAX_ENTRIES,
-            PackageLimits::MAX_ENTRY_BYTES,
-            0,
-            PackageLimits::MAX_IWA_STREAM_BYTES,
-        )
+        litchi_numbers::SourceLimits::builder().max_input_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_input_bytes()).and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members())).and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes())).and_then(|b| b.max_aggregate_bytes(0)).and_then(|b| b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())).and_then(|b| b.build())
         .is_err()
     );
     let package = Package::open(fixture_path())?;
@@ -1206,16 +1238,23 @@ fn inverse_transaction_work_limit_is_inclusive_and_max_minus_one_is_atomic() -> 
     let observed = transaction_work_precharge(&candidate, &source)?;
 
     let package_with_limit = |maximum: usize| -> TestResult<Package> {
-        let limits = PackageLimits::new(
-            PackageLimits::MAX_INPUT_BYTES,
-            PackageLimits::MAX_ENTRIES,
-            PackageLimits::MAX_ENTRY_BYTES,
-            u64::try_from(maximum)?,
-            PackageLimits::MAX_IWA_STREAM_BYTES,
-        )?;
+        let aggregate = u64::try_from(maximum)?;
+        let limits = litchi_numbers::SourceLimits::builder()
+            .max_input_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_input_bytes())
+            .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+            .and_then(|b| {
+                b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes())
+            })
+            .and_then(|b| b.max_aggregate_bytes(aggregate))
+            .and_then(|b| {
+                b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+            })
+            .and_then(|b| b.build())?;
         Ok(Package::from_bytes_with_options(
             &candidate,
-            PackageReadOptions::new(limits, PackageSemanticLimits::default()),
+            litchi_numbers::OpenOptions::new()
+                .source_limits(limits)
+                .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
         )?)
     };
 
@@ -1236,7 +1275,7 @@ fn inverse_transaction_work_limit_is_inclusive_and_max_minus_one_is_atomic() -> 
         .expect_err("max-minus-one transaction work must refuse before reopen");
     assert!(matches!(
         error,
-        TransactionError::LimitExceeded {
+        TransactionError::Limit {
             kind: LimitKind::TransactionWork,
             observed: actual,
             maximum: actual_maximum,
@@ -1251,13 +1290,13 @@ fn inverse_transaction_work_limit_is_inclusive_and_max_minus_one_is_atomic() -> 
 fn cumulative_public_read_and_changed_commit_limits_are_inclusive() -> TestResult {
     let source = std::fs::read(fixture_path())?;
     assert!(
-        PackageSemanticLimits::new(
-            PackageSemanticLimits::MAX_OBJECTS,
-            PackageSemanticLimits::MAX_SHEETS,
-            PackageSemanticLimits::MAX_TABLES,
-            0,
-        )
-        .is_err()
+        litchi_numbers::SemanticLimits::builder()
+            .max_objects(litchi_numbers::SemanticLimits::MAXIMUM.max_objects())
+            .and_then(|b| b.max_sheets(litchi_numbers::SemanticLimits::MAXIMUM.max_sheets()))
+            .and_then(|b| b.max_tables(litchi_numbers::SemanticLimits::MAXIMUM.max_tables()))
+            .and_then(|b| b.max_references(0))
+            .and_then(|b| b.build())
+            .is_err()
     );
 
     let read_exact = minimum_reference_limit(&source, |package| {
@@ -1278,7 +1317,7 @@ fn cumulative_public_read_and_changed_commit_limits_are_inclusive() -> TestResul
     let read_before = read_restricted.exact_bytes();
     assert!(matches!(
         read_restricted.table_dimension_size(0usize, 0usize, Dimension::Column(2)),
-        Err(TransactionError::LimitExceeded {
+        Err(TransactionError::Limit {
             kind: LimitKind::PayloadReferences,
             observed,
             maximum,
@@ -1317,7 +1356,7 @@ fn cumulative_public_read_and_changed_commit_limits_are_inclusive() -> TestResul
         .expect_err("cumulative max-minus-one commit must refuse atomically");
     assert!(matches!(
         error,
-        TransactionError::LimitExceeded {
+        TransactionError::Limit {
             kind: LimitKind::PayloadReferences,
             observed,
             maximum,

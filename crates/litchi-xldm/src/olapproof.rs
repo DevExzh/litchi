@@ -69,9 +69,12 @@ pub enum OlapProofError {
     /// The source profile has no admitted OLAP projection in this owner.
     UnsupportedProfile,
     /// A caller quota was reached before proof-owned allocation.
-    LimitExceeded {
-        resource: &'static str,
-        actual: usize,
+    Limit {
+        /// The exhausted quota.
+        kind: crate::LimitKind,
+        /// The observed amount, or `usize::MAX` on overflow.
+        observed: usize,
+        /// The largest accepted amount.
         maximum: usize,
     },
     /// The graph contains an explicit contradiction.
@@ -92,9 +95,9 @@ impl fmt::Display for OlapProofError {
             Self::UnsupportedProfile => {
                 formatter.write_str("XLDM OLAP proof requires the version-140 profile")
             },
-            Self::LimitExceeded {
-                resource,
-                actual,
+            Self::Limit {
+                kind: resource,
+                observed: actual,
                 maximum,
             } => write!(
                 formatter,
@@ -353,9 +356,9 @@ pub fn prove_xldm140_olap<'storage, 'source>(
             .file_groups
             .iter()
             .try_fold(0usize, |total, group| {
-                total
-                    .checked_add(group.files.len())
-                    .ok_or_else(|| limit("graph work", usize::MAX, budget.limits.max_work))
+                total.checked_add(group.files.len()).ok_or_else(|| {
+                    limit(crate::LimitKind::Work, usize::MAX, budget.limits.max_work)
+                })
             })?;
     let graph_nodes = storage
         .files
@@ -364,7 +367,7 @@ pub fn prove_xldm140_olap<'storage, 'source>(
         .and_then(|value| value.checked_add(logged_file_count))
         .and_then(|value| value.checked_add(metadata.files.len()))
         .and_then(|value| value.checked_add(model.files.len()))
-        .ok_or_else(|| limit("graph work", usize::MAX, budget.limits.max_work))?;
+        .ok_or_else(|| limit(crate::LimitKind::Work, usize::MAX, budget.limits.max_work))?;
     budget.work_bound(graph_nodes)?;
 
     let mut physical_paths = HashMap::new();
@@ -476,7 +479,7 @@ pub fn prove_xldm140_olap<'storage, 'source>(
         .checked_add(model.files.len())
         .and_then(|value| value.checked_add(storage.files.len()))
         .and_then(|value| value.checked_add(metadata.files.len()))
-        .ok_or_else(|| limit("unknown OLAP members", usize::MAX, limits.max_items))?;
+        .ok_or_else(|| limit(crate::LimitKind::Items, usize::MAX, limits.max_items))?;
     reserve_vec(
         &mut unknown_members,
         unknown_capacity,
@@ -2749,86 +2752,86 @@ fn valid_user_id(value: &str) -> bool {
 
 fn preflight_storage(storage: &Storage<'_>, budget: &mut Budget) -> OlapProofResult<()> {
     for file in &storage.files {
-        budget.item("physical files")?;
-        budget.string(&file.path, "physical paths")?;
+        budget.item()?;
+        budget.string(&file.path)?;
     }
     for group in &storage.backup_log.file_groups {
-        budget.item("FileGroups")?;
-        budget.string(&group.id, "FileGroup IDs")?;
-        budget.string(&group.name, "FileGroup names")?;
-        budget.string(&group.persist_location_path, "FileGroup paths")?;
-        budget.string(&group.storage_location_path, "FileGroup paths")?;
-        budget.string(&group.object_id, "FileGroup ObjectIDs")?;
+        budget.item()?;
+        budget.string(&group.id)?;
+        budget.string(&group.name)?;
+        budget.string(&group.persist_location_path)?;
+        budget.string(&group.storage_location_path)?;
+        budget.string(&group.object_id)?;
         for file in &group.files {
-            budget.item("logged files")?;
-            budget.string(&file.source_path, "logged source paths")?;
-            budget.string(&file.storage_path, "logged storage paths")?;
-            budget.string(&file.generated.normalized_path, "generated paths")?;
+            budget.item()?;
+            budget.string(&file.source_path)?;
+            budget.string(&file.storage_path)?;
+            budget.string(&file.generated.normalized_path)?;
         }
     }
-    budget.string(&storage.backup_log.server_root, "backup-log text")?;
-    budget.string(&storage.backup_log.object_name, "backup-log text")?;
-    budget.string(&storage.backup_log.object_id, "backup-log text")?;
+    budget.string(&storage.backup_log.server_root)?;
+    budget.string(&storage.backup_log.object_name)?;
+    budget.string(&storage.backup_log.object_id)?;
     for collation in &storage.backup_log.collations {
-        budget.item("collations")?;
-        budget.string(collation, "collations")?;
+        budget.item()?;
+        budget.string(collation)?;
     }
     Ok(())
 }
 
 fn preflight_metadata(metadata: &MetadataModel<'_>, budget: &mut Budget) -> OlapProofResult<()> {
     for file in &metadata.files {
-        budget.item("metadata files")?;
-        budget.string(file.storage_path, "metadata paths")?;
+        budget.item()?;
+        budget.string(file.storage_path)?;
         preflight_metadata_object(&file.table, budget)?;
     }
     for column in &metadata.columns {
-        budget.item("metadata policies")?;
-        budget.string(&column.name, "metadata policy text")?;
-        budget.string(&column.data_file, "metadata policy paths")?;
+        budget.item()?;
+        budget.string(&column.name)?;
+        budget.string(&column.data_file)?;
         if let Some(dictionary) = &column.dictionary {
-            budget.item("metadata policies")?;
-            budget.string(&dictionary.storage_name, "metadata policy paths")?;
-            budget.string(dictionary.class.as_str(), "metadata policy text")?;
+            budget.item()?;
+            budget.string(&dictionary.storage_name)?;
+            budget.string(dictionary.class.as_str())?;
         }
     }
     for relationship in &metadata.relationships {
-        budget.item("metadata relationships")?;
+        budget.item()?;
         if let Some(name) = &relationship.name {
-            budget.string(name, "metadata relationship names")?;
+            budget.string(name)?;
         }
-        budget.string(&relationship.primary_table, "metadata relationship names")?;
-        budget.string(&relationship.primary_column, "metadata relationship names")?;
-        budget.string(&relationship.foreign_column, "metadata relationship names")?;
+        budget.string(&relationship.primary_table)?;
+        budget.string(&relationship.primary_column)?;
+        budget.string(&relationship.foreign_column)?;
     }
     Ok(())
 }
 
 fn preflight_metadata_object(object: &MetadataObject, budget: &mut Budget) -> OlapProofResult<()> {
-    budget.item("metadata objects")?;
-    budget.string(object.class.as_str(), "metadata object text")?;
+    budget.item()?;
+    budget.string(object.class.as_str())?;
     if let Some(name) = &object.name {
-        budget.string(name, "metadata object names")?;
+        budget.string(name)?;
     }
     for property in &object.properties {
-        budget.item("metadata properties")?;
-        budget.string(&property.name, "metadata property text")?;
-        budget.string(&property.value, "metadata property text")?;
+        budget.item()?;
+        budget.string(&property.name)?;
+        budget.string(&property.value)?;
     }
     for member in &object.members {
-        budget.item("metadata members")?;
-        budget.string(&member.name, "metadata member names")?;
+        budget.item()?;
+        budget.string(&member.name)?;
         preflight_metadata_object(&member.object, budget)?;
     }
     for collection in &object.collections {
-        budget.item("metadata collections")?;
-        budget.string(&collection.name, "metadata collection names")?;
+        budget.item()?;
+        budget.string(&collection.name)?;
         for child in &collection.objects {
             preflight_metadata_object(child, budget)?;
         }
     }
     for data in &object.data_objects {
-        budget.item("metadata data objects")?;
+        budget.item()?;
         preflight_metadata_object(&data.object, budget)?;
     }
     Ok(())
@@ -2836,34 +2839,34 @@ fn preflight_metadata_object(object: &MetadataObject, budget: &mut Budget) -> Ol
 
 fn preflight_olap(model: &OlapModel<'_>, budget: &mut Budget) -> OlapProofResult<()> {
     for file in &model.files {
-        budget.item("OLAP files")?;
-        budget.string(file.storage_path, "OLAP paths")?;
+        budget.item()?;
+        budget.string(file.storage_path)?;
         if let OlapDocument::Definition(definition) = &file.document {
-            budget.string(&definition.object_id, "OLAP IDs")?;
+            budget.string(&definition.object_id)?;
             for value in [&definition.parent.database_id, &definition.parent.cube_id]
                 .into_iter()
                 .flatten()
             {
-                budget.string(value, "OLAP parent IDs")?;
+                budget.string(value)?;
             }
             if let Some(name) = &definition.object_name {
-                budget.string(name, "OLAP names")?;
+                budget.string(name)?;
             }
             preflight_olap_element(&definition.object, budget)?;
             for item in all_file_lists_for_budget(&definition.extension) {
-                budget.item("OLAP file-list members")?;
-                budget.string(item, "OLAP file-list paths")?;
+                budget.item()?;
+                budget.string(item)?;
             }
             for item in &definition.attribute_ids {
-                budget.item("OLAP attribute IDs")?;
-                budget.string(item, "OLAP attribute IDs")?;
+                budget.item()?;
+                budget.string(item)?;
             }
             for hierarchy in &definition.hierarchies {
-                budget.item("OLAP hierarchies")?;
-                budget.string(&hierarchy.id, "OLAP hierarchy IDs")?;
+                budget.item()?;
+                budget.string(&hierarchy.id)?;
                 for level in &hierarchy.level_ids {
-                    budget.item("OLAP hierarchy levels")?;
-                    budget.string(level, "OLAP hierarchy IDs")?;
+                    budget.item()?;
+                    budget.string(level)?;
                 }
             }
         }
@@ -2872,13 +2875,13 @@ fn preflight_olap(model: &OlapModel<'_>, budget: &mut Budget) -> OlapProofResult
 }
 
 fn preflight_olap_element(element: &OlapElement, budget: &mut Budget) -> OlapProofResult<()> {
-    budget.item("OLAP XML nodes")?;
-    budget.string(&element.name, "OLAP XML names")?;
-    budget.string(&element.text, "OLAP XML text")?;
+    budget.item()?;
+    budget.string(&element.name)?;
+    budget.string(&element.text)?;
     for (name, value) in &element.attributes {
-        budget.item("OLAP XML attributes")?;
-        budget.string(name, "OLAP XML attributes")?;
-        budget.string(value, "OLAP XML attributes")?;
+        budget.item()?;
+        budget.string(name)?;
+        budget.string(value)?;
     }
     for child in &element.children {
         preflight_olap_element(child, budget)?;
@@ -2893,7 +2896,7 @@ fn preflight_retained_strings(
     budget: &mut Budget,
 ) -> OlapProofResult<()> {
     for file in &storage.files {
-        charge_retained_string(budget, &file.path, "retained physical paths")?;
+        charge_retained_string(budget, &file.path)?;
     }
     for group in &storage.backup_log.file_groups {
         for value in [
@@ -2901,69 +2904,61 @@ fn preflight_retained_strings(
             group.name.as_str(),
             group.object_id.as_str(),
         ] {
-            charge_retained_string(budget, value, "retained FileGroup text")?;
+            charge_retained_string(budget, value)?;
         }
         for file in &group.files {
-            charge_retained_string(budget, &file.storage_path, "retained member paths")?;
+            charge_retained_string(budget, &file.storage_path)?;
         }
     }
     for file in &metadata.files {
-        charge_retained_string(budget, file.storage_path, "retained metadata paths")?;
+        charge_retained_string(budget, file.storage_path)?;
         charge_retained_metadata_object(&file.table, budget)?;
     }
     for column in &metadata.columns {
-        charge_retained_string(budget, &column.name, "retained metadata policy text")?;
-        charge_retained_string(budget, &column.data_file, "retained metadata policy paths")?;
+        charge_retained_string(budget, &column.name)?;
+        charge_retained_string(budget, &column.data_file)?;
         if let Some(dictionary) = &column.dictionary {
-            charge_retained_string(
-                budget,
-                &dictionary.storage_name,
-                "retained metadata dictionary paths",
-            )?;
-            charge_retained_string(
-                budget,
-                dictionary.class.as_str(),
-                "retained metadata dictionary text",
-            )?;
+            charge_retained_string(budget, &dictionary.storage_name)?;
+            charge_retained_string(budget, dictionary.class.as_str())?;
         }
     }
     for relationship in &metadata.relationships {
         if let Some(name) = &relationship.name {
-            charge_retained_string(budget, name, "retained relationship names")?;
+            charge_retained_string(budget, name)?;
         }
         for value in [
             relationship.primary_table.as_str(),
             relationship.primary_column.as_str(),
             relationship.foreign_column.as_str(),
         ] {
-            charge_retained_string(budget, value, "retained relationship endpoints")?;
+            charge_retained_string(budget, value)?;
         }
     }
     for file in &model.files {
-        charge_retained_string(budget, file.storage_path, "retained OLAP paths")?;
+        charge_retained_string(budget, file.storage_path)?;
         if let OlapDocument::Definition(definition) = &file.document {
-            charge_retained_string(budget, &definition.object_id, "retained OLAP IDs")?;
+            charge_retained_string(budget, &definition.object_id)?;
             if let Some(name) = &definition.object_name {
-                charge_retained_string(budget, name, "retained OLAP names")?;
+                charge_retained_string(budget, name)?;
             }
             for value in [&definition.parent.database_id, &definition.parent.cube_id]
                 .into_iter()
                 .flatten()
             {
-                charge_retained_string(budget, value, "retained OLAP parent IDs")?;
+                charge_retained_string(budget, value)?;
             }
             charge_retained_olap_element(&definition.object, budget)?;
             for value in all_file_lists_for_budget(&definition.extension) {
-                charge_retained_string(budget, value, "retained OLAP file-list paths")?;
+                charge_retained_string(budget, value)?;
             }
             charge_retained_derived_definition_strings(file.storage_path, definition, budget)?;
             for value in &definition.attribute_ids {
-                charge_retained_string(budget, value, "retained OLAP attribute IDs")?;
+                charge_retained_string(budget, value)?;
             }
             for hierarchy in &definition.hierarchies {
-                charge_retained_string(budget, &hierarchy.id, "retained OLAP hierarchy IDs")?;
+                charge_retained_string(budget, &hierarchy.id)?;
                 for value in &hierarchy.level_ids {
-                    charge_retained_string(budget, value, "retained OLAP hierarchy levels")?;
+                    charge_retained_string(budget, value)?;
                 }
             }
         }
@@ -2975,7 +2970,7 @@ fn preflight_retained_strings(
         .try_fold(0usize, |total, group| total.checked_add(group.files.len()))
         .ok_or_else(|| {
             limit(
-                "retained strings",
+                crate::LimitKind::StringBytes,
                 usize::MAX,
                 budget.limits.max_string_bytes,
             )
@@ -2989,7 +2984,7 @@ fn preflight_retained_strings(
         .and_then(|value| value.checked_add(logged_records))
         .ok_or_else(|| {
             limit(
-                "retained strings",
+                crate::LimitKind::StringBytes,
                 usize::MAX,
                 budget.limits.max_string_bytes,
             )
@@ -2998,12 +2993,12 @@ fn preflight_retained_strings(
         .checked_mul(DERIVED_STRING_SLACK_PER_RECORD)
         .ok_or_else(|| {
             limit(
-                "retained strings",
+                crate::LimitKind::StringBytes,
                 usize::MAX,
                 budget.limits.max_string_bytes,
             )
         })?;
-    budget.retained_bytes(slack, "retained generated strings")?;
+    budget.retained_bytes(slack)?;
     Ok(())
 }
 
@@ -3022,13 +3017,13 @@ fn charge_retained_derived_definition_strings(
         definition.kind,
         OlapObjectKind::DataSourceView | OlapObjectKind::MdxScript
     );
-    budget.retained_bytes(folder_len, "retained persistence folders")?;
+    budget.retained_bytes(folder_len)?;
     if !special && full_folder_len != folder_len {
-        budget.retained_bytes(full_folder_len, "retained persistence folders")?;
+        budget.retained_bytes(full_folder_len)?;
     }
     for item in all_file_lists_for_budget(&definition.extension) {
         if let Some(length) = qualified_file_list_len(folder_len, item) {
-            budget.retained_bytes(length, "retained qualified file-list paths")?;
+            budget.retained_bytes(length)?;
         }
     }
     Ok(())
@@ -3083,28 +3078,20 @@ fn charge_retained_metadata_object(
     object: &MetadataObject,
     budget: &mut Budget,
 ) -> OlapProofResult<()> {
-    charge_retained_string(
-        budget,
-        object.class.as_str(),
-        "retained metadata object text",
-    )?;
+    charge_retained_string(budget, object.class.as_str())?;
     if let Some(name) = &object.name {
-        charge_retained_string(budget, name, "retained metadata object names")?;
+        charge_retained_string(budget, name)?;
     }
     for property in &object.properties {
-        charge_retained_string(budget, &property.name, "retained metadata property text")?;
-        charge_retained_string(budget, &property.value, "retained metadata property text")?;
+        charge_retained_string(budget, &property.name)?;
+        charge_retained_string(budget, &property.value)?;
     }
     for member in &object.members {
-        charge_retained_string(budget, &member.name, "retained metadata member names")?;
+        charge_retained_string(budget, &member.name)?;
         charge_retained_metadata_object(&member.object, budget)?;
     }
     for collection in &object.collections {
-        charge_retained_string(
-            budget,
-            &collection.name,
-            "retained metadata collection names",
-        )?;
+        charge_retained_string(budget, &collection.name)?;
         for child in &collection.objects {
             charge_retained_metadata_object(child, budget)?;
         }
@@ -3116,11 +3103,11 @@ fn charge_retained_metadata_object(
 }
 
 fn charge_retained_olap_element(element: &OlapElement, budget: &mut Budget) -> OlapProofResult<()> {
-    charge_retained_string(budget, &element.name, "retained OLAP XML names")?;
-    charge_retained_string(budget, &element.text, "retained OLAP XML text")?;
+    charge_retained_string(budget, &element.name)?;
+    charge_retained_string(budget, &element.text)?;
     for (name, value) in &element.attributes {
-        charge_retained_string(budget, name, "retained OLAP XML attributes")?;
-        charge_retained_string(budget, value, "retained OLAP XML attributes")?;
+        charge_retained_string(budget, name)?;
+        charge_retained_string(budget, value)?;
     }
     for child in &element.children {
         charge_retained_olap_element(child, budget)?;
@@ -3128,13 +3115,9 @@ fn charge_retained_olap_element(element: &OlapElement, budget: &mut Budget) -> O
     Ok(())
 }
 
-fn charge_retained_string(
-    budget: &mut Budget,
-    value: &str,
-    resource: &'static str,
-) -> OlapProofResult<()> {
+fn charge_retained_string(budget: &mut Budget, value: &str) -> OlapProofResult<()> {
     for _ in 0..RETAINED_STRING_COPIES {
-        budget.retained_bytes(value.len(), resource)?;
+        budget.retained_bytes(value.len())?;
     }
     Ok(())
 }
@@ -3172,36 +3155,51 @@ impl Budget {
         }
     }
 
-    fn item(&mut self, resource: &'static str) -> OlapProofResult<()> {
+    fn item(&mut self) -> OlapProofResult<()> {
         self.items = self
             .items
             .checked_add(1)
-            .ok_or_else(|| limit(resource, usize::MAX, self.limits.max_items))?;
+            .ok_or_else(|| limit(crate::LimitKind::Items, usize::MAX, self.limits.max_items))?;
         if self.items > self.limits.max_items {
-            return Err(limit(resource, self.items, self.limits.max_items));
+            return Err(limit(
+                crate::LimitKind::Items,
+                self.items,
+                self.limits.max_items,
+            ));
         }
-        self.work("item")
+        self.work()
     }
 
-    fn string(&mut self, value: &str, resource: &'static str) -> OlapProofResult<()> {
-        self.retained_bytes(value.len(), resource)?;
-        self.work("string")
+    fn string(&mut self, value: &str) -> OlapProofResult<()> {
+        self.retained_bytes(value.len())?;
+        self.work()
     }
 
-    fn retained_bytes(&mut self, amount: usize, resource: &'static str) -> OlapProofResult<()> {
-        self.strings = self
-            .strings
-            .checked_add(amount)
-            .ok_or_else(|| limit(resource, usize::MAX, self.limits.max_string_bytes))?;
+    fn retained_bytes(&mut self, amount: usize) -> OlapProofResult<()> {
+        self.strings = self.strings.checked_add(amount).ok_or_else(|| {
+            limit(
+                crate::LimitKind::StringBytes,
+                usize::MAX,
+                self.limits.max_string_bytes,
+            )
+        })?;
         if self.strings > self.limits.max_string_bytes {
-            return Err(limit(resource, self.strings, self.limits.max_string_bytes));
+            return Err(limit(
+                crate::LimitKind::StringBytes,
+                self.strings,
+                self.limits.max_string_bytes,
+            ));
         }
         Ok(())
     }
 
     fn source_bytes(&self, actual: usize) -> OlapProofResult<()> {
         if actual > self.limits.max_source_bytes {
-            Err(limit("source bytes", actual, self.limits.max_source_bytes))
+            Err(limit(
+                crate::LimitKind::SourceBytes,
+                actual,
+                self.limits.max_source_bytes,
+            ))
         } else {
             Ok(())
         }
@@ -3210,24 +3208,32 @@ impl Budget {
     fn work_bound(&mut self, graph_nodes: usize) -> OlapProofResult<()> {
         let repeated = graph_nodes
             .checked_mul(graph_nodes)
-            .ok_or_else(|| limit("graph work", usize::MAX, self.limits.max_work))?;
+            .ok_or_else(|| limit(crate::LimitKind::Work, usize::MAX, self.limits.max_work))?;
         self.work = self
             .work
             .checked_add(repeated)
-            .ok_or_else(|| limit("graph work", usize::MAX, self.limits.max_work))?;
+            .ok_or_else(|| limit(crate::LimitKind::Work, usize::MAX, self.limits.max_work))?;
         if self.work > self.limits.max_work {
-            return Err(limit("graph work", self.work, self.limits.max_work));
+            return Err(limit(
+                crate::LimitKind::Work,
+                self.work,
+                self.limits.max_work,
+            ));
         }
         Ok(())
     }
 
-    fn work(&mut self, resource: &'static str) -> OlapProofResult<()> {
+    fn work(&mut self) -> OlapProofResult<()> {
         self.work = self
             .work
             .checked_add(1)
-            .ok_or_else(|| limit(resource, usize::MAX, self.limits.max_work))?;
+            .ok_or_else(|| limit(crate::LimitKind::Work, usize::MAX, self.limits.max_work))?;
         if self.work > self.limits.max_work {
-            return Err(limit(resource, self.work, self.limits.max_work));
+            return Err(limit(
+                crate::LimitKind::Work,
+                self.work,
+                self.limits.max_work,
+            ));
         }
         Ok(())
     }
@@ -3298,10 +3304,10 @@ fn unproven(path: impl Into<String>, detail: impl Into<String>) -> OlapProofErro
     }
 }
 
-fn limit(resource: &'static str, actual: usize, maximum: usize) -> OlapProofError {
-    OlapProofError::LimitExceeded {
-        resource,
-        actual,
+fn limit(resource: crate::LimitKind, actual: usize, maximum: usize) -> OlapProofError {
+    OlapProofError::Limit {
+        kind: resource,
+        observed: actual,
         maximum,
     }
 }
@@ -3506,6 +3512,7 @@ mod tests {
             bytes: &[],
             kind: MetadataFileKind::Table,
             table,
+            limits: crate::Limits::DEFAULT,
         }
     }
 
@@ -3765,6 +3772,7 @@ mod tests {
                 }],
                 data_objects: Vec::new(),
             },
+            limits: crate::Limits::DEFAULT,
         });
         let OlapDocument::Definition(dimension) = &mut model.files[2].document else {
             panic!("fixture dimension");
@@ -4150,8 +4158,8 @@ mod tests {
         let error = prove_xldm140_olap(&storage, &metadata, &model, limits).unwrap_err();
         assert!(matches!(
             error,
-            OlapProofError::LimitExceeded {
-                resource: "physical paths" | "OLAP paths" | "metadata paths" | "OLAP XML names",
+            OlapProofError::Limit {
+                kind: crate::LimitKind::StringBytes,
                 ..
             }
         ));
@@ -4182,7 +4190,10 @@ mod tests {
         .unwrap_err();
         assert!(matches!(
             error,
-            OlapProofError::LimitExceeded { resource, .. } if resource.starts_with("retained")
+            OlapProofError::Limit {
+                kind: crate::LimitKind::StringBytes,
+                ..
+            }
         ));
 
         prove_xldm140_olap(
@@ -4207,9 +4218,9 @@ mod tests {
         let error = prove_xldm140_olap(&storage, &metadata, &model, limits).unwrap_err();
         assert!(matches!(
             error,
-            OlapProofError::LimitExceeded {
-                resource: "physical files",
-                actual: 1,
+            OlapProofError::Limit {
+                kind: crate::LimitKind::Items,
+                observed: 1,
                 maximum: 0
             }
         ));
@@ -4221,8 +4232,8 @@ mod tests {
         let error = prove_xldm140_olap(&storage, &metadata, &model, limits).unwrap_err();
         assert!(matches!(
             error,
-            OlapProofError::LimitExceeded {
-                resource: "source bytes",
+            OlapProofError::Limit {
+                kind: crate::LimitKind::SourceBytes,
                 ..
             }
         ));
@@ -4238,8 +4249,8 @@ mod tests {
         let error = prove_xldm140_olap(&storage, &metadata, &model, limits).unwrap_err();
         assert!(matches!(
             error,
-            OlapProofError::LimitExceeded {
-                resource: "graph work",
+            OlapProofError::Limit {
+                kind: crate::LimitKind::Work,
                 ..
             }
         ));

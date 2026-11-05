@@ -10,9 +10,9 @@ use tempfile::NamedTempFile;
 #[test]
 fn duplicated_slide_takes_requested_position_after_round_trip() {
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
-    let mut package = Package::new().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
     {
-        let presentation = package.presentation_mut().unwrap();
+        let presentation = builder.presentation().unwrap();
         presentation.add_slide().unwrap().set_title("one");
         presentation.add_slide().unwrap().set_title("two");
         presentation.add_slide().unwrap().set_title("three");
@@ -25,6 +25,7 @@ fn duplicated_slide_takes_requested_position_after_round_trip() {
         assert!(presentation.insert_duplicate_slide(0, 9).is_err());
         assert_eq!(presentation.slide_count(), 4);
     }
+    let package = builder.build().unwrap();
     package.save(output.path()).unwrap();
 
     let reopened = Package::open(output.path()).unwrap();
@@ -49,7 +50,7 @@ fn duplicated_slide_takes_requested_position_after_round_trip() {
 
 #[test]
 fn insert_duplicate_at_end_matches_duplicate_slide() {
-    let mut presentation = litchi_pptx::MutablePresentation::new();
+    let mut presentation = litchi_pptx::builder::Presentation::new();
     presentation.add_slide().unwrap().set_title("only");
 
     let position = presentation.insert_duplicate_slide(0, 1).unwrap();
@@ -59,6 +60,6 @@ fn insert_duplicate_at_end_matches_duplicate_slide() {
     assert_eq!(presentation.slide_mut(1).unwrap().title(), Some("only"));
 
     // Empty decks reject every index without panicking.
-    let mut empty = litchi_pptx::MutablePresentation::new();
+    let mut empty = litchi_pptx::builder::Presentation::new();
     assert!(empty.insert_duplicate_slide(0, 0).is_err());
 }

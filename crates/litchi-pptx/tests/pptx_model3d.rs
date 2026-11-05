@@ -4,6 +4,9 @@
     reason = "test assertions panic on failure by design"
 )]
 
+mod in_place;
+use in_place::InPlace as _;
+
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI};
@@ -42,7 +45,7 @@ fn package_model3d_round_trip_preserves_payloads_relationships_and_unknowns() {
     let mut replacement = model.clone();
     replacement.set_asset(Asset::embedded(Data::new(b"glb-v2".to_vec()).unwrap()));
     let previous = package
-        .put_model3d(0, "3D Model", replacement)
+        .put_model3d_in_place(0, "3D Model", replacement)
         .unwrap()
         .unwrap();
     assert_eq!(
@@ -74,7 +77,10 @@ fn package_model3d_round_trip_preserves_payloads_relationships_and_unknowns() {
             .any(|part| part.content_type() == MODEL_CONTENT_TYPE && part.blob() == b"glb-v2")
     );
 
-    let removed = reopened.remove_model3d(0, "3D Model").unwrap().unwrap();
+    let removed = reopened
+        .remove_model3d_in_place(0, "3D Model")
+        .unwrap()
+        .unwrap();
     assert_eq!(removed.shape().name(), Some("3D Model"));
     let bytes = reopened.to_bytes().unwrap();
     let reopened = Package::from_bytes(&bytes).unwrap();
@@ -100,7 +106,7 @@ fn package_model3d_round_trip_preserves_payloads_relationships_and_unknowns() {
 fn package_model3d_rejects_wrong_payload_content_type() {
     let mut package = package_with_model();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             opc.get_part_mut(&PackURI::new(MODEL_PART).unwrap())?
                 .set_content_type("application/octet-stream".to_owned())?;
             Ok(())
@@ -118,7 +124,7 @@ fn package_model3d_rejects_wrong_payload_content_type() {
 fn package_model3d_rejects_missing_relationship_and_missing_target() {
     let mut missing_relationship = package_with_model();
     missing_relationship
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             opc.get_part_mut(&PackURI::new(SLIDE_PART).unwrap())?
                 .rels_mut()
                 .remove("rIdModel");
@@ -132,7 +138,7 @@ fn package_model3d_rejects_missing_relationship_and_missing_target() {
 
     let mut missing_target = package_with_model();
     missing_target
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             assert!(opc.remove_part(&PackURI::new(MODEL_PART).unwrap()));
             Ok(())
         })
@@ -164,7 +170,11 @@ fn package_model3d_failed_edit_restores_the_snapshot() {
         .blob()
         .to_vec();
     let before_parts = package.opc().unwrap().part_count();
-    assert!(package.put_model3d(0, "3D Model", invalid).is_err());
+    assert!(
+        package
+            .put_model3d_in_place(0, "3D Model", invalid)
+            .is_err()
+    );
     assert_eq!(
         package
             .opc()
@@ -178,10 +188,11 @@ fn package_model3d_failed_edit_restores_the_snapshot() {
 }
 
 fn package_with_model() -> Package {
-    let mut package = Package::new().unwrap();
-    package.presentation_mut().unwrap().add_slide().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    builder.presentation().unwrap().add_slide().unwrap();
+    let package = builder.build().unwrap();
     let bytes = package.to_bytes().unwrap();
-    let mut opc = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut opc = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     install_model(&mut opc);
     Package::from_opc_package(opc).unwrap()
 }

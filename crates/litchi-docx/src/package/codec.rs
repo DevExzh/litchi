@@ -14,19 +14,20 @@
     feature = "encryption",
     expect(
         clippy::used_underscore_binding,
-        reason = "the named ignored error records intentional source collapse"
+        reason = "the operation label is used only when encryption is enabled"
     )
 )]
 //! OPC construction, validation, and publication codecs for DOCX packages.
 
+#[cfg(feature = "encryption")]
+pub(super) use super::model::Mode;
 use super::model::{
     CustomProps, CustomPropsHost, DIAGRAM_COLORS_REL, DIAGRAM_DATA_REL, DIAGRAM_LAYOUT_REL,
-    DIAGRAM_QUICK_STYLE_REL, Error, MutableDocument, OpcPackage, PackURI, Package,
-    ParagraphIndexCache, Path, Read, Result, Slot, Write, WriteRollbackGuard, ct, docx_web,
+    DIAGRAM_QUICK_STYLE_REL, DraftDocument, Error, OpcPackage, PackURI, Package,
+    ParagraphIndexCache, Path, Read, Result, Slot, Write, ct, docx_web,
     validate_document_main_content_type,
 };
-#[cfg(feature = "encryption")]
-pub(super) use super::model::{Limits, Mode};
+use crate::OpenOptions;
 use litchi_core::Durability;
 use litchi_opc::OpcError;
 use std::sync::Arc;
@@ -82,29 +83,29 @@ impl Package {
             .map_err(|e| Error::InvalidUri(format!("styles partname: {e}")))?;
 
         // Generate default styles dynamically
-        use crate::writer::style::{MutableStyle, generate_styles_xml};
+        use crate::writer::style::{Style as DraftStyle, generate_styles_xml};
         let default_styles = vec![
-            MutableStyle::normal(),
-            MutableStyle::heading_1(),
-            MutableStyle::heading_2(),
-            MutableStyle::heading_3(),
-            MutableStyle::heading_4(),
-            MutableStyle::heading_5(),
-            MutableStyle::heading_6(),
-            MutableStyle::heading_7(),
-            MutableStyle::heading_8(),
-            MutableStyle::heading_9(),
-            MutableStyle::title(),
-            MutableStyle::default_paragraph_font(),
-            MutableStyle::toc_heading(),
-            MutableStyle::toc1(),
-            MutableStyle::toc2(),
-            MutableStyle::toc3(),
-            MutableStyle::hyperlink(),
-            MutableStyle::header(),
-            MutableStyle::footer(),
-            MutableStyle::footnote_text(),
-            MutableStyle::endnote_text(),
+            DraftStyle::normal(),
+            DraftStyle::heading_1(),
+            DraftStyle::heading_2(),
+            DraftStyle::heading_3(),
+            DraftStyle::heading_4(),
+            DraftStyle::heading_5(),
+            DraftStyle::heading_6(),
+            DraftStyle::heading_7(),
+            DraftStyle::heading_8(),
+            DraftStyle::heading_9(),
+            DraftStyle::title(),
+            DraftStyle::default_paragraph_font(),
+            DraftStyle::toc_heading(),
+            DraftStyle::toc1(),
+            DraftStyle::toc2(),
+            DraftStyle::toc3(),
+            DraftStyle::hyperlink(),
+            DraftStyle::header(),
+            DraftStyle::footer(),
+            DraftStyle::footnote_text(),
+            DraftStyle::endnote_text(),
         ];
         let styles_xml = generate_styles_xml(&default_styles)?;
 
@@ -148,9 +149,10 @@ impl Package {
         // Create webSettings.xml part
         let web_settings_partname = PackURI::new("/word/webSettings.xml")
             .map_err(|e| Error::InvalidUri(format!("webSettings partname: {e}")))?;
-        let web_settings_xml = docx_web::write(
+        let web_settings_xml = docx_web::raw::write(
             &docx_web::Settings::default(),
             docx_web::Conformance::Transitional,
+            &docx_web::Limits::DEFAULT,
         )?;
         let web_settings_part = BlobPart::new(
             web_settings_partname,
@@ -214,9 +216,6 @@ impl Package {
             .relate_to("numbering.xml", rt::NUMBERING);
         opc.add_part(Box::new(numbering_part));
 
-        // Create a mutable document for writing
-        let mutable_doc = Some(MutableDocument::new());
-
         // Initialize document properties
         let properties = Slot::load(&opc)?;
 
@@ -224,24 +223,23 @@ impl Package {
         let custom_props = CustomProps::new();
 
         Ok(Self {
-            opc,
+            opc: opc.into(),
             paragraph_index_cache: Arc::new(ParagraphIndexCache::new()),
-            mutable_doc,
-            raw_edit_committed: false,
-            properties,
-            custom_props,
-            custom_props_dirty: false,
-            #[cfg(feature = "automatic-fonts")]
-            font_embedding: None,
+            main_admission: Arc::new(std::sync::Mutex::new(std::sync::Weak::new())),
+            properties: properties.into(),
+            custom_props: custom_props.into(),
+            semantic_limits: Arc::default(),
             #[cfg(feature = "encryption")]
-            source_encryption: None,
+            source_encryption: Default::default(),
+            #[cfg(feature = "encryption")]
+            encryption_limits: Default::default(),
         })
     }
 
     /// Create a new empty macro-free Word template (`.dotx`) package.
     ///
     /// Template packages are the native container for reusable `AutoText` and
-    /// other building blocks authored through [`Self::put_glossary`].
+    /// other building blocks authored through [`Self::edit_glossary`].
     ///
     /// # Errors
     ///
@@ -275,7 +273,7 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        Self::open_with_limits(path, litchi_opc::ReadLimits::default())
+        Self::open_with_options(path, OpenOptions::default())
     }
 
     /// Open a DOCX package from a file path with explicit OPC resource limits.
@@ -283,66 +281,39 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn open_with_limits<P: AsRef<Path>>(
-        path: P,
-        limits: litchi_opc::ReadLimits,
-    ) -> Result<Self> {
-        Self::from_opc_package(OpcPackage::open_with_limits(path, limits)?)
+    pub fn open_with_options<P: AsRef<Path>>(path: P, options: OpenOptions) -> Result<Self> {
+        options.check_owning()?;
+        Ok(
+            Self::from_opc_package(OpcPackage::open(path, options.source_limits)?)?
+                .with_semantic_limits(options.semantic_limits),
+        )
     }
 
-    #[cfg(feature = "encryption")]
+    /// Open a password-bearing DOCX path with standard finite policies.
     ///
     /// # Errors
     ///
-    /// Returns an error if the operation cannot be completed.
+    /// Returns an error on I/O, failed decryption, exceeded limits or invalid DOCX.
+    #[cfg(feature = "encryption")]
     pub fn open_with_password<P: AsRef<Path>>(path: P, password: &str) -> Result<Self> {
-        Self::open_with_password_and_limits(
-            path,
-            password,
-            &Limits::default(),
-            litchi_opc::ReadLimits::default(),
-        )
+        Self::open_with_password_and_options(path, password, OpenOptions::default())
     }
 
-    /// Open with explicit outer-encryption limits.
-    ///
-    /// The decrypted OPC archive uses [`litchi_opc::ReadLimits::default`].
-    /// Use [`Self::open_with_password_and_limits`] to select both independent
-    /// resource policies.
-    #[cfg(feature = "encryption")]
+    /// Open a password-bearing DOCX with independent outer encryption and
+    /// clear OPC archive policies.
     ///
     /// # Errors
     ///
-    /// Returns an error if the operation cannot be completed.
-    pub fn open_with<P: AsRef<Path>>(path: P, password: &str, limits: &Limits) -> Result<Self> {
-        Self::open_with_password_and_limits(
-            path,
-            password,
-            limits,
-            litchi_opc::ReadLimits::default(),
-        )
-    }
-
-    /// Open an encrypted DOCX with independent outer-encryption and inner-OPC
-    /// resource policies.
-    ///
-    /// `encryption_limits` bounds encrypted input and decryption. `opc_limits`
-    /// is applied to the decrypted archive before it is adopted as a DOCX
-    /// package.
+    /// Returns an error on I/O, failed decryption, exceeded limits or invalid DOCX.
     #[cfg(feature = "encryption")]
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation cannot be completed.
-    pub fn open_with_password_and_limits<P: AsRef<Path>>(
+    pub fn open_with_password_and_options<P: AsRef<Path>>(
         path: P,
         password: &str,
-        encryption_limits: &Limits,
-        opc_limits: litchi_opc::ReadLimits,
+        options: OpenOptions,
     ) -> Result<Self> {
+        options.check_owning()?;
         let file = std::fs::File::open(path.as_ref()).map_err(Error::Io)?;
-        let opened = crate::encryption::load_with(file, password, encryption_limits)?;
-        Self::from_opened_with_limits(opened, opc_limits)
+        Self::from_reader_with_password_and_options(file, password, options)
     }
 
     /// Create a Package from an already-parsed OPC package.
@@ -362,7 +333,7 @@ impl Package {
     /// use std::io::Cursor;
     ///
     /// let bytes = std::fs::read("document.docx")?;
-    /// let opc = OpcPackage::from_reader(Cursor::new(bytes))?;
+    /// let opc = OpcPackage::from_reader(Cursor::new(bytes), litchi_opc::SourceLimits::default())?;
     /// let pkg = Package::from_opc_package(opc)?;
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
@@ -382,17 +353,16 @@ impl Package {
         let properties = Slot::load(&opc)?;
 
         Ok(Self {
-            opc,
+            opc: opc.into(),
             paragraph_index_cache: Arc::new(ParagraphIndexCache::new()),
-            mutable_doc: None,
-            raw_edit_committed: false,
-            properties,
-            custom_props,
-            custom_props_dirty: false,
-            #[cfg(feature = "automatic-fonts")]
-            font_embedding: None,
+            main_admission: Arc::new(std::sync::Mutex::new(std::sync::Weak::new())),
+            properties: properties.into(),
+            custom_props: custom_props.into(),
+            semantic_limits: Arc::default(),
             #[cfg(feature = "encryption")]
-            source_encryption: None,
+            source_encryption: Default::default(),
+            #[cfg(feature = "encryption")]
+            encryption_limits: Default::default(),
         })
     }
 
@@ -418,7 +388,7 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
-        Self::from_reader_with_limits(reader, litchi_opc::ReadLimits::default())
+        Self::from_reader_with_options(reader, OpenOptions::default())
     }
 
     /// Create a DOCX package from a reader with explicit OPC resource limits.
@@ -426,72 +396,109 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn from_reader_with_limits<R: Read>(
-        reader: R,
-        limits: litchi_opc::ReadLimits,
-    ) -> Result<Self> {
-        Self::from_opc_package(OpcPackage::from_reader_with_limits(reader, limits)?)
+    pub fn from_reader_with_options<R: Read>(reader: R, options: OpenOptions) -> Result<Self> {
+        options.check_owning()?;
+        Ok(
+            Self::from_opc_package(OpcPackage::from_reader(reader, options.source_limits)?)?
+                .with_semantic_limits(options.semantic_limits),
+        )
     }
 
-    #[cfg(feature = "encryption")]
+    /// Open a password-bearing DOCX reader with standard finite policies.
     ///
     /// # Errors
     ///
-    /// Returns an error if the operation cannot be completed.
+    /// Returns an error on I/O, failed decryption, exceeded limits or invalid DOCX.
+    #[cfg(feature = "encryption")]
     pub fn from_reader_with_password<R: Read>(reader: R, password: &str) -> Result<Self> {
-        Self::from_reader_with_password_and_limits(
-            reader,
-            password,
-            &Limits::default(),
-            litchi_opc::ReadLimits::default(),
-        )
+        Self::from_reader_with_password_and_options(reader, password, OpenOptions::default())
     }
 
-    /// Open a reader with explicit outer-encryption limits.
-    ///
-    /// The decrypted OPC archive uses [`litchi_opc::ReadLimits::default`].
-    /// Use [`Self::from_reader_with_password_and_limits`] to select both
-    /// independent resource policies.
-    #[cfg(feature = "encryption")]
+    /// Open a password-bearing reader with independent outer encryption and
+    /// clear OPC archive policies.
     ///
     /// # Errors
     ///
-    /// Returns an error if the operation cannot be completed.
-    pub fn from_reader_with<R: Read>(reader: R, password: &str, limits: &Limits) -> Result<Self> {
-        Self::from_reader_with_password_and_limits(
-            reader,
-            password,
-            limits,
-            litchi_opc::ReadLimits::default(),
-        )
-    }
-
-    /// Open an encrypted DOCX reader with independent outer-encryption and
-    /// inner-OPC resource policies.
+    /// Returns an error on I/O, failed decryption, exceeded limits or invalid DOCX.
     #[cfg(feature = "encryption")]
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation cannot be completed.
-    pub fn from_reader_with_password_and_limits<R: Read>(
+    pub fn from_reader_with_password_and_options<R: Read>(
         reader: R,
         password: &str,
-        encryption_limits: &Limits,
-        opc_limits: litchi_opc::ReadLimits,
+        options: OpenOptions,
     ) -> Result<Self> {
-        let opened = crate::encryption::load_with(reader, password, encryption_limits)?;
-        Self::from_opened_with_limits(opened, opc_limits)
+        options.check_owning()?;
+        let opened = crate::encryption::load(reader, password, &options.encryption_limits)?;
+        Self::from_decrypted(opened, options)
     }
 
+    /// Open a DOCX package from a byte slice with standard finite limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input exceeds limits or is not a valid DOCX.
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        Self::from_bytes_with_options(bytes, OpenOptions::default())
+    }
+
+    /// Open a byte slice with caller-selected source limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input exceeds limits or is not a valid DOCX.
+    pub fn from_bytes_with_options(bytes: &[u8], options: OpenOptions) -> Result<Self> {
+        Self::from_reader_with_options(bytes, options)
+    }
+
+    /// Open a password-bearing byte slice with standard finite policies.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error on failed decryption, exceeded limits or invalid DOCX.
     #[cfg(feature = "encryption")]
-    fn from_opened_with_limits(
-        opened: crate::encryption::Opened,
-        limits: litchi_opc::ReadLimits,
+    pub fn from_bytes_with_password(bytes: &[u8], password: &str) -> Result<Self> {
+        Self::from_bytes_with_password_and_options(bytes, password, OpenOptions::default())
+    }
+
+    /// Open a password-bearing byte slice with caller-selected policies.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error on failed decryption, exceeded limits or invalid DOCX.
+    #[cfg(feature = "encryption")]
+    pub fn from_bytes_with_password_and_options(
+        bytes: &[u8],
+        password: &str,
+        options: OpenOptions,
     ) -> Result<Self> {
+        Self::from_reader_with_password_and_options(bytes, password, options)
+    }
+
+    /// Open a package that was already decrypted, keeping its encryption
+    /// profile.
+    ///
+    /// `opened` comes from [`crate::encryption::open`] or one of its limit
+    /// and policy variants. The package keeps the source profile exactly as
+    /// [`Self::from_reader_with_password_and_options`] does, so plain output
+    /// stays refused until the caller chooses re-encryption or plaintext.
+    /// This lets one decryption serve both a caller's own classification of
+    /// the clear package and the open.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the clear package violates the source limits or is not a
+    /// valid DOCX package.
+    #[cfg(feature = "encryption")]
+    pub fn from_decrypted(opened: crate::encryption::Opened, options: OpenOptions) -> Result<Self> {
+        options.check_owning()?;
         let source_encryption = opened.mode();
-        let opc = OpcPackage::from_vec_with_limits(opened.into_bytes(), limits)?;
-        let mut package = Self::from_opc_package(opc)?;
-        package.source_encryption = source_encryption;
+        let opc = OpcPackage::from_vec(opened.into_bytes(), options.source_limits)?;
+        let mut package =
+            Self::from_opc_package(opc)?.with_semantic_limits(options.semantic_limits);
+        package.source_encryption = source_encryption.map_or_else(
+            litchi_ooxml_common::package_encryption::PackageEncryption::plain,
+            litchi_ooxml_common::package_encryption::PackageEncryption::encrypted,
+        );
+        package.encryption_limits = options.encryption_limits;
         Ok(package)
     }
 }
@@ -519,7 +526,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn save<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         self.save_with_durability(path, Durability::Full)
     }
 
@@ -540,7 +547,7 @@ impl Package {
     /// that the destination was replaced but its directory could not be
     /// synchronized ([`litchi_opc::OpcError::Committed`]).
     pub fn save_with_durability<P: AsRef<Path>>(
-        &mut self,
+        &self,
         path: P,
         durability: Durability,
     ) -> Result<()> {
@@ -553,7 +560,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn save_plain<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+    pub fn save_plain<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         self.save_plain_with_durability(path, Durability::Full)
     }
 
@@ -564,14 +571,14 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn save_plain_with_durability<P: AsRef<Path>>(
-        &mut self,
+        &self,
         path: P,
         durability: Durability,
     ) -> Result<()> {
         self.save_plain_impl(path, durability)
     }
 
-    fn save_plain_impl<P: AsRef<Path>>(&mut self, path: P, durability: Durability) -> Result<()> {
+    fn save_plain_impl<P: AsRef<Path>>(&self, path: P, durability: Durability) -> Result<()> {
         litchi_opc::atomic::replace_with_durability::<Error>(
             path.as_ref(),
             durability,
@@ -596,16 +603,39 @@ impl Package {
     /// let mut pkg = Package::new()?;
     /// // Modify document...
     /// let mut cursor = Cursor::new(Vec::new());
-    /// pkg.to_stream(&mut cursor)?;
+    /// pkg.write_to(&mut cursor)?;
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn to_stream<W: Write>(&mut self, writer: W) -> Result<()> {
-        self.ensure_plain_output("to_stream")?;
+    /// OPC publication errors retain their typed cause. After the sink accepts
+    /// bytes, failures report [`litchi_opc::OpcError::IncompleteOutput`] with
+    /// the accepted byte count. The package can be retried with another sink.
+    pub fn write_to<W: Write>(&self, writer: W) -> Result<()> {
+        self.ensure_plain_output("write_to")?;
         self.write_plain(writer)
+    }
+
+    /// Serialize this package into a new ZIP buffer.
+    ///
+    /// # Errors
+    /// Refuses ordinary output from an encrypted source; use explicit plaintext
+    /// or re-encrypted output. Publication errors retain their typed causes.
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        self.ensure_plain_output("to_bytes")?;
+        self.to_plain_bytes()
+    }
+
+    /// Explicitly serialize plaintext bytes without changing encryption provenance.
+    ///
+    /// # Errors
+    /// Returns a typed publication error if the package cannot be serialized.
+    pub fn to_plain_bytes(&self) -> Result<Vec<u8>> {
+        let mut output = Vec::new();
+        self.write_plain(&mut output)?;
+        Ok(output)
     }
 
     /// Explicitly write a plaintext package to a stream.
@@ -613,7 +643,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn to_plain_stream<W: Write>(&mut self, writer: W) -> Result<()> {
+    pub fn to_plain_stream<W: Write>(&self, writer: W) -> Result<()> {
         self.write_plain(writer)
     }
 
@@ -623,10 +653,14 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn to_encrypted(&mut self, password: &str, mode: Mode) -> Result<Vec<u8>> {
-        let mut output = std::io::Cursor::new(Vec::new());
-        self.write_plain(&mut output)?;
-        crate::encryption::encrypt(output.into_inner(), password, mode).map_err(Into::into)
+    pub fn to_encrypted(&self, password: &str, mode: Mode) -> Result<Vec<u8>> {
+        crate::encryption::encrypt(
+            self.to_plain_bytes()?,
+            password,
+            mode,
+            &self.encryption_limits,
+        )
+        .map_err(Into::into)
     }
 
     /// Serialize and encrypt using the source package's retained profile.
@@ -635,7 +669,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn to_reencrypted(&mut self, password: &str) -> Result<Vec<u8>> {
+    pub fn to_reencrypted(&self, password: &str) -> Result<Vec<u8>> {
         let mode = self.preserved_mode("to_reencrypted")?;
         self.to_encrypted(password, mode)
     }
@@ -647,7 +681,7 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn save_encrypted<P: AsRef<Path>>(
-        &mut self,
+        &self,
         path: P,
         password: &str,
         mode: Mode,
@@ -657,7 +691,6 @@ impl Package {
             temporary.write_all(&output)?;
             Ok(())
         })?;
-        self.source_encryption = Some(mode);
         Ok(())
     }
 
@@ -667,7 +700,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn save_reencrypted<P: AsRef<Path>>(&mut self, path: P, password: &str) -> Result<()> {
+    pub fn save_reencrypted<P: AsRef<Path>>(&self, path: P, password: &str) -> Result<()> {
         let mode = self.preserved_mode("save_reencrypted")?;
         self.save_encrypted(path, password, mode)
     }
@@ -676,43 +709,17 @@ impl Package {
     #[cfg(feature = "encryption")]
     #[must_use]
     pub const fn encryption(&self) -> Option<Mode> {
-        self.source_encryption
+        self.source_encryption.mode()
     }
 
-    pub(super) fn ensure_opc_current(&self, operation: &'static str) -> Result<()> {
+    pub(super) fn ensure_opc_current(&self, _operation: &'static str) -> Result<()> {
         #[cfg(feature = "encryption")]
-        if self.source_encryption.is_some() {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation,
-                reason: "raw OPC access would expose an encrypted source as plaintext; use the managed encryption or explicit plaintext APIs",
-            });
-        }
-
-        if self
-            .mutable_doc
-            .as_ref()
-            .is_some_and(MutableDocument::is_modified)
-        {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation,
-                reason: "the legacy document writer has unmaterialized changes; use a managed save or to_plain_stream first",
-            });
-        }
-        if self.properties.is_dirty() {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation,
-                reason: "core properties have unmaterialized changes; use a managed save or to_plain_stream first",
-            });
-        }
-        if self.custom_props_dirty {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation,
-                reason: "custom properties have unmaterialized changes; use a managed save or to_plain_stream first",
-            });
+        if self.source_encryption.mode().is_some() {
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                _operation,
+                "raw OPC access would expose an encrypted source as plaintext; use the managed encryption or explicit plaintext APIs",
+            ));
         }
 
         Ok(())
@@ -720,607 +727,549 @@ impl Package {
 
     fn ensure_plain_output(&self, _operation: &'static str) -> Result<()> {
         #[cfg(feature = "encryption")]
-        if self.source_encryption.is_some() {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
+        self.source_encryption
+            .ordinary_output()
+            .map_err(|source| Error::EncryptionPolicy {
                 operation: _operation,
-                reason: "the source package was encrypted; use save_reencrypted or save_plain",
-            });
-        }
+                source,
+            })?;
         Ok(())
     }
 
     #[cfg(feature = "encryption")]
     fn preserved_mode(&self, operation: &'static str) -> Result<Mode> {
-        self.source_encryption.ok_or(Error::UnsafeEdit {
-            format: "DOCX",
-            operation,
-            reason: "the source package has no encryption profile; supply an explicit Mode",
-        })
+        self.source_encryption
+            .require_retained_mode()
+            .map_err(|source| Error::EncryptionPolicy { operation, source })
     }
 
-    fn write_plain<W: Write>(&mut self, writer: W) -> Result<()> {
+    /// Finalize builder-authored content into the package graph: the draft
+    /// document and, when selected, its embedded fonts. The returned package
+    /// carries no authoring state.
+    pub(crate) fn finish_authoring(
+        mut self,
+        document: &mut DraftDocument,
+        #[cfg(feature = "automatic-fonts")] font_embedding: Option<litchi_fonts::embedding::Mode>,
+    ) -> Result<Self> {
+        if document.is_modified() {
+            self.materialize_document(document)?;
+        }
+        #[cfg(feature = "automatic-fonts")]
+        if let Some(mode) = font_embedding {
+            self.embed_fonts_for_document(document, mode)?;
+        }
+        Ok(self)
+    }
+
+    /// Materialize the legacy authoring document into the OPC graph:
+    /// the main part, its relationships and every generated related part.
+    pub(super) fn materialize_document(&mut self, mutable_doc: &mut DraftDocument) -> Result<()> {
         use crate::writer::relmap::RelationshipMapper;
         use litchi_opc::constants::relationship_type as rt;
 
-        // Keep both the source graph and the mutable semantic document
-        // available until the complete publication succeeds. Materializing a
-        // document rebuilds many related parts; an error half-way through must
-        // leave the caller with the same retryable edit rather than a dropped
-        // writer and a partially rewritten package.
-        let mut rollback = WriteRollbackGuard::new(self);
-        // A sink or a late writer hook may unwind instead of returning an
-        // error. Catch the unwind long enough to put both owned pieces of the
-        // host state back before resuming it; the staged-properties guard is
-        // dropped while unwinding the closure and therefore keeps its dirty
-        // intent for the next attempt.
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| -> Result<()> {
-            // If we have a mutable document, update the document.xml part
-            if let Some(mutable_doc) = rollback.mutable_doc_mut()
-                && mutable_doc.is_modified()
-            {
-                // Generate TOC if configured (must happen before serialization)
-                mutable_doc.generate_toc_if_needed()?;
+        // Generate TOC if configured (must happen before serialization)
+        mutable_doc.generate_toc_if_needed()?;
 
-                // Step 1: Collect all content that needs relationships
-                let hyperlink_urls = mutable_doc.collect_hyperlink_urls();
-                let images = mutable_doc.collect_images();
-                let ole_objects = mutable_doc.collect_ole_objects();
-                let smart_arts = mutable_doc.collect_smart_arts();
-                let has_header = mutable_doc.has_header();
-                let has_footer = mutable_doc.has_footer();
-                let section_header_footer_parts =
-                    mutable_doc.collect_section_header_footer_parts()?;
-                let explicit_section_relationships =
-                    mutable_doc.collect_explicit_section_header_footer_relationships()?;
-                let mut planned_section_parts = Vec::new();
-                for (index, (header, part)) in section_header_footer_parts.into_iter().enumerate() {
-                    let stem = if header {
-                        "headerSection"
-                    } else {
-                        "footerSection"
+        // Step 1: Collect all content that needs relationships
+        let hyperlink_urls = mutable_doc.collect_hyperlink_urls();
+        let images = mutable_doc.collect_images();
+        let ole_objects = mutable_doc.collect_ole_objects();
+        let smart_arts = mutable_doc.collect_smart_arts();
+        let has_header = mutable_doc.has_header();
+        let has_footer = mutable_doc.has_footer();
+        let section_header_footer_parts = mutable_doc.collect_section_header_footer_parts()?;
+        let explicit_section_relationships =
+            mutable_doc.collect_explicit_section_header_footer_relationships()?;
+        let mut planned_section_parts = Vec::new();
+        for (index, (header, part)) in section_header_footer_parts.into_iter().enumerate() {
+            let stem = if header {
+                "headerSection"
+            } else {
+                "footerSection"
+            };
+            let filename = format!("{stem}{}.xml", index + 1);
+            let uri = PackURI::new(format!("/word/{filename}"))
+                .map_err(|error| Error::InvalidUri(error.clone()))?;
+            match self.opc.get_part(&uri) {
+                Ok(_) => {
+                    return Err(Error::InvalidFormat(format!(
+                        "section header/footer part {uri} already exists"
+                    )));
+                },
+                Err(OpcError::PartNotFound(_)) => {},
+                Err(error) => return Err(error.into()),
+            }
+            planned_section_parts.push((header, part, uri, filename));
+        }
+
+        // Step 2: Create a relationship mapper and add relationships
+        let mut rel_mapper = RelationshipMapper::new();
+
+        // Create the document part first (we'll update it later)
+        let doc_uri = PackURI::new("/word/document.xml")
+            .map_err(|e| Error::InvalidUri(format!("document URI: {e}")))?;
+
+        if !explicit_section_relationships.is_empty() {
+            let existing_document = self.opc.get_part(&doc_uri).map_err(|_source_error| {
+                Error::InvalidFormat("section references exist without a document part".to_string())
+            })?;
+            for (id, header) in &explicit_section_relationships {
+                let relationship = existing_document.rels().get(id).ok_or_else(|| {
+                    Error::InvalidFormat(format!("section relationship {id:?} is missing"))
+                })?;
+                let expected_type = if *header {
+                    [
+                        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/header",
+                        "http://purl.oclc.org/ooxml/officeDocument/relationships/header",
+                    ]
+                } else {
+                    [
+                        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer",
+                        "http://purl.oclc.org/ooxml/officeDocument/relationships/footer",
+                    ]
+                };
+                if relationship.is_external() || !expected_type.contains(&relationship.reltype()) {
+                    return Err(Error::InvalidFormat(format!(
+                        "section relationship {id:?} has the wrong type or target mode"
+                    )));
+                }
+                let target = relationship.target_partname().map_err(|error| {
+                    Error::InvalidFormat(format!("invalid section relationship {id:?}: {error}"))
+                })?;
+                let part = self.opc.get_part(&target).map_err(|_source_error| {
+                    Error::InvalidFormat(format!(
+                        "section relationship {id:?} targets a missing part"
+                    ))
+                })?;
+                let expected_content_type = if *header {
+                    ct::WML_HEADER
+                } else {
+                    ct::WML_FOOTER
+                };
+                if part.content_type() != expected_content_type {
+                    return Err(Error::InvalidFormat(format!(
+                        "section relationship {id:?} targets the wrong content type"
+                    )));
+                }
+            }
+        }
+
+        // Get or create the document part to add relationships to
+        let content_type = match self.opc.get_part(&doc_uri) {
+            Ok(part) => part.content_type().to_string(),
+            Err(OpcError::PartNotFound(_)) => ct::WML_DOCUMENT_MAIN.to_string(),
+            Err(error) => return Err(error.into()),
+        };
+
+        // The source package may already contain note parts whose
+        // relationship targets or payloads are intentionally opaque
+        // to the mutable document model. Generate replacement parts
+        // once, before rebuilding the main-part relationships, so an
+        // absent semantic note collection leaves those source edges
+        // intact while an authored collection still gets the normal
+        // generated relationship and payload.
+        let generated_footnotes_xml = mutable_doc.generate_footnotes_xml()?;
+        let generated_endnotes_xml = mutable_doc.generate_endnotes_xml()?;
+
+        // Create new temporary part for relationships
+        use litchi_opc::part::{BlobPart, Part};
+        let mut temp_part = BlobPart::new(doc_uri.clone(), content_type.clone(), Vec::new());
+
+        // Copy existing relationships from the original document part (styles, settings, etc.)
+        match self.opc.get_part(&doc_uri) {
+            Ok(existing_part) => {
+                for rel in existing_part.rels().iter() {
+                    // Skip relationships we're going to recreate dynamically.
+                    // Note relationships are only replaced when the
+                    // mutable document has corresponding authored
+                    // notes; otherwise preserve their source target
+                    // and relationship ID verbatim.
+                    let recreated = match rel.reltype() {
+                        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink"
+                        | "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" => {
+                            true
+                        },
+                        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes"
+                        | STRICT_FOOTNOTES_RELATIONSHIP => generated_footnotes_xml.is_some(),
+                        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes"
+                        | STRICT_ENDNOTES_RELATIONSHIP => generated_endnotes_xml.is_some(),
+                        _ => false,
                     };
-                    let filename = format!("{stem}{}.xml", index + 1);
-                    let uri = PackURI::new(format!("/word/{filename}"))
-                        .map_err(|error| Error::InvalidUri(error.clone()))?;
+                    if !recreated {
+                        temp_part.rels_mut().add_relationship(
+                            rel.reltype().to_string(),
+                            rel.target_ref().to_string(),
+                            rel.r_id().to_string(),
+                            rel.is_external(),
+                        );
+                    }
+                }
+            },
+            Err(OpcError::PartNotFound(_)) => {},
+            Err(error) => return Err(error.into()),
+        }
+
+        for (header, part, _, filename) in &planned_section_parts {
+            let relationship_type = if *header { rt::HEADER } else { rt::FOOTER };
+            let rid = temp_part.relate_to(filename, relationship_type);
+            rel_mapper.add_section_header_footer_id(part.key.clone(), rid);
+        }
+
+        // Add hyperlink relationships (external)
+        for (i, url) in hyperlink_urls.iter().enumerate() {
+            let rid = temp_part.relate_to_ext(url, rt::HYPERLINK);
+            rel_mapper.add_hyperlink(i, rid);
+        }
+
+        // Add image parts and relationships
+        for (i, (image_data, image_format)) in images.iter().enumerate() {
+            let image_num = i + 1;
+            let ext = image_format.extension();
+            let image_partname = format!("/word/media/image{image_num}.{ext}");
+            let image_uri = PackURI::new(&image_partname)
+                .map_err(|e| Error::InvalidUri(format!("image URI: {e}")))?;
+
+            // Create and add image part
+            let image_part = BlobPart::new(
+                image_uri,
+                image_format.mime_type().to_string(),
+                image_data.to_vec(),
+            );
+            self.opc.add_part(Box::new(image_part));
+
+            // Create relationship from document to image
+            let rid = temp_part.relate_to(&image_partname, rt::IMAGE);
+            rel_mapper.add_image(i, rid);
+        }
+
+        // Add embedded OLE object parts and relationships. Payloads
+        // are stored verbatim as inert binary parts; optional
+        // previews are stored as ordinary media parts.
+        for (i, object) in ole_objects.iter().enumerate() {
+            let object_num = i + 1;
+            let object_partname = format!("/word/embeddings/oleObject{object_num}.bin");
+            let object_uri = PackURI::new(&object_partname)
+                .map_err(|e| Error::InvalidUri(format!("OLE object URI: {e}")))?;
+            self.opc.add_part(Box::new(BlobPart::new(
+                object_uri,
+                ct::OFC_OLE_OBJECT.to_string(),
+                object.payload().to_vec(),
+            )));
+            let rid = temp_part.relate_to(&object_partname, rt::OLE_OBJECT);
+            rel_mapper.add_ole_object(object.shape_id(), rid);
+
+            if let Some((preview_data, preview_format)) = object.preview() {
+                let preview_partname = format!(
+                    "/word/media/oleObjectPreview{object_num}.{}",
+                    preview_format.extension()
+                );
+                let preview_uri = PackURI::new(&preview_partname)
+                    .map_err(|e| Error::InvalidUri(format!("OLE preview URI: {e}")))?;
+                self.opc.add_part(Box::new(BlobPart::new(
+                    preview_uri,
+                    preview_format.mime_type().to_string(),
+                    preview_data.to_vec(),
+                )));
+                let rid = temp_part.relate_to(&preview_partname, rt::IMAGE);
+                rel_mapper.add_ole_preview(object.shape_id(), rid);
+            }
+        }
+
+        // Add SmartArt diagram parts (data, layout, quick style,
+        // colors) and their relationships. The optional pre-rendered
+        // drawing part is not generated; Word and LibreOffice
+        // re-render from the layout and data parts.
+        let mut diagram_index = 0u32;
+        for smartart in &smart_arts {
+            // Allocate non-colliding part names under /word/diagrams/.
+            let (data_name, layout_name, quick_style_name, colors_name) = loop {
+                diagram_index = diagram_index.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat("SmartArt diagram part name space exhausted".to_string())
+                })?;
+                let names = (
+                    format!("/word/diagrams/data{diagram_index}.xml"),
+                    format!("/word/diagrams/layout{diagram_index}.xml"),
+                    format!("/word/diagrams/quickStyle{diagram_index}.xml"),
+                    format!("/word/diagrams/colors{diagram_index}.xml"),
+                );
+                let mut taken = false;
+                for name in [&names.0, &names.1, &names.2, &names.3] {
+                    let uri =
+                        PackURI::new(name).map_err(|error| Error::InvalidUri(error.clone()))?;
                     match self.opc.get_part(&uri) {
                         Ok(_) => {
-                            return Err(Error::InvalidFormat(format!(
-                                "section header/footer part {uri} already exists"
-                            )));
+                            taken = true;
+                            break;
                         },
                         Err(OpcError::PartNotFound(_)) => {},
                         Err(error) => return Err(error.into()),
                     }
-                    planned_section_parts.push((header, part, uri, filename));
                 }
-
-                // Step 2: Create a relationship mapper and add relationships
-                let mut rel_mapper = RelationshipMapper::new();
-
-                // Create the document part first (we'll update it later)
-                let doc_uri = PackURI::new("/word/document.xml")
-                    .map_err(|e| Error::InvalidUri(format!("document URI: {e}")))?;
-
-                if !explicit_section_relationships.is_empty() {
-                    let existing_document =
-                        self.opc.get_part(&doc_uri).map_err(|_source_error| {
-                            Error::InvalidFormat(
-                                "section references exist without a document part".to_string(),
-                            )
-                        })?;
-                    for (id, header) in &explicit_section_relationships {
-                        let relationship = existing_document.rels().get(id).ok_or_else(|| {
-                            Error::InvalidFormat(format!("section relationship {id:?} is missing"))
-                        })?;
-                        let expected_type = if *header {
-                            [
-                                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/header",
-                                "http://purl.oclc.org/ooxml/officeDocument/relationships/header",
-                            ]
-                        } else {
-                            [
-                                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer",
-                                "http://purl.oclc.org/ooxml/officeDocument/relationships/footer",
-                            ]
-                        };
-                        if relationship.is_external()
-                            || !expected_type.contains(&relationship.reltype())
-                        {
-                            return Err(Error::InvalidFormat(format!(
-                                "section relationship {id:?} has the wrong type or target mode"
-                            )));
-                        }
-                        let target = relationship.target_partname().map_err(|error| {
-                            Error::InvalidFormat(format!(
-                                "invalid section relationship {id:?}: {error}"
-                            ))
-                        })?;
-                        let part = self.opc.get_part(&target).map_err(|_source_error| {
-                            Error::InvalidFormat(format!(
-                                "section relationship {id:?} targets a missing part"
-                            ))
-                        })?;
-                        let expected_content_type = if *header {
-                            ct::WML_HEADER
-                        } else {
-                            ct::WML_FOOTER
-                        };
-                        if part.content_type() != expected_content_type {
-                            return Err(Error::InvalidFormat(format!(
-                                "section relationship {id:?} targets the wrong content type"
-                            )));
-                        }
-                    }
+                if !taken {
+                    break names;
                 }
+            };
+            let parts = smartart.generate_parts()?;
+            for (partname, content_type, xml) in [
+                (&data_name, ct::DML_DIAGRAM_DATA, parts.data_xml),
+                (&layout_name, ct::DML_DIAGRAM_LAYOUT, parts.layout_xml),
+                (
+                    &quick_style_name,
+                    ct::DML_DIAGRAM_STYLE,
+                    parts.quick_style_xml,
+                ),
+                (&colors_name, ct::DML_DIAGRAM_COLORS, parts.colors_xml),
+            ] {
+                let uri = PackURI::new(partname)
+                    .map_err(|e| Error::InvalidUri(format!("diagram URI: {e}")))?;
+                self.opc.add_part(Box::new(BlobPart::new(
+                    uri,
+                    content_type.to_string(),
+                    xml.into_bytes(),
+                )));
+            }
+            let rel_ids = crate::writer::smartart::SmartArtRelIds {
+                data: temp_part.relate_to(&data_name, DIAGRAM_DATA_REL),
+                layout: temp_part.relate_to(&layout_name, DIAGRAM_LAYOUT_REL),
+                quick_style: temp_part.relate_to(&quick_style_name, DIAGRAM_QUICK_STYLE_REL),
+                colors: temp_part.relate_to(&colors_name, DIAGRAM_COLORS_REL),
+            };
+            rel_mapper.add_smart_art(smartart.anchor_key(), rel_ids);
+        }
 
-                // Get or create the document part to add relationships to
-                let content_type = match self.opc.get_part(&doc_uri) {
-                    Ok(part) => part.content_type().to_string(),
-                    Err(OpcError::PartNotFound(_)) => ct::WML_DOCUMENT_MAIN.to_string(),
-                    Err(error) => return Err(error.into()),
+        // Add header/footer parts and relationships
+        // Note: If watermark exists, headers will be handled by update_watermark_headers
+        // which merges user content with watermark
+        if has_header
+            && !mutable_doc.has_watermark()
+            && let Some(header_xml) = mutable_doc.generate_header_xml()?
+        {
+            let header_uri = PackURI::new("/word/header1.xml")
+                .map_err(|e| Error::InvalidUri(format!("header URI: {e}")))?;
+            let header_part = BlobPart::new(
+                header_uri,
+                ct::WML_HEADER.to_string(),
+                header_xml.into_bytes(),
+            );
+            self.opc.add_part(Box::new(header_part));
+            // Use relative path for relationship (relative to document.xml location)
+            let rid = temp_part.relate_to("header1.xml", rt::HEADER);
+            rel_mapper.set_header_id(rid);
+        }
+
+        if has_footer && let Some(footer_xml) = mutable_doc.generate_footer_xml()? {
+            let footer_uri = PackURI::new("/word/footer1.xml")
+                .map_err(|e| Error::InvalidUri(format!("footer URI: {e}")))?;
+            let footer_part = BlobPart::new(
+                footer_uri,
+                ct::WML_FOOTER.to_string(),
+                footer_xml.into_bytes(),
+            );
+            self.opc.add_part(Box::new(footer_part));
+            // Use relative path for relationship (relative to document.xml location)
+            let rid = temp_part.relate_to("footer1.xml", rt::FOOTER);
+            rel_mapper.set_footer_id(rid);
+        }
+
+        // Add footnotes parts and relationships BEFORE document XML generation
+        if let Some(footnotes_xml) = generated_footnotes_xml {
+            let footnotes_uri = PackURI::new("/word/footnotes.xml")
+                .map_err(|e| Error::InvalidUri(format!("footnotes URI: {e}")))?;
+            let footnotes_part = BlobPart::new(
+                footnotes_uri,
+                ct::WML_FOOTNOTES.to_string(),
+                footnotes_xml.into_bytes(),
+            );
+            self.opc.add_part(Box::new(footnotes_part));
+            let rid = temp_part.relate_to("footnotes.xml", rt::FOOTNOTES);
+            rel_mapper.set_footnotes_id(rid);
+        }
+
+        // Add endnotes parts and relationships BEFORE document XML generation
+        if let Some(endnotes_xml) = generated_endnotes_xml {
+            let endnotes_uri = PackURI::new("/word/endnotes.xml")
+                .map_err(|e| Error::InvalidUri(format!("endnotes URI: {e}")))?;
+            let endnotes_part = BlobPart::new(
+                endnotes_uri,
+                ct::WML_ENDNOTES.to_string(),
+                endnotes_xml.into_bytes(),
+            );
+            self.opc.add_part(Box::new(endnotes_part));
+            let rid = temp_part.relate_to("endnotes.xml", rt::ENDNOTES);
+            rel_mapper.set_endnotes_id(rid);
+        }
+
+        // Handle watermark headers before generating document XML
+        // This ensures header relationships are properly set up
+        if mutable_doc.has_watermark() || mutable_doc.has_image_watermark() {
+            // Generate user header content if exists (will be merged with watermark)
+            let user_header_content = if mutable_doc.has_header() {
+                mutable_doc.generate_header_xml()?
+            } else {
+                None
+            };
+
+            // Store the watermark image as an ordinary media part,
+            // shared by all three headers.
+            let image_media_name =
+                if let Some(image_watermark) = mutable_doc.image_watermark.as_ref() {
+                    let media_name = format!(
+                        "/word/media/watermarkImage1.{}",
+                        image_watermark.format().extension()
+                    );
+                    let media_uri = PackURI::new(&media_name)
+                        .map_err(|e| Error::InvalidUri(format!("watermark image URI: {e}")))?;
+                    self.opc.add_part(Box::new(BlobPart::new(
+                        media_uri,
+                        image_watermark.format().mime_type().to_string(),
+                        image_watermark.data().to_vec(),
+                    )));
+                    Some(media_name)
+                } else {
+                    None
                 };
 
-                // The source package may already contain note parts whose
-                // relationship targets or payloads are intentionally opaque
-                // to the mutable document model. Generate replacement parts
-                // once, before rebuilding the main-part relationships, so an
-                // absent semantic note collection leaves those source edges
-                // intact while an authored collection still gets the normal
-                // generated relationship and payload.
-                let generated_footnotes_xml = mutable_doc.generate_footnotes_xml()?;
-                let generated_endnotes_xml = mutable_doc.generate_endnotes_xml()?;
+            // Create three headers (default, first, even) with watermark
+            let header_types = [
+                ("/word/header1.xml", "header1.xml"),
+                ("/word/header2.xml", "header2.xml"),
+                ("/word/header3.xml", "header3.xml"),
+            ];
 
-                // Create new temporary part for relationships
-                use litchi_opc::part::{BlobPart, Part};
-                let mut temp_part =
-                    BlobPart::new(doc_uri.clone(), content_type.clone(), Vec::new());
-
-                // Copy existing relationships from the original document part (styles, settings, etc.)
-                match self.opc.get_part(&doc_uri) {
-                    Ok(existing_part) => {
-                        for rel in existing_part.rels().iter() {
-                            // Skip relationships we're going to recreate dynamically.
-                            // Note relationships are only replaced when the
-                            // mutable document has corresponding authored
-                            // notes; otherwise preserve their source target
-                            // and relationship ID verbatim.
-                            let recreated = match rel.reltype() {
-                                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink"
-                                | "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" => {
-                                    true
-                                },
-                                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes"
-                                | STRICT_FOOTNOTES_RELATIONSHIP => {
-                                    generated_footnotes_xml.is_some()
-                                },
-                                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes"
-                                | STRICT_ENDNOTES_RELATIONSHIP => generated_endnotes_xml.is_some(),
-                                _ => false,
-                            };
-                            if !recreated {
-                                temp_part.rels_mut().add_relationship(
-                                    rel.reltype().to_string(),
-                                    rel.target_ref().to_string(),
-                                    rel.r_id().to_string(),
-                                    rel.is_external(),
-                                );
-                            }
-                        }
-                    },
-                    Err(OpcError::PartNotFound(_)) => {},
-                    Err(error) => return Err(error.into()),
+            for (idx, (header_uri_path, header_filename)) in header_types.iter().enumerate() {
+                let mut watermark_xml = String::new();
+                if let Some(wm) = mutable_doc.watermark.as_ref() {
+                    watermark_xml.push_str(&wm.to_header_xml((idx + 1) as u32)?);
                 }
 
-                for (header, part, _, filename) in &planned_section_parts {
-                    let relationship_type = if *header { rt::HEADER } else { rt::FOOTER };
-                    let rid = temp_part.relate_to(filename, relationship_type);
-                    rel_mapper.add_section_header_footer_id(part.key.clone(), rid);
+                let header_uri = PackURI::new(*header_uri_path)
+                    .map_err(|e| Error::InvalidUri(format!("header URI: {e}")))?;
+                let mut header_part =
+                    BlobPart::new(header_uri, ct::WML_HEADER.to_string(), Vec::new());
+
+                // The image watermark references the media part
+                // through a relationship owned by this header part.
+                if let (Some(image_watermark), Some(media_name)) = (
+                    mutable_doc.image_watermark.as_ref(),
+                    image_media_name.as_deref(),
+                ) {
+                    let media_target = media_name.strip_prefix("/word/").unwrap_or(media_name);
+                    let rel_id = header_part.relate_to(media_target, rt::IMAGE);
+                    watermark_xml
+                        .push_str(&image_watermark.to_header_xml((idx + 1) as u32, &rel_id)?);
                 }
 
-                // Add hyperlink relationships (external)
-                for (i, url) in hyperlink_urls.iter().enumerate() {
-                    let rid = temp_part.relate_to_ext(url, rt::HYPERLINK);
-                    rel_mapper.add_hyperlink(i, rid);
-                }
-
-                // Add image parts and relationships
-                for (i, (image_data, image_format)) in images.iter().enumerate() {
-                    let image_num = i + 1;
-                    let ext = image_format.extension();
-                    let image_partname = format!("/word/media/image{image_num}.{ext}");
-                    let image_uri = PackURI::new(&image_partname)
-                        .map_err(|e| Error::InvalidUri(format!("image URI: {e}")))?;
-
-                    // Create and add image part
-                    let image_part = BlobPart::new(
-                        image_uri,
-                        image_format.mime_type().to_string(),
-                        image_data.to_vec(),
-                    );
-                    self.opc.add_part(Box::new(image_part));
-
-                    // Create relationship from document to image
-                    let rid = temp_part.relate_to(&image_partname, rt::IMAGE);
-                    rel_mapper.add_image(i, rid);
-                }
-
-                // Add embedded OLE object parts and relationships. Payloads
-                // are stored verbatim as inert binary parts; optional
-                // previews are stored as ordinary media parts.
-                for (i, object) in ole_objects.iter().enumerate() {
-                    let object_num = i + 1;
-                    let object_partname = format!("/word/embeddings/oleObject{object_num}.bin");
-                    let object_uri = PackURI::new(&object_partname)
-                        .map_err(|e| Error::InvalidUri(format!("OLE object URI: {e}")))?;
-                    self.opc.add_part(Box::new(BlobPart::new(
-                        object_uri,
-                        ct::OFC_OLE_OBJECT.to_string(),
-                        object.payload().to_vec(),
-                    )));
-                    let rid = temp_part.relate_to(&object_partname, rt::OLE_OBJECT);
-                    rel_mapper.add_ole_object(object.shape_id(), rid);
-
-                    if let Some((preview_data, preview_format)) = object.preview() {
-                        let preview_partname = format!(
-                            "/word/media/oleObjectPreview{object_num}.{}",
-                            preview_format.extension()
-                        );
-                        let preview_uri = PackURI::new(&preview_partname)
-                            .map_err(|e| Error::InvalidUri(format!("OLE preview URI: {e}")))?;
-                        self.opc.add_part(Box::new(BlobPart::new(
-                            preview_uri,
-                            preview_format.mime_type().to_string(),
-                            preview_data.to_vec(),
-                        )));
-                        let rid = temp_part.relate_to(&preview_partname, rt::IMAGE);
-                        rel_mapper.add_ole_preview(object.shape_id(), rid);
-                    }
-                }
-
-                // Add SmartArt diagram parts (data, layout, quick style,
-                // colors) and their relationships. The optional pre-rendered
-                // drawing part is not generated; Word and LibreOffice
-                // re-render from the layout and data parts.
-                let mut diagram_index = 0u32;
-                for smartart in &smart_arts {
-                    // Allocate non-colliding part names under /word/diagrams/.
-                    let (data_name, layout_name, quick_style_name, colors_name) = loop {
-                        diagram_index = diagram_index.checked_add(1).ok_or_else(|| {
-                            Error::InvalidFormat(
-                                "SmartArt diagram part name space exhausted".to_string(),
-                            )
-                        })?;
-                        let names = (
-                            format!("/word/diagrams/data{diagram_index}.xml"),
-                            format!("/word/diagrams/layout{diagram_index}.xml"),
-                            format!("/word/diagrams/quickStyle{diagram_index}.xml"),
-                            format!("/word/diagrams/colors{diagram_index}.xml"),
-                        );
-                        let mut taken = false;
-                        for name in [&names.0, &names.1, &names.2, &names.3] {
-                            let uri = PackURI::new(name)
-                                .map_err(|error| Error::InvalidUri(error.clone()))?;
-                            match self.opc.get_part(&uri) {
-                                Ok(_) => {
-                                    taken = true;
-                                    break;
-                                },
-                                Err(OpcError::PartNotFound(_)) => {},
-                                Err(error) => return Err(error.into()),
-                            }
-                        }
-                        if !taken {
-                            break names;
-                        }
-                    };
-                    let parts = smartart.generate_parts();
-                    for (partname, content_type, xml) in [
-                        (&data_name, ct::DML_DIAGRAM_DATA, parts.data_xml),
-                        (&layout_name, ct::DML_DIAGRAM_LAYOUT, parts.layout_xml),
-                        (
-                            &quick_style_name,
-                            ct::DML_DIAGRAM_STYLE,
-                            parts.quick_style_xml,
-                        ),
-                        (&colors_name, ct::DML_DIAGRAM_COLORS, parts.colors_xml),
-                    ] {
-                        let uri = PackURI::new(partname)
-                            .map_err(|e| Error::InvalidUri(format!("diagram URI: {e}")))?;
-                        self.opc.add_part(Box::new(BlobPart::new(
-                            uri,
-                            content_type.to_string(),
-                            xml.into_bytes(),
-                        )));
-                    }
-                    let rel_ids = crate::writer::smartart::SmartArtRelIds {
-                        data: temp_part.relate_to(&data_name, DIAGRAM_DATA_REL),
-                        layout: temp_part.relate_to(&layout_name, DIAGRAM_LAYOUT_REL),
-                        quick_style: temp_part
-                            .relate_to(&quick_style_name, DIAGRAM_QUICK_STYLE_REL),
-                        colors: temp_part.relate_to(&colors_name, DIAGRAM_COLORS_REL),
-                    };
-                    rel_mapper.add_smart_art(smartart.anchor_key(), rel_ids);
-                }
-
-                // Add header/footer parts and relationships
-                // Note: If watermark exists, headers will be handled by update_watermark_headers
-                // which merges user content with watermark
-                if has_header
-                    && !mutable_doc.has_watermark()
-                    && let Some(header_xml) = mutable_doc.generate_header_xml()?
+                // Merge user header content with watermark for the default header
+                let header_xml = if idx == 0
+                    && let Some(ref user_content) = user_header_content
                 {
-                    let header_uri = PackURI::new("/word/header1.xml")
-                        .map_err(|e| Error::InvalidUri(format!("header URI: {e}")))?;
-                    let header_part = BlobPart::new(
-                        header_uri,
-                        ct::WML_HEADER.to_string(),
-                        header_xml.into_bytes(),
-                    );
-                    self.opc.add_part(Box::new(header_part));
-                    // Use relative path for relationship (relative to document.xml location)
-                    let rid = temp_part.relate_to("header1.xml", rt::HEADER);
-                    rel_mapper.set_header_id(rid);
-                }
-
-                if has_footer && let Some(footer_xml) = mutable_doc.generate_footer_xml()? {
-                    let footer_uri = PackURI::new("/word/footer1.xml")
-                        .map_err(|e| Error::InvalidUri(format!("footer URI: {e}")))?;
-                    let footer_part = BlobPart::new(
-                        footer_uri,
-                        ct::WML_FOOTER.to_string(),
-                        footer_xml.into_bytes(),
-                    );
-                    self.opc.add_part(Box::new(footer_part));
-                    // Use relative path for relationship (relative to document.xml location)
-                    let rid = temp_part.relate_to("footer1.xml", rt::FOOTER);
-                    rel_mapper.set_footer_id(rid);
-                }
-
-                // Add footnotes parts and relationships BEFORE document XML generation
-                if let Some(footnotes_xml) = generated_footnotes_xml {
-                    let footnotes_uri = PackURI::new("/word/footnotes.xml")
-                        .map_err(|e| Error::InvalidUri(format!("footnotes URI: {e}")))?;
-                    let footnotes_part = BlobPart::new(
-                        footnotes_uri,
-                        ct::WML_FOOTNOTES.to_string(),
-                        footnotes_xml.into_bytes(),
-                    );
-                    self.opc.add_part(Box::new(footnotes_part));
-                    let rid = temp_part.relate_to("footnotes.xml", rt::FOOTNOTES);
-                    rel_mapper.set_footnotes_id(rid);
-                }
-
-                // Add endnotes parts and relationships BEFORE document XML generation
-                if let Some(endnotes_xml) = generated_endnotes_xml {
-                    let endnotes_uri = PackURI::new("/word/endnotes.xml")
-                        .map_err(|e| Error::InvalidUri(format!("endnotes URI: {e}")))?;
-                    let endnotes_part = BlobPart::new(
-                        endnotes_uri,
-                        ct::WML_ENDNOTES.to_string(),
-                        endnotes_xml.into_bytes(),
-                    );
-                    self.opc.add_part(Box::new(endnotes_part));
-                    let rid = temp_part.relate_to("endnotes.xml", rt::ENDNOTES);
-                    rel_mapper.set_endnotes_id(rid);
-                }
-
-                // Handle watermark headers before generating document XML
-                // This ensures header relationships are properly set up
-                if mutable_doc.has_watermark() || mutable_doc.has_image_watermark() {
-                    // Generate user header content if exists (will be merged with watermark)
-                    let user_header_content = if mutable_doc.has_header() {
-                        mutable_doc.generate_header_xml()?
-                    } else {
-                        None
-                    };
-
-                    // Store the watermark image as an ordinary media part,
-                    // shared by all three headers.
-                    let image_media_name = if let Some(image_watermark) =
-                        mutable_doc.image_watermark.as_ref()
-                    {
-                        let media_name = format!(
-                            "/word/media/watermarkImage1.{}",
-                            image_watermark.format().extension()
-                        );
-                        let media_uri = PackURI::new(&media_name)
-                            .map_err(|e| Error::InvalidUri(format!("watermark image URI: {e}")))?;
-                        self.opc.add_part(Box::new(BlobPart::new(
-                            media_uri,
-                            image_watermark.format().mime_type().to_string(),
-                            image_watermark.data().to_vec(),
-                        )));
-                        Some(media_name)
-                    } else {
-                        None
-                    };
-
-                    // Create three headers (default, first, even) with watermark
-                    let header_types = [
-                        ("/word/header1.xml", "header1.xml"),
-                        ("/word/header2.xml", "header2.xml"),
-                        ("/word/header3.xml", "header3.xml"),
-                    ];
-
-                    for (idx, (header_uri_path, header_filename)) in header_types.iter().enumerate()
-                    {
-                        let mut watermark_xml = String::new();
-                        if let Some(wm) = mutable_doc.watermark.as_ref() {
-                            watermark_xml.push_str(&wm.to_header_xml((idx + 1) as u32)?);
-                        }
-
-                        let header_uri = PackURI::new(*header_uri_path)
-                            .map_err(|e| Error::InvalidUri(format!("header URI: {e}")))?;
-                        let mut header_part =
-                            BlobPart::new(header_uri, ct::WML_HEADER.to_string(), Vec::new());
-
-                        // The image watermark references the media part
-                        // through a relationship owned by this header part.
-                        if let (Some(image_watermark), Some(media_name)) = (
-                            mutable_doc.image_watermark.as_ref(),
-                            image_media_name.as_deref(),
-                        ) {
-                            let media_target =
-                                media_name.strip_prefix("/word/").unwrap_or(media_name);
-                            let rel_id = header_part.relate_to(media_target, rt::IMAGE);
-                            watermark_xml.push_str(
-                                &image_watermark.to_header_xml((idx + 1) as u32, &rel_id)?,
-                            );
-                        }
-
-                        // Merge user header content with watermark for the default header
-                        let header_xml = if idx == 0
-                            && let Some(ref user_content) = user_header_content
-                        {
-                            // Extract user paragraphs from the <w:hdr>...</w:hdr> wrapper
-                            let user_paragraphs = if let Some(start) = user_content.find("<w:p") {
-                                if let Some(end) = user_content.rfind("</w:hdr>") {
-                                    &user_content[start..end]
-                                } else {
-                                    ""
-                                }
-                            } else {
-                                ""
-                            };
-
-                            // Combine watermark and user content
-                            format!(
-                                r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">{watermark_xml}{user_paragraphs}</w:hdr>"#
-                            )
+                    // Extract user paragraphs from the <w:hdr>...</w:hdr> wrapper
+                    let user_paragraphs = if let Some(start) = user_content.find("<w:p") {
+                        if let Some(end) = user_content.rfind("</w:hdr>") {
+                            &user_content[start..end]
                         } else {
-                            // Just watermark for first and even headers
-                            format!(
-                                r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">{watermark_xml}</w:hdr>"#
-                            )
-                        };
-
-                        header_part.set_blob(header_xml.into_bytes());
-                        self.opc.add_part(Box::new(header_part));
-
-                        // Add relationship for the default header
-                        if idx == 0 {
-                            let rid = temp_part.relate_to(header_filename, rt::HEADER);
-                            rel_mapper.set_header_id(rid);
-                        } else {
-                            // Other headers are added but not set in rel_mapper (they're referenced in sectPr)
-                            temp_part.relate_to(header_filename, rt::HEADER);
+                            ""
                         }
-                    }
-                }
-
-                // Step 3: Generate XML with actual relationship IDs
-                let xml = mutable_doc.to_xml_with_rels(&rel_mapper)?;
-
-                // Step 4: Update the document part with final XML and relationships
-                for (header, part, uri, _) in planned_section_parts {
-                    let content_type = if header {
-                        ct::WML_HEADER
                     } else {
-                        ct::WML_FOOTER
+                        ""
                     };
-                    self.opc.add_part(Box::new(BlobPart::new(
-                        uri,
-                        content_type.to_string(),
-                        part.xml.into_bytes(),
-                    )));
-                }
-                temp_part.set_blob(xml.into_bytes());
-                // Replace an existing main part in place so the OPC package
-                // keeps its package-level relationship provenance. `add_part`
-                // intentionally drops that provenance because it represents
-                // an arbitrary part replacement; an ordinary document edit
-                // may rebuild the relationship map while leaving its
-                // semantic binding unchanged, in which case the writer must
-                // still publish the producer's exact relationship bytes and
-                // order.  If no main part exists, retain the original add
-                // path there.
-                let replacement_blob = temp_part.blob_arc();
-                match self.opc.get_part_mut(&doc_uri) {
-                    Ok(existing_part) => {
-                        existing_part.set_blob_shared(replacement_blob);
-                        std::mem::swap(existing_part.rels_mut(), temp_part.rels_mut());
-                    },
-                    Err(OpcError::PartNotFound(_)) => {
-                        self.opc.add_part(Box::new(temp_part));
-                    },
-                    Err(error) => return Err(error.into()),
-                }
 
-                // Note: Footnotes and endnotes are already handled above (before document XML generation)
-                // so they appear in sectPr with proper relationship IDs
-
-                // Update comments if present
-                if let Some(comments_xml) = mutable_doc.generate_comments_xml()? {
-                    self.update_comments_part(comments_xml)?;
-                }
-
-                // Patch only explicitly changed protection, preserving every other setting.
-                if mutable_doc.protection_is_dirty() {
-                    let settings_uri = PackURI::new("/word/settings.xml")
-                        .map_err(|error| Error::InvalidUri(format!("settings URI: {error}")))?;
-                    let existing_settings = match self.opc.get_part(&settings_uri) {
-                        Ok(part) => Some(part.blob().to_vec()),
-                        Err(OpcError::PartNotFound(_)) => None,
-                        Err(error) => return Err(error.into()),
-                    };
-                    let settings_xml =
-                        mutable_doc.generate_settings_xml(existing_settings.as_deref())?;
-                    self.update_settings_part(settings_xml)?;
-                }
-
-                // Update theme if present
-                if let Some(theme_xml) = mutable_doc.generate_theme_xml()? {
-                    self.update_theme_part(theme_xml)?;
-                }
-            }
-
-            // Preserve the original custom XML unless its facade was edited.
-            // Keep edit intent dirty until the complete publication succeeds,
-            // so validation or sink failures remain retryable.
-            if self.custom_props_dirty {
-                self.custom_props
-                    .write_for(&mut self.opc, CustomPropsHost::Word)?;
-            }
-
-            // Embed fonts if feature enabled and requested in options
-            #[cfg(feature = "automatic-fonts")]
-            {
-                if let Some(mutable_doc) = rollback.mutable_doc_mut() {
-                    self.embed_fonts_for_document(mutable_doc)?;
+                    // Combine watermark and user content
+                    format!(
+                        r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">{watermark_xml}{user_paragraphs}</w:hdr>"#
+                    )
                 } else {
-                    self.embed_fonts()?;
+                    // Just watermark for first and even headers
+                    format!(
+                        r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">{watermark_xml}</w:hdr>"#
+                    )
+                };
+
+                header_part.set_blob(header_xml.into_bytes());
+                self.opc.add_part(Box::new(header_part));
+
+                // Add relationship for the default header
+                if idx == 0 {
+                    let rid = temp_part.relate_to(header_filename, rt::HEADER);
+                    rel_mapper.set_header_id(rid);
+                } else {
+                    // Other headers are added but not set in rel_mapper (they're referenced in sectPr)
+                    temp_part.relate_to(header_filename, rt::HEADER);
                 }
             }
-
-            // Stage only an explicitly edited core-properties slot. The guard
-            // keeps edit intent dirty until the output sink accepts the complete
-            // package, so a failed stream remains retryable.
-            let staged_properties = self.properties.stage(&mut self.opc)?;
-
-            self.opc.to_stream(writer).map_err(|e| {
-                Error::Io(std::io::Error::other(format!(
-                    "Failed to save package: {e}"
-                )))
-            })?;
-            staged_properties.commit();
-            self.custom_props_dirty = false;
-            Ok(())
-        }));
-
-        match result {
-            Ok(Ok(())) => {
-                rollback.publish(self);
-                Ok(())
-            },
-            Ok(Err(error)) => {
-                rollback.rollback(self);
-                Err(error)
-            },
-            Err(payload) => {
-                rollback.rollback(self);
-                std::panic::resume_unwind(payload);
-            },
         }
+
+        // Step 3: Generate XML with actual relationship IDs
+        let xml = mutable_doc.to_xml_with_rels(&rel_mapper)?;
+
+        // Step 4: Update the document part with final XML and relationships
+        for (header, part, uri, _) in planned_section_parts {
+            let content_type = if header {
+                ct::WML_HEADER
+            } else {
+                ct::WML_FOOTER
+            };
+            self.opc.add_part(Box::new(BlobPart::new(
+                uri,
+                content_type.to_string(),
+                part.xml.into_bytes(),
+            )));
+        }
+        temp_part.set_blob(xml.into_bytes());
+        // Replace an existing main part in place so the OPC package
+        // keeps its package-level relationship provenance. `add_part`
+        // intentionally drops that provenance because it represents
+        // an arbitrary part replacement; an ordinary document edit
+        // may rebuild the relationship map while leaving its
+        // semantic binding unchanged, in which case the writer must
+        // still publish the producer's exact relationship bytes and
+        // order.  If no main part exists, retain the original add
+        // path there.
+        let replacement_blob = temp_part.blob_arc();
+        match self.opc.get_part_mut(&doc_uri) {
+            Ok(existing_part) => {
+                existing_part.set_blob_shared(replacement_blob);
+                std::mem::swap(existing_part.rels_mut(), temp_part.rels_mut());
+            },
+            Err(OpcError::PartNotFound(_)) => {
+                self.opc.add_part(Box::new(temp_part));
+            },
+            Err(error) => return Err(error.into()),
+        }
+
+        // Note: Footnotes and endnotes are already handled above (before document XML generation)
+        // so they appear in sectPr with proper relationship IDs
+
+        // Update comments if present
+        if let Some(comments_xml) = mutable_doc.generate_comments_xml()? {
+            self.update_comments_part(comments_xml)?;
+        }
+
+        // Patch only explicitly changed protection, preserving every other setting.
+        if mutable_doc.protection_is_dirty() {
+            let settings_uri = PackURI::new("/word/settings.xml")
+                .map_err(|error| Error::InvalidUri(format!("settings URI: {error}")))?;
+            let existing_settings = match self.opc.get_part(&settings_uri) {
+                Ok(part) => Some(part.blob().to_vec()),
+                Err(OpcError::PartNotFound(_)) => None,
+                Err(error) => return Err(error.into()),
+            };
+            let settings_xml = mutable_doc.generate_settings_xml(existing_settings.as_deref())?;
+            self.update_settings_part(settings_xml)?;
+        }
+
+        // Update theme if present
+        if let Some(theme_xml) = mutable_doc.generate_theme_xml()? {
+            self.update_theme_part(theme_xml)?;
+        }
+        Ok(())
+    }
+
+    fn write_plain<W: Write>(&self, writer: W) -> Result<()> {
+        // The package holds no unmaterialized state: every change was
+        // published into the graph by its edit's commit, so output is a pure
+        // function of the graph and repeated output is byte-identical.
+        self.opc.write_to(writer)?;
+        Ok(())
     }
 }

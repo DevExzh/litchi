@@ -5,33 +5,37 @@ use std::io;
 /// How a worksheet drawing responds when its underlying cells move or resize.
 ///
 /// This is the two-bit `fMove`/`fSize` state from
-/// `[MS-XLS] OfficeArtClientAnchorSheet`.  The reserved bit patterns are not
-/// represented and are rejected by the decoder.
+/// `[MS-XLS]` 2.5.193 `OfficeArtClientAnchorSheet`. Each flag is set when the
+/// shape is *kept intact* as cells move (`fMove`, bit 0) or resize (`fSize`,
+/// bit 1), and `fSize` MUST be set when `fMove` is. The variants follow
+/// Apache POI's `ClientAnchor.AnchorType` (0, 2 and 3) and ECMA-376
+/// `ST_EditAs` (`twoCell`, `oneCell`, `absolute`). The reserved bit patterns
+/// are not represented and are rejected by the decoder.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum AnchorBehavior {
-    /// The drawing stays fixed while cells move or resize.
-    Fixed,
-    /// The drawing resizes with cells but does not move with them.
-    Size,
-    /// The drawing moves and resizes with cells.
-    MoveAndSize,
+    /// The drawing moves and resizes with its cells (both flags clear).
+    MoveAndResize,
+    /// The drawing moves with its cells but keeps its size (`fSize` only).
+    MoveWithoutResize,
+    /// The drawing neither moves nor resizes with its cells (both flags set).
+    Absolute,
 }
 
 impl AnchorBehavior {
     pub(crate) const fn wire_flags(self) -> u16 {
         match self {
-            Self::Fixed => 0,
-            Self::Size => 0b10,
-            Self::MoveAndSize => 0b11,
+            Self::MoveAndResize => 0,
+            Self::MoveWithoutResize => 0b10,
+            Self::Absolute => 0b11,
         }
     }
 
     pub(crate) fn from_wire_flags(value: u16) -> io::Result<Self> {
         match value {
-            0 => Ok(Self::Fixed),
-            0b10 => Ok(Self::Size),
-            0b11 => Ok(Self::MoveAndSize),
+            0 => Ok(Self::MoveAndResize),
+            0b10 => Ok(Self::MoveWithoutResize),
+            0b11 => Ok(Self::Absolute),
             _ => Err(super::validation::invalid(
                 "worksheet anchor has reserved behavior flags",
             )),

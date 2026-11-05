@@ -10,6 +10,7 @@
 //! `verify_source` audits it replaces, through every public door.
 
 use litchi_opc::{OpcError, PackURI, SourceBackedPackage, SourceTopologyPlan};
+use litchi_opc::{SourceCacheLimits, SourceLimits};
 use soapberry_zip::office::StreamingArchiveWriter;
 use xml_minifier::audit::{Limits, verify_source};
 
@@ -50,7 +51,8 @@ fn archive(document: &[u8]) -> Vec<u8> {
     let root_relationships = format!(
         r#"<Relationships xmlns="{RELATIONSHIPS_NS}"><Relationship Id="rId1" Type="{OFFICE_DOCUMENT_REL}" Target="word/document.xml"/></Relationships>"#
     );
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .unwrap();
@@ -76,7 +78,13 @@ enum Door {
 const DOORS: [Door; 3] = [Door::Topology, Door::SingleOverlay, Door::MultipleOverlays];
 
 fn publish(door: Door, original: &[u8], replacement: Vec<u8>) -> (Result<(), OpcError>, Vec<u8>) {
-    let package = SourceBackedPackage::from_vec(archive(original)).expect("fixture opens");
+    let package = SourceBackedPackage::from_vec(
+        archive(original),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .expect("fixture opens");
     let mut output = Vec::new();
     let result = match door {
         Door::Topology => {
@@ -120,8 +128,20 @@ fn a_local_edit_publishes_the_replacement_and_leaves_every_other_member_exact() 
     for door in DOORS {
         let (result, output) = publish(door, &original, replacement.clone());
         result.unwrap_or_else(|error| panic!("{door:?}: the local edit publishes: {error:?}"));
-        let before = SourceBackedPackage::from_vec(archive(&original)).unwrap();
-        let after = SourceBackedPackage::from_vec(output).expect("published package reopens");
+        let before = SourceBackedPackage::from_vec(
+            archive(&original),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap();
+        let after = SourceBackedPackage::from_vec(
+            output,
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            None,
+        )
+        .expect("published package reopens");
         for part in before.iter_parts() {
             let name = part.partname().clone();
             let published = after.part(&name).unwrap().data().unwrap();

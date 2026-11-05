@@ -1,0 +1,518 @@
+{
+  "source_commit": "4f53162ac95fc63299b0e348acf2adefc02647e7",
+  "probe": "crates/litchi-ops/examples/ppt_structure_bench.rs",
+  "probe_sha256": "e0ade2cd58e790fa5b8c7a5e61918c54c40e4032f4ebcf63f99784bd5dd707ab",
+  "binary_sha256": "0fb272fb47d8da97aa175e27488401718b3a95a58daa933e1a3a5e28c755fea8",
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2",
+  "machine": "Linux-7.0.0-1013-aws-x86_64-with-glibc2.43",
+  "build_command": "CARGO_PROFILE_RELEASE_LTO=false CARGO_INCREMENTAL=0 cargo run --release -p litchi-ops --no-default-features --features ppt --example ppt_structure_bench",
+  "lock_adjustment": "External scratch Cargo.lock: offline cc 1.7.0 downgraded to cached 1.6.0 with -Z lockfile-path and resolver.lockfile-path. Repository locks unchanged.",
+  "method": "Seven alternating AB/BA pairs of ten independent immutable operations. Creation, opening, typed-path construction, warmup, exact output byte checks and source immutability checks outside timing. Native swap uses two native move operations within one edit, matching unified swap.",
+  "qualification": "Local exploratory probe only; all median paired ratios below 1.10. Frozen harness, broader corpus, allocation and coalesced batch qualification remain open.",
+  "cases": [
+    {
+      "kind": "remove",
+      "slides": 3,
+      "source": "eager",
+      "pairs": 7,
+      "repeats": 10,
+      "native_ns": [
+        1189506,
+        1131826,
+        1120825,
+        1115286,
+        1101045,
+        1107565,
+        1104546
+      ],
+      "unified_ns": [
+        1166096,
+        1167255,
+        1136446,
+        1128795,
+        1131955,
+        1164946,
+        1126635
+      ],
+      "median_paired_ratio": 1.0199982617292536,
+      "native_median_ns_per_operation": 111528.6,
+      "unified_median_ns_per_operation": 113644.6
+    },
+    {
+      "kind": "move",
+      "slides": 3,
+      "source": "eager",
+      "pairs": 7,
+      "repeats": 10,
+      "native_ns": [
+        1105466,
+        1100115,
+        1090486,
+        1092865,
+        1085115,
+        1088835,
+        1098035
+      ],
+      "unified_ns": [
+        1113265,
+        1108285,
+        1113535,
+        1129076,
+        1115175,
+        1119976,
+        1111886
+      ],
+      "median_paired_ratio": 1.0211364474188573,
+      "native_median_ns_per_operation": 109286.5,
+      "unified_median_ns_per_operation": 111353.5
+    },
+    {
+      "kind": "swap",
+      "slides": 3,
+      "source": "eager",
+      "pairs": 7,
+      "repeats": 10,
+      "native_ns": [
+        1228086,
+        1222976,
+        1216516,
+        1216376,
+        1219856,
+        1230816,
+        1210736
+      ],
+      "unified_ns": [
+        1237406,
+        1244996,
+        1231946,
+        1241915,
+        1235236,
+        1251506,
+        1243876
+      ],
+      "median_paired_ratio": 1.0168099862205235,
+      "native_median_ns_per_operation": 121985.6,
+      "unified_median_ns_per_operation": 124191.5
+    },
+    {
+      "kind": "remove",
+      "slides": 3,
+      "source": "positional",
+      "pairs": 7,
+      "repeats": 10,
+      "native_ns": [
+        1175685,
+        1192486,
+        1173536,
+        1181455,
+        1150916,
+        1149905,
+        1160266
+      ],
+      "unified_ns": [
+        1225366,
+        1263446,
+        1250716,
+        1224056,
+        1245666,
+        1212536,
+        1195826
+      ],
+      "median_paired_ratio": 1.0544662385153556,
+      "native_median_ns_per_operation": 117353.6,
+      "unified_median_ns_per_operation": 122536.6
+    },
+    {
+      "kind": "move",
+      "slides": 3,
+      "source": "positional",
+      "pairs": 7,
+      "repeats": 10,
+      "native_ns": [
+        1161445,
+        1138966,
+        1166445,
+        1134656,
+        1133155,
+        1135445,
+        1134816
+      ],
+      "unified_ns": [
+        1211206,
+        1235526,
+        1259476,
+        1222076,
+        1201756,
+        1209256,
+        1211606
+      ],
+      "median_paired_ratio": 1.067667357527564,
+      "native_median_ns_per_operation": 113544.5,
+      "unified_median_ns_per_operation": 121160.6
+    },
+    {
+      "kind": "swap",
+      "slides": 3,
+      "source": "positional",
+      "pairs": 7,
+      "repeats": 10,
+      "native_ns": [
+        1271826,
+        1319506,
+        1261256,
+        1250526,
+        1243346,
+        1244506,
+        1236346
+      ],
+      "unified_ns": [
+        1355427,
+        1325786,
+        1321887,
+        1336486,
+        1325287,
+        1335006,
+        1393287
+      ],
+      "median_paired_ratio": 1.0659036181400834,
+      "native_median_ns_per_operation": 125052.6,
+      "unified_median_ns_per_operation": 133500.6
+    },
+    {
+      "kind": "remove",
+      "slides": 10,
+      "source": "eager",
+      "pairs": 7,
+      "repeats": 10,
+      "native_ns": [
+        1823148,
+        1475027,
+        1452817,
+        1623427,
+        1451267,
+        1461848,
+        1458137
+      ],
+      "unified_ns": [
+        1555208,
+        1513337,
+        1490098,
+        1481537,
+        1536908,
+        1594867,
+        1481287
+      ],
+      "median_paired_ratio": 1.0256611810021496,
+      "native_median_ns_per_operation": 146184.8,
+      "unified_median_ns_per_operation": 151333.7
+    },
+    {
+      "kind": "move",
+      "slides": 10,
+      "source": "eager",
+      "pairs": 7,
+      "repeats": 10,
+      "native_ns": [
+        1472757,
+        1473757,
+        1449287,
+        1464087,
+        1451027,
+        1462937,
+        1443477
+      ],
+      "unified_ns": [
+        1500058,
+        1488517,
+        1525337,
+        1474507,
+        1478617,
+        1479918,
+        1494897
+      ],
+      "median_paired_ratio": 1.0185373418697041,
+      "native_median_ns_per_operation": 146293.7,
+      "unified_median_ns_per_operation": 148851.7
+    },
+    {
+      "kind": "swap",
+      "slides": 10,
+      "source": "eager",
+      "pairs": 7,
+      "repeats": 10,
+      "native_ns": [
+        1638218,
+        1618518,
+        1613348,
+        1619508,
+        1618937,
+        1628418,
+        1615167
+      ],
+      "unified_ns": [
+        1661358,
+        1653268,
+        1665238,
+        1640938,
+        1759229,
+        1660218,
+        1647988
+      ],
+      "median_paired_ratio": 1.0203204993663193,
+      "native_median_ns_per_operation": 161893.7,
+      "unified_median_ns_per_operation": 166021.8
+    },
+    {
+      "kind": "remove",
+      "slides": 10,
+      "source": "positional",
+      "pairs": 7,
+      "repeats": 10,
+      "native_ns": [
+        1498177,
+        1490377,
+        1472117,
+        1496917,
+        1659138,
+        1477657,
+        1470367
+      ],
+      "unified_ns": [
+        1561107,
+        1542758,
+        1554607,
+        1537778,
+        1553537,
+        1539398,
+        1549068
+      ],
+      "median_paired_ratio": 1.0417830389596503,
+      "native_median_ns_per_operation": 149037.7,
+      "unified_median_ns_per_operation": 154906.8
+    },
+    {
+      "kind": "move",
+      "slides": 10,
+      "source": "positional",
+      "pairs": 7,
+      "repeats": 10,
+      "native_ns": [
+        1507187,
+        1480007,
+        1483068,
+        1469877,
+        1479927,
+        1484477,
+        1481907
+      ],
+      "unified_ns": [
+        1552068,
+        1545577,
+        1544377,
+        1544028,
+        1539937,
+        1597468,
+        1536048
+      ],
+      "median_paired_ratio": 1.0413393047385555,
+      "native_median_ns_per_operation": 148190.7,
+      "unified_median_ns_per_operation": 154437.7
+    },
+    {
+      "kind": "swap",
+      "slides": 10,
+      "source": "positional",
+      "pairs": 7,
+      "repeats": 10,
+      "native_ns": [
+        1730949,
+        1632608,
+        1628938,
+        1635007,
+        1616878,
+        1621428,
+        1625987
+      ],
+      "unified_ns": [
+        1759138,
+        1715728,
+        1702328,
+        1738059,
+        1711388,
+        1710999,
+        1733569
+      ],
+      "median_paired_ratio": 1.0552420459002805,
+      "native_median_ns_per_operation": 162893.8,
+      "unified_median_ns_per_operation": 171572.8
+    },
+    {
+      "kind": "remove",
+      "slides": 100,
+      "source": "eager",
+      "pairs": 7,
+      "repeats": 10,
+      "native_ns": [
+        5416086,
+        5423136,
+        5389346,
+        5473977,
+        5419746,
+        5369986,
+        5426096
+      ],
+      "unified_ns": [
+        5430916,
+        5399896,
+        5442106,
+        5425386,
+        5377736,
+        5261175,
+        5331266
+      ],
+      "median_paired_ratio": 0.9922487142386377,
+      "native_median_ns_per_operation": 541974.6,
+      "unified_median_ns_per_operation": 539989.6
+    },
+    {
+      "kind": "move",
+      "slides": 100,
+      "source": "eager",
+      "pairs": 7,
+      "repeats": 10,
+      "native_ns": [
+        5609427,
+        5536087,
+        5514316,
+        5504976,
+        5519627,
+        5469496,
+        5450056
+      ],
+      "unified_ns": [
+        5612337,
+        5643217,
+        5615987,
+        5762488,
+        5563607,
+        5559667,
+        5528447
+      ],
+      "median_paired_ratio": 1.0164861625275894,
+      "native_median_ns_per_operation": 551431.6,
+      "unified_median_ns_per_operation": 561233.7
+    },
+    {
+      "kind": "swap",
+      "slides": 100,
+      "source": "eager",
+      "pairs": 7,
+      "repeats": 10,
+      "native_ns": [
+        6074999,
+        6083980,
+        6137019,
+        6102570,
+        6132419,
+        6131610,
+        6115599
+      ],
+      "unified_ns": [
+        6190140,
+        6135699,
+        6201100,
+        6230930,
+        6147720,
+        6201649,
+        6122110
+      ],
+      "median_paired_ratio": 1.010441714454526,
+      "native_median_ns_per_operation": 611559.9,
+      "unified_median_ns_per_operation": 619014.0
+    },
+    {
+      "kind": "remove",
+      "slides": 100,
+      "source": "positional",
+      "pairs": 7,
+      "repeats": 10,
+      "native_ns": [
+        5328526,
+        5278496,
+        5263665,
+        5215855,
+        5186415,
+        5213435,
+        5194235
+      ],
+      "unified_ns": [
+        5334975,
+        5374116,
+        5345306,
+        5347836,
+        5309225,
+        5295576,
+        5293275
+      ],
+      "median_paired_ratio": 1.0181150085175776,
+      "native_median_ns_per_operation": 521585.5,
+      "unified_median_ns_per_operation": 533497.5
+    },
+    {
+      "kind": "move",
+      "slides": 100,
+      "source": "positional",
+      "pairs": 7,
+      "repeats": 10,
+      "native_ns": [
+        5352645,
+        5354905,
+        5329706,
+        5314666,
+        5375716,
+        5383206,
+        5320486
+      ],
+      "unified_ns": [
+        5420736,
+        5417537,
+        5435456,
+        5440436,
+        5466126,
+        5443366,
+        5440056
+      ],
+      "median_paired_ratio": 1.0168182247722908,
+      "native_median_ns_per_operation": 535264.5,
+      "unified_median_ns_per_operation": 544005.6
+    },
+    {
+      "kind": "swap",
+      "slides": 100,
+      "source": "positional",
+      "pairs": 7,
+      "repeats": 10,
+      "native_ns": [
+        6108270,
+        6050639,
+        6030689,
+        6030739,
+        6089779,
+        6023849,
+        6024779
+      ],
+      "unified_ns": [
+        6189289,
+        6156330,
+        6175680,
+        6168310,
+        6157560,
+        6133839,
+        6185680
+      ],
+      "median_paired_ratio": 1.0182590898277828,
+      "native_median_ns_per_operation": 603073.9,
+      "unified_median_ns_per_operation": 616831.0
+    }
+  ]
+}

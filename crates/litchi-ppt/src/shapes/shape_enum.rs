@@ -3,7 +3,7 @@
 //! Idiomatic Rust implementation using enum variants instead of trait objects.
 
 use super::picture::PictureShape;
-use super::shape::{Shape, ShapeType};
+use super::shape::{Shape, ShapeType, SourceIdentity};
 use super::{AutoShape, Placeholder, TextBox};
 use crate::package::Result;
 use crate::slide_extension::ShapeMetadata;
@@ -54,6 +54,88 @@ where
                 }
             },
             ShapeEnum::Line(shape) => shape.mark_source_bound(),
+        }
+    }
+
+    pub(crate) fn apply_source_identity(&mut self, identity: SourceIdentity) {
+        match self {
+            ShapeEnum::TextBox(shape) => shape.apply_source_identity(identity),
+            ShapeEnum::Placeholder(shape) => shape.apply_source_identity(identity),
+            ShapeEnum::AutoShape(shape) => shape.apply_source_identity(identity),
+            ShapeEnum::Picture(shape) => shape.apply_source_identity(identity),
+            ShapeEnum::Table(shape) => shape.apply_source_identity(identity),
+            ShapeEnum::Group(shape) => shape.apply_source_identity(identity),
+            ShapeEnum::Line(shape) => shape.apply_source_identity(identity),
+        }
+    }
+
+    /// The `OfficeArt` shape identifier (`spid`), unique within its drawing
+    /// (MS-ODRAW 2.2.40); the stable identity a shape keeps across reads
+    /// (L-PPT-R4).
+    #[must_use]
+    pub fn id(&self) -> u32 {
+        match self {
+            ShapeEnum::TextBox(shape) => shape.properties().id,
+            ShapeEnum::Placeholder(shape) => shape.properties().id,
+            ShapeEnum::AutoShape(shape) => shape.properties().id,
+            ShapeEnum::Picture(shape) => shape.properties().id,
+            ShapeEnum::Table(shape) => shape.id(),
+            ShapeEnum::Group(shape) => shape.id(),
+            ShapeEnum::Line(shape) => shape.id(),
+        }
+    }
+
+    /// The shape's name (`wzName`, MS-ODRAW 2.3.4.1), such as
+    /// `"Title 1"` or `"Rectangle 3"`, when it carries one (L-PPT-R3).
+    #[must_use]
+    pub fn name(&self) -> Option<&str> {
+        match self {
+            ShapeEnum::TextBox(shape) => shape.properties().name.as_deref(),
+            ShapeEnum::Placeholder(shape) => shape.properties().name.as_deref(),
+            ShapeEnum::AutoShape(shape) => shape.properties().name.as_deref(),
+            ShapeEnum::Picture(shape) => shape.properties().name.as_deref(),
+            ShapeEnum::Table(shape) => shape.name(),
+            ShapeEnum::Group(shape) => shape.name(),
+            ShapeEnum::Line(shape) => shape.name(),
+        }
+    }
+
+    /// The shape's alternative text (`wzDescription`, MS-ODRAW 2.3.4.3),
+    /// when it carries one (L-PPT-R3).
+    #[must_use]
+    pub fn description(&self) -> Option<&str> {
+        match self {
+            ShapeEnum::TextBox(shape) => shape.properties().description.as_deref(),
+            ShapeEnum::Placeholder(shape) => shape.properties().description.as_deref(),
+            ShapeEnum::AutoShape(shape) => shape.properties().description.as_deref(),
+            ShapeEnum::Picture(shape) => shape.properties().description.as_deref(),
+            ShapeEnum::Table(shape) => shape.description(),
+            ShapeEnum::Group(shape) => shape.description(),
+            ShapeEnum::Line(shape) => shape.description(),
+        }
+    }
+
+    /// The shape's stable position in its source drawing (L-PPT-R4): its
+    /// zero-based index among its siblings — the drawing's top-level shapes,
+    /// or its group's children — in drawing order.
+    ///
+    /// The index counts every shape of the drawing's shape tree, including
+    /// shapes the reader does not return (an unreadable shape, a line
+    /// without an anchor, an unknown kind), so it does not shift when a
+    /// sibling is dropped, and it is the same on every read of the same
+    /// drawing; the background shape and a group's own header are not
+    /// siblings. The position in [`crate::Slide::shapes`] counts returned
+    /// shapes only. `None` for a shape that was not read from a drawing.
+    #[must_use]
+    pub fn source_index(&self) -> Option<usize> {
+        match self {
+            ShapeEnum::TextBox(shape) => shape.properties().source_index,
+            ShapeEnum::Placeholder(shape) => shape.properties().source_index,
+            ShapeEnum::AutoShape(shape) => shape.properties().source_index,
+            ShapeEnum::Picture(shape) => shape.properties().source_index,
+            ShapeEnum::Table(shape) => shape.source_index(),
+            ShapeEnum::Group(shape) => shape.source_index(),
+            ShapeEnum::Line(shape) => shape.source_index(),
         }
     }
 
@@ -293,6 +375,25 @@ where
     }
 }
 
+/// The identity of a table, group, or line read from a drawing; the other
+/// shape kinds keep it in their [`ShapeProperties`](super::shape::ShapeProperties).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct ShapeIdentity {
+    name: Option<String>,
+    description: Option<String>,
+    source_index: Option<usize>,
+}
+
+impl From<SourceIdentity> for ShapeIdentity {
+    fn from(identity: SourceIdentity) -> Self {
+        Self {
+            name: identity.name,
+            description: identity.description,
+            source_index: Some(identity.index),
+        }
+    }
+}
+
 // PictureShape is now defined in picture.rs and re-exported
 
 /// Table shape.
@@ -308,6 +409,13 @@ pub struct TableShape {
     columns: usize,
     /// Table cells (row-major order)
     cells: Vec<Vec<String>>,
+    /// The `OfficeArt` shape ID of each cell's shape, when read from a
+    /// drawing (record 0323).
+    cell_ids: Vec<Vec<Option<u32>>>,
+    /// The top of each row and the left of each column, in master units,
+    /// when read from a drawing.
+    row_tops: Vec<i32>,
+    column_lefts: Vec<i32>,
     /// Left coordinate
     left: i32,
     /// Top coordinate
@@ -317,6 +425,7 @@ pub struct TableShape {
     /// Height
     height: i32,
     powerpoint12_shape_metadata: Option<ShapeMetadata>,
+    identity: ShapeIdentity,
     source_bound: bool,
 }
 
@@ -330,11 +439,15 @@ impl TableShape {
             rows,
             columns,
             cells,
+            cell_ids: Vec::new(),
+            row_tops: Vec::new(),
+            column_lefts: Vec::new(),
             left: 0,
             top: 0,
             width: 0,
             height: 0,
             powerpoint12_shape_metadata: None,
+            identity: ShapeIdentity::default(),
             source_bound: false,
         }
     }
@@ -343,6 +456,45 @@ impl TableShape {
         if let Some(cell) = self.cells.get_mut(row).and_then(|cells| cells.get_mut(col)) {
             *cell = text;
         }
+    }
+
+    pub(crate) fn set_cell_id(&mut self, row: usize, col: usize, id: u32) {
+        if self.cell_ids.is_empty() {
+            self.cell_ids = vec![vec![None; self.columns]; self.rows];
+        }
+        if let Some(cell) = self
+            .cell_ids
+            .get_mut(row)
+            .and_then(|cells| cells.get_mut(col))
+        {
+            *cell = Some(id);
+        }
+    }
+
+    pub(crate) fn set_grid(&mut self, row_tops: Vec<i32>, column_lefts: Vec<i32>) {
+        self.row_tops = row_tops;
+        self.column_lefts = column_lefts;
+    }
+
+    /// The `OfficeArt` shape ID of the cell shape at `row`, `col` (record
+    /// 0323); `None` for a covered cell or a table not read from a drawing.
+    #[must_use]
+    pub fn cell_shape_id(&self, row: usize, col: usize) -> Option<u32> {
+        self.cell_ids.get(row)?.get(col).copied().flatten()
+    }
+
+    /// The height of each row in master units (1/576 inch): the distance to
+    /// the next row's top, the last to the table's bottom (record 0323).
+    /// Empty for a table not read from a drawing.
+    #[must_use]
+    pub fn row_heights(&self) -> Vec<i32> {
+        extents(&self.row_tops, self.top.saturating_add(self.height))
+    }
+
+    /// The width of each column in master units, as [`Self::row_heights`].
+    #[must_use]
+    pub fn column_widths(&self) -> Vec<i32> {
+        extents(&self.column_lefts, self.left.saturating_add(self.width))
     }
 
     pub(crate) fn set_bounds(&mut self, left: i32, top: i32, width: i32, height: i32) {
@@ -407,9 +559,51 @@ impl TableShape {
         self.powerpoint12_shape_metadata = metadata;
     }
 
+    /// The shape's name (`wzName`, MS-ODRAW 2.3.4.1), when it carries one
+    /// (L-PPT-R3).
+    #[must_use]
+    pub fn name(&self) -> Option<&str> {
+        self.identity.name.as_deref()
+    }
+
+    /// The shape's alternative text (`wzDescription`, MS-ODRAW 2.3.4.3),
+    /// when it carries one (L-PPT-R3).
+    #[must_use]
+    pub fn description(&self) -> Option<&str> {
+        self.identity.description.as_deref()
+    }
+
+    /// The shape's stable zero-based position among its siblings in its
+    /// source drawing (L-PPT-R4); `None` when it was not read from one.
+    #[must_use]
+    pub fn source_index(&self) -> Option<usize> {
+        self.identity.source_index
+    }
+
+    pub(crate) fn apply_source_identity(&mut self, identity: SourceIdentity) {
+        self.identity = ShapeIdentity::from(identity);
+    }
+
     pub(crate) fn mark_source_bound(&mut self) {
         self.source_bound = true;
     }
+}
+
+/// The extent of each grid band from its start to the next start, the last
+/// to `end`.
+fn extents(starts: &[i32], end: i32) -> Vec<i32> {
+    starts
+        .iter()
+        .enumerate()
+        .map(|(index, start)| {
+            starts
+                .get(index + 1)
+                .copied()
+                .unwrap_or(end)
+                .saturating_sub(*start)
+                .max(0)
+        })
+        .collect()
 }
 
 /// Group shape containing other shapes.
@@ -430,6 +624,7 @@ pub struct GroupShape<'a> {
     /// Height
     height: i32,
     powerpoint12_shape_metadata: Option<ShapeMetadata>,
+    identity: ShapeIdentity,
     source_bound: bool,
 }
 
@@ -445,6 +640,7 @@ impl<'a> GroupShape<'a> {
             width: 0,
             height: 0,
             powerpoint12_shape_metadata: None,
+            identity: ShapeIdentity::default(),
             source_bound: false,
         }
     }
@@ -539,6 +735,31 @@ impl<'a> GroupShape<'a> {
         self.powerpoint12_shape_metadata = metadata;
     }
 
+    /// The shape's name (`wzName`, MS-ODRAW 2.3.4.1), when it carries one
+    /// (L-PPT-R3).
+    #[must_use]
+    pub fn name(&self) -> Option<&str> {
+        self.identity.name.as_deref()
+    }
+
+    /// The shape's alternative text (`wzDescription`, MS-ODRAW 2.3.4.3),
+    /// when it carries one (L-PPT-R3).
+    #[must_use]
+    pub fn description(&self) -> Option<&str> {
+        self.identity.description.as_deref()
+    }
+
+    /// The shape's stable zero-based position among its siblings in its
+    /// source drawing (L-PPT-R4); `None` when it was not read from one.
+    #[must_use]
+    pub fn source_index(&self) -> Option<usize> {
+        self.identity.source_index
+    }
+
+    pub(crate) fn apply_source_identity(&mut self, identity: SourceIdentity) {
+        self.identity = ShapeIdentity::from(identity);
+    }
+
     pub(crate) fn mark_source_bound(&mut self) {
         self.source_bound = true;
     }
@@ -565,6 +786,7 @@ pub struct LineShape {
     /// Line color
     color: Option<u32>,
     powerpoint12_shape_metadata: Option<ShapeMetadata>,
+    identity: ShapeIdentity,
     source_bound: bool,
 }
 
@@ -588,6 +810,7 @@ impl LineShape {
             width: 1,
             color: None,
             powerpoint12_shape_metadata: None,
+            identity: ShapeIdentity::default(),
             source_bound: false,
         }
     }
@@ -670,6 +893,31 @@ impl LineShape {
 
     pub(crate) fn set_powerpoint12_shape_metadata(&mut self, metadata: Option<ShapeMetadata>) {
         self.powerpoint12_shape_metadata = metadata;
+    }
+
+    /// The shape's name (`wzName`, MS-ODRAW 2.3.4.1), when it carries one
+    /// (L-PPT-R3).
+    #[must_use]
+    pub fn name(&self) -> Option<&str> {
+        self.identity.name.as_deref()
+    }
+
+    /// The shape's alternative text (`wzDescription`, MS-ODRAW 2.3.4.3),
+    /// when it carries one (L-PPT-R3).
+    #[must_use]
+    pub fn description(&self) -> Option<&str> {
+        self.identity.description.as_deref()
+    }
+
+    /// The shape's stable zero-based position among its siblings in its
+    /// source drawing (L-PPT-R4); `None` when it was not read from one.
+    #[must_use]
+    pub fn source_index(&self) -> Option<usize> {
+        self.identity.source_index
+    }
+
+    pub(crate) fn apply_source_identity(&mut self, identity: SourceIdentity) {
+        self.identity = ShapeIdentity::from(identity);
     }
 
     pub(crate) fn mark_source_bound(&mut self) {

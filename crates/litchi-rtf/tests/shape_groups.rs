@@ -9,23 +9,23 @@
 
 use std::borrow::Cow;
 
-use litchi_rtf::{
-    RtfDocument, RtfWriter, Shape, ShapeGroup, ShapeGroupChild, ShapeProperty, ShapeType,
-};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{Shape, ShapeGroup, ShapeGroupChild, ShapeProperty, ShapeType, write::Writer};
 
-fn write_document(document: &RtfDocument<'_>) -> String {
+fn write_document(document: &Tree<'_>) -> String {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     String::from_utf8(output).unwrap()
 }
 
 #[test]
 fn parses_libreoffice_group_producers_and_round_trips_order() {
-    let fdo = RtfDocument::parse(include_str!(
-        "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/fdo89496.rtf"
-    ))
+    let fdo = Tree::parse(
+        include_str!(
+            "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/fdo89496.rtf"
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     assert_eq!(fdo.shape_groups().len(), 1);
     assert!(!fdo.shape_groups()[0].shapes().is_empty());
@@ -33,7 +33,7 @@ fn parses_libreoffice_group_producers_and_round_trips_order() {
     let source = include_str!(
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf127806.rtf"
     );
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let group = &document.shape_groups()[0];
     assert_eq!(
         group.child_order().len(),
@@ -41,7 +41,7 @@ fn parses_libreoffice_group_producers_and_round_trips_order() {
     );
     let serialized = write_document(&document);
     assert!(serialized.contains("{\\shpgrp{\\*\\shpinst"));
-    let reparsed = RtfDocument::parse(&serialized).unwrap();
+    let reparsed = Tree::parse(&serialized, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.shape_groups().len(), 1);
     assert_eq!(
         reparsed.shape_groups()[0].child_order(),
@@ -69,10 +69,10 @@ fn typed_group_writes_nested_children() {
         &[ShapeGroupChild::Shape(0), ShapeGroupChild::Group(0)]
     );
 
-    let mut document = RtfDocument::parse(r"{\rtf1}").unwrap();
+    let mut document = Tree::parse(r"{\rtf1}", litchi_rtf::read::OpenOptions::default()).unwrap();
     document.push_shape_group(root).unwrap();
     let serialized = write_document(&document);
-    let reparsed = RtfDocument::parse(&serialized).unwrap();
+    let reparsed = Tree::parse(&serialized, litchi_rtf::read::OpenOptions::default()).unwrap();
     let group = &reparsed.shape_groups()[0];
     assert_eq!(
         group.child_order(),
@@ -94,12 +94,15 @@ fn rejects_hostile_group_grammar_and_typed_order_abuse() {
         "{\\rtf1{\\shpgrp{\\*\\shpinst\\bin1 x}}}",
     ];
     for source in malformed {
-        assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
+        assert!(
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted {source}"
+        );
     }
 
     let mut group = ShapeGroup::new();
     group.add_shape(Shape::new(ShapeType::Rectangle)).unwrap();
     group.child_order.push(ShapeGroupChild::Shape(0));
-    let mut document = RtfDocument::parse(r"{\rtf1}").unwrap();
+    let mut document = Tree::parse(r"{\rtf1}", litchi_rtf::read::OpenOptions::default()).unwrap();
     assert!(document.push_shape_group(group).is_err());
 }

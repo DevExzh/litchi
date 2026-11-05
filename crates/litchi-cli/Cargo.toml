@@ -1,0 +1,38 @@
+[package]
+name        = "litchi-cli"
+description = "The `litchi` command line: the unified operations verbs of `litchi-ops` over files, with OfficeCLI-shaped JSON output."
+version.workspace      = true
+edition.workspace      = true
+authors.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+# The library holds the command line so the binary stays a one-line shim
+# and the non-iWork gate's per-package `--lib` roots cover the CLI's tests.
+[lib]
+name = "litchi_cli"
+path = "src/lib.rs"
+
+[[bin]]
+name = "litchi"
+path = "src/main.rs"
+test = false
+doc  = false
+
+[dependencies]
+# Argument parsing (record 0256 §3): clap 4 is already in the workspace's
+# lock graph as the facade's dev-dependency, so it adds no new crate to the
+# supply chain. Default features (colour, suggestions) are left out; the
+# derive macros, help, usage and error context are all the CLI needs.
+clap        = { version = "4", default-features = false, features = ["derive", "error-context", "help", "std", "usage"] }
+litchi-core = { workspace = true }
+litchi-ops  = { workspace = true, features = ["doc", "docx", "ppt", "pptx", "rtf", "xls", "xlsb", "xlsx", "odt", "ods", "odp", "oth", "odm", "odg", "odc", "odi", "odb", "odf-formula", "pages", "keynote", "numbers", "eval"] }
+serde       = { workspace = true }
+serde_json  = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

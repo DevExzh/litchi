@@ -1,6 +1,10 @@
 [workspace]
 resolver = "3"
 members = ["crates/*"]
+# These vendored path dependencies are inputs to workspace members, not
+# validation members themselves. Keep their optional and dev-only dependency
+# graphs out of workspace-wide metadata while retaining direct path identity.
+exclude = ["vendor/allsorts", "vendor/flate2", "vendor/zlib-rs"]
 
 [workspace.package]
 version      = "0.0.1"
@@ -62,6 +66,12 @@ disallowed_methods = "allow"
 
 [workspace.dependencies]
 
+# The font subsetter carries a checked allocation budget through Allsorts'
+# internal parser and writer paths. Keep the exact upstream 0.17.0 source in
+# the repository so the budgeted implementation is reproducible and cannot
+# silently use a registry cache copy.
+
+
 # External deps used by ≥2 crates — declared once, inherited by members.
 # VERSIONS PRESERVED VERBATIM FROM CURRENT root Cargo.toml.
 aes           = "0.9"
@@ -71,7 +81,10 @@ aho-corasick  = "1.1"
 # backend, which flate2 prefers over `zlib-rs`: every build that enabled font
 # subsetting would then deflate with C zlib and publish different bytes. Keep
 # one Deflate backend, the workspace's `zlib-rs`, for every feature set.
-allsorts      = { version = "0.17", default-features = false, features = ["flate2_zlib-rs"] }
+# The path is intentional as well as the patch below: a path consumer such as
+# `litchi-fonts` can be resolved from a standalone Cargo root where workspace
+# patches are not inherited.
+allsorts      = { version = "0.17", path = "vendor/allsorts", default-features = false, features = ["flate2_zlib-rs"] }
 argon2        = "0.5"
 atoi_simd     = "0.18"
 base64        = "0.22"
@@ -88,7 +101,9 @@ encoding_rs   = "0.8"
 fast-float2   = "0.2"
 fixedbitset   = "0.5"
 # flate2 1.1.10 makes zlib-rs CPU dispatch opt-in when defaults are disabled.
-flate2        = { version = "1.1.10", features = ["zlib-rs", "runtime_detection"], default-features = false }
+# Keep this path paired with the Allsorts bridge so every consumer selects one
+# exact flate2 -> zlib-rs decoder instance.
+flate2        = { version = "1.1.10", path = "vendor/flate2", features = ["zlib-rs", "runtime_detection"], default-features = false }
 font-kit      = "0.14"
 hmac          = "0.13"
 image         = { version = "0.25", features = ["default-formats", "rayon"] }
@@ -116,7 +131,9 @@ litchi-iwa-graph    = { version = "0.0.1", path = "crates/litchi-iwa-graph" }
 litchi-iwa-index    = { version = "0.0.1", path = "crates/litchi-iwa-index" }
 litchi-iwa-package  = { version = "0.0.1", path = "crates/litchi-iwa-package" }
 litchi-iwa-protos   = { version = "0.0.1", path = "crates/litchi-iwa-protos" }
+litchi-iwa-table    = { version = "0.0.1", path = "crates/litchi-iwa-table" }
 litchi-iwa-structured = { version = "0.0.1", path = "crates/litchi-iwa-structured" }
+litchi-iwa-style    = { version = "0.0.1", path = "crates/litchi-iwa-style" }
 litchi-iwa-text     = { version = "0.0.1", path = "crates/litchi-iwa-text" }
 litchi-iwa-text-wire = { version = "0.0.1", path = "crates/litchi-iwa-text-wire" }
 litchi-keynote      = { version = "0.0.1", path = "crates/litchi-keynote" }
@@ -139,12 +156,14 @@ litchi-ograph       = { version = "0.0.1", path = "crates/litchi-ograph" }
 litchi-ole-common   = { version = "0.0.1", path = "crates/litchi-ole-common" }
 litchi-ooxml-common = { version = "0.0.1", path = "crates/litchi-ooxml-common" }
 litchi-opc          = { version = "0.0.1", path = "crates/litchi-opc", default-features = false }
+litchi-ops          = { version = "0.0.1", path = "crates/litchi-ops" }
 litchi-oth          = { version = "0.0.1", path = "crates/litchi-oth" }
 litchi-pages        = { version = "0.0.1", path = "crates/litchi-pages" }
 litchi-ppt          = { version = "0.0.1", path = "crates/litchi-ppt" }
 litchi-pptx         = { version = "0.0.1", path = "crates/litchi-pptx" }
 litchi-rtf          = { version = "0.0.1", path = "crates/litchi-rtf" }
 litchi-sheet        = { version = "0.0.1", path = "crates/litchi-sheet" }
+litchi-sheet-text   = { version = "0.0.1", path = "crates/litchi-sheet-text" }
 litchi-sign         = { version = "0.0.1", path = "crates/litchi-sign" }
 litchi-slide        = { version = "0.0.1", path = "crates/litchi-slide" }
 litchi-spreadsheet-drawing = { version = "0.0.1", path = "crates/litchi-spreadsheet-drawing" }
@@ -178,12 +197,15 @@ ryu           = "1.0"
 same-file     = "1.0.6"
 serde         = { version = "1", features = ["derive"] }
 serde-saphyr  = "0"
-serde_json    = "1"
+# `float_roundtrip`: correctly rounded decimal-to-f64 parsing, so a JSON number
+# (batch payloads, property values) round-trips exactly (record 0338 F1).
+serde_json    = { version = "1", features = ["float_roundtrip"] }
 sha1          = { version = "0.11", features = ["zeroize"] }
 sha1_legacy   = { package = "sha1", version = "0.10" }
 sha2          = "0.11"
 sha2_legacy   = { package = "sha2", version = "0.10" }
 signature     = "2.2"
+siphasher     = { version = "1.0.4", default-features = false }
 smallvec      = "1.15"
 snap          = "1"
 soapberry-zip       = { path = "crates/soapberry-zip" }
@@ -216,3 +238,8 @@ codegen-units = 1
 [profile.profiling]
 inherits = "release"
 debug = true
+
+[patch.crates-io]
+allsorts = { path = "vendor/allsorts" }
+flate2 = { path = "vendor/flate2" }
+zlib-rs = { path = "vendor/zlib-rs" }

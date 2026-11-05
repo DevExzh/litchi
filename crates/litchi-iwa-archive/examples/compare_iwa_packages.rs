@@ -19,7 +19,7 @@ use litchi_iwa_archive::{ComponentCatalog, Limits, Result as ArchiveResult};
 
 fn open(path: impl AsRef<Path>) -> ArchiveResult<ComponentCatalog> {
     let source = support::read_package(path.as_ref(), Limits::default())?;
-    ComponentCatalog::from_bytes(source.as_ref())
+    ComponentCatalog::from_bytes(source.as_ref(), Default::default())
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -59,7 +59,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let left_archive = left_component.archive();
         let right_archive = right_component.archive();
-        if left_archive.to_bytes()? == right_archive.to_bytes()? {
+        if left_archive.to_bytes(Default::default())?
+            == right_archive.to_bytes(Default::default())?
+        {
             continue;
         }
         differences += 1;

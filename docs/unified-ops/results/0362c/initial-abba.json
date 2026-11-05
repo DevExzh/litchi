@@ -1,0 +1,946 @@
+{
+  "baseline_commit": "45a5f9e9d1",
+  "cpu": 0,
+  "source_sha256": "d80b9ff2918f9df664cdbed452391554b787802d4b43983979066bfd9f4ecd18",
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+  "binaries": {
+    "before": {
+      "bytes": 480776,
+      "sha256": "a2a2a371bf4429ce03fe11c426cd2517eeba34dec78ab9607cb598a3663bfadd",
+      "lock_sha256": "6aa6693e39ca5804f46a6af1093fa7da6804c0ea42b8b79fae383ac908b31c08",
+      "source_digests": {
+        "crates/litchi-odraw/src/container.rs": "d193d97b78bbd16c659b94b0d0b01c44a95f05f847415d0774ae82a28eb0d59c",
+        "crates/litchi-odraw/src/error.rs": "55e806641c5dcf26484546e3741fd9b82a68378fb40988196e6ffe00250f119d",
+        "crates/litchi-odraw/src/image/codec.rs": "657e0632dd4faed657d7fa8431cd5311141fef2e9f4b2b6e96d339c4dd86e464",
+        "crates/litchi-odraw/src/image/file.rs": "44464e5aa19a44e5e138a0ada8679f8c71bee0e8c179bde78554ae3b283a770d",
+        "crates/litchi-odraw/src/image/mod.rs": "b6cecfb6b31f92e101606880819b78b2a40de420622d05b4b45dc7d3239bd2a4",
+        "crates/litchi-odraw/src/image/model.rs": "e23f438ade9a9324b62c8fa62cf845eb1dc231d033adb93ceb3f78c8d1c570f1",
+        "crates/litchi-odraw/src/image/tests.rs": "a73aa95c0c9e9eda7fe65cb725cdd6bc8ca2b44dc245dc8edd46aa4d48049af6",
+        "crates/litchi-odraw/src/image/validation.rs": "a4f2dc99b280e95cabc5c57b0e9ec7d9c811e2f68b0360108d23422a5fac0be8",
+        "crates/litchi-odraw/src/image/write.rs": "788068de5268784582b68391a0b84bc81d90b37cfa56d008e6f1c31b3ab59321",
+        "crates/litchi-odraw/src/lib.rs": "b3e236f8340e9161b292767904254aa269dc86d0e26c09d9784870453fff3d61",
+        "crates/litchi-odraw/src/parser.rs": "0b84d9f21c6ece36caceb2e27f699851005282f3aa3eab738fa821d51506b350",
+        "crates/litchi-odraw/src/prop/codec.rs": "0e07b0d5894719f59597646779218027a4c04c160a323a72d91a0a90a94a2140",
+        "crates/litchi-odraw/src/prop/geometry/codec.rs": "1c0e6e365ee5cfc4373956caf2f05212384069b9f57e2f94ca93bb70de4f5955",
+        "crates/litchi-odraw/src/prop/geometry/mod.rs": "2a853f4790a020a2857e4c804e2e9a7037b26ff8c6d8325b7c4978d99f9443ff",
+        "crates/litchi-odraw/src/prop/geometry/model.rs": "c46435d600bdd045b3ff129d12d47bfafe5b2c3730d23b01e7d67736bee0df7f",
+        "crates/litchi-odraw/src/prop/geometry/tests.rs": "7dcb890a2c660a3d31ef696b15713b80f8df94ccb4ad95ffcbbb03baf08177ca",
+        "crates/litchi-odraw/src/prop/geometry/validation.rs": "c9185a6febb85048247f6a81d90c66434b8c942f2cae16043c35ea2709c16f97",
+        "crates/litchi-odraw/src/prop/gradient/codec.rs": "f1e9f298f92dca4a5a5eb57b65e58599ac99f82fa2dbb8ccbeb575cb2d2cd58b",
+        "crates/litchi-odraw/src/prop/gradient/mod.rs": "f5e300b5ea9a5cbe83b3b82dba4862e185e9e339614ad1474d7e05f2797f25ae",
+        "crates/litchi-odraw/src/prop/gradient/model.rs": "503d2a1417b3ed2fc20ed181e13f5bcf0f9e6d3f61a0014ccdc58b2d1d4ed5b1",
+        "crates/litchi-odraw/src/prop/gradient/tests.rs": "d4577b4500a442f887ea5db6e7ccc7c1edd64452a5e2a3dd4e1d60d658dca758",
+        "crates/litchi-odraw/src/prop/gradient/validation.rs": "f75fce21bfe5ee2b59255c8efd64bb698d6d4ee93b1c8d767e91c03e30eb5f66",
+        "crates/litchi-odraw/src/prop/mod.rs": "6e006c1b03b32eea420764f7ae3751ee0a6cb421c2682f599dddb88facc2735b",
+        "crates/litchi-odraw/src/prop/model/geometry.rs": "e28ded4d504fbffeb96bf637da5f7a419eeb09541c466bfca9644aae87208ac6",
+        "crates/litchi-odraw/src/prop/model/identifiers.rs": "e6901ca6b76698c6466154dd852552a998f92b4708708d499b6526b3ae0e7cc3",
+        "crates/litchi-odraw/src/prop/model/mod.rs": "7b89a657183b7651de3f3a06639c5d1956c99cf92a0df46841250bbe1c43d019",
+        "crates/litchi-odraw/src/prop/model/property.rs": "2200d102854f81cea5a611edaacdb06ecff0e4b843d6bc2301c278877736fe3c",
+        "crates/litchi-odraw/src/prop/model/values.rs": "554a69ee578cd3a574de1d50238038c8126b01200dd5d58006a75ef6c1b7ba5c",
+        "crates/litchi-odraw/src/prop/package.rs": "4b04c4c98a0dc5974eb830b454d42c5bbb63876313211c7f303ee12ad19e67d7",
+        "crates/litchi-odraw/src/prop/picture/codec.rs": "9b69d598fc9761420d9bb0d6271f4873056dd25f47599049c447ae470e4a963b",
+        "crates/litchi-odraw/src/prop/picture/mod.rs": "7e1891b004a04b202b7ee13000aa5427e394b2816fc94e9749f79b078c5dcfd4",
+        "crates/litchi-odraw/src/prop/picture/model.rs": "f462e42e01c71edba24468911476f961586e6061d273a14560e9932da9fff5a7",
+        "crates/litchi-odraw/src/prop/picture/tests.rs": "d0ccba5047cab13783ffb93e981b6cd6b8ad7f3805aa5330c1d94095d6caffb8",
+        "crates/litchi-odraw/src/prop/picture/validation.rs": "289bddadaafd284558539c125c6a8571acdfcd0198a50f1b1fb8eb3082898096",
+        "crates/litchi-odraw/src/prop/tests.rs": "cdcfdaa364e0b31c9f255fc26add3dc523f2851f944cf649da1b4cb013038215",
+        "crates/litchi-odraw/src/record.rs": "fd8dcfa1853d8d4063c64f49a5c829886d5eb2ff4b2a5f041d0b86cde3f8bb97",
+        "crates/litchi-odraw/src/rule/codec.rs": "fe0fa94f6fd5da5337cbbf686ab1aebd50a303a76d048ff146d7881e51662a1a",
+        "crates/litchi-odraw/src/rule/mod.rs": "811f00dab15508d233e407b1209438bb30f168fb0dd6f49515c805b5a65ce171",
+        "crates/litchi-odraw/src/rule/model.rs": "0bc683df434d8816951530b8e3813b7d5b1133e7572af610bb3afd5fb7de15e7",
+        "crates/litchi-odraw/src/rule/tests.rs": "68fb070809671e80e780b1e6b5bbfbad5b5b7d0f70e5899d99de5b113a601739",
+        "crates/litchi-odraw/src/rule/validation.rs": "ca0a9f151f613afe788b73757442cae3af11ab904891aa0a6d40f80300e9a73b",
+        "crates/litchi-odraw/src/shape/codec.rs": "cb41e7897034f0dfb5cd5d098f26e7c6d2fe5e7b6b33af25a0eddfe48af68e3a",
+        "crates/litchi-odraw/src/shape/mod.rs": "aa98d8b7e41277f7c1bf90f269410f49da5d555c7c762ce4d0da2ee2977f3377",
+        "crates/litchi-odraw/src/shape/model.rs": "0fa31780862a34f5f524f3dc2df08f6ee67cbeadf5e6cc33a8bae1a27ba614fd",
+        "crates/litchi-odraw/src/shape/tests.rs": "41e72fe2f63ba0592f5557ea84c47ef5cb104f020918deef6badae7b08ab5e21",
+        "crates/litchi-odraw/src/shape/validation.rs": "e9be03ccbf74397176554c3e18a9a919e6941ba641871130198c416f500797b1",
+        "crates/litchi-odraw/src/write.rs": "d0e4fe2ea5fcae9c37d1aa38267112f8470bde6483ecc3ca055836dab104d1a3"
+      }
+    },
+    "after": {
+      "bytes": 480784,
+      "sha256": "f610db56fdde5405b53f533a7556784417b22d111c7b372df0b23990f34b339d",
+      "lock_sha256": "6aa6693e39ca5804f46a6af1093fa7da6804c0ea42b8b79fae383ac908b31c08",
+      "source_digests": {
+        "crates/litchi-odraw/src/container.rs": "5f290ffcc650c0e4b11cfe52945c0749be077c9fa23fee7d55f8b9de5aad0aaa",
+        "crates/litchi-odraw/src/error.rs": "55e806641c5dcf26484546e3741fd9b82a68378fb40988196e6ffe00250f119d",
+        "crates/litchi-odraw/src/image/codec.rs": "9379035e8a312421430df7823c69230862f65b6d76e8ce8196736f159f5150f9",
+        "crates/litchi-odraw/src/image/file.rs": "fc784810bd90d96675a8f6b32ac3e3fa4997a55fdf182856932e07f282ad6efd",
+        "crates/litchi-odraw/src/image/mod.rs": "b6cecfb6b31f92e101606880819b78b2a40de420622d05b4b45dc7d3239bd2a4",
+        "crates/litchi-odraw/src/image/model.rs": "e23f438ade9a9324b62c8fa62cf845eb1dc231d033adb93ceb3f78c8d1c570f1",
+        "crates/litchi-odraw/src/image/tests.rs": "88ef2122480af0a4a3efba06edc832e3d5bb652d756b3d9f565b71c4267dd8f7",
+        "crates/litchi-odraw/src/image/validation.rs": "dade999c7fd7e4390cc70fa073c4d9d94e9ea2c89493bed9cbccb9b56296c938",
+        "crates/litchi-odraw/src/image/write.rs": "f31710d61443a1ca9b9a2be0c4d86f2d4842cbd4991a262431d3e28f163e1b4c",
+        "crates/litchi-odraw/src/lib.rs": "b3e236f8340e9161b292767904254aa269dc86d0e26c09d9784870453fff3d61",
+        "crates/litchi-odraw/src/parser.rs": "4a50c4d96170a5809250eac0d45f9973a208d3f77de426ecafbb84a1b5ab915b",
+        "crates/litchi-odraw/src/prop/codec.rs": "0e07b0d5894719f59597646779218027a4c04c160a323a72d91a0a90a94a2140",
+        "crates/litchi-odraw/src/prop/geometry/codec.rs": "1c0e6e365ee5cfc4373956caf2f05212384069b9f57e2f94ca93bb70de4f5955",
+        "crates/litchi-odraw/src/prop/geometry/mod.rs": "2a853f4790a020a2857e4c804e2e9a7037b26ff8c6d8325b7c4978d99f9443ff",
+        "crates/litchi-odraw/src/prop/geometry/model.rs": "c46435d600bdd045b3ff129d12d47bfafe5b2c3730d23b01e7d67736bee0df7f",
+        "crates/litchi-odraw/src/prop/geometry/tests.rs": "7dcb890a2c660a3d31ef696b15713b80f8df94ccb4ad95ffcbbb03baf08177ca",
+        "crates/litchi-odraw/src/prop/geometry/validation.rs": "c9185a6febb85048247f6a81d90c66434b8c942f2cae16043c35ea2709c16f97",
+        "crates/litchi-odraw/src/prop/gradient/codec.rs": "f1e9f298f92dca4a5a5eb57b65e58599ac99f82fa2dbb8ccbeb575cb2d2cd58b",
+        "crates/litchi-odraw/src/prop/gradient/mod.rs": "f5e300b5ea9a5cbe83b3b82dba4862e185e9e339614ad1474d7e05f2797f25ae",
+        "crates/litchi-odraw/src/prop/gradient/model.rs": "503d2a1417b3ed2fc20ed181e13f5bcf0f9e6d3f61a0014ccdc58b2d1d4ed5b1",
+        "crates/litchi-odraw/src/prop/gradient/tests.rs": "d4577b4500a442f887ea5db6e7ccc7c1edd64452a5e2a3dd4e1d60d658dca758",
+        "crates/litchi-odraw/src/prop/gradient/validation.rs": "f75fce21bfe5ee2b59255c8efd64bb698d6d4ee93b1c8d767e91c03e30eb5f66",
+        "crates/litchi-odraw/src/prop/mod.rs": "6e006c1b03b32eea420764f7ae3751ee0a6cb421c2682f599dddb88facc2735b",
+        "crates/litchi-odraw/src/prop/model/geometry.rs": "e28ded4d504fbffeb96bf637da5f7a419eeb09541c466bfca9644aae87208ac6",
+        "crates/litchi-odraw/src/prop/model/identifiers.rs": "e6901ca6b76698c6466154dd852552a998f92b4708708d499b6526b3ae0e7cc3",
+        "crates/litchi-odraw/src/prop/model/mod.rs": "7b89a657183b7651de3f3a06639c5d1956c99cf92a0df46841250bbe1c43d019",
+        "crates/litchi-odraw/src/prop/model/property.rs": "2200d102854f81cea5a611edaacdb06ecff0e4b843d6bc2301c278877736fe3c",
+        "crates/litchi-odraw/src/prop/model/values.rs": "554a69ee578cd3a574de1d50238038c8126b01200dd5d58006a75ef6c1b7ba5c",
+        "crates/litchi-odraw/src/prop/package.rs": "4b04c4c98a0dc5974eb830b454d42c5bbb63876313211c7f303ee12ad19e67d7",
+        "crates/litchi-odraw/src/prop/picture/codec.rs": "9b69d598fc9761420d9bb0d6271f4873056dd25f47599049c447ae470e4a963b",
+        "crates/litchi-odraw/src/prop/picture/mod.rs": "7e1891b004a04b202b7ee13000aa5427e394b2816fc94e9749f79b078c5dcfd4",
+        "crates/litchi-odraw/src/prop/picture/model.rs": "f462e42e01c71edba24468911476f961586e6061d273a14560e9932da9fff5a7",
+        "crates/litchi-odraw/src/prop/picture/tests.rs": "d0ccba5047cab13783ffb93e981b6cd6b8ad7f3805aa5330c1d94095d6caffb8",
+        "crates/litchi-odraw/src/prop/picture/validation.rs": "289bddadaafd284558539c125c6a8571acdfcd0198a50f1b1fb8eb3082898096",
+        "crates/litchi-odraw/src/prop/tests.rs": "cdcfdaa364e0b31c9f255fc26add3dc523f2851f944cf649da1b4cb013038215",
+        "crates/litchi-odraw/src/record.rs": "fd8dcfa1853d8d4063c64f49a5c829886d5eb2ff4b2a5f041d0b86cde3f8bb97",
+        "crates/litchi-odraw/src/rule/codec.rs": "fe0fa94f6fd5da5337cbbf686ab1aebd50a303a76d048ff146d7881e51662a1a",
+        "crates/litchi-odraw/src/rule/mod.rs": "811f00dab15508d233e407b1209438bb30f168fb0dd6f49515c805b5a65ce171",
+        "crates/litchi-odraw/src/rule/model.rs": "0bc683df434d8816951530b8e3813b7d5b1133e7572af610bb3afd5fb7de15e7",
+        "crates/litchi-odraw/src/rule/tests.rs": "68fb070809671e80e780b1e6b5bbfbad5b5b7d0f70e5899d99de5b113a601739",
+        "crates/litchi-odraw/src/rule/validation.rs": "ca0a9f151f613afe788b73757442cae3af11ab904891aa0a6d40f80300e9a73b",
+        "crates/litchi-odraw/src/shape/codec.rs": "cf945881c373ab593dfeb11a705b9566e340cb4d7b0704434d2abb6a84cb8bc2",
+        "crates/litchi-odraw/src/shape/mod.rs": "98c79c250d521648675701050f2a1a5ecaa5857981c95ee458620eccb4cfbfd7",
+        "crates/litchi-odraw/src/shape/model.rs": "0fa31780862a34f5f524f3dc2df08f6ee67cbeadf5e6cc33a8bae1a27ba614fd",
+        "crates/litchi-odraw/src/shape/tests.rs": "5df5ad134443d36fb50ab3a7fd9ffa18eef621874488de73a6c0cc1d98bd3d0d",
+        "crates/litchi-odraw/src/shape/validation.rs": "e9be03ccbf74397176554c3e18a9a919e6941ba641871130198c416f500797b1",
+        "crates/litchi-odraw/src/write.rs": "d0e4fe2ea5fcae9c37d1aa38267112f8470bde6483ecc3ca055836dab104d1a3"
+      }
+    }
+  },
+  "rows": [
+    {
+      "route": "blip-small",
+      "calibration": {
+        "route": "blip-small",
+        "iterations": 10000,
+        "ns": 149451,
+        "checksum": 2290000,
+        "store_size": 48,
+        "shape_size": 312
+      },
+      "after_before": [
+        1.015664248328967,
+        0.9640171964987191,
+        1.024203745689149
+      ],
+      "samples": [
+        {
+          "route": "blip-small",
+          "iterations": 16727890,
+          "ns": 237027661,
+          "checksum": 3830686810,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "before",
+          "block": 0
+        },
+        {
+          "route": "blip-small",
+          "iterations": 16727890,
+          "ns": 240698162,
+          "checksum": 3830686810,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "after",
+          "block": 0
+        },
+        {
+          "route": "blip-small",
+          "iterations": 16727890,
+          "ns": 232795396,
+          "checksum": 3830686810,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "after",
+          "block": 0
+        },
+        {
+          "route": "blip-small",
+          "iterations": 16727890,
+          "ns": 229163365,
+          "checksum": 3830686810,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "before",
+          "block": 0
+        },
+        {
+          "route": "blip-small",
+          "iterations": 16727890,
+          "ns": 303915683,
+          "checksum": 3830686810,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "before",
+          "block": 1
+        },
+        {
+          "route": "blip-small",
+          "iterations": 16727890,
+          "ns": 243929191,
+          "checksum": 3830686810,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "after",
+          "block": 1
+        },
+        {
+          "route": "blip-small",
+          "iterations": 16727890,
+          "ns": 280687476,
+          "checksum": 3830686810,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "after",
+          "block": 1
+        },
+        {
+          "route": "blip-small",
+          "iterations": 16727890,
+          "ns": 240282770,
+          "checksum": 3830686810,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "before",
+          "block": 1
+        },
+        {
+          "route": "blip-small",
+          "iterations": 16727890,
+          "ns": 242103901,
+          "checksum": 3830686810,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "before",
+          "block": 2
+        },
+        {
+          "route": "blip-small",
+          "iterations": 16727890,
+          "ns": 282742809,
+          "checksum": 3830686810,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "after",
+          "block": 2
+        },
+        {
+          "route": "blip-small",
+          "iterations": 16727890,
+          "ns": 235129650,
+          "checksum": 3830686810,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "after",
+          "block": 2
+        },
+        {
+          "route": "blip-small",
+          "iterations": 16727890,
+          "ns": 263530316,
+          "checksum": 3830686810,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "before",
+          "block": 2
+        }
+      ]
+    },
+    {
+      "route": "blip-large",
+      "calibration": {
+        "route": "blip-large",
+        "iterations": 10000,
+        "ns": 158751,
+        "checksum": 20973170000,
+        "store_size": 48,
+        "shape_size": 312
+      },
+      "after_before": [
+        0.983099085010395,
+        0.9746143497362592,
+        0.9436934678334609
+      ],
+      "samples": [
+        {
+          "route": "blip-large",
+          "iterations": 15747932,
+          "ns": 230525042,
+          "checksum": 33028405498444,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "before",
+          "block": 0
+        },
+        {
+          "route": "blip-large",
+          "iterations": 15747932,
+          "ns": 222369895,
+          "checksum": 33028405498444,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "after",
+          "block": 0
+        },
+        {
+          "route": "blip-large",
+          "iterations": 15747932,
+          "ns": 230584133,
+          "checksum": 33028405498444,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "after",
+          "block": 0
+        },
+        {
+          "route": "blip-large",
+          "iterations": 15747932,
+          "ns": 230215930,
+          "checksum": 33028405498444,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "before",
+          "block": 0
+        },
+        {
+          "route": "blip-large",
+          "iterations": 15747932,
+          "ns": 229836068,
+          "checksum": 33028405498444,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "before",
+          "block": 1
+        },
+        {
+          "route": "blip-large",
+          "iterations": 15747932,
+          "ns": 224946440,
+          "checksum": 33028405498444,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "after",
+          "block": 1
+        },
+        {
+          "route": "blip-large",
+          "iterations": 15747932,
+          "ns": 227186173,
+          "checksum": 33028405498444,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "after",
+          "block": 1
+        },
+        {
+          "route": "blip-large",
+          "iterations": 15747932,
+          "ns": 234073183,
+          "checksum": 33028405498444,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "before",
+          "block": 1
+        },
+        {
+          "route": "blip-large",
+          "iterations": 15747932,
+          "ns": 254828075,
+          "checksum": 33028405498444,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "before",
+          "block": 2
+        },
+        {
+          "route": "blip-large",
+          "iterations": 15747932,
+          "ns": 232748846,
+          "checksum": 33028405498444,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "after",
+          "block": 2
+        },
+        {
+          "route": "blip-large",
+          "iterations": 15747932,
+          "ns": 227410434,
+          "checksum": 33028405498444,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "after",
+          "block": 2
+        },
+        {
+          "route": "blip-large",
+          "iterations": 15747932,
+          "ns": 232787126,
+          "checksum": 33028405498444,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "before",
+          "block": 2
+        }
+      ]
+    },
+    {
+      "route": "delayed",
+      "calibration": {
+        "route": "delayed",
+        "iterations": 10000,
+        "ns": 616694,
+        "checksum": 2290000,
+        "store_size": 48,
+        "shape_size": 312
+      },
+      "after_before": [
+        0.9992859909103776,
+        1.043209679128841,
+        1.0241190433073528
+      ],
+      "samples": [
+        {
+          "route": "delayed",
+          "iterations": 4053874,
+          "ns": 249082062,
+          "checksum": 928337146,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "before",
+          "block": 0
+        },
+        {
+          "route": "delayed",
+          "iterations": 4053874,
+          "ns": 252375721,
+          "checksum": 928337146,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "after",
+          "block": 0
+        },
+        {
+          "route": "delayed",
+          "iterations": 4053874,
+          "ns": 247085971,
+          "checksum": 928337146,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "after",
+          "block": 0
+        },
+        {
+          "route": "delayed",
+          "iterations": 4053874,
+          "ns": 250736505,
+          "checksum": 928337146,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "before",
+          "block": 0
+        },
+        {
+          "route": "delayed",
+          "iterations": 4053874,
+          "ns": 248168710,
+          "checksum": 928337146,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "before",
+          "block": 1
+        },
+        {
+          "route": "delayed",
+          "iterations": 4053874,
+          "ns": 259518857,
+          "checksum": 928337146,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "after",
+          "block": 1
+        },
+        {
+          "route": "delayed",
+          "iterations": 4053874,
+          "ns": 257892288,
+          "checksum": 928337146,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "after",
+          "block": 1
+        },
+        {
+          "route": "delayed",
+          "iterations": 4053874,
+          "ns": 247811298,
+          "checksum": 928337146,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "before",
+          "block": 1
+        },
+        {
+          "route": "delayed",
+          "iterations": 4053874,
+          "ns": 249839891,
+          "checksum": 928337146,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "before",
+          "block": 2
+        },
+        {
+          "route": "delayed",
+          "iterations": 4053874,
+          "ns": 251723861,
+          "checksum": 928337146,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "after",
+          "block": 2
+        },
+        {
+          "route": "delayed",
+          "iterations": 4053874,
+          "ns": 258302090,
+          "checksum": 928337146,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "after",
+          "block": 2
+        },
+        {
+          "route": "delayed",
+          "iterations": 4053874,
+          "ns": 248174431,
+          "checksum": 928337146,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "before",
+          "block": 2
+        }
+      ]
+    },
+    {
+      "route": "shape-parse",
+      "calibration": {
+        "route": "shape-parse",
+        "iterations": 10000,
+        "ns": 821665,
+        "checksum": 70000,
+        "store_size": 48,
+        "shape_size": 312
+      },
+      "after_before": [
+        1.0164694728797816,
+        1.0413187097290724,
+        0.993667689343146
+      ],
+      "samples": [
+        {
+          "route": "shape-parse",
+          "iterations": 3042602,
+          "ns": 244497739,
+          "checksum": 21298214,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "before",
+          "block": 0
+        },
+        {
+          "route": "shape-parse",
+          "iterations": 3042602,
+          "ns": 253721353,
+          "checksum": 21298214,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "after",
+          "block": 0
+        },
+        {
+          "route": "shape-parse",
+          "iterations": 3042602,
+          "ns": 244492819,
+          "checksum": 21298214,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "after",
+          "block": 0
+        },
+        {
+          "route": "shape-parse",
+          "iterations": 3042602,
+          "ns": 245644056,
+          "checksum": 21298214,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "before",
+          "block": 0
+        },
+        {
+          "route": "shape-parse",
+          "iterations": 3042602,
+          "ns": 243200971,
+          "checksum": 21298214,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "before",
+          "block": 1
+        },
+        {
+          "route": "shape-parse",
+          "iterations": 3042602,
+          "ns": 259345907,
+          "checksum": 21298214,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "after",
+          "block": 1
+        },
+        {
+          "route": "shape-parse",
+          "iterations": 3042602,
+          "ns": 255290802,
+          "checksum": 21298214,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "after",
+          "block": 1
+        },
+        {
+          "route": "shape-parse",
+          "iterations": 3042602,
+          "ns": 251015357,
+          "checksum": 21298214,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "before",
+          "block": 1
+        },
+        {
+          "route": "shape-parse",
+          "iterations": 3042602,
+          "ns": 255389473,
+          "checksum": 21298214,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "before",
+          "block": 2
+        },
+        {
+          "route": "shape-parse",
+          "iterations": 3042602,
+          "ns": 250909316,
+          "checksum": 21298214,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "after",
+          "block": 2
+        },
+        {
+          "route": "shape-parse",
+          "iterations": 3042602,
+          "ns": 253990805,
+          "checksum": 21298214,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "after",
+          "block": 2
+        },
+        {
+          "route": "shape-parse",
+          "iterations": 3042602,
+          "ns": 252728207,
+          "checksum": 21298214,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "before",
+          "block": 2
+        }
+      ]
+    },
+    {
+      "route": "shape-record",
+      "calibration": {
+        "route": "shape-record",
+        "iterations": 10000,
+        "ns": 630754,
+        "checksum": 70000,
+        "store_size": 48,
+        "shape_size": 312
+      },
+      "after_before": [
+        1.01764974854119,
+        0.9559583041167338,
+        0.9594308036411147
+      ],
+      "samples": [
+        {
+          "route": "shape-record",
+          "iterations": 3963510,
+          "ns": 246222800,
+          "checksum": 27744570,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "before",
+          "block": 0
+        },
+        {
+          "route": "shape-record",
+          "iterations": 3963510,
+          "ns": 243793654,
+          "checksum": 27744570,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "after",
+          "block": 0
+        },
+        {
+          "route": "shape-record",
+          "iterations": 3963510,
+          "ns": 261764070,
+          "checksum": 27744570,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "after",
+          "block": 0
+        },
+        {
+          "route": "shape-record",
+          "iterations": 3963510,
+          "ns": 250566714,
+          "checksum": 27744570,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "before",
+          "block": 0
+        },
+        {
+          "route": "shape-record",
+          "iterations": 3963510,
+          "ns": 250395843,
+          "checksum": 27744570,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "before",
+          "block": 1
+        },
+        {
+          "route": "shape-record",
+          "iterations": 3963510,
+          "ns": 258661322,
+          "checksum": 27744570,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "after",
+          "block": 1
+        },
+        {
+          "route": "shape-record",
+          "iterations": 3963510,
+          "ns": 247786428,
+          "checksum": 27744570,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "after",
+          "block": 1
+        },
+        {
+          "route": "shape-record",
+          "iterations": 3963510,
+          "ns": 279384324,
+          "checksum": 27744570,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "before",
+          "block": 1
+        },
+        {
+          "route": "shape-record",
+          "iterations": 3963510,
+          "ns": 282964946,
+          "checksum": 27744570,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "before",
+          "block": 2
+        },
+        {
+          "route": "shape-record",
+          "iterations": 3963510,
+          "ns": 252676897,
+          "checksum": 27744570,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "after",
+          "block": 2
+        },
+        {
+          "route": "shape-record",
+          "iterations": 3963510,
+          "ns": 258240130,
+          "checksum": 27744570,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "after",
+          "block": 2
+        },
+        {
+          "route": "shape-record",
+          "iterations": 3963510,
+          "ns": 249556029,
+          "checksum": 27744570,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "before",
+          "block": 2
+        }
+      ]
+    },
+    {
+      "route": "recursive",
+      "calibration": {
+        "route": "recursive",
+        "iterations": 10000,
+        "ns": 19834407,
+        "checksum": 103680000,
+        "store_size": 48,
+        "shape_size": 312
+      },
+      "after_before": [
+        1.0114245469454295,
+        1.0158474166903046,
+        1.0208466758507768
+      ],
+      "samples": [
+        {
+          "route": "recursive",
+          "iterations": 126043,
+          "ns": 250847516,
+          "checksum": 1306813824,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "before",
+          "block": 0
+        },
+        {
+          "route": "recursive",
+          "iterations": 126043,
+          "ns": 253728733,
+          "checksum": 1306813824,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "after",
+          "block": 0
+        },
+        {
+          "route": "recursive",
+          "iterations": 126043,
+          "ns": 253759604,
+          "checksum": 1306813824,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "after",
+          "block": 0
+        },
+        {
+          "route": "recursive",
+          "iterations": 126043,
+          "ns": 250908486,
+          "checksum": 1306813824,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "before",
+          "block": 0
+        },
+        {
+          "route": "recursive",
+          "iterations": 126043,
+          "ns": 250644556,
+          "checksum": 1306813824,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "before",
+          "block": 1
+        },
+        {
+          "route": "recursive",
+          "iterations": 126043,
+          "ns": 255299602,
+          "checksum": 1306813824,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "after",
+          "block": 1
+        },
+        {
+          "route": "recursive",
+          "iterations": 126043,
+          "ns": 254110476,
+          "checksum": 1306813824,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "after",
+          "block": 1
+        },
+        {
+          "route": "recursive",
+          "iterations": 126043,
+          "ns": 250818626,
+          "checksum": 1306813824,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "before",
+          "block": 1
+        },
+        {
+          "route": "recursive",
+          "iterations": 126043,
+          "ns": 249445948,
+          "checksum": 1306813824,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "before",
+          "block": 2
+        },
+        {
+          "route": "recursive",
+          "iterations": 126043,
+          "ns": 256560870,
+          "checksum": 1306813824,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "after",
+          "block": 2
+        },
+        {
+          "route": "recursive",
+          "iterations": 126043,
+          "ns": 253710373,
+          "checksum": 1306813824,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "after",
+          "block": 2
+        },
+        {
+          "route": "recursive",
+          "iterations": 126043,
+          "ns": 250405063,
+          "checksum": 1306813824,
+          "store_size": 48,
+          "shape_size": 312,
+          "build": "before",
+          "block": 2
+        }
+      ]
+    }
+  ]
+}

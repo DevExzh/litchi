@@ -182,9 +182,11 @@ pub(crate) fn validate(xml: &str, limits: crate::Limits) -> Result<()> {
 
 fn reject_scripts(namespace: NamespaceKind, element: &BytesStart<'_>) -> Result<()> {
     if namespace == NamespaceKind::Office && element.local_name().as_ref() == b"scripts" {
-        return Err(Error::Unsupported(
-            "ODC styles refuse executable office:scripts content".into(),
-        ));
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odc.codec.styles",
+            "ODC styles refuse executable office:scripts content",
+        )));
     }
     Ok(())
 }

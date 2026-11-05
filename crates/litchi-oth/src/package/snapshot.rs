@@ -2,8 +2,9 @@
 
 use litchi_core::{Error, Metadata, Result};
 use litchi_odf_common::core::{
-    PackageWriter, XmlSourcePart, XmlSplicePublication, family::Package,
+    OwnedPackage, PackageWriter, XmlSourcePart, XmlSplicePublication, family::Package,
 };
+use litchi_odf_common::{OpenOptions, SemanticLimitKind};
 use std::{
     path::Path,
     sync::{Arc, Mutex, OnceLock},
@@ -48,16 +49,63 @@ struct State {
 pub(crate) struct Snapshot(Arc<State>);
 
 impl Snapshot {
+    /// The retained physical package (metadata transactions, record 0288).
+    pub(crate) fn owned_package(&self) -> &OwnedPackage {
+        self.0.package.package()
+    }
+
     pub(crate) fn is_same(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.0, &other.0)
     }
-    pub(crate) fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_package(Package::open(
-            path,
+    pub(crate) fn open_with_options(
+        path: impl AsRef<Path>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        let package =
+            Package::open_with_options(path, options, MIMETYPE, PRELIMINARY_XML_MARKER, "OTH")?;
+        Self::from_package_with_options(package, options)
+    }
+
+    pub(crate) fn from_reader_with_options(
+        reader: impl std::io::Read,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        let package = Package::from_reader_with_options(
+            reader,
+            options,
             MIMETYPE,
             PRELIMINARY_XML_MARKER,
             "OTH",
-        )?)
+        )?;
+        Self::from_package_with_options(package, options)
+    }
+
+    pub(crate) fn from_bytes_with_options(
+        bytes: Vec<u8>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        let package = Package::from_bytes_with_options(
+            bytes,
+            options,
+            MIMETYPE,
+            PRELIMINARY_XML_MARKER,
+            "OTH",
+        )?;
+        Self::from_package_with_options(package, options)
+    }
+
+    pub(crate) fn from_owned_package_with_options(
+        archive: OwnedPackage,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        let package = Package::from_owned_package_with_options(
+            archive,
+            options,
+            MIMETYPE,
+            PRELIMINARY_XML_MARKER,
+            "OTH",
+        )?;
+        Self::from_package_with_options(package, options)
     }
 
     pub(crate) fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
@@ -76,6 +124,24 @@ impl Snapshot {
             PRELIMINARY_XML_MARKER,
             "OTH",
         )?)
+    }
+
+    /// Project the package, then bound its top-level body blocks by the
+    /// semantic `units` limit.
+    fn from_package_with_options(
+        package: Package,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        let snapshot = Self::from_package(package)?;
+        options.semantic_limits_value().check(
+            SemanticLimitKind::Units,
+            u64::try_from(snapshot.order().len()).unwrap_or(u64::MAX),
+        )?;
+        Ok(snapshot)
+    }
+
+    pub(crate) fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
+        self.0.package.tolerance_report()
     }
 
     fn from_package(package: Package) -> Result<Self> {
@@ -237,13 +303,6 @@ impl Snapshot {
 
     pub(crate) fn files(&self) -> Result<Vec<String>> {
         self.0.package.files()
-    }
-
-    pub(crate) fn into_bytes(self) -> Vec<u8> {
-        match Arc::try_unwrap(self.0) {
-            Ok(state) => state.package.into_bytes(),
-            Err(state) => state.package.as_bytes().to_vec(),
-        }
     }
 
     pub(crate) fn paragraphs(&self) -> &[crate::paragraph::Paragraph] {
@@ -441,7 +500,10 @@ impl Snapshot {
                 "OTH package edits refuse signed packages".to_string(),
             ));
         }
-        let mut writer = PackageWriter::new_bounded(MAX_OUTPUT_BYTES);
+        let mut writer = PackageWriter::new_bounded(
+            MAX_OUTPUT_BYTES,
+            litchi_odf_common::core::StreamingArchiveLimits::default(),
+        );
         writer.set_mimetype(MIMETYPE)?;
         writer.add_file("content.xml", content.as_bytes())?;
         for (path, change) in [("meta.xml", metadata), ("styles.xml", styles)] {

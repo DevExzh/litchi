@@ -630,7 +630,10 @@ pub(super) fn bounded_attr(
     Ok(value)
 }
 
-pub(super) fn wrap(prefix: &[u8], fragment: &[u8]) -> Result<Vec<u8>> {
+/// Wrap a captured fragment in a root binding the vocabularies it may use;
+/// `prefix` is the fragment's own element prefix, bound to the core
+/// SpreadsheetML namespace when `core` and to the Office 2010 one otherwise.
+pub(super) fn wrap(prefix: &[u8], fragment: &[u8], core: bool) -> Result<Vec<u8>> {
     if fragment.len() > MAX_FRAGMENT_BYTES {
         return Err(invalid("data-validation fragment is too large"));
     }
@@ -644,7 +647,7 @@ pub(super) fn wrap(prefix: &[u8], fragment: &[u8]) -> Result<Vec<u8>> {
         append_bounded_bytes(&mut out, prefix)?;
         append_bounded_bytes(
             &mut out,
-            if prefix == b"x" {
+            if core || prefix == b"x" {
                 b"=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\""
             } else {
                 b"=\"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main\""

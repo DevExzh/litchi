@@ -40,5 +40,5 @@ fn invalid(message: impl Into<String>) -> Error {
     unreachable_pub,
     reason = "re-exports stage this feature module API"
 )]
-pub use edit::{Commit, Patch, Snapshot, Transaction};
+pub use edit::{Commit, Diagnostics, Edit, Patch, Snapshot};
 pub use model::{WebPageType, WebPub, WebPubRange, WebSourceType};

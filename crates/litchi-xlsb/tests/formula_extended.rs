@@ -26,7 +26,9 @@ fn parses_resident_and_nonresident_ptg_list() {
         0x18, 0x19, 0x02, 0x00, 0x1A, 0x00, 0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x03, 0x00,
     ];
     assert_eq!(
-        Parser::new(&resident).parse().unwrap(),
+        Parser::new(&resident, litchi_xlsb::raw::Limits::DEFAULT)
+            .parse()
+            .unwrap(),
         vec![Token::TableReference(TableReference {
             sheet_index: 2,
             row_type: Some(TableRowType::DataAndHeaders),
@@ -50,7 +52,9 @@ fn parses_resident_and_nonresident_ptg_list() {
         extra.extend((name.encode_utf16().count() as u32).to_le_bytes());
         extra.extend(utf16(name));
     }
-    let parsed = Parser::with_extra(&token, &extra).parse().unwrap();
+    let parsed = Parser::with_extra(&token, &extra, litchi_xlsb::raw::Limits::DEFAULT)
+        .parse()
+        .unwrap();
     assert_eq!(
         parsed,
         vec![Token::TableReference(TableReference {
@@ -72,11 +76,17 @@ fn parses_resident_and_nonresident_ptg_list() {
             }),
         })]
     );
-    let (written_token, written_extra) = parsed[0].to_extended_binary().unwrap();
+    let (written_token, written_extra) = parsed[0]
+        .to_extended_binary(litchi_xlsb::raw::Limits::DEFAULT)
+        .unwrap();
     assert_eq!(
-        Parser::with_extra(&written_token, &written_extra)
-            .parse()
-            .unwrap(),
+        Parser::with_extra(
+            &written_token,
+            &written_extra,
+            litchi_xlsb::raw::Limits::DEFAULT
+        )
+        .parse()
+        .unwrap(),
         parsed
     );
 }
@@ -84,19 +94,32 @@ fn parses_resident_and_nonresident_ptg_list() {
 #[test]
 fn parses_ptg_sx_name_and_rejects_reserved_extended_fields() {
     assert_eq!(
-        Parser::new(&[0x18, 0x1D, 5, 0, 0, 0]).parse().unwrap(),
+        Parser::new(&[0x18, 0x1D, 5, 0, 0, 0], litchi_xlsb::raw::Limits::DEFAULT)
+            .parse()
+            .unwrap(),
         vec![Token::PivotName(5)]
     );
     let pivot = Token::PivotName(5);
-    let (token, extra) = pivot.to_extended_binary().unwrap();
+    let (token, extra) = pivot
+        .to_extended_binary(litchi_xlsb::raw::Limits::DEFAULT)
+        .unwrap();
     assert!(extra.is_empty());
-    assert_eq!(Parser::new(&token).parse().unwrap(), vec![pivot]);
+    assert_eq!(
+        Parser::new(&token, litchi_xlsb::raw::Limits::DEFAULT)
+            .parse()
+            .unwrap(),
+        vec![pivot]
+    );
     for malformed in [
         vec![0x18, 0x20],
         vec![0x18, 0x19, 0, 0, 0, 0x40, 1, 0, 0, 0, 0, 0, 0, 0],
         vec![0x18, 0x19, 0, 0, 3, 0, 1, 0, 0, 0, 0, 0, 0, 0],
     ] {
-        assert!(Parser::new(&malformed).parse().is_err());
+        assert!(
+            Parser::new(&malformed, litchi_xlsb::raw::Limits::DEFAULT)
+                .parse()
+                .is_err()
+        );
     }
 }
 

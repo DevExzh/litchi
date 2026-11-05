@@ -1,0 +1,55 @@
+{
+  "base_commit": "2c4c47512b4e74ff423c2a150e44500bd2661b48",
+  "normalization": "replace migrated identifiers, remove whitespace and rustfmt optional trailing call commas before closing parentheses; compare function bodies excluding signatures and docs",
+  "functions": [
+    {
+      "before": "from_bytes_with_limits",
+      "after": "from_bytes",
+      "file": "crates/litchi-iwa-text-wire/src/lib.rs",
+      "normalized_body_sha256": "ba64ae3b312b9c723e320c3ed62dfbdcedff2da7ddf0877af258df9956ae33fc",
+      "unchanged": true
+    },
+    {
+      "before": "prepare_storage_text_rewrite_with_behavior_and_limits",
+      "after": "prepare_storage_text_rewrite_with_behavior",
+      "file": "crates/litchi-iwa-text-wire/src/rewrite.rs",
+      "normalized_body_sha256": "39092368c6e5d7a3be61159b087a64b3287485706d2ef88dc05c2cfbec7ebe9d",
+      "unchanged": true
+    },
+    {
+      "before": "rewrite_storage_text_with_behavior_and_limits",
+      "after": "rewrite_storage_text_with_behavior",
+      "file": "crates/litchi-iwa-text-wire/src/rewrite.rs",
+      "normalized_body_sha256": "bbce4c1bcd4c1f52c219bb18a9e3f48873666e0b83bfeb6d9a862ccf66a00b81",
+      "unchanged": true
+    },
+    {
+      "before": "rewrite_storage_text_with_limits",
+      "after": "rewrite_storage_text",
+      "file": "crates/litchi-iwa-text-wire/src/rewrite.rs",
+      "normalized_body_sha256": "3497e1a33a5e789f684220ce5762c178a695c6dcb277aea8714bcdc09dbbebbc",
+      "unchanged": true
+    },
+    {
+      "before": "validate_storage_with_limits",
+      "after": "validate_storage",
+      "file": "crates/litchi-iwa-text-wire/src/rewrite.rs",
+      "normalized_body_sha256": "c432e25bdf4f46aa2480cb8520e0716dcc07fba6f09fa898ece9066d7101fd5c",
+      "unchanged": true
+    },
+    {
+      "before": "decode_storage_with_limits",
+      "after": "decode_storage",
+      "file": "crates/litchi-iwa-text-wire/src/rewrite.rs",
+      "normalized_body_sha256": "050279a742b76e5f335089c1152bed6c71a97ff802f66b790a93a2d6db818b84",
+      "unchanged": true
+    },
+    {
+      "before": "storage_boundaries_with_limits",
+      "after": "storage_boundaries",
+      "file": "crates/litchi-iwa-text-wire/src/rewrite.rs",
+      "normalized_body_sha256": "c1da3654b1844e7c0b76a6b67c9586ed75fd9c6aa8889d47e8929f6b2946a845",
+      "unchanged": true
+    }
+  ]
+}

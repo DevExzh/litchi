@@ -1,0 +1,333 @@
+{
+  "format": "odf",
+  "state": "open",
+  "verbs": {
+    "get": {
+      "supported": true
+    },
+    "find": {
+      "supported": true
+    },
+    "query": {
+      "supported": true
+    },
+    "view": {
+      "supported": true
+    },
+    "evaluate": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "none: import and evaluation are worksheet operations",
+      "reason": "this format has no worksheets"
+    },
+    "set": {
+      "supported": true
+    },
+    "add": {
+      "supported": true
+    },
+    "remove": {
+      "supported": true
+    },
+    "move": {
+      "supported": true
+    },
+    "swap": {
+      "supported": true
+    },
+    "edit": {
+      "supported": true
+    },
+    "batch": {
+      "supported": true
+    },
+    "import": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "none: import and evaluation are worksheet operations",
+      "reason": "this format has no worksheets"
+    },
+    "merge": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "template merge for the ODF object formats and iWork (record 0295)",
+      "reason": "template merge fills word-processing, presentation and spreadsheet templates"
+    },
+    "replace": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0295 follow-up: a find adapter over the format's text edits",
+      "reason": "find/replace is not integrated for this format"
+    },
+    "refresh": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0295 follow-up: field refresh for PPT, RTF and the ODF object formats",
+      "reason": "this format has no field refresh adapter"
+    },
+    "save": {
+      "supported": true
+    },
+    "create": {
+      "supported": true
+    },
+    "dump": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0336 follow-up: dump plans for the remaining formats",
+      "reason": "this format's write verbs cannot yet rebuild its node tree on a created document"
+    },
+    "raw": {
+      "supported": true
+    },
+    "validate": {
+      "supported": true
+    },
+    "add-part": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0336 follow-up: raw ODF part writes through the ODF package publisher",
+      "reason": "raw part writes cover OOXML (DOCX, XLSX, PPTX, XLSB)"
+    },
+    "raw-set": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0336 follow-up: raw ODF part writes through the ODF package publisher",
+      "reason": "raw part writes cover OOXML (DOCX, XLSX, PPTX, XLSB)"
+    }
+  },
+  "views": {
+    "text": {
+      "supported": true
+    },
+    "annotated": {
+      "supported": true
+    },
+    "outline": {
+      "supported": true
+    },
+    "stats": {
+      "supported": true
+    },
+    "issues": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    "forms": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    "html": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "svg": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "screenshot": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "pdf": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    }
+  },
+  "elements": [
+    {
+      "format": "odf",
+      "element": "math",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/"
+        ]
+      },
+      "children": [
+        {
+          "element": "element",
+          "pathSegment": "element"
+        }
+      ],
+      "properties": {
+        "starmath": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "starmathVersion": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "elementCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "display": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      }
+    },
+    {
+      "format": "odf",
+      "element": "element",
+      "parent": [
+        "math",
+        "element"
+      ],
+      "elementAliases": [
+        "node"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/element[N]",
+          "/element[N]/element[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "element",
+          "pathSegment": "element"
+        }
+      ],
+      "properties": {
+        "tag": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "mathvariant": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "childCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    }
+  ],
+  "gaps": [
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "element",
+      "context": "a MathML element with attributes other than `mathvariant`, or a subtree",
+      "code": "unsupported_capability",
+      "followUp": "0292 formula subtree authoring",
+      "reason": "`add` creates one element from `tag`, `text` and `mathvariant`; nested subtrees are built by further adds, and other attributes need typed values"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "element",
+      "context": "the `text` of a layout (non-token) element",
+      "code": "unsupported_capability",
+      "followUp": "0282 formula layout text",
+      "reason": "only MathML token elements hold character data"
+    },
+    {
+      "subject": "operation",
+      "verb": "get",
+      "element": "metadata",
+      "context": "path-read",
+      "code": "unsupported_capability",
+      "followUp": "0288 ODF object metadata node",
+      "reason": "`set(\"/metadata\", ..)` writes meta.xml through the ODF metadata family; the path is set-only, and reads go through File::metadata()"
+    },
+    {
+      "subject": "view",
+      "mode": "issues",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "forms",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "html",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "svg",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "screenshot",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "pdf",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    }
+  ]
+}

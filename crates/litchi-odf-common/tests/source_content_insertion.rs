@@ -355,7 +355,12 @@ fn xml_limits() -> XmlStreamLimits {
 fn raw_members(bytes: &[u8]) -> BTreeMap<Vec<u8>, RawMember> {
     let archive = ZipArchive::from_slice(bytes).unwrap().into_zip_archive();
     let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+    let index = PreservationIndex::new(
+        &archive,
+        &mut buffer,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
     index
         .entries()
         .iter()
@@ -472,7 +477,7 @@ fn invalid_offset_token_and_document_are_rejected_before_publication() {
     assert!(matches!(
         error,
         SourceContentPublicationError::Core(Error::InvalidFormat(reason))
-            if reason.contains("offset")
+            if reason == "content.xml replacement range exceeds decoded source length"
     ));
 
     let tiny_tokens =

@@ -1,0 +1,10 @@
+start 02:25:35 load 6.02
+               doc/merge       3988.0 µs
+leg 1 before 02:25:36 load 5.94
+               doc/merge       3790.1 µs
+leg 2 after 02:25:38 load 5.94
+               doc/merge       3796.2 µs
+leg 3 after 02:25:39 load 5.94
+               doc/merge       3775.8 µs
+leg 4 before 02:25:41 load 5.78
+done

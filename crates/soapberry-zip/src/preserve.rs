@@ -16,6 +16,7 @@ use crate::{
     accounting::{AccountingWriteKind, ZipOperationAccounting, usize_to_u64, write_all_counted},
     extra_fields::{ExtraFieldId, ExtraFields},
 };
+use std::fmt;
 use std::io::Write;
 use std::mem::size_of;
 use std::num::NonZeroUsize;
@@ -45,6 +46,205 @@ const ZIP64_LOCATOR_SIGNATURE: u32 = 0x0706_4b50;
 /// callers. They remain valid for the lifetime of their index.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct PreservationEntryId(u32);
+
+/// A policy failure while preparing a preservation output.
+///
+/// The archive and caller failures remain typed and are available through the
+/// accessors below.  Formatting is deliberately content-free: a caller's
+/// diagnostic cannot become part of a stable ZIP error message or debug log.
+pub enum PreservationAdmissionError<E> {
+    /// The source archive or the prepared output layout was rejected.
+    Archive(Error),
+    /// The caller's recipient policy rejected the prepared output.
+    Admission(E),
+}
+
+impl<E> PreservationAdmissionError<E> {
+    /// Return the archive failure, when the archive could not be prepared.
+    #[must_use]
+    pub fn archive(&self) -> Option<&Error> {
+        match self {
+            Self::Archive(error) => Some(error),
+            Self::Admission(_) => None,
+        }
+    }
+
+    /// Return the caller's policy failure, when admission was rejected.
+    #[must_use]
+    pub fn admission(&self) -> Option<&E> {
+        match self {
+            Self::Archive(_) => None,
+            Self::Admission(error) => Some(error),
+        }
+    }
+}
+
+impl<E> fmt::Debug for PreservationAdmissionError<E> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::Archive(_) => "PreservationAdmissionError::Archive",
+            Self::Admission(_) => "PreservationAdmissionError::Admission",
+        })
+    }
+}
+
+impl<E> fmt::Display for PreservationAdmissionError<E> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::Archive(_) => "preservation archive preparation failed",
+            Self::Admission(_) => "preservation output admission failed",
+        })
+    }
+}
+
+impl<E: std::error::Error + 'static> std::error::Error for PreservationAdmissionError<E> {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Archive(error) => Some(error),
+            Self::Admission(error) => Some(error),
+        }
+    }
+}
+
+/// Final per-member facts available to a preservation recipient policy.
+///
+/// All lengths and sizes describe the bytes that the writer will publish,
+/// including any ZIP64 central-record promotion.  The value contains no
+/// member payload or archive bytes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PreservationOutputEntry {
+    raw_name_len: u64,
+    extra_len: u64,
+    comment_len: u64,
+    metadata_len: u64,
+    central_record_len: u64,
+    compressed_size: u64,
+    uncompressed_size: u64,
+}
+
+impl PreservationOutputEntry {
+    /// Length of the raw central-directory member name.
+    #[must_use]
+    pub const fn raw_name_len(self) -> u64 {
+        self.raw_name_len
+    }
+
+    /// Length of the final central-directory extra-field region.
+    #[must_use]
+    pub const fn extra_len(self) -> u64 {
+        self.extra_len
+    }
+
+    /// Length of the final central-directory file-comment region.
+    #[must_use]
+    pub const fn comment_len(self) -> u64 {
+        self.comment_len
+    }
+
+    /// Length of all variable central-directory metadata, including the raw
+    /// name, extra fields and file comment.
+    #[must_use]
+    pub const fn metadata_len(self) -> u64 {
+        self.metadata_len
+    }
+
+    /// Length of the final central-directory record, including its fixed
+    /// header and variable metadata.
+    #[must_use]
+    pub const fn central_record_len(self) -> u64 {
+        self.central_record_len
+    }
+
+    /// Final compressed payload size declared by the central record.
+    #[must_use]
+    pub const fn compressed_size(self) -> u64 {
+        self.compressed_size
+    }
+
+    /// Final decoded payload size declared by the central record.
+    #[must_use]
+    pub const fn uncompressed_size(self) -> u64 {
+        self.uncompressed_size
+    }
+}
+
+/// Borrowed final layout facts for a preservation recipient policy.
+///
+/// The profile is created only by an admission-enabled write.  It borrows the
+/// small metrics retained by the prepared layout and never owns compressed,
+/// local-record or complete-archive bytes.
+#[derive(Debug)]
+pub struct PreservationOutputProfile<'a> {
+    entries: &'a [PreservationOutputEntry],
+    prefix_bytes: u64,
+    entry_count: u64,
+    local_bytes: u64,
+    central_directory_bytes: u64,
+    central_metadata_bytes: u64,
+    tail_bytes: u64,
+    archive_comment_bytes: u64,
+    archive_bytes: u64,
+}
+
+impl<'a> PreservationOutputProfile<'a> {
+    /// Bytes before the first local member in the published archive.
+    ///
+    /// Preservation indexes reject source prelude bytes, so this is currently
+    /// always zero. It is exposed explicitly so recipient policies account for
+    /// the complete archive geometry rather than silently assuming a prefix.
+    #[must_use]
+    pub const fn prefix_bytes(&self) -> u64 {
+        self.prefix_bytes
+    }
+
+    /// Number of retained entries in the final archive.
+    #[must_use]
+    pub const fn entry_count(&self) -> u64 {
+        self.entry_count
+    }
+
+    /// Final local-member bytes, including local framing and payload bytes.
+    #[must_use]
+    pub const fn local_bytes(&self) -> u64 {
+        self.local_bytes
+    }
+
+    /// Final central-directory bytes, including promoted records.
+    #[must_use]
+    pub const fn central_directory_bytes(&self) -> u64 {
+        self.central_directory_bytes
+    }
+
+    /// Total variable central-directory metadata bytes.
+    #[must_use]
+    pub const fn central_metadata_bytes(&self) -> u64 {
+        self.central_metadata_bytes
+    }
+
+    /// Final ZIP tail bytes, including ZIP64 EOCD and locator when present.
+    #[must_use]
+    pub const fn tail_bytes(&self) -> u64 {
+        self.tail_bytes
+    }
+
+    /// Final archive-comment bytes.
+    #[must_use]
+    pub const fn archive_comment_bytes(&self) -> u64 {
+        self.archive_comment_bytes
+    }
+
+    /// Exact final archive length, including all framing and the comment.
+    #[must_use]
+    pub const fn archive_bytes(&self) -> u64 {
+        self.archive_bytes
+    }
+
+    /// Final per-entry metrics in central-directory order.
+    #[must_use]
+    pub fn entries(&self) -> &'a [PreservationOutputEntry] {
+        self.entries
+    }
+}
 
 /// A validated source member available to a preservation plan.
 #[derive(Debug, Clone)]
@@ -327,7 +527,7 @@ fn plan_deflate_tasks(plan: &PreservationPlan) -> impl Iterator<Item = &Regenera
             PreservationAction::Regenerate { entry, .. } => Some(entry),
             PreservationAction::Copy(_) | PreservationAction::Omit(_) => None,
         })
-        .chain(plan.appended.iter())
+        .chain(plan.appended.iter().map(Arc::as_ref))
         .filter(|entry| deflate_task_len(entry).is_some())
 }
 
@@ -342,7 +542,7 @@ fn plan_deflate_tasks(plan: &PreservationPlan) -> impl Iterator<Item = &Regenera
 #[derive(Debug, Clone, Default)]
 pub struct PreservationPlan {
     actions: Vec<PreservationAction>,
-    appended: Vec<RegeneratedEntry>,
+    appended: Vec<Arc<RegeneratedEntry>>,
 }
 
 impl PreservationPlan {
@@ -397,6 +597,19 @@ impl PreservationPlan {
         entry: RegeneratedEntry,
     ) -> Result<(), std::collections::TryReserveError> {
         self.appended.try_reserve(1)?;
+        self.appended.push(Arc::new(entry));
+        Ok(())
+    }
+
+    /// Append a retained immutable member without cloning its name or payload.
+    ///
+    /// Only the handle vector grows; the caller may reuse the same entry in
+    /// another plan after success or publication failure.
+    pub fn try_append_shared(
+        &mut self,
+        entry: Arc<RegeneratedEntry>,
+    ) -> Result<(), std::collections::TryReserveError> {
+        self.appended.try_reserve(1)?;
         self.appended.push(entry);
         Ok(())
     }
@@ -406,7 +619,7 @@ impl PreservationPlan {
     }
 
     /// Generated members in their requested append order.
-    pub fn appended(&self) -> &[RegeneratedEntry] {
+    pub fn appended(&self) -> &[Arc<RegeneratedEntry>] {
         &self.appended
     }
 
@@ -544,23 +757,13 @@ impl<'source, R> PreservationIndex<'source, R>
 where
     R: ReaderAt,
 {
-    /// Builds a preservation index without reading member bodies.
+    /// Builds a preservation index under explicit archive metadata limits
+    /// without reading member bodies.
     ///
     /// Multi-disk, prefixed, ambiguous, overlapping, and truncated layouts are
     /// rejected with [`ErrorKind::UnsupportedPreservation`] before a caller
     /// can begin writing a plan. ZIP64 framing is retained when the source
     /// passes the same single-disk and field-resolution checks as ZIP32.
-    pub fn new(archive: &'source ZipArchive<R>, buffer: &mut [u8]) -> Result<Self, Error> {
-        Self::new_with_limits_and_policy(
-            archive,
-            buffer,
-            ArchiveLimits::default(),
-            PreservationPolicy::AllowZip64,
-        )
-    }
-
-    /// Builds a preservation index under explicit archive metadata limits.
-    ///
     /// Preservation retains every source central-directory record verbatim,
     /// including records for directory members and the EOCD comment. The
     /// archive profile's `max_files` bounds non-directory source members;
@@ -570,12 +773,12 @@ where
     /// in a metadata-only pass before any owned entry or raw-record buffers are
     /// reserved. ZIP64 framing and extensible tail data are retained when the
     /// source passes the same structural checks as ZIP32.
-    pub fn new_with_limits(
+    pub fn new(
         archive: &'source ZipArchive<R>,
         buffer: &mut [u8],
         limits: ArchiveLimits,
     ) -> Result<Self, Error> {
-        Self::new_with_limits_and_policy(archive, buffer, limits, PreservationPolicy::AllowZip64)
+        Self::new_with_policy(archive, buffer, limits, PreservationPolicy::AllowZip64)
     }
 
     /// Builds the internal ZIP64 preservation foundation under explicit
@@ -584,14 +787,6 @@ where
     /// exercise the narrower ZIP32 policy explicitly.
     #[allow(dead_code)]
     pub(crate) fn new_with_policy(
-        archive: &'source ZipArchive<R>,
-        buffer: &mut [u8],
-        policy: PreservationPolicy,
-    ) -> Result<Self, Error> {
-        Self::new_with_limits_and_policy(archive, buffer, ArchiveLimits::default(), policy)
-    }
-
-    pub(crate) fn new_with_limits_and_policy(
         archive: &'source ZipArchive<R>,
         buffer: &mut [u8],
         limits: ArchiveLimits,
@@ -926,6 +1121,97 @@ where
         self.write_prepared(plan, sink, accounting, None)
     }
 
+    /// Validate a preservation plan, admit its exact final layout, then write
+    /// it to a non-seekable sink. The admission callback runs after all
+    /// compression, ZIP64 promotion and tail preparation, and before the
+    /// first sink byte is accepted.
+    pub fn write_to_with_admission<W, F, E>(
+        &self,
+        plan: &PreservationPlan,
+        sink: W,
+        admission: F,
+    ) -> Result<W, PreservationAdmissionError<E>>
+    where
+        W: Write,
+        F: FnOnce(&PreservationOutputProfile<'_>) -> Result<(), E>,
+    {
+        let mut accounting = ZipOperationAccounting::default();
+        self.write_to_with_admission_and_accounting(plan, sink, &mut accounting, admission)
+    }
+
+    /// [`write_to_with_admission`](Self::write_to_with_admission) while
+    /// recording accepted source bytes in the supplied accounting value.
+    pub fn write_to_with_admission_and_accounting<W, F, E>(
+        &self,
+        plan: &PreservationPlan,
+        sink: W,
+        accounting: &mut ZipOperationAccounting,
+        admission: F,
+    ) -> Result<W, PreservationAdmissionError<E>>
+    where
+        W: Write,
+        F: FnOnce(&PreservationOutputProfile<'_>) -> Result<(), E>,
+    {
+        self.write_prepared_with_admission(plan, sink, accounting, None, admission)
+    }
+
+    /// Admit the exact final layout of a scheduled preservation write before
+    /// publication. Compression scheduling and the bounded worker session are
+    /// retained; admission is the only additional pre-publication phase.
+    pub fn write_to_with_admission_and_session<W, F, E>(
+        &self,
+        plan: &PreservationPlan,
+        sink: W,
+        session: &ParallelWriteSession,
+        wave: DeflateWave,
+        cancellation: &dyn CancellationProbe,
+        admission: F,
+    ) -> Result<W, PreservationAdmissionError<E>>
+    where
+        W: Write,
+        F: FnOnce(&PreservationOutputProfile<'_>) -> Result<(), E>,
+    {
+        let mut accounting = ZipOperationAccounting::default();
+        self.write_to_with_admission_and_accounting_and_session(
+            plan,
+            sink,
+            &mut accounting,
+            session,
+            wave,
+            cancellation,
+            admission,
+        )
+    }
+
+    /// [`write_to_with_admission_and_session`](Self::write_to_with_admission_and_session)
+    /// while recording accepted source bytes.
+    pub fn write_to_with_admission_and_accounting_and_session<W, F, E>(
+        &self,
+        plan: &PreservationPlan,
+        sink: W,
+        accounting: &mut ZipOperationAccounting,
+        session: &ParallelWriteSession,
+        wave: DeflateWave,
+        cancellation: &dyn CancellationProbe,
+        admission: F,
+    ) -> Result<W, PreservationAdmissionError<E>>
+    where
+        W: Write,
+        F: FnOnce(&PreservationOutputProfile<'_>) -> Result<(), E>,
+    {
+        self.write_prepared_with_admission(
+            plan,
+            sink,
+            accounting,
+            Some(ScheduledWave {
+                session,
+                wave,
+                cancellation,
+            }),
+            admission,
+        )
+    }
+
     /// Validates `plan` completely, then writes it to a non-seekable sink,
     /// compressing its regenerated members on an explicit write session.
     ///
@@ -1006,7 +1292,7 @@ where
     fn write_prepared<W>(
         &self,
         plan: &PreservationPlan,
-        mut sink: W,
+        sink: W,
         accounting: &mut ZipOperationAccounting,
         scheduled: Option<ScheduledWave<'_>>,
     ) -> Result<W, Error>
@@ -1016,6 +1302,44 @@ where
         let mut prepared = self.prepare_with(plan, scheduled)?;
         let layout = self.validate_output_layout(&mut prepared)?;
 
+        self.emit_prepared(prepared, layout, sink, accounting)
+    }
+
+    fn write_prepared_with_admission<W, F, E>(
+        &self,
+        plan: &PreservationPlan,
+        sink: W,
+        accounting: &mut ZipOperationAccounting,
+        scheduled: Option<ScheduledWave<'_>>,
+        admission: F,
+    ) -> Result<W, PreservationAdmissionError<E>>
+    where
+        W: Write,
+        F: FnOnce(&PreservationOutputProfile<'_>) -> Result<(), E>,
+    {
+        let mut prepared = self
+            .prepare_with(plan, scheduled)
+            .map_err(PreservationAdmissionError::Archive)?;
+        let layout = self
+            .validate_output_layout(&mut prepared)
+            .map_err(PreservationAdmissionError::Archive)?;
+        let profile = build_output_profile(&prepared, &layout, &self.entries)
+            .map_err(PreservationAdmissionError::Archive)?;
+        admission(&profile.view()).map_err(PreservationAdmissionError::Admission)?;
+        self.emit_prepared(prepared, layout, sink, accounting)
+            .map_err(PreservationAdmissionError::Archive)
+    }
+
+    fn emit_prepared<W>(
+        &self,
+        prepared: Vec<PreparedEntry>,
+        layout: OutputLayout,
+        mut sink: W,
+        accounting: &mut ZipOperationAccounting,
+    ) -> Result<W, Error>
+    where
+        W: Write,
+    {
         let mut copy_buffer = [0u8; COPY_CHUNK_SIZE];
         for &index in &self.local_order {
             if prepared[index].omitted {
@@ -1425,6 +1749,11 @@ where
             central_patches,
             tail,
             output_size,
+            entry_count,
+            local_bytes: local_size,
+            central_directory_bytes: central_size,
+            tail_bytes: tail_size,
+            archive_comment_bytes: archive_comment_len,
         })
     }
 }
@@ -1456,6 +1785,155 @@ struct OutputLayout {
     central_patches: Vec<CentralOffsetPatch>,
     tail: PreparedTail,
     output_size: u64,
+    entry_count: u64,
+    local_bytes: u64,
+    central_directory_bytes: u64,
+    tail_bytes: u64,
+    archive_comment_bytes: u64,
+}
+
+struct PreparedOutputProfile {
+    entries: Vec<PreservationOutputEntry>,
+    prefix_bytes: u64,
+    entry_count: u64,
+    local_bytes: u64,
+    central_directory_bytes: u64,
+    central_metadata_bytes: u64,
+    tail_bytes: u64,
+    archive_comment_bytes: u64,
+    archive_bytes: u64,
+}
+
+impl PreparedOutputProfile {
+    fn view(&self) -> PreservationOutputProfile<'_> {
+        PreservationOutputProfile {
+            entries: &self.entries,
+            prefix_bytes: self.prefix_bytes,
+            entry_count: self.entry_count,
+            local_bytes: self.local_bytes,
+            central_directory_bytes: self.central_directory_bytes,
+            central_metadata_bytes: self.central_metadata_bytes,
+            tail_bytes: self.tail_bytes,
+            archive_comment_bytes: self.archive_comment_bytes,
+            archive_bytes: self.archive_bytes,
+        }
+    }
+}
+
+fn central_entry_sizes(central: &[u8]) -> Result<(u64, u64), Error> {
+    let fixed = ZipFileHeaderFixed::parse(central)?;
+    let name_end = ZipFileHeaderFixed::SIZE
+        .checked_add(usize::from(fixed.file_name_len))
+        .ok_or_else(|| unsupported("central-directory metadata range"))?;
+    let extra_end = name_end
+        .checked_add(usize::from(fixed.extra_field_len))
+        .ok_or_else(|| unsupported("central-directory metadata range"))?;
+    let record_end = extra_end
+        .checked_add(usize::from(fixed.file_comment_len))
+        .ok_or_else(|| unsupported("central-directory metadata range"))?;
+    if record_end != central.len() {
+        return Err(unsupported("central-directory record length"));
+    }
+    let extra = &central[name_end..extra_end];
+    let mut compressed = (
+        u64::from(fixed.compressed_size),
+        fixed.compressed_size == u32::MAX,
+    );
+    let mut uncompressed = (
+        u64::from(fixed.uncompressed_size),
+        fixed.uncompressed_size == u32::MAX,
+    );
+    if !compressed.1 && !uncompressed.1 {
+        return Ok((compressed.0, uncompressed.0));
+    }
+
+    let mut fields = ExtraFields::new(extra);
+    while !fields.remaining_bytes().is_empty() {
+        let Some((field_id, field_data)) = fields.next() else {
+            return Err(unsupported("malformed central extra fields"));
+        };
+        if field_id != ExtraFieldId::ZIP64 {
+            continue;
+        }
+        let mut cursor = 0usize;
+        let read_u64 = |cursor: &mut usize| -> Result<u64, Error> {
+            let end = cursor
+                .checked_add(8)
+                .ok_or_else(|| unsupported("ZIP64 size field"))?;
+            let bytes = field_data
+                .get(*cursor..end)
+                .ok_or_else(|| unsupported("truncated ZIP64 size field"))?;
+            *cursor = end;
+            Ok(u64::from_le_bytes(
+                bytes
+                    .try_into()
+                    .map_err(|_| unsupported("ZIP64 size field"))?,
+            ))
+        };
+        if uncompressed.1 {
+            uncompressed.0 = read_u64(&mut cursor)?;
+            uncompressed.1 = false;
+        }
+        if compressed.1 {
+            compressed.0 = read_u64(&mut cursor)?;
+            compressed.1 = false;
+        }
+        break;
+    }
+    if compressed.1 || uncompressed.1 {
+        return Err(unsupported("missing ZIP64 size fields"));
+    }
+    Ok((compressed.0, uncompressed.0))
+}
+
+fn build_output_profile(
+    prepared: &[PreparedEntry],
+    layout: &OutputLayout,
+    source_entries: &[PreservedEntry],
+) -> Result<PreparedOutputProfile, Error> {
+    let mut entries = Vec::new();
+    entries
+        .try_reserve_exact(
+            usize::try_from(layout.entry_count)
+                .map_err(|_| unsupported("preservation output entry count"))?,
+        )
+        .map_err(|source| allocation("preservation output profile", source))?;
+    let mut metadata_total = 0_u64;
+    for entry in prepared.iter().filter(|entry| !entry.omitted) {
+        let central = entry.central.checked_bytes(source_entries)?;
+        let fixed = ZipFileHeaderFixed::parse(central)?;
+        let metadata_len = u64::from(fixed.file_name_len)
+            .checked_add(u64::from(fixed.extra_field_len))
+            .and_then(|size| size.checked_add(u64::from(fixed.file_comment_len)))
+            .ok_or_else(|| unsupported("central-directory metadata length"))?;
+        metadata_total = metadata_total
+            .checked_add(metadata_len)
+            .ok_or_else(|| unsupported("central-directory metadata length"))?;
+        let (compressed_size, uncompressed_size) = central_entry_sizes(central)?;
+        entries.push(PreservationOutputEntry {
+            raw_name_len: u64::from(fixed.file_name_len),
+            extra_len: u64::from(fixed.extra_field_len),
+            comment_len: u64::from(fixed.file_comment_len),
+            metadata_len,
+            central_record_len: usize_to_u64(central.len(), "central-directory record length")?,
+            compressed_size,
+            uncompressed_size,
+        });
+    }
+    if usize_to_u64(entries.len(), "preservation output entry count")? != layout.entry_count {
+        return Err(unsupported("preservation output profile mismatch"));
+    }
+    Ok(PreparedOutputProfile {
+        entries,
+        prefix_bytes: 0,
+        entry_count: layout.entry_count,
+        local_bytes: layout.local_bytes,
+        central_directory_bytes: layout.central_directory_bytes,
+        central_metadata_bytes: metadata_total,
+        tail_bytes: layout.tail_bytes,
+        archive_comment_bytes: layout.archive_comment_bytes,
+        archive_bytes: layout.output_size,
+    })
 }
 
 fn write_prepared_central<W: Write>(
@@ -2679,10 +3157,7 @@ fn validate_local_span<R: ReaderAt>(
 
 fn map_local_layout_error(error: Error) -> Error {
     match error.kind() {
-        ErrorKind::Allocation { .. }
-        | ErrorKind::IO(_)
-        | ErrorKind::Io(_)
-        | ErrorKind::LimitExceeded { .. } => error,
+        ErrorKind::Allocation { .. } | ErrorKind::IO(_) | ErrorKind::LimitExceeded { .. } => error,
         _ => unsupported("invalid local member framing"),
     }
 }
@@ -3029,7 +3504,7 @@ fn allocation(resource: &'static str, source: std::collections::TryReserveError)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::office::DEFAULT_MIN_PARALLELIZABLE_BYTES;
+    use crate::office::{DEFAULT_MIN_PARALLELIZABLE_BYTES, StreamingArchiveLimits};
     use flate2::{Compression, write::DeflateEncoder};
     use std::{
         cell::RefCell,
@@ -3224,7 +3699,8 @@ mod tests {
     fn a_scheduled_wave_publishes_the_sequential_bytes_at_every_width() {
         let data = deflate_member_archive(24, 6 * 1024);
         let (archive, mut buffer) = indexed(&data);
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
         let plan = regenerate_all(&index, 6 * 1024);
         let sequential = index.write_to(&plan, Vec::new()).unwrap();
 
@@ -3250,7 +3726,8 @@ mod tests {
     fn a_scheduled_wave_is_deterministic_across_repeated_publications() {
         let data = deflate_member_archive(16, 9 * 1024);
         let (archive, mut buffer) = indexed(&data);
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
         let plan = regenerate_all(&index, 9 * 1024);
         let limits = scheduled_limits(8);
         let session = ParallelWriteSession::new(limits);
@@ -3271,7 +3748,8 @@ mod tests {
     fn a_caller_facility_replaces_the_local_pool_and_keeps_the_bytes() {
         let data = deflate_member_archive(12, 5 * 1024);
         let (archive, mut buffer) = indexed(&data);
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
         let plan = regenerate_all(&index, 5 * 1024);
         let sequential = index.write_to(&plan, Vec::new()).unwrap();
 
@@ -3294,7 +3772,8 @@ mod tests {
     fn a_cold_session_admits_a_wave_only_from_the_larger_remainder() {
         let data = deflate_member_archive(16, 2 * 1024);
         let (archive, mut buffer) = indexed(&data);
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
         let plan = regenerate_all(&index, 2 * 1024);
         let limits = scheduled_limits(4);
         // 15 * 2 KiB of remainder clears the warm threshold and not the pool one.
@@ -3311,7 +3790,9 @@ mod tests {
         // Once a pool exists, the session is warm and admits the same wave.
         let wide = deflate_member_archive(40, 4 * 1024);
         let (wide_archive, mut wide_buffer) = indexed(&wide);
-        let wide_index = PreservationIndex::new(&wide_archive, &mut wide_buffer).unwrap();
+        let wide_index =
+            PreservationIndex::new(&wide_archive, &mut wide_buffer, ArchiveLimits::default())
+                .unwrap();
         let wide_plan = regenerate_all(&wide_index, 4 * 1024);
         assert!(cold.wave_for(&wide_plan).is_parallel());
         wide_index
@@ -3331,7 +3812,8 @@ mod tests {
     fn the_balance_rule_keeps_a_single_dominant_member_serial() {
         let data = deflate_member_archive(2, 1024);
         let (archive, mut buffer) = indexed(&data);
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
         let mut plan = PreservationPlan::copy_all(&index);
         plan.actions[0] = PreservationAction::Regenerate {
             id: index.entries()[0].id(),
@@ -3355,7 +3837,8 @@ mod tests {
     fn the_balance_rule_admits_many_small_members_and_narrows_by_the_task_floor() {
         let data = deflate_member_archive(40, 871);
         let (archive, mut buffer) = indexed(&data);
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
         let plan = regenerate_all(&index, 871);
 
         let wave = plan.deflate_wave(scheduled_limits(8));
@@ -3380,7 +3863,8 @@ mod tests {
     fn stored_and_precompressed_members_are_never_compression_tasks() {
         let data = deflate_member_archive(3, 2048);
         let (archive, mut buffer) = indexed(&data);
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
         let mut plan = PreservationPlan::copy_all(&index);
         plan.actions[0] = PreservationAction::Regenerate {
             id: index.entries()[0].id(),
@@ -3402,7 +3886,8 @@ mod tests {
     fn a_scheduled_wave_returns_the_sequential_error_in_plan_order() {
         let data = deflate_member_archive(6, 4 * 1024);
         let (archive, mut buffer) = indexed(&data);
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
         let mut plan = regenerate_all(&index, 4 * 1024);
         // Two members that the writer refuses, so the error returned is the
         // one earliest in plan order rather than the one that failed first.
@@ -3436,7 +3921,8 @@ mod tests {
     fn a_cancelled_wave_publishes_nothing() {
         let data = deflate_member_archive(12, 8 * 1024);
         let (archive, mut buffer) = indexed(&data);
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
         let plan = regenerate_all(&index, 8 * 1024);
         let limits = scheduled_limits(4);
         let session = ParallelWriteSession::new(limits);
@@ -3465,7 +3951,8 @@ mod tests {
         data[central..eocd].copy_from_slice(&[rest, first].concat());
 
         let (archive, mut buffer) = indexed(&data);
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
         let plan = regenerate_all(&index, 3 * 1024);
         let sequential = index.write_to(&plan, Vec::new()).unwrap();
         let limits = scheduled_limits(4);
@@ -3482,7 +3969,8 @@ mod tests {
     fn an_appended_member_is_scheduled_with_the_regenerated_ones() {
         let data = deflate_member_archive(6, 5 * 1024);
         let (archive, mut buffer) = indexed(&data);
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
         let mut plan = regenerate_all(&index, 5 * 1024);
         plan.try_append(
             RegeneratedEntry::new("appended.xml", payload(99, 5 * 1024))
@@ -3498,7 +3986,8 @@ mod tests {
             .write_to_with_session(&plan, Vec::new(), &session, wave, &NeverCancelled)
             .unwrap();
         assert_eq!(scheduled, sequential);
-        let reader = crate::office::ArchiveReader::new(&scheduled).unwrap();
+        let reader =
+            crate::office::ArchiveReader::new(&scheduled, ArchiveLimits::default()).unwrap();
         assert_eq!(reader.read("appended.xml").unwrap(), payload(99, 5 * 1024));
     }
 
@@ -3506,7 +3995,8 @@ mod tests {
         method: CompressionMethod,
         payload: &[u8],
     ) -> crate::office::VerifiedPrecompressedEntry {
-        let mut writer = crate::office::StreamingArchiveWriter::new();
+        let mut writer =
+            crate::office::StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         match method {
             CompressionMethod::Store => writer.write_stored("source.bin", payload).unwrap(),
             CompressionMethod::Deflate => writer.write_deflated("source.bin", payload).unwrap(),
@@ -3514,9 +4004,12 @@ mod tests {
         }
         let source_bytes = writer.finish_to_bytes().unwrap();
         let source_len = source_bytes.len() as u64;
-        let source =
-            crate::office::IndexedArchive::from_reader(Cursor::new(source_bytes), source_len)
-                .unwrap();
+        let source = crate::office::IndexedArchive::from_reader(
+            Cursor::new(source_bytes),
+            source_len,
+            ArchiveLimits::default(),
+        )
+        .unwrap();
         let source_id = source.entry_id("source.bin").unwrap();
         source
             .read_entry_precompressed_with_progress(source_id, payload, |_| Ok::<(), io::Error>(()))
@@ -3776,11 +4269,21 @@ mod tests {
         let archive = ZipArchive::from_slice(&data).unwrap();
         let central = usize::try_from(archive.directory_offset()).unwrap();
         let eocd = usize::try_from(archive.eocd_offset()).unwrap();
-        data[central + 32..central + 34].copy_from_slice(&(comment.len() as u16).to_le_bytes());
+        let fixed = ZipFileHeaderFixed::parse(&data[central..]).unwrap();
+        let first_record_len = ZipFileHeaderFixed::SIZE + fixed.variable_length();
+        let comment_len = usize::from(fixed.file_comment_len)
+            .checked_add(comment.len())
+            .expect("file comment length must fit usize");
+        data[central + 32..central + 34]
+            .copy_from_slice(&(u16::try_from(comment_len).unwrap()).to_le_bytes());
         let central_size = u32::from_le_bytes(data[eocd + 12..eocd + 16].try_into().unwrap());
-        data[eocd + 12..eocd + 16]
+        data.splice(
+            central + first_record_len..central + first_record_len,
+            comment.iter().copied(),
+        );
+        let new_eocd = eocd + comment.len();
+        data[new_eocd + 12..new_eocd + 16]
             .copy_from_slice(&(central_size + comment.len() as u32).to_le_bytes());
-        data.splice(eocd..eocd, comment.iter().copied());
         data
     }
 
@@ -4012,12 +4515,85 @@ mod tests {
     fn copies_store_deflate_descriptor_and_directory_members_byte_for_byte() {
         let data = ordinary_archive();
         let (archive, mut buffer) = indexed(&data);
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
         let output = index
             .write_to(&PreservationPlan::copy_all(&index), Vec::new())
             .unwrap();
 
         assert_eq!(output, data);
+    }
+
+    #[test]
+    fn admission_profile_is_exact_and_rejection_writes_zero_bytes() {
+        let data = ordinary_archive();
+        let (archive, mut buffer) = indexed(&data);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+        let plan = PreservationPlan::copy_all(&index);
+        let mut observed = None;
+        let output = index
+            .write_to_with_admission(&plan, Vec::new(), |profile| {
+                observed = Some((
+                    profile.prefix_bytes(),
+                    profile.entry_count(),
+                    profile.local_bytes(),
+                    profile.central_directory_bytes(),
+                    profile.central_metadata_bytes(),
+                    profile.tail_bytes(),
+                    profile.archive_comment_bytes(),
+                    profile.archive_bytes(),
+                    profile.entries().to_vec(),
+                ));
+                Ok::<(), io::Error>(())
+            })
+            .unwrap();
+        let (
+            prefix,
+            entry_count,
+            local_bytes,
+            central_bytes,
+            metadata_bytes,
+            tail_bytes,
+            comment_bytes,
+            archive_bytes,
+            entries,
+        ) = observed.expect("admission callback must run");
+        assert_eq!(prefix, 0);
+        assert_eq!(entry_count, entries.len() as u64);
+        assert_eq!(archive_bytes, output.len() as u64);
+        assert_eq!(
+            archive_bytes,
+            local_bytes + central_bytes + tail_bytes + comment_bytes
+        );
+        assert_eq!(
+            metadata_bytes,
+            entries.iter().map(|entry| entry.metadata_len()).sum()
+        );
+        assert!(entries.iter().all(|entry| {
+            entry.metadata_len() == entry.raw_name_len() + entry.extra_len() + entry.comment_len()
+        }));
+
+        let mut sink = Vec::new();
+        let one_under = archive_bytes
+            .checked_sub(1)
+            .expect("ordinary archive is non-empty");
+        let error = index
+            .write_to_with_admission(&plan, &mut sink, |profile| {
+                assert!(profile.archive_bytes() > one_under);
+                Err::<(), _>(io::Error::new(
+                    io::ErrorKind::PermissionDenied,
+                    "secret policy",
+                ))
+            })
+            .expect_err("one-under admission must refuse");
+        assert!(sink.is_empty(), "admission runs before the first sink byte");
+        assert!(matches!(error, PreservationAdmissionError::Admission(_)));
+        assert_eq!(error.to_string(), "preservation output admission failed");
+        assert_eq!(
+            format!("{error:?}"),
+            "PreservationAdmissionError::Admission"
+        );
     }
 
     #[test]
@@ -4027,7 +4603,7 @@ mod tests {
         let mut limits = ArchiveLimits::UNBOUNDED;
         limits.max_files = 2;
 
-        let index = PreservationIndex::new_with_limits(&archive, &mut buffer, limits).unwrap();
+        let index = PreservationIndex::new(&archive, &mut buffer, limits).unwrap();
         assert_eq!(index.entries().len(), 3);
         assert_eq!(
             index
@@ -4045,7 +4621,7 @@ mod tests {
         let (archive, mut buffer) = indexed(&data);
         let mut limits = ArchiveLimits::UNBOUNDED;
         limits.max_member_name_bytes = b"payload.bi".len() as u64;
-        let error = match PreservationIndex::new_with_limits(&archive, &mut buffer, limits) {
+        let error = match PreservationIndex::new(&archive, &mut buffer, limits) {
             Ok(_) => panic!("member-name limit should reject the source"),
             Err(error) => error,
         };
@@ -4061,7 +4637,7 @@ mod tests {
         let mut limits = ArchiveLimits::UNBOUNDED;
         limits.max_metadata_bytes = metadata_bytes - 1;
         let (archive, mut buffer) = indexed(&data);
-        let error = match PreservationIndex::new_with_limits(&archive, &mut buffer, limits) {
+        let error = match PreservationIndex::new(&archive, &mut buffer, limits) {
             Ok(_) => panic!("metadata limit should reject the source"),
             Err(error) => error,
         };
@@ -4073,6 +4649,59 @@ mod tests {
                 maximum,
             } if *actual == metadata_bytes && *maximum == metadata_bytes - 1
         ));
+    }
+
+    #[test]
+    fn preservation_index_spills_records_larger_than_stack_workspace() {
+        for extra_len in [4 * 1024 + 32, 65_530] {
+            let extra = vec![0x5a; extra_len];
+            let data = stored_archive_with_metadata("payload.bin", &extra);
+            let metadata_bytes = central_metadata_bytes(&data);
+            assert!(metadata_bytes > 4 * 1024);
+            if extra_len > 65_000 {
+                assert!(metadata_bytes > 64 * 1024);
+            }
+
+            let (archive, _) = indexed(&data);
+            let mut scratch = [0_u8; 4 * 1024];
+            let mut limits = ArchiveLimits::UNBOUNDED;
+            limits.max_metadata_bytes = metadata_bytes;
+            let index = PreservationIndex::new(&archive, &mut scratch, limits)
+                .expect("large central metadata should spill under its exact limit");
+            let output = index
+                .write_to(&PreservationPlan::copy_all(&index), Vec::new())
+                .unwrap();
+            assert_eq!(output, data);
+
+            if extra_len > 65_000 {
+                let (archive, _) = indexed(&data);
+                let mut larger_scratch = vec![0_u8; 128 * 1024];
+                let index = PreservationIndex::new(&archive, &mut larger_scratch, limits)
+                    .expect("a larger caller workspace must remain supported");
+                assert_eq!(
+                    index
+                        .write_to(&PreservationPlan::copy_all(&index), Vec::new())
+                        .unwrap(),
+                    data
+                );
+            }
+
+            let (archive, _) = indexed(&data);
+            let mut scratch = [0_u8; 4 * 1024];
+            limits.max_metadata_bytes = metadata_bytes - 1;
+            let error = match PreservationIndex::new(&archive, &mut scratch, limits) {
+                Ok(_) => panic!("metadata one byte over the finite limit must refuse"),
+                Err(error) => error,
+            };
+            assert!(matches!(
+                error.kind(),
+                ErrorKind::LimitExceeded {
+                    resource: LimitResource::MetadataBytes,
+                    actual,
+                    maximum,
+                } if *actual == metadata_bytes && *maximum == metadata_bytes - 1
+            ));
+        }
     }
 
     #[test]
@@ -4089,7 +4718,7 @@ mod tests {
         let (archive, mut buffer) = indexed(&data);
         let mut limits = ArchiveLimits::UNBOUNDED;
         limits.max_metadata_bytes = metadata_bytes - 1;
-        let error = match PreservationIndex::new_with_limits(&archive, &mut buffer, limits) {
+        let error = match PreservationIndex::new(&archive, &mut buffer, limits) {
             Ok(_) => panic!("EOCD/comment metadata limit should reject the source"),
             Err(error) => error,
         };
@@ -4104,8 +4733,7 @@ mod tests {
 
         let (archive, mut buffer) = indexed(&data);
         let index =
-            PreservationIndex::new_with_limits(&archive, &mut buffer, ArchiveLimits::UNBOUNDED)
-                .unwrap();
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::UNBOUNDED).unwrap();
         assert_eq!(
             index
                 .write_to(&PreservationPlan::copy_all(&index), Vec::new())
@@ -4120,7 +4748,7 @@ mod tests {
         let (archive, mut buffer) = indexed(&data);
         let mut limits = ArchiveLimits::UNBOUNDED;
         limits.max_files = 0;
-        let error = match PreservationIndex::new_with_limits(&archive, &mut buffer, limits) {
+        let error = match PreservationIndex::new(&archive, &mut buffer, limits) {
             Ok(_) => panic!("file-count limit should reject the source"),
             Err(error) => error,
         };
@@ -4152,7 +4780,8 @@ mod tests {
         source_bytes.extend_from_slice(b"source suffix");
 
         let (archive, mut buffer) = indexed(&source_bytes);
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
 
         assert_eq!(index.archive_end_offset(), archive_bytes.len() as u64);
         assert_eq!(
@@ -4182,7 +4811,8 @@ mod tests {
             .locate_in_reader(CountingReader::new(data.clone()), &mut [0; 64], end_offset)
             .unwrap();
         let mut buffer = vec![0; crate::RECOMMENDED_BUFFER_SIZE];
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
         let expected: Vec<_> = index
             .entries
             .iter()
@@ -4214,7 +4844,8 @@ mod tests {
             )
             .unwrap();
         let mut buffer = vec![0; crate::RECOMMENDED_BUFFER_SIZE];
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
         let local_span = index.entries()[0].local_span();
         let local_span_len = usize::try_from(local_span.end - local_span.start).unwrap();
         assert!(local_span_len > 128 * 1024);
@@ -4269,7 +4900,7 @@ mod tests {
                 &mut partial_accounting,
             )
             .unwrap_err();
-        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
         assert_eq!(sink.bytes, data[..fail_after]);
         assert_eq!(
             partial_accounting.raw_unchanged_source_bytes_accepted(),
@@ -4281,7 +4912,8 @@ mod tests {
     fn preserves_unsigned_data_descriptors() {
         let data = without_descriptor_signature(ordinary_archive());
         let (archive, mut buffer) = indexed(&data);
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
         let output = index
             .write_to(&PreservationPlan::copy_all(&index), Vec::new())
             .unwrap();
@@ -4311,11 +4943,12 @@ mod tests {
                 PreservationIndex::new_with_policy(
                     &archive,
                     &mut buffer,
+                    ArchiveLimits::default(),
                     PreservationPolicy::AllowZip64,
                 )
                 .unwrap()
             } else {
-                PreservationIndex::new(&archive, &mut buffer).unwrap()
+                PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap()
             };
             assert_eq!(
                 index
@@ -4337,7 +4970,7 @@ mod tests {
             let data = zip64_descriptor_archive(&payload, signed);
             let (archive, mut buffer) = indexed(&data);
             assert!(!archive.is_zip64());
-            let index = PreservationIndex::new(&archive, &mut buffer)
+            let index = PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default())
                 .expect("public policy preserves projected ZIP64 entries");
             assert_eq!(
                 index
@@ -4355,7 +4988,7 @@ mod tests {
         data[payload_end + 8..payload_end + 12].copy_from_slice(&999u32.to_le_bytes());
 
         let (archive, mut buffer) = indexed(&data);
-        let error = match PreservationIndex::new(&archive, &mut buffer) {
+        let error = match PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()) {
             Ok(_) => panic!("malformed data descriptor must be rejected"),
             Err(error) => error,
         };
@@ -4397,7 +5030,8 @@ mod tests {
         data[30..39].copy_from_slice(b"local-nam");
 
         let (archive, mut buffer) = indexed(&data);
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
         let output = index
             .write_to(&PreservationPlan::copy_all(&index), Vec::new())
             .unwrap();
@@ -4433,7 +5067,8 @@ mod tests {
         data[central..eocd].copy_from_slice(&[rest, first].concat());
 
         let (archive, mut buffer) = indexed(&data);
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
         let output = index
             .write_to(&PreservationPlan::copy_all(&index), Vec::new())
             .unwrap();
@@ -4445,7 +5080,8 @@ mod tests {
     fn regenerates_a_selected_member_with_writer_semantics() {
         let data = ordinary_archive();
         let (archive, mut buffer) = indexed(&data);
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
         let mut plan = PreservationPlan::copy_all(&index);
         plan.actions[1] = PreservationAction::Regenerate {
             id: index.entries()[1].id(),
@@ -4481,7 +5117,8 @@ mod tests {
     fn accounting_distinguishes_changed_store_and_deflate_members() {
         let data = ordinary_archive();
         let (archive, mut buffer) = indexed(&data);
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
         let mut plan = PreservationPlan::copy_all(&index);
         let store = b"replacement store";
         let deflate = b"replacement deflate payload";
@@ -4499,7 +5136,7 @@ mod tests {
         let output = index
             .write_to_with_accounting(&plan, Vec::new(), &mut accounting)
             .unwrap();
-        let reader = crate::office::ArchiveReader::new(&output).unwrap();
+        let reader = crate::office::ArchiveReader::new(&output, ArchiveLimits::default()).unwrap();
         assert_eq!(reader.read("changed-store").unwrap(), store);
         assert_eq!(reader.read("changed-deflate").unwrap(), deflate);
         assert_eq!(
@@ -4525,7 +5162,8 @@ mod tests {
     fn accounting_charges_generated_payloads_on_partial_publication() {
         let data = ordinary_archive();
         let (archive, mut buffer) = indexed(&data);
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
 
         let store = b"partial store payload";
         let mut store_plan = PreservationPlan::copy_all(&index);
@@ -4539,7 +5177,7 @@ mod tests {
         let error = index
             .write_to_with_accounting(&store_plan, &mut store_sink, &mut store_accounting)
             .unwrap_err();
-        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
         assert_eq!(store_accounting.stored_payload_bytes_emitted(), 3);
 
         let deflate = b"partial deflate payload with repeated repeated repeated bytes";
@@ -4555,19 +5193,23 @@ mod tests {
         let error = index
             .write_to_with_accounting(&deflate_plan, &mut deflate_sink, &mut deflate_accounting)
             .unwrap_err();
-        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
         assert_eq!(
             deflate_accounting.generated_deflate_payload_bytes_emitted(),
             3
         );
 
-        let mut source_writer = crate::office::StreamingArchiveWriter::new();
+        let mut source_writer =
+            crate::office::StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         source_writer.write_deflated("source.bin", deflate).unwrap();
         let source_bytes = source_writer.finish_to_bytes().unwrap();
         let source_len = source_bytes.len() as u64;
-        let source =
-            crate::office::IndexedArchive::from_reader(Cursor::new(source_bytes), source_len)
-                .unwrap();
+        let source = crate::office::IndexedArchive::from_reader(
+            Cursor::new(source_bytes),
+            source_len,
+            ArchiveLimits::default(),
+        )
+        .unwrap();
         let source_id = source.entry_id("source.bin").unwrap();
         let token = source
             .read_entry_precompressed_with_progress(source_id, deflate, |_| Ok::<(), io::Error>(()))
@@ -4589,7 +5231,7 @@ mod tests {
                 &mut precompressed_accounting,
             )
             .unwrap_err();
-        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
         assert_eq!(
             precompressed_accounting.precompressed_payload_bytes_emitted(),
             3
@@ -4798,7 +5440,8 @@ mod tests {
     fn direct_shared_store_rejects_oversized_name_before_publication() {
         let source = ordinary_archive();
         let (archive, mut buffer) = indexed(&source);
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
         let mut plan = PreservationPlan::copy_all(&index);
         let oversized_name = "n".repeat(usize::from(u16::MAX) + 1);
         plan.try_append(RegeneratedEntry::new_shared(
@@ -4927,7 +5570,8 @@ mod tests {
             b"append comment",
         );
         let (archive, mut buffer) = indexed(&source);
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
         let source_local_spans: Vec<_> = index
             .entries()
             .iter()
@@ -4957,8 +5601,18 @@ mod tests {
         )
         .unwrap();
         assert_eq!(plan.appended().len(), 2);
+        let shared = Arc::clone(&plan.appended()[1]);
+        let mut repeated = PreservationPlan::copy_all(&index);
+        repeated
+            .try_append_shared(Arc::clone(&plan.appended()[0]))
+            .unwrap();
+        repeated.try_append_shared(Arc::clone(&shared)).unwrap();
+        assert!(Arc::ptr_eq(&shared, &repeated.appended()[1]));
+        let cloned = plan.clone();
+        assert!(Arc::ptr_eq(&shared, &cloned.appended()[1]));
 
         let output = index.write_to(&plan, Vec::new()).unwrap();
+        assert_eq!(output, index.write_to(&repeated, Vec::new()).unwrap());
         let output_archive = ZipArchive::from_slice(&output).unwrap();
         let output_names: Vec<_> = output_archive
             .entries()
@@ -5005,7 +5659,8 @@ mod tests {
                 < output_entries[appended_start + 1].local_header_offset()
         );
         assert!(output_entries[appended_start].local_header_offset() >= source_local_end);
-        let output_reader = crate::office::ArchiveReader::new(&output).unwrap();
+        let output_reader =
+            crate::office::ArchiveReader::new(&output, ArchiveLimits::default()).unwrap();
         assert_eq!(
             output_reader
                 .read(
@@ -5033,7 +5688,8 @@ mod tests {
             b"append then omit",
         );
         let (archive, mut buffer) = indexed(&source);
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
 
         let mut append_plan = PreservationPlan::copy_all(&index);
         append_plan
@@ -5051,8 +5707,12 @@ mod tests {
         let appended = index.write_to(&append_plan, Vec::new()).unwrap();
 
         let (appended_archive, mut appended_buffer) = indexed(&appended);
-        let appended_index = PreservationIndex::new(&appended_archive, &mut appended_buffer)
-            .expect("appended archive remains preservable");
+        let appended_index = PreservationIndex::new(
+            &appended_archive,
+            &mut appended_buffer,
+            ArchiveLimits::default(),
+        )
+        .expect("appended archive remains preservable");
         let mut restore_plan = PreservationPlan::copy_all(&appended_index);
         for entry in appended_index.entries() {
             if matches!(
@@ -5072,7 +5732,8 @@ mod tests {
     fn omitting_a_middle_source_member_reopens_and_preserves_retained_raw_records() {
         let source = with_comment(ordinary_archive(), b"middle omit");
         let (archive, mut buffer) = indexed(&source);
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
         let omitted_id = index.entries()[1].id();
         let omitted_name = index.entries()[1].raw_name_bytes().to_vec();
 
@@ -5089,7 +5750,12 @@ mod tests {
         assert_eq!(output_archive.comment().as_bytes(), b"middle omit");
 
         let (output_archive, mut output_buffer) = indexed(&output);
-        let output_index = PreservationIndex::new(&output_archive, &mut output_buffer).unwrap();
+        let output_index = PreservationIndex::new(
+            &output_archive,
+            &mut output_buffer,
+            ArchiveLimits::default(),
+        )
+        .unwrap();
         for source_entry in index
             .entries()
             .iter()
@@ -5121,7 +5787,8 @@ mod tests {
                 )
             );
         }
-        let output_reader = crate::office::ArchiveReader::new(&output).unwrap();
+        let output_reader =
+            crate::office::ArchiveReader::new(&output, ArchiveLimits::default()).unwrap();
         assert_eq!(output_reader.read("first.bin").unwrap(), b"stored data");
     }
 
@@ -5129,7 +5796,8 @@ mod tests {
     fn replacement_then_append_patches_source_and_appended_offsets() {
         let source = ordinary_archive();
         let (archive, mut buffer) = indexed(&source);
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
 
         let mut plan = PreservationPlan::copy_all(&index);
         plan.actions[0] = PreservationAction::Regenerate {
@@ -5162,7 +5830,7 @@ mod tests {
         assert!(entries[1].local_header_offset() > entries[0].local_header_offset());
         assert!(entries[3].local_header_offset() > entries[2].local_header_offset());
 
-        let reader = crate::office::ArchiveReader::new(&output).unwrap();
+        let reader = crate::office::ArchiveReader::new(&output, ArchiveLimits::default()).unwrap();
         assert_eq!(reader.read("replaced.bin").unwrap(), vec![b'x'; 128 * 1024]);
         assert_eq!(reader.read("tail.bin").unwrap(), b"tail");
     }
@@ -5171,7 +5839,8 @@ mod tests {
     fn incomplete_or_unrepresentable_append_plan_leaves_sink_untouched() {
         let data = ordinary_archive();
         let (archive, mut buffer) = indexed(&data);
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
 
         let mut incomplete_sink = b"untouched".to_vec();
         let incomplete = PreservationPlan::new();
@@ -5206,7 +5875,8 @@ mod tests {
     fn fallible_plan_reservations_and_preparation_errors_leave_sink_untouched() {
         let data = ordinary_archive();
         let (archive, mut buffer) = indexed(&data);
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
 
         let mut plan = PreservationPlan::new();
         assert!(plan.try_reserve_exact(usize::MAX).is_err());
@@ -5227,7 +5897,8 @@ mod tests {
     fn rejects_the_zip32_entry_count_sentinel() {
         let data = ordinary_archive();
         let (archive, mut buffer) = indexed(&data);
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
 
         let mut prepared = Vec::with_capacity(u16::MAX as usize);
         prepared.resize_with(u16::MAX as usize, || PreparedEntry {
@@ -5252,6 +5923,7 @@ mod tests {
         let index = PreservationIndex::new_with_policy(
             &archive,
             &mut buffer,
+            ArchiveLimits::default(),
             PreservationPolicy::AllowZip64,
         )
         .unwrap();
@@ -5371,7 +6043,7 @@ mod tests {
             &mut partial_accounting,
         )
         .expect_err("partial central sink must fail");
-        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
         assert_eq!(sink.bytes.len(), 8);
         assert_eq!(partial_accounting.raw_unchanged_source_bytes_accepted(), 6);
     }
@@ -5380,7 +6052,8 @@ mod tests {
     fn layout_promotion_synthesizes_zip64_tail_without_sink_output() {
         let source = two_stored_archive();
         let (archive, mut buffer) = indexed(&source);
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
         let synthetic = PreservationIndex {
             source: index.source,
             entries: index.entries.clone(),
@@ -5433,6 +6106,104 @@ mod tests {
             },
             PreparedTail::Zip32(_) => panic!("ZIP64 geometry needs a synthesized tail"),
         }
+    }
+
+    #[test]
+    fn admission_profile_reports_exact_zip64_tail_and_comment_geometry() {
+        let source = with_comment(
+            with_file_comment(two_stored_archive(), b"entry comment"),
+            b"archive comment",
+        );
+        let (archive, mut buffer) = indexed(&source);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+        let synthetic = PreservationIndex {
+            source: index.source,
+            entries: index.entries.clone(),
+            local_order: index.local_order.clone(),
+            archive_comment: index.archive_comment.clone(),
+            zip64_tail: index.zip64_tail.clone(),
+            archive_end_offset: u64::MAX,
+        };
+        let mut prepared = vec![
+            PreparedEntry {
+                local: PreparedLocal::Copy(0..u64::from(u32::MAX) + 1),
+                central: PreparedCentral::Copy(0),
+                generated_payload: None,
+                omitted: false,
+            },
+            PreparedEntry {
+                local: PreparedLocal::Copy(index.entries[1].local_span.clone()),
+                central: PreparedCentral::Copy(1),
+                generated_payload: None,
+                omitted: false,
+            },
+        ];
+
+        let layout = synthetic.validate_output_layout(&mut prepared).unwrap();
+        let profile = build_output_profile(&prepared, &layout, &synthetic.entries).unwrap();
+        let profile = profile.view();
+        let entries = profile.entries();
+        let expected_tail = u64::try_from(
+            ZIP64_EOCD_FIXED_SIZE + ZIP64_LOCATOR_SIZE + EndOfCentralDirectoryRecordFixed::SIZE,
+        )
+        .unwrap();
+        let second_local_bytes = index.entries[1]
+            .local_span
+            .end
+            .checked_sub(index.entries[1].local_span.start)
+            .unwrap();
+
+        assert_eq!(profile.prefix_bytes(), 0);
+        assert_eq!(profile.entry_count(), 2);
+        assert_eq!(profile.tail_bytes(), expected_tail);
+        assert_eq!(
+            profile.archive_comment_bytes(),
+            b"archive comment".len() as u64
+        );
+        assert_eq!(
+            profile.local_bytes(),
+            u64::from(u32::MAX) + 1 + second_local_bytes
+        );
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].comment_len(), b"entry comment".len() as u64);
+        assert_eq!(entries[1].comment_len(), 0);
+        assert_eq!(
+            entries[0].central_record_len(),
+            u64::try_from(index.entries[0].central_bytes.len()).unwrap()
+        );
+        assert_eq!(
+            entries[1].central_record_len(),
+            u64::try_from(index.entries[1].central_bytes.len()).unwrap() + 12
+        );
+        assert!(entries[1].extra_len() > entries[0].extra_len());
+        assert_eq!(
+            profile.central_directory_bytes(),
+            entries
+                .iter()
+                .map(|entry| entry.central_record_len())
+                .sum::<u64>()
+        );
+        assert_eq!(
+            profile.central_metadata_bytes(),
+            entries
+                .iter()
+                .map(|entry| entry.metadata_len())
+                .sum::<u64>()
+        );
+        assert_eq!(
+            profile.archive_bytes(),
+            profile.prefix_bytes()
+                + profile.local_bytes()
+                + profile.central_directory_bytes()
+                + profile.tail_bytes()
+                + profile.archive_comment_bytes()
+        );
+        assert_eq!(
+            profile.archive_bytes(),
+            layout.output_size,
+            "the admission profile must report the preflight output size exactly"
+        );
     }
 
     #[test]
@@ -5547,6 +6318,7 @@ mod tests {
         let error = match PreservationIndex::new_with_policy(
             &archive,
             &mut buffer,
+            ArchiveLimits::default(),
             PreservationPolicy::AllowZip64,
         ) {
             Ok(_) => panic!("mismatched local sizes must be rejected"),
@@ -5563,6 +6335,7 @@ mod tests {
         let error = match PreservationIndex::new_with_policy(
             &archive,
             &mut buffer,
+            ArchiveLimits::default(),
             PreservationPolicy::AllowZip64,
         ) {
             Ok(_) => panic!("nonzero disk-start metadata must be rejected"),
@@ -5588,7 +6361,7 @@ mod tests {
         overlapping[central + first_len + 42..central + first_len + 46]
             .copy_from_slice(&0u32.to_le_bytes());
         let (archive, mut buffer) = indexed(&overlapping);
-        let error = match PreservationIndex::new(&archive, &mut buffer) {
+        let error = match PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()) {
             Ok(_) => panic!("overlapping spans must be rejected"),
             Err(error) => error,
         };
@@ -5612,7 +6385,7 @@ mod tests {
         truncated[central - 1 + first_central_len + 42..central - 1 + first_central_len + 46]
             .copy_from_slice(&(49u32).to_le_bytes());
         let (archive, mut buffer) = indexed(&truncated);
-        let error = match PreservationIndex::new(&archive, &mut buffer) {
+        let error = match PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()) {
             Ok(_) => panic!("truncated spans must be rejected"),
             Err(error) => error,
         };
@@ -5672,7 +6445,8 @@ mod tests {
     fn accounting_counts_exact_raw_preservation_and_partial_sink_progress() {
         let data = with_comment(ordinary_archive(), b"raw comment");
         let (archive, mut buffer) = indexed(&data);
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
         let mut accounting = ZipOperationAccounting::default();
         let output = index
             .write_to_with_accounting(
@@ -5707,7 +6481,7 @@ mod tests {
                 &mut partial_accounting,
             )
             .unwrap_err();
-        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
         assert_eq!(
             partial_accounting.raw_unchanged_source_bytes_accepted(),
             sink.bytes.len() as u64
@@ -5718,18 +6492,19 @@ mod tests {
     fn propagates_sink_failure_after_preflight() {
         let data = ordinary_archive();
         let (archive, mut buffer) = indexed(&data);
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
         let error = index
             .write_to(&PreservationPlan::copy_all(&index), FailingSink)
             .unwrap_err();
-        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
     }
 
     #[test]
     fn public_policy_preserves_zip64_while_internal_zip32_policy_refuses_it() {
         let data = zip64_archive();
         let (archive, mut buffer) = indexed(&data);
-        let index = PreservationIndex::new(&archive, &mut buffer)
+        let index = PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default())
             .expect("public preservation must accept validated ZIP64");
         assert_eq!(
             index
@@ -5742,6 +6517,7 @@ mod tests {
         let error = PreservationIndex::new_with_policy(
             &archive,
             &mut buffer,
+            ArchiveLimits::default(),
             PreservationPolicy::Zip32Only,
         );
         assert!(matches!(
@@ -5757,6 +6533,7 @@ mod tests {
         let index = PreservationIndex::new_with_policy(
             &archive,
             &mut buffer,
+            ArchiveLimits::default(),
             PreservationPolicy::AllowZip64,
         )
         .expect("public policy must preserve local-only ZIP64 framing");
@@ -5771,6 +6548,7 @@ mod tests {
         let error = PreservationIndex::new_with_policy(
             &archive,
             &mut buffer,
+            ArchiveLimits::default(),
             PreservationPolicy::Zip32Only,
         );
         assert!(matches!(
@@ -5784,7 +6562,7 @@ mod tests {
         let data = prefixed_empty_archive();
         let (archive, mut buffer) = indexed(&data);
         assert_eq!(archive.entries_hint(), 0);
-        let error = match PreservationIndex::new(&archive, &mut buffer) {
+        let error = match PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()) {
             Ok(_) => panic!("prefixed empty archive must be refused"),
             Err(error) => error,
         };
@@ -5795,7 +6573,8 @@ mod tests {
 
         let data = ZipArchiveWriter::new(Vec::new()).finish().unwrap();
         let (archive, mut buffer) = indexed(&data);
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
         assert_eq!(
             index
                 .write_to(&PreservationPlan::copy_all(&index), Vec::new())
@@ -5810,7 +6589,7 @@ mod tests {
         let (archive, mut buffer) = indexed(&data);
         let mut limits = ArchiveLimits::UNBOUNDED;
         limits.max_metadata_bytes = 6;
-        let error = match PreservationIndex::new_with_limits_and_policy(
+        let error = match PreservationIndex::new_with_policy(
             &archive,
             &mut buffer,
             limits,
@@ -5849,6 +6628,7 @@ mod tests {
             let error = match PreservationIndex::new_with_policy(
                 &archive,
                 &mut buffer,
+                ArchiveLimits::default(),
                 PreservationPolicy::AllowZip64,
             ) {
                 Ok(_) => panic!("classic ZIP64 field mismatch must be rejected"),
@@ -5869,6 +6649,7 @@ mod tests {
         let index = PreservationIndex::new_with_policy(
             &archive,
             &mut buffer,
+            ArchiveLimits::default(),
             PreservationPolicy::AllowZip64,
         )
         .unwrap();
@@ -5889,6 +6670,7 @@ mod tests {
             let index = PreservationIndex::new_with_policy(
                 &archive,
                 &mut buffer,
+                ArchiveLimits::default(),
                 PreservationPolicy::AllowZip64,
             )
             .unwrap();
@@ -5907,6 +6689,7 @@ mod tests {
         let index = PreservationIndex::new_with_policy(
             &archive,
             &mut buffer,
+            ArchiveLimits::default(),
             PreservationPolicy::AllowZip64,
         )
         .unwrap();
@@ -5935,6 +6718,7 @@ mod tests {
         let output_index = PreservationIndex::new_with_policy(
             &output_archive,
             &mut output_buffer,
+            ArchiveLimits::default(),
             PreservationPolicy::AllowZip64,
         )
         .unwrap();
@@ -5952,6 +6736,7 @@ mod tests {
         let index = PreservationIndex::new_with_policy(
             &archive,
             &mut buffer,
+            ArchiveLimits::default(),
             PreservationPolicy::AllowZip64,
         )
         .unwrap();
@@ -5971,7 +6756,7 @@ mod tests {
             archive.comment().remaining() as usize
         );
         assert_eq!(
-            crate::office::ArchiveReader::new(&output)
+            crate::office::ArchiveReader::new(&output, ArchiveLimits::default())
                 .unwrap()
                 .read("replacement.bin")
                 .unwrap(),
@@ -5990,7 +6775,7 @@ mod tests {
             ..ArchiveLimits::default()
         };
         let (archive, mut buffer) = indexed(&source);
-        let index = PreservationIndex::new_with_limits_and_policy(
+        let index = PreservationIndex::new_with_policy(
             &archive,
             &mut buffer,
             limits,
@@ -5998,7 +6783,7 @@ mod tests {
         )
         .expect("long-name ZIP64 source must be indexable");
         assert!(archive.is_zip64());
-        let indexed_archive = crate::office::IndexedArchive::from_reader_with_limits(
+        let indexed_archive = crate::office::IndexedArchive::from_reader(
             Cursor::new(source.clone()),
             source.len() as u64,
             limits,
@@ -6023,7 +6808,7 @@ mod tests {
         let output_archive = ZipArchive::from_slice(&output).unwrap();
         assert!(output_archive.is_zip64());
         assert_eq!(
-            crate::office::ArchiveReader::new_with_limits(&output, limits)
+            crate::office::ArchiveReader::new(&output, limits)
                 .unwrap()
                 .read(&name)
                 .unwrap(),
@@ -6038,6 +6823,7 @@ mod tests {
         let index = PreservationIndex::new_with_policy(
             &archive,
             &mut buffer,
+            ArchiveLimits::default(),
             PreservationPolicy::AllowZip64,
         )
         .unwrap();
@@ -6078,13 +6864,17 @@ mod tests {
     #[test]
     fn regenerated_precompressed_entry_reopens_and_charges_precompressed_bytes() {
         let payload = b"precompressed preservation payload repeated repeated";
-        let mut source_writer = crate::office::StreamingArchiveWriter::new();
+        let mut source_writer =
+            crate::office::StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         source_writer.write_deflated("source.bin", payload).unwrap();
         let source_bytes = source_writer.finish_to_bytes().unwrap();
         let source_len = source_bytes.len() as u64;
-        let source =
-            crate::office::IndexedArchive::from_reader(Cursor::new(source_bytes), source_len)
-                .unwrap();
+        let source = crate::office::IndexedArchive::from_reader(
+            Cursor::new(source_bytes),
+            source_len,
+            ArchiveLimits::default(),
+        )
+        .unwrap();
         let source_id = source.entry_id("source.bin").unwrap();
         let token = source
             .read_entry_precompressed_with_progress(source_id, payload, |_| Ok::<(), io::Error>(()))
@@ -6093,7 +6883,8 @@ mod tests {
 
         let data = ordinary_archive();
         let (archive, mut buffer) = indexed(&data);
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
         let mut plan = PreservationPlan::copy_all(&index);
         plan.try_append(RegeneratedEntry::new_precompressed_shared(
             "copied.bin",
@@ -6105,7 +6896,7 @@ mod tests {
         let output = index
             .write_to_with_accounting(&plan, Vec::new(), &mut accounting)
             .unwrap();
-        let reader = crate::office::ArchiveReader::new(&output).unwrap();
+        let reader = crate::office::ArchiveReader::new(&output, ArchiveLimits::default()).unwrap();
         assert_eq!(reader.read("copied.bin").unwrap(), payload);
         assert_eq!(
             accounting.precompressed_payload_bytes_emitted(),
@@ -6127,7 +6918,8 @@ mod tests {
 
             let source = ordinary_archive();
             let (archive, mut buffer) = indexed(&source);
-            let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+            let index =
+                PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
             let mut plan = PreservationPlan::copy_all(&index);
             plan.try_append(RegeneratedEntry::new_precompressed_shared(name, token))
                 .unwrap();
@@ -6136,7 +6928,8 @@ mod tests {
             let output = index
                 .write_to_with_accounting(&plan, Vec::new(), &mut accounting)
                 .unwrap();
-            let output_reader = crate::office::ArchiveReader::new(&output).unwrap();
+            let output_reader =
+                crate::office::ArchiveReader::new(&output, ArchiveLimits::default()).unwrap();
             assert_eq!(output_reader.read(name).unwrap(), payload);
             assert_eq!(
                 accounting.stored_payload_bytes_emitted(),
@@ -6226,7 +7019,7 @@ mod tests {
                 let error = index
                     .write_to_with_accounting(&plan, &mut sink, &mut partial_accounting)
                     .unwrap_err();
-                assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+                assert!(matches!(error.kind(), ErrorKind::IO(_)));
                 assert_eq!(sink.bytes, output[..fail_after]);
 
                 let accepted_payload = fail_after
@@ -6260,7 +7053,8 @@ mod tests {
     fn direct_precompressed_central_offset_promotes_to_zip64_before_publication() {
         let source = two_stored_archive();
         let (archive, mut buffer) = indexed(&source);
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
         let synthetic = PreservationIndex {
             source: index.source,
             entries: index.entries.clone(),

@@ -4,9 +4,11 @@
 //! shared data-list ownership.  Its job is the small and safety-critical part
 //! of a table edit: rewrite the BNC rows which are already attached to one
 //! tile.  The caller owns string/rich-text/formula reference accounting and
-//! sparse attachment.  An absent row in a populated existing tile is reported
-//! as [`TileError::NeedSparse`].  A canonical modern tile with no row records
-//! is materialised in place, retaining its top-level unknown fields exactly.
+//! sparse attachment.  An absent row of a modern tile is materialised in row
+//! order (record 0309: rows inserted by a table-topology edit sit between
+//! stored rows); a legacy tile reports it as [`TileError::NeedSparse`].  A
+//! canonical modern tile with no row records is materialised in place,
+//! retaining its top-level unknown fields exactly.
 
 use std::mem::size_of;
 
@@ -478,6 +480,9 @@ enum PreparedRowSource<'source> {
 
 struct PreparedRow<'source> {
     field_index: Option<usize>,
+    /// For a materialized (new) row, the field index of the first source
+    /// row that follows it; `None` appends it after every source row.
+    insert_before: Option<usize>,
     row: u32,
     source: PreparedRowSource<'source>,
     slots: Vec<PreparedSlot<'source>>,
@@ -876,7 +881,8 @@ pub(crate) fn preclassify_tile(
         .ok_or(TileError::InvalidSource)?;
     counters.record_scratch_allocation(retained_capacity)?;
 
-    let tile_view = WireView::parse(source).map_err(|_| TileError::InvalidSource)?;
+    let tile_view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|_| TileError::InvalidSource)?;
     let mut position_start = 0usize;
     let mut previous_row = None;
     let mut row_records = 0usize;
@@ -913,15 +919,14 @@ pub(crate) fn preclassify_tile(
             return Err(TileError::InvalidSource);
         }
         previous_row = Some(row_index);
-        if positions
+        // Positions in rows the tile does not store are missing cells; the
+        // rewrite materializes such a row in row order.
+        while let Some(position) = positions
             .get(position_start)
-            .is_some_and(|position| position.row < row_index)
+            .filter(|position| position.row < row_index)
         {
-            let position = positions[position_start];
-            return Err(TileError::NeedSparse {
-                row: position.row,
-                column: position.column,
-            });
+            cells.push(missing_cell(*position));
+            position_start += 1;
         }
         let position_end = positions[position_start..]
             .iter()
@@ -938,11 +943,8 @@ pub(crate) fn preclassify_tile(
         }
         position_start = position_end;
     }
-    if let Some(position) = positions.get(position_start) {
-        return Err(TileError::NeedSparse {
-            row: position.row,
-            column: position.column,
-        });
+    for position in &positions[position_start..] {
+        cells.push(missing_cell(*position));
     }
     if cells.len() != positions.len() {
         return Err(TileError::InvalidSource);
@@ -1277,7 +1279,8 @@ fn scan_formula_cell(
         .work
         .checked_add(u64_from_usize(bytes.len())?)
         .ok_or(TileError::InvalidSource)?;
-    let view = BncCellView::parse(bytes).map_err(|_| TileError::InvalidSource)?;
+    let view = BncCellView::parse(bytes, &crate::cell::wire::limits_for_source(bytes))
+        .map_err(|_| TileError::InvalidSource)?;
     let StoredValue::Formula(identifier) = view.stored_value() else {
         return Ok(());
     };
@@ -1306,6 +1309,24 @@ fn scan_formula_cell(
     Ok(())
 }
 
+/// The classification of a position in a row the tile does not store.
+const fn missing_cell(position: TileReadPosition) -> PreclassifiedCell {
+    PreclassifiedCell {
+        row: position.row,
+        column: position.column,
+        before: CellValue::Missing,
+        before_references: CellReferences {
+            string: None,
+            rich_text: None,
+            formula: None,
+            formula_error: None,
+            comment: None,
+        },
+        formula_cache: None,
+        present: false,
+    }
+}
+
 fn preclassify_empty_modern_tile(
     positions: &[TileReadPosition],
     counters: &mut Counters,
@@ -1327,14 +1348,7 @@ fn preclassify_empty_modern_tile(
         .ok_or(TileError::InvalidSource)?;
     counters.record_scratch_allocation(retained_capacity)?;
     for position in positions {
-        cells.push(PreclassifiedCell {
-            row: position.row,
-            column: position.column,
-            before: CellValue::Missing,
-            before_references: CellReferences::default(),
-            formula_cache: None,
-            present: false,
-        });
+        cells.push(missing_cell(*position));
     }
     counters.release_scratch(retained_capacity)?;
     counters.retain(retained_capacity, cells.len())?;
@@ -1565,7 +1579,8 @@ fn prepare_tile_internal<'source>(
     counters.report.wire_fields = u64_from_usize(codec_report.fields())?;
     counters.charge(u64_from_usize(codec_report.work_bytes())?)?;
 
-    let source_view = WireView::parse(request.source).map_err(|_| TileError::InvalidSource)?;
+    let source_view = WireView::parse(request.source, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|_| TileError::InvalidSource)?;
     let row_capacity = usize::try_from(snapshot.num_rows())
         .map_err(|_| TileError::InvalidSource)?
         .min(request.limits.max_rows);
@@ -1702,12 +1717,12 @@ fn prepare_tile_internal<'source>(
                     column: change.column,
                 });
             },
-            Err(_) => Some(prepare_canonical_row(
-                row_index,
-                request.columns,
-                row_changes,
-                &mut counters,
-            )?),
+            Err(position) => {
+                let mut row =
+                    prepare_canonical_row(row_index, request.columns, row_changes, &mut counters)?;
+                row.insert_before = raw_rows.get(position).map(|raw| raw.field_index);
+                Some(row)
+            },
         };
         let cell_count = plan.as_ref().map_or(0, |row| row.cell_count);
         final_rows.push(RowCellCount {
@@ -1930,7 +1945,6 @@ fn classify_prepared_mode(
     modern: bool,
     counters: &mut Counters,
 ) -> Result<PreparedTileMode> {
-    let last_source = raw_rows.last().map(|row| row.row.tile_row_index());
     let mut missing_materialized = false;
     for group in changes.chunk_by(|left, right| left.row == right.row) {
         counters.charge(u64_from_usize(binary_search_work(raw_rows.len()))?)?;
@@ -1940,22 +1954,17 @@ fn classify_prepared_mode(
         {
             continue;
         }
+        // A comment on an empty cell materialises it too (record 0329).
         let materialized = group.iter().any(|change| {
             matches!(
                 change.change,
-                BncChange::Set(_) | BncChange::FormulaSet { .. }
+                BncChange::Set(_) | BncChange::FormulaSet { .. } | BncChange::CommentSet { .. }
             )
         });
         if !materialized {
             continue;
         }
         if !modern {
-            return Err(TileError::NeedSparse {
-                row: group[0].row,
-                column: group[0].column,
-            });
-        }
-        if last_source.is_some_and(|last| group[0].row <= last) {
             return Err(TileError::NeedSparse {
                 row: group[0].row,
                 column: group[0].column,
@@ -1982,7 +1991,8 @@ fn prepared_tile_output_len(
     if rows.is_empty() {
         return Ok(0);
     }
-    let view = WireView::parse(source).map_err(|_| TileError::InvalidSource)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|_| TileError::InvalidSource)?;
     let mut length = 0usize;
     for (field_index, field) in view.fields().enumerate() {
         counters.charge(u64_from_usize(binary_search_work(rows.len()))?)?;
@@ -2026,11 +2036,15 @@ fn find_prepared_row_by_field<'row, 'source>(
     rows: &'row [PreparedRow<'source>],
     field_index: usize,
 ) -> Option<&'row PreparedRow<'source>> {
-    let borrowed = rows.partition_point(|row| row.field_index.is_some());
-    rows[..borrowed]
-        .binary_search_by_key(&field_index, |row| row.field_index.unwrap_or(usize::MAX))
-        .ok()
-        .and_then(|index| rows.get(index))
+    // Rows are in ascending row order: each source row sorts by its field
+    // index, and each materialized row sorts immediately before the source
+    // row it precedes (or after every source row).
+    rows.binary_search_by_key(&(field_index, true), |row| match row.field_index {
+        Some(index) => (index, true),
+        None => (row.insert_before.unwrap_or(usize::MAX), false),
+    })
+    .ok()
+    .and_then(|index| rows.get(index))
 }
 
 fn tile_execution_requirements(
@@ -2279,7 +2293,8 @@ fn merge_legacy_phase_reports(prepare: TileReport, execute: TileReport) -> Resul
 }
 
 fn tile_has_no_rows(source: &[u8]) -> Result<bool> {
-    let view = WireView::parse(source).map_err(|_| TileError::InvalidSource)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|_| TileError::InvalidSource)?;
     for field in view.fields() {
         if field.number() == 5 {
             if field.wire_type() != 2 {
@@ -2447,7 +2462,8 @@ fn prepare_borrowed_row<'source>(
                 kind,
             });
         }
-        let output_len = plan_cell_mutation(previous, change.change)?;
+        let output_len =
+            plan_cell_mutation(previous, change.change, counters.limits.max_output_bytes)?;
         counters.charge(
             u64_from_usize(previous.map_or(0, <[u8]>::len))?
                 .checked_mul(2)
@@ -2497,6 +2513,7 @@ fn prepare_borrowed_row<'source>(
     counters.retain(prepared_bytes, prepared.len())?;
     Ok(PreparedRow {
         field_index: Some(field_index),
+        insert_before: None,
         row: row.tile_row_index(),
         source: PreparedRowSource::Borrowed { raw },
         slots: prepared,
@@ -2543,11 +2560,11 @@ fn prepare_canonical_row<'source>(
         }
         if !matches!(
             change.change,
-            BncChange::Set(_) | BncChange::FormulaSet { .. }
+            BncChange::Set(_) | BncChange::FormulaSet { .. } | BncChange::CommentSet { .. }
         ) {
             continue;
         }
-        let output_len = plan_cell_mutation(None, change.change)?;
+        let output_len = plan_cell_mutation(None, change.change, counters.limits.max_output_bytes)?;
         let transition = planned_transition(row, change.column, None, change.change, output_len)?;
         slots[column] = PreparedSlot::Mutation {
             previous: None,
@@ -2581,6 +2598,7 @@ fn prepare_canonical_row<'source>(
     counters.retain(prepared_bytes, slots.len())?;
     Ok(PreparedRow {
         field_index: None,
+        insert_before: None,
         row,
         source: PreparedRowSource::Canonical { row },
         slots,
@@ -2806,8 +2824,21 @@ fn write_canonical_row_message(
 fn write_prepared_tile(plan: &PreparedTileRewrite<'_>, counters: &mut Counters) -> Result<Vec<u8>> {
     counters.charge(u64_from_usize(plan.output_len)?)?;
     let mut output = exact_scratch_vec::<u8>(plan.output_len, plan.output_len, counters)?;
-    let view = WireView::parse(plan.source).map_err(|_| TileError::InvalidSource)?;
+    let view = WireView::parse(plan.source, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|_| TileError::InvalidSource)?;
     for (field_index, field) in view.fields().enumerate() {
+        // Materialized rows keep the tile's ascending row order: each goes
+        // right before the first source row that follows it.
+        for row in plan
+            .rows
+            .iter()
+            .filter(|row| row.field_index.is_none() && row.insert_before == Some(field_index))
+        {
+            let payload = row.output.as_deref().ok_or(TileError::InvalidSource)?;
+            output.push(0x2a);
+            encode_varint(&mut output, u64_from_usize(payload.len())?);
+            output.extend_from_slice(payload);
+        }
         if let Some(row) = find_prepared_row_by_field(&plan.rows, field_index) {
             let payload = row.output.as_deref().ok_or(TileError::InvalidSource)?;
             output.extend_from_slice(field.key());
@@ -2828,7 +2859,11 @@ fn write_prepared_tile(plan: &PreparedTileRewrite<'_>, counters: &mut Counters) 
             _ => output.extend_from_slice(field.raw()),
         }
     }
-    for row in plan.rows.iter().filter(|row| row.field_index.is_none()) {
+    for row in plan
+        .rows
+        .iter()
+        .filter(|row| row.field_index.is_none() && row.insert_before.is_none())
+    {
         let payload = row.output.as_deref().ok_or(TileError::InvalidSource)?;
         output.push(0x2a);
         encode_varint(&mut output, u64_from_usize(payload.len())?);
@@ -2933,8 +2968,14 @@ enum CellMutation {
     Replace(Vec<u8>),
 }
 
-fn plan_cell_mutation(previous: Option<&[u8]>, change: BncChange) -> Result<Option<usize>> {
-    let view = BncCellView::parse(previous.unwrap_or(&MINIMAL_BNC_CELL)).map_err(map_bnc_error)?;
+fn plan_cell_mutation(
+    previous: Option<&[u8]>,
+    change: BncChange,
+    max_output_bytes: usize,
+) -> Result<Option<usize>> {
+    let source = previous.unwrap_or(&MINIMAL_BNC_CELL);
+    let limits = bnc_limits(source, max_output_bytes)?;
+    let view = BncCellView::parse(source, &limits).map_err(map_bnc_error)?;
     let plan = match change {
         BncChange::Clear => view.plan_clear_value(false),
         BncChange::FormulaClear => view.plan_clear_value(true),
@@ -2947,17 +2988,16 @@ fn plan_cell_mutation(previous: Option<&[u8]>, change: BncChange) -> Result<Opti
             expected_identifier,
         } => {
             return view
-                .clear_comment_with_limit(expected_identifier, usize::MAX)
+                .clear_comment(expected_identifier, &limits)
                 .map(|bytes| Some(bytes.len()))
                 .map_err(map_bnc_error);
         },
         BncChange::CommentSet { identifier } => {
             let mut cell =
-                litchi_numbers_wire::BncCell::parse(previous.unwrap_or(&MINIMAL_BNC_CELL))
-                    .map_err(map_bnc_error)?;
+                litchi_numbers_wire::BncCell::parse(source, &limits).map_err(map_bnc_error)?;
             cell.set_comment_identifier(Some(identifier));
             return cell
-                .try_encode_with_limit(usize::MAX)
+                .encode(&limits)
                 .map(|bytes| Some(bytes.len()))
                 .map_err(map_bnc_error);
         },
@@ -2977,32 +3017,29 @@ fn mutate_cell(
                 Ok(CellMutation::Unchanged)
             },
             BncChange::CommentSet { identifier } => {
-                let mut cell = litchi_numbers_wire::BncCell::parse(&MINIMAL_BNC_CELL)
+                let limits = bnc_limits(&MINIMAL_BNC_CELL, max_output_bytes)?;
+                let mut cell = litchi_numbers_wire::BncCell::parse(&MINIMAL_BNC_CELL, &limits)
                     .map_err(|_| TileError::InvalidSource)?;
                 cell.set_comment_identifier(Some(identifier));
-                cell.try_encode_with_limit(max_output_bytes)
+                cell.encode(&limits)
                     .map(CellMutation::Replace)
                     .map_err(map_bnc_error)
             },
             BncChange::Set(input) => {
-                let view =
-                    BncCellView::parse(&MINIMAL_BNC_CELL).map_err(|_| TileError::InvalidSource)?;
-                view.rewrite_scalar_with_limit(input.as_wire(), max_output_bytes)
+                let limits = bnc_limits(&MINIMAL_BNC_CELL, max_output_bytes)?;
+                let view = BncCellView::parse(&MINIMAL_BNC_CELL, &limits)
+                    .map_err(|_| TileError::InvalidSource)?;
+                view.rewrite_scalar(input.as_wire(), &limits)
                     .map(CellMutation::Replace)
                     .map_err(map_bnc_error)
             },
             BncChange::FormulaSet { identifier, cache } => {
-                let view =
-                    BncCellView::parse(&MINIMAL_BNC_CELL).map_err(|_| TileError::InvalidSource)?;
+                let limits = bnc_limits(&MINIMAL_BNC_CELL, max_output_bytes)?;
+                let view = BncCellView::parse(&MINIMAL_BNC_CELL, &limits)
+                    .map_err(|_| TileError::InvalidSource)?;
                 match cache {
-                    Some(cache) => view.rewrite_formula_with_limit(
-                        identifier,
-                        cache.as_wire(),
-                        max_output_bytes,
-                    ),
-                    None => {
-                        view.rewrite_formula_without_cache_with_limit(identifier, max_output_bytes)
-                    },
+                    Some(cache) => view.rewrite_formula(identifier, cache.as_wire(), &limits),
+                    None => view.rewrite_formula_without_cache(identifier, &limits),
                 }
                 .map(CellMutation::Replace)
                 .map_err(map_bnc_error)
@@ -3010,10 +3047,11 @@ fn mutate_cell(
             BncChange::FormulaCache(_) => Err(TileError::UnsupportedSource { row: 0, column: 0 }),
         };
     };
-    let view = BncCellView::parse(previous).map_err(|_| TileError::InvalidSource)?;
+    let limits = bnc_limits(previous, max_output_bytes)?;
+    let view = BncCellView::parse(previous, &limits).map_err(|_| TileError::InvalidSource)?;
     match change {
         BncChange::Clear | BncChange::FormulaClear => match view
-            .clear_value_with_limit(max_output_bytes)
+            .clear_value(&limits)
             .map_err(map_bnc_error)?
         {
             ClearValue::Delete if matches!(change, BncChange::Clear) => Ok(CellMutation::Delete),
@@ -3021,32 +3059,30 @@ fn mutate_cell(
             ClearValue::Retain(bytes) => Ok(CellMutation::Replace(bytes)),
         },
         BncChange::Set(input) => view
-            .rewrite_scalar_with_limit(input.as_wire(), max_output_bytes)
+            .rewrite_scalar(input.as_wire(), &limits)
             .map(CellMutation::Replace)
             .map_err(map_bnc_error),
         BncChange::FormulaSet { identifier, cache } => match cache {
-            Some(cache) => {
-                view.rewrite_formula_with_limit(identifier, cache.as_wire(), max_output_bytes)
-            },
-            None => view.rewrite_formula_without_cache_with_limit(identifier, max_output_bytes),
+            Some(cache) => view.rewrite_formula(identifier, cache.as_wire(), &limits),
+            None => view.rewrite_formula_without_cache(identifier, &limits),
         }
         .map(CellMutation::Replace)
         .map_err(map_bnc_error),
         BncChange::FormulaCache(input) => view
-            .rewrite_formula_cache_with_limit(input.as_wire(), max_output_bytes)
+            .rewrite_formula_cache(input.as_wire(), &limits)
             .map(CellMutation::Replace)
             .map_err(map_bnc_error),
         BncChange::CommentClear {
             expected_identifier,
         } => view
-            .clear_comment_with_limit(expected_identifier, max_output_bytes)
+            .clear_comment(expected_identifier, &limits)
             .map(CellMutation::Replace)
             .map_err(map_bnc_error),
         BncChange::CommentSet { identifier } => {
-            let mut cell = litchi_numbers_wire::BncCell::parse(previous)
+            let mut cell = litchi_numbers_wire::BncCell::parse(previous, &limits)
                 .map_err(|_| TileError::InvalidSource)?;
             cell.set_comment_identifier(Some(identifier));
-            cell.try_encode_with_limit(max_output_bytes)
+            cell.encode(&limits)
                 .map(CellMutation::Replace)
                 .map_err(map_bnc_error)
         },
@@ -3099,7 +3135,11 @@ impl CacheScalarInput {
 
 fn map_bnc_error(error: BncError) -> TileError {
     match error {
-        BncError::OutputLimitExceeded { observed, maximum } => {
+        BncError::LimitExceeded {
+            kind: _,
+            observed,
+            maximum,
+        } => {
             let Ok(observed) = u64::try_from(observed) else {
                 return TileError::InvalidSource;
             };
@@ -3110,7 +3150,14 @@ fn map_bnc_error(error: BncError) -> TileError {
         },
         BncError::Allocation { requested } => TileError::Allocation { amount: requested },
         BncError::InvalidFormat(_) | BncError::ParseError(_) => TileError::InvalidSource,
+        _ => TileError::InvalidSource,
     }
+}
+
+fn bnc_limits(source: &[u8], max_output_bytes: usize) -> Result<crate::cell::wire::Limits> {
+    crate::cell::wire::limits_for_source(source)
+        .with_output_bytes(max_output_bytes)
+        .map_err(|_| TileError::InvalidSource)
 }
 
 /// Classify one optional raw BNC slot without taking ownership of it.
@@ -3118,7 +3165,8 @@ pub(crate) fn classify_bnc_cell(cell: Option<&[u8]>) -> Result<CellValue> {
     let Some(cell) = cell else {
         return Ok(CellValue::Missing);
     };
-    let cell = BncCellView::parse(cell).map_err(|_| TileError::InvalidSource)?;
+    let cell = BncCellView::parse(cell, &crate::cell::wire::limits_for_source(cell))
+        .map_err(|_| TileError::InvalidSource)?;
     Ok(classify_bnc_view(&cell))
 }
 
@@ -3145,7 +3193,8 @@ pub(crate) fn bnc_references(cell: Option<&[u8]>) -> Result<CellReferences> {
     let Some(cell) = cell else {
         return Ok(CellReferences::default());
     };
-    let cell = BncCellView::parse(cell).map_err(|_| TileError::InvalidSource)?;
+    let cell = BncCellView::parse(cell, &crate::cell::wire::limits_for_source(cell))
+        .map_err(|_| TileError::InvalidSource)?;
     Ok(bnc_references_view(&cell))
 }
 
@@ -3172,7 +3221,8 @@ fn classify_bnc_with_references(
     let Some(cell) = cell else {
         return Ok((CellValue::Missing, CellReferences::default(), None));
     };
-    let view = BncCellView::parse(cell).map_err(|_| TileError::InvalidSource)?;
+    let view = BncCellView::parse(cell, &crate::cell::wire::limits_for_source(cell))
+        .map_err(|_| TileError::InvalidSource)?;
     let formula_cache = if matches!(view.stored_value(), StoredValue::Formula(_)) {
         match view.cached_scalar() {
             Some(CachedScalar::Number(value)) => Some(FormulaCacheValue::Number(value)),
@@ -3199,7 +3249,8 @@ pub(crate) fn bnc_change_is_noop(cell: Option<&[u8]>, change: BncChange) -> Resu
     let Some(cell) = cell else {
         return Ok(matches!(change, BncChange::Clear));
     };
-    let view = BncCellView::parse(cell).map_err(|_| TileError::InvalidSource)?;
+    let view = BncCellView::parse(cell, &crate::cell::wire::limits_for_source(cell))
+        .map_err(|_| TileError::InvalidSource)?;
     Ok(match change {
         BncChange::Clear => matches!(view.stored_value(), StoredValue::Empty),
         BncChange::FormulaClear => false,
@@ -3369,7 +3420,8 @@ fn plan_row_message(
     previous_wide: Option<bool>,
     wide: bool,
 ) -> Result<RowMessageLayout> {
-    let view = WireView::parse(source).map_err(|_| TileError::InvalidSource)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|_| TileError::InvalidSource)?;
     let mut count_present = false;
     let mut storage_present = false;
     let mut offsets_present = false;
@@ -3429,7 +3481,8 @@ fn write_row_message(
     layout: RowMessageLayout,
     counters: &mut Counters,
 ) -> Result<Vec<u8>> {
-    let view = WireView::parse(source).map_err(|_| TileError::InvalidSource)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|_| TileError::InvalidSource)?;
     counters.charge(u64_from_usize(layout.output_len)?)?;
     let mut output = Vec::new();
     counters.preflight_scratch_allocation(layout.output_len)?;
@@ -3958,7 +4011,7 @@ mod tests {
     }
 
     fn unknown_99(payload: &[u8]) -> Vec<u8> {
-        WireView::parse(payload)
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
             .expect("tile wire")
             .fields()
             .find(|field| field.number() == 99)
@@ -4053,25 +4106,37 @@ mod tests {
                     && maximum == (positions.len() - 1) as u64
         ));
 
+        // A row the populated tile does not store is a missing cell, and a
+        // write materializes it before the stored row that follows it.
         let populated = populated_template();
         let missing_position = [TileReadPosition { row: 0, column: 0 }];
-        assert!(matches!(
-            preclassify_tile(&populated, 2, &missing_position, limits()),
-            Err(TileError::NeedSparse { row: 0, column: 0 })
-        ));
-        assert!(matches!(
-            rewrite_tile(TileRewriteRequest {
-                source: &populated,
-                columns: 2,
-                changes: &[TileChange {
-                    row: 0,
-                    column: 0,
-                    change: BncChange::Set(ScalarInput::Boolean(true)),
-                }],
-                limits: limits(),
-            }),
-            Err(TileError::NeedSparse { row: 0, column: 0 })
-        ));
+        let missing = preclassify_tile(&populated, 2, &missing_position, limits())
+            .expect("a missing row classifies");
+        assert_eq!(missing.cells.len(), 1);
+        assert_eq!(missing.cells[0].before, CellValue::Missing);
+        assert!(!missing.cells[0].present);
+        let inserted = rewrite_tile(TileRewriteRequest {
+            source: &populated,
+            columns: 2,
+            changes: &[TileChange {
+                row: 0,
+                column: 0,
+                change: BncChange::Set(ScalarInput::Boolean(true)),
+            }],
+            limits: limits(),
+        })
+        .expect("a missing row before a stored row materializes");
+        let payload = inserted.payload.as_deref().expect("replacement payload");
+        let (tile, rows) = decode_rows(payload);
+        assert_eq!(tile.num_rows(), 2);
+        assert_eq!(
+            rows.values
+                .iter()
+                .map(|(row, cells, ..)| (*row, *cells))
+                .collect::<Vec<_>>(),
+            [(0, 1), (4, 0)]
+        );
+        assert_eq!(unknown_99(payload), unknown_99(&populated));
 
         let outcome = rewrite_tile(TileRewriteRequest {
             source: &source,
@@ -4305,16 +4370,16 @@ mod tests {
     fn grouped_scalar_and_formula_cache_changes_serialize_one_tile_once() {
         let mut a2 = BncCell::minimal();
         a2.set_number(120.0).unwrap();
-        let a2 = a2.encode();
+        let a2 = a2.encode(&crate::cell::wire::Limits::DEFAULT).unwrap();
         let mut b2 = BncCell::minimal();
         b2.set_comment_identifier(Some(9));
         b2.set_number(323.0).unwrap();
         b2.set_formula_reference(17);
-        let mut b2 = b2.encode();
+        let mut b2 = b2.encode(&crate::cell::wire::Limits::DEFAULT).unwrap();
         b2.extend_from_slice(&[0xde, 0xad, 0xbe, 0xef]);
         let mut c2 = BncCell::minimal();
         c2.set_rich_text(29);
-        let c2 = c2.encode();
+        let c2 = c2.encode(&crate::cell::wire::Limits::DEFAULT).unwrap();
         let source = one_row_tile(1, &[Some(a2), Some(b2.clone()), Some(c2)]);
 
         let cache_noop = [CacheChange {
@@ -4361,12 +4426,19 @@ mod tests {
         let (_, rows) = decode_rows(payload);
         let row = &rows.values[0];
         assert_eq!(
-            BncCellView::parse(row_cell(row, 0))
-                .unwrap()
-                .cached_scalar(),
+            BncCellView::parse(
+                row_cell(row, 0),
+                &crate::cell::wire::limits_for_source(row_cell(row, 0))
+            )
+            .unwrap()
+            .cached_scalar(),
             Some(CachedScalar::Number(FiniteF64::new(121.0).unwrap()))
         );
-        let cached_formula = BncCellView::parse(row_cell(row, 1)).unwrap();
+        let cached_formula = BncCellView::parse(
+            row_cell(row, 1),
+            &crate::cell::wire::limits_for_source(row_cell(row, 1)),
+        )
+        .unwrap();
         assert_eq!(cached_formula.stored_value(), StoredValue::Formula(17));
         assert_eq!(
             cached_formula.cached_scalar(),
@@ -4412,7 +4484,12 @@ mod tests {
         let mut cell = BncCell::minimal();
         cell.set_number(42.0).unwrap();
         cell.set_comment_identifier(Some(9));
-        let source = one_row_tile(0, &[Some(cell.encode())]);
+        let source = one_row_tile(
+            0,
+            &[Some(
+                cell.encode(&crate::cell::wire::Limits::DEFAULT).unwrap(),
+            )],
+        );
         let changes = [TileChange {
             row: 0,
             column: 0,
@@ -4431,7 +4508,8 @@ mod tests {
         let payload = outcome.payload.as_deref().unwrap();
         let (_, rows) = decode_rows(payload);
         let rewritten = row_cell(&rows.values[0], 0);
-        let view = BncCellView::parse(rewritten).unwrap();
+        let view = BncCellView::parse(rewritten, &crate::cell::wire::limits_for_source(rewritten))
+            .unwrap();
         assert_eq!(view.stored_value(), StoredValue::Number);
         assert_eq!(view.comment_identifier(), None);
         assert_eq!(outcome.transitions.len(), 1);
@@ -4460,7 +4538,7 @@ mod tests {
     fn comment_set_materializes_a_missing_slot_and_preserves_siblings() {
         let mut sibling = BncCell::minimal();
         sibling.set_number(42.0).unwrap();
-        let sibling = sibling.encode();
+        let sibling = sibling.encode(&crate::cell::wire::Limits::DEFAULT).unwrap();
         let source = one_row_tile(0, &[Some(sibling.clone()), None]);
         let changes = [TileChange {
             row: 0,
@@ -4484,9 +4562,12 @@ mod tests {
         let row = &rows.values[0];
         assert_eq!(row_cell(row, 0), sibling);
         assert_eq!(
-            BncCellView::parse(row_cell(row, 1))
-                .unwrap()
-                .comment_identifier(),
+            BncCellView::parse(
+                row_cell(row, 1),
+                &crate::cell::wire::limits_for_source(row_cell(row, 1))
+            )
+            .unwrap()
+            .comment_identifier(),
             Some(7)
         );
         assert_eq!(outcome.transitions.len(), 1);
@@ -4506,7 +4587,7 @@ mod tests {
         let mut formula = BncCell::minimal();
         formula.set_number(50.0).expect("finite cache");
         formula.set_formula_reference(17);
-        let formula = formula.encode();
+        let formula = formula.encode(&crate::cell::wire::Limits::DEFAULT).unwrap();
         let source = one_row_tile(2, &[Some(formula.clone())]);
         let changes = [TileChange {
             row: 2,
@@ -4529,7 +4610,11 @@ mod tests {
             .as_deref()
             .expect("explicit empty replacement");
         let (_, rows) = decode_rows(payload);
-        let cell = BncCellView::parse(row_cell(&rows.values[0], 0)).expect("empty BNC");
+        let cell = BncCellView::parse(
+            row_cell(&rows.values[0], 0),
+            &crate::cell::wire::limits_for_source(row_cell(&rows.values[0], 0)),
+        )
+        .expect("empty BNC");
         assert_eq!(cell.stored_value(), StoredValue::Empty);
         assert_eq!(cell.formula_error_identifier(), None);
         assert_eq!(outcome.final_rows[0].cell_count, 1);
@@ -4568,7 +4653,13 @@ mod tests {
         let mut formula = BncCell::minimal();
         formula.set_number(7.0).unwrap();
         formula.set_formula_reference(11);
-        let source = one_row_tile(1, &[Some(formula.encode()), None]);
+        let source = one_row_tile(
+            1,
+            &[
+                Some(formula.encode(&crate::cell::wire::Limits::DEFAULT).unwrap()),
+                None,
+            ],
+        );
         let changes = [
             TileChange {
                 row: 1,
@@ -4599,15 +4690,21 @@ mod tests {
             [1, 2]
         );
         assert_eq!(
-            BncCellView::parse(row_cell(&rows.values[0], 0))
-                .unwrap()
-                .stored_value(),
+            BncCellView::parse(
+                row_cell(&rows.values[0], 0),
+                &crate::cell::wire::limits_for_source(row_cell(&rows.values[0], 0))
+            )
+            .unwrap()
+            .stored_value(),
             StoredValue::Empty
         );
         assert!(matches!(
-            BncCellView::parse(row_cell(&rows.values[1], 1))
-                .unwrap()
-                .stored_value(),
+            BncCellView::parse(
+                row_cell(&rows.values[1], 1),
+                &crate::cell::wire::limits_for_source(row_cell(&rows.values[1], 1))
+            )
+            .unwrap()
+            .stored_value(),
             StoredValue::Formula(12)
         ));
         assert_eq!(outcome.transitions.len(), 2);
@@ -4636,7 +4733,13 @@ mod tests {
         let mut formula = BncCell::minimal();
         formula.set_number(7.0).unwrap();
         formula.set_formula_reference(11);
-        let source = one_row_tile(1, &[Some(formula.encode()), None]);
+        let source = one_row_tile(
+            1,
+            &[
+                Some(formula.encode(&crate::cell::wire::Limits::DEFAULT).unwrap()),
+                None,
+            ],
+        );
         let changes = [
             TileChange {
                 row: 1,
@@ -4726,7 +4829,12 @@ mod tests {
         let mut formula = BncCell::minimal();
         formula.set_string(27);
         formula.set_formula_reference(11);
-        let source = one_row_tile(2, &[Some(formula.encode())]);
+        let source = one_row_tile(
+            2,
+            &[Some(
+                formula.encode(&crate::cell::wire::Limits::DEFAULT).unwrap(),
+            )],
+        );
 
         let scan = scan_formula_cells(&source, 1, limits()).expect("formula scan");
 

@@ -1,17 +1,22 @@
 //! Public API and codec regressions for the mail-merge owner.
 
-use super::model::{MAX_STRING_BYTES, STRICT_W, W};
+use super::model::{DataSourceObject, FieldMap, MAX_STRING_BYTES, STRICT_W, W};
 use super::{
     Conformance, DataType, Destination, FieldMappingType, MainDocumentType, Recipient, Recipients,
-    parse_settings_mail_merge,
+    parse_settings_mail_merge, parse_settings_mail_merge_with_mce_limits,
 };
 use crate::Error;
+use litchi_ooxml_common::mce::{Error as MceError, LimitKind, Limits as MceLimits};
 
 const SETTINGS: &str = r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:mailMerge><w:mainDocumentType w:val="email"/><w:linkToQuery/><w:dataType w:val="native"/><w:connectString w:val="Provider=Inert&amp;X=1"/><w:query w:val="SELECT * FROM inert"/><w:dataSource r:id="source"/><w:destination w:val="email"/><w:mailSubject w:val="A &amp; B"/><w:mailAsAttachment/><w:viewMergedData/><w:activeRecord w:val="3"/><w:checkErrors w:val="3"/><w:odso><w:table w:val="Sheet1$"/><w:src r:id="source"/><w:colDelim w:val="9"/><w:type w:val="database"/><w:fHdr/><w:fieldMapData><w:type w:val="dbColumn"/><w:name w:val="Name"/><w:mappedName w:val="Last Name"/><w:column w:val="0"/><w:lid w:val="en-US"/><w:dynamicAddress/></w:fieldMapData><w:recipientData r:id="recipients"/></w:odso></w:mailMerge><w:trackRevisions/></w:settings>"#;
 
+fn limits() -> MceLimits {
+    MceLimits::default()
+}
+
 #[test]
 fn parses_and_deterministically_writes_complete_strict_metadata() {
-    let value = parse_settings_mail_merge(SETTINGS.as_bytes())
+    let value = parse_settings_mail_merge(SETTINGS.as_bytes(), &limits())
         .unwrap()
         .unwrap();
     assert_eq!(value.main_document_type(), MainDocumentType::Email);
@@ -22,13 +27,16 @@ fn parses_and_deterministically_writes_complete_strict_metadata() {
         value.odso().unwrap().field_maps()[0].mapping_type(),
         Some(FieldMappingType::DatabaseColumn)
     );
-    let fragment = value.to_xml(Conformance::Strict).unwrap();
+    let fragment = value.to_xml(Conformance::Strict, &limits()).unwrap();
     let wrapped = format!(r#"<s:settings xmlns:s="{STRICT_W}">{fragment}</s:settings>"#);
-    let reparsed = parse_settings_mail_merge(wrapped.as_bytes())
+    let reparsed = parse_settings_mail_merge(wrapped.as_bytes(), &limits())
         .unwrap()
         .unwrap();
     assert_eq!(reparsed, value);
-    assert_eq!(reparsed.to_xml(Conformance::Strict).unwrap(), fragment);
+    assert_eq!(
+        reparsed.to_xml(Conformance::Strict, &limits()).unwrap(),
+        fragment
+    );
 }
 
 #[test]
@@ -36,7 +44,9 @@ fn applies_defaults_and_mce_fallback_and_preservation() {
     let xml = format!(
         r#"<w:settings xmlns:w="{W}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:future" mc:Ignorable="x"><w:mailMerge mc:Ignorable="x" mc:PreserveAttributes="x:*" x:future="kept"><mc:AlternateContent><mc:Choice Requires="x"><x:dataType/></mc:Choice><mc:Fallback><w:viewMergedData/></mc:Fallback></mc:AlternateContent></w:mailMerge></w:settings>"#
     );
-    let value = parse_settings_mail_merge(xml.as_bytes()).unwrap().unwrap();
+    let value = parse_settings_mail_merge(xml.as_bytes(), &limits())
+        .unwrap()
+        .unwrap();
     assert_eq!(value.main_document_type(), MainDocumentType::FormLetters);
     assert_eq!(value.destination(), Destination::NewDocument);
     assert_eq!(value.active_record(), 1);
@@ -68,27 +78,46 @@ fn rejects_malformed_scoped_ordered_bounded_metadata() {
     ];
     for xml in invalid {
         assert!(
-            parse_settings_mail_merge(xml.as_bytes()).is_err(),
+            parse_settings_mail_merge(xml.as_bytes(), &limits()).is_err(),
             "accepted {xml}"
         );
     }
     let recipients = format!(
         r#"<w:recipients xmlns:w="{W}"><w:recipientData><w:uniqueTag w:val="AQ="/></w:recipientData></w:recipients>"#
     );
-    assert!(Recipients::parse_xml(recipients.as_bytes()).is_err());
+    assert!(Recipients::parse_xml(recipients.as_bytes(), &limits()).is_err());
+}
+
+#[test]
+fn bounded_settings_parser_preserves_typed_mce_limits() {
+    let xml = format!(r#"<w:settings xmlns:w="{W}"/>"#);
+    let maximum = xml.len() - 1;
+    let limits = MceLimits {
+        max_input_bytes: xml.len(),
+        max_output_bytes: maximum,
+        ..MceLimits::default()
+    };
+    assert!(matches!(
+        parse_settings_mail_merge_with_mce_limits(xml.as_bytes(), &limits),
+        Err(Error::Mce(MceError::LimitExceeded {
+            kind: LimitKind::OutputBytes,
+            observed,
+            maximum: actual_maximum,
+        })) if observed == xml.len() && actual_maximum == maximum
+    ));
 }
 
 #[test]
 fn rejects_mismatched_end_tags_and_oversized_attributes() {
     let mismatched = format!(r#"<w:settings xmlns:w="{W}"><w:mailMerge></w:settings>"#);
-    assert!(parse_settings_mail_merge(mismatched.as_bytes()).is_err());
+    assert!(parse_settings_mail_merge(mismatched.as_bytes(), &limits()).is_err());
 
     let oversized_value = "x".repeat(MAX_STRING_BYTES + 1);
     let oversized = format!(
         r#"<w:settings xmlns:w="{W}"><w:mailMerge><w:query w:val="{oversized_value}"/></w:mailMerge></w:settings>"#
     );
     assert!(matches!(
-        parse_settings_mail_merge(oversized.as_bytes()),
+        parse_settings_mail_merge(oversized.as_bytes(), &limits()),
         Err(Error::Invalid(message))
             if message == "mail-merge XML attribute is too large"
     ));
@@ -101,10 +130,67 @@ fn round_trips_strict_recipient_data_with_canonical_base64() {
         .add_recipient(Recipient::new(false, Some(7), Some(vec![1, 2, 3])))
         .unwrap();
 
-    let xml = recipients.to_xml(Conformance::Strict).unwrap();
+    let xml = recipients.to_xml(Conformance::Strict, &limits()).unwrap();
     assert!(xml.contains(STRICT_W));
     assert!(xml.contains("AQID"));
-    assert_eq!(Recipients::parse_xml(xml.as_bytes()).unwrap(), recipients);
+    assert_eq!(
+        Recipients::parse_xml(xml.as_bytes(), &limits()).unwrap(),
+        recipients
+    );
+}
+
+#[test]
+fn writers_refuse_output_over_the_callers_mce_budget() {
+    let limits = MceLimits {
+        max_output_bytes: 1,
+        ..MceLimits::default()
+    };
+    let settings = parse_settings_mail_merge(SETTINGS.as_bytes(), &MceLimits::default())
+        .unwrap()
+        .unwrap();
+    assert!(matches!(
+        settings.to_xml(Conformance::Strict, &limits),
+        Err(Error::MailMergeLimit {
+            kind: super::LimitKind::XmlBytes,
+            actual,
+            maximum: 1,
+        }) if actual > 1
+    ));
+
+    let mut recipients = Recipients::new();
+    recipients
+        .add_recipient(Recipient::new(false, Some(7), Some(vec![1, 2, 3])))
+        .unwrap();
+    assert!(matches!(
+        recipients.to_xml(Conformance::Strict, &limits),
+        Err(Error::MailMergeLimit {
+            kind: super::LimitKind::XmlBytes,
+            actual,
+            maximum: 1,
+        }) if actual > 1
+    ));
+}
+
+#[test]
+fn nested_authoring_strings_are_checked_before_serialization() {
+    let mut odso = DataSourceObject::new();
+    odso.set_udl(Some("x".repeat(MAX_STRING_BYTES + 1)));
+    let mut settings = super::Settings::new();
+    settings.set_odso(Some(odso));
+    assert!(matches!(
+        settings.to_xml(Conformance::Strict, &limits()),
+        Err(Error::Invalid(message)) if message == "odso udl is too large"
+    ));
+
+    let mut odso = DataSourceObject::new();
+    let mut field = FieldMap::new();
+    field.set_name(Some("x".repeat(MAX_STRING_BYTES + 1)));
+    odso.add_field_map(field);
+    settings.set_odso(Some(odso));
+    assert!(matches!(
+        settings.to_xml(Conformance::Strict, &limits()),
+        Err(Error::Invalid(message)) if message == "field-map name is too large"
+    ));
 }
 
 #[test]
@@ -112,7 +198,7 @@ fn source_checked_settings_edits_preserve_opaque_owner_markup() {
     let source = format!(
         r#"<w:settings xmlns:w="{W}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:future"><x:before/><w:mailMerge><w:query w:val="old"/><x:opaque keep="yes"/></w:mailMerge><x:after/></w:settings>"#
     );
-    let snapshot = super::Snapshot::from_xml(source.as_bytes().to_vec()).unwrap();
+    let snapshot = super::Snapshot::from_xml(source.as_bytes().to_vec(), &limits()).unwrap();
     let mut edit = snapshot.edit();
     edit.edit_settings(|settings| {
         settings.set_query(Some("new".into()));
@@ -136,6 +222,7 @@ fn source_checked_settings_edits_preserve_opaque_owner_markup() {
         source
             .replace("w:val=\"old\"", "w:val=\"stale\"")
             .into_bytes(),
+        &limits(),
     )
     .unwrap();
     assert!(commit.patch().apply(&stale).is_err());
@@ -147,9 +234,12 @@ fn recipient_transaction_is_typed_bounded_and_reversible() {
     let recipients = format!(
         r#"<w:recipients xmlns:w="{W}" xmlns:x="urn:future"><w:recipientData><w:active w:val="0"/></w:recipientData><x:opaque/></w:recipients>"#
     );
-    let snapshot =
-        super::Snapshot::from_parts(settings.into_bytes(), Some(recipients.as_bytes().to_vec()))
-            .unwrap();
+    let snapshot = super::Snapshot::from_parts(
+        settings.into_bytes(),
+        Some(recipients.as_bytes().to_vec()),
+        &limits(),
+    )
+    .unwrap();
     let mut edit = snapshot.edit();
     edit.set_recipient_active(0, true).unwrap();
     let commit = edit.commit().unwrap();
@@ -173,7 +263,7 @@ fn exact_noop_retains_source_and_invalid_recipient_edits_are_atomic() {
     let settings = format!(
         r#"<w:settings xmlns:w="{W}"><w:mailMerge><w:query w:val="same"/></w:mailMerge></w:settings>"#
     );
-    let snapshot = super::Snapshot::from_xml(settings.as_bytes().to_vec()).unwrap();
+    let snapshot = super::Snapshot::from_xml(settings.as_bytes().to_vec(), &limits()).unwrap();
     let mut no_op = snapshot.edit();
     no_op
         .edit_settings(|settings| {
@@ -186,8 +276,12 @@ fn exact_noop_retains_source_and_invalid_recipient_edits_are_atomic() {
     assert_eq!(no_op.snapshot().xml_bytes(), settings.as_bytes());
 
     let recipients = format!(r#"<w:recipients xmlns:w="{W}"><w:recipientData/></w:recipients>"#);
-    let snapshot =
-        super::Snapshot::from_parts(settings.into_bytes(), Some(recipients.into_bytes())).unwrap();
+    let snapshot = super::Snapshot::from_parts(
+        settings.into_bytes(),
+        Some(recipients.into_bytes()),
+        &limits(),
+    )
+    .unwrap();
     let before = snapshot.recipients().unwrap().clone();
     let mut edit = snapshot.edit();
     assert!(edit.set_recipient_active(1, true).is_err());

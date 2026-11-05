@@ -1,0 +1,8 @@
+before opc-open ooxml/docx/drawing.docx n=10: ==1919423==   total heap usage: 10,820 allocs, 10,819 frees, 4,403,581 bytes allocated
+before opc-open ooxml/docx/drawing.docx n=20: ==1919427==   total heap usage: 20,640 allocs, 20,639 frees, 8,403,121 bytes allocated
+before docx-open-text ooxml/docx/drawing.docx n=10: ==1919433==   total heap usage: 186,435 allocs, 186,434 frees, 33,425,030 bytes allocated
+before docx-open-text ooxml/docx/drawing.docx n=20: ==1919482==   total heap usage: 355,905 allocs, 355,904 frees, 63,807,700 bytes allocated
+before pptx-open-text poi/test-data/slideshow/45545_Comment.pptx n=10: ==1919510==   total heap usage: 74,565 allocs, 74,564 frees, 21,654,048 bytes allocated
+before pptx-open-text poi/test-data/slideshow/45545_Comment.pptx n=20: ==1919555==   total heap usage: 142,335 allocs, 142,334 frees, 41,335,808 bytes allocated
+before opc-open poi/test-data/slideshow/45545_Comment.pptx n=10: ==1919579==   total heap usage: 43,721 allocs, 43,720 frees, 8,094,430 bytes allocated
+before opc-open poi/test-data/slideshow/45545_Comment.pptx n=20: ==1919587==   total heap usage: 83,451 allocs, 83,450 frees, 15,449,270 bytes allocated

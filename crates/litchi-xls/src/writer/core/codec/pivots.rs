@@ -1,8 +1,8 @@
 use super::super::model::validate_pivot_table_config;
 use super::super::{
-    CellPos, CellValue, PivotCacheValue, PivotCellXfRole, PivotFieldConfig, PivotTableConfig,
-    WritableCell, WritablePivotDataItem, WritablePivotField, WritablePivotItem, WritablePivotTable,
-    Writer,
+    Builder, CellPos, CellValue, PivotCacheValue, PivotCellXfRole, PivotFieldConfig,
+    PivotTableConfig, WritableCell, WritablePivotDataItem, WritablePivotField, WritablePivotItem,
+    WritablePivotTable,
 };
 use crate::error::{Error, Result};
 use crate::pivot_table::{
@@ -77,7 +77,7 @@ fn check_view_extension_bytes(view: &[u8]) -> Result<()> {
     Ok(())
 }
 
-impl Writer {
+impl Builder {
     /// Add a pivot table definition to a worksheet.
     ///
     /// This writes the SX* record family (SXVS, SXVIEW, SXVD, SXVI, SXDI,

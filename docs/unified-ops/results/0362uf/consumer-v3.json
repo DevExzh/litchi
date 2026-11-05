@@ -1,0 +1,24 @@
+{
+  "source": "0befb112d96d2409e6f40c9abfeb4813665905ad",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--all-features"
+      ],
+      "exit": 101,
+      "seconds": 583.8179515970405,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v3/check-0.log",
+      "bytes": 24863,
+      "sha256": "6b4e02615fccc7c3f6fc934cd30d87f34f325e2ae6f0e220102e0203dbf47a61",
+      "target_bytes_before": 18304325632,
+      "completed_test_executables_pruned": []
+    }
+  ],
+  "note": "XLSX library check progressed; DOCX stops at missing concat comma and denied unused qualification. Harness check not reached."
+}

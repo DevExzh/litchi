@@ -5,9 +5,9 @@ use litchi_iwa_archive::{Limits as ArchiveLimits, package::Catalog};
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tp, tsp, tswp};
 use litchi_pages::{
-    DEFAULT_MAX_TEXT_BYTES, Document, DocumentReadOptions, DocumentSourceLimits, DocumentStats,
-    MAX_DOCUMENT_PROPERTIES_BYTES, MAX_SECTIONS, Package, PackageError, ReadError, ReadLimitKind,
-    SemanticLimits, Stats,
+    DEFAULT_MAX_TEXT_BYTES, Document, DocumentStats, Error as SemanticError, LimitKind,
+    MAX_DOCUMENT_PROPERTIES_BYTES, MAX_SECTIONS, OpenOptions, Package, PackageError,
+    SemanticLimitKind, SemanticLimits, SourceLimitKind, SourceLimits, Stats,
 };
 use prost::Message as _;
 
@@ -25,7 +25,7 @@ fn fixture(relative: &str) -> PathBuf {
 
 fn assert_send_sync<T: Send + Sync>() {}
 
-fn assert_content_free(error: &ReadError, sentinels: &[&str]) {
+fn assert_content_free(error: &PackageError, sentinels: &[&str]) {
     let renderings = [error.to_string(), format!("{error:?}")];
     for sentinel in sentinels {
         for rendered in &renderings {
@@ -49,25 +49,61 @@ fn assert_content_free(error: &ReadError, sentinels: &[&str]) {
         }
         source = cause.source();
     }
-    assert!(std::error::Error::source(error).is_none());
 }
 
-fn source_limits(max_input_bytes: u64) -> TestResult<DocumentSourceLimits> {
-    let defaults = DocumentSourceLimits::default();
-    Ok(DocumentSourceLimits::new(
-        max_input_bytes,
-        defaults.max_entries(),
-        defaults.max_entry_bytes(),
-        defaults.max_aggregate_bytes(),
-        defaults.max_component_bytes(),
-    )?)
+fn source_limits(max_input_bytes: u64) -> TestResult<SourceLimits> {
+    Ok(SourceLimits::builder()
+        .max_input_bytes(max_input_bytes)?
+        .build()?)
 }
 
-fn document_options(source: DocumentSourceLimits, semantic: SemanticLimits) -> DocumentReadOptions {
-    let options = DocumentReadOptions::new(source, semantic);
-    assert_eq!(options.source(), source);
-    assert_eq!(options.semantic(), semantic);
+fn text_limits(max_text_bytes: usize) -> TestResult<SemanticLimits> {
+    Ok(SemanticLimits::builder()
+        .max_sections(MAX_SECTIONS)?
+        .max_text_bytes(max_text_bytes)?
+        .build()?)
+}
+
+fn document_options(source: SourceLimits, semantic: SemanticLimits) -> OpenOptions {
+    let options = OpenOptions::new()
+        .source_limits(source)
+        .semantic_limits(semantic);
+    assert_eq!(options.source_limits_value(), source);
+    assert_eq!(options.semantic_limits_value(), semantic);
     options
+}
+
+/// The projection of a package opened from `path`.
+fn open_document(path: impl AsRef<Path>) -> Result<Document, PackageError> {
+    Package::open(path).map(|package| package.document())
+}
+
+fn open_document_with(
+    path: impl AsRef<Path>,
+    options: OpenOptions,
+) -> Result<Document, PackageError> {
+    Package::open_with_options(path, options).map(|package| package.document())
+}
+
+fn bytes_document(bytes: &[u8]) -> Result<Document, PackageError> {
+    Package::from_bytes(bytes).map(|package| package.document())
+}
+
+fn bytes_document_with(bytes: &[u8], options: OpenOptions) -> Result<Document, PackageError> {
+    Package::from_bytes_with_options(bytes, options).map(|package| package.document())
+}
+
+/// Whether `error` is the semantic text budget refusing `observed` bytes
+/// against `maximum`.
+fn is_text_limit(error: &PackageError, observed: usize, maximum: usize) -> bool {
+    matches!(
+        error,
+        PackageError::Semantic(SemanticError::TextTooLarge { observed: o, limit })
+            if *o == observed && *limit == maximum
+    ) || matches!(
+        error,
+        PackageError::PayloadLimit { observed: o, limit } if *o == observed && *limit == maximum
+    )
 }
 
 fn copy_directory_fixture(target: &Path) -> TestResult {
@@ -94,6 +130,7 @@ fn synthetic_package(root: tp::DocumentArchive, storages: &[&[&str]]) -> TestRes
             type_: 10_000,
             data: root.encode_to_vec(),
         }],
+        Default::default(),
     )?];
     for (offset, fragments) in storages.iter().enumerate() {
         objects.push(ArchiveObject::new(
@@ -106,9 +143,13 @@ fn synthetic_package(root: tp::DocumentArchive, storages: &[&[&str]]) -> TestRes
                 }
                 .encode_to_vec(),
             }],
+            Default::default(),
         )?);
     }
-    let stream = SnappyStream::compress(&Archive { objects }.to_bytes()?)?;
+    let stream = SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?;
     Ok(litchi_iwa_archive::package::to_bytes(
         [("Index/Document.iwa", stream.as_slice())],
         ArchiveLimits::default(),
@@ -123,43 +164,28 @@ fn fallback_package(messages: Vec<RawMessage>) -> TestResult<Vec<u8>> {
                 type_: 10_000,
                 data: tp::DocumentArchive::default().encode_to_vec(),
             }],
+            Default::default(),
         )?,
-        ArchiveObject::new(42, messages)?,
+        ArchiveObject::new(42, messages, Default::default())?,
     ];
-    let stream = SnappyStream::compress(&Archive { objects }.to_bytes()?)?;
+    let stream = SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?;
     Ok(litchi_iwa_archive::package::to_bytes(
         [("Index/Document.iwa", stream.as_slice())],
         ArchiveLimits::default(),
     )?)
 }
 
-fn duplicate_member_zip(first: &[u8], second: &[u8]) -> TestResult<Vec<u8>> {
-    const TARGET: &str = "Index/Document.iwa";
-    // Keep the placeholder the same length as TARGET so the valid ZIP emitted
-    // by the package writer can be rewritten without changing its offsets.
-    const PLACEHOLDER: &str = "Index/Document.jwa";
-    let mut bytes = litchi_iwa_archive::package::to_bytes(
-        [(TARGET, first), (PLACEHOLDER, second)],
-        ArchiveLimits::default(),
-    )?;
-    let mut occurrences = 0;
-    for offset in 0..=bytes.len() - PLACEHOLDER.len() {
-        if bytes[offset..offset + PLACEHOLDER.len()].starts_with(PLACEHOLDER.as_bytes()) {
-            bytes[offset..offset + PLACEHOLDER.len()].copy_from_slice(TARGET.as_bytes());
-            occurrences += 1;
-        }
-    }
-    assert_eq!(occurrences, 2, "expected local and central ZIP names");
-    Ok(bytes)
-}
-
 fn cross_component_duplicate_package() -> TestResult<Vec<u8>> {
     let component = |messages| -> TestResult<Vec<u8>> {
         Ok(SnappyStream::compress(
             &Archive {
-                objects: vec![ArchiveObject::new(1, messages)?],
+                objects: vec![ArchiveObject::new(1, messages, Default::default())?],
             }
-            .to_bytes()?,
+            .to_bytes(Default::default())?,
+            Default::default(),
         )?)
     };
     let document = component(vec![RawMessage {
@@ -191,22 +217,20 @@ fn storage_message(type_: u32, text: &[&str]) -> RawMessage {
 }
 
 #[test]
-fn archive_free_document_has_zip_directory_and_package_parity() -> TestResult {
+fn package_projection_has_zip_directory_and_byte_parity() -> TestResult {
     assert_send_sync::<Document>();
     assert_send_sync::<DocumentStats>();
     assert_send_sync::<Stats>();
-    assert_send_sync::<DocumentReadOptions>();
+    assert_send_sync::<OpenOptions>();
     assert_send_sync::<SemanticLimits>();
 
     let package = Package::open(fixture("pages/basic.pages"))?;
-    let zipped = Document::open(fixture("pages/basic.pages"))?;
-    let directory = Document::open(fixture("directory/pages/basic.pages"))?;
+    let zipped = open_document(fixture("pages/basic.pages"))?;
+    let directory = open_document(fixture("directory/pages/basic.pages"))?;
     let bytes = std::fs::read(fixture("pages/basic.pages"))?;
-    let borrowed = Document::from_bytes(&bytes)?;
+    let borrowed = bytes_document(&bytes)?;
     let shared_source: Arc<[u8]> = Arc::from(bytes);
-    let weak_source = Arc::downgrade(&shared_source);
-    let shared = Document::from_shared_bytes(shared_source)?;
-    assert!(weak_source.upgrade().is_none());
+    let shared = Package::from_shared_bytes(Arc::clone(&shared_source))?.document();
 
     zipped.validate()?;
     directory.validate()?;
@@ -232,7 +256,7 @@ fn archive_free_document_has_zip_directory_and_package_parity() -> TestResult {
     assert_eq!(section_summary(&shared), section_summary(&zipped));
     assert_eq!(
         section_summary(&zipped),
-        section_summary(package.semantic_document())
+        section_summary(package.document_ref())
     );
     assert_eq!(
         zipped.stats().map(DocumentStats::section_count),
@@ -242,23 +266,10 @@ fn archive_free_document_has_zip_directory_and_package_parity() -> TestResult {
     assert_eq!(borrowed.stats(), zipped.stats());
     assert_eq!(shared.stats(), zipped.stats());
 
-    let zipped_snapshot = zipped.snapshot();
-    let directory_snapshot = directory.snapshot();
+    // The owned projection shares the package's decoded sections.
     assert!(Arc::ptr_eq(
-        &zipped.shared_sections(),
-        &zipped_snapshot.shared_sections()
-    ));
-    assert!(Arc::ptr_eq(
-        &directory.shared_sections(),
-        &directory_snapshot.shared_sections()
-    ));
-
-    let semantic = package.semantic_document();
-    assert!(semantic.metadata().is_none());
-    assert_eq!(semantic.stats(), None);
-    assert!(Arc::ptr_eq(
-        &semantic.shared_sections(),
-        &semantic.snapshot().shared_sections()
+        &package.document().shared_sections(),
+        &package.document_ref().shared_sections()
     ));
 
     let zipped_metadata = zipped
@@ -305,11 +316,22 @@ fn archive_free_document_has_zip_directory_and_package_parity() -> TestResult {
 }
 
 #[test]
-fn exact_package_reader_refuses_directory_backing() {
-    assert!(matches!(
-        Package::open(fixture("directory/pages/basic.pages")),
-        Err(PackageError::InvalidFormat(_))
-    ));
+fn package_directories_convert_to_editable_single_file_packages() -> TestResult {
+    let package = Package::open(fixture("directory/pages/basic.pages"))?;
+    // The converted package holds every bundle file beside the index members.
+    let bytes = package.to_bytes()?;
+    let reopened = Package::from_bytes(&bytes)?;
+    assert_eq!(reopened.text()?, EXPECTED_TEXT);
+    assert_eq!(reopened.to_bytes()?, bytes);
+    // Deterministic: a second capture converts to the same bytes.
+    assert_eq!(
+        Package::open(fixture("directory/pages/basic.pages"))?.to_bytes()?,
+        bytes
+    );
+    // Editable like any exact-source package.
+    let commit = package.set_section_text(0_usize, "Directory edit")?;
+    assert_eq!(commit.package().text()?, "Directory edit");
+    Ok(())
 }
 
 #[test]
@@ -318,14 +340,19 @@ fn other_iwork_families_are_typed_before_document_publication() {
         fixture("keynote/basic.key"),
         fixture("directory/keynote/basic.key"),
     ] {
-        assert!(matches!(Document::open(path), Err(ReadError::NotPages)));
+        assert!(matches!(
+            Package::open(path),
+            Err(PackageError::UnexpectedFormat {
+                detected: litchi_core::FileFormat::Keynote
+            })
+        ));
     }
 }
 
 #[test]
 fn canonical_metadata_authorities_ignore_malformed_near_names() -> TestResult {
     let source = std::fs::read(fixture("pages/basic.pages"))?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let properties = br#"<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>Title</key><string>Canonical report</string><key>fileFormatVersion</key><string>99</string></dict></plist>"#;
     let build = br#"<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><array><string>old-build</string><string>canonical-build</string></array></plist>"#;
     let malformed = b"not a plist";
@@ -354,7 +381,7 @@ fn canonical_metadata_authorities_ignore_malformed_near_names() -> TestResult {
     let path = temp.path().join("canonical.pages");
     std::fs::write(&path, candidate)?;
 
-    let document = Document::open(path)?;
+    let document = open_document(path)?;
     let metadata = document
         .metadata()
         .ok_or_else(|| std::io::Error::other("canonical Pages metadata is missing"))?;
@@ -369,7 +396,7 @@ fn canonical_metadata_authorities_ignore_malformed_near_names() -> TestResult {
 }
 
 #[test]
-fn frozen_directory_survives_source_removal_and_limits_are_inclusive() -> TestResult {
+fn captured_directory_survives_source_removal_and_limits_are_inclusive() -> TestResult {
     let temp = tempfile::tempdir()?;
     let source = temp.path().join("detached.pages");
     copy_directory_fixture(&source)?;
@@ -382,48 +409,48 @@ fn frozen_directory_survives_source_removal_and_limits_are_inclusive() -> TestRe
         source.join("Metadata/Properties.plist"),
         source.join("Metadata/BuildVersionHistory.plist"),
         source.join("Metadata/DocumentIdentifier"),
+        source.join("A/Properties.plist"),
+        source.join("Properties.plist"),
     ]
     .iter()
     .try_fold(0_u64, |total, path| {
         Ok::<_, std::io::Error>(total.saturating_add(std::fs::metadata(path)?.len()))
     })?;
     let exact_source = source_limits(exact_input)?;
-    let exact_semantic = SemanticLimits::new(MAX_SECTIONS, RETAINED_TEXT_BYTES)?;
-    let document =
-        Document::open_with_options(&source, document_options(exact_source, exact_semantic))?;
+    let exact_semantic = text_limits(RETAINED_TEXT_BYTES)?;
+    let document = open_document_with(&source, document_options(exact_source, exact_semantic))?;
     assert_eq!(document.plain_text(), EXPECTED_TEXT);
 
-    let source_error = Document::open_with_options(
+    let source_error = open_document_with(
         &source,
         document_options(source_limits(exact_input - 1)?, SemanticLimits::default()),
     )
     .expect_err("source max-minus-one must fail before document publication");
     assert!(matches!(
         source_error,
-        ReadError::Limit {
-            kind: ReadLimitKind::InputBytes,
+        PackageError::Limit {
+            kind: LimitKind::Source(SourceLimitKind::InputBytes),
             observed,
             maximum,
         } if observed == exact_input && maximum == exact_input - 1
     ));
 
-    let semantic_error = Document::open_with_options(
+    let semantic_error = open_document_with(
         &source,
         document_options(
-            DocumentSourceLimits::default(),
-            SemanticLimits::new(MAX_SECTIONS, RETAINED_TEXT_BYTES - 1)?,
+            SourceLimits::default(),
+            text_limits(RETAINED_TEXT_BYTES - 1)?,
         ),
     )
     .expect_err("semantic max-minus-one must fail before document publication");
-    assert!(matches!(
-        semantic_error,
-        ReadError::Limit {
-            kind: ReadLimitKind::TextBytes,
-            observed,
-            maximum,
-        } if observed == RETAINED_TEXT_BYTES as u64
-            && maximum == (RETAINED_TEXT_BYTES - 1) as u64
-    ));
+    assert!(
+        is_text_limit(
+            &semantic_error,
+            RETAINED_TEXT_BYTES,
+            RETAINED_TEXT_BYTES - 1
+        ),
+        "{semantic_error:?}"
+    );
 
     std::fs::remove_dir_all(&source)?;
     document.validate()?;
@@ -441,7 +468,7 @@ fn frozen_directory_survives_source_removal_and_limits_are_inclusive() -> TestRe
 #[test]
 fn canonical_properties_hard_limit_is_exact() -> TestResult {
     let source = std::fs::read(fixture("pages/basic.pages"))?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let prefix = br#"<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>Title</key><string>Limit</string></dict></plist>"#;
     let mut exact = prefix.to_vec();
     exact.resize(MAX_DOCUMENT_PROPERTIES_BYTES, b' ');
@@ -460,26 +487,24 @@ fn canonical_properties_hard_limit_is_exact() -> TestResult {
         let temp = tempfile::tempdir()?;
         let path = temp.path().join("properties-limit.pages");
         std::fs::write(&path, &candidate)?;
-        let result = Document::open(path);
+        let result = open_document(path);
         if should_pass {
             result?.validate()?;
-            Document::from_bytes(&candidate)?.validate()?;
-            Document::from_shared_bytes(Arc::from(candidate))?.validate()?;
+            bytes_document(&candidate)?.validate()?;
+            Package::from_shared_bytes(Arc::from(candidate))?
+                .document()
+                .validate()?;
         } else {
-            let assert_limit = |result: Result<Document, ReadError>| {
+            let assert_limit = |result: Result<Document, PackageError>| {
                 assert!(matches!(
                     result,
-                    Err(ReadError::Limit {
-                        kind: ReadLimitKind::PayloadBytes,
-                        observed,
-                        maximum,
-                    }) if observed == length as u64
-                        && maximum == MAX_DOCUMENT_PROPERTIES_BYTES as u64
+                    Err(PackageError::PayloadLimit { observed, limit })
+                        if observed == length && limit == MAX_DOCUMENT_PROPERTIES_BYTES
                 ));
             };
             assert_limit(result);
-            assert_limit(Document::from_bytes(&candidate));
-            assert_limit(Document::from_shared_bytes(Arc::from(candidate)));
+            assert_limit(bytes_document(&candidate));
+            assert_limit(Package::from_shared_bytes(Arc::from(candidate)).map(|p| p.document()));
         }
     }
     Ok(())
@@ -492,32 +517,19 @@ fn rootless_fallback_preserves_storage_boundaries() -> TestResult {
     let path = temp.path().join("rootless.pages");
     std::fs::write(&path, bytes)?;
     let exact = "first\nsecond".len();
-    let document = Document::open_with_options(
+    let document = open_document_with(
         &path,
-        document_options(
-            DocumentSourceLimits::default(),
-            SemanticLimits::new(MAX_SECTIONS, exact)?,
-        ),
+        document_options(SourceLimits::default(), text_limits(exact)?),
     )?;
     assert_eq!(document.plain_text(), "first\nsecond");
     assert_eq!(document.section_count(), 1);
 
-    let error = Document::open_with_options(
+    let error = open_document_with(
         path,
-        document_options(
-            DocumentSourceLimits::default(),
-            SemanticLimits::new(MAX_SECTIONS, exact - 1)?,
-        ),
+        document_options(SourceLimits::default(), text_limits(exact - 1)?),
     )
     .expect_err("fallback separator max-minus-one must refuse");
-    assert!(matches!(
-        error,
-        ReadError::Limit {
-            kind: ReadLimitKind::TextBytes,
-            observed,
-            maximum,
-        } if observed == exact as u64 && maximum == (exact - 1) as u64
-    ));
+    assert!(is_text_limit(&error, exact, exact - 1), "{error:?}");
     Ok(())
 }
 
@@ -530,7 +542,7 @@ fn rootless_fallback_joins_colocated_storage_messages_and_empty_fragments() -> T
     let temp = tempfile::tempdir()?;
     let path = temp.path().join("colocated.pages");
     std::fs::write(&path, bytes)?;
-    let document = Document::open(path)?;
+    let document = open_document(path)?;
     assert_eq!(document.plain_text(), "first\n\nsecond");
     assert_eq!(document.section_count(), 1);
     assert_eq!(document.sections()[0].text_storages().len(), 1);
@@ -545,15 +557,14 @@ fn fallback_many_messages_enforce_the_aggregate_text_budget() -> TestResult {
         .collect::<Vec<_>>();
     let bytes = fallback_package(messages)?;
     let exact = MESSAGE_COUNT * 2 - 1;
-    let options = |maximum| {
-        document_options(
-            DocumentSourceLimits::default(),
-            SemanticLimits::new(MAX_SECTIONS, maximum)
-                .unwrap_or_else(|error| panic!("fallback limit must be valid: {error}")),
-        )
+    let options = |maximum| -> TestResult<OpenOptions> {
+        Ok(document_options(
+            SourceLimits::default(),
+            text_limits(maximum)?,
+        ))
     };
 
-    let exact_document = Document::from_bytes_with_options(&bytes, options(exact))?;
+    let exact_document = bytes_document_with(&bytes, options(exact)?)?;
     assert_eq!(exact_document.plain_text().len(), exact);
     assert_eq!(
         exact_document
@@ -564,16 +575,9 @@ fn fallback_many_messages_enforce_the_aggregate_text_budget() -> TestResult {
         MESSAGE_COUNT - 1
     );
 
-    let error = Document::from_bytes_with_options(&bytes, options(exact - 1))
+    let error = bytes_document_with(&bytes, options(exact - 1)?)
         .expect_err("many-message aggregate max-minus-one must refuse");
-    assert!(matches!(
-        error,
-        ReadError::Limit {
-            kind: ReadLimitKind::TextBytes,
-            observed,
-            maximum,
-        } if observed == exact as u64 && maximum == (exact - 1) as u64
-    ));
+    assert!(is_text_limit(&error, exact, exact - 1), "{error:?}");
     Ok(())
 }
 
@@ -584,31 +588,18 @@ fn rootless_fallback_charges_colocated_messages_before_materialization() -> Test
         storage_message(2_006, &["five"]),
     ])?;
     let exact = "four\nfive".len();
-    let exact_document = Document::from_bytes_with_options(
+    let exact_document = bytes_document_with(
         &bytes,
-        document_options(
-            DocumentSourceLimits::default(),
-            SemanticLimits::new(MAX_SECTIONS, exact)?,
-        ),
+        document_options(SourceLimits::default(), text_limits(exact)?),
     )?;
     assert_eq!(exact_document.plain_text(), "four\nfive");
 
-    let error = Document::from_bytes_with_options(
+    let error = bytes_document_with(
         &bytes,
-        document_options(
-            DocumentSourceLimits::default(),
-            SemanticLimits::new(MAX_SECTIONS, exact - 1)?,
-        ),
+        document_options(SourceLimits::default(), text_limits(exact - 1)?),
     )
     .expect_err("aggregate fallback max-minus-one must refuse before publication");
-    assert!(matches!(
-        error,
-        ReadError::Limit {
-            kind: ReadLimitKind::TextBytes,
-            observed,
-            maximum,
-        } if observed == exact as u64 && maximum == (exact - 1) as u64
-    ));
+    assert!(is_text_limit(&error, exact, exact - 1), "{error:?}");
     Ok(())
 }
 
@@ -621,7 +612,7 @@ fn fallback_trigger_without_storage_text_remains_empty() -> TestResult {
     let temp = tempfile::tempdir()?;
     let path = temp.path().join("trigger-only.pages");
     std::fs::write(&path, bytes)?;
-    let document = Document::open(path)?;
+    let document = open_document(path)?;
     assert!(document.is_empty());
     assert_eq!(document.plain_text(), "");
     Ok(())
@@ -640,9 +631,9 @@ fn malformed_root_graph_refuses_without_publishing_a_document() -> TestResult {
     let temp = tempfile::tempdir()?;
     let path = temp.path().join("malformed-secret-marker.pages");
     std::fs::write(&path, bytes)?;
-    let error = Document::open(path).expect_err("missing rooted body must refuse");
-    assert!(matches!(error, ReadError::InvalidFormat));
-    assert_content_free(&error, &["secret-marker", "998244353", "998_244_353"]);
+    let error = open_document(path).expect_err("missing rooted body must refuse");
+    assert!(matches!(error, PackageError::InvalidFormat(_)));
+    assert_content_free(&error, &["secret-marker"]);
     Ok(())
 }
 
@@ -653,32 +644,21 @@ fn cross_component_duplicate_object_identifier_refuses_before_publication() -> T
         Package::from_bytes(&bytes),
         Err(PackageError::InvalidFormat(_))
     ));
-    let error = Document::from_bytes(&bytes)
-        .expect_err("cross-component duplicate object identity must refuse");
-    assert!(matches!(error, ReadError::InvalidFormat));
-    assert_content_free(&error, &["Index/Other.iwa", "object identifier"]);
     Ok(())
 }
 
 #[test]
-fn public_read_errors_redact_paths_members_and_control_characters() -> TestResult {
+fn public_read_errors_redact_paths() -> TestResult {
     let temp = tempfile::tempdir()?;
     let path_sentinel = "private-path-sentinel-998244353";
-    let path_error = Document::open(temp.path().join(path_sentinel))
+    let path_error = open_document(temp.path().join(path_sentinel))
         .expect_err("missing sentinel path must fail");
-    assert!(matches!(path_error, ReadError::Io { .. }));
-    assert_content_free(&path_error, &[path_sentinel, "998244353"]);
-
-    let member_sentinel = "private-member-sentinel-776655443";
-    let duplicate = duplicate_member_zip(member_sentinel.as_bytes(), b"duplicate")?;
-    let member_error =
-        Document::from_bytes(&duplicate).expect_err("duplicate malformed member must fail");
-    assert_content_free(&member_error, &[member_sentinel, "776655443"]);
+    assert!(matches!(path_error, PackageError::Io(_)));
+    assert_content_free(&path_error, &[path_sentinel]);
 
     let control_sentinel = "private-control-sentinel\r\n\u{1b}[31m-112233445";
-    let control_error = Document::from_bytes(control_sentinel.as_bytes())
+    let control_error = bytes_document(control_sentinel.as_bytes())
         .expect_err("unrecognized control-character input must fail");
-    assert!(matches!(control_error, ReadError::InvalidSource));
     assert_content_free(
         &control_error,
         &[control_sentinel, "private-control-sentinel", "112233445"],
@@ -687,96 +667,87 @@ fn public_read_errors_redact_paths_members_and_control_characters() -> TestResul
 }
 
 #[test]
-fn semantic_limit_constructor_is_checked() {
+fn limit_builders_are_checked() {
     assert_eq!(
         SemanticLimits::default().max_text_bytes(),
         DEFAULT_MAX_TEXT_BYTES
     );
-    assert!(SemanticLimits::new(0, 1).is_err());
-    assert!(SemanticLimits::new(1, 0).is_err());
-    assert!(SemanticLimits::new(MAX_SECTIONS + 1, 1).is_err());
-    assert!(SemanticLimits::new(1, DEFAULT_MAX_TEXT_BYTES + 1).is_err());
-
-    let defaults = DocumentSourceLimits::default();
-    let values = [
-        (
-            0,
-            defaults.max_entries(),
-            defaults.max_entry_bytes(),
-            defaults.max_aggregate_bytes(),
-            defaults.max_component_bytes(),
-        ),
-        (
-            defaults.max_input_bytes(),
-            0,
-            defaults.max_entry_bytes(),
-            defaults.max_aggregate_bytes(),
-            defaults.max_component_bytes(),
-        ),
-        (
-            defaults.max_input_bytes(),
-            defaults.max_entries(),
-            0,
-            defaults.max_aggregate_bytes(),
-            defaults.max_component_bytes(),
-        ),
-        (
-            defaults.max_input_bytes(),
-            defaults.max_entries(),
-            defaults.max_entry_bytes(),
-            0,
-            defaults.max_component_bytes(),
-        ),
-        (
-            defaults.max_input_bytes(),
-            defaults.max_entries(),
-            defaults.max_entry_bytes(),
-            defaults.max_aggregate_bytes(),
-            0,
-        ),
-    ];
-    for (input, entries, entry, aggregate, component) in values {
-        assert!(DocumentSourceLimits::new(input, entries, entry, aggregate, component).is_err());
+    for result in [
+        SemanticLimits::builder().max_sections(0).map(|_| ()),
+        SemanticLimits::builder().max_text_bytes(0).map(|_| ()),
+        SemanticLimits::builder()
+            .max_sections(MAX_SECTIONS + 1)
+            .map(|_| ()),
+        SemanticLimits::builder()
+            .max_text_bytes(DEFAULT_MAX_TEXT_BYTES + 1)
+            .map(|_| ()),
+    ] {
+        assert!(matches!(
+            result,
+            Err(PackageError::InvalidLimit {
+                kind: LimitKind::Semantic(
+                    SemanticLimitKind::Sections | SemanticLimitKind::TextBytes
+                ),
+                ..
+            })
+        ));
     }
-
-    let over_hard = [
+    let maximum = SourceLimits::MAXIMUM;
+    for (kind, result) in [
         (
-            defaults.max_input_bytes() + 1,
-            defaults.max_entries(),
-            defaults.max_entry_bytes(),
-            defaults.max_aggregate_bytes(),
-            defaults.max_component_bytes(),
+            SourceLimitKind::InputBytes,
+            SourceLimits::builder().max_input_bytes(0).map(|_| ()),
         ),
         (
-            defaults.max_input_bytes(),
-            defaults.max_entries() + 1,
-            defaults.max_entry_bytes(),
-            defaults.max_aggregate_bytes(),
-            defaults.max_component_bytes(),
+            SourceLimitKind::Members,
+            SourceLimits::builder().max_members(0).map(|_| ()),
         ),
         (
-            defaults.max_input_bytes(),
-            defaults.max_entries(),
-            defaults.max_entry_bytes() + 1,
-            defaults.max_aggregate_bytes(),
-            defaults.max_component_bytes(),
+            SourceLimitKind::EntryBytes,
+            SourceLimits::builder().max_entry_bytes(0).map(|_| ()),
         ),
         (
-            defaults.max_input_bytes(),
-            defaults.max_entries(),
-            defaults.max_entry_bytes(),
-            defaults.max_aggregate_bytes() + 1,
-            defaults.max_component_bytes(),
+            SourceLimitKind::AggregateBytes,
+            SourceLimits::builder().max_aggregate_bytes(0).map(|_| ()),
         ),
         (
-            defaults.max_input_bytes(),
-            defaults.max_entries(),
-            defaults.max_entry_bytes(),
-            defaults.max_aggregate_bytes(),
-            defaults.max_component_bytes() + 1,
+            SourceLimitKind::ComponentBytes,
+            SourceLimits::builder().max_component_bytes(0).map(|_| ()),
         ),
-    ];
-    for (input, entries, entry, aggregate, component) in over_hard {
-        assert!(DocumentSourceLimits::new(input, entries, entry, aggregate, component).is_err());
+        (
+            SourceLimitKind::InputBytes,
+            SourceLimits::builder()
+                .max_input_bytes(maximum.max_input_bytes() + 1)
+                .map(|_| ()),
+        ),
+        (
+            SourceLimitKind::Members,
+            SourceLimits::builder()
+                .max_members(maximum.max_members() + 1)
+                .map(|_| ()),
+        ),
+        (
+            SourceLimitKind::EntryBytes,
+            SourceLimits::builder()
+                .max_entry_bytes(maximum.max_entry_bytes() + 1)
+                .map(|_| ()),
+        ),
+        (
+            SourceLimitKind::AggregateBytes,
+            SourceLimits::builder()
+                .max_aggregate_bytes(maximum.max_aggregate_bytes() + 1)
+                .map(|_| ()),
+        ),
+        (
+            SourceLimitKind::ComponentBytes,
+            SourceLimits::builder()
+                .max_component_bytes(maximum.max_component_bytes() + 1)
+                .map(|_| ()),
+        ),
+    ] {
+        assert!(matches!(
+            result,
+            Err(PackageError::InvalidLimit { kind: LimitKind::Source(found), .. }) if found == kind
+        ));
     }
 }

@@ -3,7 +3,8 @@
 use quick_xml::encoding::Decoder;
 use quick_xml::events::BytesStart;
 
-use litchi_core::sheet::Result as SheetResult;
+use crate::Result as SheetResult;
+use crate::error::invalid;
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 use litchi_sheet::Rect;
 
@@ -14,7 +15,7 @@ pub(super) fn required_string(
     description: &str,
 ) -> SheetResult<String> {
     unqualified_attribute_value(element, name, decoder)?
-        .ok_or_else(|| format!("missing {description} attribute").into())
+        .ok_or_else(|| invalid(format!("missing {description} attribute")))
 }
 
 pub(super) fn optional_u32(
@@ -27,7 +28,7 @@ pub(super) fn optional_u32(
         .map(|value| {
             value
                 .parse::<u32>()
-                .map_err(|_source| format!("invalid {description} '{value}'").into())
+                .map_err(|_source| invalid(format!("invalid {description} '{value}'")))
         })
         .transpose()
 }
@@ -39,7 +40,7 @@ pub(super) fn required_u32(
     description: &str,
 ) -> SheetResult<u32> {
     optional_u32(element, name, decoder, description)?
-        .ok_or_else(|| format!("missing {description} attribute").into())
+        .ok_or_else(|| invalid(format!("missing {description} attribute")))
 }
 
 pub(super) fn required_i32(
@@ -51,7 +52,7 @@ pub(super) fn required_i32(
     let value = required_string(element, name, decoder, description)?;
     value
         .parse::<i32>()
-        .map_err(|_source| format!("invalid {description} '{value}'").into())
+        .map_err(|_source| invalid(format!("invalid {description} '{value}'")))
 }
 
 pub(super) fn optional_i32(
@@ -64,7 +65,7 @@ pub(super) fn optional_i32(
         .map(|value| {
             value
                 .parse::<i32>()
-                .map_err(|_source| format!("invalid {description} '{value}'").into())
+                .map_err(|_source| invalid(format!("invalid {description} '{value}'")))
         })
         .transpose()
 }
@@ -79,7 +80,7 @@ pub(super) fn optional_u8(
         .map(|value| {
             value
                 .parse::<u8>()
-                .map_err(|_source| format!("invalid {description} '{value}'").into())
+                .map_err(|_source| invalid(format!("invalid {description} '{value}'")))
         })
         .transpose()
 }
@@ -94,7 +95,7 @@ pub(super) fn optional_bool(
         .map(|value| match value.as_str() {
             "1" | "true" => Ok(true),
             "0" | "false" => Ok(false),
-            _ => Err(format!("invalid {description} '{value}'").into()),
+            _ => Err(invalid(format!("invalid {description} '{value}'"))),
         })
         .transpose()
 }
@@ -106,7 +107,7 @@ pub(super) fn required_bool(
     description: &str,
 ) -> SheetResult<bool> {
     optional_bool(element, name, decoder, description)?
-        .ok_or_else(|| format!("missing {description} attribute").into())
+        .ok_or_else(|| invalid(format!("missing {description} attribute")))
 }
 
 pub(super) fn optional_f64(
@@ -119,9 +120,9 @@ pub(super) fn optional_f64(
         .map(|value| {
             let parsed = value
                 .parse::<f64>()
-                .map_err(|_source| format!("invalid {description} '{value}'"))?;
+                .map_err(|_source| invalid(format!("invalid {description} '{value}'")))?;
             if !parsed.is_finite() {
-                return Err(format!("{description} must be finite").into());
+                return Err(invalid(format!("{description} must be finite")));
             }
             Ok(parsed)
         })
@@ -135,12 +136,12 @@ pub(super) fn required_f64(
     description: &str,
 ) -> SheetResult<f64> {
     optional_f64(element, name, decoder, description)?
-        .ok_or_else(|| format!("missing {description} attribute").into())
+        .ok_or_else(|| invalid(format!("missing {description} attribute")))
 }
 
 pub(super) fn mark_once(seen: &mut bool, description: &str) -> SheetResult<()> {
     if *seen {
-        return Err(format!("duplicate {description} element").into());
+        return Err(invalid(format!("duplicate {description} element")));
     }
     *seen = true;
     Ok(())
@@ -154,9 +155,9 @@ pub(super) fn validate_count(
     if let Some(expected) = expected
         && usize::try_from(expected) != Ok(actual)
     {
-        return Err(
-            format!("{description} count is {expected}, but {actual} elements were found").into(),
-        );
+        return Err(invalid(format!(
+            "{description} count is {expected}, but {actual} elements were found"
+        )));
     }
     Ok(())
 }
@@ -165,13 +166,13 @@ pub(super) fn validate_cell_range(range: &str, description: &str) -> SheetResult
     let mut references = range.split(':');
     let first = references
         .next()
-        .ok_or_else(|| format!("empty {description}"))?;
+        .ok_or_else(|| invalid(format!("empty {description}")))?;
     Rect::from_a1(&first.replace('$', ""))?;
     if let Some(second) = references.next() {
         Rect::from_a1(&second.replace('$', ""))?;
     }
     if references.next().is_some() {
-        return Err(format!("invalid {description} range '{range}'").into());
+        return Err(invalid(format!("invalid {description} range '{range}'")));
     }
     Ok(())
 }

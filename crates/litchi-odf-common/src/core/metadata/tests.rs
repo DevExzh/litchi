@@ -6,6 +6,7 @@
 )]
 
 use super::*;
+use crate::XmlStreamLimits;
 use litchi_core::Metadata as CoreMetadata;
 
 #[test]
@@ -33,7 +34,7 @@ fn test_odf_metadata_from_xml_empty() {
 </office:meta>
 </office:document-meta>"#;
 
-    let meta = Metadata::from_xml(xml).unwrap();
+    let meta = Metadata::from_xml(xml, XmlStreamLimits::default()).unwrap();
     assert!(meta.title.is_none());
     assert!(meta.creator.is_none());
 }
@@ -48,7 +49,7 @@ fn test_odf_metadata_from_xml_title() {
 </office:meta>
 </office:document-meta>"#;
 
-    let meta = Metadata::from_xml(xml).unwrap();
+    let meta = Metadata::from_xml(xml, XmlStreamLimits::default()).unwrap();
     assert_eq!(meta.title, Some("Test Document".to_string()));
 }
 
@@ -62,7 +63,7 @@ fn test_odf_metadata_from_xml_creator() {
 </office:meta>
 </office:document-meta>"#;
 
-    let meta = Metadata::from_xml(xml).unwrap();
+    let meta = Metadata::from_xml(xml, XmlStreamLimits::default()).unwrap();
     assert_eq!(meta.creator, Some("John Doe".to_string()));
 }
 
@@ -76,7 +77,7 @@ fn test_odf_metadata_from_xml_description() {
 </office:meta>
 </office:document-meta>"#;
 
-    let meta = Metadata::from_xml(xml).unwrap();
+    let meta = Metadata::from_xml(xml, XmlStreamLimits::default()).unwrap();
     assert_eq!(
         meta.description,
         Some("This is a test document".to_string())
@@ -93,7 +94,7 @@ fn test_odf_metadata_from_xml_subject() {
 </office:meta>
 </office:document-meta>"#;
 
-    let meta = Metadata::from_xml(xml).unwrap();
+    let meta = Metadata::from_xml(xml, XmlStreamLimits::default()).unwrap();
     assert_eq!(meta.subject, Some("Testing".to_string()));
 }
 
@@ -109,7 +110,7 @@ fn test_odf_metadata_from_xml_keywords() {
 </office:meta>
 </office:document-meta>"#;
 
-    let meta = Metadata::from_xml(xml).unwrap();
+    let meta = Metadata::from_xml(xml, XmlStreamLimits::default()).unwrap();
     assert_eq!(meta.keywords, vec!["rust", "odf", "testing"]);
 }
 
@@ -123,7 +124,7 @@ fn test_odf_metadata_from_xml_language() {
 </office:meta>
 </office:document-meta>"#;
 
-    let meta = Metadata::from_xml(xml).unwrap();
+    let meta = Metadata::from_xml(xml, XmlStreamLimits::default()).unwrap();
     assert_eq!(meta.language, Some("en-US".to_string()));
 }
 
@@ -139,7 +140,7 @@ fn test_odf_metadata_from_xml_dates() {
 </office:meta>
 </office:document-meta>"#;
 
-    let meta = Metadata::from_xml(xml).unwrap();
+    let meta = Metadata::from_xml(xml, XmlStreamLimits::default()).unwrap();
     assert_eq!(meta.creation_date, Some("2024-01-15T10:30:00Z".to_string()));
     assert_eq!(
         meta.modification_date,
@@ -157,7 +158,7 @@ fn test_odf_metadata_from_xml_generator() {
 </office:meta>
 </office:document-meta>"#;
 
-    let meta = Metadata::from_xml(xml).unwrap();
+    let meta = Metadata::from_xml(xml, XmlStreamLimits::default()).unwrap();
     assert_eq!(meta.generator, Some("LibreOffice/7.0".to_string()));
 }
 
@@ -179,7 +180,7 @@ fn test_odf_metadata_from_xml_statistics() {
 </office:meta>
 </office:document-meta>"#;
 
-    let meta = Metadata::from_xml(xml).unwrap();
+    let meta = Metadata::from_xml(xml, XmlStreamLimits::default()).unwrap();
     // The statistics parsing happens on Start event with attributes
     assert_eq!(meta.statistics.page_count.as_deref(), Some("5"));
     assert_eq!(meta.statistics.paragraph_count.as_deref(), Some("42"));
@@ -201,7 +202,7 @@ fn test_odf_metadata_from_xml_user_defined() {
 </office:meta>
 </office:document-meta>"#;
 
-    let meta = Metadata::from_xml(xml).unwrap();
+    let meta = Metadata::from_xml(xml, XmlStreamLimits::default()).unwrap();
     assert_eq!(
         meta.custom_properties.get("Department"),
         Some(&"Engineering".to_string())
@@ -232,7 +233,7 @@ fn test_odf_metadata_from_xml_full() {
 </office:meta>
 </office:document-meta>"#;
 
-    let meta = Metadata::from_xml(xml).unwrap();
+    let meta = Metadata::from_xml(xml, XmlStreamLimits::default()).unwrap();
     assert_eq!(meta.title, Some("Full Test Document".to_string()));
     assert_eq!(meta.description, Some("A comprehensive test".to_string()));
     assert_eq!(meta.subject, Some("Testing".to_string()));
@@ -278,7 +279,7 @@ fn parses_namespaces_entities_and_complete_metadata_without_annotation_leakage()
   <o:body><o:text><o:annotation><d:creator>Annotation Author</d:creator></o:annotation></o:text></o:body>
 </o:document>"#;
 
-    let metadata = Metadata::from_xml(xml).unwrap();
+    let metadata = Metadata::from_xml(xml, XmlStreamLimits::default()).unwrap();
     assert_eq!(metadata.title.as_deref(), Some("R&D 🍋"));
     assert_eq!(metadata.creator.as_deref(), Some("Last Editor"));
     assert_eq!(metadata.initial_creator.as_deref(), Some("Original Author"));
@@ -347,7 +348,7 @@ fn parses_namespaces_entities_and_complete_metadata_without_annotation_leakage()
         Some("0000000000000000000000007")
     );
     assert_eq!(common.page_count, None);
-    assert!(common.last_printed_time.is_some());
+    assert!(common.last_printed.is_some());
 }
 
 #[test]
@@ -357,7 +358,10 @@ fn rejects_invalid_statistic_and_nested_simple_metadata() {
         r#"<o:document-meta xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="http://purl.org/dc/elements/1.1/"><o:meta><d:title>bad<d:subject>nested</d:subject></d:title></o:meta></o:document-meta>"#,
         r#"<o:document-meta xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:m="urn:oasis:names:tc:opendocument:xmlns:meta:1.0"><o:meta><m:user-defined>missing name</m:user-defined></o:meta></o:document-meta>"#,
     ] {
-        assert!(Metadata::from_xml(xml).is_err(), "accepted {xml}");
+        assert!(
+            Metadata::from_xml(xml, XmlStreamLimits::default()).is_err(),
+            "accepted {xml}"
+        );
     }
 }
 
@@ -403,7 +407,7 @@ fn test_into_metadata_empty() {
     let meta: CoreMetadata = odf.into();
     assert!(meta.title.is_none());
     assert!(meta.author.is_none());
-    assert!(meta.keywords.is_none());
+    assert!(meta.keywords.is_empty());
 }
 
 #[test]
@@ -430,7 +434,7 @@ fn test_into_metadata_with_data() {
     assert_eq!(meta.title, Some("Title".to_string()));
     assert_eq!(meta.author, Some("Author".to_string()));
     assert_eq!(meta.subject, Some("Subject".to_string()));
-    assert_eq!(meta.keywords, Some("a, b".to_string()));
+    assert_eq!(meta.keywords, ["a", "b"]);
     assert_eq!(meta.description, Some("Desc".to_string()));
     assert_eq!(meta.page_count, Some(5));
     assert_eq!(meta.word_count, Some(100));
@@ -448,5 +452,85 @@ fn test_into_metadata_no_keywords() {
     };
 
     let meta: CoreMetadata = odf.into();
-    assert!(meta.keywords.is_none());
+    assert!(meta.keywords.is_empty());
+}
+
+/// Record 0290: both conversions to the common model carry `dc:language`,
+/// so `File::metadata()` reports a written language for every ODF format.
+#[test]
+fn common_metadata_carries_the_language() {
+    let xml = r#"<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/"><office:meta><dc:language>de-DE</dc:language></office:meta></office:document-meta>"#;
+    let converted: CoreMetadata = Metadata::from_xml(xml, XmlStreamLimits::default())
+        .unwrap()
+        .into();
+    assert_eq!(converted.language.as_deref(), Some("de-DE"));
+    let checked = Metadata::from_xml(xml, XmlStreamLimits::default())
+        .unwrap()
+        .try_into_core()
+        .unwrap();
+    assert_eq!(checked.language.as_deref(), Some("de-DE"));
+}
+
+/// Record 0354: a keyword list patches one `meta:keyword` per keyword and
+/// an unchanged list keeps the source elements.
+#[test]
+fn keyword_lists_patch_one_element_per_keyword() {
+    let xml = concat!(
+        r#"<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/">"#,
+        r#"<office:meta><dc:title>T</dc:title><meta:keyword>a, b</meta:keyword><meta:keyword>c</meta:keyword></office:meta></office:document-meta>"#
+    );
+    let source = Metadata::from_xml(xml, XmlStreamLimits::default()).unwrap();
+    assert_eq!(source.keywords, ["a, b", "c"]);
+    let mut current: CoreMetadata = source.clone().into();
+    assert_eq!(current.keywords, ["a, b", "c"]);
+    let unchanged = MetaXmlPatch::preserve_all().diff_simple_fields(&source, &current);
+    assert_eq!(
+        patch_meta_xml(xml, &unchanged, XmlStreamLimits::default())
+            .unwrap()
+            .as_deref(),
+        Some(xml)
+    );
+
+    current.keywords = vec!["x".to_owned(), "y; z".to_owned()];
+    let changed = MetaXmlPatch::preserve_all().diff_simple_fields(&source, &current);
+    let patched = patch_meta_xml(xml, &changed, XmlStreamLimits::default())
+        .unwrap()
+        .unwrap();
+    assert!(
+        patched.contains("<dc:title>T</dc:title><meta:keyword>x</meta:keyword><meta:keyword>y; z</meta:keyword></office:meta>"),
+        "{patched}"
+    );
+    assert_eq!(
+        Metadata::from_xml(&patched, XmlStreamLimits::default())
+            .unwrap()
+            .keywords,
+        ["x", "y; z"]
+    );
+
+    current.keywords.clear();
+    let removed = MetaXmlPatch::preserve_all().diff_simple_fields(&source, &current);
+    let patched = patch_meta_xml(xml, &removed, XmlStreamLimits::default())
+        .unwrap()
+        .unwrap();
+    assert!(!patched.contains("meta:keyword"), "{patched}");
+}
+
+#[test]
+fn metadata_patch_admits_output_before_cloning_values() {
+    let xml = concat!(
+        r#"<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0"><office:meta/></office:document-meta>"#,
+    );
+    let generator = "generator-value-that-exceeds-the-output-envelope";
+    let patch = MetaXmlPatch::preserve_all()
+        .with_generator_and_modification_date(generator, "2026-10-22T00:00:00Z".to_owned());
+    let limits =
+        XmlStreamLimits::new(u64::try_from(xml.len() + 8).unwrap(), 64, 256, 64, 256).unwrap();
+    let error = patch_meta_xml(xml, &patch, limits).unwrap_err();
+    assert!(matches!(
+        error,
+        litchi_core::Error::ResourceLimit(limit)
+            if limit.resource == litchi_core::Resource::OutputBytes
+    ));
 }

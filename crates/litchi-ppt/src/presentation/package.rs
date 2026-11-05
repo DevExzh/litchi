@@ -1,4 +1,4 @@
-use super::model::{LazyPictures, Presentation};
+use super::model::{LazyPictures, Presentation, PresentationData};
 #[cfg(not(feature = "encryption"))]
 use crate::current_user::CurrentUser;
 #[cfg(feature = "encryption")]
@@ -25,38 +25,47 @@ impl Presentation {
     pub(crate) fn from_ole_with_options<R: Read + Seek>(
         ole: &mut OleFile<R>,
         options: OpenOptions<'_>,
-        record_limits: crate::RecordLimits,
+        source_limits: crate::SourceLimits,
     ) -> Result<Self> {
-        // Resolve and charge all hostile stream sizes before materializing any payload.
+        // Resolve and charge every declared stream before materializing any
+        // payload. This covers metadata and opaque streams that are reachable
+        // through the package's raw-property APIs as well as native streams.
+        crate::package::preflight_ole_file(ole, source_limits)?;
+        // Resolve the native streams used by the presentation projection.
         let document = locate_stream(
             ole,
             &DOCUMENT_PATHS,
-            record_limits.max_input_bytes,
+            source_limits.max_input_bytes,
             "PowerPoint Document",
         )?
         .ok_or_else(|| Error::InvalidFormat("PowerPoint Document stream not found".to_string()))?;
         let current_user = locate_stream(
             ole,
             &CURRENT_USER_PATHS,
-            record_limits.max_input_bytes,
+            source_limits.max_input_bytes,
             "Current User",
         )?;
         let pictures = locate_stream(
             ole,
             &PICTURES_PATHS,
-            record_limits.max_input_bytes,
+            source_limits.max_input_bytes,
             "Pictures",
         )?;
         let aggregate_bytes = document
             .1
             .checked_add(current_user.map_or(0, |value| value.1))
             .and_then(|value| value.checked_add(pictures.map_or(0, |entry| entry.1)))
-            .ok_or_else(|| Error::ResourceLimit("PPT stream-size sum overflow".to_string()))?;
-        if aggregate_bytes > record_limits.max_aggregate_input_bytes {
-            return Err(Error::ResourceLimit(format!(
-                "PPT aggregate stream size {aggregate_bytes} exceeds limit {}",
-                record_limits.max_aggregate_input_bytes
-            )));
+            .ok_or(Error::Limit {
+                kind: crate::SourceLimitKind::AggregateBytes,
+                observed: usize::MAX,
+                maximum: source_limits.max_aggregate_input_bytes,
+            })?;
+        if aggregate_bytes > source_limits.max_aggregate_input_bytes {
+            return Err(Error::Limit {
+                kind: crate::SourceLimitKind::AggregateBytes,
+                observed: aggregate_bytes,
+                maximum: source_limits.max_aggregate_input_bytes,
+            });
         }
 
         #[cfg(feature = "encryption")]
@@ -71,14 +80,14 @@ impl Presentation {
             &mut powerpoint_document,
             current_user_data.as_deref(),
             options.password,
-            record_limits,
+            source_limits,
         )?;
         #[cfg(not(feature = "encryption"))]
         {
             let _ = options;
             if let Some(parsed_current_user) = current_user_data
                 .as_deref()
-                .map(CurrentUser::parse)
+                .map(|data| CurrentUser::parse(data, &source_limits))
                 .transpose()?
                 && parsed_current_user.is_encrypted()
             {
@@ -104,20 +113,20 @@ impl Presentation {
             parser.parse_shared_document_at_offsets_with_limits(
                 &powerpoint_document,
                 &encryption.live_offsets,
-                record_limits,
+                source_limits,
             )?;
         } else {
-            parser.parse_shared_document_with_limits(&powerpoint_document, record_limits)?;
+            parser.parse_shared_document_with_limits(&powerpoint_document, source_limits)?;
         }
         #[cfg(not(feature = "encryption"))]
-        parser.parse_shared_document_with_limits(&powerpoint_document, record_limits)?;
+        parser.parse_shared_document_with_limits(&powerpoint_document, source_limits)?;
 
         // The live UserEditAtom, recovered by a stream scan when the Current
         // User stream is missing or its edit offset is unusable (F5.6).
         let head_user_edit = crate::slide::directory::locate_head_user_edit(
             &powerpoint_document,
             current_user_data.as_deref(),
-            record_limits,
+            source_limits,
             &mut tolerance,
         )?;
         #[cfg(feature = "encryption")]
@@ -146,7 +155,7 @@ impl Presentation {
             &powerpoint_document,
             head_user_edit,
             &persist_mapping,
-            record_limits,
+            source_limits,
             &mut tolerance,
         )?;
 
@@ -156,7 +165,7 @@ impl Presentation {
             {
                 let mut stream = ole.open_stream(PICTURES_PATHS[index])?;
                 if let Some(encryption) = &encrypted {
-                    decrypt_pictures(&mut stream, &encryption.crypto, record_limits)?;
+                    decrypt_pictures(&mut stream, &encryption.crypto, source_limits)?;
                 }
                 Some(stream)
             }
@@ -171,16 +180,24 @@ impl Presentation {
         // The metadata streams' repairs follow every record-level repair.
         tolerance.append_property_sets(|path| ole.property_set_stream(path));
 
-        Ok(Self {
+        #[cfg(feature = "encryption")]
+        let encryption_profile = encrypted.as_ref().map(|value| value.profile);
+        Ok(Self::from_data(PresentationData {
             powerpoint_document,
             parser,
             persist_mapping,
             slide_directory,
             pictures_data,
             pictures_source: None,
-            record_limits,
+            source_limits,
+            #[cfg(feature = "vba-inspection")]
+            vba_project_limits: options.vba_project_limits_value(),
             tolerance,
-        })
+            source: None,
+            #[cfg(feature = "encryption")]
+            encryption: encryption_profile,
+            shape_memo: crate::slide::ShapeMemo::default(),
+        }))
     }
 
     /// Build a presentation from one validated positional CFB index.
@@ -191,47 +208,59 @@ impl Presentation {
     pub(crate) fn from_shared_with_options(
         shared: Arc<SharedOleFile>,
         options: OpenOptions<'_>,
-        record_limits: crate::RecordLimits,
+        source_limits: crate::SourceLimits,
     ) -> Result<Self> {
-        let package_bytes = usize::try_from(shared.file_size()).map_err(|_error| {
-            Error::ResourceLimit("PPT package size exceeds this platform".to_string())
+        // Fence the positional source before any metadata or limit decision;
+        // a stale source must never be reported as a fresh limit failure.
+        shared.source_version()?;
+        crate::package::preflight_shared_ole_file(&shared, source_limits)?;
+        let package_bytes = usize::try_from(shared.file_size()).map_err(|_error| Error::Limit {
+            kind: crate::SourceLimitKind::InputBytes,
+            observed: usize::MAX,
+            maximum: source_limits.max_package_bytes,
         })?;
-        if package_bytes > record_limits.max_package_bytes {
-            return Err(Error::ResourceLimit(format!(
-                "PPT package size {package_bytes} exceeds limit {}",
-                record_limits.max_package_bytes
-            )));
+        if package_bytes > source_limits.max_package_bytes {
+            return Err(Error::Limit {
+                kind: crate::SourceLimitKind::InputBytes,
+                observed: package_bytes,
+                maximum: source_limits.max_package_bytes,
+            });
         }
 
         let document = locate_shared_stream(
             &shared,
             &DOCUMENT_PATHS,
-            record_limits.max_input_bytes,
+            source_limits.max_input_bytes,
             "PowerPoint Document",
         )?
         .ok_or_else(|| Error::InvalidFormat("PowerPoint Document stream not found".to_string()))?;
         let current_user = locate_shared_stream(
             &shared,
             &CURRENT_USER_PATHS,
-            record_limits.max_input_bytes,
+            source_limits.max_input_bytes,
             "Current User",
         )?;
         let pictures = locate_shared_stream(
             &shared,
             &PICTURES_PATHS,
-            record_limits.max_input_bytes,
+            source_limits.max_input_bytes,
             "Pictures",
         )?;
         let aggregate_bytes = document
             .1
             .checked_add(current_user.map_or(0, |value| value.1))
             .and_then(|value| value.checked_add(pictures.map_or(0, |entry| entry.1)))
-            .ok_or_else(|| Error::ResourceLimit("PPT stream-size sum overflow".to_string()))?;
-        if aggregate_bytes > record_limits.max_aggregate_input_bytes {
-            return Err(Error::ResourceLimit(format!(
-                "PPT aggregate stream size {aggregate_bytes} exceeds limit {}",
-                record_limits.max_aggregate_input_bytes
-            )));
+            .ok_or(Error::Limit {
+                kind: crate::SourceLimitKind::AggregateBytes,
+                observed: usize::MAX,
+                maximum: source_limits.max_aggregate_input_bytes,
+            })?;
+        if aggregate_bytes > source_limits.max_aggregate_input_bytes {
+            return Err(Error::Limit {
+                kind: crate::SourceLimitKind::AggregateBytes,
+                observed: aggregate_bytes,
+                maximum: source_limits.max_aggregate_input_bytes,
+            });
         }
 
         #[cfg(feature = "encryption")]
@@ -246,14 +275,14 @@ impl Presentation {
             &mut powerpoint_document,
             current_user_data.as_deref(),
             options.password,
-            record_limits,
+            source_limits,
         )?;
         #[cfg(not(feature = "encryption"))]
         {
             let _ = options;
             if let Some(parsed_current_user) = current_user_data
                 .as_deref()
-                .map(CurrentUser::parse)
+                .map(|data| CurrentUser::parse(data, &source_limits))
                 .transpose()?
                 && parsed_current_user.is_encrypted()
             {
@@ -276,20 +305,20 @@ impl Presentation {
             parser.parse_shared_document_at_offsets_with_limits(
                 &powerpoint_document,
                 &encryption.live_offsets,
-                record_limits,
+                source_limits,
             )?;
         } else {
-            parser.parse_shared_document_with_limits(&powerpoint_document, record_limits)?;
+            parser.parse_shared_document_with_limits(&powerpoint_document, source_limits)?;
         }
         #[cfg(not(feature = "encryption"))]
-        parser.parse_shared_document_with_limits(&powerpoint_document, record_limits)?;
+        parser.parse_shared_document_with_limits(&powerpoint_document, source_limits)?;
 
         // The live UserEditAtom, recovered by a stream scan when the Current
         // User stream is missing or its edit offset is unusable (F5.6).
         let head_user_edit = crate::slide::directory::locate_head_user_edit(
             &powerpoint_document,
             current_user_data.as_deref(),
-            record_limits,
+            source_limits,
             &mut tolerance,
         )?;
         #[cfg(feature = "encryption")]
@@ -318,10 +347,12 @@ impl Presentation {
             &powerpoint_document,
             head_user_edit,
             &persist_mapping,
-            record_limits,
+            source_limits,
             &mut tolerance,
         )?;
 
+        #[cfg(feature = "encryption")]
+        let encryption_profile = encrypted.as_ref().map(|value| value.profile);
         #[cfg(feature = "encryption")]
         let pictures_crypto = encrypted.map(|value| value.crypto);
         let pictures_source = pictures.map(|(path, length)| {
@@ -329,7 +360,7 @@ impl Presentation {
                 Arc::clone(&shared),
                 path,
                 length,
-                record_limits,
+                source_limits,
                 #[cfg(feature = "encryption")]
                 pictures_crypto,
             )
@@ -340,16 +371,22 @@ impl Presentation {
         });
         shared.source_version()?;
 
-        Ok(Self {
+        Ok(Self::from_data(PresentationData {
             powerpoint_document,
             parser,
             persist_mapping,
             slide_directory,
             pictures_data: None,
             pictures_source,
-            record_limits,
+            source_limits,
+            #[cfg(feature = "vba-inspection")]
+            vba_project_limits: options.vba_project_limits_value(),
             tolerance,
-        })
+            source: Some(shared),
+            #[cfg(feature = "encryption")]
+            encryption: encryption_profile,
+            shape_memo: crate::slide::ShapeMemo::default(),
+        }))
     }
 }
 
@@ -357,18 +394,22 @@ fn locate_shared_stream(
     shared: &SharedOleFile,
     paths: &[&'static [&'static str]],
     max_bytes: usize,
-    label: &'static str,
+    _label: &'static str,
 ) -> Result<Option<(&'static [&'static str], usize)>> {
     for path in paths {
         match shared.stream_len(path) {
             Ok(size) => {
-                let size_bytes = usize::try_from(size).map_err(|_err| {
-                    Error::ResourceLimit(format!("{label} stream size exceeds this platform"))
+                let size_bytes = usize::try_from(size).map_err(|_err| Error::Limit {
+                    kind: crate::SourceLimitKind::EntryBytes,
+                    observed: usize::MAX,
+                    maximum: max_bytes,
                 })?;
                 if size_bytes > max_bytes {
-                    return Err(Error::ResourceLimit(format!(
-                        "{label} stream size {size_bytes} exceeds limit {max_bytes}"
-                    )));
+                    return Err(Error::Limit {
+                        kind: crate::SourceLimitKind::EntryBytes,
+                        observed: size_bytes,
+                        maximum: max_bytes,
+                    });
                 }
                 return Ok(Some((*path, size_bytes)));
             },
@@ -383,18 +424,22 @@ fn locate_stream<R: Read + Seek>(
     ole: &OleFile<R>,
     paths: &[&[&str]],
     max_bytes: usize,
-    label: &'static str,
+    _label: &'static str,
 ) -> Result<Option<(usize, usize)>> {
     for (index, path) in paths.iter().enumerate() {
         match ole.stream_len(path) {
             Ok(size) => {
-                let size_bytes = usize::try_from(size).map_err(|_err| {
-                    Error::ResourceLimit(format!("{label} stream size exceeds this platform"))
+                let size_bytes = usize::try_from(size).map_err(|_err| Error::Limit {
+                    kind: crate::SourceLimitKind::EntryBytes,
+                    observed: usize::MAX,
+                    maximum: max_bytes,
                 })?;
                 if size_bytes > max_bytes {
-                    return Err(Error::ResourceLimit(format!(
-                        "{label} stream size {size_bytes} exceeds limit {max_bytes}"
-                    )));
+                    return Err(Error::Limit {
+                        kind: crate::SourceLimitKind::EntryBytes,
+                        observed: size_bytes,
+                        maximum: max_bytes,
+                    });
                 }
                 return Ok(Some((index, size_bytes)));
             },

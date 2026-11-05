@@ -52,17 +52,17 @@ struct AudioPayload {
 }
 
 fn audio_payload(source: &[u8]) -> TestResult<AudioPayload> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut found = None;
     for entry in catalog.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = match SnappyStream::decompress(entry.data()) {
+        let stream = match SnappyStream::decompress(entry.data(), Default::default()) {
             Ok(stream) => stream,
             Err(_) => continue,
         };
-        let archive = match Archive::parse(stream.as_bytes()) {
+        let archive = match Archive::parse(stream.as_bytes(), Default::default()) {
             Ok(archive) => archive,
             Err(_) => continue,
         };
@@ -103,12 +103,15 @@ fn rewrite_audio_payload(
     location: &AudioPayload,
     replacement: &[u8],
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == location.member)
         .ok_or_else(|| io::Error::other("native audio component is missing"))?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     let object = archive
         .object_mut(location.object_id)
         .ok_or_else(|| io::Error::other("native audio MovieArchive object is missing"))?;
@@ -126,8 +129,10 @@ fn rewrite_audio_payload(
             type_: MOVIE_MESSAGE_TYPE,
             data: replacement.to_vec(),
         },
+        Default::default(),
     )?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(&location.member, &compressed)],
         Limits::default(),
@@ -153,8 +158,8 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn assert_member_locality(source: &[u8], target: &[u8], changed_member: &str) -> TestResult {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     let mut changed = Vec::new();
     for entry in before.iter() {
         let candidate = after
@@ -179,8 +184,8 @@ fn assert_member_locality(source: &[u8], target: &[u8], changed_member: &str) ->
 }
 
 fn assert_media_asset_untouched(source: &[u8], target: &[u8]) -> TestResult {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     let source_asset = before
         .iter()
         .find(|entry| entry.name() == MEDIA_MEMBER)
@@ -198,7 +203,7 @@ fn assert_media_asset_untouched(source: &[u8], target: &[u8]) -> TestResult {
 }
 
 fn unknown_playback_wire(source: &[u8]) -> TestResult<Vec<Vec<u8>>> {
-    let root = WireView::parse(source)?;
+    let root = WireView::parse(source, WireLimits::DEFAULT)?;
     let super_field = root
         .fields()
         .find(|field| field.number() == 1)
@@ -209,7 +214,7 @@ fn unknown_playback_wire(source: &[u8]) -> TestResult<Vec<Vec<u8>>> {
         .map(|field| field.raw().to_vec())
         .collect::<Vec<_>>();
     records.extend(
-        WireView::parse(super_field.payload())?
+        WireView::parse(super_field.payload(), WireLimits::DEFAULT)?
             .fields()
             .map(|field| field.raw().to_vec()),
     );

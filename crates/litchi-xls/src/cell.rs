@@ -251,6 +251,11 @@ impl Cell {
         self.array_formula().is_some()
     }
 
+    /// The rendered formula text, shared without copying.
+    pub(crate) fn formula_arc(&self) -> Option<Arc<str>> {
+        self.formula.clone()
+    }
+
     pub(crate) fn set_rendered_formula(&mut self, formula: Option<String>) {
         self.formula = formula.map(Arc::from);
     }
@@ -309,29 +314,6 @@ impl CellTrait for Cell {
 
     fn is_formula(&self) -> bool {
         self.formula.is_some() || self.formula_bytes.is_some()
-    }
-}
-
-// Implement Cell for &Cell to allow zero-copy reference returns
-impl CellTrait for &Cell {
-    fn row(&self) -> u32 {
-        (*self).row()
-    }
-
-    fn column(&self) -> u32 {
-        (*self).column()
-    }
-
-    fn coordinate(&self) -> String {
-        (*self).coordinate()
-    }
-
-    fn value(&self) -> &CellValue {
-        (*self).value()
-    }
-
-    fn is_formula(&self) -> bool {
-        (*self).is_formula()
     }
 }
 

@@ -5,7 +5,7 @@
 
 use std::ops::Range;
 
-use litchi_markdown::reader::{Dialect, Error, ReadLimits, Snapshot};
+use litchi_markdown::reader::{Dialect, Error, OpenOptions, ReadLimits, Snapshot};
 use serde::Deserialize;
 
 const COMMONMARK_JSON: &str = include_str!("corpus/commonmark-0.31.2/spec.json");
@@ -66,7 +66,7 @@ fn real_document_fixtures_roundtrip_through_durable_patches() -> Result<(), Erro
             Dialect::GitHubFlavored,
         ),
     ] {
-        let snapshot = Snapshot::read_with(source, dialect, ReadLimits::DEFAULT)?;
+        let snapshot = read_with_policy(source, dialect, ReadLimits::DEFAULT)?;
         let mut edit = snapshot.edit();
         edit.append_block("Roundtrip sentinel")?;
         let commit = edit.commit()?;
@@ -78,14 +78,14 @@ fn real_document_fixtures_roundtrip_through_durable_patches() -> Result<(), Erro
             litchi_markdown::reader::PatchEnvelopeLimits::DEFAULT,
         )?;
         let applied = snapshot.apply(&durable)?;
-        let restored = applied.snapshot().apply(&durable.inverse())?;
-        assert_eq!(restored.snapshot().source().as_bytes(), source.as_bytes());
+        let restored = applied.package().apply(&durable.inverse())?;
+        assert_eq!(restored.package().source().as_bytes(), source.as_bytes());
     }
     Ok(())
 }
 
 fn assert_rendering(example: &Example, dialect: Dialect) -> Result<(), Error> {
-    let actual = Snapshot::read_with(&example.markdown, dialect, ReadLimits::DEFAULT)?.to_html()?;
+    let actual = read_with_policy(&example.markdown, dialect, ReadLimits::DEFAULT)?.to_html()?;
     assert_eq!(
         normalized_html(&actual),
         normalized_html(&example.html),
@@ -100,19 +100,19 @@ fn assert_exact_model_and_reversible_edit(
     example: &Example,
     dialect: Dialect,
 ) -> Result<(), Error> {
-    let snapshot = Snapshot::read_with(&example.markdown, dialect, ReadLimits::DEFAULT)?;
+    let snapshot = read_with_policy(&example.markdown, dialect, ReadLimits::DEFAULT)?;
     assert_eq!(snapshot.source().as_bytes(), example.markdown.as_bytes());
     assert_eq!(
         snapshot,
-        Snapshot::read_with(&example.markdown, dialect, ReadLimits::DEFAULT)?
+        read_with_policy(&example.markdown, dialect, ReadLimits::DEFAULT)?
     );
     assert_ranges(&snapshot, example);
 
     let mut edit = snapshot.edit();
     edit.append_block("release-gate-sentinel")?;
     let committed = edit.commit()?;
-    let restored = committed.snapshot().apply(&committed.patch().inverse())?;
-    assert_eq!(restored.snapshot().source(), snapshot.source());
+    let restored = committed.package().apply(&committed.patch().inverse())?;
+    assert_eq!(restored.package().source(), snapshot.source());
     Ok(())
 }
 
@@ -172,4 +172,11 @@ fn normalized_html(source: &str) -> String {
         .replace("<hr/>", "<hr />")
         .replace(">\n<", "><")
         .replace("<tbody></tbody>", "")
+}
+
+fn read_with_policy(source: &str, dialect: Dialect, limits: ReadLimits) -> Result<Snapshot, Error> {
+    Snapshot::read_with_options(
+        source,
+        OpenOptions::default().dialect(dialect).read_limits(limits),
+    )
 }

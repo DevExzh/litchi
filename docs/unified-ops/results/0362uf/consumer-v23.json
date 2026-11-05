@@ -1,0 +1,54 @@
+{
+  "source": "7de3789eded8f9a54c3eaa9d61f2adecdc736652",
+  "pid": 1867173,
+  "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration",
+  "command": [
+    "python3",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/run-semantic-checks-disk-guarded.py",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-commands-v7.json",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v23"
+  ],
+  "started_unix_seconds": 1792766832.9586873,
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--keep-going"
+      ],
+      "exit": 0,
+      "seconds": 9.757997553000678,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v23/check-0.log",
+      "bytes": 184,
+      "sha256": "a8c0aab4d3a993a4c229ba8dcf1e37e8030209dfaa31c394e9bf51f869eb3003",
+      "target_bytes_before": 18645636005,
+      "completed_test_executables_pruned": []
+    },
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--all-targets",
+        "--all-features",
+        "--keep-going"
+      ],
+      "exit": 101,
+      "seconds": 120.55562314300005,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v23/check-1.log",
+      "bytes": 24710,
+      "sha256": "a183ac997bc1a308c56a5e09914184d19f75f80517245c22f5fa765ffc1631ec",
+      "target_bytes_before": 18645633729,
+      "completed_test_executables_pruned": []
+    }
+  ],
+  "note": "Full workspace all-target/all-feature compilation passes. Perf harness all-target/all-feature compilation fails35 consumer migration errors and1warning; isolated XLSX harness group unreached."
+}

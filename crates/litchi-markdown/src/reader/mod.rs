@@ -13,8 +13,8 @@ mod parse;
 mod transaction;
 
 pub use model::{
-    Block, BlockKind, Blocks, Dialect, Error, Inline, InlineKind, Inlines, NestedBlock,
-    NestedBlocks, ProjectionCapabilities, ProjectionIssue, ProjectionIssueKind,
+    Block, BlockKind, Blocks, Dialect, Error, Inline, InlineKind, Inlines, LimitKind, NestedBlock,
+    NestedBlocks, OpenOptions, ProjectionCapabilities, ProjectionIssue, ProjectionIssueKind,
     ProjectionPreflight, ReadLimits, Reference, ReferenceKind, References, Snapshot,
 };
 pub use transaction::{

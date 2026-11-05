@@ -709,17 +709,17 @@ pub fn verify_with_certs(
     certificates: &[&[u8]],
     policy: &Policy,
 ) -> Result<Report> {
-    if xml.len() > policy.limits().max_signature_bytes() {
+    if xml.len() > policy.limits_value().max_signature_bytes() {
         return Err(Error::Limit("signature XML is too large".into()));
     }
-    let document = Document::parse(xml, policy.limits())?;
+    let document = Document::parse(xml, policy.limits_value())?;
     if !document.is(document.root, DS, "Signature") {
         return Err(Error::Xml("root element must be ds:Signature".into()));
     }
     let signed_info = document.required_child(document.root, DS, "SignedInfo")?;
     let canonicalization = document.required_child(signed_info, DS, "CanonicalizationMethod")?;
     let canon = Canon::parse(document.attr(canonicalization, "Algorithm")?)?;
-    let signed_bytes = document.canonicalize(signed_info, canon, policy.limits())?;
+    let signed_bytes = document.canonicalize(signed_info, canon, policy.limits_value())?;
     let signature_method = document.required_child(signed_info, DS, "SignatureMethod")?;
     let method = Method::parse(document.attr(signature_method, "Algorithm")?)?;
     enforce_weak(method.uses_sha1(), policy)?;
@@ -774,7 +774,7 @@ pub fn verify_with_certs(
             },
             _ => return Err(Error::Xml(format!("unexpected SignedInfo reference {uri}"))),
         };
-        let data = dereference_fragment(&document, reference, node, policy.limits())?;
+        let data = dereference_fragment(&document, reference, node, policy.limits_value())?;
         let (report, weak) =
             verify_digest(&document, reference, &data, Coverage::Complete, policy)?;
         reports.push(report);
@@ -810,7 +810,7 @@ pub fn verify_with_certs(
         .len()
         .checked_add(signed_ids.len())
         .ok_or_else(|| Error::Limit("reference count overflow".into()))?;
-    if total_references > policy.limits().max_references() {
+    if total_references > policy.limits_value().max_references() {
         return Err(Error::Limit("too many signature references".into()));
     }
     let mut seen = HashSet::new();
@@ -845,11 +845,11 @@ pub fn verify_with_certs(
         ));
     }
 
-    let certificates = extract_certificates(&document, certificates, policy.limits())?;
+    let certificates = extract_certificates(&document, certificates, policy.limits_value())?;
     let encoded = document.text(document.required_child(document.root, DS, "SignatureValue")?)?;
     let value = decode64(
         &encoded,
-        policy.limits().max_signature_bytes(),
+        policy.limits_value().max_signature_bytes(),
         "SignatureValue",
     )?;
     let valid_signature = verify_value(
@@ -858,7 +858,7 @@ pub fn verify_with_certs(
         &certificates,
         &signed_bytes,
         &value,
-        policy.limits(),
+        policy.limits_value(),
     )?;
     let integrity = reports
         .iter()
@@ -1895,7 +1895,7 @@ mod tests {
         ));
 
         let evidence = [certificate.as_slice(), certificate.as_slice()];
-        let policy = Policy::strict().with_limits(Limits::standard().certificates(1).unwrap());
+        let policy = Policy::strict().limits(Limits::standard().certificates(1).unwrap());
         let report = verify_with_certs(
             Profile::Package,
             xml.as_bytes(),

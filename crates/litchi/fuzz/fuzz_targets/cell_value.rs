@@ -13,9 +13,11 @@ use std::hint::black_box;
 
 use libfuzzer_sys::fuzz_target;
 use litchi_numbers_wire::cell_value::decode_cell_value;
+use litchi_numbers_wire::Limits;
 
 const MAX_INPUT_BYTES: usize = 1_024;
 const FIXTURE_BYTES: usize = 128;
+const WIRE_LIMITS: Limits = Limits::DEFAULT;
 
 const BNC_VERSION: u8 = 5;
 const BNC_TYPE_EMPTY: u8 = 0;
@@ -99,7 +101,7 @@ fuzz_target!(|data: &[u8]| {
 });
 
 fn exercise_source(source: &[u8]) {
-    match decode_cell_value(source) {
+    match decode_cell_value(source, &WIRE_LIMITS) {
         Ok(value) => {
             black_box((value.value, value.comment_identifier));
         },

@@ -17,7 +17,9 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits,
     OwnedSource, ReadAt, Resource, SourceVersion,
 };
-use litchi_xls::{SourceBackedError, SourceBackedLimits, SourceBackedWorkbook};
+use litchi_xls::{
+    SourceBackedError, SourceBackedLimits, SourceBackedOptions, SourceBackedWorkbook,
+};
 use std::io::{self, Cursor};
 use std::num::{NonZeroU64, NonZeroUsize};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -33,10 +35,13 @@ fn fixture(name: &str) -> Vec<u8> {
 }
 
 fn workbook_stream(bytes: Vec<u8>) -> Vec<u8> {
-    SharedOleFile::open(Arc::new(OwnedSource::new(bytes)))
-        .unwrap()
-        .open_stream(&["Workbook"])
-        .unwrap()
+    SharedOleFile::open(
+        Arc::new(OwnedSource::new(bytes)),
+        litchi_cfb::SharedOleFileLimits::default(),
+    )
+    .unwrap()
+    .open_stream(&["Workbook"])
+    .unwrap()
 }
 
 fn cfb_with_workbook(stream: &[u8]) -> Vec<u8> {
@@ -566,7 +571,11 @@ fn measure_query(
 fn disabled_cache_preserves_values_and_repeats_the_complete_scan() {
     let source = Arc::new(CountingSource::new(large_numeric_workbook(2_000)));
     let limits = SourceBackedLimits::default().with_max_query_index_bytes(0);
-    let owner = SourceBackedWorkbook::from_read_at_with_limits(source.clone(), limits).unwrap();
+    let owner = SourceBackedWorkbook::from_read_at_with_options(
+        source.clone(),
+        SourceBackedOptions::new().limits(limits),
+    )
+    .unwrap();
     let worksheet = owner.worksheet_by_index(0).unwrap().unwrap();
 
     let (first, first_bytes, first_reads) = measure_query(&source, &worksheet, 1_999, 0);
@@ -626,7 +635,11 @@ fn a_successful_warm_index_shortcuts_later_hits_and_missing_cells() {
 fn a_tiny_cache_budget_falls_back_without_changing_query_values() {
     let source = Arc::new(CountingSource::new(large_numeric_workbook(2_000)));
     let limits = SourceBackedLimits::default().with_max_query_index_bytes(1);
-    let owner = SourceBackedWorkbook::from_read_at_with_limits(source.clone(), limits).unwrap();
+    let owner = SourceBackedWorkbook::from_read_at_with_options(
+        source.clone(),
+        SourceBackedOptions::new().limits(limits),
+    )
+    .unwrap();
     let worksheet = owner.worksheet_by_index(0).unwrap().unwrap();
 
     let (first, first_bytes, first_reads) = measure_query(&source, &worksheet, 1_999, 0);
@@ -648,7 +661,11 @@ fn an_intrinsically_oversize_index_stays_on_the_cold_path_after_learning() {
     // the lower-bound sentinel; later queries must still return the ordinary
     // scan result rather than a partial or error-derived index hit.
     let limits = SourceBackedLimits::default().with_max_query_index_bytes(1_024);
-    let owner = SourceBackedWorkbook::from_read_at_with_limits(source.clone(), limits).unwrap();
+    let owner = SourceBackedWorkbook::from_read_at_with_options(
+        source.clone(),
+        SourceBackedOptions::new().limits(limits),
+    )
+    .unwrap();
     let worksheet = owner.worksheet_by_index(0).unwrap().unwrap();
 
     for _ in 0..4 {
@@ -671,7 +688,11 @@ fn an_intrinsically_oversize_index_stays_on_the_cold_path_after_learning() {
 fn an_oversize_index_sentinel_keeps_the_source_version_fence() {
     let source = Arc::new(CountingSource::new(large_numeric_workbook(4_000)));
     let limits = SourceBackedLimits::default().with_max_query_index_bytes(1_024);
-    let owner = SourceBackedWorkbook::from_read_at_with_limits(source.clone(), limits).unwrap();
+    let owner = SourceBackedWorkbook::from_read_at_with_options(
+        source.clone(),
+        SourceBackedOptions::new().limits(limits),
+    )
+    .unwrap();
     let worksheet = owner.worksheet_by_index(0).unwrap().unwrap();
 
     // The second successful scan learns the intrinsic-size sentinel.
@@ -699,7 +720,11 @@ fn an_oversize_index_sentinel_keeps_the_source_version_fence() {
 fn an_oversize_index_keeps_target_formula_refusals_source_backed() {
     let source = Arc::new(CountingSource::new(large_malformed_formula_workbook(4_000)));
     let limits = SourceBackedLimits::default().with_max_query_index_bytes(1_024);
-    let owner = SourceBackedWorkbook::from_read_at_with_limits(source.clone(), limits).unwrap();
+    let owner = SourceBackedWorkbook::from_read_at_with_options(
+        source.clone(),
+        SourceBackedOptions::new().limits(limits),
+    )
+    .unwrap();
     let worksheet = owner.worksheet_by_index(0).unwrap().unwrap();
 
     // Selecting a valid numeric cell leaves the malformed formula unselected,
@@ -731,7 +756,11 @@ fn an_oversize_index_keeps_target_formula_refusals_source_backed() {
 fn a_failed_oversize_scan_does_not_publish_a_partial_index() {
     let source = Arc::new(CountingSource::new(large_malformed_tail_workbook(4_000)));
     let limits = SourceBackedLimits::default().with_max_query_index_bytes(1_024);
-    let owner = SourceBackedWorkbook::from_read_at_with_limits(source.clone(), limits).unwrap();
+    let owner = SourceBackedWorkbook::from_read_at_with_options(
+        source.clone(),
+        SourceBackedOptions::new().limits(limits),
+    )
+    .unwrap();
     let worksheet = owner.worksheet_by_index(0).unwrap().unwrap();
 
     let mut first_error: Option<String> = None;
@@ -761,8 +790,8 @@ fn an_indexed_missing_target_still_takes_the_trailing_freshness_fence() {
 
     // Publish the worksheet index with two successful observations, then use
     // a coordinate absent from its occurrence table.  The hit has no source
-    // read of its own, so the mutation is injected into the trailing version
-    // observation rather than relying on the leading fence.
+    // read of its own and (record 0287) no leading fence, so its trailing
+    // version observation is its first; the mutation is injected there.
     assert_eq!(
         worksheet.cell_value(3_999, 0).unwrap(),
         Some(CellValue::Float(3_999.0))
@@ -772,12 +801,43 @@ fn an_indexed_missing_target_still_takes_the_trailing_freshness_fence() {
         Some(CellValue::Float(3_999.0))
     );
     source.clear_measurement();
-    source.bump_before_observation(2);
+    source.bump_before_observation(1);
     assert!(matches!(
         worksheet.cell_value(50_000, 7),
         Err(SourceBackedError::SourceChanged { .. })
     ));
     assert_eq!(source.read_count(), 0);
+}
+
+#[test]
+fn an_indexed_hit_fences_every_observation_of_its_frame() {
+    // Record 0287: an indexed hit takes no leading fence and defers its frame
+    // header's fence to the payload read. A source change before the call,
+    // or before either observation the hit makes, still fails the read.
+    for observation in 0..=2 {
+        let source = Arc::new(CountingSource::new(large_numeric_workbook(4_000)));
+        let owner = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+        let worksheet = owner.worksheet_by_index(0).unwrap().unwrap();
+        for _ in 0..2 {
+            assert_eq!(
+                worksheet.cell_value(3_999, 0).unwrap(),
+                Some(CellValue::Float(3_999.0))
+            );
+        }
+        source.clear_measurement();
+        if observation == 0 {
+            source.bump();
+        } else {
+            source.bump_before_observation(observation);
+        }
+        assert!(
+            matches!(
+                worksheet.cell_value(3_999, 0),
+                Err(SourceBackedError::SourceChanged { .. })
+            ),
+            "a change before observation {observation} must fail the hit"
+        );
+    }
 }
 
 #[test]
@@ -788,7 +848,11 @@ fn zero_half_one_and_two_mib_budgets_keep_results_identical() {
     let measure = |budget| {
         let source = Arc::new(CountingSource::new(bytes.clone()));
         let limits = SourceBackedLimits::default().with_max_query_index_bytes(budget);
-        let owner = SourceBackedWorkbook::from_read_at_with_limits(source.clone(), limits).unwrap();
+        let owner = SourceBackedWorkbook::from_read_at_with_options(
+            source.clone(),
+            SourceBackedOptions::new().limits(limits),
+        )
+        .unwrap();
         let worksheet = owner.worksheet_by_index(0).unwrap().unwrap();
         let (first, _, _) = measure_query(&source, &worksheet, 0, 0);
         let (second, _, _) = measure_query(&source, &worksheet, 0, 0);
@@ -1011,9 +1075,10 @@ fn a_shared_string_checkpoint_preserves_alternating_forward_and_backward_replays
         .map(|(row, column)| shared_string_index_at(&stream, row as u16, column as u16));
     assert_eq!(fixture_indices, [0, 3_946, 7_892]);
     let oracle_source = Arc::new(CountingSource::new(bytes.clone()));
-    let oracle_owner = SourceBackedWorkbook::from_read_at_with_limits(
+    let oracle_owner = SourceBackedWorkbook::from_read_at_with_options(
         oracle_source,
-        SourceBackedLimits::default().with_max_query_index_bytes(0),
+        SourceBackedOptions::new()
+            .limits(SourceBackedLimits::default().with_max_query_index_bytes(0)),
     )
     .unwrap();
     let oracle_sheet = oracle_owner.worksheet_by_index(0).unwrap().unwrap();
@@ -1222,9 +1287,10 @@ fn a_warm_index_keeps_alternating_first_last_missing_and_random_values_identical
     }
 
     let disabled_source = Arc::new(CountingSource::new(bytes));
-    let disabled_owner = SourceBackedWorkbook::from_read_at_with_limits(
+    let disabled_owner = SourceBackedWorkbook::from_read_at_with_options(
         disabled_source.clone(),
-        SourceBackedLimits::default().with_max_query_index_bytes(0),
+        SourceBackedOptions::new()
+            .limits(SourceBackedLimits::default().with_max_query_index_bytes(0)),
     )
     .unwrap();
     let disabled_sheet = disabled_owner.worksheet_by_index(0).unwrap().unwrap();

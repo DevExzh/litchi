@@ -26,8 +26,9 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, OwnedSource, ReadAt,
     Resource, SourceVersion,
 };
+use litchi_opc::SourceReadPolicy;
 use litchi_opc::{
-    AuthoredXmlFragment, OpcError, PackURI, ReadLimits, SourceBackedPackage, SourceCacheLimits,
+    AuthoredXmlFragment, OpcError, PackURI, SourceBackedPackage, SourceCacheLimits, SourceLimits,
 };
 use soapberry_zip::office::StreamingArchiveWriter;
 
@@ -95,7 +96,8 @@ fn archive_with_options(
         r#"<Relationships xmlns="{RELATIONSHIPS_NS}"><Relationship Id="rDoc" Type="{OFFICE_DOCUMENT_REL}" Target="{DOCUMENT_MEMBER}"/>{other_relationship}{signature_relationship}</Relationships>"#
     );
 
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .expect("content types fixture must be writable");
@@ -143,7 +145,7 @@ fn managed_context(
 
 fn managed_package(
     source: Arc<dyn ReadAt>,
-    limits: ReadLimits,
+    limits: SourceLimits,
     scope: &'static str,
 ) -> (SourceBackedPackage, Budget, CancellationSource) {
     managed_package_with_cache_limits(source, limits, SourceCacheLimits::default(), scope)
@@ -151,25 +153,25 @@ fn managed_package(
 
 fn managed_package_with_cache_limits(
     source: Arc<dyn ReadAt>,
-    limits: ReadLimits,
+    limits: SourceLimits,
     cache_limits: SourceCacheLimits,
     scope: &'static str,
 ) -> (SourceBackedPackage, Budget, CancellationSource) {
     let (budget, cancellation_source, context) = managed_context(scope, 128 * 1024 * 1024, 1 << 40);
-    let package =
-        SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            source,
-            limits,
-            cache_limits,
-            context,
-        )
-        .expect("managed fixture package must open");
+    let package = SourceBackedPackage::from_read_at(
+        source,
+        limits,
+        cache_limits,
+        SourceReadPolicy::exact(),
+        Some(context),
+    )
+    .expect("managed fixture package must open");
     (package, budget, cancellation_source)
 }
 
 fn owned_package(
     archive: Vec<u8>,
-    limits: ReadLimits,
+    limits: SourceLimits,
     scope: &'static str,
 ) -> (SourceBackedPackage, Budget, CancellationSource) {
     managed_package(Arc::new(OwnedSource::new(archive)), limits, scope)
@@ -398,7 +400,7 @@ fn matching_original_hint_reuses_exact_bytes_without_extra_budget_work() {
     let archive = archive_bytes(FORMATTED_DOCUMENT);
 
     let (cold_package, cold_budget, _cold_cancellation) =
-        owned_package(archive.clone(), ReadLimits::default(), "opc-hint-cold");
+        owned_package(archive.clone(), SourceLimits::default(), "opc-hint-cold");
     let cold_part = cold_package.part(&pack(DOCUMENT_URI)).unwrap();
     // Warm the bounded payload cache so the comparison isolates the source
     // XML validation work that the hint is intended to avoid.
@@ -410,7 +412,7 @@ fn matching_original_hint_reuses_exact_bytes_without_extra_budget_work() {
     assert_eq!(cold.bytes(), FORMATTED_DOCUMENT);
 
     let (package, budget, _cancellation) =
-        owned_package(archive, ReadLimits::default(), "opc-hint-hit");
+        owned_package(archive, SourceLimits::default(), "opc-hint-hit");
     let part = package.part(&pack(DOCUMENT_URI)).unwrap();
     let hint = part.source_xml().unwrap();
     let memory_with_hint = budget.used(Resource::Memory);
@@ -457,7 +459,7 @@ fn equal_version_foreign_lineage_falls_back_to_current_original() {
             archive_bytes(FORMATTED_DOCUMENT),
             version,
         )),
-        ReadLimits::default(),
+        SourceLimits::default(),
         "opc-hint-foreign-first",
     );
     let (second, second_budget, _second_cancellation) = managed_package(
@@ -465,7 +467,7 @@ fn equal_version_foreign_lineage_falls_back_to_current_original() {
             archive_bytes(FORMATTED_DOCUMENT),
             version,
         )),
-        ReadLimits::default(),
+        SourceLimits::default(),
         "opc-hint-foreign-second",
     );
     assert_eq!(
@@ -506,10 +508,72 @@ fn equal_version_foreign_lineage_falls_back_to_current_original() {
 }
 
 #[test]
+fn a_hint_crosses_clones_of_one_package_but_not_a_reopen() {
+    let version = SourceVersion::new(0x0012_434c_4f4e_4500, 3);
+    let (package, budget, _cancellation) = managed_package(
+        Arc::new(FixedVersionSource::new(
+            archive_bytes(FORMATTED_DOCUMENT),
+            version,
+        )),
+        SourceLimits::default(),
+        "opc-hint-clone",
+    );
+    let clone = package.clone();
+    assert_eq!(package.source_lineage(), clone.source_lineage());
+
+    // A proof captured through either clone is a proof about the one opened
+    // package, so the other clone reuses its allocation.
+    for (capturer, reuser) in [(&clone, &package), (&package, &clone)] {
+        let hint = capturer
+            .part(&pack(DOCUMENT_URI))
+            .unwrap()
+            .source_xml()
+            .unwrap();
+        let reused = reuser
+            .part(&pack(DOCUMENT_URI))
+            .unwrap()
+            .source_xml_with_hint(&hint)
+            .expect("a clone's hint must be accepted");
+        assert_eq!(reused.bytes(), FORMATTED_DOCUMENT);
+        assert_eq!(
+            reused.bytes().as_ptr(),
+            hint.bytes().as_ptr(),
+            "a clone shares the lineage, so its hint is a hit"
+        );
+    }
+
+    // A re-open of equal bytes at an equal version is another package.
+    let (reopened, _reopened_budget, _reopened_cancellation) = managed_package(
+        Arc::new(FixedVersionSource::new(
+            archive_bytes(FORMATTED_DOCUMENT),
+            version,
+        )),
+        SourceLimits::default(),
+        "opc-hint-clone-reopened",
+    );
+    let hint = clone
+        .part(&pack(DOCUMENT_URI))
+        .unwrap()
+        .source_xml()
+        .unwrap();
+    let current = reopened
+        .part(&pack(DOCUMENT_URI))
+        .unwrap()
+        .source_xml_with_hint(&hint)
+        .expect("a foreign hint must fall back to the current source Part");
+    assert_eq!(current.bytes(), FORMATTED_DOCUMENT);
+    assert_ne!(current.bytes().as_ptr(), hint.bytes().as_ptr());
+
+    drop((current, hint, reopened, package, clone));
+    assert_eq!(budget.used(Resource::Memory), 0);
+    assert_eq!(budget.used(Resource::Objects), 0);
+}
+
+#[test]
 fn different_part_and_content_type_hints_return_the_target_original() {
     let archive = archive_with_other(FORMATTED_DOCUMENT, "application/vnd.example.other+xml");
     let (package, budget, _cancellation) =
-        owned_package(archive, ReadLimits::default(), "opc-hint-part");
+        owned_package(archive, SourceLimits::default(), "opc-hint-part");
     let document = package.part(&pack(DOCUMENT_URI)).unwrap();
     let other = package.part(&pack(OTHER_URI)).unwrap();
     let hint = document.source_xml().unwrap();
@@ -544,12 +608,12 @@ fn different_content_type_hint_falls_back_even_with_equal_source_version() {
     );
     let (first, first_budget, _first_cancellation) = managed_package(
         Arc::new(FixedVersionSource::new(first_archive, version)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         "opc-hint-content-type-first",
     );
     let (second, second_budget, _second_cancellation) = managed_package(
         Arc::new(FixedVersionSource::new(second_archive, version)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         "opc-hint-content-type-second",
     );
     let hint = first
@@ -577,17 +641,17 @@ fn different_content_type_hint_falls_back_even_with_equal_source_version() {
 
 #[test]
 fn different_limits_hint_falls_back_to_validation_under_current_limits() {
-    let changed_limits = ReadLimits::builder()
-        .max_xml_events(999_999)
+    let changed_limits = SourceLimits::builder()
+        .max_events(999_999)
         .expect("changed event limit must be valid")
         .build()
         .expect("changed limits must build");
-    assert_ne!(changed_limits, ReadLimits::default());
+    assert_ne!(changed_limits, SourceLimits::default());
     let version = SourceVersion::new(0x4c49_4d49_5453_484e, 3);
     let archive = archive_bytes(FORMATTED_DOCUMENT);
     let (first, first_budget, _first_cancellation) = managed_package(
         Arc::new(FixedVersionSource::new(archive.clone(), version)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         "opc-hint-limits-first",
     );
     let (second, second_budget, _second_cancellation) = managed_package(
@@ -621,7 +685,7 @@ fn different_limits_hint_falls_back_to_validation_under_current_limits() {
 fn derived_hint_returns_current_original_and_keeps_derived_bytes_live() {
     let (package, budget, _cancellation) = owned_package(
         archive_bytes(FORMATTED_DOCUMENT),
-        ReadLimits::default(),
+        SourceLimits::default(),
         "opc-hint-derived",
     );
     let part = package.part(&pack(DOCUMENT_URI)).unwrap();
@@ -665,13 +729,25 @@ fn derived_hint_returns_current_original_and_keeps_derived_bytes_live() {
 
 #[test]
 fn malformed_current_source_is_revalidated_after_foreign_hint_mismatch() {
-    let hint_package = SourceBackedPackage::from_vec(archive_bytes(FORMATTED_DOCUMENT)).unwrap();
+    let hint_package = SourceBackedPackage::from_vec(
+        archive_bytes(FORMATTED_DOCUMENT),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let hint = hint_package
         .part(&pack(DOCUMENT_URI))
         .unwrap()
         .source_xml()
         .unwrap();
-    let current = SourceBackedPackage::from_vec(archive_bytes(MALFORMED_DOCUMENT)).unwrap();
+    let current = SourceBackedPackage::from_vec(
+        archive_bytes(MALFORMED_DOCUMENT),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let error = current
         .part(&pack(DOCUMENT_URI))
         .unwrap()
@@ -688,7 +764,7 @@ fn source_revision_change_before_hint_read_is_refused() {
     let source = Arc::new(MutableSource::new(archive_bytes(FORMATTED_DOCUMENT)));
     let (package, budget, _cancellation) = managed_package(
         source.clone(),
-        ReadLimits::default(),
+        SourceLimits::default(),
         "opc-hint-revision-before",
     );
     let part = package.part(&pack(DOCUMENT_URI)).unwrap();
@@ -709,7 +785,7 @@ fn source_revision_change_during_hint_read_is_refused_after_read() {
     let cache_limits = SourceCacheLimits::new(1, 1).expect("tiny cache limits must be valid");
     let (package, budget, _cancellation) = managed_package_with_cache_limits(
         source.clone(),
-        ReadLimits::default(),
+        SourceLimits::default(),
         cache_limits,
         "opc-hint-revision-during",
     );
@@ -729,7 +805,7 @@ fn source_revision_change_during_hint_read_is_refused_after_read() {
 fn cancellation_before_and_during_hint_read_remains_typed_and_budgeted() {
     let (package, budget, cancellation) = owned_package(
         archive_bytes(FORMATTED_DOCUMENT),
-        ReadLimits::default(),
+        SourceLimits::default(),
         "opc-hint-cancel-before",
     );
     let part = package.part(&pack(DOCUMENT_URI)).unwrap();
@@ -749,13 +825,21 @@ fn cancellation_before_and_during_hint_read_remains_typed_and_budgeted() {
         archive_bytes(FORMATTED_DOCUMENT),
         during_cancellation.clone(),
     ));
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         source.clone(),
-        ReadLimits::default(),
-        context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .expect("managed cancellation fixture must open");
-    let foreign = SourceBackedPackage::from_vec(archive_bytes(FORMATTED_DOCUMENT)).unwrap();
+    let foreign = SourceBackedPackage::from_vec(
+        archive_bytes(FORMATTED_DOCUMENT),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let hint = foreign
         .part(&pack(DOCUMENT_URI))
         .unwrap()
@@ -775,19 +859,25 @@ fn cancellation_before_and_during_hint_read_remains_typed_and_budgeted() {
 
 #[test]
 fn signed_and_encrypted_packages_refuse_hints_before_payload_transfer() {
-    let hint_package = SourceBackedPackage::from_vec(archive_bytes(FORMATTED_DOCUMENT)).unwrap();
+    let hint_package = SourceBackedPackage::from_vec(
+        archive_bytes(FORMATTED_DOCUMENT),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let hint = hint_package
         .part(&pack(DOCUMENT_URI))
         .unwrap()
         .source_xml()
         .unwrap();
 
-    let signed = SourceBackedPackage::from_vec(archive_with_options(
-        FORMATTED_DOCUMENT,
-        "application/xml",
+    let signed = SourceBackedPackage::from_vec(
+        archive_with_options(FORMATTED_DOCUMENT, "application/xml", None, true),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
         None,
-        true,
-    ))
+    )
     .expect("signed fixture must open");
     let signed_error = signed
         .part(&pack(DOCUMENT_URI))
@@ -804,7 +894,12 @@ fn signed_and_encrypted_packages_refuse_hints_before_payload_transfer() {
     // never reach an encrypted package's payload.
     let encrypted_archive =
         mark_entry_encrypted(archive_bytes(FORMATTED_DOCUMENT), DOCUMENT_MEMBER);
-    let encrypted_error = match SourceBackedPackage::from_vec(encrypted_archive) {
+    let encrypted_error = match SourceBackedPackage::from_vec(
+        encrypted_archive,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    ) {
         Ok(_) => panic!("an encrypted member must be refused during admission"),
         Err(error) => error,
     };

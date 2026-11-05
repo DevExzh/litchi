@@ -18,6 +18,7 @@ use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
+use sha2::{Digest as _, Sha256};
 use std::sync::Arc;
 
 const RELATIONSHIPS_NAMESPACE: &[u8] =
@@ -29,7 +30,7 @@ const MAX_SELECTED_RELATIONSHIPS: usize = 64;
 const MAX_SELECTOR_BYTES: usize = MAX_SELECTED_RELATIONSHIPS * 4 * 1024;
 
 /// One deterministic external hyperlink relationship in the main document.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct ExternalHyperlinkRelationship {
     relationship_id: String,
     target_url: String,
@@ -53,6 +54,17 @@ impl ExternalHyperlinkRelationship {
     #[must_use]
     pub const fn wrapper_count(&self) -> usize {
         self.wrapper_count
+    }
+}
+
+impl std::fmt::Debug for ExternalHyperlinkRelationship {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("ExternalHyperlinkRelationship")
+            .field("relationship_id_bytes", &self.relationship_id.len())
+            .field("target_url_bytes", &self.target_url.len())
+            .field("wrapper_count", &self.wrapper_count)
+            .finish_non_exhaustive()
     }
 }
 
@@ -91,7 +103,7 @@ impl EffectReport {
 }
 
 /// Exact-source immutable inventory used to plan irreversible redaction.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Snapshot {
     closure: sanitize::Snapshot,
     source_version: SourceVersion,
@@ -118,6 +130,25 @@ impl Snapshot {
         })
     }
 
+    /// Parse a standalone main-document redaction closure under an explicit
+    /// bounded XML policy.
+    pub fn from_xml(
+        xml: Vec<u8>,
+        relationships: Vec<sanitize::raw::Relationship>,
+        limits: sanitize::Limits,
+    ) -> Result<Self> {
+        let fingerprint = fingerprint(&xml);
+        let closure = sanitize::Snapshot::from_xml(xml, relationships, limits)?;
+        validate_main_document_closure(&closure)?;
+        let inventory = build_inventory(&closure, limits)?;
+        Ok(Self {
+            closure,
+            source_version: SourceVersion::new(0, 0),
+            source_fingerprint: fingerprint,
+            inventory: Arc::new(inventory),
+        })
+    }
+
     /// Borrow the deterministic relationship inventory, ordered by ID.
     #[must_use]
     pub fn relationships(&self) -> &[ExternalHyperlinkRelationship] {
@@ -136,7 +167,7 @@ impl Snapshot {
     pub fn plan_target_urls(&self, target_urls: &[&str]) -> Result<Plan> {
         if target_urls.len() > MAX_SELECTED_RELATIONSHIPS {
             return Err(Error::ExternalHyperlinkRedactionLimit {
-                resource: "target URL selectors",
+                kind: LimitKind::TargetUrlSelectors,
                 maximum: MAX_SELECTED_RELATIONSHIPS,
                 actual: target_urls.len(),
             });
@@ -145,14 +176,14 @@ impl Snapshot {
             total
                 .checked_add(target.len())
                 .ok_or(Error::ExternalHyperlinkRedactionLimit {
-                    resource: "target URL selector bytes",
+                    kind: LimitKind::TargetUrlSelectorBytes,
                     maximum: MAX_SELECTOR_BYTES,
                     actual: usize::MAX,
                 })
         })?;
         if selector_bytes > MAX_SELECTOR_BYTES {
             return Err(Error::ExternalHyperlinkRedactionLimit {
-                resource: "target URL selector bytes",
+                kind: LimitKind::TargetUrlSelectorBytes,
                 maximum: MAX_SELECTOR_BYTES,
                 actual: selector_bytes,
             });
@@ -179,9 +210,9 @@ impl Snapshot {
         targets.dedup();
         for target in &targets {
             if !self.inventory.iter().any(|item| item.target_url == *target) {
-                return Err(Error::InvalidFormat(format!(
-                    "external-hyperlink redaction target is not present: {target}"
-                )));
+                return Err(Error::InvalidFormat(
+                    "external-hyperlink redaction target is not present".into(),
+                ));
             }
         }
 
@@ -207,7 +238,7 @@ impl Snapshot {
         }
         if selected_ids.len() > MAX_SELECTED_RELATIONSHIPS {
             return Err(Error::ExternalHyperlinkRedactionLimit {
-                resource: "selected relationships",
+                kind: LimitKind::SelectedRelationships,
                 maximum: MAX_SELECTED_RELATIONSHIPS,
                 actual: selected_ids.len(),
             });
@@ -241,7 +272,7 @@ impl Snapshot {
 }
 
 /// Non-mutating, exact-source plan for irreversible external-link redaction.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Plan {
     source: Snapshot,
     selected_ids: Vec<String>,
@@ -257,15 +288,14 @@ impl Plan {
 
     /// Produce a sealed forward-only commit. This does not mutate the source.
     /// There is intentionally no inverse API.
-    pub fn apply(self) -> Result<Commit> {
+    pub fn apply(self) -> Result<IrreversibleRedactionPatch> {
         if self.selected_ids.is_empty() {
-            return Ok(Commit {
-                replacement_xml: self.source.closure.shared_xml(),
-                patch: IrreversibleRedactionPatch {
-                    source: self.source,
-                    removed_relationship_ids: self.selected_ids,
-                    report: self.report,
-                },
+            let source = self.source;
+            return Ok(IrreversibleRedactionPatch {
+                replacement_xml: source.closure.shared_xml(),
+                source,
+                removed_relationship_ids: self.selected_ids,
+                report: self.report,
             });
         }
 
@@ -298,11 +328,11 @@ impl Plan {
         if crate::paragraph::extract_word_text(self.source.document_xml())?
             != crate::paragraph::extract_word_text(&rewritten)?
         {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "external_hyperlink_redaction",
-                reason: "redaction changed visible main-document text",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "external_hyperlink_redaction",
+                "redaction changed visible main-document text",
+            ));
         }
         let retained_count = self
             .source
@@ -341,35 +371,12 @@ impl Plan {
             self.source.limits(),
         )?;
         validate_main_document_closure(&after)?;
-        Ok(Commit {
+        Ok(IrreversibleRedactionPatch {
+            source: self.source,
             replacement_xml: Arc::new(rewritten),
-            patch: IrreversibleRedactionPatch {
-                source: self.source,
-                removed_relationship_ids: self.selected_ids,
-                report: self.report,
-            },
+            removed_relationship_ids: self.selected_ids,
+            report: self.report,
         })
-    }
-}
-
-/// Successful forward-only redaction product.
-#[derive(Debug, Clone)]
-pub struct Commit {
-    replacement_xml: Arc<Vec<u8>>,
-    patch: IrreversibleRedactionPatch,
-}
-
-impl Commit {
-    /// Deterministic effects applied by this commit.
-    #[must_use]
-    pub const fn effect_report(&self) -> EffectReport {
-        self.patch.report
-    }
-
-    /// Borrow the sealed forward-only patch. It exposes no inverse operation.
-    #[must_use]
-    pub const fn patch(&self) -> &IrreversibleRedactionPatch {
-        &self.patch
     }
 }
 
@@ -377,9 +384,10 @@ impl Commit {
 ///
 /// This type intentionally has no public apply or inverse method. Publication
 /// is available only through the consuming source-backed package API.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct IrreversibleRedactionPatch {
     source: Snapshot,
+    replacement_xml: Arc<Vec<u8>>,
     removed_relationship_ids: Vec<String>,
     report: EffectReport,
 }
@@ -391,24 +399,178 @@ impl IrreversibleRedactionPatch {
         self.report.is_noop()
     }
 
+    /// Deterministic effects captured by the forward-only patch.
+    #[must_use]
+    pub const fn effect_report(&self) -> EffectReport {
+        self.report
+    }
+
     pub(crate) fn validate_source(&self, current: &Snapshot) -> Result<()> {
         if self.source.exact_source_matches(current) {
             Ok(())
         } else {
-            Err(Error::ExternalHyperlinkRedactionConflict)
+            Err(Error::conflict(
+                "external_hyperlink_redaction",
+                "the patch base does not match the supplied source",
+            ))
         }
-    }
-
-    pub(crate) const fn limits(&self) -> sanitize::Limits {
-        self.source.limits()
     }
 }
 
-pub(crate) fn publication_parts(commit: &Commit) -> (Vec<u8>, Vec<String>) {
+pub(crate) fn publication_parts(patch: &IrreversibleRedactionPatch) -> (Vec<u8>, Vec<String>) {
     (
-        commit.replacement_xml.as_ref().clone(),
-        commit.patch.removed_relationship_ids.clone(),
+        patch.replacement_xml.as_ref().clone(),
+        patch.removed_relationship_ids.clone(),
     )
+}
+
+impl std::fmt::Debug for Snapshot {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Snapshot")
+            .field("xml_bytes", &self.closure.xml_bytes().len())
+            .field("relationships", &self.inventory.len())
+            .finish_non_exhaustive()
+    }
+}
+
+impl std::fmt::Debug for Plan {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Plan")
+            .field("effect_report", &self.effect_report())
+            .finish_non_exhaustive()
+    }
+}
+
+impl std::fmt::Debug for IrreversibleRedactionPatch {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("IrreversibleRedactionPatch")
+            .field("noop", &self.is_noop())
+            .field("effect_report", &self.effect_report())
+            .field(
+                "removed_relationships",
+                &self.removed_relationship_ids.len(),
+            )
+            .finish_non_exhaustive()
+    }
+}
+
+/// Standalone bounded forward-only redaction codec.
+pub mod raw {
+    use super::{EffectReport, IrreversibleRedactionPatch, Plan, Result, Snapshot};
+    use crate::sanitize::Limits;
+
+    /// Mutable raw state for one main-document redaction closure.
+    #[derive(Clone)]
+    pub struct Codec {
+        snapshot: Snapshot,
+        replacement_xml: Vec<u8>,
+        removed_relationship_ids: Vec<String>,
+        report: EffectReport,
+        applied: bool,
+    }
+
+    impl std::fmt::Debug for Codec {
+        fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            formatter
+                .debug_struct("Codec")
+                .field("xml_bytes", &self.replacement_xml.len())
+                .field(
+                    "removed_relationships",
+                    &self.removed_relationship_ids.len(),
+                )
+                .field("applied", &self.applied)
+                .finish_non_exhaustive()
+        }
+    }
+
+    impl Codec {
+        /// Parse a standalone closure under the required finite policy.
+        pub fn from_xml(
+            xml: Vec<u8>,
+            relationships: Vec<crate::sanitize::raw::Relationship>,
+            limits: Limits,
+        ) -> Result<Self> {
+            let snapshot = Snapshot::from_xml(xml, relationships, limits)?;
+            Self::from_snapshot(snapshot, limits)
+        }
+
+        /// Adopt a parsed snapshot under an explicitly repeated policy.
+        pub fn from_snapshot(snapshot: Snapshot, limits: Limits) -> Result<Self> {
+            if snapshot.limits() != limits {
+                return Err(super::Error::InvalidFormat(
+                    "raw redactor limits do not match the snapshot".into(),
+                ));
+            }
+            let replacement_xml = snapshot.document_xml().to_vec();
+            Ok(Self {
+                snapshot,
+                replacement_xml,
+                removed_relationship_ids: Vec::new(),
+                report: EffectReport::default(),
+                applied: false,
+            })
+        }
+
+        /// Borrow the current inventory snapshot.
+        #[must_use]
+        pub const fn snapshot(&self) -> &Snapshot {
+            &self.snapshot
+        }
+
+        /// Borrow the current XML bytes.
+        #[must_use]
+        pub fn xml_bytes(&self) -> &[u8] {
+            &self.replacement_xml
+        }
+
+        /// Relationship identifiers removed from the current raw output.
+        #[must_use]
+        pub fn removed_relationship_ids(&self) -> &[String] {
+            &self.removed_relationship_ids
+        }
+
+        /// Plan exact target URL removal over the current state.
+        pub fn plan_target_urls(&self, target_urls: &[&str]) -> Result<Plan> {
+            self.snapshot.plan_target_urls(target_urls)
+        }
+
+        /// Apply a forward-only patch to the owned raw state.
+        pub fn apply(&mut self, patch: &IrreversibleRedactionPatch) -> Result<()> {
+            if self.applied {
+                return Err(super::Error::InvalidFormat(
+                    "raw redactor accepts one forward patch".into(),
+                ));
+            }
+            patch.validate_source(&self.snapshot)?;
+            self.replacement_xml = patch.replacement_xml.to_vec();
+            self.removed_relationship_ids = patch.removed_relationship_ids.clone();
+            self.report = patch.report;
+            self.applied = true;
+            Ok(())
+        }
+
+        /// Plan and apply exact target URL removal in one mutable operation.
+        pub fn redact(&mut self, target_urls: &[&str]) -> Result<IrreversibleRedactionPatch> {
+            let patch = self.plan_target_urls(target_urls)?.apply()?;
+            self.apply(&patch)?;
+            Ok(patch)
+        }
+
+        /// Effects of the most recently applied patch.
+        #[must_use]
+        pub const fn effect_report(&self) -> EffectReport {
+            self.report
+        }
+    }
+}
+
+fn fingerprint(xml: &[u8]) -> SourceArtifactFingerprint {
+    let mut digest = Sha256::new();
+    digest.update(xml);
+    SourceArtifactFingerprint::from_sha256(digest.finalize().into())
 }
 
 fn build_inventory(
@@ -422,7 +584,7 @@ fn build_inventory(
         .count();
     if external > limits.max_external_hyperlinks() {
         return Err(Error::ExternalHyperlinkRedactionLimit {
-            resource: "external hyperlink relationships",
+            kind: LimitKind::ExternalHyperlinkRelationships,
             maximum: limits.max_external_hyperlinks(),
             actual: external,
         });
@@ -444,11 +606,11 @@ fn build_inventory(
             litchi_opc::constants::relationship_type::HYPERLINK
                 | litchi_opc::constants::relationship_type::STRICT_HYPERLINK
         ) {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "external_hyperlink_redaction",
-                reason: "main document has an external relationship outside the hyperlink closure",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "external_hyperlink_redaction",
+                "main document has an external relationship outside the hyperlink closure",
+            ));
         }
         inventory.push(ExternalHyperlinkRelationship {
             relationship_id: relationship.id().to_owned(),
@@ -465,6 +627,14 @@ fn build_inventory(
 }
 
 fn validate_main_document_closure(closure: &sanitize::Snapshot) -> Result<()> {
+    // The scan resolves names on namespace values as written; a binding that
+    // spells the markup-compatibility namespace with references is invisible
+    // to it, while readers apply it.
+    if litchi_ooxml_common::mce::binds_namespace_by_reference(closure.xml_bytes()) {
+        return unsafe_closure(
+            "markup-compatibility owner syntax is outside the redaction closure",
+        );
+    }
     let mut reader = NsReader::from_reader(closure.xml_bytes());
     reader.config_mut().check_end_names = true;
     reader.config_mut().check_comments = true;
@@ -593,9 +763,54 @@ fn is_mce_namespace(namespace: &ResolveResult<'_>) -> bool {
 }
 
 fn unsafe_closure<T>(reason: &'static str) -> Result<T> {
-    Err(Error::UnsafeEdit {
-        format: "DOCX",
-        operation: "external_hyperlink_redaction",
+    Err(Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
+        "external_hyperlink_redaction",
         reason,
-    })
+    ))
+}
+
+/// The bounded resources of external-hyperlink redaction, carried by [`crate::Error::ExternalHyperlinkRedactionLimit`] (record 0355a).
+///
+/// Each variant names one bounded resource; [`std::fmt::Display`] gives its
+/// human-readable name, the one the error messages print.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Changed story parts.
+    ChangedStoryParts,
+    /// External hyperlink relationships.
+    ExternalHyperlinkRelationships,
+    /// External story hyperlink relationships.
+    ExternalStoryHyperlinkRelationships,
+    /// Selected relationships.
+    SelectedRelationships,
+    /// Selected story hyperlink relationships.
+    SelectedStoryHyperlinkRelationships,
+    /// Target URL selector bytes.
+    TargetUrlSelectorBytes,
+    /// Target URL selectors.
+    TargetUrlSelectors,
+}
+
+impl LimitKind {
+    /// The resource's human-readable name.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::ChangedStoryParts => "changed story parts",
+            Self::ExternalHyperlinkRelationships => "external hyperlink relationships",
+            Self::ExternalStoryHyperlinkRelationships => "external story hyperlink relationships",
+            Self::SelectedRelationships => "selected relationships",
+            Self::SelectedStoryHyperlinkRelationships => "selected story hyperlink relationships",
+            Self::TargetUrlSelectorBytes => "target URL selector bytes",
+            Self::TargetUrlSelectors => "target URL selectors",
+        }
+    }
+}
+
+impl std::fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
+    }
 }

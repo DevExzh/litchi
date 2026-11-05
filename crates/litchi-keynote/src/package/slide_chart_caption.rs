@@ -30,7 +30,7 @@ use litchi_iwa_archive::{
 use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes,
     varint::encoded_len,
-    wire::{WireView, append_length_delimited_field_with_limits, append_varint_field},
+    wire::{WireView, append_length_delimited_field, append_varint_field},
 };
 use litchi_iwa_core::archive::{FieldObjectReferenceTransition, ObjectReferenceTransition};
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
@@ -45,7 +45,7 @@ use litchi_iwa_protos::{
     keynote_chart_caption_codec, keynote_chart_caption_graph_codec as graph_codec,
     keynote_movie_caption_codec, pages_movie_caption_codec,
 };
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::{
     Package, PhysicalSource, ReadError, STORAGE_MESSAGE_TYPE, SemanticLimitKind,
@@ -69,13 +69,48 @@ const MAX_CAPTION_BYTES: usize = 64 * 1024 * 1024;
 
 /// Native drawable edge whose caption reference is being transitioned.
 ///
-/// Charts and movies share the graph, Metadata, and preview transaction. Only
-/// the drawable message type and strict edge codec differ.
+/// Charts, movies and images share the graph, Metadata, and preview
+/// transaction. Only the drawable message type and strict edge codec differ;
+/// images use the movie edge codec (both wrap `TSD.DrawableArchive` in field
+/// 1).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum CaptionEdgeKind {
     Chart,
     Movie,
     MovieTitle,
+    Image,
+    ImageTitle,
+    Shape,
+    ShapeTitle,
+}
+
+impl CaptionEdgeKind {
+    /// Whether the edge belongs to a media drawable (movie or image).
+    const fn is_media(self) -> bool {
+        !matches!(self, Self::Chart)
+    }
+
+    /// Whether the edge is a title rather than a caption.
+    const fn is_title(self) -> bool {
+        matches!(self, Self::MovieTitle | Self::ImageTitle | Self::ShapeTitle)
+    }
+
+    /// Whether the drawable's header also lists the new graph's style
+    /// (movies). Images, like the migration host, list only the graph root,
+    /// which replaces the old edge in place.
+    const fn lists_graph_style(self) -> bool {
+        matches!(self, Self::Movie | Self::MovieTitle)
+    }
+
+    /// The message type of the drawable that owns the edge.
+    const fn drawable_message_type(self) -> u32 {
+        match self {
+            Self::Chart => CHART_MESSAGE_TYPE,
+            Self::Movie | Self::MovieTitle => 3_007,
+            Self::Image | Self::ImageTitle => 3_005,
+            Self::Shape | Self::ShapeTitle => 2_011,
+        }
+    }
 }
 
 /// Operation-local accounting for the chart-caption owner.
@@ -110,7 +145,7 @@ pub(super) struct CaptionBudget {
 }
 
 impl CaptionBudget {
-    pub(super) fn for_package(package: &Package) -> Result<Self, ChartCaptionError> {
+    pub(super) fn for_package(package: &Package) -> Result<Self, Error> {
         let wire = package.wire_limits().map_err(map_wire_error)?;
         let semantic = package.semantic_limits();
         let physical = package.state.options.archive();
@@ -139,8 +174,8 @@ impl CaptionBudget {
         })
     }
 
-    fn limit(kind: ChartCaptionLimitKind, observed: usize, maximum: usize) -> ChartCaptionError {
-        ChartCaptionError::LimitExceeded {
+    fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
+        Error::Limit {
             kind,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
@@ -150,12 +185,10 @@ impl CaptionBudget {
     fn charge_counter(
         current: &mut usize,
         amount: usize,
-        kind: ChartCaptionLimitKind,
+        kind: LimitKind,
         maximum: usize,
-    ) -> Result<(), ChartCaptionError> {
-        let observed = current
-            .checked_add(amount)
-            .ok_or(ChartCaptionError::InvalidSource)?;
+    ) -> Result<(), Error> {
+        let observed = current.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > maximum {
             return Err(Self::limit(kind, observed, maximum));
         }
@@ -163,65 +196,65 @@ impl CaptionBudget {
         Ok(())
     }
 
-    fn charge_input(&mut self, amount: usize) -> Result<(), ChartCaptionError> {
+    fn charge_input(&mut self, amount: usize) -> Result<(), Error> {
         Self::charge_counter(
             &mut self.input,
             amount,
-            ChartCaptionLimitKind::InputBytes,
+            LimitKind::InputBytes,
             self.maximum_input,
         )
     }
 
-    fn charge_output(&mut self, amount: usize) -> Result<(), ChartCaptionError> {
+    fn charge_output(&mut self, amount: usize) -> Result<(), Error> {
         Self::charge_counter(
             &mut self.output,
             amount,
-            ChartCaptionLimitKind::OutputBytes,
+            LimitKind::OutputBytes,
             self.maximum_output,
         )
     }
 
-    fn charge_fields(&mut self, amount: usize) -> Result<(), ChartCaptionError> {
+    fn charge_fields(&mut self, amount: usize) -> Result<(), Error> {
         Self::charge_counter(
             &mut self.fields,
             amount,
-            ChartCaptionLimitKind::WireFields,
+            LimitKind::WireFields,
             self.maximum_fields,
         )
     }
 
-    fn charge_components(&mut self, amount: usize) -> Result<(), ChartCaptionError> {
+    fn charge_components(&mut self, amount: usize) -> Result<(), Error> {
         Self::charge_counter(
             &mut self.components,
             amount,
-            ChartCaptionLimitKind::Entries,
+            LimitKind::Entries,
             self.maximum_components,
         )
     }
 
-    fn charge_references(&mut self, amount: usize) -> Result<(), ChartCaptionError> {
+    fn charge_references(&mut self, amount: usize) -> Result<(), Error> {
         Self::charge_counter(
             &mut self.references,
             amount,
-            ChartCaptionLimitKind::References,
+            LimitKind::References,
             self.maximum_references,
         )
     }
 
-    fn charge_work(&mut self, amount: usize) -> Result<(), ChartCaptionError> {
+    fn charge_work(&mut self, amount: usize) -> Result<(), Error> {
         Self::charge_counter(
             &mut self.work,
             amount,
-            ChartCaptionLimitKind::WireWork,
+            LimitKind::WireWork,
             self.maximum_work,
         )
     }
 
-    fn charge_depth(&mut self, depth: u32) -> Result<(), ChartCaptionError> {
+    fn charge_depth(&mut self, depth: u32) -> Result<(), Error> {
         self.max_depth = self.max_depth.max(depth);
         if self.max_depth > self.maximum_depth {
             return Err(Self::limit(
-                ChartCaptionLimitKind::WireNesting,
+                LimitKind::WireNesting,
                 self.max_depth as usize,
                 self.maximum_depth as usize,
             ));
@@ -229,18 +262,14 @@ impl CaptionBudget {
         Ok(())
     }
 
-    fn charge_allocation(
-        &mut self,
-        count: usize,
-        retained: usize,
-    ) -> Result<(), ChartCaptionError> {
+    fn charge_allocation(&mut self, count: usize, retained: usize) -> Result<(), Error> {
         let observed = self
             .allocations
             .checked_add(count)
-            .ok_or(ChartCaptionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if observed > self.maximum_allocations {
             return Err(Self::limit(
-                ChartCaptionLimitKind::Entries,
+                LimitKind::Entries,
                 observed,
                 self.maximum_allocations,
             ));
@@ -249,22 +278,19 @@ impl CaptionBudget {
         self.retained_bytes = self
             .retained_bytes
             .checked_add(retained)
-            .ok_or(ChartCaptionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         Ok(())
     }
 
-    fn charge_scratch(&mut self, amount: usize) -> Result<(), ChartCaptionError> {
+    fn charge_scratch(&mut self, amount: usize) -> Result<(), Error> {
         self.scratch_bytes = self
             .scratch_bytes
             .checked_add(amount)
-            .ok_or(ChartCaptionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         Ok(())
     }
 
-    fn charge_report(
-        &mut self,
-        report: metadata_codec::RewriteReport,
-    ) -> Result<(), ChartCaptionError> {
+    fn charge_report(&mut self, report: metadata_codec::RewriteReport) -> Result<(), Error> {
         self.charge_input(report.input_bytes())?;
         self.charge_output(report.output_bytes())?;
         self.charge_fields(report.fields())?;
@@ -279,7 +305,7 @@ impl CaptionBudget {
     fn charge_execution_requirements(
         &mut self,
         requirements: metadata_codec::RewriteExecutionRequirements,
-    ) -> Result<(), ChartCaptionError> {
+    ) -> Result<(), Error> {
         self.charge_output(requirements.output_bytes())?;
         self.charge_fields(requirements.fields())?;
         self.charge_work(requirements.work_bytes())?;
@@ -293,7 +319,7 @@ impl CaptionBudget {
         &mut self,
         report: metadata_codec::RewriteReport,
         requirements: metadata_codec::RewriteExecutionRequirements,
-    ) -> Result<(), ChartCaptionError> {
+    ) -> Result<(), Error> {
         if report.output_bytes() > requirements.output_bytes()
             || report.fields() > requirements.fields()
             || report.work_bytes() > requirements.work_bytes()
@@ -303,15 +329,12 @@ impl CaptionBudget {
             || report.retained_bytes() > requirements.retained_bytes()
             || report.scratch_bytes() > requirements.scratch_bytes()
         {
-            return Err(ChartCaptionError::Verification);
+            return Err(Error::Verification);
         }
         self.charge_depth(report.max_depth())
     }
 
-    fn observe_graph_report(
-        &mut self,
-        report: graph_codec::EncodeReport,
-    ) -> Result<(), ChartCaptionError> {
+    fn observe_graph_report(&mut self, report: graph_codec::EncodeReport) -> Result<(), Error> {
         // This report spans the graph codec's sizing, emission, and four
         // output-buffer allocations. Charge every dimension to the enclosing
         // package transaction rather than treating the codec as a separate
@@ -324,18 +347,14 @@ impl CaptionBudget {
         self.charge_scratch(report.output_bytes())
     }
 
-    fn precharge_graph(
-        &mut self,
-        text: &str,
-        language: Option<&str>,
-    ) -> Result<(), ChartCaptionError> {
+    fn precharge_graph(&mut self, text: &str, language: Option<&str>) -> Result<(), Error> {
         let text_bytes = text
             .len()
             .checked_add(language.map_or(0, str::len))
-            .ok_or(ChartCaptionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if text_bytes > MAX_CAPTION_BYTES {
             return Err(Self::limit(
-                ChartCaptionLimitKind::CaptionBytes,
+                LimitKind::CaptionBytes,
                 text_bytes,
                 MAX_CAPTION_BYTES,
             ));
@@ -343,7 +362,7 @@ impl CaptionBudget {
         let payload_bound = text_bytes
             .checked_mul(16)
             .and_then(|value| value.checked_add(16 * 1024))
-            .ok_or(ChartCaptionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         self.charge_work(payload_bound)?;
         self.charge_fields(64)?;
         self.charge_depth(16)?;
@@ -351,28 +370,29 @@ impl CaptionBudget {
         Ok(())
     }
 
-    pub(super) fn charge_catalog_scan(
-        &mut self,
-        package: &Package,
-    ) -> Result<(), ChartCaptionError> {
+    pub(super) fn charge_catalog_scan(&mut self, package: &Package) -> Result<(), Error> {
         let mut work = 0usize;
         for component in package.state.source.components().iter() {
             work = work
                 .checked_add(component.name().len())
-                .ok_or(ChartCaptionError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             let archive = component.archive();
             work = work
-                .checked_add(archive.encoded_len().map_err(map_core_error)?)
-                .ok_or(ChartCaptionError::InvalidSource)?;
+                .checked_add(
+                    archive
+                        .encoded_len(Default::default())
+                        .map_err(map_core_error)?,
+                )
+                .ok_or(Error::InvalidSource)?;
             for object in &archive.objects {
                 work = work
                     .checked_add(1)
                     .and_then(|value| value.checked_add(object.messages.len()))
-                    .ok_or(ChartCaptionError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
                 for message in &object.messages {
                     work = work
                         .checked_add(message.data.len())
-                        .ok_or(ChartCaptionError::InvalidSource)?;
+                        .ok_or(Error::InvalidSource)?;
                 }
             }
         }
@@ -396,27 +416,30 @@ impl CaptionBudget {
         &mut self,
         package: &Package,
         passes: usize,
-    ) -> Result<(), ChartCaptionError> {
+    ) -> Result<(), Error> {
         if passes == 0 {
             return Ok(());
         }
         let mut work = 0usize;
         for component in package.state.source.components().iter() {
-            let archive_bytes = component.archive().encoded_len().map_err(map_core_error)?;
+            let archive_bytes = component
+                .archive()
+                .encoded_len(Default::default())
+                .map_err(map_core_error)?;
             work = work
                 .checked_add(component.name().len())
                 .and_then(|value| value.checked_add(archive_bytes))
-                .ok_or(ChartCaptionError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             for object in &component.archive().objects {
                 work = work
                     .checked_add(1)
                     .and_then(|value| value.checked_add(object.messages.len()))
                     .and_then(|value| value.checked_add(object.archive_info.message_infos.len()))
-                    .ok_or(ChartCaptionError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
                 for (message_index, message) in object.messages.iter().enumerate() {
                     work = work
                         .checked_add(message.data.len())
-                        .ok_or(ChartCaptionError::InvalidSource)?;
+                        .ok_or(Error::InvalidSource)?;
                     let Some(info) = object.archive_info.message_infos.get(message_index) else {
                         continue;
                     };
@@ -425,7 +448,7 @@ impl CaptionBudget {
                         .len()
                         .checked_add(info.data_references.len())
                         .and_then(|value| value.checked_add(info.field_infos.len()))
-                        .ok_or(ChartCaptionError::InvalidSource)?;
+                        .ok_or(Error::InvalidSource)?;
                     for field in &info.field_infos {
                         local_references =
                             local_references
@@ -435,11 +458,11 @@ impl CaptionBudget {
                                         |value| value.checked_add(field.data_references.len()),
                                     )
                                 })
-                                .ok_or(ChartCaptionError::InvalidSource)?;
+                                .ok_or(Error::InvalidSource)?;
                     }
                     work = work
                         .checked_add(local_references)
-                        .ok_or(ChartCaptionError::InvalidSource)?;
+                        .ok_or(Error::InvalidSource)?;
                 }
             }
         }
@@ -450,10 +473,7 @@ impl CaptionBudget {
         // input profiles without measuring a new ingress allocation. Their
         // reference comparisons are included in work below rather than being
         // charged against the one-package semantic reference ceiling again.
-        self.charge_work(
-            work.checked_mul(passes)
-                .ok_or(ChartCaptionError::InvalidSource)?,
-        )
+        self.charge_work(work.checked_mul(passes).ok_or(Error::InvalidSource)?)
     }
 
     /// Charge the bounded allocations made while resolving a movie/chart
@@ -464,20 +484,15 @@ impl CaptionBudget {
         &mut self,
         package: &Package,
         passes: usize,
-    ) -> Result<(), ChartCaptionError> {
+    ) -> Result<(), Error> {
         self.charge_validation_scan(package, passes)?;
-        self.charge_allocation(
-            passes
-                .checked_mul(2)
-                .ok_or(ChartCaptionError::InvalidSource)?,
-            0,
-        )
+        self.charge_allocation(passes.checked_mul(2).ok_or(Error::InvalidSource)?, 0)
     }
 
     fn charge_metadata_report(
         &mut self,
         report: metadata_codec::RewriteReport,
-    ) -> Result<(), ChartCaptionError> {
+    ) -> Result<(), Error> {
         self.charge_report(report)
     }
 
@@ -486,30 +501,46 @@ impl CaptionBudget {
         archive: &Archive,
         archive_limits: litchi_iwa_core::Limits,
         snappy_limits: litchi_iwa_core::SnappyLimits,
-    ) -> Result<usize, ChartCaptionError> {
+    ) -> Result<usize, Error> {
         let encoded = archive
-            .encoded_len_with_limits(archive_limits)
+            .encoded_len(archive_limits)
             .map_err(map_core_error)?;
         let compressed_bound =
-            SnappyStream::maximum_compressed_len(encoded).map_err(map_core_error)?;
-        if compressed_bound > snappy_limits.max_compressed_stream() {
-            return Err(ChartCaptionError::LimitExceeded {
-                kind: ChartCaptionLimitKind::EntryBytes,
-                observed: usize_to_u64(compressed_bound),
-                maximum: usize_to_u64(snappy_limits.max_compressed_stream()),
-            });
-        }
+            SnappyStream::maximum_compressed_len(encoded, snappy_limits).map_err(map_core_error)?;
         self.charge_work(
             encoded
                 .checked_add(compressed_bound)
-                .ok_or(ChartCaptionError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )?;
         self.charge_output(encoded)?;
+        let chunk_size = SnappyStream::WRITE_CHUNK_SIZE.min(snappy_limits.max_uncompressed_chunk());
+        let frame_count = encoded.div_ceil(chunk_size);
+        // Admit the temporary-frame fallback under tight encoded ceilings;
+        // direct encoding into reserved output needs no separate frame Vec.
+        let frame_scratch = if encoded == 0 {
+            0
+        } else {
+            SnappyStream::maximum_compressed_len(encoded.min(chunk_size), Default::default())
+                .map_err(map_core_error)?
+                .checked_sub(4)
+                .ok_or(Error::InvalidSource)?
+        };
+        // snap 1.1.2 allocates its 16,384-entry u16 table once when a
+        // block exceeds the 1,024-entry inline table.
+        let encoder_allocations = usize::from(encoded.min(chunk_size) > 1_024);
+        let encoder_scratch = encoder_allocations * 32 * 1024;
+        self.charge_scratch(
+            frame_scratch
+                .checked_add(encoder_scratch)
+                .ok_or(Error::InvalidSource)?,
+        )?;
         self.charge_allocation(
-            2,
+            frame_count
+                .checked_add(2 + encoder_allocations)
+                .ok_or(Error::InvalidSource)?,
             encoded
                 .checked_add(compressed_bound)
-                .ok_or(ChartCaptionError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )?;
         Ok(compressed_bound)
     }
@@ -517,12 +548,12 @@ impl CaptionBudget {
     fn charge_reassembly(
         &mut self,
         requirements: litchi_iwa_archive::package::ReassemblyExecutionRequirements,
-    ) -> Result<ReassemblyExecutionLimits, ChartCaptionError> {
+    ) -> Result<ReassemblyExecutionLimits, Error> {
         let amount = requirements
             .output_bytes()
             .checked_add(requirements.scratch_bytes())
             .and_then(|value| value.checked_add(requirements.offset_count()))
-            .ok_or(ChartCaptionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         self.charge_work(amount)?;
         self.charge_output(requirements.output_bytes())?;
         self.charge_allocation(requirements.allocations(), requirements.retained_bytes())?;
@@ -534,12 +565,12 @@ impl CaptionBudget {
         &mut self,
         package: &Package,
         text_bytes: usize,
-    ) -> Result<(), ChartCaptionError> {
+    ) -> Result<(), Error> {
         let source_bytes = package.state.source.shared_source().len();
         let estimate = source_bytes
             .checked_mul(2)
             .and_then(|value| value.checked_add(text_bytes))
-            .ok_or(ChartCaptionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         self.charge_work(estimate)?;
         self.charge_input(source_bytes)?;
         self.charge_output(estimate)?;
@@ -547,17 +578,14 @@ impl CaptionBudget {
         Ok(())
     }
 
-    pub(super) fn charge_candidate_reopen(
-        &mut self,
-        output_bytes: usize,
-    ) -> Result<(), ChartCaptionError> {
+    pub(super) fn charge_candidate_reopen(&mut self, output_bytes: usize) -> Result<(), Error> {
         self.charge_input(output_bytes)?;
         self.charge_work(output_bytes)?;
         self.charge_allocation(1, output_bytes)?;
         self.candidate_reopens = self
             .candidate_reopens
             .checked_add(1)
-            .ok_or(ChartCaptionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         Ok(())
     }
 
@@ -565,11 +593,11 @@ impl CaptionBudget {
         &mut self,
         source_bytes: usize,
         target_bytes: usize,
-    ) -> Result<(), ChartCaptionError> {
+    ) -> Result<(), Error> {
         self.charge_work(
             source_bytes
                 .checked_add(target_bytes)
-                .ok_or(ChartCaptionError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )
     }
 
@@ -616,7 +644,7 @@ impl CaptionBudget {
 /// or published.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum ChartCaptionLimitKind {
+pub enum LimitKind {
     /// Complete input package bytes.
     InputBytes,
     /// Complete rewritten package or payload bytes.
@@ -649,7 +677,7 @@ pub enum ChartCaptionLimitKind {
     CaptionBytes,
 }
 
-impl fmt::Display for ChartCaptionLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -672,9 +700,45 @@ impl fmt::Display for ChartCaptionLimitKind {
 }
 
 /// A content-redacted failure raised by a chart-caption transaction.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum ChartCaptionError {
+pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The source chart, caption graph, or text storage is malformed or unsafe.
+    #[error("the Keynote chart-caption source cannot be edited safely")]
+    InvalidSource,
+    /// A finite resource ceiling was exceeded.
+    #[error("Keynote chart-caption {kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        /// Resource category that exceeded its limit.
+        kind: LimitKind,
+        /// Observed or requested amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A bounded destination allocation failed before publication.
+    #[error("could not allocate {amount} units for the Keynote chart-caption transaction")]
+    Allocation {
+        /// Elements or bytes requested.
+        amount: usize,
+    },
+    /// Full candidate reopening did not reproduce the requested caption.
+    #[error("the edited Keynote chart caption failed semantic verification")]
+    Verification,
+    /// The patch does not belong to this exact immutable package artifact.
+    #[error("the Keynote chart-caption patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The source was prepared without an exact physical package artifact.
     #[error("this Keynote source does not support physical chart-caption edits")]
     UnsupportedSource,
@@ -709,44 +773,45 @@ pub enum ChartCaptionError {
     /// An empty exact chart name was supplied.
     #[error("the Keynote chart selector name cannot be empty")]
     EmptyChartName,
-    /// The source chart, caption graph, or text storage is malformed or unsafe.
-    #[error("the Keynote chart-caption source cannot be edited safely")]
-    InvalidSource,
-    /// A finite resource ceiling was exceeded.
-    #[error("Keynote chart-caption {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
-        /// Resource category that exceeded its limit.
-        kind: ChartCaptionLimitKind,
-        /// Observed or requested amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-    },
-    /// A bounded destination allocation failed before publication.
-    #[error("could not allocate {amount} units for the Keynote chart-caption transaction")]
-    Allocation {
-        /// Elements or bytes requested.
-        amount: usize,
-    },
-    /// Full candidate reopening did not reproduce the requested caption.
-    #[error("the edited Keynote chart caption failed semantic verification")]
-    Verification,
-    /// The patch does not belong to this exact immutable package artifact.
-    #[error("the Keynote chart-caption patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. } | Self::UnsupportedDependency { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+            Self::AmbiguousSelector { .. }
+            | Self::EmptySlideName { .. }
+            | Self::EmptyChartName { .. } => RefusalKind::InvalidValue,
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::ChartNameNotFound { .. }
+            | Self::ChartPositionNotFound { .. } => RefusalKind::NotFound,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// One mutable chart-caption value staged against an immutable package.
-pub struct ChartCaptionEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
     selection: CaptionSelection,
     after: Option<String>,
 }
 
-impl fmt::Debug for ChartCaptionEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("ChartCaptionEdit")
+            .debug_struct("Edit")
             .field("slide_position", &self.selection.slide_position)
             .field("chart_position", &self.selection.chart_position)
             .field("has_before", &self.selection.text.is_some())
@@ -755,12 +820,12 @@ impl fmt::Debug for ChartCaptionEdit<'_> {
     }
 }
 
-impl<'a> ChartCaptionEdit<'a> {
+impl<'a> Edit<'a> {
     fn new<'slide, 'chart>(
         source: &'a Package,
         slide_selector: impl Into<SlideSelector<'slide>>,
         chart_selector: impl Into<ChartSelector<'chart>>,
-    ) -> Result<Self, ChartCaptionError> {
+    ) -> Result<Self, Error> {
         let selection =
             select_caption(source, slide_selector.into(), chart_selector.into(), false)?;
         let after = selection.text.as_deref().map(copy_caption).transpose()?;
@@ -796,7 +861,7 @@ impl<'a> ChartCaptionEdit<'a> {
     }
 
     /// Stage whole-text replacement or creation of a native caption.
-    pub fn set(mut self, caption: impl AsRef<str>) -> Result<Self, ChartCaptionError> {
+    pub fn set(mut self, caption: impl AsRef<str>) -> Result<Self, Error> {
         self.after = Some(copy_caption(caption.as_ref())?);
         Ok(self)
     }
@@ -807,13 +872,13 @@ impl<'a> ChartCaptionEdit<'a> {
     /// fresh canonical stand-in and retains the old graph for exact history
     /// and inverse semantics. Clearing an already absent caption is an exact
     /// no-op.
-    pub fn clear(mut self) -> Result<Self, ChartCaptionError> {
+    pub fn clear(mut self) -> Result<Self, Error> {
         self.after = None;
         Ok(self)
     }
 
     /// Validate and atomically publish the staged immutable candidate.
-    pub fn commit(self) -> Result<ChartCaptionCommit, ChartCaptionError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         let catalog = physical_catalog(self.source)?;
         let source_bytes = catalog.shared_source();
         let current = select_caption(
@@ -823,13 +888,13 @@ impl<'a> ChartCaptionEdit<'a> {
             false,
         )?;
         if !current.same_identity(&self.selection) || current.text != self.selection.text {
-            return Err(ChartCaptionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if self.selection.text == self.after {
             self.source.validate().map_err(map_read_error)?;
-            return Ok(ChartCaptionCommit {
+            return Ok(Commit {
                 package: self.source.snapshot(),
-                patch: ChartCaptionPatch {
+                patch: Patch {
                     artifacts: ExactArtifacts::new(Arc::clone(&source_bytes), source_bytes),
                     target_selection: self.selection.clone(),
                     selection: self.selection,
@@ -838,11 +903,11 @@ impl<'a> ChartCaptionEdit<'a> {
                     deleted_previews: 0,
                     target_requires_invalidated_previews: false,
                 },
-                diagnostics: ChartCaptionDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         if !catalog.source_is_exact() {
-            return Err(ChartCaptionError::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         self.source.validate().map_err(map_read_error)?;
         let guarded = select_caption(
@@ -852,7 +917,7 @@ impl<'a> ChartCaptionEdit<'a> {
             true,
         )?;
         if !guarded.same_identity(&self.selection) || guarded.text != self.selection.text {
-            return Err(ChartCaptionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let mut budget = CaptionBudget::for_package(self.source)?;
         budget.charge_catalog_scan(self.source)?;
@@ -871,7 +936,7 @@ impl<'a> ChartCaptionEdit<'a> {
             true,
         )?;
         if !candidate.same_chart_identity(&self.selection) || candidate.text != self.after {
-            return Err(ChartCaptionError::Verification);
+            return Err(Error::Verification);
         }
         budget.charge_validation_scan(&package, 1)?;
         verify_caption_candidate(
@@ -885,9 +950,9 @@ impl<'a> ChartCaptionEdit<'a> {
         )?;
         let target = physical_catalog(&package)?.shared_source();
         budget.charge_exact_artifacts(source_bytes.len(), target.len())?;
-        Ok(ChartCaptionCommit {
+        Ok(Commit {
             package,
-            patch: ChartCaptionPatch {
+            patch: Patch {
                 artifacts: ExactArtifacts::new(source_bytes, target),
                 selection: self.selection,
                 target_selection: candidate,
@@ -896,14 +961,14 @@ impl<'a> ChartCaptionEdit<'a> {
                 deleted_previews,
                 target_requires_invalidated_previews: true,
             },
-            diagnostics: ChartCaptionDiagnostics::published(touched_components, deleted_previews),
+            diagnostics: Diagnostics::published(touched_components, deleted_previews),
         })
     }
 }
 
 /// An exact-source-checked reversible semantic chart-caption patch.
 #[derive(Clone, PartialEq, Eq)]
-pub struct ChartCaptionPatch {
+pub struct Patch {
     artifacts: ExactArtifacts,
     selection: CaptionSelection,
     target_selection: CaptionSelection,
@@ -913,10 +978,10 @@ pub struct ChartCaptionPatch {
     target_requires_invalidated_previews: bool,
 }
 
-impl fmt::Debug for ChartCaptionPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("ChartCaptionPatch")
+            .debug_struct("Patch")
             .field("slide_position", &self.selection.slide_position)
             .field("chart_position", &self.selection.chart_position)
             .field("has_before", &self.selection.text.is_some())
@@ -925,7 +990,7 @@ impl fmt::Debug for ChartCaptionPatch {
     }
 }
 
-impl ChartCaptionPatch {
+impl Patch {
     /// Return the selected semantic slide position.
     #[must_use]
     pub const fn slide_position(&self) -> Position {
@@ -986,14 +1051,14 @@ impl ChartCaptionPatch {
 
 /// Compact evidence describing one chart-caption commit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ChartCaptionDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     deleted_previews: usize,
     full_reparse_performed: bool,
 }
 
-impl ChartCaptionDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -1040,13 +1105,13 @@ impl ChartCaptionDiagnostics {
 /// The fully verified result of one immutable chart-caption transaction.
 #[must_use = "a Keynote chart-caption commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct ChartCaptionCommit {
+pub struct Commit {
     package: Package,
-    patch: ChartCaptionPatch,
-    diagnostics: ChartCaptionDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl ChartCaptionCommit {
+impl Commit {
     /// Borrow the fully reopened immutable package snapshot.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -1059,15 +1124,21 @@ impl ChartCaptionCommit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the reversible exact-source patch.
     #[must_use]
-    pub const fn patch(&self) -> &ChartCaptionPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Borrow compact publication diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> &ChartCaptionDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
@@ -1081,7 +1152,7 @@ impl Package {
         &self,
         slide_selector: impl Into<SlideSelector<'slide>>,
         chart_selector: impl Into<ChartSelector<'chart>>,
-    ) -> Result<Option<String>, ChartCaptionError> {
+    ) -> Result<Option<String>, Error> {
         Ok(select_caption(self, slide_selector.into(), chart_selector.into(), true)?.text)
     }
 
@@ -1090,19 +1161,16 @@ impl Package {
         &self,
         slide_selector: impl Into<SlideSelector<'slide>>,
         chart_selector: impl Into<ChartSelector<'chart>>,
-    ) -> Result<ChartCaptionEdit<'_>, ChartCaptionError> {
-        ChartCaptionEdit::new(self, slide_selector, chart_selector)
+    ) -> Result<Edit<'_>, Error> {
+        Edit::new(self, slide_selector, chart_selector)
     }
 
     /// Apply an exact-source-checked chart-caption patch.
-    pub fn apply_slide_chart_caption(
-        &self,
-        patch: &ChartCaptionPatch,
-    ) -> Result<ChartCaptionCommit, ChartCaptionError> {
+    pub fn apply_slide_chart_caption(&self, patch: &Patch) -> Result<Commit, Error> {
         let catalog = physical_catalog(self)?;
         let source = catalog.shared_source();
         if !patch.artifacts.authorizes_source(&source) {
-            return Err(ChartCaptionError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let current = select_caption(
             self,
@@ -1111,18 +1179,18 @@ impl Package {
             false,
         )?;
         if !current.same_identity(&patch.selection) || current.text != patch.selection.text {
-            return Err(ChartCaptionError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if patch.is_noop() {
             self.validate().map_err(map_read_error)?;
-            return Ok(ChartCaptionCommit {
+            return Ok(Commit {
                 package: self.snapshot(),
                 patch: patch.clone(),
-                diagnostics: ChartCaptionDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         if !catalog.source_is_exact() {
-            return Err(ChartCaptionError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let guarded = select_caption(
             self,
@@ -1131,7 +1199,7 @@ impl Package {
             true,
         )?;
         if !guarded.same_identity(&patch.selection) || guarded.text != patch.selection.text {
-            return Err(ChartCaptionError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let mut budget = CaptionBudget::for_package(self)?;
         budget.charge_catalog_scan(self)?;
@@ -1150,7 +1218,7 @@ impl Package {
             true,
         )?;
         if !selected.same_identity(&patch.target_selection) || selected.text != patch.after {
-            return Err(ChartCaptionError::Verification);
+            return Err(Error::Verification);
         }
         budget.charge_validation_scan(&candidate, 1)?;
         verify_caption_candidate(
@@ -1162,13 +1230,10 @@ impl Package {
             patch.target_requires_invalidated_previews,
             &mut budget,
         )?;
-        Ok(ChartCaptionCommit {
+        Ok(Commit {
             package: candidate,
             patch: patch.clone(),
-            diagnostics: ChartCaptionDiagnostics::published(
-                patch.touched_components,
-                patch.deleted_previews,
-            ),
+            diagnostics: Diagnostics::published(patch.touched_components, patch.deleted_previews),
         })
     }
 }
@@ -1216,7 +1281,7 @@ fn select_caption(
     slide_selector: SlideSelector<'_>,
     chart_selector: ChartSelector<'_>,
     mutation_guards: bool,
-) -> Result<CaptionSelection, ChartCaptionError> {
+) -> Result<CaptionSelection, Error> {
     let chart = select_chart(package, slide_selector, chart_selector, mutation_guards)
         .map_err(map_chart_title_error)?;
     caption_selection(package, chart, mutation_guards)
@@ -1226,19 +1291,19 @@ fn caption_selection(
     package: &Package,
     chart: ChartSelection,
     mutation_guards: bool,
-) -> Result<CaptionSelection, ChartCaptionError> {
+) -> Result<CaptionSelection, Error> {
     let record = package
         .slide_record_at(chart.slide_position.get())
         .map_err(map_read_error)?
-        .ok_or(ChartCaptionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if record.slide_identifier != chart.slide_identifier {
-        return Err(ChartCaptionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let (component, object) = package
         .object_with_component(chart.chart_identifier)
-        .ok_or(ChartCaptionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if component != chart.slide_component_name || object.messages.len() != 1 {
-        return Err(ChartCaptionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let payload = unique_payload(&object.messages, &[CHART_MESSAGE_TYPE], "Keynote chart")
         .map_err(map_read_error)?;
@@ -1263,14 +1328,14 @@ fn caption_selection(
     };
     let (info_component, info_object) = package
         .object_with_component(reference_identifier)
-        .ok_or(ChartCaptionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if info_component != chart.slide_component_name || info_object.messages.len() != 1 {
-        return Err(ChartCaptionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if info_object.messages[0].type_ == STANDIN_MESSAGE_TYPE {
         validate_selected_message_metadata(info_object, 0)?;
         if !info_object.messages[0].data.is_empty() {
-            return Err(ChartCaptionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if mutation_guards {
             prove_exclusive_caption_standin(package, chart.chart_identifier, reference_identifier)?;
@@ -1278,7 +1343,7 @@ fn caption_selection(
         return Ok(empty(Some(reference_identifier)));
     }
     if info_object.messages[0].type_ != CAPTION_INFO_MESSAGE_TYPE {
-        return Err(ChartCaptionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     validate_selected_message_metadata(info_object, 0)?;
     let snapshot = pages_movie_caption_codec::decode_caption_info(
@@ -1288,23 +1353,23 @@ fn caption_selection(
     .map_err(map_caption_info_codec_error)?;
     let storage_identifier = snapshot
         .owned_storage_identifier()
-        .ok_or(ChartCaptionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if storage_identifier == 0
         || snapshot.deprecated_storage_identifier() != Some(storage_identifier)
         || snapshot.parent_identifier() != chart.chart_identifier
         || snapshot.is_text_box() != Some(true)
         || snapshot.child_info_kind() != Some(1)
     {
-        return Err(ChartCaptionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let placement_identifier = snapshot
         .placement_identifier()
         .filter(|identifier| *identifier != 0)
-        .ok_or(ChartCaptionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let style_identifier = snapshot
         .style_identifier()
         .filter(|identifier| *identifier != 0)
-        .ok_or(ChartCaptionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let identifiers = [
         chart.chart_identifier,
         reference_identifier,
@@ -1314,7 +1379,7 @@ fn caption_selection(
     ];
     for (index, identifier) in identifiers.iter().enumerate() {
         if identifiers[..index].contains(identifier) {
-            return Err(ChartCaptionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     require_private_object(
@@ -1370,15 +1435,15 @@ pub(super) fn require_private_object(
     identifier: u64,
     message_type: u32,
     expected_component: Option<&str>,
-) -> Result<(), ChartCaptionError> {
+) -> Result<(), Error> {
     let (component, object) = package
         .object_with_component(identifier)
-        .ok_or(ChartCaptionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if expected_component.is_some_and(|expected| expected != component)
         || object.messages.len() != 1
         || object.messages[0].type_ != message_type
     {
-        return Err(ChartCaptionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     validate_selected_message_metadata(object, 0)
 }
@@ -1386,12 +1451,12 @@ pub(super) fn require_private_object(
 pub(super) fn validate_selected_message_metadata(
     object: &ArchiveObject,
     message_index: usize,
-) -> Result<(), ChartCaptionError> {
+) -> Result<(), Error> {
     let message = object
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(ChartCaptionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if object.archive_info.should_merge == Some(true)
         || message.base_message_index.is_some()
         || !message.diff_merge_version.is_empty()
@@ -1399,7 +1464,7 @@ pub(super) fn validate_selected_message_metadata(
         || !message.fields_to_remove.is_empty()
         || !message.diff_read_version.is_empty()
     {
-        return Err(ChartCaptionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -1409,17 +1474,14 @@ pub(super) fn prove_exclusive_caption_storage(
     chart_identifier: u64,
     caption_info_identifier: u64,
     storage_identifier: u64,
-) -> Result<(), ChartCaptionError> {
+) -> Result<(), Error> {
     prove_exclusive_caption_info_owner(package, chart_identifier, caption_info_identifier)?;
     let mut payload_owner_seen = false;
     let mut metadata_owner_seen = false;
     let mut chart_edge_seen = false;
     for component in package.state.source.components().iter() {
         for object in &component.archive().objects {
-            let owner_identifier = object
-                .archive_info
-                .identifier
-                .ok_or(ChartCaptionError::InvalidSource)?;
+            let owner_identifier = object.archive_info.identifier.ok_or(Error::InvalidSource)?;
             for (message_index, message) in object.messages.iter().enumerate() {
                 if message.type_ == CHART_MESSAGE_TYPE
                     && chart_caption_reference(package, &message.data)?
@@ -1428,7 +1490,7 @@ pub(super) fn prove_exclusive_caption_storage(
                     if std::mem::replace(&mut chart_edge_seen, true)
                         || owner_identifier != chart_identifier
                     {
-                        return Err(ChartCaptionError::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                 }
                 if message.type_ == CAPTION_INFO_MESSAGE_TYPE {
@@ -1443,14 +1505,14 @@ pub(super) fn prove_exclusive_caption_storage(
                         && (std::mem::replace(&mut payload_owner_seen, true)
                             || owner_identifier != caption_info_identifier)
                     {
-                        return Err(ChartCaptionError::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                 }
                 let info = object
                     .archive_info
                     .message_infos
                     .get(message_index)
-                    .ok_or(ChartCaptionError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
                 let aggregate_count = info
                     .object_references
                     .iter()
@@ -1470,11 +1532,11 @@ pub(super) fn prove_exclusive_caption_storage(
                         .filter(|identifier| **identifier == storage_identifier)
                         .count();
                     if occurrences != 0 && !matches!(field.path.as_slice(), [1, 2] | [1, 4]) {
-                        return Err(ChartCaptionError::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                     field_count = field_count
                         .checked_add(occurrences)
-                        .ok_or(ChartCaptionError::InvalidSource)?;
+                        .ok_or(Error::InvalidSource)?;
                     field_data = field_data
                         .checked_add(
                             field
@@ -1483,7 +1545,7 @@ pub(super) fn prove_exclusive_caption_storage(
                                 .filter(|identifier| **identifier == storage_identifier)
                                 .count(),
                         )
-                        .ok_or(ChartCaptionError::InvalidSource)?;
+                        .ok_or(Error::InvalidSource)?;
                 }
                 if aggregate_count != 0
                     || field_count != 0
@@ -1498,7 +1560,7 @@ pub(super) fn prove_exclusive_caption_storage(
                         || aggregate_data != 0
                         || field_data != 0
                     {
-                        return Err(ChartCaptionError::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                 }
             }
@@ -1507,7 +1569,7 @@ pub(super) fn prove_exclusive_caption_storage(
     if payload_owner_seen && metadata_owner_seen && chart_edge_seen {
         Ok(())
     } else {
-        Err(ChartCaptionError::InvalidSource)
+        Err(Error::InvalidSource)
     }
 }
 
@@ -1515,33 +1577,28 @@ pub(super) fn prove_exclusive_caption_standin(
     package: &Package,
     chart_identifier: u64,
     standin_identifier: u64,
-) -> Result<(), ChartCaptionError> {
+) -> Result<(), Error> {
     prove_exclusive_caption_info_owner(package, chart_identifier, standin_identifier)?;
     let mut payload_edges = 0usize;
     let mut aggregate_edges = 0usize;
     let mut field_edges = 0usize;
     for component in package.state.source.components().iter() {
         for object in &component.archive().objects {
-            let owner_identifier = object
-                .archive_info
-                .identifier
-                .ok_or(ChartCaptionError::InvalidSource)?;
+            let owner_identifier = object.archive_info.identifier.ok_or(Error::InvalidSource)?;
             for (message_index, message) in object.messages.iter().enumerate() {
                 if message.type_ == CHART_MESSAGE_TYPE
                     && chart_caption_reference(package, &message.data)? == Some(standin_identifier)
                 {
-                    payload_edges = payload_edges
-                        .checked_add(1)
-                        .ok_or(ChartCaptionError::InvalidSource)?;
+                    payload_edges = payload_edges.checked_add(1).ok_or(Error::InvalidSource)?;
                     if payload_edges > 1 || owner_identifier != chart_identifier {
-                        return Err(ChartCaptionError::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                 }
                 let info = object
                     .archive_info
                     .message_infos
                     .get(message_index)
-                    .ok_or(ChartCaptionError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
                 let aggregate_count = info
                     .object_references
                     .iter()
@@ -1553,18 +1610,18 @@ pub(super) fn prove_exclusive_caption_standin(
                     .filter(|identifier| **identifier == standin_identifier)
                     .count();
                 if aggregate_data != 0 {
-                    return Err(ChartCaptionError::UnsupportedDependency);
+                    return Err(Error::Refused(Refusal::UnsupportedDependency));
                 }
                 if aggregate_count != 0 {
                     if owner_identifier != chart_identifier
                         || message.type_ != CHART_MESSAGE_TYPE
                         || aggregate_count != 1
                     {
-                        return Err(ChartCaptionError::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                     aggregate_edges = aggregate_edges
                         .checked_add(aggregate_count)
-                        .ok_or(ChartCaptionError::InvalidSource)?;
+                        .ok_or(Error::InvalidSource)?;
                 }
                 for field in &info.field_infos {
                     let field_count = field
@@ -1578,7 +1635,7 @@ pub(super) fn prove_exclusive_caption_standin(
                         .filter(|identifier| **identifier == standin_identifier)
                         .count();
                     if field_data != 0 {
-                        return Err(ChartCaptionError::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                     if field_count != 0 {
                         if owner_identifier != chart_identifier
@@ -1589,11 +1646,11 @@ pub(super) fn prove_exclusive_caption_standin(
                                 [11, 1] | [1, 11, 1] | [1, 1, 11, 1]
                             )
                         {
-                            return Err(ChartCaptionError::UnsupportedDependency);
+                            return Err(Error::Refused(Refusal::UnsupportedDependency));
                         }
                         field_edges = field_edges
                             .checked_add(field_count)
-                            .ok_or(ChartCaptionError::InvalidSource)?;
+                            .ok_or(Error::InvalidSource)?;
                     }
                 }
             }
@@ -1602,7 +1659,7 @@ pub(super) fn prove_exclusive_caption_standin(
     if payload_edges == 1 && aggregate_edges == 1 && field_edges <= 1 {
         Ok(())
     } else {
-        Err(ChartCaptionError::InvalidSource)
+        Err(Error::InvalidSource)
     }
 }
 
@@ -1614,33 +1671,28 @@ fn prove_exclusive_caption_info_owner(
     package: &Package,
     chart_identifier: u64,
     caption_info_identifier: u64,
-) -> Result<(), ChartCaptionError> {
+) -> Result<(), Error> {
     let mut payload_edges = 0usize;
     let mut aggregate_edges = 0usize;
     let mut field_edges = 0usize;
     for component in package.state.source.components().iter() {
         for object in &component.archive().objects {
-            let owner_identifier = object
-                .archive_info
-                .identifier
-                .ok_or(ChartCaptionError::InvalidSource)?;
+            let owner_identifier = object.archive_info.identifier.ok_or(Error::InvalidSource)?;
             for (message_index, message) in object.messages.iter().enumerate() {
                 if message.type_ == CHART_MESSAGE_TYPE
                     && chart_caption_reference(package, &message.data)?
                         == Some(caption_info_identifier)
                 {
-                    payload_edges = payload_edges
-                        .checked_add(1)
-                        .ok_or(ChartCaptionError::InvalidSource)?;
+                    payload_edges = payload_edges.checked_add(1).ok_or(Error::InvalidSource)?;
                     if owner_identifier != chart_identifier || payload_edges > 1 {
-                        return Err(ChartCaptionError::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                 }
                 let info = object
                     .archive_info
                     .message_infos
                     .get(message_index)
-                    .ok_or(ChartCaptionError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
                 let aggregate_count = info
                     .object_references
                     .iter()
@@ -1652,7 +1704,7 @@ fn prove_exclusive_caption_info_owner(
                     .filter(|identifier| **identifier == caption_info_identifier)
                     .count();
                 if aggregate_data != 0 {
-                    return Err(ChartCaptionError::UnsupportedDependency);
+                    return Err(Error::Refused(Refusal::UnsupportedDependency));
                 }
                 let mut local_field_edges = 0usize;
                 for field in &info.field_infos {
@@ -1667,7 +1719,7 @@ fn prove_exclusive_caption_info_owner(
                         .filter(|identifier| **identifier == caption_info_identifier)
                         .count();
                     if field_data != 0 {
-                        return Err(ChartCaptionError::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                     if field_count != 0 {
                         if owner_identifier != chart_identifier
@@ -1678,11 +1730,11 @@ fn prove_exclusive_caption_info_owner(
                                 [11, 1] | [1, 11, 1] | [1, 1, 11, 1]
                             )
                         {
-                            return Err(ChartCaptionError::UnsupportedDependency);
+                            return Err(Error::Refused(Refusal::UnsupportedDependency));
                         }
                         local_field_edges = local_field_edges
                             .checked_add(field_count)
-                            .ok_or(ChartCaptionError::InvalidSource)?;
+                            .ok_or(Error::InvalidSource)?;
                     }
                 }
                 if aggregate_count != 0 {
@@ -1690,16 +1742,16 @@ fn prove_exclusive_caption_info_owner(
                         || message.type_ != CHART_MESSAGE_TYPE
                         || aggregate_count != 1
                     {
-                        return Err(ChartCaptionError::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                 }
                 if aggregate_count != 0 || local_field_edges != 0 {
                     aggregate_edges = aggregate_edges
                         .checked_add(aggregate_count)
-                        .ok_or(ChartCaptionError::InvalidSource)?;
+                        .ok_or(Error::InvalidSource)?;
                     field_edges = field_edges
                         .checked_add(local_field_edges)
-                        .ok_or(ChartCaptionError::InvalidSource)?;
+                        .ok_or(Error::InvalidSource)?;
                 }
             }
         }
@@ -1707,14 +1759,11 @@ fn prove_exclusive_caption_info_owner(
     if payload_edges == 1 && aggregate_edges == 1 && field_edges <= 1 {
         Ok(())
     } else {
-        Err(ChartCaptionError::InvalidSource)
+        Err(Error::InvalidSource)
     }
 }
 
-fn chart_caption_reference(
-    package: &Package,
-    payload: &[u8],
-) -> Result<Option<u64>, ChartCaptionError> {
+fn chart_caption_reference(package: &Package, payload: &[u8]) -> Result<Option<u64>, Error> {
     let options = chart_caption_decode_options(package, payload)?;
     let identifier = keynote_chart_caption_codec::decode_chart_caption_identifier(payload, options)
         .map_err(map_chart_caption_codec_error)?;
@@ -1722,23 +1771,23 @@ fn chart_caption_reference(
         return Ok(None);
     };
     if identifier == 0 {
-        return Err(ChartCaptionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let limits = package.wire_limits().map_err(map_wire_error)?;
-    let outer = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
-    let super_payload = unique_payload_field(&outer, 1)?.ok_or(ChartCaptionError::InvalidSource)?;
-    let drawable = WireView::parse_with_limits(super_payload, limits).map_err(map_wire_error)?;
-    let reference = unique_payload_field(&drawable, 11)?.ok_or(ChartCaptionError::InvalidSource)?;
+    let outer = WireView::parse(payload, limits).map_err(map_wire_error)?;
+    let super_payload = unique_payload_field(&outer, 1)?.ok_or(Error::InvalidSource)?;
+    let drawable = WireView::parse(super_payload, limits).map_err(map_wire_error)?;
+    let reference = unique_payload_field(&drawable, 11)?.ok_or(Error::InvalidSource)?;
     let projected = super::validate_reference_payload(reference, limits, "Keynote chart caption")
         .map_err(map_wire_error)?;
     let strict_identifier = reference_identifier(reference, limits)?;
     if projected != identifier || strict_identifier != identifier {
-        return Err(ChartCaptionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(Some(identifier))
 }
 
-fn validate_reference_optional_fields(view: &WireView<'_>) -> Result<(), ChartCaptionError> {
+fn validate_reference_optional_fields(view: &WireView<'_>) -> Result<(), Error> {
     let mut deprecated_type_seen = false;
     let mut deprecated_external_seen = false;
     for field in view.fields() {
@@ -1746,33 +1795,30 @@ fn validate_reference_optional_fields(view: &WireView<'_>) -> Result<(), ChartCa
             continue;
         }
         if field.wire_type() != 0 {
-            return Err(ChartCaptionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field.validate_canonical_key().map_err(map_wire_error)?;
-        let (value, bytes) = decode_varint_from_bytes(field.payload())
-            .map_err(|_error| ChartCaptionError::InvalidSource)?;
+        let (value, bytes) =
+            decode_varint_from_bytes(field.payload()).map_err(|_error| Error::InvalidSource)?;
         if bytes != field.payload().len() || bytes != encoded_len(value) || value != 0 {
-            return Err(ChartCaptionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if field.number() == 2 {
             if std::mem::replace(&mut deprecated_type_seen, true) {
-                return Err(ChartCaptionError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         } else if std::mem::replace(&mut deprecated_external_seen, true) {
-            return Err(ChartCaptionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(())
 }
 
-fn unique_payload_field<'a>(
-    view: &WireView<'a>,
-    number: u32,
-) -> Result<Option<&'a [u8]>, ChartCaptionError> {
+fn unique_payload_field<'a>(view: &WireView<'a>, number: u32) -> Result<Option<&'a [u8]>, Error> {
     let mut selected = None;
     for field in view.fields().filter(|field| field.number() == number) {
         if selected.is_some() || field.wire_type() != 2 {
-            return Err(ChartCaptionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field.validate_canonical_key().map_err(map_wire_error)?;
         field.validate_canonical_framing().map_err(map_wire_error)?;
@@ -1790,18 +1836,18 @@ fn rewrite_chart_caption_operation(
     selection: &CaptionSelection,
     after: Option<&str>,
     budget: &mut CaptionBudget,
-) -> Result<(Package, usize, usize), ChartCaptionError> {
+) -> Result<(Package, usize, usize), Error> {
     let creating = selection.storage_identifier.is_none() && after.is_some();
     let removing = selection.storage_identifier.is_some() && after.is_none();
     if !creating && !removing {
         let storage = selection
             .storage_identifier
-            .ok_or(ChartCaptionError::UnsupportedDependency)?;
-        let desired = after.ok_or(ChartCaptionError::UnsupportedDependency)?;
+            .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
+        let desired = after.ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
         let end = selection
             .text
             .as_deref()
-            .ok_or(ChartCaptionError::InvalidSource)?
+            .ok_or(Error::InvalidSource)?
             .encode_utf16()
             .count();
         if selection
@@ -1810,7 +1856,7 @@ fn rewrite_chart_caption_operation(
             .is_some_and(contains_dependent_marker)
             || contains_dependent_marker(desired)
         {
-            return Err(ChartCaptionError::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         if metadata_member_name(physical_catalog(source)?, source).is_ok() {
             return rewrite_existing_caption_text_with_metadata_budget(
@@ -1823,7 +1869,7 @@ fn rewrite_chart_caption_operation(
                 budget,
             );
         }
-        return Err(ChartCaptionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
 
     rewrite_caption_graph_operation_with_budget(
@@ -1853,14 +1899,14 @@ pub(super) fn rewrite_caption_graph_operation_with_budget(
     after: Option<&str>,
     edge_kind: CaptionEdgeKind,
     budget: &mut CaptionBudget,
-) -> Result<(Package, usize, usize), ChartCaptionError> {
+) -> Result<(Package, usize, usize), Error> {
     let creating = storage_identifier.is_none() && after.is_some();
     let removing = storage_identifier.is_some() && after.is_none();
     if !creating && !removing {
-        return Err(ChartCaptionError::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     if after.is_some_and(contains_dependent_marker) {
-        return Err(ChartCaptionError::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
 
     // The graph transition performs package-wide metadata, identifier, theme,
@@ -1873,31 +1919,30 @@ pub(super) fn rewrite_caption_graph_operation_with_budget(
     let metadata_name = metadata_member_name(catalog, source)?;
     let slide_name = slide_component_name.to_owned();
     if metadata_name == slide_name {
-        return Err(ChartCaptionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let physical_limits = source.state.options.archive();
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(map_archive_error)?;
     let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
-    let entries = entry_index(catalog.package(), budget, ChartCaptionError::InvalidSource)?;
+    let entries = entry_index(catalog.package(), budget, Error::InvalidSource)?;
     budget.charge_allocation(1, 0)?;
     let mut archives = Vec::new();
     archives
         .try_reserve_exact(2)
-        .map_err(|_| ChartCaptionError::Allocation { amount: 2 })?;
+        .map_err(|_| Error::Allocation { amount: 2 })?;
     for name in [&slide_name, &metadata_name] {
         let entry = entries
             .get(name.as_str())
             .copied()
-            .ok_or(ChartCaptionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if entry.is_opaque() {
-            return Err(ChartCaptionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
-        let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
-            .map_err(map_core_error)?;
-        let archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
-            .map_err(map_core_error)?;
+        let stream =
+            SnappyStream::decompress(entry.data(), snappy_limits).map_err(map_core_error)?;
+        let archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
         validate_canonical_object_framing(&archive, stream.as_bytes())?;
         archives.push((name.clone(), archive));
     }
@@ -1912,7 +1957,7 @@ pub(super) fn rewrite_caption_graph_operation_with_budget(
     budget.charge_metadata_report(
         metadata_facts
             .inspection_report
-            .ok_or(ChartCaptionError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     let slide_selector = metadata_facts.selector()?;
     prove_metadata_selector_component(source, &slide_name, slide_selector)?;
@@ -1930,7 +1975,7 @@ pub(super) fn rewrite_caption_graph_operation_with_budget(
             )?;
             let width = caption_drawable_width(source, drawable_identifier)?;
             budget.precharge_graph(
-                after.ok_or(ChartCaptionError::InvalidSource)?,
+                after.ok_or(Error::InvalidSource)?,
                 theme.language.as_deref(),
             )?;
             let (objects, graph_report) = caption_graph_objects(
@@ -1938,7 +1983,7 @@ pub(super) fn rewrite_caption_graph_operation_with_budget(
                 ids,
                 drawable_identifier,
                 width,
-                after.ok_or(ChartCaptionError::InvalidSource)?,
+                after.ok_or(Error::InvalidSource)?,
                 theme.stylesheet,
                 theme.paragraph_style,
                 theme.language.as_deref(),
@@ -1950,11 +1995,7 @@ pub(super) fn rewrite_caption_graph_operation_with_budget(
                 ids,
                 ids.info,
                 objects,
-                matches!(
-                    edge_kind,
-                    CaptionEdgeKind::Movie | CaptionEdgeKind::MovieTitle
-                )
-                .then_some(ids.style),
+                edge_kind.lists_graph_style().then_some(ids.style),
             )
         } else {
             let standin = first_identifier;
@@ -1982,7 +2023,7 @@ pub(super) fn rewrite_caption_graph_operation_with_budget(
     )?;
     for object in graph_objects {
         slide_archive
-            .insert_object_with_limits(object, archive_limits)
+            .insert_object(object, archive_limits)
             .map_err(map_core_error)?;
     }
 
@@ -1991,7 +2032,7 @@ pub(super) fn rewrite_caption_graph_operation_with_budget(
     let mut additions = Vec::new();
     additions
         .try_reserve_exact(new_identifiers.all().len())
-        .map_err(|_| ChartCaptionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: new_identifiers.all().len(),
         })?;
     for identifier in new_identifiers.all() {
@@ -2037,21 +2078,19 @@ pub(super) fn rewrite_caption_graph_operation_with_budget(
     let mut compressed = Vec::new();
     compressed
         .try_reserve_exact(archives.len())
-        .map_err(|_error| ChartCaptionError::Allocation {
+        .map_err(|_error| Error::Allocation {
             amount: archives.len(),
         })?;
     for (name, archive) in &archives {
-        let bytes = archive
-            .to_bytes_with_limits(archive_limits)
-            .map_err(map_core_error)?;
-        let data = SnappyStream::compress(&bytes).map_err(map_core_error)?;
+        let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
+        let data = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
         compressed.push((name.clone(), data));
     }
     budget.charge_allocation(1, 0)?;
     let mut edits = Vec::new();
     edits
         .try_reserve_exact(compressed.len())
-        .map_err(|_| ChartCaptionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: compressed.len(),
         })?;
     for (name, data) in &compressed {
@@ -2081,7 +2120,7 @@ pub(super) fn rewrite_existing_caption_text_with_metadata_budget(
     end: usize,
     desired: &str,
     budget: &mut CaptionBudget,
-) -> Result<(Package, usize, usize), ChartCaptionError> {
+) -> Result<(Package, usize, usize), Error> {
     let catalog = physical_catalog(source)?;
     let metadata_name = metadata_member_name(catalog, source)?;
     let deleted = preview_count(catalog);
@@ -2110,7 +2149,7 @@ pub(super) fn rewrite_existing_caption_text_with_metadata_budget(
     budget.charge_metadata_report(
         metadata_facts
             .inspection_report
-            .ok_or(ChartCaptionError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     let touched_component_names = exact_component_names_for_identifiers(
         &native_candidate,
@@ -2120,7 +2159,7 @@ pub(super) fn rewrite_existing_caption_text_with_metadata_budget(
         .iter()
         .any(|name| name == slide_component_name)
     {
-        return Err(ChartCaptionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let selectors = metadata_selectors_for_component_names(
         &native_candidate,
@@ -2164,9 +2203,10 @@ pub(super) fn rewrite_existing_caption_text_with_metadata_budget(
     let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
     budget.charge_archive_snappy_plan(&metadata_archive, archive_limits, snappy_limits)?;
     let metadata_bytes = metadata_archive
-        .to_bytes_with_limits(archive_limits)
+        .to_bytes(archive_limits)
         .map_err(map_core_error)?;
-    let metadata_compressed = SnappyStream::compress(&metadata_bytes).map_err(map_core_error)?;
+    let metadata_compressed =
+        SnappyStream::compress(&metadata_bytes, snappy_limits).map_err(map_core_error)?;
     let edit = EntryEdit::new(metadata_name.as_str(), metadata_compressed.as_slice());
     let native_catalog = physical_catalog(&native_candidate)?;
     let prepared_reassembly = native_catalog
@@ -2187,46 +2227,38 @@ pub(super) fn rewrite_existing_caption_text_with_metadata_budget(
     let _ = archive_for_member(&candidate, &metadata_name)?;
     Ok((
         candidate,
-        touched
-            .checked_add(1)
-            .ok_or(ChartCaptionError::InvalidSource)?,
+        touched.checked_add(1).ok_or(Error::InvalidSource)?,
         deleted,
     ))
 }
 
-fn archive_ref<'a>(
-    archives: &'a [(String, Archive)],
-    name: &str,
-) -> Result<&'a Archive, ChartCaptionError> {
+fn archive_ref<'a>(archives: &'a [(String, Archive)], name: &str) -> Result<&'a Archive, Error> {
     archives
         .iter()
         .find(|(candidate, _)| candidate == name)
         .map(|(_, archive)| archive)
-        .ok_or(ChartCaptionError::InvalidSource)
+        .ok_or(Error::InvalidSource)
 }
 
 fn archive_mut<'a>(
     archives: &'a mut [(String, Archive)],
     name: &str,
-) -> Result<&'a mut Archive, ChartCaptionError> {
+) -> Result<&'a mut Archive, Error> {
     archives
         .iter_mut()
         .find(|(candidate, _)| candidate == name)
         .map(|(_, archive)| archive)
-        .ok_or(ChartCaptionError::InvalidSource)
+        .ok_or(Error::InvalidSource)
 }
 
-fn metadata_member_name(
-    catalog: &SourceCatalog,
-    package: &Package,
-) -> Result<String, ChartCaptionError> {
+fn metadata_member_name(catalog: &SourceCatalog, package: &Package) -> Result<String, Error> {
     let entry = catalog
         .package()
         .iter()
         .find(|entry| entry.name() == PACKAGE_METADATA_MEMBER_NAME)
-        .ok_or(ChartCaptionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(ChartCaptionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut found = 0usize;
     for component in package.state.source.components().iter() {
@@ -2236,28 +2268,23 @@ fn metadata_member_name(
                     continue;
                 }
                 if component.name() != PACKAGE_METADATA_MEMBER_NAME {
-                    return Err(ChartCaptionError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
-                found = found
-                    .checked_add(1)
-                    .ok_or(ChartCaptionError::InvalidSource)?;
+                found = found.checked_add(1).ok_or(Error::InvalidSource)?;
             }
         }
     }
     if found == 1 {
         Ok(PACKAGE_METADATA_MEMBER_NAME.to_owned())
     } else {
-        Err(ChartCaptionError::InvalidSource)
+        Err(Error::InvalidSource)
     }
 }
 
-fn metadata_payload(archive: &Archive) -> Result<(u64, usize, Vec<u8>), ChartCaptionError> {
+fn metadata_payload(archive: &Archive) -> Result<(u64, usize, Vec<u8>), Error> {
     let mut selected = None;
     for object in &archive.objects {
-        let identifier = object
-            .archive_info
-            .identifier
-            .ok_or(ChartCaptionError::InvalidSource)?;
+        let identifier = object.archive_info.identifier.ok_or(Error::InvalidSource)?;
         for (index, message) in object.messages.iter().enumerate() {
             if message.type_ != PACKAGE_METADATA_MESSAGE_TYPE {
                 continue;
@@ -2266,11 +2293,11 @@ fn metadata_payload(archive: &Archive) -> Result<(u64, usize, Vec<u8>), ChartCap
                 .replace((identifier, index, message.data.clone()))
                 .is_some()
             {
-                return Err(ChartCaptionError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
     }
-    selected.ok_or(ChartCaptionError::InvalidSource)
+    selected.ok_or(Error::InvalidSource)
 }
 
 fn replace_metadata_payload(
@@ -2279,17 +2306,17 @@ fn replace_metadata_payload(
     index: usize,
     data: Vec<u8>,
     limits: litchi_iwa_core::Limits,
-) -> Result<(), ChartCaptionError> {
+) -> Result<(), Error> {
     let object = archive
         .object_mut(object_identifier)
-        .ok_or(ChartCaptionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if object.messages.get(index).map(|message| message.type_)
         != Some(PACKAGE_METADATA_MESSAGE_TYPE)
     {
-        return Err(ChartCaptionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             index,
             RawMessage {
                 type_: PACKAGE_METADATA_MESSAGE_TYPE,
@@ -2311,9 +2338,9 @@ fn prove_metadata_selector_component(
     package: &Package,
     component_name: &str,
     selector: ComponentSelector<'_>,
-) -> Result<(), ChartCaptionError> {
+) -> Result<(), Error> {
     if selector.locator() != metadata_locator(component_name) {
-        return Err(ChartCaptionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut owners = 0usize;
     for component in package.state.source.components().iter() {
@@ -2321,27 +2348,25 @@ fn prove_metadata_selector_component(
             continue;
         }
         if component.name() != component_name {
-            return Err(ChartCaptionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
-        owners = owners
-            .checked_add(1)
-            .ok_or(ChartCaptionError::InvalidSource)?;
+        owners = owners.checked_add(1).ok_or(Error::InvalidSource)?;
     }
     if owners == 1 {
         Ok(())
     } else {
-        Err(ChartCaptionError::InvalidSource)
+        Err(Error::InvalidSource)
     }
 }
 
 fn exact_component_names_for_identifiers(
     package: &Package,
     identifiers: &[u64],
-) -> Result<Vec<String>, ChartCaptionError> {
+) -> Result<Vec<String>, Error> {
     let mut names = Vec::new();
     names
         .try_reserve_exact(identifiers.len())
-        .map_err(|_| ChartCaptionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: identifiers.len(),
         })?;
     for identifier in identifiers {
@@ -2351,9 +2376,9 @@ fn exact_component_names_for_identifiers(
             .components()
             .iter()
             .filter(|component| component.archive().object(*identifier).is_some());
-        let owner = owners.next().ok_or(ChartCaptionError::InvalidSource)?;
+        let owner = owners.next().ok_or(Error::InvalidSource)?;
         if owners.next().is_some() {
-            return Err(ChartCaptionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if !names.iter().any(|name| name == owner.name()) {
             names.push(owner.name().to_owned());
@@ -2366,11 +2391,11 @@ fn metadata_selectors_for_component_names<'facts>(
     package: &Package,
     facts: &'facts CaptionMetadataFacts,
     component_names: &[String],
-) -> Result<Vec<ComponentSelector<'facts>>, ChartCaptionError> {
+) -> Result<Vec<ComponentSelector<'facts>>, Error> {
     let mut selectors = Vec::new();
     selectors
         .try_reserve_exact(component_names.len())
-        .map_err(|_| ChartCaptionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: component_names.len(),
         })?;
     for component_name in component_names {
@@ -2379,9 +2404,9 @@ fn metadata_selectors_for_component_names<'facts>(
             .components
             .iter()
             .filter(|component| component.current && component.locator == locator);
-        let component = matches.next().ok_or(ChartCaptionError::InvalidSource)?;
+        let component = matches.next().ok_or(Error::InvalidSource)?;
         if matches.next().is_some() {
-            return Err(ChartCaptionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let selector = ComponentSelector::new(component.identifier, component.locator.as_str());
         prove_metadata_selector_component(package, component_name, selector)?;
@@ -2394,7 +2419,7 @@ fn metadata_options(
     package: &Package,
     budget: &CaptionBudget,
     max_additions: usize,
-) -> Result<MetadataRewriteOptions, ChartCaptionError> {
+) -> Result<MetadataRewriteOptions, Error> {
     let recursion = budget.remaining_depth();
     let semantic = package.semantic_limits();
     let wire = package.wire_limits().map_err(map_wire_error)?;
@@ -2442,31 +2467,29 @@ struct CaptionMetadataExternalReference {
 }
 
 impl CaptionMetadataFacts {
-    fn selector(&self) -> Result<ComponentSelector<'_>, ChartCaptionError> {
+    fn selector(&self) -> Result<ComponentSelector<'_>, Error> {
         if self.selected_count != 1 {
-            return Err(ChartCaptionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let locator = self
             .selected_locator
             .as_deref()
-            .ok_or(ChartCaptionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         Ok(ComponentSelector::new(
-            self.selected_identifier
-                .ok_or(ChartCaptionError::InvalidSource)?,
+            self.selected_identifier.ok_or(Error::InvalidSource)?,
             locator,
         ))
     }
 
-    fn selected_component(&self) -> Result<(u64, &str), ChartCaptionError> {
+    fn selected_component(&self) -> Result<(u64, &str), Error> {
         if self.selected_count != 1 {
-            return Err(ChartCaptionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         Ok((
-            self.selected_identifier
-                .ok_or(ChartCaptionError::InvalidSource)?,
+            self.selected_identifier.ok_or(Error::InvalidSource)?,
             self.selected_locator
                 .as_deref()
-                .ok_or(ChartCaptionError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         ))
     }
 }
@@ -2555,7 +2578,7 @@ fn caption_metadata_facts(
     source: &[u8],
     target_locator: &str,
     budget: &CaptionBudget,
-) -> Result<CaptionMetadataFacts, ChartCaptionError> {
+) -> Result<CaptionMetadataFacts, Error> {
     let options = metadata_options(package, budget, 4)?;
     let mut facts = CaptionMetadataFacts {
         target_locator: target_locator.to_owned(),
@@ -2586,7 +2609,7 @@ fn prove_caption_dependencies(
     facts: &CaptionMetadataFacts,
     slide_component_name: &str,
     dependencies: [u64; 2],
-) -> Result<(), ChartCaptionError> {
+) -> Result<(), Error> {
     let (selected_identifier, selected_locator) = facts.selected_component()?;
     let mut seen = HashSet::new();
     for dependency in dependencies {
@@ -2605,7 +2628,7 @@ fn prove_caption_dependencies(
             }
         }
         if owner_names.len() != 1 {
-            return Err(ChartCaptionError::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         let owner_name = owner_names[0];
         if owner_name == slide_component_name {
@@ -2613,7 +2636,7 @@ fn prove_caption_dependencies(
         }
         let (_component_name, _object) = package
             .object_with_component(dependency)
-            .ok_or(ChartCaptionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let target_locator = metadata_locator(owner_name);
         let target_components = facts
             .components
@@ -2624,7 +2647,7 @@ fn prove_caption_dependencies(
         // package object index.  There must be one current component at the
         // exact effective locator; versioned records never authorize a write.
         if target_components.len() != 1 {
-            return Err(ChartCaptionError::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         let target_identifier = target_components[0].identifier;
         if facts
@@ -2634,7 +2657,7 @@ fn prove_caption_dependencies(
             .count()
             != 1
         {
-            return Err(ChartCaptionError::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         let mut matching = 0usize;
         let mut prohibited = false;
@@ -2649,13 +2672,11 @@ fn prove_caption_dependencies(
             if !reference.source_current || reference.versioned || reference.weak == Some(true) {
                 prohibited = true;
             } else {
-                matching = matching
-                    .checked_add(1)
-                    .ok_or(ChartCaptionError::InvalidSource)?;
+                matching = matching.checked_add(1).ok_or(Error::InvalidSource)?;
             }
         }
         if prohibited || matching != 1 {
-            return Err(ChartCaptionError::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
     }
     Ok(())
@@ -2670,18 +2691,14 @@ struct CaptionGraphIds {
 }
 
 impl CaptionGraphIds {
-    fn allocate(first: u64) -> Result<Self, ChartCaptionError> {
+    fn allocate(first: u64) -> Result<Self, Error> {
+        let ids =
+            litchi_iwa_style::caption::GraphIds::allocate(first).ok_or(Error::InvalidSource)?;
         Ok(Self {
-            style: first,
-            info: first
-                .checked_add(1)
-                .ok_or(ChartCaptionError::InvalidSource)?,
-            storage: first
-                .checked_add(2)
-                .ok_or(ChartCaptionError::InvalidSource)?,
-            placement: first
-                .checked_add(3)
-                .ok_or(ChartCaptionError::InvalidSource)?,
+            style: ids.style,
+            info: ids.info,
+            storage: ids.storage,
+            placement: ids.placement,
         })
     }
 
@@ -2706,25 +2723,18 @@ impl CaptionGraphIds {
 fn next_caption_identifier(
     package: &Package,
     metadata: &CaptionMetadataFacts,
-) -> Result<u64, ChartCaptionError> {
+) -> Result<u64, Error> {
     let metadata_last_identifier = metadata.last_identifier;
     let mut maximum = metadata_last_identifier;
     for component in package.state.source.components().iter() {
         for object in &component.archive().objects {
-            maximum = maximum.max(
-                object
-                    .archive_info
-                    .identifier
-                    .ok_or(ChartCaptionError::InvalidSource)?,
-            );
+            maximum = maximum.max(object.archive_info.identifier.ok_or(Error::InvalidSource)?);
         }
     }
     for identifier in &metadata.owned_object_identifiers {
         maximum = maximum.max(*identifier);
     }
-    maximum
-        .checked_add(1)
-        .ok_or(ChartCaptionError::InvalidSource)
+    maximum.checked_add(1).ok_or(Error::InvalidSource)
 }
 
 fn fresh_uuid(existing: &HashSet<(u64, u64)>, identifier: u64) -> UuidBits {
@@ -2737,17 +2747,8 @@ fn fresh_uuid(existing: &HashSet<(u64, u64)>, identifier: u64) -> UuidBits {
     UuidBits::new(lower, upper)
 }
 
-fn canonical_standin(identifier: u64) -> Result<ArchiveObject, ChartCaptionError> {
-    let mut object = ArchiveObject::new(
-        identifier,
-        vec![RawMessage {
-            type_: STANDIN_MESSAGE_TYPE,
-            data: graph_codec::canonical_standin_payload().to_vec(),
-        }],
-    )
-    .map_err(map_core_error)?;
-    object.archive_info.message_infos[0].versions = vec![10, 1, 0];
-    Ok(object)
+fn canonical_standin(identifier: u64) -> Result<ArchiveObject, Error> {
+    litchi_iwa_style::caption::standin(identifier, Default::default()).map_err(map_core_error)
 }
 
 fn caption_graph_objects(
@@ -2761,7 +2762,7 @@ fn caption_graph_objects(
     language: Option<&str>,
     edge_kind: CaptionEdgeKind,
     budget: &mut CaptionBudget,
-) -> Result<(Vec<ArchiveObject>, graph_codec::EncodeReport), ChartCaptionError> {
+) -> Result<(Vec<ArchiveObject>, graph_codec::EncodeReport), Error> {
     let limits = package.wire_limits().map_err(map_wire_error)?;
     let wire = graph_codec::EncodeOptions::for_text(text)
         .with_max_output_bytes(budget.remaining_output().min(limits.max_output_bytes()))
@@ -2774,60 +2775,37 @@ fn caption_graph_objects(
                 .min(u32::try_from(limits.max_nesting()).unwrap_or(u32::MAX)),
         )
         .with_max_allocations(budget.remaining_allocations());
-    let graph_kind = match edge_kind {
-        CaptionEdgeKind::MovieTitle => graph_codec::CaptionGraphKind::Title,
-        CaptionEdgeKind::Chart | CaptionEdgeKind::Movie => graph_codec::CaptionGraphKind::Caption,
+    use litchi_iwa_style::caption;
+    let label = if edge_kind.is_title() {
+        caption::Label::Title
+    } else {
+        caption::Label::Caption
     };
-    let output = graph_codec::encode_caption_graph_with_kind_with_report(
-        graph_codec::CaptionGraphWrite {
-            drawable_identifier,
-            style_identifier: ids.style,
-            info_identifier: ids.info,
-            storage_identifier: ids.storage,
-            placement_identifier: ids.placement,
-            stylesheet_identifier,
-            paragraph_style_identifier,
-            drawable_width,
-            text,
+    budget.charge_allocation(1, 0)?;
+    let (objects, report) = caption::graph_objects(
+        caption::GraphIds {
+            style: ids.style,
+            info: ids.info,
+            storage: ids.storage,
+            placement: ids.placement,
+        },
+        drawable_identifier,
+        drawable_width,
+        text,
+        caption::Theme {
+            stylesheet: stylesheet_identifier,
+            paragraph_style: paragraph_style_identifier,
             language,
         },
-        graph_kind,
+        label,
+        caption::Layout::Inline,
         wire,
+        Default::default(),
     )
-    .map_err(map_graph_error)?;
-    let report = output.report();
-    let payloads = output.into_payloads().into_parts();
-    let types = [
-        SHAPE_STYLE_MESSAGE_TYPE,
-        CAPTION_INFO_MESSAGE_TYPE,
-        STORAGE_MESSAGE_TYPE,
-        CAPTION_PLACEMENT_MESSAGE_TYPE,
-    ];
-    let identifiers = [ids.style, ids.info, ids.storage, ids.placement];
-    let references = [
-        vec![paragraph_style_identifier],
-        vec![ids.style, ids.storage, ids.placement],
-        vec![paragraph_style_identifier],
-        Vec::new(),
-    ];
-    budget.charge_allocation(1, 0)?;
-    let mut objects = Vec::new();
-    objects
-        .try_reserve_exact(4)
-        .map_err(|_error| ChartCaptionError::Allocation { amount: 4 })?;
-    for (index, (payload, references)) in payloads.into_iter().zip(references).enumerate() {
-        let mut object = ArchiveObject::new(
-            identifiers[index],
-            vec![RawMessage {
-                type_: types[index],
-                data: payload,
-            }],
-        )
-        .map_err(map_core_error)?;
-        object.archive_info.message_infos[0].versions = vec![1, 0, 5];
-        object.archive_info.message_infos[0].object_references = references;
-        objects.push(object);
-    }
+    .map_err(|error| match error {
+        caption::BuildError::Encode(error) => map_graph_error(error),
+        caption::BuildError::Archive(error) => map_core_error(error),
+    })?;
     Ok((objects, report))
 }
 
@@ -2838,7 +2816,14 @@ struct CaptionTheme {
     language: Option<String>,
 }
 
-fn caption_theme(package: &Package) -> Result<CaptionTheme, ChartCaptionError> {
+/// The theme objects a new caption graph references (stylesheet and caption
+/// paragraph style), for owners that register them before creation.
+pub(super) fn caption_dependencies(package: &Package) -> Result<[u64; 2], Error> {
+    let theme = caption_theme(package)?;
+    Ok([theme.stylesheet, theme.paragraph_style])
+}
+
+fn caption_theme(package: &Package) -> Result<CaptionTheme, Error> {
     let limits = package.wire_limits().map_err(map_wire_error)?;
     let document_candidates = package
         .state
@@ -2854,73 +2839,66 @@ fn caption_theme(package: &Package) -> Result<CaptionTheme, ChartCaptionError> {
         })
         .count();
     if document_candidates != 1 {
-        return Err(ChartCaptionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
-    let document = package.object(1).ok_or(ChartCaptionError::InvalidSource)?;
+    let document = package.object(1).ok_or(Error::InvalidSource)?;
     if document.messages.len() != 1 || document.messages[0].type_ != DOCUMENT_MESSAGE_TYPE {
-        return Err(ChartCaptionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let document_payload = document
         .messages
         .first()
-        .ok_or(ChartCaptionError::InvalidSource)?
+        .ok_or(Error::InvalidSource)?
         .data
         .as_slice();
-    let document_view =
-        WireView::parse_with_limits(document_payload, limits).map_err(map_wire_error)?;
-    let show_payload =
-        unique_payload_field(&document_view, 2)?.ok_or(ChartCaptionError::InvalidSource)?;
+    let document_view = WireView::parse(document_payload, limits).map_err(map_wire_error)?;
+    let show_payload = unique_payload_field(&document_view, 2)?.ok_or(Error::InvalidSource)?;
     let show_identifier = reference_identifier(show_payload, limits)?;
     let show = package
         .object(show_identifier)
-        .ok_or(ChartCaptionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if show.messages.len() != 1 || show.messages[0].type_ != SHOW_MESSAGE_TYPE {
-        return Err(ChartCaptionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let show_payload = show
         .messages
         .first()
-        .ok_or(ChartCaptionError::InvalidSource)?
+        .ok_or(Error::InvalidSource)?
         .data
         .as_slice();
-    let show_view = WireView::parse_with_limits(show_payload, limits).map_err(map_wire_error)?;
+    let show_view = WireView::parse(show_payload, limits).map_err(map_wire_error)?;
     let theme_identifier = reference_identifier(
-        unique_payload_field(&show_view, 2)?.ok_or(ChartCaptionError::InvalidSource)?,
+        unique_payload_field(&show_view, 2)?.ok_or(Error::InvalidSource)?,
         limits,
     )?;
     let stylesheet_identifier = reference_identifier(
-        unique_payload_field(&show_view, 5)?.ok_or(ChartCaptionError::InvalidSource)?,
+        unique_payload_field(&show_view, 5)?.ok_or(Error::InvalidSource)?,
         limits,
     )?;
     let theme = package
         .object(theme_identifier)
-        .ok_or(ChartCaptionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if theme.messages.len() != 1 || theme.messages[0].type_ != THEME_MESSAGE_TYPE {
-        return Err(ChartCaptionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let theme_payload = theme
         .messages
         .first()
-        .ok_or(ChartCaptionError::InvalidSource)?
+        .ok_or(Error::InvalidSource)?
         .data
         .as_slice();
-    let theme_view = WireView::parse_with_limits(theme_payload, limits).map_err(map_wire_error)?;
-    let theme_super =
-        unique_payload_field(&theme_view, 1)?.ok_or(ChartCaptionError::InvalidSource)?;
-    let theme_super_view =
-        WireView::parse_with_limits(theme_super, limits).map_err(map_wire_error)?;
-    let presets =
-        unique_payload_field(&theme_super_view, 210)?.ok_or(ChartCaptionError::InvalidSource)?;
-    let presets_view = WireView::parse_with_limits(presets, limits).map_err(map_wire_error)?;
+    let theme_view = WireView::parse(theme_payload, limits).map_err(map_wire_error)?;
+    let theme_super = unique_payload_field(&theme_view, 1)?.ok_or(Error::InvalidSource)?;
+    let theme_super_view = WireView::parse(theme_super, limits).map_err(map_wire_error)?;
+    let presets = unique_payload_field(&theme_super_view, 210)?.ok_or(Error::InvalidSource)?;
+    let presets_view = WireView::parse(presets, limits).map_err(map_wire_error)?;
     let paragraph_style = first_reference_identifier(&presets_view, 1, limits)?;
-    let document_super =
-        unique_payload_field(&document_view, 3)?.ok_or(ChartCaptionError::InvalidSource)?;
-    let document_super_view =
-        WireView::parse_with_limits(document_super, limits).map_err(map_wire_error)?;
+    let document_super = unique_payload_field(&document_view, 3)?.ok_or(Error::InvalidSource)?;
+    let document_super_view = WireView::parse(document_super, limits).map_err(map_wire_error)?;
     let language = match unique_payload_field(&document_super_view, 3)? {
         Some(bytes) => Some(
             std::str::from_utf8(bytes)
-                .map_err(|_| ChartCaptionError::InvalidSource)?
+                .map_err(|_| Error::InvalidSource)?
                 .to_owned(),
         ),
         None => None,
@@ -2932,21 +2910,21 @@ fn caption_theme(package: &Package) -> Result<CaptionTheme, ChartCaptionError> {
     })
 }
 
-fn reference_identifier(payload: &[u8], limits: WireLimits) -> Result<u64, ChartCaptionError> {
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+fn reference_identifier(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut selected = None;
     for field in view.fields().filter(|field| field.number() == 1) {
         if selected.is_some() || field.wire_type() != 0 {
-            return Err(ChartCaptionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field.validate_canonical_key().map_err(map_wire_error)?;
         selected = Some(field);
     }
-    let field = selected.ok_or(ChartCaptionError::InvalidSource)?;
+    let field = selected.ok_or(Error::InvalidSource)?;
     let (value, bytes) =
-        decode_varint_from_bytes(field.payload()).map_err(|_| ChartCaptionError::InvalidSource)?;
+        decode_varint_from_bytes(field.payload()).map_err(|_| Error::InvalidSource)?;
     if bytes != field.payload().len() || bytes != encoded_len(value) || value == 0 {
-        return Err(ChartCaptionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     validate_reference_optional_fields(&view)?;
     Ok(value)
@@ -2956,11 +2934,11 @@ fn first_reference_identifier(
     view: &WireView<'_>,
     number: u32,
     limits: WireLimits,
-) -> Result<u64, ChartCaptionError> {
+) -> Result<u64, Error> {
     let mut first = None;
     for field in view.fields().filter(|field| field.number() == number) {
         if field.wire_type() != 2 {
-            return Err(ChartCaptionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field.validate_canonical_key().map_err(map_wire_error)?;
         field.validate_canonical_framing().map_err(map_wire_error)?;
@@ -2969,47 +2947,25 @@ fn first_reference_identifier(
             first = Some(identifier);
         }
     }
-    first.ok_or(ChartCaptionError::InvalidSource)
+    first.ok_or(Error::InvalidSource)
 }
 
-fn caption_drawable_width(
-    package: &Package,
-    drawable_identifier: u64,
-) -> Result<f32, ChartCaptionError> {
-    let limits = package.wire_limits().map_err(map_wire_error)?;
+fn caption_drawable_width(package: &Package, drawable_identifier: u64) -> Result<f32, Error> {
+    use litchi_iwa_style::caption;
     let object = package
         .object(drawable_identifier)
-        .ok_or(ChartCaptionError::InvalidSource)?;
-    let payload = &object
-        .messages
-        .first()
-        .ok_or(ChartCaptionError::InvalidSource)?
-        .data;
-    let outer = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
-    let drawable = unique_payload_field(&outer, 1)?.ok_or(ChartCaptionError::InvalidSource)?;
-    let drawable_view = WireView::parse_with_limits(drawable, limits).map_err(map_wire_error)?;
-    let geometry =
-        unique_payload_field(&drawable_view, 1)?.ok_or(ChartCaptionError::InvalidSource)?;
-    let geometry_view = WireView::parse_with_limits(geometry, limits).map_err(map_wire_error)?;
-    let size = unique_payload_field(&geometry_view, 2)?.ok_or(ChartCaptionError::InvalidSource)?;
-    let size_view = WireView::parse_with_limits(size, limits).map_err(map_wire_error)?;
-    let mut width = None;
-    for field in size_view.fields().filter(|field| field.number() == 1) {
-        if width.is_some() || field.wire_type() != 5 {
-            return Err(ChartCaptionError::InvalidSource);
-        }
-        field.validate_canonical_key().map_err(map_wire_error)?;
-        width = Some(field);
-    }
-    let width = width.ok_or(ChartCaptionError::InvalidSource)?;
-    if width.payload().len() != 4 {
-        return Err(ChartCaptionError::InvalidSource);
-    }
-    let value = f32::from_le_bytes(width.payload().try_into().unwrap_or([0; 4]));
-    if !value.is_finite() || value <= 0.0 {
-        return Err(ChartCaptionError::InvalidSource);
-    }
-    Ok(value)
+        .ok_or(Error::InvalidSource)?;
+    let message = object.messages.first().ok_or(Error::InvalidSource)?;
+    // A shape's drawable is its ShapeArchive's super (ShapeInfo.super.super).
+    let nesting = if message.type_ == CaptionEdgeKind::Shape.drawable_message_type() {
+        caption::Nesting::Shape
+    } else {
+        caption::Nesting::Drawable
+    };
+    caption::drawable_width(&message.data, nesting)
+        .map_err(|_| Error::InvalidSource)?
+        .filter(|value| value.is_finite() && *value > 0.0)
+        .ok_or(Error::InvalidSource)
 }
 
 fn patch_caption_edge(
@@ -3022,35 +2978,35 @@ fn patch_caption_edge(
     budget: &mut CaptionBudget,
     edge_kind: CaptionEdgeKind,
     graph_style_identifier: Option<u64>,
-) -> Result<(), ChartCaptionError> {
+) -> Result<(), Error> {
     let missing_movie_edge = expected_identifier.is_none()
         && matches!(
             edge_kind,
-            CaptionEdgeKind::Movie | CaptionEdgeKind::MovieTitle
+            CaptionEdgeKind::Movie
+                | CaptionEdgeKind::MovieTitle
+                | CaptionEdgeKind::Image
+                | CaptionEdgeKind::ImageTitle
         );
     let mut expected_identifier = expected_identifier;
     if replacement_identifier == 0 {
-        return Err(ChartCaptionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let source_object = archive
         .object(drawable_identifier)
-        .ok_or(ChartCaptionError::InvalidSource)?;
-    let message_type = match edge_kind {
-        CaptionEdgeKind::Chart => CHART_MESSAGE_TYPE,
-        CaptionEdgeKind::Movie | CaptionEdgeKind::MovieTitle => 3_007,
-    };
+        .ok_or(Error::InvalidSource)?;
+    let message_type = edge_kind.drawable_message_type();
     if source_object.messages.len() != 1 || source_object.messages[0].type_ != message_type {
-        return Err(ChartCaptionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     validate_selected_message_metadata(source_object, 0)?;
     let info = source_object
         .archive_info
         .message_infos
         .first()
-        .ok_or(ChartCaptionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if expected_identifier.is_none() {
         if !missing_movie_edge {
-            return Err(ChartCaptionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let standins = info
             .object_references
@@ -3065,13 +3021,13 @@ fn patch_caption_edge(
             })
             .collect::<Vec<_>>();
         if standins.len() != 1 {
-            return Err(ChartCaptionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         expected_identifier = standins.first().copied();
     }
-    let expected_identifier = expected_identifier.ok_or(ChartCaptionError::InvalidSource)?;
+    let expected_identifier = expected_identifier.ok_or(Error::InvalidSource)?;
     if expected_identifier == replacement_identifier {
-        return Err(ChartCaptionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let aggregate_frequencies = reference_frequencies(&info.object_references, budget)?;
     if info.data_references.contains(&expected_identifier)
@@ -3079,7 +3035,7 @@ fn patch_caption_edge(
         || aggregate_frequencies.get(&expected_identifier).copied() != Some(1)
         || info.object_references.contains(&replacement_identifier)
     {
-        return Err(ChartCaptionError::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     struct OwnedFieldTransition {
         path: Vec<u32>,
@@ -3090,7 +3046,7 @@ fn patch_caption_edge(
     budget.charge_allocation(1, 0)?;
     field_states
         .try_reserve_exact(info.field_infos.len())
-        .map_err(|_error| ChartCaptionError::Allocation {
+        .map_err(|_error| Error::Allocation {
             amount: info.field_infos.len(),
         })?;
     for field in &info.field_infos {
@@ -3103,25 +3059,16 @@ fn patch_caption_edge(
             || field.data_references.contains(&replacement_identifier)
             || field.object_references.contains(&replacement_identifier)
         {
-            return Err(ChartCaptionError::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
-        let edge_field = match edge_kind {
-            CaptionEdgeKind::Chart => 11,
-            CaptionEdgeKind::Movie | CaptionEdgeKind::MovieTitle => {
-                if edge_kind == CaptionEdgeKind::MovieTitle {
-                    10
-                } else {
-                    11
-                }
-            },
-        };
+        let edge_field = if edge_kind.is_title() { 10 } else { 11 };
         if count != 0
             && (!matches!(field.path.path.as_slice(), [number, 1] if *number == edge_field)
                 && !matches!(field.path.path.as_slice(), [1, number, 1] if *number == edge_field)
                 && !matches!(field.path.path.as_slice(), [1, 1, number, 1] if *number == edge_field)
                 || count != 1)
         {
-            return Err(ChartCaptionError::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         let mut after = field.object_references.clone();
         after.retain(|identifier| *identifier != expected_identifier);
@@ -3167,7 +3114,7 @@ fn patch_caption_edge(
                 report.scratch_bytes(),
             )
         },
-        CaptionEdgeKind::Movie | CaptionEdgeKind::MovieTitle if missing_movie_edge => {
+        _ if missing_movie_edge => {
             let limits = package.wire_limits().map_err(map_wire_error)?;
             let rewritten = insert_movie_caption_edge(
                 &payload,
@@ -3178,23 +3125,19 @@ fn patch_caption_edge(
             )?;
             let input_bytes = payload.len();
             let output_bytes = rewritten.len();
-            let source_view =
-                WireView::parse_with_limits(&payload, limits).map_err(map_wire_error)?;
-            let output_view =
-                WireView::parse_with_limits(&rewritten, limits).map_err(map_wire_error)?;
+            let source_view = WireView::parse(&payload, limits).map_err(map_wire_error)?;
+            let output_view = WireView::parse(&rewritten, limits).map_err(map_wire_error)?;
             let source_fields = source_view.fields().count()
-                + WireView::parse_with_limits(
-                    unique_payload_field(&source_view, 1)?
-                        .ok_or(ChartCaptionError::InvalidSource)?,
+                + WireView::parse(
+                    unique_payload_field(&source_view, 1)?.ok_or(Error::InvalidSource)?,
                     limits,
                 )
                 .map_err(map_wire_error)?
                 .fields()
                 .count();
             let output_fields = output_view.fields().count()
-                + WireView::parse_with_limits(
-                    unique_payload_field(&output_view, 1)?
-                        .ok_or(ChartCaptionError::InvalidSource)?,
+                + WireView::parse(
+                    unique_payload_field(&output_view, 1)?.ok_or(Error::InvalidSource)?,
                     limits,
                 )
                 .map_err(map_wire_error)?
@@ -3214,22 +3157,40 @@ fn patch_caption_edge(
                 output_bytes,
             )
         },
-        CaptionEdgeKind::Movie | CaptionEdgeKind::MovieTitle => {
-            let options = movie_caption_rewrite_options(package, &payload, budget)?;
-            let write = match edge_kind {
-                CaptionEdgeKind::Movie => {
-                    keynote_movie_caption_codec::MovieCaptionWrite::caption(replacement_identifier)
-                },
-                CaptionEdgeKind::MovieTitle => {
-                    keynote_movie_caption_codec::MovieCaptionWrite::title(replacement_identifier)
-                },
-                CaptionEdgeKind::Chart => unreachable!(),
+        _ => {
+            let shape = matches!(
+                edge_kind,
+                CaptionEdgeKind::Shape | CaptionEdgeKind::ShapeTitle
+            );
+            let limits = package.wire_limits().map_err(map_wire_error)?;
+            let outer = WireView::parse(&payload, limits).map_err(map_wire_error)?;
+            let edge = if shape {
+                unique_payload_field(&outer, 1)?.ok_or(Error::InvalidSource)?
+            } else {
+                payload.as_slice()
+            };
+            let options = movie_caption_rewrite_options(package, edge, budget)?;
+            let write = if edge_kind.is_title() {
+                keynote_movie_caption_codec::MovieCaptionWrite::title(replacement_identifier)
+            } else {
+                keynote_movie_caption_codec::MovieCaptionWrite::caption(replacement_identifier)
             };
             let (rewritten, report) =
                 keynote_movie_caption_codec::rewrite_movie_caption_with_report(
-                    &payload, write, options,
+                    edge, write, options,
                 )
                 .map_err(map_movie_caption_codec_error)?;
+            // A shape's drawable is nested one level deeper (ShapeInfo.super).
+            let rewritten = if shape {
+                litchi_iwa_common::wire::transform_length_delimited_field(
+                    &payload,
+                    1,
+                    |_| -> Result<Vec<u8>, litchi_iwa_common::Error> { Ok(rewritten) },
+                )
+                .map_err(map_wire_error)?
+            } else {
+                rewritten
+            };
             (
                 rewritten,
                 report.input_bytes(),
@@ -3254,9 +3215,30 @@ fn patch_caption_edge(
     let mut aggregate_after = aggregate_before.clone();
     aggregate_after.retain(|identifier| *identifier != expected_identifier);
     aggregate_after.push(replacement_identifier);
+    // Images, like the migration host, keep the new root in the old edge's
+    // header slot.
+    let in_place = matches!(
+        edge_kind,
+        CaptionEdgeKind::Image
+            | CaptionEdgeKind::ImageTitle
+            | CaptionEdgeKind::Shape
+            | CaptionEdgeKind::ShapeTitle
+    )
+    .then(|| {
+        aggregate_before
+            .iter()
+            .map(|identifier| {
+                if *identifier == expected_identifier {
+                    replacement_identifier
+                } else {
+                    *identifier
+                }
+            })
+            .collect::<Vec<_>>()
+    });
     if let Some(style_identifier) = graph_style_identifier {
         if style_identifier == 0 || aggregate_before.contains(&style_identifier) {
-            return Err(ChartCaptionError::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         aggregate_after.push(style_identifier);
     }
@@ -3277,19 +3259,32 @@ fn patch_caption_edge(
     };
     let mut rewritten_object = source_object.clone();
     rewritten_object
-        .replace_message_transitioning_object_references_preserving_header_with_limits(
+        .replace_message_transitioning_object_references_preserving_header(
             0,
             RawMessage {
                 type_: message_type,
-                data: rewritten,
+                data: rewritten.clone(),
             },
             transition,
             archive_limits,
         )
         .map_err(map_core_error)?;
+    if let Some(order) = in_place {
+        rewritten_object
+            .replace_message_reordering_object_references_preserving_header(
+                0,
+                RawMessage {
+                    type_: message_type,
+                    data: rewritten,
+                },
+                &order,
+                archive_limits,
+            )
+            .map_err(map_core_error)?;
+    }
     *archive
         .object_mut(drawable_identifier)
-        .ok_or(ChartCaptionError::InvalidSource)? = rewritten_object;
+        .ok_or(Error::InvalidSource)? = rewritten_object;
     Ok(())
 }
 
@@ -3306,20 +3301,19 @@ fn insert_movie_caption_edge(
     limits: WireLimits,
     edge_kind: CaptionEdgeKind,
     budget: &mut CaptionBudget,
-) -> Result<Vec<u8>, ChartCaptionError> {
+) -> Result<Vec<u8>, Error> {
     if replacement_identifier == 0 {
-        return Err(ChartCaptionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
-    let outer = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
-    let super_payload = unique_payload_field(&outer, 1)?.ok_or(ChartCaptionError::InvalidSource)?;
-    let drawable = WireView::parse_with_limits(super_payload, limits).map_err(map_wire_error)?;
-    let edge_field = match edge_kind {
-        CaptionEdgeKind::Movie => 11,
-        CaptionEdgeKind::MovieTitle => 10,
-        CaptionEdgeKind::Chart => return Err(ChartCaptionError::InvalidSource),
-    };
+    let outer = WireView::parse(payload, limits).map_err(map_wire_error)?;
+    let super_payload = unique_payload_field(&outer, 1)?.ok_or(Error::InvalidSource)?;
+    let drawable = WireView::parse(super_payload, limits).map_err(map_wire_error)?;
+    if !edge_kind.is_media() {
+        return Err(Error::InvalidSource);
+    }
+    let edge_field = if edge_kind.is_title() { 10 } else { 11 };
     if drawable.fields().any(|field| field.number() == edge_field) {
-        return Err(ChartCaptionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
 
     budget.charge_allocation(1, 0)?;
@@ -3334,7 +3328,7 @@ fn insert_movie_caption_edge(
                 .len()
                 .saturating_add(reference_payload.len() + 4),
         )
-        .map_err(|_| ChartCaptionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: super_payload
                 .len()
                 .saturating_add(reference_payload.len() + 4),
@@ -3344,33 +3338,27 @@ fn insert_movie_caption_edge(
         field.validate_canonical_framing().map_err(map_wire_error)?;
         drawable_output.extend_from_slice(field.raw());
     }
-    append_length_delimited_field_with_limits(
-        &mut drawable_output,
-        edge_field,
-        &reference_payload,
-        limits,
-    )
-    .map_err(map_wire_error)?;
+    append_length_delimited_field(&mut drawable_output, edge_field, &reference_payload, limits)
+        .map_err(map_wire_error)?;
 
     budget.charge_allocation(1, 0)?;
     let mut output = Vec::new();
     output
         .try_reserve_exact(payload.len().saturating_add(drawable_output.len()))
-        .map_err(|_| ChartCaptionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: payload.len().saturating_add(drawable_output.len()),
         })?;
     for field in outer.fields() {
         field.validate_canonical_key().map_err(map_wire_error)?;
         field.validate_canonical_framing().map_err(map_wire_error)?;
         if field.number() == 1 {
-            append_length_delimited_field_with_limits(&mut output, 1, &drawable_output, limits)
+            append_length_delimited_field(&mut output, 1, &drawable_output, limits)
                 .map_err(map_wire_error)?;
         } else {
             output.extend_from_slice(field.raw());
         }
     }
-    let recursion =
-        u32::try_from(limits.max_nesting()).map_err(|_error| ChartCaptionError::InvalidSource)?;
+    let recursion = u32::try_from(limits.max_nesting()).map_err(|_error| Error::InvalidSource)?;
     let snapshot = keynote_movie_caption_codec::decode_movie_caption(
         &output,
         keynote_movie_caption_codec::DecodeOptions::new(
@@ -3382,13 +3370,13 @@ fn insert_movie_caption_edge(
         .with_max_output_bytes(limits.max_output_bytes()),
     )
     .map_err(map_movie_caption_codec_error)?;
-    let actual = match edge_kind {
-        CaptionEdgeKind::Movie => snapshot.caption_identifier(),
-        CaptionEdgeKind::MovieTitle => snapshot.title_identifier(),
-        CaptionEdgeKind::Chart => None,
+    let actual = if edge_kind.is_title() {
+        snapshot.title_identifier()
+    } else {
+        snapshot.caption_identifier()
     };
     if actual != Some(replacement_identifier) {
-        return Err(ChartCaptionError::Verification);
+        return Err(Error::Verification);
     }
     Ok(output)
 }
@@ -3399,7 +3387,7 @@ fn verify_graph_transition(
     before: &CaptionSelection,
     target: &CaptionSelection,
     budget: &mut CaptionBudget,
-) -> Result<(), ChartCaptionError> {
+) -> Result<(), Error> {
     verify_caption_graph_transition_with_budget(
         source,
         candidate,
@@ -3439,7 +3427,7 @@ pub(super) fn verify_caption_graph_transition(
     target_storage: Option<u64>,
     target_placement: Option<u64>,
     target_style: Option<u64>,
-) -> Result<(), ChartCaptionError> {
+) -> Result<(), Error> {
     let mut budget = CaptionBudget::for_package(source)?;
     verify_caption_graph_transition_with_budget(
         source,
@@ -3478,12 +3466,12 @@ fn verify_caption_graph_transition_with_budget(
     target_placement: Option<u64>,
     target_style: Option<u64>,
     budget: &mut CaptionBudget,
-) -> Result<(), ChartCaptionError> {
+) -> Result<(), Error> {
     let source_catalog = physical_catalog(source)?;
     let candidate_catalog = physical_catalog(candidate)?;
     let metadata_name = metadata_member_name(source_catalog, source)?;
     if metadata_member_name(candidate_catalog, candidate)? != metadata_name {
-        return Err(ChartCaptionError::Verification);
+        return Err(Error::Verification);
     }
     verify_external_style_transition(
         source,
@@ -3493,16 +3481,8 @@ fn verify_caption_graph_transition_with_budget(
         target_style,
         budget,
     )?;
-    let _source_entries = entry_index(
-        source_catalog.package(),
-        budget,
-        ChartCaptionError::Verification,
-    )?;
-    let candidate_entries = entry_index(
-        candidate_catalog.package(),
-        budget,
-        ChartCaptionError::Verification,
-    )?;
+    let _source_entries = entry_index(source_catalog.package(), budget, Error::Verification)?;
+    let candidate_entries = entry_index(candidate_catalog.package(), budget, Error::Verification)?;
     let slide_name = slide_component_name;
     for entry in source_catalog.package().iter() {
         if PREVIEW_ENTRY_NAMES.contains(&entry.name())
@@ -3514,15 +3494,15 @@ fn verify_caption_graph_transition_with_budget(
         let candidate_entry = candidate_entries
             .get(entry.name())
             .copied()
-            .ok_or(ChartCaptionError::Verification)?;
+            .ok_or(Error::Verification)?;
         if entry.data() != candidate_entry.data() {
-            return Err(ChartCaptionError::Verification);
+            return Err(Error::Verification);
         }
     }
     let source_metadata = metadata_payload(&archive_for_member(source, &metadata_name)?)?;
     let candidate_metadata = metadata_payload(&archive_for_member(candidate, &metadata_name)?)?;
     if source_metadata.2 == candidate_metadata.2 {
-        return Err(ChartCaptionError::Verification);
+        return Err(Error::Verification);
     }
     if before_storage.is_none() {
         // A stand-in -> active transition normally retains the source
@@ -3545,7 +3525,7 @@ fn verify_caption_graph_transition_with_budget(
             .flatten()
             .all(|identifier| candidate.object(identifier).is_some())
         {
-            return Err(ChartCaptionError::Verification);
+            return Err(Error::Verification);
         }
         let source_standin_present =
             before_reference.is_some_and(|identifier| candidate.object(identifier).is_some());
@@ -3560,20 +3540,20 @@ fn verify_caption_graph_transition_with_budget(
             .flatten()
             .all(|identifier| candidate.object(identifier).is_some())
         {
-            return Err(ChartCaptionError::Verification);
+            return Err(Error::Verification);
         }
     } else if target_storage.is_some() {
-        return Err(ChartCaptionError::Verification);
+        return Err(Error::Verification);
     } else {
         // Removal creates a fresh stand-in while retaining the old graph.
         // The inverse of creation restores the original stand-in and drops
         // that old graph, so either the target stand-in or the source graph
         // is the retained side of this exact transition.
         let target_standin = candidate
-            .object(target_reference.ok_or(ChartCaptionError::Verification)?)
+            .object(target_reference.ok_or(Error::Verification)?)
             .is_some();
         if !target_standin {
-            return Err(ChartCaptionError::Verification);
+            return Err(Error::Verification);
         }
         let source_graph_present = [
             before_caption_info,
@@ -3585,7 +3565,7 @@ fn verify_caption_graph_transition_with_budget(
         .flatten()
         .all(|identifier| candidate.object(identifier).is_some());
         if !source_graph_present && target_reference.is_none() {
-            return Err(ChartCaptionError::Verification);
+            return Err(Error::Verification);
         }
     }
     Ok(())
@@ -3602,7 +3582,7 @@ fn verify_external_style_transition(
     before_style: Option<u64>,
     target_style: Option<u64>,
     budget: &mut CaptionBudget,
-) -> Result<(), ChartCaptionError> {
+) -> Result<(), Error> {
     let mut checked = [0_u64; 2];
     let mut checked_len = 0usize;
     for identifier in [before_style, target_style].into_iter().flatten() {
@@ -3610,9 +3590,7 @@ fn verify_external_style_transition(
             continue;
         }
         checked[checked_len] = identifier;
-        checked_len = checked_len
-            .checked_add(1)
-            .ok_or(ChartCaptionError::InvalidSource)?;
+        checked_len = checked_len.checked_add(1).ok_or(Error::InvalidSource)?;
         let source_location = source.object_with_component(identifier);
         let candidate_location = candidate.object_with_component(identifier);
         let source_external =
@@ -3622,16 +3600,15 @@ fn verify_external_style_transition(
         if !source_external && !candidate_external {
             continue;
         }
-        let (source_component, source_object) =
-            source_location.ok_or(ChartCaptionError::Verification)?;
+        let (source_component, source_object) = source_location.ok_or(Error::Verification)?;
         let (candidate_component, candidate_object) =
-            candidate_location.ok_or(ChartCaptionError::Verification)?;
+            candidate_location.ok_or(Error::Verification)?;
         charge_immutable_object_comparison(budget, source_object)?;
         charge_immutable_object_comparison(budget, candidate_object)?;
         if source_component != candidate_component
             || !source_object.same_content_ignoring_offsets(candidate_object)
         {
-            return Err(ChartCaptionError::Verification);
+            return Err(Error::Verification);
         }
         require_private_object(source, identifier, SHAPE_STYLE_MESSAGE_TYPE, None)?;
         require_private_object(candidate, identifier, SHAPE_STYLE_MESSAGE_TYPE, None)?;
@@ -3642,25 +3619,25 @@ fn verify_external_style_transition(
 fn charge_immutable_object_comparison(
     budget: &mut CaptionBudget,
     object: &ArchiveObject,
-) -> Result<(), ChartCaptionError> {
-    let mut bytes = usize::try_from(object.header_length)
-        .map_err(|_conversion| ChartCaptionError::InvalidSource)?;
+) -> Result<(), Error> {
+    let mut bytes =
+        usize::try_from(object.header_length).map_err(|_conversion| Error::InvalidSource)?;
     for message in &object.messages {
         bytes = bytes
             .checked_add(message.data.len())
-            .ok_or(ChartCaptionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     let mut references = 0usize;
     for info in &object.archive_info.message_infos {
         references = references
             .checked_add(info.object_references.len())
             .and_then(|value| value.checked_add(info.data_references.len()))
-            .ok_or(ChartCaptionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         for field in &info.field_infos {
             references = references
                 .checked_add(field.object_references.len())
                 .and_then(|value| value.checked_add(field.data_references.len()))
-                .ok_or(ChartCaptionError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
         }
     }
     budget.charge_work(bytes)?;
@@ -3675,26 +3652,26 @@ fn charge_immutable_object_comparison(
 fn entry_index<'a>(
     catalog: &'a Catalog,
     budget: &mut CaptionBudget,
-    duplicate_error: ChartCaptionError,
-) -> Result<HashMap<&'a str, &'a Entry>, ChartCaptionError> {
+    duplicate_error: Error,
+) -> Result<HashMap<&'a str, &'a Entry>, Error> {
     let count = catalog.iter().count();
     budget.charge_allocation(
         usize::from(count != 0),
         count
             .checked_mul(size_of::<(&str, &Entry)>())
-            .ok_or(ChartCaptionError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     let mut index = HashMap::new();
     index
         .try_reserve(count)
-        .map_err(|_| ChartCaptionError::Allocation { amount: count })?;
+        .map_err(|_| Error::Allocation { amount: count })?;
     for entry in catalog.iter() {
         budget.charge_work(
             entry
                 .name()
                 .len()
                 .checked_add(1)
-                .ok_or(ChartCaptionError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )?;
         if index.insert(entry.name(), entry).is_some() {
             return Err(duplicate_error.clone());
@@ -3707,44 +3684,42 @@ fn entry_index<'a>(
 fn reference_frequencies(
     values: &[u64],
     budget: &mut CaptionBudget,
-) -> Result<HashMap<u64, usize>, ChartCaptionError> {
+) -> Result<HashMap<u64, usize>, Error> {
     budget.charge_work(values.len())?;
     budget.charge_allocation(
         usize::from(!values.is_empty()),
         values
             .len()
             .checked_mul(size_of::<(u64, usize)>())
-            .ok_or(ChartCaptionError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     let mut frequencies = HashMap::new();
     frequencies
         .try_reserve(values.len())
-        .map_err(|_| ChartCaptionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: values.len(),
         })?;
     for value in values {
         let count = frequencies.entry(*value).or_insert(0usize);
-        *count = count
-            .checked_add(1)
-            .ok_or(ChartCaptionError::InvalidSource)?;
+        *count = count.checked_add(1).ok_or(Error::InvalidSource)?;
     }
     Ok(frequencies)
 }
 
-fn archive_for_member(package: &Package, name: &str) -> Result<Archive, ChartCaptionError> {
+fn archive_for_member(package: &Package, name: &str) -> Result<Archive, Error> {
     let catalog = physical_catalog(package)?;
     let entry = catalog
         .package()
         .iter()
         .find(|entry| entry.name() == name)
-        .ok_or(ChartCaptionError::Verification)?;
+        .ok_or(Error::Verification)?;
     let physical_limits = package.state.options.archive();
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         physical_limits.snappy_limits().map_err(map_archive_error)?,
     )
     .map_err(map_core_error)?;
-    let archive = Archive::parse_with_limits(
+    let archive = Archive::parse(
         stream.as_bytes(),
         physical_limits
             .effective_archive_limits()
@@ -3755,12 +3730,9 @@ fn archive_for_member(package: &Package, name: &str) -> Result<Archive, ChartCap
     Ok(archive)
 }
 
-fn validate_canonical_object_framing(
-    archive: &Archive,
-    source: &[u8],
-) -> Result<(), ChartCaptionError> {
+fn validate_canonical_object_framing(archive: &Archive, source: &[u8]) -> Result<(), Error> {
     archive
-        .validate_canonical_object_framing(source)
+        .validate_canonical_object_framing(source, Default::default())
         .map_err(map_core_error)
 }
 
@@ -3772,7 +3744,7 @@ fn verify_caption_candidate(
     expected: Option<&str>,
     require_invalidated_previews: bool,
     budget: &mut CaptionBudget,
-) -> Result<(), ChartCaptionError> {
+) -> Result<(), Error> {
     let source_count = source.state.total_objects;
     let candidate_count = candidate.state.total_objects;
     let count_matches = match (before.storage_identifier, target.storage_identifier) {
@@ -3792,7 +3764,7 @@ fn verify_caption_candidate(
         _ => candidate_count == source_count,
     };
     if !count_matches {
-        return Err(ChartCaptionError::Verification);
+        return Err(Error::Verification);
     }
     budget.charge_references(1)?;
     let selected = select_caption(
@@ -3802,13 +3774,13 @@ fn verify_caption_candidate(
         true,
     )?;
     if !selected.same_identity(target) || selected.text.as_deref() != expected {
-        return Err(ChartCaptionError::Verification);
+        return Err(Error::Verification);
     }
     if let (Some(storage_identifier), Some(target_storage)) =
         (before.storage_identifier, target.storage_identifier)
     {
         if storage_identifier != target_storage {
-            return Err(ChartCaptionError::Verification);
+            return Err(Error::Verification);
         }
         if metadata_member_name(physical_catalog(source)?, source).is_ok() {
             verify_existing_text_metadata_candidate(
@@ -3837,7 +3809,7 @@ fn verify_caption_candidate(
             )
             .map_err(map_rendering_error)?
         {
-            return Err(ChartCaptionError::Verification);
+            return Err(Error::Verification);
         }
     }
     Ok(())
@@ -3850,19 +3822,19 @@ pub(super) fn verify_existing_text_metadata_candidate(
     slide_node_identifier: u64,
     require_invalidated_previews: bool,
     budget: &mut CaptionBudget,
-) -> Result<(), ChartCaptionError> {
+) -> Result<(), Error> {
     let source_catalog = physical_catalog(source)?;
     let candidate_catalog = physical_catalog(candidate)?;
     let metadata_name = metadata_member_name(source_catalog, source)?;
     if metadata_member_name(candidate_catalog, candidate)? != metadata_name
         || source_catalog.components().len() != candidate_catalog.components().len()
     {
-        return Err(ChartCaptionError::Verification);
+        return Err(Error::Verification);
     }
     let source_metadata = metadata_payload(&archive_for_member(source, &metadata_name)?)?;
     let candidate_metadata = metadata_payload(&archive_for_member(candidate, &metadata_name)?)?;
     if source_metadata.2 == candidate_metadata.2 {
-        return Err(ChartCaptionError::Verification);
+        return Err(Error::Verification);
     }
     let mut storage_seen = false;
     let mut slide_node_seen = false;
@@ -3876,7 +3848,7 @@ pub(super) fn verify_existing_text_metadata_candidate(
             || source_component.archive().objects.len()
                 != candidate_component.archive().objects.len()
         {
-            return Err(ChartCaptionError::Verification);
+            return Err(Error::Verification);
         }
         for (source_object, candidate_object) in source_component
             .archive()
@@ -3887,18 +3859,18 @@ pub(super) fn verify_existing_text_metadata_candidate(
             let identifier = source_object
                 .archive_info
                 .identifier
-                .ok_or(ChartCaptionError::Verification)?;
+                .ok_or(Error::Verification)?;
             if candidate_object.archive_info.identifier != Some(identifier) {
-                return Err(ChartCaptionError::Verification);
+                return Err(Error::Verification);
             }
             if identifier == storage_identifier {
                 if std::mem::replace(&mut storage_seen, true) {
-                    return Err(ChartCaptionError::Verification);
+                    return Err(Error::Verification);
                 }
                 verify_replaced_caption_object(source_object, candidate_object, true)?;
             } else if identifier == slide_node_identifier {
                 if std::mem::replace(&mut slide_node_seen, true) {
-                    return Err(ChartCaptionError::Verification);
+                    return Err(Error::Verification);
                 }
                 let unchanged = source_object.same_content_ignoring_offsets(candidate_object);
                 if require_invalidated_previews || !unchanged {
@@ -3933,21 +3905,21 @@ pub(super) fn verify_existing_text_metadata_candidate(
                     budget.charge_work(report.work())?;
                     budget.charge_references(report.references())?;
                     if !matches {
-                        return Err(ChartCaptionError::Verification);
+                        return Err(Error::Verification);
                     }
                 }
             } else if identifier == source_metadata.0 {
                 if std::mem::replace(&mut metadata_seen, true) {
-                    return Err(ChartCaptionError::Verification);
+                    return Err(Error::Verification);
                 }
                 verify_replaced_caption_object(source_object, candidate_object, true)?;
             } else if !source_object.same_content_ignoring_offsets(candidate_object) {
-                return Err(ChartCaptionError::Verification);
+                return Err(Error::Verification);
             }
         }
     }
     if !storage_seen || !slide_node_seen || !metadata_seen {
-        return Err(ChartCaptionError::Verification);
+        return Err(Error::Verification);
     }
     if require_invalidated_previews
         && PREVIEW_ENTRY_NAMES.iter().any(|name| {
@@ -3957,7 +3929,7 @@ pub(super) fn verify_existing_text_metadata_candidate(
                 .any(|entry| entry.name() == *name)
         })
     {
-        return Err(ChartCaptionError::Verification);
+        return Err(Error::Verification);
     }
     Ok(())
 }
@@ -3966,13 +3938,13 @@ fn verify_replaced_caption_object(
     source: &ArchiveObject,
     candidate: &ArchiveObject,
     require_changed: bool,
-) -> Result<(), ChartCaptionError> {
+) -> Result<(), Error> {
     if source.archive_info.identifier != candidate.archive_info.identifier
         || source.archive_info.should_merge != candidate.archive_info.should_merge
         || source.messages.len() != candidate.messages.len()
         || source.archive_info.message_infos.len() != candidate.archive_info.message_infos.len()
     {
-        return Err(ChartCaptionError::Verification);
+        return Err(Error::Verification);
     }
     let mut changed = 0usize;
     for ((source_message, candidate_message), (source_info, candidate_info)) in
@@ -3987,18 +3959,16 @@ fn verify_replaced_caption_object(
         if source_message.type_ != candidate_message.type_
             || !message_info_equal_except_length(source_info, candidate_info)
         {
-            return Err(ChartCaptionError::Verification);
+            return Err(Error::Verification);
         }
         if source_message.data != candidate_message.data {
-            changed = changed
-                .checked_add(1)
-                .ok_or(ChartCaptionError::Verification)?;
+            changed = changed.checked_add(1).ok_or(Error::Verification)?;
         } else if source_info.length != candidate_info.length {
-            return Err(ChartCaptionError::Verification);
+            return Err(Error::Verification);
         }
     }
     if require_changed && changed != 1 {
-        return Err(ChartCaptionError::Verification);
+        return Err(Error::Verification);
     }
     Ok(())
 }
@@ -4022,10 +3992,9 @@ fn message_info_equal_except_length(
 fn chart_caption_decode_options(
     package: &Package,
     payload: &[u8],
-) -> Result<keynote_chart_caption_codec::DecodeOptions, ChartCaptionError> {
+) -> Result<keynote_chart_caption_codec::DecodeOptions, Error> {
     let limits = package.wire_limits().map_err(map_wire_error)?;
-    let recursion =
-        u32::try_from(limits.max_nesting()).map_err(|_error| ChartCaptionError::InvalidSource)?;
+    let recursion = u32::try_from(limits.max_nesting()).map_err(|_error| Error::InvalidSource)?;
     Ok(keynote_chart_caption_codec::DecodeOptions::new(
         payload.len().min(limits.max_input_bytes()),
         limits.max_fields(),
@@ -4043,10 +4012,10 @@ fn chart_caption_rewrite_options(
     package: &Package,
     payload: &[u8],
     budget: &CaptionBudget,
-) -> Result<keynote_chart_caption_codec::DecodeOptions, ChartCaptionError> {
+) -> Result<keynote_chart_caption_codec::DecodeOptions, Error> {
     let limits = package.wire_limits().map_err(map_wire_error)?;
     let recursion = u32::try_from(limits.max_nesting())
-        .map_err(|_error| ChartCaptionError::InvalidSource)?
+        .map_err(|_error| Error::InvalidSource)?
         .min(budget.remaining_depth());
     Ok(keynote_chart_caption_codec::DecodeOptions::new(
         payload
@@ -4064,10 +4033,10 @@ fn movie_caption_rewrite_options(
     package: &Package,
     payload: &[u8],
     budget: &CaptionBudget,
-) -> Result<keynote_movie_caption_codec::DecodeOptions, ChartCaptionError> {
+) -> Result<keynote_movie_caption_codec::DecodeOptions, Error> {
     let limits = package.wire_limits().map_err(map_wire_error)?;
     let recursion = u32::try_from(limits.max_nesting())
-        .map_err(|_error| ChartCaptionError::InvalidSource)?
+        .map_err(|_error| Error::InvalidSource)?
         .min(budget.remaining_depth());
     Ok(keynote_movie_caption_codec::DecodeOptions::new(
         payload
@@ -4084,10 +4053,9 @@ fn movie_caption_rewrite_options(
 pub(super) fn caption_info_decode_options(
     package: &Package,
     payload: &[u8],
-) -> Result<pages_movie_caption_codec::DecodeOptions, ChartCaptionError> {
+) -> Result<pages_movie_caption_codec::DecodeOptions, Error> {
     let limits = package.wire_limits().map_err(map_wire_error)?;
-    let recursion =
-        u32::try_from(limits.max_nesting()).map_err(|_error| ChartCaptionError::InvalidSource)?;
+    let recursion = u32::try_from(limits.max_nesting()).map_err(|_error| Error::InvalidSource)?;
     Ok(pages_movie_caption_codec::DecodeOptions::new(
         payload.len().min(limits.max_input_bytes()),
         limits.max_fields(),
@@ -4096,17 +4064,17 @@ pub(super) fn caption_info_decode_options(
     ))
 }
 
-fn copy_caption(value: &str) -> Result<String, ChartCaptionError> {
+fn copy_caption(value: &str) -> Result<String, Error> {
     if value.len() > MAX_CAPTION_BYTES {
-        return Err(ChartCaptionError::LimitExceeded {
-            kind: ChartCaptionLimitKind::CaptionBytes,
+        return Err(Error::Limit {
+            kind: LimitKind::CaptionBytes,
             observed: usize_to_u64(value.len()),
             maximum: usize_to_u64(MAX_CAPTION_BYTES),
         });
     }
     let mut copy = String::new();
     copy.try_reserve_exact(value.len())
-        .map_err(|_error| ChartCaptionError::Allocation {
+        .map_err(|_error| Error::Allocation {
             amount: value.len(),
         })?;
     copy.push_str(value);
@@ -4124,96 +4092,88 @@ fn preview_count(catalog: &SourceCatalog) -> usize {
         .count()
 }
 
-fn physical_catalog(package: &Package) -> Result<&SourceCatalog, ChartCaptionError> {
+fn physical_catalog(package: &Package) -> Result<&SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
-        PhysicalSource::Semantic(_) => Err(ChartCaptionError::UnsupportedSource),
+        PhysicalSource::Semantic(_) => Err(Error::Refused(Refusal::UnsupportedSource)),
     }
 }
 
-fn map_chart_title_error(error: super::slide_chart_title::ChartTitleError) -> ChartCaptionError {
+fn map_chart_title_error(error: super::slide_chart_title::Error) -> Error {
     match error {
-        super::slide_chart_title::ChartTitleError::UnsupportedSource => {
-            ChartCaptionError::UnsupportedSource
+        super::slide_chart_title::Error::Refused(
+            crate::chart::title::Refusal::UnsupportedSource,
+        ) => Error::Refused(Refusal::UnsupportedSource),
+        super::slide_chart_title::Error::Refused(
+            crate::chart::title::Refusal::AmbiguousSelector,
+        ) => Error::Refused(Refusal::AmbiguousSelector),
+        super::slide_chart_title::Error::Refused(crate::chart::title::Refusal::EmptySlideName) => {
+            Error::Refused(Refusal::EmptySlideName)
         },
-        super::slide_chart_title::ChartTitleError::AmbiguousSelector => {
-            ChartCaptionError::AmbiguousSelector
+        super::slide_chart_title::Error::Refused(
+            crate::chart::title::Refusal::SlideNameNotFound,
+        ) => Error::Refused(Refusal::SlideNameNotFound),
+        super::slide_chart_title::Error::Refused(
+            crate::chart::title::Refusal::SlidePositionNotFound { position },
+        ) => Error::Refused(Refusal::SlidePositionNotFound { position }),
+        super::slide_chart_title::Error::Refused(
+            crate::chart::title::Refusal::ChartNameNotFound,
+        ) => Error::Refused(Refusal::ChartNameNotFound),
+        super::slide_chart_title::Error::Refused(
+            crate::chart::title::Refusal::ChartPositionNotFound { position },
+        ) => Error::Refused(Refusal::ChartPositionNotFound { position }),
+        super::slide_chart_title::Error::Refused(crate::chart::title::Refusal::EmptyChartName) => {
+            Error::Refused(Refusal::EmptyChartName)
         },
-        super::slide_chart_title::ChartTitleError::EmptySlideName => {
-            ChartCaptionError::EmptySlideName
-        },
-        super::slide_chart_title::ChartTitleError::SlideNameNotFound => {
-            ChartCaptionError::SlideNameNotFound
-        },
-        super::slide_chart_title::ChartTitleError::SlidePositionNotFound { position } => {
-            ChartCaptionError::SlidePositionNotFound { position }
-        },
-        super::slide_chart_title::ChartTitleError::ChartNameNotFound => {
-            ChartCaptionError::ChartNameNotFound
-        },
-        super::slide_chart_title::ChartTitleError::ChartPositionNotFound { position } => {
-            ChartCaptionError::ChartPositionNotFound { position }
-        },
-        super::slide_chart_title::ChartTitleError::EmptyChartName => {
-            ChartCaptionError::EmptyChartName
-        },
-        super::slide_chart_title::ChartTitleError::LimitExceeded {
+        super::slide_chart_title::Error::Limit {
             observed, maximum, ..
-        } => ChartCaptionError::LimitExceeded {
-            kind: ChartCaptionLimitKind::WireWork,
+        } => Error::Limit {
+            kind: LimitKind::WireWork,
             observed,
             maximum,
         },
-        super::slide_chart_title::ChartTitleError::Allocation { amount } => {
-            ChartCaptionError::Allocation { amount }
-        },
-        super::slide_chart_title::ChartTitleError::InvalidSource
-        | super::slide_chart_title::ChartTitleError::Verification
-        | super::slide_chart_title::ChartTitleError::PatchConflict => {
-            ChartCaptionError::InvalidSource
-        },
+        super::slide_chart_title::Error::Allocation { amount } => Error::Allocation { amount },
+        super::slide_chart_title::Error::InvalidSource
+        | super::slide_chart_title::Error::Verification
+        | super::slide_chart_title::Error::PatchConflict => Error::InvalidSource,
     }
 }
 
-fn map_archive_error(error: litchi_iwa_archive::Error) -> ChartCaptionError {
+fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     match error {
         litchi_iwa_archive::Error::Limit {
             kind,
             observed,
             maximum,
-        } => ChartCaptionError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_archive::LimitKind::InputBytes => ChartCaptionLimitKind::InputBytes,
-                litchi_iwa_archive::LimitKind::OutputBytes => ChartCaptionLimitKind::OutputBytes,
-                litchi_iwa_archive::LimitKind::Entries => ChartCaptionLimitKind::Entries,
+                litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
+                litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_archive::LimitKind::Entries => LimitKind::Entries,
                 litchi_iwa_archive::LimitKind::EntryBytes
-                | litchi_iwa_archive::LimitKind::CompressedEntryBytes => {
-                    ChartCaptionLimitKind::EntryBytes
-                },
+                | litchi_iwa_archive::LimitKind::CompressedEntryBytes => LimitKind::EntryBytes,
                 litchi_iwa_archive::LimitKind::TotalBytes
-                | litchi_iwa_archive::LimitKind::IwaTotalBytes => ChartCaptionLimitKind::TotalBytes,
-                litchi_iwa_archive::LimitKind::IwaStreamBytes => ChartCaptionLimitKind::WireBytes,
+                | litchi_iwa_archive::LimitKind::IwaTotalBytes => LimitKind::TotalBytes,
+                litchi_iwa_archive::LimitKind::IwaStreamBytes => LimitKind::WireBytes,
                 litchi_iwa_archive::LimitKind::MemberNameBytes
-                | litchi_iwa_archive::LimitKind::MetadataBytes => ChartCaptionLimitKind::EntryBytes,
+                | litchi_iwa_archive::LimitKind::MetadataBytes => LimitKind::EntryBytes,
             },
             observed,
             maximum,
         },
-        litchi_iwa_archive::Error::Allocation { amount, .. } => {
-            ChartCaptionError::Allocation { amount }
-        },
+        litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
         litchi_iwa_archive::Error::Iwa(error) => map_core_error(error),
-        _ => ChartCaptionError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_core_error(error: litchi_iwa_core::Error) -> ChartCaptionError {
+fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
             kind,
             observed,
             maximum,
-        } => ChartCaptionError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::ArchiveBytes
                 | litchi_iwa_core::LimitKind::ObjectBytes
@@ -4223,116 +4183,108 @@ fn map_core_error(error: litchi_iwa_core::Error) -> ChartCaptionError {
                 | litchi_iwa_core::LimitKind::SnappyChunkBytes
                 | litchi_iwa_core::LimitKind::SnappyStreamBytes
                 | litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
-                | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes => {
-                    ChartCaptionLimitKind::WireBytes
-                },
+                | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes => LimitKind::WireBytes,
                 litchi_iwa_core::LimitKind::Objects
                 | litchi_iwa_core::LimitKind::Messages
                 | litchi_iwa_core::LimitKind::MessagesPerObject
-                | litchi_iwa_core::LimitKind::MetadataItems => ChartCaptionLimitKind::Entries,
-                litchi_iwa_core::LimitKind::HeaderFields => ChartCaptionLimitKind::WireFields,
-                litchi_iwa_core::LimitKind::HeaderNesting => ChartCaptionLimitKind::WireNesting,
-                litchi_iwa_core::LimitKind::SnappyFrames => ChartCaptionLimitKind::WireWork,
+                | litchi_iwa_core::LimitKind::MetadataItems => LimitKind::Entries,
+                litchi_iwa_core::LimitKind::HeaderFields => LimitKind::WireFields,
+                litchi_iwa_core::LimitKind::HeaderNesting => LimitKind::WireNesting,
+                litchi_iwa_core::LimitKind::SnappyFrames => LimitKind::WireWork,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         },
         litchi_iwa_core::Error::Allocation { requested, .. } => {
-            ChartCaptionError::Allocation { amount: requested }
+            Error::Allocation { amount: requested }
         },
-        _ => ChartCaptionError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_metadata_error(error: metadata_codec::RewriteError) -> ChartCaptionError {
+fn map_metadata_error(error: metadata_codec::RewriteError) -> Error {
     if let Some(limit) = error.resource_limit() {
         let (kind, observed, maximum) = match limit {
             metadata_codec::RewriteLimit::InputBytes { observed, maximum } => {
-                (ChartCaptionLimitKind::WireBytes, observed, maximum)
+                (LimitKind::WireBytes, observed, maximum)
             },
             metadata_codec::RewriteLimit::OutputBytes { observed, maximum } => {
-                (ChartCaptionLimitKind::OutputBytes, observed, maximum)
+                (LimitKind::OutputBytes, observed, maximum)
             },
             metadata_codec::RewriteLimit::Fields { observed, maximum } => {
-                (ChartCaptionLimitKind::WireFields, observed, maximum)
+                (LimitKind::WireFields, observed, maximum)
             },
             metadata_codec::RewriteLimit::Work { observed, maximum } => {
-                (ChartCaptionLimitKind::WireWork, observed, maximum)
+                (LimitKind::WireWork, observed, maximum)
             },
-            metadata_codec::RewriteLimit::Nesting { observed, maximum } => (
-                ChartCaptionLimitKind::WireNesting,
-                observed as usize,
-                maximum as usize,
-            ),
+            metadata_codec::RewriteLimit::Nesting { observed, maximum } => {
+                (LimitKind::WireNesting, observed as usize, maximum as usize)
+            },
             metadata_codec::RewriteLimit::Components { observed, maximum } => {
-                (ChartCaptionLimitKind::Entries, observed, maximum)
+                (LimitKind::Entries, observed, maximum)
             },
             metadata_codec::RewriteLimit::References { observed, maximum } => {
-                (ChartCaptionLimitKind::References, observed, maximum)
+                (LimitKind::References, observed, maximum)
             },
             metadata_codec::RewriteLimit::Additions { observed, maximum } => {
-                (ChartCaptionLimitKind::Entries, observed, maximum)
+                (LimitKind::Entries, observed, maximum)
             },
-            _ => return ChartCaptionError::InvalidSource,
+            _ => return Error::InvalidSource,
         };
-        return ChartCaptionError::LimitExceeded {
+        return Error::Limit {
             kind,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some(amount) = error.allocation_request() {
-        return ChartCaptionError::Allocation { amount };
+        return Error::Allocation { amount };
     }
-    ChartCaptionError::InvalidSource
+    Error::InvalidSource
 }
 
-fn map_graph_error(error: graph_codec::EncodeError) -> ChartCaptionError {
+fn map_graph_error(error: graph_codec::EncodeError) -> Error {
     match error {
         graph_codec::EncodeError::Resource(limit) => {
             let (kind, observed, maximum) = match limit {
                 graph_codec::EncodeLimit::OutputBytes { observed, maximum } => {
-                    (ChartCaptionLimitKind::OutputBytes, observed, maximum)
+                    (LimitKind::OutputBytes, observed, maximum)
                 },
                 graph_codec::EncodeLimit::TextBytes { observed, maximum } => {
-                    (ChartCaptionLimitKind::CaptionBytes, observed, maximum)
+                    (LimitKind::CaptionBytes, observed, maximum)
                 },
                 graph_codec::EncodeLimit::Fields { observed, maximum } => {
-                    (ChartCaptionLimitKind::WireFields, observed, maximum)
+                    (LimitKind::WireFields, observed, maximum)
                 },
                 graph_codec::EncodeLimit::WorkBytes { observed, maximum } => {
-                    (ChartCaptionLimitKind::WireWork, observed, maximum)
+                    (LimitKind::WireWork, observed, maximum)
                 },
-                graph_codec::EncodeLimit::Nesting { observed, maximum } => (
-                    ChartCaptionLimitKind::WireNesting,
-                    observed as usize,
-                    maximum as usize,
-                ),
+                graph_codec::EncodeLimit::Nesting { observed, maximum } => {
+                    (LimitKind::WireNesting, observed as usize, maximum as usize)
+                },
                 graph_codec::EncodeLimit::Allocations { observed, maximum } => {
-                    (ChartCaptionLimitKind::Entries, observed, maximum)
+                    (LimitKind::Entries, observed, maximum)
                 },
-                _ => return ChartCaptionError::InvalidSource,
+                _ => return Error::InvalidSource,
             };
-            ChartCaptionError::LimitExceeded {
+            Error::Limit {
                 kind,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(maximum),
             }
         },
-        graph_codec::EncodeError::Allocation { amount } => ChartCaptionError::Allocation { amount },
-        _ => ChartCaptionError::InvalidSource,
+        graph_codec::EncodeError::Allocation { amount } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_rendering_error(
-    _error: super::rendering_invalidation::RenderingInvalidationError,
-) -> ChartCaptionError {
-    ChartCaptionError::InvalidSource
+fn map_rendering_error(_error: super::rendering_invalidation::RenderingInvalidationError) -> Error {
+    Error::InvalidSource
 }
 
-fn map_slide_preview_error(error: super::slide_preview::InvalidationError) -> ChartCaptionError {
+fn map_slide_preview_error(error: super::slide_preview::InvalidationError) -> Error {
     match error {
-        super::slide_preview::InvalidationError::InvalidSource => ChartCaptionError::InvalidSource,
+        super::slide_preview::InvalidationError::InvalidSource => Error::InvalidSource,
         super::slide_preview::InvalidationError::Wire(error) => map_wire_error(error),
         super::slide_preview::InvalidationError::Archive(error) => map_core_error(error),
     }
@@ -4344,21 +4296,17 @@ fn map_slide_preview_budget_error(
     maximum_work: usize,
     starting_references: usize,
     maximum_references: usize,
-) -> ChartCaptionError {
+) -> Error {
     match error {
         super::slide_preview::BudgetedInvalidationError::Invalidation(error) => {
             map_slide_preview_error(error)
         },
         super::slide_preview::BudgetedInvalidationError::BudgetExceeded {
             kind, observed, ..
-        } => ChartCaptionError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                super::slide_preview::InvalidationBudgetKind::References => {
-                    ChartCaptionLimitKind::References
-                },
-                super::slide_preview::InvalidationBudgetKind::Work => {
-                    ChartCaptionLimitKind::WireWork
-                },
+                super::slide_preview::InvalidationBudgetKind::References => LimitKind::References,
+                super::slide_preview::InvalidationBudgetKind::Work => LimitKind::WireWork,
             },
             observed: usize_to_u64(match kind {
                 super::slide_preview::InvalidationBudgetKind::References => {
@@ -4376,7 +4324,7 @@ fn map_slide_preview_budget_error(
     }
 }
 
-fn map_read_error(error: ReadError) -> ChartCaptionError {
+fn map_read_error(error: ReadError) -> Error {
     match error {
         ReadError::Archive(error) => map_archive_error(error),
         ReadError::SemanticLimit {
@@ -4384,14 +4332,14 @@ fn map_read_error(error: ReadError) -> ChartCaptionError {
             observed,
             maximum,
             ..
-        } => ChartCaptionError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                SemanticLimitKind::Objects => ChartCaptionLimitKind::Entries,
-                SemanticLimitKind::Slides => ChartCaptionLimitKind::Slides,
-                SemanticLimitKind::References => ChartCaptionLimitKind::References,
-                SemanticLimitKind::TextStorages => ChartCaptionLimitKind::TextStorages,
-                SemanticLimitKind::TextFragments => ChartCaptionLimitKind::TextFragments,
-                SemanticLimitKind::TextBytes => ChartCaptionLimitKind::TextBytes,
+                SemanticLimitKind::Objects => LimitKind::Entries,
+                SemanticLimitKind::Slides => LimitKind::Slides,
+                SemanticLimitKind::References => LimitKind::References,
+                SemanticLimitKind::TextStorages => LimitKind::TextStorages,
+                SemanticLimitKind::TextFragments => LimitKind::TextFragments,
+                SemanticLimitKind::TextBytes => LimitKind::TextBytes,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
@@ -4401,189 +4349,181 @@ fn map_read_error(error: ReadError) -> ChartCaptionError {
             observed,
             maximum,
             ..
-        } => ChartCaptionError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                super::PayloadLimitKind::Bytes => ChartCaptionLimitKind::WireBytes,
-                super::PayloadLimitKind::Fields => ChartCaptionLimitKind::WireFields,
-                super::PayloadLimitKind::Nesting => ChartCaptionLimitKind::WireNesting,
-                super::PayloadLimitKind::Work => ChartCaptionLimitKind::WireWork,
+                super::PayloadLimitKind::Bytes => LimitKind::WireBytes,
+                super::PayloadLimitKind::Fields => LimitKind::WireFields,
+                super::PayloadLimitKind::Nesting => LimitKind::WireNesting,
+                super::PayloadLimitKind::Work => LimitKind::WireWork,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         },
-        ReadError::Allocation { amount, .. } => ChartCaptionError::Allocation { amount },
-        _ => ChartCaptionError::InvalidSource,
+        ReadError::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_wire_error(error: litchi_iwa_common::Error) -> ChartCaptionError {
+fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
     match error {
         litchi_iwa_common::Error::LimitExceeded {
             kind,
             observed,
             limit,
-        } => ChartCaptionError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_common::LimitKind::InputBytes => ChartCaptionLimitKind::WireBytes,
-                litchi_iwa_common::LimitKind::OutputBytes => ChartCaptionLimitKind::OutputBytes,
-                litchi_iwa_common::LimitKind::Fields => ChartCaptionLimitKind::WireFields,
-                litchi_iwa_common::LimitKind::Nesting => ChartCaptionLimitKind::WireNesting,
-                litchi_iwa_common::LimitKind::RewriteWork => ChartCaptionLimitKind::WireWork,
-                _ => ChartCaptionLimitKind::WireBytes,
+                litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
+                litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_common::LimitKind::Fields => LimitKind::WireFields,
+                litchi_iwa_common::LimitKind::Nesting => LimitKind::WireNesting,
+                litchi_iwa_common::LimitKind::RewriteWork => LimitKind::WireWork,
+                _ => LimitKind::WireBytes,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
-        _ => ChartCaptionError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_chart_caption_codec_error(
-    error: keynote_chart_caption_codec::DecodeError,
-) -> ChartCaptionError {
+fn map_chart_caption_codec_error(error: keynote_chart_caption_codec::DecodeError) -> Error {
     if let Some((observed, maximum)) = error.output_limit_values() {
-        return ChartCaptionError::LimitExceeded {
-            kind: ChartCaptionLimitKind::OutputBytes,
+        return Error::Limit {
+            kind: LimitKind::OutputBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some(amount) = error.allocation_amount() {
-        return ChartCaptionError::Allocation { amount };
+        return Error::Allocation { amount };
     }
     if let Some(limit) = error.wire_resource_limit() {
         return match limit {
             keynote_chart_caption_codec::WireResourceLimit::Bytes { observed, maximum } => {
-                ChartCaptionError::LimitExceeded {
-                    kind: ChartCaptionLimitKind::WireBytes,
+                Error::Limit {
+                    kind: LimitKind::WireBytes,
                     observed: usize_to_u64(observed),
                     maximum: usize_to_u64(maximum),
                 }
             },
             keynote_chart_caption_codec::WireResourceLimit::Nesting { observed, maximum } => {
-                ChartCaptionError::LimitExceeded {
-                    kind: ChartCaptionLimitKind::WireNesting,
+                Error::Limit {
+                    kind: LimitKind::WireNesting,
                     observed: u64::from(observed),
                     maximum: u64::from(maximum),
                 }
             },
-            _ => ChartCaptionError::InvalidSource,
+            _ => Error::InvalidSource,
         };
     }
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return ChartCaptionError::LimitExceeded {
-            kind: ChartCaptionLimitKind::WireFields,
+        return Error::Limit {
+            kind: LimitKind::WireFields,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return ChartCaptionError::LimitExceeded {
-            kind: ChartCaptionLimitKind::WireWork,
+        return Error::Limit {
+            kind: LimitKind::WireWork,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
-    ChartCaptionError::InvalidSource
+    Error::InvalidSource
 }
 
-fn map_movie_caption_codec_error(
-    error: keynote_movie_caption_codec::DecodeError,
-) -> ChartCaptionError {
+fn map_movie_caption_codec_error(error: keynote_movie_caption_codec::DecodeError) -> Error {
     if let Some((observed, maximum)) = error.output_limit_values() {
-        return ChartCaptionError::LimitExceeded {
-            kind: ChartCaptionLimitKind::OutputBytes,
+        return Error::Limit {
+            kind: LimitKind::OutputBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some(amount) = error.allocation_amount() {
-        return ChartCaptionError::Allocation { amount };
+        return Error::Allocation { amount };
     }
     if let Some(limit) = error.wire_resource_limit() {
         return match limit {
             keynote_movie_caption_codec::WireResourceLimit::Bytes { observed, maximum } => {
-                ChartCaptionError::LimitExceeded {
-                    kind: ChartCaptionLimitKind::WireBytes,
+                Error::Limit {
+                    kind: LimitKind::WireBytes,
                     observed: usize_to_u64(observed),
                     maximum: usize_to_u64(maximum),
                 }
             },
             keynote_movie_caption_codec::WireResourceLimit::Nesting { observed, maximum } => {
-                ChartCaptionError::LimitExceeded {
-                    kind: ChartCaptionLimitKind::WireNesting,
+                Error::Limit {
+                    kind: LimitKind::WireNesting,
                     observed: u64::from(observed),
                     maximum: u64::from(maximum),
                 }
             },
-            _ => ChartCaptionError::InvalidSource,
+            _ => Error::InvalidSource,
         };
     }
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return ChartCaptionError::LimitExceeded {
-            kind: ChartCaptionLimitKind::WireFields,
+        return Error::Limit {
+            kind: LimitKind::WireFields,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return ChartCaptionError::LimitExceeded {
-            kind: ChartCaptionLimitKind::WireWork,
+        return Error::Limit {
+            kind: LimitKind::WireWork,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
-    ChartCaptionError::InvalidSource
+    Error::InvalidSource
 }
 
-pub(super) fn map_caption_info_codec_error(
-    error: pages_movie_caption_codec::DecodeError,
-) -> ChartCaptionError {
+pub(super) fn map_caption_info_codec_error(error: pages_movie_caption_codec::DecodeError) -> Error {
     if let Some((observed, maximum)) = error.message_byte_limit_values() {
-        return ChartCaptionError::LimitExceeded {
-            kind: ChartCaptionLimitKind::WireBytes,
+        return Error::Limit {
+            kind: LimitKind::WireBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return ChartCaptionError::LimitExceeded {
-            kind: ChartCaptionLimitKind::WireFields,
+        return Error::Limit {
+            kind: LimitKind::WireFields,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return ChartCaptionError::LimitExceeded {
-            kind: ChartCaptionLimitKind::WireWork,
+        return Error::Limit {
+            kind: LimitKind::WireWork,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
-    ChartCaptionError::InvalidSource
+    Error::InvalidSource
 }
 
-pub(super) fn map_slide_text_error(error: super::slide_text::SlideTextError) -> ChartCaptionError {
+pub(super) fn map_slide_text_error(error: super::slide_text::Error) -> Error {
     match error {
-        super::slide_text::SlideTextError::UnsupportedSource => {
-            ChartCaptionError::UnsupportedSource
+        super::slide_text::Error::Refused(crate::slide::text::Refusal::UnsupportedSource) => {
+            Error::Refused(Refusal::UnsupportedSource)
         },
-        super::slide_text::SlideTextError::DependentContent
-        | super::slide_text::SlideTextError::ObjectMarkerReplacement => {
-            ChartCaptionError::UnsupportedDependency
+        super::slide_text::Error::Refused(crate::slide::text::Refusal::DependentContent)
+        | super::slide_text::Error::Refused(crate::slide::text::Refusal::ObjectMarkerReplacement) => {
+            Error::Refused(Refusal::UnsupportedDependency)
         },
-        super::slide_text::SlideTextError::LimitExceeded {
+        super::slide_text::Error::Limit {
             observed, maximum, ..
-        } => ChartCaptionError::LimitExceeded {
-            kind: ChartCaptionLimitKind::WireWork,
+        } => Error::Limit {
+            kind: LimitKind::WireWork,
             observed,
             maximum,
         },
-        super::slide_text::SlideTextError::Allocation { amount } => {
-            ChartCaptionError::Allocation { amount }
-        },
-        super::slide_text::SlideTextError::Verification => ChartCaptionError::Verification,
-        _ => ChartCaptionError::InvalidSource,
+        super::slide_text::Error::Allocation { amount } => Error::Allocation { amount },
+        super::slide_text::Error::Verification => Error::Verification,
+        _ => Error::InvalidSource,
     }
 }
 

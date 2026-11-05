@@ -175,3 +175,10 @@ mod tests {
         );
     }
 }
+
+/// Exact-source transactions for one body image's adjustments.
+pub mod adjustments {
+    pub use crate::package::image_adjustments::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+}

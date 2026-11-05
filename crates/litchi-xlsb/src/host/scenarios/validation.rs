@@ -7,11 +7,8 @@ use super::model::{
 use crate::package::error::{Error, Result};
 use std::collections::HashSet;
 
-pub(crate) fn invalid(typ: impl Into<String>, val: impl Into<String>) -> Error {
-    Error::Unrecognized {
-        typ: typ.into(),
-        val: val.into(),
-    }
+pub(crate) fn invalid(typ: &'static str, val: &'static str) -> Error {
+    Error::Unrecognized { typ, val }
 }
 
 pub(crate) fn validate_range(value: CellRange) -> Result<()> {
@@ -20,16 +17,7 @@ pub(crate) fn validate_range(value: CellRange) -> Result<()> {
         || value.column_first() > value.column_last()
         || value.column_last() >= 16_384
     {
-        return Err(invalid(
-            "scenario range",
-            format!(
-                "rows {}..={}, columns {}..={}",
-                value.row_first(),
-                value.row_last(),
-                value.column_first(),
-                value.column_last()
-            ),
-        ));
+        return Err(invalid("scenario range", "rows..=, columns..="));
     }
     Ok(())
 }
@@ -38,13 +26,10 @@ fn utf16_units(value: &str) -> usize {
     value.encode_utf16().count()
 }
 
-pub(crate) fn validate_text(value: &str, field: &str, maximum: usize) -> Result<()> {
+pub(crate) fn validate_text(value: &str, field: &'static str, maximum: usize) -> Result<()> {
     let units = utf16_units(value);
     if units > maximum {
-        return Err(invalid(
-            field,
-            format!("{units} UTF-16 code units exceeds {maximum}"),
-        ));
+        return Err(invalid(field, "UTF-16 code units exceeds"));
     }
     if value.chars().any(|character| character == '\0') {
         return Err(invalid(field, "contains NUL"));
@@ -54,14 +39,7 @@ pub(crate) fn validate_text(value: &str, field: &str, maximum: usize) -> Result<
 
 pub(crate) fn validate_changed_cell(value: &ChangedCell) -> Result<()> {
     if value.row() >= 1_048_576 || value.column() >= 16_384 {
-        return Err(invalid(
-            "BrtSlc cell",
-            format!(
-                "({}, {}) is outside the worksheet grid",
-                value.row(),
-                value.column()
-            ),
-        ));
+        return Err(invalid("BrtSlc cell", "(, ) is outside the worksheet grid"));
     }
     validate_text(value.value(), "BrtSlc strVal", MAX_SCENARIO_TEXT)
 }
@@ -73,7 +51,7 @@ pub(crate) fn validate_scenario_text(value: &Scenario) -> Result<()> {
     if !(2..=MAX_USER_NAME).contains(&user_units) {
         return Err(invalid(
             "BrtBeginSct UserName",
-            format!("{user_units} UTF-16 code units is outside 2..={MAX_USER_NAME}"),
+            "UTF-16 code units is outside 2..=",
         ));
     }
     validate_text(value.user_name(), "BrtBeginSct UserName", MAX_USER_NAME)
@@ -131,22 +109,13 @@ fn validate_scenario_order(value: &Scenario) -> Result<()> {
 pub(crate) fn validate_scenario(value: &Scenario) -> Result<()> {
     validate_scenario_text(value)?;
     if !(1..=MAX_CHANGED_CELLS).contains(&value.changed_cells().len()) {
-        return Err(invalid(
-            "BrtBeginSct cref",
-            format!(
-                "{} changed cells is outside 1..={MAX_CHANGED_CELLS}",
-                value.changed_cells().len()
-            ),
-        ));
+        return Err(invalid("BrtBeginSct cref", "changed cells is outside 1..="));
     }
     let mut coordinates = HashSet::with_capacity(value.changed_cells().len());
     for cell in value.changed_cells() {
         validate_changed_cell(cell)?;
         if !coordinates.insert((cell.row(), cell.column())) {
-            return Err(invalid(
-                "BrtBeginSct cells",
-                format!("duplicate cell ({}, {})", cell.row(), cell.column()),
-            ));
+            return Err(invalid("BrtBeginSct cells", "duplicate cell (, )"));
         }
     }
     if value.unknown_records().len() > MAX_UNKNOWN_RECORDS {
@@ -265,7 +234,7 @@ pub(crate) fn validate_manager(value: &Manager) -> Result<()> {
     if cells > 32 {
         return Err(invalid(
             "BrtBeginScenMan sqrfxResult",
-            format!("result range contains {cells} cells, maximum is 32"),
+            "result range contains cells, maximum is 32",
         ));
     }
 

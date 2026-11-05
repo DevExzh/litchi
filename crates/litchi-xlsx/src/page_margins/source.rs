@@ -1,231 +1,194 @@
 //! Guarded page-margin publication over an immutable positional source.
+//!
+//! [`SourceBackedWorkbook::edit_page_margins`] stages one worksheet without
+//! materializing any unselected part body; [`Edit::commit`] validates the
+//! edit and returns a [`Commit`] holding the new workbook, whose output is the
+//! byte-preserving splice the former stream publisher wrote (the selected
+//! worksheet XML is the only replaced member; every other ZIP member is
+//! raw-copied). An exact no-op returns the source workbook unchanged; a
+//! changed edit of a signed source is refused at commit.
+//! [`SourceBackedWorkbook::apply_page_margins`] replays a [`Patch`] onto a workbook
+//! holding its before state (record 0360).
 
 use std::io::Write;
-use std::sync::Arc;
 
-use litchi_core::{ExecutionContext, ReadAt};
-use litchi_opc::{ReadLimits, SourceBackedPackage, SourceCacheLimits};
+use litchi_opc::SourceBackedPackage;
 
-use super::{Commit, Margins, Patch, Snapshot};
-use crate::Selector;
+use super::{Margins, Snapshot};
 use crate::error::{Result, invalid};
+use crate::workbook::source::{LazySource, own_selector};
+use crate::{Selector, SourceBackedWorkbook};
 
-/// An owning source-backed page-margin editor.
-///
-/// The editor is intentionally not cloneable. Publication consumes its
-/// deferred OPC source and may replace only one existing worksheet payload;
-/// the workbook catalog, relationships, other worksheets, drawings, and
-/// package topology are immutable under this capability.
-pub struct SourceBackedEditor {
-    package: SourceBackedPackage,
-}
+crate::workbook::source::deferred::source_family!("page-margin", super::Patch);
 
-/// An isolated page-margin edit over one exact source worksheet.
-pub struct SourceEdit {
-    before: Snapshot,
-    staged: Option<Margins>,
-}
-
-impl SourceBackedEditor {
-    /// Open with the standard bounded OPC policy.
-    pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
-        Self::from_read_at_with_limits(source, ReadLimits::default())
-    }
-
-    /// Open with an explicit bounded OPC policy.
-    pub fn from_read_at_with_limits(
-        source: Arc<dyn ReadAt>,
-        read_limits: ReadLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_limits(
-            source,
-            read_limits,
-        )?)
-    }
-
-    /// Open with an explicit finite deferred-payload cache policy.
-    pub fn from_read_at_with_cache_limits(
-        source: Arc<dyn ReadAt>,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_cache_limits(
-            source,
-            cache_limits,
-        )?)
-    }
-
-    /// Open with explicit read and cache policies.
-    pub fn from_read_at_with_limits_and_cache_limits(
-        source: Arc<dyn ReadAt>,
-        read_limits: ReadLimits,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
-                source,
-                read_limits,
-                cache_limits,
-            )?,
-        )
-    }
-
-    /// Open with an explicit caller-owned execution context.
-    pub fn from_read_at_with_execution_context(
-        source: Arc<dyn ReadAt>,
-        read_limits: ReadLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_execution_context(
-            source,
-            read_limits,
-            context,
-        )?)
-    }
-
-    /// Open with explicit read and execution policies.
-    pub fn from_read_at_with_limits_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        read_limits: ReadLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_execution_context(source, read_limits, context)
-    }
-
-    /// Open with explicit read, cache, and caller-owned execution policies.
-    pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        read_limits: ReadLimits,
-        cache_limits: SourceCacheLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                source,
-                read_limits,
-                cache_limits,
-                context,
-            )?,
-        )
-    }
-
-    /// Build an editor from an already opened deferred OPC package.
-    pub fn from_source_backed_package(package: SourceBackedPackage) -> Result<Self> {
-        package.check_execution()?;
-        Ok(Self { package })
-    }
-
-    /// Capture exact source-bound page margins for one selected worksheet.
-    pub fn snapshot<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Snapshot> {
-        self.package.check_execution()?;
-        Snapshot::load_source_backed(&self.package, selector)
-    }
-
-    /// Begin an isolated edit without materializing any unselected Part body.
-    pub fn edit<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<SourceEdit> {
-        self.package.check_execution()?;
-        Ok(SourceEdit::new(self.snapshot(selector)?))
-    }
-
-    /// Return content-free payload-cache activity for the deferred package.
+impl Patch {
+    /// The exact worksheet state the patch requires.
     #[must_use]
-    pub fn cache_diagnostics(&self) -> litchi_opc::SourceCacheDiagnostics {
-        self.package.cache_diagnostics()
+    pub fn before(&self) -> &Snapshot {
+        self.0.before()
     }
 
-    /// Publish an exact-source-checked commit to a sequential sink.
-    ///
-    /// The selected worksheet XML is the only replaceable Part. Every other
-    /// physical ZIP member is raw-copied. Exact no-ops reproduce the complete
-    /// source bytes; changed signed sources and unsupported physical layouts
-    /// are refused by the OPC owner before output begins.
-    pub fn publish_commit_to_stream<W: Write>(
-        self,
-        writer: W,
-        commit: &Commit,
-    ) -> Result<Snapshot> {
-        self.package.check_execution()?;
-        let current =
-            Snapshot::load_source_backed(&self.package, commit.patch().before().sheet_position())?;
-        if !current.same_source(commit.patch().before()) {
-            return Err(crate::Error::PatchConflict {
+    /// The exact worksheet state the patch produces.
+    #[must_use]
+    pub fn after(&self) -> &Snapshot {
+        self.0.after()
+    }
+}
+
+impl crate::workbook::source::deferred::Change for super::Patch {
+    fn is_noop(&self) -> bool {
+        self.is_empty()
+    }
+
+    fn inverse(&self) -> Self {
+        super::Patch::inverse(self)
+    }
+
+    fn check(&self, package: &SourceBackedPackage) -> Result<()> {
+        let current = Snapshot::load_source_backed(package, self.before().sheet_position())?;
+        if !current.same_source(self.before()) {
+            return Err(Error::PatchConflict {
                 part: current.worksheet_part_name().to_string(),
             });
         }
-        let target = if commit.patch().is_empty() {
-            current
-        } else {
-            commit.patch().after().clone()
-        };
-        if commit.patch().is_empty() {
-            self.package
-                .write_part_overlays_shared_to_stream(writer, Vec::new())?;
-        } else {
-            self.package.write_part_overlay_shared_to_stream(
-                writer,
-                target.worksheet_part_name(),
-                target.source_arc()?,
-            )?;
-        }
-        Ok(target)
+        Ok(())
+    }
+
+    fn write(&self, package: &SourceBackedPackage, writer: &mut dyn Write) -> Result<()> {
+        package.check_execution()?;
+        crate::workbook::source::deferred::Change::check(self, package)?;
+        package.clone().write_part_overlay_shared_to_stream(
+            writer,
+            self.after().worksheet_part_name(),
+            self.after().source_arc()?,
+        )?;
+        Ok(())
+    }
+
+    fn write_authenticated(
+        &self,
+        package: &SourceBackedPackage,
+        writer: &mut dyn Write,
+    ) -> Result<()> {
+        package.check_execution()?;
+        package.clone().write_part_overlay_shared_to_stream(
+            writer,
+            self.after().worksheet_part_name(),
+            self.after().source_arc()?,
+        )?;
+        Ok(())
     }
 }
 
-impl SourceEdit {
-    fn new(before: Snapshot) -> Self {
+impl SourceBackedWorkbook {
+    /// Begin an isolated page-margin edit of one worksheet without materializing
+    /// any unselected part body.
+    ///
+    /// # Errors
+    ///
+    /// Source-resolution errors are returned by the first accessor, staging
+    /// operation, or commit that needs the selected worksheet.
+    pub fn edit_page_margins<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Edit> {
+        self.check_execution()?;
+        Ok(Edit::new(self.clone(), own_selector(selector.into())?))
+    }
+
+    /// Replay a page-margin patch onto this workbook.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when the selected worksheet does not
+    /// hold the patch's before state, and the signed-source refusal for a
+    /// changed patch on a signed source.
+    pub fn apply_page_margins(&self, patch: &Patch) -> Result<Commit> {
+        apply_change(self, patch)
+    }
+}
+
+/// An isolated page-margin edit over one exact source worksheet of a
+/// [`SourceBackedWorkbook`]. Dropping it discards it.
+pub struct Edit {
+    source: LazySource<Snapshot>,
+    selector: Selector<'static>,
+    /// `None` means that the edit still inherits the source state. `Some`
+    /// contains the complete replacement, including `None` for removal.
+    staged: Option<Option<Margins>>,
+}
+
+impl Edit {
+    fn new(workbook: SourceBackedWorkbook, selector: Selector<'static>) -> Self {
         Self {
-            staged: before.page_margins().copied(),
-            before,
+            source: LazySource::new(workbook),
+            selector,
+            staged: None,
         }
     }
 
-    /// Exact source state captured when this edit began.
-    #[must_use]
-    pub const fn before(&self) -> &Snapshot {
-        &self.before
+    fn resolve_before(&self) -> Result<&Snapshot> {
+        let selector = self.selector.clone();
+        self.source
+            .resolve(|package| Snapshot::load_source_backed(package, selector))
+    }
+
+    fn effective(&self) -> Result<Option<&Margins>> {
+        match &self.staged {
+            Some(staged) => Ok(staged.as_ref()),
+            None => Ok(self.resolve_before()?.page_margins()),
+        }
+    }
+
+    /// Resolve the exact source state observed by this edit.
+    pub fn before(&self) -> Result<&Snapshot> {
+        self.resolve_before()
     }
 
     /// Currently staged page-margin state.
-    #[must_use]
-    pub const fn page_margins(&self) -> Option<&Margins> {
-        self.staged.as_ref()
+    pub fn page_margins(&self) -> Result<Option<&Margins>> {
+        self.effective()
     }
 
     /// Create or replace the complete staged page-margin state.
-    pub fn set(&mut self, value: Margins) -> bool {
-        if self.staged.as_ref() == Some(&value) {
-            return false;
+    pub fn set(&mut self, value: Margins) -> Result<bool> {
+        if self.effective()?.is_some_and(|current| current == &value) {
+            return Ok(false);
         }
-        self.staged = Some(value);
-        true
+        self.staged = Some(Some(value));
+        Ok(true)
     }
 
     /// Remove direct page margins.
-    pub fn remove(&mut self) -> bool {
-        self.staged.take().is_some()
+    pub fn remove(&mut self) -> Result<bool> {
+        if self.effective()?.is_none() {
+            return Ok(false);
+        }
+        self.staged = Some(None);
+        Ok(true)
     }
 
-    /// Whether the exact authored semantic state differs from its source.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.before.page_margins() != self.staged.as_ref()
+    /// Discard every staged change in place.
+    pub fn reset(&mut self) {
+        self.staged = None;
     }
 
     /// Validate and freeze this isolated edit for source-backed publication.
     pub fn commit(self) -> Result<Commit> {
-        self.before.check_execution()?;
-        if !self.is_changed() {
-            let patch = Patch::new(self.before.clone(), self.before.clone());
-            return Ok(Commit::new(self.before, patch, false));
+        let before = self.resolve_before()?.clone();
+        let staged = self
+            .staged
+            .unwrap_or_else(|| before.page_margins().copied());
+        before.check_execution()?;
+        if before.page_margins() == staged.as_ref() {
+            let patch = super::Patch::new(before.clone(), before);
+            return commit_change(self.source.workbook(), patch);
         }
-        let output = super::replace_page_margins(self.before.source_xml(), self.staged.as_ref())?;
-        let snapshot = Snapshot::from_rewritten_source(&self.before, output)?;
+        let output = super::replace_page_margins(before.source_xml(), staged.as_ref())?;
+        let snapshot = Snapshot::from_rewritten_source(&before, output)?;
         snapshot.check_execution()?;
-        if snapshot.page_margins() != self.staged.as_ref() {
+        if snapshot.page_margins() != staged.as_ref() {
             return Err(invalid(
                 "page-margin publication changed the staged semantic state",
             ));
         }
-        let patch = Patch::new(self.before, snapshot.clone());
-        Ok(Commit::new(snapshot, patch, true))
+        commit_change(self.source.workbook(), super::Patch::new(before, snapshot))
     }
 }

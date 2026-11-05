@@ -9,7 +9,7 @@
 //! the occupancy map answers (duplicates and `Array` ownership).
 
 use super::codec::{DecodeEveryCell, ValidateCells};
-use super::model::{OpenOptions, Workbook};
+use super::model::{OpenOptions, Reader};
 use super::validation_only::{KeptCells, ValidationWorkbook};
 use crate::compatibility::CompatibilityProfile;
 use crate::records::{BoundSheetRecord, Encoding, SheetType};
@@ -65,7 +65,7 @@ fn xls_fixtures() -> Vec<PathBuf> {
 /// Every fact the two modes must agree on, as deterministic text: all of the
 /// workbook's state except the CFB reader, the decoded cells and the
 /// hash-indexed formatting lookup (whose ordered contents are compared).
-fn facts<R: Read + Seek>(workbook: &Workbook<R>) -> String {
+fn facts<R: Read + Seek>(workbook: &Reader<R>) -> String {
     let worksheets = workbook
         .worksheets
         .iter()
@@ -137,7 +137,7 @@ fn facts<R: Read + Seek>(workbook: &Workbook<R>) -> String {
 }
 
 /// The outcome both modes must agree on: the first refusal, or the facts.
-fn outcome<R: Read + Seek>(result: Result<&Workbook<R>, &crate::Error>) -> String {
+fn outcome<R: Read + Seek>(result: Result<&Reader<R>, &crate::Error>) -> String {
     match result {
         Ok(workbook) => format!("ok\n{}", facts(workbook)),
         Err(error) => format!("error: {error}\n{error:?}"),
@@ -145,8 +145,8 @@ fn outcome<R: Read + Seek>(result: Result<&Workbook<R>, &crate::Error>) -> Strin
 }
 
 fn open_both(bytes: &[u8], kept: KeptCells) -> (String, String) {
-    let full = Workbook::new(Cursor::new(bytes));
-    let validated = Workbook::validation_only(Cursor::new(bytes), kept);
+    let full = Reader::new(Cursor::new(bytes));
+    let validated = Reader::validation_only(Cursor::new(bytes), kept);
     (
         outcome(full.as_ref()),
         outcome(
@@ -161,8 +161,8 @@ fn open_both(bytes: &[u8], kept: KeptCells) -> (String, String) {
 fn facts_are_deterministic_across_two_complete_opens() {
     for path in xls_fixtures().into_iter().take(24) {
         let bytes = std::fs::read(&path).unwrap();
-        let first = Workbook::new(Cursor::new(bytes.as_slice()));
-        let second = Workbook::new(Cursor::new(bytes.as_slice()));
+        let first = Reader::new(Cursor::new(bytes.as_slice()));
+        let second = Reader::new(Cursor::new(bytes.as_slice()));
         assert_eq!(
             outcome(first.as_ref()),
             outcome(second.as_ref()),
@@ -232,7 +232,7 @@ fn kept_cells_are_the_complete_readers_cells() {
     let mut compared = 0;
     for path in xls_fixtures() {
         let bytes = std::fs::read(&path).unwrap();
-        let Ok(full) = Workbook::new(Cursor::new(bytes.as_slice())) else {
+        let Ok(full) = Reader::new(Cursor::new(bytes.as_slice())) else {
             continue;
         };
         let mut kept = Vec::new();
@@ -248,7 +248,7 @@ fn kept_cells_are_the_complete_readers_cells() {
             kept.push((tab, u16::MAX, 255));
             kept.push((tab, 0, 300));
         }
-        let validated = Workbook::validation_only(
+        let validated = Reader::validation_only(
             Cursor::new(bytes.as_slice()),
             KeptCells::from_cells(kept.iter().copied()).unwrap(),
         )
@@ -305,7 +305,7 @@ struct WorksheetInputs<'w> {
     formatting: std::sync::Arc<crate::number_format::Formatting>,
 }
 
-fn inputs<R: Read + Seek>(workbook: &Workbook<R>) -> WorksheetInputs<'_> {
+fn inputs<R: Read + Seek>(workbook: &Reader<R>) -> WorksheetInputs<'_> {
     WorksheetInputs {
         encoding: Encoding::from_codepage(1252).unwrap(),
         shared_strings: workbook.shared_strings_shared(),
@@ -337,7 +337,8 @@ fn parse_both(
 ) -> (String, String) {
     let stream = encode(records);
     let parse = |validate: bool| -> String {
-        let mut framed = Records::new(&stream);
+        let mut framed =
+            Records::new(&stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
         let Some(bof) = framed.next() else {
             return "empty".into();
         };
@@ -356,7 +357,7 @@ fn parse_both(
         };
         let mut tolerance = crate::leniency::ToleranceReport::default();
         let result = if validate {
-            Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records_with_compatibility(
+            Reader::<Cursor<Vec<u8>>>::parse_worksheet_records_with_compatibility(
                 &mut framed,
                 region,
                 &inputs.encoding,
@@ -365,12 +366,13 @@ fn parse_both(
                 std::sync::Arc::clone(&inputs.properties),
                 Some(inputs.formula_context),
                 std::sync::Arc::clone(&inputs.formatting),
+                crate::SourceLimits::default(),
                 profile,
                 &mut ValidateCells::new(kept),
                 &mut tolerance,
             )
         } else {
-            Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records_with_compatibility(
+            Reader::<Cursor<Vec<u8>>>::parse_worksheet_records_with_compatibility(
                 &mut framed,
                 region,
                 &inputs.encoding,
@@ -379,6 +381,7 @@ fn parse_both(
                 std::sync::Arc::clone(&inputs.properties),
                 Some(inputs.formula_context),
                 std::sync::Arc::clone(&inputs.formatting),
+                crate::SourceLimits::default(),
                 profile,
                 &mut DecodeEveryCell,
                 &mut tolerance,
@@ -539,7 +542,12 @@ fn mutate(records: &[Record], random: &mut XorShift) -> Vec<Record> {
 fn worksheet_records(workbook_stream: &[u8], bound: &BoundSheetRecord) -> Option<Vec<Record>> {
     let start = usize::try_from(bound.position).ok()?;
     let mut records = Vec::new();
-    for record in Records::new(workbook_stream.get(start..)?) {
+    for record in Records::new(
+        workbook_stream.get(start..)?,
+        litchi_biff::Limits::default(),
+    )
+    .ok()?
+    {
         let record = record.ok()?;
         let kind = record.kind().get();
         records.push((kind, record.payload().to_vec()));
@@ -551,7 +559,8 @@ fn worksheet_records(workbook_stream: &[u8], bound: &BoundSheetRecord) -> Option
 }
 
 fn workbook_stream(bytes: &[u8]) -> Option<Vec<u8>> {
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).ok()?;
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).ok()?;
     ole.open_stream(&["Workbook"])
         .or_else(|_| ole.open_stream(&["Book"]))
         .ok()
@@ -560,7 +569,7 @@ fn workbook_stream(bytes: &[u8]) -> Option<Vec<u8>> {
 fn bound_sheets(stream: &[u8]) -> Vec<BoundSheetRecord> {
     let encoding = Encoding::from_codepage(1252).unwrap();
     let mut sheets = Vec::new();
-    for record in Records::new(stream) {
+    for record in Records::new(stream, litchi_biff::Limits::default()).expect("valid BIFF limits") {
         let Ok(record) = record else {
             break;
         };
@@ -608,8 +617,7 @@ fn worksheet_parse_agrees_with_the_complete_reader_under_mutation() {
     let mut random = XorShift(0x0746_0746_0746_0746);
     for path in fixtures {
         let bytes = std::fs::read(&path).unwrap();
-        let Ok(full) =
-            Workbook::new_with_options(Cursor::new(bytes.as_slice()), OpenOptions::new())
+        let Ok(full) = Reader::new_with_options(Cursor::new(bytes.as_slice()), OpenOptions::new())
         else {
             continue;
         };
@@ -770,14 +778,14 @@ fn bof() -> Record {
 #[test]
 fn synthetic_worksheets_agree_on_duplicate_and_array_ownership() {
     let bytes = {
-        let mut writer = crate::Writer::new();
+        let mut writer = crate::Builder::new();
         let sheet = writer.add_worksheet("Sheet1").unwrap();
         writer.write_number(sheet, 0, 0, 1.0).unwrap();
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).unwrap();
+        writer.build().unwrap().write_to(&mut output).unwrap();
         output.into_inner()
     };
-    let full = Workbook::new(Cursor::new(bytes.as_slice())).unwrap();
+    let full = Reader::new(Cursor::new(bytes.as_slice())).unwrap();
     let inputs = inputs(&full);
     let anchor = (1_u16, 0_u16);
     let valid_array = vec![
@@ -973,7 +981,9 @@ fn package_outcome_agrees_under_worksheet_mutation() {
         rewritten.extend_from_slice(&stream[start + old_length..]);
         let mut offset = 0;
         let mut globals = Vec::new();
-        for record in Records::new(&rewritten) {
+        for record in
+            Records::new(&rewritten, litchi_biff::Limits::default()).expect("valid BIFF limits")
+        {
             let record = record.unwrap();
             globals.push((offset, record.kind().get(), record.payload().len()));
             offset += record.encoded().len();
@@ -1118,14 +1128,14 @@ const BASE_MULTI_DEFECT_MATRIX: &[(&str, &str)] = &[
 #[test]
 fn worksheet_first_error_matrix_matches_the_base_for_multi_defect_inputs() {
     let bytes = {
-        let mut writer = crate::Writer::new();
+        let mut writer = crate::Builder::new();
         let sheet = writer.add_worksheet("Sheet1").unwrap();
         writer.write_number(sheet, 0, 0, 1.0).unwrap();
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).unwrap();
+        writer.build().unwrap().write_to(&mut output).unwrap();
         output.into_inner()
     };
-    let full = Workbook::new(Cursor::new(bytes.as_slice())).unwrap();
+    let full = Reader::new(Cursor::new(bytes.as_slice())).unwrap();
     let ok = full
         .xls_worksheet(0)
         .unwrap()
@@ -1156,7 +1166,8 @@ fn worksheet_first_error_matrix_matches_the_base_for_multi_defect_inputs() {
             Err(error) => error.to_string(),
         };
         let parse = |store: &mut dyn FnMut(&mut Records<'_>) -> crate::Result<Worksheet>| {
-            let mut framed = Records::new(&stream);
+            let mut framed =
+                Records::new(&stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
             outcome(store(&mut framed))
         };
         let region = super::codec::WorksheetStreamRegion {
@@ -1165,7 +1176,7 @@ fn worksheet_first_error_matrix_matches_the_base_for_multi_defect_inputs() {
             current_position: 0,
         };
         let complete = parse(&mut |framed| {
-            Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records_with_compatibility(
+            Reader::<Cursor<Vec<u8>>>::parse_worksheet_records_with_compatibility(
                 framed,
                 region,
                 &inputs.encoding,
@@ -1174,6 +1185,7 @@ fn worksheet_first_error_matrix_matches_the_base_for_multi_defect_inputs() {
                 std::sync::Arc::clone(&inputs.properties),
                 Some(inputs.formula_context),
                 std::sync::Arc::clone(&inputs.formatting),
+                crate::SourceLimits::default(),
                 CompatibilityProfile::Strict,
                 &mut DecodeEveryCell,
                 &mut crate::leniency::ToleranceReport::default(),
@@ -1181,7 +1193,7 @@ fn worksheet_first_error_matrix_matches_the_base_for_multi_defect_inputs() {
         });
         for kept in [&[][..], every_position.as_slice()] {
             let validated = parse(&mut |framed| {
-                Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records_with_compatibility(
+                Reader::<Cursor<Vec<u8>>>::parse_worksheet_records_with_compatibility(
                     framed,
                     region,
                     &inputs.encoding,
@@ -1190,6 +1202,7 @@ fn worksheet_first_error_matrix_matches_the_base_for_multi_defect_inputs() {
                     std::sync::Arc::clone(&inputs.properties),
                     Some(inputs.formula_context),
                     std::sync::Arc::clone(&inputs.formatting),
+                    crate::SourceLimits::default(),
                     CompatibilityProfile::Strict,
                     &mut ValidateCells::new(kept),
                     &mut crate::leniency::ToleranceReport::default(),
@@ -1209,20 +1222,20 @@ fn worksheet_first_error_matrix_matches_the_base_for_multi_defect_inputs() {
 #[test]
 fn kept_cell_refuses_a_position_kept_on_a_different_tab() {
     let bytes = {
-        let mut writer = crate::Writer::new();
+        let mut writer = crate::Builder::new();
         let first = writer.add_worksheet("First").unwrap();
         writer.write_number(first, 1, 1, 10.0).unwrap();
         let second = writer.add_worksheet("Second").unwrap();
         writer.write_number(second, 1, 1, 20.0).unwrap();
         writer.write_number(second, 2, 2, 30.0).unwrap();
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).unwrap();
+        writer.build().unwrap().write_to(&mut output).unwrap();
         output.into_inner()
     };
-    let full = Workbook::new(Cursor::new(bytes.as_slice())).unwrap();
+    let full = Reader::new(Cursor::new(bytes.as_slice())).unwrap();
     let first = full.sheet(0).unwrap().parsed_worksheet_index().unwrap();
     let second = full.sheet(1).unwrap().parsed_worksheet_index().unwrap();
-    let validated = Workbook::validation_only(
+    let validated = Reader::validation_only(
         Cursor::new(bytes.as_slice()),
         KeptCells::from_cells([(1, 1, 1)]).unwrap(),
     )
@@ -1239,7 +1252,7 @@ fn kept_cell_refuses_a_position_kept_on_a_different_tab() {
         assert!(
             matches!(
                 validated.kept_cell(worksheet, row, column),
-                Err(crate::Error::UnsafeEdit(message)) if message.contains("not asked to keep")
+                Err(crate::Error::Internal(reason)) if reason.contains("not asked to keep")
             ),
             "worksheet {worksheet} ({row}, {column})"
         );

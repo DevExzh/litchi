@@ -80,6 +80,29 @@ pub enum Error {
     #[error("Unsupported feature: {0}")]
     Unsupported(String),
 
+    /// A well-formed request the route refuses, with a static content-free
+    /// reason classified by its [`RefusalKind`](crate::edit::RefusalKind)
+    /// (record 0351 §2.4).
+    #[error("{0}")]
+    Refused(crate::edit::Refusal),
+
+    /// A patch's recorded base differs from the recipient content.
+    #[error("patch base does not match recipient")]
+    PatchConflict,
+
+    /// A configured resource limit lies outside its supported range.
+    #[error("invalid {scope} {kind:?} limit: {value}; maximum {maximum}")]
+    InvalidLimit {
+        /// Finite resource dimension.
+        kind: crate::Resource,
+        /// Requested value.
+        value: u64,
+        /// Largest supported value.
+        maximum: u64,
+        /// Fixed, content-free resource scope.
+        scope: &'static str,
+    },
+
     /// Feature disabled at compile time
     #[error("Feature '{0}' is disabled. Enable it with --features {0}")]
     FeatureDisabled(String),

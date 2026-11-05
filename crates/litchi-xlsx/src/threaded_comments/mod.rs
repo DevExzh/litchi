@@ -5,6 +5,7 @@
 
 mod codec;
 mod model;
+pub(crate) mod package;
 
 #[cfg(test)]
 mod tests;

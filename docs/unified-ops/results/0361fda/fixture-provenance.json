@@ -1,0 +1,66 @@
+{
+  "files": {
+    "basic.numbers": {
+      "bytes": 136357,
+      "path": "test-data/iwork/numbers/basic.numbers",
+      "sha256": "f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693"
+    },
+    "basic.pages": {
+      "bytes": 96417,
+      "path": "test-data/iwork/pages/basic.pages",
+      "sha256": "21107bc9323fba6f1589152454c0b0b0cc8e239313c6a369bc4a891116601b42"
+    },
+    "footnote-fixture.pages": {
+      "generator": {
+        "bytes": 2425,
+        "path": "docs/unified-ops/results/0361fda/generate_footnote_fixture.py",
+        "sha256": "4ccacda3726db5afc4e4e651b202c0b517350e02810277175d988ea1cd190f29"
+      },
+      "command": [
+        "python3",
+        "docs/unified-ops/results/0361fda/generate_footnote_fixture.py",
+        "--output",
+        "footnote-fixture.pages"
+      ],
+      "method": "cargo-example-body-footnote-test-builder",
+      "sources": [
+        {
+          "bytes": 10672,
+          "path": "Cargo.toml",
+          "sha256": "f5ec007892023b38f1deaef1ce20714db58b58448a3bea088be3b847b84570de"
+        },
+        {
+          "bytes": 86,
+          "path": "rust-toolchain.toml",
+          "sha256": "e3a213e0d222e94d213cafbc20932eb3f76c643b4dd63756acf95192df2aa310"
+        },
+        {
+          "bytes": 2337,
+          "path": "crates/litchi-pages/Cargo.toml",
+          "sha256": "3b5289d120cf5dc518eb3c6fcc7f3e14e21349a3b0cf01b0d8f2a30d54ff06fe"
+        },
+        {
+          "bytes": 982,
+          "path": "crates/litchi-pages/examples/generate_footnote_fixture.rs",
+          "sha256": "8bf4e6704cedf230a8b0e94a796f956757d1c2f07ced255716b68060788a36fb"
+        },
+        {
+          "bytes": 54780,
+          "path": "crates/litchi-pages/tests/body_footnote.rs",
+          "sha256": "3c6a522976632130d4e32a792fbf3c7baaa725f152f423115552b4d32f7c988f"
+        }
+      ]
+    },
+    "media-replacement-native.key": {
+      "bytes": 752060,
+      "path": "test-data/iwork/keynote/media-replacement-native.key",
+      "sha256": "f5763984974612f078486cb2310f408cbcb7cd06ef6adca494aae19eaf62609d"
+    },
+    "tone.wav": {
+      "bytes": 192044,
+      "path": "test-data/iwork/keynote/media-replacement-assets/tone.wav",
+      "sha256": "27f1b6add1bd884455da7a36244d92fc26b81b622ce1671d5cb77bebffeb135a"
+    }
+  },
+  "schema": "litchi.iwa.owner-fixtures.provenance.v1"
+}

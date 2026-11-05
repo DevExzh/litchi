@@ -3,7 +3,8 @@
 use std::io::Cursor;
 
 use litchi_cfb::{DirectoryEntry, OleFile, OleWriter};
-use litchi_xls::{UserNamesLimits, UserNamesPackageSnapshot, Workbook, Writer};
+use litchi_xls::user_names::publication::Snapshot as UserNamesPackageSnapshot;
+use litchi_xls::{Builder, UserNamesLimits, raw::Reader};
 
 const USER_NAMES_STREAM_NAME: &str = "User Names";
 const REVISION_LOG_STREAM_NAME: &str = "Revision Log";
@@ -27,6 +28,11 @@ const WINDOW2: u16 = 0x023E;
 const WINDOW2_SELECTED: u16 = 0x0200;
 const CODE_PAGE: u16 = 0x0042;
 const FILE_PASS: u16 = 0x002F;
+
+/// The package a `User Names` package snapshot was read from.
+fn xls_package(snapshot: &UserNamesPackageSnapshot) -> litchi_xls::Package {
+    litchi_xls::Package::from_bytes(snapshot.bytes()).unwrap()
+}
 
 fn record(record_type: u16, payload: &[u8]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(4 + payload.len());
@@ -131,12 +137,20 @@ fn workbook_container(user_names: Vec<u8>, revision_log: Vec<u8>) -> Vec<u8> {
 }
 
 fn authored_workbook_stream() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();
     writer.write_string(sheet, 0, 0, "shared").unwrap();
     let mut workbook_bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut workbook_bytes).unwrap();
-    let mut source = OleFile::open(Cursor::new(workbook_bytes.into_inner())).unwrap();
+    writer
+        .build()
+        .unwrap()
+        .write_to(&mut workbook_bytes)
+        .unwrap();
+    let mut source = OleFile::open(
+        Cursor::new(workbook_bytes.into_inner()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     source.open_stream(&["Workbook"]).unwrap()
 }
 
@@ -379,18 +393,24 @@ fn directory_metadata(entry: &DirectoryEntry) -> DirectoryMetadata {
 fn workbook_reads_user_names_lazily_and_reopens_after_stream_edit() {
     let guid = [0x4D; 16];
     let bytes = workbook_container(user_names_stream(guid, "Alice"), revision_log_stream(guid));
-    let mut workbook = Workbook::new(Cursor::new(bytes)).unwrap();
+    let mut workbook = Reader::new(Cursor::new(bytes)).unwrap();
     assert!(workbook.has_user_names());
-    let source = workbook.user_names().unwrap().unwrap();
+    let source = workbook
+        .user_names(UserNamesLimits::default())
+        .unwrap()
+        .unwrap();
     assert_eq!(source.users()[0].user_name(), "Alice");
     assert!(source.has_revision_guid_closure());
 
     let mut edit = source.edit();
     edit.set_user_name(0, "Élodie").unwrap();
-    let target = edit.commit().unwrap().into_snapshot();
+    let target = edit.commit().unwrap().into_package();
     let reopened_bytes = workbook_container(target.finish(), revision_log_stream(guid));
-    let mut reopened_workbook = Workbook::new(Cursor::new(reopened_bytes)).unwrap();
-    let reopened = reopened_workbook.user_names().unwrap().unwrap();
+    let mut reopened_workbook = Reader::new(Cursor::new(reopened_bytes)).unwrap();
+    let reopened = reopened_workbook
+        .user_names(UserNamesLimits::default())
+        .unwrap()
+        .unwrap();
     assert_eq!(reopened.users()[0].user_name(), "Élodie");
 }
 
@@ -402,8 +422,8 @@ fn workbook_rejects_unclosed_user_guid() {
         user_names_stream(source_guid, "Alice"),
         revision_log_stream(other_guid),
     );
-    let mut workbook = Workbook::new(Cursor::new(bytes)).unwrap();
-    assert!(workbook.user_names().is_err());
+    let mut workbook = Reader::new(Cursor::new(bytes)).unwrap();
+    assert!(workbook.user_names(UserNamesLimits::default()).is_err());
 }
 
 #[test]
@@ -411,9 +431,9 @@ fn workbook_user_names_requires_rrtabid_from_bound_sheet_count() {
     let guid = [0x21; 16];
     let revision = revision_log_stream_with(guid, 1200, false, 4113);
     let bytes = workbook_container(user_names_stream(guid, "Alice"), revision.clone());
-    let mut workbook = Workbook::new(Cursor::new(bytes.clone())).unwrap();
-    assert!(workbook.user_names().is_err());
-    assert!(UserNamesPackageSnapshot::from_bytes(bytes).is_err());
+    let mut workbook = Reader::new(Cursor::new(bytes.clone())).unwrap();
+    assert!(workbook.user_names(UserNamesLimits::default()).is_err());
+    assert!(UserNamesPackageSnapshot::from_bytes(bytes, UserNamesLimits::default()).is_err());
 }
 
 #[test]
@@ -425,12 +445,13 @@ fn package_owner_rejects_rrtabid_cardinality_mismatch_for_one_sheet() {
             revision_log_stream_with_tab_ids(guid, 1200, Some(&tab_ids), 1),
         );
         assert!(
-            UserNamesPackageSnapshot::from_bytes(bytes.clone()).is_err(),
+            UserNamesPackageSnapshot::from_bytes(bytes.clone(), UserNamesLimits::default())
+                .is_err(),
             "RRTabId cardinality {:?} was accepted for one sheet",
             tab_ids
         );
-        let mut workbook = Workbook::new(Cursor::new(bytes)).unwrap();
-        assert!(workbook.user_names().is_err());
+        let mut workbook = Reader::new(Cursor::new(bytes)).unwrap();
+        assert!(workbook.user_names(UserNamesLimits::default()).is_err());
     }
 }
 
@@ -444,11 +465,17 @@ fn package_owner_accepts_rrtabid_omission_for_more_than_4112_sheets() {
         revision_log_stream_with(guid, 1200, false, 1),
         |_| {},
     );
-    let source = UserNamesPackageSnapshot::from_bytes(bytes.clone()).unwrap();
+    let source =
+        UserNamesPackageSnapshot::from_bytes(bytes.clone(), UserNamesLimits::default()).unwrap();
     assert_eq!(source.user_names().users()[0].user_name(), "Alice");
-    let mut workbook = Workbook::new(Cursor::new(source.finish())).unwrap();
+    let mut workbook = Reader::new(Cursor::new(source.finish())).unwrap();
     assert_eq!(workbook.sheets().len(), 4_113);
-    assert!(workbook.user_names().unwrap().is_some());
+    assert!(
+        workbook
+            .user_names(UserNamesLimits::default())
+            .unwrap()
+            .is_some()
+    );
 }
 
 #[test]
@@ -461,7 +488,7 @@ fn package_owner_accepts_exact_rrtabid_cardinality_at_4112_sheets() {
         revision_log_stream_with_tab_ids(guid, 1200, Some(&tab_ids), 4_113),
         |_| {},
     );
-    let source = UserNamesPackageSnapshot::from_bytes(bytes).unwrap();
+    let source = UserNamesPackageSnapshot::from_bytes(bytes, UserNamesLimits::default()).unwrap();
     assert_eq!(source.user_names().users()[0].user_name(), "Alice");
 }
 
@@ -470,8 +497,11 @@ fn workbook_rechecks_revision_log_when_user_names_bytes_are_unchanged() {
     let guid = [0x31; 16];
     let names = user_names_stream(guid, "Alice");
     let valid = workbook_container(names.clone(), revision_log_stream(guid));
-    let mut workbook = Workbook::new(Cursor::new(valid)).unwrap();
-    let source = workbook.user_names().unwrap().unwrap();
+    let mut workbook = Reader::new(Cursor::new(valid)).unwrap();
+    let source = workbook
+        .user_names(UserNamesLimits::default())
+        .unwrap()
+        .unwrap();
 
     // The User Names stream is byte-for-byte identical, but the current
     // Revision Log has changed. The package facade must bind the actual
@@ -480,8 +510,11 @@ fn workbook_rechecks_revision_log_when_user_names_bytes_are_unchanged() {
     let mut changed_revision = revision_log_stream(guid);
     changed_revision[4 + 50 + 4 + 35] = b'B'; // RRDHead.stUser[0]
     let changed = workbook_container(names, changed_revision);
-    let mut current = Workbook::new(Cursor::new(changed)).unwrap();
-    let current_snapshot = current.user_names().unwrap().unwrap();
+    let mut current = Reader::new(Cursor::new(changed)).unwrap();
+    let current_snapshot = current
+        .user_names(UserNamesLimits::default())
+        .unwrap()
+        .unwrap();
     assert_eq!(source.finish(), current_snapshot.finish());
     assert_ne!(source, current_snapshot);
 
@@ -498,25 +531,72 @@ fn package_owner_is_exact_for_noop_and_reversible_for_changed_stream() {
     let guid = [0x41; 16];
     let source_bytes =
         workbook_container(user_names_stream(guid, "Alice"), revision_log_stream(guid));
-    let source = UserNamesPackageSnapshot::from_bytes(source_bytes.clone()).unwrap();
+    let source =
+        UserNamesPackageSnapshot::from_bytes(source_bytes.clone(), UserNamesLimits::default())
+            .unwrap();
     assert_eq!(source.bytes(), source_bytes.as_slice());
 
-    let noop = source.edit().commit().unwrap();
-    assert!(!noop.changed());
+    let noop = xls_package(&source)
+        .edit_user_names()
+        .unwrap()
+        .commit()
+        .unwrap();
+    assert!(!noop.diagnostics().changed());
     assert!(noop.patch().is_noop());
-    assert_eq!(noop.snapshot().bytes(), source_bytes.as_slice());
+    assert_eq!(noop.patch().after(), source_bytes.as_slice());
 
-    let mut edit = source.edit();
+    let mut edit = xls_package(&source).edit_user_names().unwrap();
     edit.set_user_name(0, "Bob").unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.changed());
-    assert_eq!(commit.snapshot().user_names().users()[0].user_name(), "Bob");
-    assert_eq!(commit.patch().apply(&source).unwrap(), *commit.snapshot());
-    assert_eq!(commit.patch().revert(commit.snapshot()).unwrap(), source);
+    assert!(commit.diagnostics().changed());
     assert_eq!(
-        commit.patch().inverse().apply(commit.snapshot()).unwrap(),
+        commit.package().user_names().unwrap().user_names().users()[0].user_name(),
+        "Bob"
+    );
+    assert_eq!(
+        commit.patch().apply(&source).unwrap(),
+        commit.package().user_names().unwrap()
+    );
+    assert_eq!(
+        commit
+            .patch()
+            .revert(&commit.package().user_names().unwrap())
+            .unwrap(),
         source
     );
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(&commit.package().user_names().unwrap())
+            .unwrap(),
+        source
+    );
+}
+
+#[test]
+fn package_edit_entry_and_drop_are_deferred_until_a_user_names_operation() {
+    let guid = [0x42; 16];
+    let source_bytes =
+        workbook_container(user_names_stream(guid, "Alice"), revision_log_stream(guid));
+    let source =
+        UserNamesPackageSnapshot::from_bytes(source_bytes.clone(), UserNamesLimits::default())
+            .unwrap();
+    let package = xls_package(&source);
+
+    let edit = package.edit_user_names().unwrap();
+    assert!(format!("{edit:?}").contains("materialized: false"));
+    drop(edit);
+
+    let noop = package.edit_user_names().unwrap().commit().unwrap();
+    assert!(!noop.diagnostics().changed());
+    assert_eq!(noop.patch().before(), source_bytes.as_slice());
+    assert_eq!(noop.patch().after(), source_bytes.as_slice());
+
+    let mut changed = package.edit_user_names().unwrap();
+    assert!(format!("{changed:?}").contains("materialized: false"));
+    changed.set_user_name(0, "Bob").unwrap();
+    assert!(format!("{changed:?}").contains("materialized: true"));
 }
 
 #[test]
@@ -527,14 +607,18 @@ fn package_owner_accepts_official_rrdhead_code_pages_and_keeps_unicode_user_name
             user_names_stream(guid, "Alice"),
             revision_log_stream_with(guid, code_page, true, 1),
         );
-        let source = UserNamesPackageSnapshot::from_bytes(source_bytes).unwrap();
-        let mut edit = source.edit();
+        let source =
+            UserNamesPackageSnapshot::from_bytes(source_bytes, UserNamesLimits::default()).unwrap();
+        let mut edit = xls_package(&source).edit_user_names().unwrap();
         edit.set_user_name(0, "Élodie").unwrap();
-        let target = edit.commit().unwrap().into_snapshot();
+        let target = edit.commit().unwrap().into_package().user_names().unwrap();
         assert_eq!(target.user_names().users()[0].user_name(), "Élodie");
 
-        let mut workbook = Workbook::new(Cursor::new(target.finish())).unwrap();
-        let revision = workbook.revision_log().unwrap().unwrap();
+        let mut workbook = Reader::new(Cursor::new(target.finish())).unwrap();
+        let revision = workbook
+            .revision_log(&litchi_xls::SourceLimits::default())
+            .unwrap()
+            .unwrap();
         assert_eq!(revision.headers()[0].head().code_page(), code_page);
         assert_eq!(revision.headers()[0].head().user_name(), "Alice");
     }
@@ -549,7 +633,7 @@ fn package_owner_rejects_undefined_rrdhead_code_pages() {
             revision_log_stream_with(guid, code_page, true, 1),
         );
         assert!(
-            UserNamesPackageSnapshot::from_bytes(bytes).is_err(),
+            UserNamesPackageSnapshot::from_bytes(bytes, UserNamesLimits::default()).is_err(),
             "undefined CODEPG {code_page} was accepted"
         );
     }
@@ -568,7 +652,7 @@ fn package_owner_refuses_protected_cfb_markers_and_filepass() {
             },
         );
         assert!(
-            UserNamesPackageSnapshot::from_bytes(bytes).is_err(),
+            UserNamesPackageSnapshot::from_bytes(bytes, UserNamesLimits::default()).is_err(),
             "protected marker {marker} was accepted"
         );
     }
@@ -579,7 +663,7 @@ fn package_owner_refuses_protected_cfb_markers_and_filepass() {
         revision_log_stream(guid),
         |_| {},
     );
-    assert!(UserNamesPackageSnapshot::from_bytes(bytes).is_err());
+    assert!(UserNamesPackageSnapshot::from_bytes(bytes, UserNamesLimits::default()).is_err());
 }
 
 #[test]
@@ -630,13 +714,23 @@ fn package_owner_preserves_unrelated_streams_and_directory_metadata() {
                 .unwrap();
         },
     );
-    let source = UserNamesPackageSnapshot::from_bytes(source_bytes.clone()).unwrap();
-    let mut edit = source.edit();
+    let source =
+        UserNamesPackageSnapshot::from_bytes(source_bytes.clone(), UserNamesLimits::default())
+            .unwrap();
+    let mut edit = xls_package(&source).edit_user_names().unwrap();
     edit.set_user_name(0, "Bob").unwrap();
-    let target = edit.commit().unwrap().into_snapshot();
+    let target = edit.commit().unwrap().into_package().user_names().unwrap();
 
-    let mut source_ole = OleFile::open(Cursor::new(source_bytes)).unwrap();
-    let mut target_ole = OleFile::open(Cursor::new(target.finish())).unwrap();
+    let mut source_ole = OleFile::open(
+        Cursor::new(source_bytes),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
+    let mut target_ole = OleFile::open(
+        Cursor::new(target.finish()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     assert_eq!(
         source_ole.open_stream(&["Unrelated"]).unwrap(),
         target_ole.open_stream(&["Unrelated"]).unwrap()
@@ -712,10 +806,10 @@ fn package_owner_rejects_stream_and_user_bounds_before_publication() {
     let bytes = workbook_container(names.clone(), revision_log_stream(guid));
 
     let too_small = UserNamesLimits::default().with_max_stream_bytes(names.len() - 1);
-    assert!(UserNamesPackageSnapshot::from_bytes_with_limits(bytes.clone(), too_small).is_err());
+    assert!(UserNamesPackageSnapshot::from_bytes(bytes.clone(), too_small).is_err());
 
     let no_users = UserNamesLimits::default().with_max_users(0);
-    assert!(UserNamesPackageSnapshot::from_bytes_with_limits(bytes, no_users).is_err());
+    assert!(UserNamesPackageSnapshot::from_bytes(bytes, no_users).is_err());
 }
 
 #[test]
@@ -724,12 +818,10 @@ fn package_owner_rejects_revision_scan_limits_before_guid_publication() {
     let bytes = workbook_container(user_names_stream(guid, "Alice"), revision_log_stream(guid));
 
     let too_few_records = UserNamesLimits::default().with_max_revision_records(2);
-    assert!(
-        UserNamesPackageSnapshot::from_bytes_with_limits(bytes.clone(), too_few_records).is_err()
-    );
+    assert!(UserNamesPackageSnapshot::from_bytes(bytes.clone(), too_few_records).is_err());
 
     let no_revision_guids = UserNamesLimits::default().with_max_revision_guids(0);
-    assert!(UserNamesPackageSnapshot::from_bytes_with_limits(bytes, no_revision_guids).is_err());
+    assert!(UserNamesPackageSnapshot::from_bytes(bytes, no_revision_guids).is_err());
 }
 
 #[test]
@@ -741,7 +833,7 @@ fn package_owner_rejects_unknown_revision_before_materializing_record_table() {
     let eof_offset = revision.len() - 4;
     revision.splice(eof_offset..eof_offset, unknown);
     let bytes = workbook_container(names, revision);
-    assert!(UserNamesPackageSnapshot::from_bytes(bytes).is_err());
+    assert!(UserNamesPackageSnapshot::from_bytes(bytes, UserNamesLimits::default()).is_err());
 }
 
 #[test]
@@ -756,5 +848,5 @@ fn package_owner_rejects_malformed_known_revision_production() {
     let eof_offset = revision.len() - 4;
     revision.splice(eof_offset..eof_offset, marker);
     let bytes = workbook_container(names, revision);
-    assert!(UserNamesPackageSnapshot::from_bytes(bytes).is_err());
+    assert!(UserNamesPackageSnapshot::from_bytes(bytes, UserNamesLimits::default()).is_err());
 }

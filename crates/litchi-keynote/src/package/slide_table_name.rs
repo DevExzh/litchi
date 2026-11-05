@@ -17,7 +17,7 @@ use litchi_core::Position;
 use litchi_iwa_archive::package::{EntryEdit, ExactArtifacts};
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::table_model_discovery_codec;
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::slide_table_core as core;
 use super::{Package, PayloadLimitKind, PhysicalSource, ReadError, SemanticLimitKind};
@@ -29,7 +29,7 @@ const TABLE_MODEL_MESSAGE_TYPE: u32 = 6_001;
 /// Finite resources charged by a slide-table name transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum SlideTableNameLimitKind {
+pub enum LimitKind {
     InputBytes,
     OutputBytes,
     Entries,
@@ -47,7 +47,7 @@ pub enum SlideTableNameLimitKind {
     Components,
 }
 
-impl fmt::Display for SlideTableNameLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -72,12 +72,12 @@ impl fmt::Display for SlideTableNameLimitKind {
 /// Content-free semantic path for a slide-table name operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum SlideTableNamePath {
+pub enum Path {
     Package,
     Table { slide: Position, table: Position },
 }
 
-impl fmt::Display for SlideTableNamePath {
+impl fmt::Display for Path {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Package => formatter.write_str("package"),
@@ -94,9 +94,38 @@ impl fmt::Display for SlideTableNamePath {
 }
 
 /// Failure from a Keynote slide-table name read or transaction.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum SlideTableNameError {
+pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    #[error("the selected Keynote slide-table name source is invalid")]
+    InvalidSource,
+    #[error("invalid Keynote slide-table name: {0}")]
+    InvalidName(#[source] name::Error),
+    #[error(
+        "Keynote slide-table name {kind} limit exceeded: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        kind: LimitKind,
+        observed: u64,
+        maximum: u64,
+    },
+    #[error("could not allocate {amount} units for the Keynote slide-table name transaction")]
+    Allocation { amount: usize },
+    #[error("the edited Keynote slide-table name failed semantic verification")]
+    Verification,
+    #[error("the Keynote slide-table name patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     #[error("this Keynote source does not support physical slide-table name edits")]
     UnsupportedSource,
     #[error("the requested Keynote slide-table name graph is outside the supported scope")]
@@ -115,37 +144,45 @@ pub enum SlideTableNameError {
     TablePositionNotFound { position: Position },
     #[error("the selected Keynote table is locked")]
     Locked,
-    #[error("the selected Keynote slide-table name source is invalid")]
-    InvalidSource,
-    #[error("invalid Keynote slide-table name: {0}")]
-    InvalidName(#[source] name::Error),
-    #[error(
-        "Keynote slide-table name {kind} limit exceeded: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        kind: SlideTableNameLimitKind,
-        observed: u64,
-        maximum: u64,
-    },
-    #[error("could not allocate {amount} units for the Keynote slide-table name transaction")]
-    Allocation { amount: usize },
-    #[error("the edited Keynote slide-table name failed semantic verification")]
-    Verification,
-    #[error("the Keynote slide-table name patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. }
+            | Self::UnsupportedDependency { .. }
+            | Self::UnsupportedTopology { .. } => RefusalKind::UnsupportedContent,
+            Self::AmbiguousSelector { .. } | Self::EmptySlideName { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::TablePositionNotFound { .. } => RefusalKind::NotFound,
+            Self::Locked { .. } => RefusalKind::Protected,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// One mutable name staged against an immutable package snapshot.
-pub struct SlideTableNameEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
     selection: NameSelection,
     after: name::Name,
 }
 
-impl fmt::Debug for SlideTableNameEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SlideTableNameEdit")
+            .debug_struct("Edit")
             .field("path", &self.selection.path())
             .field("before", &self.selection.before)
             .field("after", &self.after)
@@ -153,7 +190,7 @@ impl fmt::Debug for SlideTableNameEdit<'_> {
     }
 }
 
-impl SlideTableNameEdit<'_> {
+impl Edit<'_> {
     #[must_use]
     pub const fn slide_position(&self) -> Position {
         self.selection.target.slide_position
@@ -165,7 +202,7 @@ impl SlideTableNameEdit<'_> {
     }
 
     #[must_use]
-    pub const fn path(&self) -> SlideTableNamePath {
+    pub const fn path(&self) -> Path {
         self.selection.path()
     }
 
@@ -190,18 +227,18 @@ impl SlideTableNameEdit<'_> {
         self
     }
 
-    pub fn set_name(self, value: &str) -> Result<Self, SlideTableNameError> {
-        Ok(self.set(name::Name::new(value).map_err(SlideTableNameError::InvalidName)?))
+    pub fn set_name(self, value: &str) -> Result<Self, Error> {
+        Ok(self.set(name::Name::new(value).map_err(Error::InvalidName)?))
     }
 
-    pub fn commit(self) -> Result<SlideTableNameCommit, SlideTableNameError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         commit_edit(self.source, &self.selection, self.after)
     }
 }
 
 /// Exact-source checked reversible slide-table name patch.
 #[derive(Clone, PartialEq, Eq)]
-pub struct SlideTableNamePatch {
+pub struct Patch {
     artifacts: ExactArtifacts,
     selection: NameSelection,
     before: name::Name,
@@ -212,10 +249,10 @@ pub struct SlideTableNamePatch {
     target_previews_absent: bool,
 }
 
-impl fmt::Debug for SlideTableNamePatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SlideTableNamePatch")
+            .debug_struct("Patch")
             .field("path", &self.selection.path())
             .field("before", &self.before)
             .field("after", &self.after)
@@ -223,9 +260,9 @@ impl fmt::Debug for SlideTableNamePatch {
     }
 }
 
-impl SlideTableNamePatch {
+impl Patch {
     #[must_use]
-    pub const fn path(&self) -> SlideTableNamePath {
+    pub const fn path(&self) -> Path {
         self.selection.path()
     }
 
@@ -271,14 +308,14 @@ impl SlideTableNamePatch {
 
 /// Compact diagnostics for one published slide-table name transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SlideTableNameDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     deleted_previews: usize,
     full_reparse_performed: bool,
 }
 
-impl SlideTableNameDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -321,13 +358,13 @@ impl SlideTableNameDiagnostics {
 /// Fully verified result of one slide-table name transaction.
 #[must_use = "a Keynote slide-table name commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct SlideTableNameCommit {
+pub struct Commit {
     package: Package,
-    patch: SlideTableNamePatch,
-    diagnostics: SlideTableNameDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl SlideTableNameCommit {
+impl Commit {
     #[must_use]
     pub const fn package(&self) -> &Package {
         &self.package
@@ -338,13 +375,19 @@ impl SlideTableNameCommit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
     #[must_use]
-    pub const fn patch(&self) -> &SlideTableNamePatch {
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
+    #[must_use]
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     #[must_use]
-    pub const fn diagnostics(&self) -> &SlideTableNameDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
@@ -368,8 +411,8 @@ impl fmt::Debug for NameSelection {
 }
 
 impl NameSelection {
-    const fn path(&self) -> SlideTableNamePath {
-        SlideTableNamePath::Table {
+    const fn path(&self) -> Path {
+        Path::Table {
             slide: self.target.slide_position,
             table: self.target.table_position,
         }
@@ -382,7 +425,7 @@ impl Package {
         &self,
         slide: impl Into<SlideSelector<'slide>>,
         table: impl Into<TableSelector>,
-    ) -> Result<name::Name, SlideTableNameError> {
+    ) -> Result<name::Name, Error> {
         let mut budget = core::Budget::new(self).map_err(map_core_error)?;
         Ok(select_name(self, slide.into(), table.into(), &mut budget)?.before)
     }
@@ -392,11 +435,11 @@ impl Package {
         &self,
         slide: impl Into<SlideSelector<'slide>>,
         table: impl Into<TableSelector>,
-    ) -> Result<SlideTableNameEdit<'_>, SlideTableNameError> {
+    ) -> Result<Edit<'_>, Error> {
         let mut budget = core::Budget::new(self).map_err(map_core_error)?;
         let selection = select_name(self, slide.into(), table.into(), &mut budget)?;
         let after = selection.before.clone();
-        Ok(SlideTableNameEdit {
+        Ok(Edit {
             source: self,
             selection: NameSelection {
                 budget,
@@ -407,17 +450,14 @@ impl Package {
     }
 
     /// Apply an exact-source checked reversible slide-table name patch.
-    pub fn apply_slide_table_name(
-        &self,
-        patch: &SlideTableNamePatch,
-    ) -> Result<SlideTableNameCommit, SlideTableNameError> {
+    pub fn apply_slide_table_name(&self, patch: &Patch) -> Result<Commit, Error> {
         let catalog = physical_catalog(self)?;
         if !patch.artifacts.authorizes_source(&catalog.shared_source()) {
-            return Err(SlideTableNameError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let mut budget = core::Budget::new(self).map_err(map_core_error)?;
         if previews_absent(self, &mut budget)? != patch.source_previews_absent {
-            return Err(SlideTableNameError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let current = select_name(
             self,
@@ -426,14 +466,14 @@ impl Package {
             &mut budget,
         )?;
         if !same_selection(&current, &patch.selection) || current.before != patch.before {
-            return Err(SlideTableNameError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if patch.is_noop() {
             self.validate().map_err(map_read_error)?;
-            return Ok(SlideTableNameCommit {
+            return Ok(Commit {
                 package: self.snapshot(),
                 patch: patch.clone(),
-                diagnostics: SlideTableNameDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         reopen_patch(self, patch, budget)
@@ -445,7 +485,7 @@ fn select_name(
     slide: SlideSelector<'_>,
     table: TableSelector,
     budget: &mut core::Budget,
-) -> Result<NameSelection, SlideTableNameError> {
+) -> Result<NameSelection, Error> {
     let target = core::select_table(package, slide, table, budget).map_err(map_core_error)?;
     let payload = core::model_payload(package, &target).map_err(map_core_error)?;
     let snapshot = decode_model(payload, package, budget)?;
@@ -461,7 +501,7 @@ fn commit_edit(
     source: &Package,
     selection: &NameSelection,
     after: name::Name,
-) -> Result<SlideTableNameCommit, SlideTableNameError> {
+) -> Result<Commit, Error> {
     let mut budget = selection.budget;
     budget
         .owned_value(after.as_str().len())
@@ -469,9 +509,9 @@ fn commit_edit(
     if selection.before == after {
         let source_previews_absent = previews_absent(source, &mut budget)?;
         let bytes = shared_source_artifact(source, &mut budget)?;
-        return Ok(SlideTableNameCommit {
+        return Ok(Commit {
             package: source.snapshot(),
-            patch: SlideTableNamePatch {
+            patch: Patch {
                 artifacts: ExactArtifacts::new(Arc::clone(&bytes), bytes),
                 selection: selection.clone(),
                 before: selection.before.clone(),
@@ -481,16 +521,16 @@ fn commit_edit(
                 source_previews_absent,
                 target_previews_absent: source_previews_absent,
             },
-            diagnostics: SlideTableNameDiagnostics::unchanged(),
+            diagnostics: Diagnostics::unchanged(),
         });
     }
     if selection.target.locked {
-        return Err(SlideTableNameError::Locked);
+        return Err(Error::Refused(Refusal::Locked));
     }
     let source_previews_absent = previews_absent(source, &mut budget)?;
     let (candidate, deleted_previews) = rewrite_name(source, selection, &after, &mut budget)?;
     if !previews_absent(&candidate, &mut budget)? {
-        return Err(SlideTableNameError::Verification);
+        return Err(Error::Verification);
     }
     let mut reopen_budget = budget;
     let selected = select_name(
@@ -500,7 +540,7 @@ fn commit_edit(
         &mut reopen_budget,
     )?;
     if !same_selection(&selected, selection) || selected.before != after {
-        return Err(SlideTableNameError::Verification);
+        return Err(Error::Verification);
     }
     core::verify_locality(
         source,
@@ -513,9 +553,9 @@ fn commit_edit(
     let mut artifact_budget = reopen_budget;
     let target = shared_source_artifact(&candidate, &mut artifact_budget)?;
     let source_artifact = shared_source_artifact(source, &mut artifact_budget)?;
-    Ok(SlideTableNameCommit {
+    Ok(Commit {
         package: candidate,
-        patch: SlideTableNamePatch {
+        patch: Patch {
             artifacts: ExactArtifacts::new(source_artifact, target),
             selection: selection.clone(),
             before: selection.before.clone(),
@@ -525,19 +565,19 @@ fn commit_edit(
             source_previews_absent,
             target_previews_absent: true,
         },
-        diagnostics: SlideTableNameDiagnostics::published(deleted_previews),
+        diagnostics: Diagnostics::published(deleted_previews),
     })
 }
 
 fn reopen_patch(
     source: &Package,
-    patch: &SlideTableNamePatch,
+    patch: &Patch,
     mut budget: core::Budget,
-) -> Result<SlideTableNameCommit, SlideTableNameError> {
+) -> Result<Commit, Error> {
     let target_source = patch.artifacts.target();
     let candidate = parse_candidate(Arc::clone(&target_source), source, &mut budget)?;
     if previews_absent(&candidate, &mut budget)? != patch.target_previews_absent {
-        return Err(SlideTableNameError::Verification);
+        return Err(Error::Verification);
     }
     let selected = select_name(
         &candidate,
@@ -546,7 +586,7 @@ fn reopen_patch(
         &mut budget,
     )?;
     if !same_selection(&selected, &patch.selection) || selected.before != patch.after {
-        return Err(SlideTableNameError::Verification);
+        return Err(Error::Verification);
     }
     core::verify_locality(
         source,
@@ -556,10 +596,10 @@ fn reopen_patch(
         &mut budget,
     )
     .map_err(map_core_error)?;
-    Ok(SlideTableNameCommit {
+    Ok(Commit {
         package: candidate,
         patch: patch.clone(),
-        diagnostics: SlideTableNameDiagnostics::published(patch.deleted_previews),
+        diagnostics: Diagnostics::published(patch.deleted_previews),
     })
 }
 
@@ -568,15 +608,15 @@ fn rewrite_name(
     selection: &NameSelection,
     after: &name::Name,
     budget: &mut core::Budget,
-) -> Result<(Package, usize), SlideTableNameError> {
+) -> Result<(Package, usize), Error> {
     let catalog = physical_catalog(source)?;
     let entry = catalog
         .package()
         .iter()
         .find(|entry| entry.name() == selection.target.model.component.as_ref())
-        .ok_or(SlideTableNameError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(SlideTableNameError::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let physical_limits = source.state.options.archive();
     let archive_limits = physical_limits
@@ -591,8 +631,8 @@ fn rewrite_name(
     budget
         .physical(entry.data().len())
         .map_err(map_core_error)?;
-    let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
-        .map_err(map_core_native_error)?;
+    let stream =
+        SnappyStream::decompress(entry.data(), snappy_limits).map_err(map_core_native_error)?;
     budget.allocations(1).map_err(map_core_error)?;
     budget
         .retained(stream.as_bytes().len())
@@ -612,15 +652,15 @@ fn rewrite_name(
     budget
         .scratch(stream.as_bytes().len())
         .map_err(map_core_error)?;
-    let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
-        .map_err(map_core_native_error)?;
+    let mut archive =
+        Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_native_error)?;
     let original_source = archive
         .object(selection.target.model.identifier)
-        .ok_or(SlideTableNameError::InvalidSource)?
+        .ok_or(Error::InvalidSource)?
         .messages
         .get(selection.target.model_message_index)
         .filter(|message| message.type_ == TABLE_MODEL_MESSAGE_TYPE)
-        .ok_or(SlideTableNameError::InvalidSource)?
+        .ok_or(Error::InvalidSource)?
         .data
         .as_slice();
     budget
@@ -632,13 +672,13 @@ fn rewrite_name(
     let mut original = Vec::new();
     original
         .try_reserve_exact(original_source.len())
-        .map_err(|_| SlideTableNameError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: original_source.len(),
         })?;
     original.extend_from_slice(original_source);
     let original_snapshot = decode_model(&original, source, budget)?;
     if original_snapshot.table_name() != selection.before.as_str() {
-        return Err(SlideTableNameError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let fingerprint = table_model_discovery_codec::table_model_source_fingerprint(&original);
     let options = budget
@@ -668,12 +708,12 @@ fn rewrite_name(
         || verified.rows() != original_snapshot.rows()
         || verified.columns() != original_snapshot.columns()
     {
-        return Err(SlideTableNameError::Verification);
+        return Err(Error::Verification);
     }
     archive
         .object_mut(selection.target.model.identifier)
-        .ok_or(SlideTableNameError::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .ok_or(Error::InvalidSource)?
+        .replace_message_preserving_header(
             selection.target.model_message_index,
             RawMessage {
                 type_: TABLE_MODEL_MESSAGE_TYPE,
@@ -683,10 +723,10 @@ fn rewrite_name(
         )
         .map_err(map_core_native_error)?;
     let encoded_bound = archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_core_native_error)?;
-    let compressed_bound =
-        SnappyStream::maximum_compressed_len(encoded_bound).map_err(map_core_native_error)?;
+    let compressed_bound = SnappyStream::maximum_compressed_len(encoded_bound, snappy_limits)
+        .map_err(map_core_native_error)?;
     budget
         .output(
             encoded_bound
@@ -702,18 +742,19 @@ fn rewrite_name(
         .map_err(map_core_error)?;
     budget.retained(compressed_bound).map_err(map_core_error)?;
     let bytes = archive
-        .to_bytes_with_limits(archive_limits)
+        .to_bytes(archive_limits)
         .map_err(map_core_native_error)?;
     if bytes.len() != encoded_bound {
-        return Err(SlideTableNameError::Verification);
+        return Err(Error::Verification);
     }
-    let compressed = SnappyStream::compress(&bytes).map_err(map_core_native_error)?;
+    let compressed =
+        SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_native_error)?;
     if compressed.len() > compressed_bound {
-        return Err(SlideTableNameError::Verification);
+        return Err(Error::Verification);
     }
     core::charge_preview_scan(source, budget).map_err(map_core_error)?;
     let previews = super::rendering_invalidation::root_preview_deletions(catalog.package())
-        .map_err(|_| SlideTableNameError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?;
     let edits = [EntryEdit::new(
         selection.target.model.component.as_ref(),
         &compressed,
@@ -731,15 +772,15 @@ fn rewrite_name(
     Ok((candidate, previews.len()))
 }
 
-fn owned_name(value: &str, budget: &mut core::Budget) -> Result<name::Name, SlideTableNameError> {
+fn owned_name(value: &str, budget: &mut core::Budget) -> Result<name::Name, Error> {
     budget.owned_value(value.len()).map_err(map_core_error)?;
-    name::Name::new(value).map_err(SlideTableNameError::InvalidName)
+    name::Name::new(value).map_err(Error::InvalidName)
 }
 
 fn shared_source_artifact(
     package: &Package,
     budget: &mut core::Budget,
-) -> Result<Arc<[u8]>, SlideTableNameError> {
+) -> Result<Arc<[u8]>, Error> {
     let source = physical_catalog(package)?;
     let bytes = source.package().source_bytes().len();
     budget.artifact(bytes, 0).map_err(map_core_error)?;
@@ -750,7 +791,7 @@ fn parse_candidate(
     source: Arc<[u8]>,
     original: &Package,
     budget: &mut core::Budget,
-) -> Result<Package, SlideTableNameError> {
+) -> Result<Package, Error> {
     let source_bytes = source.len();
     // SourceCatalog construction indexes the ZIP and copies each decoded IWA
     // payload; validation can then materialize the lazy semantic show. Both
@@ -773,7 +814,7 @@ fn charge_reassembly_prepare(
     edited_bytes: usize,
     deleted_names: &[&str],
     budget: &mut core::Budget,
-) -> Result<(), SlideTableNameError> {
+) -> Result<(), Error> {
     budget
         .preflight_reassembly(catalog, edited_bytes, deleted_names.len())
         .map_err(map_core_error)
@@ -783,7 +824,7 @@ fn decode_model<'source>(
     payload: &'source [u8],
     package: &Package,
     budget: &mut core::Budget,
-) -> Result<table_model_discovery_codec::TableModelSnapshot<'source>, SlideTableNameError> {
+) -> Result<table_model_discovery_codec::TableModelSnapshot<'source>, Error> {
     let options = budget
         .model_codec_options(package, payload)
         .map_err(map_core_error)?;
@@ -798,88 +839,83 @@ fn same_selection(left: &NameSelection, right: &NameSelection) -> bool {
     core::same_target(&left.target, &right.target)
 }
 
-fn physical_catalog(
-    package: &Package,
-) -> Result<&litchi_iwa_archive::SourceCatalog, SlideTableNameError> {
+fn physical_catalog(package: &Package) -> Result<&litchi_iwa_archive::SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
-        PhysicalSource::Semantic(_) => Err(SlideTableNameError::UnsupportedSource),
+        PhysicalSource::Semantic(_) => Err(Error::Refused(Refusal::UnsupportedSource)),
     }
 }
 
-fn previews_absent(
-    package: &Package,
-    budget: &mut core::Budget,
-) -> Result<bool, SlideTableNameError> {
+fn previews_absent(package: &Package, budget: &mut core::Budget) -> Result<bool, Error> {
     core::charge_preview_scan(package, budget).map_err(map_core_error)?;
     super::rendering_invalidation::root_previews_absent(physical_catalog(package)?.package())
-        .map_err(|_| SlideTableNameError::Verification)
+        .map_err(|_| Error::Verification)
 }
 
-fn map_core_error(error: core::Error) -> SlideTableNameError {
+fn map_core_error(error: core::Error) -> Error {
     match error {
-        core::Error::UnsupportedSource => SlideTableNameError::UnsupportedSource,
-        core::Error::UnsupportedDependency => SlideTableNameError::UnsupportedDependency,
-        core::Error::UnsupportedTopology => SlideTableNameError::UnsupportedTopology,
-        core::Error::AmbiguousSelector => SlideTableNameError::AmbiguousSelector,
-        core::Error::EmptySlideName => SlideTableNameError::EmptySlideName,
-        core::Error::SlideNameNotFound => SlideTableNameError::SlideNameNotFound,
+        core::Error::UnsupportedSource => Error::Refused(Refusal::UnsupportedSource),
+        core::Error::UnsupportedDependency => Error::Refused(Refusal::UnsupportedDependency),
+        core::Error::UnsupportedTopology => Error::Refused(Refusal::UnsupportedTopology),
+        core::Error::AmbiguousSelector => Error::Refused(Refusal::AmbiguousSelector),
+        core::Error::EmptySlideName => Error::Refused(Refusal::EmptySlideName),
+        core::Error::SlideNameNotFound => Error::Refused(Refusal::SlideNameNotFound),
         core::Error::SlidePositionNotFound(position) => {
-            SlideTableNameError::SlidePositionNotFound { position }
+            Error::Refused(Refusal::SlidePositionNotFound { position })
         },
         core::Error::TablePositionNotFound(position) => {
-            SlideTableNameError::TablePositionNotFound { position }
+            Error::Refused(Refusal::TablePositionNotFound { position })
         },
         core::Error::Limit {
             kind,
             observed,
             maximum,
-        } => SlideTableNameError::LimitExceeded {
+        } => Error::Limit {
             kind: map_limit_kind(kind),
             observed,
             maximum,
         },
-        core::Error::Allocation(amount) => SlideTableNameError::Allocation { amount },
+        core::Error::Allocation(amount) => Error::Allocation { amount },
         core::Error::InvalidSource
         | core::Error::Read
         | core::Error::Wire
         | core::Error::Codec
         | core::Error::Archive
-        | core::Error::Verification => SlideTableNameError::InvalidSource,
+        | core::Error::Verification => Error::InvalidSource,
     }
 }
 
-fn map_limit_kind(kind: core::LimitKind) -> SlideTableNameLimitKind {
+fn map_limit_kind(kind: core::LimitKind) -> LimitKind {
     match kind {
-        core::LimitKind::InputBytes => SlideTableNameLimitKind::InputBytes,
-        core::LimitKind::OutputBytes => SlideTableNameLimitKind::OutputBytes,
-        core::LimitKind::Entries => SlideTableNameLimitKind::Entries,
-        core::LimitKind::EntryBytes => SlideTableNameLimitKind::EntryBytes,
-        core::LimitKind::TotalBytes => SlideTableNameLimitKind::TotalBytes,
-        core::LimitKind::PayloadObjects => SlideTableNameLimitKind::PayloadObjects,
-        core::LimitKind::PayloadMessages => SlideTableNameLimitKind::PayloadMessages,
-        core::LimitKind::References => SlideTableNameLimitKind::References,
-        core::LimitKind::WireFields => SlideTableNameLimitKind::WireFields,
-        core::LimitKind::WireNesting => SlideTableNameLimitKind::WireNesting,
-        core::LimitKind::WireWork => SlideTableNameLimitKind::WireWork,
-        core::LimitKind::Allocations => SlideTableNameLimitKind::Allocations,
-        core::LimitKind::Retained => SlideTableNameLimitKind::Retained,
-        core::LimitKind::Scratch => SlideTableNameLimitKind::Scratch,
-        core::LimitKind::Components => SlideTableNameLimitKind::Components,
+        core::LimitKind::InputBytes => LimitKind::InputBytes,
+        core::LimitKind::OutputBytes => LimitKind::OutputBytes,
+        core::LimitKind::Entries => LimitKind::Entries,
+        core::LimitKind::EntryBytes => LimitKind::EntryBytes,
+        core::LimitKind::TotalBytes => LimitKind::TotalBytes,
+        core::LimitKind::PayloadObjects => LimitKind::PayloadObjects,
+        core::LimitKind::PayloadMessages => LimitKind::PayloadMessages,
+        core::LimitKind::References => LimitKind::References,
+        core::LimitKind::WireFields => LimitKind::WireFields,
+        core::LimitKind::WireNesting => LimitKind::WireNesting,
+        core::LimitKind::WireWork => LimitKind::WireWork,
+        core::LimitKind::Allocations => LimitKind::Allocations,
+        core::LimitKind::Retained => LimitKind::Retained,
+        core::LimitKind::Scratch => LimitKind::Scratch,
+        core::LimitKind::Components => LimitKind::Components,
     }
 }
 
-fn map_read_error(error: ReadError) -> SlideTableNameError {
+fn map_read_error(error: ReadError) -> Error {
     match error {
         ReadError::SemanticLimit {
             kind,
             observed,
             maximum,
             ..
-        } => SlideTableNameError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                SemanticLimitKind::References => SlideTableNameLimitKind::References,
-                _ => SlideTableNameLimitKind::WireWork,
+                SemanticLimitKind::References => LimitKind::References,
+                _ => LimitKind::WireWork,
             },
             observed: observed as u64,
             maximum: maximum as u64,
@@ -889,135 +925,113 @@ fn map_read_error(error: ReadError) -> SlideTableNameError {
             observed,
             maximum,
             ..
-        } => SlideTableNameError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                PayloadLimitKind::Bytes => SlideTableNameLimitKind::InputBytes,
-                PayloadLimitKind::Fields => SlideTableNameLimitKind::WireFields,
-                PayloadLimitKind::Nesting => SlideTableNameLimitKind::WireNesting,
-                PayloadLimitKind::Work => SlideTableNameLimitKind::WireWork,
+                PayloadLimitKind::Bytes => LimitKind::InputBytes,
+                PayloadLimitKind::Fields => LimitKind::WireFields,
+                PayloadLimitKind::Nesting => LimitKind::WireNesting,
+                PayloadLimitKind::Work => LimitKind::WireWork,
             },
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        ReadError::Allocation { amount, .. } => SlideTableNameError::Allocation { amount },
+        ReadError::Allocation { amount, .. } => Error::Allocation { amount },
         ReadError::Archive(error) => map_archive_error(error),
-        _ => SlideTableNameError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_codec_error(error: table_model_discovery_codec::DecodeError) -> SlideTableNameError {
+fn map_codec_error(error: table_model_discovery_codec::DecodeError) -> Error {
     let Some(limit) = error.resource_limit() else {
-        return SlideTableNameError::InvalidSource;
+        return Error::InvalidSource;
     };
     let (kind, observed, maximum) = match limit {
-        table_model_discovery_codec::DecodeLimit::Bytes { observed, maximum } => (
-            SlideTableNameLimitKind::InputBytes,
-            observed as u64,
-            maximum as u64,
-        ),
-        table_model_discovery_codec::DecodeLimit::Fields { observed, maximum } => (
-            SlideTableNameLimitKind::WireFields,
-            observed as u64,
-            maximum as u64,
-        ),
-        table_model_discovery_codec::DecodeLimit::Work { observed, maximum } => (
-            SlideTableNameLimitKind::WireWork,
-            observed as u64,
-            maximum as u64,
-        ),
-        table_model_discovery_codec::DecodeLimit::Text { observed, maximum } => (
-            SlideTableNameLimitKind::WireWork,
-            observed as u64,
-            maximum as u64,
-        ),
-        table_model_discovery_codec::DecodeLimit::Output { observed, maximum } => (
-            SlideTableNameLimitKind::OutputBytes,
-            observed as u64,
-            maximum as u64,
-        ),
-        table_model_discovery_codec::DecodeLimit::Allocations { observed, maximum } => (
-            SlideTableNameLimitKind::Allocations,
-            observed as u64,
-            maximum as u64,
-        ),
-        table_model_discovery_codec::DecodeLimit::Retained { observed, maximum } => (
-            SlideTableNameLimitKind::Retained,
-            observed as u64,
-            maximum as u64,
-        ),
-        table_model_discovery_codec::DecodeLimit::Scratch { observed, maximum } => (
-            SlideTableNameLimitKind::Scratch,
-            observed as u64,
-            maximum as u64,
-        ),
+        table_model_discovery_codec::DecodeLimit::Bytes { observed, maximum } => {
+            (LimitKind::InputBytes, observed as u64, maximum as u64)
+        },
+        table_model_discovery_codec::DecodeLimit::Fields { observed, maximum } => {
+            (LimitKind::WireFields, observed as u64, maximum as u64)
+        },
+        table_model_discovery_codec::DecodeLimit::Work { observed, maximum } => {
+            (LimitKind::WireWork, observed as u64, maximum as u64)
+        },
+        table_model_discovery_codec::DecodeLimit::Text { observed, maximum } => {
+            (LimitKind::WireWork, observed as u64, maximum as u64)
+        },
+        table_model_discovery_codec::DecodeLimit::Output { observed, maximum } => {
+            (LimitKind::OutputBytes, observed as u64, maximum as u64)
+        },
+        table_model_discovery_codec::DecodeLimit::Allocations { observed, maximum } => {
+            (LimitKind::Allocations, observed as u64, maximum as u64)
+        },
+        table_model_discovery_codec::DecodeLimit::Retained { observed, maximum } => {
+            (LimitKind::Retained, observed as u64, maximum as u64)
+        },
+        table_model_discovery_codec::DecodeLimit::Scratch { observed, maximum } => {
+            (LimitKind::Scratch, observed as u64, maximum as u64)
+        },
         table_model_discovery_codec::DecodeLimit::Nesting { observed, maximum } => (
-            SlideTableNameLimitKind::WireNesting,
+            LimitKind::WireNesting,
             u64::from(observed),
             u64::from(maximum),
         ),
-        _ => return SlideTableNameError::InvalidSource,
+        _ => return Error::InvalidSource,
     };
-    SlideTableNameError::LimitExceeded {
+    Error::Limit {
         kind,
         observed,
         maximum,
     }
 }
 
-fn map_archive_error(error: litchi_iwa_archive::Error) -> SlideTableNameError {
+fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     match error {
         litchi_iwa_archive::Error::Limit {
             kind,
             observed,
             maximum,
-        } => SlideTableNameError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_archive::LimitKind::InputBytes => SlideTableNameLimitKind::InputBytes,
-                litchi_iwa_archive::LimitKind::OutputBytes => SlideTableNameLimitKind::OutputBytes,
-                litchi_iwa_archive::LimitKind::Entries => SlideTableNameLimitKind::Entries,
+                litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
+                litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_archive::LimitKind::Entries => LimitKind::Entries,
                 litchi_iwa_archive::LimitKind::EntryBytes
-                | litchi_iwa_archive::LimitKind::CompressedEntryBytes => {
-                    SlideTableNameLimitKind::EntryBytes
-                },
-                litchi_iwa_archive::LimitKind::TotalBytes => SlideTableNameLimitKind::TotalBytes,
-                _ => SlideTableNameLimitKind::WireWork,
+                | litchi_iwa_archive::LimitKind::CompressedEntryBytes => LimitKind::EntryBytes,
+                litchi_iwa_archive::LimitKind::TotalBytes => LimitKind::TotalBytes,
+                _ => LimitKind::WireWork,
             },
             observed,
             maximum,
         },
-        litchi_iwa_archive::Error::Allocation { amount, .. } => {
-            SlideTableNameError::Allocation { amount }
-        },
+        litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
         litchi_iwa_archive::Error::Iwa(error) => map_core_native_error(error),
-        _ => SlideTableNameError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_core_native_error(error: litchi_iwa_core::Error) -> SlideTableNameError {
+fn map_core_native_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
             kind,
             observed,
             maximum,
-        } => SlideTableNameError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_core::LimitKind::Objects => SlideTableNameLimitKind::PayloadObjects,
+                litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
                 litchi_iwa_core::LimitKind::Messages
-                | litchi_iwa_core::LimitKind::MessagesPerObject => {
-                    SlideTableNameLimitKind::PayloadMessages
-                },
-                litchi_iwa_core::LimitKind::HeaderNesting => SlideTableNameLimitKind::WireNesting,
+                | litchi_iwa_core::LimitKind::MessagesPerObject => LimitKind::PayloadMessages,
+                litchi_iwa_core::LimitKind::HeaderNesting => LimitKind::WireNesting,
                 litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
                 | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes
-                | litchi_iwa_core::LimitKind::SnappyFrames => SlideTableNameLimitKind::EntryBytes,
-                _ => SlideTableNameLimitKind::WireWork,
+                | litchi_iwa_core::LimitKind::SnappyFrames => LimitKind::EntryBytes,
+                _ => LimitKind::WireWork,
             },
             observed: observed as u64,
             maximum: maximum as u64,
         },
         litchi_iwa_core::Error::Allocation { requested, .. } => {
-            SlideTableNameError::Allocation { amount: requested }
+            Error::Allocation { amount: requested }
         },
-        _ => SlideTableNameError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }

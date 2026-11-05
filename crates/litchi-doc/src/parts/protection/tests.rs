@@ -52,7 +52,8 @@ fn fixture_streams(name: &str) -> (Vec<u8>, Vec<u8>) {
         .join("../../test-data/ole/doc")
         .join(name);
     let bytes = std::fs::read(path).expect("DOC fixture");
-    let mut ole = OleFile::open(Cursor::new(bytes)).expect("DOC fixture CFB");
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+        .expect("DOC fixture CFB");
     let word = ole.open_stream(&["WordDocument"]).expect("WordDocument");
     let table_name = if u16::from_le_bytes([word[10], word[11]]) & 0x0200 != 0 {
         "1Table"

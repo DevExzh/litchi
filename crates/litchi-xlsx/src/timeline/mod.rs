@@ -5,17 +5,18 @@
 //! renders/applies a host UI.
 
 pub mod codec;
+mod edit;
 pub mod model;
 pub mod package;
-pub mod transaction;
+pub mod raw;
 pub mod validation;
 
+pub use edit::{Commit, Diagnostics, Edit, EditOptions, Error, LimitKind, Patch};
 pub use model::{
     Cache, CacheDefinition, CachePivotTable, FilterType, Level, OpaqueXml, Part, PivotFilter,
     Range, State, View, Views,
 };
-pub use package::{load_caches, load_parts, store_caches, store_part};
-pub use transaction::Transaction;
+pub use package::{load_caches, load_parts};
 
 pub const CACHE_CONTENT_TYPE: &str = crate::timelines::TIMELINE_CACHE_CONTENT_TYPE;
 pub const CACHE_RELATIONSHIP_TYPE: &str = crate::timelines::TIMELINE_CACHE_RELATIONSHIP_TYPE;
@@ -40,7 +41,7 @@ pub fn validate(value: &CacheDefinition) -> crate::error::Result<()> {
 /// Explicitly refuses runtime/UI behavior that this inert owner does not
 /// implement.
 pub fn unsupported_ui() -> crate::error::Result<()> {
-    Err(crate::error::Error::Unsupported {
+    Err(Error::Unsupported {
         feature: "timeline UI, refresh, and filter application",
     })
 }

@@ -113,6 +113,44 @@ pub(super) const TAB_STOP_LEN: usize = 4;
 pub(super) const MAX_PARA_SPACING_PERCENT: i16 = 13200;
 
 impl TextCFException {
+    /// This exception with one `CFStyle` flag (`bold`, `italic` or
+    /// `underline` mask bit) set explicitly (record 0323).
+    pub(crate) fn with_style_flag(&self, mask: u32, on: bool) -> Self {
+        let mut changed = self.clone();
+        changed.masks |= mask;
+        let mut style = changed.font_style.unwrap_or_default();
+        // The CFStyle bits share the low mask bits' positions.
+        let bit = u16::try_from(mask).unwrap_or(0);
+        if on {
+            style.bits |= bit;
+        } else {
+            style.bits &= !bit;
+        }
+        changed.font_style = Some(style);
+        changed
+    }
+
+    /// This exception with an explicit font size in points (record 0323).
+    pub(crate) fn with_size(&self, size: i16) -> Self {
+        let mut changed = self.clone();
+        changed.masks |= CF_MASK_SIZE;
+        changed.font_size = Some(size);
+        changed
+    }
+
+    /// This exception with an explicit sRGB text color (record 0323).
+    pub(crate) fn with_rgb(&self, [red, green, blue]: [u8; 3]) -> Self {
+        let mut changed = self.clone();
+        changed.masks |= CF_MASK_COLOR;
+        changed.color = Some(ColorIndex {
+            red,
+            green,
+            blue,
+            kind: crate::slide_show_settings::ColorIndexKind::Srgb,
+        });
+        changed
+    }
+
     /// Parse one `TextCFException` from the start of `data`.
     ///
     /// Returns the decoded structure and the number of bytes consumed.

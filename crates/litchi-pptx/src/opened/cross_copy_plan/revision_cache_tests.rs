@@ -12,12 +12,13 @@ use crate::opened::model::{Limits, Snapshot};
 use crate::{Error, Package, Result};
 
 fn owned_slides(titles: &[&str]) -> Result<Package> {
-    let mut package = Package::new()?;
+    let mut builder = crate::builder::Builder::new()?;
     for title in titles {
-        package.presentation_mut()?.add_slide()?.set_title(title);
+        builder.presentation()?.add_slide()?.set_title(title);
     }
+    let package = builder.build()?;
     let bytes = package.to_bytes()?;
-    Package::from_vec(bytes)
+    Package::from_reader(std::io::Cursor::new(bytes))
 }
 
 /// Give every slide a distinct producer-visible name so a cross-package copy
@@ -42,8 +43,7 @@ fn rename_slide(package: &mut Package, index: usize, name: &str) -> Result<()> {
             "test slide {index} has no canonical producer name"
         )));
     }
-    package
-        .opc
+    std::sync::Arc::make_mut(&mut package.opc)
         .get_part_mut(&part_name)?
         .set_blob(renamed.into_bytes());
     Ok(())
@@ -70,12 +70,12 @@ fn with_eocd_comment(mut archive: Vec<u8>, comment: &[u8]) -> Result<Vec<u8>> {
 fn cross_copy_fixture() -> Result<(Package, Package)> {
     let mut source = owned_slides(&["cache-source"])?;
     rename_slide(&mut source, 0, "cache-source")?;
-    let source = Package::from_vec(source.to_bytes()?)?;
+    let source = Package::from_reader(std::io::Cursor::new(source.to_bytes()?))?;
 
     let mut destination = owned_slides(&["cache-destination-a", "cache-destination-b"])?;
     rename_slide(&mut destination, 0, "cache-destination-a")?;
     rename_slide(&mut destination, 1, "cache-destination-b")?;
-    let destination = Package::from_vec(destination.to_bytes()?)?;
+    let destination = Package::from_reader(std::io::Cursor::new(destination.to_bytes()?))?;
     Ok((source, destination))
 }
 
@@ -144,7 +144,7 @@ fn snapshot_physical_revision_is_keyed_by_the_archive_bound() -> Result<()> {
     assert!(matches!(
         snapshot_physical_revision(&snapshot, tiny),
         Err(Error::Limit {
-            resource: "cross-slide serialized archive bytes",
+            kind: crate::opened::LimitKind::PatchBytes,
             ..
         })
     ));
@@ -154,7 +154,7 @@ fn snapshot_physical_revision_is_keyed_by_the_archive_bound() -> Result<()> {
 
 #[test]
 fn rebound_snapshot_starts_an_empty_physical_revision_cache() -> Result<()> {
-    let (mut source, _destination) = cross_copy_fixture()?;
+    let (source, _destination) = cross_copy_fixture()?;
     let snapshot = source.opened_presentation()?;
     let limits = snapshot.limits();
     let original = snapshot_physical_revision(&snapshot, limits)?;
@@ -162,10 +162,10 @@ fn rebound_snapshot_starts_an_empty_physical_revision_cache() -> Result<()> {
 
     // Same graph, different retained archive: `packages_equal` holds and the
     // semantic revision is identical, but the serialized archive is not.
-    let commented = Package::from_vec(with_eocd_comment(
+    let commented = Package::from_reader(std::io::Cursor::new(with_eocd_comment(
         source.to_bytes()?,
         b"revision-cache-rebind",
-    )?)?;
+    )?))?;
     let commented_snapshot = commented.opened_presentation()?;
     assert_eq!(commented_snapshot.revision(), snapshot.revision());
     assert!(crate::opened::model::packages_equal(
@@ -218,11 +218,11 @@ fn planned_and_published_revisions_equal_fresh_serializations() -> Result<()> {
 
 #[test]
 fn warm_snapshot_caches_do_not_hide_a_stale_source_or_destination() -> Result<()> {
-    let (mut source, mut destination) = cross_copy_fixture()?;
+    let (source, destination) = cross_copy_fixture()?;
     let source_bytes = source.to_bytes()?;
     let destination_bytes = destination.to_bytes()?;
-    let source = Package::from_vec(source_bytes.clone())?;
-    let destination = Package::from_vec(destination_bytes.clone())?;
+    let source = Package::from_reader(std::io::Cursor::new(source_bytes.clone()))?;
+    let destination = Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
     let source_snapshot = source.opened_presentation()?;
     let destination_snapshot = destination.opened_presentation()?;
     let limits = destination_snapshot.limits();
@@ -247,7 +247,7 @@ fn warm_snapshot_caches_do_not_hide_a_stale_source_or_destination() -> Result<()
     // The live destination moves on after planning. The snapshot caches cover
     // the immutable captured packages, never a live one, so the apply-time
     // proof still runs and still refuses.
-    let mut drifted = Package::from_vec(destination_bytes.clone())?;
+    let mut drifted = Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
     let slide = drifted.opened_presentation()?.slides()[0]
         .part_name()
         .clone();
@@ -255,14 +255,13 @@ fn warm_snapshot_caches_do_not_hide_a_stale_source_or_destination() -> Result<()
         .map_err(|error| Error::Xml(error.to_string()))?
         .replace("cache-destination-a", "cache-destination-x")
         .into_bytes();
-    drifted.opc.get_part_mut(&slide)?.set_blob(stale);
-    let drifted_before = drifted.opc.clone();
+    std::sync::Arc::make_mut(&mut drifted.opc)
+        .get_part_mut(&slide)?
+        .set_blob(stale);
+    let drifted_before = (*drifted.opc).clone();
     assert!(matches!(
         drifted.apply_cross_slide_copy_plan(&source, &plan),
-        Err(Error::UnsafeEdit {
-            operation: "apply_cross_slide_copy_plan",
-            reason: "the complete destination package graph changed after cross-slide planning",
-        })
+        Err(Error::PatchConflict)
     ));
     assert_eq!(
         physical_package_fingerprint(&drifted.opc, limits)?,
@@ -271,25 +270,23 @@ fn warm_snapshot_caches_do_not_hide_a_stale_source_or_destination() -> Result<()
 
     // A source whose graph is identical but whose retained archive is not
     // reaches the physical proof, which still refuses it.
-    let mut repackaged_destination = Package::from_vec(destination_bytes.clone())?;
-    let recomment = Package::from_vec(with_eocd_comment(
+    let mut repackaged_destination =
+        Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
+    let recomment = Package::from_reader(std::io::Cursor::new(with_eocd_comment(
         source_bytes.clone(),
         b"revision-cache-foreign",
-    )?)?;
+    )?))?;
     assert_eq!(
         recomment.opened_presentation()?.revision(),
         source_snapshot.revision()
     );
     assert!(matches!(
         repackaged_destination.apply_cross_slide_copy_plan(&recomment, &plan),
-        Err(Error::UnsafeEdit {
-            operation: "apply_cross_slide_copy_plan",
-            reason: "the serialized source package changed after cross-slide planning",
-        })
+        Err(Error::PatchConflict)
     ));
 
     // The unchanged pairing still applies, and publishes the planned archive.
-    let mut applied = Package::from_vec(destination_bytes)?;
+    let mut applied = Package::from_reader(std::io::Cursor::new(destination_bytes))?;
     let published = applied.apply_cross_slide_copy_plan(&source, &plan)?;
     assert_eq!(published.slides().len(), 3);
     assert_eq!(

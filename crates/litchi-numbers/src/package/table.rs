@@ -3,7 +3,7 @@
 //! Tables in Numbers contain cells organized in rows and columns.
 
 use crate::cell::Value as CellValue;
-use crate::table::{Builder as TableBuilder, Dimensions, Error as TableError, Position};
+use crate::table::{At, Builder as TableBuilder, Dimensions, Error as TableError};
 use litchi_iwa_common::comment::Comment;
 use std::collections::HashMap;
 
@@ -96,7 +96,7 @@ impl Table {
 
     /// Get a cell value at the specified position
     pub(super) fn get_cell(&self, row: usize, col: usize) -> Option<&CellValue> {
-        let position = Position::try_from_usize(row, col).ok()?;
+        let position = At::try_from_usize(row, col).ok()?;
         self.model.get(position)
     }
 
@@ -141,7 +141,7 @@ impl Table {
         value: CellValue,
     ) -> super::Result<()> {
         let position =
-            Position::try_from_usize(row, col).map_err(|error| map_table_error(error.into()))?;
+            At::try_from_usize(row, col).map_err(|error| map_table_error(error.into()))?;
         self.ensure_coordinate(row, col)?;
         self.model
             .set(position, value)

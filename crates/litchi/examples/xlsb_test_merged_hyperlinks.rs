@@ -3,14 +3,14 @@
 #![allow(clippy::all)]
 
 use litchi::sheet::CellValue;
+use litchi::xlsb::builder::{self, Builder};
 use litchi::xlsb::hyperlinks::Hyperlink;
 use litchi::xlsb::merged_cells::MergedCell;
-use litchi::xlsb::writer::{MutableWorksheet, WorkbookWriter};
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut workbook = WorkbookWriter::new();
-    let mut sheet = MutableWorksheet::new("Data");
+    let mut workbook = Builder::new();
+    let mut sheet = builder::Worksheet::new("Data");
 
     // Title row (merged)
     sheet.set_cell(0, 0, CellValue::String("Sales Report".to_string()));
@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // NO named ranges added
 
     let file = File::create("xlsb_test_merged_hyperlinks.xlsb")?;
-    workbook.save(file)?;
+    workbook.build()?.write_to(file)?;
 
     println!("✓ Created xlsb_test_merged_hyperlinks.xlsb");
     println!("  - Merged cells + Hyperlinks (NO named ranges)");

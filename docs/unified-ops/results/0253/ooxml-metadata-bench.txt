@@ -1,0 +1,25 @@
+# taskset -c 7 target/release/examples/ooxml_metadata_bench (3 runs), commit 5be89f8b72, 2026-10-13T06:41:03Z
+## run 1
+Xlsx set /title (eager open): native 8740 ns, unified 9231 ns, ratio 1.056
+Xlsx set /title (source open): native 8690 ns, unified 9170 ns, ratio 1.055
+Pptx set /title (eager open): native 71860 ns, unified 72630 ns, ratio 1.011
+Pptx set /title (source open): native 78800 ns, unified 199482 ns, ratio 2.531
+Xlsb set /title (eager open): native 32720 ns, unified 36190 ns, ratio 1.106
+Xlsb set /title (source open): native 32690 ns, unified 45421 ns, ratio 1.389
+xlsx open: 71590 ns; app.xml read 8760 ns (0.122 of open)
+## run 2
+Xlsx set /title (eager open): native 8860 ns, unified 9330 ns, ratio 1.053
+Xlsx set /title (source open): native 8850 ns, unified 9380 ns, ratio 1.060
+Pptx set /title (eager open): native 72801 ns, unified 73740 ns, ratio 1.013
+Pptx set /title (source open): native 79390 ns, unified 197631 ns, ratio 2.489
+Xlsb set /title (eager open): native 32741 ns, unified 35810 ns, ratio 1.094
+Xlsb set /title (source open): native 32830 ns, unified 44860 ns, ratio 1.366
+xlsx open: 71140 ns; app.xml read 8720 ns (0.123 of open)
+## run 3
+Xlsx set /title (eager open): native 8780 ns, unified 9170 ns, ratio 1.044
+Xlsx set /title (source open): native 8721 ns, unified 9200 ns, ratio 1.055
+Pptx set /title (eager open): native 71540 ns, unified 72270 ns, ratio 1.010
+Pptx set /title (source open): native 79950 ns, unified 196141 ns, ratio 2.453
+Xlsb set /title (eager open): native 32780 ns, unified 35950 ns, ratio 1.097
+Xlsb set /title (source open): native 32710 ns, unified 45550 ns, ratio 1.393
+xlsx open: 71700 ns; app.xml read 8820 ns (0.123 of open)

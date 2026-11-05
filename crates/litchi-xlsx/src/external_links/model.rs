@@ -18,6 +18,7 @@ pub(crate) const TRANSITIONAL_REL: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 pub(crate) const STRICT_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships";
 pub(crate) const MAX_EXTERNAL_TARGET_BYTES: usize = 32 * 1024;
+pub(crate) const MAX_RELATIONSHIP_ID_BYTES: usize = 1024;
 /// Maximum bytes retained for either service-provided alternate-URL ID.
 ///
 /// The normative type is `xsd:string` and does not impose a useful Office

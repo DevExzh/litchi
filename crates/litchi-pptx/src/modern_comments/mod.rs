@@ -12,21 +12,15 @@ pub mod semantic;
 mod tests;
 mod wire;
 
-pub use commands::{ChangeCommand, load_modern_comment_changes, update_modern_comment_changes};
+pub use commands::{ChangeCommand, load_modern_comment_changes};
 pub use model::{
     Anchor, AnchorKind, Author, AuthorPart, Authors, Comment, Graph, List, NamespaceDeclaration,
     Part, Position, Progress, Reply, Status,
 };
 pub use package::{
-    add_modern_comment, add_modern_comment_author, add_modern_comment_reply, find_modern_comment,
-    find_modern_comment_author, find_modern_comment_reply, load_modern_comment_authors,
-    load_modern_comment_extensions, load_modern_comment_graph,
-    load_modern_comment_reply_extensions, load_modern_comments, remove_modern_comment,
-    remove_modern_comment_author, remove_modern_comment_reply, reorder_modern_comment_authors,
-    reorder_modern_comments, replace_modern_comment, replace_modern_comment_author,
-    replace_modern_comment_reply, store_modern_comment, store_modern_comment_authors,
-    update_modern_comment, update_modern_comment_author, update_modern_comment_extensions,
-    update_modern_comment_reply, update_modern_comment_reply_extensions,
+    find_modern_comment, find_modern_comment_author, find_modern_comment_reply,
+    load_modern_comment_authors, load_modern_comment_extensions, load_modern_comment_graph,
+    load_modern_comment_reply_extensions, load_modern_comments,
     validate_modern_comment_author_references,
 };
 pub use semantic::changes::{Change, Changes, Metadata};
@@ -60,3 +54,15 @@ pub(crate) const MAX_COMMENTS: usize = 100_000;
 pub(crate) const MAX_REPLIES: usize = 100_000;
 pub(crate) const MAX_AUTHORS: usize = 65_536;
 pub(crate) const MAX_STRING_BYTES: usize = 1024 * 1024;
+pub(crate) use commands::update_modern_comment_changes;
+pub(crate) use package::{
+    add_modern_comment, add_modern_comment_author, add_modern_comment_reply, remove_modern_comment,
+    remove_modern_comment_author, remove_modern_comment_reply, reorder_modern_comment_authors,
+    reorder_modern_comments, replace_modern_comment, replace_modern_comment_author,
+    replace_modern_comment_reply, store_modern_comment, store_modern_comment_authors,
+    update_modern_comment, update_modern_comment_author, update_modern_comment_extensions,
+    update_modern_comment_reply, update_modern_comment_reply_extensions,
+};
+
+mod edit;
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};

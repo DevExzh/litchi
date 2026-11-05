@@ -126,6 +126,33 @@ impl Story {
         })
     }
 
+    /// The story's text as OfficeCLI reads a header or footer: the text of
+    /// its runs' `w:t` elements, concatenated without paragraph separators
+    /// (record 0319); alternate-content fallbacks are skipped.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for XML that is not well-formed.
+    pub fn run_text(&self) -> Result<String> {
+        crate::part_scan::run_text(&self.xml_bytes, &[])
+    }
+
+    /// Construct a story over a shared XML allocation (a part payload read
+    /// once and kept by its owner).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the payload is not a bounded header or footer.
+    pub fn from_shared_bytes(xml_bytes: Arc<Vec<u8>>, kind: Kind) -> Result<Self> {
+        let role = codec::validate(&xml_bytes)?;
+        Ok(Self {
+            xml_bytes,
+            semantic: Arc::new(OnceLock::new()),
+            role,
+            kind,
+        })
+    }
+
     /// Construct a story by sharing the XML allocation owned by an OPC part.
     pub(crate) fn from_part(part: &dyn Part, kind: Kind) -> Result<Self> {
         let role = codec::validate(part.blob())?;
@@ -166,6 +193,29 @@ impl Story {
     pub fn text(&self) -> Result<String> {
         let xml = self.semantic_xml()?;
         extract_word_text(xml.as_slice())
+    }
+
+    /// The story's direct block children, indexed with the scanner the
+    /// document body uses (see [`crate::Blocks`]) over its
+    /// markup-compatibility-visible XML.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the story's XML is malformed or a bound on the
+    /// index is reached.
+    pub fn blocks(&self) -> Result<crate::Blocks> {
+        let xml = self.semantic_xml()?;
+        let length = u32::try_from(xml.len()).map_err(|_source_error| {
+            crate::Error::InvalidFormat("header/footer XML exceeds u32".to_string())
+        })?;
+        crate::Blocks::index(
+            xml,
+            0,
+            length,
+            &[],
+            crate::document::ContainerRoot::HEADER_FOOTER,
+            crate::parts::memo::RawPositions::Unproven,
+        )
     }
 
     /// Return all paragraphs in authored order.

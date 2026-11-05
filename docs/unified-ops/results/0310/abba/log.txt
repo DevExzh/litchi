@@ -1,0 +1,65 @@
+== query-base-1 xlsx_1000_bytes 12:26:30 load 5.71
+== query-base-1 xlsx_1000_file 12:26:49 load 5.80
+== query-base-1 xlsx_50000_bytes 12:27:13 load 6.36
+== query-base-1 xlsx_50000_file 12:27:54 load 6.73
+== query-base-1 xlsb_1000_bytes 12:28:38 load 6.68
+== query-base-1 xlsb_1000_file 12:28:42 load 6.55
+== query-base-1 pptx_small_bytes 12:28:56 load 6.30
+== query-base-1 pptx_small_file 12:28:58 load 6.52
+== query-base-1 pptx_large_bytes 12:29:01 load 6.52
+== query-base-1 pptx_large_file 12:29:04 load 6.72
+== query-base-1 docx_drawing_file 12:29:09 load 6.90
+== query-base-1 docx_saut_bytes 12:29:12 load 6.67
+== query-base-1 docx_saut_file 12:29:13 load 6.67
+== query-all-base-1 xlsx_1000_bytes 12:29:15 load 6.67
+== query-all-base-1 pptx_large_bytes 12:29:33 load 6.45
+== xls_p0-base-1.json 12:29:37 load 6.57
+== query-after-1 xlsx_1000_bytes 12:30:11 load 6.09
+== query-after-1 xlsx_1000_file 12:30:29 load 5.40
+== query-after-1 xlsx_50000_bytes 12:30:53 load 5.51
+== query-after-1 xlsx_50000_file 12:31:34 load 5.61
+== query-after-1 xlsb_1000_bytes 12:32:18 load 5.56
+== query-after-1 xlsb_1000_file 12:32:21 load 5.56
+== query-after-1 pptx_small_bytes 12:32:27 load 5.47
+== query-after-1 pptx_small_file 12:32:29 load 5.47
+== query-after-1 pptx_large_bytes 12:32:32 load 5.43
+== query-after-1 pptx_large_file 12:32:35 load 5.43
+== query-after-1 docx_drawing_file 12:32:40 load 5.40
+== query-after-1 docx_saut_bytes 12:32:43 load 5.45
+== query-after-1 docx_saut_file 12:32:44 load 5.45
+== query-all-after-1 xlsx_1000_bytes 12:32:45 load 5.45
+== query-all-after-1 pptx_large_bytes 12:33:04 load 4.90
+== xls_p0-after-1.json 12:33:07 load 4.83
+== query-after-2 xlsx_1000_bytes 12:33:41 load 4.23
+== query-after-2 xlsx_1000_file 12:33:59 load 3.95
+== query-after-2 xlsx_50000_bytes 12:34:23 load 3.97
+== query-after-2 xlsx_50000_file 12:35:04 load 3.97
+== query-after-2 xlsb_1000_bytes 12:35:48 load 4.26
+== query-after-2 xlsb_1000_file 12:35:51 load 4.26
+== query-after-2 pptx_small_bytes 12:35:57 load 4.07
+== query-after-2 pptx_small_file 12:35:59 load 4.07
+== query-after-2 pptx_large_bytes 12:36:02 load 4.06
+== query-after-2 pptx_large_file 12:36:05 load 4.06
+== query-after-2 docx_drawing_file 12:36:10 load 5.58
+== query-after-2 docx_saut_bytes 12:36:13 load 5.45
+== query-after-2 docx_saut_file 12:36:14 load 5.45
+== query-all-after-2 xlsx_1000_bytes 12:36:15 load 5.45
+== query-all-after-2 pptx_large_bytes 12:36:34 load 5.61
+== xls_p0-after-2.json 12:36:37 load 5.40
+== query-base-2 xlsx_1000_bytes 12:37:11 load 6.36
+== query-base-2 xlsx_1000_file 12:37:30 load 6.38
+== query-base-2 xlsx_50000_bytes 12:37:54 load 5.76
+== query-base-2 xlsx_50000_file 12:38:35 load 5.37
+== query-base-2 xlsb_1000_bytes 12:39:20 load 5.82
+== query-base-2 xlsb_1000_file 12:39:24 load 5.59
+== query-base-2 pptx_small_bytes 12:39:37 load 5.93
+== query-base-2 pptx_small_file 12:39:39 load 5.93
+== query-base-2 pptx_large_bytes 12:39:42 load 6.10
+== query-base-2 pptx_large_file 12:39:46 load 6.10
+== query-base-2 docx_drawing_file 12:39:50 load 6.33
+== query-base-2 docx_saut_bytes 12:39:53 load 6.47
+== query-base-2 docx_saut_file 12:39:54 load 6.47
+== query-all-base-2 xlsx_1000_bytes 12:39:56 load 6.47
+== query-all-base-2 pptx_large_bytes 12:40:15 load 7.90
+== xls_p0-base-2.json 12:40:18 load 7.99
+done abba

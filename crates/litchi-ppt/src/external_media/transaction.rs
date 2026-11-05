@@ -100,13 +100,13 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-    /// Parse one complete root record with default limits.
+    /// Parse one complete root record under `limits`.
     ///
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(bytes: impl AsRef<[u8]>) -> Result<Self> {
-        Self::parse_with_limits(bytes, Limits::default())
+    pub fn parse(bytes: impl AsRef<[u8]>, limits: &Limits) -> Result<Self> {
+        Self::parse_with_limits(bytes, *limits)
     }
 
     /// Parse one complete root record under explicit resource limits.
@@ -114,7 +114,7 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_with_limits(bytes: impl AsRef<[u8]>, limits: Limits) -> Result<Self> {
+    pub(crate) fn parse_with_limits(bytes: impl AsRef<[u8]>, limits: Limits) -> Result<Self> {
         Self::from_bytes_with_limits(bytes.as_ref().to_vec(), limits)
     }
 
@@ -123,8 +123,8 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, Limits::default())
+    pub fn from_bytes(bytes: Vec<u8>, limits: &Limits) -> Result<Self> {
+        Self::from_bytes_with_limits(bytes, *limits)
     }
 
     /// Capture an owned root record under explicit resource limits.
@@ -132,7 +132,7 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
+    pub(crate) fn from_bytes_with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
         let validated = validation::parse_source(&bytes, limits)?;
         let shared_bytes: Arc<[u8]> = Arc::from(bytes.into_boxed_slice());
         let revision = Revision::from_bytes(&shared_bytes);
@@ -186,8 +186,8 @@ impl Snapshot {
 
     /// Begin an isolated semantic edit.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub(crate) fn edit(&self) -> RecordEdit {
+        RecordEdit {
             source: self.clone(),
             candidate: self.collection.clone(),
             changes: Vec::new(),
@@ -197,42 +197,35 @@ impl Snapshot {
 
 /// Isolated, failure-atomic editor over one source snapshot.
 #[derive(Clone, Debug)]
-pub struct Transaction {
+pub(crate) struct RecordEdit {
     source: Snapshot,
     candidate: Option<Collection>,
     changes: Vec<Change>,
 }
 
-impl Transaction {
-    /// Immutable source snapshot used for stale-source checks.
-    #[must_use]
-    pub const fn source(&self) -> &Snapshot {
-        &self.source
-    }
-
+impl RecordEdit {
     /// Current typed media collection, if present.
     #[must_use]
-    pub fn collection(&self) -> Option<&Collection> {
+    pub(crate) fn collection(&self) -> Option<&Collection> {
         self.candidate.as_ref()
     }
 
     /// Current typed media objects, or an empty slice when no list exists.
     #[must_use]
-    pub fn objects(&self) -> &[Object] {
+    pub(crate) fn objects(&self) -> &[Object] {
         self.candidate
             .as_ref()
             .map_or(&[], |collection| collection.objects.as_slice())
     }
 
     /// Whether staged semantics differ from the source collection.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn has_net_change(&self) -> bool {
         self.candidate != self.source.collection
     }
 
     /// Staged semantic operations in source order.
     #[must_use]
-    pub fn changes(&self) -> &[Change] {
+    pub(crate) fn changes(&self) -> &[Change] {
         &self.changes
     }
 
@@ -241,7 +234,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_path(&mut self, id: u32, path: Option<String>) -> Result<()> {
+    pub(crate) fn set_path(&mut self, id: u32, path: Option<String>) -> Result<()> {
         let mut candidate = self.require_collection()?.clone();
         let object = candidate
             .objects
@@ -268,7 +261,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_playback(&mut self, id: u32, playback: Playback) -> Result<()> {
+    pub(crate) fn set_playback(&mut self, id: u32, playback: Playback) -> Result<()> {
         let mut candidate = self.require_collection()?.clone();
         let object = candidate
             .objects
@@ -295,7 +288,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn insert(&mut self, object: Object) -> Result<()> {
+    pub(crate) fn insert(&mut self, object: Object) -> Result<()> {
         let id = object.id();
         if id == 0 {
             return Err(Error::InvalidFormat(
@@ -330,7 +323,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn replace(&mut self, id: u32, replacement: Object) -> Result<Object> {
+    pub(crate) fn replace(&mut self, id: u32, replacement: Object) -> Result<Object> {
         if replacement.id() != id {
             return Err(Error::InvalidFormat(
                 "external media replacement must retain its owner ID".into(),
@@ -362,7 +355,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn remove(&mut self, id: u32) -> Result<Object> {
+    pub(crate) fn remove(&mut self, id: u32) -> Result<Object> {
         let current = self.require_collection()?;
         validation::can_remove(current, &self.source.owner_ids, id)?;
         let mut candidate = current.clone();
@@ -385,26 +378,14 @@ impl Transaction {
         Ok(object)
     }
 
-    /// Capture the current candidate without publishing it.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn snapshot(&self) -> Result<Snapshot> {
-        if !self.is_changed() {
-            return Ok(self.source.clone());
-        }
-        Snapshot::from_bytes_with_limits(self.emit_candidate()?, self.source.limits)
-    }
-
     /// Publish the candidate atomically with a reversible source-checked patch.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn commit(self) -> Result<Commit> {
-        if !self.is_changed() {
-            let patch = Patch {
+    pub(crate) fn commit(self) -> Result<RecordCommit> {
+        if !self.has_net_change() {
+            let patch = RecordPatch {
                 base: self.source.revision,
                 target: self.source.revision,
                 before: self.source.bytes.clone(),
@@ -412,7 +393,7 @@ impl Transaction {
                 changes: Vec::new(),
                 limits: self.source.limits,
             };
-            return Ok(Commit {
+            return Ok(RecordCommit {
                 snapshot: self.source,
                 patch,
             });
@@ -421,7 +402,7 @@ impl Transaction {
         let source = self.source;
         let changes = self.changes;
         let snapshot = Snapshot::from_bytes_with_limits(bytes, source.limits)?;
-        let patch = Patch {
+        let patch = RecordPatch {
             base: source.revision,
             target: snapshot.revision,
             before: source.bytes,
@@ -429,22 +410,7 @@ impl Transaction {
             changes,
             limits: snapshot.limits,
         };
-        Ok(Commit { snapshot, patch })
-    }
-
-    /// Alias for move-owned writer terminology.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn finish(self) -> Result<Commit> {
-        self.commit()
-    }
-
-    /// Discard all staged edits and recover the exact source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
+        Ok(RecordCommit { snapshot, patch })
     }
 
     fn require_collection(&self) -> Result<&Collection> {
@@ -454,7 +420,7 @@ impl Transaction {
     }
 
     fn validate_candidate(&self, candidate: &Collection) -> Result<()> {
-        validation::validate_collection(candidate, &self.source.hyperlink_ids)
+        validation::validate_collection(candidate, &self.source.hyperlink_ids, self.source.limits)
     }
 
     fn emit_candidate(&self) -> Result<Vec<u8>> {
@@ -474,21 +440,21 @@ impl Transaction {
 
 /// A successful immutable target and its source-checked patch.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Commit {
+pub(crate) struct RecordCommit {
     snapshot: Snapshot,
-    patch: Patch,
+    patch: RecordPatch,
 }
 
-impl Commit {
+impl RecordCommit {
     /// Published target snapshot.
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Reversible patch from source to target.
     #[must_use]
-    pub const fn patch(&self) -> &Patch {
+    pub(crate) const fn patch(&self) -> &RecordPatch {
         &self.patch
     }
 
@@ -497,7 +463,7 @@ impl Commit {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.patch.undo(current)
     }
 
@@ -506,20 +472,20 @@ impl Commit {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.patch.redo(current)
     }
 
     /// Split the commit into its target and patch.
     #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
+    pub(crate) fn into_parts(self) -> (Snapshot, RecordPatch) {
         (self.snapshot, self.patch)
     }
 }
 
 /// A source-checked reversible patch for one complete PPT root record.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Patch {
+pub(crate) struct RecordPatch {
     base: Revision,
     target: Revision,
     before: Arc<[u8]>,
@@ -528,40 +494,40 @@ pub struct Patch {
     limits: Limits,
 }
 
-impl Patch {
+impl RecordPatch {
     /// Source revision required for forward application.
     #[must_use]
-    pub const fn base(&self) -> Revision {
+    pub(crate) const fn base(&self) -> Revision {
         self.base
     }
 
     /// Target revision produced by forward application.
     #[must_use]
-    pub const fn target(&self) -> Revision {
+    pub(crate) const fn target(&self) -> Revision {
         self.target
     }
 
     /// Typed operations represented by this patch.
     #[must_use]
-    pub fn changes(&self) -> &[Change] {
+    pub(crate) fn changes(&self) -> &[Change] {
         &self.changes
     }
 
     /// Exact source bytes bound to this patch.
     #[must_use]
-    pub fn before(&self) -> &[u8] {
+    pub(crate) fn before(&self) -> &[u8] {
         &self.before
     }
 
     /// Exact target bytes produced by this patch.
     #[must_use]
-    pub fn after(&self) -> &[u8] {
+    pub(crate) fn after(&self) -> &[u8] {
         &self.after
     }
 
     /// Whether the patch is an exact byte-for-byte no-op.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.before.as_ref() == self.after.as_ref()
     }
 
@@ -570,7 +536,7 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn apply(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn apply(&self, current: &Snapshot) -> Result<Snapshot> {
         if current.revision != self.base || current.bytes.as_ref() != self.before.as_ref() {
             return Err(Error::InvalidFormat(
                 "external-media patch source does not match its base snapshot".into(),
@@ -587,7 +553,7 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.inverse().apply(current)
     }
 
@@ -596,13 +562,13 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.apply(current)
     }
 
     /// Build a source-checked inverse patch.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             base: self.target,
             target: self.base,

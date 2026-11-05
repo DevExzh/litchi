@@ -20,16 +20,14 @@ pub fn validate(transform: &Transform) -> Result<()> {
     if let Some(value) = transform.authored_rotation() {
         size = size
             .checked_add(9 + value.value().to_string().len())
-            .ok_or_else(|| limit("serialized transform bytes"))?;
+            .ok_or_else(|| limit(size))?;
     }
     for value in [
         transform.authored_flip_horizontal(),
         transform.authored_flip_vertical(),
     ] {
         if value.is_some() {
-            size = size
-                .checked_add(9)
-                .ok_or_else(|| limit("serialized transform bytes"))?;
+            size = size.checked_add(9).ok_or_else(|| limit(size))?;
         }
     }
     for value in [transform.offset(), transform.child_offset()]
@@ -45,24 +43,21 @@ pub fn validate(transform: &Transform) -> Result<()> {
         size = add_size(size, value)?;
     }
     if size > MAX_SERIALIZED_BYTES {
-        return Err(limit("serialized transform bytes"));
+        return Err(limit(size));
     }
     Ok(())
 }
 
 fn add_point(size: usize, point: &Point) -> Result<usize> {
     size.checked_add(24 + point.x().to_string().len() + point.y().to_string().len())
-        .ok_or_else(|| limit("serialized transform bytes"))
+        .ok_or_else(|| limit(size))
 }
 
 fn add_size(size: usize, value: Size) -> Result<usize> {
     size.checked_add(25 + value.width().to_string().len() + value.height().to_string().len())
-        .ok_or_else(|| limit("serialized transform bytes"))
+        .ok_or_else(|| limit(size))
 }
 
-fn limit(resource: &'static str) -> Error {
-    Error::Limit {
-        resource,
-        limit: MAX_SERIALIZED_BYTES,
-    }
+fn limit(observed: usize) -> Error {
+    Error::limit(crate::LimitKind::XmlBytes, observed, MAX_SERIALIZED_BYTES)
 }

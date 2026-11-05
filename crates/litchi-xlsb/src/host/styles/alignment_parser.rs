@@ -94,7 +94,17 @@ impl Alignment {
     ///
     /// Rotation and indentation are stored as bytes 10 and 11. Alignment and
     /// protection flags occupy bytes 12 and 13.
-    pub fn parse(data: &[u8], offset: usize) -> Result<Option<Self>> {
+    pub fn parse(data: &[u8], offset: usize, limits: crate::raw::Limits) -> Result<Option<Self>> {
+        limits.validate()?;
+        if data.len() > limits.payload() {
+            return Err(crate::package::error::Error::Wire(
+                crate::raw::Error::PayloadLimit {
+                    length: data.len(),
+                    limit: limits.payload(),
+                    offset: 0,
+                },
+            ));
+        }
         if offset + 16 > data.len() {
             return Ok(None);
         }
@@ -164,7 +174,9 @@ mod tests {
         data[12] = 3 | (2 << 3) | 0x40;
         data[13] = 1 | (2 << 2);
 
-        let alignment = Alignment::parse(&data, 0).unwrap().unwrap();
+        let alignment = Alignment::parse(&data, 0, crate::raw::Limits::DEFAULT)
+            .unwrap()
+            .unwrap();
         assert_eq!(alignment.horizontal, HorizontalAlignment::Right);
         assert_eq!(alignment.vertical, VerticalAlignment::Bottom);
         assert_eq!(alignment.rotation, 45);
@@ -176,7 +188,28 @@ mod tests {
 
     #[test]
     fn omits_default_and_truncated_alignment() {
-        assert!(Alignment::parse(&[0; 16], 0).unwrap().is_none());
-        assert!(Alignment::parse(&[0; 15], 0).unwrap().is_none());
+        assert!(
+            Alignment::parse(&[0; 16], 0, crate::raw::Limits::DEFAULT)
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            Alignment::parse(&[0; 15], 0, crate::raw::Limits::DEFAULT)
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn refuses_alignment_payload_above_the_required_raw_ceiling() {
+        let error = Alignment::parse(&[0; 16], 0, crate::raw::Limits::new(15, 64)).unwrap_err();
+        assert!(matches!(
+            error,
+            crate::package::error::Error::Wire(crate::raw::Error::PayloadLimit {
+                length: 16,
+                limit: 15,
+                ..
+            })
+        ));
     }
 }

@@ -10,7 +10,7 @@
 //!
 //! Run with: `cargo run --example ppt_transitions_example`
 
-use litchi_ppt::Writer;
+use litchi_ppt::Builder;
 use litchi_ppt::transition::{
     AdvanceMode, TransitionDirection, TransitionInfo, TransitionSpeed, TransitionType,
 };
@@ -18,9 +18,12 @@ use litchi_ppt::transition::{
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating PPT file with transitions...");
 
-    let mut writer = Writer::new_widescreen();
-    writer.set_property("Title", "Transition Effects Showcase");
-    writer.set_property("Author", "Litchi Transition Demo");
+    let mut writer = Builder::new_widescreen();
+    writer.set_metadata(litchi_core::Metadata {
+        title: Some("Transition Effects Showcase".to_owned()),
+        author: Some("Litchi Transition Demo".to_owned()),
+        ..litchi_core::Metadata::default()
+    })?;
 
     // Slide 1: Classic Transitions
     println!("Creating slide 1: Classic Transitions");
@@ -179,7 +182,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Save the presentation
     println!("Saving to ppt_transitions_showcase.ppt...");
-    writer.save("ppt_transitions_showcase.ppt")?;
+    writer.build()?.save("ppt_transitions_showcase.ppt")?;
 
     println!("✅ Transition showcase created successfully!");
     println!("   - File: ppt_transitions_showcase.ppt");

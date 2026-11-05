@@ -5,8 +5,10 @@ use litchi_iwa_common::{decode_varint_from_bytes, encode_varint_into, wire::Wire
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsk, tsp, tswp};
 use litchi_keynote::{
-    Package, Position, SlideNotesCommit, SlideNotesDiagnostics, SlideNotesError,
-    SlideNotesLimitKind, SlideNotesPatch, SlideSelector, TextPosition, TextSpan,
+    OpenOptions, Package, Position, SlideSelector, SourceLimits, TextPosition, TextSpan,
+    slide::notes::Commit as SlideNotesCommit, slide::notes::Diagnostics as SlideNotesDiagnostics,
+    slide::notes::Error as SlideNotesError, slide::notes::LimitKind as SlideNotesLimitKind,
+    slide::notes::Patch as SlideNotesPatch,
 };
 use prost::Message as _;
 
@@ -49,19 +51,23 @@ fn object(identifier: u64, type_: u32, value: &impl prost::Message) -> TestResul
             type_,
             data: value.encode_to_vec(),
         }],
+        Default::default(),
     )?)
 }
 
 fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn component_with_unknown_header(
     objects: Vec<ArchiveObject>,
     target_identifier: u64,
 ) -> TestResult<Vec<u8>> {
-    let bytes = Archive { objects }.to_bytes()?;
-    let parsed = Archive::parse(&bytes)?;
+    let bytes = Archive { objects }.to_bytes(Default::default())?;
+    let parsed = Archive::parse(&bytes, Default::default())?;
     let object = parsed
         .object(target_identifier)
         .ok_or_else(|| io::Error::other("synthetic target object is missing"))?;
@@ -94,9 +100,9 @@ fn component_with_unknown_header(
     with_unknown.extend_from_slice(&header);
     with_unknown.extend_from_slice(&bytes[data_offset..]);
 
-    let reparsed = Archive::parse(&with_unknown)?;
-    assert_eq!(reparsed.to_bytes()?, with_unknown);
-    Ok(SnappyStream::compress(&with_unknown)?)
+    let reparsed = Archive::parse(&with_unknown, Default::default())?;
+    assert_eq!(reparsed.to_bytes(Default::default())?, with_unknown);
+    Ok(SnappyStream::compress(&with_unknown, Default::default())?)
 }
 
 fn slide(identifier: u64, name: &str, note: Option<u64>) -> kn::SlideArchive {
@@ -185,6 +191,7 @@ fn synthetic_package(dependent_note_content: bool) -> TestResult<Vec<u8>> {
                 data: b"after-note-message".to_vec(),
             },
         ],
+        Default::default(),
     )?;
     note_object.archive_info.message_infos[1].object_references = vec![NOTE_STORAGE];
     let storage_object = ArchiveObject::new(
@@ -203,6 +210,7 @@ fn synthetic_package(dependent_note_content: bool) -> TestResult<Vec<u8>> {
                 data: b"after-storage-message".to_vec(),
             },
         ],
+        Default::default(),
     )?;
 
     let mut first_slide_object = object(
@@ -227,6 +235,7 @@ fn synthetic_package(dependent_note_content: bool) -> TestResult<Vec<u8>> {
                     type_: 999,
                     data: PRIVATE_MARKER.to_vec(),
                 }],
+                Default::default(),
             )?,
         ],
         NOTE_STORAGE,
@@ -237,6 +246,7 @@ fn synthetic_package(dependent_note_content: bool) -> TestResult<Vec<u8>> {
             type_: 999,
             data: b"unrelated-iwa-component".to_vec(),
         }],
+        Default::default(),
     )?])?;
     Ok(litchi_iwa_archive::package::to_bytes(
         [
@@ -249,12 +259,12 @@ fn synthetic_package(dependent_note_content: bool) -> TestResult<Vec<u8>> {
 }
 
 fn document_stream(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("missing synthetic Keynote document member"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn rewrite_document(
@@ -262,10 +272,11 @@ fn rewrite_document(
     mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
     let stream = document_stream(package)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     mutate(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(package)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(DOCUMENT_MEMBER, &compressed)],
         Limits::default(),
@@ -295,6 +306,7 @@ fn with_movie_drawable(
                 type_: 5,
                 data: value.encode_to_vec(),
             },
+            Default::default(),
         )?;
         archive.objects.push(ArchiveObject::new(
             drawable_identifier,
@@ -302,6 +314,7 @@ fn with_movie_drawable(
                 type_: MOVIE_MESSAGE_TYPE,
                 data: payload,
             }],
+            Default::default(),
         )?);
         Ok(())
     })
@@ -315,7 +328,7 @@ fn minimal_movie_payload() -> Vec<u8> {
 
 fn with_overlong_object_length_prefix(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
     let mut stream = document_stream(package)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic Keynote object"))?;
@@ -326,9 +339,9 @@ fn with_overlong_object_length_prefix(package: &[u8], identifier: u64) -> TestRe
     }
     stream[offset] |= 0x80;
     stream.insert(offset + 1, 0);
-    Archive::parse(&stream)?;
-    let compressed = SnappyStream::compress(&stream)?;
-    let catalog = Catalog::from_bytes(package)?;
+    Archive::parse(&stream, Default::default())?;
+    let compressed = SnappyStream::compress(&stream, Default::default())?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(DOCUMENT_MEMBER, &compressed)],
         Limits::default(),
@@ -337,7 +350,7 @@ fn with_overlong_object_length_prefix(package: &[u8], identifier: u64) -> TestRe
 
 fn message_payload(package: &[u8], identifier: u64, type_: u32) -> TestResult<Vec<u8>> {
     let stream = document_stream(package)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic Keynote object"))?;
@@ -351,7 +364,7 @@ fn message_payload(package: &[u8], identifier: u64, type_: u32) -> TestResult<Ve
 
 fn object_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
     let stream = document_stream(package)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic Keynote object"))?;
@@ -369,8 +382,8 @@ fn object_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
 }
 
 fn assert_only_document_payload_changed(before: &[u8], after: &[u8]) -> TestResult<()> {
-    let before_catalog = Catalog::from_bytes(before)?;
-    let after_catalog = Catalog::from_bytes(after)?;
+    let before_catalog = Catalog::from_bytes(before, Default::default())?;
+    let after_catalog = Catalog::from_bytes(after, Default::default())?;
     let before_entries = before_catalog.iter().collect::<Vec<_>>();
     let after_entries = after_catalog.iter().collect::<Vec<_>>();
     assert_eq!(before_entries.len(), after_entries.len());
@@ -395,11 +408,13 @@ fn assert_only_document_payload_changed(before: &[u8], after: &[u8]) -> TestResu
 }
 
 fn raw_fields(payload: &[u8], number: u32) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(payload)?
-        .fields()
-        .filter(|field| field.number() == number)
-        .map(|field| field.raw().to_vec())
-        .collect())
+    Ok(
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .filter(|field| field.number() == number)
+            .map(|field| field.raw().to_vec())
+            .collect(),
+    )
 }
 
 fn assert_send_sync<T: Send + Sync>(_: &T) {}
@@ -437,13 +452,19 @@ fn notes_snapshot_strictly_rejects_malformed_known_table_and_keeps_source_immuta
         // Field 9 is a recognized object-attribute table. Its malformed
         // child must be rejected by the strict schema pass even though the
         // lazy text projection itself only needs field 3.
-        litchi_iwa_common::wire::append_length_delimited_field(&mut data, 9, &[0x0a])?;
+        litchi_iwa_common::wire::append_length_delimited_field(
+            &mut data,
+            9,
+            &[0x0a],
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         object.replace_message_preserving_header(
             index,
             RawMessage {
                 type_: STORAGE_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -587,46 +608,54 @@ fn selectors_utf16_boundaries_and_staging_errors_leave_source_unchanged() -> Tes
 
     assert!(matches!(
         package.edit_slide_notes("Missing"),
-        Err(SlideNotesError::SlideNameNotFound)
+        Err(SlideNotesError::Refused(
+            litchi_keynote::slide::notes::Refusal::SlideNameNotFound
+        ))
     ));
     assert!(matches!(
         package.edit_slide_notes(SlideSelector::index(2)),
-        Err(SlideNotesError::SlidePositionNotFound { position })
+        Err(SlideNotesError::Refused(litchi_keynote::slide::notes::Refusal::SlidePositionNotFound { position }))
             if position == Position::new(2)
     ));
     assert!(matches!(
         package.edit_slide_notes("No Notes"),
-        Err(SlideNotesError::NotesStorageNotFound)
+        Err(SlideNotesError::Refused(
+            litchi_keynote::slide::notes::Refusal::NotesStorageNotFound
+        ))
     ));
 
     let mut split_start = package.edit_slide_notes("Agenda")?;
     assert!(matches!(
         split_start.replace(TextSpan::from_utf16_indexes(9, 10)?, "x"),
-        Err(SlideNotesError::SurrogateBoundary { position })
+        Err(SlideNotesError::Refused(litchi_keynote::slide::notes::Refusal::SurrogateBoundary { position }))
             if position == TextPosition::from_utf16_code_units(9)
     ));
     let mut split_end = package.edit_slide_notes("Agenda")?;
     assert!(matches!(
         split_end.delete(TextSpan::from_utf16_indexes(8, 9)?),
-        Err(SlideNotesError::SurrogateBoundary { position })
+        Err(SlideNotesError::Refused(litchi_keynote::slide::notes::Refusal::SurrogateBoundary { position }))
             if position == TextPosition::from_utf16_code_units(9)
     ));
     let mut out_of_bounds = package.edit_slide_notes("Agenda")?;
     assert!(matches!(
         out_of_bounds.delete(TextSpan::from_utf16_indexes(0, 100)?),
-        Err(SlideNotesError::SpanOutOfBounds { length, .. })
+        Err(SlideNotesError::Refused(litchi_keynote::slide::notes::Refusal::SpanOutOfBounds { length, .. }))
             if length == TextPosition::from_utf16_code_units(16)
     ));
     let mut marker = package.edit_slide_notes("Agenda")?;
     assert!(matches!(
         marker.insert(TextPosition::ZERO, "bad\u{fffc}marker"),
-        Err(SlideNotesError::ObjectMarkerReplacement)
+        Err(SlideNotesError::Refused(
+            litchi_keynote::slide::notes::Refusal::ObjectMarkerReplacement
+        ))
     ));
     let mut one_operation = package.edit_slide_notes("Agenda")?;
     one_operation.insert(TextPosition::ZERO, "first")?;
     assert!(matches!(
         one_operation.insert(TextPosition::ZERO, "second"),
-        Err(SlideNotesError::OperationAlreadyStaged)
+        Err(SlideNotesError::Refused(
+            litchi_keynote::slide::notes::Refusal::OperationAlreadyStaged
+        ))
     ));
 
     assert_eq!(package.exact_bytes(), bytes);
@@ -730,7 +759,7 @@ fn changed_notes_preserve_unknowns_scope_and_exact_inverse_application() -> Test
         Some("Speaker 🚀 notes".to_owned())
     );
 
-    let catalog = Catalog::from_bytes(&bytes)?;
+    let catalog = Catalog::from_bytes(&bytes, Default::default())?;
     let equivalent_bytes = catalog.reassemble_to_bytes(
         &[EntryEdit::new(
             "Data/sentinel.bin",
@@ -779,13 +808,16 @@ fn duplicate_names_missing_graph_and_malformed_references_fail_closed() -> TestR
                 type_: 5,
                 data: value.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
     let duplicate_name_package = Package::from_bytes(&duplicate_name)?;
     assert!(matches!(
         duplicate_name_package.edit_slide_notes("Agenda"),
-        Err(SlideNotesError::AmbiguousSelector)
+        Err(SlideNotesError::Refused(
+            litchi_keynote::slide::notes::Refusal::AmbiguousSelector
+        ))
     ));
 
     let malformed = [
@@ -803,8 +835,13 @@ fn duplicate_names_missing_graph_and_malformed_references_fail_closed() -> TestR
                 &mut data,
                 27,
                 &reference(NOTE_OBJECT).encode_to_vec(),
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
-            object.replace_message_preserving_header(index, RawMessage { type_: 5, data })?;
+            object.replace_message_preserving_header(
+                index,
+                RawMessage { type_: 5, data },
+                Default::default(),
+            )?;
             Ok(())
         })?,
         rewrite_document(&bytes, |archive| {
@@ -828,6 +865,7 @@ fn duplicate_names_missing_graph_and_malformed_references_fail_closed() -> TestR
                     type_: NOTE_MESSAGE_TYPE,
                     data: Vec::new(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })?,
@@ -845,6 +883,7 @@ fn duplicate_names_missing_graph_and_malformed_references_fail_closed() -> TestR
                 &mut data,
                 1,
                 &reference(NOTE_STORAGE).encode_to_vec(),
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
             object.replace_message_preserving_header(
                 index,
@@ -852,6 +891,7 @@ fn duplicate_names_missing_graph_and_malformed_references_fail_closed() -> TestR
                     type_: NOTE_MESSAGE_TYPE,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })?,
@@ -870,6 +910,7 @@ fn duplicate_names_missing_graph_and_malformed_references_fail_closed() -> TestR
                     type_: NOTE_MESSAGE_TYPE,
                     data: vec![0x0a, 0x00],
                 },
+                Default::default(),
             )?;
             Ok(())
         })?,
@@ -891,6 +932,7 @@ fn duplicate_names_missing_graph_and_malformed_references_fail_closed() -> TestR
                     }
                     .encode_to_vec(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })?,
@@ -910,7 +952,7 @@ fn duplicate_names_missing_graph_and_malformed_references_fail_closed() -> TestR
                 .find(|message| message.type_ == STORAGE_MESSAGE_TYPE)
                 .ok_or_else(|| io::Error::other("missing storage message"))?
                 .clone();
-            object.push_message(duplicate)?;
+            object.push_message(duplicate, Default::default())?;
             Ok(())
         })?,
         rewrite_document(&bytes, |archive| {
@@ -928,6 +970,7 @@ fn duplicate_names_missing_graph_and_malformed_references_fail_closed() -> TestR
                     type_: STORAGE_MESSAGE_TYPE,
                     data: vec![0x1a, 0x80],
                 },
+                Default::default(),
             )?;
             Ok(())
         })?,
@@ -993,7 +1036,9 @@ fn note_graph_metadata_ownership_is_proven_before_rewriting() -> TestResult<()> 
     edit.set("exclusive ownership is required")?;
     assert!(matches!(
         edit.commit(),
-        Err(SlideNotesError::DependentContent)
+        Err(SlideNotesError::Refused(
+            litchi_keynote::slide::notes::Refusal::DependentContent
+        ))
     ));
     assert_eq!(package.exact_bytes(), extra_owner);
     Ok(())
@@ -1035,6 +1080,7 @@ fn metadata_and_payload_ownership_aliases_fail_closed() -> TestResult<()> {
                 type_: 5,
                 data: value.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -1065,6 +1111,7 @@ fn metadata_and_payload_ownership_aliases_fail_closed() -> TestResult<()> {
                 type_: NOTE_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -1081,7 +1128,10 @@ fn metadata_and_payload_ownership_aliases_fail_closed() -> TestResult<()> {
         edit.set("ownership ambiguity must not publish")?;
         assert!(matches!(
             edit.commit(),
-            Err(SlideNotesError::DependentContent | SlideNotesError::InvalidSource)
+            Err(
+                SlideNotesError::Refused(litchi_keynote::slide::notes::Refusal::DependentContent)
+                    | SlideNotesError::InvalidSource
+            )
         ));
         assert_eq!(package.exact_bytes(), adversarial);
     }
@@ -1131,7 +1181,9 @@ fn dependent_note_content_is_refused_without_blocking_unrelated_text() -> TestRe
     dependent.delete(TextSpan::from_utf16_indexes(8, 10)?)?;
     assert!(matches!(
         dependent.commit(),
-        Err(SlideNotesError::DependentContent)
+        Err(SlideNotesError::Refused(
+            litchi_keynote::slide::notes::Refusal::DependentContent
+        ))
     ));
     assert_eq!(package.exact_bytes(), bytes);
 
@@ -1149,13 +1201,20 @@ fn dependent_note_content_is_refused_without_blocking_unrelated_text() -> TestRe
 fn changed_notes_respect_the_retained_output_limit() -> TestResult<()> {
     let bytes = synthetic_package(false)?;
     let input_bytes = u64::try_from(bytes.len())?;
-    let limits = Limits::new(input_bytes, 16, 1024 * 1024, 1024 * 1024, 1024 * 1024)?;
-    let package = Package::from_bytes_with_limits(&bytes, limits)?;
+    let limits = SourceLimits::builder()
+        .max_input_bytes(input_bytes)?
+        .max_entries(16)?
+        .max_entry_bytes(1024 * 1024)?
+        .max_aggregate_bytes(1024 * 1024)?
+        .max_component_bytes(1024 * 1024)?
+        .build()?;
+    let package =
+        Package::from_bytes_with_options(&bytes, OpenOptions::new().source_limits(limits))?;
     let mut edit = package.edit_slide_notes("Agenda")?;
     edit.insert(TextPosition::ZERO, &"expanded".repeat(1_024))?;
     assert!(matches!(
         edit.commit(),
-        Err(SlideNotesError::LimitExceeded {
+        Err(SlideNotesError::Limit {
             kind: SlideNotesLimitKind::OutputBytes,
             ..
         })

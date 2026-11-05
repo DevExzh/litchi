@@ -1,4 +1,5 @@
 /// Table, Row, and Cell structures for legacy Word documents.
+use super::cp_range::CpRange;
 use super::package::Result;
 use super::paragraph::Paragraph;
 use super::parts::tap::{
@@ -35,6 +36,8 @@ pub struct Table {
     rows: Arc<Vec<Row>>,
     /// Table-level properties (if available)
     properties: Option<TableProperties>,
+    /// Where the table sits in the document's CP space.
+    cp_range: Option<CpRange>,
 }
 
 impl Table {
@@ -47,6 +50,7 @@ impl Table {
         Self {
             rows: Arc::new(rows),
             properties: None,
+            cp_range: None,
         }
     }
 
@@ -59,6 +63,7 @@ impl Table {
         Self {
             rows: Arc::new(rows),
             properties: Some(properties),
+            cp_range: None,
         }
     }
 
@@ -117,6 +122,19 @@ impl Table {
     pub fn has_header_row(&self) -> bool {
         self.properties.as_ref().is_some_and(|p| p.is_header_row)
     }
+
+    /// The table's character positions: from its first paragraph's start
+    /// through its last row-end mark, nested tables included.
+    ///
+    /// `None` when the table was not read from a story's text.
+    #[must_use]
+    pub fn cp_range(&self) -> Option<CpRange> {
+        self.cp_range
+    }
+
+    pub(crate) fn set_cp_range(&mut self, range: Option<CpRange>) {
+        self.cp_range = range;
+    }
 }
 
 /// A row in a table.
@@ -137,6 +155,8 @@ pub struct Row {
     formatting_revision: Option<RevisionMark>,
     /// Whether properties preceding the revision wall are preserved
     properties_preserved_for_revision: bool,
+    /// Where the row sits in the document's CP space.
+    cp_range: Option<CpRange>,
 }
 
 impl Row {
@@ -151,6 +171,7 @@ impl Row {
             row_properties: None,
             formatting_revision: None,
             properties_preserved_for_revision: false,
+            cp_range: None,
         }
     }
 
@@ -165,6 +186,7 @@ impl Row {
             formatting_revision: None,
             properties_preserved_for_revision: properties.properties_preserved_for_revision,
             row_properties: Some(properties),
+            cp_range: None,
         }
     }
 
@@ -179,6 +201,7 @@ impl Row {
             row_properties,
             formatting_revision,
             properties_preserved_for_revision,
+            cp_range: None,
         }
     }
 
@@ -226,6 +249,20 @@ impl Row {
     pub fn properties_preserved_for_revision(&self) -> bool {
         self.properties_preserved_for_revision
     }
+
+    /// The row's character positions: its cells, nested tables included,
+    /// through its row-end mark.
+    ///
+    /// A final row that ends without a row-end mark ends with its last
+    /// paragraph. `None` when the row was not read from a story's text.
+    #[must_use]
+    pub fn cp_range(&self) -> Option<CpRange> {
+        self.cp_range
+    }
+
+    pub(crate) fn set_cp_range(&mut self, range: Option<CpRange>) {
+        self.cp_range = range;
+    }
 }
 
 /// A cell in a table.
@@ -244,6 +281,8 @@ pub struct Cell {
     paragraphs: Arc<Vec<Paragraph>>,
     /// Cell properties (if available)
     properties: Option<CellProperties>,
+    /// Where the cell sits in the document's CP space.
+    cp_range: Option<CpRange>,
 }
 
 impl Cell {
@@ -258,6 +297,7 @@ impl Cell {
             text: Arc::new(text),
             paragraphs: Arc::new(vec![para]),
             properties: None,
+            cp_range: None,
         }
     }
 
@@ -279,6 +319,7 @@ impl Cell {
             text: Arc::new(text),
             paragraphs: Arc::new(paragraphs),
             properties,
+            cp_range: None,
         }
     }
 
@@ -300,6 +341,21 @@ impl Cell {
     #[must_use]
     pub fn properties(&self) -> Option<&CellProperties> {
         self.properties.as_ref()
+    }
+
+    /// The cell's character positions: from where the previous cell (or the
+    /// row) ends through the cell's own cell mark, so the cells of a row tile
+    /// it up to its row-end mark and a table nested in the cell lies inside.
+    ///
+    /// `None` when the cell was not read from a story's text, such as the
+    /// empty cell of a row that holds only a row-end mark.
+    #[must_use]
+    pub fn cp_range(&self) -> Option<CpRange> {
+        self.cp_range
+    }
+
+    pub(crate) fn set_cp_range(&mut self, range: Option<CpRange>) {
+        self.cp_range = range;
     }
 
     /// Get the cell's vertical alignment.

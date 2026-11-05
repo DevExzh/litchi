@@ -38,7 +38,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     println!("\n📄 Parsing RTF document...\n");
 
     // Parse the document
-    let doc = RtfDocument::parse(rtf_content)?;
+    let doc = raw::Tree::parse(rtf_content, litchi::rtf::read::OpenOptions::default())?;
 
     // Display basic document info
     println!("✅ Document parsed successfully!\n");

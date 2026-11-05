@@ -70,16 +70,23 @@
 //!
 //! // Write to XML
 //! let mut xml_output = Vec::new();
-//! litchi_drawingml::chart::writer::write(&mut xml_output, &chart)?;
-//! # Ok::<(), std::io::Error>(())
+//! litchi_drawingml::chart::writer::write(
+//!     &mut xml_output,
+//!     &chart,
+//!     &litchi_drawingml::chart::Limits::DEFAULT,
+//! )?;
+//! # Ok::<(), litchi_drawingml::Error>(())
 //! ```
 
+pub mod authoring;
 pub mod axis;
 pub mod bubble;
+pub mod chartex;
 pub mod data;
 pub mod edit;
 pub mod extension;
 pub mod legend;
+mod limits;
 pub mod model;
 pub mod plot_area;
 pub mod reader;
@@ -88,12 +95,14 @@ pub mod style;
 pub mod types;
 pub mod writer;
 
+pub use crate::Error;
 pub use axis::{Axis, AxisCommon, CategoryAxis, DateAxis, SeriesAxis, ValueAxis};
 pub use data::{
     Layout, MultiLevelStringData, NumberFormat, NumericData, RichText, StringData, TitleText,
 };
-pub use edit::{Commit, DataLabelFlag, Patch, Snapshot, Transaction};
+pub use edit::{Commit, DataLabelFlag, Diagnostics, Edit, LimitKind, Package, Patch};
 pub use legend::Legend;
+pub use limits::Limits;
 pub use model::{
     Chart, ColorMapOverride, ColorMapping, ColorSchemeIndex, ExtensionList, ExternalData,
     HeaderFooter, PageMargins, PageOrientation, PageSetup, PictureFormat, PictureOptions,

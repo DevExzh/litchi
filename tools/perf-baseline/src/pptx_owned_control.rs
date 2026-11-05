@@ -320,7 +320,7 @@ fn run_control(corpus: Corpus, directory: &Path) -> Result<RunOutput, Box<dyn Er
         .checked_mul(PPTX_SOURCE_TEXT_BOXES_PER_SLIDE)
         .ok_or("PPTX owning-control replacement count overflows usize")?;
 
-    let source_package = litchi_pptx::Package::from_vec(source.clone())?;
+    let source_package = litchi_pptx::Package::from_reader(std::io::Cursor::new(source.clone()))?;
     verify_pptx_source_edit_semantics(&source_package, 0)?;
     let ingress_ownership = ownership_capability(source_package.opc()?);
     if !ingress_ownership.ingress_unmodified_owned_source
@@ -329,13 +329,14 @@ fn run_control(corpus: Corpus, directory: &Path) -> Result<RunOutput, Box<dyn Er
     {
         return Err("owning PPTX ingress did not retain exact source authorization".into());
     }
-    let mut no_op_package = litchi_pptx::Package::from_vec(source.clone())?;
-    let no_op_edit = no_op_package.opened_presentation_transaction()?;
+    let mut no_op_package =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(source.clone()))?;
+    let no_op_edit = no_op_package.edit()?;
     let no_op_commit = no_op_edit.commit()?;
-    if no_op_commit.is_changed() {
+    if no_op_commit.diagnostics().changed() {
         return Err("owning PPTX empty transaction unexpectedly changed the package".into());
     }
-    no_op_package.apply_opened_presentation_commit(no_op_commit)?;
+    no_op_package = no_op_commit.into_package();
     let no_op_ownership = ownership_capability(no_op_package.opc()?);
     let no_op = no_op_package.to_bytes()?;
     write_new_bytes(&directory.join(NOOP_FILE), &no_op)?;
@@ -348,8 +349,8 @@ fn run_control(corpus: Corpus, directory: &Path) -> Result<RunOutput, Box<dyn Er
         return Err("owning PPTX no-op transaction revoked exact source authorization".into());
     }
 
-    let mut package = litchi_pptx::Package::from_vec(source.clone())?;
-    let mut edit = package.opened_presentation_transaction()?;
+    let mut package = litchi_pptx::Package::from_reader(std::io::Cursor::new(source.clone()))?;
+    let mut edit = package.edit()?;
     for slide_position in selected_positions.iter().copied() {
         let texts = replacement_texts(slide_position);
         let replacements = super::pptx_batch_replacements(&texts);
@@ -359,7 +360,7 @@ fn run_control(corpus: Corpus, directory: &Path) -> Result<RunOutput, Box<dyn Er
         }
     }
     let commit = edit.commit()?;
-    if !commit.is_changed() {
+    if !commit.diagnostics().changed() {
         return Err("owning PPTX control produced an unchanged commit".into());
     }
     if commit.patch().resource_count() == 0 {
@@ -367,7 +368,7 @@ fn run_control(corpus: Corpus, directory: &Path) -> Result<RunOutput, Box<dyn Er
     }
     let forward = commit.patch().clone();
     let inverse = forward.inverse();
-    package.apply_opened_presentation_commit(commit)?;
+    package = commit.into_package();
     let mut ownership = ingress_ownership;
     let after_edit = ownership_capability(package.opc()?);
     ownership.after_edit_unmodified_owned_source = after_edit.ingress_unmodified_owned_source;
@@ -388,7 +389,7 @@ fn run_control(corpus: Corpus, directory: &Path) -> Result<RunOutput, Box<dyn Er
     verify_pptx_multi_slide_edit_output(&corpus, &output)?;
 
     let mut streamed = Vec::new();
-    PackageWriter::write_to_stream(&mut streamed, package.opc()?)?;
+    PackageWriter::write_to(&mut streamed, package.opc()?)?;
     if streamed != output {
         return Err("owning PPTX OPC stream differs from Package::to_bytes output".into());
     }
@@ -402,7 +403,7 @@ fn run_control(corpus: Corpus, directory: &Path) -> Result<RunOutput, Box<dyn Er
         bytes: Vec::new(),
         fail_after,
     };
-    let partial_result = PackageWriter::write_to_stream(&mut partial, package.opc()?);
+    let partial_result = PackageWriter::write_to(&mut partial, package.opc()?);
     if partial_result.is_ok()
         || partial.bytes.is_empty()
         || partial.bytes.len() >= output.len()
@@ -433,7 +434,7 @@ fn run_control(corpus: Corpus, directory: &Path) -> Result<RunOutput, Box<dyn Er
         bytes: Vec::new(),
         fail_after: 0,
     };
-    let zero_result = PackageWriter::write_to_stream(&mut zero, package.opc()?);
+    let zero_result = PackageWriter::write_to(&mut zero, package.opc()?);
     if zero_result.is_ok() || !zero.bytes.is_empty() || package.to_bytes()? != output {
         return Err("owning PPTX zero sink failure changed output or package state".into());
     }
@@ -453,13 +454,13 @@ fn run_control(corpus: Corpus, directory: &Path) -> Result<RunOutput, Box<dyn Er
     };
 
     let mut inverse_package = package;
-    inverse_package.apply_opened_presentation_patch(&inverse)?;
+    inverse_package = inverse_package.apply(&inverse)?.into_package();
     let inverse_output = inverse_package.to_bytes()?;
     write_new_bytes(&directory.join(INVERSE_FILE), &inverse_output)?;
     if inverse_output != source {
         return Err("owning PPTX inverse did not restore exact source bytes".into());
     }
-    inverse_package.apply_opened_presentation_patch(&forward)?;
+    inverse_package = inverse_package.apply(&forward)?.into_package();
     let forward_replay = inverse_package.to_bytes()?;
     write_new_bytes(&directory.join(FORWARD_REPLAY_FILE), &forward_replay)?;
     if forward_replay != output {
@@ -467,42 +468,60 @@ fn run_control(corpus: Corpus, directory: &Path) -> Result<RunOutput, Box<dyn Er
     }
 
     let durable_forward_bytes = forward.to_bytes()?;
-    let decoded_forward = litchi_pptx::opened::Patch::from_bytes(&durable_forward_bytes)?;
+    let decoded_forward = litchi_pptx::opened::Patch::from_bytes(
+        &durable_forward_bytes,
+        litchi_pptx::opened::Limits::default(),
+    )?;
     if decoded_forward != forward {
         return Err("owning PPTX durable forward patch changed during round-trip".into());
     }
     let durable_inverse_bytes = inverse.to_bytes()?;
-    let decoded_inverse = litchi_pptx::opened::Patch::from_bytes(&durable_inverse_bytes)?;
+    let decoded_inverse = litchi_pptx::opened::Patch::from_bytes(
+        &durable_inverse_bytes,
+        litchi_pptx::opened::Limits::default(),
+    )?;
     if decoded_inverse != inverse {
         return Err("owning PPTX durable inverse patch changed during round-trip".into());
     }
-    let mut durable_forward_package = litchi_pptx::Package::from_vec(source.clone())?;
-    durable_forward_package.apply_opened_presentation_patch(&decoded_forward)?;
+    let mut durable_forward_package =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(source.clone()))?;
+    durable_forward_package = durable_forward_package
+        .apply(&decoded_forward)?
+        .into_package();
     let durable_forward_output = durable_forward_package.to_bytes()?;
     if durable_forward_output != output {
         return Err("owning PPTX durable forward patch failed on a reopened source".into());
     }
-    let mut durable_inverse_package = litchi_pptx::Package::from_vec(output.clone())?;
-    durable_inverse_package.apply_opened_presentation_patch(&decoded_inverse)?;
+    let mut durable_inverse_package =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(output.clone()))?;
+    durable_inverse_package = durable_inverse_package
+        .apply(&decoded_inverse)?
+        .into_package();
     let durable_inverse_output = durable_inverse_package.to_bytes()?;
     if durable_inverse_output != source {
         return Err("owning PPTX durable inverse patch failed on a reopened candidate".into());
     }
 
-    let exact_limit = litchi_opc::ReadLimits::builder()
+    let exact_limit = litchi_opc::SourceLimits::builder()
         .max_input_bytes(u64::try_from(source.len())?)?
         .build()?;
-    let exact_limited = litchi_pptx::Package::from_vec_with_limits(source.clone(), exact_limit)?;
+    let exact_limited = litchi_pptx::Package::from_reader_with_options(
+        std::io::Cursor::new(source.clone()),
+        litchi_pptx::OpenOptions::default().source_limits(exact_limit),
+    )?;
     if exact_limited.opc()?.exact_source_len() != Some(source.len()) {
         return Err("owning PPTX exact input-byte limit did not admit the source".into());
     }
-    let under_limit = litchi_opc::ReadLimits::builder()
+    let under_limit = litchi_opc::SourceLimits::builder()
         .max_input_bytes(u64::try_from(source.len().saturating_sub(1))?)?
         .build()?;
-    match litchi_pptx::Package::from_vec_with_limits(source.clone(), under_limit) {
-        Err(litchi_pptx::Error::Opc(litchi_opc::OpcError::ReadLimit {
-            resource: litchi_opc::ReadResource::InputBytes,
-            actual,
+    match litchi_pptx::Package::from_reader_with_options(
+        std::io::Cursor::new(source.clone()),
+        litchi_pptx::OpenOptions::default().source_limits(under_limit),
+    ) {
+        Err(litchi_pptx::Error::Opc(litchi_opc::OpcError::Limit {
+            kind: litchi_opc::SourceLimitKind::InputBytes,
+            observed: actual,
             maximum,
         })) if actual == source.len() as u64 && maximum == source.len() as u64 - 1 => {},
         _ => {
@@ -512,17 +531,17 @@ fn run_control(corpus: Corpus, directory: &Path) -> Result<RunOutput, Box<dyn Er
         },
     }
 
-    let mut stale = litchi_pptx::Package::from_vec(source.clone())?;
-    let mut stale_edit = stale.opened_presentation_transaction()?;
+    let mut stale = litchi_pptx::Package::from_reader(std::io::Cursor::new(source.clone()))?;
+    let mut stale_edit = stale.edit()?;
     let stale_texts = replacement_texts(0);
     let stale_replacements = super::pptx_batch_replacements(&stale_texts);
     if stale_edit.set_shape_texts(0, &stale_replacements)? != PPTX_SOURCE_TEXT_BOXES_PER_SLIDE {
         return Err("owning PPTX stale fixture changed an unexpected shape count".into());
     }
-    stale.apply_opened_presentation_commit(stale_edit.commit()?)?;
+    stale = stale_edit.commit()?.into_package();
     let stale_before = stale.to_bytes()?;
     let stale_error = stale
-        .apply_opened_presentation_patch(&forward)
+        .apply(&forward)
         .err()
         .ok_or("owning PPTX control accepted a stale source patch")?;
     let stale_after = stale.to_bytes()?;
@@ -536,12 +555,12 @@ fn run_control(corpus: Corpus, directory: &Path) -> Result<RunOutput, Box<dyn Er
         return Err("owning PPTX stale-source refusal mutated its package".into());
     }
 
-    let mut foreign_seed = litchi_pptx::Package::new()?;
+    let foreign_seed = litchi_pptx::Package::new()?;
     let foreign_bytes = foreign_seed.to_bytes()?;
-    let mut foreign = litchi_pptx::Package::from_vec(foreign_bytes)?;
+    let foreign = litchi_pptx::Package::from_reader(std::io::Cursor::new(foreign_bytes))?;
     let foreign_before = foreign.to_bytes()?;
     let foreign_error = foreign
-        .apply_opened_presentation_patch(&forward)
+        .apply(&forward)
         .err()
         .ok_or("owning PPTX control accepted a foreign source patch")?;
     let foreign_after = foreign.to_bytes()?;
@@ -599,7 +618,7 @@ fn run_control(corpus: Corpus, directory: &Path) -> Result<RunOutput, Box<dyn Er
     let report = ControlReport {
         schema: SCHEMA,
         status: "probe_passed_pending_independent_raw_census",
-        implementation: "litchi_pptx::Package::from_vec -> opened_presentation_transaction -> PackageWriter::write_to_stream",
+        implementation: "litchi_pptx::Package::from_vec -> edit -> PackageWriter::write_to",
         timing_scope: "untimed qualification; no elapsed-time, allocation, instruction, compression, or speedup measurement",
         performance_claim: "none; this owning control only establishes preservation and refusal gates",
         corpus: corpus.manifest,

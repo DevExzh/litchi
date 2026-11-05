@@ -1,0 +1,81 @@
+{
+  "schema": "litchi.0362ul30.odp-final-memory-receipt-repair-followup.v1",
+  "date": "2026-10-24",
+  "claim_scope": "frozen source-only memory protocol, identity rechecks and negative metric tests; no Cargo build, native run, timing, memory result, qualification or acceptance claim",
+  "review": {
+    "path": "/home/zhuhe/.cache/litchi-api-contract/odp-build-handoff-receipt-review-2a20b44488.json",
+    "bytes": 6638,
+    "sha256": "58fd4e507de13ff9a6f5c6f0abf2b2a6a722a87dffb48d0e07d2398ac9565534",
+    "prior_commit": "2a20b44488"
+  },
+  "preserved_build_packet": {
+    "root": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547-repair-11858e697f",
+    "input_sha256": "92babe0b6243cdf903830b9b2a6d796604cade3a0c3b2c9724caa796391ee76d",
+    "plan_sha256": "0e96988db9add9de7d0f91f792ef8379d995a6083dac559b70d032a1a67a589e",
+    "build_handoff_sha256": "be60e8b150675818451a1962aea9d1dc32e3e51e74b51956ec910d0632088f2e",
+    "plan_receipt_sha256": "a9255a31f6a554e5e50d14f22472ae7fd44dd19af107b157233e434480d2d672",
+    "preserved": true
+  },
+  "prior_stale_record": {
+    "path": "docs/unified-ops/results/0362ul30/odp-build-handoff-receipt-repair-followup.json",
+    "recorded_bytes": 22912,
+    "recorded_sha256": "c638ad86e6a7edcf1532408156684d99060020a75d04a31aa67693a1d5c6658b",
+    "not_modified": true
+  },
+  "frozen_final": {
+    "memory_protocol": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-memory-qualification-2a20b44488-final/memory-protocol.json",
+      "bytes": 28914,
+      "sha256": "868313fa19b0fd3652bf84644899406721d8f811641cf327f417eb4f9895b3ec"
+    },
+    "handoff": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547-final-2a20b44488/final-handoff.json",
+      "bytes": 3664,
+      "sha256": "44617c1befa3fa8ade24b17046221e50dca2697af91c754d3d7fac4d385d999b"
+    },
+    "negative_partial_metrics": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-memory-qualification-2a20b44488-final/negative-partial-metrics-tests.log",
+      "bytes": 47,
+      "sha256": "ca7e7743983a6fc3d6b5f59bff03b8e42ec358e675623c0f36c7d01f5447563d",
+      "returncode": 0,
+      "cases": 5
+    },
+    "frozen_after_record": true
+  },
+  "identity_rechecks": {
+    "baseline_commit": "e4a0614f5d3a1d768346cc33a4a3b86522dda986",
+    "baseline_tree": "a1d3d5fb726673f8a162d4d9c4265f6ae79fcd4b",
+    "baseline_lock_sha256": "04665b965a919412e29c8772956ddf6267264fa40e3e0ef7c9967fd2eb584171",
+    "baseline_adapter_sha256": "47cc7a780d93b23015ff698216e98ce9597ee300ee1b34ae21a39276b2baded7",
+    "candidate_commit": "472b6705475b073e7fe08f6e11ee17fb1e29f838",
+    "candidate_tree": "ebc1cee05f124c0c63977aff07a23288c19e7d00",
+    "candidate_root_lock_sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
+    "candidate_perf_lock_sha256": "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c",
+    "candidate_probe_sha256": "c68f790247c7f83a1acb256a57f6c3928346b10cb348d5cf30d8f89705673bef",
+    "fixture_sha256": "078a83cd132a308e4609cf46f587cb68c1f928c8d2e6e1002d344223ec385cb5",
+    "cpu": 3,
+    "route": "append"
+  },
+  "final_contract": {
+    "pre_run_rechecks_locks": true,
+    "pre_run_rechecks_source_trees": true,
+    "pre_run_rechecks_binaries": true,
+    "pre_run_rechecks_probe_sources": true,
+    "pre_run_rechecks_fixture": true,
+    "pre_run_rechecks_cpu_and_route_args": true,
+    "measured_requires_peak_heap_and_peak_rss": true,
+    "measured_requires_histogram_success": true,
+    "partial_metric_negative_tests_passed": true,
+    "historical_peak_heap_delta_mib_unresolved": 0.5
+  },
+  "execution": {
+    "source_only_plan_returncode": 0,
+    "negative_metric_tests_returncode": 0,
+    "cargo_builds_run": false,
+    "native_probes_run": false,
+    "timing_run": false,
+    "memory_run": false,
+    "immutable_source_mutated": false,
+    "acceptance_claim": false
+  }
+}

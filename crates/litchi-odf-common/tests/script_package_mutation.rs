@@ -20,7 +20,7 @@ const LINK: &str = "javascript:alert(1)";
 const CONTENT: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:litchi="urn:litchi:test"><office:scripts><office:script script:language="ooo:Basic"><litchi:payload>one</litchi:payload></office:script></office:scripts><office:event-listeners><script:event-listener script:event-name="dom:load" script:language="ooo:Basic" xlink:href="javascript:alert(1)"/></office:event-listeners><office:body><office:text><text:p>preserved body</text:p></office:text></office:body></office:document-content>"#;
 
 fn package() -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(constants::ODF_TEXT).unwrap();
     writer
         .add_file(constants::ODF_CONTENT, CONTENT.as_bytes())

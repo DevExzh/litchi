@@ -11,7 +11,9 @@ use quick_xml::{
     reader::NsReader,
 };
 
-use crate::{Error, Result};
+pub use crate::Error;
+pub use crate::LimitKind;
+use crate::Result;
 
 use super::{
     ACTION_NAMESPACE, INKML_NAMESPACE, MAX_ATTRIBUTE_VALUE_BYTES, MAX_DEPTH, MAX_NODES,
@@ -21,13 +23,23 @@ use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::attributes::first_wins;
 
 #[path = "actions_edit.rs"]
-pub mod edit;
+mod edit;
 
-pub use edit::{
-    ActionDataDraft, ActionDraft, ActionGroupDraft, ActionParent, ActionSelector, ChildSelector,
-    Commit, DataChildDraft, DataGroupDraft, DataSelector, Draft, Edit, Limits, OpaquePayload,
-    Patch, Prepared, PropertyDraft,
-};
+/// Detached action-value builders.
+///
+/// Builder values are fresh authoring inputs.  They do not publish a
+/// source-backed edit; call [`builder::Draft::finish`] to emit a checked detached
+/// [`Prepared`] value, or use [`super::actions::Edit`] for source-backed
+/// editing and [`Edit::commit`] for publication.
+pub mod builder {
+    pub use super::edit::{
+        ActionDataDraft, ActionDraft, ActionGroupDraft, ActionParent, ActionSelector,
+        ChildSelector, DataChildDraft, DataGroupDraft, DataSelector, Draft, EditOptions,
+        OpaquePayload, PropertyDraft,
+    };
+}
+
+pub use edit::{Commit, Diagnostics, Edit, EditOptions, Patch, Prepared};
 
 /// Maximum action records retained by one action part.
 pub const MAX_ACTIONS: usize = 65_536;
@@ -36,6 +48,106 @@ pub const MAX_ACTION_GROUPS: usize = 16_384;
 
 const MAX_NAMESPACE_DECLARATIONS: usize = 256;
 const MAX_ATTRIBUTES_PER_ELEMENT: usize = 256;
+
+/// Caller-selected bounds for raw ink-action source and output operations.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub struct Limits {
+    /// Maximum source bytes admitted by a reader.
+    pub max_source_bytes: usize,
+    /// Maximum output bytes emitted by a writer.
+    pub max_output_bytes: usize,
+    /// Maximum XML nodes scanned.
+    pub max_nodes: usize,
+    /// Maximum XML depth scanned.
+    pub max_depth: usize,
+    /// Maximum action records.
+    pub max_actions: usize,
+    /// Maximum action groups.
+    pub max_action_groups: usize,
+    /// Maximum action payload bytes.
+    pub max_payload_bytes: usize,
+    /// Maximum scalar bytes.
+    pub max_scalar_bytes: usize,
+    /// Maximum decoded bytes in one XML attribute value.
+    pub max_attribute_value_bytes: usize,
+    /// Maximum attributes retained on one XML element.
+    pub max_attributes_per_element: usize,
+}
+
+impl Limits {
+    /// Historical bounded action policy.
+    pub const DEFAULT: Self = Self {
+        max_source_bytes: MAX_SOURCE_BYTES,
+        max_output_bytes: MAX_SOURCE_BYTES,
+        max_nodes: MAX_NODES,
+        max_depth: MAX_DEPTH,
+        max_actions: MAX_ACTIONS,
+        max_action_groups: MAX_ACTION_GROUPS,
+        max_payload_bytes: MAX_SOURCE_BYTES,
+        max_scalar_bytes: MAX_TOKEN_BYTES,
+        max_attribute_value_bytes: MAX_ATTRIBUTE_VALUE_BYTES,
+        max_attributes_per_element: MAX_ATTRIBUTES_PER_ELEMENT,
+    };
+
+    /// Construct a policy with caller-selected source/output byte caps.
+    #[must_use]
+    pub const fn new(max_source_bytes: usize, max_output_bytes: usize) -> Self {
+        Self {
+            max_source_bytes,
+            max_output_bytes,
+            ..Self::DEFAULT
+        }
+    }
+
+    fn validate(self) -> Result<Self> {
+        check_limit(
+            LimitKind::SourceBytes,
+            self.max_source_bytes,
+            MAX_SOURCE_BYTES,
+        )?;
+        check_limit(
+            LimitKind::OutputBytes,
+            self.max_output_bytes,
+            MAX_SOURCE_BYTES,
+        )?;
+        check_limit(LimitKind::Nodes, self.max_nodes, MAX_NODES)?;
+        check_limit(LimitKind::Depth, self.max_depth, MAX_DEPTH)?;
+        check_limit(LimitKind::Actions, self.max_actions, MAX_ACTIONS)?;
+        check_limit(
+            LimitKind::ActionGroups,
+            self.max_action_groups,
+            MAX_ACTION_GROUPS,
+        )?;
+        check_limit(
+            LimitKind::PayloadBytes,
+            self.max_payload_bytes,
+            MAX_SOURCE_BYTES,
+        )?;
+        check_limit(
+            LimitKind::ScalarBytes,
+            self.max_scalar_bytes,
+            MAX_TOKEN_BYTES,
+        )?;
+        check_limit(
+            LimitKind::AttributeValueBytes,
+            self.max_attribute_value_bytes,
+            MAX_ATTRIBUTE_VALUE_BYTES,
+        )?;
+        check_limit(
+            LimitKind::XmlAttributes,
+            self.max_attributes_per_element,
+            MAX_ATTRIBUTES_PER_ELEMENT,
+        )?;
+        Ok(self)
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum NamespaceId {
@@ -60,19 +172,19 @@ pub enum ActionType {
 }
 
 impl ActionType {
-    fn parse(value: &str) -> Result<Self> {
-        Self::parse_with_empty(value, false)
+    fn parse_with_limit(value: &str, maximum: usize) -> Result<Self> {
+        Self::parse_with_empty(value, false, maximum)
     }
 
-    fn parse_profile(value: &str) -> Result<Self> {
-        Self::parse_with_empty(value, true)
+    fn parse_profile_with_limit(value: &str, maximum: usize) -> Result<Self> {
+        Self::parse_with_empty(value, true, maximum)
     }
 
-    fn parse_with_empty(value: &str, allow_empty: bool) -> Result<Self> {
-        if (!allow_empty && value.is_empty())
-            || value.len() > 256
-            || value.bytes().any(|byte| byte == 0)
-        {
+    fn parse_with_empty(value: &str, allow_empty: bool, maximum: usize) -> Result<Self> {
+        if value.len() > maximum {
+            return Err(limit(LimitKind::ScalarBytes, value.len(), maximum));
+        }
+        if (!allow_empty && value.is_empty()) || value.bytes().any(|byte| byte == 0) {
             return Err(invalid("ink action type is empty or overlong"));
         }
         Ok(match value {
@@ -590,9 +702,14 @@ impl Actions {
 ///
 /// Returns an error for malformed XML, invalid required attributes, or
 /// exhausted resource limits.
-pub fn read(xml: &[u8]) -> Result<Actions> {
-    if xml.len() > MAX_SOURCE_BYTES {
-        return Err(limit("ink actions source bytes", MAX_SOURCE_BYTES));
+pub fn read(xml: &[u8], limits: Limits) -> Result<Actions> {
+    let limits = limits.validate()?;
+    if xml.len() > limits.max_source_bytes {
+        return Err(limit(
+            LimitKind::SourceBytes,
+            xml.len(),
+            limits.max_source_bytes,
+        ));
     }
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
@@ -628,41 +745,60 @@ pub fn read(xml: &[u8]) -> Result<Actions> {
                 declaration_seen = true;
             },
             Event::Start(element) if !root_seen => {
-                validate_element(&element, &reader, false)?;
+                validate_element(&element, &reader, false, limits)?;
                 legacy_fragment = require_root(&element, &resolved, &reader)?;
                 root_seen = true;
-                increment_nodes(&mut nodes)?;
-                enforce_depth(1)?;
-                length_unit = Some(required_attr(&element, b"lengthUnit", &reader)?);
-                time_unit = Some(required_attr(&element, b"timeUnit", &reader)?);
-                validate_unit(length_unit.as_deref().unwrap_or_default(), "lengthUnit")?;
-                validate_unit(time_unit.as_deref().unwrap_or_default(), "timeUnit")?;
+                increment_nodes(&mut nodes, limits.max_nodes)?;
+                enforce_depth(1, limits.max_depth)?;
+                length_unit = Some(required_attr(&element, b"lengthUnit", &reader, limits)?);
+                time_unit = Some(required_attr(&element, b"timeUnit", &reader, limits)?);
+                validate_unit(
+                    length_unit.as_deref().unwrap_or_default(),
+                    "lengthUnit",
+                    limits.max_scalar_bytes,
+                )?;
+                validate_unit(
+                    time_unit.as_deref().unwrap_or_default(),
+                    "timeUnit",
+                    limits.max_scalar_bytes,
+                )?;
                 reserve_one(&mut stack, "ink actions XML stack")?;
                 stack.push(Frame {
                     namespace: namespace_id(&resolved, &reader)?,
                     action: None,
                     action_group: false,
                     direct_actions: 0,
+                    payload_start: None,
                 });
             },
             Event::Empty(element) if !root_seen => {
-                validate_element(&element, &reader, false)?;
+                validate_element(&element, &reader, false, limits)?;
                 legacy_fragment = require_root(&element, &resolved, &reader)?;
                 root_seen = true;
                 root_closed = true;
-                increment_nodes(&mut nodes)?;
-                enforce_depth(1)?;
-                length_unit = Some(required_attr(&element, b"lengthUnit", &reader)?);
-                time_unit = Some(required_attr(&element, b"timeUnit", &reader)?);
-                validate_unit(length_unit.as_deref().unwrap_or_default(), "lengthUnit")?;
-                validate_unit(time_unit.as_deref().unwrap_or_default(), "timeUnit")?;
+                increment_nodes(&mut nodes, limits.max_nodes)?;
+                enforce_depth(1, limits.max_depth)?;
+                length_unit = Some(required_attr(&element, b"lengthUnit", &reader, limits)?);
+                time_unit = Some(required_attr(&element, b"timeUnit", &reader, limits)?);
+                validate_unit(
+                    length_unit.as_deref().unwrap_or_default(),
+                    "lengthUnit",
+                    limits.max_scalar_bytes,
+                )?;
+                validate_unit(
+                    time_unit.as_deref().unwrap_or_default(),
+                    "timeUnit",
+                    limits.max_scalar_bytes,
+                )?;
             },
             Event::Start(element) if root_seen && !root_closed => {
-                validate_element(&element, &reader, false)?;
+                validate_element(&element, &reader, false, limits)?;
                 validate_unknown_prefix(&resolved, &element, legacy_fragment)?;
-                increment_nodes(&mut nodes)?;
-                enforce_depth(stack.len().saturating_add(1))?;
+                increment_nodes(&mut nodes, limits.max_nodes)?;
+                enforce_depth(stack.len().saturating_add(1), limits.max_depth)?;
                 let local = element.name().local_name();
+                let payload_start =
+                    is_payload_element(&resolved, &element, &reader)?.then_some(start);
                 let action_group =
                     is_action_namespace(&resolved, &element, legacy_fragment, &reader)?
                         && local.as_ref() == b"actionGroup";
@@ -670,15 +806,15 @@ pub fn read(xml: &[u8]) -> Result<Actions> {
                     is_action_namespace(&resolved, &element, legacy_fragment, &reader)?
                         && local.as_ref() == b"action";
                 let action = if action_group {
-                    increment_groups(&mut groups)?;
-                    require_action_attrs(&element, &reader)?;
+                    increment_groups(&mut groups, limits.max_action_groups)?;
+                    require_action_attrs(&element, &reader, limits)?;
                     None
                 } else if action_element {
-                    ensure_action_capacity(&actions)?;
+                    ensure_action_capacity(&actions, limits.max_actions)?;
                     record_group_action(&mut stack);
                     let index = actions.len();
                     reserve_one(&mut actions, "ink action records")?;
-                    actions.push(parse_action(&element, start, end, &reader)?);
+                    actions.push(parse_action(&element, start, end, &reader, limits)?);
                     Some(index)
                 } else {
                     None
@@ -689,27 +825,31 @@ pub fn read(xml: &[u8]) -> Result<Actions> {
                     action,
                     action_group,
                     direct_actions: 0,
+                    payload_start,
                 });
             },
             Event::Empty(element) if root_seen && !root_closed => {
-                validate_element(&element, &reader, false)?;
+                validate_element(&element, &reader, false, limits)?;
                 validate_unknown_prefix(&resolved, &element, legacy_fragment)?;
-                increment_nodes(&mut nodes)?;
-                enforce_depth(stack.len().saturating_add(1))?;
+                increment_nodes(&mut nodes, limits.max_nodes)?;
+                enforce_depth(stack.len().saturating_add(1), limits.max_depth)?;
                 let local = element.name().local_name();
+                if is_payload_element(&resolved, &element, &reader)? {
+                    enforce_payload_span(start, end, limits.max_payload_bytes)?;
+                }
                 if is_action_namespace(&resolved, &element, legacy_fragment, &reader)?
                     && local.as_ref() == b"actionGroup"
                 {
-                    increment_groups(&mut groups)?;
-                    require_action_attrs(&element, &reader)?;
+                    increment_groups(&mut groups, limits.max_action_groups)?;
+                    require_action_attrs(&element, &reader, limits)?;
                     return Err(invalid("ink actionGroup requires an action child"));
                 } else if is_action_namespace(&resolved, &element, legacy_fragment, &reader)?
                     && local.as_ref() == b"action"
                 {
-                    ensure_action_capacity(&actions)?;
+                    ensure_action_capacity(&actions, limits.max_actions)?;
                     record_group_action(&mut stack);
                     reserve_one(&mut actions, "ink action records")?;
-                    actions.push(parse_action(&element, start, end, &reader)?);
+                    actions.push(parse_action(&element, start, end, &reader, limits)?);
                 }
             },
             Event::End(element) if root_seen && !root_closed => {
@@ -722,6 +862,9 @@ pub fn read(xml: &[u8]) -> Result<Actions> {
                 validate_end_name(&element, &resolved, legacy_fragment)?;
                 if frame.namespace != namespace_id(&resolved, &reader)? {
                     return Err(invalid("ink actions has mismatched closing elements"));
+                }
+                if let Some(payload_start) = frame.payload_start {
+                    enforce_payload_span(payload_start, end, limits.max_payload_bytes)?;
                 }
                 if let Some(index) = frame.action {
                     actions[index].source_end = end;
@@ -794,6 +937,216 @@ pub fn read(xml: &[u8]) -> Result<Actions> {
     })
 }
 
+/// Validate a source-backed action part without reconstructing its action
+/// vectors.  Replay writers only need the bounded admission facts: the
+/// visitor therefore retains its XML stack and counters, while typed action
+/// attributes are checked and immediately discarded.
+fn validate_source(xml: &[u8], limits: Limits) -> Result<()> {
+    if xml.len() > limits.max_source_bytes {
+        return Err(limit(
+            LimitKind::SourceBytes,
+            xml.len(),
+            limits.max_source_bytes,
+        ));
+    }
+    let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
+    reader.config_mut().trim_text(false);
+    reader.config_mut().check_end_names = true;
+    reader.config_mut().check_comments = true;
+    reader
+        .resolver_mut()
+        .set_max_declarations_per_element(MAX_NAMESPACE_DECLARATIONS);
+    let mut stack = Vec::new();
+    let mut root_seen = false;
+    let mut root_closed = false;
+    let mut nodes = 0usize;
+    let mut groups = 0usize;
+    let mut actions = 0usize;
+    let mut declaration_seen = false;
+    let mut preamble_content_seen = false;
+    let mut legacy_fragment = false;
+
+    loop {
+        let start = pos(&reader, origin)?;
+        let event = reader.read_event().map_err(xml_error)?;
+        let (resolved, event) = reader.resolver().resolve_event(event);
+        let end = pos(&reader, origin)?;
+        let is_declaration = matches!(&event, Event::Decl(_));
+        match event {
+            Event::Decl(declaration)
+                if !root_seen && !declaration_seen && !preamble_content_seen =>
+            {
+                validate_declaration(&declaration)?;
+                declaration_seen = true;
+            },
+            Event::Start(element) if !root_seen => {
+                validate_element(&element, &reader, false, limits)?;
+                legacy_fragment = require_root(&element, &resolved, &reader)?;
+                root_seen = true;
+                increment_nodes(&mut nodes, limits.max_nodes)?;
+                enforce_depth(1, limits.max_depth)?;
+                let length = required_attr(&element, b"lengthUnit", &reader, limits)?;
+                let time = required_attr(&element, b"timeUnit", &reader, limits)?;
+                validate_unit(&length, "lengthUnit", limits.max_scalar_bytes)?;
+                validate_unit(&time, "timeUnit", limits.max_scalar_bytes)?;
+                reserve_one(&mut stack, "ink actions XML stack")?;
+                stack.push(Frame {
+                    namespace: namespace_id(&resolved, &reader)?,
+                    action: None,
+                    action_group: false,
+                    direct_actions: 0,
+                    payload_start: None,
+                });
+            },
+            Event::Empty(element) if !root_seen => {
+                validate_element(&element, &reader, false, limits)?;
+                legacy_fragment = require_root(&element, &resolved, &reader)?;
+                root_seen = true;
+                root_closed = true;
+                increment_nodes(&mut nodes, limits.max_nodes)?;
+                enforce_depth(1, limits.max_depth)?;
+                let length = required_attr(&element, b"lengthUnit", &reader, limits)?;
+                let time = required_attr(&element, b"timeUnit", &reader, limits)?;
+                validate_unit(&length, "lengthUnit", limits.max_scalar_bytes)?;
+                validate_unit(&time, "timeUnit", limits.max_scalar_bytes)?;
+            },
+            Event::Start(element) if root_seen && !root_closed => {
+                validate_element(&element, &reader, false, limits)?;
+                validate_unknown_prefix(&resolved, &element, legacy_fragment)?;
+                increment_nodes(&mut nodes, limits.max_nodes)?;
+                enforce_depth(stack.len().saturating_add(1), limits.max_depth)?;
+                let local = element.name().local_name();
+                let payload_start =
+                    is_payload_element(&resolved, &element, &reader)?.then_some(start);
+                let action_group =
+                    is_action_namespace(&resolved, &element, legacy_fragment, &reader)?
+                        && local.as_ref() == b"actionGroup";
+                let action_element =
+                    is_action_namespace(&resolved, &element, legacy_fragment, &reader)?
+                        && local.as_ref() == b"action";
+                if action_group {
+                    increment_groups(&mut groups, limits.max_action_groups)?;
+                    validate_action_attrs(&element, &reader, limits)?;
+                } else if action_element {
+                    increment_action_count(&mut actions, limits.max_actions)?;
+                    record_group_action(&mut stack);
+                    validate_action_attrs(&element, &reader, limits)?;
+                }
+                reserve_one(&mut stack, "ink actions XML stack")?;
+                stack.push(Frame {
+                    namespace: namespace_id(&resolved, &reader)?,
+                    action: None,
+                    action_group,
+                    direct_actions: 0,
+                    payload_start,
+                });
+            },
+            Event::Empty(element) if root_seen && !root_closed => {
+                validate_element(&element, &reader, false, limits)?;
+                validate_unknown_prefix(&resolved, &element, legacy_fragment)?;
+                increment_nodes(&mut nodes, limits.max_nodes)?;
+                enforce_depth(stack.len().saturating_add(1), limits.max_depth)?;
+                let local = element.name().local_name();
+                if is_payload_element(&resolved, &element, &reader)? {
+                    enforce_payload_span(start, end, limits.max_payload_bytes)?;
+                }
+                if is_action_namespace(&resolved, &element, legacy_fragment, &reader)?
+                    && local.as_ref() == b"actionGroup"
+                {
+                    increment_groups(&mut groups, limits.max_action_groups)?;
+                    validate_action_attrs(&element, &reader, limits)?;
+                    return Err(invalid("ink actionGroup requires an action child"));
+                } else if is_action_namespace(&resolved, &element, legacy_fragment, &reader)?
+                    && local.as_ref() == b"action"
+                {
+                    increment_action_count(&mut actions, limits.max_actions)?;
+                    record_group_action(&mut stack);
+                    validate_action_attrs(&element, &reader, limits)?;
+                }
+            },
+            Event::End(element) if root_seen && !root_closed => {
+                let frame = stack
+                    .pop()
+                    .ok_or_else(|| invalid("ink actions has an unexpected closing element"))?;
+                if frame.action_group && frame.direct_actions == 0 {
+                    return Err(invalid("ink actionGroup requires an action child"));
+                }
+                validate_end_name(&element, &resolved, legacy_fragment)?;
+                if frame.namespace != namespace_id(&resolved, &reader)? {
+                    return Err(invalid("ink actions has mismatched closing elements"));
+                }
+                if let Some(payload_start) = frame.payload_start {
+                    enforce_payload_span(payload_start, end, limits.max_payload_bytes)?;
+                }
+                if stack.is_empty() {
+                    root_closed = true;
+                }
+            },
+            Event::Start(_) | Event::Empty(_) | Event::End(_) if root_closed => {
+                return Err(invalid("ink actions has content after its root"));
+            },
+            Event::Start(_) | Event::Empty(_) | Event::End(_) => {
+                return Err(invalid("ink actions has an invalid root transition"));
+            },
+            Event::Text(text)
+                if (!root_seen || root_closed)
+                    && !validate_text(&text, "ink actions text")?
+                        .bytes()
+                        .all(|byte| byte.is_ascii_whitespace()) =>
+            {
+                return Err(invalid("ink actions has text outside its root"));
+            },
+            Event::Text(text) => {
+                validate_text(&text, "ink actions text")?;
+            },
+            Event::CData(data) => {
+                validate_text(&data, "ink actions CDATA")?;
+                if !root_seen || root_closed {
+                    return Err(invalid("ink actions CDATA is not allowed outside its root"));
+                }
+            },
+            Event::GeneralRef(reference) => {
+                validate_reference(&reference)?;
+                if !root_seen || root_closed {
+                    return Err(invalid("ink actions has a reference outside its root"));
+                }
+            },
+            Event::Comment(comment) => {
+                validate_text(&comment, "ink actions comment")?;
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(invalid(
+                    "ink actions rejects DTDs and processing instructions",
+                ));
+            },
+            Event::Decl(_) => {
+                return Err(invalid(
+                    "ink actions has a duplicate or late XML declaration",
+                ));
+            },
+            Event::Eof => break,
+        }
+        if !is_declaration {
+            preamble_content_seen = true;
+        }
+    }
+
+    if !root_seen || !root_closed || !stack.is_empty() {
+        return Err(invalid("ink actions root is absent or unterminated"));
+    }
+    Ok(())
+}
+
+fn validate_action_attrs<R: std::io::BufRead>(
+    element: &BytesStart<'_>,
+    reader: &NsReader<R>,
+    limits: Limits,
+) -> Result<()> {
+    let _ = optional_xml_id(element, reader, limits)?;
+    require_action_attrs(element, reader, limits)
+}
+
 /// Read a namespace-bound CT_Actions value using the strict §2.21 structural
 /// profile.
 ///
@@ -805,8 +1158,8 @@ pub fn read(xml: &[u8]) -> Result<Actions> {
 /// boundaries. Schema-adjacent conventions such as the required
 /// `stroke`/`target` data names for reserved action types are deliberately not
 /// enforced here; this profile is inert and does not execute actions.
-pub fn read_profile(xml: &[u8]) -> Result<Profile> {
-    read_profile_with_source(xml, None)
+pub fn read_profile(xml: &[u8], limits: Limits) -> Result<Profile> {
+    read_profile_with_source(xml, None, limits)
 }
 
 /// Read a profile while reusing an already-owned source allocation.
@@ -815,14 +1168,23 @@ pub fn read_profile(xml: &[u8]) -> Result<Profile> {
 /// source-copy contract.  Source-backed edits already own the emitted bytes;
 /// retaining that allocation avoids a second full-source copy during typed
 /// readback.
-pub(crate) fn read_profile_owned(source: Arc<[u8]>) -> Result<Profile> {
+pub(crate) fn read_profile_owned(source: Arc<[u8]>, limits: Limits) -> Result<Profile> {
     let xml = Arc::clone(&source);
-    read_profile_with_source(&xml, Some(source))
+    read_profile_with_source(&xml, Some(source), limits)
 }
 
-fn read_profile_with_source(xml: &[u8], owned_source: Option<Arc<[u8]>>) -> Result<Profile> {
-    if xml.len() > MAX_SOURCE_BYTES {
-        return Err(limit("ink actions source bytes", MAX_SOURCE_BYTES));
+fn read_profile_with_source(
+    xml: &[u8],
+    owned_source: Option<Arc<[u8]>>,
+    limits: Limits,
+) -> Result<Profile> {
+    let limits = limits.validate()?;
+    if xml.len() > limits.max_source_bytes {
+        return Err(limit(
+            LimitKind::SourceBytes,
+            xml.len(),
+            limits.max_source_bytes,
+        ));
     }
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
@@ -854,11 +1216,11 @@ fn read_profile_with_source(xml: &[u8], owned_source: Option<Arc<[u8]>>) -> Resu
                 declaration_seen = true;
             },
             Event::Start(element) if root.is_none() => {
-                validate_profile_element(&element, &resolved, &reader)?;
-                let root_state = profile_root(&element, &resolved, &reader)?;
+                validate_profile_element(&element, &resolved, &reader, limits)?;
+                let root_state = profile_root(&element, &resolved, &reader, limits)?;
                 root = Some(root_state);
-                increment_nodes(&mut nodes)?;
-                enforce_depth(1)?;
+                increment_nodes(&mut nodes, limits.max_nodes)?;
+                enforce_depth(1, limits.max_depth)?;
                 reserve_one(&mut stack, "ink actions profile XML stack")?;
                 stack.push(ProfileFrame {
                     namespace: NamespaceId::Action,
@@ -866,17 +1228,17 @@ fn read_profile_with_source(xml: &[u8], owned_source: Option<Arc<[u8]>>) -> Resu
                 });
             },
             Event::Empty(element) if root.is_none() => {
-                validate_profile_element(&element, &resolved, &reader)?;
-                let root_state = profile_root(&element, &resolved, &reader)?;
+                validate_profile_element(&element, &resolved, &reader, limits)?;
+                let root_state = profile_root(&element, &resolved, &reader, limits)?;
                 root = Some(root_state);
-                increment_nodes(&mut nodes)?;
-                enforce_depth(1)?;
+                increment_nodes(&mut nodes, limits.max_nodes)?;
+                enforce_depth(1, limits.max_depth)?;
                 root_closed = true;
             },
             Event::Start(element) if root.is_some() && !root_closed => {
-                validate_profile_element(&element, &resolved, &reader)?;
-                increment_nodes(&mut nodes)?;
-                enforce_depth(stack.len().saturating_add(1))?;
+                validate_profile_element(&element, &resolved, &reader, limits)?;
+                increment_nodes(&mut nodes, limits.max_nodes)?;
+                enforce_depth(stack.len().saturating_add(1), limits.max_depth)?;
                 let kind = profile_start_kind(
                     &mut stack,
                     root.as_mut()
@@ -885,15 +1247,16 @@ fn read_profile_with_source(xml: &[u8], owned_source: Option<Arc<[u8]>>) -> Resu
                     &resolved,
                     start,
                     &reader,
+                    limits,
                 )?;
                 let namespace = namespace_id(&resolved, &reader)?;
                 reserve_one(&mut stack, "ink actions profile XML stack")?;
                 stack.push(ProfileFrame { namespace, kind });
             },
             Event::Empty(element) if root.is_some() && !root_closed => {
-                validate_profile_element(&element, &resolved, &reader)?;
-                increment_nodes(&mut nodes)?;
-                enforce_depth(stack.len().saturating_add(1))?;
+                validate_profile_element(&element, &resolved, &reader, limits)?;
+                increment_nodes(&mut nodes, limits.max_nodes)?;
+                enforce_depth(stack.len().saturating_add(1), limits.max_depth)?;
                 let kind = profile_start_kind(
                     &mut stack,
                     root.as_mut()
@@ -902,8 +1265,9 @@ fn read_profile_with_source(xml: &[u8], owned_source: Option<Arc<[u8]>>) -> Resu
                     &resolved,
                     start,
                     &reader,
+                    limits,
                 )?;
-                let value = profile_finish_empty(kind, start, end)?;
+                let value = profile_finish_empty(kind, start, end, limits)?;
                 attach_profile_value(
                     stack.last_mut(),
                     root.as_mut()
@@ -927,7 +1291,7 @@ fn read_profile_with_source(xml: &[u8], owned_source: Option<Arc<[u8]>>) -> Resu
                     }
                     root_closed = true;
                 } else {
-                    let value = profile_finish(frame.kind, end)?;
+                    let value = profile_finish(frame.kind, end, limits)?;
                     attach_profile_value(
                         stack.last_mut(),
                         root.as_mut()
@@ -1021,9 +1385,18 @@ fn read_profile_with_source(xml: &[u8], owned_source: Option<Arc<[u8]>>) -> Resu
 }
 
 /// Write a strict profile using its exact retained source bytes.
-pub fn write_profile(profile: &Profile) -> Result<Vec<u8>> {
-    if profile.source.len() > MAX_SOURCE_BYTES {
-        return Err(limit("ink actions source bytes", MAX_SOURCE_BYTES));
+pub fn write_profile(profile: &Profile, limits: Limits) -> Result<Vec<u8>> {
+    let limits = limits.validate()?;
+    // Re-scan source-backed profiles under the caller's complete policy
+    // before reserving output; a profile admitted under a wider policy must
+    // not bypass structural, payload, or decoded-value bounds on replay.
+    validate_profile_source(profile.source(), limits)?;
+    if profile.source.len() > limits.max_output_bytes {
+        return Err(limit(
+            LimitKind::OutputBytes,
+            profile.source.len(),
+            limits.max_output_bytes,
+        ));
     }
     let mut output = Vec::new();
     output
@@ -1034,7 +1407,16 @@ pub fn write_profile(profile: &Profile) -> Result<Vec<u8>> {
 }
 
 /// Write a strict profile to a caller-provided sink.
-pub fn write_profile_to<W: Write>(writer: &mut W, profile: &Profile) -> Result<()> {
+pub fn write_profile_to<W: Write>(writer: &mut W, profile: &Profile, limits: Limits) -> Result<()> {
+    let limits = limits.validate()?;
+    validate_profile_source(profile.source(), limits)?;
+    if profile.source.len() > limits.max_output_bytes {
+        return Err(limit(
+            LimitKind::OutputBytes,
+            profile.source.len(),
+            limits.max_output_bytes,
+        ));
+    }
     writer.write_all(profile.source())?;
     Ok(())
 }
@@ -1043,8 +1425,18 @@ pub fn write_profile_to<W: Write>(writer: &mut W, profile: &Profile) -> Result<(
 ///
 /// # Errors
 ///
-/// Returns an error only when the caller-provided sink fails.
-pub fn write_to<W: Write>(writer: &mut W, actions: &Actions) -> Result<()> {
+/// Returns an error when source validation or the output budget fails, or when
+/// the caller-provided sink fails.
+pub fn write_to<W: Write>(writer: &mut W, actions: &Actions, limits: Limits) -> Result<()> {
+    let limits = limits.validate()?;
+    validate_source(actions.source(), limits)?;
+    if actions.source().len() > limits.max_output_bytes {
+        return Err(limit(
+            LimitKind::OutputBytes,
+            actions.source().len(),
+            limits.max_output_bytes,
+        ));
+    }
     writer.write_all(actions.source())?;
     Ok(())
 }
@@ -1054,11 +1446,22 @@ pub fn write_to<W: Write>(writer: &mut W, actions: &Actions) -> Result<()> {
 /// # Errors
 ///
 /// Returns an error when source validation fails.
-pub fn write(actions: &Actions) -> Result<Vec<u8>> {
-    if actions.source().len() > MAX_SOURCE_BYTES {
-        return Err(limit("ink actions source bytes", MAX_SOURCE_BYTES));
+pub fn write(actions: &Actions, limits: Limits) -> Result<Vec<u8>> {
+    let limits = limits.validate()?;
+    validate_source(actions.source(), limits)?;
+    if actions.source().len() > limits.max_output_bytes {
+        return Err(limit(
+            LimitKind::OutputBytes,
+            actions.source().len(),
+            limits.max_output_bytes,
+        ));
     }
-    Ok(actions.source().to_vec())
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(actions.source().len())
+        .map_err(|_| invalid("ink actions output allocation failed"))?;
+    output.extend_from_slice(actions.source());
+    Ok(output)
 }
 
 #[derive(Debug)]
@@ -1206,6 +1609,7 @@ fn profile_root<R: std::io::BufRead>(
     element: &BytesStart<'_>,
     resolved: &ResolveResult<'_>,
     reader: &NsReader<R>,
+    limits: Limits,
 ) -> Result<ProfileRoot> {
     if !namespace_matches(resolved, ACTION_NAMESPACE.as_bytes(), reader)?
         || element.name().local_name().as_ref() != b"actions"
@@ -1215,10 +1619,10 @@ fn profile_root<R: std::io::BufRead>(
         ));
     }
     validate_profile_attributes(element, ProfileAttributeSet::Root)?;
-    let length = required_attr(element, b"lengthUnit", reader)?;
-    let time = required_attr(element, b"timeUnit", reader)?;
+    let length = required_attr(element, b"lengthUnit", reader, limits)?;
+    let time = required_attr(element, b"timeUnit", reader, limits)?;
     Ok(ProfileRoot {
-        xml_id: optional_xml_id(element, reader)?,
+        xml_id: optional_xml_id(element, reader, limits)?,
         length_unit: LengthUnit::parse(&length)?,
         time_unit: TimeUnit::parse(&time)?,
         definitions: None,
@@ -1234,9 +1638,611 @@ fn validate_profile_element<R: std::io::BufRead>(
     element: &BytesStart<'_>,
     resolved: &ResolveResult<'_>,
     reader: &NsReader<R>,
+    limits: Limits,
 ) -> Result<()> {
-    validate_element(element, reader, true)?;
+    validate_element(element, reader, true, limits)?;
     validate_unknown_prefix(resolved, element, false)
+}
+
+#[derive(Debug, Default)]
+struct ValidationRoot {
+    definitions_seen: bool,
+    action_seen: bool,
+    action_count: usize,
+    group_count: usize,
+}
+
+#[derive(Debug)]
+struct ValidationFrame {
+    namespace: NamespaceId,
+    kind: ValidationFrameKind,
+}
+
+#[derive(Debug)]
+enum ValidationFrameKind {
+    Root,
+    Definitions {
+        source_start: usize,
+    },
+    ActionGroup {
+        actions: usize,
+    },
+    Action {
+        data_seen: bool,
+    },
+    Property,
+    DataGroup {
+        data: usize,
+    },
+    Data {
+        transform_seen: bool,
+        trace_seen: bool,
+    },
+    DataChild {
+        source_start: usize,
+    },
+    Opaque,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ValidationValue {
+    Definitions,
+    ActionGroup,
+    Action,
+    Property,
+    DataGroup,
+    Data,
+    DataChild,
+    None,
+}
+
+/// Validate the strict action profile without constructing its retained
+/// vectors or copying its source.  This is intentionally a structural visitor:
+/// typed attributes are decoded and checked, while only grammar state and
+/// bounded child counts survive between events.
+fn validate_profile_source(xml: &[u8], limits: Limits) -> Result<()> {
+    if xml.len() > limits.max_source_bytes {
+        return Err(limit(
+            LimitKind::SourceBytes,
+            xml.len(),
+            limits.max_source_bytes,
+        ));
+    }
+    let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
+    reader.config_mut().trim_text(false);
+    reader.config_mut().check_end_names = true;
+    reader.config_mut().check_comments = true;
+    reader
+        .resolver_mut()
+        .set_max_declarations_per_element(MAX_NAMESPACE_DECLARATIONS);
+    let mut stack = Vec::new();
+    let mut root = None;
+    let mut root_closed = false;
+    let mut nodes = 0usize;
+    let mut declaration_seen = false;
+    let mut preamble_content_seen = false;
+
+    loop {
+        let start = pos(&reader, origin)?;
+        let event = reader.read_event().map_err(xml_error)?;
+        let (resolved, event) = reader.resolver().resolve_event(event);
+        let end = pos(&reader, origin)?;
+        let is_declaration = matches!(&event, Event::Decl(_));
+        match event {
+            Event::Decl(declaration)
+                if root.is_none() && !declaration_seen && !preamble_content_seen =>
+            {
+                validate_declaration(&declaration)?;
+                declaration_seen = true;
+            },
+            Event::Start(element) if root.is_none() => {
+                validate_profile_element(&element, &resolved, &reader, limits)?;
+                let root_state = validation_profile_root(&element, &resolved, &reader, limits)?;
+                root = Some(root_state);
+                increment_nodes(&mut nodes, limits.max_nodes)?;
+                enforce_depth(1, limits.max_depth)?;
+                reserve_one(&mut stack, "ink actions profile XML stack")?;
+                stack.push(ValidationFrame {
+                    namespace: NamespaceId::Action,
+                    kind: ValidationFrameKind::Root,
+                });
+            },
+            Event::Empty(element) if root.is_none() => {
+                validate_profile_element(&element, &resolved, &reader, limits)?;
+                let _ = validation_profile_root(&element, &resolved, &reader, limits)?;
+                root = Some(ValidationRoot::default());
+                increment_nodes(&mut nodes, limits.max_nodes)?;
+                enforce_depth(1, limits.max_depth)?;
+                root_closed = true;
+            },
+            Event::Start(element) if root.is_some() && !root_closed => {
+                validate_profile_element(&element, &resolved, &reader, limits)?;
+                increment_nodes(&mut nodes, limits.max_nodes)?;
+                enforce_depth(stack.len().saturating_add(1), limits.max_depth)?;
+                let kind = validation_profile_start_kind(
+                    &mut stack,
+                    root.as_mut()
+                        .ok_or_else(|| invalid("ink actions profile root is missing"))?,
+                    &element,
+                    &resolved,
+                    start,
+                    &reader,
+                    limits,
+                )?;
+                let namespace = namespace_id(&resolved, &reader)?;
+                reserve_one(&mut stack, "ink actions profile XML stack")?;
+                stack.push(ValidationFrame { namespace, kind });
+            },
+            Event::Empty(element) if root.is_some() && !root_closed => {
+                validate_profile_element(&element, &resolved, &reader, limits)?;
+                increment_nodes(&mut nodes, limits.max_nodes)?;
+                enforce_depth(stack.len().saturating_add(1), limits.max_depth)?;
+                let kind = validation_profile_start_kind(
+                    &mut stack,
+                    root.as_mut()
+                        .ok_or_else(|| invalid("ink actions profile root is missing"))?,
+                    &element,
+                    &resolved,
+                    start,
+                    &reader,
+                    limits,
+                )?;
+                let value = validation_profile_finish(kind, end, limits)?;
+                validation_profile_attach(stack.last_mut(), value)?;
+            },
+            Event::End(element) if root.is_some() && !root_closed => {
+                let frame = stack
+                    .pop()
+                    .ok_or_else(|| invalid("ink actions profile has an unexpected end"))?;
+                validate_end_name(&element, &resolved, false)?;
+                if frame.namespace != namespace_id(&resolved, &reader)? {
+                    return Err(invalid(
+                        "ink actions profile has mismatched closing namespaces",
+                    ));
+                }
+                if stack.is_empty() {
+                    if !matches!(frame.kind, ValidationFrameKind::Root) {
+                        return Err(invalid("ink actions profile root frame is invalid"));
+                    }
+                    root_closed = true;
+                } else {
+                    let value = validation_profile_finish(frame.kind, end, limits)?;
+                    validation_profile_attach(stack.last_mut(), value)?;
+                }
+            },
+            Event::Start(_) | Event::Empty(_) | Event::End(_) if root_closed => {
+                return Err(invalid("ink actions profile has content after its root"));
+            },
+            Event::Start(_) | Event::Empty(_) | Event::End(_) => {
+                return Err(invalid(
+                    "ink actions profile has an invalid root transition",
+                ));
+            },
+            Event::Text(text) => {
+                let text = validate_text(&text, "ink actions profile text")?;
+                if text.contains("]]>") {
+                    return Err(invalid(
+                        "ink actions profile text contains a raw CDATA terminator",
+                    ));
+                }
+                if (root.is_none() || root_closed) && !text.bytes().all(is_xml_whitespace) {
+                    return Err(invalid("ink actions profile has text outside its root"));
+                }
+                if root.is_some() && !root_closed && !text.is_empty() {
+                    ensure_validation_character_content(
+                        &stack,
+                        text.bytes().all(is_xml_whitespace),
+                    )?;
+                }
+            },
+            Event::CData(data) => {
+                let data = validate_text(&data, "ink actions profile CDATA")?;
+                if root.is_none() || root_closed {
+                    return Err(invalid("ink actions profile has CDATA outside its root"));
+                }
+                if !data.is_empty() {
+                    ensure_validation_character_content(
+                        &stack,
+                        data.bytes().all(is_xml_whitespace),
+                    )?;
+                }
+            },
+            Event::GeneralRef(reference) => {
+                validate_reference(&reference)?;
+                if root.is_none() || root_closed {
+                    return Err(invalid(
+                        "ink actions profile has a reference outside its root",
+                    ));
+                }
+                let whitespace = reference
+                    .resolve_char_ref()
+                    .map_err(xml_error)?
+                    .is_some_and(|character| matches!(character, ' ' | '\t' | '\r' | '\n'));
+                ensure_validation_character_content(&stack, whitespace)?;
+            },
+            Event::Comment(comment) => {
+                validate_text(&comment, "ink actions profile comment")?;
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(invalid(
+                    "ink actions profile rejects DTDs and processing instructions",
+                ));
+            },
+            Event::Decl(_) => {
+                return Err(invalid(
+                    "ink actions profile has a duplicate or late XML declaration",
+                ));
+            },
+            Event::Eof => break,
+        }
+        if !is_declaration {
+            preamble_content_seen = true;
+        }
+    }
+
+    if root.is_none() || !root_closed || !stack.is_empty() {
+        return Err(invalid(
+            "ink actions profile root is absent or unterminated",
+        ));
+    }
+    Ok(())
+}
+
+fn validation_profile_root<R: std::io::BufRead>(
+    element: &BytesStart<'_>,
+    resolved: &ResolveResult<'_>,
+    reader: &NsReader<R>,
+    limits: Limits,
+) -> Result<ValidationRoot> {
+    if !namespace_matches(resolved, ACTION_NAMESPACE.as_bytes(), reader)?
+        || element.name().local_name().as_ref() != b"actions"
+    {
+        return Err(invalid(
+            "ink actions profile root must be bound iact:actions",
+        ));
+    }
+    validate_profile_attributes(element, ProfileAttributeSet::Root)?;
+    let length = required_attr(element, b"lengthUnit", reader, limits)?;
+    let time = required_attr(element, b"timeUnit", reader, limits)?;
+    let _ = optional_xml_id(element, reader, limits)?;
+    LengthUnit::parse(&length)?;
+    TimeUnit::parse(&time)?;
+    Ok(ValidationRoot::default())
+}
+
+fn validation_profile_action_attrs<R: std::io::BufRead>(
+    element: &BytesStart<'_>,
+    reader: &NsReader<R>,
+    limits: Limits,
+) -> Result<()> {
+    validate_profile_attributes(element, ProfileAttributeSet::Action)?;
+    let _ = profile_action_attributes(element, reader, limits)?;
+    Ok(())
+}
+
+fn validation_profile_data_attrs<R: std::io::BufRead>(
+    element: &BytesStart<'_>,
+    reader: &NsReader<R>,
+    limits: Limits,
+    group: bool,
+) -> Result<()> {
+    validate_profile_attributes(
+        element,
+        if group {
+            ProfileAttributeSet::ActionDataGroup
+        } else {
+            ProfileAttributeSet::ActionData
+        },
+    )?;
+    if group {
+        let _ = optional_xml_id(element, reader, limits)?;
+        let _ = strict_token(
+            optional_attr(element, b"name", reader, limits)?.unwrap_or_else(|| "stroke".to_owned()),
+            "action data-group name",
+            limits.max_scalar_bytes,
+        )?;
+    } else {
+        let _ = profile_data_attributes(element, reader, limits)?;
+    }
+    Ok(())
+}
+
+fn validation_profile_start_kind<R: std::io::BufRead>(
+    stack: &mut [ValidationFrame],
+    root: &mut ValidationRoot,
+    element: &BytesStart<'_>,
+    resolved: &ResolveResult<'_>,
+    start: usize,
+    reader: &NsReader<R>,
+    limits: Limits,
+) -> Result<ValidationFrameKind> {
+    let local = element.name().local_name();
+    let action = namespace_matches(resolved, ACTION_NAMESPACE.as_bytes(), reader)?;
+    let inkml = namespace_matches(resolved, INKML_NAMESPACE.as_bytes(), reader)?;
+    let local = local.as_ref();
+    let known_action = is_known_action_local(local);
+    let parent = stack
+        .last_mut()
+        .ok_or_else(|| invalid("ink actions profile has no parent frame"))?;
+    match &mut parent.kind {
+        ValidationFrameKind::Root => {
+            if inkml && local == b"definitions" {
+                if root.definitions_seen || root.action_seen {
+                    return Err(invalid(
+                        "ink actions profile definitions must precede actions and be unique",
+                    ));
+                }
+                root.definitions_seen = true;
+                return Ok(ValidationFrameKind::Definitions {
+                    source_start: start,
+                });
+            }
+            if action && local == b"actionGroup" {
+                increment_validation_group(root, limits.max_action_groups)?;
+                validation_profile_action_attrs(element, reader, limits)?;
+                root.action_seen = true;
+                return Ok(ValidationFrameKind::ActionGroup { actions: 0 });
+            }
+            if action && local == b"action" {
+                increment_validation_action(root, limits.max_actions)?;
+                validation_profile_action_attrs(element, reader, limits)?;
+                root.action_seen = true;
+                return Ok(ValidationFrameKind::Action { data_seen: false });
+            }
+            if action && known_action {
+                return Err(invalid(
+                    "ink actions profile recognized child has invalid root ancestry",
+                ));
+            }
+            return Err(invalid(
+                "ink actions profile root contains an unknown direct child",
+            ));
+        },
+        ValidationFrameKind::Definitions { .. } => {
+            return Ok(ValidationFrameKind::Opaque);
+        },
+        ValidationFrameKind::ActionGroup { actions: count } => {
+            if action && local == b"action" {
+                increment_validation_action(root, limits.max_actions)?;
+                validation_profile_action_attrs(element, reader, limits)?;
+                *count = (*count)
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("ink actions profile action count overflow"))?;
+                return Ok(ValidationFrameKind::Action { data_seen: false });
+            }
+            if action && known_action {
+                return Err(invalid(
+                    "ink actions profile recognized child has invalid action-group ancestry",
+                ));
+            }
+            return Err(invalid(
+                "ink actions profile actionGroup contains an unknown direct child",
+            ));
+        },
+        ValidationFrameKind::Action { data_seen } => {
+            if action && local == b"property" {
+                validate_profile_attributes(element, ProfileAttributeSet::Property)?;
+                if *data_seen {
+                    return Err(invalid(
+                        "ink actions profile property must precede action data",
+                    ));
+                }
+                let _ = strict_token(
+                    required_attr(element, b"name", reader, limits)?,
+                    "property name",
+                    limits.max_scalar_bytes,
+                )?;
+                let _ = strict_token(
+                    optional_attr(element, b"value", reader, limits)?
+                        .unwrap_or_else(|| "ink".to_owned()),
+                    "property value",
+                    limits.max_scalar_bytes,
+                )?;
+                return Ok(ValidationFrameKind::Property);
+            }
+            if action && (local == b"actionData" || local == b"actionDataGroup") {
+                *data_seen = true;
+                let group = local == b"actionDataGroup";
+                validation_profile_data_attrs(element, reader, limits, group)?;
+                return Ok(if group {
+                    ValidationFrameKind::DataGroup { data: 0 }
+                } else {
+                    ValidationFrameKind::Data {
+                        transform_seen: false,
+                        trace_seen: false,
+                    }
+                });
+            }
+            if action && known_action {
+                return Err(invalid(
+                    "ink actions profile recognized child has invalid action ancestry",
+                ));
+            }
+            return Err(invalid(
+                "ink actions profile action contains an unknown direct child",
+            ));
+        },
+        ValidationFrameKind::DataGroup { data: count } => {
+            if action && local == b"actionData" {
+                validation_profile_data_attrs(element, reader, limits, false)?;
+                *count = (*count)
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("ink actions profile data count overflow"))?;
+                return Ok(ValidationFrameKind::Data {
+                    transform_seen: false,
+                    trace_seen: false,
+                });
+            }
+            if action && known_action {
+                return Err(invalid(
+                    "ink actions profile recognized child has invalid data-group ancestry",
+                ));
+            }
+            return Err(invalid(
+                "ink actions profile actionDataGroup contains an unknown direct child",
+            ));
+        },
+        ValidationFrameKind::Data {
+            transform_seen,
+            trace_seen,
+        } => {
+            if action && local == b"transform" {
+                if *transform_seen || *trace_seen {
+                    return Err(invalid(
+                        "ink actions profile transform must be first and unique",
+                    ));
+                }
+                *transform_seen = true;
+                return Ok(ValidationFrameKind::DataChild {
+                    source_start: start,
+                });
+            }
+            if inkml && (local == b"trace" || local == b"traceView") {
+                *trace_seen = true;
+                return Ok(ValidationFrameKind::DataChild {
+                    source_start: start,
+                });
+            }
+            if action && known_action {
+                return Err(invalid(
+                    "ink actions profile recognized child has invalid data ancestry",
+                ));
+            }
+            return Err(invalid(
+                "ink actions profile actionData contains an unknown direct child",
+            ));
+        },
+        ValidationFrameKind::Property => {
+            return Err(invalid(
+                "ink actions profile property cannot contain a child",
+            ));
+        },
+        ValidationFrameKind::DataChild { .. } | ValidationFrameKind::Opaque => {
+            return Ok(ValidationFrameKind::Opaque);
+        },
+    }
+}
+
+fn validation_profile_finish(
+    kind: ValidationFrameKind,
+    end: usize,
+    limits: Limits,
+) -> Result<ValidationValue> {
+    match kind {
+        ValidationFrameKind::Root => Err(invalid("ink actions profile root cannot be nested")),
+        ValidationFrameKind::Definitions { source_start } => {
+            enforce_payload_span(source_start, end, limits.max_payload_bytes)?;
+            Ok(ValidationValue::Definitions)
+        },
+        ValidationFrameKind::ActionGroup { actions } => {
+            if actions == 0 {
+                return Err(invalid(
+                    "ink actions profile actionGroup requires an action child",
+                ));
+            }
+            Ok(ValidationValue::ActionGroup)
+        },
+        ValidationFrameKind::Action { .. } => Ok(ValidationValue::Action),
+        ValidationFrameKind::Property => Ok(ValidationValue::Property),
+        ValidationFrameKind::DataGroup { data } => {
+            if data == 0 {
+                return Err(invalid(
+                    "ink actions profile actionDataGroup requires actionData",
+                ));
+            }
+            Ok(ValidationValue::DataGroup)
+        },
+        ValidationFrameKind::Data { .. } => Ok(ValidationValue::Data),
+        ValidationFrameKind::DataChild { source_start } => {
+            enforce_payload_span(source_start, end, limits.max_payload_bytes)?;
+            Ok(ValidationValue::DataChild)
+        },
+        ValidationFrameKind::Opaque => Ok(ValidationValue::None),
+    }
+}
+
+fn validation_profile_attach(
+    frame: Option<&mut ValidationFrame>,
+    value: ValidationValue,
+) -> Result<()> {
+    let Some(frame) = frame else {
+        return Err(invalid("ink actions profile value has no parent"));
+    };
+    let valid = matches!(
+        (&frame.kind, value),
+        (ValidationFrameKind::Root, ValidationValue::Definitions)
+            | (ValidationFrameKind::Root, ValidationValue::ActionGroup)
+            | (ValidationFrameKind::Root, ValidationValue::Action)
+            | (
+                ValidationFrameKind::ActionGroup { .. },
+                ValidationValue::Action
+            )
+            | (
+                ValidationFrameKind::Action { .. },
+                ValidationValue::Property
+            )
+            | (ValidationFrameKind::Action { .. }, ValidationValue::Data)
+            | (
+                ValidationFrameKind::Action { .. },
+                ValidationValue::DataGroup
+            )
+            | (ValidationFrameKind::DataGroup { .. }, ValidationValue::Data)
+            | (ValidationFrameKind::Data { .. }, ValidationValue::DataChild)
+            | (_, ValidationValue::None)
+    );
+    if valid {
+        Ok(())
+    } else {
+        Err(invalid(
+            "ink actions profile recognized child has invalid ancestry",
+        ))
+    }
+}
+
+fn ensure_validation_character_content(stack: &[ValidationFrame], whitespace: bool) -> Result<()> {
+    if matches!(
+        stack.last().map(|frame| &frame.kind),
+        Some(ValidationFrameKind::Property)
+    ) {
+        return Err(invalid("ink action property has character content"));
+    }
+    if whitespace {
+        return Ok(());
+    }
+    match stack.last().map(|frame| &frame.kind) {
+        Some(ValidationFrameKind::Definitions { .. })
+        | Some(ValidationFrameKind::DataChild { .. })
+        | Some(ValidationFrameKind::Opaque)
+        | None => Ok(()),
+        _ => Err(invalid(
+            "ink actions profile recognized element-only content contains text",
+        )),
+    }
+}
+
+fn increment_validation_action(root: &mut ValidationRoot, maximum: usize) -> Result<()> {
+    let next = root
+        .action_count
+        .checked_add(1)
+        .ok_or_else(|| invalid("ink action count overflow"))?;
+    if next > maximum {
+        return Err(limit(LimitKind::Actions, next, maximum));
+    }
+    root.action_count = next;
+    Ok(())
+}
+
+fn increment_validation_group(root: &mut ValidationRoot, maximum: usize) -> Result<()> {
+    let next = root
+        .group_count
+        .checked_add(1)
+        .ok_or_else(|| invalid("ink action-group count overflow"))?;
+    if next > maximum {
+        return Err(limit(LimitKind::ActionGroups, next, maximum));
+    }
+    root.group_count = next;
+    Ok(())
 }
 
 fn profile_start_kind<R: std::io::BufRead>(
@@ -1246,6 +2252,7 @@ fn profile_start_kind<R: std::io::BufRead>(
     resolved: &ResolveResult<'_>,
     start: usize,
     reader: &NsReader<R>,
+    limits: Limits,
 ) -> Result<ProfileFrameKind> {
     let local = element.name().local_name();
     let action = namespace_matches(resolved, ACTION_NAMESPACE.as_bytes(), reader)?;
@@ -1269,10 +2276,11 @@ fn profile_start_kind<R: std::io::BufRead>(
                 });
             }
             if action && local == b"actionGroup" {
-                increment_profile_group(root)?;
+                increment_profile_group(root, limits.max_action_groups)?;
                 validate_profile_attributes(element, ProfileAttributeSet::Action)?;
                 root.action_seen = true;
-                let (xml_id, action_type, start_time) = profile_action_attributes(element, reader)?;
+                let (xml_id, action_type, start_time) =
+                    profile_action_attributes(element, reader, limits)?;
                 return Ok(ProfileFrameKind::ActionGroup {
                     xml_id,
                     action_type,
@@ -1282,10 +2290,11 @@ fn profile_start_kind<R: std::io::BufRead>(
                 });
             }
             if action && local == b"action" {
-                increment_profile_action(root)?;
+                increment_profile_action(root, limits.max_actions)?;
                 validate_profile_attributes(element, ProfileAttributeSet::Action)?;
                 root.action_seen = true;
-                let (xml_id, action_type, start_time) = profile_action_attributes(element, reader)?;
+                let (xml_id, action_type, start_time) =
+                    profile_action_attributes(element, reader, limits)?;
                 return Ok(ProfileFrameKind::Action {
                     xml_id,
                     action_type,
@@ -1310,9 +2319,10 @@ fn profile_start_kind<R: std::io::BufRead>(
         },
         ProfileFrameKind::ActionGroup { .. } => {
             if action && local == b"action" {
-                increment_profile_action(root)?;
+                increment_profile_action(root, limits.max_actions)?;
                 validate_profile_attributes(element, ProfileAttributeSet::Action)?;
-                let (xml_id, action_type, start_time) = profile_action_attributes(element, reader)?;
+                let (xml_id, action_type, start_time) =
+                    profile_action_attributes(element, reader, limits)?;
                 return Ok(ProfileFrameKind::Action {
                     xml_id,
                     action_type,
@@ -1340,10 +2350,16 @@ fn profile_start_kind<R: std::io::BufRead>(
                         "ink actions profile property must precede action data",
                     ));
                 }
-                let name = strict_token(required_attr(element, b"name", reader)?, "property name")?;
+                let name = strict_token(
+                    required_attr(element, b"name", reader, limits)?,
+                    "property name",
+                    limits.max_scalar_bytes,
+                )?;
                 let value = strict_token(
-                    optional_attr(element, b"value", reader)?.unwrap_or_else(|| "ink".to_owned()),
+                    optional_attr(element, b"value", reader, limits)?
+                        .unwrap_or_else(|| "ink".to_owned()),
                     "property value",
+                    limits.max_scalar_bytes,
                 )?;
                 return Ok(ProfileFrameKind::Property {
                     name,
@@ -1355,7 +2371,8 @@ fn profile_start_kind<R: std::io::BufRead>(
                 *data_seen = true;
                 if local == b"actionData" {
                     validate_profile_attributes(element, ProfileAttributeSet::ActionData)?;
-                    let (xml_id, name, reference) = profile_data_attributes(element, reader)?;
+                    let (xml_id, name, reference) =
+                        profile_data_attributes(element, reader, limits)?;
                     return Ok(ProfileFrameKind::Data {
                         xml_id,
                         name,
@@ -1367,10 +2384,12 @@ fn profile_start_kind<R: std::io::BufRead>(
                     });
                 }
                 validate_profile_attributes(element, ProfileAttributeSet::ActionDataGroup)?;
-                let xml_id = optional_xml_id(element, reader)?;
+                let xml_id = optional_xml_id(element, reader, limits)?;
                 let name = strict_token(
-                    optional_attr(element, b"name", reader)?.unwrap_or_else(|| "stroke".to_owned()),
+                    optional_attr(element, b"name", reader, limits)?
+                        .unwrap_or_else(|| "stroke".to_owned()),
                     "action data-group name",
+                    limits.max_scalar_bytes,
                 )?;
                 return Ok(ProfileFrameKind::DataGroup {
                     xml_id,
@@ -1391,7 +2410,7 @@ fn profile_start_kind<R: std::io::BufRead>(
         ProfileFrameKind::DataGroup { .. } => {
             if action && local == b"actionData" {
                 validate_profile_attributes(element, ProfileAttributeSet::ActionData)?;
-                let (xml_id, name, reference) = profile_data_attributes(element, reader)?;
+                let (xml_id, name, reference) = profile_data_attributes(element, reader, limits)?;
                 return Ok(ProfileFrameKind::Data {
                     xml_id,
                     name,
@@ -1458,16 +2477,25 @@ fn profile_start_kind<R: std::io::BufRead>(
     Ok(ProfileFrameKind::Opaque)
 }
 
-fn profile_finish_empty(kind: ProfileFrameKind, _start: usize, end: usize) -> Result<ProfileValue> {
-    profile_finish(kind, end)
+fn profile_finish_empty(
+    kind: ProfileFrameKind,
+    _start: usize,
+    end: usize,
+    limits: Limits,
+) -> Result<ProfileValue> {
+    profile_finish(kind, end, limits)
 }
 
-fn profile_finish(kind: ProfileFrameKind, end: usize) -> Result<ProfileValue> {
+fn profile_finish(kind: ProfileFrameKind, end: usize, limits: Limits) -> Result<ProfileValue> {
     match kind {
         ProfileFrameKind::Root => Err(invalid("ink actions profile root cannot be nested")),
-        ProfileFrameKind::Definitions { source_start } => Ok(ProfileValue::Definitions(
-            SourceSpan::new(source_start, end),
-        )),
+        ProfileFrameKind::Definitions { source_start } => {
+            enforce_payload_span(source_start, end, limits.max_payload_bytes)?;
+            Ok(ProfileValue::Definitions(SourceSpan::new(
+                source_start,
+                end,
+            )))
+        },
         ProfileFrameKind::ActionGroup {
             xml_id,
             action_type,
@@ -1546,9 +2574,13 @@ fn profile_finish(kind: ProfileFrameKind, end: usize) -> Result<ProfileValue> {
             children,
             source: SourceSpan::new(source_start, end),
         })),
-        ProfileFrameKind::DataChild { kind, source_start } => Ok(ProfileValue::DataChild(
-            DataChild::from_kind(kind, SourceSpan::new(source_start, end)),
-        )),
+        ProfileFrameKind::DataChild { kind, source_start } => {
+            enforce_payload_span(source_start, end, limits.max_payload_bytes)?;
+            Ok(ProfileValue::DataChild(DataChild::from_kind(
+                kind,
+                SourceSpan::new(source_start, end),
+            )))
+        },
         ProfileFrameKind::Opaque => Ok(ProfileValue::None),
     }
 }
@@ -1641,11 +2673,16 @@ impl DataChild {
 fn profile_action_attributes<R: std::io::BufRead>(
     element: &BytesStart<'_>,
     reader: &NsReader<R>,
+    limits: Limits,
 ) -> Result<(Option<Box<str>>, ActionType, Box<str>)> {
-    let xml_id = optional_xml_id(element, reader)?;
-    let action_type = ActionType::parse_profile(&required_attr(element, b"type", reader)?)?;
-    let start_time = collapse_xml_whitespace(&required_attr(element, b"startTime", reader)?)?;
-    validate_decimal(&start_time)?;
+    let xml_id = optional_xml_id(element, reader, limits)?;
+    let action_type = ActionType::parse_profile_with_limit(
+        &required_attr(element, b"type", reader, limits)?,
+        limits.max_scalar_bytes,
+    )?;
+    let start_time =
+        collapse_xml_whitespace(&required_attr(element, b"startTime", reader, limits)?)?;
+    validate_decimal(&start_time, limits.max_scalar_bytes)?;
     Ok((xml_id, action_type, start_time.into_boxed_str()))
 }
 
@@ -1674,44 +2711,49 @@ fn collapse_xml_whitespace(value: &str) -> Result<String> {
 fn profile_data_attributes<R: std::io::BufRead>(
     element: &BytesStart<'_>,
     reader: &NsReader<R>,
+    limits: Limits,
 ) -> Result<(Option<Box<str>>, Box<str>, Option<Box<str>>)> {
-    let xml_id = optional_xml_id(element, reader)?;
+    let xml_id = optional_xml_id(element, reader, limits)?;
     let name = strict_token(
-        optional_attr(element, b"name", reader)?.unwrap_or_else(|| "stroke".to_owned()),
+        optional_attr(element, b"name", reader, limits)?.unwrap_or_else(|| "stroke".to_owned()),
         "action data name",
+        limits.max_scalar_bytes,
     )?;
-    let reference = optional_attr(element, b"ref", reader)?
-        .map(|value| strict_token(value, "action data reference"))
+    let reference = optional_attr(element, b"ref", reader, limits)?
+        .map(|value| strict_token(value, "action data reference", limits.max_scalar_bytes))
         .transpose()?;
     Ok((xml_id, name, reference))
 }
 
-fn strict_token(value: String, field: &'static str) -> Result<Box<str>> {
-    if value.len() > MAX_TOKEN_BYTES || value.bytes().any(|byte| byte == 0) {
-        return Err(limit(field, MAX_TOKEN_BYTES));
+fn strict_token(value: String, _field: &'static str, maximum: usize) -> Result<Box<str>> {
+    if value.len() > maximum {
+        return Err(limit(LimitKind::ScalarBytes, value.len(), maximum));
+    }
+    if value.bytes().any(|byte| byte == 0) {
+        return Err(invalid("ink action token contains a NUL byte"));
     }
     Ok(value.into_boxed_str())
 }
 
-fn increment_profile_action(root: &mut ProfileRoot) -> Result<()> {
+fn increment_profile_action(root: &mut ProfileRoot, maximum: usize) -> Result<()> {
     let next = root
         .action_count
         .checked_add(1)
-        .ok_or_else(|| limit("ink actions", MAX_ACTIONS))?;
-    if next > MAX_ACTIONS {
-        return Err(limit("ink actions", MAX_ACTIONS));
+        .ok_or_else(|| invalid("ink action count overflow"))?;
+    if next > maximum {
+        return Err(limit(LimitKind::Actions, next, maximum));
     }
     root.action_count = next;
     Ok(())
 }
 
-fn increment_profile_group(root: &mut ProfileRoot) -> Result<()> {
+fn increment_profile_group(root: &mut ProfileRoot, maximum: usize) -> Result<()> {
     let next = root
         .group_count
         .checked_add(1)
-        .ok_or_else(|| limit("ink action groups", MAX_ACTION_GROUPS))?;
-    if next > MAX_ACTION_GROUPS {
-        return Err(limit("ink action groups", MAX_ACTION_GROUPS));
+        .ok_or_else(|| invalid("ink action-group count overflow"))?;
+    if next > maximum {
+        return Err(limit(LimitKind::ActionGroups, next, maximum));
     }
     root.group_count = next;
     Ok(())
@@ -1721,6 +2763,7 @@ fn optional_attr<R: std::io::BufRead>(
     element: &BytesStart<'_>,
     name: &[u8],
     reader: &NsReader<R>,
+    limits: Limits,
 ) -> Result<Option<String>> {
     let mut result = None;
     for attribute in element.checked_attributes() {
@@ -1735,13 +2778,25 @@ fn optional_attr<R: std::io::BufRead>(
         }
         if attribute.value.len() > MAX_ATTRIBUTE_VALUE_BYTES {
             return Err(limit(
-                "ink actions attribute value bytes",
+                LimitKind::AttributeValueBytes,
+                attribute.value.len(),
                 MAX_ATTRIBUTE_VALUE_BYTES,
             ));
         }
+        crate::preflight_attribute_value_bytes(
+            attribute.value.as_ref(),
+            limits.max_attribute_value_bytes,
+        )?;
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
             .map_err(xml_error)?;
+        if value.len() > limits.max_attribute_value_bytes {
+            return Err(limit(
+                LimitKind::AttributeValueBytes,
+                value.len(),
+                limits.max_attribute_value_bytes,
+            ));
+        }
         validate_xml_characters(&value, "ink actions profile attribute")?;
         result = Some(value.into_owned());
     }
@@ -1751,6 +2806,7 @@ fn optional_attr<R: std::io::BufRead>(
 fn optional_xml_id<R: std::io::BufRead>(
     element: &BytesStart<'_>,
     reader: &NsReader<R>,
+    limits: Limits,
 ) -> Result<Option<Box<str>>> {
     let mut result = None;
     for attribute in element.checked_attributes() {
@@ -1763,15 +2819,31 @@ fn optional_xml_id<R: std::io::BufRead>(
         }
         if attribute.value.len() > MAX_ATTRIBUTE_VALUE_BYTES {
             return Err(limit(
-                "ink actions attribute value bytes",
+                LimitKind::AttributeValueBytes,
+                attribute.value.len(),
                 MAX_ATTRIBUTE_VALUE_BYTES,
             ));
         }
+        crate::preflight_attribute_value_bytes(
+            attribute.value.as_ref(),
+            limits.max_attribute_value_bytes,
+        )?;
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
             .map_err(xml_error)?;
+        if value.len() > limits.max_attribute_value_bytes {
+            return Err(limit(
+                LimitKind::AttributeValueBytes,
+                value.len(),
+                limits.max_attribute_value_bytes,
+            ));
+        }
         validate_xml_characters(&value, "ink actions profile xml:id")?;
-        result = Some(strict_token(value.into_owned(), "xml:id")?);
+        result = Some(strict_token(
+            value.into_owned(),
+            "xml:id",
+            limits.max_scalar_bytes,
+        )?);
     }
     Ok(result)
 }
@@ -1840,6 +2912,7 @@ struct Frame {
     action: Option<usize>,
     action_group: bool,
     direct_actions: usize,
+    payload_start: Option<usize>,
 }
 
 fn record_group_action(stack: &mut [Frame]) {
@@ -1855,13 +2928,14 @@ fn parse_action<R: std::io::BufRead>(
     start: usize,
     end: usize,
     reader: &NsReader<R>,
+    limits: Limits,
 ) -> Result<Action> {
-    let action_type = required_attr(element, b"type", reader)?;
-    let start_time = required_attr(element, b"startTime", reader)?;
-    validate_decimal(&start_time)?;
+    let action_type = required_attr(element, b"type", reader, limits)?;
+    let start_time = required_attr(element, b"startTime", reader, limits)?;
+    validate_decimal(&start_time, limits.max_scalar_bytes)?;
     Ok(Action {
-        xml_id: optional_xml_id(element, reader)?,
-        action_type: ActionType::parse(&action_type)?,
+        xml_id: optional_xml_id(element, reader, limits)?,
+        action_type: ActionType::parse_with_limit(&action_type, limits.max_scalar_bytes)?,
         start_time: start_time.into_boxed_str(),
         source_start: start,
         source_end: end,
@@ -1873,17 +2947,19 @@ fn parse_action<R: std::io::BufRead>(
 fn require_action_attrs<R: std::io::BufRead>(
     element: &BytesStart<'_>,
     reader: &NsReader<R>,
+    limits: Limits,
 ) -> Result<()> {
-    let kind = required_attr(element, b"type", reader)?;
-    let time = required_attr(element, b"startTime", reader)?;
-    ActionType::parse(&kind)?;
-    validate_decimal(&time)
+    let kind = required_attr(element, b"type", reader, limits)?;
+    let time = required_attr(element, b"startTime", reader, limits)?;
+    ActionType::parse_with_limit(&kind, limits.max_scalar_bytes)?;
+    validate_decimal(&time, limits.max_scalar_bytes)
 }
 
 fn required_attr<R: std::io::BufRead>(
     element: &BytesStart<'_>,
     name: &[u8],
     reader: &NsReader<R>,
+    limits: Limits,
 ) -> Result<String> {
     let mut result = None;
     for attribute in element.checked_attributes() {
@@ -1899,13 +2975,25 @@ fn required_attr<R: std::io::BufRead>(
         }
         if attribute.value.len() > MAX_ATTRIBUTE_VALUE_BYTES {
             return Err(limit(
-                "ink actions attribute value bytes",
+                LimitKind::AttributeValueBytes,
+                attribute.value.len(),
                 MAX_ATTRIBUTE_VALUE_BYTES,
             ));
         }
+        crate::preflight_attribute_value_bytes(
+            attribute.value.as_ref(),
+            limits.max_attribute_value_bytes,
+        )?;
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
             .map_err(xml_error)?;
+        if value.len() > limits.max_attribute_value_bytes {
+            return Err(limit(
+                LimitKind::AttributeValueBytes,
+                value.len(),
+                limits.max_attribute_value_bytes,
+            ));
+        }
         validate_xml_characters(&value, "ink actions attribute")?;
         let mut owned = String::new();
         owned
@@ -1922,9 +3010,12 @@ fn required_attr<R: std::io::BufRead>(
     })
 }
 
-fn validate_decimal(value: &str) -> Result<()> {
-    if value.is_empty() || value.len() > 256 {
-        return Err(invalid("ink action decimal is empty or overlong"));
+fn validate_decimal(value: &str, maximum: usize) -> Result<()> {
+    if value.len() > maximum {
+        return Err(limit(LimitKind::ScalarBytes, value.len(), maximum));
+    }
+    if value.is_empty() {
+        return Err(invalid("ink action decimal is empty"));
     }
     let mut digits = 0usize;
     let mut dot = false;
@@ -1948,15 +3039,17 @@ fn validate_decimal(value: &str) -> Result<()> {
     }
 }
 
-fn validate_unit(value: &str, name: &'static str) -> Result<()> {
+fn validate_unit(value: &str, name: &'static str, maximum: usize) -> Result<()> {
+    if value.len() > maximum {
+        return Err(limit(LimitKind::ScalarBytes, value.len(), maximum));
+    }
     if value.is_empty()
-        || value.len() > MAX_TOKEN_BYTES
         || value
             .bytes()
             .any(|byte| byte == 0 || byte.is_ascii_whitespace())
     {
         return Err(invalid(format!(
-            "ink actions {name} is empty, overlong, or contains whitespace"
+            "ink actions {name} is empty or contains whitespace"
         )));
     }
     Ok(())
@@ -2001,6 +3094,20 @@ fn is_action_namespace(
         },
         ResolveResult::Bound(_) | ResolveResult::Unbound => false,
     })
+}
+
+fn is_payload_element<R: std::io::BufRead>(
+    resolved: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+    reader: &NsReader<R>,
+) -> Result<bool> {
+    if !namespace_matches(resolved, INKML_NAMESPACE.as_bytes(), reader)? {
+        return Ok(false);
+    }
+    Ok(matches!(
+        element.name().local_name().as_ref(),
+        b"definitions" | b"transform" | b"trace" | b"traceView"
+    ))
 }
 
 fn namespace_id<R: std::io::BufRead>(
@@ -2069,6 +3176,7 @@ fn validate_element<R: std::io::BufRead>(
     element: &BytesStart<'_>,
     reader: &NsReader<R>,
     strict_profile: bool,
+    limits: Limits,
 ) -> Result<()> {
     let element_name = element.name();
     let name = std::str::from_utf8(element_name.as_ref()).map_err(xml_error)?;
@@ -2078,10 +3186,11 @@ fn validate_element<R: std::io::BufRead>(
     let mut attribute_keys = Vec::new();
     for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
-        if attribute_keys.len() >= MAX_ATTRIBUTES_PER_ELEMENT {
+        if attribute_keys.len() >= limits.max_attributes_per_element {
             return Err(limit(
-                "ink actions attributes per element",
-                MAX_ATTRIBUTES_PER_ELEMENT,
+                LimitKind::XmlAttributes,
+                attribute_keys.len() + 1,
+                limits.max_attributes_per_element,
             ));
         }
         let name = std::str::from_utf8(attribute.key.as_ref()).map_err(xml_error)?;
@@ -2090,7 +3199,8 @@ fn validate_element<R: std::io::BufRead>(
         }
         if attribute.value.len() > MAX_ATTRIBUTE_VALUE_BYTES {
             return Err(limit(
-                "ink actions attribute value bytes",
+                LimitKind::AttributeValueBytes,
+                attribute.value.len(),
                 MAX_ATTRIBUTE_VALUE_BYTES,
             ));
         }
@@ -2099,10 +3209,27 @@ fn validate_element<R: std::io::BufRead>(
                 "ink actions profile attribute contains a raw less-than sign",
             ));
         }
+        let is_namespace_declaration = attribute.key.as_ref() == b"xmlns"
+            || attribute.key.as_ref().strip_prefix(b"xmlns:").is_some();
+        crate::preflight_attribute_value_bytes(
+            attribute.value.as_ref(),
+            if is_namespace_declaration {
+                MAX_ATTRIBUTE_VALUE_BYTES
+            } else {
+                limits.max_attribute_value_bytes
+            },
+        )?;
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
             .map_err(xml_error)?;
         validate_xml_characters(&value, "ink actions attribute")?;
+        if !is_namespace_declaration && value.len() > limits.max_attribute_value_bytes {
+            return Err(limit(
+                LimitKind::AttributeValueBytes,
+                value.len(),
+                limits.max_attribute_value_bytes,
+            ));
+        }
         if strict_profile {
             let key = attribute.key.as_ref();
             let declared_prefix = if key == b"xmlns" {
@@ -2377,41 +3504,64 @@ fn pos<R: std::io::BufRead>(reader: &NsReader<R>, origin: ReaderOrigin) -> Resul
         .offset(reader.buffer_position())
         .ok_or_else(|| invalid("ink actions offset exceeds usize"))
 }
-fn increment_nodes(nodes: &mut usize) -> Result<()> {
+fn increment_nodes(nodes: &mut usize, maximum: usize) -> Result<()> {
     let next = nodes
         .checked_add(1)
-        .ok_or_else(|| limit("ink actions XML nodes", MAX_NODES))?;
-    enforce_nodes(next)?;
+        .ok_or_else(|| invalid("ink action XML node count overflow"))?;
+    enforce_nodes(next, maximum)?;
     *nodes = next;
     Ok(())
 }
-fn enforce_nodes(nodes: usize) -> Result<()> {
-    if nodes > MAX_NODES {
-        Err(limit("ink actions XML nodes", MAX_NODES))
+fn enforce_nodes(nodes: usize, maximum: usize) -> Result<()> {
+    if nodes > maximum {
+        Err(limit(LimitKind::Nodes, nodes, maximum))
     } else {
         Ok(())
     }
 }
-fn enforce_depth(depth: usize) -> Result<()> {
-    if depth > MAX_DEPTH {
-        Err(limit("ink actions XML depth", MAX_DEPTH))
+fn enforce_depth(depth: usize, maximum: usize) -> Result<()> {
+    if depth > maximum {
+        Err(limit(LimitKind::Depth, depth, maximum))
     } else {
         Ok(())
     }
 }
-fn increment_groups(groups: &mut usize) -> Result<()> {
+
+fn enforce_payload_span(start: usize, end: usize, maximum: usize) -> Result<()> {
+    let observed = end
+        .checked_sub(start)
+        .ok_or_else(|| invalid("ink action payload span underflow"))?;
+    if observed > maximum {
+        return Err(limit(LimitKind::PayloadBytes, observed, maximum));
+    }
+    Ok(())
+}
+
+fn increment_groups(groups: &mut usize, maximum: usize) -> Result<()> {
     let next = groups
         .checked_add(1)
-        .ok_or_else(|| limit("ink action groups", MAX_ACTION_GROUPS))?;
-    if next > MAX_ACTION_GROUPS {
-        return Err(limit("ink action groups", MAX_ACTION_GROUPS));
+        .ok_or_else(|| invalid("ink action-group count overflow"))?;
+    if next > maximum {
+        return Err(limit(LimitKind::ActionGroups, next, maximum));
     }
     *groups = next;
     Ok(())
 }
-fn ensure_action_capacity(actions: &[Action]) -> Result<()> {
-    if actions.len() >= MAX_ACTIONS {
-        Err(limit("ink actions", MAX_ACTIONS))
+
+fn increment_action_count(actions: &mut usize, maximum: usize) -> Result<()> {
+    let next = actions
+        .checked_add(1)
+        .ok_or_else(|| invalid("ink action count overflow"))?;
+    if next > maximum {
+        return Err(limit(LimitKind::Actions, next, maximum));
+    }
+    *actions = next;
+    Ok(())
+}
+
+fn ensure_action_capacity(actions: &[Action], maximum: usize) -> Result<()> {
+    if actions.len() >= maximum {
+        Err(limit(LimitKind::Actions, actions.len() + 1, maximum))
     } else {
         Ok(())
     }
@@ -2419,8 +3569,15 @@ fn ensure_action_capacity(actions: &[Action]) -> Result<()> {
 fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
-fn limit(resource: &'static str, limit: usize) -> Error {
-    Error::Limit { resource, limit }
+fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::limit(kind, observed, maximum)
+}
+
+fn check_limit(kind: LimitKind, value: usize, maximum: usize) -> Result<()> {
+    if value == 0 || value > maximum {
+        return Err(Error::invalid_limit(kind, value, maximum));
+    }
+    Ok(())
 }
 fn xml_error(error: impl fmt::Display) -> Error {
     Error::Xml(error.to_string())

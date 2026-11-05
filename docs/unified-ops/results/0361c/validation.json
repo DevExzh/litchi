@@ -1,0 +1,298 @@
+{
+  "base": "4e7dadaf1b",
+  "workspace_check": {
+    "command": [
+      "cargo",
+      "check",
+      "--workspace",
+      "--all-targets",
+      "--all-features"
+    ],
+    "attempts": [
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-c/check-1.log",
+        "bytes": 8703,
+        "sha256": "ba997da683d60151d91ed34f4fdf87d6559ec3013427b06ca7164df1c075a937",
+        "exit_code": 101
+      },
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-c/check-2.log",
+        "bytes": 3513,
+        "sha256": "20d112e21f47c61a3c8b05cc60580a3cc38e6f25f300b5d6cbcc4c518ce3745a",
+        "exit_code": 101
+      },
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-c/check-3.log",
+        "bytes": 7172,
+        "sha256": "1b6e673c1bae9b4c03fe0d1776cd527d3731c2c852bccd81ff02d3fa4a21adaa",
+        "exit_code": 0
+      }
+    ],
+    "final_exit_code": 0
+  },
+  "validation": [
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 26.922,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-c/fmt.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "-p",
+        "litchi-iwa-core",
+        "-p",
+        "litchi-iwa-archive",
+        "-p",
+        "litchi-iwa-text",
+        "-p",
+        "litchi-iwa-detect",
+        "-p",
+        "litchi-keynote",
+        "-p",
+        "litchi-numbers",
+        "-p",
+        "litchi-pages",
+        "-p",
+        "litchi-iwa",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 85.515,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-c/clippy.log",
+      "bytes": 2151,
+      "sha256": "4264d1bf490c22552405343275fc1c1ef6e6eeb2eeedd8be9f9364cd1ee091d0"
+    },
+    {
+      "name": "tests",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "litchi-iwa-core",
+        "-p",
+        "litchi-iwa-archive",
+        "-p",
+        "litchi-iwa-text",
+        "-p",
+        "litchi-iwa-detect",
+        "--all-features"
+      ],
+      "exit_code": 0,
+      "seconds": 38.477,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-c/tests.log",
+      "bytes": 38077,
+      "sha256": "0b937957cef35b0ee42006c4aee52a151e0714fd3e31e8b6c68bab35cf2e217a"
+    },
+    {
+      "name": "doc-litchi-iwa-core",
+      "command": [
+        "env",
+        "RUSTC_BOOTSTRAP=1",
+        "RUSTDOCFLAGS=-Dwarnings",
+        "cargo",
+        "rustdoc",
+        "-p",
+        "litchi-iwa-core",
+        "--lib",
+        "--all-features",
+        "--",
+        "-Zunstable-options",
+        "--output-format",
+        "json",
+        "--document-hidden-items"
+      ],
+      "exit_code": 0,
+      "seconds": 34.754,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-c/doc-litchi-iwa-core.log",
+      "bytes": 906,
+      "sha256": "26d065ef2c1048eaf63ecddac8b23fcb9d47fe00169e751366894b738bf76910"
+    },
+    {
+      "name": "doc-litchi-iwa-archive",
+      "command": [
+        "env",
+        "RUSTC_BOOTSTRAP=1",
+        "RUSTDOCFLAGS=-Dwarnings",
+        "cargo",
+        "rustdoc",
+        "-p",
+        "litchi-iwa-archive",
+        "--lib",
+        "--all-features",
+        "--",
+        "-Zunstable-options",
+        "--output-format",
+        "json",
+        "--document-hidden-items"
+      ],
+      "exit_code": 0,
+      "seconds": 23.724,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-c/doc-litchi-iwa-archive.log",
+      "bytes": 880,
+      "sha256": "62ef2c5f02beed3aec313b58cc8dee717f60737e1c13f903d9c0a3b1242f226c"
+    },
+    {
+      "name": "doc-litchi-iwa-text",
+      "command": [
+        "env",
+        "RUSTC_BOOTSTRAP=1",
+        "RUSTDOCFLAGS=-Dwarnings",
+        "cargo",
+        "rustdoc",
+        "-p",
+        "litchi-iwa-text",
+        "--lib",
+        "--all-features",
+        "--",
+        "-Zunstable-options",
+        "--output-format",
+        "json",
+        "--document-hidden-items"
+      ],
+      "exit_code": 0,
+      "seconds": 2.256,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-c/doc-litchi-iwa-text.log",
+      "bytes": 379,
+      "sha256": "cfa330653db72c252e58348a8220924019c933af9f9e9ddf3181154488a8ec8c"
+    },
+    {
+      "name": "doc-litchi-iwa",
+      "command": [
+        "env",
+        "RUSTC_BOOTSTRAP=1",
+        "RUSTDOCFLAGS=-Dwarnings",
+        "cargo",
+        "rustdoc",
+        "-p",
+        "litchi-iwa",
+        "--lib",
+        "--all-features",
+        "--",
+        "-Zunstable-options",
+        "--output-format",
+        "json",
+        "--document-hidden-items"
+      ],
+      "exit_code": 0,
+      "seconds": 11.923,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-c/doc-litchi-iwa.log",
+      "bytes": 1254,
+      "sha256": "1c690dda0a31da2c2a10355187e6f71889e966bc192d6c7e19e784277c4c57ce"
+    },
+    {
+      "name": "glossary",
+      "command": [
+        "python3",
+        "tools/check_api_glossary.py",
+        "--profile",
+        "iwa",
+        "--json",
+        "target/doc/litchi_iwa.json"
+      ],
+      "exit_code": 0,
+      "seconds": 0.892,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-c/glossary.log",
+      "bytes": 125,
+      "sha256": "a3fdfff0a73c40e90a0318a05dea650781417527daf4d869a8b131ea34b273b6"
+    },
+    {
+      "name": "perf",
+      "command": [
+        "cargo",
+        "check",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--all-targets"
+      ],
+      "exit_code": 0,
+      "seconds": 0.985,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-c/perf.log",
+      "bytes": 60,
+      "sha256": "e044439277e94567aefbb236231f11f25f54fbff842b9dc39f9c1ac704d91375"
+    },
+    {
+      "name": "resave",
+      "command": [
+        "cargo",
+        "check",
+        "--locked",
+        "--manifest-path",
+        "tools/native-resave/Cargo.toml",
+        "--all-targets"
+      ],
+      "exit_code": 0,
+      "seconds": 0.145,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-c/resave.log",
+      "bytes": 1341,
+      "sha256": "cfc8f53917bffd22425504c2521a779cb8e3ac51ed8632d67b5f5a80e682fcb7"
+    }
+  ],
+  "tests": {
+    "targets": 15,
+    "passed": 413,
+    "failed": 0,
+    "ignored": 0
+  },
+  "rustdoc_json": [
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/unified-ops-api/target/doc/litchi_iwa_core.json",
+      "bytes": 2126487,
+      "sha256": "c81efc3b522b07772cf528403f81d403a437f5479c2fb456661dd2408b08c658"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/unified-ops-api/target/doc/litchi_iwa_archive.json",
+      "bytes": 5394073,
+      "sha256": "ecb9a7bb34441e9f1c48f3b5e4c910e75eacaaea54e6a8334ec0e0335a900909"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/unified-ops-api/target/doc/litchi_iwa_text.json",
+      "bytes": 3613030,
+      "sha256": "59cc51de663b7960a3a84704ac62267273cd65bb950215601fb03c5f4445af5b"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/unified-ops-api/target/doc/litchi_iwa.json",
+      "bytes": 16866641,
+      "sha256": "fa28532a1c70f519920d9c935902dcb628748f84f9061859db463e5b4ec4c69a"
+    }
+  ],
+  "inventory": {
+    "command": [
+      "python3",
+      "tools/api_debt_inventory.py",
+      "target/doc/litchi_iwa_core.json",
+      "target/doc/litchi_iwa_archive.json",
+      "target/doc/litchi_iwa_text.json",
+      "target/doc/litchi_iwa.json"
+    ],
+    "rows": 46,
+    "categories": {
+      "with_limits": 45,
+      "edit_type": 1
+    },
+    "exhaustive_errors": 0,
+    "reviewed_descriptor": "litchi_iwa_archive::package::EntryEdit"
+  },
+  "limitations": [
+    "Other raw/shared API work remains required; 45 with_limits rows remain.",
+    "This is not the final integrated gate.",
+    "No native performance claim is made.",
+    "Native-resave retains four existing unused-import/dead-code warnings."
+  ]
+}

@@ -700,13 +700,17 @@ mod tests {
     #[test]
     fn fresh_writer_refuses_a_table_row_whose_properties_cannot_fit_a_page() {
         let write = |columns: usize| {
-            let mut writer = crate::writer::Writer::new();
+            let mut writer = crate::builder::Builder::new();
             writer.add_table(1, columns).unwrap();
             let mut output = std::io::Cursor::new(Vec::new());
-            writer.write_to(&mut output).map(|()| output.into_inner())
+            let package = writer.build()?;
+            package
+                .write_to(&mut output)
+                .map_err(crate::writer::WriteError::Package)?;
+            Ok(output.into_inner())
         };
         let bytes = write(21).unwrap();
-        let mut package = crate::Package::from_reader(std::io::Cursor::new(bytes)).unwrap();
+        let mut package = crate::raw::Reader::from_reader(std::io::Cursor::new(bytes)).unwrap();
         package.document().unwrap().text().unwrap();
         for columns in [22, 23, 40, 63] {
             match write(columns) {

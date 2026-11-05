@@ -8,6 +8,22 @@ use crate::chart::model::{ExtensionList, ShapeProperties, TextProperties};
 use crate::chart::plot_area::Lines;
 use crate::chart::types::{AxisOrientation, AxisPosition, AxisType, TickLabelPosition, TickMark};
 
+/// Parses a chart axis ID (`c:axId`, `c:crossAx`).
+///
+/// The schema types both as `ST_UnsignedInt`, but PowerPoint and Excel write
+/// IDs at or above 2^31 as negative signed integers (`-1884094432`). The
+/// reader accepts that spelling and reads it as the same 32 bits (two's
+/// complement), so a negative `c:axId` still matches the `c:crossAx` and
+/// type-group `c:axId` that name it. Writers always spell IDs as unsigned
+/// decimals, the schema form. Anything else (out of the `i32`/`u32` ranges,
+/// not a number) is `None`.
+#[must_use]
+pub fn parse_axis_id(text: &str) -> Option<u32> {
+    text.parse::<u32>()
+        .ok()
+        .or_else(|| text.parse::<i32>().ok().map(i32::cast_unsigned))
+}
+
 /// Axis crossing mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AxisCrossMode {

@@ -12,14 +12,14 @@
 //! Run with: `cargo run --example ppt_shapes_showcase`
 
 use litchi_ppt::writer::{
-    FillStyle, LineStyleConfig, ShadowStyle, ShapeColor, ShapeStyle, ShapeType, Writer,
+    Builder, FillStyle, LineStyleConfig, ShadowStyle, ShapeColor, ShapeStyle, ShapeType,
 };
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!("Creating PPT file with comprehensive shape examples...");
 
-    let mut ppt = Writer::new();
+    let mut ppt = Builder::new();
 
     // Slide 1: Basic shapes with solid fills
     create_basic_shapes_slide(&mut ppt)?;
@@ -53,7 +53,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Save the presentation
     let output_path = "output/ppt_shapes_showcase.ppt";
-    ppt.save(output_path)?;
+    ppt.build()?.save(output_path)?;
 
     println!("✓ Created: {output_path}");
     println!("  10 slides with 80+ shapes");
@@ -66,7 +66,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn create_basic_shapes_slide(ppt: &mut Writer) -> Result<(), Box<dyn Error>> {
+fn create_basic_shapes_slide(ppt: &mut Builder) -> Result<(), Box<dyn Error>> {
     let slide = ppt.add_slide()?;
 
     // Title
@@ -155,7 +155,7 @@ fn create_basic_shapes_slide(ppt: &mut Writer) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn create_arrows_slide(ppt: &mut Writer) -> Result<(), Box<dyn Error>> {
+fn create_arrows_slide(ppt: &mut Builder) -> Result<(), Box<dyn Error>> {
     let slide = ppt.add_slide()?;
 
     // Title
@@ -225,7 +225,7 @@ fn create_arrows_slide(ppt: &mut Writer) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn create_stars_slide(ppt: &mut Writer) -> Result<(), Box<dyn Error>> {
+fn create_stars_slide(ppt: &mut Builder) -> Result<(), Box<dyn Error>> {
     let slide = ppt.add_slide()?;
 
     // Title
@@ -321,7 +321,7 @@ fn create_stars_slide(ppt: &mut Writer) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn create_flowchart_slide(ppt: &mut Writer) -> Result<(), Box<dyn Error>> {
+fn create_flowchart_slide(ppt: &mut Builder) -> Result<(), Box<dyn Error>> {
     let slide = ppt.add_slide()?;
 
     // Title
@@ -416,7 +416,7 @@ fn create_flowchart_slide(ppt: &mut Writer) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn create_special_shapes_slide(ppt: &mut Writer) -> Result<(), Box<dyn Error>> {
+fn create_special_shapes_slide(ppt: &mut Builder) -> Result<(), Box<dyn Error>> {
     let slide = ppt.add_slide()?;
 
     // Title
@@ -528,7 +528,7 @@ fn create_special_shapes_slide(ppt: &mut Writer) -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
-fn create_lines_slide(ppt: &mut Writer) -> Result<(), Box<dyn Error>> {
+fn create_lines_slide(ppt: &mut Builder) -> Result<(), Box<dyn Error>> {
     let slide = ppt.add_slide()?;
 
     // Title
@@ -571,7 +571,7 @@ fn create_lines_slide(ppt: &mut Writer) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn create_styled_shapes_slide(ppt: &mut Writer) -> Result<(), Box<dyn Error>> {
+fn create_styled_shapes_slide(ppt: &mut Builder) -> Result<(), Box<dyn Error>> {
     let slide = ppt.add_slide()?;
 
     // Title
@@ -681,7 +681,7 @@ fn create_styled_shapes_slide(ppt: &mut Writer) -> Result<(), Box<dyn Error>> {
 }
 // Advanced slide functions for gradients, shadows, and transparency
 
-fn create_gradient_slide(ppt: &mut Writer) -> Result<(), Box<dyn Error>> {
+fn create_gradient_slide(ppt: &mut Builder) -> Result<(), Box<dyn Error>> {
     let slide = ppt.add_slide()?;
 
     // Title
@@ -788,7 +788,7 @@ fn create_gradient_slide(ppt: &mut Writer) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn create_shadow_slide(ppt: &mut Writer) -> Result<(), Box<dyn Error>> {
+fn create_shadow_slide(ppt: &mut Builder) -> Result<(), Box<dyn Error>> {
     let slide = ppt.add_slide()?;
 
     // Title
@@ -903,7 +903,7 @@ fn create_shadow_slide(ppt: &mut Writer) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn create_transparency_slide(ppt: &mut Writer) -> Result<(), Box<dyn Error>> {
+fn create_transparency_slide(ppt: &mut Builder) -> Result<(), Box<dyn Error>> {
     let slide = ppt.add_slide()?;
 
     // Title

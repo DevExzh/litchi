@@ -36,9 +36,6 @@ pub(crate) const STYLE: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0"
 pub(crate) const NUMBER: &str = "urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0";
 pub(crate) const LOEXT: &str =
     "urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0";
-pub(crate) const MAX_XML_BYTES: usize = 64 * 1_048_576;
-pub(crate) const MAX_DEPTH: usize = 256;
-pub(crate) const MAX_EVENTS: usize = 2_000_000;
 pub(crate) const MAX_STYLES: usize = 65_536;
 pub(crate) const MAX_PARTS: usize = 4_096;
 pub(crate) const MAX_MAPS: usize = 1_024;
@@ -46,8 +43,8 @@ pub(crate) const MAX_ATTRIBUTES: usize = 128;
 pub(crate) const MAX_VALUE_BYTES: usize = 65_536;
 pub(crate) const MAX_AGGREGATE_BYTES: usize = 32 * 1_048_576;
 
-pub(crate) fn invalid<T>(message: impl Into<String>) -> Result<T> {
-    Err(bad(message))
+pub(crate) fn invalid<T, E: From<Error>>(message: impl Into<String>) -> std::result::Result<T, E> {
+    Err(E::from(bad(message)))
 }
 
 pub(crate) fn bad(message: impl Into<String>) -> Error {

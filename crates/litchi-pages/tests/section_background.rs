@@ -1,5 +1,6 @@
 use std::io;
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_common::{
     WireLimits, encode_varint_into,
@@ -8,7 +9,7 @@ use litchi_iwa_common::{
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tp, tsd, tsp, tswp};
 use litchi_pages::{
-    Limits, Package, Position, SectionSelector,
+    Package, Position, SectionSelector,
     section::{
         Background,
         background::{Error, LimitKind},
@@ -46,11 +47,15 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
 fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn solid(red: f32, green: f32, blue: f32, alpha: f32) -> Background {
@@ -98,7 +103,7 @@ fn solid_payload_with_nested_unknown() -> TestResult<Vec<u8>> {
         .encode_to_vec();
     append_varint_field(&mut color, 99, 9_999)?;
     let mut output = Vec::new();
-    append_length_delimited_field(&mut output, 1, &color)?;
+    append_length_delimited_field(&mut output, 1, &color, WireLimits::DEFAULT)?;
     append_varint_field(&mut output, 98, 8_888)?;
     Ok(output)
 }
@@ -110,7 +115,7 @@ fn section_message(name: &str, background: Option<&[u8]>, unknown: u64) -> TestR
     }
     .encode_to_vec();
     if let Some(payload) = background {
-        append_length_delimited_field(&mut data, 30, payload)?;
+        append_length_delimited_field(&mut data, 30, payload, WireLimits::DEFAULT)?;
     }
     append_varint_field(&mut data, 99, unknown)?;
     Ok(RawMessage {
@@ -153,8 +158,8 @@ fn package_with_first_message_metadata(
     };
     if aliased_preserved_references {
         let encoded = reference(60).encode_to_vec();
-        append_length_delimited_field(&mut first.data, 23, &encoded)?;
-        append_length_delimited_field(&mut first.data, 24, &encoded)?;
+        append_length_delimited_field(&mut first.data, 23, &encoded, WireLimits::DEFAULT)?;
+        append_length_delimited_field(&mut first.data, 24, &encoded, WireLimits::DEFAULT)?;
     }
     let mut first_section = ArchiveObject::new(
         FIRST_SECTION_IDENTIFIER,
@@ -169,9 +174,14 @@ fn package_with_first_message_metadata(
                 data: b"after-section".to_vec(),
             },
         ],
+        Default::default(),
     )?;
     if field_object_reference {
-        let mut field = FieldInfo::new(vec![30]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![30], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references = vec![60];
         first_section.archive_info.message_infos[1]
             .field_infos
@@ -187,7 +197,7 @@ fn package_with_first_message_metadata(
         object(1, 10_000, root.encode_to_vec())?,
         object(BODY_IDENTIFIER, 2_001, body.encode_to_vec())?,
         first_section,
-        ArchiveObject::new(SECOND_SECTION_IDENTIFIER, vec![second])?,
+        ArchiveObject::new(SECOND_SECTION_IDENTIFIER, vec![second], Default::default())?,
     ];
     if aliased_preserved_references {
         objects.push(object(60, 888, b"shared template".to_vec())?);
@@ -212,7 +222,7 @@ fn package(first: Option<&[u8]>, second: Option<&[u8]>) -> TestResult<Vec<u8>> {
 }
 
 fn legacy_package_bytes(flat: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(flat)?;
+    let catalog = Catalog::from_bytes(flat, Default::default())?;
     let inner_entries = catalog
         .iter()
         .filter(|entry| {
@@ -236,16 +246,16 @@ fn legacy_package_bytes(flat: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn document_stream(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("document member missing"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn message_payload(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
-    let archive = Archive::parse(&document_stream(package)?)?;
+    let archive = Archive::parse(&document_stream(package)?, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("section missing"))?;
@@ -259,7 +269,7 @@ fn message_payload(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
 
 fn background_payload(package: &[u8], identifier: u64) -> TestResult<Option<Vec<u8>>> {
     let payload = message_payload(package, identifier)?;
-    let view = WireView::parse_with_limits(&payload, WireLimits::default())?;
+    let view = WireView::parse(&payload, WireLimits::default())?;
     let mut values = view
         .fields()
         .filter(|field| field.number() == 30)
@@ -273,7 +283,7 @@ fn background_payload(package: &[u8], identifier: u64) -> TestResult<Option<Vec<
 }
 
 fn fields_except_background(payload: &[u8]) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse_with_limits(payload, WireLimits::default())?
+    Ok(WireView::parse(payload, WireLimits::default())?
         .fields()
         .filter(|field| field.number() != 30)
         .map(|field| field.raw().to_vec())
@@ -281,8 +291,8 @@ fn fields_except_background(payload: &[u8]) -> TestResult<Vec<Vec<u8>>> {
 }
 
 fn assert_untouched_zip_members(before: &[u8], after: &[u8]) -> TestResult<()> {
-    let before_catalog = Catalog::from_bytes(before)?;
-    let after_catalog = Catalog::from_bytes(after)?;
+    let before_catalog = Catalog::from_bytes(before, Default::default())?;
+    let after_catalog = Catalog::from_bytes(after, Default::default())?;
     let before_entries = before_catalog.iter().collect::<Vec<_>>();
     let after_entries = after_catalog.iter().collect::<Vec<_>>();
     assert_eq!(before_entries.len(), after_entries.len());
@@ -340,20 +350,32 @@ fn selector_and_malformed_background_fields_fail_closed_without_mutation() -> Te
     )?)?;
     assert!(matches!(
         same.edit_section_background(SectionSelector::name("Missing")),
-        Err(Error::NameNotFound)
+        Err(Error::Refused(
+            litchi_pages::section::background::Refusal::NameNotFound
+        ))
     ));
     assert!(
-        matches!(same.edit_section_background(SectionSelector::index(2)), Err(Error::PositionNotFound { position }) if position == Position::new(2))
+        matches!(same.edit_section_background(SectionSelector::index(2)), Err(Error::Refused(litchi_pages::section::background::Refusal::PositionNotFound { position })) if position == Position::new(2))
     );
     assert!(
-        matches!(same.edit_section_background(SectionSelector::name("Same")), Err(Error::AmbiguousSelector { first, duplicate }) if first == Position::new(0) && duplicate == Position::new(1))
+        matches!(same.edit_section_background(SectionSelector::name("Same")), Err(Error::Refused(litchi_pages::section::background::Refusal::AmbiguousSelector { first, duplicate })) if first == Position::new(0) && duplicate == Position::new(1))
     );
 
     let canonical = section_message("Alpha", None, 7_777)?;
     let mut malformed = Vec::new();
     let mut duplicate = canonical.data.clone();
-    append_length_delimited_field(&mut duplicate, 30, &solid_payload(0.1, 0.2, 0.3, 0.4))?;
-    append_length_delimited_field(&mut duplicate, 30, &solid_payload(0.4, 0.3, 0.2, 0.1))?;
+    append_length_delimited_field(
+        &mut duplicate,
+        30,
+        &solid_payload(0.1, 0.2, 0.3, 0.4),
+        WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut duplicate,
+        30,
+        &solid_payload(0.4, 0.3, 0.2, 0.1),
+        WireLimits::DEFAULT,
+    )?;
     malformed.push(duplicate);
     let mut wrong_wire = canonical.data.clone();
     append_varint_field(&mut wrong_wire, 30, 1)?;
@@ -366,14 +388,14 @@ fn selector_and_malformed_background_fields_fail_closed_without_mutation() -> Te
     let mut nested_wrong_wire = section_message("Alpha", None, 7_777)?.data;
     let mut fill = solid_payload(0.1, 0.2, 0.3, 1.0);
     append_varint_field(&mut fill, 1, 1)?;
-    append_length_delimited_field(&mut nested_wrong_wire, 30, &fill)?;
+    append_length_delimited_field(&mut nested_wrong_wire, 30, &fill, WireLimits::DEFAULT)?;
     malformed.push(nested_wrong_wire);
 
     let mut nested_noncanonical = section_message("Alpha", None, 7_777)?.data;
     let mut fill = Vec::new();
     encode_varint_into(&mut fill, (u64::from(1_u32) << 3) | 2);
     fill.extend_from_slice(&[0x80, 0x00]);
-    append_length_delimited_field(&mut nested_noncanonical, 30, &fill)?;
+    append_length_delimited_field(&mut nested_noncanonical, 30, &fill, WireLimits::DEFAULT)?;
     malformed.push(nested_noncanonical);
 
     let mut duplicate_color = tsp::Color {
@@ -388,9 +410,9 @@ fn selector_and_malformed_background_fields_fail_closed_without_mutation() -> Te
     encode_varint_into(&mut duplicate_color, (u64::from(3_u32) << 3) | 5);
     duplicate_color.extend_from_slice(&0.4_f32.to_le_bytes());
     let mut fill = Vec::new();
-    append_length_delimited_field(&mut fill, 1, &duplicate_color)?;
+    append_length_delimited_field(&mut fill, 1, &duplicate_color, WireLimits::DEFAULT)?;
     let mut nested_duplicate = section_message("Alpha", None, 7_777)?.data;
-    append_length_delimited_field(&mut nested_duplicate, 30, &fill)?;
+    append_length_delimited_field(&mut nested_duplicate, 30, &fill, WireLimits::DEFAULT)?;
     malformed.push(nested_duplicate);
 
     let mut wrong_color_wire = tsp::Color {
@@ -404,9 +426,9 @@ fn selector_and_malformed_background_fields_fail_closed_without_mutation() -> Te
     .encode_to_vec();
     append_varint_field(&mut wrong_color_wire, 3, 1)?;
     let mut fill = Vec::new();
-    append_length_delimited_field(&mut fill, 1, &wrong_color_wire)?;
+    append_length_delimited_field(&mut fill, 1, &wrong_color_wire, WireLimits::DEFAULT)?;
     let mut nested_wrong_color_wire = section_message("Alpha", None, 7_777)?.data;
-    append_length_delimited_field(&mut nested_wrong_color_wire, 30, &fill)?;
+    append_length_delimited_field(&mut nested_wrong_color_wire, 30, &fill, WireLimits::DEFAULT)?;
     malformed.push(nested_wrong_color_wire);
 
     let mut noncanonical_color_key = tsp::Color {
@@ -420,15 +442,25 @@ fn selector_and_malformed_background_fields_fail_closed_without_mutation() -> Te
     .encode_to_vec();
     noncanonical_color_key.extend_from_slice(&[0x9d, 0x80, 0x00, 0, 0, 0, 0]);
     let mut fill = Vec::new();
-    append_length_delimited_field(&mut fill, 1, &noncanonical_color_key)?;
+    append_length_delimited_field(&mut fill, 1, &noncanonical_color_key, WireLimits::DEFAULT)?;
     let mut nested_noncanonical_color = section_message("Alpha", None, 7_777)?.data;
-    append_length_delimited_field(&mut nested_noncanonical_color, 30, &fill)?;
+    append_length_delimited_field(
+        &mut nested_noncanonical_color,
+        30,
+        &fill,
+        WireLimits::DEFAULT,
+    )?;
     malformed.push(nested_noncanonical_color);
 
     let mut malformed_gradient = Vec::new();
-    append_length_delimited_field(&mut malformed_gradient, 2, &[0x80])?;
+    append_length_delimited_field(&mut malformed_gradient, 2, &[0x80], WireLimits::DEFAULT)?;
     let mut malformed_gradient_section = section_message("Alpha", None, 7_777)?.data;
-    append_length_delimited_field(&mut malformed_gradient_section, 30, &malformed_gradient)?;
+    append_length_delimited_field(
+        &mut malformed_gradient_section,
+        30,
+        &malformed_gradient,
+        WireLimits::DEFAULT,
+    )?;
     malformed.push(malformed_gradient_section);
 
     for payload in malformed {
@@ -535,7 +567,9 @@ fn color_projection_is_strict_but_preserves_supported_display_p3() -> TestResult
                 edit.clear();
                 assert!(matches!(
                     edit.commit(),
-                    Err(Error::UnsupportedSource { .. })
+                    Err(Error::Refused(
+                        litchi_pages::section::background::Refusal::UnsupportedSource { .. }
+                    ))
                 ));
             },
             Err(Error::InvalidSource { .. }) => {},
@@ -646,7 +680,9 @@ fn clear_and_changed_legacy_sources_obey_exact_source_rules() -> TestResult<()> 
     changed.clear();
     assert!(matches!(
         changed.commit(),
-        Err(Error::UnsupportedSource { .. })
+        Err(Error::Refused(
+            litchi_pages::section::background::Refusal::UnsupportedSource { .. }
+        ))
     ));
     Ok(())
 }
@@ -672,14 +708,14 @@ fn changed_background_preserves_nested_unknowns_and_package_locality() -> TestRe
     );
     let edited_fill = background_payload(&target, FIRST_SECTION_IDENTIFIER)?
         .ok_or_else(|| io::Error::other("edited fill missing"))?;
-    let fill_view = WireView::parse(&edited_fill)?;
+    let fill_view = WireView::parse(&edited_fill, WireLimits::DEFAULT)?;
     assert!(fill_view.fields().any(|field| field.number() == 98));
     let color = fill_view
         .fields()
         .find(|field| field.number() == 1)
         .ok_or_else(|| io::Error::other("edited color missing"))?;
     assert!(
-        WireView::parse(color.payload())?
+        WireView::parse(color.payload(), WireLimits::DEFAULT)?
             .fields()
             .any(|field| field.number() == 99)
     );
@@ -699,7 +735,9 @@ fn unsupported_or_reference_owned_backgrounds_refuse_changed_edits_atomically() 
     clear.clear();
     assert!(matches!(
         clear.commit(),
-        Err(Error::UnsupportedSource { .. })
+        Err(Error::Refused(
+            litchi_pages::section::background::Refusal::UnsupportedSource { .. }
+        ))
     ));
     assert_eq!(exact_bytes(&unsupported)?, unsupported_bytes);
     let mut replace = unsupported.edit_section_background(SectionSelector::index(0))?;
@@ -709,7 +747,9 @@ fn unsupported_or_reference_owned_backgrounds_refuse_changed_edits_atomically() 
     })?;
     assert!(matches!(
         replace.commit(),
-        Err(Error::UnsupportedSource { .. })
+        Err(Error::Refused(
+            litchi_pages::section::background::Refusal::UnsupportedSource { .. }
+        ))
     ));
     assert_eq!(exact_bytes(&unsupported)?, unsupported_bytes);
 
@@ -747,7 +787,10 @@ fn unsupported_or_reference_owned_backgrounds_refuse_changed_edits_atomically() 
         })?;
         assert!(matches!(
             edit.commit(),
-            Err(Error::InvalidSource { .. } | Error::UnsupportedSource { .. })
+            Err(Error::InvalidSource { .. }
+                | Error::Refused(
+                    litchi_pages::section::background::Refusal::UnsupportedSource { .. }
+                ))
         ));
         assert_eq!(exact_bytes(&source)?, bytes);
     }
@@ -790,7 +833,10 @@ fn output_limits_are_atomic() -> TestResult<()> {
         1_024 * 1_024,
         1_024 * 1_024,
     )?;
-    let limited = Package::from_bytes_with_limits(&bytes, limits)?;
+    let limited = Package::from_bytes_with_options(
+        &bytes,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    )?;
     let mut limited_edit = limited.edit_section_background(SectionSelector::index(0))?;
     limited_edit.set_solid(match solid(0.1, 0.2, 0.3, 1.0) {
         Background::Solid(value) => value,
@@ -798,7 +844,7 @@ fn output_limits_are_atomic() -> TestResult<()> {
     })?;
     assert!(matches!(
         limited_edit.commit(),
-        Err(Error::LimitExceeded {
+        Err(Error::Limit {
             kind: LimitKind::OutputBytes,
             ..
         })

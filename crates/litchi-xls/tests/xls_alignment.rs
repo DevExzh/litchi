@@ -1,4 +1,4 @@
-use litchi_xls::{HorizontalAlignment, ReadingOrder, TextRotation, VerticalAlignment, Workbook};
+use litchi_xls::{HorizontalAlignment, ReadingOrder, TextRotation, VerticalAlignment, raw::Reader};
 use std::fs::File;
 use std::path::PathBuf;
 
@@ -10,7 +10,7 @@ fn poi_fixture(name: &str) -> PathBuf {
 
 #[test]
 fn reads_shrink_to_fit_xf_metadata() {
-    let workbook = Workbook::new(File::open(poi_fixture("ShrinkToFit.xls")).unwrap()).unwrap();
+    let workbook = Reader::new(File::open(poi_fixture("ShrinkToFit.xls")).unwrap()).unwrap();
     let formats = workbook.extended_formats();
 
     assert!(
@@ -27,7 +27,7 @@ fn reads_shrink_to_fit_xf_metadata() {
 
 #[test]
 fn retains_default_formatting_alignment() {
-    let workbook = Workbook::new(File::open(poi_fixture("Formatting.xls")).unwrap()).unwrap();
+    let workbook = Reader::new(File::open(poi_fixture("Formatting.xls")).unwrap()).unwrap();
     let alignment = workbook.extended_formats()[0].alignment();
 
     assert_eq!(alignment.horizontal(), HorizontalAlignment::General);

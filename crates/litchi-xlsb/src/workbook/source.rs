@@ -1,21 +1,22 @@
 //! Deferred, source-backed XLSB worksheet catalog and materialization.
 
+use std::collections::HashSet;
 use std::fmt;
 use std::io::{self, Cursor, Read, Write};
+use std::ops::ControlFlow;
 use std::sync::{Arc, Mutex};
 
 use litchi_core::sheet::{Cell as SheetCell, CellValue, Worksheet as SheetWorksheet};
 use litchi_core::{
-    ExecutionContext, ReadAt, SequentialTextWriter, SourceVersion, TextObjectKind, TextOutputError,
+    ReadAt, SequentialTextWriter, SourceVersion, TextObjectKind, TextOutputError,
     TextOutputOptions, TextOutputReport,
 };
 use litchi_opc::constants::{content_type, relationship_type};
-use litchi_opc::{
-    PackURI, PartData, PartView, ReadLimits, SourceBackedPackage, SourceCacheDiagnostics,
-    SourceCacheLimits,
-};
+use litchi_opc::{PackURI, PartData, PartView, SourceBackedPackage, SourceCacheDiagnostics};
 use once_cell::sync::OnceCell;
 
+use super::cache::{Limits as WorksheetCacheLimits, Stats, WorksheetCache};
+use super::catalog::{Kind, State};
 use super::model::Workbook;
 use crate::external_link::{ExternalLinkLimits, Link};
 use crate::leniency::{Leniency, Tolerance, ToleranceReport};
@@ -23,8 +24,9 @@ use crate::package::error::{Error, Result};
 use crate::package::formula::{Context, Definition, ExternalBook};
 use crate::package::shared_strings::SharedString;
 use crate::package::styles_table::StylesTable;
+use crate::package::table::Table;
 use crate::raw::{Records, kind};
-use crate::sheet::Worksheet;
+use crate::sheet::{Grid, Selector, Worksheet};
 
 const XLSB_WORKSHEET_CONTENT_TYPE: &str = "application/vnd.ms-excel.worksheet";
 const XLSB_CHARTSHEET_CONTENT_TYPE: &str = "application/vnd.ms-excel.chartsheet";
@@ -51,21 +53,33 @@ const XLSB_MACROSHEET_RELATIONSHIP: &str =
 const XLSB_INTL_MACROSHEET_RELATIONSHIP: &str =
     "http://schemas.microsoft.com/office/2006/relationships/xlIntlMacrosheet";
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum SheetKind {
-    Worksheet,
-    Chart,
-    Dialog,
-    Macro,
-    IntlMacro,
-}
+// Scalar-only fallback grids have a separate, deliberately smaller budget
+// from complete worksheet snapshots. A source owner therefore cannot retain
+// two full default caches merely by requesting both projections.
+const CACHED_VALUE_CACHE_LIMITS: WorksheetCacheLimits = WorksheetCacheLimits {
+    max_entries: 32,
+    max_weight: 16 * 1024 * 1024,
+};
 
 #[derive(Debug)]
 struct SheetMetadata {
     name: String,
     workbook_position: usize,
-    partname: PackURI,
-    kind: SheetKind,
+    partname: Option<PackURI>,
+    kind: Kind,
+    state: State,
+    /// The compact worksheet repair report survives semantic-cache eviction.
+    tolerance: OnceCell<ToleranceReport>,
+    /// Repairs from the scalar-only indexed projection. A later successful
+    /// full worksheet read supersedes this report in the aggregate accessor.
+    cached_value_tolerance: OnceCell<ToleranceReport>,
+    /// Serializes builders for this worksheet only; parsing never holds the
+    /// owner-wide cache mutex.
+    build: Mutex<()>,
+    /// The first batch of the first cell cursor that validated this
+    /// worksheet (record 0267), which later cursors start from. A few dozen
+    /// cells.
+    first_batch: OnceCell<Arc<cursor::FirstBatch>>,
 }
 
 #[derive(Debug)]
@@ -88,6 +102,7 @@ struct SourceInner {
     active_catalog_position: Option<usize>,
     formula_context: Context,
     external_link_limits: ExternalLinkLimits,
+    raw_limits: crate::raw::Limits,
     shared_strings_part: Option<PackURI>,
     styles_part: Option<PackURI>,
     incomplete_formula_context: bool,
@@ -96,12 +111,34 @@ struct SourceInner {
     styles: SemanticCache<StylesTable>,
     tables: SemanticCache<TableDefinitions>,
     external_books: SemanticCache<ExternalBooks>,
+    worksheet_cache: WorksheetCache,
+    /// Separate bounded retention for scalar-only indexed fallback grids.
+    /// These snapshots never enter the full worksheet cache because they do
+    /// not contain formulas, styles, or worksheet adjuncts.
+    cached_value_cache: WorksheetCache,
     /// Workbook-scope repairs: the workbook stream at open, then each lazily
     /// parsed workbook-scope part once its semantic cache is initialized.
     tolerance: Mutex<ToleranceReport>,
     /// Opt-in repair policy applied to lazily read worksheet content.
     leniency: Leniency,
+    /// The semantic budgets of the family reads of this owner.
+    semantic_limits: crate::SemanticLimits,
 }
+
+/// What reading one worksheet stream needs ([`SourceBackedWorksheet`]).
+struct MaterializationInputs {
+    data: PartData,
+    name: String,
+    shared_strings: Arc<Vec<SharedString>>,
+    formula_context: Context,
+    workbook_position: usize,
+    cell_xf_count: usize,
+    comments_part: Option<PackURI>,
+}
+
+mod cursor;
+mod features;
+pub use cursor::CellCursor;
 
 /// A bounded XLSB workbook catalog whose worksheet bodies remain deferred.
 ///
@@ -115,6 +152,10 @@ struct SourceInner {
 #[derive(Clone)]
 pub struct SourceBackedWorkbook {
     inner: Arc<SourceInner>,
+    /// Document-property edits published over the retained source
+    /// ([`crate::metadata::source`]). The workbook parts are unchanged, so
+    /// every semantic read and cache stays shared with the source owner.
+    pub(crate) metadata: Option<Arc<crate::metadata::source::Revision>>,
 }
 
 /// A source-bound handle for one sheet in an XLSB workbook.
@@ -128,6 +169,15 @@ pub struct SourceBackedWorksheet {
     inner: Arc<SourceInner>,
     catalog_position: usize,
 }
+
+// Shared handles: the unified operations layer keeps these in `Arc`-backed,
+// `Send + Sync` file handles (record 0003 risk R3).
+const _: () = {
+    const fn assert_send_sync<T: Send + Sync>() {}
+    assert_send_sync::<SourceBackedWorkbook>();
+    assert_send_sync::<SourceBackedWorksheet>();
+    assert_send_sync::<Workbook>();
+};
 
 /// Cached cell values accessed through a verified worksheet binary index.
 ///
@@ -164,27 +214,162 @@ impl SourceBackedIndexedWorksheet {
     /// shared-string table uses the workbook's existing ingress policy.
     pub fn cached_value(&self, row: u32, column: u32) -> Result<Option<CellValue>> {
         let _ = preflight_package(&self.inner.package)?;
-        let record = self
-            .index
-            .lookup_record(self.worksheet.as_bytes(), row, column)?;
-        let value = match record {
-            Some((offset, payload)) => {
-                let mut report = ToleranceReport::default();
-                let value = crate::binary_index::decode_cached_value(
-                    crate::raw::Kind::new(offset.record_kind)?,
-                    payload,
-                    self.limits.raw,
-                    row,
-                    &mut Tolerance::recording_with(&mut report, self.inner.leniency),
-                )?;
-                // Every lookup that performs a repair records it.
-                self.inner.lock_tolerance().append(&report);
-                Some(self.scalar_value(value)?)
-            },
-            None => None,
-        };
-        postflight_package(&self.inner.package)?;
+        let result: Result<(Option<CellValue>, ToleranceReport)> = (|| {
+            let record = self
+                .index
+                .lookup_record(self.worksheet.as_bytes(), row, column)?;
+            let (value, report) = match record {
+                Some((offset, payload)) => {
+                    let mut report = ToleranceReport::default();
+                    let value = crate::binary_index::decode_cached_value(
+                        crate::raw::Kind::new(offset.record_kind)?,
+                        payload,
+                        self.limits.raw,
+                        row,
+                        &mut Tolerance::recording_with(&mut report, self.inner.leniency),
+                    )?;
+                    (Some(self.scalar_value(value)?), report)
+                },
+                None => (None, ToleranceReport::default()),
+            };
+            Ok((value, report))
+        })();
+        let fence = postflight_package(&self.inner.package);
+        fence?;
+        let (value, report) = result?;
+        // Publish repairs only after both the lookup and its freshness fence
+        // have succeeded. A failed or stale lookup must not mutate the report.
+        self.inner.lock_tolerance().append(&report);
         Ok(value)
+    }
+
+    /// Visit the stored scalar values in worksheet row-major order without
+    /// constructing a complete [`Worksheet`]. Formula tokens remain opaque;
+    /// each formula contributes only its stored cached scalar. Returning
+    /// [`ControlFlow::Break`] stops the scan after the selected cell.
+    pub fn visit_cached_values<B, F>(&self, visit: F) -> Result<ControlFlow<B>>
+    where
+        F: FnMut(crate::binary_index::CellOffset, CellValue) -> ControlFlow<B>,
+    {
+        let (result, report) = self.visit_cached_values_with_report(visit)?;
+        // The public visitor retains its legacy behavior: repairs discovered
+        // by an explicit scan join the workbook report immediately after its
+        // own source fence has passed.
+        self.inner.lock_tolerance().append(&report);
+        Ok(result)
+    }
+
+    fn visit_cached_values_with_report<B, F>(
+        &self,
+        mut visit: F,
+    ) -> Result<(ControlFlow<B>, ToleranceReport)>
+    where
+        F: FnMut(crate::binary_index::CellOffset, CellValue) -> ControlFlow<B>,
+    {
+        let _ = preflight_package(&self.inner.package)?;
+        let mut report = ToleranceReport::default();
+        let result = (|| {
+            let mut in_sheet_data = false;
+            let mut seen_sheet_data = false;
+            let mut current_row = None;
+            let mut record_count = 0usize;
+            for record_result in Records::bounded(self.worksheet.as_bytes(), self.limits.raw)? {
+                let record = record_result?;
+                record_count = record_count.checked_add(1).ok_or(Error::CapacityOverflow {
+                    resource: "indexed worksheet record count",
+                })?;
+                if record_count > self.limits.max_records {
+                    return Err(Error::limit(
+                        crate::workbook::LimitKind::IndexedRecords,
+                        record_count,
+                        self.limits.max_records,
+                    ));
+                }
+                match record.kind() {
+                    kind::BEGIN_SHEET_DATA => {
+                        if in_sheet_data || seen_sheet_data || !record.payload().is_empty() {
+                            return Err(Error::InvalidFormat(
+                                "indexed worksheet has invalid sheet-data framing",
+                            ));
+                        }
+                        in_sheet_data = true;
+                        seen_sheet_data = true;
+                        current_row = None;
+                    },
+                    kind::END_SHEET_DATA => {
+                        if !in_sheet_data || !record.payload().is_empty() {
+                            return Err(Error::InvalidFormat(
+                                "indexed worksheet has invalid sheet-data framing",
+                            ));
+                        }
+                        in_sheet_data = false;
+                        current_row = None;
+                    },
+                    kind::ROW_HDR if in_sheet_data => {
+                        let bytes = record.payload().get(..4).ok_or(Error::InvalidFormat(
+                            "indexed worksheet row header is truncated",
+                        ))?;
+                        let row = u32::from_le_bytes(bytes.try_into().map_err(|_error| {
+                            Error::InvalidFormat("indexed worksheet row header is truncated")
+                        })?);
+                        if row > crate::binary_index::MAX_ROW_INDEX {
+                            return Err(Error::InvalidFormat(
+                                "indexed worksheet row is outside the BIFF12 grid",
+                            ));
+                        }
+                        current_row = Some(row);
+                    },
+                    cell_kind if in_sheet_data && crate::binary_index::is_cell_kind(cell_kind) => {
+                        let row = current_row.ok_or(Error::InvalidFormat(
+                            "indexed worksheet cell has no row header",
+                        ))?;
+                        let bytes = record
+                            .payload()
+                            .get(..4)
+                            .ok_or(Error::InvalidFormat("indexed worksheet cell is truncated"))?;
+                        let column = u32::from_le_bytes(bytes.try_into().map_err(|_error| {
+                            Error::InvalidFormat("indexed worksheet cell is truncated")
+                        })?);
+                        if column > crate::binary_index::MAX_COLUMN_INDEX {
+                            return Err(Error::InvalidFormat(
+                                "indexed worksheet column is outside the BIFF12 grid",
+                            ));
+                        }
+                        let value = crate::binary_index::decode_cached_value(
+                            cell_kind,
+                            record.payload(),
+                            self.limits.raw,
+                            row,
+                            &mut Tolerance::recording_with(&mut report, self.inner.leniency),
+                        )?;
+                        let value = self.scalar_value(value)?;
+                        let offset = crate::binary_index::CellOffset {
+                            row,
+                            column,
+                            offset: u64::try_from(record.offset()).map_err(|_error| {
+                                Error::CapacityOverflow {
+                                    resource: "indexed worksheet record offset",
+                                }
+                            })?,
+                            record_kind: cell_kind.get(),
+                        };
+                        if let ControlFlow::Break(value) = visit(offset, value) {
+                            return Ok(ControlFlow::Break(value));
+                        }
+                    },
+                    _ => {},
+                }
+            }
+            if !seen_sheet_data || in_sheet_data {
+                return Err(Error::InvalidFormat(
+                    "indexed worksheet sheet-data framing is incomplete",
+                ));
+            }
+            Ok(ControlFlow::Continue(()))
+        })();
+        let fence = postflight_package(&self.inner.package);
+        fence?;
+        Ok((result?, report))
     }
 
     fn scalar_value(&self, value: crate::cell_values::Value) -> Result<CellValue> {
@@ -203,20 +388,18 @@ impl SourceBackedIndexedWorksheet {
             Value::SharedStringIndex(index) => {
                 let strings = self.inner.shared_strings()?;
                 let index = usize::try_from(index).map_err(|_error| {
-                    Error::InvalidFormat("shared-string index exceeds platform size".to_string())
+                    Error::InvalidFormat("shared-string index exceeds platform size")
                 })?;
-                let string = strings.get(index).ok_or_else(|| {
-                    Error::InvalidFormat(
-                        "indexed cell refers to a missing shared string".to_string(),
-                    )
-                })?;
+                let string = strings.get(index).ok_or(Error::InvalidFormat(
+                    "indexed cell refers to a missing shared string",
+                ))?;
                 let units = string.text.encode_utf16().count();
                 if units > self.limits.raw.string_units() {
-                    return Err(Error::LimitExceeded {
-                        resource: "indexed shared-string code units",
-                        actual: units,
-                        maximum: self.limits.raw.string_units(),
-                    });
+                    return Err(Error::limit(
+                        crate::workbook::LimitKind::IndexedStringUnits,
+                        units,
+                        self.limits.raw.string_units(),
+                    ));
                 }
                 let mut text = String::new();
                 text.try_reserve_exact(string.text.len())
@@ -266,7 +449,13 @@ impl SourceBackedExternalLink {
 impl SourceBackedWorkbook {
     /// Open with the default bounded OPC read and cache policies.
     pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at(source)?)
+        Self::from_source_backed_package(SourceBackedPackage::from_read_at(
+            source,
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?)
     }
 
     /// Open an XLSB package from a sequential reader with the default bounded
@@ -278,207 +467,119 @@ impl SourceBackedWorkbook {
     /// deferred until their selected semantic reads require them. The owned
     /// source has stable freshness identity for this immutable snapshot.
     pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
-        Self::from_reader_with_limits_and_external_link_limits(
-            reader,
-            ReadLimits::default(),
-            ExternalLinkLimits::default(),
-        )
+        Self::from_reader_with_options(reader, crate::OpenOptions::default())
     }
 
-    /// Open an XLSB package from a sequential reader with explicit OPC
-    /// resource limits.
-    pub fn from_reader_with_limits<R: Read>(reader: R, limits: ReadLimits) -> Result<Self> {
-        Self::from_reader_with_limits_and_external_link_limits(
-            reader,
-            limits,
-            ExternalLinkLimits::default(),
-        )
-    }
-
-    /// Open an XLSB package from a sequential reader with explicit
-    /// external-link resource limits and the default OPC policy.
-    pub fn from_reader_with_external_link_limits<R: Read>(
+    /// Open an XLSB package from a sequential reader under explicit source
+    /// limits, external-link limits and leniency.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::UnsupportedOpenPolicy`] for skipped drawing decoding
+    /// and for cache or execution policies (the owned sequential source keeps
+    /// its bytes in memory and has no deferred-payload session; open through
+    /// [`Self::from_read_at_with_options`] to use them), the OPC limit and
+    /// archive errors, and the catalog validation errors.
+    pub fn from_reader_with_options<R: Read>(
         reader: R,
-        external_link_limits: ExternalLinkLimits,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
-        Self::from_reader_with_limits_and_external_link_limits(
-            reader,
-            ReadLimits::default(),
-            external_link_limits,
-        )
-    }
-
-    /// Open an XLSB package from a sequential reader with explicit OPC and
-    /// external-link resource limits.
-    pub fn from_reader_with_limits_and_external_link_limits<R: Read>(
-        reader: R,
-        limits: ReadLimits,
-        external_link_limits: ExternalLinkLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package_with_external_link_limits(
-            SourceBackedPackage::from_reader_with_limits(reader, limits)?,
-            external_link_limits,
-        )
-    }
-
-    /// Open with an explicit bounded OPC read policy.
-    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: ReadLimits) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_limits(
-            source, limits,
-        )?)
-    }
-
-    /// Open with the default bounded OPC policy and explicit external-link
-    /// semantic resource limits.
-    pub fn from_read_at_with_external_link_limits(
-        source: Arc<dyn ReadAt>,
-        external_link_limits: ExternalLinkLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package_with_external_link_limits(
-            SourceBackedPackage::from_read_at(source)?,
-            external_link_limits,
-        )
-    }
-
-    /// Open with explicit bounded OPC and external-link semantic policies.
-    pub fn from_read_at_with_limits_and_external_link_limits(
-        source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
-        external_link_limits: ExternalLinkLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package_with_external_link_limits(
-            SourceBackedPackage::from_read_at_with_limits(source, limits)?,
-            external_link_limits,
-        )
-    }
-
-    /// Open with an explicit finite deferred-payload cache policy.
-    pub fn from_read_at_with_cache_limits(
-        source: Arc<dyn ReadAt>,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_cache_limits(
-            source,
-            cache_limits,
-        )?)
-    }
-
-    /// Open with explicit bounded OPC read and cache policies.
-    pub fn from_read_at_with_limits_and_cache_limits(
-        source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
-                source,
-                limits,
-                cache_limits,
+        options.check_source()?;
+        options.check_owning()?;
+        Self::build(
+            SourceBackedPackage::from_reader(
+                reader,
+                options.source_limits,
+                litchi_opc::SourceCacheLimits::default(),
+                None,
             )?,
+            options.external_link_limits,
+            options.leniency,
+            options.semantic_limits,
+            options.raw_limits,
         )
     }
 
-    /// Open with explicit read and caller-owned execution policies.
-    pub fn from_read_at_with_execution_context(
+    /// Open a positional source under explicit ingress policies: source,
+    /// cache and external-link limits, an execution context and leniency.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::UnsupportedOpenPolicy`] for skipped drawing decoding
+    /// (this owner defers every drawing on its own), the OPC limit, archive
+    /// and execution errors, and the catalog validation errors.
+    pub fn from_read_at_with_options(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
-        context: ExecutionContext,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_execution_context(
-            source, limits, context,
-        )?)
-    }
-
-    /// Open with explicit read, cache, and caller-owned execution policies.
-    pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
-        cache_limits: SourceCacheLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
+        options.check_source()?;
+        let cache_limits = options.cache_limits.unwrap_or_default();
+        let package = match options.execution_context {
+            Some(context) => SourceBackedPackage::from_read_at(
                 source,
-                limits,
+                options.source_limits,
                 cache_limits,
-                context,
+                litchi_opc::SourceReadPolicy::exact(),
+                Some(context),
             )?,
+            None => SourceBackedPackage::from_read_at(
+                source,
+                options.source_limits,
+                cache_limits,
+                litchi_opc::SourceReadPolicy::exact(),
+                None,
+            )?,
+        };
+        Self::build(
+            package,
+            options.external_link_limits,
+            options.leniency,
+            options.semantic_limits,
+            options.raw_limits,
         )
     }
 
     /// Build a lazy XLSB catalog from an already validated deferred OPC package.
     pub fn from_source_backed_package(package: SourceBackedPackage) -> Result<Self> {
-        Self::from_source_backed_package_with_external_link_limits(
+        Self::build(
             package,
             ExternalLinkLimits::default(),
+            Leniency::Strict,
+            crate::SemanticLimits::new(),
+            crate::raw::Limits::DEFAULT,
         )
-    }
-
-    /// Open an XLSB package from a sequential reader with the default bounded
-    /// policies under an explicit [`Leniency`].
-    ///
-    /// The Excel-compatible repairs are applied under every variant; see
-    /// [`crate::leniency`]. [`Leniency::TolerateCachedNumbers`] additionally
-    /// repairs non-normal cached numbers read by worksheet materialization
-    /// (recorded on the [`Worksheet`]) and by indexed lookups (recorded in
-    /// [`Self::tolerance_report`]).
-    pub fn from_reader_with_leniency<R: Read>(reader: R, leniency: Leniency) -> Result<Self> {
-        Self::from_source_backed_package_with_leniency(
-            SourceBackedPackage::from_reader_with_limits(reader, ReadLimits::default())?,
-            leniency,
-        )
-    }
-
-    /// Open with the default bounded OPC read and cache policies under an
-    /// explicit [`Leniency`]; see [`Self::from_reader_with_leniency`].
-    pub fn from_read_at_with_leniency(source: Arc<dyn ReadAt>, leniency: Leniency) -> Result<Self> {
-        Self::from_source_backed_package_with_leniency(
-            SourceBackedPackage::from_read_at(source)?,
-            leniency,
-        )
-    }
-
-    /// Build a lazy XLSB catalog under an explicit [`Leniency`]; see
-    /// [`Self::from_reader_with_leniency`].
-    pub fn from_source_backed_package_with_leniency(
-        package: SourceBackedPackage,
-        leniency: Leniency,
-    ) -> Result<Self> {
-        Self::build(package, ExternalLinkLimits::default(), leniency)
-    }
-
-    /// Build a lazy XLSB catalog with explicit external-link semantic limits.
-    pub fn from_source_backed_package_with_external_link_limits(
-        package: SourceBackedPackage,
-        external_link_limits: ExternalLinkLimits,
-    ) -> Result<Self> {
-        Self::build(package, external_link_limits, Leniency::Strict)
     }
 
     fn build(
         package: SourceBackedPackage,
         external_link_limits: ExternalLinkLimits,
         leniency: Leniency,
+        semantic_limits: crate::SemanticLimits,
+        raw_limits: crate::raw::Limits,
     ) -> Result<Self> {
         let _ = preflight_package(&package)?;
         let workbook_part = package.main_document_part()?;
         if workbook_part.content_type() != content_type::XLSB_BIN {
             return Err(Error::InvalidContentType {
-                expected: content_type::XLSB_BIN.to_string(),
-                got: workbook_part.content_type().to_string(),
+                expected: content_type::XLSB_BIN,
             });
         }
 
         let workbook_data = workbook_part.data()?;
-        let mut records = Records::new(workbook_data.as_bytes());
+        let mut records = Records::new(workbook_data.as_bytes(), raw_limits);
         // The packaging repairs of the OPC read come first in discovery order.
         let mut tolerance = ToleranceReport::from_package(package.tolerance_report());
-        let info = Workbook::read_workbook(&mut records, &mut tolerance)?;
+        let info = Workbook::read_workbook(&mut records, &mut tolerance, raw_limits)?;
         let active_catalog_position =
             (!info.worksheet_names.is_empty()).then_some(info.active_catalog_position.unwrap_or(0));
         if info.worksheet_names.len() != info.worksheet_rel_ids.len() {
             return Err(Error::InvalidRelationship(
-                "XLSB sheet names and relationship identifiers have different lengths".to_string(),
+                "XLSB sheet names and relationship identifiers have different lengths",
+            ));
+        }
+        if info.worksheet_names.len() != info.worksheet_states.len() {
+            return Err(Error::InvalidFormat(
+                "XLSB sheet names and visibility states have different lengths",
             ));
         }
 
@@ -507,24 +608,25 @@ impl SourceBackedWorkbook {
             })?;
         for relationship_id in &info.external_link_rel_ids {
             let _ = preflight_package(&package)?;
-            let relationship = workbook_part.rels().get(relationship_id).ok_or_else(|| {
-                Error::InvalidRelationship(format!(
-                    "BrtSupBookSrc relationship {relationship_id:?} is missing"
-                ))
-            })?;
+            let relationship =
+                workbook_part
+                    .rels()
+                    .get(relationship_id)
+                    .ok_or(Error::InvalidRelationship(
+                        "BrtSupBookSrc relationship is missing",
+                    ))?;
             if relationship.is_external() {
-                return Err(Error::InvalidRelationship(format!(
-                    "BrtSupBookSrc relationship {relationship_id:?} is external"
-                )));
+                return Err(Error::InvalidRelationship(
+                    "BrtSupBookSrc relationship is external",
+                ));
             }
             if !matches!(
                 relationship.reltype(),
                 relationship_type::EXTERNAL_LINK | relationship_type::STRICT_EXTERNAL_LINK
             ) {
-                return Err(Error::InvalidRelationship(format!(
-                    "BrtSupBookSrc relationship {relationship_id:?} has invalid type {:?}",
-                    relationship.reltype()
-                )));
+                return Err(Error::InvalidRelationship(
+                    "BrtSupBookSrc relationship has invalid type",
+                ));
             }
             let partname = relationship.target_partname()?;
             let part = package.part(&partname)?;
@@ -554,9 +656,9 @@ impl SourceBackedWorkbook {
                 resource: "source-backed XLSB table relationship catalog",
                 source,
             })?;
-        let mut sheet_targets: Vec<PackURI> = Vec::new();
+        let mut sheet_targets = HashSet::new();
         sheet_targets
-            .try_reserve_exact(info.worksheet_names.len())
+            .try_reserve(info.worksheet_names.len())
             .map_err(|source| Error::Allocation {
                 resource: "source-backed XLSB worksheet target validation",
                 source,
@@ -570,31 +672,45 @@ impl SourceBackedWorkbook {
             .enumerate()
         {
             package.check_execution()?;
-            let relationship_id = relationship_id.as_deref().ok_or_else(|| {
-                Error::InvalidRelationship(format!(
-                    "XLSB sheet {name:?} has no relationship identifier"
-                ))
-            })?;
-            let relationship = workbook_part.rels().get(relationship_id).ok_or_else(|| {
-                Error::InvalidRelationship(format!(
-                    "XLSB sheet {name:?} relationship {relationship_id:?} is missing"
-                ))
-            })?;
+            let state_value = info.worksheet_states[workbook_position];
+            let state = State::from_hs_state(state_value)?;
+            let Some(relationship_id) = relationship_id.as_deref() else {
+                if state != State::VeryHidden {
+                    return Err(Error::InvalidRelationship(
+                        "XLSB unbound sheet tabs must be very hidden",
+                    ));
+                }
+                sheets.push(SheetMetadata {
+                    name: name.clone(),
+                    workbook_position,
+                    partname: None,
+                    kind: Kind::Unbound,
+                    state,
+                    tolerance: OnceCell::new(),
+                    cached_value_tolerance: OnceCell::new(),
+                    build: Mutex::new(()),
+                    first_batch: OnceCell::new(),
+                });
+                continue;
+            };
+            let relationship =
+                workbook_part
+                    .rels()
+                    .get(relationship_id)
+                    .ok_or(Error::InvalidRelationship(
+                        "XLSB sheet relationship is missing",
+                    ))?;
             if relationship.is_external() {
-                return Err(Error::InvalidRelationship(format!(
-                    "XLSB sheet {name:?} has an external relationship"
-                )));
+                return Err(Error::InvalidRelationship(
+                    "XLSB sheet has an external relationship",
+                ));
             }
             let partname = relationship.target_partname()?;
-            if sheet_targets
-                .iter()
-                .any(|target| target.is_equivalent_to(&partname))
-            {
-                return Err(Error::InvalidRelationship(format!(
-                    "multiple XLSB sheets resolve to {partname}"
-                )));
+            if !sheet_targets.insert(partname.as_str().to_ascii_lowercase()) {
+                return Err(Error::InvalidRelationship(
+                    "multiple XLSB sheets resolve to one physical target",
+                ));
             }
-            sheet_targets.push(partname.clone());
             let sheet_part = package.part(&partname)?;
             let sheet_kind = if matches!(
                 relationship.reltype(),
@@ -608,9 +724,9 @@ impl SourceBackedWorkbook {
                         relationship_type::TABLE | relationship_type::STRICT_TABLE
                     ) {
                         if relationship.is_external() {
-                            return Err(Error::InvalidRelationship(format!(
-                                "XLSB worksheet {name:?} has an external table relationship"
-                            )));
+                            return Err(Error::InvalidRelationship(
+                                "XLSB worksheet has an external table relationship",
+                            ));
                         }
                         let table_partname = relationship.target_partname()?;
                         let table_part = package.part(&table_partname)?;
@@ -633,30 +749,29 @@ impl SourceBackedWorkbook {
                         incomplete_formula_context = true;
                     }
                 }
-                SheetKind::Worksheet
+                Kind::Worksheet
             } else {
                 match relationship.reltype() {
                     XLSB_CHARTSHEET_RELATIONSHIP | XLSB_STRICT_CHARTSHEET_RELATIONSHIP => {
                         require_content_type(&sheet_part, XLSB_CHARTSHEET_CONTENT_TYPE)?;
-                        SheetKind::Chart
+                        Kind::Chart
                     },
                     XLSB_DIALOGSHEET_RELATIONSHIP | XLSB_STRICT_DIALOGSHEET_RELATIONSHIP => {
                         require_content_type(&sheet_part, XLSB_DIALOGSHEET_CONTENT_TYPE)?;
-                        SheetKind::Dialog
+                        Kind::Dialog
                     },
                     XLSB_MACROSHEET_RELATIONSHIP => {
                         require_content_type(&sheet_part, XLSB_MACROSHEET_CONTENT_TYPE)?;
-                        SheetKind::Macro
+                        Kind::Macro
                     },
                     XLSB_INTL_MACROSHEET_RELATIONSHIP => {
                         require_content_type(&sheet_part, XLSB_INTL_MACROSHEET_CONTENT_TYPE)?;
-                        SheetKind::IntlMacro
+                        Kind::IntlMacro
                     },
                     _ => {
-                        return Err(Error::InvalidRelationship(format!(
-                            "XLSB sheet {name:?} has unsupported relationship type {:?}",
-                            relationship.reltype()
-                        )));
+                        return Err(Error::InvalidRelationship(
+                            "XLSB sheet relationship type is unsupported",
+                        ));
                     },
                 }
             };
@@ -664,10 +779,15 @@ impl SourceBackedWorkbook {
             sheets.push(SheetMetadata {
                 name: name.clone(),
                 workbook_position,
-                partname,
+                partname: Some(partname),
                 kind: sheet_kind,
+                state,
+                tolerance: OnceCell::new(),
+                cached_value_tolerance: OnceCell::new(),
+                build: Mutex::new(()),
+                first_batch: OnceCell::new(),
             });
-            if matches!(sheet_kind, SheetKind::Worksheet) {
+            if matches!(sheet_kind, Kind::Worksheet) {
                 worksheet_positions.push(catalog_position);
             }
         }
@@ -697,6 +817,7 @@ impl SourceBackedWorkbook {
         postflight_package(&package)?;
 
         Ok(Self {
+            metadata: None,
             inner: Arc::new(SourceInner {
                 package,
                 sheets,
@@ -706,6 +827,7 @@ impl SourceBackedWorkbook {
                 active_catalog_position,
                 formula_context,
                 external_link_limits,
+                raw_limits,
                 shared_strings_part,
                 styles_part,
                 incomplete_formula_context,
@@ -714,10 +836,19 @@ impl SourceBackedWorkbook {
                 styles: SemanticCache::new(),
                 tables: SemanticCache::new(),
                 external_books: SemanticCache::new(),
+                worksheet_cache: WorksheetCache::new(),
+                cached_value_cache: WorksheetCache::with_limits(CACHED_VALUE_CACHE_LIMITS),
                 tolerance: Mutex::new(tolerance),
                 leniency,
+                semantic_limits,
             }),
         })
+    }
+
+    /// The semantic budgets this owner keeps for its family reads.
+    #[must_use]
+    pub fn semantic_limits(&self) -> crate::SemanticLimits {
+        self.inner.semantic_limits
     }
 
     /// A snapshot of every workbook-scope repair applied so far.
@@ -728,11 +859,106 @@ impl SourceBackedWorkbook {
     /// is parsed lazily the first time a worksheet materialization needs it,
     /// and its repairs join this report then, exactly once. Worksheet-stream
     /// repairs are reported by [`Worksheet::tolerance_report`] on each
-    /// materialized worksheet. See [`crate::leniency`] for the repair
-    /// contract.
+    /// materialized worksheet. A scalar-only indexed fallback retains its
+    /// compact report beside the selected catalog entry until a successful
+    /// full worksheet read supersedes it. See [`crate::leniency`] for the
+    /// repair contract.
     #[must_use]
     pub fn tolerance_report(&self) -> ToleranceReport {
         self.inner.lock_tolerance().clone()
+    }
+
+    /// Return the workbook report together with every worksheet repair that
+    /// has been successfully published by this source-backed owner.
+    ///
+    /// Worksheet streams are parsed lazily. Their compact reports are
+    /// retained beside the worksheet catalog, so cache eviction and a later
+    /// materialization do not append the same report twice. A scalar-only
+    /// indexed fallback has a parallel report slot; a successful full read
+    /// takes precedence for that worksheet. A failed or cancelled read
+    /// publishes neither its semantic value nor its report. The accessor does
+    /// not parse source parts. Its source and execution fences run before and
+    /// after the report snapshot, so callers cannot observe a report from a
+    /// stale or cancelled source.
+    #[must_use]
+    pub fn read_tolerance_report(&self) -> Result<ToleranceReport> {
+        let _ = preflight_package(&self.inner.package)?;
+        let mut report = self.inner.lock_tolerance().clone();
+        for sheet in &self.inner.sheets {
+            if let Some(tolerance) = sheet
+                .tolerance
+                .get()
+                .or_else(|| sheet.cached_value_tolerance.get())
+            {
+                report.append(tolerance);
+            }
+        }
+        postflight_package(&self.inner.package)?;
+        Ok(report)
+    }
+
+    /// Return the workbook and sheet-scoped defined names retained by the
+    /// catalog. The name records are read from `workbook.bin`; no worksheet
+    /// or table part is materialized by this accessor.
+    pub fn defined_names(&self) -> Result<Arc<[String]>> {
+        let _ = preflight_package(&self.inner.package)?;
+        let names = Arc::clone(&self.inner.formula_context.defined_names);
+        postflight_package(&self.inner.package)?;
+        Ok(names)
+    }
+
+    /// Return formula-context table definitions, loading the bounded table
+    /// parts through the leaf semantic cache when necessary.
+    pub fn tables(&self) -> Result<Arc<[Definition]>> {
+        self.inner.tables()
+    }
+
+    /// Return parsed ListObject table parts grouped by public worksheet
+    /// ordinal. Each selected worksheet loads only its own table parts. The
+    /// returned aggregate is caller-owned; the source owner does not retain a
+    /// second unbounded all-table cache.
+    pub fn structured_tables(&self) -> Result<Arc<[(usize, Table)]>> {
+        let _ = preflight_package(&self.inner.package)?;
+        let mut tables = Vec::new();
+        tables
+            .try_reserve_exact(self.inner.table_parts.len())
+            .map_err(|source| Error::Allocation {
+                resource: "source-backed XLSB structured tables",
+                source,
+            })?;
+        for (worksheet_position, &catalog_position) in
+            self.inner.worksheet_positions.iter().enumerate()
+        {
+            let sheet = SourceBackedWorksheet {
+                inner: Arc::clone(&self.inner),
+                catalog_position,
+            };
+            for table in sheet.tables()?.iter() {
+                tables.push((worksheet_position, table.clone()));
+            }
+        }
+        postflight_package(&self.inner.package)?;
+        Ok(tables.into())
+    }
+
+    /// Return the source owner's validated style table. Styles are parsed at
+    /// most once and remain owned by the leaf semantic cache.
+    pub fn styles(&self) -> Result<Arc<StylesTable>> {
+        self.inner.styles()
+    }
+
+    /// Content-free diagnostics for the owner-scoped worksheet cache.
+    #[must_use]
+    pub fn semantic_cache_diagnostics(&self) -> Stats {
+        self.inner.worksheet_cache.stats()
+    }
+
+    /// Release parsed worksheet values that no grid or legacy handle pins.
+    pub fn trim_semantic_cache(&self) -> usize {
+        self.inner
+            .worksheet_cache
+            .trim_clean()
+            .saturating_add(self.inner.cached_value_cache.trim_clean())
     }
 
     /// Return the number of external-link owners without reading their payloads.
@@ -781,6 +1007,12 @@ impl SourceBackedWorkbook {
         self.inner.external_link_limits
     }
 
+    /// Return the BIFF12 raw policy retained by this source-backed owner.
+    #[must_use]
+    pub fn raw_limits_value(&self) -> crate::raw::Limits {
+        self.inner.raw_limits
+    }
+
     /// Return the number of workbook tabs after checking source freshness.
     pub fn sheet_count(&self) -> Result<usize> {
         let _ = preflight_package(&self.inner.package)?;
@@ -822,6 +1054,35 @@ impl SourceBackedWorkbook {
         );
         postflight_package(&self.inner.package)?;
         Ok(sheets)
+    }
+
+    /// Select a workbook tab by its semantic name or checked zero-based
+    /// position in complete workbook order.
+    ///
+    /// Names use the workbook's case-insensitive comparison policy. A missing
+    /// name or position returns `Ok(None)`; every source and cancellation
+    /// fence is checked around the lookup.
+    pub fn sheet<'a>(
+        &self,
+        selector: impl Into<Selector<'a>>,
+    ) -> Result<Option<SourceBackedWorksheet>> {
+        let _ = preflight_package(&self.inner.package)?;
+        let catalog_position = match selector.into() {
+            Selector::Position(position) => self
+                .inner
+                .sheets
+                .get(position.get())
+                .map(|_| position.get()),
+            Selector::Name(name) => self.inner.sheets.iter().position(|sheet| {
+                crate::package::formula::excel_name_eq(&sheet.name, name.as_ref())
+            }),
+        };
+        let sheet = catalog_position.map(|catalog_position| SourceBackedWorksheet {
+            inner: Arc::clone(&self.inner),
+            catalog_position,
+        });
+        postflight_package(&self.inner.package)?;
+        Ok(sheet)
     }
 
     /// Select a workbook tab by zero-based position in complete workbook order.
@@ -968,24 +1229,104 @@ impl SourceBackedWorkbook {
         Ok(version)
     }
 
+    /// Borrow the validated deferred OPC package this catalog reads from.
+    ///
+    /// This is the package indexed when the workbook was opened: no ZIP
+    /// directory, content-type catalog, or relationship graph is rebuilt.
+    /// Borrowed package services, such as
+    /// [`SourceBackedPackage::source_artifact`], read through the same
+    /// positional source and observe the same source-version fence.
+    #[must_use]
+    pub fn source_backed_package(&self) -> &SourceBackedPackage {
+        &self.inner.package
+    }
+
+    /// Publish this snapshot to a sequential sink.
+    ///
+    /// An unedited catalog streams its source artifact byte for byte. After
+    /// a document-property edit ([`Self::edit_metadata`]) the property
+    /// parts, their package relationships and content types are replaced,
+    /// and every other member keeps its source bytes and compression.
+    ///
+    /// # Errors
+    ///
+    /// Returns the source-change, execution and sink errors of the OPC
+    /// publisher.
+    pub fn write_to(&self, writer: impl Write) -> Result<()> {
+        match &self.metadata {
+            Some(revision) => revision
+                .topology(&self.inner.package)
+                .map_err(publication_error)?
+                .publish_to_stream(writer)?,
+            None => self.inner.package.source_artifact().write_to(writer)?,
+        }
+        Ok(())
+    }
+
+    /// The same source owner with another document-property revision.
+    pub(crate) fn with_metadata_revision(
+        &self,
+        metadata: Option<Arc<crate::metadata::source::Revision>>,
+    ) -> Self {
+        Self {
+            inner: Arc::clone(&self.inner),
+            metadata,
+        }
+    }
+
+    /// Whether this snapshot carries document-property edits over its
+    /// source ([`Self::edit_metadata`]).
+    #[must_use]
+    pub fn has_metadata_edits(&self) -> bool {
+        self.metadata.is_some()
+    }
+
+    /// Materialize the eager, editable [`Workbook`] from this catalog.
+    ///
+    /// The owning OPC graph is built from the package indexed at open,
+    /// through the same positional source: no format detection, ZIP
+    /// directory, or relationship index is repeated, and this lazy catalog
+    /// stays usable. Ordinary Part payloads are read, so the cost is that of
+    /// an eager open's payload reads. The workbook keeps this catalog's
+    /// external-link limits and [`Leniency`].
+    ///
+    /// # Errors
+    ///
+    /// Returns the typed source-change error when the source changed after
+    /// open, `OpcError::ManagedPackageMaterialization` for a catalog opened
+    /// with an execution context, and the eager workbook's own validation,
+    /// limit and allocation errors otherwise.
+    pub fn to_workbook(&self) -> Result<Workbook> {
+        preflight_package(&self.inner.package)?;
+        let package = match &self.metadata {
+            Some(revision) => revision
+                .topology(&self.inner.package)
+                .map_err(publication_error)?
+                .to_opc_package()?,
+            None => self.inner.package.to_opc_package()?,
+        };
+        let mut workbook = Workbook::from_opc_package_with_external_link_limits(
+            package,
+            self.inner.external_link_limits,
+            self.inner.raw_limits,
+        )?;
+        workbook.leniency = self.inner.leniency;
+        postflight_package(&self.inner.package)?;
+        Ok(workbook)
+    }
+
     /// Read the workbook's optional theme without materializing worksheets.
     ///
     /// This loads the selected theme XML and returns an immutable metadata
     /// view. Image relationships remain inert; their payloads are not read.
     /// Source freshness and cancellation are checked around the operation.
     /// Retain the returned view for repeated color and font queries.
-    pub fn theme(&self) -> Result<Option<crate::theme::View>> {
-        self.theme_with_limits(crate::theme::Limits::default())
-    }
-
-    /// Read the optional theme with explicit resource ceilings.
     ///
-    /// The selected part's declared size is checked before payload loading;
-    /// decoded XML and publication bounds remain enforced by the theme owner.
-    pub fn theme_with_limits(
-        &self,
-        limits: crate::theme::Limits,
-    ) -> Result<Option<crate::theme::View>> {
+    /// The owner's [`crate::SemanticLimits::theme_value`] bound the read: the
+    /// selected part's declared size is checked before payload loading, and
+    /// decoded XML bounds remain enforced by the theme owner.
+    pub fn theme(&self) -> Result<Option<crate::theme::View>> {
+        let limits = self.inner.semantic_limits.theme_value();
         let _ = preflight_package(&self.inner.package)?;
         let theme = crate::theme::read_source(&self.inner.package, limits);
         postflight_package(&self.inner.package)?;
@@ -999,21 +1340,13 @@ impl SourceBackedWorkbook {
     /// payload views remain deferred; reading a payload is an explicit,
     /// fallible operation on the returned entry rather than part of this
     /// inventory call.
-    pub fn embedded(&self) -> Result<Vec<litchi_ooxml_common::embedded::SourceEntry<'_>>> {
-        self.embedded_with_limits(&litchi_ooxml_common::embedded::Limits::default())
-    }
-
-    /// Inventory embedded relationships with explicit resource limits.
     ///
-    /// This is a catalog-only operation over the retained source-backed OPC
-    /// package. Payload bytes are not read or materialized; callers must use
-    /// the deferred fallible payload operation on each returned entry.
-    pub fn embedded_with_limits(
-        &self,
-        limits: &litchi_ooxml_common::embedded::Limits,
-    ) -> Result<Vec<litchi_ooxml_common::embedded::SourceEntry<'_>>> {
+    /// The owner's [`crate::SemanticLimits::embedded_value`] bound the
+    /// inventory.
+    pub fn embedded(&self) -> Result<Vec<litchi_ooxml_common::embedded::SourceEntry<'_>>> {
+        let limits = &self.inner.semantic_limits.embedded_value();
         let _ = preflight_package(&self.inner.package)?;
-        let entries = litchi_ooxml_common::embedded::scan_source_with(&self.inner.package, limits);
+        let entries = litchi_ooxml_common::embedded::scan_source(&self.inner.package, limits);
         postflight_package(&self.inner.package)?;
         Ok(entries?)
     }
@@ -1024,6 +1357,25 @@ impl SourceBackedWorkbook {
         let is_1904 = self.inner.is_1904_date_system;
         postflight_package(&self.inner.package)?;
         Ok(is_1904)
+    }
+
+    /// The workbook's defined names in record order, with their scope and
+    /// formula text. Only the workbook stream is read.
+    ///
+    /// # Errors
+    ///
+    /// Returns the source-change, execution and decoding errors of the
+    /// workbook stream.
+    pub fn defined_name_entries(&self) -> Result<Vec<crate::named_ranges::Entry>> {
+        let _ = preflight_package(&self.inner.package)?;
+        let data = self.inner.package.main_document_part()?.data()?;
+        let entries = crate::named_ranges::read_entries(
+            data.as_bytes(),
+            &self.inner.formula_context,
+            self.inner.raw_limits,
+        );
+        postflight_package(&self.inner.package)?;
+        entries
     }
 
     /// Return content-free deferred-Part cache diagnostics.
@@ -1105,7 +1457,7 @@ impl SourceBackedWorkbook {
         check_text_state(&self.inner)?;
         String::from_utf8(collector.take_bytes()).map_err(|error| {
             drop(error);
-            Error::Encoding("XLSB text output was not valid UTF-8".to_string())
+            Error::Encoding("XLSB text output was not valid UTF-8")
         })
     }
 }
@@ -1134,63 +1486,67 @@ impl SourceBackedWorksheet {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// The owner's [`crate::SemanticLimits::binary_index_value`] bound the
+    /// worksheet and index validation.
     pub fn indexed_values(&self) -> Result<Option<SourceBackedIndexedWorksheet>> {
-        self.indexed_values_with_limits(crate::binary_index::Limits::DEFAULT)
-    }
-
-    /// Open indexed values with explicit worksheet and index validation limits.
-    pub fn indexed_values_with_limits(
-        &self,
-        limits: crate::binary_index::Limits,
-    ) -> Result<Option<SourceBackedIndexedWorksheet>> {
+        let limits = self.inner.semantic_limits.binary_index_value();
         let _ = preflight_package(&self.inner.package)?;
-        let limits = limits.validate()?;
-        let metadata = self.metadata();
-        if !matches!(metadata.kind, SheetKind::Worksheet) {
-            return Err(Error::UnsupportedFeature(
-                "binary-index value lookup requires an XLSB worksheet".to_string(),
-            ));
-        }
-        let part = self.inner.package.part(&metadata.partname)?;
-        let Some(index_uri) = optional_related_part(
-            &part,
-            &["http://schemas.microsoft.com/office/2006/relationships/xlBinaryIndex"],
-            "worksheet binary index",
-        )?
-        else {
-            postflight_package(&self.inner.package)?;
-            return Ok(None);
-        };
-        let index_part = self.inner.package.part(&index_uri)?;
-        require_content_type(&index_part, "application/vnd.ms-excel.binIndexWs")?;
-        if !index_part.rels().is_empty() {
-            return Err(Error::InvalidRelationship(
-                "worksheet binary index part must not have relationships".to_string(),
-            ));
-        }
-        preflight_indexed_part(
-            &index_part,
-            limits
-                .source_bytes
-                .min(crate::binary_index::MAX_INDEX_STREAM_BYTES),
-            "binary-index bytes",
-        )?;
-        preflight_indexed_part(&part, limits.source_bytes, "indexed worksheet bytes")?;
-        let index_data = index_part.data()?;
-        let worksheet = part.data()?;
-        let _ = preflight_package(&self.inner.package)?;
-        let index = crate::binary_index::WorksheetBinaryIndex::from_parts(
-            index_data.as_bytes(),
-            worksheet.as_bytes(),
-            limits,
-        )?;
-        postflight_package(&self.inner.package)?;
-        Ok(Some(SourceBackedIndexedWorksheet {
-            inner: Arc::clone(&self.inner),
-            worksheet,
-            index: Arc::new(index),
-            limits,
-        }))
+        let result = (|| {
+            let limits = limits.validate()?;
+            let metadata = self.metadata();
+            if !matches!(metadata.kind, Kind::Worksheet) {
+                return Err(Error::UnsupportedFeature(
+                    "binary-index value lookup requires an XLSB worksheet",
+                ));
+            }
+            let partname = self.physical_partname()?;
+            let part = self.inner.package.part(partname)?;
+            let Some(index_uri) = optional_related_part(
+                &part,
+                &["http://schemas.microsoft.com/office/2006/relationships/xlBinaryIndex"],
+                "worksheet binary index",
+            )?
+            else {
+                return Ok(None);
+            };
+            let index_part = self.inner.package.part(&index_uri)?;
+            require_content_type(&index_part, "application/vnd.ms-excel.binIndexWs")?;
+            if !index_part.rels().is_empty() {
+                return Err(Error::InvalidRelationship(
+                    "worksheet binary index part must not have relationships",
+                ));
+            }
+            preflight_indexed_part(
+                &index_part,
+                limits
+                    .source_bytes
+                    .min(crate::binary_index::MAX_INDEX_STREAM_BYTES),
+                crate::binary_index::LimitKind::Bytes.into(),
+            )?;
+            preflight_indexed_part(
+                &part,
+                limits.source_bytes,
+                crate::workbook::LimitKind::IndexedPartBytes.into(),
+            )?;
+            let index_data = index_part.data()?;
+            let worksheet = part.data()?;
+            let _ = preflight_package(&self.inner.package)?;
+            let index = crate::binary_index::WorksheetBinaryIndex::from_parts(
+                index_data.as_bytes(),
+                worksheet.as_bytes(),
+                limits,
+            )?;
+            Ok(Some(SourceBackedIndexedWorksheet {
+                inner: Arc::clone(&self.inner),
+                worksheet,
+                index: Arc::new(index),
+                limits,
+            }))
+        })();
+        let fence = postflight_package(&self.inner.package);
+        fence?;
+        result
     }
 
     /// Return this sheet's name after checking source freshness.
@@ -1209,6 +1565,115 @@ impl SourceBackedWorksheet {
         Ok(position)
     }
 
+    /// Return this tab's semantic kind after checking source freshness.
+    ///
+    /// Relationship identifiers and part names used to resolve the kind are
+    /// retained only by the source-backed owner; callers receive the semantic
+    /// projection in [`crate::sheet::Kind`].
+    pub fn kind(&self) -> Result<Kind> {
+        let _ = preflight_package(&self.inner.package)?;
+        let kind = self.metadata().kind;
+        postflight_package(&self.inner.package)?;
+        Ok(kind)
+    }
+
+    /// Return this tab's semantic visibility state after checking source
+    /// freshness.
+    pub fn state(&self) -> Result<State> {
+        let _ = preflight_package(&self.inner.package)?;
+        let state = self.metadata().state;
+        postflight_package(&self.inner.package)?;
+        Ok(state)
+    }
+
+    /// Resolve one materialized cell's local style through the source-owned
+    /// stylesheet cache. The cell and stylesheet remain tied to this source
+    /// generation; no eager workbook reconstruction is performed.
+    /// The workbook styles table, parsed once per owner on first use.
+    ///
+    /// # Errors
+    ///
+    /// Returns the source-change, execution and styles-part errors.
+    pub fn styles(&self) -> Result<Arc<StylesTable>> {
+        let _ = preflight_package(&self.inner.package)?;
+        let styles = self.inner.styles()?;
+        postflight_package(&self.inner.package)?;
+        Ok(styles)
+    }
+
+    pub fn style_for_cell(
+        &self,
+        cell: &crate::package::Cell,
+    ) -> Result<Option<crate::package::styles_table::CellFormat>> {
+        let _ = preflight_package(&self.inner.package)?;
+        let styles = self.inner.styles()?;
+        let style = styles.get_cell_format(cell.style_id() as usize).cloned();
+        postflight_package(&self.inner.package)?;
+        Ok(style)
+    }
+
+    /// Read the ListObject table parts owned by this worksheet only.
+    ///
+    /// Table parts remain deferred and are parsed through the leaf on each
+    /// selected read. The source owner deliberately does not retain an
+    /// unbounded second table-value cache: the caller owns the returned Arc,
+    /// while malformed or unrelated table parts remain untouched. The table
+    /// codec's strict parser is used here, so a failed read never publishes a
+    /// partial table collection or a duplicate tolerance report.
+    pub fn tables(&self) -> Result<Arc<[Table]>> {
+        let _ = preflight_package(&self.inner.package)?;
+        let result = (|| {
+            if !matches!(self.metadata().kind, Kind::Worksheet) {
+                return Err(Error::UnsupportedFeature(
+                    "source-backed XLSB tables require a worksheet tab",
+                ));
+            }
+            let worksheet_position = self
+                .inner
+                .worksheet_positions
+                .binary_search(&self.catalog_position)
+                .map_err(|_error| {
+                    Error::InvalidRelationship(
+                        "source-backed XLSB worksheet catalog is internally inconsistent",
+                    )
+                })?;
+            let count = self
+                .inner
+                .table_parts
+                .iter()
+                .filter(|part| part.worksheet_position == worksheet_position)
+                .count();
+            let mut tables = Vec::new();
+            tables
+                .try_reserve_exact(count)
+                .map_err(|source| Error::Allocation {
+                    resource: "source-backed XLSB selected worksheet tables",
+                    source,
+                })?;
+            for table_part in self
+                .inner
+                .table_parts
+                .iter()
+                .filter(|part| part.worksheet_position == worksheet_position)
+            {
+                let _ = preflight_package(&self.inner.package)?;
+                let part = self.inner.package.part(&table_part.partname)?;
+                require_content_type(&part, XLSB_TABLE_CONTENT_TYPE)?;
+                let data = part.data()?;
+                let table = crate::package::table::parse_table_part(
+                    data.as_bytes(),
+                    self.inner.raw_limits,
+                )?;
+                postflight_package(&self.inner.package)?;
+                tables.push(table);
+            }
+            Ok(tables.into())
+        })();
+        let fence = postflight_package(&self.inner.package);
+        fence?;
+        result
+    }
+
     /// Parse the selected worksheet BIFF12 stream without reading unselected sheets.
     ///
     /// This source-backed layer materializes stream-owned worksheet data and
@@ -1217,30 +1682,195 @@ impl SourceBackedWorksheet {
     /// PivotTables, slicers, and timelines remain separately deferred rather
     /// than forcing eager loading.
     pub fn materialize(&self) -> Result<Worksheet> {
+        Ok((*self.cached_worksheet()?).clone())
+    }
+
+    /// Return this worksheet as an immutable, cheaply cloned grid snapshot.
+    ///
+    /// The owner performs source and execution fences before returning the
+    /// grid. Subsequent grid reads use only the captured worksheet value and
+    /// therefore remain valid after cache eviction or owner drop.
+    pub fn grid(&self) -> Result<Grid> {
+        self.cached_worksheet().map(Grid::from_arc)
+    }
+
+    /// Build a scalar-only grid from the worksheet's binary cached-value
+    /// index. This is the explicit source fallback for workbooks whose full
+    /// worksheet materialization is refused because of an unsupported
+    /// deferred adjunct such as a PivotTable, slicer, or timeline.
+    ///
+    /// The fallback performs one bounded row-major index scan and creates
+    /// ordinary scalar cells with [`crate::package::Cell::new`]. It never invents formula
+    /// text, styles, comments, or other worksheet metadata. A missing binary
+    /// index is a typed unsupported-feature error.
+    pub fn cached_grid(&self) -> Result<Grid> {
+        let _ = preflight_package(&self.inner.package)?;
+        let metadata = self.metadata();
+        if !matches!(metadata.kind, Kind::Worksheet) {
+            return Err(Error::UnsupportedFeature(
+                "source-backed XLSB cached values require a worksheet tab",
+            ));
+        }
+        // The cache hit still crosses the source fence before the snapshot
+        // escapes. The build lock serializes full and scalar-only builds for
+        // this catalog position without holding the cache mutex during scan.
+        let _build = metadata
+            .build
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if let Some(worksheet) = self
+            .inner
+            .cached_value_cache
+            .get(self.catalog_position, true)
+        {
+            postflight_package(&self.inner.package)?;
+            return Ok(Grid::from_arc(worksheet));
+        }
+        let indexed = self.indexed_values()?.ok_or({
+            Error::UnsupportedFeature(
+                "source-backed XLSB worksheet has no indexed cached-value projection",
+            )
+        })?;
+        let mut worksheet = Worksheet::new(metadata.name.clone());
+        let (_, report) = indexed.visit_cached_values_with_report(|offset, value| {
+            worksheet.add_cell(crate::package::Cell::new(offset.row, offset.column, value));
+            ControlFlow::<()>::Continue(())
+        })?;
+        worksheet.set_tolerance_report(report.clone());
         self.inner.package.check_execution()?;
         self.inner.package.source_version()?;
+        let candidate = Arc::new(worksheet);
+        let weight = candidate.retained_bytes();
+        postflight_package(&self.inner.package)?;
+        let canonical = self.inner.cached_value_cache.publish(
+            self.catalog_position,
+            Arc::clone(&candidate),
+            weight,
+        );
+        if let Err(error) = postflight_package(&self.inner.package) {
+            if Arc::ptr_eq(&canonical, &candidate) {
+                self.inner
+                    .cached_value_cache
+                    .discard_if(self.catalog_position, &candidate);
+            }
+            return Err(error);
+        }
+        // Keep fallback repairs only after the candidate has crossed the
+        // outer publication fence. If a later full worksheet read succeeds,
+        // `read_tolerance_report` prefers its report for this sheet.
+        self.metadata()
+            .cached_value_tolerance
+            .get_or_init(|| report);
+        Ok(Grid::from_arc(canonical))
+    }
+
+    /// Return a pinned, immutable worksheet snapshot from the owner-scoped
+    /// weighted cache. The source and execution fences run on cache hits as
+    /// well as misses; parsing is never performed while the cache mutex is
+    /// held.
+    pub(crate) fn cached_worksheet(&self) -> Result<Arc<Worksheet>> {
+        let _ = preflight_package(&self.inner.package)?;
         let metadata = self.metadata();
-        if !matches!(metadata.kind, SheetKind::Worksheet) {
+        if !matches!(metadata.kind, Kind::Worksheet) {
             return Err(Error::UnsupportedFeature(
-                "source-backed XLSB non-worksheet materialization is not supported".to_string(),
+                "source-backed XLSB non-worksheet materialization is not supported",
             ));
         }
+        let partname = self.physical_partname()?.clone();
+        // Resolving the physical part is intentional on hits: it verifies the
+        // captured source snapshot before any retained semantic value escapes.
+        let _part = self.inner.package.part(&partname)?;
+        // The per-sheet build lock also covers the cache hit path. A builder
+        // publishes the value before its final fence but initializes the
+        // retained report immediately after that fence; taking this lock
+        // before looking in the cache prevents a concurrent reader from
+        // observing that provisional interval.
+        let _build = self
+            .metadata()
+            .build
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if let Some(worksheet) = self.inner.worksheet_cache.get(self.catalog_position, true) {
+            postflight_package(&self.inner.package)?;
+            return Ok(worksheet);
+        }
+
+        let mut worksheet = self.parse_materialized(partname)?;
+        self.inner.package.check_execution()?;
+        self.inner.package.source_version()?;
+        let report = worksheet.tolerance_report().clone();
+        if let Some(retained_report) = self.metadata().tolerance.get() {
+            worksheet.set_tolerance_report(retained_report.clone());
+        }
+        let candidate = Arc::new(worksheet);
+        let weight = candidate.retained_bytes();
+        // Check once before publication and once after it. The second fence
+        // closes the race in which the source changes between the first check
+        // and the cache publication.
+        postflight_package(&self.inner.package)?;
+        let canonical = self.inner.worksheet_cache.publish(
+            self.catalog_position,
+            Arc::clone(&candidate),
+            weight,
+        );
+        if let Err(error) = postflight_package(&self.inner.package) {
+            if Arc::ptr_eq(&canonical, &candidate) {
+                self.inner
+                    .worksheet_cache
+                    .discard_if(self.catalog_position, &candidate);
+            }
+            return Err(error);
+        }
+        // This infallible publication is intentionally after the final
+        // source/execution fence, so a refused candidate leaves no aggregate
+        // worksheet report behind.
+        self.metadata().tolerance.get_or_init(|| report);
+        Ok(canonical)
+    }
+
+    fn parse_materialized(&self, partname: PackURI) -> Result<Worksheet> {
+        let inputs = self.materialization_inputs(partname)?;
+        let mut worksheet = Workbook::read_worksheet(
+            Cursor::new(inputs.data.as_bytes()),
+            inputs.name,
+            inputs.shared_strings.as_slice(),
+            &inputs.formula_context,
+            inputs.workbook_position,
+            inputs.cell_xf_count,
+            self.inner.raw_limits,
+            self.inner.leniency,
+        )?;
+        worksheet.set_scenarios(crate::package::scenarios::parse_worksheet(
+            inputs.data.as_bytes(),
+            self.inner.raw_limits,
+        )?);
+        if let Some(partname) = inputs.comments_part {
+            for comment in self.read_comments(&partname, worksheet.tolerance_report_mut())? {
+                worksheet.add_comment(comment);
+            }
+        }
+        Ok(worksheet)
+    }
+
+    /// What reading the worksheet stream needs, with every refusal the
+    /// materialization raises before it reads the stream (record 0267 shares
+    /// this with the cell cursor).
+    fn materialization_inputs(&self, partname: PackURI) -> Result<MaterializationInputs> {
         if self.inner.incomplete_formula_context {
             return Err(Error::UnsupportedFeature(
-                "source-backed XLSB worksheet materialization requires deferred PivotTable formula owners"
-                    .to_string(),
+                "source-backed XLSB worksheet materialization requires deferred PivotTable formula owners",
             ));
         }
+        let metadata = self.metadata();
         let external_books = self.inner.external_books()?;
         let tables = self.inner.tables()?;
-        let worksheet_part = self.inner.package.part(&metadata.partname)?;
+        let worksheet_part = self.inner.package.part(&partname)?;
         if worksheet_part.rels().iter().any(|relationship| {
             relationship.reltype().contains("/slicer")
                 || relationship.reltype().contains("/timeline")
         }) {
             return Err(Error::UnsupportedFeature(
-                "source-backed XLSB worksheet materialization does not yet include slicer or timeline views"
-                    .to_string(),
+                "source-backed XLSB worksheet materialization does not yet include slicer or timeline views",
             ));
         }
         let comments_part = optional_related_part(
@@ -1252,11 +1882,10 @@ impl SourceBackedWorksheet {
             "comments",
         )?;
         let worksheet_data = worksheet_part.data()?;
-        for record in Records::new(worksheet_data.as_bytes()) {
+        for record in Records::new(worksheet_data.as_bytes(), self.inner.raw_limits) {
             if record?.kind() == kind::BEGIN_SPARKLINE_GROUPS {
                 return Err(Error::UnsupportedFeature(
-                    "source-backed XLSB worksheet materialization does not yet include sparkline groups"
-                        .to_string(),
+                    "source-backed XLSB worksheet materialization does not yet include sparkline groups",
                 ));
             }
         }
@@ -1265,40 +1894,49 @@ impl SourceBackedWorksheet {
         let mut formula_context = self.inner.formula_context.clone();
         formula_context.external_books = external_books;
         formula_context.tables = Arc::clone(&tables);
-        let mut worksheet = Workbook::read_worksheet(
-            Cursor::new(worksheet_data.as_bytes()),
-            metadata.name.clone(),
-            shared_strings.as_slice(),
-            &formula_context,
-            metadata.workbook_position,
-            styles.cell_xfs.len(),
-            self.inner.leniency,
-        )?;
-        worksheet.set_scenarios(crate::package::scenarios::parse_worksheet(
-            worksheet_data.as_bytes(),
-        )?);
-        if let Some(partname) = comments_part {
-            let comments_part = self.inner.package.part(&partname)?;
-            require_content_type(&comments_part, XLSB_COMMENTS_CONTENT_TYPE)?;
-            if !comments_part.rels().is_empty() {
-                return Err(Error::InvalidRelationship(
-                    "XLSB comments parts cannot own relationships".to_string(),
-                ));
-            }
-            let comments_data = comments_part.data()?;
-            for comment in crate::comments::read_recording(
-                comments_data.as_bytes(),
-                worksheet.tolerance_report_mut(),
-            )? {
-                worksheet.add_comment(comment);
-            }
+        Ok(MaterializationInputs {
+            data: worksheet_data,
+            name: metadata.name.clone(),
+            shared_strings,
+            formula_context,
+            workbook_position: metadata.workbook_position,
+            cell_xf_count: styles.cell_xfs.len(),
+            comments_part,
+        })
+    }
+
+    /// The comments of the worksheet's comments part.
+    fn read_comments(
+        &self,
+        partname: &PackURI,
+        report: &mut ToleranceReport,
+    ) -> Result<Vec<crate::comments::Record>> {
+        let comments_part = self.inner.package.part(partname)?;
+        require_content_type(&comments_part, XLSB_COMMENTS_CONTENT_TYPE)?;
+        if !comments_part.rels().is_empty() {
+            return Err(Error::InvalidRelationship(
+                "XLSB comments parts cannot own relationships",
+            ));
         }
-        postflight_package(&self.inner.package)?;
-        Ok(worksheet)
+        let comments_data = comments_part.data()?;
+        Ok(crate::comments::read_recording(
+            comments_data.as_bytes(),
+            self.inner.raw_limits,
+            report,
+        )?)
     }
 
     fn metadata(&self) -> &SheetMetadata {
         &self.inner.sheets[self.catalog_position]
+    }
+
+    fn physical_partname(&self) -> Result<&PackURI> {
+        self.metadata()
+            .partname
+            .as_ref()
+            .ok_or(Error::UnsupportedFeature(
+                "selected XLSB sheet tab has no physical sheet part",
+            ))
     }
 }
 
@@ -1397,8 +2035,13 @@ impl SourceInner {
                 let data = self.package.part(partname)?.data()?;
                 self.package.check_execution()?;
                 self.package.source_version()?;
-                let mut records = Records::new(data.as_bytes());
-                Workbook::read_shared_strings(&mut records, &mut strings, &mut report)?;
+                let mut records = Records::new(data.as_bytes(), self.raw_limits);
+                Workbook::read_shared_strings(
+                    &mut records,
+                    &mut strings,
+                    &mut report,
+                    self.raw_limits,
+                )?;
                 self.package.check_execution()?;
                 self.package.source_version()?;
             }
@@ -1425,7 +2068,11 @@ impl SourceInner {
                 let data = self.package.part(partname)?.data()?;
                 self.package.check_execution()?;
                 self.package.source_version()?;
-                let styles = StylesTable::from_bytes_with_report(data.as_bytes(), &mut report)?;
+                let styles = StylesTable::from_bytes_with_report(
+                    data.as_bytes(),
+                    self.raw_limits,
+                    &mut report,
+                )?;
                 self.package.check_execution()?;
                 self.package.source_version()?;
                 styles
@@ -1470,6 +2117,7 @@ impl SourceInner {
                     data.as_bytes(),
                     table_part.worksheet_position,
                     &mut Tolerance::recording(&mut report),
+                    self.raw_limits,
                 );
                 postflight_package(&self.package)?;
                 let table = table?;
@@ -1477,20 +2125,16 @@ impl SourceInner {
                     .iter()
                     .any(|existing: &Definition| existing.table_id() == table.table_id())
                 {
-                    Some(Error::InvalidFormula(format!(
-                        "duplicate workbook table ID {}",
-                        table.table_id()
-                    )))
+                    Some(Error::InvalidFormula("duplicate workbook table ID"))
                 } else if tables.iter().any(|existing: &Definition| {
                     crate::package::formula::excel_name_eq(
                         existing.display_name(),
                         table.display_name(),
                     )
                 }) {
-                    Some(Error::InvalidFormula(format!(
-                        "duplicate workbook table display name {:?}",
-                        table.display_name()
-                    )))
+                    Some(Error::InvalidFormula(
+                        "duplicate workbook table display name",
+                    ))
                 } else {
                     None
                 };
@@ -1645,9 +2289,9 @@ fn map_text_output_error(error: TextOutputError<Error>, allocation: Option<Error
         },
         TextOutputError::Sink { source, .. } => allocation.unwrap_or(Error::Io(source)),
         TextOutputError::NonDeterministicFragments { .. } => {
-            Error::InvalidFormat("XLSB text fragments were not deterministic".to_string())
+            Error::InvalidFormat("XLSB text fragments were not deterministic")
         },
-        _ => Error::InvalidFormat("unsupported XLSB text output error".to_string()),
+        _ => Error::InvalidFormat("unsupported XLSB text output error"),
     }
 }
 
@@ -1656,17 +2300,17 @@ fn worksheet_dimensions(worksheet: &Worksheet) -> Result<(usize, usize)> {
         SheetWorksheet::dimensions(worksheet).unwrap_or((0, 0, 0, 0));
     if min_row > max_row || min_column > max_column {
         return Err(Error::InvalidFormat(
-            "XLSB worksheet dimensions are reversed".to_string(),
+            "XLSB worksheet dimensions are reversed",
         ));
     }
     if max_row > XLSB_MAX_ROW_INDEX {
         return Err(Error::InvalidFormat(
-            "XLSB worksheet row dimension exceeds the BIFF12 bound".to_string(),
+            "XLSB worksheet row dimension exceeds the BIFF12 bound",
         ));
     }
     if max_column > XLSB_MAX_COLUMN_INDEX {
         return Err(Error::InvalidFormat(
-            "XLSB worksheet column dimension exceeds the BIFF12 bound".to_string(),
+            "XLSB worksheet column dimension exceeds the BIFF12 bound",
         ));
     }
     let row_count = max_row.checked_add(1).ok_or(Error::CapacityOverflow {
@@ -1875,7 +2519,7 @@ where
         })?;
     render(output).map_err(|error| {
         let _ = error;
-        Error::InvalidFormat("XLSB text formatting failed".to_string())
+        Error::InvalidFormat("XLSB text formatting failed")
     })
 }
 
@@ -1913,7 +2557,7 @@ fn append_cell_text(output: &mut String, value: &CellValue) -> Result<()> {
 fn optional_related_part(
     workbook_part: &PartView<'_>,
     relationship_types: &[&str],
-    owner: &str,
+    _owner: &str,
 ) -> Result<Option<PackURI>> {
     let mut relationships = workbook_part
         .rels()
@@ -1923,24 +2567,21 @@ fn optional_related_part(
         return Ok(None);
     };
     if relationships.next().is_some() {
-        return Err(Error::InvalidRelationship(format!(
-            "XLSB workbook has multiple {owner} relationships"
-        )));
+        return Err(Error::InvalidRelationship(
+            "XLSB workbook has multiple relationships",
+        ));
     }
     if relationship.is_external() {
-        return Err(Error::InvalidRelationship(format!(
-            "XLSB workbook {owner} relationship is external"
-        )));
+        return Err(Error::InvalidRelationship(
+            "XLSB workbook relationship is external",
+        ));
     }
     relationship.target_partname().map(Some).map_err(Into::into)
 }
 
-fn require_content_type(part: &PartView<'_>, expected: &str) -> Result<()> {
+fn require_content_type(part: &PartView<'_>, expected: &'static str) -> Result<()> {
     if part.content_type() != expected {
-        return Err(Error::InvalidContentType {
-            expected: expected.to_string(),
-            got: part.content_type().to_string(),
-        });
+        return Err(Error::InvalidContentType { expected });
     }
     Ok(())
 }
@@ -1948,18 +2589,45 @@ fn require_content_type(part: &PartView<'_>, expected: &str) -> Result<()> {
 fn preflight_indexed_part(
     part: &PartView<'_>,
     maximum: usize,
-    resource: &'static str,
+    kind: crate::package::LimitKind,
 ) -> Result<()> {
-    let actual = usize::try_from(part.declared_uncompressed_size()?)
-        .map_err(|_error| Error::CapacityOverflow { resource })?;
+    let actual = usize::try_from(part.declared_uncompressed_size()?).map_err(|_error| {
+        Error::CapacityOverflow {
+            resource: "indexed part size",
+        }
+    })?;
     if actual > maximum {
-        return Err(Error::LimitExceeded {
-            resource,
-            actual,
-            maximum,
-        });
+        return Err(Error::limit(kind, actual, maximum));
     }
     Ok(())
+}
+
+/// Classify a failure to plan a document-property revision over the source.
+fn publication_error(error: crate::metadata::Error) -> Error {
+    match error {
+        crate::metadata::Error::Package(litchi_ooxml_common::Error::Opc(error)) => {
+            Error::Opc(error)
+        },
+        crate::metadata::Error::Package(error) => Error::Common(error),
+        crate::metadata::Error::Signed => Error::Signed,
+        crate::metadata::Error::PatchConflict => Error::PatchConflict {
+            part: "the document-property parts",
+        },
+        crate::metadata::Error::Refused(refusal) => Error::Refused(refusal),
+        crate::metadata::Error::SourceChanged { expected, observed } => {
+            Error::Opc(litchi_opc::OpcError::SourceChanged {
+                expected,
+                actual: observed,
+            })
+        },
+        crate::metadata::Error::Limit {
+            observed, maximum, ..
+        } => Error::limit(crate::opc::LimitKind::PatchBytes, observed, maximum),
+        crate::metadata::Error::Internal(reason) => Error::CapacityOverflow { resource: reason },
+        crate::metadata::Error::Invalid(_) | _ => {
+            Error::InvalidFormat("the package structure is not valid")
+        },
+    }
 }
 
 #[cfg(test)]
@@ -2073,5 +2741,58 @@ mod tests {
             assert!(Arc::ptr_eq(&expected_strings, &strings));
             assert!(Arc::ptr_eq(&expected_styles, &styles));
         }
+    }
+}
+
+#[cfg(test)]
+mod materialize_tests {
+    use std::io::Cursor;
+
+    use litchi_core::sheet::WorkbookTrait;
+
+    use super::{SourceBackedWorkbook, Workbook};
+
+    fn fixture() -> Vec<u8> {
+        std::fs::read(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test-data/ooxml/xlsb/Simple.xlsb"
+        ))
+        .expect("read XLSB fixture")
+    }
+
+    #[test]
+    fn to_workbook_matches_an_eager_open_and_keeps_the_catalog_usable() {
+        let bytes = fixture();
+        let source = SourceBackedWorkbook::from_reader(Cursor::new(bytes.clone())).unwrap();
+        let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+
+        let materialized = source.to_workbook().expect("materialize from the catalog");
+        assert_eq!(materialized.worksheet_names(), eager.worksheet_names());
+        assert_eq!(
+            materialized.active_worksheet_index(),
+            eager.active_worksheet_index()
+        );
+        assert_eq!(
+            materialized.is_1904_date_system(),
+            eager.is_1904_date_system()
+        );
+        for index in 0..eager.worksheet_count() {
+            let left = materialized.worksheet(index).unwrap();
+            let right = eager.worksheet(index).unwrap();
+            assert_eq!(
+                litchi_core::sheet::Worksheet::dimensions(&left),
+                litchi_core::sheet::Worksheet::dimensions(&right)
+            );
+        }
+        // The materialized owner is the eager edit entry.
+        materialized
+            .to_package()
+            .edit_cell_values(materialized.worksheet_names()[0].as_str())
+            .expect("eager cell-value edit")
+            .resolve()
+            .expect("worksheet resolution")
+            .expect("worksheet selector");
+        // The lazy catalog stays readable after materialization.
+        assert_eq!(source.worksheet_names().unwrap(), eager.worksheet_names());
     }
 }

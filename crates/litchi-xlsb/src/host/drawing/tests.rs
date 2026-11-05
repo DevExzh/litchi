@@ -38,7 +38,11 @@ fn parses_two_cell_shape_anchor() {
         marker_xml("from", 0, 0, 0, 0),
         marker_xml("to", 12, 266700, 50, 114300),
     );
-    let inventory = parse_drawing_part(&drawing(&body)).unwrap();
+    let inventory = parse_drawing_part(
+        &drawing(&body),
+        litchi_core::Limits::for_profile(litchi_core::Profile::Server),
+    )
+    .unwrap();
     assert_eq!(inventory.anchors.len(), 1);
     let AnchorKind::TwoCell { from, to, edit_as } = &inventory.anchors[0].anchor else {
         panic!("expected two-cell anchor");
@@ -69,7 +73,11 @@ fn parses_one_cell_picture_anchor() {
          <xdr:spPr/></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>",
         marker_xml("from", 2, 19050, 4, 9525),
     );
-    let inventory = parse_drawing_part(&drawing(&body)).unwrap();
+    let inventory = parse_drawing_part(
+        &drawing(&body),
+        litchi_core::Limits::for_profile(litchi_core::Profile::Server),
+    )
+    .unwrap();
     assert_eq!(inventory.anchors.len(), 1);
     let AnchorKind::OneCell { from, extent } = &inventory.anchors[0].anchor else {
         panic!("expected one-cell anchor");
@@ -99,7 +107,11 @@ fn parses_absolute_chart_graphic_frame() {
         <a:graphic><a:graphicData uri=\"http://schemas.openxmlformats.org/drawingml/2006/chart\">\
         <c:chart r:id=\"rIdChart\"/></a:graphicData></a:graphic></xdr:graphicFrame>\
         <xdr:clientData/></xdr:absoluteAnchor>";
-    let inventory = parse_drawing_part(&drawing(body)).unwrap();
+    let inventory = parse_drawing_part(
+        &drawing(body),
+        litchi_core::Limits::for_profile(litchi_core::Profile::Server),
+    )
+    .unwrap();
     assert_eq!(inventory.anchors.len(), 1);
     let AnchorKind::Absolute { position, extent } = &inventory.anchors[0].anchor else {
         panic!("expected absolute anchor");
@@ -129,7 +141,11 @@ fn parses_connection_and_group_shapes() {
         marker_xml("from", 1, 0, 1, 0),
         marker_xml("to", 4, 0, 4, 0),
     );
-    let inventory = parse_drawing_part(&drawing(&body)).unwrap();
+    let inventory = parse_drawing_part(
+        &drawing(&body),
+        litchi_core::Limits::for_profile(litchi_core::Profile::Server),
+    )
+    .unwrap();
     assert_eq!(inventory.anchors.len(), 2);
     assert_eq!(
         inventory.anchors[0].object,
@@ -153,44 +169,88 @@ fn parses_connection_and_group_shapes() {
 
 #[test]
 fn empty_drawing_has_no_anchors() {
-    let inventory = parse_drawing_part(&drawing("")).unwrap();
+    let inventory = parse_drawing_part(
+        &drawing(""),
+        litchi_core::Limits::for_profile(litchi_core::Profile::Server),
+    )
+    .unwrap();
     assert!(inventory.anchors.is_empty());
-    let inventory =
-        parse_drawing_part(format!(r#"<xdr:wsDr xmlns:xdr="{XDR_NS}"/>"#).as_bytes()).unwrap();
+    let inventory = parse_drawing_part(
+        format!(r#"<xdr:wsDr xmlns:xdr="{XDR_NS}"/>"#).as_bytes(),
+        litchi_core::Limits::for_profile(litchi_core::Profile::Server),
+    )
+    .unwrap();
     assert!(inventory.anchors.is_empty());
 }
 
 #[test]
 fn rejects_malformed_drawings() {
     // Root is not xdr:wsDr.
-    assert!(parse_drawing_part(b"<html/>").is_err());
+    assert!(
+        parse_drawing_part(
+            b"<html/>",
+            litchi_core::Limits::for_profile(litchi_core::Profile::Server)
+        )
+        .is_err()
+    );
     // Not UTF-8.
-    assert!(parse_drawing_part(&[0xFF, 0xFE, 0x00]).is_err());
+    assert!(
+        parse_drawing_part(
+            &[0xFF, 0xFE, 0x00],
+            litchi_core::Limits::for_profile(litchi_core::Profile::Server)
+        )
+        .is_err()
+    );
     // Missing from marker.
     let body = "<xdr:twoCellAnchor><xdr:sp><xdr:nvSpPr><xdr:cNvPr id=\"1\" name=\"s\"/>\
         <xdr:cNvSpPr/></xdr:nvSpPr></xdr:sp></xdr:twoCellAnchor>";
-    assert!(parse_drawing_part(&drawing(body)).is_err());
+    assert!(
+        parse_drawing_part(
+            &drawing(body),
+            litchi_core::Limits::for_profile(litchi_core::Profile::Server)
+        )
+        .is_err()
+    );
     // Anchor without an object.
     let body = format!(
         "<xdr:twoCellAnchor>{}{}<xdr:clientData/></xdr:twoCellAnchor>",
         marker_xml("from", 0, 0, 0, 0),
         marker_xml("to", 1, 0, 1, 0),
     );
-    assert!(parse_drawing_part(&drawing(&body)).is_err());
+    assert!(
+        parse_drawing_part(
+            &drawing(&body),
+            litchi_core::Limits::for_profile(litchi_core::Profile::Server)
+        )
+        .is_err()
+    );
     // Duplicate from markers.
     let body = format!(
         "<xdr:twoCellAnchor>{}{}<xdr:sp/></xdr:twoCellAnchor>",
         marker_xml("from", 0, 0, 0, 0),
         marker_xml("from", 0, 0, 0, 0),
     );
-    assert!(parse_drawing_part(&drawing(&body)).is_err());
+    assert!(
+        parse_drawing_part(
+            &drawing(&body),
+            litchi_core::Limits::for_profile(litchi_core::Profile::Server)
+        )
+        .is_err()
+    );
     // Invalid marker text.
     let body = "<xdr:twoCellAnchor><xdr:from><xdr:col>x</xdr:col></xdr:from></xdr:twoCellAnchor>";
-    assert!(parse_drawing_part(&drawing(body)).is_err());
+    assert!(
+        parse_drawing_part(
+            &drawing(body),
+            litchi_core::Limits::for_profile(litchi_core::Profile::Server)
+        )
+        .is_err()
+    );
     // Unterminated XML.
     assert!(
         parse_drawing_part(
-            format!(r#"<xdr:wsDr xmlns:xdr="{XDR_NS}"><xdr:twoCellAnchor>"#).as_bytes()
+            format!(r#"<xdr:wsDr xmlns:xdr="{XDR_NS}"><xdr:twoCellAnchor>"#).as_bytes(),
+            litchi_core::Limits::for_profile(litchi_core::Profile::Server)
         )
         .is_err()
     );
@@ -224,4 +284,14 @@ fn parses_real_fixture_workbook_drawing() {
     assert!(drawing.charts.is_empty());
     assert!(workbook.chart_sheets().is_empty());
     assert!(workbook.sheet_drawing(1).is_none());
+}
+
+#[test]
+fn xml_limits_bound_drawing_input_bytes() {
+    let bytes = drawing("");
+    let input = |bytes: u64| {
+        litchi_core::Limits::new(u64::MAX, bytes, u64::MAX, u64::MAX, u64::MAX, u64::MAX)
+    };
+    assert!(parse_drawing_part(&bytes, input(bytes.len() as u64)).is_ok());
+    assert!(parse_drawing_part(&bytes, input(bytes.len() as u64 - 1)).is_err());
 }

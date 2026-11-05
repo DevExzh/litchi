@@ -41,8 +41,50 @@ const MAX_TEXT_DECODE_CHUNK_BYTES: usize = 4096;
 const MAX_TEXT_REFERENCE_BYTES: usize = 64 * 1024;
 
 pub(crate) fn extract_word_text(xml_bytes: &[u8]) -> Result<String> {
+    collect_word_text::<false>(xml_bytes, &[])
+}
+
+// Retained semantic owners know their root namespace. Only an unresolved
+// root enables fragment fallback; an unqualified descendant cannot opt in.
+// Raw fragment helpers retain their historical fallback policy.
+pub(super) fn extract_word_text_with_bindings(
+    xml_bytes: &[u8],
+    bindings: &[(Option<Vec<u8>>, Vec<u8>)],
+) -> Result<String> {
+    collect_word_text::<true>(xml_bytes, bindings)
+}
+
+fn collect_word_text<const ROOT_ONLY: bool>(
+    xml_bytes: &[u8],
+    bindings: &[(Option<Vec<u8>>, Vec<u8>)],
+) -> Result<String> {
     let mut result = String::new();
-    for_each_word_text_chunk(xml_bytes, |chunk| {
+    scan_word_text::<false, ROOT_ONLY, _, _>(xml_bytes, "", bindings, |chunk| {
+        result
+            .try_reserve(chunk.len())
+            .map_err(|source| Error::Allocation {
+                resource: "Word paragraph text",
+                source,
+            })?;
+        result.push_str(chunk);
+        Ok::<(), Error>(())
+    })?;
+    Ok(result)
+}
+
+/// Extract the visible text of a Word part with `separator` between its
+/// paragraphs.
+///
+/// The text is [`extract_word_text`]'s, with `separator` written before every
+/// paragraph after the first. A paragraph is a `w:p` that is not nested in
+/// another `w:p`, as the paragraph range scanner counts them (a text box's
+/// paragraphs stay part of the paragraph that anchors them), and an empty
+/// `<w:p/>` is one too. For well-formed XML the result is therefore the
+/// paragraph texts joined by `separator`; malformed XML fails exactly as
+/// [`extract_word_text`] fails.
+pub(crate) fn extract_word_paragraph_text(xml_bytes: &[u8], separator: &str) -> Result<String> {
+    let mut result = String::new();
+    scan_word_text::<true, false, _, _>(xml_bytes, separator, &[], |chunk| {
         result
             .try_reserve(chunk.len())
             .map_err(|source| Error::Allocation {
@@ -57,6 +99,23 @@ pub(crate) fn extract_word_text(xml_bytes: &[u8]) -> Result<String> {
 
 pub(crate) fn for_each_word_text_chunk<F, E>(
     xml_bytes: &[u8],
+    append: F,
+) -> std::result::Result<(), E>
+where
+    F: FnMut(&str) -> std::result::Result<(), E>,
+    E: From<Error>,
+{
+    scan_word_text::<false, false, F, E>(xml_bytes, "", &[], append)
+}
+
+/// The visible-text scanner behind [`for_each_word_text_chunk`] and
+/// [`extract_word_paragraph_text`]. With `PARAGRAPHS` it also appends
+/// `separator` before every paragraph after the first; without it, the
+/// paragraph bookkeeping compiles away and `separator` is unused.
+fn scan_word_text<const PARAGRAPHS: bool, const ROOT_ONLY: bool, F, E>(
+    xml_bytes: &[u8],
+    separator: &str,
+    bindings: &[(Option<Vec<u8>>, Vec<u8>)],
     mut append: F,
 ) -> std::result::Result<(), E>
 where
@@ -78,12 +137,29 @@ where
     // its result. `extract_word_text_base_oracle`, the production loop before
     // the change with quick-xml's own resolver, pins the output.
     let mut reader = Reader::from_reader(xml_bytes);
-    let mut tracker = BindingTracker::new();
+    let mut tracker = BindingTracker::with_bindings(bindings.iter().map(|(prefix, uri)| {
+        (
+            prefix.as_deref().map_or(
+                quick_xml::name::PrefixDeclaration::Default,
+                quick_xml::name::PrefixDeclaration::Named,
+            ),
+            uri.as_slice(),
+        )
+    }))
+    .map_err(|error| E::from(Error::Xml(error.to_string())))?;
     let mut pending_pop = false;
+    let mut saw_root = false;
     let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
     let mut depth = 0usize;
     let mut nodes = 0usize;
     let mut text_depth = None;
+    // The element depth of the open top-level `w:p` (0 when none is open,
+    // since every element is at depth 1 or more), and whether a paragraph has
+    // started; read only with `PARAGRAPHS`. Elements inside an open
+    // paragraph, nested paragraphs included, need no paragraph check, and the
+    // paragraph ends at the end tag that closes its depth.
+    let mut paragraph_depth = 0usize;
+    let mut paragraph_seen = false;
 
     loop {
         // The deferred pop of the previous `End`/`Empty` scope runs before
@@ -131,17 +207,25 @@ where
         // prefix, until it is known, reads every start tag's; the `w:t`
         // match reads it only for the local name `t`, and the special
         // characters only for their five local names.
+        // With `PARAGRAPHS`, a `w:p` start or empty element outside an open
+        // paragraph is resolved as well.
+        let paragraph_candidate =
+            |local: &[u8]| PARAGRAPHS && local == b"p" && paragraph_depth == 0;
         let resolves = match &event {
             Event::Start(_) => {
-                fragment_prefix.is_none() || local == b"t" || is_word_special_character_name(local)
+                (!ROOT_ONLY || !saw_root) && fragment_prefix.is_none()
+                    || local == b"t"
+                    || is_word_special_character_name(local)
+                    || paragraph_candidate(local)
             },
-            Event::Empty(_) => is_word_special_character_name(local),
+            Event::Empty(_) => is_word_special_character_name(local) || paragraph_candidate(local),
             Event::End(_) => text_depth == Some(depth) && local == b"t",
             _ => false,
         };
         let namespace = resolves.then(|| tracker.resolve_prefix_bytes(prefix));
 
-        if fragment_prefix.is_none()
+        if (!ROOT_ONLY || !saw_root)
+            && fragment_prefix.is_none()
             && matches!(event, Event::Start(_))
             && !matches!(namespace, Some(ResolveResult::Bound(_)))
         {
@@ -154,6 +238,18 @@ where
             });
         }
 
+        if matches!(event, Event::Start(_) | Event::Empty(_)) {
+            saw_root = true;
+        }
+
+        // Whether this start or empty element begins a top-level Word
+        // paragraph; always false without `PARAGRAPHS`.
+        let paragraph_starts = || {
+            paragraph_candidate(local)
+                && namespace.as_ref().is_some_and(|namespace| {
+                    is_fragment_word_local_name(namespace, local, b"p", &fragment_prefix)
+                })
+        };
         match &event {
             Event::Start(_) => {
                 nodes = nodes.checked_add(1).ok_or_else(|| {
@@ -175,6 +271,13 @@ where
                     return Err(E::from(Error::InvalidFormat(format!(
                         "Word XML nesting exceeds the {MAX_TEXT_SCAN_DEPTH} depth limit"
                     ))));
+                }
+                if paragraph_starts() {
+                    if paragraph_seen {
+                        append(separator)?;
+                    }
+                    paragraph_seen = true;
+                    paragraph_depth = depth;
                 }
                 if text_depth.is_none()
                     && namespace.as_ref().is_some_and(|namespace| {
@@ -199,6 +302,13 @@ where
                     return Err(E::from(Error::InvalidFormat(format!(
                         "Word XML exceeds {MAX_TEXT_SCAN_NODES} elements"
                     ))));
+                }
+                // An empty `<w:p/>` is a paragraph with no text.
+                if paragraph_starts() {
+                    if paragraph_seen {
+                        append(separator)?;
+                    }
+                    paragraph_seen = true;
                 }
                 if let Some(character) = namespace.as_ref().and_then(|namespace| {
                     word_special_character_local(namespace, local, &fragment_prefix)
@@ -226,6 +336,10 @@ where
                     })
                 {
                     text_depth = None;
+                }
+                // The end tag at the open paragraph's depth closes it.
+                if PARAGRAPHS && paragraph_depth == depth {
+                    paragraph_depth = 0;
                 }
                 depth = depth.checked_sub(1).ok_or_else(|| {
                     E::from(Error::InvalidFormat("invalid Word XML nesting".to_string()))
@@ -1439,7 +1553,7 @@ impl Paragraph {
     /// Returns an error if the operation cannot be completed.
     pub fn text(&self) -> Result<String> {
         let _parser_admission = self.parser_admission()?;
-        extract_word_text(self.xml_bytes())
+        extract_word_text_with_bindings(self.xml_bytes(), &self.xml_data.inherited_namespaces()?)
     }
 }
 
@@ -1917,6 +2031,83 @@ mod tests {
         eprintln!("corpus parity compared over {compared} document parts");
     }
 
+    /// The paragraph-separated extraction writes the separator before each
+    /// top-level paragraph after the first: an empty paragraph adds an empty
+    /// segment, table-cell paragraphs are paragraphs, and a text box's
+    /// paragraph stays inside the paragraph that anchors it.
+    #[test]
+    fn paragraph_text_separates_top_level_paragraphs() {
+        let xml = format!(
+            r#"<w:document xmlns:w="{W}"><w:body><w:p><w:r><w:t>a</w:t></w:r></w:p><w:p/><w:tbl><w:tr><w:tc><w:p><w:r><w:t>cell</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p><w:r><w:t>X</w:t></w:r><w:r><w:pict><w:txbxContent><w:p><w:r><w:t>inner</w:t></w:r></w:p></w:txbxContent></w:pict></w:r></w:p><w:p><w:r><w:t>z</w:t></w:r></w:p><w:sectPr/></w:body></w:document>"#
+        );
+        assert_eq!(
+            extract_word_paragraph_text(xml.as_bytes(), "\n").unwrap(),
+            "a\n\ncell\nXinner\nz"
+        );
+        assert_eq!(
+            extract_word_paragraph_text(xml.as_bytes(), " | ").unwrap(),
+            "a |  | cell | Xinner | z"
+        );
+        // A paragraph under a foreign prefix binding is not a Word paragraph.
+        let foreign = format!(
+            r#"<w:document xmlns:w="{W}"><w:body><w:p><w:r><w:t>a</w:t></w:r></w:p><f:p xmlns:f="urn:foreign"/><w:p><w:r><w:t>b</w:t></w:r></w:p></w:body></w:document>"#
+        );
+        assert_eq!(
+            extract_word_paragraph_text(foreign.as_bytes(), "\n").unwrap(),
+            "a\nb"
+        );
+    }
+
+    #[test]
+    fn paragraph_text_fails_on_malformed_xml_as_the_plain_extraction_does() {
+        for xml in [
+            format!(r#"<w:document xmlns:w="{W}"><w:body><w:p><w:r><w:t>a</w:t></w:r>"#),
+            "<w:document>".to_string(),
+            format!(r#"<w:p xmlns:w="{W}"><w:r><w:t>&bogus;</w:t></w:r></w:p>"#),
+        ] {
+            let plain = extract_word_text(xml.as_bytes()).unwrap_err();
+            let separated = extract_word_paragraph_text(xml.as_bytes(), "\n").unwrap_err();
+            assert_eq!(separated.to_string(), plain.to_string(), "{xml}");
+        }
+    }
+
+    /// Over the corpus: with an empty separator the paragraph-separated
+    /// extraction is the plain extraction, and with `\n` it is the texts of
+    /// the paragraphs the range scanner finds, joined by `\n`.
+    #[test]
+    fn paragraph_text_matches_the_paragraph_scanner_on_the_corpus() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data");
+        let mut files = Vec::new();
+        collect_docx_corpus(&root, &mut files);
+        files.sort();
+        let mut compared = 0usize;
+        for path in &files {
+            let Some(document_xml) = docx_document_xml(path) else {
+                continue;
+            };
+            assert_eq!(
+                strict_outcome(extract_word_paragraph_text(&document_xml, "")),
+                strict_outcome(extract_word_text(&document_xml)),
+                "{}",
+                path.display()
+            );
+            let Ok(separated) = extract_word_paragraph_text(&document_xml, "\n") else {
+                continue;
+            };
+            let paragraphs =
+                crate::parts::document_part::document_paragraphs(std::sync::Arc::new(document_xml))
+                    .unwrap();
+            let joined = paragraphs
+                .iter()
+                .map(|paragraph| paragraph.text().unwrap())
+                .collect::<Vec<_>>()
+                .join("\n");
+            assert_eq!(separated, joined, "{}", path.display());
+            compared += 1;
+        }
+        assert!(compared > 50, "{compared}");
+    }
+
     /// Change 0754: the complete outcome, error variant included.
     fn strict_outcome(result: Result<String>) -> String {
         match result {
@@ -2103,7 +2294,11 @@ mod tests {
 
     fn docx_document_xml(path: &Path) -> Option<Vec<u8>> {
         let bytes = std::fs::read(path).ok()?;
-        let reader = soapberry_zip::office::ArchiveReader::new(&bytes).ok()?;
+        let reader = soapberry_zip::office::ArchiveReader::new(
+            &bytes,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .ok()?;
         reader.read("word/document.xml").ok()
     }
 }

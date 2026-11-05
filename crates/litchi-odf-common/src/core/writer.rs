@@ -30,16 +30,20 @@ const LOEXT_NAMESPACE: &[u8] =
 
 fn ensure_source_manifest_rewritable(source: &OwnedPackage) -> Result<()> {
     if source.has_zip_encrypted_entries() {
-        return Err(Error::Unsupported(
-            "ZIP-encrypted ODF entries cannot be copied by the package writer".to_string(),
-        ));
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odf-common.core.writer",
+            "ZIP-encrypted ODF entries cannot be copied by the package writer",
+        )));
     }
     let has_canonical_manifest = source.has_file(MANIFEST_PATH)?;
     let has_legacy_manifest = source.has_file("manifest.xml")?;
     if has_canonical_manifest && has_legacy_manifest {
-        return Err(Error::Unsupported(
-            "ODF source contains both canonical and legacy manifest members".to_string(),
-        ));
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odf-common.core.writer",
+            "ODF source contains both canonical and legacy manifest members",
+        )));
     }
     let package = source.package()?;
     let manifest_bytes = source
@@ -52,10 +56,11 @@ fn ensure_source_manifest_rewritable(source: &OwnedPackage) -> Result<()> {
         .values()
         .any(|entry| entry.size.is_some() && entry.encryption.is_none())
     {
-        return Err(Error::Unsupported(
-            "ODF unencrypted manifest:size metadata cannot be preserved by the package writer"
-                .to_string(),
-        ));
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "odf-common.core.writer",
+            "ODF unencrypted manifest:size metadata cannot be preserved by the package writer",
+        )));
     }
     Ok(())
 }
@@ -73,14 +78,18 @@ fn ensure_supported_manifest_metadata(bytes: &[u8]) -> Result<()> {
         match event {
             Event::Start(element) | Event::Empty(element) => {
                 let ResolveResult::Bound(Namespace(uri)) = namespace else {
-                    return Err(Error::Unsupported(
-                        "ODF manifest contains unsupported non-manifest metadata".to_string(),
-                    ));
+                    return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedOperation,
+                        "odf-common.core.writer",
+                        "ODF manifest contains unsupported non-manifest metadata",
+                    )));
                 };
                 if uri != MANIFEST_NAMESPACE {
-                    return Err(Error::Unsupported(
-                        "ODF manifest contains unsupported non-manifest metadata".to_string(),
-                    ));
+                    return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedOperation,
+                        "odf-common.core.writer",
+                        "ODF manifest contains unsupported non-manifest metadata",
+                    )));
                 }
                 let element_name = element.local_name();
                 if !matches!(
@@ -92,9 +101,11 @@ fn ensure_supported_manifest_metadata(bytes: &[u8]) -> Result<()> {
                         | b"start-key-generation"
                         | b"key-derivation"
                 ) {
-                    return Err(Error::Unsupported(
-                        "ODF manifest contains unsupported element metadata".to_string(),
-                    ));
+                    return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
+                        "odf-common.core.writer",
+                        "ODF manifest contains unsupported element metadata",
+                    )));
                 }
                 let mut full_path = None;
                 let mut has_version = false;
@@ -175,25 +186,30 @@ fn ensure_supported_manifest_metadata(bytes: &[u8]) -> Result<()> {
                         _ => false,
                     };
                     if !allowed {
-                        return Err(Error::Unsupported(
-                            "ODF manifest contains unsupported metadata".to_string(),
-                        ));
+                        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                            litchi_core::edit::RefusalKind::UnsupportedOperation,
+                            "odf-common.core.writer",
+                            "ODF manifest contains unsupported metadata",
+                        )));
                     }
                 }
                 if element_name.as_ref() == b"file-entry"
                     && has_version
                     && full_path.as_deref() != Some("/")
                 {
-                    return Err(Error::Unsupported(
-                        "ODF manifest version metadata is only supported on the root entry"
-                            .to_string(),
-                    ));
+                    return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedOperation,
+                        "odf-common.core.writer",
+                        "ODF manifest version metadata is only supported on the root entry",
+                    )));
                 }
             },
             Event::DocType(_) | Event::GeneralRef(_) => {
-                return Err(Error::Unsupported(
-                    "ODF manifest contains unsupported DTD or entity metadata".to_string(),
-                ));
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odf-common.core.writer",
+                    "ODF manifest contains unsupported DTD or entity metadata",
+                )));
             },
             Event::Eof => break,
             _ => {},
@@ -208,7 +224,7 @@ fn ensure_supported_manifest_metadata(bytes: &[u8]) -> Result<()> {
 /// These limits bound ZIP transport bytes and the writer's retained manifest
 /// bookkeeping. They do not make arbitrary caller-owned readers seekable or
 /// reserve the complete payload in memory.
-pub use soapberry_zip::office::StreamingArchiveLimits as PackageWriterLimits;
+pub use soapberry_zip::office::StreamingArchiveLimits;
 
 /// Compression methods supported by opaque streamed ODF package members.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -428,11 +444,11 @@ impl std::error::Error for PackageWriterError {
         match self {
             Self::Core(error) => Some(error),
             Self::Archive(error) => match error.kind() {
-                ZipErrorKind::IO(source) | ZipErrorKind::Io(source) => Some(source),
+                ZipErrorKind::IO(source) => Some(source),
                 _ => Some(error),
             },
             Self::ArchiveFailure(failure) => match failure.error().kind() {
-                ZipErrorKind::IO(source) | ZipErrorKind::Io(source) => Some(source),
+                ZipErrorKind::IO(source) => Some(source),
                 _ => Some(failure),
             },
             Self::IncompleteOutput { source, .. } | Self::LimitExceeded { source, .. } => {
@@ -456,6 +472,16 @@ use super::xml_splice::XmlSplicePublication;
 use crate::package::validate_manifest_path;
 
 const MANIFEST_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:manifest:1.0";
+
+/// Manifest entries in path order. The manifest model is a hash map, and a
+/// generated manifest must not depend on its iteration order (record 0289).
+fn sorted_entries(
+    manifest: &super::manifest::Manifest,
+) -> Vec<(&String, &super::manifest::ManifestEntry)> {
+    let mut entries: Vec<_> = manifest.entries.iter().collect();
+    entries.sort_unstable_by(|a, b| a.0.cmp(b.0));
+    entries
+}
 
 fn normalized_manifest_path(path: &str) -> &str {
     if path == "/" {
@@ -572,10 +598,10 @@ fn validate_canonical_odf_datetime(value: &str, field: &str) -> Result<()> {
 /// # Examples
 ///
 /// ```ignore
-/// # use litchi_odf::core::PackageWriter;
+/// # use litchi_odf::core::{PackageWriter, StreamingArchiveLimits};
 /// # use litchi_core::Result;
 /// # fn example() -> Result<()> {
-/// let mut writer = PackageWriter::new();
+/// let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
 /// writer.set_mimetype("application/vnd.oasis.opendocument.text")?;
 /// writer.add_file("content.xml", b"<office:document-content>...</office:document-content>")?;
 /// writer.add_file("styles.xml", b"<office:document-styles>...</office:document-styles>")?;
@@ -594,7 +620,7 @@ pub struct PackageWriter<W: Write = io::Cursor<Vec<u8>>> {
     // The locally retained limits also bound generated ODF manifest XML and
     // manifest-only entries; ZIP transport metadata alone is insufficient.
     zip_writer: StreamingArchiveWriter<W>,
-    limits: PackageWriterLimits,
+    limits: StreamingArchiveLimits,
     mimetype: Option<String>,
     manifest_entries: Vec<ManifestEntry>,
     manifest_paths: HashSet<String>,
@@ -695,12 +721,13 @@ impl Write for BoundedBytes {
 }
 
 impl PackageWriter<io::Cursor<Vec<u8>>> {
-    /// Create a new package writer that writes to memory
+    /// Create a new package writer that writes to memory under the selected
+    /// finite ZIP transport limits.
     #[must_use]
-    pub fn new() -> Self {
+    pub fn new(limits: StreamingArchiveLimits) -> Self {
         Self {
-            zip_writer: StreamingArchiveWriter::new(),
-            limits: PackageWriterLimits::default(),
+            zip_writer: StreamingArchiveWriter::with_writer(io::Cursor::new(Vec::new()), limits),
+            limits,
             mimetype: None,
             manifest_entries: Vec::new(),
             manifest_paths: HashSet::new(),
@@ -717,36 +744,25 @@ impl PackageWriter<io::Cursor<Vec<u8>>> {
         }
     }
 
-    /// Create a writer whose archive bytes are bounded before materialization.
+    /// Create a writer whose archive bytes are bounded before materialization
+    /// under the selected ZIP transport limits.
     #[must_use]
-    pub fn new_bounded(limit: usize) -> PackageWriter<BoundedBytes> {
-        PackageWriter::with_writer(BoundedBytes::new(limit))
-    }
-
-    /// Create an in-memory writer with explicit finite ZIP transport limits.
-    #[must_use]
-    pub fn new_with_limits(limits: PackageWriterLimits) -> Self {
-        Self::with_writer_and_limits(io::Cursor::new(Vec::new()), limits)
-    }
-}
-
-impl Default for PackageWriter<io::Cursor<Vec<u8>>> {
-    fn default() -> Self {
-        Self::new()
+    pub fn new_bounded(
+        limit: usize,
+        limits: StreamingArchiveLimits,
+    ) -> PackageWriter<BoundedBytes> {
+        PackageWriter::with_writer(BoundedBytes::new(limit), limits)
     }
 }
 
 impl<W: Write> PackageWriter<W> {
-    /// Create a package writer over an arbitrary output sink.
-    pub fn with_writer(writer: W) -> Self {
-        Self::with_writer_and_limits(writer, PackageWriterLimits::default())
-    }
-
     /// Create a package writer over an arbitrary sink with explicit finite
-    /// ZIP transport limits.
-    pub fn with_writer_and_limits(writer: W, limits: PackageWriterLimits) -> Self {
+    /// ZIP transport limits. The policy is required at this raw writer
+    /// boundary; in-memory authoring uses [`Self::new`] with the same selected
+    /// policy.
+    pub fn with_writer(writer: W, limits: StreamingArchiveLimits) -> Self {
         Self {
-            zip_writer: StreamingArchiveWriter::with_writer_and_limits(writer, limits),
+            zip_writer: StreamingArchiveWriter::with_writer(writer, limits),
             limits,
             mimetype: None,
             manifest_entries: Vec::new(),
@@ -1562,7 +1578,7 @@ impl<W: Write> PackageWriter<W> {
         Ok(())
     }
 
-    fn write_exact_source_file(
+    pub(crate) fn write_exact_source_file(
         &mut self,
         path: &str,
         content: &[u8],
@@ -1607,7 +1623,7 @@ impl<W: Write> PackageWriter<W> {
                 "Rewriting encrypted ODF entries requires writer encryption".to_string(),
             ));
         }
-        for (path, entry) in &package.manifest().entries {
+        for (path, entry) in sorted_entries(package.manifest()) {
             if path.ends_with('/')
                 && !matches!(path.as_str(), "/" | "META-INF/")
                 && !excluded_paths.contains(path)
@@ -1703,7 +1719,7 @@ impl<W: Write> PackageWriter<W> {
             ));
         }
 
-        for (path, entry) in &package.manifest().entries {
+        for (path, entry) in sorted_entries(package.manifest()) {
             if path.ends_with('/') && !Self::is_regenerated_package_part(path) {
                 self.add_manifest_entry(path, &entry.media_type)?;
             }
@@ -1766,7 +1782,7 @@ impl<W: Write> PackageWriter<W> {
                     .any(|candidate| path.starts_with(candidate))
         };
 
-        for (path, entry) in &package.manifest().entries {
+        for (path, entry) in sorted_entries(package.manifest()) {
             if path.ends_with('/') && !Self::is_regenerated_package_part(path) && !excluded(path) {
                 self.add_manifest_entry(path, &entry.media_type)?;
             }
@@ -2529,21 +2545,34 @@ mod tests {
 
     #[test]
     fn test_package_writer_new() {
-        let writer = PackageWriter::new();
+        let writer = PackageWriter::new(StreamingArchiveLimits::default());
         assert!(!writer.wrote_mimetype);
         assert!(!writer.wrote_any_entry);
         assert!(writer.mimetype.is_none());
     }
 
     #[test]
-    fn test_package_writer_default() {
-        let writer = PackageWriter::default();
+    fn test_package_writer_selected_limits() {
+        let writer = PackageWriter::new(StreamingArchiveLimits::default());
         assert!(!writer.wrote_mimetype);
     }
 
     #[test]
+    fn test_package_writer_new_enforces_selected_limits() {
+        let limits = StreamingArchiveLimits {
+            max_entries: 1,
+            ..StreamingArchiveLimits::default()
+        };
+        let mut writer = PackageWriter::new(limits);
+        writer
+            .set_mimetype("application/vnd.oasis.opendocument.text")
+            .unwrap();
+        assert!(writer.add_file("content.xml", b"<root/>").is_err());
+    }
+
+    #[test]
     fn test_package_writer_set_mimetype() {
-        let mut writer = PackageWriter::new();
+        let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
         assert!(
             writer
                 .set_mimetype("application/vnd.oasis.opendocument.text")
@@ -2558,7 +2587,7 @@ mod tests {
 
     #[test]
     fn test_package_writer_set_mimetype_twice() {
-        let mut writer = PackageWriter::new();
+        let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();
@@ -2571,13 +2600,13 @@ mod tests {
 
     #[test]
     fn test_package_writer_add_file_without_mimetype() {
-        let mut writer = PackageWriter::new();
+        let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
         assert!(writer.add_file("content.xml", b"test").is_err());
     }
 
     #[test]
     fn test_package_writer_add_mimetype_as_file() {
-        let mut writer = PackageWriter::new();
+        let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();
@@ -2586,13 +2615,13 @@ mod tests {
 
     #[test]
     fn test_package_writer_finish_without_mimetype() {
-        let writer = PackageWriter::new();
+        let writer = PackageWriter::new(StreamingArchiveLimits::default());
         assert!(writer.finish().is_err());
     }
 
     #[test]
     fn test_package_writer_finish_to_bytes() {
-        let mut writer = PackageWriter::new();
+        let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();
@@ -2604,7 +2633,7 @@ mod tests {
 
     #[test]
     fn test_package_writer_add_file_with_media_type() {
-        let mut writer = PackageWriter::new();
+        let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();
@@ -2625,7 +2654,7 @@ mod tests {
                 "application/vnd.oasis.opendocument.digital-signature+xml",
             ),
         ] {
-            let mut writer = PackageWriter::new();
+            let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
             writer
                 .set_mimetype("application/vnd.oasis.opendocument.text")
                 .unwrap();
@@ -2638,7 +2667,7 @@ mod tests {
 
     #[test]
     fn real_package_enumeration_includes_rdf_and_manifest_declared_xml() {
-        let mut writer = PackageWriter::new();
+        let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();
@@ -2657,10 +2686,15 @@ mod tests {
             )
             .unwrap();
         let bytes = writer.finish().unwrap();
-        let archive = ArchiveReader::new(&bytes).unwrap();
+        let archive =
+            ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
         let manifest_xml = archive.read("META-INF/manifest.xml").unwrap();
         let manifest_text = std::str::from_utf8(&manifest_xml).unwrap();
-        let manifest = super::super::manifest::Manifest::parse(manifest_text).unwrap();
+        let manifest = super::super::manifest::Manifest::parse(
+            manifest_text,
+            super::super::XmlStreamLimits::owner_default_value(),
+        )
+        .unwrap();
         let mut audited = Vec::new();
         for name in archive.file_names() {
             let media_type = manifest.get_media_type(name).unwrap_or_default();
@@ -2699,13 +2733,14 @@ mod tests {
             zip.finish().unwrap();
         }
         let source = OwnedPackage::from_bytes(source_bytes).unwrap();
-        let mut writer = PackageWriter::new();
+        let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();
         writer.copy_auxiliary_files_from(&source).unwrap();
         let output = writer.finish().unwrap();
-        let archive = ArchiveReader::new(&output).unwrap();
+        let archive =
+            ArchiveReader::new(&output, soapberry_zip::office::ArchiveLimits::default()).unwrap();
         assert_eq!(archive.read("manifest.rdf").unwrap(), source_rdf);
     }
 
@@ -2727,7 +2762,7 @@ mod tests {
         }
 
         let source = OwnedPackage::from_bytes(bytes).unwrap();
-        let mut writer = PackageWriter::new();
+        let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();
@@ -2760,7 +2795,7 @@ mod tests {
             zip.finish().unwrap();
         }
         let source = OwnedPackage::from_bytes(bytes).unwrap();
-        let mut writer = PackageWriter::new();
+        let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();
@@ -2790,7 +2825,7 @@ mod tests {
 
     #[test]
     fn test_generate_manifest() {
-        let mut writer = PackageWriter::new();
+        let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();
@@ -2807,14 +2842,15 @@ mod tests {
 
     #[test]
     fn finalized_manifest_does_not_describe_itself_or_meta_inf() {
-        let mut writer = PackageWriter::new();
+        let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.graphics")
             .unwrap();
         writer.add_file("content.xml", b"<content/>").unwrap();
 
         let bytes = writer.finish().unwrap();
-        let archive = ArchiveReader::new(&bytes).unwrap();
+        let archive =
+            ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
         let manifest = archive.read("META-INF/manifest.xml").unwrap();
         let manifest = std::str::from_utf8(&manifest).unwrap();
 
@@ -2824,7 +2860,7 @@ mod tests {
 
     #[test]
     fn source_manifest_version_is_retained_during_auxiliary_copy() {
-        let mut source_writer = PackageWriter::new();
+        let mut source_writer = PackageWriter::new(StreamingArchiveLimits::default());
         source_writer.manifest_version = "1.2".to_string();
         source_writer
             .set_mimetype("application/vnd.oasis.opendocument.graphics")
@@ -2834,13 +2870,14 @@ mod tests {
             .unwrap();
         let source = OwnedPackage::from_bytes(source_writer.finish().unwrap()).unwrap();
 
-        let mut destination = PackageWriter::new();
+        let mut destination = PackageWriter::new(StreamingArchiveLimits::default());
         destination
             .set_mimetype("application/vnd.oasis.opendocument.graphics")
             .unwrap();
         destination.copy_auxiliary_files_from(&source).unwrap();
         let bytes = destination.finish().unwrap();
-        let archive = ArchiveReader::new(&bytes).unwrap();
+        let archive =
+            ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
         let manifest = archive.read("META-INF/manifest.xml").unwrap();
         let manifest = std::str::from_utf8(&manifest).unwrap();
 
@@ -2886,7 +2923,7 @@ mod tests {
         assert_eq!(Structure::default_meta_xml(), Structure::default_meta_xml());
 
         let build = || {
-            let mut writer = PackageWriter::new();
+            let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
             writer
                 .set_mimetype("application/vnd.oasis.opendocument.text")
                 .unwrap();
@@ -2986,7 +3023,7 @@ mod tests {
 
     #[test]
     fn test_package_writer_full_package() {
-        let mut writer = PackageWriter::new();
+        let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
 
         // Set mimetype
         writer
@@ -3034,7 +3071,7 @@ mod tests {
     #[test]
     fn preserved_manifest_requires_physical_inventory_equivalence() {
         let (source, source_manifest) = physical_inventory_source();
-        let mut writer = PackageWriter::new();
+        let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();
@@ -3050,7 +3087,7 @@ mod tests {
             source_manifest
         );
 
-        let mut writer = PackageWriter::new();
+        let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();
@@ -3087,7 +3124,7 @@ mod tests {
             zip.finish().unwrap();
         }
         let source = OwnedPackage::from_bytes(bytes).unwrap();
-        let mut writer = PackageWriter::new();
+        let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();
@@ -3106,7 +3143,7 @@ mod encrypted_copy_tests {
 
     #[test]
     fn encrypted_auxiliary_entries_require_plaintext_and_are_reencrypted() {
-        let mut source_writer = PackageWriter::new();
+        let mut source_writer = PackageWriter::new(StreamingArchiveLimits::default());
         source_writer
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();
@@ -3125,13 +3162,13 @@ mod encrypted_copy_tests {
         )
         .unwrap();
 
-        let mut unencrypted = PackageWriter::new();
+        let mut unencrypted = PackageWriter::new(StreamingArchiveLimits::default());
         unencrypted
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();
         assert!(unencrypted.copy_auxiliary_files_from(&source).is_err());
 
-        let mut destination = PackageWriter::new();
+        let mut destination = PackageWriter::new(StreamingArchiveLimits::default());
         destination
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();

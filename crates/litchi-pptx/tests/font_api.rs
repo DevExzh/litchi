@@ -9,6 +9,24 @@ use litchi_opc::{BlobPart, OpcPackage, PackURI};
 use litchi_pptx::font::{self, Data, Face, Font, Fonts, Style};
 use std::sync::Arc;
 
+/// Publish `fonts` on a raw graph through the package font family.
+fn put(opc: &mut OpcPackage, fonts: Fonts) -> litchi_pptx::Result<bool> {
+    let package = litchi_pptx::Package::from_opc_package(opc.clone())?;
+    let mut edit = package.edit_fonts()?;
+    let changed = edit.set(fonts)?;
+    *opc = edit.commit()?.into_package().opc()?.clone();
+    Ok(changed)
+}
+
+/// Remove the font collection of a raw graph through the package font family.
+fn remove(opc: &mut OpcPackage) -> litchi_pptx::Result<Option<Fonts>> {
+    let package = litchi_pptx::Package::from_opc_package(opc.clone())?;
+    let mut edit = package.edit_fonts()?;
+    let removed = edit.remove()?;
+    *opc = edit.commit()?.into_package().opc()?.clone();
+    Ok(removed)
+}
+
 fn package() -> OpcPackage {
     let mut package = OpcPackage::new();
     let presentation = PackURI::new("/ppt/presentation.xml").unwrap();
@@ -52,7 +70,7 @@ fn semantic_crud_is_concise_checked_and_zero_copy_shared() {
     assert!(fonts.add(Font::new("EXAMPLE SANS").unwrap()).is_err());
 
     let mut package = package();
-    assert!(font::put(&mut package, fonts).unwrap());
+    assert!(put(&mut package, fonts).unwrap());
     let loaded = font::load(&package).unwrap().unwrap();
     let loaded = loaded.get("Example Sans").unwrap();
     let regular = loaded
@@ -69,9 +87,9 @@ fn semantic_crud_is_concise_checked_and_zero_copy_shared() {
         .into_shared();
     assert!(Arc::ptr_eq(&regular, &bold));
     let unchanged = font::load(&package).unwrap().unwrap();
-    assert!(!font::put(&mut package, unchanged).unwrap());
+    assert!(!put(&mut package, unchanged).unwrap());
 
-    let removed = font::remove(&mut package).unwrap().unwrap();
+    let removed = remove(&mut package).unwrap().unwrap();
     assert_eq!(removed.len(), 1);
     assert!(font::load(&package).unwrap().is_none());
 }

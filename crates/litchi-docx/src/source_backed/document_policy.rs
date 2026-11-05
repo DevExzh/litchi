@@ -6,6 +6,10 @@
 //! rather than main-story syntax.  This module reads that part through its
 //! exact source-preserving OPC view and never runs markup-compatibility
 //! projection on it.
+//!
+//! The owning package publishes the same transactions, so it applies the same
+//! policy through [`validate_changed_owned_document`]: one settings
+//! inspection and one typed refusal, whichever owner holds the document.
 
 use litchi_core::{ExecutionContext, ExecutionError, Resource};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
@@ -39,18 +43,90 @@ const SETTINGS_TARGET_MEMORY_HEADROOM: u64 = 4_096;
 /// bounded policy scanner run.  Exact no-op callers deliberately do not invoke
 /// this function.
 pub(super) fn validate_changed_document(package: &Package) -> Result<()> {
-    let version = package.package.source_version()?;
+    // A main-document overlay changes the package artifact just as any other
+    // semantic publication does.  Check the retained source inventory before
+    // constructing a topology so a detached patch cannot bypass the signed
+    // source policy merely because it carries no source XML provenance.
+    if package.physical_source()?.has_signature_infrastructure() {
+        return Err(litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy.into());
+    }
+    if let Some(topology) = &package.effective {
+        return validate_changed_effective_document(topology);
+    }
+    let version = package.physical_package()?.source_version()?;
     let result = validate_changed_document_inner(package);
     finish_source_fence(package, version)?;
     result
 }
 
-fn validate_changed_document_inner(package: &Package) -> Result<()> {
-    let context = package.package.execution_context();
-    package.package.check_execution()?;
-    let source_version = package.package.source_version()?;
+fn validate_changed_effective_document(topology: &litchi_opc::PreparedTopology) -> Result<()> {
+    topology.check_source()?;
+    let result = (|| {
+        let context = topology.execution_context();
+        let main = topology.main_document_part()?;
+        let package_strict = topology
+            .rels()
+            .iter()
+            .find(|relationship| {
+                matches!(
+                    relationship.reltype(),
+                    rt::OFFICE_DOCUMENT | rt::STRICT_OFFICE_DOCUMENT
+                )
+            })
+            .map(|relationship| relationship.reltype() == rt::STRICT_OFFICE_DOCUMENT);
+        let mut settings_relationship = None;
+        for relationship in main.rels().iter().filter(|relationship| {
+            matches!(
+                relationship.reltype(),
+                rt::SETTINGS | STRICT_SETTINGS_RELATIONSHIP
+            )
+        }) {
+            if settings_relationship.replace(relationship).is_some() {
+                return Err(Error::InvalidRelationship(
+                    "document has multiple settings relationships".into(),
+                ));
+            }
+        }
+        let Some(relationship) = settings_relationship else {
+            return Ok(());
+        };
+        if relationship.is_external() {
+            return Err(Error::InvalidRelationship(
+                "settings relationship cannot be external".into(),
+            ));
+        }
+        let strict = relationship.reltype() == STRICT_SETTINGS_RELATIONSHIP;
+        if package_strict != Some(strict) {
+            return Err(Error::InvalidRelationship(
+                "main document and settings relationship use mixed OOXML conformance families"
+                    .into(),
+            ));
+        }
+        let _target = admit_target_metadata(context.as_ref(), relationship.target_path().len())?;
+        let settings = topology.part(&relationship.target_partname()?)?;
+        if settings.content_type() != ct::WML_SETTINGS {
+            return Err(Error::InvalidContentType {
+                expected: ct::WML_SETTINGS.into(),
+                got: settings.content_type().into(),
+            });
+        }
+        let data = settings.data()?;
+        let policy = inspect_settings_source(data.as_bytes(), strict, context.as_ref())?;
+        if policy.protected || policy.track_revisions {
+            return Err(protection_refusal());
+        }
+        Ok(())
+    })();
+    topology.check_source()?;
+    result
+}
 
-    let main = package.package.main_document_part()?;
+fn validate_changed_document_inner(package: &Package) -> Result<()> {
+    let context = package.physical_package()?.execution_context();
+    package.physical_package()?.check_execution()?;
+    let source_version = package.physical_package()?.source_version()?;
+
+    let main = package.physical_package()?.main_document_part()?;
     let package_dialect = package_dialect(package)?;
     let mut settings_relationship = None;
     for relationship in main.rels().iter().filter(|relationship| {
@@ -88,7 +164,7 @@ fn validate_changed_document_inner(package: &Package) -> Result<()> {
     let _target_admission =
         admit_target_metadata(context.as_ref(), relationship.target_path().len())?;
     let target = relationship.target_partname()?;
-    let settings_part = package.package.part(&target)?;
+    let settings_part = package.physical_package()?.part(&target)?;
     if settings_part.content_type() != ct::WML_SETTINGS {
         return Err(Error::InvalidContentType {
             expected: ct::WML_SETTINGS.into(),
@@ -102,24 +178,103 @@ fn validate_changed_document_inner(package: &Package) -> Result<()> {
     let source = settings_part.source_xml()?;
     let settings = inspect_settings_source(source.bytes(), settings_strict, context.as_ref())?;
     if settings.protected || settings.track_revisions {
-        return Err(Error::UnsafeEdit {
-            format: "DOCX",
-            operation: "changed document publication",
-            reason: "document or write protection, or tracked revisions, is enabled",
-        });
+        return Err(protection_refusal());
     }
 
     finish_source_fence(package, source_version)
 }
 
-fn package_dialect(package: &Package) -> Result<Option<bool>> {
-    let mut dialect = None;
-    for relationship in package.package.rels().iter().filter(|relationship| {
+/// The refusal of a changed publication under enforced protection or
+/// tracked revisions, identical for both owners.
+fn protection_refusal() -> Error {
+    Error::refused(
+        litchi_core::edit::RefusalKind::Protected,
+        "changed document publication",
+        "document or write protection, or tracked revisions, is enabled",
+    )
+}
+
+/// Validate the policy for a real changed main-document publication from an
+/// owning package.
+///
+/// This is the source-backed check over the owning OPC graph: the same
+/// relationship, conformance-family and content-type rules for the optional
+/// settings part, the same bounded inspection of its exact bytes, and the
+/// same refusal when document or write protection is enforced or revisions
+/// are tracked. Exact no-ops do not call it.
+pub(crate) fn validate_changed_owned_document(opc: &litchi_opc::OpcPackage) -> Result<()> {
+    let main = opc.main_document_part()?;
+    let mut package_dialect = None;
+    for relationship in opc.rels().iter().filter(|relationship| {
         matches!(
             relationship.reltype(),
             rt::OFFICE_DOCUMENT | rt::STRICT_OFFICE_DOCUMENT
         )
     }) {
+        if package_dialect
+            .replace(relationship.reltype() == rt::STRICT_OFFICE_DOCUMENT)
+            .is_some()
+        {
+            return Err(Error::InvalidRelationship(
+                "package has multiple main-document relationships".into(),
+            ));
+        }
+    }
+    let mut settings_relationship = None;
+    for relationship in main.rels().iter().filter(|relationship| {
+        matches!(
+            relationship.reltype(),
+            rt::SETTINGS | STRICT_SETTINGS_RELATIONSHIP
+        )
+    }) {
+        if settings_relationship.replace(relationship).is_some() {
+            return Err(Error::InvalidRelationship(
+                "document has multiple settings relationships".into(),
+            ));
+        }
+    }
+    let Some(relationship) = settings_relationship else {
+        return Ok(());
+    };
+    if relationship.is_external() {
+        return Err(Error::InvalidRelationship(
+            "settings relationship cannot be external".into(),
+        ));
+    }
+    let settings_strict = relationship.reltype() == STRICT_SETTINGS_RELATIONSHIP;
+    if package_dialect != Some(settings_strict) {
+        return Err(Error::InvalidRelationship(
+            "main document and settings relationship use mixed OOXML conformance families".into(),
+        ));
+    }
+    let target = relationship.target_partname()?;
+    let settings_part = opc.get_part(&target)?;
+    if settings_part.content_type() != ct::WML_SETTINGS {
+        return Err(Error::InvalidContentType {
+            expected: ct::WML_SETTINGS.into(),
+            got: settings_part.content_type().into(),
+        });
+    }
+    let settings = inspect_settings_source(settings_part.blob(), settings_strict, None)?;
+    if settings.protected || settings.track_revisions {
+        return Err(protection_refusal());
+    }
+    Ok(())
+}
+
+fn package_dialect(package: &Package) -> Result<Option<bool>> {
+    let mut dialect = None;
+    for relationship in package
+        .physical_package()?
+        .rels()
+        .iter()
+        .filter(|relationship| {
+            matches!(
+                relationship.reltype(),
+                rt::OFFICE_DOCUMENT | rt::STRICT_OFFICE_DOCUMENT
+            )
+        })
+    {
         if dialect
             .replace(relationship.reltype() == rt::STRICT_OFFICE_DOCUMENT)
             .is_some()
@@ -133,14 +288,14 @@ fn package_dialect(package: &Package) -> Result<Option<bool>> {
 }
 
 fn finish_source_fence(package: &Package, expected: litchi_core::SourceVersion) -> Result<()> {
-    let actual = package.package.source_version()?;
+    let actual = package.physical_package()?.source_version()?;
     if actual != expected {
         return Err(Error::Opc(litchi_opc::OpcError::SourceChanged {
             expected,
             actual,
         }));
     }
-    package.package.check_execution()?;
+    package.physical_package()?.check_execution()?;
     Ok(())
 }
 
@@ -173,7 +328,8 @@ fn inspect_settings_source(
 
     // This existing source-policy inspection validates the root dialect and
     // the direct protection markers without creating a projected MCE buffer.
-    let source_policy = variables::inspect_source_policy(xml)?;
+    let variable_limits = variables::raw::Limits::default();
+    let source_policy = variables::inspect_source_policy(xml, &variable_limits)?;
     let source_strict = matches!(source_policy.dialect, SettingsDialect::Strict);
     if source_strict != expected_strict {
         return Err(Error::InvalidRelationship(
@@ -402,18 +558,18 @@ fn guard_settings_source(
                 saw_declaration = true;
             },
             Event::PI(_) => {
-                return Err(Error::UnsafeEdit {
-                    format: "DOCX",
-                    operation: "changed document publication",
-                    reason: "processing instructions are not admitted in source-bound settings",
-                });
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "changed document publication",
+                    "processing instructions are not admitted in source-bound settings",
+                ));
             },
             Event::DocType(_) => {
-                return Err(Error::UnsafeEdit {
-                    format: "DOCX",
-                    operation: "changed document publication",
-                    reason: "DTD declarations are not admitted in source-bound settings",
-                });
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "changed document publication",
+                    "DTD declarations are not admitted in source-bound settings",
+                ));
             },
             Event::GeneralRef(reference) => {
                 if depth == 0 {
@@ -440,11 +596,11 @@ fn guard_settings_source(
                         .decode()
                         .map_err(|error| Error::Xml(error.to_string()))?;
                     if !matches!(name.as_ref(), "amp" | "apos" | "gt" | "lt" | "quot") {
-                        return Err(Error::UnsafeEdit {
-                            format: "DOCX",
-                            operation: "changed document publication",
-                            reason: "non-predefined entity references are not admitted in source-bound settings",
-                        });
+                        return Err(Error::refused(
+                            litchi_core::edit::RefusalKind::UnsupportedContent,
+                            "changed document publication",
+                            "non-predefined entity references are not admitted in source-bound settings",
+                        ));
                     }
                 }
             },
@@ -611,11 +767,11 @@ fn reject_settings_mce(
 }
 
 fn mce_refusal() -> Error {
-    Error::UnsafeEdit {
-        format: "DOCX",
-        operation: "changed document publication",
-        reason: "markup-compatibility projection or unknown source policy is not admitted",
-    }
+    Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
+        "changed document publication",
+        "markup-compatibility projection or unknown source policy is not admitted",
+    )
 }
 
 fn map_execution_error(error: ExecutionError) -> Error {

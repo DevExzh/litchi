@@ -7,8 +7,4 @@ pub mod source_append;
 pub use catalog::{SlideCatalogEntry, SourceBackedPresentationCatalog};
 pub use layout_master::MasterPage;
 pub use presentation::Presentation;
-pub use source::{ReadLimits, SourceBackedPresentation};
-pub use source_append::{
-    SourceBackedTailAppendEdit, SourceBackedTailAppendPublicationPlan, TailAppendError,
-    TailAppendLimits, TailAppendSourceProof,
-};
+pub use source::SourceBackedPresentation;

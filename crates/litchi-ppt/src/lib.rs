@@ -24,7 +24,7 @@
 //! use litchi_ppt::{Package, shapes::ShapeEnum};
 //
 // // Open a presentation
-// let mut package = Package::open("presentation.ppt")?;
+// let package = Package::open("presentation.ppt")?;
 // let pres = package.presentation()?;
 //
 // // Extract all text
@@ -60,14 +60,21 @@
     reason = "modules and re-exports are grouped by functional area rather than by item kind"
 )]
 
+mod binary_tag_edit;
 mod consts;
 mod officeart_wire;
+mod record_wire;
+mod scoped;
 
 pub use consts::RecordType;
 // Core modules
+/// Canonical PPT authoring and immutable-package builder.
+pub mod builder;
 pub mod package;
 pub mod presentation;
 pub mod presentation_advisor;
+/// Explicit cursor-based readers for low-level format integration.
+pub mod raw;
 pub mod sound_collection;
 pub mod view_info;
 
@@ -138,6 +145,7 @@ pub mod master_layout;
 pub mod master_style;
 pub mod modify_password;
 pub mod named_shows;
+pub mod outline_text;
 pub mod picture_bullets;
 pub mod placeholder_atom;
 pub mod print_options;
@@ -164,6 +172,8 @@ pub mod text_ruler;
 pub mod text_run;
 pub mod text_si_exception;
 pub mod text_special_info;
+/// The `PowerPoint` 2007 theme a presentation carries (record 0323).
+pub mod theme;
 #[cfg(feature = "vba-inspection")]
 pub mod vba_info;
 pub mod view_set_info;
@@ -178,11 +188,15 @@ pub use document_comparison::{
     SlideDiffFlags, SlideListTable10, TableDiffFlags, TextDiffFlags,
 };
 #[cfg(feature = "encryption")]
-pub use encryption::EncryptionProfile;
+pub use encryption::{EncryptionEntropy, EncryptionProfile};
 pub use non_zoom_view::{
     NoZoomViewInfo, NonZoomViewKind, OutlineSorterViewInfo, OutlineSorterViewInformation,
 };
-pub use package::{EncryptionKind, Error, OpenOptions, Package, RecordLimits, SourceBackedPackage};
+pub use package::edit::{Commit, Diagnostics, Edit, EditOptions, LimitKind, Patch};
+pub use package::{
+    EncryptionKind, Error, OpenOptions, Package, SourceBackedPackage, SourceLimitKind,
+    SourceLimits, SourceLimitsBuilder,
+};
 pub use presentation::{ParsedCustomShow, ParsedSlideComments, Presentation};
 pub use presentation_advisor::{AdvisorRule, PresentationAdvisorSettings};
 pub use slide::{
@@ -190,9 +204,7 @@ pub use slide::{
     SlideFactory, SpeakerNotes,
 };
 pub use sound_collection::{BuiltinId, Sound};
-pub use validation::{
-    PptValidationError, PptValidationLimits, validate_source, validate_source_with_limits,
-};
+pub use validation::validate_source;
 pub use view_info::{
     Guide, GuideOrientation, Ratio, SlideViewInfo, SlideViewInformation, SlideViewPreferences,
     ViewKind, ViewOrigin, ZoomViewInfo,
@@ -225,7 +237,6 @@ pub use document_properties::{
     PhotoAlbumFrameShape, PhotoAlbumLayout, PhotoAlbumSettings,
 };
 pub use document_structure::{CustomTableStylesPlacement, DocumentStructure};
-pub use embedded::object::Editor;
 pub use embedded::object::{
     Collection, ColorFollow, ContainerKind, Control, Definition, DimensionPolicy, DrawAspect,
     EmbedPreferences, ExternalObject, LinkInfo, Metadata, ObjectSubtype, ObjectType, UnknownRecord,
@@ -244,10 +255,10 @@ pub use external_media::{
     Video,
 };
 pub use font::{
-    Commit as FontCommit, EmbeddedFont, EotMetadata, Facet as FontFacet, Font, FontCollection,
-    FontCollections, FontEmbeddingFlags, Limits as FontLimits, PackageLimits as FontPackageLimits,
-    PackageOptions as FontPackageOptions, Patch as FontPatch, Revision as FontRevision,
-    Scope as FontScope, Snapshot as FontSnapshot, Transaction as FontTransaction,
+    EmbeddedFont, EotMetadata, Facet as FontFacet, Font, FontCollection, FontCollections,
+    FontEmbeddingFlags, Limits as FontLimits, PackageLimits as FontPackageLimits,
+    PackageOptions as FontPackageOptions, Revision as FontRevision, Scope as FontScope,
+    Snapshot as FontSnapshot,
 };
 pub use header_footer::{
     DateTimeFormatId, HeaderFooter, HeaderFooterDisplayText, HeaderFooterOptions,
@@ -273,11 +284,11 @@ pub use main_master::{
 pub use master_style::{TextMasterStyle, TextMasterStyleLevel};
 pub use modify_password::ModifyPassword;
 pub use named_shows::{NamedShow, NamedShows};
+pub use outline_text::OutlineTextBody;
 pub use picture_bullets::{
     MAX_PICTURE_BULLET_INDEX, PictureBullet, PictureBulletChange, PictureBulletChangeKind,
-    PictureBulletCollection, PictureBulletCommit, PictureBulletLimits, PictureBulletPackageLimits,
-    PictureBulletPatch, PictureBulletRevision, PictureBulletSnapshot, PictureBulletTransaction,
-    PictureBulletType,
+    PictureBulletCollection, PictureBulletLimits, PictureBulletPackageLimits,
+    PictureBulletRevision, PictureBulletSnapshot, PictureBulletType,
 };
 pub use placeholder_atom::{
     AtomPlaceholderSize, PlaceholderAtom, PlaceholderContext, PlaceholderEntry, PlaceholderKind,
@@ -319,10 +330,8 @@ pub use slide_round_trip::{
 };
 pub use slide_show_settings::{ColorIndex, ColorIndexKind, SlideShowFlags, SlideShowSettings};
 pub use slide_sync::{
-    Change as SlideSyncChange, ChangeSet as SlideSyncChangeSet, Commit as SlideSyncCommit,
-    Editor as SlideSyncEditor, LibraryUrl, Limits as SlideSyncLimits, MAX_TEXT_BYTES,
-    Revision as SlideSyncRevision, ServerId, Snapshot as SlideSyncSnapshot, Synchronization,
-    SystemTime,
+    LibraryUrl, Limits as SlideSyncLimits, MAX_TEXT_BYTES, Revision as SlideSyncRevision, ServerId,
+    Snapshot as SlideSyncSnapshot, Synchronization, SystemTime,
 };
 pub use smart_tags::{SmartTag, SmartTagProperty, SmartTagStore, SmartTagType};
 pub use style_text_prop::{StyleTextPropAtom, TextCFRun, TextPFRun};
@@ -362,10 +371,10 @@ pub use view_set_info::{
 };
 
 // Re-export writer types
+pub use builder::Builder;
 pub use writer::{
     FreeformGeometry, GeometryRect, ShapePathType, ShapeProperties, ShapeType, SmartTagDefinition,
     SmartTagIndex, TabAlign, TabStop, TextAlignment, TextDirection, TextFontAlign, WriteError,
-    Writer,
 };
 
 // Animation and transition support
@@ -373,7 +382,7 @@ pub mod animation;
 pub mod transition;
 
 // Re-export transition types for ergonomic read access
-pub use animation::{EditorLimits, LegacyShapeAnimation, Scope, Timeline};
+pub use animation::{LegacyShapeAnimation, Scope, Timeline};
 pub use transition::{
     AdvanceMode, SoundAction, TransitionDirection, TransitionInfo, TransitionSpeed, TransitionType,
 };

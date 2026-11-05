@@ -4,20 +4,13 @@ use crate::record::RecordKind;
 
 /// The bounded traversal resource that was exhausted.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Limit {
+pub enum LimitKind {
+    /// Maximum body bytes accepted by one raw record.
+    RecordBytes,
     /// Maximum nested-container depth.
     Depth,
     /// Maximum number of visited records.
     Records,
-}
-
-/// A bounded resource used while parsing `OfficeArt` image records.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ImageLimit {
-    /// Maximum size of one BLIP record body.
-    BlipBytes,
-    /// Maximum number of file blocks in one BLIP store.
-    StoreEntries,
 }
 
 /// A checked `OfficeArt` parsing or validation failure.
@@ -85,7 +78,9 @@ pub enum Error {
     /// An image record exceeded an explicit resource ceiling.
     ImageLimitExceeded {
         /// Resource whose ceiling was reached.
-        limit: ImageLimit,
+        limit: crate::image::LimitKind,
+        /// Observed resource size or count.
+        observed: u64,
         /// Configured maximum.
         maximum: u64,
     },
@@ -115,14 +110,18 @@ pub enum Error {
     /// A caller-supplied traversal limit exceeds the implementation's safe bound.
     InvalidLimit {
         /// Resource whose requested ceiling is unsafe.
-        limit: Limit,
+        limit: LimitKind,
+        /// Requested ceiling.
+        value: u32,
         /// Largest accepted ceiling.
         maximum: u32,
     },
     /// A bounded recursive traversal reached its configured ceiling.
     LimitExceeded {
         /// Resource whose limit was reached.
-        limit: Limit,
+        limit: LimitKind,
+        /// Observed resource size or count.
+        observed: u64,
         /// Configured maximum.
         maximum: u32,
     },
@@ -174,9 +173,13 @@ impl core::fmt::Display for Error {
                     "OfficeArt BLIP identifier {value} is outside 1..=4095"
                 )
             },
-            Self::ImageLimitExceeded { limit, maximum } => write!(
+            Self::ImageLimitExceeded {
+                limit,
+                observed,
+                maximum,
+            } => write!(
                 formatter,
-                "OfficeArt image {limit:?} limit of {maximum} exceeded"
+                "OfficeArt image {limit:?} observed {observed} exceeds {maximum}"
             ),
             Self::MissingDelayStore => {
                 write!(
@@ -202,12 +205,23 @@ impl core::fmt::Display for Error {
                     "unexpected OfficeArt top-level data at offset {offset}"
                 )
             },
-            Self::InvalidLimit { limit, maximum } => write!(
+            Self::InvalidLimit {
+                limit,
+                value,
+                maximum,
+            } => write!(
                 formatter,
-                "OfficeArt {limit:?} limit exceeds the safe maximum of {maximum}"
+                "OfficeArt {limit:?} limit {value} exceeds the safe maximum of {maximum}"
             ),
-            Self::LimitExceeded { limit, maximum } => {
-                write!(formatter, "OfficeArt {limit:?} limit of {maximum} exceeded")
+            Self::LimitExceeded {
+                limit,
+                observed,
+                maximum,
+            } => {
+                write!(
+                    formatter,
+                    "OfficeArt {limit:?} observed {observed} exceeds {maximum}"
+                )
             },
         }
     }

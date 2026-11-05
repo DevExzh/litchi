@@ -87,7 +87,7 @@ impl Snapshot {
 
     /// Start an isolated edit based on this snapshot.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
+    pub(crate) fn edit(&self) -> Transaction {
         Transaction {
             base: self.clone(),
             changes: Vec::new(),
@@ -97,7 +97,7 @@ impl Snapshot {
 
 /// A numbering edit that has not yet been published.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub(crate) struct Transaction {
     base: Snapshot,
     changes: Vec<Change>,
 }
@@ -209,7 +209,7 @@ impl Transaction {
 
 /// A successful publication containing the new snapshot and reversible patch.
 #[derive(Debug, Clone)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     patch: Patch,
 }
@@ -244,7 +244,7 @@ impl Commit {
 
 /// A source-checked, reversible abstract-definition restart patch.
 #[derive(Debug, Clone)]
-pub struct Patch {
+pub(crate) struct Patch {
     before: Vec<Change>,
     after: Vec<Change>,
     before_xml: Arc<[u8]>,

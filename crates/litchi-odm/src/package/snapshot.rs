@@ -2,6 +2,7 @@
 
 use litchi_core::{Error, Metadata, Result};
 use litchi_odf_common::core::{OwnedPackage, PackageWriter, family::Package};
+use litchi_odf_common::{Error as PackageError, OpenOptions, SemanticLimitKind, XmlStreamLimits};
 use std::{path::Path, sync::Arc};
 
 pub(crate) const MIMETYPE: &str = "application/vnd.oasis.opendocument.text-master";
@@ -15,6 +16,7 @@ const MAX_ACTIVE_XML_BYTES: usize = 256 * 1024 * 1024;
 
 struct State {
     package: Package,
+    xml_limits: XmlStreamLimits,
     semantics: crate::codec::Semantics,
     styles: Vec<crate::style::Definition>,
     resources: crate::resource::Graph,
@@ -32,45 +34,115 @@ pub(crate) struct ResourceWrite {
 pub(crate) struct Snapshot(Arc<State>);
 
 impl Snapshot {
-    pub(crate) fn open(path: impl AsRef<Path>) -> Result<Self> {
-        let package = Package::open(path, MIMETYPE, BODY_MARKER, "ODM")?;
-        Self::from_package(package)
+    /// The retained physical package (metadata transactions, record 0288).
+    pub(crate) fn owned_package(&self) -> &OwnedPackage {
+        self.0.package.package()
+    }
+
+    pub(crate) fn open_with_options(
+        path: impl AsRef<Path>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        let package = Package::open_with_options(path, options, MIMETYPE, BODY_MARKER, "ODM")?;
+        Self::from_package_with_options(package, options)
+    }
+
+    pub(crate) fn open_with_password_and_options(
+        path: impl AsRef<Path>,
+        password: impl Into<String>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        let package = Package::open_with_password_and_options(
+            path,
+            password,
+            options,
+            MIMETYPE,
+            BODY_MARKER,
+            "ODM",
+        )?;
+        Self::from_package_with_options(package, options)
+    }
+
+    pub(crate) fn from_bytes_with_options(
+        bytes: Vec<u8>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        let package =
+            Package::from_bytes_with_options(bytes, options, MIMETYPE, BODY_MARKER, "ODM")?;
+        Self::from_package_with_options(package, options)
+    }
+
+    pub(crate) fn from_bytes_with_password_and_options(
+        bytes: Vec<u8>,
+        password: impl Into<String>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        let package = Package::from_bytes_with_password_and_options(
+            bytes,
+            password,
+            options,
+            MIMETYPE,
+            BODY_MARKER,
+            "ODM",
+        )?;
+        Self::from_package_with_options(package, options)
+    }
+
+    pub(crate) fn from_reader_with_options(
+        reader: impl std::io::Read,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        let package =
+            Package::from_reader_with_options(reader, options, MIMETYPE, BODY_MARKER, "ODM")?;
+        Self::from_package_with_options(package, options)
+    }
+
+    pub(crate) fn from_owned_package_with_options(
+        archive: OwnedPackage,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        let package = Package::from_owned_package_with_options(
+            archive,
+            options,
+            MIMETYPE,
+            BODY_MARKER,
+            "ODM",
+        )?;
+        Self::from_package_with_options(package, options)
     }
 
     pub(crate) fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         let package = Package::from_bytes(bytes, MIMETYPE, BODY_MARKER, "ODM")?;
-        Self::from_package(package)
+        Self::from_package(package, XmlStreamLimits::owner_default_value())
     }
 
     pub(crate) fn from_shared_bytes(bytes: Arc<Vec<u8>>) -> Result<Self> {
         let package = Package::from_shared_bytes(bytes, MIMETYPE, BODY_MARKER, "ODM")?;
-        Self::from_package(package)
+        Self::from_package(package, XmlStreamLimits::owner_default_value())
     }
 
-    pub(crate) fn from_bytes_with_password(
-        bytes: Vec<u8>,
-        password: impl Into<String>,
-    ) -> Result<Self> {
-        let package =
-            Package::from_bytes_with_password(bytes, password, MIMETYPE, BODY_MARKER, "ODM")?;
-        Self::from_package(package)
+    /// Project a validated package, then bound its direct body items by the
+    /// semantic `units` limit.
+    fn from_package_with_options(
+        package: Package,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        let snapshot = Self::from_package(package, options.xml_limits_value())?;
+        let units = u64::try_from(snapshot.structure().items().len()).unwrap_or(u64::MAX);
+        options
+            .semantic_limits_value()
+            .check(SemanticLimitKind::Units, units)?;
+        Ok(snapshot)
     }
 
-    pub(crate) fn open_with_password(
-        path: impl AsRef<Path>,
-        password: impl Into<String>,
-    ) -> Result<Self> {
-        let package = Package::open_with_password(path, password, MIMETYPE, BODY_MARKER, "ODM")?;
-        Self::from_package(package)
-    }
-
-    fn from_package(package: Package) -> Result<Self> {
+    fn from_package(package: Package, xml_limits: XmlStreamLimits) -> Result<Self> {
         let semantics = crate::codec::parse(package.content_xml())?;
         let styles = crate::codec::parse_catalog(package.content_xml(), package.styles_xml())?;
         let resources = build_resource_graph(&package, semantics.references())?;
         let security = build_security_state(&package, &semantics)?;
         Ok(Self(Arc::new(State {
             package,
+            xml_limits,
             semantics,
             styles,
             resources,
@@ -139,7 +211,10 @@ impl Snapshot {
     ) -> Result<Self> {
         let archive = self.0.package.package();
         ensure_editable(archive, &self.files()?)?;
-        let mut writer = PackageWriter::new_bounded(MAX_OUTPUT_BYTES);
+        let mut writer = PackageWriter::new_bounded(
+            MAX_OUTPUT_BYTES,
+            litchi_odf_common::core::StreamingArchiveLimits::default(),
+        );
         writer.set_mimetype(MIMETYPE)?;
         let compact_content = crate::codec::compact_source_xml(content_xml)?;
         add_preserving_media_type(
@@ -185,11 +260,19 @@ impl Snapshot {
         for write in resource_writes {
             writer.add_file_with_media_type(&write.path, &write.bytes, &write.media_type)?;
         }
-        Self::from_bytes(writer.finish_to_bounded_bytes()?)
+        Self::from_bytes_with_options(
+            writer.finish_to_bounded_bytes()?,
+            OpenOptions::new().xml_limits(self.0.xml_limits),
+        )
+        .map_err(Error::from)
     }
 
     pub(crate) fn as_bytes(&self) -> &[u8] {
         self.0.package.as_bytes()
+    }
+
+    pub(crate) fn xml_limits_value(&self) -> XmlStreamLimits {
+        self.0.xml_limits
     }
 
     pub(crate) fn shared_bytes(&self) -> Arc<Vec<u8>> {
@@ -198,13 +281,6 @@ impl Snapshot {
 
     pub(crate) fn files(&self) -> Result<Vec<String>> {
         self.0.package.files()
-    }
-
-    pub(crate) fn into_bytes(self) -> Vec<u8> {
-        match Arc::try_unwrap(self.0) {
-            Ok(state) => state.package.into_bytes(),
-            Err(state) => state.package.as_bytes().to_vec(),
-        }
     }
 
     pub(crate) fn references(&self) -> &[crate::model::subdocument::Reference] {
@@ -452,9 +528,11 @@ fn push_active_details(
 fn ensure_editable(archive: &OwnedPackage, files: &[String]) -> Result<()> {
     let package = archive.package()?;
     if package.manifest().has_encrypted_entries() {
-        return Err(Error::Unsupported(
-            "ODM package edits refuse encrypted packages".to_string(),
-        ));
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odm.package.snapshot",
+            "ODM package edits refuse encrypted packages",
+        )));
     }
     if files.iter().any(|path| {
         matches!(
@@ -462,9 +540,11 @@ fn ensure_editable(archive: &OwnedPackage, files: &[String]) -> Result<()> {
             "META-INF/documentsignatures.xml" | "META-INF/macrosignatures.xml"
         )
     }) {
-        return Err(Error::Unsupported(
-            "ODM package edits refuse signed packages".to_string(),
-        ));
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::Protected,
+            "odm.package.snapshot",
+            "ODM package edits refuse signed packages",
+        )));
     }
     Ok(())
 }

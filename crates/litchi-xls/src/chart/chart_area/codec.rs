@@ -53,7 +53,7 @@ pub(crate) fn patch(input: &[u8], change: Change, limits: Limits) -> Result<Vec<
         ));
     }
     if records.get(1).is_none_or(|value| value.kind != CHART) {
-        return Err(unsafe_edit(
+        return Err(conflict(
             "source Chart record is not at the chart-area owner position",
         ));
     }
@@ -61,24 +61,26 @@ pub(crate) fn patch(input: &[u8], change: Change, limits: Limits) -> Result<Vec<
     let mut chart_range = None;
     for value in records.iter().filter(|value| value.kind == CHART) {
         if chart_range.is_some() {
-            return Err(unsafe_edit("source Chart record is duplicated"));
+            return Err(conflict("source Chart record is duplicated"));
         }
         let payload = input
             .get(value.body_start..value.body_end)
             .ok_or_else(|| invalid("source Chart payload falls outside the stream"))?;
         let actual = decode(payload)?;
         if actual != Snapshot::from_wire(change.before()) {
-            return Err(unsafe_edit(
+            return Err(conflict(
                 "source Chart record does not match the chart-area snapshot",
             ));
         }
         chart_range = Some((value.body_start, value.body_end));
     }
     let (body_start, body_end) =
-        chart_range.ok_or_else(|| unsafe_edit("source Chart record is missing"))?;
+        chart_range.ok_or_else(|| conflict("source Chart record is missing"))?;
     let replacement = encode(&Snapshot::from_wire(change.after()))?;
     if body_end.saturating_sub(body_start) != replacement.len() {
-        return Err(unsafe_edit("Chart payload length changed during patching"));
+        return Err(Error::Internal(
+            "Chart payload length changed during patching",
+        ));
     }
     let mut output = input.to_vec();
     output[body_start..body_end].copy_from_slice(&replacement);
@@ -92,6 +94,9 @@ fn invalid(message: impl Into<String>) -> Error {
     }
 }
 
-fn unsafe_edit(message: impl Into<String>) -> Error {
-    Error::UnsafeEdit(message.into())
+const fn conflict(reason: &'static str) -> Error {
+    Error::PatchConflict {
+        operation: "edit chart area",
+        reason,
+    }
 }

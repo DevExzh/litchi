@@ -1,4 +1,14 @@
-//! Selector-first, source-checked scalar edits for existing worksheet controls.
+//! Selector-first, source-checked scalar edits for existing worksheet
+//! controls of a [`SourceBackedWorkbook`] (record 0360, the 0355a §1 shape).
+//!
+//! [`SourceBackedWorkbook::edit_form_controls`] stages scalar changes of one
+//! worksheet's admitted form controls; [`Edit::commit`] validates the paired
+//! `ctrlProp`/VML change and returns a [`Commit`] holding the new workbook,
+//! whose output is the source-topology publication the former stream
+//! publisher wrote (both paired members replaced, every other ZIP member
+//! raw-copied) after the same complete owner readback.
+//! [`SourceBackedWorkbook::apply_form_controls`] replays a [`Patch`] onto a
+//! workbook holding its before state.
 
 use std::io::Write;
 use std::mem::size_of;
@@ -6,10 +16,10 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use litchi_core::xml::ReaderOrigin;
-use litchi_core::{ExecutionContext, ReadAt, Resource};
+use litchi_core::{ExecutionContext, Resource};
 use litchi_opc::{
-    AuthoredXmlFragment, OpcPackage, PackURI, ReadLimits, SourceBackedPackage, SourceCacheLimits,
-    SourceTopologyPlan, SourceXmlPart,
+    AuthoredXmlFragment, OpcPackage, PackURI, SourceBackedPackage, SourceTopologyPlan,
+    SourceXmlPart,
 };
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
@@ -22,11 +32,11 @@ use super::{
     budget::{ARC_HEADER_BYTES, reserve_generated},
     replace_scalar_pair_with_limits, source_form_controls_for_sheet_with_limits,
 };
-use crate::error::{Error, Result, invalid};
+use crate::error::{Result, invalid};
 use crate::raw;
 use crate::source_payload::SourcePayload;
 use crate::workbook::source::validate_sheet_graph;
-use crate::{Selector, WorksheetKind};
+use crate::{Selector, SourceBackedWorkbook, WorksheetKind};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const VML_NAMESPACE: &[u8] = b"urn:schemas-microsoft-com:vml";
@@ -78,11 +88,6 @@ impl FormControlSnapshot {
     pub const fn form_controls(&self) -> &FormControlCollection {
         &self.collection
     }
-    /// Alias for [`Self::form_controls`].
-    #[must_use]
-    pub const fn collection(&self) -> &FormControlCollection {
-        &self.collection
-    }
     /// Resolve one control by an ordinary selector.
     pub fn control<'a>(
         &self,
@@ -110,12 +115,13 @@ impl FormControlSnapshot {
     pub fn has_execution_budget(&self) -> bool {
         self.collection.has_execution_budget() || self.generated_vml.is_some()
     }
-    fn same_source(&self, other: &Self) -> bool {
+    /// The same owner state, whatever source it was read from (a replay
+    /// compares content, record 0360).
+    fn same_content(&self, other: &Self) -> bool {
         self.sheet_name == other.sheet_name
             && self.sheet_position == other.sheet_position
             && self.limits == other.limits
-            && self.source_lineage == other.source_lineage
-            && self.collection.same_source(&other.collection)
+            && self.collection.same_content_except(&other.collection, &[])
     }
     fn with_properties(&self, position: usize, properties: Properties) -> Result<Self> {
         let collection = self
@@ -284,17 +290,24 @@ impl FormControlScalarAction {
     }
 }
 
-/// Isolated source-backed edit for one worksheet.
-pub struct FormControlSourceEdit {
+/// An isolated scalar edit of one worksheet's form controls in a
+/// [`SourceBackedWorkbook`]. Dropping it discards it.
+pub struct Edit {
+    workbook: SourceBackedWorkbook,
     before: FormControlSnapshot,
     operations: Vec<Operation>,
 }
-impl FormControlSourceEdit {
-    fn new(before: FormControlSnapshot) -> Self {
+impl Edit {
+    fn new(workbook: SourceBackedWorkbook, before: FormControlSnapshot) -> Self {
         Self {
+            workbook,
             before,
             operations: Vec::new(),
         }
+    }
+    /// Discard every staged scalar change in place.
+    pub fn reset(&mut self) {
+        self.operations.clear();
     }
     /// Exact owner projection captured when this edit began.
     #[must_use]
@@ -328,22 +341,9 @@ impl FormControlSourceEdit {
         });
         Ok(self)
     }
-    /// Selector-first alias matching the worksheet edit facade.
-    pub fn set_form_control_scalar<'a>(
-        &mut self,
-        selector: impl Into<ControlSelector<'a>>,
-        field: ScalarField,
-        value: Option<ScalarValue>,
-    ) -> Result<&mut Self> {
-        self.set_scalar(selector, field, value)
-    }
-    /// Whether any scalar operation is staged.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.operations.is_empty()
-    }
-    /// Validate and freeze the paired properties/VML transaction.
-    pub fn commit(self) -> Result<FormControlCommit> {
+    /// Validate the paired properties/VML change and return the committed
+    /// workbook, the exact patch and the diagnostics.
+    pub fn commit(self) -> Result<Commit> {
         let mut current = self.before.clone();
         let mut overlay: Option<Overlay> = None;
         let mut target_position = None;
@@ -392,7 +392,7 @@ impl FormControlSourceEdit {
             let vml_source = vml_source_payload.as_bytes();
             validate_pair_input_limits(property_source, vml_source, self.before.limits)?;
             let client_data = find_client_data(vml_source, control.shape().vml_id())?;
-            let properties = super::inspect(property_source)?;
+            let properties = super::inspect(property_source, &super::Limits::default())?;
             let pair = replace_scalar_pair_with_limits(
                 &properties,
                 client_data,
@@ -466,11 +466,11 @@ impl FormControlSourceEdit {
             }
         }
         let Some(overlay) = overlay else {
-            let patch = FormControlPatch::empty(self.before.clone());
-            return Ok(FormControlCommit::new(self.before, patch, false));
+            let patch = Record::empty(self.before.clone());
+            return commit_change(&self.workbook, patch);
         };
-        let patch = FormControlPatch::from_overlay(self.before, current, overlay);
-        Ok(FormControlCommit::new(patch.after.clone(), patch, true))
+        let patch = Record::from_overlay(self.before, current, overlay);
+        commit_change(&self.workbook, patch)
     }
 }
 
@@ -497,7 +497,7 @@ pub(crate) struct OrdinaryFormControlOverlay {
     pub(crate) expected_collection: FormControlCollection,
 }
 
-/// Validate one selector against the eager owner used by `WorksheetEdit`.
+/// Validate one selector against the eager owner used by `Sheet`.
 pub(crate) fn validate_ordinary_form_control_selector(
     package: &OpcPackage,
     worksheet_uri: &PackURI,
@@ -579,7 +579,7 @@ pub(crate) fn ordinary_form_control_overlays(
             .as_deref()
             .ok_or_else(|| invalid("form-control VML source disappeared"))?;
         validate_pair_input_limits(property_bytes, vml_bytes, limits)?;
-        let properties = super::inspect(property_bytes)?;
+        let properties = super::inspect(property_bytes, &super::Limits::default())?;
         let client_data = find_client_data(vml_bytes, control.shape().vml_id())?;
         let pair = replace_scalar_pair_with_limits(
             &properties,
@@ -612,7 +612,10 @@ pub(crate) fn ordinary_form_control_overlays(
     let position =
         target_position.ok_or_else(|| invalid("form-control target position was not retained"))?;
     let expected_collection = collection
-        .with_replaced_properties(position, super::parse(&property_after)?)
+        .with_replaced_properties(
+            position,
+            super::parse(&property_after, &super::Limits::default())?,
+        )
         .ok_or_else(|| invalid("form-control target disappeared during ordinary edit"))?;
     Ok(vec![OrdinaryFormControlOverlay {
         position,
@@ -661,9 +664,9 @@ struct Overlay {
     after_vml: SourcePayload,
 }
 
-/// Exact reversible paired properties/VML patch.
+/// The exact reversible paired properties/VML record of a scalar edit.
 #[derive(Clone, Debug)]
-pub struct FormControlPatch {
+pub(crate) struct Record {
     before: FormControlSnapshot,
     after: FormControlSnapshot,
     property_uri: Option<PackURI>,
@@ -673,7 +676,7 @@ pub struct FormControlPatch {
     before_vml: Option<SourcePayload>,
     after_vml: Option<SourcePayload>,
 }
-impl FormControlPatch {
+impl Record {
     fn empty(snapshot: FormControlSnapshot) -> Self {
         Self {
             before: snapshot.clone(),
@@ -704,17 +707,17 @@ impl FormControlPatch {
     }
     /// Required exact source state.
     #[must_use]
-    pub const fn before(&self) -> &FormControlSnapshot {
+    pub(crate) const fn before(&self) -> &FormControlSnapshot {
         &self.before
     }
     /// Exact target semantic state.
     #[must_use]
-    pub const fn after(&self) -> &FormControlSnapshot {
+    pub(crate) const fn after(&self) -> &FormControlSnapshot {
         &self.after
     }
     /// Whether both paired source members are unchanged.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         match (
             &self.before_properties,
             &self.after_properties,
@@ -729,7 +732,7 @@ impl FormControlPatch {
     }
     /// Swap exact before/after source bytes and semantic projections.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
@@ -741,314 +744,103 @@ impl FormControlPatch {
             after_vml: self.before_vml.clone(),
         }
     }
-    /// Apply after checking both source members and eager owner readback.
-    pub fn apply(&self, package: &mut OpcPackage) -> Result<()> {
-        if self.is_empty() {
-            if let Some(read_set) = self.before.collection.read_set() {
-                if !super::read_set_matches_package_except(package, read_set, &[])? {
-                    return Err(Error::PatchConflict {
-                        part: read_set.worksheet_part_name().map_or_else(
-                            || "form-control read set".to_owned(),
-                            ToString::to_string,
-                        ),
-                    });
-                }
-            }
-            return Ok(());
-        }
-        let property_uri = self
-            .property_uri
-            .as_ref()
-            .ok_or_else(|| invalid("form-control patch has no properties identity"))?;
-        let vml_uri = self
-            .vml_uri
-            .as_ref()
-            .ok_or_else(|| invalid("form-control patch has no VML identity"))?;
-        let before_properties = self
-            .before_properties
-            .as_ref()
-            .ok_or_else(|| invalid("form-control patch has no properties source"))?;
-        let before_vml = self
-            .before_vml
-            .as_ref()
-            .ok_or_else(|| invalid("form-control patch has no VML source"))?;
-        validate_changed_part_count(2, self.before.limits)?;
-        validate_pair_input_limits(
-            before_properties.as_bytes(),
-            before_vml.as_bytes(),
+}
+
+crate::workbook::source::deferred::source_family!("form-control", Record);
+
+impl Patch {
+    /// The exact owner state the patch requires.
+    #[must_use]
+    pub fn before(&self) -> &FormControlSnapshot {
+        self.0.before()
+    }
+
+    /// The exact owner state the patch produces.
+    #[must_use]
+    pub fn after(&self) -> &FormControlSnapshot {
+        self.0.after()
+    }
+}
+
+impl crate::workbook::source::deferred::Change for Record {
+    fn is_noop(&self) -> bool {
+        self.is_empty()
+    }
+
+    fn inverse(&self) -> Self {
+        Record::inverse(self)
+    }
+
+    fn check(&self, package: &SourceBackedPackage) -> Result<()> {
+        let current = snapshot_of(
+            package,
+            self.before.sheet_position.into(),
             self.before.limits,
         )?;
-        if package.is_signed() || package.requires_signature_edit_policy() {
-            return Err(Error::Signed);
-        }
-        let property_current = match package.get_part(property_uri) {
-            Ok(part) => part,
-            Err(litchi_opc::OpcError::PartNotFound(_)) => {
-                return Err(Error::PatchConflict {
-                    part: property_uri.to_string(),
-                });
-            },
-            Err(error) => return Err(error.into()),
+        let conflict = || Error::PatchConflict {
+            part: current.sheet_name().to_owned(),
         };
-        if property_current.blob() != before_properties.as_bytes() {
-            return Err(Error::PatchConflict {
-                part: property_uri.to_string(),
-            });
-        }
-        let vml_current = match package.get_part(vml_uri) {
-            Ok(part) => part,
-            Err(litchi_opc::OpcError::PartNotFound(_)) => {
-                return Err(Error::PatchConflict {
-                    part: vml_uri.to_string(),
-                });
-            },
-            Err(error) => return Err(error.into()),
+        let (Some(property_uri), Some(vml_uri), Some(properties), Some(vml)) = (
+            self.property_uri.as_ref(),
+            self.vml_uri.as_ref(),
+            self.before_properties.as_ref(),
+            self.before_vml.as_ref(),
+        ) else {
+            return if current.same_content(&self.before) {
+                Ok(())
+            } else {
+                Err(conflict())
+            };
         };
-        if vml_current.blob() != before_vml.as_bytes() {
-            return Err(Error::PatchConflict {
-                part: vml_uri.to_string(),
-            });
-        }
-        let read_set = self
+        // The paired members must hold the patch's before bytes, and every
+        // other member of the owner read set must be unchanged (an inverse
+        // replays onto a reopened output whose paired members differ from
+        // the read set captured before the edit).
+        let read_set = current
+            .collection
+            .read_set()
+            .ok_or_else(|| invalid("form-control source has no read set"))?;
+        let before_read_set = self
             .before
             .collection
             .read_set()
             .ok_or_else(|| invalid("form-control patch has no source read set"))?;
-        if !super::read_set_matches_package_except(package, read_set, &[property_uri, vml_uri])? {
-            return Err(Error::PatchConflict {
-                part: read_set
-                    .worksheet_part_name()
-                    .map_or_else(|| "form-control read set".to_owned(), ToString::to_string),
-            });
+        if current.sheet_name != self.before.sheet_name
+            || current.sheet_position != self.before.sheet_position
+            || read_set.part_bytes(property_uri) != Some(properties.as_bytes())
+            || read_set.part_bytes(vml_uri) != Some(vml.as_bytes())
+            || !read_set.same_content_except(before_read_set, &[property_uri, vml_uri])
+        {
+            return Err(conflict());
         }
-        let worksheet_uri = read_set
-            .worksheet_part_name()
-            .cloned()
-            .ok_or_else(|| invalid("form-control patch has no worksheet identity"))?;
-        let after_properties = self
-            .after_properties
-            .as_ref()
-            .ok_or_else(|| invalid("form-control patch has no properties target"))?;
-        let after_vml = self
-            .after_vml
-            .as_ref()
-            .ok_or_else(|| invalid("form-control patch has no VML target"))?;
-        validate_pair_output_limits(
-            before_properties.as_bytes(),
-            before_vml.as_bytes(),
-            after_properties.as_bytes(),
-            after_vml.as_bytes(),
-            self.before.limits,
-        )?;
-        let after_properties_bytes = after_properties.materialized_arc(
-            self.before.limits.max_output_bytes(),
-            "form-control eager properties publication",
-        )?;
-        let after_vml_bytes = after_vml.materialized_arc(
-            self.before.limits.max_output_bytes(),
-            "form-control eager VML publication",
-        )?;
-        let mut candidate = package.clone();
-        // Keep the generated x14 payload source-authorized when this eager
-        // patch is later serialized.  A direct `set_blob_shared` revokes the
-        // package's retained XML provenance, so noncompact source formatting
-        // would fail at the writer boundary even though this edit is a
-        // source-preserving scalar splice.  The byte-oriented replacement
-        // API checks the stale source and installs the replacement proof on
-        // the candidate before either paired member is committed.
-        candidate.try_replace_owned_xml_part_bytes(
-            property_uri,
-            before_properties.as_bytes(),
-            after_properties_bytes,
-        )?;
-        candidate
-            .get_part_mut(vml_uri)?
-            .set_blob_shared(after_vml_bytes);
-        let resulting = super::eager_form_controls_for_sheet_with_limits(
-            &candidate,
-            &worksheet_uri,
-            self.before.limits,
-        )
-        .map_err(super::owner_to_xlsx)?;
-        if resulting != self.after.collection {
-            return Err(invalid(
-                "form-control patch paired owner readback did not match its target",
-            ));
-        }
-        *package = candidate;
         Ok(())
     }
-}
 
-/// Successful paired scalar transaction.
-#[derive(Debug)]
-pub struct FormControlCommit {
-    snapshot: FormControlSnapshot,
-    patch: FormControlPatch,
-    changed: bool,
-}
-impl FormControlCommit {
-    fn new(snapshot: FormControlSnapshot, patch: FormControlPatch, changed: bool) -> Self {
-        Self {
-            snapshot,
-            patch,
-            changed,
-        }
-    }
-    /// Whether either paired source member changed.
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-    /// Resulting immutable projection.
-    #[must_use]
-    pub const fn snapshot(&self) -> &FormControlSnapshot {
-        &self.snapshot
-    }
-    /// Exact reversible patch.
-    #[must_use]
-    pub const fn patch(&self) -> &FormControlPatch {
-        &self.patch
-    }
-    /// Consume into snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (FormControlSnapshot, FormControlPatch) {
-        (self.snapshot, self.patch)
-    }
-}
-
-/// Source-backed form-control scalar editor.
-pub struct SourceBackedFormControlEditor {
-    package: SourceBackedPackage,
-    limits: OwnerLimits,
-}
-impl SourceBackedFormControlEditor {
-    /// Open with standard bounded policies.
-    pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
-        Self::from_read_at_with_limits(source, ReadLimits::default())
-    }
-    /// Open with explicit OPC read limits.
-    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: ReadLimits) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_limits(
-            source, limits,
-        )?)
-    }
-    /// Open with an explicit source cache policy.
-    pub fn from_read_at_with_cache_limits(
-        source: Arc<dyn ReadAt>,
-        limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_cache_limits(
-            source, limits,
-        )?)
-    }
-    /// Open with explicit read and cache policies.
-    pub fn from_read_at_with_limits_and_cache_limits(
-        source: Arc<dyn ReadAt>,
-        read_limits: ReadLimits,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
-                source,
-                read_limits,
-                cache_limits,
-            )?,
-        )
-    }
-    /// Open with a caller-owned execution context.
-    pub fn from_read_at_with_execution_context(
-        source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_execution_context(
-            source, limits, context,
-        )?)
-    }
-    /// Open from an already validated deferred package.
-    pub fn from_source_backed_package(package: SourceBackedPackage) -> Result<Self> {
+    fn write(&self, package: &SourceBackedPackage, writer: &mut dyn Write) -> Result<()> {
         package.check_execution()?;
-        if package.has_encrypted_entries() {
-            return Err(invalid(
-                "encrypted XLSX form-control source is not admitted",
-            ));
-        }
-        Ok(Self {
-            limits: OwnerLimits::from_read_limits(package.read_limits()),
-            package,
-        })
-    }
-    /// Lower the owner policy.
-    #[must_use]
-    pub fn with_limits(mut self, limits: OwnerLimits) -> Self {
-        self.limits = limits;
-        self
-    }
-    /// Capture one worksheet's source-backed owner projection.
-    pub fn snapshot<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<FormControlSnapshot> {
-        self.package.check_execution()?;
-        let (position, name, uri) = source_sheet(&self.package, selector.into())?;
-        let collection =
-            source_form_controls_for_sheet_with_limits(&self.package, &uri, self.limits)?;
-        Ok(FormControlSnapshot::new(
-            name,
-            position,
-            collection,
-            self.limits,
-            Some(self.package.source_lineage()),
-            self.package.execution_context(),
-        ))
-    }
-    /// Start an isolated source-backed edit.
-    pub fn edit<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<FormControlSourceEdit> {
-        Ok(FormControlSourceEdit::new(self.snapshot(selector)?))
-    }
-    /// Publish while raw-copying every unrelated physical ZIP member.
-    pub fn publish_commit_to_stream<W: Write>(
-        self,
-        mut writer: W,
-        commit: &FormControlCommit,
-    ) -> Result<FormControlSnapshot> {
-        self.package.check_execution()?;
-        let current = self.snapshot(commit.patch.before.sheet_position)?;
-        if !current.same_source(&commit.patch.before) {
-            return Err(Error::PatchConflict {
-                part: current.sheet_name().to_owned(),
-            });
-        }
-        if commit.patch.is_empty() {
-            self.package
-                .write_part_overlays_shared_to_stream(&mut writer, Vec::new())?;
-            return Ok(current);
-        }
-        let property_uri = commit
-            .patch
+        crate::workbook::source::deferred::Change::check(self, package)?;
+        let property_uri = self
             .property_uri
             .clone()
             .ok_or_else(|| invalid("form-control commit has no properties identity"))?;
-        let vml_uri = commit
-            .patch
+        let vml_uri = self
             .vml_uri
             .clone()
             .ok_or_else(|| invalid("form-control commit has no VML identity"))?;
-        let properties_before = commit
-            .patch
+        let properties_before = self
             .before_properties
             .as_ref()
             .ok_or_else(|| invalid("form-control commit has no properties source"))?;
-        let properties_after = commit
-            .patch
+        let properties_after = self
             .after_properties
             .as_ref()
             .ok_or_else(|| invalid("form-control commit has no properties output"))?;
-        let vml_after = commit
-            .patch
+        let vml_after = self
             .after_vml
             .as_ref()
             .ok_or_else(|| invalid("form-control commit has no VML output"))?;
         let properties_source = source_xml_splice(
-            &self.package,
+            package,
             &property_uri,
             properties_before.as_bytes(),
             properties_after.as_bytes(),
@@ -1062,15 +854,14 @@ impl SourceBackedFormControlEditor {
         // guards above, while the changed payload is copied as an opaque
         // legacy part.
         plan.try_replace_part(vml_uri, vml_after.as_bytes().to_vec())?;
-        let worksheet_uri = commit
-            .patch
+        let worksheet_uri = self
             .before
             .collection
             .read_set()
             .and_then(|read_set| read_set.worksheet_part_name())
             .cloned()
             .ok_or_else(|| invalid("form-control commit has no worksheet identity"))?;
-        let prepared = self.package.prepare_topology(plan)?;
+        let prepared = package.clone().prepare_topology(plan)?;
         // `PreparedTopology::with_candidate` deliberately exposes the OPC
         // error type at its callback boundary.  Keep the owner readback
         // error in this XLSX layer instead of stringifying it into an OPC
@@ -1082,10 +873,10 @@ impl SourceBackedFormControlEditor {
                 match super::eager_form_controls_for_effective_topology(
                     candidate,
                     &worksheet_uri,
-                    commit.patch.before.limits,
+                    self.before.limits,
                 ) {
                     Ok(resulting) => {
-                        if resulting != commit.patch.after.collection {
+                        if resulting != self.after.collection {
                             readback_error = Some(invalid(
                                 "form-control source publication paired owner readback did not match its target",
                             ));
@@ -1101,14 +892,91 @@ impl SourceBackedFormControlEditor {
         if let Some(error) = readback_error {
             return Err(error);
         }
-        prepared.publish_to_stream(&mut writer)?;
-        Ok(commit.snapshot.clone())
+        prepared.publish_to_stream(writer)?;
+        Ok(())
     }
-    /// Content-free source cache diagnostics.
+}
+
+/// The owner budgets of a source-backed form-control edit.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct EditOptions {
+    limits: Option<OwnerLimits>,
+}
+
+impl EditOptions {
+    /// Lower the owner policy (the default is derived from the workbook's
+    /// source limits).
     #[must_use]
-    pub fn cache_diagnostics(&self) -> litchi_opc::SourceCacheDiagnostics {
-        self.package.cache_diagnostics()
+    pub const fn limits(mut self, limits: OwnerLimits) -> Self {
+        self.limits = Some(limits);
+        self
     }
+}
+
+impl SourceBackedWorkbook {
+    /// Begin an isolated scalar edit of one worksheet's form controls.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an encrypted source, a selector that does not
+    /// name a worksheet, an inadmissible control graph, or a source read
+    /// failure.
+    pub fn edit_form_controls<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Edit> {
+        self.edit_form_controls_with_options(selector, EditOptions::default())
+    }
+
+    /// [`Self::edit_form_controls`] under explicit owner budgets.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::edit_form_controls`].
+    pub fn edit_form_controls_with_options<'a>(
+        &self,
+        selector: impl Into<Selector<'a>>,
+        options: EditOptions,
+    ) -> Result<Edit> {
+        let package = self.edit_package()?;
+        if package.has_encrypted_entries() {
+            return Err(invalid(
+                "encrypted XLSX form-control source is not admitted",
+            ));
+        }
+        let limits = options
+            .limits
+            .unwrap_or_else(|| OwnerLimits::from_read_limits(package.read_limits()));
+        let before = snapshot_of(package, selector.into(), limits)?;
+        Ok(Edit::new(self.clone(), before))
+    }
+
+    /// Replay a form-control patch onto this workbook.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when the worksheet's controls do not
+    /// hold the patch's before state, and the signed-source refusal for a
+    /// changed patch on a signed source.
+    pub fn apply_form_controls(&self, patch: &Patch) -> Result<Commit> {
+        apply_change(self, patch)
+    }
+}
+
+/// Capture one worksheet's source-backed owner projection.
+fn snapshot_of(
+    package: &SourceBackedPackage,
+    selector: Selector<'_>,
+    limits: OwnerLimits,
+) -> Result<FormControlSnapshot> {
+    package.check_execution()?;
+    let (position, name, uri) = source_sheet(package, selector)?;
+    let collection = source_form_controls_for_sheet_with_limits(package, &uri, limits)?;
+    Ok(FormControlSnapshot::new(
+        name,
+        position,
+        collection,
+        limits,
+        Some(package.source_lineage()),
+        package.execution_context(),
+    ))
 }
 
 fn source_xml_splice(
@@ -1275,7 +1143,7 @@ fn source_sheet(
 ) -> Result<(usize, String, PackURI)> {
     let workbook = package.main_document_part()?;
     let data = workbook.data()?;
-    let catalog = raw::parse_catalog(data.as_bytes())?;
+    let catalog = raw::parse_catalog(data.as_bytes(), &package.read_limits())?;
     let parts = validate_sheet_graph(package, &workbook, &catalog.sheets)?;
     let position = match selector {
         litchi_core::Selector::Position(position) => position.get(),
@@ -1310,7 +1178,7 @@ fn validate_scalar(
     let source = control
         .source_property_bytes()
         .ok_or_else(|| invalid("form-control properties source bytes were not retained"))?;
-    let view = super::inspect(source)?;
+    let view = super::inspect(source, &super::Limits::default())?;
     // Preserve an exact source-only formula (or any other unknown source
     // scalar) when the requested value is the same typed projection.  The
     // general codec writer intentionally refuses to author source-only

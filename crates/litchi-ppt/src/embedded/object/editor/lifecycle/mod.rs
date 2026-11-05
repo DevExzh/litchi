@@ -5,5 +5,5 @@ pub(super) mod read;
 
 #[cfg(test)]
 pub(super) use self::open::inspect_live_mapping;
-pub(super) use self::open::{inspect_live_document, inspect_live_mapping_at, open, open_records};
+pub(super) use self::open::{inspect_live_document, inspect_live_mapping_at, open_records};
 pub(super) use self::read::{persist_ids, persisted_record};

@@ -1,4 +1,4 @@
-use litchi::docx::Package;
+use litchi::docx::{Builder, Package};
 use std::error::Error;
 
 type ExampleResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
@@ -9,9 +9,9 @@ fn main() -> ExampleResult<()> {
     let output_doc = "test_output_from_package.docx";
 
     println!("Test 1: Creating a new DOCX package...");
-    let mut pkg = Package::new()?;
+    let mut builder = Builder::new()?;
     {
-        let doc = pkg.document_mut()?;
+        let doc = builder.document()?;
         doc.add_heading("DOCX Package API Demo", 1)?;
         doc.add_paragraph_with_text(
             "This example exercises the currently supported DOCX package and mutable document APIs.",
@@ -21,6 +21,7 @@ fn main() -> ExampleResult<()> {
             "It creates a new package, writes paragraphs, saves the document, and reopens it for read-back verification.",
         );
     }
+    let pkg = builder.build()?;
     println!("✓ Created package and populated document content");
 
     println!("\nTest 2: Saving package...");

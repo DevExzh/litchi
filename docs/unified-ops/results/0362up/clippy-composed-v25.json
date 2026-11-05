@@ -1,0 +1,42 @@
+{
+  "source": "8225b82dde7bac272e9e77789a78751ae07aaa2a",
+  "pid": 651758,
+  "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation",
+  "command": [
+    "python3",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/run-semantic-checks-disk-guarded.py",
+    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/clippy-composed-v25-commands.json",
+    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/clippy-composed-v25"
+  ],
+  "started_unix_seconds": 1792791346.9808614,
+  "target": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target",
+  "lock_sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--keep-going",
+        "--message-format=json-render-diagnostics",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 199.60191454600135,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/clippy-composed-v25/check-0.log",
+      "bytes": 2403707,
+      "sha256": "bbd34401c4ee66836da9fe8c66066c3f4308192f64ac81bdc08bbec5830a40c5",
+      "target_bytes_before": 4397259367,
+      "completed_test_executables_pruned": []
+    }
+  ],
+  "target_bytes_after": 4397247763,
+  "post_source_clean": true,
+  "note": "Complete all-target/all-feature workspace Clippy passed with warnings denied. This source does not include the returned ODG joined migration; this is not the full 53-step gate or native qualification."
+}

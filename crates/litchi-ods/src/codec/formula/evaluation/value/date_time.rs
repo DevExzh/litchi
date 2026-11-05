@@ -1071,7 +1071,8 @@ mod tests {
 
         for name in ["NOW", "TODAY", "EASTERSUNDAY"] {
             let source = format!("={name}()");
-            let expression = Expression::parse(&source).expect("timestamp function parses");
+            let expression =
+                Expression::parse(&source, &Default::default()).expect("timestamp function parses");
             let context =
                 Context::new(&execution, Position::new("Sheet", 0, 0)).with_options(options);
             let limits = Limits::default();
@@ -1120,7 +1121,8 @@ mod tests {
 
         for name in ["NOW", "TODAY", "EASTERSUNDAY"] {
             let source = format!("={name}()");
-            let expression = Expression::parse(&source).expect("timestamp function parses");
+            let expression =
+                Expression::parse(&source, &Default::default()).expect("timestamp function parses");
             let context = Context::new(&execution, Position::new("Sheet", 0, 0));
             let limits = Limits::default();
             let scalar_context =

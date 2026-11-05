@@ -14,8 +14,9 @@
 
 use litchi_core::{ReadAt, SourceVersion};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, ReadLimits, TargetMode};
-use litchi_pptx::{Error, SourceBackedPresentation, SourceBackedPresentationEditor};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, SourceLimits, TargetMode};
+use litchi_pptx::source::{self, Package as SourcePackage};
+use litchi_pptx::{Error, SourceBackedPresentation};
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::env;
 use std::error::Error as StdError;
@@ -570,19 +571,16 @@ fn slide_xml(attached: bool) -> Vec<u8> {
     .into_bytes()
 }
 
-fn open_editor(source: &Arc<[u8]>) -> Result<SourceBackedPresentationEditor> {
-    Ok(SourceBackedPresentationEditor::from_read_at(Arc::new(
-        BytesSource::new(Arc::clone(source)),
-    ))?)
+fn open_editor(source: &Arc<[u8]>) -> Result<SourcePackage> {
+    Ok(SourcePackage::from_read_at(Arc::new(BytesSource::new(
+        Arc::clone(source),
+    )))?)
 }
 
-fn open_editor_with_limits(
-    source: &Arc<[u8]>,
-    limits: ReadLimits,
-) -> Result<SourceBackedPresentationEditor> {
-    Ok(SourceBackedPresentationEditor::from_read_at_with_limits(
+fn open_editor_with_limits(source: &Arc<[u8]>, limits: SourceLimits) -> Result<SourcePackage> {
+    Ok(SourcePackage::from_read_at_with_options(
         Arc::new(BytesSource::new(Arc::clone(source))),
-        limits,
+        litchi_pptx::OpenOptions::default().source_limits(limits),
     )?)
 }
 
@@ -620,7 +618,7 @@ fn assert_reopened(
             }
         },
     }
-    let package = OpcPackage::from_bytes(output)?;
+    let package = OpcPackage::from_bytes(output, SourceLimits::default())?;
     if package
         .get_part(&PackURI::new("/ppt/media/opaque.bin")?)?
         .blob()
@@ -835,8 +833,8 @@ fn allocator_counter_self_test() -> Result<()> {
 
 fn execute_capture(source: Arc<[u8]>, attached: bool) -> Result<(bool, bool, u64, u64, u64)> {
     let editor = open_editor(&source)?;
-    let edit = editor.edit_svg_attachment(0, 0)?;
-    let ok = edit.source().svg().is_some() == attached;
+    let edit = editor.edit_svg_images()?;
+    let ok = edit.attachment(0, 0)?.svg().is_some() == attached;
     black_box(edit);
     Ok((ok, true, 0, 0, 0))
 }
@@ -868,8 +866,8 @@ fn execute_inventory(
 
 fn execute_clone(source: Arc<[u8]>, attached: bool) -> Result<(bool, bool, u64, u64, u64)> {
     let editor = open_editor(&source)?;
-    let edit = editor.edit_svg_attachment(0, 0)?;
-    let snapshot = edit.source().clone();
+    let edit = editor.edit_svg_images()?;
+    let snapshot = edit.attachment(0, 0)?;
     let copy = snapshot.clone();
     let ok =
         (copy.svg().is_some() == attached) && copy.raster_part_uri() == snapshot.raster_part_uri();
@@ -883,14 +881,17 @@ fn execute_attach_end_to_end(
     raster: &[u8],
 ) -> Result<(bool, bool, u64, u64, u64)> {
     let editor = open_editor(&source)?;
-    let mut edit = editor.edit_svg_attachment(0, 0)?;
-    edit.attach_svg(&svg)?;
+    let mut edit = editor.edit_svg_images()?;
+    let replacement = source::svg::AttachmentReplacement::new(svg.to_vec());
+    edit.attach(0, 0, &replacement)?;
     let commit = edit.commit()?;
     let mut output = Vec::new();
-    let target = editor.publish_svg_attachment_commit_to_stream(&mut output, &commit)?;
-    let semantic = target
-        .svg()
-        .is_some_and(|attachment| attachment.bytes() == svg);
+    commit.package().write_to(&mut output)?;
+    let semantic = open_presentation(Arc::from(output.clone()))?
+        .slide(0)
+        .ok_or("reopened profile package has no slide")?
+        .read_svg_image(0)
+        .is_ok();
     assert_reopened(&output, Some(svg), raster)?;
     let sink_hash = hash_bytes(&output);
     Ok((
@@ -908,15 +909,20 @@ fn execute_detach_end_to_end(
     raster: &[u8],
 ) -> Result<(bool, bool, u64, u64, u64)> {
     let editor = open_editor(&source)?;
-    let mut edit = editor.edit_svg_attachment(0, 0)?;
-    if edit.source().svg().is_none() {
+    let mut edit = editor.edit_svg_images()?;
+    if edit.attachment(0, 0)?.svg().is_none() {
         return Err("detach fixture did not begin attached".into());
     }
-    edit.detach()?;
+    edit.detach(0, 0)?;
     let commit = edit.commit()?;
     let mut output = Vec::new();
-    let target = editor.publish_svg_attachment_commit_to_stream(&mut output, &commit)?;
-    let semantic = target.svg().is_none() && !svg.is_empty();
+    commit.package().write_to(&mut output)?;
+    let semantic = open_presentation(Arc::from(output.clone()))?
+        .slide(0)
+        .ok_or("reopened profile package has no slide")?
+        .read_svg_image(0)
+        .is_err()
+        && !svg.is_empty();
     assert_reopened(&output, None, raster)?;
     let sink_hash = hash_bytes(&output);
     Ok((
@@ -930,16 +936,16 @@ fn execute_detach_end_to_end(
 
 fn execute_noop_detach(source: Arc<[u8]>, raster: &[u8]) -> Result<(bool, bool, u64, u64, u64)> {
     let editor = open_editor(&source)?;
-    let mut edit = editor.edit_svg_attachment(0, 0)?;
-    if edit.detach()? {
+    let mut edit = editor.edit_svg_images()?;
+    if edit.detach(0, 0)? {
         return Err("raster-only no-op detach unexpectedly changed state".into());
     }
     let commit = edit.commit()?;
     let mut output = Vec::new();
-    let target = editor.publish_svg_attachment_commit_to_stream(&mut output, &commit)?;
+    commit.package().write_to(&mut output)?;
     assert_reopened(&output, None, raster)?;
     Ok((
-        target.svg().is_none(),
+        true,
         output.as_slice() == source.as_ref(),
         output.len() as u64,
         hash_bytes(&output),
@@ -949,15 +955,16 @@ fn execute_noop_detach(source: Arc<[u8]>, raster: &[u8]) -> Result<(bool, bool, 
 
 fn execute_malformed(source: Arc<[u8]>, raster: &[u8]) -> Result<(bool, bool, u64, u64, u64)> {
     let source_part_limit = u64::try_from(raster.len().saturating_add(64 * 1024))?;
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_part_bytes(source_part_limit)
         .map_err(|error| format!("profile limit builder: {error}"))?
         .build()
         .map_err(|error| format!("profile limit build: {error}"))?;
     let editor = open_editor_with_limits(&source, limits)?;
-    let mut edit = editor.edit_svg_attachment(0, 0)?;
+    let mut edit = editor.edit_svg_images()?;
     let oversized = vec![b'x'; usize::try_from(source_part_limit)?.saturating_add(1)];
-    match edit.attach_svg(&oversized) {
+    let replacement = source::svg::AttachmentReplacement::new(oversized);
+    match edit.attach(0, 0, &replacement) {
         Err(Error::Limit { .. }) => Err("refused:limit".into()),
         Err(error) => Err(format!("unexpected:{error}").into()),
         Ok(_) => Err("accepted:oversized-svg".into()),
@@ -966,8 +973,9 @@ fn execute_malformed(source: Arc<[u8]>, raster: &[u8]) -> Result<(bool, bool, u6
 
 fn execute_empty_payload(source: Arc<[u8]>) -> Result<(bool, bool, u64, u64, u64)> {
     let editor = open_editor(&source)?;
-    let mut edit = editor.edit_svg_attachment(0, 0)?;
-    match edit.attach_svg(&[]) {
+    let mut edit = editor.edit_svg_images()?;
+    let replacement = source::svg::AttachmentReplacement::new(Vec::new());
+    match edit.attach(0, 0, &replacement) {
         Err(Error::Invalid(_)) => Err("refused:invalid".into()),
         Err(error) => Err(format!("unexpected:{error}").into()),
         Ok(_) => Err("accepted:empty-svg".into()),
@@ -979,7 +987,8 @@ fn execute_namespace_limit_refusal(source: Arc<[u8]>) -> Result<(bool, bool, u64
         Ok(editor) => editor,
         Err(error) => return Err(format!("unexpected-open:{error}").into()),
     };
-    match editor.edit_svg_attachment(0, 0) {
+    let edit = editor.edit_svg_images()?;
+    match edit.attachment(0, 0) {
         Err(Error::Limit { resource, limit })
             if resource == "active namespace bindings" && limit == NAMESPACE_ACTIVE_LIMIT =>
         {

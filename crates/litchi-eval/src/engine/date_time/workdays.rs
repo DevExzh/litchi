@@ -7,7 +7,7 @@ use super::helpers::{
     serial_to_excel_date_1900, workday_core,
 };
 
-pub(crate) async fn eval_workday(
+pub(crate) fn eval_workday(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -18,7 +18,7 @@ pub(crate) async fn eval_workday(
         ));
     }
 
-    let start = match number_arg(ctx, current_sheet, &args[0]).await? {
+    let start = match number_arg(ctx, current_sheet, &args[0])? {
         Some(n) => n,
         None => {
             return Ok(CellValue::Error(
@@ -26,7 +26,7 @@ pub(crate) async fn eval_workday(
             ));
         },
     };
-    let days = match number_arg(ctx, current_sheet, &args[1]).await? {
+    let days = match number_arg(ctx, current_sheet, &args[1])? {
         Some(n) => n,
         None => {
             return Ok(CellValue::Error("WORKDAY days is not numeric".to_string()));
@@ -43,7 +43,7 @@ pub(crate) async fn eval_workday(
     };
 
     let holidays = if args.len() == 3 {
-        collect_holiday_dates(ctx, current_sheet, &args[2]).await?
+        collect_holiday_dates(ctx, current_sheet, &args[2])?
     } else {
         Vec::new()
     };
@@ -62,7 +62,7 @@ pub(crate) async fn eval_workday(
     Ok(CellValue::DateTime(serial))
 }
 
-pub(crate) async fn eval_workday_intl(
+pub(crate) fn eval_workday_intl(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -74,7 +74,7 @@ pub(crate) async fn eval_workday_intl(
         ));
     }
 
-    let start = match number_arg(ctx, current_sheet, &args[0]).await? {
+    let start = match number_arg(ctx, current_sheet, &args[0])? {
         Some(n) => n,
         None => {
             return Ok(CellValue::Error(
@@ -82,7 +82,7 @@ pub(crate) async fn eval_workday_intl(
             ));
         },
     };
-    let days = match number_arg(ctx, current_sheet, &args[1]).await? {
+    let days = match number_arg(ctx, current_sheet, &args[1])? {
         Some(n) => n,
         None => {
             return Ok(CellValue::Error(
@@ -92,7 +92,7 @@ pub(crate) async fn eval_workday_intl(
     };
 
     let weekend = if args.len() >= 3 {
-        let weekend_val = evaluate_expression(ctx, current_sheet, &args[2]).await?;
+        let weekend_val = evaluate_expression(ctx, current_sheet, &args[2])?;
         match weekend_val {
             CellValue::String(s) => WeekendConfig::Pattern(s),
             _ => match to_number(&weekend_val) {
@@ -114,7 +114,7 @@ pub(crate) async fn eval_workday_intl(
     };
 
     let holidays = if args.len() == 4 {
-        collect_holiday_dates(ctx, current_sheet, &args[3]).await?
+        collect_holiday_dates(ctx, current_sheet, &args[3])?
     } else {
         Vec::new()
     };
@@ -132,7 +132,7 @@ pub(crate) async fn eval_workday_intl(
     Ok(CellValue::DateTime(serial))
 }
 
-pub(crate) async fn eval_networkdays(
+pub(crate) fn eval_networkdays(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -143,7 +143,7 @@ pub(crate) async fn eval_networkdays(
         ));
     }
 
-    let start = match number_arg(ctx, current_sheet, &args[0]).await? {
+    let start = match number_arg(ctx, current_sheet, &args[0])? {
         Some(n) => n,
         None => {
             return Ok(CellValue::Error(
@@ -151,7 +151,7 @@ pub(crate) async fn eval_networkdays(
             ));
         },
     };
-    let end = match number_arg(ctx, current_sheet, &args[1]).await? {
+    let end = match number_arg(ctx, current_sheet, &args[1])? {
         Some(n) => n,
         None => {
             return Ok(CellValue::Error(
@@ -178,7 +178,7 @@ pub(crate) async fn eval_networkdays(
     };
 
     let holidays = if args.len() == 3 {
-        collect_holiday_dates(ctx, current_sheet, &args[2]).await?
+        collect_holiday_dates(ctx, current_sheet, &args[2])?
     } else {
         Vec::new()
     };
@@ -188,7 +188,7 @@ pub(crate) async fn eval_networkdays(
     Ok(CellValue::Int(count))
 }
 
-pub(crate) async fn eval_networkdays_intl(
+pub(crate) fn eval_networkdays_intl(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -200,7 +200,7 @@ pub(crate) async fn eval_networkdays_intl(
         ));
     }
 
-    let start = match number_arg(ctx, current_sheet, &args[0]).await? {
+    let start = match number_arg(ctx, current_sheet, &args[0])? {
         Some(n) => n,
         None => {
             return Ok(CellValue::Error(
@@ -208,7 +208,7 @@ pub(crate) async fn eval_networkdays_intl(
             ));
         },
     };
-    let end = match number_arg(ctx, current_sheet, &args[1]).await? {
+    let end = match number_arg(ctx, current_sheet, &args[1])? {
         Some(n) => n,
         None => {
             return Ok(CellValue::Error(
@@ -218,7 +218,7 @@ pub(crate) async fn eval_networkdays_intl(
     };
 
     let weekend = if args.len() >= 3 {
-        let weekend_val = evaluate_expression(ctx, current_sheet, &args[2]).await?;
+        let weekend_val = evaluate_expression(ctx, current_sheet, &args[2])?;
         match weekend_val {
             CellValue::String(s) => WeekendConfig::Pattern(s),
             _ => match to_number(&weekend_val) {
@@ -248,7 +248,7 @@ pub(crate) async fn eval_networkdays_intl(
     };
 
     let holidays = if args.len() == 4 {
-        collect_holiday_dates(ctx, current_sheet, &args[3]).await?
+        collect_holiday_dates(ctx, current_sheet, &args[3])?
     } else {
         Vec::new()
     };
@@ -271,13 +271,13 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_workday_add_days() {
+    #[test]
+    fn test_eval_workday_add_days() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // Start from 2024-03-15 (Friday), add 5 work days -> next Friday
         let args = vec![num_expr(45366.0), num_expr(5.0)];
-        let result = eval_workday(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_workday(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::DateTime(v) => {
                 // Should be 5 work days later (skipping weekend)
@@ -287,13 +287,13 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_workday_subtract_days() {
+    #[test]
+    fn test_eval_workday_subtract_days() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // Start from 2024-03-15, subtract 5 work days
         let args = vec![num_expr(45366.0), num_expr(-5.0)];
-        let result = eval_workday(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_workday(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::DateTime(v) => {
                 // Should be 5 work days earlier
@@ -303,8 +303,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_workday_with_holidays() {
+    #[test]
+    fn test_eval_workday_with_holidays() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // Set up holidays
@@ -318,7 +318,7 @@ mod tests {
             end_col: 1,
         });
         let args = vec![num_expr(45366.0), num_expr(5.0), range];
-        let result = eval_workday(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_workday(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::DateTime(v) => {
                 assert!(v > 45366.0);
@@ -327,25 +327,25 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_workday_wrong_args() {
+    #[test]
+    fn test_eval_workday_wrong_args() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(45366.0)];
-        let result = eval_workday(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_workday(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("expects 2 or 3 arguments")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_networkdays_basic() {
+    #[test]
+    fn test_eval_networkdays_basic() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // Work days between 2024-03-15 and 2024-03-22
         let args = vec![num_expr(45366.0), num_expr(45373.0)];
-        let result = eval_networkdays(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_networkdays(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Int(v) => {
                 // Should be 5 work days (Mon-Fri of week 1 + Mon-Fri of week 2)
@@ -356,8 +356,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_networkdays_with_holidays() {
+    #[test]
+    fn test_eval_networkdays_with_holidays() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // Set up holidays
@@ -371,7 +371,7 @@ mod tests {
             end_col: 1,
         });
         let args = vec![num_expr(45366.0), num_expr(45373.0), range];
-        let result = eval_networkdays(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_networkdays(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Int(v) => {
                 assert!(v >= 0);
@@ -380,25 +380,25 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_networkdays_wrong_args() {
+    #[test]
+    fn test_eval_networkdays_wrong_args() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(45366.0)];
-        let result = eval_networkdays(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_networkdays(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("expects 2 or 3 arguments")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_workday_intl() {
+    #[test]
+    fn test_eval_workday_intl() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // Start from 2024-03-15, add 5 work days with custom weekend
         let args = vec![num_expr(45366.0), num_expr(5.0), num_expr(1.0)];
-        let result = eval_workday_intl(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_workday_intl(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::DateTime(v) => {
                 assert!(v > 45366.0);
@@ -407,13 +407,13 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_networkdays_intl() {
+    #[test]
+    fn test_eval_networkdays_intl() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // Work days between dates with custom weekend
         let args = vec![num_expr(45366.0), num_expr(45373.0), num_expr(1.0)];
-        let result = eval_networkdays_intl(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_networkdays_intl(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Int(v) => {
                 assert!(v >= 0);

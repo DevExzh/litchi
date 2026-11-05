@@ -107,7 +107,7 @@ pub(crate) fn build_client_data_with_hyperlink(
     append_client_data_payload(
         &mut client_data,
         &interaction
-            .to_bytes()
+            .to_bytes(&crate::InteractionLimits::default())
             .map_err(|error| std::io::Error::other(error.to_string()))?,
     )?;
     client_data.ok_or_else(|| std::io::Error::other("missing ClientData record"))

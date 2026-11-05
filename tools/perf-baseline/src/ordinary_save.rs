@@ -4,7 +4,7 @@
 //! recorded, as the second half of its evidence gap 5, that the programme has
 //! **no selector for "the ordinary OOXML save"**: every timed publication in
 //! this harness goes through a source-backed preservation route
-//! (`publish_multi_commit_to_stream`, `write_to_stream`, `PackageWriter`) or an
+//! (`publish_multi_commit_to_stream`, `write_to`, `PackageWriter`) or an
 //! in-memory `to_bytes`. The documented entry points a caller actually reaches
 //! for — [`litchi_docx::Package::save`], [`litchi_xlsx::Workbook::save`] and
 //! [`litchi_pptx::Package::save`], "Path A" of change
@@ -195,7 +195,7 @@ impl Format {
 
     const fn sink_entry_point(self) -> &'static str {
         match self {
-            Self::Docx => "litchi_docx::Package::to_stream",
+            Self::Docx => "litchi_docx::Package::write_to",
             Self::Xlsx => "litchi_xlsx::Workbook::write_to",
             // PPTX has no sequential-sink entry point; the counting phase
             // times `to_bytes` and accepts the produced buffer into the sink.
@@ -692,7 +692,7 @@ impl EditOutcome {
 /// One opened and edited owner of the documented kind.
 enum Owner {
     Docx(Box<litchi_docx::Package>),
-    Xlsx(Box<litchi_xlsx::Workbook>),
+    Xlsx(Box<litchi_xlsx::Package>),
     Pptx(Box<litchi_pptx::Package>),
 }
 
@@ -700,7 +700,7 @@ impl Owner {
     fn open(format: Format, path: &Path) -> Result<Self, Box<dyn Error>> {
         Ok(match format {
             Format::Docx => Self::Docx(Box::new(litchi_docx::Package::open(path)?)),
-            Format::Xlsx => Self::Xlsx(Box::new(litchi_xlsx::Workbook::open(path)?)),
+            Format::Xlsx => Self::Xlsx(Box::new(litchi_xlsx::Package::open(path)?)),
             Format::Pptx => Self::Pptx(Box::new(litchi_pptx::Package::open(path)?)),
         })
     }
@@ -716,15 +716,32 @@ impl Owner {
     /// package — change 0593's `noop` scenario.
     fn edit(&mut self, corpus: &SaveCorpus) -> Result<EditOutcome, Box<dyn Error>> {
         match self {
-            Self::Docx(package) => match package.document_mut() {
-                Ok(document) => {
-                    document.add_paragraph_with_text(EDIT_MARKER);
-                    Ok(EditOutcome::Admitted)
-                },
-                Err(error) => Ok(EditOutcome::Refused(format!("refused:{error}"))),
+            Self::Docx(package) => {
+                // `document_mut` hydration was deleted (ADR 0034 §9); the
+                // documented editor of an opened package is the immutable
+                // main-document edit, appending one plain paragraph.
+                let outcome = (|| -> Result<litchi_docx::Package, String> {
+                    let count = package
+                        .document_snapshot()
+                        .map_err(|error| error.to_string())?
+                        .paragraph_count();
+                    let mut edit = package.edit().map_err(|error| error.to_string())?;
+                    edit.insert_paragraph(litchi_core::Position::new(count), EDIT_MARKER)
+                        .map_err(|error| error.to_string())?;
+                    edit.commit()
+                        .map(litchi_docx::document::Commit::into_package)
+                        .map_err(|error| error.to_string())
+                })();
+                match outcome {
+                    Ok(next) => {
+                        **package = next;
+                        Ok(EditOutcome::Admitted)
+                    },
+                    Err(error) => Ok(EditOutcome::Refused(format!("refused:{error}"))),
+                }
             },
             Self::Xlsx(workbook) => {
-                let outcome = (|| -> Result<litchi_xlsx::Workbook, String> {
+                let outcome = (|| -> Result<litchi_xlsx::Package, String> {
                     let mut edit = workbook.edit().map_err(|error| error.to_string())?;
                     {
                         let mut sheet = edit
@@ -738,10 +755,10 @@ impl Owner {
                             .map_err(|error| error.to_string())?;
                     }
                     let commit = edit.commit().map_err(|error| error.to_string())?;
-                    if commit.patch().is_empty() {
+                    if commit.patch().is_noop() {
                         return Err("the edit produced an empty patch".to_owned());
                     }
-                    Ok(commit.into_workbook())
+                    Ok(commit.into_package())
                 })();
                 match outcome {
                     Ok(edited) => {
@@ -756,9 +773,7 @@ impl Owner {
                     return Ok(EditOutcome::Refused(corpus.evidence.edit_outcome.clone()));
                 };
                 let outcome = (|| -> Result<litchi_pptx::opened::Commit, String> {
-                    let mut edit = package
-                        .opened_presentation_transaction()
-                        .map_err(|error| error.to_string())?;
+                    let mut edit = package.edit().map_err(|error| error.to_string())?;
                     if !edit
                         .set_shape_text(slide, shape, EDIT_MARKER)
                         .map_err(|error| error.to_string())?
@@ -766,14 +781,14 @@ impl Owner {
                         return Err("the derived shape position reported no change".to_owned());
                     }
                     let commit = edit.commit().map_err(|error| error.to_string())?;
-                    if !commit.is_changed() {
+                    if !commit.diagnostics().changed() {
                         return Err("the commit reports no change".to_owned());
                     }
                     Ok(commit)
                 })();
                 match outcome {
                     Ok(commit) => {
-                        package.apply_opened_presentation_commit(commit)?;
+                        **package = commit.into_package();
                         Ok(EditOutcome::Admitted)
                     },
                     Err(error) => Ok(EditOutcome::Refused(format!("refused:{error}"))),
@@ -813,7 +828,7 @@ impl Owner {
     /// The documented sequential serialization entry point.
     fn write_to(&mut self, sink: &mut BoundedSink) -> Result<(), Box<dyn Error>> {
         match self {
-            Self::Docx(package) => package.to_stream(&mut *sink)?,
+            Self::Docx(package) => package.write_to(&mut *sink)?,
             Self::Xlsx(workbook) => workbook.write_to(&mut *sink)?,
             Self::Pptx(package) => {
                 let bytes = package.to_bytes()?;
@@ -1011,7 +1026,7 @@ fn real_file_manifest(
     // Keep the manifest target on the decoded side of the ZIP boundary. The
     // reader's default limits are finite, so a caller-named archive cannot
     // turn this identity read into an unbounded decompression allocation.
-    let reader = ArchiveReader::new_with_limits(archive, ArchiveLimits::default())?;
+    let reader = ArchiveReader::new(archive, ArchiveLimits::default())?;
     let main_payload = reader.read(main_part)?;
     Ok(CorpusManifest {
         name: format!("{}-real-file-save", format.extension()),
@@ -1049,8 +1064,9 @@ fn checked_uncompressed_member_bytes(
 /// Derives the XLSX edit target from the workbook itself: the first worksheet
 /// the reader reports, and a fixed address inside it.
 fn xlsx_edit_target(path: &Path) -> Result<(String, String), Box<dyn Error>> {
-    let workbook = litchi_xlsx::Workbook::open(path)?;
+    let workbook = litchi_xlsx::Package::open(path)?;
     let sheet = workbook
+        .workbook_ref()
         .sheets()
         .next()
         .ok_or("ordinary-save XLSX corpus declares no worksheet")?;
@@ -1078,7 +1094,7 @@ fn pptx_edit_target(
         for shape in 0..MAX_SHAPES {
             // Each transaction is detached from the package, so one open is
             // enough to probe every position.
-            let Ok(mut edit) = package.opened_presentation_transaction() else {
+            let Ok(mut edit) = package.edit() else {
                 continue;
             };
             match edit.set_shape_text(slide, shape, EDIT_MARKER) {
@@ -1180,17 +1196,17 @@ pub(crate) fn build_corpus(
         .unwrap_or_else(|| "admitted".to_owned());
     let edit_description = match format {
         Format::Docx => {
-            format!("Package::document_mut().add_paragraph_with_text({EDIT_MARKER:?})")
+            format!("Package::edit().insert_paragraph(end, {EDIT_MARKER:?}) and commit")
         },
         Format::Xlsx => format!(
             "Workbook::edit().sheet({xlsx_sheet:?}).set({xlsx_address:?}, {EDIT_MARKER:?}) and commit"
         ),
         Format::Pptx => match pptx_target {
             Some((slide, shape)) => format!(
-                "Package::opened_presentation_transaction().set_shape_text({slide}, {shape}, \
+                "Package::edit().set_shape_text({slide}, {shape}, \
                  {EDIT_MARKER:?}) and apply"
             ),
-            None => "Package::opened_presentation_transaction() admits no shape position on this \
+            None => "Package::edit() admits no shape position on this \
                      deck; the save phases publish the unedited opened package"
                 .to_owned(),
         },
@@ -2045,7 +2061,8 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer
             .write_deflated(format.main_part(), &main_payload)
             .expect("main ZIP member");

@@ -1,3 +1,4 @@
+use litchi_odf_common::XmlStreamLimits;
 use litchi_odt::list_style::{
     BulletRelativeSize, BulletStyle, ImageSource, Kind, LevelStyle, NumberStyle, Style, parse,
 };
@@ -11,6 +12,10 @@ fn wrap(x: &str) -> String {
     format!(r#"<o:styles xmlns:o="{O}" xmlns:s="{S}" xmlns:t="{T}" xmlns:x="{X}">{x}</o:styles>"#)
 }
 
+fn limits() -> XmlStreamLimits {
+    XmlStreamLimits::owner_default_value()
+}
+
 #[test]
 fn parses_number_bullet_and_image_levels() {
     let x = wrap(concat!(
@@ -20,7 +25,7 @@ fn parses_number_bullet_and_image_levels() {
         r#"<t:list-level-style-image t:level="3" x:type="simple" x:href="Pictures/bullet.png" x:show="embed" x:actuate="onLoad"/>"#,
         r#"</t:list-style>"#,
     ));
-    let set = parse(&x).unwrap();
+    let set = parse(&x, &limits()).unwrap();
     let style = set.get("L1").unwrap();
     assert_eq!(style.display_name.as_deref(), Some("List 1"));
     assert_eq!(style.consecutive_numbering, Some(true));
@@ -54,7 +59,7 @@ fn parses_embedded_binary_image_level() {
     let x = wrap(
         r#"<t:list-style s:name="Img"><t:list-level-style-image t:level="1"><o:binary-data>aGVsbG8=</o:binary-data></t:list-level-style-image></t:list-style>"#,
     );
-    let set = parse(&x).unwrap();
+    let set = parse(&x, &limits()).unwrap();
     let Kind::Image(ImageSource::Embedded(data)) = &set.get("Img").unwrap().level(1).unwrap().kind
     else {
         panic!("level 1 must be an embedded image");
@@ -93,12 +98,12 @@ fn round_trip_fragment_reparses_identically() {
         style_name: None,
         kind: Kind::Image(ImageSource::Embedded("AAAA".to_string())),
     });
-    let fragment = style.to_xml_fragment().unwrap();
+    let fragment = style.to_xml_fragment(&limits()).unwrap();
     assert!(fragment.contains(r#"text:consecutive-numbering="false""#));
     assert!(fragment.contains(r#"text:bullet-char="⚑""#));
     assert!(fragment.contains("<office:binary-data>AAAA</office:binary-data>"));
 
-    let reparsed = parse(&wrap(&fragment)).unwrap();
+    let reparsed = parse(&wrap(&fragment), &limits()).unwrap();
     let round = reparsed.get("RT").unwrap();
     assert_eq!(round, &style);
 }
@@ -111,16 +116,16 @@ fn linked_image_round_trip() {
         style_name: None,
         kind: Kind::Image(ImageSource::Linked("images/dot.png".to_string())),
     });
-    let fragment = style.to_xml_fragment().unwrap();
+    let fragment = style.to_xml_fragment(&limits()).unwrap();
     assert!(fragment.contains(r#"xlink:href="images/dot.png""#));
-    let reparsed = parse(&wrap(&fragment)).unwrap();
+    let reparsed = parse(&wrap(&fragment), &limits()).unwrap();
     assert_eq!(reparsed.get("Link").unwrap(), &style);
 }
 
 #[test]
 fn parses_flat_odt_fixture() {
     let bytes = include_bytes!("../../../test-data/odf/odt/note-ordinary-numbering.fodt");
-    let flat = litchi_odt::generic::FlatDocument::from_reader(Cursor::new(bytes)).unwrap();
+    let flat = litchi_odt::generic::flat::Document::from_reader(Cursor::new(bytes)).unwrap();
     let set = flat.styles().unwrap();
     let l1 = set.get("L1").expect("fixture declares list style L1");
     let Kind::Number(number) = &l1.level(1).unwrap().kind else {
@@ -140,7 +145,7 @@ fn parses_libreoffice_list_style_fixture() {
     let bytes = include_bytes!(
         "../../../test-data/libreoffice-core/xmloff/qa/unit/data/differentListStylesInOneList.fodt"
     );
-    let flat = litchi_odt::generic::FlatDocument::from_reader(Cursor::new(bytes)).unwrap();
+    let flat = litchi_odt::generic::flat::Document::from_reader(Cursor::new(bytes)).unwrap();
     let set = flat.styles().unwrap();
     let one = set
         .get("ListStyleOne")
@@ -158,44 +163,44 @@ fn rejects_invalid_declarations() {
     // Missing text:bullet-char.
     let x =
         wrap(r#"<t:list-style s:name="B"><t:list-level-style-bullet t:level="1"/></t:list-style>"#);
-    assert!(parse(&x).is_err());
+    assert!(parse(&x, &limits()).is_err());
     // Duplicate level.
     let x = wrap(
         r#"<t:list-style s:name="D"><t:list-level-style-number t:level="1" s:num-format="1"/><t:list-level-style-number t:level="1" s:num-format="1"/></t:list-style>"#,
     );
-    assert!(parse(&x).is_err());
+    assert!(parse(&x, &limits()).is_err());
     // Level zero.
     let x = wrap(
         r#"<t:list-style s:name="Z"><t:list-level-style-number t:level="0" s:num-format="1"/></t:list-style>"#,
     );
-    assert!(parse(&x).is_err());
+    assert!(parse(&x, &limits()).is_err());
     // num-letter-sync without an alphabetic format.
     let x = wrap(
         r#"<t:list-style s:name="S"><t:list-level-style-number t:level="1" s:num-format="1" s:num-letter-sync="true"/></t:list-style>"#,
     );
-    assert!(parse(&x).is_err());
+    assert!(parse(&x, &limits()).is_err());
     // Image without href or binary data.
     let x =
         wrap(r#"<t:list-style s:name="I"><t:list-level-style-image t:level="1"/></t:list-style>"#);
-    assert!(parse(&x).is_err());
+    assert!(parse(&x, &limits()).is_err());
     // Image combining href and binary data.
     let x = wrap(
         r#"<t:list-style s:name="C"><t:list-level-style-image t:level="1" x:href="a.png"><o:binary-data>AAAA</o:binary-data></t:list-level-style-image></t:list-style>"#,
     );
-    assert!(parse(&x).is_err());
+    assert!(parse(&x, &limits()).is_err());
     // Unknown attribute in an ODF namespace.
     let x = wrap(
         r#"<t:list-style s:name="U"><t:list-level-style-bullet t:level="1" t:bullet-char="-" t:bogus="1"/></t:list-style>"#,
     );
-    assert!(parse(&x).is_err());
+    assert!(parse(&x, &limits()).is_err());
     // Missing style:name.
     let x = wrap(r#"<t:list-style><t:list-level-style-number t:level="1"/></t:list-style>"#);
-    assert!(parse(&x).is_err());
+    assert!(parse(&x, &limits()).is_err());
     // Multi-character bullet.
     let x = wrap(
         r#"<t:list-style s:name="M"><t:list-level-style-bullet t:level="1" t:bullet-char="--"/></t:list-style>"#,
     );
-    assert!(parse(&x).is_err());
+    assert!(parse(&x, &limits()).is_err());
 }
 
 #[test]

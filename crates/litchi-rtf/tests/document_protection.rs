@@ -9,11 +9,9 @@
 
 mod repair_support;
 
+use litchi_rtf::raw::Tree;
 use litchi_rtf::write::Writer;
-use litchi_rtf::{
-    Document, MAX_PASSWORD_HASH_BYTES, PasswordHash, ProtectionLevel, ProtectionType, RtfDocument,
-    RtfWriter,
-};
+use litchi_rtf::{MAX_PASSWORD_HASH_BYTES, Package, PasswordHash, ProtectionLevel, ProtectionType};
 use std::borrow::Cow;
 use std::fs;
 
@@ -31,12 +29,10 @@ fn decode_hex(value: &str) -> Vec<u8> {
         .collect()
 }
 
-fn round_trip(document: &RtfDocument<'_>) -> RtfDocument<'static> {
+fn round_trip(document: &Tree<'_>) -> Tree<'static> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(document)
-        .unwrap();
-    RtfDocument::parse_bytes(&output).unwrap()
+    Writer::new(&mut output).write_document(document).unwrap();
+    Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap()
 }
 
 #[test]
@@ -46,7 +42,7 @@ fn parses_all_protection_controls_and_round_trips_inert_hash() {
         r#"\formprot\annotprot0\revprot\readprot0\allprot"#,
         r#"\enforceprot1\protlevel2 Body}"#,
     );
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let protection = document.protection();
     assert_eq!(protection.forms, Some(true));
     assert_eq!(protection.annotations, Some(false));
@@ -97,7 +93,10 @@ fn rejects_malformed_duplicate_or_misplaced_protection() {
         ),
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted {source}"
         );
     }
@@ -111,20 +110,20 @@ fn parses_real_libreoffice_protection_fixtures() {
     );
 
     let read_only = fs::read(format!("{root}/rtfimport/data/read-only-protect.rtf")).unwrap();
-    let document = RtfDocument::parse_bytes(&read_only).unwrap();
+    let document = Tree::parse_bytes(&read_only, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(document.protection().annotations, Some(true));
     assert_eq!(document.protection().read_only, Some(true));
     assert_eq!(document.protection().enforced, Some(true));
     assert_eq!(document.protection().level, Some(ProtectionLevel::Level3));
 
     let forms = fs::read(format!("{root}/rtfexport/data/4010_min.rtf")).unwrap();
-    let document = RtfDocument::parse_bytes(&forms).unwrap();
+    let document = Tree::parse_bytes(&forms, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(document.protection().forms, Some(true));
     assert_eq!(document.protection().all, Some(true));
     assert_eq!(document.protection().level, Some(ProtectionLevel::Level2));
 
     let password = fs::read(format!("{root}/rtfexport/data/fdo55504-1-min.rtf")).unwrap();
-    let document = RtfDocument::parse_bytes(&password).unwrap();
+    let document = Tree::parse_bytes(&password, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         document.protection().password_hash.as_deref(),
         Some("00000000")
@@ -139,7 +138,7 @@ fn parses_modern_passwordhash_as_inert_typed_payload() {
         r#"{{\rtf1\ansi{{\*\passwordhash
 {MODERN_PASSWORD_HASH_SAMPLE}}} Body}}"#
     );
-    let document = RtfDocument::parse(&source).unwrap();
+    let document = Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let hash = document.protection().modern_password_hash().unwrap();
     assert_eq!(hash.version(), 1);
     assert_eq!(hash.total_size(), 76);
@@ -199,11 +198,11 @@ fn immutable_facade_write_preserves_passwordhash_source_exactly() {
         "\n010000004c000000010000000480000050c300001400000010000000f89c360d0c9d360d000000008bc29e2f78a2144122ed68a1701e2ea50bbbbeaf7333c40dfe048ccf55f709b8cc7e8b49",
         "}\nBody}"
     );
-    let document = Document::from_bytes(source.as_bytes()).unwrap();
+    let document = Package::from_bytes(source.as_bytes()).unwrap();
     let mut output = Vec::new();
     Writer::new(&mut output).write(&document).unwrap();
     assert_eq!(output, source.as_bytes());
-    assert_eq!(Document::from_bytes(&output).unwrap().text(), "Body");
+    assert_eq!(Package::from_bytes(&output).unwrap().text(), "Body");
 }
 
 #[test]
@@ -212,7 +211,7 @@ fn authored_passwordhash_removal_and_readdition_round_trip_semantically() {
         r#"{{\rtf1\ansi{{\*\passwordhash
 {MODERN_PASSWORD_HASH_SAMPLE}}} Body}}"#
     );
-    let mut document = RtfDocument::parse(&source).unwrap();
+    let mut document = Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let original = document.protection().clone().into_owned();
     document.clear_protection();
     assert!(
@@ -229,7 +228,7 @@ fn authored_passwordhash_removal_and_readdition_round_trip_semantically() {
 fn parser_rejects_passwordhash_hex_beyond_the_decoded_bound() {
     let payload = "00".repeat(MAX_PASSWORD_HASH_BYTES + 1);
     let source = format!(r"{{\rtf1{{\*\passwordhash {payload}}}}}");
-    assert!(RtfDocument::parse(&source).is_err());
+    assert!(Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).is_err());
 }
 
 #[test]
@@ -237,13 +236,16 @@ fn rejects_passwordhash_after_structural_body_events() {
     let field = format!(
         r"{{\rtf1\ansi{{\field{{\*\fldinst X}}{{\fldrslt }}}}{{\*\passwordhash {MODERN_PASSWORD_HASH_SAMPLE}}} Body}}"
     );
-    assert!(RtfDocument::parse(&field).is_err());
+    assert!(Tree::parse(&field, litchi_rtf::read::OpenOptions::default()).is_err());
 
     for prefix in [r"\par", r"\line", r"\page"] {
         let source = format!(
             r"{{\rtf1\ansi{prefix}{{\*\passwordhash {MODERN_PASSWORD_HASH_SAMPLE}}} Body}}"
         );
-        assert!(RtfDocument::parse(&source).is_err(), "accepted {source}");
+        assert!(
+            Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted {source}"
+        );
     }
 }
 
@@ -259,11 +261,14 @@ fn rejects_passwordhash_after_zero_width_body_structures() {
     for prefix in prefixes {
         let valid = format!(r"{prefix} Body}}");
         assert!(
-            RtfDocument::parse(&valid).is_ok(),
+            Tree::parse(&valid, litchi_rtf::read::OpenOptions::default()).is_ok(),
             "invalid control fixture {valid}"
         );
         let source = format!(r"{prefix}{{\*\passwordhash {MODERN_PASSWORD_HASH_SAMPLE}}} Body}}");
-        assert!(RtfDocument::parse(&source).is_err(), "accepted {source}");
+        assert!(
+            Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted {source}"
+        );
     }
 }
 
@@ -277,14 +282,17 @@ fn rejects_nested_known_passwordhash_before_opaque_or_specialized_parsing() {
     let header =
         format!(r"{{\rtf1\ansi{{\header{{\*\passwordhash {MODERN_PASSWORD_HASH_SAMPLE}Z}}}}}}");
     for source in [unknown, field, header] {
-        assert!(RtfDocument::parse(&source).is_err(), "accepted {source}");
+        assert!(
+            Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted {source}"
+        );
     }
 }
 
 #[test]
 fn rejects_impossible_declared_passwordhash_size_at_header_boundary() {
     let source = r"{\rtf1\ansi{\*\passwordhash 01000000FFFFFFFF}}";
-    assert!(RtfDocument::parse(source).is_err());
+    assert!(Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err());
 }
 
 #[test]
@@ -300,8 +308,8 @@ fn rejects_passwordhash_bytes_after_declared_total_before_push() {
     let complete_extra = format!(r"{{\rtf1\ansi{{\*\passwordhash {header_hex}00}}}}");
     let odd_extra = format!(r"{{\rtf1\ansi{{\*\passwordhash {header_hex}0}}}}");
 
-    assert!(RtfDocument::parse(&complete_extra).is_err());
-    assert!(RtfDocument::parse(&odd_extra).is_err());
+    assert!(Tree::parse(&complete_extra, litchi_rtf::read::OpenOptions::default()).is_err());
+    assert!(Tree::parse(&odd_extra, litchi_rtf::read::OpenOptions::default()).is_err());
 }
 
 #[test]

@@ -7,7 +7,7 @@ use litchi_opc::part::{BlobPart, Part};
 use litchi_opc::{OpcPackage, PackURI, PackageWriter};
 
 fn package(bytes: &[u8]) -> XmlMapInfo {
-    let package = OpcPackage::from_bytes(bytes).unwrap();
+    let package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     load_from_package(&package).unwrap().unwrap()
 }
 
@@ -190,7 +190,7 @@ fn serializer_rejects_oversized_output_before_final_append() {
     let error = value.to_xml(false).unwrap_err();
     assert_eq!(
         error.to_string(),
-        "serialized custom XML maps part exceeds 32 MiB"
+        "shared OOXML service error: serialized custom XML maps part exceeds 32 MiB"
     );
 }
 
@@ -314,9 +314,10 @@ fn preserves_unrelated_references_when_removing_xml_maps() {
 
 #[test]
 fn writes_real_poi_xml_maps_package_without_resolving_schema_payloads() {
-    let mut package = OpcPackage::from_bytes(include_bytes!(
-        "../../../../test-data/poi/test-data/spreadsheet/CustomXMLMappings.xlsx"
-    ))
+    let mut package = OpcPackage::from_bytes(
+        include_bytes!("../../../../test-data/poi/test-data/spreadsheet/CustomXMLMappings.xlsx"),
+        litchi_opc::SourceLimits::default(),
+    )
     .unwrap();
     let (value, conformance) = load_from_package_with_conformance(&package)
         .unwrap()
@@ -326,7 +327,7 @@ fn writes_real_poi_xml_maps_package_without_resolving_schema_payloads() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("xml-maps.xlsx");
     package.save(&path).unwrap();
-    let reopened = OpcPackage::open(&path).unwrap();
+    let reopened = OpcPackage::open(&path, litchi_opc::SourceLimits::default()).unwrap();
     assert_eq!(
         load_from_package_with_conformance(&reopened).unwrap(),
         Some((value, conformance))
@@ -428,8 +429,9 @@ fn transaction_crud_preserves_source_payload_and_round_trips_both_conformances()
     for conformance in [XmlMapConformance::Transitional, XmlMapConformance::Strict] {
         let mut package = workbook_package();
         let value = fixture_info();
-        let mut create = Transaction::new_with_conformance(&mut package, conformance).unwrap();
-        assert!(create.info().is_none());
+        let mut create = Transaction::new(&mut package).unwrap();
+        create.set_conformance(conformance).unwrap();
+        assert!(create.info().unwrap().is_none());
         assert!(create.set(value.clone()).unwrap());
         let commit = create.commit().unwrap();
         assert!(commit.changed());
@@ -453,7 +455,7 @@ fn transaction_crud_preserves_source_payload_and_round_trips_both_conformances()
 
         let mut remove_map = Transaction::new(&mut package).unwrap();
         assert!(remove_map.remove_map(1).is_err());
-        assert_eq!(remove_map.info().unwrap().maps.len(), 1);
+        assert_eq!(remove_map.info().unwrap().unwrap().maps.len(), 1);
 
         let mut remove = Transaction::new(&mut package).unwrap();
         assert!(remove.remove().unwrap().is_some());
@@ -473,7 +475,7 @@ fn transaction_noop_inverse_and_stale_patch_are_atomic() {
     assert!(!no_op.edit_map(1, |_map| Ok(())).unwrap());
     let commit = no_op.commit().unwrap();
     assert!(!commit.changed());
-    assert!(commit.patch().is_empty());
+    assert!(commit.patch().is_noop());
     assert_eq!(PackageWriter::to_bytes(&package).unwrap(), original_bytes);
 
     let mut changed = Transaction::new(&mut package).unwrap();

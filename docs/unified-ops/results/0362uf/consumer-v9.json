@@ -1,0 +1,25 @@
+{
+  "source": "b170204d17df40c5240637437747d647026c895e",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--keep-going"
+      ],
+      "exit": 101,
+      "seconds": 215.67205425799966,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v9/check-0.log",
+      "bytes": 68469,
+      "sha256": "cb259594b244f0f1544fe7bd38c131024340c85badb0185d07ac4c43f882e21d",
+      "target_bytes_before": 18305135614,
+      "completed_test_executables_pruned": []
+    }
+  ],
+  "note": "OPC library/test compilation failed on the new token preflight visibility boundary, missing imports and denied redundant qualifications. The harness group was not reached."
+}

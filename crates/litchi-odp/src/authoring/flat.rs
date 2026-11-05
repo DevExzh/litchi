@@ -1,34 +1,105 @@
-//! Bounded, source-bound flat `OpenDocument` presentation support.
+//! Bounded, source-bound flat (single-file) `OpenDocument` presentation
+//! owners and slide edits.
+//!
+//! [`Presentation`] is the immutable owner of one `.fodp` document, opened
+//! under one [`OpenOptions`] envelope: the source `input_bytes` and the
+//! semantic `content_bytes` bound the XML, `depth` its nesting, `units` its
+//! slides and `text_bytes` one slide replacement. [`Presentation::edit`]
+//! stages an [`Edit`]; [`Edit::commit`] publishes a new [`Presentation`] with
+//! its [`Patch`] and [`Diagnostics`]; [`Presentation::apply`] replays a patch
+//! onto its exact source.
 
 use crate::codec::Parser;
 use crate::model::{Settings, Slide, declaration, page_layout, page_metadata, settings};
 use litchi_core::xml::escape_xml;
-use litchi_core::{Error, Result};
+use litchi_core::{Error as CoreError, Result};
+use litchi_odf_common::{SemanticLimitKind, SemanticLimits};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::collections::BTreeMap;
+use std::io::Read;
 use std::ops::Range;
+use std::path::Path;
 use std::sync::Arc;
+
+/// Whether a commit changed the presentation bytes.
+pub use litchi_core::edit::Diagnostics;
+/// The family error: typed limits and refusals plus the common-core payload.
+pub use litchi_odf_common::Error;
+/// The dimension named by [`Error::Limit`] and [`Error::InvalidLimit`].
+pub use litchi_odf_common::LimitKind;
+pub use litchi_odf_common::OpenOptions;
+
+/// A committed flat edit: the published presentation, its patch and
+/// diagnostics.
+pub type Commit = litchi_core::edit::Commit<Presentation, Patch>;
 use xml_minifier::audit;
 
 const OFFICE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const DRAW: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
 const PRESENTATION: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
 const MIMETYPE: &str = "application/vnd.oasis.opendocument.presentation";
-const MAX_XML_BYTES: usize = 64 * 1024 * 1024;
-const MAX_TEXT_BYTES: usize = 16 * 1024 * 1024;
-const MAX_DEPTH: usize = 512;
-const MAX_SLIDES: usize = 65_536;
 
-/// An immutable flat `OpenDocument` presentation (`.fodp`).
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "FlatPresentation is the established public type name; renaming it would break the crate API"
-)]
+/// The bounds one flat presentation is read and edited under, resolved from
+/// its [`OpenOptions`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Bounds {
+    bytes: usize,
+    text_bytes: usize,
+    depth: usize,
+    slides: usize,
+    limits: SemanticLimits,
+    options: OpenOptions,
+}
+
+impl Bounds {
+    fn new(options: OpenOptions) -> Self {
+        let limits = options.semantic_limits_value();
+        let input =
+            usize::try_from(options.source_limits_value().max_input_bytes()).unwrap_or(usize::MAX);
+        Self {
+            bytes: input.min(limits.usize_value(SemanticLimitKind::ContentBytes)),
+            text_bytes: limits.usize_value(SemanticLimitKind::TextBytes),
+            depth: limits.usize_value(SemanticLimitKind::Depth),
+            slides: limits.usize_value(SemanticLimitKind::Units),
+            limits,
+            options,
+        }
+    }
+
+    fn exceeded(self, kind: SemanticLimitKind, observed: usize) -> CoreError {
+        self.limits
+            .check_core(kind, observed)
+            .err()
+            .unwrap_or_else(|| invalid_error("flat ODP limit accounting failed"))
+    }
+
+    fn check_input(self, observed: usize) -> Result<()> {
+        if observed <= self.bytes {
+            return Ok(());
+        }
+        if observed > self.limits.usize_value(SemanticLimitKind::ContentBytes) {
+            return Err(self.exceeded(SemanticLimitKind::ContentBytes, observed));
+        }
+        Err(CoreError::ResourceLimit(litchi_core::ResourceLimit {
+            resource: litchi_core::Resource::InputBytes,
+            observed: u64::try_from(observed).unwrap_or(u64::MAX),
+            limit: u64::try_from(self.bytes).unwrap_or(u64::MAX),
+            scope: "ODF owned package input".into(),
+        }))
+    }
+}
+
+/// The immutable owner of one flat `OpenDocument` presentation (`.fodp`).
+///
+/// Cheap to clone; a commit publishes a new presentation and never changes
+/// its source. The presentation keeps the [`OpenOptions`] it was opened
+/// with; its edits and replays use them.
 #[derive(Clone)]
-pub struct FlatPresentation {
+pub struct Presentation {
+    bounds: Bounds,
     bytes: Arc<[u8]>,
     xml: Arc<str>,
     page_ranges: Arc<[Range<usize>]>,
@@ -36,23 +107,95 @@ pub struct FlatPresentation {
     tolerance: Arc<litchi_odf_common::leniency::ToleranceReport>,
 }
 
-impl FlatPresentation {
-    /// Open bounded UTF-8 flat-presentation bytes.
+impl Presentation {
+    /// Opens a flat presentation from a path with the default
+    /// [`OpenOptions`].
     ///
     /// # Errors
-    /// Returns an error when a configured limit is exceeded or the package cannot be serialized.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        if bytes.len() > MAX_XML_BYTES {
-            return invalid("flat ODP exceeds the 64 MiB input limit");
-        }
-        let xml = String::from_utf8(bytes.clone())
-            .map_err(|error| Error::InvalidFormat(format!("flat ODP is not UTF-8: {error}")))?;
-        let page_ranges = scan_flat(&xml)?;
+    ///
+    /// As [`Self::from_bytes_with_options`], plus the read failure.
+    pub fn open(path: impl AsRef<Path>) -> std::result::Result<Self, Error> {
+        Self::open_with_options(path, OpenOptions::new())
+    }
+
+    /// Opens a flat presentation from a path under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::from_bytes_with_options`], plus the read failure.
+    pub fn open_with_options(
+        path: impl AsRef<Path>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, Error> {
+        let file = std::fs::File::open(path)?;
+        Self::from_reader_with_options(file, options)
+    }
+
+    /// Reads a flat presentation from a stream with the default
+    /// [`OpenOptions`].
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::from_bytes_with_options`], plus the read failure.
+    pub fn from_reader(reader: impl Read) -> std::result::Result<Self, Error> {
+        Self::from_reader_with_options(reader, OpenOptions::new())
+    }
+
+    /// Reads a flat presentation from a stream under caller-selected limits;
+    /// the stream is read through a `bytes + 1` guard.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::from_bytes_with_options`], plus the read failure.
+    pub fn from_reader_with_options(
+        reader: impl Read,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, Error> {
+        let bounds = Bounds::new(options);
+        let mut bytes = Vec::new();
+        let guard = u64::try_from(bounds.bytes)
+            .unwrap_or(u64::MAX)
+            .saturating_add(1);
+        reader.take(guard).read_to_end(&mut bytes)?;
+        Ok(Self::parse(&bytes, bounds)?)
+    }
+
+    /// Opens bounded UTF-8 flat-presentation bytes with the default
+    /// [`OpenOptions`]; the bytes are copied.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::from_bytes_with_options`].
+    pub fn from_bytes(bytes: &[u8]) -> std::result::Result<Self, Error> {
+        Self::from_bytes_with_options(bytes, OpenOptions::new())
+    }
+
+    /// Opens bounded UTF-8 flat-presentation bytes under caller-selected
+    /// limits; the bytes are copied.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Limit`] when a selected dimension is exceeded and
+    /// [`Error::Core`] when the XML is not a structurally valid flat
+    /// presentation.
+    pub fn from_bytes_with_options(
+        bytes: &[u8],
+        options: OpenOptions,
+    ) -> std::result::Result<Self, Error> {
+        Ok(Self::parse(bytes, Bounds::new(options))?)
+    }
+
+    fn parse(bytes: &[u8], bounds: Bounds) -> Result<Self> {
+        bounds.check_input(bytes.len())?;
+        let xml = String::from_utf8(bytes.to_vec())
+            .map_err(|error| CoreError::InvalidFormat(format!("flat ODP is not UTF-8: {error}")))?;
+        let page_ranges = scan_flat(&xml, bounds)?;
         let (slides, tolerance) = Parser::parse_slides_with_report(&xml, Some(&xml))?;
         if slides.len() != page_ranges.len() {
             return invalid("flat ODP slide projection does not match its page structure");
         }
         Ok(Self {
+            bounds,
             bytes: Arc::from(bytes),
             xml: Arc::from(xml),
             page_ranges: Arc::from(page_ranges),
@@ -127,56 +270,39 @@ impl FlatPresentation {
         settings::parse(&self.xml)
     }
 
-    /// Create an immutable source-bound editing snapshot.
-    #[must_use]
-    pub fn snapshot(&self) -> Snapshot {
-        Snapshot {
-            presentation: self.clone(),
-        }
-    }
-}
-
-/// Immutable source identity for flat-presentation edits.
-#[derive(Clone)]
-pub struct Snapshot {
-    presentation: FlatPresentation,
-}
-
-impl Snapshot {
-    /// Parse owned source bytes as a flat editing snapshot.
-    ///
-    /// # Errors
-    /// Returns an error when a configured limit is exceeded or the package cannot be serialized.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Ok(FlatPresentation::from_bytes(bytes)?.snapshot())
+    /// The options this presentation was opened with.
+    pub fn options(&self) -> OpenOptions {
+        self.bounds.options
     }
 
-    /// Borrow the exact source bytes.
+    /// Starts an isolated, source-bound edit.
     #[must_use]
-    pub fn bytes(&self) -> &[u8] {
-        self.presentation.as_bytes()
-    }
-
-    /// Borrow the immutable slide projection.
-    #[must_use]
-    pub fn slides(&self) -> &[Slide] {
-        self.presentation.slides()
-    }
-
-    /// Start an isolated edit transaction.
-    #[must_use]
-    pub fn transaction(&self) -> Transaction {
-        Transaction {
+    pub fn edit(&self) -> Edit {
+        Edit {
             source: self.clone(),
-            draft: self.slides().to_vec(),
+            draft: None,
             replacements: BTreeMap::new(),
         }
     }
 
-    /// Materialize the ordinary flat reader.
-    #[must_use]
-    pub fn to_presentation(&self) -> FlatPresentation {
-        self.presentation.clone()
+    /// Replays a patch onto this exact source presentation.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when this presentation is not the
+    /// patch's exact source.
+    pub fn apply(&self, patch: &Patch) -> std::result::Result<Commit, Error> {
+        if !patch.is_applicable_to(self) {
+            return Err(Error::patch_conflict(
+                "flat.apply",
+                "the presentation is not the patch source",
+            ));
+        }
+        Ok(Commit::new(
+            patch.after.clone(),
+            patch.clone(),
+            Diagnostics::new(!patch.is_noop()),
+        ))
     }
 }
 
@@ -201,18 +327,32 @@ impl<'a> From<&'a str> for Selector<'a> {
     }
 }
 
-/// Isolated replacement transaction for a flat presentation.
-pub struct Transaction {
-    source: Snapshot,
-    draft: Vec<Slide>,
+/// An isolated, source-bound replacement edit of a flat presentation.
+pub struct Edit {
+    source: Presentation,
+    draft: Option<Vec<Slide>>,
     replacements: BTreeMap<usize, String>,
 }
 
-impl Transaction {
+impl Edit {
+    /// The source presentation this edit stages against.
+    #[must_use]
+    pub fn package(&self) -> &Presentation {
+        &self.source
+    }
+
+    /// Discards every staged replacement in place.
+    pub fn reset(&mut self) {
+        self.draft = None;
+        self.replacements.clear();
+    }
+
     /// Borrow the staged slide projection.
     #[must_use]
     pub fn slides(&self) -> &[Slide] {
-        &self.draft
+        self.draft
+            .as_deref()
+            .unwrap_or_else(|| self.source.slides())
     }
 
     /// Replace one slide's modeled title and drawing payload.
@@ -226,18 +366,19 @@ impl Transaction {
     where
         S: Into<Selector<'a>>,
     {
-        check_text(title, text)?;
-        let Some(index) = select(&self.draft, selector.into())? else {
+        check_text(title, text, self.source.bounds)?;
+        let Some(index) = select(self.slides(), selector.into())? else {
             return Ok(None);
         };
-        if self.draft[index].title.as_deref() == Some(title) && self.draft[index].text == text {
+        if self.slides()[index].title.as_deref() == Some(title) && self.slides()[index].text == text
+        {
             return Ok(Some(()));
         }
-        let range = &self.source.presentation.page_ranges[index];
-        let source_page = &self.source.presentation.xml[range.clone()];
+        let range = &self.source.page_ranges[index];
+        let source_page = &self.source.xml[range.clone()];
         let replacement = replace_page(source_page, title, text)?;
         self.replacements.insert(index, replacement);
-        let slide = &mut self.draft[index];
+        let slide = &mut self.draft_mut()[index];
         slide.title = (!title.is_empty()).then(|| title.to_owned());
         text.clone_into(&mut slide.text);
         slide.shapes.clear();
@@ -248,115 +389,87 @@ impl Transaction {
 
     /// Validate, serialize, reparse, and atomically publish the staged bytes.
     ///
+    /// An edit with no staged replacement commits the source itself:
+    /// `diagnostics().changed()` is false and `patch().is_noop()` holds.
+    ///
     /// # Errors
     /// Returns an error when a configured limit is exceeded or the package cannot be serialized.
-    pub fn commit(self) -> Result<Commit> {
+    pub fn commit(self) -> std::result::Result<Commit, Error> {
+        Ok(self.commit_core()?)
+    }
+
+    fn commit_core(self) -> Result<Commit> {
+        let bounds = self.source.bounds;
         if self.replacements.is_empty() {
-            return Ok(Commit::unchanged(self.source));
+            return Ok(Commit::new(
+                self.source.clone(),
+                Patch {
+                    before: self.source.clone(),
+                    after: self.source,
+                },
+                Diagnostics::UNCHANGED,
+            ));
         }
-        let xml = &self.source.presentation.xml;
+        let xml = &self.source.xml;
         let mut capacity = xml.len();
         for (index, replacement) in &self.replacements {
-            let original = self.source.presentation.page_ranges[*index].len();
+            let original = self.source.page_ranges[*index].len();
             capacity = capacity
                 .checked_sub(original)
                 .and_then(|size| size.checked_add(replacement.len()))
                 .ok_or_else(|| invalid_error("flat ODP output size overflow"))?;
         }
-        if capacity > MAX_XML_BYTES {
-            return invalid("flat ODP commit exceeds the 64 MiB output limit");
+        if capacity > bounds.bytes {
+            return Err(bounds.exceeded(SemanticLimitKind::ContentBytes, capacity));
         }
         let mut output = String::with_capacity(capacity);
         let mut cursor = 0;
-        for (index, range) in self.source.presentation.page_ranges.iter().enumerate() {
-            push_bounded(&mut output, &xml[cursor..range.start])?;
+        for (index, range) in self.source.page_ranges.iter().enumerate() {
+            push_bounded(&mut output, &xml[cursor..range.start], bounds)?;
             if let Some(replacement) = self.replacements.get(&index) {
-                push_bounded(&mut output, replacement)?;
+                push_bounded(&mut output, replacement, bounds)?;
             } else {
-                push_bounded(&mut output, &xml[range.clone()])?;
+                push_bounded(&mut output, &xml[range.clone()], bounds)?;
             }
             cursor = range.end;
         }
-        push_bounded(&mut output, &xml[cursor..])?;
-        validate_compact_xml(&output)?;
-        let presentation = FlatPresentation::from_bytes(output.into_bytes())?;
-        if presentation.slides() != self.draft {
+        push_bounded(&mut output, &xml[cursor..], bounds)?;
+        validate_compact_xml(&output, bounds)?;
+        let presentation = Presentation::parse(output.as_bytes(), bounds)?;
+        if presentation.slides()
+            != self
+                .draft
+                .as_deref()
+                .unwrap_or_else(|| self.source.slides())
+        {
             return invalid("flat ODP commit readback differs from the staged slide model");
         }
-        let snapshot = presentation.snapshot();
+        let changed = presentation.as_bytes() != self.source.as_bytes();
         let patch = Patch {
             before: self.source,
-            after: snapshot.clone(),
+            after: presentation.clone(),
         };
-        Ok(Commit {
-            snapshot,
-            patch,
-            changed: true,
-        })
-    }
-}
-
-/// Successful flat transaction publication.
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-    changed: bool,
-}
-
-impl Commit {
-    fn unchanged(snapshot: Snapshot) -> Self {
-        Self {
-            patch: Patch {
-                before: snapshot.clone(),
-                after: snapshot.clone(),
-            },
-            snapshot,
-            changed: false,
-        }
+        Ok(Commit::new(presentation, patch, Diagnostics::new(changed)))
     }
 
-    /// Whether bytes changed.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        self.changed
-    }
-
-    /// Borrow the published snapshot.
-    #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Borrow the reversible exact-source patch.
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consume the commit into its snapshot.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
+    fn draft_mut(&mut self) -> &mut Vec<Slide> {
+        self.draft
+            .get_or_insert_with(|| self.source.slides().to_vec())
     }
 }
 
 /// Exact-source-checked reversible flat-presentation patch.
 #[derive(Clone)]
 pub struct Patch {
-    before: Snapshot,
-    after: Snapshot,
+    before: Presentation,
+    after: Presentation,
 }
 
 impl Patch {
-    /// Apply only to the exact source bytes from which this patch was made.
-    ///
-    /// # Errors
-    /// Returns an error when a configured limit is exceeded or the package cannot be serialized.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
-        if source.bytes() != self.before.bytes() {
-            return invalid("flat ODP patch source does not match");
-        }
-        Ok(self.after.clone())
+    /// Whether this patch was made from exactly `source`'s bytes.
+    #[must_use]
+    pub fn is_applicable_to(&self, source: &Presentation) -> bool {
+        source.as_bytes() == self.before.as_bytes()
     }
 
     /// Return the inverse patch.
@@ -371,11 +484,11 @@ impl Patch {
     /// Whether applying the patch changes no bytes.
     #[must_use]
     pub fn is_noop(&self) -> bool {
-        self.before.bytes() == self.after.bytes()
+        self.before.as_bytes() == self.after.as_bytes()
     }
 }
 
-fn scan_flat(xml: &str) -> Result<Vec<Range<usize>>> {
+fn scan_flat(xml: &str, bounds: Bounds) -> Result<Vec<Range<usize>>> {
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     let mut stack: Vec<(Option<Vec<u8>>, Vec<u8>, usize)> = Vec::new();
@@ -385,9 +498,9 @@ fn scan_flat(xml: &str) -> Result<Vec<Range<usize>>> {
     let mut root_seen = false;
     loop {
         let (namespace, event) = {
-            let (resolved, event) = reader
-                .read_resolved_event()
-                .map_err(|error| Error::InvalidFormat(format!("invalid flat ODP XML: {error}")))?;
+            let (resolved, event) = reader.read_resolved_event().map_err(|error| {
+                CoreError::InvalidFormat(format!("invalid flat ODP XML: {error}"))
+            })?;
             (namespace_of(&resolved), event)
         };
         let end = usize::try_from(reader.buffer_position())
@@ -408,10 +521,10 @@ fn scan_flat(xml: &str) -> Result<Vec<Range<usize>>> {
                     &mut presentation_count,
                 )?;
                 if is(namespace.as_deref(), &local, DRAW, b"page") {
-                    validate_page_parent_and_limit(&stack, pages.len())?;
+                    validate_page_parent_and_limit(&stack, pages.len(), bounds)?;
                 }
-                if stack.len() == MAX_DEPTH {
-                    return invalid("flat ODP exceeds the XML nesting limit");
+                if stack.len() >= bounds.depth {
+                    return Err(bounds.exceeded(SemanticLimitKind::Depth, stack.len() + 1));
                 }
                 stack.push((namespace, local, start));
             },
@@ -430,7 +543,7 @@ fn scan_flat(xml: &str) -> Result<Vec<Range<usize>>> {
                     &mut presentation_count,
                 )?;
                 if is(namespace.as_deref(), &local, DRAW, b"page") {
-                    validate_page_parent_and_limit(&stack, pages.len())?;
+                    validate_page_parent_and_limit(&stack, pages.len(), bounds)?;
                     pages.push(start..end);
                 }
             },
@@ -447,13 +560,16 @@ fn scan_flat(xml: &str) -> Result<Vec<Range<usize>>> {
             Event::Text(text) if stack.is_empty() => {
                 if !text
                     .xml_content(XmlVersion::Explicit1_0)
-                    .map_err(|error| Error::InvalidFormat(error.to_string()))?
+                    .map_err(|error| CoreError::InvalidFormat(error.to_string()))?
                     .trim()
                     .is_empty()
                 {
                     return invalid("flat ODP has text outside its root element");
                 }
             },
+            // The five predefined entities and character references are
+            // plain XML (quick-xml reports them as references, record 0341).
+            Event::GeneralRef(reference) if is_plain_reference(&reference) => {},
             Event::DocType(_) | Event::GeneralRef(_) => {
                 return invalid("DOCTYPE and custom entities are not allowed in flat ODP");
             },
@@ -474,6 +590,7 @@ fn scan_flat(xml: &str) -> Result<Vec<Range<usize>>> {
 fn validate_page_parent_and_limit(
     stack: &[(Option<Vec<u8>>, Vec<u8>, usize)],
     page_count: usize,
+    bounds: Bounds,
 ) -> Result<()> {
     if stack.len() != 3
         || !stack.get(2).is_some_and(|(namespace, local, _)| {
@@ -482,8 +599,8 @@ fn validate_page_parent_and_limit(
     {
         return invalid("draw:page is outside office:presentation");
     }
-    if page_count >= MAX_SLIDES {
-        return invalid("flat ODP exceeds the slide-count limit");
+    if page_count >= bounds.slides {
+        return Err(bounds.exceeded(SemanticLimitKind::Units, page_count + 1));
     }
     Ok(())
 }
@@ -511,7 +628,7 @@ fn validate_open(
         let mut mimetype = None;
         for attribute in element.attributes() {
             let parsed_attribute = attribute.map_err(|error| {
-                Error::InvalidFormat(format!("invalid flat ODP attribute: {error}"))
+                CoreError::InvalidFormat(format!("invalid flat ODP attribute: {error}"))
             })?;
             let (resolved, name) = reader.resolver().resolve_attribute(parsed_attribute.key);
             if name.as_ref() == b"mimetype"
@@ -520,7 +637,7 @@ fn validate_open(
                 mimetype = Some(
                     parsed_attribute
                         .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-                        .map_err(|error| Error::InvalidFormat(error.to_string()))?
+                        .map_err(|error| CoreError::InvalidFormat(error.to_string()))?
                         .into_owned(),
                 );
             }
@@ -581,7 +698,7 @@ fn direct_notes(page: &str) -> Result<Option<&str>> {
     loop {
         let (resolved, event) = reader
             .read_resolved_event()
-            .map_err(|error| Error::InvalidFormat(format!("invalid flat ODP page: {error}")))?;
+            .map_err(|error| CoreError::InvalidFormat(format!("invalid flat ODP page: {error}")))?;
         let namespace = namespace_of(&resolved);
         let end = usize::try_from(reader.buffer_position())
             .map_err(|_error| invalid_error("flat ODP XML position exceeds platform limits"))?;
@@ -591,10 +708,11 @@ fn direct_notes(page: &str) -> Result<Option<&str>> {
                 let local = element.local_name().as_ref().to_vec();
                 let inherited = inherited_fragment_namespace(namespace, element.name().as_ref());
                 if stack.len() == 1 && !is_modeled_direct_page_child(inherited.as_deref(), &local) {
-                    return Err(Error::Unsupported(
-                        "flat ODP page has an unsupported direct child; replacement refused"
-                            .to_string(),
-                    ));
+                    return Err(CoreError::Refused(litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedOperation,
+                        "odp.authoring.flat",
+                        "flat ODP page has an unsupported direct child; replacement refused",
+                    )));
                 }
                 stack.push((inherited, local, start));
             },
@@ -603,10 +721,11 @@ fn direct_notes(page: &str) -> Result<Option<&str>> {
                 let local_name = element.local_name();
                 let local = local_name.as_ref();
                 if stack.len() == 1 && !is_modeled_direct_page_child(inherited.as_deref(), local) {
-                    return Err(Error::Unsupported(
-                        "flat ODP page has an unsupported direct child; replacement refused"
-                            .to_string(),
-                    ));
+                    return Err(CoreError::Refused(litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedOperation,
+                        "odp.authoring.flat",
+                        "flat ODP page has an unsupported direct child; replacement refused",
+                    )));
                 }
                 if stack.len() == 1 && is(inherited.as_deref(), local, PRESENTATION, b"notes") {
                     if notes.is_some() {
@@ -629,6 +748,7 @@ fn direct_notes(page: &str) -> Result<Option<&str>> {
                     notes = Some(&page[start..end]);
                 }
             },
+            Event::GeneralRef(reference) if is_plain_reference(&reference) => {},
             Event::DocType(_) | Event::GeneralRef(_) => {
                 return invalid("DOCTYPE and custom entities are not allowed in flat ODP pages");
             },
@@ -641,6 +761,23 @@ fn direct_notes(page: &str) -> Result<Option<&str>> {
         }
     }
     Ok(notes)
+}
+
+/// Whether an entity reference is one of XML's five predefined entities or
+/// a character reference to an XML 1.0 character, which need no document
+/// type (as `litchi-odf-common`'s package validation admits them).
+fn is_plain_reference(reference: &quick_xml::events::BytesRef<'_>) -> bool {
+    matches!(
+        reference.as_ref(),
+        b"amp" | b"lt" | b"gt" | b"apos" | b"quot"
+    ) || (reference.is_char_ref()
+        && reference
+            .resolve_char_ref()
+            .ok()
+            .flatten()
+            .is_some_and(|character| {
+                matches!(character, '\t' | '\n' | '\r' | '\u{20}'..='\u{D7FF}' | '\u{E000}'..='\u{FFFD}' | '\u{10000}'..)
+            }))
 }
 
 fn is_modeled_direct_page_child(namespace: Option<&[u8]>, local: &[u8]) -> bool {
@@ -662,38 +799,40 @@ fn push_paragraphs(output: &mut String, value: &str) {
     }
 }
 
-fn push_bounded(output: &mut String, value: &str) -> Result<()> {
+fn push_bounded(output: &mut String, value: &str, bounds: Bounds) -> Result<()> {
     let size = output
         .len()
         .checked_add(value.len())
         .ok_or_else(|| invalid_error("flat ODP output size overflow"))?;
-    if size > MAX_XML_BYTES {
-        return invalid("flat ODP commit exceeds the 64 MiB output limit");
+    if size > bounds.bytes {
+        return Err(bounds.exceeded(SemanticLimitKind::ContentBytes, size));
     }
     output.push_str(value);
     Ok(())
 }
 
-fn validate_compact_xml(xml: &str) -> Result<()> {
+fn validate_compact_xml(xml: &str, bounds: Bounds) -> Result<()> {
     let limits = audit::Limits::new(
-        MAX_XML_BYTES,
-        MAX_DEPTH,
+        bounds.bytes,
+        bounds.depth,
         1_000_000,
         250_000,
-        MAX_TEXT_BYTES,
-        MAX_XML_BYTES,
+        bounds.text_bytes.min(bounds.bytes),
+        bounds.bytes,
     )
     .map_err(|source| invalid_error(format!("invalid flat ODP XML audit limits: {source}")))?;
     let _report = audit::verify(xml.as_bytes(), limits).map_err(|source| match source {
-        audit::Error::NotCompact(_) => {
-            Error::Unsupported(format!("flat ODP XML is not compact: {source}"))
-        },
+        audit::Error::NotCompact(_) => CoreError::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odp.authoring.flat",
+            "flat ODP XML is not compact",
+        )),
         audit::Error::Limit { .. }
         | audit::Error::Encoding { .. }
         | audit::Error::Malformed { .. }
         | audit::Error::Doctype { .. }
         | audit::Error::Allocation
-        | _ => Error::InvalidFormat(format!("flat ODP XML failed audit: {source}")),
+        | _ => CoreError::InvalidFormat(format!("flat ODP XML failed audit: {source}")),
     })?;
     Ok(())
 }
@@ -715,13 +854,13 @@ fn select(slides: &[Slide], selector: Selector<'_>) -> Result<Option<usize>> {
     }
 }
 
-fn check_text(title: &str, text: &str) -> Result<()> {
+fn check_text(title: &str, text: &str, bounds: Bounds) -> Result<()> {
     let size = title
         .len()
         .checked_add(text.len())
         .ok_or_else(|| invalid_error("flat ODP slide text size overflow"))?;
-    if size > MAX_TEXT_BYTES {
-        return invalid("flat ODP slide text exceeds the 16 MiB limit");
+    if size > bounds.text_bytes {
+        return Err(bounds.exceeded(SemanticLimitKind::TextBytes, size));
     }
     Ok(())
 }
@@ -760,6 +899,6 @@ fn invalid<T>(message: impl Into<String>) -> Result<T> {
     Err(invalid_error(message))
 }
 
-fn invalid_error(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn invalid_error(message: impl Into<String>) -> CoreError {
+    CoreError::InvalidFormat(message.into())
 }

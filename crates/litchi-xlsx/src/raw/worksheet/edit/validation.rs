@@ -134,11 +134,13 @@ pub(super) fn validate_actions(
                 .any(|range| range.contains(*address))
         {
             Some(EditBlock::DataValidation)
-        } else if !matches!(action.payload(), Some(Payload::SharedFormula { .. }))
-            && layout
-                .formula_ranges
-                .iter()
-                .any(|range| range.contains(*address))
+        } else if !matches!(
+            action.payload(),
+            Some(Payload::SharedFormula { .. } | Payload::Cache(_))
+        ) && layout
+            .formula_ranges
+            .iter()
+            .any(|range| range.contains(*address))
         {
             Some(EditBlock::GroupFormula)
         } else if layout

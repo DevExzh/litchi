@@ -7,6 +7,8 @@
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
 
+use super::codec::Limits;
+use super::package::*;
 use super::*;
 use crate::time::Offset;
 
@@ -39,13 +41,15 @@ fn drafts() -> Vec<Draft> {
 fn create_read_noop_and_typed_update_are_source_checked() {
     let name = slide_name();
     let mut package = fixture();
-    store(&mut package, &name, &drafts()).unwrap();
-    let source = load_snapshot(&package, &name).unwrap().unwrap();
+    store(&mut package, &name, &drafts(), Limits::DEFAULT).unwrap();
+    let source = load_snapshot(&package, &name, Limits::DEFAULT)
+        .unwrap()
+        .unwrap();
     assert_eq!(source.events().len(), 2);
 
     let no_op = source.edit().commit().unwrap();
-    assert!(!no_op.is_changed());
-    assert!(no_op.patch().is_empty());
+    assert!(!no_op.diagnostics().changed());
+    assert!(no_op.patch().is_noop());
     apply_commit(&mut package, no_op).unwrap();
     assert_eq!(package.get_part(&name).unwrap().blob(), source.source_xml());
 
@@ -54,21 +58,24 @@ fn create_read_noop_and_typed_update_are_source_checked() {
     edit.set_object_id(1, 7).unwrap();
     edit.set_kind(1, Kind::Play).unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.is_changed());
+    assert!(commit.diagnostics().changed());
     let output = String::from_utf8_lossy(commit.snapshot().source_xml());
     assert!(output.contains("time=\"1500\""));
     assert!(output.contains("objId=\"7\""));
     assert!(output.contains("<p14:playEvt"));
     assert!(output.contains("<x:data>keep</x:data>"));
     apply_commit(&mut package, commit).unwrap();
-    assert_eq!(load(&package, &name).unwrap().unwrap()[0].object_id(), 6);
+    assert_eq!(
+        load(&package, &name, Limits::DEFAULT).unwrap().unwrap()[0].object_id(),
+        6
+    );
 }
 
 #[test]
 fn unknown_event_attributes_and_opaque_extensions_survive_attribute_edits() {
     let name = slide_name();
     let mut package = fixture();
-    store(&mut package, &name, &drafts()).unwrap();
+    store(&mut package, &name, &drafts(), Limits::DEFAULT).unwrap();
     let part = package.get_part_mut(&name).unwrap();
     let mut xml = part.blob().to_vec();
     let needle = br"<p14:triggerEvt";
@@ -82,7 +89,9 @@ fn unknown_event_attributes_and_opaque_extensions_survive_attribute_edits() {
     );
     part.set_blob(xml);
 
-    let source = load_snapshot(&package, &name).unwrap().unwrap();
+    let source = load_snapshot(&package, &name, Limits::DEFAULT)
+        .unwrap()
+        .unwrap();
     let mut edit = source.edit();
     edit.set_time(0, Offset::ms(2500)).unwrap();
     let commit = edit.commit().unwrap();
@@ -95,8 +104,10 @@ fn unknown_event_attributes_and_opaque_extensions_survive_attribute_edits() {
 fn list_crud_inverse_stale_rejection_and_remove_are_atomic() {
     let name = slide_name();
     let mut package = fixture();
-    store(&mut package, &name, &drafts()).unwrap();
-    let original = load_snapshot(&package, &name).unwrap().unwrap();
+    store(&mut package, &name, &drafts(), Limits::DEFAULT).unwrap();
+    let original = load_snapshot(&package, &name, Limits::DEFAULT)
+        .unwrap()
+        .unwrap();
 
     let mut edit = original.edit();
     edit.insert(1, Draft::null(Offset::ms(4), 9)).unwrap();
@@ -114,16 +125,22 @@ fn list_crud_inverse_stale_rejection_and_remove_are_atomic() {
     assert_eq!(package.get_part(&name).unwrap().blob(), stale.as_slice());
 
     let mut restored_package = fixture();
-    store(&mut restored_package, &name, &drafts()).unwrap();
+    store(&mut restored_package, &name, &drafts(), Limits::DEFAULT).unwrap();
     patch.apply(&mut restored_package).unwrap();
     patch.inverse().apply(&mut restored_package).unwrap();
     assert_eq!(
         restored_package.get_part(&name).unwrap().blob(),
         original.source_xml()
     );
-    let removed = remove(&mut restored_package, &name).unwrap().unwrap();
+    let removed = remove(&mut restored_package, &name, Limits::DEFAULT)
+        .unwrap()
+        .unwrap();
     assert_eq!(removed.source_xml(), original.source_xml());
-    assert!(load_snapshot(&restored_package, &name).unwrap().is_none());
+    assert!(
+        load_snapshot(&restored_package, &name, Limits::DEFAULT)
+            .unwrap()
+            .is_none()
+    );
     let xml = String::from_utf8_lossy(restored_package.get_part(&name).unwrap().blob());
     assert!(xml.contains("<x:data>keep</x:data>"));
 }
@@ -132,8 +149,10 @@ fn list_crud_inverse_stale_rejection_and_remove_are_atomic() {
 fn failed_edits_leave_the_staged_sequence_unchanged() {
     let name = slide_name();
     let mut package = fixture();
-    store(&mut package, &name, &drafts()).unwrap();
-    let source = load_snapshot(&package, &name).unwrap().unwrap();
+    store(&mut package, &name, &drafts(), Limits::DEFAULT).unwrap();
+    let source = load_snapshot(&package, &name, Limits::DEFAULT)
+        .unwrap()
+        .unwrap();
     let mut edit = source.edit();
     let before = edit.events().to_vec();
     assert!(edit.replace(Vec::new()).is_err());

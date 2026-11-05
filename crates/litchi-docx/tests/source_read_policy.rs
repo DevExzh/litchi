@@ -22,7 +22,8 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits as CoreLimits,
     OwnedSource, ReadAt, Resource, SourceVersion,
 };
-use litchi_docx::{Package, ReadLimits, source_backed};
+use litchi_docx::source_backed::tail_append::EditOptions;
+use litchi_docx::{Package, SourceLimits, source_backed};
 use litchi_opc::SourceCacheLimits;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use soapberry_zip::office::StreamingArchiveWriter;
@@ -44,7 +45,8 @@ fn fixture() -> Vec<u8> {
         rt::OFFICE_DOCUMENT
     );
 
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .expect("content types fixture must be writable");
@@ -119,8 +121,8 @@ fn managed_context(name: &'static str) -> (Budget, CancellationSource, Execution
     )
 }
 
-fn append_limits() -> source_backed::TailAppendLimits {
-    source_backed::TailAppendLimits {
+fn append_limits() -> source_backed::tail_append::Limits {
+    source_backed::tail_append::Limits {
         max_source_xml_bytes: 2 * 1024 * 1024,
         max_text_bytes: 64 * 1024,
         max_fragment_bytes: 65_536,
@@ -144,14 +146,14 @@ fn managed_read_ahead_supports_semantic_read_then_releases_before_docx_publicati
     // each package has completed its mandatory source indexing.
     let (exact_budget, _exact_cancellation, exact_context) = managed_context("docx-exact-control");
     let exact_source = Arc::new(CountingSource::new(archive.clone()));
-    let exact_package =
-        source_backed::Package::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            exact_source.clone(),
-            ReadLimits::default(),
-            SourceCacheLimits::default(),
-            exact_context,
-        )
-        .expect("exact managed DOCX fixture must open");
+    let exact_package = source_backed::Package::from_read_at_with_options(
+        exact_source.clone(),
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .cache_limits(SourceCacheLimits::default())
+            .execution_context(exact_context),
+    )
+    .expect("exact managed DOCX fixture must open");
     let exact_before = exact_source.calls();
     assert_eq!(
         exact_package
@@ -173,12 +175,13 @@ fn managed_read_ahead_supports_semantic_read_then_releases_before_docx_publicati
     let candidate_source = Arc::new(CountingSource::new(archive));
     let source_read_policy = source_backed::SourceReadPolicy::forward_start(4096)
         .expect("focused read-ahead policy must be valid");
-    let package = source_backed::Package::from_read_at_with_limits_and_cache_limits_and_source_read_policy_and_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         candidate_source.clone(),
-        ReadLimits::default(),
-        SourceCacheLimits::default(),
-        source_read_policy,
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .cache_limits(SourceCacheLimits::default())
+            .source_read_policy(source_read_policy)
+            .execution_context(context),
     )
     .expect("managed read-ahead DOCX fixture must open");
 
@@ -217,7 +220,7 @@ fn managed_read_ahead_supports_semantic_read_then_releases_before_docx_publicati
     );
     let plan = package
         .tail_append_plain_paragraph("tail")
-        .with_limits(append_limits())
+        .with_options(EditOptions::new(append_limits()))
         .prepare()
         .expect("simple DOCX append must prepare");
     assert!(!plan.is_noop(), "the append must be a real edit");
@@ -231,11 +234,13 @@ fn managed_read_ahead_supports_semantic_read_then_releases_before_docx_publicati
     );
     assert_eq!(prepared.retained_window_bytes, 0);
     let mut output = Vec::new();
-    let publication = plan
-        .write_to_stream(&mut output)
+    let commit = plan.commit().expect("DOCX commit must succeed");
+    assert!(!commit.patch().is_noop());
+    commit
+        .package()
+        .write_to(&mut output)
         .expect("DOCX publication must succeed");
-    assert!(!publication.is_noop());
-    drop(publication);
+    drop(commit);
 
     let after = package
         .source_read_diagnostics()

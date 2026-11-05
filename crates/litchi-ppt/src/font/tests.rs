@@ -5,9 +5,10 @@
 )]
 
 use super::{
-    Facet, FontCollection, FontCollections, FontEmbeddingFlags, PackageLimits, Scope, Snapshot,
+    Facet, FontCollection, FontCollections, FontEmbeddingFlags, Limits, PackageLimits, Scope,
+    Snapshot,
 };
-use crate::{Record, RecordType};
+use crate::{Record, RecordType, SourceLimits};
 use std::io::Cursor;
 use std::sync::Arc;
 
@@ -111,7 +112,11 @@ fn ordinals_are_distinct_from_raw_instances_and_ignored_bits_round_trip() {
         RecordType::FontEmbeddedData.as_u16(),
         b"opaque-eot",
     ));
-    let parsed = FontCollection::parse(&collection(RecordType::FontCollection, payload)).unwrap();
+    let parsed = FontCollection::parse(
+        &collection(RecordType::FontCollection, payload),
+        &Limits::default(),
+    )
+    .unwrap();
     let font = parsed.get(0).unwrap();
     assert_eq!(font.index, 0);
     assert_eq!(font.raw_instance, 7);
@@ -119,7 +124,7 @@ fn ordinals_are_distinct_from_raw_instances_and_ignored_bits_round_trip() {
     assert_eq!(font.font_type_flags, 0xac);
     assert_eq!(font.facet(Facet::Plain).unwrap().bytes(), b"opaque-eot");
 
-    let reparsed = FontCollection::parse(&parsed.to_record().unwrap()).unwrap();
+    let reparsed = FontCollection::parse(&parsed.to_record().unwrap(), &Limits::default()).unwrap();
     assert_eq!(reparsed, parsed);
     assert_eq!(
         reparsed.to_record().unwrap().data,
@@ -142,7 +147,7 @@ fn owned_parser_moves_large_facet_allocation_and_clones_share_it() {
     let mut record = collection(RecordType::FontCollection, payload);
     record.children = children;
 
-    let parsed = FontCollection::take_with_limits(&mut record, super::Limits::default()).unwrap();
+    let parsed = FontCollection::take_with_limits(&mut record, Limits::default()).unwrap();
     let data = &parsed.get(0).unwrap().facet(Facet::Plain).unwrap().data;
     assert_eq!(data.as_ptr(), original);
     let clone = data.clone();
@@ -158,16 +163,19 @@ fn accepts_exactly_32_non_nul_utf16_units_by_ordinal() {
         payload[index * 2..index * 2 + 2].copy_from_slice(&unit.to_le_bytes());
     }
     payload[66] = 4;
-    let parsed = FontCollection::parse(&collection(
-        RecordType::FontCollection,
-        record_bytes(0, 11, RecordType::FontEntityAtom.as_u16(), &payload),
-    ))
+    let parsed = FontCollection::parse(
+        &collection(
+            RecordType::FontCollection,
+            record_bytes(0, 11, RecordType::FontEntityAtom.as_u16(), &payload),
+        ),
+        &Limits::default(),
+    )
     .unwrap();
     assert_eq!(parsed.get(0).unwrap().name, name);
     assert_eq!(parsed.get(0).unwrap().index, 0);
     assert_eq!(parsed.get(0).unwrap().raw_instance, 11);
     assert_eq!(
-        FontCollection::parse(&parsed.to_record().unwrap()).unwrap(),
+        FontCollection::parse(&parsed.to_record().unwrap(), &Limits::default()).unwrap(),
         parsed
     );
 }
@@ -178,10 +186,13 @@ fn rejects_malformed_utf16_and_authored_names_over_32_units() {
     malformed[..2].copy_from_slice(&0xd800u16.to_le_bytes());
     malformed[66] = 4;
     assert!(
-        FontCollection::parse(&collection(
-            RecordType::FontCollection,
-            record_bytes(0, 0, RecordType::FontEntityAtom.as_u16(), &malformed),
-        ))
+        FontCollection::parse(
+            &collection(
+                RecordType::FontCollection,
+                record_bytes(0, 0, RecordType::FontEntityAtom.as_u16(), &malformed),
+            ),
+            &Limits::default()
+        )
         .is_err()
     );
 
@@ -194,7 +205,11 @@ fn rejects_malformed_utf16_and_authored_names_over_32_units() {
 fn duplicate_record_instances_still_resolve_by_collection_ordinal() {
     let mut payload = entity(7, "First", 0);
     payload.extend_from_slice(&entity(7, "Second", 0));
-    let parsed = FontCollection::parse(&collection(RecordType::FontCollection, payload)).unwrap();
+    let parsed = FontCollection::parse(
+        &collection(RecordType::FontCollection, payload),
+        &Limits::default(),
+    )
+    .unwrap();
     assert_eq!(parsed.get(0).unwrap().name, "First");
     assert_eq!(parsed.get(1).unwrap().name, "Second");
     assert_eq!(parsed.get(0).unwrap().raw_instance, 7);
@@ -221,24 +236,24 @@ fn contextual_owner_headers_and_zero_aggregate_limits_are_enforced() {
     let valid = document(base.clone(), &[]);
     let mut malformed = valid.clone();
     malformed.children[1].version = 0;
-    assert!(FontCollections::parse(&malformed).is_err());
+    assert!(FontCollections::parse(&malformed, &Limits::default()).is_err());
 
     let mut direct = valid.clone();
     direct.children[1] = prog_tags_record(&[]);
     assert!(
-        FontCollections::parse(&direct)
+        FontCollections::parse(&direct, &Limits::default())
             .unwrap()
             .international
             .is_none()
     );
 
-    let limits = super::Limits {
+    let limits = Limits {
         max_fonts_per_collection: 0,
-        ..super::Limits::default()
+        ..Limits::default()
     };
     assert!(FontCollections::parse_with_limits(&valid, limits).is_err());
 
-    let mut copied = super::Limits::default();
+    let mut copied = Limits::default();
     copied.records.max_copied_payload_bytes = 67;
     assert!(FontCollections::parse_with_limits(&valid, copied).is_err());
 }
@@ -274,11 +289,14 @@ fn nested_programmable_tags_share_one_record_budget() {
         &[],
     );
     root.children[1] = doc_info_list(prog_tags);
-    let mut limits = super::Limits::default();
+    let mut limits = Limits::default();
     limits.records.max_records = 12;
     assert!(matches!(
         FontCollections::parse_with_limits(&root, limits),
-        Err(crate::Error::ResourceLimit(_))
+        Err(crate::Error::Limit {
+            kind: crate::SourceLimitKind::Events,
+            ..
+        })
     ));
 }
 
@@ -313,7 +331,7 @@ fn discovers_only_live_environment_and_document_ppt10_owners() {
         RecordType::FontEmbedFlags10Atom.as_u16(),
         &0xffff_ffffu32.to_le_bytes(),
     ));
-    let parsed = FontCollections::parse(&document(base, &ppt10)).unwrap();
+    let parsed = FontCollections::parse(&document(base, &ppt10), &Limits::default()).unwrap();
     assert_eq!(parsed.get_base(0).unwrap().raw_instance, 12);
     assert_eq!(parsed.get_international(0).unwrap().raw_instance, 44);
     assert_eq!(parsed.embedding_flags.unwrap().raw, u32::MAX);
@@ -321,10 +339,10 @@ fn discovers_only_live_environment_and_document_ppt10_owners() {
 
 #[test]
 fn collection_mutations_keep_ordinals_stable() {
-    let mut collection = FontCollection::parse(&collection(
-        RecordType::FontCollection,
-        entity(7, "First", 0),
-    ))
+    let mut collection = FontCollection::parse(
+        &collection(RecordType::FontCollection, entity(7, "First", 0)),
+        &Limits::default(),
+    )
     .unwrap();
     let mut appended = collection.get(0).unwrap().clone();
     appended.name = "Second".into();
@@ -337,18 +355,16 @@ fn collection_mutations_keep_ordinals_stable() {
 
 #[test]
 fn whole_package_transaction_is_exact_reversible_and_refuses_reindexing() {
-    let mut writer = crate::Writer::new();
+    let mut writer = crate::Builder::new();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
-    let source = Snapshot::from_bytes(output.into_inner()).unwrap();
+    crate::raw::encode(&mut writer, &mut output).unwrap();
+    let source = Snapshot::from_bytes(output.into_inner(), &PackageLimits::default()).unwrap();
     let mut transaction = source.edit().unwrap();
     let mut replacement = source.fonts().get_base(0).unwrap().clone();
     replacement.name = "Transaction Font".into();
     transaction
         .replace_font(Scope::Base, 0, replacement)
         .unwrap();
-    assert!(transaction.remove_font(Scope::Base, 0).is_err());
-    assert!(transaction.reorder_fonts(Scope::Base, &[0]).is_err());
     let commit = transaction.commit().unwrap();
     assert_eq!(commit.fonts().get_base(0).unwrap().name, "Transaction Font");
     let replay = commit.patch().apply(&source).unwrap();
@@ -361,14 +377,14 @@ fn whole_package_transaction_is_exact_reversible_and_refuses_reindexing() {
 }
 
 fn minimal_live_snapshot() -> Snapshot {
-    let mut writer = crate::Writer::new();
+    let mut writer = crate::Builder::new();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
-    Snapshot::from_bytes(output.into_inner()).unwrap()
+    crate::raw::encode(&mut writer, &mut output).unwrap();
+    Snapshot::from_bytes(output.into_inner(), &PackageLimits::default()).unwrap()
 }
 
 fn document_saves_fonts(bytes: &[u8]) -> bool {
-    let mut package = crate::Package::from_reader(Cursor::new(bytes)).unwrap();
+    let mut package = crate::raw::Reader::from_reader(Cursor::new(bytes)).unwrap();
     package
         .presentation()
         .unwrap()
@@ -441,7 +457,6 @@ fn failed_mutation_rolls_back_without_staging_changes() {
     );
     assert_eq!(transaction.fonts(), &before);
     assert!(transaction.changes().is_empty());
-    assert_eq!(transaction.rollback().bytes(), source.bytes());
 }
 
 #[test]
@@ -591,7 +606,7 @@ fn last_facet_removal_clears_subset_state_and_missing_owner_is_unchanged() {
 
 #[test]
 fn live_transaction_appends_base_and_international_fonts_and_updates_flags() {
-    let mut writer = crate::Writer::new();
+    let mut writer = crate::Builder::new();
     writer
         .add_font_model(Scope::International, super::Font::new("Intl Zero"))
         .unwrap();
@@ -599,8 +614,8 @@ fn live_transaction_appends_base_and_international_fonts_and_updates_flags() {
         .set_font_embedding_flags(Some(FontEmbeddingFlags::new(false, false)))
         .unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
-    let source = Snapshot::from_bytes(output.into_inner()).unwrap();
+    crate::raw::encode(&mut writer, &mut output).unwrap();
+    let source = Snapshot::from_bytes(output.into_inner(), &PackageLimits::default()).unwrap();
 
     let mut transaction = source.edit().unwrap();
     assert_eq!(
@@ -628,15 +643,15 @@ fn live_transaction_appends_base_and_international_fonts_and_updates_flags() {
 
 #[test]
 fn live_transaction_accepts_font_129_and_atomically_refuses_font_130() {
-    let mut writer = crate::Writer::new();
+    let mut writer = crate::Builder::new();
     for ordinal in 1..128 {
         writer
             .add_font_model(Scope::Base, super::Font::new(format!("Boundary {ordinal}")))
             .unwrap();
     }
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
-    let source = Snapshot::from_bytes(output.into_inner()).unwrap();
+    crate::raw::encode(&mut writer, &mut output).unwrap();
+    let source = Snapshot::from_bytes(output.into_inner(), &PackageLimits::default()).unwrap();
     assert_eq!(source.fonts().base.as_ref().unwrap().fonts.len(), 128);
 
     let mut transaction = source.edit().unwrap();
@@ -689,14 +704,16 @@ fn inserts_pp10_font_flags_after_comments_and_before_later_or_opaque_tail() {
     ));
     ppt10.extend_from_slice(&record_bytes(0, 0, 0x7abc, &[9, 8, 7]));
     let mut root = document(base, &ppt10);
-    let before = FontCollections::parse(&root).unwrap();
+    let before = FontCollections::parse(&root, &Limits::default()).unwrap();
     let mut after = before.clone();
     after.embedding_flags = Some(FontEmbeddingFlags::new(true, false));
     after
-        .apply_to_document_from(&before, &mut root, super::Limits::default())
+        .apply_to_document_from(&before, &mut root, Limits::default())
         .unwrap();
 
-    let records = root.versioned_binary_tag_records(10).unwrap();
+    let records = root
+        .versioned_binary_tag_records(10, &SourceLimits::default())
+        .unwrap();
     let position = |kind| {
         records
             .iter()

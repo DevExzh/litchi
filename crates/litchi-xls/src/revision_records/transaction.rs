@@ -6,6 +6,7 @@
 //! transaction changes only fixed-width fields whose wire locations are
 //! defined by [MS-XLS]; every other byte remains owned by the source snapshot.
 
+use litchi_core::edit::RefusalKind;
 use std::sync::Arc;
 
 use crate::{Error, Result};
@@ -135,8 +136,8 @@ impl Snapshot {
 
     /// Starts a detached, failure-atomic transaction.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction::new(self.clone())
+    pub fn edit(&self) -> Edit {
+        Edit::new(self.clone())
     }
 
     /// Publishes the exact validated source stream.
@@ -156,12 +157,12 @@ impl Eq for Snapshot {}
 
 /// A failure-atomic edit over inert Revision Log metadata.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub struct Edit {
     source: Snapshot,
     candidate: Vec<u8>,
 }
 
-impl Transaction {
+impl Edit {
     fn new(source: Snapshot) -> Self {
         Self {
             candidate: source.bytes().to_vec(),
@@ -181,24 +182,6 @@ impl Transaction {
         self.before()
     }
 
-    /// Parses the current candidate without publishing it.
-    /// # Errors
-    ///
-    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn snapshot(&self) -> Result<Snapshot> {
-        if self.candidate.as_slice() == self.source.bytes() {
-            Ok(self.source.clone())
-        } else {
-            Snapshot::parse(&self.candidate)
-        }
-    }
-
-    /// Whether a staged edit changes any stream byte.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.candidate.as_slice() != self.source.bytes()
-    }
-
     /// Replaces the accepted and undo-action bits of one revision.
     ///
     /// `revision_id` is unique within a valid shared-workbook revision
@@ -213,8 +196,10 @@ impl Transaction {
         flags: RevisionFlags,
     ) -> Result<&mut Self> {
         if revision_id < 0 {
-            return Err(Error::UnsafeEdit(
-                "revision identifiers cannot be negative".to_string(),
+            return Err(Error::refused(
+                RefusalKind::InvalidValue,
+                "edit revision records",
+                "revision identifiers cannot be negative",
             ));
         }
         let offset = find_revision_offset(&self.candidate, revision_id)?;
@@ -286,12 +271,6 @@ impl Transaction {
         Ok(self)
     }
 
-    /// Discards all staged edits and returns the original source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
-    }
-
     /// Validates and publishes the candidate with a reversible source-checked
     /// patch.  Failed validation leaves the transaction's candidate intact.
     /// # Errors
@@ -301,14 +280,12 @@ impl Transaction {
         let source = self.source;
         if self.candidate.as_slice() == source.bytes() {
             let patch = Patch::new(source.clone(), source.clone());
-            return Ok(Commit {
-                snapshot: source,
-                patch,
-            });
+            return Ok(Commit::new(source, patch, Diagnostics::UNCHANGED));
         }
         let snapshot = Snapshot::parse(self.candidate)?;
         let patch = Patch::new(source, snapshot.clone());
-        Ok(Commit { snapshot, patch })
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(snapshot, patch, diagnostics))
     }
 
     fn replace_candidate(&mut self, candidate: Vec<u8>) -> Result<()> {
@@ -321,51 +298,12 @@ impl Transaction {
     }
 }
 
-/// A successful publication containing the typed result and its reversible
-/// source-checked patch.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
+/// A published edit: the new snapshot, its reversible patch and
+/// diagnostics.
+pub type Commit = litchi_core::edit::Commit<Snapshot, Patch>;
 
-impl Commit {
-    /// Whether publication changed any stream byte.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        !self.patch.is_noop()
-    }
-
-    /// Returns the post-edit snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Returns the reversible patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consumes the publication into its snapshot.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
-    }
-
-    /// Consumes the publication into its patch.
-    #[must_use]
-    pub fn into_patch(self) -> Patch {
-        self.patch
-    }
-
-    /// Consumes the publication into exact stream bytes.
-    #[must_use]
-    pub fn into_bytes(self) -> Vec<u8> {
-        self.snapshot.finish()
-    }
-}
+/// Content-free diagnostics of one commit.
+pub use litchi_core::edit::Diagnostics;
 
 /// A source-checked, reversible replacement of one complete Revision Log
 /// stream.
@@ -423,9 +361,10 @@ impl Patch {
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.fingerprint() != self.source_fingerprint || source.bytes() != self.before() {
-            return Err(Error::UnsafeEdit(
-                "Revision Log patch source does not match its base snapshot".to_string(),
-            ));
+            return Err(Error::PatchConflict {
+                operation: "edit revision records",
+                reason: "Revision Log patch source does not match its base snapshot",
+            });
         }
         if self.is_noop() {
             Ok(source.clone())
@@ -440,9 +379,10 @@ impl Patch {
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn revert(&self, target: &Snapshot) -> Result<Snapshot> {
         if target.fingerprint() != self.target_fingerprint || target.bytes() != self.after() {
-            return Err(Error::UnsafeEdit(
-                "Revision Log patch target does not match its committed snapshot".to_string(),
-            ));
+            return Err(Error::PatchConflict {
+                operation: "edit revision records",
+                reason: "Revision Log patch target does not match its committed snapshot",
+            });
         }
         if self.is_noop() {
             Ok(target.clone())
@@ -495,9 +435,11 @@ fn find_revision_offset(bytes: &[u8], revision_id: i32) -> Result<usize> {
             let header = RevisionRecordHeader::parse(record_type, payload, false)?;
             if header.revision_id() == revision_id {
                 if found.is_some() {
-                    return Err(Error::UnsafeEdit(format!(
-                        "revision identifier {revision_id} is ambiguous"
-                    )));
+                    return Err(Error::refused(
+                        RefusalKind::InvalidValue,
+                        "edit revision records",
+                        "revision identifier is ambiguous",
+                    ));
                 }
                 found = Some(payload_start);
             }
@@ -505,9 +447,11 @@ fn find_revision_offset(bytes: &[u8], revision_id: i32) -> Result<usize> {
         offset = payload_end;
     }
     found.ok_or_else(|| {
-        Error::UnsafeEdit(format!(
-            "revision identifier {revision_id} was not found in the Revision Log"
-        ))
+        Error::refused(
+            RefusalKind::NotFound,
+            "edit revision records",
+            "revision identifier was not found in the Revision Log",
+        )
     })
 }
 
@@ -540,9 +484,11 @@ fn find_header(bytes: &[u8], header_index: usize) -> Result<(usize, &[u8])> {
         }
         offset = payload_end;
     }
-    Err(Error::UnsafeEdit(format!(
-        "revision header index {header_index} is out of range"
-    )))
+    Err(Error::refused(
+        RefusalKind::NotFound,
+        "edit revision records",
+        "the revision header index is out of range",
+    ))
 }
 
 fn encode_user_name(field: &mut [u8], user_name: &str) -> Result<u16> {
@@ -553,15 +499,19 @@ fn encode_user_name(field: &mut [u8], user_name: &str) -> Result<u16> {
         });
     }
     if user_name.chars().any(|character| character == '\0') {
-        return Err(Error::UnsafeEdit(
-            "RRDHead user names cannot contain NUL characters".to_string(),
+        return Err(Error::refused(
+            RefusalKind::InvalidValue,
+            "edit revision records",
+            "RRDHead user names cannot contain NUL characters",
         ));
     }
     let utf16_len = user_name.encode_utf16().count();
     if utf16_len > RRD_HEAD_MAX_USER_CHARS {
-        return Err(Error::UnsafeEdit(format!(
-            "RRDHead user name has {utf16_len} UTF-16 characters; maximum is {RRD_HEAD_MAX_USER_CHARS}"
-        )));
+        return Err(Error::refused(
+            RefusalKind::InvalidValue,
+            "edit revision records",
+            "the RRDHead user name exceeds its UTF-16 character limit",
+        ));
     }
     let compressed = user_name
         .chars()
@@ -572,17 +522,21 @@ fn encode_user_name(field: &mut [u8], user_name: &str) -> Result<u16> {
         utf16_len
     };
     if count > RRD_HEAD_MAX_USER_CHARS {
-        return Err(Error::UnsafeEdit(format!(
-            "RRDHead user name has {count} characters; maximum is {RRD_HEAD_MAX_USER_CHARS}"
-        )));
+        return Err(Error::refused(
+            RefusalKind::InvalidValue,
+            "edit revision records",
+            "the RRDHead user name exceeds its character limit",
+        ));
     }
     let encoded_len = 1usize
         + count
             .checked_mul(if compressed { 1 } else { 2 })
             .ok_or(Error::Allocation("encoding RRDHead user name"))?;
     if encoded_len > field.len() {
-        return Err(Error::UnsafeEdit(
-            "RRDHead user name does not fit its fixed field".to_string(),
+        return Err(Error::refused(
+            RefusalKind::InvalidValue,
+            "edit revision records",
+            "RRDHead user name does not fit its fixed field",
         ));
     }
 

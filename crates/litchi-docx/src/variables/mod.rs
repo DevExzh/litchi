@@ -11,6 +11,7 @@
 
 mod codec;
 mod model;
+pub mod raw;
 mod transaction;
 
 #[cfg(test)]
@@ -22,6 +23,7 @@ pub use model::{
     MAX_DOCUMENT_VARIABLE_VALUE_CHARS, MAX_DOCUMENT_VARIABLE_XML_BYTES, MAX_DOCUMENT_VARIABLES,
     Variables,
 };
-pub use transaction::{Commit, Patch, Snapshot, Transaction};
+pub(crate) use transaction::Edit;
+pub use transaction::{Patch, Snapshot};
 
 pub(crate) use codec::{SettingsDialect, ensure_source_backed_rewrite_safe, inspect_source_policy};

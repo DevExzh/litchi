@@ -43,4 +43,6 @@ pub(crate) fn validate_style_set(value: &StyleSet) -> Result<()> {
 pub(crate) const MAX_XML_BYTES: usize = 4 * 1024 * 1024;
 pub(crate) const MAX_XML_DEPTH: usize = 128;
 pub(crate) const MAX_XML_NODES: usize = 65_536;
+pub(crate) const MAX_XML_ATTRIBUTES: usize = 65_536;
+pub(crate) const MAX_XML_ATTRIBUTE_BYTES: usize = MAX_XML_BYTES;
 pub(crate) const MAX_STYLE_SETS: usize = 20;

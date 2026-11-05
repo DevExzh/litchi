@@ -89,13 +89,13 @@ fn mini_data_terminal_sector(bytes: &[u8]) -> u32 {
 
 fn assert_open_corrupted(bytes: Vec<u8>, expected: &str) {
     assert!(matches!(
-        OleFile::open(Cursor::new(bytes)),
+        OleFile::open(Cursor::new(bytes), OleFileLimits::default()),
         Err(OleError::CorruptedFile(message)) if message.contains(expected)
     ));
 }
 
 fn assert_open_repairs_surplus_chain(bytes: Vec<u8>, expected: &[u8]) {
-    let mut file = OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut file = OleFile::open(Cursor::new(bytes), OleFileLimits::default()).unwrap();
     assert!(
         file.tolerance_report()
             .contains(crate::AllocationDefect::ChainLongerThanSize)
@@ -152,7 +152,7 @@ impl Seek for ReportedLengthReader {
 fn rejects_version_3_directory_sector_count() {
     let mut bytes = sample_file();
     write_u32(&mut bytes, 0x28, 1);
-    assert!(OleFile::open(Cursor::new(bytes)).is_err());
+    assert!(OleFile::open(Cursor::new(bytes), OleFileLimits::default()).is_err());
 }
 
 #[test]
@@ -244,7 +244,7 @@ fn allocation_table_budget_accepts_exact_and_rejects_one_byte_under() {
         .unwrap()
         .with_max_allocation_table_bytes(observed)
         .unwrap();
-    OleFile::open_with_limits(Cursor::new(bytes.clone()), exact)
+    OleFile::open(Cursor::new(bytes.clone()), exact)
         .expect("a table budget exactly at the declared bytes opens");
 
     let under = OleFileLimits::new(bytes.len() as u64)
@@ -252,7 +252,7 @@ fn allocation_table_budget_accepts_exact_and_rejects_one_byte_under() {
         .with_max_allocation_table_bytes(observed - 1)
         .unwrap();
     assert!(matches!(
-        OleFile::open_with_limits(Cursor::new(bytes), under),
+        OleFile::open(Cursor::new(bytes), under),
         Err(OleError::LimitExceeded {
             resource: "allocation table bytes",
             observed: actual,
@@ -265,14 +265,14 @@ fn allocation_table_budget_accepts_exact_and_rejects_one_byte_under() {
 fn low_level_ingress_accepts_exact_limit_and_rejects_max_plus_one() {
     let bytes = sample_file();
     let exact = OleFileLimits::new(bytes.len() as u64).unwrap();
-    OleFile::open_with_limits(Cursor::new(bytes.clone()), exact)
+    OleFile::open(Cursor::new(bytes.clone()), exact)
         .expect("a source exactly at its configured limit opens");
 
     let over_limit = OleFileLimits::new(bytes.len() as u64).unwrap();
     let mut oversized = bytes;
     oversized.push(0);
     assert!(matches!(
-        OleFile::open_with_limits(Cursor::new(oversized), over_limit),
+        OleFile::open(Cursor::new(oversized), over_limit),
         Err(OleError::LimitExceeded {
             resource: "input bytes",
             observed,
@@ -294,7 +294,7 @@ fn hostile_reported_length_is_rejected_before_header_read() {
     let limits = OleFileLimits::new(reader.reported_length - 1).unwrap();
 
     assert!(matches!(
-        OleFile::open_with_limits(reader, limits),
+        OleFile::open(reader, limits),
         Err(OleError::LimitExceeded {
             resource: "input bytes",
             observed,
@@ -331,7 +331,7 @@ fn larger_explicit_ingress_preserves_defaults_and_version_three_size_limit() {
     };
     let limits = OleFileLimits::new(reader.reported_length).unwrap();
     assert!(matches!(
-        OleFile::open_with_limits(reader, limits),
+        OleFile::open(reader, limits),
         Err(OleError::InvalidFormat(message)) if message.contains("Version 3 CFB input cannot exceed")
     ));
     // Only the fixed header was read; no FAT/directory traversal occurred.
@@ -359,7 +359,7 @@ fn hostile_allocation_table_count_is_rejected_before_sector_index_or_read() {
     };
     let limits = OleFileLimits::new(OleFileLimits::MAX_INPUT_BYTES).unwrap();
     assert!(matches!(
-        OleFile::open_with_limits(reader, limits),
+        OleFile::open(reader, limits),
         Err(OleError::LimitExceeded {
             resource: "allocation table bytes",
             observed,
@@ -376,7 +376,7 @@ fn hostile_count_metadata_is_rejected_before_index_allocation() {
     write_u32(&mut bytes, NUM_FAT_SECTORS_OFFSET, u32::MAX);
 
     assert!(matches!(
-        OleFile::open(Cursor::new(bytes)),
+        OleFile::open(Cursor::new(bytes), OleFileLimits::default()),
         Err(OleError::CorruptedFile(message))
             if message.contains("Declared FAT sector count exceeds the physical file")
     ));
@@ -401,7 +401,7 @@ fn hostile_difat_and_minifat_counts_are_rejected_before_index_allocation() {
         write_u32(&mut bytes, first_offset, 0);
 
         assert!(matches!(
-            OleFile::open(Cursor::new(bytes)),
+            OleFile::open(Cursor::new(bytes), OleFileLimits::default()),
             Err(OleError::CorruptedFile(actual)) if actual == message
         ));
     }
@@ -417,7 +417,7 @@ fn hostile_version_4_directory_count_is_rejected_before_index_allocation() {
     write_u32(&mut bytes, 0x28, u32::MAX);
 
     assert!(matches!(
-        OleFile::open(Cursor::new(bytes)),
+        OleFile::open(Cursor::new(bytes), OleFileLimits::default()),
         Err(OleError::CorruptedFile(message))
             if message == "Declared directory sector count exceeds the physical file"
     ));
@@ -430,7 +430,7 @@ fn version_3_directory_byte_limit_is_checked_at_padded_sector_boundaries() {
         .unwrap()
         .with_max_directory_bytes(u64::try_from(SECTOR_SIZE_V3).unwrap())
         .unwrap();
-    OleFile::open_with_limits(Cursor::new(bytes.clone()), exact)
+    OleFile::open(Cursor::new(bytes.clone()), exact)
         .expect("a directory exactly at its configured limit opens");
 
     let under = OleFileLimits::new(bytes.len() as u64)
@@ -438,7 +438,7 @@ fn version_3_directory_byte_limit_is_checked_at_padded_sector_boundaries() {
         .with_max_directory_bytes(u64::try_from(SECTOR_SIZE_V3 - 1).unwrap())
         .unwrap();
     assert!(matches!(
-        OleFile::open_with_limits(Cursor::new(bytes.clone()), under),
+        OleFile::open(Cursor::new(bytes.clone()), under),
         Err(OleError::LimitExceeded {
             resource: "directory bytes",
             observed,
@@ -450,8 +450,7 @@ fn version_3_directory_byte_limit_is_checked_at_padded_sector_boundaries() {
         .unwrap()
         .with_max_directory_bytes(u64::try_from(SECTOR_SIZE_V3 + 1).unwrap())
         .unwrap();
-    OleFile::open_with_limits(Cursor::new(bytes), over)
-        .expect("a directory below its configured limit opens");
+    OleFile::open(Cursor::new(bytes), over).expect("a directory below its configured limit opens");
 }
 
 #[test]
@@ -466,7 +465,7 @@ fn version_4_directory_byte_limit_is_checked_before_chain_allocation() {
         .unwrap()
         .with_max_directory_bytes(u64::try_from(SECTOR_SIZE_V4).unwrap())
         .unwrap();
-    OleFile::open_with_limits(Cursor::new(bytes.clone()), exact)
+    OleFile::open(Cursor::new(bytes.clone()), exact)
         .expect("a version 4 directory exactly at its configured limit opens");
 
     let under = OleFileLimits::new(bytes.len() as u64)
@@ -474,7 +473,7 @@ fn version_4_directory_byte_limit_is_checked_before_chain_allocation() {
         .with_max_directory_bytes(u64::try_from(SECTOR_SIZE_V4 - 1).unwrap())
         .unwrap();
     assert!(matches!(
-        OleFile::open_with_limits(Cursor::new(bytes.clone()), under),
+        OleFile::open(Cursor::new(bytes.clone()), under),
         Err(OleError::LimitExceeded {
             resource: "directory bytes",
             observed,
@@ -486,7 +485,7 @@ fn version_4_directory_byte_limit_is_checked_before_chain_allocation() {
         .unwrap()
         .with_max_directory_bytes(u64::try_from(SECTOR_SIZE_V4 + 1).unwrap())
         .unwrap();
-    OleFile::open_with_limits(Cursor::new(bytes), over)
+    OleFile::open(Cursor::new(bytes), over)
         .expect("a version 4 directory below its configured limit opens");
 }
 
@@ -495,7 +494,7 @@ fn rejects_difat_start_count_disagreement() {
     let mut bytes = sample_file();
     write_u32(&mut bytes, 0x48, 1);
     write_u32(&mut bytes, 0x44, 0xFFFF_FFFE);
-    assert!(OleFile::open(Cursor::new(bytes)).is_err());
+    assert!(OleFile::open(Cursor::new(bytes), OleFileLimits::default()).is_err());
 }
 
 #[test]
@@ -503,7 +502,7 @@ fn rejects_directory_and_fat_sector_overlap() {
     let mut bytes = sample_file();
     let first_fat_sector = read_u32(&bytes, 0x4C);
     write_u32(&mut bytes, 0x30, first_fat_sector);
-    assert!(OleFile::open(Cursor::new(bytes)).is_err());
+    assert!(OleFile::open(Cursor::new(bytes), OleFileLimits::default()).is_err());
 }
 
 #[test]
@@ -513,7 +512,7 @@ fn rejects_fat_sector_without_fatsect_marker() {
     let first_fat_sector = read_u32(&bytes, 0x4C) as usize;
     let fat_offset = (first_fat_sector + 1) * sector_size + first_fat_sector * 4;
     write_u32(&mut bytes, fat_offset, 0xFFFF_FFFF);
-    assert!(OleFile::open(Cursor::new(bytes)).is_err());
+    assert!(OleFile::open(Cursor::new(bytes), OleFileLimits::default()).is_err());
 }
 
 #[test]
@@ -522,7 +521,7 @@ fn rejects_incorrect_minifat_sector_count() {
     let count = read_u32(&bytes, 0x40);
     assert!(count > 0, "sample must contain a MiniFAT");
     write_u32(&mut bytes, 0x40, count + 1);
-    assert!(OleFile::open(Cursor::new(bytes)).is_err());
+    assert!(OleFile::open(Cursor::new(bytes), OleFileLimits::default()).is_err());
 }
 
 #[test]
@@ -539,14 +538,14 @@ fn open_rejects_minifat_cycles_and_invalid_markers() {
     let mini_start = data_start_sector(&cycle);
     corrupt_first_data_mini_sector(&mut cycle, mini_start);
     assert!(matches!(
-        OleFile::open(Cursor::new(cycle)),
+        OleFile::open(Cursor::new(cycle), OleFileLimits::default()),
         Err(OleError::CorruptedFile(message)) if message.contains("Cycle detected")
     ));
 
     let mut invalid_marker = mini_stream_file();
     corrupt_first_data_mini_sector(&mut invalid_marker, MAXREGSECT);
     assert!(matches!(
-        OleFile::open(Cursor::new(invalid_marker)),
+        OleFile::open(Cursor::new(invalid_marker), OleFileLimits::default()),
         Err(OleError::CorruptedFile(message)) if message.contains("Invalid sector marker")
     ));
 }
@@ -565,14 +564,14 @@ fn open_rejects_fat_stream_cycles_and_invalid_markers() {
     let data_start = data_start_sector(&cycle);
     corrupt_first_data_sector(&mut cycle, data_start);
     assert!(matches!(
-        OleFile::open(Cursor::new(cycle)),
+        OleFile::open(Cursor::new(cycle), OleFileLimits::default()),
         Err(OleError::CorruptedFile(message)) if message.contains("Cycle detected")
     ));
 
     let mut invalid_marker = regular_stream_file();
     corrupt_first_data_sector(&mut invalid_marker, MAXREGSECT);
     assert!(matches!(
-        OleFile::open(Cursor::new(invalid_marker)),
+        OleFile::open(Cursor::new(invalid_marker), OleFileLimits::default()),
         Err(OleError::CorruptedFile(message)) if message.contains("Invalid sector marker")
     ));
 }
@@ -602,7 +601,7 @@ fn open_rejects_fat_stream_short_excess_and_terminal_markers() {
     let terminal = regular_data_terminal_sector(&explicit_terminal);
     let offset = fat_entry_offset(&explicit_terminal, terminal);
     write_u32(&mut explicit_terminal, offset, ENDOFCHAIN);
-    assert!(OleFile::open(Cursor::new(explicit_terminal)).is_ok());
+    assert!(OleFile::open(Cursor::new(explicit_terminal), OleFileLimits::default()).is_ok());
 }
 
 #[test]
@@ -625,7 +624,7 @@ fn open_rejects_minifat_stream_short_excess_and_terminal_markers() {
     let terminal = mini_data_terminal_sector(&explicit_terminal);
     let offset = minifat_entry_offset(&explicit_terminal, terminal);
     write_u32(&mut explicit_terminal, offset, ENDOFCHAIN);
-    assert!(OleFile::open(Cursor::new(explicit_terminal)).is_ok());
+    assert!(OleFile::open(Cursor::new(explicit_terminal), OleFileLimits::default()).is_ok());
 }
 
 #[test]
@@ -640,7 +639,7 @@ fn opens_real_world_word_compound_files() {
             include_bytes!("../../../test-data/ole/doc/Lists.doc").as_slice(),
         ),
     ] {
-        OleFile::open(Cursor::new(bytes))
+        OleFile::open(Cursor::new(bytes), OleFileLimits::default())
             .unwrap_or_else(|error| panic!("failed to open {name}: {error}"));
     }
 }
@@ -677,7 +676,7 @@ fn opens_the_complete_legacy_office_compound_file_corpus() {
     for path in files {
         let bytes = std::fs::read(&path)
             .unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display()));
-        OleFile::open(Cursor::new(bytes))
+        OleFile::open(Cursor::new(bytes), OleFileLimits::default())
             .unwrap_or_else(|error| panic!("failed to open {}: {error}", path.display()));
     }
 }
@@ -707,7 +706,8 @@ fn opens_version_3_files_with_an_uninitialized_stream_size_high_word() {
         "fixture must contain a nonzero high stream-size word"
     );
 
-    let file = OleFile::open(Cursor::new(FIXTURE)).expect("uninitialized high word is ignored");
+    let file = OleFile::open(Cursor::new(FIXTURE), OleFileLimits::default())
+        .expect("uninitialized high word is ignored");
     let entries = file.list_streams();
     assert!(
         entries
@@ -732,7 +732,8 @@ fn opens_files_whose_length_is_not_a_whole_number_of_sectors() {
         "fixture must end mid-sector"
     );
 
-    let file = OleFile::open(Cursor::new(FIXTURE)).expect("a short final sector is tolerated");
+    let file = OleFile::open(Cursor::new(FIXTURE), OleFileLimits::default())
+        .expect("a short final sector is tolerated");
     let entries = file.list_streams();
     assert!(
         entries
@@ -749,7 +750,7 @@ fn still_rejects_sectors_that_start_past_the_end_of_the_file() {
     let bytes = sample_file();
     let truncated = &bytes[..SECTOR_SIZE_V3];
     assert!(
-        OleFile::open(Cursor::new(truncated.to_vec())).is_err(),
+        OleFile::open(Cursor::new(truncated.to_vec()), OleFileLimits::default()).is_err(),
         "a header-only file has no sectors to read"
     );
 }
@@ -774,7 +775,8 @@ fn ignores_the_unused_tail_of_the_header_difat() {
         write_u32(&mut bytes, HEADER_DIFAT_OFFSET + index * 4, value);
     }
 
-    let file = OleFile::open(Cursor::new(bytes)).expect("a dirty DIFAT tail is not fatal");
+    let file = OleFile::open(Cursor::new(bytes), OleFileLimits::default())
+        .expect("a dirty DIFAT tail is not fatal");
     let entries = file.list_streams();
     assert!(
         entries
@@ -793,5 +795,5 @@ fn still_rejects_a_header_difat_list_shorter_than_its_count() {
     assert!(used > 0, "sample must declare at least one FAT sector");
 
     write_u32(&mut bytes, HEADER_DIFAT_OFFSET + (used - 1) * 4, FREESECT);
-    assert!(OleFile::open(Cursor::new(bytes)).is_err());
+    assert!(OleFile::open(Cursor::new(bytes), OleFileLimits::default()).is_err());
 }

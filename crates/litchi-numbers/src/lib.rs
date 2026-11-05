@@ -1,7 +1,7 @@
 //! Numbers semantic value models.
 //!
 //! This crate owns archive-free Numbers semantics, bounded native package
-//! reading, and focused exact package transactions. [`Package::document`]
+//! reading, and focused exact package transactions. [`Package::workbook`]
 //! exposes the strict rooted workbook, while
 //! [`compatibility_tables_from_bytes`] is an explicitly allocating global
 //! projection for historical structured-data migration, including detached
@@ -36,7 +36,7 @@
 //! remain private implementation details.
 //!
 //! ```no_run
-//! use litchi_numbers::{CellPosition, CellRange, Package, SheetSelector, TableSelector};
+//! use litchi_numbers::{At, Area, Package, SheetSelector, TableSelector};
 //! use litchi_numbers::table::cells::Storage;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -44,12 +44,12 @@
 //! let sheet = SheetSelector::name("Summary");
 //! let table = TableSelector::name("Revenue");
 //!
-//! let b2 = package.table_cell(sheet, table, CellPosition::from_a1("B2")?)?;
+//! let b2 = package.table_cell(sheet, table, At::from_a1("B2")?)?;
 //! if let Storage::Stored(value) = b2.storage() {
 //!     println!("B2 is a {} cell", value.cell_type().name());
 //! }
 //!
-//! let range = CellRange::from_a1("B2:C3")?;
+//! let range = Area::from_a1("B2:C3")?;
 //! let states = package.table_cells(sheet, table, range)?;
 //! assert_eq!(states.len(), 4); // Dense, row-major: B2, C2, B3, C3.
 //! # Ok(())
@@ -136,14 +136,14 @@
 //! ```no_run
 //! use litchi_numbers::{
 //!     cell::data_format::{Fraction, FractionAccuracy},
-//!     CellPosition, Package, SheetSelector, TableSelector,
+//!     At, Package, SheetSelector, TableSelector,
 //! };
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let package = Package::open("input.numbers")?;
 //! let sheet = SheetSelector::name("Summary");
 //! let table = TableSelector::name("Revenue");
-//! let position = CellPosition::from_a1("B3")?;
+//! let position = At::from_a1("B3")?;
 //!
 //! let _before = package.table_cell_fraction_format(sheet, table, position)?;
 //! let commit = package
@@ -175,14 +175,14 @@
 //! members.
 //!
 //! ```no_run
-//! use litchi_numbers::{cell::data_format::DateTime, CellPosition, Package};
+//! use litchi_numbers::{cell::data_format::DateTime, At, Package};
 //! use litchi_numbers::{SheetSelector, TableSelector};
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let package = Package::open("input.numbers")?;
 //! let sheet = SheetSelector::name("Summary");
 //! let table = TableSelector::name("Revenue");
-//! let position = CellPosition::from_a1("B3")?;
+//! let position = At::from_a1("B3")?;
 //! let _before = package.table_cell_date_time_format(sheet, table, position)?;
 //! let commit = package
 //!     .edit_table_cell_date_time_format(sheet, table, position)?
@@ -306,12 +306,15 @@
 
 #![forbid(unsafe_code)]
 
-/// Cell-level Numbers vocabulary.
 pub mod cell;
-/// Immutable, archive-free Numbers document snapshots.
-pub mod document;
+/// Fresh workbooks: `Package::new`, the option-bearing `Builder` and the
+/// explicit document `Identity`.
+pub mod create;
+/// Cell-level Numbers vocabulary.
 /// Dependency-free formula vocabulary shared by Numbers, Pages, and Keynote.
 pub mod formula;
+/// Checked source and semantic ingress profiles and the open envelope.
+pub mod limits;
 /// Atomic, preservation-safe Numbers sheet and table name transactions.
 pub mod names;
 /// Native Numbers package parsing and semantic projection.
@@ -324,15 +327,16 @@ pub mod shape;
 pub mod sheet;
 /// Sparse semantic table vocabulary.
 pub mod table;
+/// The read-only semantic workbook projection.
+pub mod workbook;
 
 pub use cell::CellControl;
 pub use cell::data_format::{Checkbox, PopUpMenu, Slider, StarRating, Stepper};
-pub use document::{
-    DEFAULT_MAX_TEXT_BYTES, Document, DocumentReadOptions, DocumentSourceLimitKind,
-    DocumentSourceLimits, DocumentSourceLimitsError, Error as DocumentError, IoKind,
-    LimitKind as DocumentLimitKind, Limits as DocumentLimits, LimitsError as DocumentLimitsError,
-    MAX_MATERIALIZED_CELLS, MAX_SHEETS, MAX_TABLES, ReadError as DocumentReadError,
-    ReadLimitKind as DocumentReadLimitKind, Result as DocumentResult, Stats as DocumentStats,
+pub use create::{Builder, Identity};
+pub use limits::{
+    LimitKind, MAX_MATERIALIZED_CELLS, MAX_OBJECTS, MAX_REFERENCES, MAX_SHEETS, MAX_TABLES,
+    MAX_TEXT_BYTES, OpenOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsBuilder,
+    SourceLimitKind, SourceLimits, SourceLimitsBuilder,
 };
 pub use litchi_iwa_common::chart::arrangement::ChartArrangement;
 pub use litchi_iwa_common::chart::data::ChartData;
@@ -353,56 +357,20 @@ pub use package::{__decode_image_adjustments_payload, ImageAdjustmentsError};
 pub use package::{
     __movie_playback_settings, __rewrite_movie_playback_settings, MoviePlaybackError,
 };
+
 pub use package::{
-    ChartArrangementCommit as SheetChartArrangementCommit,
-    ChartArrangementDiagnostics as SheetChartArrangementDiagnostics,
-    ChartArrangementEdit as SheetChartArrangementEdit,
-    ChartArrangementError as SheetChartArrangementError,
-    ChartArrangementLimitKind as SheetChartArrangementLimitKind,
-    ChartArrangementPatch as SheetChartArrangementPatch,
-};
-pub use package::{
-    ChartDataCommit, ChartDataDiagnostics, ChartDataEdit, ChartDataPatch, SheetChartDataCommit,
-    SheetChartDataDiagnostics, SheetChartDataEdit, SheetChartDataPatch,
-};
-pub use package::{ChartDataError, ChartDataLimitKind};
-pub use package::{ChartMetadataError, ChartMetadataLimitKind};
-pub use package::{
-    Error as PackageError, Limits as PackageLimits, MAX_OBJECTS, MAX_REFERENCES, MergeReader,
-    Package, PayloadLimitKind as PackagePayloadLimitKind, ReadOptions as PackageReadOptions,
-    ResourceError as PackageResourceError, Result as PackageResult, SaveError, SemanticLimitKind,
-    SemanticLimits as PackageSemanticLimits, SemanticLimitsError as PackageSemanticLimitsError,
-    SemanticPath as PackageSemanticPath, SheetImageAdjustmentsCommit,
-    SheetImageAdjustmentsDiagnostics, SheetImageAdjustmentsEdit, SheetImageAdjustmentsError,
-    SheetImageAdjustmentsLimitKind, SheetImageAdjustmentsPatch, TableLockCommit,
-    TableLockDiagnostics, TableLockEdit, TableLockError, TableLockLimitKind, TableLockPatch,
-    TableMergesCommit, TableMergesDiagnostics, TableMergesEdit, TableMergesError,
-    TableMergesLimitKind, TableMergesPatch, WriteError,
-    comments::{
-        Comment as TableCellComment, CommentAuthor as TableCellCommentAuthor,
-        CommentReply as TableCellCommentReply, CommentReplyCommit as TableCellCommentReplyCommit,
-        CommentReplyDiagnostics as TableCellCommentReplyDiagnostics,
-        CommentReplyEdit as TableCellCommentReplyEdit,
-        CommentReplyError as TableCellCommentReplyError,
-        CommentReplyIndex as TableCellCommentReplyIndex,
-        CommentReplyLimitKind as TableCellCommentReplyLimitKind,
-        CommentReplyPatch as TableCellCommentReplyPatch,
-        CommentReplyPath as TableCellCommentReplyPath,
-        CommentTimestamp as TableCellCommentTimestamp, Commit as TableCellCommentCommit,
-        Diagnostics as TableCellCommentDiagnostics, Edit as TableCellCommentEdit,
-        Error as TableCellCommentError, LimitKind as TableCellCommentLimitKind,
-        Patch as TableCellCommentPatch, Path as TableCellCommentPath,
-    },
-    compatibility_tables_from_bytes, compatibility_tables_from_bytes_with_options,
+    Error, MergeReader, Package, PayloadLimitKind, ResourceError, Result, SaveError, SemanticPath,
+    WriteError, compatibility_tables_from_bytes, compatibility_tables_from_bytes_with_options,
 };
 pub use selector::{ChartSelector, SheetSelector, TableSelector};
 pub use shape::image::{ImageAdjustment, ImageAdjustments, ImageEnhancement, ImageSelector};
+pub use sheet::drawable::DrawableSelector;
 pub use sheet::{Builder as SheetBuilder, SelectorError as TableSelectorError, Sheet};
 pub use table::appearance::{Appearance, Banding, GridlineVisibility, Gridlines, RowSizing};
 pub use table::dimension::{Dimension, Points, Size};
 pub use table::topology::{ColumnDeletion, RowDeletion};
 pub use table::{
-    AddressError, Builder as TableBuilder, Cell, CellPosition, CellRange, CoordinateError,
-    Dimensions, Error as TableError, Grid, GridBudget, InsertError, InsertResult, Position, Range,
-    Table, View,
+    AddressError, Area, At, Builder as TableBuilder, Cell, CoordinateError, Dimensions,
+    Error as TableError, Grid, GridBudget, InsertError, InsertResult, Table, View,
 };
+pub use workbook::Workbook;

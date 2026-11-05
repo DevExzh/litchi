@@ -6,9 +6,9 @@ use crate::property_set::{
 #[test]
 fn typed_pidssi_round_trip_uses_contextual_accessors() {
     let snapshot = Snapshot::new(CodePage::Utf16Le).unwrap();
-    let mut transaction = snapshot.transaction().unwrap();
+    let mut transaction = snapshot.edit().unwrap();
     {
-        let mut edit = transaction.edit();
+        let edit = &mut transaction;
         edit.set_category("Presentation").unwrap();
         edit.set_presentation_format("On-screen Show (16:9)")
             .unwrap();
@@ -39,8 +39,8 @@ fn typed_pidssi_round_trip_uses_contextual_accessors() {
         edit.set_document_version("3.7").unwrap();
     }
     let commit = transaction.commit().unwrap();
-    assert!(commit.changed());
-    let stream = Stream::new(commit.section().clone());
+    assert!(commit.diagnostics().changed());
+    let stream = Stream::new(commit.package().clone());
     let parsed = Stream::parse(&stream.to_bytes().unwrap()).unwrap();
     let typed = Snapshot::from_stream(&parsed).unwrap();
 
@@ -98,16 +98,16 @@ fn opaque_pidssi_payloads_survive_typed_edits_and_wire_round_trip() {
         .unwrap();
 
     let snapshot = Snapshot::from_section(&section).unwrap();
-    let mut transaction = snapshot.transaction().unwrap();
-    transaction.edit().set_category("Changed").unwrap();
+    let mut transaction = snapshot.edit().unwrap();
+    transaction.set_category("Changed").unwrap();
     let commit = transaction.commit().unwrap();
     assert_eq!(
-        commit.section().property(DIGITAL_SIGNATURE),
+        commit.package().property(DIGITAL_SIGNATURE),
         section.property(DIGITAL_SIGNATURE)
     );
-    assert_eq!(commit.section().property(0x25), section.property(0x25));
+    assert_eq!(commit.package().property(0x25), section.property(0x25));
 
-    let stream = Stream::new(commit.section().clone());
+    let stream = Stream::new(commit.package().clone());
     let parsed = Stream::parse(&stream.to_bytes().unwrap()).unwrap();
     let typed = Snapshot::from_stream(&parsed).unwrap();
     assert_eq!(
@@ -122,26 +122,39 @@ fn opaque_pidssi_payloads_survive_typed_edits_and_wire_round_trip() {
 fn patch_requires_the_exact_source_and_failed_edits_are_transactional() {
     let snapshot = Snapshot::new(CodePage::WINDOWS_1252).unwrap();
     let original = snapshot.section().clone();
-    let mut transaction = snapshot.transaction().unwrap();
-    assert!(transaction.edit().set_scale(true).is_err());
+    let mut transaction = snapshot.edit().unwrap();
+    assert!(transaction.set_scale(true).is_err());
     let unchanged = transaction.commit().unwrap();
-    assert!(!unchanged.changed());
-    assert_eq!(unchanged.section(), &original);
+    assert!(!unchanged.diagnostics().changed());
+    assert_eq!(unchanged.package(), &original);
 
-    let mut transaction = snapshot.transaction().unwrap();
-    transaction.edit().set_category("New").unwrap();
+    let mut transaction = snapshot.edit().unwrap();
+    transaction.set_category("New").unwrap();
     let commit = transaction.commit().unwrap();
     let patch = commit.patch();
     assert_eq!(
         patch.apply(&original).unwrap().property(CATEGORY),
-        commit.section().property(CATEGORY)
+        commit.package().property(CATEGORY)
+    );
+
+    // Reopening an equal section must preserve replay capability even though
+    // it is a distinct owner allocation.
+    let reparsed_stream =
+        Stream::parse(&Stream::new(original.clone()).to_bytes().unwrap()).unwrap();
+    let reparsed = Snapshot::from_stream(&reparsed_stream).unwrap();
+    assert_eq!(
+        patch.apply(reparsed.section()).unwrap().property(CATEGORY),
+        commit.package().property(CATEGORY)
     );
 
     let mut different_source = original.clone();
     different_source
         .add(CATEGORY, Value::Lpstr("Other".into()))
         .unwrap();
-    assert!(patch.apply(&different_source).is_err());
+    assert!(matches!(
+        patch.apply(&different_source),
+        Err(crate::Error::PatchConflict)
+    ));
 }
 
 #[test]
@@ -171,26 +184,26 @@ fn known_pid_types_and_required_invariants_are_checked() {
 #[test]
 fn typed_string_edits_are_bounded_and_follow_the_section_codepage() {
     let ansi_snapshot = Snapshot::new(CodePage::WINDOWS_1252).unwrap();
-    let mut ansi = ansi_snapshot.transaction().unwrap();
-    ansi.edit().set_category("ANSI").unwrap();
+    let mut ansi = ansi_snapshot.edit().unwrap();
+    ansi.set_category("ANSI").unwrap();
     let commit = ansi.commit().unwrap();
     assert!(matches!(
-        commit.section().property(CATEGORY),
+        commit.package().property(CATEGORY),
         Some(Value::Lpstr(_))
     ));
 
     let unicode_snapshot = Snapshot::new(CodePage::Utf16Le).unwrap();
-    let mut unicode = unicode_snapshot.transaction().unwrap();
-    unicode.edit().set_category("Unicode").unwrap();
+    let mut unicode = unicode_snapshot.edit().unwrap();
+    unicode.set_category("Unicode").unwrap();
     let commit = unicode.commit().unwrap();
     assert!(matches!(
-        commit.section().property(CATEGORY),
+        commit.package().property(CATEGORY),
         Some(Value::Lpwstr(_))
     ));
 
     let oversized = "x".repeat(MAX_TEXT_BYTES + 1);
     let bounded_snapshot = Snapshot::new(CodePage::WINDOWS_1252).unwrap();
-    let mut bounded = bounded_snapshot.transaction().unwrap();
-    assert!(bounded.edit().set_category(&oversized).is_err());
-    assert!(!bounded.commit().unwrap().changed());
+    let mut bounded = bounded_snapshot.edit().unwrap();
+    assert!(bounded.set_category(&oversized).is_err());
+    assert!(!bounded.commit().unwrap().diagnostics().changed());
 }

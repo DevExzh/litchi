@@ -1,0 +1,449 @@
+{
+ "schema": "litchi.unified-ops.0250.abba.v1",
+ "method": "ABBA x2 (8 processes), each process 40 samples + 5 warmup per case; value = median over runs of each run's p50; taskset -c 27; shared 32-core AMD EPYC 9R45 host",
+ "base": {
+  "commit": "908f9cccdd",
+  "binary_sha256": "58ff342799f711f64b1adba398571af81db68cebc8a44fe2e344a4ca7cf88acc"
+ },
+ "candidate": {
+  "commit": "a3418ede8b",
+  "binary_sha256": "5e8c99f8b4449736fa9d9ac24ac70744f46635b6277699f5b724c1b1aac5d570"
+ },
+ "build": "cargo build --release --manifest-path tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline",
+ "command": "litchi-perf-baseline --case xlsx_open_owned,xlsx_bytes_leaf_open,xlsx_one_cell_commit,xlsx_one_percent_commit,xlsx_noop_commit,xlsx_one_cell_commit_save,xlsx_noop_commit_save,xlsx_ordinary_save_edit --samples 40 --warmup 5",
+ "results": [
+  {
+   "case": "xlsx_bytes_leaf_open",
+   "fixture": "xlsx-cell-values-medium",
+   "base_p50_median_ns": 59150.0,
+   "new_p50_median_ns": 61670.0,
+   "delta_pct": 4.26,
+   "base_run_p50s": [
+    58975,
+    58920,
+    68695,
+    59325
+   ],
+   "new_run_p50s": [
+    73980,
+    61555,
+    61785,
+    58650
+   ]
+  },
+  {
+   "case": "xlsx_noop_commit",
+   "fixture": "xlsx-dense-wide",
+   "base_p50_median_ns": 1400.0,
+   "new_p50_median_ns": 1287.5,
+   "delta_pct": -8.04,
+   "base_run_p50s": [
+    1245,
+    2335,
+    1285,
+    1515
+   ],
+   "new_run_p50s": [
+    1280,
+    1295,
+    1265,
+    1345
+   ]
+  },
+  {
+   "case": "xlsx_noop_commit",
+   "fixture": "xlsx-medium",
+   "base_p50_median_ns": 300.0,
+   "new_p50_median_ns": 290.0,
+   "delta_pct": -3.33,
+   "base_run_p50s": [
+    290,
+    310,
+    280,
+    310
+   ],
+   "new_run_p50s": [
+    290,
+    290,
+    455,
+    290
+   ]
+  },
+  {
+   "case": "xlsx_noop_commit",
+   "fixture": "xlsx-tiny",
+   "base_p50_median_ns": 235.0,
+   "new_p50_median_ns": 215.0,
+   "delta_pct": -8.51,
+   "base_run_p50s": [
+    220,
+    240,
+    240,
+    230
+   ],
+   "new_run_p50s": [
+    220,
+    230,
+    200,
+    210
+   ]
+  },
+  {
+   "case": "xlsx_noop_commit_save",
+   "fixture": "xlsx-dense-wide",
+   "base_p50_median_ns": 16875.0,
+   "new_p50_median_ns": 17212.5,
+   "delta_pct": 2.0,
+   "base_run_p50s": [
+    17200,
+    16810,
+    16355,
+    16940
+   ],
+   "new_run_p50s": [
+    17285,
+    17245,
+    17180,
+    17160
+   ]
+  },
+  {
+   "case": "xlsx_noop_commit_save",
+   "fixture": "xlsx-medium",
+   "base_p50_median_ns": 535.0,
+   "new_p50_median_ns": 540.0,
+   "delta_pct": 0.93,
+   "base_run_p50s": [
+    540,
+    540,
+    480,
+    530
+   ],
+   "new_run_p50s": [
+    480,
+    540,
+    540,
+    540
+   ]
+  },
+  {
+   "case": "xlsx_noop_commit_save",
+   "fixture": "xlsx-tiny",
+   "base_p50_median_ns": 315.0,
+   "new_p50_median_ns": 305.0,
+   "delta_pct": -3.17,
+   "base_run_p50s": [
+    310,
+    320,
+    325,
+    290
+   ],
+   "new_run_p50s": [
+    300,
+    310,
+    310,
+    290
+   ]
+  },
+  {
+   "case": "xlsx_one_cell_commit",
+   "fixture": "xlsx-dense-wide",
+   "base_p50_median_ns": 15091963.0,
+   "new_p50_median_ns": 15251446.5,
+   "delta_pct": 1.06,
+   "base_run_p50s": [
+    14977545,
+    15206381,
+    15350625,
+    14930941
+   ],
+   "new_run_p50s": [
+    15113542,
+    15401536,
+    15265960,
+    15236933
+   ]
+  },
+  {
+   "case": "xlsx_one_cell_commit",
+   "fixture": "xlsx-medium",
+   "base_p50_median_ns": 426232.0,
+   "new_p50_median_ns": 428655.0,
+   "delta_pct": 0.57,
+   "base_run_p50s": [
+    425597,
+    423753,
+    426867,
+    428322
+   ],
+   "new_run_p50s": [
+    426532,
+    427262,
+    430048,
+    432222
+   ]
+  },
+  {
+   "case": "xlsx_one_cell_commit",
+   "fixture": "xlsx-tiny",
+   "base_p50_median_ns": 65882.5,
+   "new_p50_median_ns": 66112.5,
+   "delta_pct": 0.35,
+   "base_run_p50s": [
+    65635,
+    66176,
+    66130,
+    65485
+   ],
+   "new_run_p50s": [
+    65525,
+    66355,
+    66160,
+    66065
+   ]
+  },
+  {
+   "case": "xlsx_one_cell_commit_save",
+   "fixture": "xlsx-dense-wide",
+   "base_p50_median_ns": 60495886.5,
+   "new_p50_median_ns": 60516064.0,
+   "delta_pct": 0.03,
+   "base_run_p50s": [
+    60483871,
+    61391117,
+    60507902,
+    59863420
+   ],
+   "new_run_p50s": [
+    60601482,
+    60029383,
+    60430646,
+    60626267
+   ]
+  },
+  {
+   "case": "xlsx_one_cell_commit_save",
+   "fixture": "xlsx-medium",
+   "base_p50_median_ns": 851962.5,
+   "new_p50_median_ns": 855877.0,
+   "delta_pct": 0.46,
+   "base_run_p50s": [
+    851260,
+    852665,
+    863575,
+    847399
+   ],
+   "new_run_p50s": [
+    848599,
+    853504,
+    858250,
+    860499
+   ]
+  },
+  {
+   "case": "xlsx_one_cell_commit_save",
+   "fixture": "xlsx-tiny",
+   "base_p50_median_ns": 102062.5,
+   "new_p50_median_ns": 102605.5,
+   "delta_pct": 0.53,
+   "base_run_p50s": [
+    101016,
+    102105,
+    102960,
+    102020
+   ],
+   "new_run_p50s": [
+    101551,
+    102510,
+    102806,
+    102701
+   ]
+  },
+  {
+   "case": "xlsx_one_percent_commit",
+   "fixture": "xlsx-dense-wide",
+   "base_p50_median_ns": 33234370.0,
+   "new_p50_median_ns": 33741491.5,
+   "delta_pct": 1.53,
+   "base_run_p50s": [
+    33139219,
+    34069012,
+    33329521,
+    32960034
+   ],
+   "new_run_p50s": [
+    33673803,
+    33809180,
+    33824269,
+    33477733
+   ]
+  },
+  {
+   "case": "xlsx_one_percent_commit",
+   "fixture": "xlsx-medium",
+   "base_p50_median_ns": 1669789.5,
+   "new_p50_median_ns": 1675359.0,
+   "delta_pct": 0.33,
+   "base_run_p50s": [
+    1672520,
+    1662649,
+    1681519,
+    1667059
+   ],
+   "new_run_p50s": [
+    1667700,
+    1673324,
+    1677394,
+    1683549
+   ]
+  },
+  {
+   "case": "xlsx_one_percent_commit",
+   "fixture": "xlsx-tiny",
+   "base_p50_median_ns": 109080.5,
+   "new_p50_median_ns": 109451.0,
+   "delta_pct": 0.34,
+   "base_run_p50s": [
+    108630,
+    109305,
+    109260,
+    108901
+   ],
+   "new_run_p50s": [
+    109561,
+    110101,
+    109225,
+    109341
+   ]
+  },
+  {
+   "case": "xlsx_open_owned",
+   "fixture": "xlsx-dense-wide",
+   "base_p50_median_ns": 1348213.0,
+   "new_p50_median_ns": 1345800.0,
+   "delta_pct": -0.18,
+   "base_run_p50s": [
+    1360647,
+    1348663,
+    1347763,
+    1343042
+   ],
+   "new_run_p50s": [
+    1335153,
+    1351443,
+    1340157,
+    1572933
+   ]
+  },
+  {
+   "case": "xlsx_open_owned",
+   "fixture": "xlsx-medium",
+   "base_p50_median_ns": 102410.0,
+   "new_p50_median_ns": 102946.0,
+   "delta_pct": 0.52,
+   "base_run_p50s": [
+    103000,
+    102565,
+    102255,
+    102185
+   ],
+   "new_run_p50s": [
+    102946,
+    102700,
+    102946,
+    103005
+   ]
+  },
+  {
+   "case": "xlsx_open_owned",
+   "fixture": "xlsx-tiny",
+   "base_p50_median_ns": 51402.5,
+   "new_p50_median_ns": 51727.5,
+   "delta_pct": 0.63,
+   "base_run_p50s": [
+    51225,
+    51515,
+    51810,
+    51290
+   ],
+   "new_run_p50s": [
+    51430,
+    52016,
+    51710,
+    51745
+   ]
+  },
+  {
+   "case": "xlsx_ordinary_save_edit",
+   "fixture": "xlsx-cell-values-medium",
+   "base_p50_median_ns": 2376030.5,
+   "new_p50_median_ns": 2379358.0,
+   "delta_pct": 0.14,
+   "base_run_p50s": [
+    2341318,
+    2347828,
+    2453493,
+    2404233
+   ],
+   "new_run_p50s": [
+    2380923,
+    2390018,
+    2346878,
+    2377793
+   ]
+  }
+ ],
+ "leaf_open_rerun": {
+  "method": "ABBA x3, 100 samples + 10 warmup, p50 per process",
+  "runs": [
+   {
+    "side": "A",
+    "p50_ns": 60675
+   },
+   {
+    "side": "B",
+    "p50_ns": 61075
+   },
+   {
+    "side": "B",
+    "p50_ns": 65030
+   },
+   {
+    "side": "A",
+    "p50_ns": 68225
+   },
+   {
+    "side": "A",
+    "p50_ns": 64740
+   },
+   {
+    "side": "B",
+    "p50_ns": 66110
+   },
+   {
+    "side": "B",
+    "p50_ns": 72430
+   },
+   {
+    "side": "A",
+    "p50_ns": 60395
+   },
+   {
+    "side": "A",
+    "p50_ns": 60430
+   },
+   {
+    "side": "B",
+    "p50_ns": 60720
+   },
+   {
+    "side": "B",
+    "p50_ns": 59840
+   },
+   {
+    "side": "A",
+    "p50_ns": 60460
+   }
+  ]
+ }
+}

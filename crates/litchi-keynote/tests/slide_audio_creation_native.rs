@@ -11,7 +11,8 @@ use litchi_iwa_common::shape::geometry::Point;
 use litchi_iwa_core::{Archive, SnappyStream};
 use litchi_iwa_protos::{kn, tsd};
 use litchi_keynote::{
-    MediaPart, MovieKind, MovieSelector, Package, SlideSelector, slide::audio::Options,
+    MovieKind, MovieSelector, Package, SlideSelector, slide::audio::Options,
+    slide::media::data::MediaPart,
 };
 use prost::Message;
 
@@ -65,12 +66,13 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn native_archives(source: &[u8]) -> TestResult<Vec<Archive>> {
-    Catalog::from_bytes(source)?
+    Catalog::from_bytes(source, Default::default())?
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
         .map(|entry| {
             Ok(Archive::parse(
-                &SnappyStream::decompress(entry.data())?.into_bytes(),
+                &SnappyStream::decompress(entry.data(), Default::default())?.into_bytes(),
+                Default::default(),
             )?)
         })
         .collect()
@@ -349,8 +351,10 @@ fn audio_creation_from_saved_keynote_fixture_round_trips_exactly() -> TestResult
     let source = Package::from_bytes(NATIVE_FOCUSED)?;
     let data = audio();
     let requested = Options::new(Point { x: 321.0, y: 42.0 }, Duration::from_millis(250))?;
-    let commit =
-        source.add_slide_audio(SlideSelector::index(0), "second-pcm.wav", &data, requested)?;
+    let commit = source
+        .edit_slide_audio_creation()
+        .add(SlideSelector::index(0), "second-pcm.wav", &data, requested)
+        .and_then(|edit| edit.commit())?;
     let candidate_bytes = exact_bytes(commit.package())?;
     assert_ne!(candidate_bytes, exact_bytes(&source)?);
     assert_eq!(commit.patch().created_objects(), 5);

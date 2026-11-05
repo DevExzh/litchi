@@ -1,10 +1,8 @@
 //! Parser for one `table:data-pilot-table` declaration.
 
 use litchi_core::Result;
-use quick_xml::{
-    events::{BytesStart, Event},
-    reader::NsReader,
-};
+use litchi_odf_common::{ResolvedReader, XmlStreamLimits};
+use quick_xml::events::{BytesStart, Event};
 
 use crate::model::data_pilot::{
     invalid_message,
@@ -23,7 +21,11 @@ use super::{
     support::xml_error,
 };
 
-pub(super) fn parse_table(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Table> {
+pub(super) fn parse_table(
+    reader: &mut ResolvedReader<'_>,
+    start: &BytesStart<'_>,
+    limits: &XmlStreamLimits,
+) -> Result<Table> {
     let mut table = Table {
         name: required_attr(reader, start, b"name")?,
         application_data: optional_attr(reader, start, b"application-data")?,
@@ -41,11 +43,8 @@ pub(super) fn parse_table(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) 
         fields: Vec::new(),
     };
     let mut fields_started = false;
-    let mut buf = Vec::new();
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buf)
-            .map_err(xml_error)?;
+        let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         match event {
             Event::Start(ref element)
                 if is_table_ext(&namespace, element, b"data-pilot-grand-total") =>
@@ -76,7 +75,7 @@ pub(super) fn parse_table(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) 
                 }
                 set_once(
                     &mut table.source,
-                    Source::Database(parse_source_sql(reader, element)?),
+                    Source::Database(parse_source_sql(reader, element, limits)?),
                     "data-pilot source",
                 )?;
             },
@@ -88,7 +87,7 @@ pub(super) fn parse_table(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) 
                 }
                 set_once(
                     &mut table.source,
-                    Source::Database(parse_source_table(reader, element)?),
+                    Source::Database(parse_source_table(reader, element, limits)?),
                     "data-pilot source",
                 )?;
             },
@@ -100,7 +99,7 @@ pub(super) fn parse_table(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) 
                 }
                 set_once(
                     &mut table.source,
-                    Source::Database(parse_source_query(reader, element)?),
+                    Source::Database(parse_source_query(reader, element, limits)?),
                     "data-pilot source",
                 )?;
             },
@@ -123,7 +122,7 @@ pub(super) fn parse_table(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) 
                 if fields_started {
                     return Err(invalid_message("data-pilot source must precede all fields"));
                 }
-                let source = parse_cell_range_source(reader, element)?;
+                let source = parse_cell_range_source(reader, element, limits)?;
                 set_once(&mut table.source, source, "data-pilot source")?;
             },
             Event::Empty(ref element) if is_table(&namespace, element, b"source-cell-range") => {
@@ -139,10 +138,20 @@ pub(super) fn parse_table(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) 
             },
             Event::Start(ref element) if is_table(&namespace, element, b"data-pilot-field") => {
                 fields_started = true;
-                table.fields.push(parse_field(reader, element)?);
+                if table.fields.len() >= limits.max_events() {
+                    return Err(invalid_message(
+                        "data-pilot field collection exceeds the configured event limit",
+                    ));
+                }
+                table.fields.push(parse_field(reader, element, limits)?);
             },
             Event::Empty(ref element) if is_table(&namespace, element, b"data-pilot-field") => {
                 fields_started = true;
+                if table.fields.len() >= limits.max_events() {
+                    return Err(invalid_message(
+                        "data-pilot field collection exceeds the configured event limit",
+                    ));
+                }
                 table.fields.push(field_from_start(reader, element)?);
             },
             Event::End(ref element) if is_table(&namespace, element, b"data-pilot-table") => break,
@@ -175,13 +184,12 @@ pub(super) fn parse_table(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) 
                 )));
             },
         }
-        buf.clear();
     }
     Ok(table)
 }
 
 fn parse_grand_total(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
 ) -> Result<GrandTotalElement> {
     Ok(GrandTotalElement {

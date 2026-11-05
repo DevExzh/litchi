@@ -268,9 +268,14 @@ pub(crate) struct EscherDgData {
 
 impl EscherDgData {
     pub(crate) fn new(shape_count: u32, drawing_id: u32) -> Self {
+        Self::with_spid_base(shape_count, drawing_id << 10)
+    }
+
+    /// The drawing record of shapes numbered from `spid_base`.
+    pub(crate) const fn with_spid_base(shape_count: u32, spid_base: u32) -> Self {
         Self {
             csp: shape_count,
-            spid_cur: (drawing_id << 10) + shape_count,
+            spid_cur: spid_base + shape_count,
         }
     }
 }

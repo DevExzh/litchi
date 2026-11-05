@@ -187,9 +187,8 @@ impl Element {
     /// MathML-namespace elements share the default namespace declared on the
     /// subtree root; foreign namespaces receive generated `ns1..nsN`
     /// prefixes in first-use order.
-    #[must_use]
-    pub fn to_xml(&self) -> String {
-        crate::codec::serialize::write_mathml(self)
+    pub fn to_xml(&self, limits: &crate::codec::Limits) -> Result<String> {
+        crate::codec::serialize::write_mathml(self, limits)
     }
 }
 

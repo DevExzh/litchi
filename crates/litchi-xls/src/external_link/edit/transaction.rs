@@ -1,5 +1,6 @@
 //! Failure-atomic metadata edits over one external-link snapshot.
 
+use litchi_core::edit::RefusalKind;
 use std::sync::Arc;
 
 use crate::{Error, Result};
@@ -7,18 +8,18 @@ use crate::{Error, Result};
 use super::super::codec::{encode_external_name, encode_supporting_book};
 use super::super::model::{Name, NameBody, SupportingBook};
 use super::super::package::Package;
-use super::{Commit, Patch, Snapshot};
+use super::{Commit, Diagnostics, Patch, Snapshot};
 
 /// A detached transaction over inert supporting-book, external-name, and
 /// external-cache metadata.
 #[derive(Clone)]
-pub struct Transaction {
+pub struct Edit {
     source: Snapshot,
     candidate: Vec<u8>,
     package: Package,
 }
 
-impl Transaction {
+impl Edit {
     pub(crate) fn new(source: Snapshot) -> Self {
         Self {
             candidate: source.bytes().to_vec(),
@@ -45,21 +46,6 @@ impl Transaction {
         self.package.links()
     }
 
-    /// Materializes the current candidate as a validated immutable snapshot.
-    pub fn snapshot(&self) -> Result<Snapshot> {
-        if self.candidate.as_slice() == self.source.bytes() {
-            Ok(self.source.clone())
-        } else {
-            Snapshot::parse(&self.candidate)
-        }
-    }
-
-    /// Whether a staged edit changes any stream byte.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.candidate.as_slice() != self.source.bytes()
-    }
-
     /// Replaces one external or DDE/OLE supporting-book target string.
     ///
     /// The target remains inert BIFF metadata; this operation never checks the
@@ -77,14 +63,18 @@ impl Transaction {
             .get(book_index)
             .cloned()
             .ok_or_else(|| {
-                Error::UnsafeEdit(format!(
-                    "supporting-book index {book_index} is outside the external-link collection"
-                ))
+                Error::refused(
+                    RefusalKind::InvalidValue,
+                    "edit external links",
+                    "supporting-book index is outside the external-link collection",
+                )
             })?;
         let current = supporting_book_target(&book).ok_or_else(|| {
-            Error::UnsafeEdit(format!(
-                "supporting-book {book_index} does not own editable target metadata"
-            ))
+            Error::refused(
+                RefusalKind::UnsupportedTarget,
+                "edit external links",
+                "supporting-book does not own editable target metadata",
+            )
         })?;
         if current == target {
             return Ok(self);
@@ -109,19 +99,25 @@ impl Transaction {
             .get(book_index)
             .cloned()
             .ok_or_else(|| {
-                Error::UnsafeEdit(format!(
-                    "supporting-book index {book_index} is outside the external-link collection"
-                ))
+                Error::refused(
+                    RefusalKind::InvalidValue,
+                    "edit external links",
+                    "supporting-book index is outside the external-link collection",
+                )
             })?;
         let SupportingBook::ExternalWorkbook(workbook) = &book else {
-            return Err(Error::UnsafeEdit(format!(
-                "supporting-book {book_index} does not own external sheet names"
-            )));
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit external links",
+                "supporting-book does not own external sheet names",
+            ));
         };
         let sheet = workbook.sheets().get(sheet_index).ok_or_else(|| {
-            Error::UnsafeEdit(format!(
-                "sheet index {sheet_index} is outside supporting book {book_index}"
-            ))
+            Error::refused(
+                RefusalKind::InvalidValue,
+                "edit external links",
+                "sheet index is outside supporting book",
+            )
         })?;
         if sheet.name() == name {
             return Ok(self);
@@ -142,9 +138,11 @@ impl Transaction {
             .get(name_index)
             .and_then(name_value)
             .ok_or_else(|| {
-                Error::UnsafeEdit(format!(
-                    "external-name index {name_index} is outside the external-link collection"
-                ))
+                Error::refused(
+                    RefusalKind::InvalidValue,
+                    "edit external links",
+                    "external-name index is outside the external-link collection",
+                )
             })?;
         if current == name {
             return Ok(self);
@@ -172,19 +170,25 @@ impl Transaction {
             .supporting_books()
             .get(book_index)
             .ok_or_else(|| {
-                Error::UnsafeEdit(format!(
-                    "supporting-book index {book_index} is outside the external-link collection"
-                ))
+                Error::refused(
+                    RefusalKind::InvalidValue,
+                    "edit external links",
+                    "supporting-book index is outside the external-link collection",
+                )
             })?;
         let SupportingBook::ExternalWorkbook(workbook) = book else {
-            return Err(Error::UnsafeEdit(format!(
-                "supporting-book {book_index} does not own external cache sheets"
-            )));
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit external links",
+                "supporting-book does not own external cache sheets",
+            ));
         };
         let sheet = workbook.sheets().get(sheet_index).ok_or_else(|| {
-            Error::UnsafeEdit(format!(
-                "sheet index {sheet_index} is outside supporting book {book_index}"
-            ))
+            Error::refused(
+                RefusalKind::InvalidValue,
+                "edit external links",
+                "sheet index is outside supporting book",
+            )
         })?;
         let cache = self.package.cache_record(book_index, sheet_index)?;
         if sheet.cache_valid() == valid {
@@ -192,34 +196,40 @@ impl Transaction {
         }
         let magnitude = cache.declared.unsigned_abs();
         if !valid && magnitude == 0 {
-            return Err(Error::UnsafeEdit(
-                "a zero-cardinality XCT cannot represent an invalid cache".into(),
+            return Err(Error::refused(
+                RefusalKind::InvalidValue,
+                "edit external links",
+                "a zero-cardinality XCT cannot represent an invalid cache",
             ));
         }
         let declared = if valid {
             i16::try_from(magnitude).map_err(|_error| {
-                Error::UnsafeEdit("XCT cache cardinality does not fit signed BIFF8 count".into())
+                Error::refused(
+                    RefusalKind::InvalidValue,
+                    "edit external links",
+                    "XCT cache cardinality does not fit signed BIFF8 count",
+                )
             })?
         } else {
             -i16::try_from(magnitude).map_err(|_error| {
-                Error::UnsafeEdit("XCT cache cardinality does not fit signed BIFF8 count".into())
+                Error::refused(
+                    RefusalKind::InvalidValue,
+                    "edit external links",
+                    "XCT cache cardinality does not fit signed BIFF8 count",
+                )
             })?
         };
         let mut replacement = cache.record.payload(&self.candidate).to_vec();
         if replacement.len() != 4 {
-            return Err(Error::UnsafeEdit(
-                "selected XCT record is not owned by the parsed cache model".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit external links",
+                "selected XCT record is not owned by the parsed cache model",
             ));
         }
         replacement[..2].copy_from_slice(&declared.to_le_bytes());
         self.replace_record(cache.record, &replacement)?;
         Ok(self)
-    }
-
-    /// Discards all staged edits and returns the original source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
     }
 
     /// Validates and publishes the candidate with a reversible source-checked
@@ -228,11 +238,12 @@ impl Transaction {
         let source = self.source;
         if self.candidate.as_slice() == source.bytes() {
             let patch = Patch::new(source.clone(), source.clone());
-            return Ok(Commit::new(source, patch));
+            return Ok(Commit::new(source, patch, Diagnostics::UNCHANGED));
         }
         let snapshot = Snapshot::parse_shared(Arc::from(self.candidate.into_boxed_slice()))?;
         let patch = Patch::new(source, snapshot.clone());
-        Ok(Commit::new(snapshot, patch))
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(snapshot, patch, diagnostics))
     }
 
     fn replace_record(

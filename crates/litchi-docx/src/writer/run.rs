@@ -5,10 +5,6 @@
         reason = "items remain grouped by OOXML schema family and package lifecycle"
     )
 )]
-#![expect(
-    clippy::module_name_repetitions,
-    reason = "public names retain established OOXML facade terminology"
-)]
 //! Run types and implementation for DOCX documents.
 use crate::OfficeMath;
 use crate::error::{Error, Result};
@@ -18,7 +14,7 @@ use litchi_core::xml::escape_xml;
 use std::fmt::Write as FmtWrite;
 
 // Import shared format types
-pub use super::super::format::UnderlineStyle;
+pub(crate) use super::super::format::UnderlineStyle;
 // Import section types for PageNumberFormat
 use super::revision::{RevisionMetadata, RevisionTextMode, RunPropertyChange};
 use super::section::PageNumberFormat;
@@ -50,7 +46,7 @@ pub enum RunContent {
 ///
 /// Runs contain text and character formatting.
 #[derive(Debug, Clone)]
-pub struct MutableRun {
+pub struct Run {
     /// Run content
     pub(crate) content: RunContent,
     /// Run properties
@@ -62,7 +58,7 @@ pub struct MutableRun {
 use litchi_fonts::{CollectGlyphs, GlyphMap, Request, Style as FontStyle};
 
 #[cfg(feature = "fonts")]
-impl CollectGlyphs for MutableRun {
+impl CollectGlyphs for Run {
     fn collect_glyphs(&self) -> GlyphMap {
         let mut glyphs = GlyphMap::new();
         if let RunContent::Text(text) = &self.content
@@ -87,7 +83,7 @@ impl CollectGlyphs for MutableRun {
     }
 }
 
-impl MutableRun {
+impl Run {
     pub(crate) fn new() -> Self {
         Self {
             content: RunContent::Text(String::new()),
@@ -256,11 +252,7 @@ impl MutableRun {
     }
 
     /// Record the run properties that existed before this formatting revision.
-    pub fn set_property_change(
-        &mut self,
-        metadata: RevisionMetadata,
-        previous: &MutableRun,
-    ) -> &mut Self {
+    pub fn set_property_change(&mut self, metadata: RevisionMetadata, previous: &Run) -> &mut Self {
         self.property_change = Some(RunPropertyChange::snapshot(metadata, previous));
         self
     }

@@ -1,7 +1,7 @@
 //! Generate the small ODG candidate used by the headless native metadata receipt.
 
-use litchi_odg::{Drawing, Transition};
-use std::{env, fs, io};
+use litchi_odg::{Package, Transition};
+use std::{env, io};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args_os();
@@ -19,7 +19,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err(io::Error::new(io::ErrorKind::InvalidInput, "too many arguments").into());
     }
 
-    let source = Drawing::from_bytes(fs::read(&source_path)?)?;
+    let source = Package::open(&source_path)?;
     let mut transition = Transition::new();
     transition.set_transition_type(Some("automatic"))?;
     transition.set_style(Some("dissolve"))?;
@@ -33,13 +33,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut edit = source.edit();
     edit.set_page_transition(0, Some(transition))?;
     let commit = edit.commit()?;
-    let output = commit.snapshot();
-    let reopened = Drawing::from_bytes(output.as_bytes().to_vec())?;
+    let output = commit.package();
+    let reopened = Package::from_bytes(output.as_bytes())?.drawing();
     println!("source={}", source_path.to_string_lossy());
     println!("candidate={}", destination_path.to_string_lossy());
     println!("bytes={}", output.as_bytes().len());
     println!("transition={:?}", reopened.pages()[0].transition());
     println!("active={:?}", reopened.active_content());
-    fs::write(destination_path, output.as_bytes())?;
+    output.save(destination_path)?;
     Ok(())
 }

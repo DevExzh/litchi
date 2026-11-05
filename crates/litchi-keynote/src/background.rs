@@ -18,3 +18,8 @@ pub enum Background {
     /// This marker is observable but cannot be authored or changed safely.
     Unsupported,
 }
+
+// Exact-source transaction vocabulary of this family (ADR 0034 W1).
+pub use crate::package::slide_background::{
+    Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+};

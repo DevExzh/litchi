@@ -3,7 +3,7 @@
 use crate::consts::RecordType;
 use crate::embedded::reference::Reference;
 use crate::hyperlink::Hyperlinks;
-use crate::package::{Error, Result};
+use crate::package::{Error, Result, SourceLimits};
 use crate::records::Record;
 use std::collections::HashSet;
 
@@ -20,6 +20,31 @@ pub(crate) struct ValidatedSource {
     pub(crate) hyperlink_ids: Vec<u32>,
 }
 
+/// Translate the external-media policy into the limits used by the nested
+/// generic PPT record parser.  Every variable child sequence must use this
+/// same selected policy rather than silently falling back to parser defaults.
+pub(crate) fn record_limits(limits: Limits) -> Result<SourceLimits> {
+    validate_limits(limits)?;
+    SourceLimits::builder()
+        .max_input_bytes(limits.max_root_bytes)?
+        .max_entry_bytes(limits.max_root_bytes)?
+        .max_aggregate_bytes(limits.max_root_bytes)?
+        .max_record_bytes(limits.max_record_bytes)?
+        .max_events(limits.max_records)?
+        .max_depth(limits.max_depth)?
+        .max_record_payload_bytes(limits.max_record_bytes.saturating_sub(8))?
+        .max_aggregate_payload_bytes(limits.max_root_bytes)?
+        .build()
+}
+
+fn officeart_limits(limits: Limits) -> litchi_odraw::Limits {
+    litchi_odraw::Limits {
+        max_record_bytes: limits.max_record_bytes.min(u32::MAX as usize) as u32,
+        max_depth: limits.max_depth.min(u16::MAX as usize) as u16,
+        max_records: limits.max_records.min(u32::MAX as usize) as u32,
+    }
+}
+
 /// Parse and validate one complete source record tree.
 pub(crate) fn parse_source(bytes: &[u8], limits: Limits) -> Result<ValidatedSource> {
     validate_limits(limits)?;
@@ -33,7 +58,8 @@ pub(crate) fn parse_source(bytes: &[u8], limits: Limits) -> Result<ValidatedSour
             "PowerPoint external-media source is missing its root record header".into(),
         ));
     }
-    let (root, consumed) = Record::parse(bytes, 0)?;
+    let record_limits = record_limits(limits)?;
+    let (root, consumed) = Record::parse(bytes, 0, &record_limits)?;
     if consumed != bytes.len() {
         return Err(Error::Corrupted(
             "PowerPoint external-media source contains trailing bytes".into(),
@@ -42,8 +68,8 @@ pub(crate) fn parse_source(bytes: &[u8], limits: Limits) -> Result<ValidatedSour
     let mut record_count = 0usize;
     validate_record(&root, 0, limits, &mut record_count)?;
 
-    let collection = Collection::parse_media_only(&root)?;
-    let hyperlinks = Hyperlinks::parse(&root)?;
+    let collection = Collection::parse_media_only(&root, limits)?;
+    let hyperlinks = Hyperlinks::parse(&root, &record_limits)?;
     let hyperlink_ids = hyperlinks
         .hyperlinks
         .iter()
@@ -55,7 +81,7 @@ pub(crate) fn parse_source(bytes: &[u8], limits: Limits) -> Result<ValidatedSour
                 "external-object list reuses an ID for media and a hyperlink".into(),
             ));
         }
-        validate_collection(list, &hyperlink_ids)?;
+        validate_collection(list, &hyperlink_ids, limits)?;
     }
 
     let mut owner_ids = Vec::new();
@@ -85,14 +111,35 @@ pub(crate) fn validate_limits(limits: Limits) -> Result<()> {
     Ok(())
 }
 
+/// Re-check an already parsed root before a public record-level projection
+/// walks variable child containers.  This keeps direct callers on the same
+/// bounds as source-backed snapshots.
+pub(crate) fn validate_record_tree(root: &Record, limits: Limits) -> Result<()> {
+    validate_limits(limits)?;
+    let root_bytes = 8usize
+        .checked_add(root.data.len())
+        .ok_or_else(|| Error::Corrupted("PowerPoint root record size overflows usize".into()))?;
+    if root_bytes > limits.max_root_bytes {
+        return Err(Error::InvalidFormat(
+            "PowerPoint external-media root exceeds its byte limit".into(),
+        ));
+    }
+    let mut record_count = 0usize;
+    validate_record(root, 0, limits, &mut record_count)
+}
+
 /// Validate a candidate list against the document's hyperlink namespace.
-pub(crate) fn validate_collection(collection: &Collection, hyperlink_ids: &[u32]) -> Result<()> {
+pub(crate) fn validate_collection(
+    collection: &Collection,
+    hyperlink_ids: &[u32],
+    limits: Limits,
+) -> Result<()> {
     if collection.id_seed == 0 || collection.id_seed > i32::MAX as u32 {
         return Err(Error::Corrupted(
             "ExObjListAtom identifier seed must be a positive i32".into(),
         ));
     }
-    if collection.objects.len() > super::codec::MAX_EXTERNAL_MEDIA_OBJECTS {
+    if collection.objects.len() > super::codec::MAX_EXTERNAL_MEDIA_OBJECTS.min(limits.max_records) {
         return Err(Error::InvalidFormat(format!(
             "external-object list exceeds {} media objects",
             super::codec::MAX_EXTERNAL_MEDIA_OBJECTS
@@ -198,7 +245,8 @@ fn collect_officeart_owner_ids(
     record_count: &mut usize,
     depth: usize,
 ) -> Result<()> {
-    for record in litchi_odraw::Parser::new(data).records() {
+    let officeart_limits = officeart_limits(limits);
+    for record in litchi_odraw::Parser::new(data, officeart_limits).records() {
         let parsed_record = record?;
         collect_officeart_record(&parsed_record, limits, owner_ids, record_count, depth)?;
     }
@@ -219,7 +267,12 @@ fn collect_officeart_record(
     }
     visit_record_count(record_count, limits)?;
     if record.kind() == litchi_odraw::RecordKind::ClientData {
-        for child in Record::parse_sequence_strict(record.data(), "OfficeArt ClientData")? {
+        let record_limits = record_limits(limits)?;
+        for child in Record::parse_sequence_strict_with_limits(
+            record.data(),
+            "OfficeArt ClientData",
+            record_limits,
+        )? {
             collect_owner_ids(&child, limits, owner_ids, record_count)?;
         }
     }

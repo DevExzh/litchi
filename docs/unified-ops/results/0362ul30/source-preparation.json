@@ -1,0 +1,192 @@
+{
+  "baseline_bindings": {
+    "odf": {
+      "commit": "173dd5330476713714871007316794b9a3a1bdaa"
+    },
+    "odg": {
+      "commit": "ad52437f5e5e2c71ea476eedd5ddcf61aee2021d",
+      "root_lock_sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+      "source_closure": {
+        "bytes": 6263042584,
+        "entries": 460379,
+        "sha256": "4832e5ab43ef930da7d5ddac9f9af74a0dac8bea98ea23c6fa9220d8a44bee42"
+      },
+      "tree": "34a2b3f7d81b7175bd6d2d366e49bc9201e1591d"
+    },
+    "odp": {
+      "commit": "e4a0614f5d3a1d768346cc33a4a3b86522dda986"
+    }
+  },
+  "candidate": {
+    "candidate_worktree": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/odg-final-prep-472b670547/candidate",
+    "commit": "472b6705475b073e7fe08f6e11ee17fb1e29f838",
+    "root_lock": {
+      "bytes": 139606,
+      "sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1"
+    },
+    "source_closure": {
+      "bytes": 6269467397,
+      "entries": 460717,
+      "sha256": "682a4b02744a7ab110c3ea5f061749215832cf2221c5c689632e9b7773b860bb"
+    },
+    "source_root": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source",
+    "tree": "ebc1cee05f124c0c63977aff07a23288c19e7d00"
+  },
+  "claim_scope": "source identities, preparation receipts, plans and executable commands only; no build, native timing, qualification or acceptance claim",
+  "date": "2026-10-24",
+  "execution": {
+    "acceptance_claim": false,
+    "cargo_builds_run": false,
+    "native_probes_run": false,
+    "odf_static_validation": "18 Python tests plus manifest-schema validation passed",
+    "odg_plan_validation": "passed",
+    "odp_plan_validation": "passed",
+    "timing_run": false
+  },
+  "final_packets": {
+    "odf": [
+      {
+        "bytes": 4625,
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/odf-final-prep-472b670547/input/odf-shared-triad.json",
+        "role": "manifest",
+        "sha256": "59e16a3bec360e71d24e6d19781554d58fc2160c32bfe31ef302894d6d4cf6de"
+      },
+      {
+        "bytes": 3023,
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/odf-final-prep-472b670547/preparation.json",
+        "role": "source-preparation-receipt",
+        "sha256": "18fcdba1653487cfcbf958b3d5e430ca106ab6e19bb5a0f89ebc804ed6d57bb8"
+      }
+    ],
+    "odg": [
+      {
+        "bytes": 8163,
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/odg-final-prep-472b670547/manifest.json",
+        "role": "manifest",
+        "sha256": "e678936335af1ac32097d30300a6c473868b69ca738c2526d4ce33f5a43cb60b"
+      },
+      {
+        "bytes": 1006,
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/odg-final-prep-472b670547/plan/plan.json",
+        "role": "plan",
+        "sha256": "f3849edb5ec65759e1c686f2027ffdca841a6a2303ca4f746a581a429ca8d852"
+      },
+      {
+        "bytes": 48198,
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/odg-final-prep-472b670547/prepare.json",
+        "role": "source-preparation-receipt",
+        "sha256": "5d559b6125e5212c6defbad0c2d64b8908f0017b76599833a3b0a9aca7af253f"
+      },
+      {
+        "bytes": 7838,
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/odg-final-prep-472b670547/execution-commands.json",
+        "role": "execution-commands",
+        "sha256": "e2d7b3f64aa287eac455f7bb5086c25f915b5218a3bd2ae099afc5dec360fb6c"
+      }
+    ],
+    "odp": [
+      {
+        "bytes": 1686,
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/odp-final-prep-472b670547/input.json",
+        "role": "input-manifest",
+        "sha256": "65197807c41a2de1200af623911275adeb2aafedbb40477dfa7ec6f47a7eb168"
+      },
+      {
+        "bytes": 2034,
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/odp-final-prep-472b670547/plan/plan.json",
+        "role": "plan",
+        "sha256": "e47db2ae6d707be66d35ba4a30de28b8511d6ab43ca08ec0e2d0ddf6cbbe1d23"
+      }
+    ]
+  },
+  "preserved_c796_packet": {
+    "candidate_commit": "c796d0acc24c7c6e6fd08980b9e31af6bb86b18b",
+    "odg": [
+      {
+        "bytes": 8263,
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/odg-final-prep-c796d0acc2/manifest.json",
+        "role": "manifest",
+        "sha256": "70df88e089559e25bd7ff0d9f63d15ce282d0d6dd78e4cd589787a642ed9f79b"
+      },
+      {
+        "bytes": 1006,
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/odg-final-prep-c796d0acc2/plan/plan.json",
+        "role": "plan",
+        "sha256": "885d83739221fbbfdd31136d841cdc5639f58cdfeef32f282e7bc22bde62b635"
+      },
+      {
+        "bytes": 48458,
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/odg-final-prep-c796d0acc2/prepare.json",
+        "role": "source-preparation-receipt",
+        "sha256": "b63499a1b8080662dbc5db622438bb6aa168091a9144454dd22d99bb428643cb"
+      }
+    ]
+  },
+  "protocol": {
+    "odf_routes": [
+      {
+        "changed_marker": "shared-triad qualification",
+        "facade": "File::edit -> set(/, title) -> commit",
+        "family": "odc",
+        "id": "odc_chart_title",
+        "leaf": "Package::edit -> replace_chart(title) -> commit",
+        "no_op": "Package::edit/File::edit with an empty closure",
+        "source": "litchi_odc::Package::new"
+      },
+      {
+        "changed_marker": "1cm,2cm,3cm,4cm frame geometry",
+        "facade": "File::edit -> set(/frame[1], geometry) -> commit",
+        "family": "odi",
+        "id": "odi_frame_geometry",
+        "leaf": "Package::edit -> set_geometry(frame 0) -> commit",
+        "no_op": "Package::edit/File::edit with an empty closure",
+        "source": "litchi_odi::Package::new"
+      },
+      {
+        "changed_marker": "shared-triad qualification",
+        "facade": "File::edit -> set(/body/p[1], text) -> commit",
+        "family": "oth",
+        "id": "oth_paragraph_text",
+        "leaf": "Package::edit -> set_paragraph_text(position 0) -> commit",
+        "no_op": "Package::edit/File::edit with an empty closure",
+        "source": "litchi_oth::Builder::paragraph(before)"
+      },
+      {
+        "changed_marker": "shared-triad qualification",
+        "facade": "File::edit -> set(/metadata, title) -> commit",
+        "family": "odm",
+        "id": "odm_title",
+        "leaf": "Package::edit -> set_title -> commit",
+        "no_op": "Package::edit/File::edit with an empty closure",
+        "source": "litchi_odm::Builder::new + timestamp-free Structure::default_meta_xml"
+      }
+    ],
+    "odg": {
+      "blocks": 2,
+      "cpu": 3,
+      "max_iterations": 1000000,
+      "max_load": 1.0,
+      "minimum_ms": 150,
+      "target_ms": 500,
+      "timeout_s": 300.0,
+      "warmups": 20
+    },
+    "odp_protocol": {
+      "blocks": 3,
+      "cpu": 3,
+      "max_iterations": 1000000,
+      "max_load": 1.0,
+      "minimum_ns": 150000000,
+      "target_ns": 500000000,
+      "timeout_s": 300.0,
+      "warmups": 3
+    },
+    "odp_routes": [
+      "open",
+      "read",
+      "write",
+      "append"
+    ]
+  },
+  "schema": "litchi.0362ul30.native-source-preparation.v1"
+}

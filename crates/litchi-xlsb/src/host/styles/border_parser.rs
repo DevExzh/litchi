@@ -77,7 +77,15 @@ impl Border {
     /// The BrtBorder record specifies border formatting properties.
     /// Each border side is a 10-byte `Blxf`: style, reserved byte, and an
     /// 8-byte `BrtColor`.
-    pub fn parse(data: &[u8]) -> Result<Self> {
+    pub fn parse(data: &[u8], limits: crate::raw::Limits) -> Result<Self> {
+        limits.validate()?;
+        if data.len() > limits.payload() {
+            return Err(Error::Wire(crate::raw::Error::PayloadLimit {
+                length: data.len(),
+                limit: limits.payload(),
+                offset: 0,
+            }));
+        }
         const BORDER_SIZE: usize = 51;
         if data.len() < BORDER_SIZE {
             return Err(Error::InvalidLength {
@@ -88,8 +96,8 @@ impl Border {
         let flags = data[0];
         if flags & !0x03 != 0 {
             return Err(Error::Unrecognized {
-                typ: "BrtBorder flags".to_string(),
-                val: format!("0x{flags:02X}"),
+                typ: "BrtBorder flags",
+                val: "0x",
             });
         }
 
@@ -110,8 +118,8 @@ impl Border {
         let style_byte = data[0];
         if style_byte > 13 || data[1] != 0 {
             return Err(Error::Unrecognized {
-                typ: "Blxf".to_string(),
-                val: format!("style 0x{style_byte:02X}, reserved 0x{:02X}", data[1]),
+                typ: "Blxf",
+                val: "style, reserved",
             });
         }
         let style = BorderStyle::from_u8(style_byte);
@@ -131,8 +139,8 @@ impl Border {
         }
         if !valid_rgb {
             return Err(Error::Unrecognized {
-                typ: "BrtColor".to_string(),
-                val: "direct RGB color is not marked valid".to_string(),
+                typ: "BrtColor",
+                val: "direct RGB color is not marked valid",
             });
         }
         Ok(Some(
@@ -159,7 +167,7 @@ mod tests {
     #[test]
     fn test_empty_border() {
         assert!(matches!(
-            Border::parse(&[]),
+            Border::parse(&[], crate::raw::Limits::DEFAULT),
             Err(Error::InvalidLength { .. })
         ));
     }
@@ -169,7 +177,7 @@ mod tests {
         let mut data = vec![0; 51];
         data[1] = 1;
         data[3..11].copy_from_slice(&[5, 0, 0, 0, 0x40, 0x20, 0x10, 0x80]);
-        let border = Border::parse(&data).unwrap();
+        let border = Border::parse(&data, crate::raw::Limits::DEFAULT).unwrap();
         assert!(border.top.is_some());
         let top = border.top.unwrap();
         assert_eq!(top.style, BorderStyle::Thin);
@@ -182,9 +190,22 @@ mod tests {
         let mut data = vec![0; 51];
         data[0] = 3;
         data[41] = 6;
-        let border = Border::parse(&data).unwrap();
+        let border = Border::parse(&data, crate::raw::Limits::DEFAULT).unwrap();
         assert!(border.diagonal_down);
         assert!(border.diagonal_up);
         assert_eq!(border.diagonal.unwrap().style, BorderStyle::Double);
+    }
+
+    #[test]
+    fn refuses_border_payload_above_the_required_raw_ceiling() {
+        let error = Border::parse(&[0; 51], crate::raw::Limits::new(50, 64)).unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Wire(crate::raw::Error::PayloadLimit {
+                length: 51,
+                limit: 50,
+                ..
+            })
+        ));
     }
 }

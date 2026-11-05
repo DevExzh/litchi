@@ -2,7 +2,9 @@
 
 use std::path::{Path, PathBuf};
 
-use litchi::{docx, ooxml_common::Props, pptx, xlsx};
+use litchi::{docx, pptx, xlsx};
+use litchi_core::Metadata;
+use litchi_ooxml_common::custom::Host;
 use litchi_ooxml_common::properties;
 use litchi_opc::OpcPackage;
 
@@ -26,27 +28,28 @@ fn main() -> Result<()> {
 fn create_docx(directory: &Path) -> Result<()> {
     let authored = directory.join("core-props.docx");
     let cleared = directory.join("core-props-cleared.docx");
-    let mut package = docx::Package::new()?;
-    package
-        .document_mut()?
+    let mut builder = docx::Builder::new()?;
+    builder
+        .document()?
         .add_heading("Litchi core-properties verification", 1)?;
-    package
-        .document_mut()?
+    builder
+        .document()?
         .add_paragraph_with_text("Word opened a move-authored metadata package.");
-    let _ = package.put_props(smoke_props("DOCX"));
-    package.save(&authored)?;
+    let mut metadata = builder.build()?.edit_metadata();
+    metadata.set(smoke_props("DOCX"));
+    metadata.commit()?.into_package().save(&authored)?;
 
-    let mut package = docx::Package::open(&authored)?;
-    let _ = package.clear_props();
-    package.save(&cleared)?;
+    let mut metadata = docx::Package::open(&authored)?.edit_metadata();
+    metadata.clear();
+    metadata.commit()?.into_package().save(&cleared)?;
     Ok(())
 }
 
 fn create_pptx(directory: &Path) -> Result<()> {
     let authored = directory.join("core-props.pptx");
     let cleared = directory.join("core-props-cleared.pptx");
-    let mut package = pptx::Package::new()?;
-    let slide = package.presentation_mut()?.add_slide()?;
+    let mut builder = pptx::builder::Builder::new()?;
+    let slide = builder.presentation()?.add_slide()?;
     slide.set_title("Litchi core-properties verification");
     slide.add_text_box(
         "PowerPoint opened a move-authored metadata package.",
@@ -55,21 +58,17 @@ fn create_pptx(directory: &Path) -> Result<()> {
         7_315_200,
         914_400,
     );
-    package.save(&authored)?;
-
-    let package = pptx::Package::open(&authored)?;
-    let mut graph = package.opc()?.clone();
-    let _ = properties::write(&mut graph, smoke_props("PPTX"))?;
-    let mut package = pptx::Package::from_opc_package(graph)?;
+    let package = builder.build()?;
+    let graph = publish_core(package.opc()?, Host::PowerPoint, Some(smoke_props("PPTX")))?;
+    let package = pptx::Package::from_opc_package(graph)?;
     package.save(&authored)?;
 
     let package = pptx::Package::open(&authored)?;
     if read_clean(package.opc()?)?.is_none() {
         return Err("PPTX core properties were not published".into());
     }
-    let mut graph = package.opc()?.clone();
-    let _ = properties::clear(&mut graph)?;
-    let mut package = pptx::Package::from_opc_package(graph)?;
+    let graph = publish_core(package.opc()?, Host::PowerPoint, None)?;
+    let package = pptx::Package::from_opc_package(graph)?;
     package.save(&cleared)?;
     Ok(())
 }
@@ -77,28 +76,41 @@ fn create_pptx(directory: &Path) -> Result<()> {
 fn create_xlsx(directory: &Path) -> Result<()> {
     let authored = directory.join("core-props.xlsx");
     let cleared = directory.join("core-props-cleared.xlsx");
-    let package = xlsx::Package::create()?;
+    let package = xlsx::Package::new()?;
     package.save(&authored)?;
 
-    let mut graph = OpcPackage::open(&authored)?;
-    let _ = properties::write(&mut graph, smoke_props("XLSX"))?;
+    let graph = OpcPackage::open(&authored, litchi_opc::SourceLimits::default())?;
+    let graph = publish_core(&graph, Host::Excel, Some(smoke_props("XLSX")))?;
     let package = xlsx::Package::from_opc(graph)?;
     package.save(&authored)?;
 
-    let graph = OpcPackage::open(&authored)?;
+    let graph = OpcPackage::open(&authored, litchi_opc::SourceLimits::default())?;
     if read_clean(&graph)?.is_none() {
         return Err("XLSX core properties were not published".into());
     }
-    let mut graph = OpcPackage::open(&authored)?;
-    let _ = properties::clear(&mut graph)?;
+    let graph = OpcPackage::open(&authored, litchi_opc::SourceLimits::default())?;
+    let graph = publish_core(&graph, Host::Excel, None)?;
     let package = xlsx::Package::from_opc(graph)?;
     package.save(&cleared)?;
     Ok(())
 }
 
+fn publish_core(package: &OpcPackage, host: Host, value: Option<Metadata>) -> Result<OpcPackage> {
+    let mut edit = properties::Edit::new(package, host)?;
+    match value {
+        Some(value) => {
+            edit.set_metadata(value);
+        },
+        None => {
+            edit.clear_metadata();
+        },
+    }
+    Ok(edit.commit()?.into_package())
+}
+
 /// Read core properties the example just authored; a freshly written part
 /// needs no repair.
-fn read_clean(package: &OpcPackage) -> Result<Option<Props>> {
+fn read_clean(package: &OpcPackage) -> Result<Option<Metadata>> {
     let mut repairs = litchi_ooxml_common::leniency::ToleranceReport::default();
     let props = properties::read_with_report(package, &mut repairs)?;
     if !repairs.is_clean() {
@@ -107,16 +119,20 @@ fn read_clean(package: &OpcPackage) -> Result<Option<Props>> {
     Ok(props)
 }
 
-fn smoke_props(host: &str) -> Props {
-    Props::new()
-        .title(format!("Litchi {host} core-properties smoke"))
-        .creator("Litchi Office verification")
-        .subject("Safe move-owned OOXML metadata CRUD")
-        .keywords("litchi,core-properties,crud")
-        .description("Generated by the shared OOXML core-properties facade")
-        .category("Interoperability")
-        .content_status("Final")
-        .language("en-US")
-        .revision("2")
-        .version("1.0")
+fn smoke_props(host: &str) -> Metadata {
+    Metadata {
+        title: Some(format!("Litchi {host} core-properties smoke")),
+        author: Some("Litchi Office verification".to_owned()),
+        subject: Some("Safe move-owned OOXML metadata CRUD".to_owned()),
+        keywords: ["litchi", "core-properties", "crud"]
+            .map(str::to_owned)
+            .to_vec(),
+        description: Some("Generated by the shared OOXML core-properties facade".to_owned()),
+        category: Some("Interoperability".to_owned()),
+        content_status: Some("Final".to_owned()),
+        language: Some("en-US".to_owned()),
+        revision: Some("2".to_owned()),
+        version: Some("1.0".to_owned()),
+        ..Metadata::default()
+    }
 }

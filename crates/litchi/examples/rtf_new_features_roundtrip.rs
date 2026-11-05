@@ -20,7 +20,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     // Phase 2: Read RTF document
     println!("\n📖 PHASE 2: Reading RTF document back...\n");
 
-    let doc = RtfDocument::from_bytes(&rtf_content)?;
+    let doc = raw::Tree::from_bytes(&rtf_content, litchi::rtf::read::OpenOptions::default())?;
 
     println!("✅ Document parsed successfully!");
 

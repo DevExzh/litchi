@@ -3,19 +3,20 @@
 use std::borrow::Cow;
 
 use crate::model::data_pilot::Table;
-use crate::package::Package;
+use crate::package::Archive;
 use litchi_core::{Error, Result};
 
 use super::model::{Catalog, Selector, select};
 use super::{codec::Location, package, validation};
 
 /// An isolated mutable draft derived from an immutable `DataPilot` catalog.
-pub struct Transaction<'source> {
-    pub(crate) source: &'source Package,
+pub(crate) struct Transaction<'source> {
+    pub(crate) source: &'source Archive,
     pub(crate) source_xml: &'source str,
     pub(crate) location: Location,
     pub(crate) original: Option<Vec<Table>>,
     pub(crate) draft: Option<Vec<Table>>,
+    pub(crate) xml_limits: litchi_odf_common::XmlStreamLimits,
 }
 
 impl<'source> Transaction<'source> {
@@ -27,24 +28,19 @@ impl<'source> Transaction<'source> {
             location: catalog.location.clone(),
             draft: original.clone(),
             original,
+            xml_limits: catalog.xml_limits,
         }
     }
 
     /// Borrow the current staged declarations.  An absent owner is an empty
     /// semantic catalog, while [`Self::has_owner`] retains physical presence.
     #[must_use]
-    pub fn tables(&self) -> &[Table] {
+    pub(crate) fn tables(&self) -> &[Table] {
         self.draft.as_deref().unwrap_or(&[])
     }
 
-    /// Return whether the staged XML contains a physical owner.
-    #[must_use]
-    pub fn has_owner(&self) -> bool {
-        self.draft.is_some()
-    }
-
     /// Open a short-lived contextual editor.
-    pub fn editor(&mut self) -> Editor<'_, 'source> {
+    pub(crate) fn editor(&mut self) -> Editor<'_, 'source> {
         Editor { transaction: self }
     }
 
@@ -52,7 +48,7 @@ impl<'source> Transaction<'source> {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn replace(&mut self, tables: Vec<Table>) -> Result<()> {
+    pub(crate) fn replace(&mut self, tables: Vec<Table>) -> Result<()> {
         let candidate = Some(tables);
         validation::validate_candidate(&self.location, &self.original, &candidate)?;
         self.draft = candidate;
@@ -63,7 +59,7 @@ impl<'source> Transaction<'source> {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn remove(&mut self) -> Result<()> {
+    pub(crate) fn remove(&mut self) -> Result<()> {
         let candidate = None;
         validation::validate_candidate(&self.location, &self.original, &candidate)?;
         self.draft = candidate;
@@ -74,13 +70,11 @@ impl<'source> Transaction<'source> {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn commit(self) -> Result<Commit<'source>> {
+    pub(crate) fn commit(self) -> Result<Commit<'source>> {
         validation::validate_candidate(&self.location, &self.original, &self.draft)?;
         if self.original == self.draft {
             return Ok(Commit {
                 bytes: Cow::Borrowed(self.source.package().as_bytes()),
-                tables: self.draft.unwrap_or_default(),
-                has_owner: self.original.is_some(),
                 changed: false,
             });
         }
@@ -89,12 +83,10 @@ impl<'source> Transaction<'source> {
             self.source_xml,
             &self.location,
             self.draft.as_deref(),
+            &self.xml_limits,
         )?;
-        let has_owner = self.draft.is_some();
         Ok(Commit {
             bytes: Cow::Owned(bytes),
-            tables: self.draft.unwrap_or_default(),
-            has_owner,
             changed: true,
         })
     }
@@ -186,49 +178,30 @@ impl Editor<'_, '_> {
 }
 
 /// The result of publishing a `DataPilot` transaction.
-pub struct Commit<'source> {
+pub(crate) struct Commit<'source> {
     bytes: Cow<'source, [u8]>,
-    tables: Vec<Table>,
-    has_owner: bool,
     changed: bool,
 }
 
 impl Commit<'_> {
+    #[cfg(test)]
     /// Borrow the resulting package bytes.
     #[must_use]
-    pub fn bytes(&self) -> &[u8] {
+    pub(crate) fn bytes(&self) -> &[u8] {
         &self.bytes
-    }
-
-    /// Borrow the declarations represented by the commit.
-    #[must_use]
-    pub fn tables(&self) -> &[Table] {
-        &self.tables
     }
 
     /// Return whether the physical package changed.
     #[must_use]
-    pub const fn changed(&self) -> bool {
+    pub(crate) const fn changed(&self) -> bool {
         self.changed
-    }
-
-    /// Return whether the resulting package has a physical owner.
-    #[must_use]
-    pub const fn has_owner(&self) -> bool {
-        self.has_owner
     }
 }
 
 impl<'source> Commit<'source> {
-    /// Consume the commit while retaining a borrow for a no-op result.
-    #[must_use]
-    pub fn into_bytes(self) -> Cow<'source, [u8]> {
-        self.bytes
-    }
-
     /// Consume the commit into package-owned bytes.
     #[must_use]
-    pub fn into_owned_bytes(self) -> Vec<u8> {
+    pub(crate) fn into_owned_bytes(self) -> Vec<u8> {
         self.bytes.into_owned()
     }
 }

@@ -1,4 +1,4 @@
-//! Spreadsheet row and column label ranges.
+//! Workbook row and column label ranges.
 
 use super::structure::validate_cell_range_addresses;
 use litchi_core::{Error, Result, xml::escape_xml};
@@ -381,7 +381,7 @@ fn xml_error(error: quick_xml::Error) -> Error {
 #[cfg(any())]
 mod tests {
     use super::*;
-    use crate::{Builder, MutableSpreadsheet, Spreadsheet};
+    use crate::{Builder, Workbook, builder::Workbook as Draft};
 
     const PREFIX: &str = concat!(
         "<office:document-content ",
@@ -472,7 +472,7 @@ mod tests {
         builder.add_sheet("Sheet1").unwrap();
         builder.add_label_range(first.clone()).unwrap();
         let bytes = builder.build().unwrap();
-        let spreadsheet = Spreadsheet::from_bytes(bytes).unwrap();
+        let spreadsheet = Workbook::from_bytes(bytes).unwrap();
         let xml = spreadsheet.content_xml();
         assert!(
             xml.find("<table:label-ranges>").unwrap() < xml.find("<table:table ").unwrap(),
@@ -480,10 +480,10 @@ mod tests {
         );
         assert_eq!(spreadsheet.label_ranges(), &[first]);
 
-        let mut mutable = MutableSpreadsheet::from_spreadsheet(spreadsheet).unwrap();
+        let mut mutable = Draft::from_spreadsheet(spreadsheet).unwrap();
         mutable.add_label_range(second.clone()).unwrap();
         assert!(mutable.remove_label_range(0).is_some());
-        let reopened = Spreadsheet::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+        let reopened = Workbook::from_bytes(mutable.to_bytes().unwrap()).unwrap();
         assert_eq!(reopened.label_ranges(), &[second]);
     }
 }

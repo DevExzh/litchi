@@ -39,13 +39,11 @@ selected table stream, and optional `Data` stream. Separate 1 GiB/512 MiB/768
 MiB hard ceilings bound explicitly requested values accepted by
 `Limits::try_new` and its checked builder methods.
 
-`Package::open` uses those finite defaults; `Package::open_with` accepts a
-`PackageOpenOptions` value for ergonomic explicit limits without replacing the
-minimal API. `Package::{open,from_reader,from_ole_file}_with_limits` remains
-available for direct limit passing. `document_with_limits` and
-`document_with_options_and_limits` combine their supplied limits component by
-component with those package limits, retaining the stricter value in each
-dimension. Limit failures are structured `Error::ResourceLimit` values with
+`Package::open` uses those finite defaults; `Package::open_with_options` accepts
+the merged `OpenOptions` envelope for explicit limits and password/leniency
+policy. The raw cursor owner is available under `litchi_doc::raw::Package` for
+format-specific consumers; its explicit limit methods remain physical-reader
+helpers. Limit failures are structured `Error::ResourceLimit` values with
 the exceeded resource kind, observed size, configured limit, and a stream path
 when applicable. These limits govern package and main DOC-stream ingestion;
 individual typed codecs can impose additional format-specific bounds.

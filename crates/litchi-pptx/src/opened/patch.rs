@@ -5,10 +5,13 @@ use std::sync::Arc;
 
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
 
-use super::model::{Limits, Snapshot, capture, invalid, packages_equal};
+use super::model::{Limits, Snapshot, invalid, packages_equal, relationships_equal};
 use crate::{Error, Result};
 
-const MAGIC: &[u8; 8] = b"LPTX0002";
+mod metadata;
+use metadata::Metadata;
+
+const MAGIC: &[u8; 8] = b"LPTX0003";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct RelationshipState {
@@ -45,12 +48,55 @@ struct ResourceState {
     relationships: Vec<RelationshipState>,
 }
 
+/// Freeze the visible references used by admission. A foreign part may choose
+/// another backing value on a later accessor call; ownership capture must use
+/// these exact references rather than re-reading the part after preflight.
+#[derive(Clone, Copy)]
+struct BorrowedState<'a> {
+    part: &'a dyn Part,
+    content_type: &'a str,
+    blob: &'a [u8],
+    relationships: &'a litchi_opc::Relationships,
+}
+
+impl<'a> BorrowedState<'a> {
+    fn read(part: &'a dyn Part) -> Self {
+        Self {
+            part,
+            content_type: part.content_type(),
+            blob: part.blob(),
+            relationships: part.rels(),
+        }
+    }
+
+    fn matches(self, other: Self) -> bool {
+        self.content_type == other.content_type
+            && (std::ptr::eq(self.blob, other.blob) || self.blob == other.blob)
+            && relationships_equal(self.relationships, other.relationships)
+    }
+}
+
 impl ResourceState {
-    fn capture_bounded(part: &dyn Part) -> Result<Self> {
+    fn capture_bounded(part: BorrowedState<'_>) -> Result<Self> {
+        let shared = part.part.blob_arc();
+        let visible = part.blob;
+        let blob = if shared.len() == visible.len() && std::ptr::eq(shared.as_slice(), visible) {
+            shared
+        } else {
+            let mut bytes = Vec::new();
+            bytes
+                .try_reserve_exact(visible.len())
+                .map_err(|source| Error::Allocation {
+                    resource: "opened-presentation patch payload",
+                    source,
+                })?;
+            bytes.extend_from_slice(visible);
+            Arc::new(bytes)
+        };
         Ok(Self {
-            content_type: part.content_type().to_owned(),
-            blob: part.blob_arc(),
-            relationships: RelationshipState::capture_bounded(part.rels())?,
+            content_type: part.content_type.to_owned(),
+            blob,
+            relationships: RelationshipState::capture_bounded(part.relationships)?,
         })
     }
 
@@ -73,7 +119,7 @@ impl ResourceState {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub(crate) struct Delta {
     name: PackURI,
     before: Option<ResourceState>,
@@ -91,13 +137,13 @@ impl Delta {
 }
 
 /// One physical resource conflict in a three-way merge plan.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Conflict {
     name: PackURI,
 }
 
 impl Conflict {
-    /// Physical OPC part whose two candidate states differ.
+    /// Physical OPC part whose two candidate states differ; `/` names package-root relationships.
     #[must_use]
     pub const fn resource(&self) -> &PackURI {
         &self.name
@@ -118,9 +164,54 @@ pub enum Resolution {
 #[derive(Debug, Clone)]
 struct PlannedConflict {
     conflict: Conflict,
-    left: Delta,
-    right: Delta,
+    candidates: ConflictCandidates,
     resolution: Option<Resolution>,
+}
+
+type RootStates = (Vec<RelationshipState>, Vec<RelationshipState>);
+
+#[derive(Debug, Clone)]
+enum ConflictCandidates {
+    Part {
+        left: Option<Delta>,
+        right: Option<Delta>,
+        left_metadata: Metadata,
+        right_metadata: Metadata,
+    },
+    Root {
+        left: Option<RootStates>,
+        right: Option<RootStates>,
+        left_metadata: Metadata,
+        right_metadata: Metadata,
+    },
+}
+impl PlannedConflict {
+    fn selected_metadata(&self) -> Option<&Metadata> {
+        let (left, right) = match &self.candidates {
+            ConflictCandidates::Part {
+                left_metadata,
+                right_metadata,
+                ..
+            }
+            | ConflictCandidates::Root {
+                left_metadata,
+                right_metadata,
+                ..
+            } => (left_metadata, right_metadata),
+        };
+        match self.resolution {
+            Some(Resolution::Left) => Some(left),
+            Some(Resolution::Right) => Some(right),
+            _ => None,
+        }
+    }
+    fn selected_part(&self) -> Option<&Delta> {
+        match (&self.candidates, self.resolution) {
+            (ConflictCandidates::Part { left, .. }, Some(Resolution::Left)) => left.as_ref(),
+            (ConflictCandidates::Part { right, .. }, Some(Resolution::Right)) => right.as_ref(),
+            _ => None,
+        }
+    }
 }
 
 /// Immutable, non-publishing plan for a deterministic three-way merge.
@@ -128,6 +219,9 @@ struct PlannedConflict {
 pub struct ThreeWayPlan {
     presentation_name: PackURI,
     automatic: Vec<Delta>,
+    root: Option<RootStates>,
+    left_metadata: Metadata,
+    right_metadata: Metadata,
     conflicts: Vec<PlannedConflict>,
     limits: Limits,
 }
@@ -154,6 +248,11 @@ impl ThreeWayPlan {
     ///
     /// Returns an error when `index` is outside the conflict list.
     pub fn resolve(&self, index: usize, resolution: Resolution) -> Result<Self> {
+        if index >= self.conflicts.len() {
+            return Err(invalid(
+                "opened-presentation merge conflict index is out of bounds",
+            ));
+        }
         let mut next = self.clone();
         let entry = next
             .conflicts
@@ -174,30 +273,113 @@ impl ThreeWayPlan {
                 "opened-presentation three-way merge has unresolved conflicts",
             ));
         }
-        let mut deltas = self.automatic.clone();
+        let mut root = self.root.as_ref();
         for entry in &self.conflicts {
-            match entry.resolution {
-                Some(Resolution::Base) => {},
-                Some(Resolution::Left) => deltas.push(entry.left.clone()),
-                Some(Resolution::Right) => deltas.push(entry.right.clone()),
-                None => {
-                    return Err(invalid(
-                        "opened-presentation three-way merge has unresolved conflicts",
-                    ));
-                },
+            if let ConflictCandidates::Root { left, right, .. } = &entry.candidates {
+                match entry.resolution {
+                    Some(Resolution::Left) => {
+                        root = left.as_ref();
+                    },
+                    Some(Resolution::Right) => {
+                        root = right.as_ref();
+                    },
+                    Some(Resolution::Base) => {},
+                    None => return Err(invalid("unresolved package-root conflict")),
+                }
             }
         }
-        Patch::new(self.presentation_name.clone(), deltas, None, self.limits)
+        let selected = self.automatic.iter().chain(
+            self.conflicts
+                .iter()
+                .filter_map(PlannedConflict::selected_part),
+        );
+        let mut count = 0usize;
+        let mut length = MAGIC.len() + 4 + self.presentation_name.as_str().len() + 1 + 4;
+        if let Some((before, after)) = root {
+            require_relationship_count(before.len(), self.limits)?;
+            require_relationship_count(after.len(), self.limits)?;
+            add_len(&mut length, relationships_len(before)?)?;
+            add_len(&mut length, relationships_len(after)?)?;
+        }
+        for delta in selected {
+            count = count
+                .checked_add(1)
+                .ok_or_else(|| invalid("patch part count overflow"))?;
+            if count > self.limits.max_parts() {
+                return Err(Error::Limit {
+                    kind: crate::opened::LimitKind::Parts,
+                    observed: count,
+                    maximum: self.limits.max_parts(),
+                });
+            }
+            add_len(&mut length, 4 + delta.name.as_str().len())?;
+            for state in [&delta.before, &delta.after] {
+                if let Some(state) = state {
+                    require_relationship_count(state.relationships.len(), self.limits)?;
+                }
+                add_len(&mut length, optional_state_len(state.as_ref())?)?;
+            }
+            require_capture_bytes(length, self.limits)?;
+        }
+        add_len(
+            &mut length,
+            self.left_metadata
+                .joined_len(&self.right_metadata, self.limits)?,
+        )?;
+        let mut groups = self.left_metadata.joined_count(&self.right_metadata);
+        for metadata in self
+            .conflicts
+            .iter()
+            .filter_map(PlannedConflict::selected_metadata)
+        {
+            // Each selected owner was removed from automatic metadata.
+            add_len(&mut length, metadata.encoded_len()?.saturating_sub(4))?;
+            groups = groups
+                .checked_add(metadata.group_count())
+                .ok_or_else(|| invalid("metadata count overflow"))?;
+        }
+        if groups > self.limits.max_parts().saturating_mul(2).saturating_add(2) {
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::Parts,
+                observed: groups,
+                maximum: self.limits.max_parts(),
+            });
+        }
+        require_capture_bytes(length, self.limits)?;
+        let mut metadata = self.left_metadata.join(&self.right_metadata, self.limits)?;
+        for selected in self
+            .conflicts
+            .iter()
+            .filter_map(PlannedConflict::selected_metadata)
+        {
+            metadata = metadata.join(selected, self.limits)?;
+        }
+        let mut deltas = self.automatic.clone();
+        deltas.extend(
+            self.conflicts
+                .iter()
+                .filter_map(PlannedConflict::selected_part)
+                .cloned(),
+        );
+        Patch::new(
+            self.presentation_name.clone(),
+            deltas,
+            root.cloned(),
+            self.limits,
+            metadata,
+        )
     }
 }
 
 /// Durable, exact-source patch over a finite set of OPC resources.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Patch {
     pub(crate) presentation_name: PackURI,
     pub(crate) deltas: Vec<Delta>,
+    metadata: Metadata,
     root: Option<(Vec<RelationshipState>, Vec<RelationshipState>)>,
     pub(crate) limits: Limits,
+    wire_len: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -213,55 +395,71 @@ impl Patch {
         presentation_name: PackURI,
         limits: Limits,
     ) -> Result<Self> {
-        let mut names = Vec::new();
-        let name_count = source
-            .part_count()
-            .checked_add(target.part_count())
-            .ok_or_else(|| invalid("opened-presentation patch part count overflow"))?;
-        names
-            .try_reserve_exact(name_count)
-            .map_err(|source| Error::Allocation {
-                resource: "opened-presentation patch part names",
+        // Admit the complete durable write set using borrowed visible values.
+        // No payload owner or relationship string is retained until every
+        // changed resource and the aggregate encoded size have passed.
+        let root_changed = !relationships_equal(source.rels(), target.rels());
+        require_wire_u32(presentation_name.as_str().len())?;
+        let mut length = MAGIC.len() + 4 + 1 + 4;
+        add_len(&mut length, presentation_name.as_str().len())?;
+        if root_changed {
+            add_len(
+                &mut length,
+                borrowed_relationships_len(source.rels(), limits)?,
+            )?;
+            add_len(
+                &mut length,
+                borrowed_relationships_len(target.rels(), limits)?,
+            )?;
+        }
+        require_capture_bytes(length, limits)?;
+        let mut planned = Vec::new();
+        visit_changed_parts(source, target, |name, before, after| {
+            if planned.len() >= limits.max_parts() {
+                return Err(Error::Limit {
+                    kind: crate::opened::LimitKind::Parts,
+                    observed: planned.len().checked_add(1).unwrap_or(usize::MAX),
+                    maximum: limits.max_parts(),
+                });
+            }
+            require_wire_u32(planned.len().checked_add(1).unwrap_or(usize::MAX))?;
+            require_wire_u32(name.as_str().len())?;
+            add_len(&mut length, 4)?;
+            add_len(&mut length, name.as_str().len())?;
+            add_len(&mut length, borrowed_state_len(before, limits)?)?;
+            add_len(&mut length, borrowed_state_len(after, limits)?)?;
+            require_capture_bytes(length, limits)?;
+            planned.try_reserve(1).map_err(|source| Error::Allocation {
+                resource: "opened-presentation borrowed patch plan",
                 source,
             })?;
-        names.extend(
-            source
-                .iter_parts()
-                .chain(target.iter_parts())
-                .map(|part| part.partname().clone()),
-        );
-        names.sort_unstable_by(|left, right| left.as_str().cmp(right.as_str()));
-        names.dedup();
+            planned.push((name, before, after));
+            Ok(())
+        })?;
+        let metadata = Metadata::capture(source, target, &planned, limits, length)?;
         let mut deltas = Vec::new();
         deltas
-            .try_reserve_exact(names.len())
+            .try_reserve_exact(planned.len())
             .map_err(|source| Error::Allocation {
                 resource: "opened-presentation patch deltas",
                 source,
             })?;
-        for name in names {
-            let before = match source.get_part(&name) {
-                Ok(part) => Some(ResourceState::capture_bounded(part)?),
-                Err(litchi_opc::OpcError::PartNotFound(_)) => None,
-                Err(error) => return Err(error.into()),
-            };
-            let after = match target.get_part(&name) {
-                Ok(part) => Some(ResourceState::capture_bounded(part)?),
-                Err(litchi_opc::OpcError::PartNotFound(_)) => None,
-                Err(error) => return Err(error.into()),
-            };
-            if before != after {
-                deltas.push(Delta {
-                    name,
-                    before,
-                    after,
-                });
-            }
+        for (name, before, after) in planned {
+            deltas.push(Delta {
+                name: name.clone(),
+                before: before.map(ResourceState::capture_bounded).transpose()?,
+                after: after.map(ResourceState::capture_bounded).transpose()?,
+            });
         }
-        let before_root = RelationshipState::capture_bounded(source.rels())?;
-        let after_root = RelationshipState::capture_bounded(target.rels())?;
-        let root = (before_root != after_root).then_some((before_root, after_root));
-        Self::new(presentation_name, deltas, root, limits)
+        let root = if root_changed {
+            Some((
+                RelationshipState::capture_bounded(source.rels())?,
+                RelationshipState::capture_bounded(target.rels())?,
+            ))
+        } else {
+            None
+        };
+        Self::new(presentation_name, deltas, root, limits, metadata)
     }
 
     fn new(
@@ -269,12 +467,14 @@ impl Patch {
         mut deltas: Vec<Delta>,
         root: Option<(Vec<RelationshipState>, Vec<RelationshipState>)>,
         limits: Limits,
+        metadata: Metadata,
     ) -> Result<Self> {
         deltas.sort_unstable_by(|left, right| left.name.as_str().cmp(right.name.as_str()));
         if deltas.len() > limits.max_parts() {
             return Err(Error::Limit {
-                resource: "opened-presentation patch parts",
-                limit: limits.max_parts(),
+                kind: crate::opened::LimitKind::Parts,
+                observed: deltas.len(),
+                maximum: limits.max_parts(),
             });
         }
         if deltas.windows(2).any(|pair| pair[0].name == pair[1].name) {
@@ -292,26 +492,60 @@ impl Patch {
                 "opened-presentation patch contains a no-op root relationship delta",
             ));
         }
+        // Join and three-way resolution intersect policies, so state that was
+        // admitted under another patch's limits needs count admission again.
+        if let Some((before, after)) = &root {
+            require_relationship_count(before.len(), limits)?;
+            require_relationship_count(after.len(), limits)?;
+        }
+        for delta in &deltas {
+            for state in [delta.before.as_ref(), delta.after.as_ref()]
+                .into_iter()
+                .flatten()
+            {
+                require_relationship_count(state.relationships.len(), limits)?;
+            }
+        }
+        metadata.require_coverage(&deltas, root.as_ref(), limits)?;
         let patch = Self {
             presentation_name,
             deltas,
             root,
             limits,
+            metadata,
+            wire_len: 0,
         };
-        patch.require_encoded_limit()?;
-        Ok(patch)
+        let wire_len = patch.encoded_len_uncached()?;
+        if wire_len > patch.limits.max_patch_bytes() {
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::PatchBytes,
+                observed: wire_len,
+                maximum: patch.limits.max_patch_bytes(),
+            });
+        }
+        Ok(Self { wire_len, ..patch })
     }
 
     /// Whether this patch changes no OPC resource.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.deltas.is_empty() && self.root.is_none()
+    pub fn is_noop(&self) -> bool {
+        self.deltas.is_empty() && self.root.is_none() && self.metadata.is_empty()
     }
 
-    /// Number of exact part and optional package-root resources in the write set.
+    /// Conservative wire-size charge for retaining this patch, without encoding it.
+    #[must_use]
+    pub fn retained_bytes(&self) -> usize {
+        self.encoded_len().unwrap_or(usize::MAX)
+    }
+
+    /// Number of part/root resources plus standalone metadata owners in the write set.
     #[must_use]
     pub fn resource_count(&self) -> usize {
-        self.deltas.len() + usize::from(self.root.is_some())
+        self.deltas.len()
+            + usize::from(self.root.is_some())
+            + self
+                .metadata
+                .additional_resources(&self.deltas, self.root.is_some())
     }
 
     /// Physical part names in deterministic order.
@@ -326,8 +560,12 @@ impl Patch {
             .any(|delta| &delta.name == name && delta.before.is_some() && delta.after.is_none())
     }
 
+    /// The direction and slide of an exact slide removal or its inverse:
+    /// the presentation Part changes, one slide Part leaves or returns, and
+    /// every other changed resource is a non-slide Part that leaves or
+    /// returns with it (the Parts the slide owns, record 0303).
     pub(crate) fn exact_slide_removal_change(&self) -> Option<(SinglePartChange, &PackURI)> {
-        if self.root.is_some() || self.deltas.len() != 2 {
+        if self.root.is_some() || self.deltas.len() < 2 {
             return None;
         }
         let presentation = self
@@ -346,29 +584,40 @@ impl Patch {
         {
             return None;
         }
-        let slide = self
+        let mut slides = self.deltas.iter().filter(|delta| {
+            delta.name != self.presentation_name
+                && [delta.before.as_ref(), delta.after.as_ref()]
+                    .into_iter()
+                    .flatten()
+                    .any(|image| {
+                        image.content_type == litchi_opc::constants::content_type::PML_SLIDE
+                    })
+        });
+        let slide = slides.next()?;
+        if slides.next().is_some() {
+            return None;
+        }
+        let direction = match (&slide.before, &slide.after) {
+            (Some(_), None) => SinglePartChange::Remove,
+            (None, Some(_)) => SinglePartChange::Add,
+            _ => return None,
+        };
+        let dependents_follow = self
             .deltas
             .iter()
-            .find(|delta| delta.name != self.presentation_name)?;
-        match (&slide.before, &slide.after) {
-            (Some(before), None)
-                if before.content_type == litchi_opc::constants::content_type::PML_SLIDE =>
-            {
-                Some((SinglePartChange::Remove, &slide.name))
-            },
-            (None, Some(after))
-                if after.content_type == litchi_opc::constants::content_type::PML_SLIDE =>
-            {
-                Some((SinglePartChange::Add, &slide.name))
-            },
-            _ => None,
-        }
+            .filter(|delta| delta.name != self.presentation_name && delta.name != slide.name)
+            .all(|delta| match direction {
+                SinglePartChange::Remove => delta.before.is_some() && delta.after.is_none(),
+                SinglePartChange::Add => delta.before.is_none() && delta.after.is_some(),
+            });
+        dependents_follow.then_some((direction, &slide.name))
     }
 
     pub(crate) fn has_same_changes(&self, other: &Self) -> bool {
         self.presentation_name == other.presentation_name
             && self.deltas == other.deltas
             && self.root == other.root
+            && self.metadata == other.metadata
     }
 
     pub(crate) const fn limits(&self) -> Limits {
@@ -386,18 +635,21 @@ impl Patch {
                 .as_ref()
                 .map(|(before, after)| (after.clone(), before.clone())),
             limits: self.limits,
+            metadata: self.metadata.inverse(),
+            wire_len: self.wire_len,
         }
     }
 
     /// Whether two patches select different outcomes for any physical resource.
     #[must_use]
     pub fn conflicts_with(&self, other: &Self) -> bool {
-        root_conflicts(self.root.as_ref(), other.root.as_ref())
+        self.metadata.conflicts(&other.metadata)
+            || root_conflicts(self.root.as_ref(), other.root.as_ref())
             || self.deltas.iter().any(|left| {
-                other.deltas.iter().any(|right| {
-                    left.name == right.name
-                        && (left.before != right.before || left.after != right.after)
-                })
+                other
+                    .deltas
+                    .iter()
+                    .any(|right| left.name == right.name && deltas_conflict(left, right))
             })
     }
 
@@ -412,20 +664,33 @@ impl Patch {
     pub fn join(&self, other: &Self) -> Result<Self> {
         require_same_root(self, other)?;
         let limits = intersect_limits(self.limits, other.limits)?;
+        preflight_join(self, other, limits)?;
         let mut deltas = self.deltas.clone();
         for candidate in &other.deltas {
-            if let Some(existing) = deltas.iter().find(|delta| delta.name == candidate.name) {
-                if existing.before != candidate.before || existing.after != candidate.after {
-                    return Err(invalid(
-                        "opened-presentation patches conflict on a physical part",
-                    ));
-                }
+            if let Some(existing) = deltas.iter_mut().find(|delta| delta.name == candidate.name) {
+                *existing = merge_delta(existing, candidate)?;
             } else {
                 deltas.push(candidate.clone());
             }
         }
         let root = merge_root(self.root.as_ref(), other.root.as_ref())?;
-        Self::new(self.presentation_name.clone(), deltas, root, limits)
+        if let Some((before, after)) = &root {
+            require_relationship_count(before.len(), limits)?;
+            require_relationship_count(after.len(), limits)?;
+        }
+        for delta in &deltas {
+            for state in [&delta.before, &delta.after].into_iter().flatten() {
+                require_relationship_count(state.relationships.len(), limits)?;
+            }
+        }
+
+        Self::new(
+            self.presentation_name.clone(),
+            deltas,
+            root,
+            limits,
+            self.metadata.join(&other.metadata, limits)?,
+        )
     }
 
     /// Build a non-mutating three-way plan against an immutable base snapshot.
@@ -442,32 +707,139 @@ impl Patch {
         }
         validate_before(base.package.as_ref(), left)?;
         validate_before(base.package.as_ref(), right)?;
-        if left.root.is_some() || right.root.is_some() {
-            return Err(invalid(
-                "opened-presentation three-way planning does not merge package-root relationships",
-            ));
-        }
         let limits = intersect_limits(left.limits, right.limits)?;
+        // The immutable plan retains both candidates, so each input must fit
+        // the intersected policy before any candidate or metadata is cloned.
+        for patch in [left, right] {
+            require_capture_bytes(patch.encoded_len()?, limits)?;
+            if patch.deltas.len() > limits.max_parts() {
+                return Err(Error::Limit {
+                    kind: crate::opened::LimitKind::Parts,
+                    observed: patch.deltas.len(),
+                    maximum: limits.max_parts(),
+                });
+            }
+            if let Some((before, after)) = &patch.root {
+                require_relationship_count(before.len(), limits)?;
+                require_relationship_count(after.len(), limits)?;
+            }
+            for delta in &patch.deltas {
+                for state in [&delta.before, &delta.after].into_iter().flatten() {
+                    require_relationship_count(state.relationships.len(), limits)?;
+                }
+            }
+            patch.metadata.check(limits)?;
+        }
         let mut automatic = Vec::new();
         let mut conflicts = Vec::new();
+        let mut owners = left.metadata.conflicting_part_owners(&right.metadata)?;
         for delta in &left.deltas {
+            if right
+                .deltas
+                .iter()
+                .any(|other| other.name == delta.name && deltas_conflict(delta, other))
+                && !owners.contains(&delta.name)
+            {
+                owners.try_reserve(1).map_err(|source| Error::Allocation {
+                    resource: "opened-presentation conflict owners",
+                    source,
+                })?;
+                owners.push(delta.name.clone());
+            }
+        }
+        let mut left_metadata = left.metadata.clone();
+        let mut right_metadata = right.metadata.clone();
+        for owner in &owners {
+            let a = left.deltas.iter().find(|delta| &delta.name == owner);
+            let b = right.deltas.iter().find(|delta| &delta.name == owner);
+            if [a, b].into_iter().flatten().any(|delta| {
+                delta.before.as_ref().map(|state| &state.content_type)
+                    != delta.after.as_ref().map(|state| &state.content_type)
+            }) {
+                return Err(invalid(
+                    "content-type-coupled part conflict resolution is not yet supported",
+                ));
+            }
+            let (left_other, left_selected) =
+                left_metadata.partition_relationships(owner, limits)?;
+            let (right_other, right_selected) =
+                right_metadata.partition_relationships(owner, limits)?;
+            left_metadata = left_other;
+            right_metadata = right_other;
+            conflicts.push(PlannedConflict {
+                conflict: Conflict {
+                    name: owner.clone(),
+                },
+                candidates: ConflictCandidates::Part {
+                    left: a.cloned(),
+                    right: b.cloned(),
+                    left_metadata: left_selected,
+                    right_metadata: right_selected,
+                },
+                resolution: None,
+            });
+        }
+        for delta in &left.deltas {
+            if owners.contains(&delta.name) {
+                continue;
+            }
             match right.deltas.iter().find(|other| other.name == delta.name) {
                 None => automatic.push(delta.clone()),
-                Some(other) if delta.after == other.after => automatic.push(delta.clone()),
-                Some(other) => conflicts.push(PlannedConflict {
-                    conflict: Conflict {
-                        name: delta.name.clone(),
-                    },
-                    left: delta.clone(),
-                    right: other.clone(),
-                    resolution: None,
-                }),
+                Some(other) if !deltas_conflict(delta, other) => {
+                    if let (Some(base), Some(a), Some(b)) =
+                        (&delta.before, &delta.after, &other.after)
+                    {
+                        merged_relationship_len(
+                            &base.relationships,
+                            &a.relationships,
+                            &b.relationships,
+                            limits,
+                        )?;
+                    }
+                    automatic.push(merge_delta(delta, other)?)
+                },
+                Some(_) => return Err(invalid("unclassified part conflict")),
             }
         }
         for delta in &right.deltas {
-            if !left.deltas.iter().any(|other| other.name == delta.name) {
+            if !owners.contains(&delta.name)
+                && !left.deltas.iter().any(|other| other.name == delta.name)
+            {
                 automatic.push(delta.clone());
             }
+        }
+        let root_conflict = root_conflicts(left.root.as_ref(), right.root.as_ref())
+            || left.metadata.root_conflicts(&right.metadata);
+        let (left_metadata, right_metadata, root) = if root_conflict {
+            let (left_other, left_root) = left_metadata.partition_root(limits)?;
+            let (right_other, right_root) = right_metadata.partition_root(limits)?;
+            conflicts.push(PlannedConflict {
+                conflict: Conflict {
+                    name: PackURI::new("/").map_err(Error::Invalid)?,
+                },
+                candidates: ConflictCandidates::Root {
+                    left: left.root.clone(),
+                    right: right.root.clone(),
+                    left_metadata: left_root,
+                    right_metadata: right_root,
+                },
+                resolution: None,
+            });
+            (left_other, right_other, None)
+        } else {
+            if let (Some((base, a)), Some((_, b))) = (&left.root, &right.root) {
+                merged_relationship_len(base, a, b, limits)?;
+            }
+            (
+                left_metadata,
+                right_metadata,
+                merge_root(left.root.as_ref(), right.root.as_ref())?,
+            )
+        };
+        if left_metadata.conflicts(&right_metadata) {
+            return Err(invalid(
+                "content-type metadata conflict resolution is not yet supported",
+            ));
         }
         automatic.sort_unstable_by(|left, right| left.name.as_str().cmp(right.name.as_str()));
         conflicts.sort_unstable_by(|left, right| {
@@ -479,12 +851,15 @@ impl Patch {
         Ok(ThreeWayPlan {
             presentation_name: left.presentation_name.clone(),
             automatic,
+            root,
+            left_metadata,
+            right_metadata,
             conflicts,
             limits,
         })
     }
 
-    /// Serialize this patch into the stable `LPTX0002` binary format.
+    /// Serialize this patch into the stable `LPTX0003` binary format.
     ///
     /// # Errors
     ///
@@ -498,16 +873,33 @@ impl Patch {
                 resource: "opened-presentation durable patch",
                 source,
             })?;
-        output.extend_from_slice(MAGIC);
-        put_bytes32(&mut output, self.presentation_name.as_str().as_bytes())?;
-        put_optional_relationship_delta(&mut output, self.root.as_ref())?;
-        put_u32(&mut output, self.deltas.len())?;
-        for delta in &self.deltas {
-            put_bytes32(&mut output, delta.name.as_str().as_bytes())?;
-            put_optional_state(&mut output, delta.before.as_ref())?;
-            put_optional_state(&mut output, delta.after.as_ref())?;
+        self.encode_into(&mut output)?;
+        if output.len() == length {
+            return Ok(output);
         }
-        if output.len() != length {
+
+        // The wire length is cached because normal publication is immutable.
+        // Tests in this module also deliberately forge a patch by editing its
+        // private metadata, though, and that mutation cannot invalidate the
+        // cache.  Recompute only on this exceptional mismatch so ordinary
+        // serialization keeps the one-pass, cached fast path.
+        let fresh_length = self.encoded_len_uncached()?;
+        if fresh_length > self.limits.max_patch_bytes() {
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::PatchBytes,
+                observed: fresh_length,
+                maximum: self.limits.max_patch_bytes(),
+            });
+        }
+        output.clear();
+        output
+            .try_reserve_exact(fresh_length)
+            .map_err(|source| Error::Allocation {
+                resource: "opened-presentation durable patch",
+                source,
+            })?;
+        self.encode_into(&mut output)?;
+        if output.len() != fresh_length {
             return Err(invalid(
                 "opened-presentation durable patch length changed during encoding",
             ));
@@ -515,13 +907,18 @@ impl Patch {
         Ok(output)
     }
 
-    /// Parse a stable durable patch under conservative finite limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for malformed or unbounded input.
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, Limits::default())
+    fn encode_into(&self, output: &mut Vec<u8>) -> Result<()> {
+        output.extend_from_slice(MAGIC);
+        put_bytes32(output, self.presentation_name.as_str().as_bytes())?;
+        put_optional_relationship_delta(output, self.root.as_ref())?;
+        put_u32(output, self.deltas.len())?;
+        for delta in &self.deltas {
+            put_bytes32(output, delta.name.as_str().as_bytes())?;
+            put_optional_state(output, delta.before.as_ref())?;
+            put_optional_state(output, delta.after.as_ref())?;
+        }
+        self.metadata.encode(output)?;
+        Ok(())
     }
 
     /// Parse a stable durable patch under caller-selected finite limits.
@@ -529,13 +926,15 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error for malformed or unbounded input.
-    pub fn from_bytes_with_limits(bytes: &[u8], limits: Limits) -> Result<Self> {
+    pub fn from_bytes(bytes: &[u8], limits: Limits) -> Result<Self> {
         if bytes.len() > limits.max_patch_bytes() {
             return Err(Error::Limit {
-                resource: "opened-presentation durable patch bytes",
-                limit: limits.max_patch_bytes(),
+                kind: crate::opened::LimitKind::PatchBytes,
+                observed: bytes.len(),
+                maximum: limits.max_patch_bytes(),
             });
         }
+        preflight_wire(bytes, limits)?;
         let mut input = Input::new(bytes);
         if input.take(MAGIC.len())? != MAGIC {
             return Err(invalid(
@@ -547,8 +946,9 @@ impl Patch {
         let count = input.usize32()?;
         if count > limits.max_parts() {
             return Err(Error::Limit {
-                resource: "opened-presentation patch parts",
-                limit: limits.max_parts(),
+                kind: crate::opened::LimitKind::Parts,
+                observed: count,
+                maximum: limits.max_parts(),
             });
         }
         let mut deltas = Vec::new();
@@ -565,15 +965,23 @@ impl Patch {
                 after: parse_optional_state(&mut input, limits)?,
             });
         }
+        let metadata = Metadata::parse(&mut input, limits)?;
         if !input.is_empty() {
             return Err(invalid(
                 "opened-presentation durable patch has trailing bytes",
             ));
         }
-        Self::new(presentation_name, deltas, root, limits)
+        Self::new(presentation_name, deltas, root, limits, metadata)
     }
 
     pub(crate) fn encoded_len(&self) -> Result<usize> {
+        if self.wire_len != 0 {
+            return Ok(self.wire_len);
+        }
+        self.encoded_len_uncached()
+    }
+
+    fn encoded_len_uncached(&self) -> Result<usize> {
         let mut length = MAGIC.len();
         add_len(&mut length, 4)?;
         add_len(&mut length, self.presentation_name.as_str().len())?;
@@ -590,24 +998,197 @@ impl Patch {
             add_len(&mut length, optional_state_len(delta.after.as_ref())?)?;
             if length > self.limits.max_patch_bytes() {
                 return Err(Error::Limit {
-                    resource: "opened-presentation durable patch bytes",
-                    limit: self.limits.max_patch_bytes(),
+                    kind: crate::opened::LimitKind::PatchBytes,
+                    observed: length,
+                    maximum: self.limits.max_patch_bytes(),
                 });
             }
         }
+        add_len(&mut length, self.metadata.encoded_len()?)?;
         Ok(length)
     }
+}
 
-    fn require_encoded_limit(&self) -> Result<()> {
-        let length = self.encoded_len()?;
-        if length > self.limits.max_patch_bytes() {
-            return Err(Error::Limit {
-                resource: "opened-presentation durable patch bytes",
-                limit: self.limits.max_patch_bytes(),
-            });
+/// Visit differences without collecting the complete package's names or
+/// asking a foreign `Part` for a possibly unrelated shared payload owner.
+fn visit_changed_parts<'a>(
+    source: &'a OpcPackage,
+    target: &'a OpcPackage,
+    mut visit: impl FnMut(
+        &'a PackURI,
+        Option<BorrowedState<'a>>,
+        Option<BorrowedState<'a>>,
+    ) -> Result<()>,
+) -> Result<()> {
+    for before in source.try_iter_parts() {
+        let before = before?;
+        let name = before.partname();
+        let after = optional_part(target, name)?.map(BorrowedState::read);
+        let before = BorrowedState::read(before);
+        if after.is_none_or(|after| !before.matches(after)) {
+            visit(name, Some(before), after)?;
         }
-        Ok(())
     }
+    for after in target.try_iter_parts() {
+        let after = after?;
+        let name = after.partname();
+        if optional_part(source, name)?.is_none() {
+            visit(name, None, Some(BorrowedState::read(after)))?;
+        }
+    }
+    Ok(())
+}
+
+fn optional_part<'a>(package: &'a OpcPackage, name: &PackURI) -> Result<Option<&'a dyn Part>> {
+    match package.get_part(name) {
+        Ok(part) => Ok(Some(part)),
+        Err(litchi_opc::OpcError::PartNotFound(_)) => Ok(None),
+        Err(error) => Err(error.into()),
+    }
+}
+
+fn require_capture_bytes(length: usize, limits: Limits) -> Result<()> {
+    if length > limits.max_patch_bytes() {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::PatchBytes,
+            observed: length,
+            maximum: limits.max_patch_bytes(),
+        });
+    }
+    Ok(())
+}
+
+fn borrowed_state_len(part: Option<BorrowedState<'_>>, limits: Limits) -> Result<usize> {
+    let mut length = 1usize;
+    if let Some(part) = part {
+        add_len(&mut length, 4)?;
+        require_wire_u32(part.content_type.len())?;
+        add_len(&mut length, part.content_type.len())?;
+        add_len(&mut length, 8)?;
+        add_len(&mut length, part.blob.len())?;
+        add_len(
+            &mut length,
+            borrowed_relationships_len(part.relationships, limits)?,
+        )?;
+    }
+    Ok(length)
+}
+
+fn require_wire_u32(length: usize) -> Result<()> {
+    u32::try_from(length)
+        .map(|_| ())
+        .map_err(|_| invalid("opened-presentation durable length exceeds u32"))
+}
+
+fn require_relationship_count(count: usize, limits: Limits) -> Result<()> {
+    if count > limits.max_parts() {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Parts,
+            observed: count,
+            maximum: limits.max_parts(),
+        });
+    }
+    require_wire_u32(count)
+}
+
+fn borrowed_relationships_len(
+    relationships: &litchi_opc::Relationships,
+    limits: Limits,
+) -> Result<usize> {
+    require_relationship_count(relationships.len(), limits)?;
+    let mut length = 4usize;
+    for relationship in relationships.iter() {
+        for value in [
+            relationship.r_id(),
+            relationship.reltype(),
+            relationship.target_ref(),
+        ] {
+            require_wire_u32(value.len())?;
+            add_len(&mut length, 4)?;
+            add_len(&mut length, value.len())?;
+        }
+        add_len(&mut length, 1)?;
+    }
+    Ok(length)
+}
+
+fn state_matches(part: Option<&dyn Part>, expected: Option<&ResourceState>) -> bool {
+    match (part, expected) {
+        (None, None) => true,
+        (Some(part), Some(expected)) => {
+            part.content_type() == expected.content_type
+                && part.blob() == expected.blob.as_slice()
+                && relationships_match(part.rels(), &expected.relationships)
+        },
+        _ => false,
+    }
+}
+
+fn delta_matches(part: Option<&dyn Part>, delta: &Delta, after: bool, metadata: &Metadata) -> bool {
+    if metadata.has_relationships(&delta.name)
+        && let (Some(part), Some(before), Some(next)) = (part, &delta.before, &delta.after)
+    {
+        let expected = if after { next } else { before };
+        part.content_type() == expected.content_type
+            && part.blob() == expected.blob.as_slice()
+            && relationship_changes_match(
+                part.rels(),
+                &before.relationships,
+                &next.relationships,
+                after,
+            )
+    } else {
+        state_matches(
+            part,
+            if after {
+                delta.after.as_ref()
+            } else {
+                delta.before.as_ref()
+            },
+        )
+    }
+}
+fn relationship_changes_match(
+    actual: &litchi_opc::Relationships,
+    before: &[RelationshipState],
+    after: &[RelationshipState],
+    target: bool,
+) -> bool {
+    let matches = |id: &str, expected: Option<&RelationshipState>| match (actual.get(id), expected)
+    {
+        (None, None) => true,
+        (Some(actual), Some(expected)) => {
+            actual.reltype() == expected.kind
+                && actual.target_ref() == expected.target
+                && actual.is_external() == expected.external
+        },
+        _ => false,
+    };
+    before.iter().all(|old| {
+        let next = after
+            .binary_search_by(|value| value.id.cmp(&old.id))
+            .ok()
+            .map(|index| &after[index]);
+        next == Some(old) || matches(&old.id, if target { next } else { Some(old) })
+    }) && after
+        .iter()
+        .filter(|next| {
+            before
+                .binary_search_by(|value| value.id.cmp(&next.id))
+                .is_err()
+        })
+        .all(|next| matches(&next.id, if target { Some(next) } else { None }))
+}
+
+fn relationships_match(actual: &litchi_opc::Relationships, expected: &[RelationshipState]) -> bool {
+    actual.len() == expected.len()
+        && expected.iter().all(|expected| {
+            actual.get(&expected.id).is_some_and(|actual| {
+                actual.reltype() == expected.kind
+                    && actual.target_ref() == expected.target
+                    && actual.is_external() == expected.external
+            })
+        })
 }
 
 fn optional_state_len(value: Option<&ResourceState>) -> Result<usize> {
@@ -692,15 +1273,16 @@ impl History {
     ///
     /// Returns an error when one patch alone exceeds the history byte bound.
     pub fn push(&mut self, patch: Patch) -> Result<()> {
-        if patch.is_empty() {
+        if patch.is_noop() {
             return Ok(());
         }
         self.clear_redo();
         let length = patch.encoded_len()?;
         if length > self.limits.max_history_bytes() {
             return Err(Error::Limit {
-                resource: "opened-presentation history bytes",
-                limit: self.limits.max_history_bytes(),
+                kind: crate::opened::LimitKind::HistoryBytes,
+                observed: length,
+                maximum: self.limits.max_history_bytes(),
             });
         }
         while self.undo.len() >= self.limits.max_history_entries()
@@ -750,54 +1332,56 @@ impl History {
     }
 }
 
+#[cfg(test)]
 pub(crate) fn apply(
     package: &mut OpcPackage,
     patch: &Patch,
     physical_source_provenance: bool,
 ) -> Result<Snapshot> {
-    apply_with_revision(package, patch, None, None, physical_source_provenance, None)
+    apply_with_semantic_limits(package, patch, physical_source_provenance, None)
 }
 
-/// Apply a patch whose committing transaction already captured the staged
-/// result, reusing that capture when the candidate this application builds
-/// carries identical content.
-///
-/// `committed` is only ever an optimization: the candidate is built, validated
-/// and assigned exactly as [`apply`] builds it, and the committed snapshot is
-/// consulted after that candidate exists. When the candidate differs from the
-/// committed package in any fingerprint input — because the destination
-/// package moved on outside the patch write set, or because the caller's
-/// physical-source provenance or resource limits differ — the candidate is
-/// captured from scratch, so no refusal, no snapshot field and no published
-/// byte depends on the reuse.
-///
-/// `parent` is the facade's retained payload-digest memo of the package being
-/// patched. It is consulted only when the candidate has to be captured from
-/// scratch, and only to skip re-hashing payload allocations the candidate
-/// shares with it; a memo that names nothing the candidate holds costs one
-/// lookup per part and changes no value.
-pub(crate) fn apply_committed(
+pub(crate) fn apply_with_semantic_limits(
     package: &mut OpcPackage,
     patch: &Patch,
-    committed: Option<&Snapshot>,
     physical_source_provenance: bool,
-    parent: &super::model::PartDigests,
+    semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
 ) -> Result<Snapshot> {
     apply_with_revision(
         package,
         patch,
         None,
-        committed,
+        None,
         physical_source_provenance,
-        Some(parent),
+        None,
+        semantic_limits,
     )
 }
 
-pub(crate) fn apply_exact_revision(
+pub(crate) fn apply_to_new_with_semantic_limits(
+    package: &OpcPackage,
+    patch: &Patch,
+    physical_source_provenance: bool,
+    parent: &super::model::PartDigests,
+    semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
+) -> Result<(OpcPackage, Snapshot)> {
+    applied_with_revision(
+        package,
+        patch,
+        None,
+        None,
+        physical_source_provenance,
+        Some(parent),
+        semantic_limits,
+    )
+}
+
+pub(crate) fn apply_exact_revision_with_semantic_limits(
     package: &mut OpcPackage,
     patch: &Patch,
     result_revision: [u8; 32],
     physical_source_provenance: bool,
+    semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
 ) -> Result<Snapshot> {
     apply_with_revision(
         package,
@@ -806,6 +1390,7 @@ pub(crate) fn apply_exact_revision(
         None,
         physical_source_provenance,
         None,
+        semantic_limits,
     )
 }
 
@@ -817,10 +1402,12 @@ fn capture_candidate(
     physical_source_provenance: bool,
     committed: Option<&Snapshot>,
     parent: Option<&super::model::PartDigests>,
+    semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
 ) -> Result<Snapshot> {
     if let Some(committed) = committed
         && committed.limits == limits
         && committed.physical_source_provenance == physical_source_provenance
+        && committed.semantic_limits() == crate::open_options::selected(semantic_limits.as_ref())
         && packages_equal(committed.package.as_ref(), candidate)
     {
         return Ok(committed.rebound_to(candidate));
@@ -832,13 +1419,19 @@ fn capture_candidate(
         .map(|snapshot| snapshot.part_digests.as_ref())
         .or(parent)
     {
-        Some(parent) => super::model::capture_with_parent_digests(
+        Some(parent) => super::model::capture_with_parent_digests_and_semantic_limits(
             candidate,
             limits,
             physical_source_provenance,
             parent,
+            semantic_limits,
         ),
-        None => capture(candidate, limits, physical_source_provenance),
+        None => super::model::capture_with_provenance_and_semantic_limits(
+            candidate,
+            limits,
+            physical_source_provenance,
+            semantic_limits,
+        ),
     }
 }
 
@@ -860,6 +1453,7 @@ pub(crate) fn validate_candidate(
     result_revision: [u8; 32],
     physical_source_provenance: bool,
     parent: Option<&super::model::PartDigests>,
+    semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
 ) -> Result<Snapshot> {
     let current_main = crate::parts::PresentationPart::from_package(source)?
         .part()
@@ -872,13 +1466,19 @@ pub(crate) fn validate_candidate(
     }
     validate_before(source, patch)?;
     let snapshot = match parent {
-        Some(parent) => super::model::capture_with_parent_digests(
+        Some(parent) => super::model::capture_with_parent_digests_and_semantic_limits(
             candidate,
             patch.limits,
             physical_source_provenance,
             parent,
+            semantic_limits,
         )?,
-        None => capture(candidate, patch.limits, physical_source_provenance)?,
+        None => super::model::capture_with_provenance_and_semantic_limits(
+            candidate,
+            patch.limits,
+            physical_source_provenance,
+            semantic_limits,
+        )?,
     };
     validate_after(candidate, patch)?;
     if snapshot.revision() != result_revision {
@@ -896,7 +1496,30 @@ fn apply_with_revision(
     committed: Option<&Snapshot>,
     physical_source_provenance: bool,
     parent: Option<&super::model::PartDigests>,
+    semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
 ) -> Result<Snapshot> {
+    let (candidate, snapshot) = applied_with_revision(
+        package,
+        patch,
+        result_revision,
+        committed,
+        physical_source_provenance,
+        parent,
+        semantic_limits,
+    )?;
+    *package = candidate;
+    Ok(snapshot)
+}
+
+fn applied_with_revision(
+    package: &OpcPackage,
+    patch: &Patch,
+    result_revision: Option<[u8; 32]>,
+    committed: Option<&Snapshot>,
+    physical_source_provenance: bool,
+    parent: Option<&super::model::PartDigests>,
+    semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
+) -> Result<(OpcPackage, Snapshot)> {
     let current_main = crate::parts::PresentationPart::from_package(package)?
         .part()
         .partname()
@@ -907,23 +1530,29 @@ fn apply_with_revision(
         ));
     }
     validate_before(package, patch)?;
-    if patch.is_empty() {
+    if patch.is_noop() {
         let snapshot = capture_candidate(
             package,
             patch.limits,
             physical_source_provenance,
             committed,
             parent,
+            semantic_limits,
         )?;
         if result_revision.is_some_and(|expected| snapshot.revision() != expected) {
             return Err(invalid(
                 "opened-presentation candidate has an unexpected complete-package revision",
             ));
         }
-        return Ok(snapshot);
+        return Ok((package.clone(), snapshot));
     }
+    let metadata = patch.metadata.prepare(package, patch.limits)?;
     let mut candidate = package.clone();
-    if let Some((_before, after)) = &patch.root {
+    if let Some((_before, after)) = &patch.root
+        && !patch
+            .metadata
+            .has_relationships(&PackURI::new("/").map_err(Error::Invalid)?)
+    {
         replace_relationships(candidate.rels_mut(), after)?;
     }
     for delta in &patch.deltas {
@@ -944,7 +1573,9 @@ fn apply_with_revision(
                     part.set_content_type(state.content_type.clone())?;
                 }
                 part.set_blob_shared(Arc::clone(&state.blob));
-                replace_relationships(part.rels_mut(), &state.relationships)?;
+                if !patch.metadata.has_relationships(&delta.name) {
+                    replace_relationships(part.rels_mut(), &state.relationships)?;
+                }
             },
             (None, None) => {
                 return Err(invalid(
@@ -953,12 +1584,15 @@ fn apply_with_revision(
             },
         }
     }
+    metadata.install(&mut candidate, patch.limits)?;
+    validate_topology_dependencies(&candidate, patch)?;
     let snapshot = capture_candidate(
         &candidate,
         patch.limits,
         physical_source_provenance,
         committed,
         parent,
+        semantic_limits,
     )?;
     validate_after(&candidate, patch)?;
     if result_revision.is_some_and(|expected| snapshot.revision() != expected) {
@@ -966,23 +1600,26 @@ fn apply_with_revision(
             "opened-presentation candidate has an unexpected complete-package revision",
         ));
     }
-    *package = candidate;
-    Ok(snapshot)
+    Ok((candidate, snapshot))
 }
 
 fn validate_before(package: &OpcPackage, patch: &Patch) -> Result<()> {
+    patch.metadata.validate(package, false, patch.limits)?;
     if let Some((before, _after)) = &patch.root
-        && RelationshipState::capture_bounded(package.rels())? != *before
+        && !(if patch
+            .metadata
+            .has_relationships(&PackURI::new("/").map_err(Error::Invalid)?)
+        {
+            relationship_changes_match(package.rels(), before, _after, false)
+        } else {
+            relationships_match(package.rels(), before)
+        })
     {
         return Err(stale());
     }
     for delta in &patch.deltas {
-        let current = match package.get_part(&delta.name) {
-            Ok(part) => Some(ResourceState::capture_bounded(part)?),
-            Err(litchi_opc::OpcError::PartNotFound(_)) => None,
-            Err(error) => return Err(error.into()),
-        };
-        if current != delta.before {
+        let current = optional_part(package, &delta.name)?;
+        if !delta_matches(current, delta, false, &patch.metadata) {
             return Err(stale());
         }
     }
@@ -990,20 +1627,24 @@ fn validate_before(package: &OpcPackage, patch: &Patch) -> Result<()> {
 }
 
 fn validate_after(package: &OpcPackage, patch: &Patch) -> Result<()> {
+    patch.metadata.validate(package, true, patch.limits)?;
     if let Some((_before, after)) = &patch.root
-        && RelationshipState::capture_bounded(package.rels())? != *after
+        && !(if patch
+            .metadata
+            .has_relationships(&PackURI::new("/").map_err(Error::Invalid)?)
+        {
+            relationship_changes_match(package.rels(), _before, after, true)
+        } else {
+            relationships_match(package.rels(), after)
+        })
     {
         return Err(invalid(
             "opened-presentation published root relationships differ from the patch target",
         ));
     }
     for delta in &patch.deltas {
-        let current = match package.get_part(&delta.name) {
-            Ok(part) => Some(ResourceState::capture_bounded(part)?),
-            Err(litchi_opc::OpcError::PartNotFound(_)) => None,
-            Err(error) => return Err(error.into()),
-        };
-        if current != delta.after {
+        let current = optional_part(package, &delta.name)?;
+        if !delta_matches(current, delta, true, &patch.metadata) {
             return Err(invalid(
                 "opened-presentation published resource differs from its patch target",
             ));
@@ -1012,11 +1653,117 @@ fn validate_after(package: &OpcPackage, patch: &Patch) -> Result<()> {
     Ok(())
 }
 
-fn stale() -> Error {
-    Error::UnsafeEdit {
-        operation: "apply_opened_presentation_patch",
-        reason: "an opened-presentation patch resource is stale",
+// Final private-graph admission covers both directions: deletion cannot orphan
+// another owner, and creation cannot activate an unrelated dangling edge.
+fn validate_topology_dependencies(package: &OpcPackage, patch: &Patch) -> Result<()> {
+    let removals = patch.deltas.iter().filter(|d| d.after.is_none()).count();
+    let additions = patch.deltas.iter().filter(|d| d.before.is_none()).count();
+    if removals == 0 && additions == 0 {
+        return Ok(());
     }
+    fn folded(value: &str) -> Result<String> {
+        let mut text = String::new();
+        text.try_reserve_exact(value.len())
+            .map_err(|source| Error::Allocation {
+                resource: "part dependency name",
+                source,
+            })?;
+        text.push_str(value);
+        text.make_ascii_lowercase();
+        Ok(text)
+    }
+    let mut removed = std::collections::HashSet::new();
+    let mut added = std::collections::HashSet::new();
+    removed
+        .try_reserve(removals)
+        .map_err(|source| Error::Allocation {
+            resource: "removed part dependencies",
+            source,
+        })?;
+    added
+        .try_reserve(additions)
+        .map_err(|source| Error::Allocation {
+            resource: "added part dependencies",
+            source,
+        })?;
+    for delta in &patch.deltas {
+        if delta.after.is_none() {
+            removed.insert(folded(delta.name.as_str())?);
+        }
+        if delta.before.is_none() {
+            added.insert(folded(delta.name.as_str())?);
+        }
+    }
+    let root = PackURI::new("/").map_err(Error::Invalid)?;
+    for (owner, graph) in std::iter::once((&root, package.rels())).chain(
+        package
+            .iter_parts()
+            .map(|part| (part.partname(), part.rels())),
+    ) {
+        for relationship in graph.iter().filter(|r| !r.is_external()) {
+            let target = folded(relationship.target_partname()?.as_str())?;
+            if removed.contains(&target) {
+                return Err(Error::PatchConflict);
+            }
+            if added.contains(&target) && !authorizes_added_target_edge(patch, owner, relationship)
+            {
+                return Err(Error::PatchConflict);
+            }
+        }
+    }
+    Ok(())
+}
+fn authorizes_added_target_edge(
+    patch: &Patch,
+    owner: &PackURI,
+    edge: &litchi_opc::Relationship,
+) -> bool {
+    let (before, after) = if owner.as_str() == "/" {
+        let Some((a, b)) = &patch.root else {
+            return false;
+        };
+        (Some(a.as_slice()), Some(b.as_slice()))
+    } else {
+        let index = patch
+            .deltas
+            .binary_search_by(|d| d.name.as_str().cmp(owner.as_str()))
+            .ok()
+            .or_else(|| {
+                patch
+                    .deltas
+                    .iter()
+                    .position(|d| d.name.is_equivalent_to(owner))
+            });
+        let Some(index) = index else {
+            return false;
+        };
+        let delta = &patch.deltas[index];
+        (
+            delta.before.as_ref().map(|s| s.relationships.as_slice()),
+            delta.after.as_ref().map(|s| s.relationships.as_slice()),
+        )
+    };
+    fn find<'a>(
+        values: Option<&'a [RelationshipState]>,
+        id: &str,
+    ) -> Option<&'a RelationshipState> {
+        let values = values?;
+        values
+            .binary_search_by(|value| value.id.as_str().cmp(id))
+            .ok()
+            .map(|i| &values[i])
+    }
+    let Some(expected) = find(after, edge.r_id()) else {
+        return false;
+    };
+    find(before, edge.r_id()) != Some(expected)
+        && expected.kind == edge.reltype()
+        && expected.target == edge.target_ref()
+        && expected.external == edge.is_external()
+}
+
+fn stale() -> Error {
+    Error::PatchConflict
 }
 
 fn replace_relationships(
@@ -1054,11 +1801,248 @@ fn require_same_root(left: &Patch, right: &Patch) -> Result<()> {
     Ok(())
 }
 
+fn changed_relationships_conflict(
+    base: &[RelationshipState],
+    left: &[RelationshipState],
+    right: &[RelationshipState],
+) -> bool {
+    let find = |values: &[RelationshipState], id: &str| {
+        values
+            .binary_search_by(|value| value.id.as_str().cmp(id))
+            .ok()
+    };
+    let conflict = |id: &str| {
+        let before = find(base, id).map(|i| &base[i]);
+        let a = find(left, id).map(|i| &left[i]);
+        let b = find(right, id).map(|i| &right[i]);
+        a != before && b != before && a != b
+    };
+    base.iter()
+        .chain(left)
+        .chain(right)
+        .any(|value| conflict(&value.id))
+}
+fn deltas_conflict(left: &Delta, right: &Delta) -> bool {
+    if left == right {
+        return false;
+    }
+    if left.before != right.before {
+        return true;
+    }
+    match (&left.before, &left.after, &right.after) {
+        (Some(base), Some(a), Some(b)) => {
+            (a.content_type != base.content_type
+                && b.content_type != base.content_type
+                && a.content_type != b.content_type)
+                || (a.blob != base.blob && b.blob != base.blob && a.blob != b.blob)
+                || changed_relationships_conflict(
+                    &base.relationships,
+                    &a.relationships,
+                    &b.relationships,
+                )
+        },
+        _ => true,
+    }
+}
+// Traverse the two sorted outcomes without allocating a merged graph.
+fn merged_relationships<'a>(
+    base: &'a [RelationshipState],
+    left: &'a [RelationshipState],
+    right: &'a [RelationshipState],
+) -> impl Iterator<Item = &'a RelationshipState> {
+    let (mut a, mut b) = (0, 0);
+    std::iter::from_fn(move || {
+        loop {
+            let id = match (left.get(a), right.get(b)) {
+                (None, None) => return None,
+                (Some(x), None) | (None, Some(x)) => x.id.as_str(),
+                (Some(x), Some(y)) => x.id.as_str().min(y.id.as_str()),
+            };
+            let l = left.get(a).filter(|value| value.id == id);
+            let r = right.get(b).filter(|value| value.id == id);
+            a += usize::from(l.is_some());
+            b += usize::from(r.is_some());
+            let previous = base
+                .binary_search_by(|value| value.id.as_str().cmp(id))
+                .ok()
+                .map(|i| &base[i]);
+            if let Some(value) = if l == previous { r } else { l } {
+                return Some(value);
+            }
+        }
+    })
+}
+fn merged_relationship_len(
+    base: &[RelationshipState],
+    left: &[RelationshipState],
+    right: &[RelationshipState],
+    limits: Limits,
+) -> Result<usize> {
+    if changed_relationships_conflict(base, left, right) {
+        return Err(invalid("patches conflict on a relationship ID"));
+    }
+    require_relationship_count(base.len(), limits)?;
+    let mut count = 0usize;
+    let mut length = 4;
+    for value in merged_relationships(base, left, right) {
+        count = count
+            .checked_add(1)
+            .ok_or_else(|| invalid("relationship count overflow"))?;
+        require_relationship_count(count, limits)?;
+        add_len(
+            &mut length,
+            relationships_len(std::slice::from_ref(value))? - 4,
+        )?;
+    }
+    Ok(length)
+}
+fn preflight_join(left: &Patch, right: &Patch, limits: Limits) -> Result<()> {
+    if left.conflicts_with(right) {
+        return Err(invalid("patches conflict"));
+    }
+    let count = left
+        .deltas
+        .len()
+        .checked_add(
+            right
+                .deltas
+                .iter()
+                .filter(|d| !left.deltas.iter().any(|a| a.name == d.name))
+                .count(),
+        )
+        .ok_or_else(|| invalid("patch part count overflow"))?;
+    if count > limits.max_parts() {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Parts,
+            observed: count,
+            maximum: limits.max_parts(),
+        });
+    }
+    let mut length = MAGIC.len() + 4 + left.presentation_name.as_str().len() + 1 + 4;
+    match (&left.root, &right.root) {
+        (Some((base, a)), Some((_, b))) => {
+            add_len(&mut length, relationships_len(base)?)?;
+            add_len(&mut length, merged_relationship_len(base, a, b, limits)?)?;
+        },
+        (Some((a, b)), None) | (None, Some((a, b))) => {
+            require_relationship_count(a.len(), limits)?;
+            require_relationship_count(b.len(), limits)?;
+            add_len(&mut length, relationships_len(a)?)?;
+            add_len(&mut length, relationships_len(b)?)?;
+        },
+        (None, None) => {},
+    }
+    for delta in left.deltas.iter().chain(
+        right
+            .deltas
+            .iter()
+            .filter(|d| !left.deltas.iter().any(|a| a.name == d.name)),
+    ) {
+        add_len(&mut length, 4 + delta.name.as_str().len())?;
+        for state in [&delta.before, &delta.after].into_iter().flatten() {
+            require_relationship_count(state.relationships.len(), limits)?;
+        }
+        add_len(&mut length, optional_state_len(delta.before.as_ref())?)?;
+        let other = right
+            .deltas
+            .iter()
+            .find(|d| d.name == delta.name && *d != delta);
+        if let (Some(other), Some(base), Some(a)) = (other, &delta.before, &delta.after) {
+            let b = other
+                .after
+                .as_ref()
+                .ok_or_else(|| invalid("incompatible resource outcomes"))?;
+            let content_type = if a.content_type == base.content_type {
+                &b.content_type
+            } else {
+                &a.content_type
+            };
+            let blob = if a.blob == base.blob {
+                &b.blob
+            } else {
+                &a.blob
+            };
+            add_len(&mut length, 1 + 4 + content_type.len() + 8)?;
+            add_len(&mut length, blob.len())?;
+            add_len(
+                &mut length,
+                merged_relationship_len(
+                    &base.relationships,
+                    &a.relationships,
+                    &b.relationships,
+                    limits,
+                )?,
+            )?;
+        } else {
+            add_len(&mut length, optional_state_len(delta.after.as_ref())?)?;
+        }
+        require_capture_bytes(length, limits)?;
+    }
+    add_len(
+        &mut length,
+        left.metadata.joined_len(&right.metadata, limits)?,
+    )?;
+    require_capture_bytes(length, limits)
+}
+fn merge_relationship_states(
+    base: &[RelationshipState],
+    left: &[RelationshipState],
+    right: &[RelationshipState],
+) -> Result<Vec<RelationshipState>> {
+    if changed_relationships_conflict(base, left, right) {
+        return Err(invalid("patches conflict on a relationship ID"));
+    }
+    let count = merged_relationships(base, left, right).count();
+    let mut merged = Vec::new();
+    merged
+        .try_reserve_exact(count)
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation merged relationships",
+            source,
+        })?;
+    merged.extend(merged_relationships(base, left, right).cloned());
+    Ok(merged)
+}
+fn merge_delta(left: &Delta, right: &Delta) -> Result<Delta> {
+    if left == right {
+        return Ok(left.clone());
+    }
+    if deltas_conflict(left, right) {
+        return Err(invalid(
+            "opened-presentation patches conflict on a physical part",
+        ));
+    }
+    let (Some(base), Some(a), Some(b)) = (&left.before, &left.after, &right.after) else {
+        return Err(invalid("incompatible resource outcomes"));
+    };
+    Ok(Delta {
+        name: left.name.clone(),
+        before: left.before.clone(),
+        after: Some(ResourceState {
+            content_type: if a.content_type == base.content_type {
+                b.content_type.clone()
+            } else {
+                a.content_type.clone()
+            },
+            blob: if a.blob == base.blob {
+                Arc::clone(&b.blob)
+            } else {
+                Arc::clone(&a.blob)
+            },
+            relationships: merge_relationship_states(
+                &base.relationships,
+                &a.relationships,
+                &b.relationships,
+            )?,
+        }),
+    })
+}
+
 fn root_conflicts(
     left: Option<&(Vec<RelationshipState>, Vec<RelationshipState>)>,
     right: Option<&(Vec<RelationshipState>, Vec<RelationshipState>)>,
 ) -> bool {
-    matches!((left, right), (Some(left), Some(right)) if left != right)
+    matches!((left, right), (Some(left), Some(right)) if left.0 != right.0 || changed_relationships_conflict(&left.0, &left.1, &right.1))
 }
 
 fn merge_root(
@@ -1069,8 +2053,12 @@ fn merge_root(
         (None, None) => Ok(None),
         (Some(value), None) | (None, Some(value)) => Ok(Some(value.clone())),
         (Some(left), Some(right)) if left == right => Ok(Some(left.clone())),
+        (Some(left), Some(right)) if left.0 == right.0 => Ok(Some((
+            left.0.clone(),
+            merge_relationship_states(&left.0, &left.1, &right.1)?,
+        ))),
         (Some(_), Some(_)) => Err(invalid(
-            "opened-presentation patches conflict on package-root relationships",
+            "opened-presentation patches have different package-root before-states",
         )),
     }
 }
@@ -1142,6 +2130,70 @@ fn put_relationships(output: &mut Vec<u8>, relationships: &[RelationshipState]) 
     Ok(())
 }
 
+// Complete framing/count admission precedes every decoded payload or metadata
+// allocation. XML/native-key validation follows under the same finite policy.
+fn preflight_wire(bytes: &[u8], limits: Limits) -> Result<()> {
+    fn relationships(input: &mut Input<'_>, limits: Limits) -> Result<()> {
+        let count = input.usize32()?;
+        require_relationship_count(count, limits)?;
+        for _ in 0..count {
+            input.bytes32()?;
+            input.bytes32()?;
+            input.bytes32()?;
+            if input.byte()? > 1 {
+                return Err(invalid("invalid relationship mode"));
+            }
+        }
+        Ok(())
+    }
+    fn state(input: &mut Input<'_>, limits: Limits) -> Result<()> {
+        match input.byte()? {
+            0 => Ok(()),
+            1 => {
+                input.bytes32()?;
+                input.bytes64(limits.max_patch_bytes())?;
+                relationships(input, limits)
+            },
+            _ => Err(invalid("invalid resource state marker")),
+        }
+    }
+    let mut input = Input::new(bytes);
+    if input.take(MAGIC.len())? != MAGIC {
+        return Err(invalid(
+            "opened-presentation durable patch has an unsupported version",
+        ));
+    }
+    input.bytes32()?;
+    match input.byte()? {
+        0 => {},
+        1 => {
+            relationships(&mut input, limits)?;
+            relationships(&mut input, limits)?;
+        },
+        _ => return Err(invalid("invalid root relationship marker")),
+    }
+    let count = input.usize32()?;
+    if count > limits.max_parts() {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Parts,
+            observed: count,
+            maximum: limits.max_parts(),
+        });
+    }
+    for _ in 0..count {
+        input.bytes32()?;
+        state(&mut input, limits)?;
+        state(&mut input, limits)?;
+    }
+    Metadata::preflight(&mut input, limits)?;
+    if !input.is_empty() {
+        return Err(invalid(
+            "opened-presentation durable patch has trailing bytes",
+        ));
+    }
+    Ok(())
+}
+
 fn parse_optional_relationship_delta(
     input: &mut Input<'_>,
     limits: Limits,
@@ -1176,8 +2228,9 @@ fn parse_relationships(input: &mut Input<'_>, limits: Limits) -> Result<Vec<Rela
     let count = input.usize32()?;
     if count > limits.max_parts() {
         return Err(Error::Limit {
-            resource: "opened-presentation patch relationships",
-            limit: limits.max_parts(),
+            kind: crate::opened::LimitKind::Parts,
+            observed: count,
+            maximum: limits.max_parts(),
         });
     }
     let mut relationships = Vec::new();
@@ -1241,7 +2294,8 @@ fn put_bytes64(output: &mut Vec<u8>, value: &[u8]) -> Result<()> {
 }
 
 fn parse_part_name(value: &[u8]) -> Result<PackURI> {
-    PackURI::new(parse_text(value, "part name")?).map_err(Error::Invalid)
+    PackURI::new(parse_text(value, "part name")?)
+        .map_err(|_error| invalid("opened-presentation patch part name is invalid"))
 }
 
 fn parse_text(value: &[u8], label: &str) -> Result<String> {
@@ -1307,8 +2361,9 @@ impl<'a> Input<'a> {
         let length = self.usize64()?;
         if length > limit {
             return Err(Error::Limit {
-                resource: "opened-presentation durable resource bytes",
-                limit,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PayloadBytes),
+                observed: length,
+                maximum: limit,
             });
         }
         self.take(length)
@@ -1318,3 +2373,34 @@ impl<'a> Input<'a> {
         self.position == self.bytes.len()
     }
 }
+
+#[cfg(test)]
+#[path = "patch_capture_tests.rs"]
+mod capture_tests;
+
+impl std::fmt::Debug for Patch {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Patch")
+            .field("resource_count", &self.resource_count())
+            .finish_non_exhaustive()
+    }
+}
+impl std::fmt::Debug for Delta {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Delta")
+            .field("before_present", &self.before.is_some())
+            .field("after_present", &self.after.is_some())
+            .finish_non_exhaustive()
+    }
+}
+impl std::fmt::Debug for Conflict {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.debug_struct("Conflict").finish_non_exhaustive()
+    }
+}
+
+#[cfg(test)]
+#[path = "patch_metadata_tests.rs"]
+mod metadata_tests;

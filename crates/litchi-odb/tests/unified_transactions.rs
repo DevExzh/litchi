@@ -4,15 +4,15 @@
 )]
 
 use litchi_odb::{
-    Builder, ChangeKind, Column, Component, ComponentKind, Connection, DataType, Database, History,
-    HistoryLimits, Index, IndexColumn, Key, KeyColumn, KeyKind, Query, ReferentialAction, Table,
-    TableKind,
+    Builder, ChangeKind, Column, Component, ComponentKind, Connection, DataType, History,
+    HistoryLimits, Index, IndexColumn, Key, KeyColumn, KeyKind, Package, Query, ReferentialAction,
+    Table, TableKind,
 };
 
 const SOURCE: &str = r#"<?xml version="1.0" encoding="UTF-8"?><o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:database:1.0" xmlns:x="http://www.w3.org/1999/xlink"><o:body><o:database><d:data-source/></o:database></o:body></o:document-content>"#;
 
-fn source() -> Database {
-    Database::from_bytes(Builder::new().content_xml(SOURCE).build().unwrap()).unwrap()
+fn source() -> Package {
+    Builder::new().content_xml(SOURCE).build().unwrap()
 }
 
 #[test]
@@ -73,10 +73,10 @@ fn unified_transaction_composes_schema_relation_query_connection_component_and_e
     .unwrap();
 
     let commit = edit.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert!(commit.patch().changes().len() >= 8);
     assert_eq!(commit.patch().changes()[0].kind(), ChangeKind::Connection);
-    let catalog = commit.database().catalog().unwrap();
+    let catalog = commit.package().database().catalog().unwrap();
     assert_eq!(catalog.tables().len(), 2);
     assert_eq!(catalog.queries()[0].command(), "SELECT * FROM orders");
     assert_eq!(catalog.components().len(), 2);
@@ -91,14 +91,14 @@ fn unified_transaction_composes_schema_relation_query_connection_component_and_e
         catalog.connection(),
         Some(Connection::Resource(value)) if value == "sdbc:embedded:firebird"
     ));
-    let extensions = commit.database().producer_extensions().unwrap();
+    let extensions = commit.package().database().producer_extensions().unwrap();
     assert_eq!(extensions.len(), 1);
     assert_eq!(extensions[0].local_name(), "database-settings");
     assert!(extensions[0].xml().contains("lo:keep=\"true\""));
 
-    let restored = commit.patch().inverse().apply(commit.database()).unwrap();
-    assert_eq!(restored.as_bytes(), source.as_bytes());
-    assert!(commit.patch().apply(commit.database()).is_err());
+    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
+    assert_eq!(restored.into_package().as_bytes(), source.as_bytes());
+    assert!(commit.package().apply(commit.patch()).is_err());
 }
 
 #[test]
@@ -123,13 +123,13 @@ fn dependency_aware_renames_and_complete_deletion_reopen_cleanly() {
         )
         .unwrap();
     create.add_query(Query::new("q", "SELECT 1")).unwrap();
-    let created = create.commit().unwrap().into_database();
+    let created = create.commit().unwrap().into_package();
 
     let mut edit = created.edit();
     edit.rename_table("parent", "account").unwrap();
     edit.rename_column("account", "id", "account_id").unwrap();
-    let renamed = edit.commit().unwrap().into_database();
-    let renamed_catalog = renamed.catalog().unwrap();
+    let renamed = edit.commit().unwrap().into_package();
+    let renamed_catalog = renamed.database().catalog().unwrap();
     let relation = &renamed_catalog.relations()[0];
     assert_eq!(relation.referenced_table(), "account");
     assert_eq!(relation.columns()[0].related_column(), Some("account_id"));
@@ -140,9 +140,9 @@ fn dependency_aware_renames_and_complete_deletion_reopen_cleanly() {
     remove.remove_table("child").unwrap();
     remove.remove_table("account").unwrap();
     remove.remove_query("q").unwrap();
-    let empty = remove.commit().unwrap().into_database();
-    assert!(empty.catalog().unwrap().tables().is_empty());
-    assert!(empty.catalog().unwrap().queries().is_empty());
+    let empty = remove.commit().unwrap().into_package();
+    assert!(empty.database().catalog().unwrap().tables().is_empty());
+    assert!(empty.database().catalog().unwrap().queries().is_empty());
 }
 
 #[test]
@@ -150,8 +150,8 @@ fn real_pretty_libreoffice_package_changes_only_the_selected_query_xml() {
     let bytes = Vec::from(include_bytes!(
         "../../../test-data/libreoffice-core/dbaccess/qa/unit/data/tdf132924.odb"
     ));
-    let database = Database::from_bytes(bytes.clone()).unwrap();
-    let original = database.content_xml().to_owned();
+    let database = Package::from_bytes(&bytes).unwrap();
+    let original = database.database().content_xml().to_owned();
     let mut edit = database.edit();
     edit.set_query_command("AliasTest", "SELECT 7").unwrap();
     let commit = edit.commit().unwrap();
@@ -160,13 +160,13 @@ fn real_pretty_libreoffice_package_changes_only_the_selected_query_xml() {
         "db:command=\"SELECT &quot;tid&quot; &quot;TestId&quot;, &quot;tname&quot; &quot;TestName&quot; FROM &quot;test&quot;\"",
         "db:command=\"SELECT 7\"",
     );
-    assert_eq!(commit.database().content_xml(), expected);
+    assert_eq!(commit.package().database().content_xml(), expected);
     assert_eq!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.database())
+            .package()
+            .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         bytes
     );
@@ -178,11 +178,11 @@ fn budgeted_history_undoes_and_redoes_full_reopened_snapshots() {
     let mut edit = source.edit();
     edit.add_query(Query::new("history", "SELECT 1")).unwrap();
     let commit = edit.commit().unwrap();
-    let weight = u64::try_from(commit.database().as_bytes().len()).unwrap();
+    let weight = u64::try_from(commit.package().as_bytes().len()).unwrap();
     let mut history = History::new(source.clone(), HistoryLimits::new(2, weight));
     assert!(
         history
-            .record(commit.into_database(), weight)
+            .record(commit.into_package(), weight)
             .unwrap()
             .is_empty()
     );
@@ -192,6 +192,7 @@ fn budgeted_history_undoes_and_redoes_full_reopened_snapshots() {
     assert!(
         history
             .current()
+            .database()
             .catalog()
             .unwrap()
             .query("history")

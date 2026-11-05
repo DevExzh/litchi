@@ -1,0 +1,158 @@
+{
+  "status": "all seven checks passed",
+  "base_commit": "916fc215ff",
+  "checks": [
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "-p",
+        "litchi-odraw"
+      ],
+      "started_ns": 1792619134982527751,
+      "finished_ns": 1792619135118844972,
+      "exit_code": 0,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odraw-limit-kinds-0362i/fmt.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "test_results": []
+    },
+    {
+      "name": "tests",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "litchi-odraw",
+        "--all-features"
+      ],
+      "started_ns": 1792619135119015283,
+      "finished_ns": 1792619143890009046,
+      "exit_code": 0,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odraw-limit-kinds-0362i/tests.log",
+        "bytes": 8256,
+        "sha256": "562bfcc08377257894987461fabc61d34fe87fbe6f893a44161aa8ac429b5a0a"
+      },
+      "test_results": [
+        "test result: ok. 95 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "-p",
+        "litchi-odraw",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "started_ns": 1792619143890230207,
+      "finished_ns": 1792619146958469214,
+      "exit_code": 0,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odraw-limit-kinds-0362i/clippy.log",
+        "bytes": 355,
+        "sha256": "ac245d1a0381511dea94a32af56b3c7e5617a7c32b7c71575e117a8a013dd0db"
+      },
+      "test_results": []
+    },
+    {
+      "name": "glossary",
+      "command": [
+        "python3",
+        "tools/check_api_glossary.py",
+        "--profile",
+        "odraw",
+        "--target-dir",
+        "/home/zhuhe/code/litchi-worktrees/unified-ops-api/target"
+      ],
+      "started_ns": 1792619146958701405,
+      "finished_ns": 1792619153967891686,
+      "exit_code": 0,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odraw-limit-kinds-0362i/glossary.log",
+        "bytes": 699,
+        "sha256": "ef6f25c35f28cf4bfe2449923517a198cdf7a7ed41af2a86bb056a4928b445b8"
+      },
+      "test_results": []
+    },
+    {
+      "name": "consumer-check",
+      "command": [
+        "cargo",
+        "check",
+        "-p",
+        "litchi-imgconv",
+        "-p",
+        "litchi-doc",
+        "-p",
+        "litchi-xls",
+        "-p",
+        "litchi-ppt",
+        "-p",
+        "litchi",
+        "--all-targets",
+        "--all-features"
+      ],
+      "started_ns": 1792619167159862861,
+      "finished_ns": 1792619406049116800,
+      "exit_code": 0,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odraw-limit-kinds-0362i/consumer-check.log",
+        "bytes": 8911,
+        "sha256": "27f1804d734a075021841dc3243ff602400c0dd46863b3ff796157459c4e8113"
+      },
+      "test_results": []
+    },
+    {
+      "name": "glossary-tests",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "tools.test_check_api_glossary"
+      ],
+      "started_ns": 1792619406049368921,
+      "finished_ns": 1792619406547160692,
+      "exit_code": 0,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odraw-limit-kinds-0362i/glossary-tests.log",
+        "bytes": 130,
+        "sha256": "d2e64369f016580bd42b31aa430622d6cdfc8a6761cf090d7a59d584c387ffee"
+      },
+      "test_results": []
+    },
+    {
+      "name": "fmt-check",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "started_ns": 1792619406547379244,
+      "finished_ns": 1792619433707996471,
+      "exit_code": 0,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odraw-limit-kinds-0362i/fmt-check.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "test_results": []
+    }
+  ],
+  "distinct_rust_tests": 96,
+  "rust_ignored": 0,
+  "target_size": "12 GiB (du -sh after checks)",
+  "source_review": "Independent W8 review and complete normalized Rust source parity; no behavioral/fidelity finding. Private import alias disambiguates two resource kinds and is not publicly exported.",
+  "scope": "Naming-only slice; no new native timing or final integrated workspace gate claimed."
+}

@@ -4,10 +4,11 @@
     reason = "fixed fixtures and test assertions are intentionally direct"
 )]
 
+use litchi_core::Position;
 use litchi_rtf::{
-    Document,
+    Package,
     edit::Error,
-    transport::{compress, decompress, is_compressed_rtf},
+    transport::{CompressionLimits, DecompressionLimits, compress, decompress, is_compressed_rtf},
 };
 
 const LZFU_RAW: &[u8] = b"{\\rtf1\\ansi\\ansicpg1252\\pard hello world}\r\n";
@@ -25,17 +26,18 @@ fn literal_byte1252_transport_is_exact_and_changed_write_is_atomic_on_refusal() 
     source.push(0xe9);
     source.push(b'}');
 
-    let document = Document::from_bytes(&source).unwrap();
+    let document = Package::from_bytes(&source).unwrap();
     assert_eq!(document.text(), "caf\u{e9}");
     assert_eq!(document.body().len(), document.text().len());
     assert_eq!(document.to_bytes().unwrap(), source);
 
     let noop = document.edit().commit().unwrap();
-    assert!(noop.snapshot().same_snapshot(&document));
-    assert_eq!(noop.snapshot().to_bytes().unwrap(), source);
+    assert!(noop.package().same_snapshot(&document));
+    assert_eq!(noop.package().to_bytes().unwrap(), source);
 
     let mut edit = document.edit();
-    edit.replace_paragraph_text(0, "changed").unwrap();
+    edit.replace_paragraph_text(Position::new(0), "changed")
+        .unwrap();
     assert!(matches!(edit.commit(), Err(Error::Rtf(_))));
     assert_eq!(document.to_bytes().unwrap(), source);
 }
@@ -43,10 +45,16 @@ fn literal_byte1252_transport_is_exact_and_changed_write_is_atomic_on_refusal() 
 #[test]
 fn specification_lzfu_transport_is_exact_and_changed_write_fails_closed() {
     assert!(is_compressed_rtf(LZFU_SPEC));
-    assert_eq!(decompress(LZFU_SPEC).unwrap(), LZFU_RAW);
-    assert_eq!(compress(LZFU_RAW, true).unwrap(), LZFU_SPEC);
+    assert_eq!(
+        decompress(LZFU_SPEC, DecompressionLimits::default()).unwrap(),
+        LZFU_RAW
+    );
+    assert_eq!(
+        compress(LZFU_RAW, true, CompressionLimits::default()).unwrap(),
+        LZFU_SPEC
+    );
 
-    let document = Document::from_bytes(LZFU_SPEC).unwrap();
+    let document = Package::from_bytes(LZFU_SPEC).unwrap();
     assert_eq!(document.text(), "hello world");
     assert_eq!(document.body().len(), document.text().len());
     assert_eq!(document.to_bytes().unwrap(), LZFU_SPEC);
@@ -55,12 +63,15 @@ fn specification_lzfu_transport_is_exact_and_changed_write_fails_closed() {
     assert_eq!(streamed, LZFU_SPEC);
 
     let noop = document.edit().commit().unwrap();
-    assert!(noop.snapshot().same_snapshot(&document));
-    assert_eq!(noop.snapshot().to_bytes().unwrap(), LZFU_SPEC);
+    assert!(noop.package().same_snapshot(&document));
+    assert_eq!(noop.package().to_bytes().unwrap(), LZFU_SPEC);
 
     let mut edit = document.edit();
-    edit.replace_paragraph_text(0, "changed").unwrap();
-    assert!(matches!(edit.commit(), Err(Error::UnsupportedSource(_))));
+    edit.replace_paragraph_text(Position::new(0), "changed")
+        .unwrap();
+    assert!(
+        matches!(edit.commit(), Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent)
+    );
     assert_eq!(document.to_bytes().unwrap(), LZFU_SPEC);
 }
 
@@ -69,7 +80,7 @@ fn libreoffice_watermark_is_visible_through_public_header_shapes_and_exact_on_no
     let source = include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/watermark.rtf"
     );
-    let document = Document::from_bytes(source).unwrap();
+    let document = Package::from_bytes(source).unwrap();
     assert_eq!(document.body().len(), document.text().len());
     let themed_fill = document
         .sections()
@@ -83,11 +94,11 @@ fn libreoffice_watermark_is_visible_through_public_header_shapes_and_exact_on_no
     assert_eq!(document.to_bytes().unwrap(), source);
 
     let noop = document.edit().commit().unwrap();
-    assert!(noop.snapshot().same_snapshot(&document));
+    assert!(noop.package().same_snapshot(&document));
     let mut streamed = Vec::new();
-    noop.snapshot().write_to(&mut streamed).unwrap();
+    noop.package().write_to(&mut streamed).unwrap();
     assert_eq!(streamed, source);
-    let reopened = Document::from_bytes(&streamed).unwrap();
+    let reopened = Package::from_bytes(&streamed).unwrap();
     assert_eq!(reopened.to_bytes().unwrap(), source);
 }
 
@@ -101,7 +112,7 @@ fn relsize_public_edit_and_checked_native_resave_reopen_semantically() {
     let resaved_bytes =
         include_bytes!("../../../test-data/office-interop/libreoffice-resaved/relsize-litchi.rtf");
 
-    let source = Document::from_bytes(source_bytes).unwrap();
+    let source = Package::from_bytes(source_bytes).unwrap();
     assert_eq!(source.shapes().len(), 1);
     assert_eq!(source.shapes()[0].text, "Textbox text.\n");
     assert_eq!(source.to_bytes().unwrap(), source_bytes);
@@ -112,8 +123,8 @@ fn relsize_public_edit_and_checked_native_resave_reopen_semantically() {
     let commit = edit.commit().unwrap();
     assert_eq!(commit.diagnostics().operation_count(), 1);
     assert!(commit.diagnostics().changed());
-    let generated = commit.snapshot().to_bytes().unwrap();
-    let generated_reopen = Document::from_bytes(&generated).unwrap();
+    let generated = commit.package().to_bytes().unwrap();
+    let generated_reopen = Package::from_bytes(&generated).unwrap();
     let generated_shape = &generated_reopen.shapes()[0];
     assert_eq!(generated_shape.text, NATIVE_SENTINEL);
     assert_eq!(generated_shape.position, original.position);
@@ -123,12 +134,12 @@ fn relsize_public_edit_and_checked_native_resave_reopen_semantically() {
     assert_eq!(generated_reopen.text(), source.text());
     assert_eq!(source.to_bytes().unwrap(), source_bytes);
 
-    let changed = Document::from_bytes(changed_bytes).unwrap();
+    let changed = Package::from_bytes(changed_bytes).unwrap();
     assert_eq!(changed.shapes().len(), 1);
     assert_eq!(changed.shapes()[0].text, NATIVE_SENTINEL);
     assert_eq!(changed.to_bytes().unwrap(), changed_bytes);
 
-    let resaved = Document::from_bytes(resaved_bytes).unwrap();
+    let resaved = Package::from_bytes(resaved_bytes).unwrap();
     assert_eq!(resaved.shapes().len(), 1);
     assert_eq!(resaved.shapes()[0].text, format!("{NATIVE_SENTINEL}\n"));
     assert_eq!(resaved.to_bytes().unwrap(), resaved_bytes);

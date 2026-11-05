@@ -16,13 +16,13 @@ use std::fmt;
 use litchi_core::Position;
 use litchi_iwa_common::chart::{kind::Kind, metadata::ChartMetadata};
 use litchi_iwa_protos::chart_metadata_codec::{self, DecodeOptions, LabelList};
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::Package;
 use super::chart_axis_support::{self, AxisSupportBudget, AxisSupportError};
 use super::slide_chart_title::{
-    self, ChartGraphScanBudget, ChartSelection, ChartTitleError, ChartTitleLimitKind,
-    select_chart_with_budget,
+    self, ChartGraphScanBudget, ChartSelection, Error as ChartTitleError,
+    LimitKind as ChartTitleLimitKind, select_chart_with_budget,
 };
 use crate::{ChartSelector, SlideSelector};
 
@@ -33,7 +33,7 @@ const MAX_METADATA_TEXT_BYTES: usize = 64 * 1024 * 1024;
 /// A finite resource governed while one chart metadata view is prepared.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum SlideChartMetadataLimitKind {
+pub enum LimitKind {
     /// Complete package input bytes.
     InputBytes,
     /// Bytes in one protobuf payload.
@@ -76,7 +76,7 @@ pub enum SlideChartMetadataLimitKind {
     LabelCount,
 }
 
-impl fmt::Display for SlideChartMetadataLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -104,9 +104,9 @@ impl fmt::Display for SlideChartMetadataLimitKind {
 }
 
 /// A content-redacted failure raised by a chart metadata read.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum SlideChartMetadataError {
+pub enum Error {
     /// The source was not retained as an exact physical package.
     #[error("this Keynote source does not support physical chart metadata reads")]
     UnsupportedSource,
@@ -136,9 +136,9 @@ pub enum SlideChartMetadataError {
     InvalidSource,
     /// A finite resource ceiling was exceeded.
     #[error("Keynote chart metadata {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
+    Limit {
         /// Resource category that exceeded its limit.
-        kind: SlideChartMetadataLimitKind,
+        kind: LimitKind,
         /// Observed or requested amount.
         observed: u64,
         /// Configured maximum.
@@ -155,7 +155,7 @@ impl Package {
         &self,
         slide_selector: impl Into<SlideSelector<'slide>>,
         chart_selector: impl Into<ChartSelector<'chart>>,
-    ) -> Result<ChartMetadata, SlideChartMetadataError> {
+    ) -> Result<ChartMetadata, Error> {
         let mut budget = ChartGraphScanBudget::new(self).map_err(map_chart_title_error)?;
         budget
             .charge_selection_scans(self, true)
@@ -176,12 +176,12 @@ fn read_selected_metadata(
     package: &Package,
     selection: ChartSelection,
     budget: &mut ChartGraphScanBudget,
-) -> Result<ChartMetadata, SlideChartMetadataError> {
+) -> Result<ChartMetadata, Error> {
     let (component_name, chart_object) = package
         .object_with_component(selection.chart_identifier)
-        .ok_or(SlideChartMetadataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if component_name != selection.slide_component_name {
-        return Err(SlideChartMetadataError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let (message_index, message) =
         chart_axis_support::unique_message(chart_object, CHART_MESSAGE_TYPE, budget)
@@ -191,18 +191,16 @@ fn read_selected_metadata(
 
     let (limits, residual_work) = budget.chart_metadata_residual_limits();
     if residual_work == 0 {
-        return Err(SlideChartMetadataError::LimitExceeded {
-            kind: SlideChartMetadataLimitKind::WireWork,
+        return Err(Error::Limit {
+            kind: LimitKind::WireWork,
             observed: 1,
             maximum: 0,
         });
     }
-    let maximum_depth = u32::try_from(limits.max_nesting()).map_err(|_error| {
-        SlideChartMetadataError::LimitExceeded {
-            kind: SlideChartMetadataLimitKind::WireNesting,
-            observed: usize_to_u64(limits.max_nesting()),
-            maximum: u64::from(u32::MAX),
-        }
+    let maximum_depth = u32::try_from(limits.max_nesting()).map_err(|_error| Error::Limit {
+        kind: LimitKind::WireNesting,
+        observed: usize_to_u64(limits.max_nesting()),
+        maximum: u64::from(u32::MAX),
     })?;
     let options = DecodeOptions::new(
         message.data.len().max(1).min(limits.max_input_bytes()),
@@ -234,7 +232,7 @@ fn read_selected_metadata(
     if snapshot.non_style_ref().map(|reference| reference.get())
         != Some(selection.non_style_identifier)
     {
-        return Err(SlideChartMetadataError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
 
     let row_names = copy_labels(snapshot.row_labels(), budget)?;
@@ -252,155 +250,165 @@ fn read_selected_metadata(
 fn copy_labels<'source>(
     labels: LabelList<'source>,
     budget: &mut ChartGraphScanBudget,
-) -> Result<Vec<String>, SlideChartMetadataError> {
+) -> Result<Vec<String>, Error> {
     let count = labels.len();
     let mut text_bytes = 0usize;
     let mut string_allocations = 0usize;
     let mut seen = 0usize;
     for label in labels.iter() {
-        seen = seen
-            .checked_add(1)
-            .ok_or(SlideChartMetadataError::InvalidSource)?;
+        seen = seen.checked_add(1).ok_or(Error::InvalidSource)?;
         text_bytes = text_bytes
             .checked_add(label.len())
-            .ok_or(SlideChartMetadataError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         string_allocations = string_allocations
             .checked_add(usize::from(!label.is_empty()))
-            .ok_or(SlideChartMetadataError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     if seen != count {
-        return Err(SlideChartMetadataError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let charge = count
         .checked_add(text_bytes)
         .and_then(|value| value.checked_add(string_allocations))
-        .ok_or(SlideChartMetadataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.charge_work(charge).map_err(map_axis_support_error)?;
 
     let mut copied = Vec::new();
     copied
         .try_reserve_exact(count)
-        .map_err(|_error| SlideChartMetadataError::Allocation { amount: count })?;
+        .map_err(|_error| Error::Allocation { amount: count })?;
     for label in labels.iter() {
         let mut owned = String::new();
-        owned.try_reserve_exact(label.len()).map_err(|_error| {
-            SlideChartMetadataError::Allocation {
+        owned
+            .try_reserve_exact(label.len())
+            .map_err(|_error| Error::Allocation {
                 amount: label.len(),
-            }
-        })?;
+            })?;
         owned.push_str(label);
         copied.push(owned);
     }
     if copied.len() != count {
-        return Err(SlideChartMetadataError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(copied)
 }
 
-fn map_axis_support_error(error: AxisSupportError) -> SlideChartMetadataError {
+fn map_axis_support_error(error: AxisSupportError) -> Error {
     map_chart_title_error(slide_chart_title::map_axis_support_error(error))
 }
 
-fn map_chart_title_error(error: ChartTitleError) -> SlideChartMetadataError {
+fn map_chart_title_error(error: ChartTitleError) -> Error {
     match error {
-        ChartTitleError::UnsupportedSource => SlideChartMetadataError::UnsupportedSource,
-        ChartTitleError::AmbiguousSelector => SlideChartMetadataError::AmbiguousSelector,
-        ChartTitleError::EmptySlideName => SlideChartMetadataError::EmptySlideName,
-        ChartTitleError::SlideNameNotFound => SlideChartMetadataError::SlideNameNotFound,
-        ChartTitleError::SlidePositionNotFound { position } => {
-            SlideChartMetadataError::SlidePositionNotFound { position }
+        ChartTitleError::Refused(crate::chart::title::Refusal::UnsupportedSource) => {
+            Error::UnsupportedSource
         },
-        ChartTitleError::ChartNameNotFound => SlideChartMetadataError::ChartNameNotFound,
-        ChartTitleError::ChartPositionNotFound { position } => {
-            SlideChartMetadataError::ChartPositionNotFound { position }
+        ChartTitleError::Refused(crate::chart::title::Refusal::AmbiguousSelector) => {
+            Error::AmbiguousSelector
         },
-        ChartTitleError::EmptyChartName => SlideChartMetadataError::EmptyChartName,
+        ChartTitleError::Refused(crate::chart::title::Refusal::EmptySlideName) => {
+            Error::EmptySlideName
+        },
+        ChartTitleError::Refused(crate::chart::title::Refusal::SlideNameNotFound) => {
+            Error::SlideNameNotFound
+        },
+        ChartTitleError::Refused(crate::chart::title::Refusal::SlidePositionNotFound {
+            position,
+        }) => Error::SlidePositionNotFound { position },
+        ChartTitleError::Refused(crate::chart::title::Refusal::ChartNameNotFound) => {
+            Error::ChartNameNotFound
+        },
+        ChartTitleError::Refused(crate::chart::title::Refusal::ChartPositionNotFound {
+            position,
+        }) => Error::ChartPositionNotFound { position },
+        ChartTitleError::Refused(crate::chart::title::Refusal::EmptyChartName) => {
+            Error::EmptyChartName
+        },
         ChartTitleError::InvalidSource
         | ChartTitleError::Verification
-        | ChartTitleError::PatchConflict => SlideChartMetadataError::InvalidSource,
-        ChartTitleError::LimitExceeded {
+        | ChartTitleError::PatchConflict => Error::InvalidSource,
+        ChartTitleError::Limit {
             kind,
             observed,
             maximum,
-        } => SlideChartMetadataError::LimitExceeded {
+        } => Error::Limit {
             kind: map_title_limit_kind(kind),
             observed,
             maximum,
         },
-        ChartTitleError::Allocation { amount } => SlideChartMetadataError::Allocation { amount },
+        ChartTitleError::Allocation { amount } => Error::Allocation { amount },
     }
 }
 
-fn map_title_limit_kind(kind: ChartTitleLimitKind) -> SlideChartMetadataLimitKind {
+fn map_title_limit_kind(kind: ChartTitleLimitKind) -> LimitKind {
     match kind {
-        ChartTitleLimitKind::InputBytes => SlideChartMetadataLimitKind::InputBytes,
-        ChartTitleLimitKind::OutputBytes => SlideChartMetadataLimitKind::WireBytes,
-        ChartTitleLimitKind::WireBytes => SlideChartMetadataLimitKind::WireBytes,
-        ChartTitleLimitKind::Entries => SlideChartMetadataLimitKind::Entries,
-        ChartTitleLimitKind::EntryBytes => SlideChartMetadataLimitKind::EntryBytes,
-        ChartTitleLimitKind::TotalBytes => SlideChartMetadataLimitKind::TotalBytes,
-        ChartTitleLimitKind::Slides => SlideChartMetadataLimitKind::Slides,
-        ChartTitleLimitKind::References => SlideChartMetadataLimitKind::References,
-        ChartTitleLimitKind::TextStorages => SlideChartMetadataLimitKind::TextStorages,
-        ChartTitleLimitKind::TextFragments => SlideChartMetadataLimitKind::TextFragments,
-        ChartTitleLimitKind::TextBytes | ChartTitleLimitKind::TitleBytes => {
-            SlideChartMetadataLimitKind::TextBytes
-        },
-        ChartTitleLimitKind::WireFields => SlideChartMetadataLimitKind::WireFields,
-        ChartTitleLimitKind::WireNesting => SlideChartMetadataLimitKind::WireNesting,
-        ChartTitleLimitKind::WireWork => SlideChartMetadataLimitKind::WireWork,
+        ChartTitleLimitKind::InputBytes => LimitKind::InputBytes,
+        ChartTitleLimitKind::OutputBytes => LimitKind::WireBytes,
+        ChartTitleLimitKind::WireBytes => LimitKind::WireBytes,
+        ChartTitleLimitKind::Entries => LimitKind::Entries,
+        ChartTitleLimitKind::EntryBytes => LimitKind::EntryBytes,
+        ChartTitleLimitKind::TotalBytes => LimitKind::TotalBytes,
+        ChartTitleLimitKind::Slides => LimitKind::Slides,
+        ChartTitleLimitKind::References => LimitKind::References,
+        ChartTitleLimitKind::TextStorages => LimitKind::TextStorages,
+        ChartTitleLimitKind::TextFragments => LimitKind::TextFragments,
+        ChartTitleLimitKind::TextBytes | ChartTitleLimitKind::TitleBytes => LimitKind::TextBytes,
+        // Metadata reads use the shared graph proof, which has no separate
+        // retained-selector dimension. Keep this impossible forwarding path
+        // in the semantic text-byte class rather than exposing native detail.
+        ChartTitleLimitKind::SelectorBytes => LimitKind::TextBytes,
+        ChartTitleLimitKind::WireFields => LimitKind::WireFields,
+        ChartTitleLimitKind::WireNesting => LimitKind::WireNesting,
+        ChartTitleLimitKind::WireWork => LimitKind::WireWork,
     }
 }
 
-fn map_chart_metadata_decode_error(
-    error: chart_metadata_codec::DecodeError,
-) -> SlideChartMetadataError {
+fn map_chart_metadata_decode_error(error: chart_metadata_codec::DecodeError) -> Error {
     if let Some(amount) = error.allocation_amount() {
-        return SlideChartMetadataError::Allocation { amount };
+        return Error::Allocation { amount };
     }
     if let Some((observed, maximum)) = error.input_limit_values() {
-        return SlideChartMetadataError::LimitExceeded {
-            kind: SlideChartMetadataLimitKind::WireBytes,
+        return Error::Limit {
+            kind: LimitKind::WireBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return SlideChartMetadataError::LimitExceeded {
-            kind: SlideChartMetadataLimitKind::WireFields,
+        return Error::Limit {
+            kind: LimitKind::WireFields,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return SlideChartMetadataError::LimitExceeded {
-            kind: SlideChartMetadataLimitKind::WireWork,
+        return Error::Limit {
+            kind: LimitKind::WireWork,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.label_limit_values() {
-        return SlideChartMetadataError::LimitExceeded {
-            kind: SlideChartMetadataLimitKind::LabelCount,
+        return Error::Limit {
+            kind: LimitKind::LabelCount,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.text_limit_values() {
-        return SlideChartMetadataError::LimitExceeded {
-            kind: SlideChartMetadataLimitKind::TextBytes,
+        return Error::Limit {
+            kind: LimitKind::TextBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.depth_limit_values() {
-        return SlideChartMetadataError::LimitExceeded {
-            kind: SlideChartMetadataLimitKind::WireNesting,
+        return Error::Limit {
+            kind: LimitKind::WireNesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),
         };
     }
-    SlideChartMetadataError::InvalidSource
+    Error::InvalidSource
 }
 
 fn usize_to_u64(value: usize) -> u64 {

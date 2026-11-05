@@ -1,0 +1,40 @@
+{
+  "record": "0362x",
+  "base": "e66b418b465d84cce58c008381c5a844865f128d",
+  "branch": "uo2-zip-gate-repair",
+  "failure": {
+    "test": "directory_prefill::an_oversized_variable_field_keeps_its_typed_refusal",
+    "indexed_kind_before": "Eof",
+    "public_iterator_kind": "BufferTooSmall",
+    "fixture": "4000-byte central name exceeding the declared directory"
+  },
+  "repair": {
+    "file": "crates/soapberry-zip/src/archive.rs",
+    "spill_threshold": "buffer.len().max(RECOMMENDED_BUFFER_SIZE)",
+    "allocation_or_read_before_central_bound": false,
+    "test_expectations_changed": false
+  },
+  "validation": {
+    "zip_suite": {
+      "result": "pass",
+      "targets": 8,
+      "tests": 104,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/zip-gate-repair/zip-suite.log",
+        "bytes": 92378,
+        "sha256": "be06937340df7a6342ed0fc1a14d5b137ae5bfd09816d2afdb74c4f64016099d"
+      }
+    },
+    "clippy": {
+      "result": "pass",
+      "command": "cargo clippy --offline --locked -p soapberry-zip --all-targets --all-features -- -D warnings",
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/zip-gate-repair/zip-clippy.log",
+        "bytes": 223,
+        "sha256": "0d3aecd8b1776627590b71af471c3891df2c07c1317c558330eb96256960ab7e"
+      }
+    },
+    "format": "pass",
+    "maximum_target_bytes": 283115520
+  }
+}

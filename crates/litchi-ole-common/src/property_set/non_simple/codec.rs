@@ -1,6 +1,7 @@
 //! Bounded CFB capture, closure validation, and candidate rendering.
 
 use super::model::{ElementKind, EntryRecord, Limits, State, same_path};
+use crate::Error;
 use crate::object::directory::{self, Catalog, EntryKind, Sid};
 use crate::property_set::model::{
     CodePage, Guid, IndirectPropertyName, VT_STORAGE, VT_STORED_OBJECT, VT_STREAM,
@@ -17,7 +18,7 @@ use std::io::{self, Seek, SeekFrom, Write};
 use std::sync::Arc;
 
 /// A stable positional adapter over the exact source allocation retained by a
-/// non-simple snapshot.  `SharedOleFile::open_with_limits` accepts this
+/// non-simple snapshot.  `SharedOleFile::open` accepts this
 /// adapter, allowing owner-specific CFB limits without copying an `Arc<[u8]>`
 /// into an unrelated `Vec<u8>`.
 #[derive(Debug)]
@@ -49,14 +50,14 @@ impl ReadAt for ArcSource {
     }
 }
 
-pub(crate) fn capture(source: Arc<[u8]>, limits: Limits) -> Result<Arc<State>, OleError> {
+pub(crate) fn capture(source: Arc<[u8]>, limits: Limits) -> Result<Arc<State>, Error> {
     limits.validate()?;
     let cfb_limits = limits.cfb_limits()?;
     let source_adapter: Arc<dyn ReadAt> = Arc::new(ArcSource {
         bytes: Arc::clone(&source),
         version: SourceVersion::new(0x4f4c_4550_5300_0001, 0),
     });
-    let cfb = Arc::new(SharedOleFile::open_with_limits(source_adapter, cfb_limits)?);
+    let cfb = Arc::new(SharedOleFile::open(source_adapter, cfb_limits)?);
     let mut source_entries = Vec::new();
     source_entries
         .try_reserve(limits.max_directory_entries.min(1024))
@@ -70,7 +71,8 @@ pub(crate) fn capture(source: Arc<[u8]>, limits: Limits) -> Result<Arc<State>, O
                 resource: "non-simple Property Set directory entries",
                 observed: source_entries.len() as u64 + 1,
                 maximum: limits.max_directory_entries as u64,
-            });
+            }
+            .into());
         }
         source_entries
             .try_reserve(1)
@@ -111,16 +113,15 @@ pub(crate) fn capture(source: Arc<[u8]>, limits: Limits) -> Result<Arc<State>, O
     let contents_record = find_record(&records, &["CONTENTS"])
         .ok_or_else(|| invalid("non-simple Property Set CONTENTS stream is missing"))?;
     if contents_record.path.len() != 1 || contents_record.kind != Some(ElementKind::Stream) {
-        return Err(invalid(
-            "non-simple Property Set CONTENTS must be a root stream",
-        ));
+        return Err(invalid("non-simple Property Set CONTENTS must be a root stream").into());
     }
     if contents_record.size > limits.max_contents_bytes {
         return Err(OleError::LimitExceeded {
             resource: "non-simple Property Set CONTENTS bytes",
             observed: contents_record.size,
             maximum: limits.max_contents_bytes,
-        });
+        }
+        .into());
     }
     let root = records
         .iter()
@@ -131,9 +132,7 @@ pub(crate) fn capture(source: Arc<[u8]>, limits: Limits) -> Result<Arc<State>, O
         .metadata
         .ok_or_else(|| invalid("non-simple Property Set root metadata is unavailable"))?;
     if root_metadata.kind() != EntryKind::Root {
-        return Err(invalid(
-            "non-simple Property Set root entry has the wrong kind",
-        ));
+        return Err(invalid("non-simple Property Set root entry has the wrong kind").into());
     }
 
     Ok(Arc::new(State {
@@ -244,7 +243,7 @@ fn preflight_source_entries(entries: &[&DirectoryEntry], limits: Limits) -> Resu
     Ok(())
 }
 
-fn collect_records(catalog: &Catalog, limits: Limits) -> Result<Vec<EntryRecord>, OleError> {
+fn collect_records(catalog: &Catalog, limits: Limits) -> Result<Vec<EntryRecord>, Error> {
     let raw = catalog.raw_entries();
     let root = raw
         .first()
@@ -258,9 +257,7 @@ fn collect_records(catalog: &Catalog, limits: Limits) -> Result<Vec<EntryRecord>
         })?;
     for entry in raw {
         if by_sid.insert(entry.sid, entry).is_some() {
-            return Err(invalid(
-                "non-simple Property Set directory has duplicate SIDs",
-            ));
+            return Err(invalid("non-simple Property Set directory has duplicate SIDs").into());
         }
     }
 
@@ -313,9 +310,7 @@ fn collect_records(catalog: &Catalog, limits: Limits) -> Result<Vec<EntryRecord>
             continue;
         }
         if !seen.insert(sid) {
-            return Err(invalid(
-                "non-simple Property Set directory graph repeats a SID",
-            ));
+            return Err(invalid("non-simple Property Set directory graph repeats a SID").into());
         }
         let entry = by_sid
             .get(&sid)
@@ -331,7 +326,8 @@ fn collect_records(catalog: &Catalog, limits: Limits) -> Result<Vec<EntryRecord>
                 resource: "non-simple Property Set storage depth",
                 observed: path.len() as u64,
                 maximum: limits.max_storage_depth.saturating_add(1) as u64,
-            });
+            }
+            .into());
         }
         let metadata = catalog.metadata(Sid::new(entry.sid)?).copied();
         let kind = match entry.entry_type {
@@ -399,9 +395,9 @@ fn collect_records(catalog: &Catalog, limits: Limits) -> Result<Vec<EntryRecord>
         }
     }
     if seen.len() + 1 != raw.len() {
-        return Err(invalid(
-            "non-simple Property Set directory contains unreachable entries",
-        ));
+        return Err(
+            invalid("non-simple Property Set directory contains unreachable entries").into(),
+        );
     }
     Ok(records)
 }
@@ -1036,7 +1032,7 @@ fn preflight_render_output(
         state.limits.max_output_bytes,
     );
     let options = SequentialWriterOptions::default()
-        .with_limits(planner_limits)
+        .limits(planner_limits)
         .with_publication_buffer_bytes(512);
     let mut planner = SequentialOleWriter::with_options(options).map_err(map_sequential_error)?;
     planner.set_root_clsid(*contents.class_identifier.as_bytes());

@@ -1,9 +1,9 @@
 //! Host-parity regressions for the focused Keynote direct-drawable comment
 //! owner.
 //!
-//! These cases deliberately build the small graph shapes which the old
-//! `KeynoteEditor` comment methods accepted but which a native fixture cannot
-//! express on its own: two drawables sharing one root, two roots sharing one
+//! These cases deliberately build the small graph shapes which the retired
+//! migration host's Keynote comment methods (last present at commit
+//! `4d8a3e161f`) accepted but which a native fixture cannot express on its own: two drawables sharing one root, two roots sharing one
 //! reply, and a package with no annotation-author storage.  The physical
 //! oracle is shared with the cross-component parity tests so the public
 //! assertions remain selector and value based.
@@ -106,16 +106,16 @@ fn route_path(message_type: u32) -> Option<&'static [u32]> {
 
 fn component_archives(source: &[u8]) -> TestResult<Vec<(String, Archive)>> {
     let mut archives = Vec::new();
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     for entry in catalog.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = match SnappyStream::decompress(entry.data()) {
+        let stream = match SnappyStream::decompress(entry.data(), Default::default()) {
             Ok(stream) => stream.into_bytes(),
             Err(_) => continue,
         };
-        let archive = match Archive::parse(&stream) {
+        let archive = match Archive::parse(&stream, Default::default()) {
             Ok(archive) => archive,
             Err(_) => continue,
         };
@@ -132,9 +132,9 @@ fn component_containing_object(source: &[u8], identifier: u64) -> TestResult<(St
 }
 
 fn replace_component(source: &[u8], component_name: &str, archive: Archive) -> TestResult<Vec<u8>> {
-    let bytes = archive.to_bytes()?;
-    let compressed = SnappyStream::compress(&bytes)?;
-    let catalog = Catalog::from_bytes(source)?;
+    let bytes = archive.to_bytes(Default::default())?;
+    let compressed = SnappyStream::compress(&bytes, Default::default())?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entries = catalog
         .iter()
         .map(|entry| {
@@ -187,7 +187,7 @@ fn first_slide(source: &[u8]) -> TestResult<(String, u64, Vec<u64>)> {
 fn nested_payload(payload: &[u8], path: &[u32]) -> TestResult<Vec<u8>> {
     let mut current = payload;
     for field_number in path {
-        let fields = WireView::parse(current)?
+        let fields = WireView::parse(current, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .filter(|field| field.number() == *field_number)
             .collect::<Vec<_>>();
@@ -204,7 +204,12 @@ fn wrap_field_one(payload: &[u8], count: usize) -> TestResult<Vec<u8>> {
     let mut wrapped = payload.to_owned();
     for _ in 0..count {
         let mut outer = Vec::new();
-        append_length_delimited_field(&mut outer, 1, &wrapped)?;
+        append_length_delimited_field(
+            &mut outer,
+            1,
+            &wrapped,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         wrapped = outer;
     }
     Ok(wrapped)
@@ -220,7 +225,9 @@ fn reorder_slide_owned_drawables(archive: &mut Archive, slide_identifier: u64) -
         .position(|message| message.type_ == SLIDE_MESSAGE_TYPE)
         .ok_or_else(|| io::Error::other("rooted slide payload disappeared"))?;
     let payload = slide.messages[message_index].data.clone();
-    let fields = WireView::parse(&payload)?.fields().collect::<Vec<_>>();
+    let fields = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?
+        .fields()
+        .collect::<Vec<_>>();
     let mut owned = fields
         .iter()
         .copied()
@@ -246,6 +253,7 @@ fn reorder_slide_owned_drawables(archive: &mut Archive, slide_identifier: u64) -
             type_: SLIDE_MESSAGE_TYPE,
             data: output,
         },
+        Default::default(),
     )?;
     Ok(())
 }
@@ -290,6 +298,7 @@ fn morph_square_route(
             type_: message_type,
             data,
         },
+        Default::default(),
     )?;
     let (_, slide_identifier, _) = first_slide(source)?;
     if reverse_source_order {
@@ -353,7 +362,7 @@ fn unique_message(object: &ArchiveObject, message_type: u32) -> TestResult<(usiz
 fn comment_identifier(payload: &[u8], path: &[u32]) -> TestResult<Option<u64>> {
     let mut current = payload;
     for (depth, field_number) in path.iter().copied().enumerate() {
-        let fields = WireView::parse(current)?
+        let fields = WireView::parse(current, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .filter(|field| field.number() == field_number)
             .collect::<Vec<_>>();
@@ -371,7 +380,7 @@ fn comment_identifier(payload: &[u8], path: &[u32]) -> TestResult<Option<u64>> {
         }
         current = field.payload();
     }
-    let fields = WireView::parse(current)?
+    let fields = WireView::parse(current, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .filter(|field| field.number() == 1)
         .collect::<Vec<_>>();
@@ -453,14 +462,17 @@ fn append_comment_reference(payload: &[u8], path: &[u32], identifier: u64) -> Te
         }
         .encode_to_vec();
         let mut output = payload.to_vec();
-        append_length_delimited_field(&mut output, field_number, &reference)?;
+        append_length_delimited_field(
+            &mut output,
+            field_number,
+            &reference,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         return Ok(output);
     }
-    Ok(transform_length_delimited_field(
-        payload,
-        field_number,
-        |nested| append_comment_reference(nested, remainder, identifier),
-    )?)
+    transform_length_delimited_field(payload, field_number, |nested| {
+        append_comment_reference(nested, remainder, identifier)
+    })
 }
 
 fn attach_comment(source: &[u8], entry: &DrawableEntry, comment_id: u64) -> TestResult<Vec<u8>> {
@@ -491,6 +503,7 @@ fn attach_comment(source: &[u8], entry: &DrawableEntry, comment_id: u64) -> Test
             type_: entry.message_type,
             data,
         },
+        Default::default(),
     )?;
     replace_component(source, &component_name, archive)
 }
@@ -529,11 +542,11 @@ fn append_reply_and_second_root(
     let second_root_identifier = reply_identifier
         .checked_add(1)
         .ok_or_else(|| io::Error::other("second root identifier overflow"))?;
-    let author = root.author.clone();
+    let author = root.author;
     let reply_payload = tsd::CommentStorageArchive {
         text: Some("shared reply branch".to_owned()),
         creation_date: Some(tsp::Date { seconds: 42.5 }),
-        author: author.clone(),
+        author,
         storage_uuid: Some(tsp::Uuid {
             lower: 0x1111_2222_3333_4444,
             upper: 0x5555_6666_7777_8888,
@@ -547,13 +560,14 @@ fn append_reply_and_second_root(
             type_: COMMENT_STORAGE_MESSAGE_TYPE,
             data: reply_payload,
         }],
+        Default::default(),
     )?;
     if let Some(author) = author.as_ref() {
         reply.archive_info.message_infos[0]
             .object_references
             .push(author.identifier);
     }
-    archive.insert_object(reply)?;
+    archive.insert_object(reply, Default::default())?;
 
     let mut root_payload = archive
         .object(root_identifier)
@@ -568,6 +582,7 @@ fn append_reply_and_second_root(
             ..Default::default()
         }
         .encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     let root_object = archive
         .object_mut(root_identifier)
@@ -581,6 +596,7 @@ fn append_reply_and_second_root(
             type_: COMMENT_STORAGE_MESSAGE_TYPE,
             data: root_payload,
         },
+        Default::default(),
     )?;
 
     let second_root_payload = tsd::CommentStorageArchive {
@@ -595,7 +611,6 @@ fn append_reply_and_second_root(
             lower: 0x9999_aaaa_bbbb_cccc,
             upper: 0xdddd_eeee_ffff_0001,
         }),
-        ..Default::default()
     }
     .encode_to_vec();
     let mut second_root = ArchiveObject::new(
@@ -604,6 +619,7 @@ fn append_reply_and_second_root(
             type_: COMMENT_STORAGE_MESSAGE_TYPE,
             data: second_root_payload,
         }],
+        Default::default(),
     )?;
     if let Some(author) = root.author {
         second_root.archive_info.message_infos[0]
@@ -613,7 +629,7 @@ fn append_reply_and_second_root(
     second_root.archive_info.message_infos[0]
         .object_references
         .push(reply_identifier);
-    archive.insert_object(second_root)?;
+    archive.insert_object(second_root, Default::default())?;
     Ok((
         replace_component(source, &component_name, archive)?,
         reply_identifier,
@@ -726,7 +742,10 @@ fn annotation_author_state(
                                 .into());
                             }
                         }
-                        for field in WireView::parse(&message.data)?.fields() {
+                        for field in
+                            WireView::parse(&message.data, litchi_iwa_common::WireLimits::DEFAULT)?
+                                .fields()
+                        {
                             if field.number() != 1 || field.wire_type() != 2 {
                                 continue;
                             }
@@ -757,13 +776,13 @@ fn annotation_author_state(
 }
 
 fn native_watermark(source: &[u8]) -> TestResult<u64> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == "Index/Metadata.iwa")
         .ok_or_else(|| io::Error::other("missing native metadata component"))?;
-    let stream = SnappyStream::decompress(entry.data())?.into_bytes();
-    let archive = Archive::parse(&stream)?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+    let archive = Archive::parse(&stream, Default::default())?;
     let message = archive
         .objects
         .iter()
@@ -1292,7 +1311,11 @@ fn without_annotation_author_storage(source: &[u8]) -> TestResult<Vec<u8>> {
             object.archive_info.message_infos[message_index]
                 .object_references
                 .retain(|identifier| *identifier != storage_identifier);
-            object.replace_message(message_index, RawMessage { type_: 1, data })?;
+            object.replace_message(
+                message_index,
+                RawMessage { type_: 1, data },
+                Default::default(),
+            )?;
             changed = true;
             break;
         }
@@ -1307,7 +1330,7 @@ fn without_annotation_author_storage(source: &[u8]) -> TestResult<Vec<u8>> {
 fn reference_at_path(payload: &[u8], path: &[u32]) -> TestResult<Option<u64>> {
     let mut current = payload;
     for field_number in path {
-        let fields = WireView::parse(current)?
+        let fields = WireView::parse(current, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .filter(|field| field.number() == *field_number)
             .collect::<Vec<_>>();

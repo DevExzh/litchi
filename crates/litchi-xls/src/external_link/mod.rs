@@ -33,7 +33,7 @@ pub(super) const MAX_DDE_OLE_VALUES: usize = 65_536;
     unreachable_pub,
     reason = "re-exports stage this feature module API"
 )]
-pub use edit::{Commit, Patch, Snapshot, Transaction};
+pub use edit::{Commit, Diagnostics, Edit, Patch, Snapshot};
 pub use model::{
     CacheRow, CachedValue, ClipboardFormat, ErrorValue, Links, Name, NameBody, Sheet,
     SheetReference, SupportingBook, ValueMatrix, Workbook,

@@ -3,7 +3,6 @@
 use std::sync::Arc;
 
 use litchi_core::Position;
-use litchi_iwa_archive::SourceCatalog;
 use litchi_iwa_common::{WireLimits, color::RgbColorSpace, wire::WireView};
 use litchi_iwa_protos::pages_section_background_codec::{
     self as codec, BackgroundSnapshot, BackgroundWrite, DecodeOptions, RgbSpace,
@@ -60,20 +59,24 @@ pub(crate) fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
             0,
         );
         return Ok(Commit::from_parts(
-            source.snapshot(),
+            source.clone(),
             patch,
             Diagnostics::unchanged(),
         ));
     }
     if before == Background::Unsupported {
-        return Err(Error::UnsupportedSource {
-            path: Path::section(position),
-        });
+        return Err(Error::Refused(
+            crate::section::background::Refusal::UnsupportedSource {
+                path: Path::section(position),
+            },
+        ));
     }
     if !source.state.source.source_is_exact() {
-        return Err(Error::UnsupportedSource {
-            path: Path::section(position),
-        });
+        return Err(Error::Refused(
+            crate::section::background::Refusal::UnsupportedSource {
+                path: Path::section(position),
+            },
+        ));
     }
 
     let mut budget = transaction::TransactionBudget::new(source).map_err(map_transaction)?;
@@ -138,7 +141,7 @@ fn apply_patch(source: &Package, patch: &Patch) -> Result<Commit, Error> {
     }
     if patch.is_noop() {
         return Ok(Commit::from_parts(
-            source.snapshot(),
+            source.clone(),
             patch.clone(),
             Diagnostics::unchanged(),
         ));
@@ -165,12 +168,12 @@ fn apply_patch(source: &Package, patch: &Patch) -> Result<Commit, Error> {
             transaction_path(Path::Package),
         )
         .map_err(map_transaction)?;
-    let catalog = SourceCatalog::from_shared_bytes_with_limits(
-        Arc::clone(patch.target_artifact()),
-        source.state.source.limits(),
-    )
-    .map_err(transaction::map_archive_error)
-    .map_err(map_transaction)?;
+    let catalog = source
+        .state
+        .source
+        .reopen(Arc::clone(patch.target_artifact()))
+        .map_err(transaction::map_archive_error)
+        .map_err(map_transaction)?;
     let candidate = Package::from_source_catalog(catalog)
         .map_err(transaction::map_package_error)
         .map_err(map_transaction)?;
@@ -242,9 +245,11 @@ fn rewrite_background(
             },
         },
         Background::Unsupported => {
-            return Err(Error::UnsupportedSource {
-                path: Path::Package,
-            });
+            return Err(Error::Refused(
+                crate::section::background::Refusal::UnsupportedSource {
+                    path: Path::Package,
+                },
+            ));
         },
     };
     let options = codec_options(limits, budget);
@@ -351,7 +356,7 @@ fn validate_reference_ownership(
         return Err(Error::InvalidSource { path });
     }
     let payload = transaction::selected_payload(package, target).map_err(map_transaction)?;
-    let view = WireView::parse_with_limits(
+    let view = WireView::parse(
         payload,
         transaction::wire_limits(package).map_err(map_transaction)?,
     )
@@ -444,7 +449,7 @@ fn map_codec(error: &codec::Error, path: Path) -> Error {
         codec::LimitKind::WorkBytes { observed, maximum } => {
             limit_error(path, LimitKind::WireWork, observed, maximum)
         },
-        codec::LimitKind::Nesting { observed, maximum } => Error::LimitExceeded {
+        codec::LimitKind::Nesting { observed, maximum } => Error::Limit {
             path,
             kind: LimitKind::WireNesting,
             observed: u64::from(observed),
@@ -456,7 +461,7 @@ fn map_codec(error: &codec::Error, path: Path) -> Error {
 }
 
 fn limit_error(path: Path, kind: LimitKind, observed: usize, maximum: usize) -> Error {
-    Error::LimitExceeded {
+    Error::Limit {
         path,
         kind,
         observed: u64::try_from(observed).unwrap_or(u64::MAX),
@@ -474,28 +479,37 @@ fn transaction_path(path: Path) -> crate::section::settings::Path {
 fn map_transaction(error: crate::section::settings::Error) -> Error {
     use crate::section::settings::{Error as Source, LimitKind as SourceLimit};
     match error {
-        Source::AmbiguousSelector { first, duplicate } => {
-            Error::AmbiguousSelector { first, duplicate }
+        Source::Refused(crate::section::settings::Refusal::AmbiguousSelector {
+            first,
+            duplicate,
+        }) => Error::Refused(crate::section::background::Refusal::AmbiguousSelector {
+            first,
+            duplicate,
+        }),
+        Source::Refused(crate::section::settings::Refusal::NameNotFound) => {
+            Error::Refused(crate::section::background::Refusal::NameNotFound)
         },
-        Source::NameNotFound => Error::NameNotFound,
-        Source::PositionNotFound { position } => Error::PositionNotFound { position },
-        Source::UnsupportedSource { path } | Source::UnsupportedDependency { path, .. } => {
-            Error::UnsupportedSource {
-                path: background_path(path),
-            }
+        Source::Refused(crate::section::settings::Refusal::PositionNotFound { position }) => {
+            Error::Refused(crate::section::background::Refusal::PositionNotFound { position })
         },
+        Source::Refused(crate::section::settings::Refusal::UnsupportedSource { path })
+        | Source::Refused(crate::section::settings::Refusal::UnsupportedDependency {
+            path, ..
+        }) => Error::Refused(crate::section::background::Refusal::UnsupportedSource {
+            path: background_path(path),
+        }),
         Source::InvalidSource { path } => Error::InvalidSource {
             path: background_path(path),
         },
         Source::InvalidSettings(_) => Error::InvalidSource {
             path: Path::Package,
         },
-        Source::LimitExceeded {
+        Source::Limit {
             path,
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             path: background_path(path),
             kind: match kind {
                 SourceLimit::InputBytes => LimitKind::InputBytes,

@@ -19,8 +19,8 @@ use std::sync::Arc;
 use litchi_core::Position;
 use litchi_iwa_common::{WireLimits, wire::WireView};
 use litchi_iwa_core::{
-    ArchiveLimits, ArchiveObject, ArchiveReferenceKind, ArchiveReferenceOccurrence,
-    ArchiveReferencePolicy, ArchiveReferenceVisitor, MessageInfo,
+    ArchiveObject, ArchiveReferenceKind, ArchiveReferenceOccurrence, ArchiveReferencePolicy,
+    ArchiveReferenceVisitor, Limits as ArchiveLimits, MessageInfo,
 };
 use litchi_iwa_protos::{annotation_author_codec, comment_storage_codec};
 
@@ -166,14 +166,18 @@ pub(super) fn select_drawable(
     let context = resolve_slide_context(package, slide_selector, limits, budget)?;
     let drawable_position = drawable_selector.as_position();
     if context.drawables.get(drawable_position.get()).is_none() {
-        return Err(Error::DrawablePositionNotFound {
-            position: drawable_position,
-        });
+        return Err(Error::Refused(
+            crate::slide::comment::transaction::Refusal::DrawablePositionNotFound {
+                position: drawable_position,
+            },
+        ));
     }
     let resolved = resolve_drawables(package, &context, limits, budget)?
         .into_iter()
         .find(|drawable| drawable.position == drawable_position)
-        .ok_or(Error::UnsupportedDrawable)?;
+        .ok_or(Error::Refused(
+            crate::slide::comment::transaction::Refusal::UnsupportedDrawable,
+        ))?;
 
     let direct_users = match resolved.comment_identifier {
         Some(identifier) => global_direct_users(package, identifier, limits, budget)?,
@@ -375,24 +379,32 @@ fn resolve_slide_position(
             .slide_record_at(position.get())
             .map_err(|_| Error::Read)?
             .map(|_| position)
-            .ok_or(Error::SlidePositionNotFound { position }),
+            .ok_or(Error::Refused(
+                crate::slide::comment::transaction::Refusal::SlidePositionNotFound { position },
+            )),
         SlideSelector::Name(name) => {
             if name.is_empty() {
-                return Err(Error::EmptySlideName);
+                return Err(Error::Refused(
+                    crate::slide::comment::transaction::Refusal::EmptySlideName,
+                ));
             }
             let selected = package
                 .show()
                 .map_err(|_| Error::Read)?
                 .select_slide(SlideSelector::name(name))
                 .map_err(|error| match error {
-                    crate::SlideSelectorError::EmptySlideName => Error::EmptySlideName,
-                    crate::SlideSelectorError::DuplicateSlideName { .. } => {
-                        Error::AmbiguousSelector
+                    crate::SlideSelectorError::EmptySlideName => {
+                        Error::Refused(crate::slide::comment::transaction::Refusal::EmptySlideName)
                     },
+                    crate::SlideSelectorError::DuplicateSlideName { .. } => Error::Refused(
+                        crate::slide::comment::transaction::Refusal::AmbiguousSelector,
+                    ),
                 })?;
             selected
                 .map(|slide| Position::new(slide.index()))
-                .ok_or(Error::SlideNameNotFound)
+                .ok_or(Error::Refused(
+                    crate::slide::comment::transaction::Refusal::SlideNameNotFound,
+                ))
         },
     }
 }
@@ -570,7 +582,7 @@ fn census_core_header_root_reference(
         found: false,
     };
     let observed = object
-        .inspect_references_with_policy_and_limits(
+        .inspect_references_with_policy(
             &mut visitor,
             ArchiveReferencePolicy::RejectUnknownMetadata,
             archive_limits,
@@ -1052,7 +1064,7 @@ fn parse_view<'source>(
     budget.charge_wire_work(payload.len().max(1))?;
     budget.charge_nesting(nesting.max(1))?;
     budget.charge_allocations(payload.len())?;
-    let view = WireView::parse_with_limits(payload, limits).map_err(|_| Error::InvalidSource)?;
+    let view = WireView::parse(payload, limits).map_err(|_| Error::InvalidSource)?;
     budget.charge_wire_fields(view.len())?;
     Ok(view)
 }
@@ -1201,8 +1213,6 @@ fn binary_search_work(length: usize) -> Result<usize, Error> {
         .ok_or(Error::InvalidSource)
 }
 
-fn map_lifecycle_error(
-    error: crate::package::slide_media_lifecycle::SlideMediaLifecycleError,
-) -> Error {
+fn map_lifecycle_error(error: crate::package::slide_media_lifecycle::Error) -> Error {
     error.into()
 }

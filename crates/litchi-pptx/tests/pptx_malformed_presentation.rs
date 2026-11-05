@@ -4,6 +4,9 @@
     reason = "test assertions panic on failure by design"
 )]
 
+mod in_place;
+use in_place::InPlace as _;
+
 use litchi_opc::PackURI;
 use litchi_pptx::parts::SlideReference;
 use litchi_pptx::{Error, Package, Result};
@@ -20,13 +23,13 @@ type SlideSize = Result<(i64, i64)>;
 /// presentation reader to accept the replacement during the edit itself.
 fn with_presentation_blob(blob: &[u8]) -> Package {
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
-    let mut package = Package::new().unwrap();
+    let package = Package::new().unwrap();
     package.save(output.path()).unwrap();
 
     let mut package = Package::open(output.path()).unwrap();
     let part_name = PackURI::new("/ppt/presentation.xml").unwrap();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             opc.get_part_mut(&part_name)?.set_blob(blob.to_vec());
             Ok(())
         })
@@ -74,7 +77,7 @@ fn malformed_presentation_children_are_reported_by_their_owner() {
     assert!(size.is_err());
 
     let malformed_reference = format!(
-        r#"<p:presentation xmlns:p="{PML}" xmlns:r="{RML}"><p:sldIdLst><p:sldId id="not-a-number" r:id="rId1"/></p:sldIdLst><p:sldSz cx="1" cy="1"/></p:presentation>"#
+        r#"<p:presentation xmlns:p="{PML}" xmlns:r="{RML}"><p:sldIdLst><p:sldId id="not-a-number" r:id="rId1"/></p:sldIdLst><p:sldSz cx="914400" cy="914400"/></p:presentation>"#
     );
     let (references, size) = presentation_accessors(malformed_reference.as_bytes());
     assert!(references.is_err());
@@ -86,24 +89,26 @@ fn optional_slide_id_list_accepts_missing_and_empty_lists_in_both_namespaces() {
     let cases = [
         (
             "transitional missing",
-            format!(r#"<p:presentation xmlns:p="{PML}"><p:sldSz cx="1" cy="1"/></p:presentation>"#),
+            format!(
+                r#"<p:presentation xmlns:p="{PML}"><p:sldSz cx="914400" cy="914400"/></p:presentation>"#
+            ),
         ),
         (
             "transitional empty",
             format!(
-                r#"<p:presentation xmlns:p="{PML}"><p:sldIdLst/><p:sldSz cx="1" cy="1"/></p:presentation>"#
+                r#"<p:presentation xmlns:p="{PML}"><p:sldIdLst/><p:sldSz cx="914400" cy="914400"/></p:presentation>"#
             ),
         ),
         (
             "strict missing",
             format!(
-                r#"<p:presentation xmlns:p="{STRICT_PML}"><p:sldSz cx="1" cy="1"/></p:presentation>"#
+                r#"<p:presentation xmlns:p="{STRICT_PML}"><p:sldSz cx="914400" cy="914400"/></p:presentation>"#
             ),
         ),
         (
             "strict empty",
             format!(
-                r#"<p:presentation xmlns:p="{STRICT_PML}"><p:sldIdLst/><p:sldSz cx="1" cy="1"/></p:presentation>"#
+                r#"<p:presentation xmlns:p="{STRICT_PML}"><p:sldIdLst/><p:sldSz cx="914400" cy="914400"/></p:presentation>"#
             ),
         ),
     ];
@@ -128,7 +133,7 @@ fn optional_slide_id_list_accepts_missing_and_empty_lists_in_both_namespaces() {
             presentation
                 .slide_size()
                 .expect("slide size should remain readable"),
-            (1, 1),
+            (914_400, 914_400),
             "slide size should be independent of slide-ID list presence: {label}"
         );
     }
@@ -170,10 +175,11 @@ fn slide_reference_owner_rejects_duplicate_ids_and_out_of_range_ids() {
 #[test]
 fn slide_reference_owner_skips_case_equivalent_target_parts_first_wins() {
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
-    let mut package = Package::new().unwrap();
-    let presentation = package.presentation_mut().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    let presentation = builder.presentation().unwrap();
     presentation.add_slide().unwrap();
     presentation.add_slide().unwrap();
+    let package = builder.build().unwrap();
     package.save(output.path()).unwrap();
 
     let mut package = Package::open(output.path()).unwrap();
@@ -187,7 +193,7 @@ fn slide_reference_owner_skips_case_equivalent_target_parts_first_wins() {
         .clone();
     let second_relationship_id = second.relationship_id().to_owned();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             let presentation = opc.get_part_mut(&PackURI::new("/ppt/presentation.xml").unwrap())?;
             presentation
                 .rels_mut()
@@ -237,19 +243,20 @@ fn malformed_slide_accessors_do_not_panic() {
 
     for blob in cases {
         let output = NamedTempFile::with_suffix(".pptx").unwrap();
-        let mut package = Package::new().unwrap();
-        package
-            .presentation_mut()
+        let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+        builder
+            .presentation()
             .unwrap()
             .add_slide()
             .unwrap()
             .set_title("seed");
+        let package = builder.build().unwrap();
         package.save(output.path()).unwrap();
 
         let mut package = Package::open(output.path()).unwrap();
         let slide_uri = PackURI::new("/ppt/slides/slide1.xml").unwrap();
         package
-            .edit_opc(|opc| {
+            .edit_opc_in_place(|opc| {
                 opc.get_part_mut(&slide_uri)?.set_blob(blob.clone());
                 Ok(())
             })

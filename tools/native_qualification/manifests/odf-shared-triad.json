@@ -1,0 +1,117 @@
+{
+  "schema": "litchi.odf.shared-triad-qualification.manifest.v2",
+  "lane": "odf-shared-triad",
+  "baseline_commit": "173dd5330476713714871007316794b9a3a1bdaa",
+  "candidate_commit": null,
+  "source": {
+    "package_manifest": "crates/litchi-ops/Cargo.toml",
+    "lock_path": "Cargo.lock",
+    "lock_sha256": null
+  },
+  "probe": {
+    "path": "crates/litchi-ops/examples/odf_shared_triad_qualification.rs",
+    "sha256": "89db987251dd8f857e4d144ee0a711828e157ee89077f8b656e3ac7d9bcf6c0d",
+    "features": ["odc", "odi", "oth", "odm"],
+    "modes": ["validate", "timed", "allocator"],
+    "max_iterations": 128
+  },
+  "routes": [
+    {
+      "id": "odc_chart_title",
+      "family": "odc",
+      "source": "litchi_odc::Package::new",
+      "leaf": "Package::edit -> replace_chart(title) -> commit",
+      "facade": "File::edit -> set(/, title) -> commit",
+      "changed_marker": "shared-triad qualification",
+      "no_op": "Package::edit/File::edit with an empty closure"
+    },
+    {
+      "id": "odi_frame_geometry",
+      "family": "odi",
+      "source": "litchi_odi::Package::new",
+      "leaf": "Package::edit -> set_geometry(frame 0) -> commit",
+      "facade": "File::edit -> set(/frame[1], geometry) -> commit",
+      "changed_marker": "1cm,2cm,3cm,4cm frame geometry",
+      "no_op": "Package::edit/File::edit with an empty closure"
+    },
+    {
+      "id": "oth_paragraph_text",
+      "family": "oth",
+      "source": "litchi_oth::Builder::paragraph(before)",
+      "leaf": "Package::edit -> set_paragraph_text(position 0) -> commit",
+      "facade": "File::edit -> set(/body/p[1], text) -> commit",
+      "changed_marker": "shared-triad qualification",
+      "no_op": "Package::edit/File::edit with an empty closure"
+    },
+    {
+      "id": "odm_title",
+      "family": "odm",
+      "source": "litchi_odm::Builder::new + timestamp-free Structure::default_meta_xml",
+      "leaf": "Package::edit -> set_title -> commit",
+      "facade": "File::edit -> set(/metadata, title) -> commit",
+      "changed_marker": "shared-triad qualification",
+      "no_op": "Package::edit/File::edit with an empty closure"
+    }
+  ],
+  "phases": {
+    "setup_outside_clock": [
+      "deterministic builder or tracked fixture read",
+      "Package::from_bytes and File::open_bytes",
+      "typed edit inputs, props and edit target construction"
+    ],
+    "inside_clock": ["commit_only", "commit_plus_diagnostics", "publication"],
+    "allocation_observation": {
+      "facade": "Commit::diagnostics().snapshot_bytes",
+      "leaf": "not exposed by litchi_core::edit::Diagnostics",
+      "process_allocator": "paired runner operation-scoped system allocator observer"
+    }
+  },
+  "paired": {
+    "abba_order": ["baseline", "candidate", "candidate", "baseline"],
+    "warmup_iterations_per_leg": 3,
+    "samples_per_leg": 30,
+    "probe_iterations": 128,
+    "families": ["odc", "odi", "oth", "odm"],
+    "phases": ["normal", "allocator"],
+    "calibration": {
+      "mode": "validate",
+      "iterations": 1,
+      "roles": ["baseline", "candidate"],
+      "families": ["odc", "odi", "oth", "odm"]
+    },
+    "quiet": {
+      "process_guard": "tools.native_qualification_runner.ProcessGuard",
+      "cpu_affinity_required": true,
+      "resource_monitor": "loadavg+proc-descendants+target-bytes"
+    },
+    "allocator": {
+      "scope": "operation_global_system_allocator",
+      "source_cfg": "odf_shared_triad_allocator",
+      "elapsed_claimable": false,
+      "operation_metrics": [
+        "allocations",
+        "deallocations",
+        "allocated_bytes",
+        "deallocated_bytes",
+        "reallocations"
+      ]
+    },
+    "baseline_overlay": {
+      "preparation_schema": "litchi.odf.shared-triad-qualification.preparation.v1",
+      "allowed_paths": [
+        "Cargo.lock",
+        "crates/litchi-ops/examples/odf_shared_triad_qualification.rs"
+      ],
+      "production_tree": "baseline HEAD tree must remain unchanged"
+    }
+  },
+  "output": {
+    "schema": "litchi.odf.shared-triad-qualification.v1",
+    "families": ["odc", "odi", "oth", "odm"],
+    "odm_changed_output_decisions": [
+      "byte_exact",
+      "archive_member_order_and_manifest_listing"
+    ]
+  },
+  "claim_scope": "validation and reproducible phase protocol only; no native acceptance claim"
+}

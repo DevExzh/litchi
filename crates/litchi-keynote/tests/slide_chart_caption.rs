@@ -6,12 +6,12 @@ use litchi_iwa_common::{
     wire::{WireView, append_length_delimited_field, append_varint_field},
 };
 use litchi_iwa_core::{
-    Archive, ArchiveInfo, ArchiveObject, FieldInfo, FieldPath, FieldType, RawMessage, SnappyStream,
+    Archive, ArchiveInfo, ArchiveObject, FieldInfo, FieldType, RawMessage, SnappyStream,
 };
 use litchi_iwa_protos::{kn, tsa, tsch, tsd, tsk, tsp, tswp};
 use litchi_keynote::{
-    ChartCaptionError, ChartCaptionLimitKind, ChartSelector, Package, Position, ReadOptions,
-    SemanticLimits, SlideSelector,
+    ChartSelector, OpenOptions, Package, Position, SemanticLimits, SlideSelector, SourceLimits,
+    chart::caption::Error as ChartCaptionError, chart::caption::LimitKind as ChartCaptionLimitKind,
 };
 use prost::Message as _;
 
@@ -59,6 +59,7 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
@@ -92,17 +93,37 @@ fn chart_payload(chart: usize, caption_identifier: Option<u64>) -> TestResult<Ve
         ..tsch::ChartArchive::default()
     };
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, 1, &drawable.encode_to_vec())?;
-    append_length_delimited_field(&mut payload, 10_000, &chart_data.encode_to_vec())?;
+    append_length_delimited_field(
+        &mut payload,
+        1,
+        &drawable.encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut payload,
+        10_000,
+        &chart_data.encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
 fn non_style_payload(title: &str) -> TestResult<Vec<u8>> {
     let mut extension = Vec::new();
     append_varint_field(&mut extension, 21, 1)?;
-    append_length_delimited_field(&mut extension, 23, title.as_bytes())?;
+    append_length_delimited_field(
+        &mut extension,
+        23,
+        title.as_bytes(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, 10_000, &extension)?;
+    append_length_delimited_field(
+        &mut payload,
+        10_000,
+        &extension,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -142,13 +163,21 @@ fn storage_payload(text: &str, unknown: bool) -> TestResult<Vec<u8>> {
     }
     .encode_to_vec();
     if unknown {
-        append_length_delimited_field(&mut payload, 4_001, b"opaque caption extension")?;
+        append_length_delimited_field(
+            &mut payload,
+            4_001,
+            b"opaque caption extension",
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     Ok(payload)
 }
 
 fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn synthetic_package() -> TestResult<Vec<u8>> {
@@ -320,6 +349,7 @@ fn metadata_component_payload_with_external_references(
         &mut payload,
         METADATA_COMPONENT_UNKNOWN_FIELD,
         METADATA_UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     Ok(payload)
 }
@@ -361,14 +391,30 @@ fn metadata_payload(
 
     let mut payload = Vec::new();
     append_varint_field(&mut payload, 1, last_identifier)?;
-    append_length_delimited_field(&mut payload, 3, &document)?;
-    append_length_delimited_field(&mut payload, 3, &unrelated)?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &document,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &unrelated,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut payload, 8, 10)?;
-    append_length_delimited_field(&mut payload, 11, &versioned)?;
+    append_length_delimited_field(
+        &mut payload,
+        11,
+        &versioned,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_length_delimited_field(
         &mut payload,
         METADATA_ROOT_UNKNOWN_FIELD,
         METADATA_UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     Ok(payload)
 }
@@ -413,15 +459,36 @@ fn metadata_payload_with_foreign_dependencies(
     .encode_to_vec();
     let mut payload = Vec::new();
     append_varint_field(&mut payload, 1, last_identifier)?;
-    append_length_delimited_field(&mut payload, 3, &document)?;
-    append_length_delimited_field(&mut payload, 3, &unrelated)?;
-    append_length_delimited_field(&mut payload, 3, &stylesheet)?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &document,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &unrelated,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &stylesheet,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut payload, 8, 10)?;
-    append_length_delimited_field(&mut payload, 11, &versioned)?;
+    append_length_delimited_field(
+        &mut payload,
+        11,
+        &versioned,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_length_delimited_field(
         &mut payload,
         METADATA_ROOT_UNKNOWN_FIELD,
         METADATA_UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     Ok(payload)
 }
@@ -469,15 +536,36 @@ fn metadata_payload_with_external_objects(
     .encode_to_vec();
     let mut payload = Vec::new();
     append_varint_field(&mut payload, 1, last_identifier)?;
-    append_length_delimited_field(&mut payload, 3, &document)?;
-    append_length_delimited_field(&mut payload, 3, &unrelated)?;
-    append_length_delimited_field(&mut payload, 3, &stylesheet)?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &document,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &unrelated,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &stylesheet,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut payload, 8, 10)?;
-    append_length_delimited_field(&mut payload, 11, &versioned)?;
+    append_length_delimited_field(
+        &mut payload,
+        11,
+        &versioned,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_length_delimited_field(
         &mut payload,
         METADATA_ROOT_UNKNOWN_FIELD,
         METADATA_UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     Ok(payload)
 }
@@ -485,13 +573,28 @@ fn metadata_payload_with_external_objects(
 fn caption_theme_payload() -> TestResult<Vec<u8>> {
     let presets = {
         let mut bytes = Vec::new();
-        append_length_delimited_field(&mut bytes, 1, &reference(82).encode_to_vec())?;
+        append_length_delimited_field(
+            &mut bytes,
+            1,
+            &reference(82).encode_to_vec(),
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         bytes
     };
     let mut theme_super = Vec::new();
-    append_length_delimited_field(&mut theme_super, 210, &presets)?;
+    append_length_delimited_field(
+        &mut theme_super,
+        210,
+        &presets,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let mut theme = Vec::new();
-    append_length_delimited_field(&mut theme, 1, &theme_super)?;
+    append_length_delimited_field(
+        &mut theme,
+        1,
+        &theme_super,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(theme)
 }
 
@@ -501,7 +604,7 @@ fn synthetic_metadata_package_with_captions(
     collision_identifier: Option<u64>,
 ) -> TestResult<Vec<u8>> {
     let source = synthetic_package_with_captions(captions)?;
-    let mut document = Archive::parse(&document_stream(&source)?)?;
+    let mut document = Archive::parse(&document_stream(&source)?, Default::default())?;
     document
         .objects
         .push(object(80, 10, caption_theme_payload()?)?);
@@ -513,7 +616,7 @@ fn synthetic_metadata_package_with_captions(
         11_006,
         metadata_payload(last_identifier, collision_identifier)?,
     )?])?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let mut entries = catalog
         .iter()
         .map(|entry| (entry.name(), entry.data()))
@@ -531,12 +634,17 @@ fn synthetic_metadata_package_with_one_byte_standin() -> TestResult<Vec<u8>> {
         METADATA_LAST_IDENTIFIER,
         None,
     )?;
-    let mut document = Archive::parse(&document_stream(&source)?)?;
+    let mut document = Archive::parse(&document_stream(&source)?, Default::default())?;
     let chart = document
         .object_mut(CHARTS[0])
         .ok_or_else(|| io::Error::other("missing synthetic chart"))?;
     let mut chart_data = chart_payload(0, Some(7))?;
-    append_length_delimited_field(&mut chart_data, 4_004, &vec![0; 4_096])?;
+    append_length_delimited_field(
+        &mut chart_data,
+        4_004,
+        &vec![0; 4_096],
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     chart.messages[0].data = chart_data;
     chart.archive_info.message_infos[0].object_references = vec![TITLES[0], NON_STYLES[0], 7];
     let standin = document
@@ -551,7 +659,7 @@ fn synthetic_cross_component_metadata_package(
     external_references: &[tsp::ComponentExternalReference],
 ) -> TestResult<Vec<u8>> {
     let source = synthetic_package_with_captions(captions)?;
-    let mut document = Archive::parse(&document_stream(&source)?)?;
+    let mut document = Archive::parse(&document_stream(&source)?, Default::default())?;
     document
         .objects
         .push(object(80, 10, caption_theme_payload()?)?);
@@ -565,7 +673,7 @@ fn synthetic_cross_component_metadata_package(
         11_006,
         metadata_payload_with_foreign_dependencies(METADATA_LAST_IDENTIFIER, external_references)?,
     )?])?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let mut entries = catalog
         .iter()
         .map(|entry| (entry.name(), entry.data()))
@@ -583,7 +691,7 @@ fn synthetic_external_caption_package(
     external_references: &[tsp::ComponentExternalReference],
 ) -> TestResult<Vec<u8>> {
     let source = synthetic_package_with_captions([Some("North"), Some("South")])?;
-    let mut document = Archive::parse(&document_stream(&source)?)?;
+    let mut document = Archive::parse(&document_stream(&source)?, Default::default())?;
     document
         .objects
         .push(object(80, 10, caption_theme_payload()?)?);
@@ -606,7 +714,12 @@ fn synthetic_external_caption_package(
             if message.type_ != SHAPE_STYLE_MESSAGE_TYPE {
                 return Err(io::Error::other("external style has the wrong message type").into());
             }
-            append_length_delimited_field(&mut message.data, 4_004, EXTERNAL_STYLE_UNKNOWN_MARKER)?;
+            append_length_delimited_field(
+                &mut message.data,
+                4_004,
+                EXTERNAL_STYLE_UNKNOWN_MARKER,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         }
         external_objects.push(object);
     }
@@ -622,7 +735,7 @@ fn synthetic_external_caption_package(
             external_references,
         )?,
     )?])?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let mut entries = catalog
         .iter()
         .map(|entry| {
@@ -667,7 +780,7 @@ impl PackageMetrics {
 }
 
 fn package_metrics(package: &[u8]) -> TestResult<PackageMetrics> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let mut metrics = PackageMetrics {
         total_uncompressed_bytes: 0,
         total_iwa_stream_bytes: 0,
@@ -689,13 +802,13 @@ fn package_metrics(package: &[u8]) -> TestResult<PackageMetrics> {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = SnappyStream::decompress(entry.data())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
         metrics.total_iwa_stream_bytes = metrics
             .total_iwa_stream_bytes
             .checked_add(u64::try_from(stream.as_bytes().len())?)
             .ok_or_else(|| io::Error::other("synthetic IWA stream total overflow"))?;
         metrics.max_iwa_stream_bytes = metrics.max_iwa_stream_bytes.max(stream.as_bytes().len());
-        let archive = Archive::parse(stream.as_bytes())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
         metrics.total_objects = metrics
             .total_objects
             .checked_add(archive.objects.len())
@@ -720,37 +833,28 @@ fn package_metrics(package: &[u8]) -> TestResult<PackageMetrics> {
     Ok(metrics)
 }
 
-fn target_read_options(target: &[u8]) -> TestResult<ReadOptions> {
+fn target_read_options(target: &[u8]) -> TestResult<OpenOptions> {
     let metrics = package_metrics(target)?;
-    let defaults = Limits::default();
     let max_input_bytes = u64::try_from(target.len())?;
-    let archive_limits = Limits::new(
-        max_input_bytes,
-        defaults.max_entries(),
-        metrics.max_entry_bytes,
-        metrics.total_bytes_limit(),
-        metrics.max_iwa_stream_bytes,
-    )?;
-    let iwa_limits = litchi_iwa_core::Limits::default()
-        .with_archive_bytes(metrics.max_iwa_stream_bytes)?
-        .with_objects(metrics.max_archive_objects)?
-        .with_messages(metrics.max_archive_messages)?
-        .with_message_bytes(metrics.max_message_bytes)?;
-    let archive_limits = archive_limits.with_archive_limits(iwa_limits)?;
-    let defaults = SemanticLimits::default();
-    let semantic_limits = SemanticLimits::new(
-        metrics.total_objects,
-        defaults.max_slides(),
-        defaults.max_references(),
-        defaults.max_text_storages(),
-        defaults.max_text_fragments(),
-        defaults.max_text_bytes(),
-    )?;
-    Ok(ReadOptions::new(archive_limits, semantic_limits))
+    let source_limits = SourceLimits::builder()
+        .max_input_bytes(max_input_bytes)?
+        .max_entry_bytes(metrics.max_entry_bytes)?
+        .max_aggregate_bytes(metrics.total_bytes_limit())?
+        .max_component_bytes(metrics.max_iwa_stream_bytes)?
+        .max_component_objects(metrics.max_archive_objects)?
+        .max_component_messages(metrics.max_archive_messages)?
+        .max_message_bytes(metrics.max_message_bytes)?
+        .build()?;
+    let semantic_limits = SemanticLimits::builder()
+        .max_objects(metrics.total_objects)?
+        .build()?;
+    Ok(OpenOptions::new()
+        .source_limits(source_limits)
+        .semantic_limits(semantic_limits))
 }
 
 fn replace_archive_limit(
-    options: ReadOptions,
+    options: OpenOptions,
     max_input_bytes: u64,
     max_entry_bytes: u64,
     max_total_bytes: u64,
@@ -758,29 +862,24 @@ fn replace_archive_limit(
     max_archive_objects: usize,
     max_archive_messages: usize,
     max_message_bytes: usize,
-) -> TestResult<ReadOptions> {
-    let defaults = options.archive();
-    let archive_limits = Limits::new(
-        max_input_bytes,
-        defaults.max_entries(),
-        max_entry_bytes,
-        max_total_bytes,
-        max_iwa_stream_bytes,
-    )?;
-    let iwa_limits = litchi_iwa_core::Limits::default()
-        .with_archive_bytes(max_iwa_stream_bytes)?
-        .with_objects(max_archive_objects)?
-        .with_messages(max_archive_messages)?
-        .with_message_bytes(max_message_bytes)?;
-    Ok(ReadOptions::new(
-        archive_limits.with_archive_limits(iwa_limits)?,
-        options.semantic(),
-    ))
+) -> TestResult<OpenOptions> {
+    let defaults = options.source_limits_value();
+    let source_limits = SourceLimits::builder()
+        .max_input_bytes(max_input_bytes)?
+        .max_entries(defaults.max_entries())?
+        .max_entry_bytes(max_entry_bytes)?
+        .max_aggregate_bytes(max_total_bytes)?
+        .max_component_bytes(max_iwa_stream_bytes)?
+        .max_component_objects(max_archive_objects)?
+        .max_component_messages(max_archive_messages)?
+        .max_message_bytes(max_message_bytes)?
+        .build()?;
+    Ok(options.source_limits(source_limits))
 }
 
 fn run_caption_create_with_options(
     source: &[u8],
-    options: ReadOptions,
+    options: OpenOptions,
 ) -> TestResult<Result<Vec<u8>, ChartCaptionError>> {
     let package = Package::from_bytes_with_options(source, options)?;
     let result = package
@@ -798,8 +897,8 @@ fn run_caption_create_with_options(
 
 fn run_caption_apply_with_options(
     source: &[u8],
-    patch: &litchi_keynote::ChartCaptionPatch,
-    options: ReadOptions,
+    patch: &litchi_keynote::chart::caption::Patch,
+    options: OpenOptions,
 ) -> TestResult<Result<Vec<u8>, ChartCaptionError>> {
     let package = Package::from_bytes_with_options(source, options)?;
     let result = package.apply_slide_chart_caption(patch);
@@ -814,32 +913,32 @@ fn run_caption_apply_with_options(
 
 fn assert_caption_limit(result: Result<Vec<u8>, ChartCaptionError>, label: &str) -> TestResult<()> {
     assert!(
-        matches!(result, Err(ChartCaptionError::LimitExceeded { .. })),
+        matches!(result, Err(ChartCaptionError::Limit { .. })),
         "{label} did not return a bounded limit error: {result:?}"
     );
     Ok(())
 }
 
 fn document_stream(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("missing synthetic document component"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn metadata_stream(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or_else(|| io::Error::other("missing synthetic metadata component"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn member_bytes(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
-    Catalog::from_bytes(package)?
+    Catalog::from_bytes(package, Default::default())?
         .iter()
         .find(|entry| entry.name() == name)
         .map(|entry| entry.data().to_vec())
@@ -847,8 +946,8 @@ fn member_bytes(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
 }
 
 fn assert_member_unchanged(source: &[u8], target: &[u8], name: &str) -> TestResult<()> {
-    let source_catalog = Catalog::from_bytes(source)?;
-    let target_catalog = Catalog::from_bytes(target)?;
+    let source_catalog = Catalog::from_bytes(source, Default::default())?;
+    let target_catalog = Catalog::from_bytes(target, Default::default())?;
     let source_entry = source_catalog
         .iter()
         .find(|entry| entry.name() == name)
@@ -871,7 +970,7 @@ fn assert_member_unchanged(source: &[u8], target: &[u8], name: &str) -> TestResu
 }
 
 fn without_member(source: &[u8], name: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entries = catalog
         .iter()
         .filter(|entry| entry.name() != name)
@@ -884,16 +983,16 @@ fn without_member(source: &[u8], name: &str) -> TestResult<Vec<u8>> {
 }
 
 fn stylesheet_stream(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_STYLESHEET_MEMBER)
         .ok_or_else(|| io::Error::other("missing synthetic stylesheet component"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn metadata_message_payload(package: &[u8]) -> TestResult<Vec<u8>> {
-    let archive = Archive::parse(&metadata_stream(package)?)?;
+    let archive = Archive::parse(&metadata_stream(package)?, Default::default())?;
     let object = archive
         .objects
         .iter()
@@ -918,11 +1017,13 @@ fn decoded_metadata(package: &[u8]) -> TestResult<tsp::PackageMetadata> {
 }
 
 fn raw_fields(payload: &[u8], number: u32) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(payload)?
-        .fields()
-        .filter(|field| field.number() == number)
-        .map(|field| field.raw().to_vec())
-        .collect())
+    Ok(
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .filter(|field| field.number() == number)
+            .map(|field| field.raw().to_vec())
+            .collect(),
+    )
 }
 
 fn push_varint_width(mut value: u64, width: usize, output: &mut Vec<u8>) {
@@ -966,7 +1067,7 @@ fn fixed32_field_with_key_width(number: u32, value: f32, key_width: usize) -> Ve
 }
 
 fn append_duplicate_field(payload: &[u8], number: u32) -> TestResult<Vec<u8>> {
-    let view = WireView::parse(payload)?;
+    let view = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     let duplicate = view
         .fields()
         .find(|field| field.number() == number)
@@ -985,7 +1086,7 @@ fn replace_nested_field_raw(
     let number = *path
         .first()
         .ok_or_else(|| io::Error::other("empty nested field path"))?;
-    let view = WireView::parse(payload)?;
+    let view = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(payload.len() + replacement.len());
     let mut replaced = false;
     for field in view.fields() {
@@ -1018,7 +1119,7 @@ fn append_nested_duplicate(payload: &[u8], path: &[u32]) -> TestResult<Vec<u8>> 
     if path.len() == 1 {
         return append_duplicate_field(payload, path[0]);
     }
-    let view = WireView::parse(payload)?;
+    let view = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     let parent_number = path[0];
     let parent = view
         .fields()
@@ -1035,12 +1136,12 @@ fn append_nested_duplicate(payload: &[u8], path: &[u32]) -> TestResult<Vec<u8>> 
 
 fn chart_reference_identifier(package: &[u8]) -> TestResult<Option<u64>> {
     let payload = message_payload(package, CHARTS[0], CHART_MESSAGE_TYPE)?;
-    let outer = WireView::parse(&payload)?;
+    let outer = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     let drawable = outer
         .fields()
         .find(|field| field.number() == 1)
         .ok_or_else(|| io::Error::other("missing chart drawable"))?;
-    let drawable = WireView::parse(drawable.payload())?;
+    let drawable = WireView::parse(drawable.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
     let Some(reference) = drawable.fields().find(|field| field.number() == 11) else {
         return Ok(None);
     };
@@ -1070,17 +1171,19 @@ fn metadata_component_raw_fields(
     identifier: u64,
     number: u32,
 ) -> TestResult<Vec<Vec<u8>>> {
-    for field in WireView::parse(payload)?
+    for field in WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .filter(|field| field.number() == 3)
     {
         let component = tsp::ComponentInfo::decode(field.payload())?;
         if component.identifier == identifier {
-            return Ok(WireView::parse(field.payload())?
-                .fields()
-                .filter(|field| field.number() == number)
-                .map(|field| field.raw().to_vec())
-                .collect());
+            return Ok(
+                WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?
+                    .fields()
+                    .filter(|field| field.number() == number)
+                    .map(|field| field.raw().to_vec())
+                    .collect(),
+            );
         }
     }
     Err(io::Error::other("missing synthetic current metadata component").into())
@@ -1092,7 +1195,7 @@ fn metadata_component_raw_payload(
     versioned: bool,
 ) -> TestResult<Vec<u8>> {
     let field_number = if versioned { 11 } else { 3 };
-    for field in WireView::parse(payload)?
+    for field in WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .filter(|field| field.number() == field_number)
     {
@@ -1114,7 +1217,7 @@ fn replace_component_field(
 
 fn with_document_preferred_locator(source: &[u8], preferred_locator: &str) -> TestResult<Vec<u8>> {
     let payload = metadata_message_payload(source)?;
-    let root = WireView::parse(&payload)?;
+    let root = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut rewritten = Vec::with_capacity(payload.len() + preferred_locator.len());
     let mut replaced = false;
     for field in root.fields() {
@@ -1123,9 +1226,19 @@ fn with_document_preferred_locator(source: &[u8], preferred_locator: &str) -> Te
             if component.identifier == DOCUMENT_COMPONENT {
                 let mut component_payload = field.payload().to_vec();
                 let mut preferred = Vec::new();
-                append_length_delimited_field(&mut preferred, 2, preferred_locator.as_bytes())?;
+                append_length_delimited_field(
+                    &mut preferred,
+                    2,
+                    preferred_locator.as_bytes(),
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )?;
                 component_payload = replace_component_field(&component_payload, 2, &preferred)?;
-                append_length_delimited_field(&mut rewritten, 3, &component_payload)?;
+                append_length_delimited_field(
+                    &mut rewritten,
+                    3,
+                    &component_payload,
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )?;
                 replaced = true;
                 continue;
             }
@@ -1155,7 +1268,7 @@ fn with_metadata_reserved_identifier(
     let payload = metadata_message_payload(source)?;
     let mut rewritten = Vec::with_capacity(payload.len().saturating_add(32));
     let mut document_seen = false;
-    for field in WireView::parse(&payload)?.fields() {
+    for field in WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?.fields() {
         if field.number() != 3 {
             rewritten.extend_from_slice(field.raw());
             continue;
@@ -1170,7 +1283,12 @@ fn with_metadata_reserved_identifier(
         match kind {
             MetadataReservedIdentifierKind::UuidObject => {
                 let entry = metadata_uuid_entry(identifier).encode_to_vec();
-                append_length_delimited_field(&mut component_payload, 11, &entry)?;
+                append_length_delimited_field(
+                    &mut component_payload,
+                    11,
+                    &entry,
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )?;
             },
             MetadataReservedIdentifierKind::ExternalObject => {
                 let reference = external_reference(UNRELATED_COMPONENT, Some(identifier), None);
@@ -1178,6 +1296,7 @@ fn with_metadata_reserved_identifier(
                     &mut component_payload,
                     6,
                     &reference.encode_to_vec(),
+                    litchi_iwa_common::WireLimits::DEFAULT,
                 )?;
             },
             MetadataReservedIdentifierKind::DataObject => {
@@ -1192,6 +1311,7 @@ fn with_metadata_reserved_identifier(
                     &mut component_payload,
                     7,
                     &reference.encode_to_vec(),
+                    litchi_iwa_common::WireLimits::DEFAULT,
                 )?;
             },
             MetadataReservedIdentifierKind::RootDataMetadataMap
@@ -1200,19 +1320,29 @@ fn with_metadata_reserved_identifier(
         if matches!(kind, MetadataReservedIdentifierKind::AmbiguousObject) {
             append_varint_field(&mut component_payload, 20, identifier)?;
         }
-        append_length_delimited_field(&mut rewritten, 3, &component_payload)?;
+        append_length_delimited_field(
+            &mut rewritten,
+            3,
+            &component_payload,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     if !document_seen {
         return Err(io::Error::other("missing document metadata component").into());
     }
     if matches!(kind, MetadataReservedIdentifierKind::RootDataMetadataMap) {
-        append_length_delimited_field(&mut rewritten, 10, &reference(identifier).encode_to_vec())?;
+        append_length_delimited_field(
+            &mut rewritten,
+            10,
+            &reference(identifier).encode_to_vec(),
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     replace_metadata_payload(source, rewritten)
 }
 
 fn message_payload(package: &[u8], identifier: u64, type_: u32) -> TestResult<Vec<u8>> {
-    let archive = Archive::parse(&document_stream(package)?)?;
+    let archive = Archive::parse(&document_stream(package)?, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic object"))?;
@@ -1225,30 +1355,36 @@ fn message_payload(package: &[u8], identifier: u64, type_: u32) -> TestResult<Ve
 }
 
 fn replace_document_stream(source: &[u8], archive: Archive) -> TestResult<Vec<u8>> {
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    Ok(Catalog::from_bytes(source)?.reassemble_to_bytes(
-        &[litchi_iwa_archive::package::EntryEdit::new(
-            DOCUMENT_MEMBER,
-            &compressed,
-        )],
-        Limits::default(),
-    )?)
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    Ok(
+        Catalog::from_bytes(source, Default::default())?.reassemble_to_bytes(
+            &[litchi_iwa_archive::package::EntryEdit::new(
+                DOCUMENT_MEMBER,
+                &compressed,
+            )],
+            Limits::default(),
+        )?,
+    )
 }
 
 fn with_stylesheet_archive(
     source: &[u8],
     mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(&stylesheet_stream(source)?)?;
+    let mut archive = Archive::parse(&stylesheet_stream(source)?, Default::default())?;
     mutate(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    Ok(Catalog::from_bytes(source)?.reassemble_to_bytes(
-        &[litchi_iwa_archive::package::EntryEdit::new(
-            DOCUMENT_STYLESHEET_MEMBER,
-            &compressed,
-        )],
-        Limits::default(),
-    )?)
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    Ok(
+        Catalog::from_bytes(source, Default::default())?.reassemble_to_bytes(
+            &[litchi_iwa_archive::package::EntryEdit::new(
+                DOCUMENT_STYLESHEET_MEMBER,
+                &compressed,
+            )],
+            Limits::default(),
+        )?,
+    )
 }
 
 fn push_varint(value: u64, output: &mut Vec<u8>) {
@@ -1275,7 +1411,7 @@ fn object_header_location(stream: &[u8], identifier: u64) -> TestResult<(usize, 
         let header = stream
             .get(header_start..header_end)
             .ok_or_else(|| io::Error::other("synthetic header is truncated"))?;
-        let info = ArchiveInfo::decode(header)?;
+        let info = ArchiveInfo::decode(header, Default::default())?;
         if info.identifier == Some(identifier) {
             return Ok((object_start, prefix_length, header_length));
         }
@@ -1319,6 +1455,7 @@ fn with_unknown_archive_header(package: &[u8], identifier: u64) -> TestResult<Ve
         &mut header,
         ARCHIVE_HEADER_UNKNOWN_FIELD,
         ARCHIVE_HEADER_UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     let mut rewritten = Vec::with_capacity(
         stream
@@ -1330,20 +1467,22 @@ fn with_unknown_archive_header(package: &[u8], identifier: u64) -> TestResult<Ve
     rewritten.extend_from_slice(&header);
     rewritten.extend_from_slice(&stream[header_end..]);
     stream = rewritten;
-    Archive::parse(&stream)?;
-    let compressed = SnappyStream::compress(&stream)?;
-    Ok(Catalog::from_bytes(package)?.reassemble_to_bytes(
-        &[litchi_iwa_archive::package::EntryEdit::new(
-            DOCUMENT_MEMBER,
-            &compressed,
-        )],
-        Limits::default(),
-    )?)
+    Archive::parse(&stream, Default::default())?;
+    let compressed = SnappyStream::compress(&stream, Default::default())?;
+    Ok(
+        Catalog::from_bytes(package, Default::default())?.reassemble_to_bytes(
+            &[litchi_iwa_archive::package::EntryEdit::new(
+                DOCUMENT_MEMBER,
+                &compressed,
+            )],
+            Limits::default(),
+        )?,
+    )
 }
 
 fn with_overlong_object_length_prefix(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
     let mut stream = document_stream(package)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic object"))?;
@@ -1354,30 +1493,35 @@ fn with_overlong_object_length_prefix(package: &[u8], identifier: u64) -> TestRe
     }
     stream[offset] |= 0x80;
     stream.insert(offset + 1, 0);
-    Archive::parse(&stream)?;
-    let compressed = SnappyStream::compress(&stream)?;
-    Ok(Catalog::from_bytes(package)?.reassemble_to_bytes(
-        &[litchi_iwa_archive::package::EntryEdit::new(
-            DOCUMENT_MEMBER,
-            &compressed,
-        )],
-        Limits::default(),
-    )?)
+    Archive::parse(&stream, Default::default())?;
+    let compressed = SnappyStream::compress(&stream, Default::default())?;
+    Ok(
+        Catalog::from_bytes(package, Default::default())?.reassemble_to_bytes(
+            &[litchi_iwa_archive::package::EntryEdit::new(
+                DOCUMENT_MEMBER,
+                &compressed,
+            )],
+            Limits::default(),
+        )?,
+    )
 }
 
 fn replace_metadata_stream(source: &[u8], archive: Archive) -> TestResult<Vec<u8>> {
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    Ok(Catalog::from_bytes(source)?.reassemble_to_bytes(
-        &[litchi_iwa_archive::package::EntryEdit::new(
-            METADATA_MEMBER,
-            &compressed,
-        )],
-        Limits::default(),
-    )?)
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    Ok(
+        Catalog::from_bytes(source, Default::default())?.reassemble_to_bytes(
+            &[litchi_iwa_archive::package::EntryEdit::new(
+                METADATA_MEMBER,
+                &compressed,
+            )],
+            Limits::default(),
+        )?,
+    )
 }
 
 fn replace_metadata_payload(source: &[u8], payload: Vec<u8>) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(&metadata_stream(source)?)?;
+    let mut archive = Archive::parse(&metadata_stream(source)?, Default::default())?;
     let object = archive
         .objects
         .iter_mut()
@@ -1398,7 +1542,7 @@ fn replace_metadata_payload(source: &[u8], payload: Vec<u8>) -> TestResult<Vec<u
 }
 
 fn duplicate_metadata_object(source: &[u8]) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(&metadata_stream(source)?)?;
+    let mut archive = Archive::parse(&metadata_stream(source)?, Default::default())?;
     let mut duplicate = archive
         .objects
         .iter()
@@ -1421,7 +1565,7 @@ fn shared_metadata_graph_source() -> TestResult<Vec<u8>> {
         METADATA_LAST_IDENTIFIER,
         None,
     )?;
-    let mut archive = Archive::parse(&document_stream(&source)?)?;
+    let mut archive = Archive::parse(&document_stream(&source)?, Default::default())?;
     let second = archive
         .object_mut(CAPTION_INFOS[1])
         .ok_or_else(|| io::Error::other("missing second caption info"))?;
@@ -1439,7 +1583,10 @@ fn assert_graph_change_rejected(source: &[u8]) -> TestResult<()> {
         .and_then(|edit| edit.commit());
     assert!(matches!(
         result,
-        Err(ChartCaptionError::InvalidSource | ChartCaptionError::UnsupportedDependency)
+        Err(ChartCaptionError::InvalidSource
+            | ChartCaptionError::Refused(
+                litchi_keynote::chart::caption::Refusal::UnsupportedDependency
+            ))
     ));
     assert_eq!(exact_bytes(&package)?, source);
     Ok(())
@@ -1456,7 +1603,10 @@ fn assert_graph_or_ingress_rejected(source: &[u8]) -> TestResult<()> {
         .and_then(|edit| edit.commit());
     assert!(matches!(
         result,
-        Err(ChartCaptionError::InvalidSource | ChartCaptionError::UnsupportedDependency)
+        Err(ChartCaptionError::InvalidSource
+            | ChartCaptionError::Refused(
+                litchi_keynote::chart::caption::Refusal::UnsupportedDependency
+            ))
     ));
     assert_eq!(exact_bytes(&package)?, source);
     Ok(())
@@ -1469,7 +1619,10 @@ fn assert_caption_graph_rejected(source: &[u8]) -> TestResult<()> {
     };
     assert!(matches!(
         package.slide_chart_caption(0usize, 0usize),
-        Err(ChartCaptionError::InvalidSource | ChartCaptionError::UnsupportedDependency)
+        Err(ChartCaptionError::InvalidSource
+            | ChartCaptionError::Refused(
+                litchi_keynote::chart::caption::Refusal::UnsupportedDependency
+            ))
     ));
     let result = package
         .edit_slide_chart_caption(0usize, 0usize)
@@ -1477,7 +1630,10 @@ fn assert_caption_graph_rejected(source: &[u8]) -> TestResult<()> {
         .and_then(|edit| edit.commit());
     assert!(matches!(
         result,
-        Err(ChartCaptionError::InvalidSource | ChartCaptionError::UnsupportedDependency)
+        Err(ChartCaptionError::InvalidSource
+            | ChartCaptionError::Refused(
+                litchi_keynote::chart::caption::Refusal::UnsupportedDependency
+            ))
     ));
     assert_eq!(exact_bytes(&package)?, source);
     Ok(())
@@ -1491,7 +1647,10 @@ fn assert_replacement_rejected(source: &[u8]) -> TestResult<()> {
         .and_then(|edit| edit.commit());
     assert!(matches!(
         result,
-        Err(ChartCaptionError::InvalidSource | ChartCaptionError::UnsupportedDependency)
+        Err(ChartCaptionError::InvalidSource
+            | ChartCaptionError::Refused(
+                litchi_keynote::chart::caption::Refusal::UnsupportedDependency
+            ))
     ));
     assert_eq!(exact_bytes(&package)?, source);
     Ok(())
@@ -1503,7 +1662,7 @@ fn with_document_message_payload(
     type_: u32,
     data: Vec<u8>,
 ) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     let object = archive
         .object_mut(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic document object"))?;
@@ -1522,7 +1681,7 @@ fn with_document_message_type(
     type_: u32,
     replacement_type: u32,
 ) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     let object = archive
         .object_mut(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic document object"))?;
@@ -1536,7 +1695,7 @@ fn with_document_message_type(
 }
 
 fn with_unrelated_caption_owner(source: &[u8]) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     let object = archive
         .object_mut(NON_STYLES[1])
         .ok_or_else(|| io::Error::other("missing unrelated chart object"))?;
@@ -1547,7 +1706,8 @@ fn with_unrelated_caption_owner(source: &[u8]) -> TestResult<Vec<u8>> {
         .ok_or_else(|| io::Error::other("missing unrelated chart message info"))?;
     info.object_references.push(STORAGES[0]);
     info.field_infos.push(FieldInfo {
-        path: FieldPath::new(vec![77, 1]),
+        path: litchi_iwa_core::FieldPath::new(vec![77, 1], litchi_iwa_core::Limits::default())
+            .unwrap(),
         r#type: Some(FieldType::ObjectReference),
         object_references: vec![STORAGES[0]],
         ..FieldInfo::default()
@@ -1590,8 +1750,8 @@ fn existing_caption_replacement_is_exact_reversible_and_local() -> TestResult<()
     assert!(commit.diagnostics().full_reparse_performed());
 
     let target = exact_bytes(commit.package())?;
-    let source_catalog = Catalog::from_bytes(&source)?;
-    let target_catalog = Catalog::from_bytes(&target)?;
+    let source_catalog = Catalog::from_bytes(&source, Default::default())?;
+    let target_catalog = Catalog::from_bytes(&target, Default::default())?;
     assert_eq!(
         source_catalog
             .iter()
@@ -1677,7 +1837,10 @@ fn semantic_noop_skips_changed_only_caption_ownership_guards() -> TestResult<()>
         .commit();
     assert!(matches!(
         changed,
-        Err(ChartCaptionError::InvalidSource | ChartCaptionError::UnsupportedDependency)
+        Err(ChartCaptionError::InvalidSource
+            | ChartCaptionError::Refused(
+                litchi_keynote::chart::caption::Refusal::UnsupportedDependency
+            ))
     ));
     assert_eq!(exact_bytes(&package)?, source);
     Ok(())
@@ -1688,15 +1851,19 @@ fn semantic_selectors_report_missing_and_ambiguous_charts() -> TestResult<()> {
     let package = Package::from_bytes(&synthetic_package()?)?;
     assert!(matches!(
         package.slide_chart_caption(0usize, ChartSelector::name("Missing")),
-        Err(ChartCaptionError::ChartNameNotFound)
+        Err(ChartCaptionError::Refused(
+            litchi_keynote::chart::caption::Refusal::ChartNameNotFound
+        ))
     ));
     assert!(matches!(
         package.slide_chart_caption(Position::new(9), 0usize),
-        Err(ChartCaptionError::SlidePositionNotFound { .. })
+        Err(ChartCaptionError::Refused(
+            litchi_keynote::chart::caption::Refusal::SlidePositionNotFound { .. }
+        ))
     ));
 
     let source = synthetic_package()?;
-    let mut archive = Archive::parse(&document_stream(&source)?)?;
+    let mut archive = Archive::parse(&document_stream(&source)?, Default::default())?;
     let message = archive
         .object_mut(NON_STYLES[1])
         .and_then(|object| object.messages.first_mut())
@@ -1705,7 +1872,9 @@ fn semantic_selectors_report_missing_and_ambiguous_charts() -> TestResult<()> {
     let duplicate = Package::from_bytes(&replace_document_stream(&source, archive)?)?;
     assert!(matches!(
         duplicate.slide_chart_caption(0usize, ChartSelector::name("Revenue")),
-        Err(ChartCaptionError::AmbiguousSelector)
+        Err(ChartCaptionError::Refused(
+            litchi_keynote::chart::caption::Refusal::AmbiguousSelector
+        ))
     ));
     Ok(())
 }
@@ -1713,7 +1882,7 @@ fn semantic_selectors_report_missing_and_ambiguous_charts() -> TestResult<()> {
 #[test]
 fn shared_storage_and_wrong_parent_are_rejected_atomically() -> TestResult<()> {
     let source = synthetic_package()?;
-    let mut archive = Archive::parse(&document_stream(&source)?)?;
+    let mut archive = Archive::parse(&document_stream(&source)?, Default::default())?;
     let second = archive
         .object_mut(CAPTION_INFOS[1])
         .ok_or_else(|| io::Error::other("missing second caption info"))?;
@@ -1724,11 +1893,13 @@ fn shared_storage_and_wrong_parent_are_rejected_atomically() -> TestResult<()> {
     let shared = Package::from_bytes(&shared_bytes)?;
     assert!(matches!(
         shared.slide_chart_caption(0usize, 0usize),
-        Err(ChartCaptionError::UnsupportedDependency)
+        Err(ChartCaptionError::Refused(
+            litchi_keynote::chart::caption::Refusal::UnsupportedDependency
+        ))
     ));
     assert_eq!(exact_bytes(&shared)?, shared_bytes);
 
-    let mut archive = Archive::parse(&document_stream(&source)?)?;
+    let mut archive = Archive::parse(&document_stream(&source)?, Default::default())?;
     archive
         .object_mut(CAPTION_INFOS[0])
         .ok_or_else(|| io::Error::other("missing first caption info"))?
@@ -1774,7 +1945,7 @@ fn patch_conflict_and_debug_output_are_content_redacted() -> TestResult<()> {
 #[test]
 fn malformed_caption_edge_and_storage_wire_are_refused() -> TestResult<()> {
     let source = synthetic_package()?;
-    let mut archive = Archive::parse(&document_stream(&source)?)?;
+    let mut archive = Archive::parse(&document_stream(&source)?, Default::default())?;
     archive
         .object_mut(CHARTS[0])
         .ok_or_else(|| io::Error::other("missing chart"))?
@@ -1786,7 +1957,7 @@ fn malformed_caption_edge_and_storage_wire_are_refused() -> TestResult<()> {
         Err(ChartCaptionError::InvalidSource)
     ));
 
-    let mut archive = Archive::parse(&document_stream(&source)?)?;
+    let mut archive = Archive::parse(&document_stream(&source)?, Default::default())?;
     archive
         .object_mut(STORAGES[0])
         .ok_or_else(|| io::Error::other("missing storage"))?
@@ -1953,7 +2124,7 @@ fn metadata_creation_from_canonical_standin_updates_graph_registry_and_inverse()
             .any(|entry| entry.identifier == 1_004)
     );
 
-    let document = Archive::parse(&document_stream(&target)?)?;
+    let document = Archive::parse(&document_stream(&target)?, Default::default())?;
     assert_eq!(
         document
             .object(CAPTION_INFOS[0])
@@ -1974,8 +2145,8 @@ fn metadata_creation_from_canonical_standin_updates_graph_registry_and_inverse()
     );
     assert_eq!(chart_reference_identifier(&target)?, Some(1_002));
 
-    let source_catalog = Catalog::from_bytes(&source)?;
-    let target_catalog = Catalog::from_bytes(&target)?;
+    let source_catalog = Catalog::from_bytes(&source, Default::default())?;
+    let target_catalog = Catalog::from_bytes(&target, Default::default())?;
     assert_eq!(
         source_catalog
             .iter()
@@ -2081,7 +2252,7 @@ fn metadata_removal_allocates_fresh_standin_and_retains_old_graph() -> TestResul
             .iter()
             .any(|entry| entry.identifier == 1_001)
     );
-    let document = Archive::parse(&document_stream(&target)?)?;
+    let document = Archive::parse(&document_stream(&target)?, Default::default())?;
     for (identifier, type_) in [
         (CAPTION_INFOS[0], CAPTION_INFO_MESSAGE_TYPE),
         (STORAGES[0], STORAGE_MESSAGE_TYPE),
@@ -2103,14 +2274,14 @@ fn metadata_removal_allocates_fresh_standin_and_retains_old_graph() -> TestResul
     );
     assert_eq!(chart_reference_identifier(&target)?, Some(1_001));
 
-    let target_catalog = Catalog::from_bytes(&target)?;
+    let target_catalog = Catalog::from_bytes(&target, Default::default())?;
     assert!(
         target_catalog
             .iter()
             .all(|entry| !entry.name().starts_with("preview"))
     );
     assert_eq!(
-        Catalog::from_bytes(&source)?
+        Catalog::from_bytes(&source, Default::default())?
             .iter()
             .find(|entry| entry.name() == "Data/sentinel.bin")
             .map(|entry| entry.data()),
@@ -2171,7 +2342,7 @@ fn metadata_owned_identifiers_beyond_watermark_are_not_reused() -> TestResult<()
             .commit()?;
         let target = exact_bytes(commit.package())?;
         assert_eq!(chart_reference_identifier(&target)?, Some(reserved + 2));
-        let document = Archive::parse(&document_stream(&target)?)?;
+        let document = Archive::parse(&document_stream(&target)?, Default::default())?;
         assert!(document.object(reserved).is_none());
         for identifier in reserved + 1..=reserved + 4 {
             assert!(document.object(identifier).is_some());
@@ -2195,7 +2366,7 @@ fn extra_or_wrong_type_root_and_theme_candidates_fail_atomically() -> TestResult
         METADATA_LAST_IDENTIFIER,
         None,
     )?;
-    let mut archive = Archive::parse(&document_stream(&source)?)?;
+    let mut archive = Archive::parse(&document_stream(&source)?, Default::default())?;
     let document_payload = archive
         .object(1)
         .and_then(|object| object.messages.first())
@@ -2217,7 +2388,7 @@ fn canonical_standin_and_shared_or_aliased_graphs_are_rejected() -> TestResult<(
         METADATA_LAST_IDENTIFIER,
         None,
     )?;
-    let mut archive = Archive::parse(&document_stream(&source)?)?;
+    let mut archive = Archive::parse(&document_stream(&source)?, Default::default())?;
     archive
         .object_mut(CAPTION_INFOS[0])
         .ok_or_else(|| io::Error::other("missing stand-in"))?
@@ -2235,11 +2406,13 @@ fn canonical_standin_and_shared_or_aliased_graphs_are_rejected() -> TestResult<(
     let package = Package::from_bytes(&shared)?;
     assert!(matches!(
         package.slide_chart_caption(0usize, 0usize),
-        Err(ChartCaptionError::UnsupportedDependency)
+        Err(ChartCaptionError::Refused(
+            litchi_keynote::chart::caption::Refusal::UnsupportedDependency
+        ))
     ));
     assert_graph_change_rejected(&shared)?;
 
-    let mut alias_archive = Archive::parse(&document_stream(&source)?)?;
+    let mut alias_archive = Archive::parse(&document_stream(&source)?, Default::default())?;
     let second_chart = alias_archive
         .object_mut(CHARTS[1])
         .ok_or_else(|| io::Error::other("missing second chart"))?;
@@ -2496,7 +2669,7 @@ fn known_caption_reference_theme_and_width_wire_variants_fail_closed() -> TestRe
         None,
     )?;
     let chart = message_payload(&source, CHARTS[0], CHART_MESSAGE_TYPE)?;
-    let drawable = WireView::parse(&chart)?
+    let drawable = WireView::parse(&chart, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == 1)
         .ok_or_else(|| io::Error::other("missing chart drawable"))?;
@@ -2538,7 +2711,7 @@ fn known_caption_reference_theme_and_width_wire_variants_fail_closed() -> TestRe
     }
 
     let theme = message_payload(&source, 80, 10)?;
-    let theme_root = WireView::parse(&theme)?
+    let theme_root = WireView::parse(&theme, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == 1)
         .ok_or_else(|| io::Error::other("missing theme root"))?;
@@ -2686,7 +2859,7 @@ fn caption_reference_varint_growth_is_source_preserving_and_output_bounded() -> 
     assert!(
         matches!(
             &result,
-            Err(ChartCaptionError::LimitExceeded {
+            Err(ChartCaptionError::Limit {
                 kind: ChartCaptionLimitKind::OutputBytes,
                 ..
             })
@@ -2841,32 +3014,30 @@ fn public_package_limits_bound_caption_creation_and_patch_apply_atomically() -> 
         "message-byte max-minus-one",
     )?;
 
-    let under_semantic_objects = ReadOptions::new(
-        exact.archive(),
-        SemanticLimits::new(
-            target_metrics.total_objects.saturating_sub(1),
-            exact.semantic().max_slides(),
-            exact.semantic().max_references(),
-            exact.semantic().max_text_storages(),
-            exact.semantic().max_text_fragments(),
-            exact.semantic().max_text_bytes(),
-        )?,
+    let under_semantic_objects = exact.semantic_limits(
+        SemanticLimits::builder()
+            .max_objects(target_metrics.total_objects.saturating_sub(1))?
+            .max_slides(exact.semantic_limits_value().max_slides())?
+            .max_references(exact.semantic_limits_value().max_references())?
+            .max_text_storages(exact.semantic_limits_value().max_text_storages())?
+            .max_text_fragments(exact.semantic_limits_value().max_text_fragments())?
+            .max_text_bytes(exact.semantic_limits_value().max_text_bytes())?
+            .build()?,
     );
     assert_caption_limit(
         run_caption_create_with_options(&source, under_semantic_objects)?,
         "semantic-object max-minus-one",
     )?;
 
-    let under_references = ReadOptions::new(
-        exact.archive(),
-        SemanticLimits::new(
-            exact.semantic().max_objects(),
-            exact.semantic().max_slides(),
-            4,
-            exact.semantic().max_text_storages(),
-            exact.semantic().max_text_fragments(),
-            exact.semantic().max_text_bytes(),
-        )?,
+    let under_references = exact.semantic_limits(
+        SemanticLimits::builder()
+            .max_objects(exact.semantic_limits_value().max_objects())?
+            .max_slides(exact.semantic_limits_value().max_slides())?
+            .max_references(4)?
+            .max_text_storages(exact.semantic_limits_value().max_text_storages())?
+            .max_text_fragments(exact.semantic_limits_value().max_text_fragments())?
+            .max_text_bytes(exact.semantic_limits_value().max_text_bytes())?
+            .build()?,
     );
     assert_caption_limit(
         run_caption_create_with_options(&source, under_references)?,

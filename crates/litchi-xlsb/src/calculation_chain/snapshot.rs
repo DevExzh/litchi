@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use litchi_opc::{OpcPackage, OwnedContentTypes, OwnedRelationships};
 
-use super::model::{ChainPart, ReadLimits};
+use super::model::{ChainPart, SemanticLimits};
 use super::package::{self, Graph};
 use crate::package::error::{Error, Result};
 
@@ -12,14 +12,14 @@ use crate::package::error::{Error, Result};
 #[derive(Clone, Debug)]
 pub struct Snapshot {
     part: Option<Arc<ChainPart>>,
-    limits: ReadLimits,
+    limits: SemanticLimits,
     source: SourceState,
     package: Arc<OpcPackage>,
 }
 
 impl Snapshot {
     /// Read a snapshot with explicit finite limits.
-    pub(crate) fn read_with_limits(package: &OpcPackage, limits: ReadLimits) -> Result<Self> {
+    pub(crate) fn read_with_limits(package: &OpcPackage, limits: SemanticLimits) -> Result<Self> {
         Self::read_with_probe(package, limits, None)
     }
 
@@ -27,7 +27,7 @@ impl Snapshot {
     /// no hidden inbound relationship when the current owner is absent.
     pub(crate) fn read_with_probe(
         package: &OpcPackage,
-        limits: ReadLimits,
+        limits: SemanticLimits,
         probe_target: Option<&litchi_opc::PackURI>,
     ) -> Result<Self> {
         let limits = limits.validate()?;
@@ -38,11 +38,11 @@ impl Snapshot {
         let workbook = package.main_document_part()?;
         let workbook_name = workbook.partname().clone();
         if workbook.blob().len() > limits.max_part_bytes {
-            return Err(Error::LimitExceeded {
-                resource: "Calculation Chain Workbook bytes",
-                actual: workbook.blob().len(),
-                maximum: limits.max_part_bytes,
-            });
+            return Err(Error::limit(
+                crate::calculation_chain::LimitKind::WorkbookBytes,
+                workbook.blob().len(),
+                limits.max_part_bytes,
+            ));
         }
         let part = graph
             .as_ref()
@@ -51,11 +51,11 @@ impl Snapshot {
             .map(|part| {
                 let bytes = part.blob_arc();
                 if bytes.len() > limits.max_part_bytes {
-                    return Err(Error::LimitExceeded {
-                        resource: "Calculation Chain part bytes",
-                        actual: bytes.len(),
-                        maximum: limits.max_part_bytes,
-                    });
+                    return Err(Error::limit(
+                        crate::calculation_chain::LimitKind::PartBytes,
+                        bytes.len(),
+                        limits.max_part_bytes,
+                    ));
                 }
                 Ok(ChainPart {
                     part_name: part.partname().as_str().to_string(),
@@ -88,16 +88,19 @@ impl Snapshot {
         self.part.is_some()
     }
 
-    /// Start a detached source-bound transaction. The only supported change
-    /// is removal of the optional cache owner.
-    #[must_use]
-    pub fn edit(&self) -> super::Transaction {
-        super::Transaction::new(self.clone())
+    /// Start an edit of the package this snapshot was read from (the unit
+    /// tests' route; packages start one with `edit_calculation_chain`).
+    #[cfg(test)]
+    pub(crate) fn edit(&self) -> super::Edit {
+        super::Edit::new(
+            crate::Package::from(self.package().as_ref().clone()),
+            self.limits(),
+        )
     }
 
     /// Exact finite limits retained by this snapshot.
     #[must_use]
-    pub const fn limits(&self) -> ReadLimits {
+    pub const fn limits(&self) -> SemanticLimits {
         self.limits
     }
 
@@ -151,23 +154,19 @@ impl SourceState {
         package: &OpcPackage,
         workbook_name: &litchi_opc::PackURI,
         graph: Option<&Graph>,
-        limits: ReadLimits,
+        limits: SemanticLimits,
     ) -> Result<Self> {
         let workbook = package.get_part(workbook_name)?;
-        let root_name =
-            litchi_opc::PackURI::new("/").map_err(|error| Error::InvalidUri(error.to_string()))?;
+        let root_name = litchi_opc::PackURI::new("/")?;
         let opc_limits = opc_capture_limits(limits)?;
-        let root_relationships =
-            package.source_relationships_with_limits(&root_name, opc_limits)?;
-        let workbook_relationships =
-            package.source_relationships_with_limits(workbook_name, opc_limits)?;
-        let content_types = package.source_content_types_with_limits(opc_limits)?;
+        let root_relationships = package.source_relationships(&root_name, opc_limits)?;
+        let workbook_relationships = package.source_relationships(workbook_name, opc_limits)?;
+        let content_types = package.source_content_types(opc_limits)?;
         let owner = graph
             .map(|graph| package.get_part(&graph.part_name))
             .transpose()?
             .map(|part| {
-                let relationships =
-                    package.source_relationships_with_limits(part.partname(), opc_limits)?;
+                let relationships = package.source_relationships(part.partname(), opc_limits)?;
                 Ok::<SourcePart, Error>(SourcePart {
                     name: part.partname().as_str().to_string(),
                     content_type: part.content_type().to_string(),
@@ -186,11 +185,11 @@ impl SourceState {
             maximum = maximum.max(owner.relationships.bytes().len());
         }
         if maximum > limits.max_part_bytes {
-            return Err(Error::LimitExceeded {
-                resource: "Calculation Chain source closure bytes",
-                actual: maximum,
-                maximum: limits.max_part_bytes,
-            });
+            return Err(Error::limit(
+                crate::calculation_chain::LimitKind::SourceBytes,
+                maximum,
+                limits.max_part_bytes,
+            ));
         }
 
         Ok(Self {
@@ -209,13 +208,13 @@ impl SourceState {
     }
 }
 
-pub(crate) fn opc_capture_limits(limits: ReadLimits) -> Result<litchi_opc::ReadLimits> {
+pub(crate) fn opc_capture_limits(limits: SemanticLimits) -> Result<litchi_opc::SourceLimits> {
     if limits.max_part_bytes == 0 {
-        return Err(Error::LimitExceeded {
-            resource: "Calculation Chain source closure bytes",
-            actual: 1,
-            maximum: limits.max_part_bytes,
-        });
+        return Err(Error::limit(
+            crate::calculation_chain::LimitKind::SourceBytes,
+            1,
+            limits.max_part_bytes,
+        ));
     }
     let maximum_relationship_xml =
         limits
@@ -224,7 +223,7 @@ pub(crate) fn opc_capture_limits(limits: ReadLimits) -> Result<litchi_opc::ReadL
             .ok_or(Error::CapacityOverflow {
                 resource: "Calculation Chain relationship source bytes",
             })?;
-    let defaults = litchi_opc::ReadLimits::default();
+    let defaults = litchi_opc::SourceLimits::default();
     let maximum_relationships = limits.max_relationships.max(1);
     let maximum_parts = limits.max_graph_parts.max(1).min(defaults.max_parts());
     let maximum_mappings = limits.max_graph_parts.max(1).min(
@@ -232,7 +231,7 @@ pub(crate) fn opc_capture_limits(limits: ReadLimits) -> Result<litchi_opc::ReadL
             .max_content_type_mappings()
             .max(defaults.max_parts()),
     );
-    let builder = litchi_opc::ReadLimits::builder()
+    let builder = litchi_opc::SourceLimits::builder()
         .max_parts(maximum_parts)?
         .max_content_types_bytes(limits.max_part_bytes)?
         .max_content_type_mappings(maximum_mappings)?

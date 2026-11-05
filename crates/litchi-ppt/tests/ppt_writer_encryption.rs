@@ -6,13 +6,13 @@
 #![cfg(feature = "encryption")]
 
 use litchi_cfb::OleFile;
-use litchi_ppt::writer::{EncryptionProfile, PictureKind, Writer};
-use litchi_ppt::{Error, OpenOptions, Package};
+use litchi_ppt::writer::{Builder, EncryptionProfile, PictureKind};
+use litchi_ppt::{Error, OpenOptions, raw::Reader};
 use std::collections::BTreeMap;
 use std::io::Cursor;
 
 fn write(profile: EncryptionProfile, password: &str, picture: bool) -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     writer
         .add_textbox(slide, 10, 10, 300, 40, "Encrypted 文本")
@@ -28,12 +28,13 @@ fn write(profile: EncryptionProfile, password: &str, picture: bool) -> Vec<u8> {
     }
     writer.set_password(password, profile).unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.set_encryption_entropy(litchi_ppt::EncryptionEntropy::generate().unwrap());
+    litchi_ppt::raw::encode(&mut writer, &mut output).unwrap();
     output.into_inner()
 }
 
 fn streams(file: &[u8]) -> (Vec<u8>, Vec<u8>, Option<Vec<u8>>) {
-    let mut ole = OleFile::open(Cursor::new(file)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(file), litchi_cfb::OleFileLimits::default()).unwrap();
     let document = ole.open_stream(&["PowerPoint Document"]).unwrap();
     let current_user = ole.open_stream(&["Current User"]).unwrap();
     let pictures = ole.open_stream(&["Pictures"]).ok();
@@ -60,23 +61,17 @@ fn persist_mappings(document: &[u8], offset: usize) -> BTreeMap<u32, u32> {
 
 fn assert_round_trip(profile: EncryptionProfile, password: &str, picture: bool) -> Vec<u8> {
     let bytes = write(profile, password, picture);
-    let mut package = Package::from_reader(Cursor::new(bytes.clone())).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes.clone())).unwrap();
     assert!(matches!(
         package.presentation(),
         Err(Error::PasswordRequired)
     ));
     assert!(matches!(
-        package.presentation_with_options(OpenOptions {
-            password: Some("wrong"),
-            ..Default::default()
-        }),
+        package.presentation_with_options(OpenOptions::new().password("wrong")),
         Err(Error::InvalidPassword)
     ));
     let presentation = package
-        .presentation_with_options(OpenOptions {
-            password: Some(password),
-            ..Default::default()
-        })
+        .presentation_with_options(OpenOptions::new().password(password))
         .unwrap();
     assert!(presentation.text().unwrap().contains("Encrypted 文本"));
     if picture {
@@ -184,7 +179,7 @@ fn pictures_salts_and_atomic_profile_validation_are_covered() {
         salt(&second_document, &second_current)
     );
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer
         .set_password("kept", EncryptionProfile::CryptoApiRc4 { key_bits: 128 })
         .unwrap();

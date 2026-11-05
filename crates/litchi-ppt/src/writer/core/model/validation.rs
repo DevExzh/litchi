@@ -1,13 +1,13 @@
 //! Validation and atomic mutation gates for the PPT writer model.
 
-use super::{WriteError, Writer};
+use super::{Builder, WriteError};
 #[cfg(feature = "encryption")]
 use crate::encryption::validate_writer_password;
 use crate::modify_password::validate_value as validate_modify_password;
 use crate::view_info::{SlideViewInfo, ViewKind};
 use crate::writer::core::codec::{interaction_for_hyperlink, shape_text_unit_count};
 
-impl Writer {
+impl Builder {
     pub(in crate::writer::core) fn validate_encryption(&self) -> Result<(), WriteError> {
         #[cfg(feature = "encryption")]
         let missing_open_password = self.encryption.is_none();
@@ -23,6 +23,12 @@ impl Writer {
         if let Some(value) = &self.encryption {
             validate_writer_password(value.profile, value.password.as_str())
                 .map_err(WriteError::InvalidData)?;
+            // PowerPoint keeps the properties of an encrypted presentation in
+            // its encrypted summary stream ([MS-OFFCRYPTO] 2.3.5.4), which is
+            // not produced; refuse rather than write them in plaintext.
+            if !self.properties.is_empty() {
+                return Err(WriteError::EncryptedMetadata);
+            }
         }
         if let Some(value) = &self.modify_password {
             validate_modify_password(value.password.as_str())
@@ -145,7 +151,7 @@ impl Writer {
     }
 }
 
-impl Writer {
+impl Builder {
     /// Attach a hyperlink to the last shape added on a slide
     ///
     /// # Errors
@@ -190,7 +196,7 @@ impl Writer {
     ///
     /// Returns an error if the interaction fails validation, references an
     /// unknown hyperlink, the slide does not exist, or the slide has no shapes.
-    pub fn set_last_shape_interaction_with_limits(
+    pub(crate) fn set_last_shape_interaction_with_limits(
         &mut self,
         slide: usize,
         interaction: crate::Interaction,
@@ -314,7 +320,7 @@ impl Writer {
     /// Returns an error if the interaction references an unknown hyperlink, the
     /// slide does not exist, the slide has no shapes, the UTF-16 range is invalid
     /// for the shape text, or the configured interaction count limit is exceeded.
-    pub fn set_last_shape_text_interaction_with_limits(
+    pub(crate) fn set_last_shape_text_interaction_with_limits(
         &mut self,
         slide: usize,
         interaction: crate::TextInteraction,
@@ -416,7 +422,7 @@ impl Writer {
     }
 }
 
-impl Writer {
+impl Builder {
     fn validate_view_info_kind(view: &SlideViewInfo, expected: ViewKind) -> Result<(), WriteError> {
         view.to_bytes()
             .map_err(|error| WriteError::InvalidData(error.to_string()))?;

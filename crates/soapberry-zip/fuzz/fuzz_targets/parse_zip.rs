@@ -159,7 +159,7 @@ fn exercise_reader_at_metadata<R: ReaderAt>(archive: &IndexedArchive<R>) {
 
 fn exercise_preservation_index<R: ReaderAt>(archive: &IndexedArchive<R>, limits: ArchiveLimits) {
     let mut scratch = [0u8; RECOMMENDED_BUFFER_SIZE];
-    let Ok(index) = archive.preservation_index_with_limits(&mut scratch, limits) else {
+    let Ok(index) = archive.preservation_index(&mut scratch, limits) else {
         return;
     };
 
@@ -258,7 +258,7 @@ fn exercise_precompressed_republication<R: ReaderAt>(
     }
 
     let mut scratch = [0u8; RECOMMENDED_BUFFER_SIZE];
-    let Ok(index) = archive.preservation_index_with_limits(&mut scratch, limits) else {
+    let Ok(index) = archive.preservation_index(&mut scratch, limits) else {
         return;
     };
     let mut plan = PreservationPlan::copy_all(&index);
@@ -291,7 +291,7 @@ fn exercise_precompressed_republication<R: ReaderAt>(
     output_limits.max_files = limits.max_files.saturating_add(1);
     output_limits.max_metadata_bytes = limits.max_metadata_bytes.saturating_add(128 * 1024);
     output_limits.max_total_size = MAX_REPUBLISHED_OUTPUT_BYTES as u64;
-    let output_reader = ArchiveReader::new_with_limits(&output, output_limits)
+    let output_reader = ArchiveReader::new(&output, output_limits)
         .expect("successful bounded publication must reopen within expanded limits");
     let readback = output_reader
         .read(REPUBLISHED_MEMBER_NAME)
@@ -350,7 +350,7 @@ fn exercise_precompressed_republication<R: ReaderAt>(
         let error = index
             .write_to_with_accounting(&plan, &mut partial_sink, &mut partial_accounting)
             .expect_err("partial sink must fail after its accepted prefix");
-        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
         assert_eq!(partial_sink.bytes, output[..fail_after]);
         let accepted_payload = accepted_prefix as u64;
         match token.compression_method() {
@@ -419,9 +419,9 @@ fn exercise_fused_precompressed<R: ReaderAt>(
     }
 }
 
-fn exercise_replay<R: ReaderAt>(archive: &IndexedArchive<R>, data: &[u8]) {
+fn exercise_replay<R: ReaderAt>(archive: &IndexedArchive<R>, data: &[u8], limits: ArchiveLimits) {
     let mut scratch = vec![0; RECOMMENDED_BUFFER_SIZE];
-    let Ok(index) = archive.preservation_index(&mut scratch) else {
+    let Ok(index) = archive.preservation_index(&mut scratch, limits) else {
         return;
     };
     let Some(target) = index.entries().iter().find(|entry| {
@@ -467,7 +467,7 @@ fn exercise_replay<R: ReaderAt>(archive: &IndexedArchive<R>, data: &[u8]) {
     let output = sink.bytes;
     let mut output_limits = fuzz_limits();
     output_limits.max_total_size += MAX_REPLAY_PAYLOAD_BYTES as u64;
-    let reopened = ArchiveReader::new_with_limits(&output, output_limits)
+    let reopened = ArchiveReader::new(&output, output_limits)
         .expect("successful bounded replay must have readable metadata");
     assert_eq!(
         reopened.read(name).expect("replayed member verifies"),
@@ -507,8 +507,8 @@ fn exercise_replay<R: ReaderAt>(archive: &IndexedArchive<R>, data: &[u8]) {
 
 fn exercise_bounded_paths(data: &[u8]) {
     let limits = fuzz_limits();
-    let borrowed = ArchiveReader::new_with_limits(data, limits);
-    let reader_at = IndexedArchive::from_reader_with_limits(data, data.len() as u64, limits);
+    let borrowed = ArchiveReader::new(data, limits);
+    let reader_at = IndexedArchive::from_reader(data, data.len() as u64, limits);
 
     if let Ok(reader) = &borrowed {
         exercise_borrowed_reader(reader);
@@ -522,7 +522,7 @@ fn exercise_bounded_paths(data: &[u8]) {
     // successful results keeps this target sensitive to drift between the
     // contiguous borrowed source and the positional ReaderAt source.
     if let (Ok(reader), Ok(archive)) = (&borrowed, &reader_at) {
-        exercise_replay(archive, data);
+        exercise_replay(archive, data, limits);
         exercise_fused_precompressed(archive, reader);
         exercise_precompressed(archive, reader, limits);
         for name in reader.file_names() {

@@ -9,7 +9,7 @@ use litchi_numbers::{
     Package, SheetSelector, TableSelector,
     cell::Value,
     table::{
-        CellPosition, CellRange, Dimensions,
+        Area, At, Dimensions,
         cells::{
             Change, Commit, DependencyKind, Diagnostics, Edit, Error, Input, LimitKind, Patch,
             Path, State, Storage,
@@ -47,8 +47,8 @@ fn assert_exact_scalar_locality(
     target: &[u8],
     expected_changed_members: &[&str],
 ) -> TestResult {
-    let source = Catalog::from_bytes(source)?;
-    let target = Catalog::from_bytes(target)?;
+    let source = Catalog::from_bytes(source, Default::default())?;
+    let target = Catalog::from_bytes(target, Default::default())?;
     let mut changed_members = Vec::new();
 
     for before in source.iter() {
@@ -79,14 +79,14 @@ fn assert_exact_scalar_locality(
 }
 
 fn string_lists(package: &[u8]) -> TestResult<Vec<tst::TableDataList>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let mut lists = Vec::new();
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
         for message in archive
             .objects
             .iter()
@@ -126,9 +126,9 @@ fn string_list_with_text(package: &[u8], text: &str) -> TestResult<tst::TableDat
 #[test]
 fn native_single_reads_use_checked_index_and_name_selectors() -> TestResult {
     let package = Package::open(fixture_path())?;
-    let b2 = CellPosition::from_a1("B2")?;
-    let b3 = CellPosition::from_a1("B3")?;
-    let g22 = CellPosition::from_a1("G22")?;
+    let b2 = At::from_a1("B2")?;
+    let b3 = At::from_a1("B3")?;
+    let g22 = At::from_a1("G22")?;
 
     let text_by_index = package.table_cell(0usize, 0usize, b2)?;
     let text_by_name = package.table_cell(
@@ -166,22 +166,25 @@ fn native_single_reads_use_checked_index_and_name_selectors() -> TestResult {
 fn native_a1_read_helpers_match_checked_coordinate_reads() -> TestResult {
     let package = Package::open(fixture_path())?;
 
-    let coordinate = package.table_cell("Sheet 1", "Table 1", CellPosition::from_a1("B2")?)?;
+    let coordinate = package.table_cell("Sheet 1", "Table 1", At::from_a1("B2")?)?;
     let a1 = package.table_cell_a1("Sheet 1", "Table 1", "B2")?;
     assert_eq!(a1, coordinate);
 
-    let coordinate_range =
-        package.table_cells("Sheet 1", "Table 1", CellRange::from_a1("B2:C3")?)?;
+    let coordinate_range = package.table_cells("Sheet 1", "Table 1", Area::from_a1("B2:C3")?)?;
     let a1_range = package.table_cells_a1("Sheet 1", "Table 1", "$B$2:$C$3")?;
     assert_eq!(a1_range, coordinate_range);
 
     assert!(matches!(
         package.table_cell_a1("Sheet 1", "Table 1", "A0"),
-        Err(Error::InvalidAddress)
+        Err(Error::Refused(
+            litchi_numbers::table::cells::Refusal::InvalidAddress
+        ))
     ));
     assert!(matches!(
         package.table_cells_a1("Sheet 1", "Table 1", "A1:B2:C3"),
-        Err(Error::InvalidAddress)
+        Err(Error::Refused(
+            litchi_numbers::table::cells::Refusal::InvalidAddress
+        ))
     ));
     Ok(())
 }
@@ -190,7 +193,7 @@ fn native_a1_read_helpers_match_checked_coordinate_reads() -> TestResult {
 fn native_scalar_shortcuts_share_selector_atomic_and_inverse_paths() -> TestResult {
     let package = Package::open(fixture_path())?;
     let source = package.exact_bytes();
-    let b3 = CellPosition::from_a1("B3")?;
+    let b3 = At::from_a1("B3")?;
 
     let no_op = package.set_table_cell(
         SheetSelector::index(0),
@@ -236,7 +239,9 @@ fn native_scalar_shortcuts_share_selector_atomic_and_inverse_paths() -> TestResu
 
     assert!(matches!(
         package.clear_table_cell_a1(0usize, 0usize, "A0"),
-        Err(Error::InvalidAddress)
+        Err(Error::Refused(
+            litchi_numbers::table::cells::Refusal::InvalidAddress
+        ))
     ));
     assert_eq!(package.exact_bytes(), source);
     Ok(())
@@ -248,12 +253,12 @@ fn native_dense_range_is_row_major_and_presence_preserving() -> TestResult {
     let states = package.table_cells(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellRange::from_a1("B2:B3")?,
+        Area::from_a1("B2:B3")?,
     )?;
 
     assert_eq!(states.len(), 2);
-    assert_eq!(states[0].position(), CellPosition::from_a1("B2")?);
-    assert_eq!(states[1].position(), CellPosition::from_a1("B3")?);
+    assert_eq!(states[0].position(), At::from_a1("B2")?);
+    assert_eq!(states[1].position(), At::from_a1("B3")?);
     assert!(matches!(
         states[0].storage(),
         Storage::Stored(Value::Text(text)) if text == FIXTURE_MARKER
@@ -263,12 +268,12 @@ fn native_dense_range_is_row_major_and_presence_preserving() -> TestResult {
         Storage::Stored(Value::Number(value)) if value.get() == 42.0
     ));
 
-    let missing = package.table_cells(0usize, 0usize, CellRange::from_a1("F21:G22")?)?;
+    let missing = package.table_cells(0usize, 0usize, Area::from_a1("F21:G22")?)?;
     assert_eq!(missing.len(), 4);
     assert_eq!(
         missing.iter().map(State::position).collect::<Vec<_>>(),
         ["F21", "G21", "F22", "G22"]
-            .map(CellPosition::from_a1)
+            .map(At::from_a1)
             .into_iter()
             .collect::<Result<Vec<_>, _>>()?
     );
@@ -279,34 +284,38 @@ fn native_dense_range_is_row_major_and_presence_preserving() -> TestResult {
 #[test]
 fn missing_selectors_and_bounds_return_typed_errors() -> TestResult {
     let package = Package::open(fixture_path())?;
-    let b2 = CellPosition::from_a1("B2")?;
+    let b2 = At::from_a1("B2")?;
     assert!(matches!(
         package.table_cell("missing sheet", 0usize, b2),
-        Err(Error::SheetNotFound)
+        Err(Error::Refused(
+            litchi_numbers::table::cells::Refusal::SheetNotFound
+        ))
     ));
     assert!(matches!(
         package.table_cell(0usize, "missing table", b2),
-        Err(Error::TableNotFound)
+        Err(Error::Refused(
+            litchi_numbers::table::cells::Refusal::TableNotFound
+        ))
     ));
 
     let dimensions = Dimensions::new(22, 7);
-    let outside = CellPosition::new(22, 0);
+    let outside = At::new(22, 0);
     assert!(matches!(
         package.table_cell(0usize, 0usize, outside),
-        Err(Error::OutOfBounds {
+        Err(Error::Refused(litchi_numbers::table::cells::Refusal::OutOfBounds {
             position,
             dimensions: actual,
-        }) if position == outside && actual == dimensions
+        })) if position == outside && actual == dimensions
     ));
 
-    let end = CellPosition::new(22, 8);
-    let outside_range = CellRange::new(CellPosition::new(21, 6), end)?;
+    let end = At::new(22, 8);
+    let outside_range = Area::new(At::new(21, 6), end)?;
     assert!(matches!(
         package.table_cells(0usize, 0usize, outside_range),
-        Err(Error::OutOfBounds {
+        Err(Error::Refused(litchi_numbers::table::cells::Refusal::OutOfBounds {
             position,
             dimensions: actual,
-        }) if position == end && actual == dimensions
+        })) if position == end && actual == dimensions
     ));
     Ok(())
 }
@@ -321,18 +330,14 @@ fn public_read_values_are_send_sync_and_debug_redacted() -> TestResult {
     assert_send_sync_debug::<Path>();
 
     let package = Package::open(fixture_path())?;
-    let state = package.table_cell("Sheet 1", "Table 1", CellPosition::from_a1("B2")?)?;
+    let state = package.table_cell("Sheet 1", "Table 1", At::from_a1("B2")?)?;
     for rendered in [format!("{state:?}"), format!("{:?}", state.storage())] {
         assert!(rendered.contains("Text"));
         assert!(!rendered.contains(FIXTURE_MARKER));
     }
 
     let error = package
-        .table_cell(
-            "private missing sheet name",
-            0usize,
-            CellPosition::new(0, 0),
-        )
+        .table_cell("private missing sheet name", 0usize, At::new(0, 0))
         .expect_err("missing selector must fail");
     for rendered in [format!("{error:?}"), error.to_string()] {
         assert!(!rendered.contains("private missing sheet name"));
@@ -345,7 +350,7 @@ fn public_read_values_are_send_sync_and_debug_redacted() -> TestResult {
 fn native_number_change_is_exact_reversible_and_source_bound() -> TestResult {
     let package = Package::open(fixture_path())?;
     let source = package.exact_bytes();
-    let b3 = CellPosition::from_a1("B3")?;
+    let b3 = At::from_a1("B3")?;
 
     let commit = package
         .edit_table_cells(0usize, 0usize)?
@@ -400,12 +405,13 @@ fn native_number_change_is_exact_reversible_and_source_bound() -> TestResult {
 #[test]
 fn changed_patch_preserves_exact_source_preview_subset() -> TestResult {
     let native = std::fs::read(fixture_path())?;
-    let masked = Catalog::from_bytes(&native)?.reassemble_with_deletions_to_bytes(
-        &[],
-        &["preview.jpg", "preview-web.jpg"],
-        Limits::default(),
-    )?;
-    let masked_catalog = Catalog::from_bytes(&masked)?;
+    let masked = Catalog::from_bytes(&native, Default::default())?
+        .reassemble_with_deletions_to_bytes(
+            &[],
+            &["preview.jpg", "preview-web.jpg"],
+            Limits::default(),
+        )?;
+    let masked_catalog = Catalog::from_bytes(&masked, Default::default())?;
     assert_eq!(
         CANONICAL_PREVIEWS
             .iter()
@@ -423,7 +429,7 @@ fn changed_patch_preserves_exact_source_preview_subset() -> TestResult {
         .commit()?;
     assert_eq!(commit.diagnostics().deleted_previews(), 1);
     let target = commit.package().exact_bytes();
-    let target_catalog = Catalog::from_bytes(&target)?;
+    let target_catalog = Catalog::from_bytes(&target, Default::default())?;
     assert!(
         CANONICAL_PREVIEWS
             .iter()
@@ -462,10 +468,11 @@ fn native_mixed_scalar_batch_roundtrips_from_one_final_state() -> TestResult {
     assert_eq!(commit.patch().len(), 4);
     assert_eq!(commit.diagnostics().requested_cells(), 4);
     assert_eq!(commit.diagnostics().changed_cells(), 4);
-    assert_eq!(commit.diagnostics().touched_components(), 2);
+    // The tile and both header buckets: C3:E3 add cells to their columns.
+    assert_eq!(commit.diagnostics().touched_components(), 3);
     let states = commit
         .package()
-        .table_cells(0usize, 0usize, CellRange::from_a1("B3:E3")?)?;
+        .table_cells(0usize, 0usize, Area::from_a1("B3:E3")?)?;
     assert!(matches!(
         states[0].storage(),
         Storage::Stored(Value::Number(value)) if value.get() == 43.5
@@ -503,18 +510,19 @@ fn native_same_tile_mixed_equal_and_changed_counts_final_delta() -> TestResult {
     assert_eq!(commit.patch().len(), 2);
     assert_eq!(commit.diagnostics().requested_cells(), 2);
     assert_eq!(commit.diagnostics().changed_cells(), 1);
-    assert_eq!(commit.diagnostics().touched_components(), 2);
+    // The tile and both header buckets: C3 adds a cell to column C.
+    assert_eq!(commit.diagnostics().touched_components(), 3);
     assert!(matches!(
         commit
             .package()
-            .table_cell(0usize, 0usize, CellPosition::from_a1("B3")?)?
+            .table_cell(0usize, 0usize, At::from_a1("B3")?)?
             .storage(),
         Storage::Stored(Value::Number(value)) if value.get() == 42.0
     ));
     assert!(matches!(
         commit
             .package()
-            .table_cell(0usize, 0usize, CellPosition::from_a1("C3")?)?
+            .table_cell(0usize, 0usize, At::from_a1("C3")?)?
             .storage(),
         Storage::Stored(Value::Boolean(true))
     ));
@@ -525,6 +533,7 @@ fn native_same_tile_mixed_equal_and_changed_counts_final_delta() -> TestResult {
         &[
             "Index/Tables/Tile.iwa",
             "Index/Tables/HeaderStorageBucket-904855-2.iwa",
+            "Index/Tables/HeaderStorageBucket-904899-2.iwa",
         ],
     )?;
     assert_eq!(
@@ -542,8 +551,8 @@ fn native_same_tile_mixed_equal_and_changed_counts_final_delta() -> TestResult {
 fn native_clear_preserves_stored_empty_as_distinct_from_missing() -> TestResult {
     let package = Package::open(fixture_path())?;
     let source = package.exact_bytes();
-    let b3 = CellPosition::from_a1("B3")?;
-    let g22 = CellPosition::from_a1("G22")?;
+    let b3 = At::from_a1("B3")?;
+    let g22 = At::from_a1("G22")?;
     let commit = package
         .edit_table_cells(0usize, 0usize)?
         .clear(b3)?
@@ -607,7 +616,7 @@ fn native_text_replacement_and_clear_update_exact_string_ownership() -> TestResu
     assert!(matches!(
         changed
             .package()
-            .table_cell(0usize, 0usize, CellPosition::from_a1("B2")?)?
+            .table_cell(0usize, 0usize, At::from_a1("B2")?)?
             .storage(),
         Storage::Stored(Value::Text(value)) if value == replacement
     ));
@@ -639,7 +648,7 @@ fn native_text_replacement_and_clear_update_exact_string_ownership() -> TestResu
     assert!(matches!(
         cleared
             .package()
-            .table_cell(0usize, 0usize, CellPosition::from_a1("B2")?)?
+            .table_cell(0usize, 0usize, At::from_a1("B2")?)?
             .storage(),
         Storage::Stored(Value::Empty)
     ));
@@ -701,7 +710,7 @@ fn native_exact_noop_bypasses_changed_path_and_preserves_source() -> TestResult 
 fn duplicate_bounds_and_addresses_fail_before_publication() -> TestResult {
     let package = Package::open(fixture_path())?;
     let source = package.exact_bytes();
-    let b3 = CellPosition::from_a1("B3")?;
+    let b3 = At::from_a1("B3")?;
     let duplicate = package
         .edit_table_cells(0usize, 0usize)?
         .set(b3, Input::number(43.0)?)?
@@ -710,26 +719,28 @@ fn duplicate_bounds_and_addresses_fail_before_publication() -> TestResult {
         .expect_err("duplicate coordinates must fail");
     assert!(matches!(
         duplicate,
-        Error::DuplicatePosition { position } if position == b3
+        Error::Refused(litchi_numbers::table::cells::Refusal::DuplicatePosition { position }) if position == b3
     ));
 
-    let outside = CellPosition::new(22, 0);
+    let outside = At::new(22, 0);
     let bounds = package
         .edit_table_cells(0usize, 0usize)?
         .set(outside, Input::number(43.0)?)
         .expect_err("out-of-bounds coordinate must fail while staging");
     assert!(matches!(
         bounds,
-        Error::OutOfBounds {
+        Error::Refused(litchi_numbers::table::cells::Refusal::OutOfBounds {
             position,
             dimensions,
-        } if position == outside && dimensions == Dimensions::new(22, 7)
+        }) if position == outside && dimensions == Dimensions::new(22, 7)
     ));
     assert!(matches!(
         package
             .edit_table_cells(0usize, 0usize)?
             .set_a1("private invalid address", Input::boolean(true)),
-        Err(Error::InvalidAddress)
+        Err(Error::Refused(
+            litchi_numbers::table::cells::Refusal::InvalidAddress
+        ))
     ));
     assert_eq!(package.exact_bytes(), source);
     Ok(())
@@ -753,10 +764,12 @@ fn native_header_name_index_allows_noop_and_refuses_change() -> TestResult {
         .expect_err("header-name indexed edits must refuse atomically");
     assert!(matches!(
         error,
-        Error::UnsupportedDependency {
-            path: Path::Table { sheet: 0, table: 0 },
-            kind: DependencyKind::HeaderNameIndex,
-        }
+        Error::Refused(
+            litchi_numbers::table::cells::Refusal::UnsupportedDependency {
+                path: Path::Table { sheet: 0, table: 0 },
+                kind: DependencyKind::HeaderNameIndex,
+            }
+        )
     ));
     assert_eq!(package.exact_bytes(), source);
     Ok(())
@@ -784,9 +797,9 @@ fn locked_table_allows_exact_noop_and_refuses_changed_cell() -> TestResult {
         .expect_err("a locked table must refuse a changed cell batch");
     assert!(matches!(
         error,
-        Error::TableLocked {
+        Error::Refused(litchi_numbers::table::cells::Refusal::TableLocked {
             path: Path::Table { sheet: 0, table: 0 }
-        }
+        })
     ));
     assert_eq!(locked.exact_bytes(), source);
     Ok(())

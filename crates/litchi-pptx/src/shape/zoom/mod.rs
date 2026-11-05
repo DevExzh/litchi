@@ -27,3 +27,5 @@ pub fn read(xml: &[u8]) -> crate::Result<Owner> {
 }
 
 pub(crate) use package::{load, remove, store};
+mod edit;
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};

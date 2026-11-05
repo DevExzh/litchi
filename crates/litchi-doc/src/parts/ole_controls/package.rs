@@ -5,7 +5,7 @@ use super::model::{
     EPRINT_STREAM, Entry, Metadata, OBJ_INFO_STREAM, OBJECT_POOL_STORAGE, OCX_DATA_STREAM,
     ObjectPool, PRINT_STREAM, RgxOcxInfo, StorageName,
 };
-use crate::package::{Error as PackageError, Result};
+use crate::package::{Error as PackageError, Result, SourceLimits};
 use crate::parts::fib::FileInformationBlock;
 use litchi_ole_common::object::{Object, Objects};
 
@@ -16,7 +16,11 @@ pub const FIB_INDEX_PLC_OCX: usize = 85;
 ///
 /// This seam reads only the table-stream range. It does not inspect the
 /// referenced fields or resolve any OLE storage.
-pub fn parse(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<Option<RgxOcxInfo>> {
+pub fn parse(
+    fib: &FileInformationBlock,
+    table_stream: &[u8],
+    limits: &SourceLimits,
+) -> Result<Option<RgxOcxInfo>> {
     let Some((offset, length)) = fib.get_table_pointer(FIB_INDEX_PLC_OCX) else {
         return Ok(None);
     };
@@ -33,7 +37,7 @@ pub fn parse(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<Option<R
     let data = table_stream
         .get(start..end)
         .ok_or_else(|| corrupted("RgxOcxInfo extends beyond the table stream"))?;
-    parse_bytes(data).map(Some)
+    parse_bytes(data, limits).map(Some)
 }
 
 /// Parse inert metadata from selected `ObjectPool` storages.
@@ -83,8 +87,12 @@ pub fn parse_object_metadata(data: &[u8]) -> Result<Metadata> {
 
 impl RgxOcxInfo {
     /// Parse the optional `fcPlcocx`/`lcbPlcocx` table range.
-    pub fn parse(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<Option<Self>> {
-        parse(fib, table_stream)
+    pub fn parse(
+        fib: &FileInformationBlock,
+        table_stream: &[u8],
+        limits: &SourceLimits,
+    ) -> Result<Option<Self>> {
+        parse(fib, table_stream, limits)
     }
 }
 

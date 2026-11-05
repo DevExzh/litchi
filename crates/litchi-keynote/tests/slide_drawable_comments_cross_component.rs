@@ -45,13 +45,13 @@ fn export_candidate(bytes: &[u8], name: &str) -> TestResult<()> {
 }
 
 fn metadata_payload(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == "Index/Metadata.iwa")
         .ok_or_else(|| io::Error::other("missing metadata component"))?;
-    let stream = SnappyStream::decompress(entry.data())?.into_bytes();
-    let archive = Archive::parse(&stream)?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+    let archive = Archive::parse(&stream, Default::default())?;
     archive
         .objects
         .iter()
@@ -62,13 +62,13 @@ fn metadata_payload(source: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn replace_metadata_payload(source: &[u8], metadata: &tsp::PackageMetadata) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == "Index/Metadata.iwa")
         .ok_or_else(|| io::Error::other("missing metadata component"))?;
-    let stream = SnappyStream::decompress(entry.data())?.into_bytes();
-    let mut archive = Archive::parse(&stream)?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+    let mut archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .objects
         .iter_mut()
@@ -85,7 +85,8 @@ fn replace_metadata_payload(source: &[u8], metadata: &tsp::PackageMetadata) -> T
         .find(|message| message.type_ == 11_006)
         .ok_or_else(|| io::Error::other("missing metadata message"))?;
     message.data = metadata.encode_to_vec();
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     let entries = catalog
         .iter()
         .map(|entry| {
@@ -103,14 +104,14 @@ fn replace_metadata_payload(source: &[u8], metadata: &tsp::PackageMetadata) -> T
 }
 
 fn without_reply_payload_uuid(source: &[u8], reply_identifier: u64) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut replacement = None;
     for entry in catalog.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = SnappyStream::decompress(entry.data())?.into_bytes();
-        let mut archive = Archive::parse(&stream)?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+        let mut archive = Archive::parse(&stream, Default::default())?;
         let Some(object) = archive.object_mut(reply_identifier) else {
             continue;
         };
@@ -131,10 +132,11 @@ fn without_reply_payload_uuid(source: &[u8], reply_identifier: u64) -> TestResul
                 type_: 3_056,
                 data: comment.encode_to_vec(),
             },
+            Default::default(),
         )?;
         replacement = Some((
             entry.name().to_owned(),
-            SnappyStream::compress(&archive.to_bytes()?)?,
+            SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?,
         ));
         break;
     }
@@ -323,7 +325,7 @@ fn assert_noop_and_inverse(fixture: &RelocatedFixture) -> TestResult<()> {
         other
             .package()
             .apply_slide_drawable_comment(changed.patch()),
-        Err(litchi_keynote::SlideDrawableCommentError::PatchConflict)
+        Err(litchi_keynote::slide::comment::transaction::Error::PatchConflict)
     ));
     assert_eq!(exact_bytes(other.package())?, other_bytes);
     Ok(())
@@ -528,7 +530,7 @@ fn data_reference_owner_rejects_reply_removal_atomically() -> TestResult<()> {
             .and_then(|edit| edit.commit());
         assert!(matches!(
             result,
-            Err(litchi_keynote::SlideDrawableCommentError::InvalidSource)
+            Err(litchi_keynote::slide::comment::transaction::Error::InvalidSource)
         ));
         assert_eq!(exact_bytes(&package)?, before);
     }

@@ -8,13 +8,10 @@ pub mod codec;
 mod model;
 
 pub use codec::{
-    Limits, canonical_extension, canonical_extension_with_limits, parse_properties,
-    parse_properties_with_limits, rewrite_extension_list, rewrite_extension_list_with_limits,
-    rewrite_id, rewrite_id_with_limits, validate_source_properties,
-    validate_source_properties_with_limits, validate_workbook_root,
-    validate_workbook_root_with_limits, write_properties, write_properties_with_limits,
+    Limits, canonical_extension, parse_properties, rewrite_extension_list, rewrite_id,
+    validate_source_properties, validate_workbook_root, write_properties,
 };
-pub use model::{CustomData, CustomDataView, ExtensionList, Properties, RemovalDisposition, Store};
+pub use model::{CustomData, CustomDataView, ExtensionList, Properties, RemovalDisposition};
 
 /// Custom Data Properties part content type.
 pub const PROPERTIES_CONTENT_TYPE: &str =

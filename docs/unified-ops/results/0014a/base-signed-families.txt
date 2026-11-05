@@ -1,0 +1,92 @@
+REPORT no-op | hello-world-signed.pptx: legacy comments | result=Ok(()) | signed_after=true | exact=true
+REPORT change | hello-world-signed.pptx: legacy comments | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | hello-world-signed.pptx: modern comments | result=Ok(()) | signed_after=true | exact=true
+REPORT change | hello-world-signed.pptx: modern comments | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | hello-world-signed.pptx: notes | result=Ok(()) | signed_after=true | exact=true
+REPORT no-op | hello-world-signed.pptx: slide tags | result=Ok(()) | signed_after=true | exact=true
+REPORT change | hello-world-signed.pptx: slide tags | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | hello-world-signed.pptx: shape tags | result=Ok(()) | signed_after=true | exact=true
+REPORT change | hello-world-signed.pptx: shape tags | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | hello-world-signed.pptx: change tracking | result=Ok(()) | signed_after=true | exact=true
+REPORT change | hello-world-signed.pptx: change tracking | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | hello-world-signed.pptx: shape classification | result=Ok(()) | signed_after=true | exact=true
+REPORT change | hello-world-signed.pptx: shape classification | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | hello-world-signed.pptx: shape design element | result=Ok(()) | signed_after=true | exact=true
+REPORT change | hello-world-signed.pptx: shape design element | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | hello-world-signed.pptx: shape Designer properties | result=Ok(()) | signed_after=true | exact=true
+REPORT change | hello-world-signed.pptx: shape Designer properties | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | hello-world-signed.pptx: zoom and model3d owners | result=Ok(()) | signed_after=true | exact=true
+REPORT no-op | hello-world-signed.pptx: themes | result=Ok(()) | signed_after=true | exact=true
+REPORT change | hello-world-signed.pptx: themes | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | hello-world-signed.pptx: math properties | result=Ok(()) | signed_after=true | exact=true
+REPORT change | hello-world-signed.pptx: math properties | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | hello-world-signed.pptx: presentation structure (sections) | result=Ok(()) | signed_after=true | exact=true
+REPORT change | hello-world-signed.pptx: presentation structure (sections) | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | hello-world-signed.pptx: custom shows | result=Ok(()) | signed_after=true | exact=true
+REPORT change | hello-world-signed.pptx: custom shows | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | hello-world-signed.pptx: slide-show events | result=Ok(()) | signed_after=true | exact=true
+REPORT change | hello-world-signed.pptx: slide-show events | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | hello-world-signed.pptx: extended guides | result=Ok(()) | signed_after=true | exact=true
+REPORT no-op | hello-world-signed.pptx: slide Designer tags | result=Ok(()) | signed_after=true | exact=true
+REPORT change | hello-world-signed.pptx: slide Designer tags | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | hello-world-signed.pptx: Changes Information | result=Ok(()) | signed_after=true | exact=true
+REPORT change | hello-world-signed.pptx: Changes Information | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | hello-world-signed.pptx: embedded OLE objects | result=Ok(()) | signed_after=true | exact=true
+REPORT change | hello-world-signed.pptx: embedded OLE objects | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | hello-world-signed.pptx: embedded fonts | result=Ok(()) | signed_after=true | exact=true
+REPORT change | hello-world-signed.pptx: embedded fonts | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | hello-world-signed.pptx: table styles | result=Ok(()) | signed_after=true | exact=true
+REPORT change | hello-world-signed.pptx: table styles | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | hello-world-signed.pptx: slide masters, layouts and placeholders | result=Ok(()) | signed_after=true | exact=true
+REPORT change | hello-world-signed.pptx: slide masters, layouts and placeholders | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT change | hello-world-signed.pptx: charts | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | hello-world-signed.pptx: Package::edit_opc | result=Ok(()) | signed_after=true | exact=true
+REPORT change | hello-world-signed.pptx: Package::edit_opc | result=Err(Opc(SignedSourceRequiresExplicitPolicy)) | signed_after=true | to_bytes=source
+REPORT no-op | hello-world-signed.pptx: opened-presentation transaction | result=Ok(()) | signed_after=true | exact=true
+REPORT change | hello-world-signed.pptx: opened-presentation transaction | result=Err(Opc(SignedSourceRequiresExplicitPolicy)) | signed_after=true | to_bytes=source
+REPORT no-op | ms-office-2010-signed.pptx: legacy comments | result=Ok(()) | signed_after=true | exact=true
+REPORT change | ms-office-2010-signed.pptx: legacy comments | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | ms-office-2010-signed.pptx: modern comments | result=Ok(()) | signed_after=true | exact=true
+REPORT change | ms-office-2010-signed.pptx: modern comments | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | ms-office-2010-signed.pptx: notes | result=Ok(()) | signed_after=true | exact=true
+REPORT no-op | ms-office-2010-signed.pptx: slide tags | result=Ok(()) | signed_after=true | exact=true
+REPORT change | ms-office-2010-signed.pptx: slide tags | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | ms-office-2010-signed.pptx: shape tags | result=Ok(()) | signed_after=true | exact=true
+REPORT change | ms-office-2010-signed.pptx: shape tags | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | ms-office-2010-signed.pptx: change tracking | result=Ok(()) | signed_after=true | exact=true
+REPORT change | ms-office-2010-signed.pptx: change tracking | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | ms-office-2010-signed.pptx: shape classification | result=Ok(()) | signed_after=true | exact=true
+REPORT change | ms-office-2010-signed.pptx: shape classification | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | ms-office-2010-signed.pptx: shape design element | result=Ok(()) | signed_after=true | exact=true
+REPORT change | ms-office-2010-signed.pptx: shape design element | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | ms-office-2010-signed.pptx: shape Designer properties | result=Ok(()) | signed_after=true | exact=true
+REPORT change | ms-office-2010-signed.pptx: shape Designer properties | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | ms-office-2010-signed.pptx: zoom and model3d owners | result=Ok(()) | signed_after=true | exact=true
+REPORT no-op | ms-office-2010-signed.pptx: themes | result=Ok(()) | signed_after=true | exact=true
+REPORT change | ms-office-2010-signed.pptx: themes | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | ms-office-2010-signed.pptx: math properties | result=Ok(()) | signed_after=true | exact=true
+REPORT change | ms-office-2010-signed.pptx: math properties | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | ms-office-2010-signed.pptx: presentation structure (sections) | result=Ok(()) | signed_after=true | exact=true
+REPORT change | ms-office-2010-signed.pptx: presentation structure (sections) | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | ms-office-2010-signed.pptx: custom shows | result=Ok(()) | signed_after=true | exact=true
+REPORT change | ms-office-2010-signed.pptx: custom shows | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | ms-office-2010-signed.pptx: slide-show events | result=Ok(()) | signed_after=true | exact=true
+REPORT change | ms-office-2010-signed.pptx: slide-show events | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | ms-office-2010-signed.pptx: extended guides | result=Ok(()) | signed_after=true | exact=true
+REPORT no-op | ms-office-2010-signed.pptx: slide Designer tags | result=Ok(()) | signed_after=true | exact=true
+REPORT change | ms-office-2010-signed.pptx: slide Designer tags | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | ms-office-2010-signed.pptx: Changes Information | result=Ok(()) | signed_after=true | exact=true
+REPORT change | ms-office-2010-signed.pptx: Changes Information | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | ms-office-2010-signed.pptx: embedded OLE objects | result=Ok(()) | signed_after=true | exact=true
+REPORT change | ms-office-2010-signed.pptx: embedded OLE objects | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | ms-office-2010-signed.pptx: embedded fonts | result=Ok(()) | signed_after=true | exact=true
+REPORT change | ms-office-2010-signed.pptx: embedded fonts | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | ms-office-2010-signed.pptx: table styles | result=Ok(()) | signed_after=true | exact=true
+REPORT change | ms-office-2010-signed.pptx: table styles | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | ms-office-2010-signed.pptx: slide masters, layouts and placeholders | result=Ok(()) | signed_after=true | exact=true
+REPORT change | ms-office-2010-signed.pptx: slide masters, layouts and placeholders | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT change | ms-office-2010-signed.pptx: charts | result=Ok(()) | signed_after=false | to_bytes=changed(signature=false)
+REPORT no-op | ms-office-2010-signed.pptx: Package::edit_opc | result=Ok(()) | signed_after=true | exact=true
+REPORT change | ms-office-2010-signed.pptx: Package::edit_opc | result=Err(Opc(SignedSourceRequiresExplicitPolicy)) | signed_after=true | to_bytes=source
+REPORT no-op | ms-office-2010-signed.pptx: opened-presentation transaction | result=Ok(()) | signed_after=true | exact=true
+REPORT change | ms-office-2010-signed.pptx: opened-presentation transaction | result=Err(Opc(SignedSourceRequiresExplicitPolicy)) | signed_after=true | to_bytes=source

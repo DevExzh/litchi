@@ -10,7 +10,8 @@ use super::model::{
     SlideCreationEntry, SlideListTable10, Unknown,
 };
 use super::validation::{
-    MAX_REVIEWER_NAME_BYTES, corrupted, validate_atom, validate_count, validate_reviewer_name,
+    MAX_REVIEWER_NAME_BYTES, MAX_SLIDE_LIST_ENTRIES, corrupted, validate_atom, validate_count,
+    validate_reviewer_name,
 };
 
 pub(super) const RECORD_HEADER_SIZE: usize = 8;
@@ -147,17 +148,17 @@ impl DiffNode {
 }
 
 impl DiffTree10 {
-    /// Parse a strict `DiffTree10Container` record under the default limits.
+    /// Parse a strict `DiffTree10Container` record under `limits`.
     ///
     /// # Errors
     ///
     /// Returns an error if the container header, reviewer-name atom, or any
     /// nested `Diff10` record is malformed or truncated.
-    pub fn parse(record: &Record) -> Result<Self> {
+    pub fn parse(record: &Record, limits: &Limits) -> Result<Self> {
         Self::parse_with_limits(
             record,
             POWERPOINT_DIFF_MAX_DEPTH,
-            POWERPOINT_DIFF_MAX_RECORDS,
+            limits.max_records.min(limits.max_review_records),
         )
     }
 
@@ -170,7 +171,7 @@ impl DiffTree10 {
     /// Returns an error if `max_records` is zero, or if the container header,
     /// reviewer-name atom, or any nested `Diff10` record is malformed or
     /// truncated.
-    pub fn parse_with_limits(
+    pub(crate) fn parse_with_limits(
         record: &Record,
         max_depth: usize,
         max_records: usize,
@@ -330,13 +331,19 @@ impl SlideListTable10 {
     /// # Panics
     ///
     /// Panics if internal invariants are violated.
-    pub fn parse(record: &Record) -> Result<Self> {
+    pub fn parse(record: &Record, limits: &Limits) -> Result<Self> {
+        let limits = limits.validate()?;
         if record.record_type != RecordType::SlideListTable10
             || record.version != 0x0f
             || record.instance != 0
             || usize::try_from(record.data_length).ok() != Some(record.data.len())
         {
             return corrupted("SlideListTable10Container has an invalid record header");
+        }
+        if record.data.len().saturating_add(RECORD_HEADER_SIZE) > limits.max_bytes {
+            return Err(Error::InvalidFormat(
+                "slide-list table exceeds the document-comparison byte limit".into(),
+            ));
         }
         let data = record.data.as_slice();
         if data.len() < SIZE_ATOM_RECORD_SIZE {
@@ -356,7 +363,9 @@ impl SlideListTable10 {
         ]);
         let count = usize::try_from(signed_count)
             .map_err(|_err| Error::Corrupted("negative slide-list table count".to_string()))?;
-        validate_count(count)?;
+        if count > limits.max_review_records.min(MAX_SLIDE_LIST_ENTRIES) {
+            return corrupted("slide-list table count exceeds its configured limit");
+        }
         let expected = count
             .checked_mul(ENTRY_RECORD_SIZE)
             .and_then(|size| size.checked_add(SIZE_ATOM_RECORD_SIZE))
@@ -489,9 +498,12 @@ fn parse_payload(data: &[u8], limits: Limits) -> Result<Review> {
                     return corrupted("review payload contains duplicate slide-list tables");
                 }
                 seen_slide_list = true;
-                (Entry::SlideList(SlideListTable10::parse(&record)?), 1)
+                (
+                    Entry::SlideList(SlideListTable10::parse(&record, &limits)?),
+                    1,
+                )
             },
-            RecordType::DiffTree10 => (Entry::Diff(DiffTree10::parse(&record)?), 2),
+            RecordType::DiffTree10 => (Entry::Diff(DiffTree10::parse(&record, &limits)?), 2),
             _ => (
                 Entry::Unknown(Unknown::new(
                     record.record_type_raw,
@@ -584,7 +596,7 @@ pub(crate) fn encode_document(root: &Record) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
-fn find_pp10_blob(root: &Record) -> Result<Option<Vec<usize>>> {
+pub(super) fn find_pp10_blob(root: &Record) -> Result<Option<Vec<usize>>> {
     if root.record_type != RecordType::Document {
         return corrupted("document-comparison owner requires a DocumentContainer root");
     }
@@ -635,7 +647,7 @@ fn find_pp10_blob(root: &Record) -> Result<Option<Vec<usize>>> {
     Ok(match_path)
 }
 
-fn is_pp10_tag(record: &Record) -> Result<bool> {
+pub(super) fn is_pp10_tag(record: &Record) -> Result<bool> {
     let Some(name) = record
         .children
         .iter()

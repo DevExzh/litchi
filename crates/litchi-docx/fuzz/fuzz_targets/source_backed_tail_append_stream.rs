@@ -15,14 +15,29 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use libfuzzer_sys::fuzz_target;
-use litchi_docx::ReadLimits;
+use litchi_docx::SourceLimits;
 use litchi_docx::source_backed::{
-    Package, TailAppendLimits, TailAppendStreamCursor, TailAppendStreamEvent,
-    TailAppendStreamLimits, TailAppendStreamSource,
+    Package,
+    paragraph_stream::{self, Commit as ParagraphStreamCommit},
+    tail_append::Limits as TailAppendLimits,
+    tail_append_stream::{
+        ParagraphCursor as TailAppendStreamCursor, ParagraphStreamLimits as TailAppendStreamLimits,
+        ParagraphStreamPlan, PlainParagraphEvent as TailAppendStreamEvent,
+        ReplayableParagraphSource as TailAppendStreamSource,
+    },
 };
 
 const MAX_INPUT_BYTES: usize = 64 * 1024;
 const ZIP_LOCAL_HEADER: &[u8] = b"PK\x03\x04";
+
+fn publish<'package, W: Write>(
+    plan: ParagraphStreamPlan<'package>,
+    output: W,
+) -> Result<ParagraphStreamCommit, paragraph_stream::Error> {
+    let commit = plan.commit()?;
+    commit.package().write_to(output)?;
+    Ok(commit)
+}
 
 #[derive(Clone, Debug)]
 enum Event {
@@ -140,21 +155,21 @@ impl Write for PrefixFailSink {
     }
 }
 
-fn read_limits() -> ReadLimits {
-    ReadLimits::builder()
+fn read_limits() -> SourceLimits {
+    SourceLimits::builder()
         // The fuzz input is capped at 64 KiB, while a successful candidate
         // archive also contains the generated stream and ZIP directory.
         .max_input_bytes(128 * 1024)
         .unwrap()
-        .max_archive_members(32)
+        .max_members(32)
         .unwrap()
         .max_relationship_parts(32)
         .unwrap()
         .max_parts(32)
         .unwrap()
-        .max_archive_entry_bytes(64 * 1024)
+        .max_entry_bytes(64 * 1024)
         .unwrap()
-        .max_archive_total_bytes(128 * 1024)
+        .max_aggregate_bytes(128 * 1024)
         .unwrap()
         .max_archive_compressed_bytes(128 * 1024)
         .unwrap()
@@ -170,7 +185,7 @@ fn read_limits() -> ReadLimits {
         .unwrap()
         .max_total_relationship_xml_bytes(64 * 1024)
         .unwrap()
-        .max_xml_events(32 * 1024)
+        .max_events(32 * 1024)
         .unwrap()
         .build()
         .unwrap()
@@ -296,7 +311,10 @@ fn recipe_events(recipe: &[u8]) -> (Vec<Event>, Option<Vec<Event>>, bool) {
 }
 
 fn exercise(archive: &[u8], recipe: &[u8]) -> bool {
-    let Ok(package) = Package::from_reader_with_limits(Cursor::new(archive), read_limits()) else {
+    let Ok(package) = Package::from_reader_with_options(
+        Cursor::new(archive),
+        litchi_docx::OpenOptions::default().source_limits(read_limits()),
+    ) else {
         return false;
     };
     let (events, alternate, expected_success) = recipe_events(recipe);
@@ -323,15 +341,18 @@ fn exercise(archive: &[u8], recipe: &[u8]) -> bool {
         .expect("bounded authored paragraph count fits usize");
 
     let mut output = Vec::new();
-    let Ok(publication) = plan.write_to_stream(&mut output) else {
+    let Ok(publication) = publish(plan, &mut output) else {
         return false;
     };
     assert!(
         !output.is_empty(),
         "successful publication produced no archive"
     );
-    let current = Package::from_reader_with_limits(Cursor::new(&output), read_limits())
-        .expect("successful publication must reopen");
+    let current = Package::from_reader_with_options(
+        Cursor::new(&output),
+        litchi_docx::OpenOptions::default().source_limits(read_limits()),
+    )
+    .expect("successful publication must reopen");
     let after_count = current
         .document_snapshot()
         .expect("published candidate must have a semantic document snapshot")
@@ -339,16 +360,22 @@ fn exercise(archive: &[u8], recipe: &[u8]) -> bool {
     assert_eq!(after_count, before_count + authored_count);
 
     let mut restored = Vec::new();
-    publication
-        .write_inverse_to_stream(&current, &mut restored)
-        .expect("immediate inverse must authorize the current candidate");
+    current
+        .apply_paragraph_stream(&publication.patch().inverse())
+        .expect("immediate inverse must authorize the current candidate")
+        .package()
+        .write_to(&mut restored)
+        .expect("immediate inverse must publish");
     assert_eq!(
         restored, archive,
         "immediate inverse must restore exact bytes"
     );
 
-    let partial_package = Package::from_reader_with_limits(Cursor::new(archive), read_limits())
-        .expect("the source package was accepted");
+    let partial_package = Package::from_reader_with_options(
+        Cursor::new(archive),
+        litchi_docx::OpenOptions::default().source_limits(read_limits()),
+    )
+    .expect("the source package was accepted");
     let Ok(partial_plan) = partial_package
         .tail_append_plain_paragraphs(EventSource::stable(valid_events(recipe)), limits)
         .prepare()
@@ -356,7 +383,7 @@ fn exercise(archive: &[u8], recipe: &[u8]) -> bool {
         return false;
     };
     let mut sink = PrefixFailSink::after(48);
-    let result = partial_plan.write_to_stream(&mut sink);
+    let result = publish(partial_plan, &mut sink);
     assert!(
         result.is_err(),
         "short sink unexpectedly accepted full archive"

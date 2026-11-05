@@ -7,7 +7,7 @@
 /// Exact-source transactions for one rooted table's header and footer settings.
 pub mod transaction {
     pub use crate::package::table_headers::{
-        Commit, Diagnostics, Edit, Error, InvalidReason, LimitKind, Patch, Path,
+        Commit, Diagnostics, Edit, Error, InvalidReason, LimitKind, Patch, Path, Refusal,
     };
 }
 

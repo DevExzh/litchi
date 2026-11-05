@@ -4,7 +4,7 @@ use crate::error::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::constants::content_type as ct;
-use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, SourceLimits};
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -27,6 +27,47 @@ const MAX_TOTAL_EXTENSION_BYTES: usize = 8 * 1024 * 1024;
 const MAX_EXTENSION_ATTRIBUTES: usize = 128;
 const MAX_EXTENSION_ATTRIBUTE_BYTES: usize = 64 * 1024;
 const MAX_RELATIONSHIP_ID_BYTES: usize = 4096;
+
+struct BoundedXml {
+    bytes: Vec<u8>,
+    limit: usize,
+}
+
+impl BoundedXml {
+    fn new(limit: usize) -> Self {
+        Self {
+            bytes: Vec::new(),
+            limit: limit.min(MAX_PART_BYTES),
+        }
+    }
+
+    fn append(&mut self, bytes: &[u8]) -> Result<()> {
+        let length = self
+            .bytes
+            .len()
+            .checked_add(bytes.len())
+            .ok_or_else(|| limit("serialized part bytes"))?;
+        if length > self.limit {
+            return Err(limit("serialized part bytes"));
+        }
+        self.bytes
+            .try_reserve_exact(bytes.len())
+            .map_err(|source| Error::Allocation {
+                resource: "Slicers XML output",
+                source,
+            })?;
+        self.bytes.extend_from_slice(bytes);
+        Ok(())
+    }
+
+    fn push(&mut self, byte: u8) -> Result<()> {
+        self.append(&[byte])
+    }
+
+    fn finish(self) -> Vec<u8> {
+        self.bytes
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct XmlAttribute {
@@ -294,62 +335,68 @@ pub fn parse_slicers(xml: &[u8]) -> Result<Slicers> {
     Ok(value)
 }
 
+pub(crate) fn parse_slicers_limited(xml: &[u8], limits: &SourceLimits) -> Result<Slicers> {
+    crate::raw::check_xml_limits(xml, limits)?;
+    parse_slicers(xml)
+}
+
 /// Deterministically serializes one MS-XLSX Slicers part.
 pub fn write_slicers(value: &Slicers) -> Result<Vec<u8>> {
+    write_slicers_limited(value, MAX_PART_BYTES)
+}
+
+pub(crate) fn write_slicers_limited(value: &Slicers, maximum: usize) -> Result<Vec<u8>> {
     validate_slicers(value)?;
-    let mut output = Vec::new();
-    output.extend_from_slice(b"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>");
-    output.extend_from_slice(b"<x14:slicers xmlns:x14=\"");
-    escape(&mut output, SLICERS_NS);
-    output.push(b'\"');
+    let mut output = BoundedXml::new(maximum);
+    output.append(b"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>")?;
+    output.append(b"<x14:slicers xmlns:x14=\"")?;
+    escape(&mut output, SLICERS_NS)?;
+    output.push(b'\"')?;
     write_extension_attributes(&mut output, &value.xml_attributes, true)?;
-    output.push(b'>');
+    output.push(b'>')?;
     for slicer in &value.slicers {
-        output.extend_from_slice(b"<x14:slicer name=\"");
-        escape(&mut output, &slicer.name);
-        output.extend_from_slice(b"\" cache=\"");
-        escape(&mut output, &slicer.cache);
-        output.push(b'\"');
+        output.append(b"<x14:slicer name=\"")?;
+        escape(&mut output, &slicer.name)?;
+        output.append(b"\" cache=\"")?;
+        escape(&mut output, &slicer.cache)?;
+        output.push(b'\"')?;
         if let Some(caption) = &slicer.caption {
-            output.extend_from_slice(b" caption=\"");
-            escape(&mut output, caption);
-            output.push(b'\"');
+            output.append(b" caption=\"")?;
+            escape(&mut output, caption)?;
+            output.push(b'\"')?;
         }
         if slicer.start_item != 0 {
-            attr_u32(&mut output, "startItem", slicer.start_item);
+            attr_u32(&mut output, "startItem", slicer.start_item)?;
         }
         if slicer.column_count != 1 {
-            attr_u32(&mut output, "columnCount", slicer.column_count);
+            attr_u32(&mut output, "columnCount", slicer.column_count)?;
         }
         if !slicer.show_caption {
-            output.extend_from_slice(b" showCaption=\"false\"");
+            output.append(b" showCaption=\"false\"")?;
         }
         if slicer.level != 0 {
-            attr_u32(&mut output, "level", slicer.level);
+            attr_u32(&mut output, "level", slicer.level)?;
         }
         if let Some(style) = &slicer.style {
-            output.extend_from_slice(b" style=\"");
-            escape(&mut output, style);
-            output.push(b'\"');
+            output.append(b" style=\"")?;
+            escape(&mut output, style)?;
+            output.push(b'\"')?;
         }
         if slicer.locked_position {
-            output.extend_from_slice(b" lockedPosition=\"true\"");
+            output.append(b" lockedPosition=\"true\"")?;
         }
-        attr_u32(&mut output, "rowHeight", slicer.row_height);
+        attr_u32(&mut output, "rowHeight", slicer.row_height)?;
         write_extension_attributes(&mut output, &slicer.xml_attributes, false)?;
         if let Some(extension) = &slicer.extension_list {
-            output.push(b'>');
-            output.extend_from_slice(extension.xml());
-            output.extend_from_slice(b"</x14:slicer>");
+            output.push(b'>')?;
+            output.append(extension.xml())?;
+            output.append(b"</x14:slicer>")?;
         } else {
-            output.extend_from_slice(b"/>");
+            output.append(b"/>")?;
         }
     }
-    output.extend_from_slice(b"</x14:slicers>");
-    if output.len() > MAX_PART_BYTES {
-        return Err(limit("serialized part bytes"));
-    }
-    Ok(output)
+    output.append(b"</x14:slicers>")?;
+    Ok(output.finish())
 }
 
 /// Resolves every Slicers relationship owned by `worksheet_name`, after
@@ -357,6 +404,15 @@ pub fn write_slicers(value: &Slicers) -> Result<Vec<u8>> {
 pub fn load_slicer_parts(
     package: &OpcPackage,
     worksheet_name: &PackURI,
+) -> Result<Vec<SlicerPart>> {
+    let limits = package.read_limits();
+    load_slicer_parts_limited(package, worksheet_name, &limits)
+}
+
+pub(crate) fn load_slicer_parts_limited(
+    package: &OpcPackage,
+    worksheet_name: &PackURI,
+    limits: &SourceLimits,
 ) -> Result<Vec<SlicerPart>> {
     validate_package_graph(package)?;
     let worksheet = package.get_part(worksheet_name)?;
@@ -376,23 +432,42 @@ pub fn load_slicer_parts(
         output.push(SlicerPart {
             relationship_id: relationship.r_id().to_owned(),
             part_name: target.to_string(),
-            slicers: parse_slicers(part.blob())?,
+            slicers: parse_slicers_limited(part.blob(), limits)?,
         });
     }
     Ok(output)
 }
 
 /// Adds one leaf Slicers part and its explicit worksheet relationship.
-pub fn store_slicer_part(
+///
+/// Adding a part changes the package, so a signed package is refused up front
+/// with [`crate::Error::Signed`] (it used to be changed in memory and refused
+/// only when saved): remove the signature explicitly first
+/// ([`OpcPackage::unsign`]).
+pub(crate) fn store_slicer_part(
     package: &mut OpcPackage,
     worksheet_name: &PackURI,
     value: &SlicerPart,
 ) -> Result<()> {
+    let limits = package.read_limits();
+    store_slicer_part_limited(package, worksheet_name, value, &limits)
+}
+
+fn preflight_slicer_part_insertion(
+    package: &OpcPackage,
+    worksheet_name: &PackURI,
+    value: &SlicerPart,
+    limits: &SourceLimits,
+) -> Result<()> {
     validate_package_graph(package)?;
-    validate_relationship_id(&value.relationship_id)?;
-    let xml = write_slicers(&value.slicers)?;
-    let part_name = PackURI::new(&value.part_name)
-        .map_err(|error| invalid(format!("invalid Slicers part URI: {error}")))?;
+    validate_slicers(&value.slicers)?;
+    crate::raw::check_new_part_count(package, 1, limits)?;
+    let part_uri = crate::slicer::raw::validate_part_identity_fields(
+        &value.relationship_id,
+        &value.part_name,
+        worksheet_name.base_uri(),
+        limits,
+    )?;
     let worksheet = package.get_part(worksheet_name)?;
     require_worksheet(worksheet.partname(), worksheet.content_type())?;
     let count = worksheet
@@ -409,19 +484,116 @@ pub fn store_slicer_part(
             value.relationship_id
         )));
     }
-    if package
-        .iter_parts()
-        .any(|part| part.partname() == &part_name)
-    {
+    crate::raw::check_new_relationship_identity(
+        package,
+        worksheet_name,
+        &value.relationship_id,
+        &part_uri,
+    )?;
+    Ok(())
+}
+
+pub(crate) fn store_slicer_part_limited(
+    package: &mut OpcPackage,
+    worksheet_name: &PackURI,
+    value: &SlicerPart,
+    limits: &SourceLimits,
+) -> Result<()> {
+    preflight_slicer_part_insertion(package, worksheet_name, value, limits)?;
+    let part_name = crate::slicer::raw::validate_part_identity_fields(
+        &value.relationship_id,
+        &value.part_name,
+        worksheet_name.base_uri(),
+        limits,
+    )?;
+    let additions = [(
+        value.relationship_id.clone(),
+        SLICERS_RELATIONSHIP_TYPE.to_owned(),
+        part_name.relative_ref(worksheet_name.base_uri()),
+    )];
+    let budget = crate::raw::prepare_package_budget(package, worksheet_name, &additions, limits)?;
+    let prepared = crate::slicer::raw::prepare_part(
+        crate::slicer::raw::Part {
+            relationship_id: value.relationship_id.clone(),
+            part_name: value.part_name.clone(),
+            slicers: value.slicers.clone(),
+        },
+        worksheet_name.base_uri(),
+        limits,
+    )?;
+    store_slicer_part_prepared_limited_with_budget(
+        package,
+        worksheet_name,
+        &prepared,
+        limits,
+        &budget,
+    )
+}
+
+pub(crate) fn store_slicer_part_prepared_limited(
+    package: &mut OpcPackage,
+    worksheet_name: &PackURI,
+    prepared: &crate::slicer::raw::PreparedPart,
+    limits: &SourceLimits,
+) -> Result<()> {
+    let value = &prepared.value;
+    let part_name = prepared.uri.clone();
+    let additions = [(
+        value.relationship_id.clone(),
+        SLICERS_RELATIONSHIP_TYPE.to_owned(),
+        part_name.relative_ref(worksheet_name.base_uri()),
+    )];
+    let budget = crate::raw::prepare_package_budget(package, worksheet_name, &additions, limits)?;
+    store_slicer_part_prepared_limited_with_budget(
+        package,
+        worksheet_name,
+        prepared,
+        limits,
+        &budget,
+    )
+}
+
+pub(crate) fn store_slicer_part_prepared_limited_with_budget(
+    package: &mut OpcPackage,
+    worksheet_name: &PackURI,
+    prepared: &crate::slicer::raw::PreparedPart,
+    limits: &SourceLimits,
+    budget: &crate::raw::PackageBudget,
+) -> Result<()> {
+    let value = &prepared.value;
+    validate_package_graph(package)?;
+    load_slicer_parts_limited(package, worksheet_name, limits)?;
+    validate_relationship_id(&value.relationship_id)?;
+    let xml = &prepared.xml;
+    let part_name = prepared.uri.clone();
+    let worksheet = package.get_part(worksheet_name)?;
+    require_worksheet(worksheet.partname(), worksheet.content_type())?;
+    let count = worksheet
+        .rels()
+        .iter()
+        .filter(|relationship| relationship.reltype() == SLICERS_RELATIONSHIP_TYPE)
+        .count();
+    if count >= MAX_SLICER_PARTS_PER_WORKSHEET {
+        return Err(limit("parts per worksheet"));
+    }
+    if worksheet.rels().get(&value.relationship_id).is_some() {
+        return Err(invalid(format!(
+            "worksheet relationship ID '{}' already exists",
+            value.relationship_id
+        )));
+    }
+    if package.get_part(&part_name).is_ok() {
         return Err(invalid(format!(
             "Slicers part '{part_name}' already exists"
         )));
     }
+    crate::raw::check_part_budget_with_ledger(package, budget, 1, xml.len(), &[], limits)?;
     let target = part_name.relative_ref(worksheet_name.base_uri());
+    crate::signature_policy::ensure_unsigned(package)?;
     package.try_add_part(Box::new(BlobPart::new(
         part_name,
         SLICERS_CONTENT_TYPE.into(),
-        xml,
+        xml.clone(),
     )))?;
     package
         .get_part_mut(worksheet_name)?
@@ -432,6 +604,7 @@ pub fn store_slicer_part(
             value.relationship_id.clone(),
             false,
         );
+    package.source_content_types(*limits)?;
     Ok(())
 }
 
@@ -803,7 +976,7 @@ fn parse_bool(value: &str, name: &str) -> Result<bool> {
 }
 
 fn write_extension_attributes(
-    output: &mut Vec<u8>,
+    output: &mut BoundedXml,
     attributes: &[XmlAttribute],
     root: bool,
 ) -> Result<()> {
@@ -815,21 +988,22 @@ fn write_extension_attributes(
         if !root && attribute.qualified_name == "xmlns:x14" {
             continue;
         }
-        output.push(b' ');
-        output.extend_from_slice(attribute.qualified_name.as_bytes());
-        output.extend_from_slice(b"=\"");
-        escape(output, &attribute.value);
-        output.push(b'\"');
+        output.push(b' ')?;
+        output.append(attribute.qualified_name.as_bytes())?;
+        output.append(b"=\"")?;
+        escape(output, &attribute.value)?;
+        output.push(b'\"')?;
     }
     Ok(())
 }
 
-fn attr_u32(output: &mut Vec<u8>, name: &str, value: u32) {
-    output.push(b' ');
-    output.extend_from_slice(name.as_bytes());
-    output.extend_from_slice(b"=\"");
-    output.extend_from_slice(value.to_string().as_bytes());
-    output.push(b'\"');
+fn attr_u32(output: &mut BoundedXml, name: &str, value: u32) -> Result<()> {
+    output.push(b' ')?;
+    output.append(name.as_bytes())?;
+    output.append(b"=\"")?;
+    output.append(value.to_string().as_bytes())?;
+    output.push(b'\"')?;
+    Ok(())
 }
 
 fn require_worksheet(partname: &PackURI, content_type: &str) -> Result<()> {
@@ -869,21 +1043,22 @@ fn is_xml_character(character: char) -> bool {
     matches!(character as u32, 0x9 | 0xA | 0xD | 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x0010_FFFF)
 }
 
-fn escape(output: &mut Vec<u8>, value: &str) {
+fn escape(output: &mut BoundedXml, value: &str) -> Result<()> {
     for character in value.chars() {
         match character {
-            '&' => output.extend_from_slice(b"&amp;"),
-            '<' => output.extend_from_slice(b"&lt;"),
-            '"' => output.extend_from_slice(b"&quot;"),
-            '\t' => output.extend_from_slice(b"&#x9;"),
-            '\n' => output.extend_from_slice(b"&#xA;"),
-            '\r' => output.extend_from_slice(b"&#xD;"),
+            '&' => output.append(b"&amp;")?,
+            '<' => output.append(b"&lt;")?,
+            '"' => output.append(b"&quot;")?,
+            '\t' => output.append(b"&#x9;")?,
+            '\n' => output.append(b"&#xA;")?,
+            '\r' => output.append(b"&#xD;")?,
             _ => {
                 let mut bytes = [0; 4];
-                output.extend_from_slice(character.encode_utf8(&mut bytes).as_bytes());
+                output.append(character.encode_utf8(&mut bytes).as_bytes())?;
             },
         }
     }
+    Ok(())
 }
 
 fn xml_error(error: impl std::fmt::Display) -> Error {

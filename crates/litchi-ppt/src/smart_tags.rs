@@ -2,6 +2,7 @@
 
 use super::package::{Error, Result};
 use super::records::Record;
+use crate::SourceLimits;
 use crate::consts::RecordType;
 use litchi_codepage::Ansi;
 use litchi_ole_common::smart_tags::{Limits, PropertyBagStore};
@@ -47,8 +48,8 @@ impl SmartTagStore {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(root: &Record) -> Result<Option<Self>> {
-        Self::parse_with(root, Ansi::WINDOWS_1252)
+    pub fn parse(root: &Record, limits: &SourceLimits) -> Result<Option<Self>> {
+        Self::parse_with(root, Ansi::WINDOWS_1252, limits)
     }
 
     /// Parse with an explicitly validated ANSI page.
@@ -56,9 +57,13 @@ impl SmartTagStore {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_with(root: &Record, ansi: Ansi) -> Result<Option<Self>> {
+    pub fn parse_with(
+        root: &Record,
+        ansi: Ansi,
+        source_limits: &SourceLimits,
+    ) -> Result<Option<Self>> {
         let mut store = None;
-        for record in root.versioned_binary_tag_records(11)? {
+        for record in root.versioned_binary_tag_records(11, source_limits)? {
             if record.record_type != RecordType::SmartTagStore11 {
                 continue;
             }
@@ -67,7 +72,7 @@ impl SmartTagStore {
                     "Record tree contains multiple PowerPoint 11 smart-tag stores".to_string(),
                 ));
             }
-            store = Some(parse_store(&record, ansi)?);
+            store = Some(parse_store(&record, ansi, source_limits)?);
         }
         Ok(store)
     }
@@ -77,9 +82,13 @@ impl SmartTagStore {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_page(root: &Record, page: u32) -> Result<Option<Self>> {
+    pub fn parse_page(
+        root: &Record,
+        page: u32,
+        source_limits: &SourceLimits,
+    ) -> Result<Option<Self>> {
         let ansi = Ansi::require(page).map_err(|error| Error::Corrupted(error.to_string()))?;
-        Self::parse_with(root, ansi)
+        Self::parse_with(root, ansi, source_limits)
     }
 
     /// Resolve a zero-based smart-tag index from a text run.
@@ -95,7 +104,7 @@ impl SmartTagStore {
     }
 }
 
-fn parse_store(record: &Record, ansi: Ansi) -> Result<SmartTagStore> {
+fn parse_store(record: &Record, ansi: Ansi, source_limits: &SourceLimits) -> Result<SmartTagStore> {
     if record.record_type != RecordType::SmartTagStore11
         || record.version != 0x0f
         || record.instance != 0
@@ -115,7 +124,13 @@ fn parse_store(record: &Record, ansi: Ansi) -> Result<SmartTagStore> {
         bag_count_bytes[3],
     ]))
     .map_err(|_err| Error::Corrupted("smart-tag bag count overflows usize".to_string()))?;
-    let limits = Limits::default();
+    let limits = Limits {
+        max_types: source_limits.max_events(),
+        max_strings: source_limits.max_events(),
+        max_bags: source_limits.max_events(),
+        max_properties: source_limits.max_events(),
+        max_bytes: source_limits.max_aggregate_input_bytes,
+    };
     let (shared, consumed) = PropertyBagStore::parse_prefix(&data[4..], ansi, limits)
         .map_err(|error| Error::Corrupted(error.to_string()))?;
     let bags_start = 4usize
@@ -270,7 +285,9 @@ mod tests {
     #[test]
     fn parses_and_resolves_powerpoint11_smart_tags() {
         let record = smart_tag_record(&store_payload(2, 0, 0));
-        let store = SmartTagStore::parse(&root(11, &record)).unwrap().unwrap();
+        let store = SmartTagStore::parse(&root(11, &record), &SourceLimits::default())
+            .unwrap()
+            .unwrap();
 
         assert_eq!(store.ansi, Ansi::WINDOWS_1252);
         let tag = store.get(0).unwrap();
@@ -292,21 +309,30 @@ mod tests {
             smart_tag_record(&oversized_count),
         ];
         for record in malformed {
-            assert!(SmartTagStore::parse(&root(11, &record)).is_err());
+            assert!(SmartTagStore::parse(&root(11, &record), &SourceLimits::default()).is_err());
         }
 
         let record = smart_tag_record(&store_payload(2, 0, 0));
         let mut duplicate = record.clone();
         duplicate.extend_from_slice(&record);
-        assert!(SmartTagStore::parse(&root(11, &duplicate)).is_err());
+        assert!(SmartTagStore::parse(&root(11, &duplicate), &SourceLimits::default()).is_err());
     }
 
     #[test]
     fn isolates_smart_tags_by_version_and_validates_codepages() {
         let record = smart_tag_record(&store_payload(2, 0, 0));
 
-        assert!(SmartTagStore::parse(&root(10, &record)).unwrap().is_none());
-        assert!(SmartTagStore::parse_page(&root(11, &record), 99_999).is_err());
-        assert!(SmartTagStore::parse_page(&root(11, &record), 65001).is_err());
+        assert!(
+            SmartTagStore::parse(&root(10, &record), &SourceLimits::default())
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            SmartTagStore::parse_page(&root(11, &record), 99_999, &SourceLimits::default())
+                .is_err()
+        );
+        assert!(
+            SmartTagStore::parse_page(&root(11, &record), 65001, &SourceLimits::default()).is_err()
+        );
     }
 }

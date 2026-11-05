@@ -9,7 +9,7 @@
 use super::super::super::model::*;
 use super::super::{binary::*, semantic::*};
 use crate::formula::ParsedFormula;
-use crate::raw::{Writer, kind};
+use crate::raw::{Encoder, kind};
 
 #[cfg(test)]
 mod model_tests {
@@ -39,7 +39,7 @@ mod model_tests {
         data.extend_from_slice(&0u32.to_le_bytes());
         data.extend_from_slice(&0u32.to_le_bytes());
         data.extend_from_slice(&u32::MAX.to_le_bytes());
-        data.extend_from_slice(&formula.to_bytes().unwrap());
+        data.extend_from_slice(&formula.to_bytes(crate::raw::Limits::DEFAULT).unwrap());
         data
     }
 
@@ -65,7 +65,8 @@ mod model_tests {
 
     #[test]
     fn test_cfvo_serialize_roundtrip() {
-        let parsed = Value::parse(&numeric_cfvo_payload(1, 50.0)).unwrap();
+        let parsed =
+            Value::parse(&numeric_cfvo_payload(1, 50.0), crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(parsed.cfvo_type, 1);
         assert_eq!(parsed.value.as_deref(), Some("50"));
         assert_eq!(parsed.numeric_value, 50.0);
@@ -73,7 +74,8 @@ mod model_tests {
 
     #[test]
     fn test_cfvo_serialize_none_value() {
-        let parsed = Value::parse(&numeric_cfvo_payload(2, 0.0)).unwrap();
+        let parsed =
+            Value::parse(&numeric_cfvo_payload(2, 0.0), crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(parsed.cfvo_type, 2);
         assert!(parsed.value.is_none());
         assert!(parsed.formula_binary.is_none());
@@ -81,7 +83,7 @@ mod model_tests {
 
     #[test]
     fn test_cfvo_parse_too_short() {
-        let result = Value::parse(&[0x01]);
+        let result = Value::parse(&[0x01], crate::raw::Limits::DEFAULT);
         assert!(result.is_err());
     }
 
@@ -176,7 +178,11 @@ mod model_tests {
 
     #[test]
     fn test_conditional_formatting_rule_parse() {
-        let rule = Rule::parse(&cell_rule_payload(u32::MAX, 1, false, 5)).unwrap();
+        let rule = Rule::parse(
+            &cell_rule_payload(u32::MAX, 1, false, 5),
+            crate::raw::Limits::DEFAULT,
+        )
+        .unwrap();
         assert_eq!(rule.rule_type, RuleType::CellIs);
         assert!(rule.dxf_id.is_none());
         assert_eq!(rule.priority, 1);
@@ -186,7 +192,11 @@ mod model_tests {
 
     #[test]
     fn test_conditional_formatting_rule_parse_with_dxf() {
-        let rule = Rule::parse(&cell_rule_payload(5, 10, true, 3)).unwrap();
+        let rule = Rule::parse(
+            &cell_rule_payload(5, 10, true, 3),
+            crate::raw::Limits::DEFAULT,
+        )
+        .unwrap();
         assert_eq!(rule.dxf_id, Some(5));
         assert_eq!(rule.priority, 10);
         assert!(rule.stop_if_true);
@@ -195,7 +205,7 @@ mod model_tests {
     #[test]
     fn test_conditional_formatting_rule_parse_too_short() {
         let data = [0x01, 0x02, 0x03]; // too short
-        let result = Rule::parse(&data);
+        let result = Rule::parse(&data, crate::raw::Limits::DEFAULT);
         assert!(result.is_err());
     }
 
@@ -205,14 +215,14 @@ mod model_tests {
             0xFF, // invalid type
             0xFF, 0xFF, 0xFF, 0xFF, 0x01, 0x00, 0x00, 0x00, 0x00,
         ];
-        let result = Rule::parse(&data);
+        let result = Rule::parse(&data, crate::raw::Limits::DEFAULT);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_read_optional_string_none() {
         let data = u32::MAX.to_le_bytes();
-        let mut cursor = CfCursor::new(&data, "test");
+        let mut cursor = CfCursor::new(&data, "test", crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(cursor.read_nullable_string().unwrap(), None);
         cursor.finish().unwrap();
     }
@@ -225,7 +235,7 @@ mod model_tests {
             0x48, 0x00, // 'H'
             0x69, 0x00, // 'i'
         ];
-        let mut cursor = CfCursor::new(&data, "test");
+        let mut cursor = CfCursor::new(&data, "test", crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(
             cursor.read_nullable_string().unwrap().as_deref(),
             Some("Hi")
@@ -236,21 +246,21 @@ mod model_tests {
     #[test]
     fn test_read_optional_string_too_short() {
         let data = [0x01]; // too short
-        let mut cursor = CfCursor::new(&data, "test");
+        let mut cursor = CfCursor::new(&data, "test", crate::raw::Limits::DEFAULT).unwrap();
         assert!(cursor.read_nullable_string().is_err());
     }
 
     #[test]
     fn test_write_optional_string_none() {
         let data = u32::MAX.to_le_bytes();
-        let mut cursor = CfCursor::new(&data, "test");
+        let mut cursor = CfCursor::new(&data, "test", crate::raw::Limits::DEFAULT).unwrap();
         assert!(cursor.read_nullable_string().unwrap().is_none());
     }
 
     #[test]
     fn test_write_optional_string_some() {
         let data = [0x04, 0x00, 0x00, 0x00, b'T', 0, b'e', 0, b's', 0, b't', 0];
-        let mut cursor = CfCursor::new(&data, "test");
+        let mut cursor = CfCursor::new(&data, "test", crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(
             cursor.read_nullable_string().unwrap().as_deref(),
             Some("Test")
@@ -289,6 +299,69 @@ mod model_tests {
         assert_eq!(cloned.min_color, cs.min_color);
         assert_eq!(cloned.max_color, cs.max_color);
     }
+
+    #[test]
+    fn raw_limits_bound_rule_payload_text_and_output() {
+        use crate::conditional_formatting::Error;
+        use crate::raw::{Error as WireError, Limits};
+        let payload = cell_rule_payload(0, 1, false, 3);
+        Rule::parse(&payload, Limits::new(payload.len(), 0)).unwrap();
+        assert!(matches!(
+            Rule::parse(&payload, Limits::new(payload.len() - 1, 0)),
+            Err(Error::Wire(WireError::PayloadLimit { .. }))
+        ));
+
+        let text = [2, 0, 0, 0, b'a', 0, b'b', 0];
+        let mut cursor = CfCursor::new(&text, "test", Limits::new(text.len(), 2)).unwrap();
+        assert_eq!(
+            cursor.read_nullable_string().unwrap().as_deref(),
+            Some("ab")
+        );
+        let mut cursor = CfCursor::new(&text, "test", Limits::new(text.len(), 1)).unwrap();
+        assert!(matches!(
+            cursor.read_nullable_string(),
+            Err(Error::Wire(WireError::StringLimit { .. }))
+        ));
+        assert!(matches!(
+            CfCursor::new(&text, "test", Limits::new(text.len() - 1, 2)),
+            Err(Error::Wire(WireError::PayloadLimit { .. }))
+        ));
+
+        let style = crate::conditional_formatting::edit::DifferentialStyle {
+            name: Some("Arial".to_owned()),
+            bold: Some(true),
+            ..Default::default()
+        };
+        let encoded = style.encode(Limits::new(64, 5)).unwrap();
+        assert_eq!(
+            crate::conditional_formatting::edit::DifferentialStyle::parse(
+                &encoded,
+                Limits::new(encoded.len(), 5)
+            )
+            .unwrap(),
+            style
+        );
+        assert!(style.encode(Limits::new(64, 4)).is_err());
+        assert!(style.encode(Limits::new(encoded.len() - 1, 5)).is_err());
+        assert!(
+            crate::conditional_formatting::edit::DifferentialStyle::parse(
+                &encoded,
+                Limits::new(encoded.len(), 4)
+            )
+            .is_err()
+        );
+        assert!(
+            crate::conditional_formatting::edit::DifferentialStyle::parse(
+                &encoded,
+                Limits::new(encoded.len() - 1, 5)
+            )
+            .is_err()
+        );
+        assert!(matches!(
+            parse_rule_extension_guid(&[0; 20], Limits::new(19, 0)),
+            Err(Error::Wire(WireError::PayloadLimit { .. }))
+        ));
+    }
 }
 
 #[cfg(test)]
@@ -309,13 +382,13 @@ mod writer_tests {
         data.extend_from_slice(&0u32.to_le_bytes());
         data.extend_from_slice(&0u32.to_le_bytes());
         data.extend_from_slice(&u32::MAX.to_le_bytes());
-        data.extend_from_slice(&formula.to_bytes().unwrap());
+        data.extend_from_slice(&formula.to_bytes(crate::raw::Limits::DEFAULT).unwrap());
         data
     }
 
     #[test]
     fn parses_normative_cell_is_rule() {
-        let rule = Rule::parse(&fixture_cell_is_payload()).unwrap();
+        let rule = Rule::parse(&fixture_cell_is_payload(), crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(rule.rule_type, RuleType::CellIs);
         assert_eq!(rule.template, 0);
         assert_eq!(rule.parameter, 5);
@@ -331,11 +404,11 @@ mod writer_tests {
         let size = wrong_slot[30..34].to_vec();
         wrong_slot[30..34].fill(0);
         wrong_slot[34..38].copy_from_slice(&size);
-        assert!(Rule::parse(&wrong_slot).is_err());
+        assert!(Rule::parse(&wrong_slot, crate::raw::Limits::DEFAULT).is_err());
 
         let mut wrong_size = fixture_cell_is_payload();
         wrong_size[30..34].copy_from_slice(&4u32.to_le_bytes());
-        assert!(Rule::parse(&wrong_size).is_err());
+        assert!(Rule::parse(&wrong_size, crate::raw::Limits::DEFAULT).is_err());
     }
 
     #[test]
@@ -348,8 +421,8 @@ mod writer_tests {
         data.extend_from_slice(&0u32.to_le_bytes());
         data.extend_from_slice(&1u32.to_le_bytes());
         data.extend_from_slice(&(formula.rgce.len() as u32).to_le_bytes());
-        data.extend_from_slice(&formula.to_bytes().unwrap());
-        let parsed = Value::parse(&data).unwrap();
+        data.extend_from_slice(&formula.to_bytes(crate::raw::Limits::DEFAULT).unwrap());
+        let parsed = Value::parse(&data, crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(parsed.formula_binary.as_ref().unwrap(), &formula);
     }
 
@@ -364,8 +437,10 @@ mod writer_tests {
             greater_than_or_equal: false,
             formula_binary: Some(formula.clone()),
         };
-        let encoded = formula_value.serialize_extension14().unwrap();
-        let parsed = Value::parse_extension14(&encoded).unwrap();
+        let encoded = formula_value
+            .serialize_extension14(crate::raw::Limits::DEFAULT)
+            .unwrap();
+        let parsed = Value::parse_extension14(&encoded, crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(parsed.cfvo_type, 7);
         assert_eq!(parsed.formula_binary, Some(formula));
         assert!(!parsed.greater_than_or_equal);
@@ -379,8 +454,13 @@ mod writer_tests {
                 greater_than_or_equal: true,
                 formula_binary: None,
             };
-            let encoded = automatic.serialize_extension14().unwrap();
-            assert_eq!(Value::parse_extension14(&encoded).unwrap(), automatic);
+            let encoded = automatic
+                .serialize_extension14(crate::raw::Limits::DEFAULT)
+                .unwrap();
+            assert_eq!(
+                Value::parse_extension14(&encoded, crate::raw::Limits::DEFAULT).unwrap(),
+                automatic
+            );
         }
     }
 
@@ -395,26 +475,43 @@ mod writer_tests {
             greater_than_or_equal: true,
             formula_binary: Some(formula),
         };
-        let mut encoded = value.serialize_extension14().unwrap();
+        let mut encoded = value
+            .serialize_extension14(crate::raw::Limits::DEFAULT)
+            .unwrap();
         let declared_offset = encoded.len() - 4;
         encoded[declared_offset..].copy_from_slice(&999u32.to_le_bytes());
-        assert!(Value::parse_extension14(&encoded).is_err());
+        assert!(Value::parse_extension14(&encoded, crate::raw::Limits::DEFAULT).is_err());
     }
 
     #[test]
     fn parses_direct_and_theme_colors() {
-        let direct = Color::parse(&[5, 0, 0, 0, 0x11, 0x22, 0x33, 0xff]).unwrap();
+        let direct = Color::parse(
+            &[5, 0, 0, 0, 0x11, 0x22, 0x33, 0xff],
+            crate::raw::Limits::DEFAULT,
+        )
+        .unwrap();
         assert_eq!(direct.argb, Some(0xff11_2233));
-        let theme = Color::parse(&[6, 4, 0, 0, 0, 0, 0, 0]).unwrap();
+        let theme = Color::parse(&[6, 4, 0, 0, 0, 0, 0, 0], crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(theme.color_type, 3);
         assert_eq!(theme.index, 4);
-        assert!(Color::parse(&[6, 12, 0, 0, 0, 0, 0, 0]).is_err());
+        assert!(Color::parse(&[6, 12, 0, 0, 0, 0, 0, 0], crate::raw::Limits::DEFAULT).is_err());
 
         let theme = Color::theme(5, -1_000).unwrap();
-        assert_eq!(Color::parse(&theme.to_bytes().unwrap()).unwrap(), theme);
+        assert_eq!(
+            Color::parse(
+                &theme.to_bytes(crate::raw::Limits::DEFAULT).unwrap(),
+                crate::raw::Limits::DEFAULT
+            )
+            .unwrap(),
+            theme
+        );
         let mut indexed = Color::indexed(42, 0);
         indexed.tint = 2_000;
-        let reparsed = Color::parse(&indexed.to_bytes().unwrap()).unwrap();
+        let reparsed = Color::parse(
+            &indexed.to_bytes(crate::raw::Limits::DEFAULT).unwrap(),
+            crate::raw::Limits::DEFAULT,
+        )
+        .unwrap();
         assert_eq!(reparsed.index, 42);
         assert_eq!(reparsed.tint, 2_000);
     }
@@ -422,18 +519,26 @@ mod writer_tests {
     #[test]
     fn extension_color_and_rule_guid_roundtrip_exactly() {
         let color = Color::theme(4, -2_500).unwrap();
-        let encoded = color.serialize_extension14().unwrap();
-        assert_eq!(Color::parse_extension14(&encoded).unwrap(), color);
+        let encoded = color
+            .serialize_extension14(crate::raw::Limits::DEFAULT)
+            .unwrap();
+        assert_eq!(
+            Color::parse_extension14(&encoded, crate::raw::Limits::DEFAULT).unwrap(),
+            color
+        );
         let mut malformed = encoded;
         malformed[0] = 1;
-        assert!(Color::parse_extension14(&malformed).is_err());
+        assert!(Color::parse_extension14(&malformed, crate::raw::Limits::DEFAULT).is_err());
 
         let guid = [0x42; 16];
         let encoded = serialize_rule_extension_guid(guid);
-        assert_eq!(parse_rule_extension_guid(&encoded).unwrap(), guid);
+        assert_eq!(
+            parse_rule_extension_guid(&encoded, crate::raw::Limits::DEFAULT).unwrap(),
+            guid
+        );
         let mut malformed = encoded;
         malformed[3] = 1;
-        assert!(parse_rule_extension_guid(&malformed).is_err());
+        assert!(parse_rule_extension_guid(&malformed, crate::raw::Limits::DEFAULT).is_err());
     }
 
     #[test]
@@ -451,8 +556,8 @@ mod writer_tests {
         bar.border = true;
         bar.custom_negative_fill = true;
         bar.unused_flags = 0xA5F0;
-        let encoded = bar.serialize_header().unwrap();
-        let parsed = Bar14::parse_header(&encoded).unwrap();
+        let encoded = bar.serialize_header(crate::raw::Limits::DEFAULT).unwrap();
+        let parsed = Bar14::parse_header(&encoded, crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(parsed.min_length, 3);
         assert_eq!(parsed.max_length, 97);
         assert!(!parsed.show_value);
@@ -465,7 +570,7 @@ mod writer_tests {
 
         let mut malformed = encoded;
         malformed[6] = 2;
-        assert!(Bar14::parse_header(&malformed).is_err());
+        assert!(Bar14::parse_header(&malformed, crate::raw::Limits::DEFAULT).is_err());
     }
 
     #[test]
@@ -481,8 +586,8 @@ mod writer_tests {
             };
             5
         ]);
-        let encoded = set.serialize_header().unwrap();
-        let parsed = IconSet14::parse_header(&encoded).unwrap();
+        let encoded = set.serialize_header(crate::raw::Limits::DEFAULT).unwrap();
+        let parsed = IconSet14::parse_header(&encoded, crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(parsed.icon_set_type, 19);
         assert!(parsed.custom);
         assert!(!parsed.show_value);
@@ -490,15 +595,18 @@ mod writer_tests {
         assert_eq!(parsed.unused_flags, 0x38);
 
         for icon in set.custom_icons.unwrap() {
-            let encoded = icon.serialize().unwrap();
-            assert_eq!(Icon::parse(&encoded).unwrap(), icon);
+            let encoded = icon.serialize(crate::raw::Limits::DEFAULT).unwrap();
+            assert_eq!(
+                Icon::parse(&encoded, crate::raw::Limits::DEFAULT).unwrap(),
+                icon
+            );
         }
         assert!(
             Icon {
                 icon_set: 0,
                 index: 3,
             }
-            .serialize()
+            .serialize(crate::raw::Limits::DEFAULT)
             .is_err()
         );
     }
@@ -513,7 +621,8 @@ mod writer_tests {
         data.extend_from_slice(&1u32.to_le_bytes());
         data.extend_from_slice(&0u32.to_le_bytes());
         data.extend_from_slice(&1u32.to_le_bytes());
-        let (formatting, count, base) = parse_classic_header(&data).unwrap();
+        let (formatting, count, base) =
+            parse_classic_header(&data, crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(count, 1);
         assert!(formatting.pivot_only);
         assert_eq!(formatting.ranges, ["A1:B2"]);
@@ -525,8 +634,11 @@ mod writer_tests {
         let mut formatting = Formatting::new(vec!["A1:B2 C3".to_string()]);
         formatting.pivot_only = true;
         formatting.rules.push(Rule::new(RuleType::Expression, 1));
-        let encoded = formatting.serialize_extension14_header().unwrap();
-        let (parsed, count) = Formatting::parse_extension14_header(&encoded).unwrap();
+        let encoded = formatting
+            .serialize_extension14_header(crate::raw::Limits::DEFAULT)
+            .unwrap();
+        let (parsed, count) =
+            Formatting::parse_extension14_header(&encoded, crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(count, 1);
         assert_eq!(parsed.ranges, ["A1:B2", "C3"]);
         assert!(parsed.pivot_only);
@@ -552,14 +664,21 @@ mod writer_tests {
             linked_classic_priority: None,
         });
 
-        let encoded = rule.serialize_extension14().unwrap();
-        let parsed = Rule::parse_extension14(&encoded).unwrap();
+        let encoded = rule
+            .serialize_extension14(crate::raw::Limits::DEFAULT)
+            .unwrap();
+        let parsed = Rule::parse_extension14(&encoded, crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(parsed.priority, 7);
         assert_eq!(parsed.operator, Some(1));
         assert_eq!(parsed.formulas, [first.rgce, second.rgce]);
         assert_eq!(parsed.formula_extras, [first.rgcb, second.rgcb]);
         assert_eq!(parsed.extension14, rule.extension14);
-        assert_eq!(parsed.serialize_extension14().unwrap(), encoded);
+        assert_eq!(
+            parsed
+                .serialize_extension14(crate::raw::Limits::DEFAULT)
+                .unwrap(),
+            encoded
+        );
     }
 
     #[test]
@@ -574,12 +693,19 @@ mod writer_tests {
             linked_classic_priority: None,
         });
 
-        let encoded = rule.serialize_extension14().unwrap();
-        let parsed = Rule::parse_extension14(&encoded).unwrap();
+        let encoded = rule
+            .serialize_extension14(crate::raw::Limits::DEFAULT)
+            .unwrap();
+        let parsed = Rule::parse_extension14(&encoded, crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(parsed.priority, 0);
         assert_eq!(parsed.template, 0);
         assert_eq!(parsed.extension14, rule.extension14);
-        assert_eq!(parsed.serialize_extension14().unwrap(), encoded);
+        assert_eq!(
+            parsed
+                .serialize_extension14(crate::raw::Limits::DEFAULT)
+                .unwrap(),
+            encoded
+        );
     }
 
     #[test]
@@ -593,20 +719,23 @@ mod writer_tests {
             guid_present: false,
             linked_classic_priority: None,
         });
-        let encoded = rule.serialize_extension14().unwrap();
-        let (_, fixed_offset) = parse_formula_header(&encoded, "test", 2).unwrap();
+        let encoded = rule
+            .serialize_extension14(crate::raw::Limits::DEFAULT)
+            .unwrap();
+        let (_, fixed_offset) =
+            parse_formula_header(&encoded, "test", 2, crate::raw::Limits::DEFAULT).unwrap();
 
         let mut reserved = encoded.clone();
         reserved[fixed_offset + 20..fixed_offset + 24].copy_from_slice(&1u32.to_le_bytes());
-        assert!(Rule::parse_extension14(&reserved).is_err());
+        assert!(Rule::parse_extension14(&reserved, crate::raw::Limits::DEFAULT).is_err());
 
         let mut priority = encoded.clone();
         priority[fixed_offset + 12..fixed_offset + 16].copy_from_slice(&0i32.to_le_bytes());
-        assert!(Rule::parse_extension14(&priority).is_err());
+        assert!(Rule::parse_extension14(&priority, crate::raw::Limits::DEFAULT).is_err());
 
         let mut declared = encoded;
         declared[fixed_offset + 30..fixed_offset + 34].copy_from_slice(&999u32.to_le_bytes());
-        assert!(Rule::parse_extension14(&declared).is_err());
+        assert!(Rule::parse_extension14(&declared, crate::raw::Limits::DEFAULT).is_err());
     }
 }
 
@@ -628,11 +757,11 @@ mod tests {
         rule.operator = Some(5);
         rule.parameter = 5;
         rule.formulas.push(formula.rgce);
-        let payload = serialize_cf_rule(&rule).unwrap();
+        let payload = serialize_cf_rule(&rule, crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(payload.len(), 57);
         assert_eq!(u32::from_le_bytes(payload[30..34].try_into().unwrap()), 3);
         assert_eq!(&payload[42..46], &u32::MAX.to_le_bytes());
-        let parsed = Rule::parse(&payload).unwrap();
+        let parsed = Rule::parse(&payload, crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(parsed.operator, Some(5));
         assert_eq!(parsed.formula_texts, ["5"]);
     }
@@ -641,7 +770,8 @@ mod tests {
     fn header_preserves_pivot_and_multiple_ranges() {
         let mut formatting = Formatting::new(vec!["A1:B10".into(), "D4".into()]);
         formatting.pivot_only = true;
-        let payload = serialize_cond_formatting_header(&formatting).unwrap();
+        let payload =
+            serialize_cond_formatting_header(&formatting, crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(u32::from_le_bytes(payload[4..8].try_into().unwrap()), 1);
         assert_eq!(u32::from_le_bytes(payload[8..12].try_into().unwrap()), 2);
     }
@@ -678,8 +808,12 @@ mod tests {
         formatting.add_rule(icons);
 
         let mut bytes = Vec::new();
-        write_conditional_formattings(&mut Writer::new(&mut bytes), &[formatting]).unwrap();
-        let records = Records::new(&bytes);
+        write_conditional_formattings(
+            &mut Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT),
+            &[formatting],
+        )
+        .unwrap();
+        let records = Records::new(&bytes, crate::raw::Limits::DEFAULT);
         let mut found = Vec::new();
         for record in records {
             found.push(record.unwrap().kind());
@@ -705,7 +839,11 @@ mod tests {
         let mut second = Formatting::new(vec!["B1".into()]);
         second.add_rule(rule);
         assert!(
-            write_conditional_formattings(&mut Writer::new(Vec::new()), &[first, second]).is_err()
+            write_conditional_formattings(
+                &mut Encoder::new(Vec::new(), crate::raw::Limits::DEFAULT),
+                &[first, second]
+            )
+            .is_err()
         );
     }
 
@@ -729,8 +867,12 @@ mod tests {
         formatting.add_rule(rule);
 
         let mut bytes = Vec::new();
-        write_conditional_formattings(&mut Writer::new(&mut bytes), &[formatting]).unwrap();
-        let found = Records::new(&bytes)
+        write_conditional_formattings(
+            &mut Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT),
+            &[formatting],
+        )
+        .unwrap();
+        let found = Records::new(&bytes, crate::raw::Limits::DEFAULT)
             .map(|record| record.unwrap().kind())
             .collect::<Vec<_>>();
         assert_eq!(
@@ -768,7 +910,13 @@ mod tests {
             0xff00_ff00,
         ));
         extension.add_rule(rule);
-        assert!(write_conditional_formattings(&mut Writer::new(Vec::new()), &[extension]).is_err());
+        assert!(
+            write_conditional_formattings(
+                &mut Encoder::new(Vec::new(), crate::raw::Limits::DEFAULT),
+                &[extension]
+            )
+            .is_err()
+        );
 
         let mut classic = Formatting::new(vec!["A1".into()]);
         let mut bar = Rule::new(RuleType::DataBar, 1);
@@ -779,6 +927,12 @@ mod tests {
             0xff44_72c4,
         ));
         classic.add_rule(bar);
-        assert!(write_conditional_formattings(&mut Writer::new(Vec::new()), &[classic]).is_err());
+        assert!(
+            write_conditional_formattings(
+                &mut Encoder::new(Vec::new(), crate::raw::Limits::DEFAULT),
+                &[classic]
+            )
+            .is_err()
+        );
     }
 }

@@ -100,6 +100,27 @@ pub fn replace_conditional_formattings(
     values: &[Formatting],
     differential_format_count: usize,
 ) -> Result<Vec<u8>> {
+    replace(worksheet_xml, values, differential_format_count, false)
+}
+
+/// [`replace_conditional_formattings`], writing the owners in the
+/// worksheet root's own prefix without a local namespace declaration, so
+/// every other worksheet writer reads them as direct children (the edit
+/// family of record 0320).
+pub(crate) fn replace_in_root_prefix(
+    worksheet_xml: &[u8],
+    values: &[Formatting],
+    differential_format_count: usize,
+) -> Result<Vec<u8>> {
+    replace(worksheet_xml, values, differential_format_count, true)
+}
+
+fn replace(
+    worksheet_xml: &[u8],
+    values: &[Formatting],
+    differential_format_count: usize,
+    root_prefix: bool,
+) -> Result<Vec<u8>> {
     let layout = scan_layout(worksheet_xml)?;
     let before = parse_conditional_formattings(worksheet_xml, differential_format_count)?;
     if before.len() != layout.spans.len() {
@@ -112,6 +133,11 @@ pub fn replace_conditional_formattings(
         return Ok(worksheet_xml.to_vec());
     }
     let replacement = write_collections(values, layout.namespace)?;
+    let replacement = if root_prefix {
+        in_root_prefix(&replacement, layout.namespace, &layout.prefix)
+    } else {
+        replacement
+    };
     let removed = layout.spans.iter().try_fold(0usize, |sum, span| {
         sum.checked_add(span.len())
             .ok_or_else(|| invalid("conditional-formatting removed size overflow"))
@@ -248,6 +274,34 @@ fn validate_core_rule(rule: &Rule) -> Result<()> {
         return Err(invalid("conditional-formatting formula is too large"));
     }
     Ok(())
+}
+
+/// Rewrite a fragment written with the `x:` prefix and a local declaration
+/// into the root's prefix, without the declaration.
+fn in_root_prefix(fragment: &[u8], namespace: &[u8], prefix: &[u8]) -> Vec<u8> {
+    let mut declaration = b" xmlns:x=\"".to_vec();
+    declaration.extend_from_slice(namespace);
+    declaration.push(b'"');
+    let mut out = Vec::with_capacity(fragment.len());
+    let mut index = 0;
+    while index < fragment.len() {
+        let rest = &fragment[index..];
+        if rest.starts_with(&declaration) {
+            index += declaration.len();
+        } else if rest.starts_with(b"</x:") {
+            out.extend_from_slice(b"</");
+            out.extend_from_slice(prefix);
+            index += 4;
+        } else if rest.starts_with(b"<x:") {
+            out.push(b'<');
+            out.extend_from_slice(prefix);
+            index += 3;
+        } else {
+            out.push(fragment[index]);
+            index += 1;
+        }
+    }
+    out
 }
 
 fn write_collections(values: &[Formatting], namespace: &[u8]) -> Result<Vec<u8>> {
@@ -453,6 +507,8 @@ fn escaped(output: &mut Vec<u8>, value: &str) {
 
 struct Layout {
     namespace: &'static [u8],
+    /// The worksheet root's prefix with its colon (`x:`), or empty.
+    prefix: Vec<u8>,
     spans: Vec<ByteRange<usize>>,
     insertion: usize,
 }
@@ -468,6 +524,7 @@ fn scan_layout(xml: &[u8]) -> Result<Layout> {
     let mut depth = 0usize;
     let mut events = 0usize;
     let mut namespace = None;
+    let mut prefix = Vec::new();
     let mut root_close = None;
     let mut insertion = None;
     let mut owner: Option<(usize, usize)> = None;
@@ -511,6 +568,10 @@ fn scan_layout(xml: &[u8]) -> Result<Layout> {
                     namespace = spreadsheet_namespace(&resolved);
                     if namespace.is_none() {
                         return Err(invalid("invalid SpreadsheetML worksheet namespace"));
+                    }
+                    let name = element.name();
+                    if let Some(at) = name.as_ref().iter().position(|byte| *byte == b':') {
+                        prefix = name.as_ref()[..=at].to_vec();
                     }
                 } else if depth == 1 {
                     if !spreadsheet(&resolved) {
@@ -659,6 +720,7 @@ fn scan_layout(xml: &[u8]) -> Result<Layout> {
         ));
     }
     Ok(Layout {
+        prefix,
         namespace: namespace.ok_or_else(|| invalid("worksheet XML has no root"))?,
         spans,
         insertion: insertion

@@ -1,0 +1,102 @@
+{
+  "schema": "litchi.0362ul30.odp-build-handoff-receipt-repair-followup.v1",
+  "date": "2026-10-24",
+  "claim_scope": "source-only handoff repair evidence, packet identities, freshness guards and receipt schemas; no Cargo build, native run, timing, heaptrack result, qualification or acceptance claim",
+  "review": {
+    "path": "/home/zhuhe/.cache/litchi-api-contract/odp-build-handoff-repair-review-11858e697f.json",
+    "bytes": 6061,
+    "sha256": "23d31045e5f59bb78cc789c4deb9414c851a82501c5717f00f1f59f1a6b1d499",
+    "prior_commit": "11858e697f845ade1ad0e633af6d1afcf1d99cc5",
+    "findings_repaired": [
+      "plan validation now uses a fresh manifest-plan-recheck output while retaining the earlier plan",
+      "generated build receipt and memory guard/receipt bind binaries, source revisions, probe hashes, fixture, CPU and exact route arguments",
+      "targets and TMP paths are absent-or-empty guarded before creation, including memory legs and TMP directories",
+      "Bash is declared for arrays and process substitution"
+    ]
+  },
+  "preserved_prior_packet": {
+    "root": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547-repair-40165ae0af",
+    "commit": "11858e697f845ade1ad0e633af6d1afcf1d99cc5",
+    "input_sha256": "a7f598369ee2698a8ae265c71921f112f352e08a9bcedbd44977ee31811a6aac",
+    "plan_sha256": "dfb286badeefbd5b036730500f7da182c5ec8b9da201dcd573cfacc5cb19a342",
+    "build_handoff_sha256": "41012547d456a841d260952b08bf76bfcd5c22976349b6624752e0bf5e9efa62",
+    "memory_protocol_sha256": "44103b2a571a3dfb309e0aad5deed383deb63b8d3226b10a496050031f9c31cf",
+    "plan_receipt_sha256": "a9755a31f6a554e5e50d14f22472ae7fd44dd19af107b157233e434480d2d672",
+    "failed_review_counts_preserved": true
+  },
+  "repaired_packet": {
+    "root": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547-repair-11858e697f",
+    "status": "build_required",
+    "shell": "/bin/bash",
+    "files": [
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547-repair-11858e697f/input.json",
+        "bytes": 1749,
+        "sha256": "92babe0b6243cdf903830b9b2a6d796604cade3a0c3b2c9724caa796391ee76d",
+        "role": "corrected runner manifest"
+      },
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547-repair-11858e697f/plan.json",
+        "bytes": 2058,
+        "sha256": "0e96988db9add9de7d0f91f792ef8379d995a6083dac559b70d032a1a67a589e",
+        "role": "plan with fresh execution paths"
+      },
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547-repair-11858e697f/build-handoff.json",
+        "bytes": 20762,
+        "sha256": "be60e8b150675818451a1962aea9d1dc32e3e51e74b51956ec910d0632088f2e",
+        "role": "freshness-guarded builds and generated build receipt"
+      },
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547-repair-11858e697f/memory-protocol.json",
+        "bytes": 22912,
+        "sha256": "c638ad86e6a7edcf1532408156684d99060020a75d04a31aa67693a1d5c6658b",
+        "role": "Bash memory pre-run, identity receipt and dynamic heaptrack protocol"
+      },
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547-repair-11858e697f/qualification-run/manifest-plan-recheck/plan.json",
+        "bytes": 2093,
+        "sha256": "a9255a31f6a554e5e50d14f22472ae7fd44dd19af107b157233e434480d2d672",
+        "role": "fresh source-only runner --plan receipt"
+      }
+    ],
+    "generated_build_receipt": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547-repair-11858e697f/build-receipts/build-receipt.json",
+    "generated_memory_guard": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547-repair-11858e697f/memory-qualification/guard-status.json",
+    "generated_memory_receipt": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547-repair-11858e697f/memory-qualification/receipt.json"
+  },
+  "identities": {
+    "baseline_commit": "e4a0614f5d3a1d768346cc33a4a3b86522dda986",
+    "baseline_tree": "a1d3d5fb726673f8a162d4d9c4265f6ae79fcd4b",
+    "baseline_lock_sha256": "04665b965a919412e29c8772956ddf6267264fa40e3e0ef7c9967fd2eb584171",
+    "baseline_adapter_sha256": "47cc7a780d93b23015ff698216e98ce9597ee300ee1b34ae21a39276b2baded7",
+    "candidate_commit": "472b6705475b073e7fe08f6e11ee17fb1e29f838",
+    "candidate_tree": "ebc1cee05f124c0c63977aff07a23288c19e7d00",
+    "candidate_root_lock_sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
+    "candidate_perf_lock_sha256": "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c",
+    "candidate_probe_sha256": "c68f790247c7f83a1acb256a57f6c3928346b10cb348d5cf30d8f89705673bef",
+    "runner_sha256": "e12434a16547753571865692e6510195ea6fdab7d26274460d2c14213575d4b9",
+    "fixture_sha256": "078a83cd132a308e4609cf46f587cb68c1f928c8d2e6e1002d344223ec385cb5"
+  },
+  "repair_contract": {
+    "plan_recheck_output_is_fresh": true,
+    "prior_plan_preserved": true,
+    "target_and_build_tmp_absent_or_empty_before_mkdir": true,
+    "memory_root_legs_tmp_absent_or_empty_before_mkdir": true,
+    "build_receipt_generated_after_both_builds": true,
+    "memory_receipt_rechecks_build_receipt": true,
+    "memory_receipt_binds_binary_source_probe_fixture_protocol_and_guards": true,
+    "heaptrack_capture_extension_discovered": [".gz", ".zst"],
+    "heaptrack_print_histogram_argument_bound": true,
+    "memory_tmpdir_exported": true,
+    "historical_peak_heap_delta_mib_unresolved": 0.5
+  },
+  "execution": {
+    "source_only_plan_returncode": 0,
+    "cargo_builds_run": false,
+    "native_probes_run": false,
+    "timing_run": false,
+    "memory_run": false,
+    "immutable_source_mutated": false,
+    "acceptance_claim": false
+  }
+}

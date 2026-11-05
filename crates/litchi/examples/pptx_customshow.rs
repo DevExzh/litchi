@@ -1,7 +1,7 @@
 //! Typed custom slide shows with a transactional PresentationML round-trip.
 
 use litchi_pptx::Package;
-use litchi_pptx::presentation_properties::metadata::custom_show::{List, Show};
+use litchi_pptx::presentation_properties::metadata::custom_show::{Limits, List, Show};
 use litchi_pptx::presentation_properties::metadata::structure;
 use std::error::Error as StdError;
 
@@ -26,17 +26,16 @@ const TITLES: [&str; 15] = [
 fn main() -> Result<(), Box<dyn StdError>> {
     println!("=== Custom Slide Shows Example ===\n");
 
-    let mut package = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
     for title in TITLES {
-        package.presentation_mut()?.add_slide()?.set_title(title);
+        builder.presentation()?.add_slide()?.set_title(title);
     }
 
     // Publish authored slides before the package-aware structure owner reads
     // their stable PresentationML IDs.
-    let bytes = package.to_bytes()?;
-    let mut package = Package::from_bytes(&bytes)?;
+    let mut package = builder.build()?;
     let slide_ids = package
-        .with_opc(structure::load)?
+        .with_opc(|opc| structure::load(opc, Limits::DEFAULT))?
         .slides
         .into_iter()
         .map(|slide| slide.slide_id)
@@ -99,7 +98,7 @@ fn main() -> Result<(), Box<dyn StdError>> {
         "Executive Summary"
     );
 
-    let xml = shows.to_xml();
+    let xml = shows.to_xml(Limits::DEFAULT)?;
     println!("\n--- Generated Typed XML ---");
     println!("XML length: {} bytes", xml.len());
     assert!(xml.contains("<p:custShowLst>"));
@@ -120,14 +119,15 @@ fn main() -> Result<(), Box<dyn StdError>> {
     assert_eq!(manual.slide_count(), 5);
 
     // Publish the typed values atomically into ppt/presentation.xml.
-    package.edit_opc(|opc| {
+    {
+        let mut edit = package.edit_structure()?;
         for show in shows.shows.iter().cloned() {
-            structure::add_custom_show(opc, show)?;
+            edit.add_custom_show(show)?;
         }
-        Ok(())
-    })?;
+        package = edit.commit()?.into_package();
+    }
 
-    let graph = package.with_opc(structure::load)?;
+    let graph = package.with_opc(|opc| structure::load(opc, Limits::DEFAULT))?;
     assert_eq!(graph.custom_shows.shows, shows.shows);
     println!(
         "\nPublished {} custom shows transactionally.",
@@ -136,13 +136,14 @@ fn main() -> Result<(), Box<dyn StdError>> {
 
     // Exercise a second transactional edit and verify it after reopening.
     let quick_demo_id = shows.get_by_name("Quick Demo").expect("quick demo").id;
-    package.edit_opc(|opc| {
-        assert!(structure::remove_custom_show(opc, quick_demo_id)?);
-        Ok(())
-    })?;
+    {
+        let mut edit = package.edit_structure()?;
+        assert!(edit.remove_custom_show(quick_demo_id)?);
+        package = edit.commit()?.into_package();
+    }
 
     let round_trip = Package::from_bytes(&package.to_bytes()?)?;
-    let graph = round_trip.with_opc(structure::load)?;
+    let graph = round_trip.with_opc(|opc| structure::load(opc, Limits::DEFAULT))?;
     assert_eq!(graph.custom_shows.len(), 3);
     assert!(graph.custom_shows.get_by_name("Quick Demo").is_none());
     assert_eq!(

@@ -23,10 +23,7 @@ use litchi_numbers::cell::data_format::{
         transaction::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path},
     },
 };
-use litchi_numbers::{
-    CellPosition, Package, PackageLimits, PackageReadOptions, PackageSemanticLimits, SheetSelector,
-    TableSelector,
-};
+use litchi_numbers::{At, Package, SheetSelector, TableSelector};
 use litchi_numbers_wire::{BncCell, StoredValue};
 use prost::Message as _;
 
@@ -48,12 +45,12 @@ impl ExactBytes for Package {
     }
 }
 
-fn selected_position() -> CellPosition {
-    CellPosition::new(fixture::FIRST_CELL.0 as u32, fixture::FIRST_CELL.1 as u32)
+fn selected_position() -> At {
+    At::new(fixture::FIRST_CELL.0 as u32, fixture::FIRST_CELL.1 as u32)
 }
 
-fn second_position() -> CellPosition {
-    CellPosition::new(fixture::SECOND_CELL.0 as u32, fixture::SECOND_CELL.1 as u32)
+fn second_position() -> At {
+    At::new(fixture::SECOND_CELL.0 as u32, fixture::SECOND_CELL.1 as u32)
 }
 
 fn source(family: fixture::CustomFamily) -> TestResult<Vec<u8>> {
@@ -91,7 +88,10 @@ fn first_cell(source: &[u8]) -> TestResult<BncCell> {
     let bytes = cells
         .first()
         .ok_or_else(|| io::Error::other("custom fixture first cell is missing"))?;
-    Ok(BncCell::parse(bytes)?)
+    Ok(BncCell::parse(
+        bytes,
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?)
 }
 
 fn assert_non_format_cell_state(source: &[u8], target: &[u8]) -> TestResult {
@@ -99,22 +99,29 @@ fn assert_non_format_cell_state(source: &[u8], target: &[u8]) -> TestResult {
     let after = fixture::tile_cells(target)?;
     assert_eq!(before.len(), after.len());
     for (before, after) in before.iter().zip(after.iter()) {
-        let before_cell = BncCell::parse(before)?;
-        let after_cell = BncCell::parse(after)?;
+        let before_cell = BncCell::parse(before, &litchi_numbers_wire::Limits::DEFAULT)?;
+        let after_cell = BncCell::parse(after, &litchi_numbers_wire::Limits::DEFAULT)?;
         assert_eq!(before_cell.stored_value(), after_cell.stored_value());
         assert_eq!(before_cell.cached_scalar()?, after_cell.cached_scalar()?);
         let mut before_metadata_free = before_cell;
         let mut after_metadata_free = after_cell;
         before_metadata_free.clear_explicit_format();
         after_metadata_free.clear_explicit_format();
-        assert_eq!(before_metadata_free.encode(), after_metadata_free.encode());
+        assert_eq!(
+            before_metadata_free
+                .encode(&litchi_numbers_wire::Limits::DEFAULT)
+                .unwrap(),
+            after_metadata_free
+                .encode(&litchi_numbers_wire::Limits::DEFAULT)
+                .unwrap()
+        );
     }
     Ok(())
 }
 
 fn assert_exact_locality(source: &[u8], target: &[u8]) -> TestResult {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     let mut changed = Vec::new();
     for entry in before.iter() {
         let candidate = after
@@ -175,11 +182,12 @@ fn rewrite_first_custom_archive(
     mutate: impl FnOnce(&[u8]) -> TestResult<Vec<u8>>,
 ) -> TestResult<Vec<u8>> {
     let registry_payload = fixture::custom_registry_payload_bytes(source)?;
-    let archive_payload = WireView::parse(&registry_payload)?
-        .fields()
-        .find(|field| field.number() == 2)
-        .ok_or_else(|| io::Error::other("custom registry archive is missing"))?
-        .payload();
+    let archive_payload =
+        WireView::parse(&registry_payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .find(|field| field.number() == 2)
+            .ok_or_else(|| io::Error::other("custom registry archive is missing"))?
+            .payload();
     let archive_payload = mutate(archive_payload)?;
     let registry_payload =
         patch_length_delimited_field(&registry_payload, 2, true, Some(&archive_payload))?;
@@ -201,20 +209,31 @@ fn rewrite_custom_registry_with_entries(
     additional_entries: usize,
 ) -> TestResult<Vec<u8>> {
     let registry_payload = fixture::custom_registry_payload_bytes(source)?;
-    let archive_payload = WireView::parse(&registry_payload)?
-        .fields()
-        .find(|field| field.number() == 2)
-        .ok_or_else(|| io::Error::other("custom registry archive is missing"))?
-        .payload()
-        .to_vec();
+    let archive_payload =
+        WireView::parse(&registry_payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .find(|field| field.number() == 2)
+            .ok_or_else(|| io::Error::other("custom registry archive is missing"))?
+            .payload()
+            .to_vec();
     let mut registry_payload = registry_payload;
     for index in 0..additional_entries {
         let index = u64::try_from(index)?;
         let mut uuid_payload = Vec::new();
         append_varint_field(&mut uuid_payload, 1, 0x1000_0000_0000_0000 + index)?;
         append_varint_field(&mut uuid_payload, 2, 0x2000_0000_0000_0000 + index)?;
-        append_length_delimited_field(&mut registry_payload, 1, &uuid_payload)?;
-        append_length_delimited_field(&mut registry_payload, 2, &archive_payload)?;
+        append_length_delimited_field(
+            &mut registry_payload,
+            1,
+            &uuid_payload,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
+        append_length_delimited_field(
+            &mut registry_payload,
+            2,
+            &archive_payload,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     fixture::rewrite_member(source, fixture::CUSTOM_MEMBER, |archive| {
         let registry = archive
@@ -234,7 +253,7 @@ fn read_custom(
     family: fixture::CustomFamily,
     sheet: impl Into<SheetSelector<'static>>,
     table: impl Into<TableSelector<'static>>,
-    position: CellPosition,
+    position: At,
 ) -> Result<Option<Custom>, Error> {
     let _ = family;
     package.table_cell_custom_format(sheet, table, position)
@@ -317,23 +336,23 @@ fn custom_transaction_debug_redacts_semantic_content() -> TestResult {
         format!("{:?}", changed.diagnostics()),
         format!(
             "{:?}",
-            Error::WrongFormatFamily {
+            Error::Refused(litchi_numbers::cell::data_format::custom::transaction::Refusal::WrongFormatFamily {
                 path: Path::Cell {
                     sheet: 3,
                     table: 5,
                     position: selected_position(),
                 },
-            }
+            })
         ),
         format!(
             "{}",
-            Error::WrongFormatFamily {
+            Error::Refused(litchi_numbers::cell::data_format::custom::transaction::Refusal::WrongFormatFamily {
                 path: Path::Cell {
                     sheet: 3,
                     table: 5,
                     position: selected_position(),
                 },
-            }
+            })
         ),
     ];
 
@@ -663,19 +682,21 @@ fn custom_rewrite_preserves_unknown_registry_order_and_nested_spans() -> TestRes
     let root_90 = fixture::custom_registry_field_record(&bytes, 90)?;
     let nested_94 = fixture::custom_archive_field_record(&bytes, "Accounting", 94)?;
     let unknown_records = |payload: &[u8]| -> TestResult<Vec<(usize, Vec<u8>)>> {
-        Ok(WireView::parse(payload)?
-            .fields()
-            .enumerate()
-            .filter(|(_, field)| field.number() > 5)
-            .map(|(index, field)| (index, field.raw().to_vec()))
-            .collect())
+        Ok(
+            WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
+                .fields()
+                .enumerate()
+                .filter(|(_, field)| field.number() > 5)
+                .map(|(index, field)| (index, field.raw().to_vec()))
+                .collect(),
+        )
     };
 
     // Add an additional unknown record between two known custom archive
     // fields.  The owner must preserve its raw record and source span while
     // changing the selected custom semantic value.
     let mut hostile_registry = Vec::new();
-    let view = WireView::parse(&root_before)?;
+    let view = WireView::parse(&root_before, litchi_iwa_common::WireLimits::DEFAULT)?;
     for (index, field) in view.fields().enumerate() {
         hostile_registry.extend_from_slice(field.raw());
         if index == 0 {
@@ -734,11 +755,15 @@ fn custom_selectors_wrong_family_and_missing_selection_are_typed() -> TestResult
     );
     assert!(matches!(
         package.table_cell_custom_format("missing sheet", 0usize, selected_position()),
-        Err(Error::SheetNotFound)
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::custom::transaction::Refusal::SheetNotFound
+        ))
     ));
     assert!(matches!(
         package.table_cell_custom_format(0usize, "missing table", selected_position()),
-        Err(Error::TableNotFound)
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::custom::transaction::Refusal::TableNotFound
+        ))
     ));
 
     let ordinary = Package::from_bytes(&fixture::synthetic_package_for(
@@ -747,7 +772,9 @@ fn custom_selectors_wrong_family_and_missing_selection_are_typed() -> TestResult
     )?)?;
     assert!(matches!(
         ordinary.table_cell_custom_format(0usize, 0usize, selected_position()),
-        Err(Error::WrongFormatFamily { .. })
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::custom::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     let text = Package::from_bytes(&source(fixture::CustomFamily::Text)?)?;
     assert!(matches!(
@@ -852,7 +879,12 @@ fn custom_locked_changed_edit_refuses_publication_but_reads() -> TestResult {
             .set(replacement)
             .commit()
             .expect_err("a changed custom edit must refuse a locked table");
-        assert!(matches!(error, Error::TableLocked { .. }));
+        assert!(matches!(
+            error,
+            Error::Refused(
+                litchi_numbers::cell::data_format::custom::transaction::Refusal::TableLocked { .. }
+            )
+        ));
         assert_eq!(package.exact_bytes(), before);
     }
     Ok(())
@@ -889,16 +921,22 @@ fn custom_patch_rejects_stale_and_foreign_sources_atomically() -> TestResult {
 #[test]
 fn custom_input_operation_budgets_and_allocation_refuse_before_publication() -> TestResult {
     let source = source(fixture::CustomFamily::Number)?;
-    let exact_limits = PackageLimits::new(
-        u64::try_from(source.len())?,
-        PackageLimits::MAX_ENTRIES,
-        PackageLimits::MAX_ENTRY_BYTES,
-        PackageLimits::MAX_TOTAL_BYTES,
-        PackageLimits::MAX_IWA_STREAM_BYTES,
-    )?;
+    let exact_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(source.len())?)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
     let exact = Package::from_bytes_with_options(
         &source,
-        PackageReadOptions::new(exact_limits, PackageSemanticLimits::default()),
+        litchi_numbers::OpenOptions::new()
+            .source_limits(exact_limits)
+            .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
     )?;
     assert!(
         exact
@@ -906,25 +944,36 @@ fn custom_input_operation_budgets_and_allocation_refuse_before_publication() -> 
             .is_some()
     );
 
-    let tight = PackageLimits::new(
-        u64::try_from(source.len().saturating_sub(1))?,
-        PackageLimits::MAX_ENTRIES,
-        PackageLimits::MAX_ENTRY_BYTES,
-        PackageLimits::MAX_TOTAL_BYTES,
-        PackageLimits::MAX_IWA_STREAM_BYTES,
-    )?;
+    let tight = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(source.len().saturating_sub(1))?)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
     assert!(
         Package::from_bytes_with_options(
             &source,
-            PackageReadOptions::new(tight, PackageSemanticLimits::default()),
+            litchi_numbers::OpenOptions::new()
+                .source_limits(tight)
+                .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
         )
         .is_err()
     );
-    let semantic = PackageSemanticLimits::new(1, 1, 1, 1)?;
+    let semantic = litchi_numbers::SemanticLimits::builder()
+        .max_objects(1)
+        .and_then(|b| b.max_sheets(1))
+        .and_then(|b| b.max_tables(1))
+        .and_then(|b| b.max_references(1))
+        .and_then(|b| b.build())?;
     assert!(
         Package::from_bytes_with_options(
             &source,
-            PackageReadOptions::new(PackageLimits::default(), semantic),
+            litchi_numbers::OpenOptions::new().semantic_limits(semantic),
         )
         .is_err()
     );
@@ -938,9 +987,7 @@ fn custom_input_operation_budgets_and_allocation_refuse_before_publication() -> 
     assert!(
         matches!(
             result,
-            Err(Error::LimitExceeded { .. })
-                | Err(Error::Allocation { .. })
-                | Err(Error::Verification)
+            Err(Error::Limit { .. }) | Err(Error::Allocation { .. }) | Err(Error::Verification)
         ),
         "unexpected custom operation-budget result: {result:?}"
     );
@@ -959,7 +1006,7 @@ fn custom_registry_oversized_name_and_pattern_refuse_atomically() -> TestResult 
     assert_owner_rejects(&oversized_name, fixture::CustomFamily::Number)?;
 
     let oversized_pattern = rewrite_first_custom_archive(&source, |archive| {
-        let default_pattern = WireView::parse(archive)?
+        let default_pattern = WireView::parse(archive, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .find(|field| field.number() == 3)
             .ok_or_else(|| io::Error::other("custom default pattern is missing"))?
@@ -983,15 +1030,15 @@ fn custom_registry_many_entries_are_rejected_at_the_reference_budget() -> TestRe
     const MAX_REFERENCES: usize = 1_024;
     let source = source(fixture::CustomFamily::Number)?;
     let hostile = rewrite_custom_registry_with_entries(&source, MAX_REFERENCES)?;
-    let semantic = PackageSemanticLimits::new(
-        PackageSemanticLimits::MAX_OBJECTS,
-        PackageSemanticLimits::MAX_SHEETS,
-        PackageSemanticLimits::MAX_TABLES,
-        MAX_REFERENCES,
-    )?;
+    let semantic = litchi_numbers::SemanticLimits::builder()
+        .max_objects(litchi_numbers::SemanticLimits::MAXIMUM.max_objects())
+        .and_then(|b| b.max_sheets(litchi_numbers::SemanticLimits::MAXIMUM.max_sheets()))
+        .and_then(|b| b.max_tables(litchi_numbers::SemanticLimits::MAXIMUM.max_tables()))
+        .and_then(|b| b.max_references(MAX_REFERENCES))
+        .and_then(|b| b.build())?;
     let package = Package::from_bytes_with_options(
         &hostile,
-        PackageReadOptions::new(PackageLimits::default(), semantic),
+        litchi_numbers::OpenOptions::new().semantic_limits(semantic),
     )?;
     let before = package.exact_bytes();
     let result = package.table_cell_custom_format(0usize, 0usize, selected_position());
@@ -1094,7 +1141,8 @@ fn custom_registry_source_has_field8_shape_for_hostile_entry_and_document_root_r
         fixture::CustomCorruption::Field8CustomEntry,
     )?;
     let payload = fixture::format_list_payload(&field8)?;
-    let mut fields = RawWireFields::new(&payload);
+    let mut fields =
+        RawWireFields::new(&payload, litchi_iwa_common::wire::RawWireLimits::default());
     let mut saw_field8 = false;
     while let Some(field) = fields.next()? {
         if field.number() != 3 {

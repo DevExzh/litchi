@@ -5,9 +5,11 @@ use std::ops::Range;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
-use litchi::common::detection::{detect_file_format_from_bytes, detect_format_from_reader};
+use litchi::common::detection::{
+    DetectedFormat, SourceLimits, detect_file_format_from_bytes, detect_format_from_reader,
+    detect_format_smart,
+};
 use litchi::common::{FileFormat, ReadAt, SourceVersion};
-use litchi::detection_smart::{DetectedFormat, detect_format_smart};
 
 const DOCX_MAIN_CONTENT_TYPE: &str =
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml";
@@ -244,8 +246,8 @@ fn malformed_opc_package() -> Vec<u8> {
     ])
 }
 
-fn input_limit_below(fixture: &Fixture) -> litchi::opc::ReadLimits {
-    litchi::opc::ReadLimits::builder()
+fn input_limit_below(fixture: &Fixture) -> litchi::opc::SourceLimits {
+    litchi::opc::SourceLimits::builder()
         .max_input_bytes(u64::try_from(fixture.bytes.len() - 1).expect("fixture length fits u64"))
         .expect("positive input limit")
         .build()
@@ -257,7 +259,7 @@ fn catalog_first_detection_matches_bytes_reader_and_typed_docx_without_payload_r
     let fixture = docx_fixture();
 
     assert_eq!(
-        detect_file_format_from_bytes(&fixture.bytes),
+        detect_file_format_from_bytes(&fixture.bytes, &SourceLimits::default()),
         Some(FileFormat::Docx)
     );
 
@@ -266,7 +268,7 @@ fn catalog_first_detection_matches_bytes_reader_and_typed_docx_without_payload_r
         .seek(SeekFrom::Start(41))
         .expect("initial reader position is valid");
     assert_eq!(
-        detect_format_from_reader(&mut reader),
+        detect_format_from_reader(&mut reader, &SourceLimits::default()),
         Some(FileFormat::Docx)
     );
     assert_eq!(reader.stream_position().expect("position is readable"), 41);
@@ -277,8 +279,11 @@ fn catalog_first_detection_matches_bytes_reader_and_typed_docx_without_payload_r
     catalog_reader
         .seek(SeekFrom::Start(17))
         .expect("initial reader position is valid");
-    let catalog = litchi::opc::probe_package_catalog_from_reader(&mut catalog_reader)
-        .expect("valid OPC catalog should be admitted");
+    let catalog = litchi::opc::probe_package_catalog_from_reader(
+        &mut catalog_reader,
+        litchi_opc::SourceLimits::default(),
+    )
+    .expect("valid OPC catalog should be admitted");
     assert_eq!(catalog.part_count(), 1);
     assert!(
         catalog
@@ -298,7 +303,7 @@ fn catalog_first_detection_matches_bytes_reader_and_typed_docx_without_payload_r
     let typed = litchi::docx::source_backed::Package::from_read_at(source_for_open)
         .expect("typed DOCX source open should use the catalog only");
     assert_eq!(
-        detect_file_format_from_bytes(&fixture.bytes),
+        detect_file_format_from_bytes(&fixture.bytes, &SourceLimits::default()),
         Some(FileFormat::Docx),
         "the typed source owner and both detector APIs identify DOCX"
     );
@@ -315,8 +320,11 @@ fn typed_catalog_and_owner_restore_reader_position_on_error_and_limit() {
     malformed_reader
         .seek(SeekFrom::Start(23))
         .expect("initial reader position is valid");
-    let malformed_error = litchi::opc::probe_package_catalog_from_reader(&mut malformed_reader)
-        .expect_err("malformed OPC catalog must return a typed error");
+    let malformed_error = litchi::opc::probe_package_catalog_from_reader(
+        &mut malformed_reader,
+        litchi_opc::SourceLimits::default(),
+    )
+    .expect_err("malformed OPC catalog must return a typed error");
     assert!(matches!(
         malformed_error,
         litchi::opc::OpcError::PartNotFound(_)
@@ -333,7 +341,7 @@ fn typed_catalog_and_owner_restore_reader_position_on_error_and_limit() {
         .seek(SeekFrom::Start(31))
         .expect("initial reader position is valid");
     assert_eq!(
-        detect_format_from_reader(&mut malformed_detection_reader),
+        detect_format_from_reader(&mut malformed_detection_reader, &SourceLimits::default(),),
         None
     );
     assert_eq!(
@@ -348,15 +356,15 @@ fn typed_catalog_and_owner_restore_reader_position_on_error_and_limit() {
     limited_reader
         .seek(SeekFrom::Start(29))
         .expect("initial reader position is valid");
-    let limited_error = litchi::opc::probe_package_catalog_from_reader_with_limits(
+    let limited_error = litchi::opc::probe_package_catalog_from_reader(
         &mut limited_reader,
         input_limit_below(&fixture),
     )
     .expect_err("input limit must be reported by the typed catalog probe");
     assert!(matches!(
         limited_error,
-        litchi::opc::OpcError::ReadLimit {
-            resource: litchi::opc::ReadResource::InputBytes,
+        litchi::opc::OpcError::Limit {
+            kind: litchi::opc::SourceLimitKind::InputBytes,
             ..
         }
     ));
@@ -369,17 +377,17 @@ fn typed_catalog_and_owner_restore_reader_position_on_error_and_limit() {
     limited_reader.guard().assert_no_forbidden_reads();
 
     let source = GuardedSource::new(fixture.bytes.clone(), fixture.ordinary_payload.clone());
-    let owner_error = match litchi::docx::source_backed::Package::from_read_at_with_limits(
+    let owner_error = match litchi::docx::source_backed::Package::from_read_at_with_options(
         Arc::new(source.clone()),
-        input_limit_below(&fixture),
+        litchi::docx::OpenOptions::default().source_limits(input_limit_below(&fixture)),
     ) {
         Ok(_) => panic!("typed DOCX owner unexpectedly accepted the input limit"),
         Err(error) => error,
     };
     assert!(matches!(
         owner_error,
-        litchi::docx::Error::Opc(litchi::opc::OpcError::ReadLimit {
-            resource: litchi::opc::ReadResource::InputBytes,
+        litchi::docx::Error::Opc(litchi::opc::OpcError::Limit {
+            kind: litchi::opc::SourceLimitKind::InputBytes,
             ..
         })
     ));
@@ -391,8 +399,14 @@ fn typed_malformed_package_error_is_distinct_from_fresh_no_match() {
     let malformed = malformed_opc_package();
     let fresh_no_match = b"this is not an Office package".to_vec();
 
-    assert_eq!(detect_file_format_from_bytes(&malformed), None);
-    assert_eq!(detect_file_format_from_bytes(&fresh_no_match), None);
+    assert_eq!(
+        detect_file_format_from_bytes(&malformed, &SourceLimits::default()),
+        None
+    );
+    assert_eq!(
+        detect_file_format_from_bytes(&fresh_no_match, &SourceLimits::default()),
+        None
+    );
 
     let malformed_source = GuardedSource::new(malformed, 0..0);
     let malformed_error =
@@ -421,28 +435,17 @@ fn typed_malformed_package_error_is_distinct_from_fresh_no_match() {
 fn smart_detection_still_returns_a_usable_eager_docx_variant() {
     let fixture = docx_fixture();
 
-    match detect_format_smart(fixture.bytes) {
+    match detect_format_smart(fixture.bytes, &SourceLimits::default()) {
         Some(DetectedFormat::Docx(package)) => {
             let main = package
                 .main_document_part()
                 .expect("eager DOCX variant remains usable");
             assert_eq!(main.content_type(), DOCX_MAIN_CONTENT_TYPE);
         },
-        #[cfg(any(
-            feature = "doc",
-            feature = "ppt",
-            feature = "pptx",
-            feature = "xls",
-            feature = "xlsx",
-            feature = "xlsb",
-            feature = "pages",
-            feature = "keynote",
-            feature = "numbers",
-            feature = "odt",
-            feature = "ods",
-            feature = "odp",
-            feature = "rtf"
-        ))]
+        #[allow(
+            unreachable_patterns,
+            reason = "a DOCX-only build has no other variant"
+        )]
         Some(other) => panic!("expected eager DOCX variant, got {other:?}"),
         None => panic!("valid DOCX fixture was not smart-detected"),
     }

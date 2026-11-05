@@ -9,7 +9,7 @@ mod transaction;
 pub use builder::Builder;
 pub use composition::{
     CompositionLimits, JoinError, JoinedEdits, Lineage, MergeChoice, MergePlan, MergePlanError,
-    PreparedEdit,
+    SubEdit,
 };
 pub use durable::{DurablePatch, SealedPatch};
 pub use policy::{
@@ -19,10 +19,12 @@ pub use policy::{
     SignatureCapability, SignaturePolicy,
 };
 pub(crate) use transaction::producer_extensions;
-pub use transaction::{Change, ChangeAction, ChangeKind, Commit, Edit, Patch, QueryChange};
+pub use transaction::{
+    Change, ChangeAction, ChangeKind, Commit, Diagnostics, Edit, Patch, QueryChange,
+};
 
-/// Explicit budgeted undo/redo retention for immutable database snapshots.
-pub type History = litchi_core::patch::History<crate::Database>;
+/// Explicit budgeted undo/redo retention for immutable database packages.
+pub type History = litchi_core::patch::History<crate::Package>;
 
 /// Finite step and retained-weight bounds for [`History`].
 pub use litchi_core::patch::HistoryLimits;

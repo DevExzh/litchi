@@ -629,7 +629,11 @@ impl Recipients {
     /// Returns an error if the operation cannot be completed.
     pub fn add_recipient(&mut self, recipient: Recipient) -> Result<&mut Self> {
         if self.recipients.len() >= MAX_RECIPIENTS {
-            return Err(invalid("too many mail-merge recipients"));
+            return Err(Error::MailMergeLimit {
+                kind: crate::mail_merge::LimitKind::Recipients,
+                actual: (self.recipients.len()).saturating_add(1),
+                maximum: MAX_RECIPIENTS,
+            });
         }
         self.recipients.push(recipient);
         Ok(self)

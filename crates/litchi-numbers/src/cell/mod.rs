@@ -1,8 +1,8 @@
 //! Numbers cell vocabulary.
 //!
 //! Native Binary Numbers Cell (BNC) storage is an implementation detail. Use
-//! the semantic [`Value`](crate::cell::Value) and
-//! [`data_format`](crate::cell::data_format) APIs instead of depending on its
+//! the semantic [`Value`] and
+//! [`data_format`] APIs instead of depending on its
 //! byte layout.
 
 /// Archive-free direct replies attached to a cell comment.
@@ -10,6 +10,53 @@ pub mod comment;
 
 /// Checked, archive-free cell display formats.
 pub mod data_format;
+/// One character or paragraph property of whole cells' text (record 0370),
+/// started by [`crate::Package::edit_table_cell_text`] and read by
+/// [`crate::Package::table_cell_text`].
+pub mod text {
+    pub use crate::package::table_cell_text::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_text_wire::paragraph_style::{Property, PropertyKind};
+}
+/// Ordered conditional-highlight rules of cells (record 0370d), started by
+/// [`crate::Package::edit_table_cell_conditional_highlights`] and read by
+/// [`crate::Package::table_cell_conditional_highlight`].
+pub mod conditional_highlight {
+    pub use crate::package::conditional_highlight::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_common::table::cell::conditional_highlight::{
+        Condition, Date, DateRange, Error as ValueError, Number, Offset, OffsetDirection, Period,
+        PeriodUnit, Range, Rule, Style, Text,
+    };
+}
+/// Paragraph lists of cells' text (record 0370b), started by
+/// [`crate::Package::edit_table_cell_lists`]: a plain cell is promoted to
+/// rich text on its first list change.
+pub mod list {
+    pub use crate::package::table_cell_list::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_text::paragraph::list::{
+        ParagraphList, ParagraphListBullet, ParagraphListBulletBaselineOffset,
+        ParagraphListBulletGeometry, ParagraphListBulletScale, ParagraphListIndentation,
+        ParagraphListLabelColor, ParagraphListLabelIndent, ParagraphListLevel,
+        ParagraphListLevelPlacement, ParagraphListNumberFormat, ParagraphListNumberPunctuation,
+        ParagraphListNumberScale, ParagraphListNumberSequence, ParagraphListNumberTiering,
+        ParagraphListNumbering, ParagraphListPlacement, ParagraphListStart, ParagraphListTextGap,
+    };
+    pub use litchi_iwa_text::position::TextPosition;
+    pub use litchi_iwa_text_wire::list::{Property, PropertyKind};
+}
+/// Character properties of cells' text (record 0309), started by
+/// [`crate::Package::edit_table_cell_text_style`].
+pub mod text_style {
+    pub use crate::package::table_cell_text_style::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_text_wire::CharacterProperties;
+}
 /// Unified archive-free interactive cell controls.
 ///
 /// The value types are defined by the focused data-format modules and are
@@ -30,9 +77,26 @@ pub(crate) mod wire {
 
     use super::FiniteF64;
 
+    pub(crate) use native::Limits;
     #[cfg(test)]
     pub(crate) use native::decimal128_le;
     pub(crate) use native::{ClearValue, Error, RewritePlan, StoredValue};
+
+    /// Derive the raw-cell profile from the owner-selected source extent.
+    ///
+    /// Fixed-width field checks are derived from the retained source extent;
+    /// the output ceiling stays at the raw leaf's finite hard maximum because
+    /// an owner may add metadata fields during a rewrite. Callers still pass
+    /// the checked profile explicitly at every raw parse/encode boundary.
+    pub(crate) fn limits_for_source(source: &[u8]) -> Limits {
+        if source.is_empty() {
+            return Limits::DEFAULT;
+        }
+        Limits::DEFAULT
+            .with_input_bytes(source.len())
+            .and_then(|limits| limits.with_tail_bytes(source.len()))
+            .expect("source-derived BNC limits stay within the checked hard ceilings")
+    }
 
     /// A finite scalar accepted by the private BNC rewrite adapter.
     #[derive(Debug, Clone, Copy, PartialEq)]
@@ -108,8 +172,8 @@ pub(crate) mod wire {
     }
 
     impl BncCell {
-        pub(crate) fn parse(data: &[u8]) -> Result<Self, Error> {
-            native::BncCell::parse(data).map(Self)
+        pub(crate) fn parse(data: &[u8], limits: &Limits) -> Result<Self, Error> {
+            native::BncCell::parse(data, limits).map(Self)
         }
 
         #[cfg(test)]
@@ -130,8 +194,8 @@ pub(crate) mod wire {
     pub(crate) struct BncCellView<'a>(native::BncCellView<'a>);
 
     impl<'a> BncCellView<'a> {
-        pub(crate) fn parse(data: &'a [u8]) -> Result<Self, Error> {
-            native::BncCellView::parse(data).map(Self)
+        pub(crate) fn parse(data: &'a [u8], limits: &Limits) -> Result<Self, Error> {
+            native::BncCellView::parse(data, limits).map(Self)
         }
 
         #[must_use]
@@ -178,29 +242,24 @@ pub(crate) mod wire {
             self.0.plan_clear_value(retain_empty)
         }
 
-        pub(crate) fn rewrite_scalar_with_limit(
+        pub(crate) fn rewrite_scalar(
             &self,
             value: ScalarValue,
-            max_output_bytes: usize,
+            limits: &Limits,
         ) -> Result<Vec<u8>, Error> {
-            self.0
-                .rewrite_scalar_with_limit(value.into_native(), max_output_bytes)
+            self.0.rewrite_scalar(value.into_native(), limits)
         }
 
-        pub(crate) fn clear_value_with_limit(
-            &self,
-            max_output_bytes: usize,
-        ) -> Result<ClearValue, Error> {
-            self.0.clear_value_with_limit(max_output_bytes)
+        pub(crate) fn clear_value(&self, limits: &Limits) -> Result<ClearValue, Error> {
+            self.0.clear_value(limits)
         }
 
-        pub(crate) fn clear_comment_with_limit(
+        pub(crate) fn clear_comment(
             &self,
             expected_identifier: u32,
-            max_output_bytes: usize,
+            limits: &Limits,
         ) -> Result<Vec<u8>, Error> {
-            self.0
-                .clear_comment_with_limit(expected_identifier, max_output_bytes)
+            self.0.clear_comment(expected_identifier, limits)
         }
 
         pub(crate) fn formula_cache_equals(&self, value: CachedScalar) -> bool {
@@ -215,32 +274,30 @@ pub(crate) mod wire {
             self.0.formula_value_equals(identifier, value.into_native())
         }
 
-        pub(crate) fn rewrite_formula_with_limit(
+        pub(crate) fn rewrite_formula(
             &self,
             identifier: u32,
             cache: ScalarValue,
-            max_output_bytes: usize,
+            limits: &Limits,
         ) -> Result<Vec<u8>, Error> {
             self.0
-                .rewrite_formula_with_limit(identifier, cache.into_native(), max_output_bytes)
+                .rewrite_formula(identifier, cache.into_native(), limits)
         }
 
-        pub(crate) fn rewrite_formula_without_cache_with_limit(
+        pub(crate) fn rewrite_formula_without_cache(
             &self,
             identifier: u32,
-            max_output_bytes: usize,
+            limits: &Limits,
         ) -> Result<Vec<u8>, Error> {
-            self.0
-                .rewrite_formula_without_cache_with_limit(identifier, max_output_bytes)
+            self.0.rewrite_formula_without_cache(identifier, limits)
         }
 
-        pub(crate) fn rewrite_formula_cache_with_limit(
+        pub(crate) fn rewrite_formula_cache(
             &self,
             cache: CachedScalar,
-            max_output_bytes: usize,
+            limits: &Limits,
         ) -> Result<Vec<u8>, Error> {
-            self.0
-                .rewrite_formula_cache_with_limit(cache.into_native(), max_output_bytes)
+            self.0.rewrite_formula_cache(cache.into_native(), limits)
         }
 
         #[must_use]

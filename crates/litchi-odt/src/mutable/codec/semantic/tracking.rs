@@ -5,12 +5,12 @@ use litchi_core::Result;
 
 impl MutableDocument {
     /// Return declarations, policy, and marker-correlated content from current XML.
-    pub fn tracked_changes(&self) -> Result<crate::TrackedChanges> {
+    pub(crate) fn tracked_changes(&self) -> Result<crate::TrackedChanges> {
         self.with_content_xml(crate::parser::Parser::parse_tracked_changes)
     }
 
     /// Atomically replace the declaration table and policy metadata.
-    pub fn set_tracked_changes(&mut self, tracked: crate::TrackedChanges) -> Result<()> {
+    pub(crate) fn set_tracked_changes(&mut self, tracked: crate::TrackedChanges) -> Result<()> {
         let updated =
             self.with_content_xml(|xml| crate::set_tracked_changes_xml(xml, Some(&tracked)))?;
         self.content_xml = Some(updated);
@@ -18,7 +18,7 @@ impl MutableDocument {
     }
 
     /// Atomically update tracking policy and inert protection metadata.
-    pub fn set_tracked_change_policy(
+    pub(crate) fn set_tracked_change_policy(
         &mut self,
         track_changes: Option<bool>,
         protection_key: Option<String>,
@@ -32,14 +32,14 @@ impl MutableDocument {
     }
 
     /// Atomically append a declaration in insertion order.
-    pub fn add_tracked_change(&mut self, change: crate::TrackChange) -> Result<()> {
+    pub(crate) fn add_tracked_change(&mut self, change: crate::TrackChange) -> Result<()> {
         let mut tracked = self.tracked_changes()?;
         tracked.changes.push(change);
         self.set_tracked_changes(tracked)
     }
 
     /// Atomically replace a declaration without changing marker identity.
-    pub fn update_tracked_change(
+    pub(crate) fn update_tracked_change(
         &mut self,
         id: &str,
         replacement: crate::TrackChange,
@@ -65,7 +65,7 @@ impl MutableDocument {
     }
 
     /// Remove a declaration and all of its correlated markers atomically.
-    pub fn remove_tracked_change(&mut self, id: &str) -> Result<crate::TrackChange> {
+    pub(crate) fn remove_tracked_change(&mut self, id: &str) -> Result<crate::TrackChange> {
         let mut tracked = self.tracked_changes()?;
         let index = tracked
             .changes
@@ -86,7 +86,7 @@ impl MutableDocument {
     }
 
     /// Remove all declarations, policy, and correlated markers.
-    pub fn clear_tracked_changes(&mut self) -> Result<()> {
+    pub(crate) fn clear_tracked_changes(&mut self) -> Result<()> {
         let tracked = self.tracked_changes()?;
         let updated = self.with_content_xml(|xml| {
             let mut candidate = xml.to_string();
@@ -100,7 +100,7 @@ impl MutableDocument {
     }
 
     /// Mark a live insertion or format-change range using Unicode character offsets.
-    pub fn mark_tracked_change_range(
+    pub(crate) fn mark_tracked_change_range(
         &mut self,
         change_id: &str,
         start: crate::Position,
@@ -114,7 +114,7 @@ impl MutableDocument {
     }
 
     /// Place a point deletion marker using a Unicode character offset.
-    pub fn mark_tracked_deletion(
+    pub(crate) fn mark_tracked_deletion(
         &mut self,
         change_id: &str,
         position: crate::Position,
@@ -126,7 +126,7 @@ impl MutableDocument {
     }
 
     /// Remove every marker for one declaration while retaining its live text.
-    pub fn unmark_tracked_change(&mut self, change_id: &str) -> Result<()> {
+    pub(crate) fn unmark_tracked_change(&mut self, change_id: &str) -> Result<()> {
         let updated =
             self.with_content_xml(|xml| crate::unmark_tracked_change_xml(xml, change_id))?;
         self.content_xml = Some(updated);

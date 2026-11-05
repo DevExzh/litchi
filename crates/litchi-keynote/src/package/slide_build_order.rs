@@ -16,7 +16,7 @@ use litchi_core::Position;
 use litchi_iwa_archive::package::EntryEdit;
 use litchi_iwa_common::{WireLimits, wire::WireView};
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::{
     BUILD_MESSAGE_TYPE, Package, PhysicalSource, ReadError, SHOW_MESSAGE_TYPE, SLIDE_MESSAGE_TYPE,
@@ -47,7 +47,7 @@ const UUID_UPPER_FIELD: u32 = 2;
 /// prepared.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum SlideBuildOrderLimitKind {
+pub enum LimitKind {
     /// Complete input package bytes.
     InputBytes,
     /// Complete rewritten package bytes.
@@ -76,7 +76,7 @@ pub enum SlideBuildOrderLimitKind {
     WireWork,
 }
 
-impl fmt::Display for SlideBuildOrderLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -101,9 +101,45 @@ impl fmt::Display for SlideBuildOrderLimitKind {
 ///
 /// Error values contain only semantic positions and resource measurements;
 /// native object identities, member names, and lower wire types stay private.
-#[derive(Debug, Error)]
+#[derive(Debug, ThisError)]
 #[non_exhaustive]
-pub enum SlideBuildOrderError {
+pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The source package or selected wire payload is structurally invalid.
+    #[error("the Keynote source cannot be reordered safely")]
+    InvalidSource,
+    /// A finite resource ceiling was exceeded.
+    #[error("Keynote build-order {kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        /// Resource category that exceeded its limit.
+        kind: LimitKind,
+        /// Observed or requested amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A bounded destination allocation failed before publication.
+    #[error("could not allocate {amount} units for the Keynote build-order transaction")]
+    Allocation {
+        /// Elements or bytes requested.
+        amount: usize,
+    },
+    /// Full candidate reopening did not reproduce the requested order.
+    #[error("the reordered Keynote candidate failed semantic verification")]
+    Verification,
+    /// The patch does not belong to this exact immutable package artifact.
+    #[error("the Keynote build-order patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// This package was prepared for semantic reading only and has no editable
     /// physical source.
     #[error("this Keynote source does not support physical edits")]
@@ -148,31 +184,34 @@ pub enum SlideBuildOrderError {
     /// Commit was requested without a staged operation.
     #[error("the Keynote build-order transaction has no staged operation")]
     NoStagedOperation,
-    /// The source package or selected wire payload is structurally invalid.
-    #[error("the Keynote source cannot be reordered safely")]
-    InvalidSource,
-    /// A finite resource ceiling was exceeded.
-    #[error("Keynote build-order {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
-        /// Resource category that exceeded its limit.
-        kind: SlideBuildOrderLimitKind,
-        /// Observed or requested amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-    },
-    /// A bounded destination allocation failed before publication.
-    #[error("could not allocate {amount} units for the Keynote build-order transaction")]
-    Allocation {
-        /// Elements or bytes requested.
-        amount: usize,
-    },
-    /// Full candidate reopening did not reproduce the requested order.
-    #[error("the reordered Keynote candidate failed semantic verification")]
-    Verification,
-    /// The patch does not belong to this exact immutable package artifact.
-    #[error("the Keynote build-order patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. } | Self::UnsupportedTopology { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+            Self::AmbiguousSelector { .. }
+            | Self::EmptySlideName { .. }
+            | Self::DestinationOutOfRange { .. } => RefusalKind::InvalidValue,
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::BuildPositionNotFound { .. } => RefusalKind::NotFound,
+            Self::OperationAlreadyStaged { .. } | Self::NoStagedOperation { .. } => {
+                RefusalKind::UnsupportedOperation
+            },
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -184,12 +223,12 @@ struct Intent {
 
 /// A bounded build-order edit staged against an immutable Keynote snapshot.
 #[derive(Debug)]
-pub struct SlideBuildOrderEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
     intent: Option<Intent>,
 }
 
-impl<'a> SlideBuildOrderEdit<'a> {
+impl<'a> Edit<'a> {
     pub(super) const fn new(source: &'a Package) -> Self {
         Self {
             source,
@@ -213,22 +252,24 @@ impl<'a> SlideBuildOrderEdit<'a> {
         slide_input: impl Into<SlideSelector<'selector>>,
         source: Position,
         destination: Position,
-    ) -> Result<&mut Self, SlideBuildOrderError> {
+    ) -> Result<&mut Self, Error> {
         if self.intent.is_some() {
-            return Err(SlideBuildOrderError::OperationAlreadyStaged);
+            return Err(Error::Refused(Refusal::OperationAlreadyStaged));
         }
 
         let slide = resolve_slide_position(self.source, slide_input)?;
         let snapshot = read_build_order(self.source, slide)?;
         let build_count = snapshot.builds.len();
         if source.get() >= build_count {
-            return Err(SlideBuildOrderError::BuildPositionNotFound { position: source });
+            return Err(Error::Refused(Refusal::BuildPositionNotFound {
+                position: source,
+            }));
         }
         if destination.get() >= build_count {
-            return Err(SlideBuildOrderError::DestinationOutOfRange {
+            return Err(Error::Refused(Refusal::DestinationOutOfRange {
                 position: destination,
                 build_count,
-            });
+            }));
         }
         self.intent = Some(Intent {
             slide,
@@ -243,17 +284,19 @@ impl<'a> SlideBuildOrderEdit<'a> {
     /// An exact same-position move reuses the source package allocation and
     /// bytes. A changed candidate is fully reopened and semantically read back
     /// under the original physical and semantic limits before publication.
-    pub fn commit(self) -> Result<SlideBuildOrderCommit, SlideBuildOrderError> {
-        let intent = self.intent.ok_or(SlideBuildOrderError::NoStagedOperation)?;
+    pub fn commit(self) -> Result<Commit, Error> {
+        let intent = self
+            .intent
+            .ok_or(Error::Refused(Refusal::NoStagedOperation))?;
         let source_bytes = physical_shared_source(self.source)?;
         let source_fingerprint = fingerprint(&source_bytes);
         let before = read_build_order(self.source, intent.slide)?;
         ensure_intent_bounds(&before, intent)?;
         if intent.source == intent.destination {
             self.source.validate().map_err(map_read_error)?;
-            return Ok(SlideBuildOrderCommit {
+            return Ok(Commit {
                 package: self.source.snapshot(),
-                patch: SlideBuildOrderPatch {
+                patch: Patch {
                     source_bytes: Arc::clone(&source_bytes),
                     target_bytes: source_bytes,
                     source_fingerprint,
@@ -262,7 +305,7 @@ impl<'a> SlideBuildOrderEdit<'a> {
                     source: intent.source,
                     destination: intent.destination,
                 },
-                diagnostics: SlideBuildOrderDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
 
@@ -271,8 +314,8 @@ impl<'a> SlideBuildOrderEdit<'a> {
         let after = moved_build_order(&before, intent)?;
         let package = rewrite_build_order(self.source, &before, intent, &after)?;
         let target_fingerprint = fingerprint(package.source_bytes());
-        Ok(SlideBuildOrderCommit {
-            patch: SlideBuildOrderPatch {
+        Ok(Commit {
+            patch: Patch {
                 source_bytes,
                 target_bytes: editable_shared_source(&package)?,
                 source_fingerprint,
@@ -282,7 +325,7 @@ impl<'a> SlideBuildOrderEdit<'a> {
                 destination: intent.destination,
             },
             package,
-            diagnostics: SlideBuildOrderDiagnostics::published(),
+            diagnostics: Diagnostics::published(),
         })
     }
 }
@@ -292,7 +335,7 @@ impl<'a> SlideBuildOrderEdit<'a> {
 /// Native identities and package member names remain private. Public metadata
 /// contains only the checked semantic slide and build positions.
 #[derive(Clone, PartialEq, Eq)]
-pub struct SlideBuildOrderPatch {
+pub struct Patch {
     source_bytes: Arc<[u8]>,
     target_bytes: Arc<[u8]>,
     source_fingerprint: u64,
@@ -302,10 +345,10 @@ pub struct SlideBuildOrderPatch {
     destination: Position,
 }
 
-impl fmt::Debug for SlideBuildOrderPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SlideBuildOrderPatch")
+            .debug_struct("Patch")
             .field("slide", &self.slide)
             .field("source", &self.source)
             .field("destination", &self.destination)
@@ -313,7 +356,7 @@ impl fmt::Debug for SlideBuildOrderPatch {
     }
 }
 
-impl SlideBuildOrderPatch {
+impl Patch {
     /// Return the base package's compact diagnostic fingerprint.
     #[must_use]
     pub const fn source_fingerprint(&self) -> u64 {
@@ -371,13 +414,13 @@ impl SlideBuildOrderPatch {
 
 /// Compact evidence describing one build-order commit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SlideBuildOrderDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     full_reparse_performed: bool,
 }
 
-impl SlideBuildOrderDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -416,13 +459,13 @@ impl SlideBuildOrderDiagnostics {
 /// The fully verified result of one immutable Keynote build-order transaction.
 #[must_use = "a Keynote build-order commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct SlideBuildOrderCommit {
+pub struct Commit {
     package: Package,
-    patch: SlideBuildOrderPatch,
-    diagnostics: SlideBuildOrderDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl SlideBuildOrderCommit {
+impl Commit {
     /// Borrow the fully reopened immutable package snapshot.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -435,15 +478,21 @@ impl SlideBuildOrderCommit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the reversible exact-source patch.
     #[must_use]
-    pub const fn patch(&self) -> &SlideBuildOrderPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Borrow compact publication diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> &SlideBuildOrderDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
@@ -451,24 +500,21 @@ impl SlideBuildOrderCommit {
 impl Package {
     /// Start one selector-first Keynote build-order edit.
     #[must_use]
-    pub const fn edit_slide_build_order(&self) -> SlideBuildOrderEdit<'_> {
-        SlideBuildOrderEdit::new(self)
+    pub const fn edit_slide_build_order(&self) -> Edit<'_> {
+        Edit::new(self)
     }
 
     /// Apply an exact-source-checked build-order patch.
     ///
     /// The retained target is fully reopened and semantically verified under
     /// this package's original physical and semantic limits.
-    pub fn apply_slide_build_order(
-        &self,
-        patch: &SlideBuildOrderPatch,
-    ) -> Result<SlideBuildOrderCommit, SlideBuildOrderError> {
+    pub fn apply_slide_build_order(&self, patch: &Patch) -> Result<Commit, Error> {
         let source = physical_shared_source(self)?;
         if fingerprint(self.source_bytes()) != patch.source_fingerprint
             || self.source_bytes() != patch.source_bytes.as_ref()
             || source.as_ref() != patch.source_bytes.as_ref()
         {
-            return Err(SlideBuildOrderError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let current = read_build_order(self, patch.slide)?;
         let intent = Intent {
@@ -480,19 +526,19 @@ impl Package {
 
         if patch.is_noop() {
             if patch.source_bytes.as_ref() != patch.target_bytes.as_ref() {
-                return Err(SlideBuildOrderError::PatchConflict);
+                return Err(Error::PatchConflict);
             }
             self.validate().map_err(map_read_error)?;
-            return Ok(SlideBuildOrderCommit {
+            return Ok(Commit {
                 package: self.snapshot(),
                 patch: patch.clone(),
-                diagnostics: SlideBuildOrderDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
 
         editable_source_catalog(self)?;
         if fingerprint(&patch.target_bytes) != patch.target_fingerprint {
-            return Err(SlideBuildOrderError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         self.validate().map_err(map_read_error)?;
         let expected = moved_build_order(&current, intent)?;
@@ -502,12 +548,12 @@ impl Package {
         candidate.validate().map_err(map_read_error)?;
         let readback = read_build_order(&candidate, patch.slide)?;
         if !same_order(&readback, &expected) {
-            return Err(SlideBuildOrderError::Verification);
+            return Err(Error::Verification);
         }
-        Ok(SlideBuildOrderCommit {
+        Ok(Commit {
             package: candidate,
             patch: patch.clone(),
-            diagnostics: SlideBuildOrderDiagnostics::published(),
+            diagnostics: Diagnostics::published(),
         })
     }
 }
@@ -552,13 +598,13 @@ struct BuildOrderSnapshot {
 fn resolve_slide_position<'selector>(
     source: &Package,
     selector_input: impl Into<SlideSelector<'selector>>,
-) -> Result<Position, SlideBuildOrderError> {
+) -> Result<Position, Error> {
     let selector = selector_input.into();
     let show = source.show().map_err(map_read_error)?;
     match selector {
         SlideSelector::Position(position) => {
             if position.get() >= show.slides().len() {
-                return Err(SlideBuildOrderError::SlidePositionNotFound { position });
+                return Err(Error::Refused(Refusal::SlidePositionNotFound { position }));
             }
             Ok(position)
         },
@@ -566,7 +612,7 @@ fn resolve_slide_position<'selector>(
             let selected = show
                 .select_slide(selector)
                 .map_err(map_selector_error)?
-                .ok_or(SlideBuildOrderError::SlideNameNotFound)?;
+                .ok_or(Error::Refused(Refusal::SlideNameNotFound))?;
             Ok(Position::new(selected.index()))
         },
     }
@@ -575,11 +621,11 @@ fn resolve_slide_position<'selector>(
 fn read_build_order(
     source: &Package,
     slide_position: Position,
-) -> Result<BuildOrderSnapshot, SlideBuildOrderError> {
+) -> Result<BuildOrderSnapshot, Error> {
     let slide_identifier = slide_identifier_at_position(source, slide_position)?;
     let (component_name, slide_object) = source
         .object_with_component(slide_identifier)
-        .ok_or(SlideBuildOrderError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let slide_payload = unique_payload(
         &slide_object.messages,
         &[SLIDE_MESSAGE_TYPE],
@@ -594,20 +640,20 @@ fn read_build_order(
     )?;
 
     let mut build_ids = HashSet::new();
-    build_ids.try_reserve(build_references.len()).map_err(|_| {
-        SlideBuildOrderError::Allocation {
+    build_ids
+        .try_reserve(build_references.len())
+        .map_err(|_| Error::Allocation {
             amount: build_references.len(),
-        }
-    })?;
+        })?;
     let mut builds = Vec::new();
     builds
         .try_reserve_exact(build_references.len())
-        .map_err(|_| SlideBuildOrderError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: build_references.len(),
         })?;
     for reference in build_references {
         if !build_ids.insert(reference.identifier) {
-            return Err(SlideBuildOrderError::UnsupportedTopology);
+            return Err(Error::Refused(Refusal::UnsupportedTopology));
         }
         let payload = object_payload_in_component(
             source,
@@ -624,20 +670,20 @@ fn read_build_order(
     }
 
     let mut chunk_ids = HashSet::new();
-    chunk_ids.try_reserve(chunk_references.len()).map_err(|_| {
-        SlideBuildOrderError::Allocation {
+    chunk_ids
+        .try_reserve(chunk_references.len())
+        .map_err(|_| Error::Allocation {
             amount: chunk_references.len(),
-        }
-    })?;
+        })?;
     let mut chunks = Vec::new();
     chunks
         .try_reserve_exact(chunk_references.len())
-        .map_err(|_| SlideBuildOrderError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: chunk_references.len(),
         })?;
     for reference in chunk_references {
         if !chunk_ids.insert(reference.identifier) {
-            return Err(SlideBuildOrderError::UnsupportedTopology);
+            return Err(Error::Refused(Refusal::UnsupportedTopology));
         }
         let payload = object_payload_in_component(
             source,
@@ -647,7 +693,7 @@ fn read_build_order(
         )?;
         let (build_identifier, automatic, referent) = parse_chunk_payload(payload, limits)?;
         if !build_ids.contains(&build_identifier) {
-            return Err(SlideBuildOrderError::UnsupportedTopology);
+            return Err(Error::Refused(Refusal::UnsupportedTopology));
         }
         chunks.push(ChunkFact {
             identifier: reference.identifier,
@@ -661,7 +707,7 @@ fn read_build_order(
     let mut build_indexes = HashMap::new();
     build_indexes
         .try_reserve(builds.len())
-        .map_err(|_| SlideBuildOrderError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: builds.len(),
         })?;
     for (index, build) in builds.iter().enumerate() {
@@ -670,7 +716,7 @@ fn read_build_order(
     let mut chunk_indexes_by_build = Vec::new();
     chunk_indexes_by_build
         .try_reserve_exact(builds.len())
-        .map_err(|_| SlideBuildOrderError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: builds.len(),
         })?;
     for _ in &builds {
@@ -689,7 +735,7 @@ fn read_build_order(
             .len()
             .checked_add(chunks.len())
             .and_then(|value| value.checked_add(owned_drawables.len()))
-            .ok_or(SlideBuildOrderError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
 
     Ok(BuildOrderSnapshot {
@@ -701,13 +747,10 @@ fn read_build_order(
     })
 }
 
-fn slide_identifier_at_position(
-    source: &Package,
-    position: Position,
-) -> Result<u64, SlideBuildOrderError> {
+fn slide_identifier_at_position(source: &Package, position: Position) -> Result<u64, Error> {
     let show_identifier = source.root_show_identifier().map_err(map_read_error)?;
     if show_identifier == 0 {
-        return Err(SlideBuildOrderError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let show_object = source
         .required_object(show_identifier, "Keynote show")
@@ -723,7 +766,7 @@ fn slide_identifier_at_position(
     )
     .map_err(map_read_error)?
     .map(|reference| reference.identifier())
-    .ok_or(SlideBuildOrderError::SlidePositionNotFound { position })?;
+    .ok_or(Error::Refused(Refusal::SlidePositionNotFound { position }))?;
     let node_object = source
         .required_object(node_identifier, "Keynote slide node")
         .map_err(map_read_error)?;
@@ -742,7 +785,7 @@ fn slide_identifier_at_position(
     )
     .map_err(map_read_error)?;
     if slide_identifier == 0 {
-        return Err(SlideBuildOrderError::UnsupportedTopology);
+        return Err(Error::Refused(Refusal::UnsupportedTopology));
     }
     Ok(slide_identifier)
 }
@@ -751,8 +794,8 @@ fn parse_slide_order_payload(
     payload: &[u8],
     limits: WireLimits,
     max_references: usize,
-) -> Result<(Vec<RawReference>, Vec<RawReference>, HashSet<u64>), SlideBuildOrderError> {
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+) -> Result<(Vec<RawReference>, Vec<RawReference>, HashSet<u64>), Error> {
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut build_count = 0usize;
     let mut chunk_count = 0usize;
     let mut owned_count = 0usize;
@@ -760,22 +803,20 @@ fn parse_slide_order_payload(
         let count = match field.number() {
             BUILDS_FIELD => &mut build_count,
             DEPRECATED_BUILD_CHUNKS_FIELD => {
-                return Err(SlideBuildOrderError::UnsupportedTopology);
+                return Err(Error::Refused(Refusal::UnsupportedTopology));
             },
             BUILD_CHUNKS_FIELD => &mut chunk_count,
             OWNED_DRAWABLES_FIELD => &mut owned_count,
             _ => continue,
         };
-        *count = count
-            .checked_add(1)
-            .ok_or(SlideBuildOrderError::InvalidSource)?;
+        *count = count.checked_add(1).ok_or(Error::InvalidSource)?;
     }
     for (kind, observed) in [
-        (SlideBuildOrderLimitKind::Builds, build_count),
-        (SlideBuildOrderLimitKind::BuildChunks, chunk_count),
+        (LimitKind::Builds, build_count),
+        (LimitKind::BuildChunks, chunk_count),
     ] {
         if observed > max_references {
-            return Err(SlideBuildOrderError::LimitExceeded {
+            return Err(Error::Limit {
                 kind,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(max_references),
@@ -785,10 +826,10 @@ fn parse_slide_order_payload(
     let reference_count = build_count
         .checked_add(chunk_count)
         .and_then(|count| count.checked_add(owned_count))
-        .ok_or(SlideBuildOrderError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if reference_count > max_references {
-        return Err(SlideBuildOrderError::LimitExceeded {
-            kind: SlideBuildOrderLimitKind::References,
+        return Err(Error::Limit {
+            kind: LimitKind::References,
             observed: usize_to_u64(reference_count),
             maximum: usize_to_u64(max_references),
         });
@@ -796,32 +837,32 @@ fn parse_slide_order_payload(
     let mut builds = Vec::new();
     builds
         .try_reserve_exact(build_count)
-        .map_err(|_| SlideBuildOrderError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: build_count,
         })?;
     let mut chunks = Vec::new();
     chunks
         .try_reserve_exact(chunk_count)
-        .map_err(|_| SlideBuildOrderError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: chunk_count,
         })?;
     let mut owned = HashSet::new();
     owned
         .try_reserve(owned_count)
-        .map_err(|_| SlideBuildOrderError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: owned_count,
         })?;
     for field in view.fields() {
         match field.number() {
             BUILDS_FIELD => builds.push(parse_reference_field(field, limits)?),
             DEPRECATED_BUILD_CHUNKS_FIELD => {
-                return Err(SlideBuildOrderError::UnsupportedTopology);
+                return Err(Error::Refused(Refusal::UnsupportedTopology));
             },
             BUILD_CHUNKS_FIELD => chunks.push(parse_reference_field(field, limits)?),
             OWNED_DRAWABLES_FIELD => {
                 let identifier = parse_reference_field(field, limits)?.identifier;
                 if !owned.insert(identifier) {
-                    return Err(SlideBuildOrderError::UnsupportedTopology);
+                    return Err(Error::Refused(Refusal::UnsupportedTopology));
                 }
             },
             _ => {},
@@ -833,9 +874,9 @@ fn parse_slide_order_payload(
 fn parse_reference_field(
     field: litchi_iwa_common::wire::WireFieldView<'_>,
     limits: WireLimits,
-) -> Result<RawReference, SlideBuildOrderError> {
+) -> Result<RawReference, Error> {
     if field.wire_type() != 2 {
-        return Err(SlideBuildOrderError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     field.validate_canonical_framing().map_err(map_wire_error)?;
     let identifier = parse_reference_payload(field.payload(), limits)?;
@@ -845,11 +886,8 @@ fn parse_reference_field(
     })
 }
 
-fn parse_reference_payload(
-    payload: &[u8],
-    limits: WireLimits,
-) -> Result<u64, SlideBuildOrderError> {
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+fn parse_reference_payload(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut identifier = None;
     let mut deprecated_type = None;
     let mut external = None;
@@ -859,24 +897,24 @@ fn parse_reference_payload(
                 field.validate_canonical_key().map_err(map_wire_error)?;
                 let value = canonical_varint(field.payload())?;
                 if identifier.replace(value).is_some() {
-                    return Err(SlideBuildOrderError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
             },
             2 => {
                 field.validate_canonical_key().map_err(map_wire_error)?;
                 let value = canonical_varint(field.payload())?;
                 if value > i32::MAX as u64 && value < 0xffff_ffff_8000_0000 {
-                    return Err(SlideBuildOrderError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 if deprecated_type.replace(value).is_some() {
-                    return Err(SlideBuildOrderError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
             },
             3 => {
                 field.validate_canonical_key().map_err(map_wire_error)?;
                 let value = canonical_varint(field.payload())?;
                 if value > 1 || external.replace(value == 1).is_some() {
-                    return Err(SlideBuildOrderError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
             },
             _ => {},
@@ -884,9 +922,9 @@ fn parse_reference_payload(
     }
     let identifier = identifier
         .filter(|identifier| *identifier != 0)
-        .ok_or(SlideBuildOrderError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if external == Some(true) {
-        return Err(SlideBuildOrderError::UnsupportedTopology);
+        return Err(Error::Refused(Refusal::UnsupportedTopology));
     }
     Ok(identifier)
 }
@@ -895,8 +933,8 @@ fn parse_build_payload(
     payload: &[u8],
     limits: WireLimits,
     owned_drawables: &HashSet<u64>,
-) -> Result<Option<bool>, SlideBuildOrderError> {
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+) -> Result<Option<bool>, Error> {
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut drawable = None;
     let mut delivery = false;
     let mut attributes = None;
@@ -904,22 +942,22 @@ fn parse_build_payload(
         match field.number() {
             DRAWABLE_FIELD => {
                 if drawable.is_some() {
-                    return Err(SlideBuildOrderError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 let reference = parse_reference_payload_field(field, limits)?;
                 drawable = Some(reference);
             },
             DELIVERY_FIELD => {
                 if delivery || field.wire_type() != 2 {
-                    return Err(SlideBuildOrderError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 field.validate_canonical_framing().map_err(map_wire_error)?;
-                str::from_utf8(field.payload()).map_err(|_| SlideBuildOrderError::InvalidSource)?;
+                str::from_utf8(field.payload()).map_err(|_| Error::InvalidSource)?;
                 delivery = true;
             },
             ATTRIBUTES_FIELD => {
                 if attributes.is_some() || field.wire_type() != 2 {
-                    return Err(SlideBuildOrderError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 field.validate_canonical_framing().map_err(map_wire_error)?;
                 attributes = Some(field.payload());
@@ -927,9 +965,9 @@ fn parse_build_payload(
             _ => {},
         }
     }
-    let drawable = drawable.ok_or(SlideBuildOrderError::UnsupportedTopology)?;
+    let drawable = drawable.ok_or(Error::Refused(Refusal::UnsupportedTopology))?;
     if !owned_drawables.contains(&drawable) || !delivery || attributes.is_none() {
-        return Err(SlideBuildOrderError::UnsupportedTopology);
+        return Err(Error::Refused(Refusal::UnsupportedTopology));
     }
     parse_animation_automatic(attributes.unwrap_or_default(), limits)
 }
@@ -937,26 +975,23 @@ fn parse_build_payload(
 fn parse_reference_payload_field(
     field: litchi_iwa_common::wire::WireFieldView<'_>,
     limits: WireLimits,
-) -> Result<u64, SlideBuildOrderError> {
+) -> Result<u64, Error> {
     if field.wire_type() != 2 {
-        return Err(SlideBuildOrderError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     field.validate_canonical_framing().map_err(map_wire_error)?;
     parse_reference_payload(field.payload(), limits)
 }
 
-fn parse_animation_automatic(
-    payload: &[u8],
-    limits: WireLimits,
-) -> Result<Option<bool>, SlideBuildOrderError> {
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+fn parse_animation_automatic(payload: &[u8], limits: WireLimits) -> Result<Option<bool>, Error> {
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut animation = None;
     for field in view.fields() {
         if field.number() != ATTRIBUTES_ANIMATION_FIELD {
             continue;
         }
         if animation.is_some() || field.wire_type() != 2 {
-            return Err(SlideBuildOrderError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field.validate_canonical_framing().map_err(map_wire_error)?;
         animation = Some(field.payload());
@@ -964,14 +999,14 @@ fn parse_animation_automatic(
     let Some(animation) = animation else {
         return Ok(None);
     };
-    let animation_view = WireView::parse_with_limits(animation, limits).map_err(map_wire_error)?;
+    let animation_view = WireView::parse(animation, limits).map_err(map_wire_error)?;
     let mut automatic = None;
     for field in animation_view.fields() {
         if field.number() != ANIMATION_AUTOMATIC_FIELD {
             continue;
         }
         if automatic.is_some() {
-            return Err(SlideBuildOrderError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         automatic = Some(parse_bool_field(field)?);
     }
@@ -981,8 +1016,8 @@ fn parse_animation_automatic(
 fn parse_chunk_payload(
     payload: &[u8],
     limits: WireLimits,
-) -> Result<(u64, Option<bool>, Option<bool>), SlideBuildOrderError> {
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+) -> Result<(u64, Option<bool>, Option<bool>), Error> {
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut build = None;
     let mut automatic = None;
     let mut referent = None;
@@ -992,32 +1027,32 @@ fn parse_chunk_payload(
         match field.number() {
             CHUNK_BUILD_FIELD => {
                 if build.is_some() {
-                    return Err(SlideBuildOrderError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 build = Some(parse_reference_payload_field(field, limits)?);
             },
             CHUNK_AUTOMATIC_FIELD => {
                 if automatic.is_some() {
-                    return Err(SlideBuildOrderError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 automatic = Some(parse_bool_field(field)?);
             },
             CHUNK_REFERENT_FIELD => {
                 if referent.is_some() {
-                    return Err(SlideBuildOrderError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 referent = Some(parse_bool_field(field)?);
             },
             CHUNK_IDENTIFIER_FIELD => {
                 if chunk_identifier.is_some() || field.wire_type() != 2 {
-                    return Err(SlideBuildOrderError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 field.validate_canonical_framing().map_err(map_wire_error)?;
                 chunk_identifier = Some(parse_chunk_identifier(field.payload(), limits)?);
             },
             CHUNK_BUILD_ID_FIELD => {
                 if build_id.is_some() || field.wire_type() != 2 {
-                    return Err(SlideBuildOrderError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 field.validate_canonical_framing().map_err(map_wire_error)?;
                 build_id = Some(parse_uuid(field.payload(), limits)?);
@@ -1027,56 +1062,53 @@ fn parse_chunk_payload(
     }
     if let (Some(left), Some(right)) = (chunk_identifier, build_id) {
         if left != right {
-            return Err(SlideBuildOrderError::UnsupportedTopology);
+            return Err(Error::Refused(Refusal::UnsupportedTopology));
         }
     }
-    let build = build.ok_or(SlideBuildOrderError::UnsupportedTopology)?;
+    let build = build.ok_or(Error::Refused(Refusal::UnsupportedTopology))?;
     Ok((build, automatic, referent))
 }
 
-fn parse_chunk_identifier(
-    payload: &[u8],
-    limits: WireLimits,
-) -> Result<Uuid, SlideBuildOrderError> {
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+fn parse_chunk_identifier(payload: &[u8], limits: WireLimits) -> Result<Uuid, Error> {
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut uuid = None;
     let mut chunk_id = None;
     for field in view.fields() {
         match field.number() {
             1 => {
                 if uuid.is_some() || field.wire_type() != 2 {
-                    return Err(SlideBuildOrderError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 field.validate_canonical_framing().map_err(map_wire_error)?;
                 uuid = Some(parse_uuid(field.payload(), limits)?);
             },
             2 => {
                 if chunk_id.is_some() {
-                    return Err(SlideBuildOrderError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 chunk_id = Some(canonical_int32(field)?);
             },
             _ => {},
         }
     }
-    uuid.ok_or(SlideBuildOrderError::UnsupportedTopology)
+    uuid.ok_or(Error::Refused(Refusal::UnsupportedTopology))
 }
 
-fn parse_uuid(payload: &[u8], limits: WireLimits) -> Result<Uuid, SlideBuildOrderError> {
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+fn parse_uuid(payload: &[u8], limits: WireLimits) -> Result<Uuid, Error> {
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut lower = None;
     let mut upper = None;
     for field in view.fields() {
         match field.number() {
             UUID_LOWER_FIELD => {
                 if lower.is_some() {
-                    return Err(SlideBuildOrderError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 lower = Some(canonical_uint64(field)?);
             },
             UUID_UPPER_FIELD => {
                 if upper.is_some() {
-                    return Err(SlideBuildOrderError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 upper = Some(canonical_uint64(field)?);
             },
@@ -1084,50 +1116,44 @@ fn parse_uuid(payload: &[u8], limits: WireLimits) -> Result<Uuid, SlideBuildOrde
         }
     }
     Ok(Uuid {
-        lower: lower.ok_or(SlideBuildOrderError::UnsupportedTopology)?,
-        upper: upper.ok_or(SlideBuildOrderError::UnsupportedTopology)?,
+        lower: lower.ok_or(Error::Refused(Refusal::UnsupportedTopology))?,
+        upper: upper.ok_or(Error::Refused(Refusal::UnsupportedTopology))?,
     })
 }
 
-fn parse_bool_field(
-    field: litchi_iwa_common::wire::WireFieldView<'_>,
-) -> Result<bool, SlideBuildOrderError> {
+fn parse_bool_field(field: litchi_iwa_common::wire::WireFieldView<'_>) -> Result<bool, Error> {
     if field.wire_type() != 0 {
-        return Err(SlideBuildOrderError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     field.validate_canonical_key().map_err(map_wire_error)?;
     match canonical_varint(field.payload())? {
         0 => Ok(false),
         1 => Ok(true),
-        _ => Err(SlideBuildOrderError::InvalidSource),
+        _ => Err(Error::InvalidSource),
     }
 }
 
-fn canonical_uint64(
-    field: litchi_iwa_common::wire::WireFieldView<'_>,
-) -> Result<u64, SlideBuildOrderError> {
+fn canonical_uint64(field: litchi_iwa_common::wire::WireFieldView<'_>) -> Result<u64, Error> {
     if field.wire_type() != 0 {
-        return Err(SlideBuildOrderError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     field.validate_canonical_key().map_err(map_wire_error)?;
     canonical_varint(field.payload())
 }
 
-fn canonical_int32(
-    field: litchi_iwa_common::wire::WireFieldView<'_>,
-) -> Result<i32, SlideBuildOrderError> {
+fn canonical_int32(field: litchi_iwa_common::wire::WireFieldView<'_>) -> Result<i32, Error> {
     let value = canonical_uint64(field)?;
     if value > i32::MAX as u64 && value < 0xffff_ffff_8000_0000 {
-        return Err(SlideBuildOrderError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(value as i32)
 }
 
-fn canonical_varint(payload: &[u8]) -> Result<u64, SlideBuildOrderError> {
-    let (value, consumed) = litchi_iwa_common::decode_varint_from_bytes(payload)
-        .map_err(|_| SlideBuildOrderError::InvalidSource)?;
+fn canonical_varint(payload: &[u8]) -> Result<u64, Error> {
+    let (value, consumed) =
+        litchi_iwa_common::decode_varint_from_bytes(payload).map_err(|_| Error::InvalidSource)?;
     if consumed != payload.len() || consumed != litchi_iwa_common::varint::encoded_len(value) {
-        return Err(SlideBuildOrderError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(value)
 }
@@ -1137,48 +1163,48 @@ fn validate_chunk_grouping(
     chunks: &[ChunkFact],
     build_indexes: &HashMap<u64, usize>,
     chunk_indexes_by_build: &mut [Vec<usize>],
-) -> Result<(), SlideBuildOrderError> {
+) -> Result<(), Error> {
     let mut chunk_counts = Vec::new();
     chunk_counts
         .try_reserve_exact(builds.len())
-        .map_err(|_| SlideBuildOrderError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: builds.len(),
         })?;
     chunk_counts.resize(builds.len(), 0usize);
     for chunk in chunks {
         let build_index = *build_indexes
             .get(&chunk.build_identifier)
-            .ok_or(SlideBuildOrderError::UnsupportedTopology)?;
+            .ok_or(Error::Refused(Refusal::UnsupportedTopology))?;
         chunk_counts[build_index] = chunk_counts[build_index]
             .checked_add(1)
-            .ok_or(SlideBuildOrderError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     for (indexes, count) in chunk_indexes_by_build.iter_mut().zip(chunk_counts) {
         indexes
             .try_reserve_exact(count)
-            .map_err(|_| SlideBuildOrderError::Allocation { amount: count })?;
+            .map_err(|_| Error::Allocation { amount: count })?;
     }
     let mut closed = HashSet::new();
     closed
         .try_reserve(builds.len())
-        .map_err(|_| SlideBuildOrderError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: builds.len(),
         })?;
     let mut active = None;
     let mut group_order = Vec::new();
     group_order
         .try_reserve_exact(builds.len())
-        .map_err(|_| SlideBuildOrderError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: builds.len(),
         })?;
     for (chunk_index, chunk) in chunks.iter().enumerate() {
         let build_index = *build_indexes
             .get(&chunk.build_identifier)
-            .ok_or(SlideBuildOrderError::UnsupportedTopology)?;
+            .ok_or(Error::Refused(Refusal::UnsupportedTopology))?;
         chunk_indexes_by_build[build_index].push(chunk_index);
         if active != Some(build_index) {
             if closed.contains(&build_index) {
-                return Err(SlideBuildOrderError::UnsupportedTopology);
+                return Err(Error::Refused(Refusal::UnsupportedTopology));
             }
             if let Some(previous) = active.replace(build_index) {
                 closed.insert(previous);
@@ -1189,7 +1215,7 @@ fn validate_chunk_grouping(
     let mut expected_group_order = Vec::new();
     expected_group_order
         .try_reserve_exact(builds.len())
-        .map_err(|_| SlideBuildOrderError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: builds.len(),
         })?;
     for (index, chunk_indexes) in chunk_indexes_by_build.iter().enumerate() {
@@ -1198,7 +1224,7 @@ fn validate_chunk_grouping(
         }
     }
     if group_order != expected_group_order {
-        return Err(SlideBuildOrderError::UnsupportedTopology);
+        return Err(Error::Refused(Refusal::UnsupportedTopology));
     }
     Ok(())
 }
@@ -1207,59 +1233,57 @@ fn validate_start_semantics(
     builds: &[BuildFact],
     chunks: &[ChunkFact],
     chunk_indexes_by_build: &[Vec<usize>],
-) -> Result<(), SlideBuildOrderError> {
+) -> Result<(), Error> {
     let mut event_index = 0usize;
     for (build_index, build) in builds.iter().enumerate() {
         let Some(first_chunk_index) = chunk_indexes_by_build[build_index].first().copied() else {
             continue;
         };
-        let chunk = chunks
-            .get(first_chunk_index)
-            .ok_or(SlideBuildOrderError::InvalidSource)?;
+        let chunk = chunks.get(first_chunk_index).ok_or(Error::InvalidSource)?;
         let automatic = chunk.automatic.or(build.default_automatic).unwrap_or(false);
         let referent = chunk.referent.unwrap_or(true);
         // Automatic/referent on the first event is native After Transition;
         // the same shape later in the order is native After Previous.
         if automatic && !referent && event_index == 0 {
-            return Err(SlideBuildOrderError::UnsupportedTopology);
+            return Err(Error::Refused(Refusal::UnsupportedTopology));
         }
         event_index = event_index
             .checked_add(chunk_indexes_by_build[build_index].len())
-            .ok_or(SlideBuildOrderError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     Ok(())
 }
 
-fn try_owned_bytes(source: &[u8]) -> Result<Box<[u8]>, SlideBuildOrderError> {
+fn try_owned_bytes(source: &[u8]) -> Result<Box<[u8]>, Error> {
     let mut bytes = Vec::new();
     bytes
         .try_reserve_exact(source.len())
-        .map_err(|_| SlideBuildOrderError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: source.len(),
         })?;
     bytes.extend_from_slice(source);
     Ok(bytes.into_boxed_slice())
 }
 
-fn try_owned_string(source: &str) -> Result<String, SlideBuildOrderError> {
+fn try_owned_string(source: &str) -> Result<String, Error> {
     let mut value = String::new();
     value
         .try_reserve_exact(source.len())
-        .map_err(|_| SlideBuildOrderError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: source.len(),
         })?;
     value.push_str(source);
     Ok(value)
 }
 
-fn try_clone_reference(source: &RawReference) -> Result<RawReference, SlideBuildOrderError> {
+fn try_clone_reference(source: &RawReference) -> Result<RawReference, Error> {
     Ok(RawReference {
         identifier: source.identifier,
         raw: try_owned_bytes(&source.raw)?,
     })
 }
 
-fn try_clone_build_fact(source: &BuildFact) -> Result<BuildFact, SlideBuildOrderError> {
+fn try_clone_build_fact(source: &BuildFact) -> Result<BuildFact, Error> {
     Ok(BuildFact {
         identifier: source.identifier,
         reference: try_clone_reference(&source.reference)?,
@@ -1267,7 +1291,7 @@ fn try_clone_build_fact(source: &BuildFact) -> Result<BuildFact, SlideBuildOrder
     })
 }
 
-fn try_clone_chunk_fact(source: &ChunkFact) -> Result<ChunkFact, SlideBuildOrderError> {
+fn try_clone_chunk_fact(source: &ChunkFact) -> Result<ChunkFact, Error> {
     Ok(ChunkFact {
         identifier: source.identifier,
         reference: try_clone_reference(&source.reference)?,
@@ -1282,19 +1306,17 @@ fn object_payload_in_component<'a>(
     expected_component: &str,
     identifier: u64,
     type_: u32,
-) -> Result<&'a [u8], SlideBuildOrderError> {
+) -> Result<&'a [u8], Error> {
     let (component, object) = source
         .object_with_component(identifier)
-        .ok_or(SlideBuildOrderError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if component != expected_component {
-        return Err(SlideBuildOrderError::UnsupportedTopology);
+        return Err(Error::Refused(Refusal::UnsupportedTopology));
     }
     unique_payload(&object.messages, &[type_], "Keynote build object").map_err(map_read_error)
 }
 
-fn validate_build_order_snapshot(
-    snapshot: &BuildOrderSnapshot,
-) -> Result<(), SlideBuildOrderError> {
+fn validate_build_order_snapshot(snapshot: &BuildOrderSnapshot) -> Result<(), Error> {
     if snapshot.builds.len() != snapshot.chunk_indexes_by_build.len()
         || snapshot
             .builds
@@ -1305,26 +1327,23 @@ fn validate_build_order_snapshot(
             .iter()
             .any(|chunk| chunk.reference.identifier != chunk.identifier)
     {
-        return Err(SlideBuildOrderError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
 
-fn ensure_intent_bounds(
-    snapshot: &BuildOrderSnapshot,
-    intent: Intent,
-) -> Result<(), SlideBuildOrderError> {
+fn ensure_intent_bounds(snapshot: &BuildOrderSnapshot, intent: Intent) -> Result<(), Error> {
     validate_build_order_snapshot(snapshot)?;
     if intent.source.get() >= snapshot.builds.len() {
-        return Err(SlideBuildOrderError::BuildPositionNotFound {
+        return Err(Error::Refused(Refusal::BuildPositionNotFound {
             position: intent.source,
-        });
+        }));
     }
     if intent.destination.get() >= snapshot.builds.len() {
-        return Err(SlideBuildOrderError::DestinationOutOfRange {
+        return Err(Error::Refused(Refusal::DestinationOutOfRange {
             position: intent.destination,
             build_count: snapshot.builds.len(),
-        });
+        }));
     }
     Ok(())
 }
@@ -1332,11 +1351,11 @@ fn ensure_intent_bounds(
 fn moved_build_order(
     before: &BuildOrderSnapshot,
     intent: Intent,
-) -> Result<BuildOrderSnapshot, SlideBuildOrderError> {
+) -> Result<BuildOrderSnapshot, Error> {
     let mut order = Vec::new();
     order
         .try_reserve_exact(before.builds.len())
-        .map_err(|_| SlideBuildOrderError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: before.builds.len(),
         })?;
     order.extend(0..before.builds.len());
@@ -1344,20 +1363,20 @@ fn moved_build_order(
     order.insert(intent.destination.get(), selected);
 
     let mut builds = Vec::new();
-    builds.try_reserve_exact(before.builds.len()).map_err(|_| {
-        SlideBuildOrderError::Allocation {
+    builds
+        .try_reserve_exact(before.builds.len())
+        .map_err(|_| Error::Allocation {
             amount: before.builds.len(),
-        }
-    })?;
+        })?;
     for index in &order {
         builds.push(try_clone_build_fact(&before.builds[*index])?);
     }
     let mut chunks = Vec::new();
-    chunks.try_reserve_exact(before.chunks.len()).map_err(|_| {
-        SlideBuildOrderError::Allocation {
+    chunks
+        .try_reserve_exact(before.chunks.len())
+        .map_err(|_| Error::Allocation {
             amount: before.chunks.len(),
-        }
-    })?;
+        })?;
     for index in &order {
         for chunk_index in &before.chunk_indexes_by_build[*index] {
             chunks.push(try_clone_chunk_fact(&before.chunks[*chunk_index])?);
@@ -1366,7 +1385,7 @@ fn moved_build_order(
     let mut chunk_indexes_by_build = Vec::new();
     chunk_indexes_by_build
         .try_reserve_exact(builds.len())
-        .map_err(|_| SlideBuildOrderError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: builds.len(),
         })?;
     let mut chunk_offset = 0usize;
@@ -1375,12 +1394,12 @@ fn moved_build_order(
         let chunk_count = before.chunk_indexes_by_build[*index].len();
         indexes
             .try_reserve_exact(chunk_count)
-            .map_err(|_| SlideBuildOrderError::Allocation {
+            .map_err(|_| Error::Allocation {
                 amount: chunk_count,
             })?;
         let chunk_end = chunk_offset
             .checked_add(chunk_count)
-            .ok_or(SlideBuildOrderError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         indexes.extend(chunk_offset..chunk_end);
         chunk_offset = chunk_end;
         chunk_indexes_by_build.push(indexes);
@@ -1415,35 +1434,39 @@ fn rewrite_build_order(
     before: &BuildOrderSnapshot,
     intent: Intent,
     after: &BuildOrderSnapshot,
-) -> Result<Package, SlideBuildOrderError> {
+) -> Result<Package, Error> {
     let expected = moved_build_order(before, intent)?;
     if !same_order(&expected, after) {
-        return Err(SlideBuildOrderError::Verification);
+        return Err(Error::Verification);
     }
     let source_catalog = editable_source_catalog(source)?;
     let component = source_catalog
         .components()
         .iter()
         .find(|component| component.name() == before.component_name.as_str())
-        .ok_or(SlideBuildOrderError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let entry = source_catalog
         .package()
         .iter()
         .find(|entry| entry.name() == before.component_name.as_str())
-        .ok_or(SlideBuildOrderError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if entry.is_opaque()
         || component
             .archive()
             .object(before.slide_identifier)
             .is_none()
     {
-        return Err(SlideBuildOrderError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let archive_limits = source_catalog
         .limits()
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    let stream = SnappyStream::decompress_with_limits(
+    let snappy_limits = source_catalog
+        .limits()
+        .snappy_limits()
+        .map_err(map_archive_error)?;
+    let stream = SnappyStream::decompress(
         entry.data(),
         source_catalog
             .limits()
@@ -1452,21 +1475,20 @@ fn rewrite_build_order(
     )
     .map_err(map_core_error)?;
     let stream_bytes = stream.as_bytes();
-    let mut archive =
-        Archive::parse_with_limits(stream_bytes, archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream_bytes, archive_limits).map_err(map_core_error)?;
     archive
-        .validate_canonical_object_framing(stream_bytes)
+        .validate_canonical_object_framing(stream_bytes, Default::default())
         .map_err(map_core_error)?;
     let object = archive
         .object_mut(before.slide_identifier)
-        .ok_or(SlideBuildOrderError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let mut message_index = None;
     for (index, message) in object.messages.iter().enumerate() {
         if message.type_ == SLIDE_MESSAGE_TYPE && message_index.replace(index).is_some() {
-            return Err(SlideBuildOrderError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
-    let message_index = message_index.ok_or(SlideBuildOrderError::InvalidSource)?;
+    let message_index = message_index.ok_or(Error::InvalidSource)?;
     let original = object.messages[message_index].data.as_slice();
     let rewritten = permute_slide_build_references(
         original,
@@ -1479,12 +1501,10 @@ fn rewrite_build_order(
         data: rewritten,
     };
     object
-        .replace_message_preserving_header_with_limits(message_index, replacement, archive_limits)
+        .replace_message_preserving_header(message_index, replacement, archive_limits)
         .map_err(map_core_error)?;
-    let serialized = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
-    let compressed = SnappyStream::compress(&serialized).map_err(map_core_error)?;
+    let serialized = archive.to_bytes(archive_limits).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&serialized, snappy_limits).map_err(map_core_error)?;
     let output = source_catalog
         .package()
         .reassemble_to_bytes(
@@ -1500,12 +1520,12 @@ fn permute_slide_build_references(
     before: &BuildOrderSnapshot,
     after: &BuildOrderSnapshot,
     limits: WireLimits,
-) -> Result<Vec<u8>, SlideBuildOrderError> {
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+) -> Result<Vec<u8>, Error> {
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut build_raw_by_id = HashMap::new();
     build_raw_by_id
         .try_reserve(before.builds.len())
-        .map_err(|_| SlideBuildOrderError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: before.builds.len(),
         })?;
     for build in &before.builds {
@@ -1513,13 +1533,13 @@ fn permute_slide_build_references(
             .insert(build.identifier, build.reference.raw.as_ref())
             .is_some()
         {
-            return Err(SlideBuildOrderError::UnsupportedTopology);
+            return Err(Error::Refused(Refusal::UnsupportedTopology));
         }
     }
     let mut chunk_raw_by_id = HashMap::new();
     chunk_raw_by_id
         .try_reserve(before.chunks.len())
-        .map_err(|_| SlideBuildOrderError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: before.chunks.len(),
         })?;
     for chunk in &before.chunks {
@@ -1527,7 +1547,7 @@ fn permute_slide_build_references(
             .insert(chunk.identifier, chunk.reference.raw.as_ref())
             .is_some()
         {
-            return Err(SlideBuildOrderError::UnsupportedTopology);
+            return Err(Error::Refused(Refusal::UnsupportedTopology));
         }
     }
     let mut requested_builds = after.builds.iter();
@@ -1535,7 +1555,7 @@ fn permute_slide_build_references(
     let mut output = Vec::new();
     output
         .try_reserve_exact(payload.len())
-        .map_err(|_| SlideBuildOrderError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: payload.len(),
         })?;
     for field in view.fields() {
@@ -1544,35 +1564,35 @@ fn permute_slide_build_references(
                 let identifier = requested_builds
                     .next()
                     .map(|build| &build.identifier)
-                    .ok_or(SlideBuildOrderError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
                 output.extend_from_slice(
                     build_raw_by_id
                         .get(identifier)
                         .copied()
-                        .ok_or(SlideBuildOrderError::InvalidSource)?,
+                        .ok_or(Error::InvalidSource)?,
                 );
             },
             BUILD_CHUNKS_FIELD => {
                 let identifier = requested_chunks
                     .next()
                     .map(|chunk| &chunk.identifier)
-                    .ok_or(SlideBuildOrderError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
                 output.extend_from_slice(
                     chunk_raw_by_id
                         .get(identifier)
                         .copied()
-                        .ok_or(SlideBuildOrderError::InvalidSource)?,
+                        .ok_or(Error::InvalidSource)?,
                 );
             },
             _ => output.extend_from_slice(field.raw()),
         }
     }
     if requested_builds.next().is_some() || requested_chunks.next().is_some() {
-        return Err(SlideBuildOrderError::Verification);
+        return Err(Error::Verification);
     }
     if output.len() > limits.max_output_bytes() {
-        return Err(SlideBuildOrderError::LimitExceeded {
-            kind: SlideBuildOrderLimitKind::OutputBytes,
+        return Err(Error::Limit {
+            kind: LimitKind::OutputBytes,
             observed: usize_to_u64(output.len()),
             maximum: usize_to_u64(limits.max_output_bytes()),
         });
@@ -1580,11 +1600,11 @@ fn permute_slide_build_references(
     Ok(output)
 }
 
-fn ensure_reference_limit(source: &Package, count: usize) -> Result<(), SlideBuildOrderError> {
+fn ensure_reference_limit(source: &Package, count: usize) -> Result<(), Error> {
     let maximum = source.semantic_limits().max_references();
     if count > maximum {
-        return Err(SlideBuildOrderError::LimitExceeded {
-            kind: SlideBuildOrderLimitKind::References,
+        return Err(Error::Limit {
+            kind: LimitKind::References,
             observed: usize_to_u64(count),
             maximum: usize_to_u64(maximum),
         });
@@ -1592,52 +1612,50 @@ fn ensure_reference_limit(source: &Package, count: usize) -> Result<(), SlideBui
     Ok(())
 }
 
-fn physical_shared_source(source: &Package) -> Result<Arc<[u8]>, SlideBuildOrderError> {
+fn physical_shared_source(source: &Package) -> Result<Arc<[u8]>, Error> {
     match &source.state.source {
         PhysicalSource::Package(package) => Ok(package.shared_source()),
-        PhysicalSource::Semantic(_) => Err(SlideBuildOrderError::UnsupportedSource),
+        PhysicalSource::Semantic(_) => Err(Error::Refused(Refusal::UnsupportedSource)),
     }
 }
 
-fn editable_shared_source(source: &Package) -> Result<Arc<[u8]>, SlideBuildOrderError> {
+fn editable_shared_source(source: &Package) -> Result<Arc<[u8]>, Error> {
     Ok(editable_source_catalog(source)?.shared_source())
 }
 
-fn editable_source_catalog(
-    source: &Package,
-) -> Result<&litchi_iwa_archive::SourceCatalog, SlideBuildOrderError> {
+fn editable_source_catalog(source: &Package) -> Result<&litchi_iwa_archive::SourceCatalog, Error> {
     let package = match &source.state.source {
         PhysicalSource::Package(package) => package,
-        PhysicalSource::Semantic(_) => return Err(SlideBuildOrderError::UnsupportedSource),
+        PhysicalSource::Semantic(_) => return Err(Error::Refused(Refusal::UnsupportedSource)),
     };
     if !package.source_is_exact() {
-        return Err(SlideBuildOrderError::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     Ok(package)
 }
 
-fn map_selector_error(error: SlideSelectorError) -> SlideBuildOrderError {
+fn map_selector_error(error: SlideSelectorError) -> Error {
     match error {
-        SlideSelectorError::EmptySlideName => SlideBuildOrderError::EmptySlideName,
-        SlideSelectorError::DuplicateSlideName { .. } => SlideBuildOrderError::AmbiguousSelector,
+        SlideSelectorError::EmptySlideName => Error::Refused(Refusal::EmptySlideName),
+        SlideSelectorError::DuplicateSlideName { .. } => Error::Refused(Refusal::AmbiguousSelector),
     }
 }
 
-fn map_read_error(error: ReadError) -> SlideBuildOrderError {
+fn map_read_error(error: ReadError) -> Error {
     match error {
         ReadError::SemanticLimit {
             kind,
             observed,
             maximum,
             ..
-        } => SlideBuildOrderError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                super::SemanticLimitKind::Objects => SlideBuildOrderLimitKind::Entries,
-                super::SemanticLimitKind::Slides => SlideBuildOrderLimitKind::Slides,
-                super::SemanticLimitKind::References => SlideBuildOrderLimitKind::References,
+                super::SemanticLimitKind::Objects => LimitKind::Entries,
+                super::SemanticLimitKind::Slides => LimitKind::Slides,
+                super::SemanticLimitKind::References => LimitKind::References,
                 super::SemanticLimitKind::TextStorages
                 | super::SemanticLimitKind::TextFragments
-                | super::SemanticLimitKind::TextBytes => SlideBuildOrderLimitKind::WireWork,
+                | super::SemanticLimitKind::TextBytes => LimitKind::WireWork,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
@@ -1647,117 +1665,95 @@ fn map_read_error(error: ReadError) -> SlideBuildOrderError {
             observed,
             maximum,
             ..
-        } => SlideBuildOrderError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                super::PayloadLimitKind::Bytes => SlideBuildOrderLimitKind::WireBytes,
-                super::PayloadLimitKind::Fields => SlideBuildOrderLimitKind::WireFields,
-                super::PayloadLimitKind::Nesting => SlideBuildOrderLimitKind::WireNesting,
-                super::PayloadLimitKind::Work => SlideBuildOrderLimitKind::WireWork,
+                super::PayloadLimitKind::Bytes => LimitKind::WireBytes,
+                super::PayloadLimitKind::Fields => LimitKind::WireFields,
+                super::PayloadLimitKind::Nesting => LimitKind::WireNesting,
+                super::PayloadLimitKind::Work => LimitKind::WireWork,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         },
-        ReadError::Allocation { amount, .. } => SlideBuildOrderError::Allocation { amount },
+        ReadError::Allocation { amount, .. } => Error::Allocation { amount },
         ReadError::Archive(archive_error) => map_archive_error(archive_error),
         ReadError::Io(_)
         | ReadError::Detection(_)
-        | ReadError::NotKeynote
+        | ReadError::UnexpectedFormat { .. }
         | ReadError::InvalidFormat(_)
         | ReadError::Decode(_)
         | ReadError::TextStorage { .. }
-        | ReadError::Metadata(_) => SlideBuildOrderError::InvalidSource,
+        | ReadError::Metadata(_) => Error::InvalidSource,
     }
 }
 
-fn map_archive_error(error: litchi_iwa_archive::Error) -> SlideBuildOrderError {
+fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     match error {
         litchi_iwa_archive::Error::Limit {
             kind,
             observed,
             maximum,
-        } => SlideBuildOrderError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_archive::LimitKind::InputBytes => SlideBuildOrderLimitKind::InputBytes,
-                litchi_iwa_archive::LimitKind::OutputBytes => SlideBuildOrderLimitKind::OutputBytes,
-                litchi_iwa_archive::LimitKind::Entries => SlideBuildOrderLimitKind::Entries,
+                litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
+                litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_archive::LimitKind::Entries => LimitKind::Entries,
                 litchi_iwa_archive::LimitKind::MemberNameBytes
                 | litchi_iwa_archive::LimitKind::MetadataBytes
                 | litchi_iwa_archive::LimitKind::CompressedEntryBytes
                 | litchi_iwa_archive::LimitKind::EntryBytes
-                | litchi_iwa_archive::LimitKind::IwaStreamBytes => {
-                    SlideBuildOrderLimitKind::EntryBytes
-                },
+                | litchi_iwa_archive::LimitKind::IwaStreamBytes => LimitKind::EntryBytes,
                 litchi_iwa_archive::LimitKind::TotalBytes
-                | litchi_iwa_archive::LimitKind::IwaTotalBytes => {
-                    SlideBuildOrderLimitKind::TotalBytes
-                },
+                | litchi_iwa_archive::LimitKind::IwaTotalBytes => LimitKind::TotalBytes,
             },
             observed,
             maximum,
         },
-        litchi_iwa_archive::Error::Allocation { amount, .. } => {
-            SlideBuildOrderError::Allocation { amount }
-        },
+        litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
         litchi_iwa_archive::Error::Iwa(core_error) => map_core_error(core_error),
-        litchi_iwa_archive::Error::Io(_)
-        | litchi_iwa_archive::Error::Zip { .. }
-        | litchi_iwa_archive::Error::InvalidLimits(_)
-        | litchi_iwa_archive::Error::Encrypted
-        | litchi_iwa_archive::Error::SourceChanged { .. }
-        | litchi_iwa_archive::Error::DirectoryChanged { .. }
-        | litchi_iwa_archive::Error::Reassembly(_)
-        | litchi_iwa_archive::Error::InvalidBundle(_) => SlideBuildOrderError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_core_error(error: litchi_iwa_core::Error) -> SlideBuildOrderError {
+fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
             observed, maximum, ..
-        } => SlideBuildOrderError::LimitExceeded {
-            kind: SlideBuildOrderLimitKind::EntryBytes,
+        } => Error::Limit {
+            kind: LimitKind::EntryBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         },
         litchi_iwa_core::Error::Allocation { requested, .. } => {
-            SlideBuildOrderError::Allocation { amount: requested }
+            Error::Allocation { amount: requested }
         },
-        litchi_iwa_core::Error::InvalidArchive { .. }
-        | litchi_iwa_core::Error::InvalidLimits { .. }
-        | litchi_iwa_core::Error::HeaderCodec { .. }
-        | litchi_iwa_core::Error::Io(_)
-        | litchi_iwa_core::Error::Snappy { .. } => SlideBuildOrderError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_wire_error(error: litchi_iwa_common::Error) -> SlideBuildOrderError {
+fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
     match error {
         litchi_iwa_common::Error::LimitExceeded {
             kind,
             observed,
             limit,
-        } => SlideBuildOrderError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_common::LimitKind::InputBytes => SlideBuildOrderLimitKind::WireBytes,
-                litchi_iwa_common::LimitKind::OutputBytes => SlideBuildOrderLimitKind::OutputBytes,
+                litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
+                litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,
                 litchi_iwa_common::LimitKind::Fields
                 | litchi_iwa_common::LimitKind::TableRows
                 | litchi_iwa_common::LimitKind::TableColumns
                 | litchi_iwa_common::LimitKind::TableCells
-                | litchi_iwa_common::LimitKind::MaterializedCells => {
-                    SlideBuildOrderLimitKind::WireFields
-                },
-                litchi_iwa_common::LimitKind::Nesting => SlideBuildOrderLimitKind::WireNesting,
-                litchi_iwa_common::LimitKind::RewriteWork => SlideBuildOrderLimitKind::WireWork,
+                | litchi_iwa_common::LimitKind::MaterializedCells => LimitKind::WireFields,
+                litchi_iwa_common::LimitKind::Nesting => LimitKind::WireNesting,
+                litchi_iwa_common::LimitKind::RewriteWork => LimitKind::WireWork,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
-        litchi_iwa_common::Error::Allocation { amount, .. } => {
-            SlideBuildOrderError::Allocation { amount }
-        },
-        litchi_iwa_common::Error::InvalidFormat(_)
-        | litchi_iwa_common::Error::InvalidLimit { .. } => SlideBuildOrderError::InvalidSource,
+        litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
@@ -1824,11 +1820,15 @@ mod tests {
         Ok(ArchiveObject::new(
             identifier,
             vec![RawMessage { type_, data }],
+            Default::default(),
         )?)
     }
 
     fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-        Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+        Ok(SnappyStream::compress(
+            &Archive { objects }.to_bytes(Default::default())?,
+            Default::default(),
+        )?)
     }
 
     #[allow(
@@ -1925,7 +1925,8 @@ mod tests {
             ..Default::default()
         }
         .encode_to_vec();
-        let view = WireView::parse(&canonical).expect("canonical slide parses");
+        let view =
+            WireView::parse(&canonical, WireLimits::DEFAULT).expect("canonical slide parses");
         let mut build_index = 0usize;
         let mut chunk_index = 0usize;
         let mut output = Vec::with_capacity(canonical.len().saturating_add(64));
@@ -2052,7 +2053,7 @@ mod tests {
                 (DOCUMENT_MEMBER, document_component.as_slice()),
                 (SLIDE_MEMBER, slide_component.as_slice()),
             ],
-            super::super::Limits::default(),
+            litchi_iwa_archive::Limits::default(),
         )?)
     }
 
@@ -2077,18 +2078,18 @@ mod tests {
     }
 
     fn slide_reference_records(package_bytes: &[u8], number: u32) -> TestResult<Vec<Vec<u8>>> {
-        let catalog = Catalog::from_bytes(package_bytes)?;
+        let catalog = Catalog::from_bytes(package_bytes, Default::default())?;
         let entry = catalog
             .iter()
             .find(|entry| entry.name() == SLIDE_MEMBER)
             .ok_or_else(|| io::Error::other("fixture slide member missing"))?;
-        let stream = SnappyStream::decompress(entry.data())?;
-        let archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
         let slide = archive
             .object(4)
             .and_then(|object| object.messages.iter().find(|message| message.type_ == 5))
             .ok_or_else(|| io::Error::other("fixture slide object missing"))?;
-        Ok(WireView::parse(&slide.data)?
+        Ok(WireView::parse(&slide.data, WireLimits::DEFAULT)?
             .fields()
             .filter(|field| field.number() == number)
             .map(|field| field.raw().to_vec())
@@ -2166,7 +2167,7 @@ mod tests {
         let changed_source = applied.package();
         assert!(matches!(
             changed_source.apply_slide_build_order(commit.patch()),
-            Err(SlideBuildOrderError::PatchConflict)
+            Err(Error::PatchConflict)
         ));
         let debug = format!("{:?}", commit.patch());
         assert!(!debug.contains("Index/"));
@@ -2195,7 +2196,7 @@ mod tests {
             let bytes = package_bytes(options)?;
             let package = Package::from_bytes(&bytes)?;
             let source = exact_bytes(&package);
-            let result = (|| -> Result<(), SlideBuildOrderError> {
+            let result = (|| -> Result<(), Error> {
                 let mut edit = package.edit_slide_build_order();
                 edit.move_build(0usize, Position::new(0), Position::new(1))?;
                 let _commit = edit.commit()?;
@@ -2203,7 +2204,7 @@ mod tests {
             })();
             assert!(matches!(
                 result,
-                Err(SlideBuildOrderError::UnsupportedTopology)
+                Err(Error::Refused(Refusal::UnsupportedTopology))
             ));
             assert_eq!(exact_bytes(&package), source);
         }
@@ -2219,8 +2220,8 @@ mod tests {
         two_builds.extend_from_slice(&build);
         assert!(matches!(
             parse_slide_order_payload(&two_builds, WireLimits::default(), 1),
-            Err(SlideBuildOrderError::LimitExceeded {
-                kind: SlideBuildOrderLimitKind::Builds,
+            Err(Error::Limit {
+                kind: LimitKind::Builds,
                 observed: 2,
                 maximum: 1,
             })
@@ -2230,8 +2231,8 @@ mod tests {
         two_chunks.extend_from_slice(&chunk);
         assert!(matches!(
             parse_slide_order_payload(&two_chunks, WireLimits::default(), 1),
-            Err(SlideBuildOrderError::LimitExceeded {
-                kind: SlideBuildOrderLimitKind::BuildChunks,
+            Err(Error::Limit {
+                kind: LimitKind::BuildChunks,
                 observed: 2,
                 maximum: 1,
             })
@@ -2241,8 +2242,8 @@ mod tests {
         aggregate.extend_from_slice(&chunk);
         assert!(matches!(
             parse_slide_order_payload(&aggregate, WireLimits::default(), 1),
-            Err(SlideBuildOrderError::LimitExceeded {
-                kind: SlideBuildOrderLimitKind::References,
+            Err(Error::Limit {
+                kind: LimitKind::References,
                 observed: 2,
                 maximum: 1,
             })

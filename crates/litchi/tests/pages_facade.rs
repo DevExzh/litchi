@@ -3,16 +3,24 @@
 use std::io;
 use std::path::PathBuf;
 
-use litchi::Document;
 use litchi::pages::document_settings::{
     Commit, Diagnostics, Edit, Error, LimitKind, Patch, Settings,
 };
 use litchi::pages::{
-    Package, PageLayoutCommit, PageLayoutDiagnostics, PageLayoutEdit, PageLayoutError,
-    PageLayoutLimitKind, PageLayoutPatch, SectionSelector, SectionTextCommit,
-    SectionTextDiagnostics, SectionTextEdit, SectionTextError, SectionTextLimitKind,
-    SectionTextPatch, TextPosition, TextSpan,
+    Package, SectionSelector, TextPosition, TextSpan,
+    page_layout::transaction::Commit as PageLayoutCommit,
+    page_layout::transaction::Diagnostics as PageLayoutDiagnostics,
+    page_layout::transaction::Edit as PageLayoutEdit,
+    page_layout::transaction::Error as PageLayoutError,
+    page_layout::transaction::LimitKind as PageLayoutLimitKind,
+    page_layout::transaction::Patch as PageLayoutPatch,
     page_layout::{Layout, Orientation},
+    section::text::Commit as SectionTextCommit,
+    section::text::Diagnostics as SectionTextDiagnostics,
+    section::text::Edit as SectionTextEdit,
+    section::text::Error as SectionTextError,
+    section::text::LimitKind as SectionTextLimitKind,
+    section::text::Patch as SectionTextPatch,
     section::{PageNumber, PageNumbering, Start},
 };
 
@@ -28,6 +36,12 @@ fn package_bytes(package: &Package) -> Result<Vec<u8>, Box<dyn std::error::Error
     Ok(bytes)
 }
 
+/// Pages body text that the native reader projects into a rich-text storage
+/// reaches the facade reader as one paragraph.
+///
+/// The unified `File` reads that storage (records 0296 and 0306; the
+/// facade's read-only `litchi::iwork::Document` that read it before is
+/// deleted).
 #[test]
 fn body_storage_reaches_facade_paragraphs() -> Result<(), Box<dyn std::error::Error>> {
     let path = fixture_path();
@@ -49,29 +63,25 @@ fn body_storage_reaches_facade_paragraphs() -> Result<(), Box<dyn std::error::Er
         .text();
     assert!(!expected.is_empty());
 
-    let document = Document::open(path)?;
-    assert_eq!(document.text()?, expected);
-    assert_eq!(document.paragraph_count()?, 1);
-
-    let paragraphs = document.paragraphs()?;
-    assert_eq!(paragraphs.len(), 1);
+    // `litchi::open` reads the same body through the unified `File`
+    // (record 0296): one paragraph per line of the section's text.
+    let file = litchi::open(&path)?;
+    assert_eq!(file.format(), Some(litchi::FileFormat::Pages));
+    let first_line = expected.split('\n').next().unwrap_or_default();
+    let paragraph = file.get("/body/p[1]")?;
+    assert_eq!(paragraph.view().text()?.as_deref(), Some(first_line));
+    // One body section whose text is exactly the storage, as the deleted
+    // snapshot reported it (one section, one text item).
+    let section = file.get("/section[1]")?;
+    assert_eq!(section.view().text()?.as_deref(), Some(expected));
     assert_eq!(
-        paragraphs
-            .first()
-            .ok_or_else(|| io::Error::other("facade returned no Pages paragraph"))?
-            .text()?,
-        expected
+        file.get("/section[2]").map(|_| ()).unwrap_err().code(),
+        litchi::Code::PathNotFound
     );
-
-    let elements = document.elements()?;
-    assert_eq!(elements.len(), 1);
     assert_eq!(
-        elements
-            .first()
-            .and_then(litchi::DocumentElement::as_paragraph)
-            .ok_or_else(|| io::Error::other("facade returned no Pages paragraph element"))?
-            .text()?,
-        expected
+        file.query("p")?.count(),
+        expected.split('\n').count(),
+        "one paragraph per line"
     );
 
     Ok(())
@@ -299,7 +309,7 @@ fn page_layout_transaction_reaches_pages_facade() -> Result<(), Box<dyn std::err
     assert_eq!(edit.layout(), before);
     edit.set_layout(after)?;
     let edit_debug = format!("{edit:?}");
-    assert!(edit_debug.contains("PageLayoutEdit"));
+    assert!(edit_debug.starts_with("Edit"));
     assert!(!edit_debug.contains("Index/"));
     assert!(!edit_debug.contains(".iwa"));
     assert!(!edit_debug.contains("identifier"));
@@ -315,7 +325,7 @@ fn page_layout_transaction_reaches_pages_facade() -> Result<(), Box<dyn std::err
     assert_ne!(package_bytes(changed.package())?, source);
 
     let patch_debug = format!("{:?}", changed.patch());
-    assert!(patch_debug.contains("PageLayoutPatch"));
+    assert!(patch_debug.starts_with("Patch"));
     assert!(!patch_debug.contains("Index/"));
     assert!(!patch_debug.contains(".iwa"));
     assert!(!patch_debug.contains("identifier"));

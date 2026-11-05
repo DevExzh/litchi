@@ -9,6 +9,21 @@ reversible block edits, plus the `ToMarkdown` trait and configuration types
 used by Litchi's higher-level format adapters. It deliberately has no knowledge
 of any concrete document format.
 
+`Snapshot::read` and `Snapshot::read_bytes` are finite CommonMark convenience
+constructors. Callers that select GFM or a stricter policy use one retained
+`OpenOptions` value:
+
+```rust
+use litchi_markdown::OpenOptions;
+use litchi_markdown::reader::{Dialect, ReadLimits, Snapshot};
+
+let options = OpenOptions::default()
+    .dialect(Dialect::GitHubFlavored)
+    .read_limits(ReadLimits::DEFAULT);
+let source = Snapshot::read_with_options("# Original", options)?;
+# Ok::<(), litchi_markdown::reader::Error>(())
+```
+
 Snapshots expose source-ranged top-level blocks, nested block nodes, inline
 nodes, and a deterministic link/image/footnote reference graph. Transactions
 can stage multiple disjoint block, nested-block, and inline replacements plus
@@ -30,10 +45,10 @@ let source = Snapshot::read("# Original\n\nBody")?;
 let mut edit = source.edit();
 edit.replace_block_with_text(0, "# literal heading marker")?;
 let commit = edit.commit()?;
-assert_eq!(commit.snapshot().source(), "\\# literal heading marker\n\nBody");
+assert_eq!(commit.package().source(), "\\# literal heading marker\n\nBody");
 
-let restored = commit.snapshot().apply(&commit.patch().inverse())?;
-assert_eq!(restored.snapshot().source(), source.source());
+let restored = commit.package().apply(&commit.patch().inverse())?;
+assert_eq!(restored.package().source(), source.source());
 # Ok::<(), litchi_markdown::reader::Error>(())
 ```
 
@@ -70,7 +85,8 @@ fn render<T: ToMarkdown>(value: &T) -> String {
 
 ## Features
 
-- `ToMarkdown` trait for converting types to Markdown.
+- `ToMarkdown` trait for converting types to Markdown; each implementor names
+  the typed error its conversion reports.
 - `MarkdownOptions` plus `FormulaStyle`, `ScriptStyle`, `StrikethroughStyle`, `TableStyle` enums for tuning the output.
 - Unicode helpers for rendering super- and subscript characters.
 

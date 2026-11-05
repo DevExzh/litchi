@@ -2,7 +2,7 @@ use super::super::support::*;
 
 #[test]
 fn test_headers_and_footers() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.set_odd_header("Odd Header");
     writer.set_even_header("Even Header");
     writer.set_first_header("First Header");
@@ -54,7 +54,7 @@ mod header_kind_tests {
 
     #[test]
     fn header_shape_ids_use_the_header_cluster() {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         writer
             .insert_header_picture(
                 HeaderKind::Odd,

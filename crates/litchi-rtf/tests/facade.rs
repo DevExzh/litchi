@@ -7,8 +7,9 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+use litchi_core::Position;
 use litchi_rtf::write::Writer;
-use litchi_rtf::{Document, read};
+use litchi_rtf::{Document, OpenOptions, Package, SourceLimits};
 use litchi_rtf::{text, text::Inline};
 use std::io::{self, Write};
 
@@ -45,7 +46,7 @@ fn retained_paragraph_count_matches_hidden_and_structural_content() {
         r"{\rtf1{\*\unknown hidden\par}visible\par tail}",
         r"{\rtf1\trowd\cellx1000\intbl cell\cell\row visible\par tail}",
     ] {
-        let document = Document::parse(source).unwrap();
+        let document = Package::parse(source).unwrap();
         assert_eq!(
             document.paragraph_count(),
             document.body().paragraphs().count(),
@@ -56,14 +57,16 @@ fn retained_paragraph_count_matches_hidden_and_structural_content() {
 
 #[test]
 fn document_is_a_small_shared_snapshot() {
+    assert_snapshot_traits::<Package>();
     assert_snapshot_traits::<Document>();
     assert_borrowed_view_traits::<litchi_rtf::font::Catalog<'static>>();
     assert_borrowed_view_traits::<litchi_rtf::font::Font<'static>>();
     assert_borrowed_view_traits::<litchi_rtf::color::Palette<'static>>();
     assert_borrowed_view_traits::<litchi_rtf::color::Value>();
+    assert_eq!(size_of::<Package>(), size_of::<usize>());
     assert_eq!(size_of::<Document>(), size_of::<usize>());
 
-    let document = Document::parse(r"{\rtf1\ansi first\par second}").unwrap();
+    let document = Package::parse(r"{\rtf1\ansi first\par second}").unwrap();
     let shared = document.clone();
 
     assert!(document.same_snapshot(&shared));
@@ -73,20 +76,57 @@ fn document_is_a_small_shared_snapshot() {
 }
 
 #[test]
+fn package_projection_survives_owner_drop_and_retains_open_policy() {
+    let limits = SourceLimits::builder()
+        .max_input_bytes(512)
+        .expect("source-byte limit is representable")
+        .build()
+        .expect("source profile is consistent");
+    let package = Package::parse_with_options(
+        r"{\rtf1\ansi first\par second}",
+        OpenOptions::new().source_limits(limits),
+    )
+    .unwrap();
+    assert_eq!(package.source_limits(), limits);
+    assert_eq!(package.open_options().source_limits_value(), limits);
+
+    let document = package.document();
+    let clone = document.clone();
+    assert!(std::ptr::eq(package.text(), document.text()));
+    assert!(std::ptr::eq(document.text(), clone.text()));
+    assert_eq!(document.text(), "first\nsecond");
+    assert_eq!(document.paragraph_count(), 2);
+
+    drop(package);
+    assert_eq!(document.text(), "first\nsecond");
+    assert_eq!(document.body().paragraphs().count(), 2);
+}
+
+#[test]
 fn contextual_reader_uses_checked_limits() {
-    let limits = read::Limits::new().with_max_source_bytes(8);
-    assert!(Document::parse_with_limits(r"{\rtf1 too large}", limits).is_err());
+    let limits = SourceLimits::builder()
+        .max_input_bytes(8)
+        .expect("source-byte limit is representable")
+        .build()
+        .expect("source profile is consistent");
+    assert!(
+        Package::parse_with_options(
+            r"{\rtf1 too large}",
+            OpenOptions::new().source_limits(limits)
+        )
+        .is_err()
+    );
 }
 
 #[test]
 fn snapshot_round_trips_through_concise_writer() {
     let document =
-        Document::parse(r"{\rtf1\ansi{\fonttbl{\f0\fswiss Helvetica;}}\f0\pard Hello!\par}")
+        Package::parse(r"{\rtf1\ansi{\fonttbl{\f0\fswiss Helvetica;}}\f0\pard Hello!\par}")
             .unwrap();
 
     let mut bytes = Vec::new();
     Writer::new(&mut bytes).write(&document).unwrap();
-    let reparsed = Document::from_bytes(&bytes).unwrap();
+    let reparsed = Package::from_bytes(&bytes).unwrap();
 
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.fonts().len(), 1);
@@ -95,7 +135,7 @@ fn snapshot_round_trips_through_concise_writer() {
 
 #[test]
 fn font_catalog_hides_sparse_rtf_slots_and_resolves_runs() {
-    let document = Document::parse(
+    let document = Package::parse(
         r"{\rtf1\ansi{\fonttbl{\f7\fswiss Sparse Sans;}{\f42\froman Story Serif;}}\f42 text}",
     )
     .unwrap();
@@ -131,7 +171,7 @@ fn font_catalog_hides_sparse_rtf_slots_and_resolves_runs() {
 #[test]
 fn font_lookup_reports_ambiguous_names() {
     let document =
-        Document::parse(r"{\rtf1\ansi{\fonttbl{\f1\fswiss Shared;}{\f9\froman Shared;}}\f1 text}")
+        Package::parse(r"{\rtf1\ansi{\fonttbl{\f1\fswiss Shared;}{\f9\froman Shared;}}\f1 text}")
             .unwrap();
 
     assert!(matches!(
@@ -142,7 +182,7 @@ fn font_lookup_reports_ambiguous_names() {
 
 #[test]
 fn run_format_resolves_checked_color_values() {
-    let document = Document::parse(
+    let document = Package::parse(
         r"{\rtf1\ansi{\fonttbl{\f0\fnil Arial;}}{\colortbl;\red12\green34\blue56;}\f0\cf1\cb1\highlight1\ul\ulc1 colored}",
     )
     .unwrap();
@@ -167,7 +207,7 @@ fn run_format_resolves_checked_color_values() {
     assert_eq!(format.highlight_color(), Some(expected));
     assert_eq!(format.underline_color(), Some(expected));
 
-    let reparsed = Document::from_bytes(&document.to_bytes().unwrap()).unwrap();
+    let reparsed = Package::from_bytes(&document.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reparsed.colors().at(0),
         Some(litchi_rtf::color::Value::Automatic)
@@ -179,17 +219,177 @@ fn run_format_resolves_checked_color_values() {
 }
 
 #[test]
+fn inline_character_controls_split_native_runs_and_restore_groups() {
+    let document = Package::parse(
+        r"{\rtf1\ansi{\fonttbl{\f0\fnil Base;}{\f1\fswiss Alt;}}{\colortbl;\red255\green0\blue0;}\f0 base\f1 alt\f0 base_again\i italic\i0 italic_off\fs28 big\fs24 size_off\uldb under_double\ulnone under_off\strike struck\strike0 strike_off\striked dstruck\striked0 dstrike_off\v hidden\v0 hidden_off\caps caps\caps0 caps_off\scaps smallcaps\scaps0 smallcaps_off\outl outline\outl0 outline_off\cf1 red\cf0 color_off{\b grouped_bold{\i nested_italic}grouped_restored}after_group}",
+    )
+    .unwrap();
+
+    let runs: Vec<_> = document.body().runs().collect();
+    let texts: Vec<_> = runs.iter().map(|run| run.text()).collect();
+    assert_eq!(
+        texts,
+        vec![
+            "base",
+            "alt",
+            "base_again",
+            "italic",
+            "italic_off",
+            "big",
+            "size_off",
+            "under_double",
+            "under_off",
+            "struck",
+            "strike_off",
+            "dstruck",
+            "dstrike_off",
+            "hidden",
+            "hidden_off",
+            "caps",
+            "caps_off",
+            "smallcaps",
+            "smallcaps_off",
+            "outline",
+            "outline_off",
+            "red",
+            "color_off",
+            "grouped_bold",
+            "nested_italic",
+            "grouped_restored",
+            "after_group",
+        ]
+    );
+
+    let run = |text: &str| runs.iter().find(|run| run.text() == text).unwrap();
+    assert_eq!(
+        run("base")
+            .format()
+            .font()
+            .map(litchi_rtf::font::Font::name),
+        Some("Base")
+    );
+    assert_eq!(
+        run("alt").format().font().map(litchi_rtf::font::Font::name),
+        Some("Alt")
+    );
+    assert_eq!(
+        run("base_again")
+            .format()
+            .font()
+            .map(litchi_rtf::font::Font::name),
+        Some("Base")
+    );
+    assert!(run("italic").format().italic());
+    assert!(!run("italic_off").format().italic());
+    assert_eq!(run("big").format().size().get(), 28);
+    assert_eq!(run("size_off").format().size().get(), 24);
+    assert_eq!(
+        run("under_double").format().underline(),
+        text::Underline::Double
+    );
+    assert_eq!(run("under_off").format().underline(), text::Underline::None);
+    assert!(run("struck").format().strike());
+    assert!(!run("strike_off").format().strike());
+    assert!(run("dstruck").format().double_strike());
+    assert!(!run("dstrike_off").format().double_strike());
+    assert!(run("hidden").format().hidden());
+    assert!(!run("hidden_off").format().hidden());
+    assert!(run("caps").format().all_caps());
+    assert!(!run("caps_off").format().all_caps());
+    assert!(run("smallcaps").format().small_caps());
+    assert!(!run("smallcaps_off").format().small_caps());
+    assert!(run("outline").format().outline());
+    assert!(!run("outline_off").format().outline());
+    assert_eq!(
+        run("red").format().foreground(),
+        Some(litchi_rtf::color::Value::Rgb(
+            litchi_rtf::color::Color::new(255, 0, 0)
+        ))
+    );
+    assert_eq!(
+        run("color_off").format().foreground(),
+        Some(litchi_rtf::color::Value::Automatic)
+    );
+
+    assert!(run("grouped_bold").format().bold());
+    assert!(!run("grouped_bold").format().italic());
+    assert!(run("nested_italic").format().bold());
+    assert!(run("nested_italic").format().italic());
+    assert!(run("grouped_restored").format().bold());
+    assert!(!run("grouped_restored").format().italic());
+    assert!(!run("after_group").format().bold());
+    assert!(!run("after_group").format().italic());
+}
+
+#[test]
+fn every_native_underline_control_starts_a_distinct_run() {
+    const STYLES: &[(&str, text::Underline)] = &[
+        (r"\ul", text::Underline::Single),
+        (r"\ulnone", text::Underline::None),
+        (r"\uldb", text::Underline::Double),
+        (r"\uld", text::Underline::Dotted),
+        (r"\uldash", text::Underline::Dashed),
+        (r"\uldashd", text::Underline::DashDot),
+        (r"\uldashdd", text::Underline::DashDotDot),
+        (r"\ulw", text::Underline::Words),
+        (r"\ulth", text::Underline::Thick),
+        (r"\ulwave", text::Underline::Wave),
+        (r"\ulhair", text::Underline::Hairline),
+        (r"\ulthd", text::Underline::ThickDotted),
+        (r"\ulthdash", text::Underline::ThickDashed),
+        (r"\ulthdashd", text::Underline::ThickDashDot),
+        (r"\ulthdashdd", text::Underline::ThickDashDotDot),
+        (r"\ulthldash", text::Underline::ThickLongDash),
+        (r"\ulldash", text::Underline::LongDash),
+        (r"\ulhwave", text::Underline::HeavyWave),
+        (r"\ululdbwave", text::Underline::DoubleWave),
+    ];
+    let mut source = String::from(r"{\rtf1\ansi");
+    for (index, (control, _)) in STYLES.iter().enumerate() {
+        source.push_str(control);
+        source.push(' ');
+        source.push('u');
+        source.push_str(&index.to_string());
+        source.push_str(r"\ulnone off");
+        source.push_str(&index.to_string());
+    }
+    source.push('}');
+
+    let document = Package::parse(&source).unwrap();
+    let runs: Vec<_> = document.body().runs().collect();
+    assert_eq!(runs.len(), STYLES.len() * 2);
+    for (index, (control, style)) in STYLES.iter().enumerate() {
+        let styled_text = format!("u{index}");
+        let reset_text = format!("off{index}");
+        let styled = runs
+            .iter()
+            .find(|run| run.text() == styled_text.as_str())
+            .unwrap();
+        let reset = runs
+            .iter()
+            .find(|run| run.text() == reset_text.as_str())
+            .unwrap();
+        assert_eq!(styled.format().underline(), *style, "{control}");
+        assert_eq!(
+            reset.format().underline(),
+            text::Underline::None,
+            "reset after {control}"
+        );
+    }
+}
+
+#[test]
 fn snapshot_to_bytes_matches_streaming_facade() {
-    let document = Document::parse(r"{\rtf1\ansi concise}").unwrap();
+    let document = Package::parse(r"{\rtf1\ansi concise}").unwrap();
     let direct = document.to_bytes().unwrap();
-    let reparsed = Document::from_bytes(&direct).unwrap();
+    let reparsed = Package::from_bytes(&direct).unwrap();
     assert_eq!(reparsed.text(), "concise");
 }
 
 #[test]
 fn streaming_facade_propagates_partial_sink_failure_without_mutating_snapshot() {
     let source = br"{\rtf1\ansi immutable sequential output}";
-    let document = Document::from_bytes(source).unwrap();
+    let document = Package::from_bytes(source).unwrap();
     let before = document.text().to_owned();
     let mut sink = FailAfter {
         accepted: 0,
@@ -206,7 +406,7 @@ fn streaming_facade_propagates_partial_sink_failure_without_mutating_snapshot() 
 
 #[test]
 fn story_lazily_distinguishes_lines_paragraphs_and_empty_paragraphs() {
-    let document = Document::parse(r"{\rtf1\ansi\qc\b one\line two\par\par three}").unwrap();
+    let document = Package::parse(r"{\rtf1\ansi\qc\b one\line two\par\par three}").unwrap();
     assert_eq!(document.body().len(), document.text().len());
     assert_eq!(document.body().is_empty(), document.text().is_empty());
     let paragraphs: Vec<_> = document.body().paragraphs().collect();
@@ -256,34 +456,36 @@ fn story_retains_exact_text_length_across_fragmentation_and_edits() {
         r"{\rtf1\ansi first\par\par trailing}",
         r"{\rtf1\ansi A\u10?B}",
     ] {
-        let document = Document::parse(source).unwrap();
+        let document = Package::parse(source).unwrap();
         assert_eq!(document.body().len(), document.text().len());
         assert_eq!(document.body().is_empty(), document.text().is_empty());
     }
 
-    let source = Document::parse(r"{\rtf1\ansi old\par retained}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi old\par retained}").unwrap();
     let source_len = source.body().len();
+    let projection = source.document();
     let mut edit = source.edit();
-    edit.replace_paragraph_text(0, "a longer replacement")
+    edit.replace_paragraph_text(Position::new(0), "a longer replacement")
         .unwrap();
-    let changed = edit.commit().unwrap().snapshot().clone();
+    let changed = edit.commit().unwrap().package().clone();
 
     assert_eq!(source.body().len(), source_len);
     assert_eq!(source.body().len(), source.text().len());
     assert_eq!(changed.body().len(), changed.text().len());
     assert_ne!(changed.body().len(), source.body().len());
+    assert_eq!(projection.text(), "old\nretained");
 }
 
 #[test]
 fn structural_break_kinds_survive_snapshot_round_trip() {
-    let document = Document::parse(r"{\rtf1 first\line second\par third}").unwrap();
+    let document = Package::parse(r"{\rtf1 first\line second\par third}").unwrap();
     let encoded = document.to_bytes().unwrap();
     let source = std::str::from_utf8(&encoded).unwrap();
 
     assert!(source.contains("\\line "));
     assert!(source.contains("\\par "));
 
-    let reparsed = Document::from_bytes(&encoded).unwrap();
+    let reparsed = Package::from_bytes(&encoded).unwrap();
     let paragraphs: Vec<_> = reparsed
         .body()
         .paragraphs()
@@ -294,7 +496,7 @@ fn structural_break_kinds_survive_snapshot_round_trip() {
 
 #[test]
 fn literal_line_feed_is_text_not_a_structural_break() {
-    let document = Document::parse(r"{\rtf1 A\u10?B}").unwrap();
+    let document = Package::parse(r"{\rtf1 A\u10?B}").unwrap();
     assert_eq!(document.paragraph_count(), 1);
     assert_eq!(
         document
@@ -329,7 +531,7 @@ fn literal_line_feed_is_text_not_a_structural_break() {
     assert!(!source.contains("\\line "));
     assert!(!source.contains("\\par "));
 
-    let reparsed = Document::from_bytes(&canonical).unwrap();
+    let reparsed = Package::from_bytes(&canonical).unwrap();
     assert_eq!(reparsed.text(), "A\nB");
     assert_eq!(reparsed.paragraph_count(), 1);
 }

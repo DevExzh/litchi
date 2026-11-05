@@ -1,0 +1,2245 @@
+{
+  "format": "ods",
+  "state": "open",
+  "verbs": {
+    "get": {
+      "supported": true
+    },
+    "find": {
+      "supported": true
+    },
+    "query": {
+      "supported": true
+    },
+    "view": {
+      "supported": true
+    },
+    "evaluate": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0295 follow-up: OpenFormula translation for the litchi-eval engine",
+      "reason": "ODS formulas are OpenFormula; the evaluation engine reads Excel syntax"
+    },
+    "set": {
+      "supported": true
+    },
+    "add": {
+      "supported": true
+    },
+    "remove": {
+      "supported": true
+    },
+    "move": {
+      "supported": true
+    },
+    "swap": {
+      "supported": true
+    },
+    "edit": {
+      "supported": true
+    },
+    "batch": {
+      "supported": true
+    },
+    "import": {
+      "supported": true
+    },
+    "merge": {
+      "supported": true
+    },
+    "replace": {
+      "supported": true
+    },
+    "refresh": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0295 follow-up: field refresh for PPT, RTF and the ODF object formats",
+      "reason": "this format has no field refresh adapter"
+    },
+    "save": {
+      "supported": true
+    },
+    "create": {
+      "supported": true
+    },
+    "dump": {
+      "supported": true
+    },
+    "raw": {
+      "supported": true
+    },
+    "validate": {
+      "supported": true
+    },
+    "add-part": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0336 follow-up: raw ODF part writes through the ODF package publisher",
+      "reason": "raw part writes cover OOXML (DOCX, XLSX, PPTX, XLSB)"
+    },
+    "raw-set": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0336 follow-up: raw ODF part writes through the ODF package publisher",
+      "reason": "raw part writes cover OOXML (DOCX, XLSX, PPTX, XLSB)"
+    }
+  },
+  "views": {
+    "text": {
+      "supported": true
+    },
+    "annotated": {
+      "supported": true
+    },
+    "outline": {
+      "supported": true
+    },
+    "stats": {
+      "supported": true
+    },
+    "issues": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    "forms": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    "html": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "svg": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "screenshot": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "pdf": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    }
+  },
+  "elements": [
+    {
+      "format": "ods",
+      "element": "workbook",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/"
+        ]
+      },
+      "children": [
+        {
+          "element": "sheet",
+          "pathSegment": "<sheet>"
+        },
+        {
+          "element": "namedrange",
+          "pathSegment": "namedrange"
+        }
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "author": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "subject": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "keywords": {
+          "type": "list",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "description": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "category": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "lastModifiedBy": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "revisionNumber": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "created": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "modified": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      }
+    },
+    {
+      "format": "ods",
+      "element": "sheet",
+      "parent": "workbook",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "stable": [
+          "/<sheet>",
+          "<sheet>!<A1>"
+        ],
+        "positional": [
+          "/sheet[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "column",
+          "pathSegment": "col"
+        },
+        {
+          "element": "row",
+          "pathSegment": "row"
+        },
+        {
+          "element": "cell",
+          "pathSegment": "<A1>"
+        },
+        {
+          "element": "table",
+          "pathSegment": "table"
+        },
+        {
+          "element": "comment",
+          "pathSegment": "comment"
+        },
+        {
+          "element": "chart",
+          "pathSegment": "chart"
+        },
+        {
+          "element": "pivottable",
+          "pathSegment": "pivottable"
+        },
+        {
+          "element": "slicer",
+          "pathSegment": "slicer"
+        },
+        {
+          "element": "sparkline",
+          "pathSegment": "sparkline"
+        },
+        {
+          "element": "dataValidation",
+          "pathSegment": "dataValidation"
+        },
+        {
+          "element": "conditionalFormatting",
+          "pathSegment": "cf"
+        },
+        {
+          "element": "autofilter",
+          "pathSegment": "autofilter"
+        },
+        {
+          "element": "hyperlink",
+          "pathSegment": "hyperlink"
+        },
+        {
+          "element": "mergeCell",
+          "pathSegment": "mergeCell"
+        },
+        {
+          "element": "picture",
+          "pathSegment": "picture"
+        },
+        {
+          "element": "shape",
+          "pathSegment": "shape"
+        },
+        {
+          "element": "ole",
+          "pathSegment": "ole"
+        },
+        {
+          "element": "rowbreak",
+          "pathSegment": "rowbreak"
+        },
+        {
+          "element": "colbreak",
+          "pathSegment": "colbreak"
+        }
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "ods",
+      "element": "cell",
+      "parent": [
+        "sheet",
+        "range"
+      ],
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "stable": [
+          "/<sheet>/<A1>"
+        ]
+      },
+      "children": [
+        {
+          "element": "run",
+          "pathSegment": "run"
+        }
+      ],
+      "properties": {
+        "type": {
+          "type": "enum",
+          "values": [
+            "Number",
+            "String",
+            "Boolean",
+            "Date",
+            "Time",
+            "Currency",
+            "Percentage",
+            "Unknown"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "formula": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "cachedValue": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "empty": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "merge": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "mergeAnchor": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "link": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "value": {
+          "type": "scalar",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "clear": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "style": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type",
+          "value"
+        ]
+      }
+    },
+    {
+      "format": "ods",
+      "element": "range",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": false,
+        "remove": true
+      },
+      "paths": {
+        "stable": [
+          "/<sheet>/<A1>:<A1>"
+        ]
+      },
+      "children": [
+        {
+          "element": "cell",
+          "pathSegment": "<A1>"
+        }
+      ],
+      "properties": {
+        "merge": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "value": {
+          "type": "scalar",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "clear": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "formula": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "style": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
+        }
+      }
+    },
+    {
+      "format": "ods",
+      "element": "row",
+      "parent": "sheet",
+      "operations": {
+        "add": true,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "stable": [
+          "<sheet>!N:N"
+        ],
+        "positional": [
+          "/<sheet>/row[N]"
+        ]
+      },
+      "properties": {},
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "ods",
+      "element": "column",
+      "parent": "sheet",
+      "elementAliases": [
+        "col"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/<sheet>/col[<letters>]",
+          "<sheet>!B:B"
+        ],
+        "positional": [
+          "/<sheet>/col[N]"
+        ]
+      },
+      "properties": {},
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "ods",
+      "element": "table",
+      "parent": [
+        "sheet",
+        "workbook"
+      ],
+      "elementAliases": [
+        "listobject"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/<sheet>/table[@name=<name>]",
+          "/table[@name=<name>]"
+        ],
+        "positional": [
+          "/<sheet>/table[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "ODS adapter follow-up (record 0277)",
+        "reason": "ODS database ranges are read by the leaf but not projected into unified table nodes yet"
+      }
+    },
+    {
+      "format": "ods",
+      "element": "namedrange",
+      "parent": "workbook",
+      "elementAliases": [
+        "definedname"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "stable": [
+          "/namedrange[<name>]",
+          "/namedrange[@name=<name>]"
+        ],
+        "positional": [
+          "/namedrange[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "ref": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "scope": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "ods",
+      "element": "comment",
+      "parent": "sheet",
+      "elementAliases": [
+        "note"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/comment[N]"
+        ]
+      },
+      "properties": {
+        "ref": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "author": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "date": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "anchoredTo": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "ods",
+      "element": "chart",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/chart[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "series",
+          "pathSegment": "series"
+        },
+        {
+          "element": "axis",
+          "pathSegment": "axis"
+        }
+      ],
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "ODS adapter follow-up (record 0277)",
+        "reason": "ODS chart objects are read by the leaf but not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "ods",
+      "element": "series",
+      "parent": "chart",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/chart[N]/series[K]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "ODS adapter follow-up (record 0277)",
+        "reason": "ODS chart series are not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "ods",
+      "element": "axis",
+      "parent": "chart",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/chart[N]/axis[@role=<role>]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "ODS adapter follow-up (record 0277)",
+        "reason": "ODS chart axes are not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "ods",
+      "element": "pivottable",
+      "parent": "sheet",
+      "elementAliases": [
+        "pivot"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/pivottable[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "ODS adapter follow-up (record 0277)",
+        "reason": "ODS data pilot tables are read by the leaf but not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "ods",
+      "element": "slicer",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/slicer[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "none: OpenDocument has no slicer element",
+        "reason": "OpenDocument spreadsheets have no slicer concept"
+      }
+    },
+    {
+      "format": "ods",
+      "element": "sparkline",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/sparkline[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "ODS adapter follow-up (record 0277)",
+        "reason": "ODS sparkline groups are read by the leaf but not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "ods",
+      "element": "dataValidation",
+      "parent": "sheet",
+      "elementAliases": [
+        "validation"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/dataValidation[N]"
+        ]
+      },
+      "properties": {
+        "ref": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "type": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "operator": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "formula1": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "formula2": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "allowBlank": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "showError": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "showInput": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "errorTitle": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "error": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "promptTitle": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "prompt": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "errorStyle": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "inCellDropdown": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "ods",
+      "element": "conditionalFormatting",
+      "parent": "sheet",
+      "elementAliases": [
+        "cf"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/cf[N]"
+        ]
+      },
+      "properties": {
+        "type": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "ref": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "priority": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "stopIfTrue": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "dxfId": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "operator": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "value": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "value2": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "formula": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "rank": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "percent": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "bottom": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "aboveAverage": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "equalAverage": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "stdDev": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "period": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "min": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "max": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "minLength": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "maxLength": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "showValue": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "minColor": {
+          "type": "color",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "midColor": {
+          "type": "color",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "maxColor": {
+          "type": "color",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "midpoint": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "iconset": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "reverse": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "fill": {
+          "type": "color",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.color": {
+          "type": "color",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.bold": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.italic": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.strike": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.underline": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.size": {
+          "type": "font-size",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "negativeColor": {
+          "type": "color",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "axisColor": {
+          "type": "color",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "axisPosition": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "direction": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "ods",
+      "element": "autofilter",
+      "parent": "sheet",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "stable": [
+          "/<sheet>/autofilter"
+        ]
+      },
+      "properties": {
+        "range": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "criteria0": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "ods",
+      "element": "hyperlink",
+      "parent": "sheet",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/hyperlink[N]"
+        ]
+      },
+      "properties": {
+        "ref": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "url": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "location": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "display": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "tooltip": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "ods",
+      "element": "mergeCell",
+      "parent": "sheet",
+      "elementAliases": [
+        "merge",
+        "mergedrange"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/mergeCell[N]"
+        ]
+      },
+      "properties": {
+        "ref": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "ods",
+      "element": "picture",
+      "parent": "sheet",
+      "elementAliases": [
+        "image",
+        "media"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/picture[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "title": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "decorative": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "hyperlink": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "y": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "width": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "height": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "anchorMode": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "rotation": {
+          "type": "number",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "flip": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "contentType": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "fileSize": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "src": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "anchor": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "flipH": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "flipV": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "flipBoth": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "crop": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "opacity": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "shadow": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "glow": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "reflection": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "softEdge": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "ods",
+      "element": "shape",
+      "parent": "sheet",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/shape[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "geometry": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "y": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "width": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "height": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "fill": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "line": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "size": {
+          "type": "font-size",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "bold": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "italic": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "underline": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "color": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "align": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "valign": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "rotation": {
+          "type": "number",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "flip": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "hyperlink": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "anchor": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "flipH": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "flipV": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "flipBoth": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "margin": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "gradientFill": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "shadow": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "glow": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "reflection": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "softEdge": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "ods",
+      "element": "ole",
+      "parent": "sheet",
+      "elementAliases": [
+        "embed",
+        "object",
+        "oleobject"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/ole[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "ODS adapter follow-up (record 0277)",
+        "reason": "ODS embedded objects are read by the leaf but not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "ods",
+      "element": "rowbreak",
+      "parent": "sheet",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/rowbreak[N]"
+        ]
+      },
+      "properties": {
+        "row": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "manual": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "min": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "max": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "ods",
+      "element": "colbreak",
+      "parent": "sheet",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/colbreak[N]"
+        ]
+      },
+      "properties": {
+        "col": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "manual": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "min": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "max": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "ods",
+      "element": "run",
+      "parent": "cell",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/<A1>/run[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "ODS adapter follow-up (record 0277)",
+        "reason": "ODS rich cell text is flattened into the cell's displayed text"
+      }
+    }
+  ],
+  "gaps": [
+    {
+      "subject": "element",
+      "element": "table",
+      "code": "unsupported_capability",
+      "followUp": "ODS adapter follow-up (record 0277)",
+      "reason": "ODS database ranges are read by the leaf but not projected into unified table nodes yet"
+    },
+    {
+      "subject": "element",
+      "element": "chart",
+      "code": "unsupported_capability",
+      "followUp": "ODS adapter follow-up (record 0277)",
+      "reason": "ODS chart objects are read by the leaf but not projected into unified nodes yet"
+    },
+    {
+      "subject": "element",
+      "element": "series",
+      "code": "unsupported_capability",
+      "followUp": "ODS adapter follow-up (record 0277)",
+      "reason": "ODS chart series are not projected into unified nodes yet"
+    },
+    {
+      "subject": "element",
+      "element": "axis",
+      "code": "unsupported_capability",
+      "followUp": "ODS adapter follow-up (record 0277)",
+      "reason": "ODS chart axes are not projected into unified nodes yet"
+    },
+    {
+      "subject": "element",
+      "element": "pivottable",
+      "code": "unsupported_capability",
+      "followUp": "ODS adapter follow-up (record 0277)",
+      "reason": "ODS data pilot tables are read by the leaf but not projected into unified nodes yet"
+    },
+    {
+      "subject": "element",
+      "element": "slicer",
+      "code": "unsupported_capability",
+      "followUp": "none: OpenDocument has no slicer element",
+      "reason": "OpenDocument spreadsheets have no slicer concept"
+    },
+    {
+      "subject": "element",
+      "element": "sparkline",
+      "code": "unsupported_capability",
+      "followUp": "ODS adapter follow-up (record 0277)",
+      "reason": "ODS sparkline groups are read by the leaf but not projected into unified nodes yet"
+    },
+    {
+      "subject": "element",
+      "element": "ole",
+      "code": "unsupported_capability",
+      "followUp": "ODS adapter follow-up (record 0277)",
+      "reason": "ODS embedded objects are read by the leaf but not projected into unified nodes yet"
+    },
+    {
+      "subject": "element",
+      "element": "run",
+      "code": "unsupported_capability",
+      "followUp": "ODS adapter follow-up (record 0277)",
+      "reason": "ODS rich cell text is flattened into the cell's displayed text"
+    },
+    {
+      "subject": "element",
+      "element": "detectedtable",
+      "code": "unsupported_capability",
+      "followUp": "WP11 (record 0339 F5): header-row table detection in queries",
+      "reason": "OfficeCLI's detectedtable is a header-row block found heuristically in unstructured cells and reported by table queries; Litchi's queries return declared tables only"
+    },
+    {
+      "subject": "operation",
+      "verb": "query",
+      "element": "row",
+      "context": "header-column-predicates",
+      "code": "unsupported_capability",
+      "followUp": "ODS adapter follow-up (record 0277)",
+      "reason": "ODS does not yet bind row predicate names to header columns"
+    },
+    {
+      "subject": "operation",
+      "verb": "query",
+      "element": "cell",
+      "context": "styled-blank-cells",
+      "code": "unsupported_capability",
+      "followUp": "ODS adapter follow-up (record 0277)",
+      "reason": "queries enumerate content cells (a value, text, formula, link or merge span); styled blank padding runs are addressable by coordinate only"
+    },
+    {
+      "subject": "property",
+      "element": "workbook",
+      "key": "workbook.date1904",
+      "code": "unsupported_capability",
+      "followUp": "ODS adapter follow-up (record 0277)",
+      "reason": "the ODS null date lives in settings.xml, which is not projected yet"
+    },
+    {
+      "subject": "property",
+      "element": "workbook",
+      "key": "activeTab",
+      "code": "unsupported_capability",
+      "followUp": "ODS adapter follow-up (record 0277)",
+      "reason": "the ODS active table lives in settings.xml, which is not projected yet"
+    },
+    {
+      "subject": "property",
+      "element": "sheet",
+      "key": "hidden",
+      "code": "unsupported_capability",
+      "followUp": "ODS adapter follow-up (record 0277)",
+      "reason": "ODS sheet visibility lives in the table's automatic style, which is not resolved yet"
+    },
+    {
+      "subject": "property",
+      "element": "sheet",
+      "key": "visibility",
+      "code": "unsupported_capability",
+      "followUp": "ODS adapter follow-up (record 0277)",
+      "reason": "ODS sheet visibility lives in the table's automatic style, which is not resolved yet"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "font.bold",
+      "code": "unsupported_capability",
+      "followUp": "ODS adapter follow-up (record 0277)",
+      "reason": "ODS cell formatting lives in named and automatic styles, which node views do not resolve yet; set `style` to apply a named style"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "numberformat",
+      "code": "unsupported_capability",
+      "followUp": "ODS adapter follow-up (record 0277)",
+      "reason": "ODS number formats are data styles referenced by the cell style, which node views do not resolve yet"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "computedValue",
+      "code": "unsupported_capability",
+      "followUp": "ODS adapter follow-up (record 0277)",
+      "reason": "ODS formulas use OpenFormula syntax; `File::evaluate` covers the Excel-syntax workbook formats only"
+    },
+    {
+      "subject": "property",
+      "element": "row",
+      "key": "height",
+      "code": "unsupported_capability",
+      "followUp": "ODS adapter follow-up (record 0277)",
+      "reason": "ODS row heights live in row styles, which are not resolved yet"
+    },
+    {
+      "subject": "property",
+      "element": "row",
+      "key": "hidden",
+      "code": "unsupported_capability",
+      "followUp": "ODS adapter follow-up (record 0277)",
+      "reason": "ODS row visibility is not modeled by the leaf worksheet projection"
+    },
+    {
+      "subject": "property",
+      "element": "column",
+      "key": "width",
+      "code": "unsupported_capability",
+      "followUp": "ODS adapter follow-up (record 0277)",
+      "reason": "ODS column widths live in column styles, which are not resolved yet"
+    },
+    {
+      "subject": "property",
+      "element": "column",
+      "key": "hidden",
+      "code": "unsupported_capability",
+      "followUp": "ODS adapter follow-up (record 0277)",
+      "reason": "ODS column visibility is not modeled by the leaf worksheet projection"
+    },
+    {
+      "subject": "operation",
+      "verb": "get",
+      "element": "metadata",
+      "context": "path-read",
+      "code": "unsupported_capability",
+      "followUp": "ODS adapter follow-up (record 0277)",
+      "reason": "`set(\"/metadata\", ..)` writes meta.xml; the path is set-only, and reads go through File::metadata() and the workbook root"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "metadata",
+      "context": "unowned-fields",
+      "code": "unsupported_capability",
+      "followUp": "ODS adapter follow-up (record 0277)",
+      "reason": "the ODF metadata family (record 0288) writes title, subject, description, author, lastModifiedBy, language and keywords; created, modified, revision, template, statistics and custom.<name> are refused"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "cell",
+      "context": "formatting-properties",
+      "code": "unsupported_capability",
+      "followUp": "ODS adapter follow-up (record 0277)",
+      "reason": "cell formatting is applied by naming an existing cell style (`style`); direct font, fill, border, alignment and number-format keys need an automatic-style author in the unified layer"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "cell",
+      "context": "formula-evaluation",
+      "code": "unsupported_capability",
+      "followUp": "ODS adapter follow-up (record 0277)",
+      "reason": "an authored OpenFormula is stored inert with the cell's cached value (or none); the unified layer does not evaluate ODS formulas"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "sheet",
+      "context": "producer-table-markup",
+      "code": "unsupported_capability",
+      "followUp": "ODS adapter follow-up (record 0277)",
+      "reason": "a rename copies the table fragment under its new name and drops the original; the leaf refuses sheets with formulas, ranges, drawings, forms, protection or other dependency owners, and the writer refuses names a formula or named range still uses"
+    },
+    {
+      "subject": "operation",
+      "verb": "move",
+      "element": "sheet",
+      "context": "native-dependency-closure",
+      "code": "unsupported_capability",
+      "followUp": "ODS adapter follow-up (record 0277)",
+      "reason": "the leaf moves only dependency-free worksheets: formulas, named/database/validation/print ranges, settings, scripts and tracked changes are refused; an added sheet placed before the end is moved the same way"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "row",
+      "context": "logical-row-shift",
+      "code": "unsupported_capability",
+      "followUp": "ODS adapter follow-up (record 0277)",
+      "reason": "rows are inserted, removed, moved and swapped through the leaf's logical row editor, which refuses formulas, merges, ranges, validations, drawings, annotations and other coordinate owners on the worksheet"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "col",
+      "context": "native-editor",
+      "code": "unsupported_capability",
+      "followUp": "ODS adapter follow-up (record 0277)",
+      "reason": "inserting or removing a column that shifts cells needs a logical column editor the leaf does not have"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "row",
+      "context": "layout",
+      "code": "unsupported_capability",
+      "followUp": "ODS adapter follow-up (record 0277)",
+      "reason": "row height and visibility, and column width and visibility, live in automatic styles the unified writer does not author yet"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "namedrange",
+      "context": "scope",
+      "code": "unsupported_capability",
+      "followUp": "ODS adapter follow-up (record 0277)",
+      "reason": "a named range's scope is fixed once added; named expressions are retargeted through `ref` and are not added"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "workbook",
+      "context": "flat-odf",
+      "code": "unsupported_capability",
+      "followUp": "ODS adapter follow-up (record 0277)",
+      "reason": "flat single-XML spreadsheets (.fods) are edited through the leaf's packaged projection and republished element by element (record 0292); an edit that adds a package member or changes a part's root has no flat form and is refused, as is a projection the packaged reader refuses"
+    },
+    {
+      "subject": "operation",
+      "verb": "batch",
+      "element": "cell",
+      "context": "coalescing",
+      "code": "unsupported_capability",
+      "followUp": "ODS adapter follow-up (record 0277)",
+      "reason": "consecutive direct cell value, text, clear and formula sets share one leaf edit; style, merge, range and query sets and every other verb close the run"
+    },
+    {
+      "subject": "view",
+      "mode": "issues",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "forms",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "html",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "svg",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "screenshot",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "pdf",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    }
+  ]
+}

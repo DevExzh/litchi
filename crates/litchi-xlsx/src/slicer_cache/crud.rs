@@ -3,27 +3,25 @@
 use std::collections::{HashMap, HashSet};
 
 use litchi_core::xml::ReaderOrigin;
-use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, SourceLimits};
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 
-use super::package::{load_slicer_caches, store_slicer_cache};
+use super::package::{load_slicer_caches_limited, store_slicer_cache_limited};
 use super::views::{
-    SLICERS_CONTENT_TYPE, Slicer, SlicerPart, Slicers, load_slicer_parts, store_slicer_part,
-    write_slicers,
+    SLICERS_CONTENT_TYPE, Slicer, SlicerPart, Slicers, load_slicer_parts_limited,
+    store_slicer_part_limited,
 };
-use super::{
-    Cache as SlicerCache, Definition as SlicerDefinition, write as write_slicer_cache_definition,
-};
+use super::{Cache as SlicerCache, Definition as SlicerDefinition};
 use crate::error::{Error, Result};
-use crate::pivot::read_pivot_tables;
+use crate::pivot::reader::read_pivot_tables_limited;
 use crate::timelines::{
     Cache, CacheDefinition, Part as TimelinePart, TIMELINE_CACHE_CONTENT_TYPE,
     TIMELINE_CACHE_EXTENSION_URI, TIMELINE_CACHE_RELATIONSHIP_TYPE, TIMELINES_EXTENSION_URI, View,
-    Views, load_timeline_caches, load_timelines, store_timeline_caches, store_worksheet_timelines,
-    write_timeline_cache_definition, write_timelines,
+    Views, load_timeline_caches_limited, load_timelines_limited, store_timeline_caches_limited,
+    store_worksheet_timelines_limited,
 };
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
@@ -41,8 +39,9 @@ pub fn find_slicer(
     package: &OpcPackage,
     worksheet_name: &PackURI,
     slicer_name: &str,
+    limits: &SourceLimits,
 ) -> Result<Option<Slicer>> {
-    Ok(load_slicer_parts(package, worksheet_name)?
+    Ok(load_slicer_parts_limited(package, worksheet_name, limits)?
         .into_iter()
         .flat_map(|part| part.slicers.slicers)
         .find(|slicer| slicer.name.eq_ignore_ascii_case(slicer_name)))
@@ -52,22 +51,29 @@ pub fn add_slicer(
     package: &mut OpcPackage,
     worksheet_name: &PackURI,
     slicer: Slicer,
+    limits: &SourceLimits,
 ) -> Result<SlicerPart> {
-    let caches = load_slicer_caches(package)?;
+    let caches = load_slicer_caches_limited(package, limits)?;
     validate_slicer_cache_reference(&slicer, &caches)?;
-    let mut parts = load_slicer_parts(package, worksheet_name)?;
-    if all_slicer_names(package)?.contains(&slicer.name.to_ascii_lowercase()) {
+    let mut parts = load_slicer_parts_limited(package, worksheet_name, limits)?;
+    if all_slicer_names(package, limits)?.contains(&slicer.name.to_ascii_lowercase()) {
         return Err(invalid(format!("duplicate slicer name '{}'", slicer.name)));
     }
     if let Some(part) = parts.first_mut() {
         part.slicers.slicers.push(slicer);
-        let xml = write_slicers(&part.slicers)?;
+        let xml =
+            super::views::write_slicers_limited(&part.slicers, crate::raw::output_ceiling(limits))?;
         let staged = part.clone();
-        validate_slicer_views(package, Some((&staged.part_name, &staged.slicers)), &caches)?;
+        validate_slicer_views(
+            package,
+            Some((&staged.part_name, &staged.slicers)),
+            &caches,
+            limits,
+        )?;
+        crate::signature_policy::ensure_unsigned(package)?;
         package
             .get_part_mut(&uri(&staged.part_name)?)?
             .set_blob(xml);
-        package.unsign();
         return Ok(staged);
     }
     let part_name = next_part_name(package, "/xl/slicers/slicer%d.xml")?;
@@ -77,8 +83,7 @@ pub fn add_slicer(
         part_name: part_name.to_string(),
         slicers: Slicers::new(vec![slicer]),
     };
-    store_slicer_part(package, worksheet_name, &value)?;
-    package.unsign();
+    store_slicer_part_limited(package, worksheet_name, &value, limits)?;
     Ok(value)
 }
 
@@ -87,12 +92,13 @@ pub fn update_slicer<F>(
     worksheet_name: &PackURI,
     slicer_name: &str,
     update: F,
+    limits: &SourceLimits,
 ) -> Result<bool>
 where
     F: FnOnce(&mut Slicer),
 {
-    let caches = load_slicer_caches(package)?;
-    let mut parts = load_slicer_parts(package, worksheet_name)?;
+    let caches = load_slicer_caches_limited(package, limits)?;
+    let mut parts = load_slicer_parts_limited(package, worksheet_name, limits)?;
     let mut update = Some(update);
     let mut changed = None;
     for (part_index, part) in parts.iter_mut().enumerate() {
@@ -121,11 +127,15 @@ where
         package,
         Some((&parts[index].part_name, &parts[index].slicers)),
         &caches,
+        limits,
     )?;
-    let xml = write_slicers(&parts[index].slicers)?;
+    let xml = super::views::write_slicers_limited(
+        &parts[index].slicers,
+        crate::raw::output_ceiling(limits),
+    )?;
     let part_name = uri(&parts[index].part_name)?;
+    crate::signature_policy::ensure_unsigned(package)?;
     package.get_part_mut(&part_name)?.set_blob(xml);
-    package.unsign();
     Ok(true)
 }
 
@@ -134,21 +144,29 @@ pub fn replace_slicer(
     worksheet_name: &PackURI,
     slicer_name: &str,
     replacement: Slicer,
+    limits: &SourceLimits,
 ) -> Result<bool> {
     if !replacement.name.eq_ignore_ascii_case(slicer_name) {
         return Err(invalid("replacement slicer name must match"));
     }
-    update_slicer(package, worksheet_name, slicer_name, move |slicer| {
-        *slicer = replacement;
-    })
+    update_slicer(
+        package,
+        worksheet_name,
+        slicer_name,
+        move |slicer| {
+            *slicer = replacement;
+        },
+        limits,
+    )
 }
 
 pub fn remove_slicer(
     package: &mut OpcPackage,
     worksheet_name: &PackURI,
     slicer_name: &str,
+    limits: &SourceLimits,
 ) -> Result<bool> {
-    let mut parts = load_slicer_parts(package, worksheet_name)?;
+    let mut parts = load_slicer_parts_limited(package, worksheet_name, limits)?;
     let Some(part_index) = parts.iter().position(|part| {
         part.slicers
             .slicers
@@ -164,6 +182,7 @@ pub fn remove_slicer(
         .position(|slicer| slicer.name.eq_ignore_ascii_case(slicer_name))
         .unwrap_or_else(|| crate::error::panic_missing_invariant("located"));
     parts[part_index].slicers.slicers.remove(item_index);
+    crate::signature_policy::ensure_unsigned(package)?;
     if parts[part_index].slicers.slicers.is_empty() {
         let removed = parts.remove(part_index);
         let uri = uri(&removed.part_name)?;
@@ -175,11 +194,13 @@ pub fn remove_slicer(
             package.remove_part(&uri);
         }
     } else {
-        let xml = write_slicers(&parts[part_index].slicers)?;
+        let xml = super::views::write_slicers_limited(
+            &parts[part_index].slicers,
+            crate::raw::output_ceiling(limits),
+        )?;
         let uri = uri(&parts[part_index].part_name)?;
         package.get_part_mut(&uri)?.set_blob(xml);
     }
-    package.unsign();
     Ok(true)
 }
 
@@ -187,9 +208,10 @@ pub fn reorder_slicers(
     package: &mut OpcPackage,
     worksheet_name: &PackURI,
     ordered_names: &[String],
+    limits: &SourceLimits,
 ) -> Result<Vec<Slicer>> {
-    let caches = load_slicer_caches(package)?;
-    let mut parts = load_slicer_parts(package, worksheet_name)?;
+    let caches = load_slicer_caches_limited(package, limits)?;
+    let mut parts = load_slicer_parts_limited(package, worksheet_name, limits)?;
     let counts: Vec<usize> = parts
         .iter()
         .map(|part| part.slicers.slicers.len())
@@ -204,20 +226,35 @@ pub fn reorder_slicers(
         part.slicers.slicers = ordered[offset..offset + count].to_vec();
         offset += count;
     }
-    validate_slicer_views(package, None, &caches)?;
+    validate_slicer_views(package, None, &caches, limits)?;
     let plans: Vec<(PackURI, Vec<u8>)> = parts
         .iter()
-        .map(|part| Ok((uri(&part.part_name)?, write_slicers(&part.slicers)?)))
+        .map(|part| {
+            Ok((
+                uri(&part.part_name)?,
+                super::views::write_slicers_limited(
+                    &part.slicers,
+                    crate::raw::output_ceiling(limits),
+                )?,
+            ))
+        })
         .collect::<Result<_>>()?;
+    if rewrites_nothing(package, &plans)? {
+        return Ok(ordered);
+    }
+    crate::signature_policy::ensure_unsigned(package)?;
     for (uri, xml) in plans {
         package.get_part_mut(&uri)?.set_blob(xml);
     }
-    package.unsign();
     Ok(ordered)
 }
 
-pub fn find_slicer_cache(package: &OpcPackage, name: &str) -> Result<Option<SlicerCache>> {
-    Ok(load_slicer_caches(package)?
+pub fn find_slicer_cache(
+    package: &OpcPackage,
+    name: &str,
+    limits: &SourceLimits,
+) -> Result<Option<SlicerCache>> {
+    Ok(load_slicer_caches_limited(package, limits)?
         .into_iter()
         .find(|cache| cache.definition.name.eq_ignore_ascii_case(name)))
 }
@@ -225,6 +262,7 @@ pub fn find_slicer_cache(package: &OpcPackage, name: &str) -> Result<Option<Slic
 pub fn add_slicer_cache(
     package: &mut OpcPackage,
     definition: SlicerDefinition,
+    limits: &SourceLimits,
 ) -> Result<SlicerCache> {
     let workbook_name = package.main_document_part()?.partname().clone();
     let value = SlicerCache {
@@ -232,17 +270,21 @@ pub fn add_slicer_cache(
         part_name: next_part_name(package, "/xl/slicerCaches/slicerCache%d.xml")?.to_string(),
         definition,
     };
-    validate_slicer_cache_pivot_links(package, std::slice::from_ref(&value))?;
-    store_slicer_cache(package, &value)?;
-    package.unsign();
+    validate_slicer_cache_pivot_links(package, std::slice::from_ref(&value), limits)?;
+    store_slicer_cache_limited(package, &value, limits)?;
     Ok(value)
 }
 
-pub fn update_slicer_cache<F>(package: &mut OpcPackage, name: &str, update: F) -> Result<bool>
+pub fn update_slicer_cache<F>(
+    package: &mut OpcPackage,
+    name: &str,
+    update: F,
+    limits: &SourceLimits,
+) -> Result<bool>
 where
     F: FnOnce(&mut SlicerDefinition),
 {
-    let mut caches = load_slicer_caches(package)?;
+    let mut caches = load_slicer_caches_limited(package, limits)?;
     let Some(index) = caches
         .iter()
         .position(|cache| cache.definition.name.eq_ignore_ascii_case(name))
@@ -253,11 +295,14 @@ where
     if !caches[index].definition.name.eq_ignore_ascii_case(name) {
         return Err(invalid("Slicer Cache update cannot change its name"));
     }
-    validate_slicer_cache_set(package, &caches)?;
-    let xml = write_slicer_cache_definition(&caches[index].definition)?;
+    validate_slicer_cache_set(package, &caches, limits)?;
+    let xml = super::write_limited(
+        &caches[index].definition,
+        crate::raw::output_ceiling(limits),
+    )?;
     let uri = uri(&caches[index].part_name)?;
+    crate::signature_policy::ensure_unsigned(package)?;
     package.get_part_mut(&uri)?.set_blob(xml);
-    package.unsign();
     Ok(true)
 }
 
@@ -265,22 +310,32 @@ pub fn replace_slicer_cache(
     package: &mut OpcPackage,
     name: &str,
     replacement: SlicerDefinition,
+    limits: &SourceLimits,
 ) -> Result<bool> {
     if !replacement.name.eq_ignore_ascii_case(name) {
         return Err(invalid("replacement Slicer Cache name must match"));
     }
-    update_slicer_cache(package, name, move |definition| *definition = replacement)
+    update_slicer_cache(
+        package,
+        name,
+        move |definition| *definition = replacement,
+        limits,
+    )
 }
 
-pub fn remove_slicer_cache(package: &mut OpcPackage, name: &str) -> Result<bool> {
-    let mut caches = load_slicer_caches(package)?;
+pub fn remove_slicer_cache(
+    package: &mut OpcPackage,
+    name: &str,
+    limits: &SourceLimits,
+) -> Result<bool> {
+    let mut caches = load_slicer_caches_limited(package, limits)?;
     let Some(index) = caches
         .iter()
         .position(|cache| cache.definition.name.eq_ignore_ascii_case(name))
     else {
         return Ok(false);
     };
-    if all_slicers(package)?
+    if all_slicers(package, limits)?
         .iter()
         .any(|slicer| slicer.cache.eq_ignore_ascii_case(name))
     {
@@ -289,7 +344,7 @@ pub fn remove_slicer_cache(package: &mut OpcPackage, name: &str) -> Result<bool>
         )));
     }
     let removed = caches.remove(index);
-    validate_slicer_cache_set(package, &caches)?;
+    validate_slicer_cache_set(package, &caches, limits)?;
     let workbook_name = package.main_document_part()?.partname().clone();
     let ids: Vec<String> = caches
         .iter()
@@ -303,6 +358,7 @@ pub fn remove_slicer_cache(package: &mut OpcPackage, name: &str) -> Result<bool>
         "slicerCache",
         &ids,
     )?;
+    crate::signature_policy::ensure_unsigned(package)?;
     package.get_part_mut(&workbook_name)?.set_blob(updated);
     package
         .get_part_mut(&workbook_name)?
@@ -312,21 +368,21 @@ pub fn remove_slicer_cache(package: &mut OpcPackage, name: &str) -> Result<bool>
     if !part_is_referenced(package, &uri) {
         package.remove_part(&uri);
     }
-    package.unsign();
     Ok(true)
 }
 
 pub fn reorder_slicer_caches(
     package: &mut OpcPackage,
     ordered_names: &[String],
+    limits: &SourceLimits,
 ) -> Result<Vec<SlicerCache>> {
     let caches = reorder_by_key(
-        load_slicer_caches(package)?,
+        load_slicer_caches_limited(package, limits)?,
         ordered_names,
         |cache| &cache.definition.name,
         "Slicer Cache",
     )?;
-    validate_slicer_cache_set(package, &caches)?;
+    validate_slicer_cache_set(package, &caches, limits)?;
     let workbook_name = package.main_document_part()?.partname().clone();
     let ids: Vec<String> = caches
         .iter()
@@ -340,34 +396,44 @@ pub fn reorder_slicer_caches(
         "slicerCache",
         &ids,
     )?;
+    if updated.as_slice() == package.get_part(&workbook_name)?.blob() {
+        return Ok(caches);
+    }
+    crate::signature_policy::ensure_unsigned(package)?;
     package.get_part_mut(&workbook_name)?.set_blob(updated);
-    package.unsign();
     Ok(caches)
 }
 
-pub fn find_timeline_cache(package: &OpcPackage, name: &str) -> Result<Option<Cache>> {
+pub fn find_timeline_cache(
+    package: &OpcPackage,
+    name: &str,
+    limits: &SourceLimits,
+) -> Result<Option<Cache>> {
     let workbook = package.main_document_part()?.partname().clone();
-    Ok(load_timeline_caches(package, &workbook)?
+    Ok(load_timeline_caches_limited(package, &workbook, limits)?
         .into_iter()
         .find(|cache| cache.definition.name.eq_ignore_ascii_case(name)))
 }
 
-pub fn add_timeline_cache(package: &mut OpcPackage, definition: CacheDefinition) -> Result<Cache> {
+pub fn add_timeline_cache(
+    package: &mut OpcPackage,
+    definition: CacheDefinition,
+    limits: &SourceLimits,
+) -> Result<Cache> {
     let workbook = package.main_document_part()?.partname().clone();
-    let mut caches = load_timeline_caches(package, &workbook)?;
+    let mut caches = load_timeline_caches_limited(package, &workbook, limits)?;
     let value = Cache {
         relationship_id: next_relationship_id(package.get_part(&workbook)?, "rIdTimelineCache")?,
         part_name: next_part_name(package, "/xl/timelineCaches/timelineCache%d.xml")?.to_string(),
         definition,
     };
-    validate_timeline_cache_set(package, std::slice::from_ref(&value))?;
+    validate_timeline_cache_set(package, std::slice::from_ref(&value), limits)?;
     if caches.is_empty() {
-        store_timeline_caches(package, &workbook, std::slice::from_ref(&value))?;
-        package.unsign();
+        store_timeline_caches_limited(package, &workbook, std::slice::from_ref(&value), limits)?;
         return Ok(value);
     }
     caches.push(value.clone());
-    validate_timeline_cache_set(package, &caches)?;
+    validate_timeline_cache_set(package, &caches, limits)?;
     let ids: Vec<String> = caches
         .iter()
         .map(|cache| cache.relationship_id.clone())
@@ -381,7 +447,11 @@ pub fn add_timeline_cache(package: &mut OpcPackage, definition: CacheDefinition)
         &ids,
     )?;
     let uri = uri(&value.part_name)?;
-    let xml = write_timeline_cache_definition(&value.definition)?;
+    let xml = crate::timelines::write_timeline_cache_definition_limited(
+        &value.definition,
+        crate::raw::output_ceiling(limits),
+    )?;
+    crate::signature_policy::ensure_unsigned(package)?;
     package.try_add_part(Box::new(BlobPart::new(
         uri.clone(),
         TIMELINE_CACHE_CONTENT_TYPE.into(),
@@ -397,16 +467,20 @@ pub fn add_timeline_cache(package: &mut OpcPackage, definition: CacheDefinition)
             false,
         );
     package.get_part_mut(&workbook)?.set_blob(updated);
-    package.unsign();
     Ok(value)
 }
 
-pub fn update_timeline_cache<F>(package: &mut OpcPackage, name: &str, update: F) -> Result<bool>
+pub fn update_timeline_cache<F>(
+    package: &mut OpcPackage,
+    name: &str,
+    update: F,
+    limits: &SourceLimits,
+) -> Result<bool>
 where
     F: FnOnce(&mut CacheDefinition),
 {
     let workbook = package.main_document_part()?.partname().clone();
-    let mut caches = load_timeline_caches(package, &workbook)?;
+    let mut caches = load_timeline_caches_limited(package, &workbook, limits)?;
     let Some(index) = caches
         .iter()
         .position(|cache| cache.definition.name.eq_ignore_ascii_case(name))
@@ -417,11 +491,14 @@ where
     if !caches[index].definition.name.eq_ignore_ascii_case(name) {
         return Err(invalid("Timeline Cache update cannot change its name"));
     }
-    validate_timeline_cache_set(package, &caches)?;
-    let xml = write_timeline_cache_definition(&caches[index].definition)?;
+    validate_timeline_cache_set(package, &caches, limits)?;
+    let xml = crate::timelines::write_timeline_cache_definition_limited(
+        &caches[index].definition,
+        crate::raw::output_ceiling(limits),
+    )?;
     let uri = uri(&caches[index].part_name)?;
+    crate::signature_policy::ensure_unsigned(package)?;
     package.get_part_mut(&uri)?.set_blob(xml);
-    package.unsign();
     Ok(true)
 }
 
@@ -429,35 +506,48 @@ pub fn replace_timeline_cache(
     package: &mut OpcPackage,
     name: &str,
     replacement: CacheDefinition,
+    limits: &SourceLimits,
 ) -> Result<bool> {
     if !replacement.name.eq_ignore_ascii_case(name) {
         return Err(invalid("replacement Timeline Cache name must match"));
     }
-    update_timeline_cache(package, name, move |definition| *definition = replacement)
+    update_timeline_cache(
+        package,
+        name,
+        move |definition| *definition = replacement,
+        limits,
+    )
 }
 
-pub fn remove_timeline_cache(package: &mut OpcPackage, name: &str) -> Result<bool> {
+pub fn remove_timeline_cache(
+    package: &mut OpcPackage,
+    name: &str,
+    limits: &SourceLimits,
+) -> Result<bool> {
     let workbook = package.main_document_part()?.partname().clone();
-    let mut caches = load_timeline_caches(package, &workbook)?;
+    let mut caches = load_timeline_caches_limited(package, &workbook, limits)?;
     let Some(index) = caches
         .iter()
         .position(|cache| cache.definition.name.eq_ignore_ascii_case(name))
     else {
         return Ok(false);
     };
-    if load_timelines(package, &workbook)?.iter().any(|sheet| {
-        sheet
-            .timelines
-            .timelines
-            .iter()
-            .any(|timeline| timeline.cache.eq_ignore_ascii_case(name))
-    }) {
+    if load_timelines_limited(package, &workbook, limits)?
+        .iter()
+        .any(|sheet| {
+            sheet
+                .timelines
+                .timelines
+                .iter()
+                .any(|timeline| timeline.cache.eq_ignore_ascii_case(name))
+        })
+    {
         return Err(invalid(format!(
             "Timeline Cache '{name}' is still referenced"
         )));
     }
     let removed = caches.remove(index);
-    validate_timeline_cache_set(package, &caches)?;
+    validate_timeline_cache_set(package, &caches, limits)?;
     let ids: Vec<String> = caches
         .iter()
         .map(|cache| cache.relationship_id.clone())
@@ -470,6 +560,7 @@ pub fn remove_timeline_cache(package: &mut OpcPackage, name: &str) -> Result<boo
         "timelineCacheRef",
         &ids,
     )?;
+    crate::signature_policy::ensure_unsigned(package)?;
     package.get_part_mut(&workbook)?.set_blob(updated);
     package
         .get_part_mut(&workbook)?
@@ -479,22 +570,22 @@ pub fn remove_timeline_cache(package: &mut OpcPackage, name: &str) -> Result<boo
     if !part_is_referenced(package, &uri) {
         package.remove_part(&uri);
     }
-    package.unsign();
     Ok(true)
 }
 
 pub fn reorder_timeline_caches(
     package: &mut OpcPackage,
     ordered_names: &[String],
+    limits: &SourceLimits,
 ) -> Result<Vec<Cache>> {
     let workbook = package.main_document_part()?.partname().clone();
     let caches = reorder_by_key(
-        load_timeline_caches(package, &workbook)?,
+        load_timeline_caches_limited(package, &workbook, limits)?,
         ordered_names,
         |cache| &cache.definition.name,
         "Timeline Cache",
     )?;
-    validate_timeline_cache_set(package, &caches)?;
+    validate_timeline_cache_set(package, &caches, limits)?;
     let ids: Vec<String> = caches
         .iter()
         .map(|cache| cache.relationship_id.clone())
@@ -507,8 +598,11 @@ pub fn reorder_timeline_caches(
         "timelineCacheRef",
         &ids,
     )?;
+    if updated.as_slice() == package.get_part(&workbook)?.blob() {
+        return Ok(caches);
+    }
+    crate::signature_policy::ensure_unsigned(package)?;
     package.get_part_mut(&workbook)?.set_blob(updated);
-    package.unsign();
     Ok(caches)
 }
 
@@ -516,9 +610,10 @@ pub fn find_timeline(
     package: &OpcPackage,
     worksheet: &PackURI,
     name: &str,
+    limits: &SourceLimits,
 ) -> Result<Option<View>> {
     let workbook = package.main_document_part()?.partname().clone();
-    Ok(load_timelines(package, &workbook)?
+    Ok(load_timelines_limited(package, &workbook, limits)?
         .into_iter()
         .find(|sheet| sheet.worksheet_part_name == worksheet.to_string())
         .and_then(|sheet| {
@@ -534,11 +629,12 @@ pub fn add_timeline(
     package: &mut OpcPackage,
     worksheet: &PackURI,
     timeline: View,
+    limits: &SourceLimits,
 ) -> Result<TimelinePart> {
     let workbook = package.main_document_part()?.partname().clone();
-    let caches = load_timeline_caches(package, &workbook)?;
+    let caches = load_timeline_caches_limited(package, &workbook, limits)?;
     validate_timeline_cache_reference(&timeline, &caches)?;
-    let mut sheets = load_timelines(package, &workbook)?;
+    let mut sheets = load_timelines_limited(package, &workbook, limits)?;
     if sheets
         .iter()
         .flat_map(|sheet| &sheet.timelines.timelines)
@@ -554,11 +650,14 @@ pub fn add_timeline(
         .position(|sheet| sheet.worksheet_part_name == worksheet.to_string())
     {
         sheets[index].timelines.timelines.push(timeline);
-        validate_timeline_views(&sheets, &caches)?;
-        let xml = write_timelines(&sheets[index].timelines)?;
+        validate_timeline_views(&sheets, &caches, limits)?;
+        let xml = crate::timelines::write_timelines_limited(
+            &sheets[index].timelines,
+            crate::raw::output_ceiling(limits),
+        )?;
         let uri = uri(&sheets[index].part_name)?;
+        crate::signature_policy::ensure_unsigned(package)?;
         package.get_part_mut(&uri)?.set_blob(xml);
-        package.unsign();
         return Ok(sheets[index].clone());
     }
     let value = TimelinePart {
@@ -569,8 +668,7 @@ pub fn add_timeline(
             timelines: vec![timeline],
         },
     };
-    store_worksheet_timelines(package, &workbook, &value)?;
-    package.unsign();
+    store_worksheet_timelines_limited(package, &workbook, &value, limits)?;
     Ok(value)
 }
 
@@ -579,13 +677,14 @@ pub fn update_timeline<F>(
     worksheet: &PackURI,
     name: &str,
     update: F,
+    limits: &SourceLimits,
 ) -> Result<bool>
 where
     F: FnOnce(&mut View),
 {
     let workbook = package.main_document_part()?.partname().clone();
-    let caches = load_timeline_caches(package, &workbook)?;
-    let mut sheets = load_timelines(package, &workbook)?;
+    let caches = load_timeline_caches_limited(package, &workbook, limits)?;
+    let mut sheets = load_timelines_limited(package, &workbook, limits)?;
     let Some(sheet_index) = sheets
         .iter()
         .position(|sheet| sheet.worksheet_part_name == worksheet.to_string())
@@ -607,11 +706,14 @@ where
     {
         return Err(invalid("timeline update cannot change its name"));
     }
-    validate_timeline_views(&sheets, &caches)?;
-    let xml = write_timelines(&sheets[sheet_index].timelines)?;
+    validate_timeline_views(&sheets, &caches, limits)?;
+    let xml = crate::timelines::write_timelines_limited(
+        &sheets[sheet_index].timelines,
+        crate::raw::output_ceiling(limits),
+    )?;
     let uri = uri(&sheets[sheet_index].part_name)?;
+    crate::signature_policy::ensure_unsigned(package)?;
     package.get_part_mut(&uri)?.set_blob(xml);
-    package.unsign();
     Ok(true)
 }
 
@@ -620,19 +722,31 @@ pub fn replace_timeline(
     worksheet: &PackURI,
     name: &str,
     replacement: View,
+    limits: &SourceLimits,
 ) -> Result<bool> {
     if !replacement.name.eq_ignore_ascii_case(name) {
         return Err(invalid("replacement timeline name must match"));
     }
-    update_timeline(package, worksheet, name, move |timeline| {
-        *timeline = replacement;
-    })
+    update_timeline(
+        package,
+        worksheet,
+        name,
+        move |timeline| {
+            *timeline = replacement;
+        },
+        limits,
+    )
 }
 
-pub fn remove_timeline(package: &mut OpcPackage, worksheet: &PackURI, name: &str) -> Result<bool> {
+pub fn remove_timeline(
+    package: &mut OpcPackage,
+    worksheet: &PackURI,
+    name: &str,
+    limits: &SourceLimits,
+) -> Result<bool> {
     let workbook = package.main_document_part()?.partname().clone();
-    let caches = load_timeline_caches(package, &workbook)?;
-    let mut sheets = load_timelines(package, &workbook)?;
+    let caches = load_timeline_caches_limited(package, &workbook, limits)?;
+    let mut sheets = load_timelines_limited(package, &workbook, limits)?;
     let Some(sheet_index) = sheets
         .iter()
         .position(|sheet| sheet.worksheet_part_name == worksheet.to_string())
@@ -650,7 +764,7 @@ pub fn remove_timeline(package: &mut OpcPackage, worksheet: &PackURI, name: &str
     sheets[sheet_index].timelines.timelines.remove(index);
     if sheets[sheet_index].timelines.timelines.is_empty() {
         let removed = sheets.remove(sheet_index);
-        validate_timeline_views(&sheets, &caches)?;
+        validate_timeline_views(&sheets, &caches, limits)?;
         let updated = rewrite_integration_refs(
             package.get_part(worksheet)?.blob(),
             TIMELINES_EXTENSION_URI,
@@ -659,6 +773,7 @@ pub fn remove_timeline(package: &mut OpcPackage, worksheet: &PackURI, name: &str
             "timelineRef",
             &[],
         )?;
+        crate::signature_policy::ensure_unsigned(package)?;
         package.get_part_mut(worksheet)?.set_blob(updated);
         package
             .get_part_mut(worksheet)?
@@ -669,12 +784,15 @@ pub fn remove_timeline(package: &mut OpcPackage, worksheet: &PackURI, name: &str
             package.remove_part(&uri);
         }
     } else {
-        validate_timeline_views(&sheets, &caches)?;
-        let xml = write_timelines(&sheets[sheet_index].timelines)?;
+        validate_timeline_views(&sheets, &caches, limits)?;
+        let xml = crate::timelines::write_timelines_limited(
+            &sheets[sheet_index].timelines,
+            crate::raw::output_ceiling(limits),
+        )?;
         let uri = uri(&sheets[sheet_index].part_name)?;
+        crate::signature_policy::ensure_unsigned(package)?;
         package.get_part_mut(&uri)?.set_blob(xml);
     }
-    package.unsign();
     Ok(true)
 }
 
@@ -682,10 +800,11 @@ pub fn reorder_timelines(
     package: &mut OpcPackage,
     worksheet: &PackURI,
     ordered_names: &[String],
+    limits: &SourceLimits,
 ) -> Result<Vec<View>> {
     let workbook = package.main_document_part()?.partname().clone();
-    let caches = load_timeline_caches(package, &workbook)?;
-    let mut sheets = load_timelines(package, &workbook)?;
+    let caches = load_timeline_caches_limited(package, &workbook, limits)?;
+    let mut sheets = load_timelines_limited(package, &workbook, limits)?;
     let Some(sheet_index) = sheets
         .iter()
         .position(|sheet| sheet.worksheet_part_name == worksheet.to_string())
@@ -702,20 +821,41 @@ pub fn reorder_timelines(
         "timeline",
     )?;
     sheets[sheet_index].timelines.timelines.clone_from(&ordered);
-    validate_timeline_views(&sheets, &caches)?;
-    let xml = write_timelines(&sheets[sheet_index].timelines)?;
+    validate_timeline_views(&sheets, &caches, limits)?;
+    let xml = crate::timelines::write_timelines_limited(
+        &sheets[sheet_index].timelines,
+        crate::raw::output_ceiling(limits),
+    )?;
     let uri = uri(&sheets[sheet_index].part_name)?;
+    if xml.as_slice() == package.get_part(&uri)?.blob() {
+        return Ok(ordered);
+    }
+    crate::signature_policy::ensure_unsigned(package)?;
     package.get_part_mut(&uri)?.set_blob(xml);
-    package.unsign();
     Ok(ordered)
 }
 
-fn validate_slicer_cache_set(package: &OpcPackage, caches: &[SlicerCache]) -> Result<()> {
+/// Whether every planned part rewrite reproduces the part's current bytes,
+/// so the reorder publishes nothing (a worksheet without slicers plans none).
+fn rewrites_nothing(package: &OpcPackage, plans: &[(PackURI, Vec<u8>)]) -> Result<bool> {
+    for (uri, xml) in plans {
+        if package.get_part(uri)?.blob() != xml.as_slice() {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
+fn validate_slicer_cache_set(
+    package: &OpcPackage,
+    caches: &[SlicerCache],
+    limits: &SourceLimits,
+) -> Result<()> {
     let mut names = HashSet::new();
     let mut uids = HashSet::new();
     let any_uid = caches.iter().any(|cache| cache.definition.uid.is_some());
     for cache in caches {
-        write_slicer_cache_definition(&cache.definition)?;
+        super::write_limited(&cache.definition, crate::raw::output_ceiling(limits))?;
         if !names.insert(cache.definition.name.to_ascii_lowercase()) {
             return Err(invalid("duplicate Slicer Cache name"));
         }
@@ -731,13 +871,17 @@ fn validate_slicer_cache_set(package: &OpcPackage, caches: &[SlicerCache]) -> Re
             _ => {},
         }
     }
-    validate_slicer_views(package, None, caches)?;
-    validate_slicer_cache_pivot_links(package, caches)
+    validate_slicer_views(package, None, caches, limits)?;
+    validate_slicer_cache_pivot_links(package, caches, limits)
 }
 
-fn validate_slicer_cache_pivot_links(package: &OpcPackage, caches: &[SlicerCache]) -> Result<()> {
+fn validate_slicer_cache_pivot_links(
+    package: &OpcPackage,
+    caches: &[SlicerCache],
+    limits: &SourceLimits,
+) -> Result<()> {
     let workbook = package.main_document_part()?;
-    let details = crate::raw::parse_catalog(workbook.blob())?;
+    let details = crate::raw::parse_catalog(workbook.blob(), limits)?;
     if details.pivot_caches.is_empty() {
         return Ok(());
     }
@@ -746,7 +890,7 @@ fn validate_slicer_cache_pivot_links(package: &OpcPackage, caches: &[SlicerCache
         .into_iter()
         .map(|sheet| (sheet.name, sheet.sheet_id))
         .collect();
-    let pivots = read_pivot_tables(package).map_err(|e| invalid(e.to_string()))?;
+    let pivots = read_pivot_tables_limited(package, limits)?;
     let bindings: HashSet<(u32, String)> = pivots
         .into_iter()
         .filter_map(|pivot| {
@@ -768,13 +912,20 @@ fn validate_slicer_cache_pivot_links(package: &OpcPackage, caches: &[SlicerCache
     Ok(())
 }
 
-fn validate_timeline_cache_set(package: &OpcPackage, caches: &[Cache]) -> Result<()> {
+fn validate_timeline_cache_set(
+    package: &OpcPackage,
+    caches: &[Cache],
+    limits: &SourceLimits,
+) -> Result<()> {
     let mut names = HashSet::new();
     let mut uids = HashSet::new();
     let any_uid = caches.iter().any(|cache| cache.definition.uid.is_some());
     let mut filter_ids = HashSet::new();
     for cache in caches {
-        write_timeline_cache_definition(&cache.definition)?;
+        crate::timelines::write_timeline_cache_definition_limited(
+            &cache.definition,
+            crate::raw::output_ceiling(limits),
+        )?;
         if !names.insert(cache.definition.name.to_ascii_lowercase()) {
             return Err(invalid("duplicate Timeline Cache name"));
         }
@@ -799,7 +950,7 @@ fn validate_timeline_cache_set(package: &OpcPackage, caches: &[Cache]) -> Result
         }
     }
     let workbook = package.main_document_part()?;
-    let details = crate::raw::parse_catalog(workbook.blob())?;
+    let details = crate::raw::parse_catalog(workbook.blob(), limits)?;
     if !details.pivot_caches.is_empty() {
         let ids: HashSet<u32> = details
             .pivot_caches
@@ -815,13 +966,18 @@ fn validate_timeline_cache_set(package: &OpcPackage, caches: &[Cache]) -> Result
             }
         }
     }
-    validate_timeline_views(&load_timelines(package, workbook.partname())?, caches)
+    validate_timeline_views(
+        &load_timelines_limited(package, workbook.partname(), limits)?,
+        caches,
+        limits,
+    )
 }
 
 fn validate_slicer_views(
     package: &OpcPackage,
     replacement: Option<(&str, &Slicers)>,
     caches: &[SlicerCache],
+    limits: &SourceLimits,
 ) -> Result<()> {
     let cache_names: HashSet<String> = caches
         .iter()
@@ -838,7 +994,7 @@ fn validate_slicer_views(
                 .1
                 .clone()
         } else {
-            super::views::parse_slicers(package.get_part(part.partname())?.blob())?
+            super::views::parse_slicers_limited(package.get_part(part.partname())?.blob(), limits)?
         };
         for slicer in value.slicers {
             if !names.insert(slicer.name.to_ascii_lowercase()) {
@@ -855,7 +1011,11 @@ fn validate_slicer_views(
     Ok(())
 }
 
-fn validate_timeline_views(sheets: &[TimelinePart], caches: &[Cache]) -> Result<()> {
+fn validate_timeline_views(
+    sheets: &[TimelinePart],
+    caches: &[Cache],
+    limits: &SourceLimits,
+) -> Result<()> {
     let cache_names: HashSet<String> = caches
         .iter()
         .map(|cache| cache.definition.name.to_ascii_lowercase())
@@ -863,7 +1023,10 @@ fn validate_timeline_views(sheets: &[TimelinePart], caches: &[Cache]) -> Result<
     let mut names = HashSet::new();
     let mut uids = HashSet::new();
     for sheet in sheets {
-        write_timelines(&sheet.timelines)?;
+        crate::timelines::write_timelines_limited(
+            &sheet.timelines,
+            crate::raw::output_ceiling(limits),
+        )?;
         for timeline in &sheet.timelines.timelines {
             if !names.insert(timeline.name.to_ascii_lowercase()) {
                 return Err(invalid("duplicate workbook timeline name"));
@@ -912,21 +1075,22 @@ fn validate_timeline_cache_reference(timeline: &View, caches: &[Cache]) -> Resul
     }
 }
 
-fn all_slicers(package: &OpcPackage) -> Result<Vec<Slicer>> {
+fn all_slicers(package: &OpcPackage, limits: &SourceLimits) -> Result<Vec<Slicer>> {
     let mut output = Vec::new();
     for part in package
         .iter_parts()
         .filter(|part| part.content_type() == SLICERS_CONTENT_TYPE)
     {
         output.extend(
-            super::views::parse_slicers(package.get_part(part.partname())?.blob())?.slicers,
+            super::views::parse_slicers_limited(package.get_part(part.partname())?.blob(), limits)?
+                .slicers,
         );
     }
     Ok(output)
 }
 
-fn all_slicer_names(package: &OpcPackage) -> Result<HashSet<String>> {
-    Ok(all_slicers(package)?
+fn all_slicer_names(package: &OpcPackage, limits: &SourceLimits) -> Result<HashSet<String>> {
+    Ok(all_slicers(package, limits)?
         .into_iter()
         .map(|slicer| slicer.name.to_ascii_lowercase())
         .collect())

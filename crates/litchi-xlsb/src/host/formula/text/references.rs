@@ -95,8 +95,7 @@ pub(super) fn encode_shared_reference(
 ) -> Result<(u32, u16)> {
     let row = if reference.row_relative {
         let offset = i64::from(reference.row) - i64::from(base_row);
-        i32::try_from(offset)
-            .map_err(|_| Error::InvalidFormula("shared row offset overflow".to_string()))?
+        i32::try_from(offset).map_err(|_| Error::InvalidFormula("shared row offset overflow"))?
             as u32
     } else {
         reference.row
@@ -104,9 +103,9 @@ pub(super) fn encode_shared_reference(
     let col_value = if reference.col_relative {
         let offset = i64::from(reference.col) - i64::from(base_col);
         if !(-16_383..=16_383).contains(&offset) {
-            return Err(Error::InvalidFormula(format!(
-                "shared column offset {offset} is outside the XLSB range"
-            )));
+            return Err(Error::InvalidFormula(
+                "shared column offset is outside the XLSB range",
+            ));
         }
         (offset as i32 as u16) & 0x3FFF
     } else {

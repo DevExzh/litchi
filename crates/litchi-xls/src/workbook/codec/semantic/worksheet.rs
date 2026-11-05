@@ -9,21 +9,40 @@ use crate::error::{Error, Result};
 use crate::formula::{FormulaContext, ptg_exp_anchor, render_formula};
 use crate::formula_metadata::array::{self, Owner as ArrayFormula};
 use crate::formula_metadata::{Cell as FormulaCell, Defect as FormulaDefect, FlagDefect};
-use crate::leniency::{EncodingDefect, ToleranceReport};
+use crate::leniency::{EncodingDefect, ToleranceReport, WorksheetDefect};
 use crate::number_format::Formatting;
 use crate::records::{
     BoundSheetRecord, CellRecord, DimensionsRecord, Encoding, FormulaValue, SharedStringProperties,
 };
-use crate::workbook::model::Workbook;
+use crate::workbook::model::Reader;
 use crate::worksheet::Worksheet;
 use crate::{
-    autofilter, comments, compatibility::CompatibilityProfile, conditional_format, hyperlinks,
-    layout, merged_cells, page_setup, pivot_table, protection, utils, view,
+    SourceLimits, autofilter, comments, compatibility::CompatibilityProfile, conditional_format,
+    hyperlinks, layout, merged_cells, page_setup, pivot_table, protection, utils, view,
 };
 use litchi_biff::Records;
 use std::collections::{HashMap, HashSet};
 use std::io::{Read, Seek};
 use std::sync::Arc;
+
+/// Consumes an embedded substream whose BOF was just read, through its
+/// matching EOF (nested substreams included).
+fn skip_embedded_substream(records: &mut Records<'_>) -> Result<()> {
+    let mut depth = 1_usize;
+    for record in records.by_ref() {
+        match record?.kind().get() {
+            0x0809 => depth += 1,
+            0x000A => {
+                depth -= 1;
+                if depth == 0 {
+                    return Ok(());
+                }
+            },
+            _ => {},
+        }
+    }
+    Err(Error::Eof("embedded substream has no EOF record"))
+}
 
 #[derive(Clone, Copy)]
 struct FormulaLink {
@@ -220,7 +239,7 @@ fn claim_array_range(occupancy: &mut HashMap<u16, [u64; 4]>, owner: &ArrayFormul
     Ok(())
 }
 
-impl<R: Read + Seek> Workbook<R> {
+impl<R: Read + Seek> Reader<R> {
     /// Parse a worksheet from its position in the workbook stream.
     ///
     /// `store` decides which validated cell records become decoded cells; it
@@ -240,7 +259,7 @@ impl<R: Read + Seek> Workbook<R> {
         let worksheet_data = workbook_data.get(worksheet_position..).ok_or_else(|| {
             Error::InvalidData("BoundSheet8 points outside the Workbook stream".to_string())
         })?;
-        let mut records = Records::new(worksheet_data);
+        let mut records = Records::new(worksheet_data, litchi_biff::Limits::default())?;
 
         // Start directly at the worksheet BOF. The borrowed BIFF iterator
         // reports offsets relative to this slice; the absolute base is passed
@@ -283,6 +302,7 @@ impl<R: Read + Seek> Workbook<R> {
             shared_string_properties,
             Some(&self.formula_context),
             self.formatting.clone(),
+            self.source_limits,
             compatibility_profile,
             store,
             tolerance,
@@ -317,6 +337,7 @@ impl<R: Read + Seek> Workbook<R> {
             shared_string_properties,
             formula_context,
             formatting,
+            SourceLimits::default(),
             CompatibilityProfile::Strict,
             &mut super::cells::DecodeEveryCell,
             &mut tolerance,
@@ -332,6 +353,7 @@ impl<R: Read + Seek> Workbook<R> {
         shared_string_properties: Arc<Vec<Option<Box<SharedStringProperties>>>>,
         formula_context: Option<&FormulaContext>,
         formatting: Arc<Formatting>,
+        source_limits: SourceLimits,
         compatibility_profile: CompatibilityProfile,
         store: &mut S,
         tolerance: &mut ToleranceReport,
@@ -350,7 +372,7 @@ impl<R: Read + Seek> Workbook<R> {
         let mut pivot_table_collector = pivot_table::PivotTableCollector::new();
 
         let mut comment_collector = comments::CommentCollector::new();
-        let mut hyperlink_collector = hyperlinks::HyperlinkCollector::new();
+        let mut hyperlink_collector = hyperlinks::HyperlinkCollector::new(source_limits);
         let mut layout_collector = layout::Collector::new();
         let mut sheet_layout_collector = crate::worksheet::layout::Collector::new();
         let mut view_collector = view::ViewCollector::new();
@@ -390,6 +412,16 @@ impl<R: Read + Seek> Workbook<R> {
 
         while let Some(record_result) = records_iter.next() {
             let record = record_result?;
+            if record.kind().get() == 0x0809 {
+                // The worksheet's own BOF was consumed by the caller, so a
+                // BOF here opens an embedded substream (an embedded chart
+                // after its drawing object: MS-XLS 2.1.7.20.6 OBJECTS). Its
+                // records belong to that substream, whose own owner (the chart
+                // inventory) reads them; the worksheet collectors must not see
+                // its HEADER, WINDOW2 or EOF.
+                skip_embedded_substream(records_iter)?;
+                continue;
+            }
             let record_position = region.base_position + record.offset() as u64;
             sheet_layout_collector.feed_record(record.kind().get(), record.payload())?;
             comment_collector.feed_record(record.kind().get(), record.payload())?;
@@ -401,6 +433,15 @@ impl<R: Read + Seek> Workbook<R> {
                 tolerance,
             )?;
             view_collector.feed_record(record.kind().get(), record.payload())?;
+            if record.kind().get() == 0x023E {
+                for defect in view_collector.take_zoom_defects() {
+                    tolerance.record(
+                        WorksheetDefect::ZoomLevel,
+                        u32::try_from(record_position).unwrap_or(u32::MAX),
+                        u32::from(defect.raw),
+                    );
+                }
+            }
             page_setup_collector.feed_record(record.kind().get(), record.payload())?;
             protection_collector.feed_record(record.kind().get(), record.payload())?;
             conditional_format_collector.feed_record(
@@ -679,14 +720,26 @@ impl<R: Read + Seek> Workbook<R> {
                 0x00FD | // LabelSst
                 0x0006   // Formula
                 => {
-                    let preserve_formula_defect = record.kind().get() == 0x0006
-                        && compatibility_profile
-                            .preserves_shared_formula_flag_without_ptg_exp();
-                    let (cell_record, formula_defect) = if preserve_formula_defect {
-                        CellRecord::parse_formula_preserving_defect(record.payload())?
+                    let preserve_formula_defect = compatibility_profile
+                        .preserves_shared_formula_flag_without_ptg_exp();
+                    let (cell_record, formula_defect) = if record.kind().get() == 0x0006 {
+                        CellRecord::parse_formula_reporting_defect(
+                            record.payload(),
+                            preserve_formula_defect,
+                        )?
                     } else {
                         (CellRecord::parse(record.kind().get(), record.payload(), encoding)?, None)
                     };
+                    if !preserve_formula_defect
+                        && matches!(formula_defect, Some(FlagDefect::SharedWithoutPtgExp))
+                    {
+                        // The stale flag is ignored (record 0316).
+                        tolerance.record(
+                            WorksheetDefect::SharedFormulaFlag,
+                            u32::from(cell_record.row()),
+                            u32::from(cell_record.col()),
+                        );
+                    }
                     if let Some((row, col, _unit)) =
                         CellRecord::label_unpaired_surrogate(record.kind().get(), record.payload())
                     {
@@ -696,7 +749,9 @@ impl<R: Read + Seek> Workbook<R> {
                             u32::from(col),
                         );
                     }
-                    if matches!(formula_defect, Some(FlagDefect::SharedWithoutPtgExp)) {
+                    if preserve_formula_defect
+                        && matches!(formula_defect, Some(FlagDefect::SharedWithoutPtgExp))
+                    {
                         if formula_metadata_defects.len() >= tracking_limit {
                             return Err(Error::InvalidRecord {
                                 record_type: 0x0006,

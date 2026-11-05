@@ -8,4 +8,5 @@
 mod codec;
 mod model;
 
+pub use super::Limits;
 pub use model::{Algorithm, Settings, Slide, Type, Verifier};

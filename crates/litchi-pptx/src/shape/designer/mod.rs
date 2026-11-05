@@ -14,7 +14,7 @@ mod model;
 )]
 mod p202;
 mod package;
-mod properties;
+pub mod properties;
 mod transaction;
 mod validation;
 
@@ -22,21 +22,24 @@ mod validation;
 mod tests;
 
 pub use model::{DrawingProperties, Limits, Opaque, Snapshot, Tag, Tags};
-pub use properties::{PropertiesCommit, PropertiesEdit, PropertiesSnapshot};
-pub use transaction::Editor;
 
 pub(crate) use p202::{read_tags_with_prefix, write_properties, write_tags};
 
 #[cfg(test)]
 pub(crate) use p202::{read_properties, read_tags};
-pub(crate) use package::{load, put, remove};
-pub(crate) use properties::load_properties_with_limits;
+pub(crate) use package::{load_with_limits, put_with_limits, remove_with_limits};
+mod edit;
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
+
 #[allow(
     unused_imports,
     reason = "staged crate-private host API; public facades deliberately remain unchanged"
 )]
 // Staged crate-private host API; public facades deliberately remain unchanged.
-pub(crate) use properties::{apply_properties, load_properties, put_properties, remove_properties};
+pub(crate) use properties::apply_properties;
+pub(crate) use properties::{
+    load_properties_with_limits_and_shape_limits, load_properties_with_shape_limits,
+};
 
 /// URI assigned to the design-element extension by [MS-PPTX] 2.2.17.
 pub const EXTENSION_URI: &str = "{386F3935-93C4-4BCD-93E2-E3B085C9AB24}";

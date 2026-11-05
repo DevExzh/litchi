@@ -21,14 +21,18 @@ use litchi_iwa_common::{
         repeated_length_delimited_payloads,
     },
 };
-use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, SnappyStream};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsce, tsd, tsk, tsp, tss, tst, tswp};
 use litchi_keynote::slide::table::headers::{Count, Settings};
 use litchi_keynote::{
-    MAX_OBJECTS, MAX_SLIDES, MAX_TEXT_BYTES, MAX_TEXT_FRAGMENTS, MAX_TEXT_STORAGES, Package,
-    ReadOptions, SemanticLimits, SlideSelector, SlideTableHeaderCommit,
-    SlideTableHeaderDiagnostics, SlideTableHeaderEdit, SlideTableHeaderError,
-    SlideTableHeaderLimitKind, SlideTableHeaderPatch, SlideTableHeaderPath, TableSelector,
+    OpenOptions, Package, SemanticLimits, SlideSelector, TableSelector,
+    slide::table::headers::transaction::Commit as SlideTableHeaderCommit,
+    slide::table::headers::transaction::Diagnostics as SlideTableHeaderDiagnostics,
+    slide::table::headers::transaction::Edit as SlideTableHeaderEdit,
+    slide::table::headers::transaction::Error as SlideTableHeaderError,
+    slide::table::headers::transaction::LimitKind as SlideTableHeaderLimitKind,
+    slide::table::headers::transaction::Patch as SlideTableHeaderPatch,
+    slide::table::headers::transaction::Path as SlideTableHeaderPath,
 };
 use prost::Message as _;
 
@@ -86,8 +90,12 @@ fn reference(identifier: u64) -> tsp::Reference {
     }
 }
 
-fn field_reference(path: impl Into<FieldPath>, references: &[u64]) -> FieldInfo {
-    let mut field = FieldInfo::new(path);
+fn field_reference(path: Vec<u32>, references: &[u64]) -> FieldInfo {
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(path, litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     field.object_references.extend_from_slice(references);
     field
 }
@@ -98,7 +106,11 @@ fn object(
     data: Vec<u8>,
     references: &[u64],
 ) -> TestResult<ArchiveObject> {
-    let mut object = ArchiveObject::new(identifier, vec![RawMessage { type_, data }])?;
+    let mut object = ArchiveObject::new(
+        identifier,
+        vec![RawMessage { type_, data }],
+        Default::default(),
+    )?;
     object.archive_info.message_infos[0]
         .object_references
         .extend_from_slice(references);
@@ -185,7 +197,12 @@ fn table_model(
         append_varint_field(&mut payload, UNKNOWN_MODEL_FIELD, UNKNOWN_MODEL_VALUE)?;
     }
     if with_tracker {
-        append_length_delimited_field(&mut payload, TABLE_MODEL_FIELD_TRACKER, TRACKER_BYTES)?;
+        append_length_delimited_field(
+            &mut payload,
+            TABLE_MODEL_FIELD_TRACKER,
+            TRACKER_BYTES,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     Ok(payload)
 }
@@ -273,8 +290,18 @@ fn metadata_payload() -> TestResult<Vec<u8>> {
     );
     let mut payload = Vec::new();
     append_varint_field(&mut payload, 1, METADATA_OBJECT)?;
-    append_length_delimited_field(&mut payload, 3, &document_component)?;
-    append_length_delimited_field(&mut payload, 3, &model_component)?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &document_component,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &model_component,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -404,13 +431,15 @@ fn synthetic_package(locked: bool, with_unknowns: bool, with_tracker: bool) -> T
         &Archive {
             objects: document_objects,
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     let model_component = SnappyStream::compress(
         &Archive {
             objects: model_objects,
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     let metadata_component = SnappyStream::compress(
         &Archive {
@@ -421,7 +450,8 @@ fn synthetic_package(locked: bool, with_unknowns: bool, with_tracker: bool) -> T
                 &[],
             )?],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
 
     let mut members: Vec<(&str, &[u8])> = vec![
@@ -448,7 +478,7 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn member_bytes(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
-    Ok(Catalog::from_bytes(package)?
+    Ok(Catalog::from_bytes(package, Default::default())?
         .iter()
         .find(|entry| entry.name() == name)
         .ok_or_else(|| io::Error::other(format!("missing package member {name}")))?
@@ -459,7 +489,8 @@ fn member_bytes(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
 fn member_archive(package: &[u8], name: &str) -> TestResult<Archive> {
     let bytes = member_bytes(package, name)?;
     Ok(Archive::parse(
-        SnappyStream::decompress(&bytes)?.as_bytes(),
+        SnappyStream::decompress(&bytes, Default::default())?.as_bytes(),
+        Default::default(),
     )?)
 }
 
@@ -490,10 +521,11 @@ fn replace_member_archive(
     name: &str,
     mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let mut archive = member_archive(package, name)?;
     mutate(&mut archive)?;
-    let replacement = SnappyStream::compress(&archive.to_bytes()?)?;
+    let replacement =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(&[EntryEdit::new(name, &replacement)], Limits::default())?)
 }
 
@@ -513,6 +545,7 @@ fn replace_model_payload(package: &[u8], identifier: u64, payload: Vec<u8>) -> T
                 type_: TABLE_MODEL_MESSAGE_TYPE,
                 data: payload,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -533,7 +566,12 @@ fn append_model_message_field(
     payload: &[u8],
 ) -> TestResult<Vec<u8>> {
     let mut raw = Vec::new();
-    append_length_delimited_field(&mut raw, field_number, payload)?;
+    append_length_delimited_field(
+        &mut raw,
+        field_number,
+        payload,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_model_raw(package, &raw)
 }
 
@@ -567,6 +605,7 @@ fn with_header_name_manager(package: &[u8]) -> TestResult<Vec<u8>> {
                 type_: DOCUMENT_MESSAGE_TYPE,
                 data: document.encode_to_vec(),
             },
+            Default::default(),
         )?;
         let info = &mut root.archive_info.message_infos[message_index];
         info.object_references.push(CALCULATION_ENGINE);
@@ -623,6 +662,7 @@ fn with_malformed_category_owner(package: &[u8], missing_group_uid: bool) -> Tes
                 upper: 62,
             }
             .encode_to_vec(),
+            litchi_iwa_common::WireLimits::DEFAULT,
         )?;
     }
     append_varint_field(&mut group, 6, 0)?;
@@ -636,9 +676,15 @@ fn with_malformed_category_owner(package: &[u8], missing_group_uid: bool) -> Tes
                 upper: 64,
             }
             .encode_to_vec(),
+            litchi_iwa_common::WireLimits::DEFAULT,
         )?;
     }
-    append_length_delimited_field(&mut owner, 2, &group)?;
+    append_length_delimited_field(
+        &mut owner,
+        2,
+        &group,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_model_message_field(package, 81, &owner)
 }
 
@@ -652,6 +698,7 @@ fn with_invalid_group_owner_index(package: &[u8], duplicate: bool) -> TestResult
             upper: 66,
         }
         .encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     append_varint_field(&mut group, 6, 0)?;
     append_varint_field(&mut group, 14, 8)?;
@@ -673,8 +720,14 @@ fn with_invalid_group_owner_index(package: &[u8], duplicate: bool) -> TestResult
             upper: 68,
         }
         .encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
-    append_length_delimited_field(&mut owner, 2, &group)?;
+    append_length_delimited_field(
+        &mut owner,
+        2,
+        &group,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_model_message_field(package, 81, &owner)
 }
 
@@ -691,9 +744,15 @@ fn with_invalid_group_coordinate(package: &[u8]) -> TestResult<Vec<u8>> {
             upper: 72,
         }
         .encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     append_varint_field(&mut group, 6, 0)?;
-    append_length_delimited_field(&mut group, 7, &coordinate)?;
+    append_length_delimited_field(
+        &mut group,
+        7,
+        &coordinate,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let mut owner = Vec::new();
     append_length_delimited_field(
         &mut owner,
@@ -703,8 +762,14 @@ fn with_invalid_group_coordinate(package: &[u8]) -> TestResult<Vec<u8>> {
             upper: 74,
         }
         .encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
-    append_length_delimited_field(&mut owner, 2, &group)?;
+    append_length_delimited_field(
+        &mut owner,
+        2,
+        &group,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_model_message_field(package, 81, &owner)
 }
 
@@ -719,13 +784,19 @@ fn with_pivot_owner(package: &[u8]) -> TestResult<Vec<u8>> {
             .position(|message| message.type_ == TABLE_MODEL_MESSAGE_TYPE)
             .ok_or_else(|| io::Error::other("missing table-model message"))?;
         let mut payload = model.messages[message_index].data.clone();
-        append_length_delimited_field(&mut payload, 85, &reference(PIVOT_OWNER).encode_to_vec())?;
+        append_length_delimited_field(
+            &mut payload,
+            85,
+            &reference(PIVOT_OWNER).encode_to_vec(),
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         model.replace_message_preserving_header(
             message_index,
             RawMessage {
                 type_: TABLE_MODEL_MESSAGE_TYPE,
                 data: payload,
             },
+            Default::default(),
         )?;
         let info = &mut model.archive_info.message_infos[message_index];
         info.object_references.push(PIVOT_OWNER);
@@ -762,13 +833,19 @@ fn with_opaque_category_reference(package: &[u8]) -> TestResult<Vec<u8>> {
         let mut reference_payload = reference(CATEGORY_OWNER).encode_to_vec();
         append_varint_field(&mut reference_payload, 4, 1)?;
         let mut payload = model.messages[message_index].data.clone();
-        append_length_delimited_field(&mut payload, 86, &reference_payload)?;
+        append_length_delimited_field(
+            &mut payload,
+            86,
+            &reference_payload,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         model.replace_message_preserving_header(
             message_index,
             RawMessage {
                 type_: TABLE_MODEL_MESSAGE_TYPE,
                 data: payload,
             },
+            Default::default(),
         )?;
         let info = &mut model.archive_info.message_infos[message_index];
         info.object_references.push(CATEGORY_OWNER);
@@ -797,6 +874,7 @@ fn with_table_info_cache(package: &[u8]) -> TestResult<Vec<u8>> {
                 type_: TABLE_INFO_MESSAGE_TYPE,
                 data: info.encode_to_vec(),
             },
+            Default::default(),
         )?;
         let message_info = &mut info_object.archive_info.message_infos[message_index];
         message_info.object_references.push(TABLE_INFO_CACHE);
@@ -830,6 +908,7 @@ fn replace_table_info(
                 type_: TABLE_INFO_MESSAGE_TYPE,
                 data: info.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -856,6 +935,7 @@ fn replace_slide(
                 type_: SLIDE_MESSAGE_TYPE,
                 data: slide.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -872,7 +952,11 @@ fn set_model_message_type(package: &[u8], type_: u32) -> TestResult<Vec<u8>> {
             .position(|message| message.type_ == TABLE_MODEL_MESSAGE_TYPE)
             .ok_or_else(|| io::Error::other("missing table-model message"))?;
         let data = object.messages[message_index].data.clone();
-        object.replace_message_preserving_header(message_index, RawMessage { type_, data })?;
+        object.replace_message_preserving_header(
+            message_index,
+            RawMessage { type_, data },
+            Default::default(),
+        )?;
         Ok(())
     })
 }
@@ -991,13 +1075,14 @@ fn field_info_wrong_path(package: &[u8]) -> TestResult<Vec<u8>> {
         let object = archive
             .object_mut(TABLE_INFOS[0])
             .ok_or_else(|| io::Error::other("missing table-info object"))?;
-        object.archive_info.message_infos[0].field_infos[0].path = FieldPath::new(vec![99]);
+        object.archive_info.message_infos[0].field_infos[0].path =
+            litchi_iwa_core::FieldPath::new(vec![99], litchi_iwa_core::Limits::default()).unwrap();
         Ok(())
     })
 }
 
 fn unknown_model_value(payload: &[u8]) -> TestResult<u64> {
-    let field = WireView::parse(payload)?
+    let field = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == UNKNOWN_MODEL_FIELD)
         .ok_or_else(|| io::Error::other("missing unknown model field"))?;
@@ -1014,10 +1099,13 @@ fn model_field_payloads(package: &[u8], field: u32) -> TestResult<Vec<Vec<u8>>> 
 }
 
 fn field_numbers(package: &[u8], field: u32) -> TestResult<usize> {
-    Ok(WireView::parse(&model_payload(package, MODELS[0])?)?
-        .fields()
-        .filter(|candidate| candidate.number() == field)
-        .count())
+    Ok(WireView::parse(
+        &model_payload(package, MODELS[0])?,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?
+    .fields()
+    .filter(|candidate| candidate.number() == field)
+    .count())
 }
 
 fn assert_rejected_atomically(source: &[u8]) -> TestResult {
@@ -1080,7 +1168,9 @@ fn selectors_read_all_seven_fields_and_positions_count_only_tables() -> TestResu
     );
     assert!(matches!(
         package.slide_table_header_settings("Tables", TableSelector::index(2)),
-        Err(SlideTableHeaderError::TablePositionNotFound { .. })
+        Err(SlideTableHeaderError::Refused(
+            litchi_keynote::slide::table::headers::transaction::Refusal::TablePositionNotFound { .. }
+        ))
     ));
 
     let edit = package.edit_slide_table_headers("Tables", 0usize)?;
@@ -1327,7 +1417,9 @@ fn locked_table_refuses_changed_settings_but_allows_exact_noop() -> TestResult {
             .edit_slide_table_headers("Tables", 0usize)?
             .set(changed_settings())
             .commit(),
-        Err(SlideTableHeaderError::Locked)
+        Err(SlideTableHeaderError::Refused(
+            litchi_keynote::slide::table::headers::transaction::Refusal::Locked
+        ))
     ));
     assert_eq!(exact_bytes(&package)?, source);
     Ok(())
@@ -1348,7 +1440,9 @@ fn coordinate_dependency_graphs_block_counts_but_allow_safe_flags() -> TestResul
                 .edit_slide_table_headers("Tables", 0usize)?
                 .set(changed_settings())
                 .commit(),
-            Err(SlideTableHeaderError::UnsupportedDependency)
+            Err(SlideTableHeaderError::Refused(
+                litchi_keynote::slide::table::headers::transaction::Refusal::UnsupportedDependency
+            ))
         ));
         assert_eq!(exact_bytes(&package)?, before);
 
@@ -1382,7 +1476,9 @@ fn pivot_owner_blocks_even_flag_only_edits() -> TestResult {
             .edit_slide_table_headers("Tables", 0usize)?
             .set(toggled_flags(fixture_settings(0)))
             .commit(),
-        Err(SlideTableHeaderError::UnsupportedDependency)
+        Err(SlideTableHeaderError::Refused(
+            litchi_keynote::slide::table::headers::transaction::Refusal::UnsupportedDependency
+        ))
     ));
     assert_eq!(exact_bytes(&package)?, before);
     Ok(())
@@ -1486,15 +1582,10 @@ fn finite_resource_limits_reject_before_publication() -> TestResult {
     // one over the configured budget.  Every rejected attempt must leave the
     // immutable source exact.
     for references in 1..=64 {
-        let semantic = SemanticLimits::new(
-            MAX_OBJECTS,
-            MAX_SLIDES,
-            references,
-            MAX_TEXT_STORAGES,
-            MAX_TEXT_FRAGMENTS,
-            MAX_TEXT_BYTES,
-        )?;
-        let options = ReadOptions::new(Limits::default(), semantic);
+        let semantic = SemanticLimits::builder()
+            .max_references(references)?
+            .build()?;
+        let options = OpenOptions::new().semantic_limits(semantic);
         let Ok(package) = Package::from_bytes_with_options(&source, options) else {
             continue;
         };
@@ -1502,7 +1593,7 @@ fn finite_resource_limits_reject_before_publication() -> TestResult {
         let result = package
             .edit_slide_table_headers(0usize, 0usize)
             .and_then(|edit| edit.set(changed_settings()).commit());
-        if matches!(result, Err(SlideTableHeaderError::LimitExceeded { .. })) {
+        if matches!(result, Err(SlideTableHeaderError::Limit { .. })) {
             assert_eq!(exact_bytes(&package)?, before);
             rejected = true;
             break;

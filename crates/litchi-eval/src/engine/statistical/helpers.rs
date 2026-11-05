@@ -7,12 +7,12 @@ use litchi_core::sheet::{CellValue, Result};
 
 pub(super) const EPS: f64 = 1e-12;
 
-pub(super) async fn number_arg(
+pub(super) fn number_arg(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     expr: &Expr,
 ) -> Result<Option<f64>> {
-    let v = evaluate_expression(ctx, current_sheet, expr).await?;
+    let v = evaluate_expression(ctx, current_sheet, expr)?;
     Ok(to_number(&v))
 }
 
@@ -116,21 +116,21 @@ mod tests {
 
     // ===== number_arg tests =====
 
-    #[tokio::test]
-    async fn test_number_arg_with_number() {
+    #[test]
+    fn test_number_arg_with_number() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let expr = num_expr(42.0);
-        let result = number_arg(ctx, "Sheet1", &expr).await.unwrap();
+        let result = number_arg(ctx, "Sheet1", &expr).unwrap();
         assert_eq!(result, Some(42.0));
     }
 
-    #[tokio::test]
-    async fn test_number_arg_with_string() {
+    #[test]
+    fn test_number_arg_with_string() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let expr = Expr::Literal(CellValue::String("abc".to_string()));
-        let result = number_arg(ctx, "Sheet1", &expr).await.unwrap();
+        let result = number_arg(ctx, "Sheet1", &expr).unwrap();
         assert_eq!(result, None);
     }
 

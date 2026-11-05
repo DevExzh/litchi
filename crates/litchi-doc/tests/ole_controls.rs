@@ -74,5 +74,5 @@ fn public_owner_editor_keeps_the_source_snapshot_immutable() {
     edit.replace(0, replacement).unwrap();
     let commit = edit.commit().unwrap();
     assert_eq!(source.infos()[0].cookie(), 7);
-    assert_eq!(commit.snapshot().infos()[0].cookie(), 8);
+    assert_eq!(commit.package().infos()[0].cookie(), 8);
 }

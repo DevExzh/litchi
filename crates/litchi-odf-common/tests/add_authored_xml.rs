@@ -6,7 +6,7 @@
 //! Typed authored-XML publication, preflight, and transport failure contracts.
 
 use litchi_core::Error;
-use litchi_odf_common::core::{PackageWriter, PackageWriterError, PackageWriterLimits, Profile};
+use litchi_odf_common::core::{PackageWriter, PackageWriterError, Profile, StreamingArchiveLimits};
 use litchi_odf_common::signature::{DocumentSigner, SignatureAlgorithm};
 use soapberry_zip::office::ArchiveReader;
 use std::cell::RefCell;
@@ -36,7 +36,10 @@ impl Write for SharedSink {
 }
 
 fn shared_writer(bytes: &Rc<RefCell<Vec<u8>>>) -> PackageWriter<SharedSink> {
-    PackageWriter::with_writer(SharedSink(Rc::clone(bytes)))
+    PackageWriter::with_writer(
+        SharedSink(Rc::clone(bytes)),
+        StreamingArchiveLimits::default(),
+    )
 }
 
 fn signer() -> DocumentSigner {
@@ -54,7 +57,7 @@ fn authored_package_with(content: &[u8]) -> Vec<u8> {
     // bounded controls below.  In particular, do not compare `new()` plus the
     // compatibility `set_mimetype` path to a caller-owned sink publication.
     let mut sink = Vec::new();
-    let mut writer = PackageWriter::with_writer(&mut sink);
+    let mut writer = PackageWriter::with_writer(&mut sink, StreamingArchiveLimits::default());
     writer.set_mimetype_streaming(MIME).unwrap();
     writer
         .add_authored_xml("content.xml", content, XML_MEDIA_TYPE)
@@ -79,7 +82,8 @@ fn authored_xml_preserves_valid_comments_byte_for_byte() {
     let content = b"<root><!--keep this authored comment--><child>text</child></root>";
     let output = authored_package_with(content);
 
-    let archive = ArchiveReader::new(&output).unwrap();
+    let archive =
+        ArchiveReader::new(&output, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     assert_eq!(archive.read("content.xml").unwrap(), content);
 }
 
@@ -232,12 +236,15 @@ fn assert_authored_io_marker(error: &PackageWriterError) {
 #[test]
 fn authored_xml_io_failure_retains_marker_and_poisoned_finalize() {
     let bytes = Rc::new(RefCell::new(Vec::new()));
-    let mut writer = PackageWriter::with_writer(MarkerSink {
-        bytes: Rc::clone(&bytes),
-        // Leave enough room for the mimetype and the beginning of the authored
-        // member, then fail during its local header/data publication.
-        remaining: 128,
-    });
+    let mut writer = PackageWriter::with_writer(
+        MarkerSink {
+            bytes: Rc::clone(&bytes),
+            // Leave enough room for the mimetype and the beginning of the authored
+            // member, then fail during its local header/data publication.
+            remaining: 128,
+        },
+        StreamingArchiveLimits::default(),
+    );
     writer.set_mimetype_streaming(MIME).unwrap();
     let before_member = bytes.borrow().len();
     let error = writer
@@ -258,12 +265,9 @@ fn authored_xml_io_failure_retains_marker_and_poisoned_finalize() {
 }
 
 fn output_limited_writer(sink: &mut Vec<u8>, maximum_output: u64) -> PackageWriter<&mut Vec<u8>> {
-    let limits = PackageWriterLimits::new(3, 32, maximum_output.min(64 * 1024)).with_byte_limits(
-        64 * 1024,
-        64 * 1024,
-        maximum_output,
-    );
-    PackageWriter::with_writer_and_limits(sink, limits)
+    let limits = StreamingArchiveLimits::new(3, 32, maximum_output.min(64 * 1024))
+        .with_byte_limits(64 * 1024, 64 * 1024, maximum_output);
+    PackageWriter::with_writer(sink, limits)
 }
 
 #[test]
@@ -302,9 +306,9 @@ fn authored_xml_output_limit_is_inclusive_and_one_byte_under_is_typed() {
     assert!(under_sink.len() < expected.len());
 }
 
-fn metadata_limits(max_metadata_bytes: u64) -> PackageWriterLimits {
-    let defaults = PackageWriterLimits::default();
-    PackageWriterLimits::new(
+fn metadata_limits(max_metadata_bytes: u64) -> StreamingArchiveLimits {
+    let defaults = StreamingArchiveLimits::default();
+    StreamingArchiveLimits::new(
         defaults.max_entries,
         defaults.max_member_name_bytes,
         max_metadata_bytes,
@@ -319,7 +323,7 @@ fn metadata_limits(max_metadata_bytes: u64) -> PackageWriterLimits {
 fn metadata_limited_package(max_metadata_bytes: u64) -> Result<Vec<u8>, PackageWriterError> {
     let limits = metadata_limits(max_metadata_bytes);
     let mut sink = Vec::new();
-    let mut writer = PackageWriter::with_writer_and_limits(&mut sink, limits);
+    let mut writer = PackageWriter::with_writer(&mut sink, limits);
     writer.set_mimetype_streaming(MIME)?;
     writer.add_authored_xml("content.xml", AUTHORED_XML, XML_MEDIA_TYPE)?;
     let _ = writer.finish_to_writer()?;
@@ -327,7 +331,7 @@ fn metadata_limited_package(max_metadata_bytes: u64) -> Result<Vec<u8>, PackageW
 }
 
 fn minimum_successful_metadata_limit() -> u64 {
-    let maximum = PackageWriterLimits::default().max_metadata_bytes;
+    let maximum = StreamingArchiveLimits::default().max_metadata_bytes;
     assert!(metadata_limited_package(maximum).is_ok());
     let mut low = 0_u64;
     let mut high = maximum;

@@ -2,6 +2,7 @@ use super::super::codec::{invalid, limit};
 use super::super::validation::validate_task_pane;
 use super::super::{Error, Result};
 use super::{MAX_WEB_EXTENSION_ITEMS, Pane, canonicalize_pane_snapshot_resources};
+use crate::web::LimitKind;
 /// A checked pane selector. Add-in IDs are the semantic primary key; numeric
 /// positions are available for ordered document workflows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -119,7 +120,7 @@ impl Panes {
     pub fn push(&mut self, mut pane: Pane) -> Result<&mut Self> {
         if self.panes.len() >= MAX_WEB_EXTENSION_ITEMS {
             return limit(
-                "web extension panes",
+                LimitKind::Panes,
                 MAX_WEB_EXTENSION_ITEMS,
                 self.panes.len().saturating_add(1),
             );
@@ -147,9 +148,9 @@ impl Panes {
 
     pub(in crate::web) fn next_relationship_id(&self) -> Result<String> {
         let attempts = self.panes.len().checked_add(1).ok_or(Error::Limit {
-            resource: "web extension pane relationship IDs",
-            max: usize::MAX,
-            actual: usize::MAX,
+            kind: crate::LimitKind::Web(LimitKind::PaneRelationshipIds),
+            maximum: usize::MAX,
+            observed: usize::MAX,
         })?;
         for index in 1..=attempts {
             let candidate = format!("rIdAddIn{index}");

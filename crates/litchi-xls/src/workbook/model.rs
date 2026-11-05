@@ -14,21 +14,26 @@ use crate::pivot_table;
 use crate::protection;
 use crate::records::{BiffVersion, SharedStringProperties};
 use crate::sheet_metadata::SheetMetadata;
+use crate::source_limits::SourceLimits;
 use crate::worksheet::Worksheet;
 use litchi_cfb::OleFile;
-use litchi_core::sheet::{
-    Result as SheetResult, Worksheet as SheetTrait, WorksheetIterator as WorksheetIteratorTrait,
-};
 use std::io::{Read, Seek};
 use std::sync::Arc;
 
 /// XLS workbook implementation
 #[derive(Debug)]
-pub struct Workbook<R: Read + Seek> {
+pub struct Reader<R: Read + Seek> {
     pub(super) ole_file: OleFile<R>,
+    /// Physical source limits inherited by every lazy package-stream reader.
+    pub(super) source_limits: SourceLimits,
+    /// Password-to-open profile selected by the Workbook stream's BIFF
+    /// `FILEPASS` record. The parsed bytes may be clear after decryption, but
+    /// package publication must retain this source protection state and its
+    /// exact mode parameters.
+    pub(super) encryption: Option<crate::EncryptionProfile>,
     pub(super) worksheets: Vec<Worksheet>,
     pub(super) worksheet_names: Vec<String>,
-    pub(super) sheets: Vec<SheetMetadata>,
+    pub(super) sheets: Arc<[SheetMetadata]>,
     /// Shared string table (Arc for zero-copy sharing across worksheets)
     pub(super) shared_strings: Option<Arc<Vec<String>>>,
     /// Sparse rich-text and phonetic properties parallel to `shared_strings`.
@@ -76,9 +81,23 @@ pub struct Workbook<R: Read + Seek> {
 }
 
 /// Options for opening a legacy XLS workbook.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///
+/// Setters consume the options value and preserve the other selected policies.
+/// Passwords are never included in its debug representation.
+///
+/// ```
+/// use litchi_xls::{Leniency, OpenOptions};
+/// let options = OpenOptions::new()
+///     .password("example-password")
+///     .leniency(Leniency::Strict);
+/// assert_eq!(options.leniency_value(), Leniency::Strict);
+/// assert!(!format!("{options:?}").contains("example-password"));
+/// ```
+#[derive(Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct OpenOptions<'a> {
+    /// Checked physical input and declared-stream policy.
+    source_limits: SourceLimits,
     /// Password used for BIFF8 password-to-open encryption.
     password: Option<&'a str>,
     /// How non-structural formatting defects are treated.
@@ -88,7 +107,7 @@ pub struct OpenOptions<'a> {
     /// [`Leniency::TolerateFormattingDefects`] to open the widespread
     /// real-world workbooks whose cosmetic formatting metadata is
     /// self-contradictory; everything repaired is then enumerable through
-    /// [`Workbook::tolerance_report`]. Set
+    /// [`Reader::tolerance_report`]. Set
     /// [`Leniency::TolerateSheetNameDefects`] to keep worksheet names that
     /// break the MS-XLS naming rules (see [`crate::SheetNameDefect`]), or
     /// [`Leniency::TolerateAllDefects`] for both opt-in classes. The
@@ -110,51 +129,76 @@ impl<'a> OpenOptions<'a> {
     #[must_use]
     pub const fn new() -> Self {
         Self {
+            source_limits: SourceLimits::DEFAULT,
             password: None,
             leniency: Leniency::Strict,
             compatibility_profile: crate::CompatibilityProfile::Strict,
         }
     }
 
+    /// Select checked physical input and declared-stream limits.
+    #[must_use]
+    pub const fn source_limits(mut self, limits: SourceLimits) -> Self {
+        self.source_limits = limits;
+        self
+    }
+
+    /// Return the selected physical source policy.
+    #[must_use]
+    pub const fn source_limits_value(&self) -> SourceLimits {
+        self.source_limits
+    }
+
     /// Password used for BIFF8 password-to-open encryption.
     #[must_use]
-    pub const fn password(&self) -> Option<&'a str> {
+    pub const fn password_value(&self) -> Option<&'a str> {
         self.password
     }
 
     /// Set the optional BIFF8 password-to-open password.
-    pub fn with_password(mut self, password: impl Into<Option<&'a str>>) -> Self {
+    pub fn password(mut self, password: impl Into<Option<&'a str>>) -> Self {
         self.password = password.into();
         self
     }
 
     /// Current formatting-defect policy.
     #[must_use]
-    pub const fn leniency(&self) -> Leniency {
+    pub const fn leniency_value(&self) -> Leniency {
         self.leniency
     }
 
     /// Set the formatting-defect policy.
     #[must_use]
-    pub const fn with_leniency(mut self, leniency: Leniency) -> Self {
+    pub const fn leniency(mut self, leniency: Leniency) -> Self {
         self.leniency = leniency;
         self
     }
 
     /// Current explicit workbook compatibility profile.
     #[must_use]
-    pub const fn compatibility_profile(&self) -> crate::CompatibilityProfile {
+    pub const fn compatibility_profile_value(&self) -> crate::CompatibilityProfile {
         self.compatibility_profile
     }
 
     /// Select an explicit, versioned workbook compatibility profile.
     #[must_use]
-    pub const fn with_compatibility_profile(
+    pub const fn compatibility_profile(
         mut self,
         compatibility_profile: crate::CompatibilityProfile,
     ) -> Self {
         self.compatibility_profile = compatibility_profile;
         self
+    }
+}
+
+impl std::fmt::Debug for OpenOptions<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OpenOptions")
+            .field("source_limits", &self.source_limits)
+            .field("password", &self.password.map(|_| "[REDACTED]"))
+            .field("leniency", &self.leniency)
+            .field("compatibility_profile", &self.compatibility_profile)
+            .finish()
     }
 }
 
@@ -164,7 +208,26 @@ impl Default for OpenOptions<'_> {
     }
 }
 
-impl<R: Read + Seek> Workbook<R> {
+impl<R: Read + Seek> Reader<R> {
+    /// Returns whether this source contained a BIFF `FILEPASS` record.
+    ///
+    /// A successful open may expose decrypted projections, while edits still
+    /// need to preserve the source's encrypted protection policy.
+    #[must_use]
+    pub fn encrypted_source(&self) -> bool {
+        self.encryption.is_some()
+    }
+
+    /// Returns the password-to-open profile found in this source, if any.
+    ///
+    /// The profile is retained after decryption so an owning package can
+    /// report the original mode and, for CryptoAPI RC4, the original key
+    /// length without rescanning the raw Workbook stream.
+    #[must_use]
+    pub fn encryption(&self) -> Option<crate::EncryptionProfile> {
+        self.encryption
+    }
+
     pub(crate) fn shared_strings_shared(&self) -> Arc<Vec<String>> {
         self.shared_strings
             .as_ref()
@@ -189,6 +252,15 @@ impl<R: Read + Seek> Workbook<R> {
     /// the substitute value each one produced.
     pub fn tolerance_report(&self) -> &ToleranceReport {
         &self.tolerance
+    }
+
+    /// Borrows the reader the workbook's compound file was parsed from.
+    ///
+    /// For an in-memory workbook this is the cursor over the exact source
+    /// bytes, which an editor such as [`crate::cell_values::Snapshot`] can be
+    /// opened from without reading the source again.
+    pub fn get_ref(&self) -> &R {
+        self.ole_file.get_ref()
     }
 
     /// Optional `ExtSST` shared-string lookup index.
@@ -326,6 +398,12 @@ impl<R: Read + Seek> Workbook<R> {
         &self.sheets
     }
 
+    /// Share the parsed tab catalog with package projections without cloning
+    /// its names. The reader owns this immutable allocation after parsing.
+    pub(crate) fn shared_sheets(&self) -> Arc<[SheetMetadata]> {
+        Arc::clone(&self.sheets)
+    }
+
     /// Sheet directory entry at a workbook tab index.
     pub fn sheet(&self, index: usize) -> Option<&SheetMetadata> {
         self.sheets.get(index)
@@ -335,7 +413,7 @@ impl<R: Read + Seek> Workbook<R> {
     pub fn sheet_by_name(&self, name: &str) -> Option<&SheetMetadata> {
         self.sheets
             .iter()
-            .find(|sheet| sheet.name().eq_ignore_ascii_case(name))
+            .find(|sheet| crate::sheet_name::equivalent(sheet.name(), name))
     }
 
     /// Total number of cell references represented by the workbook SST.
@@ -552,17 +630,25 @@ impl<R: Read + Seek> Workbook<R> {
 }
 
 impl<R: Read + Seek + std::fmt::Debug + Send + Sync> litchi_core::sheet::WorkbookTrait
-    for Workbook<R>
+    for Reader<R>
 {
-    fn active_worksheet(&self) -> SheetResult<Box<dyn SheetTrait + '_>> {
+    type Error = Error;
+    /// Worksheets are borrowed from the reader: zero-copy.
+    type Worksheet<'a>
+        = &'a Worksheet
+    where
+        Self: 'a;
+    type Worksheets<'a>
+        = Worksheets<'a>
+    where
+        Self: 'a;
+
+    fn active_worksheet(&self) -> Result<&Worksheet> {
         if self.worksheets.is_empty() {
-            return Err(Box::new(Error::WorksheetNotFound(
-                "No worksheets found".to_string(),
-            )));
+            return Err(Error::WorksheetNotFound("No worksheets found".to_string()));
         }
-        // Return reference instead of clone - zero-copy!
         let index = self.active_worksheet_position().unwrap_or(0);
-        Ok(Box::new(&self.worksheets[index]))
+        Ok(&self.worksheets[index])
     }
 
     fn worksheet_names(&self) -> &[String] {
@@ -570,31 +656,28 @@ impl<R: Read + Seek + std::fmt::Debug + Send + Sync> litchi_core::sheet::Workboo
         &self.worksheet_names
     }
 
-    fn worksheet_by_name(&self, name: &str) -> SheetResult<Box<dyn SheetTrait + '_>> {
+    fn worksheet_by_name(&self, name: &str) -> Result<&Worksheet> {
         for worksheet in &self.worksheets {
-            if names_equal(worksheet.name(), name) {
-                // Return reference instead of clone - zero-copy!
-                return Ok(Box::new(worksheet));
+            if names_equal(litchi_core::sheet::Worksheet::name(worksheet), name) {
+                return Ok(worksheet);
             }
         }
-        Err(Box::new(Error::WorksheetNotFound(name.to_string())))
+        Err(Error::WorksheetNotFound(name.to_string()))
     }
 
-    fn worksheet_by_index(&self, index: usize) -> SheetResult<Box<dyn SheetTrait + '_>> {
+    fn worksheet_by_index(&self, index: usize) -> Result<&Worksheet> {
         if index >= self.worksheets.len() {
-            return Err(Box::new(Error::WorksheetNotFound(format!(
+            return Err(Error::WorksheetNotFound(format!(
                 "Index {index} out of bounds"
-            ))));
+            )));
         }
-        // Return reference instead of clone - zero-copy!
-        Ok(Box::new(&self.worksheets[index]))
+        Ok(&self.worksheets[index])
     }
 
-    fn worksheets(&self) -> Box<dyn WorksheetIteratorTrait<'_> + '_> {
-        Box::new(WorksheetIterator {
-            worksheets: self.worksheets.iter().collect(),
-            index: 0,
-        })
+    fn worksheets(&self) -> Worksheets<'_> {
+        Worksheets {
+            worksheets: self.worksheets.iter(),
+        }
     }
 
     fn worksheet_count(&self) -> usize {
@@ -610,25 +693,26 @@ impl<R: Read + Seek + std::fmt::Debug + Send + Sync> litchi_core::sheet::Workboo
     }
 }
 
-/// Worksheet iterator for XLS workbooks
-struct WorksheetIterator<'a> {
-    worksheets: Vec<&'a Worksheet>,
-    index: usize,
+/// The worksheets of an XLS workbook, in workbook order: the iterator
+/// [`WorkbookTrait::worksheets`](litchi_core::sheet::WorkbookTrait::worksheets)
+/// returns.
+#[derive(Debug, Clone)]
+pub struct Worksheets<'a> {
+    worksheets: std::slice::Iter<'a, Worksheet>,
 }
 
-impl<'a> WorksheetIteratorTrait<'a> for WorksheetIterator<'a> {
-    fn next(&mut self) -> Option<SheetResult<Box<dyn SheetTrait + 'a>>> {
-        if self.index >= self.worksheets.len() {
-            None
-        } else {
-            let worksheet = self.worksheets[self.index];
-            self.index += 1;
-            // Return reference instead of clone - zero-copy!
-            Some(Ok(Box::new(worksheet)))
-        }
+impl<'a> Iterator for Worksheets<'a> {
+    type Item = Result<&'a Worksheet>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.worksheets.next().map(Ok)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.worksheets.size_hint()
     }
 }
 
 fn names_equal(left: &str, right: &str) -> bool {
-    left.to_lowercase() == right.to_lowercase()
+    crate::sheet_name::equivalent(left, right)
 }

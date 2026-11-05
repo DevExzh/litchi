@@ -1,0 +1,227 @@
+{
+  "base": "5f82848509",
+  "non_exhaustive_error_enums_added": 25,
+  "workspace_check": {
+    "command": [
+      "cargo",
+      "check",
+      "--workspace",
+      "--all-targets",
+      "--all-features"
+    ],
+    "status": 0
+  },
+  "commands": [
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "status": 0,
+      "elapsed_seconds": 26.9164484560024
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "-p",
+        "litchi-iwa-common",
+        "-p",
+        "litchi-iwa-core",
+        "-p",
+        "litchi-iwa-text-wire",
+        "-p",
+        "litchi-iwa-detect",
+        "-p",
+        "litchi-pages",
+        "-p",
+        "litchi-keynote",
+        "-p",
+        "litchi-numbers",
+        "-p",
+        "litchi-iwa",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "status": 0,
+      "elapsed_seconds": 84.64576368301641
+    },
+    {
+      "name": "tests",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "litchi-iwa-common",
+        "-p",
+        "litchi-iwa-core",
+        "-p",
+        "litchi-iwa-text-wire",
+        "-p",
+        "litchi-iwa-detect",
+        "--all-features"
+      ],
+      "status": 0,
+      "elapsed_seconds": 38.92371349595487
+    },
+    {
+      "name": "rustdoc",
+      "command": [
+        "cargo",
+        "rustdoc",
+        "-p",
+        "litchi-iwa-common",
+        "--lib",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings",
+        "-Zunstable-options",
+        "--output-format",
+        "json",
+        "--document-hidden-items"
+      ],
+      "status": 0,
+      "elapsed_seconds": 1.984108428005129
+    },
+    {
+      "name": "glossary",
+      "command": [
+        "python3",
+        "tools/check_api_glossary.py",
+        "--profile",
+        "iwa-common",
+        "--json",
+        "target/doc/litchi_iwa_common.json"
+      ],
+      "status": 0,
+      "elapsed_seconds": 0.21426479797810316
+    },
+    {
+      "name": "inventory",
+      "command": [
+        "python3",
+        "tools/api_debt_inventory.py",
+        "target/doc/litchi_iwa_common.json"
+      ],
+      "status": 0,
+      "elapsed_seconds": 0.21434622793458402
+    },
+    {
+      "name": "harness",
+      "command": [
+        "cargo",
+        "check",
+        "--locked",
+        "--all-targets",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml"
+      ],
+      "status": 0,
+      "elapsed_seconds": 30.18325252807699
+    },
+    {
+      "name": "resave",
+      "command": [
+        "cargo",
+        "check",
+        "--locked",
+        "--all-targets",
+        "--manifest-path",
+        "tools/native-resave/Cargo.toml"
+      ],
+      "status": 0,
+      "elapsed_seconds": 0.16746158804744482
+    }
+  ],
+  "tests": {
+    "passed": 417,
+    "ignored": 0,
+    "targets": 11,
+    "includes_compile_fail_doctests": 1
+  },
+  "tool_tests": {
+    "command": [
+      "python3",
+      "-m",
+      "unittest",
+      "tools.test_check_api_glossary",
+      "tools.test_check_iwork_leaf_public_api"
+    ],
+    "passed": 47,
+    "status": 0
+  },
+  "remaining_inventory_rows": {
+    "edit_type": 1,
+    "exhaustive_error": 0
+  },
+  "remaining_row_review": "wire::NestedFieldEdit is an immutable Copy raw patch descriptor, not a staging Edit; see 0361b",
+  "raw_logs": [
+    {
+      "name": "fmt",
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-validation/fmt.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "clippy",
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-validation/clippy.log",
+      "bytes": 2668,
+      "sha256": "5c4594cafce5a19fa452c9a4ffa1d979b183e66272610d1ac360ce4fc359848d"
+    },
+    {
+      "name": "tests",
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-validation/tests.log",
+      "bytes": 37254,
+      "sha256": "c23ef4fac6bfde8b17c8c0d09f545271503233cf9965c8eb2c035f28cb9e7d59"
+    },
+    {
+      "name": "rustdoc",
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-validation/rustdoc.log",
+      "bytes": 268,
+      "sha256": "692dfd7357f25f85e40874ce6dc7d7f5f4df44dbceded7e3bf82d6dde2899105"
+    },
+    {
+      "name": "glossary",
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-validation/glossary.log",
+      "bytes": 123,
+      "sha256": "b94f276d44565d7ff2b4dec030f3e43233174495c862e9b40525072555aa861c"
+    },
+    {
+      "name": "inventory",
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-validation/inventory.log",
+      "bytes": 140,
+      "sha256": "12f547b62f50f072fa9343e289f8fa2e990eac0dcf98c5c199e331cf29a41f4e"
+    },
+    {
+      "name": "workspace-check",
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-check-6.log",
+      "bytes": 6499,
+      "sha256": "c673e60c853daa2b5d907272310dd7c3e4344f1cf151862416b84cdf6010f5b3"
+    },
+    {
+      "name": "harness",
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-validation/harness.log",
+      "bytes": 776,
+      "sha256": "5d6ff298ef43d6d5345eaeee8394a2cd1f0b98ff2437ed86a918554aea096a4e"
+    },
+    {
+      "name": "resave",
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-validation/resave.log",
+      "bytes": 1455,
+      "sha256": "93a5633aa6315d1d1fe85c5f9515bc406006ca76479d67aef57ad1c02515b468"
+    }
+  ],
+  "performance_claim": "No codec or output algorithm changes; no native measurement claim.",
+  "existing_warnings": {
+    "native-resave": 4
+  }
+}

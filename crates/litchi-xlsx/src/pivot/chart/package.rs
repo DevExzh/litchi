@@ -17,7 +17,7 @@ use super::codec::{parse_binding, xml_error};
 /// Load every pivot chart reachable through the workbook relationship graph.
 pub fn load(package: &OpcPackage) -> Result<Vec<SheetCharts>> {
     let workbook_part = package.main_document_part()?;
-    let sheets = parse_workbook_sheets(workbook_part.blob())?;
+    let sheets = parse_workbook_sheets(workbook_part.blob(), &package.read_limits())?;
     let tables = read_pivot_tables(package).map_err(|error| invalid(error.to_string()))?;
     let mut output = Vec::new();
     for sheet in &sheets {
@@ -41,7 +41,7 @@ pub fn load(package: &OpcPackage) -> Result<Vec<SheetCharts>> {
 /// Load pivot charts hosted by one named worksheet or chartsheet.
 pub fn load_sheet(package: &OpcPackage, sheet_name: &str) -> Result<Vec<Chart>> {
     let workbook_part = package.main_document_part()?;
-    let sheets = parse_workbook_sheets(workbook_part.blob())?;
+    let sheets = parse_workbook_sheets(workbook_part.blob(), &package.read_limits())?;
     let tables = read_pivot_tables(package).map_err(|error| invalid(error.to_string()))?;
     let sheet = sheets
         .iter()
@@ -53,11 +53,14 @@ pub fn load_sheet(package: &OpcPackage, sheet_name: &str) -> Result<Vec<Chart>> 
     Ok(charts)
 }
 
-fn parse_workbook_sheets(xml: &[u8]) -> Result<Vec<crate::raw::Sheet>> {
+fn parse_workbook_sheets(
+    xml: &[u8],
+    limits: &litchi_opc::SourceLimits,
+) -> Result<Vec<crate::raw::Sheet>> {
     if xml.len() > MAX_WORKBOOK_BYTES {
         return Err(limit("workbook XML bytes"));
     }
-    Ok(parse_catalog(xml)
+    Ok(parse_catalog(xml, limits)
         .map_err(|error| invalid(error.to_string()))?
         .sheets)
 }
@@ -125,7 +128,7 @@ fn load_for_sheet(
             return Err(limit("drawing part bytes"));
         }
         let drawing_xml = std::str::from_utf8(drawing_part.blob()).map_err(xml_error)?;
-        let drawing = parse(drawing_xml)?
+        let drawing = parse(drawing_xml, &package.read_limits())?
             .ok_or_else(|| invalid(format!("drawing part '{drawing_uri}' has no wsDr root")))?;
         for chart in drawing.charts() {
             let chart_relationship =

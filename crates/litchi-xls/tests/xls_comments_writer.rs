@@ -1,11 +1,17 @@
 use std::io::Cursor;
 
-use litchi_xls::writer::shape::{Anchor, Behavior, Point};
-use litchi_xls::writer::{CommentTextRunWrite, CommentWriteOptions, PivotTableConfig, Writer};
-use litchi_xls::{Visibility, Workbook};
+use litchi_xls::AnchorBehavior;
+use litchi_xls::writer::shape::{Anchor, Point};
+use litchi_xls::writer::{
+    Builder, CommentTextRunWrite, CommentWriteOptions, PivotCacheValue, PivotDataItemConfig,
+    PivotFieldConfig, PivotItemConfig, PivotTableConfig,
+};
+use litchi_xls::{PivotCacheItem, Visibility, raw::Reader};
 
 fn workbook_records(bytes: Vec<u8>) -> Vec<(u16, Vec<u8>)> {
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     let stream = ole.open_stream(&["Workbook"]).unwrap();
     let mut records = Vec::new();
     let mut offset = 0usize;
@@ -23,7 +29,7 @@ fn workbook_records(bytes: Vec<u8>) -> Vec<(u16, Vec<u8>)> {
 
 #[test]
 fn comments_round_trip_unicode_runs_visibility_and_guid() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Comments").unwrap();
     let guid = [7u8; 16];
     writer
@@ -40,7 +46,7 @@ fn comments_round_trip_unicode_runs_visibility_and_guid() {
                     Anchor::new(
                         Point::new(3, 4).unwrap().offset(20, 10).unwrap(),
                         Point::new(8, 7).unwrap().offset(200, 900).unwrap(),
-                        Behavior::MoveAndSize,
+                        AnchorBehavior::Absolute,
                     )
                     .unwrap(),
                 ),
@@ -54,8 +60,11 @@ fn comments_round_trip_unicode_runs_visibility_and_guid() {
         )
         .unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
-    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    let package = writer
+        .build()
+        .unwrap_or_else(|error| panic!("comment fixture build failed: {error} ({error:?})"));
+    package.write_to(&mut output).unwrap();
+    let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     let comments = workbook.xls_worksheet(0).unwrap().comments();
     assert_eq!(comments.len(), 1);
     assert_eq!(comments[0].text(), "Hello 😀");
@@ -67,13 +76,16 @@ fn comments_round_trip_unicode_runs_visibility_and_guid() {
 
 #[test]
 fn long_comment_splits_without_breaking_surrogates() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Long").unwrap();
     let text = "😀".repeat(5000);
     writer.add_comment(sheet, 0, 0, "A", &text).unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
-    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    let package = writer
+        .build()
+        .unwrap_or_else(|error| panic!("comment fixture build failed: {error} ({error:?})"));
+    package.write_to(&mut output).unwrap();
+    let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     assert_eq!(
         workbook.xls_worksheet(0).unwrap().comments()[0].text(),
         text
@@ -82,7 +94,7 @@ fn long_comment_splits_without_breaking_surrogates() {
 
 #[test]
 fn comment_api_rejects_bounds_duplicates_and_bad_runs() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Bad").unwrap();
     assert!(writer.add_comment(sheet, 65_536, 0, "A", "x").is_err());
     assert!(writer.add_comment(sheet, 0, 256, "A", "x").is_err());
@@ -111,11 +123,14 @@ fn comment_api_rejects_bounds_duplicates_and_bad_runs() {
 
 #[test]
 fn comment_records_follow_client_boundaries_and_note_order() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Structure").unwrap();
     writer.add_comment(sheet, 0, 0, "A", "text").unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    let package = writer
+        .build()
+        .unwrap_or_else(|error| panic!("comment fixture build failed: {error} ({error:?})"));
+    package.write_to(&mut output).unwrap();
     let records = workbook_records(output.into_inner());
     let relevant = records
         .iter()
@@ -138,7 +153,7 @@ fn comment_records_follow_client_boundaries_and_note_order() {
 
 #[test]
 fn comments_and_pivot_objects_share_one_drawing_and_use_separate_object_ids() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Mixed").unwrap();
     writer
         .add_pivot_table(
@@ -148,29 +163,71 @@ fn comments_and_pivot_objects_share_one_drawing_and_use_separate_object_ids() {
                 source_type: 1,
                 source_sheet_name: "Mixed".into(),
                 source_first_row: 0,
-                source_last_row: 0,
+                source_last_row: 1,
                 source_first_col: 0,
-                source_last_col: 0,
+                source_last_col: 1,
                 first_row: 4,
-                last_row: 4,
+                last_row: 5,
                 first_col: 0,
-                last_col: 0,
+                last_col: 1,
                 first_header_row: 4,
-                first_data_row: 4,
-                first_data_col: 0,
+                first_data_row: 5,
+                first_data_col: 1,
                 data_field_name: "Values".into(),
                 data_axis: 0,
                 data_position: 0,
-                fields: Vec::new(),
-                data_items: Vec::new(),
-                page_entries: vec![(0, 0, 1)],
-                source_data: Vec::new(),
+                fields: vec![
+                    PivotFieldConfig {
+                        axis: 8,
+                        subtotal_count: 0,
+                        subtotal_flags: 0,
+                        items: Vec::new(),
+                        name: None,
+                        cache_name: "Value".into(),
+                        cache_items: Vec::new(),
+                        is_numeric: true,
+                        grouping: None,
+                    },
+                    PivotFieldConfig {
+                        axis: 4,
+                        subtotal_count: 0,
+                        subtotal_flags: 0,
+                        items: vec![PivotItemConfig {
+                            item_type: 0,
+                            flags: 0,
+                            cache_index: 0,
+                            name: None,
+                        }],
+                        name: None,
+                        cache_name: "Filter".into(),
+                        cache_items: vec![PivotCacheItem::from("All")],
+                        is_numeric: false,
+                        grouping: None,
+                    },
+                ],
+                data_items: vec![PivotDataItemConfig {
+                    source_field_index: 0,
+                    function: 0,
+                    display_format: 0,
+                    base_field_index: 0,
+                    base_item_index: 0,
+                    num_format_index: 0,
+                    name: "Sum of Value".into(),
+                }],
+                page_entries: vec![(0, 1, 1)],
+                source_data: vec![vec![
+                    PivotCacheValue::Number(42.0),
+                    PivotCacheValue::StringIndex(0),
+                ]],
             },
         )
         .unwrap();
     writer.add_comment(sheet, 1, 1, "A", "mixed").unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    let package = writer
+        .build()
+        .unwrap_or_else(|error| panic!("comment fixture build failed: {error} ({error:?})"));
+    package.write_to(&mut output).unwrap();
     let records = workbook_records(output.into_inner());
     let drawing_group = records
         .iter()

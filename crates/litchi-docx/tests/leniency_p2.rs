@@ -24,7 +24,8 @@ fn fixture(name: &str) -> Vec<u8> {
 }
 
 fn member(bytes: &[u8], name: &str) -> String {
-    let archive = ArchiveReader::new(bytes).expect("fixture archive");
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
+        .expect("fixture archive");
     String::from_utf8(archive.read(name).expect("archive member")).expect("UTF-8 member")
 }
 
@@ -38,8 +39,10 @@ fn patch(bytes: &[u8], name: &str, from: &str, to: &str) -> Vec<u8> {
 
 /// Rewrite the text of archive member `name` with `rewrite`.
 fn patch_with(bytes: &[u8], name: &str, rewrite: impl FnOnce(String) -> String) -> Vec<u8> {
-    let archive = ArchiveReader::new(bytes).expect("fixture archive");
-    let mut writer = StreamingArchiveWriter::new();
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
+        .expect("fixture archive");
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     let mut rewrite = Some(rewrite);
     for member in archive.file_names() {
         let mut content = archive.read(member).expect("archive member");
@@ -260,11 +263,8 @@ fn non_numeric_levels_stay_fatal() {
         r#"<w:pPr><w:outlineLvl w:val="-1"/></w:pPr>"#,
     );
     let package = open(&bytes);
-    let mut styles = package
-        .document()
-        .expect("document")
-        .styles()
-        .expect("styles");
+    let document = package.document().expect("document");
+    let mut styles = document.styles().expect("styles");
     assert!(styles.len().is_err());
 }
 
@@ -725,11 +725,8 @@ fn complete_style_num_pr_records_nothing() {
 fn nested_style_num_pr_stays_fatal() {
     let bytes = ilvl_only_style_fixture("<w:numPr><w:numPr/></w:numPr>");
     let package = open(&bytes);
-    let mut styles = package
-        .document()
-        .expect("document")
-        .styles()
-        .expect("styles");
+    let document = package.document().expect("document");
+    let mut styles = document.styles().expect("styles");
     assert!(styles.len().is_err());
 }
 

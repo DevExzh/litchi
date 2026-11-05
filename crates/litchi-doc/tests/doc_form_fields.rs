@@ -60,7 +60,11 @@ const DROPDOWN_OFFSET: u32 = 12509;
 #[test]
 fn parses_ffdata_from_the_data_stream() {
     let path = fixture(TRAVEL_FORM);
-    let mut ole = OleFile::open(File::open(&path).unwrap()).unwrap();
+    let mut ole = OleFile::open(
+        File::open(&path).unwrap(),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let data_stream = ole.open_stream(&["Data"]).unwrap();
 
     let nil_picf = NilPicfAndBinData::parse_at(&data_stream, CHECKBOX_OFFSET).unwrap();
@@ -95,7 +99,7 @@ fn parses_ffdata_from_the_data_stream() {
 #[test]
 fn exposes_form_data_through_the_document_api() {
     let mut package =
-        litchi_doc::Package::from_reader(File::open(fixture(TRAVEL_FORM)).unwrap()).unwrap();
+        litchi_doc::raw::Reader::from_reader(File::open(fixture(TRAVEL_FORM)).unwrap()).unwrap();
     let document = package.document().unwrap();
 
     let fields = document.legacy_form_fields().unwrap();
@@ -142,7 +146,7 @@ fn exposes_form_data_through_the_document_api() {
 fn documents_without_form_fields_report_none() {
     // The seat booking form uses no legacy form-code fields at all.
     let mut package =
-        litchi_doc::Package::from_reader(File::open(fixture(CONCERT_FORM)).unwrap()).unwrap();
+        litchi_doc::raw::Reader::from_reader(File::open(fixture(CONCERT_FORM)).unwrap()).unwrap();
     let document = package.document().unwrap();
     assert!(document.legacy_form_fields().unwrap().is_empty());
 }

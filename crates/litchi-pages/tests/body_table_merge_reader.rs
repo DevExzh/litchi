@@ -14,7 +14,10 @@ use litchi_iwa_archive::package::{Catalog, EntryEdit};
 use litchi_iwa_common::table::merge::Region;
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::tswp;
-use litchi_pages::{BodyTableMergesError, BodyTableSelector, MergeReader, Package};
+use litchi_pages::{
+    BodyTableSelector, MergeReader, OpenOptions, Package, SourceLimits,
+    table::merge::transaction::Error as BodyTableMergesError,
+};
 use prost::Message as _;
 
 const NATIVE: &[u8] = include_bytes!(concat!(
@@ -41,13 +44,13 @@ fn expected() -> [Region; 1] {
 }
 
 fn append_irrelevant_body_run(source: &[u8], length: usize) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == "Index/Document.iwa")
         .ok_or("missing Pages document component")?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let mut archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
     for object in &mut archive.objects {
         for message_index in 0..object.messages.len() {
             let message_type = object.messages[message_index].type_;
@@ -59,10 +62,10 @@ fn append_irrelevant_body_run(source: &[u8], length: usize) -> TestResult<Vec<u8
             else {
                 continue;
             };
-            if !storage
+            if storage
                 .table_attachment
                 .as_ref()
-                .is_some_and(|table| !table.entries.is_empty())
+                .is_none_or(|table| table.entries.is_empty())
             {
                 continue;
             }
@@ -73,8 +76,10 @@ fn append_irrelevant_body_run(source: &[u8], length: usize) -> TestResult<Vec<u8
                     type_: message_type,
                     data: storage.encode_to_vec(),
                 },
+                Default::default(),
             )?;
-            let component = SnappyStream::compress(&archive.to_bytes()?)?;
+            let component =
+                SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
             return Ok(catalog.reassemble_to_bytes(
                 &[EntryEdit::new(entry.name(), component.as_ref())],
                 Limits::default(),
@@ -102,7 +107,9 @@ fn reader_matches_package_for_name_and_position() -> TestResult {
     );
     assert_eq!(
         reader.body_table_merges(BodyTableSelector::name("missing")),
-        Err(BodyTableMergesError::TableNotFound)
+        Err(BodyTableMergesError::Refused(
+            litchi_pages::table::merge::transaction::Refusal::TableNotFound
+        ))
     );
     assert_eq!(package.body_table_merges(0usize)?, expected());
     Ok(())
@@ -124,29 +131,20 @@ fn reader_keeps_a_bounded_snapshot_after_path_removal() -> TestResult {
 #[test]
 fn reader_accepts_an_inclusive_input_limit_and_rejects_one_below() -> TestResult {
     let input_bytes = u64::try_from(NATIVE.len())?;
-    let exact = Limits::new(
-        input_bytes,
-        Limits::MAX_ENTRIES,
-        Limits::MAX_ENTRY_BYTES,
-        Limits::MAX_TOTAL_BYTES,
-        Limits::MAX_IWA_STREAM_BYTES,
-    )?;
+    let options = |maximum| -> Result<OpenOptions, litchi_pages::PackageError> {
+        Ok(OpenOptions::new()
+            .source_limits(SourceLimits::builder().max_input_bytes(maximum)?.build()?))
+    };
     assert_eq!(
-        MergeReader::from_bytes_with_limits(NATIVE, exact)?.body_table_merges(0usize)?,
+        MergeReader::from_bytes_with_options(NATIVE, options(input_bytes)?)?
+            .body_table_merges(0usize)?,
         expected()
     );
 
-    let below = Limits::new(
-        input_bytes - 1,
-        Limits::MAX_ENTRIES,
-        Limits::MAX_ENTRY_BYTES,
-        Limits::MAX_TOTAL_BYTES,
-        Limits::MAX_IWA_STREAM_BYTES,
-    )?;
     assert!(matches!(
-        MergeReader::from_bytes_with_limits(NATIVE, below),
-        Err(BodyTableMergesError::LimitExceeded {
-            kind: litchi_pages::BodyTableMergesLimitKind::InputBytes,
+        MergeReader::from_bytes_with_options(NATIVE, options(input_bytes - 1)?),
+        Err(BodyTableMergesError::Limit {
+            kind: litchi_pages::table::merge::transaction::LimitKind::InputBytes,
             observed,
             maximum,
         }) if observed == input_bytes && maximum == input_bytes - 1
@@ -160,11 +158,15 @@ fn reader_preserves_empty_body_and_table_miss_semantics() -> TestResult {
 
     assert_eq!(
         reader.body_table_merges(0usize),
-        Err(BodyTableMergesError::TableNotFound)
+        Err(BodyTableMergesError::Refused(
+            litchi_pages::table::merge::transaction::Refusal::TableNotFound
+        ))
     );
     assert_eq!(
         reader.body_table_merges(BodyTableSelector::name("missing")),
-        Err(BodyTableMergesError::TableNotFound)
+        Err(BodyTableMergesError::Refused(
+            litchi_pages::table::merge::transaction::Refusal::TableNotFound
+        ))
     );
     Ok(())
 }
@@ -204,7 +206,7 @@ fn shared_byte_reader_clones_survive_input_source_drop() -> TestResult {
 #[cfg(feature = "internal-iwork-source")]
 #[test]
 fn shared_catalog_ingress_retains_the_original_archive_records() -> TestResult {
-    let source = SourceCatalog::from_bytes_with_limits(NATIVE, Limits::default())?;
+    let source = SourceCatalog::from_bytes(NATIVE, Limits::default())?;
     let components = Arc::new(source.into_components());
     let components_lifetime = Arc::downgrade(&components);
     let reader = MergeReader::__from_shared_catalog(Arc::clone(&components), Limits::default())?;
@@ -284,7 +286,7 @@ fn total_component_payload_bytes(components: &litchi_iwa_archive::ComponentCatal
 #[cfg(feature = "internal-iwork-source")]
 #[test]
 fn shared_catalog_reader_accepts_the_exact_component_payload_budget() -> TestResult {
-    let source = SourceCatalog::from_bytes_with_limits(NATIVE, Limits::default())?;
+    let source = SourceCatalog::from_bytes(NATIVE, Limits::default())?;
     let components = Arc::new(source.into_components());
     let total = total_component_payload_bytes(&components);
     let limits = component_payload_limits(&components, total);
@@ -297,7 +299,7 @@ fn shared_catalog_reader_accepts_the_exact_component_payload_budget() -> TestRes
 #[cfg(feature = "internal-iwork-source")]
 #[test]
 fn shared_catalog_reader_rejects_one_below_component_payload_budget() -> TestResult {
-    let source = SourceCatalog::from_bytes_with_limits(NATIVE, Limits::default())?;
+    let source = SourceCatalog::from_bytes(NATIVE, Limits::default())?;
     let components = Arc::new(source.into_components());
     let total = total_component_payload_bytes(&components);
     assert!(total > 0);
@@ -306,8 +308,8 @@ fn shared_catalog_reader_rejects_one_below_component_payload_budget() -> TestRes
 
     assert!(matches!(
         reader.body_table_merges(0usize),
-        Err(BodyTableMergesError::LimitExceeded {
-            kind: litchi_pages::BodyTableMergesLimitKind::TotalPayloadBytes,
+        Err(BodyTableMergesError::Limit {
+            kind: litchi_pages::table::merge::transaction::LimitKind::TotalPayloadBytes,
             observed,
             maximum,
         }) if observed == total && maximum == total - 1

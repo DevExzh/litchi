@@ -9,16 +9,16 @@ use super::super::model::Editor;
 use super::super::storage::{OBJECT_POOL, add_wrapped_storage, discover_targets};
 use crate::package::{Error as PackageError, Result};
 use crate::writer::ChpxFkpBuilder;
-use litchi_ole_common::object::{Editor as ObjectEditor, Target};
+use litchi_ole_common::object::{OpenOptions, Package as ObjectPackage, Target};
 
 impl Editor {
     /// Publishes the source-backed DOC/ObjectPool edit with the default OLE2
     /// sector-layout reuse policy carried by the common object editor.
-    pub fn finish(self) -> Result<Vec<u8>> {
+    pub(crate) fn finish(self) -> Result<Vec<u8>> {
         if self.changed {
             self.protection_policy.authorize(self.protection)?;
         }
-        self.package.finish().map_err(PackageError::from)
+        crate::package::object_edit_bytes(&self.package)
     }
 
     pub(in crate::embedded_object) fn add_object_storage(
@@ -40,9 +40,15 @@ impl Editor {
         self.package
             .add_storage(object_pool_target, wrapped)
             .map_err(PackageError::from)?;
-        let bytes = self.package.clone().finish().map_err(PackageError::from)?;
+        let bytes = crate::package::object_edit_bytes(&self.package)?;
         let (targets, _) = discover_targets(&bytes, limits)?;
-        self.package = ObjectEditor::open(bytes, targets, limits).map_err(PackageError::from)?;
+        self.package = ObjectPackage::open_with_options(
+            bytes,
+            OpenOptions::new().targets(targets).limits(limits),
+        )
+        .map_err(PackageError::from)?
+        .edit()
+        .map_err(PackageError::from)?;
         self.object_pool_exists = true;
         Ok(())
     }

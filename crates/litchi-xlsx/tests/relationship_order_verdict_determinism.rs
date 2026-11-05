@@ -32,13 +32,19 @@
 //! half the time, so the loop repeats enough times that an accidental agreement
 //! across every trial is not worth considering.
 
+#[path = "support/source_editors.rs"]
+mod source_editors;
+#[allow(
+    unused_imports,
+    reason = "each test target uses a subset of the drivers"
+)]
+use source_editors::{Replay, RowVisibilityEditor, SourceBackedEditor, replay_bytes, replay_patch};
 use std::sync::Arc;
 
 use litchi_core::OwnedSource;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, TargetMode};
 use litchi_xlsx::Selector;
-use litchi_xlsx::cell_values::SourceBackedEditor;
 
 /// Repetitions per determinism assertion; 2^-128 accidental agreement.
 const REPEATS: usize = 128;
@@ -104,7 +110,11 @@ fn workbook_with_styles_and_theme() -> Vec<u8> {
 /// captured `PartState`, so no order exists to get wrong. This is the negative
 /// control — it passed before the fix and must keep passing after it.
 fn workbook_with_styles_only() -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&workbook_with_styles_and_theme()).unwrap();
+    let mut package = OpcPackage::from_bytes(
+        &workbook_with_styles_and_theme(),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     package
         .get_part_mut(&PackURI::new(MAIN).unwrap())
         .unwrap()
@@ -125,10 +135,13 @@ fn noop_patch_survives_a_reload(bytes: &[u8]) -> litchi_xlsx::Result<()> {
         .unwrap()
         .commit()
         .unwrap();
-    assert!(!commit.changed(), "the transaction stages no edit");
-    assert!(commit.patch().is_empty(), "the patch is an exact no-op");
-    let mut replay = OpcPackage::from_bytes(bytes).unwrap();
-    commit.patch().apply(&mut replay)
+    assert!(
+        !commit.diagnostics().changed(),
+        "the transaction stages no edit"
+    );
+    assert!(commit.patch().is_noop(), "the patch is an exact no-op");
+    let mut replay = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
+    replay_patch(&mut replay, commit.patch())
 }
 
 #[test]
@@ -165,14 +178,14 @@ fn a_genuinely_different_workbook_is_still_refused() {
         .commit()
         .unwrap();
 
-    let mut altered = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut altered = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     altered
         .get_part_mut(&PackURI::new(THEME).unwrap())
         .unwrap()
         .set_blob(b"<theme><changed/></theme>".to_vec());
     assert!(
         matches!(
-            commit.patch().apply(&mut altered),
+            replay_patch(&mut altered, commit.patch()),
             Err(litchi_xlsx::Error::PatchConflict { .. })
         ),
         "a changed theme part must still be a conflict"

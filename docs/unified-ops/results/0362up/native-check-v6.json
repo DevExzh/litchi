@@ -1,0 +1,47 @@
+{
+  "source": "dae6654a8bd25b748971585f65efebb20d8a20df",
+  "pid": 2838325,
+  "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation",
+  "command": [
+    "python3",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/run-semantic-checks-disk-guarded.py",
+    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/native-check-v6-commands.json",
+    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/native-check-v6"
+  ],
+  "started_unix_seconds": 1792773647.5430489,
+  "target": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target",
+  "lock_sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--all-targets",
+        "--all-features",
+        "--keep-going",
+        "-p",
+        "litchi-docx",
+        "-p",
+        "litchi-pptx",
+        "-p",
+        "litchi-xlsx",
+        "-p",
+        "litchi-xlsb",
+        "-p",
+        "litchi-ops",
+        "-p",
+        "litchi-xls"
+      ],
+      "exit": 101,
+      "seconds": 23.769662602000608,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/native-check-v6/check-0.log",
+      "bytes": 12191,
+      "sha256": "a1085b876f4da3338a8f9f23bdb0a728224e663268a58b9ab8ff7bb09545cb2c",
+      "target_bytes_before": 639227163,
+      "completed_test_executables_pruned": []
+    }
+  ],
+  "note": "Combined compilation reports unused common metadata helpers and XLS regression-test type/mutability errors. Group 1 (ops without default features) was not reached. Semantic returns remain open."
+}

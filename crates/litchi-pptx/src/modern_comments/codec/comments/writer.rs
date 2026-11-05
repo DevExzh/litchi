@@ -1,6 +1,6 @@
 use super::super::super::model::{Comment, List, NamespaceDeclaration, Reply};
 use super::super::super::{MAX_BYTES, P188};
-use super::parser::parse_comment_list;
+use super::parser::{parse_comment_list, parse_processed_comment_list};
 use super::validation::{limit, validate_model};
 use crate::Result;
 
@@ -174,6 +174,11 @@ fn escape(out: &mut Vec<u8>, value: &str) {
 }
 
 impl List {
+    /// Decode XML already admitted by the source physical/MCE boundary.
+    pub(crate) fn from_processed(xml: &[u8]) -> Result<Self> {
+        parse_processed_comment_list(xml)
+    }
+
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
@@ -200,7 +205,11 @@ impl List {
             close_tag(&mut out, &self.root_prefix, "cmLst");
         }
         if out.len() > MAX_BYTES {
-            return Err(limit("serialized modern Comment bytes"));
+            return Err(limit(
+                crate::error::CodecLimitKind::OutputBytes,
+                out.len(),
+                MAX_BYTES,
+            ));
         }
         parse_comment_list(&out)?;
         Ok(out)

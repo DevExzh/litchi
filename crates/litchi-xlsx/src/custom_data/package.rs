@@ -7,20 +7,18 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use litchi_core::Resource;
 use litchi_opc::{
     BlobPart, ContentTypeEdit, OpcPackage, OwnedContentTypes, OwnedRelationships, PackURI,
-    Part as OpcPart, PartMetadata, ReadLimits, RelationshipEdit, Relationships, TargetMode,
+    Part as OpcPart, PartMetadata, RelationshipEdit, Relationships, SourceLimits, TargetMode,
 };
 use quick_xml::{Reader, events::Event};
 
 use crate::connections::embedded_data::Bindings;
-use crate::error::{Error, Result, invalid};
+use crate::error::{Result, invalid};
 
 use super::codec::{
-    XmlLimits, canonical_extension_with_limits, parse_properties_with_limits,
-    rewrite_extension_list_with_limits_and_output, rewrite_id_with_limits_and_output,
-    validate_source_properties_with_limits, write_properties_with_limits,
+    XmlLimits, canonical_extension, parse_properties, rewrite_extension_list, rewrite_id,
+    validate_source_properties, write_properties,
 };
 use super::{
     CustomData, CustomDataView, DATA_CONTENT_TYPE, DATA_RELATIONSHIP_TYPE, PROPERTIES_CONTENT_TYPE,
@@ -61,13 +59,44 @@ fn allocation(resource: &'static str, source: std::collections::TryReserveError)
     Error::Allocation { resource, source }
 }
 
-fn limit(resource: Resource, name: &'static str, observed: usize, maximum: usize) -> Error {
-    Error::ResourceLimit(litchi_core::ResourceLimit {
-        resource,
-        observed: observed as u64,
-        limit: maximum as u64,
-        scope: Arc::<str>::from(format!("XLSX Custom Data {name}")),
-    })
+fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::limit(kind, observed, maximum)
+}
+
+/// A bounded dimension of the Custom Data family; each is configured by its
+/// [`Limits`] budget (or, for the content-types scan, the package's source
+/// limits).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Storage pairs of the catalog ([`Limits::max_storages`]).
+    Storages,
+    /// UTF-16 units of one storage UID ([`Limits::max_uid_units`]).
+    UidUnits,
+    /// Bytes of one Custom Data Properties part
+    /// ([`Limits::max_properties_xml_bytes`]).
+    PropertiesXmlBytes,
+    /// Bytes of one extension list ([`Limits::max_extension_xml_bytes`]).
+    ExtensionXmlBytes,
+    /// Bytes of one inert payload ([`Limits::max_payload_bytes`]).
+    PayloadBytes,
+    /// Relationships of the package ([`Limits::max_relationships`]).
+    Relationships,
+    /// Bytes of one relationships part
+    /// ([`Limits::max_relationship_xml_bytes`]).
+    RelationshipXmlBytes,
+    /// Parts of the package ([`Limits::max_package_nodes`]).
+    PackageNodes,
+    /// Bytes of the package ([`Limits::max_package_bytes`]).
+    PackageBytes,
+    /// Bytes of the published output ([`Limits::max_output_bytes`]).
+    OutputBytes,
+    /// Bytes of temporary staging buffers ([`Limits::max_temporary_bytes`]).
+    TemporaryBytes,
+    /// Events of the content-types part scan.
+    ContentTypesEvents,
+    /// Bytes of one content-types attribute value.
+    ContentTypesAttributeBytes,
 }
 
 /// Bounded Custom Data resource policy.
@@ -420,12 +449,7 @@ fn validate_limits(limits: Limits) -> Result<Limits> {
 fn validate_uid_limit(id: &str, limits: Limits) -> Result<()> {
     let units = id.encode_utf16().count();
     if units > limits.max_uid_units() {
-        return Err(limit(
-            Resource::InputBytes,
-            "UID UTF-16 units",
-            units,
-            limits.max_uid_units(),
-        ));
+        return Err(limit(LimitKind::UidUnits, units, limits.max_uid_units()));
     }
     Ok(())
 }
@@ -436,17 +460,17 @@ fn validate_uid_limit(id: &str, limits: Limits) -> Result<()> {
 /// an unrelated manifest member.  This lets the OPC reader reject an
 /// oversized retained member before it parses or materializes that member for
 /// the host owner.
-fn bounded_read_limits(package: &OpcPackage, limits: Limits) -> Result<ReadLimits> {
+fn bounded_read_limits(package: &OpcPackage, limits: Limits) -> Result<SourceLimits> {
     let current = package.read_limits();
-    let mut builder = ReadLimits::builder();
+    let mut builder = SourceLimits::builder();
     builder = builder.max_input_bytes(current.max_input_bytes())?;
-    builder = builder.max_archive_members(current.max_archive_members())?;
+    builder = builder.max_members(current.max_members())?;
     builder = builder.max_archive_total_entries(current.max_archive_total_entries())?;
     builder = builder.max_archive_member_name_bytes(current.max_archive_member_name_bytes())?;
     builder = builder.max_archive_metadata_bytes(current.max_archive_metadata_bytes())?;
     builder = builder.max_archive_compressed_bytes(current.max_archive_compressed_bytes())?;
-    builder = builder.max_archive_entry_bytes(current.max_archive_entry_bytes())?;
-    builder = builder.max_archive_total_bytes(current.max_archive_total_bytes())?;
+    builder = builder.max_entry_bytes(current.max_entry_bytes())?;
+    builder = builder.max_aggregate_bytes(current.max_aggregate_bytes())?;
     builder = builder.max_parts(current.max_parts())?;
     builder = builder.max_part_bytes(current.max_part_bytes())?;
     builder = builder.max_total_part_bytes(current.max_total_part_bytes())?;
@@ -475,10 +499,10 @@ fn bounded_read_limits(package: &OpcPackage, limits: Limits) -> Result<ReadLimit
             .max_relationship_graph_nodes()
             .min(limits.max_package_nodes()),
     )?;
-    builder = builder.max_xml_events(current.max_xml_events().min(limits.max_xml_events()))?;
+    builder = builder.max_events(current.max_events().min(limits.max_xml_events()))?;
     builder =
         builder.max_total_relationship_xml_events(current.max_total_relationship_xml_events())?;
-    builder = builder.max_xml_depth(current.max_xml_depth().min(limits.max_xml_depth()))?;
+    builder = builder.max_depth(current.max_depth().min(limits.max_xml_depth()))?;
     builder = builder.max_xml_attribute_bytes(
         current
             .max_xml_attribute_bytes()
@@ -572,7 +596,7 @@ impl Snapshot {
     }
 
     /// Load all Custom Data storage pairs with explicit limits.
-    pub fn load_with_limits(package: &OpcPackage, limits: &Limits) -> Result<Self> {
+    pub(crate) fn load_with_limits(package: &OpcPackage, limits: &Limits) -> Result<Self> {
         let limits = validate_limits(*limits)?;
         validate_package_limits(package, limits)?;
         let entries = load_entries(package, &limits)?;
@@ -585,10 +609,10 @@ impl Snapshot {
         Ok(Self {
             entries: Arc::from(entries.into_boxed_slice()),
             source: SourceState {
-                content_types: package.source_content_types_with_limits(read_limits)?,
+                content_types: package.source_content_types(read_limits)?,
                 workbook_blob: workbook.blob_arc(),
                 workbook_relationships: package
-                    .source_relationships_with_limits(workbook.partname(), read_limits)?,
+                    .source_relationships(workbook.partname(), read_limits)?,
                 incoming_relationships: Arc::from(incoming_relationships.into_boxed_slice()),
                 connections,
             },
@@ -600,12 +624,6 @@ impl Snapshot {
     #[must_use]
     pub fn entries(&self) -> &[Part] {
         &self.entries
-    }
-
-    /// Alias emphasizing the custom-data storage collection.
-    #[must_use]
-    pub fn storages(&self) -> &[Part] {
-        self.entries()
     }
 
     /// Find a storage by its exact decoded UID.
@@ -685,56 +703,122 @@ fn same_value(left: &CustomDataView, right: &CustomDataView, limits: Limits) -> 
         return Ok(false);
     }
     let xml_limits = xml_limits(limits);
-    let left =
-        canonical_extension_with_limits(left.properties.extension_list.as_ref(), &xml_limits)?;
-    let right =
-        canonical_extension_with_limits(right.properties.extension_list.as_ref(), &xml_limits)?;
+    let left = canonical_extension(left.properties.extension_list.as_ref(), &xml_limits)?;
+    let right = canonical_extension(right.properties.extension_list.as_ref(), &xml_limits)?;
     Ok(left == right)
 }
 
-/// Clone-staged Custom Data CRUD transaction.
-pub struct Transaction<'a> {
-    target: &'a mut OpcPackage,
+crate::record::record_family!("Custom Data");
+
+/// The configuration of a Custom Data edit.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct EditOptions {
+    limits: Option<Limits>,
+}
+
+impl EditOptions {
+    /// Bound the edit by `limits` instead of the package's semantic Custom
+    /// Data limits ([`crate::SemanticLimits::custom_data`]).
+    #[must_use]
+    pub const fn limits(mut self, limits: Limits) -> Self {
+        self.limits = Some(limits);
+        self
+    }
+}
+
+/// A staged, source-bound Custom Data edit of one [`crate::Package`].
+///
+/// Starting one retains only the source package and limits; it does not read
+/// the catalog or copy part payloads. The graph and semantic draft are
+/// materialized by the first getter, mutation or commit. Dropping the edit
+/// discards it; [`Self::commit`] publishes a new package.
+pub struct Edit {
+    target: crate::record::Source,
+    limits: Limits,
+    loaded: Option<Loaded>,
+}
+
+struct Loaded {
     before: Snapshot,
     draft: Vec<Part>,
-    limits: Limits,
     connections: Bindings,
 }
 
-impl<'a> Transaction<'a> {
-    /// Start a transaction with default limits.
-    pub fn new(target: &'a mut OpcPackage) -> Result<Self> {
-        Self::with_limits(target, &Limits::default())
+impl crate::Package {
+    /// Start a Custom Data edit under the package's semantic limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns the encryption-policy error for a package whose mutations are
+    /// refused. Catalog, graph, XML and limit errors are deferred to the first
+    /// getter, mutation or commit.
+    pub fn edit_custom_data(&self) -> Result<Edit> {
+        self.edit_custom_data_with_options(EditOptions::default())
     }
 
-    /// Start a transaction with explicit limits.
-    pub fn with_limits(target: &'a mut OpcPackage, limits: &Limits) -> Result<Self> {
+    /// Start a Custom Data edit with explicit options.
+    ///
+    /// # Errors
+    ///
+    /// See [`Self::edit_custom_data`].
+    pub fn edit_custom_data_with_options(&self, options: EditOptions) -> Result<Edit> {
+        let limits = options
+            .limits
+            .unwrap_or_else(|| self.semantic_limits().custom_data_value());
+        Edit::start(
+            crate::record::Source::new(self, "edit_custom_data")?,
+            &limits,
+        )
+    }
+
+    /// Apply an exact Custom Data patch to a new package; this one is
+    /// unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when this package is not the patch's
+    /// before state and [`Error::Signed`] for a changed patch of a signed
+    /// workbook.
+    pub fn apply_custom_data(&self, patch: &Patch) -> Result<Commit> {
+        crate::record::replay(self, patch, "apply_custom_data")
+    }
+}
+
+impl Edit {
+    fn start(target: crate::record::Source, limits: &Limits) -> Result<Self> {
         let limits = validate_limits(*limits)?;
-        let before = Snapshot::load_with_limits(target, &limits)?;
-        let mut draft = Vec::new();
-        draft
-            .try_reserve_exact(before.entries.len())
-            .map_err(|source| allocation("Custom Data transaction entries", source))?;
-        draft.extend_from_slice(&before.entries);
         Ok(Self {
-            draft,
-            connections: before.source.connections.clone(),
             target,
-            before,
             limits,
+            loaded: None,
         })
     }
 
-    /// Source snapshot captured at transaction start.
-    #[must_use]
-    pub fn before(&self) -> &Snapshot {
-        &self.before
+    fn ensure_loaded(&mut self) -> Result<&mut Loaded> {
+        if self.loaded.is_none() {
+            let before = Snapshot::load_with_limits(&self.target, &self.limits)?;
+            let mut draft = Vec::new();
+            draft
+                .try_reserve_exact(before.entries.len())
+                .map_err(|source| allocation("Custom Data transaction entries", source))?;
+            draft.extend_from_slice(&before.entries);
+            self.loaded = Some(Loaded {
+                connections: before.source.connections.clone(),
+                before,
+                draft,
+            });
+        }
+        Ok(self.loaded.as_mut().expect("Custom Data graph loaded"))
+    }
+
+    /// Materialize and return the source snapshot used by this edit.
+    pub fn before(&mut self) -> Result<&Snapshot> {
+        Ok(&self.ensure_loaded()?.before)
     }
 
     /// Currently staged entries.
-    #[must_use]
-    pub fn entries(&self) -> &[Part] {
-        &self.draft
+    pub fn entries(&mut self) -> Result<&[Part]> {
+        Ok(&self.ensure_loaded()?.draft)
     }
 
     /// Replace one storage while retaining its physical graph identity.
@@ -743,31 +827,50 @@ impl<'a> Transaction<'a> {
     }
 
     fn set_shared(&mut self, index: usize, value: CustomDataView) -> Result<bool> {
+        self.ensure_loaded()?;
         validate_value(&value, &self.limits)?;
         let current = self
+            .loaded
+            .as_ref()
+            .expect("Custom Data graph loaded")
             .draft
             .get(index)
             .ok_or_else(|| invalid(format!("custom-data index {index} is absent")))?;
         if current.value == value {
             return Ok(false);
         }
-        let mut candidate = self.draft.clone();
+        let mut candidate = self
+            .loaded
+            .as_ref()
+            .expect("Custom Data graph loaded")
+            .draft
+            .clone();
         candidate[index].value = value;
-        validate_entries(self.target, &candidate, &self.limits)?;
-        if candidate[index].id().is_empty() && self.connections.count(current.id()) > 0 {
+        validate_entries(&self.target, &candidate, &self.limits)?;
+        if candidate[index].id().is_empty()
+            && self
+                .loaded
+                .as_ref()
+                .expect("Custom Data graph loaded")
+                .connections
+                .count(current.id())
+                > 0
+        {
             return Err(Error::Unsupported {
                 feature: "renaming a referenced Custom Data storage to the unreferencable empty UID",
             });
         }
-        let connections = self.connections.rebind_with_limits(
-            current.id(),
-            candidate[index].id(),
-            self.limits,
-        )?;
+        let connections = self
+            .loaded
+            .as_ref()
+            .expect("Custom Data graph loaded")
+            .connections
+            .rebind_with_limits(current.id(), candidate[index].id(), self.limits)?;
         let ids = collect_ids(&candidate, &self.limits)?;
         connections.validate_ids(&ids)?;
-        self.draft = candidate;
-        self.connections = connections;
+        let loaded = self.loaded.as_mut().expect("Custom Data graph loaded");
+        loaded.draft = candidate;
+        loaded.connections = connections;
         Ok(true)
     }
 
@@ -777,7 +880,11 @@ impl<'a> Transaction<'a> {
         index: usize,
         edit: impl FnOnce(&mut super::Properties) -> Result<()>,
     ) -> Result<bool> {
+        self.ensure_loaded()?;
         let mut value = self
+            .loaded
+            .as_ref()
+            .expect("Custom Data graph loaded")
             .draft
             .get(index)
             .map(|entry| entry.value.clone())
@@ -790,15 +897,18 @@ impl<'a> Transaction<'a> {
 
     /// Replace one inert payload without exposing package relationships.
     pub fn set_data(&mut self, index: usize, data: Vec<u8>) -> Result<bool> {
+        self.ensure_loaded()?;
         if data.len() > self.limits.max_payload_bytes() {
             return Err(limit(
-                Resource::InputBytes,
-                "payload bytes",
+                LimitKind::PayloadBytes,
                 data.len(),
                 self.limits.max_payload_bytes(),
             ));
         }
         let mut value = self
+            .loaded
+            .as_ref()
+            .expect("Custom Data graph loaded")
             .draft
             .get(index)
             .map(|entry| entry.value.clone())
@@ -809,9 +919,13 @@ impl<'a> Transaction<'a> {
 
     /// Insert a new storage with an allocated, source-bound graph.
     pub fn insert(&mut self, value: CustomData) -> Result<usize> {
+        self.ensure_loaded()?;
         let value = CustomDataView::from(value);
         validate_value(&value, &self.limits)?;
         if self
+            .loaded
+            .as_ref()
+            .expect("Custom Data graph loaded")
             .draft
             .iter()
             .any(|entry| entry.id() == value.properties.id)
@@ -819,15 +933,20 @@ impl<'a> Transaction<'a> {
             return Err(invalid("Custom Data storage IDs must be unique"));
         }
         let workbook = self.target.main_document_part()?;
-        let properties_part_name = allocate_part_name(self.target, &self.draft, "properties")?;
-        let data_part_name = allocate_part_name(self.target, &self.draft, "data")?;
+        let draft = &self
+            .loaded
+            .as_ref()
+            .expect("Custom Data graph loaded")
+            .draft;
+        let properties_part_name = allocate_part_name(&self.target, draft, "properties")?;
+        let data_part_name = allocate_part_name(&self.target, draft, "data")?;
         let workbook_relationship_id =
-            allocate_relationship_id(workbook, &self.draft, "rIdCustomData", true);
+            allocate_relationship_id(workbook, draft, "rIdCustomData", true);
         let data_relationship_id = "rIdCustomData".to_owned();
         let workbook_relationship_target =
             properties_part_name.relative_ref(workbook.partname().base_uri());
         let data_relationship_target = data_part_name.relative_ref(properties_part_name.base_uri());
-        let mut candidate = self.draft.clone();
+        let mut candidate = draft.clone();
         candidate.push(Part {
             value,
             properties_part_name,
@@ -842,14 +961,19 @@ impl<'a> Transaction<'a> {
             properties_relationships: None,
             data_relationships: None,
         });
-        validate_entries(self.target, &candidate, &self.limits)?;
-        self.draft = candidate;
-        Ok(self.draft.len() - 1)
+        validate_entries(&self.target, &candidate, &self.limits)?;
+        let loaded = self.loaded.as_mut().expect("Custom Data graph loaded");
+        loaded.draft = candidate;
+        Ok(loaded.draft.len() - 1)
     }
 
     /// Insert or replace the storage with the same UID.
     pub fn upsert(&mut self, value: CustomData) -> Result<usize> {
+        self.ensure_loaded()?;
         if let Some(index) = self
+            .loaded
+            .as_ref()
+            .expect("Custom Data graph loaded")
             .draft
             .iter()
             .position(|entry| entry.id() == value.properties.id)
@@ -875,19 +999,78 @@ impl<'a> Transaction<'a> {
         self.remove_with(index, RemovalDisposition::RejectReferenced)
     }
 
+    /// The staged index of the storage with UID `id`.
+    fn index_of(&mut self, id: &str) -> Result<Option<usize>> {
+        Ok(self
+            .ensure_loaded()?
+            .draft
+            .iter()
+            .position(|entry| entry.id() == id))
+    }
+
+    /// Remove the storage with UID `id` with an explicit connection
+    /// disposition; an absent UID is a no-op. Returns whether a storage was
+    /// staged for removal.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::CustomDataReferenced`] for a referenced storage under
+    /// [`RemovalDisposition::RejectReferenced`], and the validation errors of
+    /// the remaining catalog.
+    pub fn remove_storage(&mut self, id: &str, disposition: RemovalDisposition) -> Result<bool> {
+        match self.index_of(id)? {
+            Some(index) => Ok(self.remove_with(index, disposition)?.is_some()),
+            None => Ok(false),
+        }
+    }
+
+    /// Rename the storage with UID `id` and its recognized connection
+    /// references; returns whether anything changed.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `NotFound` refusal for an absent UID and the validation
+    /// errors of the renamed catalog.
+    pub fn rename_storage(&mut self, id: &str, new_id: impl Into<String>) -> Result<bool> {
+        let index = self.index_of(id)?.ok_or(Error::refused(
+            litchi_core::edit::RefusalKind::NotFound,
+            "rename_storage",
+            "the Custom Data storage UID is absent",
+        ))?;
+        self.rename(index, new_id)
+    }
+
     /// Remove a storage and explicitly detach or retarget its connections.
     pub fn remove_with(
         &mut self,
         index: usize,
         disposition: RemovalDisposition,
     ) -> Result<Option<Part>> {
-        if index >= self.draft.len() {
+        self.ensure_loaded()?;
+        if index
+            >= self
+                .loaded
+                .as_ref()
+                .expect("Custom Data graph loaded")
+                .draft
+                .len()
+        {
             return Ok(None);
         }
-        let mut candidate = self.draft.clone();
+        let mut candidate = self
+            .loaded
+            .as_ref()
+            .expect("Custom Data graph loaded")
+            .draft
+            .clone();
         let removed = candidate.remove(index);
-        validate_entries(self.target, &candidate, &self.limits)?;
-        let count = self.connections.count(removed.id());
+        validate_entries(&self.target, &candidate, &self.limits)?;
+        let count = self
+            .loaded
+            .as_ref()
+            .expect("Custom Data graph loaded")
+            .connections
+            .count(removed.id());
         let replacement = match &disposition {
             RemovalDisposition::RejectReferenced if count > 0 => {
                 return Err(Error::CustomDataReferenced {
@@ -905,84 +1088,123 @@ impl<'a> Transaction<'a> {
                 id.as_str()
             },
         };
-        let connections =
-            self.connections
-                .rebind_with_limits(removed.id(), replacement, self.limits)?;
+        let connections = self
+            .loaded
+            .as_ref()
+            .expect("Custom Data graph loaded")
+            .connections
+            .rebind_with_limits(removed.id(), replacement, self.limits)?;
         let ids = collect_ids(&candidate, &self.limits)?;
         connections.validate_ids(&ids)?;
-        self.draft = candidate;
-        self.connections = connections;
+        let loaded = self.loaded.as_mut().expect("Custom Data graph loaded");
+        loaded.draft = candidate;
+        loaded.connections = connections;
         Ok(Some(removed))
     }
 
     /// Whether staged typed values or graph identities differ.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.before.same_semantics(&self.draft) || self.connections.is_changed()
+    fn changed(loaded: &Loaded) -> bool {
+        !loaded.before.same_semantics(&loaded.draft) || loaded.connections.is_changed()
     }
 
-    /// Validate the source closure and atomically publish the staged graph.
+    #[cfg(test)]
+    pub(crate) fn is_changed(&mut self) -> Result<bool> {
+        Ok(Self::changed(self.ensure_loaded()?))
+    }
+
+    /// Discard every staged change.
+    pub fn reset(&mut self) -> Result<()> {
+        let loaded = self.ensure_loaded()?;
+        loaded.draft.clear();
+        loaded.draft.extend_from_slice(&loaded.before.entries);
+        loaded.connections = loaded.before.source.connections.clone();
+        Ok(())
+    }
+
+    /// Validate the source closure and publish the staged graph as a new
+    /// package. An unchanged edit returns the source package.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Signed`] for a changed edit of a signed workbook,
+    /// the typed limits of the family and the publication's validation
+    /// errors.
     pub fn commit(self) -> Result<Commit> {
-        if !self.is_changed() {
-            return Ok(Commit::new(
-                self.before.clone(),
-                Patch::new(self.before.clone(), self.before.clone()),
-                false,
+        self.publish().map(|(commit, _)| commit)
+    }
+
+    /// [`Self::commit`], keeping the published catalog.
+    fn publish(mut self) -> Result<(Commit, Snapshot)> {
+        let unchanged = {
+            let loaded = self.ensure_loaded()?;
+            !Self::changed(loaded)
+        };
+        if unchanged {
+            let loaded = self.loaded.take().expect("Custom Data graph loaded");
+            let patch = Patch::new(loaded.before.clone(), loaded.before.clone());
+            return Ok((
+                Commit::new(self.target.into_package(), patch, Diagnostics::new(false)),
+                loaded.before,
             ));
         }
+        let loaded = self.loaded.take().expect("Custom Data graph loaded");
+        let Loaded {
+            before,
+            draft,
+            connections,
+        } = loaded;
         if self.target.is_signed() || self.target.requires_signature_edit_policy() {
             return Err(Error::Signed);
         }
-        let current = Snapshot::load_with_limits(self.target, &self.limits)?;
-        if !current.same_source(&self.before) {
+        let current = Snapshot::load_with_limits(&self.target, &self.limits)?;
+        if !current.same_source(&before) {
             return Err(Error::PatchConflict {
                 part: "Custom Data source closure".into(),
             });
         }
         let content_types = transition_content_types(
-            &self.before.source.content_types,
-            &self.before.entries,
-            &self.draft,
+            &before.source.content_types,
+            &before.entries,
+            &draft,
             self.limits,
-            bounded_read_limits(self.target, self.limits)?,
+            bounded_read_limits(&self.target, self.limits)?,
         )?;
         preflight_staged_output_budget(
-            self.target,
-            &self.before,
-            &self.draft,
-            &self.connections,
+            &self.target,
+            &before,
+            &draft,
+            &connections,
             &content_types,
             self.limits,
         )?;
-        let mut candidate = self.target.clone();
+        let mut candidate = OpcPackage::clone(&self.target);
         apply_entries(
             &mut candidate,
-            self.before.entries(),
-            &self.draft,
+            before.entries(),
+            &draft,
             &self.limits,
             &content_types,
         )?;
-        let connection_output_limit = if let Some(bytes) = self.connections.source_bytes_len() {
+        let connection_output_limit = if let Some(bytes) = connections.source_bytes_len() {
             replacement_output_limit(&candidate, bytes, self.limits)?
         } else {
             self.limits.max_output_bytes()
         };
-        self.connections.publish_with_limits(
-            &mut candidate,
-            self.limits,
-            connection_output_limit,
-        )?;
+        connections.publish_with_limits(&mut candidate, self.limits, connection_output_limit)?;
         validate_package_limits(&candidate, self.limits)?;
         validate_output_limits(&candidate, self.limits)?;
         let snapshot = Snapshot::load_with_limits(&candidate, &self.limits)?;
-        if !snapshot.same_published_semantics(&self.draft)?
-            || !snapshot.source.connections.same_values(&self.connections)
+        if !snapshot.same_published_semantics(&draft)?
+            || !snapshot.source.connections.same_values(&connections)
         {
             return Err(invalid("Custom Data publication changed staged semantics"));
         }
-        let patch = Patch::new(self.before, snapshot.clone());
-        *self.target = candidate;
-        Ok(Commit::new(snapshot, patch, true))
+        let patch = Patch::new(before, snapshot.clone());
+        let package = self.target.publish(candidate)?;
+        Ok((
+            Commit::new(package, patch, Diagnostics::new(true)),
+            snapshot,
+        ))
     }
 }
 
@@ -1012,7 +1234,7 @@ impl Patch {
 
     /// Whether this patch is a source-byte no-op.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
@@ -1026,14 +1248,14 @@ impl Patch {
     }
 
     /// Apply atomically after source-closure validation.
-    pub fn apply(&self, target: &mut OpcPackage) -> Result<()> {
+    pub(crate) fn apply(&self, target: &mut OpcPackage) -> Result<()> {
         let current = Snapshot::load_with_limits(target, &self.before.limits)?;
         if !current.same_source(&self.before) {
             return Err(Error::PatchConflict {
                 part: "Custom Data source closure".into(),
             });
         }
-        if self.is_empty() {
+        if self.is_noop() {
             return Ok(());
         }
         if target.is_signed() || target.requires_signature_edit_policy() {
@@ -1055,39 +1277,66 @@ impl Patch {
     }
 }
 
-/// Successful Custom Data transaction publication.
-#[derive(Debug)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-    changed: bool,
+impl crate::record::Record for Patch {
+    fn is_noop(&self) -> bool {
+        Self::is_noop(self)
+    }
+
+    fn apply_to(&self, package: &mut OpcPackage) -> Result<()> {
+        self.apply(package)
+    }
 }
 
-impl Commit {
-    fn new(snapshot: Snapshot, patch: Patch, changed: bool) -> Self {
-        Self {
+/// A raw-graph route over [`Edit`] for the unit tests that author bare
+/// graphs.
+#[cfg(test)]
+pub(crate) struct Transaction<'a> {
+    target: crate::record::TestTarget<'a>,
+    edit: Edit,
+}
+
+#[cfg(test)]
+impl<'a> Transaction<'a> {
+    pub(crate) fn new(target: impl Into<crate::record::TestTarget<'a>>) -> Result<Self> {
+        Self::with_limits(target, &Limits::default())
+    }
+
+    pub(crate) fn with_limits(
+        target: impl Into<crate::record::TestTarget<'a>>,
+        limits: &Limits,
+    ) -> Result<Self> {
+        let target = target.into();
+        let package = target.package()?;
+        let edit = package.edit_custom_data_with_options(EditOptions::default().limits(*limits))?;
+        Ok(Self { target, edit })
+    }
+
+    pub(crate) fn commit(self) -> Result<crate::record::RawCommit<Snapshot, Patch>> {
+        let (commit, snapshot) = self.edit.publish()?;
+        let changed = commit.diagnostics().changed();
+        let (package, patch) = commit.into_parts();
+        self.target.store(package);
+        Ok(crate::record::RawCommit {
             snapshot,
             patch,
             changed,
-        }
+        })
     }
+}
 
-    /// Whether the catalog changed.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        self.changed
+#[cfg(test)]
+impl std::ops::Deref for Transaction<'_> {
+    type Target = Edit;
+
+    fn deref(&self) -> &Edit {
+        &self.edit
     }
+}
 
-    /// Resulting snapshot.
-    #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Exact reversible patch.
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
+#[cfg(test)]
+impl std::ops::DerefMut for Transaction<'_> {
+    fn deref_mut(&mut self) -> &mut Edit {
+        &mut self.edit
     }
 }
 
@@ -1104,8 +1353,7 @@ fn load_entries(package: &OpcPackage, limits: &Limits) -> Result<Vec<Part>> {
     {
         if properties_parts.len() >= limits.max_storages() {
             return Err(limit(
-                Resource::Objects,
-                "storage objects",
+                LimitKind::Storages,
                 properties_parts.len().saturating_add(1),
                 limits.max_storages(),
             ));
@@ -1188,8 +1436,7 @@ fn load_entries(package: &OpcPackage, limits: &Limits) -> Result<Vec<Part>> {
         }
         if data_part.blob().len() > limits.max_payload_bytes() {
             return Err(limit(
-                Resource::InputBytes,
-                "payload bytes",
+                LimitKind::PayloadBytes,
                 data_part.blob().len(),
                 limits.max_payload_bytes(),
             ));
@@ -1202,14 +1449,12 @@ fn load_entries(package: &OpcPackage, limits: &Limits) -> Result<Vec<Part>> {
         let properties_part = package.get_part(properties_part.partname())?;
         if properties_part.blob().len() > limits.max_properties_xml_bytes() {
             return Err(limit(
-                Resource::InputBytes,
-                "Properties XML bytes",
+                LimitKind::PropertiesXmlBytes,
                 properties_part.blob().len(),
                 limits.max_properties_xml_bytes(),
             ));
         }
-        let properties =
-            parse_properties_with_limits(properties_part.blob(), &xml_limits(*limits))?;
+        let properties = parse_properties(properties_part.blob(), &xml_limits(*limits))?;
         validate_uid_limit(&properties.id, *limits)?;
         if !ids.insert(properties.id.clone()) {
             return Err(invalid("Custom Data storage IDs must be unique"));
@@ -1341,8 +1586,7 @@ fn validate_feature_relationship(
 fn validate_value(value: &CustomDataView, limits: &Limits) -> Result<()> {
     if value.data.len() > limits.max_payload_bytes() {
         return Err(limit(
-            Resource::InputBytes,
-            "payload bytes",
+            LimitKind::PayloadBytes,
             value.data.len(),
             limits.max_payload_bytes(),
         ));
@@ -1352,20 +1596,18 @@ fn validate_value(value: &CustomDataView, limits: &Limits) -> Result<()> {
         && extension.xml.len() > limits.max_extension_xml_bytes()
     {
         return Err(limit(
-            Resource::InputBytes,
-            "extension XML bytes",
+            LimitKind::ExtensionXmlBytes,
             extension.xml.len(),
             limits.max_extension_xml_bytes(),
         ));
     }
-    validate_source_properties_with_limits(&value.properties, &xml_limits(*limits))
+    validate_source_properties(&value.properties, &xml_limits(*limits))
 }
 
 fn validate_entries(package: &OpcPackage, entries: &[Part], limits: &Limits) -> Result<()> {
     if entries.len() > limits.max_storages() {
         return Err(limit(
-            Resource::Objects,
-            "storage objects",
+            LimitKind::Storages,
             entries.len(),
             limits.max_storages(),
         ));
@@ -1409,11 +1651,10 @@ fn source_relationships_bounded(
     limits: Limits,
 ) -> Result<OwnedRelationships> {
     let read_limits = bounded_read_limits(package, limits)?;
-    let relationships = package.source_relationships_with_limits(owner, read_limits)?;
+    let relationships = package.source_relationships(owner, read_limits)?;
     if relationships.bytes().len() > limits.max_relationship_xml_bytes() {
         return Err(limit(
-            Resource::InputBytes,
-            "relationship XML bytes",
+            LimitKind::RelationshipXmlBytes,
             relationships.bytes().len(),
             limits.max_relationship_xml_bytes(),
         ));
@@ -1429,14 +1670,11 @@ fn source_relationships_bounded(
 fn package_size(package: &OpcPackage, limits: Limits) -> Result<usize> {
     let read_limits = bounded_read_limits(package, limits)?;
     let root = PackURI::new("/").map_err(invalid)?;
-    let mut total = package
-        .source_content_types_with_limits(read_limits)?
-        .bytes()
-        .len();
+    let mut total = package.source_content_types(read_limits)?.bytes().len();
     total = total
         .checked_add(
             package
-                .source_relationships_with_limits(&root, read_limits)?
+                .source_relationships(&root, read_limits)?
                 .bytes()
                 .len(),
         )
@@ -1451,7 +1689,7 @@ fn package_size(package: &OpcPackage, limits: Limits) -> Result<usize> {
         total = total
             .checked_add(
                 package
-                    .source_relationships_with_limits(part.partname(), read_limits)?
+                    .source_relationships(part.partname(), read_limits)?
                     .bytes()
                     .len(),
             )
@@ -1473,8 +1711,7 @@ fn package_relationship_count(package: &OpcPackage) -> Result<usize> {
 fn validate_package_limits(package: &OpcPackage, limits: Limits) -> Result<()> {
     if package.part_count() > limits.max_package_nodes() {
         return Err(limit(
-            Resource::Objects,
-            "package nodes",
+            LimitKind::PackageNodes,
             package.part_count(),
             limits.max_package_nodes(),
         ));
@@ -1483,8 +1720,7 @@ fn validate_package_limits(package: &OpcPackage, limits: Limits) -> Result<()> {
     let bytes = package_size(package, limits)?;
     if bytes > limits.max_package_bytes() {
         return Err(limit(
-            Resource::InputBytes,
-            "package bytes",
+            LimitKind::PackageBytes,
             bytes,
             limits.max_package_bytes(),
         ));
@@ -1492,8 +1728,7 @@ fn validate_package_limits(package: &OpcPackage, limits: Limits) -> Result<()> {
     let relationships = package_relationship_count(package)?;
     if relationships > limits.max_relationships() {
         return Err(limit(
-            Resource::Objects,
-            "relationships",
+            LimitKind::Relationships,
             relationships,
             limits.max_relationships(),
         ));
@@ -1507,11 +1742,10 @@ fn validate_relationship_xml_limits(package: &OpcPackage, limits: Limits) -> Res
     let root = PackURI::new("/").map_err(invalid)?;
     let owners = std::iter::once(&root).chain(package.iter_parts().map(|part| part.partname()));
     for owner in owners {
-        let relationships = package.source_relationships_with_limits(owner, read_limits)?;
+        let relationships = package.source_relationships(owner, read_limits)?;
         if relationships.bytes().len() > maximum {
             return Err(limit(
-                Resource::InputBytes,
-                "relationship XML bytes",
+                LimitKind::RelationshipXmlBytes,
                 relationships.bytes().len(),
                 maximum,
             ));
@@ -1524,8 +1758,7 @@ fn validate_output_limits(package: &OpcPackage, limits: Limits) -> Result<()> {
     let bytes = package_size(package, limits)?;
     if bytes > limits.max_output_bytes() {
         return Err(limit(
-            Resource::OutputBytes,
-            "final output bytes",
+            LimitKind::OutputBytes,
             bytes,
             limits.max_output_bytes(),
         ));
@@ -1576,8 +1809,7 @@ fn incoming_relationships(
         {
             if values.len() >= limits.max_relationships() {
                 return Err(limit(
-                    Resource::Objects,
-                    "relationships",
+                    LimitKind::Relationships,
                     values.len().saturating_add(1),
                     limits.max_relationships(),
                 ));
@@ -1603,8 +1835,7 @@ fn incoming_relationships(
             {
                 if values.len() >= limits.max_relationships() {
                     return Err(limit(
-                        Resource::Objects,
-                        "relationships",
+                        LimitKind::Relationships,
                         values.len().saturating_add(1),
                         limits.max_relationships(),
                     ));
@@ -1735,7 +1966,7 @@ fn apply_entries(
                 } else if previous.value.properties.extension_list
                     == entry.value.properties.extension_list
                 {
-                    Some(rewrite_id_with_limits_and_output(
+                    Some(rewrite_id(
                         previous
                             .source_properties_proof
                             .as_ref()
@@ -1746,7 +1977,7 @@ fn apply_entries(
                     )?)
                 } else {
                     let rewrite_limits = xml_limits(*limits);
-                    let mut proof = rewrite_extension_list_with_limits_and_output(
+                    let mut proof = rewrite_extension_list(
                         previous
                             .source_properties_proof
                             .as_ref()
@@ -1756,7 +1987,7 @@ fn apply_entries(
                         limits.max_temporary_bytes(),
                     )?;
                     if previous.id() != entry.id() {
-                        proof = rewrite_id_with_limits_and_output(
+                        proof = rewrite_id(
                             &proof,
                             entry.id(),
                             &rewrite_limits,
@@ -1768,22 +1999,20 @@ fn apply_entries(
                 if let Some(proof) = proof {
                     if proof.bytes().len() > limits.max_properties_xml_bytes() {
                         return Err(limit(
-                            Resource::OutputBytes,
-                            "Properties XML bytes",
+                            LimitKind::PropertiesXmlBytes,
                             proof.bytes().len(),
                             limits.max_properties_xml_bytes(),
                         ));
                     }
                     package.try_replace_owned_xml_part(&previous.source_properties, proof)?;
                 } else {
-                    let properties = write_properties_with_limits(
+                    let properties = write_properties(
                         &entry.value.properties,
                         &xml_limits_with_output(*limits, limits.max_temporary_bytes()),
                     )?;
                     if properties.len() > limits.max_temporary_bytes() {
                         return Err(limit(
-                            Resource::Memory,
-                            "temporary Properties bytes",
+                            LimitKind::TemporaryBytes,
                             properties.len(),
                             limits.max_temporary_bytes(),
                         ));
@@ -1809,9 +2038,9 @@ fn apply_entries(
         }
     }
     let read_limits = bounded_read_limits(package, *limits)?;
-    let current_content_types = package.source_content_types_with_limits(read_limits)?;
+    let current_content_types = package.source_content_types(read_limits)?;
     if current_content_types.bytes() != content_types.bytes() {
-        package.try_replace_content_types_with_limits(
+        package.try_replace_content_types(
             current_content_types.bytes(),
             content_types,
             read_limits,
@@ -1825,7 +2054,7 @@ fn transition_content_types(
     before_entries: &[Part],
     after_entries: &[Part],
     limits: Limits,
-    read_limits: ReadLimits,
+    read_limits: SourceLimits,
 ) -> Result<OwnedContentTypes> {
     let mut before_map = HashMap::new();
     before_map
@@ -1890,16 +2119,14 @@ fn transition_content_types(
     let plan = before.plan_edit(&additions, &removals, read_limits)?;
     if plan.final_len() > limits.max_output_bytes() {
         return Err(limit(
-            Resource::OutputBytes,
-            "content-types output bytes",
+            LimitKind::OutputBytes,
             plan.final_len(),
             limits.max_output_bytes(),
         ));
     }
     if plan.final_len() > limits.max_temporary_bytes() {
         return Err(limit(
-            Resource::Memory,
-            "temporary content-types output bytes",
+            LimitKind::TemporaryBytes,
             plan.final_len(),
             limits.max_temporary_bytes(),
         ));
@@ -1910,7 +2137,7 @@ fn transition_content_types(
 fn existing_content_type_removals(
     source: &OwnedContentTypes,
     candidates: &[PackURI],
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<Vec<PackURI>> {
     let mut selected = Vec::new();
     selected
@@ -1925,12 +2152,11 @@ fn existing_content_type_removals(
     let mut events = 0usize;
     loop {
         events = events.saturating_add(1);
-        if events > limits.max_xml_events() {
+        if events > limits.max_events() {
             return Err(limit(
-                Resource::Objects,
-                "content-types XML events",
+                LimitKind::ContentTypesEvents,
                 events,
-                limits.max_xml_events(),
+                limits.max_events(),
             ));
         }
         let event = reader
@@ -1952,8 +2178,7 @@ fn existing_content_type_removals(
             }
             if attribute.value.as_ref().len() > limits.max_xml_attribute_bytes() {
                 return Err(limit(
-                    Resource::InputBytes,
-                    "content-types XML attribute bytes",
+                    LimitKind::ContentTypesAttributeBytes,
                     attribute.value.as_ref().len(),
                     limits.max_xml_attribute_bytes(),
                 ));
@@ -2016,7 +2241,7 @@ fn preflight_snapshot_output_budget(
     total = total
         .checked_add(
             package
-                .source_relationships_with_limits(&root, read_limits)?
+                .source_relationships(&root, read_limits)?
                 .bytes()
                 .len(),
         )
@@ -2029,8 +2254,7 @@ fn preflight_snapshot_output_budget(
         {
             continue;
         }
-        let relationships =
-            package.source_relationships_with_limits(part.partname(), read_limits)?;
+        let relationships = package.source_relationships(part.partname(), read_limits)?;
         // The output ceiling is charged against inflated bytes, so each
         // retained part is decoded here (ADR 0030).
         let bytes = package.get_part(part.partname())?.blob().len();
@@ -2105,7 +2329,7 @@ fn preflight_staged_output_budget(
     total = total
         .checked_add(
             package
-                .source_relationships_with_limits(&root, read_limits)?
+                .source_relationships(&root, read_limits)?
                 .bytes()
                 .len(),
         )
@@ -2118,8 +2342,7 @@ fn preflight_staged_output_budget(
         {
             continue;
         }
-        let relationships =
-            package.source_relationships_with_limits(part.partname(), read_limits)?;
+        let relationships = package.source_relationships(part.partname(), read_limits)?;
         // The output ceiling is charged against inflated bytes, so each
         // retained part is decoded here (ADR 0030).
         let bytes = package.get_part(part.partname())?.blob().len();
@@ -2173,8 +2396,7 @@ fn preflight_staged_output_budget(
 fn check_final_output_size(total: usize, limits: Limits) -> Result<()> {
     if total > limits.max_output_bytes() {
         return Err(limit(
-            Resource::OutputBytes,
-            "final output bytes",
+            LimitKind::OutputBytes,
             total,
             limits.max_output_bytes(),
         ));
@@ -2185,7 +2407,7 @@ fn check_final_output_size(total: usize, limits: Limits) -> Result<()> {
 fn staged_workbook_relationship_len(
     before: &Snapshot,
     after: &[Part],
-    read_limits: ReadLimits,
+    read_limits: SourceLimits,
 ) -> Result<usize> {
     let mut removals = Vec::new();
     removals
@@ -2225,7 +2447,7 @@ fn staged_workbook_relationship_len(
     Ok(plan.final_len())
 }
 
-fn canonical_data_relationship_len(entry: &Part, read_limits: ReadLimits) -> Result<usize> {
+fn canonical_data_relationship_len(entry: &Part, read_limits: SourceLimits) -> Result<usize> {
     let mut relationships = Relationships::new(entry.properties_part_name.base_uri().to_owned());
     relationships.add_relationship(
         DATA_RELATIONSHIP_TYPE.into(),
@@ -2242,7 +2464,7 @@ fn projected_properties_len(
     limits: Limits,
 ) -> Result<usize> {
     let Some(previous) = previous else {
-        let bytes = write_properties_with_limits(
+        let bytes = write_properties(
             &entry.value.properties,
             &xml_limits_with_output(limits, limits.max_temporary_bytes()),
         )?;
@@ -2262,7 +2484,7 @@ fn projected_properties_len(
             .as_ref()
             .clone()
     } else if previous.value.properties.extension_list == entry.value.properties.extension_list {
-        rewrite_id_with_limits_and_output(
+        rewrite_id(
             previous
                 .source_properties_proof
                 .as_ref()
@@ -2272,7 +2494,7 @@ fn projected_properties_len(
             limits.max_temporary_bytes(),
         )?
     } else {
-        let mut proof = rewrite_extension_list_with_limits_and_output(
+        let mut proof = rewrite_extension_list(
             previous
                 .source_properties_proof
                 .as_ref()
@@ -2282,7 +2504,7 @@ fn projected_properties_len(
             limits.max_temporary_bytes(),
         )?;
         if previous.id() != entry.id() {
-            proof = rewrite_id_with_limits_and_output(
+            proof = rewrite_id(
                 &proof,
                 entry.id(),
                 &rewrite_limits,
@@ -2328,7 +2550,7 @@ fn add_entry(package: &mut OpcPackage, entry: &Part, limits: &Limits) -> Result<
     // in the workbook `.rels` member when the new edge is spliced in.
     let read_limits = bounded_read_limits(package, *limits)?;
     let properties_xml = if entry.source_properties.is_empty() {
-        Arc::new(write_properties_with_limits(
+        Arc::new(write_properties(
             &entry.value.properties,
             &xml_limits_with_output(*limits, limits.max_temporary_bytes()),
         )?)
@@ -2337,16 +2559,14 @@ fn add_entry(package: &mut OpcPackage, entry: &Part, limits: &Limits) -> Result<
     };
     if properties_xml.len() > limits.max_properties_xml_bytes() {
         return Err(limit(
-            Resource::OutputBytes,
-            "Properties XML bytes",
+            LimitKind::PropertiesXmlBytes,
             properties_xml.len(),
             limits.max_properties_xml_bytes(),
         ));
     }
     if properties_xml.len() > limits.max_temporary_bytes() {
         return Err(limit(
-            Resource::Memory,
-            "temporary Properties bytes",
+            LimitKind::TemporaryBytes,
             properties_xml.len(),
             limits.max_temporary_bytes(),
         ));
@@ -2377,7 +2597,7 @@ fn add_entry(package: &mut OpcPackage, entry: &Part, limits: &Limits) -> Result<
         TargetMode::Internal,
         properties_output_limit,
     )?;
-    package.try_replace_relationships_with_limits(
+    package.try_replace_relationships(
         &properties_relationships,
         &properties_replacement,
         read_limits,
@@ -2393,7 +2613,7 @@ fn add_entry(package: &mut OpcPackage, entry: &Part, limits: &Limits) -> Result<
         TargetMode::Internal,
         workbook_output_limit,
     )?;
-    package.try_replace_relationships_with_limits(
+    package.try_replace_relationships(
         &workbook_relationships,
         &workbook_replacement,
         read_limits,
@@ -2459,12 +2679,12 @@ fn remove_entry(package: &mut OpcPackage, entry: &Part, limits: &Limits) -> Resu
         .min(limits.max_temporary_bytes());
     let properties_replacement = properties_relationships
         .without_relationship(&entry.data_relationship_id, properties_output_limit)?;
-    package.try_replace_relationships_with_limits(
+    package.try_replace_relationships(
         &workbook_relationships,
         &workbook_replacement,
         read_limits,
     )?;
-    package.try_replace_relationships_with_limits(
+    package.try_replace_relationships(
         &properties_relationships,
         &properties_replacement,
         read_limits,
@@ -2542,14 +2762,13 @@ fn restore_relationship_provenance(
     let restore = |package: &mut OpcPackage, source: &OwnedRelationships| -> Result<()> {
         if source.bytes().len() > limits.max_relationship_xml_bytes() {
             return Err(limit(
-                Resource::InputBytes,
-                "relationship XML bytes",
+                LimitKind::RelationshipXmlBytes,
                 source.bytes().len(),
                 limits.max_relationship_xml_bytes(),
             ));
         }
         let current = source_relationships_bounded(package, source.owner(), limits)?;
-        package.try_replace_relationships_with_limits(&current, source, read_limits)?;
+        package.try_replace_relationships(&current, source, read_limits)?;
         Ok(())
     };
     restore(package, &snapshot.source.workbook_relationships)?;
@@ -2711,7 +2930,9 @@ mod tests {
         overrides: &[(&str, &[u8])],
         content_types: Option<&[u8]>,
     ) -> OpcPackage {
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         let mut parts = package
             .try_iter_parts()
             .map(|part| part.expect("part payload decodes"))
@@ -2770,7 +2991,7 @@ mod tests {
         writer
             .write_stored("_rels/.rels", package.rels().to_xml().as_bytes())
             .unwrap();
-        OpcPackage::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap()
+        OpcPackage::from_bytes(&writer.finish_to_bytes().unwrap(), SourceLimits::default()).unwrap()
     }
 
     #[test]
@@ -2875,7 +3096,11 @@ mod tests {
             transaction.commit().unwrap()
         };
         let removed_bytes = PackageWriter::to_bytes(&package).unwrap();
-        let removed_archive = soapberry_zip::office::ArchiveReader::new(&removed_bytes).unwrap();
+        let removed_archive = soapberry_zip::office::ArchiveReader::new(
+            &removed_bytes,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
         let removed_content_types = removed_archive.read("[Content_Types].xml").unwrap();
         assert!(
             removed_content_types
@@ -2898,10 +3123,14 @@ mod tests {
                 .any(|window| window == b"/xl/customData/data1.bin")
         );
 
-        let mut reopened = OpcPackage::from_vec(removed_bytes).unwrap();
+        let mut reopened = OpcPackage::from_vec(removed_bytes, SourceLimits::default()).unwrap();
         commit.patch().inverse().apply(&mut reopened).unwrap();
         let restored_bytes = PackageWriter::to_bytes(&reopened).unwrap();
-        let restored_archive = soapberry_zip::office::ArchiveReader::new(&restored_bytes).unwrap();
+        let restored_archive = soapberry_zip::office::ArchiveReader::new(
+            &restored_bytes,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
         assert_eq!(
             restored_archive.read("[Content_Types].xml").unwrap(),
             content_types
@@ -2925,7 +3154,12 @@ mod tests {
         transaction.rename(0, final_id).unwrap();
         // Staging identities does not serialize connection parts repeatedly.
         assert_eq!(
-            transaction.target.get_part(&connections).unwrap().blob(),
+            transaction
+                .edit
+                .target
+                .get_part(&connections)
+                .unwrap()
+                .blob(),
             connection_xml.as_bytes()
         );
         let commit = transaction.commit().unwrap();
@@ -2969,14 +3203,14 @@ mod tests {
         let mut transaction = Transaction::new(&mut package).unwrap();
         transaction.rename(0, "temporary").unwrap();
         assert!(transaction.rename(0, "").is_err());
-        assert_eq!(transaction.entries()[0].id(), "temporary");
+        assert_eq!(transaction.entries().unwrap()[0].id(), "temporary");
         transaction
             .edit_properties(0, |properties| {
                 properties.id = "Storage-1".into();
                 Ok(())
             })
             .unwrap();
-        assert!(!transaction.is_changed());
+        assert!(!transaction.is_changed().unwrap());
         let commit = transaction.commit().unwrap();
         assert!(!commit.changed());
         assert!(Snapshot::load(&package).unwrap().same_source(&before));
@@ -2991,7 +3225,7 @@ mod tests {
             transaction.remove(0),
             Err(Error::CustomDataReferenced { connections: 2, .. })
         ));
-        assert!(!transaction.is_changed());
+        assert!(!transaction.is_changed().unwrap());
         transaction
             .remove_with(0, RemovalDisposition::DetachConnections)
             .unwrap();
@@ -3016,7 +3250,7 @@ mod tests {
                 .remove_with(0, RemovalDisposition::RetargetConnections("missing".into()))
                 .is_err()
         );
-        assert!(!transaction.is_changed());
+        assert!(!transaction.is_changed().unwrap());
         let second = transaction
             .insert(CustomData::new("Storage-2", vec![2]))
             .unwrap();
@@ -3105,31 +3339,47 @@ mod tests {
             transaction.rename(0, "New"),
             Err(Error::Unsupported { .. })
         ));
-        assert!(!transaction.is_changed());
+        assert!(!transaction.is_changed().unwrap());
     }
 
     #[test]
     fn public_package_rename_and_remove_reopen_with_resolved_references() {
-        let mut package = crate::Package::from_opc(with_connections()).unwrap();
-        assert!(package.rename_custom_data("Storage-1", "New").unwrap());
+        let package = crate::Package::from_opc(with_connections()).unwrap();
+        let mut edit = package.edit_custom_data().unwrap();
+        assert!(edit.rename_storage("Storage-1", "New").unwrap());
+        let package = edit.commit().unwrap().into_package();
+        let mut edit = package.edit_custom_data().unwrap();
         assert!(matches!(
-            package.remove_custom_data("New"),
+            edit.remove_storage("New", RemovalDisposition::RejectReferenced),
             Err(Error::CustomDataReferenced { .. })
         ));
+        assert!(matches!(
+            edit.rename_storage("Absent", "Other"),
+            Err(Error::Refused(refusal))
+                if refusal.kind() == litchi_core::edit::RefusalKind::NotFound
+        ));
+        assert!(
+            !edit
+                .remove_storage("Absent", RemovalDisposition::RejectReferenced)
+                .unwrap()
+        );
         let mut bytes = Vec::new();
         package.write_to(&mut bytes).unwrap();
-        let mut reopened = crate::Package::from_bytes(bytes).unwrap();
+        let reopened = crate::Package::from_bytes(&bytes).unwrap();
         assert_eq!(
             reopened.custom_data().unwrap().connection_references("New"),
             2
         );
-        reopened
-            .remove_custom_data_with("New", RemovalDisposition::DetachConnections)
-            .unwrap();
+        let mut edit = reopened.edit_custom_data().unwrap();
+        assert!(
+            edit.remove_storage("New", RemovalDisposition::DetachConnections)
+                .unwrap()
+        );
+        let reopened = edit.commit().unwrap().into_package();
         assert!(reopened.custom_data().unwrap().is_empty());
         let output = reopened.to_bytes().unwrap();
         assert!(
-            crate::Package::from_bytes(output)
+            crate::Package::from_bytes(&output)
                 .unwrap()
                 .custom_data()
                 .unwrap()
@@ -3207,11 +3457,15 @@ mod tests {
             transaction.commit().unwrap()
         };
         let removed = PackageWriter::to_bytes(&package).unwrap();
-        let mut reopened = OpcPackage::from_vec(removed).unwrap();
+        let mut reopened = OpcPackage::from_vec(removed, SourceLimits::default()).unwrap();
         commit.patch().inverse().apply(&mut reopened).unwrap();
 
         let restored = PackageWriter::to_bytes(&reopened).unwrap();
-        let archive = soapberry_zip::office::ArchiveReader::new(&restored).unwrap();
+        let archive = soapberry_zip::office::ArchiveReader::new(
+            &restored,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
         assert_eq!(
             archive
                 .read(workbook_uri.rels_uri().unwrap().membername())
@@ -3230,7 +3484,7 @@ mod tests {
                 .unwrap(),
             data_relationships
         );
-        let restored = OpcPackage::from_vec(restored).unwrap();
+        let restored = OpcPackage::from_vec(restored, SourceLimits::default()).unwrap();
         assert!(Snapshot::load(&restored).unwrap().same_source(&before));
     }
 
@@ -3269,10 +3523,14 @@ mod tests {
             transaction.commit().unwrap()
         };
         let removed = PackageWriter::to_bytes(&package).unwrap();
-        let mut reopened = OpcPackage::from_vec(removed).unwrap();
+        let mut reopened = OpcPackage::from_vec(removed, SourceLimits::default()).unwrap();
         commit.patch().inverse().apply(&mut reopened).unwrap();
         let restored = PackageWriter::to_bytes(&reopened).unwrap();
-        let archive = soapberry_zip::office::ArchiveReader::new(&restored).unwrap();
+        let archive = soapberry_zip::office::ArchiveReader::new(
+            &restored,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
         assert_eq!(
             archive
                 .read(
@@ -3313,7 +3571,7 @@ mod tests {
             archive.read("xl/connections.xml").unwrap(),
             before_connections
         );
-        let restored = OpcPackage::from_vec(restored).unwrap();
+        let restored = OpcPackage::from_vec(restored, SourceLimits::default()).unwrap();
         assert!(Snapshot::load(&restored).unwrap().same_source(&before));
     }
 
@@ -3336,7 +3594,11 @@ mod tests {
             transaction.commit().unwrap()
         };
         let output = PackageWriter::to_bytes(&package).unwrap();
-        let archive = soapberry_zip::office::ArchiveReader::new(&output).unwrap();
+        let archive = soapberry_zip::office::ArchiveReader::new(
+            &output,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
         let workbook = archive
             .read(
                 PackURI::new("/xl/workbook.xml")
@@ -3393,7 +3655,7 @@ mod tests {
         ));
         let mut transaction = Transaction::new(&mut package).unwrap();
         assert_eq!(
-            transaction.entries()[0].value().data().as_ptr(),
+            transaction.entries().unwrap()[0].value().data().as_ptr(),
             data.as_ptr()
         );
         transaction
@@ -3403,7 +3665,7 @@ mod tests {
             })
             .unwrap();
         assert_eq!(
-            transaction.entries()[0].value().data().as_ptr(),
+            transaction.entries().unwrap()[0].value().data().as_ptr(),
             data.as_ptr()
         );
         assert_eq!(snapshot.entries[0].value().properties().id, "Storage-1");
@@ -3435,11 +3697,11 @@ mod tests {
             .insert(CustomData::new("Storage-2", inserted))
             .unwrap();
         assert_eq!(
-            transaction.entries()[0].value().data().as_ptr(),
+            transaction.entries().unwrap()[0].value().data().as_ptr(),
             replacement_ptr
         );
         assert_eq!(
-            transaction.entries()[1].value().data().as_ptr(),
+            transaction.entries().unwrap()[1].value().data().as_ptr(),
             inserted_ptr
         );
         let commit = transaction.commit().unwrap();
@@ -3482,7 +3744,7 @@ mod tests {
         // An existing empty binary part is not a newly allocated graph identity.
         transaction.set_data(0, vec![42]).unwrap();
         transaction.set_data(0, Vec::new()).unwrap();
-        assert!(!transaction.is_changed());
+        assert!(!transaction.is_changed().unwrap());
         transaction.remove(0).unwrap();
         let commit = transaction.commit().unwrap();
         commit.patch().inverse().apply(&mut package).unwrap();
@@ -3812,8 +4074,8 @@ mod tests {
                 Ok(())
             })
             .unwrap();
-        assert!(!no_op.is_changed());
-        no_op.commit().unwrap();
+        let no_op_commit = no_op.commit().unwrap();
+        assert!(!no_op_commit.changed());
         assert_eq!(package.get_part(&properties).unwrap().blob(), before_bytes);
 
         let replacement = format!(

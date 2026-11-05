@@ -1,9 +1,24 @@
-//! Source-checked, failure-atomic edits for the XLSB connections owner.
+//! Immutable edits of the XLSB External Data Connections owner (record
+//! 0360b).
+//!
+//! [`Package::edit_connections`] starts an [`Edit`] over the workbook's
+//! inert connection catalog; its verbs stage a replacement, one connection
+//! or one parameter, each validated as a complete catalog. [`Edit::commit`]
+//! stores the staged catalog (or removes the owner), reads it back, and
+//! returns a [`Commit`] with the new package, the reversible [`Patch`] and
+//! the [`Diagnostics`]; [`Package::apply_connections`] replays a patch onto
+//! an equal package. Connection strings, commands, URLs, paths and
+//! credential metadata are stored verbatim and never resolved or executed.
+//! A catalog equal to the stored one publishes nothing, and a changed edit
+//! of a signed workbook is refused with [`Error::Signed`].
 
 use litchi_opc::OpcPackage;
 
 use super::model::{Connection, Connections, Parameter, UnknownRecord};
 use super::{Result, package, validation};
+use crate::part_edit::{Staged, family};
+
+family!("connections");
 
 /// An immutable workbook connections snapshot bound to the exact OPC owner
 /// graph and BIFF12 source bytes.
@@ -15,14 +30,15 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-    /// Read and validate the complete workbook connections graph.
-    pub fn read(package: &OpcPackage) -> Result<Self> {
-        let connections = package::validate_graph(package)?;
+    /// Read and validate the complete workbook connections graph under the
+    /// owner's raw profile.
+    pub(crate) fn read(package: &OpcPackage, raw_limits: crate::raw::Limits) -> Result<Self> {
+        let connections = package::load(package, raw_limits)?;
         let source = package::capture_source(package)?;
         let unknown_records = source
             .connection
             .as_ref()
-            .map(|part| super::codec::parse_source(part.bytes.as_ref()))
+            .map(|part| super::codec::parse_source(part.bytes.as_ref(), raw_limits))
             .transpose()?
             .map_or_else(Vec::new, |source| source.unknown_records);
         validation::unknown_records(&unknown_records)?;
@@ -31,11 +47,6 @@ impl Snapshot {
             source,
             unknown_records,
         })
-    }
-
-    /// Alias for [`Snapshot::read`].
-    pub fn load(package: &OpcPackage) -> Result<Self> {
-        Self::read(package)
     }
 
     /// Borrow the typed connection catalog, when present.
@@ -76,44 +87,118 @@ impl Snapshot {
     pub const fn is_source_bound(&self) -> bool {
         true
     }
+}
 
-    pub(crate) fn same_source(&self, other: &Self) -> bool {
-        self.source == other.source
+/// A bounded dimension of this family; an exceeded bound is reported as
+/// [`crate::package::PackageError::Limit`] with this kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Connections of one catalog.
+    Connections,
+    /// Bytes of the External Data Connections part.
+    PartBytes,
+}
+
+impl std::fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::Connections => "External Data Connections",
+            Self::PartBytes => "External Data Connections bytes",
+        })
     }
 }
 
-/// A detached, failure-atomic transaction over inert connection metadata.
-pub struct Transaction<'a> {
-    target: &'a mut OpcPackage,
-    before: Snapshot,
+/// A staged connections edit. Dropping it discards it.
+#[derive(Debug, Clone)]
+pub struct Edit {
+    staged: Staged,
+    raw_limits: crate::raw::Limits,
+    before: Option<Snapshot>,
     draft: Option<Connections>,
 }
 
-impl<'a> Transaction<'a> {
-    /// Start a transaction against a validated package.
-    pub fn new(target: &'a mut OpcPackage) -> Result<Self> {
-        let before = Snapshot::read(target)?;
-        Ok(Self {
-            draft: before.connections.clone(),
-            target,
-            before,
+impl crate::Package {
+    /// The source-bound External Data Connections snapshot of this package.
+    ///
+    /// # Errors
+    ///
+    /// Returns the connections graph and decoding errors.
+    pub fn connections(&self) -> Result<Snapshot> {
+        Snapshot::read(self.opc_package(), self.raw_limits_value())
+    }
+
+    /// Start a connections edit. Starting one copies no part payload.
+    ///
+    /// The owner graph is read on the first operation or commit, so dropping
+    /// an untouched edit does not decode the connections part.
+    pub fn edit_connections(&self) -> Result<Edit> {
+        Ok(Edit {
+            staged: Staged::of_package(self)?,
+            raw_limits: self.raw_limits_value(),
+            draft: None,
+            before: None,
         })
     }
 
-    /// Borrow the source snapshot used for stale-source checks.
-    #[must_use]
-    pub const fn before(&self) -> &Snapshot {
-        &self.before
+    /// Apply a connections patch to a new package; this one is unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when this package is not the patch's
+    /// before state and [`Error::Signed`] for a changed patch of a signed
+    /// workbook.
+    pub fn apply_connections(&self, patch: &Patch) -> Result<Commit> {
+        Ok(Commit::new((patch.0.apply(self)?, patch.0.clone())))
+    }
+}
+
+impl Edit {
+    fn ensure_prepared(&mut self) -> Result<()> {
+        if self.before.is_some() {
+            return Ok(());
+        }
+        let before = Snapshot::read(self.staged.opc(), self.raw_limits)?;
+        self.draft = before.connections.clone();
+        self.before = Some(before);
+        Ok(())
     }
 
-    /// Borrow the currently staged connection catalog.
-    #[must_use]
-    pub const fn connections(&self) -> Option<&Connections> {
-        self.draft.as_ref()
+    fn snapshot(&self) -> Result<&Snapshot> {
+        self.before
+            .as_ref()
+            .ok_or_else(|| super::invalid("connections edit is not prepared"))
     }
 
-    /// Replace or remove the complete connections owner.
+    /// The source snapshot the edit started from.
+    #[must_use]
+    pub fn before(&mut self) -> Result<&Snapshot> {
+        self.ensure_prepared()?;
+        self.snapshot()
+    }
+
+    /// The staged connection catalog.
+    #[must_use]
+    pub fn connections(&mut self) -> Result<Option<&Connections>> {
+        self.ensure_prepared()?;
+        Ok(self.draft.as_ref())
+    }
+
+    /// Discard every staged change.
+    pub fn reset(&mut self) -> Result<()> {
+        self.ensure_prepared()?;
+        self.draft = self.snapshot()?.connections.clone();
+        Ok(())
+    }
+
+    /// Replace or remove the complete connections owner. Returns whether the
+    /// staged catalog changed.
+    ///
+    /// # Errors
+    ///
+    /// Returns the catalog validation errors.
     pub fn replace(&mut self, value: Option<Connections>) -> Result<bool> {
+        self.ensure_prepared()?;
         if let Some(value) = &value {
             validation::connections(value)?;
         }
@@ -125,11 +210,17 @@ impl<'a> Transaction<'a> {
     }
 
     /// Edit one connection through a typed, failure-atomic closure.
+    ///
+    /// # Errors
+    ///
+    /// Returns the closure's error, an absent owner or connection, a changed
+    /// connection ID and the catalog validation errors.
     pub fn edit(
         &mut self,
         connection_id: u32,
         edit: impl FnOnce(&mut Connection) -> Result<()>,
     ) -> Result<bool> {
+        self.ensure_prepared()?;
         let mut draft = self
             .draft
             .clone()
@@ -154,7 +245,12 @@ impl<'a> Transaction<'a> {
     }
 
     /// Add a connection or replace one with the same stable identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns the catalog validation errors.
     pub fn set(&mut self, connection: Connection) -> Result<bool> {
+        self.ensure_prepared()?;
         let mut draft = self.draft.clone().unwrap_or_default();
         if let Some(existing) = draft
             .connections
@@ -173,8 +269,14 @@ impl<'a> Transaction<'a> {
         Ok(true)
     }
 
-    /// Remove one connection by stable identifier.
+    /// Remove one connection by stable identifier; removing the last one
+    /// removes the owner.
+    ///
+    /// # Errors
+    ///
+    /// Returns an absent owner and the catalog validation errors.
     pub fn remove(&mut self, connection_id: u32) -> Result<Option<Connection>> {
+        self.ensure_prepared()?;
         let mut draft = self
             .draft
             .clone()
@@ -197,6 +299,10 @@ impl<'a> Transaction<'a> {
     }
 
     /// Replace one parameter without contacting its provider.
+    ///
+    /// # Errors
+    ///
+    /// The errors of [`Self::edit`] and a missing parameter index.
     pub fn set_parameter(
         &mut self,
         connection_id: u32,
@@ -214,6 +320,10 @@ impl<'a> Transaction<'a> {
     }
 
     /// Append one inert connection parameter.
+    ///
+    /// # Errors
+    ///
+    /// The errors of [`Self::edit`].
     pub fn push_parameter(&mut self, connection_id: u32, parameter: Parameter) -> Result<bool> {
         self.edit(connection_id, |connection| {
             connection.parameters.push(parameter);
@@ -222,6 +332,10 @@ impl<'a> Transaction<'a> {
     }
 
     /// Remove one inert connection parameter.
+    ///
+    /// # Errors
+    ///
+    /// The errors of [`Self::edit`] and a missing parameter index.
     pub fn remove_parameter(
         &mut self,
         connection_id: u32,
@@ -238,156 +352,46 @@ impl<'a> Transaction<'a> {
         Ok(removed)
     }
 
-    /// Validate and publish the transaction as a reversible package patch.
-    pub fn commit(self) -> Result<Commit> {
-        if self.draft == self.before.connections {
-            return Ok(Commit {
-                snapshot: self.before.clone(),
-                patch: Patch {
-                    before: self.before.clone(),
-                    after: self.before.clone(),
+    /// Store the staged catalog, read it back and publish a new package. An
+    /// unchanged catalog returns the source package.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Signed`] for a changed edit of a signed workbook, the
+    /// connections graph errors, a readback that differs from the staged
+    /// catalog, and the workbook validation errors of the result.
+    pub fn commit(mut self) -> Result<Commit> {
+        self.ensure_prepared()?;
+        let unchanged = {
+            let before = self.snapshot()?;
+            self.draft == before.connections
+        };
+        if unchanged {
+            self.staged.reset();
+            return Ok(Commit::new(self.staged.commit()?));
+        }
+        crate::signature_policy::ensure_unsigned(self.staged.opc())?;
+        let workbook = self.snapshot()?.source.workbook_name.clone();
+        let draft = self.draft.clone();
+        let raw_limits = self.staged.raw_limits();
+        self.staged.update(|candidate| {
+            let stored = match &draft {
+                Some(value) => Some(package::store_on_workbook(
+                    candidate, &workbook, value, raw_limits,
+                )?),
+                None => {
+                    package::remove_from_workbook(candidate, &workbook)?;
+                    None
                 },
-                changed: false,
-            });
-        }
-
-        let current = Snapshot::read(self.target)?;
-        if !current.same_source(&self.before) {
-            return Err(super::invalid("connections transaction source is stale"));
-        }
-        let mut candidate = self.target.clone();
-        match &self.draft {
-            Some(value) => {
-                package::store_on_workbook(
-                    &mut candidate,
-                    &self.before.source.workbook_name,
-                    value,
-                )?;
-            },
-            None => {
-                package::remove_from_workbook(&mut candidate, &self.before.source.workbook_name)?;
-            },
-        }
-        let snapshot = Snapshot::read(&candidate)?;
-        if snapshot.connections.as_ref() != self.draft.as_ref() {
-            return Err(super::invalid(
-                "connection publication changed the staged model",
-            ));
-        }
-        *self.target = candidate;
-        Ok(Commit {
-            patch: Patch {
-                before: self.before,
-                after: snapshot.clone(),
-            },
-            snapshot,
-            changed: true,
-        })
+            };
+            let snapshot = Snapshot::read(candidate, raw_limits)?;
+            if snapshot.connections != stored {
+                return Err(super::invalid(
+                    "connection publication changed the staged model",
+                ));
+            }
+            Ok(())
+        })?;
+        Ok(Commit::new(self.staged.commit()?))
     }
-}
-
-/// A successful source-checked package commit.
-#[derive(Debug, Clone)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-    changed: bool,
-}
-
-impl Commit {
-    /// Whether the transaction changed the package.
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-
-    /// Borrow the committed snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Borrow the reversible source-checked patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Split the commit into snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
-    }
-}
-
-/// A reversible package patch guarded by exact source graph metadata.
-#[derive(Debug, Clone)]
-pub struct Patch {
-    before: Snapshot,
-    after: Snapshot,
-}
-
-impl Patch {
-    /// Whether applying this patch is source-identical.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.before.same_source(&self.after)
-    }
-
-    /// Borrow the before-image snapshot.
-    #[must_use]
-    pub const fn before(&self) -> &Snapshot {
-        &self.before
-    }
-
-    /// Borrow the after-image snapshot.
-    #[must_use]
-    pub const fn after(&self) -> &Snapshot {
-        &self.after
-    }
-
-    /// Apply only to a package with the exact source graph used to create it.
-    pub fn apply(&self, target: &mut OpcPackage) -> Result<Snapshot> {
-        let current = Snapshot::read(target)?;
-        if !current.same_source(&self.before) {
-            return Err(super::invalid("connections patch source is stale"));
-        }
-        if self.is_empty() {
-            return Ok(current);
-        }
-        let mut candidate = target.clone();
-        package::restore_source(&mut candidate, &self.after.source)?;
-        let snapshot = Snapshot::read(&candidate)?;
-        if !snapshot.same_source(&self.after) {
-            return Err(super::invalid(
-                "connection patch publication changed its source",
-            ));
-        }
-        *target = candidate;
-        Ok(snapshot)
-    }
-
-    /// Alias for [`Patch::apply`].
-    pub fn commit(&self, target: &mut OpcPackage) -> Result<Snapshot> {
-        self.apply(target)
-    }
-
-    /// Return the exact inverse patch.
-    #[must_use]
-    pub fn inverse(&self) -> Self {
-        Self {
-            before: self.after.clone(),
-            after: self.before.clone(),
-        }
-    }
-}
-
-/// Read the source-checked connections owner.
-pub fn read(package: &OpcPackage) -> Result<Snapshot> {
-    Snapshot::read(package)
-}
-
-/// Apply a source-checked connections patch.
-pub fn apply(target: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
-    patch.apply(target)
 }

@@ -246,11 +246,32 @@ pub enum CandidateEntryKind {
 }
 
 /// A borrowed, allocation-free descriptor for one ZIP record.
+///
+/// The descriptor is bound to the source bytes of the plan that produced it:
+/// it cannot outlive them, and [`CandidateIngressPlan::admit_entry`] refuses a
+/// descriptor from another source, or one whose recorded facts no longer
+/// match its central record, before any charge is made.
+///
+/// ```compile_fail,E0515
+/// use litchi_iwa_archive::Limits;
+/// use litchi_iwa_archive::unstable::{CandidateEntry, CandidateIngressPlan};
+/// fn stale<'a>() -> CandidateEntry<'a> {
+///     let bytes = Vec::new();
+///     let plan = CandidateIngressPlan::from_bytes(&bytes, Limits::default()).unwrap();
+///     let entry = plan.entries().next().unwrap().unwrap();
+///     entry
+/// }
+/// ```
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub struct CandidateEntry {
+pub struct CandidateEntry<'data> {
+    source_lifetime: std::marker::PhantomData<&'data [u8]>,
+    central_offset: u64,
+    source_ptr: usize,
+    source_len: usize,
     ordinal: usize,
     wayfinder: soapberry_zip::ZipArchiveEntryWayfinder,
     kind: CandidateEntryKind,
+    operation_storage: bool,
     compression: CandidateCompression,
     metadata_bytes: usize,
     compressed_bytes: usize,
@@ -258,7 +279,7 @@ pub struct CandidateEntry {
     materialized_bytes: usize,
 }
 
-impl std::fmt::Debug for CandidateEntry {
+impl std::fmt::Debug for CandidateEntry<'_> {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
             .debug_struct("CandidateEntry")
@@ -273,7 +294,7 @@ impl std::fmt::Debug for CandidateEntry {
     }
 }
 
-impl CandidateEntry {
+impl CandidateEntry<'_> {
     /// Stable ordinal within this candidate's central-directory order.
     #[must_use]
     pub const fn ordinal(self) -> usize {
@@ -304,6 +325,15 @@ impl CandidateEntry {
         matches!(self.kind, CandidateEntryKind::Iwa)
     }
 
+    /// Whether the exact source member basename is `OperationStorage.iwa`.
+    ///
+    /// Callers must additionally inspect the admitted decoded payload for the
+    /// `bvxn` marker before treating this member as an opaque operation log.
+    #[must_use]
+    pub const fn is_operation_storage(self) -> bool {
+        self.operation_storage
+    }
+
     /// Central fixed and variable metadata bytes for this record.
     #[must_use]
     pub const fn metadata_bytes(self) -> usize {
@@ -332,7 +362,7 @@ impl CandidateEntry {
 /// One ZIP target whose output capacity has been admitted.
 pub struct AdmittedCandidateEntry<'plan, 'data> {
     plan: &'plan CandidateIngressPlan<'data>,
-    entry: CandidateEntry,
+    entry: CandidateEntry<'data>,
 }
 
 impl std::fmt::Debug for AdmittedCandidateEntry<'_, '_> {
@@ -347,7 +377,7 @@ impl std::fmt::Debug for AdmittedCandidateEntry<'_, '_> {
 impl<'plan, 'data> AdmittedCandidateEntry<'plan, 'data> {
     /// Borrow the neutral descriptor after its output charge was admitted.
     #[must_use]
-    pub const fn entry(&self) -> CandidateEntry {
+    pub const fn entry(&self) -> CandidateEntry<'data> {
         self.entry
     }
 
@@ -404,7 +434,7 @@ impl std::fmt::Debug for CandidateIngressPlan<'_> {
 impl<'data> CandidateIngressPlan<'data> {
     /// Validate the ZIP envelope and produce physical facts without retaining
     /// a central-directory map, member names, or decoded payloads.
-    pub fn from_bytes_with_limits(data: &'data [u8], limits: Limits) -> Result<Self> {
+    pub fn from_bytes(data: &'data [u8], limits: Limits) -> Result<Self> {
         let limits = limits.validate()?;
         limits.check_input_size(
             u64::try_from(data.len()).map_err(|_error| {
@@ -548,11 +578,6 @@ impl<'data> CandidateIngressPlan<'data> {
         })
     }
 
-    /// Validate one source with the default physical limits.
-    pub fn from_bytes(data: &'data [u8]) -> Result<Self> {
-        Self::from_bytes_with_limits(data, Limits::default())
-    }
-
     /// Borrow the aggregate ZIP facts.
     #[must_use]
     pub const fn requirements(&self) -> CandidateIngressRequirements {
@@ -560,7 +585,7 @@ impl<'data> CandidateIngressPlan<'data> {
     }
 
     /// Return descriptors in central-directory order without allocating names.
-    pub fn entries(&self) -> impl Iterator<Item = Result<CandidateEntry>> + '_ {
+    pub fn entries(&self) -> impl Iterator<Item = Result<CandidateEntry<'data>>> + '_ {
         self.archive
             .entries()
             .enumerate()
@@ -589,23 +614,58 @@ impl<'data> CandidateIngressPlan<'data> {
     /// Admit one member's ZIP-decoded output before materializing it.
     pub fn admit_entry<V>(
         &self,
-        entry: CandidateEntry,
+        entry: CandidateEntry<'data>,
         visitor: &mut V,
     ) -> std::result::Result<AdmittedCandidateEntry<'_, 'data>, CandidateIngressError<V::Error>>
     where
         V: CandidateIngressVisitor,
     {
+        if !self.owns_entry(entry) {
+            return Err(CandidateIngressError::Physical(invalid(
+                "candidate ZIP entry does not belong to this source plan",
+            )));
+        }
         if entry.is_directory() {
             return Err(CandidateIngressError::Physical(invalid(
                 "cannot admit a directory as a ZIP payload",
             )));
         }
+        // A Deflate read also owns the decoder's input buffer and state, and
+        // revalidating the recorded central member traverses its metadata.
+        let (retained_bytes, allocations) = match entry.compression {
+            CandidateCompression::Deflated => (
+                entry
+                    .materialized_bytes
+                    .checked_add(soapberry_zip::office::DEFLATE_READ_SCRATCH_UPPER_BOUND_BYTES)
+                    .ok_or_else(|| {
+                        CandidateIngressError::Physical(invalid(
+                            "candidate ZIP Deflate storage overflows usize",
+                        ))
+                    })?,
+                1usize
+                    .checked_add(soapberry_zip::office::DEFLATE_READ_SCRATCH_ALLOCATIONS)
+                    .ok_or_else(|| {
+                        CandidateIngressError::Physical(invalid(
+                            "candidate ZIP Deflate allocation count overflows usize",
+                        ))
+                    })?,
+            ),
+            _ => (entry.materialized_bytes, 1),
+        };
+        let traversal_bytes = entry
+            .compressed_bytes
+            .checked_add(entry.metadata_bytes)
+            .ok_or_else(|| {
+                CandidateIngressError::Physical(invalid(
+                    "candidate ZIP entry validation work overflows usize",
+                ))
+            })?;
         visitor
             .admit(CandidateIngressCharge::new(
                 CandidateIngressPhase::ZipEntryStorage,
-                entry.materialized_bytes,
-                entry.compressed_bytes,
-                1,
+                retained_bytes,
+                traversal_bytes,
+                allocations,
             ))
             .map_err(CandidateIngressError::Admission)?;
         Ok(AdmittedCandidateEntry { plan: self, entry })
@@ -615,7 +675,7 @@ impl<'data> CandidateIngressPlan<'data> {
     pub fn preflight_snappy_stream(&self, compressed: &[u8]) -> Result<SnappyIngressRequirements> {
         let limits = self.limits.snappy_limits()?;
         let decoded_bytes =
-            SnappyStream::decompressed_len_with_limits(compressed, limits).map_err(Error::Iwa)?;
+            SnappyStream::decompressed_len(compressed, limits).map_err(Error::Iwa)?;
         Ok(SnappyIngressRequirements {
             compressed_bytes: compressed.len(),
             decoded_bytes,
@@ -647,8 +707,7 @@ impl<'data> CandidateIngressPlan<'data> {
 
     /// Preflight a decoded IWA stream without constructing generated values.
     pub fn preflight_archive_stream(&self, decoded: &[u8]) -> Result<ArchiveIngressRequirements> {
-        Archive::preflight_with_limits(decoded, self.limits.effective_archive_limits()?)
-            .map_err(Error::Iwa)
+        Archive::preflight(decoded, self.limits.effective_archive_limits()?).map_err(Error::Iwa)
     }
 
     /// Admit archive/header storage before parsing the decoded IWA stream.
@@ -699,7 +758,11 @@ impl<'data> CandidateIngressPlan<'data> {
             })
     }
 
-    fn entry_from_record(&self, ordinal: usize, entry: ZipFileHeaderRecord<'_>) -> CandidateEntry {
+    fn entry_from_record(
+        &self,
+        ordinal: usize,
+        entry: ZipFileHeaderRecord<'_>,
+    ) -> CandidateEntry<'data> {
         let raw_path = entry.file_path();
         let raw_name = raw_path.as_ref();
         let kind = classify_entry(raw_name, entry.is_dir());
@@ -713,10 +776,17 @@ impl<'data> CandidateIngressPlan<'data> {
             CompressionMethod::Deflate => declared_bytes.saturating_add(1),
             _ => 0,
         };
+        let source = self.archive.as_bytes();
         CandidateEntry {
+            source_lifetime: std::marker::PhantomData,
+            central_offset: entry.central_directory_offset(),
+            source_ptr: source.as_ptr() as usize,
+            source_len: source.len(),
             ordinal,
             wayfinder: entry.wayfinder(),
             kind,
+            operation_storage: raw_name.rsplit(|byte| matches!(*byte, b'/' | b'\\')).next()
+                == Some(b"OperationStorage.iwa".as_slice()),
             compression: compression(entry.compression_method()),
             metadata_bytes: ZIP_CENTRAL_FIXED_METADATA_BYTES.saturating_add(
                 usize_from_u64(entry.metadata_size_hint(), "ZIP metadata length")
@@ -728,7 +798,21 @@ impl<'data> CandidateIngressPlan<'data> {
         }
     }
 
-    fn read_entry(&self, entry: CandidateEntry) -> Result<Vec<u8>> {
+    /// Whether a descriptor came from this plan's source and still matches
+    /// its recorded central record. The record is looked up directly at its
+    /// offset, without rescanning preceding records.
+    fn owns_entry(&self, candidate: CandidateEntry<'_>) -> bool {
+        let source = self.archive.as_bytes();
+        if candidate.source_ptr != source.as_ptr() as usize || candidate.source_len != source.len()
+        {
+            return false;
+        }
+        self.archive
+            .central_record_at(candidate.central_offset)
+            .is_ok_and(|entry| self.entry_from_record(candidate.ordinal, entry) == candidate)
+    }
+
+    fn read_entry(&self, entry: CandidateEntry<'_>) -> Result<Vec<u8>> {
         let source = self.archive.get_entry_borrowed(entry.wayfinder)?;
         match entry.compression {
             CandidateCompression::Stored => {
@@ -899,24 +983,46 @@ impl SourceCatalog {
     /// Build the allocation-free physical candidate plan used by a caller's
     /// aggregate transaction ledger.
     #[doc(hidden)]
-    pub fn __candidate_ingress_with_limits(
-        bytes: &[u8],
-        limits: Limits,
-    ) -> Result<CandidateIngressPlan<'_>> {
-        CandidateIngressPlan::from_bytes_with_limits(bytes, limits)
+    pub fn __candidate_ingress(bytes: &[u8], limits: Limits) -> Result<CandidateIngressPlan<'_>> {
+        CandidateIngressPlan::from_bytes(bytes, limits)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        CandidateCompression, CandidateEntryKind, CandidateIngressCharge, CandidateIngressPhase,
-        CandidateIngressPlan,
+        CandidateCompression, CandidateEntryKind, CandidateIngressCharge, CandidateIngressError,
+        CandidateIngressPhase, CandidateIngressPlan,
     };
     use crate::package::{EntryEdit, EntryInsertion};
     use crate::{Limits, SourceCatalog};
     use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
     use soapberry_zip::office::StreamingArchiveWriter;
+
+    #[test]
+    fn operation_log_descriptor_requires_exact_portable_basename() -> crate::Result<()> {
+        let names = [
+            ("OperationStorage.iwa", true),
+            ("Index/OperationStorage.iwa", true),
+            ("Index\\OperationStorage.iwa", true),
+            ("Index/OtherOperationStorage.iwa", false),
+            ("Index/OperationStorage.iwa.extra", false),
+        ];
+        for (name, expected) in names {
+            let mut writer = StreamingArchiveWriter::new(
+                soapberry_zip::office::StreamingArchiveLimits::default(),
+            );
+            writer.write_stored(name, b"bvxn log")?;
+            let source = writer.finish_to_bytes()?;
+            let plan = CandidateIngressPlan::from_bytes(&source, Limits::default())?;
+            let entry =
+                plan.entries().next().transpose()?.ok_or_else(|| {
+                    crate::Error::InvalidBundle("test entry is missing".to_owned())
+                })?;
+            assert_eq!(entry.is_operation_storage(), expected, "{name}");
+        }
+        Ok(())
+    }
 
     fn package() -> crate::Result<Vec<u8>> {
         let archive = Archive {
@@ -926,19 +1032,112 @@ mod tests {
                     type_: 6000,
                     data: vec![1, 2, 3],
                 }],
+                Default::default(),
             )?],
         };
-        let stream = SnappyStream::compress(&archive.to_bytes()?)?;
-        let mut writer = StreamingArchiveWriter::new();
+        let stream =
+            SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer.write_stored("Index/Document.iwa", &stream)?;
         writer.write_deflated("Metadata/Properties.plist", b"properties")?;
         writer.finish_to_bytes().map_err(crate::Error::from)
     }
 
     #[test]
+    fn candidate_entry_is_source_bound_before_any_charge() -> crate::Result<()> {
+        let first = package()?;
+        let second = first.clone();
+        let plan_a = CandidateIngressPlan::from_bytes(&first, Limits::default())?;
+        let plan_b = CandidateIngressPlan::from_bytes(&second, Limits::default())?;
+        let entry = plan_a
+            .entries()
+            .next()
+            .transpose()?
+            .ok_or_else(|| crate::Error::InvalidBundle("test entry is missing".to_owned()))?;
+
+        let mut charges = 0usize;
+        let result = plan_b.admit_entry(entry, &mut |_charge| {
+            charges = charges.saturating_add(1);
+            Ok::<(), crate::Error>(())
+        });
+        assert!(matches!(
+            result,
+            Err(CandidateIngressError::Physical(crate::Error::InvalidBundle(message)))
+                if message.contains("does not belong to this source plan")
+        ));
+        assert_eq!(charges, 0);
+
+        let mut forged = plan_b
+            .entries()
+            .next()
+            .transpose()?
+            .ok_or_else(|| crate::Error::InvalidBundle("test entry is missing".to_owned()))?;
+        forged.materialized_bytes = forged.materialized_bytes.saturating_add(1);
+        let result = plan_b.admit_entry(forged, &mut |_charge| {
+            charges = charges.saturating_add(1);
+            Ok::<(), crate::Error>(())
+        });
+        assert!(matches!(
+            result,
+            Err(CandidateIngressError::Physical(crate::Error::InvalidBundle(message)))
+                if message.contains("does not belong to this source plan")
+        ));
+        assert_eq!(charges, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn deflated_entry_charge_includes_decoder_workspace() -> crate::Result<()> {
+        let bytes = package()?;
+        let plan = CandidateIngressPlan::from_bytes(&bytes, Limits::default())?;
+        let entry = plan
+            .entries()
+            .find(|result| {
+                result
+                    .as_ref()
+                    .is_ok_and(|entry| entry.compression() == CandidateCompression::Deflated)
+            })
+            .transpose()?
+            .ok_or_else(|| {
+                crate::Error::InvalidBundle("deflated test entry is missing".to_owned())
+            })?;
+        let mut admitted = None;
+        plan.admit_entry(entry, &mut |charge: CandidateIngressCharge| {
+            admitted = Some(charge);
+            Ok::<(), crate::Error>(())
+        })
+        .map_err(|error| match error {
+            CandidateIngressError::Physical(error) | CandidateIngressError::Admission(error) => {
+                error
+            },
+            CandidateIngressError::CloneArithmetic { resource } => {
+                crate::Error::InvalidBundle(resource.to_owned())
+            },
+        })?;
+        let charge = admitted.ok_or_else(|| {
+            crate::Error::InvalidBundle("deflated admission did not charge".to_owned())
+        })?;
+        assert_eq!(
+            charge.retained_bytes(),
+            entry.materialized_bytes()
+                + soapberry_zip::office::DEFLATE_READ_SCRATCH_UPPER_BOUND_BYTES
+        );
+        assert_eq!(
+            charge.allocations(),
+            1 + soapberry_zip::office::DEFLATE_READ_SCRATCH_ALLOCATIONS
+        );
+        assert_eq!(
+            charge.traversal_bytes(),
+            entry.compressed_bytes() + entry.metadata_bytes()
+        );
+        Ok(())
+    }
+
+    #[test]
     fn candidate_plan_reports_targets_without_allocating_a_reader_index() -> crate::Result<()> {
         let bytes = package()?;
-        let plan = CandidateIngressPlan::from_bytes_with_limits(&bytes, Limits::default())?;
+        let plan = CandidateIngressPlan::from_bytes(&bytes, Limits::default())?;
         let entries = plan.entries().collect::<crate::Result<Vec<_>>>()?;
         assert_eq!(entries.len(), 2);
         assert!(entries.iter().any(|entry| {
@@ -956,7 +1155,7 @@ mod tests {
     #[test]
     fn candidate_phases_charge_before_decode() -> crate::Result<()> {
         let bytes = package()?;
-        let plan = CandidateIngressPlan::from_bytes(&bytes)?;
+        let plan = CandidateIngressPlan::from_bytes(&bytes, Default::default())?;
         let mut phases = Vec::new();
         plan.admit_zip_directory(&mut |charge: CandidateIngressCharge| {
             phases.push(charge.phase());
@@ -981,7 +1180,7 @@ mod tests {
             })
             .map_err(|_| crate::Error::InvalidBundle("Snappy admission failed".to_owned()))?;
         assert!(requirements.decoded_bytes() > 0);
-        let decoded = SnappyStream::decompress(&snappy)?;
+        let decoded = SnappyStream::decompress(&snappy, Default::default())?;
         plan.admit_archive_stream(decoded.as_bytes(), &mut |charge: CandidateIngressCharge| {
             phases.push(charge.phase());
             Ok::<_, ()>(())
@@ -1010,7 +1209,7 @@ mod tests {
             Limits::MAX_IWA_STREAM_BYTES,
         )?;
         assert!(matches!(
-            CandidateIngressPlan::from_bytes_with_limits(&bytes, limits),
+            CandidateIngressPlan::from_bytes(&bytes, limits),
             Err(crate::Error::Limit {
                 kind: crate::LimitKind::EntryBytes,
                 ..
@@ -1022,7 +1221,7 @@ mod tests {
     #[test]
     fn reassembly_preparation_is_admitted_before_reader_and_indexes() -> crate::Result<()> {
         let bytes = package()?;
-        let catalog = SourceCatalog::from_bytes(&bytes)?;
+        let catalog = SourceCatalog::from_bytes(&bytes, Default::default())?;
         let edit = EntryEdit::new("Metadata/Properties.plist", b"edited properties");
         let mut phases = Vec::new();
         let requirements = catalog
@@ -1054,7 +1253,7 @@ mod tests {
     #[test]
     fn reassembly_preparation_rejection_happens_before_prepare() -> crate::Result<()> {
         let bytes = package()?;
-        let catalog = SourceCatalog::from_bytes(&bytes)?;
+        let catalog = SourceCatalog::from_bytes(&bytes, Default::default())?;
         let edit = EntryEdit::new("Metadata/Properties.plist", b"edited properties");
         let result = catalog.__admit_reassembly_preparation(
             &[],
@@ -1065,7 +1264,7 @@ mod tests {
         );
         assert!(matches!(
             result,
-            Err(super::CandidateIngressError::Admission("ledger full"))
+            Err(CandidateIngressError::Admission("ledger full"))
         ));
         Ok(())
     }
@@ -1073,7 +1272,7 @@ mod tests {
     #[test]
     fn reassembly_preparation_covers_insertions_and_deletions() -> crate::Result<()> {
         let bytes = package()?;
-        let catalog = SourceCatalog::from_bytes(&bytes)?;
+        let catalog = SourceCatalog::from_bytes(&bytes, Default::default())?;
         let insertions = [EntryInsertion::new("Metadata/New.plist", b"new properties")];
         let edits: [EntryEdit<'_>; 0] = [];
         let deleted_names = ["Metadata/Properties.plist"];

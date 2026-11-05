@@ -1,7 +1,7 @@
 //! OPC graph ownership for workbook revision parts.
 
 use crate::error::Result;
-use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, SourceLimits};
 use std::collections::{HashMap, HashSet};
 
 use super::codec::{
@@ -15,7 +15,10 @@ use super::model::{
 };
 use super::snapshot::{Snapshot, SourceRelationship};
 
-pub fn load_workbook_revisions(package: &OpcPackage) -> Result<Option<Revisions>> {
+pub fn load_workbook_revisions(
+    package: &OpcPackage,
+    limits: &SourceLimits,
+) -> Result<Option<Revisions>> {
     let workbook = package.main_document_part()?;
     require_workbook_type(workbook.content_type())?;
     let workbook_name = workbook.partname().to_string();
@@ -55,7 +58,7 @@ pub fn load_workbook_revisions(package: &OpcPackage) -> Result<Option<Revisions>
     require_ct(headers_part, HEADERS_CT)?;
     no_rels(users_part, "userNames")?;
     validate_sources(package, &workbook_name, Some(headers_uri.as_str()))?;
-    let headers = parse_revision_headers(headers_part.blob())?;
+    let headers = parse_revision_headers(headers_part.blob(), limits)?;
     let mut logs = Vec::new();
     let mut targets = HashSet::new();
     for header in &headers.headers {
@@ -83,7 +86,7 @@ pub fn load_workbook_revisions(package: &OpcPackage) -> Result<Option<Revisions>
         logs.push(RevisionLogPart {
             relationship_id: header.relationship_id.clone(),
             part_name: uri.to_string(),
-            log: parse_revision_log(part.blob())?,
+            log: parse_revision_log(part.blob(), limits)?,
         });
     }
     if headers_part.rels().iter().any(|r| !is_log_rel(r.reltype()))
@@ -104,7 +107,7 @@ pub fn load_workbook_revisions(package: &OpcPackage) -> Result<Option<Revisions>
         users_part_name: users_uri.to_string(),
         headers_relationship_id: headers_rel.r_id().into(),
         headers_part_name: headers_uri.to_string(),
-        users: parse_revision_users(users_part.blob())?,
+        users: parse_revision_users(users_part.blob(), limits)?,
         headers,
         logs,
     };
@@ -112,7 +115,14 @@ pub fn load_workbook_revisions(package: &OpcPackage) -> Result<Option<Revisions>
     Ok(Some(value))
 }
 
-pub fn store_workbook_revisions(
+/// Store a complete revision owner in a package that has none.
+///
+/// The graph is staged on a clone, so every failure leaves `package` as it
+/// was. Storing changes the package, so a signed package is refused with
+/// [`crate::Error::Signed`]: remove the signature explicitly first
+/// ([`OpcPackage::unsign`]).
+#[cfg(test)]
+pub(crate) fn store_workbook_revisions(
     package: &mut OpcPackage,
     value: &Revisions,
     conformance: RevisionConformance,
@@ -129,7 +139,7 @@ fn store_workbook_revisions_inner(
     conformance: RevisionConformance,
 ) -> Result<()> {
     validate_physical_value(value)?;
-    if load_workbook_revisions(package)?.is_some() {
+    if load_workbook_revisions(package, &package.read_limits())?.is_some() {
         return Err(invalid("package already contains workbook revisions"));
     }
     let workbook = package.main_document_part()?;
@@ -149,8 +159,9 @@ fn store_workbook_revisions_inner(
     if names.len() != 2 {
         return Err(invalid("revision part names must be unique"));
     }
-    let users_xml = write_revision_users(&value.users, conformance)?;
-    let headers_xml = write_revision_headers(&value.headers, conformance)?;
+    let limits = package.read_limits();
+    let users_xml = write_revision_users(&value.users, conformance, &limits)?;
+    let headers_xml = write_revision_headers(&value.headers, conformance, &limits)?;
     let mut pending = Vec::new();
     for log in &value.logs {
         let uri = PackURI::new(&log.part_name).map_err(invalid)?;
@@ -160,7 +171,7 @@ fn store_workbook_revisions_inner(
         pending.push((
             uri,
             log.relationship_id.clone(),
-            write_revision_log(&log.log, conformance)?,
+            write_revision_log(&log.log, conformance, &limits)?,
         ));
     }
     for name in &names {
@@ -169,6 +180,7 @@ fn store_workbook_revisions_inner(
             .validate_new_part_name(&uri)
             .map_err(|error| invalid(error.to_string()))?;
     }
+    crate::signature_policy::ensure_unsigned(package)?;
     package.try_add_part(Box::new(BlobPart::new(
         users_uri.clone(),
         USERS_CT.into(),
@@ -209,7 +221,6 @@ fn store_workbook_revisions_inner(
                 litchi_opc::TargetMode::Internal,
             )?;
     }
-    package.unsign();
     Ok(())
 }
 
@@ -223,7 +234,7 @@ pub(crate) fn replace_workbook_revisions(
     value: Option<&Revisions>,
     conformance: RevisionConformance,
 ) -> Result<()> {
-    let existing = load_workbook_revisions(package)?;
+    let existing = load_workbook_revisions(package, &package.read_limits())?;
     match (existing.as_ref(), value) {
         (None, None) => return Ok(()),
         (Some(existing), None) => remove_workbook_revisions_inner(package, existing)?,
@@ -240,18 +251,6 @@ pub(crate) fn replace_workbook_revisions(
         },
     }
     Ok(())
-}
-
-/// Remove the complete workbook revision owner atomically.
-pub fn remove_workbook_revisions(package: &mut OpcPackage) -> Result<bool> {
-    let mut candidate = package.clone();
-    let Some(value) = load_workbook_revisions(&candidate)? else {
-        return Ok(false);
-    };
-    remove_workbook_revisions_inner(&mut candidate, &value)?;
-    validate_graph(&candidate)?;
-    *package = candidate;
-    Ok(true)
 }
 
 fn remove_workbook_revisions_inner(package: &mut OpcPackage, value: &Revisions) -> Result<()> {
@@ -283,6 +282,7 @@ fn remove_workbook_revisions_inner(package: &mut OpcPackage, value: &Revisions) 
         .filter(|relationship| is_log_rel(relationship.reltype()))
         .map(|relationship| relationship.r_id().to_owned())
         .collect::<Vec<_>>();
+    crate::signature_policy::ensure_unsigned(package)?;
     {
         let workbook_part = package.get_part_mut(&workbook)?;
         workbook_part
@@ -301,7 +301,6 @@ fn remove_workbook_revisions_inner(package: &mut OpcPackage, value: &Revisions) 
         let actual = package.get_part(&name)?.partname().clone();
         package.remove_part(&actual);
     }
-    package.unsign();
     Ok(())
 }
 
@@ -363,10 +362,10 @@ fn update_in_place(
         .collect();
 
     let users_xml = users_changed
-        .then(|| write_revision_users(&value.users, conformance))
+        .then(|| write_revision_users(&value.users, conformance, &package.read_limits()))
         .transpose()?;
     let headers_xml = headers_changed
-        .then(|| write_revision_headers(&value.headers, conformance))
+        .then(|| write_revision_headers(&value.headers, conformance, &package.read_limits()))
         .transpose()?;
     let mut log_xml = HashMap::new();
     for log in &value.logs {
@@ -377,7 +376,7 @@ fn update_in_place(
         if changed {
             log_xml.insert(
                 log.relationship_id.clone(),
-                write_revision_log(&log.log, conformance)?,
+                write_revision_log(&log.log, conformance, &package.read_limits())?,
             );
         }
     }
@@ -409,6 +408,12 @@ fn update_in_place(
         }
     }
 
+    // An unchanged owner publishes nothing, so a signed package keeps its
+    // signature; a change is refused until the signature is removed.
+    if !(users_changed || headers_changed || current.logs != value.logs || conformance_changed) {
+        return validate_graph(package);
+    }
+    crate::signature_policy::ensure_unsigned(package)?;
     let users_uri = PackURI::new(&value.users_part_name).map_err(invalid)?;
     let headers_uri = PackURI::new(&value.headers_part_name).map_err(invalid)?;
     if let Some(xml) = users_xml {
@@ -478,9 +483,6 @@ fn update_in_place(
             &value.headers_relationship_id,
             conformance.headers_relationship(),
         )?;
-    }
-    if users_changed || headers_changed || current.logs != value.logs || conformance_changed {
-        package.unsign();
     }
     validate_graph(package)
 }
@@ -576,7 +578,7 @@ fn apply_relationship_set(
 
 /// Validate the complete revision relationship graph without mutating it.
 pub(super) fn validate_graph(package: &OpcPackage) -> Result<()> {
-    let value = load_workbook_revisions(package)?;
+    let value = load_workbook_revisions(package, &package.read_limits())?;
     if let Some(value) = value {
         validate_owner_references(package, &value)?;
     }

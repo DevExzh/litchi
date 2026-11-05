@@ -1,0 +1,106 @@
+{
+ "schema": "litchi.unified-fin-perf.sb-summary.v1",
+ "record": "0377",
+ "rows": [
+  {
+   "scenario": "ods/cells1",
+   "base_median_us": [
+    350884.176,
+    359694.298
+   ],
+   "candidate_median_us": [
+    376253.534,
+    375648.304
+   ],
+   "base_peak_heap_bytes": [
+    173260855,
+    173260855
+   ],
+   "candidate_peak_heap_bytes": [
+    173261551,
+    173261551
+   ],
+   "outputs_identical_siphash": true
+  },
+  {
+   "scenario": "ods/cells100",
+   "base_median_us": [
+    1477206.834,
+    1466258.333
+   ],
+   "candidate_median_us": [
+    1521512.5080000001,
+    1531432.1020000002
+   ],
+   "base_peak_heap_bytes": [
+    177662058,
+    177662058
+   ],
+   "candidate_peak_heap_bytes": [
+    177662754,
+    177662754
+   ],
+   "outputs_identical_siphash": true
+  },
+  {
+   "scenario": "ods/dde",
+   "base_median_us": [
+    253253.44999999998,
+    251601.06300000002
+   ],
+   "candidate_median_us": [
+    255041.95,
+    251882.11100000003
+   ],
+   "base_peak_heap_bytes": [
+    70581212,
+    70581212
+   ],
+   "candidate_peak_heap_bytes": [
+    70581337,
+    70581337
+   ],
+   "outputs_identical_siphash": true
+  },
+  {
+   "scenario": "ods/sheet_metadata",
+   "base_median_us": [
+    406682.181,
+    413843.12200000003
+   ],
+   "candidate_median_us": [
+    417037.412,
+    413207.852
+   ],
+   "base_peak_heap_bytes": [
+    269667925,
+    269667925
+   ],
+   "candidate_peak_heap_bytes": [
+    250324691,
+    250324691
+   ],
+   "outputs_identical_siphash": true
+  },
+  {
+   "scenario": "odp/tail_append",
+   "base_median_us": [
+    12931.865000000002,
+    13265.249
+   ],
+   "candidate_median_us": [
+    12870.357,
+    12887.086000000001
+   ],
+   "base_peak_heap_bytes": [
+    612845,
+    612845
+   ],
+   "candidate_peak_heap_bytes": [
+    612893,
+    612893
+   ],
+   "outputs_identical_siphash": true
+  }
+ ]
+}

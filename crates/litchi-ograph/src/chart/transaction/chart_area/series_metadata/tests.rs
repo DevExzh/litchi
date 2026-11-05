@@ -5,7 +5,7 @@
 )]
 
 use super::{Metadata, Snapshot};
-use crate::chart::{Cache, Chart, Context, Count, DataKind, RowCol, Series, Stream, Value, cache};
+use crate::chart::{Cache, Context, Count, DataKind, Model, RowCol, Series, Stream, Value, cache};
 use crate::{Error, Result};
 use litchi_biff::{Encoder, Kind, Records};
 
@@ -14,7 +14,7 @@ const SERIES: Kind = Kind::from_wire(0x1003);
 
 fn fixture(category: DataKind, category_count: u16, unknown_payload: &[u8]) -> Stream {
     let context = Context::graph();
-    let mut chart = Chart::new(context).expect("chart");
+    let mut chart = Model::new(context).expect("chart");
     chart
         .add_series(Series::new(context))
         .expect("regular series");
@@ -32,8 +32,10 @@ fn fixture(category: DataKind, category_count: u16, unknown_payload: &[u8]) -> S
     chart.series_mut()[0].bubble_count = Count::new(1).expect("count");
     chart.authoring_proven = true;
     let source = chart.encode().expect("authoring fixture");
-    let mut output = Encoder::new();
-    for item in Records::new(source.as_bytes()) {
+    let mut output = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
+    for item in
+        Records::new(source.as_bytes(), litchi_biff::Limits::default()).expect("valid BIFF limits")
+    {
         let record = item.expect("fixture record");
         if record.kind() == SERIES {
             output
@@ -42,11 +44,12 @@ fn fixture(category: DataKind, category_count: u16, unknown_payload: &[u8]) -> S
         }
         output.push_ref(record).expect("record replay");
     }
-    Stream::open(output.finish()).expect("framed fixture")
+    Stream::open(output.finish(), crate::Limits::default()).expect("framed fixture")
 }
 
 fn series_payload(bytes: &[u8]) -> Vec<u8> {
-    Records::new(bytes)
+    Records::new(bytes, litchi_biff::Limits::default())
+        .expect("valid BIFF limits")
         .find_map(|item| {
             let record = item.expect("record");
             (record.kind() == SERIES).then(|| record.payload().to_vec())
@@ -58,7 +61,7 @@ fn series_payload(bytes: &[u8]) -> Vec<u8> {
 fn edits_series_metadata_in_place_and_preserves_unknown_records() -> Result<()> {
     let source = fixture(DataKind::Text, 1, &[0xA1, 0xB2, 0xC3]);
     let original = source.as_bytes().to_vec();
-    let chart = Chart::open(source, Context::graph())?;
+    let chart = Model::open(source, Context::graph())?;
     let snapshot = Snapshot::from_chart(chart)?;
     assert_eq!(snapshot.get(0).expect("metadata").category_count().get(), 1);
     let mut edit = snapshot.edit();
@@ -72,16 +75,20 @@ fn edits_series_metadata_in_place_and_preserves_unknown_records() -> Result<()> 
         ),
     )?;
     let commit = edit.commit()?;
-    assert_eq!(commit.patch().len(), 1);
-    assert_eq!(commit.chart().series()[0].category_kind, DataKind::Numeric);
-    assert_eq!(commit.chart().series()[0].value_count.get(), 8);
-    let changed = commit.into_chart().encode()?;
+    assert_eq!(commit.patch().change_count(), 1);
+    assert_eq!(
+        commit.package().series()[0].category_kind,
+        DataKind::Numeric
+    );
+    assert_eq!(commit.package().series()[0].value_count.get(), 8);
+    let changed = commit.into_package().encode()?;
     assert_eq!(changed.as_bytes().len(), original.len());
     assert_ne!(
         series_payload(&original),
         series_payload(changed.as_bytes())
     );
-    let unknowns: Vec<_> = Records::new(changed.as_bytes())
+    let unknowns: Vec<_> = Records::new(changed.as_bytes(), litchi_biff::Limits::default())
+        .expect("valid BIFF limits")
         .filter_map(|item| {
             let record = item.expect("record");
             (record.kind() == UNKNOWN).then(|| record.payload().to_vec())
@@ -96,14 +103,14 @@ fn no_op_commit_replays_the_exact_source() -> Result<()> {
     let source = fixture(DataKind::Text, 1, &[0x10, 0x20]);
     let pointer = source.as_bytes().as_ptr();
     let original = source.as_bytes().to_vec();
-    let chart = Chart::open(source, Context::graph())?;
+    let chart = Model::open(source, Context::graph())?;
     let snapshot = Snapshot::from_chart(chart)?;
     let current = snapshot.get(0).expect("metadata");
     let mut edit = snapshot.edit();
     edit.set(0, current)?;
     let commit = edit.commit()?;
-    assert!(commit.patch().is_empty());
-    let replay = commit.into_chart().encode()?;
+    assert!(commit.patch().is_noop());
+    let replay = commit.into_package().encode()?;
     assert_eq!(replay.as_bytes(), original.as_slice());
     assert_eq!(replay.as_bytes().as_ptr(), pointer);
     Ok(())
@@ -113,7 +120,7 @@ fn no_op_commit_replays_the_exact_source() -> Result<()> {
 fn stale_sources_are_rejected_and_inverse_restores_exact_bytes() -> Result<()> {
     let source = fixture(DataKind::Text, 1, &[0x01]);
     let original = source.as_bytes().to_vec();
-    let chart = Chart::open(source, Context::graph())?;
+    let chart = Model::open(source, Context::graph())?;
     let mut edit = Snapshot::from_chart(chart)?.edit();
     edit.set(
         0,
@@ -129,16 +136,16 @@ fn stale_sources_are_rejected_and_inverse_restores_exact_bytes() -> Result<()> {
     let changed_stream = changed_chart.encode()?;
     let changed = changed_stream.as_bytes().to_vec();
     let inverse = patch.inverse();
-    let changed_target = Chart::open(changed_stream, Context::graph())?;
-    let restored = inverse.apply(changed_target)?.into_chart().encode()?;
+    let changed_target = Model::open(changed_stream, Context::graph())?;
+    let restored = inverse.apply(changed_target)?.into_package().encode()?;
     assert_eq!(restored.as_bytes(), original.as_slice());
 
-    let stale = Chart::open(fixture(DataKind::Text, 1, &[0x02]), Context::graph())?;
+    let stale = Model::open(fixture(DataKind::Text, 1, &[0x02]), Context::graph())?;
     assert!(matches!(
         patch.apply(stale),
-        Err(Error::UnsupportedMutation {
+        Err(Error::PatchConflict {
             operation: "series-metadata-patch",
-            reason: "patch source fingerprint does not match the target snapshot"
+            reason: "patch source fingerprint does not match the target snapshot",
         })
     ));
     assert_ne!(changed, original);
@@ -148,7 +155,7 @@ fn stale_sources_are_rejected_and_inverse_restores_exact_bytes() -> Result<()> {
 #[test]
 fn invalid_metadata_fails_before_publication() -> Result<()> {
     let source = fixture(DataKind::Text, 1, &[0xAA]);
-    let chart = Chart::open(source, Context::graph())?;
+    let chart = Model::open(source, Context::graph())?;
     let snapshot = Snapshot::from_chart(chart)?;
     let mut edit = snapshot.edit();
     let error = edit
@@ -177,7 +184,7 @@ fn invalid_metadata_fails_before_publication() -> Result<()> {
 fn physical_validation_is_failure_atomic() -> Result<()> {
     let source = fixture(DataKind::Text, 1, &[0xBB]);
     let original = source.as_bytes().to_vec();
-    let mut chart = Chart::open(source, Context::graph())?;
+    let mut chart = Model::open(source, Context::graph())?;
     let scan = super::codec::scan(&chart)?;
     let invalid = Metadata::new(
         DataKind::Text,

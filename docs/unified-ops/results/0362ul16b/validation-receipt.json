@@ -1,0 +1,127 @@
+{
+  "schema": "litchi.cfb-report-output-accessor-ordinary-check.validation.v1",
+  "source": {
+    "base_commit": "a3ec9799939071d535925133c483bc998aa9667c",
+    "tested_state": "assembled base plus the tracked consumer, formatter and reviewed-pin changes; source bytes were hashed before the follow-up commit",
+    "files": {
+      "crates/litchi-xls/src/cell_values/tests.rs": {
+        "bytes": 123163,
+        "sha256": "330be88a95284469ee8d71f7c8022795ab0cb2369496492dd24c7de924134bcd"
+      },
+      "tools/perf-baseline/src/filesystem.rs": {
+        "bytes": 312657,
+        "sha256": "a2bef24d7c4ce3a446109981fa448c8cf310ffe8a4b7170aeabdc156a8333f89"
+      },
+      "tools/perf-baseline/src/lib.rs": {
+        "bytes": 3088216,
+        "sha256": "280d61ae1f714af78be6cecf21a4432a9ea2a27478e89c237b5d358bc02db02a"
+      },
+      "tools/perf-baseline/src/xls_numeric.rs": {
+        "bytes": 89692,
+        "sha256": "db42bde7725af38a68cd472cf29b6a4eb3685eb774e21060ca8dafe57094bcc0"
+      },
+      "tools/native_qualification/prepare_drawingml_raw_inputs.py": {
+        "bytes": 18384,
+        "sha256": "084ff9a1a5c3b3167aab818909ecc6f3f5449cb1e3c08bfce518ed1b5462ed91"
+      },
+      "tools/native_qualification/prepare_xlsx_raw_inputs.py": {
+        "bytes": 14720,
+        "sha256": "76e7fa1c90a2dff8b34324bfb40bc83fedc9500f67c7949ca142002cde9502a4"
+      }
+    }
+  },
+  "locks": {
+    "Cargo.lock": {
+      "bytes": 139606,
+      "sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1"
+    },
+    "tools/perf-baseline/Cargo.lock": {
+      "bytes": 57227,
+      "sha256": "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c"
+    }
+  },
+  "environment": {
+    "cargo": "/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo",
+    "offline": true,
+    "locked": true,
+    "cargo_build_jobs": 1,
+    "rust_test_threads": 1,
+    "memory_cap": "20G",
+    "target": "/home/zhuhe/code/litchi-worktrees/.coord/cfb-sequential-error-layout/perf-16b-target",
+    "target_du_sb_bytes_after": 2862146958
+  },
+  "successful_commands": [
+    {
+      "name": "ordinary_perf_baseline_all_targets_check",
+      "argv": ["cargo", "check", "--manifest-path", "tools/perf-baseline/Cargo.toml", "--offline", "--locked", "--all-targets"],
+      "exit_code": 0,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/cfb-sequential-error-layout/validation-16b/ordinary-check-fixed-manifest.log",
+        "bytes": 39914,
+        "sha256": "1c4178777c0f11075515750580a9a94d36141281acce6b38e620ae24a745cd10"
+      },
+      "warnings": "53 existing litchi-perf-baseline library warnings and one existing example unused-import warning; exit status was zero"
+    },
+    {
+      "name": "workspace_format_check",
+      "argv": ["cargo", "fmt", "--all", "--check"],
+      "exit_code": 0,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/cfb-sequential-error-layout/validation-16b/root-fmt-final.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "drawingml_and_xlsx_preparer_tests",
+      "argv": ["python3", "-m", "unittest", "-q", "tools.test_drawingml_raw_qualification", "tools.test_drawingml_compile_driver", "tools.test_prepare_xlsx_raw_inputs"],
+      "exit_code": 0,
+      "tests": 23,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/cfb-sequential-error-layout/validation-16b/protocol-tests.log",
+        "bytes": 98,
+        "sha256": "4e4793c3224b7c923b76ad78b35ba1d537b3ffeae9dcff667b79f90bcc6da93e"
+      }
+    }
+  ],
+  "rejected_attempts": [
+    {
+      "name": "workspace_package_selector_probe",
+      "argv": ["cargo", "check", "--offline", "--locked", "-p", "litchi-perf-baseline", "--all-targets"],
+      "exit_code": 101,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/cfb-sequential-error-layout/validation-16b/ordinary-check.log",
+        "bytes": 82,
+        "sha256": "1de91218d83fe2c6abb4500bdcfbed5346109729dc72eb88bd3f61094d06cb8e"
+      },
+      "reason": "The standalone performance manifest is not a member of the root workspace; the corrected manifest-path command passed."
+    },
+    {
+      "name": "workspace_format_before_consumer_formatting",
+      "argv": ["cargo", "fmt", "--all", "--check"],
+      "exit_code": 1,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/cfb-sequential-error-layout/validation-16b/root-fmt.log",
+        "bytes": 540,
+        "sha256": "bd1437032bc7c022981cc77456fdff399bb2aa2e4c6b7e39e3c633dcf3d7e949"
+      },
+      "reason": "The prior XLS consumer replacement needed rustfmt's multiline layout; that formatting-only change is included and root-fmt-final passes."
+    },
+    {
+      "name": "standalone_perf_manifest_format_check",
+      "argv": ["cargo", "fmt", "--manifest-path", "tools/perf-baseline/Cargo.toml", "--all", "--", "--check"],
+      "exit_code": 1,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/cfb-sequential-error-layout/validation-16b/perf-fmt.log",
+        "bytes": 1881,
+        "sha256": "ac7a14fda5ef3b26fd588a4ca40fe09a230d238982ec4d60edb12fe7ffe6a6e4"
+      },
+      "reason": "This standalone manifest check also traverses pre-existing unrelated formatting in ole_package_clone_probe.rs and the perf lib module ordering; the required root workspace formatter and ordinary perf all-targets check pass."
+    }
+  ],
+  "claims": {
+    "abba": false,
+    "performance_acceptance": false,
+    "independent_finite_review_notification": "receipt supplied to coordinator for gate_upstream_guard review"
+  }
+}

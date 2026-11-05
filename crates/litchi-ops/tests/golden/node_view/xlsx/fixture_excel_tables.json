@@ -1,0 +1,114 @@
+[
+{
+  "path": "/",
+  "type": "workbook",
+  "childCount": 1,
+  "format": {
+    "author": "",
+    "lastModifiedBy": "",
+    "created": "2006-09-21T08:52:22.0000000Z",
+    "modified": "2013-07-16T07:00:19.0000000Z",
+    "extended.company": "",
+    "extended.application": "Microsoft Excel",
+    "extended.totalTime": 0
+  },
+  "children": [
+    {
+      "path": "/sheet[1]",
+      "type": "sheet",
+      "preview": "ExcelTable",
+      "format": {
+        "name": "ExcelTable"
+      },
+      "children": []
+    }
+  ]
+},
+{
+  "path": "/sheet[1]",
+  "type": "sheet",
+  "preview": "ExcelTable",
+  "childCount": 4,
+  "format": {
+    "name": "ExcelTable"
+  },
+  "children": [
+    {
+      "path": "/sheet[1]/row[1]",
+      "type": "row",
+      "childCount": 6,
+      "format": {},
+      "children": []
+    },
+    {
+      "path": "/sheet[1]/row[2]",
+      "type": "row",
+      "childCount": 6,
+      "format": {},
+      "children": []
+    },
+    {
+      "path": "/sheet[1]/row[3]",
+      "type": "row",
+      "childCount": 6,
+      "format": {},
+      "children": []
+    },
+    {
+      "path": "/sheet[1]/row[4]",
+      "type": "row",
+      "childCount": 6,
+      "format": {},
+      "children": []
+    }
+  ]
+},
+{
+  "path": "/sheet[1]/table[1]",
+  "type": "table",
+  "text": "TableName",
+  "preview": "TableName (G1:I4)",
+  "childCount": 0,
+  "format": {
+    "name": "TableName",
+    "displayName": "TableName",
+    "ref": "G1:I4",
+    "style": "TableStyleLight1",
+    "bandedRows": true,
+    "bandedCols": false,
+    "firstCol": false,
+    "lastCol": false,
+    "headerRow": true,
+    "totalRow": false,
+    "columns": "Name,Age,AgeGroup"
+  },
+  "children": []
+},
+{
+  "path": "/sheet[1]/C2",
+  "type": "cell",
+  "text": "4",
+  "preview": "C2",
+  "childCount": 0,
+  "format": {
+    "type": "Number",
+    "formula": "INT(B2/10)",
+    "cachedValue": "4",
+    "evaluated": true
+  },
+  "children": []
+},
+{
+  "path": "/namedrange[2]",
+  "type": "namedrange",
+  "text": "TableName[#All]",
+  "preview": "TableName[#All]",
+  "childCount": 0,
+  "format": {
+    "name": "TableAsRangeName",
+    "ref": "TableName[#All]",
+    "scope": "workbook"
+  },
+  "children": []
+}
+]

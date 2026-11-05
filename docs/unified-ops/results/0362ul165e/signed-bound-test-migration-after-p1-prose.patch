@@ -1,0 +1,111 @@
+diff --git a/tools/test_signed_native_policy_v2.py b/tools/test_signed_native_policy_v2.py
+--- a/tools/test_signed_native_policy_v2.py
++++ b/tools/test_signed_native_policy_v2.py
+@@ -21,6 +21,27 @@
+
+
+ class SignedNativePolicyV2Tests(unittest.TestCase):
++    def _pending_policy_document(self) -> dict:
++        """Build an explicit pending fixture without changing checked-in P."""
++        document = copy.deepcopy(policy.load_policy())
++        candidate = document["candidate"]
++        pending = copy.deepcopy(candidate)
++        pending["status"] = "pending_final_source_freeze"
++        pending["source"] = {
++            "commit": None,
++            "git_tree": None,
++            "tree_sha256": None,
++            "archive": None,
++        }
++        pending.pop("source_assembly", None)
++        pending["manifests"] = None
++        pending["vendor_tree"] = None
++        pending["lock_graph"] = None
++        pending["features"] = None
++        document["endpoints"] = copy.deepcopy(policy.ENDPOINT_POLICY_BINDINGS)
++        document["candidate"] = pending
++        return document
++
+     def _git_repo(self, root: Path, files: dict[str, bytes]) -> None:
+         subprocess.run(["git", "init", "-q", str(root)], check=True)
+         subprocess.run(
+@@ -40,28 +61,35 @@
+             ["git", "-C", str(root), "commit", "-qm", "fixture"], check=True
+         )
+
+-    def test_checked_in_policy_is_pending_and_execution_fails_closed(self) -> None:
+-        self.assertEqual(
+-            policy.validate_policy(),
+-            {
+-                "status": "pending_final_source_freeze",
+-                "execution": "refused_pending_source_freeze",
+-            },
+-        )
+-        with tempfile.TemporaryDirectory(prefix="signed-native-v2-output-") as name:
+-            output = Path(name) / "must-not-exist"
+-            with self.assertRaises(policy.IncompletePolicyError):
+-                policy.execute()
+-            self.assertFalse(output.exists())
++    def test_pending_policy_fixture_fails_closed(self) -> None:
++        # Keep the pre-install negative after P becomes bound by using an
++        # explicit temporary manifest and mocked None code binding.  The
++        # checked-in production manifest is never relabelled or rewritten.
++        with tempfile.TemporaryDirectory(prefix="signed-native-v2-pending-") as name:
++            manifest = Path(name) / "signed-native-v2.json"
++            manifest.write_text(json.dumps(self._pending_policy_document()), encoding="utf-8")
++            with mock.patch.object(policy, "POLICY_PATH", manifest), mock.patch.object(policy, "CANDIDATE_BINDING", None):
++                self.assertEqual(
++                    policy.validate_policy(),
++                    {
++                        "status": "pending_final_source_freeze",
++                        "execution": "refused_pending_source_freeze",
++                    },
++                )
++                with self.assertRaises(policy.IncompletePolicyError):
++                    policy.execute()
+
+     def test_prepare_rejects_an_unbound_source_before_output_mutation(self) -> None:
+         with tempfile.TemporaryDirectory(prefix="signed-native-v2-prepare-") as name:
+             root = Path(name)
+             source = root / "source"
+             output = root / "output"
+-            with self.assertRaisesRegex(policy.IncompletePolicyError, "after endpoint is unavailable"):
+-                policy.prepare(source, output)
+-            self.assertFalse(output.exists())
++            manifest = root / "signed-native-v2.json"
++            manifest.write_text(json.dumps(self._pending_policy_document()), encoding="utf-8")
++            with mock.patch.object(policy, "POLICY_PATH", manifest), mock.patch.object(policy, "CANDIDATE_BINDING", None):
++                with self.assertRaisesRegex(policy.IncompletePolicyError, "after endpoint is unavailable"):
++                    policy.prepare(source, output)
++                self.assertFalse(output.exists())
+
+     def test_policy_cannot_be_activated_by_supplied_candidate_digest(self) -> None:
+         document = policy.load_policy()
+@@ -73,11 +101,22 @@
+             "tree_sha256": "2" * 64,
+             "archive": {"path": "/tmp/arbitrary.tar", "bytes": 1, "sha256": "3" * 64},
+         }
+-        with self.assertRaisesRegex(policy.PolicyError, "code binding is still incomplete"):
+-            policy._validate_policy_document(changed, execution=True)
+-        # The public loader does not take a path or digest override.
+-        self.assertNotIn("candidate", policy.execute.__annotations__)
+-        self.assertIsNone(policy.CANDIDATE_BINDING)
++        with mock.patch.object(policy, "CANDIDATE_BINDING", None):
++            with self.assertRaisesRegex(policy.PolicyError, "code binding is still incomplete"):
++                policy._validate_policy_document(changed, execution=True)
++            # The public loader does not take a path or digest override.
++            self.assertNotIn("candidate", policy.execute.__annotations__)
++            self.assertIsNone(policy.CANDIDATE_BINDING)
++
++    def test_production_bound_policy_matches_trusted_binding(self) -> None:
++        document = policy.load_policy()
++        self.assertEqual(document["candidate"]["status"], "bound")
++        self.assertIsNotNone(policy.CANDIDATE_BINDING)
++        self.assertEqual(document["candidate"], policy.CANDIDATE_BINDING)
++        self.assertEqual(
++            policy.validate_policy(),
++            {"status": "bound", "execution": "bound"},
++        )
+
+     def test_v1_receipts_are_not_relabelled(self) -> None:
+         with self.assertRaisesRegex(policy.PolicyError, "cannot be relabelled"):

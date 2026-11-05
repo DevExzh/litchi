@@ -1,7 +1,7 @@
 use super::model::{MAX_STOPS, Stop, Stops};
 use super::validation::validate;
 use crate::prop::{Array, Id, Props, Value};
-use crate::{Error, Result};
+use crate::{Error, LimitKind, Limits, Result};
 
 const ELEMENT_SIZE: u16 = 8;
 const ARRAY_HEADER_SIZE: usize = 6;
@@ -35,7 +35,14 @@ pub fn parse<'data>(properties: &Props<'data>) -> Result<Option<Stops<'data>>> {
 /// Returns `Error::MalformedProperties` if the payload is not an exact
 /// `IMsoArray` of eight-byte elements or fails shade-stop validation, and
 /// `Error::ArithmeticOverflow` if the declared array extent overflows.
-pub fn parse_payload(payload: &[u8]) -> Result<Stops<'_>> {
+pub fn parse_payload(payload: &[u8], limits: Limits) -> Result<Stops<'_>> {
+    if u64::try_from(payload.len()).unwrap_or(u64::MAX) > u64::from(limits.max_record_bytes) {
+        return Err(Error::LimitExceeded {
+            limit: LimitKind::RecordBytes,
+            observed: u64::try_from(payload.len()).unwrap_or(u64::MAX),
+            maximum: limits.max_record_bytes,
+        });
+    }
     from_array(Array::new(payload)?)
 }
 
@@ -46,7 +53,7 @@ pub fn parse_payload(payload: &[u8]) -> Result<Stops<'_>> {
 /// Returns `Error::MalformedProperties` if the stop count exceeds the safe
 /// bound or the stops fail shade-stop validation, and
 /// `Error::ArithmeticOverflow` if the encoded array extent overflows.
-pub fn encode(stops: &[Stop]) -> Result<Vec<u8>> {
+pub fn encode(stops: &[Stop], limits: Limits) -> Result<Vec<u8>> {
     if stops.len() > MAX_STOPS || stops.len() > usize::from(u16::MAX) {
         return Err(Error::MalformedProperties {
             reason: "gradient stop count exceeds the safe bound",
@@ -59,6 +66,13 @@ pub fn encode(stops: &[Stop]) -> Result<Vec<u8>> {
         .ok_or(Error::ArithmeticOverflow {
             context: "gradient stop array extent",
         })?;
+    if u64::try_from(payload_len).unwrap_or(u64::MAX) > u64::from(limits.max_record_bytes) {
+        return Err(Error::LimitExceeded {
+            limit: LimitKind::RecordBytes,
+            observed: u64::try_from(payload_len).unwrap_or(u64::MAX),
+            maximum: limits.max_record_bytes,
+        });
+    }
     let mut payload = Vec::with_capacity(payload_len);
     let count = u16::try_from(stops.len()).map_err(|_err| Error::MalformedProperties {
         reason: "gradient stop count exceeds the safe bound",
@@ -73,7 +87,7 @@ pub fn encode(stops: &[Stop]) -> Result<Vec<u8>> {
 
     // Validate the canonical result as well as the caller's typed inputs.  The
     // borrowed return is intentionally dropped; callers receive owned bytes.
-    parse_payload(&payload)?;
+    parse_payload(&payload, limits)?;
     Ok(payload)
 }
 

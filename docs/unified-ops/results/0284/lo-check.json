@@ -1,0 +1,8 @@
+{
+  "layouts": 7,
+  "texts_missing": 0,
+  "failures": 0,
+  "libreoffice": "26.2.6.3",
+  "foreign_fixture": "test-data/ooxml/pptx/smartart-accent-process.pptx",
+  "foreign_drawing_after_text_edit": "removed (no unambiguous shape), re-laid out by LibreOffice"
+}

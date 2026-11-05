@@ -11,11 +11,14 @@ use crate::directory_name::{
     directory_name_data_allowing_forbidden, has_forbidden_character,
 };
 use crate::leniency::{AllocationDefect, DirectoryDefect, HeaderDefect, ToleranceReport};
+use crate::writer::{PublishFailure, SystemSteps, TemporaryIdentity, publish_staged};
+use litchi_core::Durability;
 use smallvec::SmallVec;
 use std::cmp::Ordering;
-use std::io::{self, Read, Seek, SeekFrom};
+use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::num::NonZeroUsize;
 use std::ops::Range;
+use std::path::Path;
 use zerocopy::{FromBytes, LE, U16, U32, U64};
 use zerocopy_derive::FromBytes as DeriveFromBytes;
 
@@ -905,10 +908,113 @@ impl<R: Read + Seek> OleFile<R> {
         self.reader
     }
 
+    /// Copy the complete validated source artifact to a sequential sink.
+    ///
+    /// The parsed CFB view retains ownership of its original reader.  This
+    /// method publishes that source byte-for-byte, including directory
+    /// metadata, sector slack, and streams unknown to a higher-level format
+    /// owner.  The reader position is restored after the copy succeeds or
+    /// fails, so publication does not change subsequent stream reads.
+    ///
+    /// The caller must keep the reader content stable. Extent checks detect
+    /// growth and truncation, but a generic `Read + Seek` reader cannot expose
+    /// a revision token for same-length external changes.
+    pub fn copy_source_to<W: Write>(&mut self, mut writer: W) -> Result<(), OleError> {
+        let position = self.reader.stream_position()?;
+        let observed_size = match self.reader.seek(SeekFrom::End(0)) {
+            Ok(size) => size,
+            Err(error) => {
+                let _ = self.reader.seek(SeekFrom::Start(position));
+                return Err(error.into());
+            },
+        };
+        if observed_size != self.file_size {
+            let _ = self.reader.seek(SeekFrom::Start(position));
+            return Err(OleError::InvalidData(format!(
+                "CFB source length changed from {} to {observed_size}",
+                self.file_size
+            )));
+        }
+        if let Err(error) = self.reader.seek(SeekFrom::Start(0)) {
+            let _ = self.reader.seek(SeekFrom::Start(position));
+            return Err(error.into());
+        }
+
+        let mut remaining = self.file_size;
+        let mut buffer = [0u8; 64 * 1024];
+        let result = (|| {
+            while remaining != 0 {
+                let count = usize::try_from(remaining)
+                    .unwrap_or(buffer.len())
+                    .min(buffer.len());
+                self.reader.read_exact(&mut buffer[..count])?;
+                writer.write_all(&buffer[..count])?;
+                remaining -= count as u64;
+            }
+            Ok::<(), io::Error>(())
+        })();
+
+        let observed_after = self.reader.seek(SeekFrom::End(0));
+        let restore = self.reader.seek(SeekFrom::Start(position));
+        match result {
+            Err(error) => {
+                let _ = restore;
+                Err(error.into())
+            },
+            Ok(()) => {
+                let observed_after = observed_after?;
+                restore?;
+                if observed_after != self.file_size {
+                    return Err(OleError::InvalidData(format!(
+                        "CFB source length changed from {} to {observed_after}",
+                        self.file_size
+                    )));
+                }
+                Ok(())
+            },
+        }
+    }
+
+    /// Publish the complete validated source artifact through a sibling
+    /// temporary file and atomic replacement.
+    ///
+    /// This preserves the source bytes exactly, including opaque CFB content
+    /// unknown to a higher-level format owner, while sharing the CFB writer's
+    /// platform-aware replacement, cleanup, and durability behavior.
+    pub fn save_source_with_durability<P: AsRef<Path>>(
+        &mut self,
+        path: P,
+        durability: Durability,
+    ) -> Result<(), OleError> {
+        let mut steps = SystemSteps;
+        publish_staged(
+            path.as_ref(),
+            durability,
+            TemporaryIdentity::Unchecked,
+            &mut steps,
+            |staging| self.copy_source_to(staging),
+            |_staged_file, ()| Ok(()),
+        )
+        .map_err(|failure| match failure {
+            PublishFailure::Create(error) | PublishFailure::Caller(error) => error,
+            PublishFailure::Flush { source, .. }
+            | PublishFailure::SyncFile { source, .. }
+            | PublishFailure::Identity { source, .. }
+            | PublishFailure::Replace { source, .. } => OleError::Io(source),
+            PublishFailure::Committed { source, .. } => OleError::Committed { source },
+        })
+    }
+
     /// Discard the cursor and validation-only state, retaining the parsed CFB
     /// index for the crate's immutable positional reader.
     pub(crate) fn into_parsed_index(self) -> ParsedOleIndex {
-        ParsedOleIndex {
+        self.into_reader_and_parsed_index().1
+    }
+
+    /// Splits this parsed view into its reader and the cursor-independent
+    /// index, discarding only validation and read scratch state.
+    pub(crate) fn into_reader_and_parsed_index(self) -> (R, ParsedOleIndex) {
+        let index = ParsedOleIndex {
             file_size: self.file_size,
             sector_size: self.sector_size,
             mini_sector_size: self.mini_sector_size,
@@ -921,13 +1027,15 @@ impl<R: Read + Seek> OleFile<R> {
             dir_name_data: self.dir_name_data,
             tolerance: self.tolerance,
             misordered_siblings: self.misordered_siblings,
-        }
+        };
+        (self.reader, index)
     }
 
-    /// Open and parse an OLE file from a reader
+    /// Open and parse an OLE file from a reader under explicit finite limits.
     ///
     /// # Arguments
     /// * `reader` - A reader that implements Read + Seek
+    /// * `limits` - Finite physical CFB bounds selected by the caller
     ///
     /// # Returns
     /// * `Result<OleFile<R>, OleError>` - The parsed OLE file or an error
@@ -935,17 +1043,9 @@ impl<R: Read + Seek> OleFile<R> {
     /// # Errors
     /// Returns an `OleError` if the reader fails, or if the data is not a
     /// valid OLE compound file (bad magic, truncated header, corrupt FAT).
-    pub fn open(reader: R) -> Result<Self, OleError> {
-        Self::open_with_limits(reader, OleFileLimits::default())
-    }
-
-    /// Open and parse an OLE file under an explicit finite ingress limit.
-    ///
     /// The source length is checked immediately after the reader reports it,
     /// before any CFB metadata can cause an allocation or index traversal.
-    /// Existing callers should use [`Self::open`], which retains the same
-    /// source-compatible entry point with finite default limits.
-    pub fn open_with_limits(mut reader: R, limits: OleFileLimits) -> Result<Self, OleError> {
+    pub fn open(mut reader: R, limits: OleFileLimits) -> Result<Self, OleError> {
         // Get file size
         let file_size = reader.seek(SeekFrom::End(0))?;
         if file_size > limits.max_input_bytes() {
@@ -4786,7 +4886,7 @@ mod tests {
     )]
     use super::*;
     use crate::writer::OleWriter;
-    use std::io::{self, Cursor, Read, Seek, SeekFrom};
+    use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
 
     fn sample_file() -> Vec<u8> {
         let mut writer = OleWriter::new();
@@ -4794,6 +4894,43 @@ mod tests {
         let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output).unwrap();
         output.into_inner()
+    }
+
+    #[test]
+    fn copy_source_to_preserves_extent_and_reader_position() {
+        let mut expected = sample_file();
+        expected.extend_from_slice(b"trailing bytes outside the CFB layout");
+        let mut file =
+            OleFile::open(Cursor::new(expected.clone()), OleFileLimits::default()).unwrap();
+        file.reader.seek(SeekFrom::Start(17)).unwrap();
+
+        let mut output = Vec::new();
+        file.copy_source_to(&mut output).unwrap();
+
+        assert_eq!(output, expected);
+        assert_eq!(file.reader.stream_position().unwrap(), 17);
+    }
+
+    #[test]
+    fn copy_source_to_restores_reader_position_after_sink_failure() {
+        struct FailingSink;
+
+        impl Write for FailingSink {
+            fn write(&mut self, _buffer: &[u8]) -> io::Result<usize> {
+                Err(io::Error::other("sink failed"))
+            }
+
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+
+        let mut file = OleFile::open(Cursor::new(sample_file()), OleFileLimits::default()).unwrap();
+        file.reader.seek(SeekFrom::Start(23)).unwrap();
+        let error = file.copy_source_to(FailingSink).unwrap_err();
+
+        assert!(matches!(error, OleError::Io(_)));
+        assert_eq!(file.reader.stream_position().unwrap(), 23);
     }
 
     #[test]
@@ -4806,7 +4943,8 @@ mod tests {
             .expect("stream name should be present in directory");
         let creation_time = entry_name + 100;
         data[creation_time..creation_time + 8].copy_from_slice(&1_u64.to_le_bytes());
-        let file = OleFile::open(Cursor::new(data)).expect("legacy stream metadata is readable");
+        let file = OleFile::open(Cursor::new(data), OleFileLimits::default())
+            .expect("legacy stream metadata is readable");
         let stream = file
             .list_streams()
             .into_iter()
@@ -4832,7 +4970,7 @@ mod tests {
         }
         let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output).unwrap();
-        OleFile::open(Cursor::new(output.into_inner())).unwrap()
+        OleFile::open(Cursor::new(output.into_inner()), OleFileLimits::default()).unwrap()
     }
 
     #[test]
@@ -4967,7 +5105,7 @@ mod tests {
             let mut data = sample_file();
             data[offset..offset + 2].copy_from_slice(&value.to_le_bytes());
             assert!(matches!(
-                OleFile::open(Cursor::new(data)),
+                OleFile::open(Cursor::new(data), OleFileLimits::default()),
                 Err(OleError::InvalidFormat(_))
             ));
         }
@@ -4975,7 +5113,7 @@ mod tests {
         let mut data = sample_file();
         data[0x38..0x3C].copy_from_slice(&2048u32.to_le_bytes());
         assert!(matches!(
-            OleFile::open(Cursor::new(data)),
+            OleFile::open(Cursor::new(data), OleFileLimits::default()),
             Err(OleError::InvalidFormat(_))
         ));
     }
@@ -5260,7 +5398,7 @@ mod tests {
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             let mut data = sample_file();
             data[0x48..0x4C].copy_from_slice(&u32::MAX.to_le_bytes());
-            OleFile::open(Cursor::new(data))
+            OleFile::open(Cursor::new(data), OleFileLimits::default())
         }));
 
         assert!(result.is_ok(), "malformed CFB input must not panic");
@@ -5991,7 +6129,11 @@ mod tests {
         writer.create_storage(&["Folder"]).unwrap();
         let mut serialized = Cursor::new(Vec::new());
         writer.write_to(&mut serialized).unwrap();
-        let mut file = OleFile::open(TrackingReader::new(serialized.into_inner())).unwrap();
+        let mut file = OleFile::open(
+            TrackingReader::new(serialized.into_inner()),
+            OleFileLimits::default(),
+        )
+        .unwrap();
         file.reader.reads.clear();
 
         let mut byte = [0u8; 1];
@@ -6031,7 +6173,11 @@ mod tests {
         writer.create_stream(&["Large"], &payload).unwrap();
         let mut serialized = Cursor::new(Vec::new());
         writer.write_to(&mut serialized).unwrap();
-        let mut file = OleFile::open(TrackingReader::new(serialized.into_inner())).unwrap();
+        let mut file = OleFile::open(
+            TrackingReader::new(serialized.into_inner()),
+            OleFileLimits::default(),
+        )
+        .unwrap();
         let start_sector = file.find_entry(&["Large"]).unwrap().start_sector;
         let physical = (u64::from(start_sector) + 1) * file.sector_size as u64 + 510;
         file.reader.reads.clear();
@@ -6058,7 +6204,11 @@ mod tests {
         writer.create_stream(&["Large"], &payload).unwrap();
         let mut serialized = Cursor::new(Vec::new());
         writer.write_to(&mut serialized).unwrap();
-        let mut file = OleFile::open(TrackingReader::new(serialized.into_inner())).unwrap();
+        let mut file = OleFile::open(
+            TrackingReader::new(serialized.into_inner()),
+            OleFileLimits::default(),
+        )
+        .unwrap();
         file.reader.fail_seeks = true;
         let mut output = [0u8; 4];
         assert!(matches!(
@@ -6561,7 +6711,7 @@ mod tests {
         data[0x48..0x4C].copy_from_slice(&u32::MAX.to_le_bytes());
 
         assert!(matches!(
-            OleFile::open(Cursor::new(data)),
+            OleFile::open(Cursor::new(data), OleFileLimits::default()),
             Err(OleError::CorruptedFile(message))
                 if message.contains("DIFAT sector count exceeds the physical file")
         ));
@@ -6635,7 +6785,7 @@ mod tests {
         data[directory_offset + 76..directory_offset + 80].copy_from_slice(&0u32.to_le_bytes());
 
         assert!(matches!(
-            OleFile::open(Cursor::new(data)),
+            OleFile::open(Cursor::new(data), OleFileLimits::default()),
             Err(OleError::CorruptedFile(message)) if message.contains("repeated SID")
         ));
     }
@@ -6714,7 +6864,7 @@ mod tests {
         );
         data[padding_offset..padding_offset + 4].copy_from_slice(&ENDOFCHAIN.to_le_bytes());
 
-        assert!(OleFile::open(Cursor::new(data)).is_ok());
+        assert!(OleFile::open(Cursor::new(data), OleFileLimits::default()).is_ok());
     }
 
     #[test]

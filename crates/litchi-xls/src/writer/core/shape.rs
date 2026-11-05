@@ -1,4 +1,4 @@
-use crate::{Error, Result};
+use crate::{AnchorBehavior, Error, Result};
 
 /// Safe, inert `OfficeArt` primitive supported by the BIFF8 writer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -66,28 +66,6 @@ pub enum ShapeLine {
         /// Line width in English Metric Units.
         width_emu: u32,
     },
-}
-
-/// How a cell-relative anchor responds when its underlying cells change.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
-pub enum Behavior {
-    /// Neither the BIFF `fMove` nor `fSize` flag is set.
-    Fixed,
-    /// Only the BIFF `fSize` flag is set.
-    Size,
-    /// Both the BIFF `fMove` and `fSize` flags are set.
-    MoveAndSize,
-}
-
-impl Behavior {
-    const fn bits(self) -> u16 {
-        match self {
-            Self::Fixed => 0,
-            Self::Size => 0b10,
-            Self::MoveAndSize => 0b11,
-        }
-    }
 }
 
 /// A checked cell-relative point in a BIFF8 worksheet anchor.
@@ -171,7 +149,7 @@ impl Point {
 /// A checked cell-relative BIFF8 client anchor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Anchor {
-    behavior: Behavior,
+    behavior: AnchorBehavior,
     first: Point,
     last: Point,
 }
@@ -181,7 +159,7 @@ impl Anchor {
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn new(first: Point, last: Point, behavior: Behavior) -> Result<Self> {
+    pub fn new(first: Point, last: Point, behavior: AnchorBehavior) -> Result<Self> {
         let horizontal_order =
             (first.column, first.column_offset) < (last.column, last.column_offset);
         let vertical_order = (first.row, first.row_offset) < (last.row, last.row_offset);
@@ -206,7 +184,7 @@ impl Anchor {
         first_column: u16,
         last_row: u32,
         last_column: u16,
-        behavior: Behavior,
+        behavior: AnchorBehavior,
     ) -> Result<Self> {
         Self::new(
             Point::new(first_row, first_column)?,
@@ -217,7 +195,7 @@ impl Anchor {
 
     /// Return the cell-change behavior.
     #[must_use]
-    pub const fn behavior(self) -> Behavior {
+    pub const fn behavior(self) -> AnchorBehavior {
         self.behavior
     }
 
@@ -235,7 +213,7 @@ impl Anchor {
 
     pub(crate) const fn fields(self) -> [u16; 9] {
         [
-            self.behavior.bits(),
+            self.behavior.wire_flags(),
             self.first.column as u16,
             self.first.column_offset,
             self.first.row,
@@ -251,7 +229,7 @@ impl Anchor {
         let first_column = column.saturating_add(1).min(252);
         let first_row = row.min(65_531);
         Self {
-            behavior: Behavior::MoveAndSize,
+            behavior: AnchorBehavior::Absolute,
             first: Point::cell(first_row, first_column),
             last: Point::cell(first_row + 4, first_column + 3),
         }
@@ -499,20 +477,20 @@ mod tests {
     fn anchor_and_group_rect_reject_degenerate_axes() {
         let first = Point::cell(4, 3);
         let right = Point::cell(4, 3).offset(1, 1).unwrap();
-        let anchor = Anchor::new(first, right, Behavior::MoveAndSize).unwrap();
+        let anchor = Anchor::new(first, right, AnchorBehavior::Absolute).unwrap();
         assert_eq!(anchor.first(), first);
         assert_eq!(anchor.last(), right);
-        assert_eq!(anchor.behavior(), Behavior::MoveAndSize);
+        assert_eq!(anchor.behavior(), AnchorBehavior::Absolute);
 
         let outcome = catch_unwind(|| {
-            assert!(Anchor::new(first, first, Behavior::Fixed).is_err());
-            assert!(Anchor::new(right, first, Behavior::Size).is_err());
-            assert!(Anchor::cells(0, 0, 65_536, 255, Behavior::Fixed).is_err());
+            assert!(Anchor::new(first, first, AnchorBehavior::MoveAndResize).is_err());
+            assert!(Anchor::new(right, first, AnchorBehavior::MoveWithoutResize).is_err());
+            assert!(Anchor::cells(0, 0, 65_536, 255, AnchorBehavior::MoveAndResize).is_err());
             assert!(
                 Anchor::new(
                     Point::new(65_534, 254).unwrap().offset(255, 1023).unwrap(),
                     Point::new(65_535, 255).unwrap().offset(255, 1023).unwrap(),
-                    Behavior::MoveAndSize,
+                    AnchorBehavior::Absolute,
                 )
                 .is_ok()
             );

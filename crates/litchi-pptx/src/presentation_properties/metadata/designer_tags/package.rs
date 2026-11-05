@@ -7,7 +7,8 @@ use litchi_opc::{OpcPackage, PackURI};
 
 use super::codec::{self, Located};
 use super::model::{Binding, Snapshot};
-use super::{Commit, Limits, Patch, Tags};
+use super::{Change, Limits, Prepared, Tags};
+use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 
 const PRESENTATION_PART: &str = "/ppt/presentation.xml";
@@ -39,7 +40,7 @@ pub fn load_snapshot(package: &OpcPackage, slide_id: u32) -> Result<Snapshot> {
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn load_snapshot_with_limits(
+pub(crate) fn load_snapshot_with_limits(
     package: &OpcPackage,
     slide_id: u32,
     limits: Limits,
@@ -58,8 +59,9 @@ pub fn load_snapshot_with_limits(
     }
     if presentation.blob().len() > limits.xml_bytes() {
         return Err(Error::Limit {
-            resource: "Designer-tag owner XML bytes",
-            limit: limits.xml_bytes(),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: presentation.blob().len(),
+            maximum: limits.xml_bytes(),
         });
     }
     let source = presentation.blob_arc();
@@ -78,10 +80,17 @@ pub fn load_snapshot_with_limits(
 
 /// Store a singular tag list atomically and return the previous value.
 ///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
-pub fn store(package: &mut OpcPackage, slide_id: u32, value: &Tags) -> Result<Option<Tags>> {
+pub(crate) fn store(package: &mut OpcPackage, slide_id: u32, value: &Tags) -> Result<Option<Tags>> {
     let limits = Limits::default();
     let value = codec::clone_tags(value, limits)?;
     let snapshot = load_snapshot(package, slide_id)?;
@@ -97,10 +106,17 @@ pub fn store(package: &mut OpcPackage, slide_id: u32, value: &Tags) -> Result<Op
 
 /// Remove a singular tag list atomically and return the previous value.
 ///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn remove(package: &mut OpcPackage, slide_id: u32) -> Result<Option<Tags>> {
+pub(crate) fn remove(package: &mut OpcPackage, slide_id: u32) -> Result<Option<Tags>> {
     let snapshot = load_snapshot(package, slide_id)?;
     let previous = snapshot
         .tags()?
@@ -117,10 +133,17 @@ pub fn remove(package: &mut OpcPackage, slide_id: u32) -> Result<Option<Tags>> {
 
 /// Apply a committed edit atomically.
 ///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot> {
+pub(crate) fn apply_commit(package: &mut OpcPackage, commit: Prepared) -> Result<Snapshot> {
     apply_patch(package, commit.patch())
 }
 
@@ -130,10 +153,17 @@ pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot
 /// is scoped to the selected host. Deletion, rebinding, duplicate identity,
 /// and concurrent edits of that host are refused.
 ///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
+pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Change) -> Result<Snapshot> {
     let current = load_snapshot_with_limits(package, patch.before.slide_id, patch.before.limits)?;
     if current.presentation_part_name != patch.before.presentation_part_name
         || current.presentation_content_type != patch.before.presentation_content_type
@@ -148,7 +178,7 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
             "Designer-tag selected slide-ID source is stale or rebound".into(),
         ));
     }
-    if !patch.is_changed() {
+    if patch.is_noop() {
         return Ok(current);
     }
     let desired = patch.after.singular()?;
@@ -159,6 +189,7 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
         current.limits,
     )?;
     let part_name = PackURI::new(&current.presentation_part_name).map_err(Error::Uri)?;
+    refuse_signed_change(package)?;
     let mut candidate = package.clone();
     candidate
         .get_part_mut(&part_name)?
@@ -176,7 +207,7 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
             "published Designer-tag candidate differs from the committed host".into(),
         ));
     }
-    candidate.unsign();
+    settle_unsigned_change(&mut candidate)?;
     *package = candidate;
     Ok(published)
 }

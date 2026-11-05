@@ -19,6 +19,7 @@
 //!     test-data/ooxml/docx/documentProperties.docx /word/document.xml /tmp/document.xml
 //! ```
 
+use litchi_opc::SourceLimits;
 use litchi_opc::{OpcPackage, PackURI};
 use std::io::Write;
 use std::path::PathBuf;
@@ -51,7 +52,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     writeln!(err)?;
 
-    let pkg = OpcPackage::open(&pkg_path)?;
+    let pkg = OpcPackage::open(&pkg_path, SourceLimits::default())?;
     writeln!(
         err,
         "Opened {} ({} parts). Looking up {partname}...",

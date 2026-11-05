@@ -1,0 +1,81 @@
+{
+  "schema": "litchi-iwa-constructor-admission.v6",
+  "status": "default path optimization qualified by exact instruction counts and allocations; native timing pending",
+  "source": {
+    "base_commit": "ddf2ac8ae2117cd78829ef94bcb610d6cbdfa0e2",
+    "candidate_commit": "bd011f99a87910c679634ac6ee1251f2d3433b3d",
+    "candidate_parent": "ceb87be1d3141124d2f1af29da3281b3fcf364d0",
+    "optimization": "For the default hard profile, metadata count bounds prove FieldPath and minimal FieldInfo header, neutral-memory, field and nesting ceilings. Non-default and over-bound inputs retain the exact admission path and error precedence.",
+    "probe_source_sha256": "e2e16d88f9fa70c621599b9d6ac85fef85d2a1997810be311bcaaeae447366ad",
+    "probe_lock_sha256": "21e7fece767541aa3d8a189f49368dcb5a1d27a7b3ca6d137f93d4452c7d6c65"
+  },
+  "binaries": {
+    "allocation_base": {"path":"/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v22-alloc-base/iwa-constructor-probe-ceb-alloc","bytes":653552,"sha256":"868370074002ba8d17972b5a6193958bcbe55e72d354827043971f7a916096d3"},
+    "allocation_candidate": {"path":"/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v22-alloc-candidate/iwa-constructor-probe-ceb-pathfast-alloc","bytes":678816,"sha256":"8cc80c3681be48f1313c49d83ed56ff8cab44666eeb7f5fea73afd7eaeb75d32"},
+    "callgrind_base": {"path":"/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v22-alloc-base/iwa-constructor-probe-ceb-native","bytes":630256,"sha256":"06af91d3772d5d347ea7c5b62c047bed2582025039993d5ee49d61957178a675"},
+    "callgrind_candidate": {"path":"/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v22-alloc-candidate/iwa-constructor-probe-ceb-pathfast-native","bytes":657944,"sha256":"a140404b3a1014a2b5e2a0f1471eccbc61d6ab75f8dbab65fc477a23524c7665"}
+  },
+  "allocation": {
+    "method": "ABBA, 100 iterations per route; all four allocator counters checked for endpoint-leg stability",
+    "summary_path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v22-alloc-ceb-pathfast/summary.json",
+    "summary_bytes": 56726,
+    "summary_sha256": "955202c8d0aa33a87a966e1edf1b48f2c03b480d112be89ae6f907add93ade3e",
+    "result": "All 15 routes matched checksum, output bytes and output SHA-256; allocator counters were stable. FieldPath and FieldInfo remain zero-allocation; MessageInfo remains one 12-byte allocation per iteration."
+  },
+  "callgrind": {
+    "method": "valgrind --tool=callgrind --collect-jumps=no --error-exitcode=99; Ir/op=(Ir at 12000 - Ir at 2000)/10000",
+    "manifest_path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v22-ceb-pathfast/manifest.json",
+    "manifest_bytes": 44651,
+    "manifest_sha256": "cb1d9b4e7b867f85f2e1b6a1f035d52559ef1b49ae85048afa05545b2ce5cf73",
+    "capture_files": 180,
+    "capture_bytes": 6632287,
+    "rows": [
+      {"route":"field_path","base_ir":36.0024,"candidate_ir":62.0036,"delta_ir":26.0012,"candidate_base":1.722207},
+      {"route":"field_info","base_ir":65.0034,"candidate_ir":146.0026,"delta_ir":80.9992,"candidate_base":2.246077},
+      {"route":"message_info","base_ir":168.0042,"candidate_ir":274.0042,"delta_ir":106.0000,"candidate_base":1.630937},
+      {"route":"archive_info","base_ir":51.0050,"candidate_ir":294.0040,"delta_ir":242.9990,"candidate_base":5.764219},
+      {"route":"archive_object","base_ir":13723.9943,"candidate_ir":3332.9992,"delta_ir":-10390.9951,"candidate_base":0.242859},
+      {"route":"archive_object_reject","base_ir":3440.0046,"candidate_ir":371.0051,"delta_ir":-3068.9995,"candidate_base":0.107850},
+      {"route":"parse","base_ir":53467.0360,"candidate_ir":48204.4730,"delta_ir":-5262.5630,"candidate_base":0.901574},
+      {"route":"validate","base_ir":9061.0046,"candidate_ir":3188.0046,"delta_ir":-5873.0000,"candidate_base":0.351838},
+      {"route":"encode","base_ir":37737.7921,"candidate_ir":31832.9945,"delta_ir":-5904.7976,"candidate_base":0.843531},
+      {"route":"retained_parse","base_ir":89533.6377,"candidate_ir":89907.1337,"delta_ir":373.4960,"candidate_base":1.004172},
+      {"route":"retained_validate","base_ir":9067.0046,"candidate_ir":7257.0046,"delta_ir":-1810.0000,"candidate_base":0.800375},
+      {"route":"retained_encoded_len","base_ir":15585.0046,"candidate_ir":7345.0046,"delta_ir":-8240.0000,"candidate_base":0.471287},
+      {"route":"retained_encode","base_ir":46978.0197,"candidate_ir":36020.6201,"delta_ir":-10957.3996,"candidate_base":0.766755},
+      {"route":"retained_validate_tight","base_ir":9134.0046,"candidate_ir":7329.0046,"delta_ir":-1805.0000,"candidate_base":0.802387},
+      {"route":"retained_encode_tight","base_ir":46157.3053,"candidate_ir":35848.6491,"delta_ir":-10308.6562,"candidate_base":0.776663}
+    ]
+  },
+  "dynamic_archive_info": {
+    "method": "The same optimized dynamic-count probe measured archive_info at 0, 1, 8, 32 and 128 messages; each row uses 2000/12000 Callgrind subtraction.",
+    "summary_path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v22-ceb-pathfast-empty/summary.json",
+    "summary_sha256": "63525e9ba152322f8fb4adfbd4ecefda16397f47ec7fb7f99fd7e8f69d1686aa",
+    "rows": [
+      {"messages":0,"base_ir":51.0061,"candidate_ir":87.0050,"delta_ir":35.9989},
+      {"messages":1,"base_ir":51.0061,"candidate_ir":113.0050,"delta_ir":61.9989},
+      {"messages":8,"base_ir":51.0061,"candidate_ir":295.0040,"delta_ir":243.9979},
+      {"messages":32,"base_ir":51.0050,"candidate_ir":919.0066,"delta_ir":868.0016},
+      {"messages":128,"base_ir":51.0046,"candidate_ir":3415.0025,"delta_ir":3363.9979}
+    ],
+    "attribution": "The optimized default raw Vec path remains 36 Ir fixed plus about 26 Ir per public MessageInfo. The current-field check is irreducible public validation: the debug-symbol source line accounts for 1 Ir/message at the versions comparison, while its comparator helper contributes the rest of about 5 Ir/message; the eight shape fields cost about 6 and the message-length ceiling about 5. The remaining roughly 10 Ir/message is loop and ownership work. A shape-only diagnostic (which does not enforce version values) measured about 34 + 21*N Ir/op and is retained only to isolate the exact-value guard."
+  },
+  "shape_only_diagnostic": {
+    "status": "non-qualifying diagnostic; intentionally omits exact public versions values",
+    "summary_path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v22-oldshape/summary.json",
+    "summary_sha256": "72f088afa7fe0ad1cf1f8e917da058b42360700a2d0294299ee867f0c6995449",
+    "formula": "about 34 + 21*N Ir/op; compared with the exact guard's 36 + 26*N, the value check costs about 2 fixed plus 5 Ir/message"
+  },
+  "fixed_constructor_attribution": {
+    "message_info": "106.0000 Ir/op over the old unchecked signature; allocator evidence is one 12-byte versions allocation per operation, so the fallible allocation is fixed per constructor rather than per archive message.",
+    "debug_capture": {
+      "binary_sha256":"a57e1badd9d06f92479f764a0db087ec2cec8ffe496d5fc355ccd5bbae75b4e5",
+      "archive_capture_sha256":"3a6fc5f376ee7dfda483e318ae559b57b26e3f056df81f4b392780dff1cd57ef",
+      "message_capture_sha256":"d88350d78c956534728fcb722887d9e436638b94045b01c1fbe449230107a018"
+    }
+  },
+  "validation": {
+    "core_tests": "cargo test --offline --locked --manifest-path crates/litchi-iwa-core/Cargo.toml --lib: 83 passed, 0 failed.",
+    "native_timing": "Not run; host was not verified quiet while other builds were active."
+  }
+}

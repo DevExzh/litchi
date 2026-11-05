@@ -1,6 +1,7 @@
 //! Non-mutating semantic three-way merge support.
 
-use crate::{Definition, DefinitionPatch, DefinitionSnapshot, Limits, PlotAreaSpec};
+use crate::definition::{Patch as DefinitionPatch, Snapshot as DefinitionSnapshot};
+use crate::{Definition, Limits, PlotAreaSpec};
 
 /// One deterministic semantic merge conflict.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -21,7 +22,7 @@ impl Conflict {
 }
 
 /// Result of a non-mutating definition join or dependency transfer.
-pub struct DefinitionMerge {
+pub(crate) struct DefinitionMerge {
     patch: Option<DefinitionPatch>,
     conflicts: Vec<Conflict>,
 }
@@ -35,26 +36,14 @@ impl DefinitionMerge {
 
     /// Return the merged patch when no conflicts occurred.
     #[must_use]
-    pub const fn patch(&self) -> Option<&DefinitionPatch> {
+    pub(crate) const fn patch(&self) -> Option<&DefinitionPatch> {
         self.patch.as_ref()
-    }
-
-    /// Consume the result into the merged patch.
-    #[must_use]
-    pub fn into_patch(self) -> Option<DefinitionPatch> {
-        self.patch
     }
 
     /// Return deterministic conflicts without mutating any input snapshot.
     #[must_use]
-    pub fn conflicts(&self) -> &[Conflict] {
+    pub(crate) fn conflicts(&self) -> &[Conflict] {
         &self.conflicts
-    }
-
-    /// Return whether the merge completed without conflicts.
-    #[must_use]
-    pub fn is_merged(&self) -> bool {
-        self.patch.is_some()
     }
 }
 
@@ -93,7 +82,7 @@ fn merge_patch(
     left: &DefinitionSnapshot,
     right: &DefinitionSnapshot,
     source: &DefinitionSnapshot,
-    changes: Vec<crate::DefinitionChange>,
+    changes: Vec<crate::definition::Change>,
     limits: Limits,
 ) -> DefinitionMerge {
     let mut conflicts = Vec::new();

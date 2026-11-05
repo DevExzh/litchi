@@ -1,0 +1,124 @@
+{
+  "schema": "litchi-iwa-constructor-admission.v7-inline-message-versions",
+  "status": "inline common versions qualified for correctness, allocation, and Callgrind; native timing pending a verified quiet host",
+  "source": {
+    "candidate_commit": "5fd7624a24f554befe1f3ac2aa8f1f0cfa742cb0",
+    "representation_baseline_commit": "a5e4127e641287885c2c3a96d6a8b5870876c170",
+    "representation_baseline_archive_sha256": "86735ee6f799c64dab2a2dd983e481788f3188c7fb67a59f0346e4dd0acde86a",
+    "changes": [
+      "MessageInfo.versions uses SmallVec<[u32; 3]> with arbitrary-length heap fallback; common [1, 0, 5] stays inline.",
+      "All workspace consumers and tests migrated in the same commit; no compatibility alias or lost public mutation capability.",
+      "Spilled versions are never accepted by the minimal collection ledger, and spilled memory accounting charges the full logical sequence length rather than len minus the inline capacity.",
+      "The keynote source-owned heap estimate no longer charges inline SmallVec storage while conversion scratch still charges its logical copy."
+    ],
+    "feature_check": "cargo tree --offline --locked -p litchi-iwa-core -e features showed smallvec default and union features active in the iwa-core graph.",
+    "probe": {
+      "base_project": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v24-project-base",
+      "candidate_project": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v24-project-candidate",
+      "base_main_sha256": "5af21e72fb796b9fc1e912e468bfb967ed0770c469e2773b2f1cace1552c1452",
+      "candidate_main_sha256": "d54d828ff5866fb5df8c7fecff67627717c6da3863202a0ef75a883bf295fe87",
+      "base_lock_sha256": "551fd8812350c2b13b5d1791fb8773ba4a50c71801728c3a18f6c1dca3f7f89a",
+      "candidate_lock_sha256": "7f3995948b308f5ccc22c4f9bb462da0ceb4eacbd370ccc3f73ff85ac7e020ec"
+    }
+  },
+  "matched_targets": {
+    "build": "CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo build --release --manifest-path <project>/Cargo.toml --target-dir <target>",
+    "base": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v24-target-base",
+      "disk_bytes": 753422513,
+      "files": 1498
+    },
+    "candidate": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v24-target-candidate",
+      "disk_bytes": 476841172,
+      "files": 1128
+    }
+  },
+  "binaries": {
+    "allocation_base": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v24-alloc-base/iwa-constructor-probe-v24-base-alloc",
+      "bytes": 658296,
+      "sha256": "d3bfb49e8df6487a3790928893837059f7e71dcb3e9b987e81dd7d507b34b643"
+    },
+    "allocation_candidate": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v24-alloc-candidate/iwa-constructor-probe-v24-smallvec-alloc",
+      "bytes": 698704,
+      "sha256": "498f998775c7caa1ca94cc8b30b7557c348dca8240acf3369da6d7747ff858be"
+    },
+    "callgrind_base": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v24-callgrind/iwa-constructor-probe-v24-base",
+      "bytes": 633744,
+      "sha256": "a40ed830e640f3992ac288ec1691639e3a44689f020d4acd7fc94977eec5dda0"
+    },
+    "callgrind_candidate": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v24-callgrind/iwa-constructor-probe-v24-smallvec",
+      "bytes": 677464,
+      "sha256": "130713a57c1213ea12cfceaabc4d2f101eb110665fce1238c69b01c7263c1e81"
+    },
+    "representation_baseline_allocation": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v24-alloc-pre-smallvec/iwa-constructor-probe-v24-pre-smallvec-alloc",
+      "bytes": 691072,
+      "sha256": "375517f320fc4da89ed5a55de5cd7bc9715ee59f237383f7ac5309531f07eb86"
+    },
+    "representation_baseline_callgrind": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v24-callgrind-pre-smallvec/iwa-constructor-probe-v24-pre-smallvec",
+      "bytes": 670208,
+      "sha256": "3865de8075c848ed45eb45b30e0a4fe60fd6101ccb475acd6e607d0a8cba6bdb"
+    }
+  },
+  "correctness": {
+    "canonical_and_retained_output_sha256": [
+      "8b436827ca0ea648569e590e9a37fca13b42c6c63c93a4e45955b62a02b98d15",
+      "7bc9a96f894c2361619db11643c80373d56202f07e376de6930ecdadce0146af"
+    ],
+    "result": "Base, exact pre-SmallVec representation, and candidate output bytes and hashes matched for canonical and retained routes; the full public version sequence remains mutable and arbitrary spill lengths are preserved.",
+    "versions_equality_gap": "Slice equality alone allowed a spilled [1, 0, 5] SmallVec into the minimal ledger. The candidate now requires inline storage plus exact values; the public raw Vec path retains its exact current-field validation, while the private ledger cannot certify a spilled representation."
+  },
+  "allocation": {
+    "method": "ABBA, 100 iterations per route, allocator-enabled matched release probes; all counters, checksum, output length and output SHA-256 checked",
+    "summary_path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v24-alloc-repr-results/summary.tsv",
+    "summary_bytes": 19664,
+    "summary_sha256": "63a0b0c1b945bbfde4b3b688928b074aaa483b39addd930cf67872226e819df0",
+    "representative_representation_deltas": [
+      {"route":"message_info","count":8,"pre_peak":12,"candidate_peak":0,"pre_bytes":1200,"candidate_bytes":0,"pre_calls":100,"candidate_calls":0},
+      {"route":"archive_info_raw_e2e","count":1,"pre_peak":220,"candidate_peak":208,"pre_bytes":22100,"candidate_bytes":20900,"pre_calls":300,"candidate_calls":200},
+      {"route":"archive_info_raw_e2e","count":8,"pre_peak":1760,"candidate_peak":1664,"pre_bytes":176100,"candidate_bytes":166500,"pre_calls":1000,"candidate_calls":200},
+      {"route":"archive_info_raw_e2e","count":32,"pre_peak":7040,"candidate_peak":6656,"pre_bytes":704200,"candidate_bytes":665800,"pre_calls":3400,"candidate_calls":200},
+      {"route":"archive_info_raw_e2e","count":128,"pre_peak":28160,"candidate_peak":26624,"pre_bytes":2816300,"candidate_bytes":2662700,"pre_calls":13000,"candidate_calls":200},
+      {"route":"archive_object","count":8,"pre_peak":1760,"candidate_peak":1664,"pre_bytes":176000,"candidate_bytes":166400,"pre_calls":900,"candidate_calls":100},
+      {"route":"archive_object_serialize_e2e","count":8,"pre_peak":24389,"candidate_peak":24197,"pre_bytes":2658600,"candidate_bytes":2639400,"pre_calls":5900,"candidate_calls":4300}
+    ],
+    "interpretation": "The common three-version constructor loses one 12-byte allocation and one allocation call per message_info construction. Spilled storage is charged as the entire logical sequence under the existing budget contract; no capacity-based undercharge is introduced."
+  },
+  "callgrind": {
+    "method": "valgrind --tool=callgrind --collect-jumps=no --error-exitcode=99; Ir/op=(Ir at 12000 - Ir at 2000)/10000; 2000 and 12000 runs were collected for fixed and raw-count routes",
+    "summary_path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v24-callgrind-repr-results/summary.tsv",
+    "summary_bytes": 15434,
+    "summary_sha256": "f41abb6aaf2d506fbee9b22f30e1846bf101c24cdae644c9694aadc341c34412",
+    "representative_rows": [
+      {"route":"message_info","iterations":12000,"pre_ir":4764182,"candidate_ir":2649773,"delta_ir":-2114409,"delta_ir_per_op":-176.20075},
+      {"route":"archive_info_raw","count":1,"iterations":12000,"pre_ir":1775799,"candidate_ir":1749050,"delta_ir":-26749,"delta_ir_per_op":-2.229083},
+      {"route":"archive_info_raw","count":8,"iterations":12000,"pre_ir":4920039,"candidate_ir":4785630,"delta_ir":-134409,"delta_ir_per_op":-11.20075},
+      {"route":"archive_info_raw","count":32,"iterations":12000,"pre_ir":15822191,"candidate_ir":15334110,"delta_ir":-488081,"delta_ir_per_op":-40.673417},
+      {"route":"archive_info_raw","count":128,"iterations":12000,"pre_ir":59472487,"candidate_ir":57609044,"delta_ir":-1863443,"delta_ir_per_op":-155.286917},
+      {"route":"archive_info_raw_e2e","count":1,"iterations":12000,"pre_ir":15347901,"candidate_ir":12981102,"delta_ir":-2366799,"delta_ir_per_op":-197.23325},
+      {"route":"archive_info_raw_e2e","count":8,"iterations":12000,"pre_ir":41064151,"candidate_ir":23721682,"delta_ir":-17342469,"delta_ir_per_op":-1445.20575},
+      {"route":"archive_info_raw_e2e","count":32,"iterations":12000,"pre_ir":184103299,"candidate_ir":53170633,"delta_ir":-130932666,"delta_ir_per_op":-10911.0555},
+      {"route":"archive_info_raw_e2e","count":128,"iterations":12000,"pre_ir":846772937,"candidate_ir":169089097,"delta_ir":-677683840,"delta_ir_per_op":-56473.653333},
+      {"route":"archive_object","iterations":12000,"pre_ir":41484195,"candidate_ir":22965786,"delta_ir":-18518409,"delta_ir_per_op":-1543.20075},
+      {"route":"archive_object_serialize_e2e","count":8,"iterations":12000,"pre_ir":482434668,"candidate_ir":399017870,"delta_ir":-83416798,"delta_ir_per_op":-6951.399833}
+    ],
+    "interpretation": "Absolute and per-operation deltas are negative against the exact pre-migration representation. The full raw constructor and object routes therefore do not reproduce the earlier Vec-allocation regression; native timing is still unqualified."
+  },
+  "external_summaries": [
+    {"path":"/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v24-alloc-results/summary.tsv","bytes":19738,"sha256":"ff6e77dbd73ecacb19e7115acb4bd770d37c64c8863a2bd663a6fc61b6e3a455"},
+    {"path":"/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v24-callgrind-results/summary.tsv","bytes":15478,"sha256":"3cb9928932aa2ecfac14e758e142191dc93abe8cd8a6884eb990b64e4671e7cd"}
+  ],
+  "validation": {
+    "core_tests": "cargo test --offline --locked -p litchi-iwa-core --lib: 84 passed, 0 failed",
+    "consumer_check": "cargo check --offline --locked --all-targets --keep-going -p litchi-iwa -p litchi-keynote -p litchi-numbers -p litchi-pages -p litchi-iwa-archive -p litchi-iwa-detect: finished successfully",
+    "keynote_heap_test": "cargo test --offline --locked -p litchi-keynote --lib message_info_heap_tests: 1 passed, 0 failed",
+    "format": "cargo fmt --all",
+    "native_timing": "Not run; host quietness was not verified while other builds were active."
+  }
+}

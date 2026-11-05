@@ -35,7 +35,8 @@ use litchi_opc::OpcError;
 use litchi_opc::constants::content_type as ct;
 use soapberry_zip::office::StreamingArchiveWriter;
 
-use crate::cell_values::{SheetCellValueEdit, SourceBackedEditor};
+use crate::cell_values::SheetChange;
+use crate::cell_values::test_editors::SourceBackedEditor;
 use crate::{Address, Error, Number, Value};
 
 const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -75,7 +76,8 @@ fn package_with(workbook: &str, worksheet: &str) -> Vec<u8> {
     let workbook_relationships = format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><Relationships xmlns=\"{PKG_REL}\"><Relationship Id=\"rIdSheet\" Type=\"{REL}/worksheet\" Target=\"worksheets/sheet1.xml\"/></Relationships>"
     );
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for (name, bytes) in [
         ("[Content_Types].xml", content_types.as_bytes()),
         ("_rels/.rels", package_relationships.as_bytes()),
@@ -142,14 +144,14 @@ fn number(value: &str) -> Value {
 /// planner admits.
 fn plan_commit_publish(
     worksheet: &str,
-    edit: SheetCellValueEdit<'_>,
+    edit: SheetChange<'_>,
 ) -> (Vec<u8>, Result<(), Error>, Vec<u8>) {
     plan_commit_publish_package(package(worksheet), edit)
 }
 
 fn plan_commit_publish_package(
     package: Vec<u8>,
-    edit: SheetCellValueEdit<'_>,
+    edit: SheetChange<'_>,
 ) -> (Vec<u8>, Result<(), Error>, Vec<u8>) {
     let editor = editor(package);
     let commit = editor
@@ -158,7 +160,8 @@ fn plan_commit_publish_package(
         .commit()
         .expect("the commit admits the witness");
     let replacement = commit
-        .snapshot()
+        .patch()
+        .after()
         .sheets()
         .first()
         .expect("one worksheet")
@@ -171,8 +174,8 @@ fn plan_commit_publish_package(
     (replacement, published, sink)
 }
 
-fn set_a1(value: &str) -> SheetCellValueEdit<'static> {
-    SheetCellValueEdit::set("Sheet1", Address::from_a1("A1").expect("A1"), number(value))
+fn set_a1(value: &str) -> SheetChange<'static> {
+    SheetChange::set("Sheet1", Address::from_a1("A1").expect("A1"), number(value))
 }
 
 /// Assert a publication refusal from the XML audit of `expected_part`, with
@@ -325,7 +328,7 @@ fn an_insertion_can_push_an_admitted_original_over_the_attribute_budget() {
     published.expect("the original is within the audit budget");
     assert!(!sink.is_empty());
 
-    let insert = SheetCellValueEdit::insert(
+    let insert = SheetChange::insert(
         "Sheet1",
         Address::from_a1("C1").expect("C1"),
         Number::new("7").expect("numeral"),

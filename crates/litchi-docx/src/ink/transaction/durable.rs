@@ -6,6 +6,7 @@
 //! used only to rebuild a private proof source for inverse replay; it is never
 //! a permission to copy arbitrary package bytes into the published package.
 
+use crate::ink::LimitKind;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::mem::size_of;
@@ -30,7 +31,7 @@ use super::super::authoring::{
     HorizontalRelativeFrom, ImageDimensions, ImageType, Placement, Point, Style, VerticalAlignment,
     VerticalPosition, VerticalRelativeFrom, WrapMode,
 };
-use super::{Destination, EditLimits, Patch, SemanticIntent, Snapshot};
+use super::{Commit, Destination, Diagnostics, EditOptions, Patch, SemanticIntent};
 use crate::ink::Limits;
 use crate::package::story::{self, StoryKind};
 use crate::{Error, Package, Result};
@@ -68,7 +69,7 @@ impl Patch {
     /// `commit.patch().to_durable(patch_limits)`,
     /// `CorePatch::<Reversible>::to_deterministic_json` and
     /// `from_deterministic_json`, followed by
-    /// [`Package::apply_durable_ink_patch`].  The source guard binds the
+    /// [`Package::apply_durable_ink`].  The source guard binds the
     /// logical OPC content-types member, relationship members and presence,
     /// part names/types/payloads, and the public non-part name/reason
     /// inventory.  ZIP compression bytes and other physical archive details
@@ -80,7 +81,7 @@ impl Patch {
     ) -> std::result::Result<CorePatch<Reversible>, PatchError> {
         let before_artifact = package_fingerprint(&self.before.package)?;
         let after_artifact = package_fingerprint(&self.after.package)?;
-        if self.is_empty() {
+        if self.is_noop() {
             let forward = PatchOperation::new(
                 limits,
                 NOOP,
@@ -220,23 +221,39 @@ impl Patch {
 }
 
 impl Package {
-    /// Apply one durable typed Ink edit atomically.
+    /// Apply one durable typed Ink edit and return its package, patch and diagnostics.
     ///
     /// Forward operations replay through [`super::Edit`].  Inverse operations
     /// first rebuild a private source from their exact closure, replay the
     /// original forward intent there, and then apply that checked in-memory
     /// inverse.  No durable blob is ever installed as an unverified package.
-    pub fn apply_durable_ink_patch<Mode>(&mut self, patch: &CorePatch<Mode>) -> Result<Snapshot> {
-        self.apply_durable_ink_patch_with_limits(patch, EditLimits::default())
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a stale source, an unsupported durable vocabulary
+    /// or a replay the edit refuses.
+    pub fn apply_durable_ink<Mode>(&self, patch: &CorePatch<Mode>) -> Result<Commit> {
+        self.apply_durable_ink_with_options(
+            patch,
+            EditOptions {
+                inventory: self.semantic_limits().ink_value(),
+                ..EditOptions::default()
+            },
+        )
     }
 
-    /// Apply a durable Ink edit with explicit replay and reconstruction bounds.
-    pub fn apply_durable_ink_patch_with_limits<Mode>(
-        &mut self,
+    /// Apply a durable Ink edit with explicit replay and reconstruction
+    /// bounds, returning its package, checked in-memory patch and diagnostics.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::apply_durable_ink`].
+    pub fn apply_durable_ink_with_options<Mode>(
+        &self,
         patch: &CorePatch<Mode>,
-        limits: EditLimits,
-    ) -> Result<Snapshot> {
-        let limits = limits.validate()?;
+        options: EditOptions,
+    ) -> Result<Commit> {
+        let limits = options.validate()?;
         let fingerprint_bounds = FingerprintBounds::from_edit_limits(limits);
         self.ensure_story_opc_current("apply_durable_ink_patch")?;
         if patch.format() != FORMAT_NAME {
@@ -252,30 +269,32 @@ impl Package {
         // Run the same bounded source admission that owns every semantic edit
         // before hashing the package.  In particular, this prevents a durable
         // no-op or stale-source check from walking an unbounded package before
-        // the caller's EditLimits have had a chance to refuse it.
-        let source_snapshot = {
-            let edit = self.edit_ink_with_limits(limits)?;
-            edit.snapshot().clone()
-        };
-        let source_artifact =
-            package_fingerprint_with_bounds(self.opc_package(), fingerprint_bounds)
-                .map_err(|error| invalid_durable(error.to_string()))?;
-        if text_precondition(operation, "artifact_sha256")? != source_artifact {
-            return Err(invalid_durable("Ink durable source is stale"));
+        // the caller's EditOptions have had a chance to refuse it.
+        let source_edit = self.edit_ink_with_options(limits)?;
+        if operation.op == NOOP {
+            let source_artifact = checked_source_artifact(self, operation, fingerprint_bounds)?;
+            if operation.preconditions.len() != 3
+                || text_precondition(operation, "kind")? != "noop"
+                || text_precondition(operation, "target_sha256")? != source_artifact
+                || !patch.blobs().is_empty()
+            {
+                return Err(invalid_durable("invalid Ink durable no-op"));
+            }
+            let planned = source_edit.plan()?;
+            return Ok(Commit::new(
+                self.clone(),
+                planned.patch,
+                Diagnostics::new(false),
+            ));
         }
+        // Changed replay constructs its own checked patch. Release the source
+        // admission state before fingerprinting/reconstruction, as it is not
+        // part of that proof and need not increase retained memory.
+        drop(source_edit);
+        let source_artifact = checked_source_artifact(self, operation, fingerprint_bounds)?;
         let target_artifact = text_precondition(operation, "target_sha256")?;
         let kind = text_precondition(operation, "kind")?;
         match operation.op.as_str() {
-            NOOP => {
-                if operation.preconditions.len() != 3
-                    || kind != "noop"
-                    || target_artifact != source_artifact
-                    || !patch.blobs().is_empty()
-                {
-                    return Err(invalid_durable("invalid Ink durable no-op"));
-                }
-                Ok(source_snapshot)
-            },
             EDIT => {
                 if operation.preconditions.len() != 4 {
                     return Err(invalid_durable("invalid Ink durable edit"));
@@ -295,7 +314,7 @@ impl Package {
                 if generated != target_artifact {
                     return Err(invalid_durable("Ink durable typed replay target mismatch"));
                 }
-                self.apply_ink_patch(commit.patch())
+                self.apply_ink(commit.patch())
             },
             RESTORE => {
                 if operation.preconditions.len() != 4 {
@@ -340,23 +359,39 @@ impl Package {
                         "Ink durable restore forward replay mismatch",
                     ));
                 }
-                self.apply_ink_patch(&commit.patch().inverse())
+                self.apply_ink(&commit.patch().inverse())
             },
             _ => Err(invalid_durable("unsupported Ink durable operation")),
         }
     }
 }
 
+fn checked_source_artifact(
+    package: &Package,
+    operation: &PatchOperation,
+    bounds: FingerprintBounds,
+) -> Result<String> {
+    let artifact = package_fingerprint_with_bounds(package.opc_package(), bounds)
+        .map_err(|error| invalid_durable(error.to_string()))?;
+    if text_precondition(operation, "artifact_sha256")? != artifact {
+        return Err(Error::conflict(
+            "apply_durable_ink",
+            "the package does not hold the durable Ink patch source",
+        ));
+    }
+    Ok(artifact)
+}
+
 fn replay_intents(
     source: OpcPackage,
     intents: &[SemanticIntent],
-    limits: EditLimits,
-) -> Result<super::Commit> {
+    limits: EditOptions,
+) -> Result<super::Planned> {
     if intents.is_empty() || intents.len() > MAX_INTENTS {
         return Err(invalid_durable("invalid Ink durable intent count"));
     }
     let source_package = Package::from_opc_package(source)?;
-    let mut edit = source_package.edit_ink_with_limits(limits)?;
+    let mut edit = source_package.edit_ink_with_options(limits)?;
     for intent in intents {
         match intent {
             SemanticIntent::Insert {
@@ -384,7 +419,7 @@ fn replay_intents(
             },
         }
     }
-    let commit = edit.commit()?;
+    let commit = edit.plan()?;
     if !commit.changed() {
         return Err(invalid_durable(
             "Ink durable intent produced no changed commit",
@@ -873,7 +908,7 @@ impl<'a> IntentDecoder<'a> {
         ))
     }
 
-    fn u64(&mut self, resource: &'static str, maximum: usize) -> Result<usize> {
+    fn u64(&mut self, resource: LimitKind, maximum: usize) -> Result<usize> {
         let value = usize::try_from(u64::from_le_bytes(
             self.take(8)?
                 .try_into()
@@ -882,7 +917,7 @@ impl<'a> IntentDecoder<'a> {
         .map_err(|_| invalid_durable("Ink durable integer exceeds this platform"))?;
         if value > maximum {
             return Err(Error::InkLimit {
-                resource,
+                kind: resource,
                 actual: value,
                 maximum,
             });
@@ -908,7 +943,7 @@ impl<'a> IntentDecoder<'a> {
         }
     }
 
-    fn bytes(&mut self, resource: &'static str, maximum: usize) -> Result<Vec<u8>> {
+    fn bytes(&mut self, resource: LimitKind, maximum: usize) -> Result<Vec<u8>> {
         let source = self.bytes_slice(resource, maximum)?;
         let length = source.len();
         let mut bytes = Vec::new();
@@ -922,24 +957,24 @@ impl<'a> IntentDecoder<'a> {
         Ok(bytes)
     }
 
-    fn bytes_slice(&mut self, resource: &'static str, maximum: usize) -> Result<&'a [u8]> {
+    fn bytes_slice(&mut self, resource: LimitKind, maximum: usize) -> Result<&'a [u8]> {
         let length = self.u64(resource, maximum)?;
         self.take(length)
     }
 }
 
-fn decode_intents(bytes: &[u8], limits: EditLimits) -> Result<Vec<SemanticIntent>> {
+fn decode_intents(bytes: &[u8], limits: EditOptions) -> Result<Vec<SemanticIntent>> {
     let maximum = MAX_INTENT_BYTES.min(limits.max_staged_bytes);
     if bytes.len() > maximum {
         return Err(Error::InkLimit {
-            resource: "durable intent bytes",
+            kind: LimitKind::DurableIntentBytes,
             actual: bytes.len(),
             maximum,
         });
     }
     let mut decoder = IntentDecoder::new(bytes, INTENT_HEADER)?;
     let count = decoder.u64(
-        "durable intent count",
+        LimitKind::DurableIntentCount,
         MAX_INTENTS.min(limits.max_operations),
     )?;
     if count == 0 {
@@ -954,7 +989,7 @@ fn decode_intents(bytes: &[u8], limits: EditLimits) -> Result<Vec<SemanticIntent
         .ok_or_else(|| invalid_durable("Ink durable intent allocation overflow"))?;
     if retained_bytes > limits.max_staged_bytes {
         return Err(Error::InkLimit {
-            resource: "durable intent records",
+            kind: LimitKind::DurableIntentRecords,
             actual: retained_bytes,
             maximum: limits.max_staged_bytes,
         });
@@ -970,11 +1005,11 @@ fn decode_intents(bytes: &[u8], limits: EditLimits) -> Result<Vec<SemanticIntent
         match decoder.u8()? {
             0 => {
                 let kind = story_kind_from_code(decoder.u8()?)?;
-                let story_position = decoder.u64("durable story position", usize::MAX)?;
-                let paragraph = decoder.u64("durable paragraph position", usize::MAX)?;
+                let story_position = decoder.u64(LimitKind::DurableStoryPosition, usize::MAX)?;
+                let paragraph = decoder.u64(LimitKind::DurableParagraphPosition, usize::MAX)?;
                 let payload = decode_prepared(
                     decoder.bytes_slice(
-                        "durable prepared Ink bytes",
+                        LimitKind::DurablePreparedInkBytes,
                         limits.inventory.max_payload_bytes,
                     )?,
                     limits.inventory.max_payload_bytes,
@@ -990,10 +1025,10 @@ fn decode_intents(bytes: &[u8], limits: EditLimits) -> Result<Vec<SemanticIntent
                 });
             },
             1 => {
-                let position = decoder.u64("durable annotation position", usize::MAX)?;
+                let position = decoder.u64(LimitKind::DurableAnnotationPosition, usize::MAX)?;
                 let payload = decode_prepared(
                     decoder.bytes_slice(
-                        "durable prepared Ink bytes",
+                        LimitKind::DurablePreparedInkBytes,
                         limits.inventory.max_payload_bytes,
                     )?,
                     limits.inventory.max_payload_bytes,
@@ -1006,7 +1041,7 @@ fn decode_intents(bytes: &[u8], limits: EditLimits) -> Result<Vec<SemanticIntent
                 });
             },
             2 => {
-                let position = decoder.u64("durable annotation position", usize::MAX)?;
+                let position = decoder.u64(LimitKind::DurableAnnotationPosition, usize::MAX)?;
                 intents.push(SemanticIntent::Remove { position });
             },
             _ => return Err(invalid_durable("unknown Ink durable intent")),
@@ -1019,12 +1054,12 @@ fn decode_intents(bytes: &[u8], limits: EditLimits) -> Result<Vec<SemanticIntent
 }
 
 fn decode_prepared(bytes: &[u8], maximum: usize) -> Result<litchi_drawingml::ink::Prepared> {
-    let authoring_limits = litchi_drawingml::ink::AuthoringLimits {
+    let authoring_limits = litchi_drawingml::ink::builder::AuthoringLimits {
         max_source_bytes: maximum,
         max_output_bytes: maximum,
         ..Default::default()
     };
-    litchi_drawingml::ink::Prepared::from_bytes_with_limits(bytes, authoring_limits)
+    litchi_drawingml::ink::Prepared::from_bytes(bytes, authoring_limits)
         .map_err(|error| invalid_durable(format!("invalid canonical Ink payload: {error}")))
 }
 
@@ -1050,8 +1085,8 @@ fn decode_style(decoder: &mut IntentDecoder<'_>, maximum: usize) -> Result<Style
 
 fn decode_placement(decoder: &mut IntentDecoder<'_>) -> Result<Placement> {
     let kind = decoder.u8()?;
-    let width = decoder.u64("durable geometry width", u64::MAX as usize)? as u64;
-    let height = decoder.u64("durable geometry height", u64::MAX as usize)? as u64;
+    let width = decoder.u64(LimitKind::DurableGeometryWidth, u64::MAX as usize)? as u64;
+    let height = decoder.u64(LimitKind::DurableGeometryHeight, u64::MAX as usize)? as u64;
     let extent = Geometry::new(width, height)
         .map_err(|error| invalid_durable(format!("invalid Ink durable geometry: {error}")))?;
     match kind {
@@ -1130,7 +1165,7 @@ fn decode_fallback(
                     invalid_durable(format!("invalid Ink durable dimensions: {error}"))
                 })?;
             let bytes = decoder.bytes(
-                "durable fallback image bytes",
+                LimitKind::DurableFallbackImageBytes,
                 maximum.min(16 * 1024 * 1024),
             )?;
             FallbackImage::new(Arc::new(bytes), media, dimensions)
@@ -1141,25 +1176,25 @@ fn decode_fallback(
     }
 }
 
-fn decode_restore(bytes: &[u8], limits: EditLimits) -> Result<(&[u8], &[u8])> {
+fn decode_restore(bytes: &[u8], limits: EditOptions) -> Result<(&[u8], &[u8])> {
     let maximum = MAX_INTENT_BYTES
         .min(limits.max_staged_bytes)
         .checked_add(MAX_DELTA_BYTES.min(limits.max_package_bytes))
         .ok_or_else(|| invalid_durable("durable restore bound overflow"))?;
     if bytes.len() > maximum {
         return Err(Error::InkLimit {
-            resource: "durable restore bytes",
+            kind: LimitKind::DurableRestoreBytes,
             actual: bytes.len(),
             maximum,
         });
     }
     let mut decoder = IntentDecoder::new(bytes, RESTORE_HEADER)?;
     let intent = decoder.bytes_slice(
-        "durable restore intent bytes",
+        LimitKind::DurableRestoreIntentBytes,
         MAX_INTENT_BYTES.min(limits.max_staged_bytes),
     )?;
     let delta = decoder.bytes_slice(
-        "durable restore closure bytes",
+        LimitKind::DurableRestoreClosureBytes,
         MAX_DELTA_BYTES.min(limits.max_package_bytes),
     )?;
     if decoder.offset != bytes.len() {
@@ -1220,12 +1255,12 @@ fn preflight_delta(
     maximum: usize,
 ) -> std::result::Result<(), PatchError> {
     let before_content = before
-        .source_content_types()
+        .source_content_types(before.read_limits())
         .map_err(|_| PatchError::InvalidText {
             field: "Ink durable source content types",
         })?;
     let after_content = after
-        .source_content_types()
+        .source_content_types(after.read_limits())
         .map_err(|_| PatchError::InvalidText {
             field: "Ink durable target content types",
         })?;
@@ -1354,12 +1389,11 @@ fn part_member_size(
         return Ok(1);
     }
     let part = decoded_part(package, name)?;
-    let relationships =
-        package
-            .source_relationships(name)
-            .map_err(|_| PatchError::InvalidText {
-                field: "Ink durable relationship token",
-            })?;
+    let relationships = package
+        .source_relationships(name, package.read_limits())
+        .map_err(|_| PatchError::InvalidText {
+            field: "Ink durable relationship token",
+        })?;
     let mut size = 1usize;
     size = size.saturating_add(framed_size(part.content_type().len()));
     size = size.saturating_add(framed_size(part.blob().len()));
@@ -1381,18 +1415,16 @@ fn parts_equal(
         (true, true) => {
             let left = decoded_part(before, name)?;
             let right = decoded_part(after, name)?;
-            let left_relationships =
-                before
-                    .source_relationships(name)
-                    .map_err(|_| PatchError::InvalidText {
-                        field: "Ink durable relationship token",
-                    })?;
-            let right_relationships =
-                after
-                    .source_relationships(name)
-                    .map_err(|_| PatchError::InvalidText {
-                        field: "Ink durable relationship token",
-                    })?;
+            let left_relationships = before
+                .source_relationships(name, before.read_limits())
+                .map_err(|_| PatchError::InvalidText {
+                    field: "Ink durable relationship token",
+                })?;
+            let right_relationships = after
+                .source_relationships(name, after.read_limits())
+                .map_err(|_| PatchError::InvalidText {
+                    field: "Ink durable relationship token",
+                })?;
             Ok(left.content_type() == right.content_type()
                 && left.blob() == right.blob()
                 && left_relationships.member_present() == right_relationships.member_present()
@@ -1514,12 +1546,12 @@ fn collect_records(
     after: &OpcPackage,
 ) -> std::result::Result<Vec<Record>, PatchError> {
     let before_content = before
-        .source_content_types()
+        .source_content_types(before.read_limits())
         .map_err(|_| PatchError::InvalidText {
             field: "Ink durable source content types",
         })?;
     let after_content = after
-        .source_content_types()
+        .source_content_types(after.read_limits())
         .map_err(|_| PatchError::InvalidText {
             field: "Ink durable target content types",
         })?;
@@ -1622,12 +1654,11 @@ fn capture_part(
         return Ok(None);
     }
     let part = decoded_part(package, name)?;
-    let relationships =
-        package
-            .source_relationships(name)
-            .map_err(|_| PatchError::InvalidText {
-                field: "Ink durable relationship token",
-            })?;
+    let relationships = package
+        .source_relationships(name, package.read_limits())
+        .map_err(|_| PatchError::InvalidText {
+            field: "Ink durable relationship token",
+        })?;
     Ok(Some(Member {
         content_type: Some(clone_durable_text(
             part.content_type(),
@@ -1664,7 +1695,7 @@ fn clone_durable_text(text: &str, _field: &'static str) -> std::result::Result<S
 
 fn root_relationships(package: &OpcPackage) -> Result<OwnedRelationships> {
     let root = PackURI::new("/").map_err(Error::Uri)?;
-    Ok(package.source_relationships(&root)?)
+    Ok(package.source_relationships(&root, package.read_limits())?)
 }
 
 #[derive(Clone, Copy)]
@@ -1683,7 +1714,7 @@ impl Default for FingerprintBounds {
 }
 
 impl FingerprintBounds {
-    fn from_edit_limits(limits: EditLimits) -> Self {
+    fn from_edit_limits(limits: EditOptions) -> Self {
         Self {
             max_non_part_members: limits
                 .inventory
@@ -1728,7 +1759,7 @@ fn package_fingerprint_with_bounds(
         }
     }
     let content = package
-        .source_content_types()
+        .source_content_types(package.read_limits())
         .map_err(|_| PatchError::InvalidText {
             field: "Ink durable content types",
         })?;
@@ -1753,12 +1784,11 @@ fn package_fingerprint_with_bounds(
         parts.insert(part.partname().as_str().to_owned(), part);
     }
     for (name, part) in parts {
-        let relationships =
-            package
-                .source_relationships(part.partname())
-                .map_err(|_| PatchError::InvalidText {
-                    field: "Ink durable relationship token",
-                })?;
+        let relationships = package
+            .source_relationships(part.partname(), package.read_limits())
+            .map_err(|_| PatchError::InvalidText {
+                field: "Ink durable relationship token",
+            })?;
         hash_section(&mut digest, b"part-name", name.as_bytes());
         hash_section(
             &mut digest,
@@ -1841,7 +1871,7 @@ impl<'a> Decoder<'a> {
         self.bytes.len().saturating_sub(self.offset)
     }
 
-    fn u64(&mut self, resource: &'static str, maximum: usize) -> Result<usize> {
+    fn u64(&mut self, resource: LimitKind, maximum: usize) -> Result<usize> {
         let bytes: [u8; 8] = self
             .take(8)?
             .try_into()
@@ -1850,7 +1880,7 @@ impl<'a> Decoder<'a> {
             .map_err(|_| invalid_durable("Ink durable integer exceeds this platform"))?;
         if value > maximum {
             return Err(Error::InkLimit {
-                resource,
+                kind: resource,
                 actual: value,
                 maximum,
             });
@@ -1858,7 +1888,7 @@ impl<'a> Decoder<'a> {
         Ok(value)
     }
 
-    fn bytes(&mut self, resource: &'static str, maximum: usize) -> Result<Vec<u8>> {
+    fn bytes(&mut self, resource: LimitKind, maximum: usize) -> Result<Vec<u8>> {
         let length = self.u64(resource, maximum)?;
         let source = self.take(length)?;
         let mut bytes = Vec::new();
@@ -1872,7 +1902,7 @@ impl<'a> Decoder<'a> {
         Ok(bytes)
     }
 
-    fn text(&mut self, resource: &'static str, maximum: usize) -> Result<String> {
+    fn text(&mut self, resource: LimitKind, maximum: usize) -> Result<String> {
         let bytes = self.bytes(resource, maximum)?;
         let text = std::str::from_utf8(&bytes)
             .map_err(|_| invalid_durable("Ink durable closure text is not UTF-8"))?;
@@ -1885,19 +1915,19 @@ impl<'a> Decoder<'a> {
 
 fn decode_delta(
     bytes: &[u8],
-    limits: EditLimits,
+    limits: EditOptions,
     story_names: &BTreeSet<String>,
 ) -> Result<Vec<Record>> {
     let maximum = limits.max_package_bytes.min(MAX_DELTA_BYTES);
     if bytes.len() > maximum {
         return Err(Error::InkLimit {
-            resource: "durable closure bytes",
+            kind: LimitKind::DurableClosureBytes,
             actual: bytes.len(),
             maximum,
         });
     }
     let mut decoder = Decoder::new(bytes)?;
-    let count = decoder.u64("durable closure records", MAX_DELTA_RECORDS)?;
+    let count = decoder.u64(LimitKind::DurableClosureRecords, MAX_DELTA_RECORDS)?;
     if count == 0 {
         return Err(invalid_durable("empty Ink durable closure"));
     }
@@ -1910,7 +1940,7 @@ fn decode_delta(
         .ok_or_else(|| invalid_durable("Ink durable closure allocation overflow"))?;
     if retained_bytes > maximum {
         return Err(Error::InkLimit {
-            resource: "durable closure records",
+            kind: LimitKind::DurableClosureRecords,
             actual: retained_bytes,
             maximum,
         });
@@ -1933,7 +1963,7 @@ fn decode_delta(
             return Err(invalid_durable("unknown Ink durable closure member kind"));
         }
         let name = decoder.text(
-            "durable member name",
+            LimitKind::DurableMemberName,
             MAX_MEMBER_NAME.min(limits.inventory.stories.max_topology_bytes),
         )?;
         if kind == 0 && name != "[Content_Types].xml" {
@@ -2037,7 +2067,7 @@ fn add_closure_metadata_bytes(
         .ok_or_else(|| invalid_durable("Ink durable closure metadata overflow"))?;
     if total > maximum {
         return Err(Error::InkLimit {
-            resource: "durable closure metadata bytes",
+            kind: LimitKind::DurableClosureMetadataBytes,
             actual: total,
             maximum,
         });
@@ -2051,7 +2081,7 @@ fn add_closure_metadata_size(current: usize, additional: usize, maximum: usize) 
         .ok_or_else(|| invalid_durable("Ink durable closure metadata overflow"))?;
     if total > maximum {
         return Err(Error::InkLimit {
-            resource: "durable closure metadata bytes",
+            kind: LimitKind::DurableClosureMetadataBytes,
             actual: total,
             maximum,
         });
@@ -2076,7 +2106,7 @@ fn add_closure_relationship_count(
         .ok_or_else(|| invalid_durable("Ink durable relationship count overflow"))?;
     if total > limits.max_relationships {
         return Err(Error::InkLimit {
-            resource: "durable closure relationships",
+            kind: LimitKind::DurableClosureRelationships,
             actual: total,
             maximum: limits.max_relationships,
         });
@@ -2088,7 +2118,7 @@ fn decode_member(
     decoder: &mut Decoder<'_>,
     kind: u8,
     name: &str,
-    limits: EditLimits,
+    limits: EditOptions,
     story_names: &BTreeSet<String>,
 ) -> Result<Option<Member>> {
     let present = decoder.u8()?;
@@ -2100,7 +2130,7 @@ fn decode_member(
     }
     if kind == 2 {
         let content_type = decoder.text(
-            "durable content type",
+            LimitKind::DurableContentType,
             MAX_CONTENT_TYPE.min(limits.inventory.stories.max_topology_bytes),
         )?;
         let payload_maximum = if story_names.contains(name) || is_story_content_type(&content_type)
@@ -2109,13 +2139,13 @@ fn decode_member(
         } else {
             limits.inventory.max_payload_bytes
         };
-        let payload = decoder.bytes("durable part payload", payload_maximum)?;
+        let payload = decoder.bytes(LimitKind::DurablePartPayload, payload_maximum)?;
         let relationship_present = decoder.u8()?;
         if relationship_present > 1 {
             return Err(invalid_durable("invalid Ink durable relationship presence"));
         }
         let relationships = decoder.bytes(
-            "durable relationship bytes",
+            LimitKind::DurableRelationshipBytes,
             MAX_RELATIONSHIPS_BYTES
                 .min(limits.inventory.stories.max_topology_bytes)
                 .min(limits.max_package_bytes),
@@ -2129,7 +2159,7 @@ fn decode_member(
         Ok(Some(Member {
             content_type: None,
             payload: decoder.bytes(
-                "durable package XML",
+                LimitKind::DurablePackageXml,
                 (MAX_RELATIONSHIPS_BYTES * 16)
                     .min(limits.inventory.stories.max_topology_bytes)
                     .min(limits.max_package_bytes),
@@ -2163,7 +2193,7 @@ fn validate_delta_source(package: &OpcPackage, records: &[Record]) -> Result<()>
         }
         match record.kind {
             0 => {
-                let current = package.source_content_types()?;
+                let current = package.source_content_types(package.read_limits())?;
                 let expected = record
                     .before
                     .as_ref()
@@ -2213,7 +2243,7 @@ fn validate_delta_source(package: &OpcPackage, records: &[Record]) -> Result<()>
                         let Some((present, relationships)) = expected.relationships.as_ref() else {
                             return Err(invalid_durable("missing source part relationship token"));
                         };
-                        let current = package.source_relationships(&name)?;
+                        let current = package.source_relationships(&name, package.read_limits())?;
                         if expected.content_type.as_deref() != Some(part.content_type())
                             || expected.payload.as_slice() != part.blob()
                             || *present != current.member_present()
@@ -2253,7 +2283,7 @@ fn apply_delta(
         None
     };
     let target_content_bytes = target_content.map(|member| member.payload.as_slice());
-    let source_content = package.source_content_types()?;
+    let source_content = package.source_content_types(package.read_limits())?;
 
     let mut part_records = Vec::new();
     for record in records.iter().filter(|record| record.kind == 2) {
@@ -2315,7 +2345,7 @@ fn apply_delta(
     let mut processed_owners = BTreeSet::new();
     for (owner_name, additions) in &additions_by_owner {
         let owner = PackURI::new(owner_name.clone()).map_err(Error::Uri)?;
-        let current_owner = package.source_relationships(&owner)?;
+        let current_owner = package.source_relationships(&owner, package.read_limits())?;
         let replacement_owner = relationship_targets
             .get(owner_name)
             .ok_or_else(|| invalid_durable("missing Ink owner relationship target"))?;
@@ -2359,10 +2389,15 @@ fn apply_delta(
         )?;
         for record in additions {
             let name = PackURI::new(record.name.clone()).map_err(Error::Uri)?;
-            let target_relationships = proof.source_relationships(&name)?;
-            let current_relationships = package.source_relationships(&name)?;
+            let target_relationships = proof.source_relationships(&name, proof.read_limits())?;
+            let current_relationships =
+                package.source_relationships(&name, package.read_limits())?;
             if current_relationships != target_relationships {
-                package.try_replace_relationships(&current_relationships, &target_relationships)?;
+                package.try_replace_relationships(
+                    &current_relationships,
+                    &target_relationships,
+                    package.read_limits(),
+                )?;
             }
         }
         current_content = next_content;
@@ -2375,9 +2410,9 @@ fn apply_delta(
             continue;
         }
         let owner = PackURI::new(owner_name.clone()).map_err(Error::Uri)?;
-        let current = package.source_relationships(&owner)?;
+        let current = package.source_relationships(&owner, package.read_limits())?;
         if current != *replacement {
-            package.try_replace_relationships(&current, replacement)?;
+            package.try_replace_relationships(&current, replacement, package.read_limits())?;
         }
     }
 
@@ -2423,15 +2458,19 @@ fn apply_delta(
     }
 
     if let Some(target) = target_content_bytes {
-        let replacement = proof.source_content_types()?;
+        let replacement = proof.source_content_types(proof.read_limits())?;
         if replacement.bytes() != target {
             return Err(invalid_durable(
                 "Ink durable proof content types changed during OPC parsing",
             ));
         }
-        let current_token = package.source_content_types()?;
-        package.try_replace_content_types(current_token.bytes(), &replacement)?;
-        if package.source_content_types()?.bytes() != target {
+        let current_token = package.source_content_types(package.read_limits())?;
+        package.try_replace_content_types(
+            current_token.bytes(),
+            &replacement,
+            package.read_limits(),
+        )?;
+        if package.source_content_types(package.read_limits())?.bytes() != target {
             return Err(invalid_durable(
                 "content-types transition is not source-preserving",
             ));
@@ -2497,7 +2536,7 @@ fn exact_transition_proof_package(
         proof_maximum,
     )?;
     let root = PackURI::new("/").map_err(Error::Uri)?;
-    let root_relationships = package.source_relationships(&root)?;
+    let root_relationships = package.source_relationships(&root, package.read_limits())?;
     if root_relationships.member_present() {
         proof_add_metadata(
             &mut total,
@@ -2585,11 +2624,14 @@ fn exact_transition_proof_package(
         }
     }
     let proof = writer.finish()?;
-    Ok(OpcPackage::from_bytes(&proof)?)
+    Ok(OpcPackage::from_bytes(&proof, package.read_limits())?)
 }
 
 enum ProofRelationships<'a> {
-    Current(OwnedRelationships),
+    // A current source token contains the full OPC relationship index, while
+    // closure proofs borrow only their serialized bytes. Box the uncommon
+    // current token so each proof part remains bounded by its borrowed view.
+    Current(Box<OwnedRelationships>),
     Closure { present: bool, bytes: &'a [u8] },
 }
 
@@ -2648,11 +2690,11 @@ fn final_proof_part<'a>(
     }
     let name = PackURI::new(name.to_owned()).map_err(Error::Uri)?;
     let part = package.get_part(&name)?;
-    let relationships = package.source_relationships(&name)?;
+    let relationships = package.source_relationships(&name, package.read_limits())?;
     Ok(ProofPart {
         content_type: part.content_type(),
         payload: &[],
-        relationships: ProofRelationships::Current(relationships),
+        relationships: ProofRelationships::Current(Box::new(relationships)),
     })
 }
 
@@ -2789,7 +2831,7 @@ fn relationship_tokens(
         let Some((after_present, after_bytes)) = after.relationships.as_ref() else {
             return Err(invalid_durable("missing target owner relationships"));
         };
-        let current = package.source_relationships(&owner)?;
+        let current = package.source_relationships(&owner, package.read_limits())?;
         if current.member_present() != *before_present || current.bytes() != before_bytes {
             return Err(invalid_durable("relationship owner source is stale"));
         }
@@ -2810,7 +2852,7 @@ fn relationship_tokens(
                 return Err(invalid_durable("relationship retargeting is not admitted"));
             }
         }
-        let token = proof.source_relationships(&owner)?;
+        let token = proof.source_relationships(&owner, proof.read_limits())?;
         if token.bytes() != after_bytes || token.member_present() != *after_present {
             return Err(invalid_durable(
                 "relationship proof token does not match target",
@@ -2824,7 +2866,7 @@ fn relationship_tokens(
 fn parse_relationships(bytes: &[u8], limits: Limits) -> Result<Vec<RelationshipSpec>> {
     if bytes.len() > limits.stories.max_topology_bytes {
         return Err(Error::InkLimit {
-            resource: "Ink relationship metadata bytes",
+            kind: LimitKind::RelationshipMetadataBytes,
             actual: bytes.len(),
             maximum: limits.stories.max_topology_bytes,
         });
@@ -2867,9 +2909,11 @@ fn parse_relationships(bytes: &[u8], limits: Limits) -> Result<Vec<RelationshipS
                     }
                 }
                 if relationships.len() >= maximum {
-                    return Err(invalid_durable(
-                        "Ink durable relationship count exceeds limits",
-                    ));
+                    return Err(Error::InkLimit {
+                        kind: LimitKind::DurableClosureRelationships,
+                        actual: relationships.len().saturating_add(1),
+                        maximum,
+                    });
                 }
                 relationships
                     .try_reserve(1)
@@ -2935,9 +2979,10 @@ mod tests {
     }
 
     fn make_patch() -> (Patch, CorePatch<Reversible>) {
-        let mut package = Package::new().expect("new DOCX");
-        package.document_mut().expect("document").add_paragraph();
+        let mut builder = crate::Builder::new().expect("new DOCX");
+        builder.document().expect("document").add_paragraph();
         let mut bytes = std::io::Cursor::new(Vec::new());
+        let package = builder.build().expect("new DOCX");
         package
             .to_plain_stream(&mut bytes)
             .expect("materialize DOCX");
@@ -2958,7 +3003,8 @@ mod tests {
     #[test]
     fn inverse_restore_replays_intent_before_publishing_forged_story() {
         let (patch, durable) = make_patch();
-        let mut target = Package::from_opc_package(patch.after.package.clone()).expect("target");
+        let target =
+            Package::from_opc_package(patch.after.package.as_ref().clone()).expect("target");
         let forged_source = tamper_story(&patch.before.package);
         let intent_id = durable.operations()[0].preconditions["intent_sha256"]
             .as_str()
@@ -2990,13 +3036,13 @@ mod tests {
             Value::String(BlobId::of(&restore).as_hex()),
         );
         let forged = CorePatch::<Reversible>::from_deterministic_json(
-            &serde_json::to_vec(&wire).expect("canonical JSON"),
+            &litchi_core::canonical_json::to_vec(&wire),
             limits(),
         )
         .expect("forged patch parses");
         let before = package_fingerprint(target.opc_package()).expect("target fingerprint");
         let error = target
-            .apply_durable_ink_patch(&forged)
+            .apply_durable_ink(&forged)
             .expect_err("forged source must fail forward replay");
         assert!(
             error
@@ -3020,13 +3066,14 @@ mod tests {
         wire["operations"][0]["forward"]["preconditions"]["target_sha256"] =
             Value::String(forged_target_hash);
         let forged = CorePatch::<Reversible>::from_deterministic_json(
-            &serde_json::to_vec(&wire).expect("canonical JSON"),
+            &litchi_core::canonical_json::to_vec(&wire),
             limits(),
         )
         .expect("forged patch parses");
-        let mut source = Package::from_opc_package(patch.before.package.clone()).expect("source");
+        let source =
+            Package::from_opc_package(patch.before.package.as_ref().clone()).expect("source");
         let before = package_fingerprint(source.opc_package()).expect("source fingerprint");
-        assert!(source.apply_durable_ink_patch(&forged).is_err());
+        assert!(source.apply_durable_ink(&forged).is_err());
         assert_eq!(
             package_fingerprint(source.opc_package()).expect("unchanged"),
             before
@@ -3036,7 +3083,8 @@ mod tests {
     #[test]
     fn inverse_restore_rebuilds_source_content_types_from_exact_proof() {
         let (initial, _) = make_patch();
-        let source = Package::from_opc_package(initial.after.package.clone()).expect("source");
+        let source =
+            Package::from_opc_package(initial.after.package.as_ref().clone()).expect("source");
         let mut edit = source.edit_ink().expect("Ink edit");
         edit.replace(
             Position::new(0),
@@ -3046,12 +3094,13 @@ mod tests {
         .expect("replace");
         let commit = edit.commit().expect("commit");
         let durable = commit.patch().to_durable(limits()).expect("durable");
-        let mut target =
-            Package::from_opc_package(commit.patch().after.package.clone()).expect("target");
+        let target = Package::from_opc_package(commit.patch().after.package.as_ref().clone())
+            .expect("target");
 
-        target
-            .apply_durable_ink_patch(&durable.inverse())
-            .expect("inverse replay");
+        let target = target
+            .apply_durable_ink(&durable.inverse())
+            .expect("inverse replay")
+            .into_package();
         assert_eq!(
             package_fingerprint(target.opc_package()).expect("restored fingerprint"),
             package_fingerprint(&commit.patch().before.package).expect("source fingerprint"),
@@ -3061,8 +3110,8 @@ mod tests {
     #[test]
     fn durable_decoders_reject_impossible_counts_before_reserving_records() {
         let mut intent = INTENT_HEADER.to_vec();
-        intent.extend_from_slice(&(EditLimits::default().max_operations as u64).to_le_bytes());
-        let intent_error = match decode_intents(&intent, EditLimits::default()) {
+        intent.extend_from_slice(&(EditOptions::default().max_operations as u64).to_le_bytes());
+        let intent_error = match decode_intents(&intent, EditOptions::default()) {
             Err(error) => error,
             Ok(_) => panic!("truncated intent count must be rejected"),
         };
@@ -3074,7 +3123,7 @@ mod tests {
 
         let mut closure = DELTA_HEADER.to_vec();
         closure.extend_from_slice(&(MAX_DELTA_RECORDS as u64).to_le_bytes());
-        let closure_error = match decode_delta(&closure, EditLimits::default(), &BTreeSet::new()) {
+        let closure_error = match decode_delta(&closure, EditOptions::default(), &BTreeSet::new()) {
             Err(error) => error,
             Ok(_) => panic!("truncated closure count must be rejected"),
         };
@@ -3092,7 +3141,9 @@ mod tests {
         const MANIFEST: &[u8] = br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="bin" ContentType="application/octet-stream"/></Types>"#;
         const ROOT_RELATIONSHIPS: &[u8] = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>"#;
         const CORRUPT_PAYLOAD: &[u8] = b"ink-durable-corrupt-payload";
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         writer
             .write_stored("[Content_Types].xml", MANIFEST)
             .expect("manifest");
@@ -3113,7 +3164,8 @@ mod tests {
                 .expect("stored payload");
             bytes[offset] ^= 1;
         }
-        OpcPackage::from_vec(bytes).expect("corruption is deferred to first decode")
+        OpcPackage::from_vec(bytes, litchi_opc::SourceLimits::default())
+            .expect("corruption is deferred to first decode")
     }
 
     fn is_undecodable_part(result: std::result::Result<impl Sized, PatchError>) -> bool {

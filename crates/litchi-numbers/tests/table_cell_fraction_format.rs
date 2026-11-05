@@ -23,10 +23,7 @@ use litchi_numbers::cell::data_format::{
     percentage::transaction as percentage_transaction,
     scientific::transaction as scientific_transaction,
 };
-use litchi_numbers::{
-    CellPosition, Package, PackageLimits, PackageReadOptions, PackageSemanticLimits, SheetSelector,
-    TableSelector,
-};
+use litchi_numbers::{At, Package, SheetSelector, TableSelector};
 use litchi_numbers_wire::{BncCell, CellDataFormatKind, StoredValue};
 use prost::Message as _;
 
@@ -78,12 +75,12 @@ fn native_accuracy(accuracy: FractionAccuracy) -> u32 {
     }
 }
 
-fn selected_position() -> CellPosition {
-    CellPosition::new(fixture::FIRST_CELL.0 as u32, fixture::FIRST_CELL.1 as u32)
+fn selected_position() -> At {
+    At::new(fixture::FIRST_CELL.0 as u32, fixture::FIRST_CELL.1 as u32)
 }
 
-fn sibling_position() -> CellPosition {
-    CellPosition::new(fixture::SECOND_CELL.0 as u32, fixture::SECOND_CELL.1 as u32)
+fn sibling_position() -> At {
+    At::new(fixture::SECOND_CELL.0 as u32, fixture::SECOND_CELL.1 as u32)
 }
 
 fn shared_source() -> TestResult<Vec<u8>> {
@@ -94,8 +91,8 @@ fn shared_source() -> TestResult<Vec<u8>> {
 }
 
 fn assert_exact_locality(source: &[u8], target: &[u8]) -> TestResult {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     let mut changed = Vec::new();
     for entry in before.iter() {
         let candidate = after
@@ -126,9 +123,11 @@ fn assert_exact_locality(source: &[u8], target: &[u8]) -> TestResult {
 }
 
 fn normalized_cell(cell: &[u8]) -> TestResult<Vec<u8>> {
-    let mut parsed = BncCell::parse(cell)?;
+    let mut parsed = BncCell::parse(cell, &litchi_numbers_wire::Limits::DEFAULT)?;
     parsed.clear_explicit_format();
-    Ok(parsed.encode())
+    Ok(parsed
+        .encode(&litchi_numbers_wire::Limits::DEFAULT)
+        .unwrap())
 }
 
 fn assert_non_format_bnc_bytes(source: &[u8], target: &[u8]) -> TestResult {
@@ -137,8 +136,8 @@ fn assert_non_format_bnc_bytes(source: &[u8], target: &[u8]) -> TestResult {
     assert_eq!(before.len(), after.len());
     for (before, after) in before.iter().zip(after.iter()) {
         assert_eq!(
-            BncCell::parse(before)?.cached_scalar()?,
-            BncCell::parse(after)?.cached_scalar()?,
+            BncCell::parse(before, &litchi_numbers_wire::Limits::DEFAULT)?.cached_scalar()?,
+            BncCell::parse(after, &litchi_numbers_wire::Limits::DEFAULT)?.cached_scalar()?,
             "Fraction format edit changed the cached numeric scalar"
         );
         assert_eq!(
@@ -297,11 +296,15 @@ fn fraction_selectors_and_option_semantics_are_explicit() -> TestResult {
     );
     assert!(matches!(
         package.table_cell_fraction_format("missing sheet", 0usize, selected_position()),
-        Err(Error::SheetNotFound)
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::fraction::transaction::Refusal::SheetNotFound
+        ))
     ));
     assert!(matches!(
         package.table_cell_fraction_format(0usize, "missing table", selected_position()),
-        Err(Error::TableNotFound)
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::fraction::transaction::Refusal::TableNotFound
+        ))
     ));
 
     let cleared = package
@@ -332,18 +335,18 @@ fn fraction_selectors_and_option_semantics_are_explicit() -> TestResult {
 fn fraction_coordinate_boundaries_return_cell_not_found_without_mutation() -> TestResult {
     let package = Package::from_bytes(&shared_source()?)?;
     let before = package.exact_bytes();
-    for position in [
-        CellPosition::new(1, 0),
-        CellPosition::new(0, 2),
-        CellPosition::new(u32::MAX, u32::MAX),
-    ] {
+    for position in [At::new(1, 0), At::new(0, 2), At::new(u32::MAX, u32::MAX)] {
         assert!(matches!(
             package.table_cell_fraction_format(0usize, 0usize, position),
-            Err(Error::CellNotFound)
+            Err(Error::Refused(
+                litchi_numbers::cell::data_format::fraction::transaction::Refusal::CellNotFound
+            ))
         ));
         assert!(matches!(
             package.edit_table_cell_fraction_format(0usize, 0usize, position),
-            Err(Error::CellNotFound)
+            Err(Error::Refused(
+                litchi_numbers::cell::data_format::fraction::transaction::Refusal::CellNotFound
+            ))
         ));
     }
     assert_eq!(package.exact_bytes(), before);
@@ -383,7 +386,10 @@ fn fraction_valid_id_with_inherited_bnc_flags_reads_none_then_restores_and_clear
         .set(fraction(FractionAccuracy::Halves))
         .commit()?;
     let set_bytes = set.package().exact_bytes();
-    let set_cell = BncCell::parse(&fixture::tile_cells(&set_bytes)?[0])?;
+    let set_cell = BncCell::parse(
+        &fixture::tile_cells(&set_bytes)?[0],
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
     assert_eq!(
         set_cell.explicit_format_flags(),
         litchi_numbers_wire::EXPLICIT_DECIMAL_FORMAT
@@ -401,7 +407,10 @@ fn fraction_valid_id_with_inherited_bnc_flags_reads_none_then_restores_and_clear
         .clear()
         .commit()?;
     let cleared_bytes = cleared.package().exact_bytes();
-    let cleared_cell = BncCell::parse(&fixture::tile_cells(&cleared_bytes)?[0])?;
+    let cleared_cell = BncCell::parse(
+        &fixture::tile_cells(&cleared_bytes)?[0],
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
     assert_eq!(cleared_cell.explicit_format_flags(), 0);
     assert_eq!(cleared_cell.format_identifier(), None);
     assert_eq!(
@@ -428,11 +437,11 @@ fn fraction_wrong_family_boundaries_are_typed_and_symmetric() -> TestResult {
         let before = package.exact_bytes();
         assert!(matches!(
             package.table_cell_fraction_format(0usize, 0usize, selected_position()),
-            Err(Error::WrongFormatFamily { .. })
+            Err(Error::Refused(litchi_numbers::cell::data_format::fraction::transaction::Refusal::WrongFormatFamily { .. }))
         ));
         assert!(matches!(
             package.edit_table_cell_fraction_format(0usize, 0usize, selected_position()),
-            Err(Error::WrongFormatFamily { .. })
+            Err(Error::Refused(litchi_numbers::cell::data_format::fraction::transaction::Refusal::WrongFormatFamily { .. }))
         ));
         assert_eq!(package.exact_bytes(), before);
     }
@@ -441,19 +450,23 @@ fn fraction_wrong_family_boundaries_are_typed_and_symmetric() -> TestResult {
     let package = Package::from_bytes(&source)?;
     assert!(matches!(
         package.table_cell_number_format(0usize, 0usize, selected_position()),
-        Err(number_transaction::Error::WrongFormatFamily { .. })
+        Err(number_transaction::Error::Refused(
+            litchi_numbers::cell::data_format::number::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     assert!(matches!(
         package.table_cell_percentage_format(0usize, 0usize, selected_position()),
-        Err(percentage_transaction::Error::WrongFormatFamily { .. })
+        Err(percentage_transaction::Error::Refused(litchi_numbers::cell::data_format::percentage::transaction::Refusal::WrongFormatFamily { .. }))
     ));
     assert!(matches!(
         package.table_cell_currency_format(0usize, 0usize, selected_position()),
-        Err(currency_transaction::Error::WrongFormatFamily { .. })
+        Err(currency_transaction::Error::Refused(
+            litchi_numbers::cell::data_format::currency::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     assert!(matches!(
         package.table_cell_scientific_format(0usize, 0usize, selected_position()),
-        Err(scientific_transaction::Error::WrongFormatFamily { .. })
+        Err(scientific_transaction::Error::Refused(litchi_numbers::cell::data_format::scientific::transaction::Refusal::WrongFormatFamily { .. }))
     ));
     Ok(())
 }
@@ -474,13 +487,13 @@ fn fraction_changed_edit_refuses_locked_table_atomically() -> TestResult {
         .expect_err("a changed Fraction edit must refuse a locked table");
     assert!(matches!(
         error,
-        Error::TableLocked {
+        Error::Refused(litchi_numbers::cell::data_format::fraction::transaction::Refusal::TableLocked {
             path: Path::Cell {
                 sheet: 0,
                 table: 0,
                 position,
             }
-        } if position == selected_position()
+        }) if position == selected_position()
     ));
     assert_eq!(package.exact_bytes(), before);
     Ok(())
@@ -685,9 +698,9 @@ fn fraction_does_not_reuse_a_number_or_percentage_entry() -> TestResult {
         let sibling = cells
             .get_mut(1)
             .ok_or_else(|| io::Error::other("format fixture sibling cell is missing"))?;
-        let mut cell = BncCell::parse(sibling)?;
+        let mut cell = BncCell::parse(sibling, &litchi_numbers_wire::Limits::DEFAULT)?;
         cell.set_number_or_percentage_format_identifier_preserving_value(None)?;
-        *sibling = cell.encode();
+        *sibling = cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
         Ok(())
     })?;
     let source = fixture::rewrite_format_list_payload_for_test(&source, |list| {
@@ -746,11 +759,11 @@ fn fraction_rewrite_preserves_scalar_style_comment_and_opaque_cell_bytes() -> Te
         let first = cells
             .first_mut()
             .ok_or_else(|| io::Error::other("format fixture first cell is missing"))?;
-        let mut cell = BncCell::parse(first)?;
+        let mut cell = BncCell::parse(first, &litchi_numbers_wire::Limits::DEFAULT)?;
         cell.set_style_identifier(Some(23));
         cell.set_text_style_identifier(Some(29));
         cell.set_comment_identifier(Some(31));
-        let mut encoded = cell.encode();
+        let mut encoded = cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
         encoded.extend_from_slice(&[0xde, 0xad, 0xbe, 0xef]);
         *first = encoded;
         Ok(())
@@ -762,8 +775,14 @@ fn fraction_rewrite_preserves_scalar_style_comment_and_opaque_cell_bytes() -> Te
         .commit()?;
     let target = commit.package().exact_bytes();
     assert_non_format_bnc_bytes(&source, &target)?;
-    let before = BncCell::parse(&fixture::tile_cells(&source)?[0])?;
-    let after = BncCell::parse(&fixture::tile_cells(&target)?[0])?;
+    let before = BncCell::parse(
+        &fixture::tile_cells(&source)?[0],
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
+    let after = BncCell::parse(
+        &fixture::tile_cells(&target)?[0],
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
     assert_eq!(after.style_identifier(), before.style_identifier());
     assert_eq!(
         after.text_style_identifier(),
@@ -823,7 +842,12 @@ fn fraction_unknown_wire_bytes_and_nested_extensions_survive_rewrite() -> TestRe
     let mut payload = fixture::format_payload_by_key(&source, fixture::FIRST_FORMAT_KEY)?;
     let original_nested_extension = fixture::unknown_field_record(&payload, 94)?;
     append_varint_field(&mut payload, 46, 0x80_03)?;
-    append_length_delimited_field(&mut payload, 47, b"fraction extension")?;
+    append_length_delimited_field(
+        &mut payload,
+        47,
+        b"fraction extension",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     payload.extend_from_slice(&encode_varint((48_u64 << 3) | 5));
     payload.extend_from_slice(&[0x11, 0x22, 0x33, 0x44]);
     payload.extend_from_slice(&encode_varint((49_u64 << 3) | 1));
@@ -849,7 +873,7 @@ fn fraction_unknown_wire_bytes_and_nested_extensions_survive_rewrite() -> TestRe
     );
     for field_number in [46, 47, 48, 49] {
         assert!(
-            WireView::parse(&target_nested)?
+            WireView::parse(&target_nested, litchi_iwa_common::WireLimits::DEFAULT)?
                 .fields()
                 .any(|field| field.number() == field_number),
             "unknown field {field_number} was not retained"
@@ -947,6 +971,7 @@ fn fraction_malformed_wire_and_graph_inputs_fail_closed_and_remain_atomic() -> T
         &mut wrong_wire,
         1,
         &fixture::NATIVE_FRACTION_FORMAT_TYPE.to_le_bytes(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     append_varint_field(&mut wrong_wire, 11, 8)?;
     assert_rejected_or_owner(&rewrite_payload(&source, &wrong_wire)?)?;
@@ -957,7 +982,12 @@ fn fraction_malformed_wire_and_graph_inputs_fail_closed_and_remain_atomic() -> T
         1,
         u64::from(fixture::NATIVE_FRACTION_FORMAT_TYPE),
     )?;
-    append_length_delimited_field(&mut wrong_wire_accuracy, 11, &[0x08])?;
+    append_length_delimited_field(
+        &mut wrong_wire_accuracy,
+        11,
+        &[0x08],
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     assert_rejected_or_owner(&rewrite_payload(&source, &wrong_wire_accuracy)?)?;
 
     // Field 20 is a native replacement marker. Canonical false is accepted
@@ -1027,6 +1057,7 @@ fn fraction_wrong_bnc_family_shapes_are_refused_without_mutation() -> TestResult
             cells
                 .first()
                 .ok_or_else(|| io::Error::other("format fixture first cell is missing"))?,
+            &litchi_numbers_wire::Limits::DEFAULT,
         )?;
         let mut replacement = first;
         replacement.set_data_format_identifier(
@@ -1034,7 +1065,9 @@ fn fraction_wrong_bnc_family_shapes_are_refused_without_mutation() -> TestResult
             CellDataFormatKind::NumericControlNumberOrPercentage,
             Some(77),
         )?;
-        cells[0] = replacement.encode();
+        cells[0] = replacement
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         Ok(())
     })?;
     assert_owner_rejects(&control)?;
@@ -1044,6 +1077,7 @@ fn fraction_wrong_bnc_family_shapes_are_refused_without_mutation() -> TestResult
             cells
                 .first()
                 .ok_or_else(|| io::Error::other("format fixture first cell is missing"))?,
+            &litchi_numbers_wire::Limits::DEFAULT,
         )?;
         let mut replacement = first;
         replacement.set_string(7);
@@ -1052,7 +1086,9 @@ fn fraction_wrong_bnc_family_shapes_are_refused_without_mutation() -> TestResult
             CellDataFormatKind::Text,
             None,
         )?;
-        cells[0] = replacement.encode();
+        cells[0] = replacement
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         Ok(())
     })?;
     assert_owner_rejects(&text)?;
@@ -1069,11 +1105,14 @@ fn fraction_secondary_and_alternate_number_shapes_fail_closed() -> TestResult {
             cells
                 .first()
                 .ok_or_else(|| io::Error::other("format fixture first cell is missing"))?,
+            &litchi_numbers_wire::Limits::DEFAULT,
         )?;
         let mut replacement = first;
         replacement
             .set_currency_format_identifier_preserving_value(Some(fixture::FIRST_FORMAT_KEY))?;
-        cells[0] = replacement.encode();
+        cells[0] = replacement
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         Ok(())
     })?;
     assert_rejected_or_owner(&alternate)?;
@@ -1112,7 +1151,7 @@ fn fraction_rewrite_preserves_empty_cell_value_and_opaque_metadata() -> TestResu
         empty.set_number_or_percentage_format_identifier_preserving_value(Some(
             fixture::FIRST_FORMAT_KEY,
         ))?;
-        let mut encoded = empty.encode();
+        let mut encoded = empty.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
         encoded.extend_from_slice(b"empty-fraction-tail");
         *first = encoded;
         Ok(())
@@ -1122,7 +1161,10 @@ fn fraction_rewrite_preserves_empty_cell_value_and_opaque_metadata() -> TestResu
         package.table_cell_fraction_format(0usize, 0usize, selected_position())?,
         Some(fraction(FractionAccuracy::Eighths))
     );
-    let before = BncCell::parse(&fixture::tile_cells(&source)?[0])?;
+    let before = BncCell::parse(
+        &fixture::tile_cells(&source)?[0],
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
     assert_eq!(before.stored_value(), StoredValue::Empty);
     assert_eq!(before.cached_scalar()?, None);
 
@@ -1131,7 +1173,10 @@ fn fraction_rewrite_preserves_empty_cell_value_and_opaque_metadata() -> TestResu
         .set(fraction(FractionAccuracy::Sixteenths))
         .commit()?;
     let target = commit.package().exact_bytes();
-    let after = BncCell::parse(&fixture::tile_cells(&target)?[0])?;
+    let after = BncCell::parse(
+        &fixture::tile_cells(&target)?[0],
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
     assert_eq!(after.stored_value(), StoredValue::Empty);
     assert_eq!(after.cached_scalar()?, None);
     assert_eq!(after.style_identifier(), before.style_identifier());
@@ -1147,18 +1192,23 @@ fn fraction_rewrite_preserves_formula_and_cached_scalar() -> TestResult {
         let first = cells
             .first_mut()
             .ok_or_else(|| io::Error::other("format fixture first cell is missing"))?;
-        let mut formula = BncCell::parse(first)?;
+        let mut formula = BncCell::parse(first, &litchi_numbers_wire::Limits::DEFAULT)?;
         formula.set_formula_reference(71);
         formula.set_formula_cached_number(-98.25)?;
         formula.set_style_identifier(Some(127));
         formula.set_comment_identifier(Some(131));
-        let mut encoded = formula.encode();
+        let mut encoded = formula
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         encoded.extend_from_slice(b"formula-fraction-tail");
         *first = encoded;
         Ok(())
     })?;
     let package = Package::from_bytes(&source)?;
-    let before = BncCell::parse(&fixture::tile_cells(&source)?[0])?;
+    let before = BncCell::parse(
+        &fixture::tile_cells(&source)?[0],
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
     let before_value = before.stored_value();
     let before_cache = before.cached_scalar()?;
     assert!(matches!(before_value, StoredValue::Formula(71)));
@@ -1169,7 +1219,10 @@ fn fraction_rewrite_preserves_formula_and_cached_scalar() -> TestResult {
         .set(fraction(FractionAccuracy::Tenths))
         .commit()?;
     let target = commit.package().exact_bytes();
-    let after = BncCell::parse(&fixture::tile_cells(&target)?[0])?;
+    let after = BncCell::parse(
+        &fixture::tile_cells(&target)?[0],
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
     assert_eq!(after.stored_value(), before_value);
     assert_eq!(after.cached_scalar()?, before_cache);
     assert_eq!(after.style_identifier(), before.style_identifier());
@@ -1181,41 +1234,58 @@ fn fraction_rewrite_preserves_formula_and_cached_scalar() -> TestResult {
 #[test]
 fn fraction_input_and_operation_budgets_reject_before_publication() -> TestResult {
     let source = shared_source()?;
-    let exact_limits = PackageLimits::new(
-        u64::try_from(source.len())?,
-        PackageLimits::MAX_ENTRIES,
-        PackageLimits::MAX_ENTRY_BYTES,
-        PackageLimits::MAX_TOTAL_BYTES,
-        PackageLimits::MAX_IWA_STREAM_BYTES,
-    )?;
+    let exact_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(source.len())?)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
     let exact = Package::from_bytes_with_options(
         &source,
-        PackageReadOptions::new(exact_limits, PackageSemanticLimits::default()),
+        litchi_numbers::OpenOptions::new()
+            .source_limits(exact_limits)
+            .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
     )?;
     assert_eq!(
         exact.table_cell_fraction_format(0usize, 0usize, selected_position())?,
         Some(fraction(FractionAccuracy::Eighths))
     );
 
-    let tight = PackageLimits::new(
-        u64::try_from(source.len().saturating_sub(1))?,
-        PackageLimits::MAX_ENTRIES,
-        PackageLimits::MAX_ENTRY_BYTES,
-        PackageLimits::MAX_TOTAL_BYTES,
-        PackageLimits::MAX_IWA_STREAM_BYTES,
-    )?;
+    let tight = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(source.len().saturating_sub(1))?)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
     assert!(
         Package::from_bytes_with_options(
             &source,
-            PackageReadOptions::new(tight, PackageSemanticLimits::default()),
+            litchi_numbers::OpenOptions::new()
+                .source_limits(tight)
+                .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
         )
         .is_err()
     );
-    let semantic = PackageSemanticLimits::new(1, 1, 1, 1)?;
+    let semantic = litchi_numbers::SemanticLimits::builder()
+        .max_objects(1)
+        .and_then(|b| b.max_sheets(1))
+        .and_then(|b| b.max_tables(1))
+        .and_then(|b| b.max_references(1))
+        .and_then(|b| b.build())?;
     assert!(
         Package::from_bytes_with_options(
             &source,
-            PackageReadOptions::new(PackageLimits::default(), semantic),
+            litchi_numbers::OpenOptions::new().semantic_limits(semantic),
         )
         .is_err()
     );
@@ -1226,7 +1296,7 @@ fn fraction_input_and_operation_budgets_reject_before_publication() -> TestResul
         .set(fraction(FractionAccuracy::UpToOneDigit))
         .commit();
     assert!(
-        matches!(result, Err(Error::LimitExceeded { .. })),
+        matches!(result, Err(Error::Limit { .. })),
         "unexpected operation-budget result: {result:?}"
     );
     assert_eq!(exact.exact_bytes(), before);
@@ -1319,11 +1389,8 @@ fn fraction_reopened_package_keeps_family_and_selector_equivalence() -> TestResu
 #[test]
 fn fraction_missing_metadata_is_rejected_without_publication() -> TestResult {
     let source = shared_source()?;
-    let without_metadata = Catalog::from_bytes(&source)?.reassemble_with_deletions_to_bytes(
-        &[],
-        &[fixture::METADATA_MEMBER],
-        Limits::default(),
-    )?;
+    let without_metadata = Catalog::from_bytes(&source, Default::default())?
+        .reassemble_with_deletions_to_bytes(&[], &[fixture::METADATA_MEMBER], Limits::default())?;
     assert_rejected_or_owner(&without_metadata)?;
     Ok(())
 }

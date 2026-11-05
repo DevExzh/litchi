@@ -38,9 +38,9 @@ pub enum PictureFrameKind {
 /// # Example
 /// ```ignore
 /// use litchi_imgconv::Convert as _;
-/// use litchi_ppt::Package;
+/// use litchi_ppt::raw::Reader;
 ///
-/// let mut pkg = Package::open("presentation.ppt")?;
+/// let mut pkg = Reader::open("presentation.ppt")?;
 /// let mut pres = pkg.presentation()?;
 ///
 /// for slide in pres.slides()? {
@@ -254,7 +254,11 @@ impl PictureShape {
         self.blip_id
     }
 
-    /// Get picture name
+    /// Get the picture's file name, as assigned with [`Self::set_name`].
+    ///
+    /// This is not the shape's name: a picture read from a presentation
+    /// reports its `wzName` in [`ShapeProperties::name`] (through
+    /// [`Self::properties`] or [`crate::shapes::ShapeEnum::name`]).
     #[must_use]
     pub fn name(&self) -> Option<&str> {
         self.name.as_deref()
@@ -280,6 +284,10 @@ impl PictureShape {
 
     pub(crate) fn mark_source_bound(&mut self) {
         self.source_bound = true;
+    }
+
+    pub(crate) fn apply_source_identity(&mut self, identity: super::shape::SourceIdentity) {
+        self.properties.apply_source_identity(identity);
     }
 
     pub(crate) fn ensure_mutable(
@@ -326,8 +334,9 @@ impl PictureShape {
     ) -> Result<Option<ImageFile<'data>>> {
         // Try to extract from embedded Escher data first
         if let Some(ref escher_data) = self.escher_data {
-            let images = litchi_odraw::image::scan(escher_data)
-                .map_err(|error| litchi_core::error::Error::ParseError(error.to_string()))?;
+            let images =
+                litchi_odraw::image::scan(escher_data, litchi_odraw::image::Limits::default())
+                    .map_err(|error| litchi_core::error::Error::ParseError(error.to_string()))?;
             if let Some(image) = images.into_iter().next() {
                 return Ok(Some(image));
             }
@@ -385,10 +394,6 @@ impl Shape for PictureShape {
         false
     }
 
-    fn clone_box(&self) -> Box<dyn Shape> {
-        Box::new(self.clone())
-    }
-
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
@@ -412,7 +417,7 @@ pub fn extract_blip_id(container: &Container<'_>) -> litchi_odraw::Result<Option
     for child in container.children() {
         let record = child?;
         if record.kind() == RecordKind::Opt
-            && let Some(raw) = Props::parse(&record)?.get_int(Id::BlipToDisplay)
+            && let Some(raw) = Props::parse(&record, record.limits())?.get_int(Id::BlipToDisplay)
         {
             let blip_index =
                 u32::try_from(raw).map_err(|_err| litchi_odraw::Error::MalformedProperties {

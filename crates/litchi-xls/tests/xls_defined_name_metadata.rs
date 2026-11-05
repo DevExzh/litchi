@@ -3,10 +3,10 @@ use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
 use litchi_cfb::OleFile;
-use litchi_xls::writer::{DefinedNameRecordOptions, FunctionGroupOptions, Writer};
+use litchi_xls::writer::{Builder, DefinedNameRecordOptions, FunctionGroupOptions};
 use litchi_xls::{
     BuiltInFunctionCategories, DefinedNameFutureRecords, DefinedNameKind, NameFnGrp12, NamePublish,
-    NameScope, Workbook,
+    NameScope, raw::Reader,
 };
 
 fn fixture(name: &str) -> PathBuf {
@@ -16,7 +16,7 @@ fn fixture(name: &str) -> PathBuf {
 }
 
 fn future_record_file() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_worksheet("Sheet1").unwrap();
     let categories = (0..19).map(|index| format!("Category{index}")).collect();
     writer
@@ -62,12 +62,16 @@ fn future_record_file() -> Vec<u8> {
         )
         .unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 
 fn workbook_records(file: &[u8]) -> Vec<(u16, Vec<u8>)> {
-    let mut ole = OleFile::open(Cursor::new(file.to_vec())).unwrap();
+    let mut ole = OleFile::open(
+        Cursor::new(file.to_vec()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let stream = ole.open_stream(&["Workbook"]).unwrap();
     let mut records = Vec::new();
     let mut offset = 0;
@@ -102,7 +106,7 @@ fn replace_group(file: &[u8], old: &[u8], new: &[u8]) -> Vec<u8> {
 
 #[test]
 fn rich_name_and_comment_round_trip_as_inert_metadata() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_worksheet("Sheet1").unwrap();
     writer
         .define_name_with_comment("Rate", "A1", "Unicode \u{7a0e}\u{7387}")
@@ -178,8 +182,8 @@ fn rich_name_and_comment_round_trip_as_inert_metadata() {
         .unwrap();
 
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
-    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     assert_eq!(workbook.defined_names().len(), 1);
     assert_eq!(
         workbook.defined_names()[0].comment.as_deref(),
@@ -209,7 +213,7 @@ fn rich_name_and_comment_round_trip_as_inert_metadata() {
 
 #[test]
 fn reads_poi_unicode_names_and_formula_extra() {
-    let workbook = Workbook::new(File::open(fixture("testNames.xls")).unwrap()).unwrap();
+    let workbook = Reader::new(File::open(fixture("testNames.xls")).unwrap()).unwrap();
     assert_eq!(workbook.defined_name_records().len(), 8);
     assert!(workbook.defined_name_records()[1].is_macro());
     let array_name = workbook
@@ -219,7 +223,7 @@ fn reads_poi_unicode_names_and_formula_extra() {
         .unwrap();
     assert!(!array_name.formula_extra.is_empty());
 
-    let workbook = Workbook::new(File::open(fixture("unicodeNameRecord.xls")).unwrap()).unwrap();
+    let workbook = Reader::new(File::open(fixture("unicodeNameRecord.xls")).unwrap()).unwrap();
     assert!(
         workbook
             .defined_name_records()
@@ -230,13 +234,13 @@ fn reads_poi_unicode_names_and_formula_extra() {
 
 #[test]
 fn poi_name_comment_corpus_round_trips_through_rich_inert_options() {
-    let source = Workbook::new(File::open(fixture("53109.xls")).unwrap()).unwrap();
+    let source = Reader::new(File::open(fixture("53109.xls")).unwrap()).unwrap();
     let name = source
         .defined_name_records()
         .iter()
         .find(|name| name.comment.is_some() && !name.is_macro())
         .unwrap();
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     for index in 0..source.sheets().len() {
         writer
             .add_worksheet(&format!("Sheet{}", index + 1))
@@ -266,8 +270,8 @@ fn poi_name_comment_corpus_round_trips_through_rich_inert_options() {
         })
         .unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
-    let reparsed = Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
+    let reparsed = Reader::new(Cursor::new(output.into_inner())).unwrap();
     let round_tripped = &reparsed.defined_name_records()[0];
     assert_eq!(round_tripped.name, name.name);
     assert_eq!(round_tripped.comment, name.comment);
@@ -301,7 +305,7 @@ fn exact_future_records_reject_malformed_order_cardinality_names_headers_and_con
     group.extend_from_slice(function);
     group.extend_from_slice(publish);
     let parses =
-        |replacement: &[u8]| Workbook::new(Cursor::new(replace_group(&file, &group, replacement)));
+        |replacement: &[u8]| Reader::new(Cursor::new(replace_group(&file, &group, replacement)));
     let mut out_of_order = Vec::new();
     out_of_order.extend_from_slice(function);
     out_of_order.extend_from_slice(comment);
@@ -363,7 +367,7 @@ fn future_record_writer_enforces_caps_names_and_emitted_category_references() {
         status_bar: String::new(),
         comment: None,
     };
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_worksheet("Sheet1").unwrap();
     assert!(
         writer
@@ -406,6 +410,8 @@ fn future_record_writer_enforces_caps_names_and_emitted_category_references() {
             },
         )
         .unwrap();
-    let mut output = Cursor::new(Vec::new());
-    assert!(writer.write_to(&mut output).is_err());
+    assert!(matches!(
+        writer.build(),
+        Err(litchi_xls::package::Error::Reader(_))
+    ));
 }

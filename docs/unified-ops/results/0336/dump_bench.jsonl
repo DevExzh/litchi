@@ -1,0 +1,9 @@
+{"scenario":"docx","items":1487,"traverse_median_us":11671.5,"traverse_min_us":11579.9,"dump_median_us":16957.9,"dump_min_us":16790.4,"ratio":1.453}
+{"scenario":"xlsx","items":74512,"traverse_median_us":237779.9,"traverse_min_us":236961.3,"dump_median_us":365738.1,"dump_min_us":363440.3,"ratio":1.538}
+{"scenario":"pptx","items":1001,"traverse_median_us":3353.2,"traverse_min_us":3289.0,"dump_median_us":7141.9,"dump_min_us":7095.2,"ratio":2.130}
+{"scenario":"docx","items":1487,"traverse_median_us":11702.3,"traverse_min_us":11595.9,"dump_median_us":17030.5,"dump_min_us":16942.0,"ratio":1.455}
+{"scenario":"xlsx","items":74512,"traverse_median_us":239103.9,"traverse_min_us":235972.4,"dump_median_us":369125.8,"dump_min_us":364323.9,"ratio":1.544}
+{"scenario":"pptx","items":1001,"traverse_median_us":3351.1,"traverse_min_us":3310.3,"dump_median_us":7155.6,"dump_min_us":7087.4,"ratio":2.135}
+{"scenario":"docx","items":1487,"traverse_median_us":11648.8,"traverse_min_us":11524.0,"dump_median_us":16798.2,"dump_min_us":16693.1,"ratio":1.442}
+{"scenario":"xlsx","items":74512,"traverse_median_us":239246.4,"traverse_min_us":237732.1,"dump_median_us":365993.4,"dump_min_us":364061.9,"ratio":1.530}
+{"scenario":"pptx","items":1001,"traverse_median_us":3445.7,"traverse_min_us":3331.9,"dump_median_us":7982.6,"dump_min_us":7104.0,"ratio":2.317}

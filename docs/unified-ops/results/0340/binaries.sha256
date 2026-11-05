@@ -1,0 +1,6 @@
+# Record 0340 harness binaries (kept outside the checkout; build.sh rebuilds them).
+# Features pages,keynote,numbers,odc of tools/perf-baseline/unified-batch-closure (record 0337's harness, unchanged).
+# before: trunk 2083926091 (git archive of crates/, the harness and its Keynote fixture)
+d93327911ec30467ad1de98157b6afeaa64f236009eb806aab1a23bc79971ef3  unified-batch-closure (before; runs tagged "before")
+# after: this branch at 67b6652c01 (the Keynote and object-navigator commits)
+9ef55d8f17648d6b28093222bc1926ad6cb1c1be1ed07c1364fb86db44e1d529  unified-batch-closure (after; runs tagged "after")

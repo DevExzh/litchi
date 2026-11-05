@@ -11,7 +11,7 @@
 
 use super::model::{Record, Run};
 use crate::leniency::{Tolerance, ToleranceReport};
-use crate::raw::{Cursor, Record as RawRecord, Records, Writer, kind};
+use crate::raw::{Cursor, Encoder, Record as RawRecord, Records, kind};
 use std::collections::{HashMap, HashSet, TryReserveError};
 use std::io::Write;
 use thiserror::Error;
@@ -52,16 +52,16 @@ pub enum Error {
     #[error("unrecognized {typ}: {val}")]
     Unrecognized {
         /// Name of the record or field being rejected.
-        typ: String,
+        typ: &'static str,
         /// Diagnostic value.
-        val: String,
+        val: &'static str,
     },
     /// A writer-side value cannot be represented by the codec.
     #[error("encoding error: {0}")]
-    Encoding(String),
+    Encoding(&'static str),
     /// A valid value uses a feature that `BrtCommentText` does not permit.
     #[error("unsupported feature: {0}")]
-    UnsupportedFeature(String),
+    UnsupportedFeature(&'static str),
     /// A bounded collection could not reserve its required memory.
     #[error("allocation failed for {resource}: {source}")]
     Allocation {
@@ -76,17 +76,25 @@ pub enum Error {
 ///
 /// This standalone function cannot report repairs, so it refuses every
 /// defect an opened worksheet repairs and records (see [`crate::leniency`]).
-pub fn read(bytes: &[u8]) -> Result<Vec<Record>> {
-    read_with(bytes, &mut Tolerance::refusing())
+pub fn read(bytes: &[u8], limits: crate::raw::Limits) -> Result<Vec<Record>> {
+    read_with(bytes, limits, &mut Tolerance::refusing())
 }
 
 /// Read one comments stream, recording Excel-compatible repairs into `report`.
-pub(crate) fn read_recording(bytes: &[u8], report: &mut ToleranceReport) -> Result<Vec<Record>> {
-    read_with(bytes, &mut Tolerance::recording(report))
+pub(crate) fn read_recording(
+    bytes: &[u8],
+    limits: crate::raw::Limits,
+    report: &mut ToleranceReport,
+) -> Result<Vec<Record>> {
+    read_with(bytes, limits, &mut Tolerance::recording(report))
 }
 
-fn read_with(bytes: &[u8], tolerance: &mut Tolerance<'_>) -> Result<Vec<Record>> {
-    let records = collect_records(bytes)?;
+fn read_with(
+    bytes: &[u8],
+    limits: crate::raw::Limits,
+    tolerance: &mut Tolerance<'_>,
+) -> Result<Vec<Record>> {
+    let records = collect_records(bytes, limits)?;
     let mut pos = 0;
     expect(&records, &mut pos, kind::BEGIN_COMMENTS)?;
     expect(&records, &mut pos, kind::BEGIN_COMMENT_AUTHORS)?;
@@ -100,6 +108,7 @@ fn read_with(bytes: &[u8], tolerance: &mut Tolerance<'_>) -> Result<Vec<Record>>
         pos += 1;
         let (author, consumed) = decode_wide_string(
             record.payload(),
+            limits,
             tolerance,
             kind::COMMENT_AUTHOR,
             record_location(record.offset()),
@@ -107,8 +116,8 @@ fn read_with(bytes: &[u8], tolerance: &mut Tolerance<'_>) -> Result<Vec<Record>>
         let length = author.encode_utf16().count();
         if length > MAX_AUTHOR_UNITS {
             return Err(Error::Unrecognized {
-                typ: "BrtCommentAuthor".to_string(),
-                val: author,
+                typ: "BrtCommentAuthor",
+                val: "unexpected value",
             });
         }
         let trailing = record.payload().len().saturating_sub(consumed);
@@ -117,8 +126,8 @@ fn read_with(bytes: &[u8], tolerance: &mut Tolerance<'_>) -> Result<Vec<Record>>
             record_location(record.offset()),
             trailing,
             || Error::Unrecognized {
-                typ: "BrtCommentAuthor".to_string(),
-                val: author.clone(),
+                typ: "BrtCommentAuthor",
+                val: "unexpected value",
             },
         )?;
         reserve(&mut authors, 1, "comment authors")?;
@@ -144,8 +153,8 @@ fn read_with(bytes: &[u8], tolerance: &mut Tolerance<'_>) -> Result<Vec<Record>>
                 if record.kind() == kind::UID {
                     if record.payload().len() != 16 || uid.is_some() {
                         return Err(Error::Unrecognized {
-                            typ: "ACUID BrtUid".to_string(),
-                            val: "invalid or duplicate UID".to_string(),
+                            typ: "ACUID BrtUid",
+                            val: "invalid or duplicate UID",
                         });
                     }
                     let mut value = [0; 16];
@@ -166,8 +175,8 @@ fn read_with(bytes: &[u8], tolerance: &mut Tolerance<'_>) -> Result<Vec<Record>>
         {
             if alternate_guid.is_some() {
                 return Err(Error::Unrecognized {
-                    typ: "ACUID".to_string(),
-                    val: "not followed by BrtBeginComment".to_string(),
+                    typ: "ACUID",
+                    val: "not followed by BrtBeginComment",
                 });
             }
             break;
@@ -195,8 +204,8 @@ fn read_with(bytes: &[u8], tolerance: &mut Tolerance<'_>) -> Result<Vec<Record>>
             || !cells.insert((row, col))
         {
             return Err(Error::Unrecognized {
-                typ: "BrtBeginComment".to_string(),
-                val: format!("author={author_raw}, range={row}:{col}-{last_row}:{last_col}"),
+                typ: "BrtBeginComment",
+                val: ", range",
             });
         }
 
@@ -208,13 +217,14 @@ fn read_with(bytes: &[u8], tolerance: &mut Tolerance<'_>) -> Result<Vec<Record>>
             pos += 1;
             let rich = RichString::parse_with(
                 record.payload(),
+                limits,
                 record_location(record.offset()),
                 tolerance,
             )?;
             if !rich.is_rich || rich.is_extended {
                 return Err(Error::Unrecognized {
-                    typ: "BrtCommentText".to_string(),
-                    val: "invalid RichStr flags".to_string(),
+                    typ: "BrtCommentText",
+                    val: "invalid RichStr flags",
                 });
             }
             (rich.text, rich.runs)
@@ -261,15 +271,15 @@ fn read_with(bytes: &[u8], tolerance: &mut Tolerance<'_>) -> Result<Vec<Record>>
     expect(&records, &mut pos, kind::END_COMMENTS)?;
     if pos != records.len() {
         return Err(Error::Unrecognized {
-            typ: "Comments stream".to_string(),
-            val: "trailing records".to_string(),
+            typ: "Comments stream",
+            val: "trailing records",
         });
     }
     Ok(comments)
 }
 
 /// Write one complete XLSB comments stream.
-pub fn write<W: Write>(writer: &mut Writer<W>, comments: &[Record]) -> Result<()> {
+pub fn write<W: Write>(writer: &mut Encoder<W>, comments: &[Record]) -> Result<()> {
     writer.write_record(kind::BEGIN_COMMENTS, &[])?;
     writer.write_record(kind::BEGIN_COMMENT_AUTHORS, &[])?;
 
@@ -284,24 +294,7 @@ pub fn write<W: Write>(writer: &mut Writer<W>, comments: &[Record]) -> Result<()
         }
     }
     for author in &authors {
-        let length = author.encode_utf16().count();
-        if length > MAX_AUTHOR_UNITS {
-            return Err(Error::Encoding(
-                "comment author length must not exceed 54 characters".to_string(),
-            ));
-        }
-        let byte_length = length
-            .checked_mul(2)
-            .and_then(|value| value.checked_add(4))
-            .ok_or_else(|| Error::Encoding("comment author length overflow".to_string()))?;
-        let mut data = Vec::new();
-        data.try_reserve(byte_length)
-            .map_err(|source| allocation("comment author payload", source))?;
-        data.extend_from_slice(&(length as u32).to_le_bytes());
-        for unit in author.encode_utf16() {
-            data.extend_from_slice(&unit.to_le_bytes());
-        }
-        writer.write_record(kind::COMMENT_AUTHOR, &data)?;
+        writer.write_record(kind::COMMENT_AUTHOR, &encode_author(author)?)?;
     }
     writer.write_record(kind::END_COMMENT_AUTHORS, &[])?;
     writer.write_record(kind::BEGIN_COMMENT_LIST, &[])?;
@@ -312,36 +305,67 @@ pub fn write<W: Write>(writer: &mut Writer<W>, comments: &[Record]) -> Result<()
             || comment.col >= MAX_COLUMNS
             || !cells.insert((comment.row, comment.col))
         {
-            return Err(Error::Encoding(
-                "invalid or duplicate comment cell".to_string(),
-            ));
+            return Err(Error::Encoding("invalid or duplicate comment cell"));
         }
         let author = author_ids[comment.author.as_str()];
-        let mut begin = Vec::new();
-        begin
-            .try_reserve(36)
-            .map_err(|source| allocation("comment header", source))?;
-        begin.extend_from_slice(&author.to_le_bytes());
-        begin.extend_from_slice(&comment.row.to_le_bytes());
-        begin.extend_from_slice(&comment.row.to_le_bytes());
-        begin.extend_from_slice(&comment.col.to_le_bytes());
-        begin.extend_from_slice(&comment.col.to_le_bytes());
-        begin.extend_from_slice(&comment.guid);
-        writer.write_record(kind::BEGIN_COMMENT, &begin)?;
-        if !comment.text.is_empty() {
-            let rich = RichString {
-                text: comment.text.clone(),
-                runs: comment.runs.clone(),
-                is_rich: true,
-                is_extended: false,
-            };
-            let data = rich.to_comment_bytes()?;
-            writer.write_record(kind::COMMENT_TEXT, &data)?;
-        }
-        writer.write_record(kind::END_COMMENT, &[])?;
+        write_comment(writer, comment, author)?;
     }
     writer.write_record(kind::END_COMMENT_LIST, &[])?;
     writer.write_record(kind::END_COMMENTS, &[])?;
+    Ok(())
+}
+
+/// Encode one `BrtCommentAuthor` payload.
+pub(crate) fn encode_author(author: &str) -> Result<Vec<u8>> {
+    let length = author.encode_utf16().count();
+    if length > MAX_AUTHOR_UNITS {
+        return Err(Error::Encoding(
+            "comment author length must not exceed 54 characters",
+        ));
+    }
+    let byte_length = length
+        .checked_mul(2)
+        .and_then(|value| value.checked_add(4))
+        .ok_or(Error::Encoding("comment author length overflow"))?;
+    let mut data = Vec::new();
+    data.try_reserve(byte_length)
+        .map_err(|source| allocation("comment author payload", source))?;
+    data.extend_from_slice(&(length as u32).to_le_bytes());
+    for unit in author.encode_utf16() {
+        data.extend_from_slice(&unit.to_le_bytes());
+    }
+    Ok(data)
+}
+
+/// Write one comment (`BrtBeginComment`, its `BrtCommentText` when it has
+/// text, and `BrtEndComment`) naming author index `author`.
+pub(crate) fn write_comment<W: Write>(
+    writer: &mut Encoder<W>,
+    comment: &Record,
+    author: u32,
+) -> Result<()> {
+    let mut begin = Vec::new();
+    begin
+        .try_reserve(36)
+        .map_err(|source| allocation("comment header", source))?;
+    begin.extend_from_slice(&author.to_le_bytes());
+    begin.extend_from_slice(&comment.row.to_le_bytes());
+    begin.extend_from_slice(&comment.row.to_le_bytes());
+    begin.extend_from_slice(&comment.col.to_le_bytes());
+    begin.extend_from_slice(&comment.col.to_le_bytes());
+    begin.extend_from_slice(&comment.guid);
+    writer.write_record(kind::BEGIN_COMMENT, &begin)?;
+    if !comment.text.is_empty() {
+        let rich = RichString {
+            text: comment.text.clone(),
+            runs: comment.runs.clone(),
+            is_rich: true,
+            is_extended: false,
+        };
+        let data = rich.to_comment_bytes()?;
+        writer.write_record(kind::COMMENT_TEXT, &data)?;
+    }
+    writer.write_record(kind::END_COMMENT, &[])?;
     Ok(())
 }
 
@@ -350,9 +374,9 @@ fn record_location(offset: usize) -> u32 {
     u32::try_from(offset).unwrap_or(u32::MAX)
 }
 
-fn collect_records(bytes: &[u8]) -> Result<Vec<RawRecord<'_>>> {
+fn collect_records(bytes: &[u8], limits: crate::raw::Limits) -> Result<Vec<RawRecord<'_>>> {
     let mut records = Vec::new();
-    for record in Records::new(bytes) {
+    for record in Records::new(bytes, limits) {
         reserve(&mut records, 1, "comments records")?;
         records.push(record?);
     }
@@ -378,11 +402,12 @@ fn expect(records: &[RawRecord<'_>], pos: &mut usize, expected: crate::raw::Kind
 
 fn decode_wide_string(
     data: &[u8],
+    limits: crate::raw::Limits,
     tolerance: &mut Tolerance<'_>,
     record_type: crate::raw::Kind,
     location: u32,
 ) -> Result<(String, usize)> {
-    let mut cursor = Cursor::new(data, "XLWideString");
+    let mut cursor = Cursor::new(data, "XLWideString", limits);
     let value = tolerance.read_wide_string(&mut cursor, record_type, location)?;
     Ok((value, cursor.position()))
 }
@@ -404,7 +429,12 @@ struct RichString {
 }
 
 impl RichString {
-    fn parse_with(data: &[u8], location: u32, tolerance: &mut Tolerance<'_>) -> Result<Self> {
+    fn parse_with(
+        data: &[u8],
+        limits: crate::raw::Limits,
+        location: u32,
+        tolerance: &mut Tolerance<'_>,
+    ) -> Result<Self> {
         if data.is_empty() {
             return Err(Error::InvalidLength {
                 expected: 1,
@@ -414,26 +444,26 @@ impl RichString {
         let is_rich = data[0] & 1 != 0;
         let is_extended = data[0] & 2 != 0;
         let (text, consumed) =
-            decode_wide_string(&data[1..], tolerance, kind::COMMENT_TEXT, location)?;
+            decode_wide_string(&data[1..], limits, tolerance, kind::COMMENT_TEXT, location)?;
         let text_len = text.encode_utf16().count();
         if text_len > MAX_TEXT_UNITS {
             return Err(Error::Unrecognized {
-                typ: "RichStr text length".to_string(),
-                val: text_len.to_string(),
+                typ: "RichStr text length",
+                val: "unexpected value",
             });
         }
         let mut offset = 1usize
             .checked_add(consumed)
-            .ok_or_else(|| Error::Encoding("RichStr offset overflow".to_string()))?;
+            .ok_or(Error::Encoding("RichStr offset overflow"))?;
         let mut runs = Vec::new();
         if is_rich {
             let count = read_count(data, &mut offset, "StrRun")?;
             let byte_count = count
                 .checked_mul(4)
-                .ok_or_else(|| Error::Encoding("StrRun byte count overflow".to_string()))?;
+                .ok_or(Error::Encoding("StrRun byte count overflow"))?;
             let end = offset
                 .checked_add(byte_count)
-                .ok_or_else(|| Error::Encoding("StrRun offset overflow".to_string()))?;
+                .ok_or(Error::Encoding("StrRun offset overflow"))?;
             if end > data.len() {
                 return Err(Error::InvalidLength {
                     expected: end,
@@ -448,8 +478,8 @@ impl RichString {
                     || previous.is_some_and(|value| character_index <= value)
                 {
                     return Err(Error::Unrecognized {
-                        typ: "StrRun ich".to_string(),
-                        val: character_index.to_string(),
+                        typ: "StrRun ich",
+                        val: "unexpected value",
                     });
                 }
                 previous = Some(character_index);
@@ -462,22 +492,27 @@ impl RichString {
         }
 
         if is_extended {
-            let (phonetic_text, consumed) =
-                decode_wide_string(&data[offset..], tolerance, kind::COMMENT_TEXT, location)?;
+            let (phonetic_text, consumed) = decode_wide_string(
+                &data[offset..],
+                limits,
+                tolerance,
+                kind::COMMENT_TEXT,
+                location,
+            )?;
             offset = offset
                 .checked_add(consumed)
-                .ok_or_else(|| Error::Encoding("phonetic text offset overflow".to_string()))?;
+                .ok_or(Error::Encoding("phonetic text offset overflow"))?;
             let phonetic_len = phonetic_text.encode_utf16().count();
             let count = read_count(data, &mut offset, "PhRun")?;
             let byte_count = count
                 .checked_mul(6)
-                .ok_or_else(|| Error::Encoding("PhRun byte count overflow".to_string()))?;
+                .ok_or(Error::Encoding("PhRun byte count overflow"))?;
             let runs_end = offset
                 .checked_add(byte_count)
-                .ok_or_else(|| Error::Encoding("PhRun offset overflow".to_string()))?;
+                .ok_or(Error::Encoding("PhRun offset overflow"))?;
             let end = runs_end
                 .checked_add(4)
-                .ok_or_else(|| Error::Encoding("phonetic settings offset overflow".to_string()))?;
+                .ok_or(Error::Encoding("phonetic settings offset overflow"))?;
             if end > data.len() {
                 return Err(Error::InvalidLength {
                     expected: end,
@@ -492,7 +527,7 @@ impl RichString {
                 let base_character_count = u16::from_le_bytes([chunk[4], chunk[5]]);
                 let base_end = usize::from(base_character_index)
                     .checked_add(usize::from(base_character_count))
-                    .ok_or_else(|| Error::Encoding("PhRun range overflow".to_string()))?;
+                    .ok_or(Error::Encoding("PhRun range overflow"))?;
                 if usize::from(phonetic_character_index) >= phonetic_len
                     || usize::from(base_character_index) >= text_len
                     || base_end > text_len
@@ -501,8 +536,8 @@ impl RichString {
                         .is_some_and(|value| usize::from(base_character_index) < value)
                 {
                     return Err(Error::Unrecognized {
-                        typ: "PhRun index".to_string(),
-                        val: format!("{phonetic_character_index}/{base_character_index}"),
+                        typ: "PhRun index",
+                        val: "/",
                     });
                 }
                 previous_phonetic = Some(phonetic_character_index);
@@ -514,8 +549,8 @@ impl RichString {
         let trailing = data.len().saturating_sub(offset);
         tolerance.tolerate_trailing(kind::COMMENT_TEXT, location, trailing, || {
             Error::Unrecognized {
-                typ: "RichStr".to_string(),
-                val: format!("{trailing} trailing bytes"),
+                typ: "RichStr",
+                val: "trailing bytes",
             }
         })?;
         Ok(Self {
@@ -529,13 +564,11 @@ impl RichString {
     fn to_comment_bytes(&self) -> Result<Vec<u8>> {
         let text_len = self.text.encode_utf16().count();
         if text_len > MAX_TEXT_UNITS {
-            return Err(Error::Encoding(
-                "RichStr text exceeds 32,767 characters".to_string(),
-            ));
+            return Err(Error::Encoding("RichStr text exceeds 32,767 characters"));
         }
         if self.is_extended {
             return Err(Error::UnsupportedFeature(
-                "phonetic metadata is not permitted in BrtCommentText".to_string(),
+                "phonetic metadata is not permitted in BrtCommentText",
             ));
         }
         let mut runs = self.runs.clone();
@@ -549,17 +582,17 @@ impl RichString {
         validate_runs(&runs, text_len)?;
         let text_bytes = text_len
             .checked_mul(2)
-            .ok_or_else(|| Error::Encoding("RichStr text byte count overflow".to_string()))?;
+            .ok_or(Error::Encoding("RichStr text byte count overflow"))?;
         let run_bytes = runs
             .len()
             .checked_mul(4)
-            .ok_or_else(|| Error::Encoding("RichStr run byte count overflow".to_string()))?;
+            .ok_or(Error::Encoding("RichStr run byte count overflow"))?;
         let capacity = 1usize
             .checked_add(4)
             .and_then(|value| value.checked_add(text_bytes))
             .and_then(|value| value.checked_add(4))
             .and_then(|value| value.checked_add(run_bytes))
-            .ok_or_else(|| Error::Encoding("RichStr size overflow".to_string()))?;
+            .ok_or(Error::Encoding("RichStr size overflow"))?;
         let mut data = Vec::new();
         data.try_reserve(capacity)
             .map_err(|source| allocation("comment rich-string payload", source))?;
@@ -579,26 +612,24 @@ impl RichString {
 
 fn validate_runs(runs: &[Run], text_len: usize) -> Result<()> {
     if runs.len() > MAX_TEXT_RUNS {
-        return Err(Error::Encoding("too many RichStr runs".to_string()));
+        return Err(Error::Encoding("too many RichStr runs"));
     }
     let mut previous = None;
     for run in runs {
         if usize::from(run.character_index) >= text_len
             || previous.is_some_and(|value| run.character_index <= value)
         {
-            return Err(Error::Encoding(
-                "invalid RichStr run ordering or index".to_string(),
-            ));
+            return Err(Error::Encoding("invalid RichStr run ordering or index"));
         }
         previous = Some(run.character_index);
     }
     Ok(())
 }
 
-fn read_count(data: &[u8], offset: &mut usize, context: &str) -> Result<usize> {
+fn read_count(data: &[u8], offset: &mut usize, _context: &str) -> Result<usize> {
     let end = offset
         .checked_add(4)
-        .ok_or_else(|| Error::Encoding(format!("{context} count offset overflow")))?;
+        .ok_or(Error::Encoding("count offset overflow"))?;
     if end > data.len() {
         return Err(Error::InvalidLength {
             expected: end,
@@ -609,8 +640,8 @@ fn read_count(data: &[u8], offset: &mut usize, context: &str) -> Result<usize> {
     *offset = end;
     if count > MAX_TEXT_RUNS {
         return Err(Error::Unrecognized {
-            typ: format!("{context} count"),
-            val: count.to_string(),
+            typ: "count",
+            val: "unexpected value",
         });
     }
     Ok(count)
@@ -663,7 +694,11 @@ mod tests {
 
     fn comment_stream(comment: &Record) -> Vec<u8> {
         let mut bytes = Vec::new();
-        write(&mut Writer::new(&mut bytes), std::slice::from_ref(comment)).unwrap();
+        write(
+            &mut Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT),
+            std::slice::from_ref(comment),
+        )
+        .unwrap();
         bytes
     }
 
@@ -682,7 +717,7 @@ mod tests {
         ];
         comment.guid = [7; 16];
 
-        let parsed = read(&comment_stream(&comment)).unwrap();
+        let parsed = read(&comment_stream(&comment), crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(parsed.len(), 1);
         assert_eq!(parsed[0].row, 2);
         assert_eq!(parsed[0].col, 3);
@@ -695,9 +730,24 @@ mod tests {
     }
 
     #[test]
+    fn required_raw_limits_bound_comment_record_payloads() {
+        let comment = Record::new(2, 3, "Sven".to_string(), "text".to_string());
+        let bytes = comment_stream(&comment);
+        let limits = crate::raw::Limits::new(35, crate::raw::Limits::DEFAULT.string_units());
+        assert!(matches!(
+            read(&bytes, limits),
+            Err(Error::Wire(crate::raw::Error::PayloadLimit {
+                length: 36,
+                limit: 35,
+                ..
+            }))
+        ));
+    }
+
+    #[test]
     fn reads_alternate_uid_and_future_record_wrappers() {
         let mut bytes = Vec::new();
-        let mut writer = Writer::new(&mut bytes);
+        let mut writer = Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT);
         writer.write_record(kind::BEGIN_COMMENTS, &[]).unwrap();
         writer
             .write_record(kind::BEGIN_COMMENT_AUTHORS, &[])
@@ -725,7 +775,7 @@ mod tests {
         writer.write_record(kind::FRT_END, &[]).unwrap();
         writer.write_record(kind::END_COMMENTS, &[]).unwrap();
 
-        let comments = read(&bytes).unwrap();
+        let comments = read(&bytes, crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(comments.len(), 1);
         assert_eq!(comments[0].alternate_guid, Some([9; 16]));
         assert_eq!(comments[0].guid, [7; 16]);
@@ -737,14 +787,14 @@ mod tests {
         let bytes = comment_stream(&comment);
         let mut duplicate = Vec::new();
         write(
-            &mut Writer::new(&mut duplicate),
+            &mut Encoder::new(&mut duplicate, crate::raw::Limits::DEFAULT),
             &[comment.clone(), comment],
         )
         .unwrap_err();
-        assert!(read(&bytes).is_ok());
+        assert!(read(&bytes, crate::raw::Limits::DEFAULT).is_ok());
 
         let mut malformed = Vec::new();
-        let mut writer = Writer::new(&mut malformed);
+        let mut writer = Encoder::new(&mut malformed, crate::raw::Limits::DEFAULT);
         writer.write_record(kind::BEGIN_COMMENTS, &[]).unwrap();
         writer
             .write_record(kind::BEGIN_COMMENT_AUTHORS, &[])
@@ -766,6 +816,6 @@ mod tests {
         writer.write_record(kind::END_COMMENT, &[]).unwrap();
         writer.write_record(kind::END_COMMENT_LIST, &[]).unwrap();
         writer.write_record(kind::END_COMMENTS, &[]).unwrap();
-        assert!(read(&malformed).is_err());
+        assert!(read(&malformed, crate::raw::Limits::DEFAULT).is_err());
     }
 }

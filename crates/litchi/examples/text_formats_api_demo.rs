@@ -1,12 +1,47 @@
-//! API demonstration for text format functions
+//! API demonstration for text format workbooks
 //!
-//! This example shows how to use the public API functions for opening
-//! text format workbooks through the sheet module.
+//! This example shows how to open text format workbooks through the
+//! concrete `litchi::sheet::text::Workbook` type and the format readers of
+//! `litchi::sheet::text` (the `litchi-sheet-text` crate). Text formats are
+//! not Office files, so `litchi::open` does not read them; a text `Workbook`
+//! implements the generic `WorkbookTrait` instead.
 
-use litchi::sheet::CellValue;
-use litchi::sheet::functions::*;
+use std::fs::File;
+
+use litchi::sheet::Worksheet as _;
+use litchi::sheet::text::{Workbook, delimited, dif, fixed_width, sylk};
+use litchi::sheet::{CellValue, WorkbookTrait};
 
 type ExampleResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
+
+/// A workbook over the cells a SYLK, DIF or fixed-width reader parsed.
+fn workbook_from_cells(cells: Vec<Vec<CellValue>>) -> Workbook {
+    Workbook::new(cells, delimited::Options::default())
+}
+
+/// Open a SYLK (Symbolic Link) workbook.
+fn open_sylk(path: &str) -> litchi::sheet::text::Result<Workbook> {
+    Ok(workbook_from_cells(sylk::read(
+        File::open(path)?,
+        &sylk::Options::default(),
+    )?))
+}
+
+/// Open a DIF (Data Interchange Format) workbook.
+fn open_dif(path: &str) -> litchi::sheet::text::Result<Workbook> {
+    Ok(workbook_from_cells(dif::read(
+        File::open(path)?,
+        &dif::Options::default(),
+    )?))
+}
+
+/// Open a fixed-width PRN workbook.
+fn open_fixed_width(path: &str) -> litchi::sheet::text::Result<Workbook> {
+    Ok(workbook_from_cells(fixed_width::read(
+        File::open(path)?,
+        &fixed_width::Options::default(),
+    )?))
+}
 
 fn main() -> ExampleResult<()> {
     println!("=== Text Formats API Demo ===\n");
@@ -61,8 +96,8 @@ fn create_sample_csv() -> ExampleResult<()> {
 fn test_csv_api() -> ExampleResult<()> {
     println!("\nTesting CSV API...");
 
-    // Open CSV workbook
-    let workbook = open_csv_workbook("sample.csv")?;
+    // Open CSV workbook (comma-delimited is the default configuration)
+    let workbook = Workbook::open("sample.csv")?;
 
     // Get worksheet
     let worksheet = workbook.worksheet_by_index(0)?;
@@ -95,7 +130,7 @@ fn test_csv_api() -> ExampleResult<()> {
 fn test_tsv_api() {
     println!("\nTesting TSV API...");
 
-    match open_tsv_workbook("sample.tsv") {
+    match Workbook::open_with_options("sample.tsv", delimited::Options::tsv()) {
         Ok(workbook) => {
             let worksheet = workbook.worksheet_by_index(0).unwrap();
             println!("  ✓ Opened TSV workbook: {}", worksheet.name());
@@ -109,7 +144,7 @@ fn test_prn_api() {
     println!("\nTesting PRN API...");
 
     // Test delimited PRN
-    match open_prn_workbook("sample.csv") {
+    match Workbook::open_with_options("sample.csv", delimited::Options::prn()) {
         // Using CSV as PRN for demo
         Ok(workbook) => {
             let worksheet = workbook.worksheet_by_index(0).unwrap();
@@ -120,7 +155,7 @@ fn test_prn_api() {
     }
 
     // Test fixed-width PRN
-    match open_fixed_width_workbook("sample.prn") {
+    match open_fixed_width("sample.prn") {
         Ok(workbook) => {
             let worksheet = workbook.worksheet_by_index(0).unwrap();
             println!("  ✓ Opened PRN (fixed-width) workbook");
@@ -133,7 +168,7 @@ fn test_prn_api() {
 fn test_sylk_api() {
     println!("\nTesting SYLK API...");
 
-    match open_sylk_workbook("sample.slk") {
+    match open_sylk("sample.slk") {
         Ok(workbook) => {
             let worksheet = workbook.worksheet_by_index(0).unwrap();
             println!("  ✓ Opened SYLK workbook");
@@ -156,7 +191,7 @@ fn test_sylk_api() {
 fn test_dif_api() {
     println!("\nTesting DIF API...");
 
-    match open_dif_workbook("sample.dif") {
+    match open_dif("sample.dif") {
         Ok(workbook) => {
             let worksheet = workbook.worksheet_by_index(0).unwrap();
             println!("  ✓ Opened DIF workbook");
@@ -169,7 +204,7 @@ fn test_dif_api() {
 fn test_fixed_width_api() {
     println!("\nTesting Fixed-width API...");
 
-    match open_fixed_width_workbook("sample.prn") {
+    match open_fixed_width("sample.prn") {
         Ok(workbook) => {
             let worksheet = workbook.worksheet_by_index(0).unwrap();
             println!("  ✓ Opened fixed-width workbook");

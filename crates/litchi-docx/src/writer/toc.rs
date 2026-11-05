@@ -197,7 +197,7 @@ impl TableOfContents {
     /// Returns a paragraph containing the TOC field with optional title.
     ///
     /// Note: This method generates standalone XML. The field-based approach via
-    /// `MutableField::toc()` is preferred for integration with the document structure.
+    /// `Field::toc()` is preferred for integration with the document structure.
     #[allow(
         dead_code,
         reason = "writer helper is retained for package integration"
@@ -241,7 +241,7 @@ impl TableOfContents {
     /// This is more compatible with some Word versions than fldSimple.
     ///
     /// Note: This method generates standalone XML. The field-based approach via
-    /// `MutableField::toc()` is preferred for integration with the document structure.
+    /// `Field::toc()` is preferred for integration with the document structure.
     #[allow(
         dead_code,
         reason = "writer helper is retained for package integration"

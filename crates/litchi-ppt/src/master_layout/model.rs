@@ -17,7 +17,9 @@ pub enum Context {
     Main,
     /// A Slide container whose SlideAtom.geom is `SL_MasterTitle`.
     Title,
-    /// A Notes container whose NotesAtom.slideIdRef is zero.
+    /// A Notes container whose NotesAtom.slideIdRef is null or in the
+    /// `MasterId` domain (the notes master; a notes slide references a
+    /// presentation slide).
     Notes,
     /// A Handout container.
     Handout,
@@ -212,8 +214,8 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn from_record(context: Context, root: Record) -> Result<Self> {
-        Self::from_record_with_limits(context, root, Limits::default())
+    pub fn from_record(context: Context, root: Record, limits: &Limits) -> Result<Self> {
+        Self::from_record_with_limits(context, root, *limits)
     }
 
     /// Validate and capture a record under explicit resource limits.
@@ -226,7 +228,11 @@ impl Snapshot {
         reason = "callers hand over ownership of the parsed record tree; taking it by \
                   reference would churn the established public API and its callers"
     )]
-    pub fn from_record_with_limits(context: Context, root: Record, limits: Limits) -> Result<Self> {
+    pub(crate) fn from_record_with_limits(
+        context: Context,
+        root: Record,
+        limits: Limits,
+    ) -> Result<Self> {
         let validated_limits = limits.validate()?;
         let bytes = codec::encode(&root, validated_limits)?;
         let reparsed = codec::parse(&bytes, validated_limits)?;
@@ -244,8 +250,8 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(context: Context, bytes: &[u8]) -> Result<Self> {
-        Self::parse_with_limits(context, bytes, Limits::default())
+    pub fn parse(context: Context, bytes: &[u8], limits: &Limits) -> Result<Self> {
+        Self::parse_with_limits(context, bytes, *limits)
     }
 
     /// Parse one complete PPT record under explicit resource limits.
@@ -253,7 +259,11 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_with_limits(context: Context, bytes: &[u8], limits: Limits) -> Result<Self> {
+    pub(crate) fn parse_with_limits(
+        context: Context,
+        bytes: &[u8],
+        limits: Limits,
+    ) -> Result<Self> {
         let validated_limits = limits.validate()?;
         let root = codec::parse(bytes, validated_limits)?;
         validation::validate(context, &root, validated_limits)?;
@@ -303,8 +313,8 @@ impl Snapshot {
 
     /// Start an isolated transactional edit from this immutable state.
     #[must_use]
-    pub fn edit(&self) -> transaction::Transaction {
-        transaction::Transaction::open(self.clone())
+    pub(crate) fn edit(&self) -> transaction::RecordEdit {
+        transaction::RecordEdit::open(self.clone())
     }
 
     /// Borrow this snapshot through the transaction's immutable view.

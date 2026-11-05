@@ -4,39 +4,97 @@
 //! and generated protobuf messages. It publishes [`Package`] snapshots whose
 //! semantic content is represented by the archive-free [`crate::Document`].
 
-mod body_chart_arrangement;
-mod body_chart_data;
-mod body_chart_metadata;
-mod body_footnote;
+pub(crate) mod body_bookmarks;
+pub(crate) mod body_chart_arrangement;
+pub(crate) mod body_chart_caption;
+pub(crate) mod body_chart_data;
+pub(crate) mod body_chart_font;
+pub(crate) mod body_chart_lifecycle;
+pub(crate) mod body_chart_metadata;
+pub(crate) mod body_chart_reference_lines;
+pub(crate) mod body_chart_series;
+pub(crate) mod body_chart_style;
+pub(crate) mod body_chart_text;
+pub(crate) mod body_chart_value_axis;
+pub(crate) mod body_date_time_fields;
+pub(crate) mod body_drawable_caption;
+pub(crate) mod body_drawable_graph;
+pub(crate) mod body_drawable_properties;
+pub(crate) mod body_drawable_style;
+pub(crate) mod body_drawable_text;
+pub(crate) mod body_footnote;
+pub(crate) mod body_media_lifecycle;
+pub(crate) mod body_number_attachments;
+pub(crate) mod body_storage_objects;
+mod body_story;
 pub(crate) mod body_table_appearance;
-mod body_table_catalog;
-mod body_table_deletion;
+pub(crate) mod body_table_catalog;
+pub(crate) mod body_table_cell_appearance;
+pub(crate) mod body_table_cell_format;
+pub(crate) mod body_table_cell_list;
+mod body_table_cell_rich_text;
+pub(crate) mod body_table_cell_text;
+pub(crate) mod body_table_comments;
+pub(crate) mod body_table_conditional_highlight;
+pub(crate) mod body_table_creation;
+pub(crate) mod body_table_deletion;
 pub(crate) mod body_table_dimension;
+mod body_table_duplicate;
 pub(crate) mod body_table_headers;
 pub(crate) mod body_table_hidden_axes;
-mod body_table_merges;
+pub(crate) mod body_table_merges;
 pub(crate) mod body_table_name;
+pub(crate) mod body_table_resize;
 pub(crate) mod body_table_sort;
+pub(crate) mod body_table_sort_execution;
 pub(crate) mod body_table_title;
+pub(crate) mod body_table_topology;
+pub(crate) mod body_table_values;
+pub(crate) mod builder_table;
 #[cfg(feature = "internal-iwork-source")]
 mod catalog_body_table_appearance;
+mod directory;
 pub(crate) mod document_settings;
-mod drawable_order;
-mod footnote_text;
-mod header_footer_text;
-mod image_adjustments;
+pub(crate) mod drawable_order;
+pub(crate) mod footnote_text;
+pub(crate) mod header_footer_text;
+pub(crate) mod image_adjustments;
+pub(crate) mod metadata_edit;
 #[cfg(feature = "internal-iwork-source")]
 mod movie_playback;
-mod page_layout;
+// The drawable-properties family reads and rewrites movie playback through
+// the same owner module, so it is compiled without the host seam feature as
+// well; only the hidden `__*` re-exports stay behind the feature.
+mod locale;
+#[cfg(not(feature = "internal-iwork-source"))]
+#[path = "package/movie_playback.rs"]
+mod movie_playback;
+pub(crate) mod page_layout;
 mod save;
 pub(crate) mod section_background;
-mod section_name;
-mod section_pagination;
+pub(crate) mod section_lifecycle;
+pub(crate) mod section_name;
+pub(crate) mod section_pagination;
+pub(crate) mod section_paragraphs;
 pub(crate) mod section_settings;
-mod section_text;
+pub(crate) mod section_text;
+pub(crate) mod section_text_style;
 mod section_transaction;
+pub(crate) mod sidecars;
+mod structure;
 pub(crate) mod table_cells;
-mod table_lock;
+pub(crate) mod table_lock;
+pub(crate) mod text_box_annotation;
+mod text_box_comment_graph;
+pub(crate) mod text_box_date_time;
+pub(crate) mod text_box_drawable_comment;
+pub(crate) mod text_box_drop_cap;
+pub(crate) mod text_box_hyperlink;
+pub(crate) mod text_box_language;
+pub(crate) mod text_box_list;
+pub(crate) mod text_box_named_style;
+mod text_box_structure;
+pub(crate) mod text_box_text;
 #[cfg(feature = "internal-iwork-source")]
 mod text_storage;
 
@@ -54,7 +112,9 @@ use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes,
     wire::{WireFieldView, WireView},
 };
-use litchi_iwa_detect::{Format, PreparedSource};
+use litchi_iwa_detect::Format;
+#[cfg(feature = "internal-iwork-source")]
+use litchi_iwa_detect::PreparedSource;
 use litchi_iwa_protos::pages_body_codec::{self, DecodeOptions as PagesBodyDecodeOptions};
 use litchi_iwa_protos::{pages_footnote_codec, pages_footnote_marker_codec};
 use litchi_iwa_text::storage::{Run, Storage};
@@ -68,110 +128,19 @@ use crate::{
     MAX_SECTIONS, Root, Section, SectionType,
 };
 
-pub use body_chart_arrangement::{
-    BodyChartArrangementCommit, BodyChartArrangementDiagnostics, BodyChartArrangementEdit,
-    BodyChartArrangementError, BodyChartArrangementLimitKind, BodyChartArrangementPatch,
-};
-pub use body_chart_data::{
-    BodyChartDataCommit, BodyChartDataDiagnostics, BodyChartDataEdit, BodyChartDataError,
-    BodyChartDataLimitKind, BodyChartDataPatch,
-};
-pub use body_chart_metadata::{BodyChartMetadataError, BodyChartMetadataLimitKind};
-pub use body_footnote::{
-    BodyFootnoteCommit, BodyFootnoteDiagnostics, BodyFootnoteEdit, BodyFootnoteError,
-    BodyFootnoteLimitKind, BodyFootnotePatch, BodyFootnoteSnapshot,
-};
-pub use body_table_appearance::{
-    BodyTableAppearanceCommit, BodyTableAppearanceDiagnostics, BodyTableAppearanceEdit,
-    BodyTableAppearanceError, BodyTableAppearanceLimitKind, BodyTableAppearancePatch,
-    BodyTableAppearancePath,
-};
-pub use body_table_catalog::{
-    BodyTableCatalog, BodyTableCatalogError, BodyTableCatalogLimitKind, BodyTableSnapshot,
-};
-pub use body_table_deletion::{
-    BodyTableDeletionCommit, BodyTableDeletionDiagnostics, BodyTableDeletionError,
-    BodyTableDeletionLimitKind, BodyTableDeletionPatch,
-};
-pub use body_table_dimension::{
-    BodyTableDimensionCommit, BodyTableDimensionDiagnostics, BodyTableDimensionEdit,
-    BodyTableDimensionError, BodyTableDimensionLimitKind, BodyTableDimensionPatch,
-};
-pub use body_table_headers::{
-    BodyTableHeaderSettingsCommit, BodyTableHeaderSettingsDiagnostics, BodyTableHeaderSettingsEdit,
-    BodyTableHeaderSettingsError, BodyTableHeaderSettingsInvalidReason,
-    BodyTableHeaderSettingsLimitKind, BodyTableHeaderSettingsPatch,
-};
-pub use body_table_hidden_axes::{
-    BodyTableHiddenAxesCommit, BodyTableHiddenAxesDiagnostics, BodyTableHiddenAxesEdit,
-    BodyTableHiddenAxesError, BodyTableHiddenAxesLimitKind, BodyTableHiddenAxesPatch,
-    BodyTableHiddenAxesPath,
-};
-pub use body_table_merges::{
-    BodyTableMergesCommit, BodyTableMergesDiagnostics, BodyTableMergesEdit, BodyTableMergesError,
-    BodyTableMergesLimitKind, BodyTableMergesPatch, MergeReader,
-};
-pub use body_table_name::{
-    BodyTableNameCommit, BodyTableNameDiagnostics, BodyTableNameEdit, BodyTableNameError,
-    BodyTableNameLimitKind, BodyTableNamePatch, BodyTableNamePath,
-};
-pub use body_table_sort::{
-    BodyTableSortCommit, BodyTableSortDiagnostics, BodyTableSortEdit, BodyTableSortError,
-    BodyTableSortLimitKind, BodyTableSortPatch, BodyTableSortPath,
-};
-pub use body_table_title::{
-    BodyTableTitleCommit, BodyTableTitleDiagnostics, BodyTableTitleEdit, BodyTableTitleError,
-    BodyTableTitleLimitKind, BodyTableTitlePatch,
-};
+pub use body_table_merges::MergeReader;
 #[cfg(feature = "internal-iwork-source")]
 pub use catalog_body_table_appearance::{
     __CatalogBodyTableAppearanceSource, __catalog_body_table_appearance,
     __catalog_body_table_style_edges,
 };
-pub use drawable_order::{
-    BodyDrawableOrderCommit, BodyDrawableOrderDiagnostics, BodyDrawableOrderEdit,
-    BodyDrawableOrderError, BodyDrawableOrderLimitKind, BodyDrawableOrderPatch,
-};
-pub use footnote_text::{
-    FootnoteTextCommit, FootnoteTextDiagnostics, FootnoteTextEdit, FootnoteTextError,
-    FootnoteTextLimitKind, FootnoteTextPatch,
-};
-pub use header_footer_text::{
-    HeaderFooterTextCommit, HeaderFooterTextDiagnostics, HeaderFooterTextEdit,
-    HeaderFooterTextError, HeaderFooterTextLimitKind, HeaderFooterTextPatch,
-};
 #[cfg(feature = "internal-iwork-source")]
 pub use image_adjustments::{__decode_image_adjustments_payload, ImageAdjustmentsError};
-pub use image_adjustments::{
-    BodyImageAdjustmentsCommit, BodyImageAdjustmentsDiagnostics, BodyImageAdjustmentsEdit,
-    BodyImageAdjustmentsError, BodyImageAdjustmentsLimitKind, BodyImageAdjustmentsPatch,
-};
 #[cfg(feature = "internal-iwork-source")]
 pub use movie_playback::{
     __decode_movie_playback_payload, __rewrite_movie_playback_payload, MoviePlaybackError,
 };
-pub use page_layout::{
-    PageLayoutCommit, PageLayoutDiagnostics, PageLayoutEdit, PageLayoutError, PageLayoutLimitKind,
-    PageLayoutPatch,
-};
 pub use save::SaveError;
-pub use section_name::{
-    SectionNameCommit, SectionNameDiagnostics, SectionNameEdit, SectionNameError,
-    SectionNameLimitKind, SectionNamePatch,
-};
-pub use section_pagination::{
-    SectionPaginationCommit, SectionPaginationDiagnostics, SectionPaginationEdit,
-    SectionPaginationError, SectionPaginationLimitKind, SectionPaginationPatch,
-};
-pub use section_text::{
-    SectionTextCommit, SectionTextDiagnostics, SectionTextEdit, SectionTextError,
-    SectionTextLimitKind, SectionTextPatch,
-};
-pub use table_cells::{BodyTableCellsError, BodyTableCellsLimitKind};
-pub use table_lock::{
-    BodyTableLockCommit, BodyTableLockDiagnostics, BodyTableLockEdit, BodyTableLockError,
-    BodyTableLockLimitKind, BodyTableLockPatch,
-};
 const SECTION_MESSAGE_TYPE: u32 = 10_011;
 const FOOTNOTE_REFERENCE_MESSAGE_TYPE: u32 = 2_008;
 const TEXTUAL_ATTACHMENT_MESSAGE_TYPE: u32 = 2_004;
@@ -267,7 +236,7 @@ pub fn __pages_body_storage_discovery(source: &[u8]) -> PackageResult<BodyStorag
 /// This is the shared iWork ZIP/IWA resource profile. It remains a separate
 /// type because Pages owns the application parser, while physical validation
 /// is shared by the three iWork format owners.
-pub type Limits = litchi_iwa_archive::Limits;
+pub(crate) type Limits = litchi_iwa_archive::Limits;
 
 /// Errors raised while opening or validating a native Pages package.
 #[derive(Debug, Error)]
@@ -282,9 +251,57 @@ pub enum PackageError {
     /// Focused iWork source capture or classification rejected the input.
     #[error(transparent)]
     Detection(#[from] litchi_iwa_detect::Error),
-    /// The input is valid iWork data but belongs to another application.
-    #[error("iWork package is not a Pages document")]
-    NotPages,
+    /// The input is a recognized package of another application.
+    #[error("the input is a {detected:?} package, not a Pages document")]
+    UnexpectedFormat {
+        /// The format the input was recognized as.
+        detected: litchi_core::FileFormat,
+    },
+    /// The input is not a recognized iWork package.
+    #[error("the input is not an iWork package")]
+    NotOfficeFile,
+    /// An ingress dimension exceeded the selected limit.
+    #[error("Pages {kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        /// The exceeded dimension.
+        kind: crate::LimitKind,
+        /// The observed (or first excessive) value.
+        observed: u64,
+        /// The selected maximum.
+        maximum: u64,
+    },
+    /// A fresh document was built without its required identity
+    /// ([`crate::builder::Identity`]).
+    #[error("a fresh Pages document needs an explicit identity")]
+    MissingIdentity,
+    /// A fresh document's language is not a valid language tag
+    /// ([`crate::builder::Builder::language`]).
+    #[error("invalid Pages document language: {0}")]
+    InvalidLanguage(#[source] litchi_iwa_text::LanguageError),
+    /// A fresh document's locale is empty or holds a NUL character
+    /// ([`crate::builder::Builder::locale`]).
+    #[error("a Pages document locale must be non-empty text without NUL")]
+    InvalidLocale,
+    /// A fresh document's body table has an empty name, a name holding a
+    /// NUL character, or a size a table cannot take
+    /// ([`crate::builder::Builder::body_table`]).
+    #[error("invalid Pages body table: {rows} x {columns}")]
+    InvalidTable {
+        /// The requested rows.
+        rows: u32,
+        /// The requested columns.
+        columns: u32,
+    },
+    /// A limit profile was built with a value outside `1..=maximum`.
+    #[error("invalid Pages {kind} limit {value} (allowed 1..={maximum})")]
+    InvalidLimit {
+        /// The dimension being configured.
+        kind: crate::LimitKind,
+        /// The rejected value.
+        value: u64,
+        /// The hard ceiling for this dimension.
+        maximum: u64,
+    },
     /// The parsed package cannot form a valid Pages-native document.
     #[error("invalid Pages package: {0}")]
     InvalidFormat(String),
@@ -393,6 +410,142 @@ pub struct Package {
     state: Arc<State>,
 }
 
+/// The shared table engines (`litchi-iwa-table`, record 0379) read the
+/// package through its catalog and ingress limits. Pages keeps no object
+/// index; an object is found by a scan of the component catalog. The
+/// semantic ceilings are the engines' defaults, the same as Numbers'.
+impl litchi_iwa_table::TableSource for Package {
+    fn catalog(&self) -> &ComponentCatalog {
+        self.state.source.components()
+    }
+
+    fn physical(&self) -> Option<&SourceCatalog> {
+        Some(&self.state.source)
+    }
+
+    fn resolve_object(
+        &self,
+        identifier: u64,
+    ) -> Result<Option<litchi_iwa_table::ResolvedObject<'_>>, litchi_iwa_table::ResolveError> {
+        for (component_index, component) in self.state.source.components().iter().enumerate() {
+            let archive = component.archive();
+            if archive.object(identifier).is_none() {
+                continue;
+            }
+            let object_index = archive
+                .objects
+                .iter()
+                .position(|object| object.archive_info.identifier == Some(identifier))
+                .ok_or(litchi_iwa_table::ResolveError)?;
+            return Ok(Some(litchi_iwa_table::ResolvedObject {
+                messages: &archive.objects[object_index].messages,
+                component_index,
+                object_index,
+            }));
+        }
+        Ok(None)
+    }
+
+    fn source_bytes(&self) -> &[u8] {
+        self.state.source.source_bytes()
+    }
+
+    fn archive_limits(&self) -> Limits {
+        self.state.source.limits()
+    }
+
+    fn max_objects(&self) -> usize {
+        TABLE_ENGINE_MAX_OBJECTS
+    }
+
+    fn max_references(&self) -> usize {
+        TABLE_ENGINE_MAX_REFERENCES
+    }
+}
+
+/// The shared structural working set (`litchi_iwa_table::structure`)
+/// reopens its candidate through this package's strict ingress, reusing the
+/// parsed archive of every byte-identical member.
+impl litchi_iwa_table::structure::TableLeaf for Package {
+    fn reopen_candidate(
+        &self,
+        candidate: Arc<[u8]>,
+    ) -> litchi_iwa_table::structure::FaultResult<Self> {
+        let source = self
+            .state
+            .source
+            .reopen(candidate)
+            .map_err(|error| reopen_fault(PackageError::Archive(error)))?;
+        Self::from_source_catalog_with_semantic_limits(source, self.state.semantic_limits)
+            .map_err(reopen_fault)
+    }
+}
+
+/// Preserve bounded candidate-ingress failures at the shared structural
+/// boundary. Pages has a smaller package error surface than Numbers and
+/// Keynote: archive, payload, object-inventory, semantic and allocation
+/// failures are the only resource-bearing variants. Shape and format
+/// failures intentionally become verification so a transaction cannot turn a
+/// malformed candidate into a successful publish.
+fn reopen_fault(error: PackageError) -> litchi_iwa_table::structure::Fault {
+    use litchi_iwa_table::structure::{Fault, FaultLimit};
+
+    fn limit(kind: FaultLimit, observed: usize, maximum: usize) -> Fault {
+        Fault::Limit {
+            kind,
+            observed: u64::try_from(observed).unwrap_or(u64::MAX),
+            maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+        }
+    }
+
+    match error {
+        PackageError::Archive(error) => match error {
+            litchi_iwa_archive::Error::Limit {
+                observed, maximum, ..
+            } => Fault::Limit {
+                kind: FaultLimit::PackageBytes,
+                observed,
+                maximum,
+            },
+            litchi_iwa_archive::Error::Allocation { amount, .. } => Fault::Allocation { amount },
+            _ => Fault::Verification,
+        },
+        PackageError::PayloadLimit {
+            observed,
+            limit: maximum,
+        }
+        | PackageError::SectionNamesTooLarge {
+            observed,
+            limit: maximum,
+        } => limit(FaultLimit::PayloadBytes, observed, maximum),
+        PackageError::ObjectLimit {
+            observed,
+            limit: maximum,
+        } => limit(FaultLimit::Identifiers, observed, maximum),
+        PackageError::Semantic(
+            SemanticError::TooManySections {
+                actual: observed,
+                limit: maximum,
+            }
+            | SemanticError::TextTooLarge {
+                observed,
+                limit: maximum,
+            }
+            | SemanticError::TooManyBodyStorages {
+                actual: observed,
+                limit: maximum,
+            },
+        ) => limit(FaultLimit::PayloadBytes, observed, maximum),
+        PackageError::Allocation { amount } => Fault::Allocation { amount },
+        _ => Fault::Verification,
+    }
+}
+
+/// Semantic ceilings handed to the shared table engines (the Numbers
+/// defaults, record 0379).
+const TABLE_ENGINE_MAX_OBJECTS: usize = 1_000_000;
+const TABLE_ENGINE_MAX_REFERENCES: usize = 1_000_000;
+
 impl fmt::Debug for Package {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.debug_struct("Package").finish_non_exhaustive()
@@ -405,6 +558,7 @@ struct State {
     document: Document,
     metadata: Metadata,
     object_count: usize,
+    semantic_limits: crate::SemanticLimits,
 }
 
 #[derive(Debug, Default)]
@@ -526,40 +680,69 @@ impl FileSnapshot {
 }
 
 impl Package {
-    /// Open and parse a Pages package from a regular filesystem file.
+    /// Open and parse a Pages package from a regular filesystem file or an
+    /// app-authored package directory.
+    ///
+    /// A package directory (the bundle form Pages writes when "Save as
+    /// package" is selected) is captured once and converted into its
+    /// single-file form: the `Index.zip` members followed by every other file
+    /// of the bundle in byte order of its relative name. The resulting
+    /// package is an ordinary exact-source package: it edits like a
+    /// single-file package, and [`Self::save`] and [`Self::write_to`] publish
+    /// the single-file form.
     ///
     /// # Errors
     ///
-    /// Returns [`PackageError`] when the source is not a regular file, exceeds
-    /// the default physical bounds, or cannot be decoded as a valid Pages
-    /// package.
+    /// Returns [`PackageError`] when the source is neither a regular file nor
+    /// a package directory, exceeds the default bounds ([`OpenOptions::new`]),
+    /// belongs to another application ([`PackageError::UnexpectedFormat`]),
+    /// or cannot be decoded as a valid Pages package.
     pub fn open(path: impl AsRef<Path>) -> PackageResult<Self> {
-        Self::open_with_limits(path, Limits::default())
+        Self::open_with_options(path, crate::OpenOptions::new())
     }
 
-    /// Open and parse a Pages package under explicit physical ingress bounds.
+    /// Open and parse a Pages package under explicit source and semantic
+    /// limits.
     ///
     /// # Errors
     ///
-    /// Returns [`PackageError`] when the source is not a regular file, exceeds
-    /// the selected bounds, or cannot be decoded as a valid Pages package.
-    pub fn open_with_limits(path: impl AsRef<Path>, limits: Limits) -> PackageResult<Self> {
-        let source_bytes = read_path(path.as_ref(), limits)?;
-        let source_catalog = SourceCatalog::from_shared_bytes_with_limits(source_bytes, limits)?;
-        Self::from_source_catalog(source_catalog)
+    /// Returns the same failures as [`Self::open`], with limit failures
+    /// measured against `options`.
+    pub fn open_with_options(
+        path: impl AsRef<Path>,
+        options: crate::OpenOptions,
+    ) -> PackageResult<Self> {
+        let path = path.as_ref();
+        let source_limits = options.source_limits_value();
+        let limits = options.archive()?;
+        let (source_bytes, limits): (Arc<[u8]>, Limits) = match std::fs::symlink_metadata(path) {
+            Ok(metadata) if metadata.is_dir() => {
+                let bytes = directory::single_file_bytes(path, source_limits)?;
+                // The bundle's files were bounded while they were captured;
+                // the converted package adds only ZIP framing, so its own
+                // input bound is its length.
+                let limits = directory::converted_limits(limits, bytes.len())?;
+                (bytes.into(), limits)
+            },
+            _ => (read_path(path, limits)?, limits),
+        };
+        let source_catalog = SourceCatalog::from_shared_bytes(source_bytes, limits)?;
+        Self::from_ingress(source_catalog, options.semantic_limits_value())
     }
 
-    /// Parse a Pages package from ZIP bytes.
+    /// Parse a Pages package from ZIP bytes (copied once into the retained
+    /// source).
     ///
     /// # Errors
     ///
-    /// Returns [`PackageError`] when the bytes exceed the default physical or
-    /// semantic bounds, or cannot be decoded as a valid Pages package.
+    /// Returns [`PackageError`] when the bytes exceed the default bounds,
+    /// belong to another application, or cannot be decoded as a valid Pages
+    /// package.
     pub fn from_bytes(bytes: &[u8]) -> PackageResult<Self> {
-        Self::from_bytes_with_limits(bytes, Limits::default())
+        Self::from_bytes_with_options(bytes, crate::OpenOptions::new())
     }
 
-    /// Parse a Pages package from ZIP bytes under explicit physical bounds.
+    /// Parse a Pages package from ZIP bytes under explicit limits.
     ///
     /// The selected physical profile also caps semantic text ingress at its
     /// IWA-stream maximum, which prevents native text materialization from
@@ -567,11 +750,39 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`PackageError`] when the bytes exceed a selected limit, the
-    /// package shape is invalid, or semantic projection is invalid.
-    pub fn from_bytes_with_limits(bytes: &[u8], limits: Limits) -> PackageResult<Self> {
-        let source = SourceCatalog::from_bytes_with_limits(bytes, limits)?;
-        Self::from_source_catalog(source)
+    /// Returns the same failures as [`Self::from_bytes`], with limit failures
+    /// measured against `options`.
+    pub fn from_bytes_with_options(
+        bytes: &[u8],
+        options: crate::OpenOptions,
+    ) -> PackageResult<Self> {
+        let limits = options.archive()?;
+        let source = SourceCatalog::from_bytes(bytes, limits)?;
+        Self::from_ingress(source, options.semantic_limits_value())
+    }
+
+    /// Parse a Pages package from shared ZIP bytes without copying them: the
+    /// package retains `bytes` as its exact source.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same failures as [`Self::from_bytes`].
+    pub fn from_shared_bytes(bytes: Arc<[u8]>) -> PackageResult<Self> {
+        Self::from_shared_bytes_with_options(bytes, crate::OpenOptions::new())
+    }
+
+    /// Parse shared ZIP bytes without copying them, under explicit limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same failures as [`Self::from_bytes_with_options`].
+    pub fn from_shared_bytes_with_options(
+        bytes: Arc<[u8]>,
+        options: crate::OpenOptions,
+    ) -> PackageResult<Self> {
+        let limits = options.archive()?;
+        let source = SourceCatalog::from_shared_bytes(bytes, limits)?;
+        Self::from_ingress(source, options.semantic_limits_value())
     }
 
     /// Consume a source prepared by the focused iWork coordinator.
@@ -587,43 +798,108 @@ impl Package {
     #[cfg(feature = "internal-iwork-source")]
     #[doc(hidden)]
     pub fn __from_prepared_source(source: PreparedSource) -> PackageResult<Self> {
+        Self::__from_prepared_source_with_semantic_limits(source, crate::SemanticLimits::DEFAULT)
+    }
+
+    /// [`Self::__from_prepared_source`] under explicit semantic limits; the
+    /// prepared source's physical profile stays authoritative (record 0306).
+    ///
+    /// # Errors
+    ///
+    /// The errors of [`Self::__from_prepared_source`], with semantic limit
+    /// failures measured against `semantic`.
+    #[cfg(feature = "internal-iwork-source")]
+    #[doc(hidden)]
+    pub fn __from_prepared_source_with_semantic_limits(
+        source: PreparedSource,
+        semantic: crate::SemanticLimits,
+    ) -> PackageResult<Self> {
         validate_prepared_format(&source)?;
         let source_catalog = source.__into_source_catalog().ok_or_else(|| {
             PackageError::InvalidFormat(
                 "directory-backed Pages sources support semantic projection only".to_owned(),
             )
         })?;
-        Self::from_source_catalog(source_catalog)
+        Self::from_source_catalog_with(source_catalog, semantic)
     }
 
-    fn from_source_catalog(source: SourceCatalog) -> PackageResult<Self> {
+    /// Classify a public ingress source before projecting it: a package of
+    /// another iWork application is [`PackageError::UnexpectedFormat`], a
+    /// ZIP without an iWork root is [`PackageError::NotOfficeFile`].
+    fn from_ingress(source: SourceCatalog, semantic: crate::SemanticLimits) -> PackageResult<Self> {
+        // A root the classifier cannot read is left to the projection, whose
+        // errors name the malformed structure precisely.
+        match litchi_iwa_detect::component_catalog(source.components()) {
+            Ok(Some(Format::Pages)) | Err(_) => {},
+            Ok(Some(other)) => {
+                return Err(PackageError::UnexpectedFormat {
+                    detected: match other {
+                        Format::Keynote => litchi_core::FileFormat::Keynote,
+                        Format::Numbers => litchi_core::FileFormat::Numbers,
+                        Format::Pages => litchi_core::FileFormat::Pages,
+                    },
+                });
+            },
+            Ok(None) => return Err(PackageError::NotOfficeFile),
+        }
+        Self::from_source_catalog_with(source, semantic)
+    }
+
+    /// Reopen exact ZIP bytes under an already selected archive profile
+    /// (transaction candidates).
+    pub(crate) fn from_bytes_with_archive_limits(
+        bytes: &[u8],
+        limits: Limits,
+    ) -> PackageResult<Self> {
+        Self::from_source_catalog(SourceCatalog::from_bytes(bytes, limits)?)
+    }
+
+    pub(crate) fn from_source_catalog(source: SourceCatalog) -> PackageResult<Self> {
+        Self::from_source_catalog_with(source, crate::SemanticLimits::DEFAULT)
+    }
+
+    /// Reopen a candidate with the semantic admission profile selected for
+    /// the immutable source snapshot.  Focused transactions must not widen a
+    /// caller's semantic budget merely because the candidate is parsed from a
+    /// fresh source catalog.
+    pub(crate) fn from_source_catalog_with_semantic_limits(
+        source: SourceCatalog,
+        semantic: crate::SemanticLimits,
+    ) -> PackageResult<Self> {
+        Self::from_source_catalog_with(source, semantic)
+    }
+
+    fn from_source_catalog_with(
+        source: SourceCatalog,
+        semantic: crate::SemanticLimits,
+    ) -> PackageResult<Self> {
         let limits = source.limits();
         let metadata = Metadata::from_catalog(source.package())?;
         let components = source.components();
         let object_count = validate_components(components)?;
         let root_references = root_references_with_limits(components, limits)?;
-        let text_limit = effective_text_limit(limits);
+        let text_limit = effective_text_limit(limits).min(semantic.max_text_bytes());
         let document = decode_document(
             components,
             root_references,
-            MAX_SECTIONS,
+            semantic.max_sections(),
             text_limit,
             limits,
         )?;
+        let stats = Stats {
+            total_objects: object_count,
+            section_count: document.section_count(),
+        };
+        let document = Document::from_source(document, metadata.to_core(), stats);
         Ok(Self {
             state: Arc::new(State {
                 source,
                 document,
                 metadata,
                 object_count,
+                semantic_limits: semantic,
             }),
         })
-    }
-
-    /// Capture another cheap handle to the same native and semantic snapshot.
-    #[must_use]
-    pub fn snapshot(&self) -> Self {
-        self.clone()
     }
 
     /// Borrow exact package bytes for crate-internal preservation logic.
@@ -635,6 +911,17 @@ impl Package {
     #[must_use]
     pub(crate) fn source_bytes(&self) -> &[u8] {
         self.state.source.source_bytes()
+    }
+
+    /// Return the raw Numbers-wire profile selected by this package's
+    /// retained physical and semantic ingress limits.
+    pub(crate) fn numbers_wire_limits(&self) -> PackageResult<litchi_numbers_wire::Limits> {
+        let maximum = self.state.source.limits().max_iwa_stream_bytes();
+        let wire = WireLimits::default()
+            .with_input_bytes(maximum)
+            .and_then(|limits| limits.with_output_bytes(maximum))
+            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
+        Ok(litchi_numbers_wire::Limits::from_wire_limits(wire))
     }
 
     /// Write this exact immutable package artifact to a caller-owned sink.
@@ -694,6 +981,18 @@ impl Package {
         Ok(())
     }
 
+    /// The exact package artifact as one owned byte buffer.
+    ///
+    /// # Errors
+    ///
+    /// Infallible in practice (an in-memory sink); the result keeps the
+    /// output verbs uniform.
+    pub fn to_bytes(&self) -> Result<Vec<u8>, WriteError> {
+        let mut bytes = Vec::with_capacity(self.source_bytes().len());
+        self.write_to(&mut bytes)?;
+        Ok(bytes)
+    }
+
     /// Durably save this exact immutable package artifact to a filesystem
     /// path.
     ///
@@ -712,6 +1011,27 @@ impl Package {
     /// already committed through [`SaveError::was_committed`].
     pub fn save(&self, path: impl AsRef<Path>) -> Result<(), SaveError> {
         save::save(self, path)
+    }
+
+    /// Save this package as an app-style package directory at `path`
+    /// (`IWORK_API_REQUESTS.md` request 16, record 0301): `Index.zip` holds
+    /// the `Index/` members with their records unchanged, and every other
+    /// member (metadata sidecars, previews, `Data/` media) is a plain file.
+    /// Opening the directory again gives back this package's exact bytes.
+    ///
+    /// The bundle is written into a sibling staging directory; an existing
+    /// destination directory is swapped out only after the new one is
+    /// complete and synchronized.
+    ///
+    /// # Errors
+    ///
+    /// [`SaveError::Publication`] when the destination exists and is not a
+    /// directory or the staging, synchronization or swap fails;
+    /// [`SaveError::Bundling`] when a staged file cannot be written;
+    /// [`SaveError::Bundle`] when the index archive cannot be assembled or a
+    /// member name cannot be a file.
+    pub fn save_directory(&self, path: impl AsRef<Path>) -> Result<(), SaveError> {
+        directory::save_bundle(&self.state.source, path.as_ref())
     }
 
     /// Render all native Pages text through the immutable semantic snapshot.
@@ -788,13 +1108,21 @@ impl Package {
     ///
     /// A missing position returns `Ok(None)`, matching [`Document::section_at`]
     /// and keeping package callers independent of native object identifiers.
-    pub fn section_at(&self, position: usize) -> SelectorResult<Option<&Section>> {
-        self.select_section(SectionSelector::index(position))
+    pub fn section_at(&self, position: litchi_core::Position) -> SelectorResult<Option<&Section>> {
+        self.select_section(SectionSelector::position(position))
     }
 
-    /// Borrow the immutable Pages semantic snapshot.
+    /// The read-only semantic projection: sections, their text, metadata
+    /// and statistics. Cheap: the projection shares this package's decoded
+    /// sections (one reference-count increment).
     #[must_use]
-    pub fn semantic_document(&self) -> &Document {
+    pub fn document(&self) -> Document {
+        self.state.document.clone()
+    }
+
+    /// Borrow the read-only semantic projection.
+    #[must_use]
+    pub fn document_ref(&self) -> &Document {
         &self.state.document
     }
 
@@ -847,6 +1175,7 @@ impl Metadata {
         Ok(metadata)
     }
 
+    #[cfg(feature = "internal-iwork-source")]
     fn from_prepared_sidecars(
         sidecars: &litchi_iwa_detect::PreparedMetadataSidecars,
     ) -> PackageResult<Self> {
@@ -888,7 +1217,11 @@ impl Metadata {
         litchi_core::Metadata {
             title: self.title.clone(),
             author: self.author.clone(),
-            keywords: self.keywords.clone(),
+            keywords: self
+                .keywords
+                .as_deref()
+                .map(litchi_core::metadata::keywords::split)
+                .unwrap_or_default(),
             description: self.description.clone(),
             application: Some(
                 self.application
@@ -993,11 +1326,14 @@ pub fn __semantic_document_from_prepared_source(
     max_sections: usize,
     max_text_bytes: usize,
 ) -> PackageResult<Document> {
-    let semantic = crate::SemanticLimits::new(max_sections, max_text_bytes)
-        .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
+    let semantic = crate::SemanticLimits::builder()
+        .max_sections(max_sections)?
+        .max_text_bytes(max_text_bytes)?
+        .build()?;
     semantic_document_from_prepared_source(source, semantic)
 }
 
+#[cfg(feature = "internal-iwork-source")]
 pub(crate) fn semantic_document_from_prepared_source(
     source: PreparedSource,
     semantic: crate::SemanticLimits,
@@ -1023,9 +1359,16 @@ pub(crate) fn semantic_document_from_prepared_source(
     Ok(Document::from_source(document, metadata, stats))
 }
 
+#[cfg(feature = "internal-iwork-source")]
 fn validate_prepared_format(source: &PreparedSource) -> PackageResult<()> {
     if source.format() != Format::Pages {
-        return Err(PackageError::NotPages);
+        return Err(PackageError::UnexpectedFormat {
+            detected: match source.format() {
+                Format::Keynote => litchi_core::FileFormat::Keynote,
+                Format::Numbers => litchi_core::FileFormat::Numbers,
+                Format::Pages => litchi_core::FileFormat::Pages,
+            },
+        });
     }
     Ok(())
 }
@@ -1200,6 +1543,12 @@ fn metadata_entry<'a>(catalog: &'a Catalog, name: &str) -> PackageResult<Option<
         return Err(PackageError::InvalidFormat(format!(
             "Pages metadata entry {name} uses an unsupported compression method"
         )));
+    }
+    if entry.data().len() > crate::MAX_DOCUMENT_PROPERTIES_BYTES {
+        return Err(PackageError::PayloadLimit {
+            observed: entry.data().len(),
+            limit: crate::MAX_DOCUMENT_PROPERTIES_BYTES,
+        });
     }
     Ok(Some(entry.data()))
 }
@@ -1475,7 +1824,7 @@ fn decode_body_storage_with_wire_error(
             "Pages body object {identifier} text validation limits are invalid: {wire_error}"
         )),
     })?;
-    let decoded = litchi_iwa_text_wire::decode_storage_with_limits(payload, wire_limits)
+    let decoded = litchi_iwa_text_wire::decode_storage(payload, wire_limits)
         .map_err(BodyStorageDecodeError::Wire)?;
     // The strict text-wire pass above is authoritative for legacy balanced
     // unknown groups. `WireView` intentionally rejects group wire values, so
@@ -1812,7 +2161,7 @@ fn footnote_table_entries(
 ) -> PackageResult<Vec<NativeFootnoteReference>> {
     let wire_limits = storage_wire_limits(limits)?;
     let context = format!("Pages body object {body_identifier}");
-    let body_view = WireView::parse_with_limits(body_payload, wire_limits).map_err(|error| {
+    let body_view = WireView::parse(body_payload, wire_limits).map_err(|error| {
         PackageError::InvalidFormat(format!("{context} has invalid protobuf wire data: {error}"))
     })?;
     let Some(table_field) =
@@ -1820,12 +2169,11 @@ fn footnote_table_entries(
     else {
         return Ok(Vec::new());
     };
-    let table_view =
-        WireView::parse_with_limits(table_field.payload(), wire_limits).map_err(|error| {
-            PackageError::InvalidFormat(format!(
-                "{context} footnote table has invalid protobuf wire data: {error}"
-            ))
-        })?;
+    let table_view = WireView::parse(table_field.payload(), wire_limits).map_err(|error| {
+        PackageError::InvalidFormat(format!(
+            "{context} footnote table has invalid protobuf wire data: {error}"
+        ))
+    })?;
     let boundary_options = pages_body_options(limits)?;
     let mut entries = Vec::new();
     for field in table_view
@@ -2064,7 +2412,7 @@ fn footnote_marker_identifier(
 ) -> PackageResult<NonZeroU64> {
     let wire_limits = storage_wire_limits(limits)?;
     let context = format!("Pages footnote storage object {storage_identifier}");
-    let view = WireView::parse_with_limits(storage_payload, wire_limits).map_err(|error| {
+    let view = WireView::parse(storage_payload, wire_limits).map_err(|error| {
         PackageError::InvalidFormat(format!("{context} has invalid protobuf wire data: {error}"))
     })?;
     let kind = unique_wire_field(&view, STORAGE_KIND_FIELD, 0, true, &context)?
@@ -2079,12 +2427,11 @@ fn footnote_marker_identifier(
         unique_wire_field(&view, TABLE_ATTACHMENT_FIELD, 2, true, &context)?.ok_or_else(|| {
             PackageError::InvalidFormat(format!("{context} has no marker attachment table"))
         })?;
-    let table_view =
-        WireView::parse_with_limits(table.payload(), wire_limits).map_err(|error| {
-            PackageError::InvalidFormat(format!(
-                "{context} marker attachment table has invalid protobuf wire data: {error}"
-            ))
-        })?;
+    let table_view = WireView::parse(table.payload(), wire_limits).map_err(|error| {
+        PackageError::InvalidFormat(format!(
+            "{context} marker attachment table has invalid protobuf wire data: {error}"
+        ))
+    })?;
     let boundary_options = pages_body_options(limits)?;
     let mut marker = None;
     for field in table_view
@@ -2316,7 +2663,7 @@ fn preflight_section_table_entry(
 }
 
 fn parse_wire<'a>(payload: &'a [u8], context: &str) -> PackageResult<WireView<'a>> {
-    WireView::parse(payload).map_err(|error| {
+    WireView::parse(payload, WireLimits::DEFAULT).map_err(|error| {
         PackageError::InvalidFormat(format!("{context} has invalid protobuf wire data: {error}"))
     })
 }
@@ -2875,7 +3222,7 @@ fn extract_storages(
                 if !is_storage_message_type(message.type_) {
                     continue;
                 }
-                let validation_result = litchi_iwa_text_wire::validate_storage_with_limits(
+                let validation_result = litchi_iwa_text_wire::validate_storage(
                     message.data.as_slice(),
                     validation_limits,
                 );
@@ -2939,10 +3286,8 @@ fn extract_storages(
                 // payload is not a strict TSWP storage is not promoted into
                 // semantic state. Valid candidates pass raw-wire preflight and
                 // the bounded Buffa projection before any text is published.
-                let storage_result = litchi_iwa_text_wire::from_bytes_with_limits(
-                    message.data.as_slice(),
-                    text_limits,
-                );
+                let storage_result =
+                    litchi_iwa_text_wire::from_bytes(message.data.as_slice(), text_limits);
                 let storage = match storage_result {
                     Ok(storage) => storage,
                     Err(error) => {
@@ -3363,6 +3708,7 @@ mod tests {
                     type_: 10_000,
                     data: root.encode_to_vec(),
                 }],
+                Default::default(),
             )
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
         ];
@@ -3378,6 +3724,7 @@ mod tests {
                         type_: 2001,
                         data: storage.encode_to_vec(),
                     }],
+                    Default::default(),
                 )
                 .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
             );
@@ -3433,6 +3780,7 @@ mod tests {
                     type_: 10_000,
                     data: root.encode_to_vec(),
                 }],
+                Default::default(),
             )
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
         );
@@ -3443,12 +3791,13 @@ mod tests {
                     type_: 2001,
                     data: storage.encode_to_vec(),
                 }],
+                Default::default(),
             )
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
         );
         for (identifier, messages) in section_objects {
             objects.push(
-                ArchiveObject::new(identifier, messages)
+                ArchiveObject::new(identifier, messages, Default::default())
                     .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
             );
         }
@@ -3534,6 +3883,7 @@ mod tests {
                         type_: FOOTNOTE_REFERENCE_MESSAGE_TYPE,
                         data: reference,
                     }],
+                    Default::default(),
                 )
                 .map_err(|error| PackageError::InvalidFormat(error.to_string())),
                 ArchiveObject::new(
@@ -3542,6 +3892,7 @@ mod tests {
                         type_: 2_001,
                         data: storage.encode_to_vec(),
                     }],
+                    Default::default(),
                 )
                 .map_err(|error| PackageError::InvalidFormat(error.to_string())),
                 ArchiveObject::new(
@@ -3550,6 +3901,7 @@ mod tests {
                         type_: TEXTUAL_ATTACHMENT_MESSAGE_TYPE,
                         data: marker,
                     }],
+                    Default::default(),
                 )
                 .map_err(|error| PackageError::InvalidFormat(error.to_string())),
             ]
@@ -3563,6 +3915,7 @@ mod tests {
                     type_: 10_000,
                     data: root.encode_to_vec(),
                 }],
+                Default::default(),
             )
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
             ArchiveObject::new(
@@ -3571,6 +3924,7 @@ mod tests {
                     type_: 2_001,
                     data: body.encode_to_vec(),
                 }],
+                Default::default(),
             )
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
         ];
@@ -3586,9 +3940,10 @@ mod tests {
         let archive = Archive { objects };
         let compressed = SnappyStream::compress(
             archive
-                .to_bytes()
+                .to_bytes(Default::default())
                 .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
                 .as_slice(),
+            Default::default(),
         )
         .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
 
@@ -3609,7 +3964,7 @@ mod tests {
 
     fn package_bytes_with_opaque_member() -> PackageResult<Vec<u8>> {
         let source = package_bytes(Some("Opaque body"), true, true)?;
-        let catalog = Catalog::from_bytes(&source)?;
+        let catalog = Catalog::from_bytes(&source, Default::default())?;
         let mut entries: Vec<(&str, &[u8])> = catalog
             .iter()
             .map(|entry| (entry.name(), entry.data()))
@@ -3755,7 +4110,7 @@ mod tests {
         let limits = Limits::default();
         let source = read_path(&path, limits)?;
         let source_pointer = source.as_ptr();
-        let catalog = SourceCatalog::from_shared_bytes_with_limits(Arc::clone(&source), limits)?;
+        let catalog = SourceCatalog::from_shared_bytes(Arc::clone(&source), limits)?;
         assert_eq!(catalog.source_bytes().as_ptr(), source_pointer);
         assert_eq!(catalog.source_bytes(), expected);
 
@@ -3773,7 +4128,8 @@ mod tests {
         let directory_error = Package::open(&secret_directory)
             .err()
             .unwrap_or_else(|| panic!("a directory must not be accepted as a Pages package"));
-        assert!(directory_error.to_string().contains("regular file"));
+        // An empty directory is not a package directory: it has no Index.zip.
+        assert!(directory_error.to_string().contains("Index.zip"));
         assert!(
             !directory_error
                 .to_string()
@@ -3872,10 +4228,10 @@ mod tests {
         assert_eq!(package.metadata().identifier.as_deref(), Some("pages-id"));
         package.validate()?;
 
-        let snapshot = package.snapshot();
+        let snapshot = package.clone();
         assert!(std::ptr::eq(
-            package.semantic_document(),
-            snapshot.semantic_document()
+            package.document_ref(),
+            snapshot.document_ref()
         ));
         Ok(())
     }
@@ -3893,7 +4249,7 @@ mod tests {
     -> Result<(), Box<dyn std::error::Error>> {
         let bytes = package_bytes_with_opaque_member()?;
         let package = Package::from_bytes(&bytes)?;
-        let snapshot = package.snapshot();
+        let snapshot = package.clone();
 
         assert!(Arc::ptr_eq(&package.state, &snapshot.state));
         assert_eq!(
@@ -4068,10 +4424,13 @@ mod tests {
         let source_footnotes = package.body_footnotes()?;
 
         let mut edit = package
-            .edit_body_footnote_text(crate::footnote::body::Selector::Index(1))
+            .edit_body_footnote_text(crate::footnote::body::Selector::index(1))
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
-        assert_eq!(edit.position(), Position::from_utf16_index(5).unwrap());
-        assert_eq!(edit.before(), &source_footnotes[1]);
+        assert_eq!(
+            edit.position().unwrap(),
+            Position::from_utf16_index(5).unwrap()
+        );
+        assert_eq!(edit.before().unwrap(), &source_footnotes[1]);
         edit.set("Updated😀")
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
         let commit = edit
@@ -4129,9 +4488,9 @@ mod tests {
         );
 
         let mut edit = package
-            .edit_body_footnote_text(crate::footnote::body::Selector::Index(1))
+            .edit_body_footnote_text(crate::footnote::body::Selector::index(1))
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
-        assert_eq!(edit.custom_mark(), Some("†"));
+        assert_eq!(edit.custom_mark().unwrap(), Some("†"));
         edit.set("UpdatedSecond")
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
         edit.set_custom_mark(Some("‡"))
@@ -4187,7 +4546,7 @@ mod tests {
         let package = Package::from_bytes(&package_bytes(None, false, false)?)?;
 
         assert!(package.sections().is_empty());
-        assert!(package.semantic_document().is_empty());
+        assert!(package.document_ref().is_empty());
         assert_eq!(package.text()?, "");
         assert_eq!(package.stats().section_count(), 0);
         Ok(())
@@ -4214,6 +4573,7 @@ mod tests {
                         type_: 10_000,
                         data: root.encode_to_vec(),
                     }],
+                    Default::default(),
                 )
                 .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
                 ArchiveObject::new(
@@ -4222,6 +4582,7 @@ mod tests {
                         type_: 2_001,
                         data: storage.encode_to_vec(),
                     }],
+                    Default::default(),
                 )
                 .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
             ],
@@ -4247,6 +4608,7 @@ mod tests {
                         type_: 10_000,
                         data: vec![0x22, 0x02, 0x08, 0x2a],
                     }],
+                    Default::default(),
                 )
                 .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
             ],
@@ -4269,6 +4631,7 @@ mod tests {
                         type_: 10_000,
                         data: vec![0x22, 0x02, 0x08, 0x2a, 0x22, 0x02, 0x08, 0x2b, 0x7a, 0x00],
                     }],
+                    Default::default(),
                 )
                 .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
             ],
@@ -4305,7 +4668,7 @@ mod tests {
     fn prepared_source_handoff_matches_direct_ingress() -> PackageResult<()> {
         let bytes = package_bytes(Some("Prepared Pages body"), true, true)?;
         let direct = Package::from_bytes(&bytes)?;
-        let prepared = PreparedSource::from_bytes(&bytes)
+        let prepared = PreparedSource::from_bytes(&bytes, litchi_iwa_detect::Limits::default())
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
             .ok_or_else(|| {
                 PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
@@ -4336,7 +4699,7 @@ mod tests {
             ],
         )?;
         let direct = Package::from_bytes(&bytes)?;
-        let prepared = PreparedSource::from_bytes(&bytes)
+        let prepared = PreparedSource::from_bytes(&bytes, litchi_iwa_detect::Limits::default())
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
             .ok_or_else(|| {
                 PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
@@ -4363,11 +4726,12 @@ mod tests {
     fn semantic_prepared_source_releases_physical_source() -> PackageResult<()> {
         let source: Arc<[u8]> = package_bytes(Some("Detached"), true, true)?.into();
         let weak_source = Arc::downgrade(&source);
-        let prepared = PreparedSource::from_shared_bytes(Arc::clone(&source))
-            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
-            .ok_or_else(|| {
-                PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
-            })?;
+        let prepared = PreparedSource::from_shared_bytes(
+            Arc::clone(&source),
+            litchi_iwa_detect::Limits::default(),
+        )
+        .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
+        .ok_or_else(|| PackageError::InvalidFormat("Pages fixture was not detected".to_owned()))?;
         drop(source);
         assert!(weak_source.upgrade().is_some());
 
@@ -4400,12 +4764,13 @@ mod tests {
                         type_: 10_000,
                         data: root.encode_to_vec(),
                     }],
+                    Default::default(),
                 )
                 .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
             ],
             false,
         )?;
-        let prepared = PreparedSource::from_bytes(&bytes)
+        let prepared = PreparedSource::from_bytes(&bytes, litchi_iwa_detect::Limits::default())
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
             .ok_or_else(|| {
                 PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
@@ -4431,7 +4796,7 @@ mod tests {
     #[test]
     fn semantic_prepared_source_enforces_exact_and_one_over_text_limits() -> PackageResult<()> {
         let bytes = package_bytes(Some("12345"), true, false)?;
-        let exact = PreparedSource::from_bytes(&bytes)
+        let exact = PreparedSource::from_bytes(&bytes, litchi_iwa_detect::Limits::default())
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
             .ok_or_else(|| {
                 PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
@@ -4439,7 +4804,7 @@ mod tests {
         let document = __semantic_document_from_prepared_source(exact, MAX_SECTIONS, 5)?;
         assert_eq!(document.plain_text(), "12345");
 
-        let one_over = PreparedSource::from_bytes(&bytes)
+        let one_over = PreparedSource::from_bytes(&bytes, litchi_iwa_detect::Limits::default())
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
             .ok_or_else(|| {
                 PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
@@ -4467,7 +4832,7 @@ mod tests {
             None,
             vec![(43, vec![section_payload(Some("X"))])],
         )?;
-        let exact = PreparedSource::from_bytes(&bytes)
+        let exact = PreparedSource::from_bytes(&bytes, litchi_iwa_detect::Limits::default())
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
             .ok_or_else(|| {
                 PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
@@ -4492,7 +4857,7 @@ mod tests {
                 (44, vec![section_payload(Some("Two"))]),
             ],
         )?;
-        let exact = PreparedSource::from_bytes(&bytes)
+        let exact = PreparedSource::from_bytes(&bytes, litchi_iwa_detect::Limits::default())
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
             .ok_or_else(|| {
                 PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
@@ -4500,7 +4865,7 @@ mod tests {
         let document = __semantic_document_from_prepared_source(exact, 2, DEFAULT_MAX_TEXT_BYTES)?;
         assert_eq!(document.sections().len(), 2);
 
-        let one_over = PreparedSource::from_bytes(&bytes)
+        let one_over = PreparedSource::from_bytes(&bytes, litchi_iwa_detect::Limits::default())
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
             .ok_or_else(|| {
                 PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
@@ -4557,7 +4922,7 @@ mod tests {
         assert_eq!(package.sections()[1].plain_text(), "B");
         assert_eq!(
             package
-                .section_at(1)
+                .section_at(litchi_core::Position::new(1))
                 .unwrap_or_else(|error| panic!("checked native position should resolve: {error}"))
                 .map(Section::index),
             Some(1)
@@ -4602,7 +4967,7 @@ mod tests {
         );
         assert_eq!(
             package
-                .section_at(1)
+                .section_at(litchi_core::Position::new(1))
                 .unwrap_or_else(|error| panic!("typed native position should resolve: {error}"))
                 .and_then(Section::name),
             Some("Repeated")
@@ -4701,8 +5066,12 @@ mod tests {
 
     #[test]
     fn section_name_budget_is_charged_before_owned_materialization() -> PackageResult<()> {
-        let object = ArchiveObject::new(43, vec![section_payload(Some("oversized"))])
-            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
+        let object = ArchiveObject::new(
+            43,
+            vec![section_payload(Some("oversized"))],
+            Default::default(),
+        )
+        .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
         let error = decode_section_name(&object, NonZeroU64::MIN, 2, 4)
             .err()
             .unwrap_or_else(|| panic!("an over-budget section name should fail"));
@@ -4721,7 +5090,7 @@ mod tests {
     fn input_limit_is_enforced_before_native_projection() {
         let limits = Limits::new(1, 10, 100, 100, 100)
             .unwrap_or_else(|error| panic!("test limits should be valid: {error}"));
-        let error = Package::from_bytes_with_limits(&[0, 1], limits)
+        let error = Package::from_bytes_with_archive_limits(&[0, 1], limits)
             .err()
             .unwrap_or_else(|| panic!("oversized input should fail"));
         assert!(error.to_string().contains("limit"));
@@ -4760,6 +5129,7 @@ mod tests {
                         type_: 10_000,
                         data: tp::DocumentArchive::default().encode_to_vec(),
                     }],
+                    Default::default(),
                 )
                 .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
             ],
@@ -4772,20 +5142,23 @@ mod tests {
                         type_: 999,
                         data: Vec::new(),
                     }],
+                    Default::default(),
                 )
                 .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
             ],
         };
         let root_stream = SnappyStream::compress(
             &root
-                .to_bytes()
+                .to_bytes(Default::default())
                 .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
+            Default::default(),
         )
         .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
         let other_stream = SnappyStream::compress(
             &other
-                .to_bytes()
+                .to_bytes(Default::default())
                 .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
+            Default::default(),
         )
         .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
         let bytes = litchi_iwa_archive::package::to_bytes(

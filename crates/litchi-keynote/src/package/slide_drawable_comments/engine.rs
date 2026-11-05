@@ -25,12 +25,13 @@ use litchi_iwa_core::archive::{
     ArchiveReferenceKind, ArchiveReferenceOccurrence, ArchiveReferencePolicy,
     ArchiveReferenceVisitor, FieldObjectReferenceTransition, ObjectReferenceTransition,
 };
-use litchi_iwa_core::{Archive, ArchiveLimits, ArchiveObject, RawMessage, SnappyStream};
+use litchi_iwa_core::{Archive, ArchiveObject, Limits as ArchiveLimits, RawMessage, SnappyStream};
 use litchi_iwa_protos::comment_storage_codec::{
     self, CommentStorageReplyRewrite, DateSnapshot, DecodeOptions, ReferenceRecord,
     RewriteExecutionRequirements, UuidSnapshot,
 };
 
+use super::super::snappy_failure::SnappyFailure;
 use super::super::{Package, PhysicalSource};
 use super::{Budget, Error, Operation};
 use super::{graph, metadata};
@@ -149,7 +150,7 @@ impl<'source> WorkingSet<'source> {
                     .ok_or(Error::InvalidSource)?;
                 let archive = component.archive();
                 let encoded = archive
-                    .encoded_len_with_limits(
+                    .encoded_len(
                         self.source
                             .limits()
                             .effective_archive_limits()
@@ -696,7 +697,9 @@ pub(super) fn execute(
     budget: &mut Budget,
 ) -> Result<EngineOutput, Error> {
     if !source_has_exact_catalog(source) {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::slide::comment::transaction::Refusal::UnsupportedSource,
+        ));
     }
 
     // The graph adapter performs the complete wrapper-route, rooted-closure,
@@ -851,7 +854,12 @@ pub(super) fn execute(
             )?;
 
             let reply_identifier = metadata::allocate_identifier(source, &mut working, budget)?;
-            let reply_uuid = metadata::fresh_storage_uuid_in_working_set(source, &working, budget)?;
+            let reply_uuid = metadata::fresh_storage_uuid_in_working_set(
+                source,
+                &working,
+                reply_identifier,
+                budget,
+            )?;
             let reply_data = canonical_leaf(text, author_identifier, reply_uuid, budget)?;
             insert_storage_object(
                 source,
@@ -1144,7 +1152,12 @@ fn finalize_storage_clones<'source>(
     for clone in clones {
         let old_retained = working.find_object(clone.old_identifier).is_some();
         let new_uuid = if old_retained || clone.old_uuid.is_none() {
-            metadata::fresh_storage_uuid_in_working_set(source, working, budget)?
+            metadata::fresh_storage_uuid_in_working_set(
+                source,
+                working,
+                clone.new_identifier,
+                budget,
+            )?
         } else {
             clone.old_uuid.ok_or(Error::InvalidSource)?
         };
@@ -1297,7 +1310,7 @@ fn create_root(
     let author = metadata::ensure_generated_author(source, working, budget)?;
     let author_identifier = author.identifier();
     let identifier = metadata::allocate_identifier(source, working, budget)?;
-    let uuid = metadata::fresh_storage_uuid_in_working_set(source, working, budget)?;
+    let uuid = metadata::fresh_storage_uuid_in_working_set(source, working, identifier, budget)?;
     let data = canonical_leaf(text, author_identifier, uuid, budget)?;
     insert_storage_object(
         source,
@@ -1501,17 +1514,12 @@ fn clone_storage_object_raw(
     // Source headers are preserved by the core object clone operation. This
     // also retains unknown ArchiveInfo fields and all object-reference order.
     let clone = source_object
-        .clone_with_identity_remap_with_limits(
-            new_identifier,
-            &[],
-            &source_object.messages,
-            core_limits,
-        )
+        .clone_with_identity_remap(new_identifier, &[], &source_object.messages, core_limits)
         .map_err(|_| Error::InvalidSource)?;
     let archive = working.load(component, budget)?;
     budget.charge_allocations(size_of::<ArchiveObject>())?;
     archive
-        .insert_object_with_limits(clone, archive_limits)
+        .insert_object(clone, archive_limits)
         .map_err(|_| Error::InvalidSource)
 }
 
@@ -1537,7 +1545,7 @@ fn insert_storage_object(
         .and_then(|bytes| bytes.checked_add(size_of::<litchi_iwa_core::MessageInfo>()))
         .ok_or(Error::InvalidSource)?;
     budget.charge_allocation_plan(constructor_bytes, 3)?;
-    let mut object = ArchiveObject::new_with_limits(
+    let mut object = ArchiveObject::new(
         identifier,
         vec![RawMessage {
             type_: COMMENT_STORAGE_MESSAGE_TYPE,
@@ -1558,7 +1566,7 @@ fn insert_storage_object(
     let archive = working.load(component, budget)?;
     budget.charge_allocations(size_of::<ArchiveObject>())?;
     archive
-        .insert_object_with_limits(object, archive_limits)
+        .insert_object(object, archive_limits)
         .map_err(|_| Error::InvalidSource)
 }
 
@@ -1691,7 +1699,7 @@ fn rewrite_root_replies(
     archive
         .object_mut(root_identifier)
         .ok_or(Error::InvalidSource)?
-        .replace_message_transitioning_object_references_preserving_header_with_limits(
+        .replace_message_transitioning_object_references_preserving_header(
             index,
             RawMessage {
                 type_: COMMENT_STORAGE_MESSAGE_TYPE,
@@ -1927,7 +1935,7 @@ fn replace_drawable_reference(
     let first_envelope_missing = if old.is_none() && selection.comment_wire_path.len() > 1 {
         budget.charge_allocations(message.data.len())?;
         budget.charge_wire_work(message.data.len().max(1))?;
-        let fields = wire::parse_wire_fields_with_limits(message.data.as_slice(), wire_limits)
+        let fields = wire::parse_wire_fields(message.data.as_slice(), wire_limits)
             .map_err(|_| Error::InvalidSource)?;
         budget.charge_wire_fields(fields.len())?;
         !fields
@@ -1979,7 +1987,7 @@ fn replace_drawable_reference(
                     budget,
                 )?;
                 object
-                    .replace_message_preserving_header_with_limits(
+                    .replace_message_preserving_header(
                         selection.message_index,
                         RawMessage {
                             type_: selection.message_type,
@@ -2029,7 +2037,7 @@ fn replace_drawable_reference(
         budget,
     )?;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             selection.message_index,
             RawMessage {
                 type_: selection.message_type,
@@ -2109,8 +2117,8 @@ fn patch_nested_fields(
             .checked_add(output_bound)
             .ok_or(Error::InvalidSource)?,
     )?;
-    let output = wire::patch_nested_fields_batched_with_limits(data, edits, limits)
-        .map_err(|_| Error::InvalidSource)?;
+    let output =
+        wire::patch_nested_fields_batched(data, edits, limits).map_err(|_| Error::InvalidSource)?;
     if output.len() > output_bound {
         return Err(Error::InvalidSource);
     }
@@ -2278,7 +2286,7 @@ fn cleanup_old_graph(
                 source_in_closure,
             };
             let references = object
-                .inspect_references_with_policy_and_limits(
+                .inspect_references_with_policy(
                     &mut visitor,
                     ArchiveReferencePolicy::RejectUnknownMetadata,
                     archive_limits,
@@ -2428,7 +2436,7 @@ fn cleanup_old_graph(
         }
         let archive = working.load(node.component_name.as_ref(), budget)?;
         archive
-            .remove_object_checked_with_limits(
+            .remove_object_checked(
                 node.identifier,
                 source
                     .limits()
@@ -2498,7 +2506,7 @@ fn replace_message(
         .ok_or(Error::InvalidSource)?
         .type_;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             index,
             RawMessage {
                 type_: message_type,
@@ -2812,7 +2820,11 @@ fn serialize_candidate(
 ) -> Result<Vec<u8>, Error> {
     let source_catalog = match &source.state.source {
         PhysicalSource::Package(source) => source,
-        PhysicalSource::Semantic(_) => return Err(Error::UnsupportedSource),
+        PhysicalSource::Semantic(_) => {
+            return Err(Error::Refused(
+                crate::slide::comment::transaction::Refusal::UnsupportedSource,
+            ));
+        },
     };
     let archive_limits = source
         .limits()
@@ -2841,27 +2853,30 @@ fn serialize_candidate(
     for name in working.changed_names() {
         let archive = working.get(name).ok_or(Error::InvalidSource)?;
         let encoded_length = archive
-            .encoded_len_with_limits(archive_limits)
+            .encoded_len(archive_limits)
             .map_err(|_| Error::InvalidSource)?;
-        let compressed_upper_bound = SnappyStream::maximum_compressed_len(encoded_length)
-            .map_err(|_| Error::InvalidSource)?;
-        if compressed_upper_bound > snappy_limits.max_compressed_stream() {
-            return Err(Error::InvalidSource);
-        }
+        let compressed_upper_bound =
+            SnappyStream::maximum_compressed_len(encoded_length, snappy_limits)
+                .map_err(map_snappy_error)?;
         budget.charge_allocations(
             encoded_length
                 .checked_add(compressed_upper_bound)
                 .ok_or(Error::InvalidSource)?,
         )?;
         let decompressed = archive
-            .to_bytes_with_limits(archive_limits)
+            .to_bytes(archive_limits)
             .map_err(|_| Error::InvalidSource)?;
         if decompressed.len() != encoded_length {
             return Err(Error::InvalidSource);
         }
-        let bytes = SnappyStream::compress(&decompressed).map_err(|_| Error::InvalidSource)?;
+        let bytes =
+            SnappyStream::compress(&decompressed, snappy_limits).map_err(map_snappy_error)?;
         if bytes.len() > snappy_limits.max_compressed_stream() {
-            return Err(Error::InvalidSource);
+            return Err(Error::Limit {
+                kind: super::LimitKind::EntryBytes,
+                observed: u64::try_from(bytes.len()).unwrap_or(u64::MAX),
+                maximum: u64::try_from(snappy_limits.max_compressed_stream()).unwrap_or(u64::MAX),
+            });
         }
         encoded_archives.push(bytes);
     }
@@ -2906,8 +2921,7 @@ fn decode_drawable_reference(
         budget.charge_allocations(current.len())?;
         budget.charge_wire_work(current.len().max(1))?;
         budget.charge_nesting(depth.saturating_add(1))?;
-        let fields = wire::parse_wire_fields_with_limits(current, limits)
-            .map_err(|_| Error::InvalidSource)?;
+        let fields = wire::parse_wire_fields(current, limits).map_err(|_| Error::InvalidSource)?;
         budget.charge_wire_fields(fields.len())?;
         let mut selected = None;
         for field in fields {
@@ -2935,4 +2949,28 @@ fn decode_drawable_reference(
         current = selected;
     }
     Err(Error::InvalidSource)
+}
+
+/// Preserve a retained Snappy encoder refusal as a typed owner failure
+/// (see [`SnappyFailure`]).
+fn map_snappy_error(error: litchi_iwa_core::Error) -> Error {
+    match SnappyFailure::from(error) {
+        SnappyFailure::CompressedBytes { observed, maximum } => Error::Limit {
+            kind: super::LimitKind::EntryBytes,
+            observed,
+            maximum,
+        },
+        SnappyFailure::DecodedBytes { observed, maximum } => Error::Limit {
+            kind: super::LimitKind::EntryBytes,
+            observed,
+            maximum,
+        },
+        SnappyFailure::Work { observed, maximum } => Error::Limit {
+            kind: super::LimitKind::WireWork,
+            observed,
+            maximum,
+        },
+        SnappyFailure::Allocation { requested } => Error::Allocation { amount: requested },
+        SnappyFailure::Invalid => Error::InvalidSource,
+    }
 }

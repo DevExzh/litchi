@@ -25,7 +25,7 @@
 //! no earlier writer produced them reproducibly.
 
 use litchi_core::validation::EvidenceDigest;
-use litchi_xls::writer::Writer;
+use litchi_xls::writer::Builder;
 use std::io::Cursor;
 
 fn repeat_to(seed: &str, bytes: usize) -> String {
@@ -36,9 +36,9 @@ fn repeat_to(seed: &str, bytes: usize) -> String {
     text
 }
 
-fn written(mut writer: Writer) -> Vec<u8> {
+fn written(mut writer: Builder) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 
@@ -59,7 +59,7 @@ fn one_string_per_sheet() -> Vec<u8> {
         "é".repeat(0xFFFF),
         format!("{}😀", "a".repeat(0xFFFD)),
     ];
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     for (index, value) in values.iter().enumerate() {
         let sheet = writer.add_worksheet(&format!("Sheet{index:02}")).unwrap();
         writer.write_string(sheet, 0, 0, value).unwrap();
@@ -71,7 +71,7 @@ fn one_string_per_sheet() -> Vec<u8> {
 }
 
 fn repeated_string() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Repeated").unwrap();
     for row in 0..200u32 {
         writer.write_string(sheet, row, 0, "same label ✓").unwrap();
@@ -83,7 +83,7 @@ fn repeated_string() -> Vec<u8> {
 }
 
 fn harness_numeric(sheets: usize, rows: usize, columns: usize) -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     for sheet in 0..sheets {
         let worksheet = writer.add_worksheet(&format!("Bench{sheet:02}")).unwrap();
         for row in 0..rows {
@@ -112,7 +112,7 @@ fn harness_large() -> Vec<u8> {
 }
 
 fn harness_payload_heavy() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     for sheet in 0..128usize {
         let worksheet = writer.add_worksheet(&format!("Payload{sheet:03}")).unwrap();
         let mut text = format!(
@@ -129,7 +129,7 @@ fn harness_payload_heavy() -> Vec<u8> {
 }
 
 fn empty_worksheet() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_worksheet("Empty").unwrap();
     written(writer)
 }
@@ -187,8 +187,8 @@ fn fresh_xls_writer_shared_strings_match_the_pre_0753_goldens() {
 /// Four worksheets of 900 string cells each, with repeated, empty, non-ASCII,
 /// supplementary-plane and CONTINUE-spanning strings, and a numeric worksheet
 /// between them; also returns every string cell's expected value.
-fn many_strings() -> (Writer, Vec<(usize, u32, u16, String)>) {
-    let mut writer = Writer::new();
+fn many_strings() -> (Builder, Vec<(usize, u32, u16, String)>) {
+    let mut writer = Builder::new();
     let mut expected = Vec::new();
     for sheet in 0..4usize {
         let worksheet = writer.add_worksheet(&format!("Strings{sheet}")).unwrap();
@@ -221,7 +221,7 @@ fn many_strings() -> (Writer, Vec<(usize, u32, u16, String)>) {
 /// Strings written in reverse row and column order, repeated across and within
 /// worksheets, so neither insertion order nor a cell map's order is the
 /// row-major order the SST follows.
-fn scrambled_strings() -> Writer {
+fn scrambled_strings() -> Builder {
     let labels = [
         "zeta",
         "alpha",
@@ -231,7 +231,7 @@ fn scrambled_strings() -> Writer {
         "astral 😀𝄞🦀",
         "alpha",
     ];
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     for sheet in 0..3usize {
         let worksheet = writer.add_worksheet(&format!("Scrambled{sheet}")).unwrap();
         for row in (0..40u32).rev() {
@@ -312,7 +312,7 @@ fn multi_string_worksheets_are_pinned_across_processes() {
 fn the_sst_lists_strings_in_first_occurrence_order() {
     use litchi_core::sheet::{Cell as _, CellValue};
 
-    let workbook = litchi_xls::Workbook::new(Cursor::new(scrambled_strings_workbook())).unwrap();
+    let workbook = litchi_xls::raw::Reader::new(Cursor::new(scrambled_strings_workbook())).unwrap();
     let mut expected: Vec<String> = Vec::new();
     for sheet in 0..3usize {
         let worksheet = workbook.xls_worksheet(sheet).unwrap();
@@ -338,7 +338,7 @@ fn many_distinct_and_repeated_strings_read_back_cell_by_cell() {
     use litchi_core::sheet::{Cell as _, CellValue};
 
     let (writer, expected) = many_strings();
-    let workbook = litchi_xls::Workbook::new(Cursor::new(written(writer))).unwrap();
+    let workbook = litchi_xls::raw::Reader::new(Cursor::new(written(writer))).unwrap();
     for (sheet, row, column, value) in expected {
         let sheet_index = if sheet >= 2 { sheet + 1 } else { sheet };
         let worksheet = workbook.xls_worksheet(sheet_index).unwrap();
@@ -357,7 +357,7 @@ fn many_distinct_and_repeated_strings_read_back_cell_by_cell() {
 fn a_writer_written_twice_and_extended_restages_its_strings() {
     use litchi_core::sheet::{Cell as _, CellValue};
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Reused").unwrap();
     for row in 0..50u32 {
         writer
@@ -365,16 +365,16 @@ fn a_writer_written_twice_and_extended_restages_its_strings() {
             .unwrap();
     }
     let mut first = Cursor::new(Vec::new());
-    writer.write_to(&mut first).unwrap();
+    writer.build().unwrap().write_to(&mut first).unwrap();
     let mut second = Cursor::new(Vec::new());
-    writer.write_to(&mut second).unwrap();
+    writer.build().unwrap().write_to(&mut second).unwrap();
     assert_eq!(first.get_ref(), second.get_ref());
 
     writer.write_string(sheet, 0, 1, "added later 😀").unwrap();
     writer.write_string(sheet, 1, 1, "value 3 ✓").unwrap();
     let mut third = Cursor::new(Vec::new());
-    writer.write_to(&mut third).unwrap();
-    let workbook = litchi_xls::Workbook::new(Cursor::new(third.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut third).unwrap();
+    let workbook = litchi_xls::raw::Reader::new(Cursor::new(third.into_inner())).unwrap();
     let worksheet = workbook.xls_worksheet(0).unwrap();
     for row in 0..50u32 {
         assert_eq!(

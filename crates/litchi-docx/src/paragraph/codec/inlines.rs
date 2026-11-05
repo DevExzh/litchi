@@ -8,19 +8,20 @@ use quick_xml::reader::NsReader;
 use crate::bookmark::Bookmark;
 use crate::error::{Error, Result};
 
+use super::super::InlineKind;
 use super::super::model::{Inline, OpaqueInline, Paragraph, Run, XmlRef};
 use super::xml::is_fragment_word_name;
 
 const MAX_INLINE_DEPTH: usize = 128;
 const MAX_INLINE_NODES: usize = 1_000_000;
 
+/// How a direct paragraph child is projected.
 #[derive(Clone, Copy)]
-enum InlineKind {
+enum Child {
     Run,
-    Hyperlink,
     BookmarkStart,
     BookmarkEnd,
-    Unknown,
+    Opaque(InlineKind),
 }
 
 #[allow(
@@ -32,18 +33,15 @@ fn classify(
     namespace: &quick_xml::name::ResolveResult<'_>,
     name: quick_xml::name::QName<'_>,
     fragment_prefix: &Option<Option<Vec<u8>>>,
-) -> InlineKind {
-    for (local, kind) in [
-        (b"r".as_slice(), InlineKind::Run),
-        (b"hyperlink".as_slice(), InlineKind::Hyperlink),
-        (b"bookmarkStart".as_slice(), InlineKind::BookmarkStart),
-        (b"bookmarkEnd".as_slice(), InlineKind::BookmarkEnd),
-    ] {
-        if is_fragment_word_name(namespace, name, local, fragment_prefix) {
-            return kind;
-        }
+) -> Child {
+    if is_fragment_word_name(namespace, name, b"r", fragment_prefix) {
+        return Child::Run;
     }
-    InlineKind::Unknown
+    match InlineKind::classify(namespace, name, fragment_prefix) {
+        InlineKind::BookmarkStart => Child::BookmarkStart,
+        InlineKind::BookmarkEnd => Child::BookmarkEnd,
+        kind => Child::Opaque(kind),
+    }
 }
 
 impl Paragraph {
@@ -64,11 +62,22 @@ impl Paragraph {
         let source = self.xml_data.xml_ref()?;
         let _parser_admission = source.parser_admission()?;
         let mut reader = NsReader::from_reader(xml);
+        for (prefix, namespace) in self.xml_data.inherited_namespaces()?.iter() {
+            let prefix = prefix.as_deref().map_or(
+                quick_xml::name::PrefixDeclaration::Default,
+                quick_xml::name::PrefixDeclaration::Named,
+            );
+            reader
+                .resolver_mut()
+                .add(prefix, quick_xml::name::Namespace(namespace))
+                .map_err(|_| Error::Xml("invalid inherited inline namespace".into()))?;
+        }
         let origin = ReaderOrigin::of(xml);
         let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
         let mut paragraph_depth = None;
-        let mut capture = None::<(InlineKind, usize, usize)>;
+        let mut capture = None::<(Child, usize, usize)>;
         let mut inlines = Vec::new();
+        let mut namespaces = crate::namespace::NamespaceCapture::default();
         let mut saw_paragraph = false;
         let mut depth = 0usize;
         let mut nodes = 0usize;
@@ -175,6 +184,7 @@ impl Paragraph {
                             event_start,
                             event_end,
                         )?;
+                        capture_run_namespaces(&mut inlines, &mut namespaces, reader.resolver())?;
                     }
                 },
                 Event::End(element) => {
@@ -182,6 +192,7 @@ impl Paragraph {
                         && depth == capture_depth
                     {
                         push_inline(&mut inlines, &source, kind, start, event_end)?;
+                        capture_run_namespaces(&mut inlines, &mut namespaces, reader.resolver())?;
                         capture = None;
                     }
                     if paragraph_depth == Some(depth)
@@ -220,7 +231,7 @@ impl Paragraph {
 fn push_inline(
     inlines: &mut Vec<Inline>,
     source: &XmlRef,
-    kind: InlineKind,
+    kind: Child,
     start: usize,
     end: usize,
 ) -> Result<()> {
@@ -236,26 +247,23 @@ fn push_inline(
         Error::InvalidFormat("Word inline absolute offset exceeds source range".into())
     })?;
     match kind {
-        InlineKind::Run => inlines.push(Inline::Run(Box::new(Run::from_xml_ref(range)))),
-        InlineKind::Hyperlink => inlines.push(Inline::Unknown(Box::new(
-            OpaqueInline::from_xml_ref(range, true),
-        ))),
-        InlineKind::BookmarkStart => match parse_bookmark(range.bytes()) {
+        Child::Run => inlines.push(Inline::Run(Box::new(Run::from_xml_ref(range)))),
+        Child::BookmarkStart => match parse_bookmark(range.bytes()) {
             Some(bookmark) => inlines.push(Inline::BookmarkStart(bookmark)),
-            None => push_unknown(inlines, range),
+            None => push_unknown(inlines, range, InlineKind::BookmarkStart),
         },
-        InlineKind::BookmarkEnd => match parse_bookmark(range.bytes()) {
+        Child::BookmarkEnd => match parse_bookmark(range.bytes()) {
             Some(bookmark) => inlines.push(Inline::BookmarkEnd(bookmark.id())),
-            None => push_unknown(inlines, range),
+            None => push_unknown(inlines, range, InlineKind::BookmarkEnd),
         },
-        InlineKind::Unknown => push_unknown(inlines, range),
+        Child::Opaque(kind) => push_unknown(inlines, range, kind),
     }
     Ok(())
 }
 
-fn push_unknown(inlines: &mut Vec<Inline>, source: XmlRef) {
+fn push_unknown(inlines: &mut Vec<Inline>, source: XmlRef, kind: InlineKind) {
     inlines.push(Inline::Unknown(Box::new(OpaqueInline::from_xml_ref(
-        source, false,
+        source, kind,
     ))));
 }
 
@@ -288,4 +296,15 @@ fn parse_bookmark(raw: &[u8]) -> Option<Bookmark> {
             _ => {},
         }
     }
+}
+
+fn capture_run_namespaces(
+    inlines: &mut [Inline],
+    capture: &mut crate::namespace::NamespaceCapture,
+    resolver: &quick_xml::name::NamespaceResolver,
+) -> Result<()> {
+    if let Some(Inline::Run(run)) = inlines.last_mut() {
+        run.namespaces = Some(capture.capture(resolver)?);
+    }
+    Ok(())
 }

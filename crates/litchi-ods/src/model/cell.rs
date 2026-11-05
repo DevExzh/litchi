@@ -476,10 +476,10 @@ impl Cell {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::Spreadsheet;
+    /// use litchi_odf::Workbook;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let mut spreadsheet = Spreadsheet::open("data.ods")?;
+    /// let mut spreadsheet = Workbook::open("data.ods")?;
     /// let sheets = spreadsheet.sheets()?;
     /// if let Some(first_sheet) = sheets.first() {
     ///     if let Some(cell) = first_sheet.rows.get(0).and_then(|row| row.cells.get(0)) {
@@ -507,10 +507,10 @@ impl Cell {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::Spreadsheet;
+    /// use litchi_odf::Workbook;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let mut spreadsheet = Spreadsheet::open("data.ods")?;
+    /// let mut spreadsheet = Workbook::open("data.ods")?;
     /// let sheets = spreadsheet.sheets()?;
     /// if let Some(first_sheet) = sheets.first() {
     ///     if let Some(cell) = first_sheet.rows.get(0).and_then(|row| row.cells.get(0)) {
@@ -535,10 +535,10 @@ impl Cell {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::Spreadsheet;
+    /// use litchi_odf::Workbook;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let mut spreadsheet = Spreadsheet::open("data.ods")?;
+    /// let mut spreadsheet = Workbook::open("data.ods")?;
     /// let sheets = spreadsheet.sheets()?;
     /// if let Some(first_sheet) = sheets.first() {
     ///     if let Some(cell) = first_sheet.rows.get(0).and_then(|row| row.cells.get(0)) {
@@ -568,10 +568,10 @@ impl Cell {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odf::Spreadsheet;
+    /// use litchi_odf::Workbook;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let mut spreadsheet = Spreadsheet::open("data.ods")?;
+    /// let mut spreadsheet = Workbook::open("data.ods")?;
     /// let sheets = spreadsheet.sheets()?;
     /// if let Some(first_sheet) = sheets.first() {
     ///     if let Some(cell) = first_sheet.rows.get(0).and_then(|row| row.cells.get(0)) {

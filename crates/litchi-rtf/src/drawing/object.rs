@@ -2,8 +2,6 @@
 
 use std::borrow::Cow;
 
-use crate::{RtfError, RtfResult};
-
 const COMPOUND_FILE_SIGNATURE: [u8; 8] = [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1];
 
 /// Maximum number of inert object destinations retained from one document.
@@ -100,7 +98,7 @@ pub struct EmbeddedObject<'a> {
     /// Optional name of the linked document section (`objsect`)
     pub section: Option<Cow<'a, str>>,
     /// Optional time the object was last updated (`objtime`)
-    pub time: Option<crate::RtfTimestamp>,
+    pub time: Option<crate::metadata::Timestamp>,
     /// Optional original CLSID from the `oleclsid` destination
     pub class_id: Cow<'a, str>,
     /// Object width in twips
@@ -135,7 +133,7 @@ pub struct EmbeddedObject<'a> {
     pub result_kind: Option<ObjectResultKind>,
     /// Plain-text rendered fallback from the `result` destination
     pub result_text: Cow<'a, str>,
-    /// Indices into `RtfDocument::pictures()` for rendered fallback images
+    /// Indices into `Tree::pictures()` for rendered fallback images
     pub result_picture_indices: Vec<usize>,
     /// Decoded `objdata`, including the OLE `ObjectHeader`
     pub data: Vec<u8>,
@@ -202,9 +200,9 @@ impl EmbeddedObject<'_> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self, body: &str, picture_count: usize) -> RtfResult<()> {
+    pub fn validate(&self, body: &str, picture_count: usize) -> crate::Result<()> {
         if body.get(..self.position).is_none() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF embedded object position is not a UTF-8 body boundary".to_string(),
             ));
         }
@@ -219,17 +217,17 @@ impl EmbeddedObject<'_> {
             })
             .and_then(|size| size.checked_add(self.result_text.len()))
             .ok_or_else(|| {
-                RtfError::MalformedDocument(
+                crate::Error::MalformedDocument(
                     "RTF embedded object metadata size overflow".to_string(),
                 )
             })?;
         if metadata_bytes > MAX_OBJECT_METADATA_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF embedded object metadata exceeds the safety limit".to_string(),
             ));
         }
         if self.data.len() > MAX_OBJECT_DATA_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF embedded object data exceeds the safety limit".to_string(),
             ));
         }
@@ -238,7 +236,7 @@ impl EmbeddedObject<'_> {
             .iter()
             .any(|index| *index >= picture_count)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF embedded object references a missing result picture".to_string(),
             ));
         }

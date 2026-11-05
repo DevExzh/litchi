@@ -74,8 +74,8 @@ impl Snapshot {
 
     /// Starts a detached, failure-atomic transaction.
     #[must_use]
-    pub fn edit(&self) -> super::Transaction {
-        super::Transaction::new(self.clone())
+    pub fn edit(&self) -> super::Edit {
+        super::Edit::new(self.clone())
     }
 
     /// Publishes the exact validated source payload.
@@ -156,9 +156,10 @@ impl Patch {
     /// Applies this patch only to its exact source snapshot.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.fingerprint() != self.source_fingerprint || source.bytes() != self.before() {
-            return Err(Error::UnsafeEdit(
-                "WebPub patch source does not match its base snapshot".into(),
-            ));
+            return Err(Error::PatchConflict {
+                operation: "edit web publishing",
+                reason: "WebPub patch source does not match its base snapshot",
+            });
         }
         if self.is_noop() {
             Ok(source.clone())
@@ -170,9 +171,10 @@ impl Patch {
     /// Applies the exact inverse replacement to its committed target.
     pub fn revert(&self, target: &Snapshot) -> Result<Snapshot> {
         if target.fingerprint() != self.target_fingerprint || target.bytes() != self.after() {
-            return Err(Error::UnsafeEdit(
-                "WebPub patch target does not match its committed snapshot".into(),
-            ));
+            return Err(Error::PatchConflict {
+                operation: "edit web publishing",
+                reason: "WebPub patch target does not match its committed snapshot",
+            });
         }
         if self.is_noop() {
             Ok(target.clone())
@@ -193,54 +195,12 @@ impl Patch {
     }
 }
 
-/// A successful publication containing the typed result and reversible patch.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
+/// A published edit: the new snapshot, its reversible patch and
+/// diagnostics.
+pub type Commit = litchi_core::edit::Commit<Snapshot, Patch>;
 
-impl Commit {
-    pub(super) fn new(snapshot: Snapshot, patch: Patch) -> Self {
-        Self { snapshot, patch }
-    }
-
-    /// Whether publication changed any payload byte.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        !self.patch.is_noop()
-    }
-
-    /// Returns the post-edit snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Returns the source-checked reversible patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consumes the publication into its post-edit snapshot.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
-    }
-
-    /// Consumes the publication into its reversible patch.
-    #[must_use]
-    pub fn into_patch(self) -> Patch {
-        self.patch
-    }
-
-    /// Consumes the publication into exact BIFF8 payload bytes.
-    #[must_use]
-    pub fn into_bytes(self) -> Vec<u8> {
-        self.snapshot.finish()
-    }
-}
+/// Content-free diagnostics of one commit.
+pub use litchi_core::edit::Diagnostics;
 
 fn fingerprint(bytes: &[u8]) -> u64 {
     let mut value = 0xcbf2_9ce4_8422_2325u64;

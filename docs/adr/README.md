@@ -40,11 +40,13 @@ Office round trips.
 | [0025](0025-ograph-chart-area-transactions.md) | Typed OGraph chart-area snapshot transactions |
 | [0026](0026-ole-directory-metadata-binding.md) | Typed shared OLE CFB directory metadata |
 | [0027](0027-xls-sheet-anchor-ownership.md) | Typed XLS sheet-anchor ownership |
-| [0028](0028-iwa-monolith-exit.md) | Ordered exit of the legacy IWA migration host |
+| [0028](0028-iwa-monolith-exit.md) | Ordered exit of the legacy IWA migration host (host deleted by unified-ops 0429) |
 | [0029](0029-iwa-index-foundation.md) | Archive-free IWA object-index foundation |
 | [0030](0030-lazy-opc-part-decode.md) | Lazy OPC part decode behind the fallible package accessors |
 | [0031](0031-execution-context-budgets.md) | I/O concurrency, CPU task and executor budgets in the execution context |
 | [0032](0032-snapshot-derived-value-memos.md) | Snapshot memos of small derived values of payload bytes (widens ADR 0005's 2026-09-16 digest-memo amendment) |
+| [0033](0033-unified-operations-api.md) | Unified operations API over the per-format owners (`litchi-ops`), with read and write for every claimed format |
+| [0034](0034-unified-api-glossary-and-default-policies.md) | Canonical API vocabulary and strict default policies; owner-directed rollout recorded in unified-ops 0016 |
 
 The OGraph record retains its original 0025 identity. The later XLS record,
 which duplicated that number, is indexed as 0027; its decision text remains
@@ -61,7 +63,15 @@ table above. Nothing in the workspace may cite them as authority, and no code
 change is permitted on their basis, until a human accepts one and moves it into
 the table.
 
-No proposed record is outstanding. ADR 0030 and ADR 0031, proposed on
+| ADR | Proposed | Decision |
+|---|---|---|
+| _none_ | | |
+
+ADR 0033, proposed on 2026-10-04 by unified-ops change record 0004, was
+accepted the same day by the owner's decision recorded in
+[unified-ops record 0006](../unified-ops/0006-owner-accepts-adr-0033.md).
+
+Earlier proposals have all been accepted. ADR 0030 and ADR 0031, proposed on
 2026-09-15, were accepted on 2026-09-16 by the owner's decision recorded in
 [change 0652](../performance/0652-owner-decisions-for-the-third-wave.md). ADR
 0032, proposed on 2026-09-23 by
@@ -84,5 +94,6 @@ When two records appear to conflict, apply this order:
 
 [ADR 0024](0024-current-topology.md) is the authoritative inventory of the
 current workspace package topology. Older records may retain `litchi-ooxml` as
-historical migration-host terminology; those references are preserved as
-implementation evidence and do not denote a current workspace package.
+historical migration-host terminology, and older records name `litchi-iwa`, the
+iWork migration host deleted by unified-ops record 0429; those references are
+preserved as implementation evidence and do not denote a current workspace package.

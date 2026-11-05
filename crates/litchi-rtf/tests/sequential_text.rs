@@ -4,7 +4,7 @@
 )]
 
 use litchi_core::{TextOutputError, TextOutputLimitKind, TextOutputOptions};
-use litchi_rtf::Document;
+use litchi_rtf::Package;
 use std::io::{self, Write};
 
 struct FailAfter {
@@ -33,7 +33,7 @@ impl Write for FailAfter {
 #[test]
 fn writes_formatted_utf8_paragraphs_without_flattening_the_document() {
     let document =
-        Document::parse(r"{\rtf1\ansi First \b caf\u233?\b0\line\u28450?\u23383?\par Second\par}")
+        Package::parse(r"{\rtf1\ansi First \b caf\u233?\b0\line\u28450?\u23383?\par Second\par}")
             .unwrap();
     let shared = document.clone();
     let options = TextOutputOptions::new("|", "--", 128, 8);
@@ -52,7 +52,7 @@ fn writes_formatted_utf8_paragraphs_without_flattening_the_document() {
 
 #[test]
 fn empty_and_protected_readable_documents_are_deterministic() {
-    let empty = Document::parse(r"{\rtf1\ansi}").unwrap();
+    let empty = Package::parse(r"{\rtf1\ansi}").unwrap();
     let mut output = Vec::new();
     let report = empty
         .write_text_to(&mut output, TextOutputOptions::default())
@@ -60,7 +60,7 @@ fn empty_and_protected_readable_documents_are_deterministic() {
     assert!(output.is_empty());
     assert_eq!(report.objects_written(), 0);
 
-    let protected = Document::parse(r"{\rtf1\ansi\formprot readable\par}").unwrap();
+    let protected = Package::parse(r"{\rtf1\ansi\formprot readable\par}").unwrap();
     protected
         .write_text_to(&mut output, TextOutputOptions::default())
         .unwrap();
@@ -69,7 +69,7 @@ fn empty_and_protected_readable_documents_are_deterministic() {
 
 #[test]
 fn object_limits_and_partial_sink_failures_report_truthful_progress() {
-    let document = Document::parse(r"{\rtf1\ansi alpha\par beta\par}").unwrap();
+    let document = Package::parse(r"{\rtf1\ansi alpha\par beta\par}").unwrap();
     let options = TextOutputOptions::new("|", "--", 128, 1);
     let mut limited = Vec::new();
     let error = document.write_text_to(&mut limited, options).unwrap_err();
@@ -93,7 +93,7 @@ fn object_limits_and_partial_sink_failures_report_truthful_progress() {
 #[test]
 fn empty_paragraphs_use_the_requested_separator_and_inert_destinations_stay_hidden() {
     let document =
-        Document::parse(r"{\rtf1\ansi alpha\par\par{\*\litchiunknown hidden}beta\par}").unwrap();
+        Package::parse(r"{\rtf1\ansi alpha\par\par{\*\litchiunknown hidden}beta\par}").unwrap();
     let mut output = Vec::new();
     let options = TextOutputOptions::new("<P>", "--", 128, 8);
 

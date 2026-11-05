@@ -18,10 +18,10 @@ mod validation;
 #[cfg(test)]
 mod tests;
 
-pub use content::{ContentCommit, ContentEdit, ContentEditor};
+pub use content::{Draft, DraftEditor};
 pub use model::{Catalog, Selector};
-pub use snapshot::{Commit, Edit, OwnedEditor, Patch, Snapshot};
-pub use transaction::{Commit as CatalogCommit, Editor, Transaction};
+pub use snapshot::{Edit, OwnedEditor, Snapshot};
+pub use transaction::Editor;
 
 pub use crate::model::database_range::{
     Condition, ConditionSource, DataType, EmbeddedNumberBehavior, Expression, Field, Filter, Key,
@@ -32,10 +32,16 @@ pub use crate::model::database_range::{
 /// source. The returned boolean distinguishes an absent owner from an
 /// explicitly empty `table:database-ranges` element.
 pub(crate) fn parse_content(xml: &str) -> litchi_core::Result<(Vec<Range>, bool)> {
-    let location = codec::locate(xml)?;
+    let location = codec::locate(
+        xml,
+        &litchi_odf_common::XmlStreamLimits::owner_default_value(),
+    )?;
     let ranges = if let Some(container) = &location.container {
         let fragment = codec::owner_fragment(xml, container)?;
-        crate::model::database_range::parse_database_ranges(&fragment)?
+        crate::model::database_range::parse_database_ranges(
+            &fragment,
+            &litchi_odf_common::XmlStreamLimits::owner_default_value(),
+        )?
     } else {
         Vec::new()
     };
@@ -51,11 +57,15 @@ pub(crate) fn replace_content(
     xml: &str,
     candidate: Option<&[Range]>,
 ) -> litchi_core::Result<String> {
-    let location = codec::locate(xml)?;
+    let location = codec::locate(
+        xml,
+        &litchi_odf_common::XmlStreamLimits::owner_default_value(),
+    )?;
     let original = if let Some(container) = &location.container {
         let fragment = codec::owner_fragment(xml, container)?;
         Some(crate::model::database_range::parse_database_ranges(
             &fragment,
+            &litchi_odf_common::XmlStreamLimits::owner_default_value(),
         )?)
     } else {
         None
@@ -66,5 +76,10 @@ pub(crate) fn replace_content(
     if original.as_deref() == candidate_owned.as_deref() {
         return Ok(xml.to_owned());
     }
-    codec::replace(xml, &location, candidate)
+    codec::replace(
+        xml,
+        &location,
+        candidate,
+        &litchi_odf_common::XmlStreamLimits::owner_default_value(),
+    )
 }

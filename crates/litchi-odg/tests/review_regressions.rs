@@ -1,10 +1,10 @@
 #![allow(clippy::unwrap_used, reason = "test assertions use unwrap for clarity")]
 
 use litchi_odf_common::core::PackageWriter;
-use litchi_odg::{Drawing, Transition, shape::ShapeKind};
+use litchi_odg::{Package, Transition, shape::ShapeKind};
 
 fn package(content: &str) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.graphics")
         .unwrap();
@@ -22,18 +22,18 @@ fn transition() -> Transition {
 #[test]
 fn first_transition_can_be_added_to_a_style_without_properties() {
     let content = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" office:version="1.4"><office:automatic-styles><style:style style:name="dp1" style:family="drawing-page"></style:style></office:automatic-styles><office:body><office:drawing><draw:page draw:name="Page 1" draw:style-name="dp1"/></office:drawing></office:body></office:document-content>"#;
-    let source = Drawing::from_bytes(package(content)).unwrap();
+    let source = Package::from_bytes(&package(content)).unwrap();
     assert!(source.pages()[0].transition().is_none());
 
     let mut edit = source.edit();
     edit.set_page_transition(0, Some(transition())).unwrap();
-    let output = edit.commit().unwrap().into_snapshot();
+    let output = edit.commit().unwrap().into_package();
     assert!(
         output
             .content_xml()
             .contains("<style:drawing-page-properties")
     );
-    let reopened = Drawing::from_bytes(output.as_bytes().to_vec()).unwrap();
+    let reopened = Package::from_bytes(output.as_bytes()).unwrap();
     assert_eq!(
         reopened.pages()[0].transition().unwrap().style(),
         Some("dissolve")
@@ -43,7 +43,7 @@ fn first_transition_can_be_added_to_a_style_without_properties() {
 #[test]
 fn accepts_group_and_nested_dr3d_scene_owners() {
     let content = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:dr3d="urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0" office:version="1.4"><office:body><office:drawing><draw:page draw:name="Page 1"><draw:g draw:name="Group"><dr3d:scene draw:name="Outer"><dr3d:scene draw:name="Inner"><dr3d:cube/></dr3d:scene></dr3d:scene></draw:g></draw:page></office:drawing></office:body></office:document-content>"#;
-    let drawing = Drawing::from_bytes(package(content)).unwrap();
+    let drawing = Package::from_bytes(&package(content)).unwrap();
     let shapes = drawing.pages()[0].shapes();
     assert_eq!(shapes.len(), 4);
     assert_eq!(shapes[0].kind(), ShapeKind::Group);
@@ -55,7 +55,7 @@ fn accepts_group_and_nested_dr3d_scene_owners() {
 #[test]
 fn accepts_repeated_frame_and_scene_glue_points_and_scene_description_first() {
     let content = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:dr3d="urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" office:version="1.4"><office:body><office:drawing><draw:page draw:name="Page 1"><draw:frame draw:name="Frame"><draw:glue-point draw:id="0" svg:x="1cm" svg:y="2cm" draw:escape-direction="auto"/><draw:glue-point draw:id="1" svg:x="3cm" svg:y="4cm" draw:escape-direction="auto"/></draw:frame><dr3d:scene draw:name="Scene"><svg:desc>Scene description</svg:desc><draw:glue-point draw:id="2" svg:x="5cm" svg:y="6cm" draw:escape-direction="auto"/><draw:glue-point draw:id="3" svg:x="7cm" svg:y="8cm" draw:escape-direction="auto"/></dr3d:scene></draw:page></office:drawing></office:body></office:document-content>"#;
-    let drawing = Drawing::from_bytes(package(content)).unwrap();
+    let drawing = Package::from_bytes(&package(content)).unwrap();
     let shapes = drawing.pages()[0].shapes();
     assert_eq!(shapes[0].glue_points().len(), 2);
     assert_eq!(shapes[1].glue_points().len(), 2);
@@ -68,6 +68,6 @@ fn rejects_accessibility_elements_after_their_owner_sequence() {
     let scene_title_after_description = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:dr3d="urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" office:version="1.4"><office:body><office:drawing><draw:page draw:name="Page 1"><dr3d:scene draw:name="Scene"><svg:desc>Description</svg:desc><svg:title>Late title</svg:title></dr3d:scene></draw:page></office:drawing></office:body></office:document-content>"#;
 
     for content in [frame_after_contour, scene_title_after_description] {
-        assert!(Drawing::from_bytes(package(content)).is_err());
+        assert!(Package::from_bytes(&package(content)).is_err());
     }
 }

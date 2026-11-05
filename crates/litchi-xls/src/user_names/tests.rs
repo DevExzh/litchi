@@ -46,14 +46,14 @@ fn timestamp_edit_preserves_nul_in_inert_user_name() {
         ShortDtr::parse(USR_INFO_RECORD_TYPE, &[0xEA, 0x07, 2, 3, 4, 5, 6, 2]).unwrap(),
     )
     .unwrap();
-    let target = edit.commit().unwrap().into_snapshot();
+    let target = edit.commit().unwrap().into_package();
     assert_eq!(target.users()[0].user_name().as_bytes(), b"A\0lice");
 }
 
 #[test]
 fn parses_user_names_and_preserves_reserved_fields() {
     let (bytes, guid) = stream_with_user();
-    let snapshot = Snapshot::parse(&bytes).unwrap();
+    let snapshot = Snapshot::parse(&bytes, Limits::default()).unwrap();
     assert_eq!(snapshot.user_count(), 1);
     assert_eq!(snapshot.users()[0].user_id(), 7);
     assert_eq!(snapshot.users()[0].guid(), &guid);
@@ -77,17 +77,17 @@ fn metadata_edit_is_source_checked_and_reversible() {
     )
     .unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.changed());
-    assert_eq!(commit.patch().apply(&source).unwrap(), *commit.snapshot());
-    assert_eq!(commit.patch().revert(commit.snapshot()).unwrap(), source);
+    assert!(commit.diagnostics().changed());
+    assert_eq!(commit.patch().apply(&source).unwrap(), *commit.package());
+    assert_eq!(commit.patch().revert(commit.package()).unwrap(), source);
     assert_eq!(
-        commit.patch().inverse().apply(commit.snapshot()).unwrap(),
+        commit.patch().inverse().apply(commit.package()).unwrap(),
         source
     );
-    assert_eq!(commit.snapshot().users()[0].user_name(), "Élodie");
-    assert_eq!(commit.snapshot().users()[0].string_flags(), 0x02);
-    assert_eq!(commit.snapshot().model().user_record_sizes()[255], 0x1234);
-    assert_eq!(commit.snapshot().model().user_check().reserved(), 0xF2F1);
+    assert_eq!(commit.package().users()[0].user_name(), "Élodie");
+    assert_eq!(commit.package().users()[0].string_flags(), 0x02);
+    assert_eq!(commit.package().model().user_record_sizes()[255], 0x1234);
+    assert_eq!(commit.package().model().user_check().reserved(), 0xF2F1);
 }
 
 #[test]
@@ -96,17 +96,16 @@ fn semantic_revert_is_an_exact_noop_and_invalid_edit_is_atomic() {
     let source = Snapshot::parse_with_revision_guids(&bytes, &[guid]).unwrap();
     let mut edit = source.edit();
     edit.set_user_name(0, "Bob").unwrap();
-    assert!(edit.is_changed());
+    assert!(edit.clone().commit().unwrap().diagnostics().changed());
     edit.set_user_name(0, "Alice").unwrap();
-    assert!(!edit.is_changed());
     let noop = edit.commit().unwrap();
-    assert!(!noop.changed());
-    assert_eq!(noop.snapshot(), &source);
+    assert!(!noop.diagnostics().changed());
+    assert_eq!(noop.package(), &source);
 
     let mut rejected = source.edit();
     assert!(rejected.set_user_name(0, "").is_err());
-    assert!(!rejected.is_changed());
     assert_eq!(rejected.users()[0].user_name(), "Alice");
+    assert!(!rejected.commit().unwrap().diagnostics().changed());
 }
 
 #[test]
@@ -118,7 +117,7 @@ fn collection_edit_updates_cusr_and_cbusr() {
     let another = UserEntry::new(8, guid, opened_at(), "Bob").unwrap();
     let mut edit = source.edit();
     edit.push(another.clone()).unwrap();
-    let added = edit.commit().unwrap().into_snapshot();
+    let added = edit.commit().unwrap().into_package();
     assert_eq!(added.user_count(), 2);
     assert_eq!(added.users()[1].user_name(), "Bob");
 
@@ -128,7 +127,7 @@ fn collection_edit_updates_cusr_and_cbusr() {
     assert_eq!(
         append_commit
             .patch()
-            .revert(append_commit.snapshot())
+            .revert(append_commit.package())
             .unwrap(),
         source
     );
@@ -136,14 +135,14 @@ fn collection_edit_updates_cusr_and_cbusr() {
         append_commit
             .patch()
             .inverse()
-            .apply(append_commit.snapshot())
+            .apply(append_commit.package())
             .unwrap(),
         source
     );
 
     let mut remove = added.edit();
     assert_eq!(remove.remove(0).unwrap().user_name(), "Alice");
-    let removed = remove.commit().unwrap().into_snapshot();
+    let removed = remove.commit().unwrap().into_package();
     assert_eq!(removed.user_count(), 1);
     assert_eq!(removed.users()[0].user_name(), "Bob");
     assert_eq!(removed.model().user_record_sizes()[1], 0);
@@ -152,7 +151,7 @@ fn collection_edit_updates_cusr_and_cbusr() {
 #[test]
 fn insertion_requires_revision_guid_closure() {
     let (bytes, guid) = stream_with_user();
-    let source = Snapshot::parse(&bytes).unwrap();
+    let source = Snapshot::parse(&bytes, Limits::default()).unwrap();
     let user = UserEntry::new(8, guid, opened_at(), "Bob").unwrap();
     assert!(source.edit().push(user).is_err());
 }
@@ -187,7 +186,11 @@ fn shared_guid_parse_precharges_source_and_guid_limits() {
     let guid_bound = Limits::default().with_max_revision_guids(0);
     let error = Snapshot::parse_shared_with_revision_guids_and_limits(source, &[guid], guid_bound)
         .unwrap_err();
-    assert!(error.to_string().contains("Revision Log contains"));
+    assert!(
+        error
+            .to_string()
+            .contains("Revision Log exceeds its GUID limit")
+    );
 }
 
 #[test]
@@ -202,13 +205,13 @@ fn malformed_count_and_size_are_rejected() {
     let (mut bytes, _) = stream_with_user();
     // CUsr declares two users while only one UsrInfo follows.
     bytes[4..6].copy_from_slice(&2u16.to_le_bytes());
-    assert!(Snapshot::parse(&bytes).is_err());
+    assert!(Snapshot::parse(&bytes, Limits::default()).is_err());
 
     let (mut bytes, _) = stream_with_user();
     // CbUsr's first declared payload length no longer matches UsrInfo.
     let cbusr_payload_offset = 4 + 2 + 4 + 4 + 4;
     bytes[cbusr_payload_offset..cbusr_payload_offset + 2].copy_from_slice(&1u16.to_le_bytes());
-    assert!(Snapshot::parse(&bytes).is_err());
+    assert!(Snapshot::parse(&bytes, Limits::default()).is_err());
 
     let (mut bytes, _) = stream_with_user();
     // UsrChk.version is restricted to the BIFF2-BIFF8 values in MS-XLS
@@ -216,18 +219,18 @@ fn malformed_count_and_size_are_rejected() {
     let usr_chk_payload_offset = 4 + 2 + 4;
     bytes[usr_chk_payload_offset..usr_chk_payload_offset + 2]
         .copy_from_slice(&0x0700u16.to_le_bytes());
-    assert!(Snapshot::parse(&bytes).is_err());
+    assert!(Snapshot::parse(&bytes, Limits::default()).is_err());
 
     let (bytes, _) = stream_with_user();
     assert!(
-        Snapshot::parse_with_limits(
+        Snapshot::parse(
             &bytes,
             Limits::default().with_max_stream_bytes(bytes.len() - 1),
         )
         .is_err()
     );
     assert!(
-        Snapshot::parse_with_limits(
+        Snapshot::parse(
             &bytes,
             Limits::default().with_max_stream_bytes(Limits::MAX_STREAM_BYTES + 1),
         )

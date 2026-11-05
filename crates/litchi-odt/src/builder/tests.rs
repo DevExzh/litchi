@@ -39,7 +39,7 @@ fn hyperlink_authoring_round_trips_through_an_odt_package() {
     configured.set_title("Jump to bookmark");
     builder.add_hyperlink_element(configured).unwrap();
 
-    let document = crate::Document::from_bytes(builder.build().unwrap()).unwrap();
+    let document = builder.build().unwrap().document().unwrap();
     assert_eq!(
         document.hyperlinks().unwrap(),
         vec![
@@ -86,7 +86,7 @@ fn ruby_annotation_authoring_round_trips_through_an_odt_package() {
     assert!(builder.add_ruby_style(style.clone()).is_err());
     builder.add_ruby_annotation(0, &annotation).unwrap();
 
-    let document = crate::Document::from_bytes(builder.build().unwrap()).unwrap();
+    let document = builder.build().unwrap().document().unwrap();
     assert_eq!(document.ruby_styles().unwrap().styles, vec![style]);
     assert_eq!(
         document.ruby_annotations().unwrap().annotations,
@@ -118,7 +118,7 @@ fn ruby_range_annotation_authoring_round_trips_through_an_odt_package() {
         .wrap_ruby_annotation(0, start..start + "字".len(), &annotation)
         .unwrap();
 
-    let document = crate::Document::from_bytes(builder.build().unwrap()).unwrap();
+    let document = builder.build().unwrap().document().unwrap();
     assert_eq!(
         document.ruby_annotations().unwrap().annotations,
         vec![annotation]
@@ -143,7 +143,7 @@ fn ruby_range_annotation_authoring_round_trips_through_an_odt_package() {
         .wrap_ruby_annotation(0, 1..1 + "漢字".len(), &structured)
         .unwrap();
 
-    let document = crate::Document::from_bytes(builder.build().unwrap()).unwrap();
+    let document = builder.build().unwrap().document().unwrap();
     assert_eq!(
         document.ruby_annotations().unwrap().annotations,
         vec![structured]
@@ -160,7 +160,7 @@ fn note_authoring_round_trips_through_an_odt_package() {
     builder.add_paragraph("Body text").unwrap();
     builder.add_note(0, &note).unwrap();
 
-    let document = crate::Document::from_bytes(builder.build().unwrap()).unwrap();
+    let document = builder.build().unwrap().document().unwrap();
     assert_eq!(document.notes().unwrap(), vec![note.clone()]);
     assert_eq!(document.footnotes().unwrap(), vec![note]);
     assert!(document.endnotes().unwrap().is_empty());
@@ -273,7 +273,7 @@ fn test_set_metadata() {
         author: Some("Test Author".to_string()),
         subject: Some("Test Subject".to_string()),
         description: Some("Test Description".to_string()),
-        keywords: Some("test, keywords".to_string()),
+        keywords: vec!["test".to_string(), "keywords".to_string()],
         ..Metadata::default()
     };
     builder.set_metadata(metadata);
@@ -312,24 +312,32 @@ fn test_generate_meta_xml() {
     builder.metadata.author = Some("My Author".to_string());
     builder.metadata.subject = Some("My Subject".to_string());
     builder.metadata.description = Some("My Description".to_string());
-    builder.metadata.keywords = Some("my, keywords".to_string());
+    builder.metadata.keywords = vec!["my".to_string(), "keywords".to_string()];
     builder.metadata.identifier = Some("urn:litchi:document".to_string());
     builder.metadata.language = Some("en-US".to_string());
     builder.metadata.created = Some("2026-08-10T01:02:03Z".parse().unwrap());
-    builder.metadata.modified_local = Some(
-        chrono::NaiveDateTime::parse_from_str("2026-08-10T04:05:06", "%Y-%m-%dT%H:%M:%S").unwrap(),
+    builder.metadata.modified = Some(
+        chrono::NaiveDateTime::parse_from_str("2026-08-10T04:05:06", "%Y-%m-%dT%H:%M:%S")
+            .unwrap()
+            .into(),
     );
 
     let meta_xml = builder.generate_meta_xml();
     assert_eq!(meta_xml, builder.generate_meta_xml());
-    litchi_odf_common::compact_xml::validate(meta_xml.as_bytes()).unwrap();
+    litchi_odf_common::compact_xml::validate(
+        meta_xml.as_bytes(),
+        litchi_odf_common::compact_xml::Limits::default(),
+    )
+    .unwrap();
     assert!(meta_xml.contains("office:document-meta"));
     assert!(meta_xml.contains("Litchi/"));
     assert!(meta_xml.contains("My Title"));
     assert!(meta_xml.contains("My Author"));
     assert!(meta_xml.contains("My Subject"));
     assert!(meta_xml.contains("My Description"));
-    assert!(meta_xml.contains("my, keywords"));
+    assert!(
+        meta_xml.contains("<meta:keyword>my</meta:keyword><meta:keyword>keywords</meta:keyword>")
+    );
     assert_eq!(meta_xml.matches("<dc:title>").count(), 1);
     assert!(meta_xml.contains("<dc:identifier>urn:litchi:document</dc:identifier>"));
     assert!(meta_xml.contains("<dc:language>en-US</dc:language>"));
@@ -343,7 +351,11 @@ fn default_metadata_xml_has_no_ambient_timestamp() {
     let meta_xml = builder.generate_meta_xml();
     assert!(!meta_xml.contains("<meta:creation-date>"));
     assert!(!meta_xml.contains("<dc:date>"));
-    litchi_odf_common::compact_xml::validate(meta_xml.as_bytes()).unwrap();
+    litchi_odf_common::compact_xml::validate(
+        meta_xml.as_bytes(),
+        litchi_odf_common::compact_xml::Limits::default(),
+    )
+    .unwrap();
 }
 
 #[test]
@@ -386,12 +398,12 @@ fn line_numbering_configuration_round_trips_through_an_odt_package() {
         .unwrap();
 
     let bytes = builder.build().unwrap();
-    let document = crate::Document::from_bytes(bytes.clone()).unwrap();
+    let document = bytes.document().unwrap();
     assert_eq!(
         document.line_numbering_configuration().unwrap(),
         Some(configuration.clone())
     );
-    let package = crate::Package::from_bytes(bytes).unwrap();
+    let package = crate::GenericPackage::from_bytes(bytes.as_bytes()).unwrap();
     assert_eq!(
         package.line_numbering_configuration().unwrap(),
         Some(configuration)
@@ -405,7 +417,7 @@ fn test_build() {
 
     let result = builder.build();
     assert!(result.is_ok());
-    let bytes = result.unwrap();
+    let bytes = result.unwrap().to_bytes().unwrap();
     assert!(!bytes.is_empty());
     // Check it's a valid ZIP (starts with PK)
     assert_eq!(&bytes[0..2], b"PK");
@@ -419,7 +431,7 @@ fn test_save() {
     let mut builder = Builder::new();
     builder.add_paragraph("Test content").unwrap();
 
-    let result = builder.save(&path);
+    let result = builder.build().unwrap().save(&path);
     assert!(result.is_ok());
     assert!(path.exists());
 

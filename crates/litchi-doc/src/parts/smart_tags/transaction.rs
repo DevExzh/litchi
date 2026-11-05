@@ -75,21 +75,6 @@ impl Snapshot {
         )
     }
 
-    /// Parse with custom resource limits and LCID-derived ANSI decoding.
-    pub fn parse_with_limits(
-        fib: &FileInformationBlock,
-        table_stream: &[u8],
-        limits: Limits,
-    ) -> PackageResult<Self> {
-        Self::parse_with_options_and_policy(
-            fib,
-            table_stream,
-            None,
-            limits,
-            ProtectionPolicy::default(),
-        )
-    }
-
     /// Parse with explicit ANSI decoding and resource limits.
     pub fn parse_with_options(
         fib: &FileInformationBlock,
@@ -106,7 +91,9 @@ impl Snapshot {
         )
     }
 
-    pub(super) fn parse_with_options_and_policy(
+    /// Parse with explicit ANSI decoding, resource limits and protected-edit
+    /// policy.
+    pub fn parse_with_options_and_policy(
         fib: &FileInformationBlock,
         table_stream: &[u8],
         ansi: Option<Ansi>,
@@ -225,13 +212,13 @@ impl Snapshot {
 
     /// Start an isolated typed transaction.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction::new(self.clone())
+    pub fn edit(&self) -> Edit {
+        Edit::new(self.clone())
     }
 
     /// Alias for [`Self::edit`].
     #[must_use]
-    pub fn transaction(&self) -> Transaction {
+    pub fn transaction(&self) -> Edit {
         self.edit()
     }
 
@@ -312,12 +299,12 @@ impl Eq for Snapshot {}
 
 /// A staged, clone-first edit over one source snapshot.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub struct Edit {
     source: Snapshot,
     metadata: DocumentSmartTags,
 }
 
-impl Transaction {
+impl Edit {
     pub(super) fn new(source: Snapshot) -> Self {
         Self {
             metadata: source.metadata.clone(),
@@ -335,12 +322,6 @@ impl Transaction {
     #[must_use]
     pub const fn metadata(&self) -> &DocumentSmartTags {
         &self.metadata
-    }
-
-    /// Whether the typed candidate differs from the source projection.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.metadata != *self.source.metadata()
     }
 
     /// Replace one complete bookmark while retaining its stable table slot.
@@ -551,22 +532,17 @@ impl Transaction {
         Ok(self)
     }
 
-    /// Materialize the staged candidate as a validated snapshot.
-    pub fn snapshot(&self) -> TxResult<Snapshot> {
+    /// Materialize the staged candidate as a validated snapshot without
+    /// committing it.
+    pub fn staged(&self) -> TxResult<Snapshot> {
         self.source
             .materialize(self.metadata.clone())
             .map_err(Error::Invalid)
     }
 
-    /// Discard the candidate and recover the immutable source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
-    }
-
     /// Commit the candidate as a reversible source-checked patch.
     pub fn commit(self) -> TxResult<Commit> {
-        let snapshot = self.snapshot()?;
+        let snapshot = self.staged()?;
         if snapshot != self.source {
             self.source
                 .protection_policy
@@ -575,7 +551,8 @@ impl Transaction {
         }
         let policy = self.source.protection_policy.clone();
         let patch = Patch::new(self.source, snapshot.clone(), policy);
-        Ok(Commit { snapshot, patch })
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(snapshot, patch, diagnostics))
     }
 
     fn set_property_string(
@@ -619,39 +596,12 @@ impl Transaction {
     }
 }
 
-/// A committed immutable result and its reversible patch.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
+/// A committed snapshot, its reversible source-checked patch and whether
+/// the serialized FIB/table bytes changed.
+pub type Commit = litchi_core::edit::Commit<Snapshot, Patch>;
 
-impl Commit {
-    /// The post-edit snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// The source-checked reversible patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Whether the serialized FIB/table bytes changed.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        !self.patch.is_noop()
-    }
-
-    /// Split the result into the snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
-    }
-}
-
+/// Content-free diagnostics of one commit.
+pub use litchi_core::edit::Diagnostics;
 /// A reversible replacement of the complete smart-tag snapshot projection.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Patch {
@@ -702,7 +652,7 @@ impl Patch {
         policy: ProtectionPolicy,
     ) -> TxResult<Snapshot> {
         if source.fingerprint() != self.before.fingerprint() || source != &self.before {
-            return Err(Error::Conflict);
+            return Err(Error::PatchConflict);
         }
         if source != &self.after {
             policy
@@ -725,18 +675,19 @@ impl Patch {
 
 /// Errors produced by a staged smart-tag edit.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// The candidate violates a DOC, MS-OSHARED, or fixed-topology invariant.
     Invalid(PackageError),
     /// The patch was applied to a different source snapshot.
-    Conflict,
+    PatchConflict,
 }
 
 impl std::fmt::Display for Error {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Invalid(error) => error.fmt(formatter),
-            Self::Conflict => formatter.write_str("smart-tag transaction source conflict"),
+            Self::PatchConflict => formatter.write_str("smart-tag transaction source conflict"),
         }
     }
 }

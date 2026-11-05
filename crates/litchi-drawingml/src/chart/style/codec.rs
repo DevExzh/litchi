@@ -5,7 +5,11 @@ use super::model::{
     EntryKind, FontIndex, FontReference, Info, MarkerLayout, MarkerSymbol, Payload, Reference,
     Transform, TransformKind, Variation,
 };
-use crate::{Error, Result};
+use crate::chart::Limits;
+use crate::chart::limits::{
+    decoded_attribute_value_bytes, decoded_cdata_value_bytes, decoded_text_value_bytes,
+};
+use crate::{Error, LimitKind, Result};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -18,14 +22,6 @@ const A: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
 const A_STRICT: &str = "http://purl.oclc.org/ooxml/drawingml/main";
 const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
 const MAX_XML_BYTES: usize = 16 * 1024 * 1024;
-const MAX_NODES: usize = 100_000;
-const MAX_DEPTH: usize = 96;
-const MAX_ATTRIBUTES: usize = 64;
-const MAX_STRING_BYTES: usize = 4 * 1024 * 1024;
-const MAX_MODIFIERS: usize = 256;
-const MAX_COLORS: usize = 4_096;
-const MAX_VARIATIONS: usize = 4_096;
-const MAX_TRANSFORMS: usize = 4_096;
 
 impl Document {
     #[must_use]
@@ -73,15 +69,18 @@ struct Node {
 ///
 /// Returns an error when input violates DrawingML constraints, exceeds a configured
 /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-pub fn parse(xml: &[u8]) -> Result<Document> {
-    let processed = litchi_ooxml_common::mce::process_ooxml(xml)?;
-    let mut document = parse_document(processed.as_ref())?;
+pub fn parse(xml: &[u8], limits: &Limits) -> Result<Document> {
+    let limits = limits.validate()?;
+    check_source(xml, limits.max_style_bytes)?;
+    let processed = process_mce(xml, limits)?;
+    let mut document = parse_document(processed.as_ref(), limits)?;
     document.xml = xml.to_vec();
+    limits.validate_style_document(&document)?;
     Ok(document)
 }
 
-fn parse_document(xml: &[u8]) -> Result<Document> {
-    let root = parse_tree(xml)?;
+fn parse_document(xml: &[u8], limits: Limits) -> Result<Document> {
+    let root = parse_tree(xml, limits)?;
     require_root(&root, "chartStyle")?;
     let ignorable = ignorable_namespaces(&root)?;
     let id = optional_u32_attribute(&root, "id", &ignorable)?;
@@ -140,7 +139,7 @@ fn parse_document(xml: &[u8]) -> Result<Document> {
         let child = children[cursor];
         cursor += 1;
         if let Some(kind) = kind {
-            entries.push(parse_style_entry(child, kind, &ignorable)?);
+            entries.push(parse_style_entry(child, kind, &ignorable, limits)?);
         } else {
             marker_layout = Some(parse_marker_layout(child, &ignorable)?);
         }
@@ -171,15 +170,18 @@ fn parse_document(xml: &[u8]) -> Result<Document> {
 ///
 /// Returns an error when input violates DrawingML constraints, exceeds a configured
 /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-pub fn parse_color(xml: &[u8]) -> Result<ColorDocument> {
-    let processed = litchi_ooxml_common::mce::process_ooxml(xml)?;
-    let mut document = parse_color_document(processed.as_ref())?;
+pub fn parse_color(xml: &[u8], limits: &Limits) -> Result<ColorDocument> {
+    let limits = limits.validate()?;
+    check_source(xml, limits.max_style_bytes)?;
+    let processed = process_mce(xml, limits)?;
+    let mut document = parse_color_document(processed.as_ref(), limits)?;
     document.xml = xml.to_vec();
+    limits.validate_color_document(&document)?;
     Ok(document)
 }
 
-fn parse_color_document(xml: &[u8]) -> Result<ColorDocument> {
-    let root = parse_tree(xml)?;
+fn parse_color_document(xml: &[u8], limits: Limits) -> Result<ColorDocument> {
+    let root = parse_tree(xml, limits)?;
     require_root(&root, "colorStyle")?;
     let ignorable = ignorable_namespaces(&root)?;
     let method = required_attribute(&root, "meth", &ignorable)?.to_owned();
@@ -200,10 +202,14 @@ fn parse_color_document(xml: &[u8]) -> Result<ColorDocument> {
         if !is_a(&child.namespace) || color_kind(&child.name).is_none() {
             break;
         }
-        if colors.len() >= MAX_COLORS {
-            return limit("chart color style colors");
+        if colors.len() >= limits.max_style_colors {
+            return limit(
+                LimitKind::ChartStyleColors,
+                colors.len() + 1,
+                limits.max_style_colors,
+            );
         }
-        colors.push(parse_drawing_color(child, &ignorable)?);
+        colors.push(parse_drawing_color(child, &ignorable, limits)?);
         cursor += 1;
     }
     if colors.is_empty() {
@@ -214,8 +220,12 @@ fn parse_color_document(xml: &[u8]) -> Result<ColorDocument> {
         .get(cursor)
         .is_some_and(|child| child.namespace == CS && child.name == "variation")
     {
-        if variations.len() >= MAX_VARIATIONS {
-            return limit("chart color style variations");
+        if variations.len() >= limits.max_style_variations {
+            return limit(
+                LimitKind::ChartStyleVariations,
+                variations.len() + 1,
+                limits.max_style_variations,
+            );
         }
         let child = children[cursor];
         reject_attributes(child, &[], &ignorable, "variation")?;
@@ -223,7 +233,7 @@ fn parse_color_document(xml: &[u8]) -> Result<ColorDocument> {
             return invalid("chart color style variation contains text");
         }
         variations.push(Variation {
-            transforms: parse_transforms(child, &ignorable)?,
+            transforms: parse_transforms(child, &ignorable, limits)?,
         });
         cursor += 1;
     }
@@ -250,15 +260,21 @@ fn parse_color_document(xml: &[u8]) -> Result<ColorDocument> {
     })
 }
 
-fn parse_style_entry(node: &Node, kind: EntryKind, ignorable: &HashSet<String>) -> Result<Entry> {
-    let modifiers = modifiers(node, ignorable)?;
+fn parse_style_entry(
+    node: &Node,
+    kind: EntryKind,
+    ignorable: &HashSet<String>,
+    limits: Limits,
+) -> Result<Entry> {
+    let modifiers = modifiers(node, ignorable, limits)?;
     reject_attributes(node, &["mods"], ignorable, &node.name)?;
     if !node.text.trim().is_empty() {
         return invalid("chart style entry contains text");
     }
     let children = semantic_children(node, ignorable)?;
     let mut cursor = 0usize;
-    let line_reference = parse_required_reference(children.get(cursor), "lnRef", ignorable)?;
+    let line_reference =
+        parse_required_reference(children.get(cursor), "lnRef", ignorable, limits)?;
     cursor += 1;
     let line_width_scale = if children
         .get(cursor)
@@ -275,11 +291,13 @@ fn parse_style_entry(node: &Node, kind: EntryKind, ignorable: &HashSet<String>) 
     } else {
         "1.0".to_owned()
     };
-    let fill_reference = parse_required_reference(children.get(cursor), "fillRef", ignorable)?;
+    let fill_reference =
+        parse_required_reference(children.get(cursor), "fillRef", ignorable, limits)?;
     cursor += 1;
-    let effect_reference = parse_required_reference(children.get(cursor), "effectRef", ignorable)?;
+    let effect_reference =
+        parse_required_reference(children.get(cursor), "effectRef", ignorable, limits)?;
     cursor += 1;
-    let font_reference = parse_required_font_reference(children.get(cursor), ignorable)?;
+    let font_reference = parse_required_font_reference(children.get(cursor), ignorable, limits)?;
     cursor += 1;
     let shape_properties = take_payload(&children, &mut cursor, "spPr", ignorable)?;
     let default_run_properties = take_payload(&children, &mut cursor, "defRPr", ignorable)?;
@@ -313,6 +331,7 @@ fn parse_required_reference(
     node: Option<&&Node>,
     expected: &str,
     ignorable: &HashSet<String>,
+    limits: Limits,
 ) -> Result<Reference> {
     let node = node
         .copied()
@@ -321,9 +340,9 @@ fn parse_required_reference(
     let index = required_attribute(node, "idx", ignorable)?
         .parse::<u32>()
         .map_err(|_error| invalid_error(format!("invalid {expected} index")))?;
-    let modifiers = modifiers(node, ignorable)?;
+    let modifiers = modifiers(node, ignorable, limits)?;
     reject_attributes(node, &["idx", "mods"], ignorable, expected)?;
-    let (color, style_color) = parse_reference_colors(node, ignorable)?;
+    let (color, style_color) = parse_reference_colors(node, ignorable, limits)?;
     Ok(Reference {
         index,
         modifiers,
@@ -335,6 +354,7 @@ fn parse_required_reference(
 fn parse_required_font_reference(
     node: Option<&&Node>,
     ignorable: &HashSet<String>,
+    limits: Limits,
 ) -> Result<FontReference> {
     let node = node
         .copied()
@@ -346,9 +366,9 @@ fn parse_required_font_reference(
         "none" => FontIndex::None,
         _ => return invalid("invalid fontRef index"),
     };
-    let modifiers = modifiers(node, ignorable)?;
+    let modifiers = modifiers(node, ignorable, limits)?;
     reject_attributes(node, &["idx", "mods"], ignorable, "fontRef")?;
-    let (color, style_color) = parse_reference_colors(node, ignorable)?;
+    let (color, style_color) = parse_reference_colors(node, ignorable, limits)?;
     Ok(FontReference {
         index,
         modifiers,
@@ -360,6 +380,7 @@ fn parse_required_font_reference(
 fn parse_reference_colors(
     node: &Node,
     ignorable: &HashSet<String>,
+    limits: Limits,
 ) -> Result<(Option<Color>, Option<ColorValue>)> {
     if !node.text.trim().is_empty() {
         return invalid("chart style reference contains text");
@@ -371,7 +392,7 @@ fn parse_reference_colors(
         .filter(|child| is_a(&child.namespace) && color_kind(&child.name).is_some());
     let color = if let Some(color) = color {
         cursor += 1;
-        Some(parse_drawing_color(color, ignorable)?)
+        Some(parse_drawing_color(color, ignorable, limits)?)
     } else {
         None
     };
@@ -380,7 +401,7 @@ fn parse_reference_colors(
         .filter(|child| child.namespace == CS && child.name == "styleClr");
     let style_color = if let Some(style_color) = style_color {
         cursor += 1;
-        Some(parse_style_color(style_color, ignorable)?)
+        Some(parse_style_color(style_color, ignorable, limits)?)
     } else {
         None
     };
@@ -390,7 +411,11 @@ fn parse_reference_colors(
     Ok((color, style_color))
 }
 
-fn parse_style_color(node: &Node, ignorable: &HashSet<String>) -> Result<ColorValue> {
+fn parse_style_color(
+    node: &Node,
+    ignorable: &HashSet<String>,
+    limits: Limits,
+) -> Result<ColorValue> {
     let raw = optional_attribute(node, "val", ignorable).map(str::to_owned);
     if let Some(raw) = &raw {
         check_string(raw, 256, "style color value")?;
@@ -402,7 +427,7 @@ fn parse_style_color(node: &Node, ignorable: &HashSet<String>) -> Result<ColorVa
         raw,
         index,
         automatic,
-        transforms: parse_transforms(node, ignorable)?,
+        transforms: parse_transforms(node, ignorable, limits)?,
     })
 }
 
@@ -442,7 +467,7 @@ fn parse_marker_layout(node: &Node, ignorable: &HashSet<String>) -> Result<Marke
     Ok(MarkerLayout { symbol, size })
 }
 
-fn parse_drawing_color(node: &Node, ignorable: &HashSet<String>) -> Result<Color> {
+fn parse_drawing_color(node: &Node, ignorable: &HashSet<String>, limits: Limits) -> Result<Color> {
     let kind =
         color_kind(&node.name).ok_or_else(|| invalid_error("unsupported DrawingML color"))?;
     let mut components = Vec::new();
@@ -492,18 +517,26 @@ fn parse_drawing_color(node: &Node, ignorable: &HashSet<String>) -> Result<Color
         kind,
         value,
         components,
-        transforms: parse_transforms(node, ignorable)?,
+        transforms: parse_transforms(node, ignorable, limits)?,
     })
 }
 
-fn parse_transforms(node: &Node, ignorable: &HashSet<String>) -> Result<Vec<Transform>> {
+fn parse_transforms(
+    node: &Node,
+    ignorable: &HashSet<String>,
+    limits: Limits,
+) -> Result<Vec<Transform>> {
     if !node.text.trim().is_empty() {
         return invalid("color or variation contains text");
     }
     let mut transforms = Vec::new();
     for child in semantic_children(node, ignorable)? {
-        if transforms.len() >= MAX_TRANSFORMS {
-            return limit("chart style color transforms");
+        if transforms.len() >= limits.max_style_transforms {
+            return limit(
+                LimitKind::ChartStyleTransforms,
+                transforms.len() + 1,
+                limits.max_style_transforms,
+            );
         }
         if !is_a(&child.namespace) {
             return invalid("color transform has the wrong namespace");
@@ -576,9 +609,10 @@ fn count_semantic_descendants(node: &Node, ignorable: &HashSet<String>) -> Resul
     Ok(count)
 }
 
-fn parse_tree(xml: &[u8]) -> Result<Node> {
-    if xml.len() > MAX_XML_BYTES {
-        return limit("chart style XML bytes");
+fn parse_tree(xml: &[u8], limits: Limits) -> Result<Node> {
+    let maximum = limits.max_style_bytes.min(MAX_XML_BYTES);
+    if xml.len() > maximum {
+        return limit(LimitKind::XmlBytes, xml.len(), maximum);
     }
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
@@ -589,19 +623,35 @@ fn parse_tree(xml: &[u8]) -> Result<Node> {
     loop {
         match reader.read_event().map_err(xml_error)? {
             Event::Start(element) => {
-                let node = make_node(&reader, &element, &mut strings)?;
-                stack.push(node);
-                nodes += 1;
-                if stack.len() > MAX_DEPTH || nodes > MAX_NODES {
-                    return limit("chart style XML structure");
+                let depth = stack.len().checked_add(1).ok_or_else(|| {
+                    Error::limit(LimitKind::XmlDepth, usize::MAX, limits.max_style_depth)
+                })?;
+                if depth > limits.max_style_depth {
+                    return limit(LimitKind::XmlDepth, depth, limits.max_style_depth);
                 }
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    Error::limit(LimitKind::XmlNodes, usize::MAX, limits.max_style_nodes)
+                })?;
+                if nodes > limits.max_style_nodes {
+                    return limit(LimitKind::XmlNodes, nodes, limits.max_style_nodes);
+                }
+                let node = make_node(&reader, &element, &mut strings, limits)?;
+                stack.push(node);
             },
             Event::Empty(element) => {
-                let node = make_node(&reader, &element, &mut strings)?;
-                nodes += 1;
-                if nodes > MAX_NODES {
-                    return limit("chart style XML structure");
+                let depth = stack.len().checked_add(1).ok_or_else(|| {
+                    Error::limit(LimitKind::XmlDepth, usize::MAX, limits.max_style_depth)
+                })?;
+                if depth > limits.max_style_depth {
+                    return limit(LimitKind::XmlDepth, depth, limits.max_style_depth);
                 }
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    Error::limit(LimitKind::XmlNodes, usize::MAX, limits.max_style_nodes)
+                })?;
+                if nodes > limits.max_style_nodes {
+                    return limit(LimitKind::XmlNodes, nodes, limits.max_style_nodes);
+                }
+                let node = make_node(&reader, &element, &mut strings, limits)?;
                 append_node(node, &mut stack, &mut root)?;
             },
             Event::End(_) => {
@@ -611,11 +661,18 @@ fn parse_tree(xml: &[u8]) -> Result<Node> {
                 append_node(node, &mut stack, &mut root)?;
             },
             Event::Text(value) => {
+                let decoded_length = decoded_text_value_bytes(
+                    value.as_ref(),
+                    reader.decoder(),
+                    XmlVersion::Implicit1_0,
+                )
+                .map_err(Error::Xml)?;
+                preflight_strings(strings, decoded_length, limits.max_style_string_bytes)?;
                 let value = value
                     .xml_content(XmlVersion::Implicit1_0)
                     .map_err(xml_error)?
                     .into_owned();
-                add_strings(&mut strings, value.len())?;
+                add_strings(&mut strings, value.len(), limits.max_style_string_bytes)?;
                 if let Some(node) = stack.last_mut() {
                     node.text.push_str(&value);
                 } else if !value.trim().is_empty() {
@@ -623,12 +680,15 @@ fn parse_tree(xml: &[u8]) -> Result<Node> {
                 }
             },
             Event::CData(value) => {
+                let decoded_length = decoded_cdata_value_bytes(value.as_ref(), reader.decoder())
+                    .map_err(Error::Xml)?;
+                preflight_strings(strings, decoded_length, limits.max_style_string_bytes)?;
                 let value = reader
                     .decoder()
                     .decode(value.as_ref())
                     .map_err(xml_error)?
                     .into_owned();
-                add_strings(&mut strings, value.len())?;
+                add_strings(&mut strings, value.len(), limits.max_style_string_bytes)?;
                 if let Some(node) = stack.last_mut() {
                     node.text.push_str(&value);
                 } else if !value.trim().is_empty() {
@@ -639,7 +699,30 @@ fn parse_tree(xml: &[u8]) -> Result<Node> {
                 return invalid("DTD and processing instructions are rejected in chart styles");
             },
             Event::Eof => break,
-            Event::Comment(_) | Event::Decl(_) | Event::GeneralRef(_) => {},
+            Event::GeneralRef(reference) => {
+                let value = match reference
+                    .resolve_char_ref()
+                    .map_err(|error| Error::Xml(error.to_string()))?
+                {
+                    Some(character) => character.to_string(),
+                    None => {
+                        let name = reference
+                            .decode()
+                            .map_err(|error| Error::Xml(error.to_string()))?;
+                        quick_xml::escape::resolve_predefined_entity(&name)
+                            .ok_or_else(|| Error::Xml("unknown XML entity".into()))?
+                            .to_owned()
+                    },
+                };
+                preflight_strings(strings, value.len(), limits.max_style_string_bytes)?;
+                if let Some(node) = stack.last_mut() {
+                    node.text.push_str(&value);
+                } else if !value.trim().is_empty() {
+                    return invalid("text outside chart style root");
+                }
+                add_strings(&mut strings, value.len(), limits.max_style_string_bytes)?;
+            },
+            Event::Comment(_) | Event::Decl(_) => {},
         }
     }
     if !stack.is_empty() {
@@ -652,22 +735,70 @@ fn make_node(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
     strings: &mut usize,
+    limits: Limits,
 ) -> Result<Node> {
     let namespace = resolved(reader.resolver().resolve_element(element.name()).0)?;
     let name = std::str::from_utf8(element.local_name().as_ref())
         .map_err(xml_error)?
         .to_owned();
-    add_strings(strings, namespace.len() + name.len())?;
+    add_strings(
+        strings,
+        namespace.len() + name.len(),
+        limits.max_style_string_bytes,
+    )?;
+    let mut attribute_count = 0usize;
+    // Admit the complete attribute budget before decoding any values into
+    // owned strings. The semantic loop below still uses the checked iterator
+    // so expanded-name duplicates retain the style codec's strict grammar.
+    for item in element.unchecked_attributes() {
+        let item = item.map_err(xml_error)?;
+        let raw_name = item.key.as_ref();
+        if raw_name == b"xmlns" || raw_name.starts_with(b"xmlns:") {
+            continue;
+        }
+        attribute_count = attribute_count.checked_add(1).ok_or_else(|| {
+            Error::limit(
+                LimitKind::XmlAttributes,
+                usize::MAX,
+                limits.max_style_attributes,
+            )
+        })?;
+        if attribute_count > limits.max_style_attributes {
+            return limit(
+                LimitKind::XmlAttributes,
+                attribute_count,
+                limits.max_style_attributes,
+            );
+        }
+    }
     let mut attributes = Vec::new();
     let mut namespace_declarations = Vec::new();
     for item in element.checked_attributes() {
         let item = item.map_err(xml_error)?;
         let raw_name = item.key.as_ref();
+        let value_length = decoded_attribute_value_bytes(item.value.as_ref(), reader.decoder())
+            .map_err(xml_error)?;
+        if value_length > limits.max_attribute_value_bytes {
+            return limit(
+                LimitKind::AttributeValueBytes,
+                value_length,
+                limits.max_attribute_value_bytes,
+            );
+        }
+        preflight_strings(
+            *strings,
+            raw_name.len().saturating_add(value_length),
+            limits.max_style_string_bytes,
+        )?;
         let value = item
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
             .map_err(xml_error)?
             .into_owned();
-        add_strings(strings, raw_name.len() + value.len())?;
+        add_strings(
+            strings,
+            raw_name.len() + value.len(),
+            limits.max_style_string_bytes,
+        )?;
         if raw_name == b"xmlns" {
             namespace_declarations.push((String::new(), value));
             continue;
@@ -679,8 +810,12 @@ fn make_node(
             ));
             continue;
         }
-        if attributes.len() >= MAX_ATTRIBUTES {
-            return limit("chart style element attributes");
+        if attributes.len() >= limits.max_style_attributes {
+            return limit(
+                LimitKind::XmlAttributes,
+                attributes.len() + 1,
+                limits.max_style_attributes,
+            );
         }
         let (namespace, local) = reader.resolver().resolve_attribute(item.key);
         let namespace = resolved(namespace)?;
@@ -843,14 +978,30 @@ fn optional_u32_attribute(
         .transpose()
 }
 
-fn modifiers(node: &Node, ignorable: &HashSet<String>) -> Result<Vec<String>> {
-    let values = optional_attribute(node, "mods", ignorable)
+fn modifiers(node: &Node, ignorable: &HashSet<String>, limits: Limits) -> Result<Vec<String>> {
+    let mut values = Vec::new();
+    for modifier in optional_attribute(node, "mods", ignorable)
         .unwrap_or_default()
         .split_ascii_whitespace()
-        .map(str::to_owned)
-        .collect::<Vec<_>>();
-    if values.len() > MAX_MODIFIERS || values.iter().any(|value| value.len() > 256) {
-        return limit("chart style modifiers");
+    {
+        let observed = values.len().checked_add(1).ok_or_else(|| {
+            Error::limit(
+                LimitKind::ChartStyleModifiers,
+                usize::MAX,
+                limits.max_style_modifiers,
+            )
+        })?;
+        if observed > limits.max_style_modifiers {
+            return limit(
+                LimitKind::ChartStyleModifiers,
+                observed,
+                limits.max_style_modifiers,
+            );
+        }
+        if modifier.len() > 256 {
+            return limit(LimitKind::ChartStyleModifierBytes, modifier.len(), 256);
+        }
+        values.push(modifier.to_owned());
     }
     Ok(values)
 }
@@ -935,19 +1086,29 @@ fn validate_double(value: &str) -> Result<()> {
     Ok(())
 }
 
-fn check_string(value: &str, maximum: usize, label: &str) -> Result<()> {
+fn check_string(value: &str, maximum: usize, _label: &str) -> Result<()> {
     if value.len() > maximum {
-        return limit(label);
+        return limit(LimitKind::TextBytes, value.len(), maximum);
     }
     Ok(())
 }
 
-fn add_strings(total: &mut usize, amount: usize) -> Result<()> {
+fn add_strings(total: &mut usize, amount: usize, maximum: usize) -> Result<()> {
     *total = total
         .checked_add(amount)
         .ok_or_else(|| invalid_error("chart style string count overflow"))?;
-    if *total > MAX_STRING_BYTES {
-        return limit("chart style strings");
+    if *total > maximum {
+        return limit(LimitKind::ChartStyleStrings, *total, maximum);
+    }
+    Ok(())
+}
+
+fn preflight_strings(total: usize, amount: usize, maximum: usize) -> Result<()> {
+    let observed = total
+        .checked_add(amount)
+        .ok_or_else(|| Error::limit(LimitKind::ChartStyleStrings, usize::MAX, maximum))?;
+    if observed > maximum {
+        return limit(LimitKind::ChartStyleStrings, observed, maximum);
     }
     Ok(())
 }
@@ -973,12 +1134,70 @@ fn invalid_error(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-fn limit<T>(label: impl Into<String>) -> Result<T> {
-    invalid(format!("{} exceeds safety limit", label.into()))
+fn limit<T>(kind: LimitKind, observed: usize, maximum: usize) -> Result<T> {
+    Err(Error::limit(kind, observed, maximum))
 }
 
 fn xml_error(error: impl std::fmt::Display) -> Error {
     Error::Xml(error.to_string())
+}
+
+fn check_source(xml: &[u8], maximum: usize) -> Result<()> {
+    if xml.len() > maximum {
+        return limit(LimitKind::XmlBytes, xml.len(), maximum);
+    }
+    Ok(())
+}
+
+fn process_mce(xml: &[u8], limits: Limits) -> Result<std::borrow::Cow<'_, [u8]>> {
+    litchi_ooxml_common::mce::process_markup_compatibility(
+        xml,
+        &litchi_ooxml_common::mce::Capabilities::default(),
+        &litchi_ooxml_common::mce::Limits {
+            max_input_bytes: limits.max_style_bytes,
+            max_output_bytes: limits.max_style_bytes,
+            max_depth: limits.max_style_depth,
+            max_namespace_bindings: 4_096,
+            max_directive_tokens: 4_096,
+            max_choices_per_alternate: 1_024,
+            max_attributes_per_element: limits.max_style_attributes,
+        },
+    )
+    .map(|output| output.xml)
+    .map_err(|error| match error {
+        litchi_ooxml_common::mce::Error::LimitExceeded {
+            kind,
+            observed,
+            maximum,
+        } => Error::limit(
+            match kind {
+                litchi_ooxml_common::mce::LimitKind::InputBytes => LimitKind::XmlBytes,
+                litchi_ooxml_common::mce::LimitKind::OutputBytes => LimitKind::XmlBytes,
+                litchi_ooxml_common::mce::LimitKind::Depth => LimitKind::XmlDepth,
+                litchi_ooxml_common::mce::LimitKind::Attributes => LimitKind::XmlAttributes,
+                _ => LimitKind::XmlNodes,
+            },
+            observed,
+            maximum,
+        ),
+        litchi_ooxml_common::mce::Error::InvalidLimit {
+            kind,
+            value,
+            maximum,
+            ..
+        } => Error::invalid_limit(
+            match kind {
+                litchi_ooxml_common::mce::LimitKind::InputBytes => LimitKind::XmlBytes,
+                litchi_ooxml_common::mce::LimitKind::OutputBytes => LimitKind::XmlBytes,
+                litchi_ooxml_common::mce::LimitKind::Depth => LimitKind::XmlDepth,
+                litchi_ooxml_common::mce::LimitKind::Attributes => LimitKind::XmlAttributes,
+                _ => LimitKind::XmlNodes,
+            },
+            value,
+            maximum,
+        ),
+        other => Error::Mce(other),
+    })
 }
 
 #[cfg(test)]
@@ -1044,7 +1263,7 @@ mod tests {
     #[test]
     fn parses_producer_styles_as_inert_lossless_metadata() {
         let style = style_xml();
-        let document = parse(style.as_bytes()).unwrap();
+        let document = parse(style.as_bytes(), &Limits::DEFAULT).unwrap();
         assert_eq!(document.info().id, Some(42));
         assert_eq!(document.info().entries.len(), 30);
         assert_eq!(document.info().entries[0].line_width_scale, "1.25");
@@ -1065,7 +1284,7 @@ mod tests {
         assert_eq!(document.to_xml(), style.as_bytes());
 
         let colors = color_xml("vendorMethod");
-        let document = parse_color(colors.as_bytes()).unwrap();
+        let document = parse_color(colors.as_bytes(), &Limits::DEFAULT).unwrap();
         assert_eq!(document.info().method, "vendorMethod");
         assert_eq!(document.info().effective_method, ColorMethod::Cycle);
         assert_eq!(document.info().colors.len(), 2);
@@ -1089,7 +1308,7 @@ mod tests {
             format!("<!DOCTYPE x [<!ENTITY e SYSTEM 'file:///etc/passwd'>]>{base}"),
         ];
         for xml in cases {
-            assert!(parse(xml.as_bytes()).is_err());
+            assert!(parse(xml.as_bytes(), &Limits::DEFAULT).is_err());
         }
         let colors = color_xml("cycle");
         for xml in [
@@ -1098,7 +1317,17 @@ mod tests {
             colors.replace("<cs:variation>", "<cs:variation><a:vendor/>"),
             colors.replace("meth=\"cycle\"", ""),
         ] {
-            assert!(parse_color(xml.as_bytes()).is_err());
+            assert!(parse_color(xml.as_bytes(), &Limits::DEFAULT).is_err());
         }
+    }
+
+    #[test]
+    fn decodes_style_text_references_before_budgeting() {
+        let xml = style_xml().replace(
+            "<cs:lineWidthScale>1.25</cs:lineWidthScale>",
+            "<cs:lineWidthScale>1&#46;25</cs:lineWidthScale>",
+        );
+        let document = parse(xml.as_bytes(), &Limits::DEFAULT).unwrap();
+        assert_eq!(document.info().entries[0].line_width_scale, "1.25");
     }
 }

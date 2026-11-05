@@ -21,9 +21,9 @@ use crate::{
     mutable::MutableDocument,
 };
 use litchi_core::{
-    BlobBundle, BlobId, BlobLimits, Error, ForwardOnly, History as CoreHistory, JoinedSubEdits,
-    Patch as CorePatch, PatchLimits, PatchOperation, Result, Reversible, ReversibleOperation,
-    SubEdit, ThreeWayMergePlan,
+    BlobBundle, BlobId, BlobLimits, Error as CoreError, ForwardOnly, History as CoreHistory,
+    JoinedSubEdits, Patch as CorePatch, PatchLimits, PatchOperation, Result as CoreResult,
+    Reversible, ReversibleOperation, SubEdit, ThreeWayMergePlan,
 };
 use serde_json::Value;
 use std::{
@@ -31,16 +31,32 @@ use std::{
     sync::Arc,
 };
 
+mod document_verbs;
+
 pub use crate::package::paragraph_transfer::ParagraphTransferPlan;
 /// Shared zero-based semantic collection position.
 pub use litchi_core::Position;
 pub use litchi_core::{
     CompositionLimits, ConflictSet, HistoryLimits, MergeChoice, SubEditConflict, SubEditJoinFailure,
 };
+/// The family error of package-level verbs, [`Edit::commit`] and
+/// [`Package::apply`]: typed limits plus the common-core payload.
+pub use litchi_odf_common::Error;
+use litchi_odf_common::Error as PackageError;
+/// The dimension named by [`Error::Limit`] and [`Error::InvalidLimit`].
+pub use litchi_odf_common::LimitKind;
+pub use litchi_odf_common::OpenOptions;
+use litchi_odf_common::SemanticLimitKind;
+use litchi_odf_common::XmlStreamLimits;
+
+type FamilyResult<T> = Result<T, PackageError>;
 
 const MAX_PACKAGE_BYTES: usize = 64 * 1024 * 1024;
 const MAX_DURABLE_TRANSFER_EXPANSION_BYTES: usize = MAX_PACKAGE_BYTES;
 const MAX_OPERATIONS: usize = 1_024;
+/// Body edits compile to one splice publication, so one edit admits more of
+/// them than of the operations that each republish the package.
+const MAX_BODY_OPERATIONS: usize = 65_536;
 const MAX_WIRE_JSON_BYTES: usize = 192 * 1024 * 1024;
 const MAX_SEMANTIC_TEXT_BYTES: usize = 1024 * 1024;
 const MAX_PLAIN_PARAGRAPH_MOVE_POSITIONS: usize = 4_096;
@@ -52,11 +68,18 @@ const TARGET_PRECONDITION: &str = "target_sha256";
 const DEFAULT_COMPOSITION_LIMITS: CompositionLimits =
     CompositionLimits::new(1_024, 64, 4_096, 1_024);
 
-/// Immutable, validated ODT package snapshot.
+/// The immutable owner of one packaged ODT artifact.
+///
+/// `Package` owns every state verb: ingress (`open*`, `from_bytes*`,
+/// `from_reader*`), the primary [`Edit`] transaction, patch application and
+/// output (`save`, `save_with_durability`, `to_bytes`, `write_to`). It is
+/// cheap to clone; clones share the exact bytes, the validated archive index
+/// and the parsed [`Document`] projection. A commit publishes a new package
+/// and never mutates its source.
 #[derive(Clone)]
-pub struct Snapshot {
+pub struct Package {
     bytes: Arc<Vec<u8>>,
-    /// The validated physical package is retained alongside its byte owner.
+    /// The validated physical package retained alongside its byte owner.
     ///
     /// `OwnedPackage` keeps the immutable ZIP index in an `Arc`, so reopening
     /// a snapshot for semantic validation can reuse the already-built
@@ -64,43 +87,398 @@ pub struct Snapshot {
     /// bytes. The byte handle remains separate because lineage and exact
     /// source authorization intentionally compare the immutable artifact.
     package: crate::core::OwnedPackage,
+    /// The caller-selected raw XML policy retained across projections,
+    /// edits, commits and patch replay.
+    xml_limits: XmlStreamLimits,
+    /// The parsed read-only projection of exactly these bytes. Opened and
+    /// committed packages hold it from construction; freshly built packages
+    /// parse it on first use.
+    document: Arc<std::sync::OnceLock<Document>>,
 }
 
-impl Snapshot {
-    /// Opens and retains an ODT package as an immutable snapshot.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        ensure_package_size(bytes.len(), "ODT transaction input")?;
+impl std::fmt::Debug for Package {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Package")
+            .field("bytes", &self.bytes.len())
+            .finish_non_exhaustive()
+    }
+}
+
+impl Package {
+    /// Create the minimal valid text document.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error only when the fixed minimal package cannot be built.
+    pub fn new() -> Result<Self, PackageError> {
+        crate::Builder::new().build()
+    }
+
+    /// Open an ODT package from a path with the default [`OpenOptions`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PackageError::Limit`] when a source dimension is exceeded and
+    /// [`PackageError::Core`] for I/O, archive or family-validation failures.
+    pub fn open(path: impl AsRef<std::path::Path>) -> Result<Self, PackageError> {
+        Self::open_with_options(path, OpenOptions::new())
+    }
+
+    /// Open an ODT package from a path under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn open_with_options(
+        path: impl AsRef<std::path::Path>,
+        options: OpenOptions,
+    ) -> Result<Self, PackageError> {
+        let file = std::fs::File::open(path)?;
+        Self::from_reader_with_options(file, options)
+    }
+
+    /// Open a password-encrypted ODT package from a path.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`]; a wrong password fails while the projection reads
+    /// the encrypted parts.
+    pub fn open_with_password(
+        path: impl AsRef<std::path::Path>,
+        password: impl Into<String>,
+    ) -> Result<Self, PackageError> {
+        Self::open_with_password_and_options(path, password, OpenOptions::new())
+    }
+
+    /// Open a password-encrypted ODT package under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open_with_password`].
+    pub fn open_with_password_and_options(
+        path: impl AsRef<std::path::Path>,
+        password: impl Into<String>,
+        options: OpenOptions,
+    ) -> Result<Self, PackageError> {
+        let password = zeroize::Zeroizing::new(password.into());
+        let file = std::fs::File::open(path)?;
+        let package = crate::core::OwnedPackage::from_reader_with_password_and_options(
+            file,
+            password.as_str(),
+            options,
+        )?;
+        Self::from_owned_package_with_options(package, options)
+    }
+
+    /// Open an ODT package from bytes (the bytes are copied).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, PackageError> {
+        Self::from_bytes_with_options(bytes, OpenOptions::new())
+    }
+
+    /// Open an ODT package from bytes under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_bytes_with_options(
+        bytes: &[u8],
+        options: OpenOptions,
+    ) -> Result<Self, PackageError> {
+        let limits = options.source_limits_value();
+        check_input_bytes(bytes.len(), limits)?;
+        Self::from_vec_with_options(copy_input(bytes)?, options)
+    }
+
+    /// Open a password-encrypted ODT package from bytes.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open_with_password`].
+    pub fn from_bytes_with_password(
+        bytes: &[u8],
+        password: impl Into<String>,
+    ) -> Result<Self, PackageError> {
+        Self::from_bytes_with_password_and_options(bytes, password, OpenOptions::new())
+    }
+
+    /// Open a password-encrypted ODT package from bytes under caller-selected
+    /// limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open_with_password`].
+    pub fn from_bytes_with_password_and_options(
+        bytes: &[u8],
+        password: impl Into<String>,
+        options: OpenOptions,
+    ) -> Result<Self, PackageError> {
+        let password = zeroize::Zeroizing::new(password.into());
+        let limits = options.source_limits_value();
+        check_input_bytes(bytes.len(), limits)?;
+        let package = crate::core::OwnedPackage::from_bytes_with_password_and_options(
+            copy_input(bytes)?,
+            password.as_str(),
+            OpenOptions::new().source_limits(limits),
+        )?;
+        Self::from_owned_package_with_options(package, options)
+    }
+
+    /// Open an ODT package from a reader with the default [`OpenOptions`].
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_reader(reader: impl std::io::Read) -> Result<Self, PackageError> {
+        Self::from_reader_with_options(reader, OpenOptions::new())
+    }
+
+    /// Open an ODT package from a reader under caller-selected limits. The
+    /// reader is consumed through an input-limit guard before indexing.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_reader_with_options(
+        reader: impl std::io::Read,
+        options: OpenOptions,
+    ) -> Result<Self, PackageError> {
+        let package = crate::core::OwnedPackage::from_reader_with_options(reader, options)?;
+        Self::from_owned_package_with_options(package, options)
+    }
+
+    /// Adopt a packaged ODF result prepared by smart detection, reusing its
+    /// validated archive index.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`litchi_core::Error::UnexpectedFormat`] (as
+    /// [`PackageError::Core`]) when the prepared package is another family.
+    pub fn from_prepared_package(
+        prepared: crate::core::PreparedPackage,
+    ) -> Result<Self, PackageError> {
+        Self::from_prepared_package_with_options(prepared, OpenOptions::new())
+    }
+
+    /// Adopt a prepared package under the semantic limits in `options`.
+    /// Its source limits were applied when the archive was prepared.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::from_prepared_package`], plus a typed semantic limit failure.
+    pub fn from_prepared_package_with_options(
+        prepared: crate::core::PreparedPackage,
+        options: OpenOptions,
+    ) -> Result<Self, PackageError> {
+        if prepared.format() != litchi_core::FileFormat::Odt {
+            return Err(PackageError::Core(litchi_core::Error::UnexpectedFormat {
+                detected: prepared.format(),
+            }));
+        }
+        Self::from_owned_package_with_options(prepared.into_package(), options)
+    }
+
+    /// Adopt a prepared package of any ODF text-body family — ODT, an
+    /// OpenDocument web template (`FileFormat::Oth`) or a master document
+    /// (`FileFormat::Odm`) — through this crate's text model, reusing the
+    /// validated archive index. Every member outside the edited parts keeps
+    /// its source bytes, so the package keeps its own MIME type. This is the
+    /// reuse hook of the unified OTH/ODM adapters (record 0282).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`litchi_core::Error::UnexpectedFormat`] (as
+    /// [`PackageError::Core`]) for any other family.
+    pub fn from_prepared_text_package(
+        prepared: crate::core::PreparedPackage,
+    ) -> Result<Self, PackageError> {
+        Self::from_prepared_text_package_with_options(prepared, OpenOptions::new())
+    }
+
+    /// Adopt a prepared text-family package under the semantic limits in
+    /// `options`, reusing the archive and its already-applied source policy.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::from_prepared_text_package`], plus a typed semantic limit failure.
+    pub fn from_prepared_text_package_with_options(
+        prepared: crate::core::PreparedPackage,
+        options: OpenOptions,
+    ) -> Result<Self, PackageError> {
+        use litchi_core::detection::FileFormat;
+        match prepared.format() {
+            FileFormat::Odt => Self::from_prepared_package_with_options(prepared, options),
+            FileFormat::Oth | FileFormat::Odm => {
+                Self::from_owned_package_with_options(prepared.into_package(), options)
+            },
+            detected => Err(PackageError::Core(litchi_core::Error::UnexpectedFormat {
+                detected,
+            })),
+        }
+    }
+
+    fn from_vec_with_options(bytes: Vec<u8>, options: OpenOptions) -> Result<Self, PackageError> {
+        let package = crate::core::OwnedPackage::from_bytes_with_options(bytes, options)?;
+        Self::from_owned_package_with_options(package, options)
+    }
+
+    fn from_owned_package_with_options(
+        package: crate::core::OwnedPackage,
+        options: OpenOptions,
+    ) -> Result<Self, PackageError> {
+        let document = Document::from_owned_package_with_limits(
+            package,
+            options.semantic_limits_value(),
+            options.xml_limits_value(),
+        )?;
+        Ok(Self::from_parsed(document))
+    }
+
+    /// Adopt a parsed projection; the package shares its exact bytes.
+    pub(crate) fn from_parsed(document: Document) -> Self {
+        let xml_limits = document.transaction_xml_limits();
+        let package = document.transaction_package().clone_without_password();
+        Self {
+            bytes: package.shared_bytes(),
+            package,
+            xml_limits,
+            document: Arc::new(std::sync::OnceLock::from(document)),
+        }
+    }
+
+    /// Adopt complete bytes written by the crate's own authoring codecs. The
+    /// archive is indexed and validated now; the projection is parsed on the
+    /// first [`Self::document`] call.
+    pub(crate) fn from_authored(bytes: Vec<u8>) -> CoreResult<Self> {
         let package = crate::core::OwnedPackage::from_bytes(bytes)?;
-        // Constructing the semantic document performs family validation,
-        // while the retained package is moved into the immutable snapshot so
-        // its validated ZIP index can be shared by subsequent reopenings.
-        Document::from_owned_package(package.clone())?;
-        Self::from_owned_package(package)
-    }
-
-    /// Captures the exact bytes backing an already validated document.
-    pub fn from_document(document: &Document) -> Result<Self> {
-        ensure_package_size(document.original_bytes().len(), "ODT transaction package")?;
-        Self::from_owned_package(document.transaction_package().clone_without_password())
-    }
-
-    fn from_owned_package(package: crate::core::OwnedPackage) -> Result<Self> {
-        ensure_package_size(package.as_bytes().len(), "ODT transaction package")?;
         Ok(Self {
             bytes: package.shared_bytes(),
             package,
+            xml_limits: XmlStreamLimits::owner_default_value(),
+            document: Arc::new(std::sync::OnceLock::new()),
         })
+    }
+
+    /// Reopen complete bytes produced inside the crate.
+    pub(crate) fn from_vec(bytes: Vec<u8>) -> CoreResult<Self> {
+        Ok(Self::from_parsed(Document::from_bytes(bytes)?))
+    }
+
+    pub(crate) fn from_vec_with_xml_limits(
+        bytes: Vec<u8>,
+        xml_limits: XmlStreamLimits,
+    ) -> CoreResult<Self> {
+        Ok(Self::from_parsed(Document::from_bytes_with_xml_limits(
+            bytes, xml_limits,
+        )?))
+    }
+
+    pub(crate) const fn xml_limits_value(&self) -> XmlStreamLimits {
+        self.xml_limits
+    }
+
+    /// Captures the exact bytes backing an already validated document.
+    pub(crate) fn from_document(document: &Document) -> CoreResult<Self> {
+        Ok(Self::from_parsed(document.clone()))
+    }
+
+    /// The owned read-only projection of this package (one reference-count
+    /// increment once parsed).
+    ///
+    /// # Errors
+    ///
+    /// Returns the parse failure of a freshly built package whose projection
+    /// has not been parsed yet; opened and committed packages never fail.
+    pub fn document(&self) -> FamilyResult<Document> {
+        if let Some(document) = self.document.get() {
+            return Ok(document.clone());
+        }
+        let document = Document::from_owned_package_with_limits(
+            self.package.clone(),
+            litchi_odf_common::SemanticLimits::DEFAULT,
+            self.xml_limits,
+        )?;
+        Ok(self.document.get_or_init(|| document).clone())
+    }
+
+    /// Repairs tolerated while this package was opened.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
+        match self.document.get() {
+            Some(document) => document.tolerance_report(),
+            None => self.package.tolerance_report(),
+        }
+    }
+
+    /// Apply a primary-transaction patch to this exact package.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PackageError::PatchConflict`] when this package is not
+    /// byte-identical to the patch source.
+    pub fn apply(&self, patch: &Patch) -> Result<Commit, PackageError> {
+        if !patch.is_applicable_to(self) {
+            return Err(PackageError::patch_conflict(
+                "odt.apply",
+                "the package is not the patch source",
+            ));
+        }
+        Ok(Commit::replayed(patch.apply(self)?, patch.clone()))
+    }
+
+    /// Atomically replace `path` with this package (full durability).
+    ///
+    /// The artifact is staged in a sibling temporary file and published with
+    /// one rename; a failure before publication leaves the destination
+    /// unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PackageError::Core`] carrying the I/O failure.
+    pub fn save(&self, path: impl AsRef<std::path::Path>) -> Result<(), PackageError> {
+        self.save_with_durability(path, litchi_core::Durability::Full)
+    }
+
+    /// Atomically replace `path` with this package under explicit durability.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::save`].
+    pub fn save_with_durability(
+        &self,
+        path: impl AsRef<std::path::Path>,
+        durability: litchi_core::Durability,
+    ) -> Result<(), PackageError> {
+        litchi_odf_common::publish::save_bytes(path.as_ref(), self.as_bytes(), durability)
+    }
+
+    /// Copy the exact package bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an allocation failure.
+    pub fn to_bytes(&self) -> Result<Vec<u8>, PackageError> {
+        Ok(copy_input(self.as_bytes())?)
+    }
+
+    /// Write the exact package bytes to a stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns the stream's I/O failure.
+    pub fn write_to(&self, mut writer: impl std::io::Write) -> Result<(), PackageError> {
+        writer.write_all(self.as_bytes())?;
+        Ok(())
     }
 
     /// Returns the exact package bytes represented by this snapshot.
     #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         self.bytes.as_slice()
-    }
-
-    /// Reopens this immutable snapshot for semantic inspection.
-    pub fn document(&self) -> Result<Document> {
-        Document::from_owned_package(self.package.clone())
     }
 
     /// Return the identity of the validated physical package index retained
@@ -117,13 +495,34 @@ impl Snapshot {
         Edit {
             source: self.clone(),
             operations: Vec::new(),
+            body: None,
         }
+    }
+
+    /// Starts a detached edit of the document properties in `meta.xml`.
+    #[must_use]
+    pub fn edit_metadata(&self) -> crate::metadata::Edit {
+        crate::metadata::Edit::new(self)
+    }
+
+    /// Applies a metadata patch to the exact snapshot it was made from.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PackageError::PatchConflict`] when this package is not the
+    /// patch's source snapshot.
+    pub fn apply_metadata(
+        &self,
+        patch: &crate::metadata::Patch,
+    ) -> Result<crate::metadata::Commit, PackageError> {
+        let (package, primary) = self.apply(patch.primary())?.into_parts();
+        Ok(crate::metadata::Commit::replayed(package, primary))
     }
 
     /// Starts a bounded deterministic collection of independently prepared edits.
     #[must_use]
-    pub fn joined_edit(&self) -> JoinedEdit {
-        JoinedEdit::new(self.clone(), DEFAULT_COMPOSITION_LIMITS)
+    pub fn joined_edits(&self) -> JoinedEdits {
+        JoinedEdits::new(self.clone(), DEFAULT_COMPOSITION_LIMITS)
     }
 
     /// Starts commit-coupled bounded undo/redo history at this snapshot.
@@ -133,8 +532,8 @@ impl Snapshot {
     }
 
     /// Reports the package envelope policy enforced by immutable edits.
-    pub fn envelope_kind(&self) -> Result<EnvelopeKind> {
-        envelope_kind(self)
+    pub fn envelope_kind(&self) -> FamilyResult<EnvelopeKind> {
+        Ok(envelope_kind(self)?)
     }
 
     /// Plans transfer of one dependency-free direct plain paragraph from an
@@ -145,42 +544,141 @@ impl Snapshot {
     /// any bytes are retained by the plan.
     pub fn plan_plain_paragraph_transfer_from(
         &self,
-        donor: &Snapshot,
+        donor: &Package,
         source: Position,
         target: Position,
-    ) -> Result<ParagraphTransferPlan> {
-        crate::package::paragraph_transfer::plan_one(self, donor, source, target)
+    ) -> FamilyResult<ParagraphTransferPlan> {
+        Ok(crate::package::paragraph_transfer::plan_one(
+            self, donor, source, target,
+        )?)
     }
 
     /// Plans transfer of a bounded ordered batch of dependency-free direct
     /// plain paragraphs from an immutable donor snapshot.
     pub fn plan_plain_paragraphs_transfer_from(
         &self,
-        donor: &Snapshot,
+        donor: &Package,
         sources: &[Position],
         target: Position,
-    ) -> Result<ParagraphTransferPlan> {
-        crate::package::paragraph_transfer::plan_many(self, donor, sources, target)
+    ) -> FamilyResult<ParagraphTransferPlan> {
+        Ok(crate::package::paragraph_transfer::plan_many(
+            self, donor, sources, target,
+        )?)
     }
 
     /// Alias using the singular operation name for callers passing a batch
     /// slice of length one or more.
     pub fn plan_plain_paragraph_transfer_batch_from(
         &self,
-        donor: &Snapshot,
+        donor: &Package,
         sources: &[Position],
         target: Position,
-    ) -> Result<ParagraphTransferPlan> {
+    ) -> FamilyResult<ParagraphTransferPlan> {
         self.plan_plain_paragraphs_transfer_from(donor, sources, target)
     }
 }
 
-fn snapshot_from_final_document(source: &Snapshot, document: &Document) -> Result<Snapshot> {
+fn apply_annotation_operation(
+    document: &mut Document,
+    operation: &AnnotationOperation,
+) -> CoreResult<OperationResult> {
+    use crate::package::annotation::AnnotationHost;
+    let package = document.transaction_package();
+    let content = document.transaction_content_xml();
+    let xml_limits = document.transaction_xml_limits();
+    let (bytes, result) = match operation {
+        AnnotationOperation::Add { anchor, annotation } => {
+            let (bytes, index) = crate::package::annotation::add(
+                package,
+                content,
+                AnnotationHost::Text,
+                anchor,
+                annotation,
+                &xml_limits,
+            )?;
+            (bytes, OperationResult::Index(index))
+        },
+        AnnotationOperation::Replace { index, annotation } => (
+            crate::package::annotation::replace(
+                package,
+                content,
+                AnnotationHost::Text,
+                *index,
+                annotation,
+                &xml_limits,
+            )?,
+            OperationResult::Unit,
+        ),
+        AnnotationOperation::Update { index, update } => (
+            crate::package::annotation::update(
+                package,
+                content,
+                AnnotationHost::Text,
+                *index,
+                update,
+                &xml_limits,
+            )?,
+            OperationResult::Unit,
+        ),
+        AnnotationOperation::Remove { index } => (
+            crate::package::annotation::remove(
+                package,
+                content,
+                AnnotationHost::Text,
+                *index,
+                &xml_limits,
+            )?,
+            OperationResult::Unit,
+        ),
+        AnnotationOperation::Reorder { from, to } => (
+            crate::package::annotation::reorder(
+                package,
+                content,
+                AnnotationHost::Text,
+                *from,
+                *to,
+                &xml_limits,
+            )?,
+            OperationResult::Unit,
+        ),
+    };
+    document.replace_transaction_bytes(bytes)?;
+    Ok(result)
+}
+
+fn snapshot_from_final_document(source: &Package, document: &Document) -> CoreResult<Package> {
     if document.original_bytes() == source.as_bytes() {
         Ok(source.clone())
     } else {
-        Snapshot::from_document(document)
+        Package::from_document(document)
     }
+}
+
+fn check_input_bytes(
+    length: usize,
+    limits: litchi_odf_common::SourceLimits,
+) -> Result<(), PackageError> {
+    let observed = u64::try_from(length).unwrap_or(u64::MAX);
+    if observed > limits.max_input_bytes() {
+        return Err(PackageError::Limit {
+            kind: LimitKind::Source(litchi_odf_common::SourceLimitKind::InputBytes),
+            observed,
+            maximum: limits.max_input_bytes(),
+        });
+    }
+    Ok(())
+}
+
+fn copy_input(source: &[u8]) -> CoreResult<Vec<u8>> {
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(source.len())
+        .map_err(|allocation_error| CoreError::Allocation {
+            resource: "ODT package bytes",
+            source: allocation_error,
+        })?;
+    bytes.extend_from_slice(source);
+    Ok(bytes)
 }
 
 /// Security envelope classification relevant to package mutation.
@@ -231,8 +729,10 @@ impl ParagraphSelector {
 
 /// Detached, lossless packaged-ODT edit.
 pub struct Edit {
-    source: Snapshot,
+    source: Package,
     operations: Vec<Operation>,
+    /// Structural body edits against the source's [`crate::body::Tree`].
+    body: Option<Box<crate::body::BodyEdits>>,
 }
 
 impl Edit {
@@ -241,7 +741,7 @@ impl Edit {
         &mut self,
         position: Position,
         text: impl Into<String>,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let text = bounded_semantic_text(text.into(), "paragraph text")?;
         self.push(Operation::InsertParagraph {
             index: position.get(),
@@ -254,7 +754,7 @@ impl Edit {
         &mut self,
         position: Position,
         text: impl Into<String>,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let text = bounded_semantic_text(text.into(), "paragraph text")?;
         self.push(Operation::ReplaceParagraph {
             index: position.get(),
@@ -263,7 +763,7 @@ impl Edit {
     }
 
     /// Stages removal of one paragraph selected by semantic position.
-    pub fn remove_paragraph(&mut self, position: Position) -> Result<&mut Self> {
+    pub fn remove_paragraph(&mut self, position: Position) -> FamilyResult<&mut Self> {
         self.push(Operation::RemoveParagraph {
             index: position.get(),
         })
@@ -276,13 +776,19 @@ impl Edit {
     /// an exact no-op. Documents with structured body children, rich paragraph
     /// markup, active content, protection, or unsafe package envelopes are
     /// refused when the transaction commits.
-    pub fn move_plain_paragraph(&mut self, from: Position, to: Position) -> Result<&mut Self> {
+    pub fn move_plain_paragraph(
+        &mut self,
+        from: Position,
+        to: Position,
+    ) -> FamilyResult<&mut Self> {
         if from.get() >= MAX_PLAIN_PARAGRAPH_MOVE_POSITIONS
             || to.get() >= MAX_PLAIN_PARAGRAPH_MOVE_POSITIONS
         {
-            return Err(Error::InvalidFormat(format!(
-                "ODT plain paragraph move position exceeds {MAX_PLAIN_PARAGRAPH_MOVE_POSITIONS}"
-            )));
+            return Err(PackageError::Limit {
+                kind: LimitKind::Semantic(SemanticLimitKind::Units),
+                observed: from.get().max(to.get()).saturating_add(1) as u64,
+                maximum: MAX_PLAIN_PARAGRAPH_MOVE_POSITIONS as u64,
+            });
         }
         if from == to {
             return Ok(self);
@@ -296,10 +802,10 @@ impl Edit {
     /// Stages one checked dependency-free direct plain paragraph transfer.
     pub fn copy_plain_paragraph_from(
         &mut self,
-        donor: &Snapshot,
+        donor: &Package,
         source: Position,
         target: Position,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let plan = self
             .source
             .plan_plain_paragraph_transfer_from(donor, source, target)?;
@@ -309,10 +815,10 @@ impl Edit {
     /// Alias for [`Edit::copy_plain_paragraph_from`].
     pub fn copy_plain_paragraph_transfer_from(
         &mut self,
-        donor: &Snapshot,
+        donor: &Package,
         source: Position,
         target: Position,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         self.copy_plain_paragraph_from(donor, source, target)
     }
 
@@ -320,10 +826,10 @@ impl Edit {
     /// paragraph transfers.
     pub fn copy_plain_paragraphs_from(
         &mut self,
-        donor: &Snapshot,
+        donor: &Package,
         sources: &[Position],
         target: Position,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let plan = self
             .source
             .plan_plain_paragraphs_transfer_from(donor, sources, target)?;
@@ -333,10 +839,10 @@ impl Edit {
     /// Alias for [`Edit::copy_plain_paragraphs_from`].
     pub fn copy_plain_paragraphs_transfer_from(
         &mut self,
-        donor: &Snapshot,
+        donor: &Package,
         sources: &[Position],
         target: Position,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         self.copy_plain_paragraphs_from(donor, sources, target)
     }
 
@@ -344,14 +850,14 @@ impl Edit {
     pub fn apply_plain_paragraph_transfer(
         &mut self,
         plan: &ParagraphTransferPlan,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         self.stage_plain_paragraph_transfer(plan)
     }
 
     pub(crate) fn stage_plain_paragraph_transfer(
         &mut self,
         plan: &ParagraphTransferPlan,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         plan.validate_integrity(&self.source)?;
         if plan.fragments.is_empty() {
             return Ok(self);
@@ -365,7 +871,7 @@ impl Edit {
         paragraph: Position,
         text: impl Into<String>,
         style_name: Option<&str>,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let text = bounded_semantic_text(text.into(), "run text")?;
         let style_name = style_name
             .map(|value| bounded_semantic_text(value.to_owned(), "run style name"))
@@ -383,7 +889,7 @@ impl Edit {
         paragraph: Position,
         href: impl Into<String>,
         text: impl Into<String>,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let href = bounded_semantic_text(href.into(), "hyperlink target")?;
         let text = bounded_semantic_text(text.into(), "hyperlink text")?;
         self.push(Operation::AppendHyperlink {
@@ -396,7 +902,7 @@ impl Edit {
     /// Stages a line break in the selected paragraph without rebuilding its
     /// inline markup. Scripts, forms, DDE declarations, and other active
     /// content are retained as inert package data and are never executed.
-    pub fn append_line_break(&mut self, selector: ParagraphSelector) -> Result<&mut Self> {
+    pub fn append_line_break(&mut self, selector: ParagraphSelector) -> FamilyResult<&mut Self> {
         let index = match &selector {
             ParagraphSelector::Index(index) => *index,
             ParagraphSelector::Position(_) | ParagraphSelector::ExactText(_) => {
@@ -411,7 +917,7 @@ impl Edit {
         &mut self,
         paragraph: Position,
         note: &crate::note::Note,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         note.validate()?;
         self.push(Operation::InsertNote {
             paragraph: paragraph.get(),
@@ -425,7 +931,7 @@ impl Edit {
         &mut self,
         note: Position,
         replacement: &crate::note::Note,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         replacement.validate()?;
         self.push(Operation::ReplaceNote {
             index: note.get(),
@@ -435,7 +941,7 @@ impl Edit {
     }
 
     /// Stages removal of one note in semantic document order.
-    pub fn remove_note(&mut self, note: Position) -> Result<&mut Self> {
+    pub fn remove_note(&mut self, note: Position) -> FamilyResult<&mut Self> {
         self.push(Operation::RemoveNote { index: note.get() })
     }
 
@@ -444,7 +950,7 @@ impl Edit {
         &mut self,
         paragraph: Position,
         annotation: &crate::ruby_family::Annotation,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         annotation.validate()?;
         self.push(Operation::InsertRubyAnnotation {
             paragraph: paragraph.get(),
@@ -457,7 +963,7 @@ impl Edit {
         &mut self,
         annotation: Position,
         replacement: &crate::ruby_family::Annotation,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         replacement.validate()?;
         self.push(Operation::ReplaceRubyAnnotation {
             index: annotation.get(),
@@ -466,7 +972,7 @@ impl Edit {
     }
 
     /// Stages removal of one ruby annotation in document order.
-    pub fn remove_ruby_annotation(&mut self, annotation: Position) -> Result<&mut Self> {
+    pub fn remove_ruby_annotation(&mut self, annotation: Position) -> FamilyResult<&mut Self> {
         self.push(Operation::RemoveRubyAnnotation {
             index: annotation.get(),
         })
@@ -477,7 +983,7 @@ impl Edit {
         &mut self,
         paragraph: Position,
         field: &DynamicTextField,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         field.validate()?;
         self.push(Operation::InsertDynamicTextField {
             paragraph: paragraph.get(),
@@ -490,7 +996,7 @@ impl Edit {
         &mut self,
         field: Position,
         replacement: &DynamicTextField,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         replacement.validate()?;
         self.push(Operation::ReplaceDynamicTextField {
             index: field.get(),
@@ -499,12 +1005,12 @@ impl Edit {
     }
 
     /// Stages removal of one typed dynamic field in document order.
-    pub fn remove_dynamic_text_field(&mut self, field: Position) -> Result<&mut Self> {
+    pub fn remove_dynamic_text_field(&mut self, field: Position) -> FamilyResult<&mut Self> {
         self.push(Operation::RemoveDynamicTextField { index: field.get() })
     }
 
     /// Stages insertion or replacement of one named ruby style.
-    pub fn set_ruby_style(&mut self, style: &crate::ruby_family::Style) -> Result<&mut Self> {
+    pub fn set_ruby_style(&mut self, style: &crate::ruby_family::Style) -> FamilyResult<&mut Self> {
         style.validate()?;
         self.push(Operation::SetRubyStyle {
             style: style.clone(),
@@ -512,7 +1018,7 @@ impl Edit {
     }
 
     /// Stages removal of one named ruby style.
-    pub fn remove_ruby_style(&mut self, name: &str) -> Result<&mut Self> {
+    pub fn remove_ruby_style(&mut self, name: &str) -> FamilyResult<&mut Self> {
         let name = bounded_semantic_text(name.to_owned(), "ruby style name")?;
         self.push(Operation::RemoveRubyStyle { name })
     }
@@ -523,7 +1029,7 @@ impl Edit {
         track_changes: Option<bool>,
         protection_key: Option<&str>,
         digest_algorithm: Option<&str>,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let protection_key = protection_key
             .map(|value| bounded_semantic_text(value.to_owned(), "tracked-change protection key"))
             .transpose()?;
@@ -538,7 +1044,7 @@ impl Edit {
     }
 
     /// Stages removal of one tracked-change declaration and its correlated markers.
-    pub fn remove_tracked_change(&mut self, id: &str) -> Result<&mut Self> {
+    pub fn remove_tracked_change(&mut self, id: &str) -> FamilyResult<&mut Self> {
         let id = bounded_semantic_text(id.to_owned(), "tracked-change ID")?;
         self.push(Operation::RemoveTrackedChange { id })
     }
@@ -548,7 +1054,7 @@ impl Edit {
         &mut self,
         preferred_path: Option<&str>,
         triples: &[crate::rdf::Triple],
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         self.push(Operation::AddRdfGraph {
             preferred_path: preferred_path.map(str::to_owned),
             triples: triples.to_vec(),
@@ -560,7 +1066,7 @@ impl Edit {
         &mut self,
         path: &str,
         triples: &[crate::rdf::Triple],
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         self.push(Operation::ReplaceRdfGraph {
             path: path.to_owned(),
             triples: triples.to_vec(),
@@ -568,7 +1074,7 @@ impl Edit {
     }
 
     /// Stages removal of one RDF graph selected by package path.
-    pub fn remove_rdf_graph(&mut self, path: &str) -> Result<&mut Self> {
+    pub fn remove_rdf_graph(&mut self, path: &str) -> FamilyResult<&mut Self> {
         self.push(Operation::RemoveRdfGraph {
             path: path.to_owned(),
         })
@@ -576,14 +1082,21 @@ impl Edit {
 
     /// Stages inert document-protection metadata. The policy is retained but
     /// never enforced by this library.
-    pub fn set_protection(&mut self, policy: &crate::protection::Policy) -> Result<&mut Self> {
+    pub fn set_protection(
+        &mut self,
+        policy: &crate::protection::Policy,
+    ) -> FamilyResult<&mut Self> {
         self.push(Operation::SetProtection {
             policy: policy.clone(),
         })
     }
 
     /// Stages one RDF assertion in a graph selected by package path.
-    pub fn add_rdf_triple(&mut self, path: &str, triple: &crate::rdf::Triple) -> Result<&mut Self> {
+    pub fn add_rdf_triple(
+        &mut self,
+        path: &str,
+        triple: &crate::rdf::Triple,
+    ) -> FamilyResult<&mut Self> {
         self.push(Operation::AddRdfTriple {
             path: path.to_owned(),
             triple: triple.clone(),
@@ -596,20 +1109,11 @@ impl Edit {
         path: &str,
         index: usize,
         triple: &crate::rdf::Triple,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         self.push(Operation::ReplaceRdfTriple {
             path: path.to_owned(),
             index,
             triple: triple.clone(),
-        })
-    }
-
-    /// Stages removal of one RDF assertion.
-    #[deprecated(note = "use remove_rdf_triple_at with a checked Position")]
-    pub fn remove_rdf_triple(&mut self, path: &str, index: usize) -> Result<&mut Self> {
-        self.push(Operation::RemoveRdfTriple {
-            path: path.to_owned(),
-            index,
         })
     }
 
@@ -618,23 +1122,14 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error if the transaction operation limit has been reached.
-    pub fn remove_rdf_triple_at(&mut self, path: &str, position: Position) -> Result<&mut Self> {
+    pub fn remove_rdf_triple_at(
+        &mut self,
+        path: &str,
+        position: Position,
+    ) -> FamilyResult<&mut Self> {
         self.push(Operation::RemoveRdfTriple {
             path: path.to_owned(),
             index: position.get(),
-        })
-    }
-
-    /// Stages an RDF assertion move; equal selectors are an exact no-op.
-    #[deprecated(note = "use move_rdf_triple_to with checked Positions")]
-    pub fn move_rdf_triple(&mut self, path: &str, from: usize, to: usize) -> Result<&mut Self> {
-        if from == to {
-            return Ok(self);
-        }
-        self.push(Operation::MoveRdfTriple {
-            path: path.to_owned(),
-            from,
-            to,
         })
     }
 
@@ -648,7 +1143,7 @@ impl Edit {
         path: &str,
         from: Position,
         to: Position,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         if from == to {
             return Ok(self);
         }
@@ -664,7 +1159,7 @@ impl Edit {
         &mut self,
         group_index: usize,
         form: &crate::package::forms::AuthoredForm,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         self.push(Operation::AddForm {
             group_index,
             form: form.clone(),
@@ -676,7 +1171,7 @@ impl Edit {
         &mut self,
         parent_form: usize,
         form: &crate::package::forms::AuthoredForm,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         self.push(Operation::AddNestedForm {
             parent_form,
             form: form.clone(),
@@ -688,7 +1183,7 @@ impl Edit {
         &mut self,
         form_index: usize,
         control: &crate::package::forms::AuthoredFormControl,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         self.push(Operation::AddFormControl {
             form_index,
             control: control.clone(),
@@ -700,17 +1195,11 @@ impl Edit {
         &mut self,
         index: usize,
         control: &crate::package::forms::AuthoredFormControl,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         self.push(Operation::ReplaceFormControl {
             index,
             control: control.clone(),
         })
-    }
-
-    /// Stages removal of an inert form control.
-    #[deprecated(note = "use remove_form_control_at with a checked Position")]
-    pub fn remove_form_control(&mut self, index: usize) -> Result<&mut Self> {
-        self.push(Operation::RemoveFormControl { index })
     }
 
     /// Stages removal of a form control selected by a checked position.
@@ -718,19 +1207,10 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error if the transaction operation limit has been reached.
-    pub fn remove_form_control_at(&mut self, position: Position) -> Result<&mut Self> {
+    pub fn remove_form_control_at(&mut self, position: Position) -> FamilyResult<&mut Self> {
         self.push(Operation::RemoveFormControl {
             index: position.get(),
         })
-    }
-
-    /// Stages a form-control move; equal selectors are an exact no-op.
-    #[deprecated(note = "use move_form_control_to with checked Positions")]
-    pub fn move_form_control(&mut self, from: usize, to: usize) -> Result<&mut Self> {
-        if from == to {
-            return Ok(self);
-        }
-        self.push(Operation::MoveFormControl { from, to })
     }
 
     /// Stages a form-control move between checked semantic positions.
@@ -738,7 +1218,11 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error if the transaction operation limit has been reached.
-    pub fn move_form_control_to(&mut self, from: Position, to: Position) -> Result<&mut Self> {
+    pub fn move_form_control_to(
+        &mut self,
+        from: Position,
+        to: Position,
+    ) -> FamilyResult<&mut Self> {
         if from == to {
             return Ok(self);
         }
@@ -753,17 +1237,11 @@ impl Edit {
         &mut self,
         index: usize,
         form: &crate::package::forms::AuthoredForm,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         self.push(Operation::ReplaceForm {
             index,
             form: form.clone(),
         })
-    }
-
-    /// Stages removal of a form selected in semantic document order.
-    #[deprecated(note = "use remove_form_at with a checked Position")]
-    pub fn remove_form(&mut self, index: usize) -> Result<&mut Self> {
-        self.push(Operation::RemoveForm { index })
     }
 
     /// Stages removal of a form selected by a checked position.
@@ -771,19 +1249,10 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error if the transaction operation limit has been reached.
-    pub fn remove_form_at(&mut self, position: Position) -> Result<&mut Self> {
+    pub fn remove_form_at(&mut self, position: Position) -> FamilyResult<&mut Self> {
         self.push(Operation::RemoveForm {
             index: position.get(),
         })
-    }
-
-    /// Stages a form move; equal selectors are an exact no-op.
-    #[deprecated(note = "use move_form_to with checked Positions")]
-    pub fn move_form(&mut self, from: usize, to: usize) -> Result<&mut Self> {
-        if from == to {
-            return Ok(self);
-        }
-        self.push(Operation::MoveForm { from, to })
     }
 
     /// Stages a form move between checked semantic positions.
@@ -791,7 +1260,7 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error if the transaction operation limit has been reached.
-    pub fn move_form_to(&mut self, from: Position, to: Position) -> Result<&mut Self> {
+    pub fn move_form_to(&mut self, from: Position, to: Position) -> FamilyResult<&mut Self> {
         if from == to {
             return Ok(self);
         }
@@ -803,7 +1272,10 @@ impl Edit {
 
     /// Stages creation of a packaged or inline embedded chart. Formula and
     /// calculation metadata remains inert and is never evaluated.
-    pub fn add_embedded_chart(&mut self, definition: &crate::odc::Definition) -> Result<&mut Self> {
+    pub fn add_embedded_chart(
+        &mut self,
+        definition: &crate::odc::Definition,
+    ) -> FamilyResult<&mut Self> {
         self.push(Operation::AddEmbeddedChart {
             definition: definition.clone(),
         })
@@ -814,7 +1286,7 @@ impl Edit {
         &mut self,
         definition: &crate::odc::Definition,
         storage: crate::package::charts::EmbeddedChartStorage,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         self.push(Operation::AddEmbeddedChartWithStorage {
             definition: definition.clone(),
             storage,
@@ -826,17 +1298,11 @@ impl Edit {
         &mut self,
         index: usize,
         definition: &crate::odc::Definition,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         self.push(Operation::ReplaceEmbeddedChart {
             index,
             definition: definition.clone(),
         })
-    }
-
-    /// Stages removal of an embedded chart selected in document order.
-    #[deprecated(note = "use remove_embedded_chart_at with a checked Position")]
-    pub fn remove_embedded_chart(&mut self, index: usize) -> Result<&mut Self> {
-        self.push(Operation::RemoveEmbeddedChart { index })
     }
 
     /// Stages removal of an embedded chart selected by a checked position.
@@ -844,7 +1310,7 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error if the transaction operation limit has been reached.
-    pub fn remove_embedded_chart_at(&mut self, position: Position) -> Result<&mut Self> {
+    pub fn remove_embedded_chart_at(&mut self, position: Position) -> FamilyResult<&mut Self> {
         self.push(Operation::RemoveEmbeddedChart {
             index: position.get(),
         })
@@ -854,7 +1320,7 @@ impl Edit {
     pub fn add_embedded_resource(
         &mut self,
         resource: &crate::package::embedded::EmbeddedResource,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         self.push(Operation::AddEmbeddedResource {
             resource: resource.clone(),
         })
@@ -872,7 +1338,7 @@ impl Edit {
     pub fn edit_embedded_resources(
         &mut self,
         changes: &[crate::package::embedded::EmbeddedResourceChange],
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         crate::package::embedded::validate_batch_limits(changes)?;
         if changes.is_empty() {
             return Ok(self);
@@ -887,7 +1353,7 @@ impl Edit {
         &mut self,
         index: usize,
         resource: &crate::package::embedded::EmbeddedResource,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         self.push(Operation::ReplaceEmbeddedObject {
             index,
             resource: resource.clone(),
@@ -899,17 +1365,11 @@ impl Edit {
         &mut self,
         index: usize,
         resource: &crate::package::embedded::EmbeddedResource,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         self.push(Operation::ReplaceEmbeddedImage {
             index,
             resource: resource.clone(),
         })
-    }
-
-    /// Stages removal of an embedded object selected in document order.
-    #[deprecated(note = "use remove_embedded_object_at with a checked Position")]
-    pub fn remove_embedded_object(&mut self, index: usize) -> Result<&mut Self> {
-        self.push(Operation::RemoveEmbeddedObject { index })
     }
 
     /// Stages removal of an embedded object selected by a checked position.
@@ -917,16 +1377,10 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error if the transaction operation limit has been reached.
-    pub fn remove_embedded_object_at(&mut self, position: Position) -> Result<&mut Self> {
+    pub fn remove_embedded_object_at(&mut self, position: Position) -> FamilyResult<&mut Self> {
         self.push(Operation::RemoveEmbeddedObject {
             index: position.get(),
         })
-    }
-
-    /// Stages removal of an embedded image selected in document order.
-    #[deprecated(note = "use remove_embedded_image_at with a checked Position")]
-    pub fn remove_embedded_image(&mut self, index: usize) -> Result<&mut Self> {
-        self.push(Operation::RemoveEmbeddedImage { index })
     }
 
     /// Stages removal of an embedded image selected by a checked position.
@@ -934,19 +1388,10 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error if the transaction operation limit has been reached.
-    pub fn remove_embedded_image_at(&mut self, position: Position) -> Result<&mut Self> {
+    pub fn remove_embedded_image_at(&mut self, position: Position) -> FamilyResult<&mut Self> {
         self.push(Operation::RemoveEmbeddedImage {
             index: position.get(),
         })
-    }
-
-    /// Stages an embedded-object move; equal selectors are an exact no-op.
-    #[deprecated(note = "use move_embedded_object_to with checked Positions")]
-    pub fn move_embedded_object(&mut self, from: usize, to: usize) -> Result<&mut Self> {
-        if from == to {
-            return Ok(self);
-        }
-        self.push(Operation::MoveEmbeddedObject { from, to })
     }
 
     /// Stages an embedded-object move between checked semantic positions.
@@ -954,7 +1399,11 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error if the transaction operation limit has been reached.
-    pub fn move_embedded_object_to(&mut self, from: Position, to: Position) -> Result<&mut Self> {
+    pub fn move_embedded_object_to(
+        &mut self,
+        from: Position,
+        to: Position,
+    ) -> FamilyResult<&mut Self> {
         if from == to {
             return Ok(self);
         }
@@ -964,21 +1413,16 @@ impl Edit {
         })
     }
 
-    /// Stages an embedded-image move; equal selectors are an exact no-op.
-    #[deprecated(note = "use move_embedded_image_to with checked Positions")]
-    pub fn move_embedded_image(&mut self, from: usize, to: usize) -> Result<&mut Self> {
-        if from == to {
-            return Ok(self);
-        }
-        self.push(Operation::MoveEmbeddedImage { from, to })
-    }
-
     /// Stages an embedded-image move between checked semantic positions.
     ///
     /// # Errors
     ///
     /// Returns an error if the transaction operation limit has been reached.
-    pub fn move_embedded_image_to(&mut self, from: Position, to: Position) -> Result<&mut Self> {
+    pub fn move_embedded_image_to(
+        &mut self,
+        from: Position,
+        to: Position,
+    ) -> FamilyResult<&mut Self> {
         if from == to {
             return Ok(self);
         }
@@ -993,7 +1437,7 @@ impl Edit {
     pub fn add_script_resource(
         &mut self,
         resource: &crate::ScriptResourceSpec,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         self.push(Operation::AddScriptResource {
             resource: resource.clone(),
         })
@@ -1004,7 +1448,7 @@ impl Edit {
         &mut self,
         path: &str,
         resource: &crate::ScriptResourceSpec,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         self.push(Operation::ReplaceScriptResource {
             path: path.to_owned(),
             resource: resource.clone(),
@@ -1012,32 +1456,369 @@ impl Edit {
     }
 
     /// Stages removal of an unreferenced opaque script resource.
-    pub fn remove_script_resource(&mut self, path: &str) -> Result<&mut Self> {
+    pub fn remove_script_resource(&mut self, path: &str) -> FamilyResult<&mut Self> {
         self.push(Operation::RemoveScriptResource {
             path: path.to_owned(),
         })
     }
 
-    fn push(&mut self, operation: Operation) -> Result<&mut Self> {
-        if self.operations.len() >= MAX_OPERATIONS {
-            return Err(Error::InvalidFormat(format!(
-                "ODT transaction exceeds {MAX_OPERATIONS} staged operations"
-            )));
+    /// Stages a point or named-range body annotation; the commit result is
+    /// its allocated [`OperationResult::Index`].
+    pub fn add_annotation(
+        &mut self,
+        anchor: &crate::AnnotationAnchor,
+        annotation: &crate::Annotation,
+    ) -> FamilyResult<&mut Self> {
+        self.push(Operation::Annotation(AnnotationOperation::Add {
+            anchor: anchor.clone(),
+            annotation: annotation.clone(),
+        }))
+    }
+
+    /// Stages replacement of an annotation body and metadata, retaining its
+    /// anchor.
+    pub fn replace_annotation(
+        &mut self,
+        annotation_index: Position,
+        annotation: &crate::Annotation,
+    ) -> FamilyResult<&mut Self> {
+        self.push(Operation::Annotation(AnnotationOperation::Replace {
+            index: annotation_index.get(),
+            annotation: annotation.clone(),
+        }))
+    }
+
+    /// Stages a partial typed annotation metadata update.
+    pub fn update_annotation(
+        &mut self,
+        annotation_index: Position,
+        update: &crate::AnnotationUpdate,
+    ) -> FamilyResult<&mut Self> {
+        self.push(Operation::Annotation(AnnotationOperation::Update {
+            index: annotation_index.get(),
+            update: update.clone(),
+        }))
+    }
+
+    /// Stages removal of an annotation and its paired end marker, if any.
+    pub fn remove_annotation(&mut self, annotation_index: Position) -> FamilyResult<&mut Self> {
+        self.push(Operation::Annotation(AnnotationOperation::Remove {
+            index: annotation_index.get(),
+        }))
+    }
+
+    /// Stages a reorder of point annotations that are direct XML siblings.
+    pub fn reorder_annotation(&mut self, from: Position, to: Position) -> FamilyResult<&mut Self> {
+        self.push(Operation::Annotation(AnnotationOperation::Reorder {
+            from: from.get(),
+            to: to.get(),
+        }))
+    }
+
+    /// Stage one structural body edit against the source's body index.
+    fn stage_body(
+        &mut self,
+        stage: impl FnOnce(&mut crate::body::BodyEdits, crate::body::Body<'_>) -> CoreResult<()>,
+    ) -> FamilyResult<&mut Self> {
+        let staged = match self.operations.as_slice() {
+            [] => 0,
+            [Operation::Body { count }] => *count,
+            _ => {
+                return Err(PackageError::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odt.edit.stage_body",
+                    "body edits must precede other staged operations",
+                ));
+            },
+        };
+        if staged >= MAX_BODY_OPERATIONS {
+            return Err(PackageError::Limit {
+                kind: LimitKind::Semantic(SemanticLimitKind::Edits),
+                observed: staged.saturating_add(1) as u64,
+                maximum: MAX_BODY_OPERATIONS as u64,
+            });
         }
-        self.operations
-            .try_reserve(1)
-            .map_err(|source| Error::Allocation {
+        let document = self.source.document()?;
+        let body = document.body()?;
+        let edits = self.body.get_or_insert_with(Box::default);
+        stage(edits, body)?;
+        match self.operations.first_mut() {
+            Some(Operation::Body { count }) => {
+                *count += 1;
+                Ok(self)
+            },
+            _ => self.push(Operation::Body { count: 1 }),
+        }
+    }
+
+    /// Stages replacement of a body node's text (paragraph, heading, run,
+    /// hyperlink, cell, list item, text box, note or annotation). Spaces,
+    /// tabs and line feeds are kept as `text:s`, `text:tab` and
+    /// `text:line-break`; a cell becomes a string cell.
+    ///
+    /// The set replaces text, not content (record 0304): an element inside
+    /// the node that shows no text — a frame, a note, an annotation, a
+    /// bookmark, a reference, index or change mark, a soft page break — is
+    /// kept, at the character offset it had in the old text (clamped to the
+    /// new text's length), so setting the old text back puts it back where
+    /// it was.
+    ///
+    /// Body edits name nodes of [`Document::body`] of this edit's source and
+    /// must be staged before any other operation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a node without text, text XML cannot carry, or
+    /// an edit overlapping another staged body edit, and
+    /// [`litchi_core::Error::Unsupported`] naming the first element the set
+    /// could neither keep nor replace: an element with text of its own (a
+    /// text field such as `text:page-number`, `text:meta`, `text:ruby`) or,
+    /// in a cell, list item, text box or note, a block other than a
+    /// paragraph (a table, a nested list, a section).
+    pub fn set_text(
+        &mut self,
+        node: crate::body::NodeId,
+        text: impl Into<String>,
+    ) -> FamilyResult<&mut Self> {
+        let text = text.into();
+        self.stage_body(|edits, body| edits.set_text(body, node, text))
+    }
+
+    /// Stages replacing the displayed text of one body text field
+    /// ([`crate::body::text_fields`]), keeping its element and attributes:
+    /// a field refresh (record 0295).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a field of another body, text XML cannot carry,
+    /// or an edit overlapping another staged body edit.
+    pub fn set_field_text(
+        &mut self,
+        field: &crate::body::TextField<'_>,
+        text: &str,
+    ) -> FamilyResult<&mut Self> {
+        let range = field.range();
+        self.stage_body(|edits, body| edits.set_field_text(body, range, text))
+    }
+
+    /// Stages replacing the text of one master-page header or footer region
+    /// ([`crate::body::parts::Region`] of this edit's source) with one
+    /// paragraph that keeps the region's first paragraph start tag; spaces,
+    /// tabs and line feeds are kept as `text:s`, `text:tab` and
+    /// `text:line-break` (record 0328). Setting the text the region shows
+    /// stages nothing.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`litchi_core::Error::Unsupported`] when the region holds
+    /// content a text set cannot keep (a field, a frame, a table, a
+    /// bookmark), and an error for a region of another document, text XML
+    /// cannot carry, or a region edited twice.
+    pub fn set_region_text(
+        &mut self,
+        region: &crate::body::parts::Region<'_>,
+        text: &str,
+    ) -> FamilyResult<&mut Self> {
+        let range = region.range();
+        self.stage_body(|edits, body| edits.set_region_text(body, range, text))
+    }
+
+    /// Stages setting (`Some`) or removing (`None`) one typed attribute of
+    /// a body node.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the node's kind has no such attribute, the value
+    /// is invalid (an unknown style, a script hyperlink, a grid attribute),
+    /// or the edit overlaps another staged body edit.
+    pub fn set_attribute(
+        &mut self,
+        node: crate::body::NodeId,
+        attribute: crate::body::Attribute,
+        value: Option<&str>,
+    ) -> FamilyResult<&mut Self> {
+        let value = value.map(str::to_owned);
+        self.stage_body(|edits, body| edits.set_attribute(body, node, attribute, value))
+    }
+
+    /// Stages character formatting of a run, paragraph or heading. The
+    /// commit derives one new automatic style (from the node's automatic
+    /// style when it has one) and points the node at it; a run without a
+    /// style of its own becomes a `text:span`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a node without character formatting, an invalid
+    /// value, or an overlapping body edit.
+    pub fn set_text_properties(
+        &mut self,
+        node: crate::body::NodeId,
+        properties: &crate::body::TextPropertyUpdate,
+    ) -> FamilyResult<&mut Self> {
+        self.stage_body(|edits, body| edits.set_text_properties(body, node, properties))
+    }
+
+    /// Stages paragraph formatting of a paragraph or heading through a
+    /// derived automatic paragraph style.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::set_text_properties`].
+    pub fn set_paragraph_properties(
+        &mut self,
+        node: crate::body::NodeId,
+        properties: &crate::body::ParagraphPropertyUpdate,
+    ) -> FamilyResult<&mut Self> {
+        self.stage_body(|edits, body| edits.set_paragraph_properties(body, node, properties))
+    }
+
+    /// Stages insertion of a new body node at `location`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the parent cannot hold the node, the anchor is
+    /// not the parent's child, a value is invalid, or the insertion lies in
+    /// a node another staged body edit replaces.
+    pub fn insert(
+        &mut self,
+        location: crate::body::Location,
+        node: &crate::body::NewNode,
+    ) -> FamilyResult<&mut Self> {
+        self.stage_body(|edits, body| edits.insert(body, location, node))
+    }
+
+    /// Stages removal of a body node with everything inside it. A range
+    /// bookmark or a comment loses its end marker with it. Cells and rows
+    /// with vertically merged cells keep the table grid and are refused.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for the body, a grid-bound node, or an overlapping
+    /// body edit.
+    pub fn remove(&mut self, node: crate::body::NodeId) -> FamilyResult<&mut Self> {
+        self.stage_body(|edits, body| edits.remove(body, node))
+    }
+
+    /// Stages a move of a body node, keeping its exact bytes.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::remove`], and when the destination cannot hold the node.
+    pub fn relocate(
+        &mut self,
+        node: crate::body::NodeId,
+        location: crate::body::Location,
+    ) -> FamilyResult<&mut Self> {
+        self.stage_body(|edits, body| edits.relocate(body, node, location))
+    }
+
+    /// Stages an exchange of two body nodes, keeping both nodes' bytes.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::remove`], and when either destination cannot hold the
+    /// other node or one node contains the other.
+    pub fn swap(
+        &mut self,
+        left: crate::body::NodeId,
+        right: crate::body::NodeId,
+    ) -> FamilyResult<&mut Self> {
+        self.stage_body(|edits, body| edits.swap(body, left, right))
+    }
+
+    /// Stages setting (`Some`) or removing (`None`) one `meta.xml`
+    /// property; the public route is [`crate::metadata::Edit`].
+    pub(crate) fn set_metadata(
+        &mut self,
+        field: crate::metadata::Field,
+        value: Option<&str>,
+    ) -> FamilyResult<&mut Self> {
+        let value = value.map(str::to_owned);
+        self.stage_body(|edits, _| edits.set_metadata(field, value))
+    }
+
+    /// Stages the `meta.xml` keyword list; the public route is
+    /// [`crate::metadata::Edit::set_keywords`].
+    pub(crate) fn set_metadata_keywords(&mut self, keywords: &[String]) -> FamilyResult<&mut Self> {
+        let keywords = keywords.to_vec();
+        self.stage_body(|edits, _| edits.set_metadata_keywords(keywords))
+    }
+
+    /// The number of staged operations, body edits included.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.operations.len()
+    }
+
+    /// Whether nothing is staged.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.operations.is_empty()
+    }
+
+    /// Stage one structural document verb.
+    fn document_operation(
+        &mut self,
+        apply: impl Fn(&mut MutableDocument) -> CoreResult<OperationResult> + Send + Sync + 'static,
+    ) -> FamilyResult<&mut Self> {
+        self.document_operation_at("/package".to_owned(), apply)
+    }
+
+    /// Stage one structural document verb writing only `scope`, so joined
+    /// and three-way merged edits of disjoint layout owners compose.
+    fn document_operation_at(
+        &mut self,
+        scope: String,
+        apply: impl Fn(&mut MutableDocument) -> CoreResult<OperationResult> + Send + Sync + 'static,
+    ) -> FamilyResult<&mut Self> {
+        self.push(Operation::Document {
+            apply: Arc::new(apply),
+            scope: Arc::from(scope),
+        })
+    }
+
+    fn push(&mut self, operation: Operation) -> FamilyResult<&mut Self> {
+        if self.operations.len() >= MAX_OPERATIONS {
+            return Err(PackageError::Limit {
+                kind: LimitKind::Semantic(SemanticLimitKind::Edits),
+                observed: self.operations.len().saturating_add(1) as u64,
+                maximum: MAX_OPERATIONS as u64,
+            });
+        }
+        self.operations.try_reserve(1).map_err(|source| {
+            PackageError::from(CoreError::Allocation {
                 resource: "ODT transaction operations",
                 source,
-            })?;
+            })
+        })?;
         self.operations.push(operation);
         Ok(self)
     }
 
-    /// Validates every staged operation and publishes one immutable snapshot.
-    pub fn commit(self) -> Result<Commit> {
+    /// Validates every staged operation and publishes one immutable package.
+    ///
+    /// An edit with no staged operation commits the source package itself:
+    /// `diagnostics().changed()` is false and `patch().is_noop()` holds.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Refused`] for an operation that cannot be composed,
+    /// and [`Error::Core`] for invalid operations, including a changed write
+    /// on a signed or encrypted source.
+    pub fn commit(self) -> Result<Commit, PackageError> {
         if !transfer_operations_are_isolated(&self.operations) {
-            return Err(Error::InvalidFormat(
+            return Err(PackageError::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odt.edit.commit",
+                "paragraph transfer cannot be composed with another staged mutation",
+            ));
+        }
+        Ok(self.commit_core()?)
+    }
+
+    pub(crate) fn commit_core(self) -> CoreResult<Commit> {
+        if !transfer_operations_are_isolated(&self.operations) {
+            return Err(CoreError::InvalidFormat(
                 "ODT paragraph transfer cannot be composed with another staged mutation"
                     .to_string(),
             ));
@@ -1055,19 +1836,26 @@ impl Edit {
     }
 
     #[inline(never)]
-    fn commit_changed(self) -> Result<Commit> {
+    fn commit_changed(mut self) -> CoreResult<Commit> {
         ensure_editable_envelope(&self.source)?;
         let mut document = self.source.document()?;
+        if let Some(body) = self.body.take() {
+            if let Some(bytes) = crate::body::apply_body_edits(&document, *body)? {
+                document =
+                    Document::from_bytes_with_xml_limits(bytes, document.transaction_xml_limits())?;
+            }
+        }
         let mut results = Vec::new();
         results
             .try_reserve_exact(self.operations.len())
-            .map_err(|source| Error::Allocation {
+            .map_err(|source| CoreError::Allocation {
                 resource: "ODT transaction results",
                 source,
             })?;
         let mut operation_index = 0;
         while operation_index < self.operations.len() {
             let operation = &self.operations[operation_index];
+            let xml_limits = document.transaction_xml_limits();
             let before_operation = document.transaction_package().clone();
             let run_end = model_content_run_end(&self.operations, operation_index);
             if is_model_content_operation(operation) && run_end - operation_index >= 2 {
@@ -1088,38 +1876,76 @@ impl Edit {
                     results.push(result);
                     operation_index += 1;
                 }
-                document = Document::from_bytes(mutable.to_bytes_content_only()?)?;
+                document = Document::from_bytes_with_xml_limits(
+                    mutable.to_bytes_content_only()?,
+                    xml_limits,
+                )?;
+                audit_changed_xml_is_compact(&before_operation, document.transaction_package())?;
+                continue;
+            }
+            if matches!(operation, Operation::Document { .. }) {
+                let mut mutable = MutableDocument::from_document(document)?;
+                while let Some(Operation::Document { apply, .. }) =
+                    self.operations.get(operation_index)
+                {
+                    results.push(apply(&mut mutable)?);
+                    operation_index += 1;
+                }
+                document = Document::from_bytes_with_xml_limits(mutable.to_bytes()?, xml_limits)?;
                 audit_changed_xml_is_compact(&before_operation, document.transaction_package())?;
                 continue;
             }
             let result = match operation {
                 Operation::Noop => OperationResult::Unit,
+                Operation::Document { .. } => unreachable!("document operations run above"),
+                Operation::Body { count } => {
+                    // One result per staged body edit; the edits were applied
+                    // together before this loop.
+                    results
+                        .try_reserve(*count)
+                        .map_err(|source| CoreError::Allocation {
+                            resource: "ODT transaction results",
+                            source,
+                        })?;
+                    results.extend((1..*count).map(|_| OperationResult::Unit));
+                    OperationResult::Unit
+                },
                 Operation::RestoreSnapshot => {
-                    return Err(Error::Unsupported(
-                        "snapshot restoration is available only through patch application"
-                            .to_string(),
-                    ));
+                    return Err(CoreError::Refused(litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedOperation,
+                        "odt.transaction",
+                        "snapshot restoration is available only through patch application",
+                    )));
                 },
                 Operation::InsertParagraph { index, text } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.insert_semantic_paragraph(*index, text)?;
-                    document = Document::from_bytes(mutable.to_bytes_content_only()?)?;
+                    document = Document::from_bytes_with_xml_limits(
+                        mutable.to_bytes_content_only()?,
+                        xml_limits,
+                    )?;
                     OperationResult::Index(*index)
                 },
                 Operation::ReplaceParagraph { index, text } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.replace_semantic_paragraph(*index, text)?;
-                    document = Document::from_bytes(mutable.to_bytes_content_only()?)?;
+                    document = Document::from_bytes_with_xml_limits(
+                        mutable.to_bytes_content_only()?,
+                        xml_limits,
+                    )?;
                     OperationResult::Unit
                 },
                 Operation::RemoveParagraph { index } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.remove_semantic_paragraph(*index)?;
-                    document = Document::from_bytes(mutable.to_bytes_content_only()?)?;
+                    document = Document::from_bytes_with_xml_limits(
+                        mutable.to_bytes_content_only()?,
+                        xml_limits,
+                    )?;
                     OperationResult::Unit
                 },
                 Operation::MovePlainParagraph { from, to } => {
-                    let snapshot = Snapshot::from_document(&document)?;
+                    let snapshot = Package::from_document(&document)?;
                     let moved = crate::package::paragraph_move::move_plain_paragraph(
                         &snapshot, *from, *to,
                     )?;
@@ -1127,14 +1953,14 @@ impl Edit {
                     OperationResult::Unit
                 },
                 Operation::TransferPlainParagraphs(transfer) => {
-                    let snapshot = Snapshot::from_document(&document)?;
+                    let snapshot = Package::from_document(&document)?;
                     let transferred =
                         crate::package::paragraph_transfer::apply_operation(&snapshot, transfer)?;
                     document = transferred.document()?;
                     let mut indexes = Vec::new();
                     indexes
                         .try_reserve_exact(transfer.fragments.len())
-                        .map_err(|source| Error::Allocation {
+                        .map_err(|source| CoreError::Allocation {
                             resource: "ODT paragraph transfer result indexes",
                             source,
                         })?;
@@ -1157,7 +1983,10 @@ impl Edit {
                 } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.append_semantic_run(*paragraph, text, style_name.as_deref())?;
-                    document = Document::from_bytes(mutable.to_bytes_content_only()?)?;
+                    document = Document::from_bytes_with_xml_limits(
+                        mutable.to_bytes_content_only()?,
+                        xml_limits,
+                    )?;
                     OperationResult::Unit
                 },
                 Operation::AppendHyperlink {
@@ -1167,13 +1996,19 @@ impl Edit {
                 } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.append_semantic_hyperlink(*paragraph, href, text)?;
-                    document = Document::from_bytes(mutable.to_bytes_content_only()?)?;
+                    document = Document::from_bytes_with_xml_limits(
+                        mutable.to_bytes_content_only()?,
+                        xml_limits,
+                    )?;
                     OperationResult::Unit
                 },
                 Operation::AppendLineBreak { index } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.append_line_break_at(Position::new(*index))?;
-                    document = Document::from_bytes(mutable.to_bytes_content_only()?)?;
+                    document = Document::from_bytes_with_xml_limits(
+                        mutable.to_bytes_content_only()?,
+                        xml_limits,
+                    )?;
                     OperationResult::Unit
                 },
                 Operation::InsertNote {
@@ -1187,7 +2022,8 @@ impl Edit {
                     } else {
                         mutable.insert_note(*paragraph, note)?;
                     }
-                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    document =
+                        Document::from_bytes_with_xml_limits(mutable.to_bytes()?, xml_limits)?;
                     OperationResult::Unit
                 },
                 Operation::ReplaceNote {
@@ -1201,13 +2037,15 @@ impl Edit {
                     } else {
                         mutable.replace_note(*index, note)?;
                     }
-                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    document =
+                        Document::from_bytes_with_xml_limits(mutable.to_bytes()?, xml_limits)?;
                     OperationResult::Unit
                 },
                 Operation::RemoveNote { index } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.remove_note(*index)?;
-                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    document =
+                        Document::from_bytes_with_xml_limits(mutable.to_bytes()?, xml_limits)?;
                     OperationResult::Unit
                 },
                 Operation::InsertRubyAnnotation {
@@ -1216,49 +2054,57 @@ impl Edit {
                 } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.insert_ruby_annotation(*paragraph, annotation)?;
-                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    document =
+                        Document::from_bytes_with_xml_limits(mutable.to_bytes()?, xml_limits)?;
                     OperationResult::Unit
                 },
                 Operation::ReplaceRubyAnnotation { index, annotation } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.replace_ruby_annotation(*index, annotation)?;
-                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    document =
+                        Document::from_bytes_with_xml_limits(mutable.to_bytes()?, xml_limits)?;
                     OperationResult::Unit
                 },
                 Operation::RemoveRubyAnnotation { index } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.remove_ruby_annotation(*index)?;
-                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    document =
+                        Document::from_bytes_with_xml_limits(mutable.to_bytes()?, xml_limits)?;
                     OperationResult::Unit
                 },
                 Operation::InsertDynamicTextField { paragraph, field } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.insert_dynamic_text_field(*paragraph, field)?;
-                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    document =
+                        Document::from_bytes_with_xml_limits(mutable.to_bytes()?, xml_limits)?;
                     OperationResult::Unit
                 },
                 Operation::ReplaceDynamicTextField { index, field } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.replace_dynamic_text_field(*index, field)?;
-                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    document =
+                        Document::from_bytes_with_xml_limits(mutable.to_bytes()?, xml_limits)?;
                     OperationResult::Unit
                 },
                 Operation::RemoveDynamicTextField { index } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.remove_dynamic_text_field(*index)?;
-                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    document =
+                        Document::from_bytes_with_xml_limits(mutable.to_bytes()?, xml_limits)?;
                     OperationResult::Unit
                 },
                 Operation::SetRubyStyle { style } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.set_ruby_style(style)?;
-                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    document =
+                        Document::from_bytes_with_xml_limits(mutable.to_bytes()?, xml_limits)?;
                     OperationResult::Unit
                 },
                 Operation::RemoveRubyStyle { name } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.remove_ruby_style(name)?;
-                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    document =
+                        Document::from_bytes_with_xml_limits(mutable.to_bytes()?, xml_limits)?;
                     OperationResult::Unit
                 },
                 Operation::SetTrackedChangePolicy {
@@ -1272,13 +2118,15 @@ impl Edit {
                         protection_key.clone(),
                         digest_algorithm.clone(),
                     )?;
-                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    document =
+                        Document::from_bytes_with_xml_limits(mutable.to_bytes()?, xml_limits)?;
                     OperationResult::Unit
                 },
                 Operation::RemoveTrackedChange { id } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.remove_tracked_change(id)?;
-                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    document =
+                        Document::from_bytes_with_xml_limits(mutable.to_bytes()?, xml_limits)?;
                     OperationResult::Unit
                 },
                 Operation::AddRdfGraph {
@@ -1323,7 +2171,7 @@ impl Edit {
                         .into_iter()
                         .find(|graph| graph.path == *path)
                         .ok_or_else(|| {
-                            Error::InvalidFormat(format!("RDF graph '{path}' was not found"))
+                            CoreError::InvalidFormat(format!("RDF graph '{path}' was not found"))
                         })?
                         .triples
                         .len();
@@ -1608,12 +2456,14 @@ impl Edit {
                     OperationResult::Indices(indices)
                 },
                 Operation::GarbageCollectEmbeddedResources { candidates } => {
-                    let current = Snapshot::from_document(&document)?;
+                    let current = Package::from_document(&document)?;
                     let plan = crate::package::resource_gc::plan(current, candidates)?;
                     if !plan.is_applicable() {
-                        return Err(Error::Unsupported(
-                            "ODT embedded-resource GC replay contains a typed refusal".to_string(),
-                        ));
+                        return Err(CoreError::Refused(litchi_core::edit::Refusal::new(
+                            litchi_core::edit::RefusalKind::UnsupportedOperation,
+                            "odt.transaction",
+                            "ODT embedded-resource GC replay contains a typed refusal",
+                        )));
                     }
                     let bytes = plan.apply_to_package(document.transaction_package())?;
                     document.replace_transaction_bytes(bytes)?;
@@ -1713,9 +2563,13 @@ impl Edit {
                         document.transaction_package(),
                         document.transaction_content_xml(),
                         path,
+                        &document.transaction_xml_limits(),
                     )?;
                     document.replace_transaction_bytes(bytes)?;
                     OperationResult::Unit
+                },
+                Operation::Annotation(operation) => {
+                    apply_annotation_operation(&mut document, operation)?
                 },
             };
             // The paragraph mover publishes several individually audited,
@@ -1732,9 +2586,8 @@ impl Edit {
             operation_index += 1;
         }
         let after = snapshot_from_final_document(&self.source, &document)?;
-        // Reparse after the compact audit so commit never returns an invalid
-        // candidate even when a writer implementation changes independently.
-        after.document()?;
+        // `document` is the parse of the final candidate bytes and is retained
+        // by `after`, so the commit never returns an unparsed candidate.
         Ok(Commit::new(self.source, after, results, self.operations))
     }
 }
@@ -1787,7 +2640,7 @@ fn model_content_run_end(operations: &[Operation], start: usize) -> usize {
 fn apply_model_content_operation(
     mutable: &mut MutableDocument,
     operation: &Operation,
-) -> Result<OperationResult> {
+) -> CoreResult<OperationResult> {
     match operation {
         Operation::InsertParagraph { index, text } => {
             mutable.insert_semantic_paragraph(*index, text)?;
@@ -1817,7 +2670,7 @@ fn apply_model_content_operation(
             mutable.append_semantic_hyperlink(*paragraph, href, text)?;
             Ok(OperationResult::Unit)
         },
-        _ => Err(Error::InvalidFormat(
+        _ => Err(CoreError::InvalidFormat(
             "ODT model-content batch received a non-content operation".to_string(),
         )),
     }
@@ -1850,16 +2703,16 @@ impl JoinConflict {
 }
 
 /// Bounded collection of disjoint edits against one exact immutable snapshot.
-pub struct JoinedEdit {
-    source: Snapshot,
+pub struct JoinedEdits {
+    source: Package,
     limits: CompositionLimits,
     inner: JoinedSubEdits<Lineage, Vec<Operation>>,
 }
 
-impl JoinedEdit {
+impl JoinedEdits {
     /// Creates an empty composition under caller-selected finite bounds.
     #[must_use]
-    pub fn new(source: Snapshot, limits: CompositionLimits) -> Self {
+    pub fn new(source: Package, limits: CompositionLimits) -> Self {
         let lineage = Lineage(source.bytes.clone());
         Self {
             source,
@@ -1873,9 +2726,10 @@ impl JoinedEdit {
         &mut self,
         identifier: impl Into<String>,
         edit: Edit,
-    ) -> std::result::Result<&mut Self, JoinConflict> {
-        if !transfer_operations_are_isolated(&edit.operations) {
-            // The core composition vocabulary has no format-specific
+    ) -> Result<&mut Self, JoinConflict> {
+        if !transfer_operations_are_isolated(&edit.operations) || edit.body.is_some() {
+            // Body edits address one source tree and do not compose; the
+            // core composition vocabulary has no format-specific
             // isolation variant. Report this admission refusal through its
             // invalid-effect branch rather than retaining an unsafe payload.
             return Err(JoinConflict {
@@ -1915,48 +2769,56 @@ impl JoinedEdit {
     /// Atomically commits accepted work in stable identifier order.
     /// Transfer operations are isolated from every other mutation so their
     /// exact lexical destination authentication remains valid.
-    pub fn commit(self) -> Result<Commit> {
+    pub fn commit(self) -> FamilyResult<Commit> {
         let mut operations = Vec::new();
         for edit in self.inner.into_sub_edits() {
             let payload = edit.into_payload();
             if !transfer_operations_are_isolated(&payload) {
-                return Err(Error::InvalidFormat(
-                    "ODT paragraph transfer cannot be composed within one sub-edit".to_string(),
+                return Err(PackageError::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odt.joined_edits.commit",
+                    "paragraph transfer cannot be composed with another staged mutation",
                 ));
             }
             operations.extend(payload);
         }
+        if !transfer_operations_are_isolated(&operations) {
+            return Err(PackageError::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odt.joined_edits.commit",
+                "paragraph transfer cannot be composed with another staged mutation",
+            ));
+        }
         Edit {
             source: self.source,
             operations,
+            body: None,
         }
-        .commit()
+        .commit_core()
+        .map_err(PackageError::from)
     }
 }
 
 /// Non-applying three-way plan for two branches from one exact ODT snapshot.
 pub struct MergePlan {
-    source: Snapshot,
+    source: Package,
     limits: CompositionLimits,
     inner: ThreeWayMergePlan<Lineage, Vec<Operation>>,
 }
 
 impl MergePlan {
     /// Plans a merge without mutating or reopening the base snapshot.
-    pub fn new(left: JoinedEdit, right: JoinedEdit) -> Result<Self> {
+    pub fn new(left: JoinedEdits, right: JoinedEdits) -> FamilyResult<Self> {
         if left.source.as_bytes() != right.source.as_bytes() {
-            return Err(Error::InvalidFormat(
-                "ODT merge branches do not share an exact base snapshot".to_string(),
+            return Err(PackageError::patch_conflict(
+                "odt.merge",
+                "the merge branches do not share an exact base snapshot",
             ));
         }
         let source = left.source.clone();
         let limits = left.limits;
-        let inner = ThreeWayMergePlan::new(left.inner, right.inner).map_err(|error| {
-            Error::InvalidFormat(format!(
-                "ODT three-way planning failed: {:?}",
-                error.failure()
-            ))
-        })?;
+        let inner = ThreeWayMergePlan::new(left.inner, right.inner)
+            .map_err(|error| merge_plan_error(error.failure()))?;
         Ok(Self {
             source,
             limits,
@@ -1983,9 +2845,9 @@ impl MergePlan {
     }
 
     /// Finishes only after every conflict has an explicit resolution.
-    pub fn finish(self) -> std::result::Result<JoinedEdit, Box<Self>> {
+    pub fn finish(self) -> Result<JoinedEdits, Box<Self>> {
         match self.inner.finish() {
-            Ok(inner) => Ok(JoinedEdit {
+            Ok(inner) => Ok(JoinedEdits {
                 source: self.source,
                 limits: self.limits,
                 inner,
@@ -1999,15 +2861,62 @@ impl MergePlan {
     }
 }
 
+fn merge_plan_error(failure: &litchi_core::ThreeWayMergeFailure) -> PackageError {
+    match failure {
+        litchi_core::ThreeWayMergeFailure::DifferentLineage => PackageError::patch_conflict(
+            "odt.merge",
+            "the merge branches do not share an exact base lineage",
+        ),
+        litchi_core::ThreeWayMergeFailure::DifferentLimits => PackageError::refused(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odt.merge",
+            "the merge branches use different composition limits",
+        ),
+        litchi_core::ThreeWayMergeFailure::Limit(error) => composition_limit_error(error),
+        _ => PackageError::refused(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odt.merge",
+            "the merge plan uses an unsupported composition failure",
+        ),
+    }
+}
+
+fn composition_limit_error(error: &litchi_core::CompositionError) -> PackageError {
+    match error {
+        litchi_core::CompositionError::Limit {
+            observed, limit, ..
+        } => PackageError::Limit {
+            kind: LimitKind::Semantic(SemanticLimitKind::Edits),
+            observed: *observed as u64,
+            maximum: *limit as u64,
+        },
+        litchi_core::CompositionError::InvalidId => PackageError::refused(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odt.merge",
+            "the merge branch contains an invalid sub-edit identifier",
+        ),
+        litchi_core::CompositionError::InvalidEffect => PackageError::refused(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odt.merge",
+            "the merge branch contains an invalid semantic effect",
+        ),
+        _ => PackageError::refused(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odt.merge",
+            "the merge plan uses an unsupported composition failure",
+        ),
+    }
+}
+
 /// Commit-coupled bounded undo/redo over exact immutable ODT snapshots.
 pub struct History {
-    inner: CoreHistory<Snapshot>,
+    inner: CoreHistory<Package>,
 }
 
 impl History {
     /// Starts history at one immutable snapshot.
     #[must_use]
-    pub fn new(current: Snapshot, limits: HistoryLimits) -> Self {
+    pub fn new(current: Package, limits: HistoryLimits) -> Self {
         Self {
             inner: CoreHistory::new(current, limits),
         }
@@ -2015,12 +2924,12 @@ impl History {
 
     /// Current exact immutable snapshot.
     #[must_use]
-    pub const fn current(&self) -> &Snapshot {
+    pub const fn current(&self) -> &Package {
         self.inner.current()
     }
 
     /// Fully reopens the current snapshot for semantic inspection.
-    pub fn document(&self) -> Result<Document> {
+    pub fn document(&self) -> FamilyResult<Document> {
         self.current().document()
     }
 
@@ -2031,17 +2940,20 @@ impl History {
     }
 
     /// Commits and records an edit only when it targets the current exact head.
-    pub fn commit(&mut self, edit: Edit) -> Result<Commit> {
+    pub fn commit(&mut self, edit: Edit) -> FamilyResult<Commit> {
         if edit.source.as_bytes() != self.current().as_bytes() {
-            return Err(stale_history_error());
+            return Err(PackageError::patch_conflict(
+                "odt.history.commit",
+                "the edit is not based on the current history head",
+            ));
         }
         let commit = edit.commit()?;
-        self.record(commit.snapshot().clone())?;
+        self.record(commit.package().clone())?;
         Ok(commit)
     }
 
     /// Applies and records a durable patch only at the current exact head.
-    pub fn apply(&mut self, patch: &DurablePatch) -> Result<Snapshot> {
+    pub fn apply(&mut self, patch: &DurablePatch) -> FamilyResult<Package> {
         let snapshot = patch.apply(self.current())?;
         self.record(snapshot.clone())?;
         Ok(snapshot)
@@ -2069,9 +2981,9 @@ impl History {
         self.inner.can_redo()
     }
 
-    fn record(&mut self, snapshot: Snapshot) -> Result<()> {
+    fn record(&mut self, snapshot: Package) -> CoreResult<()> {
         let weight = u64::try_from(self.current().as_bytes().len()).map_err(|_error| {
-            Error::InvalidFormat("ODT history snapshot weight exceeds u64".to_string())
+            CoreError::InvalidFormat("ODT history snapshot weight exceeds u64".to_string())
         })?;
         self.inner
             .record(snapshot, weight)
@@ -2080,10 +2992,28 @@ impl History {
     }
 }
 
+/// One staged structural document verb: the closure applies the verb to the
+/// working document of the commit (record 0358).
+type DocumentStep = Arc<dyn Fn(&mut MutableDocument) -> CoreResult<OperationResult> + Send + Sync>;
+
 #[derive(Clone)]
 enum Operation {
     Noop,
     RestoreSnapshot,
+    /// A structural document verb; consecutive document operations share one
+    /// working document.
+    Document {
+        apply: DocumentStep,
+        /// The effect path the step writes (`/package` when it may rewrite
+        /// any part; one layout owner for the layout verbs).
+        scope: Arc<str>,
+    },
+    /// `count` staged structural body edits; the edits themselves live in
+    /// [`Edit::body`] and are applied together, before every other
+    /// operation.
+    Body {
+        count: usize,
+    },
     InsertParagraph {
         index: usize,
         text: String,
@@ -2308,37 +3238,92 @@ enum Operation {
     RemoveScriptResource {
         path: String,
     },
+    /// A body annotation edit. Annotation operations are source-local: they
+    /// are not encoded into durable patches and are refused by transfers.
+    Annotation(AnnotationOperation),
+}
+
+#[derive(Clone, Debug)]
+enum AnnotationOperation {
+    Add {
+        anchor: crate::AnnotationAnchor,
+        annotation: crate::Annotation,
+    },
+    Replace {
+        index: usize,
+        annotation: crate::Annotation,
+    },
+    Update {
+        index: usize,
+        update: crate::AnnotationUpdate,
+    },
+    Remove {
+        index: usize,
+    },
+    Reorder {
+        from: usize,
+        to: usize,
+    },
 }
 
 /// A validated packaged-ODT transaction result.
 pub struct Commit {
-    snapshot: Snapshot,
+    package: Package,
     patch: Patch,
     results: Vec<OperationResult>,
 }
 
+/// Content-free facts about one [`Commit`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Diagnostics {
+    changed: bool,
+    operation_count: usize,
+}
+
+impl Diagnostics {
+    /// Whether the committed package differs from its source bytes.
+    #[must_use]
+    pub const fn changed(&self) -> bool {
+        self.changed
+    }
+
+    /// The number of staged operations the commit applied.
+    #[must_use]
+    pub const fn operation_count(&self) -> usize {
+        self.operation_count
+    }
+}
+
 impl Commit {
+    pub(crate) fn replayed(package: Package, patch: Patch) -> Self {
+        Self {
+            package,
+            patch,
+            results: Vec::new(),
+        }
+    }
+
     fn new(
-        before: Snapshot,
-        snapshot: Snapshot,
+        before: Package,
+        package: Package,
         results: Vec<OperationResult>,
         operations: Vec<Operation>,
     ) -> Self {
         Self {
             patch: Patch {
                 before,
-                after: snapshot.clone(),
+                after: package.clone(),
                 operations,
             },
-            snapshot,
+            package,
             results,
         }
     }
 
-    /// Returns the committed immutable snapshot.
+    /// Returns the committed immutable package.
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
+    pub const fn package(&self) -> &Package {
+        &self.package
     }
 
     /// Returns the exact source-checked reversible patch.
@@ -2347,22 +3332,45 @@ impl Commit {
         &self.patch
     }
 
+    /// Returns content-free facts about this commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> Diagnostics {
+        Diagnostics {
+            changed: !self.patch.is_noop(),
+            operation_count: self
+                .patch
+                .operations
+                .iter()
+                .map(|operation| match operation {
+                    Operation::Body { count } => *count,
+                    _ => 1,
+                })
+                .sum(),
+        }
+    }
+
     /// Returns one deterministic result for each staged operation.
     #[must_use]
     pub fn results(&self) -> &[OperationResult] {
         &self.results
     }
 
-    /// Consumes the commit and returns its immutable snapshot.
+    /// Consumes the commit and returns its immutable package.
     #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
+    pub fn into_package(self) -> Package {
+        self.package
+    }
+
+    /// Consumes the commit into its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
     }
 }
 
 pub(crate) fn embedded_resource_gc_commit(
-    before: Snapshot,
-    snapshot: Snapshot,
+    before: Package,
+    snapshot: Package,
     candidates: Vec<crate::package::resource_gc::EmbeddedResourceGcCandidate>,
 ) -> Commit {
     let operations = if candidates.is_empty() {
@@ -2385,21 +3393,37 @@ pub enum OperationResult {
     Indices(Vec<usize>),
     /// Package path allocated by a resource insertion operation.
     Path(String),
+    /// Name allocated by a document operation (a frame or drawing name).
+    Name(String),
 }
 
 /// Exact-byte, source-checked package patch.
 #[derive(Clone)]
 pub struct Patch {
-    before: Snapshot,
-    after: Snapshot,
+    before: Package,
+    after: Package,
     operations: Vec<Operation>,
 }
 
 impl Patch {
+    /// Whether applying this patch preserves the exact source bytes.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        Arc::ptr_eq(&self.before.bytes, &self.after.bytes)
+            || self.before.as_bytes() == self.after.as_bytes()
+    }
+
+    /// Whether this patch was made from exactly `source`'s bytes.
+    #[must_use]
+    pub fn is_applicable_to(&self, source: &Package) -> bool {
+        Arc::ptr_eq(&self.before.bytes, &source.bytes)
+            || source.as_bytes() == self.before.as_bytes()
+    }
+
     /// Applies this patch only to the exact snapshot from which it was made.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn apply(&self, source: &Package) -> CoreResult<Package> {
         if source.as_bytes() != self.before.as_bytes() {
-            return Err(Error::InvalidFormat(
+            return Err(CoreError::InvalidFormat(
                 "ODT patch source does not match its expected snapshot".to_string(),
             ));
         }
@@ -2426,8 +3450,8 @@ impl Patch {
     ///
     /// Returns an error if either package exceeds the durable patch bounds or
     /// the format-neutral wire envelope cannot be constructed.
-    pub fn durable(&self) -> Result<DurablePatch> {
-        DurablePatch::from_semantic_patch(self)
+    pub fn durable(&self) -> FamilyResult<DurablePatch> {
+        Ok(DurablePatch::from_semantic_patch(self)?)
     }
 
     /// Builds a non-mutating, dependency-checked plan for replaying portable
@@ -2436,8 +3460,8 @@ impl Patch {
     /// Form, chart, and embedded-resource positions are checked against the
     /// destination before their replacements, removals, or moves may commit.
     /// Other source-local selectors and snapshot restores remain refused.
-    pub fn plan_transfer(&self, destination: &Snapshot) -> Result<TransferPlan> {
-        TransferPlan::new(destination.clone(), &self.operations)
+    pub fn plan_transfer(&self, destination: &Package) -> FamilyResult<TransferPlan> {
+        Ok(TransferPlan::new(destination.clone(), &self.operations)?)
     }
 }
 
@@ -2499,13 +3523,13 @@ impl TransferDependency {
 
 /// Non-mutating, bounded plan for dependency-aware cross-document replay.
 pub struct TransferPlan {
-    destination: Snapshot,
+    destination: Package,
     operations: Vec<Operation>,
     dependencies: Vec<TransferDependency>,
 }
 
 impl TransferPlan {
-    fn new(destination: Snapshot, operations: &[Operation]) -> Result<Self> {
+    fn new(destination: Package, operations: &[Operation]) -> CoreResult<Self> {
         if operations.len() > MAX_OPERATIONS {
             return Err(invalid_durable_patch());
         }
@@ -2865,10 +3889,11 @@ impl TransferPlan {
                     );
                 },
                 _ => {
-                    return Err(Error::Unsupported(
-                        "ODT cross-document transfer refuses this source-local operation"
-                            .to_string(),
-                    ));
+                    return Err(CoreError::Refused(litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedOperation,
+                        "odt.transaction",
+                        "ODT cross-document transfer refuses this source-local operation",
+                    )));
                 },
             }
         }
@@ -2900,21 +3925,25 @@ impl TransferPlan {
     }
 
     /// Applies the planned edit only when every dependency is satisfied.
-    pub fn commit(self) -> Result<Commit> {
+    pub fn commit(self) -> FamilyResult<Commit> {
         if self
             .dependencies
             .iter()
             .any(|dependency| !dependency.satisfied)
         {
-            return Err(Error::InvalidFormat(
-                "ODT transfer plan has unresolved dependencies".to_string(),
+            return Err(PackageError::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odt.transfer_plan.commit",
+                "the transfer plan has unresolved dependencies",
             ));
         }
         Edit {
             source: self.destination,
             operations: self.operations,
+            body: None,
         }
-        .commit()
+        .commit_core()
+        .map_err(PackageError::from)
     }
 }
 
@@ -3111,11 +4140,11 @@ pub struct DurablePatch {
 }
 
 impl DurablePatch {
-    fn from_semantic_patch(patch: &Patch) -> Result<Self> {
+    fn from_semantic_patch(patch: &Patch) -> CoreResult<Self> {
         // Durable patches intentionally do not retain credentials. This
         // credential-free reopen makes the encrypted-package refusal explicit.
-        Snapshot::from_bytes(copy_bytes(patch.before.as_bytes())?)?;
-        Snapshot::from_bytes(copy_bytes(patch.after.as_bytes())?)?;
+        Package::from_vec(copy_bytes(patch.before.as_bytes())?)?;
+        Package::from_vec(copy_bytes(patch.after.as_bytes())?)?;
         let limits = durable_patch_limits();
         let blob_limits = limits.blobs();
         let mut forward_blobs = BlobBundle::new(blob_limits);
@@ -3130,9 +4159,14 @@ impl DurablePatch {
         if operations.is_empty() {
             operations.push(Operation::Noop);
         }
+        // Structural document verbs have no semantic wire vocabulary; a patch
+        // holding one is carried as the exact target artifact (record 0358a).
         let restoring = operations
             .iter()
-            .all(|operation| matches!(operation, Operation::RestoreSnapshot));
+            .all(|operation| matches!(operation, Operation::RestoreSnapshot))
+            || operations
+                .iter()
+                .any(|operation| matches!(operation, Operation::Document { .. }));
         if restoring {
             let target_blob = forward_blobs
                 .insert(patch.after.as_bytes())
@@ -3153,7 +4187,7 @@ impl DurablePatch {
         let mut pairs = Vec::new();
         pairs
             .try_reserve_exact(operations.len())
-            .map_err(|allocation_error| Error::Allocation {
+            .map_err(|allocation_error| CoreError::Allocation {
                 resource: "ODT durable semantic operations",
                 source: allocation_error,
             })?;
@@ -3188,7 +4222,7 @@ impl DurablePatch {
     ///
     /// Returns an error for non-canonical JSON, exceeded limits, invalid blob
     /// integrity, a foreign operation vocabulary, or an invalid ODT artifact.
-    pub fn from_deterministic_json(bytes: &[u8]) -> Result<Self> {
+    pub fn from_deterministic_json(bytes: &[u8]) -> FamilyResult<Self> {
         let inner = CorePatch::<Reversible>::from_deterministic_json(bytes, durable_patch_limits())
             .map_err(durable_wire_error)?;
         validate_reversible_patch(&inner)?;
@@ -3200,10 +4234,11 @@ impl DurablePatch {
     /// # Errors
     ///
     /// Returns an error if the bounded JSON output cannot be produced.
-    pub fn to_deterministic_json(&self) -> Result<Vec<u8>> {
-        self.inner
+    pub fn to_deterministic_json(&self) -> FamilyResult<Vec<u8>> {
+        Ok(self
+            .inner
             .to_deterministic_json()
-            .map_err(durable_wire_error)
+            .map_err(durable_wire_error)?)
     }
 
     /// Applies this patch only to its exact source package bytes.
@@ -3212,12 +4247,15 @@ impl DurablePatch {
     ///
     /// Returns an error if `source` is not byte-identical to the retained
     /// source artifact or the target package no longer validates as ODT.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+    pub fn apply(&self, source: &Package) -> FamilyResult<Package> {
         let inverse = self.inner.inverse();
         if let Some(expected_source) = restore_target_bytes(&inverse)?
             && source.as_bytes() != expected_source
         {
-            return Err(durable_source_mismatch());
+            return Err(PackageError::patch_conflict(
+                "odt.durable.apply",
+                "the source does not match the retained patch base",
+            ));
         }
         apply_durable_patch(&self.inner, source)
     }
@@ -3252,7 +4290,7 @@ impl SealedPatch {
     ///
     /// Returns an error for non-canonical JSON, exceeded limits, invalid blob
     /// integrity, a foreign operation vocabulary, or an invalid target ODT.
-    pub fn from_deterministic_json(bytes: &[u8]) -> Result<Self> {
+    pub fn from_deterministic_json(bytes: &[u8]) -> FamilyResult<Self> {
         let inner =
             CorePatch::<ForwardOnly>::from_deterministic_json(bytes, durable_patch_limits())
                 .map_err(durable_wire_error)?;
@@ -3265,10 +4303,11 @@ impl SealedPatch {
     /// # Errors
     ///
     /// Returns an error if the bounded JSON output cannot be produced.
-    pub fn to_deterministic_json(&self) -> Result<Vec<u8>> {
-        self.inner
+    pub fn to_deterministic_json(&self) -> FamilyResult<Vec<u8>> {
+        Ok(self
+            .inner
             .to_deterministic_json()
-            .map_err(durable_wire_error)
+            .map_err(durable_wire_error)?)
     }
 
     /// Applies the sealed patch after checking the source SHA-256 precondition.
@@ -3280,7 +4319,7 @@ impl SealedPatch {
     ///
     /// Returns an error if the source digest differs or the target package no
     /// longer validates as ODT.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+    pub fn apply(&self, source: &Package) -> FamilyResult<Package> {
         apply_durable_patch(&self.inner, source)
     }
 }
@@ -3323,7 +4362,7 @@ fn restore_patch_operation(
     source: &BlobId,
     target: &BlobId,
     target_blob: &BlobId,
-) -> Result<PatchOperation> {
+) -> CoreResult<PatchOperation> {
     PatchOperation::new(
         limits,
         RESTORE_OPERATION,
@@ -3340,7 +4379,7 @@ fn semantic_patch_operation(
     target: &BlobId,
     operation: &Operation,
     blobs: &mut BlobBundle,
-) -> Result<PatchOperation> {
+) -> CoreResult<PatchOperation> {
     let (name, path, value) = match operation {
         Operation::Noop => (NOOP_OPERATION, "/".to_string(), Value::Null),
         Operation::InsertParagraph { index, text } => (
@@ -3708,11 +4747,15 @@ fn semantic_patch_operation(
             format!("/package/scripts/{path}"),
             Value::Null,
         ),
-        Operation::RestoreSnapshot => {
-            return Err(Error::Unsupported(
-                "this ODT operation has not migrated to the semantic durable vocabulary"
-                    .to_string(),
-            ));
+        Operation::RestoreSnapshot
+        | Operation::Annotation(_)
+        | Operation::Body { .. }
+        | Operation::Document { .. } => {
+            return Err(CoreError::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odt.transaction",
+                "this ODT operation has not migrated to the semantic durable vocabulary",
+            )));
         },
     };
     PatchOperation::new(
@@ -3725,7 +4768,7 @@ fn semantic_patch_operation(
     .map_err(durable_wire_error)
 }
 
-fn durable_lineage<Mode>(patch: &CorePatch<Mode>) -> Result<DurableLineage<'_>> {
+fn durable_lineage<Mode>(patch: &CorePatch<Mode>) -> CoreResult<DurableLineage<'_>> {
     if patch.format() != DURABLE_FORMAT || patch.operations().is_empty() {
         return Err(invalid_durable_patch());
     }
@@ -3765,7 +4808,7 @@ fn durable_lineage<Mode>(patch: &CorePatch<Mode>) -> Result<DurableLineage<'_>> 
     })
 }
 
-fn validate_reversible_patch(patch: &CorePatch<Reversible>) -> Result<()> {
+fn validate_reversible_patch(patch: &CorePatch<Reversible>) -> CoreResult<()> {
     validate_patch_direction(patch)?;
     let forward = durable_lineage(patch)?;
     let inverse_patch = patch.inverse();
@@ -3777,11 +4820,11 @@ fn validate_reversible_patch(patch: &CorePatch<Reversible>) -> Result<()> {
     Ok(())
 }
 
-fn validate_sealed_patch(patch: &CorePatch<ForwardOnly>) -> Result<()> {
+fn validate_sealed_patch(patch: &CorePatch<ForwardOnly>) -> CoreResult<()> {
     validate_patch_direction(patch)
 }
 
-fn validate_patch_direction<Mode>(patch: &CorePatch<Mode>) -> Result<()> {
+fn validate_patch_direction<Mode>(patch: &CorePatch<Mode>) -> CoreResult<()> {
     let lineage = durable_lineage(patch)?;
     let restoring = patch
         .operations()
@@ -3811,7 +4854,7 @@ fn preflight_transfer_expansion(
     operations: &[PatchOperation],
     blobs: &BlobBundle,
     expected_destination: &str,
-) -> Result<()> {
+) -> CoreResult<()> {
     let mut total_bytes = 0_usize;
     for operation in operations {
         if operation.op != "paragraph.transfer_plain" {
@@ -3896,7 +4939,7 @@ fn preflight_transfer_expansion(
     Ok(())
 }
 
-fn collect_blob_references(value: &Value, output: &mut BTreeSet<String>) -> Result<()> {
+fn collect_blob_references(value: &Value, output: &mut BTreeSet<String>) -> CoreResult<()> {
     match value {
         Value::Object(object) => {
             if let Some(blob) = object.get("blob") {
@@ -3922,7 +4965,7 @@ fn collect_blob_references(value: &Value, output: &mut BTreeSet<String>) -> Resu
     Ok(())
 }
 
-fn restore_target_bytes<Mode>(patch: &CorePatch<Mode>) -> Result<Option<&[u8]>> {
+fn restore_target_bytes<Mode>(patch: &CorePatch<Mode>) -> CoreResult<Option<&[u8]>> {
     if !patch
         .operations()
         .iter()
@@ -3960,23 +5003,27 @@ fn restore_target_bytes<Mode>(patch: &CorePatch<Mode>) -> Result<Option<&[u8]>> 
     if BlobId::of(bytes).as_hex() != lineage.target_id {
         return Err(invalid_durable_patch());
     }
-    Snapshot::from_bytes(copy_bytes(bytes)?)?;
+    Package::from_vec(copy_bytes(bytes)?)?;
     Ok(Some(bytes))
 }
 
-fn apply_durable_patch<Mode>(patch: &CorePatch<Mode>, source: &Snapshot) -> Result<Snapshot> {
+fn apply_durable_patch<Mode>(patch: &CorePatch<Mode>, source: &Package) -> FamilyResult<Package> {
     let lineage = durable_lineage(patch)?;
     if BlobId::of(source.as_bytes()).as_hex() != lineage.source_id {
-        return Err(durable_source_mismatch());
+        return Err(PackageError::patch_conflict(
+            "odt.durable.apply",
+            "the source does not match the retained patch base",
+        ));
     }
     validate_patch_direction(patch)?;
     if let Some(bytes) = restore_target_bytes(patch)? {
-        return Snapshot::from_bytes(copy_bytes(bytes)?);
+        return Package::from_vec_with_xml_limits(copy_bytes(bytes)?, source.xml_limits_value())
+            .map_err(PackageError::from);
     }
     let mut operations = Vec::new();
     operations
         .try_reserve_exact(patch.operations().len())
-        .map_err(|allocation_error| Error::Allocation {
+        .map_err(|allocation_error| CoreError::Allocation {
             resource: "ODT durable semantic replay",
             source: allocation_error,
         })?;
@@ -3989,17 +5036,22 @@ fn apply_durable_patch<Mode>(patch: &CorePatch<Mode>, source: &Snapshot) -> Resu
     let committed = Edit {
         source: source.clone(),
         operations,
+        body: None,
     }
     .commit()?;
-    if BlobId::of(committed.snapshot().as_bytes()).as_hex() != lineage.target_id {
-        return Err(Error::InvalidFormat(
+    if BlobId::of(committed.package().as_bytes()).as_hex() != lineage.target_id {
+        return Err(CoreError::InvalidFormat(
             "ODT semantic patch replay produced an unexpected target".to_string(),
-        ));
+        )
+        .into());
     }
-    Ok(committed.into_snapshot())
+    Ok(committed.into_package())
 }
 
-fn decode_semantic_operation(operation: &PatchOperation, blobs: &BlobBundle) -> Result<Operation> {
+fn decode_semantic_operation(
+    operation: &PatchOperation,
+    blobs: &BlobBundle,
+) -> CoreResult<Operation> {
     let index = |prefix: &str, suffix: &str| parse_target_index(&operation.target, prefix, suffix);
     match operation.op.as_str() {
         NOOP_OPERATION if operation.target == "/" && operation.value.is_null() => {
@@ -4340,7 +5392,7 @@ fn decode_semantic_operation(operation: &PatchOperation, blobs: &BlobBundle) -> 
     }
 }
 
-fn note_from_value(value: &Value) -> Result<(crate::note::Note, String)> {
+fn note_from_value(value: &Value) -> CoreResult<(crate::note::Note, String)> {
     let fragment = object_string(value, "xml", 1)?;
     crate::note::validate_note_fragment(&fragment)?;
     let xml = format!(
@@ -4356,7 +5408,7 @@ fn note_from_value(value: &Value) -> Result<(crate::note::Note, String)> {
         .ok_or_else(invalid_durable_patch)
 }
 
-fn note_fragment_value(note: &crate::note::Note, fragment: Option<&str>) -> Result<Value> {
+fn note_fragment_value(note: &crate::note::Note, fragment: Option<&str>) -> CoreResult<Value> {
     let xml = match fragment {
         Some(fragment) => fragment.to_owned(),
         None => note.to_xml_fragment()?,
@@ -4365,34 +5417,34 @@ fn note_fragment_value(note: &crate::note::Note, fragment: Option<&str>) -> Resu
     Ok(serde_json::json!({"xml": xml}))
 }
 
-fn ruby_annotation_from_value(value: &Value) -> Result<crate::ruby_family::Annotation> {
+fn ruby_annotation_from_value(value: &Value) -> CoreResult<crate::ruby_family::Annotation> {
     crate::ruby_family::Annotation::from_xml_fragment(&object_string(value, "xml", 1)?)
         .map_err(|_error| invalid_durable_patch())
 }
 
-fn form_fragment_value(fragment: &str) -> Result<Value> {
+fn form_fragment_value(fragment: &str) -> CoreResult<Value> {
     crate::package::forms::validate_form_fragment(fragment)?;
     Ok(serde_json::json!({"xml": fragment}))
 }
 
-fn form_fragment_from_value(value: &Value) -> Result<String> {
+fn form_fragment_from_value(value: &Value) -> CoreResult<String> {
     let fragment = object_string(value, "xml", 1)?;
     crate::package::forms::validate_form_fragment(&fragment)?;
     Ok(fragment)
 }
 
-fn form_control_fragment_value(fragment: &str) -> Result<Value> {
+fn form_control_fragment_value(fragment: &str) -> CoreResult<Value> {
     crate::package::forms::validate_control_fragment(fragment)?;
     Ok(serde_json::json!({"xml": fragment}))
 }
 
-fn form_control_fragment_from_value(value: &Value) -> Result<String> {
+fn form_control_fragment_from_value(value: &Value) -> CoreResult<String> {
     let fragment = object_string(value, "xml", 1)?;
     crate::package::forms::validate_control_fragment(&fragment)?;
     Ok(fragment)
 }
 
-fn move_target_from_value(value: &Value) -> Result<usize> {
+fn move_target_from_value(value: &Value) -> CoreResult<usize> {
     json_usize(exact_object(value, 1)?.get("to"))
 }
 
@@ -4400,7 +5452,7 @@ fn plain_paragraph_transfer_value(
     transfer: &crate::package::paragraph_transfer::PlainParagraphTransferOperation,
     destination: &BlobId,
     blobs: &mut BlobBundle,
-) -> Result<Value> {
+) -> CoreResult<Value> {
     if transfer.destination_fingerprint != destination.as_hex() {
         return Err(invalid_durable_patch());
     }
@@ -4413,7 +5465,7 @@ fn plain_paragraph_transfer_value(
     let mut source_positions = Vec::new();
     source_positions
         .try_reserve_exact(transfer.source_positions.len())
-        .map_err(|source| Error::Allocation {
+        .map_err(|source| CoreError::Allocation {
             resource: "ODT paragraph transfer durable positions",
             source,
         })?;
@@ -4423,7 +5475,7 @@ fn plain_paragraph_transfer_value(
     let mut fragments = Vec::new();
     fragments
         .try_reserve_exact(transfer.fragments.len())
-        .map_err(|source| Error::Allocation {
+        .map_err(|source| CoreError::Allocation {
             resource: "ODT paragraph transfer durable fragments",
             source,
         })?;
@@ -4445,7 +5497,7 @@ fn plain_paragraph_transfer_from_value(
     value: &Value,
     blobs: &BlobBundle,
     expected_destination: &str,
-) -> Result<crate::package::paragraph_transfer::PlainParagraphTransferOperation> {
+) -> CoreResult<crate::package::paragraph_transfer::PlainParagraphTransferOperation> {
     let value = exact_object(value, 5)?;
     let destination = object_required_string_map(value, "destination")?;
     let fragment_digest = object_required_string_map(value, "fragment_digest")?;
@@ -4508,7 +5560,7 @@ fn plain_paragraph_transfer_from_value(
     let mut fragments = Vec::new();
     fragments
         .try_reserve_exact(fragments_value.len())
-        .map_err(|source| Error::Allocation {
+        .map_err(|source| CoreError::Allocation {
             resource: "ODT paragraph transfer durable fragment decode",
             source,
         })?;
@@ -4519,7 +5571,7 @@ fn plain_paragraph_transfer_from_value(
         let mut owned = Vec::new();
         owned
             .try_reserve_exact(bytes.len())
-            .map_err(|source| Error::Allocation {
+            .map_err(|source| CoreError::Allocation {
                 resource: "ODT paragraph transfer durable fragment",
                 source,
             })?;
@@ -4537,15 +5589,15 @@ fn plain_paragraph_transfer_from_value(
     Ok(operation)
 }
 
-fn parse_transfer_target(target: &str) -> Result<usize> {
+fn parse_transfer_target(target: &str) -> CoreResult<usize> {
     parse_target_index(target, "/body/paragraphs/", "/transfer")
 }
 
-fn parse_transfer_target_value(value: &Value) -> Result<usize> {
+fn parse_transfer_target_value(value: &Value) -> CoreResult<usize> {
     json_usize(Some(value))
 }
 
-fn transfer_positions_from_value(value: &Value) -> Result<Vec<usize>> {
+fn transfer_positions_from_value(value: &Value) -> CoreResult<Vec<usize>> {
     let positions = value.as_array().ok_or_else(invalid_durable_patch)?;
     if positions.len() > crate::package::paragraph_transfer::MAX_PLAIN_PARAGRAPH_TRANSFER_PARAGRAPHS
     {
@@ -4554,7 +5606,7 @@ fn transfer_positions_from_value(value: &Value) -> Result<Vec<usize>> {
     let mut output = Vec::new();
     output
         .try_reserve_exact(positions.len())
-        .map_err(|source| Error::Allocation {
+        .map_err(|source| CoreError::Allocation {
             resource: "ODT paragraph transfer durable source positions",
             source,
         })?;
@@ -4564,7 +5616,7 @@ fn transfer_positions_from_value(value: &Value) -> Result<Vec<usize>> {
     Ok(output)
 }
 
-fn dynamic_field_from_value(value: &Value) -> Result<DynamicTextField> {
+fn dynamic_field_from_value(value: &Value) -> CoreResult<DynamicTextField> {
     let fragment = object_string(value, "xml", 1)?;
     let xml = format!(
         r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:text><text:p>{fragment}</text:p></office:text></office:body></office:document-content>"#
@@ -4576,7 +5628,7 @@ fn dynamic_field_from_value(value: &Value) -> Result<DynamicTextField> {
     fields.pop().ok_or_else(invalid_durable_patch)
 }
 
-fn ruby_style_from_value(value: &Value) -> Result<crate::ruby_family::Style> {
+fn ruby_style_from_value(value: &Value) -> CoreResult<crate::ruby_family::Style> {
     let fragment = object_string(value, "xml", 1)?;
     let xml = format!(
         r#"<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:styles>{fragment}</office:styles></office:document-styles>"#
@@ -4588,22 +5640,24 @@ fn ruby_style_from_value(value: &Value) -> Result<crate::ruby_family::Style> {
     styles.pop().ok_or_else(invalid_durable_patch)
 }
 
-fn rdf_triples_value(triples: &[crate::rdf::Triple]) -> Result<Value> {
+fn rdf_triples_value(triples: &[crate::rdf::Triple]) -> CoreResult<Value> {
     triples
         .iter()
         .map(rdf_triple_value)
-        .collect::<Result<Vec<_>>>()
+        .collect::<CoreResult<Vec<_>>>()
         .map(Value::Array)
 }
 
-fn rdf_triple_value(triple: &crate::rdf::Triple) -> Result<Value> {
+fn rdf_triple_value(triple: &crate::rdf::Triple) -> CoreResult<Value> {
     let (subject_kind, subject_value) = match &triple.subject {
         crate::rdf::Subject::Iri(value) => ("iri", value),
         crate::rdf::Subject::BlankNode(value) => ("blank", value),
         _ => {
-            return Err(Error::Unsupported(
-                "unsupported RDF subject variant".to_string(),
-            ));
+            return Err(CoreError::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odt.transaction",
+                "unsupported RDF subject variant",
+            )));
         },
     };
     let object = match &triple.object {
@@ -4622,9 +5676,11 @@ fn rdf_triple_value(triple: &crate::rdf::Triple) -> Result<Value> {
             "value": value,
         }),
         _ => {
-            return Err(Error::Unsupported(
-                "unsupported RDF object variant".to_string(),
-            ));
+            return Err(CoreError::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odt.transaction",
+                "unsupported RDF object variant",
+            )));
         },
     };
     Ok(serde_json::json!({
@@ -4634,7 +5690,7 @@ fn rdf_triple_value(triple: &crate::rdf::Triple) -> Result<Value> {
     }))
 }
 
-fn rdf_triples_from_value(value: &Value) -> Result<Vec<crate::rdf::Triple>> {
+fn rdf_triples_from_value(value: &Value) -> CoreResult<Vec<crate::rdf::Triple>> {
     let values = value.as_array().ok_or_else(invalid_durable_patch)?;
     if values.len() > MAX_OPERATIONS {
         return Err(invalid_durable_patch());
@@ -4642,7 +5698,7 @@ fn rdf_triples_from_value(value: &Value) -> Result<Vec<crate::rdf::Triple>> {
     values.iter().map(rdf_triple_from_value).collect()
 }
 
-fn rdf_triple_from_value(value: &Value) -> Result<crate::rdf::Triple> {
+fn rdf_triple_from_value(value: &Value) -> CoreResult<crate::rdf::Triple> {
     let value = exact_object(value, 3)?;
     let subject = exact_object(value.get("subject").ok_or_else(invalid_durable_patch)?, 2)?;
     let subject_value = bounded_semantic_text(
@@ -4694,7 +5750,7 @@ fn protection_value(policy: &crate::protection::Policy) -> Value {
     })
 }
 
-fn protection_from_value(value: &Value) -> Result<crate::protection::Policy> {
+fn protection_from_value(value: &Value) -> CoreResult<crate::protection::Policy> {
     let value = exact_object(value, 4)?;
     let redline_key = match value.get("redline_key") {
         Some(Value::String(value)) => Some(crate::protection::Key::new(hex_decode(value)?)?),
@@ -4715,7 +5771,7 @@ fn chart_content_value(
     content: &str,
     storage: crate::package::charts::EmbeddedChartStorage,
     blobs: &mut BlobBundle,
-) -> Result<Value> {
+) -> CoreResult<Value> {
     crate::package::charts::validate_chart_content(content)?;
     let blob = blobs
         .insert(content.as_bytes())
@@ -4730,7 +5786,7 @@ fn chart_content_value(
 fn chart_content_from_value(
     value: &Value,
     blobs: &BlobBundle,
-) -> Result<(String, crate::package::charts::EmbeddedChartStorage)> {
+) -> CoreResult<(String, crate::package::charts::EmbeddedChartStorage)> {
     let value = exact_object(value, 2)?;
     let blob = object_required_string_map(value, "blob")?;
     if !is_canonical_digest(blob) {
@@ -4751,7 +5807,7 @@ fn chart_content_from_value(
 fn embedded_resource_batch_value(
     changes: &[crate::package::embedded::EmbeddedResourceChange],
     blobs: &mut BlobBundle,
-) -> Result<Value> {
+) -> CoreResult<Value> {
     use crate::package::embedded::{EmbeddedResourceChange, EmbeddedResourceSelector};
     if changes.is_empty() || changes.len() > crate::package::embedded::MAX_BATCH_CHANGES {
         return Err(invalid_durable_patch());
@@ -4759,7 +5815,7 @@ fn embedded_resource_batch_value(
     let mut values = Vec::new();
     values
         .try_reserve_exact(changes.len())
-        .map_err(|source| Error::Allocation {
+        .map_err(|source| CoreError::Allocation {
             resource: "embedded-resource durable batch",
             source,
         })?;
@@ -4800,7 +5856,7 @@ fn embedded_resource_batch_value(
 fn embedded_resource_batch_from_value(
     value: &Value,
     blobs: &BlobBundle,
-) -> Result<Vec<crate::package::embedded::EmbeddedResourceChange>> {
+) -> CoreResult<Vec<crate::package::embedded::EmbeddedResourceChange>> {
     use crate::package::embedded::{EmbeddedResourceChange, EmbeddedResourceSelector};
     let values = value.as_array().ok_or_else(invalid_durable_patch)?;
     if values.is_empty() || values.len() > crate::package::embedded::MAX_BATCH_CHANGES {
@@ -4809,7 +5865,7 @@ fn embedded_resource_batch_from_value(
     let mut changes = Vec::new();
     changes
         .try_reserve_exact(values.len())
-        .map_err(|source| Error::Allocation {
+        .map_err(|source| CoreError::Allocation {
             resource: "embedded-resource durable batch",
             source,
         })?;
@@ -4876,7 +5932,7 @@ fn embedded_resource_gc_value(
 
 fn embedded_resource_gc_from_value(
     value: &Value,
-) -> Result<Vec<crate::package::resource_gc::EmbeddedResourceGcCandidate>> {
+) -> CoreResult<Vec<crate::package::resource_gc::EmbeddedResourceGcCandidate>> {
     use crate::package::resource_gc::EmbeddedResourceGcCandidate;
     let values = value.as_array().ok_or_else(invalid_durable_patch)?;
     if values.len() > 256 {
@@ -4885,7 +5941,7 @@ fn embedded_resource_gc_from_value(
     let mut candidates = Vec::new();
     candidates
         .try_reserve_exact(values.len())
-        .map_err(|source| Error::Allocation {
+        .map_err(|source| CoreError::Allocation {
             resource: "embedded-resource GC durable candidates",
             source,
         })?;
@@ -4908,7 +5964,7 @@ fn embedded_resource_gc_from_value(
 fn embedded_resource_value(
     resource: &crate::package::embedded::EmbeddedResource,
     blobs: &mut BlobBundle,
-) -> Result<Value> {
+) -> CoreResult<Value> {
     use crate::package::embedded::{EmbeddedResourceKind, EmbeddedResourceSource};
     let kind = match resource.kind {
         EmbeddedResourceKind::Object => "object",
@@ -4938,20 +5994,20 @@ fn embedded_resource_value(
             preferred_root,
         } => {
             if files.len() > 16_384 {
-                return Err(Error::InvalidFormat(
+                return Err(CoreError::InvalidFormat(
                     "embedded resource has too many durable files".to_string(),
                 ));
             }
             let total = files.iter().try_fold(0usize, |total, file| {
                 total.checked_add(file.bytes.len()).ok_or_else(|| {
-                    Error::InvalidFormat("embedded resource byte count overflow".to_string())
+                    CoreError::InvalidFormat("embedded resource byte count overflow".to_string())
                 })
             })?;
             ensure_package_size(total, "embedded resource durable payload")?;
             let mut payload = Vec::new();
             payload
                 .try_reserve_exact(total)
-                .map_err(|source| Error::Allocation {
+                .map_err(|source| CoreError::Allocation {
                     resource: "embedded resource durable payload",
                     source,
                 })?;
@@ -4959,7 +6015,7 @@ fn embedded_resource_value(
             let mut entries = Vec::new();
             entries
                 .try_reserve_exact(files.len())
-                .map_err(|source| Error::Allocation {
+                .map_err(|source| CoreError::Allocation {
                     resource: "embedded resource durable file table",
                     source,
                 })?;
@@ -4988,9 +6044,11 @@ fn embedded_resource_value(
                 litchi_odf_common::embedded::Root::OpenDocument => "open-document",
                 litchi_odf_common::embedded::Root::MathMl => "mathml",
                 _ => {
-                    return Err(Error::Unsupported(
-                        "unsupported embedded XML root".to_string(),
-                    ));
+                    return Err(CoreError::Refused(litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedOperation,
+                        "odt.transaction",
+                        "unsupported embedded XML root",
+                    )));
                 },
             };
             serde_json::json!({"blob": blob.as_hex(), "root": root, "type": "inline-xml"})
@@ -5016,7 +6074,7 @@ fn embedded_resource_value(
 fn embedded_resource_from_value(
     value: &Value,
     blobs: &BlobBundle,
-) -> Result<crate::package::embedded::EmbeddedResource> {
+) -> CoreResult<crate::package::embedded::EmbeddedResource> {
     use crate::package::embedded::{
         EmbeddedResource, EmbeddedResourceFile, EmbeddedResourceKind, EmbeddedResourceSource,
     };
@@ -5064,7 +6122,7 @@ fn embedded_resource_from_value(
             let mut files = Vec::new();
             files
                 .try_reserve_exact(entries.len())
-                .map_err(|source| Error::Allocation {
+                .map_err(|source| CoreError::Allocation {
                     resource: "embedded resource durable file table",
                     source,
                 })?;
@@ -5138,14 +6196,17 @@ fn embedded_resource_from_value(
     })
 }
 
-fn resource_blob(source: &serde_json::Map<String, Value>, blobs: &BlobBundle) -> Result<Vec<u8>> {
+fn resource_blob(
+    source: &serde_json::Map<String, Value>,
+    blobs: &BlobBundle,
+) -> CoreResult<Vec<u8>> {
     copy_bytes(resource_blob_ref(source, blobs)?)
 }
 
 fn resource_blob_ref<'a>(
     source: &serde_json::Map<String, Value>,
     blobs: &'a BlobBundle,
-) -> Result<&'a [u8]> {
+) -> CoreResult<&'a [u8]> {
     let blob = object_required_string_map(source, "blob")?;
     if !is_canonical_digest(blob) {
         return Err(invalid_durable_patch());
@@ -5153,7 +6214,7 @@ fn resource_blob_ref<'a>(
     blob_by_hex(blobs, blob).ok_or_else(invalid_durable_patch)
 }
 
-fn json_usize(value: Option<&Value>) -> Result<usize> {
+fn json_usize(value: Option<&Value>) -> CoreResult<usize> {
     value
         .and_then(Value::as_u64)
         .and_then(|value| usize::try_from(value).ok())
@@ -5163,7 +6224,7 @@ fn json_usize(value: Option<&Value>) -> Result<usize> {
 fn script_resource_value(
     resource: &crate::ScriptResourceSpec,
     blobs: &mut BlobBundle,
-) -> Result<Value> {
+) -> CoreResult<Value> {
     let blob = blobs.insert(&resource.bytes).map_err(durable_wire_error)?;
     let kind = match resource.kind {
         crate::ScriptResourceKind::BasicLibrary => "basic-library",
@@ -5182,7 +6243,7 @@ fn script_resource_value(
 fn script_resource_from_value(
     value: &Value,
     blobs: &BlobBundle,
-) -> Result<crate::ScriptResourceSpec> {
+) -> CoreResult<crate::ScriptResourceSpec> {
     let value = exact_object(value, 4)?;
     let kind = match object_required_string_map(value, "kind")? {
         "basic-library" => crate::ScriptResourceKind::BasicLibrary,
@@ -5214,7 +6275,7 @@ fn blob_by_hex<'a>(blobs: &'a BlobBundle, id: &str) -> Option<&'a [u8]> {
         .and_then(|candidate| blobs.get(candidate))
 }
 
-fn exact_object(value: &Value, fields: usize) -> Result<&serde_json::Map<String, Value>> {
+fn exact_object(value: &Value, fields: usize) -> CoreResult<&serde_json::Map<String, Value>> {
     let value = value.as_object().ok_or_else(invalid_durable_patch)?;
     if value.len() != fields {
         return Err(invalid_durable_patch());
@@ -5225,14 +6286,14 @@ fn exact_object(value: &Value, fields: usize) -> Result<&serde_json::Map<String,
 fn object_required_string_map<'a>(
     value: &'a serde_json::Map<String, Value>,
     key: &str,
-) -> Result<&'a str> {
+) -> CoreResult<&'a str> {
     value
         .get(key)
         .and_then(Value::as_str)
         .ok_or_else(invalid_durable_patch)
 }
 
-fn optional_bounded_string(value: Option<&Value>, field: &str) -> Result<Option<String>> {
+fn optional_bounded_string(value: Option<&Value>, field: &str) -> CoreResult<Option<String>> {
     match value {
         Some(Value::String(value)) => bounded_semantic_text(value.clone(), field).map(Some),
         Some(Value::Null) => Ok(None),
@@ -5240,7 +6301,7 @@ fn optional_bounded_string(value: Option<&Value>, field: &str) -> Result<Option<
     }
 }
 
-fn optional_bool(value: Option<&Value>) -> Result<Option<bool>> {
+fn optional_bool(value: Option<&Value>) -> CoreResult<Option<bool>> {
     match value {
         Some(Value::Bool(value)) => Ok(Some(*value)),
         Some(Value::Null) => Ok(None),
@@ -5248,7 +6309,7 @@ fn optional_bool(value: Option<&Value>) -> Result<Option<bool>> {
     }
 }
 
-fn target_tail(target: &str, prefix: &str) -> Result<String> {
+fn target_tail(target: &str, prefix: &str) -> CoreResult<String> {
     let value = target
         .strip_prefix(prefix)
         .ok_or_else(invalid_durable_patch)?;
@@ -5258,7 +6319,7 @@ fn target_tail(target: &str, prefix: &str) -> Result<String> {
     bounded_semantic_text(value.to_owned(), "durable target")
 }
 
-fn target_middle(target: &str, prefix: &str, suffix: &str) -> Result<String> {
+fn target_middle(target: &str, prefix: &str, suffix: &str) -> CoreResult<String> {
     let value = target
         .strip_prefix(prefix)
         .and_then(|value| value.strip_suffix(suffix))
@@ -5269,7 +6330,7 @@ fn target_middle(target: &str, prefix: &str, suffix: &str) -> Result<String> {
     bounded_semantic_text(value.to_owned(), "durable target")
 }
 
-fn rdf_target(target: &str) -> Result<(String, usize)> {
+fn rdf_target(target: &str) -> CoreResult<(String, usize)> {
     let value = target
         .strip_prefix("/package/rdf/")
         .ok_or_else(invalid_durable_patch)?;
@@ -5285,7 +6346,7 @@ fn rdf_target(target: &str) -> Result<(String, usize)> {
     ))
 }
 
-fn parse_canonical_index(value: &str) -> Result<usize> {
+fn parse_canonical_index(value: &str) -> CoreResult<usize> {
     if value.is_empty() || (value.len() > 1 && value.starts_with('0')) {
         return Err(invalid_durable_patch());
     }
@@ -5302,7 +6363,7 @@ fn hex_encode(bytes: &[u8]) -> String {
     output
 }
 
-fn hex_decode(value: &str) -> Result<Vec<u8>> {
+fn hex_decode(value: &str) -> CoreResult<Vec<u8>> {
     if !value.len().is_multiple_of(2) {
         return Err(invalid_durable_patch());
     }
@@ -5327,7 +6388,7 @@ fn hex_nibble(byte: u8) -> Option<u8> {
     }
 }
 
-fn parse_target_index(target: &str, prefix: &str, suffix: &str) -> Result<usize> {
+fn parse_target_index(target: &str, prefix: &str, suffix: &str) -> CoreResult<usize> {
     let value = target
         .strip_prefix(prefix)
         .and_then(|value| value.strip_suffix(suffix))
@@ -5335,7 +6396,7 @@ fn parse_target_index(target: &str, prefix: &str, suffix: &str) -> Result<usize>
     parse_canonical_index(value)
 }
 
-fn object_string(value: &Value, key: &str, expected_fields: usize) -> Result<String> {
+fn object_string(value: &Value, key: &str, expected_fields: usize) -> CoreResult<String> {
     let object = value.as_object().ok_or_else(invalid_durable_patch)?;
     if object.len() != expected_fields {
         return Err(invalid_durable_patch());
@@ -5354,27 +6415,19 @@ fn is_canonical_digest(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
-fn durable_wire_error(source: litchi_core::PatchError) -> Error {
+fn durable_wire_error(source: litchi_core::PatchError) -> CoreError {
     let message = format!("invalid ODT durable patch: {source}");
     drop(source);
-    Error::InvalidFormat(message)
+    CoreError::InvalidFormat(message)
 }
 
-fn invalid_durable_patch() -> Error {
-    Error::InvalidFormat("invalid ODT durable patch vocabulary".to_string())
+fn invalid_durable_patch() -> CoreError {
+    CoreError::InvalidFormat("invalid ODT durable patch vocabulary".to_string())
 }
 
-fn durable_source_mismatch() -> Error {
-    Error::InvalidFormat("ODT durable patch source does not match".to_string())
-}
-
-fn stale_history_error() -> Error {
-    Error::InvalidFormat("ODT history edit is stale relative to the current head".to_string())
-}
-
-fn bounded_semantic_text(value: String, field: &str) -> Result<String> {
+fn bounded_semantic_text(value: String, field: &str) -> CoreResult<String> {
     if value.len() > MAX_SEMANTIC_TEXT_BYTES || value.chars().any(|character| character == '\0') {
-        return Err(Error::InvalidFormat(format!(
+        return Err(CoreError::InvalidFormat(format!(
             "ODT {field} exceeds semantic patch bounds"
         )));
     }
@@ -5432,6 +6485,10 @@ fn operation_effects(operations: &[Operation]) -> (Vec<String>, Vec<String>) {
         }
         match operation {
             Operation::Noop => {},
+            // A structural document verb may rewrite any part.
+            Operation::Document { scope, .. } => writes.push(scope.to_string()),
+            Operation::Body { .. } => writes.push("/body".to_string()),
+            Operation::Annotation(_) => writes.push("/body/annotations".to_string()),
             Operation::InsertParagraph { index, .. } | Operation::RemoveParagraph { index } => {
                 writes.push("/body/paragraphs/order".to_string());
                 writes.push(format!("/body/paragraphs/{index}/content"));
@@ -5655,7 +6712,7 @@ fn append_paragraph_index_point_effects(reads: &mut Vec<String>, index: usize) {
     }
 }
 
-fn envelope_kind(snapshot: &Snapshot) -> Result<EnvelopeKind> {
+fn envelope_kind(snapshot: &Package) -> CoreResult<EnvelopeKind> {
     let package = envelope_package(snapshot)?;
     let archive = package.package()?;
     if archive
@@ -5674,17 +6731,17 @@ fn envelope_kind(snapshot: &Snapshot) -> Result<EnvelopeKind> {
     Ok(EnvelopeKind::Plain)
 }
 
-fn envelope_package(snapshot: &Snapshot) -> Result<crate::core::OwnedPackage> {
+fn envelope_package(snapshot: &Package) -> CoreResult<crate::core::OwnedPackage> {
     ensure_package_size(snapshot.as_bytes().len(), "ODT transaction package")?;
     Ok(snapshot.package.clone())
 }
 
-fn copy_bytes(source: &[u8]) -> Result<Vec<u8>> {
+fn copy_bytes(source: &[u8]) -> CoreResult<Vec<u8>> {
     ensure_package_size(source.len(), "ODT transaction package")?;
     let mut bytes = Vec::new();
     bytes
         .try_reserve_exact(source.len())
-        .map_err(|allocation_error| Error::Allocation {
+        .map_err(|allocation_error| CoreError::Allocation {
             resource: "ODT transaction package",
             source: allocation_error,
         })?;
@@ -5692,28 +6749,28 @@ fn copy_bytes(source: &[u8]) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
-fn ensure_package_size(size: usize, scope: &str) -> Result<()> {
+fn ensure_package_size(size: usize, scope: &str) -> CoreResult<()> {
     if size > MAX_PACKAGE_BYTES {
-        return Err(Error::InvalidFormat(format!(
+        return Err(CoreError::InvalidFormat(format!(
             "{scope} exceeds the {MAX_PACKAGE_BYTES}-byte package limit"
         )));
     }
     Ok(())
 }
 
-fn resolve_paragraph(document: &Document, selector: &ParagraphSelector) -> Result<usize> {
+fn resolve_paragraph(document: &Document, selector: &ParagraphSelector) -> CoreResult<usize> {
     let paragraphs = document.paragraphs()?;
     match selector {
         ParagraphSelector::Position(position) if position.get() < paragraphs.len() => {
             Ok(position.get())
         },
-        ParagraphSelector::Position(position) => Err(Error::InvalidFormat(format!(
+        ParagraphSelector::Position(position) => Err(CoreError::InvalidFormat(format!(
             "paragraph selector position {} is out of bounds (found {})",
             position.get(),
             paragraphs.len()
         ))),
         ParagraphSelector::Index(index) if *index < paragraphs.len() => Ok(*index),
-        ParagraphSelector::Index(index) => Err(Error::InvalidFormat(format!(
+        ParagraphSelector::Index(index) => Err(CoreError::InvalidFormat(format!(
             "paragraph selector index {index} is out of bounds (found {})",
             paragraphs.len()
         ))),
@@ -5722,14 +6779,14 @@ fn resolve_paragraph(document: &Document, selector: &ParagraphSelector) -> Resul
             for (index, paragraph) in paragraphs.into_iter().enumerate() {
                 if paragraph.text()? == *text {
                     if selected.replace(index).is_some() {
-                        return Err(Error::InvalidFormat(
+                        return Err(CoreError::InvalidFormat(
                             "paragraph text selector is ambiguous".to_string(),
                         ));
                     }
                 }
             }
             selected.ok_or_else(|| {
-                Error::InvalidFormat("paragraph text selector did not match".to_string())
+                CoreError::InvalidFormat("paragraph text selector did not match".to_string())
             })
         },
     }
@@ -5738,7 +6795,7 @@ fn resolve_paragraph(document: &Document, selector: &ParagraphSelector) -> Resul
 fn audit_changed_xml_is_compact(
     source: &crate::core::OwnedPackage,
     candidate: &crate::core::OwnedPackage,
-) -> Result<()> {
+) -> CoreResult<()> {
     let source_archive = source.package()?;
     let archive = candidate.package()?;
     for path in archive.files()? {
@@ -5754,7 +6811,9 @@ fn audit_changed_xml_is_compact(
             }
             if path == crate::constants::ODF_CONTENT {
                 let candidate_content = std::str::from_utf8(&xml).map_err(|error| {
-                    Error::InvalidFormat(format!("changed content.xml is not valid UTF-8: {error}"))
+                    CoreError::InvalidFormat(format!(
+                        "changed content.xml is not valid UTF-8: {error}"
+                    ))
                 })?;
                 if litchi_odf_common::package::content_splice_publication(
                     &source,
@@ -5766,11 +6825,13 @@ fn audit_changed_xml_is_compact(
                 }
             }
             let limits = litchi_odf_common::compact_xml::Limits::new(MAX_PACKAGE_BYTES, 4_096)
-                .map_err(Error::from)?;
+                .map_err(CoreError::from)?;
             let validation_xml = numeric_reference_projection(&xml)?;
-            litchi_odf_common::compact_xml::validate_with_limits(&validation_xml, limits).map_err(
+            litchi_odf_common::compact_xml::validate(&validation_xml, limits).map_err(
                 |source| {
-                    Error::InvalidFormat(format!("XML publication rejected for '{path}': {source}"))
+                    CoreError::InvalidFormat(format!(
+                        "XML publication rejected for '{path}': {source}"
+                    ))
                 },
             )?;
         }
@@ -5778,11 +6839,11 @@ fn audit_changed_xml_is_compact(
     Ok(())
 }
 
-fn numeric_reference_projection(xml: &[u8]) -> Result<Vec<u8>> {
+fn numeric_reference_projection(xml: &[u8]) -> CoreResult<Vec<u8>> {
     let mut output = Vec::new();
     output
         .try_reserve_exact(xml.len())
-        .map_err(|source| Error::Allocation {
+        .map_err(|source| CoreError::Allocation {
             resource: "ODT compact XML numeric-reference audit",
             source,
         })?;
@@ -5793,7 +6854,7 @@ fn numeric_reference_projection(xml: &[u8]) -> Result<Vec<u8>> {
                 .iter()
                 .position(|byte| *byte == b';')
                 .ok_or_else(|| {
-                    Error::InvalidFormat(
+                    CoreError::InvalidFormat(
                         "ODT authored XML contains an unterminated numeric reference".to_string(),
                     )
                 })?;
@@ -5843,19 +6904,22 @@ fn is_xml_scalar(value: u32) -> bool {
     )
 }
 
-fn invalid_numeric_reference() -> Error {
-    Error::InvalidFormat("ODT authored XML contains an invalid numeric reference".to_string())
+fn invalid_numeric_reference() -> CoreError {
+    CoreError::InvalidFormat("ODT authored XML contains an invalid numeric reference".to_string())
 }
 
-fn ensure_editable_envelope(snapshot: &Snapshot) -> Result<()> {
+fn ensure_editable_envelope(snapshot: &Package) -> CoreResult<()> {
     match envelope_kind(snapshot)? {
-        EnvelopeKind::Encrypted => Err(Error::Unsupported(
-            "packaged ODT transactions preserve encrypted snapshots only as exact no-ops"
-                .to_string(),
-        )),
-        EnvelopeKind::Signed => Err(Error::Unsupported(
-            "packaged ODT transactions preserve signed snapshots only as exact no-ops".to_string(),
-        )),
+        EnvelopeKind::Encrypted => Err(CoreError::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "odt.transaction",
+            "packaged ODT transactions preserve encrypted snapshots only as exact no-ops",
+        ))),
+        EnvelopeKind::Signed => Err(CoreError::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::Protected,
+            "odt.transaction",
+            "packaged ODT transactions preserve signed snapshots only as exact no-ops",
+        ))),
         EnvelopeKind::Plain => Ok(()),
     }
 }
@@ -5865,13 +6929,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn snapshot_from_document_shares_exact_package_allocation() -> Result<()> {
+    fn snapshot_from_document_shares_exact_package_allocation() -> CoreResult<()> {
         let mut mutable = MutableDocument::new();
         mutable.add_paragraph("shared snapshot")?;
         let document = Document::from_bytes(mutable.to_bytes()?)?;
         let package_bytes = document.transaction_package().shared_bytes();
 
-        let snapshot = Snapshot::from_document(&document)?;
+        let snapshot = Package::from_document(&document)?;
 
         assert!(Arc::ptr_eq(&snapshot.bytes, &package_bytes));
         assert_eq!(
@@ -5883,17 +6947,17 @@ mod tests {
     }
 
     #[test]
-    fn changed_final_document_handoff_shares_bytes_and_reopens_independently() -> Result<()> {
+    fn changed_final_document_handoff_shares_bytes_and_reopens_independently() -> CoreResult<()> {
         let mut source_document = MutableDocument::new();
         source_document.add_paragraph("before")?;
-        let source = Snapshot::from_bytes(source_document.to_bytes()?)?;
+        let source = Package::from_vec(source_document.to_bytes()?)?;
 
         let mut changed_document = MutableDocument::new();
         changed_document.add_paragraph("after")?;
         let changed_document = Document::from_bytes(changed_document.to_bytes()?)?;
         let changed_bytes = changed_document.transaction_package().shared_bytes();
         let copied_and_reparsed =
-            Snapshot::from_bytes(copy_bytes(changed_document.original_bytes())?)?;
+            Package::from_vec(copy_bytes(changed_document.original_bytes())?)?;
 
         let snapshot = snapshot_from_final_document(&source, &changed_document)?;
 
@@ -5909,13 +6973,13 @@ mod tests {
     }
 
     #[test]
-    fn direct_snapshot_and_reopened_document_share_exact_package_allocation() -> Result<()> {
+    fn direct_snapshot_and_reopened_document_share_exact_package_allocation() -> CoreResult<()> {
         let mut mutable = MutableDocument::new();
         mutable.add_paragraph("shared direct snapshot")?;
         let bytes = mutable.to_bytes()?;
         let source_pointer = bytes.as_ptr();
 
-        let snapshot = Snapshot::from_bytes(bytes)?;
+        let snapshot = Package::from_vec(bytes)?;
         let document = snapshot.document()?;
         let document_bytes = document.transaction_package().shared_bytes();
 
@@ -5930,10 +6994,10 @@ mod tests {
     }
 
     #[test]
-    fn repeated_snapshot_reopens_reuse_the_validated_package_index() -> Result<()> {
+    fn repeated_snapshot_reopens_reuse_the_validated_package_index() -> CoreResult<()> {
         let mut mutable = MutableDocument::new();
         mutable.add_paragraph("reused package index")?;
-        let snapshot = Snapshot::from_bytes(mutable.to_bytes()?)?;
+        let snapshot = Package::from_vec(mutable.to_bytes()?)?;
 
         let first = snapshot.document()?;
         let second = snapshot.document()?;
@@ -5954,10 +7018,10 @@ mod tests {
     }
 
     #[test]
-    fn envelope_classification_shares_the_snapshot_package_allocation() -> Result<()> {
+    fn envelope_classification_shares_the_snapshot_package_allocation() -> CoreResult<()> {
         let mut mutable = MutableDocument::new();
         mutable.add_paragraph("shared envelope classification")?;
-        let snapshot = Snapshot::from_bytes(mutable.to_bytes()?)?;
+        let snapshot = Package::from_vec(mutable.to_bytes()?)?;
 
         let package = envelope_package(&snapshot)?;
 
@@ -5971,22 +7035,22 @@ mod tests {
     }
 
     #[test]
-    fn exact_noop_commit_shares_bytes_and_package_index() -> Result<()> {
+    fn exact_noop_commit_shares_bytes_and_package_index() -> CoreResult<()> {
         let mut mutable = MutableDocument::new();
         mutable.add_paragraph("exact no-op")?;
-        let snapshot = Snapshot::from_bytes(mutable.to_bytes()?)?;
+        let snapshot = Package::from_vec(mutable.to_bytes()?)?;
         let commit = snapshot.edit().commit()?;
 
-        assert!(Arc::ptr_eq(&snapshot.bytes, &commit.snapshot().bytes));
+        assert!(Arc::ptr_eq(&snapshot.bytes, &commit.package().bytes));
         assert_eq!(
             snapshot.prepared_index_identity(),
-            commit.snapshot().prepared_index_identity()
+            commit.package().prepared_index_identity()
         );
         Ok(())
     }
 
     #[test]
-    fn compact_audit_shares_the_validated_predecessor_package() -> Result<()> {
+    fn compact_audit_shares_the_validated_predecessor_package() -> CoreResult<()> {
         let mut mutable = MutableDocument::new();
         mutable.add_paragraph("before compact audit")?;
         let source = Document::from_bytes(mutable.to_bytes()?)?;

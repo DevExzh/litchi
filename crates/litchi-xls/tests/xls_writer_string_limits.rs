@@ -16,22 +16,22 @@ use std::io::Cursor;
 
 use litchi_core::sheet::{Cell as _, CellValue, WorkbookTrait as _};
 use litchi_xls::writer::{
-    CellStyle, DataValidation, DataValidationOperator, DataValidationRange, DataValidationType,
-    PageSetupOptions, Writer,
+    Builder, CellStyle, DataValidation, DataValidationOperator, DataValidationRange,
+    DataValidationType, PageSetupOptions,
 };
 use litchi_xls::writer::{DefinedNameFutureRecords, DefinedNameRecordOptions, NamePublish};
 use litchi_xls::{DefinedNameKind, Error, NameScope};
 
-type Workbook = litchi_xls::Workbook<Cursor<Vec<u8>>>;
+type Reader = litchi_xls::raw::Reader<Cursor<Vec<u8>>>;
 
-fn written(writer: &mut Writer) -> Vec<u8> {
+fn written(writer: &mut Builder) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 
-fn read(bytes: Vec<u8>) -> Workbook {
-    Workbook::new(Cursor::new(bytes)).unwrap()
+fn read(bytes: Vec<u8>) -> Reader {
+    Reader::new(Cursor::new(bytes)).unwrap()
 }
 
 /// The field, length and limit of a [`Error::StringTooLong`] refusal.
@@ -58,7 +58,7 @@ fn strings_of(units: usize) -> Vec<String> {
     ]
 }
 
-fn cell_text(workbook: &Workbook, sheet: usize, row: u32, column: u32) -> CellValue {
+fn cell_text(workbook: &Reader, sheet: usize, row: u32, column: u32) -> CellValue {
     workbook
         .xls_worksheet(sheet)
         .unwrap()
@@ -72,7 +72,7 @@ fn cell_text(workbook: &Workbook, sheet: usize, row: u32, column: u32) -> CellVa
 fn shared_strings_up_to_65535_units_are_written_whole_and_one_more_is_refused() {
     for units in [65_534, 65_535] {
         for value in strings_of(units) {
-            let mut writer = Writer::new();
+            let mut writer = Builder::new();
             let sheet = writer.add_worksheet("Text").unwrap();
             writer.write_string(sheet, 0, 0, &value).unwrap();
             writer.write_string(sheet, 1, 0, "after").unwrap();
@@ -85,7 +85,7 @@ fn shared_strings_up_to_65535_units_are_written_whole_and_one_more_is_refused() 
         }
     }
     for value in strings_of(65_536) {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         let sheet = writer.add_worksheet("Text").unwrap();
         writer.write_string(sheet, 0, 0, "kept").unwrap();
         assert_eq!(
@@ -113,7 +113,7 @@ fn shared_strings_up_to_65535_units_are_written_whole_and_one_more_is_refused() 
 #[test]
 fn a_string_whose_surrogate_pair_straddles_the_limit_is_refused_not_split() {
     let straddling = format!("{}😀", "a".repeat(65_534));
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Pair").unwrap();
     assert_eq!(
         too_long(writer.write_string(sheet, 0, 0, &straddling)),
@@ -130,14 +130,14 @@ fn a_string_whose_surrogate_pair_straddles_the_limit_is_refused_not_split() {
 fn worksheet_names_up_to_31_units_are_written_whole_and_one_more_is_refused() {
     for units in [30, 31] {
         for name in strings_of(units) {
-            let mut writer = Writer::new();
+            let mut writer = Builder::new();
             writer.add_worksheet(&name).unwrap();
             let workbook = read(written(&mut writer));
             assert_eq!(workbook.worksheet_names(), [name]);
         }
     }
     for name in strings_of(32) {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         writer.add_worksheet("First").unwrap();
         assert_eq!(
             too_long(writer.add_worksheet(&name)),
@@ -147,7 +147,7 @@ fn worksheet_names_up_to_31_units_are_written_whole_and_one_more_is_refused() {
     }
     // 31 UTF-16 code units in more than 31 UTF-8 bytes used to be refused by
     // byte length; BIFF8 counts code units.
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(&"é".repeat(31)).unwrap();
     assert!(matches!(
         writer.add_worksheet(""),
@@ -159,7 +159,7 @@ fn worksheet_names_up_to_31_units_are_written_whole_and_one_more_is_refused() {
 fn defined_names_up_to_255_units_are_written_whole_and_one_more_is_refused() {
     for units in [254, 255] {
         for name in strings_of(units) {
-            let mut writer = Writer::new();
+            let mut writer = Builder::new();
             writer.add_worksheet("Data").unwrap();
             writer.define_name(&name, "A1:B2").unwrap();
             let workbook = read(written(&mut writer));
@@ -172,7 +172,7 @@ fn defined_names_up_to_255_units_are_written_whole_and_one_more_is_refused() {
         }
     }
     for name in strings_of(256) {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         writer.add_worksheet("Data").unwrap();
         assert_eq!(
             too_long(writer.define_name(&name, "A1")),
@@ -195,7 +195,7 @@ fn defined_names_up_to_255_units_are_written_whole_and_one_more_is_refused() {
 /// count; both desynchronised the record.
 #[test]
 fn non_ascii_defined_names_round_trip() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_worksheet("Data").unwrap();
     let names = [
         "Café_Total",
@@ -220,7 +220,7 @@ fn non_ascii_defined_names_round_trip() {
 fn defined_name_comments_up_to_255_units_are_written_and_one_more_is_refused() {
     for units in [254, 255] {
         for comment in strings_of(units) {
-            let mut writer = Writer::new();
+            let mut writer = Builder::new();
             writer.add_worksheet("Data").unwrap();
             writer
                 .define_name_with_comment("Noted", "A1", &comment)
@@ -233,7 +233,7 @@ fn defined_name_comments_up_to_255_units_are_written_and_one_more_is_refused() {
         }
     }
     for comment in strings_of(256) {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         writer.add_worksheet("Data").unwrap();
         // Refused when the name is defined, not when the workbook is written.
         assert_eq!(
@@ -246,7 +246,7 @@ fn defined_name_comments_up_to_255_units_are_written_and_one_more_is_refused() {
 }
 
 /// Decodes the `PtgStr` a one-token formula consists of.
-fn formula_string(workbook: &Workbook) -> String {
+fn formula_string(workbook: &Reader) -> String {
     let tokens = workbook
         .xls_worksheet(0)
         .unwrap()
@@ -274,7 +274,7 @@ fn formula_string(workbook: &Workbook) -> String {
 fn formula_string_literals_up_to_255_units_are_written_whole_and_one_more_is_refused() {
     for units in [254, 255] {
         for literal in strings_of(units) {
-            let mut writer = Writer::new();
+            let mut writer = Builder::new();
             let sheet = writer.add_worksheet("Formulas").unwrap();
             writer
                 .write_formula(sheet, 0, 0, &format!("\"{literal}\""))
@@ -284,7 +284,7 @@ fn formula_string_literals_up_to_255_units_are_written_whole_and_one_more_is_ref
         }
     }
     for literal in strings_of(256) {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         let sheet = writer.add_worksheet("Formulas").unwrap();
         // Since change 0766 formula text is tokenized when it is set, so the
         // refusal comes from `write_formula` and leaves the cell unset.
@@ -301,7 +301,7 @@ fn formula_string_literals_up_to_255_units_are_written_whole_and_one_more_is_ref
 fn number_formats_up_to_255_units_are_written_whole_and_one_more_is_refused() {
     for units in [254, 255] {
         for pattern in strings_of(units) {
-            let mut writer = Writer::new();
+            let mut writer = Builder::new();
             writer.add_worksheet("Formats").unwrap();
             let id = writer.register_number_format(&pattern).unwrap();
             let workbook = read(written(&mut writer));
@@ -315,7 +315,7 @@ fn number_formats_up_to_255_units_are_written_whole_and_one_more_is_refused() {
         }
     }
     for pattern in strings_of(256) {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         writer.add_worksheet("Formats").unwrap();
         // Refused when registered, not when the workbook is written.
         assert_eq!(
@@ -324,7 +324,7 @@ fn number_formats_up_to_255_units_are_written_whole_and_one_more_is_refused() {
         );
         written(&mut writer);
     }
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_worksheet("Formats").unwrap();
     assert!(matches!(
         writer.register_number_format(""),
@@ -334,8 +334,8 @@ fn number_formats_up_to_255_units_are_written_whole_and_one_more_is_refused() {
 }
 
 /// A workbook with some of everything the refused calls below would add to.
-fn registration_workbook() -> Writer {
-    let mut writer = Writer::new();
+fn registration_workbook() -> Builder {
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Data").unwrap();
     writer.write_string(sheet, 0, 0, "label").unwrap();
     writer.write_string(sheet, 0, 1, "other ✓").unwrap();
@@ -414,7 +414,7 @@ fn comment_authors_and_texts_keep_their_limits() {
         ("a".repeat(53), "b".repeat(65_534)),
         ("é".repeat(54), format!("{}😀", "c".repeat(65_533))),
     ] {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         let sheet = writer.add_worksheet("Notes").unwrap();
         writer.add_comment(sheet, 0, 0, &author, &text).unwrap();
         let workbook = read(written(&mut writer));
@@ -422,7 +422,7 @@ fn comment_authors_and_texts_keep_their_limits() {
         assert_eq!(comments[0].author(), author);
         assert_eq!(comments[0].text(), text);
     }
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Notes").unwrap();
     assert!(matches!(
         writer.add_comment(sheet, 0, 0, &"a".repeat(55), "text"),
@@ -440,7 +440,7 @@ fn comment_authors_and_texts_keep_their_limits() {
 fn headers_and_footers_keep_their_limits() {
     for units in [254, 255] {
         for text in strings_of(units) {
-            let mut writer = Writer::new();
+            let mut writer = Builder::new();
             let sheet = writer.add_worksheet("Print").unwrap();
             writer
                 .set_page_setup(
@@ -462,7 +462,7 @@ fn headers_and_footers_keep_their_limits() {
         }
     }
     for text in strings_of(256) {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         let sheet = writer.add_worksheet("Print").unwrap();
         for options in [
             PageSetupOptions {
@@ -490,7 +490,7 @@ fn headers_and_footers_keep_their_limits() {
 /// dropped the whole worksheet.
 #[test]
 fn latin1_data_validation_strings_round_trip() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Data").unwrap();
     let mut validation = DataValidation::new(
         DataValidationRange::new(0, 3, 0, 1).unwrap(),
@@ -550,7 +550,7 @@ fn record_options(name: &str) -> DefinedNameRecordOptions {
 fn defined_name_records_up_to_255_units_are_written_whole_and_one_more_is_refused() {
     for units in [254, 255] {
         for name in strings_of(units) {
-            let mut writer = Writer::new();
+            let mut writer = Builder::new();
             writer.add_worksheet("Data").unwrap();
             writer
                 .add_defined_name_record_with_future_records(
@@ -580,7 +580,7 @@ fn defined_name_records_up_to_255_units_are_written_whole_and_one_more_is_refuse
         }
     }
     for name in strings_of(256) {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         writer.add_worksheet("Data").unwrap();
         assert!(matches!(
             writer.add_defined_name_record(record_options(&name)),

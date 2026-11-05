@@ -77,7 +77,13 @@ fn parse_record_header(block: &[u8], offset: usize) -> (u16, u16, u16, u32) {
 fn picture_block_layout_matches_ms_doc() {
     let picture = Picture::new(png_bytes()).unwrap();
     let mut block = Vec::new();
-    write_picture_block(&picture, FIRST_PICTURE_SHAPE_ID, &mut block).unwrap();
+    write_picture_block(
+        &picture,
+        FIRST_PICTURE_SHAPE_ID,
+        &mut block,
+        litchi_odraw::image::Limits::default(),
+    )
+    .unwrap();
 
     // PICF header.
     let lcb = i32::from_le_bytes(block[0..4].try_into().unwrap()) as usize;
@@ -119,7 +125,7 @@ fn picture_block_layout_matches_ms_doc() {
 
     // Embedded BLIP record.
     let blip = &bse[BSE_HEADER_LEN..BSE_HEADER_LEN + blip_size];
-    let parsed = litchi_odraw::image::Blip::parse(blip).unwrap();
+    let parsed = litchi_odraw::image::Blip::parse(blip, Default::default()).unwrap();
     assert_eq!(parsed.kind(), BlipKind::Png);
     assert_eq!(parsed.record().instance(), 0x6e0);
     // The BLIP UID matches the BSE rgbUid, and the payload is byte-identical.
@@ -159,12 +165,18 @@ fn picture_block_bse_parses_with_crate_reader() {
 
     let picture = Picture::new(jpeg_bytes()).unwrap();
     let mut block = Vec::new();
-    write_picture_block(&picture, FIRST_PICTURE_SHAPE_ID, &mut block).unwrap();
+    write_picture_block(
+        &picture,
+        FIRST_PICTURE_SHAPE_ID,
+        &mut block,
+        litchi_odraw::image::Limits::default(),
+    )
+    .unwrap();
 
     let (_ver, _inst, _record_type, sp_len) = parse_record_header(&block, PICF_HEADER_LEN);
     let bse_offset = PICF_HEADER_LEN + RECORD_HEADER_LEN + sp_len as usize;
-    let (record, _) = Record::parse(&block, bse_offset).unwrap();
-    let bse = Entry::parse(record).unwrap();
+    let (record, _) = Record::parse(&block, bse_offset, litchi_odraw::Limits::default()).unwrap();
+    let bse = Entry::parse(record, Default::default()).unwrap();
     assert_eq!(bse.kind().unwrap(), BlipKind::Jpeg);
     assert!(matches!(
         bse.storage().unwrap(),
@@ -308,7 +320,7 @@ fn dgg_info_layout_matches_ms_odraw() {
     let positions = sample_positions();
     let shapes = floating_shapes(&png, &jpeg, &positions);
 
-    let dgg = build_dgg_info(&shapes, &[], 3).unwrap();
+    let dgg = build_dgg_info(&shapes, &[], 3, litchi_odraw::image::Limits::default()).unwrap();
     let records = collect_records(&dgg, 0, dgg.len());
 
     // Top level: DggContainer, then dgglbl + DgContainer.
@@ -425,7 +437,7 @@ fn dgg_info_bse_blips_parse_with_crate_reader() {
     let positions = sample_positions();
     let shapes = floating_shapes(&png, &jpeg, &positions);
 
-    let dgg = build_dgg_info(&shapes, &[], 2).unwrap();
+    let dgg = build_dgg_info(&shapes, &[], 2, litchi_odraw::image::Limits::default()).unwrap();
     let records = collect_records(&dgg, 0, dgg.len());
     let bses: Vec<_> = records
         .iter()
@@ -435,8 +447,9 @@ fn dgg_info_bse_blips_parse_with_crate_reader() {
 
     let expected = [(BlipKind::Png, png.data()), (BlipKind::Jpeg, jpeg.data())];
     for (bse_record, (kind, payload)) in bses.iter().zip(expected.iter()) {
-        let (record, _) = Record::parse(&dgg, bse_record.0).unwrap();
-        let bse = Entry::parse(record).unwrap();
+        let (record, _) =
+            Record::parse(&dgg, bse_record.0, litchi_odraw::Limits::default()).unwrap();
+        let bse = Entry::parse(record, Default::default()).unwrap();
         assert_eq!(bse.kind().unwrap(), *kind);
         let blip = bse.resolve(Context::new()).unwrap().unwrap();
         assert_eq!(blip.data(), *payload);
@@ -477,7 +490,13 @@ fn dgg_info_with_header_drawing_uses_own_cluster() {
         text: Some("hdr"),
     }];
 
-    let dgg = build_dgg_info(&main_shapes, &header_shapes, 2).unwrap();
+    let dgg = build_dgg_info(
+        &main_shapes,
+        &header_shapes,
+        2,
+        litchi_odraw::image::Limits::default(),
+    )
+    .unwrap();
     let records = collect_records(&dgg, 0, dgg.len());
 
     // Two drawings: main (dgglbl 0, Dg instance 1) and header (dgglbl 1,

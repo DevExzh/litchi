@@ -1,17 +1,24 @@
 //! FIB/table-stream package integration for command-bar records.
 
+#![allow(
+    dead_code,
+    reason = "the byte-level editor keeps its record-level API for its unit tests; the package family drives a subset"
+)]
+
 use super::codec;
 use super::model::CommandBars;
 use super::transaction::{
-    Commit as TransactionCommit, Error as TransactionError, Snapshot as TransactionSnapshot,
-    Transaction,
+    Edit as RecordEdit, Error as TransactionError, Patch as RecordPatch,
+    Snapshot as TransactionSnapshot,
 };
 use super::validation;
-use crate::package::{Error as PackageError, Result};
+use crate::package::{Error as PackageError, Result, SourceLimits};
 use crate::parts::fib::FileInformationBlock;
 use crate::parts::protection::{EditProtection, PackagePatch, ProtectionPolicy, classify};
 use crate::writer::fib::FibBuilder;
-use litchi_ole_common::object::{Editor as ObjectEditor, Limits, Targets};
+use litchi_ole_common::object::{
+    Edit as ObjectEditor, Limits, OpenOptions, Package as ObjectPackage, Targets,
+};
 
 /// `FibRgFcLcb97` index of fcCmds/lcbCmds (MS-DOC 2.5).
 pub const FIB_INDEX_CMDS: usize = 24;
@@ -20,6 +27,7 @@ pub const FIB_INDEX_CMDS: usize = 24;
 pub fn parse<'a>(
     fib: &FileInformationBlock,
     table_stream: &'a [u8],
+    limits: &SourceLimits,
 ) -> Result<Option<CommandBars<'a>>> {
     let Some((offset, length)) = fib.get_table_pointer(FIB_INDEX_CMDS) else {
         return Ok(None);
@@ -36,7 +44,7 @@ pub fn parse<'a>(
     let data = table_stream
         .get(start..end)
         .ok_or_else(|| corrupted("Tcg extends beyond the table stream"))?;
-    codec::parse_bytes(data).map(Some)
+    codec::parse_bytes(data, limits).map(Some)
 }
 
 /// Append a command-bar table and update its FIB pointer atomically with the
@@ -45,8 +53,9 @@ pub fn write(
     fib: &mut FibBuilder,
     table_stream: &mut Vec<u8>,
     value: &CommandBars<'_>,
+    limits: &SourceLimits,
 ) -> Result<()> {
-    let data = codec::to_bytes(value)?;
+    let data = codec::to_bytes(value, limits)?;
     let offset = u32::try_from(table_stream.len())
         .map_err(|_| corrupted("table-stream offset exceeds u32::MAX"))?;
     let length = u32::try_from(data.len()).map_err(|_| corrupted("Tcg length exceeds u32::MAX"))?;
@@ -57,7 +66,7 @@ pub fn write(
 
 /// An immutable DOC package snapshot carrying its command-bar metadata.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Snapshot {
+pub(crate) struct Snapshot {
     bytes: Vec<u8>,
     command_bars: TransactionSnapshot,
 }
@@ -72,61 +81,62 @@ impl Snapshot {
 
     /// Returns the immutable semantic command-bar snapshot.
     #[must_use]
-    pub fn command_bars(&self) -> &TransactionSnapshot {
+    pub(crate) fn command_bars(&self) -> &TransactionSnapshot {
         &self.command_bars
     }
 
     /// Returns the rendered package bytes.
-    pub fn finish(&self) -> Result<Vec<u8>> {
+    pub(crate) fn finish(&self) -> Result<Vec<u8>> {
         Ok(self.bytes.clone())
     }
 
     /// Starts an independent semantic transaction.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
+    pub(crate) fn edit(&self) -> RecordEdit {
         self.command_bars.edit()
     }
 }
 
 /// A package commit containing semantic and reversible OLE byte patches.
 #[derive(Debug, Clone)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
-    patch: TransactionCommit,
+    patch: RecordPatch,
     package_patch: PackagePatch,
 }
 
 impl Commit {
     /// The immutable post-edit package snapshot.
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// The reversible semantic command-bar patch.
     #[must_use]
-    pub fn patch(&self) -> &TransactionCommit {
+    pub(crate) fn patch(&self) -> &RecordPatch {
         &self.patch
     }
 
     /// The reversible whole-CFB byte patch.
     #[must_use]
-    pub fn package_patch(&self) -> &PackagePatch {
+    pub(crate) fn package_patch(&self) -> &PackagePatch {
         &self.package_patch
     }
 
     /// Splits the package snapshot, semantic patch, and CFB byte patch.
     #[must_use]
-    pub fn into_parts(self) -> (Snapshot, TransactionCommit, PackagePatch) {
+    pub(crate) fn into_parts(self) -> (Snapshot, RecordPatch, PackagePatch) {
         (self.snapshot, self.patch, self.package_patch)
     }
 }
 
 /// Transactional DOC package editor for the `fcCmds/lcbCmds` range.
 #[derive(Debug, Clone)]
-pub struct Editor {
+pub(crate) struct Editor {
     package: ObjectEditor,
     table_name: String,
+    source_limits: SourceLimits,
     original: TransactionSnapshot,
     command_bars: TransactionSnapshot,
     protection: EditProtection,
@@ -136,29 +146,52 @@ pub struct Editor {
 
 impl Editor {
     /// Opens an unencrypted Word 97+ package from CFB bytes.
-    pub fn open(bytes: Vec<u8>) -> Result<Self> {
-        Self::open_with_limits(bytes, Limits::default())
+    pub(crate) fn open(bytes: Vec<u8>) -> Result<Self> {
+        Self::open_bounded(
+            bytes,
+            SourceLimits::default(),
+            Limits::default(),
+            ProtectionPolicy::default(),
+        )
     }
 
     /// Opens a package with an explicit policy for changed protected content.
-    pub fn open_with_policy(bytes: Vec<u8>, policy: ProtectionPolicy) -> Result<Self> {
-        Self::open_with_limits_and_policy(bytes, Limits::default(), policy)
+    pub(crate) fn open_with_policy(bytes: Vec<u8>, policy: ProtectionPolicy) -> Result<Self> {
+        Self::open_bounded(bytes, SourceLimits::default(), Limits::default(), policy)
     }
 
-    /// Opens a package with an explicit bounded OLE resource profile.
-    pub fn open_with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
-        Self::open_with_limits_and_policy(bytes, limits, ProtectionPolicy::default())
+    /// Opens a package under one edit profile: its revision limits bound the
+    /// compound-file parse and its protection policy governs changed
+    /// protected content.
+    pub(crate) fn open_with_options(
+        bytes: Vec<u8>,
+        source_limits: SourceLimits,
+        options: &crate::EditOptions,
+    ) -> Result<Self> {
+        Self::open_bounded(
+            bytes,
+            source_limits,
+            options.revision_limits_value(),
+            options.protection_policy_value(),
+        )
     }
 
     /// Opens a package with both bounded resources and an explicit protection policy.
-    pub fn open_with_limits_and_policy(
+    fn open_bounded(
         bytes: Vec<u8>,
+        source_limits: SourceLimits,
         limits: Limits,
         protection_policy: ProtectionPolicy,
     ) -> Result<Self> {
-        let package =
-            ObjectEditor::open(bytes, Targets::new([]).map_err(PackageError::from)?, limits)
-                .map_err(PackageError::from)?;
+        let package = ObjectPackage::open_with_options(
+            bytes,
+            OpenOptions::new()
+                .targets(Targets::new([]).map_err(PackageError::from)?)
+                .limits(limits),
+        )
+        .map_err(PackageError::from)?
+        .edit()
+        .map_err(PackageError::from)?;
         let word = package
             .stream(&["WordDocument".to_owned()])
             .ok_or_else(|| PackageError::StreamNotFound("WordDocument".into()))?;
@@ -173,10 +206,11 @@ impl Editor {
             .stream(&[table_name.to_owned()])
             .ok_or_else(|| PackageError::StreamNotFound(table_name.to_owned()))?;
         let protection = classify(&fib, table)?;
-        let command_bars = TransactionSnapshot::new(parse(&fib, table)?)?;
+        let command_bars = TransactionSnapshot::new(parse(&fib, table, &source_limits)?)?;
         Ok(Self {
             package,
             table_name: table_name.to_owned(),
+            source_limits,
             original: command_bars.clone(),
             command_bars,
             protection,
@@ -187,29 +221,29 @@ impl Editor {
 
     /// Returns the current immutable semantic command-bar snapshot.
     #[must_use]
-    pub fn command_bars(&self) -> &TransactionSnapshot {
+    pub(crate) fn command_bars(&self) -> &TransactionSnapshot {
         &self.command_bars
     }
 
     /// Whether this editor has published a changed package state.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
+    pub(crate) fn is_changed(&self) -> bool {
         self.changed
     }
 
     /// Starts an independent semantic transaction.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
+    pub(crate) fn edit(&self) -> RecordEdit {
         self.command_bars.edit()
     }
 
     /// Sets or replaces the complete command-bar range atomically.
-    pub fn set(&mut self, command_bars: CommandBars<'_>) -> Result<Commit> {
+    pub(crate) fn set(&mut self, command_bars: CommandBars<'_>) -> Result<Commit> {
         self.install(TransactionSnapshot::new(Some(command_bars))?)
     }
 
     /// Replaces existing command-bar metadata, rejecting an absent range.
-    pub fn replace(&mut self, command_bars: CommandBars<'_>) -> Result<Commit> {
+    pub(crate) fn replace(&mut self, command_bars: CommandBars<'_>) -> Result<Commit> {
         if !self.command_bars.is_present() {
             return Err(PackageError::InvalidFormat(
                 "cannot replace missing command-bar metadata".into(),
@@ -219,46 +253,46 @@ impl Editor {
     }
 
     /// Applies and publishes a semantic transaction atomically.
-    pub fn apply(&mut self, transaction: Transaction) -> Result<Commit> {
+    pub(crate) fn apply(&mut self, transaction: RecordEdit) -> Result<Commit> {
         let commit = transaction.commit().map_err(transaction_error)?;
-        if commit.before() != &self.command_bars {
+        if commit.patch().before() != &self.command_bars {
             return Err(PackageError::InvalidFormat(
                 "command-bar transaction snapshot conflict".into(),
             ));
         }
-        self.install(commit.snapshot().clone())
+        self.install(commit.package().clone())
     }
 
     /// Clears the command-bar FIB range while preserving its old table bytes.
-    pub fn clear(&mut self) -> Result<Commit> {
+    pub(crate) fn clear(&mut self) -> Result<Commit> {
         let mut transaction = self.edit();
         transaction.clear();
         self.apply(transaction)
     }
 
     /// Captures the current package as an immutable snapshot.
-    pub fn snapshot(&self) -> Result<Snapshot> {
-        let bytes = self.package.clone().finish().map_err(PackageError::from)?;
+    pub(crate) fn snapshot(&self) -> Result<Snapshot> {
+        let bytes = crate::package::object_edit_bytes(&self.package)?;
         Ok(Snapshot::new(bytes, self.command_bars.clone()))
     }
 
     /// Finishes the edit and returns rendered DOC bytes.
-    pub fn finish(self) -> Result<Vec<u8>> {
+    pub(crate) fn finish(self) -> Result<Vec<u8>> {
         if self.changed {
             self.protection_policy.authorize(self.protection)?;
         }
-        self.package.finish().map_err(PackageError::from)
+        crate::package::object_edit_bytes(&self.package)
     }
 
     /// Commits the package as an immutable snapshot with reversible patches.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
         if self.changed {
             self.protection_policy.authorize(self.protection)?;
         }
-        let patch = TransactionCommit::new(self.original, self.command_bars.clone());
+        let patch = RecordPatch::new(self.original, self.command_bars.clone());
         let object_commit = self.package.commit().map_err(PackageError::from)?;
         let bytes = object_commit.patch().after().to_vec();
-        let package_patch = PackagePatch::new(object_commit.into_patch(), self.protection);
+        let package_patch = PackagePatch::new(object_commit.into_parts().1, self.protection);
         Ok(Commit {
             snapshot: Snapshot::new(bytes, self.command_bars),
             patch,
@@ -267,14 +301,15 @@ impl Editor {
     }
 
     fn install(&mut self, snapshot: TransactionSnapshot) -> Result<Commit> {
-        let patch = TransactionCommit::new(self.command_bars.clone(), snapshot.clone());
+        let patch = RecordPatch::new(self.command_bars.clone(), snapshot.clone());
         if patch.is_noop() {
             let package_patch = self
                 .package
                 .clone()
                 .commit()
                 .map_err(PackageError::from)?
-                .into_patch();
+                .into_parts()
+                .1;
             let package_patch = PackagePatch::new(package_patch, self.protection);
             return Ok(Commit {
                 snapshot: self.snapshot()?,
@@ -295,7 +330,7 @@ impl Editor {
             .commit()
             .map_err(PackageError::from)?;
         let bytes = object_commit.patch().after().to_vec();
-        let package_patch = PackagePatch::new(object_commit.into_patch(), candidate.protection);
+        let package_patch = PackagePatch::new(object_commit.into_parts().1, candidate.protection);
         let package_snapshot = Snapshot::new(bytes, candidate.command_bars.clone());
         *self = candidate;
         Ok(Commit {
@@ -321,7 +356,7 @@ impl Editor {
         let fib = FileInformationBlock::parse(&word)?;
         let pointer = validation::pointer_location(&fib)?;
         if let Some(command_bars) = snapshot.command_bars() {
-            let payload = codec::to_bytes(command_bars)?;
+            let payload = codec::to_bytes(command_bars, &self.source_limits)?;
             let offset = u32::try_from(table.len())
                 .map_err(|_| PackageError::Corrupted("table stream exceeds u32::MAX".into()))?;
             let length = u32::try_from(payload.len()).map_err(|_| {
@@ -335,7 +370,8 @@ impl Editor {
         }
 
         let reparsed_fib = FileInformationBlock::parse(&word)?;
-        let reparsed = TransactionSnapshot::new(parse(&reparsed_fib, &table)?)?;
+        let reparsed =
+            TransactionSnapshot::new(parse(&reparsed_fib, &table, &self.source_limits)?)?;
         if &reparsed != snapshot {
             return Err(PackageError::Corrupted(
                 "command-bar snapshot failed FIB/table-stream round-trip validation".into(),

@@ -4,7 +4,11 @@ pub mod powerpoint;
 
 use crate::model::{FontData, FontError, FontProperties, GlyphMap, Request, Style};
 #[cfg(feature = "subset")]
-use crate::subset::{Allsorts, Subsetter, glyph_ids};
+use crate::subset::mapping::glyph_ids_scoped;
+#[cfg(feature = "subset")]
+use crate::subset::{Allsorts, Limits as SubsetLimits, SubsetSession};
+
+const DEFAULT_MAX_SUBSET_WORKING_BYTES: usize = 1024 * 1024 * 1024;
 
 /// Resolves one typed face request to an owned font program and metadata.
 pub trait Resolver {
@@ -30,6 +34,12 @@ pub struct PreparationLimits {
     pub max_family_name_bytes: usize,
     pub max_program_bytes: usize,
     pub max_total_program_bytes: usize,
+    /// Maximum checked working-memory budget for one subset operation.
+    ///
+    /// This is independent from the retained output-program limits. The
+    /// subsetter charges source, decoded structures, temporary indexes, and
+    /// output assembly against this budget before the operation can proceed.
+    pub max_subset_working_bytes: usize,
 }
 
 impl Default for PreparationLimits {
@@ -40,6 +50,7 @@ impl Default for PreparationLimits {
             max_family_name_bytes: 4_096,
             max_program_bytes: 64 * 1024 * 1024,
             max_total_program_bytes: 256 * 1024 * 1024,
+            max_subset_working_bytes: DEFAULT_MAX_SUBSET_WORKING_BYTES,
         }
     }
 }
@@ -60,16 +71,8 @@ pub struct Prepared {
 /// types, relationship IDs, and part names belong to the document adapters.
 /// Requests are processed in key order, making resolver calls and results
 /// deterministic regardless of `GlyphMap`'s hash iteration order.
+/// The caller supplies request and program-size bounds explicitly.
 pub fn prepare_with(
-    resolver: &impl Resolver,
-    used_glyphs: GlyphMap,
-    mode: Mode,
-) -> Result<Vec<Prepared>, FontError> {
-    prepare_with_limits(resolver, used_glyphs, mode, PreparationLimits::default())
-}
-
-/// Resolve and prepare fonts with explicit request and program-size bounds.
-pub fn prepare_with_limits(
     resolver: &impl Resolver,
     used_glyphs: GlyphMap,
     mode: Mode,
@@ -143,8 +146,22 @@ pub fn prepare_with_limits(
         let data = if subsetted {
             #[cfg(feature = "subset")]
             {
-                let ids = glyph_ids(&font, &glyphs)?;
-                subsetter.subset(&font, &ids)?
+                let remaining_total_program_bytes = limits
+                    .max_total_program_bytes
+                    .checked_sub(total_program_bytes)
+                    .ok_or(FontError::LimitExceeded {
+                        resource: "prepared font programs",
+                        limit: limits.max_total_program_bytes,
+                        actual: total_program_bytes,
+                    })?;
+                let output_limit = limits.max_program_bytes.min(remaining_total_program_bytes);
+                let subset_session = SubsetSession::new(SubsetLimits::new(
+                    limits.max_subset_working_bytes,
+                    output_limit,
+                ));
+                subset_session.charge_mapping_staging(font.data.len(), glyphs.len())?;
+                let ids = glyph_ids_scoped(&subset_session, &font, &glyphs)?;
+                subsetter.subset_scoped(&subset_session, &font, &ids)?
             }
             #[cfg(not(feature = "subset"))]
             unreachable!("subset mode is rejected before resolution")
@@ -191,10 +208,22 @@ fn enforce_limit(resource: &'static str, actual: usize, limit: usize) -> Result<
     Ok(())
 }
 
-/// Discover and prepare fonts using the host's configured system font source.
+/// Discover and prepare fonts using the host's configured system font source
+/// under the caller-selected resource policy.
 #[cfg(feature = "automatic")]
-pub fn prepare(used_glyphs: GlyphMap, mode: Mode) -> Result<Vec<Prepared>, FontError> {
-    prepare_with(&crate::discovery::Loader::new(), used_glyphs, mode)
+pub fn prepare(
+    used_glyphs: GlyphMap,
+    mode: Mode,
+    limits: PreparationLimits,
+) -> Result<Vec<Prepared>, FontError> {
+    prepare_with(&automatic_loader(limits), used_glyphs, mode, limits)
+}
+
+#[cfg(feature = "automatic")]
+fn automatic_loader(limits: PreparationLimits) -> crate::discovery::Loader {
+    crate::discovery::Loader::with_max_font_program_bytes(
+        limits.max_program_bytes.min(limits.max_total_program_bytes),
+    )
 }
 
 fn standalone(font: &mut FontData) -> Result<Vec<u8>, FontError> {
@@ -233,6 +262,7 @@ fn validate_license(name: &str, license: crate::License) -> Result<(), FontError
 mod tests {
     use super::*;
     use std::collections::HashMap;
+    use std::mem::size_of;
 
     struct StaticResolver;
 
@@ -254,13 +284,52 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "subset")]
+    struct FixtureResolver;
+
+    #[cfg(feature = "subset")]
+    impl Resolver for FixtureResolver {
+        fn resolve(&self, request: &Request) -> Result<FontData, FontError> {
+            Ok(FontData {
+                name: request.family().to_owned(),
+                data: include_bytes!("../../../../test-data/fonts/NotoSansLycian-Regular.ttf")
+                    .to_vec(),
+                index: 0,
+                properties: Some(FontProperties::new(
+                    crate::License::new(0).expect("installable license"),
+                    crate::Panose::new([0; 10]),
+                    None,
+                    crate::Family::Auto,
+                    crate::Pitch::Default,
+                    crate::Signature::new([0; 4], [0; 2]),
+                )),
+            })
+        }
+    }
+
+    #[cfg(feature = "subset")]
+    fn fixture_glyphs() -> GlyphMap {
+        let mut glyphs = GlyphMap::new();
+        glyphs.insert(
+            Request::regular("Noto Sans Lycian"),
+            ['\u{10280}'].into_iter().collect(),
+        );
+        glyphs
+    }
+
     #[test]
     fn explicit_resolver_prepares_requests_in_stable_order() {
         let mut glyphs = HashMap::new();
         glyphs.insert(Request::regular("Zulu"), crate::Glyphs::new());
         glyphs.insert(Request::regular("Alpha"), crate::Glyphs::new());
 
-        let prepared = prepare_with(&StaticResolver, glyphs, Mode::Full).expect("prepared fonts");
+        let prepared = prepare_with(
+            &StaticResolver,
+            glyphs,
+            Mode::Full,
+            PreparationLimits::default(),
+        )
+        .expect("prepared fonts");
         assert_eq!(
             prepared
                 .iter()
@@ -274,7 +343,12 @@ mod tests {
     #[test]
     fn subset_mode_requires_the_subset_capability() {
         assert!(matches!(
-            prepare_with(&StaticResolver, HashMap::new(), Mode::Subset),
+            prepare_with(
+                &StaticResolver,
+                HashMap::new(),
+                Mode::Subset,
+                PreparationLimits::default(),
+            ),
             Err(FontError::SubsettingUnavailable)
         ));
     }
@@ -288,7 +362,7 @@ mod tests {
             ..PreparationLimits::default()
         };
         assert!(matches!(
-            prepare_with_limits(&StaticResolver, glyphs, Mode::Full, limits),
+            prepare_with(&StaticResolver, glyphs, Mode::Full, limits),
             Err(FontError::LimitExceeded {
                 resource: "embedded-font requests",
                 ..
@@ -309,12 +383,11 @@ mod tests {
             ..PreparationLimits::default()
         };
         assert!(
-            prepare_with_limits(&StaticResolver, glyph_map("Alpha", "A"), Mode::Full, limits,)
-                .is_ok()
+            prepare_with(&StaticResolver, glyph_map("Alpha", "A"), Mode::Full, limits,).is_ok()
         );
         limits.max_family_name_bytes = 4;
         assert!(matches!(
-            prepare_with_limits(&StaticResolver, glyph_map("Alpha", "A"), Mode::Full, limits,),
+            prepare_with(&StaticResolver, glyph_map("Alpha", "A"), Mode::Full, limits,),
             Err(FontError::LimitExceeded {
                 resource: "font-family name",
                 limit: 4,
@@ -325,7 +398,7 @@ mod tests {
         limits = PreparationLimits::default();
         limits.max_glyphs_per_request = 2;
         assert!(
-            prepare_with_limits(
+            prepare_with(
                 &StaticResolver,
                 glyph_map("Alpha", "AB"),
                 Mode::Full,
@@ -335,7 +408,7 @@ mod tests {
         );
         limits.max_glyphs_per_request = 1;
         assert!(matches!(
-            prepare_with_limits(
+            prepare_with(
                 &StaticResolver,
                 glyph_map("Alpha", "AB"),
                 Mode::Full,
@@ -351,12 +424,11 @@ mod tests {
         limits = PreparationLimits::default();
         limits.max_program_bytes = 12;
         assert!(
-            prepare_with_limits(&StaticResolver, glyph_map("Alpha", "A"), Mode::Full, limits,)
-                .is_ok()
+            prepare_with(&StaticResolver, glyph_map("Alpha", "A"), Mode::Full, limits,).is_ok()
         );
         limits.max_program_bytes = 11;
         assert!(matches!(
-            prepare_with_limits(&StaticResolver, glyph_map("Alpha", "A"), Mode::Full, limits,),
+            prepare_with(&StaticResolver, glyph_map("Alpha", "A"), Mode::Full, limits,),
             Err(FontError::LimitExceeded {
                 resource: "resolved font program",
                 limit: 11,
@@ -369,15 +441,88 @@ mod tests {
         two.insert(Request::regular("Zulu"), crate::Glyphs::new());
         limits = PreparationLimits::default();
         limits.max_total_program_bytes = 24;
-        assert!(prepare_with_limits(&StaticResolver, two.clone(), Mode::Full, limits).is_ok());
+        assert!(prepare_with(&StaticResolver, two.clone(), Mode::Full, limits).is_ok());
         limits.max_total_program_bytes = 23;
         assert!(matches!(
-            prepare_with_limits(&StaticResolver, two, Mode::Full, limits),
+            prepare_with(&StaticResolver, two, Mode::Full, limits),
             Err(FontError::LimitExceeded {
                 resource: "prepared font programs",
                 limit: 23,
                 actual: 24,
             })
         ));
+    }
+
+    #[cfg(feature = "subset")]
+    #[test]
+    fn subset_preparation_charges_staging_before_mapping() {
+        assert_eq!(
+            PreparationLimits::default().max_subset_working_bytes,
+            DEFAULT_MAX_SUBSET_WORKING_BYTES
+        );
+
+        let source_bytes =
+            include_bytes!("../../../../test-data/fonts/NotoSansLycian-Regular.ttf").len();
+        let actual = source_bytes + (1 + 1) * size_of::<u16>();
+        let limits = PreparationLimits {
+            max_subset_working_bytes: actual - 1,
+            ..PreparationLimits::default()
+        };
+        assert!(matches!(
+            prepare_with(
+                &FixtureResolver,
+                fixture_glyphs(),
+                Mode::Subset,
+                limits,
+            ),
+            Err(FontError::LimitExceeded {
+                resource: "font subsetting working bytes",
+                limit,
+                actual: observed,
+            }) if limit + 1 == observed
+        ));
+    }
+
+    #[cfg(feature = "subset")]
+    #[test]
+    fn subset_preparation_maps_output_budget_failures() {
+        let limits = PreparationLimits {
+            max_total_program_bytes: 1,
+            ..PreparationLimits::default()
+        };
+        assert!(matches!(
+            prepare_with(&FixtureResolver, fixture_glyphs(), Mode::Subset, limits),
+            Err(FontError::LimitExceeded {
+                resource: "font subsetting output bytes",
+                limit: 1,
+                actual,
+            }) if actual > 1
+        ));
+    }
+
+    #[cfg(feature = "subset")]
+    #[test]
+    fn subset_preparation_produces_a_real_fixture_program() {
+        let prepared = prepare_with(
+            &FixtureResolver,
+            fixture_glyphs(),
+            Mode::Subset,
+            PreparationLimits::default(),
+        )
+        .expect("subset fixture");
+        assert_eq!(prepared.len(), 1);
+        assert!(prepared[0].subsetted);
+        assert!(!prepared[0].data.is_empty());
+    }
+
+    #[cfg(feature = "automatic")]
+    #[test]
+    fn automatic_loader_uses_the_narrowest_selected_program_cap() {
+        let limits = PreparationLimits {
+            max_program_bytes: 17,
+            max_total_program_bytes: 11,
+            ..PreparationLimits::default()
+        };
+        assert_eq!(automatic_loader(limits).max_font_program_bytes(), 11);
     }
 }

@@ -55,10 +55,12 @@ fn absent_presentation_surface_sizes_return_typed_absence_or_error() {
 }
 
 fn package_with_presentation_xml(xml: &[u8]) -> Package {
-    let mut package = Package::new().unwrap();
-    package.presentation_mut().unwrap().add_slide().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    builder.presentation().unwrap().add_slide().unwrap();
+    let package = builder.build().unwrap();
     let package_bytes = package.to_bytes().unwrap();
-    let mut opc = OpcPackage::from_bytes(&package_bytes).unwrap();
+    let mut opc =
+        OpcPackage::from_bytes(&package_bytes, litchi_opc::SourceLimits::default()).unwrap();
     let part_name = PackURI::new("/ppt/presentation.xml").unwrap();
     opc.get_part_mut(&part_name).unwrap().set_blob(xml.to_vec());
     Package::from_opc_package(opc).unwrap()

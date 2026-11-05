@@ -4,7 +4,7 @@ use std::{fmt, sync::Arc};
 
 use thiserror::Error as ThisError;
 
-use crate::{Error, Result};
+use crate::{Error, LimitKind, Result};
 
 use super::{MAX_ATTRIBUTE_VALUE_BYTES, MAX_GUID_BYTES, MAX_NAME_BYTES};
 
@@ -24,7 +24,7 @@ impl Guid {
     /// # Errors
     ///
     /// Returns [`ValueError::Guid`] for a value outside the schema lexical
-    /// form and [`ValueError::TooLong`] when the explicit bound is exceeded.
+    /// form and [`ValueError::Limit`] when the explicit bound is exceeded.
     pub fn new(value: impl AsRef<str>) -> std::result::Result<Self, ValueError> {
         let value = value.as_ref();
         // Bound the borrowed input before any error or normalized-value
@@ -32,9 +32,10 @@ impl Guid {
         // lexical value, so the raw bound is deliberately wider than
         // `MAX_GUID_BYTES` while remaining finite.
         if value.len() > MAX_ATTRIBUTE_VALUE_BYTES {
-            return Err(ValueError::TooLong {
-                field: "theme family GUID input",
-                limit: MAX_ATTRIBUTE_VALUE_BYTES,
+            return Err(ValueError::Limit {
+                kind: LimitKind::AttributeValueBytes,
+                observed: value.len(),
+                maximum: MAX_ATTRIBUTE_VALUE_BYTES,
             });
         }
         // `ST_Guid` derives from `xsd:token`, whose XML whitespace domain is
@@ -43,9 +44,10 @@ impl Guid {
         let normalized =
             value.trim_matches(|character| matches!(character, ' ' | '\t' | '\r' | '\n'));
         if normalized.len() > MAX_GUID_BYTES {
-            return Err(ValueError::TooLong {
-                field: "theme family GUID",
-                limit: MAX_GUID_BYTES,
+            return Err(ValueError::Limit {
+                kind: LimitKind::ScalarBytes,
+                observed: normalized.len(),
+                maximum: MAX_GUID_BYTES,
             });
         }
         if !is_guid(normalized) {
@@ -105,13 +107,27 @@ pub enum ValueError {
     #[error("invalid theme family GUID '{value}'")]
     Guid { value: String },
     /// A scalar exceeds its explicit bound.
-    #[error("theme family {field} exceeds the limit of {limit} bytes")]
-    TooLong { field: &'static str, limit: usize },
+    #[error("theme family {kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        /// Typed resource dimension.
+        kind: LimitKind,
+        /// First observed value beyond the bound.
+        observed: usize,
+        /// Maximum accepted value.
+        maximum: usize,
+    },
 }
 
 impl From<ValueError> for Error {
     fn from(error: ValueError) -> Self {
-        Self::Invalid(error.to_string())
+        match error {
+            ValueError::Limit {
+                kind,
+                observed,
+                maximum,
+            } => Self::limit(kind, observed, maximum),
+            error => Self::Invalid(error.to_string()),
+        }
     }
 }
 
@@ -275,10 +291,11 @@ impl Family {
 
 pub(crate) fn checked_name(value: &str) -> Result<Arc<str>> {
     if value.len() > MAX_NAME_BYTES {
-        return Err(Error::Limit {
-            resource: "theme family name bytes",
-            limit: MAX_NAME_BYTES,
-        });
+        return Err(Error::limit(
+            LimitKind::ThemeFamilyNameBytes,
+            value.len(),
+            MAX_NAME_BYTES,
+        ));
     }
     validate_xml_text(value, "theme family name")?;
     Ok(Arc::from(value))

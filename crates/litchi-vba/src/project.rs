@@ -4,7 +4,7 @@ use super::dir::{
     Dir, Kind, NameMap, Reference, decode_utf16, encode_dir_with_references,
     validate_vba_identifier,
 };
-use super::{Error, Limits, check_limit, codec, invalid};
+use super::{Error, LimitKind, Limits, check_limit, codec, invalid};
 use litchi_cfb::{OleError, OleFile};
 use litchi_codepage::Mbcs;
 use std::fmt::Write as FmtWrite;
@@ -379,7 +379,7 @@ impl DesignerFrame {
         limits: &Limits,
     ) -> Result<Self, Error> {
         check_limit(
-            "VBA designer stream bytes",
+            LimitKind::DesignerStreamBytes,
             raw.len(),
             limits.max_decompressed_stream_bytes,
         )?;
@@ -394,7 +394,7 @@ impl ProjectText {
     /// Parse a decoded `PROJECT` stream while retaining its exact text.
     pub fn parse(text: &str, limits: &Limits) -> Result<Self, Error> {
         check_limit(
-            "PROJECT text bytes",
+            LimitKind::ProjectTextBytes,
             text.len(),
             limits.max_decompressed_stream_bytes,
         )?;
@@ -405,7 +405,7 @@ impl ProjectText {
                 .try_reserve(1)
                 .map_err(|_| invalid("PROJECT text record allocation failed"))?;
             check_limit(
-                "PROJECT text line bytes",
+                LimitKind::ProjectTextLineBytes,
                 line.len(),
                 limits.max_string_bytes,
             )?;
@@ -776,13 +776,13 @@ impl ProjectText {
         // still returned byte-for-byte by Project::encode_project_text.
         let _ = Self::parse(&text, limits)?;
         check_limit(
-            "PROJECT text bytes",
+            LimitKind::ProjectTextBytes,
             text.len(),
             limits.max_decompressed_stream_bytes,
         )?;
         let encoded = super::dir::encode_mbcs(&text, page, "PROJECT stream")?;
         check_limit(
-            "PROJECT stream bytes",
+            LimitKind::ProjectStreamBytes,
             encoded.len(),
             limits.max_decompressed_stream_bytes,
         )?;
@@ -904,18 +904,6 @@ pub struct Project {
 }
 
 impl Project {
-    /// Parse a standalone `vbaProject.bin` payload with safe default limits.
-    ///
-    /// The CFB bytes are borrowed and never copied.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the payload is not a readable CFB file, the project
-    /// structures are malformed, or the default resource limits are exceeded.
-    pub fn read(bytes: &[u8]) -> Result<Self, Error> {
-        Self::read_with(bytes, &Limits::default())
-    }
-
     /// Parse a standalone `vbaProject.bin` payload with explicit limits.
     ///
     /// This is the container-independent entry point for OOXML hosts. The
@@ -926,13 +914,9 @@ impl Project {
     ///
     /// Returns an error if the payload is not a readable CFB file, the project
     /// structures are malformed, or `limits` are exceeded.
-    pub fn read_with(bytes: &[u8], limits: &Limits) -> Result<Self, Error> {
-        check_limit(
-            "standalone VBA CFB bytes",
-            bytes.len(),
-            limits.max_cfb_bytes,
-        )?;
-        let mut ole = OleFile::open(Cursor::new(bytes))?;
+    pub fn read(bytes: &[u8], limits: &Limits) -> Result<Self, Error> {
+        check_limit(LimitKind::CfbBytes, bytes.len(), limits.max_cfb_bytes)?;
+        let mut ole = OleFile::open(Cursor::new(bytes), crate::cfb_limits(limits)?)?;
         Self::open(&mut ole, &[], limits)
     }
 
@@ -1031,14 +1015,14 @@ impl Project {
             };
             let source_bytes = match codec::decode(compressed_source, &stream_limits) {
                 Ok(bytes) => bytes,
-                Err(Error::LimitExceeded {
-                    limit: "decompressed VBA stream bytes",
-                    actual,
+                Err(Error::Limit {
+                    kind: LimitKind::DecompressedStreamBytes,
+                    observed: actual,
                     ..
                 }) if stream_maximum < limits.max_decompressed_stream_bytes => {
-                    return Err(Error::LimitExceeded {
-                        limit: "aggregate VBA module source bytes",
-                        actual: total_source_bytes.saturating_add(actual),
+                    return Err(Error::Limit {
+                        kind: LimitKind::TotalSourceBytes,
+                        observed: total_source_bytes.saturating_add(actual),
                         maximum: limits.max_total_source_bytes,
                     });
                 },
@@ -1048,7 +1032,7 @@ impl Project {
                 .checked_add(source_bytes.len())
                 .ok_or_else(|| invalid("aggregate VBA source size overflow"))?;
             check_limit(
-                "aggregate VBA module source bytes",
+                LimitKind::TotalSourceBytes,
                 total_source_bytes,
                 limits.max_total_source_bytes,
             )?;
@@ -1136,12 +1120,12 @@ impl Project {
             // no-op path must not bypass string, reference, or module bounds.
             let _ = Dir::parse_decompressed(&self.dir_source, limits)?;
             check_limit(
-                "compressed VBA stream bytes",
+                LimitKind::CompressedStreamBytes,
                 self.dir_compressed_source.len(),
                 limits.max_compressed_stream_bytes,
             )?;
             check_limit(
-                "decompressed VBA stream bytes",
+                LimitKind::DecompressedStreamBytes,
                 self.dir_source.len(),
                 limits.max_decompressed_stream_bytes,
             )?;
@@ -1162,7 +1146,7 @@ impl Project {
     /// remains compatible with producer extensions represented as unknown
     /// text lines. Successful parses are cached; malformed parses are not.
     pub fn project_text(&self, limits: &Limits) -> Result<&ProjectText, Error> {
-        check_limit("VBA module count", self.modules.len(), limits.max_modules)?;
+        check_limit(LimitKind::Modules, self.modules.len(), limits.max_modules)?;
         if let Some(cache) = self.project_text_cache.get() {
             // A semantic cache is reusable only after it has been checked
             // against the caller's current limits. In particular, a caller
@@ -1189,14 +1173,14 @@ impl Project {
         text: &ProjectText,
         limits: &Limits,
     ) -> Result<Vec<u8>, Error> {
-        check_limit("VBA module count", self.modules.len(), limits.max_modules)?;
+        check_limit(LimitKind::Modules, self.modules.len(), limits.max_modules)?;
         if !text.edited && text.raw == self.properties.text() {
             // The exact-source fast path still validates the complete typed
             // grammar and per-record limits for this caller. Returning the
             // original bytes must not bypass a newly tighter limit.
             let _ = ProjectText::parse(self.properties.text(), limits)?;
             check_limit(
-                "PROJECT text bytes",
+                LimitKind::ProjectTextBytes,
                 self.properties.raw.len(),
                 limits.max_decompressed_stream_bytes,
             )?;
@@ -1208,7 +1192,7 @@ impl Project {
     /// Optional MBCS/UTF-16 module-name map from the `PROJECTwm` stream.
     #[must_use = "PROJECTwm parsing result should be checked"]
     pub fn project_wm(&self, limits: &Limits) -> Result<Option<&[NameMap]>, Error> {
-        check_limit("VBA module count", self.modules.len(), limits.max_modules)?;
+        check_limit(LimitKind::Modules, self.modules.len(), limits.max_modules)?;
         let Some(source) = self.project_wm_source.as_deref() else {
             return Ok(None);
         };
@@ -1238,7 +1222,7 @@ impl Project {
     /// parsed maps back unchanged returns the original stream bytes, which
     /// preserves a producer's exact source representation for a no-op edit.
     pub fn encode_project_wm(&self, maps: &[NameMap], limits: &Limits) -> Result<Vec<u8>, Error> {
-        check_limit("VBA module count", self.modules.len(), limits.max_modules)?;
+        check_limit(LimitKind::Modules, self.modules.len(), limits.max_modules)?;
         if let Some(source) = self.project_wm_source.as_deref() {
             let parsed = self
                 .project_wm(limits)?
@@ -1348,7 +1332,7 @@ impl Project {
     }
 }
 
-fn read_limited_stream<R: Read + Seek>(
+pub(crate) fn read_limited_stream<R: Read + Seek>(
     ole: &mut OleFile<R>,
     path: &[&str],
     maximum: usize,
@@ -1365,9 +1349,9 @@ fn read_limited_stream<R: Read + Seek>(
     let Ok(size) = usize::try_from(entry.size) else {
         return Err(invalid("VBA stream size does not fit usize"));
     };
-    check_limit("VBA CFB stream bytes", size, maximum)?;
+    check_limit(LimitKind::CfbStreamBytes, size, maximum)?;
     let stream = ole.open_stream(path)?;
-    check_limit("VBA CFB stream bytes", stream.len(), maximum)?;
+    check_limit(LimitKind::CfbStreamBytes, stream.len(), maximum)?;
     Ok(stream)
 }
 
@@ -1396,9 +1380,9 @@ fn parse_project_wm(
     modules: &[Module],
     limits: &Limits,
 ) -> Result<Vec<NameMap>, Error> {
-    check_limit("VBA module count", modules.len(), limits.max_modules)?;
+    check_limit(LimitKind::Modules, modules.len(), limits.max_modules)?;
     check_limit(
-        "decompressed VBA stream bytes",
+        LimitKind::DecompressedStreamBytes,
         bytes.len(),
         limits.max_decompressed_stream_bytes,
     )?;
@@ -1427,7 +1411,7 @@ fn parse_project_wm(
         while cursor < bytes.len() && bytes[cursor] != 0 {
             cursor += 1;
             check_limit(
-                "PROJECTwm module-name bytes",
+                LimitKind::ModuleNameBytes,
                 cursor.saturating_sub(mbcs_start),
                 limits.max_string_bytes,
             )?;
@@ -1458,7 +1442,7 @@ fn parse_project_wm(
                 break;
             }
             check_limit(
-                "PROJECTwm Unicode module-name bytes",
+                LimitKind::UnicodeModuleNameBytes,
                 cursor.saturating_sub(unicode_start),
                 limits.max_string_bytes,
             )?;
@@ -1513,12 +1497,12 @@ fn encode_project_wm(
             )));
         }
         check_limit(
-            "VBA input string bytes",
+            LimitKind::InputStringBytes,
             map.mbcs_name().len(),
             limits.max_string_bytes.saturating_mul(4),
         )?;
         let mbcs = super::dir::encode_mbcs(map.mbcs_name(), page, "PROJECTwm module name")?;
-        check_limit("VBA string bytes", mbcs.len(), limits.max_string_bytes)?;
+        check_limit(LimitKind::StringBytes, mbcs.len(), limits.max_string_bytes)?;
         let decoded = page
             .decode(&mbcs)
             .map_err(|_| invalid(format!("PROJECTwm map {index} MBCS name is not decodable")))?;
@@ -1535,20 +1519,24 @@ fn encode_project_wm(
             .len()
             .checked_mul(2)
             .ok_or_else(|| invalid("PROJECTwm Unicode name length overflow"))?;
-        check_limit("VBA string bytes", unicode_bytes, limits.max_string_bytes)?;
+        check_limit(
+            LimitKind::StringBytes,
+            unicode_bytes,
+            limits.max_string_bytes,
+        )?;
         for code_unit in unicode {
             output.extend_from_slice(&code_unit.to_le_bytes());
         }
         output.extend_from_slice(&0u16.to_le_bytes());
         check_limit(
-            "decompressed VBA stream bytes",
+            LimitKind::DecompressedStreamBytes,
             output.len(),
             limits.max_decompressed_stream_bytes,
         )?;
     }
     output.extend_from_slice(&0u16.to_le_bytes());
     check_limit(
-        "decompressed VBA stream bytes",
+        LimitKind::DecompressedStreamBytes,
         output.len(),
         limits.max_decompressed_stream_bytes,
     )?;
@@ -1583,7 +1571,7 @@ fn read_designer_frames<R: Read + Seek>(
             continue;
         }
         check_limit(
-            "VBA designer count",
+            LimitKind::Designers,
             frames.len().saturating_add(1),
             limits.max_modules,
         )?;
@@ -1638,7 +1626,7 @@ fn parse_vbframe(
     let mut ended = false;
     for line in &lines[2..] {
         check_limit(
-            "VBA designer property count",
+            LimitKind::DesignerProperties,
             properties.len().saturating_add(1),
             limits.max_string_bytes,
         )?;
@@ -1802,7 +1790,7 @@ fn parse_project_lk(bytes: &[u8], limits: &Limits) -> Result<Vec<LicenseInfo>, E
         .ok_or_else(|| invalid("PROJECTlk stream is missing its count"))?;
     let count = usize::try_from(count)
         .map_err(|_| invalid("PROJECTlk license count does not fit usize"))?;
-    check_limit("VBA license count", count, limits.max_licenses)?;
+    check_limit(LimitKind::Licenses, count, limits.max_licenses)?;
     const LICENSEINFO_MINIMUM_BYTES: usize = 16 + 4 + 4;
     let minimum_bytes = count
         .checked_mul(LICENSEINFO_MINIMUM_BYTES)
@@ -1837,7 +1825,11 @@ fn parse_project_lk(bytes: &[u8], limits: &Limits) -> Result<Vec<LicenseInfo>, E
             .ok_or_else(|| invalid("PROJECTlk cursor overflow"))?;
         let key_length = usize::try_from(key_length)
             .map_err(|_| invalid("PROJECTlk license key length does not fit usize"))?;
-        check_limit("VBA license key bytes", key_length, limits.max_string_bytes)?;
+        check_limit(
+            LimitKind::LicenseKeyBytes,
+            key_length,
+            limits.max_string_bytes,
+        )?;
         let key_end = cursor
             .checked_add(key_length)
             .ok_or_else(|| invalid("PROJECTlk license key length overflows stream"))?;
@@ -2155,7 +2147,11 @@ fn parse_path(value: &str, limits: &Limits) -> Result<String, Error> {
     if path.chars().count() > 259 {
         return Err(invalid("PROJECT path exceeds 259 characters"));
     }
-    check_limit("PROJECT path bytes", path.len(), limits.max_string_bytes)?;
+    check_limit(
+        LimitKind::ProjectPathBytes,
+        path.len(),
+        limits.max_string_bytes,
+    )?;
     Ok(path)
 }
 
@@ -2451,10 +2447,10 @@ mod tests {
         };
         assert!(matches!(
             parse_project_lk(&trailing, &limits),
-            Err(Error::LimitExceeded {
-                limit: "VBA license count",
-                actual: 1,
-                maximum: 0,
+            Err(Error::Limit {
+                kind: LimitKind::Licenses,
+                observed: 1,
+                maximum: 0
             })
         ));
     }
@@ -2590,7 +2586,8 @@ mod tests {
             .finish(&Limits::default())
             .unwrap()
             .into_bytes();
-        let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
+        let mut ole =
+            OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
         let project = Project::open(&mut ole, &[], &Limits::default()).unwrap();
         let permissive = Limits::default();
         let text = project.project_text(&permissive).unwrap();
@@ -2605,22 +2602,22 @@ mod tests {
         };
         assert!(matches!(
             project.project_text(&tiny_string),
-            Err(Error::LimitExceeded {
-                limit: "PROJECT text line bytes",
+            Err(Error::Limit {
+                kind: LimitKind::ProjectTextLineBytes,
                 ..
             })
         ));
         assert!(matches!(
             project.encode_project_text(text, &tiny_string),
-            Err(Error::LimitExceeded {
-                limit: "PROJECT text line bytes",
+            Err(Error::Limit {
+                kind: LimitKind::ProjectTextLineBytes,
                 ..
             })
         ));
         assert!(matches!(
             project.encode_dir_with_references(project.references(), &tiny_string),
-            Err(Error::LimitExceeded {
-                limit: "VBA string bytes",
+            Err(Error::Limit {
+                kind: LimitKind::StringBytes,
                 ..
             })
         ));
@@ -2631,27 +2628,27 @@ mod tests {
         };
         assert!(matches!(
             project.project_text(&no_modules),
-            Err(Error::LimitExceeded {
-                limit: "VBA module count",
-                actual: 1,
-                maximum: 0,
+            Err(Error::Limit {
+                kind: LimitKind::Modules,
+                observed: 1,
+                maximum: 0
             })
         ));
         assert!(matches!(
             project.project_wm(&no_modules),
-            Err(Error::LimitExceeded {
-                limit: "VBA module count",
-                actual: 1,
-                maximum: 0,
+            Err(Error::Limit {
+                kind: LimitKind::Modules,
+                observed: 1,
+                maximum: 0
             })
         ));
         let maps = project.project_wm(&permissive).unwrap().unwrap().to_vec();
         assert!(matches!(
             project.encode_project_wm(&maps, &no_modules),
-            Err(Error::LimitExceeded {
-                limit: "VBA module count",
-                actual: 1,
-                maximum: 0,
+            Err(Error::Limit {
+                kind: LimitKind::Modules,
+                observed: 1,
+                maximum: 0
             })
         ));
     }
@@ -2698,8 +2695,8 @@ mod tests {
                 Mbcs::WINDOWS_1252,
                 &limits,
             ),
-            Err(Error::LimitExceeded {
-                limit: "VBA designer stream bytes",
+            Err(Error::Limit {
+                kind: LimitKind::DesignerStreamBytes,
                 ..
             })
         ));
@@ -2776,7 +2773,7 @@ mod tests {
     fn reads_borrowed_standalone_project_with_a_preparse_size_bound() {
         let source = b"Attribute VB_Name = \"Module1\"\r\nSub Main()\r\nEnd Sub\r\n";
         let bytes = sample_project_bytes(source);
-        let project = Project::read(&bytes).expect("borrowed project");
+        let project = Project::read(&bytes, &Limits::default()).expect("borrowed project");
 
         assert_eq!(project.name(), "Sample");
         assert_eq!(project.modules()[0].source().raw(), source);
@@ -2786,12 +2783,8 @@ mod tests {
             ..Limits::default()
         };
         assert!(matches!(
-            Project::read_with(&bytes, &limits),
-            Err(Error::LimitExceeded {
-                limit: "standalone VBA CFB bytes",
-                actual,
-                maximum,
-            }) if actual == bytes.len() && maximum == limits.max_cfb_bytes
+            Project::read(&bytes, &limits),
+            Err(Error::Limit { kind: LimitKind::CfbBytes, observed: actual, maximum }) if actual == bytes.len() && maximum == limits.max_cfb_bytes
         ));
 
         let limits = Limits {
@@ -2799,9 +2792,9 @@ mod tests {
             ..Limits::default()
         };
         assert!(matches!(
-            Project::read_with(&bytes, &limits),
-            Err(Error::LimitExceeded {
-                limit: "aggregate VBA module source bytes",
+            Project::read(&bytes, &limits),
+            Err(Error::Limit {
+                kind: LimitKind::TotalSourceBytes,
                 maximum: 1,
                 ..
             })
@@ -2811,7 +2804,7 @@ mod tests {
     #[test]
     fn borrowed_standalone_reader_returns_typed_cfb_errors() {
         assert!(matches!(
-            Project::read(b"not a compound file"),
+            Project::read(b"not a compound file", &Limits::default()),
             Err(Error::Cfb(_))
         ));
     }
@@ -2839,7 +2832,7 @@ mod tests {
         writer.write_to(&mut cursor).unwrap();
         cursor.set_position(0);
 
-        let mut ole = OleFile::open(cursor).unwrap();
+        let mut ole = OleFile::open(cursor, litchi_cfb::OleFileLimits::default()).unwrap();
         let project = Project::open(&mut ole, &[], &Limits::default()).unwrap();
         assert_eq!(project.name(), "Sample");
         assert_eq!(project.page(), Mbcs::WINDOWS_1252);
@@ -2874,7 +2867,7 @@ mod tests {
         let mut cursor = Cursor::new(Vec::new());
         writer.write_to(&mut cursor).unwrap();
         cursor.set_position(0);
-        let mut ole = OleFile::open(cursor).unwrap();
+        let mut ole = OleFile::open(cursor, litchi_cfb::OleFileLimits::default()).unwrap();
         assert!(Project::open(&mut ole, &[], &Limits::default()).is_err());
     }
 
@@ -2890,7 +2883,7 @@ mod tests {
             let mut cursor = Cursor::new(Vec::new());
             writer.write_to(&mut cursor).unwrap();
             cursor.set_position(0);
-            let mut ole = OleFile::open(cursor).unwrap();
+            let mut ole = OleFile::open(cursor, litchi_cfb::OleFileLimits::default()).unwrap();
             assert!(Project::open(&mut ole, &[], &Limits::default()).is_err());
         }
 
@@ -2916,7 +2909,7 @@ mod tests {
         let mut cursor = Cursor::new(Vec::new());
         writer.write_to(&mut cursor).unwrap();
         cursor.set_position(0);
-        let mut ole = OleFile::open(cursor).unwrap();
+        let mut ole = OleFile::open(cursor, litchi_cfb::OleFileLimits::default()).unwrap();
         let project = Project::open(&mut ole, &[], &Limits::default()).unwrap();
         assert_eq!(project.modules()[0].source().raw(), source);
     }

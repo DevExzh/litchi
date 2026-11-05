@@ -18,9 +18,9 @@ use litchi_iwa_core::{
 use super::budget::LifecycleBudget;
 use super::comment_graph::{CommentGraphPlan, plan_comment_graph};
 use super::{
-    BUILD_CHUNK_MESSAGE_TYPE, BUILD_MESSAGE_TYPE, COMMENT_STORAGE_MESSAGE_TYPE, MOVIE_DATA_FIELD,
-    MOVIE_MESSAGE_TYPE, POSTER_IMAGE_DATA_FIELD, Package, SLIDE_BUILD_CHUNKS_FIELD,
-    SLIDE_BUILDS_FIELD, SLIDE_OWNED_DRAWABLES_FIELD, SlideMediaLifecycleError, SuperUuid,
+    BUILD_CHUNK_MESSAGE_TYPE, BUILD_MESSAGE_TYPE, COMMENT_STORAGE_MESSAGE_TYPE, Error,
+    MOVIE_DATA_FIELD, MOVIE_MESSAGE_TYPE, POSTER_IMAGE_DATA_FIELD, Package,
+    SLIDE_BUILD_CHUNKS_FIELD, SLIDE_BUILDS_FIELD, SLIDE_OWNED_DRAWABLES_FIELD, SuperUuid,
 };
 use crate::{MovieKind, MovieSelector, SlideSelector};
 
@@ -51,21 +51,23 @@ pub(super) fn select_media(
     movie_selector: MovieSelector,
     limits: WireLimits,
     budget: &mut LifecycleBudget,
-) -> Result<MediaGraphSelection, SlideMediaLifecycleError> {
+) -> Result<MediaGraphSelection, Error> {
     let slide_position = resolve_slide_position(package, slide_selector, budget)?;
     let slide_record = package
         .slide_record_at(slide_position.get())
-        .map_err(|_| SlideMediaLifecycleError::Read)?
-        .ok_or(SlideMediaLifecycleError::SlidePositionNotFound {
-            position: slide_position,
-        })?;
+        .map_err(|_| Error::Read)?
+        .ok_or(Error::Refused(
+            crate::slide::media::lifecycle::Refusal::SlidePositionNotFound {
+                position: slide_position,
+            },
+        ))?;
     let (component_name, slide) = package
         .object_with_component(slide_record.slide_identifier)
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.charge_wire_fields(slide.messages.len())?;
     budget.charge_wire_work(slide.messages.len().max(1))?;
     let slide_payload = super::unique_payload(&slide.messages, super::SLIDE_MESSAGE_TYPE)
-        .map_err(|_| SlideMediaLifecycleError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?;
     let drawable_ids =
         references_in_field(slide_payload, SLIDE_OWNED_DRAWABLES_FIELD, limits, budget)?;
     let mut movies = Vec::new();
@@ -73,14 +75,14 @@ pub(super) fn select_media(
     for drawable_identifier in drawable_ids {
         let Some((movie_component, movie)) = package.object_with_component(drawable_identifier)
         else {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         };
         if movie_component != component_name {
             // A slide-owned drawable is a same-component invariant in the
             // native graph.  Skipping a foreign component would shift the
             // source-order selector and make a later edit target the wrong
             // semantic media item.
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         budget.charge_wire_fields(movie.messages.len())?;
         budget.charge_wire_work(movie.messages.len().max(1))?;
@@ -90,21 +92,21 @@ pub(super) fn select_media(
             .filter(|message| message.type_ == MOVIE_MESSAGE_TYPE)
             .count();
         if matches > 1 {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if matches == 1 {
             push_u64(&mut movies, drawable_identifier, budget)?;
         }
     }
     let movie_position = movie_selector.as_position();
-    let movie_identifier = *movies.get(movie_position.get()).ok_or(
-        SlideMediaLifecycleError::MoviePositionNotFound {
+    let movie_identifier = *movies.get(movie_position.get()).ok_or(Error::Refused(
+        crate::slide::media::lifecycle::Refusal::MoviePositionNotFound {
             position: movie_position,
         },
-    )?;
+    ))?;
     let movie = package
         .object(movie_identifier)
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.charge_wire_fields(movie.messages.len())?;
     budget.charge_wire_work(movie.messages.len().max(1))?;
     let movie_payload = movie
@@ -113,7 +115,7 @@ pub(super) fn select_media(
         .filter(|message| message.type_ == MOVIE_MESSAGE_TYPE)
         .map(|message| message.data.as_slice())
         .next()
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let (movie_info, _references) = super::super::decode_movie_info(
         movie_payload,
         limits,
@@ -122,9 +124,9 @@ pub(super) fn select_media(
             index: movie_position.get(),
         },
     )
-    .map_err(|_| SlideMediaLifecycleError::InvalidSource)?;
+    .map_err(|_| Error::InvalidSource)?;
     if !matches!(movie_info.kind(), MovieKind::File | MovieKind::Audio) {
-        return Err(SlideMediaLifecycleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let comment_graph = match direct_drawable_comment(movie_payload, limits, budget)? {
         Some(root) => {
@@ -132,12 +134,12 @@ pub(super) fn select_media(
                 .messages
                 .iter()
                 .position(|message| message.type_ == MOVIE_MESSAGE_TYPE)
-                .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             let info = movie
                 .archive_info
                 .message_infos
                 .get(message_index)
-                .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             budget.charge_references(info.object_references.len())?;
             if info
                 .object_references
@@ -146,7 +148,7 @@ pub(super) fn select_media(
                 .count()
                 != 1
             {
-                return Err(SlideMediaLifecycleError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             Some(plan_comment_graph(
                 package,
@@ -160,7 +162,7 @@ pub(super) fn select_media(
     };
     let parent = drawable_parent(movie_payload, limits, budget)?;
     if parent != slide_record.slide_identifier {
-        return Err(SlideMediaLifecycleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let content_identifier =
         unique_data_identifier(movie_payload, MOVIE_DATA_FIELD, limits, budget)?;
@@ -169,7 +171,7 @@ pub(super) fn select_media(
     if content_identifier.is_none()
         || (movie_info.kind() == MovieKind::File && poster_identifier.is_none())
     {
-        return Err(SlideMediaLifecycleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
 
     let private_object_ids = private_graph(
@@ -187,7 +189,7 @@ pub(super) fn select_media(
             .iter()
             .any(|id| private_object_ids.binary_search(id).is_err())
         {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     let build_ids = selected_builds(
@@ -236,28 +238,28 @@ pub(super) fn direct_drawable_comment(
     payload: &[u8],
     limits: WireLimits,
     budget: &mut LifecycleBudget,
-) -> Result<Option<u64>, SlideMediaLifecycleError> {
+) -> Result<Option<u64>, Error> {
     let root = parse_view(payload, limits, budget, 1)?;
     let mut drawable = None;
     for field in root.fields().filter(|field| field.number() == 1) {
         if drawable.is_some() || field.wire_type() != 2 {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field
             .validate_canonical_framing()
-            .map_err(|_| SlideMediaLifecycleError::InvalidSource)?;
+            .map_err(|_| Error::InvalidSource)?;
         drawable = Some(field.payload());
     }
-    let drawable = drawable.ok_or(SlideMediaLifecycleError::InvalidSource)?;
+    let drawable = drawable.ok_or(Error::InvalidSource)?;
     let drawable_view = parse_view(drawable, limits, budget, 2)?;
     let mut comment = None;
     for field in drawable_view.fields().filter(|field| field.number() == 6) {
         if comment.is_some() || field.wire_type() != 2 {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field
             .validate_canonical_framing()
-            .map_err(|_| SlideMediaLifecycleError::InvalidSource)?;
+            .map_err(|_| Error::InvalidSource)?;
         comment = Some(strict_reference_identifier(
             field.payload(),
             limits,
@@ -272,26 +274,34 @@ fn resolve_slide_position(
     package: &Package,
     selector: SlideSelector<'_>,
     budget: &mut LifecycleBudget,
-) -> Result<Position, SlideMediaLifecycleError> {
+) -> Result<Position, Error> {
     budget.charge_wire_work(1)?;
     match selector {
         SlideSelector::Position(position) => package
             .slide_record_at(position.get())
-            .map_err(|_| SlideMediaLifecycleError::Read)?
+            .map_err(|_| Error::Read)?
             .map(|_| position)
-            .ok_or(SlideMediaLifecycleError::SlidePositionNotFound { position }),
+            .ok_or(Error::Refused(
+                crate::slide::media::lifecycle::Refusal::SlidePositionNotFound { position },
+            )),
         SlideSelector::Name(name) => {
             if name.is_empty() {
-                return Err(SlideMediaLifecycleError::EmptySlideName);
+                return Err(Error::Refused(
+                    crate::slide::media::lifecycle::Refusal::EmptySlideName,
+                ));
             }
             let selected = package
                 .show()
-                .map_err(|_| SlideMediaLifecycleError::Read)?
+                .map_err(|_| Error::Read)?
                 .select_slide(SlideSelector::name(name))
-                .map_err(|_| SlideMediaLifecycleError::AmbiguousSelector)?;
+                .map_err(|_| {
+                    Error::Refused(crate::slide::media::lifecycle::Refusal::AmbiguousSelector)
+                })?;
             selected
                 .map(|slide| Position::new(slide.index()))
-                .ok_or(SlideMediaLifecycleError::SlideNameNotFound)
+                .ok_or(Error::Refused(
+                    crate::slide::media::lifecycle::Refusal::SlideNameNotFound,
+                ))
         },
     }
 }
@@ -301,7 +311,7 @@ fn references_in_field(
     field_number: u32,
     limits: WireLimits,
     budget: &mut LifecycleBudget,
-) -> Result<Vec<u64>, SlideMediaLifecycleError> {
+) -> Result<Vec<u64>, Error> {
     let view = parse_view(payload, limits, budget, 1)?;
     let count = view
         .fields()
@@ -311,11 +321,11 @@ fn references_in_field(
     reserve_u64s(&mut references, count, budget)?;
     for field in view.fields().filter(|field| field.number() == field_number) {
         if field.wire_type() != 2 {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field
             .validate_canonical_framing()
-            .map_err(|_| SlideMediaLifecycleError::InvalidSource)?;
+            .map_err(|_| Error::InvalidSource)?;
         push_u64(
             &mut references,
             reference_identifier(field.payload(), limits, budget, 2)?,
@@ -330,7 +340,7 @@ fn reference_identifier(
     limits: WireLimits,
     budget: &mut LifecycleBudget,
     nesting: usize,
-) -> Result<u64, SlideMediaLifecycleError> {
+) -> Result<u64, Error> {
     reference_identifier_with_policy(payload, limits, budget, nesting, false)
 }
 
@@ -345,7 +355,7 @@ pub(super) fn strict_reference_identifier(
     limits: WireLimits,
     budget: &mut LifecycleBudget,
     nesting: usize,
-) -> Result<u64, SlideMediaLifecycleError> {
+) -> Result<u64, Error> {
     reference_identifier_with_policy(payload, limits, budget, nesting, true)
 }
 
@@ -355,7 +365,7 @@ fn reference_identifier_with_policy(
     budget: &mut LifecycleBudget,
     nesting: usize,
     reject_legacy_fields: bool,
-) -> Result<u64, SlideMediaLifecycleError> {
+) -> Result<u64, Error> {
     let view = parse_view(payload, limits, budget, nesting)?;
     let mut identifier = None;
     let mut deprecated_type = None;
@@ -363,26 +373,26 @@ fn reference_identifier_with_policy(
     for field in view.fields() {
         field
             .validate_canonical_framing()
-            .map_err(|_| SlideMediaLifecycleError::InvalidSource)?;
+            .map_err(|_| Error::InvalidSource)?;
         if !matches!(field.number(), 1..=3) {
             if reject_legacy_fields {
-                return Err(SlideMediaLifecycleError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             continue;
         }
         if field.wire_type() != 0 {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let (value, width) = litchi_iwa_common::varint::decode_varint_from_bytes(field.payload())
-            .map_err(|_| SlideMediaLifecycleError::InvalidSource)?;
+            .map_err(|_| Error::InvalidSource)?;
         if width != field.payload().len() || litchi_iwa_common::varint::encoded_len(value) != width
         {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         match field.number() {
             1 => {
                 if identifier.replace(value).is_some() || value == 0 {
-                    return Err(SlideMediaLifecycleError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
             },
             2 => {
@@ -390,22 +400,22 @@ fn reference_identifier_with_policy(
                     || deprecated_type.replace(value).is_some()
                     || !canonical_int32(value)
                 {
-                    return Err(SlideMediaLifecycleError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
             },
             3 => {
                 if reject_legacy_fields || external.replace(value).is_some() || value > 1 {
-                    return Err(SlideMediaLifecycleError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
             },
             _ => unreachable!(),
         }
     }
     if external == Some(1) {
-        return Err(SlideMediaLifecycleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let _ = deprecated_type;
-    identifier.ok_or(SlideMediaLifecycleError::InvalidSource)
+    identifier.ok_or(Error::InvalidSource)
 }
 
 fn unique_data_identifier(
@@ -413,16 +423,16 @@ fn unique_data_identifier(
     field_number: u32,
     limits: WireLimits,
     budget: &mut LifecycleBudget,
-) -> Result<Option<u64>, SlideMediaLifecycleError> {
+) -> Result<Option<u64>, Error> {
     let view = parse_view(payload, limits, budget, 1)?;
     let mut selected = None;
     for field in view.fields().filter(|field| field.number() == field_number) {
         if selected.is_some() || field.wire_type() != 2 {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field
             .validate_canonical_framing()
-            .map_err(|_| SlideMediaLifecycleError::InvalidSource)?;
+            .map_err(|_| Error::InvalidSource)?;
         selected = Some(reference_identifier(field.payload(), limits, budget, 2)?);
     }
     Ok(selected)
@@ -432,28 +442,28 @@ fn drawable_parent(
     payload: &[u8],
     limits: WireLimits,
     budget: &mut LifecycleBudget,
-) -> Result<u64, SlideMediaLifecycleError> {
+) -> Result<u64, Error> {
     let view = parse_view(payload, limits, budget, 1)?;
     let mut parent = None;
     for field in view.fields().filter(|field| field.number() == 1) {
         if parent.is_some() || field.wire_type() != 2 {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field
             .validate_canonical_framing()
-            .map_err(|_| SlideMediaLifecycleError::InvalidSource)?;
+            .map_err(|_| Error::InvalidSource)?;
         let drawable = parse_view(field.payload(), limits, budget, 2)?;
         for nested in drawable.fields().filter(|nested| nested.number() == 2) {
             if nested.wire_type() != 2 || parent.is_some() {
-                return Err(SlideMediaLifecycleError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             nested
                 .validate_canonical_framing()
-                .map_err(|_| SlideMediaLifecycleError::InvalidSource)?;
+                .map_err(|_| Error::InvalidSource)?;
             parent = Some(reference_identifier(nested.payload(), limits, budget, 3)?);
         }
     }
-    parent.ok_or(SlideMediaLifecycleError::InvalidSource)
+    parent.ok_or(Error::InvalidSource)
 }
 
 fn private_graph(
@@ -463,16 +473,16 @@ fn private_graph(
     owning_slide: u64,
     comment_graph: Option<&CommentGraphPlan>,
     budget: &mut LifecycleBudget,
-) -> Result<Vec<u64>, SlideMediaLifecycleError> {
+) -> Result<Vec<u64>, Error> {
     let mut pending = Vec::new();
     push_sorted_unique(&mut pending, root, budget)?;
     let mut selected = Vec::new();
     while let Some(identifier) = pending.pop() {
         let Some((component, object)) = package.object_with_component(identifier) else {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         };
         if component != component_name {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if object
             .messages
@@ -480,7 +490,9 @@ fn private_graph(
             .any(|message| message.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
             && comment_graph.is_none_or(|plan| plan.storage_ids.binary_search(&identifier).is_err())
         {
-            return Err(SlideMediaLifecycleError::UnsupportedComment);
+            return Err(Error::Refused(
+                crate::slide::media::lifecycle::Refusal::UnsupportedComment,
+            ));
         }
         insert_sorted_unique(&mut selected, identifier, budget)?;
         budget.charge_entries(1)?;
@@ -490,10 +502,10 @@ fn private_graph(
             for reference in info.object_references.iter().copied() {
                 budget.charge_references(1)?;
                 if reference == 0 {
-                    return Err(SlideMediaLifecycleError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 if reference == owning_slide {
-                    return Err(SlideMediaLifecycleError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 if comment_graph
                     .is_some_and(|plan| plan.author_ids.binary_search(&reference).is_ok())
@@ -508,17 +520,17 @@ fn private_graph(
                     // references outside the slide component. They are
                     // dependencies, never clone roots, and remain untouched.
                     Some(_) => {},
-                    None => return Err(SlideMediaLifecycleError::InvalidSource),
+                    None => return Err(Error::InvalidSource),
                 }
             }
             for field in &info.field_infos {
                 for reference in field.object_references.iter().copied() {
                     budget.charge_references(1)?;
                     if reference == 0 {
-                        return Err(SlideMediaLifecycleError::InvalidSource);
+                        return Err(Error::InvalidSource);
                     }
                     if reference == owning_slide {
-                        return Err(SlideMediaLifecycleError::InvalidSource);
+                        return Err(Error::InvalidSource);
                     }
                     if comment_graph
                         .is_some_and(|plan| plan.author_ids.binary_search(&reference).is_ok())
@@ -530,7 +542,7 @@ fn private_graph(
                             push_sorted_unique_if_new(&mut pending, &selected, reference, budget)?;
                         },
                         Some(_) => {},
-                        None => return Err(SlideMediaLifecycleError::InvalidSource),
+                        None => return Err(Error::InvalidSource),
                     }
                 }
             }
@@ -547,16 +559,16 @@ fn selected_builds(
     movie_identifier: u64,
     limits: WireLimits,
     budget: &mut LifecycleBudget,
-) -> Result<Vec<u64>, SlideMediaLifecycleError> {
+) -> Result<Vec<u64>, Error> {
     let build_ids = references_in_field(slide_payload, SLIDE_BUILDS_FIELD, limits, budget)?;
     let mut selected = Vec::new();
     reserve_u64s(&mut selected, build_ids.len(), budget)?;
     for identifier in build_ids {
         let Some((component, object)) = package.object_with_component(identifier) else {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         };
         if component != component_name {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let payload = unique_message_payload(object, BUILD_MESSAGE_TYPE, budget)?;
         let target = build_target_identifier(payload, budget)?;
@@ -574,17 +586,17 @@ fn selected_chunks(
     build_ids: &[u64],
     limits: WireLimits,
     budget: &mut LifecycleBudget,
-) -> Result<Vec<u64>, SlideMediaLifecycleError> {
+) -> Result<Vec<u64>, Error> {
     let chunk_ids = references_in_field(slide_payload, SLIDE_BUILD_CHUNKS_FIELD, limits, budget)?;
     let mut selected = Vec::new();
     reserve_u64s(&mut selected, chunk_ids.len(), budget)?;
     let build_lookup = sorted_ids(build_ids, budget)?;
     for identifier in chunk_ids {
         let Some((component, object)) = package.object_with_component(identifier) else {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         };
         if component != component_name {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let payload = unique_message_payload(object, BUILD_CHUNK_MESSAGE_TYPE, budget)?;
         let target = build_chunk_target_identifier(payload, budget)?;
@@ -607,13 +619,13 @@ fn data_edges(
     build_ids: &[u64],
     chunk_ids: &[u64],
     budget: &mut LifecycleBudget,
-) -> Result<Vec<(u64, u64)>, SlideMediaLifecycleError> {
+) -> Result<Vec<(u64, u64)>, Error> {
     let mut output = Vec::new();
     let total_ids = private_object_ids
         .len()
         .checked_add(build_ids.len())
         .and_then(|value| value.checked_add(chunk_ids.len()))
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     reserve_pairs(&mut output, total_ids, budget)?;
     for identifier in private_object_ids
         .iter()
@@ -622,35 +634,35 @@ fn data_edges(
         .copied()
     {
         let Some((component, object)) = package.object_with_component(identifier) else {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         };
         if component != component_name {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         for info in &object.archive_info.message_infos {
             budget.charge_wire_fields(
                 1usize
                     .checked_add(info.data_references.len())
                     .and_then(|value| value.checked_add(info.field_infos.len()))
-                    .ok_or(SlideMediaLifecycleError::InvalidSource)?,
+                    .ok_or(Error::InvalidSource)?,
             )?;
             let mut field_references = Vec::new();
             let field_reference_count =
                 info.field_infos.iter().try_fold(0usize, |total, field| {
                     total
                         .checked_add(field.data_references.len())
-                        .ok_or(SlideMediaLifecycleError::InvalidSource)
+                        .ok_or(Error::InvalidSource)
                 })?;
             reserve_u64s(&mut field_references, field_reference_count, budget)?;
             for field in &info.field_infos {
                 if !field.data_references.is_empty()
                     && field.r#type != Some(FieldType::DataReference)
                 {
-                    return Err(SlideMediaLifecycleError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 for data in field.data_references.iter().copied() {
                     if data == 0 {
-                        return Err(SlideMediaLifecycleError::InvalidSource);
+                        return Err(Error::InvalidSource);
                     }
                     budget.charge_references(1)?;
                     push_u64(&mut field_references, data, budget)?;
@@ -661,7 +673,7 @@ fn data_edges(
                 reserve_u64s(&mut aggregate, info.data_references.len(), budget)?;
                 for data in info.data_references.iter().copied() {
                     if data == 0 {
-                        return Err(SlideMediaLifecycleError::InvalidSource);
+                        return Err(Error::InvalidSource);
                     }
                     budget.charge_references(1)?;
                     push_u64(&mut aggregate, data, budget)?;
@@ -670,14 +682,14 @@ fn data_edges(
                 sorted_fields.sort_unstable();
                 aggregate.sort_unstable();
                 if sorted_fields != aggregate {
-                    return Err(SlideMediaLifecycleError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
             } else {
                 budget.charge_references(info.data_references.len())?;
             }
             for data in info.data_references.iter().copied() {
                 if data == 0 {
-                    return Err(SlideMediaLifecycleError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 push_pair(&mut output, (data, identifier), budget)?;
             }
@@ -696,26 +708,26 @@ pub(super) fn validate_removal_closure(
     package: &Package,
     removed_ids: &[u64],
     budget: &mut LifecycleBudget,
-) -> Result<(), SlideMediaLifecycleError> {
+) -> Result<(), Error> {
     budget.charge_wire_work(removed_ids.len().max(1))?;
     if removed_ids.windows(2).any(|window| window[0] >= window[1]) {
-        return Err(SlideMediaLifecycleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let archive_limits = package
         .limits()
         .effective_archive_limits()
-        .map_err(|_| SlideMediaLifecycleError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?;
     for component in package.state.source.components().iter() {
         budget.charge_entries(component.archive().objects.len())?;
         for object in &component.archive().objects {
             let Some(identifier) = object.archive_info.identifier else {
-                return Err(SlideMediaLifecycleError::InvalidSource);
+                return Err(Error::InvalidSource);
             };
             if removed_ids.binary_search(&identifier).is_ok() {
                 continue;
             }
             if object.archive_info.message_infos.len() != object.messages.len() {
-                return Err(SlideMediaLifecycleError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             let header_limits =
                 reserve_core_header_inspection_work(object, archive_limits, budget)?;
@@ -728,7 +740,7 @@ pub(super) fn validate_removal_closure(
                     .try_fold(0usize, |total, info| {
                         total
                             .checked_add(info.field_infos.len())
-                            .ok_or(SlideMediaLifecycleError::InvalidSource)
+                            .ok_or(Error::InvalidSource)
                     })?;
             budget.charge_wire_fields(
                 object
@@ -736,7 +748,7 @@ pub(super) fn validate_removal_closure(
                     .message_infos
                     .len()
                     .checked_add(metadata_fields)
-                    .ok_or(SlideMediaLifecycleError::InvalidSource)?,
+                    .ok_or(Error::InvalidSource)?,
             )?;
             for (message, info) in object
                 .messages
@@ -745,13 +757,13 @@ pub(super) fn validate_removal_closure(
             {
                 for reference in &info.object_references {
                     if removed_ids.binary_search(reference).is_ok() {
-                        return Err(SlideMediaLifecycleError::InvalidSource);
+                        return Err(Error::InvalidSource);
                     }
                 }
                 for field in &info.field_infos {
                     for reference in &field.object_references {
                         if removed_ids.binary_search(reference).is_ok() {
-                            return Err(SlideMediaLifecycleError::InvalidSource);
+                            return Err(Error::InvalidSource);
                         }
                     }
                 }
@@ -763,7 +775,7 @@ pub(super) fn validate_removal_closure(
                         build_chunk_target_identifier(&message.data, budget)?
                     };
                     if removed_ids.binary_search(&reference).is_ok() {
-                        return Err(SlideMediaLifecycleError::InvalidSource);
+                        return Err(Error::InvalidSource);
                     }
                 }
             }
@@ -782,7 +794,7 @@ pub(super) fn clone_object(
     movie_uuid: Option<SuperUuid>,
     transitive_style_witnesses: &[u64],
     budget: &mut LifecycleBudget,
-) -> Result<ArchiveObject, SlideMediaLifecycleError> {
+) -> Result<ArchiveObject, Error> {
     if source.archive_info.should_merge == Some(true)
         || source.archive_info.message_infos.iter().any(|message| {
             message.base_message_index.is_some()
@@ -792,7 +804,7 @@ pub(super) fn clone_object(
                 || !message.diff_read_version.is_empty()
         })
     {
-        return Err(SlideMediaLifecycleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let inspection_limits = reserve_core_header_inspection_work(source, limits, budget)?;
     strict_reference_census(source, inspection_limits, budget)?;
@@ -802,11 +814,11 @@ pub(super) fn clone_object(
         .messages
         .len()
         .checked_mul(size_of::<RawMessage>())
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.charge_allocations(replacement_bytes)?;
     replacements
         .try_reserve_exact(source.messages.len())
-        .map_err(|_| SlideMediaLifecycleError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: replacement_bytes,
         })?;
     for (message_index, message) in source.messages.iter().enumerate() {
@@ -814,14 +826,14 @@ pub(super) fn clone_object(
             .archive_info
             .message_infos
             .get(message_index)
-            .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let wire_limits = payload_limits(message.data.len())?;
         let scratch = message
             .data
             .len()
             .checked_mul(2)
             .and_then(|value| value.checked_add(256))
-            .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         budget.charge_allocations(scratch)?;
         let mut data = if message.type_ == COMMENT_STORAGE_MESSAGE_TYPE {
             super::comment_clone::rewrite_comment_payload(&message.data, object_remap, budget)?
@@ -830,7 +842,7 @@ pub(super) fn clone_object(
                 Some(data) => data,
                 None => {
                     if has_mapped_header_reference(info, object_remap, budget)? {
-                        return Err(SlideMediaLifecycleError::InvalidSource);
+                        return Err(Error::InvalidSource);
                     }
                     copy_bytes(&message.data, budget)?
                 },
@@ -840,7 +852,7 @@ pub(super) fn clone_object(
                 Some(data) => data,
                 None => {
                     if has_mapped_header_reference(info, object_remap, budget)? {
-                        return Err(SlideMediaLifecycleError::InvalidSource);
+                        return Err(Error::InvalidSource);
                     }
                     copy_bytes(&message.data, budget)?
                 },
@@ -889,7 +901,7 @@ pub(super) fn clone_object(
                 },
                 Err(super::clone_payload::ClonePayloadError::UnsupportedMessageType(_)) => {
                     if has_mapped_header_reference(info, object_remap, budget)? {
-                        return Err(SlideMediaLifecycleError::InvalidSource);
+                        return Err(Error::InvalidSource);
                     }
                     copy_bytes(&message.data, budget)?
                 },
@@ -909,12 +921,12 @@ pub(super) fn clone_object(
     let output_bytes = replacements.iter().try_fold(0usize, |total, message| {
         total
             .checked_add(message.data.len())
-            .ok_or(SlideMediaLifecycleError::InvalidSource)
+            .ok_or(Error::InvalidSource)
     })?;
     budget.charge_allocations(output_bytes)?;
     budget.charge_output(output_bytes)?;
     source
-        .clone_with_identity_remap_with_limits(new_identifier, object_remap, &replacements, limits)
+        .clone_with_identity_remap(new_identifier, object_remap, &replacements, limits)
         .map_err(map_archive_error)
 }
 
@@ -922,7 +934,7 @@ fn rewrite_build_payload(
     payload: &[u8],
     object_remap: &[(u64, u64)],
     budget: &mut LifecycleBudget,
-) -> Result<Option<Vec<u8>>, SlideMediaLifecycleError> {
+) -> Result<Option<Vec<u8>>, Error> {
     let options = lifecycle_decode_options(payload);
     let (snapshot, report) =
         litchi_iwa_protos::keynote_media_lifecycle_codec::decode_build_with_report(
@@ -933,7 +945,7 @@ fn rewrite_build_payload(
     let source = snapshot
         .drawable()
         .map(|reference| reference.identifier())
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.charge_references(1)?;
     let Some(target) = lookup_remap(object_remap, source, budget)? else {
         return Ok(None);
@@ -958,7 +970,7 @@ fn rewrite_build_chunk_payload(
     object_remap: &[(u64, u64)],
     movie_uuid: Option<SuperUuid>,
     budget: &mut LifecycleBudget,
-) -> Result<Option<Vec<u8>>, SlideMediaLifecycleError> {
+) -> Result<Option<Vec<u8>>, Error> {
     let options = lifecycle_decode_options(payload);
     let (snapshot, report) =
         litchi_iwa_protos::keynote_media_lifecycle_codec::decode_build_chunk_with_report(
@@ -989,7 +1001,7 @@ fn rewrite_build_chunk_payload(
             .chunk_identifier()
             .or_else(|| snapshot.build_id())
             .map(|uuid| uuid.uuid())
-            .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         edit = edit.with_uuid(
             litchi_iwa_protos::keynote_media_lifecycle_codec::UuidRewrite::new(
                 litchi_iwa_protos::keynote_media_lifecycle_codec::Uuid::new(
@@ -1018,7 +1030,7 @@ fn lookup_remap(
     remap: &[(u64, u64)],
     source: u64,
     budget: &mut LifecycleBudget,
-) -> Result<Option<u64>, SlideMediaLifecycleError> {
+) -> Result<Option<u64>, Error> {
     budget.charge_wire_work(remap.len().max(1))?;
     Ok(remap
         .binary_search_by_key(&source, |&(old, _)| old)
@@ -1030,7 +1042,7 @@ fn offset_movie_geometry(
     payload: &[u8],
     limits: WireLimits,
     budget: &mut LifecycleBudget,
-) -> Result<Vec<u8>, SlideMediaLifecycleError> {
+) -> Result<Vec<u8>, Error> {
     // Movie.super -> Drawable.geometry -> Geometry.position -> Point.x/y.
     // The lifecycle owner changes only the position;
     // size, playback, captions, title, and opaque fields remain source bytes.
@@ -1044,11 +1056,11 @@ fn rewrite_nested_f32(
     delta: f32,
     limits: WireLimits,
     budget: &mut LifecycleBudget,
-) -> Result<Vec<u8>, SlideMediaLifecycleError> {
+) -> Result<Vec<u8>, Error> {
     let mut replacements = 0usize;
     let output = rewrite_nested_f32_inner(payload, path, delta, limits, budget, &mut replacements)?;
     if replacements != 1 {
-        return Err(SlideMediaLifecycleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(output)
 }
@@ -1060,7 +1072,7 @@ fn rewrite_nested_f32_inner(
     limits: WireLimits,
     budget: &mut LifecycleBudget,
     replacements: &mut usize,
-) -> Result<Vec<u8>, SlideMediaLifecycleError> {
+) -> Result<Vec<u8>, Error> {
     let view = parse_view(payload, limits, budget, path.len())?;
     let mut output = Vec::new();
     reserve_bytes(&mut output, payload.len(), budget)?;
@@ -1068,16 +1080,12 @@ fn rewrite_nested_f32_inner(
         if path.len() == 1 && field.number() == path[0] && field.wire_type() == 5 {
             let value = field.payload();
             if value.len() != 4 {
-                return Err(SlideMediaLifecycleError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
-            let bytes: [u8; 4] = value
-                .try_into()
-                .map_err(|_| SlideMediaLifecycleError::InvalidSource)?;
+            let bytes: [u8; 4] = value.try_into().map_err(|_| Error::InvalidSource)?;
             let current = f32::from_le_bytes(bytes);
             let replacement = (current + delta).to_le_bytes();
-            *replacements = replacements
-                .checked_add(1)
-                .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+            *replacements = replacements.checked_add(1).ok_or(Error::InvalidSource)?;
             output.extend_from_slice(field.key());
             // Fixed-width replacement preserves the source key and payload
             // span exactly, while retaining any noncanonical outer framing.
@@ -1110,45 +1118,34 @@ fn append_length_delimited(
     payload: &[u8],
     limits: WireLimits,
     budget: &mut LifecycleBudget,
-) -> Result<(), SlideMediaLifecycleError> {
+) -> Result<(), Error> {
     budget.charge_wire_work(output.len().max(1))?;
-    let payload_len =
-        u64::try_from(payload.len()).map_err(|_| SlideMediaLifecycleError::InvalidSource)?;
+    let payload_len = u64::try_from(payload.len()).map_err(|_| Error::InvalidSource)?;
     let required = litchi_iwa_common::varint::encoded_len(u64::from(field_number) << 3 | 2)
         .checked_add(litchi_iwa_common::varint::encoded_len(payload_len))
         .and_then(|value| value.checked_add(payload.len()))
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if output.capacity().saturating_sub(output.len()) < required {
         budget.charge_allocations(required)?;
     }
-    litchi_iwa_common::wire::append_length_delimited_field_with_limits(
-        output,
-        field_number,
-        payload,
-        limits,
-    )
-    .map_err(map_wire_error)
+    litchi_iwa_common::wire::append_length_delimited_field(output, field_number, payload, limits)
+        .map_err(map_wire_error)
 }
 
-fn copy_boxed(
-    value: &str,
-    budget: &mut LifecycleBudget,
-) -> Result<Box<str>, SlideMediaLifecycleError> {
+fn copy_boxed(value: &str, budget: &mut LifecycleBudget) -> Result<Box<str>, Error> {
     let mut output = String::new();
     budget.charge_allocations(value.len())?;
     output
         .try_reserve_exact(value.len())
-        .map_err(|_| SlideMediaLifecycleError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: value.len(),
         })?;
     output.push_str(value);
     Ok(output.into_boxed_str())
 }
 
-fn payload_limits(length: usize) -> Result<WireLimits, SlideMediaLifecycleError> {
-    let output = length
-        .checked_add(512)
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+fn payload_limits(length: usize) -> Result<WireLimits, Error> {
+    let output = length.checked_add(512).ok_or(Error::InvalidSource)?;
     WireLimits::default()
         .with_input_bytes(length.max(1))
         .and_then(|limits| limits.with_output_bytes(output))
@@ -1160,14 +1157,14 @@ fn parse_view<'source>(
     limits: WireLimits,
     budget: &mut LifecycleBudget,
     nesting: usize,
-) -> Result<WireView<'source>, SlideMediaLifecycleError> {
+) -> Result<WireView<'source>, Error> {
     budget.charge_wire_work(payload.len().max(1))?;
     budget.charge_nesting(nesting.max(1))?;
     // WireView is borrowed, but its parser still performs bounded scratch
     // accounting internally.  Precharge the conservative source-width upper
     // bound before entering it so hostile nesting cannot allocate first.
     budget.charge_allocations(payload.len())?;
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     budget.charge_wire_fields(view.len())?;
     Ok(view)
 }
@@ -1176,18 +1173,18 @@ fn reserve_bytes<T>(
     output: &mut Vec<T>,
     additional: usize,
     budget: &mut LifecycleBudget,
-) -> Result<(), SlideMediaLifecycleError> {
+) -> Result<(), Error> {
     if additional == 0 {
         return Ok(());
     }
     budget.charge_allocations(
         additional
             .checked_mul(size_of::<T>())
-            .ok_or(SlideMediaLifecycleError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     output
         .try_reserve_exact(additional)
-        .map_err(|_| SlideMediaLifecycleError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: additional.checked_mul(size_of::<T>()).unwrap_or(usize::MAX),
         })
 }
@@ -1196,7 +1193,7 @@ fn reserve_u64s(
     output: &mut Vec<u64>,
     additional: usize,
     budget: &mut LifecycleBudget,
-) -> Result<(), SlideMediaLifecycleError> {
+) -> Result<(), Error> {
     reserve_bytes(output, additional, budget)
 }
 
@@ -1204,15 +1201,11 @@ fn reserve_pairs(
     output: &mut Vec<(u64, u64)>,
     additional: usize,
     budget: &mut LifecycleBudget,
-) -> Result<(), SlideMediaLifecycleError> {
+) -> Result<(), Error> {
     reserve_bytes(output, additional, budget)
 }
 
-fn push_u64(
-    output: &mut Vec<u64>,
-    value: u64,
-    budget: &mut LifecycleBudget,
-) -> Result<(), SlideMediaLifecycleError> {
+fn push_u64(output: &mut Vec<u64>, value: u64, budget: &mut LifecycleBudget) -> Result<(), Error> {
     if output.len() == output.capacity() {
         reserve_u64s(output, 1, budget)?;
     }
@@ -1224,7 +1217,7 @@ fn push_pair(
     output: &mut Vec<(u64, u64)>,
     value: (u64, u64),
     budget: &mut LifecycleBudget,
-) -> Result<(), SlideMediaLifecycleError> {
+) -> Result<(), Error> {
     if output.len() == output.capacity() {
         reserve_pairs(output, 1, budget)?;
     }
@@ -1236,7 +1229,7 @@ fn insert_sorted_unique(
     output: &mut Vec<u64>,
     value: u64,
     budget: &mut LifecycleBudget,
-) -> Result<bool, SlideMediaLifecycleError> {
+) -> Result<bool, Error> {
     match output.binary_search(&value) {
         Ok(_) => Ok(false),
         Err(index) => {
@@ -1254,7 +1247,7 @@ fn push_sorted_unique(
     output: &mut Vec<u64>,
     value: u64,
     budget: &mut LifecycleBudget,
-) -> Result<(), SlideMediaLifecycleError> {
+) -> Result<(), Error> {
     let _ = insert_sorted_unique(output, value, budget)?;
     Ok(())
 }
@@ -1264,7 +1257,7 @@ fn push_sorted_unique_if_new(
     selected: &[u64],
     value: u64,
     budget: &mut LifecycleBudget,
-) -> Result<(), SlideMediaLifecycleError> {
+) -> Result<(), Error> {
     budget.charge_wire_work(selected.len().max(1))?;
     if selected.binary_search(&value).is_ok() {
         return Ok(());
@@ -1273,10 +1266,7 @@ fn push_sorted_unique_if_new(
     Ok(())
 }
 
-fn reserve_bytes_copy(
-    source: &[u8],
-    budget: &mut LifecycleBudget,
-) -> Result<Vec<u8>, SlideMediaLifecycleError> {
+fn reserve_bytes_copy(source: &[u8], budget: &mut LifecycleBudget) -> Result<Vec<u8>, Error> {
     let mut output = Vec::new();
     reserve_bytes(&mut output, source.len(), budget)?;
     output.extend_from_slice(source);
@@ -1284,17 +1274,11 @@ fn reserve_bytes_copy(
     Ok(output)
 }
 
-fn copy_bytes(
-    source: &[u8],
-    budget: &mut LifecycleBudget,
-) -> Result<Vec<u8>, SlideMediaLifecycleError> {
+fn copy_bytes(source: &[u8], budget: &mut LifecycleBudget) -> Result<Vec<u8>, Error> {
     reserve_bytes_copy(source, budget)
 }
 
-fn sorted_ids(
-    source: &[u64],
-    budget: &mut LifecycleBudget,
-) -> Result<Vec<u64>, SlideMediaLifecycleError> {
+fn sorted_ids(source: &[u64], budget: &mut LifecycleBudget) -> Result<Vec<u64>, Error> {
     let mut output = Vec::new();
     reserve_u64s(&mut output, source.len(), budget)?;
     output.extend_from_slice(source);
@@ -1307,7 +1291,7 @@ fn unique_message_payload<'source>(
     object: &'source ArchiveObject,
     message_type: u32,
     budget: &mut LifecycleBudget,
-) -> Result<&'source [u8], SlideMediaLifecycleError> {
+) -> Result<&'source [u8], Error> {
     budget.charge_wire_fields(object.messages.len())?;
     budget.charge_wire_work(object.messages.len().max(1))?;
     let mut found = None;
@@ -1316,22 +1300,22 @@ fn unique_message_payload<'source>(
             continue;
         }
         if found.replace(message.data.as_slice()).is_some() {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
-    found.ok_or(SlideMediaLifecycleError::InvalidSource)
+    found.ok_or(Error::InvalidSource)
 }
 
 fn has_mapped_header_reference(
     info: &litchi_iwa_core::MessageInfo,
     remap: &[(u64, u64)],
     budget: &mut LifecycleBudget,
-) -> Result<bool, SlideMediaLifecycleError> {
+) -> Result<bool, Error> {
     let field_count = info
         .field_infos
         .len()
         .checked_add(info.object_references.len())
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.charge_wire_fields(field_count)?;
     budget.charge_wire_work(field_count.max(1))?;
     let aggregate = info.object_references.iter().any(|reference| {
@@ -1357,7 +1341,7 @@ fn contains_sorted(
     values: &[u64],
     needle: u64,
     budget: &mut LifecycleBudget,
-) -> Result<bool, SlideMediaLifecycleError> {
+) -> Result<bool, Error> {
     budget.charge_wire_work(values.len().max(1))?;
     Ok(values.binary_search(&needle).is_ok())
 }
@@ -1368,10 +1352,7 @@ fn lifecycle_decode_options(
     litchi_iwa_protos::keynote_media_lifecycle_codec::DecodeOptions::for_source(payload)
 }
 
-fn build_target_identifier(
-    payload: &[u8],
-    budget: &mut LifecycleBudget,
-) -> Result<u64, SlideMediaLifecycleError> {
+fn build_target_identifier(payload: &[u8], budget: &mut LifecycleBudget) -> Result<u64, Error> {
     budget.charge_allocations(payload.len().saturating_mul(2))?;
     match litchi_iwa_protos::keynote_media_lifecycle_codec::decode_build_with_report(
         payload,
@@ -1382,7 +1363,7 @@ fn build_target_identifier(
             let identifier = snapshot
                 .drawable()
                 .map(|reference| reference.identifier())
-                .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             budget.charge_references(1)?;
             Ok(identifier)
         },
@@ -1393,7 +1374,7 @@ fn build_target_identifier(
 fn build_chunk_target_identifier(
     payload: &[u8],
     budget: &mut LifecycleBudget,
-) -> Result<u64, SlideMediaLifecycleError> {
+) -> Result<u64, Error> {
     budget.charge_allocations(payload.len().saturating_mul(2))?;
     match litchi_iwa_protos::keynote_media_lifecycle_codec::decode_build_chunk_with_report(
         payload,
@@ -1412,7 +1393,7 @@ fn build_chunk_target_identifier(
 fn charge_decode_report(
     budget: &mut LifecycleBudget,
     report: litchi_iwa_protos::keynote_media_lifecycle_codec::DecodeReport,
-) -> Result<(), SlideMediaLifecycleError> {
+) -> Result<(), Error> {
     budget.charge_wire_fields(report.fields())?;
     budget.charge_wire_work(report.work_bytes())?;
     budget.charge_nesting(report.max_depth() as usize)?;
@@ -1426,7 +1407,7 @@ fn charge_decode_report(
 fn charge_rewrite_report(
     budget: &mut LifecycleBudget,
     report: litchi_iwa_protos::keynote_media_lifecycle_codec::RewriteReport,
-) -> Result<(), SlideMediaLifecycleError> {
+) -> Result<(), Error> {
     budget.charge_wire_fields(report.fields())?;
     budget.charge_wire_work(report.work_bytes())?;
     budget.charge_nesting(report.max_depth() as usize)?;
@@ -1440,54 +1421,50 @@ fn charge_rewrite_report(
 
 fn map_lifecycle_decode_error(
     error: litchi_iwa_protos::keynote_media_lifecycle_codec::DecodeError,
-) -> SlideMediaLifecycleError {
+) -> Error {
     use litchi_iwa_protos::keynote_media_lifecycle_codec::DecodeLimit;
     if let Some(limit) = error.resource_limit() {
         return match limit {
-            DecodeLimit::Bytes { observed, maximum } => SlideMediaLifecycleError::LimitExceeded {
-                kind: super::SlideMediaLifecycleLimitKind::InputBytes,
+            DecodeLimit::Bytes { observed, maximum } => Error::Limit {
+                kind: super::LimitKind::InputBytes,
                 observed: observed as u64,
                 maximum: maximum as u64,
             },
-            DecodeLimit::Fields { observed, maximum } => SlideMediaLifecycleError::LimitExceeded {
-                kind: super::SlideMediaLifecycleLimitKind::WireFields,
+            DecodeLimit::Fields { observed, maximum } => Error::Limit {
+                kind: super::LimitKind::WireFields,
                 observed: observed as u64,
                 maximum: maximum as u64,
             },
-            DecodeLimit::Work { observed, maximum } => SlideMediaLifecycleError::LimitExceeded {
-                kind: super::SlideMediaLifecycleLimitKind::WireWork,
+            DecodeLimit::Work { observed, maximum } => Error::Limit {
+                kind: super::LimitKind::WireWork,
                 observed: observed as u64,
                 maximum: maximum as u64,
             },
-            DecodeLimit::OutputBytes { observed, maximum } => {
-                SlideMediaLifecycleError::LimitExceeded {
-                    kind: super::SlideMediaLifecycleLimitKind::OutputBytes,
-                    observed: observed as u64,
-                    maximum: maximum as u64,
-                }
+            DecodeLimit::OutputBytes { observed, maximum } => Error::Limit {
+                kind: super::LimitKind::OutputBytes,
+                observed: observed as u64,
+                maximum: maximum as u64,
             },
-            DecodeLimit::References { observed, maximum } => {
-                SlideMediaLifecycleError::LimitExceeded {
-                    kind: super::SlideMediaLifecycleLimitKind::References,
-                    observed: observed as u64,
-                    maximum: maximum as u64,
-                }
+            DecodeLimit::References { observed, maximum } => Error::Limit {
+                kind: super::LimitKind::References,
+                observed: observed as u64,
+                maximum: maximum as u64,
             },
-            DecodeLimit::Nesting { observed, maximum } => SlideMediaLifecycleError::LimitExceeded {
-                kind: super::SlideMediaLifecycleLimitKind::WireNesting,
+            DecodeLimit::Nesting { observed, maximum } => Error::Limit {
+                kind: super::LimitKind::WireNesting,
                 observed: u64::from(observed),
                 maximum: u64::from(maximum),
             },
-            _ => SlideMediaLifecycleError::InvalidSource,
+            _ => Error::InvalidSource,
         };
     }
-    SlideMediaLifecycleError::InvalidSource
+    Error::InvalidSource
 }
 
 fn charge_clone_payload_report(
     budget: &mut LifecycleBudget,
     report: super::clone_payload::ClonePayloadReport,
-) -> Result<(), SlideMediaLifecycleError> {
+) -> Result<(), Error> {
     budget.charge_wire_fields(report.fields())?;
     budget.charge_wire_work(report.work_bytes())?;
     budget.charge_references(report.references_seen())?;
@@ -1498,22 +1475,18 @@ fn charge_clone_payload_report(
     Ok(())
 }
 
-fn map_clone_payload_error(
-    error: super::clone_payload::ClonePayloadError,
-) -> SlideMediaLifecycleError {
+fn map_clone_payload_error(error: super::clone_payload::ClonePayloadError) -> Error {
     match error {
         super::clone_payload::ClonePayloadError::Wire(error) => map_wire_error(error),
         super::clone_payload::ClonePayloadError::UnsupportedMessageType(_)
         | super::clone_payload::ClonePayloadError::InvalidReference
         | super::clone_payload::ClonePayloadError::SourceReferenceWitnessMismatch
         | super::clone_payload::ClonePayloadError::Budget
-        | super::clone_payload::ClonePayloadError::InvalidRemap => {
-            SlideMediaLifecycleError::InvalidSource
-        },
+        | super::clone_payload::ClonePayloadError::InvalidRemap => Error::InvalidSource,
     }
 }
 
-fn map_wire_error(error: litchi_iwa_common::Error) -> SlideMediaLifecycleError {
+fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
     match error {
         litchi_iwa_common::Error::LimitExceeded {
             kind,
@@ -1521,49 +1494,37 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> SlideMediaLifecycleError {
             limit,
         } => {
             let kind = match kind {
-                litchi_iwa_common::LimitKind::InputBytes => {
-                    super::SlideMediaLifecycleLimitKind::InputBytes
-                },
-                litchi_iwa_common::LimitKind::Fields => {
-                    super::SlideMediaLifecycleLimitKind::WireFields
-                },
-                litchi_iwa_common::LimitKind::OutputBytes => {
-                    super::SlideMediaLifecycleLimitKind::OutputBytes
-                },
-                litchi_iwa_common::LimitKind::Nesting => {
-                    super::SlideMediaLifecycleLimitKind::WireNesting
-                },
-                litchi_iwa_common::LimitKind::RewriteWork => {
-                    super::SlideMediaLifecycleLimitKind::WireWork
-                },
-                _ => return SlideMediaLifecycleError::InvalidSource,
+                litchi_iwa_common::LimitKind::InputBytes => super::LimitKind::InputBytes,
+                litchi_iwa_common::LimitKind::Fields => super::LimitKind::WireFields,
+                litchi_iwa_common::LimitKind::OutputBytes => super::LimitKind::OutputBytes,
+                litchi_iwa_common::LimitKind::Nesting => super::LimitKind::WireNesting,
+                litchi_iwa_common::LimitKind::RewriteWork => super::LimitKind::WireWork,
+                _ => return Error::InvalidSource,
             };
-            SlideMediaLifecycleError::LimitExceeded {
+            Error::Limit {
                 kind,
                 observed: observed as u64,
                 maximum: limit as u64,
             }
         },
-        litchi_iwa_common::Error::Allocation { amount, .. } => {
-            SlideMediaLifecycleError::Allocation { amount }
-        },
-        _ => SlideMediaLifecycleError::InvalidSource,
+        litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_archive_error(error: litchi_iwa_core::Error) -> SlideMediaLifecycleError {
+fn map_archive_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
             observed, maximum, ..
-        } => SlideMediaLifecycleError::LimitExceeded {
-            kind: super::SlideMediaLifecycleLimitKind::Entries,
+        } => Error::Limit {
+            kind: super::LimitKind::Entries,
             observed: observed as u64,
             maximum: maximum as u64,
         },
         litchi_iwa_core::Error::Allocation { requested, .. } => {
-            SlideMediaLifecycleError::Allocation { amount: requested }
+            Error::Allocation { amount: requested }
         },
-        _ => SlideMediaLifecycleError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
@@ -1574,13 +1535,10 @@ pub(super) fn replace_slide_message_with_lifecycle_refs(
     payload: Vec<u8>,
     limits: ArchiveObjectLimits,
     budget: &mut LifecycleBudget,
-) -> Result<(), SlideMediaLifecycleError> {
+) -> Result<(), Error> {
     use litchi_iwa_core::archive::{FieldObjectReferenceTransition, ObjectReferenceTransition};
     use litchi_iwa_protos::keynote_media_lifecycle_codec as codec;
-    let source = object
-        .messages
-        .get(index)
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+    let source = object.messages.get(index).ok_or(Error::InvalidSource)?;
     let (before, before_report) = codec::decode_slide_lifecycle_with_report(
         &source.data,
         lifecycle_decode_options(&source.data),
@@ -1635,11 +1593,11 @@ pub(super) fn replace_slide_message_with_lifecycle_refs(
         .archive_info
         .message_infos
         .get(index)
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     for reference in &before_union {
         budget.charge_wire_work(info.object_references.len())?;
         if !info.object_references.contains(reference) {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     for field in &info.field_infos {
@@ -1652,7 +1610,7 @@ pub(super) fn replace_slide_message_with_lifecycle_refs(
                 && (field.r#type != Some(FieldType::ObjectReference)
                     || field.object_references != *before)
             {
-                return Err(SlideMediaLifecycleError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
     }
@@ -1676,17 +1634,17 @@ pub(super) fn replace_slide_message_with_lifecycle_refs(
                 .count()
                 != 1
             {
-                return Err(SlideMediaLifecycleError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
         if removed.binary_search(&before.style().identifier()).is_ok() {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let info = object
             .archive_info
             .message_infos
             .get(index)
-            .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         for field in &info.field_infos {
             if !groups
                 .iter()
@@ -1696,12 +1654,12 @@ pub(super) fn replace_slide_message_with_lifecycle_refs(
                     .iter()
                     .any(|identifier| removed.binary_search(identifier).is_ok())
             {
-                return Err(SlideMediaLifecycleError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
         let limits = reserve_core_header_work(object, removed.len(), limits, budget)?;
         return object
-            .replace_message_pruning_object_references_preserving_header_with_limits(
+            .replace_message_pruning_object_references_preserving_header(
                 index,
                 RawMessage {
                     type_: super::SLIDE_MESSAGE_TYPE,
@@ -1717,12 +1675,12 @@ pub(super) fn replace_slide_message_with_lifecycle_refs(
         .archive_info
         .message_infos
         .get(index)
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let aggregate_before = copy_reference_ids(&info.object_references, budget)?;
     for reference in &before_union {
         budget.charge_wire_work(aggregate_before.len())?;
         if !aggregate_before.contains(reference) {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     let aggregate_after =
@@ -1741,7 +1699,7 @@ pub(super) fn replace_slide_message_with_lifecycle_refs(
         }
         // A partial or aliased field census needs a separate semantic witness.
         if field.object_references != *before {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let mut path = Vec::new();
         reserve_bytes(&mut path, field.path.as_slice().len(), budget)?;
@@ -1775,11 +1733,11 @@ pub(super) fn replace_slide_message_with_lifecycle_refs(
         .try_fold(aggregate_after.len(), |total, field| {
             total
                 .checked_add(field.after.len())
-                .ok_or(SlideMediaLifecycleError::InvalidSource)
+                .ok_or(Error::InvalidSource)
         })?;
     let limits = reserve_core_header_work(object, growth, limits, budget)?;
     object
-        .replace_message_transitioning_object_references_preserving_header_with_limits(
+        .replace_message_transitioning_object_references_preserving_header(
             index,
             RawMessage {
                 type_: super::SLIDE_MESSAGE_TYPE,
@@ -1801,17 +1759,14 @@ fn collect_reference_ids<'source>(
         Item = litchi_iwa_protos::keynote_media_lifecycle_codec::Reference<'source>,
     >,
     budget: &mut LifecycleBudget,
-) -> Result<Vec<u64>, SlideMediaLifecycleError> {
+) -> Result<Vec<u64>, Error> {
     let mut output = Vec::new();
     reserve_bytes(&mut output, references.len(), budget)?;
     output.extend(references.map(|reference| reference.identifier()));
     Ok(output)
 }
 
-fn copy_reference_ids(
-    source: &[u64],
-    budget: &mut LifecycleBudget,
-) -> Result<Vec<u64>, SlideMediaLifecycleError> {
+fn copy_reference_ids(source: &[u64], budget: &mut LifecycleBudget) -> Result<Vec<u64>, Error> {
     let mut output = Vec::new();
     reserve_bytes(&mut output, source.len(), budget)?;
     output.extend_from_slice(source);
@@ -1823,14 +1778,14 @@ fn transition_reference_ids(
     before: &[u64],
     after: &[u64],
     budget: &mut LifecycleBudget,
-) -> Result<Vec<u64>, SlideMediaLifecycleError> {
+) -> Result<Vec<u64>, Error> {
     let mut output = Vec::new();
     reserve_bytes(
         &mut output,
         source
             .len()
             .checked_add(after.len())
-            .ok_or(SlideMediaLifecycleError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
         budget,
     )?;
     budget.charge_wire_work(
@@ -1849,7 +1804,7 @@ fn transition_reference_ids(
             // New identifiers must not alias an unrelated retained header edge.
             budget.charge_wire_work(source.len())?;
             if source.contains(&identifier) {
-                return Err(SlideMediaLifecycleError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             output.push(identifier);
         }
@@ -1877,10 +1832,10 @@ pub(super) fn strict_reference_census(
     source: &ArchiveObject,
     limits: ArchiveObjectLimits,
     budget: &mut LifecycleBudget,
-) -> Result<usize, SlideMediaLifecycleError> {
+) -> Result<usize, Error> {
     let mut visitor = ReferenceOccurrenceCounter;
     let occurrences = source
-        .inspect_references_with_policy_and_limits(
+        .inspect_references_with_policy(
             &mut visitor,
             ArchiveReferencePolicy::RejectUnknownMetadata,
             limits,
@@ -1893,14 +1848,14 @@ pub(super) fn strict_reference_census(
 /// Reserve the source-sized core header arena needed by a read-only reference
 /// census.  The decoded limits are identical to the mutation reservation, but
 /// the shared lifecycle ledger only admits the canonical source, preflight,
-/// and neutral decode arenas that `inspect_references_with_policy_and_limits`
+/// and neutral decode arenas that `inspect_references_with_policy`
 /// can hold concurrently.  A removal scan must not consume four rewrite
 /// arenas for every unrelated surviving object.
 pub(super) fn reserve_core_header_inspection_work(
     source: &ArchiveObject,
     limits: ArchiveObjectLimits,
     budget: &mut LifecycleBudget,
-) -> Result<ArchiveObjectLimits, SlideMediaLifecycleError> {
+) -> Result<ArchiveObjectLimits, Error> {
     reserve_core_header_work_inner(source, 0, limits, budget, false)
 }
 
@@ -1912,7 +1867,7 @@ pub(super) fn reserve_core_header_work(
     additional_references: usize,
     limits: ArchiveObjectLimits,
     budget: &mut LifecycleBudget,
-) -> Result<ArchiveObjectLimits, SlideMediaLifecycleError> {
+) -> Result<ArchiveObjectLimits, Error> {
     reserve_core_header_work_inner(source, additional_references, limits, budget, true)
 }
 
@@ -1922,21 +1877,20 @@ fn reserve_core_header_work_inner(
     limits: ArchiveObjectLimits,
     budget: &mut LifecycleBudget,
     rewrite: bool,
-) -> Result<ArchiveObjectLimits, SlideMediaLifecycleError> {
-    let source_bytes = usize::try_from(source.header_length)
-        .map_err(|_| SlideMediaLifecycleError::InvalidSource)?;
+) -> Result<ArchiveObjectLimits, Error> {
+    let source_bytes = usize::try_from(source.header_length).map_err(|_| Error::InvalidSource)?;
     if source_bytes == 0 {
-        return Err(SlideMediaLifecycleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut variable_fields = additional_references
         .checked_add(2)
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let mut containers = source
         .archive_info
         .message_infos
         .len()
         .checked_add(1)
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     for message in &source.archive_info.message_infos {
         budget.charge_wire_work(message.field_infos.len().saturating_add(1))?;
         // Merge/diff metadata is outside this lifecycle owner's admission.
@@ -1946,35 +1900,35 @@ fn reserve_core_header_work_inner(
             || !message.fields_to_remove.is_empty()
             || !message.diff_read_version.is_empty()
         {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         variable_fields = variable_fields
             .checked_add(message.object_references.len())
             .and_then(|n| n.checked_add(2))
-            .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         containers = containers
             .checked_add(message.field_infos.len())
-            .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         for field in &message.field_infos {
             variable_fields = variable_fields
                 .checked_add(field.object_references.len())
-                .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
         }
     }
     let growth = variable_fields
         .checked_add(containers)
         .and_then(|n| n.checked_mul(10))
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let header_bytes = source_bytes
         .checked_add(growth)
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?
+        .ok_or(Error::InvalidSource)?
         .min(limits.max_header_bytes());
     // Every encoded field/item occupies at least one source byte. A 256-byte
     // cell per byte bounds decoded neutral/generated metadata and raw rewrite
     // cells; the core enforces this arena independently of the shared ledger.
     let memory = header_bytes
         .checked_mul(256)
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?
+        .ok_or(Error::InvalidSource)?
         .min(limits.max_header_memory_bytes());
     let narrowed = limits
         .with_header_bytes(header_bytes)
@@ -1999,11 +1953,11 @@ fn reserve_core_header_work_inner(
                 .checked_mul(header_overhead)
                 .and_then(|h| n.checked_add(h))
         })
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let events = containers
         .checked_mul(event_factor)
         .and_then(|n| n.checked_add(event_extra))
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.charge_allocation_plan(bytes, events)?;
     budget.charge_wire_work(bytes)?;
     Ok(narrowed)

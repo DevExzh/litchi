@@ -5,31 +5,31 @@
 )]
 
 use litchi_rtf::{
-    CellStoryEvent, Document, FieldOwner, StoryEvent, TableCellPath,
+    CellStoryEvent, FieldOwner, Package, StoryEvent, TableCellPath,
     edit::{Error, TransferPlan},
     style::Kind as StyleKind,
 };
 
 #[test]
 fn external_hyperlink_transfer_is_refused_before_publication() {
-    let source = Document::parse(
+    let source = Package::parse(
         r#"{\rtf1\ansi{\field{\*\fldinst HYPERLINK "https://example.com"}{\fldrslt Link}}}"#,
     )
     .unwrap();
-    let target = Document::parse(r"{\rtf1\ansi Target}").unwrap();
+    let target = Package::parse(r"{\rtf1\ansi Target}").unwrap();
     assert!(matches!(
         TransferPlan::field(&source, 0, &target),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 }
 
 #[test]
 fn nested_table_style_list_and_object_transfers_reopen_with_dependencies() {
-    let nested_source = Document::parse(
+    let nested_source = Package::parse(
         r"{\rtf1\trowd\cellx5000\intbl\itap1 Before \intbl\itap2 Inner{\field{\*\fldinst PAGE}{\fldrslt 1}}{\shp{\*\shpinst{\sp{\sn shapeType}{\sv 1}}}}\page\column End\nestcell{\*\nesttableprops\trowd\cellx1000\nestrow}{\nonesttables ignored}\intbl\itap1 After\cell\row}",
     )
     .unwrap();
-    let table_target = Document::parse(r"{\rtf1\trowd\cellx1000\intbl Target\cell\row}").unwrap();
+    let table_target = Package::parse(r"{\rtf1\trowd\cellx1000\intbl Target\cell\row}").unwrap();
     let nested_plan = TransferPlan::nested_table(
         &nested_source,
         &TableCellPath::outer(0, 0, 0),
@@ -39,7 +39,7 @@ fn nested_table_style_list_and_object_transfers_reopen_with_dependencies() {
     )
     .unwrap();
     assert_eq!(nested_plan.dependency_count(), 2);
-    let nested = nested_plan.commit().unwrap().into_snapshot();
+    let nested = nested_plan.commit().unwrap().into_package();
     assert_eq!(
         nested.tables()[0].rows()[0].cells()[0].nested_tables()[0]
             .table
@@ -73,9 +73,9 @@ fn nested_table_style_list_and_object_transfers_reopen_with_dependencies() {
     );
     assert_eq!(nested.fields().len(), 1);
     assert_eq!(nested.fields()[0].owner, FieldOwner::TableCell(2));
-    Document::from_bytes(&nested.to_bytes().unwrap()).unwrap();
+    Package::from_bytes(&nested.to_bytes().unwrap()).unwrap();
 
-    let mismatched_color_target = Document::parse(
+    let mismatched_color_target = Package::parse(
         r"{\rtf1{\colortbl;\red0\green0\blue255;}\trowd\cellx1000\intbl Target\cell\row}",
     )
     .unwrap();
@@ -87,27 +87,27 @@ fn nested_table_style_list_and_object_transfers_reopen_with_dependencies() {
             &mismatched_color_target,
             TableCellPath::outer(0, 0, 0),
         ),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
     let style_source =
-        Document::parse(r"{\rtf1{\stylesheet{\s0 Normal;}{\s1\sbasedon0 Heading;}}Body}").unwrap();
-    let resource_target = Document::parse(r"{\rtf1 Target}").unwrap();
+        Package::parse(r"{\rtf1{\stylesheet{\s0 Normal;}{\s1\sbasedon0 Heading;}}Body}").unwrap();
+    let resource_target = Package::parse(r"{\rtf1 Target}").unwrap();
     let style_plan =
         TransferPlan::style(&style_source, StyleKind::Paragraph, 1, &resource_target).unwrap();
     assert_eq!(style_plan.dependency_count(), 1);
-    let styled = style_plan.commit().unwrap().into_snapshot();
+    let styled = style_plan.commit().unwrap().into_package();
     assert!(styled.styles().iter().any(|style| style.id == 0));
     assert!(styled.styles().iter().any(|style| style.id == 1));
 
-    let drawing_field_source = Document::parse(
+    let drawing_field_source = Package::parse(
         r"{\rtf1{\field{\*\fldinst PAGE}{\fldrslt A{\shp{\*\shpinst{\sp{\sn shapeType}{\sv 1}}}}\page B}}}",
     )
     .unwrap();
     let drawing_field_plan =
         TransferPlan::field(&drawing_field_source, 0, &resource_target).unwrap();
     assert_eq!(drawing_field_plan.dependency_count(), 1);
-    let drawing_field = drawing_field_plan.commit().unwrap().into_snapshot();
+    let drawing_field = drawing_field_plan.commit().unwrap().into_package();
     assert_eq!(drawing_field.fields()[0].shapes.len(), 1);
     assert!(
         drawing_field.fields()[0]
@@ -121,19 +121,19 @@ fn nested_table_style_list_and_object_transfers_reopen_with_dependencies() {
             .iter()
             .any(|event| matches!(event, StoryEvent::PageBreak(_)))
     );
-    Document::from_bytes(&drawing_field.to_bytes().unwrap()).unwrap();
+    Package::from_bytes(&drawing_field.to_bytes().unwrap()).unwrap();
 
-    let list_source = Document::parse(
+    let list_source = Package::parse(
         r"{\rtf1{\*\listtable{\*\listpicture{\*\shppict{\pict\pngblip 89504e470d0a1a0a}}}{\list\listtemplateid7\listsimple{\listlevel\levelnfc0\levelstartat1\levelpicture0\f0{\leveltext\'02\'00.;}{\levelnumbers\'01;}}\listid7}}{\*\listoverridetable{\listoverride\listid7\listoverridecount0\ls3}}Body}",
     )
     .unwrap();
-    let list_target = Document::parse(
+    let list_target = Package::parse(
         r"{\rtf1{\*\listtable{\*\listpicture{\*\shppict{\pict\jpegblip ffd8ffe0}}}}Target}",
     )
     .unwrap();
     let list_plan = TransferPlan::list(&list_source, 7, &list_target).unwrap();
     assert_eq!(list_plan.dependency_count(), 3);
-    let listed = list_plan.commit().unwrap().into_snapshot();
+    let listed = list_plan.commit().unwrap().into_package();
     assert_eq!(listed.pictures().len(), 2);
     assert_eq!(
         listed
@@ -151,44 +151,44 @@ fn nested_table_style_list_and_object_transfers_reopen_with_dependencies() {
             .iter()
             .any(|entry| entry.list_id == 7)
     );
-    Document::from_bytes(&listed.to_bytes().unwrap()).unwrap();
+    Package::from_bytes(&listed.to_bytes().unwrap()).unwrap();
 
-    let object_source = Document::parse(
-        r"{\rtf1 A{\object\objemb{\*\objclass Package}{\*\objdata 0102}{\result fallback{\pict\pngblip\picw1\pich1 89504e470d0a1a0a}}}}",
+    let object_source = Package::parse(
+        r"{\rtf1 A{\object\objemb{\*\objclass Document}{\*\objdata 0102}{\result fallback{\pict\pngblip\picw1\pich1 89504e470d0a1a0a}}}}",
     )
     .unwrap();
     let object_plan = TransferPlan::object(&object_source, 0, &resource_target).unwrap();
     assert_eq!(object_plan.dependency_count(), 1);
-    let object = object_plan.commit().unwrap().into_snapshot();
+    let object = object_plan.commit().unwrap().into_package();
     assert_eq!(object.pictures().len(), 1);
     assert_eq!(object.objects().len(), 1);
-    Document::from_bytes(&object.to_bytes().unwrap()).unwrap();
+    Package::from_bytes(&object.to_bytes().unwrap()).unwrap();
 }
 
 #[test]
 fn opaque_and_active_dependencies_are_refused_before_publication() {
     let source =
-        Document::parse(r"{\rtf1{\field{\*\fldinst INCLUDETEXT external}{\fldrslt x}}}").unwrap();
-    let target = Document::parse(r"{\rtf1 Target}").unwrap();
+        Package::parse(r"{\rtf1{\field{\*\fldinst INCLUDETEXT external}{\fldrslt x}}}").unwrap();
+    let target = Package::parse(r"{\rtf1 Target}").unwrap();
     assert!(matches!(
         TransferPlan::field(&source, 0, &target),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
-    let plain = Document::parse(r"{\rtf1{\field{\*\fldinst PAGE}{\fldrslt 1}}}").unwrap();
-    let opaque_target = Document::parse(r"{\rtf1{\*\vendor opaque}Target}").unwrap();
+    let plain = Package::parse(r"{\rtf1{\field{\*\fldinst PAGE}{\fldrslt 1}}}").unwrap();
+    let opaque_target = Package::parse(r"{\rtf1{\*\vendor opaque}Target}").unwrap();
     let exact = opaque_target.to_bytes().unwrap();
     assert!(matches!(
         TransferPlan::field(&plain, 0, &opaque_target),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
     assert_eq!(opaque_target.to_bytes().unwrap(), exact);
 
-    let nested_active = Document::parse(
+    let nested_active = Package::parse(
         r"{\rtf1\trowd\cellx5000\intbl\itap1 Before \intbl\itap2 {\field{\*\fldinst INCLUDETEXT external}{\fldrslt x}}\nestcell{\*\nesttableprops\trowd\cellx1000\nestrow}{\nonesttables ignored}\intbl\itap1 After\cell\row}",
     )
     .unwrap();
-    let table_target = Document::parse(r"{\rtf1\trowd\cellx1000\intbl Target\cell\row}").unwrap();
+    let table_target = Package::parse(r"{\rtf1\trowd\cellx1000\intbl Target\cell\row}").unwrap();
     assert!(matches!(
         TransferPlan::nested_table(
             &nested_active,
@@ -197,6 +197,6 @@ fn opaque_and_active_dependencies_are_refused_before_publication() {
             &table_target,
             TableCellPath::outer(0, 0, 0),
         ),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 }

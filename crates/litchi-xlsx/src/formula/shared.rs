@@ -1,6 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
-use litchi_core::sheet::{CellValue, Result};
+use crate::Result;
+use crate::error::invalid;
+use litchi_core::sheet::CellValue;
 
 const MAX_ROW: u32 = 1_048_576;
 const MAX_COLUMN: u32 = 16_384;
@@ -26,14 +28,14 @@ impl CellRange {
     fn parse(value: &str) -> Result<Self> {
         let (first, last) = value.split_once(':').unwrap_or((value, value));
         if last.contains(':') {
-            return Err(format!("invalid shared formula range '{value}'").into());
+            return Err(invalid(format!("invalid shared formula range '{value}'")));
         }
         let (first_row, first_column) = parse_cell_position(first)
-            .ok_or_else(|| format!("invalid shared formula range '{value}'"))?;
+            .ok_or_else(|| invalid(format!("invalid shared formula range '{value}'")))?;
         let (last_row, last_column) = parse_cell_position(last)
-            .ok_or_else(|| format!("invalid shared formula range '{value}'"))?;
+            .ok_or_else(|| invalid(format!("invalid shared formula range '{value}'")))?;
         if first_row > last_row || first_column > last_column {
-            return Err(format!("reversed shared formula range '{value}'").into());
+            return Err(invalid(format!("reversed shared formula range '{value}'")));
         }
         Ok(Self {
             first_row,
@@ -68,11 +70,10 @@ pub fn resolve(
     let mut occupied = HashSet::with_capacity(shared_cells.len());
     for cell in shared_cells {
         if !occupied.insert((cell.row, cell.column)) {
-            return Err(format!(
+            return Err(invalid(format!(
                 "duplicate or ambiguous shared formula membership at row {}, column {}",
                 cell.row, cell.column
-            )
-            .into());
+            )));
         }
     }
 
@@ -82,25 +83,23 @@ pub fn resolve(
             continue;
         }
         let reference = cell.reference.as_deref().ok_or_else(|| {
-            format!(
+            invalid(format!(
                 "shared formula master at row {}, column {} is missing ref",
                 cell.row, cell.column
-            )
+            ))
         })?;
         if cell.formula.is_empty() {
-            return Err(format!(
+            return Err(invalid(format!(
                 "shared formula master at row {}, column {} has no formula",
                 cell.row, cell.column
-            )
-            .into());
+            )));
         }
         let range = CellRange::parse(reference)?;
         if (cell.row, cell.column) != (range.first_row, range.first_column) {
-            return Err(format!(
+            return Err(invalid(format!(
                 "shared formula master at row {}, column {} is not the first cell of ref '{reference}'",
                 cell.row, cell.column
-            )
-            .into());
+            )));
         }
         let master = Master {
             row: cell.row,
@@ -109,36 +108,36 @@ pub fn resolve(
             formula: cell.formula.clone(),
         };
         if masters.insert(cell.index, master).is_some() {
-            return Err(format!("duplicate shared formula master for si={}", cell.index).into());
+            return Err(invalid(format!(
+                "duplicate shared formula master for si={}",
+                cell.index
+            )));
         }
     }
 
     for cell in shared_cells {
         if !masters.contains_key(&cell.index) {
-            return Err(format!(
+            return Err(invalid(format!(
                 "shared formula at row {}, column {} has no master for si={}",
                 cell.row, cell.column, cell.index
-            )
-            .into());
+            )));
         }
     }
 
     for cell in shared_cells {
         let master = &masters[&cell.index];
         if !master.range.contains(cell.row, cell.column) {
-            return Err(format!(
+            return Err(invalid(format!(
                 "shared formula at row {}, column {} lies outside master range for si={}",
                 cell.row, cell.column, cell.index
-            )
-            .into());
+            )));
         }
         let is_master = (cell.row, cell.column) == (master.row, master.column);
         if !is_master && (!cell.formula.is_empty() || cell.reference.is_some()) {
-            return Err(format!(
+            return Err(invalid(format!(
                 "shared formula follower at row {}, column {} contains master data",
                 cell.row, cell.column
-            )
-            .into());
+            )));
         }
         if is_master {
             continue;
@@ -147,17 +146,16 @@ pub fn resolve(
             .get_mut(&cell.row)
             .and_then(|row| row.get_mut(&cell.column))
             .ok_or_else(|| {
-                format!(
+                invalid(format!(
                     "missing materialized shared formula cell at row {}, column {}",
                     cell.row, cell.column
-                )
+                ))
             })?;
         let CellValue::Formula { formula, .. } = value else {
-            return Err(format!(
+            return Err(invalid(format!(
                 "shared formula metadata points to a non-formula cell at row {}, column {}",
                 cell.row, cell.column
-            )
-            .into());
+            )));
         };
         *formula = translate_formula(
             &master.formula,

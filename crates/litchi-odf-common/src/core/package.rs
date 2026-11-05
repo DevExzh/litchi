@@ -5,7 +5,9 @@
 //!
 //! Uses soapberry-zip for high-performance zero-copy ZIP parsing.
 
+use crate::XmlStreamLimits;
 use crate::leniency::ToleranceReport;
+use crate::limits::SourceLimits;
 pub use crate::package::ArchiveLimits;
 use crate::package::{self, Archive, PreparedArchive};
 #[cfg(any(unix, windows))]
@@ -58,7 +60,7 @@ pub fn is_signature_owner_path(path: &str) -> bool {
 )]
 pub struct Package<'data> {
     archive: Archive<'data>,
-    manifest: super::manifest::Manifest,
+    manifest: Arc<super::manifest::Manifest>,
     mimetype: String,
     password: Option<&'data str>,
     /// The LENIENCY_AUDIT F9.2 root media-type fallback this view adopted,
@@ -77,9 +79,22 @@ pub struct OwnedPackage {
     data: Arc<Vec<u8>>,
     index: PreparedArchive,
     password: Option<Zeroizing<String>>,
-    limits: SourcePackageLimits,
+    limits: SourceLimits,
     strict_package: bool,
     tolerance: ToleranceReport,
+    /// The `mimetype` member and the parsed manifest, read once: every
+    /// [`Self::package`] view (and so every `has_file`, `mimetype` and
+    /// `get_file`) used to read and strictly re-parse both (record 0377a).
+    /// The bytes are immutable and the parse depends only on them and the
+    /// retained limits, so clones share it.
+    meta: Arc<std::sync::OnceLock<Arc<PackageMeta>>>,
+}
+
+/// The parsed package metadata a [`Package`] view starts from.
+struct PackageMeta {
+    mimetype: String,
+    manifest: Arc<super::manifest::Manifest>,
+    manifest_root_fallback: Option<u16>,
 }
 
 /// Metadata facts captured by the retained strict package index.
@@ -98,105 +113,6 @@ pub(crate) struct PreparedCatalogFacts {
     pub(crate) has_encrypted_entries: bool,
     pub(crate) archive_end_offset: u64,
     pub(crate) exact_catalog_marker: bool,
-}
-
-/// Resource limits for ODF package ingress.
-///
-/// `max_source_bytes` bounds the physical source before ZIP indexing starts;
-/// [`Self::archive`] bounds the central-directory and declared member sizes.
-/// Both limits are finite by default and are checked before payloads other
-/// than the mandatory `mimetype` and manifest members are read. The mandatory
-/// member ceilings are independently hard-capped so a hostile ZIP declaration
-/// cannot turn package opening into an unbounded metadata allocation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SourcePackageLimits {
-    /// Maximum physical source length accepted by an owned or positional
-    /// package owner.
-    pub max_source_bytes: u64,
-    /// ZIP index and declared member limits.
-    pub archive: ArchiveLimits,
-    /// Maximum declared and materialized `mimetype` bytes.
-    pub max_mimetype_bytes: u64,
-    /// Maximum declared and materialized manifest bytes.
-    pub max_manifest_bytes: u64,
-}
-
-impl SourcePackageLimits {
-    /// Construct a positional package policy from a source ceiling and ZIP
-    /// limits.
-    #[must_use]
-    pub const fn new(max_source_bytes: u64, archive: ArchiveLimits) -> Self {
-        Self {
-            max_source_bytes,
-            archive,
-            max_mimetype_bytes: 4 * 1024,
-            max_manifest_bytes: 16 * 1024 * 1024,
-        }
-    }
-
-    /// Return the configured physical source ceiling.
-    #[must_use]
-    pub const fn max_source_bytes(self) -> u64 {
-        self.max_source_bytes
-    }
-
-    /// Return the configured ZIP limits.
-    #[must_use]
-    pub const fn archive_limits(self) -> ArchiveLimits {
-        self.archive
-    }
-
-    /// Tighten the physical source ceiling.
-    #[must_use]
-    pub const fn with_max_source_bytes(mut self, maximum: u64) -> Self {
-        self.max_source_bytes = maximum;
-        self
-    }
-
-    /// Set the ZIP limits; package opening validates that callers only tighten
-    /// the hard default ceilings.
-    #[must_use]
-    pub const fn with_archive_limits(mut self, archive: ArchiveLimits) -> Self {
-        self.archive = archive;
-        self
-    }
-
-    /// Return the configured `mimetype` payload ceiling.
-    #[must_use]
-    pub const fn max_mimetype_bytes(self) -> u64 {
-        self.max_mimetype_bytes
-    }
-
-    /// Return the configured manifest payload ceiling.
-    #[must_use]
-    pub const fn max_manifest_bytes(self) -> u64 {
-        self.max_manifest_bytes
-    }
-
-    /// Tighten the mandatory `mimetype` payload ceiling.
-    #[must_use]
-    pub const fn with_max_mimetype_bytes(mut self, maximum: u64) -> Self {
-        self.max_mimetype_bytes = maximum;
-        self
-    }
-
-    /// Tighten the mandatory manifest payload ceiling.
-    #[must_use]
-    pub const fn with_max_manifest_bytes(mut self, maximum: u64) -> Self {
-        self.max_manifest_bytes = maximum;
-        self
-    }
-}
-
-impl Default for SourcePackageLimits {
-    fn default() -> Self {
-        Self {
-            max_source_bytes: 2 * 1024 * 1024 * 1024,
-            archive: ArchiveLimits::default(),
-            max_mimetype_bytes: 4 * 1024,
-            max_manifest_bytes: 16 * 1024 * 1024,
-        }
-    }
 }
 
 /// Failure from a callback-scoped, verified source member read.
@@ -228,18 +144,6 @@ impl<E> SourceMemberReaderError<E> {
         }
     }
 
-    /// Alias for [`Self::core`].
-    #[must_use]
-    pub fn core_error(&self) -> Option<&Error> {
-        self.core()
-    }
-
-    /// Alias for [`Self::core`] using the conventional `error` name.
-    #[must_use]
-    pub fn error(&self) -> Option<&Error> {
-        self.core()
-    }
-
     /// Return the callback failure, including one retained by a primary
     /// source or archive failure.
     #[must_use]
@@ -250,12 +154,6 @@ impl<E> SourceMemberReaderError<E> {
         }
     }
 
-    /// Alias for [`Self::callback`].
-    #[must_use]
-    pub fn callback_error(&self) -> Option<&E> {
-        self.callback()
-    }
-
     /// Extract the primary common-core error, if present.
     pub fn into_core(self) -> Option<Error> {
         match self {
@@ -264,27 +162,12 @@ impl<E> SourceMemberReaderError<E> {
         }
     }
 
-    /// Alias for [`Self::into_core`].
-    pub fn into_core_error(self) -> Option<Error> {
-        self.into_core()
-    }
-
-    /// Alias for [`Self::into_core`] using the conventional `error` name.
-    pub fn into_error(self) -> Option<Error> {
-        self.into_core()
-    }
-
     /// Extract the callback failure, if one was returned.
     pub fn into_callback(self) -> Option<E> {
         match self {
             Self::Core { callback_error, .. } => callback_error,
             Self::Callback(error) => Some(error),
         }
-    }
-
-    /// Alias for [`Self::into_callback`].
-    pub fn into_callback_error(self) -> Option<E> {
-        self.into_callback()
     }
 }
 
@@ -335,7 +218,7 @@ pub struct SourceBackedPackage {
     source: Arc<dyn ReadAt>,
     source_version: SourceVersion,
     source_length: u64,
-    limits: SourcePackageLimits,
+    limits: SourceLimits,
     archive: SourceIndexedArchive<SourceReader>,
     manifest: super::manifest::Manifest,
     mimetype: String,
@@ -621,15 +504,20 @@ impl ZipReaderAt for SourceReader {
 impl SourceBackedPackage {
     /// Open a positional ODF package with the default finite limits.
     pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
-        Self::from_read_at_with_limits(source, SourcePackageLimits::default())
+        Self::from_read_at_with_options(source, crate::OpenOptions::new())
     }
 
-    /// Open a positional ODF package with explicit finite limits.
-    pub fn from_read_at_with_limits(
+    /// Open a positional ODF package under the source limits of one
+    /// [`crate::OpenOptions`] envelope.
+    pub fn from_read_at_with_options(
         source: Arc<dyn ReadAt>,
-        limits: SourcePackageLimits,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
-        Self::from_read_at_with_limits_and_password_inner(source, limits, None)
+        Self::from_read_at_with_limits_and_password_inner(
+            source,
+            options.source_limits_value(),
+            None,
+        )
     }
 
     /// Open a positional ODF package and retain a password for lazy entry
@@ -641,29 +529,31 @@ impl SourceBackedPackage {
         let password = zeroizing_password(password);
         Self::from_read_at_with_limits_and_password_inner(
             source,
-            SourcePackageLimits::default(),
+            SourceLimits::default(),
             Some(password),
         )
     }
 
-    /// Open a positional ODF package with explicit limits and a retained
-    /// password for lazy entry decryption.
-    pub fn from_read_at_with_limits_and_password(
+    /// Open a positional ODF package under one [`crate::OpenOptions`]
+    /// envelope and retain a password for lazy entry decryption.
+    pub fn from_read_at_with_password_and_options(
         source: Arc<dyn ReadAt>,
-        limits: SourcePackageLimits,
         password: impl Into<String>,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
         let password = zeroizing_password(password);
-        Self::from_read_at_with_limits_and_password_inner(source, limits, Some(password))
+        Self::from_read_at_with_limits_and_password_inner(
+            source,
+            options.source_limits_value(),
+            Some(password),
+        )
     }
 
     fn from_read_at_with_limits_and_password_inner(
         source: Arc<dyn ReadAt>,
-        limits: SourcePackageLimits,
+        limits: SourceLimits,
         password: Option<Zeroizing<String>>,
     ) -> Result<Self> {
-        validate_source_limits(limits)?;
-
         let source_version = source.version()?;
         let source_length = source.len()?;
         let observed = source.version()?;
@@ -673,11 +563,11 @@ impl SourceBackedPackage {
                 observed,
             });
         }
-        if source_length > limits.max_source_bytes {
+        if source_length > limits.max_input_bytes() {
             return Err(Error::ResourceLimit(ResourceLimit {
                 resource: Resource::InputBytes,
                 observed: source_length,
-                limit: limits.max_source_bytes,
+                limit: limits.max_input_bytes(),
                 scope: Arc::from("ODF positional package"),
             }));
         }
@@ -687,10 +577,10 @@ impl SourceBackedPackage {
             expected: source_version,
             length: source_length,
         };
-        let archive_result = SourceIndexedArchive::from_reader_with_limits_and_policy(
+        let archive_result = SourceIndexedArchive::from_reader_with_policy(
             reader,
             source_length,
-            limits.archive.into_zip_limits(),
+            limits.archive().into_zip_limits(),
             SourceArchiveValidationPolicy::StrictPackage,
         );
         let mut tolerance = ToleranceReport::default();
@@ -738,7 +628,7 @@ impl SourceBackedPackage {
         let mimetype = read_indexed_string_with_limit(
             &archive,
             "mimetype",
-            limits.max_mimetype_bytes,
+            limits.max_mimetype_bytes(),
             "ODF mimetype bytes",
             source.as_ref(),
             source_version,
@@ -754,7 +644,7 @@ impl SourceBackedPackage {
             read_indexed_string_with_limit(
                 &archive,
                 "META-INF/manifest.xml",
-                limits.max_manifest_bytes,
+                limits.max_manifest_bytes(),
                 "ODF manifest bytes",
                 source.as_ref(),
                 source_version,
@@ -767,7 +657,7 @@ impl SourceBackedPackage {
             read_indexed_string_with_limit(
                 &archive,
                 "manifest.xml",
-                limits.max_manifest_bytes,
+                limits.max_manifest_bytes(),
                 "ODF manifest bytes",
                 source.as_ref(),
                 source_version,
@@ -780,7 +670,7 @@ impl SourceBackedPackage {
         let mut manifest = prefer_current(
             source.as_ref(),
             source_version,
-            super::manifest::Manifest::parse(&manifest_xml),
+            super::manifest::Manifest::parse(&manifest_xml, XmlStreamLimits::owner_default_value()),
         )?;
         adopt_manifest_root_fallback(&mut manifest, &mimetype, &mut tolerance);
         let mime_result = if manifest.mimetype == mimetype {
@@ -812,13 +702,14 @@ impl SourceBackedPackage {
         Self::from_read_at(Arc::new(FileSource::open(path)?))
     }
 
-    /// Open a filesystem-backed ODF package with explicit finite limits.
+    /// Open a filesystem-backed ODF package under one [`crate::OpenOptions`]
+    /// envelope.
     #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits(
+    pub fn from_path_with_options(
         path: impl AsRef<Path>,
-        limits: SourcePackageLimits,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
-        Self::from_read_at_with_limits(Arc::new(FileSource::open(path)?), limits)
+        Self::from_read_at_with_options(Arc::new(FileSource::open(path)?), options)
     }
 
     /// Open a filesystem-backed ODF package with a retained decryption
@@ -831,22 +722,23 @@ impl SourceBackedPackage {
         let password = zeroizing_password(password);
         Self::from_read_at_with_limits_and_password_inner(
             Arc::new(FileSource::open(path)?),
-            SourcePackageLimits::default(),
+            SourceLimits::default(),
             Some(password),
         )
     }
 
-    /// Open a filesystem-backed ODF package with explicit limits and password.
+    /// Open a filesystem-backed ODF package under one [`crate::OpenOptions`]
+    /// envelope with a retained decryption password.
     #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits_and_password(
+    pub fn from_path_with_password_and_options(
         path: impl AsRef<Path>,
-        limits: SourcePackageLimits,
         password: impl Into<String>,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
         let password = zeroizing_password(password);
         Self::from_read_at_with_limits_and_password_inner(
             Arc::new(FileSource::open(path)?),
-            limits,
+            options.source_limits_value(),
             Some(password),
         )
     }
@@ -882,7 +774,7 @@ impl SourceBackedPackage {
 
     /// Return the source package limits.
     #[must_use]
-    pub const fn limits(&self) -> SourcePackageLimits {
+    pub const fn limits(&self) -> SourceLimits {
         self.limits
     }
 
@@ -1180,7 +1072,10 @@ impl SourceBackedPackage {
         // the owned package accepts exactly what this owner accepted.
         let built = match strict {
             Err(_error) if !self.tolerance.is_clean() => {
-                OwnedPackage::from_shared_bytes_with_limits(bytes, self.limits)
+                OwnedPackage::from_shared_bytes_with_options(
+                    bytes,
+                    crate::OpenOptions::new().source_limits(self.limits),
+                )
             },
             other => other,
         };
@@ -1326,7 +1221,8 @@ impl SourceBackedPackage {
         soapberry_zip::PreservationIndex<'archive, SourceReader>,
         soapberry_zip::Error,
     > {
-        self.archive.preservation_index(scratch)
+        self.archive
+            .preservation_index(scratch, self.limits.archive().into_zip_limits())
     }
 
     fn read_entry(&self, path: &str) -> Result<Vec<u8>> {
@@ -1513,7 +1409,7 @@ fn tolerant_source_archive(
     source: &Arc<dyn ReadAt>,
     source_version: SourceVersion,
     source_length: u64,
-    limits: SourcePackageLimits,
+    limits: SourceLimits,
     tolerance: &mut ToleranceReport,
 ) -> Result<Option<SourceIndexedArchive<SourceReader>>> {
     let mut probe = [0_u8; LOCAL_HEADER_FIXED + 8];
@@ -1534,10 +1430,10 @@ fn tolerant_source_archive(
         expected: source_version,
         length: source_length,
     };
-    let archive = match SourceIndexedArchive::from_reader_with_limits_and_policy(
+    let archive = match SourceIndexedArchive::from_reader_with_policy(
         reader,
         source_length,
-        limits.archive.into_zip_limits(),
+        limits.archive().into_zip_limits(),
         SourceArchiveValidationPolicy::Normalized,
     ) {
         Ok(archive) => archive,
@@ -1608,66 +1504,6 @@ fn fallible_string(value: &str, resource: &'static str) -> Result<String> {
         .map_err(|source| Error::Allocation { resource, source })?;
     output.push_str(value);
     Ok(output)
-}
-
-fn validate_source_limits(limits: SourcePackageLimits) -> Result<()> {
-    let hard = SourcePackageLimits::default();
-    validate_limit(
-        "ODF positional source bytes",
-        limits.max_source_bytes,
-        hard.max_source_bytes,
-    )?;
-    validate_limit(
-        "ODF mimetype bytes",
-        limits.max_mimetype_bytes,
-        hard.max_mimetype_bytes,
-    )?;
-    validate_limit(
-        "ODF manifest bytes",
-        limits.max_manifest_bytes,
-        hard.max_manifest_bytes,
-    )?;
-    if limits.archive.max_files() == 0 || limits.archive.max_files() > hard.archive.max_files() {
-        return Err(Error::InvalidFormat(format!(
-            "ODF archive max_files must be between 1 and {}",
-            hard.archive.max_files()
-        )));
-    }
-    validate_limit(
-        "ODF archive max_member_name_bytes",
-        limits.archive.max_member_name_bytes(),
-        hard.archive.max_member_name_bytes(),
-    )?;
-    validate_limit(
-        "ODF archive max_metadata_bytes",
-        limits.archive.max_metadata_bytes(),
-        hard.archive.max_metadata_bytes(),
-    )?;
-    validate_limit(
-        "ODF archive max_compressed_size",
-        limits.archive.max_compressed_size(),
-        hard.archive.max_compressed_size(),
-    )?;
-    validate_limit(
-        "ODF archive max_entry_size",
-        limits.archive.max_entry_size(),
-        hard.archive.max_entry_size(),
-    )?;
-    validate_limit(
-        "ODF archive max_total_size",
-        limits.archive.max_total_size(),
-        hard.archive.max_total_size(),
-    )?;
-    Ok(())
-}
-
-fn validate_limit(name: &str, actual: u64, maximum: u64) -> Result<()> {
-    if actual == 0 || actual > maximum {
-        return Err(Error::InvalidFormat(format!(
-            "{name} must be between 1 and {maximum}"
-        )));
-    }
-    Ok(())
 }
 
 fn resource_limit_error(observed: u64, limit: u64, scope: &'static str) -> Error {
@@ -1767,7 +1603,7 @@ pub(crate) fn map_zip_error(error: soapberry_zip::Error) -> Error {
             actual,
             maximum,
         } => zip_limit_error(resource, actual, maximum),
-        ZipErrorKind::IO(io_error) | ZipErrorKind::Io(io_error) => {
+        ZipErrorKind::IO(io_error) => {
             if let Some(source) = io_error
                 .get_ref()
                 .and_then(|source| source.downcast_ref::<SourceChangedIo>())
@@ -1823,9 +1659,7 @@ fn map_source_member_reader_error<E>(
 
 fn map_source_member_zip_error(error: soapberry_zip::Error) -> Error {
     match error.into_kind() {
-        ZipErrorKind::IO(error) | ZipErrorKind::Io(error) => {
-            map_source_member_transport_error(error)
-        },
+        ZipErrorKind::IO(error) => map_source_member_transport_error(error),
         kind => map_zip_error(soapberry_zip::Error::from(kind)),
     }
 }
@@ -1902,22 +1736,23 @@ fn map_owned_zip_error(error: soapberry_zip::Error) -> Error {
 impl OwnedPackage {
     /// Open an ODF package from a reader with the default finite limits.
     ///
-    /// The reader is consumed through a `max_source_bytes + 1` guard so an
+    /// The reader is consumed through a `max_input_bytes + 1` guard so an
     /// oversized stream is rejected before the ZIP index is built.  The
     /// existing convenience method remains source-compatible while gaining
     /// the same bounded ingress contract as positional packages.
     pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
-        Self::from_reader_with_limits(reader, SourcePackageLimits::default())
+        Self::from_reader_with_options(reader, crate::OpenOptions::new())
     }
 
-    /// Open an ODF package from a reader under explicit finite limits.
-    pub fn from_reader_with_limits<R: Read>(
+    /// Open an ODF package from a reader under the source limits of one
+    /// [`crate::OpenOptions`] envelope.
+    pub fn from_reader_with_options<R: Read>(
         reader: R,
-        limits: SourcePackageLimits,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
-        validate_source_limits(limits)?;
-        let data = read_owned_input(reader, limits.max_source_bytes, "ODF owned package input")?;
-        Self::from_bytes_with_limits(data, limits)
+        let limits = options.source_limits_value();
+        let data = read_owned_input(reader, limits.max_input_bytes(), "ODF owned package input")?;
+        Self::from_bytes_with_options(data, options)
     }
 
     /// Open an ODF package from a reader and retain a password for lazy entry
@@ -1927,27 +1762,26 @@ impl OwnedPackage {
         password: impl Into<String>,
     ) -> Result<Self> {
         let password = zeroizing_password(password);
-        Self::from_reader_with_zeroizing_password(reader, SourcePackageLimits::default(), password)
+        Self::from_reader_with_zeroizing_password(reader, SourceLimits::default(), password)
     }
 
-    /// Open an ODF package from a reader with explicit finite limits and a
-    /// retained password for lazy entry decryption.
-    pub fn from_reader_with_limits_and_password<R: Read>(
+    /// Open an ODF package from a reader under one [`crate::OpenOptions`]
+    /// envelope and retain a password for lazy entry decryption.
+    pub fn from_reader_with_password_and_options<R: Read>(
         reader: R,
-        limits: SourcePackageLimits,
         password: impl Into<String>,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
         let password = zeroizing_password(password);
-        Self::from_reader_with_zeroizing_password(reader, limits, password)
+        Self::from_reader_with_zeroizing_password(reader, options.source_limits_value(), password)
     }
 
     pub(crate) fn from_reader_with_zeroizing_password<R: Read>(
         reader: R,
-        limits: SourcePackageLimits,
+        limits: SourceLimits,
         password: Zeroizing<String>,
     ) -> Result<Self> {
-        validate_source_limits(limits)?;
-        let data = read_owned_input(reader, limits.max_source_bytes, "ODF owned package input")?;
+        let data = read_owned_input(reader, limits.max_input_bytes(), "ODF owned package input")?;
         Self::from_bytes_with_zeroizing_password(data, limits, password)
     }
 
@@ -1957,12 +1791,13 @@ impl OwnedPackage {
     ///
     /// Returns an error when the bytes do not form a valid ZIP archive.
     pub fn from_bytes(data: Vec<u8>) -> Result<Self> {
-        Self::from_bytes_with_limits(data, SourcePackageLimits::default())
+        Self::from_bytes_with_options(data, crate::OpenOptions::new())
     }
 
-    /// Create an ODF package from bytes under explicit finite limits.
-    pub fn from_bytes_with_limits(data: Vec<u8>, limits: SourcePackageLimits) -> Result<Self> {
-        Self::from_shared_bytes_with_limits(Arc::new(data), limits)
+    /// Create an ODF package from bytes under the source limits of one
+    /// [`crate::OpenOptions`] envelope.
+    pub fn from_bytes_with_options(data: Vec<u8>, options: crate::OpenOptions) -> Result<Self> {
+        Self::from_shared_bytes_with_options(Arc::new(data), options)
     }
 
     /// Adopt shared ODF package bytes without copying the archive buffer.
@@ -1977,28 +1812,22 @@ impl OwnedPackage {
         )
     }
 
-    /// Adopt shared ODF package bytes under explicit finite limits without
-    /// copying the archive buffer.
-    pub fn from_shared_bytes_with_limits(
+    /// Adopt shared ODF package bytes under the source limits of one
+    /// [`crate::OpenOptions`] envelope without copying the archive buffer.
+    pub fn from_shared_bytes_with_options(
         data: Arc<Vec<u8>>,
-        limits: SourcePackageLimits,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
         Self::from_shared_bytes_with_policy_and_limits(
             data,
-            limits,
+            options.source_limits_value(),
             soapberry_zip::office::ArchiveValidationPolicy::Normalized,
         )
     }
 
-    pub(crate) fn from_prepared_bytes_or_recover(
-        data: Vec<u8>,
-    ) -> std::result::Result<Self, Vec<u8>> {
-        Self::from_prepared_bytes_or_recover_with_limits(data, SourcePackageLimits::default())
-    }
-
     pub(crate) fn from_prepared_bytes_or_recover_with_limits(
         data: Vec<u8>,
-        limits: SourcePackageLimits,
+        limits: SourceLimits,
     ) -> std::result::Result<Self, Vec<u8>> {
         let data = Arc::new(data);
         match Self::from_shared_bytes_with_strict_policy_and_limits(Arc::clone(&data), limits) {
@@ -2020,10 +1849,13 @@ impl OwnedPackage {
     /// re-zipped `mimetype` member keeps strict preparation from engaging.
     pub(crate) fn from_shared_bytes_or_recover_with_limits(
         data: Vec<u8>,
-        limits: SourcePackageLimits,
+        limits: SourceLimits,
     ) -> std::result::Result<Self, Vec<u8>> {
         let data = Arc::new(data);
-        match Self::from_shared_bytes_with_limits(Arc::clone(&data), limits) {
+        match Self::from_shared_bytes_with_options(
+            Arc::clone(&data),
+            crate::OpenOptions::new().source_limits(limits),
+        ) {
             Ok(package) => Ok(package),
             Err(_error) => {
                 let Some(data) = Arc::into_inner(data) else {
@@ -2038,32 +1870,31 @@ impl OwnedPackage {
         data: Arc<Vec<u8>>,
         policy: soapberry_zip::office::ArchiveValidationPolicy,
     ) -> Result<Self> {
-        Self::from_shared_bytes_with_policy_and_limits(data, SourcePackageLimits::default(), policy)
+        Self::from_shared_bytes_with_policy_and_limits(data, SourceLimits::default(), policy)
     }
 
     fn from_shared_bytes_with_policy_and_limits(
         data: Arc<Vec<u8>>,
-        limits: SourcePackageLimits,
+        limits: SourceLimits,
         policy: soapberry_zip::office::ArchiveValidationPolicy,
     ) -> Result<Self> {
-        validate_source_limits(limits)?;
         let data_length = u64::try_from(data.len()).map_err(|_| {
             Error::InvalidFormat("ODF package length exceeds ZIP reader limits".to_string())
         })?;
-        if data_length > limits.max_source_bytes {
+        if data_length > limits.max_input_bytes() {
             return Err(resource_limit_error(
                 data_length,
-                limits.max_source_bytes,
+                limits.max_input_bytes(),
                 "ODF owned package input",
             ));
         }
         #[cfg(test)]
         package::note_index_build();
         let index = Arc::new(
-            soapberry_zip::office::IndexedArchive::from_reader_with_limits_and_policy(
+            soapberry_zip::office::IndexedArchive::from_reader_with_policy(
                 Arc::clone(&data),
                 data_length,
-                limits.archive.into_zip_limits(),
+                limits.archive().into_zip_limits(),
                 policy,
             )
             .map_err(map_owned_zip_error)?,
@@ -2093,6 +1924,7 @@ impl OwnedPackage {
                 soapberry_zip::office::ArchiveValidationPolicy::StrictPackage
             ),
             tolerance,
+            meta: Arc::default(),
         };
         // A manifest without a usable root media type falls back to the
         // `mimetype` member (LENIENCY_AUDIT F9.2); every borrowed view adopts
@@ -2114,7 +1946,7 @@ impl OwnedPackage {
 
     pub(crate) fn from_shared_bytes_with_strict_policy_and_limits(
         data: Arc<Vec<u8>>,
-        limits: SourcePackageLimits,
+        limits: SourceLimits,
     ) -> Result<Self> {
         Self::from_shared_bytes_with_policy_and_limits(
             data,
@@ -2130,26 +1962,25 @@ impl OwnedPackage {
     /// Returns an error when the bytes do not form a valid ZIP archive.
     pub fn from_bytes_with_password(data: Vec<u8>, password: impl Into<String>) -> Result<Self> {
         let password = zeroizing_password(password);
-        Self::from_bytes_with_zeroizing_password(data, SourcePackageLimits::default(), password)
+        Self::from_bytes_with_zeroizing_password(data, SourceLimits::default(), password)
     }
 
-    /// Open ODF bytes with explicit finite limits and retain a password for
-    /// lazy entry decryption.
-    pub fn from_bytes_with_limits_and_password(
+    /// Open ODF bytes under one [`crate::OpenOptions`] envelope and retain a
+    /// password for lazy entry decryption.
+    pub fn from_bytes_with_password_and_options(
         data: Vec<u8>,
-        limits: SourcePackageLimits,
         password: impl Into<String>,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
         let password = zeroizing_password(password);
-        Self::from_bytes_with_zeroizing_password(data, limits, password)
+        Self::from_bytes_with_zeroizing_password(data, options.source_limits_value(), password)
     }
 
     pub(crate) fn from_bytes_with_zeroizing_password(
         data: Vec<u8>,
-        limits: SourcePackageLimits,
+        limits: SourceLimits,
         password: Zeroizing<String>,
     ) -> Result<Self> {
-        validate_source_limits(limits)?;
         Self::from_shared_bytes_with_policy_and_limits(
             Arc::new(data),
             limits,
@@ -2168,11 +1999,16 @@ impl OwnedPackage {
     /// Returns an error when the archive MIME type or manifest cannot be
     /// decoded.
     pub fn package(&self) -> Result<Package<'_>> {
-        Package::new_with_prepared(
-            Arc::clone(&self.index),
-            self.password.as_ref().map(|password| password.as_str()),
-            self.limits,
-        )
+        let password = self.password.as_ref().map(|password| password.as_str());
+        let archive = Archive::from_prepared(Arc::clone(&self.index));
+        let meta = match self.meta.get() {
+            Some(meta) => Arc::clone(meta),
+            None => {
+                let meta = Arc::new(Package::read_meta(&archive, self.limits)?);
+                Arc::clone(self.meta.get_or_init(|| meta))
+            },
+        };
+        Ok(Package::from_meta(archive, password, &meta))
     }
 
     /// Get the underlying data.
@@ -2185,6 +2021,7 @@ impl OwnedPackage {
             limits: _,
             strict_package: _,
             tolerance: _,
+            meta: _,
         } = self;
         match Arc::try_unwrap(index) {
             Ok(index) => {
@@ -2215,7 +2052,7 @@ impl OwnedPackage {
 
     /// Return the finite limits retained by this package owner.
     #[must_use]
-    pub const fn limits(&self) -> SourcePackageLimits {
+    pub const fn limits(&self) -> SourceLimits {
         self.limits
     }
 
@@ -2243,6 +2080,7 @@ impl OwnedPackage {
             limits: self.limits,
             strict_package: self.strict_package,
             tolerance: self.tolerance.clone(),
+            meta: Arc::clone(&self.meta),
         }
     }
 
@@ -2382,29 +2220,42 @@ impl<'data> Package<'data> {
     }
 
     fn new_with_password(data: &'data [u8], password: Option<&'data str>) -> Result<Self> {
-        let archive = Archive::new(data)?;
+        let archive = Archive::new(data, ArchiveLimits::default())?;
 
-        Self::from_archive(archive, password, SourcePackageLimits::default())
-    }
-
-    fn new_with_prepared(
-        index: PreparedArchive,
-        password: Option<&'data str>,
-        limits: SourcePackageLimits,
-    ) -> Result<Self> {
-        let archive = Archive::from_prepared(index);
-
-        Self::from_archive(archive, password, limits)
+        Self::from_archive(archive, password, SourceLimits::default())
     }
 
     fn from_archive(
         archive: Archive<'data>,
         password: Option<&'data str>,
-        limits: SourcePackageLimits,
+        limits: SourceLimits,
     ) -> Result<Self> {
+        let meta = Self::read_meta(&archive, limits)?;
+        Ok(Self::from_meta(archive, password, &meta))
+    }
+
+    fn from_meta(
+        archive: Archive<'data>,
+        password: Option<&'data str>,
+        meta: &PackageMeta,
+    ) -> Self {
+        Self {
+            archive,
+            manifest: Arc::clone(&meta.manifest),
+            mimetype: meta.mimetype.clone(),
+            password,
+            manifest_root_fallback: meta.manifest_root_fallback,
+        }
+    }
+
+    fn read_meta(archive: &Archive<'data>, limits: SourceLimits) -> Result<PackageMeta> {
         // Read MIME type from mimetype file
         let mimetype = archive
-            .read_string_with_limit("mimetype", limits.max_mimetype_bytes, "ODF mimetype bytes")
+            .read_string_with_limit(
+                "mimetype",
+                limits.max_mimetype_bytes(),
+                "ODF mimetype bytes",
+            )
             .map_err(|error| match error {
                 limit @ Error::ResourceLimit(_) => limit,
                 error => {
@@ -2417,7 +2268,8 @@ impl<'data> Package<'data> {
         // Parse the manifest
         let mut manifest = super::manifest::Manifest::parse(
             &archive
-                .read_manifest_xml_with_limit(limits.max_manifest_bytes, "ODF manifest bytes")?,
+                .read_manifest_xml_bounded(limits.max_manifest_bytes(), "ODF manifest bytes")?,
+            XmlStreamLimits::owner_default_value(),
         )?;
         // An absent or empty manifest root media type falls back to the
         // `mimetype` member (LENIENCY_AUDIT F9.2). The owning
@@ -2427,11 +2279,9 @@ impl<'data> Package<'data> {
             manifest.mimetype.clone_from(&mimetype);
         }
 
-        Ok(Self {
-            archive,
-            manifest,
+        Ok(PackageMeta {
             mimetype,
-            password,
+            manifest: Arc::new(manifest),
             manifest_root_fallback: root_fallback,
         })
     }
@@ -2809,6 +2659,32 @@ mod tests {
     }
 
     #[test]
+    fn source_backed_preservation_index_uses_retained_zip_limits() {
+        let data = create_test_odf_package("application/vnd.oasis.opendocument.text");
+        let source = CountingSource::new(data);
+        let mut package = SourceBackedPackage::from_read_at(source).unwrap();
+        let original_limits = package.limits;
+        package.limits = SourceLimits::builder()
+            .max_archive_metadata_bytes(1)
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let mut scratch = vec![0; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
+        let error = match package.preservation_index(&mut scratch) {
+            Ok(_) => panic!("preservation index exceeded no retained metadata limit"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error.kind(),
+            soapberry_zip::ErrorKind::LimitExceeded { .. }
+        ));
+
+        package.limits = original_limits;
+        assert!(package.preservation_index(&mut scratch).is_ok());
+    }
+
+    #[test]
     fn source_backed_materialized_member_size_is_metadata_only_and_safe() {
         let data = create_test_odf_package("application/vnd.oasis.opendocument.text");
         let source = CountingSource::new(data);
@@ -2835,7 +2711,7 @@ mod tests {
     #[test]
     fn source_backed_materialized_member_size_uses_encrypted_plaintext_metadata() {
         let plaintext = b"<office:document-content/>";
-        let mut writer = PackageWriter::new();
+        let mut writer = PackageWriter::new(crate::core::StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();
@@ -2857,7 +2733,7 @@ mod tests {
 
     #[test]
     fn source_backed_encrypted_preflight_rejects_without_payload_read() {
-        let mut writer = PackageWriter::new();
+        let mut writer = PackageWriter::new(crate::core::StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();
@@ -3000,7 +2876,7 @@ mod tests {
             Err(Error::SourceChanged { .. })
         ));
 
-        let mut writer = PackageWriter::new();
+        let mut writer = PackageWriter::new(crate::core::StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();
@@ -3028,16 +2904,22 @@ mod tests {
     fn source_backed_enforces_exact_source_ceiling_and_materializes() {
         let data = create_test_odf_package("application/vnd.oasis.opendocument.text");
         let source = CountingSource::new(data.clone());
-        let limits = SourcePackageLimits::new(
-            u64::try_from(data.len() - 1).unwrap(),
-            ArchiveLimits::default(),
+        let limits = input_limits(u64::try_from(data.len() - 1).unwrap());
+        assert!(
+            SourceBackedPackage::from_read_at_with_options(
+                source,
+                crate::OpenOptions::new().source_limits(limits)
+            )
+            .is_err()
         );
-        assert!(SourceBackedPackage::from_read_at_with_limits(source, limits).is_err());
 
-        let limits =
-            SourcePackageLimits::new(u64::try_from(data.len()).unwrap(), ArchiveLimits::default());
+        let limits = input_limits(u64::try_from(data.len()).unwrap());
         let source = CountingSource::new(data.clone());
-        let package = SourceBackedPackage::from_read_at_with_limits(source, limits).unwrap();
+        let package = SourceBackedPackage::from_read_at_with_options(
+            source,
+            crate::OpenOptions::new().source_limits(limits),
+        )
+        .unwrap();
         let materialized = package.materialize().unwrap();
         assert_eq!(materialized.as_bytes(), data.as_slice());
         assert_eq!(materialized.limits(), limits);
@@ -3055,21 +2937,37 @@ mod tests {
             NEXT_PATH_ID.fetch_add(1, Ordering::Relaxed),
         ));
         std::fs::write(&path, &data).unwrap();
-        let exact =
-            SourcePackageLimits::new(u64::try_from(data.len()).unwrap(), ArchiveLimits::default());
-        assert!(SourceBackedPackage::from_path_with_limits(&path, exact).is_ok());
+        let exact = input_limits(u64::try_from(data.len()).unwrap());
         assert!(
-            SourceBackedPackage::from_path_with_limits_and_password(&path, exact, "password")
-                .is_ok()
+            SourceBackedPackage::from_path_with_options(
+                &path,
+                crate::OpenOptions::new().source_limits(exact)
+            )
+            .is_ok()
+        );
+        assert!(
+            SourceBackedPackage::from_path_with_password_and_options(
+                &path,
+                "password",
+                crate::OpenOptions::new().source_limits(exact)
+            )
+            .is_ok()
         );
 
-        let too_small = exact.with_max_source_bytes(exact.max_source_bytes() - 1);
+        let too_small = input_limits(exact.max_input_bytes() - 1);
         assert!(matches!(
-            SourceBackedPackage::from_path_with_limits(&path, too_small),
+            SourceBackedPackage::from_path_with_options(
+                &path,
+                crate::OpenOptions::new().source_limits(too_small)
+            ),
             Err(Error::ResourceLimit(_))
         ));
         assert!(matches!(
-            SourceBackedPackage::from_path_with_limits_and_password(&path, too_small, "password"),
+            SourceBackedPackage::from_path_with_password_and_options(
+                &path,
+                "password",
+                crate::OpenOptions::new().source_limits(too_small)
+            ),
             Err(Error::ResourceLimit(_))
         ));
         let missing = path.with_extension("missing");
@@ -3079,29 +2977,35 @@ mod tests {
 
     #[test]
     fn owned_reader_limits_apply_before_zip_indexing_and_match_password_path() {
-        let limits = SourcePackageLimits::new(8, ArchiveLimits::default());
+        let limits = input_limits(8);
         assert!(matches!(
-            OwnedPackage::from_reader_with_limits(Cursor::new(vec![0_u8; 8]), limits),
-            Err(Error::InvalidFormat(_))
-        ));
-        assert!(matches!(
-            OwnedPackage::from_reader_with_limits(Cursor::new(vec![0_u8; 9]), limits),
-            Err(Error::ResourceLimit(_))
-        ));
-
-        assert!(matches!(
-            OwnedPackage::from_reader_with_limits_and_password(
+            OwnedPackage::from_reader_with_options(
                 Cursor::new(vec![0_u8; 8]),
-                limits,
-                "password",
+                crate::OpenOptions::new().source_limits(limits)
             ),
             Err(Error::InvalidFormat(_))
         ));
         assert!(matches!(
-            OwnedPackage::from_reader_with_limits_and_password(
+            OwnedPackage::from_reader_with_options(
                 Cursor::new(vec![0_u8; 9]),
-                limits,
+                crate::OpenOptions::new().source_limits(limits)
+            ),
+            Err(Error::ResourceLimit(_))
+        ));
+
+        assert!(matches!(
+            OwnedPackage::from_reader_with_password_and_options(
+                Cursor::new(vec![0_u8; 8]),
                 "password",
+                crate::OpenOptions::new().source_limits(limits)
+            ),
+            Err(Error::InvalidFormat(_))
+        ));
+        assert!(matches!(
+            OwnedPackage::from_reader_with_password_and_options(
+                Cursor::new(vec![0_u8; 9]),
+                "password",
+                crate::OpenOptions::new().source_limits(limits)
             ),
             Err(Error::ResourceLimit(_))
         ));
@@ -3117,17 +3021,10 @@ mod tests {
 
     #[test]
     fn owned_password_ingress_handles_validation_read_and_archive_errors() {
-        let invalid_limits = SourcePackageLimits::new(0, ArchiveLimits::default());
-        let mut reader = Cursor::new(vec![0_u8; 1]);
         assert!(matches!(
-            OwnedPackage::from_reader_with_limits_and_password(
-                &mut reader,
-                invalid_limits,
-                "password",
-            ),
-            Err(Error::InvalidFormat(_))
+            SourceLimits::builder().max_input_bytes(0),
+            Err(crate::Error::InvalidLimit { .. })
         ));
-        assert_eq!(reader.position(), 0);
 
         assert!(matches!(
             OwnedPackage::from_reader_with_password(FailingReader, "password"),
@@ -3138,31 +3035,33 @@ mod tests {
             Err(Error::InvalidFormat(_))
         ));
         assert!(matches!(
-            OwnedPackage::from_bytes_with_limits_and_password(
+            OwnedPackage::from_bytes_with_password_and_options(
                 Vec::new(),
-                invalid_limits,
                 "password",
+                crate::OpenOptions::new().source_limits(input_limits(1))
             ),
             Err(Error::InvalidFormat(_))
         ));
     }
 
     #[test]
-    fn source_backed_rejects_unbounded_or_oversized_policies_before_reads() {
-        let data = create_test_odf_package("application/vnd.oasis.opendocument.text");
-        let source = CountingSource::new(data.clone());
-        let limits =
-            SourcePackageLimits::new(u64::try_from(data.len()).unwrap(), ArchiveLimits::UNBOUNDED);
-        assert!(SourceBackedPackage::from_read_at_with_limits(source.clone(), limits).is_err());
-        assert_eq!(source.read_count(), 0);
+    fn unbounded_or_oversized_policies_cannot_be_constructed() {
+        assert!(matches!(
+            SourceLimits::builder().max_members(usize::MAX),
+            Err(crate::Error::InvalidLimit { .. })
+        ));
+        assert!(matches!(
+            SourceLimits::builder().max_input_bytes(SourceLimits::MAXIMUM.max_input_bytes() + 1),
+            Err(crate::Error::InvalidLimit { .. })
+        ));
+    }
 
-        let source = CountingSource::new(data);
-        let limits = SourcePackageLimits::new(
-            SourcePackageLimits::default().max_source_bytes + 1,
-            ArchiveLimits::default(),
-        );
-        assert!(SourceBackedPackage::from_read_at_with_limits(source.clone(), limits).is_err());
-        assert_eq!(source.read_count(), 0);
+    fn input_limits(maximum: u64) -> SourceLimits {
+        SourceLimits::builder()
+            .max_input_bytes(maximum)
+            .unwrap()
+            .build()
+            .unwrap()
     }
 
     #[test]
@@ -3278,8 +3177,7 @@ mod tests {
         let error = SourceBackedPackage::from_read_at(source).unwrap_err();
         assert!(matches!(error, Error::Io(_) | Error::InvalidFormat(_)));
 
-        let oversized =
-            vec![b'x'; SourcePackageLimits::default().max_manifest_bytes() as usize + 1];
+        let oversized = vec![b'x'; SourceLimits::default().max_manifest_bytes() as usize + 1];
         let source = CountingSource::new(create_manifest_location_package(
             Some(&oversized),
             Some(&legacy),
@@ -3693,7 +3591,7 @@ mod tests {
         assert!(materialized.tolerance_report().is_clean());
 
         // Smart detection retains the report on the prepared handoff.
-        let prepared = crate::detect::prepared_or_original(data.to_vec())
+        let prepared = crate::detect::prepared_or_original(data.to_vec(), SourceLimits::default())
             .unwrap_or_else(|_| panic!("conforming fixture must be detected"));
         assert_eq!(prepared.format(), crate::detect::Format::Odt);
         assert!(prepared.tolerance_report().is_clean());

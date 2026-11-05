@@ -5,15 +5,11 @@
         reason = "items remain grouped by OOXML schema family and package lifecycle"
     )
 )]
-#![expect(
-    clippy::module_name_repetitions,
-    reason = "public names retain established OOXML facade terminology"
-)]
 //! Hyperlink support for DOCX documents.
 
-use super::field::MutableField;
+use super::field::Field;
 use super::revision::RevisionTextMode;
-use super::run::MutableRun;
+use super::run::Run;
 use crate::error::{Error, Result};
 use litchi_core::xml::escape_xml;
 use std::fmt::Write as FmtWrite;
@@ -24,16 +20,17 @@ use std::fmt::Write as FmtWrite;
     clippy::large_enum_variant,
     reason = "writer-internal variants are moved and boxing would add churn"
 )] // writer-internal type; boxing would churn all match sites
+#[derive(Clone)]
 pub(crate) enum HyperlinkElement {
-    Run(MutableRun),
-    Field(MutableField),
+    Run(Run),
+    Field(Field),
 }
 
 /// A mutable hyperlink in a document.
 ///
 /// Hyperlinks can be added to paragraphs to create clickable links to URLs or document anchors.
-#[derive(Debug)]
-pub struct MutableHyperlink {
+#[derive(Debug, Clone)]
+pub struct Hyperlink {
     /// Hyperlink URL (for external links)
     pub(crate) url: Option<String>,
     /// Anchor name (for internal bookmarks)
@@ -50,7 +47,7 @@ pub struct MutableHyperlink {
 use litchi_fonts::{CollectGlyphs, GlyphMap, Request};
 
 #[cfg(feature = "fonts")]
-impl CollectGlyphs for MutableHyperlink {
+impl CollectGlyphs for Hyperlink {
     fn collect_glyphs(&self) -> GlyphMap {
         let mut glyphs = GlyphMap::new();
 
@@ -80,7 +77,7 @@ impl CollectGlyphs for MutableHyperlink {
     }
 }
 
-impl MutableHyperlink {
+impl Hyperlink {
     /// Create a new hyperlink to a URL.
     pub fn new(url: impl Into<String>, text: impl Into<String>) -> Self {
         Self {
@@ -104,7 +101,7 @@ impl MutableHyperlink {
     }
 
     /// Add a run to the hyperlink.
-    pub fn add_run(&mut self, run: MutableRun) {
+    pub fn add_run(&mut self, run: Run) {
         self.elements.push(HyperlinkElement::Run(run));
     }
 
@@ -174,7 +171,7 @@ mod tests {
 
     #[test]
     fn test_hyperlink_new() {
-        let link = MutableHyperlink::new("https://example.com", "Click here");
+        let link = Hyperlink::new("https://example.com", "Click here");
         assert_eq!(link.url, Some("https://example.com".to_string()));
         assert_eq!(link.text, Some("Click here".to_string()));
         assert!(link.anchor.is_none());
@@ -184,7 +181,7 @@ mod tests {
 
     #[test]
     fn test_hyperlink_new_anchor() {
-        let link = MutableHyperlink::new_anchor("bookmark1");
+        let link = Hyperlink::new_anchor("bookmark1");
         assert!(link.url.is_none());
         assert!(link.text.is_none());
         assert_eq!(link.anchor, Some("bookmark1".to_string()));
@@ -193,22 +190,22 @@ mod tests {
 
     #[test]
     fn test_hyperlink_set_tooltip() {
-        let mut link = MutableHyperlink::new("https://example.com", "Click here");
+        let mut link = Hyperlink::new("https://example.com", "Click here");
         link.set_tooltip("Example tooltip");
         assert_eq!(link.tooltip, Some("Example tooltip".to_string()));
     }
 
     #[test]
     fn test_hyperlink_add_run() {
-        let mut link = MutableHyperlink::new_anchor("bookmark1");
-        let run = MutableRun::new();
+        let mut link = Hyperlink::new_anchor("bookmark1");
+        let run = Run::new();
         link.add_run(run);
         assert_eq!(link.elements.len(), 1);
     }
 
     #[test]
     fn test_hyperlink_to_xml_with_anchor() {
-        let link = MutableHyperlink::new_anchor("bookmark1");
+        let link = Hyperlink::new_anchor("bookmark1");
         let mut xml = String::new();
         let result = link.to_xml_mode(&mut xml, None, RevisionTextMode::Normal);
         assert!(result.is_ok());
@@ -219,7 +216,7 @@ mod tests {
 
     #[test]
     fn test_hyperlink_to_xml_with_url() {
-        let link = MutableHyperlink::new("https://example.com", "Click here");
+        let link = Hyperlink::new("https://example.com", "Click here");
         let mut xml = String::new();
         let result = link.to_xml_mode(&mut xml, Some("rId1"), RevisionTextMode::Normal);
         assert!(result.is_ok());
@@ -231,7 +228,7 @@ mod tests {
 
     #[test]
     fn test_hyperlink_to_xml_without_r_id_or_anchor() {
-        let link = MutableHyperlink::new("https://example.com", "Click here");
+        let link = Hyperlink::new("https://example.com", "Click here");
         let mut xml = String::new();
         let result = link.to_xml_mode(&mut xml, None, RevisionTextMode::Normal);
         assert!(result.is_err());
@@ -239,7 +236,7 @@ mod tests {
 
     #[test]
     fn test_hyperlink_element_debug() {
-        let element = HyperlinkElement::Run(MutableRun::new());
+        let element = HyperlinkElement::Run(Run::new());
         let debug_str = format!("{:?}", element);
         assert!(debug_str.contains("Run"));
     }

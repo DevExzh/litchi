@@ -340,6 +340,9 @@ const FUNCTIONS: [(&str, u16); 14] = [
 pub struct FormulaTokenizer {
     /// Built-in function names to indices
     functions: &'static [(&'static str, u16)],
+    /// Whether every other built-in worksheet function is admitted too
+    /// (record 0327, for conditional-format and validation formulas).
+    extended: bool,
 }
 
 impl FormulaTokenizer {
@@ -351,15 +354,35 @@ impl FormulaTokenizer {
     pub const fn new() -> Self {
         Self {
             functions: &FUNCTIONS,
+            extended: false,
         }
     }
 
-    /// The Excel function-table index of the upper-case function `name`.
+    /// A tokenizer that also admits every built-in worksheet function of the
+    /// BIFF8 function table except the ones that call code or other
+    /// applications (`CALL`, `REGISTER.ID`, `EXEC`). Its token streams are
+    /// encoded with [`encode_ptg_tokens_by_arity`].
+    pub(crate) const fn extended() -> Self {
+        Self {
+            functions: &FUNCTIONS,
+            extended: true,
+        }
+    }
+
+    /// The Excel function-table index of the upper-case function `name`:
+    /// the tokenizer's own table first, then, for an extended tokenizer,
+    /// every other admitted built-in function (record 0327).
     fn function_index(&self, name: &str) -> Option<u16> {
         self.functions
             .iter()
             .find(|(function, _)| *function == name)
             .map(|(_, index)| *index)
+            .or_else(|| {
+                if !self.extended || matches!(name, "CALL" | "REGISTER.ID" | "EXEC") {
+                    return None;
+                }
+                crate::formula::built_in_function(name).map(|(index, _, _)| index)
+            })
     }
 
     /// Tokenize a formula string to RPN tokens
@@ -1162,6 +1185,37 @@ fn try_encode_array_tokens(
                     "unsupported token in authored array formula".to_string(),
                 ));
             },
+        }
+    }
+    Ok(bytes)
+}
+
+/// Encode an extended tokenizer's tokens: a function outside the
+/// tokenizer's own table is a `PtgFunc` when its arity is fixed and a
+/// `PtgFuncVar` otherwise, with an argument count the function takes; every
+/// other token as [`encode_ptg_tokens`] encodes it.
+pub(crate) fn encode_ptg_tokens_by_arity(tokens: &[Ptg]) -> Result<Vec<u8>, Error> {
+    let mut bytes = Vec::new();
+    for token in tokens {
+        match token {
+            Ptg::Func(index, arguments) if !FUNCTIONS.iter().any(|(_, held)| held == index) => {
+                let (min, max) = crate::formula::function_arity_range(*index).ok_or_else(|| {
+                    Error::InvalidFormula(format!("function {index} is not a built-in function"))
+                })?;
+                if *arguments < min || *arguments > max {
+                    return Err(Error::InvalidFormula(format!(
+                        "function {index} takes {min} to {max} arguments"
+                    )));
+                }
+                if min == max {
+                    bytes.push(0x41); // PtgFunc, value operand class
+                } else {
+                    bytes.push(0x42); // PtgFuncVar, value operand class
+                    bytes.push(*arguments);
+                }
+                bytes.extend_from_slice(&index.to_le_bytes());
+            },
+            token => bytes.extend(encode_ptg_tokens(std::slice::from_ref(token))?),
         }
     }
     Ok(bytes)

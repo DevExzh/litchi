@@ -10,8 +10,9 @@ use super::validation::{
     mark_once, optional_bool, optional_f64, optional_i32, optional_u8, optional_u32, required_bool,
     required_f64, required_i32, required_string, required_u32, validate_cell_range, validate_count,
 };
+use crate::Result as SheetResult;
+use crate::error::{invalid, malformed};
 use crate::raw::namespace::{is_spreadsheetml_name, relationship_attribute_value};
-use litchi_core::sheet::Result as SheetResult;
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -26,7 +27,7 @@ impl PivotTableParser {
     ) -> SheetResult<Self> {
         let name = required_string(element, b"name", decoder, "pivot-table name")?;
         if name.is_empty() {
-            return Err("pivot-table name cannot be empty".into());
+            return Err(invalid("pivot-table name cannot be empty"));
         }
         let cache_id = required_u32(element, b"cacheId", decoder, "pivot-table cache ID")?;
         required_string(element, b"dataCaption", decoder, "pivot-table data caption")?;
@@ -68,13 +69,13 @@ impl PivotTableParser {
 
         loop {
             let decoder = reader.decoder();
-            let event = reader.read_event()?.into_owned();
+            let event = reader.read_event().map_err(malformed)?.into_owned();
             let resolver = reader.resolver().clone();
             let (namespace, event) = resolver.resolve_event(event);
             match event {
                 Event::Start(element) if stack.is_empty() => {
                     if closed_root {
-                        return Err("pivot table contains multiple root elements".into());
+                        return Err(invalid("pivot table contains multiple root elements"));
                     }
                     if !is_spreadsheetml_name(&namespace, element.name(), b"pivotTableDefinition") {
                         return Ok(None);
@@ -84,7 +85,7 @@ impl PivotTableParser {
                 },
                 Event::Empty(element) if stack.is_empty() => {
                     if closed_root {
-                        return Err("pivot table contains multiple root elements".into());
+                        return Err(invalid("pivot table contains multiple root elements"));
                     }
                     if !is_spreadsheetml_name(&namespace, element.name(), b"pivotTableDefinition") {
                         return Ok(None);
@@ -94,28 +95,32 @@ impl PivotTableParser {
                     return Ok(Some(root.build()?));
                 },
                 Event::Start(element) => {
-                    let parent = *stack.last().ok_or("pivot table is missing its root")?;
+                    let parent = *stack
+                        .last()
+                        .ok_or_else(|| invalid("pivot table is missing its root"))?;
                     let context = parser
                         .as_mut()
-                        .ok_or("pivot table parser is not initialized")?
+                        .ok_or_else(|| invalid("pivot table parser is not initialized"))?
                         .start(parent, &namespace, &element, decoder)?;
                     stack.push(context);
                 },
                 Event::Empty(element) => {
-                    let parent = *stack.last().ok_or("pivot table is missing its root")?;
+                    let parent = *stack
+                        .last()
+                        .ok_or_else(|| invalid("pivot table is missing its root"))?;
                     let parser = parser
                         .as_mut()
-                        .ok_or("pivot table parser is not initialized")?;
+                        .ok_or_else(|| invalid("pivot table parser is not initialized"))?;
                     let context = parser.start(parent, &namespace, &element, decoder)?;
                     parser.finish(context)?;
                 },
                 Event::End(element) => {
-                    let context = stack
-                        .pop()
-                        .ok_or("pivot table has a closing element outside its root")?;
+                    let context = stack.pop().ok_or_else(|| {
+                        invalid("pivot table has a closing element outside its root")
+                    })?;
                     parser
                         .as_mut()
-                        .ok_or("pivot table parser is not initialized")?
+                        .ok_or_else(|| invalid("pivot table parser is not initialized"))?
                         .finish(context)?;
                     if context == TableContext::Root {
                         if !is_spreadsheetml_name(
@@ -123,14 +128,14 @@ impl PivotTableParser {
                             element.name(),
                             b"pivotTableDefinition",
                         ) {
-                            return Err("pivot table has an invalid root closing element".into());
+                            return Err(invalid("pivot table has an invalid root closing element"));
                         }
                         closed_root = true;
                     }
                 },
                 Event::Eof if parser.is_none() => return Ok(None),
                 Event::Eof if !closed_root || !stack.is_empty() => {
-                    return Err("pivot table has a missing or unterminated root".into());
+                    return Err(invalid("pivot table has a missing or unterminated root"));
                 },
                 Event::Eof => break,
                 Event::Text(_)
@@ -217,15 +222,15 @@ impl PivotTableParser {
                 self.column_field_count += 1;
             }
             if index >= 0 {
-                let index =
-                    u32::try_from(index).map_err(|_source| "pivot field index overflows")?;
+                let index = u32::try_from(index)
+                    .map_err(|_source| invalid("pivot field index overflows"))?;
                 if parent == TableContext::RowFields {
                     self.row_indexes.push(index);
                 } else {
                     self.column_indexes.push(index);
                 }
             } else if index != -2 {
-                return Err(format!("invalid pivot axis field index '{index}'").into());
+                return Err(invalid(format!("invalid pivot axis field index '{index}'")));
             }
             return Ok(TableContext::Other);
         }
@@ -242,10 +247,12 @@ impl PivotTableParser {
         {
             let index = required_i32(element, b"fld", decoder, "pivot page field index")?;
             if index < 0 {
-                return Err(format!("invalid pivot page field index '{index}'").into());
+                return Err(invalid(format!("invalid pivot page field index '{index}'")));
             }
-            self.filter_indexes
-                .push(u32::try_from(index).map_err(|_source| "pivot page field index overflows")?);
+            self.filter_indexes.push(
+                u32::try_from(index)
+                    .map_err(|_source| invalid("pivot page field index overflows"))?,
+            );
             return Ok(TableContext::Other);
         }
         if parent == TableContext::Root
@@ -275,10 +282,10 @@ impl PivotTableParser {
     fn finish(&self, context: TableContext) -> SheetResult<()> {
         match context {
             TableContext::Root if !self.saw_location => {
-                Err("pivot table is missing its required location".into())
+                Err(invalid("pivot table is missing its required location"))
             },
             TableContext::Root if !self.saw_pivot_fields => {
-                Err("pivot table is missing its required pivotFields".into())
+                Err(invalid("pivot table is missing its required pivotFields"))
             },
             TableContext::PivotFields => validate_count(
                 self.expected_pivot_fields,
@@ -312,12 +319,11 @@ impl PivotTableParser {
 
     fn apply_cache_fields(&mut self, cache_fields: &[Field]) -> SheetResult<()> {
         if self.field_names.len() != cache_fields.len() {
-            return Err(format!(
+            return Err(invalid(format!(
                 "pivot table has {} pivot fields, but its cache defines {} fields",
                 self.field_names.len(),
                 cache_fields.len()
-            )
-            .into());
+            )));
         }
         self.field_names = cache_fields
             .iter()
@@ -340,11 +346,10 @@ impl PivotTableParser {
                     Err(_) => true,
                 };
                 if index_out_of_range {
-                    return Err(format!(
+                    return Err(invalid(format!(
                         "pivot field index {index} exceeds {} pivot fields",
                         self.field_names.len()
-                    )
-                    .into());
+                    )));
                 }
             }
         }
@@ -411,7 +416,9 @@ impl PivotCacheParser {
         };
         cache.id = relationship_attribute_value(element, b"id", decoder, resolver)?;
         if cache.id.as_deref() == Some("") {
-            return Err("pivot cache records relationship ID cannot be empty".into());
+            return Err(invalid(
+                "pivot cache records relationship ID cannot be empty",
+            ));
         }
         cache.invalid =
             optional_bool(element, b"invalid", decoder, "pivot cache invalid")?.unwrap_or(false);
@@ -522,13 +529,13 @@ impl PivotCacheParser {
 
         loop {
             let decoder = reader.decoder();
-            let event = reader.read_event()?.into_owned();
+            let event = reader.read_event().map_err(malformed)?.into_owned();
             let resolver = reader.resolver().clone();
             let (namespace, event) = resolver.resolve_event(event);
             match event {
                 Event::Start(element) if stack.is_empty() => {
                     if closed_root {
-                        return Err("pivot cache contains multiple root elements".into());
+                        return Err(invalid("pivot cache contains multiple root elements"));
                     }
                     if !is_spreadsheetml_name(&namespace, element.name(), b"pivotCacheDefinition") {
                         return Ok(None);
@@ -545,28 +552,32 @@ impl PivotCacheParser {
                     return Ok(Some(parser.cache));
                 },
                 Event::Start(element) => {
-                    let parent = *stack.last().ok_or("pivot cache is missing its root")?;
+                    let parent = *stack
+                        .last()
+                        .ok_or_else(|| invalid("pivot cache is missing its root"))?;
                     let context = parser
                         .as_mut()
-                        .ok_or("pivot cache parser is not initialized")?
+                        .ok_or_else(|| invalid("pivot cache parser is not initialized"))?
                         .start(parent, &namespace, &element, decoder, &resolver)?;
                     stack.push(context);
                 },
                 Event::Empty(element) => {
-                    let parent = *stack.last().ok_or("pivot cache is missing its root")?;
+                    let parent = *stack
+                        .last()
+                        .ok_or_else(|| invalid("pivot cache is missing its root"))?;
                     let parser = parser
                         .as_mut()
-                        .ok_or("pivot cache parser is not initialized")?;
+                        .ok_or_else(|| invalid("pivot cache parser is not initialized"))?;
                     let context = parser.start(parent, &namespace, &element, decoder, &resolver)?;
                     parser.finish(context)?;
                 },
                 Event::End(element) => {
-                    let context = stack
-                        .pop()
-                        .ok_or("pivot cache has a closing element outside its root")?;
+                    let context = stack.pop().ok_or_else(|| {
+                        invalid("pivot cache has a closing element outside its root")
+                    })?;
                     parser
                         .as_mut()
-                        .ok_or("pivot cache parser is not initialized")?
+                        .ok_or_else(|| invalid("pivot cache parser is not initialized"))?
                         .finish(context)?;
                     if context == CacheContext::Root {
                         if !is_spreadsheetml_name(
@@ -574,14 +585,14 @@ impl PivotCacheParser {
                             element.name(),
                             b"pivotCacheDefinition",
                         ) {
-                            return Err("pivot cache has an invalid root closing element".into());
+                            return Err(invalid("pivot cache has an invalid root closing element"));
                         }
                         closed_root = true;
                     }
                 },
                 Event::Eof if parser.is_none() => return Ok(None),
                 Event::Eof if !closed_root || !stack.is_empty() => {
-                    return Err("pivot cache has a missing or unterminated root".into());
+                    return Err(invalid("pivot cache has a missing or unterminated root"));
                 },
                 Event::Eof => break,
                 Event::Text(_)
@@ -609,7 +620,7 @@ impl PivotCacheParser {
         {
             mark_once(&mut self.saw_cache_source, "pivot cacheSource")?;
             if self.saw_cache_fields {
-                return Err("pivot cacheSource must precede cacheFields".into());
+                return Err(invalid("pivot cacheSource must precede cacheFields"));
             }
             let source_type =
                 required_string(element, b"type", decoder, "pivot cache source type")?;
@@ -617,7 +628,9 @@ impl PivotCacheParser {
                 source_type.as_str(),
                 "worksheet" | "external" | "consolidation" | "scenario"
             ) {
-                return Err(format!("invalid pivot cache source type '{source_type}'").into());
+                return Err(invalid(format!(
+                    "invalid pivot cache source type '{source_type}'"
+                )));
             }
             self.cache.source_type = source_type;
             self.cache.source_connection_id = optional_u32(
@@ -636,7 +649,9 @@ impl PivotCacheParser {
                 "pivot cache worksheetSource",
             )?;
             if self.cache.source_type != "worksheet" {
-                return Err("worksheetSource requires a worksheet pivot-cache source".into());
+                return Err(invalid(
+                    "worksheetSource requires a worksheet pivot-cache source",
+                ));
             }
             self.cache.source_worksheet = unqualified_attribute_value(element, b"sheet", decoder)?;
             self.cache.source_ref = unqualified_attribute_value(element, b"ref", decoder)?;
@@ -647,7 +662,9 @@ impl PivotCacheParser {
             self.cache.source_relationship_id =
                 relationship_attribute_value(element, b"id", decoder, resolver)?;
             if self.cache.source_relationship_id.as_deref() == Some("") {
-                return Err("pivot cache source relationship ID cannot be empty".into());
+                return Err(invalid(
+                    "pivot cache source relationship ID cannot be empty",
+                ));
             }
             return Ok(CacheContext::WorksheetSource);
         }
@@ -656,7 +673,7 @@ impl PivotCacheParser {
         {
             mark_once(&mut self.saw_cache_fields, "pivot cacheFields")?;
             if !self.saw_cache_source {
-                return Err("pivot cacheFields must follow cacheSource".into());
+                return Err(invalid("pivot cacheFields must follow cacheSource"));
             }
             self.expected_fields =
                 optional_u32(element, b"count", decoder, "pivot cacheFields count")?;
@@ -666,7 +683,7 @@ impl PivotCacheParser {
             && is_spreadsheetml_name(namespace, element.name(), b"cacheField")
         {
             if self.pending_field.is_some() {
-                return Err("nested pivot cache field".into());
+                return Err(invalid("nested pivot cache field"));
             }
             self.pending_field = Some(parse_cache_field_element(element, decoder)?);
             self.field_saw_shared_items = false;
@@ -685,7 +702,7 @@ impl PivotCacheParser {
             if let Some(item) = item {
                 self.pending_field
                     .as_mut()
-                    .ok_or("pivot shared item outside a cache field")?
+                    .ok_or_else(|| invalid("pivot shared item outside a cache field"))?
                     .shared_items
                     .push(item);
                 return Ok(CacheContext::Item);
@@ -697,16 +714,16 @@ impl PivotCacheParser {
     fn finish(&mut self, context: CacheContext) -> SheetResult<()> {
         match context {
             CacheContext::Root if !self.saw_cache_source => {
-                Err("pivot cache is missing cacheSource".into())
+                Err(invalid("pivot cache is missing cacheSource"))
             },
             CacheContext::Root if !self.saw_cache_fields => {
-                Err("pivot cache is missing cacheFields".into())
+                Err(invalid("pivot cache is missing cacheFields"))
             },
             CacheContext::Items => validate_count(
                 self.expected_shared_items,
                 self.pending_field
                     .as_ref()
-                    .ok_or("missing pending pivot cache field")?
+                    .ok_or_else(|| invalid("missing pending pivot cache field"))?
                     .shared_items
                     .len(),
                 "pivot sharedItems",
@@ -715,7 +732,7 @@ impl PivotCacheParser {
                 self.cache.cache_fields.push(
                     self.pending_field
                         .take()
-                        .ok_or("missing pending pivot cache field")?,
+                        .ok_or_else(|| invalid("missing pending pivot cache field"))?,
                 );
                 self.expected_shared_items = None;
                 Ok(())
@@ -751,10 +768,9 @@ impl RecordsParser {
         if let Some(definition_record_count) = definition_record_count
             && definition_record_count != expected_records
         {
-            return Err(format!(
+            return Err(invalid(format!(
                 "pivot cache definition declares {definition_record_count} records, but the records part declares {expected_records}"
-            )
-            .into());
+            )));
         }
         Ok(Self {
             records: Records::default(),
@@ -788,13 +804,15 @@ impl RecordsParser {
 
         loop {
             let decoder = reader.decoder();
-            let event = reader.read_event()?.into_owned();
+            let event = reader.read_event().map_err(malformed)?.into_owned();
             let resolver = reader.resolver().clone();
             let (namespace, event) = resolver.resolve_event(event);
             match event {
                 Event::Start(element) if stack.is_empty() => {
                     if closed_root {
-                        return Err("pivot cache records contain multiple root elements".into());
+                        return Err(invalid(
+                            "pivot cache records contain multiple root elements",
+                        ));
                     }
                     if !is_spreadsheetml_name(&namespace, element.name(), b"pivotCacheRecords") {
                         return Ok(None);
@@ -825,44 +843,46 @@ impl RecordsParser {
                 Event::Start(element) => {
                     let parent = *stack
                         .last()
-                        .ok_or("pivot cache records are missing their root")?;
+                        .ok_or_else(|| invalid("pivot cache records are missing their root"))?;
                     let context = parser
                         .as_mut()
-                        .ok_or("pivot cache records parser is not initialized")?
+                        .ok_or_else(|| invalid("pivot cache records parser is not initialized"))?
                         .start(parent, &namespace, &element, decoder)?;
                     stack.push(context);
                 },
                 Event::Empty(element) => {
                     let parent = *stack
                         .last()
-                        .ok_or("pivot cache records are missing their root")?;
+                        .ok_or_else(|| invalid("pivot cache records are missing their root"))?;
                     let parser = parser
                         .as_mut()
-                        .ok_or("pivot cache records parser is not initialized")?;
+                        .ok_or_else(|| invalid("pivot cache records parser is not initialized"))?;
                     let context = parser.start(parent, &namespace, &element, decoder)?;
                     parser.finish(context)?;
                 },
                 Event::End(element) => {
-                    let context = stack
-                        .pop()
-                        .ok_or("pivot cache records have a closing element outside their root")?;
+                    let context = stack.pop().ok_or_else(|| {
+                        invalid("pivot cache records have a closing element outside their root")
+                    })?;
                     parser
                         .as_mut()
-                        .ok_or("pivot cache records parser is not initialized")?
+                        .ok_or_else(|| invalid("pivot cache records parser is not initialized"))?
                         .finish(context)?;
                     if context == CacheRecordsContext::Root {
                         if !is_spreadsheetml_name(&namespace, element.name(), b"pivotCacheRecords")
                         {
-                            return Err(
-                                "pivot cache records have an invalid root closing element".into()
-                            );
+                            return Err(invalid(
+                                "pivot cache records have an invalid root closing element",
+                            ));
                         }
                         closed_root = true;
                     }
                 },
                 Event::Eof if parser.is_none() => return Ok(None),
                 Event::Eof if !closed_root || !stack.is_empty() => {
-                    return Err("pivot cache records have a missing or unterminated root".into());
+                    return Err(invalid(
+                        "pivot cache records have a missing or unterminated root",
+                    ));
                 },
                 Event::Eof => break,
                 Event::Text(_)
@@ -888,7 +908,7 @@ impl RecordsParser {
             && is_spreadsheetml_name(namespace, element.name(), b"r")
         {
             if self.pending_record.is_some() {
-                return Err("nested pivot cache record".into());
+                return Err(invalid("nested pivot cache record"));
             }
             self.pending_record = Some(CacheRecord::default());
             self.pending_value_count = 0;
@@ -900,27 +920,26 @@ impl RecordsParser {
             if let Some(expected) = self.expected_field_count
                 && self.pending_value_count >= expected
             {
-                return Err(
-                    format!("pivot cache record has more than {expected} field values").into(),
-                );
+                return Err(invalid(format!(
+                    "pivot cache record has more than {expected} field values"
+                )));
             }
             if let Item::Index(index) = &value
                 && self.expected_field_count.is_some()
             {
                 let shared_item_count = self.shared_item_counts[self.pending_value_count];
                 if usize::try_from(*index).map_or(true, |index| index >= shared_item_count) {
-                    return Err(format!(
+                    return Err(invalid(format!(
                         "pivot cache shared-item index {index} exceeds the {shared_item_count} items for field {}",
                         self.pending_value_count
-                    )
-                    .into());
+                    )));
                 }
             }
             self.pending_value_count += 1;
             if self.retain_records {
                 self.pending_record
                     .as_mut()
-                    .ok_or("pivot cache value outside a record")?
+                    .ok_or_else(|| invalid("pivot cache value outside a record"))?
                     .values
                     .push(value);
             }
@@ -935,16 +954,15 @@ impl RecordsParser {
                 if let Some(expected) = self.expected_field_count
                     && self.pending_value_count != expected
                 {
-                    return Err(format!(
+                    return Err(invalid(format!(
                         "pivot cache record has {} values, expected {expected}",
                         self.pending_value_count
-                    )
-                    .into());
+                    )));
                 }
                 let record = self
                     .pending_record
                     .take()
-                    .ok_or("missing pending pivot cache record")?;
+                    .ok_or_else(|| invalid("missing pending pivot cache record"))?;
                 self.actual_records += 1;
                 if self.retain_records {
                     self.records.records.push(record);
@@ -975,7 +993,7 @@ pub(super) fn validate_pivot_cache_records(
     definition_record_count: Option<u32>,
 ) -> SheetResult<()> {
     RecordsParser::parse(xml, Some(cache_fields), definition_record_count, false)?
-        .ok_or("pivot-cache records part has no pivotCacheRecords root")?;
+        .ok_or_else(|| invalid("pivot-cache records part has no pivotCacheRecords root"))?;
     Ok(())
 }
 
@@ -1114,6 +1132,6 @@ fn parse_subtotal(subtotal: Option<&str>) -> SheetResult<PivotValueFunction> {
         "min" => Ok(PivotValueFunction::Min),
         "max" => Ok(PivotValueFunction::Max),
         "product" | "stdDev" | "stdDevp" | "var" | "varp" => Ok(PivotValueFunction::Custom),
-        value => Err(format!("invalid pivot data subtotal '{value}'").into()),
+        value => Err(invalid(format!("invalid pivot data subtotal '{value}'"))),
     }
 }

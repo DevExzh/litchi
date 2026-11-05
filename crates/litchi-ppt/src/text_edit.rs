@@ -1,14 +1,48 @@
 //! Source-checked, lossless edits of text already owned by a PPT shape.
 //!
-//! Length-changing replacement is supported when the selected
-//! `TextCharsAtom` or `TextBytesAtom` has either no style record or a single
-//! paragraph-formatting run and a single character-formatting run. The two
-//! style coverage counts are then updated with the text atom and every owning
+//! Length-changing replacement is supported when the selected text body is a
+//! `TextHeaderAtom` and one `TextCharsAtom` or `TextBytesAtom` followed by at
+//! most one each of:
+//!
+//! - a `StyleTextPropAtom` with one paragraph run and one character run
+//!   (optionally plus a one-character run for the paragraph mark);
+//! - a `TextSpecialInfoAtom` with one run, or one text run plus a mark run;
+//! - a `TextRulerAtom`, which holds no character position.
+//!
+//! The coverage counts are then updated with the text atom and every owning
 //! container length. `[MS-PPT]` associates other formatting, interaction,
-//! bookmark, metacharacter, and special-information records with UTF-16
-//! positions; their presence remains a typed dependency-closure refusal.
+//! bookmark, metacharacter, and multi-run special-information records with
+//! UTF-16 positions; their presence remains a typed dependency-closure
+//! refusal for a changed length (same-length replacement stays available).
+//!
+//! The text of a title or body placeholder that `PowerPoint` keeps in the
+//! slide list (its `ClientTextbox` holds only an `OutlineTextRefAtom`, MS-PPT
+//! 2.9.78) is edited in place in the live `DocumentContainer`'s
+//! `SlideListWithTextContainer` body the reference selects, under the same
+//! rules, by the root transaction's batch publisher.
+//!
+//! The editing owners are crate-private since record 0357: the public text
+//! edits are the [`crate::Package::edit`] verbs (`set_shape_text`,
+//! `set_shape_texts`, `set_notes_text`, `set_run_format`, …), which drive
+//! this module. It keeps public the vocabulary those verbs take
+//! ([`Target`](crate::text_edit::Target),
+//! [`RunFormat`](crate::text_edit::RunFormat)), the read views
+//! ([`TextRuns`](crate::text_edit::TextRuns) and the source-backed
+//! [`SourceSnapshot`](crate::text_edit::SourceSnapshot) reader) and the typed
+//! [`Error`](crate::text_edit::Error)/[`Refusal`](crate::text_edit::Refusal).
+//!
+//! The source-backed same-length splice is a scoped family since record
+//! 0357a: [`Package::edit_text`](crate::Package::edit_text) returns a
+//! [`text_edit::Edit`](crate::text_edit::Edit) whose commit publishes a new
+//! package over the composed overlay source without materializing it, and
+//! [`Package::apply_text`](crate::Package::apply_text) replays its
+//! [`text_edit::Patch`](crate::text_edit::Patch).
+#![allow(
+    dead_code,
+    reason = "crate-private native text owners (record 0357): the whole-artifact transaction and the source-backed splice owner behind text_edit::Edit keep their full surface exercised by the unit tests"
+)]
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet, btree_map::Entry};
 use std::fmt;
 use std::io::{Cursor, Write};
 use std::sync::Arc;
@@ -16,8 +50,9 @@ use std::sync::Arc;
 pub use litchi_core::Position;
 
 use crate::consts::RecordType;
-use crate::package::{Error as PackageError, Package, Result as PackageResult};
+use crate::package::{Error as PackageError, Result as PackageResult};
 use crate::presentation::Presentation;
+use crate::raw::Reader;
 use crate::shapes::ShapeEnum;
 use litchi_cfb::{
     ArtifactFingerprint, OleError, OverlayError, PublishReport, SameLengthStreamSplice,
@@ -26,7 +61,15 @@ use litchi_cfb::{
 use litchi_core::{ReadAt, SourceVersion};
 use litchi_ole_common::source_backed_overlay::SourceBackedOverlayPublisher;
 
+mod family;
+mod readback;
+#[cfg(test)]
+mod readback_tests;
+pub(crate) mod runs;
 mod source_range;
+
+pub use family::{Commit, Diagnostics, Edit, LimitKind, Patch};
+pub use runs::{CharacterRun, RunFormat, TextLink, TextRuns};
 
 const PPT_HEADER_LEN: usize = 8;
 const OFFICEART_SP_CONTAINER: u16 = 0xF004;
@@ -102,6 +145,8 @@ pub enum Refusal {
     /// The selected textbox contains a record whose relationship to the text
     /// atom is not modeled by the source-backed splice owner.
     UnsupportedDependency,
+    /// The selected slide has no notes page to hold speaker-notes text.
+    NoNotesPage,
 }
 
 impl fmt::Display for Refusal {
@@ -142,6 +187,7 @@ impl fmt::Display for Refusal {
                 formatter,
                 "source-backed PPT shape-text replacement must preserve encoded atom length"
             ),
+            Self::NoNotesPage => write!(formatter, "PPT slide has no notes page"),
             Self::UnsupportedDependency => write!(
                 formatter,
                 "selected PPT shape text has an unsupported dependency record"
@@ -150,8 +196,35 @@ impl fmt::Display for Refusal {
     }
 }
 
+impl Refusal {
+    /// The shared refusal class of this reason (record 0351 §2.4 rule 2);
+    /// unified callers classify by this kind alone.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+
+        match self {
+            Self::SlideNotFound { .. } | Self::ShapeNotFound => RefusalKind::NotFound,
+            Self::AmbiguousShape
+            | Self::NoAnchor
+            | Self::AmbiguousAnchor
+            | Self::NoTextbox
+            | Self::AmbiguousTextbox
+            | Self::NoTextAtom
+            | Self::MultipleTextAtoms
+            | Self::NoNotesPage => RefusalKind::UnsupportedTarget,
+            Self::UnsupportedSource
+            | Self::IncompatibleEncoding
+            | Self::DependencyClosure
+            | Self::LengthChange
+            | Self::UnsupportedDependency => RefusalKind::UnsupportedContent,
+        }
+    }
+}
+
 /// Error returned by the focused text-edit transaction.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// The package could not be opened, parsed, or republished.
     Package(PackageError),
@@ -160,6 +233,12 @@ pub enum Error {
     /// The immutable positional source or sequential overlay publisher
     /// rejected a source-backed operation.
     Source(OverlayError),
+    /// A [`Patch`] was made from a package with another exact source
+    /// artifact fingerprint (record 0357a).
+    PatchConflict,
+    /// A changed text splice would invalidate the package signature
+    /// (record 0357a).
+    Signed,
 }
 
 impl fmt::Display for Error {
@@ -168,6 +247,11 @@ impl fmt::Display for Error {
             Self::Package(error) => error.fmt(formatter),
             Self::Refused(refusal) => refusal.fmt(formatter),
             Self::Source(error) => error.fmt(formatter),
+            Self::PatchConflict => formatter
+                .write_str("PPT text patch source does not match the exact package receiving it"),
+            Self::Signed => {
+                formatter.write_str("changed PPT text writes require explicit signature removal")
+            },
         }
     }
 }
@@ -176,7 +260,7 @@ impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Package(error) => Some(error),
-            Self::Refused(_) => None,
+            Self::Refused(_) | Self::PatchConflict | Self::Signed => None,
             Self::Source(error) => Some(error),
         }
     }
@@ -199,8 +283,9 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 /// Immutable whole-package snapshot used by [`Transaction`].
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Snapshot {
+pub(crate) struct Snapshot {
     bytes: Arc<[u8]>,
+    source_limits: crate::SourceLimits,
 }
 
 impl Snapshot {
@@ -209,7 +294,7 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error when the complete package cannot be opened.
-    pub fn parse(bytes: &[u8]) -> Result<Self> {
+    pub(crate) fn parse(bytes: &[u8]) -> Result<Self> {
         Self::from_bytes(bytes.to_vec())
     }
 
@@ -218,21 +303,25 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error when the complete package cannot be opened.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        let _ = presentation(&bytes)?;
+    pub(crate) fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
+        let presentation = presentation(&bytes)?;
         Ok(Self {
             bytes: Arc::from(bytes.into_boxed_slice()),
+            source_limits: presentation.source_limits(),
         })
     }
 
     pub(crate) fn from_shared_bytes(bytes: Arc<[u8]>) -> Result<Self> {
-        let _ = presentation_shared(bytes.clone())?;
-        Ok(Self { bytes })
+        let presentation = presentation_shared(bytes.clone())?;
+        Ok(Self {
+            bytes,
+            source_limits: presentation.source_limits(),
+        })
     }
 
     /// Exact bytes of the complete source or committed package artifact.
     #[must_use]
-    pub fn bytes(&self) -> &[u8] {
+    pub(crate) fn bytes(&self) -> &[u8] {
         &self.bytes
     }
 
@@ -242,17 +331,37 @@ impl Snapshot {
     ///
     /// Returns a typed refusal when the target cannot be resolved to one safe
     /// text atom.
-    pub fn edit_text(&self, target: Target) -> Result<Transaction> {
+    pub(crate) fn edit_text(&self, target: Target) -> Result<Transaction> {
+        self.edit_text_in(target, None)
+    }
+
+    /// [`Self::edit_text`], resolving the target through `presentation`, the
+    /// already opened projection of exactly these bytes, when one is given.
+    pub(crate) fn edit_text_in(
+        &self,
+        target: Target,
+        presentation: Option<&Presentation>,
+    ) -> Result<Transaction> {
         // Resolve the semantic selector without surfacing its result yet. The
         // editor preflight below remains the first observable failure, while
         // keeping the two allocation-heavy owners sequential.
-        let shape_target = resolve_shape_target(&self.bytes, target);
+        let shape_target = match presentation {
+            Some(presentation) => resolve_shape_target_at_with_view(presentation, target),
+            None => presentation_shared(self.bytes.clone())
+                .map_err(Error::from)
+                .and_then(|presentation| {
+                    resolve_shape_target_in_presentation_with_view(&presentation, target)
+                }),
+        };
         // The shared incremental owner rejects signed and encrypted CFB
         // envelopes before any candidate is staged. Surface that capability
         // boundary as a typed refusal instead of trying to normalize it.
-        let editor = crate::embedded::object::Editor::open_records(self.bytes.to_vec())
-            .map_err(|_error| Error::Refused(Refusal::UnsupportedSource))?;
-        let resolved = resolve_with_shape_target(target, shape_target?, &editor)?;
+        let editor =
+            crate::embedded::object::Editor::open_records(self.bytes.to_vec(), self.source_limits)
+                .map_err(|_error| Error::Refused(Refusal::UnsupportedSource))?;
+        let (shape_target, source_view) = shape_target?;
+        let mut resolved = resolve_with_shape_target(target, shape_target, &editor)?;
+        resolved.source_view = source_view.map(Arc::new);
         Ok(Transaction {
             source: self.clone(),
             resolved,
@@ -271,7 +380,10 @@ impl Snapshot {
     ///
     /// Returns an error when the patch vocabulary is unsupported, a
     /// precondition conflicts, or the requested text edit is refused.
-    pub fn apply_durable<Mode>(&self, patch: &litchi_core::patch::Patch<Mode>) -> Result<Self> {
+    pub(crate) fn apply_durable<Mode>(
+        &self,
+        patch: &litchi_core::patch::Patch<Mode>,
+    ) -> Result<Self> {
         if patch.format() != "litchi-ppt" || !patch.blobs().is_empty() {
             return Err(invalid_durable_patch("unsupported format or blob bundle"));
         }
@@ -326,12 +438,12 @@ impl Snapshot {
 /// Options for the narrow immutable positional PPT text-splice owner.
 ///
 /// The owner intentionally has no length-changing or topology-changing
-/// fallback. `record_limits` bounds the semantic metadata and selected slide
+/// fallback. `source_limits` bounds the semantic metadata and selected slide
 /// reads; `splice_limits` bounds the common CFB physical plan.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct SourceBackedOptions {
     /// Finite PPT record and stream limits.
-    pub record_limits: crate::RecordLimits,
+    pub source_limits: crate::SourceLimits,
     /// Finite CFB same-length splice limits.
     pub splice_limits: StreamSpliceLimits,
 }
@@ -380,39 +492,71 @@ impl SourceSnapshot {
         Self::open_with_options(source, SourceBackedOptions::default())
     }
 
-    /// Opens a positional source with explicit finite limits.
-    pub fn open_with_limits(
-        source: Arc<dyn ReadAt>,
-        record_limits: crate::RecordLimits,
-    ) -> Result<Self> {
-        Self::open_with_options(
-            source,
-            SourceBackedOptions {
-                record_limits,
-                ..SourceBackedOptions::default()
-            },
-        )
-    }
-
     /// Opens a positional source with explicit semantic and splice limits.
     pub fn open_with_options(
         source: Arc<dyn ReadAt>,
         options: SourceBackedOptions,
     ) -> Result<Self> {
-        let shared_limits = shared_limits(options.record_limits)?;
+        let shared_limits = shared_limits(options.source_limits)?;
         let length = source
             .len()
             .map_err(|error| Error::Source(OverlayError::Io(error)))?;
         if length > shared_limits.max_input_bytes() {
-            return Err(PackageError::ResourceLimit(format!(
-                "PPT source length {length} exceeds limit {}",
-                shared_limits.max_input_bytes()
-            ))
+            return Err(PackageError::Limit {
+                kind: crate::SourceLimitKind::InputBytes,
+                observed: usize::try_from(length).unwrap_or(usize::MAX),
+                maximum: options.source_limits.max_input_bytes(),
+            }
             .into());
         }
-        let publisher =
-            SourceBackedOverlayPublisher::open_with_limits(Arc::clone(&source), shared_limits)
-                .map_err(Error::Source)?;
+        let publisher = SourceBackedOverlayPublisher::open(Arc::clone(&source), shared_limits)
+            .map_err(Error::Source)?;
+        let shared = publisher.shared();
+        crate::package::preflight_shared_ole_file(&shared, options.source_limits)?;
+        Self::from_publisher(source, length, &publisher, options)
+    }
+
+    /// Builds the snapshot over a positional CFB owner that is already open,
+    /// such as the one a [`crate::SourceBackedPackage`] or a format detector
+    /// holds, without indexing the container again.
+    ///
+    /// The checks are the ones [`Self::open_with_options`] runs after its own
+    /// index: the protected-container refusal, the source version, and the
+    /// complete-artifact fingerprint of an empty splice plan. The CFB index
+    /// is the adopted one, so `options.source_limits` bounds the input length
+    /// here but cannot re-run the index's directory and allocation-table
+    /// ceilings; those are the ones `shared` was opened under.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source exceeds `options`, is protected, has
+    /// changed since `shared` was opened, or cannot be fingerprinted.
+    pub fn from_shared(shared: Arc<SharedOleFile>, options: SourceBackedOptions) -> Result<Self> {
+        shared.source_version().map_err(map_ole_error)?;
+        crate::package::preflight_shared_ole_file(&shared, options.source_limits)?;
+        let shared_limits = shared_limits(options.source_limits)?;
+        let source = shared.source_arc();
+        let length = shared.file_size();
+        if length > shared_limits.max_input_bytes() {
+            return Err(PackageError::Limit {
+                kind: crate::SourceLimitKind::InputBytes,
+                observed: usize::try_from(length).unwrap_or(usize::MAX),
+                maximum: options.source_limits.max_input_bytes(),
+            }
+            .into());
+        }
+        let publisher = SourceBackedOverlayPublisher::from_shared(shared).map_err(Error::Source)?;
+        Self::from_publisher(source, length, &publisher, options)
+    }
+
+    /// The common tail of the two constructors: everything after the CFB
+    /// owner exists and has passed the protected-container refusal.
+    fn from_publisher(
+        source: Arc<dyn ReadAt>,
+        length: u64,
+        publisher: &SourceBackedOverlayPublisher,
+        options: SourceBackedOptions,
+    ) -> Result<Self> {
         let version = publisher.source_version().map_err(Error::Source)?;
 
         // An empty splice still runs the common full-artifact fingerprint and
@@ -475,7 +619,7 @@ impl SourceSnapshot {
     ///
     /// The returned transaction admits only an equal encoded-length
     /// replacement. There is no fallback to the ordinary full-record editor.
-    pub fn edit_text(&self, target: Target) -> Result<SourceTransaction> {
+    pub(crate) fn edit_text(&self, target: Target) -> Result<SourceTransaction> {
         let resolved = self.resolve_source_text(target)?;
         Ok(SourceTransaction {
             source: self.clone(),
@@ -488,8 +632,8 @@ impl SourceSnapshot {
     ///
     /// The returned text is owned, so the source-backed selector does not
     /// expose a source lifetime or any physical CFB identity. Resolution uses
-    /// the same bounded positional path and refusal checks as
-    /// [`Self::edit_text`].
+    /// the bounded positional path and refusal checks of the source-backed
+    /// text owner.
     pub fn read_text(&self, target: Target) -> Result<String> {
         Ok(self.resolve_source_text(target)?.text)
     }
@@ -506,7 +650,7 @@ impl SourceSnapshot {
             &document_path,
             &current_user_path,
             target,
-            self.inner.options.record_limits,
+            self.inner.options.source_limits,
         )?;
         self.ensure_current()?;
         Ok(resolved)
@@ -534,7 +678,7 @@ impl SourceSnapshot {
 /// One isolated equal-length text replacement staged against a positional
 /// PPT source.
 #[derive(Clone)]
-pub struct SourceTransaction {
+pub(crate) struct SourceTransaction {
     source: SourceSnapshot,
     resolved: SourceResolved,
     replacement: Option<String>,
@@ -554,13 +698,13 @@ impl fmt::Debug for SourceTransaction {
 impl SourceTransaction {
     /// Exact semantic text currently read from the selected atom.
     #[must_use]
-    pub fn text(&self) -> &str {
+    pub(crate) fn text(&self) -> &str {
         &self.resolved.text
     }
 
     /// Selected semantic slide/shape position.
     #[must_use]
-    pub const fn target(&self) -> Target {
+    pub(crate) const fn target(&self) -> Target {
         self.resolved.target
     }
 
@@ -568,7 +712,7 @@ impl SourceTransaction {
     ///
     /// Failed validation leaves the transaction unchanged. The ordinary
     /// source-owning editor remains separate and is not used as a fallback.
-    pub fn set_text(&mut self, value: impl Into<String>) -> Result<()> {
+    pub(crate) fn set_text(&mut self, value: impl Into<String>) -> Result<()> {
         let candidate = value.into();
         let encoded_length = encoded_replacement_len(&candidate, self.resolved.kind)?;
         if encoded_length != self.resolved.payload.len() {
@@ -580,23 +724,17 @@ impl SourceTransaction {
 
     /// Publishes the bounded source-backed splice after complete candidate
     /// CFB reopen and selected-slide semantic readback.
-    pub fn commit(self) -> Result<SourceBackedCommit> {
+    pub(crate) fn commit(self) -> Result<SourceBackedCommit> {
         let replacement = self
             .replacement
             .unwrap_or_else(|| self.resolved.text.clone());
         publish_source_text(self.source, self.resolved, replacement)
     }
-
-    /// Discards this transaction and returns its immutable source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> SourceSnapshot {
-        self.source
-    }
 }
 
 /// Content-free diagnostics for one source-backed PPT text publication.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SourceBackedDiagnostics {
+pub(crate) struct SourceBackedDiagnostics {
     target: Target,
     changed_spans: usize,
     replacement_bytes: u64,
@@ -610,55 +748,55 @@ pub struct SourceBackedDiagnostics {
 impl SourceBackedDiagnostics {
     /// Semantic selector used by the operation.
     #[must_use]
-    pub const fn target(self) -> Target {
+    pub(crate) const fn target(self) -> Target {
         self.target
     }
 
     /// Number of physical CFB spans changed by the splice.
     #[must_use]
-    pub const fn changed_spans(self) -> usize {
+    pub(crate) const fn changed_spans(self) -> usize {
         self.changed_spans
     }
 
     /// Replacement bytes submitted to the CFB splice planner.
     #[must_use]
-    pub const fn replacement_bytes(self) -> u64 {
+    pub(crate) const fn replacement_bytes(self) -> u64 {
         self.replacement_bytes
     }
 
     /// Complete source CFB length.
     #[must_use]
-    pub const fn source_bytes(self) -> u64 {
+    pub(crate) const fn source_bytes(self) -> u64 {
         self.source_bytes
     }
 
     /// Exact source artifact fingerprint.
     #[must_use]
-    pub const fn source_fingerprint(self) -> ArtifactFingerprint {
+    pub(crate) const fn source_fingerprint(self) -> ArtifactFingerprint {
         self.source_fingerprint
     }
 
     /// Exact composed target artifact fingerprint.
     #[must_use]
-    pub const fn target_fingerprint(self) -> ArtifactFingerprint {
+    pub(crate) const fn target_fingerprint(self) -> ArtifactFingerprint {
         self.target_fingerprint
     }
 
     /// Source version checked before planning.
     #[must_use]
-    pub const fn source_version(self) -> SourceVersion {
+    pub(crate) const fn source_version(self) -> SourceVersion {
         self.source_version
     }
 
     /// Composed target version exposed by the positional overlay.
     #[must_use]
-    pub const fn target_version(self) -> SourceVersion {
+    pub(crate) const fn target_version(self) -> SourceVersion {
         self.target_version
     }
 }
 
 /// A published source-backed PPT target and its reusable overlay plan.
-pub struct SourceBackedCommit {
+pub(crate) struct SourceBackedCommit {
     snapshot: SourceSnapshot,
     patch: SourceBackedPatch,
     plan: ValidatedOverlayPlan,
@@ -679,53 +817,53 @@ impl fmt::Debug for SourceBackedCommit {
 impl SourceBackedCommit {
     /// Reopened target source snapshot.
     #[must_use]
-    pub const fn snapshot(&self) -> &SourceSnapshot {
+    pub(crate) const fn snapshot(&self) -> &SourceSnapshot {
         &self.snapshot
     }
 
     /// Exact-source reversible patch.
     #[must_use]
-    pub const fn patch(&self) -> &SourceBackedPatch {
+    pub(crate) const fn patch(&self) -> &SourceBackedPatch {
         &self.patch
     }
 
     /// Common validated CFB overlay plan.
     #[must_use]
-    pub const fn plan(&self) -> &ValidatedOverlayPlan {
+    pub(crate) const fn plan(&self) -> &ValidatedOverlayPlan {
         &self.plan
     }
 
     /// Content-free publication diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> SourceBackedDiagnostics {
+    pub(crate) const fn diagnostics(&self) -> SourceBackedDiagnostics {
         self.diagnostics
     }
 
     /// Whether the selected replacement is an exact byte no-op.
     #[must_use]
-    pub fn is_noop(&self) -> bool {
+    pub(crate) fn is_noop(&self) -> bool {
         self.plan.is_noop()
     }
 
     /// Streams the complete validated target to a sequential sink.
-    pub fn write_to<W: Write>(&self, writer: &mut W) -> Result<PublishReport> {
+    pub(crate) fn write_to<W: Write>(&self, writer: &mut W) -> Result<PublishReport> {
         self.plan.write_to(writer).map_err(Error::Source)
     }
 
     /// Alias emphasizing the forward-only publication boundary.
-    pub fn publish_to_stream<W: Write>(&self, writer: &mut W) -> Result<PublishReport> {
+    pub(crate) fn publish_to_stream<W: Write>(&self, writer: &mut W) -> Result<PublishReport> {
         self.write_to(writer)
     }
 
     /// Publishes through the common synced sibling-temp/atomic-rename path.
-    pub fn save<P: AsRef<std::path::Path>>(&self, path: P) -> Result<PublishReport> {
+    pub(crate) fn save<P: AsRef<std::path::Path>>(&self, path: P) -> Result<PublishReport> {
         self.plan.save(path).map_err(Error::Source)
     }
 
     /// Publishes through the common sibling-temp/atomic-rename path at a
     /// caller-chosen [`Durability`](litchi_core::Durability); see
     /// [`litchi_cfb::ValidatedOverlayPlan::save_with_durability`].
-    pub fn save_with_durability<P: AsRef<std::path::Path>>(
+    pub(crate) fn save_with_durability<P: AsRef<std::path::Path>>(
         &self,
         path: P,
         durability: litchi_core::Durability,
@@ -738,7 +876,7 @@ impl SourceBackedCommit {
 
 /// A source-checked reversible equal-length PPT text splice.
 #[derive(Clone)]
-pub struct SourceBackedPatch {
+pub(crate) struct SourceBackedPatch {
     before: SourceSnapshot,
     after: SourceSnapshot,
     operation: Option<SourceOperation>,
@@ -758,37 +896,37 @@ impl fmt::Debug for SourceBackedPatch {
 impl SourceBackedPatch {
     /// Exact source snapshot required for forward application.
     #[must_use]
-    pub const fn source(&self) -> &SourceSnapshot {
+    pub(crate) const fn source(&self) -> &SourceSnapshot {
         &self.before
     }
 
     /// Exact target snapshot produced by forward application.
     #[must_use]
-    pub const fn target(&self) -> &SourceSnapshot {
+    pub(crate) const fn target(&self) -> &SourceSnapshot {
         &self.after
     }
 
     /// Exact source artifact fingerprint required for forward application.
     #[must_use]
-    pub fn source_fingerprint(&self) -> ArtifactFingerprint {
+    pub(crate) fn source_fingerprint(&self) -> ArtifactFingerprint {
         self.before.fingerprint()
     }
 
     /// Exact target artifact fingerprint produced by forward application.
     #[must_use]
-    pub fn target_fingerprint(&self) -> ArtifactFingerprint {
+    pub(crate) fn target_fingerprint(&self) -> ArtifactFingerprint {
         self.after.fingerprint()
     }
 
     /// Whether the patch changes no bytes.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.operation.is_none()
     }
 
     /// Applies only to the exact source version and fingerprint captured by
     /// this patch. The candidate is reopened and semantically read back again.
-    pub fn apply(&self, current: &SourceSnapshot) -> Result<SourceSnapshot> {
+    pub(crate) fn apply(&self, current: &SourceSnapshot) -> Result<SourceSnapshot> {
         if current.source_version() != self.before.source_version() {
             return Err(Error::Source(OverlayError::SourceChanged {
                 expected: self.before.source_version(),
@@ -817,7 +955,7 @@ impl SourceBackedPatch {
 
     /// Returns the exact-source-checked inverse operation.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
@@ -916,12 +1054,10 @@ fn publish_source_text(
 
 fn publish_source_noop(source: SourceSnapshot, target: Target) -> Result<SourceBackedCommit> {
     source.ensure_current()?;
-    let shared_limits = shared_limits(source.inner.options.record_limits)?;
-    let publisher = SourceBackedOverlayPublisher::open_with_limits(
-        Arc::clone(&source.inner.source),
-        shared_limits,
-    )
-    .map_err(Error::Source)?;
+    let shared_limits = shared_limits(source.inner.options.source_limits)?;
+    let publisher =
+        SourceBackedOverlayPublisher::open(Arc::clone(&source.inner.source), shared_limits)
+            .map_err(Error::Source)?;
     let plan = publisher
         .plan_splices(Vec::new(), source.inner.options.splice_limits)
         .map_err(Error::Source)?;
@@ -959,12 +1095,10 @@ fn publish_source_operation(
     operation: SourceOperation,
 ) -> Result<SourceBackedCommit> {
     source.ensure_current()?;
-    let shared_limits = shared_limits(source.inner.options.record_limits)?;
-    let publisher = SourceBackedOverlayPublisher::open_with_limits(
-        Arc::clone(&source.inner.source),
-        shared_limits,
-    )
-    .map_err(Error::Source)?;
+    let shared_limits = shared_limits(source.inner.options.source_limits)?;
+    let publisher =
+        SourceBackedOverlayPublisher::open(Arc::clone(&source.inner.source), shared_limits)
+            .map_err(Error::Source)?;
     let observed_version = publisher.source_version().map_err(Error::Source)?;
     if observed_version != source.source_version() {
         return Err(Error::Source(OverlayError::SourceChanged {
@@ -982,16 +1116,15 @@ fn publish_source_operation(
         source.inner.options.splice_limits,
         |composed| -> Result<(Arc<dyn ReadAt>, SharedOleFile, SourceVersion)> {
             let candidate: Arc<dyn ReadAt> = Arc::new(composed.clone());
-            let candidate_shared =
-                SharedOleFile::open_with_limits(Arc::clone(&candidate), shared_limits)
-                    .map_err(map_ole_error)?;
+            let candidate_shared = SharedOleFile::open(Arc::clone(&candidate), shared_limits)
+                .map_err(map_ole_error)?;
             reject_macro_components(&candidate_shared)?;
             let candidate_resolved = source_range::resolve_source_target(
                 &candidate_shared,
                 &operation.document_path,
                 &operation.current_user_path,
                 operation.target,
-                source.inner.options.record_limits,
+                source.inner.options.source_limits,
             )?;
             verify_source_readback(&operation, &candidate_resolved)?;
             let target_version = candidate
@@ -1066,10 +1199,8 @@ fn verify_source_readback(operation: &SourceOperation, resolved: &SourceResolved
     Ok(())
 }
 
-fn shared_limits(record_limits: crate::RecordLimits) -> Result<SharedOleFileLimits> {
-    let maximum = u64::try_from(record_limits.max_package_bytes).map_err(|_error| {
-        PackageError::ResourceLimit("PPT package limit does not fit u64".into())
-    })?;
+fn shared_limits(source_limits: crate::SourceLimits) -> Result<SharedOleFileLimits> {
+    let maximum = u64::try_from(source_limits.max_package_bytes).unwrap_or(u64::MAX);
     SharedOleFileLimits::new(maximum).map_err(map_ole_error)
 }
 
@@ -1093,12 +1224,10 @@ fn open_shared_source(source: &SourceSnapshot) -> Result<Arc<SharedOleFile>> {
 impl SourceSnapshot {
     fn ensure_identity(&self) -> Result<()> {
         self.ensure_current()?;
-        let shared_limits = shared_limits(self.inner.options.record_limits)?;
-        let publisher = SourceBackedOverlayPublisher::open_with_limits(
-            Arc::clone(&self.inner.source),
-            shared_limits,
-        )
-        .map_err(Error::Source)?;
+        let shared_limits = shared_limits(self.inner.options.source_limits)?;
+        let publisher =
+            SourceBackedOverlayPublisher::open(Arc::clone(&self.inner.source), shared_limits)
+                .map_err(Error::Source)?;
         let plan = publisher
             .plan_splices(Vec::new(), self.inner.options.splice_limits)
             .map_err(Error::Source)?;
@@ -1165,19 +1294,22 @@ fn ensure_matching_stream_topology(document: &[String], current_user: &[String])
 fn read_bounded_stream(
     shared: &SharedOleFile,
     path: &[String],
-    limits: crate::RecordLimits,
-    label: &str,
+    limits: crate::SourceLimits,
+    _label: &str,
 ) -> Result<Vec<u8>> {
     let refs: Vec<_> = path.iter().map(String::as_str).collect();
     let length = shared.stream_len(&refs).map_err(map_ole_error)?;
-    let length_usize = usize::try_from(length).map_err(|_error| {
-        PackageError::ResourceLimit(format!("{label} stream size exceeds this platform"))
+    let length_usize = usize::try_from(length).map_err(|_error| PackageError::Limit {
+        kind: crate::SourceLimitKind::EntryBytes,
+        observed: usize::MAX,
+        maximum: limits.max_input_bytes,
     })?;
     if length_usize > limits.max_input_bytes {
-        return Err(PackageError::ResourceLimit(format!(
-            "{label} stream size {length_usize} exceeds limit {}",
-            limits.max_input_bytes
-        ))
+        return Err(PackageError::Limit {
+            kind: crate::SourceLimitKind::EntryBytes,
+            observed: length_usize,
+            maximum: limits.max_input_bytes,
+        }
         .into());
     }
     let mut bytes = Vec::new();
@@ -1225,7 +1357,7 @@ fn is_macro_storage_name(name: &str) -> bool {
 fn reject_macro_records(
     document: &[u8],
     document_offset: usize,
-    limits: crate::RecordLimits,
+    limits: crate::SourceLimits,
 ) -> Result<()> {
     let (record, _consumed) =
         crate::Record::parse_strict_with_limits(document, document_offset, limits)?;
@@ -1365,7 +1497,7 @@ fn resolve_source_target_owned(
     document_path: &[String],
     current_user_path: &[String],
     target: Target,
-    limits: crate::RecordLimits,
+    limits: crate::SourceLimits,
 ) -> Result<SourceResolved> {
     let document_refs: Vec<_> = document_path.iter().map(String::as_str).collect();
     let current_user_refs: Vec<_> = current_user_path.iter().map(String::as_str).collect();
@@ -1373,17 +1505,21 @@ fn resolve_source_target_owned(
     let current_user_length = shared
         .stream_len(&current_user_refs)
         .map_err(map_ole_error)?;
-    let aggregate_length = document_length
-        .checked_add(current_user_length)
-        .ok_or_else(|| PackageError::ResourceLimit("PPT metadata stream sizes overflow".into()))?;
-    let aggregate_limit = u64::try_from(limits.max_aggregate_input_bytes).map_err(|_error| {
-        PackageError::ResourceLimit("PPT aggregate input limit does not fit u64".into())
-    })?;
+    let aggregate_length =
+        document_length
+            .checked_add(current_user_length)
+            .ok_or(PackageError::Limit {
+                kind: crate::SourceLimitKind::AggregateBytes,
+                observed: usize::MAX,
+                maximum: limits.max_aggregate_input_bytes,
+            })?;
+    let aggregate_limit = u64::try_from(limits.max_aggregate_input_bytes).unwrap_or(u64::MAX);
     if aggregate_length > aggregate_limit {
-        return Err(PackageError::ResourceLimit(format!(
-            "PPT Document and Current User streams total {aggregate_length} bytes, exceeding limit {}",
-            limits.max_aggregate_input_bytes
-        ))
+        return Err(PackageError::Limit {
+            kind: crate::SourceLimitKind::AggregateBytes,
+            observed: usize::try_from(aggregate_length).unwrap_or(usize::MAX),
+            maximum: limits.max_aggregate_input_bytes,
+        }
         .into());
     }
     // Shared so the selected slide's record payloads span this buffer instead
@@ -1458,7 +1594,7 @@ fn inspect_source_text_atom(
     document: &[u8],
     slide_offset: usize,
     shape_id: u32,
-    limits: crate::RecordLimits,
+    limits: crate::SourceLimits,
 ) -> Result<SourceTextAtom> {
     let (slide, consumed) =
         crate::Record::parse_strict_with_limits(document, slide_offset, limits)?;
@@ -1814,7 +1950,7 @@ fn invalid_durable_patch(message: &str) -> Error {
 
 /// One isolated text replacement staged against an immutable package.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub(crate) struct Transaction {
     source: Snapshot,
     resolved: Resolved,
     replacement: Option<String>,
@@ -1823,13 +1959,13 @@ pub struct Transaction {
 impl Transaction {
     /// The exact text currently stored in the selected shape.
     #[must_use]
-    pub fn text(&self) -> &str {
+    pub(crate) fn text(&self) -> &str {
         &self.resolved.text
     }
 
     /// The selected semantic target.
     #[must_use]
-    pub const fn target(&self) -> Target {
+    pub(crate) const fn target(&self) -> Target {
         self.resolved.target
     }
 
@@ -1840,12 +1976,16 @@ impl Transaction {
     ///
     /// Returns a typed refusal when the replacement has an incompatible
     /// encoding or when its changed length has unmodeled dependent ranges.
-    pub fn set_text(&mut self, value: impl Into<String>) -> Result<()> {
+    pub(crate) fn set_text(&mut self, value: impl Into<String>) -> Result<()> {
         let candidate = value.into();
         let encoded = encode_replacement(&candidate, self.resolved.kind)?;
-        if encoded.len() != self.resolved.payload.len() && !self.resolved.can_resize {
-            return Err(Error::Refused(Refusal::DependencyClosure));
-        }
+        check_replacement(
+            self.resolved.kind,
+            &self.resolved.payload,
+            &encoded,
+            self.resolved.can_resize,
+            &self.resolved.pins,
+        )?;
         self.replacement = Some(candidate);
         Ok(())
     }
@@ -1857,23 +1997,39 @@ impl Transaction {
     ///
     /// Returns an error if package publication or source-checked readback
     /// fails, or a typed refusal for an unsafe replacement.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<RecordCommit> {
+        self.commit_verified().map(|(commit, _)| commit)
+    }
+
+    /// [`Self::commit`], also returning the shapes a parse of the published
+    /// slide returns when the readback proved them incrementally (record
+    /// 0264).
+    pub(crate) fn commit_verified(
+        self,
+    ) -> Result<(RecordCommit, Option<(u32, crate::slide::PatchedShapes)>)> {
         let replacement = self
             .replacement
             .unwrap_or_else(|| self.resolved.text.clone());
         if replacement == self.resolved.text {
-            let patch = Patch::new(self.source.clone(), self.source.clone(), None);
-            return Ok(Commit {
-                snapshot: self.source,
-                patch,
-                replaced_slide_persist_id: None,
-            });
+            let patch = RecordPatch::new(self.source.clone(), self.source.clone(), None);
+            return Ok((
+                RecordCommit {
+                    snapshot: self.source,
+                    patch,
+                    replaced_slide_persist_id: None,
+                },
+                None,
+            ));
         }
 
         let encoded = encode_replacement(&replacement, self.resolved.kind)?;
-        if encoded.len() != self.resolved.payload.len() && !self.resolved.can_resize {
-            return Err(Error::Refused(Refusal::DependencyClosure));
-        }
+        check_replacement(
+            self.resolved.kind,
+            &self.resolved.payload,
+            &encoded,
+            self.resolved.can_resize,
+            &self.resolved.pins,
+        )?;
         let target_slide = rewrite_slide(
             &self.resolved.slide_record,
             self.resolved.native_shape_id,
@@ -1881,8 +2037,10 @@ impl Transaction {
             &self.resolved.payload,
             &encoded,
         )?;
-        let mut editor =
-            crate::embedded::object::Editor::open_records(self.source.bytes.clone().to_vec())?;
+        let mut editor = crate::embedded::object::Editor::open_records(
+            self.source.bytes.clone().to_vec(),
+            self.source.source_limits,
+        )?;
         let live = editor.persisted_record(self.resolved.slide_persist_id)?;
         if live != self.resolved.slide_record.as_ref() {
             return Err(PackageError::Corrupted(
@@ -1892,8 +2050,17 @@ impl Transaction {
         }
         editor.replace_persisted_record(self.resolved.slide_persist_id, target_slide)?;
         let bytes = editor.finish()?;
-        let snapshot = Snapshot::from_bytes(bytes)?;
-        let readback = resolve(&snapshot.bytes, self.resolved.target)?;
+        // `Snapshot::from_bytes` validates that the candidate opens; that
+        // open also serves the incremental readback (record 0264).
+        let bytes: Arc<[u8]> = Arc::from(bytes.into_boxed_slice());
+        let opened = presentation_shared(bytes.clone())?;
+        let snapshot = Snapshot {
+            bytes,
+            source_limits: opened.source_limits(),
+        };
+        let (readback, verified) =
+            resolve_published(&snapshot.bytes, &self.resolved, &replacement, &opened)?;
+        drop(opened);
         if readback.text != replacement {
             return Err(PackageError::Corrupted(
                 "published PPT shape text did not round-trip through the selected source shape"
@@ -1906,45 +2073,42 @@ impl Transaction {
             before_text: self.resolved.text,
             after_text: replacement,
         };
-        let patch = Patch::new(self.source, snapshot.clone(), Some(change));
-        Ok(Commit {
-            snapshot,
-            patch,
-            replaced_slide_persist_id: Some(self.resolved.slide_persist_id),
-        })
-    }
-
-    /// Discards this candidate without changing the source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
+        let patch = RecordPatch::new(self.source, snapshot.clone(), Some(change));
+        Ok((
+            RecordCommit {
+                snapshot,
+                patch,
+                replaced_slide_persist_id: Some(self.resolved.slide_persist_id),
+            },
+            verified,
+        ))
     }
 }
 
 /// A published snapshot and its reversible source-checked patch.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
+pub(crate) struct RecordCommit {
     snapshot: Snapshot,
-    patch: Patch,
+    patch: RecordPatch,
     replaced_slide_persist_id: Option<u32>,
 }
 
-impl Commit {
+impl RecordCommit {
     /// The immutable committed package.
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// The source-checked patch that produced this snapshot.
     #[must_use]
-    pub const fn patch(&self) -> &Patch {
+    pub(crate) const fn patch(&self) -> &RecordPatch {
         &self.patch
     }
 
     /// Consumes the commit into its snapshot and patch.
     #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
+    pub(crate) fn into_parts(self) -> (Snapshot, RecordPatch) {
         (self.snapshot, self.patch)
     }
 
@@ -2000,11 +2164,27 @@ pub(crate) struct RootBatchPublication {
     source: Arc<[u8]>,
     output: Arc<[u8]>,
     changes: Vec<RootShapeTextChange>,
+    /// Whether the publication replaced the live `DocumentContainer`, which
+    /// owns slide-list (outline) text bodies.
+    document_changed: bool,
+    /// Shapes that parsing each edited slide of `output` returns, proven by
+    /// the incremental readback (record 0264); empty when not proven or not
+    /// requested.
+    verified: readback::VerifiedSlides,
 }
 
 impl RootBatchPublication {
+    /// Take the proven shapes of the edited slides of the output.
+    pub(crate) fn take_verified_shapes(&mut self) -> readback::VerifiedSlides {
+        std::mem::take(&mut self.verified)
+    }
+
     pub(crate) fn source(&self) -> &[u8] {
         &self.source
+    }
+
+    pub(crate) const fn document_changed(&self) -> bool {
+        self.document_changed
     }
 
     pub(crate) fn changes(&self) -> &[RootShapeTextChange] {
@@ -2032,13 +2212,13 @@ impl RootPublication {
 
 /// A reversible in-memory patch authorized by exact package bytes.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Patch {
+pub(crate) struct RecordPatch {
     before: Snapshot,
     after: Snapshot,
     change: Option<Change>,
 }
 
-impl Patch {
+impl RecordPatch {
     fn new(before: Snapshot, after: Snapshot, change: Option<Change>) -> Self {
         Self {
             before,
@@ -2049,19 +2229,19 @@ impl Patch {
 
     /// Exact source bytes required for forward application.
     #[must_use]
-    pub fn before(&self) -> &[u8] {
+    pub(crate) fn before(&self) -> &[u8] {
         self.before.bytes()
     }
 
     /// Exact target bytes produced by forward application.
     #[must_use]
-    pub fn after(&self) -> &[u8] {
+    pub(crate) fn after(&self) -> &[u8] {
         self.after.bytes()
     }
 
     /// Whether the patch changes no bytes.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.before.bytes() == self.after.bytes()
     }
 
@@ -2070,7 +2250,7 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error if `current` is not that exact source artifact.
-    pub fn apply(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn apply(&self, current: &Snapshot) -> Result<Snapshot> {
         if current.bytes() != self.before.bytes() {
             return Err(PackageError::InvalidFormat(
                 "PPT shape-text patch source does not match its base artifact".into(),
@@ -2082,7 +2262,7 @@ impl Patch {
 
     /// Returns the exact-source-checked inverse patch.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self::new(
             self.after.clone(),
             self.before.clone(),
@@ -2101,7 +2281,7 @@ impl Patch {
     ///
     /// Returns an error when caller-selected wire limits cannot represent the
     /// operation or its authored text.
-    pub fn to_durable(
+    pub(crate) fn to_durable(
         &self,
         limits: litchi_core::patch::PatchLimits,
     ) -> std::result::Result<
@@ -2211,6 +2391,11 @@ struct Resolved {
     payload: Vec<u8>,
     text: String,
     can_resize: bool,
+    /// The text positions of the body's metacharacter fields (record 0304).
+    pins: Vec<usize>,
+    /// The source parse of the target's slide, which the commit readback
+    /// verifies the publication against incrementally (record 0264).
+    source_view: Option<Arc<readback::SourceSlideView>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2220,12 +2405,20 @@ enum TextKind {
 }
 
 fn presentation(bytes: &[u8]) -> PackageResult<Presentation> {
-    let mut package = Package::from_reader(Cursor::new(bytes.to_vec()))?;
+    let mut package = Reader::from_reader(Cursor::new(bytes.to_vec()))?;
     package.presentation()
 }
 
+fn presentation_with_options(
+    bytes: &[u8],
+    options: crate::package::OpenOptions<'_>,
+) -> PackageResult<Presentation> {
+    let mut package = Reader::from_reader_with_options(Cursor::new(bytes), options)?;
+    package.presentation_with_options(options)
+}
+
 fn presentation_shared(bytes: Arc<[u8]>) -> PackageResult<Presentation> {
-    let mut package = Package::from_reader(Cursor::new(bytes))?;
+    let mut package = Reader::from_reader(Cursor::new(bytes))?;
     package.presentation()
 }
 
@@ -2268,18 +2461,197 @@ fn resolved_from_shared_location(
         payload: text.payload,
         text: text.text,
         can_resize: text.can_resize,
+        pins: text.pins,
+        source_view: None,
     })
 }
 
 fn resolve_shape(bytes: &[u8], target: Target) -> Result<ShapeLocation> {
-    let (persist_id, shape_id) = resolve_shape_target(bytes, target)?;
-    let editor = crate::embedded::object::Editor::open_records(bytes.to_vec())?;
+    let presentation = presentation(bytes)?;
+    resolve_shape_in_presentation(bytes, target, &presentation)
+}
+
+fn resolve_shape_in_presentation(
+    bytes: &[u8],
+    target: Target,
+    presentation: &Presentation,
+) -> Result<ShapeLocation> {
+    let source_limits = presentation.source_limits();
+    let (persist_id, shape_id) = resolve_shape_target_in_presentation(presentation, target)?;
+    let editor = crate::embedded::object::Editor::open_records(bytes.to_vec(), source_limits)?;
     resolve_shape_record(persist_id, shape_id, &editor)
+}
+
+/// Reads one shape's text without opening the mutation-capable persisted
+/// record editor.  Signed packages use this path to distinguish an exact
+/// semantic no-op from a changed request while retaining the signature CFB
+/// components byte-for-byte.
+pub(crate) fn inspect_shape_text_readonly(
+    bytes: &[u8],
+    target: Target,
+    options: crate::package::OpenOptions<'_>,
+) -> Result<String> {
+    let location = resolve_shape_readonly(bytes, target, options)?;
+    match inspect_slide(&location.slide_record, location.shape_id) {
+        Ok(atom) => Ok(atom.text),
+        Err(Error::Refused(Refusal::NoTextAtom)) => {
+            let Some(body) = outline_reference(&location.slide_record, location.shape_id)? else {
+                return Err(Error::Refused(Refusal::NoTextAtom));
+            };
+            let presentation = presentation_with_options(bytes, options)?;
+            let document = presentation.live_document_bytes()?;
+            Ok(inspect_outline_body(&document, location.persist_id, body)?.text)
+        },
+        Err(error) => Err(error),
+    }
+}
+
+/// Reads one shape's anchor without opening the mutation-capable persisted
+/// record editor.  This is deliberately a read-only companion to
+/// [`inspect_shape_anchor`], whose normal path also prepares a publication.
+pub(crate) fn inspect_shape_anchor_readonly(
+    bytes: &[u8],
+    target: Target,
+    options: crate::package::OpenOptions<'_>,
+) -> Result<crate::Anchor> {
+    let location = resolve_shape_readonly(bytes, target, options)?;
+    inspect_anchor(&location.slide_record, location.shape_id)
+}
+
+fn resolve_shape_readonly(
+    bytes: &[u8],
+    target: Target,
+    options: crate::package::OpenOptions<'_>,
+) -> Result<ShapeLocation> {
+    let presentation = presentation_with_options(bytes, options)?;
+    let (persist_id, shape_id) = resolve_shape_target_in_presentation(&presentation, target)?;
+    let factory = crate::slide::SlideFactory::new_shared_with_limits(
+        &presentation.inner.powerpoint_document,
+        &presentation.inner.persist_mapping,
+        &presentation.inner.slide_directory,
+        presentation.source_limits(),
+    );
+    let slide = factory.parse_slide(persist_id)?;
+    let document = slide.doc_data();
+    let tail = document.get(slide.offset..).ok_or_else(|| {
+        PackageError::Corrupted("PPT selected slide offset exceeds its document stream".into())
+    })?;
+    let (_, consumed) = crate::Record::parse(tail, 0, &presentation.source_limits())?;
+    let slide_end = slide
+        .offset
+        .checked_add(consumed)
+        .ok_or_else(|| PackageError::Corrupted("PPT selected slide length overflows".into()))?;
+    let slide_record = document
+        .get(slide.offset..slide_end)
+        .ok_or_else(|| {
+            PackageError::Corrupted("PPT selected slide exceeds its document stream".into())
+        })?
+        .to_vec();
+    Ok(ShapeLocation {
+        persist_id,
+        shape_id,
+        slide_record,
+    })
 }
 
 fn resolve_shape_target(bytes: &[u8], target: Target) -> Result<(u32, u32)> {
     let presentation = presentation(bytes)?;
     resolve_shape_target_in_presentation(&presentation, target)
+}
+
+/// Resolve `target` in a published candidate, as [`resolve`] does, proving
+/// its slide's parse incrementally from the source parse when possible
+/// (record 0264). [`resolve`] parses the whole slide to find the target's
+/// persist and shape identifiers; when [`readback::readback_incremental`]
+/// accepts, those identifiers are proven to be the ones that parse yields,
+/// and every later step is the same.
+fn resolve_published(
+    bytes: &[u8],
+    resolved: &Resolved,
+    replacement: &str,
+    opened: &Presentation,
+) -> Result<(Resolved, Option<(u32, crate::slide::PatchedShapes)>)> {
+    if let Some(view) = &resolved.source_view
+        && let Some((shape_target, patched)) =
+            incremental_published_target(opened, resolved, view, replacement)
+    {
+        let editor =
+            crate::embedded::object::Editor::open_records(bytes.to_vec(), opened.source_limits())?;
+        let location = resolve_shape_record(shape_target.0, shape_target.1, &editor)?;
+        return Ok((
+            resolved_from_location(resolved.target, location)?,
+            Some(patched),
+        ));
+    }
+    Ok((resolve(bytes, resolved.target)?, None))
+}
+
+/// `opened` is a default-policy open of exactly the candidate, the same open
+/// `resolve_shape_target` makes.
+fn incremental_published_target(
+    opened: &Presentation,
+    resolved: &Resolved,
+    view: &Arc<readback::SourceSlideView>,
+    replacement: &str,
+) -> Option<((u32, u32), (u32, crate::slide::PatchedShapes))> {
+    let slides = opened.slides().ok()?;
+    let targets = [readback::ReadbackTarget {
+        target: resolved.target,
+        slide_persist_id: resolved.slide_persist_id,
+        native_shape_id: resolved.native_shape_id,
+        replacement,
+    }];
+    let sources = BTreeMap::from([(resolved.slide_persist_id, Arc::clone(view))]);
+    let (persist_id, patched) =
+        readback::readback_incremental(&slides, &targets, &sources)?.pop()?;
+    Some((
+        (persist_id, resolved.native_shape_id),
+        (persist_id, patched),
+    ))
+}
+
+/// Resolves one target through a single selected slide of an opened
+/// projection, with the same refusals as
+/// [`resolve_shape_target_in_presentation`], also capturing the slide's
+/// parse (record 0264).
+fn resolve_shape_target_at_with_view(
+    presentation: &Presentation,
+    target: Target,
+) -> Result<((u32, u32), Option<readback::SourceSlideView>)> {
+    let slide = presentation
+        .slide_at(target.slide.get())?
+        .ok_or(Error::Refused(Refusal::SlideNotFound {
+            position: target.slide,
+        }))?;
+    let shape = slide
+        .shapes()?
+        .get(target.shape.get())
+        .ok_or(Error::Refused(Refusal::ShapeNotFound))?;
+    let shape_target = (slide.persist_id(), native_shape_id(shape));
+    Ok((
+        shape_target,
+        readback::SourceSlideView::capture(&slide).ok(),
+    ))
+}
+
+/// [`resolve_shape_target_in_presentation`], also capturing the selected
+/// slide's parse.
+fn resolve_shape_target_in_presentation_with_view(
+    presentation: &Presentation,
+    target: Target,
+) -> Result<((u32, u32), Option<readback::SourceSlideView>)> {
+    let slides = presentation.slides()?;
+    let slide = slides
+        .get(target.slide.get())
+        .ok_or(Error::Refused(Refusal::SlideNotFound {
+            position: target.slide,
+        }))?;
+    let shape = slide
+        .shapes()?
+        .get(target.shape.get())
+        .ok_or(Error::Refused(Refusal::ShapeNotFound))?;
+    let shape_target = (slide.persist_id(), native_shape_id(shape));
+    Ok((shape_target, readback::SourceSlideView::capture(slide).ok()))
 }
 
 fn resolve_shape_target_in_presentation(
@@ -2299,18 +2671,38 @@ fn resolve_shape_target_in_presentation(
     Ok((slide.persist_id(), native_shape_id(shape)))
 }
 
+#[derive(Debug)]
+struct BatchTextTarget {
+    target: Target,
+    replacement: String,
+    slide_persist_id: u32,
+    native_shape_id: u32,
+    slide_record: Arc<[u8]>,
+}
+
+#[derive(Debug)]
+struct PreparedBatchText {
+    resolved: Resolved,
+    replacement: String,
+    encoded: Vec<u8>,
+    /// The slide-list text body the shape's `OutlineTextRefAtom` selects, when
+    /// the shape's text lives in the live document instead of its drawing.
+    outline_body: Option<usize>,
+}
+
 /// Replaces a bounded caller-preflighted set of semantic shape targets through
 /// one persisted-record editor and one full candidate reopen.
 ///
 /// Callers retain the hard operation-count bound. This owner resolves every
 /// target and validates every encoding/dependency closure before staging any
-/// record in the editor. Distinct shapes on one slide are rewritten against
-/// the progressively staged slide record, while each rewrite retains the
-/// original atom payload as its exact source precondition.
+/// record in the editor. Targets sharing a persisted slide are indexed and
+/// rewritten in one drawing pass, while each rewrite retains the original
+/// atom payload as its exact source precondition.
 pub(crate) fn replace_shape_texts_batch(
     source: Arc<[u8]>,
     replacements: &[(Target, &str)],
     max_output_bytes: usize,
+    opened: Option<&Presentation>,
 ) -> Result<Option<RootBatchPublication>> {
     let replacement_bytes =
         replacements
@@ -2324,82 +2716,270 @@ pub(crate) fn replace_shape_texts_batch(
             })?;
     require_batch_text_budget(replacement_bytes, 0, max_output_bytes)?;
 
+    // An already opened projection of exactly `source` (the root edit's
+    // untouched package) shares its parsed shapes; otherwise open one.
+    let presentation = match opened {
+        Some(presentation) => presentation.clone(),
+        None => presentation_shared(source.clone())?,
+    };
     let mut editor = crate::embedded::object::Editor::open_records_arc_with_limit(
         source.clone(),
         max_output_bytes,
+        presentation.source_limits(),
     )?;
-    let presentation = presentation_shared(source.clone())?;
+    let document_persist_id = presentation.slide_directory().document_persist_id();
     let slides = presentation.slides()?;
-    let mut prepared = Vec::with_capacity(replacements.len());
+    let mut targets = Vec::with_capacity(replacements.len());
     let mut original_slides = BTreeMap::<u32, Arc<[u8]>>::new();
-    let mut encoded_bytes = 0usize;
-
-    // Complete semantic resolution and replacement validation before the
-    // editor receives its first staged mutation.
+    let mut requested_shapes = BTreeMap::<u32, BTreeSet<u32>>::new();
+    let mut source_views = BTreeMap::<u32, Arc<readback::SourceSlideView>>::new();
+    let mut deferred_resolution_error = None;
+    // Resolve the semantic slide and shape positions once per request, but
+    // defer text inspection until each persisted slide's drawing has been
+    // indexed.  This keeps the public positional/error order while avoiding a
+    // complete drawing walk for every target on a large slide.
     for (target, replacement) in replacements {
-        let slide =
-            slides
-                .get(target.slide.get())
-                .ok_or(Error::Refused(Refusal::SlideNotFound {
-                    position: target.slide,
-                }))?;
-        let shape = slide
-            .shapes()?
-            .get(target.shape.get())
-            .ok_or(Error::Refused(Refusal::ShapeNotFound))?;
-        let persist_id = slide.persist_id();
-        let shape_id = native_shape_id(shape);
-        let slide_record = match original_slides.get(&persist_id) {
+        let Some(slide) = slides.get(target.slide.get()) else {
+            deferred_resolution_error = Some(Error::Refused(Refusal::SlideNotFound {
+                position: target.slide,
+            }));
+            break;
+        };
+        let shapes = match slide.shapes() {
+            Ok(shapes) => shapes,
+            Err(error) => {
+                deferred_resolution_error = Some(error.into());
+                break;
+            },
+        };
+        let Some(shape) = shapes.get(target.shape.get()) else {
+            deferred_resolution_error = Some(Error::Refused(Refusal::ShapeNotFound));
+            break;
+        };
+        let slide_persist_id = slide.persist_id();
+        let native_shape_id = native_shape_id(shape);
+        if let Entry::Vacant(entry) = source_views.entry(slide_persist_id)
+            && let Ok(view) = readback::SourceSlideView::capture(slide)
+        {
+            // The incremental readback starts from this parse (record 0264).
+            entry.insert(Arc::new(view));
+        }
+        let slide_record = match original_slides.get(&slide_persist_id) {
             Some(record) => record.clone(),
             None => {
-                let record: Arc<[u8]> =
-                    Arc::from(editor.persisted_record(persist_id)?.into_boxed_slice());
-                original_slides.insert(persist_id, record.clone());
+                let record: Arc<[u8]> = match editor.persisted_record(slide_persist_id) {
+                    Ok(record) => Arc::from(record.into_boxed_slice()),
+                    Err(error) => {
+                        deferred_resolution_error = Some(error.into());
+                        break;
+                    },
+                };
+                original_slides.insert(slide_persist_id, record.clone());
                 record
             },
         };
-        let resolved = resolved_from_shared_location(*target, persist_id, shape_id, slide_record)?;
-        let encoded_len = encoded_replacement_len(replacement, resolved.kind)?;
+        targets.push(BatchTextTarget {
+            target: *target,
+            replacement: (*replacement).to_string(),
+            slide_persist_id,
+            native_shape_id,
+            slide_record,
+        });
+        requested_shapes
+            .entry(slide_persist_id)
+            .or_default()
+            .insert(native_shape_id);
+    }
+    drop(slides);
+    drop(presentation);
+
+    let mut indexed_shapes = BTreeMap::new();
+    let mut index_failures = BTreeSet::new();
+    let mut prepared = Vec::with_capacity(targets.len());
+    let mut encoded_bytes = 0usize;
+    let mut inspected_shapes = BTreeMap::<(u32, u32), (TextAtom, Option<usize>)>::new();
+    let mut live_document: Option<Vec<u8>> = None;
+
+    // Complete text/dependency resolution and replacement validation before
+    // the editor receives its first staged mutation.  The index was built by
+    // one framing walk per drawing; this loop retains the caller's request
+    // order for all typed shape/text errors.
+    for target in targets {
+        if !index_failures.contains(&target.slide_persist_id)
+            && let Entry::Vacant(entry) = indexed_shapes.entry(target.slide_persist_id)
+        {
+            let shape_ids = requested_shapes
+                .get(&target.slide_persist_id)
+                .ok_or_else(|| {
+                    PackageError::Corrupted(
+                        "PPT batch shape-text indexing lost its requested identities".into(),
+                    )
+                })?;
+            let slide_record = original_slides
+                .get(&target.slide_persist_id)
+                .ok_or_else(|| {
+                    PackageError::Corrupted(
+                        "PPT batch shape-text indexing lost its original slide record".into(),
+                    )
+                })?;
+            match index_slide_text_targets(slide_record, shape_ids) {
+                Ok(index) => {
+                    entry.insert(index);
+                },
+                Err(_error) => {
+                    // A malformed OfficeArt subtree takes the slow error
+                    // path below, which replays the old one-target
+                    // inspector in caller order and therefore preserves
+                    // its exact first-error precedence.
+                    index_failures.insert(target.slide_persist_id);
+                },
+            }
+        }
+        let (text, outline_body) = match inspected_shapes
+            .get(&(target.slide_persist_id, target.native_shape_id))
+        {
+            Some(inspected) => inspected.clone(),
+            None => {
+                let inspected = if index_failures.contains(&target.slide_persist_id) {
+                    inspect_slide(&target.slide_record, target.native_shape_id)
+                } else {
+                    let index = indexed_shapes
+                        .get(&target.slide_persist_id)
+                        .ok_or_else(|| {
+                            PackageError::Corrupted(
+                                "PPT batch shape-text validation lost its drawing index".into(),
+                            )
+                        })?;
+                    inspect_indexed_shape_text(index, target.native_shape_id)
+                };
+                let inspected = match inspected {
+                    Ok(text) => (text, None),
+                    Err(Error::Refused(Refusal::NoTextAtom)) => {
+                        // A placeholder whose text lives in the slide
+                        // list holds only an `OutlineTextRefAtom`
+                        // (MS-PPT 2.9.78); its body is edited in the live
+                        // document instead of the drawing.
+                        let Some(body) =
+                            outline_reference(&target.slide_record, target.native_shape_id)?
+                        else {
+                            return Err(Error::Refused(Refusal::NoTextAtom));
+                        };
+                        if live_document.is_none() {
+                            live_document = Some(editor.persisted_record(document_persist_id)?);
+                        }
+                        let document = live_document.as_deref().ok_or_else(|| {
+                            PackageError::Corrupted(
+                                "PPT outline text lost its live document".into(),
+                            )
+                        })?;
+                        (
+                            inspect_outline_body(document, target.slide_persist_id, body)?,
+                            Some(body),
+                        )
+                    },
+                    Err(error) => return Err(error),
+                };
+                inspected_shapes.insert(
+                    (target.slide_persist_id, target.native_shape_id),
+                    inspected.clone(),
+                );
+                inspected
+            },
+        };
+        let resolved = Resolved {
+            target: target.target,
+            slide_persist_id: target.slide_persist_id,
+            native_shape_id: target.native_shape_id,
+            slide_record: target.slide_record,
+            kind: text.kind,
+            payload: text.payload,
+            text: text.text,
+            can_resize: text.can_resize,
+            pins: text.pins,
+            source_view: None,
+        };
+        let encoded_len = encoded_replacement_len(&target.replacement, resolved.kind)?;
         encoded_bytes = encoded_bytes.checked_add(encoded_len).ok_or_else(|| {
             PackageError::ResourceLimit("PPT shape-text batch encoded byte count overflow".into())
         })?;
         require_batch_text_budget(replacement_bytes, encoded_bytes, max_output_bytes)?;
-        let encoded = encode_replacement(replacement, resolved.kind)?;
+        let encoded = encode_replacement(&target.replacement, resolved.kind)?;
         if encoded.len() != encoded_len {
             return Err(PackageError::Corrupted(
                 "PPT shape-text batch replacement size preflight disagrees with encoding".into(),
             )
             .into());
         }
-        if encoded.len() != resolved.payload.len() && !resolved.can_resize {
-            return Err(Error::Refused(Refusal::DependencyClosure));
-        }
-        if *replacement != resolved.text {
-            prepared.push((resolved, (*replacement).to_string(), encoded));
+        check_replacement(
+            resolved.kind,
+            &resolved.payload,
+            &encoded,
+            resolved.can_resize,
+            &resolved.pins,
+        )?;
+        if target.replacement != resolved.text {
+            prepared.push(PreparedBatchText {
+                resolved,
+                replacement: target.replacement,
+                encoded,
+                outline_body,
+            });
         }
     }
-    drop(slides);
-    drop(presentation);
+
+    if let Some(error) = deferred_resolution_error {
+        return Err(error);
+    }
 
     if prepared.is_empty() {
         return Ok(None);
     }
 
     // Input order is retained in the semantic change list. Each native slide
-    // record is progressively rewritten in memory and staged in the editor
-    // exactly once after all of its shape replacements succeed.
+    // drawing is rewritten exactly once after all of its shape replacements
+    // succeed; the rewrite itself visits the OfficeArt tree once and applies
+    // every selected textbox while preserving wire order.
+    let mut grouped = BTreeMap::<u32, Vec<ShapeTextRewrite<'_>>>::new();
+    let mut outline = BTreeMap::<(u32, usize), ShapeTextRewrite<'_>>::new();
+    for prepared in &prepared {
+        if let Some(body) = prepared.outline_body {
+            let rewrite = ShapeTextRewrite {
+                shape_id: prepared.resolved.native_shape_id,
+                kind: prepared.resolved.kind,
+                before: &prepared.resolved.payload,
+                after: &prepared.encoded,
+            };
+            if outline
+                .insert((prepared.resolved.slide_persist_id, body), rewrite)
+                .is_some()
+            {
+                // Two shapes referencing one body would publish two texts
+                // into one record.
+                return Err(Error::Refused(Refusal::AmbiguousTextbox));
+            }
+            continue;
+        }
+        grouped
+            .entry(prepared.resolved.slide_persist_id)
+            .or_default()
+            .push(ShapeTextRewrite {
+                shape_id: prepared.resolved.native_shape_id,
+                kind: prepared.resolved.kind,
+                before: &prepared.resolved.payload,
+                after: &prepared.encoded,
+            });
+    }
     let mut staged_slides = BTreeMap::<u32, Vec<u8>>::new();
-    for (resolved, _replacement, encoded) in &prepared {
-        let staged = staged_slides
-            .entry(resolved.slide_persist_id)
-            .or_insert_with(|| resolved.slide_record.to_vec());
-        *staged = rewrite_slide(
-            staged,
-            resolved.native_shape_id,
-            resolved.kind,
-            &resolved.payload,
-            encoded,
-        )?;
+    for (slide_persist_id, replacements) in grouped {
+        let original = original_slides.get(&slide_persist_id).ok_or_else(|| {
+            PackageError::Corrupted(
+                "PPT batch shape-text rewrite lost its original slide record".into(),
+            )
+        })?;
+        staged_slides.insert(
+            slide_persist_id,
+            rewrite_slide_grouped(original, &replacements)?,
+        );
     }
 
     for (persist_id, staged) in staged_slides {
@@ -2416,51 +2996,580 @@ pub(crate) fn replace_shape_texts_batch(
         }
         editor.replace_persisted_record(persist_id, staged)?;
     }
+    let document_changed = !outline.is_empty();
+    if document_changed {
+        let original = live_document.as_deref().ok_or_else(|| {
+            PackageError::Corrupted("PPT outline text publication lost its live document".into())
+        })?;
+        let staged = rewrite_outline_bodies(original, &outline)?;
+        if editor.persisted_record(document_persist_id)?.as_slice() != original {
+            return Err(PackageError::Corrupted(
+                "PPT outline text transaction source changed before publication".into(),
+            )
+            .into());
+        }
+        editor.replace_persisted_record(document_persist_id, staged)?;
+    }
 
     let candidate = editor.finish()?;
     crate::font::validate_unrelated_streams(&source, &candidate)?;
     let output: Arc<[u8]> = Arc::from(candidate.into_boxed_slice());
 
     // One complete reopen validates the publication and supplies all semantic
-    // readbacks without reopening the package once per shape.
+    // readbacks without reopening the package once per shape. The edited
+    // slides are verified incrementally against their source parse when that
+    // is provably equivalent to parsing them again (record 0264).
     let reopened = presentation_shared(output.clone())?;
     let reopened_slides = reopened.slides()?;
-    let mut changes = Vec::with_capacity(prepared.len());
-    for (resolved, replacement, _encoded) in prepared {
-        let slide = reopened_slides
-            .get(resolved.target.slide.get())
-            .ok_or(Error::Refused(Refusal::SlideNotFound {
-                position: resolved.target.slide,
-            }))?;
-        if slide.persist_id() != resolved.slide_persist_id {
-            return Err(PackageError::Corrupted(
-                "published PPT batch shape text resolved a different slide".into(),
-            )
-            .into());
-        }
-        let shape = slide
-            .shapes()?
-            .get(resolved.target.shape.get())
-            .ok_or(Error::Refused(Refusal::ShapeNotFound))?;
-        if shape.text()? != replacement {
-            return Err(PackageError::Corrupted(
-                "published PPT batch shape text did not round-trip through its source shape".into(),
-            )
-            .into());
-        }
-        changes.push(RootShapeTextChange {
-            target: resolved.target,
-            before: resolved.text,
-            after: replacement,
-            slide_persist_id: resolved.slide_persist_id,
-        });
-    }
+    let targets = prepared
+        .iter()
+        .map(|prepared| readback::ReadbackTarget {
+            target: prepared.resolved.target,
+            slide_persist_id: prepared.resolved.slide_persist_id,
+            native_shape_id: prepared.resolved.native_shape_id,
+            replacement: &prepared.replacement,
+        })
+        .collect::<Vec<_>>();
+    let verified = if document_changed {
+        // Outline bodies live in the republished document; parse in full.
+        readback::readback_full(&reopened_slides, &targets)?;
+        Vec::new()
+    } else {
+        readback::readback(&reopened_slides, &targets, &source_views)?
+    };
+    drop(targets);
+    let changes = prepared
+        .into_iter()
+        .map(|prepared| RootShapeTextChange {
+            target: prepared.resolved.target,
+            before: prepared.resolved.text,
+            after: prepared.replacement,
+            slide_persist_id: prepared.resolved.slide_persist_id,
+        })
+        .collect();
 
     Ok(Some(RootBatchPublication {
         source,
         output,
         changes,
+        document_changed,
+        verified,
     }))
+}
+
+/// Publishes a batch through a test hook that may corrupt each staged slide
+/// record, then returns both verifiers' verdicts on the published bytes
+/// (record 0264 differential tests).
+#[cfg(test)]
+pub(crate) fn differential_readback_for_test(
+    source: &[u8],
+    replacements: &[(Target, &str)],
+    corrupt: &dyn Fn(u32, &mut Vec<u8>),
+) -> Result<DifferentialVerdicts> {
+    let source: Arc<[u8]> = Arc::from(source);
+    let presentation = presentation_shared(source.clone())?;
+    let source_limits = presentation.source_limits();
+    let slides = presentation.slides()?;
+    let mut editor = crate::embedded::object::Editor::open_records_arc_with_limit(
+        source.clone(),
+        usize::MAX,
+        source_limits,
+    )?;
+    let mut views = BTreeMap::new();
+    let mut grouped = BTreeMap::<u32, Vec<ShapeTextRewrite<'_>>>::new();
+    let mut originals = BTreeMap::new();
+    let mut prepared = Vec::new();
+    for (target, replacement) in replacements {
+        let slide =
+            slides
+                .get(target.slide.get())
+                .ok_or(Error::Refused(Refusal::SlideNotFound {
+                    position: target.slide,
+                }))?;
+        let shape = slide
+            .shapes()?
+            .get(target.shape.get())
+            .ok_or(Error::Refused(Refusal::ShapeNotFound))?;
+        let persist_id = slide.persist_id();
+        let shape_id = native_shape_id(shape);
+        if let Entry::Vacant(entry) = views.entry(persist_id) {
+            entry.insert(Arc::new(readback::SourceSlideView::capture(slide)?));
+        }
+        if let Entry::Vacant(entry) = originals.entry(persist_id) {
+            entry.insert(editor.persisted_record(persist_id)?);
+        }
+        let record = originals
+            .get(&persist_id)
+            .ok_or(Error::Refused(Refusal::ShapeNotFound))?;
+        let text = inspect_slide(record, shape_id)?;
+        prepared.push((
+            *target,
+            persist_id,
+            shape_id,
+            text,
+            encode_replacement_owned(replacement)?,
+        ));
+    }
+    for (_, persist_id, shape_id, text, encoded) in &prepared {
+        let encoded = match text.kind {
+            TextKind::Chars => &encoded.0,
+            TextKind::Bytes => encoded
+                .1
+                .as_ref()
+                .ok_or(Error::Refused(Refusal::DependencyClosure))?,
+        };
+        grouped
+            .entry(*persist_id)
+            .or_default()
+            .push(ShapeTextRewrite {
+                shape_id: *shape_id,
+                kind: text.kind,
+                before: &text.payload,
+                after: encoded,
+            });
+    }
+    for (persist_id, rewrites) in grouped {
+        let original = originals
+            .get(&persist_id)
+            .ok_or(Error::Refused(Refusal::ShapeNotFound))?;
+        let mut staged = rewrite_slide_grouped(original, &rewrites)?;
+        corrupt(persist_id, &mut staged);
+        editor.replace_persisted_record(persist_id, staged)?;
+    }
+    let output: Arc<[u8]> = Arc::from(editor.finish()?.into_boxed_slice());
+    // A candidate that does not reopen is refused by both verifiers, which
+    // share the reopen.
+    let reopened = presentation_shared(output.clone());
+    let reopened_slides = reopened.as_ref().map(Presentation::slides);
+    let Ok(Ok(reopened_slides)) = reopened_slides else {
+        return Ok(DifferentialVerdicts {
+            incremental: None,
+            full_accepted: false,
+            reopened: false,
+            single: None,
+            persist_ids: Vec::new(),
+            parsed: Vec::new(),
+        });
+    };
+    let targets = prepared
+        .iter()
+        .zip(replacements)
+        .map(
+            |((target, persist_id, shape_id, _, _), (_, replacement))| readback::ReadbackTarget {
+                target: *target,
+                slide_persist_id: *persist_id,
+                native_shape_id: *shape_id,
+                replacement,
+            },
+        )
+        .collect::<Vec<_>>();
+    let incremental = readback::readback_incremental(&reopened_slides, &targets, &views);
+    // The single-target commit readback on the same candidate: the proven
+    // resolution against the reference `resolve`.
+    let single = match replacements {
+        [(target, replacement)] => {
+            let transaction = Snapshot::from_shared_bytes(source.clone())?.edit_text(*target)?;
+            let opened = presentation_shared(output.clone())?;
+            let proven = resolve_published(&output, &transaction.resolved, replacement, &opened);
+            let reference = resolve(&output, *target);
+            let summary = |resolved: &Resolved| {
+                (
+                    resolved.slide_persist_id,
+                    resolved.native_shape_id,
+                    resolved.payload.clone(),
+                    resolved.text.clone(),
+                )
+            };
+            Some(SingleVerdicts {
+                proven: proven
+                    .as_ref()
+                    .map(|(resolved, _)| summary(resolved))
+                    .map_err(|error| format!("{error:?}")),
+                used_proof: proven
+                    .as_ref()
+                    .is_ok_and(|(_, verified)| verified.is_some()),
+                reference: reference
+                    .as_ref()
+                    .map(summary)
+                    .map_err(|error| format!("{error:?}")),
+            })
+        },
+        _ => None,
+    };
+    let full = readback::readback_full(&reopened_slides, &targets);
+    let parsed = reopened_slides
+        .iter()
+        .map(|slide| {
+            slide
+                .shapes()
+                .map(|shapes| format!("{shapes:?}"))
+                .map_err(|_| ())
+        })
+        .collect();
+    Ok(DifferentialVerdicts {
+        incremental: incremental.map(|verified| {
+            verified
+                .into_iter()
+                .map(|(persist_id, shapes)| (persist_id, format!("{:?}", &*shapes.materialize())))
+                .collect()
+        }),
+        full_accepted: full.is_ok(),
+        reopened: true,
+        single,
+        persist_ids: reopened_slides
+            .iter()
+            .map(|slide| slide.persist_id())
+            .collect(),
+        parsed,
+    })
+}
+
+/// Both verifiers' verdicts on one published candidate.
+#[cfg(test)]
+#[derive(Debug)]
+pub(crate) struct DifferentialVerdicts {
+    /// The incremental verifier's proven shapes (debug form) per edited
+    /// slide, or `None` when it could not prove acceptance.
+    pub(crate) incremental: Option<Vec<(u32, String)>>,
+    /// Whether the reference verifier accepted.
+    pub(crate) full_accepted: bool,
+    /// Whether the candidate reopened and listed its slides (the step both
+    /// verifiers share).
+    pub(crate) reopened: bool,
+    /// For a one-target batch, the single-commit readback on the candidate.
+    pub(crate) single: Option<SingleVerdicts>,
+    /// Persist identifiers of the reopened slides, in order.
+    pub(crate) persist_ids: Vec<u32>,
+    /// A full parse of every reopened slide's shapes (debug form).
+    pub(crate) parsed: Vec<std::result::Result<String, ()>>,
+}
+
+/// A resolved readback: persist id, shape id, text payload, text.
+#[cfg(test)]
+pub(crate) type ResolvedSummary = (u32, u32, Vec<u8>, String);
+
+/// The single-target commit readback, proven and reference.
+#[cfg(test)]
+#[derive(Debug)]
+pub(crate) struct SingleVerdicts {
+    /// `resolve_published` (incremental when provable).
+    pub(crate) proven: std::result::Result<ResolvedSummary, String>,
+    /// Whether `resolve_published` used the incremental proof.
+    pub(crate) used_proof: bool,
+    /// The reference `resolve` (full parse).
+    pub(crate) reference: std::result::Result<ResolvedSummary, String>,
+}
+
+#[cfg(test)]
+fn encode_replacement_owned(value: &str) -> Result<(Vec<u8>, Option<Vec<u8>>)> {
+    Ok((
+        encode_replacement(value, TextKind::Chars)?,
+        encode_replacement(value, TextKind::Bytes).ok(),
+    ))
+}
+
+/// One published speaker-notes text replacement.
+pub(crate) struct RootNotesPublication {
+    source: Arc<[u8]>,
+    output: Arc<[u8]>,
+    notes_persist_id: u32,
+    before: String,
+}
+
+impl RootNotesPublication {
+    pub(crate) fn source(&self) -> &[u8] {
+        &self.source
+    }
+
+    pub(crate) const fn notes_persist_id(&self) -> u32 {
+        self.notes_persist_id
+    }
+
+    pub(crate) fn before(&self) -> &str {
+        &self.before
+    }
+
+    pub(crate) fn into_output(self) -> Arc<[u8]> {
+        self.output
+    }
+}
+
+/// Reads the speaker-notes text of the slide at a source position.
+pub(crate) fn inspect_notes_text_readonly(
+    bytes: &[u8],
+    slide: Position,
+    options: crate::package::OpenOptions<'_>,
+) -> Result<String> {
+    let presentation = presentation_with_options(bytes, options)?;
+    let selected = presentation
+        .slide_at(slide.get())?
+        .ok_or(Error::Refused(Refusal::SlideNotFound { position: slide }))?;
+    let notes = selected
+        .speaker_notes()?
+        .ok_or(Error::Refused(Refusal::NoNotesPage))?;
+    Ok(notes.text()?.to_owned())
+}
+
+/// Replaces the speaker-notes text of the slide at a source position.
+///
+/// The notes page must hold exactly one body placeholder
+/// (`PlaceholderKind::NotesBody`), whose text body is rewritten under the
+/// same dependency-closure rules as slide shape text; every other record of
+/// the notes page and every other persist object is copied exactly. Equal
+/// text returns `Ok(None)` without publishing.
+pub(crate) fn replace_notes_text(
+    source: Arc<[u8]>,
+    slide: Position,
+    replacement: &str,
+    max_output_bytes: usize,
+) -> Result<Option<RootNotesPublication>> {
+    require_batch_text_budget(replacement.len(), 0, max_output_bytes)?;
+    let presentation = presentation_shared(source.clone())?;
+    let selected = presentation
+        .slide_at(slide.get())?
+        .ok_or(Error::Refused(Refusal::SlideNotFound { position: slide }))?;
+    let notes = selected
+        .speaker_notes()?
+        .ok_or(Error::Refused(Refusal::NoNotesPage))?;
+    let before = notes.text()?.to_owned();
+    if before == replacement {
+        return Ok(None);
+    }
+    let notes_persist_id = notes.persist_id();
+    let source_limits = presentation.source_limits();
+    let shape_id = match notes.body_shape_ids()?.as_slice() {
+        [] => return Err(Error::Refused(Refusal::NoTextbox)),
+        [shape_id] => *shape_id,
+        _ => return Err(Error::Refused(Refusal::AmbiguousTextbox)),
+    };
+    drop(selected);
+    drop(presentation);
+
+    let mut editor = crate::embedded::object::Editor::open_records_arc_with_limit(
+        source.clone(),
+        max_output_bytes,
+        source_limits,
+    )?;
+    let original = editor.persisted_record(notes_persist_id)?;
+    if record_type(&original)? != RecordType::Notes as u16 {
+        return Err(PackageError::Corrupted(
+            "PPT notes persist object is not a NotesContainer".into(),
+        )
+        .into());
+    }
+    let atom = inspect_slide(&original, shape_id)?;
+    let encoded_len = encoded_replacement_len(replacement, atom.kind)?;
+    require_batch_text_budget(replacement.len(), encoded_len, max_output_bytes)?;
+    let encoded = encode_replacement(replacement, atom.kind)?;
+    check_replacement(
+        atom.kind,
+        &atom.payload,
+        &encoded,
+        atom.can_resize,
+        &atom.pins,
+    )?;
+    let staged = rewrite_slide_grouped(
+        &original,
+        &[ShapeTextRewrite {
+            shape_id,
+            kind: atom.kind,
+            before: &atom.payload,
+            after: &encoded,
+        }],
+    )?;
+    editor.replace_persisted_record(notes_persist_id, staged)?;
+    let candidate = editor.finish()?;
+    crate::font::validate_unrelated_streams(&source, &candidate)?;
+    let output: Arc<[u8]> = Arc::from(candidate.into_boxed_slice());
+
+    let reopened = presentation_shared(output.clone())?;
+    let readback = reopened
+        .slide_at(slide.get())?
+        .ok_or(Error::Refused(Refusal::SlideNotFound { position: slide }))?;
+    let notes = readback
+        .speaker_notes()?
+        .ok_or(Error::Refused(Refusal::NoNotesPage))?;
+    if notes.persist_id() != notes_persist_id || notes.text()? != replacement {
+        return Err(PackageError::Corrupted(
+            "published PPT notes text did not round-trip through its notes page".into(),
+        )
+        .into());
+    }
+    Ok(Some(RootNotesPublication {
+        source,
+        output,
+        notes_persist_id,
+        before,
+    }))
+}
+
+/// Rewrite the text of the shape with `OfficeArt` ID `shape_id` under the
+/// ordinary text-closure rules; `None` when the text is already equal.
+pub(crate) fn rewrite_shape_text_by_id(
+    slide: &[u8],
+    shape_id: u32,
+    replacement: &str,
+) -> Result<Option<Vec<u8>>> {
+    let atom = match inspect_slide(slide, shape_id) {
+        Ok(atom) => atom,
+        Err(Error::Refused(Refusal::NoTextAtom)) => {
+            return insert_text_atom(slide, shape_id, replacement);
+        },
+        Err(error) => return Err(error),
+    };
+    if atom.text == replacement {
+        return Ok(None);
+    }
+    let encoded = encode_replacement(replacement, atom.kind)?;
+    check_replacement(
+        atom.kind,
+        &atom.payload,
+        &encoded,
+        atom.can_resize,
+        &atom.pins,
+    )?;
+    rewrite_slide(slide, shape_id, atom.kind, &atom.payload, &encoded).map(Some)
+}
+
+/// Give an empty text body its first text atom (record 0323).
+///
+/// The shape's `ClientTextbox` must hold a `TextHeaderAtom` followed only by
+/// at most one each of `StyleTextPropAtom`, `TextSpecialInfoAtom` and
+/// `TextRulerAtom`: the records [`resize_dependency_closure_is_modeled`]
+/// admits. A `TextCharsAtom` is inserted after the header and the style and
+/// special-information runs grow from the paragraph mark alone to cover the
+/// new text. An empty replacement keeps the body.
+fn insert_text_atom(slide: &[u8], shape_id: u32, replacement: &str) -> Result<Option<Vec<u8>>> {
+    if replacement.is_empty() {
+        return Ok(None);
+    }
+    let encoded = encode_replacement(replacement, TextKind::Chars)?;
+    let units = text_units(TextKind::Chars, encoded.len())?;
+    let mut drawing_count = 0usize;
+    let mut matches = 0usize;
+    let rewritten = rewrite_ppt_record(slide, 0, &mut |record| {
+        if record_type(record)? != RecordType::PPDrawing as u16 {
+            return Ok(None);
+        }
+        drawing_count += 1;
+        let data = insert_into_officeart(
+            drawing_payload(record)?,
+            shape_id,
+            &encoded,
+            units,
+            0,
+            &mut matches,
+        )?;
+        rebuild(record, &data).map(Some).map_err(Into::into)
+    })?;
+    if drawing_count != 1 {
+        return Err(PackageError::Corrupted(
+            "selected slide has ambiguous PPDrawing ownership".into(),
+        )
+        .into());
+    }
+    match matches {
+        0 => Err(Error::Refused(Refusal::ShapeNotFound)),
+        1 => rewritten
+            .map(Some)
+            .ok_or(Error::Refused(Refusal::ShapeNotFound)),
+        _ => Err(Error::Refused(Refusal::AmbiguousShape)),
+    }
+}
+
+fn insert_into_officeart(
+    record: &[u8],
+    shape_id: u32,
+    encoded: &[u8],
+    units: usize,
+    depth: usize,
+    matches: &mut usize,
+) -> Result<Vec<u8>> {
+    if depth >= 128 {
+        return Err(
+            PackageError::Corrupted("OfficeArt nesting exceeds text-edit limit".into()).into(),
+        );
+    }
+    if record_type(record)? == OFFICEART_SP_CONTAINER && shape_id_of(record)? == Some(shape_id) {
+        *matches = matches.saturating_add(1);
+        let mut textboxes = 0usize;
+        let mut data = Vec::with_capacity(record.len().saturating_add(encoded.len() + 16));
+        for child in children(record)? {
+            let child = child?;
+            if record_type(child)? == OFFICEART_CLIENT_TEXTBOX {
+                textboxes += 1;
+                data.extend_from_slice(&insert_into_textbox(child, encoded, units)?);
+            } else {
+                data.extend_from_slice(child);
+            }
+        }
+        return match textboxes {
+            0 => Err(Error::Refused(Refusal::NoTextbox)),
+            1 => rebuild(record, &data).map_err(Into::into),
+            _ => Err(Error::Refused(Refusal::AmbiguousTextbox)),
+        };
+    }
+    if record_version(record)? != 0xF {
+        return Ok(record.to_vec());
+    }
+    let mut data = Vec::with_capacity(drawing_payload(record)?.len());
+    for child in children(record)? {
+        data.extend_from_slice(&insert_into_officeart(
+            child?,
+            shape_id,
+            encoded,
+            units,
+            depth + 1,
+            matches,
+        )?);
+    }
+    rebuild(record, &data).map_err(Into::into)
+}
+
+fn insert_into_textbox(textbox: &[u8], encoded: &[u8], units: usize) -> Result<Vec<u8>> {
+    let records = children(textbox)?.collect::<PackageResult<Vec<_>>>()?;
+    let [header, rest @ ..] = records.as_slice() else {
+        return Err(Error::Refused(Refusal::NoTextAtom));
+    };
+    if record_type(header)? != RecordType::TextHeaderAtom as u16 {
+        return Err(Error::Refused(Refusal::NoTextAtom));
+    }
+    let resizable = [
+        RecordType::StyleTextPropAtom as u16,
+        RecordType::TextSpecInfoAtom as u16,
+        RecordType::TextRulerAtom as u16,
+    ];
+    let mut seen = [false; 3];
+    let mut data = Vec::with_capacity(textbox.len().saturating_add(encoded.len() + 8));
+    data.extend_from_slice(header);
+    let length = u32::try_from(encoded.len())
+        .map_err(|_err| PackageError::ResourceLimit("PPT text atom exceeds u32".into()))?;
+    data.extend_from_slice(&0_u16.to_le_bytes());
+    data.extend_from_slice(&(RecordType::TextCharsAtom as u16).to_le_bytes());
+    data.extend_from_slice(&length.to_le_bytes());
+    data.extend_from_slice(encoded);
+    for record in rest {
+        let kind = record_type(record)?;
+        let Some(slot) = resizable.iter().position(|candidate| *candidate == kind) else {
+            // Another record may hold a character position.
+            return Err(Error::Refused(Refusal::NoTextAtom));
+        };
+        if std::mem::replace(&mut seen[slot], true) {
+            return Err(Error::Refused(Refusal::NoTextAtom));
+        }
+        match slot {
+            0 => data.extend_from_slice(
+                &crate::StyleTextPropAtom::resize_single_run_record(record, 0, units)?
+                    .ok_or(Error::Refused(Refusal::DependencyClosure))?,
+            ),
+            1 => data.extend_from_slice(
+                &crate::TextSpecialInfoRuns::resize_single_run_record(record, 0, units)?
+                    .ok_or(Error::Refused(Refusal::DependencyClosure))?,
+            ),
+            _ => data.extend_from_slice(record),
+        }
+    }
+    rebuild(textbox, &data).map_err(Into::into)
 }
 
 fn require_batch_text_budget(
@@ -2500,7 +3609,8 @@ pub(crate) fn replace_shape_anchor(
     target: Target,
     replacement: crate::Anchor,
 ) -> Result<AnchorRewrite> {
-    let location = resolve_shape(bytes, target)?;
+    let source_presentation = presentation(bytes)?;
+    let location = resolve_shape_in_presentation(bytes, target, &source_presentation)?;
     let before = inspect_anchor(&location.slide_record, location.shape_id)?;
     if before == replacement {
         return Ok(AnchorRewrite {
@@ -2515,7 +3625,10 @@ pub(crate) fn replace_shape_anchor(
         &before.to_bytes(),
         &replacement.to_bytes(),
     )?;
-    let mut editor = crate::embedded::object::Editor::open_records(bytes.to_vec())?;
+    let mut editor = crate::embedded::object::Editor::open_records(
+        bytes.to_vec(),
+        source_presentation.source_limits(),
+    )?;
     if editor.persisted_record(location.persist_id)? != location.slide_record {
         return Err(PackageError::Corrupted(
             "PPT shape-anchor source changed before publication".into(),
@@ -2607,7 +3720,8 @@ pub(crate) fn add_unmodeled_text_dependency_for_test(
         rebuild(record, &data).map_err(Into::into)
     }
 
-    let location = resolve_shape(bytes, target)?;
+    let presentation = presentation(bytes)?;
+    let location = resolve_shape_in_presentation(bytes, target, &presentation)?;
     let mut drawings = 0usize;
     let rewritten = rewrite_ppt_record(&location.slide_record, 0, &mut |record| {
         if record_type(record)? != RecordType::PPDrawing as u16 {
@@ -2628,12 +3742,15 @@ pub(crate) fn add_unmodeled_text_dependency_for_test(
         )
         .into());
     }
-    let mut editor = crate::embedded::object::Editor::open_records(bytes.to_vec())?;
+    let mut editor = crate::embedded::object::Editor::open_records(
+        bytes.to_vec(),
+        presentation.source_limits(),
+    )?;
     editor.replace_persisted_record(location.persist_id, rewritten)?;
     editor.finish().map_err(Into::into)
 }
 
-fn native_shape_id(selected: &ShapeEnum<'_>) -> u32 {
+pub(crate) fn native_shape_id(selected: &ShapeEnum<'_>) -> u32 {
     match selected {
         ShapeEnum::TextBox(textbox) => textbox.source_shape_id(),
         ShapeEnum::Placeholder(placeholder) => placeholder.source_shape_id(),
@@ -2645,12 +3762,148 @@ fn native_shape_id(selected: &ShapeEnum<'_>) -> u32 {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct TextAtom {
     kind: TextKind,
     payload: Vec<u8>,
     text: String,
     can_resize: bool,
+    /// The text positions of the body's metacharacter fields (record 0304).
+    pins: Vec<usize>,
+}
+
+#[derive(Debug)]
+struct IndexedShapeText<'a> {
+    containers: Vec<&'a [u8]>,
+}
+
+/// Index only the requested OfficeArt shape containers in one drawing walk.
+///
+/// The index deliberately records raw containers instead of eagerly parsing
+/// their text.  This lets the caller inspect targets in the original request
+/// order, retaining the single-target error precedence while ensuring that
+/// an unrelated textbox is never validated merely because it shares a
+/// drawing with a requested shape.
+fn index_slide_text_targets<'a>(
+    slide: &'a [u8],
+    requested_shape_ids: &BTreeSet<u32>,
+) -> Result<BTreeMap<u32, IndexedShapeText<'a>>> {
+    let (_, consumed) = crate::Record::parse_strict(slide, 0)?;
+    if consumed != slide.len() {
+        return Err(PackageError::Corrupted("selected slide has trailing bytes".into()).into());
+    }
+    let drawing = find_ppt_record(slide, RecordType::PPDrawing as u16, 0)?
+        .ok_or(Error::Refused(Refusal::ShapeNotFound))?;
+    let mut index = BTreeMap::new();
+    let mut active_shape_ids = requested_shape_ids.clone();
+    index_officeart_shape_targets(
+        drawing_payload(drawing)?,
+        &mut active_shape_ids,
+        0,
+        &mut index,
+    )?;
+    Ok(index)
+}
+
+fn index_officeart_shape_targets<'a>(
+    record: &'a [u8],
+    active_shape_ids: &mut BTreeSet<u32>,
+    depth: usize,
+    index: &mut BTreeMap<u32, IndexedShapeText<'a>>,
+) -> Result<()> {
+    if depth >= 128 {
+        return Err(PackageError::Corrupted(
+            "OfficeArt nesting exceeds shape-inspection limit".into(),
+        )
+        .into());
+    }
+    if record_type(record)? == OFFICEART_SP_CONTAINER {
+        if let Some(shape_id) = shape_id_of(record)?
+            && active_shape_ids.contains(&shape_id)
+        {
+            index
+                .entry(shape_id)
+                .or_insert_with(|| IndexedShapeText {
+                    containers: Vec::new(),
+                })
+                .containers
+                .push(record);
+            // A single-target visit stops at its matching SP container.  If
+            // this drawing has other requested identities, those target
+            // visits continue through the selected container and therefore
+            // still require its nested OfficeArt framing to be checked.  The
+            // active set models those independent visits without rescanning
+            // the drawing once per target.  Removing the matched identity
+            // also prevents nested containers with that identity from being
+            // misclassified as additional semantic matches.
+            if active_shape_ids.len() == 1 {
+                return Ok(());
+            }
+            active_shape_ids.remove(&shape_id);
+            let result = (|| {
+                if active_shape_ids.is_empty() {
+                    return Ok(());
+                }
+                if record_version(record)? == 0xF {
+                    for child_result in children(record)? {
+                        index_officeart_shape_targets(
+                            child_result?,
+                            active_shape_ids,
+                            depth + 1,
+                            index,
+                        )?;
+                    }
+                }
+                Ok(())
+            })();
+            // Every independent target scan stops at its own matching
+            // container, so restore this identity before returning even when
+            // nested framing reported an error.
+            active_shape_ids.insert(shape_id);
+            return result;
+        }
+    }
+    if record_version(record)? == 0xF {
+        for child_result in children(record)? {
+            index_officeart_shape_targets(child_result?, active_shape_ids, depth + 1, index)?;
+        }
+    }
+    Ok(())
+}
+
+fn inspect_indexed_shape_text(
+    index: &BTreeMap<u32, IndexedShapeText<'_>>,
+    shape_id: u32,
+) -> Result<TextAtom> {
+    let indexed = index
+        .get(&shape_id)
+        .ok_or(Error::Refused(Refusal::ShapeNotFound))?;
+    let mut matches = 0usize;
+    let mut text = None;
+    for container in &indexed.containers {
+        matches = matches.saturating_add(1);
+        let atom = inspect_shape_container_text(container)?;
+        if text.replace(atom).is_some() {
+            return Err(Error::Refused(Refusal::AmbiguousShape));
+        }
+    }
+    match matches {
+        0 => Err(Error::Refused(Refusal::ShapeNotFound)),
+        1 => text.ok_or(Error::Refused(Refusal::NoTextbox)),
+        _ => Err(Error::Refused(Refusal::AmbiguousShape)),
+    }
+}
+
+fn inspect_shape_container_text(container: &[u8]) -> Result<TextAtom> {
+    let mut textbox = None;
+    for child_result in children(container)? {
+        let child = child_result?;
+        if record_type(child)? == OFFICEART_CLIENT_TEXTBOX && textbox.replace(child).is_some() {
+            return Err(Error::Refused(Refusal::AmbiguousTextbox));
+        }
+    }
+    let selected_textbox = textbox.ok_or(Error::Refused(Refusal::NoTextbox))?;
+    inspect_textbox(selected_textbox)
 }
 
 fn inspect_slide(slide: &[u8], shape_id: u32) -> Result<TextAtom> {
@@ -2681,7 +3934,12 @@ fn inspect_anchor(slide: &[u8], shape_id: u32) -> Result<crate::Anchor> {
             for child_result in children(container)? {
                 let child = child_result?;
                 if record_type(child)? == OFFICEART_CLIENT_ANCHOR
-                    && anchor.replace(crate::Anchor::parse(child)?).is_some()
+                    && anchor
+                        .replace(crate::Anchor::parse(
+                            child,
+                            &crate::client_anchor::Limits::default(),
+                        )?)
+                        .is_some()
                 {
                     return Err(Error::Refused(Refusal::AmbiguousAnchor));
                 }
@@ -2745,17 +4003,37 @@ fn inspect_drawing(drawing: &[u8], shape_id: u32) -> Result<TextAtom> {
 }
 
 fn inspect_textbox(textbox: &[u8]) -> Result<TextAtom> {
+    inspect_text_records(children(textbox)?)
+}
+
+/// Inspects the records of one text body: a `ClientTextbox` payload or a
+/// slide-list text body, which share the same record vocabulary.
+fn inspect_text_records<'a>(
+    records: impl Iterator<Item = PackageResult<&'a [u8]>>,
+) -> Result<TextAtom> {
     let mut atom = None;
     let mut child_types = Vec::new();
     let mut style_record = None;
-    for child_result in children(textbox)? {
+    let mut special_info_record = None;
+    let mut pins = Vec::new();
+    for child_result in records {
         let child = child_result?;
         let child_type = record_type(child)?;
         child_types.push(child_type);
+        if is_metacharacter(child_type) {
+            let position = drawing_payload(child)?
+                .first_chunk::<4>()
+                .map(|bytes| u32::from_le_bytes(*bytes))
+                .ok_or_else(|| PackageError::Corrupted("metacharacter atom is truncated".into()))?;
+            pins.push(usize::try_from(position).unwrap_or(usize::MAX));
+        }
         if child_type == RecordType::StyleTextPropAtom as u16
             && style_record.replace(child).is_some()
         {
             return Err(Error::Refused(Refusal::DependencyClosure));
+        }
+        if child_type == RecordType::TextSpecInfoAtom as u16 {
+            special_info_record = Some(child);
         }
         let atom_kind = match child_type {
             value if value == RecordType::TextBytesAtom as u16 => Some(TextKind::Bytes),
@@ -2776,49 +4054,132 @@ fn inspect_textbox(textbox: &[u8]) -> Result<TextAtom> {
             payload,
             text,
             can_resize: false,
+            pins: Vec::new(),
         });
     }
     let mut text_atom = atom.ok_or(Error::Refused(Refusal::NoTextAtom))?;
+    text_atom.pins = pins;
     text_atom.can_resize = resize_dependency_closure_is_modeled(
         &child_types,
         style_record,
+        special_info_record,
         text_units(text_atom.kind, text_atom.payload.len())?,
     )?;
     Ok(text_atom)
 }
 
+/// Refuse a replacement whose length change has unmodeled dependent ranges,
+/// or (record 0304) that writes another character at a metacharacter
+/// field's position: the field (`*` for a date, time, slide number,
+/// header or footer) would become plain text without a word.
+fn check_replacement(
+    kind: TextKind,
+    payload: &[u8],
+    encoded: &[u8],
+    can_resize: bool,
+    pins: &[usize],
+) -> Result<()> {
+    if encoded.len() != payload.len() && !can_resize {
+        return Err(Error::Refused(Refusal::DependencyClosure));
+    }
+    let width = match kind {
+        TextKind::Bytes => 1,
+        TextKind::Chars => 2,
+    };
+    for &pin in pins {
+        let unit = pin
+            .checked_mul(width)
+            .and_then(|start| Some(start..start.checked_add(width)?));
+        let same = unit.is_some_and(|unit| {
+            payload.get(unit.clone()).is_some() && payload.get(unit.clone()) == encoded.get(unit)
+        });
+        if !same {
+            return Err(Error::Refused(Refusal::DependencyClosure));
+        }
+    }
+    Ok(())
+}
+
+fn is_metacharacter(record: u16) -> bool {
+    [
+        RecordType::SlideNumberMCAtom,
+        RecordType::DateTimeMCAtom,
+        RecordType::GenericDateMCAtom,
+        RecordType::HeaderMCAtom,
+        RecordType::FooterMCAtom,
+        RecordType::RtfDateTimeMCAtom,
+    ]
+    .iter()
+    .any(|kind| *kind as u16 == record)
+}
+
+/// Whether a length-changing replacement keeps every dependent range of the
+/// text body valid.
+///
+/// The body must be a `TextHeaderAtom` followed by its one text atom, then at
+/// most one each of:
+///
+/// - `StyleTextPropAtom` with one paragraph run and one character run, whose
+///   two coverage counts are resized;
+/// - `TextSpecialInfoAtom` with one run (language and spelling), whose
+///   coverage count is resized;
+/// - `TextRulerAtom`, which holds indents and tab stops but no character
+///   position, so it stays exact.
+///
+/// Any other record (interactions, bookmarks, metacharacter fields, several
+/// formatting runs) associates data with character positions that a whole
+/// replacement would invalidate; the body then keeps the same-length-only
+/// contract and a changed length is a typed dependency-closure refusal.
 fn resize_dependency_closure_is_modeled(
     child_types: &[u16],
     style_record: Option<&[u8]>,
+    special_info_record: Option<&[u8]>,
     old_text_units: usize,
 ) -> Result<bool> {
     let text_header = RecordType::TextHeaderAtom as u16;
     let text_bytes = RecordType::TextBytesAtom as u16;
     let text_chars = RecordType::TextCharsAtom as u16;
-    let style = RecordType::StyleTextPropAtom as u16;
-    let supported_shape = matches!(
-        child_types,
-        [header, text]
-            if *header == text_header && (*text == text_bytes || *text == text_chars)
-    ) || matches!(
-        child_types,
-        [header, text, style_type]
-            if *header == text_header
-                && (*text == text_bytes || *text == text_chars)
-                && *style_type == style
-    );
-    if !supported_shape {
+    let [header, text, rest @ ..] = child_types else {
+        return Ok(false);
+    };
+    if *header != text_header || (*text != text_bytes && *text != text_chars) {
         return Ok(false);
     }
-    let Some(style_bytes) = style_record else {
-        return Ok(true);
-    };
-    Ok(crate::StyleTextPropAtom::resize_single_run_record(
-        style_bytes,
-        old_text_units,
-        old_text_units,
-    )?
-    .is_some())
+    let resizable = [
+        RecordType::StyleTextPropAtom as u16,
+        RecordType::TextSpecInfoAtom as u16,
+        RecordType::TextRulerAtom as u16,
+    ];
+    let mut seen = [false; 3];
+    for child_type in rest {
+        let Some(slot) = resizable.iter().position(|kind| kind == child_type) else {
+            return Ok(false);
+        };
+        if std::mem::replace(&mut seen[slot], true) {
+            return Ok(false);
+        }
+    }
+    if let Some(style_bytes) = style_record
+        && crate::StyleTextPropAtom::resize_single_run_record(
+            style_bytes,
+            old_text_units,
+            old_text_units,
+        )?
+        .is_none()
+    {
+        return Ok(false);
+    }
+    if let Some(special_info_bytes) = special_info_record
+        && crate::TextSpecialInfoRuns::resize_single_run_record(
+            special_info_bytes,
+            old_text_units,
+            old_text_units,
+        )?
+        .is_none()
+    {
+        return Ok(false);
+    }
+    Ok(true)
 }
 
 fn rewrite_slide(
@@ -2851,6 +4212,169 @@ fn rewrite_slide(
         .into());
     }
     rewritten.ok_or(Error::Refused(Refusal::ShapeNotFound))
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ShapeTextRewrite<'a> {
+    shape_id: u32,
+    kind: TextKind,
+    before: &'a [u8],
+    after: &'a [u8],
+}
+
+fn rewrite_slide_grouped(slide: &[u8], replacements: &[ShapeTextRewrite<'_>]) -> Result<Vec<u8>> {
+    let mut drawing_count = 0usize;
+    let mut match_counts = BTreeMap::<u32, usize>::new();
+    for replacement in replacements {
+        match_counts.entry(replacement.shape_id).or_insert(0);
+    }
+    let rewritten = rewrite_ppt_record(slide, 0, &mut |record| {
+        if record_type(record)? != RecordType::PPDrawing as u16 {
+            return Ok(None);
+        }
+        drawing_count += 1;
+        let drawing = rewrite_drawing_grouped(record, replacements, &mut match_counts)?;
+        Ok(Some(drawing))
+    })?;
+    if drawing_count != 1 {
+        return Err(PackageError::Corrupted(
+            "selected slide has ambiguous PPDrawing ownership".into(),
+        )
+        .into());
+    }
+    for (shape_id, matches) in match_counts {
+        match matches {
+            0 => return Err(Error::Refused(Refusal::ShapeNotFound)),
+            1 => {},
+            _ => return Err(Error::Refused(Refusal::AmbiguousShape)),
+        }
+        // Keep the binding above explicit: the count is checked for every
+        // requested identity even when the drawing visitor found another
+        // target first in wire order.
+        let _ = shape_id;
+    }
+    rewritten.ok_or(Error::Refused(Refusal::ShapeNotFound))
+}
+
+fn rewrite_drawing_grouped(
+    drawing: &[u8],
+    replacements: &[ShapeTextRewrite<'_>],
+    match_counts: &mut BTreeMap<u32, usize>,
+) -> Result<Vec<u8>> {
+    let mut replacements_by_shape = BTreeMap::<u32, Vec<ShapeTextRewrite<'_>>>::new();
+    for replacement in replacements {
+        replacements_by_shape
+            .entry(replacement.shape_id)
+            .or_default()
+            .push(*replacement);
+    }
+    let data = rewrite_officeart_grouped(
+        drawing_payload(drawing)?,
+        &replacements_by_shape,
+        match_counts,
+        0,
+    )?;
+    rebuild(drawing, &data).map_err(Into::into)
+}
+
+fn rewrite_officeart_grouped(
+    record: &[u8],
+    replacements: &BTreeMap<u32, Vec<ShapeTextRewrite<'_>>>,
+    match_counts: &mut BTreeMap<u32, usize>,
+    depth: usize,
+) -> Result<Vec<u8>> {
+    let mut output = Vec::with_capacity(record.len());
+    rewrite_officeart_grouped_into(record, replacements, match_counts, depth, &mut output)?;
+    Ok(output)
+}
+
+/// Appends the rewritten record to `output`. Every container is framed again
+/// in place (its length patched after its children), so one drawing pass
+/// writes one buffer instead of allocating a copy per record (record 0264);
+/// the visited records, checks, errors and bytes are those of the
+/// per-record rebuild.
+fn rewrite_officeart_grouped_into(
+    record: &[u8],
+    replacements: &BTreeMap<u32, Vec<ShapeTextRewrite<'_>>>,
+    match_counts: &mut BTreeMap<u32, usize>,
+    depth: usize,
+    output: &mut Vec<u8>,
+) -> Result<()> {
+    if depth >= 128 {
+        return Err(
+            PackageError::Corrupted("OfficeArt nesting exceeds text-edit limit".into()).into(),
+        );
+    }
+    if record_type(record)? == OFFICEART_SP_CONTAINER {
+        if let Some(shape_id) = shape_id_of(record)?
+            && let Some(shape_replacements) = replacements.get(&shape_id)
+        {
+            let count = match_counts.get_mut(&shape_id).ok_or_else(|| {
+                PackageError::Corrupted("PPT grouped rewrite lost shape identity".into())
+            })?;
+            *count = count.saturating_add(1);
+            output.extend_from_slice(&rewrite_shape_container_grouped(
+                record,
+                shape_replacements,
+            )?);
+            return Ok(());
+        }
+    }
+    if record_version(record)? != 0xF {
+        output.extend_from_slice(record);
+        return Ok(());
+    }
+    // `drawing_payload` proves the 8-byte header and the payload extent.
+    let payload = drawing_payload(record)?;
+    let start = output.len();
+    output.extend_from_slice(&record[..PPT_HEADER_LEN]);
+    output.reserve(payload.len());
+    for child_result in children(record)? {
+        rewrite_officeart_grouped_into(
+            child_result?,
+            replacements,
+            match_counts,
+            depth + 1,
+            output,
+        )?;
+    }
+    let data_length = u32::try_from(output.len() - start - PPT_HEADER_LEN)
+        .map_err(|_err| PackageError::ResourceLimit("PPT text-edit record exceeds u32".into()))?;
+    output[start + 4..start + PPT_HEADER_LEN].copy_from_slice(&data_length.to_le_bytes());
+    Ok(())
+}
+
+fn rewrite_shape_container_grouped(
+    record: &[u8],
+    replacements: &[ShapeTextRewrite<'_>],
+) -> Result<Vec<u8>> {
+    let mut textbox_count = 0usize;
+    let mut data = Vec::with_capacity(drawing_payload(record)?.len());
+    for child_result in children(record)? {
+        let child = child_result?;
+        if record_type(child)? != OFFICEART_CLIENT_TEXTBOX {
+            data.extend_from_slice(child);
+            continue;
+        }
+        textbox_count += 1;
+        let mut rewritten = child.to_vec();
+        for replacement in replacements {
+            rewritten = rewrite_textbox(
+                &rewritten,
+                replacement.kind,
+                replacement.before,
+                replacement.after,
+            )?;
+        }
+        data.extend_from_slice(&rewritten);
+    }
+    if textbox_count == 0 {
+        return Err(Error::Refused(Refusal::NoTextbox));
+    }
+    if textbox_count > 1 {
+        return Err(Error::Refused(Refusal::AmbiguousTextbox));
+    }
+    rebuild(record, &data).map_err(Into::into)
 }
 
 fn rewrite_anchor(slide: &[u8], shape_id: u32, before: &[u8], after: &[u8]) -> Result<Vec<u8>> {
@@ -3012,32 +4536,67 @@ fn rewrite_officeart(
     depth: usize,
     matches: &mut usize,
 ) -> Result<Vec<u8>> {
+    let mut output = Vec::with_capacity(record.len());
+    let target = SingleRewrite {
+        shape_id,
+        kind,
+        before,
+        after,
+    };
+    rewrite_officeart_into(record, &target, depth, matches, &mut output)?;
+    Ok(output)
+}
+
+struct SingleRewrite<'a> {
+    shape_id: u32,
+    kind: TextKind,
+    before: &'a [u8],
+    after: &'a [u8],
+}
+
+/// Appends the rewritten record to `output`, framing each container in
+/// place; the same visits, checks, errors and bytes as a per-record rebuild
+/// (record 0264, as [`rewrite_officeart_grouped_into`]).
+fn rewrite_officeart_into(
+    record: &[u8],
+    target: &SingleRewrite<'_>,
+    depth: usize,
+    matches: &mut usize,
+    output: &mut Vec<u8>,
+) -> Result<()> {
     if depth >= 128 {
         return Err(
             PackageError::Corrupted("OfficeArt nesting exceeds text-edit limit".into()).into(),
         );
     }
-    if record_type(record)? == OFFICEART_SP_CONTAINER && shape_id_of(record)? == Some(shape_id) {
+    if record_type(record)? == OFFICEART_SP_CONTAINER
+        && shape_id_of(record)? == Some(target.shape_id)
+    {
         *matches = matches.saturating_add(1);
-        return rewrite_shape_container(record, kind, before, after);
+        output.extend_from_slice(&rewrite_shape_container(
+            record,
+            target.kind,
+            target.before,
+            target.after,
+        )?);
+        return Ok(());
     }
     if record_version(record)? != 0xF {
-        return Ok(record.to_vec());
+        output.extend_from_slice(record);
+        return Ok(());
     }
-    let mut data = Vec::with_capacity(drawing_payload(record)?.len());
+    // `drawing_payload` proves the 8-byte header and the payload extent.
+    let payload = drawing_payload(record)?;
+    let start = output.len();
+    output.extend_from_slice(&record[..PPT_HEADER_LEN]);
+    output.reserve(payload.len());
     for child_result in children(record)? {
-        let child = child_result?;
-        data.extend_from_slice(&rewrite_officeart(
-            child,
-            shape_id,
-            kind,
-            before,
-            after,
-            depth + 1,
-            matches,
-        )?);
+        rewrite_officeart_into(child_result?, target, depth + 1, matches, output)?;
     }
-    rebuild(record, &data).map_err(Into::into)
+    let data_length = u32::try_from(output.len() - start - PPT_HEADER_LEN)
+        .map_err(|_err| PackageError::ResourceLimit("PPT text-edit record exceeds u32".into()))?;
+    output[start + 4..start + PPT_HEADER_LEN].copy_from_slice(&data_length.to_le_bytes());
+    Ok(())
 }
 
 fn rewrite_shape_container(
@@ -3073,11 +4632,24 @@ fn rewrite_shape_container(
 }
 
 fn rewrite_textbox(textbox: &[u8], kind: TextKind, before: &[u8], after: &[u8]) -> Result<Vec<u8>> {
+    let data = rewrite_text_records(children(textbox)?, kind, before, after)?;
+    rebuild(textbox, &data).map_err(Into::into)
+}
+
+/// Rewrites the text atom of one text body and resizes the dependent ranges
+/// [`resize_dependency_closure_is_modeled`] admits, returning the body's
+/// re-encoded records. Every other record is copied exactly.
+fn rewrite_text_records<'a>(
+    records: impl Iterator<Item = PackageResult<&'a [u8]>>,
+    kind: TextKind,
+    before: &[u8],
+    after: &[u8],
+) -> Result<Vec<u8>> {
     let mut count = 0usize;
-    let mut data = Vec::with_capacity(drawing_payload(textbox)?.len());
+    let mut data = Vec::with_capacity(after.len().saturating_add(64));
     let old_text_units = text_units(kind, before.len())?;
     let new_text_units = text_units(kind, after.len())?;
-    for child_result in children(textbox)? {
+    for child_result in records {
         let child = child_result?;
         let record_type = record_type(child)?;
         let is_target = match kind {
@@ -3104,13 +4676,23 @@ fn rewrite_textbox(textbox: &[u8], kind: TextKind, before: &[u8], after: &[u8]) 
             )?
             .ok_or(Error::Refused(Refusal::DependencyClosure))?;
             data.extend_from_slice(&rewritten);
+        } else if record_type == RecordType::TextSpecInfoAtom as u16
+            && old_text_units != new_text_units
+        {
+            let rewritten = crate::TextSpecialInfoRuns::resize_single_run_record(
+                child,
+                old_text_units,
+                new_text_units,
+            )?
+            .ok_or(Error::Refused(Refusal::DependencyClosure))?;
+            data.extend_from_slice(&rewritten);
         } else {
             data.extend_from_slice(child);
         }
     }
     match count {
         0 => Err(Error::Refused(Refusal::NoTextAtom)),
-        1 => rebuild(textbox, &data).map_err(Into::into),
+        1 => Ok(data),
         _ => Err(Error::Refused(Refusal::MultipleTextAtoms)),
     }
 }
@@ -3175,7 +4757,7 @@ fn visit_shape_container(
     Ok(())
 }
 
-fn shape_id_of(record: &[u8]) -> PackageResult<Option<u32>> {
+pub(crate) fn shape_id_of(record: &[u8]) -> PackageResult<Option<u32>> {
     for child_result in children(record)? {
         let child = child_result?;
         if record_type(child)? == OFFICEART_SP {
@@ -3190,6 +4772,181 @@ fn shape_id_of(record: &[u8]) -> PackageResult<Option<u32>> {
         }
     }
     Ok(None)
+}
+
+/// The slide-list body index an outline-backed shape's `ClientTextbox`
+/// selects, or `None` when the shape is not outline-backed.
+///
+/// The textbox must hold exactly one `OutlineTextRefAtom` and no text atom;
+/// a `TextRulerAtom` beside it is allowed. A negative index selects nothing
+/// and is reported as a missing text atom.
+fn outline_reference(slide: &[u8], shape_id: u32) -> Result<Option<usize>> {
+    let (_, consumed) = crate::Record::parse_strict(slide, 0)?;
+    if consumed != slide.len() {
+        return Err(PackageError::Corrupted("selected slide has trailing bytes".into()).into());
+    }
+    let drawing = find_ppt_record(slide, RecordType::PPDrawing as u16, 0)?
+        .ok_or(Error::Refused(Refusal::ShapeNotFound))?;
+    let mut matches = 0usize;
+    let mut reference = None;
+    visit_officeart(
+        drawing_payload(drawing)?,
+        shape_id,
+        0,
+        &mut matches,
+        &mut |textbox| {
+            let mut found = None;
+            for child_result in children(textbox)? {
+                let child = child_result?;
+                let child_type = record_type(child)?;
+                if child_type == RecordType::OutlineTextRefAtom as u16 {
+                    if found.is_some() {
+                        return Ok(());
+                    }
+                    let payload: [u8; 4] = drawing_payload(child)?.try_into().map_err(|_err| {
+                        PackageError::Corrupted("malformed OutlineTextRefAtom".into())
+                    })?;
+                    found = Some(i32::from_le_bytes(payload));
+                } else if child_type != RecordType::TextRulerAtom as u16 {
+                    return Ok(());
+                }
+            }
+            reference = found.and_then(|index| usize::try_from(index).ok());
+            Ok(())
+        },
+    )?;
+    match matches {
+        0 => Err(Error::Refused(Refusal::ShapeNotFound)),
+        1 => Ok(reference),
+        _ => Err(Error::Refused(Refusal::AmbiguousShape)),
+    }
+}
+
+/// Visits the records of every text body of each slide in the live
+/// document's slide `SlideListWithTextContainer` (instance 0).
+///
+/// Bodies are numbered per slide in slide-list order, as an
+/// `OutlineTextRefAtom` counts them; records before a slide's first
+/// `TextHeaderAtom` belong to no body. `visit` receives the slide persist
+/// identifier, the body index and the body's records.
+fn for_each_outline_body<'a>(
+    slide_list: &'a [u8],
+    mut visit: impl FnMut(Option<(u32, usize)>, &[&'a [u8]]) -> Result<()>,
+) -> Result<()> {
+    let mut slide = None;
+    let mut body = None::<usize>;
+    let mut segment: Vec<&'a [u8]> = Vec::new();
+    for child_result in children(slide_list)? {
+        let child = child_result?;
+        let child_type = record_type(child)?;
+        let starts_segment = child_type == RecordType::SlidePersistAtom as u16
+            || child_type == RecordType::TextHeaderAtom as u16;
+        if starts_segment {
+            let key = slide.zip(body);
+            visit(key, &segment)?;
+            segment.clear();
+            if child_type == RecordType::SlidePersistAtom as u16 {
+                let payload = drawing_payload(child)?;
+                let persist_id: [u8; 4] = payload
+                    .get(..4)
+                    .and_then(|value| value.try_into().ok())
+                    .ok_or_else(|| PackageError::Corrupted("malformed SlidePersistAtom".into()))?;
+                slide = Some(u32::from_le_bytes(persist_id));
+                body = None;
+            } else {
+                body = Some(body.map_or(0, |index| index.saturating_add(1)));
+            }
+        }
+        segment.push(child);
+    }
+    visit(slide.zip(body), &segment)
+}
+
+/// The live document's slide `SlideListWithTextContainer`.
+fn slide_list_of(document: &[u8]) -> Result<&[u8]> {
+    if record_type(document)? != RecordType::Document as u16 {
+        return Err(
+            PackageError::Corrupted("live PPT record is not a DocumentContainer".into()).into(),
+        );
+    }
+    let mut found = None;
+    for child_result in children(document)? {
+        let child = child_result?;
+        if record_type(child)? == RecordType::SlideListWithText as u16
+            && record_instance(child)? == 0
+            && found.replace(child).is_some()
+        {
+            return Err(
+                PackageError::Corrupted("PPT document has several slide lists".into()).into(),
+            );
+        }
+    }
+    found.ok_or(Error::Refused(Refusal::NoTextAtom))
+}
+
+/// Inspects the slide-list text body an outline-backed shape selects.
+fn inspect_outline_body(document: &[u8], slide_persist_id: u32, body: usize) -> Result<TextAtom> {
+    let mut selected = None;
+    for_each_outline_body(slide_list_of(document)?, |key, records| {
+        if key == Some((slide_persist_id, body)) {
+            if selected.is_some() {
+                return Err(Error::Refused(Refusal::AmbiguousTextbox));
+            }
+            selected = Some(inspect_text_records(
+                records.iter().map(|record| Ok(*record)),
+            )?);
+        }
+        Ok(())
+    })?;
+    selected.ok_or(Error::Refused(Refusal::NoTextAtom))
+}
+
+/// Rewrites selected slide-list text bodies of the live document; every
+/// other record of the document is copied exactly.
+fn rewrite_outline_bodies(
+    document: &[u8],
+    rewrites: &BTreeMap<(u32, usize), ShapeTextRewrite<'_>>,
+) -> Result<Vec<u8>> {
+    let slide_list = slide_list_of(document)?;
+    let mut list_data = Vec::with_capacity(drawing_payload(slide_list)?.len().saturating_add(64));
+    let mut applied = 0usize;
+    for_each_outline_body(slide_list, |key, records| {
+        match key.and_then(|key| rewrites.get(&key)) {
+            Some(rewrite) => {
+                let body = rewrite_text_records(
+                    records.iter().map(|record| Ok(*record)),
+                    rewrite.kind,
+                    rewrite.before,
+                    rewrite.after,
+                )?;
+                list_data.extend_from_slice(&body);
+                applied = applied.saturating_add(1);
+            },
+            None => {
+                for record in records {
+                    list_data.extend_from_slice(record);
+                }
+            },
+        }
+        Ok(())
+    })?;
+    if applied != rewrites.len() {
+        return Err(PackageError::Corrupted(
+            "PPT outline text rewrite did not find every selected body".into(),
+        )
+        .into());
+    }
+    let rebuilt_list = rebuild(slide_list, &list_data)?;
+    let mut document_data = Vec::with_capacity(drawing_payload(document)?.len().saturating_add(64));
+    for child_result in children(document)? {
+        let child = child_result?;
+        if std::ptr::eq(child.as_ptr(), slide_list.as_ptr()) {
+            document_data.extend_from_slice(&rebuilt_list);
+        } else {
+            document_data.extend_from_slice(child);
+        }
+    }
+    rebuild(document, &document_data).map_err(Into::into)
 }
 
 fn encode_replacement(value: &str, kind: TextKind) -> Result<Vec<u8>> {
@@ -3239,7 +4996,7 @@ fn text_units(kind: TextKind, byte_length: usize) -> Result<usize> {
     }
 }
 
-fn decode_utf16(bytes: &[u8]) -> Result<String> {
+pub(crate) fn decode_utf16(bytes: &[u8]) -> Result<String> {
     if !bytes.len().is_multiple_of(2) {
         return Err(Error::Refused(Refusal::IncompatibleEncoding));
     }
@@ -3252,7 +5009,7 @@ fn decode_utf16(bytes: &[u8]) -> Result<String> {
     String::from_utf16(&units).map_err(|_err| Error::Refused(Refusal::IncompatibleEncoding))
 }
 
-fn record_type(record: &[u8]) -> PackageResult<u16> {
+pub(crate) fn record_type(record: &[u8]) -> PackageResult<u16> {
     let bytes: &[u8; 2] = record
         .get(2..4)
         .and_then(|value| value.try_into().ok())
@@ -3260,7 +5017,7 @@ fn record_type(record: &[u8]) -> PackageResult<u16> {
     Ok(u16::from_le_bytes(*bytes))
 }
 
-fn record_version(record: &[u8]) -> PackageResult<u16> {
+pub(crate) fn record_version(record: &[u8]) -> PackageResult<u16> {
     let bytes: &[u8; 2] = record
         .get(..2)
         .and_then(|value| value.try_into().ok())
@@ -3268,7 +5025,7 @@ fn record_version(record: &[u8]) -> PackageResult<u16> {
     Ok(u16::from_le_bytes(*bytes) & 0x000F)
 }
 
-fn record_instance(record: &[u8]) -> PackageResult<u16> {
+pub(crate) fn record_instance(record: &[u8]) -> PackageResult<u16> {
     let bytes: &[u8; 2] = record
         .get(..2)
         .and_then(|value| value.try_into().ok())
@@ -3276,7 +5033,7 @@ fn record_instance(record: &[u8]) -> PackageResult<u16> {
     Ok(u16::from_le_bytes(*bytes) >> 4)
 }
 
-fn drawing_payload(record: &[u8]) -> PackageResult<&[u8]> {
+pub(crate) fn drawing_payload(record: &[u8]) -> PackageResult<&[u8]> {
     let bytes: &[u8; 4] = record
         .get(4..8)
         .and_then(|value| value.try_into().ok())
@@ -3292,7 +5049,7 @@ fn drawing_payload(record: &[u8]) -> PackageResult<&[u8]> {
         .ok_or_else(|| PackageError::Corrupted("truncated text-edit record payload".into()))
 }
 
-fn children(record: &[u8]) -> PackageResult<impl Iterator<Item = PackageResult<&[u8]>>> {
+pub(crate) fn children(record: &[u8]) -> PackageResult<impl Iterator<Item = PackageResult<&[u8]>>> {
     let payload = drawing_payload(record)?;
     Ok(ChildRecords { payload, offset: 0 })
 }
@@ -3329,7 +5086,7 @@ impl<'a> Iterator for ChildRecords<'a> {
     }
 }
 
-fn rebuild(record: &[u8], data: &[u8]) -> PackageResult<Vec<u8>> {
+pub(crate) fn rebuild(record: &[u8], data: &[u8]) -> PackageResult<Vec<u8>> {
     let _ = drawing_payload(record)?;
     let data_length = u32::try_from(data.len())
         .map_err(|_err| PackageError::ResourceLimit("PPT text-edit record exceeds u32".into()))?;
@@ -3348,10 +5105,14 @@ fn rebuild(record: &[u8], data: &[u8]) -> PackageResult<Vec<u8>> {
 )]
 mod tests {
     use super::{Error, Position, Refusal, Snapshot, Target};
-    use crate::Package;
-    use crate::writer::Writer;
-    use litchi_cfb::{OleFile, OutputProgress, OverlayError, SharedOleFile, StreamSpliceLimits};
+    use crate::raw::Reader;
+    use crate::writer::Builder;
+    use litchi_cfb::{
+        OleFile, OutputProgress, OverlayError, SharedOleFile, SharedOleFileLimits,
+        StreamSpliceLimits,
+    };
     use litchi_core::{OwnedSource, ReadAt, SourceVersion};
+    use std::collections::BTreeSet;
     use std::io::{self, Cursor, Write};
     use std::sync::{
         Arc, Mutex,
@@ -3359,11 +5120,11 @@ mod tests {
     };
 
     fn fixture(text: &str) -> Vec<u8> {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         let slide = writer.add_slide().unwrap();
         writer.add_textbox(slide, 10, 10, 240, 40, text).unwrap();
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).unwrap();
+        crate::raw::encode(&mut writer, &mut output).unwrap();
         output.into_inner()
     }
 
@@ -3372,7 +5133,7 @@ mod tests {
     }
 
     fn generated_fixture(slide_count: usize, shapes_per_slide: usize) -> Vec<u8> {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         for slide_index in 0..slide_count {
             let slide = writer.add_slide().unwrap();
             for shape_index in 0..shapes_per_slide {
@@ -3382,8 +5143,54 @@ mod tests {
             }
         }
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).unwrap();
+        crate::raw::encode(&mut writer, &mut output).unwrap();
         output.into_inner()
+    }
+
+    #[test]
+    fn grouped_shape_rewrite_matches_sequential_wire_output() {
+        let source = generated_fixture(1, 4);
+        let presentation = super::presentation(&source).unwrap();
+        let slide = &presentation.slides().unwrap()[0];
+        let slide_record = super::resolve(&source, Target::new(Position::new(0), Position::new(0)))
+            .unwrap()
+            .slide_record;
+        let mut plans = Vec::new();
+        let mut sequential = slide_record.to_vec();
+
+        for (shape_position, shape) in slide.shapes().unwrap().iter().enumerate() {
+            let target = Target::new(Position::new(0), Position::new(shape_position));
+            let resolved = super::resolve(&source, target).unwrap();
+            let mut after = resolved.payload.clone();
+            assert!(!after.is_empty());
+            after[0] = b'X';
+            sequential = super::rewrite_slide(
+                &sequential,
+                super::native_shape_id(shape),
+                resolved.kind,
+                &resolved.payload,
+                &after,
+            )
+            .unwrap();
+            plans.push((
+                super::native_shape_id(shape),
+                resolved.kind,
+                resolved.payload,
+                after,
+            ));
+        }
+
+        let grouped_plans = plans
+            .iter()
+            .map(|(shape_id, kind, before, after)| super::ShapeTextRewrite {
+                shape_id: *shape_id,
+                kind: *kind,
+                before,
+                after,
+            })
+            .collect::<Vec<_>>();
+        let grouped = super::rewrite_slide_grouped(&slide_record, &grouped_plans).unwrap();
+        assert_eq!(grouped, sequential);
     }
 
     #[derive(Debug, Default)]
@@ -3581,7 +5388,11 @@ mod tests {
     #[test]
     fn the_identity_plan_reports_one_digest_for_both_identities() {
         let bytes = fixture("abc");
-        let shared = SharedOleFile::open(Arc::new(OwnedSource::new(bytes.clone()))).unwrap();
+        let shared = SharedOleFile::open(
+            Arc::new(OwnedSource::new(bytes.clone())),
+            SharedOleFileLimits::default(),
+        )
+        .unwrap();
         let plan = shared
             .plan_same_length_stream_splices(Vec::new(), StreamSpliceLimits::default())
             .unwrap();
@@ -3606,13 +5417,14 @@ mod tests {
     ) {
         let (counting, metrics) = CountingSource::new(bytes);
         let source: Arc<dyn ReadAt> = Arc::new(counting);
-        let shared = SharedOleFile::open(Arc::clone(&source)).unwrap();
+        let shared =
+            SharedOleFile::open(Arc::clone(&source), SharedOleFileLimits::default()).unwrap();
         let document_path =
             super::select_stream_path(&shared, &super::DOCUMENT_PATHS, "PowerPoint Document")
                 .unwrap();
         let current_user_path =
             super::select_stream_path(&shared, &super::CURRENT_USER_PATHS, "Current User").unwrap();
-        let limits = crate::RecordLimits::default();
+        let limits = crate::SourceLimits::default();
         let owned = super::resolve_source_target_owned(
             &shared,
             &document_path,
@@ -3634,7 +5446,11 @@ mod tests {
     }
 
     fn live_document_bounds(source: &[u8]) -> (Vec<u8>, usize, usize) {
-        let mut ole = OleFile::open(Cursor::new(source.to_vec())).unwrap();
+        let mut ole = OleFile::open(
+            Cursor::new(source.to_vec()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let document = ole.open_stream(&["PowerPoint Document"]).unwrap();
         let current_user = ole.open_stream(&["Current User"]).unwrap();
         let directory = crate::slide::SlideDirectory::build(
@@ -3648,7 +5464,7 @@ mod tests {
         let (_record, consumed) = crate::Record::parse_strict_with_limits(
             &document,
             offset,
-            crate::RecordLimits::default(),
+            crate::SourceLimits::default(),
         )
         .unwrap();
         (document, offset, offset + consumed)
@@ -3787,13 +5603,17 @@ mod tests {
     }
 
     fn resolve_synthetic_history(source: Vec<u8>) -> Result<(), Error> {
-        let shared = SharedOleFile::open(Arc::new(OwnedSource::new(source))).unwrap();
+        let shared = SharedOleFile::open(
+            Arc::new(OwnedSource::new(source)),
+            SharedOleFileLimits::default(),
+        )
+        .unwrap();
         super::source_range::resolve_source_target(
             &shared,
             &["PowerPoint Document".to_string()],
             &["Current User".to_string()],
             target(),
-            crate::RecordLimits::default(),
+            crate::SourceLimits::default(),
         )
         .map(|_| ())
     }
@@ -3801,7 +5621,8 @@ mod tests {
     fn with_storage(source: Vec<u8>, path: &[&str]) -> Vec<u8> {
         use litchi_cfb::{OleFile, OleWriter};
 
-        let mut source_file = OleFile::open(Cursor::new(source)).unwrap();
+        let mut source_file =
+            OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default()).unwrap();
         let streams = source_file
             .list_streams()
             .into_iter()
@@ -3825,7 +5646,8 @@ mod tests {
     fn with_stream(source: Vec<u8>, path: &[&str], data: &[u8]) -> Vec<u8> {
         use litchi_cfb::{OleFile, OleWriter};
 
-        let mut source_file = OleFile::open(Cursor::new(source)).unwrap();
+        let mut source_file =
+            OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default()).unwrap();
         let streams = source_file
             .list_streams()
             .into_iter()
@@ -3849,7 +5671,8 @@ mod tests {
     fn relocate_root_stream_to_dual(source: Vec<u8>, name: &str) -> Vec<u8> {
         use litchi_cfb::{OleFile, OleWriter};
 
-        let mut source_file = OleFile::open(Cursor::new(source)).unwrap();
+        let mut source_file =
+            OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default()).unwrap();
         let streams = source_file
             .list_streams()
             .into_iter()
@@ -3904,6 +5727,166 @@ mod tests {
         )
     }
 
+    fn find_officeart_shape_offset(
+        data: &[u8],
+        record_offset: usize,
+        shape_id: u32,
+    ) -> Option<usize> {
+        fn find(data: &[u8], record_offset: usize, shape_id: u32, depth: usize) -> Option<usize> {
+            assert!(depth < 128, "test OfficeArt fixture exceeded its bound");
+            if record_type_at(data, record_offset) == super::OFFICEART_SP_CONTAINER {
+                let shape = record_children_offsets(data, record_offset)
+                    .into_iter()
+                    .find(|&child| record_type_at(data, child) == super::OFFICEART_SP)
+                    .and_then(|child| {
+                        let payload_len =
+                            u32::from_le_bytes(data[child + 4..child + 8].try_into().unwrap())
+                                as usize;
+                        let payload = &data[child + 8..child + 8 + payload_len];
+                        payload
+                            .get(..4)
+                            .and_then(|value| value.try_into().ok())
+                            .map(u32::from_le_bytes)
+                    });
+                if shape == Some(shape_id) {
+                    return Some(record_offset);
+                }
+            }
+            let version =
+                u16::from_le_bytes(data[record_offset..record_offset + 2].try_into().unwrap())
+                    & 0x000F;
+            if version != 0x000F {
+                return None;
+            }
+            record_children_offsets(data, record_offset)
+                .into_iter()
+                .find_map(|child| find(data, child, shape_id, depth + 1))
+        }
+
+        find(data, record_offset, shape_id, 0)
+    }
+
+    fn malformed_officeart_child() -> Vec<u8> {
+        // The unknown version-15 container has one child header whose
+        // declared payload is longer than the bounded container payload.
+        let mut malformed_inner = Vec::with_capacity(8);
+        malformed_inner.extend_from_slice(&0x000F_u16.to_le_bytes());
+        malformed_inner.extend_from_slice(&0x7FFD_u16.to_le_bytes());
+        malformed_inner.extend_from_slice(&1_u32.to_le_bytes());
+        raw_record(0x0F, 0, 0x7FFE, &malformed_inner)
+    }
+
+    fn mutate_batch_corruption_slide(
+        slide: &[u8],
+        early_shape_id: Option<u32>,
+        malformed_shape_id: u32,
+    ) -> super::Result<Vec<u8>> {
+        fn rewrite_textbox_header(textbox: &[u8]) -> super::Result<Vec<u8>> {
+            let mut data = Vec::with_capacity(super::drawing_payload(textbox)?.len());
+            for child_result in super::children(textbox)? {
+                let child = child_result?;
+                if super::record_type(child)? == crate::RecordType::TextHeaderAtom as u16 {
+                    let mut changed = child.to_vec();
+                    changed[2..4]
+                        .copy_from_slice(&(crate::RecordType::TextBytesAtom as u16).to_le_bytes());
+                    data.extend_from_slice(&changed);
+                } else {
+                    data.extend_from_slice(child);
+                }
+            }
+            super::rebuild(textbox, &data).map_err(Into::into)
+        }
+
+        fn rewrite_officeart(
+            record: &[u8],
+            early_shape_id: Option<u32>,
+            malformed_shape_id: u32,
+            malformed_child: &[u8],
+            depth: usize,
+        ) -> super::Result<Vec<u8>> {
+            assert!(depth < 128, "test OfficeArt fixture exceeded its bound");
+            if super::record_type(record)? == super::OFFICEART_SP_CONTAINER {
+                let shape_id = super::shape_id_of(record)?;
+                let mut data = Vec::with_capacity(
+                    super::drawing_payload(record)?.len() + malformed_child.len(),
+                );
+                for child_result in super::children(record)? {
+                    let child = child_result?;
+                    if shape_id == early_shape_id
+                        && super::record_type(child)? == super::OFFICEART_CLIENT_TEXTBOX
+                    {
+                        data.extend_from_slice(&rewrite_textbox_header(child)?);
+                    } else {
+                        data.extend_from_slice(child);
+                    }
+                }
+                if shape_id == Some(malformed_shape_id) {
+                    data.extend_from_slice(malformed_child);
+                }
+                return super::rebuild(record, &data).map_err(Into::into);
+            }
+            if super::record_version(record)? != 0xF {
+                return Ok(record.to_vec());
+            }
+            let mut data = Vec::with_capacity(super::drawing_payload(record)?.len());
+            for child_result in super::children(record)? {
+                data.extend_from_slice(&rewrite_officeart(
+                    child_result?,
+                    early_shape_id,
+                    malformed_shape_id,
+                    malformed_child,
+                    depth + 1,
+                )?);
+            }
+            super::rebuild(record, &data).map_err(Into::into)
+        }
+
+        let malformed_child = malformed_officeart_child();
+        let mut drawings = 0usize;
+        let rewritten = super::rewrite_ppt_record(slide, 0, &mut |record| {
+            if super::record_type(record)? != crate::RecordType::PPDrawing as u16 {
+                return Ok(None);
+            }
+            drawings += 1;
+            let data = rewrite_officeart(
+                super::drawing_payload(record)?,
+                early_shape_id,
+                malformed_shape_id,
+                &malformed_child,
+                0,
+            )?;
+            super::rebuild(record, &data).map(Some).map_err(Into::into)
+        })?;
+        assert_eq!(drawings, 1);
+        rewritten.ok_or(Error::Refused(Refusal::ShapeNotFound))
+    }
+
+    fn batch_corruption_fixture(early_shape_error: bool) -> (Vec<u8>, u32, u32) {
+        let source = generated_fixture(1, 2);
+        let first =
+            super::resolve(&source, Target::new(Position::new(0), Position::new(0))).unwrap();
+        let second =
+            super::resolve(&source, Target::new(Position::new(0), Position::new(1))).unwrap();
+        let drawing =
+            find_nested_record_offset(&first.slide_record, 0, crate::RecordType::PPDrawing as u16)
+                .unwrap();
+        assert!(
+            find_officeart_shape_offset(&first.slide_record, drawing, first.native_shape_id)
+                .is_some()
+        );
+        assert!(
+            find_officeart_shape_offset(&first.slide_record, drawing, second.native_shape_id)
+                .is_some()
+        );
+        let slide = mutate_batch_corruption_slide(
+            &first.slide_record,
+            early_shape_error.then_some(first.native_shape_id),
+            second.native_shape_id,
+        )
+        .unwrap();
+        (slide, first.native_shape_id, second.native_shape_id)
+    }
+
     struct PartialSink {
         bytes: Vec<u8>,
         limit: usize,
@@ -3951,6 +5934,78 @@ mod tests {
     }
 
     #[test]
+    fn batch_preserves_early_text_error_before_later_shape_resolution_error() {
+        let source = Arc::from(fixture("abc").into_boxed_slice());
+        let missing_shape = Target::new(Position::new(0), Position::new(1));
+        let error = super::replace_shape_texts_batch(
+            source,
+            &[(target(), "\0"), (missing_shape, "replacement")],
+            usize::MAX,
+            None,
+        )
+        .err()
+        .expect("a missing later shape must leave the earlier text error observable");
+        assert!(matches!(
+            error,
+            Error::Refused(Refusal::IncompatibleEncoding)
+        ));
+    }
+
+    #[test]
+    fn batch_index_replays_legacy_error_for_malformed_requested_sibling() {
+        let (slide, first_shape_id, second_shape_id) = batch_corruption_fixture(false);
+        let requested = [first_shape_id, second_shape_id]
+            .into_iter()
+            .collect::<BTreeSet<_>>();
+
+        let legacy = super::inspect_slide(&slide, first_shape_id)
+            .expect_err("legacy first-target inspection must reject malformed sibling framing");
+        assert!(matches!(
+            &legacy,
+            Error::Package(crate::package::Error::Corrupted(message))
+                if message.contains("truncated")
+        ));
+
+        let indexed = super::index_slide_text_targets(&slide, &requested);
+        assert!(matches!(
+            &indexed,
+            Err(Error::Package(crate::package::Error::Corrupted(message)))
+                if message.contains("truncated")
+        ));
+        let batch = match indexed {
+            Err(_index_error) => super::inspect_slide(&slide, first_shape_id),
+            Ok(index) => super::inspect_indexed_shape_text(&index, first_shape_id),
+        }
+        .expect_err("the batch admission path must reject");
+        assert_eq!(format!("{batch:?}"), format!("{legacy:?}"));
+    }
+
+    #[test]
+    fn batch_index_preserves_earlier_target_error_before_sibling_framing_error() {
+        let (slide, first_shape_id, second_shape_id) = batch_corruption_fixture(true);
+        let requested = [first_shape_id, second_shape_id]
+            .into_iter()
+            .collect::<BTreeSet<_>>();
+
+        let legacy = super::inspect_slide(&slide, first_shape_id)
+            .expect_err("legacy first-target inspection must reject the malformed textbox");
+        assert!(matches!(legacy, Error::Refused(Refusal::MultipleTextAtoms)));
+
+        let indexed = super::index_slide_text_targets(&slide, &requested);
+        assert!(matches!(
+            &indexed,
+            Err(Error::Package(crate::package::Error::Corrupted(message)))
+                if message.contains("truncated")
+        ));
+        let batch = match indexed {
+            Err(_index_error) => super::inspect_slide(&slide, first_shape_id),
+            Ok(index) => super::inspect_indexed_shape_text(&index, first_shape_id),
+        }
+        .expect_err("the batch admission path must reject");
+        assert!(matches!(batch, Error::Refused(Refusal::MultipleTextAtoms)));
+    }
+
+    #[test]
     fn source_checked_text_edit_round_trips_and_reverses() {
         let source = Snapshot::from_bytes(fixture("abc")).unwrap();
         let target = target();
@@ -3972,7 +6027,7 @@ mod tests {
             .count();
         assert_eq!(changed, 3);
         let mut package =
-            Package::from_reader(Cursor::new(commit.snapshot().bytes().to_vec())).unwrap();
+            Reader::from_reader(Cursor::new(commit.snapshot().bytes().to_vec())).unwrap();
         let presentation = package.presentation().unwrap();
         assert_eq!(
             presentation.slides().unwrap()[0].shapes().unwrap()[0]
@@ -4002,10 +6057,12 @@ mod tests {
 
         let mut output = Vec::new();
         let report = commit.write_to(&mut output).unwrap();
-        assert_eq!(report.bytes(), u64::try_from(bytes.len()).unwrap());
+        assert_eq!(report.output_bytes(), u64::try_from(bytes.len()).unwrap());
 
-        let mut original = OleFile::open(Cursor::new(bytes)).unwrap();
-        let mut published = OleFile::open(Cursor::new(output)).unwrap();
+        let mut original =
+            OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
+        let mut published =
+            OleFile::open(Cursor::new(output), litchi_cfb::OleFileLimits::default()).unwrap();
         assert_eq!(
             published.open_stream(&["UnrelatedPayload"]).unwrap(),
             original.open_stream(&["UnrelatedPayload"]).unwrap()
@@ -4107,17 +6164,19 @@ mod tests {
 
         let limited_source = Arc::new(OwnedSource::new(fixture("abc")));
         let limited_options = super::SourceBackedOptions {
-            record_limits: crate::RecordLimits {
+            source_limits: crate::SourceLimits {
                 max_aggregate_input_bytes: 1,
-                ..crate::RecordLimits::default()
+                ..crate::SourceLimits::default()
             },
             ..super::SourceBackedOptions::default()
         };
-        let limited =
-            super::SourceSnapshot::open_with_options(limited_source, limited_options).unwrap();
         assert!(matches!(
-            limited.edit_text(target()),
-            Err(Error::Package(crate::package::Error::ResourceLimit(_)))
+            super::SourceSnapshot::open_with_options(limited_source, limited_options),
+            Err(Error::Package(crate::package::Error::Limit {
+                kind: crate::SourceLimitKind::AggregateBytes,
+                maximum: 1,
+                ..
+            }))
         ));
     }
 
@@ -4134,7 +6193,8 @@ mod tests {
         assert_eq!(owned.payload, ranged.payload);
         assert_eq!(owned.text, ranged.text);
 
-        let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
+        let mut ole =
+            OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
         let document = ole.open_stream(&["PowerPoint Document"]).unwrap();
         let metrics = metrics.lock().unwrap();
         assert!(metrics.calls > 0);
@@ -4145,7 +6205,7 @@ mod tests {
     #[test]
     fn source_range_resolver_matches_owned_oracle_for_every_shape() {
         let bytes = generated_fixture(6, 4);
-        let mut package = Package::from_reader(Cursor::new(bytes.clone())).unwrap();
+        let mut package = Reader::from_reader(Cursor::new(bytes.clone())).unwrap();
         let presentation = package.presentation().unwrap();
 
         for (slide_index, slide) in presentation.slides().unwrap().iter().enumerate() {
@@ -4169,7 +6229,7 @@ mod tests {
         let source =
             super::SourceSnapshot::open(Arc::new(OwnedSource::new(bytes.clone()))).unwrap();
 
-        let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
+        let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
         let presentation = package.presentation().unwrap();
         let slides = presentation.slides().unwrap();
         for (slide_index, slide) in slides.iter().enumerate() {
@@ -4183,6 +6243,74 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn adopted_shared_owner_matches_a_fresh_positional_open() {
+        let bytes = generated_fixture(6, 4);
+        let opened =
+            super::SourceSnapshot::open(Arc::new(OwnedSource::new(bytes.clone()))).unwrap();
+        let ole = OleFile::open(
+            Cursor::new(bytes.clone()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
+        let shared = Arc::new(
+            SharedOleFile::from_owned_ole_file(
+                ole,
+                SourceVersion::new(0x5050_5431, 0),
+                SharedOleFileLimits::default(),
+            )
+            .unwrap(),
+        );
+        let adopted = super::SourceSnapshot::from_shared(
+            Arc::clone(&shared),
+            super::SourceBackedOptions::default(),
+        )
+        .unwrap();
+        assert!(Arc::ptr_eq(&adopted.inner.shared, &shared));
+        assert_eq!(adopted.fingerprint(), opened.fingerprint());
+        assert_eq!(adopted.len(), opened.len());
+        let target = Target::new(Position::new(5), Position::new(3));
+        assert_eq!(
+            adopted.read_text(target).unwrap(),
+            opened.read_text(target).unwrap()
+        );
+
+        let package =
+            crate::SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
+        let from_package = package.text_edit_snapshot().unwrap();
+        assert_eq!(from_package.fingerprint(), opened.fingerprint());
+        assert_eq!(
+            from_package.read_text(target).unwrap(),
+            opened.read_text(target).unwrap()
+        );
+
+        let limited = super::SourceBackedOptions {
+            source_limits: crate::SourceLimits {
+                max_package_bytes: 1,
+                ..crate::SourceLimits::default()
+            },
+            ..super::SourceBackedOptions::default()
+        };
+        assert!(matches!(
+            super::SourceSnapshot::from_shared(shared, limited),
+            Err(Error::Package(crate::package::Error::Limit {
+                kind: crate::SourceLimitKind::InputBytes,
+                maximum: 1,
+                ..
+            }))
+        ));
+    }
+
+    const fn assert_send_sync<T: Send + Sync>() {}
+    // Risk R3 of unified-ops record 0003: the unified `Ppt` handle retains
+    // these owners behind an `Arc`, so they must stay thread-safe.
+    const _: () = {
+        assert_send_sync::<super::SourceSnapshot>();
+        assert_send_sync::<Snapshot>();
+        assert_send_sync::<crate::SourceBackedPackage>();
+        assert_send_sync::<crate::presentation::Presentation>();
+    };
 
     #[test]
     fn repeated_source_reads_reuse_validated_cfb_index_and_reject_mutation() {
@@ -4199,9 +6327,9 @@ mod tests {
         let mut legacy_text = None;
         for _ in 0..2 {
             legacy_snapshot.ensure_current().unwrap();
-            let shared = SharedOleFile::open_with_limits(
+            let shared = SharedOleFile::open(
                 Arc::clone(&legacy_source),
-                super::shared_limits(crate::RecordLimits::default()).unwrap(),
+                super::shared_limits(crate::SourceLimits::default()).unwrap(),
             )
             .unwrap();
             super::reject_macro_components(&shared).unwrap();
@@ -4217,7 +6345,7 @@ mod tests {
                 &document_path,
                 &current_user_path,
                 Target::new(Position::new(5), Position::new(3)),
-                crate::RecordLimits::default(),
+                crate::SourceLimits::default(),
             )
             .unwrap();
             if let Some(expected) = &legacy_text {
@@ -4305,9 +6433,9 @@ mod tests {
         let limited = super::SourceSnapshot::open_with_options(
             Arc::new(OwnedSource::new(fixture("abc"))),
             super::SourceBackedOptions {
-                record_limits: crate::RecordLimits {
-                    max_aggregate_input_bytes: 1,
-                    ..crate::RecordLimits::default()
+                source_limits: crate::SourceLimits {
+                    max_records: 1,
+                    ..crate::SourceLimits::default()
                 },
                 ..super::SourceBackedOptions::default()
             },
@@ -4315,8 +6443,11 @@ mod tests {
         .unwrap();
         assert!(matches!(
             limited.read_text(target()),
-            Err(Error::Package(crate::package::Error::ResourceLimit(message)))
-                if message.contains("total") || message.contains("aggregate")
+            Err(Error::Package(crate::package::Error::Limit {
+                kind: crate::SourceLimitKind::Events,
+                maximum: 1,
+                ..
+            }))
         ));
 
         let valid =
@@ -4401,10 +6532,14 @@ mod tests {
         ));
 
         let source = fixture("abc");
-        let mut ole = OleFile::open(Cursor::new(source.clone())).unwrap();
+        let mut ole = OleFile::open(
+            Cursor::new(source.clone()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let current_user = ole.open_stream(&["Current User"]).unwrap();
         let edit_offset = usize::try_from(
-            crate::CurrentUser::parse(&current_user)
+            crate::CurrentUser::parse(&current_user, &crate::SourceLimits::default())
                 .unwrap()
                 .current_edit_offset(),
         )
@@ -4447,11 +6582,15 @@ mod tests {
         ));
 
         let source = fixture("abc");
-        let mut ole = OleFile::open(Cursor::new(source.clone())).unwrap();
+        let mut ole = OleFile::open(
+            Cursor::new(source.clone()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let document = ole.open_stream(&["PowerPoint Document"]).unwrap();
         let current_user = ole.open_stream(&["Current User"]).unwrap();
         let edit_offset = usize::try_from(
-            crate::CurrentUser::parse(&current_user)
+            crate::CurrentUser::parse(&current_user, &crate::SourceLimits::default())
                 .unwrap()
                 .current_edit_offset(),
         )
@@ -4514,7 +6653,7 @@ mod tests {
         let doc_info = raw_record(0x0F, 0, crate::RecordType::DocInfoList as u16, &macro_info);
         let document = raw_record(0x0F, 0, crate::RecordType::Document as u16, &doc_info);
         assert!(matches!(
-            super::reject_macro_records(&document, 0, crate::RecordLimits::default()),
+            super::reject_macro_records(&document, 0, crate::SourceLimits::default()),
             Err(Error::Refused(Refusal::UnsupportedSource))
         ));
 
@@ -4535,7 +6674,7 @@ mod tests {
         );
         let document = raw_record(0x0F, 0, crate::RecordType::Document as u16, &duplicate_info);
         assert!(matches!(
-            super::reject_macro_records(&document, 0, crate::RecordLimits::default()),
+            super::reject_macro_records(&document, 0, crate::SourceLimits::default()),
             Err(Error::Package(crate::package::Error::Corrupted(message)))
                 if message.contains("multiple VBAInfo")
         ));
@@ -4548,7 +6687,7 @@ mod tests {
             &[doc_info.clone(), doc_info].concat(),
         );
         assert!(matches!(
-            super::reject_macro_records(&document, 0, crate::RecordLimits::default()),
+            super::reject_macro_records(&document, 0, crate::SourceLimits::default()),
             Err(Error::Package(crate::package::Error::Corrupted(message)))
                 if message.contains("multiple DocInfoList")
         ));
@@ -4562,7 +6701,7 @@ mod tests {
         let doc_info = raw_record(0x0F, 0, crate::RecordType::DocInfoList as u16, &orphan_atom);
         let document = raw_record(0x0F, 0, crate::RecordType::Document as u16, &doc_info);
         assert!(matches!(
-            super::reject_macro_records(&document, 0, crate::RecordLimits::default()),
+            super::reject_macro_records(&document, 0, crate::SourceLimits::default()),
             Err(Error::Refused(Refusal::UnsupportedSource))
         ));
 
@@ -4709,7 +6848,11 @@ mod tests {
         let target = target();
         let standalone = super::resolve(&bytes, target).unwrap();
         let shape_target = super::resolve_shape_target(&bytes, target).unwrap();
-        let editor = crate::embedded::object::Editor::open_records(bytes.clone()).unwrap();
+        let editor = crate::embedded::object::Editor::open_records(
+            bytes.clone(),
+            super::presentation(&bytes).unwrap().source_limits(),
+        )
+        .unwrap();
         let supplied = super::resolve_with_shape_target(target, shape_target, &editor).unwrap();
 
         assert_eq!(supplied.target, standalone.target);
@@ -4781,6 +6924,35 @@ mod tests {
                     crate::RecordType::StyleTextPropAtom as u16,
                     crate::RecordType::TextInteractiveInfoAtom as u16,
                 ],
+                None,
+                None,
+                3,
+            )
+            .unwrap()
+        );
+        // A repeated position-free record is not one modeled body either.
+        assert!(
+            !super::resize_dependency_closure_is_modeled(
+                &[
+                    crate::RecordType::TextHeaderAtom as u16,
+                    crate::RecordType::TextBytesAtom as u16,
+                    crate::RecordType::TextRulerAtom as u16,
+                    crate::RecordType::TextRulerAtom as u16,
+                ],
+                None,
+                None,
+                3,
+            )
+            .unwrap()
+        );
+        assert!(
+            super::resize_dependency_closure_is_modeled(
+                &[
+                    crate::RecordType::TextHeaderAtom as u16,
+                    crate::RecordType::TextBytesAtom as u16,
+                    crate::RecordType::TextRulerAtom as u16,
+                ],
+                None,
                 None,
                 3,
             )

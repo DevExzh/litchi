@@ -38,6 +38,7 @@ impl Default for Limits {
 
 /// A malformed or resource-exhausting serialized signature blob.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     /// The source ended before a declared field boundary.
     Truncated(&'static str),
@@ -181,14 +182,8 @@ impl Blob {
 
     /// Starts a source-checked edit over this exact source.
     #[must_use]
-    pub fn edit(&self) -> super::Transaction {
+    pub fn edit(&self) -> super::Edit {
         self.snapshot().edit()
-    }
-
-    /// Alias for [`Self::edit`] using transactional terminology.
-    #[must_use]
-    pub fn transaction(&self) -> super::Transaction {
-        self.edit()
     }
 
     pub(crate) fn layout(&self) -> &codec::Layout {

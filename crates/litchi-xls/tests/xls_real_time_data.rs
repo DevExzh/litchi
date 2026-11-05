@@ -1,8 +1,8 @@
 //! Round-trip tests for the BIFF8 `RealTimeData` record (RTD topics).
 
-use litchi_xls::Workbook;
+use litchi_xls::raw::Reader;
 use litchi_xls::real_time_data::{Cell, Record, Value};
-use litchi_xls::writer::Writer;
+use litchi_xls::writer::Builder;
 use std::io::Cursor;
 
 fn rtd_topic(segments: &[&str], value: Value, cells: Vec<Cell>) -> Record {
@@ -60,16 +60,16 @@ fn real_time_data_round_trips_through_writer_and_reader() {
         ),
     ];
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Quotes").unwrap();
     writer.write_number(sheet, 1, 2, 58.25).unwrap();
     for topic in &topics {
         writer.add_real_time_data(topic.clone()).unwrap();
     }
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
 
-    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     assert_eq!(workbook.real_time_data(), topics.as_slice());
 }
 
@@ -82,15 +82,15 @@ fn real_time_data_prefix_compression_round_trips() {
     second.common_prefix_len = 7;
     second.topic = "PROG.IDBOND".to_string();
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Quotes").unwrap();
     writer.write_number(sheet, 0, 0, 1.0).unwrap();
     writer.add_real_time_data(first.clone()).unwrap();
     writer.add_real_time_data(second.clone()).unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
 
-    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     let parsed = workbook.real_time_data();
     assert_eq!(parsed.len(), 2);
     assert_eq!(parsed[0], first);
@@ -105,12 +105,12 @@ fn real_time_data_prefix_compression_round_trips() {
 
 #[test]
 fn workbook_without_real_time_data_has_none() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Plain").unwrap();
     writer.write_string(sheet, 0, 0, "content").unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
 
-    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     assert!(workbook.real_time_data().is_empty());
 }

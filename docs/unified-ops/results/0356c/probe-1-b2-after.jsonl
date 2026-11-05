@@ -1,0 +1,16 @@
+{"scenario":"noop","median_us":39.97}
+{"scenario":"payload_commit","median_us":43.300000000000004}
+{"scenario":"payload_save","median_us":12144.869}
+{"scenario":"payload_save_twice","median_us":24200.077}
+{"scenario":"part_add_commit","median_us":53.831}
+{"scenario":"part_add_save","median_us":12138.478}
+{"scenario":"root_relationship_commit","median_us":48.31}
+{"scenario":"payload_replay_warm","median_us":74.24}
+{"scenario":"payload_inverse_warm","median_us":76.53}
+{"scenario":"payload_commit_and_first_replay","median_us":122.39099999999999}
+{"scenario":"payload_commit_and_first_inverse","median_us":126.12999999999998}
+{"scenario":"payload_patch_history_128","median_us":6244.185}
+{"scenario":"part_add_replay_warm","median_us":73.941}
+{"scenario":"part_add_inverse_warm","median_us":73.591}
+{"scenario":"part_add_patch_history_128","median_us":7257.7609999999995}
+{"scenario":"batch1000","median_us":28684.763}

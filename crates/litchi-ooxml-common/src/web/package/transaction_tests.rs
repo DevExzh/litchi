@@ -50,6 +50,13 @@ fn package() -> (OpcPackage, PackURI, PackURI, PackURI, PackURI) {
     (package, task, extension, old_image, new_image)
 }
 
+fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<bool> {
+    let commit = patch.apply(package)?;
+    let changed = commit.diagnostics().changed();
+    *package = commit.into_package();
+    Ok(changed)
+}
+
 fn task_noop_patch(package: &OpcPackage, task: &PackURI) -> Patch {
     let root = package
         .rels()
@@ -185,7 +192,10 @@ fn lexical_source_package() -> (OpcPackage, PackURI) {
         ("web/_rels/taskpanes.xml.rels", TASK_RELATIONSHIPS),
         ("web/extension.xml", EXT_XML),
     ]);
-    (OpcPackage::from_bytes(&archive).unwrap(), task)
+    (
+        OpcPackage::from_bytes(&archive, litchi_opc::SourceLimits::default()).unwrap(),
+        task,
+    )
 }
 
 #[test]
@@ -196,8 +206,12 @@ fn inverse_restores_content_types_relationships_and_xml_after_reopen() {
         .iter()
         .find(|relationship| relationship.reltype() == TASK_PANES_RELATIONSHIP)
         .map(RelationshipState::capture);
-    let before_content_types = package.source_content_types().unwrap();
-    let before_relationships = package.source_relationships(&task).unwrap();
+    let before_content_types = package
+        .source_content_types(litchi_opc::SourceLimits::default())
+        .unwrap();
+    let before_relationships = package
+        .source_relationships(&task, litchi_opc::SourceLimits::default())
+        .unwrap();
     let before_xml = package.source_xml_part(&task).unwrap();
     let old_image_bytes = package.get_part(&old_image).unwrap().blob_arc();
     let extension_state = PartState::capture(package.get_part(&extension).unwrap());
@@ -254,24 +268,28 @@ fn inverse_restores_content_types_relationships_and_xml_after_reopen() {
         },
     )
     .unwrap();
-    assert!(!patch.is_empty());
+    assert!(!patch.is_noop());
     let mut signed = package.clone();
     signed.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
-    assert!(patch.apply(&mut signed).is_err());
+    assert!(apply_patch(&mut signed, &patch).is_err());
     assert!(signed.is_signed());
-    assert!(patch.apply(&mut package).unwrap());
+    assert!(apply_patch(&mut package, &patch).unwrap());
     assert_eq!(package.get_part(&task).unwrap().blob(), TASK_XML_AFTER);
     assert!(package.get_part(&old_image).is_err());
     assert!(package.get_part(&new_image).is_ok());
 
     let inverse = patch.inverse();
-    assert!(inverse.apply(&mut package).unwrap());
+    assert!(apply_patch(&mut package, &inverse).unwrap());
     assert_eq!(
-        package.source_content_types().unwrap(),
+        package
+            .source_content_types(litchi_opc::SourceLimits::default())
+            .unwrap(),
         before_content_types
     );
     assert_eq!(
-        package.source_relationships(&task).unwrap(),
+        package
+            .source_relationships(&task, litchi_opc::SourceLimits::default())
+            .unwrap(),
         before_relationships
     );
     assert_eq!(package.source_xml_part(&task).unwrap(), before_xml);
@@ -283,14 +301,18 @@ fn inverse_restores_content_types_relationships_and_xml_after_reopen() {
     assert!(PartState::capture(package.get_part(&extension).unwrap()) == extension_state);
 
     let mut bytes = Vec::new();
-    PackageWriter::write_to_stream(&mut bytes, &package).unwrap();
-    let reopened = OpcPackage::from_vec(bytes).unwrap();
+    PackageWriter::write_to(&mut bytes, &package).unwrap();
+    let reopened = OpcPackage::from_vec(bytes, litchi_opc::SourceLimits::default()).unwrap();
     assert_eq!(
-        reopened.source_content_types().unwrap(),
+        reopened
+            .source_content_types(litchi_opc::SourceLimits::default())
+            .unwrap(),
         before_content_types
     );
     assert_eq!(
-        reopened.source_relationships(&task).unwrap(),
+        reopened
+            .source_relationships(&task, litchi_opc::SourceLimits::default())
+            .unwrap(),
         before_relationships
     );
     assert_eq!(reopened.source_xml_part(&task).unwrap(), before_xml);
@@ -300,12 +322,14 @@ fn inverse_restores_content_types_relationships_and_xml_after_reopen() {
 fn source_bound_noop_checks_source_and_inverse_before_returning_false() {
     let (mut source_package, task, _extension, _old_image, _new_image) = package();
     let patch = task_noop_patch(&source_package, &task);
-    assert!(patch.is_empty());
-    assert!(!patch.apply(&mut source_package).unwrap());
+    assert!(patch.is_noop());
+    assert!(!apply_patch(&mut source_package, &patch).unwrap());
 
     let (mut lexical_package, lexical_task) = lexical_source_package();
     let lexical_patch = task_noop_patch(&lexical_package, &lexical_task);
-    let before_relationships = lexical_package.source_relationships(&lexical_task).unwrap();
+    let before_relationships = lexical_package
+        .source_relationships(&lexical_task, litchi_opc::SourceLimits::default())
+        .unwrap();
     let removed = before_relationships
         .without_relationship("rIdExtension", Limits::standard().xml_bytes)
         .unwrap();
@@ -320,27 +344,31 @@ fn source_bound_noop_checks_source_and_inverse_before_returning_false() {
         .unwrap();
     assert_ne!(before_relationships, rewritten);
     lexical_package
-        .try_replace_relationships(&before_relationships, &removed)
+        .try_replace_relationships(
+            &before_relationships,
+            &removed,
+            litchi_opc::SourceLimits::default(),
+        )
         .unwrap();
     lexical_package
-        .try_replace_relationships(&removed, &rewritten)
+        .try_replace_relationships(&removed, &rewritten, litchi_opc::SourceLimits::default())
         .unwrap();
-    assert!(lexical_patch.apply(&mut lexical_package).is_err());
+    assert!(apply_patch(&mut lexical_package, &lexical_patch).is_err());
 
     source_package
         .get_part_mut(&task)
         .unwrap()
         .set_blob(TASK_XML_AFTER.to_vec());
     let stale_bytes = source_package.get_part(&task).unwrap().blob().to_vec();
-    assert!(patch.apply(&mut source_package).is_err());
+    assert!(apply_patch(&mut source_package, &patch).is_err());
     assert_eq!(source_package.get_part(&task).unwrap().blob(), stale_bytes);
 
     let (mut inverse_package, inverse_task, _extension, _old_image, _new_image) = package();
     let inverse = patch.inverse();
-    assert!(!inverse.apply(&mut inverse_package).unwrap());
+    assert!(!apply_patch(&mut inverse_package, &inverse).unwrap());
     inverse_package
         .get_part_mut(&inverse_task)
         .unwrap()
         .set_blob(TASK_XML_AFTER.to_vec());
-    assert!(inverse.apply(&mut inverse_package).is_err());
+    assert!(apply_patch(&mut inverse_package, &inverse).is_err());
 }

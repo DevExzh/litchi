@@ -71,6 +71,7 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
@@ -99,7 +100,6 @@ fn movie_payload(movie: usize) -> TestResult<Vec<u8>> {
                 }),
                 flags: Some(0x20),
                 angle: Some(17.5),
-                ..Default::default()
             }),
             parent: Some(reference(SLIDE)),
             title: Some(reference(TITLES[movie])),
@@ -134,7 +134,12 @@ fn movie_payload(movie: usize) -> TestResult<Vec<u8>> {
     }
     .encode_to_vec();
     let mut payload = value;
-    append_length_delimited_field(&mut payload, UNKNOWN_FIELD, UNKNOWN_MARKER)?;
+    append_length_delimited_field(
+        &mut payload,
+        UNKNOWN_FIELD,
+        UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -178,7 +183,12 @@ fn audio_payload() -> TestResult<Vec<u8>> {
     }
     .encode_to_vec();
     let mut payload = value;
-    append_length_delimited_field(&mut payload, UNKNOWN_FIELD, UNKNOWN_MARKER)?;
+    append_length_delimited_field(
+        &mut payload,
+        UNKNOWN_FIELD,
+        UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -208,6 +218,7 @@ fn image_payload() -> TestResult<Vec<u8>> {
         &mut payload,
         UNKNOWN_FIELD,
         b"shared-poster-image-unknown-extension",
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     Ok(payload)
 }
@@ -244,7 +255,12 @@ fn metadata_component_payload(
     }
     .encode_to_vec();
     let mut payload = component;
-    append_length_delimited_field(&mut payload, UNKNOWN_FIELD, METADATA_UNKNOWN_MARKER)?;
+    append_length_delimited_field(
+        &mut payload,
+        UNKNOWN_FIELD,
+        METADATA_UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -329,16 +345,29 @@ fn metadata_payload() -> TestResult<Vec<u8>> {
     // This keeps the fixture's component/data shape easy to inspect while
     // retaining a byte that changed writers must preserve.
     let mut payload = metadata.encode_to_vec();
-    append_length_delimited_field(&mut payload, UNKNOWN_FIELD, METADATA_UNKNOWN_MARKER)?;
+    append_length_delimited_field(
+        &mut payload,
+        UNKNOWN_FIELD,
+        METADATA_UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     // Keep the unrelated component in the same root payload after the typed
     // projection so selected-component ownership is tested against a second
     // locator and UUID namespace.
-    append_length_delimited_field(&mut payload, 3, &unrelated)?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &unrelated,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
 fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 /// Build the exact source used by the focused media replacement tests.
@@ -443,7 +472,7 @@ pub(super) fn synthetic_package() -> TestResult<Vec<u8>> {
 /// variant exercises the replacement owner's complete current owner census.
 pub(super) fn synthetic_package_with_shared_image_poster_owner() -> TestResult<Vec<u8>> {
     let source = synthetic_package()?;
-    let mut archive = Archive::parse(&document_stream(&source)?)?;
+    let mut archive = Archive::parse(&document_stream(&source)?, Default::default())?;
     let slide = archive
         .object_mut(SLIDE)
         .ok_or_else(|| io::Error::other("missing synthetic slide object"))?;
@@ -503,7 +532,7 @@ pub(super) fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 pub(super) fn member_bytes(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
-    Catalog::from_bytes(package)?
+    Catalog::from_bytes(package, Default::default())?
         .iter()
         .find(|entry| entry.name() == name)
         .map(|entry| entry.data().to_vec())
@@ -512,12 +541,17 @@ pub(super) fn member_bytes(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
 }
 
 pub(super) fn document_stream(package: &[u8]) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::decompress(&member_bytes(package, DOCUMENT_MEMBER)?)?.into_bytes())
+    Ok(
+        SnappyStream::decompress(&member_bytes(package, DOCUMENT_MEMBER)?, Default::default())?
+            .into_bytes(),
+    )
 }
 
 pub(super) fn metadata_stream(package: &[u8]) -> TestResult<Vec<u8>> {
     let archive = Archive::parse(
-        &SnappyStream::decompress(&member_bytes(package, METADATA_MEMBER)?)?.into_bytes(),
+        &SnappyStream::decompress(&member_bytes(package, METADATA_MEMBER)?, Default::default())?
+            .into_bytes(),
+        Default::default(),
     )?;
     archive
         .object(METADATA_OBJECT)
@@ -532,7 +566,7 @@ pub(super) fn metadata_stream(package: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 pub(super) fn movie_payload_from_package(package: &[u8], movie: u64) -> TestResult<Vec<u8>> {
-    let archive = Archive::parse(&document_stream(package)?)?;
+    let archive = Archive::parse(&document_stream(package)?, Default::default())?;
     archive
         .object(movie)
         .and_then(|object| {
@@ -546,7 +580,7 @@ pub(super) fn movie_payload_from_package(package: &[u8], movie: u64) -> TestResu
 }
 
 pub(super) fn image_payload_from_package(package: &[u8], image: u64) -> TestResult<Vec<u8>> {
-    let archive = Archive::parse(&document_stream(package)?)?;
+    let archive = Archive::parse(&document_stream(package)?, Default::default())?;
     archive
         .object(image)
         .and_then(|object| {
@@ -560,8 +594,9 @@ pub(super) fn image_payload_from_package(package: &[u8], image: u64) -> TestResu
 }
 
 pub(super) fn replace_document_archive(source: &[u8], archive: Archive) -> TestResult<Vec<u8>> {
-    let replacement = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(source)?;
+    let replacement =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entries = catalog
         .iter()
         .map(|entry| {
@@ -583,9 +618,10 @@ pub(super) fn replace_metadata_payload(source: &[u8], payload: Vec<u8>) -> TestR
         &Archive {
             objects: vec![object(METADATA_OBJECT, 11_006, payload)?],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entries = catalog
         .iter()
         .map(|entry| {
@@ -607,7 +643,7 @@ pub(super) fn with_movie_payload(
     movie: u64,
     payload: Vec<u8>,
 ) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     archive
         .object_mut(movie)
         .ok_or_else(|| io::Error::other(format!("missing movie object {movie}")))?

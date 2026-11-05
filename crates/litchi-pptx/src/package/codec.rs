@@ -12,7 +12,6 @@ use super::Package;
 use crate::custom::{Host, Props};
 use crate::parts::PresentationPart;
 use crate::resources;
-use crate::writer::MutablePresentation;
 use crate::{Error, Result};
 
 const PRESENTATION_PART: &str = "/ppt/presentation.xml";
@@ -27,15 +26,29 @@ const NOTES_MASTER_RELATIONSHIP_ID: &str = "rIdNotesMaster";
 const CORE_PROPERTIES_PART: &str = "/docProps/core.xml";
 const EXTENDED_PROPERTIES_PART: &str = "/docProps/app.xml";
 
-pub(super) const STALE_PRESENTATION_GRAPH_REASON: &str = "the mutable presentation model has unflushed changes; save and reopen before reading the canonical package graph";
-
 impl Package {
-    /// Create a minimal valid, mutable `PresentationML` package.
+    /// Create a minimal valid canonical `PresentationML` package.
+    ///
+    /// Use [`crate::builder::Builder`] to configure a fresh presentation.
+    ///
+    /// ```
+    /// let package = litchi_pptx::Package::new()?;
+    /// assert_eq!(package.presentation()?.slide_count()?, 0);
+    /// let commit = package.edit()?.commit()?;
+    /// assert!(commit.patch().is_noop());
+    /// let mut bytes = Vec::new();
+    /// commit.into_package().write_to(&mut bytes)?;
+    /// # Ok::<(), litchi_pptx::Error>(())
+    /// ```
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
     pub fn new() -> Result<Self> {
+        Self::new_authoring()
+    }
+
+    pub(crate) fn new_authoring() -> Result<Self> {
         let mut package = OpcPackage::new();
         let presentation_name = pack_uri(PRESENTATION_PART)?;
         let master_name = pack_uri(MASTER_PART)?;
@@ -105,7 +118,9 @@ impl Package {
         let mut notes_master = BlobPart::new(
             notes_master_name,
             ct::PML_NOTES_MASTER.to_string(),
-            crate::notes::master_xml().as_bytes().to_vec(),
+            crate::notes::master_xml(crate::notes::Limits::DEFAULT)?
+                .as_bytes()
+                .to_vec(),
         );
         notes_master.relate_to("../theme/theme2.xml", rt::THEME);
 
@@ -158,17 +173,23 @@ impl Package {
         package.add_part(Box::new(table_styles));
         package.add_part(Box::new(core_properties));
         package.add_part(Box::new(extended_properties));
+        let part_bytes = Self::part_bytes_for(&package)?;
+
+        let replay_index = crate::package::replay_index::ReplayIndex::from_package(&package)?;
 
         Ok(Self {
-            opc: package,
-            mutable_pres: Some(MutablePresentation::new()),
-            part_digests: std::sync::OnceLock::new(),
+            opc: std::sync::Arc::new(package),
+            part_bytes,
+            content_revision: std::sync::Arc::new(std::sync::OnceLock::new()),
+            part_digests: std::sync::Arc::new(std::sync::OnceLock::new()),
+            replay_index: std::sync::Arc::new(replay_index),
             physical_source_provenance: false,
+            semantic_limits: None,
             tolerance: crate::leniency::ToleranceReport::default(),
             #[cfg(feature = "encryption")]
             encryption: litchi_ooxml_common::package_encryption::PackageEncryption::plain(),
-            #[cfg(feature = "automatic-fonts")]
-            font_embedding_dirty: false,
+            #[cfg(feature = "encryption")]
+            encryption_limits: litchi_crypto::ooxml::Limits::default(),
         })
     }
 
@@ -178,19 +199,23 @@ impl Package {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        Self::open_with_limits(path, litchi_opc::ReadLimits::default())
+        Self::open_with_options(path, crate::OpenOptions::default())
     }
 
-    /// Open a PPTX from a filesystem path with explicit OPC resource limits.
+    /// Open a PPTX from a filesystem path with explicit ingress options.
     ///
     /// # Errors
     ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn open_with_limits<P: AsRef<Path>>(
-        path: P,
-        limits: litchi_opc::ReadLimits,
-    ) -> Result<Self> {
-        Self::from_opc_package_with_provenance(OpcPackage::open_with_limits(path, limits)?, true)
+    /// Returns [`crate::Error::UnsupportedOpenPolicy`] for cache or execution
+    /// policies, which only positional-source owners honor, and an error if
+    /// the input exceeds the source limits, cannot be read or is malformed.
+    pub fn open_with_options<P: AsRef<Path>>(path: P, options: crate::OpenOptions) -> Result<Self> {
+        options.check_owning()?;
+        Self::from_opc_package_with_provenance_and_semantic_limits(
+            OpcPackage::open(path, options.source_limits)?,
+            true,
+            options.semantic_limits,
+        )
     }
 
     /// Parse a PPTX from a reader.
@@ -199,42 +224,27 @@ impl Package {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
-        Self::from_reader_with_limits(reader, litchi_opc::ReadLimits::default())
+        Self::from_reader_with_options(reader, crate::OpenOptions::default())
     }
 
-    /// Parse a PPTX from a reader with explicit OPC resource limits.
+    /// Parse a PPTX from a reader with explicit ingress options.
+    ///
+    /// Reader ingestion is bounded by the selected source limits.
     ///
     /// # Errors
     ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_reader_with_limits<R: Read>(
+    /// Returns [`crate::Error::UnsupportedOpenPolicy`] for cache or execution
+    /// policies, and an error if the input exceeds the source limits, cannot
+    /// be read or is malformed.
+    pub fn from_reader_with_options<R: Read>(
         reader: R,
-        limits: litchi_opc::ReadLimits,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
-        Self::from_opc_package_with_provenance(
-            OpcPackage::from_reader_with_limits(reader, limits)?,
+        options.check_owning()?;
+        Self::from_opc_package_with_provenance_and_semantic_limits(
+            OpcPackage::from_reader(reader, options.source_limits)?,
             true,
-        )
-    }
-
-    /// Parse a PPTX from an owned ZIP buffer.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_vec(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_vec_with_limits(bytes, litchi_opc::ReadLimits::default())
-    }
-
-    /// Parse a PPTX from an owned ZIP buffer with explicit OPC resource limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_vec_with_limits(bytes: Vec<u8>, limits: litchi_opc::ReadLimits) -> Result<Self> {
-        Self::from_opc_package_with_provenance(
-            OpcPackage::from_vec_with_limits(bytes, limits)?,
-            true,
+            options.semantic_limits,
         )
     }
 
@@ -244,16 +254,23 @@ impl Package {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, litchi_opc::ReadLimits::default())
+        Self::from_bytes_with_options(bytes, crate::OpenOptions::default())
     }
 
-    /// Parse a PPTX from a borrowed ZIP buffer with explicit OPC resource limits.
+    /// Parse a PPTX from a borrowed ZIP buffer with explicit ingress options.
     ///
     /// # Errors
     ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_bytes_with_limits(bytes: &[u8], limits: litchi_opc::ReadLimits) -> Result<Self> {
-        Self::from_opc_package(OpcPackage::from_bytes_with_limits(bytes, limits)?)
+    /// Returns [`crate::Error::UnsupportedOpenPolicy`] for cache or execution
+    /// policies, and an error if the input exceeds the source limits or is
+    /// malformed.
+    pub fn from_bytes_with_options(bytes: &[u8], options: crate::OpenOptions) -> Result<Self> {
+        options.check_owning()?;
+        Self::from_opc_package_with_provenance_and_semantic_limits(
+            OpcPackage::from_bytes(bytes, options.source_limits)?,
+            false,
+            options.semantic_limits,
+        )
     }
 
     /// Adopt an already parsed OPC graph without hydrating a mutable model.
@@ -265,10 +282,23 @@ impl Package {
         Self::from_opc_package_with_provenance(opc, false)
     }
 
-    fn from_opc_package_with_provenance(
+    pub(crate) fn from_opc_package_with_provenance(
         opc: OpcPackage,
         physical_source_provenance: bool,
     ) -> Result<Self> {
+        Self::from_opc_package_with_provenance_and_semantic_limits(
+            opc,
+            physical_source_provenance,
+            None,
+        )
+    }
+
+    pub(crate) fn from_opc_package_with_provenance_and_semantic_limits(
+        opc: OpcPackage,
+        physical_source_provenance: bool,
+        semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
+    ) -> Result<Self> {
+        let part_bytes = Self::part_bytes_for(&opc)?;
         let main = opc.main_document_part()?;
         let presentation = PresentationPart::from_part(main)?;
         // Slide-list repairs (audit finding 6.7) are recorded at open. A slide
@@ -293,18 +323,28 @@ impl Package {
         // `Package::math_properties`, a lazy read that re-reads them without
         // a report; their repairs are recorded here, advisorily, like the
         // metadata above.
+        let presentation_limits =
+            crate::presentation_properties::Limits::from_source_limits(opc.read_limits());
         let _deferred_presentation_properties_error =
-            crate::presentation_properties::load_from_package_with_tolerance(&opc, &mut tolerance);
+            crate::presentation_properties::load_from_package_with_tolerance(
+                &opc,
+                &mut tolerance,
+                presentation_limits,
+            );
+        let replay_index = crate::package::replay_index::ReplayIndex::from_package(&opc)?;
         Ok(Self {
-            opc,
-            mutable_pres: None,
-            part_digests: std::sync::OnceLock::new(),
+            opc: std::sync::Arc::new(opc),
+            part_bytes,
+            content_revision: std::sync::Arc::new(std::sync::OnceLock::new()),
+            part_digests: std::sync::Arc::new(std::sync::OnceLock::new()),
+            replay_index: std::sync::Arc::new(replay_index),
             physical_source_provenance,
+            semantic_limits,
             tolerance,
             #[cfg(feature = "encryption")]
             encryption: litchi_ooxml_common::package_encryption::PackageEncryption::plain(),
-            #[cfg(feature = "automatic-fonts")]
-            font_embedding_dirty: false,
+            #[cfg(feature = "encryption")]
+            encryption_limits: litchi_crypto::ooxml::Limits::default(),
         })
     }
 
@@ -316,7 +356,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the output cannot be encoded or written.
-    pub fn save<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         self.save_with_durability(path, litchi_core::Durability::Full)
     }
 
@@ -336,7 +376,7 @@ impl Package {
     /// `Durability::Full` can report that the destination was replaced but
     /// its directory could not be synchronized.
     pub fn save_with_durability<P: AsRef<Path>>(
-        &mut self,
+        &self,
         path: P,
         durability: litchi_core::Durability,
     ) -> Result<()> {
@@ -347,7 +387,6 @@ impl Package {
                 operation: "save",
                 source,
             })?;
-        self.flush_presentation()?;
         PackageWriter::write_with_durability(path, &self.opc, durability)?;
         Ok(())
     }
@@ -357,7 +396,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn to_bytes(&mut self) -> Result<Vec<u8>> {
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
         #[cfg(feature = "encryption")]
         self.encryption
             .ordinary_output()
@@ -365,95 +404,42 @@ impl Package {
                 operation: "to_bytes",
                 source,
             })?;
-        self.flush_presentation()?;
         Ok(PackageWriter::to_bytes(&self.opc)?)
     }
 
-    pub(super) fn edit_typed<T>(
-        &mut self,
-        operation: impl FnOnce(&mut OpcPackage) -> Result<T>,
-    ) -> Result<T> {
-        self.ensure_plain_mutation("typed package mutation")?;
-        self.edit_raw(operation)
-    }
-
-    pub(super) fn edit_raw<T>(
-        &mut self,
-        operation: impl FnOnce(&mut OpcPackage) -> Result<T>,
-    ) -> Result<T> {
-        let before = self.opc.clone();
-        let presentation_before = self.mutable_pres.clone();
-        #[cfg(feature = "automatic-fonts")]
-        let font_embedding_dirty_before = self.font_embedding_dirty;
-
-        // A raw edit hands the complete graph to the operation, so no memo of
-        // the previous graph survives it, in either direction.
-        self.release_part_digests();
-        let result = (|| {
-            self.flush_presentation()?;
-            operation(&mut self.opc)
-        })();
-        match result {
-            Ok(value) => Ok(value),
-            Err(error) => {
-                self.opc = before;
-                self.mutable_pres = presentation_before;
-                #[cfg(feature = "automatic-fonts")]
-                {
-                    self.font_embedding_dirty = font_embedding_dirty_before;
-                }
-                Err(error)
-            },
-        }
-    }
-
-    pub(super) fn flush_presentation(&mut self) -> Result<()> {
-        let presentation_modified = self.is_modified();
+    /// Publish an authored presentation model into this freshly created
+    /// package: the slides when the model changed, and the automatic fonts
+    /// when `embed_fonts` asks for them. On error the package is dropped.
+    pub(crate) fn publish_authored(
+        mut self,
+        presentation: &crate::builder::Presentation,
+        embed_fonts: bool,
+        #[cfg(feature = "automatic-fonts")] preparation_limits: litchi_fonts::PreparationLimits,
+        #[cfg(feature = "automatic-fonts")] eot_limits: litchi_fonts::embedding::powerpoint::Limits,
+    ) -> Result<Self> {
+        let _ = embed_fonts;
+        let presentation_modified = presentation.is_modified();
         #[cfg(feature = "automatic-fonts")]
         let fonts_requested = self.opc.save_options().fonts != litchi_opc::FontEmbedding::None
-            && (presentation_modified || self.font_embedding_dirty);
+            && (presentation_modified || embed_fonts);
         #[cfg(not(feature = "automatic-fonts"))]
         let fonts_requested = false;
         if !presentation_modified && !fonts_requested {
-            return Ok(());
+            return Ok(self);
         }
-        let Some(presentation) = self.mutable_pres.clone() else {
-            return Err(Error::UnsafeEdit {
-                operation: "save",
-                reason: "the lossless facade cannot publish an opened package's mutable graph",
-            });
-        };
-        // Materializing the mutable presentation rewrites parts of the graph,
-        // so the retained payload-digest memo is released first.
-        self.release_part_digests();
-        let before = self.opc.clone();
-        let result = (|| {
-            if presentation_modified {
-                self.materialize_presentation(&presentation)?;
-            }
-            #[cfg(feature = "automatic-fonts")]
-            self.embed_fonts_for_presentation(&presentation)?;
-            Ok(())
-        })();
-        match result {
-            Ok(()) => {
-                #[cfg(feature = "automatic-fonts")]
-                if fonts_requested {
-                    self.font_embedding_dirty = false;
-                }
-                if presentation_modified && let Some(presentation) = self.mutable_pres.as_mut() {
-                    presentation.mark_clean();
-                }
-                Ok(())
-            },
-            Err(error) => {
-                self.opc = before;
-                Err(error)
-            },
+        if presentation_modified {
+            self.materialize_presentation(presentation)?;
         }
+        #[cfg(feature = "automatic-fonts")]
+        self.embed_fonts_for_presentation(presentation, preparation_limits, eot_limits)?;
+        self.refresh_authored_publication()?;
+        Ok(self)
     }
 
-    fn materialize_presentation(&mut self, presentation: &MutablePresentation) -> Result<()> {
+    fn materialize_presentation(
+        &mut self,
+        presentation: &crate::builder::Presentation,
+    ) -> Result<()> {
         // Compile all fallible p202 payloads before changing any OPC state.
         let designer = presentation.preflight_designer()?;
         let presentation_name = pack_uri(PRESENTATION_PART)?;
@@ -468,7 +454,7 @@ impl Package {
                 .collect()
         };
         {
-            let part = self.opc.get_part_mut(&presentation_name)?;
+            let part = std::sync::Arc::make_mut(&mut self.opc).get_part_mut(&presentation_name)?;
             for relationship_id in old_slide_relationships {
                 part.rels_mut().remove(&relationship_id);
             }
@@ -481,7 +467,7 @@ impl Package {
             .map(|part| part.partname().clone())
             .collect();
         for part in old_slides {
-            self.opc.remove_part(&part);
+            std::sync::Arc::make_mut(&mut self.opc).remove_part(&part);
         }
         let old_notes_slides: Vec<_> = self
             .opc
@@ -490,7 +476,7 @@ impl Package {
             .map(|part| part.partname().clone())
             .collect();
         for part in old_notes_slides {
-            self.opc.remove_part(&part);
+            std::sync::Arc::make_mut(&mut self.opc).remove_part(&part);
         }
 
         let mut relationship_ids = Vec::with_capacity(presentation.slide_count());
@@ -501,8 +487,7 @@ impl Package {
             .enumerate()
         {
             let target = format!("slides/slide{}.xml", index.saturating_add(1));
-            let relationship_id = self
-                .opc
+            let relationship_id = std::sync::Arc::make_mut(&mut self.opc)
                 .get_part_mut(&presentation_name)?
                 .relate_to(&target, rt::SLIDE);
             relationship_ids.push(relationship_id);
@@ -520,7 +505,7 @@ impl Package {
                     rt::NOTES_SLIDE,
                 );
             }
-            self.opc.add_part(Box::new(slide_part));
+            std::sync::Arc::make_mut(&mut self.opc).add_part(Box::new(slide_part));
 
             if let Some(text) = slide.notes() {
                 let notes_name =
@@ -528,17 +513,22 @@ impl Package {
                 let mut notes_part = BlobPart::new(
                     notes_name,
                     ct::PML_NOTES_SLIDE.to_string(),
-                    crate::notes::write_text(text)?,
+                    crate::notes::write_text(
+                        text,
+                        self.semantic_limits()
+                            .notes()
+                            .constrained_by_source(self.opc.read_limits()),
+                    )?,
                 );
                 notes_part.relate_to(&format!("../slides/slide{}.xml", index + 1), rt::SLIDE);
                 notes_part.relate_to("../notesMasters/notesMaster1.xml", rt::NOTES_MASTER);
-                self.opc.add_part(Box::new(notes_part));
+                std::sync::Arc::make_mut(&mut self.opc).add_part(Box::new(notes_part));
             }
         }
 
         let xml =
             presentation.generate_presentation_xml_with_designer(&relationship_ids, &designer)?;
-        self.opc
+        std::sync::Arc::make_mut(&mut self.opc)
             .get_part_mut(&presentation_name)?
             .set_blob(xml.into_bytes());
         Ok(())

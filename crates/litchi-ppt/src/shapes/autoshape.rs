@@ -280,7 +280,7 @@ impl<'a> AutoShape<'a> {
         let Some(opt) = Self::find_odraw_record(raw_data, litchi_odraw::RecordKind::Opt)? else {
             return Ok(Vec::new());
         };
-        let properties = litchi_odraw::prop::Props::parse(&opt)?;
+        let properties = litchi_odraw::prop::Props::parse(&opt, opt.limits())?;
         Ok(Self::extract_adjustments_from_properties(&properties))
     }
 
@@ -290,7 +290,7 @@ impl<'a> AutoShape<'a> {
         let Some(opt) = Self::find_odraw_record(raw_data, litchi_odraw::RecordKind::Opt)? else {
             return Ok(None);
         };
-        let properties = litchi_odraw::prop::Props::parse(&opt)?;
+        let properties = litchi_odraw::prop::Props::parse(&opt, opt.limits())?;
         Ok(AutoShapeGeometry::from_properties(&properties))
     }
 
@@ -310,7 +310,8 @@ impl<'a> AutoShape<'a> {
                         "OfficeArt shape exceeds the PPT record limit".to_string(),
                     ));
                 }
-                let (record, consumed) = litchi_odraw::Record::parse(stream, offset)?;
+                let (record, consumed) =
+                    litchi_odraw::Record::parse(stream, offset, litchi_odraw::Limits::default())?;
                 scanned += 1;
                 if record.kind() == record_type {
                     return Ok(Some(record));
@@ -461,6 +462,10 @@ impl<'a> AutoShape<'a> {
         self.container.mark_source_bound();
     }
 
+    pub(crate) fn apply_source_identity(&mut self, identity: super::shape::SourceIdentity) {
+        self.container.apply_source_identity(identity);
+    }
+
     /// Return explicit custom/freeform geometry, when the shape defines it.
     #[must_use]
     pub fn geometry(&self) -> Option<&AutoShapeGeometry> {
@@ -517,10 +522,6 @@ where
         !self.text().is_empty()
     }
 
-    fn clone_box(&self) -> Box<dyn Shape> {
-        Box::new(self.clone())
-    }
-
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
@@ -540,14 +541,23 @@ mod tests {
         use crate::officeart_wire::{PropertyBuilder, ShapeBuilder, record_type, write_container};
 
         let mut children = Vec::new();
-        ShapeBuilder::new(13, 7).write(&mut children).unwrap();
+        ShapeBuilder::new(13, 7)
+            .write(&mut children, Default::default())
+            .unwrap();
         let mut properties = PropertyBuilder::new();
         properties.add_simple(0x0147, 25);
         properties.add_simple(0x0149, 75);
-        properties.write(&mut children).unwrap();
+        properties.write(&mut children, Default::default()).unwrap();
 
         let mut raw_data = Vec::new();
-        write_container(&mut raw_data, 0, record_type::SP_CONTAINER, &children).unwrap();
+        write_container(
+            &mut raw_data,
+            0,
+            record_type::SP_CONTAINER,
+            &children,
+            Default::default(),
+        )
+        .unwrap();
         ShapeContainer::new(ShapeProperties::default(), raw_data)
     }
 

@@ -5,7 +5,8 @@
 //! an external link. It is separate from the compact worksheet graph because
 //! those extension owners cannot be edited through that graph yet.
 
-use litchi_core::{Error, Result};
+use litchi_core::{Error as CoreError, Result as CoreResult};
+use litchi_odf_common::Error as OdfError;
 use quick_xml::{
     events::{BytesStart, Event},
     name::{Namespace, ResolveResult},
@@ -25,6 +26,8 @@ const MAX_DEPTH: usize = 256;
 const MAX_SHEETS: usize = 16_384;
 const MAX_ITEMS_PER_SHEET: usize = 16_384;
 const MAX_TEXT_BYTES: usize = 64 * 1024;
+
+type FamilyResult<T> = Result<T, OdfError>;
 
 /// Resource budget for [`Snapshot`] source inspection.
 ///
@@ -113,8 +116,8 @@ impl Snapshot {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn parse(xml: &str) -> Result<Self> {
-        Self::parse_with(xml, Limits::default())
+    pub fn parse(xml: &str) -> FamilyResult<Self> {
+        Ok(Self::parse_with_core(xml, Limits::default())?)
     }
 
     /// Inspect a canonical content part under an explicit resource budget.
@@ -125,9 +128,13 @@ impl Snapshot {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn parse_with(xml: &str, limits: Limits) -> Result<Self> {
+    pub fn parse_with(xml: &str, limits: Limits) -> FamilyResult<Self> {
+        Ok(Self::parse_with_core(xml, limits)?)
+    }
+
+    fn parse_with_core(xml: &str, limits: Limits) -> CoreResult<Self> {
         if xml.len() > limits.input_bytes {
-            return Err(Error::InvalidFormat(format!(
+            return Err(CoreError::InvalidFormat(format!(
                 "ODS feature XML exceeds the {}-byte input limit",
                 limits.input_bytes
             )));
@@ -147,14 +154,14 @@ impl Snapshot {
                 reader
                     .read_resolved_event_into(&mut buffer)
                     .map_err(|error| {
-                        Error::InvalidFormat(format!("invalid ODS feature XML: {error}"))
+                        CoreError::InvalidFormat(format!("invalid ODS feature XML: {error}"))
                     })?;
             let namespace = namespace_kind(&namespace);
             events = events.checked_add(1).ok_or_else(|| {
-                Error::InvalidFormat("ODS feature XML event counter overflow".to_string())
+                CoreError::InvalidFormat("ODS feature XML event counter overflow".to_string())
             })?;
             if events > limits.events {
-                return Err(Error::InvalidFormat(format!(
+                return Err(CoreError::InvalidFormat(format!(
                     "ODS feature XML exceeds the {}-event limit",
                     limits.events
                 )));
@@ -163,7 +170,7 @@ impl Snapshot {
             match event {
                 Event::Start(start) => {
                     if stack.len() >= limits.depth {
-                        return Err(Error::InvalidFormat(format!(
+                        return Err(CoreError::InvalidFormat(format!(
                             "ODS feature XML nesting exceeds the {}-element limit",
                             limits.depth
                         )));
@@ -181,7 +188,7 @@ impl Snapshot {
                 },
                 Event::Empty(start) => {
                     if stack.len() >= limits.depth {
-                        return Err(Error::InvalidFormat(format!(
+                        return Err(CoreError::InvalidFormat(format!(
                             "ODS feature XML nesting exceeds the {}-element limit",
                             limits.depth
                         )));
@@ -199,11 +206,8 @@ impl Snapshot {
                         Element::Hyperlink { sheet, text } => {
                             push_hyperlink(&mut sheets, sheet, text, limits)?;
                         },
-                        Element::Root
-                        | Element::Body
-                        | Element::Spreadsheet
-                        | Element::Sheet(_) => {
-                            return Err(Error::InvalidFormat(
+                        Element::Root | Element::Body | Element::Workbook | Element::Sheet(_) => {
+                            return Err(CoreError::InvalidFormat(
                                 "ODS feature XML requires a non-empty canonical envelope"
                                     .to_string(),
                             ));
@@ -219,7 +223,7 @@ impl Snapshot {
                     let value = text
                         .xml_content(quick_xml::XmlVersion::Explicit1_0)
                         .map_err(|error| {
-                            Error::InvalidFormat(format!("invalid ODS hyperlink text: {error}"))
+                            CoreError::InvalidFormat(format!("invalid ODS hyperlink text: {error}"))
                         })?;
                     if let Some(Element::Hyperlink {
                         text: hyperlink, ..
@@ -230,7 +234,7 @@ impl Snapshot {
                     {
                         append_text(value, hyperlink, limits)?;
                     } else if stack.is_empty() && !value.trim().is_empty() {
-                        return Err(Error::InvalidFormat(
+                        return Err(CoreError::InvalidFormat(
                             "ODS feature XML has text outside its document root".to_string(),
                         ));
                     }
@@ -245,13 +249,15 @@ impl Snapshot {
                     {
                         append_text(
                             text.decode().map_err(|error| {
-                                Error::InvalidFormat(format!("invalid ODS hyperlink text: {error}"))
+                                CoreError::InvalidFormat(format!(
+                                    "invalid ODS hyperlink text: {error}"
+                                ))
                             })?,
                             hyperlink,
                             limits,
                         )?;
                     } else {
-                        return Err(Error::InvalidFormat(
+                        return Err(CoreError::InvalidFormat(
                             "ODS feature XML has CDATA outside a hyperlink".to_string(),
                         ));
                     }
@@ -263,18 +269,18 @@ impl Snapshot {
                     Some(Element::Root) => closed_root = true,
                     Some(_) => {},
                     None => {
-                        return Err(Error::InvalidFormat(
+                        return Err(CoreError::InvalidFormat(
                             "ODS feature XML element stack underflow".to_string(),
                         ));
                     },
                 },
                 Event::DocType(_) => {
-                    return Err(Error::InvalidFormat(
+                    return Err(CoreError::InvalidFormat(
                         "ODS feature inspection rejects DTD declarations".to_string(),
                     ));
                 },
                 Event::GeneralRef(_) => {
-                    return Err(Error::InvalidFormat(
+                    return Err(CoreError::InvalidFormat(
                         "ODS feature inspection rejects general entity references".to_string(),
                     ));
                 },
@@ -284,7 +290,7 @@ impl Snapshot {
             buffer.clear();
         }
         if !seen_root || !closed_root || !stack.is_empty() {
-            return Err(Error::InvalidFormat(
+            return Err(CoreError::InvalidFormat(
                 "ODS feature XML is missing a complete canonical document-content envelope"
                     .to_string(),
             ));
@@ -401,7 +407,7 @@ impl Drawing {
 enum Element {
     Root,
     Body,
-    Spreadsheet,
+    Workbook,
     Sheet(usize),
     Cell(usize),
     ConditionalFormats(usize),
@@ -424,12 +430,12 @@ fn classify_start(
     limits: Limits,
     seen_root: &mut bool,
     closed_root: bool,
-) -> Result<Element> {
+) -> CoreResult<Element> {
     let local = start.local_name();
     let local = local.as_ref();
     if namespace == NamespaceKind::Office && local == b"document-content" {
         if *seen_root || closed_root || !stack.is_empty() {
-            return Err(Error::InvalidFormat(
+            return Err(CoreError::InvalidFormat(
                 "ODS feature XML has multiple document roots".to_string(),
             ));
         }
@@ -440,33 +446,33 @@ fn classify_start(
         return matches!(stack.last(), Some(Element::Root))
             .then_some(Element::Body)
             .ok_or_else(|| {
-                Error::InvalidFormat(
+                CoreError::InvalidFormat(
                     "office:body must be the direct child of office:document-content".to_string(),
                 )
             });
     }
     if namespace == NamespaceKind::Office && local == b"spreadsheet" {
         return matches!(stack.last(), Some(Element::Body))
-            .then_some(Element::Spreadsheet)
+            .then_some(Element::Workbook)
             .ok_or_else(|| {
-                Error::InvalidFormat(
+                CoreError::InvalidFormat(
                     "office:spreadsheet must be the direct child of office:body".to_string(),
                 )
             });
     }
     if stack.is_empty() || closed_root {
-        return Err(Error::InvalidFormat(
+        return Err(CoreError::InvalidFormat(
             "ODS feature XML has content outside its canonical document root".to_string(),
         ));
     }
     if namespace == NamespaceKind::Table && local == b"table" {
-        if !matches!(stack.last(), Some(Element::Spreadsheet)) {
-            return Err(Error::InvalidFormat(
+        if !matches!(stack.last(), Some(Element::Workbook)) {
+            return Err(CoreError::InvalidFormat(
                 "table:table must be a direct child of office:spreadsheet".to_string(),
             ));
         }
         if sheets.len() >= limits.sheets {
-            return Err(Error::InvalidFormat(format!(
+            return Err(CoreError::InvalidFormat(format!(
                 "ODS feature inspection exceeds the {}-sheet limit",
                 limits.sheets
             )));
@@ -483,7 +489,7 @@ fn classify_start(
         Element::Sheet(index) => Some(*index),
         Element::Root
         | Element::Body
-        | Element::Spreadsheet
+        | Element::Workbook
         | Element::Cell(_)
         | Element::ConditionalFormats(_)
         | Element::SparklineGroups(_)
@@ -502,7 +508,7 @@ fn classify_start(
         return matches!(stack.last(), Some(Element::Sheet(index)) if *index == sheet)
             .then_some(Element::Shapes(sheet))
             .ok_or_else(|| {
-                Error::InvalidFormat(
+                CoreError::InvalidFormat(
                     "table:shapes must be a direct child of table:table".to_string(),
                 )
             });
@@ -511,7 +517,7 @@ fn classify_start(
         return matches!(stack.last(), Some(Element::Sheet(index)) if *index == sheet)
             .then_some(Element::ConditionalFormats(sheet))
             .ok_or_else(|| {
-                Error::InvalidFormat(
+                CoreError::InvalidFormat(
                     "calcext:conditional-formats must be a direct child of table:table".to_string(),
                 )
             });
@@ -521,7 +527,7 @@ fn classify_start(
             matches!(stack.last(), Some(Element::ConditionalFormats(index)) if *index == sheet)
                 .then_some(sheet)
                 .ok_or_else(|| {
-                    Error::InvalidFormat(
+                    CoreError::InvalidFormat(
                         "calcext:conditional-format must be inside calcext:conditional-formats"
                             .to_string(),
                     )
@@ -533,7 +539,7 @@ fn classify_start(
         return matches!(stack.last(), Some(Element::Sheet(index)) if *index == sheet)
             .then_some(Element::SparklineGroups(sheet))
             .ok_or_else(|| {
-                Error::InvalidFormat(
+                CoreError::InvalidFormat(
                     "calcext:sparkline-groups must be a direct child of table:table".to_string(),
                 )
             });
@@ -542,7 +548,7 @@ fn classify_start(
             matches!(stack.last(), Some(Element::SparklineGroups(index)) if *index == sheet)
                 .then_some(sheet)
                 .ok_or_else(|| {
-                    Error::InvalidFormat(
+                    CoreError::InvalidFormat(
                         "calcext:sparkline-group must be inside calcext:sparkline-groups"
                             .to_string(),
                     )
@@ -556,7 +562,7 @@ fn classify_start(
             .rev()
             .any(|element| matches!(element, Element::Cell(index) if *index == sheet))
         {
-            return Err(Error::InvalidFormat(
+            return Err(CoreError::InvalidFormat(
                 "text:a must occur inside a table cell".to_string(),
             ));
         }
@@ -574,7 +580,7 @@ fn classify_start(
             .rev()
             .any(|element| matches!(element, Element::Shapes(index) if *index == sheet))
         {
-            return Err(Error::InvalidFormat(
+            return Err(CoreError::InvalidFormat(
                 "draw:* source features must occur inside table:shapes".to_string(),
             ));
         }
@@ -590,7 +596,7 @@ fn classify_start(
         };
         let features = &mut sheets[sheet];
         if features.drawings.len() >= limits.items_per_sheet {
-            return Err(Error::InvalidFormat(format!(
+            return Err(CoreError::InvalidFormat(format!(
                 "ODS feature inspection exceeds the {}-drawing limit",
                 limits.items_per_sheet
             )));
@@ -633,10 +639,10 @@ fn attribute(
     wanted_namespace: &[u8],
     wanted_local: &[u8],
     limits: Limits,
-) -> Result<Option<String>> {
+) -> CoreResult<Option<String>> {
     for raw in start.attributes().with_checks(true) {
         let raw = raw.map_err(|error| {
-            Error::InvalidFormat(format!("invalid ODS feature attribute: {error}"))
+            CoreError::InvalidFormat(format!("invalid ODS feature attribute: {error}"))
         })?;
         let (namespace, local) = reader.resolver().resolve_attribute(raw.key);
         if matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == wanted_namespace)
@@ -645,11 +651,13 @@ fn attribute(
             let value = raw
                 .decoded_and_normalized_value(quick_xml::XmlVersion::Explicit1_0, reader.decoder())
                 .map_err(|error| {
-                    Error::InvalidFormat(format!("invalid ODS feature attribute value: {error}"))
+                    CoreError::InvalidFormat(format!(
+                        "invalid ODS feature attribute value: {error}"
+                    ))
                 })?
                 .into_owned();
             if value.len() > limits.text_bytes {
-                return Err(Error::InvalidFormat(format!(
+                return Err(CoreError::InvalidFormat(format!(
                     "ODS feature attribute exceeds the {}-byte limit",
                     limits.text_bytes
                 )));
@@ -660,12 +668,12 @@ fn attribute(
     Ok(None)
 }
 
-fn checked_increment(value: usize, label: &str, limits: Limits) -> Result<usize> {
+fn checked_increment(value: usize, label: &str, limits: Limits) -> CoreResult<usize> {
     value
         .checked_add(1)
         .filter(|value| *value <= limits.items_per_sheet)
         .ok_or_else(|| {
-            Error::InvalidFormat(format!(
+            CoreError::InvalidFormat(format!(
                 "ODS feature inspection exceeds the {}-{label} limit",
                 limits.items_per_sheet
             ))
@@ -676,13 +684,12 @@ fn append_text(
     value: std::borrow::Cow<'_, str>,
     target: &mut Hyperlink,
     limits: Limits,
-) -> Result<()> {
-    let next =
-        target.text.len().checked_add(value.len()).ok_or_else(|| {
-            Error::InvalidFormat("ODS hyperlink text length overflow".to_string())
-        })?;
+) -> CoreResult<()> {
+    let next = target.text.len().checked_add(value.len()).ok_or_else(|| {
+        CoreError::InvalidFormat("ODS hyperlink text length overflow".to_string())
+    })?;
     if next > limits.text_bytes {
-        return Err(Error::InvalidFormat(format!(
+        return Err(CoreError::InvalidFormat(format!(
             "ODS hyperlink text exceeds the {}-byte limit",
             limits.text_bytes
         )));
@@ -696,12 +703,12 @@ fn push_hyperlink(
     sheet: usize,
     hyperlink: Hyperlink,
     limits: Limits,
-) -> Result<()> {
+) -> CoreResult<()> {
     let features = sheets.get_mut(sheet).ok_or_else(|| {
-        Error::InvalidFormat("ODS feature inspection lost its sheet context".to_string())
+        CoreError::InvalidFormat("ODS feature inspection lost its sheet context".to_string())
     })?;
     if features.hyperlinks.len() >= limits.items_per_sheet {
-        return Err(Error::InvalidFormat(format!(
+        return Err(CoreError::InvalidFormat(format!(
             "ODS feature inspection exceeds the {}-hyperlink limit",
             limits.items_per_sheet
         )));

@@ -1,6 +1,6 @@
 use super::{
     Cow, Destination, DrawingStoryCapture, MAX_LOGICAL_TABLE_ROWS, MAX_LOGICAL_TABLES,
-    NestedTableBuilder, Parser, RtfError, RtfResult, resolve_preferred_width, resolve_row_geometry,
+    NestedTableBuilder, Parser, resolve_preferred_width, resolve_row_geometry,
 };
 
 impl<'a> Parser<'a> {
@@ -21,15 +21,15 @@ impl<'a> Parser<'a> {
     pub(super) fn ensure_nested_builder(
         &mut self,
         level: u8,
-    ) -> RtfResult<&mut NestedTableBuilder<'a>> {
+    ) -> crate::Result<&mut NestedTableBuilder<'a>> {
         if !(2..=crate::MAX_TABLE_NESTING_DEPTH as u8).contains(&level) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF nested-table level is outside 2..=32".to_string(),
             ));
         }
         let index = usize::from(level - 2);
         if self.nested_table_builders.len() < index {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF nested-table level transition skips a parent level".to_string(),
             ));
         }
@@ -41,12 +41,15 @@ impl<'a> Parser<'a> {
                 .push(NestedTableBuilder::new(level));
         }
         self.nested_table_builders.get_mut(index).ok_or_else(|| {
-            RtfError::ParserError("RTF nested-table builder state is missing".to_string())
+            crate::Error::ParserError("RTF nested-table builder state is missing".to_string())
         })
     }
 
-    pub(super) fn append_table_text(&mut self, text: &[u8], raw_level: u8) -> RtfResult<()> {
+    pub(super) fn append_table_text(&mut self, text: &[u8], raw_level: u8) -> crate::Result<()> {
         let level = if raw_level >= 2 { raw_level } else { 1 };
+        if level == 1 {
+            self.observe_cell_text();
+        }
         let frame = self.effective_cell_paragraph_frame()?;
         self.observe_cell_paragraph_frame(level, frame);
         // Ordinary table text has no revision side effects. Avoid cloning the
@@ -64,7 +67,7 @@ impl<'a> Parser<'a> {
             // Keep the established validation order: the cell buffer is
             // updated before the parser validates the transport slice.
             std::str::from_utf8(text).map_err(|_err| {
-                RtfError::MalformedDocument("invalid UTF-8 in table revision".to_string())
+                crate::Error::MalformedDocument("invalid UTF-8 in table revision".to_string())
             })?;
             return Ok(());
         }
@@ -78,7 +81,7 @@ impl<'a> Parser<'a> {
         };
         if state.revision_type == Some(super::super::super::annotation::RevisionType::Deletion) {
             let decoded = std::str::from_utf8(text).map_err(|_err| {
-                RtfError::MalformedDocument("invalid UTF-8 in table revision".to_string())
+                crate::Error::MalformedDocument("invalid UTF-8 in table revision".to_string())
             })?;
             return self.append_revision_text(&state, decoded, start, start);
         }
@@ -90,10 +93,10 @@ impl<'a> Parser<'a> {
                 .extend_from_slice(text);
         }
         let end = start.checked_add(text.len()).ok_or_else(|| {
-            RtfError::MalformedDocument("RTF table-cell text length overflow".to_string())
+            crate::Error::MalformedDocument("RTF table-cell text length overflow".to_string())
         })?;
         let decoded = std::str::from_utf8(text).map_err(|_err| {
-            RtfError::MalformedDocument("invalid UTF-8 in table revision".to_string())
+            crate::Error::MalformedDocument("invalid UTF-8 in table revision".to_string())
         })?;
         self.append_revision_text(&state, decoded, start, end)
     }
@@ -116,7 +119,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub(super) fn record_table_paragraph_break(&mut self, raw_level: u8) -> RtfResult<()> {
+    pub(super) fn record_table_paragraph_break(&mut self, raw_level: u8) -> crate::Result<()> {
         let level = if raw_level >= 2 { raw_level } else { 1 };
         let frame = self.effective_cell_paragraph_frame()?.or(if level == 1 {
             self.current_cell_paragraph_frame
@@ -136,7 +139,9 @@ impl<'a> Parser<'a> {
             self.current_cell_paragraphs
                 .push(crate::CellParagraph::new(start, end, frame, true));
             self.current_cell_paragraph_start = end.checked_add(1).ok_or_else(|| {
-                RtfError::MalformedDocument("RTF table-cell paragraph offset overflow".to_string())
+                crate::Error::MalformedDocument(
+                    "RTF table-cell paragraph offset overflow".to_string(),
+                )
             })?;
             self.current_cell_paragraph_frame = None;
         } else {
@@ -151,7 +156,7 @@ impl<'a> Parser<'a> {
                 .cell_paragraphs
                 .push(crate::CellParagraph::new(start, end, frame, true));
             builder.cell_paragraph_start = end.checked_add(1).ok_or_else(|| {
-                RtfError::MalformedDocument(
+                crate::Error::MalformedDocument(
                     "RTF nested table-cell paragraph offset overflow".to_string(),
                 )
             })?;
@@ -160,7 +165,7 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    fn finish_table_cell_paragraphs(&mut self) -> RtfResult<Vec<crate::CellParagraph>> {
+    fn finish_table_cell_paragraphs(&mut self) -> crate::Result<Vec<crate::CellParagraph>> {
         let frame = self
             .effective_cell_paragraph_frame()?
             .or(self.current_cell_paragraph_frame);
@@ -182,7 +187,10 @@ impl<'a> Parser<'a> {
         Ok(std::mem::take(&mut self.current_cell_paragraphs))
     }
 
-    fn finish_nested_cell_paragraphs(&mut self, level: u8) -> RtfResult<Vec<crate::CellParagraph>> {
+    fn finish_nested_cell_paragraphs(
+        &mut self,
+        level: u8,
+    ) -> crate::Result<Vec<crate::CellParagraph>> {
         let frame = self.effective_cell_paragraph_frame()?;
         let builder = self.ensure_nested_builder(level)?;
         let frame = frame.or(builder.cell_paragraph_frame);
@@ -204,7 +212,7 @@ impl<'a> Parser<'a> {
         Ok(std::mem::take(&mut builder.cell_paragraphs))
     }
 
-    fn effective_cell_paragraph_frame(&self) -> RtfResult<Option<crate::ParagraphFrame>> {
+    fn effective_cell_paragraph_frame(&self) -> crate::Result<Option<crate::ParagraphFrame>> {
         let state = self.current_state()?;
         if let Some(frame) = state.paragraph.frame {
             return Ok(Some(frame));
@@ -226,14 +234,14 @@ impl<'a> Parser<'a> {
             .and_then(|properties| properties.paragraph.frame))
     }
 
-    pub(super) fn drain_nested_to(&mut self, parent_level: u8) -> RtfResult<()> {
+    pub(super) fn drain_nested_to(&mut self, parent_level: u8) -> crate::Result<()> {
         while self
             .nested_table_builders
             .last()
             .is_some_and(|builder| builder.level > parent_level)
         {
             let builder = self.nested_table_builders.pop().ok_or_else(|| {
-                RtfError::ParserError("RTF nested-table builder state is missing".to_string())
+                crate::Error::ParserError("RTF nested-table builder state is missing".to_string())
             })?;
             if !builder.cell_text.is_empty()
                 || !builder.cell_nested.is_empty()
@@ -243,21 +251,21 @@ impl<'a> Parser<'a> {
                 || !builder.cell_story_events.is_empty()
                 || builder.row.cell_count() > 0
             {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF nested-table level ended before nestcell/nestrow".to_string(),
                 ));
             }
             if builder.table.row_count() == 0 {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF nested table has no completed rows".to_string(),
                 ));
             }
             builder
                 .table
                 .validate_merges()
-                .map_err(RtfError::MalformedDocument)?;
+                .map_err(crate::Error::MalformedDocument)?;
             if self.logical_table_count >= MAX_LOGICAL_TABLES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF document exceeds 4096 logical tables".to_string(),
                 ));
             }
@@ -280,10 +288,12 @@ impl<'a> Parser<'a> {
                 self.current_cell_nested.push(entry);
             } else {
                 let parent = self.nested_table_builders.last_mut().ok_or_else(|| {
-                    RtfError::MalformedDocument("RTF nested table lacks a parent table".to_string())
+                    crate::Error::MalformedDocument(
+                        "RTF nested table lacks a parent table".to_string(),
+                    )
                 })?;
                 if parent.level != parent_level {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF nested-table parent level mismatch".to_string(),
                     ));
                 }
@@ -296,19 +306,19 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    pub(super) fn finalize_nested_cell(&mut self, level: u8) -> RtfResult<()> {
+    pub(super) fn finalize_nested_cell(&mut self, level: u8) -> crate::Result<()> {
         self.drain_nested_to(level)?;
         self.close_revision_at_cell_boundary(level)?;
         let paragraphs = self.finish_nested_cell_paragraphs(level)?;
         let arena = self.arena;
         let builder = self.ensure_nested_builder(level)?;
         if builder.row.cell_count() >= crate::MAX_TABLE_CELLS_PER_ROW {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF table row exceeds 4096 cells".to_string(),
             ));
         }
         let text = std::str::from_utf8(&builder.cell_text).map_err(|_err| {
-            RtfError::MalformedDocument("invalid UTF-8 in nested table cell".to_string())
+            crate::Error::MalformedDocument("invalid UTF-8 in nested table cell".to_string())
         })?;
         let mut cell = crate::Cell::new(Cow::Borrowed(arena.alloc_str(text)));
         cell.set_paragraphs(paragraphs)?;
@@ -326,7 +336,7 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    pub(super) fn finalize_nested_row(&mut self, level: u8) -> RtfResult<()> {
+    pub(super) fn finalize_nested_row(&mut self, level: u8) -> crate::Result<()> {
         self.drain_nested_to(level)?;
         let state = self.current_state()?.clone();
         let geometry = resolve_row_geometry(&state)?;
@@ -347,19 +357,19 @@ impl<'a> Parser<'a> {
             || !builder.cell_drawings.drawing_order.is_empty()
             || !builder.cell_story_events.is_empty()
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF nestrow encountered an unterminated nested cell".to_string(),
             ));
         }
         if builder.row.cell_count() == 0 {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF nestrow has no nestcell".to_string(),
             ));
         }
         if !state.cell_boundaries.is_empty()
             && state.cell_boundaries.len() != builder.row.cell_count()
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF nested row cell boundaries do not match nestcell count".to_string(),
             ));
         }
@@ -403,7 +413,7 @@ impl<'a> Parser<'a> {
         builder.row.set_banding(state.table_row_banding);
         builder.row.set_revision(state.table_row_revision);
         if builder.table.row_count() >= MAX_LOGICAL_TABLE_ROWS {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF logical table exceeds 65536 rows".to_string(),
             ));
         }
@@ -413,18 +423,18 @@ impl<'a> Parser<'a> {
             .first()
             .is_some_and(|first| first.positioning() != builder.row.positioning())
         {
-            return Err(RtfError::MalformedDocument("RTF positioned-table properties must be identical for all rows in one logical table".to_string()));
+            return Err(crate::Error::MalformedDocument("RTF positioned-table properties must be identical for all rows in one logical table".to_string()));
         }
         builder
             .row
             .validate_paragraph_frames()
-            .map_err(RtfError::MalformedDocument)?;
+            .map_err(crate::Error::MalformedDocument)?;
         builder.table.add_row(std::mem::take(&mut builder.row));
         Ok(())
     }
 
     /// Finalize the current cell and add it to the current row.
-    pub(super) fn finalize_cell(&mut self, explicit: bool) -> RtfResult<()> {
+    pub(super) fn finalize_cell(&mut self, explicit: bool) -> crate::Result<()> {
         self.drain_nested_to(1)?;
         self.close_revision_at_cell_boundary(1)?;
         if explicit
@@ -441,7 +451,7 @@ impl<'a> Parser<'a> {
                 .map_or(0, crate::content::table::Row::cell_count)
                 >= crate::MAX_TABLE_CELLS_PER_ROW
             {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF table row exceeds 4096 cells".to_string(),
                 ));
             }
@@ -512,11 +522,20 @@ impl<'a> Parser<'a> {
                 )?;
 
                 // Add cell to current row
+                if self.current_row.is_some() {
+                    let table = self.tables.len();
+                    let row = self
+                        .current_table
+                        .as_ref()
+                        .map_or(0, crate::content::table::Table::row_count);
+                    self.record_cell_source(table, row, index);
+                }
                 if let Some(row) = &mut self.current_row {
                     row.add_cell(cell);
                 }
             }
         }
+        self.current_cell_text_tokens = None;
         self.current_cell_text.clear();
         self.current_cell_paragraph_start = 0;
         self.current_cell_paragraph_frame = None;
@@ -527,7 +546,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Finalize the current row and add it to the current table.
-    pub(super) fn finalize_row(&mut self) -> RtfResult<()> {
+    pub(super) fn finalize_row(&mut self) -> crate::Result<()> {
         // Finalize any pending cell
         self.finalize_cell(false)?;
 
@@ -536,9 +555,9 @@ impl<'a> Parser<'a> {
             && row.cell_count() > 0
         {
             row.validate_paragraph_frames()
-                .map_err(RtfError::MalformedDocument)?;
+                .map_err(crate::Error::MalformedDocument)?;
             if table.row_count() >= MAX_LOGICAL_TABLE_ROWS {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF logical table exceeds 65536 rows".to_string(),
                 ));
             }
@@ -547,7 +566,7 @@ impl<'a> Parser<'a> {
                 .first()
                 .is_some_and(|first| first.positioning() != row.positioning())
             {
-                return Err(RtfError::MalformedDocument("RTF positioned-table properties must be identical for all rows in one logical table".to_string()));
+                return Err(crate::Error::MalformedDocument("RTF positioned-table properties must be identical for all rows in one logical table".to_string()));
             }
             table.add_row(row);
         }
@@ -558,7 +577,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Finalize the current table and add it to the tables list.
-    pub(super) fn finalize_table(&mut self) -> RtfResult<()> {
+    pub(super) fn finalize_table(&mut self) -> crate::Result<()> {
         self.drain_nested_to(1)?;
         // Finalize any pending row
         if self.current_row.is_some() {
@@ -571,9 +590,9 @@ impl<'a> Parser<'a> {
         {
             table
                 .validate_merges()
-                .map_err(RtfError::MalformedDocument)?;
+                .map_err(crate::Error::MalformedDocument)?;
             if self.logical_table_count >= MAX_LOGICAL_TABLES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF document exceeds 4096 logical tables".to_string(),
                 ));
             }
@@ -586,7 +605,7 @@ impl<'a> Parser<'a> {
     pub(super) fn finalize_table_before_non_table_body_content(
         &mut self,
         meaningful: bool,
-    ) -> RtfResult<bool> {
+    ) -> crate::Result<bool> {
         if meaningful
             && self
                 .current_table

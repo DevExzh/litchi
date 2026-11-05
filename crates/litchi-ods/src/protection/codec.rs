@@ -4,6 +4,7 @@ use super::model::{Document, Permissions, Sheet, Styles};
 use crate::model::protection as wire;
 use crate::model::style_protection::{self, PreservedXmlFragment};
 use litchi_core::{Error, Result, xml::escape_xml};
+use litchi_odf_common::XmlStreamLimits;
 use quick_xml::{
     XmlVersion,
     encoding::Decoder,
@@ -26,6 +27,75 @@ pub(crate) fn validate_size(source: &str) -> Result<()> {
         return Err(Error::InvalidFormat(
             "ODS protection content.xml exceeds the snapshot limit".to_string(),
         ));
+    }
+    Ok(())
+}
+
+/// Apply the caller's complete XML stream budget before a protection handler
+/// can inspect or materialize a token.  Both the fused and sequential
+/// locators use this helper so their admission behavior stays identical.
+pub(crate) fn validate_event_budget(
+    event: &Event<'_>,
+    pos_before: u64,
+    pos_after: u64,
+    limits: &XmlStreamLimits,
+    events: &mut usize,
+    depth: &mut usize,
+    attributes: &mut usize,
+) -> Result<()> {
+    *events = events.checked_add(1).ok_or_else(|| {
+        Error::InvalidFormat("ODS protection XML event count overflow".to_string())
+    })?;
+    if *events > limits.max_events() {
+        return Err(Error::InvalidFormat(
+            "ODS protection XML exceeds the configured event limit".to_string(),
+        ));
+    }
+    let token = pos_after.saturating_sub(pos_before);
+    if token > limits.max_token_bytes() as u64 {
+        return Err(Error::InvalidFormat(
+            "ODS protection XML token exceeds the configured token limit".to_string(),
+        ));
+    }
+    match event {
+        Event::Start(element) | Event::Empty(element) => {
+            if *depth >= limits.max_depth() {
+                return Err(Error::InvalidFormat(
+                    "ODS protection XML exceeds the configured depth limit".to_string(),
+                ));
+            }
+            for attribute in element.attributes() {
+                let attribute = attribute.map_err(|error| {
+                    Error::InvalidFormat(format!("invalid protection XML attribute: {error}"))
+                })?;
+                *attributes = (*attributes).checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat("ODS protection XML attribute count overflow".to_string())
+                })?;
+                if *attributes > limits.max_attributes() {
+                    return Err(Error::InvalidFormat(
+                        "ODS protection XML exceeds the configured attribute limit".to_string(),
+                    ));
+                }
+                if attribute.value.len() > limits.max_token_bytes() {
+                    return Err(Error::InvalidFormat(
+                        "ODS protection XML attribute exceeds the configured token limit"
+                            .to_string(),
+                    ));
+                }
+            }
+            if matches!(event, Event::Start(_)) {
+                *depth += 1;
+            }
+        },
+        Event::End(_) => {
+            if *depth == 0 {
+                return Err(Error::InvalidFormat(
+                    "unexpected ODS protection XML closing tag".to_string(),
+                ));
+            }
+            *depth -= 1;
+        },
+        _ => {},
     }
     Ok(())
 }
@@ -66,6 +136,7 @@ pub(crate) struct Location {
     automatic_fragment: Option<PreservedXmlFragment>,
     automatic_validation_xml: Option<String>,
     styles_xml: Option<String>,
+    xml_limits: XmlStreamLimits,
     table_prefix: Option<String>,
     loext_prefix: Option<String>,
 }
@@ -76,8 +147,14 @@ impl Location {
     /// which drives the equivalent [`LocationHandler`] over the same event
     /// stream.
     #[cfg_attr(not(test), allow(dead_code))]
-    pub(crate) fn parse(source: &str, styles_xml: Option<&str>) -> Result<Self> {
-        if source.len() > MAX_CONTENT_BYTES {
+    pub(crate) fn parse(
+        source: &str,
+        styles_xml: Option<&str>,
+        limits: &XmlStreamLimits,
+    ) -> Result<Self> {
+        if source.len() > MAX_CONTENT_BYTES
+            || u64::try_from(source.len()).unwrap_or(u64::MAX) > limits.max_bytes()
+        {
             return Err(Error::InvalidFormat(
                 "ODS protection content.xml exceeds the snapshot limit".to_string(),
             ));
@@ -92,6 +169,9 @@ impl Location {
         let mut automatic = None;
         let mut table_prefix = None;
         let mut loext_prefix = None;
+        let mut events = 0usize;
+        let mut depth = 0usize;
+        let mut attributes = 0usize;
 
         loop {
             let event_start = usize::try_from(reader.buffer_position()).map_err(|_error| {
@@ -101,10 +181,19 @@ impl Location {
                 .read_resolved_event_into(&mut buffer)
                 .map_err(|error| Error::InvalidFormat(format!("XML parsing error: {error}")))?;
             let namespace = namespace_uri(&namespace);
-            let event = event.into_owned();
             let event_end = usize::try_from(reader.buffer_position()).map_err(|_error| {
                 Error::InvalidFormat("protection XML position exceeds usize".to_string())
             })?;
+            validate_event_budget(
+                &event,
+                u64::try_from(event_start).unwrap_or(u64::MAX),
+                u64::try_from(event_end).unwrap_or(u64::MAX),
+                limits,
+                &mut events,
+                &mut depth,
+                &mut attributes,
+            )?;
+            let event = event.into_owned();
             match event {
                 Event::Start(element) => {
                     let info = element_location(source, &reader, &element, event_start, event_end)?;
@@ -117,7 +206,7 @@ impl Location {
                         collect_prefixes(&reader, &element, &mut table_prefix, &mut loext_prefix)?;
                     }
                     let sheet_index = match kind {
-                        ElementKind::Spreadsheet => {
+                        ElementKind::Workbook => {
                             if spreadsheet.is_some() {
                                 return Err(Error::InvalidFormat(
                                     "duplicate office:spreadsheet element".to_string(),
@@ -187,7 +276,7 @@ impl Location {
                         collect_prefixes(&reader, &element, &mut table_prefix, &mut loext_prefix)?;
                     }
                     match kind {
-                        ElementKind::Spreadsheet => {
+                        ElementKind::Workbook => {
                             if spreadsheet.replace(info).is_some() {
                                 return Err(Error::InvalidFormat(
                                     "duplicate office:spreadsheet element".to_string(),
@@ -267,7 +356,7 @@ impl Location {
                         ElementKind::Other
                         | ElementKind::DocumentContent
                         | ElementKind::Body
-                        | ElementKind::Spreadsheet => {},
+                        | ElementKind::Workbook => {},
                     }
                 },
                 Event::Eof => break,
@@ -292,7 +381,7 @@ impl Location {
         })?;
         let automatic_fragment = automatic
             .as_ref()
-            .map(|_| style_protection::extract_automatic_styles(source))
+            .map(|_| style_protection::extract_automatic_styles(source, limits))
             .transpose()?
             .flatten();
         let automatic_fragment = automatic_fragment.map(|mut fragment| {
@@ -311,6 +400,7 @@ impl Location {
             automatic_fragment,
             automatic_validation_xml,
             styles_xml: styles_xml.map(str::to_owned),
+            xml_limits: *limits,
             table_prefix,
             loext_prefix,
         })
@@ -425,6 +515,7 @@ pub(crate) fn location_namespace(namespace: &ResolveResult<'_>) -> LocationNames
 pub(crate) struct LocationHandler<'a> {
     source: &'a str,
     styles_xml: Option<&'a str>,
+    limits: XmlStreamLimits,
     stack: Vec<OpenElement>,
     spreadsheet: Option<ElementLocation>,
     body_start: Option<usize>,
@@ -437,10 +528,15 @@ pub(crate) struct LocationHandler<'a> {
 impl<'a> LocationHandler<'a> {
     /// Start the locator scan over `source`, carrying `styles_xml` into the
     /// resulting [`Location`].
-    pub(crate) fn new(source: &'a str, styles_xml: Option<&'a str>) -> Self {
+    pub(crate) fn new(
+        source: &'a str,
+        styles_xml: Option<&'a str>,
+        limits: &XmlStreamLimits,
+    ) -> Self {
         Self {
             source,
             styles_xml,
+            limits: *limits,
             stack: Vec::new(),
             spreadsheet: None,
             body_start: None,
@@ -495,7 +591,7 @@ impl<'a> LocationHandler<'a> {
                     )?;
                 }
                 let sheet_index = match kind {
-                    ElementKind::Spreadsheet => {
+                    ElementKind::Workbook => {
                         if self.spreadsheet.is_some() {
                             return Err(Error::InvalidFormat(
                                 "duplicate office:spreadsheet element".to_string(),
@@ -581,7 +677,7 @@ impl<'a> LocationHandler<'a> {
                     )?;
                 }
                 match kind {
-                    ElementKind::Spreadsheet => {
+                    ElementKind::Workbook => {
                         if self.spreadsheet.replace(info).is_some() {
                             return Err(Error::InvalidFormat(
                                 "duplicate office:spreadsheet element".to_string(),
@@ -665,7 +761,7 @@ impl<'a> LocationHandler<'a> {
                     ElementKind::Other
                     | ElementKind::DocumentContent
                     | ElementKind::Body
-                    | ElementKind::Spreadsheet => {},
+                    | ElementKind::Workbook => {},
                 }
             },
             Event::Eof => {},
@@ -694,7 +790,7 @@ impl<'a> LocationHandler<'a> {
         let automatic_fragment = self
             .automatic
             .as_ref()
-            .map(|_| style_protection::extract_automatic_styles(self.source))
+            .map(|_| style_protection::extract_automatic_styles(self.source, &self.limits))
             .transpose()?
             .flatten();
         let automatic_fragment = automatic_fragment.map(|mut fragment| {
@@ -713,6 +809,7 @@ impl<'a> LocationHandler<'a> {
             automatic_fragment,
             automatic_validation_xml,
             styles_xml: self.styles_xml.map(str::to_owned),
+            xml_limits: self.limits,
             table_prefix: self.table_prefix,
             loext_prefix: self.loext_prefix,
         })
@@ -724,7 +821,7 @@ enum ElementKind {
     Other,
     DocumentContent,
     Body,
-    Spreadsheet,
+    Workbook,
     Sheet,
     Protection,
     Automatic,
@@ -745,10 +842,10 @@ fn classify(namespace: &[u8], local: &[u8], parent: Option<ElementKind>) -> Elem
     } else if office && local == b"body" {
         ElementKind::Body
     } else if office && local == b"spreadsheet" {
-        ElementKind::Spreadsheet
+        ElementKind::Workbook
     } else if office && local == b"automatic-styles" {
         ElementKind::Automatic
-    } else if table && local == b"table" && parent == Some(ElementKind::Spreadsheet) {
+    } else if table && local == b"table" && parent == Some(ElementKind::Workbook) {
         ElementKind::Sheet
     } else if local == b"table-protection"
         && (namespace == TABLE_NAMESPACE
@@ -1157,6 +1254,7 @@ pub(crate) fn replace(
             location.automatic_fragment(),
             styles.conditional(),
             &styles_to_wire(styles),
+            &location.xml_limits,
         )?;
         if let Some(range) = location.automatic_range() {
             replacements.push(Replacement::range(range, fragment.xml));
@@ -1186,6 +1284,16 @@ pub(crate) fn replace(
         cursor = replacement.end();
     }
     output.push_str(&source[cursor..]);
+    if output.len()
+        > location
+            .xml_limits
+            .max_bytes()
+            .min(MAX_CONTENT_BYTES as u64) as usize
+    {
+        return Err(Error::InvalidFormat(
+            "ODS protection output exceeds the configured XML limit".to_string(),
+        ));
+    }
     Ok(output)
 }
 
@@ -1406,8 +1514,9 @@ fn styles_to_wire(value: &Styles) -> Vec<style_protection::TableStyle> {
 pub(crate) fn parse(
     source: &str,
     styles_xml: Option<&str>,
+    limits: &XmlStreamLimits,
 ) -> Result<(Location, Document, Vec<Sheet>, Styles)> {
-    let (location, document, wire_sheets) = super::fused::parse(source, styles_xml)?;
+    let (location, document, wire_sheets) = super::fused::parse(source, styles_xml, limits)?;
     if wire_sheets.len() != location.sheets.len() {
         return Err(Error::InvalidFormat(
             "ODS protection sheet parser and source locator disagree".to_string(),
@@ -1423,6 +1532,13 @@ pub(crate) fn parse(
         .automatic_fragment
         .as_ref()
         .map_or("", |fragment| fragment.xml.as_str());
+    if let Some(styles_xml) = styles_xml {
+        if u64::try_from(styles_xml.len()).unwrap_or(u64::MAX) > limits.max_bytes() {
+            return Err(Error::InvalidFormat(
+                "ODS protection styles XML exceeds the configured XML limit".to_string(),
+            ));
+        }
+    }
     let registry = style_protection::CellStyleRegistry::parse(styles_xml, automatic_xml)?;
     let styles = super::model::styles_from_wire(&registry);
     Ok((

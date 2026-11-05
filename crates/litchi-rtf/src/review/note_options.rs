@@ -1,7 +1,5 @@
 //! Document-level footnote and endnote configuration.
 
-use crate::{RtfError, RtfResult};
-
 /// Kinds of notes declared present by `\fet`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PresentNoteKinds {
@@ -78,11 +76,11 @@ impl NoteOptions {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self.footnote_start.is_some_and(|value| value <= 0)
             || self.endnote_start.is_some_and(|value| value <= 0)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF note starting numbers must be positive".to_string(),
             ));
         }

@@ -4,7 +4,7 @@
 //! parts to a worksheet. This example retains the complete people/comment
 //! graph and validates both XML parts through the XLSX codec instead.
 
-use litchi_xlsx::Workbook;
+use litchi_xlsx::Package;
 use litchi_xlsx::threaded_comments::{
     Comment, Comments, Graph, Mention, People, PeoplePart, Person, validate_graph, write_comments,
     write_persons,
@@ -88,7 +88,7 @@ fn main() -> ExampleResult<()> {
         .unwrap_or_else(|| "threaded_comments_examples".to_string());
     fs::create_dir_all(&output_dir)?;
 
-    let workbook = Workbook::create()?;
+    let workbook = Package::new()?;
     let mut edit = workbook.edit()?;
     edit.tab(0)?
         .ok_or("default worksheet is missing")?
@@ -109,7 +109,7 @@ fn main() -> ExampleResult<()> {
             .set("B3", "Design user interface")?
             .set("C3", "Not Started")?;
     }
-    let workbook = edit.commit()?.into_workbook();
+    let workbook = edit.commit()?.into_package();
     let workbook_path = Path::new(&output_dir).join("comments_basic.xlsx");
     workbook.save(&workbook_path)?;
 

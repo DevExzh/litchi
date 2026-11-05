@@ -77,8 +77,9 @@ fn package_inventory_rejects_malformed_inkml() {
 
 fn package_with_ink() -> Package {
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
-    let mut package = Package::new().unwrap();
-    package.presentation_mut().unwrap().add_slide().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    builder.presentation().unwrap().add_slide().unwrap();
+    let package = builder.build().unwrap();
     package.save(output.path()).unwrap();
 
     let package = Package::open(output.path()).unwrap();
@@ -125,9 +126,9 @@ fn annotations_result(package: &Package) -> litchi_pptx::Result<Vec<ink::Annotat
         .map(|groups| groups.into_iter().flatten().collect())
 }
 
-fn edit_package(mut package: Package, edit: impl FnOnce(&mut OpcPackage)) -> Package {
+fn edit_package(package: Package, edit: impl FnOnce(&mut OpcPackage)) -> Package {
     let bytes = package.to_bytes().unwrap();
-    let mut opc = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut opc = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     edit(&mut opc);
     Package::from_opc_package(opc).unwrap()
 }

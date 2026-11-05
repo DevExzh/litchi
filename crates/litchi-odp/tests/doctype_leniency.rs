@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use litchi_core::OwnedSource;
 use litchi_odf_common::{ContentDefect, Defect, ToleranceReport};
-use litchi_odp::{Presentation, SourceBackedPresentation};
+use litchi_odp::{Package, SourceBackedPresentation};
 
 const OOO_DOCTYPE: &str = r#"<!DOCTYPE office:document-content PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "office.dtd">"#;
 
@@ -46,7 +46,7 @@ fn with_doctype(doctype: &str) -> Vec<u8> {
 }
 
 fn assert_every_open_path(bytes: &[u8], defects: &[(Defect, u16)], label: &str) {
-    let owned = Presentation::from_bytes(bytes.to_vec()).unwrap();
+    let owned = Package::from_bytes(bytes).unwrap().presentation().unwrap();
     assert_eq!(owned.slides().unwrap().len(), 5, "{label}: slides");
     assert_eq!(
         recorded(owned.tolerance_report()),
@@ -54,9 +54,15 @@ fn assert_every_open_path(bytes: &[u8], defects: &[(Defect, u16)], label: &str) 
         "{label}: from_bytes"
     );
 
-    let prepared = litchi_odf_common::detect::prepared(bytes.to_vec())
-        .unwrap_or_else(|| panic!("{label}: package must prepare"));
-    let adopted = Presentation::from_prepared_package(prepared).unwrap();
+    let prepared = litchi_odf_common::detect::prepared(
+        bytes.to_vec(),
+        litchi_odf_common::SourceLimits::default(),
+    )
+    .unwrap_or_else(|| panic!("{label}: package must prepare"));
+    let adopted = Package::from_prepared_package(prepared)
+        .unwrap()
+        .presentation()
+        .unwrap();
     assert_eq!(
         recorded(adopted.tolerance_report()),
         defects,
@@ -113,17 +119,26 @@ fn a_dtd_never_declares_entities() {
             &declared[open_end..]
         )
     });
-    let never_expanded = |slides: litchi_core::Result<Vec<litchi_odp::model::Slide>>| match slides {
-        Err(_) => true,
-        Ok(slides) => slides
-            .iter()
-            .all(|slide| !format!("{slide:?}").contains("EXPANDED-PAYLOAD")),
-    };
+    fn never_expanded<E>(slides: Result<Vec<litchi_odp::model::Slide>, E>) -> bool {
+        match slides {
+            Err(_) => true,
+            Ok(slides) => slides
+                .iter()
+                .all(|slide| !format!("{slide:?}").contains("EXPANDED-PAYLOAD")),
+        }
+    }
     assert!(never_expanded(
-        Presentation::from_bytes(bytes.clone()).and_then(|presentation| presentation.slides())
+        Package::from_bytes(&bytes)
+            .and_then(|package| package.presentation())
+            .and_then(|presentation| presentation.slides())
     ));
     assert!(never_expanded(
-        SourceBackedPresentation::from_read_at(Arc::new(OwnedSource::new(bytes)))
-            .and_then(|presentation| presentation.slides())
+        SourceBackedPresentation::from_read_at(Arc::new(OwnedSource::new(bytes))).and_then(
+            |presentation| {
+                presentation
+                    .slides()
+                    .map_err(litchi_odf_common::Error::from)
+            }
+        )
     ));
 }

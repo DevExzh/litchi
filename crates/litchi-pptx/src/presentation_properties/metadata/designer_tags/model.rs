@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use super::codec::Layout;
-use super::{Edit, Limits, Tags};
+use super::{Draft, Limits, Tags};
 use crate::{Error, Result};
 
 /// The exact relationship and part binding of one stable slide ID.
@@ -57,7 +57,7 @@ impl Binding {
 ///
 /// Zero occurrences means absent. One empty [`Tags`] value means explicitly
 /// present but empty. More than one occurrence is retained for inspection,
-/// while [`Snapshot::edit`] refuses the ambiguous singular mutation.
+/// while [`Edit`](crate::presentation_properties::metadata::designer_tags::Edit) refuses the ambiguous singular mutation.
 #[derive(Debug)]
 pub struct Snapshot {
     pub(crate) presentation_part_name: String,
@@ -80,20 +80,6 @@ impl Snapshot {
     #[inline]
     pub fn load(package: &litchi_opc::OpcPackage, slide_id: u32) -> Result<Self> {
         super::load_snapshot(package, slide_id)
-    }
-
-    /// Load one stable slide-ID owner under caller-supplied bounds.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the input cannot be read or is malformed.
-    #[inline]
-    pub fn load_with_limits(
-        package: &litchi_opc::OpcPackage,
-        slide_id: u32,
-        limits: Limits,
-    ) -> Result<Self> {
-        super::load_snapshot_with_limits(package, slide_id, limits)
     }
 
     /// Return the stable `p:sldId/@id` key.
@@ -156,11 +142,11 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn edit(self) -> Result<Edit> {
+    pub(crate) fn edit(self) -> Result<Draft> {
         if self.occurrences.len() > 1 {
             return Err(ambiguous(self.occurrences.len()));
         }
-        Ok(Edit::new(self))
+        Ok(Draft::new(self))
     }
 
     pub(crate) fn duplicate(&self) -> Self {

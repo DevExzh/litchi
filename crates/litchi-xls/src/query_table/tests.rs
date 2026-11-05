@@ -575,10 +575,19 @@ fn malformed_records_never_panic() {
 
 /// Feed every record of a fixture's Workbook stream through the
 /// collector, mirroring the worksheet walker.
-fn collect_from_fixture(path: &str) -> Vec<QueryTable> {
-    let bytes = std::fs::read(path).expect("fixture readable");
-    let mut ole =
-        litchi_cfb::OleFile::open(std::io::Cursor::new(bytes)).expect("fixture is a CFB container");
+fn poi_fixture(name: &str) -> std::path::PathBuf {
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/poi/test-data/spreadsheet")
+        .join(name)
+}
+
+fn collect_from_fixture(name: &str) -> Vec<QueryTable> {
+    let bytes = std::fs::read(poi_fixture(name)).expect("fixture readable");
+    let mut ole = litchi_cfb::OleFile::open(
+        std::io::Cursor::new(bytes),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .expect("fixture is a CFB container");
     let stream = ole
         .open_stream(&["Workbook"])
         .or_else(|_| ole.open_stream(&["Book"]))
@@ -601,7 +610,7 @@ fn collect_from_fixture(path: &str) -> Vec<QueryTable> {
 /// real bytes still drive the collector.
 #[test]
 fn web_query_57456_fixture() {
-    let tables = collect_from_fixture("../../test-data/poi/test-data/spreadsheet/57456.xls");
+    let tables = collect_from_fixture("57456.xls");
     assert_eq!(tables.len(), 1);
     let table = &tables[0];
     assert_eq!(table.name, "ExternalData_1");
@@ -627,7 +636,7 @@ fn web_query_57456_fixture() {
 /// cross-checks the raw record walk against the same bytes.
 #[test]
 fn text_query_45365_fixture() {
-    let tables = collect_from_fixture("../../test-data/poi/test-data/spreadsheet/45365.xls");
+    let tables = collect_from_fixture("45365.xls");
     assert_eq!(tables.len(), 1);
     let table = &tables[0];
     assert_eq!(table.name, "Jac-Jackson-MSC_1");

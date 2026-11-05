@@ -569,8 +569,18 @@ pub(super) fn prepare_complete_final_formula_set<'formula, 'cache>(
             let change = changes
                 .get(formula.change_index)
                 .ok_or(Error::Verification { path })?;
-            let Some(Input::Formula { cached, .. }) = change.input_ref() else {
+            let Some(Input::Formula { expression, cached }) = change.input_ref() else {
                 return Err(Error::Verification { path });
+            };
+            // A pivot-category formula is not evaluable here; without a
+            // supplied cache it keeps the host's zero placeholder until
+            // Numbers recalculates (record 0424).
+            let supplied = match cached {
+                Some(cached) => Some(supplied_cache(cached)),
+                None if expression.contains_pivot_category() => Some(cache::SuppliedCache::Number(
+                    litchi_iwa_common::formula::FiniteF64::new(0.0).expect("zero is finite"),
+                )),
+                None => None,
             };
             authored_cache.push(cache::AuthoredFormulaCache {
                 owner: existing.identity.owner,
@@ -578,7 +588,7 @@ pub(super) fn prepare_complete_final_formula_set<'formula, 'cache>(
                     row: formula.position.row(),
                     column: formula.position.column(),
                 },
-                supplied: cached.as_ref(),
+                supplied,
             });
         }
         exact_capacity(&cells, plan.final_cells, path)?;
@@ -1504,19 +1514,19 @@ impl cache::CacheBaseline for SemanticBaseline {
         &self,
         owner: u32,
         coordinate: cache::Coordinate,
-    ) -> Result<Option<cache::ScalarValue>, cache::Failure> {
+    ) -> Result<Option<cache::ScalarValue>, cache::Error> {
         if owner != self.owner {
-            return Err(cache::Failure::UnsupportedDependency(
+            return Err(cache::Error::UnsupportedDependency(
                 cache::Unsupported::MissingOwner,
             ));
         }
         if self.unsupported.binary_search(&coordinate).is_ok() {
-            return Err(cache::Failure::UnsupportedDependency(
+            return Err(cache::Error::UnsupportedDependency(
                 cache::Unsupported::Formula,
             ));
         }
         if self.aggregate_ignored.binary_search(&coordinate).is_ok() {
-            return Err(cache::Failure::UnsupportedDependency(
+            return Err(cache::Error::UnsupportedDependency(
                 cache::Unsupported::TextScalar,
             ));
         }
@@ -1528,9 +1538,9 @@ impl cache::CacheBaseline for SemanticBaseline {
             .map(|entry| entry.1))
     }
 
-    fn lookup_work(&self, owner: u32) -> Result<usize, cache::Failure> {
+    fn lookup_work(&self, owner: u32) -> Result<usize, cache::Error> {
         if owner != self.owner {
-            return Err(cache::Failure::UnsupportedDependency(
+            return Err(cache::Error::UnsupportedDependency(
                 cache::Unsupported::MissingOwner,
             ));
         }
@@ -1539,6 +1549,18 @@ impl cache::CacheBaseline for SemanticBaseline {
             self.aggregate_ignored.len(),
             self.unsupported.len(),
         )
+    }
+}
+
+/// The shared planner's borrowed view of an authored formula's cache.
+fn supplied_cache(value: &crate::formula::CachedValue) -> cache::SuppliedCache<'_> {
+    use crate::formula::CachedKind;
+    match value.kind() {
+        CachedKind::Number(number) => cache::SuppliedCache::Number(to_native(*number)),
+        CachedKind::Text(text) => cache::SuppliedCache::Text(text),
+        CachedKind::Boolean(flag) => cache::SuppliedCache::Boolean(*flag),
+        CachedKind::Date(date) => cache::SuppliedCache::Date(to_native(*date)),
+        CachedKind::Duration(duration) => cache::SuppliedCache::Duration(to_native(*duration)),
     }
 }
 
@@ -1558,7 +1580,7 @@ impl cache::CacheBaseline for FinalBaseline<'_> {
         &self,
         owner: u32,
         coordinate: cache::Coordinate,
-    ) -> Result<Option<cache::ScalarValue>, cache::Failure> {
+    ) -> Result<Option<cache::ScalarValue>, cache::Error> {
         if owner == self.selected.owner {
             return self.selected.value(owner, coordinate);
         }
@@ -1566,23 +1588,21 @@ impl cache::CacheBaseline for FinalBaseline<'_> {
             .tables
             .binary_search_by_key(&owner, |table| table.identity.owner)
             .map_err(|_error| {
-                cache::Failure::UnsupportedDependency(cache::Unsupported::MissingOwner)
+                cache::Error::UnsupportedDependency(cache::Unsupported::MissingOwner)
             })?;
         if coordinate.row >= self.tables[table].rows
             || coordinate.column >= self.tables[table].columns
         {
-            return Err(cache::Failure::InvalidSource);
+            return Err(cache::Error::InvalidSource);
         }
         let position = self
             .external
             .binary_search_by_key(&owner, |entry| entry.owner)
-            .map_err(|_| cache::Failure::UnsupportedDependency(cache::Unsupported::MissingOwner))?;
+            .map_err(|_| cache::Error::UnsupportedDependency(cache::Unsupported::MissingOwner))?;
         match self.external[position]
             .table
-            .view(crate::table::CellPosition::new(
-                coordinate.row,
-                coordinate.column,
-            )) {
+            .view(crate::table::At::new(coordinate.row, coordinate.column))
+        {
             crate::table::View::Missing | crate::table::View::Stored(Value::Empty) => Ok(None),
             crate::table::View::Stored(Value::Number(value)) => {
                 Ok(Some(cache::ScalarValue::Number(to_native(*value))))
@@ -1596,30 +1616,30 @@ impl cache::CacheBaseline for FinalBaseline<'_> {
             crate::table::View::Stored(Value::Duration(value)) => {
                 Ok(Some(cache::ScalarValue::Duration(to_native(*value))))
             },
-            crate::table::View::Stored(Value::Text(_)) => Err(
-                cache::Failure::UnsupportedDependency(cache::Unsupported::TextScalar),
-            ),
+            crate::table::View::Stored(Value::Text(_)) => Err(cache::Error::UnsupportedDependency(
+                cache::Unsupported::TextScalar,
+            )),
             crate::table::View::Stored(Value::Formula(_) | Value::Error(_))
-            | crate::table::View::Covered => Err(cache::Failure::UnsupportedDependency(
+            | crate::table::View::Covered => Err(cache::Error::UnsupportedDependency(
                 cache::Unsupported::Formula,
             )),
         }
     }
 
-    fn lookup_work(&self, owner: u32) -> Result<usize, cache::Failure> {
+    fn lookup_work(&self, owner: u32) -> Result<usize, cache::Error> {
         if owner == self.selected.owner {
             return self.selected.lookup_work(owner);
         }
         let position = self
             .external
             .binary_search_by_key(&owner, |entry| entry.owner)
-            .map_err(|_| cache::Failure::UnsupportedDependency(cache::Unsupported::MissingOwner))?;
+            .map_err(|_| cache::Error::UnsupportedDependency(cache::Unsupported::MissingOwner))?;
         binary_search_work(self.external.len())
             .checked_add(binary_search_work(
                 self.external[position].table.cell_count(),
             ))
             .and_then(|work| work.checked_add(binary_search_work(self.tables.len())))
-            .ok_or(cache::Failure::InvalidSource)
+            .ok_or(cache::Error::InvalidSource)
     }
 }
 
@@ -2193,26 +2213,29 @@ fn tile_report_usage(report: tile::TileReport, path: Path) -> Result<budget::Usa
     })
 }
 
-fn map_cache_error(error: cache::Failure, path: Path, remaining: budget::Remaining) -> Error {
+fn map_cache_error(error: cache::Error, path: Path, remaining: budget::Remaining) -> Error {
     match error {
-        cache::Failure::InvalidSource => Error::InvalidSource { path },
-        cache::Failure::UnsupportedDependency(cache::Unsupported::HeaderNameManager) => {
-            Error::UnsupportedDependency {
-                path,
-                kind: DependencyKind::HeaderNameIndex,
-            }
+        cache::Error::InvalidSource => Error::InvalidSource { path },
+        cache::Error::UnsupportedDependency(cache::Unsupported::HeaderNameManager) => {
+            Error::Refused(
+                crate::package::table_cells::Refusal::UnsupportedDependency {
+                    path,
+                    kind: DependencyKind::HeaderNameIndex,
+                },
+            )
         },
-        cache::Failure::UnsupportedDependency(_) => cache_refusal(path),
-        cache::Failure::LimitExceeded { observed, .. } => Error::LimitExceeded {
+        cache::Error::UnsupportedDependency(_) => cache_refusal(path),
+        cache::Error::Limit { observed, .. } => Error::Limit {
             kind: LimitKind::FormulaWork,
             observed,
             maximum: remaining.formula_work,
             path,
         },
-        cache::Failure::Allocation { amount } => Error::Allocation {
+        cache::Error::Allocation { amount } => Error::Allocation {
             kind: LimitKind::RetainedElements,
             amount,
         },
+        _ => Error::InvalidSource { path },
     }
 }
 
@@ -2252,10 +2275,12 @@ fn sort_work(length: usize, path: Path) -> Result<usize, Error> {
 }
 
 fn cache_refusal(path: Path) -> Error {
-    Error::UnsupportedDependency {
-        path,
-        kind: DependencyKind::FormulaCache,
-    }
+    Error::Refused(
+        crate::package::table_cells::Refusal::UnsupportedDependency {
+            path,
+            kind: DependencyKind::FormulaCache,
+        },
+    )
 }
 
 const fn as_u64(value: usize) -> u64 {
@@ -2266,7 +2291,7 @@ const fn as_u64(value: usize) -> u64 {
 mod tests {
     use std::cell::Cell;
 
-    use crate::table::{CellPosition, Dimensions};
+    use crate::table::{At, Dimensions};
 
     use super::*;
 
@@ -2343,28 +2368,22 @@ mod tests {
         let mut builder = Table::builder("Formula", Dimensions::new(1, 5));
         builder
             .set(
-                CellPosition::new(0, 0),
+                At::new(0, 0),
                 Value::number(1.0).expect("finite baseline number"),
             )
             .expect("number cell is in bounds");
         builder
-            .set(CellPosition::new(0, 1), Value::Formula("=A1".to_owned()))
+            .set(At::new(0, 1), Value::Formula("=A1".to_owned()))
             .expect("formula cell is in bounds");
         builder
-            .set(
-                CellPosition::new(0, 2),
-                Value::Text("ignored by SUM".to_owned()),
-            )
+            .set(At::new(0, 2), Value::Text("ignored by SUM".to_owned()))
             .expect("text cell is in bounds");
         builder
-            .set(
-                CellPosition::new(0, 3),
-                Value::date(12.0).expect("finite date"),
-            )
+            .set(At::new(0, 3), Value::date(12.0).expect("finite date"))
             .expect("date cell is in bounds");
         builder
             .set(
-                CellPosition::new(0, 4),
+                At::new(0, 4),
                 Value::duration(3.5).expect("finite duration"),
             )
             .expect("duration cell is in bounds");
@@ -2419,7 +2438,7 @@ mod tests {
 
         assert!(matches!(
             result,
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: LimitKind::RetainedElements,
                 observed: 16,
                 maximum: 15,

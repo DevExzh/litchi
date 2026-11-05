@@ -31,6 +31,7 @@ pub mod envelope;
 pub mod fib;
 pub mod fields;
 pub mod fkp;
+pub mod fonts;
 pub mod footnotes;
 pub mod form_fields;
 pub mod format_consistency;
@@ -74,3 +75,38 @@ pub mod textbox;
 pub mod textbox_breaks;
 pub mod vba_signature;
 pub mod xml_schemas;
+
+/// Charge one variable-size DOC fragment against the retained source-entry
+/// policy before its codec allocates from a count or length field.
+///
+/// Fragment codecs receive slices of a CFB stream, so the source-entry
+/// dimension is the applicable physical budget.  The package ingress has
+/// already charged the complete stream aggregate; this helper prevents a
+/// public raw boundary from silently selecting a larger per-fragment budget.
+pub(crate) fn enforce_source_entry_limit(
+    data: &[u8],
+    limits: &crate::package::SourceLimits,
+) -> crate::package::Result<()> {
+    enforce_source_entry_size(data.len(), limits)
+}
+
+/// Charge an already computed fragment size before reserving its output.
+///
+/// DOC's raw part writers use the same finite per-entry policy as their input
+/// codecs.  Keeping the check separate from the slice helper lets writers
+/// reject an exact over-budget size before allocating their output buffer.
+pub(crate) fn enforce_source_entry_size(
+    size: usize,
+    limits: &crate::package::SourceLimits,
+) -> crate::package::Result<()> {
+    let observed = u64::try_from(size).unwrap_or(u64::MAX);
+    let maximum = u64::try_from(limits.max_entry_bytes()).unwrap_or(u64::MAX);
+    if observed > maximum {
+        return Err(crate::package::Error::Limit {
+            kind: crate::package::SourceLimitKind::EntryBytes,
+            observed,
+            maximum,
+        });
+    }
+    Ok(())
+}

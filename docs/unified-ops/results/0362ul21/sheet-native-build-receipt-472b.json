@@ -1,0 +1,122 @@
+{
+  "schema": "litchi.sheet-native-build-receipt.v1",
+  "recorded_utc": "2026-10-24",
+  "scope": "four isolated release builds only; no native probe, correctness, timing, allocation, ABBA, or acceptance claim",
+  "candidate": {
+    "commit": "472b6705475b073e7fe08f6e11ee17fb1e29f838",
+    "tree": "ebc1cee05f124c0c63977aff07a23288c19e7d00",
+    "root": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source",
+    "root_cargo_lock_sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
+    "perf_cargo_lock_sha256": "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c"
+  },
+  "baseline": {
+    "xlsx_source": {
+      "commit": "e63a1fe3534bcaaae2ce367339f7f8275877baef",
+      "root": "/home/zhuhe/code/litchi-worktrees/.coord/sheet-preparation-691941/xlsx-source-baseline-e63",
+      "perf_cargo_lock_sha256": "0e1810824db584d171c16b45930776812a6e44c36e62c3e1e5b52e49a86da1cd"
+    },
+    "xls_f3": {
+      "commit": "9b1f96d6dce1506dc9d0080f0696b42ba592c397",
+      "root": "/home/zhuhe/code/litchi-worktrees/.coord/sheet-preparation-691941/xls-f3-baseline-9b1",
+      "f3_cargo_toml_sha256": "7849d690275dbb13ee28d3e4b3805e73b4882af13b936e49f5df1df84ffbe9a1",
+      "f3_cargo_lock_sha256": "e263612d864e4592b80be6ef626948a4eb73b9be31537ac78f5ea00243fc62fb"
+    }
+  },
+  "harness": {
+    "f3_overlay_ref": "0b8f68d7e9d3c97cfa62cedceacdeb2ad5f4ba76",
+    "f3_overlay_manifest_sha256": "375eb8fb835b3d3bfd74606de52dc460538e29a73113c3120dafe7c2442f87c5",
+    "cpu": 30,
+    "cargo_shim": "/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo",
+    "offline": true,
+    "locked": true,
+    "cargo_build_jobs": 1,
+    "rust_test_threads": 1,
+    "litchi_mem_max": "20G",
+    "target_guard_bytes": 20000000000,
+    "target_guard": "du -sb polled every two seconds; no target exceeded the guard",
+    "debug_profiles": 0,
+    "unset": ["LITCHI_CAPPED", "LITCHI_BLESS", "RUSTC", "RUSTFLAGS", "CARGO_TARGET_DIR"]
+  },
+  "config_equivalence": {
+    "cargo_config_sha256": "50b044c83828f2c448ee59c362afaa79de2dd47fbd390f0cd2888391f1d1119d",
+    "rust_toolchain_sha256": "e3a213e0d222e94d213cafbc20932eb3f76c643b4dd63756acf95192df2aa310",
+    "ancestor_cargo_config": false,
+    "xlsx_baseline_observed_cwd": "/home/zhuhe/code/litchi-worktrees/unified-ops-api",
+    "xlsx_baseline_reviewed_cwd": "/home/zhuhe/code/litchi-worktrees/.coord/sheet-preparation-691941/xlsx-source-baseline-e63",
+    "xlsx_baseline_cwd_difference_material": false,
+    "basis": "trunk and reviewed baseline .cargo/config.toml and rust-toolchain.toml were byte-identical; manifest path, lock, toolchain, and explicit build environment were unchanged"
+  },
+  "builds": [
+    {
+      "lane": "xlsx-source-baseline",
+      "status": "ok",
+      "pid": 974940,
+      "exec_session": 18377,
+      "cwd": "/home/zhuhe/code/litchi-worktrees/unified-ops-api",
+      "reviewed_cwd": "/home/zhuhe/code/litchi-worktrees/.coord/sheet-preparation-691941/xlsx-source-baseline-e63",
+      "target": "/home/zhuhe/code/litchi-worktrees/.coord/sheet-preparation-691941/targets/xlsx-base-472b670547",
+      "tmpdir": "/home/zhuhe/code/litchi-worktrees/.coord/sheet-preparation-691941/tmp/xlsx-base-472b670547",
+      "target_bytes": 1382744832,
+      "log": {"path": "/home/zhuhe/code/litchi-worktrees/.coord/sheet-preparation-691941/logs/xlsx-base-472b670547-build.log", "bytes": 10443, "sha256": "51bf30b6ad87ad89d05f8e771dd2d6e805348ea3afa453653ad3b796356b9b88"},
+      "binaries": {
+        "litchi-perf-baseline": {"path": "release/litchi-perf-baseline", "bytes": 97329888, "sha256": "a5710c6ad5318572398fec5d330df238bbb15ac681cda3663f259ea67098d083"},
+        "xlsx_merge_source_abba": {"path": "release/xlsx_merge_source_abba", "bytes": 11636952, "sha256": "fb2ca83c2d2075492be64d2167c51eec3658185f5da42f269b7fa50cd1bd16b6"}
+      }
+    },
+    {
+      "lane": "xlsx-source-candidate",
+      "status": "ok",
+      "pid": 1098302,
+      "exec_session": 24441,
+      "cwd": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source",
+      "target": "/home/zhuhe/code/litchi-worktrees/.coord/sheet-preparation-691941/targets/xlsx-candidate-472b670547",
+      "tmpdir": "/home/zhuhe/code/litchi-worktrees/.coord/sheet-preparation-691941/tmp/xlsx-candidate-472b670547",
+      "target_bytes": 1427423172,
+      "log": {"path": "/home/zhuhe/code/litchi-worktrees/.coord/sheet-preparation-691941/logs/xlsx-candidate-472b670547-build.log", "bytes": 39490, "sha256": "e272eccb62a75d2982701dab5fea1c17c79faaab5ec34a9a9699d03da542ae63"},
+      "binaries": {
+        "litchi-perf-baseline": {"path": "release/litchi-perf-baseline", "bytes": 101711056, "sha256": "40a7879aee9a5cdfb847bfa70041d4dba8edc59391572bdc151182ecbafc5502"},
+        "xlsx_merge_source_abba": {"path": "release/xlsx_merge_source_abba", "bytes": 12672304, "sha256": "4d466a5f96c00e0e3424ac2ebb61c670f76dc4b50a17bc2e35dcc89de0f20c3c"}
+      }
+    },
+    {
+      "lane": "xls-f3-baseline",
+      "status": "ok",
+      "pid": 1195249,
+      "exec_session": 23731,
+      "cwd": "/home/zhuhe/code/litchi-worktrees/.coord/sheet-preparation-691941/xls-f3-baseline-9b1",
+      "target": "/home/zhuhe/code/litchi-worktrees/.coord/sheet-preparation-691941/targets/xls-f3-base-472b670547",
+      "tmpdir": "/home/zhuhe/code/litchi-worktrees/.coord/sheet-preparation-691941/tmp/xls-f3-base-472b670547",
+      "target_bytes": 334136554,
+      "log": {"path": "/home/zhuhe/code/litchi-worktrees/.coord/sheet-preparation-691941/logs/xls-f3-base-472b670547-build.log", "bytes": 4928, "sha256": "4e50d9b7d0862913eaf8c9032f3ef4d3a86ef8fdf1abf24dec4c0543a2d72e03"},
+      "binaries": {
+        "xls_f3_qualification": {"path": "release/examples/xls_f3_qualification", "bytes": 7328952, "sha256": "9d39aa79e808096cd0487d88e8eddd277182ff5ab91a501d8e9caf6793d3be2c"}
+      }
+    },
+    {
+      "lane": "xls-f3-candidate",
+      "status": "failed",
+      "pid": 1224411,
+      "exec_session": 53757,
+      "cwd": "/home/zhuhe/code/litchi-worktrees/.coord/sheet-preparation-691941/xls-f3-candidate-472b",
+      "target": "/home/zhuhe/code/litchi-worktrees/.coord/sheet-preparation-691941/targets/xls-f3-candidate-472b670547",
+      "tmpdir": "/home/zhuhe/code/litchi-worktrees/.coord/sheet-preparation-691941/tmp/xls-f3-candidate-472b670547",
+      "target_bytes": 316656081,
+      "log": {"path": "/home/zhuhe/code/litchi-worktrees/.coord/sheet-preparation-691941/logs/xls-f3-candidate-472b670547-build.log", "bytes": 11249, "sha256": "4b76d28d19ef19995f84d94f674f0a22bac50210c3b46e04d38c3abdbbc80aba"},
+      "failure": {
+        "exit_code": 101,
+        "diagnostics": [
+          "pinned F3 overlay has seven OleFile::open call sites missing the required litchi_cfb::OleFileLimits argument; together with the missing fixture this accounts for eight compile errors",
+          "include_bytes!(../../../test-data/poi/test-data/spreadsheet/54016.xls) is missing from the candidate source tree"
+        ],
+        "qualification_run": "not run",
+        "acceptance_claim": false
+      }
+    }
+  ],
+  "active_input_review": {
+    "f3_manifest_paths_are_relative": true,
+    "removed_uo2_xls_f3_qualification_dependency": false,
+    "historical_only_path_mentions": "unified-xlsx-source-history/README.md mentions old uo2-e63 paths; no active F3 manifest/source/command uses them"
+  },
+  "external_evidence": "Full build logs and targets remain under /home/zhuhe/code/litchi-worktrees/.coord/sheet-preparation-691941; this committed receipt intentionally contains no compiled binary or raw log."
+}

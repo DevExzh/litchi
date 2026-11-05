@@ -9,9 +9,11 @@
 pub mod build;
 pub mod codec;
 pub mod dir;
+mod limit;
 pub mod project;
 
 pub use build::Payload;
+pub use limit::LimitKind;
 
 use litchi_cfb::OleError;
 use std::fmt;
@@ -63,17 +65,18 @@ impl Default for Limits {
 
 /// Error returned for malformed, unsupported, or over-limit MS-OVBA data.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// The containing CFB file could not be read or written.
     Cfb(OleError),
     /// A required MS-OVBA structure is malformed.
     InvalidData(String),
-    /// An explicit resource ceiling was exceeded.
-    LimitExceeded {
-        /// Name of the exceeded ceiling.
-        limit: &'static str,
+    /// An explicit resource ceiling was exceeded (record 0360).
+    Limit {
+        /// The exceeded ceiling.
+        kind: LimitKind,
         /// Observed or requested byte/item count.
-        actual: usize,
+        observed: usize,
         /// Configured maximum.
         maximum: usize,
     },
@@ -93,11 +96,11 @@ impl fmt::Display for Error {
         match self {
             Self::Cfb(error) => write!(formatter, "{error}"),
             Self::InvalidData(message) => write!(formatter, "invalid MS-OVBA data: {message}"),
-            Self::LimitExceeded {
-                limit,
-                actual,
+            Self::Limit {
+                kind,
+                observed,
                 maximum,
-            } => write!(formatter, "{limit} limit exceeded: {actual} > {maximum}"),
+            } => write!(formatter, "{kind} limit exceeded: {observed} > {maximum}"),
             Self::UnsupportedCodePage(code_page) => {
                 write!(formatter, "unsupported VBA project code page {code_page}")
             },
@@ -109,9 +112,7 @@ impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Cfb(error) => Some(error),
-            Self::InvalidData(_) | Self::LimitExceeded { .. } | Self::UnsupportedCodePage(_) => {
-                None
-            },
+            Self::InvalidData(_) | Self::Limit { .. } | Self::UnsupportedCodePage(_) => None,
         }
     }
 }
@@ -126,15 +127,31 @@ pub(crate) fn invalid(message: impl Into<String>) -> Error {
     Error::invalid(message)
 }
 
-pub(crate) fn check_limit(limit: &'static str, actual: usize, maximum: usize) -> Result<(), Error> {
+pub(crate) fn check_limit(kind: LimitKind, actual: usize, maximum: usize) -> Result<(), Error> {
     if actual > maximum {
-        return Err(Error::LimitExceeded {
-            limit,
-            actual,
+        return Err(Error::Limit {
+            kind,
+            observed: actual,
             maximum,
         });
     }
     Ok(())
+}
+
+/// Derive the physical CFB reader policy from the selected VBA limits.
+///
+/// The MS-OVBA limits own the standalone CFB byte budget.  Reusing the CFB
+/// reader's defaults here would silently replace that caller-selected budget
+/// at the nested allocation boundary, so the directory and allocation-table
+/// ceilings are constrained by the same finite input ceiling.
+pub(crate) fn cfb_limits(limits: &Limits) -> Result<litchi_cfb::OleFileLimits, Error> {
+    let maximum = u64::try_from(limits.max_cfb_bytes)
+        .map_err(|_| invalid("VBA CFB byte limit does not fit in u64"))?;
+    let directory_maximum = maximum.min(litchi_cfb::OleFileLimits::MAX_DIRECTORY_BYTES);
+    let allocation_maximum = maximum.min(litchi_cfb::OleFileLimits::MAX_ALLOCATION_TABLE_BYTES);
+    Ok(litchi_cfb::OleFileLimits::new(maximum)?
+        .with_max_directory_bytes(directory_maximum)?
+        .with_max_allocation_table_bytes(allocation_maximum)?)
 }
 
 #[cfg(test)]
@@ -147,5 +164,20 @@ mod tests {
     fn owned_outputs_are_send_and_sync() {
         assert_send_sync::<Payload>();
         assert_send_sync::<project::Project>();
+    }
+
+    #[test]
+    fn nested_cfb_limits_follow_the_selected_vba_input_budget() {
+        let limits = Limits {
+            max_cfb_bytes: 8 * 1024 * 1024,
+            ..Limits::default()
+        };
+        let cfb = cfb_limits(&limits).expect("finite CFB policy");
+        assert_eq!(cfb.max_input_bytes(), limits.max_cfb_bytes as u64);
+        assert_eq!(cfb.max_directory_bytes(), limits.max_cfb_bytes as u64);
+        assert_eq!(
+            cfb.max_allocation_table_bytes(),
+            limits.max_cfb_bytes as u64
+        );
     }
 }

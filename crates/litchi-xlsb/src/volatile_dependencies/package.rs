@@ -2,7 +2,7 @@
 
 use litchi_opc::{OpcPackage, PackURI, TargetMode};
 
-use super::model::ReadLimits;
+use super::model::SemanticLimits;
 use crate::package::error::{Error, Result};
 
 /// MS-XLSB 2.1.7.60 content type.
@@ -29,7 +29,7 @@ pub(crate) struct Graph {
 pub(crate) fn discover_graph(
     package: &OpcPackage,
     workbook_name: &PackURI,
-    limits: ReadLimits,
+    limits: SemanticLimits,
 ) -> Result<Option<Graph>> {
     let workbook = package.get_part(workbook_name)?;
     if workbook.content_type() != litchi_opc::constants::content_type::XLSB_BIN {
@@ -63,11 +63,7 @@ pub(crate) fn discover_graph(
     // must be restored by an inverse publication.
     let stored_part_name = part.partname().clone();
     if part.content_type() != CONTENT_TYPE {
-        return Err(invalid(format!(
-            "Volatile Dependencies part '{}' has content type '{}'",
-            part_name.as_str(),
-            part.content_type()
-        )));
+        return Err(invalid("Volatile Dependencies part has content type"));
     }
     if !part.rels().is_empty() {
         return Err(invalid(
@@ -100,7 +96,7 @@ pub(crate) fn discover_graph(
 fn scan_feature_relationships(
     package: &OpcPackage,
     workbook_name: &PackURI,
-    limits: ReadLimits,
+    limits: SemanticLimits,
 ) -> Result<()> {
     let mut relationship_count = 0usize;
     for relationship in package.rels().iter() {
@@ -115,26 +111,25 @@ fn scan_feature_relationships(
         for relationship in source.rels().iter() {
             relationship_count = checked_relationship_count(relationship_count, limits)?;
             if relationship.reltype() == RELATIONSHIP_TYPE && source.partname() != workbook_name {
-                return Err(invalid(format!(
-                    "Volatile Dependencies relationship on unexpected source part '{}'",
-                    source.partname().as_str()
-                )));
+                return Err(invalid(
+                    "Volatile Dependencies relationship on unexpected source part",
+                ));
             }
         }
     }
     Ok(())
 }
 
-fn checked_relationship_count(current: usize, limits: ReadLimits) -> Result<usize> {
+fn checked_relationship_count(current: usize, limits: SemanticLimits) -> Result<usize> {
     let actual = current.checked_add(1).ok_or(Error::CapacityOverflow {
         resource: "Volatile Dependencies relationships",
     })?;
     if actual > limits.max_relationships {
-        return Err(Error::LimitExceeded {
-            resource: "Volatile Dependencies relationships",
+        return Err(Error::limit(
+            crate::volatile_dependencies::LimitKind::Relationships,
             actual,
-            maximum: limits.max_relationships,
-        });
+            limits.max_relationships,
+        ));
     }
     Ok(actual)
 }
@@ -156,7 +151,7 @@ fn ensure_exclusive_inbound_relationship(
     target: &PackURI,
     expected_source: &PackURI,
     expected_relationship_id: &str,
-    limits: ReadLimits,
+    limits: SemanticLimits,
 ) -> Result<()> {
     let mut relationship_count = 0usize;
     for relationship in package.rels().iter() {
@@ -187,13 +182,14 @@ fn ensure_exclusive_inbound_relationship(
 }
 
 pub(crate) fn default_part_uri() -> Result<PackURI> {
-    PackURI::new(DEFAULT_PART_NAME).map_err(|error| Error::InvalidUri(error.to_string()))
+    PackURI::new(DEFAULT_PART_NAME)
+        .map_err(|_error| Error::InvalidUri("the part name is not a valid package URI"))
 }
 
 pub(crate) fn reject_inbound_relationships(
     package: &OpcPackage,
     target: &PackURI,
-    limits: ReadLimits,
+    limits: SemanticLimits,
 ) -> Result<()> {
     let mut relationship_count = 0usize;
     for relationship in package.rels().iter() {
@@ -201,10 +197,9 @@ pub(crate) fn reject_inbound_relationships(
         if relationship.target_mode() == TargetMode::Internal
             && relationship.target_partname()?.is_equivalent_to(target)
         {
-            return Err(invalid(format!(
-                "package relationship targets Volatile Dependencies part '{}'",
-                target.as_str()
-            )));
+            return Err(invalid(
+                "package relationship targets Volatile Dependencies part",
+            ));
         }
     }
     for source in package.iter_parts() {
@@ -213,17 +208,13 @@ pub(crate) fn reject_inbound_relationships(
             if relationship.target_mode() == TargetMode::Internal
                 && relationship.target_partname()?.is_equivalent_to(target)
             {
-                return Err(invalid(format!(
-                    "part '{}' targets Volatile Dependencies part '{}'",
-                    source.partname().as_str(),
-                    target.as_str()
-                )));
+                return Err(invalid("part targets Volatile Dependencies part"));
             }
         }
     }
     Ok(())
 }
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn invalid(message: &'static str) -> Error {
+    Error::InvalidFormat(message)
 }

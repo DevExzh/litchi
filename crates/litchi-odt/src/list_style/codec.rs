@@ -9,11 +9,11 @@ use super::{
 };
 use crate::outline_style::{NumberFormat, PositiveInteger};
 use litchi_core::{Result, xml::escape_xml};
+use litchi_odf_common::{ResolvedReader, XmlStreamLimits};
 use quick_xml::{
     XmlVersion,
     events::{BytesStart, Event},
     name::{QName, ResolveResult},
-    reader::NsReader,
 };
 use std::collections::HashSet;
 
@@ -27,14 +27,17 @@ const OFFICE_STR: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const XLINK_STR: &str = "http://www.w3.org/1999/xlink";
 
 impl LevelStyle {
-    fn to_xml_fragment(&self) -> Result<String> {
+    fn to_xml_fragment(&self, limits: &XmlStreamLimits) -> Result<String> {
         self.validate()?;
         let tag = match &self.kind {
             Kind::Number(_) => "list-level-style-number",
             Kind::Bullet(_) => "list-level-style-bullet",
             Kind::Image(_) => "list-level-style-image",
         };
-        let mut xml = format!(r#"<text:{tag} text:level="{}""#, self.level);
+        let capacity = level_size(self)?;
+        ensure_output_size(capacity, limits)?;
+        let mut xml = String::with_capacity(capacity);
+        xml.push_str(&format!(r#"<text:{tag} text:level="{}""#, self.level));
         if let Some(value) = &self.style_name {
             xml.push_str(&format!(r#" text:style-name="{}""#, escape_xml(value)));
         }
@@ -97,22 +100,39 @@ impl LevelStyle {
             },
             Kind::Image(ImageSource::Embedded(data)) => {
                 xml.push('>');
-                xml.push_str(&format!(
-                    "<office:binary-data>{data}</office:binary-data></text:{tag}>"
-                ));
+                xml.push_str("<office:binary-data>");
+                xml.push_str(data);
+                xml.push_str("</office:binary-data></text:");
+                xml.push_str(tag);
+                xml.push('>');
             },
+        }
+        if u64::try_from(xml.len()).unwrap_or(u64::MAX) > limits.max_bytes() {
+            return Err(bad(
+                "serialized list level exceeds the configured XML limit",
+            ));
         }
         Ok(xml)
     }
 }
 
 impl Style {
-    pub fn to_xml_fragment(&self) -> Result<String> {
+    pub fn to_xml_fragment(&self, limits: &XmlStreamLimits) -> Result<String> {
         self.validate()?;
-        let mut xml = format!(
-            r#"<text:list-style xmlns:text="{TEXT_STR}" xmlns:style="{STYLE_STR}" xmlns:office="{OFFICE_STR}" xmlns:xlink="{XLINK_STR}" style:name="{}""#,
-            escape_xml(&self.name)
-        );
+        let capacity = style_size(self)?;
+        ensure_output_size(capacity, limits)?;
+        let mut xml = String::with_capacity(capacity);
+        xml.push_str("<text:list-style xmlns:text=\"");
+        xml.push_str(TEXT_STR);
+        xml.push_str("\" xmlns:style=\"");
+        xml.push_str(STYLE_STR);
+        xml.push_str("\" xmlns:office=\"");
+        xml.push_str(OFFICE_STR);
+        xml.push_str("\" xmlns:xlink=\"");
+        xml.push_str(XLINK_STR);
+        xml.push_str("\" style:name=\"");
+        xml.push_str(&escape_xml(&self.name));
+        xml.push('"');
         if let Some(value) = &self.display_name {
             xml.push_str(&format!(r#" style:display-name="{}""#, escape_xml(value)));
         }
@@ -121,15 +141,173 @@ impl Style {
         }
         if self.levels.is_empty() {
             xml.push_str("/>");
+            if u64::try_from(xml.len()).unwrap_or(u64::MAX) > limits.max_bytes() {
+                return Err(bad(
+                    "serialized list style exceeds the configured XML limit",
+                ));
+            }
             return Ok(xml);
         }
         xml.push('>');
         for level in &self.levels {
-            xml.push_str(&level.to_xml_fragment()?);
+            xml.push_str(&level.to_xml_fragment(limits)?);
         }
         xml.push_str("</text:list-style>");
+        if u64::try_from(xml.len()).unwrap_or(u64::MAX) > limits.max_bytes() {
+            return Err(bad(
+                "serialized list style exceeds the configured XML limit",
+            ));
+        }
         Ok(xml)
     }
+}
+
+fn level_size(level: &LevelStyle) -> Result<usize> {
+    let tag = match &level.kind {
+        Kind::Number(_) => "list-level-style-number",
+        Kind::Bullet(_) => "list-level-style-bullet",
+        Kind::Image(_) => "list-level-style-image",
+    };
+    let mut size = 0usize;
+    add_size(&mut size, b"<text:".len())?;
+    add_size(&mut size, tag.len())?;
+    add_size(&mut size, b" text:level=\"".len())?;
+    add_size(&mut size, level.level.to_string().len())?;
+    add_size(&mut size, 1)?;
+    add_attr_size(&mut size, "text:style-name", level.style_name.as_deref())?;
+    match &level.kind {
+        Kind::Number(number) => {
+            add_attr_size(
+                &mut size,
+                "style:num-format",
+                number.format.as_ref().map(NumberFormat::as_str),
+            )?;
+            add_attr_size(&mut size, "style:num-prefix", number.prefix.as_deref())?;
+            add_attr_size(&mut size, "style:num-suffix", number.suffix.as_deref())?;
+            add_attr_size(
+                &mut size,
+                "style:num-letter-sync",
+                number
+                    .letter_sync
+                    .map(|value| if value { "true" } else { "false" }),
+            )?;
+            add_attr_size(
+                &mut size,
+                "text:display-levels",
+                number.display_levels.as_ref().map(PositiveInteger::as_str),
+            )?;
+            add_attr_size(
+                &mut size,
+                "text:start-value",
+                number.start_value.as_ref().map(PositiveInteger::as_str),
+            )?;
+            add_size(&mut size, 2)?;
+        },
+        Kind::Bullet(bullet) => {
+            let bullet_char = bullet.bullet_char.to_string();
+            add_attr_size(&mut size, "text:bullet-char", Some(&bullet_char))?;
+            add_attr_size(
+                &mut size,
+                "text:bullet-relative-size",
+                bullet
+                    .relative_size
+                    .as_ref()
+                    .map(BulletRelativeSize::as_str),
+            )?;
+            add_attr_size(&mut size, "style:num-prefix", bullet.prefix.as_deref())?;
+            add_attr_size(&mut size, "style:num-suffix", bullet.suffix.as_deref())?;
+            add_size(&mut size, 2)?;
+        },
+        Kind::Image(ImageSource::Linked(href)) => {
+            add_attr_size(&mut size, "xlink:type", Some("simple"))?;
+            add_attr_size(&mut size, "xlink:href", Some(href))?;
+            add_attr_size(&mut size, "xlink:show", Some("embed"))?;
+            add_attr_size(&mut size, "xlink:actuate", Some("onLoad"))?;
+            add_size(&mut size, 2)?;
+        },
+        Kind::Image(ImageSource::Embedded(data)) => {
+            add_size(&mut size, 1)?;
+            add_size(&mut size, b"<office:binary-data>".len())?;
+            add_size(&mut size, data.len())?;
+            add_size(&mut size, b"</office:binary-data></text:".len())?;
+            add_size(&mut size, tag.len() + 1)?;
+        },
+    }
+    Ok(size)
+}
+
+fn style_size(style: &Style) -> Result<usize> {
+    let mut size = 0usize;
+    add_size(&mut size, b"<text:list-style xmlns:text=\"".len())?;
+    add_size(&mut size, TEXT_STR.len())?;
+    add_size(&mut size, b"\" xmlns:style=\"".len())?;
+    add_size(&mut size, STYLE_STR.len())?;
+    add_size(&mut size, b"\" xmlns:office=\"".len())?;
+    add_size(&mut size, OFFICE_STR.len())?;
+    add_size(&mut size, b"\" xmlns:xlink=\"".len())?;
+    add_size(&mut size, XLINK_STR.len())?;
+    add_size(&mut size, b"\" style:name=\"".len())?;
+    add_size(&mut size, escaped_len(&style.name)?)?;
+    add_size(&mut size, 1)?;
+    add_attr_size(
+        &mut size,
+        "style:display-name",
+        style.display_name.as_deref(),
+    )?;
+    add_attr_size(
+        &mut size,
+        "text:consecutive-numbering",
+        style
+            .consecutive_numbering
+            .map(|value| if value { "true" } else { "false" }),
+    )?;
+    if style.levels.is_empty() {
+        add_size(&mut size, 2)?;
+    } else {
+        add_size(&mut size, 1)?;
+        for level in &style.levels {
+            add_size(&mut size, level_size(level)?)?;
+        }
+        add_size(&mut size, b"</text:list-style>".len())?;
+    }
+    Ok(size)
+}
+
+fn add_attr_size(size: &mut usize, name: &str, value: Option<&str>) -> Result<()> {
+    let Some(value) = value else { return Ok(()) };
+    add_size(size, 1 + name.len() + 2)?;
+    add_size(size, escaped_len(value)?)?;
+    add_size(size, 1)
+}
+
+fn escaped_len(value: &str) -> Result<usize> {
+    value.chars().try_fold(0usize, |size, character| {
+        let encoded = match character {
+            '&' => 5,
+            '<' | '>' => 4,
+            '"' => 6,
+            '\'' => 6,
+            _ => character.len_utf8(),
+        };
+        size.checked_add(encoded)
+            .ok_or_else(|| bad("list style output size overflow"))
+    })
+}
+
+fn add_size(size: &mut usize, amount: usize) -> Result<()> {
+    *size = size
+        .checked_add(amount)
+        .ok_or_else(|| bad("list style output size overflow"))?;
+    Ok(())
+}
+
+fn ensure_output_size(size: usize, limits: &XmlStreamLimits) -> Result<()> {
+    if u64::try_from(size).unwrap_or(u64::MAX) > limits.max_bytes() {
+        return Err(bad(
+            "serialized list style exceeds the configured XML limit",
+        ));
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -149,12 +327,12 @@ fn known(resolve: ResolveResult<'_>) -> Ns {
         _ => Ns::Other,
     }
 }
-fn element(reader: &NsReader<&[u8]>, name: QName<'_>) -> (Ns, Vec<u8>) {
+fn element(reader: &ResolvedReader<'_>, name: QName<'_>) -> (Ns, Vec<u8>) {
     let (namespace, local) = reader.resolver().resolve_element(name);
     (known(namespace), local.as_ref().to_vec())
 }
 fn value(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     version: XmlVersion,
     attr: &quick_xml::events::attributes::Attribute<'_>,
 ) -> Result<String> {
@@ -165,7 +343,11 @@ fn value(
 
 /// Namespace-resolved attribute bag with one-shot accessors.
 struct Attrs(Vec<(Ns, Vec<u8>, String)>);
-fn attrs(reader: &NsReader<&[u8]>, version: XmlVersion, start: &BytesStart<'_>) -> Result<Attrs> {
+fn attrs(
+    reader: &ResolvedReader<'_>,
+    version: XmlVersion,
+    start: &BytesStart<'_>,
+) -> Result<Attrs> {
     let mut out = Vec::new();
     let mut seen = HashSet::new();
     for attr in start.attributes().with_checks(true) {
@@ -363,7 +545,7 @@ fn push_style(styles: &mut Vec<Style>, style: Style, total: &mut usize) -> Resul
 }
 
 fn style_attrs(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     version: XmlVersion,
     start: &BytesStart<'_>,
 ) -> Result<Style> {
@@ -393,14 +575,13 @@ fn is_style(current: &(Ns, Vec<u8>), parent: Option<&(Ns, Vec<u8>)>) -> bool {
 }
 
 /// Parse every `text:list-style` declared in a styles or flat document part.
-pub fn parse(xml: &str) -> Result<Styles> {
-    if xml.len() > MAX_XML {
+pub fn parse(xml: &str, limits: &XmlStreamLimits) -> Result<Styles> {
+    if xml.len() > MAX_XML || u64::try_from(xml.len()).unwrap_or(u64::MAX) > limits.max_bytes() {
         return Err(bad("styles XML is too large"));
     }
-    if !xml.contains("list-style") {
-        return Ok(Styles::default());
-    }
-    let mut reader = NsReader::from_reader(xml.as_bytes());
+    let mut reader = ResolvedReader::from_xml_document(xml, *limits).map_err(|error| {
+        litchi_odf_common::map_resolved_reader_error(error, "invalid list-style XML")
+    })?;
     reader.config_mut().trim_text(false);
     let mut version = XmlVersion::Implicit1_0;
     let mut stack: Vec<(Ns, Vec<u8>)> = Vec::new();
@@ -408,9 +589,15 @@ pub fn parse(xml: &str) -> Result<Styles> {
     let mut styles = Vec::new();
     let mut total = 0;
     loop {
-        match reader.read_event() {
-            Ok(Event::Start(start)) => {
-                if stack.len() >= MAX_DEPTH {
+        let event = reader
+            .read_resolved_event()
+            .map_err(|error| {
+                litchi_odf_common::map_resolved_reader_error(error, "invalid list-style XML")
+            })?
+            .1;
+        match event {
+            Event::Start(start) => {
+                if stack.len() >= MAX_DEPTH.min(limits.max_depth()) {
                     return Err(bad("styles XML nesting is too deep"));
                 }
                 let current = element(&reader, start.name());
@@ -500,7 +687,7 @@ pub fn parse(xml: &str) -> Result<Styles> {
                     },
                 }
             },
-            Ok(Event::Empty(start)) => {
+            Event::Empty(start) => {
                 let current = element(&reader, start.name());
                 if is_style(&current, stack.last()) {
                     if active.is_some() {
@@ -572,7 +759,7 @@ pub fn parse(xml: &str) -> Result<Styles> {
                     },
                 }
             },
-            Ok(Event::Text(text)) => {
+            Event::Text(text) => {
                 if let Some(state) = active.as_mut()
                     && let Some(image) = state.image.as_mut()
                     && image.binary_seen
@@ -589,7 +776,7 @@ pub fn parse(xml: &str) -> Result<Styles> {
                     }
                 }
             },
-            Ok(Event::End(_)) => {
+            Event::End(_) => {
                 let depth = stack.len();
                 if let Some(state) = active.as_mut() {
                     if state.skip == Some(depth) {
@@ -630,17 +817,16 @@ pub fn parse(xml: &str) -> Result<Styles> {
                 }
                 stack.pop();
             },
-            Ok(Event::Decl(decl)) => {
+            Event::Decl(decl) => {
                 version = decl
                     .xml_version()
                     .map_err(|error| bad(format!("unsupported XML version: {error}")))?;
             },
-            Ok(Event::DocType(_) | Event::PI(_)) => {
+            Event::DocType(_) | Event::PI(_) => {
                 return Err(bad("DTD and processing instructions are not allowed"));
             },
-            Ok(Event::Eof) => break,
-            Ok(_) => {},
-            Err(error) => return Err(bad(format!("invalid styles XML: {error}"))),
+            Event::Eof => break,
+            _ => {},
         }
     }
     if !stack.is_empty() || active.is_some() {

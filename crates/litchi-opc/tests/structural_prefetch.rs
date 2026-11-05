@@ -26,7 +26,7 @@ use litchi_core::{
 };
 use litchi_opc::leniency::{Defect, RelationshipDefect};
 use litchi_opc::{
-    OpcError, PackURI, ReadLimits, SourceBackedPackage, SourceCacheLimits, SourceReadPolicy,
+    OpcError, PackURI, SourceBackedPackage, SourceCacheLimits, SourceLimits, SourceReadPolicy,
 };
 use soapberry_zip::office::StreamingArchiveWriter;
 
@@ -162,7 +162,8 @@ fn run_package(child_count: usize, broken: Option<(usize, String)>) -> Vec<u8> {
     let children: Vec<String> = (0..child_count)
         .map(|index| format!("word/child{index}.xml"))
         .collect();
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types(&children).as_bytes())
         .unwrap();
@@ -198,7 +199,13 @@ fn run_package(child_count: usize, broken: Option<(usize, String)>) -> Vec<u8> {
 
 fn open(source: Arc<Recording>) -> Result<SourceBackedPackage, OpcError> {
     let dynamic: Arc<dyn ReadAt> = source;
-    SourceBackedPackage::from_read_at(dynamic)
+    SourceBackedPackage::from_read_at(
+        dynamic,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
 }
 
 fn open_with_policy(
@@ -206,11 +213,12 @@ fn open_with_policy(
     policy: SourceReadPolicy,
 ) -> Result<SourceBackedPackage, OpcError> {
     let dynamic: Arc<dyn ReadAt> = source;
-    SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_source_read_policy(
+    SourceBackedPackage::from_read_at(
         dynamic,
-        ReadLimits::default(),
+        SourceLimits::default(),
         SourceCacheLimits::default(),
         policy,
+        None,
     )
 }
 
@@ -286,16 +294,17 @@ struct Verdict {
 }
 
 fn verdict(source: Arc<Recording>) -> Verdict {
-    verdict_with_limits(source, ReadLimits::default())
+    verdict_with_limits(source, SourceLimits::default())
 }
 
-fn verdict_with_limits(source: Arc<Recording>, limits: ReadLimits) -> Verdict {
+fn verdict_with_limits(source: Arc<Recording>, limits: SourceLimits) -> Verdict {
     let dynamic: Arc<dyn ReadAt> = source;
-    match SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_source_read_policy(
+    match SourceBackedPackage::from_read_at(
         dynamic,
         limits,
         SourceCacheLimits::default(),
         SourceReadPolicy::exact(),
+        None,
     ) {
         Err(error) => Verdict {
             outcome: Err(format!("{error:?}")),
@@ -369,7 +378,8 @@ fn a_run_read_never_covers_an_ordinary_part_payload() {
     // The ordinary parts sit after the structural members, and one more
     // ordinary member is written between two relationship parts so a run has
     // to break rather than read across it.
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     let children = vec!["word/child0.xml".to_string(), "word/child1.xml".to_string()];
     writer
         .write_stored("[Content_Types].xml", content_types(&children).as_bytes())
@@ -500,7 +510,8 @@ fn a_duplicate_relationship_id_keeps_its_repair_anywhere_in_a_run() {
 fn the_untyped_member_admission_verdict_does_not_move() {
     let build = |referenced: bool| {
         let children = vec!["word/child0.xml".to_string()];
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer
             .write_stored("[Content_Types].xml", content_types(&children).as_bytes())
             .unwrap();
@@ -582,7 +593,8 @@ fn a_scattered_package_costs_no_more_reads() {
     let children: Vec<String> = (0..4)
         .map(|index| format!("word/child{index}.xml"))
         .collect();
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types(&children).as_bytes())
         .unwrap();
@@ -660,11 +672,12 @@ fn a_managed_open_keeps_the_exact_grammar() {
     )
     .expect("execution limits must be valid");
     let context = ExecutionContext::new(budget, cancellation, execution_limits);
-    SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
+    SourceBackedPackage::from_read_at(
         dynamic,
-        ReadLimits::default(),
+        SourceLimits::default(),
         SourceCacheLimits::default(),
-        context,
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .expect("managed open");
     let managed_reads = without_admission_probes(&bytes, managed_source.take());
@@ -714,7 +727,7 @@ fn source_observations_do_not_move() {
 fn a_relationship_budget_refuses_identically_inside_a_run() {
     let bytes = run_package(8, None);
     for ceiling in [1usize, 400, 900, 1_400, 2_000] {
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_total_relationship_xml_bytes(ceiling)
             .expect("ceiling")
             .build()

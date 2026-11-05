@@ -1,0 +1,77 @@
+[
+  {
+    "median_us": 3525.4092000000005,
+    "min_us": 3514.7831999999994,
+    "output_sha256": "d318ad95cfb1463e09a5ee39b5bfbe6adb8b4d0cd9060a34c9d627e6c89e3663",
+    "samples": 31,
+    "scenario": "doc/source_set"
+  },
+  {
+    "median_us": 6674531.4520000005,
+    "min_us": 6494343.630000001,
+    "samples": 7,
+    "scenario": "doc/batch1k_ops"
+  },
+  {
+    "median_us": 1112030.64,
+    "min_us": 1103647.345,
+    "samples": 7,
+    "scenario": "doc/batch1k_leaf"
+  },
+  {
+    "median_us": 240.39959999999996,
+    "min_us": 238.82740000000004,
+    "output_sha256": "595ab31fa6ced92034e6eff1663f2d880b886832a3be9095fde07f1e6f22f992",
+    "samples": 31,
+    "scenario": "xls/source_cells1"
+  },
+  {
+    "median_us": 198.8852,
+    "min_us": 197.91320000000002,
+    "output_sha256": "595ab31fa6ced92034e6eff1663f2d880b886832a3be9095fde07f1e6f22f992",
+    "samples": 31,
+    "scenario": "xls/source_cells1_plan"
+  },
+  {
+    "median_us": 604.8756,
+    "min_us": 602.5058,
+    "output_sha256": "7b810037f305d037644a0aeee4dd196e883d8426a1b48c9b20a4ee420be08080",
+    "samples": 31,
+    "scenario": "xls/source_cells100"
+  },
+  {
+    "median_us": 253.2096,
+    "min_us": 251.91559999999998,
+    "output_sha256": "7b810037f305d037644a0aeee4dd196e883d8426a1b48c9b20a4ee420be08080",
+    "samples": 31,
+    "scenario": "xls/source_cells100_plan"
+  },
+  {
+    "median_us": 1514.307,
+    "min_us": 1507.3572,
+    "output_sha256": "dd1faf8e5fb072ecd59e50fd9c7f549d39fdff4ddc2b874f1d1e8ac7bfe3a5bd",
+    "samples": 31,
+    "scenario": "xls/source_comments1"
+  },
+  {
+    "median_us": 2016.8301999999999,
+    "min_us": 2004.9482,
+    "output_sha256": "6dc30ba00e98c80924488cba6e0af4a2add43770886636190d0e61bbcfeb2f16",
+    "samples": 31,
+    "scenario": "xls/source_comments256"
+  },
+  {
+    "median_us": 77.2824,
+    "min_us": 75.68440000000001,
+    "output_sha256": "460f614162e09972b08518490580f235ac7ca6305f497e8571edc5d673b7bcdb",
+    "samples": 31,
+    "scenario": "xls/source_hide7"
+  },
+  {
+    "median_us": 299.3198,
+    "min_us": 297.71979999999996,
+    "output_sha256": "9c1cc5368f99a988f1280446fcf43ec9485a1a88ff6e7245b26038676718731a",
+    "samples": 31,
+    "scenario": "rtf/source_append"
+  }
+]

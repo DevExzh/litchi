@@ -1,15 +1,16 @@
 //! Native Numbers package parsing.
 //!
 //! This adapter owns physical package ingress, IWA-object lookup, and
-//! protobuf-to-semantic conversion. The archive-free [`crate::Document`]
-//! remains the public semantic owner; this module retains no dependency on the
-//! historical umbrella facade.
+//! protobuf-to-semantic conversion. [`Package`] is the immutable owner of
+//! every state verb; [`crate::Workbook`] is its read-only semantic
+//! projection (ADR 0034 §2).
 
+pub(crate) mod builder_synthesis;
 mod chart_arrangement;
 mod chart_data;
 mod chart_data_edit;
 mod chart_metadata;
-pub mod comments;
+pub(crate) mod comments;
 #[allow(
     dead_code,
     reason = "Comment reply mutations reuse the strict metadata registry and prepared transitions as the owner lands."
@@ -19,7 +20,8 @@ pub(crate) mod comments_metadata;
     dead_code,
     reason = "The private native reply transition is reached through package::comments."
 )]
-pub(crate) mod comments_reply_native;
+pub(crate) mod conditional_highlight;
+mod document_locale;
 #[allow(
     dead_code,
     reason = "The parser keeps private native table helpers together so all IWA table variants share one bounded decoder."
@@ -49,7 +51,43 @@ mod save;
     reason = "Decoded sheets expose only the construction path used at package ingress."
 )]
 mod sheet;
+pub(crate) mod sheet_chart_axis;
+pub(crate) mod sheet_chart_axis_title;
+pub(crate) mod sheet_chart_font;
+pub(crate) mod sheet_chart_legend_style;
+pub(crate) mod sheet_chart_lifecycle;
+pub(crate) mod sheet_chart_reference_lines;
+pub(crate) mod sheet_chart_series;
+mod sheet_chart_series_style;
+pub(crate) mod sheet_chart_style;
+pub(crate) mod sheet_chart_text;
+pub(crate) mod sheet_chart_title;
+pub(crate) mod sheet_chart_value_axis;
+pub(crate) mod sheet_drawable;
+pub(crate) mod sheet_drawable_annotation;
+mod sheet_drawable_author;
+pub(crate) mod sheet_drawable_caption;
+mod sheet_drawable_chart;
+pub(crate) mod sheet_drawable_comment;
+mod sheet_drawable_comment_graph;
+pub(crate) mod sheet_drawable_date_time;
+pub(crate) mod sheet_drawable_drop_cap;
+mod sheet_drawable_duplicate;
+mod sheet_drawable_graph;
+pub(crate) mod sheet_drawable_hyperlink;
+pub(crate) mod sheet_drawable_language;
+pub(crate) mod sheet_drawable_list;
+mod sheet_drawable_media;
+pub(crate) mod sheet_drawable_named_style;
+pub(crate) mod sheet_drawable_plain_text;
+pub(crate) mod sheet_drawable_properties;
+pub(crate) mod sheet_drawable_style;
+pub(crate) mod sheet_drawable_text;
+pub(crate) mod sheet_lifecycle;
+pub(crate) mod sheet_media;
 pub(crate) mod sheet_order;
+mod structure;
+mod style_graph;
 #[allow(
     dead_code,
     reason = "Private native tables retain sidecar helpers while the public surface exposes only semantic tables."
@@ -57,26 +95,33 @@ pub(crate) mod sheet_order;
 mod table;
 pub(crate) mod table_appearance;
 pub(crate) mod table_cell_control;
-pub(crate) mod table_cell_control_native;
+pub(crate) use litchi_iwa_table::cell_format::control as table_cell_control_native;
 pub(crate) mod table_cell_currency_format;
 pub(crate) mod table_cell_custom_format;
+pub(crate) mod table_cell_data_format;
 pub(crate) mod table_cell_date_time_format;
-pub(crate) mod table_cell_display_format_native;
+pub(crate) use litchi_iwa_table::cell_format::display as table_cell_display_format_native;
+pub(crate) mod pivot_categories;
+pub(crate) mod table_cell_appearance;
 pub(crate) mod table_cell_duration_format;
 pub(crate) mod table_cell_edit;
 pub(crate) mod table_cell_fraction_format;
+pub(crate) mod table_cell_list;
 pub(crate) mod table_cell_number_format;
 pub(crate) mod table_cell_percentage_format;
 pub(crate) mod table_cell_pop_up_menu;
-pub(crate) mod table_cell_pop_up_menu_metadata;
-pub(crate) mod table_cell_pop_up_menu_native;
 pub(crate) mod table_cell_scientific_format;
+pub(crate) mod table_cell_text;
 pub(crate) mod table_cell_text_format;
+pub(crate) mod table_cell_text_style;
 pub(crate) mod table_cells;
 pub(crate) mod table_dimension;
 pub(crate) mod table_headers;
-mod table_lock;
-mod table_merges;
+pub(crate) mod table_hidden_axes;
+pub(crate) mod table_lifecycle;
+pub(crate) mod table_lock;
+pub(crate) mod table_merges;
+pub(crate) mod table_order;
 pub(crate) mod table_relocation;
 #[cfg(feature = "internal-iwork-source")]
 #[allow(
@@ -84,17 +129,20 @@ pub(crate) mod table_relocation;
     reason = "The physical-only relocation seam is retained solely for the legacy migration host."
 )]
 mod table_relocation_compat;
+pub(crate) mod table_resize;
 pub(crate) mod table_sort;
 #[allow(
     dead_code,
     reason = "The physical-only persisted-sort seam is retained solely for legacy migration snapshots."
 )]
 mod table_sort_compat;
+pub(crate) mod table_sort_execution;
 pub(crate) mod table_title;
+pub(crate) mod table_topology;
 
 use std::collections::HashSet;
 use std::fmt;
-use std::fs::{Metadata, OpenOptions};
+use std::fs::{Metadata, OpenOptions as FsOpenOptions};
 use std::io::{self, Read, Write};
 use std::path::Path;
 use std::sync::Arc;
@@ -102,61 +150,59 @@ use std::sync::Arc;
 use litchi_iwa_archive::package::SharedBytes;
 use litchi_iwa_archive::{ComponentCatalog, OwnedSourceCatalog, SourceCatalog};
 use litchi_iwa_common::WireLimits;
-use litchi_iwa_common::wire::{WireDescent, preflight_wire_tree_with_limits};
+use litchi_iwa_common::wire::{WireDescent, preflight_wire_tree};
 use litchi_iwa_core::{Archive, RawMessage};
 use litchi_iwa_detect::{Format, PreparedSource};
 use litchi_iwa_protos::{numbers_sheet_order_codec, table_info_codec};
-use litchi_iwa_text_wire::{
-    RewriteError as TextWireError, RewriteLimits as TextWireLimits, ValidatedStorage,
-    decode_storage_with_limits,
-};
+use litchi_iwa_table::cell_format::control::PackageProofs;
 use plist::stream::{Event as PlistEvent, Reader as PlistReader};
 use thiserror::Error;
 
-use crate::{Document, DocumentError, DocumentLimits, Sheet, SheetSelector, TableSelector};
+use crate::limits::OpenOptions;
+use crate::workbook::Error as WorkbookError;
+use crate::{Sheet, SheetSelector, TableSelector, Workbook};
 use extractor::TableDataExtractor;
 use index::{Index, Resolved};
 use sheet::DecodedSheet;
 
-pub use chart_arrangement::{
-    ChartArrangementCommit, ChartArrangementDiagnostics, ChartArrangementEdit,
-    ChartArrangementError, ChartArrangementLimitKind, ChartArrangementPatch,
-    SheetChartArrangementCommit, SheetChartArrangementDiagnostics, SheetChartArrangementEdit,
-    SheetChartArrangementError, SheetChartArrangementLimitKind, SheetChartArrangementPatch,
-};
-pub use chart_data::{ChartDataError, ChartDataLimitKind};
-pub use chart_data_edit::{
-    ChartDataCommit, ChartDataDiagnostics, ChartDataEdit, ChartDataPatch, SheetChartDataCommit,
-    SheetChartDataDiagnostics, SheetChartDataEdit, SheetChartDataPatch,
-};
-pub use chart_metadata::{ChartMetadataError, ChartMetadataLimitKind};
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
 pub use image_adjustments::{__decode_image_adjustments_payload, ImageAdjustmentsError};
-pub use image_adjustments::{
-    SheetImageAdjustmentsCommit, SheetImageAdjustmentsDiagnostics, SheetImageAdjustmentsEdit,
-    SheetImageAdjustmentsError, SheetImageAdjustmentsLimitKind, SheetImageAdjustmentsPatch,
-};
-pub use limits::{
-    MAX_OBJECTS, MAX_REFERENCES, ReadOptions, SemanticLimitKind, SemanticLimits,
-    SemanticLimitsError,
-};
+
+pub use crate::limits::{MAX_OBJECTS, MAX_REFERENCES, SemanticLimitKind, SemanticLimits};
+pub(crate) use limits::Profile;
 /// Physical ingress ceilings for a parsed Numbers package.
-pub use litchi_iwa_archive::Limits;
+pub(crate) use litchi_iwa_archive::Limits;
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
 pub use movie_playback::{
     __movie_playback_settings, __rewrite_movie_playback_settings, MoviePlaybackError,
 };
 pub use save::SaveError;
-pub use table_lock::{
-    TableLockCommit, TableLockDiagnostics, TableLockEdit, TableLockError, TableLockLimitKind,
-    TableLockPatch,
-};
-pub use table_merges::{
-    MergeReader, TableMergesCommit, TableMergesDiagnostics, TableMergesEdit, TableMergesError,
-    TableMergesLimitKind, TableMergesPatch,
-};
+
+/// The focused transaction families whose owners stay private to the
+/// package adapter; their public modules re-export these (ADR 0034 §3).
+pub(crate) mod families {
+    pub(crate) mod chart_arrangement {
+        pub use super::super::chart_arrangement::{
+            Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+        };
+    }
+    pub(crate) mod chart_data {
+        pub use super::super::chart_data::{Error, LimitKind, Refusal};
+        pub use super::super::chart_data_edit::{Commit, Diagnostics, Edit, Patch};
+    }
+    pub(crate) mod chart_metadata {
+        pub use super::super::chart_metadata::{Error, LimitKind};
+    }
+    pub(crate) mod image_adjustments {
+        pub use super::super::image_adjustments::{
+            Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+        };
+    }
+}
+
+pub use table_merges::MergeReader;
 
 const DOCUMENT_MESSAGE_TYPE: u32 = 1;
 const SHEET_MESSAGE_TYPE: u32 = 2;
@@ -249,7 +295,7 @@ pub enum PayloadLimitKind {
 #[non_exhaustive]
 pub enum ResourceError {
     /// A finite native-payload resource ceiling was exceeded.
-    LimitExceeded {
+    Limit {
         /// Resource that exceeded its ceiling.
         kind: PayloadLimitKind,
         /// Observed or requested amount.
@@ -298,8 +344,21 @@ pub enum Error {
         path: SemanticPath,
     },
     /// The package is a recognized iWork document owned by another application.
-    #[error("package is not a Numbers document")]
-    NotNumbers,
+    #[error("the package is a {detected:?} document, not Numbers")]
+    UnexpectedFormat {
+        /// The format the package was recognized as.
+        detected: litchi_core::FileFormat,
+    },
+    /// A caller-selected limit is outside its valid range.
+    #[error("Numbers {kind} limit must be between 1 and {maximum}, got {value}")]
+    InvalidLimit {
+        /// The dimension being configured.
+        kind: crate::LimitKind,
+        /// The rejected value.
+        value: u64,
+        /// The hard ceiling for this dimension.
+        maximum: u64,
+    },
     /// A native IWA value could not be decoded or validated.
     #[error(transparent)]
     Common(#[from] litchi_iwa_common::Error),
@@ -310,8 +369,8 @@ pub enum Error {
     #[error("could not parse Numbers table data: {0}")]
     ParseError(String),
     /// Semantic ingress rejected the decoded sheet sequence.
-    #[error("invalid Numbers semantic document: {0}")]
-    Semantic(DocumentError),
+    #[error("invalid Numbers semantic workbook: {0}")]
+    Semantic(WorkbookError),
     /// A package-wide semantic resource ceiling was exceeded.
     #[error(
         "Numbers semantic {kind} limit exceeded at {path}: observed {observed}, maximum {maximum}"
@@ -396,7 +455,7 @@ impl Error {
                     kind,
                     observed,
                     limit,
-                } => Some(ResourceError::LimitExceeded {
+                } => Some(ResourceError::Limit {
                     kind: match kind {
                         litchi_iwa_common::LimitKind::InputBytes => PayloadLimitKind::InputBytes,
                         litchi_iwa_common::LimitKind::Fields => PayloadLimitKind::Fields,
@@ -418,14 +477,14 @@ impl Error {
                 litchi_iwa_common::Error::Allocation { amount, .. } => {
                     Some(ResourceError::Allocation { amount: *amount })
                 },
-                litchi_iwa_common::Error::InvalidFormat(_)
-                | litchi_iwa_common::Error::InvalidLimit { .. } => None,
+                _ => None,
             },
             Self::Io(_)
             | Self::Archive(_)
             | Self::Detection(_)
             | Self::MalformedPayload { .. }
-            | Self::NotNumbers
+            | Self::UnexpectedFormat { .. }
+            | Self::InvalidLimit { .. }
             | Self::InvalidFormat(_)
             | Self::ParseError(_)
             | Self::Semantic(_)
@@ -454,26 +513,26 @@ enum Components {
 
 impl Components {
     fn from_bytes(bytes: &[u8], limits: Limits) -> Result<Self> {
-        Ok(Self::PhysicalShared(Box::new(
-            SourceCatalog::from_bytes_with_limits(bytes, limits)?,
-        )))
+        Ok(Self::PhysicalShared(Box::new(SourceCatalog::from_bytes(
+            bytes, limits,
+        )?)))
     }
 
     fn from_shared_bytes(source: Arc<[u8]>, limits: Limits) -> Result<Self> {
         Ok(Self::PhysicalShared(Box::new(
-            SourceCatalog::from_shared_bytes_with_limits(source, limits)?,
+            SourceCatalog::from_shared_bytes(source, limits)?,
         )))
     }
 
     fn from_owned_bytes(source: Vec<u8>, limits: Limits) -> Result<Self> {
         Ok(Self::PhysicalOwned(Box::new(
-            OwnedSourceCatalog::__from_owned_bytes_with_limits(source, limits)?,
+            OwnedSourceCatalog::__from_owned_bytes(source, limits)?,
         )))
     }
 
     fn from_source_owner(source: SharedBytes, limits: Limits) -> Result<Self> {
         Ok(Self::PhysicalOwned(Box::new(
-            OwnedSourceCatalog::__from_source_owner_with_limits(source, limits)?,
+            OwnedSourceCatalog::__from_source_owner(source, limits)?,
         )))
     }
 
@@ -515,6 +574,58 @@ impl Components {
     }
 }
 
+/// The shared table engines (`litchi-iwa-table`, record 0379) read the
+/// package through its catalog, physical source, object index and limits.
+impl litchi_iwa_table::TableSource for Package {
+    fn catalog(&self) -> &ComponentCatalog {
+        self.state.components.catalog()
+    }
+
+    fn physical(&self) -> Option<&SourceCatalog> {
+        self.state.components.physical()
+    }
+
+    fn resolve_object(
+        &self,
+        identifier: u64,
+    ) -> core::result::Result<
+        Option<litchi_iwa_table::ResolvedObject<'_>>,
+        litchi_iwa_table::ResolveError,
+    > {
+        self.state
+            .index
+            .resolve_ref_id(&self.state.components, identifier)
+            .map(|resolved| {
+                resolved.map(|resolved| litchi_iwa_table::ResolvedObject {
+                    messages: resolved.messages,
+                    component_index: resolved.component_index,
+                    object_index: resolved.object_index,
+                })
+            })
+            .map_err(|_| litchi_iwa_table::ResolveError)
+    }
+
+    fn source_bytes(&self) -> &[u8] {
+        self.state.source.as_ref()
+    }
+
+    fn archive_limits(&self) -> Limits {
+        self.state.options.archive()
+    }
+
+    fn proofs(&self) -> Option<&PackageProofs> {
+        Some(&self.state.proofs)
+    }
+
+    fn max_objects(&self) -> usize {
+        self.state.options.semantic().max_objects()
+    }
+
+    fn max_references(&self) -> usize {
+        self.state.options.semantic().max_references()
+    }
+}
+
 /// A parsed native Numbers package and its immutable semantic projection.
 ///
 /// Cloning this value or calling [`Self::snapshot`] shares the physical IWA
@@ -536,8 +647,10 @@ struct State {
     source: SharedBytes,
     components: Components,
     index: Index,
-    document: Document,
-    options: ReadOptions,
+    document: Workbook,
+    options: Profile,
+    /// The cell-format engines' package-level proofs (record 0370k).
+    proofs: PackageProofs,
 }
 
 #[derive(Debug)]
@@ -586,22 +699,22 @@ impl SemanticBudget {
 impl Package {
     /// Open a Numbers package from a filesystem path using default limits.
     ///
+    /// The path is a regular file or an app-authored package directory. A
+    /// package directory (the bundle form Numbers writes when "Save as
+    /// package" is selected) is captured once and converted into its
+    /// single-file form ([`litchi_iwa_archive::bundle::capture`], record
+    /// 0306): the `Index.zip` members followed by every other file of the
+    /// bundle in byte order of its relative name. The result is an ordinary
+    /// exact-source package: it edits like a single-file package,
+    /// [`Self::save`] and [`Self::write_to`] publish the single-file form,
+    /// and [`Self::save_directory`] writes the bundle form back.
+    ///
     /// # Errors
     ///
     /// Returns a typed error when the path cannot be read, the package exceeds
     /// a physical ceiling, or its IWA/Numbers contents are malformed.
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::open_with_options(path, ReadOptions::default())
-    }
-
-    /// Open a Numbers package from a filesystem path under explicit limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns a typed error before allocating more than the selected input
-    /// ceiling, or when the package cannot become a semantic document.
-    pub fn open_with_limits(path: impl AsRef<Path>, limits: Limits) -> Result<Self> {
-        Self::open_with_options(path, ReadOptions::new(limits, SemanticLimits::default()))
+        Self::open_with_options(path, OpenOptions::new())
     }
 
     /// Open a Numbers package under explicit physical and semantic limits.
@@ -610,9 +723,24 @@ impl Package {
     ///
     /// Returns a typed error when either selected profile is exceeded, or when
     /// the package cannot become a strict rooted semantic document.
-    pub fn open_with_options(path: impl AsRef<Path>, options: ReadOptions) -> Result<Self> {
-        let bytes = read_source(path.as_ref(), options.archive())?;
-        Self::from_shared_bytes_with_options(bytes.into(), options)
+    pub fn open_with_options(path: impl AsRef<Path>, options: OpenOptions) -> Result<Self> {
+        let options = Profile::from_options(options)?;
+        let path = path.as_ref();
+        if litchi_iwa_archive::bundle::is_directory(path) {
+            let archive = options.archive();
+            let bytes = litchi_iwa_archive::bundle::capture(path, archive.into(), archive)
+                .map_err(litchi_iwa_archive::Error::from)?;
+            // The bundle's files were bounded while they were captured; the
+            // converted package adds only ZIP framing, so its own input bound
+            // is its length.
+            let archive = litchi_iwa_archive::bundle::converted_limits(archive, bytes.len())?;
+            return Self::from_shared_profile(
+                bytes.into(),
+                Profile::new(archive, options.semantic()),
+            );
+        }
+        let bytes = read_source(path, options.archive())?;
+        Self::from_shared_profile(bytes.into(), options)
     }
 
     /// Parse a Numbers package from an in-memory ZIP payload using defaults.
@@ -622,17 +750,27 @@ impl Package {
     /// Returns a typed error when physical ingress, IWA framing, protobuf
     /// decoding, or semantic construction fails.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        Self::from_bytes_with_options(bytes, ReadOptions::default())
+        Self::from_bytes_with_options(bytes, OpenOptions::new())
     }
 
-    /// Parse a Numbers package from an in-memory ZIP payload under limits.
+    /// Parse a Numbers package from shared immutable bytes without copying
+    /// them: the package retains `bytes` as its exact source.
     ///
     /// # Errors
     ///
-    /// Returns a typed error when the package exceeds a selected resource
-    /// ceiling or cannot be decoded as a Numbers document.
-    pub fn from_bytes_with_limits(bytes: &[u8], limits: Limits) -> Result<Self> {
-        Self::from_bytes_with_options(bytes, ReadOptions::new(limits, SemanticLimits::default()))
+    /// The errors of [`Self::from_bytes`].
+    pub fn from_shared_bytes(bytes: Arc<[u8]>) -> Result<Self> {
+        Self::from_shared_bytes_with_options(bytes, OpenOptions::new())
+    }
+
+    /// Parse shared immutable bytes under explicit physical and semantic
+    /// limits, without copying them.
+    ///
+    /// # Errors
+    ///
+    /// The errors of [`Self::from_bytes_with_options`].
+    pub fn from_shared_bytes_with_options(bytes: Arc<[u8]>, options: OpenOptions) -> Result<Self> {
+        Self::from_shared_profile(bytes, Profile::from_options(options)?)
     }
 
     /// Parse a Numbers package under explicit physical and semantic limits.
@@ -645,7 +783,8 @@ impl Package {
     ///
     /// Returns a typed error when the package exceeds either selected profile,
     /// contains ambiguous rooted ownership, or cannot be decoded as Numbers.
-    pub fn from_bytes_with_options(bytes: &[u8], options: ReadOptions) -> Result<Self> {
+    pub fn from_bytes_with_options(bytes: &[u8], options: OpenOptions) -> Result<Self> {
+        let options = Profile::from_options(options)?;
         let components = Components::from_bytes(bytes, options.archive())?;
         Self::from_components_with_options(components, options)
     }
@@ -660,33 +799,89 @@ impl Package {
     #[doc(hidden)]
     pub fn __from_shared_source_with_options(
         source: Arc<[u8]>,
-        options: ReadOptions,
+        options: OpenOptions,
     ) -> Result<Self> {
         Self::from_shared_bytes_with_options(source, options)
     }
 
-    fn from_shared_bytes_with_options(source: Arc<[u8]>, options: ReadOptions) -> Result<Self> {
+    /// Consume a package source prepared by a format coordinator.
+    ///
+    /// This unstable handoff adopts the coordinator's parsed container
+    /// without a second ZIP traversal or IWA component decode, exactly as the
+    /// Pages and Keynote owners' prepared-source ingress does. The source's
+    /// physical profile remains authoritative; `semantic` selects the
+    /// semantic admission limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::UnexpectedFormat`] when the source belongs to another
+    /// application, an [`Error::InvalidFormat`] for a directory-backed or
+    /// semantic-only source, and the errors of [`Self::from_bytes_with_options`]
+    /// when the package cannot become a semantic document.
+    #[cfg(feature = "internal-iwork-source")]
+    #[doc(hidden)]
+    pub fn __from_prepared_source(
+        source: PreparedSource,
+        semantic: SemanticLimits,
+    ) -> Result<Self> {
+        if source.format() != Format::Numbers {
+            return Err(Error::UnexpectedFormat {
+                detected: crate::workbook::detected_format(source.format()),
+            });
+        }
+        let catalog = source.__into_source_catalog().ok_or_else(|| {
+            Error::InvalidFormat(
+                "directory-backed Numbers sources support semantic projection only".to_owned(),
+            )
+        })?;
+        let limits = catalog.limits();
+        let components = Components::PhysicalShared(Box::new(catalog));
+        Self::from_components_with_options(components, Profile::new(limits, semantic))
+    }
+
+    pub(crate) fn from_shared_profile(source: Arc<[u8]>, options: Profile) -> Result<Self> {
         let components = Components::from_shared_bytes(source, options.archive())?;
         Self::from_components_with_options(components, options)
     }
 
-    pub(crate) fn from_owned_bytes_with_options(
-        source: Vec<u8>,
-        options: ReadOptions,
-    ) -> Result<Self> {
+    /// Reopen `candidate`, an edited reassembly of this package, under this
+    /// package's profile. Unchanged IWA members reuse this package's parsed
+    /// archives; the ZIP and every budget are still checked in full
+    /// (`SourceCatalog::reopen`).
+    pub(crate) fn reopen_candidate(&self, candidate: Arc<[u8]>) -> Result<Self> {
+        let components = match self.state.components.physical() {
+            Some(catalog) => Components::PhysicalShared(Box::new(catalog.reopen(candidate)?)),
+            None => Components::from_shared_bytes(candidate, self.state.options.archive())?,
+        };
+        let proofs = self
+            .state
+            .proofs
+            .reopened(self.state.components.catalog(), components.catalog());
+        Self::from_components_with_proofs(components, self.state.options, proofs)
+    }
+
+    pub(crate) fn from_owned_bytes_with_options(source: Vec<u8>, options: Profile) -> Result<Self> {
         let components = Components::from_owned_bytes(source, options.archive())?;
         Self::from_components_with_options(components, options)
     }
 
     pub(crate) fn from_source_owner_with_options(
         source: SharedBytes,
-        options: ReadOptions,
+        options: Profile,
     ) -> Result<Self> {
         let components = Components::from_source_owner(source, options.archive())?;
         Self::from_components_with_options(components, options)
     }
 
-    fn from_components_with_options(components: Components, options: ReadOptions) -> Result<Self> {
+    fn from_components_with_options(components: Components, options: Profile) -> Result<Self> {
+        Self::from_components_with_proofs(components, options, PackageProofs::default())
+    }
+
+    fn from_components_with_proofs(
+        components: Components,
+        options: Profile,
+        proofs: PackageProofs,
+    ) -> Result<Self> {
         let source = components
             .physical()
             .ok_or_else(|| {
@@ -700,15 +895,8 @@ impl Package {
         let index = Index::from_components(&components, semantic.max_objects())?;
         let root = Self::root_sheet_order(&components, semantic)?;
         let sheets = Self::decode_sheets(&components, &index, &root, semantic, true)?;
-        let document_limits = DocumentLimits::new(
-            semantic.max_sheets(),
-            semantic.max_tables(),
-            semantic.max_materialized_cells(),
-            semantic.max_output_text_bytes(),
-        )
-        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let document =
-            Document::from_sheets_with_limits(sheets, document_limits).map_err(Error::Semantic)?;
+            Workbook::from_sheets_with_limits(sheets, semantic).map_err(Error::Semantic)?;
         Ok(Self {
             state: Arc::new(State {
                 source,
@@ -716,6 +904,7 @@ impl Package {
                 index,
                 document,
                 options,
+                proofs,
             }),
         })
     }
@@ -824,6 +1013,36 @@ impl Package {
         save::save(self, path)
     }
 
+    /// Save this package as an app-style package directory at `path`
+    /// (`IWORK_API_REQUESTS.md` request 16, record 0306): `Index.zip` holds
+    /// the `Index/` members with their records unchanged, and every other
+    /// member (metadata sidecars, previews, `Data/` media) is a plain file.
+    /// Opening the directory again gives back this package's exact bytes.
+    ///
+    /// The bundle is written into a sibling staging directory; an existing
+    /// destination directory is swapped out only after the new one is
+    /// complete and synchronized.
+    ///
+    /// # Errors
+    ///
+    /// [`SaveError::Publication`] when the destination exists and is not a
+    /// directory or the staging, synchronization or swap fails;
+    /// [`SaveError::Bundling`] when a staged file cannot be written;
+    /// [`SaveError::Bundle`] when the package or its index archive cannot be
+    /// assembled or a member name cannot be a file.
+    pub fn save_directory(&self, path: impl AsRef<Path>) -> std::result::Result<(), SaveError> {
+        let limits = self.state.options.archive();
+        let package = litchi_iwa_archive::package::Catalog::from_bytes(self.source_bytes(), limits)
+            .map_err(SaveError::Bundle)?;
+        litchi_iwa_archive::bundle::save(
+            &package,
+            limits,
+            path.as_ref(),
+            SaveError::Bundle,
+            SaveError::Bundling,
+        )
+    }
+
     /// Borrow decoded semantic sheets in stable source order.
     #[must_use]
     pub fn sheets(&self) -> &[Sheet] {
@@ -834,7 +1053,7 @@ impl Package {
     /// zero-based position.
     ///
     /// This is the package-level convenience form of
-    /// [`Document::sheet`](crate::Document::sheet). Resolution runs only over
+    /// [`Workbook::sheet`](crate::Workbook::sheet). Resolution runs only over
     /// the immutable semantic snapshot; native object identifiers, archive
     /// member names, and payloads are not part of this API.
     ///
@@ -842,7 +1061,7 @@ impl Package {
     /// package snapshots currently make this lookup infallible, while the
     /// document result type keeps the selector boundary compatible with
     /// future semantic validation rules.
-    pub fn sheet<'a, S>(&self, selector: S) -> std::result::Result<Option<&Sheet>, DocumentError>
+    pub fn sheet<'a, S>(&self, selector: S) -> std::result::Result<Option<&Sheet>, WorkbookError>
     where
         S: Into<SheetSelector<'a>>,
     {
@@ -852,7 +1071,7 @@ impl Package {
     /// Select a rooted semantic table by its sheet and table selectors.
     ///
     /// This is the package-level convenience form of
-    /// [`Document::table`](crate::Document::table). Resolution runs only over
+    /// [`Workbook::table`](crate::Workbook::table). Resolution runs only over
     /// the immutable semantic snapshot; native object identifiers, archive
     /// member names, and payloads are not part of this API.
     ///
@@ -878,27 +1097,49 @@ impl Package {
         self.state.document.shared_sheets()
     }
 
-    /// Borrow the archive-free semantic Numbers document.
+    /// The read-only semantic workbook projection (ADR 0034 §2): an owned,
+    /// cheap handle (one reference-count bump) to the decoded sheets.
     #[must_use]
-    pub fn document(&self) -> &Document {
+    pub fn workbook(&self) -> Workbook {
+        self.state.document.clone()
+    }
+
+    /// Borrow the read-only semantic workbook projection.
+    #[must_use]
+    pub fn workbook_ref(&self) -> &Workbook {
         &self.state.document
     }
 
-    /// Capture the archive-free semantic document snapshot.
-    #[must_use]
-    pub fn document_snapshot(&self) -> Document {
-        self.state.document.snapshot()
+    /// The resolved profile focused transactions reopen candidates under.
+    pub(crate) fn profile(&self) -> Profile {
+        self.state.options
     }
 
-    /// Return the physical and semantic profiles retained by this snapshot.
-    #[must_use]
-    pub fn read_options(&self) -> ReadOptions {
-        self.state.options
+    /// Return the raw Numbers-wire profile selected by this package's
+    /// retained archive and semantic ingress limits (the table-topology
+    /// engine derives the same profile from `TableSource::archive_limits`).
+    #[cfg(test)]
+    pub(crate) fn numbers_wire_limits(&self) -> Result<litchi_numbers_wire::Limits> {
+        let maximum = self
+            .profile()
+            .archive()
+            .effective_archive_limits()?
+            .max_message_bytes();
+        let wire = WireLimits::default()
+            .with_input_bytes(maximum)?
+            .with_output_bytes(maximum)?;
+        Ok(litchi_numbers_wire::Limits::from_wire_limits(wire))
+    }
+
+    /// The physical and semantic ingress profile this package was read
+    /// under; focused transactions reopen candidates under it.
+    pub fn open_options(&self) -> OpenOptions {
+        self.state.options.options()
     }
 
     /// Extract the legacy-compatible global table projection.
     ///
-    /// Unlike [`Self::document`], this allocating compatibility view scans
+    /// Unlike [`Self::workbook`], this allocating compatibility view scans
     /// package objects by their primary native type. It preserves the former
     /// structured extractor's deterministic order and includes valid detached
     /// table models. Type-6001 models precede legacy type-6000 models; object
@@ -916,64 +1157,6 @@ impl Package {
             &self.state.index,
             self.state.options.semantic(),
         )
-    }
-
-    /// Return the count of indexed IWA objects retained by this package.
-    ///
-    /// This is a native-package diagnostic, not a semantic Numbers document
-    /// measure. It remains available for migration-host compatibility while
-    /// the package adapter is retired behind the semantic facade.
-    #[deprecated(
-        since = "0.0.1",
-        note = "native IWA object-count diagnostic; native object counts are not part of the supported semantic Numbers API; use Package::document and selector-based semantic APIs"
-    )]
-    #[must_use]
-    pub fn object_count(&self) -> usize {
-        self.state.index.object_count()
-    }
-
-    /// Extract all native rich-text storages in deterministic archive order.
-    ///
-    /// Storage objects are preserved separately from semantic tables because
-    /// Numbers may retain text for shapes and auxiliary objects. Each decoded
-    /// non-empty storage message is separated with one newline. This
-    /// compatibility diagnostic is not the rooted workbook rendering exposed
-    /// by [`Document::plain_text`].
-    ///
-    /// # Errors
-    ///
-    /// Returns a typed error if decoded text cannot be represented safely.
-    #[deprecated(
-        since = "0.0.1",
-        note = "native rich-text storage diagnostic; use Package::document and Document::plain_text for rooted semantic workbook text"
-    )]
-    pub fn text(&self) -> Result<String> {
-        const STORAGE_TYPES: [u32; 14] = [
-            200, 201, 202, 203, 204, 205, 2001, 2002, 2003, 2004, 2005, 2011, 2012, 2022,
-        ];
-        let maximum = self.state.options.semantic().max_output_text_bytes();
-        let mut text = String::new();
-        for object in self.state.components.iter_objects() {
-            for message in &object.messages {
-                if !STORAGE_TYPES.contains(&message.type_) {
-                    continue;
-                }
-                let Some(storage) = decode_numbers_storage(
-                    message.data.as_slice(),
-                    maximum.saturating_sub(text.len()),
-                    text.len(),
-                    maximum,
-                )?
-                else {
-                    continue;
-                };
-                if storage.storage().runs().is_empty() {
-                    continue;
-                }
-                append_storage_fragments(&mut text, &storage, maximum)?;
-            }
-        }
-        Ok(text)
     }
 
     /// Decode the rooted sheet order through the generated-free Buffa
@@ -1198,128 +1381,6 @@ impl Package {
     }
 }
 
-fn decode_numbers_storage(
-    source: &[u8],
-    remaining_text_bytes: usize,
-    current_text_bytes: usize,
-    maximum_text_bytes: usize,
-) -> Result<Option<ValidatedStorage>> {
-    let Some(limits) = text_wire_limits(source.len(), remaining_text_bytes) else {
-        return Ok(None);
-    };
-    match decode_storage_with_limits(source, limits) {
-        Ok(storage) => Ok(Some(storage)),
-        Err(TextWireError::LimitExceeded {
-            resource: "text bytes",
-            observed,
-            ..
-        }) => Err(Error::SemanticLimit {
-            kind: SemanticLimitKind::OutputTextBytes,
-            observed: current_text_bytes.saturating_add(observed),
-            maximum: maximum_text_bytes,
-            path: SemanticPath::Package,
-        }),
-        Err(TextWireError::Allocation { resource, amount }) => {
-            Err(Error::Common(litchi_iwa_common::Error::Allocation {
-                resource,
-                amount,
-            }))
-        },
-        Err(_) => Ok(None),
-    }
-}
-
-fn text_wire_limits(source_bytes: usize, max_text_bytes: usize) -> Option<TextWireLimits> {
-    let message_bytes = source_bytes.clamp(1, TextWireLimits::MAX_MESSAGE_BYTES);
-    let fields = source_bytes.clamp(1, TextWireLimits::MAX_FIELDS);
-    let fragments = source_bytes.clamp(1, TextWireLimits::MAX_FRAGMENTS);
-    let table_entries = source_bytes.clamp(1, TextWireLimits::MAX_TABLE_ENTRIES);
-    let references = source_bytes.clamp(1, TextWireLimits::MAX_OBJECT_REFERENCES);
-    let work = TextWireLimits::MAX_REWRITE_WORK;
-    let text_bytes = max_text_bytes.clamp(1, TextWireLimits::MAX_TEXT_BYTES);
-    let output_bytes = TextWireLimits::MAX_OUTPUT_BYTES;
-    TextWireLimits::new(
-        message_bytes,
-        fields,
-        4,
-        fragments,
-        text_bytes,
-        table_entries,
-        references,
-        output_bytes,
-        work,
-    )
-    .ok()
-}
-
-fn append_storage_fragments(
-    output: &mut String,
-    storage: &ValidatedStorage,
-    maximum: usize,
-) -> Result<()> {
-    let semantic = storage.storage();
-    let runs = semantic.runs();
-    let separator_count = usize::from(!output.is_empty()) + runs.len().saturating_sub(1);
-    let fragment_bytes = runs.iter().try_fold(0usize, |total, run| {
-        total.checked_add(run.len()).ok_or(Error::SemanticLimit {
-            kind: SemanticLimitKind::OutputTextBytes,
-            observed: usize::MAX,
-            maximum,
-            path: SemanticPath::Package,
-        })
-    })?;
-    let required = fragment_bytes
-        .checked_add(separator_count)
-        .ok_or(Error::SemanticLimit {
-            kind: SemanticLimitKind::OutputTextBytes,
-            observed: usize::MAX,
-            maximum,
-            path: SemanticPath::Package,
-        })?;
-    let observed = output
-        .len()
-        .checked_add(required)
-        .ok_or(Error::SemanticLimit {
-            kind: SemanticLimitKind::OutputTextBytes,
-            observed: usize::MAX,
-            maximum,
-            path: SemanticPath::Package,
-        })?;
-    if observed > maximum {
-        return Err(Error::SemanticLimit {
-            kind: SemanticLimitKind::OutputTextBytes,
-            observed,
-            maximum,
-            path: SemanticPath::Package,
-        });
-    }
-    output
-        .try_reserve(required)
-        .map_err(|_error| allocation_error("Numbers compatibility text", required))?;
-    if !output.is_empty() {
-        output.push('\n');
-    }
-    let source = semantic.text();
-    for (index, run) in runs.iter().copied().enumerate() {
-        if index != 0 {
-            output.push('\n');
-        }
-        let end = run.end().ok_or(Error::SemanticLimit {
-            kind: SemanticLimitKind::OutputTextBytes,
-            observed: usize::MAX,
-            maximum,
-            path: SemanticPath::Package,
-        })?;
-        let fragment = source
-            .get(run.start()..end)
-            .ok_or(Error::MalformedPayload {
-                path: SemanticPath::Package,
-            })?;
-        output.push_str(fragment);
-    }
-    Ok(())
-}
-
 /// Bounded policy for the focused table-info reference projection.
 ///
 /// The raw message was already admitted under the caller's physical IWA
@@ -1339,22 +1400,22 @@ pub(super) fn table_info_decode_options(source: &[u8]) -> table_info_codec::Deco
 ///
 /// This entry point validates Numbers application ownership and indexes the
 /// physical package, but deliberately does not construct the strict rooted
-/// [`Document`]. It therefore remains usable for migration callers that need
+/// [`Workbook`]. It therefore remains usable for migration callers that need
 /// detached historical table models even when unrelated rooted topology is
-/// incomplete. New application code should normally use [`Package::document`].
+/// incomplete. New application code should normally use [`Package::workbook`].
 ///
 /// # Errors
 ///
 /// Returns a typed error when the bytes are not an unambiguous Numbers package,
 /// physical or semantic limits are exceeded, or a selected table is malformed.
 pub fn compatibility_tables_from_bytes(bytes: &[u8]) -> Result<Vec<crate::Table>> {
-    compatibility_tables_from_bytes_with_options(bytes, ReadOptions::default())
+    compatibility_tables_from_bytes_with_options(bytes, OpenOptions::new())
 }
 
 /// Extract the allocating global compatibility projection under explicit
 /// physical and semantic limits.
 ///
-/// This path does not construct the strict rooted [`Document`]. It may lazily
+/// This path does not construct the strict rooted [`Workbook`]. It may lazily
 /// resolve source sheet and drawable names when enriching a non-empty formula
 /// sidecar. The object and table portions of [`SemanticLimits`] are consumed
 /// directly; its reference ceiling applies to unique source-derived
@@ -1369,8 +1430,9 @@ pub fn compatibility_tables_from_bytes(bytes: &[u8]) -> Result<Vec<crate::Table>
 /// indexing, table decoding, or a selected resource ceiling fails.
 pub fn compatibility_tables_from_bytes_with_options(
     bytes: &[u8],
-    options: ReadOptions,
+    options: OpenOptions,
 ) -> Result<Vec<crate::Table>> {
+    let options = Profile::from_options(options)?;
     let components = Components::from_bytes(bytes, options.archive())?;
     compatibility_tables_from_components(&components, options.archive(), options.semantic())
 }
@@ -1385,7 +1447,7 @@ pub fn compatibility_tables_from_bytes_with_options(
 ///
 /// # Errors
 ///
-/// Returns [`Error`] when the source belongs to another application or the
+/// Returns [`enum@Error`] when the source belongs to another application or the
 /// Numbers compatibility projection is malformed or over budget.
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
@@ -1394,7 +1456,9 @@ pub fn __compatibility_tables_from_prepared_source(
     semantic: SemanticLimits,
 ) -> Result<Vec<crate::Table>> {
     if source.format() != Format::Numbers {
-        return Err(Error::NotNumbers);
+        return Err(Error::UnexpectedFormat {
+            detected: crate::workbook::detected_format(source.format()),
+        });
     }
     let (catalog, archive_limits) = source.__into_components();
     let components = Components::from_catalog(catalog);
@@ -1405,31 +1469,31 @@ pub fn __compatibility_tables_from_prepared_source(
 ///
 /// Exact source-package provenance is discarded before semantic publication.
 /// This unstable handoff exists for format coordinators and the focused
-/// [`Document`] source constructors.
+/// [`Workbook`] source constructors.
 ///
 /// # Errors
 ///
-/// Returns [`Error`] when the source belongs to another application, metadata
+/// Returns [`enum@Error`] when the source belongs to another application, metadata
 /// diagnostics are malformed, or the rooted workbook exceeds a selected
 /// semantic ceiling.
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
 pub fn __semantic_document_from_prepared_source(
     source: PreparedSource,
-    semantic: DocumentLimits,
-) -> Result<Document> {
+    semantic: SemanticLimits,
+) -> Result<Workbook> {
     semantic_document_from_prepared_source(source, semantic)
 }
 
 pub(crate) fn semantic_document_from_prepared_source(
     source: PreparedSource,
-    semantic: DocumentLimits,
-) -> Result<Document> {
+    semantic: SemanticLimits,
+) -> Result<Workbook> {
     if source.format() != Format::Numbers {
-        return Err(Error::NotNumbers);
+        return Err(Error::UnexpectedFormat {
+            detected: crate::workbook::detected_format(source.format()),
+        });
     }
-    let document_limits = semantic;
-    let semantic = package_semantic_limits(document_limits)?;
     let prepared = source.__into_numbers_semantic_source()?;
     let (catalog, source_limits, sidecars) = prepared.__into_parts();
     let metadata = metadata_from_sidecars(&sidecars)?;
@@ -1438,9 +1502,8 @@ pub(crate) fn semantic_document_from_prepared_source(
     let index = Index::from_components(&components, semantic.max_objects())?;
     let source_record_count = index.object_count();
     let root_payload = Package::root_document_payload(&components)?;
-    let root = preflight_root_sheet_references(root_payload, document_limits)?;
-    let sheets = Package::decode_sheets(&components, &index, &root, semantic, false)
-        .map_err(|error| remap_document_limit_error(error, document_limits))?;
+    let root = preflight_root_sheet_references(root_payload, semantic)?;
+    let sheets = Package::decode_sheets(&components, &index, &root, semantic, false)?;
     let table_count = sheets
         .iter()
         .try_fold(0usize, |count, sheet| {
@@ -1452,19 +1515,18 @@ pub(crate) fn semantic_document_from_prepared_source(
             maximum: semantic.max_tables(),
             path: SemanticPath::Document,
         })?;
-    let document =
-        Document::from_sheets_with_limits(sheets, document_limits).map_err(Error::Semantic)?;
-    let stats = crate::document::Stats {
+    let document = Workbook::from_sheets_with_limits(sheets, semantic).map_err(Error::Semantic)?;
+    let stats = crate::workbook::Stats {
         source_record_count,
         sheet_count: document.sheet_count(),
         table_count,
     };
-    Ok(Document::from_source(document, metadata, stats))
+    Ok(Workbook::from_source(document, metadata, stats))
 }
 
 fn preflight_root_sheet_references(
     payload: &[u8],
-    limits: DocumentLimits,
+    limits: SemanticLimits,
 ) -> Result<numbers_sheet_order_codec::DocumentSheetOrderSnapshot> {
     preflight_root_sheet_references_with_max(payload, limits.max_sheets())
 }
@@ -1473,7 +1535,7 @@ fn preflight_root_sheet_references_with_max(
     payload: &[u8],
     max_sheets: usize,
 ) -> Result<numbers_sheet_order_codec::DocumentSheetOrderSnapshot> {
-    let max_sheets = max_sheets.min(DocumentLimits::default().max_sheets());
+    let max_sheets = max_sheets.min(SemanticLimits::MAXIMUM.max_sheets());
     let options = numbers_sheet_order_codec::DecodeOptions::new(
         payload.len().max(1),
         payload.len().saturating_mul(2).max(1),
@@ -1485,7 +1547,7 @@ fn preflight_root_sheet_references_with_max(
         if let Some(limit) = error.resource_limit() {
             let (kind, observed, maximum) = match limit {
                 numbers_sheet_order_codec::DecodeLimit::Bytes { observed, maximum } => {
-                    (SemanticLimitKind::FormulaWireBytes, observed, maximum)
+                    (SemanticLimitKind::FormulaCategoryBytes, observed, maximum)
                 },
                 numbers_sheet_order_codec::DecodeLimit::References { observed, maximum } => (
                     SemanticLimitKind::Sheets,
@@ -1525,37 +1587,6 @@ fn preflight_root_sheet_references_with_max(
     })
 }
 
-fn package_semantic_limits(limits: DocumentLimits) -> Result<SemanticLimits> {
-    Ok(SemanticLimits::for_document(limits))
-}
-
-fn remap_document_limit_error(error: Error, limits: DocumentLimits) -> Error {
-    let Error::SemanticLimit {
-        kind,
-        observed,
-        maximum,
-        path,
-    } = error
-    else {
-        return error;
-    };
-    let selected = match kind {
-        SemanticLimitKind::Sheets => limits.max_sheets(),
-        SemanticLimitKind::Tables => limits.max_tables(),
-        SemanticLimitKind::MaterializedCells => limits.max_materialized_cells(),
-        SemanticLimitKind::OutputTextBytes | SemanticLimitKind::TextBytes => {
-            limits.max_text_bytes()
-        },
-        _ => maximum,
-    };
-    Error::SemanticLimit {
-        kind,
-        observed,
-        maximum: maximum.min(selected),
-        path,
-    }
-}
-
 fn metadata_from_sidecars(
     sidecars: &litchi_iwa_detect::PreparedMetadataSidecars,
 ) -> Result<litchi_core::Metadata> {
@@ -1572,7 +1603,11 @@ fn metadata_from_sidecars(
             .author
             .or(diagnostic.document_author)
             .or(diagnostic.sfwp_author);
-        metadata.keywords = diagnostic.keywords;
+        metadata.keywords = diagnostic
+            .keywords
+            .as_deref()
+            .map(litchi_core::metadata::keywords::split)
+            .unwrap_or_default();
         metadata.description = diagnostic.comments;
         metadata.revision = diagnostic.revision;
         build_version = diagnostic.build_version;
@@ -2091,16 +2126,19 @@ fn validate_numbers_application(components: &Components, archive_limits: Limits)
     )?;
     let Some(canonical) = canonical_message else {
         let mut foreign = 0usize;
+        let mut detected = None;
         for message in &root.messages {
-            if matches!(
-                litchi_iwa_detect::__classify_application_payload(&message.data)?,
-                Some(Format::Pages | Format::Keynote)
-            ) {
+            if let Some(format @ (Format::Pages | Format::Keynote)) =
+                litchi_iwa_detect::__classify_application_payload(&message.data)?
+            {
                 foreign = foreign.saturating_add(1);
+                detected = Some(format);
             }
         }
-        if foreign == 1 {
-            return Err(Error::NotNumbers);
+        if let (1, Some(format)) = (foreign, detected) {
+            return Err(Error::UnexpectedFormat {
+                detected: crate::workbook::detected_format(format),
+            });
         }
         return Err(Error::InvalidFormat(
             "iWork document root has no canonical Numbers payload".to_owned(),
@@ -2115,7 +2153,9 @@ fn validate_numbers_application(components: &Components, archive_limits: Limits)
         })?;
     match application {
         Format::Numbers => Ok(()),
-        Format::Pages | Format::Keynote => Err(Error::NotNumbers),
+        format @ (Format::Pages | Format::Keynote) => Err(Error::UnexpectedFormat {
+            detected: crate::workbook::detected_format(format),
+        }),
     }
 }
 
@@ -2130,7 +2170,7 @@ fn preflight_application_payload(payload: &[u8], archive_limits: Limits) -> Resu
     let wire_limits = WireLimits::default()
         .with_input_bytes(input_bytes)?
         .with_fields(fields)?;
-    preflight_wire_tree_with_limits(payload, wire_limits, |visit| {
+    preflight_wire_tree(payload, wire_limits, |visit| {
         let field = visit.field().number();
         let descend = match visit.path() {
             [] => matches!(field, 2 | 3 | 4 | 5 | 6 | 8 | 15) && visit.field().wire_type() == 2,
@@ -2263,14 +2303,14 @@ fn map_sheet_preflight_error(
     consumed_references: usize,
 ) -> Error {
     match error {
-        names::Error::LimitExceeded {
+        names::Error::Limit {
             kind,
             observed,
             maximum,
         } => Error::SemanticLimit {
             kind: match kind {
                 names::LimitKind::PayloadReferences => SemanticLimitKind::References,
-                names::LimitKind::WireBytes => SemanticLimitKind::FormulaWireBytes,
+                names::LimitKind::WireBytes => SemanticLimitKind::FormulaCategoryBytes,
                 names::LimitKind::WireFields => SemanticLimitKind::Objects,
                 names::LimitKind::WireNesting => SemanticLimitKind::FormulaDepth,
                 names::LimitKind::WireWork => SemanticLimitKind::FormulaWork,
@@ -2312,7 +2352,7 @@ fn try_owned_text(source: &str, resource: &'static str) -> Result<String> {
 }
 
 fn read_source(path: &Path, limits: Limits) -> Result<Vec<u8>> {
-    let mut open_options = OpenOptions::new();
+    let mut open_options = FsOpenOptions::new();
     open_options.read(true);
     #[cfg(unix)]
     {
@@ -2464,10 +2504,8 @@ mod tests {
     fn shared_source_handoff_preserves_the_input_allocation() -> Result<()> {
         let source: Arc<[u8]> = package_bytes(&tn::DocumentArchive::default())?.into();
         let source_pointer = source.as_ptr();
-        let package = Package::__from_shared_source_with_options(
-            Arc::clone(&source),
-            ReadOptions::default(),
-        )?;
+        let package =
+            Package::__from_shared_source_with_options(Arc::clone(&source), OpenOptions::new())?;
         assert_eq!(package.state.source.as_ref().as_ptr(), source_pointer);
         assert_eq!(package.state.source.as_ref().len(), source.len());
         Ok(())
@@ -2635,7 +2673,7 @@ mod tests {
             });
             assert_eq!(
                 error.resource_error(),
-                Some(ResourceError::LimitExceeded {
+                Some(ResourceError::Limit {
                     kind: normalized,
                     observed: 9,
                     maximum: 8,
@@ -2708,9 +2746,12 @@ mod tests {
                 .encode_to_vec(),
             })
             .collect(),
+            Default::default(),
         )
         .map_err(|error| Error::InvalidFormat(error.to_string()))?;
-        let empty_cell = crate::cell::wire::BncCell::minimal().encode();
+        let empty_cell = crate::cell::wire::BncCell::minimal()
+            .encode(&crate::cell::wire::Limits::DEFAULT)
+            .expect("minimal BNC cell encodes under default limits");
         let mut objects = vec![
             object(
                 1,
@@ -2782,6 +2823,7 @@ mod tests {
                 .encode_to_vec(),
             })
             .collect(),
+            Default::default(),
         )
         .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let first_model = tst::TableModelArchive {
@@ -2898,6 +2940,7 @@ mod tests {
                 data: list.encode_to_vec(),
             })
             .collect(),
+            Default::default(),
         )
         .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let mut formula_cell = crate::cell::wire::BncCell::minimal();
@@ -2927,7 +2970,11 @@ mod tests {
                 tile_row_index: 0,
                 cell_count: 1,
                 storage_version: Some(5),
-                cell_storage_buffer: Some(formula_cell.encode()),
+                cell_storage_buffer: Some(
+                    formula_cell
+                        .encode(&crate::cell::wire::Limits::DEFAULT)
+                        .expect("formula BNC cell encodes under default limits"),
+                ),
                 cell_offsets: Some(vec![0, 0]),
                 ..Default::default()
             }],
@@ -2981,8 +3028,9 @@ mod tests {
         for (name, archive) in archives {
             let iwa = SnappyStream::compress(
                 &archive
-                    .to_bytes()
+                    .to_bytes(Default::default())
                     .map_err(|error| Error::InvalidFormat(error.to_string()))?,
+                Default::default(),
             )
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
             entries.push((name, iwa));
@@ -3214,15 +3262,15 @@ mod tests {
         let mut decompressed = Archive {
             objects: vec![root, sheet.clone()],
         }
-        .to_bytes()
+        .to_bytes(Default::default())
         .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let duplicate = Archive {
             objects: vec![sheet],
         }
-        .to_bytes()
+        .to_bytes(Default::default())
         .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         decompressed.extend_from_slice(&duplicate);
-        let iwa = SnappyStream::compress(&decompressed)
+        let iwa = SnappyStream::compress(&decompressed, Default::default())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         litchi_iwa_archive::package::to_bytes(
             [("Index/Document.iwa", iwa.as_slice())]
@@ -3255,13 +3303,13 @@ mod tests {
         let mut duplicate_component = Archive {
             objects: vec![sheet.clone()],
         }
-        .to_bytes()
+        .to_bytes(Default::default())
         .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         duplicate_component.extend_from_slice(
             &Archive {
                 objects: vec![sheet.clone()],
             }
-            .to_bytes()
+            .to_bytes(Default::default())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?,
         );
         let entries = [
@@ -3271,8 +3319,9 @@ mod tests {
                     &Archive {
                         objects: vec![sheet],
                     }
-                    .to_bytes()
+                    .to_bytes(Default::default())
                     .map_err(|error| Error::InvalidFormat(error.to_string()))?,
+                    Default::default(),
                 )
                 .map_err(|error| Error::InvalidFormat(error.to_string()))?,
             ),
@@ -3282,14 +3331,15 @@ mod tests {
                     &Archive {
                         objects: vec![root],
                     }
-                    .to_bytes()
+                    .to_bytes(Default::default())
                     .map_err(|error| Error::InvalidFormat(error.to_string()))?,
+                    Default::default(),
                 )
                 .map_err(|error| Error::InvalidFormat(error.to_string()))?,
             ),
             (
                 "Index/Sheet.iwa",
-                SnappyStream::compress(&duplicate_component)
+                SnappyStream::compress(&duplicate_component, Default::default())
                     .map_err(|error| Error::InvalidFormat(error.to_string()))?,
             ),
         ];
@@ -3308,7 +3358,7 @@ mod tests {
                 tn::DocumentArchive::default().encode_to_vec(),
             )?],
         }
-        .to_bytes()
+        .to_bytes(Default::default())
         .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let sheet = object(
             2,
@@ -3322,7 +3372,7 @@ mod tests {
         let canonical = Archive {
             objects: vec![sheet],
         }
-        .to_bytes()
+        .to_bytes(Default::default())
         .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let (header_length, prefix_length) = decode_varint_from_bytes(&canonical)
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
@@ -3352,11 +3402,11 @@ mod tests {
         raw_alias.extend_from_slice(&raw_header);
         raw_alias.extend_from_slice(payload);
 
-        let compressed_root = SnappyStream::compress(&root)
+        let compressed_root = SnappyStream::compress(&root, Default::default())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
-        let compressed_canonical = SnappyStream::compress(&canonical)
+        let compressed_canonical = SnappyStream::compress(&canonical, Default::default())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
-        let compressed_alias = SnappyStream::compress(&raw_alias)
+        let compressed_alias = SnappyStream::compress(&raw_alias, Default::default())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let entries = [
             ("Index/Document.iwa", compressed_root),
@@ -3377,6 +3427,7 @@ mod tests {
                 type_: message_type,
                 data,
             }],
+            Default::default(),
         )
         .map_err(|error| Error::InvalidFormat(error.to_string()))
     }
@@ -3389,14 +3440,56 @@ mod tests {
         let package = Package::from_bytes(&package_bytes(&tn::DocumentArchive::default())?)?;
         let snapshot = package.snapshot();
 
-        assert_eq!(package.object_count(), 1);
+        assert_eq!(package.state.index.object_count(), 1);
         assert!(package.sheets().is_empty());
         assert!(package.shared_sheets().is_empty());
-        assert!(package.document().is_empty());
-        assert!(package.document_snapshot().is_empty());
-        assert_eq!(package.read_options(), ReadOptions::default());
-        assert_eq!(package.text()?, "");
+        assert!(package.workbook_ref().is_empty());
+        assert!(package.workbook().is_empty());
+        assert_eq!(package.open_options(), OpenOptions::new());
         assert!(Arc::ptr_eq(&package.state, &snapshot.state));
+        Ok(())
+    }
+
+    #[test]
+    fn retained_physical_catalog_uses_selected_public_snappy_profile() -> Result<()> {
+        let bytes = package_bytes(&tn::DocumentArchive::default())?;
+        let source_catalog =
+            litchi_iwa_archive::package::Catalog::from_bytes(&bytes, Limits::default())?;
+        let selected_entry_bytes = source_catalog
+            .iter()
+            .map(|entry| entry.data().len())
+            .max()
+            .ok_or_else(|| Error::InvalidFormat("source has no entries".to_owned()))?;
+        let selected_entry_bytes = u64::try_from(selected_entry_bytes)
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let source_limits = crate::SourceLimits::builder()
+            .max_entry_bytes(selected_entry_bytes)
+            .and_then(|builder| builder.build())
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let package = Package::from_bytes_with_options(
+            &bytes,
+            OpenOptions::new().source_limits(source_limits),
+        )?;
+        let physical =
+            package.state.components.physical().ok_or_else(|| {
+                Error::InvalidFormat("package has no physical catalog".to_owned())
+            })?;
+        let physical_limits = physical.limits();
+
+        assert_eq!(
+            physical_limits.max_entry_bytes(),
+            selected_entry_bytes,
+            "the retained physical catalog must use the selected public entry ceiling"
+        );
+        assert_eq!(
+            physical_limits
+                .snappy_limits()
+                .map_err(Error::Archive)?
+                .max_compressed_stream(),
+            usize::try_from(selected_entry_bytes)
+                .map_err(|error| Error::InvalidFormat(error.to_string()))?,
+            "the retained physical catalog must derive Snappy from that same ceiling"
+        );
         Ok(())
     }
 
@@ -3418,11 +3511,11 @@ mod tests {
             })?;
             assert!(matches!(
                 Package::from_bytes(&bytes),
-                Err(Error::NotNumbers)
+                Err(Error::UnexpectedFormat { .. })
             ));
             assert!(matches!(
                 compatibility_tables_from_bytes(&bytes),
-                Err(Error::NotNumbers)
+                Err(Error::UnexpectedFormat { .. })
             ));
         }
 
@@ -3431,11 +3524,11 @@ mod tests {
         })?;
         assert!(matches!(
             Package::from_bytes(&native_pages),
-            Err(Error::NotNumbers)
+            Err(Error::UnexpectedFormat { .. })
         ));
         assert!(matches!(
             compatibility_tables_from_bytes(&native_pages),
-            Err(Error::NotNumbers)
+            Err(Error::UnexpectedFormat { .. })
         ));
 
         let unknown = package_bytes_from_archive(Archive {
@@ -3469,6 +3562,7 @@ mod tests {
                     data: pages.encode_to_vec(),
                 },
             ],
+            Default::default(),
         )
         .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let unrelated = package_bytes_from_archive(Archive {
@@ -3520,6 +3614,7 @@ mod tests {
                     data: tn::DocumentArchive::default().encode_to_vec(),
                 },
             ],
+            Default::default(),
         )
         .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let masked = package_bytes_from_archive(Archive {
@@ -3564,14 +3659,17 @@ mod tests {
                 object(2, 6_383, group.encode_to_vec())?,
             ],
         })?;
-        let semantic = SemanticLimits::new(2, crate::MAX_SHEETS, crate::MAX_TABLES, 1)
+        let semantic = SemanticLimits::builder()
+            .max_objects(2)
+            .and_then(|b| b.max_sheets(crate::MAX_SHEETS))
+            .and_then(|b| b.max_tables(crate::MAX_TABLES))
+            .and_then(|b| b.max_references(1))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
 
-        let package = Package::from_bytes_with_options(
-            &bytes,
-            ReadOptions::new(Limits::default(), semantic),
-        )?;
-        assert!(package.document().is_empty());
+        let package =
+            Package::from_bytes_with_options(&bytes, OpenOptions::new().semantic_limits(semantic))?;
+        assert!(package.workbook_ref().is_empty());
         Ok(())
     }
 
@@ -3642,6 +3740,7 @@ mod tests {
                     data: tst::TableModelArchive::default().encode_to_vec(),
                 },
             ],
+            Default::default(),
         )
         .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let bytes = package_bytes_from_archive(Archive {
@@ -3673,6 +3772,7 @@ mod tests {
                     data: tst::TableModelArchive::default().encode_to_vec(),
                 },
             ],
+            Default::default(),
         )
         .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let bytes = package_bytes_from_archive(Archive {
@@ -3707,6 +3807,7 @@ mod tests {
                     data: tst::TableInfoArchive::default().encode_to_vec(),
                 },
             ],
+            Default::default(),
         )
         .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let bytes = package_bytes_from_archive(Archive {
@@ -3823,6 +3924,7 @@ mod tests {
                     data: tn::DocumentArchive::default().encode_to_vec(),
                 },
             ],
+            Default::default(),
         )
         .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let duplicate_bytes = package_bytes_from_archive(Archive {
@@ -3851,17 +3953,27 @@ mod tests {
                 object(2, 99_999, Vec::new())?,
             ],
         })?;
-        let exact = SemanticLimits::new(2, crate::MAX_SHEETS, crate::MAX_TABLES, MAX_REFERENCES)
+        let exact = SemanticLimits::builder()
+            .max_objects(2)
+            .and_then(|b| b.max_sheets(crate::MAX_SHEETS))
+            .and_then(|b| b.max_tables(crate::MAX_TABLES))
+            .and_then(|b| b.max_references(MAX_REFERENCES))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
-        let exact_options = ReadOptions::new(Limits::default(), exact);
+        let exact_options = OpenOptions::new().semantic_limits(exact);
         let exact_package = Package::from_bytes_with_options(&bytes, exact_options)?;
-        assert_eq!(exact_package.object_count(), 2);
-        assert_eq!(exact_package.read_options(), exact_options);
+        assert_eq!(exact_package.state.index.object_count(), 2);
+        assert_eq!(exact_package.open_options(), exact_options);
 
-        let exceeded = SemanticLimits::new(1, crate::MAX_SHEETS, crate::MAX_TABLES, MAX_REFERENCES)
+        let exceeded = SemanticLimits::builder()
+            .max_objects(1)
+            .and_then(|b| b.max_sheets(crate::MAX_SHEETS))
+            .and_then(|b| b.max_tables(crate::MAX_TABLES))
+            .and_then(|b| b.max_references(MAX_REFERENCES))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         assert!(matches!(
-            Package::from_bytes_with_options(&bytes, ReadOptions::new(Limits::default(), exceeded)),
+            Package::from_bytes_with_options(&bytes, OpenOptions::new().semantic_limits(exceeded)),
             Err(Error::SemanticLimit {
                 kind: SemanticLimitKind::Objects,
                 observed: 2,
@@ -3877,13 +3989,16 @@ mod tests {
         let bytes = package_with_two_materialized_empty_tables()?;
         let limits = |cells, text| {
             SemanticLimits::default()
-                .with_projection_limits(cells, text)
+                .to_builder()
+                .max_materialized_cells(cells)
+                .and_then(|b| b.max_output_text_bytes(text))
+                .and_then(|b| b.build())
                 .map_err(|error| Error::InvalidFormat(error.to_string()))
         };
 
         let exact = compatibility_tables_from_bytes_with_options(
             &bytes,
-            ReadOptions::new(Limits::default(), limits(2, 2)?),
+            OpenOptions::new().semantic_limits(limits(2, 2)?),
         )?;
         assert_eq!(exact.len(), 2);
         assert_eq!(exact.iter().map(crate::Table::cell_count).sum::<usize>(), 2);
@@ -3891,7 +4006,7 @@ mod tests {
         assert!(matches!(
             compatibility_tables_from_bytes_with_options(
                 &bytes,
-                ReadOptions::new(Limits::default(), limits(1, 2)?),
+                OpenOptions::new().semantic_limits(limits(1, 2)?),
             ),
             Err(Error::SemanticLimit {
                 kind: SemanticLimitKind::MaterializedCells,
@@ -3903,7 +4018,7 @@ mod tests {
         assert!(matches!(
             compatibility_tables_from_bytes_with_options(
                 &bytes,
-                ReadOptions::new(Limits::default(), limits(2, 1)?),
+                OpenOptions::new().semantic_limits(limits(2, 1)?),
             ),
             Err(Error::SemanticLimit {
                 kind: SemanticLimitKind::OutputTextBytes,
@@ -3947,20 +4062,25 @@ mod tests {
             ],
         })?;
         let limits = |max_references| {
-            SemanticLimits::new(4, 1, crate::MAX_TABLES, max_references)
+            SemanticLimits::builder()
+                .max_objects(4)
+                .and_then(|b| b.max_sheets(1))
+                .and_then(|b| b.max_tables(crate::MAX_TABLES))
+                .and_then(|b| b.max_references(max_references))
+                .and_then(|b| b.build())
                 .map_err(|error| Error::InvalidFormat(error.to_string()))
         };
 
         let exact = Package::from_bytes_with_options(
             &bytes,
-            ReadOptions::new(Limits::default(), limits(3)?),
+            OpenOptions::new().semantic_limits(limits(3)?),
         )?;
         assert_eq!(exact.sheets().len(), 1);
         assert_eq!(exact.sheets()[0].tables().len(), 0);
 
         let exceeded = Package::from_bytes_with_options(
             &bytes,
-            ReadOptions::new(Limits::default(), limits(2)?),
+            OpenOptions::new().semantic_limits(limits(2)?),
         );
         assert!(matches!(
             exceeded,
@@ -3971,6 +4091,21 @@ mod tests {
                 path: SemanticPath::Sheet { index: 0 },
             })
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn materialized_cell_budget_does_not_become_raw_item_width() -> Result<()> {
+        let bytes = package_with_two_materialized_empty_tables()?;
+        let semantic = SemanticLimits::default()
+            .to_builder()
+            .max_materialized_cells(1)
+            .and_then(|builder| builder.build())
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let package =
+            Package::from_bytes_with_options(&bytes, OpenOptions::new().semantic_limits(semantic))?;
+        let raw = package.numbers_wire_limits()?;
+        assert_eq!(raw.max_items(), litchi_numbers_wire::Limits::MAX_ITEMS);
         Ok(())
     }
 
@@ -4013,19 +4148,24 @@ mod tests {
             ],
         })?;
         let limits = |max_sheets| {
-            SemanticLimits::new(3, max_sheets, crate::MAX_TABLES, 2)
+            SemanticLimits::builder()
+                .max_objects(3)
+                .and_then(|b| b.max_sheets(max_sheets))
+                .and_then(|b| b.max_tables(crate::MAX_TABLES))
+                .and_then(|b| b.max_references(2))
+                .and_then(|b| b.build())
                 .map_err(|error| Error::InvalidFormat(error.to_string()))
         };
 
         let exact = Package::from_bytes_with_options(
             &bytes,
-            ReadOptions::new(Limits::default(), limits(2)?),
+            OpenOptions::new().semantic_limits(limits(2)?),
         )?;
         assert_eq!(exact.sheets().len(), 2);
 
         let exceeded = Package::from_bytes_with_options(
             &bytes,
-            ReadOptions::new(Limits::default(), limits(1)?),
+            OpenOptions::new().semantic_limits(limits(1)?),
         );
         assert!(matches!(
             exceeded,
@@ -4042,11 +4182,16 @@ mod tests {
     #[test]
     fn rooted_duplicate_model_precedes_an_exhausted_table_budget() -> Result<()> {
         let bytes = rooted_two_table_package(5, Vec::new())?;
-        let semantic = SemanticLimits::new(7, 1, 1, 5)
+        let semantic = SemanticLimits::builder()
+            .max_objects(7)
+            .and_then(|b| b.max_sheets(1))
+            .and_then(|b| b.max_tables(1))
+            .and_then(|b| b.max_references(5))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
 
         let error =
-            Package::from_bytes_with_options(&bytes, ReadOptions::new(Limits::default(), semantic))
+            Package::from_bytes_with_options(&bytes, OpenOptions::new().semantic_limits(semantic))
                 .expect_err("the second drawable must not reuse the first table model");
         assert!(matches!(
             error,
@@ -4060,11 +4205,16 @@ mod tests {
     #[test]
     fn rooted_table_budget_is_charged_before_model_decoding() -> Result<()> {
         let bytes = rooted_two_table_package(6, vec![0xff])?;
-        let semantic = SemanticLimits::new(7, 1, 1, 5)
+        let semantic = SemanticLimits::builder()
+            .max_objects(7)
+            .and_then(|b| b.max_sheets(1))
+            .and_then(|b| b.max_tables(1))
+            .and_then(|b| b.max_references(5))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
 
         assert!(matches!(
-            Package::from_bytes_with_options(&bytes, ReadOptions::new(Limits::default(), semantic),),
+            Package::from_bytes_with_options(&bytes, OpenOptions::new().semantic_limits(semantic),),
             Err(Error::SemanticLimit {
                 kind: SemanticLimitKind::Tables,
                 observed: 2,
@@ -4089,6 +4239,7 @@ mod tests {
                     data: vec![0xff],
                 },
             ],
+            Default::default(),
         )
         .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let bytes = package_bytes_from_archive(Archive {
@@ -4242,6 +4393,7 @@ mod tests {
                     data: info,
                 },
             ],
+            Default::default(),
         )
         .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let ambiguous_bytes = package_bytes_from_archive(Archive {
@@ -4290,7 +4442,7 @@ mod tests {
         let bytes = exact_cross_component_alias_package_bytes()?;
         let package = Package::from_bytes(&bytes)?;
 
-        assert_eq!(package.object_count(), 3);
+        assert_eq!(package.state.index.object_count(), 3);
         assert_eq!(package.sheets().len(), 1);
         assert_eq!(package.sheets()[0].name(), "Aliased");
         let entries = package
@@ -4339,10 +4491,15 @@ mod tests {
     #[test]
     fn physical_object_limit_counts_cross_component_aliases() -> Result<()> {
         let bytes = exact_cross_component_alias_package_bytes()?;
-        let semantic = SemanticLimits::new(2, crate::MAX_SHEETS, crate::MAX_TABLES, MAX_REFERENCES)
+        let semantic = SemanticLimits::builder()
+            .max_objects(2)
+            .and_then(|b| b.max_sheets(crate::MAX_SHEETS))
+            .and_then(|b| b.max_tables(crate::MAX_TABLES))
+            .and_then(|b| b.max_references(MAX_REFERENCES))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         assert!(matches!(
-            Package::from_bytes_with_options(&bytes, ReadOptions::new(Limits::default(), semantic),),
+            Package::from_bytes_with_options(&bytes, OpenOptions::new().semantic_limits(semantic),),
             Err(Error::SemanticLimit {
                 kind: SemanticLimitKind::Objects,
                 observed: 3,

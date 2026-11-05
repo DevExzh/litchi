@@ -5,12 +5,12 @@
 
 use std::{error::Error, fs, path::PathBuf};
 
-use litchi_doc::writer::{FloatingPosition, Kind, Shape, Writer};
-use litchi_ppt::writer::{
-    FillStyle, LineStyleConfig, ShapeColor, ShapeStyle, ShapeType, Table, Writer as PptWriter,
-};
+use litchi_doc::builder::Builder;
+use litchi_doc::writer::{FloatingPosition, Kind, Shape};
+use litchi_ppt::writer::{FillStyle, LineStyleConfig, ShapeColor, ShapeStyle, ShapeType, Table};
+use litchi_xls::AnchorBehavior;
 use litchi_xls::writer as xls_writer;
-use litchi_xls::writer::shape::{Anchor, Behavior, Rect};
+use litchi_xls::writer::shape::{Anchor, Rect};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let output = std::env::var_os("LITCHI_OFFICE_SMOKE_DIR")
@@ -36,11 +36,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 fn write_doc(path: &std::path::Path, mode: &str) -> Result<(), Box<dyn Error>> {
-    let mut doc = Writer::new();
+    let mut doc = Builder::new();
     doc.add_paragraph("Litchi OfficeArt native smoke test")?;
 
     if mode == "basic" {
-        doc.save(path)?;
+        doc.build()?.save(path)?;
         return Ok(());
     }
 
@@ -52,7 +52,7 @@ fn write_doc(path: &std::path::Path, mode: &str) -> Result<(), Box<dyn Error>> {
     )?;
 
     if mode == "shape" {
-        doc.save(path)?;
+        doc.build()?.save(path)?;
         return Ok(());
     }
 
@@ -64,12 +64,12 @@ fn write_doc(path: &std::path::Path, mode: &str) -> Result<(), Box<dyn Error>> {
         "Typed DOC textbox",
     )?;
     doc.add_paragraph("The document remains editable in Microsoft Word.")?;
-    doc.save(path)?;
+    doc.build()?.save(path)?;
     Ok(())
 }
 
 fn write_ppt(path: &std::path::Path) -> Result<(), Box<dyn Error>> {
-    let mut ppt = PptWriter::new_widescreen();
+    let mut ppt = litchi_ppt::Builder::new_widescreen();
     let slide = ppt.add_slide()?;
     ppt.add_textbox(slide, 50, 25, 650, 40, "Litchi OfficeArt native smoke test")?;
     let rectangle = ShapeStyle::default()
@@ -100,18 +100,18 @@ fn write_ppt(path: &std::path::Path) -> Result<(), Box<dyn Error>> {
     table.set_cell_text(1, 0, "safe")?;
     table.set_cell_text(1, 1, "anchor")?;
     ppt.add_table(slide, 80, 380, table)?;
-    ppt.save(path)?;
+    ppt.build()?.save(path)?;
     Ok(())
 }
 
 fn write_xls(path: &std::path::Path, mode: &str) -> Result<(), Box<dyn Error>> {
-    let mut xls = xls_writer::Writer::new();
-    let sheet = xls.add_worksheet("OfficeArt")?;
-    xls.write_string(sheet, 0, 0, "Litchi OfficeArt native smoke test")?;
-    xls.write_number(sheet, 1, 0, 42.0)?;
+    let mut builder = xls_writer::Builder::new();
+    let sheet = builder.add_worksheet("OfficeArt")?;
+    builder.write_string(sheet, 0, 0, "Litchi OfficeArt native smoke test")?;
+    builder.write_number(sheet, 1, 0, 42.0)?;
 
     if mode == "basic" {
-        xls.save(path)?;
+        builder.build()?.save(path)?;
         return Ok(());
     }
 
@@ -119,10 +119,10 @@ fn write_xls(path: &std::path::Path, mode: &str) -> Result<(), Box<dyn Error>> {
         xls_writer::ShapeWrite::new(xls_writer::ShapeKind::Rectangle, xls_anchor(1, 2, 5, 8)?);
     rectangle.fill = xls_writer::ShapeFill::Solid(xls_writer::ShapeColor::rgb(0x1F, 0x4E, 0x78));
     rectangle.line = xls_writer::ShapeLine::None;
-    xls.add_shape(sheet, rectangle)?;
+    builder.add_shape(sheet, rectangle)?;
 
     if mode == "primitive" {
-        xls.save(path)?;
+        builder.build()?.save(path)?;
         return Ok(());
     }
 
@@ -130,10 +130,10 @@ fn write_xls(path: &std::path::Path, mode: &str) -> Result<(), Box<dyn Error>> {
         xls_writer::ShapeWrite::new(xls_writer::ShapeKind::TextBox, xls_anchor(6, 2, 11, 8)?);
     textbox.text = Some(xls_writer::ShapeText::new("Typed XLS textbox 世界"));
     textbox.fill = xls_writer::ShapeFill::Solid(xls_writer::ShapeColor::rgb(0xE2, 0xF0, 0xD9));
-    xls.add_shape(sheet, textbox)?;
+    builder.add_shape(sheet, textbox)?;
 
     if mode == "textbox" {
-        xls.save(path)?;
+        builder.build()?.save(path)?;
         return Ok(());
     }
 
@@ -151,9 +151,9 @@ fn write_xls(path: &std::path::Path, mode: &str) -> Result<(), Box<dyn Error>> {
     );
     label.text = Some(xls_writer::ShapeText::new("Grouped"));
     group.children.push(label);
-    xls.add_shape_group(sheet, group)?;
+    builder.add_shape_group(sheet, group)?;
 
-    xls.save(path)?;
+    builder.build()?.save(path)?;
     Ok(())
 }
 
@@ -168,6 +168,6 @@ fn xls_anchor(
         first_col,
         last_row,
         last_col,
-        Behavior::MoveAndSize,
+        AnchorBehavior::Absolute,
     )
 }

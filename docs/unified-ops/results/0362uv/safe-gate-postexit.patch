@@ -1,0 +1,162 @@
+--- a/run_safe_gate.py
++++ b/run_safe_gate.py
+@@ -29,0 +30,4 @@
++BUILDER_EXECUTABLES = frozenset({"cargo", "rustc", "rustdoc"})
++POST_EXIT_POLL_SECONDS = 0.05
++POST_EXIT_STABLE_SAMPLES = 2
++POST_EXIT_TIMEOUT_SECONDS = 2.0
+@@ -73,2 +77 @@
+-def builders(exclude: set[int], root: Path, target: Path) -> list[dict]:
+-    rows = []
++def process_table() -> dict[int, dict]:
+@@ -79,2 +81,0 @@
+-            if pid in exclude:
+-                continue
+@@ -84 +85,3 @@
+-            ppid = int((entry / "stat").read_text().split()[3])
++            stat = (entry / "stat").read_text().split()
++            ppid = int(stat[3])
++            pgrp = int(stat[4])
+@@ -87 +90,15 @@
+-        info[pid] = {"pid": pid, "ppid": ppid, "command": command, "executable": executable, "cwd": str(cwd)}
++        info[pid] = {
++            "pid": pid,
++            "ppid": ppid,
++            "pgrp": pgrp,
++            "command": command,
++            "executable": executable,
++            "cwd": str(cwd),
++        }
++    return info
++
++
++def builders(exclude: set[int], root: Path, target: Path) -> list[dict]:
++    rows = []
++    info = process_table()
++    info = {pid: row for pid, row in info.items() if pid not in exclude}
+@@ -100 +117 @@
+-        if row["executable"] not in {"cargo", "rustc", "rustdoc"}:
++        if row["executable"] not in BUILDER_EXECUTABLES:
+@@ -115 +132 @@
+-            if pid in root_related or row["executable"] not in {"cargo", "rustc", "rustdoc"}:
++            if pid in root_related or row["executable"] not in BUILDER_EXECUTABLES:
+@@ -121 +138 @@
+-        rows.append({key: info[pid][key] for key in ("pid", "ppid", "executable", "cwd", "command")})
++        rows.append({key: info[pid][key] for key in ("pid", "ppid", "pgrp", "executable", "cwd", "command")})
+@@ -124,0 +142,71 @@
++def owned_processes(process_pid: int, info: dict[int, dict] | None = None) -> list[dict]:
++    """Return processes still in the child process group or subtree."""
++    info = process_table() if info is None else info
++    descendants = {process_pid}
++    changed = True
++    while changed:
++        changed = False
++        for pid, row in info.items():
++            if pid not in descendants and row["ppid"] in descendants:
++                descendants.add(pid)
++                changed = True
++    rows = []
++    for pid, row in info.items():
++        if pid in descendants or row["pgrp"] == process_pid:
++            rows.append({key: row[key] for key in ("pid", "ppid", "pgrp", "executable", "cwd", "command")})
++    return rows
++
++
++def owned_builders(process_pid: int, root: Path, target: Path, info: dict[int, dict] | None = None) -> list[dict]:
++    """Return builders still owned by a completed step or its source/target."""
++    info = process_table() if info is None else info
++    owned = {row["pid"]: row for row in owned_processes(process_pid, info)}
++    root_text = str(root)
++    target_text = str(target)
++    rows = []
++    for pid, row in info.items():
++        if row["executable"] not in BUILDER_EXECUTABLES:
++            continue
++        rooted = (
++            row["cwd"] == root_text
++            or row["cwd"].startswith(root_text + "/")
++            or root_text in row["command"]
++            or target_text in row["command"]
++        )
++        if pid in owned or rooted:
++            rows.append({key: row[key] for key in ("pid", "ppid", "pgrp", "executable", "cwd", "command")})
++    return rows
++
++
++def post_exit_guard(process_pid: int, root: Path, target: Path) -> dict:
++    """Require owned builders to exit and the selected target to stabilize."""
++    deadline = time.monotonic() + POST_EXIT_TIMEOUT_SECONDS
++    previous_size: int | None = None
++    stable_samples = 0
++    samples = []
++    while True:
++        info = process_table()
++        owned = owned_processes(process_pid, info)
++        leaked = owned_builders(process_pid, root, target, info)
++        size = target_bytes(target)
++        samples.append({"at": time.time(), "target_bytes": size, "owned": owned, "builders": leaked})
++        if leaked:
++            raise RuntimeError(f"owned builder remained after child exit: {leaked}")
++        if owned:
++            stable_samples = 0
++            if time.monotonic() >= deadline:
++                raise RuntimeError(f"owned child remained after child exit: {owned}")
++            time.sleep(POST_EXIT_POLL_SECONDS)
++            continue
++        if previous_size is not None and size == previous_size:
++            stable_samples += 1
++        else:
++            stable_samples = 0
++        if stable_samples >= POST_EXIT_STABLE_SAMPLES:
++            return {"target_bytes": size, "samples": samples}
++        if time.monotonic() >= deadline:
++            raise RuntimeError(f"target did not stabilize after child exit: {samples[-1]}")
++        previous_size = size
++        time.sleep(POST_EXIT_POLL_SECONDS)
++
++
+@@ -228 +316,10 @@
+-def run_step(step: dict, root: Path, target: Path, state_dir: Path, source: dict, index: int, total: int) -> dict:
++def attempt_paths(state_dir: Path, index: int, name: str, attempt: str) -> tuple[Path, Path]:
++    stem = f"{index:02d}-{name}-attempt-{attempt}"
++    return state_dir / f"{stem}.log", state_dir / f"{stem}-cargo-targets.tsv"
++
++
++def new_attempt() -> str:
++    return f"{time.time_ns()}-{os.getpid()}"
++
++
++def run_step(step: dict, root: Path, target: Path, state_dir: Path, source: dict, index: int, total: int, attempt: str = "manual") -> dict:
+@@ -233 +330,3 @@
+-    trace = state_dir / f"{index:02d}-cargo-targets.tsv"
++    env["LITCHI_GATE_ATTEMPT"] = attempt
++    log, trace = attempt_paths(state_dir, index, step["name"], attempt)
++    log.write_text("", encoding="utf-8")
+@@ -238 +337 @@
+-        process = subprocess.Popen(command, cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
++        process = subprocess.Popen(command, cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True)
+@@ -241,2 +340 @@
+-        process = subprocess.Popen(command, cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+-    log = state_dir / f"{index:02d}-{step['name']}.log"
++        process = subprocess.Popen(command, cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True)
+@@ -249 +347,2 @@
+-    size = target_bytes(target)
++    post_exit = post_exit_guard(process.pid, root, target)
++    size = post_exit["target_bytes"]
+@@ -269,0 +369 @@
++        "attempt": attempt,
+@@ -271 +371 @@
+-        "environment": {key: env[key] for key in ("CARGO_TARGET_DIR", "CARGO_NET_OFFLINE", "LITCHI_MEM_MAX", "CARGO_BUILD_JOBS", "RUST_TEST_THREADS", "CARGO_INCREMENTAL", "RUSTDOCFLAGS") if key in env},
++        "environment": {key: env[key] for key in ("CARGO_TARGET_DIR", "CARGO_NET_OFFLINE", "LITCHI_MEM_MAX", "CARGO_BUILD_JOBS", "RUST_TEST_THREADS", "CARGO_INCREMENTAL", "RUSTDOCFLAGS", "LITCHI_GATE_ATTEMPT") if key in env},
+@@ -277,0 +378 @@
++        "post_exit": post_exit,
+@@ -392,0 +494 @@
++        attempt = new_attempt()
+@@ -394 +496 @@
+-            row = run_step(step, root, target, state_dir, source, index, len(all_steps))
++            row = run_step(step, root, target, state_dir, source, index, len(all_steps), attempt)
+@@ -396 +498 @@
+-            log = state_dir / f"{index:02d}-{step['name']}.log"
++            log, _ = attempt_paths(state_dir, index, step["name"], attempt)
+@@ -409,0 +512 @@
++                "attempt": attempt,

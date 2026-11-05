@@ -1,8 +1,8 @@
 //! Test XLSB column widths and row heights
 //!
 //! This example creates a single worksheet with customized column widths and
-//! row heights using `MutableWorksheet::set_column_width` and
-//! `MutableWorksheet::set_row_height`.
+//! row heights using `builder::Worksheet::set_column_width` and
+//! `builder::Worksheet::set_row_height`.
 //!
 //! Run with:
 //! ```bash
@@ -10,14 +10,14 @@
 //! ```
 
 use litchi::sheet::CellValue;
-use litchi::xlsb::writer::{MutableWorksheet, WorkbookWriter};
+use litchi::xlsb::builder::{self, Builder};
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating XLSB with custom column widths and row heights...");
 
-    let mut workbook = WorkbookWriter::new();
-    let mut sheet = MutableWorksheet::new("Sizes");
+    let mut workbook = Builder::new();
+    let mut sheet = builder::Worksheet::new("Sizes");
 
     // Header row
     sheet.set_cell(0, 0, CellValue::String("Wide Col".to_string()));
@@ -44,7 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     workbook.add_worksheet(sheet);
 
     let file = File::create("xlsb_test_col_row_sizes.xlsb")?;
-    workbook.save(file)?;
+    workbook.build()?.write_to(file)?;
 
     println!("\n[32m✓ Created xlsb_test_col_row_sizes.xlsb[0m");
     Ok(())

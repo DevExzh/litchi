@@ -17,7 +17,8 @@ pub(in crate::embedded_object) fn discover_targets(
     bytes: &[u8],
     limits: Limits,
 ) -> Result<(Targets, bool)> {
-    let ole = OleFile::open(Cursor::new(bytes)).map_err(PackageError::from)?;
+    let ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+        .map_err(PackageError::from)?;
     let entries = match ole.list_directory_entries(&[OBJECT_POOL]) {
         Ok(entries) => entries,
         Err(OleError::StreamNotFound) => return Ok((Targets::default(), false)),
@@ -65,7 +66,11 @@ fn wrap_object_storage(
     if compound_file.len() as u64 > limits.max_object_size {
         return Err(corrupted("embedded object exceeds resource limit"));
     }
-    let mut source = OleFile::open(Cursor::new(compound_file)).map_err(PackageError::from)?;
+    let mut source = OleFile::open(
+        Cursor::new(compound_file),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .map_err(PackageError::from)?;
     let mut writer = OleWriter::new();
     writer
         .create_storage(&[storage_name])

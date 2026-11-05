@@ -28,7 +28,7 @@ use litchi_iwa_protos::keynote_chart_axis_title_codec::{
     decode_axis_titles_with_report, prepare_axis_title_rewrite,
 };
 use litchi_iwa_protos::package_metadata_codec;
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::chart_axis_support::{self, AxisSelection, AxisSupportBudget, AxisSupportError};
 use super::{Package, PhysicalSource, ReadError, SemanticLimitKind};
@@ -65,20 +65,14 @@ struct AxisTitleBudget {
 }
 
 impl AxisTitleBudget {
-    fn new(package: &Package) -> Result<Self, ChartAxisTitleError> {
+    fn new(package: &Package) -> Result<Self, Error> {
         let limits = package.wire_limits().map_err(map_wire_error)?;
         let physical_input = usize::try_from(package.state.options.archive().max_input_bytes())
-            .map_err(|_error| ChartAxisTitleError::InvalidSource)?;
-        let aggregate_bytes = physical_input
-            .checked_mul(8)
-            .ok_or(ChartAxisTitleError::InvalidSource)?;
-        let aggregate_memory = physical_input
-            .checked_mul(64)
-            .ok_or(ChartAxisTitleError::InvalidSource)?;
+            .map_err(|_error| Error::InvalidSource)?;
+        let aggregate_bytes = physical_input.checked_mul(8).ok_or(Error::InvalidSource)?;
+        let aggregate_memory = physical_input.checked_mul(64).ok_or(Error::InvalidSource)?;
         let aggregate_items = 16usize;
-        let maximum_allocations = physical_input
-            .checked_add(64)
-            .ok_or(ChartAxisTitleError::InvalidSource)?;
+        let maximum_allocations = physical_input.checked_add(64).ok_or(Error::InvalidSource)?;
         Ok(Self {
             limits,
             maximum_input: aggregate_bytes,
@@ -86,21 +80,21 @@ impl AxisTitleBudget {
             maximum_fields: limits
                 .max_fields()
                 .checked_mul(aggregate_items)
-                .ok_or(ChartAxisTitleError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
             maximum_work: limits
                 .max_rewrite_work()
                 .checked_mul(aggregate_items)
-                .ok_or(ChartAxisTitleError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
             maximum_components: package
                 .semantic_limits()
                 .max_objects()
                 .checked_mul(aggregate_items)
-                .ok_or(ChartAxisTitleError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
             maximum_references: package
                 .semantic_limits()
                 .max_references()
                 .checked_mul(aggregate_items)
-                .ok_or(ChartAxisTitleError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
             maximum_allocations,
             maximum_retained: aggregate_memory,
             maximum_scratch: aggregate_memory,
@@ -122,13 +116,11 @@ impl AxisTitleBudget {
         current: &mut usize,
         amount: usize,
         maximum: usize,
-        kind: ChartAxisTitleLimitKind,
-    ) -> Result<(), ChartAxisTitleError> {
-        let observed = current
-            .checked_add(amount)
-            .ok_or(ChartAxisTitleError::InvalidSource)?;
+        kind: LimitKind,
+    ) -> Result<(), Error> {
+        let observed = current.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > maximum {
-            return Err(ChartAxisTitleError::LimitExceeded {
+            return Err(Error::Limit {
                 kind,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(maximum),
@@ -138,67 +130,67 @@ impl AxisTitleBudget {
         Ok(())
     }
 
-    fn charge_input(&mut self, amount: usize) -> Result<(), ChartAxisTitleError> {
+    fn charge_input(&mut self, amount: usize) -> Result<(), Error> {
         Self::charge_counter(
             &mut self.input,
             amount,
             self.maximum_input,
-            ChartAxisTitleLimitKind::InputBytes,
+            LimitKind::InputBytes,
         )
     }
 
-    fn charge_output(&mut self, amount: usize) -> Result<(), ChartAxisTitleError> {
+    fn charge_output(&mut self, amount: usize) -> Result<(), Error> {
         Self::charge_counter(
             &mut self.output,
             amount,
             self.maximum_output,
-            ChartAxisTitleLimitKind::OutputBytes,
+            LimitKind::OutputBytes,
         )
     }
 
-    fn charge_fields(&mut self, amount: usize) -> Result<(), ChartAxisTitleError> {
+    fn charge_fields(&mut self, amount: usize) -> Result<(), Error> {
         Self::charge_counter(
             &mut self.fields,
             amount,
             self.maximum_fields,
-            ChartAxisTitleLimitKind::WireFields,
+            LimitKind::WireFields,
         )
     }
 
-    fn charge(&mut self, amount: usize) -> Result<(), ChartAxisTitleError> {
+    fn charge(&mut self, amount: usize) -> Result<(), Error> {
         Self::charge_counter(
             &mut self.work,
             amount,
             self.maximum_work,
-            ChartAxisTitleLimitKind::WireWork,
+            LimitKind::WireWork,
         )
     }
 
-    fn charge_components(&mut self, amount: usize) -> Result<(), ChartAxisTitleError> {
+    fn charge_components(&mut self, amount: usize) -> Result<(), Error> {
         Self::charge_counter(
             &mut self.components,
             amount,
             self.maximum_components,
-            ChartAxisTitleLimitKind::Entries,
+            LimitKind::Entries,
         )
     }
 
-    fn charge_references(&mut self, amount: usize) -> Result<(), ChartAxisTitleError> {
+    fn charge_references(&mut self, amount: usize) -> Result<(), Error> {
         Self::charge_counter(
             &mut self.references,
             amount,
             self.maximum_references,
-            ChartAxisTitleLimitKind::References,
+            LimitKind::References,
         )
     }
 
-    fn charge_depth(&mut self, depth: u32) -> Result<(), ChartAxisTitleError> {
+    fn charge_depth(&mut self, depth: u32) -> Result<(), Error> {
         self.max_depth = self.max_depth.max(depth);
-        let maximum = u32::try_from(self.limits.max_nesting())
-            .map_err(|_error| ChartAxisTitleError::InvalidSource)?;
+        let maximum =
+            u32::try_from(self.limits.max_nesting()).map_err(|_error| Error::InvalidSource)?;
         if self.max_depth > maximum {
-            return Err(ChartAxisTitleError::LimitExceeded {
-                kind: ChartAxisTitleLimitKind::WireNesting,
+            return Err(Error::Limit {
+                kind: LimitKind::WireNesting,
                 observed: u64::from(self.max_depth),
                 maximum: u64::from(maximum),
             });
@@ -211,31 +203,31 @@ impl AxisTitleBudget {
         count: usize,
         retained: usize,
         scratch: usize,
-    ) -> Result<(), ChartAxisTitleError> {
+    ) -> Result<(), Error> {
         Self::charge_counter(
             &mut self.allocations,
             count,
             self.maximum_allocations,
-            ChartAxisTitleLimitKind::Entries,
+            LimitKind::Entries,
         )?;
         Self::charge_counter(
             &mut self.retained,
             retained,
             self.maximum_retained,
-            ChartAxisTitleLimitKind::TotalBytes,
+            LimitKind::TotalBytes,
         )?;
         Self::charge_counter(
             &mut self.scratch,
             scratch,
             self.maximum_scratch,
-            ChartAxisTitleLimitKind::TotalBytes,
+            LimitKind::TotalBytes,
         )
     }
 
-    fn charge_wire_vector(&mut self, payload: usize) -> Result<(), ChartAxisTitleError> {
+    fn charge_wire_vector(&mut self, payload: usize) -> Result<(), Error> {
         let capacity = payload
             .checked_mul(size_of::<WireField>())
-            .ok_or(ChartAxisTitleError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         self.charge_input(payload)?;
         self.charge(payload)?;
         // One byte is the smallest possible field, so this also bounds any
@@ -243,30 +235,30 @@ impl AxisTitleBudget {
         self.charge_allocation(payload.max(1), capacity, capacity)
     }
 
-    fn finish_wire_scan(&mut self, fields: usize) -> Result<(), ChartAxisTitleError> {
+    fn finish_wire_scan(&mut self, fields: usize) -> Result<(), Error> {
         self.charge_fields(fields)?;
         self.charge(fields)
     }
 
-    fn charge_reference_vector(&mut self, capacity: usize) -> Result<(), ChartAxisTitleError> {
+    fn charge_reference_vector(&mut self, capacity: usize) -> Result<(), Error> {
         let bytes = capacity
             .checked_mul(size_of::<u64>())
-            .ok_or(ChartAxisTitleError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         self.charge_allocation(1, bytes, bytes)
     }
 
-    fn charge_owned_clone(&mut self, bytes: usize) -> Result<(), ChartAxisTitleError> {
+    fn charge_owned_clone(&mut self, bytes: usize) -> Result<(), Error> {
         self.charge(bytes)?;
         self.charge_allocation(1, bytes, bytes)
     }
 
-    fn charge_enclosing_buffer(&mut self, bytes: usize) -> Result<(), ChartAxisTitleError> {
+    fn charge_enclosing_buffer(&mut self, bytes: usize) -> Result<(), Error> {
         self.charge_output(bytes)?;
         self.charge(bytes)?;
         self.charge_allocation(1, bytes, bytes)
     }
 
-    fn charge_decode(&mut self, report: DecodeReport) -> Result<(), ChartAxisTitleError> {
+    fn charge_decode(&mut self, report: DecodeReport) -> Result<(), Error> {
         self.charge_input(report.source_bytes())?;
         self.charge_output(report.output_bytes())?;
         self.charge_fields(report.fields())?;
@@ -282,7 +274,7 @@ impl AxisTitleBudget {
     fn charge_metadata_report(
         &mut self,
         report: package_metadata_codec::RewriteReport,
-    ) -> Result<(), ChartAxisTitleError> {
+    ) -> Result<(), Error> {
         self.charge_input(report.input_bytes())?;
         self.charge_output(report.output_bytes())?;
         self.charge_fields(report.fields())?;
@@ -301,12 +293,12 @@ impl AxisTitleBudget {
         &mut self,
         report: DecodeReport,
         requirements: RewriteExecutionRequirements,
-    ) -> Result<(), ChartAxisTitleError> {
+    ) -> Result<(), Error> {
         if report.work_bytes() > requirements.work_bytes
             || report.fields() > requirements.fields
             || report.max_depth() > requirements.max_depth
         {
-            return Err(ChartAxisTitleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         self.charge_input(report.source_bytes())?;
         self.charge_output(requirements.output_bytes)?;
@@ -320,34 +312,37 @@ impl AxisTitleBudget {
         )
     }
 
-    fn charge_catalog_scan(&mut self, package: &Package) -> Result<(), ChartAxisTitleError> {
+    fn charge_catalog_scan(&mut self, package: &Package) -> Result<(), Error> {
         let mut work = 0usize;
         let mut references = 0usize;
         for component in package.state.source.components().iter() {
-            let archive_bytes = component.archive().encoded_len().map_err(map_core_error)?;
+            let archive_bytes = component
+                .archive()
+                .encoded_len(Default::default())
+                .map_err(map_core_error)?;
             work = work
                 .checked_add(component.name().len())
                 .and_then(|value| value.checked_add(archive_bytes))
-                .ok_or(ChartAxisTitleError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             for object in &component.archive().objects {
                 for (index, message) in object.messages.iter().enumerate() {
                     work = work
                         .checked_add(message.data.len())
-                        .ok_or(ChartAxisTitleError::InvalidSource)?;
+                        .ok_or(Error::InvalidSource)?;
                     let info = object
                         .archive_info
                         .message_infos
                         .get(index)
-                        .ok_or(ChartAxisTitleError::InvalidSource)?;
+                        .ok_or(Error::InvalidSource)?;
                     references = references
                         .checked_add(info.object_references.len())
                         .and_then(|value| value.checked_add(info.data_references.len()))
-                        .ok_or(ChartAxisTitleError::InvalidSource)?;
+                        .ok_or(Error::InvalidSource)?;
                     for field in &info.field_infos {
                         references = references
                             .checked_add(field.object_references.len())
                             .and_then(|value| value.checked_add(field.data_references.len()))
-                            .ok_or(ChartAxisTitleError::InvalidSource)?;
+                            .ok_or(Error::InvalidSource)?;
                     }
                 }
             }
@@ -372,7 +367,7 @@ impl AxisTitleBudget {
         &mut self,
         package: &Package,
         retained_vectors: usize,
-    ) -> Result<(), ChartAxisTitleError> {
+    ) -> Result<(), Error> {
         let inventory = package_scan_inventory(package)?;
         self.charge_components(inventory.objects)?;
         self.charge_references(inventory.references)?;
@@ -385,7 +380,7 @@ impl AxisTitleBudget {
         &mut self,
         package: &Package,
         mutation_guards: bool,
-    ) -> Result<(), ChartAxisTitleError> {
+    ) -> Result<(), Error> {
         // Selector resolution walks the semantic slide/chart graph once. A
         // mutation additionally builds the package-wide chart-owner census.
         self.charge_scan_pass(package, 2)?;
@@ -395,7 +390,7 @@ impl AxisTitleBudget {
         Ok(())
     }
 
-    fn charge_locality_scan(&mut self, package: &Package) -> Result<(), ChartAxisTitleError> {
+    fn charge_locality_scan(&mut self, package: &Package) -> Result<(), Error> {
         // Locality compares the physical catalog and the selected component's
         // complete object/message inventory without constructing a new index.
         let inventory = package_scan_inventory(package)?;
@@ -410,7 +405,7 @@ impl AxisTitleBudget {
             inventory
                 .scan_work()?
                 .checked_add(entries)
-                .ok_or(ChartAxisTitleError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )
     }
 
@@ -419,21 +414,17 @@ impl AxisTitleBudget {
         compressed: usize,
         decompressed: usize,
         objects: usize,
-    ) -> Result<(), ChartAxisTitleError> {
+    ) -> Result<(), Error> {
         self.charge_input(compressed)?;
         self.charge_output(decompressed)?;
         self.charge(
             compressed
                 .checked_add(decompressed)
-                .ok_or(ChartAxisTitleError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )?;
         self.charge_allocation(
-            objects
-                .checked_add(2)
-                .ok_or(ChartAxisTitleError::InvalidSource)?,
-            decompressed
-                .checked_mul(2)
-                .ok_or(ChartAxisTitleError::InvalidSource)?,
+            objects.checked_add(2).ok_or(Error::InvalidSource)?,
+            decompressed.checked_mul(2).ok_or(Error::InvalidSource)?,
             compressed,
         )
     }
@@ -443,33 +434,27 @@ impl AxisTitleBudget {
         archive: &Archive,
         archive_limits: litchi_iwa_core::Limits,
         snappy_limits: litchi_iwa_core::SnappyLimits,
-    ) -> Result<(), ChartAxisTitleError> {
+    ) -> Result<(), Error> {
         let encoded = archive
-            .encoded_len_with_limits(archive_limits)
+            .encoded_len(archive_limits)
             .map_err(map_core_error)?;
-        let compressed = SnappyStream::maximum_compressed_len(encoded).map_err(map_core_error)?;
-        if compressed > snappy_limits.max_compressed_stream() {
-            return Err(ChartAxisTitleError::LimitExceeded {
-                kind: ChartAxisTitleLimitKind::EntryBytes,
-                observed: usize_to_u64(compressed),
-                maximum: usize_to_u64(snappy_limits.max_compressed_stream()),
-            });
-        }
+        let compressed =
+            SnappyStream::maximum_compressed_len(encoded, snappy_limits).map_err(map_core_error)?;
         self.charge_output(
             encoded
                 .checked_add(compressed)
-                .ok_or(ChartAxisTitleError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )?;
         self.charge(
             encoded
                 .checked_add(compressed)
-                .ok_or(ChartAxisTitleError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )?;
         self.charge_allocation(
             2,
             encoded
                 .checked_add(compressed)
-                .ok_or(ChartAxisTitleError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
             encoded,
         )
     }
@@ -477,14 +462,14 @@ impl AxisTitleBudget {
     fn charge_reassembly(
         &mut self,
         requirements: litchi_iwa_archive::package::ReassemblyExecutionRequirements,
-    ) -> Result<litchi_iwa_archive::package::ReassemblyExecutionLimits, ChartAxisTitleError> {
+    ) -> Result<litchi_iwa_archive::package::ReassemblyExecutionLimits, Error> {
         self.charge_output(requirements.output_bytes())?;
         self.charge(
             requirements
                 .output_bytes()
                 .checked_add(requirements.scratch_bytes())
                 .and_then(|value| value.checked_add(requirements.offset_count()))
-                .ok_or(ChartAxisTitleError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )?;
         self.charge_allocation(
             requirements.allocations(),
@@ -499,7 +484,7 @@ impl AxisTitleBudget {
         source: &Package,
         bytes: usize,
         replacement: Option<(&str, &Archive)>,
-    ) -> Result<(), ChartAxisTitleError> {
+    ) -> Result<(), Error> {
         let envelope = candidate_reopen_envelope(source, bytes, replacement)?;
         self.charge_input(bytes)?;
         self.charge_components(envelope.objects)?;
@@ -510,69 +495,61 @@ impl AxisTitleBudget {
         self.candidate_reopens = self
             .candidate_reopens
             .checked_add(1)
-            .ok_or(ChartAxisTitleError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         Ok(())
     }
 
-    fn charge_exact_artifacts(
-        &mut self,
-        source: usize,
-        target: usize,
-    ) -> Result<(), ChartAxisTitleError> {
-        self.charge(
-            source
-                .checked_add(target)
-                .ok_or(ChartAxisTitleError::InvalidSource)?,
-        )
+    fn charge_exact_artifacts(&mut self, source: usize, target: usize) -> Result<(), Error> {
+        self.charge(source.checked_add(target).ok_or(Error::InvalidSource)?)
     }
 
-    fn codec_options(&self, source_len: usize) -> Result<DecodeOptions, ChartAxisTitleError> {
+    fn codec_options(&self, source_len: usize) -> Result<DecodeOptions, Error> {
         let input = self
             .maximum_input
             .checked_sub(self.input)
-            .ok_or(ChartAxisTitleError::InvalidSource)?
+            .ok_or(Error::InvalidSource)?
             .min(self.limits.max_input_bytes());
         let output = self
             .maximum_output
             .checked_sub(self.output)
-            .ok_or(ChartAxisTitleError::InvalidSource)?
+            .ok_or(Error::InvalidSource)?
             .min(self.limits.max_output_bytes());
         let fields = self
             .maximum_fields
             .checked_sub(self.fields)
-            .ok_or(ChartAxisTitleError::InvalidSource)?
+            .ok_or(Error::InvalidSource)?
             .min(self.limits.max_fields());
         let work = self
             .maximum_work
             .checked_sub(self.work)
-            .ok_or(ChartAxisTitleError::InvalidSource)?
+            .ok_or(Error::InvalidSource)?
             .min(self.limits.max_rewrite_work());
         if input < source_len || input == 0 {
-            return Err(ChartAxisTitleError::LimitExceeded {
-                kind: ChartAxisTitleLimitKind::InputBytes,
+            return Err(Error::Limit {
+                kind: LimitKind::InputBytes,
                 observed: usize_to_u64(source_len.max(1)),
                 maximum: usize_to_u64(input),
             });
         }
-        let recursion = u32::try_from(self.limits.max_nesting())
-            .map_err(|_error| ChartAxisTitleError::InvalidSource)?;
+        let recursion =
+            u32::try_from(self.limits.max_nesting()).map_err(|_error| Error::InvalidSource)?;
         Ok(DecodeOptions::new(input, fields, work, recursion)
             .with_max_output_bytes(output)
             .with_max_title_bytes(MAX_CHART_TITLE_BYTES.min(self.limits.max_output_bytes()))
             .with_max_allocations(
                 self.maximum_allocations
                     .checked_sub(self.allocations)
-                    .ok_or(ChartAxisTitleError::InvalidSource)?,
+                    .ok_or(Error::InvalidSource)?,
             )
             .with_max_retained_bytes(
                 self.maximum_retained
                     .checked_sub(self.retained)
-                    .ok_or(ChartAxisTitleError::InvalidSource)?,
+                    .ok_or(Error::InvalidSource)?,
             )
             .with_max_scratch_bytes(
                 self.maximum_scratch
                     .checked_sub(self.scratch)
-                    .ok_or(ChartAxisTitleError::InvalidSource)?,
+                    .ok_or(Error::InvalidSource)?,
             ))
     }
 }
@@ -642,42 +619,42 @@ impl AxisSupportBudget for AxisTitleBudget {
 fn metadata_options(
     package: &Package,
     budget: &AxisTitleBudget,
-) -> Result<package_metadata_codec::RewriteOptions, ChartAxisTitleError> {
+) -> Result<package_metadata_codec::RewriteOptions, Error> {
     let limits = package.wire_limits().map_err(map_wire_error)?;
     Ok(package_metadata_codec::RewriteOptions::new(
         budget
             .maximum_input
             .checked_sub(budget.input)
-            .ok_or(ChartAxisTitleError::InvalidSource)?
+            .ok_or(Error::InvalidSource)?
             .min(limits.max_input_bytes()),
         budget
             .maximum_output
             .checked_sub(budget.output)
-            .ok_or(ChartAxisTitleError::InvalidSource)?
+            .ok_or(Error::InvalidSource)?
             .min(limits.max_output_bytes()),
         budget
             .maximum_fields
             .checked_sub(budget.fields)
-            .ok_or(ChartAxisTitleError::InvalidSource)?
+            .ok_or(Error::InvalidSource)?
             .min(limits.max_fields()),
         budget
             .maximum_work
             .checked_sub(budget.work)
-            .ok_or(ChartAxisTitleError::InvalidSource)?
+            .ok_or(Error::InvalidSource)?
             .min(limits.max_rewrite_work()),
-        u32::try_from(limits.max_nesting()).map_err(|_| ChartAxisTitleError::InvalidSource)?,
+        u32::try_from(limits.max_nesting()).map_err(|_| Error::InvalidSource)?,
         budget
             .maximum_components
             .checked_sub(budget.components)
-            .ok_or(ChartAxisTitleError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
         budget
             .maximum_references
             .checked_sub(budget.references)
-            .ok_or(ChartAxisTitleError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
         budget
             .maximum_allocations
             .checked_sub(budget.allocations)
-            .ok_or(ChartAxisTitleError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     ))
 }
 
@@ -692,63 +669,60 @@ struct PackageScanInventory {
 }
 
 impl PackageScanInventory {
-    fn add_archive(&mut self, archive: &Archive) -> Result<(), ChartAxisTitleError> {
-        self.components = self
-            .components
-            .checked_add(1)
-            .ok_or(ChartAxisTitleError::InvalidSource)?;
+    fn add_archive(&mut self, archive: &Archive) -> Result<(), Error> {
+        self.components = self.components.checked_add(1).ok_or(Error::InvalidSource)?;
         self.objects = self
             .objects
             .checked_add(archive.objects.len())
-            .ok_or(ChartAxisTitleError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         for object in &archive.objects {
             self.messages = self
                 .messages
                 .checked_add(object.messages.len())
-                .ok_or(ChartAxisTitleError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             self.metadata_fields = self
                 .metadata_fields
                 .checked_add(object.archive_info.message_infos.len())
-                .ok_or(ChartAxisTitleError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             for message in &object.messages {
                 self.message_bytes = self
                     .message_bytes
                     .checked_add(message.data.len())
-                    .ok_or(ChartAxisTitleError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
             }
             for info in &object.archive_info.message_infos {
                 self.references = self
                     .references
                     .checked_add(info.object_references.len())
                     .and_then(|value| value.checked_add(info.data_references.len()))
-                    .ok_or(ChartAxisTitleError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
                 self.metadata_fields = self
                     .metadata_fields
                     .checked_add(info.field_infos.len())
-                    .ok_or(ChartAxisTitleError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
                 for field in &info.field_infos {
                     self.references = self
                         .references
                         .checked_add(field.object_references.len())
                         .and_then(|value| value.checked_add(field.data_references.len()))
-                        .ok_or(ChartAxisTitleError::InvalidSource)?;
+                        .ok_or(Error::InvalidSource)?;
                 }
             }
         }
         Ok(())
     }
 
-    fn scan_work(self) -> Result<usize, ChartAxisTitleError> {
+    fn scan_work(self) -> Result<usize, Error> {
         self.components
             .checked_add(self.objects)
             .and_then(|value| value.checked_add(self.messages))
             .and_then(|value| value.checked_add(self.message_bytes))
             .and_then(|value| value.checked_add(self.metadata_fields))
             .and_then(|value| value.checked_add(self.references))
-            .ok_or(ChartAxisTitleError::InvalidSource)
+            .ok_or(Error::InvalidSource)
     }
 
-    fn logical_index_bytes(self) -> Result<usize, ChartAxisTitleError> {
+    fn logical_index_bytes(self) -> Result<usize, Error> {
         self.objects
             .checked_mul(3 * size_of::<usize>())
             .and_then(|value| {
@@ -761,11 +735,11 @@ impl PackageScanInventory {
                     .checked_mul(size_of::<u64>())
                     .and_then(|references| value.checked_add(references))
             })
-            .ok_or(ChartAxisTitleError::InvalidSource)
+            .ok_or(Error::InvalidSource)
     }
 }
 
-fn package_scan_inventory(package: &Package) -> Result<PackageScanInventory, ChartAxisTitleError> {
+fn package_scan_inventory(package: &Package) -> Result<PackageScanInventory, Error> {
     let mut inventory = PackageScanInventory::default();
     for component in package.state.source.components().iter() {
         inventory.add_archive(component.archive())?;
@@ -790,13 +764,12 @@ fn candidate_reopen_envelope(
     source: &Package,
     candidate_bytes: usize,
     replacement: Option<(&str, &Archive)>,
-) -> Result<CandidateReopenEnvelope, ChartAxisTitleError> {
+) -> Result<CandidateReopenEnvelope, Error> {
     let physical_limits = source.state.options.archive();
-    let candidate_u64 =
-        u64::try_from(candidate_bytes).map_err(|_error| ChartAxisTitleError::InvalidSource)?;
+    let candidate_u64 = u64::try_from(candidate_bytes).map_err(|_error| Error::InvalidSource)?;
     if candidate_u64 > physical_limits.max_input_bytes() {
-        return Err(ChartAxisTitleError::LimitExceeded {
-            kind: ChartAxisTitleLimitKind::OutputBytes,
+        return Err(Error::Limit {
+            kind: LimitKind::OutputBytes,
             observed: candidate_u64,
             maximum: physical_limits.max_input_bytes(),
         });
@@ -805,7 +778,7 @@ fn candidate_reopen_envelope(
         .map_err(map_axis_support_error)?
         .package();
     if catalog.len() > physical_limits.max_entries() {
-        return Err(ChartAxisTitleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let archive_limits = physical_limits
         .effective_archive_limits()
@@ -818,14 +791,14 @@ fn candidate_reopen_envelope(
             .filter(|(name, _archive)| *name == component.name())
             .map_or(component.archive(), |(_name, archive)| archive);
         let bytes = archive
-            .encoded_len_with_limits(archive_limits)
+            .encoded_len(archive_limits)
             .map_err(map_core_error)?;
         if bytes > physical_limits.max_iwa_stream_bytes() {
-            return Err(ChartAxisTitleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         decompressed = decompressed
             .checked_add(bytes)
-            .ok_or(ChartAxisTitleError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         largest_component = largest_component.max(bytes);
         inventory.add_archive(archive)?;
     }
@@ -836,29 +809,25 @@ fn candidate_reopen_envelope(
         let growth = candidate_bytes.saturating_sub(source.source_bytes().len());
         decompressed = decompressed
             .checked_add(growth)
-            .ok_or(ChartAxisTitleError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         largest_component = largest_component
             .checked_add(growth)
-            .ok_or(ChartAxisTitleError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     let catalog_index = catalog
         .len()
         .checked_mul(size_of::<[usize; 8]>())
-        .ok_or(ChartAxisTitleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let logical = inventory.logical_index_bytes()?;
     let retained = candidate_bytes
-        .checked_add(
-            decompressed
-                .checked_mul(2)
-                .ok_or(ChartAxisTitleError::InvalidSource)?,
-        )
+        .checked_add(decompressed.checked_mul(2).ok_or(Error::InvalidSource)?)
         .and_then(|value| value.checked_add(logical))
         .and_then(|value| value.checked_add(catalog_index))
-        .ok_or(ChartAxisTitleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let scratch = largest_component
         .checked_add(candidate_bytes)
         .and_then(|value| value.checked_add(catalog_index))
-        .ok_or(ChartAxisTitleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let allocations = catalog
         .len()
         .checked_mul(2)
@@ -867,11 +836,11 @@ fn candidate_reopen_envelope(
         .and_then(|value| value.checked_add(inventory.messages.checked_mul(3)?))
         .and_then(|value| value.checked_add(inventory.metadata_fields))
         .and_then(|value| value.checked_add(4))
-        .ok_or(ChartAxisTitleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let work = candidate_bytes
         .checked_add(decompressed)
         .and_then(|value| inventory.scan_work().ok()?.checked_add(value))
-        .ok_or(ChartAxisTitleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     Ok(CandidateReopenEnvelope {
         objects: inventory.objects,
         references: inventory.references,
@@ -887,7 +856,7 @@ fn candidate_reopen_envelope(
 /// published.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum ChartAxisTitleLimitKind {
+pub enum LimitKind {
     /// Complete input package bytes.
     InputBytes,
     /// Complete rewritten package or payload bytes.
@@ -920,7 +889,7 @@ pub enum ChartAxisTitleLimitKind {
     TitleBytes,
 }
 
-impl fmt::Display for ChartAxisTitleLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -943,9 +912,48 @@ impl fmt::Display for ChartAxisTitleLimitKind {
 }
 
 /// A content-redacted failure raised by a chart-axis-title transaction.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum ChartAxisTitleError {
+pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The source chart graph, title stand-in, or selected native payload is
+    /// malformed or unsupported.
+    #[error("the Keynote chart-axis-title source cannot be edited safely")]
+    InvalidSource,
+    /// A finite resource ceiling was exceeded.
+    #[error(
+        "Keynote chart-axis-title {kind} limit exceeded: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        /// Resource category that exceeded its limit.
+        kind: LimitKind,
+        /// Observed or requested amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A bounded destination allocation failed before publication.
+    #[error("could not allocate {amount} units for the Keynote chart-axis-title transaction")]
+    Allocation {
+        /// Elements or bytes requested.
+        amount: usize,
+    },
+    /// Full candidate reopening did not reproduce the requested title.
+    #[error("the edited Keynote chart title failed semantic verification")]
+    Verification,
+    /// The patch does not belong to this exact immutable package artifact.
+    #[error("the Keynote chart-axis-title patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The source was prepared without an exact physical package artifact.
     #[error("this Keynote source does not support physical chart-axis-title edits")]
     UnsupportedSource,
@@ -976,38 +984,34 @@ pub enum ChartAxisTitleError {
     /// An empty exact chart name was supplied.
     #[error("the Keynote chart selector name cannot be empty")]
     EmptyChartName,
-    /// The source chart graph, title stand-in, or selected native payload is
-    /// malformed or unsupported.
-    #[error("the Keynote chart-axis-title source cannot be edited safely")]
-    InvalidSource,
-    /// A finite resource ceiling was exceeded.
-    #[error(
-        "Keynote chart-axis-title {kind} limit exceeded: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        /// Resource category that exceeded its limit.
-        kind: ChartAxisTitleLimitKind,
-        /// Observed or requested amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-    },
-    /// A bounded destination allocation failed before publication.
-    #[error("could not allocate {amount} units for the Keynote chart-axis-title transaction")]
-    Allocation {
-        /// Elements or bytes requested.
-        amount: usize,
-    },
-    /// Full candidate reopening did not reproduce the requested title.
-    #[error("the edited Keynote chart title failed semantic verification")]
-    Verification,
-    /// The patch does not belong to this exact immutable package artifact.
-    #[error("the Keynote chart-axis-title patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+            Self::AmbiguousSelector { .. }
+            | Self::EmptySlideName { .. }
+            | Self::EmptyChartName { .. } => RefusalKind::InvalidValue,
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::ChartNameNotFound { .. }
+            | Self::ChartPositionNotFound { .. } => RefusalKind::NotFound,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// One mutable chart-axis-title value staged against an immutable package snapshot.
-pub struct ChartAxisTitleEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
     slide_position: Position,
     chart_position: Position,
@@ -1021,10 +1025,10 @@ pub struct ChartAxisTitleEdit<'a> {
     after: Option<String>,
 }
 
-impl fmt::Debug for ChartAxisTitleEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("ChartAxisTitleEdit")
+            .debug_struct("Edit")
             .field("slide_position", &self.slide_position)
             .field("chart_position", &self.chart_position)
             .field("has_before", &self.before.is_some())
@@ -1033,13 +1037,13 @@ impl fmt::Debug for ChartAxisTitleEdit<'_> {
     }
 }
 
-impl<'a> ChartAxisTitleEdit<'a> {
+impl<'a> Edit<'a> {
     fn new<'slide, 'chart>(
         source: &'a Package,
         slide_selector: impl Into<SlideSelector<'slide>>,
         chart_selector: impl Into<ChartSelector<'chart>>,
         axis: Axis,
-    ) -> Result<Self, ChartAxisTitleError> {
+    ) -> Result<Self, Error> {
         let mut budget = AxisTitleBudget::new(source)?;
         budget.charge_catalog_scan(source)?;
         let selection = chart_axis_support::select_axis(
@@ -1097,19 +1101,19 @@ impl<'a> ChartAxisTitleEdit<'a> {
     /// The input is copied into bounded edit-owned storage immediately, so a
     /// caller may pass either a borrowed string slice or an owned `String`
     /// without changing the transaction's source ownership or wire behavior.
-    pub fn set(mut self, title: impl AsRef<str>) -> Result<Self, ChartAxisTitleError> {
+    pub fn set(mut self, title: impl AsRef<str>) -> Result<Self, Error> {
         self.after = Some(copy_title(title.as_ref())?);
         Ok(self)
     }
 
     /// Stage removal of the visible chart title.
-    pub fn clear(mut self) -> Result<Self, ChartAxisTitleError> {
+    pub fn clear(mut self) -> Result<Self, Error> {
         self.after = None;
         Ok(self)
     }
 
     /// Validate and atomically publish the staged immutable candidate.
-    pub fn commit(self) -> Result<ChartAxisTitleCommit, ChartAxisTitleError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         let catalog =
             chart_axis_support::physical_catalog(self.source).map_err(map_axis_support_error)?;
         let source_bytes = catalog.shared_source();
@@ -1132,14 +1136,14 @@ impl<'a> ChartAxisTitleEdit<'a> {
             || source_selection.slide_identifier != self.slide_identifier
             || source_title != self.before
         {
-            return Err(ChartAxisTitleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
 
         if self.before == self.after {
             self.source.validate().map_err(map_read_error)?;
-            return Ok(ChartAxisTitleCommit {
+            return Ok(Commit {
                 package: self.source.snapshot(),
-                patch: ChartAxisTitlePatch {
+                patch: Patch {
                     artifacts: ExactArtifacts::new(Arc::clone(&source_bytes), source_bytes),
                     slide_position: self.slide_position,
                     chart_position: self.chart_position,
@@ -1155,12 +1159,12 @@ impl<'a> ChartAxisTitleEdit<'a> {
                     restored_previews: 0,
                     target_requires_invalidated_previews: false,
                 },
-                diagnostics: ChartAxisTitleDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
 
         if !catalog.source_is_exact() {
-            return Err(ChartAxisTitleError::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         self.source.validate().map_err(map_read_error)?;
         let (package, deleted_previews) = rewrite_chart_axis_title(
@@ -1192,7 +1196,7 @@ impl<'a> ChartAxisTitleEdit<'a> {
             || candidate_selection.slide_identifier != self.slide_identifier
             || candidate_title != self.after
         {
-            return Err(ChartAxisTitleError::Verification);
+            return Err(Error::Verification);
         }
         verify_candidate_reopen_locality(
             self.source,
@@ -1204,9 +1208,9 @@ impl<'a> ChartAxisTitleEdit<'a> {
             true,
             &mut budget,
         )?;
-        Ok(ChartAxisTitleCommit {
+        Ok(Commit {
             package,
-            patch: ChartAxisTitlePatch {
+            patch: Patch {
                 artifacts: ExactArtifacts::new(source_bytes, Arc::clone(&target)),
                 slide_position: self.slide_position,
                 chart_position: self.chart_position,
@@ -1222,14 +1226,14 @@ impl<'a> ChartAxisTitleEdit<'a> {
                 restored_previews: 0,
                 target_requires_invalidated_previews: true,
             },
-            diagnostics: ChartAxisTitleDiagnostics::published(deleted_previews),
+            diagnostics: Diagnostics::published(deleted_previews),
         })
     }
 }
 
 /// An exact-source-checked reversible semantic chart-axis-title patch.
 #[derive(Clone, PartialEq, Eq)]
-pub struct ChartAxisTitlePatch {
+pub struct Patch {
     artifacts: ExactArtifacts,
     slide_position: Position,
     chart_position: Position,
@@ -1246,10 +1250,10 @@ pub struct ChartAxisTitlePatch {
     target_requires_invalidated_previews: bool,
 }
 
-impl fmt::Debug for ChartAxisTitlePatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("ChartAxisTitlePatch")
+            .debug_struct("Patch")
             .field("slide_position", &self.slide_position)
             .field("chart_position", &self.chart_position)
             .field("has_before", &self.before.is_some())
@@ -1258,7 +1262,7 @@ impl fmt::Debug for ChartAxisTitlePatch {
     }
 }
 
-impl ChartAxisTitlePatch {
+impl Patch {
     /// Return the selected semantic slide position.
     #[must_use]
     pub const fn slide_position(&self) -> Position {
@@ -1326,14 +1330,14 @@ impl ChartAxisTitlePatch {
 
 /// Compact evidence describing one chart-axis-title commit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ChartAxisTitleDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     deleted_previews: usize,
     full_reparse_performed: bool,
 }
 
-impl ChartAxisTitleDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -1380,13 +1384,13 @@ impl ChartAxisTitleDiagnostics {
 /// The fully verified result of one immutable chart-axis-title transaction.
 #[must_use = "a Keynote chart-axis-title commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct ChartAxisTitleCommit {
+pub struct Commit {
     package: Package,
-    patch: ChartAxisTitlePatch,
-    diagnostics: ChartAxisTitleDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl ChartAxisTitleCommit {
+impl Commit {
     /// Borrow the fully reopened immutable package snapshot.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -1399,15 +1403,21 @@ impl ChartAxisTitleCommit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the reversible exact-source patch.
     #[must_use]
-    pub const fn patch(&self) -> &ChartAxisTitlePatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Borrow compact publication diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> &ChartAxisTitleDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
@@ -1419,7 +1429,7 @@ impl Package {
         slide_selector: impl Into<SlideSelector<'slide>>,
         chart_selector: impl Into<ChartSelector<'chart>>,
         axis: Axis,
-    ) -> Result<Option<String>, ChartAxisTitleError> {
+    ) -> Result<Option<String>, Error> {
         let mut budget = AxisTitleBudget::new(self)?;
         budget.charge_catalog_scan(self)?;
         let selection = chart_axis_support::select_axis(
@@ -1440,21 +1450,18 @@ impl Package {
         slide_selector: impl Into<SlideSelector<'slide>>,
         chart_selector: impl Into<ChartSelector<'chart>>,
         axis: Axis,
-    ) -> Result<ChartAxisTitleEdit<'_>, ChartAxisTitleError> {
-        ChartAxisTitleEdit::new(self, slide_selector, chart_selector, axis)
+    ) -> Result<Edit<'_>, Error> {
+        Edit::new(self, slide_selector, chart_selector, axis)
     }
 
     /// Apply an exact-source-checked chart-axis-title patch.
-    pub fn apply_slide_chart_axis_title(
-        &self,
-        patch: &ChartAxisTitlePatch,
-    ) -> Result<ChartAxisTitleCommit, ChartAxisTitleError> {
+    pub fn apply_slide_chart_axis_title(&self, patch: &Patch) -> Result<Commit, Error> {
         let catalog = chart_axis_support::physical_catalog(self).map_err(map_axis_support_error)?;
         let source = catalog.shared_source();
         let mut budget = AxisTitleBudget::new(self)?;
         budget.charge_catalog_scan(self)?;
         if !patch.artifacts.authorizes_source(&source) {
-            return Err(ChartAxisTitleError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let source_selection = chart_axis_support::select_axis(
             self,
@@ -1473,18 +1480,18 @@ impl Package {
             || source_selection.slide_identifier != patch.slide_identifier
             || source_title != patch.before
         {
-            return Err(ChartAxisTitleError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if patch.is_noop() {
             self.validate().map_err(map_read_error)?;
-            return Ok(ChartAxisTitleCommit {
+            return Ok(Commit {
                 package: self.snapshot(),
                 patch: patch.clone(),
-                diagnostics: ChartAxisTitleDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         if !catalog.source_is_exact() {
-            return Err(ChartAxisTitleError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         budget.charge_exact_artifacts(source.len(), patch.artifacts.target().len())?;
         budget.charge_candidate_reopen(self, patch.artifacts.target().len(), None)?;
@@ -1510,7 +1517,7 @@ impl Package {
             || candidate_selection.slide_identifier != patch.slide_identifier
             || candidate_title != patch.after
         {
-            return Err(ChartAxisTitleError::Verification);
+            return Err(Error::Verification);
         }
         verify_candidate_reopen_locality(
             self,
@@ -1522,10 +1529,10 @@ impl Package {
             patch.target_requires_invalidated_previews,
             &mut budget,
         )?;
-        Ok(ChartAxisTitleCommit {
+        Ok(Commit {
             package: candidate,
             patch: patch.clone(),
-            diagnostics: ChartAxisTitleDiagnostics::published(patch.deleted_previews),
+            diagnostics: Diagnostics::published(patch.deleted_previews),
         })
     }
 }
@@ -1535,15 +1542,15 @@ fn rewrite_chart_axis_title(
     selection: &AxisSelection,
     after: Option<&str>,
     budget: &mut AxisTitleBudget,
-) -> Result<(Package, usize), ChartAxisTitleError> {
+) -> Result<(Package, usize), Error> {
     let catalog = chart_axis_support::physical_catalog(source).map_err(map_axis_support_error)?;
     let entry = catalog
         .package()
         .iter()
         .find(|entry| entry.name() == selection.axis_component_name)
-        .ok_or(ChartAxisTitleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(ChartAxisTitleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let archive_limits = source
         .state
@@ -1563,20 +1570,18 @@ fn rewrite_chart_axis_title(
         .components()
         .iter()
         .find(|component| component.name() == selection.axis_component_name)
-        .ok_or(ChartAxisTitleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let decompressed_bound = parsed_component
         .archive()
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_core_error)?;
     budget.charge_native_decompress_parse(
         entry.data().len(),
         decompressed_bound,
         parsed_component.archive().objects.len(),
     )?;
-    let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
-        .map_err(map_core_error)?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let stream = SnappyStream::decompress(entry.data(), snappy_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     chart_axis_support::validate_canonical_object_length_prefixes_with_budget(
         stream.as_bytes(),
         &archive,
@@ -1586,17 +1591,17 @@ fn rewrite_chart_axis_title(
     let message_data = {
         let object = archive
             .object(selection.axis_identifier)
-            .ok_or(ChartAxisTitleError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let message = object
             .messages
             .get(selection.axis_message_index)
             .filter(|message| message.type_ == CHART_AXIS_MESSAGE_TYPE)
-            .ok_or(ChartAxisTitleError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         budget.charge_owned_clone(message.data.len())?;
         let mut cloned = Vec::new();
         cloned
             .try_reserve_exact(message.data.len())
-            .map_err(|_error| ChartAxisTitleError::Allocation {
+            .map_err(|_error| Error::Allocation {
                 amount: message.data.len(),
             })?;
         cloned.extend_from_slice(&message.data);
@@ -1612,8 +1617,8 @@ fn rewrite_chart_axis_title(
     )?;
     archive
         .object_mut(selection.axis_identifier)
-        .ok_or(ChartAxisTitleError::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .ok_or(Error::InvalidSource)?
+        .replace_message_preserving_header(
             selection.axis_message_index,
             RawMessage {
                 type_: CHART_AXIS_MESSAGE_TYPE,
@@ -1623,12 +1628,10 @@ fn rewrite_chart_axis_title(
         )
         .map_err(map_core_error)?;
     budget.charge_archive_snappy_plan(&archive, archive_limits, snappy_limits)?;
-    let bytes = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
-    let compressed = SnappyStream::compress(&bytes).map_err(map_core_error)?;
+    let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
     let previews = super::rendering_invalidation::root_preview_deletions(catalog.package())
-        .map_err(|_error| ChartAxisTitleError::InvalidSource)?;
+        .map_err(|_error| Error::InvalidSource)?;
     let edit = EntryEdit::new(
         selection.axis_component_name.as_str(),
         compressed.as_slice(),
@@ -1659,15 +1662,13 @@ fn read_chart_axis_title(
     limits: WireLimits,
     kind: AxisTitleKind,
     budget: &mut AxisTitleBudget,
-) -> Result<Option<String>, ChartAxisTitleError> {
+) -> Result<Option<String>, Error> {
     let fields = accounted_wire_fields(data, limits, budget)?;
     let mut extension_field = None;
     let mut extension_count = 0usize;
     for field in &fields {
         if field.number() == GENERATED_CHART_AXIS_EXTENSION_FIELD {
-            extension_count = extension_count
-                .checked_add(1)
-                .ok_or(ChartAxisTitleError::InvalidSource)?;
+            extension_count = extension_count.checked_add(1).ok_or(Error::InvalidSource)?;
             extension_field = Some(*field);
         }
     }
@@ -1675,7 +1676,7 @@ fn read_chart_axis_title(
         return Ok(None);
     };
     if extension_count != 1 || field.wire_type() != 2 {
-        return Err(ChartAxisTitleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     field
         .validate_canonical_framing(data)
@@ -1692,15 +1693,15 @@ fn read_selected_axis_title(
     package: &Package,
     selection: &AxisSelection,
     budget: &mut AxisTitleBudget,
-) -> Result<Option<String>, ChartAxisTitleError> {
+) -> Result<Option<String>, Error> {
     let (_component, object) = package
         .object_with_component(selection.axis_identifier)
-        .ok_or(ChartAxisTitleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let message = object
         .messages
         .get(selection.axis_message_index)
         .filter(|message| message.type_ == CHART_AXIS_MESSAGE_TYPE)
-        .ok_or(ChartAxisTitleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let limits = package.wire_limits().map_err(map_wire_error)?;
     read_chart_axis_title(
         &message.data,
@@ -1714,7 +1715,7 @@ fn accounted_wire_fields(
     payload: &[u8],
     limits: WireLimits,
     budget: &mut AxisTitleBudget,
-) -> Result<Vec<WireField>, ChartAxisTitleError> {
+) -> Result<Vec<WireField>, Error> {
     chart_axis_support::accounted_wire_fields(payload, limits, budget)
         .map_err(map_axis_support_error)
 }
@@ -1728,9 +1729,9 @@ fn verify_candidate_reopen_locality(
     expected_title: Option<&str>,
     target_requires_invalidated_previews: bool,
     budget: &mut AxisTitleBudget,
-) -> Result<(), ChartAxisTitleError> {
+) -> Result<(), Error> {
     if source.state.total_objects != candidate.state.total_objects {
-        return Err(ChartAxisTitleError::Verification);
+        return Err(Error::Verification);
     }
     let source_selected = chart_axis_support::select_axis(
         source,
@@ -1756,12 +1757,12 @@ fn verify_candidate_reopen_locality(
         || source_selected.axis_component_name != candidate_selected.axis_component_name
         || candidate_title.as_deref() != expected_title
     {
-        return Err(ChartAxisTitleError::Verification);
+        return Err(Error::Verification);
     }
     let source_show = source.show().map_err(map_read_error)?;
     let candidate_show = candidate.show().map_err(map_read_error)?;
     if source_show != candidate_show {
-        return Err(ChartAxisTitleError::Verification);
+        return Err(Error::Verification);
     }
     chart_axis_support::verify_package_locality(
         source,
@@ -1777,9 +1778,9 @@ fn verify_candidate_reopen_locality(
                 .map_err(map_axis_support_error)?
                 .package(),
         )
-        .map_err(|_error| ChartAxisTitleError::Verification)?
+        .map_err(|_error| Error::Verification)?
     {
-        return Err(ChartAxisTitleError::Verification);
+        return Err(Error::Verification);
     }
     Ok(())
 }
@@ -1790,7 +1791,7 @@ fn patch_chart_axis_title(
     limits: WireLimits,
     kind: AxisTitleKind,
     budget: &mut AxisTitleBudget,
-) -> Result<Vec<u8>, ChartAxisTitleError> {
+) -> Result<Vec<u8>, Error> {
     let fields = accounted_wire_fields(data, limits, budget)?;
     let extension_field = fields
         .iter()
@@ -1802,11 +1803,11 @@ fn patch_chart_axis_title(
         .count()
         > 1
     {
-        return Err(ChartAxisTitleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if let Some(field) = extension_field {
         if field.wire_type() != 2 {
-            return Err(ChartAxisTitleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field
             .validate_canonical_framing(data)
@@ -1839,7 +1840,7 @@ fn execute_prepared_axis_title_rewrite(
     source: &[u8],
     write: AxisTitleWrite<'_>,
     budget: &mut AxisTitleBudget,
-) -> Result<Vec<u8>, ChartAxisTitleError> {
+) -> Result<Vec<u8>, Error> {
     let prepared = prepare_axis_title_rewrite(source, write, budget.codec_options(source.len())?)
         .map_err(map_chart_axis_title_codec_error)?;
     let prepare_report = prepared.prepare_report();
@@ -1864,9 +1865,9 @@ fn rewrite_chart_non_style_extension(
     replacement: &[u8],
     limits: WireLimits,
     budget: &mut AxisTitleBudget,
-) -> Result<Vec<u8>, ChartAxisTitleError> {
+) -> Result<Vec<u8>, Error> {
     let replacement_length =
-        u64::try_from(replacement.len()).map_err(|_error| ChartAxisTitleError::InvalidSource)?;
+        u64::try_from(replacement.len()).map_err(|_error| Error::InvalidSource)?;
     let key_length = extension_field.map_or_else(
         || encoded_len((u64::from(GENERATED_CHART_AXIS_EXTENSION_FIELD) << 3) | 2),
         |field| field.key_end() - field.start(),
@@ -1874,7 +1875,7 @@ fn rewrite_chart_non_style_extension(
     let replacement_field_length = key_length
         .checked_add(encoded_len(replacement_length))
         .and_then(|length| length.checked_add(replacement.len()))
-        .ok_or(ChartAxisTitleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let output_length = extension_field
         .map_or_else(
             || data.len().checked_add(replacement_field_length),
@@ -1884,10 +1885,10 @@ fn rewrite_chart_non_style_extension(
                     .and_then(|length| length.checked_add(replacement_field_length))
             },
         )
-        .ok_or(ChartAxisTitleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if output_length > limits.max_output_bytes() {
-        return Err(ChartAxisTitleError::LimitExceeded {
-            kind: ChartAxisTitleLimitKind::OutputBytes,
+        return Err(Error::Limit {
+            kind: LimitKind::OutputBytes,
             observed: usize_to_u64(output_length),
             maximum: usize_to_u64(limits.max_output_bytes()),
         });
@@ -1896,7 +1897,7 @@ fn rewrite_chart_non_style_extension(
     let mut output = Vec::new();
     output
         .try_reserve_exact(output_length)
-        .map_err(|_error| ChartAxisTitleError::Allocation {
+        .map_err(|_error| Error::Allocation {
             amount: output_length,
         })?;
     match extension_field {
@@ -1925,10 +1926,10 @@ fn clone_title_source(
     data: &[u8],
     limits: WireLimits,
     budget: &mut AxisTitleBudget,
-) -> Result<Vec<u8>, ChartAxisTitleError> {
+) -> Result<Vec<u8>, Error> {
     if data.len() > limits.max_output_bytes() {
-        return Err(ChartAxisTitleError::LimitExceeded {
-            kind: ChartAxisTitleLimitKind::OutputBytes,
+        return Err(Error::Limit {
+            kind: LimitKind::OutputBytes,
             observed: usize_to_u64(data.len()),
             maximum: usize_to_u64(limits.max_output_bytes()),
         });
@@ -1937,15 +1938,15 @@ fn clone_title_source(
     let mut output = Vec::new();
     output
         .try_reserve_exact(data.len())
-        .map_err(|_error| ChartAxisTitleError::Allocation { amount: data.len() })?;
+        .map_err(|_error| Error::Allocation { amount: data.len() })?;
     output.extend_from_slice(data);
     Ok(output)
 }
 
-fn copy_title(title: &str) -> Result<String, ChartAxisTitleError> {
+fn copy_title(title: &str) -> Result<String, Error> {
     if title.len() > MAX_CHART_TITLE_BYTES {
-        return Err(ChartAxisTitleError::LimitExceeded {
-            kind: ChartAxisTitleLimitKind::TitleBytes,
+        return Err(Error::Limit {
+            kind: LimitKind::TitleBytes,
             observed: usize_to_u64(title.len()),
             maximum: usize_to_u64(MAX_CHART_TITLE_BYTES),
         });
@@ -1953,288 +1954,212 @@ fn copy_title(title: &str) -> Result<String, ChartAxisTitleError> {
     let mut owned = String::new();
     owned
         .try_reserve_exact(title.len())
-        .map_err(|_error| ChartAxisTitleError::Allocation {
+        .map_err(|_error| Error::Allocation {
             amount: title.len(),
         })?;
     owned.push_str(title);
     Ok(owned)
 }
 
-fn map_chart_axis_title_codec_error(error: ChartAxisTitleDecodeError) -> ChartAxisTitleError {
+fn map_chart_axis_title_codec_error(error: ChartAxisTitleDecodeError) -> Error {
     if let Some(limit) = error.resource_limit() {
         return match limit {
-            ChartAxisTitleDecodeLimit::Bytes { observed, maximum } => {
-                ChartAxisTitleError::LimitExceeded {
-                    kind: ChartAxisTitleLimitKind::WireBytes,
-                    observed: usize_to_u64(observed),
-                    maximum: usize_to_u64(maximum),
-                }
+            ChartAxisTitleDecodeLimit::Bytes { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireBytes,
+                observed: usize_to_u64(observed),
+                maximum: usize_to_u64(maximum),
             },
-            ChartAxisTitleDecodeLimit::Fields { observed, maximum } => {
-                ChartAxisTitleError::LimitExceeded {
-                    kind: ChartAxisTitleLimitKind::WireFields,
-                    observed: usize_to_u64(observed),
-                    maximum: usize_to_u64(maximum),
-                }
+            ChartAxisTitleDecodeLimit::Fields { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireFields,
+                observed: usize_to_u64(observed),
+                maximum: usize_to_u64(maximum),
             },
-            ChartAxisTitleDecodeLimit::Work { observed, maximum } => {
-                ChartAxisTitleError::LimitExceeded {
-                    kind: ChartAxisTitleLimitKind::WireWork,
-                    observed: usize_to_u64(observed),
-                    maximum: usize_to_u64(maximum),
-                }
+            ChartAxisTitleDecodeLimit::Work { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireWork,
+                observed: usize_to_u64(observed),
+                maximum: usize_to_u64(maximum),
             },
-            ChartAxisTitleDecodeLimit::Output { observed, maximum } => {
-                ChartAxisTitleError::LimitExceeded {
-                    kind: ChartAxisTitleLimitKind::OutputBytes,
-                    observed: usize_to_u64(observed),
-                    maximum: usize_to_u64(maximum),
-                }
+            ChartAxisTitleDecodeLimit::Output { observed, maximum } => Error::Limit {
+                kind: LimitKind::OutputBytes,
+                observed: usize_to_u64(observed),
+                maximum: usize_to_u64(maximum),
             },
-            ChartAxisTitleDecodeLimit::Title { observed, maximum } => {
-                ChartAxisTitleError::LimitExceeded {
-                    kind: ChartAxisTitleLimitKind::TitleBytes,
-                    observed: usize_to_u64(observed),
-                    maximum: usize_to_u64(maximum),
-                }
+            ChartAxisTitleDecodeLimit::Title { observed, maximum } => Error::Limit {
+                kind: LimitKind::TitleBytes,
+                observed: usize_to_u64(observed),
+                maximum: usize_to_u64(maximum),
             },
-            ChartAxisTitleDecodeLimit::Nesting { observed, maximum } => {
-                ChartAxisTitleError::LimitExceeded {
-                    kind: ChartAxisTitleLimitKind::WireNesting,
-                    observed: u64::from(observed),
-                    maximum: u64::from(maximum),
-                }
+            ChartAxisTitleDecodeLimit::Nesting { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireNesting,
+                observed: u64::from(observed),
+                maximum: u64::from(maximum),
             },
-            ChartAxisTitleDecodeLimit::Allocations { observed, maximum } => {
-                ChartAxisTitleError::LimitExceeded {
-                    kind: ChartAxisTitleLimitKind::Entries,
-                    observed: usize_to_u64(observed),
-                    maximum: usize_to_u64(maximum),
-                }
+            ChartAxisTitleDecodeLimit::Allocations { observed, maximum } => Error::Limit {
+                kind: LimitKind::Entries,
+                observed: usize_to_u64(observed),
+                maximum: usize_to_u64(maximum),
             },
             ChartAxisTitleDecodeLimit::Retained { observed, maximum }
-            | ChartAxisTitleDecodeLimit::Scratch { observed, maximum } => {
-                ChartAxisTitleError::LimitExceeded {
-                    kind: ChartAxisTitleLimitKind::TotalBytes,
-                    observed: usize_to_u64(observed),
-                    maximum: usize_to_u64(maximum),
-                }
+            | ChartAxisTitleDecodeLimit::Scratch { observed, maximum } => Error::Limit {
+                kind: LimitKind::TotalBytes,
+                observed: usize_to_u64(observed),
+                maximum: usize_to_u64(maximum),
             },
-            _ => ChartAxisTitleError::InvalidSource,
+            _ => Error::InvalidSource,
         };
     }
     if let Some(limit) = error.wire_resource_limit() {
         return match limit {
-            ChartAxisTitleWireResourceLimit::Bytes { observed, maximum } => {
-                ChartAxisTitleError::LimitExceeded {
-                    kind: ChartAxisTitleLimitKind::WireBytes,
-                    observed: usize_to_u64(observed),
-                    maximum: usize_to_u64(maximum),
-                }
+            ChartAxisTitleWireResourceLimit::Bytes { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireBytes,
+                observed: usize_to_u64(observed),
+                maximum: usize_to_u64(maximum),
             },
-            ChartAxisTitleWireResourceLimit::Nesting { observed, maximum } => {
-                ChartAxisTitleError::LimitExceeded {
-                    kind: ChartAxisTitleLimitKind::WireNesting,
-                    observed: u64::from(observed),
-                    maximum: u64::from(maximum),
-                }
+            ChartAxisTitleWireResourceLimit::Nesting { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireNesting,
+                observed: u64::from(observed),
+                maximum: u64::from(maximum),
             },
-            _ => ChartAxisTitleError::InvalidSource,
+            _ => Error::InvalidSource,
         };
     }
     if let Some(amount) = error.allocation_amount() {
-        return ChartAxisTitleError::Allocation { amount };
+        return Error::Allocation { amount };
     }
-    ChartAxisTitleError::InvalidSource
+    Error::InvalidSource
 }
 
-fn axis_support_budget_error(error: ChartAxisTitleError) -> AxisSupportError {
+fn axis_support_budget_error(error: Error) -> AxisSupportError {
     match error {
-        ChartAxisTitleError::UnsupportedSource => AxisSupportError::Selector(
+        Error::Refused(Refusal::UnsupportedSource) => AxisSupportError::Selector(
             chart_axis_support::AxisSupportSelectorError::UnsupportedSource,
         ),
-        ChartAxisTitleError::AmbiguousSelector => AxisSupportError::Selector(
+        Error::Refused(Refusal::AmbiguousSelector) => AxisSupportError::Selector(
             chart_axis_support::AxisSupportSelectorError::AmbiguousSelector,
         ),
-        ChartAxisTitleError::EmptySlideName => {
+        Error::Refused(Refusal::EmptySlideName) => {
             AxisSupportError::Selector(chart_axis_support::AxisSupportSelectorError::EmptySlideName)
         },
-        ChartAxisTitleError::SlideNameNotFound => AxisSupportError::Selector(
+        Error::Refused(Refusal::SlideNameNotFound) => AxisSupportError::Selector(
             chart_axis_support::AxisSupportSelectorError::SlideNameNotFound,
         ),
-        ChartAxisTitleError::SlidePositionNotFound { position } => AxisSupportError::Selector(
+        Error::Refused(Refusal::SlidePositionNotFound { position }) => AxisSupportError::Selector(
             chart_axis_support::AxisSupportSelectorError::SlidePositionNotFound { position },
         ),
-        ChartAxisTitleError::ChartNameNotFound => AxisSupportError::Selector(
+        Error::Refused(Refusal::ChartNameNotFound) => AxisSupportError::Selector(
             chart_axis_support::AxisSupportSelectorError::ChartNameNotFound,
         ),
-        ChartAxisTitleError::ChartPositionNotFound { position } => AxisSupportError::Selector(
+        Error::Refused(Refusal::ChartPositionNotFound { position }) => AxisSupportError::Selector(
             chart_axis_support::AxisSupportSelectorError::ChartPositionNotFound { position },
         ),
-        ChartAxisTitleError::EmptyChartName => {
+        Error::Refused(Refusal::EmptyChartName) => {
             AxisSupportError::Selector(chart_axis_support::AxisSupportSelectorError::EmptyChartName)
         },
-        ChartAxisTitleError::LimitExceeded {
+        Error::Limit {
             kind,
             observed,
             maximum,
         } => AxisSupportError::LimitExceeded {
             kind: match kind {
-                ChartAxisTitleLimitKind::InputBytes => {
-                    chart_axis_support::AxisSupportLimitKind::InputBytes
-                },
-                ChartAxisTitleLimitKind::OutputBytes => {
-                    chart_axis_support::AxisSupportLimitKind::OutputBytes
-                },
-                ChartAxisTitleLimitKind::WireBytes => {
-                    chart_axis_support::AxisSupportLimitKind::WireBytes
-                },
-                ChartAxisTitleLimitKind::Entries => {
-                    chart_axis_support::AxisSupportLimitKind::Entries
-                },
-                ChartAxisTitleLimitKind::EntryBytes => {
-                    chart_axis_support::AxisSupportLimitKind::EntryBytes
-                },
-                ChartAxisTitleLimitKind::TotalBytes => {
-                    chart_axis_support::AxisSupportLimitKind::TotalBytes
-                },
-                ChartAxisTitleLimitKind::Slides => chart_axis_support::AxisSupportLimitKind::Slides,
-                ChartAxisTitleLimitKind::References => {
-                    chart_axis_support::AxisSupportLimitKind::References
-                },
-                ChartAxisTitleLimitKind::TextStorages => {
-                    chart_axis_support::AxisSupportLimitKind::TextStorages
-                },
-                ChartAxisTitleLimitKind::TextFragments => {
-                    chart_axis_support::AxisSupportLimitKind::TextFragments
-                },
-                ChartAxisTitleLimitKind::TextBytes => {
-                    chart_axis_support::AxisSupportLimitKind::TextBytes
-                },
-                ChartAxisTitleLimitKind::WireFields => {
-                    chart_axis_support::AxisSupportLimitKind::WireFields
-                },
-                ChartAxisTitleLimitKind::WireNesting => {
-                    chart_axis_support::AxisSupportLimitKind::WireNesting
-                },
-                ChartAxisTitleLimitKind::WireWork => {
-                    chart_axis_support::AxisSupportLimitKind::WireWork
-                },
-                ChartAxisTitleLimitKind::TitleBytes => {
-                    chart_axis_support::AxisSupportLimitKind::TitleBytes
-                },
+                LimitKind::InputBytes => chart_axis_support::AxisSupportLimitKind::InputBytes,
+                LimitKind::OutputBytes => chart_axis_support::AxisSupportLimitKind::OutputBytes,
+                LimitKind::WireBytes => chart_axis_support::AxisSupportLimitKind::WireBytes,
+                LimitKind::Entries => chart_axis_support::AxisSupportLimitKind::Entries,
+                LimitKind::EntryBytes => chart_axis_support::AxisSupportLimitKind::EntryBytes,
+                LimitKind::TotalBytes => chart_axis_support::AxisSupportLimitKind::TotalBytes,
+                LimitKind::Slides => chart_axis_support::AxisSupportLimitKind::Slides,
+                LimitKind::References => chart_axis_support::AxisSupportLimitKind::References,
+                LimitKind::TextStorages => chart_axis_support::AxisSupportLimitKind::TextStorages,
+                LimitKind::TextFragments => chart_axis_support::AxisSupportLimitKind::TextFragments,
+                LimitKind::TextBytes => chart_axis_support::AxisSupportLimitKind::TextBytes,
+                LimitKind::WireFields => chart_axis_support::AxisSupportLimitKind::WireFields,
+                LimitKind::WireNesting => chart_axis_support::AxisSupportLimitKind::WireNesting,
+                LimitKind::WireWork => chart_axis_support::AxisSupportLimitKind::WireWork,
+                LimitKind::TitleBytes => chart_axis_support::AxisSupportLimitKind::TitleBytes,
             },
             observed,
             maximum,
         },
-        ChartAxisTitleError::Allocation { amount } => AxisSupportError::Allocation { amount },
-        ChartAxisTitleError::InvalidSource
-        | ChartAxisTitleError::Verification
-        | ChartAxisTitleError::PatchConflict => AxisSupportError::InvalidSource,
+        Error::Allocation { amount } => AxisSupportError::Allocation { amount },
+        Error::InvalidSource | Error::Verification | Error::PatchConflict => {
+            AxisSupportError::InvalidSource
+        },
     }
 }
 
-fn map_axis_support_error(error: AxisSupportError) -> ChartAxisTitleError {
+fn map_axis_support_error(error: AxisSupportError) -> Error {
     match error {
         AxisSupportError::Selector(selector) => match selector {
             chart_axis_support::AxisSupportSelectorError::UnsupportedSource => {
-                ChartAxisTitleError::UnsupportedSource
+                Error::Refused(Refusal::UnsupportedSource)
             },
             chart_axis_support::AxisSupportSelectorError::AmbiguousSelector => {
-                ChartAxisTitleError::AmbiguousSelector
+                Error::Refused(Refusal::AmbiguousSelector)
             },
             chart_axis_support::AxisSupportSelectorError::EmptySlideName => {
-                ChartAxisTitleError::EmptySlideName
+                Error::Refused(Refusal::EmptySlideName)
             },
             chart_axis_support::AxisSupportSelectorError::SlideNameNotFound => {
-                ChartAxisTitleError::SlideNameNotFound
+                Error::Refused(Refusal::SlideNameNotFound)
             },
             chart_axis_support::AxisSupportSelectorError::SlidePositionNotFound { position } => {
-                ChartAxisTitleError::SlidePositionNotFound { position }
+                Error::Refused(Refusal::SlidePositionNotFound { position })
             },
             chart_axis_support::AxisSupportSelectorError::ChartNameNotFound => {
-                ChartAxisTitleError::ChartNameNotFound
+                Error::Refused(Refusal::ChartNameNotFound)
             },
             chart_axis_support::AxisSupportSelectorError::ChartPositionNotFound { position } => {
-                ChartAxisTitleError::ChartPositionNotFound { position }
+                Error::Refused(Refusal::ChartPositionNotFound { position })
             },
             chart_axis_support::AxisSupportSelectorError::EmptyChartName => {
-                ChartAxisTitleError::EmptyChartName
+                Error::Refused(Refusal::EmptyChartName)
             },
         },
         AxisSupportError::LimitExceeded {
             kind,
             observed,
             maximum,
-        } => ChartAxisTitleError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                chart_axis_support::AxisSupportLimitKind::InputBytes => {
-                    ChartAxisTitleLimitKind::InputBytes
-                },
-                chart_axis_support::AxisSupportLimitKind::OutputBytes => {
-                    ChartAxisTitleLimitKind::OutputBytes
-                },
-                chart_axis_support::AxisSupportLimitKind::WireBytes => {
-                    ChartAxisTitleLimitKind::WireBytes
-                },
-                chart_axis_support::AxisSupportLimitKind::Entries => {
-                    ChartAxisTitleLimitKind::Entries
-                },
-                chart_axis_support::AxisSupportLimitKind::EntryBytes => {
-                    ChartAxisTitleLimitKind::EntryBytes
-                },
-                chart_axis_support::AxisSupportLimitKind::TotalBytes => {
-                    ChartAxisTitleLimitKind::TotalBytes
-                },
-                chart_axis_support::AxisSupportLimitKind::Slides => ChartAxisTitleLimitKind::Slides,
-                chart_axis_support::AxisSupportLimitKind::References => {
-                    ChartAxisTitleLimitKind::References
-                },
-                chart_axis_support::AxisSupportLimitKind::TextStorages => {
-                    ChartAxisTitleLimitKind::TextStorages
-                },
-                chart_axis_support::AxisSupportLimitKind::TextFragments => {
-                    ChartAxisTitleLimitKind::TextFragments
-                },
-                chart_axis_support::AxisSupportLimitKind::TextBytes => {
-                    ChartAxisTitleLimitKind::TextBytes
-                },
-                chart_axis_support::AxisSupportLimitKind::WireFields => {
-                    ChartAxisTitleLimitKind::WireFields
-                },
-                chart_axis_support::AxisSupportLimitKind::WireNesting => {
-                    ChartAxisTitleLimitKind::WireNesting
-                },
-                chart_axis_support::AxisSupportLimitKind::WireWork => {
-                    ChartAxisTitleLimitKind::WireWork
-                },
-                chart_axis_support::AxisSupportLimitKind::TitleBytes => {
-                    ChartAxisTitleLimitKind::TitleBytes
-                },
+                chart_axis_support::AxisSupportLimitKind::InputBytes => LimitKind::InputBytes,
+                chart_axis_support::AxisSupportLimitKind::OutputBytes => LimitKind::OutputBytes,
+                chart_axis_support::AxisSupportLimitKind::WireBytes => LimitKind::WireBytes,
+                chart_axis_support::AxisSupportLimitKind::Entries => LimitKind::Entries,
+                chart_axis_support::AxisSupportLimitKind::EntryBytes => LimitKind::EntryBytes,
+                chart_axis_support::AxisSupportLimitKind::TotalBytes => LimitKind::TotalBytes,
+                chart_axis_support::AxisSupportLimitKind::Slides => LimitKind::Slides,
+                chart_axis_support::AxisSupportLimitKind::References => LimitKind::References,
+                chart_axis_support::AxisSupportLimitKind::TextStorages => LimitKind::TextStorages,
+                chart_axis_support::AxisSupportLimitKind::TextFragments => LimitKind::TextFragments,
+                chart_axis_support::AxisSupportLimitKind::TextBytes => LimitKind::TextBytes,
+                chart_axis_support::AxisSupportLimitKind::WireFields => LimitKind::WireFields,
+                chart_axis_support::AxisSupportLimitKind::WireNesting => LimitKind::WireNesting,
+                chart_axis_support::AxisSupportLimitKind::WireWork => LimitKind::WireWork,
+                chart_axis_support::AxisSupportLimitKind::TitleBytes => LimitKind::TitleBytes,
             },
             observed,
             maximum,
         },
-        AxisSupportError::Allocation { amount } => ChartAxisTitleError::Allocation { amount },
-        AxisSupportError::InvalidSource => ChartAxisTitleError::InvalidSource,
+        AxisSupportError::Allocation { amount } => Error::Allocation { amount },
+        AxisSupportError::InvalidSource => Error::InvalidSource,
     }
 }
 
-fn map_read_error(error: ReadError) -> ChartAxisTitleError {
+fn map_read_error(error: ReadError) -> Error {
     match error {
         ReadError::SemanticLimit {
             kind,
             observed,
             maximum,
             ..
-        } => ChartAxisTitleError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                SemanticLimitKind::Objects => ChartAxisTitleLimitKind::Entries,
-                SemanticLimitKind::Slides => ChartAxisTitleLimitKind::Slides,
-                SemanticLimitKind::References => ChartAxisTitleLimitKind::References,
-                SemanticLimitKind::TextStorages => ChartAxisTitleLimitKind::TextStorages,
-                SemanticLimitKind::TextFragments => ChartAxisTitleLimitKind::TextFragments,
-                SemanticLimitKind::TextBytes => ChartAxisTitleLimitKind::TextBytes,
+                SemanticLimitKind::Objects => LimitKind::Entries,
+                SemanticLimitKind::Slides => LimitKind::Slides,
+                SemanticLimitKind::References => LimitKind::References,
+                SemanticLimitKind::TextStorages => LimitKind::TextStorages,
+                SemanticLimitKind::TextFragments => LimitKind::TextFragments,
+                SemanticLimitKind::TextBytes => LimitKind::TextBytes,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
@@ -2244,66 +2169,64 @@ fn map_read_error(error: ReadError) -> ChartAxisTitleError {
             observed,
             maximum,
             ..
-        } => ChartAxisTitleError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                super::PayloadLimitKind::Bytes => ChartAxisTitleLimitKind::WireBytes,
-                super::PayloadLimitKind::Fields => ChartAxisTitleLimitKind::WireFields,
-                super::PayloadLimitKind::Nesting => ChartAxisTitleLimitKind::WireNesting,
-                super::PayloadLimitKind::Work => ChartAxisTitleLimitKind::WireWork,
+                super::PayloadLimitKind::Bytes => LimitKind::WireBytes,
+                super::PayloadLimitKind::Fields => LimitKind::WireFields,
+                super::PayloadLimitKind::Nesting => LimitKind::WireNesting,
+                super::PayloadLimitKind::Work => LimitKind::WireWork,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         },
-        ReadError::Allocation { amount, .. } => ChartAxisTitleError::Allocation { amount },
+        ReadError::Allocation { amount, .. } => Error::Allocation { amount },
         ReadError::Archive(_)
         | ReadError::Detection(_)
-        | ReadError::NotKeynote
+        | ReadError::UnexpectedFormat { .. }
         | ReadError::InvalidFormat(_)
         | ReadError::Decode(_)
         | ReadError::TextStorage { .. }
         | ReadError::Metadata(_)
-        | ReadError::Io(_) => ChartAxisTitleError::InvalidSource,
+        | ReadError::Io(_) => Error::InvalidSource,
     }
 }
 
-fn map_archive_error(error: litchi_iwa_archive::Error) -> ChartAxisTitleError {
+fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     match error {
         litchi_iwa_archive::Error::Limit {
             kind,
             observed,
             maximum,
-        } => ChartAxisTitleError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_archive::LimitKind::InputBytes => ChartAxisTitleLimitKind::InputBytes,
-                litchi_iwa_archive::LimitKind::OutputBytes => ChartAxisTitleLimitKind::OutputBytes,
-                litchi_iwa_archive::LimitKind::Entries => ChartAxisTitleLimitKind::Entries,
-                litchi_iwa_archive::LimitKind::EntryBytes => ChartAxisTitleLimitKind::EntryBytes,
-                litchi_iwa_archive::LimitKind::TotalBytes => ChartAxisTitleLimitKind::TotalBytes,
-                _ => ChartAxisTitleLimitKind::WireBytes,
+                litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
+                litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_archive::LimitKind::Entries => LimitKind::Entries,
+                litchi_iwa_archive::LimitKind::EntryBytes => LimitKind::EntryBytes,
+                litchi_iwa_archive::LimitKind::TotalBytes => LimitKind::TotalBytes,
+                _ => LimitKind::WireBytes,
             },
             observed,
             maximum,
         },
-        litchi_iwa_archive::Error::Allocation { amount, .. } => {
-            ChartAxisTitleError::Allocation { amount }
-        },
-        _ => ChartAxisTitleError::InvalidSource,
+        litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_core_error(error: litchi_iwa_core::Error) -> ChartAxisTitleError {
+fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
             kind,
             observed,
             maximum,
-        } => ChartAxisTitleError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_core::LimitKind::ArchiveBytes => ChartAxisTitleLimitKind::TotalBytes,
+                litchi_iwa_core::LimitKind::ArchiveBytes => LimitKind::TotalBytes,
                 litchi_iwa_core::LimitKind::Objects
                 | litchi_iwa_core::LimitKind::Messages
                 | litchi_iwa_core::LimitKind::MessagesPerObject
-                | litchi_iwa_core::LimitKind::MetadataItems => ChartAxisTitleLimitKind::Entries,
+                | litchi_iwa_core::LimitKind::MetadataItems => LimitKind::Entries,
                 litchi_iwa_core::LimitKind::ObjectBytes
                 | litchi_iwa_core::LimitKind::MessageBytes
                 | litchi_iwa_core::LimitKind::HeaderBytes
@@ -2311,51 +2234,44 @@ fn map_core_error(error: litchi_iwa_core::Error) -> ChartAxisTitleError {
                 | litchi_iwa_core::LimitKind::SnappyChunkBytes
                 | litchi_iwa_core::LimitKind::SnappyStreamBytes
                 | litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
-                | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes => {
-                    ChartAxisTitleLimitKind::WireBytes
-                },
-                litchi_iwa_core::LimitKind::HeaderFields => ChartAxisTitleLimitKind::WireFields,
-                litchi_iwa_core::LimitKind::HeaderNesting => ChartAxisTitleLimitKind::WireNesting,
-                litchi_iwa_core::LimitKind::SnappyFrames => ChartAxisTitleLimitKind::WireWork,
+                | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes => LimitKind::WireBytes,
+                litchi_iwa_core::LimitKind::HeaderFields => LimitKind::WireFields,
+                litchi_iwa_core::LimitKind::HeaderNesting => LimitKind::WireNesting,
+                litchi_iwa_core::LimitKind::SnappyFrames => LimitKind::WireWork,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         },
         litchi_iwa_core::Error::Allocation { requested, .. } => {
-            ChartAxisTitleError::Allocation { amount: requested }
+            Error::Allocation { amount: requested }
         },
-        _ => ChartAxisTitleError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_wire_error(error: litchi_iwa_common::Error) -> ChartAxisTitleError {
+fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
     match error {
         litchi_iwa_common::Error::LimitExceeded {
             kind,
             observed,
             limit,
-        } => ChartAxisTitleError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_common::LimitKind::InputBytes => ChartAxisTitleLimitKind::WireBytes,
-                litchi_iwa_common::LimitKind::OutputBytes => ChartAxisTitleLimitKind::OutputBytes,
+                litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
+                litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,
                 litchi_iwa_common::LimitKind::Fields
                 | litchi_iwa_common::LimitKind::TableRows
                 | litchi_iwa_common::LimitKind::TableColumns
                 | litchi_iwa_common::LimitKind::TableCells
-                | litchi_iwa_common::LimitKind::MaterializedCells => {
-                    ChartAxisTitleLimitKind::WireFields
-                },
-                litchi_iwa_common::LimitKind::Nesting => ChartAxisTitleLimitKind::WireNesting,
-                litchi_iwa_common::LimitKind::RewriteWork => ChartAxisTitleLimitKind::WireWork,
+                | litchi_iwa_common::LimitKind::MaterializedCells => LimitKind::WireFields,
+                litchi_iwa_common::LimitKind::Nesting => LimitKind::WireNesting,
+                litchi_iwa_common::LimitKind::RewriteWork => LimitKind::WireWork,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
-        litchi_iwa_common::Error::Allocation { amount, .. } => {
-            ChartAxisTitleError::Allocation { amount }
-        },
-        litchi_iwa_common::Error::InvalidFormat(_)
-        | litchi_iwa_common::Error::InvalidLimit { .. } => ChartAxisTitleError::InvalidSource,
+        litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 

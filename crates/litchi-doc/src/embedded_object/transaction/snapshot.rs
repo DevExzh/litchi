@@ -5,7 +5,7 @@ use super::super::model::{Editor, Inventory, Reference, WriteOptions};
 use super::Transaction;
 use crate::package::Result;
 use crate::parts::protection::ProtectionPolicy;
-use litchi_ole_common::ole_streams::{self, NativeSnapshot, PresentationSnapshot};
+use litchi_ole_common::ole_streams::{self, native, presentation};
 use std::sync::{Arc, OnceLock};
 
 /// Shared physical DOC bytes with a lazy slice-shaped public handle.
@@ -65,12 +65,12 @@ impl Snapshot {
     ///
     /// Returns an error when the DOC FIB, field tables, CFB package, resource
     /// bounds, or `ObjectPool` ownership references are invalid.
-    pub fn open(input: impl Into<Vec<u8>>, limits: Limits) -> Result<Self> {
+    pub(crate) fn open(input: impl Into<Vec<u8>>, limits: Limits) -> Result<Self> {
         Self::open_with_policy(input, limits, ProtectionPolicy::default())
     }
 
     /// Opens and validates a snapshot with an explicit protected-edit policy.
-    pub fn open_with_policy(
+    pub(crate) fn open_with_policy(
         input: impl Into<Vec<u8>>,
         limits: Limits,
         protection_policy: ProtectionPolicy,
@@ -118,9 +118,9 @@ impl Snapshot {
 
     /// Returns a stable non-cryptographic source fingerprint.
     ///
-    /// Callers that need conflict safety must use
-    /// [`crate::embedded_object::Patch::apply`], which
-    /// checks both this fingerprint and the complete source bytes.
+    /// Callers that need conflict safety replay a patch with
+    /// [`crate::Package::apply_embedded_objects`], which checks the complete
+    /// source bytes.
     #[must_use]
     pub fn fingerprint(&self) -> u64 {
         fingerprint(self.source.as_bytes())
@@ -146,112 +146,60 @@ impl Snapshot {
         self.editor.objects()
     }
 
-    /// Returns one managed object's inert OLEDS presentation stream.
-    ///
-    /// The DOC field and `ObjectPool` storage remain owned by this DOC layer;
-    /// the stream payload is parsed by the shared bounded OLEDS owner and is
-    /// never rendered or activated.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the storage is not referenced, the stream index
-    /// or payload is malformed, or the selected OLEDS limits are exceeded.
+    /// Returns one managed presentation under explicit OLEDS limits.
     pub fn presentation(
         &self,
         storage_id: u32,
         index: usize,
-    ) -> Result<Option<PresentationSnapshot>> {
-        self.editor.presentation(storage_id, index)
-    }
-
-    /// Returns one managed presentation under explicit OLEDS limits.
-    pub fn presentation_with_limits(
-        &self,
-        storage_id: u32,
-        index: usize,
         limits: ole_streams::Limits,
-    ) -> Result<Option<PresentationSnapshot>> {
-        self.editor
-            .presentation_with_limits(storage_id, index, limits)
+    ) -> Result<Option<presentation::Snapshot>> {
+        self.editor.presentation(storage_id, index, limits)
     }
 
-    /// Returns one presentation selected by a DOC object reference.
+    /// Returns one reference-selected presentation under explicit limits.
     pub fn presentation_for(
         &self,
         reference: &Reference,
         index: usize,
-    ) -> Result<Option<PresentationSnapshot>> {
-        self.editor.presentation_for(reference, index)
-    }
-
-    /// Returns one reference-selected presentation under explicit limits.
-    pub fn presentation_for_with_limits(
-        &self,
-        reference: &Reference,
-        index: usize,
         limits: ole_streams::Limits,
-    ) -> Result<Option<PresentationSnapshot>> {
-        self.editor
-            .presentation_for_with_limits(reference, index, limits)
-    }
-
-    /// Returns all managed OLEDS presentations in numeric order.
-    pub fn presentations(&self, storage_id: u32) -> Result<Vec<(usize, PresentationSnapshot)>> {
-        self.editor.presentations(storage_id)
+    ) -> Result<Option<presentation::Snapshot>> {
+        self.editor.presentation_for(reference, index, limits)
     }
 
     /// Returns all managed presentations under explicit OLEDS limits.
-    pub fn presentations_with_limits(
+    pub fn presentations(
         &self,
         storage_id: u32,
         limits: ole_streams::Limits,
-    ) -> Result<Vec<(usize, PresentationSnapshot)>> {
-        self.editor.presentations_with_limits(storage_id, limits)
-    }
-
-    /// Returns all presentations selected by a DOC object reference.
-    pub fn presentations_for(
-        &self,
-        reference: &Reference,
-    ) -> Result<Vec<(usize, PresentationSnapshot)>> {
-        self.editor.presentations_for(reference)
+    ) -> Result<Vec<(usize, presentation::Snapshot)>> {
+        self.editor.presentations(storage_id, limits)
     }
 
     /// Returns all reference-selected presentations under explicit limits.
-    pub fn presentations_for_with_limits(
+    pub fn presentations_for(
         &self,
         reference: &Reference,
         limits: ole_streams::Limits,
-    ) -> Result<Vec<(usize, PresentationSnapshot)>> {
-        self.editor.presentations_for_with_limits(reference, limits)
-    }
-
-    /// Returns one managed object's inert OLEDS native-data stream.
-    pub fn native(&self, storage_id: u32) -> Result<Option<NativeSnapshot>> {
-        self.editor.native(storage_id)
+    ) -> Result<Vec<(usize, presentation::Snapshot)>> {
+        self.editor.presentations_for(reference, limits)
     }
 
     /// Returns one managed native-data stream under explicit OLEDS limits.
-    pub fn native_with_limits(
+    pub fn native(
         &self,
         storage_id: u32,
         limits: ole_streams::Limits,
-    ) -> Result<Option<NativeSnapshot>> {
-        self.editor.native_with_limits(storage_id, limits)
-    }
-
-    /// Returns native data selected by a DOC object reference.
-    pub fn native_for(&self, reference: &Reference) -> Result<Option<NativeSnapshot>> {
-        self.editor.native_for(reference)
+    ) -> Result<Option<native::Snapshot>> {
+        self.editor.native(storage_id, limits)
     }
 
     /// Returns reference-selected native data under explicit OLEDS limits.
-    pub fn native_for_with_limits(
+    pub fn native_for(
         &self,
         reference: &Reference,
         limits: ole_streams::Limits,
-    ) -> Result<Option<NativeSnapshot>> {
-        self.editor.native_for_with_limits(reference, limits)
+    ) -> Result<Option<native::Snapshot>> {
+        self.editor.native_for(reference, limits)
     }
 
     /// Exports one managed object as a bounded inert transfer closure.
@@ -271,7 +219,7 @@ impl Snapshot {
 
     /// Starts an independent clone-staged transaction.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
+    pub(crate) fn edit(&self) -> Transaction {
         Transaction::new(self.clone())
     }
 
@@ -337,14 +285,14 @@ pub(super) fn fingerprint(bytes: &[u8]) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::{Limits, Snapshot, SourceOwner};
-    use crate::writer::Writer;
+    use crate::builder::Builder;
     use std::sync::Arc;
 
     fn base_doc() -> Vec<u8> {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         writer.add_paragraph("source owner regression").unwrap();
         let mut output = std::io::Cursor::new(Vec::new());
-        writer.write_to(&mut output).unwrap();
+        writer.build().unwrap().write_to(&mut output).unwrap();
         output.into_inner()
     }
 

@@ -9,21 +9,22 @@
 
 mod repair_support;
 
+use litchi_rtf::raw::Tree;
 use litchi_rtf::{
-    RtfDocument, RtfWriter, TableCellMergeRole, TableIndentUnit, TablePreferredWidthUnit,
-    TableRowGeometry, TableRowHeight,
+    TableCellMergeRole, TableIndentUnit, TablePreferredWidthUnit, TableRowGeometry, TableRowHeight,
+    write::Writer,
 };
 
-fn write(document: &RtfDocument<'_>) -> String {
+fn write(document: &Tree<'_>) -> String {
     let mut bytes = Vec::new();
-    RtfWriter::new(&mut bytes).write_document(document).unwrap();
+    Writer::new(&mut bytes).write_document(document).unwrap();
     String::from_utf8(bytes).unwrap()
 }
 
 #[test]
 fn parses_owned_geometry_widths_height_semantics_and_canonical_round_trip() {
     let source = r"{\rtf1\trowd\trgaph108\trleft-108\trrh240\trftsWidth2\trwWidth2500\trautofit1\tblind-120\tblindtype1\clftsWidth3\clwWidth900\clmgf\cellx900\clftsWidth2\clwWidth2500\clmrg\cellx2100\intbl A\cell B\cell\row\trowd\trrh-300\trftsWidth1\trautofit0\tblind0\tblindtype2\clftsWidth0\clwWidth0\cellx1200\intbl C\cell\row}";
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let rows = document.tables()[0].rows();
     let geometry = rows[0].geometry();
     assert_eq!(geometry.half_gap_twips(), Some(108));
@@ -64,14 +65,14 @@ fn parses_owned_geometry_widths_height_semantics_and_canonical_round_trip() {
     assert!(first.contains("\\trgaph108\\trleft-108\\trrh240\\trftsWidth2\\trwWidth2500\\trautofit1\\tblind-120\\tblindtype1"));
     assert!(first.contains("\\clftsWidth3\\clwWidth900\\clmgf\\cellx900"));
     assert!(first.contains("\\trrh-300\\trftsWidth1\\tblind0\\tblindtype2"));
-    let second = write(&RtfDocument::parse(&first).unwrap());
+    let second = write(&Tree::parse(&first, litchi_rtf::read::OpenOptions::default()).unwrap());
     assert_eq!(first, second);
 }
 
 #[test]
 fn restores_groups_resets_trowd_and_snapshots_width_at_each_cellx() {
     let source = r"{\rtf1\trowd{\trgaph200\trleft300\trrh400\trftsWidth3\trwWidth1000\trautofit1\tblind100\tblindtype1\clftsWidth3\clwWidth400}\cellx1000\intbl A\cell\row\trowd\trgaph50\clftsWidth3\clwWidth600\cellx1000\clftsWidth2\clwWidth1250\cellx2000\intbl B\cell C\cell\row\trowd\cellx900\intbl D\cell\row}";
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let rows = document.tables()[0].rows();
     assert_eq!(rows[0].geometry().half_gap_twips(), None);
     assert_eq!(rows[0].geometry().preferred_width(), None);
@@ -92,7 +93,7 @@ fn restores_groups_resets_trowd_and_snapshots_width_at_each_cellx() {
 #[test]
 fn applies_geometry_to_end_defined_nested_rows() {
     let source = r"{\rtf1\trowd\cellx5000\intbl\itap2 A\nestcell\intbl\itap2 B\nestcell{\*\nesttableprops\itap2\trowd\trgaph40\trleft-20\trrh-180\trftsWidth3\trwWidth1700\trautofit1\tblind-10\tblindtype1\clftsWidth3\clwWidth700\cellx700\clftsWidth2\clwWidth2500\cellx1700\nestrow}\intbl\itap1\cell\row}";
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let nested = &document.tables()[0].rows()[0].cells()[0].nested_tables()[0].table;
     let row = &nested.rows()[0];
     assert_eq!(row.geometry().height(), TableRowHeight::Exact(180));
@@ -105,7 +106,8 @@ fn applies_geometry_to_end_defined_nested_rows() {
         row.cells()[1].preferred_width().unwrap().unit(),
         TablePreferredWidthUnit::Percent
     );
-    let reparsed = RtfDocument::parse(&write(&document)).unwrap();
+    let reparsed =
+        Tree::parse(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         reparsed.tables()[0].rows()[0].cells()[0].nested_tables()[0]
             .table
@@ -145,7 +147,10 @@ fn rejects_missing_invalid_unpaired_and_out_of_range_controls() {
     for controls in controls {
         let source = format!("{{\\rtf1\\trowd\\{controls}\\cellx1000\\intbl X\\cell\\row}}");
         assert!(
-            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(&source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                &source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted {controls}"
         );
     }
@@ -163,22 +168,33 @@ fn rejects_missing_invalid_unpaired_and_out_of_range_controls() {
     for controls in cell_controls {
         let source = format!("{{\\rtf1\\trowd\\{controls}\\cellx1000\\intbl X\\cell\\row}}");
         assert!(
-            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(&source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                &source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted {controls}"
         );
     }
-    let defaulted = RtfDocument::parse(r"{\rtf1\trowd\tblind\cellx1000\intbl X\cell\row}").unwrap();
+    let defaulted = Tree::parse(
+        r"{\rtf1\trowd\tblind\cellx1000\intbl X\cell\row}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let indent = defaulted.tables()[0].rows()[0].geometry().indent().unwrap();
     assert_eq!(indent.unit(), TableIndentUnit::Twips);
     assert_eq!(indent.value(), 0);
-    assert!(RtfDocument::parse(r"{\rtf1\trowd\trrh0\trgaph31680\trleft-31680\trftsWidth2\trwWidth5000\tblind-5000\tblindtype3\clftsWidth3\clwWidth31680\cellx31680\intbl X\cell\row}").is_ok());
+    assert!(Tree::parse(r"{\rtf1\trowd\trrh0\trgaph31680\trleft-31680\trftsWidth2\trwWidth5000\tblind-5000\tblindtype3\clftsWidth3\clwWidth31680\cellx31680\intbl X\cell\row}", litchi_rtf::read::OpenOptions::default()).is_ok());
 }
 
 #[test]
 fn parses_real_libreoffice_geometry_fixture() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/libreoffice-core/sw/qa/extras/rtfimport/data/tdf148544.rtf");
-    let document = RtfDocument::parse(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let document = Tree::parse(
+        &std::fs::read_to_string(path).unwrap(),
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let rows = document
         .tables()
         .iter()
@@ -223,7 +239,7 @@ fn parses_real_libreoffice_geometry_fixture() {
     let rewritten = write(&document);
     assert!(rewritten.contains("\\clshdng500\\clshdngraw500"));
     assert!(rewritten.contains("\\clshdrawnil"));
-    let reparsed = RtfDocument::parse(&rewritten).unwrap();
+    let reparsed = Tree::parse(&rewritten, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert!(
         reparsed
             .tables()

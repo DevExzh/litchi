@@ -1,0 +1,31 @@
+{
+  "application": "Numbers",
+  "version": "14.4",
+  "macos": "26.5.2 (25F84)",
+  "verification_date": "2026-11-05",
+  "authored_by": "the repository owner, by hand, in Numbers 14.4",
+  "file": "volatile-highlight-native-second.numbers",
+  "source": "A copy of volatile-highlight-native.numbers",
+  "size": 139023,
+  "sha256": "e97fc85baa0fb950e5ca9955ffc50e02b1b9476c6a81a7076c69b856818607e7",
+  "sheet": "Sheet 1",
+  "table": "Table 1",
+  "timezone": "Asia/Shanghai",
+  "cells_as_stored": {
+    "A2": "2026-11-06 (tomorrow when saved)",
+    "A3": "2026-11-03",
+    "A4": "2026-11-05 (today when saved)"
+  },
+  "rules_as_stored": {
+    "A2": ["Date is today (Red Fill)", "Date is tomorrow (a second preset fill)"],
+    "A3": ["Date is today (Red Fill)"],
+    "A4": ["Date is today (Red Fill)"]
+  },
+  "applied_rule_as_stored": {
+    "A2": "second rule",
+    "A3": "none",
+    "A4": "first rule"
+  },
+  "note": "The kit asked for the second rule on a different cell; this file holds it as a second rule on A2, which holds tomorrow's date.",
+  "scope": "Native second-rule evidence for record 0433. Read from the bytes; no screenshot was delivered."
+}

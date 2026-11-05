@@ -49,7 +49,7 @@ fn prepare(package: &Package) -> Prepared<'_> {
     }
 }
 
-fn run_preflight(package: &Package, mut budget: Budget) -> Result<(), TableMergesError> {
+fn run_preflight(package: &Package, mut budget: Budget) -> Result<(), Error> {
     let (sheet_position, table_position) = select_semantic_positions(
         package,
         SheetSelector::name(SHEET_NAME),
@@ -66,10 +66,7 @@ fn run_preflight(package: &Package, mut budget: Budget) -> Result<(), TableMerge
     Ok(())
 }
 
-fn run_with_budget(
-    model: &[u8],
-    mut budget: Budget,
-) -> (Result<Vec<Region>, TableMergesError>, Budget) {
+fn run_with_budget(model: &[u8], mut budget: Budget) -> (Result<Vec<Region>, Error>, Budget) {
     let result = (|| {
         let max_regions = merge_region_capacity(
             budget.remaining_allocations()?,
@@ -95,17 +92,17 @@ fn run_with_budget(
         budget.charge_allocations(
             region_count
                 .checked_mul(MERGE_READER_ALLOCATIONS_PER_REGION)
-                .ok_or(TableMergesError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )?;
         budget.charge_scratch(
             region_count
                 .checked_mul(MERGE_READER_SCRATCH_PER_REGION)
-                .ok_or(TableMergesError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )?;
         budget.charge_retained(
             region_count
                 .checked_mul(REGION_BYTES)
-                .ok_or(TableMergesError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )?;
         Ok(read.regions)
     })();
@@ -187,26 +184,18 @@ fn counters(
     )
 }
 
-fn assert_limit(
-    result: Result<Vec<Region>, TableMergesError>,
-    expected: TableMergesLimitKind,
-    label: &str,
-) {
+fn assert_limit(result: Result<Vec<Region>, Error>, expected: LimitKind, label: &str) {
     match result {
-        Err(TableMergesError::LimitExceeded { kind, .. }) => {
+        Err(Error::Limit { kind, .. }) => {
             assert_eq!(kind, expected, "{label} reported the wrong resource");
         },
         other => panic!("{label} unexpectedly returned {other:?}"),
     }
 }
 
-fn assert_preflight_limit(
-    result: Result<(), TableMergesError>,
-    expected: TableMergesLimitKind,
-    label: &str,
-) {
+fn assert_preflight_limit(result: Result<(), Error>, expected: LimitKind, label: &str) {
     match result {
-        Err(TableMergesError::LimitExceeded { kind, .. }) => {
+        Err(Error::Limit { kind, .. }) => {
             assert_eq!(kind, expected, "{label} reported the wrong resource");
         },
         other => panic!("{label} unexpectedly returned {other:?}"),
@@ -303,7 +292,7 @@ fn exact_root_metadata_and_selector_caps_admit_and_one_below_refuses() {
     input.wire_max_input -= 1;
     assert_preflight_limit(
         run_preflight(&package, input),
-        TableMergesLimitKind::WireBytes,
+        LimitKind::WireBytes,
         "root input",
     );
 
@@ -311,7 +300,7 @@ fn exact_root_metadata_and_selector_caps_admit_and_one_below_refuses() {
     fields.wire_max_fields -= 1;
     assert_preflight_limit(
         run_preflight(&package, fields),
-        TableMergesLimitKind::WireFields,
+        LimitKind::WireFields,
         "root fields",
     );
 
@@ -319,7 +308,7 @@ fn exact_root_metadata_and_selector_caps_admit_and_one_below_refuses() {
     work.wire_max_work -= 1;
     assert_preflight_limit(
         run_preflight(&package, work),
-        TableMergesLimitKind::WireWork,
+        LimitKind::WireWork,
         "selector work",
     );
 
@@ -327,7 +316,7 @@ fn exact_root_metadata_and_selector_caps_admit_and_one_below_refuses() {
     objects.max_objects -= 1;
     assert_preflight_limit(
         run_preflight(&package, objects),
-        TableMergesLimitKind::PayloadObjects,
+        LimitKind::PayloadObjects,
         "root objects",
     );
 
@@ -335,7 +324,7 @@ fn exact_root_metadata_and_selector_caps_admit_and_one_below_refuses() {
     messages.max_messages -= 1;
     assert_preflight_limit(
         run_preflight(&package, messages),
-        TableMergesLimitKind::PayloadMessages,
+        LimitKind::PayloadMessages,
         "metadata messages",
     );
 
@@ -343,7 +332,7 @@ fn exact_root_metadata_and_selector_caps_admit_and_one_below_refuses() {
     items.max_items -= 1;
     assert_preflight_limit(
         run_preflight(&package, items),
-        TableMergesLimitKind::PayloadItems,
+        LimitKind::PayloadItems,
         "metadata items",
     );
 
@@ -351,7 +340,7 @@ fn exact_root_metadata_and_selector_caps_admit_and_one_below_refuses() {
     references.max_references -= 1;
     assert_preflight_limit(
         run_preflight(&package, references),
-        TableMergesLimitKind::PayloadReferences,
+        LimitKind::PayloadReferences,
         "root references",
     );
 }
@@ -365,37 +354,37 @@ fn one_below_each_wire_and_result_budget_is_reported_as_a_typed_refusal() {
     let mut input = exact;
     input.wire_max_input -= 1;
     let (result, _) = run_with_budget(prepared.model, input);
-    assert_limit(result, TableMergesLimitKind::WireBytes, "input");
+    assert_limit(result, LimitKind::WireBytes, "input");
 
     let mut fields = exact;
     fields.wire_max_fields -= 1;
     let (result, _) = run_with_budget(prepared.model, fields);
-    assert_limit(result, TableMergesLimitKind::WireFields, "fields");
+    assert_limit(result, LimitKind::WireFields, "fields");
 
     let mut work = exact;
     work.wire_max_work -= 1;
     let (result, _) = run_with_budget(prepared.model, work);
-    assert_limit(result, TableMergesLimitKind::WireWork, "work");
+    assert_limit(result, LimitKind::WireWork, "work");
 
     let mut regions = exact;
     regions.max_regions -= 1;
     let (result, _) = run_with_budget(prepared.model, regions);
-    assert_limit(result, TableMergesLimitKind::Regions, "regions");
+    assert_limit(result, LimitKind::Regions, "regions");
 
     let mut allocations = exact;
     allocations.max_allocations -= 1;
     let (result, _) = run_with_budget(prepared.model, allocations);
-    assert_limit(result, TableMergesLimitKind::Regions, "allocations");
+    assert_limit(result, LimitKind::Regions, "allocations");
 
     let mut retained = exact;
     retained.max_retained -= 1;
     let (result, _) = run_with_budget(prepared.model, retained);
-    assert_limit(result, TableMergesLimitKind::Regions, "retained");
+    assert_limit(result, LimitKind::Regions, "retained");
 
     let mut scratch = exact;
     scratch.max_scratch -= 1;
     let (result, _) = run_with_budget(prepared.model, scratch);
-    assert_limit(result, TableMergesLimitKind::Regions, "scratch");
+    assert_limit(result, LimitKind::Regions, "scratch");
 }
 
 #[test]
@@ -407,11 +396,7 @@ fn zero_wire_residual_refuses_before_entering_the_selected_codec() {
     input.wire_max_input = input.input;
     let before = counters(&input);
     let (result, after) = run_with_budget(prepared.model, input);
-    assert_limit(
-        result,
-        TableMergesLimitKind::WireBytes,
-        "zero input residual",
-    );
+    assert_limit(result, LimitKind::WireBytes, "zero input residual");
     assert_eq!(
         counters(&after),
         before,
@@ -422,11 +407,7 @@ fn zero_wire_residual_refuses_before_entering_the_selected_codec() {
     fields.wire_max_fields = fields.fields;
     let before = counters(&fields);
     let (result, after) = run_with_budget(prepared.model, fields);
-    assert_limit(
-        result,
-        TableMergesLimitKind::WireFields,
-        "zero field residual",
-    );
+    assert_limit(result, LimitKind::WireFields, "zero field residual");
     assert_eq!(
         counters(&after),
         before,
@@ -437,7 +418,7 @@ fn zero_wire_residual_refuses_before_entering_the_selected_codec() {
     work.wire_max_work = work.work;
     let before = counters(&work);
     let (result, after) = run_with_budget(prepared.model, work);
-    assert_limit(result, TableMergesLimitKind::WireWork, "zero work residual");
+    assert_limit(result, LimitKind::WireWork, "zero work residual");
     assert_eq!(
         counters(&after),
         before,
@@ -464,7 +445,7 @@ fn absent_drawable_lock_is_valid_during_table_ownership_preflight() {
         let mut budget = Budget::new(&package).expect("native fixture admits the default profile");
         if locked.is_none() {
             assert!(
-                !source.iter().any(|byte| *byte == 0x28),
+                !source.contains(&0x28),
                 "the absent-lock case must omit DrawableArchive.locked"
             );
         }

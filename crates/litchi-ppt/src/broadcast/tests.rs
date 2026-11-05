@@ -153,7 +153,7 @@ fn record_bytes(record: &Record) -> Vec<u8> {
 #[test]
 fn snapshot_no_op_keeps_exact_source_bytes() {
     let source = record_bytes(&broadcast().to_record().unwrap());
-    let snapshot = Snapshot::parse(source.clone()).unwrap();
+    let snapshot = Snapshot::parse(source.clone(), &crate::SourceLimits::default()).unwrap();
     let commit = snapshot.edit().commit().unwrap();
 
     assert!(commit.patch().is_empty());
@@ -166,7 +166,7 @@ fn snapshot_no_op_keeps_exact_source_bytes() {
 #[test]
 fn invalid_inert_targets_are_failure_atomic() {
     let source = record_bytes(&broadcast().to_record().unwrap());
-    let snapshot = Snapshot::parse(source).unwrap();
+    let snapshot = Snapshot::parse(source, &crate::SourceLimits::default()).unwrap();
     let mut transaction = snapshot.edit();
     let before = transaction.broadcast().clone();
 
@@ -176,7 +176,7 @@ fn invalid_inert_targets_are_failure_atomic() {
             .is_err()
     );
     assert_eq!(transaction.broadcast(), &before);
-    assert!(!transaction.is_changed());
+    assert!(transaction.changes().is_empty());
 
     assert!(transaction.set_remote_server_name(None).is_err());
     assert_eq!(transaction.broadcast(), &before);
@@ -196,7 +196,7 @@ fn edits_retain_unknown_children_and_support_inverse_and_stale_rejection() {
         &data,
     )
     .unwrap();
-    let snapshot = Snapshot::parse(source.clone()).unwrap();
+    let snapshot = Snapshot::parse(source.clone(), &crate::SourceLimits::default()).unwrap();
     assert_eq!(snapshot.unknown_records().len(), 1);
     assert_eq!(
         snapshot.unknown_records()[0].to_record_bytes().unwrap(),
@@ -231,6 +231,144 @@ fn edits_retain_unknown_children_and_support_inverse_and_stale_rejection() {
 
     let mut stale_bytes = source;
     stale_bytes[16] = b'R';
-    let stale = Snapshot::parse(stale_bytes).unwrap();
+    let stale = Snapshot::parse(stale_bytes, &crate::SourceLimits::default()).unwrap();
     assert!(commit.patch().apply(&stale).is_err());
+}
+
+/// A built one-slide package whose live document carries the test broadcast
+/// in its `___PPT9` programmable tag.
+fn package_with_broadcast() -> (crate::Package, Vec<u8>) {
+    use crate::consts::RecordType;
+    use crate::record_wire as wire;
+    use crate::slide_order::records::{Owner, Rewrite, publish};
+
+    let mut builder = crate::Builder::new();
+    builder.add_slide().unwrap();
+    let package = builder.build().unwrap();
+    let base = crate::scoped::Base::capture(&package).unwrap();
+    let native = base.native().unwrap();
+    let document = base.owner_record(&native, Owner::Document).unwrap();
+    let children = wire::child_list(&document).unwrap();
+    let info = children
+        .iter()
+        .position(|child| wire::record_type(child).unwrap() == RecordType::DocInfoList as u16);
+    let list = match info {
+        Some(index) => children[index].to_vec(),
+        None => wire::container(RecordType::DocInfoList as u16, 0, &[]).unwrap(),
+    };
+    let blob = crate::binary_tag_edit::locate(
+        &list,
+        RecordType::DocInfoList as u16,
+        "___PPT9",
+        "broadcast",
+    )
+    .unwrap();
+    let mut records = blob
+        .records()
+        .iter()
+        .map(|record| record.to_vec())
+        .collect::<Vec<_>>();
+    records.push(record_bytes(&broadcast().to_record().unwrap()));
+    let list = blob.rebuild(&list, &records, &[]).unwrap();
+    let mut data = Vec::new();
+    for (index, child) in children.iter().enumerate() {
+        if Some(index) == info {
+            data.extend_from_slice(&list);
+            continue;
+        }
+        // A new information list goes before the closing EndDocumentAtom.
+        if info.is_none() && index + 1 == children.len() {
+            data.extend_from_slice(&list);
+        }
+        data.extend_from_slice(child);
+    }
+    let after = wire::rebuild(&document, &data).unwrap();
+    let published = publish(
+        &native,
+        &[Rewrite {
+            owner: Owner::Document,
+            before: document.into(),
+            after: after.into(),
+        }],
+    )
+    .unwrap();
+    let bytes = published.bytes().to_vec();
+    (crate::Package::from_bytes(&bytes).unwrap(), bytes)
+}
+
+#[test]
+fn package_broadcast_edits_publish_replay_and_invert_exactly() {
+    use litchi_core::Position;
+
+    let (source, source_bytes) = package_with_broadcast();
+    let read = source.presentation().unwrap().broadcasts().unwrap();
+    assert_eq!(read.broadcasts, vec![broadcast()]);
+
+    let no_op = source
+        .edit_broadcast(Position::new(0))
+        .unwrap()
+        .commit()
+        .unwrap();
+    assert!(!no_op.diagnostics().changed());
+    assert_eq!(no_op.package().to_bytes().unwrap(), source_bytes);
+
+    let mut edit = source.edit_broadcast(Position::new(0)).unwrap();
+    edit.set_title(Some("Scoped broadcast".into())).unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    let published = commit
+        .package()
+        .presentation()
+        .unwrap()
+        .broadcasts()
+        .unwrap();
+    assert_eq!(
+        published.broadcasts[0].title.as_deref(),
+        Some("Scoped broadcast")
+    );
+
+    let replayed = source.apply_broadcast(commit.patch()).unwrap();
+    assert_eq!(
+        replayed.package().to_bytes().unwrap(),
+        commit.package().to_bytes().unwrap()
+    );
+    let restored = commit
+        .package()
+        .apply_broadcast(&commit.patch().inverse())
+        .unwrap();
+    assert_eq!(restored.package().to_bytes().unwrap(), source_bytes);
+    assert!(matches!(
+        commit.package().apply_broadcast(commit.patch()),
+        Err(super::Error::PatchConflict)
+    ));
+    let Err(super::Error::Refused(refusal)) = source
+        .edit_broadcast(Position::new(1))
+        .and_then(|edit| edit.broadcast().map(|_| ()))
+    else {
+        panic!("a position past the last broadcast must be refused");
+    };
+    assert_eq!(refusal.kind(), litchi_core::edit::RefusalKind::NotFound);
+}
+
+#[test]
+fn package_broadcast_edits_admit_a_signed_package_and_refuse_a_changed_commit() {
+    use litchi_core::Position;
+
+    let (source, _) = package_with_broadcast();
+    let signed = crate::scoped::signed(&source);
+    let bytes = signed.to_bytes().unwrap();
+
+    let no_op = signed
+        .edit_broadcast(Position::new(0))
+        .unwrap()
+        .commit()
+        .unwrap();
+    assert!(!no_op.diagnostics().changed());
+    assert!(no_op.patch().is_noop());
+    assert_eq!(no_op.package().to_bytes().unwrap(), bytes);
+
+    let mut edit = signed.edit_broadcast(Position::new(0)).unwrap();
+    edit.set_title(Some("Scoped broadcast".into())).unwrap();
+    assert!(matches!(edit.commit(), Err(super::Error::Signed)));
+    assert_eq!(signed.to_bytes().unwrap(), bytes);
 }

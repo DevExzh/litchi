@@ -1,17 +1,16 @@
 use std::io;
 use std::sync::Arc;
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::{Catalog, EntryEdit};
 use litchi_iwa_common::{
     decode_varint_from_bytes,
     wire::{WireView, append_varint_field},
 };
-use litchi_iwa_core::{
-    Archive, ArchiveInfo, ArchiveObject, FieldInfo, FieldPath, RawMessage, SnappyStream,
-};
+use litchi_iwa_core::{Archive, ArchiveInfo, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsk, tsp};
 use litchi_keynote::{
-    Limits, Package, ReadError, ReadOptions, Seconds, SemanticLimits,
+    OpenOptions, Package, ReadError, Seconds, SemanticLimits, SourceLimits,
     show::{
         Commit as ShowSettingsCommit, Diagnostics as ShowSettingsDiagnostics,
         Edit as ShowSettingsEdit, Error as ShowSettingsError, LimitKind as ShowSettingsLimitKind,
@@ -108,11 +107,15 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
 fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 #[allow(
@@ -151,7 +154,7 @@ fn fixed64_field(number: u32, value: u64) -> Vec<u8> {
 
 fn adversarial_size(width: f32, height: f32) -> TestResult<Vec<u8>> {
     let canonical = tsp::Size { width, height }.encode_to_vec();
-    let view = WireView::parse(&canonical)?;
+    let view = WireView::parse(&canonical, litchi_iwa_common::WireLimits::DEFAULT)?;
     let width_record = view
         .fields()
         .find(|field| field.number() == 1)
@@ -201,7 +204,7 @@ fn raw_show_with_slide_nodes(
         ..Default::default()
     }
     .encode_to_vec();
-    let view = WireView::parse(&canonical)?;
+    let view = WireView::parse(&canonical, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(canonical.len().saturating_add(100));
     append_varint_field(&mut output, 90, unknown_sentinel)?;
     for field in view.fields() {
@@ -271,10 +274,15 @@ fn package_bytes_with_slide_nodes(
                 data: b"after-show-sentinel".to_vec(),
             },
         ],
+        Default::default(),
     )?;
     let mut document = object(DOCUMENT_IDENTIFIER, 1, document.encode_to_vec())?;
     document.archive_info.message_infos[0].object_references = vec![SHOW_IDENTIFIER];
-    let mut show_field = FieldInfo::new(vec![2]);
+    let mut show_field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![2], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     show_field.object_references = vec![SHOW_IDENTIFIER];
     document.archive_info.message_infos[0]
         .field_infos
@@ -291,7 +299,7 @@ fn package_bytes_with_slide_nodes(
 
 fn interleaved_adversarial_zip_package_bytes() -> TestResult<Vec<u8>> {
     let source = package_bytes(NativeSettings::absent(), Malformation::None, 160)?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let document = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
@@ -310,7 +318,7 @@ fn interleaved_adversarial_zip_package_bytes() -> TestResult<Vec<u8>> {
 }
 
 fn adversarialize_selected_zip_metadata(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let selected = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
@@ -332,7 +340,7 @@ fn adversarialize_selected_zip_metadata(package: &[u8]) -> TestResult<Vec<u8>> {
     output[central_offset + 36..central_offset + 38].copy_from_slice(&0xa55a_u16.to_le_bytes());
     output[central_offset + 38..central_offset + 42]
         .copy_from_slice(&0x81a4_0000_u32.to_le_bytes());
-    Catalog::from_bytes(&output)?;
+    Catalog::from_bytes(&output, Default::default())?;
     Ok(output)
 }
 
@@ -361,7 +369,11 @@ fn cache_package_bytes(split_components: bool) -> TestResult<Vec<u8>> {
     };
     let mut document = object(DOCUMENT_IDENTIFIER, 1, document_value.encode_to_vec())?;
     document.archive_info.message_infos[0].object_references = vec![SHOW_IDENTIFIER];
-    let mut show_field = FieldInfo::new(vec![2]);
+    let mut show_field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![2], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     show_field.object_references = vec![SHOW_IDENTIFIER];
     document.archive_info.message_infos[0]
         .field_infos
@@ -378,7 +390,11 @@ fn cache_package_bytes(split_components: bool) -> TestResult<Vec<u8>> {
         )?,
     )?;
     show.archive_info.message_infos[0].object_references = vec![SLIDE_NODE_IDENTIFIER];
-    let mut slide_tree_field = FieldInfo::new(vec![3, 2]);
+    let mut slide_tree_field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![3, 2], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     slide_tree_field.object_references = vec![SLIDE_NODE_IDENTIFIER];
     show.archive_info.message_infos[0]
         .field_infos
@@ -414,12 +430,20 @@ fn cache_package_bytes(split_components: bool) -> TestResult<Vec<u8>> {
     let mut node = object(SLIDE_NODE_IDENTIFIER, 4, node_value.encode_to_vec())?;
     node.archive_info.message_infos[0].object_references = vec![SLIDE_IDENTIFIER];
     node.archive_info.message_infos[0].data_references = vec![7_001, 7_002];
-    let mut slide_field = FieldInfo::new(vec![2]);
+    let mut slide_field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![2], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     slide_field.object_references = vec![SLIDE_IDENTIFIER];
     node.archive_info.message_infos[0]
         .field_infos
         .push(slide_field);
-    let mut thumbnails_field = FieldInfo::new(vec![16]);
+    let mut thumbnails_field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![16], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     thumbnails_field.data_references = vec![7_001, 7_002];
     node.archive_info.message_infos[0]
         .field_infos
@@ -483,7 +507,7 @@ fn empty_show_package_bytes() -> TestResult<Vec<u8>> {
 }
 
 fn legacy_package_bytes(flat: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(flat)?;
+    let catalog = Catalog::from_bytes(flat, Default::default())?;
     let inner_entries = catalog
         .iter()
         .filter(|entry| {
@@ -512,12 +536,12 @@ fn document_stream(package: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn component_stream(package: &[u8], component: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == component)
         .ok_or_else(|| io::Error::other("missing synthetic document member"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn rewrite_component(
@@ -526,10 +550,11 @@ fn rewrite_component(
     mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
     let stream = component_stream(package, component)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     mutate(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(package)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(
         catalog
             .reassemble_to_bytes(&[EntryEdit::new(component, &compressed)], Limits::default())?,
@@ -537,13 +562,16 @@ fn rewrite_component(
 }
 
 fn adversarialize_show_archive_header(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let mut entries = Vec::with_capacity(catalog.len());
     for entry in catalog.iter() {
         let data = if entry.name() == DOCUMENT_MEMBER {
-            let stream = SnappyStream::decompress(entry.data())?.into_bytes();
+            let stream = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
             let stream = rewrite_object_header(&stream, DOCUMENT_IDENTIFIER, 0)?;
-            SnappyStream::compress(&rewrite_object_header(&stream, SHOW_IDENTIFIER, 1)?)?
+            SnappyStream::compress(
+                &rewrite_object_header(&stream, SHOW_IDENTIFIER, 1)?,
+                Default::default(),
+            )?
         } else {
             entry.data().to_vec()
         };
@@ -563,7 +591,7 @@ fn with_overlong_object_length_prefix(
     identifier: u64,
 ) -> TestResult<Vec<u8>> {
     let mut stream = component_stream(package, component)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic object"))?;
@@ -574,9 +602,9 @@ fn with_overlong_object_length_prefix(
     }
     stream[offset] |= 0x80;
     stream.insert(offset + 1, 0);
-    Archive::parse(&stream)?;
-    let compressed = SnappyStream::compress(&stream)?;
-    let catalog = Catalog::from_bytes(package)?;
+    Archive::parse(&stream, Default::default())?;
+    let compressed = SnappyStream::compress(&stream, Default::default())?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(
         catalog
             .reassemble_to_bytes(&[EntryEdit::new(component, &compressed)], Limits::default())?,
@@ -617,12 +645,17 @@ fn with_metadata_guard(
                 object.archive_info.message_infos[index].diff_merge_version = vec![1];
             },
             MetadataGuard::DiffPath => {
-                object.archive_info.message_infos[index].diff_field_path =
-                    Some(FieldPath::new(vec![4]));
+                object.archive_info.message_infos[index].diff_field_path = Some(
+                    litchi_iwa_core::FieldPath::new(vec![4], litchi_iwa_core::Limits::default())
+                        .unwrap(),
+                );
             },
             MetadataGuard::FieldsToRemove => object.archive_info.message_infos[index]
                 .fields_to_remove
-                .push(FieldPath::new(vec![4])),
+                .push(
+                    litchi_iwa_core::FieldPath::new(vec![4], litchi_iwa_core::Limits::default())
+                        .unwrap(),
+                ),
             MetadataGuard::ReadVersion => {
                 object.archive_info.message_infos[index].diff_read_version = vec![1];
             },
@@ -647,7 +680,7 @@ fn rewrite_object_header(
     let header = stream
         .get(header_start..header_end)
         .ok_or_else(|| io::Error::other("synthetic header is truncated"))?;
-    let view = WireView::parse(header)?;
+    let view = WireView::parse(header, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut rewritten = Vec::with_capacity(header.len().saturating_add(64));
     rewritten.extend_from_slice(&fixed64_field(90, 0x1020_3040_5060_7080));
     let mut message_index = 0usize;
@@ -691,7 +724,7 @@ fn rewrite_object_header(
 }
 
 fn adversarial_message_info(source: &[u8]) -> TestResult<Vec<u8>> {
-    let view = WireView::parse(source)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(source.len().saturating_add(32));
     output.extend_from_slice(&fixed32_field(90, 0xa1b2_c3d4));
     for field in view.fields() {
@@ -738,7 +771,7 @@ fn object_header_location(stream: &[u8], identifier: u64) -> TestResult<(usize, 
         let header = stream
             .get(header_start..header_end)
             .ok_or_else(|| io::Error::other("synthetic header is truncated"))?;
-        let info = ArchiveInfo::decode(header)?;
+        let info = ArchiveInfo::decode(header, Default::default())?;
         if info.identifier == Some(identifier) {
             return Ok((object_start, prefix_length, header_length));
         }
@@ -768,7 +801,7 @@ fn object_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
 }
 
 fn normalize_message_length(header: &[u8], target_index: usize) -> TestResult<Vec<u8>> {
-    let view = WireView::parse(header)?;
+    let view = WireView::parse(header, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(header.len());
     let mut message_index = 0usize;
     for field in view.fields() {
@@ -784,7 +817,7 @@ fn normalize_message_length(header: &[u8], target_index: usize) -> TestResult<Ve
 
         output.extend_from_slice(field.key());
         output.extend_from_slice(b"<message-info>");
-        let message = WireView::parse(field.payload())?;
+        let message = WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
         let effective_length = message
             .fields()
             .enumerate()
@@ -809,7 +842,7 @@ fn normalize_message_length(header: &[u8], target_index: usize) -> TestResult<Ve
 
 fn show_messages(package: &[u8]) -> TestResult<Vec<(u32, Vec<u8>)>> {
     let stream = document_stream(package)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     Ok(archive
         .object(2)
         .ok_or_else(|| io::Error::other("missing synthetic show object"))?
@@ -825,10 +858,12 @@ fn show_records(package: &[u8]) -> TestResult<Vec<(u32, Vec<u8>)>> {
         .iter()
         .find_map(|(type_, data)| (*type_ == 2).then_some(data.as_slice()))
         .ok_or_else(|| io::Error::other("missing synthetic show message"))?;
-    Ok(WireView::parse(payload)?
-        .fields()
-        .map(|field| (field.number(), field.raw().to_vec()))
-        .collect())
+    Ok(
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .map(|field| (field.number(), field.raw().to_vec()))
+            .collect(),
+    )
 }
 
 fn size_records(package: &[u8]) -> TestResult<Vec<(u32, Vec<u8>)>> {
@@ -837,14 +872,16 @@ fn size_records(package: &[u8]) -> TestResult<Vec<(u32, Vec<u8>)>> {
         .iter()
         .find_map(|(number, raw)| (*number == 4).then_some(raw.as_slice()))
         .ok_or_else(|| io::Error::other("missing synthetic show size"))?;
-    let size_field = WireView::parse(size)?
+    let size_field = WireView::parse(size, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .next()
         .ok_or_else(|| io::Error::other("malformed synthetic show size record"))?;
-    Ok(WireView::parse(size_field.payload())?
-        .fields()
-        .map(|field| (field.number(), field.raw().to_vec()))
-        .collect())
+    Ok(
+        WireView::parse(size_field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .map(|field| (field.number(), field.raw().to_vec()))
+            .collect(),
+    )
 }
 
 fn rewrite_root(
@@ -869,7 +906,10 @@ fn rewrite_root_reference(
     mutate: impl Fn(&mut Vec<u8>) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
     rewrite_root(package, |root, index| {
-        let document = WireView::parse(&root.messages[index].data)?;
+        let document = WireView::parse(
+            &root.messages[index].data,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut rewritten = Vec::new();
         let mut selected = false;
         for field in document.fields() {
@@ -882,7 +922,12 @@ fn rewrite_root_reference(
             }
             let mut reference = field.payload().to_vec();
             mutate(&mut reference)?;
-            litchi_iwa_common::wire::append_length_delimited_field(&mut rewritten, 2, &reference)?;
+            litchi_iwa_common::wire::append_length_delimited_field(
+                &mut rewritten,
+                2,
+                &reference,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         }
         if !selected {
             return Err(io::Error::other("missing root show reference").into());
@@ -893,6 +938,7 @@ fn rewrite_root_reference(
                 type_: 1,
                 data: rewritten,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -917,7 +963,7 @@ fn assert_noop_then_changed_refused(bytes: &[u8]) -> TestResult<()> {
 }
 
 fn entry_bytes(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
-    Ok(Catalog::from_bytes(package)?
+    Ok(Catalog::from_bytes(package, Default::default())?
         .iter()
         .find(|entry| entry.name() == name)
         .ok_or_else(|| io::Error::other("missing synthetic package entry"))?
@@ -933,7 +979,7 @@ fn written(package: &Package) -> TestResult<Vec<u8>> {
 
 fn object_bytes(package: &[u8], component: &str, identifier: u64) -> TestResult<Vec<u8>> {
     let stream = component_stream(package, component)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic object"))?;
@@ -948,7 +994,7 @@ fn object_bytes(package: &[u8], component: &str, identifier: u64) -> TestResult<
 }
 
 fn assert_previews_absent(package: &[u8]) -> TestResult<()> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     for preview in PREVIEW_MEMBERS {
         assert!(catalog.iter().all(|entry| entry.name() != preview));
     }
@@ -956,8 +1002,8 @@ fn assert_previews_absent(package: &[u8]) -> TestResult<()> {
 }
 
 fn assert_entry_preserved(before: &[u8], after: &[u8], name: &str) -> TestResult<()> {
-    let before = Catalog::from_bytes(before)?;
-    let after = Catalog::from_bytes(after)?;
+    let before = Catalog::from_bytes(before, Default::default())?;
+    let after = Catalog::from_bytes(after, Default::default())?;
     let source = before
         .iter()
         .find(|entry| entry.name() == name)
@@ -1023,7 +1069,7 @@ fn assert_optional_fields(package: &[u8], expected_count: usize) -> TestResult<(
     Ok(())
 }
 
-fn tight_limits_for(artifacts: &[&[u8]]) -> TestResult<Limits> {
+fn tight_limits_for(artifacts: &[&[u8]]) -> TestResult<SourceLimits> {
     let mut max_input_bytes = 0u64;
     let mut max_entries = 0usize;
     let mut max_entry_bytes = 0u64;
@@ -1032,7 +1078,7 @@ fn tight_limits_for(artifacts: &[&[u8]]) -> TestResult<Limits> {
 
     for artifact in artifacts {
         max_input_bytes = max_input_bytes.max(u64::try_from(artifact.len())?);
-        let catalog = Catalog::from_bytes(artifact)?;
+        let catalog = Catalog::from_bytes(artifact, Default::default())?;
         max_entries = max_entries.max(catalog.len());
         let mut total_bytes = 0u64;
         for entry in catalog.iter() {
@@ -1045,7 +1091,9 @@ fn tight_limits_for(artifacts: &[&[u8]]) -> TestResult<Limits> {
                 .extension()
                 .is_some_and(|extension| extension.eq_ignore_ascii_case("iwa"))
             {
-                let stream_bytes = SnappyStream::decompress(entry.data())?.as_bytes().len();
+                let stream_bytes = SnappyStream::decompress(entry.data(), Default::default())?
+                    .as_bytes()
+                    .len();
                 // Replacing one Archive message briefly retains a slightly larger
                 // encoded header before the final stream is serialized.
                 max_iwa_stream_bytes = max_iwa_stream_bytes.max(stream_bytes.saturating_add(16));
@@ -1055,13 +1103,13 @@ fn tight_limits_for(artifacts: &[&[u8]]) -> TestResult<Limits> {
     }
     max_total_bytes = max_total_bytes.max(u64::try_from(max_iwa_stream_bytes)?);
 
-    Ok(Limits::new(
-        max_input_bytes,
-        max_entries,
-        max_entry_bytes,
-        max_total_bytes,
-        max_iwa_stream_bytes,
-    )?)
+    Ok(SourceLimits::builder()
+        .max_input_bytes(max_input_bytes)?
+        .max_entries(max_entries)?
+        .max_entry_bytes(max_entry_bytes)?
+        .max_aggregate_bytes(max_total_bytes)?
+        .max_component_bytes(max_iwa_stream_bytes)?
+        .build()?)
 }
 
 #[test]
@@ -1173,8 +1221,8 @@ fn changed_commit_preserves_unknowns_and_the_immutable_source() -> TestResult<()
     assert_eq!(commit.diagnostics().touched_components(), 1);
     assert!(commit.diagnostics().full_reparse_performed());
 
-    let before_catalog = Catalog::from_bytes(&bytes)?;
-    let after_catalog = Catalog::from_bytes(&after_bytes)?;
+    let before_catalog = Catalog::from_bytes(&bytes, Default::default())?;
+    let after_catalog = Catalog::from_bytes(&after_bytes, Default::default())?;
     let mut changed_entries = 0usize;
     for (before, after) in before_catalog.iter().zip(after_catalog.iter()) {
         assert_eq!(before.name(), after.name());
@@ -1199,7 +1247,7 @@ fn changed_commit_preserves_unknowns_and_the_immutable_source() -> TestResult<()
 #[test]
 fn changed_commit_preserves_selected_zip_metadata_and_interleaved_members() -> TestResult<()> {
     let bytes = interleaved_adversarial_zip_package_bytes()?;
-    let before_catalog = Catalog::from_bytes(&bytes)?;
+    let before_catalog = Catalog::from_bytes(&bytes, Default::default())?;
     let before_order = before_catalog
         .iter()
         .map(|entry| entry.name().to_owned())
@@ -1239,7 +1287,7 @@ fn changed_commit_preserves_selected_zip_metadata_and_interleaved_members() -> T
         .set(present_settings()?)
         .commit()?;
     let changed_bytes = written(changed.package())?;
-    let after_catalog = Catalog::from_bytes(&changed_bytes)?;
+    let after_catalog = Catalog::from_bytes(&changed_bytes, Default::default())?;
     let after_order = after_catalog
         .iter()
         .map(|entry| entry.name().to_owned())
@@ -1390,7 +1438,7 @@ fn patch_is_exact_conflict_checked_and_byte_reversible() -> TestResult<()> {
         Err(ShowSettingsError::PatchConflict)
     ));
 
-    let catalog = Catalog::from_bytes(&bytes)?;
+    let catalog = Catalog::from_bytes(&bytes, Default::default())?;
     let tampered_bytes = catalog.reassemble_to_bytes(
         &[EntryEdit::new(
             "Data/sentinel.bin",
@@ -1425,31 +1473,40 @@ fn nondefault_tight_limits_survive_read_edit_commit_and_apply() -> TestResult<()
     let target_bytes = written(baseline_commit.package())?;
 
     let physical = tight_limits_for(&[&bytes, &target_bytes])?;
-    let semantic = SemanticLimits::new(2, 1, 16, 1, 1, 64)?;
-    let options = ReadOptions::new(physical, semantic);
-    assert_ne!(options, ReadOptions::default());
+    let semantic = SemanticLimits::builder()
+        .max_objects(2)?
+        .max_slides(1)?
+        .max_references(16)?
+        .max_text_storages(1)?
+        .max_text_fragments(1)?
+        .max_text_bytes(64)?
+        .build()?;
+    let options = OpenOptions::new()
+        .source_limits(physical)
+        .semantic_limits(semantic);
+    assert_ne!(options, OpenOptions::default());
     assert_eq!(physical.max_entries(), 2);
     let expected_max_input = u64::try_from(bytes.len().max(target_bytes.len()))?;
     assert_eq!(physical.max_input_bytes(), expected_max_input);
 
     let package = Package::from_bytes_with_options(&bytes, options)?;
-    assert_eq!(package.read_options(), options);
+    assert_eq!(package.options(), options);
     assert_eq!(*package.show()?.settings(), Settings::default());
 
     let edit = package.edit_show_settings()?;
     assert_eq!(edit.settings(), Settings::default());
     let commit = edit.set(present_settings()?).commit()?;
-    assert_eq!(commit.package().read_options(), options);
+    assert_eq!(commit.package().options(), options);
     assert_eq!(written(commit.package())?, target_bytes);
 
     let applied = package.apply_show_settings(commit.patch())?;
-    assert_eq!(applied.package().read_options(), options);
+    assert_eq!(applied.package().options(), options);
     assert_eq!(written(applied.package())?, target_bytes);
 
     let restored = commit
         .package()
         .apply_show_settings(&commit.patch().inverse())?;
-    assert_eq!(restored.package().read_options(), options);
+    assert_eq!(restored.package().options(), options);
     assert_eq!(written(restored.package())?, bytes);
     Ok(())
 }
@@ -1458,11 +1515,18 @@ fn nondefault_tight_limits_survive_read_edit_commit_and_apply() -> TestResult<()
 fn focused_reader_reports_typed_slide_limit_before_publication() -> TestResult<()> {
     let bytes =
         package_bytes_with_slide_nodes(NativeSettings::absent(), Malformation::None, 150, &[3, 4])?;
-    let semantic = SemanticLimits::new(8, 1, 16, 1, 1, 64)?;
+    let semantic = SemanticLimits::builder()
+        .max_objects(8)?
+        .max_slides(1)?
+        .max_references(16)?
+        .max_text_storages(1)?
+        .max_text_fragments(1)?
+        .max_text_bytes(64)?
+        .build()?;
     let package =
-        Package::from_bytes_with_options(&bytes, ReadOptions::new(Limits::default(), semantic))?;
+        Package::from_bytes_with_options(&bytes, OpenOptions::new().semantic_limits(semantic))?;
 
-    let expected = ShowSettingsError::LimitExceeded {
+    let expected = ShowSettingsError::Limit {
         kind: ShowSettingsLimitKind::Slides,
         observed: 2,
         maximum: 1,
@@ -1539,6 +1603,7 @@ fn root_reference_and_ownership_metadata_fail_closed() -> TestResult<()> {
                 type_: 1,
                 data: document.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -1562,17 +1627,22 @@ fn root_reference_and_ownership_metadata_fail_closed() -> TestResult<()> {
         Ok(())
     })?;
     let wrong_wire = rewrite_root_reference(&bytes, |reference| {
-        let view = WireView::parse(reference)?;
+        let view = WireView::parse(reference, litchi_iwa_common::WireLimits::DEFAULT)?;
         let mut rewritten = Vec::new();
         for field in view.fields().filter(|field| field.number() != 3) {
             rewritten.extend_from_slice(field.raw());
         }
-        litchi_iwa_common::wire::append_length_delimited_field(&mut rewritten, 3, &[0])?;
+        litchi_iwa_common::wire::append_length_delimited_field(
+            &mut rewritten,
+            3,
+            &[0],
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         *reference = rewritten;
         Ok(())
     })?;
     let noncanonical = rewrite_root_reference(&bytes, |reference| {
-        let view = WireView::parse(reference)?;
+        let view = WireView::parse(reference, litchi_iwa_common::WireLimits::DEFAULT)?;
         let mut rewritten = Vec::new();
         for field in view.fields().filter(|field| field.number() != 3) {
             rewritten.extend_from_slice(field.raw());
@@ -1611,7 +1681,8 @@ fn root_reference_and_ownership_metadata_fail_closed() -> TestResult<()> {
         Ok(())
     })?;
     let wrong_path = rewrite_root(&bytes, |root, index| {
-        root.archive_info.message_infos[index].field_infos[0].path = FieldPath::new(vec![3]);
+        root.archive_info.message_infos[index].field_infos[0].path =
+            litchi_iwa_core::FieldPath::new(vec![3], litchi_iwa_core::Limits::default()).unwrap();
         Ok(())
     })?;
     for malformed in [missing, duplicate, wrong_path] {
@@ -1634,7 +1705,11 @@ fn root_reference_and_ownership_metadata_fail_closed() -> TestResult<()> {
         root.archive_info.message_infos[0]
             .object_references
             .push(SIBLING_IDENTIFIER);
-        let mut unrelated = FieldInfo::new(vec![77]);
+        let mut unrelated = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![77], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         unrelated.object_references = vec![SIBLING_IDENTIFIER];
         root.archive_info.message_infos[0]
             .field_infos
@@ -1706,7 +1781,7 @@ fn checked_native_fixture_noop_playback_and_rendering_changes_follow_cache_polic
     let bytes = std::fs::read(native_fixture_path())?;
     let package = Package::from_bytes(&bytes)?;
     let before = package.show_settings()?;
-    let catalog = Catalog::from_bytes(&bytes)?;
+    let catalog = Catalog::from_bytes(&bytes, Default::default())?;
     let slide_components = catalog
         .iter()
         .filter_map(|entry| {
@@ -1893,7 +1968,10 @@ fn huge_nested_size_opaque_field_hits_byte_work_limit_before_publication() -> Te
             .iter()
             .position(|message| message.type_ == 2)
             .ok_or_else(|| io::Error::other("missing show message"))?;
-        let source = WireView::parse(&show.messages[index].data)?;
+        let source = WireView::parse(
+            &show.messages[index].data,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut payload = Vec::new();
         let mut selected_size = false;
         for field in source.fields() {
@@ -1909,8 +1987,14 @@ fn huge_nested_size_opaque_field_hits_byte_work_limit_before_publication() -> Te
                 &mut size,
                 199,
                 &vec![0xa5; 16_100_000],
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
-            litchi_iwa_common::wire::append_length_delimited_field(&mut payload, 4, &size)?;
+            litchi_iwa_common::wire::append_length_delimited_field(
+                &mut payload,
+                4,
+                &size,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         }
         if !selected_size {
             return Err(io::Error::other("missing show size field").into());
@@ -1921,6 +2005,7 @@ fn huge_nested_size_opaque_field_hits_byte_work_limit_before_publication() -> Te
                 type_: 2,
                 data: payload,
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -1929,7 +2014,7 @@ fn huge_nested_size_opaque_field_hits_byte_work_limit_before_publication() -> Te
     assert!(field_count < 100);
     assert!(matches!(
         package.edit_show_settings(),
-        Err(ShowSettingsError::LimitExceeded {
+        Err(ShowSettingsError::Limit {
             kind: ShowSettingsLimitKind::WireWork,
             ..
         })
@@ -1956,7 +2041,9 @@ fn legacy_source_accepts_exact_noop_and_refuses_changed_reassembly() -> TestResu
     settings.set_automatically_plays_upon_open(Some(true));
     assert!(matches!(
         changed.set(settings).commit(),
-        Err(ShowSettingsError::UnsupportedSource)
+        Err(ShowSettingsError::Refused(
+            litchi_keynote::show::Refusal::UnsupportedSource
+        ))
     ));
     Ok(())
 }
@@ -1969,7 +2056,7 @@ fn null_show_reader_matches_full_semantics_and_only_exact_noop_is_editable() -> 
     assert_eq!(*package.show()?.settings(), Settings::default());
     assert!(package.show()?.is_empty());
     assert!(package.slides()?.is_empty());
-    assert!(package.semantic_snapshot()?.slides().is_empty());
+    assert!(package.presentation()?.slides().is_empty());
     assert_eq!(package.text()?, "");
 
     let noop = package.edit_show_settings()?.commit()?;
@@ -1985,7 +2072,9 @@ fn null_show_reader_matches_full_semantics_and_only_exact_noop_is_editable() -> 
     settings.set_loop_presentation(Some(true));
     assert!(matches!(
         changed.set(settings).commit(),
-        Err(ShowSettingsError::UnsupportedSource)
+        Err(ShowSettingsError::Refused(
+            litchi_keynote::show::Refusal::UnsupportedSource
+        ))
     ));
     Ok(())
 }

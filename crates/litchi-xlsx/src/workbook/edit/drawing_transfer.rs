@@ -29,7 +29,7 @@ const MAX_ANCHORS: usize = 100_000;
 const MAX_REFERENCES: usize = 4_096;
 const MAX_URI_ATTEMPTS: u32 = 10_000;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(super) struct Plan {
     pub(super) source_position: usize,
     pub(super) source_name: Box<str>,
@@ -260,7 +260,7 @@ fn prepare_dependency(
                     "drawing chart target is outside /xl/charts or lacks .xml suffix",
                 ));
             }
-            let anchor = crate::chart::Anchor::new(0, 0, 1, 1);
+            let anchor = crate::builder::chart::Anchor::new(0, 0, 1, 1);
             let chart = crate::chart::read(source.blob(), anchor)?;
             clone_chart_relationships(workbook, source, target_uri, target, reserved, &chart)
         },
@@ -276,7 +276,7 @@ fn clone_chart_relationships(
     target_uri: &PackURI,
     target: &mut BlobPart,
     reserved: &mut BTreeSet<String>,
-    chart: &crate::chart::Chart,
+    chart: &crate::builder::chart::Chart,
 ) -> Result<Vec<GraphChange>> {
     let mut fragment_ids =
         litchi_spreadsheet_drawing::chart::relationship::fragment_ids(&chart.chart)?;
@@ -476,12 +476,14 @@ fn validate_image_leaf(part: &dyn Part) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn attach_worksheet(xml: &[u8], relationship_id: &str) -> Result<Vec<u8>> {
+pub(crate) fn attach_worksheet(xml: &[u8], relationship_id: &str) -> Result<Vec<u8>> {
     let layout = worksheet_layout(xml)?;
     if layout.drawing_reference.is_some() {
         return Err(unsupported("merging into an existing worksheet drawing"));
     }
-    if layout.alternate_content {
+    // Branches bound through a declaration spelled with references are
+    // invisible to the layout scan but applied by preprocessing (record 0011).
+    if layout.alternate_content || litchi_ooxml_common::mce::binds_namespace_by_reference(xml) {
         return Err(unsupported(
             "inserting a drawing beside worksheet markup-compatibility branches",
         ));

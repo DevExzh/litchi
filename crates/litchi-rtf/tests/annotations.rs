@@ -7,13 +7,14 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
-use litchi_rtf::{Annotation, NavigationEntry, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{Annotation, NavigationEntry, write::Writer};
 use std::borrow::Cow;
 
 #[test]
 fn parses_full_comment_metadata_range_unicode_and_hidden_body() {
     let source = r"{\rtf1\ansi A{\*\atrfstart 7}\u20320?{\*\atrfend 7}{\*\atnid AM}{\*\atnauthor Ada \u20320?}\chatn{\*\annotation{\*\atnref 7}{\*\atndate -12}{\*\atnparent root}{\*\atnicn 2}{\*\atntime 42}Review \u-10179?\u-8704?}Z}";
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(document.text(), "A你Z");
     let annotation = &document.annotations()[0];
     assert!(annotation.has_reference);
@@ -44,7 +45,7 @@ fn parses_bundled_libreoffice_comment_fixtures() {
         "fdo63428.rtf",
     ] {
         let source = std::fs::read_to_string(root.join(fixture)).unwrap();
-        let document = RtfDocument::parse(&source)
+        let document = Tree::parse(&source, litchi_rtf::read::OpenOptions::default())
             .unwrap_or_else(|error| panic!("failed to parse {fixture}: {error}"));
         assert!(!document.annotations().is_empty(), "{fixture}");
     }
@@ -53,21 +54,23 @@ fn parses_bundled_libreoffice_comment_fixtures() {
 #[test]
 fn point_and_range_comments_round_trip_without_visible_text_duplication() {
     let source = r"{\rtf1 A{\*\atnid }{\*\atnauthor Point}\chatn{\*\annotation point}B{\*\atrfstart 9}\u20320?{\*\atrfend 9}{\*\atnid R}{\*\atnauthor Range}\chatn{\*\annotation{\*\atnref 9}range}C}";
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert!(!document.annotations()[0].has_reference);
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut output).write_document(&document).unwrap();
     let output = String::from_utf8(output).unwrap();
-    let reparsed = RtfDocument::parse(&output).unwrap();
+    let reparsed = Tree::parse(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.annotations(), document.annotations());
 }
 
 #[test]
 fn typed_mutation_validates_positions_identity_and_coexists_with_navigation_marks() {
-    let mut document = RtfDocument::parse(r"{\rtf1 Body{\tc\v Heading}}").unwrap();
+    let mut document = Tree::parse(
+        r"{\rtf1 Body{\tc\v Heading}}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert!(matches!(
         document.navigation_entries()[0],
         NavigationEntry::TableOfContents(_)
@@ -96,7 +99,10 @@ fn rejects_conflicts_orphans_active_data_and_invalid_metadata() {
         r"{\rtf1\chatn{\*\annotation{\object danger}}}",
         "{\\rtf1\\chatn{\\*\\annotation\\bin4 abcd}}",
     ] {
-        assert!(RtfDocument::parse(source).is_err(), "{source}");
+        assert!(
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "{source}"
+        );
     }
 }
 #[test]
@@ -108,7 +114,7 @@ fn annotation_baseline_controls_fail_closed() {
         r#"{\rtf1{\chatn{\*\annotation\adn2 One\adn4 Two}}}"#,
     ] {
         assert!(
-            RtfDocument::parse(source).is_err(),
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
             "annotation baseline controls must be rejected"
         );
     }

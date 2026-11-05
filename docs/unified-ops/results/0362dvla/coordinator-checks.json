@@ -1,0 +1,390 @@
+{
+  "schema": "litchi.composed-gate-repair.v1",
+  "artifacts": [
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/cfb-composed-06f9241a23/receipt.json",
+      "bytes": 3136,
+      "sha256": "fb8dfc55314f964075d4ae6a61dc6f664d767baad5e663f942e66ccfa5206c9d",
+      "receipt": {
+        "source": "06f9241a236298087fdea35fb14090a72c914fec",
+        "root": "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration",
+        "lock_sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
+        "source_file_sha256": "c41bb4b3007f2b7fe9b80f777040929884c6cf88df760a3de769e8d2248318eb",
+        "env": {
+          "PATH": "/home/zhuhe/code/litchi-worktrees/.coord/bin:/home/zhuhe/.local/bin:/home/zhuhe/.codex/packages/standalone/releases/0.164.0-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.codex/tmp/arg0-linux/codex-arg0FCLdkN:/home/zhuhe/.codex/tmp/arg0-linux/codex-arg00dw7C8:/home/zhuhe/.local/bin:/home/zhuhe/.kimi-code/bin:/home/zhuhe/.bun/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/146209_1792754085282/bin:/home/zhuhe/.local/bin:/home/zhuhe/.moon/bin:/home/zhuhe/.kimi-code/bin:/home/zhuhe/.bun/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/52327_1792753151407/bin:/home/zhuhe/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/zhuhe/.fzf/bin:/home/zhuhe/go/bin:/home/zhuhe/go/bin",
+          "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-chart-raw-target",
+          "TMPDIR": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/cfb-composed-06f9241a23/tmp",
+          "CARGO_BUILD_JOBS": "1",
+          "RUST_TEST_THREADS": "1",
+          "CARGO_INCREMENTAL": "0",
+          "CARGO_PROFILE_DEV_DEBUG": "0",
+          "CARGO_PROFILE_TEST_DEBUG": "0",
+          "CARGO_PROFILE_RELEASE_DEBUG": "0",
+          "CARGO_NET_OFFLINE": "true",
+          "LITCHI_MEM_MAX": "20G",
+          "LC_ALL": "C"
+        },
+        "steps": [
+          {
+            "name": "cfb-tests",
+            "argv": [
+              "cargo",
+              "test",
+              "--offline",
+              "--locked",
+              "-p",
+              "litchi-cfb",
+              "--lib",
+              "--tests"
+            ],
+            "exit_code": 0,
+            "started_utc": "2026-10-24T16:18:13.540239+00:00",
+            "elapsed_seconds": 40.92290663719177,
+            "target_before_bytes": 6595576309,
+            "target_after_bytes": 6685551656,
+            "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/cfb-composed-06f9241a23/cfb-tests.log",
+            "log_bytes": 48723,
+            "log_sha256": "6f652cc2b62f3f05cc42c366ac03c3396932bca3ed0a7e82f5c7e9efe63e87db"
+          },
+          {
+            "name": "all-features-clippy",
+            "argv": [
+              "cargo",
+              "clippy",
+              "--offline",
+              "--locked",
+              "-p",
+              "litchi-cli",
+              "-p",
+              "litchi-ops",
+              "-p",
+              "litchi",
+              "-p",
+              "litchi-py",
+              "--all-targets",
+              "--all-features",
+              "--",
+              "-D",
+              "warnings"
+            ],
+            "exit_code": 101,
+            "started_utc": "2026-10-24T16:18:54.506231+00:00",
+            "elapsed_seconds": 87.32262587547302,
+            "target_before_bytes": 6685551656,
+            "target_after_bytes": 6940163424,
+            "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/cfb-composed-06f9241a23/all-features-clippy.log",
+            "log_bytes": 12048,
+            "log_sha256": "1e4ffeca1f2f24c3e5d1ad20cf97337b87bbf179b3b7b7be42a8dad4e1773b7c"
+          }
+        ],
+        "status": "failed"
+      }
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-clippy-repair-06f/receipt.json",
+      "bytes": 3860,
+      "sha256": "c07a82a57fde6be450747b78e994b612ff0064594caf9cbc2c15262af572e597",
+      "receipt": {
+        "base": "06f9241a236298087fdea35fb14090a72c914fec",
+        "source_files": {
+          "crates/litchi-drawingml/src/chart/chartex.rs": "03dccaa602595c3abc2971659055893e0c6747b1feb5d15c872545a3867941b8",
+          "crates/litchi-drawingml/src/diagram/authoring.rs": "833939f7c83d015726cf5d3b9351e9f77d73879333679871bf522b9debadb98a",
+          "crates/litchi-drawingml/src/diagram/model.rs": "7012c70245addc997c2b9b205877567f859e271be6db0f8e598990988f9d0b80",
+          "crates/litchi-drawingml/src/ink/actions.rs": "2750b920c1dae8df62b36dee36af964512e2b8bd65b3a24a270956343e89ee20",
+          "crates/litchi-drawingml/src/text/body/reader.rs": "9664f1b176d8b4f0bf17ae4100afc80f82c4392841239e11b6feaff716e2fa36",
+          "crates/litchi-drawingml/src/theme/family/codec.rs": "72f63af3c5e8ce58f8954f78ac0ed3ab09d0c1a5c5d7bf783478ab11c293c5c5"
+        },
+        "root": "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration",
+        "lock_sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
+        "environment": {
+          "PATH": "/home/zhuhe/code/litchi-worktrees/.coord/bin:/home/zhuhe/.local/bin:/home/zhuhe/.codex/packages/standalone/releases/0.164.0-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.codex/tmp/arg0-linux/codex-arg0FCLdkN:/home/zhuhe/.codex/tmp/arg0-linux/codex-arg00dw7C8:/home/zhuhe/.local/bin:/home/zhuhe/.kimi-code/bin:/home/zhuhe/.bun/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/146209_1792754085282/bin:/home/zhuhe/.local/bin:/home/zhuhe/.moon/bin:/home/zhuhe/.kimi-code/bin:/home/zhuhe/.bun/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/52327_1792753151407/bin:/home/zhuhe/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/zhuhe/.fzf/bin:/home/zhuhe/go/bin:/home/zhuhe/go/bin",
+          "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-chart-raw-target",
+          "TMPDIR": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-clippy-repair-06f/tmp",
+          "CARGO_BUILD_JOBS": "1",
+          "RUST_TEST_THREADS": "1",
+          "CARGO_INCREMENTAL": "0",
+          "CARGO_PROFILE_DEV_DEBUG": "0",
+          "CARGO_PROFILE_TEST_DEBUG": "0",
+          "CARGO_PROFILE_RELEASE_DEBUG": "0",
+          "CARGO_NET_OFFLINE": "true",
+          "LITCHI_MEM_MAX": "20G",
+          "LC_ALL": "C"
+        },
+        "steps": [
+          {
+            "name": "drawingml-tests",
+            "argv": [
+              "cargo",
+              "test",
+              "--offline",
+              "--locked",
+              "-p",
+              "litchi-drawingml",
+              "--all-features",
+              "--lib",
+              "--tests"
+            ],
+            "exit_code": 0,
+            "started_utc": "2026-10-24T16:24:34.007184+00:00",
+            "elapsed_seconds": 34.67758822441101,
+            "target_before_bytes": 6940163424,
+            "target_after_bytes": 7161067490,
+            "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-clippy-repair-06f/drawingml-tests.log",
+            "log_bytes": 44848,
+            "log_sha256": "5e79f9b78cd404a4a865f77c119caf9b5aed46a52df6b6b1c448c4a426b7b31f"
+          },
+          {
+            "name": "all-features-clippy",
+            "argv": [
+              "cargo",
+              "clippy",
+              "--offline",
+              "--locked",
+              "-p",
+              "litchi-cli",
+              "-p",
+              "litchi-ops",
+              "-p",
+              "litchi",
+              "-p",
+              "litchi-py",
+              "--all-targets",
+              "--all-features",
+              "--",
+              "-D",
+              "warnings"
+            ],
+            "exit_code": 101,
+            "started_utc": "2026-10-24T16:25:08.738843+00:00",
+            "elapsed_seconds": 20.616219997406006,
+            "target_before_bytes": 7161067490,
+            "target_after_bytes": 7204379830,
+            "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-clippy-repair-06f/all-features-clippy.log",
+            "log_bytes": 3368,
+            "log_sha256": "123dedd05a313e3cc1797e357cb65495249fd7ba54ab04ea26bc343c05eb6d0d"
+          }
+        ],
+        "status": "failed"
+      }
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-clippy-repair-06f-r2/receipt.json",
+      "bytes": 2268,
+      "sha256": "149812dff601d988bd829e1c4806594c3f88f72a86d1aa4ab92a6080ad9cd40c",
+      "receipt": {
+        "base": "06f9241a236298087fdea35fb14090a72c914fec",
+        "source_files": {
+          "crates/litchi-drawingml/src/chart/chartex.rs": "03dccaa602595c3abc2971659055893e0c6747b1feb5d15c872545a3867941b8",
+          "crates/litchi-drawingml/src/diagram/authoring.rs": "833939f7c83d015726cf5d3b9351e9f77d73879333679871bf522b9debadb98a",
+          "crates/litchi-drawingml/src/diagram/model.rs": "7012c70245addc997c2b9b205877567f859e271be6db0f8e598990988f9d0b80",
+          "crates/litchi-drawingml/src/ink/actions.rs": "2750b920c1dae8df62b36dee36af964512e2b8bd65b3a24a270956343e89ee20",
+          "crates/litchi-drawingml/src/text/body/reader.rs": "9664f1b176d8b4f0bf17ae4100afc80f82c4392841239e11b6feaff716e2fa36",
+          "crates/litchi-drawingml/src/theme/family/codec.rs": "72f63af3c5e8ce58f8954f78ac0ed3ab09d0c1a5c5d7bf783478ab11c293c5c5",
+          "crates/litchi-spreadsheet-drawing/src/shape/writer/mod.rs": "bfe6c6f83ddeb84cbf220826ed34f75c3a27dd32c214c4fd5746bc9e88a83e9b"
+        },
+        "lock_sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
+        "environment": {
+          "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-chart-raw-target",
+          "TMPDIR": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-clippy-repair-06f-r2/tmp",
+          "CARGO_BUILD_JOBS": "1",
+          "RUST_TEST_THREADS": "1",
+          "CARGO_INCREMENTAL": "0",
+          "CARGO_PROFILE_DEV_DEBUG": "0",
+          "CARGO_PROFILE_TEST_DEBUG": "0",
+          "CARGO_PROFILE_RELEASE_DEBUG": "0",
+          "CARGO_NET_OFFLINE": "true",
+          "LITCHI_MEM_MAX": "20G",
+          "LC_ALL": "C"
+        },
+        "argv": [
+          "cargo",
+          "clippy",
+          "--offline",
+          "--locked",
+          "--keep-going",
+          "-p",
+          "litchi-cli",
+          "-p",
+          "litchi-ops",
+          "-p",
+          "litchi",
+          "-p",
+          "litchi-py",
+          "--all-targets",
+          "--all-features",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "target_before_bytes": 7204379830,
+        "started_unix": 1792859239.9887664,
+        "status": "failed",
+        "exit_code": 101,
+        "elapsed_seconds": 166.5244846343994,
+        "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-clippy-repair-06f-r2/all-features-clippy.log",
+        "log_bytes": 10779,
+        "log_sha256": "e67535502a3006490cd84dac694dd4eb24490fc4d083afee41d6619b53ae4dee",
+        "target_after_bytes": 7473447646
+      }
+    }
+  ],
+  "owner_tooling": {
+    "merge": "b0e6abfd7a",
+    "command": [
+      "python3",
+      "-m",
+      "unittest",
+      "tools.test_drawingml_raw_qualification",
+      "tools.test_drawingml_compile_driver",
+      "tools.test_native_qualification_runner"
+    ],
+    "tests": 41,
+    "exit_code": 0,
+    "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-owner-9d-composed/tooling.log",
+    "log_bytes": 374,
+    "log_sha256": "f694191348d8f215cc83caa9a76498c469c30fc0675fa34409ec8ad921c5deca"
+  },
+  "counts": {
+    "cfb_tests": 555,
+    "drawingml_tests": 486
+  },
+  "ppt_082_diagnostic": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/diagnostic-receipt-082fbeafe8.json",
+    "bytes": 4564,
+    "sha256": "3340a422d44ebf1f89b4bf887abe4c48c42422ce0a6f9b693629777cd4b50ba3",
+    "receipt": {
+      "schema": "litchi.ppt.lazy-native.diagnostic-receipt.v1",
+      "status": "candidate_compile_failed",
+      "claim_scope": "bounded source/build/correctness diagnostic only; no timing, calibration, ABBA, allocation-count, or performance acceptance claim",
+      "protocol": {
+        "source_commit": "ee74c234972527b6cf906a094c30f133b95d6701",
+        "source_tree": "c97a7201ce8126d7f7827c8401973455a2321c6e",
+        "candidate_preparation": {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/preparation-082fbeafe8.json",
+          "bytes": 12230,
+          "sha256": "ddee2942921348aaa1b8968860c36ff8a3fdc865fbc3245ca3f621318ad66514"
+        },
+        "candidate_preparation_log": {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/logs/preparation-082fbeafe8.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "exit": 0
+        },
+        "probe_sources": [
+          {
+            "path": "tools/perf-baseline/src/ppt_lazy_native.rs",
+            "bytes": 24586,
+            "sha256": "68d77fad390dc681ed248b2348b26f319d2e646d1f0b006796ecd89c49cae62e"
+          },
+          {
+            "path": "tools/perf-baseline/src/bin/ppt_lazy_native.rs",
+            "bytes": 146,
+            "sha256": "04df53920b036911e9002df152b9e07b1e0392ac6a1a545b285807108d808d12"
+          },
+          {
+            "path": "tools/perf-baseline/src/bin/ppt_lazy_native_alloc.rs",
+            "bytes": 203,
+            "sha256": "661e94115adc418de1c25ee6dd5481e4399e43eee26e011a49d1fb9d1ce56201"
+          }
+        ],
+        "toolchain": "rustc 1.95.0 (59807616e 2026-04-14), LLVM 22.1.2",
+        "environment": {
+          "memory_cap": "LITCHI_MEM_MAX=20G",
+          "cargo_build_jobs": "1",
+          "cargo_incremental": "0",
+          "cargo_net_offline": "true",
+          "cargo_profile_release_debug": "0",
+          "cpu_pin": "none; no timing or ABBA execution",
+          "target_limit_bytes": 20000000000
+        },
+        "command": "cargo build --release --offline --locked --manifest-path tools/perf-baseline/Cargo.toml --bin <binary>"
+      },
+      "baseline": {
+        "head": "8779d059add6c90c74552801372c44f770db9f0f",
+        "tree": "27e0b56e2f8e3ab11b00c119604b5636f358dfe2",
+        "lock": {
+          "bytes": 57158,
+          "sha256": "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184"
+        },
+        "normal_build": {
+          "exit": 0,
+          "binary": {
+            "path": "baseline-082-normal-target/release/ppt_lazy_native",
+            "bytes": 12131056,
+            "sha256": "ffcf3aebd0adca8ec26047f732e58026506829562cf51480056315a0a598416a"
+          },
+          "log": {
+            "path": "logs/baseline-082-normal-build.log",
+            "bytes": 11288,
+            "sha256": "b3f2a2eb5673e8661b694128bd3ef9d672caf7ec84fa491ac1d6456fb3a477d0"
+          },
+          "target_bytes": 1314991296
+        },
+        "allocator_build": {
+          "exit": 0,
+          "binary": {
+            "path": "baseline-082-allocator-target/release/ppt_lazy_native_alloc",
+            "bytes": 12138552,
+            "sha256": "0d045e2c6a36e83d4d36fb9525b814849ec39b3d06a0e4fe02fcc9ed94cb85d7"
+          },
+          "log": {
+            "path": "logs/baseline-082-allocator-build.log",
+            "bytes": 11288,
+            "sha256": "091adb9992ae99ed71a2227d0f600544515c12f762298c7fe9f2b4595bd788ce"
+          },
+          "target_bytes": 1315001381
+        },
+        "normal_verify": {
+          "exit": 0,
+          "report": {
+            "path": "verify-baseline-082-normal.json",
+            "bytes": 12094,
+            "sha256": "2daa5587982ac38c4a4068adc03a9c91798a4c98ce95b050e541069ed276d07c"
+          },
+          "validation": "28 routes and 4 fixtures passed; allocation unavailable"
+        },
+        "allocator_verify": {
+          "exit": 0,
+          "report": {
+            "path": "verify-baseline-082-allocator.json",
+            "bytes": 12091,
+            "sha256": "a16a3ef18063f0ba31d379bba1022a6b38eeaba383b1d487683ff3b0a1f076f9"
+          },
+          "validation": "same 28 route/4 fixture proofs passed; allocation status measured"
+        }
+      },
+      "candidate": {
+        "root": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-082fbeafe8/source",
+        "head": "082fbeafe8f1e68c7118ec8561b5bd6fe1577415",
+        "tree": "ba03f0a148c3029a3e2cbec47abce8e2813b3f1b",
+        "lock": {
+          "bytes": 57227,
+          "sha256": "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c"
+        },
+        "normal_build": {
+          "exit": 101,
+          "binary": null,
+          "log": {
+            "path": "logs/candidate-082-normal-build.log",
+            "bytes": 67307,
+            "sha256": "23e8933d87164ebe7a1dfa8df3ee9b9e06ac911a0e3f0d16107918f403eb19d9"
+          },
+          "target_bytes": 1186539247,
+          "failure": "litchi-perf-baseline failed with 72 drawingml_raw_probe.rs API errors; the module is unconditionally compiled in the candidate library"
+        },
+        "allocator_build": {
+          "status": "not_run",
+          "reason": "shared candidate library failed the exact normal build"
+        },
+        "verify": {
+          "status": "not_run",
+          "reason": "no candidate normal or allocator binary was produced"
+        }
+      }
+    }
+  },
+  "claims": {
+    "full_gate": false,
+    "native_performance": false
+  }
+}

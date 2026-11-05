@@ -6,8 +6,8 @@
 //! shapes, opaque syntax, signatures, or protection metadata.  Those surfaces
 //! remain explicit diagnostics and make strict planning fail closed.
 
+use crate::Package;
 use crate::edit::Error;
-use crate::{Document, RtfError};
 use litchi_core::patch::{BlobBundle, BlobId, ForwardOnly, Patch, PatchLimits, PatchOperation};
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -168,14 +168,14 @@ impl Diagnostics {
 /// Exact immutable source inventory for the narrow external-reference closure.
 #[derive(Debug, Clone)]
 pub struct Snapshot {
-    source: Document,
+    source: Package,
     references: Vec<ReferenceOccurrence>,
     unsupported: Box<[UnsupportedReference]>,
 }
 
 impl Snapshot {
     /// Capture a bounded inventory from one immutable document snapshot.
-    pub(crate) fn from_document(source: &Document) -> Result<Self, Error> {
+    pub(crate) fn from_package(source: &Package) -> Result<Self, Error> {
         let model = source.model();
         let references = model.external_references();
         let spans = model.external_reference_source_spans();
@@ -184,7 +184,7 @@ impl Snapshot {
         let count = usize::from(references.next_file.is_some())
             .saturating_add(usize::from(references.template.is_some()));
         if count > MAX_REFERENCES {
-            return Err(Error::Rtf(RtfError::LimitExceeded {
+            return Err(Error::Rtf(crate::Error::LimitExceeded {
                 resource: "RTF external-reference inventory entries",
                 observed: count,
                 limit: MAX_REFERENCES,
@@ -247,7 +247,7 @@ impl Snapshot {
     /// bound.  The plan never changes the source snapshot.
     pub fn plan(&self, mode: Mode, limits: PatchLimits) -> Result<Plan, Error> {
         if matches!(mode, Mode::Strict) && !self.unsupported.is_empty() {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "external-reference redaction has unsupported remaining surfaces",
             ));
         }
@@ -279,11 +279,7 @@ impl Plan {
             &self.source.unsupported,
         )?;
         let patch = build_patch(&self.source.source, &selected, self.mode, self.limits)?;
-        Ok(Commit {
-            document: candidate,
-            patch,
-            diagnostics,
-        })
+        Ok(Commit::new(candidate, patch, diagnostics))
     }
 
     /// Source inventory used by this plan.
@@ -293,42 +289,11 @@ impl Plan {
     }
 }
 
-/// Ordinary document plus an intentionally irreversible forward-only patch.
-#[derive(Debug, Clone)]
-pub struct Commit {
-    document: Document,
-    patch: Patch<ForwardOnly>,
-    diagnostics: Diagnostics,
-}
-
-impl Commit {
-    /// Borrow the ordinary candidate document.  This is not a certification
-    /// type; callers must inspect [`Self::diagnostics`] before treating the
-    /// result as complete.
-    #[must_use]
-    pub const fn document(&self) -> &Document {
-        &self.document
-    }
-
-    /// Consume the commit and return its ordinary candidate document.
-    #[must_use]
-    pub fn into_document(self) -> Document {
-        self.document
-    }
-
-    /// Borrow the sealed forward-only durable patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch<ForwardOnly> {
-        &self.patch
-    }
-
-    /// Borrow explicit completeness/effect diagnostics.
-    #[must_use]
-    pub const fn diagnostics(&self) -> &Diagnostics {
-        &self.diagnostics
-    }
-}
-
+/// The ordinary candidate document plus an intentionally irreversible
+/// forward-only patch and explicit completeness/effect diagnostics. The
+/// document is not a certification type: callers must inspect
+/// `diagnostics()` before treating the result as complete.
+pub type Commit = litchi_core::edit::Commit<Package, Patch<ForwardOnly>, Diagnostics>;
 fn push_occurrence(
     entries: &mut Vec<ReferenceOccurrence>,
     kind: ReferenceKind,
@@ -356,7 +321,7 @@ fn push_occurrence(
 }
 
 fn collect_unsupported(
-    model: &crate::raw::Document<'_>,
+    model: &crate::raw::Tree<'_>,
     unsupported: &mut Vec<UnsupportedReference>,
 ) -> Result<(), Error> {
     if !model.opaque_nodes().is_empty() {
@@ -469,7 +434,7 @@ fn collect_unsupported(
 /// external-reference surface when it lives outside the body root: headers,
 /// footers, notes, annotations, separators, table cells, field results, and
 /// legacy text-box stories all retain independent drawing stores.
-fn model_has_hyperlink_shapes(model: &crate::raw::Document<'_>) -> bool {
+fn model_has_hyperlink_shapes(model: &crate::raw::Tree<'_>) -> bool {
     story_shapes_have_hyperlink(model.shapes(), model.shape_groups())
         || model.tables().iter().any(table_has_hyperlink)
         || model
@@ -543,7 +508,7 @@ fn push_unique(
         return Ok(());
     }
     if unsupported.len() >= MAX_DIAGNOSTICS {
-        return Err(Error::Rtf(RtfError::LimitExceeded {
+        return Err(Error::Rtf(crate::Error::LimitExceeded {
             resource: "external-reference diagnostics",
             observed: unsupported.len().saturating_add(1),
             limit: MAX_DIAGNOSTICS,
@@ -572,19 +537,19 @@ fn selected_entries(entries: &[ReferenceOccurrence]) -> Result<Vec<&ReferenceOcc
 }
 
 fn rewrite_candidate(
-    source: &Document,
+    source: &Package,
     selected: &[&ReferenceOccurrence],
     mode: Mode,
     unsupported: &[UnsupportedReference],
-) -> Result<(Document, Diagnostics), Error> {
+) -> Result<(Package, Diagnostics), Error> {
     if matches!(mode, Mode::Strict) && !unsupported.is_empty() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "external-reference redaction has unsupported remaining surfaces",
         ));
     }
-    let source_bytes = source
-        .source_bytes()
-        .ok_or(Error::UnsupportedSource("RTF source bytes are unavailable"))?;
+    let source_bytes = source.source_bytes().ok_or(Error::unsupported_source(
+        "RTF source bytes are unavailable",
+    ))?;
     let diagnostics = Diagnostics {
         removed_references: selected.len(),
         unsupported: clone_unsupported(unsupported)?,
@@ -597,9 +562,9 @@ fn rewrite_candidate(
         return Ok((source.clone(), diagnostics));
     }
     let candidate =
-        Document::from_bytes_with_options(&output, source.options()).map_err(Error::Rtf)?;
+        Package::from_bytes_with_options(&output, source.options()).map_err(Error::Rtf)?;
     if candidate.text() != source.text() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "external-reference redaction changed visible text",
         ));
     }
@@ -607,7 +572,7 @@ fn rewrite_candidate(
         .source_bytes()
         .is_none_or(|candidate_bytes| candidate_bytes != output.as_slice())
     {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "external-reference redaction candidate did not retain exact bytes",
         ));
     }
@@ -617,13 +582,13 @@ fn rewrite_candidate(
             ReferenceKind::Template => candidate.external_references().template.is_some(),
         };
         if present {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "external-reference redaction candidate retained a selected group",
             ));
         }
     }
     if matches!(mode, Mode::Strict) && !candidate.external_references().is_empty() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "external-reference redaction candidate retained a modeled reference",
         ));
     }
@@ -643,13 +608,16 @@ fn clone_unsupported(
 
 fn splice_groups(source: &[u8], selected: &[&ReferenceOccurrence]) -> Result<Vec<u8>, Error> {
     let removed = selected.iter().try_fold(0usize, |total, entry| {
-        let range = entry.source_range.as_ref().ok_or(Error::UnsupportedSource(
-            "external-reference source span is unavailable",
-        ))?;
+        let range = entry
+            .source_range
+            .as_ref()
+            .ok_or(Error::unsupported_source(
+                "external-reference source span is unavailable",
+            ))?;
         let length = range
             .end
             .checked_sub(range.start)
-            .ok_or(Error::UnsupportedSource(
+            .ok_or(Error::unsupported_source(
                 "external-reference source span is reversed",
             ))?;
         total.checked_add(length).ok_or(Error::DurablePatch(
@@ -659,7 +627,7 @@ fn splice_groups(source: &[u8], selected: &[&ReferenceOccurrence]) -> Result<Vec
     let retained = source
         .len()
         .checked_sub(removed)
-        .ok_or(Error::UnsupportedSource(
+        .ok_or(Error::unsupported_source(
             "external-reference source span exceeds source",
         ))?;
     // Several adjacent destination groups can be removed together.  Inspect
@@ -676,16 +644,19 @@ fn splice_groups(source: &[u8], selected: &[&ReferenceOccurrence]) -> Result<Vec
         .map_err(|_error| allocation("external-reference candidate bytes", output_len))?;
     let mut cursor = 0usize;
     for entry in selected {
-        let range = entry.source_range.as_ref().ok_or(Error::UnsupportedSource(
-            "external-reference source span is unavailable",
-        ))?;
+        let range = entry
+            .source_range
+            .as_ref()
+            .ok_or(Error::unsupported_source(
+                "external-reference source span is unavailable",
+            ))?;
         if range.start < cursor || range.end > source.len() || range.start >= range.end {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "external-reference source spans overlap or fall outside the source",
             ));
         }
         output.extend_from_slice(source.get(cursor..range.start).ok_or(
-            Error::UnsupportedSource("external-reference source prefix is unavailable"),
+            Error::unsupported_source("external-reference source prefix is unavailable"),
         )?);
         cursor = range.end;
     }
@@ -697,7 +668,7 @@ fn splice_groups(source: &[u8], selected: &[&ReferenceOccurrence]) -> Result<Vec
         // still preserved.
         output.push(b' ');
     }
-    output.extend_from_slice(source.get(cursor..).ok_or(Error::UnsupportedSource(
+    output.extend_from_slice(source.get(cursor..).ok_or(Error::unsupported_source(
         "external-reference source suffix is unavailable",
     ))?);
     Ok(output)
@@ -741,23 +712,26 @@ fn needs_control_delimiter_before_suffix(source: &[u8], selected: &[&ReferenceOc
 }
 
 fn build_patch(
-    source: &Document,
+    source: &Package,
     selected: &[&ReferenceOccurrence],
     mode: Mode,
     limits: PatchLimits,
 ) -> Result<Patch<ForwardOnly>, Error> {
-    let source_bytes = source
-        .source_bytes()
-        .ok_or(Error::UnsupportedSource("RTF source bytes are unavailable"))?;
+    let source_bytes = source.source_bytes().ok_or(Error::unsupported_source(
+        "RTF source bytes are unavailable",
+    ))?;
     let artifact = BlobId::of(source_bytes).as_hex();
     let mut operations = Vec::new();
     operations
         .try_reserve_exact(selected.len())
         .map_err(|_error| allocation("external-reference patch operations", selected.len()))?;
     for entry in selected {
-        let source_range = entry.source_range.as_ref().ok_or(Error::UnsupportedSource(
-            "external-reference source span is unavailable",
-        ))?;
+        let source_range = entry
+            .source_range
+            .as_ref()
+            .ok_or(Error::unsupported_source(
+                "external-reference source span is unavailable",
+            ))?;
         let mut preconditions = BTreeMap::new();
         // `BTreeMap` has no fallible reserve API on the supported Rust
         // versions.  This map is deliberately bounded to four fixed keys per
@@ -815,10 +789,7 @@ fn build_patch(
 }
 
 /// Apply a previously sealed forward-only external-reference patch.
-pub(crate) fn apply_forward(
-    source: &Document,
-    patch: &Patch<ForwardOnly>,
-) -> Result<Document, Error> {
+pub(crate) fn apply_forward(source: &Package, patch: &Patch<ForwardOnly>) -> Result<Commit, Error> {
     if patch.format() != REDACTION_FORMAT {
         return Err(Error::DurablePatch(
             "external-reference patch format is not litchi-rtf".to_string(),
@@ -830,19 +801,26 @@ pub(crate) fn apply_forward(
         ));
     }
     if patch.operations().len() > MAX_REFERENCES {
-        return Err(Error::Rtf(RtfError::LimitExceeded {
+        return Err(Error::Rtf(crate::Error::LimitExceeded {
             resource: "external-reference patch operations",
             observed: patch.operations().len(),
             limit: MAX_REFERENCES,
         }));
     }
-    let snapshot = Snapshot::from_document(source)?;
+    let snapshot = Snapshot::from_package(source)?;
     if patch.operations().is_empty() {
-        return Ok(source.clone());
+        return Ok(Commit::new(
+            source.clone(),
+            patch.clone(),
+            Diagnostics {
+                removed_references: 0,
+                unsupported: snapshot.unsupported.clone(),
+            },
+        ));
     }
-    let source_bytes = source
-        .source_bytes()
-        .ok_or(Error::UnsupportedSource("RTF source bytes are unavailable"))?;
+    let source_bytes = source.source_bytes().ok_or(Error::unsupported_source(
+        "RTF source bytes are unavailable",
+    ))?;
     let artifact = BlobId::of(source_bytes).as_hex();
     let mut selected = Vec::new();
     selected
@@ -950,17 +928,17 @@ pub(crate) fn apply_forward(
     selected.sort_unstable_by_key(|entry| entry.source_range.as_ref().map(|range| range.start));
     let mode = mode.unwrap_or(Mode::BestEffort);
     if matches!(mode, Mode::Strict) && !snapshot.unsupported.is_empty() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "external-reference redaction has unsupported remaining surfaces",
         ));
     }
-    let (candidate, _diagnostics) =
+    let (candidate, diagnostics) =
         rewrite_candidate(source, &selected, mode, &snapshot.unsupported)?;
-    Ok(candidate)
+    Ok(Commit::new(candidate, patch.clone(), diagnostics))
 }
 
 fn allocation(resource: &'static str, requested: usize) -> Error {
-    Error::Rtf(RtfError::AllocationFailed {
+    Error::Rtf(crate::Error::AllocationFailed {
         resource,
         requested,
     })

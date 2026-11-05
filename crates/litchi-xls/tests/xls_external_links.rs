@@ -3,13 +3,13 @@ use std::io::Cursor;
 use std::path::PathBuf;
 
 use litchi_xls::writer::{
-    ExternalCacheRowOptions, ExternalSheetOptions, ExternalWorkbookOptions, Writer,
+    Builder, ExternalCacheRowOptions, ExternalSheetOptions, ExternalWorkbookOptions,
 };
-use litchi_xls::{CachedValue, ErrorValue, Workbook};
+use litchi_xls::{CachedValue, ErrorValue, raw::Reader};
 
 #[test]
 fn external_workbook_cache_round_trip_is_inert() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_worksheet("Local").unwrap();
     writer
         .add_external_workbook_link(ExternalWorkbookOptions {
@@ -31,8 +31,8 @@ fn external_workbook_cache_round_trip_is_inert() {
         })
         .unwrap();
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
-    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let external = workbook
         .external_links()
         .external_workbooks()
@@ -51,7 +51,7 @@ fn external_workbook_cache_round_trip_is_inert() {
 fn reads_poi_and_libreoffice_external_caches() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let poi = root.join("test-data/poi/test-data/spreadsheet/XRefCalc.xls");
-    let workbook = Workbook::new(File::open(poi).unwrap()).unwrap();
+    let workbook = Reader::new(File::open(poi).unwrap()).unwrap();
     let external = workbook
         .external_links()
         .external_workbooks()
@@ -62,7 +62,7 @@ fn reads_poi_and_libreoffice_external_caches() {
     assert!(!external.sheets()[0].cache_rows().is_empty());
 
     let libreoffice = root.join("test-data/libreoffice-core/sc/qa/unit/data/xls/external-ref.xls");
-    let workbook = Workbook::new(File::open(libreoffice).unwrap()).unwrap();
+    let workbook = Reader::new(File::open(libreoffice).unwrap()).unwrap();
     let external = workbook
         .external_links()
         .external_workbooks()
@@ -77,7 +77,7 @@ fn reads_poi_and_libreoffice_external_caches() {
 
 #[test]
 fn writer_rejects_external_cache_resource_errors() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     assert!(
         writer
             .add_external_workbook_link(ExternalWorkbookOptions {

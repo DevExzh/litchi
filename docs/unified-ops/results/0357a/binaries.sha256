@@ -1,0 +1,8 @@
+# scoped_patch_probe release binaries (not committed), record 0357a.
+# Build: cargo build --release -p litchi-ppt --example scoped_patch_probe
+#   (rustc per rust-toolchain.toml, no LTO, CARGO_BUILD_JOBS=6)
+# before: git archive e673d4addb (Cargo.toml crates rust-toolchain.toml .cargo)
+#   + the worktree Cargo.lock + examples/scoped_patch_probe.rs, separate target dir
+# after:  uo2/w3-ppt working tree of the record 0357a commit
+2a53b7ed84730261d81f9fafef1a60c86293fef8ae0e3ae9f088d89e08d69845  before
+011be94e35499143217d3dfe1f53f2fd3514370ebc622a1bcf36f8a5cb8b4c1f  after

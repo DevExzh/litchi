@@ -1,6 +1,6 @@
 //! Typed transaction values and reversible change metadata.
 
-use super::super::{Cache, Chart, RowCol, Value, XlValue, cache};
+use super::super::{Cache, Model, RowCol, Value, XlValue, cache};
 use super::chart_area;
 use super::sheet_props;
 use crate::{Error, Result};
@@ -169,16 +169,16 @@ impl Patch {
 
     /// Number of effective semantic changes, including the optional chart area.
     #[must_use]
-    pub fn len(&self) -> usize {
+    pub fn change_count(&self) -> usize {
         self.changes
             .len()
             .saturating_add(usize::from(self.chart_area.is_some()))
             .saturating_add(usize::from(self.sheet_props.is_some()))
     }
 
-    /// Whether the transaction was a semantic no-op.
+    /// Whether applying the patch changes nothing.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.changes.is_empty() && self.chart_area.is_none() && self.sheet_props.is_none()
     }
 
@@ -219,42 +219,12 @@ impl Patch {
     }
 }
 
-/// Published result of a successful chart transaction.
-#[derive(Debug)]
-pub struct Commit {
-    chart: Chart,
-    patch: Patch,
-}
+/// A published chart edit: the edited model, its reversible patch and
+/// diagnostics.
+pub type Commit = litchi_core::edit::Commit<Model, Patch>;
 
-impl Commit {
-    pub(crate) const fn new(chart: Chart, patch: Patch) -> Self {
-        Self { chart, patch }
-    }
-
-    /// Borrow the post-edit chart snapshot.
-    #[must_use]
-    pub const fn chart(&self) -> &Chart {
-        &self.chart
-    }
-
-    /// Borrow the reversible semantic patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consume the commit and return the post-edit chart snapshot.
-    #[must_use]
-    pub fn into_chart(self) -> Chart {
-        self.chart
-    }
-
-    /// Split the commit into the chart snapshot and reversible patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Chart, Patch) {
-        (self.chart, self.patch)
-    }
-}
+/// Content-free diagnostics of one chart commit.
+pub use litchi_core::edit::Diagnostics;
 
 /// One staged cache replacement, kept private to the transaction layer.
 #[derive(Debug)]

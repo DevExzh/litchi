@@ -1,6 +1,7 @@
 use crate::overlay::collect_chain_exact;
 use crate::{
-    ExistingStreamMove, OleFile, OleWriter, OverlayError, SharedOleFile, StreamMoveLimits,
+    ExistingStreamMove, OleFile, OleFileLimits, OleWriter, OverlayError, SharedOleFile,
+    SharedOleFileLimits, StreamMoveLimits,
 };
 use litchi_core::{OwnedSource, ReadAt, SourceVersion};
 use std::io::{self, Cursor};
@@ -27,7 +28,11 @@ fn sample_bytes() -> Vec<u8> {
 }
 
 fn shared(bytes: Vec<u8>) -> SharedOleFile {
-    SharedOleFile::open(Arc::new(OwnedSource::new(bytes))).unwrap()
+    SharedOleFile::open(
+        Arc::new(OwnedSource::new(bytes)),
+        SharedOleFileLimits::default(),
+    )
+    .unwrap()
 }
 
 fn request(source: &[&str], destination: &[&str]) -> ExistingStreamMove {
@@ -64,7 +69,8 @@ fn moves_and_renames_a_batch_without_touching_payload_or_allocation_sectors() {
 
     let mut target = Vec::new();
     plan.write_to(&mut target).unwrap();
-    let mut reopened = OleFile::open(Cursor::new(target.clone())).unwrap();
+    let mut reopened =
+        OleFile::open(Cursor::new(target.clone()), OleFileLimits::default()).unwrap();
     assert_eq!(
         reopened.open_stream(&["Beta", "RenamedMini"]).unwrap(),
         vec![0x31; 137]
@@ -108,7 +114,11 @@ fn evaluates_final_casefold_collisions_atomically_and_allows_swaps() {
             StreamMoveLimits::default(),
         )
         .unwrap();
-    let moved = SharedOleFile::open(Arc::new(swap.forward().composed_source().unwrap())).unwrap();
+    let moved = SharedOleFile::open(
+        Arc::new(swap.forward().composed_source().unwrap()),
+        SharedOleFileLimits::default(),
+    )
+    .unwrap();
     assert_eq!(
         moved.open_stream(&["Beta", "Other"]).unwrap(),
         vec![0x31; 137]
@@ -188,6 +198,27 @@ fn no_op_and_every_finite_limit_are_exact() {
 }
 
 #[test]
+fn inverse_replay_retains_the_custom_physical_profile() {
+    let source = sample_bytes();
+    let custom = SharedOleFileLimits::new(u64::try_from(source.len()).unwrap())
+        .unwrap()
+        .with_max_directory_bytes(4 * 1024)
+        .unwrap()
+        .with_max_allocation_table_bytes(4 * 1024)
+        .unwrap();
+    let parsed = SharedOleFile::open(Arc::new(OwnedSource::new(source)), custom).unwrap();
+    let plan = parsed
+        .plan_stream_moves(
+            vec![request(&["Alpha", "Mini"], &["Beta", "Moved"])],
+            StreamMoveLimits::default(),
+        )
+        .unwrap();
+
+    assert_eq!(plan.forward().source_limits_for_test(), custom);
+    assert_eq!(plan.inverse().source_limits_for_test(), custom);
+}
+
+#[test]
 fn version_four_directory_fragments_are_bounded_before_collection() {
     let mut writer = OleWriter::with_sector_size(4_096).unwrap();
     for index in 0..40 {
@@ -214,7 +245,11 @@ fn version_four_directory_fragments_are_bounded_before_collection() {
             StreamMoveLimits::default(),
         )
         .unwrap();
-    let moved = SharedOleFile::open(Arc::new(plan.forward().composed_source().unwrap())).unwrap();
+    let moved = SharedOleFile::open(
+        Arc::new(plan.forward().composed_source().unwrap()),
+        SharedOleFileLimits::default(),
+    )
+    .unwrap();
     assert_eq!(moved.open_stream(&["Moved39"]).unwrap(), vec![39; 17]);
 }
 
@@ -260,7 +295,7 @@ fn forward_and_inverse_refuse_a_stale_source() {
         bytes: Mutex::new(sample_bytes()),
         revision: AtomicU64::new(0),
     });
-    let opened = SharedOleFile::open(source.clone()).unwrap();
+    let opened = SharedOleFile::open(source.clone(), SharedOleFileLimits::default()).unwrap();
     let plan = opened
         .plan_stream_moves(
             vec![request(&["Alpha", "Mini"], &["Beta", "Moved"])],

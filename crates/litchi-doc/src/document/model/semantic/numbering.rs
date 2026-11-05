@@ -23,7 +23,7 @@ impl Document {
     /// ```
     #[must_use]
     pub fn list_tables(&self) -> Option<&ListTables> {
-        self.list_tables.as_ref()
+        self.0.list_tables.as_ref()
     }
 
     /// Resolve a non-empty `LISTNUM` name by zero-based `PlfLst` definition index.
@@ -31,11 +31,11 @@ impl Document {
     /// Entries beyond the list-definition array are ignored as required by `[MS-DOC]`.
     #[must_use]
     pub fn list_name_for_definition_index(&self, index: usize) -> Option<&str> {
-        let definition_count = self.list_tables.as_ref()?.structures().len();
+        let definition_count = self.0.list_tables.as_ref()?.structures().len();
         if index >= definition_count {
             return None;
         }
-        self.list_names.as_ref()?.name(index)
+        self.0.list_names.as_ref()?.name(index)
     }
 
     /// Get list/numbering information for a specific paragraph.
@@ -67,6 +67,9 @@ impl Document {
         let properties = paragraph.properties();
         let signed_lfo = properties.list_format_override?;
         let level = properties.list_level.unwrap_or(0);
-        self.list_tables.as_ref()?.bind_paragraph(signed_lfo, level)
+        self.0
+            .list_tables
+            .as_ref()?
+            .bind_paragraph(signed_lfo, level)
     }
 }

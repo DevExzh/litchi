@@ -9,19 +9,22 @@
 
 mod repair_support;
 
-use litchi_rtf::{DocumentOutputSettings, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{DocumentOutputSettings, write::Writer};
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
 #[test]
 fn parses_both_passive_parameterless_flags() {
-    let document = RtfDocument::parse(r"{\rtf1\muser\psover Body}").unwrap();
+    let document = Tree::parse(
+        r"{\rtf1\muser\psover Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(
         *document.output_settings(),
         DocumentOutputSettings {
@@ -34,13 +37,14 @@ fn parses_both_passive_parameterless_flags() {
 
 #[test]
 fn omission_preserves_no_requested_output_behavior() {
-    let document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
+    let document = Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     assert!(document.output_settings().is_empty());
 }
 
 #[test]
 fn typed_api_round_trips_in_stable_order_and_clears_without_side_effects() {
-    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
+    let mut document =
+        Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     document.set_output_settings(DocumentOutputSettings {
         word97_compatibility_marker: true,
         postscript_over_text: true,
@@ -49,7 +53,7 @@ fn typed_api_round_trips_in_stable_order_and_clears_without_side_effects() {
     let output = write(&document);
     let serialized = String::from_utf8(output.clone()).unwrap();
     assert!(serialized.find("\\muser").unwrap() < serialized.find("\\psover").unwrap());
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.output_settings(), document.output_settings());
     assert_eq!(reparsed.text(), "Body");
 
@@ -59,15 +63,23 @@ fn typed_api_round_trips_in_stable_order_and_clears_without_side_effects() {
     let cleared_text = String::from_utf8(cleared.clone()).unwrap();
     assert!(!cleared_text.contains("\\muser"));
     assert!(!cleared_text.contains("\\psover"));
-    assert_eq!(RtfDocument::parse_bytes(&cleared).unwrap().text(), "Body");
+    assert_eq!(
+        Tree::parse_bytes(&cleared, litchi_rtf::read::OpenOptions::default())
+            .unwrap()
+            .text(),
+        "Body"
+    );
 }
 
 #[test]
 fn coexists_with_adjacent_document_properties_in_canonical_order() {
-    let document = RtfDocument::parse(concat!(
-        r#"{\rtf1\fromhtml1\deff0{\*\nextfile next.rtf}"#,
-        r#"\psover\makebackup\muser\defformat\doctemp\doctype2 Body}"#,
-    ))
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1\fromhtml1\deff0{\*\nextfile next.rtf}"#,
+            r#"\psover\makebackup\muser\defformat\doctemp\doctype2 Body}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     let output = write(&document);
     let serialized = String::from_utf8(output.clone()).unwrap();
@@ -82,7 +94,7 @@ fn coexists_with_adjacent_document_properties_in_canonical_order() {
     assert!(doctemp < muser);
     assert!(muser < psover);
 
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.output_settings(), document.output_settings());
     assert_eq!(reparsed.text(), "Body");
 }
@@ -106,7 +118,10 @@ fn rejects_parameters_duplicates_starred_grouped_late_and_overlong_numeric_forms
         r"{\rtf1 Body\psover}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted malformed {source}"
         );
     }

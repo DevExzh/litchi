@@ -7,16 +7,19 @@
 //!
 //! to Markdown format with extensive customization options.
 //!
+//! Every input opens through `litchi::open`, which detects the format from
+//! the content; the `File` it returns converts itself to Markdown.
+//!
 //! # Usage
 //!
 //! Basic conversion:
 //! ```sh
-//! cargo run --example to_markdown -- input.docx -o output.md
+//! cargo run --example to_markdown --features all -- input.docx -o output.md
 //! ```
 //!
 //! Convert with options:
 //! ```sh
-//! cargo run --example to_markdown -- input.docx -o output.md \
+//! cargo run --example to_markdown --features all -- input.docx -o output.md \
 //!     --table-style markdown \
 //!     --no-styles \
 //!     --no-metadata
@@ -24,19 +27,19 @@
 //!
 //! Convert to directory (auto-generates filename):
 //! ```sh
-//! cargo run --example to_markdown -- input.docx -o output_dir/
+//! cargo run --example to_markdown --features all -- input.docx -o output_dir/
 //! ```
 //!
 //! Batch conversion:
 //! ```sh
-//! cargo run --example to_markdown -- *.docx -o output_dir/
+//! cargo run --example to_markdown --features all -- *.docx -o output_dir/
 //! ```
 
 use clap::{Parser, ValueEnum};
+use litchi::Family;
 use litchi::markdown::{
     FormulaStyle, MarkdownOptions, ScriptStyle, StrikethroughStyle, TableStyle, ToMarkdown,
 };
-use litchi::{Document, FileFormat, Presentation};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -258,7 +261,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             },
             Err(e) => {
                 error_count += 1;
-                eprintln!("✗ {}: {}", input.display(), e);
+                eprintln!("✗ {}: {}", input.display(), with_causes(&*e));
             },
         }
     }
@@ -278,49 +281,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// A prepared OOXML package, on the platforms that can produce one.
-#[cfg(any(unix, windows))]
-type Prepared = Option<litchi::opc::PreparedOoxmlSource>;
-#[cfg(not(any(unix, windows)))]
-type Prepared = Option<std::convert::Infallible>;
-
-/// Detect the format, retaining the package the detection indexed.
-#[cfg(any(unix, windows))]
-fn detect(input: &Path) -> Option<(FileFormat, Prepared)> {
-    litchi::detect_and_prepare(input).map(litchi::PreparedDetection::into_parts)
-}
-
-#[cfg(not(any(unix, windows)))]
-fn detect(input: &Path) -> Option<(FileFormat, Prepared)> {
-    litchi::detect_file_format(input).map(|format| (format, None))
-}
-
-/// Open a document, adopting an already-indexed package when detection
-/// produced one. A legacy, RTF or OpenDocument input has no prepared package
-/// and takes the ordinary path.
-fn open_document(input: &Path, prepared: Prepared) -> Result<Document, Box<dyn std::error::Error>> {
-    #[cfg(any(unix, windows))]
-    if let Some(prepared) = prepared {
-        return Ok(Document::from_prepared(prepared)?);
+/// The error followed by its causes. A `litchi::Error` displays its code and
+/// a summary; the error of the format crate that failed is its source.
+fn with_causes(error: &dyn std::error::Error) -> String {
+    let mut text = error.to_string();
+    let mut cause = error.source();
+    while let Some(error) = cause {
+        text.push_str(": ");
+        text.push_str(&error.to_string());
+        cause = error.source();
     }
-    #[cfg(not(any(unix, windows)))]
-    let _ = prepared;
-    Ok(Document::open(input)?)
-}
-
-/// Open a presentation, adopting an already-indexed package when detection
-/// produced one.
-fn open_presentation(
-    input: &Path,
-    prepared: Prepared,
-) -> Result<Presentation, Box<dyn std::error::Error>> {
-    #[cfg(any(unix, windows))]
-    if let Some(prepared) = prepared {
-        return Ok(Presentation::from_prepared(prepared)?);
-    }
-    #[cfg(not(any(unix, windows)))]
-    let _ = prepared;
-    Ok(Presentation::open(input)?)
+    text
 }
 
 /// Convert a single file to Markdown
@@ -330,37 +301,37 @@ fn convert_file(
     options: &MarkdownOptions,
     verbose: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Detect the format and keep the OOXML package the detection built, so
-    // the open below adopts that index instead of building a second one.
-    let (format, prepared) = detect(input)
+    // One detection pass: the format comes from the content, and the
+    // container is indexed once, for the conversion below to read. Only an
+    // encrypted OOXML package whose name does not say what it holds has no
+    // knowable format.
+    let file = litchi::open(input)?;
+    let format = file
+        .format()
         .ok_or_else(|| format!("Could not detect file format for: {}", input.display()))?;
 
     if verbose {
         println!("  Detected format: {:?}", format);
     }
 
-    // Convert based on format
-    let markdown = match format {
-        FileFormat::Doc | FileFormat::Docx | FileFormat::Odt | FileFormat::Rtf => {
+    // Convert based on the format's family
+    let markdown = match Family::of(format) {
+        Family::Document => {
             // Word document formats
-            let doc = open_document(input, prepared)?;
-
             if verbose {
                 println!("  Processing document...");
             }
 
-            doc.to_markdown_with_options(options)?
+            file.to_markdown_with_options(options)?
         },
-        FileFormat::Ppt | FileFormat::Pptx | FileFormat::Odp => {
+        Family::Presentation => {
             // PowerPoint presentation formats
-            let pres = open_presentation(input, prepared)?;
-
             if verbose {
-                let slide_count = pres.slide_count()?;
+                let slide_count = file.presentation()?.slide_count()?;
                 println!("  Processing presentation ({} slides)...", slide_count);
             }
 
-            pres.to_markdown_with_options(options)?
+            file.to_markdown_with_options(options)?
         },
         _ => {
             return Err(format!(

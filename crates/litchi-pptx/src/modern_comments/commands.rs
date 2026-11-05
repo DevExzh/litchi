@@ -3,6 +3,7 @@
 
 use super::semantic::changes::Changes;
 use super::wire;
+use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 use litchi_opc::{OpcPackage, PackURI};
 
@@ -28,8 +29,13 @@ pub struct ChangeCommand {
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn load_modern_comment_changes(package: &OpcPackage) -> Result<Vec<ChangeCommand>> {
-    let Some(part) = super::super::presentation_properties::metadata::changes::load(package)?
+pub fn load_modern_comment_changes(
+    package: &OpcPackage,
+    selected_limits: super::super::presentation_properties::metadata::changes::Limits,
+) -> Result<Vec<ChangeCommand>> {
+    let limits = selected_limits.constrained_by_source(package.read_limits());
+    let Some(part) =
+        super::super::presentation_properties::metadata::changes::load(package, limits)?
     else {
         return Ok(Vec::new());
     };
@@ -55,14 +61,27 @@ pub fn load_modern_comment_changes(package: &OpcPackage) -> Result<Vec<ChangeCom
 /// fragments. Such structural edits would risk changing unrelated future
 /// command data and are rejected. No command is interpreted or executed.
 ///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn update_modern_comment_changes<F>(package: &mut OpcPackage, update: F) -> Result<bool>
+pub(crate) fn update_modern_comment_changes<F>(
+    package: &mut OpcPackage,
+    selected_limits: super::super::presentation_properties::metadata::changes::Limits,
+    update: F,
+) -> Result<bool>
 where
     F: FnOnce(&mut Vec<ChangeCommand>),
 {
-    let Some(mut part) = super::super::presentation_properties::metadata::changes::load(package)?
+    let limits = selected_limits.constrained_by_source(package.read_limits());
+    let Some(mut part) =
+        super::super::presentation_properties::metadata::changes::load(package, limits)?
     else {
         return Ok(false);
     };
@@ -135,7 +154,7 @@ where
     if cursor != commands.len() {
         return Err(invalid("modern comment command locations are incomplete"));
     }
-    let xml = part.changes_information.to_xml()?;
+    let xml = part.changes_information.to_xml(limits)?;
     let uri = PackURI::new(&part.part_name).map_err(invalid)?;
     let stored = package.get_part(&uri)?;
     if stored.content_type() != CHANGES_CONTENT_TYPE {
@@ -143,7 +162,85 @@ where
             "Changes Information part has an unexpected content type",
         ));
     }
+    // Commands that serialize to the stored bytes publish nothing, so an
+    // exact no-op keeps a signed package byte for byte.
+    if stored.blob() == xml.as_slice() {
+        return Ok(true);
+    }
+    refuse_signed_change(package)?;
     package.get_part_mut(&uri)?.set_blob(xml);
-    package.unsign();
+    settle_unsigned_change(package)?;
     Ok(true)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use litchi_opc::{BlobPart, OpcPackage, PackURI};
+
+    const PRESENTATION_CONTENT_TYPE: &str =
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml";
+
+    fn package_with_changes(xml: Vec<u8>) -> OpcPackage {
+        let mut package = OpcPackage::new();
+        package.rels_mut().add_relationship(
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+                .into(),
+            "ppt/presentation.xml".into(),
+            "rId1".into(),
+            false,
+        );
+        let presentation_name = PackURI::new("/ppt/presentation.xml").unwrap();
+        package.add_part(Box::new(BlobPart::new(
+            presentation_name.clone(),
+            PRESENTATION_CONTENT_TYPE.into(),
+            Vec::new(),
+        )));
+        package
+            .get_part_mut(&presentation_name)
+            .unwrap()
+            .rels_mut()
+            .add_relationship(
+                super::super::super::presentation_properties::metadata::changes::RELATIONSHIP_TYPE
+                    .into(),
+                "changesInfos/changesInfo1.xml".into(),
+                "rIdChanges".into(),
+                false,
+            );
+        package.add_part(Box::new(BlobPart::new(
+            PackURI::new("/ppt/changesInfos/changesInfo1.xml").unwrap(),
+            CHANGES_CONTENT_TYPE.into(),
+            xml,
+        )));
+        package
+    }
+
+    #[test]
+    fn selected_changes_profile_is_used_by_the_raw_helper() {
+        let xml = br#"<pc:chgInfo xmlns:pc="http://schemas.microsoft.com/office/powerpoint/2013/main/command"><pc:docChgLst/></pc:chgInfo>"#;
+        let package = package_with_changes(xml.to_vec());
+        assert!(
+            load_modern_comment_changes(
+                &package,
+                super::super::super::presentation_properties::metadata::changes::Limits::DEFAULT,
+            )
+            .unwrap()
+            .is_empty()
+        );
+
+        let default =
+            super::super::super::presentation_properties::metadata::changes::Limits::DEFAULT;
+        let tight = super::super::super::presentation_properties::metadata::changes::Limits::new(
+            xml.len() - 1,
+            default.max_output_bytes(),
+            default.max_depth(),
+            default.max_nodes(),
+            default.max_lists(),
+            default.max_changes(),
+            default.max_extensions(),
+            default.max_string_bytes(),
+        )
+        .unwrap();
+        assert!(load_modern_comment_changes(&package, tight).is_err());
+    }
 }

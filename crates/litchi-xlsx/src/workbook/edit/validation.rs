@@ -4,6 +4,7 @@
 //! tab-order projection used by the public semantic facade.
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use litchi_ooxml_common::web as common_web;
 use litchi_sheet::{Cell as Address, Column as ColumnIndex, Rect, Row as RowIndex};
@@ -14,15 +15,48 @@ use crate::error::{Result, allocation, invalid};
 use crate::raw;
 use crate::raw::worksheet::edit::{Action, ColumnAction, DefaultsAction, RowAction};
 use crate::sheet::Name;
+use crate::style::{AlignmentChange, BorderChange, FillChange, FontChange, ProtectionChange};
 use crate::web::Bindings as WebBindings;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub(super) struct SheetActions {
     pub(super) rename: Option<Name>,
     pub(super) visibility: Option<TabAction>,
     pub(super) defaults: Option<DefaultsAction>,
     pub(super) web: Option<WebBindings>,
     pub(super) cells: BTreeMap<Address, Action>,
+    /// Deferred typed font changes. These are lowered to concrete shared
+    /// styles only after the transaction has planned the complete stylesheet.
+    pub(super) fonts: BTreeMap<Address, FontChange>,
+    /// Deferred typed alignment changes. These share the stylesheet lowering
+    /// pass with font requests so a cell receives one composed style.
+    pub(super) alignments: BTreeMap<Address, AlignmentChange>,
+    /// Deferred typed fill changes, lowered with the other cell-format
+    /// properties into one native shared style.
+    pub(super) fills: BTreeMap<Address, FillChange>,
+    /// Deferred typed border changes, lowered with the other cell-format
+    /// properties into one native shared style.
+    pub(super) borders: BTreeMap<Address, BorderChange>,
+    /// Conservative retained-memory charge for deferred border changes. The
+    /// charge covers the fixed border value, its map key/node, and the
+    /// short-lived lowering copies made for a stylesheet request.
+    pub(super) staged_border_bytes: usize,
+    /// Retained bytes owned by the deferred fill changes above. A replacement
+    /// payload is charged conservatively once per staged cell even when its
+    /// `Arc` backing storage is shared by cloned requests. This keeps per-cell
+    /// admission O(1) with respect to the number of other fills in the
+    /// transaction; the lowering proof may recompute it once.
+    pub(super) staged_fill_bytes: usize,
+    /// Deferred typed protection changes, lowered with the other cell-format
+    /// properties into one native shared style.
+    pub(super) protections: BTreeMap<Address, ProtectionChange>,
+    /// Deferred `quotePrefix` changes. The map entry itself records that the
+    /// property was mentioned; its value distinguishes authored true/false
+    /// from removal of the authored attribute.
+    pub(super) quote_prefixes: BTreeMap<Address, Option<bool>>,
+    /// Deferred authored number-format codes. The map entry distinguishes an
+    /// authored code from removal of the local `numFmtId` attribute.
+    pub(super) number_formats: BTreeMap<Address, Option<Arc<str>>>,
     pub(super) rows: BTreeMap<RowIndex, RowAction>,
     pub(super) columns: BTreeMap<ColumnIndex, ColumnAction>,
     pub(super) merges: Vec<MergeIntent>,
@@ -66,6 +100,13 @@ impl SheetActions {
             .saturating_add(usize::from(self.defaults.is_some()))
             .saturating_add(usize::from(self.web.is_some()))
             .saturating_add(self.cells.len())
+            .saturating_add(self.fonts.len())
+            .saturating_add(self.alignments.len())
+            .saturating_add(self.fills.len())
+            .saturating_add(self.borders.len())
+            .saturating_add(self.protections.len())
+            .saturating_add(self.quote_prefixes.len())
+            .saturating_add(self.number_formats.len())
             .saturating_add(self.rows.len())
             .saturating_add(self.columns.len())
             .saturating_add(self.merges.len())
@@ -83,6 +124,13 @@ impl SheetActions {
             && self.defaults.is_none()
             && self.web.is_none()
             && self.cells.is_empty()
+            && self.fonts.is_empty()
+            && self.alignments.is_empty()
+            && self.fills.is_empty()
+            && self.borders.is_empty()
+            && self.protections.is_empty()
+            && self.quote_prefixes.is_empty()
+            && self.number_formats.is_empty()
             && self.rows.is_empty()
             && self.columns.is_empty()
             && self.merges.is_empty()
@@ -167,7 +215,7 @@ pub(super) struct MoveIntent {
     pub(super) to: usize,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(super) struct OrderPlan {
     pub(super) positions: Vec<usize>,
     pub(super) moves: Vec<MoveIntent>,
@@ -186,14 +234,14 @@ pub(super) enum Placement {
     After(usize),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(super) struct Added {
     pub(super) name: Name,
     pub(super) actions: SheetActions,
     pub(super) placement: Placement,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(super) enum PanesAction {
     Put {
         panes: common_web::Panes,

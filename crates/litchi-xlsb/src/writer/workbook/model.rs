@@ -9,9 +9,7 @@ use crate::calc::Props;
 use crate::named_ranges::{Definition, validate_name};
 use crate::package::error::{Error, Result};
 use crate::package::formula::excel_name_eq;
-use crate::writer::{
-    MutableChartSheet, MutableSharedStringsWriter, MutableWorksheet, StylesWriter,
-};
+use crate::writer::{ChartSheet, SharedStringsWriter, StylesWriter, Worksheet};
 #[cfg(feature = "vba-inspection")]
 use std::sync::Arc;
 
@@ -28,27 +26,28 @@ const MAX_AUTHORED_EXTERNAL_LINKS: usize = 4_096;
 /// # Example
 ///
 /// ```rust,no_run
-/// use litchi_xlsb::writer::{WorkbookWriter, MutableWorksheet};
+/// use litchi_xlsb::builder::{Builder, Worksheet};
 /// use std::fs::File;
 ///
-/// let mut workbook = WorkbookWriter::new();
+/// let mut workbook = Builder::new();
 ///
-/// let mut sheet = MutableWorksheet::new("Sheet1");
+/// let mut sheet = Worksheet::new("Sheet1");
 /// sheet.set_cell(0, 0, "Hello");
 /// sheet.set_cell(0, 1, 42.0);
 ///
 /// workbook.add_worksheet(sheet);
 ///
+/// let package = workbook.build()?;
 /// let file = File::create("output.xlsb")?;
-/// workbook.save(file)?;
+/// package.write_to(file)?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-pub struct WorkbookWriter {
-    pub(super) worksheets: Vec<MutableWorksheet>,
-    pub(super) chart_sheets: Vec<MutableChartSheet>,
+pub struct Builder {
+    pub(super) worksheets: Vec<Worksheet>,
+    pub(super) chart_sheets: Vec<ChartSheet>,
     pub(super) sheet_order: Vec<SheetSlot>,
     pub(super) named_ranges: Vec<Definition>,
-    pub(super) shared_strings: MutableSharedStringsWriter,
+    pub(super) shared_strings: SharedStringsWriter,
     pub(super) styles: StylesWriter,
     pub(super) calc: Props,
     pub(super) is_1904: bool,
@@ -78,15 +77,15 @@ pub(super) struct AuthoredPivotCache {
     pub(super) bytes: Vec<u8>,
 }
 
-impl WorkbookWriter {
+impl Builder {
     /// Create a new XLSB workbook writer
     pub fn new() -> Self {
-        WorkbookWriter {
+        Builder {
             worksheets: Vec::new(),
             chart_sheets: Vec::new(),
             sheet_order: Vec::new(),
             named_ranges: Vec::new(),
-            shared_strings: MutableSharedStringsWriter::new(),
+            shared_strings: SharedStringsWriter::new(),
             styles: StylesWriter::new(),
             calc: Props::default(),
             is_1904: false,
@@ -116,7 +115,12 @@ impl WorkbookWriter {
     /// The Theme is validated and encoded only after the complete typed model
     /// is supplied; failed validation leaves the writer unchanged.
     pub fn set_theme(&mut self, theme: crate::theme::Theme) -> Result<&mut Self> {
-        litchi_drawingml::theme::codec::encode_part(&theme.name, &theme.colors, &theme.fonts)?;
+        litchi_drawingml::theme::codec::encode_part(
+            &theme.name,
+            &theme.colors,
+            &theme.fonts,
+            litchi_drawingml::theme::codec::Limits::DEFAULT,
+        )?;
         self.theme = Some(theme);
         Ok(self)
     }
@@ -178,13 +182,13 @@ impl WorkbookWriter {
     /// # Example
     ///
     /// ```rust
-    /// use litchi_xlsb::writer::{WorkbookWriter, MutableWorksheet};
+    /// use litchi_xlsb::builder::{Builder, Worksheet};
     ///
-    /// let mut workbook = WorkbookWriter::new();
-    /// let sheet = MutableWorksheet::new("Sheet1");
+    /// let mut workbook = Builder::new();
+    /// let sheet = Worksheet::new("Sheet1");
     /// workbook.add_worksheet(sheet);
     /// ```
-    pub fn add_worksheet(&mut self, worksheet: MutableWorksheet) {
+    pub fn add_worksheet(&mut self, worksheet: Worksheet) {
         self.worksheets.push(worksheet);
         self.sheet_order
             .push(SheetSlot::Worksheet(self.worksheets.len() - 1));
@@ -193,15 +197,12 @@ impl WorkbookWriter {
     /// Add a chart sheet in the current workbook sheet order.
     ///
     /// The chart is stored inertly in standard DrawingML parts. Package
-    /// relationships are allocated at save time and never followed or fetched.
-    pub fn add_chart_sheet(
-        &mut self,
-        chart_sheet: MutableChartSheet,
-    ) -> Result<&mut MutableChartSheet> {
+    /// relationships are allocated at build time and never followed or fetched.
+    pub fn add_chart_sheet(&mut self, chart_sheet: ChartSheet) -> Result<&mut ChartSheet> {
         chart_sheet.validate()?;
         if self.chart_sheets.len() >= crate::writer::chartsheet::max_chart_sheets() {
             return Err(Error::InvalidFormula(
-                "XLSB chart-sheet count limit exceeded".to_string(),
+                "XLSB chart-sheet count limit exceeded",
             ));
         }
         if self
@@ -209,10 +210,7 @@ impl WorkbookWriter {
             .iter()
             .any(|slot| excel_name_eq(self.sheet_name(*slot), chart_sheet.name()))
         {
-            return Err(Error::InvalidFormula(format!(
-                "duplicate sheet name {:?}",
-                chart_sheet.name()
-            )));
+            return Err(Error::InvalidFormula("duplicate sheet name"));
         }
         self.chart_sheets.push(chart_sheet);
         self.sheet_order
@@ -262,7 +260,7 @@ impl WorkbookWriter {
         link.validate()?;
         if self.external_links.len() >= MAX_AUTHORED_EXTERNAL_LINKS {
             return Err(Error::InvalidFormula(
-                "XLSB external-link count exceeds the safety limit".to_string(),
+                "XLSB external-link count exceeds the safety limit",
             ));
         }
         self.external_links.push(link);
@@ -283,6 +281,7 @@ impl WorkbookWriter {
         crate::xml_maps::serialize_xml_map_info(
             &value,
             crate::xml_maps::XmlMapConformance::Transitional,
+            &crate::xml_maps::XmlMapLimits::DEFAULT,
         )?;
         self.xml_maps = Some(value);
         Ok(self)
@@ -339,7 +338,7 @@ impl WorkbookWriter {
     ///
     /// The definition is serialized immediately, so model content the
     /// serializer cannot represent losslessly is rejected here rather than
-    /// at save time. Returns the allocated workbook PivotCache identifier
+    /// at build time. Returns the allocated workbook PivotCache identifier
     /// (`idSx`), unique per writer. Cache contents are stored verbatim and
     /// are never refreshed, contacted, or evaluated.
     pub fn add_pivot_cache(
@@ -350,7 +349,7 @@ impl WorkbookWriter {
         let cache_id = u32::try_from(self.pivot_caches.len())
             .ok()
             .and_then(|next| next.checked_add(1))
-            .ok_or_else(|| Error::InvalidFormula("PivotCache identifier overflow".to_string()))?;
+            .ok_or(Error::InvalidFormula("PivotCache identifier overflow"))?;
         self.pivot_caches.push(AuthoredPivotCache {
             id: cache_id,
             version_created: definition.version_created,
@@ -360,7 +359,7 @@ impl WorkbookWriter {
     }
 
     /// Get a mutable reference to a worksheet by index
-    pub fn get_worksheet_mut(&mut self, index: usize) -> Option<&mut MutableWorksheet> {
+    pub fn worksheet_mut(&mut self, index: usize) -> Option<&mut Worksheet> {
         self.worksheets.get_mut(index)
     }
 
@@ -375,7 +374,7 @@ impl WorkbookWriter {
     }
 
     /// Mutable chart-sheet access by chart-sheet insertion index.
-    pub fn get_chart_sheet_mut(&mut self, index: usize) -> Option<&mut MutableChartSheet> {
+    pub fn chart_sheet_mut(&mut self, index: usize) -> Option<&mut ChartSheet> {
         self.chart_sheets.get_mut(index)
     }
 
@@ -397,13 +396,12 @@ impl WorkbookWriter {
     }
 }
 
-impl WorkbookWriter {
+impl Builder {
     pub(super) fn validate_formula_metadata(&self) -> Result<()> {
         if self.sheet_order.len() > usize::from(u16::MAX) - 2 {
-            return Err(Error::InvalidFormula(format!(
-                "{} sheets exceed the XLSB extern-sheet index limit",
-                self.sheet_order.len()
-            )));
+            return Err(Error::InvalidFormula(
+                "sheets exceed the XLSB extern-sheet index limit",
+            ));
         }
         for (index, slot) in self.sheet_order.iter().copied().enumerate() {
             let name = self.sheet_name(slot);
@@ -414,17 +412,15 @@ impl WorkbookWriter {
                 || name.starts_with('\'')
                 || name.ends_with('\'')
             {
-                return Err(Error::InvalidFormula(format!(
-                    "sheet name {name:?} does not follow BrtBundleSh grammar"
-                )));
+                return Err(Error::InvalidFormula(
+                    "sheet name does not follow BrtBundleSh grammar",
+                ));
             }
             if self.sheet_order[..index]
                 .iter()
                 .any(|existing| excel_name_eq(self.sheet_name(*existing), name))
             {
-                return Err(Error::InvalidFormula(format!(
-                    "duplicate sheet name {name:?}"
-                )));
+                return Err(Error::InvalidFormula("duplicate sheet name"));
             }
         }
         for chart_sheet in &self.chart_sheets {
@@ -432,43 +428,37 @@ impl WorkbookWriter {
         }
         for (index, named_range) in self.named_ranges.iter().enumerate() {
             if named_range.function {
-                return Err(Error::UnsupportedFeature(format!(
-                    "macro defined name {} cannot be emitted",
-                    named_range.name
-                )));
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "build_xlsb",
+                    "macro defined names are outside this XLSB writer route",
+                ));
             }
             validate_name(&named_range.name)?;
             if named_range.formula.is_none() {
-                return Err(Error::InvalidFormula(format!(
-                    "defined name {} has no formula",
-                    named_range.name
-                )));
+                return Err(Error::InvalidFormula("defined name has no formula"));
             }
             if named_range.sheet_id.is_some_and(|sheet_id| {
                 usize::try_from(sheet_id)
                     .ok()
                     .is_none_or(|sheet_id| sheet_id >= self.sheet_order.len())
             }) {
-                return Err(Error::InvalidFormula(format!(
-                    "defined name {} has invalid sheet scope {:?}",
-                    named_range.name, named_range.sheet_id
-                )));
+                return Err(Error::InvalidFormula(
+                    "defined name has invalid sheet scope",
+                ));
             }
             if self.named_ranges[..index].iter().any(|existing| {
                 existing.sheet_id == named_range.sheet_id
                     && excel_name_eq(&existing.name, &named_range.name)
             }) {
-                return Err(Error::InvalidFormula(format!(
-                    "duplicate defined name {:?} in scope {:?}",
-                    named_range.name, named_range.sheet_id
-                )));
+                return Err(Error::InvalidFormula("duplicate defined name in scope"));
             }
         }
         Ok(())
     }
 }
 
-impl Default for WorkbookWriter {
+impl Default for Builder {
     fn default() -> Self {
         Self::new()
     }

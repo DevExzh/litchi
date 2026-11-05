@@ -6,12 +6,9 @@
 //! the common ODF positional writer so every other ZIP member remains a raw
 //! source copy.
 
-use std::{collections::BTreeMap, fmt, io::Write, ops::Range, sync::Arc};
+use std::{collections::BTreeMap, fmt, ops::Range, sync::Arc};
 
 use litchi_core::{Error, Result, SourceVersion};
-use litchi_odf_common::core::{
-    SourceContentPublicationError, SourceContentPublicationOptions, SourceContentPublicationReport,
-};
 
 use super::SourceBackedSpreadsheet;
 use crate::worksheet::Row;
@@ -218,7 +215,7 @@ impl HyperlinkChange {
 /// It is not a complete-package snapshot: source publication remains the
 /// responsibility of the originating [`SourceBackedSpreadsheet`].
 #[derive(Clone)]
-pub struct SourceCellSnapshot<'source> {
+pub(crate) struct SourceCellSnapshot<'source> {
     owner: &'source SourceBackedSpreadsheet,
     content_xml: Arc<str>,
     sheets: Arc<[Sheet]>,
@@ -237,13 +234,11 @@ impl fmt::Debug for SourceCellSnapshot<'_> {
 }
 
 /// A sparse, failure-atomic existing-cell transaction.
-pub struct SourceCellEdit<'source> {
+pub(crate) struct SourceCellEdit<'source> {
     before: SourceCellSnapshot<'source>,
     touched: BTreeMap<usize, Sheet>,
     coordinates: Vec<(usize, usize, usize)>,
     hyperlink_edit: bool,
-    structure_protected: bool,
-    protected_sheets: Vec<String>,
 }
 
 impl fmt::Debug for SourceCellEdit<'_> {
@@ -253,38 +248,13 @@ impl fmt::Debug for SourceCellEdit<'_> {
             .field("source_version", &self.before.source_version)
             .field("touched_sheets", &self.touched.len())
             .field("changed_cells", &self.coordinates.len())
-            .field("structure_protected", &self.structure_protected)
             .finish_non_exhaustive()
     }
 }
 
-/// A semantic `content.xml` patch bound to one retained positional owner.
-///
-/// This patch is intentionally not an exact ZIP-artifact patch. Applying it
-/// validates the complete semantic source snapshot and returns the retained
-/// target projection; publication still requires the checked commit that
-/// created it. Reopening a streamed artifact establishes a new source lineage.
-#[derive(Clone)]
-pub struct SourceCellPatch<'source> {
-    before: SourceCellSnapshot<'source>,
-    after: SourceCellSnapshot<'source>,
-}
-
-impl fmt::Debug for SourceCellPatch<'_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("SourceCellPatch")
-            .field("changed", &self.changed())
-            .field("source_content_bytes", &self.before.content_xml.len())
-            .field("target_content_bytes", &self.after.content_xml.len())
-            .finish()
-    }
-}
-
-/// A checked source-backed cell edit ready for sequential publication.
-pub struct SourceCellCommit<'source> {
+/// A checked source-backed cell edit: the candidate `content.xml`.
+pub(crate) struct SourceCellCommit<'source> {
     snapshot: SourceCellSnapshot<'source>,
-    patch: SourceCellPatch<'source>,
     changed_cells: usize,
 }
 
@@ -298,48 +268,9 @@ impl fmt::Debug for SourceCellCommit<'_> {
     }
 }
 
-/// Complete report for one source-backed ODS cell publication.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct SourceCellPublicationReport {
-    changed_cells: usize,
-    content: SourceContentPublicationReport,
-}
-
-impl SourceCellPublicationReport {
-    /// Number of semantic cells changed by the transaction.
-    #[must_use]
-    pub const fn changed_cells(self) -> usize {
-        self.changed_cells
-    }
-
-    /// Whether the publication copied the exact source artifact.
-    #[must_use]
-    pub const fn is_no_op(self) -> bool {
-        self.content.is_no_op()
-    }
-
-    /// Complete candidate artifact bytes accepted by the sink.
-    #[must_use]
-    pub const fn bytes(self) -> u64 {
-        self.content.bytes()
-    }
-
-    /// Source version checked throughout publication.
-    #[must_use]
-    pub const fn source_version(self) -> SourceVersion {
-        self.content.source_version()
-    }
-
-    /// The common ODF transport report.
-    #[must_use]
-    pub const fn content(self) -> SourceContentPublicationReport {
-        self.content
-    }
-}
-
 impl SourceBackedSpreadsheet {
     /// Capture a cheap immutable cell-edit snapshot of this exact source.
-    pub fn cell_snapshot(&self) -> Result<SourceCellSnapshot<'_>> {
+    pub(crate) fn cell_snapshot(&self) -> Result<SourceCellSnapshot<'_>> {
         self.check_source()?;
         let snapshot = SourceCellSnapshot {
             owner: self,
@@ -350,55 +281,17 @@ impl SourceBackedSpreadsheet {
         self.check_source()?;
         Ok(snapshot)
     }
-
-    /// Begin one sparse existing-cell edit over this exact source.
-    pub fn edit_cells(&self) -> Result<SourceCellEdit<'_>> {
-        self.cell_snapshot()?.edit()
-    }
-
-    /// Alias for [`Self::edit_cells`].
-    pub fn begin_cell_edit(&self) -> Result<SourceCellEdit<'_>> {
-        self.edit_cells()
-    }
 }
 
 impl<'source> SourceCellSnapshot<'source> {
-    /// Exact source version captured by this snapshot.
-    #[must_use]
-    pub const fn source_version(&self) -> SourceVersion {
-        self.source_version
-    }
-
-    /// Borrow the validated candidate `content.xml`.
-    #[must_use]
-    pub fn content_xml(&self) -> &str {
-        &self.content_xml
-    }
-
-    /// Borrow the complete validated worksheet projection.
-    #[must_use]
-    pub fn sheets(&self) -> &[Sheet] {
-        &self.sheets
-    }
-
-    /// Select a worksheet by exact name or checked zero-based position.
-    pub fn sheet<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Option<&Sheet>> {
-        crate::worksheet::snapshot::select(&self.sheets, selector.into())
-            .map(|selected| selected.map(|index| &self.sheets[index]))
-    }
-
     /// Start an isolated sparse transaction from this snapshot.
-    pub fn edit(&self) -> Result<SourceCellEdit<'source>> {
-        self.check_source()?;
-        let (structure_protected, protected_sheets) = self.owner.edit_protection()?.clone();
+    pub(crate) fn edit(&self) -> Result<SourceCellEdit<'source>> {
         self.check_source()?;
         Ok(SourceCellEdit {
             before: self.clone(),
             touched: BTreeMap::new(),
             coordinates: Vec::new(),
             hyperlink_edit: false,
-            structure_protected,
-            protected_sheets,
         })
     }
 
@@ -413,36 +306,33 @@ impl<'source> SourceCellSnapshot<'source> {
             })
         }
     }
-
-    fn same_snapshot(&self, other: &Self) -> bool {
-        std::ptr::eq(self.owner, other.owner)
-            && self.source_version == other.source_version
-            && self.content_xml.as_ref() == other.content_xml.as_ref()
-            && self.sheets.as_ref() == other.sheets.as_ref()
-    }
 }
 
 impl<'source> SourceCellEdit<'source> {
-    /// Exact source snapshot captured when this edit began.
-    #[must_use]
-    pub const fn before(&self) -> &SourceCellSnapshot<'source> {
-        &self.before
-    }
-
     /// Number of effective unique cell changes staged so far.
     #[must_use]
-    pub fn changed_cells(&self) -> usize {
+    pub(crate) fn changed_cells(&self) -> usize {
         self.coordinates.len()
     }
 
     /// Whether this transaction currently has no effective changes.
     #[must_use]
-    pub fn is_no_op(&self) -> bool {
+    pub(crate) fn is_no_op(&self) -> bool {
         self.coordinates.is_empty()
     }
 
+    fn check_protection(&self, sheet_name: &str) -> Result<()> {
+        let (structure_protected, protected_sheets) = self.before.owner.edit_protection()?;
+        if *structure_protected || protected_sheets.iter().any(|name| name == sheet_name) {
+            return Err(Error::InvalidFormat(
+                "ODS source cell edits refuse protected spreadsheets and worksheets".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
     /// Replace one existing ordinary scalar cell.
-    pub fn set_cell<'a>(
+    pub(crate) fn set_cell<'a>(
         &mut self,
         selector: impl Into<Selector<'a>>,
         row: usize,
@@ -455,7 +345,7 @@ impl<'source> SourceCellEdit<'source> {
 
     /// Replace one existing formula cell while retaining its cached value,
     /// displayed text, style, and other cell metadata.
-    pub fn set_formula<'a>(
+    pub(crate) fn set_formula<'a>(
         &mut self,
         selector: impl Into<Selector<'a>>,
         row: usize,
@@ -473,7 +363,7 @@ impl<'source> SourceCellEdit<'source> {
     /// links are authoring-validated; unchanged parsed links are only required
     /// to pass storage validation.  Scalar and formula operations retain their
     /// separate refusal for rows containing hyperlinks.
-    pub fn set_hyperlinks<'a>(
+    pub(crate) fn set_hyperlinks<'a>(
         &mut self,
         selector: impl Into<Selector<'a>>,
         mut changes: Vec<HyperlinkChange>,
@@ -511,16 +401,7 @@ impl<'source> SourceCellEdit<'source> {
             self.before.check_source()?;
             return Ok(Some(0));
         }
-        if self.structure_protected
-            || self
-                .protected_sheets
-                .iter()
-                .any(|name| name == &source_sheet.name)
-        {
-            return Err(Error::InvalidFormat(
-                "ODS source cell edits refuse protected spreadsheets and worksheets".to_string(),
-            ));
-        }
+        self.check_protection(&source_sheet.name)?;
         let attempted = self
             .coordinates
             .len()
@@ -575,22 +456,13 @@ impl<'source> SourceCellEdit<'source> {
         Ok(Some(effective.len()))
     }
 
-    /// Alias for [`Self::set_hyperlinks`].
-    pub fn set_links<'a>(
-        &mut self,
-        selector: impl Into<Selector<'a>>,
-        changes: Vec<HyperlinkChange>,
-    ) -> Result<Option<usize>> {
-        self.set_hyperlinks(selector, changes)
-    }
-
     /// Atomically replace a bounded batch of existing formula cells.
     ///
     /// Missing cells, scalar cells, repeated physical rows, merged cells,
     /// unknown values, and duplicate coordinates are refused. Repeated
     /// physical columns may be split because the containing row remains the
     /// same owner. Formula changes never evaluate or replace cached values.
-    pub fn set_formulas<'a>(
+    pub(crate) fn set_formulas<'a>(
         &mut self,
         selector: impl Into<Selector<'a>>,
         mut changes: Vec<FormulaChange>,
@@ -628,16 +500,7 @@ impl<'source> SourceCellEdit<'source> {
             self.before.check_source()?;
             return Ok(Some(0));
         }
-        if self.structure_protected
-            || self
-                .protected_sheets
-                .iter()
-                .any(|name| name == &source_sheet.name)
-        {
-            return Err(Error::InvalidFormat(
-                "ODS source cell edits refuse protected spreadsheets and worksheets".to_string(),
-            ));
-        }
+        self.check_protection(&source_sheet.name)?;
         let attempted = self
             .coordinates
             .len()
@@ -690,7 +553,7 @@ impl<'source> SourceCellEdit<'source> {
     /// Missing cells, repeated physical rows, formulas, merged cells, unknown
     /// values, and style retargeting are refused. Repeated cell runs may be
     /// split because the containing physical row remains the same owner.
-    pub fn set_cells<'a>(
+    pub(crate) fn set_cells<'a>(
         &mut self,
         selector: impl Into<Selector<'a>>,
         mut changes: Vec<CellChange>,
@@ -727,16 +590,7 @@ impl<'source> SourceCellEdit<'source> {
             self.before.check_source()?;
             return Ok(Some(0));
         }
-        if self.structure_protected
-            || self
-                .protected_sheets
-                .iter()
-                .any(|name| name == &source_sheet.name)
-        {
-            return Err(Error::InvalidFormat(
-                "ODS source cell edits refuse protected spreadsheets and worksheets".to_string(),
-            ));
-        }
+        self.check_protection(&source_sheet.name)?;
         let attempted = self
             .coordinates
             .len()
@@ -785,16 +639,11 @@ impl<'source> SourceCellEdit<'source> {
     }
 
     /// Validate the row-local replacement and freeze a publication commit.
-    pub fn commit(self) -> Result<SourceCellCommit<'source>> {
+    pub(crate) fn commit(self) -> Result<SourceCellCommit<'source>> {
         self.before.check_source()?;
         if self.touched.is_empty() {
-            let snapshot = self.before.clone();
             return Ok(SourceCellCommit {
-                patch: SourceCellPatch {
-                    before: self.before,
-                    after: snapshot.clone(),
-                },
-                snapshot,
+                snapshot: self.before,
                 changed_cells: 0,
             });
         }
@@ -879,129 +728,22 @@ impl<'source> SourceCellEdit<'source> {
             sheets: Arc::from(parsed),
             source_version: self.before.source_version,
         };
-        let patch = SourceCellPatch {
-            before: self.before,
-            after: snapshot.clone(),
-        };
         Ok(SourceCellCommit {
             snapshot,
-            patch,
             changed_cells: self.coordinates.len(),
         })
     }
 }
 
-impl<'source> SourceCellPatch<'source> {
-    /// Exact semantic source required by this patch.
-    #[must_use]
-    pub const fn source(&self) -> &SourceCellSnapshot<'source> {
-        &self.before
-    }
-
-    /// Exact semantic target produced by this patch.
-    #[must_use]
-    pub const fn target(&self) -> &SourceCellSnapshot<'source> {
-        &self.after
-    }
-
-    /// Whether the candidate `content.xml` changes.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        self.before.content_xml.as_ref() != self.after.content_xml.as_ref()
-    }
-
-    /// Apply this semantic patch to its exact in-memory source snapshot.
-    pub fn apply(
-        &self,
-        snapshot: &SourceCellSnapshot<'source>,
-    ) -> Result<SourceCellSnapshot<'source>> {
-        snapshot.check_source()?;
-        if !snapshot.same_snapshot(&self.before) {
-            return Err(Error::InvalidFormat(
-                "ODS source cell patch source snapshot does not match".to_string(),
-            ));
-        }
-        Ok(self.after.clone())
-    }
-
-    /// Return the exact inverse semantic `content.xml` patch.
-    #[must_use]
-    pub fn inverse(&self) -> Self {
-        Self {
-            before: self.after.clone(),
-            after: self.before.clone(),
-        }
-    }
-}
-
-impl<'source> SourceCellCommit<'source> {
-    /// Candidate semantic snapshot after this edit.
-    #[must_use]
-    pub const fn snapshot(&self) -> &SourceCellSnapshot<'source> {
-        &self.snapshot
-    }
-
-    /// Source-content semantic patch for this edit.
-    #[must_use]
-    pub const fn patch(&self) -> &SourceCellPatch<'source> {
-        &self.patch
+impl SourceCellCommit<'_> {
+    /// The candidate `content.xml`.
+    pub(crate) fn content_xml(&self) -> &Arc<str> {
+        &self.snapshot.content_xml
     }
 
     /// Number of effective changed cells.
-    #[must_use]
-    pub const fn changed_cells(&self) -> usize {
+    pub(crate) const fn changed_cells(&self) -> usize {
         self.changed_cells
-    }
-
-    /// Whether the edit changed `content.xml`.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        self.patch.changed()
-    }
-
-    /// Publish the candidate to a sequential sink under the default policy.
-    pub fn write_to<W: Write>(
-        &self,
-        writer: W,
-    ) -> std::result::Result<SourceCellPublicationReport, SourceContentPublicationError> {
-        self.write_to_with_options(writer, SourceContentPublicationOptions::default())
-    }
-
-    /// Publish under explicit replacement/output, cancellation, payload, and
-    /// hierarchical execution policies.
-    pub fn write_to_with_options<W: Write>(
-        &self,
-        writer: W,
-        options: SourceContentPublicationOptions,
-    ) -> std::result::Result<SourceCellPublicationReport, SourceContentPublicationError> {
-        self.patch
-            .before
-            .check_source()
-            .map_err(|error| match error {
-                Error::SourceChanged { expected, observed } => {
-                    SourceContentPublicationError::SourceChanged {
-                        expected,
-                        observed,
-                        progress:
-                            litchi_odf_common::core::SourceContentPublicationProgress::Untouched,
-                    }
-                },
-                other => SourceContentPublicationError::Core(other),
-            })?;
-        let content = self
-            .patch
-            .before
-            .owner
-            .package
-            .write_content_xml_to_stream_with_options(
-                writer,
-                self.snapshot.content_xml.as_bytes(),
-                options,
-            )?;
-        Ok(SourceCellPublicationReport {
-            changed_cells: self.changed_cells,
-            content,
-        })
     }
 }
 

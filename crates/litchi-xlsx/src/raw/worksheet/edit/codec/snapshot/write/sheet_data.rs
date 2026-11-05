@@ -697,21 +697,30 @@ fn write_new_row(
         return Ok(());
     }
     let name = sibling_name(sheet_data_name, "row");
-    let tag = Tag {
-        name: name.clone().into_boxed_str(),
-        attributes: Box::new([]),
-    };
-    let mut appended = vec![("r", number.to_string())];
-    let mut removed = Vec::new();
     if let Some(action) = edits.row {
+        let tag = Tag {
+            name: name.clone().into_boxed_str(),
+            attributes: Box::new([]),
+        };
+        let mut appended = vec![("r", number.to_string())];
+        let mut removed = Vec::new();
         row_effect_attributes(action, descent_name, &mut removed, &mut appended);
+        write_tag(output, &tag, !creates_cell, &removed, &appended);
+    } else {
+        // A row with no row-level effect: the same bytes `write_tag` writes
+        // for its one `r` attribute, without the per-row tag and list.
+        output.push(b'<');
+        output.extend_from_slice(name.as_bytes());
+        output.extend_from_slice(b" r=\"");
+        output.extend_from_slice(number.to_string().as_bytes());
+        output.extend_from_slice(if creates_cell { b"\">" } else { b"\"/>" });
     }
-    write_tag(output, &tag, !creates_cell, &removed, &appended);
     if !creates_cell {
         return Ok(());
     }
+    let cell_name = sibling_name(&name, "c");
     for (address, action) in &edits.cells {
-        write_new_action(output, &name, *address, action)?;
+        write_new_cell(output, &cell_name, *address, action)?;
     }
     write_close(output, &name);
     Ok(())
@@ -777,7 +786,11 @@ fn write_cell(output: &mut Vec<u8>, source: &[u8], cell: &CellSlot, action: &Act
     let content = payload.as_ref().filter(|payload| {
         matches!(
             payload,
-            Payload::Set(_) | Payload::SharedString { .. } | Payload::SharedFormula { .. }
+            Payload::Set(_)
+                | Payload::SharedString { .. }
+                | Payload::SharedFormula { .. }
+                | Payload::Rich(_)
+                | Payload::Cache(_)
         )
     });
     let cell_type = content.and_then(payload_type);
@@ -806,8 +819,10 @@ fn write_cell(output: &mut Vec<u8>, source: &[u8], cell: &CellSlot, action: &Act
     if remains_empty {
         return Ok(());
     }
-    if let Some(content) = content {
-        write_payload(output, cell_name, content)?;
+    match content {
+        Some(Payload::Cache(value)) => write_cache(output, source, cell, cell_name, value)?,
+        Some(content) => write_payload(output, cell_name, content)?,
+        None => {},
     }
     if !cell.empty {
         if payload.is_some() {
@@ -832,6 +847,19 @@ fn write_new_action(
     address: Address,
     action: &Action,
 ) -> Result<()> {
+    write_new_cell(output, &sibling_name(row_name, "c"), address, action)
+}
+
+/// Write one created cell. `name` is the cell element's qualified name (the
+/// row's prefix and `c`); the tag is written directly, byte-identical to
+/// `write_tag` with the same attributes, without a per-cell tag, attribute
+/// list or address string (record 0377a).
+fn write_new_cell(
+    output: &mut Vec<u8>,
+    name: &str,
+    address: Address,
+    action: &Action,
+) -> Result<()> {
     let Action::Update { payload, style } = action else {
         return Ok(());
     };
@@ -841,26 +869,29 @@ fn write_new_action(
     let content = payload.as_ref().filter(|payload| {
         matches!(
             payload,
-            Payload::Set(_) | Payload::SharedString { .. } | Payload::SharedFormula { .. }
+            Payload::Set(_)
+                | Payload::SharedString { .. }
+                | Payload::SharedFormula { .. }
+                | Payload::Rich(_)
         )
     });
-    let name = sibling_name(row_name, "c");
-    let tag = Tag {
-        name: name.clone().into_boxed_str(),
-        attributes: Box::new([]),
-    };
-    let mut appended = vec![("r", address.a1())];
+    output.push(b'<');
+    output.extend_from_slice(name.as_bytes());
+    // An A1 label is letters and digits: XML escaping leaves it unchanged.
+    output.extend_from_slice(b" r=\"");
+    address.append_a1(output);
+    output.push(b'"');
     if let Some(cell_type) = content.and_then(payload_type) {
-        appended.push(("t", cell_type.to_owned()));
+        write_attribute(output, "t", cell_type);
     }
     if let Some(StyleEffect::Set(key)) = style {
-        appended.push(("s", key.to_string()));
+        write_attribute(output, "s", &key.to_string());
     }
     let empty = content.is_none();
-    write_tag(output, &tag, empty, &[], &appended);
+    output.extend_from_slice(if empty { b"/>" } else { b">" });
     if let Some(content) = content {
-        write_payload(output, &name, content)?;
-        write_close(output, &name);
+        write_payload(output, name, content)?;
+        write_close(output, name);
     }
     Ok(())
 }
@@ -879,7 +910,15 @@ fn payload_type(payload: &Payload) -> Option<&'static str> {
     match payload {
         Payload::Set(content) => content_type(content),
         Payload::SharedString { .. } => Some("s"),
+        Payload::Rich(_) => Some("inlineStr"),
         Payload::SharedFormula { .. } => None,
+        Payload::Cache(value) => match value {
+            Value::Bool(_) => Some("b"),
+            Value::Text(_) => Some("str"),
+            Value::Date(_) => Some("d"),
+            Value::Error(_) => Some("e"),
+            Value::Number(_) => None,
+        },
         Payload::Clear | Payload::ClearIfPresent => None,
     }
 }
@@ -896,8 +935,55 @@ fn write_payload(output: &mut Vec<u8>, cell_name: &str, payload: &Payload) -> Re
             reference,
             formula,
         } => write_shared_formula(output, cell_name, *index, reference, formula.as_ref()),
-        Payload::Clear | Payload::ClearIfPresent => Ok(()),
+        Payload::Rich(rich) => write_rich(output, cell_name, rich),
+        Payload::Clear | Payload::ClearIfPresent | Payload::Cache(_) => Ok(()),
     }
+}
+
+/// Write an existing formula cell's `f` element unchanged, then its new
+/// cached result (record 0279).
+fn write_cache(
+    output: &mut Vec<u8>,
+    source: &[u8],
+    cell: &CellSlot,
+    cell_name: &str,
+    value: &Value,
+) -> Result<()> {
+    let formula = cell
+        .primary
+        .as_slice()
+        .iter()
+        .find(|span| {
+            let bytes = &source[span.start..span.end];
+            let name_end = bytes[1..]
+                .iter()
+                .position(|byte| matches!(*byte, b' ' | b'>' | b'/' | b'\t' | b'\n' | b'\r'))
+                .map_or(bytes.len(), |offset| offset + 1);
+            let name = &bytes[1..name_end];
+            name == b"f" || name.ends_with(b":f")
+        })
+        .ok_or_else(|| invalid("a formula cache needs a stored formula"))?;
+    output.extend_from_slice(&source[formula.start..formula.end]);
+    match value {
+        Value::Bool(value) => {
+            write_text_element(output, cell_name, "v", if *value { "1" } else { "0" });
+        },
+        Value::Number(value) => {
+            write_text_element(output, cell_name, "v", &escape_xml(value.as_str()));
+        },
+        Value::Text(value) => {
+            require_xml_text(value.as_str())?;
+            write_text_element(output, cell_name, "v", &escape_xml(value.as_str()));
+        },
+        Value::Date(value) => {
+            require_xml_text(value)?;
+            write_text_element(output, cell_name, "v", &escape_xml(value));
+        },
+        Value::Error(value) => {
+            write_text_element(output, cell_name, "v", &escape_xml(value.as_str()));
+        },
+    }
+    Ok(())
 }
 
 fn write_shared_formula(
@@ -965,6 +1051,53 @@ fn write_content(output: &mut Vec<u8>, cell_name: &str, content: &Content) -> Re
             write_text_element(output, cell_name, "f", &escape_xml(formula.text()));
         },
     }
+    Ok(())
+}
+
+/// Write `rich` as an inline string: one `r` per run, its `rPr` children
+/// re-emitted with the cell's namespace prefix and their attributes as
+/// stored (record 0295).
+fn write_rich(output: &mut Vec<u8>, cell_name: &str, rich: &crate::cell::RichText) -> Result<()> {
+    let inline = sibling_name(cell_name, "is");
+    let run = sibling_name(cell_name, "r");
+    let properties = sibling_name(cell_name, "rPr");
+    let text = sibling_name(cell_name, "t");
+    let open = |output: &mut Vec<u8>, name: &str| {
+        output.push(b'<');
+        output.extend_from_slice(name.as_bytes());
+        output.push(b'>');
+    };
+    let close = |output: &mut Vec<u8>, name: &str| {
+        output.extend_from_slice(b"</");
+        output.extend_from_slice(name.as_bytes());
+        output.push(b'>');
+    };
+    open(output, &inline);
+    for item in rich.runs() {
+        require_xml_text(item.text())?;
+        open(output, &run);
+        if let Some(children) = item.properties.as_deref() {
+            open(output, &properties);
+            for (local, attributes) in children {
+                let name = sibling_name(cell_name, local);
+                output.push(b'<');
+                output.extend_from_slice(name.as_bytes());
+                if !attributes.is_empty() {
+                    output.push(b' ');
+                    output.extend_from_slice(attributes.as_bytes());
+                }
+                output.extend_from_slice(b"/>");
+            }
+            close(output, &properties);
+        }
+        output.push(b'<');
+        output.extend_from_slice(text.as_bytes());
+        output.extend_from_slice(b" xml:space=\"preserve\">");
+        output.extend_from_slice(escape_xml(&encode_spreadsheet_text(item.text())).as_bytes());
+        close(output, &text);
+        close(output, &run);
+    }
+    close(output, &inline);
     Ok(())
 }
 

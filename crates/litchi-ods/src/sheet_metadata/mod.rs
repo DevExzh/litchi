@@ -9,16 +9,11 @@
 pub mod detective;
 mod index;
 
-use std::{
-    collections::BTreeMap, fmt, io::Write, mem::size_of, ops::Range as ByteRange, sync::Arc,
-};
+use std::{collections::BTreeMap, fmt, mem::size_of, ops::Range as ByteRange, sync::Arc};
 
 use litchi_core::{
     Budget, CancellationSource, Error, ExecutionContext, ExecutionLimits, Position, Profile,
-    Reservation, Resource, Result, SourceVersion,
-};
-use litchi_odf_common::core::{
-    SourceContentPublicationError, SourceContentPublicationOptions, SourceContentPublicationReport,
+    Reservation, Resource, Result,
 };
 
 pub use crate::model::consolidation::{Options, UseLabels};
@@ -641,46 +636,14 @@ impl Snapshot {
         })
     }
 
-    /// Reopen a retained target under the destination snapshot's policy.
-    ///
-    /// A patch target may have been accepted under another profile or
-    /// cancellation token.  Reusing its retained snapshot would therefore
-    /// bypass destination admission.  The exact target bytes are checked and
-    /// parsed again under the destination context, with a destination-owned
-    /// output reservation retained by the returned snapshot.
-    fn reopen_for_destination(&self, destination: &Self) -> Result<Self> {
-        self.context.check().map_err(map_execution)?;
-        destination.context.check().map_err(map_execution)?;
-        let target_bytes = self.source.len();
-        if target_bytes > destination.limits.max_output_bytes() {
-            return Err(limit(
-                Resource::OutputBytes,
-                "output bytes",
-                target_bytes,
-                destination.limits.max_output_bytes(),
-            ));
-        }
-        let output = destination
-            .context
-            .reserve(
-                Resource::OutputBytes,
-                u64::try_from(target_bytes)
-                    .map_err(|_| invalid("ODS metadata target size overflows u64"))?,
-            )
-            .map_err(map_execution)?;
-        let mut target = Self::parse_arc_with_context(
-            Arc::clone(&self.source),
-            destination.limits,
-            &destination.context,
-            destination.enforce_context_lineage,
-        )?;
-        target._source_output = Some(Arc::new(output));
-        Ok(target)
-    }
-
     /// Exact content.xml source bytes retained by this snapshot.
     #[must_use]
     pub fn source_xml(&self) -> &str {
+        &self.source
+    }
+
+    /// The retained `content.xml`, shared.
+    pub(crate) fn source_arc(&self) -> &Arc<str> {
         &self.source
     }
     /// Alias for [`Self::source_xml`].
@@ -772,7 +735,7 @@ impl Snapshot {
     }
 
     /// Start a non-consuming semantic metadata edit.
-    pub fn edit(&self) -> Edit {
+    pub(crate) fn edit(&self) -> Edit {
         Edit {
             before: self.clone(),
             consolidation: None,
@@ -1436,11 +1399,27 @@ impl Edit {
             .cell_for_selector_with_budget(&selector, selector_budget)?
         {
             index::PhysicalCell::Missing if allow_missing => Ok(()),
-            index::PhysicalCell::Missing => Err(Error::InvalidFormat("ODS metadata cell selector did not match a physical cell".to_string())),
-            index::PhysicalCell::ImplicitCovered { .. } => Err(Error::Unsupported("UnsupportedImplicitCoveredCell: ODS metadata cannot materialize an implicit covered cell".to_string())),
+            index::PhysicalCell::Missing => Err(Error::InvalidFormat(
+                "ODS metadata cell selector did not match a physical cell".to_string(),
+            )),
+            index::PhysicalCell::ImplicitCovered { .. } => {
+                Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "ods.sheet_metadata",
+                    "UnsupportedImplicitCoveredCell: ODS metadata cannot materialize an implicit covered cell",
+                )))
+            },
             index::PhysicalCell::Stored(index) => {
-                let cell = self.before.catalog.cells.get(index).ok_or_else(|| Error::InvalidFormat("ODS metadata cell index disappeared".to_string()))?;
-                if !cell.sequence_valid || cell.unsupported_child || cell.direct_owner_count > 0 { return Err(Error::Unsupported("ODS metadata cell owner is opaque or has an ambiguous insertion anchor".to_string())); }
+                let cell = self.before.catalog.cells.get(index).ok_or_else(|| {
+                    Error::InvalidFormat("ODS metadata cell index disappeared".to_string())
+                })?;
+                if !cell.sequence_valid || cell.unsupported_child || cell.direct_owner_count > 0 {
+                    return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
+                        "ods.sheet_metadata",
+                        "ODS metadata cell owner is opaque or has an ambiguous insertion anchor",
+                    )));
+                }
                 Ok(())
             },
         }
@@ -1520,25 +1499,22 @@ impl Edit {
     }
 
     /// Commit this edit without consuming its staged ledger.
-    pub fn commit(&mut self, context: &ExecutionContext) -> Result<Commit> {
+    pub(crate) fn commit(&mut self, context: &ExecutionContext) -> Result<Commit> {
         context.check().map_err(map_execution)?;
         if self.before.enforce_context_lineage {
             if context.limits() != self.before.context.limits()
                 || !same_budget_lineage(&self.before.context, context)?
             {
-                return Err(Error::Unsupported(
-                    "ODS metadata commit context does not match the snapshot execution lineage"
-                        .to_string(),
-                ));
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "ods.sheet_metadata",
+                    "ODS metadata commit context does not match the snapshot execution lineage",
+                )));
             }
         }
         if self.is_no_op() {
             return Ok(Commit {
                 snapshot: self.before.clone(),
-                patch: Patch {
-                    source: self.before.clone(),
-                    target: self.before.clone(),
-                },
                 changed: false,
             });
         }
@@ -1552,15 +1528,12 @@ impl Edit {
         verify_readback(&target, self, context)?;
         Ok(Commit {
             snapshot: target.clone(),
-            patch: Patch {
-                source: self.before.clone(),
-                target,
-            },
             changed: true,
         })
     }
-    /// Clear every staged operation by restoring the immutable base ledger.
-    pub fn rollback(&mut self) {
+
+    /// Discard every staged change in place.
+    pub fn reset(&mut self) {
         self.consolidation = None;
         self.consolidation_staged = false;
         self.labels = None;
@@ -1574,490 +1547,49 @@ impl Edit {
 
 /// Accepted source-checked metadata result.
 #[derive(Clone, Debug)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
-    patch: Patch,
     changed: bool,
 }
 
 impl Commit {
     /// Whether content.xml changed.
     #[must_use]
-    pub const fn changed(&self) -> bool {
+    pub(crate) const fn changed(&self) -> bool {
         self.changed
     }
     /// Resulting immutable snapshot.
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
-    /// Reversible exact-source patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
 }
 
-/// Exact content.xml patch authorized by one metadata snapshot.
-#[derive(Clone, Debug)]
-pub struct Patch {
-    source: Snapshot,
-    target: Snapshot,
-}
-
-impl Patch {
-    /// Whether source and target are byte-identical.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        self.source.source.as_ref() != self.target.source.as_ref()
+/// Admit an exact target `content.xml` under a destination's limits and
+/// execution context, as a patch replay did before record 0358a: the output
+/// ceiling, an output reservation and a full parse under that policy.
+pub(crate) fn admit_target(
+    target: &Arc<str>,
+    limits: Limits,
+    context: &ExecutionContext,
+) -> Result<()> {
+    context.check().map_err(map_execution)?;
+    if target.len() > limits.max_output_bytes() {
+        return Err(limit(
+            Resource::OutputBytes,
+            "output bytes",
+            target.len(),
+            limits.max_output_bytes(),
+        ));
     }
-    /// Alias for [`Self::changed`] with the opposite polarity.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        !self.changed()
-    }
-    /// Exact source bytes required by this patch.
-    #[must_use]
-    pub fn source_xml(&self) -> &str {
-        self.source.source_xml()
-    }
-    /// Exact target bytes produced by this patch.
-    #[must_use]
-    pub fn target_xml(&self) -> &str {
-        self.target.source_xml()
-    }
-    /// Inverse exact-source patch.
-    #[must_use]
-    pub fn inverse(&self) -> Self {
-        Self {
-            source: self.target.clone(),
-            target: self.source.clone(),
-        }
-    }
-    /// Apply to an exact source snapshot, reopening the retained target under
-    /// the destination snapshot's limits and execution context.
-    pub fn apply(&self, snapshot: &Snapshot) -> Result<Commit> {
-        if snapshot.source.as_ref() != self.source.source.as_ref() {
-            return Err(Error::InvalidFormat(
-                "ODS sheet metadata patch source snapshot does not match".to_string(),
-            ));
-        }
-        snapshot.context.check().map_err(map_execution)?;
-        if !self.changed() {
-            return Ok(Commit {
-                snapshot: snapshot.clone(),
-                patch: self.clone(),
-                changed: false,
-            });
-        }
-        let target = self.target.reopen_for_destination(snapshot)?;
-        Ok(Commit {
-            snapshot: target.clone(),
-            patch: Patch {
-                source: snapshot.clone(),
-                target,
-            },
-            changed: self.changed(),
-        })
-    }
-}
-
-/// Source-backed immutable metadata snapshot.
-pub struct SourceMetadataSnapshot<'source> {
-    owner: &'source crate::facade::SourceBackedSpreadsheet,
-    inner: Snapshot,
-    source_version: SourceVersion,
-}
-
-impl fmt::Debug for SourceMetadataSnapshot<'_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("SourceMetadataSnapshot")
-            .field("source_version", &self.source_version)
-            .field("source_bytes", &self.inner.source.len())
-            .finish_non_exhaustive()
-    }
-}
-
-impl<'source> Clone for SourceMetadataSnapshot<'source> {
-    fn clone(&self) -> Self {
-        Self {
-            owner: self.owner,
-            inner: self.inner.clone(),
-            source_version: self.source_version,
-        }
-    }
-}
-
-impl<'source> SourceMetadataSnapshot<'source> {
-    pub(crate) fn from_owner(
-        owner: &'source crate::facade::SourceBackedSpreadsheet,
-        limits: Limits,
-        context: &ExecutionContext,
-        enforce_context_lineage: bool,
-    ) -> Result<Self> {
-        owner.check_source()?;
-        let source_version = owner.source_version()?;
-        let source = owner.content_xml_arc()?;
-        let inner =
-            Snapshot::parse_arc_with_context(source, limits, context, enforce_context_lineage)?;
-        owner.check_source()?;
-        Ok(Self {
-            owner,
-            inner,
-            source_version,
-        })
-    }
-    /// Exact source version captured by this snapshot.
-    #[must_use]
-    pub const fn source_version(&self) -> SourceVersion {
-        self.source_version
-    }
-    /// Borrow exact content.xml bytes.
-    #[must_use]
-    pub fn source_xml(&self) -> &str {
-        self.inner.source_xml()
-    }
-    /// Read consolidation.
-    pub fn consolidation(&self) -> Result<Option<&Options>> {
-        self.check_source()?;
-        self.inner.consolidation()
-    }
-    /// Read labels.
-    pub fn label_ranges(&self) -> Result<LabelRangesView<'_>> {
-        self.check_source()?;
-        Ok(self.inner.label_ranges())
-    }
-    /// Read cell metadata.
-    pub fn cell_metadata(
-        &self,
-        selector: CellSelector<'_>,
-    ) -> Result<Option<CellMetadataView<'_>>> {
-        self.check_source()?;
-        self.inner.cell_metadata(selector)
-    }
-    /// Start source-backed edit.
-    pub fn edit(&self) -> Result<SourceMetadataEdit<'source>> {
-        self.check_source()?;
-        Ok(SourceMetadataEdit {
-            before: self.clone(),
-            inner: self.inner.edit(),
-        })
-    }
-    fn check_source(&self) -> Result<()> {
-        let observed = self.owner.source_version()?;
-        if observed == self.source_version {
-            Ok(())
-        } else {
-            Err(Error::SourceChanged {
-                expected: self.source_version,
-                observed,
-            })
-        }
-    }
-    fn is_signed(&self) -> Result<bool> {
-        self.owner.sheet_metadata_signed()
-    }
-}
-
-/// Source-backed semantic metadata edit. Its `commit` method borrows the edit
-/// so failed validation leaves the staged ledger and source snapshot intact.
-pub struct SourceMetadataEdit<'source> {
-    before: SourceMetadataSnapshot<'source>,
-    inner: Edit,
-}
-
-impl fmt::Debug for SourceMetadataEdit<'_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("SourceMetadataEdit")
-            .field("source_version", &self.before.source_version)
-            .finish_non_exhaustive()
-    }
-}
-
-impl<'source> SourceMetadataEdit<'source> {
-    /// Base source snapshot.
-    #[must_use]
-    pub const fn before(&self) -> &SourceMetadataSnapshot<'source> {
-        &self.before
-    }
-    /// Stage consolidation replacement/removal.
-    pub fn set_consolidation(&mut self, value: Option<Options>) -> Result<()> {
-        self.inner.set_consolidation(value)
-    }
-    /// Clear consolidation.
-    pub fn clear_consolidation(&mut self) -> Result<()> {
-        self.inner.clear_consolidation()
-    }
-    /// Stage label insertion.
-    pub fn add_label_range(&mut self, value: LabelRange) -> Result<()> {
-        self.inner.add_label_range(value)
-    }
-    /// Stage label insertion at a source-order index.
-    pub fn insert_label_range(&mut self, index: usize, value: LabelRange) -> Result<()> {
-        self.inner.insert_label_range(index, value)
-    }
-    /// Stage label replacement.
-    pub fn replace_label_range(&mut self, index: usize, value: LabelRange) -> Result<()> {
-        self.inner.replace_label_range(index, value)
-    }
-    /// Stage label removal.
-    pub fn remove_label_range(&mut self, index: usize) -> Result<LabelRange> {
-        self.inner.remove_label_range(index)
-    }
-    /// Clear labels and their container.
-    pub fn clear_label_ranges(&mut self) -> Result<()> {
-        self.inner.clear_label_ranges()
-    }
-    /// Ensure labels container presence.
-    pub fn ensure_label_ranges(&mut self) -> Result<()> {
-        self.inner.ensure_label_ranges()
-    }
-    /// Set an existing cell source owner.
-    pub fn set_cell_range_source(
-        &mut self,
-        selector: CellSelector<'_>,
-        value: CellRange,
-    ) -> Result<()> {
-        self.inner.set_cell_range_source(selector, value)
-    }
-    /// Clear an existing cell source owner.
-    pub fn clear_cell_range_source(&mut self, selector: CellSelector<'_>) -> Result<()> {
-        self.inner.clear_cell_range_source(selector)
-    }
-    /// Set an existing cell detective owner.
-    pub fn set_detective(&mut self, selector: CellSelector<'_>, value: Detective) -> Result<()> {
-        self.inner.set_detective(selector, value)
-    }
-    /// Clear an existing cell detective owner.
-    pub fn clear_detective(&mut self, selector: CellSelector<'_>) -> Result<()> {
-        self.inner.clear_detective(selector)
-    }
-    /// Edit an existing cell detective owner.
-    pub fn edit_detective<F>(&mut self, selector: CellSelector<'_>, update: F) -> Result<()>
-    where
-        F: FnOnce(&mut Detective) -> Result<()>,
-    {
-        self.inner.edit_detective(selector, update)
-    }
-    /// Commit against the retained source version without consuming this edit.
-    pub fn commit(&mut self, context: &ExecutionContext) -> Result<SourceMetadataCommit<'source>> {
-        self.before.check_source()?;
-        let commit = self.inner.commit(context)?;
-        if commit.changed() && self.before.is_signed()? {
-            return Err(Error::Unsupported("signed-source refusal: changed ODS sheet metadata requires explicit unsign/resign policy".to_string()));
-        }
-        self.before.check_source()?;
-        Ok(SourceMetadataCommit {
-            snapshot: SourceMetadataSnapshot {
-                owner: self.before.owner,
-                inner: commit.snapshot.clone(),
-                source_version: self.before.source_version,
-            },
-            patch: SourceMetadataPatch {
-                before: self.before.clone(),
-                target_inner: commit.snapshot.clone(),
-            },
-            changed: commit.changed(),
-        })
-    }
-}
-
-/// Source-backed exact content patch and accepted target snapshot.
-pub struct SourceMetadataCommit<'source> {
-    snapshot: SourceMetadataSnapshot<'source>,
-    patch: SourceMetadataPatch<'source>,
-    changed: bool,
-}
-
-impl fmt::Debug for SourceMetadataCommit<'_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("SourceMetadataCommit")
-            .field("changed", &self.changed)
-            .field("source_bytes", &self.snapshot.inner.source.len())
-            .finish_non_exhaustive()
-    }
-}
-
-impl<'source> SourceMetadataCommit<'source> {
-    /// Candidate source-backed metadata snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &SourceMetadataSnapshot<'source> {
-        &self.snapshot
-    }
-    /// Exact reversible patch.
-    #[must_use]
-    pub const fn patch(&self) -> &SourceMetadataPatch<'source> {
-        &self.patch
-    }
-    /// Whether content.xml changed.
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-    /// Publish the complete accepted ODS package to a sequential sink.
-    ///
-    /// Publication limits, cancellation, and optional execution-budget
-    /// accounting are governed by `options`. The metadata snapshot's retained
-    /// execution context is not implicitly reused for this package phase.
-    pub fn write_to<W: Write>(
-        &self,
-        writer: W,
-        options: SourceContentPublicationOptions,
-    ) -> std::result::Result<SourceContentPublicationReport, SourceContentPublicationError> {
-        if let Err(error) = self.snapshot.check_source() {
-            return Err(match error {
-                Error::SourceChanged { expected, observed } => {
-                    SourceContentPublicationError::SourceChanged {
-                        expected,
-                        observed,
-                        progress:
-                            litchi_odf_common::core::SourceContentPublicationProgress::Untouched,
-                    }
-                },
-                other => SourceContentPublicationError::Core(other),
-            });
-        }
-        if self.changed
-            && self
-                .snapshot
-                .is_signed()
-                .map_err(SourceContentPublicationError::Core)?
-        {
-            return Err(SourceContentPublicationError::Core(Error::Unsupported(
-                "signed-source refusal: changed ODS sheet metadata cannot be published".to_string(),
-            )));
-        }
-        self.snapshot.owner.write_sheet_metadata_content(
-            writer,
-            self.snapshot.source_xml().as_bytes(),
-            options,
+    let _output = context
+        .reserve(
+            Resource::OutputBytes,
+            u64::try_from(target.len())
+                .map_err(|_| invalid("ODS metadata target size overflows u64"))?,
         )
-    }
-    /// Publish with default finite source-content options.
-    pub fn write_to_default<W: Write>(
-        &self,
-        writer: W,
-    ) -> std::result::Result<SourceContentPublicationReport, SourceContentPublicationError> {
-        self.write_to(writer, SourceContentPublicationOptions::new())
-    }
-}
-
-/// Source-backed exact patch.
-pub struct SourceMetadataPatch<'source> {
-    before: SourceMetadataSnapshot<'source>,
-    target_inner: Snapshot,
-}
-
-impl fmt::Debug for SourceMetadataPatch<'_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("SourceMetadataPatch")
-            .field("changed", &self.changed())
-            .finish_non_exhaustive()
-    }
-}
-
-impl<'source> Clone for SourceMetadataPatch<'source> {
-    fn clone(&self) -> Self {
-        Self {
-            before: self.before.clone(),
-            target_inner: self.target_inner.clone(),
-        }
-    }
-}
-
-impl<'source> SourceMetadataPatch<'source> {
-    /// Exact source content.xml bytes authorized by this patch.
-    #[must_use]
-    pub fn source_xml(&self) -> &str {
-        self.before.source_xml()
-    }
-    /// Exact target content.xml bytes produced by this patch.
-    #[must_use]
-    pub fn target_xml(&self) -> &str {
-        self.target_inner.source_xml()
-    }
-    /// Whether target bytes differ.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        self.before.source_xml() != self.target_inner.source_xml()
-    }
-    /// Alias for changed.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        !self.changed()
-    }
-    /// Inverse source-authorized patch.
-    #[must_use]
-    pub fn inverse(&self) -> Self {
-        Self {
-            before: SourceMetadataSnapshot {
-                owner: self.before.owner,
-                inner: self.target_inner.clone(),
-                source_version: self.before.source_version,
-            },
-            target_inner: self.before.inner.clone(),
-        }
-    }
-    /// Apply against the exact source-backed snapshot.
-    ///
-    /// The destination must come from the same live
-    /// [`crate::facade::SourceBackedSpreadsheet`] owner and source version,
-    /// and must retain identical `content.xml` bytes.  An independently
-    /// reopened package with equivalent bytes is a different source lineage
-    /// and is rejected.
-    pub fn apply(
-        &self,
-        snapshot: &SourceMetadataSnapshot<'source>,
-    ) -> Result<SourceMetadataCommit<'source>> {
-        snapshot.check_source()?;
-        snapshot.inner.context.check().map_err(map_execution)?;
-        if !std::ptr::eq(snapshot.owner, self.before.owner)
-            || snapshot.source_version != self.before.source_version
-            || snapshot.source_xml() != self.source_xml()
-        {
-            return Err(Error::InvalidFormat(
-                "ODS source metadata patch source snapshot does not match".to_string(),
-            ));
-        }
-        if self.changed() && snapshot.is_signed()? {
-            return Err(Error::Unsupported(
-                "signed-source refusal: changed ODS sheet metadata patch cannot be applied"
-                    .to_string(),
-            ));
-        }
-        if !self.changed() {
-            return Ok(SourceMetadataCommit {
-                snapshot: snapshot.clone(),
-                patch: self.clone(),
-                changed: false,
-            });
-        }
-        // The accepted target was fully reopened during the originating
-        // commit and is retained by this patch.  A source-backed owner may
-        // still expose multiple snapshots with different destination
-        // profiles, so revalidate the exact target under the destination
-        // context before handing it back.  This also keeps the returned
-        // reversible patch bound to that destination snapshot.
-        let inner = self.target_inner.reopen_for_destination(&snapshot.inner)?;
-        let patch_target = inner.clone();
-        snapshot.check_source()?;
-        Ok(SourceMetadataCommit {
-            snapshot: SourceMetadataSnapshot {
-                owner: snapshot.owner,
-                inner,
-                source_version: snapshot.source_version,
-            },
-            patch: SourceMetadataPatch {
-                before: snapshot.clone(),
-                target_inner: patch_target,
-            },
-            changed: self.changed(),
-        })
-    }
+        .map_err(map_execution)?;
+    Snapshot::parse_arc_with_context(Arc::clone(target), limits, context, true).map(drop)
 }
 
 pub(crate) fn detective_limits(limits: Limits) -> Result<detective::Limits> {
@@ -2143,9 +1675,11 @@ fn preflight_render_memory(
             .catalog
             .cell_for_selector_with_budget(&selector, &mut selector_budget)?;
         let index::PhysicalCell::Stored(cell_index) = physical else {
-            return Err(Error::Unsupported(
-                "UnsupportedImplicitCoveredCell: metadata edit has no physical owner".to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "ods.sheet_metadata",
+                "UnsupportedImplicitCoveredCell: metadata edit has no physical owner",
+            )));
         };
         let cell = before
             .catalog
@@ -2153,10 +1687,11 @@ fn preflight_render_memory(
             .get(cell_index)
             .ok_or_else(|| invalid("ODS metadata cell index disappeared"))?;
         if !cell.sequence_valid || cell.unsupported_child || cell.direct_owner_count > 0 {
-            return Err(Error::Unsupported(
-                "ODS metadata cell owner is opaque or has an ambiguous insertion anchor"
-                    .to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "ods.sheet_metadata",
+                "ODS metadata cell owner is opaque or has an ambiguous insertion anchor",
+            )));
         }
         let span = before
             .catalog
@@ -2374,7 +1909,7 @@ fn render_candidate(
         let replacement = match (&catalog.consolidation, edit.staged_consolidation()) {
             (Some(record), Some(value)) => {
                 if !record.canonical {
-                    return Err(Error::Unsupported(
+                    return Err(Error::Other(
                         "ODS consolidation owner requires lexical preservation".to_string(),
                     ));
                 }
@@ -2384,7 +1919,7 @@ fn render_candidate(
             },
             (Some(record), None) => {
                 if !record.canonical {
-                    return Err(Error::Unsupported(
+                    return Err(Error::Other(
                         "ODS consolidation owner requires lexical preservation".to_string(),
                     ));
                 }
@@ -2423,7 +1958,7 @@ fn render_candidate(
         render_step(context, 1)?;
         if let Some(record) = &catalog.labels {
             if !record.canonical {
-                return Err(Error::Unsupported(
+                return Err(Error::Other(
                     "ODS label-ranges owner requires lexical preservation".to_string(),
                 ));
             }
@@ -2464,19 +1999,22 @@ fn render_candidate(
         let selector = key.selector();
         let physical = catalog.cell_for_selector_with_budget(&selector, &mut selector_budget)?;
         let index::PhysicalCell::Stored(cell_index) = physical else {
-            return Err(Error::Unsupported(
-                "UnsupportedImplicitCoveredCell: metadata edit has no physical owner".to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "ods.sheet_metadata",
+                "UnsupportedImplicitCoveredCell: metadata edit has no physical owner",
+            )));
         };
         let cell = catalog
             .cells
             .get(cell_index)
             .ok_or_else(|| invalid("ODS metadata cell index disappeared"))?;
         if !cell.sequence_valid || cell.unsupported_child || cell.direct_owner_count > 0 {
-            return Err(Error::Unsupported(
-                "ODS metadata cell owner is opaque or has an ambiguous insertion anchor"
-                    .to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "ods.sheet_metadata",
+                "ODS metadata cell owner is opaque or has an ambiguous insertion anchor",
+            )));
         }
         let row = catalog
             .rows
@@ -2612,9 +2150,11 @@ fn render_candidate(
     let mut previous_end = 0usize;
     for operation in &operations {
         if operation.range.start < previous_end {
-            return Err(Error::Unsupported(
-                "ODS metadata operations overlap".to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "ods.sheet_metadata",
+                "ODS metadata operations overlap",
+            )));
         }
         previous_end = operation.range.end;
     }
@@ -2828,9 +2368,11 @@ fn render_repeated_cell_change(
         .ok_or_else(|| invalid("ODS metadata cell source range is invalid"))?;
     if cell.column_repeat <= 1 {
         if targets.len() > 1 {
-            return Err(Error::Unsupported(
-                "ODS metadata has multiple edits for one logical cell".to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "ods.sheet_metadata",
+                "ODS metadata has multiple edits for one logical cell",
+            )));
         }
         let target = targets
             .first()
@@ -2873,9 +2415,11 @@ fn render_repeated_cell_change(
             .last()
             .is_some_and(|previous| previous.offset == target.column_offset)
         {
-            return Err(Error::Unsupported(
-                "ODS metadata has multiple edits for one logical repeated cell".to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "ods.sheet_metadata",
+                "ODS metadata has multiple edits for one logical repeated cell",
+            )));
         }
         variants.push(CellVariant {
             offset: target.column_offset,
@@ -3212,7 +2756,7 @@ fn render_cell_direct(
             .as_ref()
             .is_some_and(|owner| owner.opaque || !owner.canonical)
     {
-        return Err(Error::Unsupported(
+        return Err(Error::Other(
             "ODS cell-range-source owner requires lexical preservation".to_string(),
         ));
     }
@@ -3222,7 +2766,7 @@ fn render_cell_direct(
             .as_ref()
             .is_some_and(|owner| owner.opaque || !owner.canonical)
     {
-        return Err(Error::Unsupported(
+        return Err(Error::Other(
             "ODS detective owner requires lexical preservation".to_string(),
         ));
     }
@@ -3304,9 +2848,11 @@ fn expand_empty_cell(
     context: &ExecutionContext,
 ) -> Result<String> {
     if cell.source_owner.is_some() || cell.detective_owner.is_some() {
-        return Err(Error::Unsupported(
-            "ODS empty metadata cell has an unexpected direct owner".to_string(),
-        ));
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "ods.sheet_metadata",
+            "ODS empty metadata cell has an unexpected direct owner",
+        )));
     }
     let opening_len = opening_end(raw)?;
     let opening = raw
@@ -3353,9 +2899,9 @@ fn direct_owner_replacement(
     match (owner, replacement) {
         (Some(owner), Some(value)) => {
             if owner.opaque || !owner.canonical {
-                return Err(Error::Unsupported(format!(
-                    "ODS {local} owner requires lexical preservation"
-                )));
+                return Err(Error::Other(
+                    "ODS owner requires lexical preservation".to_string(),
+                ));
             }
             let local_start = owner
                 .raw
@@ -3371,9 +2917,9 @@ fn direct_owner_replacement(
         },
         (Some(owner), None) => {
             if owner.opaque || !owner.canonical {
-                return Err(Error::Unsupported(format!(
-                    "ODS {local} owner requires lexical preservation"
-                )));
+                return Err(Error::Other(
+                    "ODS owner requires lexical preservation".to_string(),
+                ));
             }
             let local_start = owner
                 .raw
@@ -3389,9 +2935,11 @@ fn direct_owner_replacement(
         },
         (None, Some(value)) => {
             if cell.unsupported_child || !cell.sequence_valid {
-                return Err(Error::Unsupported(
-                    "ODS metadata cell insertion anchor is ambiguous".to_string(),
-                ));
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "ods.sheet_metadata",
+                    "ODS metadata cell insertion anchor is ambiguous",
+                )));
             }
             let anchor = cell_insertion_anchor(before, cell, local)?;
             Ok((anchor..anchor, Some(value), priority))
@@ -3855,16 +3403,20 @@ fn top_level_anchor(before: &Snapshot, local: &str) -> Result<ByteRange<usize>> 
             } else if local == "label-ranges" && saw_table {
                 break;
             } else {
-                return Err(Error::Unsupported(
-                    "ODS metadata insertion anchor is ambiguous around an unsupported spreadsheet child".to_string(),
-                ));
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "ods.sheet_metadata",
+                    "ODS metadata insertion anchor is ambiguous around an unsupported spreadsheet child",
+                )));
             }
         } else if local == "label-ranges" && saw_table {
             break;
         } else {
-            return Err(Error::Unsupported(
-                "ODS metadata insertion anchor is ambiguous around an unsupported spreadsheet child".to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "ods.sheet_metadata",
+                "ODS metadata insertion anchor is ambiguous around an unsupported spreadsheet child",
+            )));
         }
     }
     let start = match local {
@@ -3977,15 +3529,13 @@ fn validate_detective_limits(value: &Detective, limits: Limits) -> Result<()> {
     Ok(())
 }
 
-fn map_execution(error: litchi_core::ExecutionError) -> Error {
+pub(crate) fn map_execution(error: litchi_core::ExecutionError) -> Error {
     match error {
         litchi_core::ExecutionError::ResourceLimit(value) => Error::ResourceLimit(value),
         litchi_core::ExecutionError::Cancelled => {
-            Error::Unsupported("ODS metadata operation cancelled".to_string())
+            Error::Other("ODS metadata operation cancelled".to_string())
         },
-        other => Error::Unsupported(format!(
-            "ODS metadata execution policy rejected operation: {other}"
-        )),
+        _other => Error::Other("ODS metadata execution policy rejected operation".to_string()),
     }
 }
 
@@ -4025,30 +3575,4 @@ pub(crate) fn default_context() -> ExecutionContext {
         )
         .expect("finite execution profile"),
     )
-}
-
-impl crate::facade::SourceBackedSpreadsheet {
-    /// Capture a source-backed sheet metadata snapshot under finite defaults.
-    pub fn sheet_metadata(&self) -> Result<SourceMetadataSnapshot<'_>> {
-        SourceMetadataSnapshot::from_owner(self, Limits::default(), &default_context(), false)
-    }
-    /// Capture a source-backed sheet metadata snapshot under explicit limits and context.
-    pub fn sheet_metadata_with(
-        &self,
-        limits: Limits,
-        context: &ExecutionContext,
-    ) -> Result<SourceMetadataSnapshot<'_>> {
-        SourceMetadataSnapshot::from_owner(self, limits, context, true)
-    }
-    /// Begin a source-backed metadata edit.
-    pub fn edit_sheet_metadata(&self) -> Result<SourceMetadataEdit<'_>> {
-        self.sheet_metadata()?.edit()
-    }
-    /// Apply an exact source-backed metadata patch and return its accepted commit.
-    pub fn apply_sheet_metadata_patch<'a>(
-        &'a self,
-        patch: &SourceMetadataPatch<'a>,
-    ) -> Result<SourceMetadataCommit<'a>> {
-        patch.apply(&self.sheet_metadata()?)
-    }
 }

@@ -416,10 +416,14 @@ impl Inputs {
                 );
             }
         }
-        let element_small_prepared = formatcode2::read(&element_small)?;
-        let element_near_prepared = formatcode2::read(&element_near_limit)?;
-        let attribute_small_prepared = formatcode2::read_attribute(&attribute_small)?;
-        let attribute_near_prepared = formatcode2::read_attribute(&attribute_near_limit)?;
+        let element_small_prepared =
+            formatcode2::read(&element_small, &formatcode2::Limits::DEFAULT)?;
+        let element_near_prepared =
+            formatcode2::read(&element_near_limit, &formatcode2::Limits::DEFAULT)?;
+        let attribute_small_prepared =
+            formatcode2::read_attribute(&attribute_small, &formatcode2::Limits::DEFAULT)?;
+        let attribute_near_prepared =
+            formatcode2::read_attribute(&attribute_near_limit, &formatcode2::Limits::DEFAULT)?;
         if element_small_prepared.value() != SMALL_VALUE
             || element_near_prepared.value() != near_value
             || attribute_small_prepared.value() != SMALL_ATTRIBUTE_VALUE
@@ -431,10 +435,19 @@ impl Inputs {
         if detached.as_str() != SMALL_VALUE {
             return Err("detached formatcode2 Value has an unexpected value".into());
         }
-        if formatcode2::read(&element_malformed_small).is_ok()
-            || formatcode2::read(&element_malformed_near_limit).is_ok()
-            || formatcode2::read_attribute(&attribute_malformed_small).is_ok()
-            || formatcode2::read_attribute(&attribute_malformed_near_limit).is_ok()
+        if formatcode2::read(&element_malformed_small, &formatcode2::Limits::DEFAULT).is_ok()
+            || formatcode2::read(&element_malformed_near_limit, &formatcode2::Limits::DEFAULT)
+                .is_ok()
+            || formatcode2::read_attribute(
+                &attribute_malformed_small,
+                &formatcode2::Limits::DEFAULT,
+            )
+            .is_ok()
+            || formatcode2::read_attribute(
+                &attribute_malformed_near_limit,
+                &formatcode2::Limits::DEFAULT,
+            )
+            .is_ok()
         {
             return Err("malformed formatcode2 fixture was accepted".into());
         }
@@ -631,18 +644,20 @@ fn operation(inputs: &Inputs, lane: &str) -> Result<Work> {
         &inputs.attribute_small_shared
     };
     match lane {
-        "element_small_read" | "element_near_limit_read" => {
-            Ok(Work::Element(formatcode2::read(source)?))
-        },
+        "element_small_read" | "element_near_limit_read" => Ok(Work::Element(formatcode2::read(
+            source,
+            &formatcode2::Limits::DEFAULT,
+        )?)),
         "element_small_read_shared" | "element_near_limit_read_shared" => Ok(Work::Element(
-            formatcode2::read_shared(Arc::clone(element_shared))?,
+            formatcode2::read_shared(Arc::clone(element_shared), &formatcode2::Limits::DEFAULT)?,
         )),
-        "element_small_noop" | "element_near_limit_noop" => {
-            Ok(Work::Bytes(formatcode2::write(element_prepared)?))
-        },
+        "element_small_noop" | "element_near_limit_noop" => Ok(Work::Bytes(formatcode2::write(
+            element_prepared,
+            &formatcode2::Limits::DEFAULT,
+        )?)),
         "element_small_write_to" | "element_near_limit_write_to" => {
             let mut sink = HashSink::new();
-            formatcode2::write_to(&mut sink, element_prepared)?;
+            formatcode2::write_to(&mut sink, element_prepared, &formatcode2::Limits::DEFAULT)?;
             Ok(Work::Sink(sink))
         },
         "element_small_scalar_edit" | "element_near_limit_scalar_edit" => {
@@ -653,24 +668,31 @@ fn operation(inputs: &Inputs, lane: &str) -> Result<Work> {
                 SMALL_UPDATED
             };
             value.set_value(updated)?;
-            let bytes = formatcode2::write(&value)?;
+            let bytes = formatcode2::write(&value, &formatcode2::Limits::DEFAULT)?;
             Ok(Work::ElementEdit { value, bytes })
         },
         "element_small_clone" | "element_near_limit_clone" => {
             Ok(Work::Element(element_prepared.clone()))
         },
-        "attribute_small_read" | "attribute_near_limit_read" => {
-            Ok(Work::Attribute(formatcode2::read_attribute(source)?))
-        },
-        "attribute_small_read_shared" | "attribute_near_limit_read_shared" => Ok(Work::Attribute(
-            formatcode2::read_attribute_shared(Arc::clone(attribute_shared))?,
+        "attribute_small_read" | "attribute_near_limit_read" => Ok(Work::Attribute(
+            formatcode2::read_attribute(source, &formatcode2::Limits::DEFAULT)?,
         )),
+        "attribute_small_read_shared" | "attribute_near_limit_read_shared" => {
+            Ok(Work::Attribute(formatcode2::read_attribute_shared(
+                Arc::clone(attribute_shared),
+                &formatcode2::Limits::DEFAULT,
+            )?))
+        },
         "attribute_small_noop" | "attribute_near_limit_noop" => Ok(Work::Bytes(
-            formatcode2::write_attribute(attribute_prepared)?,
+            formatcode2::write_attribute(attribute_prepared, &formatcode2::Limits::DEFAULT)?,
         )),
         "attribute_small_write_to" | "attribute_near_limit_write_to" => {
             let mut sink = HashSink::new();
-            formatcode2::write_attribute_to(&mut sink, attribute_prepared)?;
+            formatcode2::write_attribute_to(
+                &mut sink,
+                attribute_prepared,
+                &formatcode2::Limits::DEFAULT,
+            )?;
             Ok(Work::Sink(sink))
         },
         "attribute_small_scalar_edit" | "attribute_near_limit_scalar_edit" => {
@@ -681,30 +703,42 @@ fn operation(inputs: &Inputs, lane: &str) -> Result<Work> {
                 SMALL_ATTRIBUTE_UPDATED
             };
             value.set_value(updated)?;
-            let bytes = formatcode2::write_attribute(&value)?;
+            let bytes = formatcode2::write_attribute(&value, &formatcode2::Limits::DEFAULT)?;
             Ok(Work::AttributeEdit { value, bytes })
         },
         "attribute_small_clone" | "attribute_near_limit_clone" => {
             Ok(Work::Attribute(attribute_prepared.clone()))
         },
-        "element_small_malformed" => match formatcode2::read(&inputs.element_malformed_small) {
+        "element_small_malformed" => match formatcode2::read(
+            &inputs.element_malformed_small,
+            &formatcode2::Limits::DEFAULT,
+        ) {
             Ok(value) => Ok(Work::Element(value)),
             Err(_) => Ok(Work::Rejected),
         },
         "element_near_limit_malformed" => {
-            match formatcode2::read(&inputs.element_malformed_near_limit) {
+            match formatcode2::read(
+                &inputs.element_malformed_near_limit,
+                &formatcode2::Limits::DEFAULT,
+            ) {
                 Ok(value) => Ok(Work::Element(value)),
                 Err(_) => Ok(Work::Rejected),
             }
         },
         "attribute_small_malformed" => {
-            match formatcode2::read_attribute(&inputs.attribute_malformed_small) {
+            match formatcode2::read_attribute(
+                &inputs.attribute_malformed_small,
+                &formatcode2::Limits::DEFAULT,
+            ) {
                 Ok(value) => Ok(Work::Attribute(value)),
                 Err(_) => Ok(Work::Rejected),
             }
         },
         "attribute_near_limit_malformed" => {
-            match formatcode2::read_attribute(&inputs.attribute_malformed_near_limit) {
+            match formatcode2::read_attribute(
+                &inputs.attribute_malformed_near_limit,
+                &formatcode2::Limits::DEFAULT,
+            ) {
                 Ok(value) => Ok(Work::Attribute(value)),
                 Err(_) => Ok(Work::Rejected),
             }
@@ -829,7 +863,7 @@ fn validate_work(
             ))
         },
         ("element_small_noop" | "element_near_limit_noop", Work::Bytes(bytes)) => {
-            let reopened = formatcode2::read(bytes)?;
+            let reopened = formatcode2::read(bytes, &formatcode2::Limits::DEFAULT)?;
             Ok((
                 reopened.value() == expected_value,
                 false,
@@ -851,7 +885,7 @@ fn validate_work(
             ))
         },
         ("attribute_small_noop" | "attribute_near_limit_noop", Work::Bytes(bytes)) => {
-            let reopened = formatcode2::read_attribute(bytes)?;
+            let reopened = formatcode2::read_attribute(bytes, &formatcode2::Limits::DEFAULT)?;
             Ok((
                 reopened.value() == expected_value,
                 false,
@@ -876,7 +910,7 @@ fn validate_work(
             "element_small_scalar_edit" | "element_near_limit_scalar_edit",
             Work::ElementEdit { value, bytes },
         ) => {
-            let reopened = formatcode2::read(bytes)?;
+            let reopened = formatcode2::read(bytes, &formatcode2::Limits::DEFAULT)?;
             Ok((
                 value.value() == updated_value && reopened.value() == updated_value,
                 false,
@@ -890,7 +924,7 @@ fn validate_work(
             "attribute_small_scalar_edit" | "attribute_near_limit_scalar_edit",
             Work::AttributeEdit { value, bytes },
         ) => {
-            let reopened = formatcode2::read_attribute(bytes)?;
+            let reopened = formatcode2::read_attribute(bytes, &formatcode2::Limits::DEFAULT)?;
             Ok((
                 value.value() == updated_value && reopened.value() == updated_value,
                 false,

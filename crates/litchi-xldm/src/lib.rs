@@ -23,6 +23,7 @@ pub mod olap;
 pub mod olapproof;
 
 mod codec;
+mod limits;
 mod model;
 mod seen_names;
 mod semantic;
@@ -34,7 +35,7 @@ mod xml_attributes;
 mod tests;
 
 pub use codec::{inspect, write};
-pub use error::{Error, Result};
+pub use error::{Error, LimitKind, Result};
 pub use identity::{
     Xldm140Closure, Xldm140ClosureMember, Xldm140ColumnBinding, Xldm140ColumnIdentity,
     Xldm140FileReplacement, Xldm140IdentityProjection, Xldm140InversePatch, Xldm140MemberSection,
@@ -44,6 +45,7 @@ pub use identity::{
     project_xldm140_identity_with_closure, prove_xldm140_closure,
     validate_xldm140_identity_closure,
 };
+pub use limits::Limits;
 pub use model::{
     BackupLog, Compression, FileEntry, FileGroup, FileGroupClass, FileKind, GeneratedNameKind,
     GeneratedPath, Header, LoggedFile, Offset, PartitionMarker, Size, Storage, StorageProfile,
@@ -63,6 +65,6 @@ pub use semantic::classify_generated_path;
 /// This name makes the source-sharing lifetime explicit at call sites; it is
 /// equivalent to [`inspect`]. No member payload is copied by inspection.
 #[must_use = "inspection results carry the borrowed source lifetime"]
-pub fn inspect_shared(bytes: &[u8]) -> Result<Storage<'_>> {
-    inspect(bytes)
+pub fn inspect_shared<'a>(bytes: &'a [u8], limits: &Limits) -> Result<Storage<'a>> {
+    inspect(bytes, limits)
 }

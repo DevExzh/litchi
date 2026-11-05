@@ -1,0 +1,100 @@
+//! Selector-first edits of the drawables a slide owns: read the inventory,
+//! set geometry, remove, reorder (z-order) and create text boxes, preset
+//! shapes and images, as one exact-source transaction (record 0298).
+//!
+//! [`Package::slide_drawable_list`](crate::Package::slide_drawable_list)
+//! reads a slide's drawables in source order, the order
+//! [`DrawableSelector`](crate::DrawableSelector) addresses. Start an edit
+//! with [`Package::edit_slide_drawables`](crate::Package::edit_slide_drawables),
+//! stage any number of operations and [`Edit::commit`] them as one verified
+//! package; [`Package::apply_slide_drawables`](crate::Package::apply_slide_drawables)
+//! replays a [`Patch`] or its inverse.
+//!
+//! ```no_run
+//! use litchi_keynote::slide::drawable::{Geometry, Preset};
+//! use litchi_keynote::{DrawableSelector, Package, Position, SlideSelector};
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let package = Package::open("deck.key")?;
+//! let slide = SlideSelector::index(0);
+//! let mut edit = package.edit_slide_drawables();
+//! edit.add_text_box(slide, Geometry::new(80.0, 80.0, 400.0, 60.0), "Agenda")?
+//!     .add_shape(slide, Preset::Rectangle, Geometry::new(80.0, 200.0, 200.0, 100.0), "")?
+//!     .move_to(slide, DrawableSelector::index(0), Position::new(0))?;
+//! let (edited, patch) = edit.commit()?.into_parts();
+//! let restored = edited.apply_slide_drawables(&patch.inverse())?;
+//! # let _ = restored;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! Supported: geometry of text boxes, shapes, images and placeholders;
+//! plain text of text boxes and shapes ([`Edit::set_text`], a minimal-span
+//! rewrite of the drawable's own storage);
+//! removal of text boxes, shapes, lines and images with their private
+//! objects (registry UUIDs and data owners are dropped; data items stay);
+//! z-order moves; new text boxes, rectangle / rounded-rectangle / ellipse
+//! shapes and PNG / JPEG / GIF images styled from the theme as the legacy
+//! host does; new tables cloned from the deck's first slide table
+//! ([`Edit::add_table`], record 0329); table cell values; character runs. Refused with
+//! [`Refusal::Unsupported`]: removing tables, charts, groups, movies, audio
+//! and placeholders, removing drawables referenced by builds or other
+//! objects, geometry of tables, charts, groups, lines and movies, and
+//! character-style writes ([`Unsupported::TextStyling`]).
+
+pub use crate::package::slide_drawable::{
+    Commit, Created, Diagnostics, Drawable, Edit, Error, Geometry, ImageFormat, Kind, LimitKind,
+    NewTable, Patch, Preset, Refusal, Style, TableCellValue, TextRun, TextSpan, Unsupported,
+};
+/// Hyperlink, lock and accessibility properties ([`Edit::set_properties`]).
+pub use crate::slide::media::MediaProperties;
+/// The axis of an Arrange Flip ([`Edit::flip`]).
+pub use litchi_iwa_common::shape::geometry::FlipAxis;
+/// Whole-text character and paragraph properties
+/// ([`Edit::set_text_property`], [`Edit::reset_text_property`]), the shared
+/// W1-D paragraph-style vocabulary.
+pub mod text_property {
+    pub use litchi_iwa_text_wire::paragraph_style::{Property, PropertyKind};
+}
+/// Named paragraph-style vocabulary ([`Edit::apply_named_style`] and the
+/// named-style reads).
+pub mod named_style {
+    pub use litchi_iwa_text::paragraph::style::{
+        NamedParagraphStyle, ParagraphStyleId, ParagraphStyleName,
+    };
+}
+/// Paragraph-list vocabulary ([`Edit::set_list`], [`Edit::set_list_property`]
+/// and the list reads), shared with the W1-D list engine.
+pub mod list {
+    pub use litchi_iwa_text::paragraph::list::{
+        ParagraphList, ParagraphListBullet, ParagraphListBulletBaselineOffset,
+        ParagraphListBulletGeometry, ParagraphListBulletScale, ParagraphListIndentation,
+        ParagraphListLabelColor, ParagraphListLabelIndent, ParagraphListLevel,
+        ParagraphListLevelPlacement, ParagraphListNumberFormat, ParagraphListNumberPunctuation,
+        ParagraphListNumberScale, ParagraphListNumberSequence, ParagraphListNumberTiering,
+        ParagraphListNumbering, ParagraphListStart, ParagraphListTextGap,
+    };
+    pub use litchi_iwa_text::position::TextPosition;
+    pub use litchi_iwa_text_wire::list::{Property, PropertyKind};
+}
+/// Drawing and frame styles of text boxes, shapes and lines
+/// ([`Edit::set_shape_style`], [`Edit::reset_shape_style`],
+/// [`Edit::set_image_fill`] and the style read), over the shared
+/// shape-style variation engine and the shared iWork drawing vocabulary.
+pub mod shape_style {
+    pub use crate::package::slide_drawable::shape_style::{ImageFill, Property, PropertyKind};
+    pub use litchi_iwa_common::color::{RgbColorSpace, Rgba};
+    pub use litchi_iwa_common::shape::effects::Effects;
+    pub use litchi_iwa_common::shape::fill::{Fill, Gradient, ImageTechnique};
+    pub use litchi_iwa_common::shape::geometry::Size;
+    pub use litchi_iwa_common::shape::line::{Endpoint, Endpoints};
+    pub use litchi_iwa_common::shape::shadow::Shadow;
+    pub use litchi_iwa_common::shape::stroke::Stroke;
+    pub use litchi_iwa_common::text::layout::Layout;
+    pub use litchi_iwa_text::columns::Columns;
+}
+/// A straight line's segment ([`Edit::set_line_segment`]).
+pub use litchi_iwa_common::shape::line::Segment;
+/// Validated preset parameters ([`Preset::RegularPolygon`], [`Preset::Star`]),
+/// the shared iWork shape vocabulary.
+pub use litchi_iwa_common::shape::path::{InnerRadiusRatio, PolygonSides, StarPoints};

@@ -11,7 +11,7 @@ use super::row::{
     HorizontalBackgroundPosition, Opacity, Repeat, VerticalBackgroundPosition,
 };
 use super::table::{Shadow, WritingMode};
-use crate::{FlatDocument, Package};
+use crate::{FlatDocument, GenericPackage as Package};
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
     XmlVersion,

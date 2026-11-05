@@ -10,8 +10,8 @@
 use std::io::{Cursor as IoCursor, Read};
 
 use litchi_xlsb::raw::{
-    Cursor, Error, Header, Kind, LimitResource, Limits, MAX_WIRE_PAYLOAD, MAX_WIRE_STRING_UNITS,
-    Records, Stage, Writer, kind,
+    Cursor, Encoder, Error, Header, Kind, LimitResource, Limits, MAX_WIRE_PAYLOAD,
+    MAX_WIRE_STRING_UNITS, Records, Stage, kind,
 };
 
 #[test]
@@ -27,12 +27,15 @@ fn round_trips_kind_boundaries_with_borrowed_payloads() {
 
     for (kind, expected) in cases {
         let mut bytes = Vec::new();
-        Writer::new(&mut bytes)
+        Encoder::new(&mut bytes, Limits::DEFAULT)
             .write_record(kind, &[1, 2, 3])
             .unwrap();
         assert_eq!(bytes, expected);
 
-        let record = Records::new(&bytes).next().unwrap().unwrap();
+        let record = Records::new(&bytes, Limits::DEFAULT)
+            .next()
+            .unwrap()
+            .unwrap();
         assert_eq!(record.kind(), kind);
         assert_eq!(record.len(), 3);
         assert_eq!(record.payload(), [1, 2, 3]);
@@ -108,7 +111,7 @@ fn distinguishes_clean_eof_from_truncated_header_and_payload() {
         })
     ));
 
-    let mut records = Records::new(&[0x01, 0x02, 0xaa]);
+    let mut records = Records::new(&[0x01, 0x02, 0xaa], Limits::DEFAULT);
     assert!(matches!(
         records.next(),
         Some(Err(Error::Truncated {
@@ -133,7 +136,7 @@ fn enforces_payload_budgets_before_reading_or_writing_payloads() {
         })
     ));
 
-    let mut writer = Writer::with_limits(Vec::new(), limits);
+    let mut writer = Encoder::new(Vec::new(), limits);
     assert!(matches!(
         writer.write_header(kind::CELL_BLANK, 4),
         Err(Error::PayloadLimit {
@@ -186,7 +189,7 @@ fn legacy_limit_constructor_is_validated_before_wire_work() {
         }) if value == MAX_WIRE_PAYLOAD + 1
     ));
 
-    let mut records = Records::with_limits(&[], invalid);
+    let mut records = Records::new(&[], invalid);
     assert!(matches!(
         records.next(),
         Some(Err(Error::InvalidLimit {
@@ -197,7 +200,7 @@ fn legacy_limit_constructor_is_validated_before_wire_work() {
     ));
 
     let mut output = Vec::new();
-    let mut writer = Writer::with_limits(&mut output, invalid);
+    let mut writer = Encoder::new(&mut output, invalid);
     assert!(matches!(
         writer.write_u8(0),
         Err(Error::InvalidLimit {
@@ -213,21 +216,21 @@ fn legacy_limit_constructor_is_validated_before_wire_work() {
 fn checked_limit_constructors_reject_invalid_profiles() {
     let invalid = Limits::new(MAX_WIRE_PAYLOAD + 1, 0);
     assert!(matches!(
-        Cursor::try_with_limits(&[], "test", invalid),
+        Cursor::bounded(&[], "test", invalid),
         Err(Error::InvalidLimit {
             resource: LimitResource::Payload,
             ..
         })
     ));
     assert!(matches!(
-        Records::try_with_limits(&[], invalid),
+        Records::bounded(&[], invalid),
         Err(Error::InvalidLimit {
             resource: LimitResource::Payload,
             ..
         })
     ));
     assert!(matches!(
-        Writer::try_with_limits(Vec::new(), invalid),
+        Encoder::bounded(Vec::new(), invalid),
         Err(Error::InvalidLimit {
             resource: LimitResource::Payload,
             ..
@@ -240,7 +243,7 @@ fn oversized_wire_limits_are_rejected_before_writer_creation() {
     let too_large = MAX_WIRE_PAYLOAD + 1;
     let mut output = Vec::new();
     assert!(matches!(
-        Writer::try_with_limits(&mut output, Limits::new(too_large, 1)),
+        Encoder::bounded(&mut output, Limits::new(too_large, 1)),
         Err(Error::InvalidLimit {
             resource: LimitResource::Payload,
             value,
@@ -254,13 +257,13 @@ fn oversized_wire_limits_are_rejected_before_writer_creation() {
 fn strictly_decodes_utf16_and_enforces_string_budgets() {
     let mut good = 2_u32.to_le_bytes().to_vec();
     good.extend_from_slice(&[b'A', 0, b'B', 0]);
-    let mut cursor = Cursor::with_limits(&good, "test", Limits::new(64, 2));
+    let mut cursor = Cursor::new(&good, "test", Limits::new(64, 2));
     assert_eq!(cursor.read_wide_string().unwrap(), "AB");
     cursor.finish().unwrap();
 
     let mut over_budget = 3_u32.to_le_bytes().to_vec();
     over_budget.extend_from_slice(&[b'A', 0, b'B', 0, b'C', 0]);
-    let mut cursor = Cursor::with_limits(&over_budget, "test", Limits::new(64, 2));
+    let mut cursor = Cursor::new(&over_budget, "test", Limits::new(64, 2));
     assert!(matches!(
         cursor.read_wide_string(),
         Err(Error::StringLimit {
@@ -272,7 +275,7 @@ fn strictly_decodes_utf16_and_enforces_string_budgets() {
 
     let mut unpaired = 1_u32.to_le_bytes().to_vec();
     unpaired.extend_from_slice(&0xd800_u16.to_le_bytes());
-    let mut cursor = Cursor::new(&unpaired, "test");
+    let mut cursor = Cursor::new(&unpaired, "test", Limits::DEFAULT);
     assert!(matches!(
         cursor.read_wide_string(),
         Err(Error::InvalidUtf16 { .. })
@@ -282,7 +285,7 @@ fn strictly_decodes_utf16_and_enforces_string_budgets() {
 #[test]
 fn hostile_wide_string_count_is_rejected_before_materialization() {
     let bytes = u32::MAX.to_le_bytes();
-    let mut cursor = Cursor::new(&bytes, "hostile string");
+    let mut cursor = Cursor::new(&bytes, "hostile string", Limits::DEFAULT);
     assert!(matches!(
         cursor.read_wide_string(),
         Err(Error::StringLimit {
@@ -297,10 +300,10 @@ fn hostile_wide_string_count_is_rejected_before_materialization() {
 #[test]
 fn writer_streams_utf16_and_round_trips_without_a_temporary_unit_buffer() {
     let mut bytes = Vec::new();
-    Writer::new(&mut bytes)
+    Encoder::new(&mut bytes, Limits::DEFAULT)
         .write_wide_string("Hello 世界")
         .unwrap();
-    let mut cursor = Cursor::new(&bytes, "test");
+    let mut cursor = Cursor::new(&bytes, "test", Limits::DEFAULT);
     assert_eq!(cursor.read_wide_string().unwrap(), "Hello 世界");
     cursor.finish().unwrap();
 }
@@ -308,7 +311,7 @@ fn writer_streams_utf16_and_round_trips_without_a_temporary_unit_buffer() {
 #[test]
 fn byte_blobs_are_lent_from_the_payload() {
     let bytes = [3, 0, 0, 0, 7, 8, 9];
-    let mut cursor = Cursor::new(&bytes, "test");
+    let mut cursor = Cursor::new(&bytes, "test", Limits::DEFAULT);
     let blob = cursor.read_blob().unwrap();
     assert_eq!(blob, [7, 8, 9]);
     assert_eq!(blob.as_ptr(), bytes[4..].as_ptr());
@@ -316,7 +319,7 @@ fn byte_blobs_are_lent_from_the_payload() {
 
 #[test]
 fn trailing_payload_errors_retain_the_callers_context() {
-    let cursor = Cursor::new(&[0xaa], "BrtExample");
+    let cursor = Cursor::new(&[0xaa], "BrtExample", Limits::DEFAULT);
     assert!(matches!(
         cursor.finish(),
         Err(Error::Trailing {
@@ -330,7 +333,7 @@ fn trailing_payload_errors_retain_the_callers_context() {
 #[test]
 fn bool32_is_typed_and_rejects_non_boolean_values() {
     let bytes = [1, 0, 0, 0, 2, 0, 0, 0];
-    let mut cursor = Cursor::new(&bytes, "test");
+    let mut cursor = Cursor::new(&bytes, "test", Limits::DEFAULT);
     assert!(cursor.read_bool32().unwrap());
     assert!(matches!(
         cursor.read_bool32(),
@@ -344,7 +347,7 @@ fn bool32_is_typed_and_rejects_non_boolean_values() {
 #[test]
 fn bool8_is_typed_and_rejects_non_boolean_values() {
     let bytes = [0, 1, 2];
-    let mut cursor = Cursor::new(&bytes, "test");
+    let mut cursor = Cursor::new(&bytes, "test", Limits::DEFAULT);
     assert!(!cursor.read_bool8().unwrap());
     assert!(cursor.read_bool8().unwrap());
     assert!(matches!(
@@ -357,12 +360,14 @@ fn bool8_is_typed_and_rejects_non_boolean_values() {
 }
 
 fn decode_rk(rk: u32) -> f64 {
-    Cursor::new(&rk.to_le_bytes(), "RK").read_rk().unwrap()
+    Cursor::new(&rk.to_le_bytes(), "RK", Limits::DEFAULT)
+        .read_rk()
+        .unwrap()
 }
 
 fn encode_rk(value: f64) -> Result<u32, Error> {
     let mut bytes = Vec::new();
-    Writer::new(&mut bytes).write_rk(value)?;
+    Encoder::new(&mut bytes, Limits::DEFAULT).write_rk(value)?;
     let encoded = <[u8; 4]>::try_from(bytes.as_slice()).map_err(|_| Error::LengthOverflow {
         what: "RK test output",
         length: bytes.len(),

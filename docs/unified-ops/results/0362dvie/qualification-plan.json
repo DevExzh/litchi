@@ -1,0 +1,680 @@
+{
+  "schema": "litchi.native-final-acceptance.drawingml-additional-qualification.v2",
+  "audited_at": "2026-10-24T14:58:17.672118+00:00",
+  "supersedes": {
+    "path": "drawingml-additional-qualification-plan-20261024T135637Z.json",
+    "sha256": "662a915923f93216ec4684a663b105269816d59ad578a14a876be5cc0cc83352"
+  },
+  "method": "Coordinator return based on independent source review at418cff01db/staging29f072f and actual minimal compile/preflight diagnostics. No native performance acceptance. Prior plans and failed attempts remain immutable.",
+  "decision": "RETURN_FOR_NATIVE_OPERATION_TIMING_AND_EXPLICIT_FIDELITY_ORACLES",
+  "audited_protocol": {
+    "source_tree": "6d9d110c8c7f72a3b5646e5423fa2d0147d6c225",
+    "candidate_revision": "PENDING_FINAL_CANDIDATE_SHA",
+    "protocol_record": "docs/unified-ops/0362dvi-drawingml-native-protocol.md",
+    "manifest": "tools/native_qualification/manifests/drawingml-raw.json",
+    "probe": "tools/perf-baseline/src/drawingml_raw_probe.rs",
+    "validator": "tools/native_qualification/drawingml_raw_validator.py",
+    "status": "Source/protocol integration is staged; correctness/timing returns remain. Final execution endpoint is not frozen.",
+    "source_fence": "The 5055 protocol checkout is deliberately pre-owner and is not the candidate endpoint."
+  },
+  "candidate_policy": {
+    "candidate_tree": "37dceb650c5c699a81229ac1dee6fbd98478b597",
+    "candidate_revision": "PENDING_FINAL_CANDIDATE_SHA",
+    "candidate_status": "Pending final source freeze and tested commit; do not qualify the tree hash as a commit.",
+    "adapter_rule": "Use final-assembly candidate adapters and native historical adapters for each baseline. Never force a baseline through a candidate alias or normalized error shim.",
+    "source_evidence": [
+      "crates/litchi-drawingml/src/chart/reader/codec/xml.rs",
+      "crates/litchi-drawingml/src/chart/writer/codec.rs",
+      "crates/litchi-drawingml/src/chart/extension/formatcode2.rs",
+      "crates/litchi-drawingml/src/text/body/reader.rs",
+      "crates/litchi-drawingml/src/text/body/writer.rs",
+      "crates/litchi-drawingml/src/model3d/codec/xml.rs",
+      "crates/litchi-drawingml/src/svg_blip.rs",
+      "crates/litchi-drawingml/src/diagram/data/codec.rs",
+      "crates/litchi-drawingml/src/diagram/edit.rs",
+      "crates/litchi-drawingml/src/theme/codec.rs",
+      "crates/litchi-drawingml/src/theme/family/codec.rs",
+      "crates/litchi-drawingml/src/theme/family/part.rs",
+      "crates/litchi-drawingml/src/ink/actions.rs",
+      "crates/litchi-drawingml/src/transform/codec.rs",
+      "crates/litchi-drawingml/src/geometry/writer.rs",
+      "crates/litchi-drawingml/src/color/codec.rs",
+      "crates/litchi-drawingml/src/blip.rs"
+    ]
+  },
+  "baseline_policy": {
+    "owner_before": {
+      "revision": "945eb1d6b9ef6c56fa26c82e12758d38c1b9015d",
+      "rule": "All four owner-transition before legs use 945eb1d6; 2d330c and later are post-owner history."
+    },
+    "raw_profiles": [
+      {
+        "profile": "chart-diagram-text-media-geometry-color-formatcode2-transform",
+        "revision": "2f7db7ee7fa01893e9099217fc4243687d196f63",
+        "lock": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+        "rule": "Historical no-limit signatures; never describe them as candidate APIs."
+      },
+      {
+        "profile": "theme-ink-bulk",
+        "revision": "996651b6b19717a0192dfd4144bccd367fb2ea44",
+        "rule": "Historical no-limit theme and Ink signatures."
+      },
+      {
+        "profile": "theme-family-part",
+        "revision": "11728db894181ffbcdbcea3ae0008d51fdd2d8af",
+        "rule": "Historical *_with_limit part functions; no current part::Limits type."
+      }
+    ]
+  },
+  "capability_matrix": [
+    {
+      "lane": "drawingml-chart-raw",
+      "baseline": {
+        "revision": "2f7db7ee7fa01893e9099217fc4243687d196f63",
+        "routes": [
+          {
+            "part": "chart",
+            "read_api": "chart::reader::codec::read<R: BufRead>(reader)",
+            "write_api": "chart::writer::codec::write<W: Write>(writer, chart)",
+            "capability": "Write sink with no caller output limit",
+            "limits": "Historical hard parser ceilings; no caller Limits",
+            "preflight": "No output-cap admission; no zero-write claim",
+            "fidelity": "Canonical chart output with semantic readback"
+          },
+          {
+            "part": "formatcode2",
+            "read_api": "chart::extension::formatcode2::read(xml)",
+            "write_api": "write_to<W: Write>(writer, value)",
+            "capability": "Unchanged source direct; changed write_to calls write(value) and writes complete Vec",
+            "limits": "Historical lexical/parser ceilings; no caller output budget",
+            "preflight": "No output-cap policy",
+            "fidelity": "Unchanged source exact; changed source rewrite semantic/lexical preservation"
+          }
+        ]
+      },
+      "candidate": {
+        "tree": "37dceb650c5c699a81229ac1dee6fbd98478b597",
+        "revision": "PENDING_FINAL_CANDIDATE_SHA",
+        "routes": [
+          {
+            "part": "chart",
+            "read_api": "chart::reader::codec::read<R: BufRead>(reader, &Limits)",
+            "write_api": "chart::writer::codec::write<W: Write>(writer, chart, &Limits)",
+            "capability": "Direct Write sink guarded by LimitedWriter",
+            "limits": "Input/output bytes, XML nodes/depth/attributes, chart structure",
+            "preflight": "Input reads max_input_bytes+1. Typed OutputBytes refusal may follow prior chunks; emitted bytes must be <= cap, not zero-write",
+            "fidelity": "Canonical chart output with semantic readback",
+            "source_evidence": "crates/litchi-drawingml/src/chart/reader/codec/xml.rs; chart/writer/codec.rs"
+          },
+          {
+            "part": "formatcode2",
+            "read_api": "chart::extension::formatcode2::read(xml, &Limits)",
+            "write_api": "write_to<W: Write>(writer, value, &Limits)",
+            "capability": "Direct sink; changed write_to_bounded/write_source_to streams retained ranges after exact output-length preflight",
+            "limits": "XML/value/attribute/node/depth/namespace/output bytes",
+            "preflight": "Output refusal precedes first sink write; replacement fragments may allocate, complete output Vec is not materialized",
+            "fidelity": "Exact unchanged source; changed splice lexical plus semantic checks",
+            "source_evidence": "crates/litchi-drawingml/src/chart/extension/formatcode2.rs"
+          }
+        ]
+      },
+      "required_rows": [
+        "Chart MCE InputBytes boundary",
+        "Chart output under/at/over cap with emitted bytes and bounded-partial behavior",
+        "formatcode2 retained-source no-op and changed splice exact/semantic checks",
+        "Owner no-op/changed, forward/inverse, stale recipient"
+      ]
+    },
+    {
+      "lane": "drawingml-diagram-raw",
+      "baseline": {
+        "revision": "2f7db7ee7fa01893e9099217fc4243687d196f63",
+        "routes": [
+          {
+            "part": "diagram data model",
+            "read_api": "diagram::edit::Outline::read(xml)",
+            "write_api": "DiagramDataModel::write_xml(&mut String, Conformance)",
+            "capability": "String-only canonical publication; no Write sink",
+            "limits": "Historical hard structural limits; no caller Limits",
+            "preflight": "No caller output budget",
+            "fidelity": "Semantic/canonical; not lossless arbitrary-XML rewrite"
+          }
+        ]
+      },
+      "candidate": {
+        "tree": "37dceb650c5c699a81229ac1dee6fbd98478b597",
+        "revision": "PENDING_FINAL_CANDIDATE_SHA",
+        "routes": [
+          {
+            "part": "diagram data model",
+            "read_api": "diagram::edit::Outline::read(xml, &Limits)",
+            "write_api": "DiagramDataModel::to_xml(conformance, &Limits) or write_xml(&mut String, conformance, &Limits)",
+            "capability": "String-only canonical publication with caller-buffer reuse; no generic sink",
+            "limits": "Input/output bytes, XML nodes/depth, points, connections, text, structural bounds",
+            "preflight": "Serialized length and output_bytes_value checked before changing String; failure-atomic",
+            "fidelity": "Semantic/canonical only",
+            "source_evidence": "crates/litchi-drawingml/src/diagram/data/codec.rs; diagram/edit.rs"
+          },
+          {
+            "part": "diagram source edit",
+            "read_api": "Outline read plus source-span parser",
+            "write_api": "diagram::edit::set_text(xml,id,text,&Limits) and drawing_text(...,&Limits)",
+            "capability": "Source-edit plus serialization returning Vec<u8>; not a pure writer",
+            "limits": "Real diagram Limits including output_bytes_value and structural bounds",
+            "preflight": "Edited total checked before allocating/splicing; readback outside timing",
+            "fidelity": "Untouched supported source spans plus semantic edited-node readback"
+          }
+        ]
+      },
+      "required_rows": [
+        "Outline entry/read, malformed, structural limits",
+        "String model output bound and allocation receipt",
+        "set_text/drawing_text labelled source-edit+serialize",
+        "Semantic readback outside timing"
+      ]
+    },
+    {
+      "lane": "drawingml-text-media-raw",
+      "baseline": {
+        "revision": "2f7db7ee7fa01893e9099217fc4243687d196f63",
+        "routes": [
+          {
+            "part": "text body",
+            "read_api": "text::body::reader::read_with_options(xml,scope,limits)",
+            "write_api": "text::body::writer::write(&mut String,body)",
+            "capability": "String-only writer",
+            "limits": "Reader Limits behind read_with_options; writer no output budget",
+            "preflight": "No writer output-cap preflight",
+            "fidelity": "Semantic writer; no streaming"
+          },
+          {
+            "part": "SVG blip",
+            "read_api": "svg_blip::read/read_contextual(xml,context)",
+            "write_api": "write_to<W: Write> and write_contextual_to<W: Write>(...,max_output_bytes)",
+            "capability": "Contextual sink route",
+            "limits": "Historical contextual scalar output cap",
+            "preflight": "Contextual size checked before sink writes",
+            "fidelity": "Exact retained source/context where retained; semantic dirty oracle"
+          },
+          {
+            "part": "model3d",
+            "read_api": "model3d::codec::read(xml)",
+            "write_api": "write_to<W: Write>(writer,metadata)",
+            "capability": "Wrapper first calls write(metadata) and materializes complete Vec",
+            "limits": "Historical hard XML/tree ceilings",
+            "preflight": "Output built before sink; no caller output budget or streaming",
+            "fidelity": "Semantic/opaque-fragment oracle"
+          },
+          {
+            "part": "image blip",
+            "read_api": "blip::find_first_embed(xml)",
+            "write_api": "blip::write_embed(&mut String)",
+            "capability": "Scanner/admission plus String helper",
+            "limits": "No owned typed input boundary",
+            "preflight": "Output sink/source roundtrip N/A",
+            "fidelity": "Scanner relationship/namespace admission only"
+          }
+        ]
+      },
+      "candidate": {
+        "tree": "37dceb650c5c699a81229ac1dee6fbd98478b597",
+        "revision": "PENDING_FINAL_CANDIDATE_SHA",
+        "routes": [
+          {
+            "part": "text body",
+            "read_api": "text::body::reader::read(xml,scope,limits)",
+            "write_api": "text::body::writer::write(&mut String,body,writer::Limits)",
+            "capability": "String-only writer; no generic sink",
+            "limits": "Reader input/nesting/text budgets and writer max_output_bytes",
+            "preflight": "Serialized size checked before String mutation; typed output refusal failure-atomic",
+            "fidelity": "Semantic readback and unsupported-content refusal",
+            "source_evidence": "crates/litchi-drawingml/src/text/body/reader.rs; text/body/writer.rs"
+          },
+          {
+            "part": "SVG blip",
+            "read_api": "svg_blip::read/read_contextual(xml,limits)",
+            "write_api": "write_contextual_to<W: Write>(writer,value,limits)",
+            "capability": "Direct contextual sink",
+            "limits": "Input/output bytes, namespaces, relationships, attributes, children, depth/nodes",
+            "preflight": "Complete contextual length checked before first write; OutputBytes refusal zero sink writes",
+            "fidelity": "Exact unchanged source; semantic/namespace dirty oracle",
+            "source_evidence": "crates/litchi-drawingml/src/svg_blip.rs"
+          },
+          {
+            "part": "model3d",
+            "read_api": "model3d::codec::read(xml,Limits)",
+            "write_api": "write_to<W: Write>(writer,metadata,Limits)",
+            "capability": "Direct sink after output_size counting preflight; no complete output Vec",
+            "limits": "XML, inert fragments, output bytes, children, raster children, depth, nodes",
+            "preflight": "Output size checked before write_inner; typed refusal zero sink writes; report counting pass/small allocations",
+            "fidelity": "Semantic/opaque-fragment oracle",
+            "source_evidence": "crates/litchi-drawingml/src/model3d/codec/xml.rs; model3d/codec/mod.rs"
+          },
+          {
+            "part": "image blip",
+            "read_api": "blip::find_first_embed(xml,blip::Limits)",
+            "write_api": "blip::write_embed(&mut String)",
+            "capability": "Scanner plus String helper; no complete codec or Write sink",
+            "limits": "Scanner input and relationship-id bytes",
+            "preflight": "Output sink N/A; input scanner boundary is real",
+            "fidelity": "Scanner admission and relationship/namespace refusal",
+            "source_evidence": "crates/litchi-drawingml/src/blip.rs"
+          }
+        ]
+      },
+      "required_rows": [
+        "Text current read signature, malformed, real limits",
+        "SVG contextual sink zero-write output refusal",
+        "Model3d counted direct sink without complete-Vec claim",
+        "Blip scanner input boundary and scanner-only fidelity"
+      ]
+    },
+    {
+      "lane": "drawingml-theme-ink",
+      "baseline": {
+        "revision": "996651b6b19717a0192dfd4144bccd367fb2ea44",
+        "family_part_revision": "11728db894181ffbcdbcea3ae0008d51fdd2d8af",
+        "routes": [
+          {
+            "part": "theme palette",
+            "read_api": "theme::codec::read(xml)",
+            "write_api": "theme::codec::encode_part(name,colors,fonts)",
+            "capability": "Vec-only canonical encoder",
+            "limits": "Historical hard ceilings; no caller Limits",
+            "preflight": "No caller output budget",
+            "fidelity": "Semantic/canonical theme oracle"
+          },
+          {
+            "part": "theme family fragment",
+            "read_api": "theme::family::part::read(xml)",
+            "write_api": "theme::family::part::*_with_limit entry points",
+            "capability": "Source edit plus Vec serialization; not pure writer",
+            "limits": "Explicit historical max_xml_bytes scalar",
+            "preflight": "Historical source splice bound",
+            "fidelity": "Exact untouched splice where promised; semantic family oracle"
+          },
+          {
+            "part": "Ink actions",
+            "read_api": "ink::actions::read_profile(xml)",
+            "write_api": "ink::actions::write_profile_to<W: Write>(writer,profile)",
+            "capability": "Direct retained-source sink",
+            "limits": "Historical hard bounds; no caller output policy",
+            "preflight": "No caller output cap",
+            "fidelity": "Exact retained profile source"
+          }
+        ]
+      },
+      "candidate": {
+        "tree": "37dceb650c5c699a81229ac1dee6fbd98478b597",
+        "revision": "PENDING_FINAL_CANDIDATE_SHA",
+        "routes": [
+          {
+            "part": "theme palette",
+            "read_api": "theme::codec::read(xml,Limits)",
+            "write_api": "theme::codec::encode_part(name,colors,fonts,Limits)",
+            "capability": "Vec-only canonical encoder",
+            "limits": "XML bytes, nodes, depth, namespaces, attributes, attribute values",
+            "preflight": "Part length checked before output Vec allocation; no sink row",
+            "fidelity": "Semantic/canonical oracle",
+            "source_evidence": "crates/litchi-drawingml/src/theme/codec.rs"
+          },
+          {
+            "part": "theme family fragment",
+            "read_api": "theme::family::codec::read/read_shared(xml,Limits)",
+            "write_api": "theme::family::codec::write_to<W: Write>(writer,family,Limits)",
+            "capability": "Direct sink; exact source direct, changed source bounded rewrite streams retained ranges",
+            "limits": "XML bytes, nodes, depth, attributes, namespace, scalar values",
+            "preflight": "Typed XML-byte refusal before changed writes; zero-write on cap refusal",
+            "fidelity": "Exact unchanged and known-field source-preserving mutation; semantic oracle",
+            "source_evidence": "crates/litchi-drawingml/src/theme/family/codec.rs"
+          },
+          {
+            "part": "theme family complete part",
+            "read_api": "theme::family::part::read/read_shared(xml,part::Limits)",
+            "write_api": "Snapshot::replace_family/add_family/add_family_with_uri/remove_family(...,part::Limits)->Vec",
+            "capability": "Source edit plus complete-part serialization; not pure writer",
+            "limits": "part::Limits.max_xml_bytes",
+            "preflight": "Complete output bounded before splice; no sink zero-write row",
+            "fidelity": "Exact untouched complete part plus changed-owner readback; label edit+serialize"
+          },
+          {
+            "part": "Ink actions profile",
+            "read_api": "ink::actions::read_profile(xml,Limits)",
+            "write_api": "ink::actions::write_profile_to<W: Write>(writer,profile,Limits)",
+            "capability": "Direct retained-source sink",
+            "limits": "Source/output bytes, nodes, depth, actions, groups, scalar/payload bytes",
+            "preflight": "Source revalidated and length checked before write_all; OutputBytes refusal zero writes",
+            "fidelity": "Exact profile source; owner checks outside timing",
+            "source_evidence": "crates/litchi-drawingml/src/ink/actions.rs"
+          },
+          {
+            "part": "Ink Prepared owner",
+            "read_api": "Prepared::from_bytes/strict admission",
+            "write_api": "Draft::finish; Prepared::edit/edit_with_options; Edit::commit; Prepared::apply",
+            "capability": "Source-backed edit/commit/apply; not raw sink",
+            "limits": "EditOptions output/payload/node/depth/action/group/scalar budgets",
+            "preflight": "Edit length and strict readback before publication",
+            "fidelity": "Exact no-op/inverse and typed PatchConflict stale refusal"
+          }
+        ]
+      },
+      "required_rows": [
+        "Theme Vec output bound",
+        "Historical 11728 *_with_limit versus candidate part::Limits",
+        "Theme-family sink exact/no-op and changed mutation",
+        "Ink sink plus owner no-op/changed/replay/stale"
+      ]
+    },
+    {
+      "lane": "drawingml-geometry-color-formatcode2-transform",
+      "baseline": {
+        "revision": "2f7db7ee7fa01893e9099217fc4243687d196f63",
+        "routes": [
+          {
+            "part": "custom geometry",
+            "read_api": "geometry reader",
+            "write_api": "geometry::writer::write_custom_geometry(&mut String,geometry)",
+            "capability": "String-only canonical writer",
+            "limits": "Historical structural ceilings",
+            "preflight": "No caller output bound",
+            "fidelity": "Semantic/canonical oracle"
+          },
+          {
+            "part": "color",
+            "read_api": "color::codec::read(xml)",
+            "write_api": "color::codec::write(value)",
+            "capability": "Vec-only canonical codec",
+            "limits": "Historical hard ceilings",
+            "preflight": "No caller output bound",
+            "fidelity": "Semantic/canonical oracle"
+          },
+          {
+            "part": "formatcode2",
+            "read_api": "chart::extension::formatcode2::read(xml)",
+            "write_api": "write_to<W: Write>(writer,value)",
+            "capability": "Changed path materializes write(value) before sink",
+            "limits": "Historical lexical ceilings",
+            "preflight": "No caller output cap",
+            "fidelity": "Exact unchanged; semantic changed oracle"
+          },
+          {
+            "part": "transform",
+            "read_api": "transform::codec::read(xml)",
+            "write_api": "transform::codec::write_to<W: Write>(writer,transform)",
+            "capability": "Sink-shaped historical unbounded route",
+            "limits": "Historical hard ceilings",
+            "preflight": "No caller output cap",
+            "fidelity": "Semantic/canonical oracle"
+          }
+        ]
+      },
+      "candidate": {
+        "tree": "37dceb650c5c699a81229ac1dee6fbd98478b597",
+        "revision": "PENDING_FINAL_CANDIDATE_SHA",
+        "routes": [
+          {
+            "part": "custom geometry",
+            "read_api": "geometry reader with current Limits",
+            "write_api": "geometry::writer::write_custom_geometry(&mut String,geometry,&Limits)",
+            "capability": "String-only canonical writer; no generic sink",
+            "limits": "Structural guides/sites/paths/path-commands and max_output_bytes",
+            "preflight": "LengthWriter before String mutation; no sink row",
+            "fidelity": "Semantic/canonical oracle",
+            "source_evidence": "crates/litchi-drawingml/src/geometry/writer.rs"
+          },
+          {
+            "part": "color",
+            "read_api": "color::codec::read(xml,&Limits)",
+            "write_api": "color::codec::write(value,&Limits)->Vec",
+            "capability": "Vec-only canonical codec",
+            "limits": "XML bytes/depth/nodes/transforms",
+            "preflight": "Serialized length/XML limits before completing Vec; no sink row",
+            "fidelity": "Semantic/canonical oracle",
+            "source_evidence": "crates/litchi-drawingml/src/color/codec.rs"
+          },
+          {
+            "part": "formatcode2",
+            "read_api": "chart::extension::formatcode2::read(xml,&Limits)",
+            "write_api": "write_to<W: Write>(writer,value,&Limits)",
+            "capability": "Direct sink with exact output-length preflight; changed source streams retained ranges and replacement fragments",
+            "limits": "XML/value/attribute/node/depth/namespace/output bytes",
+            "preflight": "Output refusal before first sink write; zero-write on cap refusal",
+            "fidelity": "Exact unchanged plus changed splice lexical/semantic checks",
+            "source_evidence": "crates/litchi-drawingml/src/chart/extension/formatcode2.rs"
+          },
+          {
+            "part": "transform",
+            "read_api": "transform::codec::read(xml,&Limits)",
+            "write_api": "transform::codec::write_to<W: Write>(writer,transform,&Limits)",
+            "capability": "Direct sink after LengthWriter; no complete output Vec",
+            "limits": "XML bytes and nodes",
+            "preflight": "LengthWriter before write_transform_to; XmlBytes refusal zero writes",
+            "fidelity": "Semantic/canonical oracle; owner replay separately",
+            "source_evidence": "crates/litchi-drawingml/src/transform/codec.rs"
+          }
+        ]
+      },
+      "required_rows": [
+        "Geometry 1,025-path over-limit against 1,024-path policy and output bound",
+        "Color Vec semantic readback",
+        "Formatcode2 unchanged/changed sink preflight",
+        "Transform sink preflight and owner replay/stale"
+      ]
+    }
+  ],
+  "owner_api_matrix": [
+    {
+      "route": "chart",
+      "baseline_source": "945eb1d6b9ef6c56fa26c82e12758d38c1b9015d",
+      "baseline_shape": "Historical Snapshot/Transaction/Patch adapter",
+      "candidate_source": "PENDING_FINAL_CANDIDATE_SHA; tree 37dceb650c5c699a81229ac1dee6fbd98478b597",
+      "candidate_shape": "Package::from_xml, Package::edit, Edit::commit, Package::apply returning core Commit triad",
+      "rule": "Capture native errors; never synthesize typed conflict from a string."
+    },
+    {
+      "route": "theme family and transform",
+      "baseline_source": "945eb1d6b9ef6c56fa26c82e12758d38c1b9015d",
+      "baseline_shape": "Historical Snapshot/Transaction/Patch adapter",
+      "candidate_source": "PENDING_FINAL_CANDIDATE_SHA; tree 37dceb650c5c699a81229ac1dee6fbd98478b597",
+      "candidate_shape": "Immutable Package, detached Edit, commit, Patch replay through Package::apply",
+      "rule": "Keep candidate raw Limits and owner patch validation separate."
+    },
+    {
+      "route": "Ink Prepared",
+      "baseline_source": "945eb1d6b9ef6c56fa26c82e12758d38c1b9015d",
+      "baseline_shape": "Historical Edit/from_profile and Patch::apply",
+      "candidate_source": "PENDING_FINAL_CANDIDATE_SHA; tree 37dceb650c5c699a81229ac1dee6fbd98478b597",
+      "candidate_shape": "EditOptions, Prepared/Draft, Edit::commit, Prepared::apply(&Patch)",
+      "rule": "Candidate EditOptions and strict readback are production boundaries; retain baseline native errors."
+    },
+    {
+      "route": "theme family complete part",
+      "baseline_source": "11728db894181ffbcdbcea3ae0008d51fdd2d8af",
+      "baseline_shape": "replace_family_with_limit/add_family_with_limit/add_family_with_uri_limit/remove_family_with_limit",
+      "candidate_source": "PENDING_FINAL_CANDIDATE_SHA; tree 37dceb650c5c699a81229ac1dee6fbd98478b597",
+      "candidate_shape": "Snapshot mutations with part::Limits",
+      "rule": "Raw source-edit route, not one of the 945 owner transitions."
+    }
+  ],
+  "preflight_policy": {
+    "sink_routes": {
+      "chart": "Bounded partial output allowed. Record typed OutputBytes refusal and emitted bytes; assert emitted <= cap, never universal zero-write.",
+      "formatcode2": "Exact output length before retained-range writes; zero-write on output-cap refusal.",
+      "svg_blip": "Contextual output length before first sink write; zero-write on OutputBytes refusal.",
+      "model3d": "output_size before write_inner; zero-write on OutputBytes refusal; expose counting pass/small allocations.",
+      "theme_family": "Source exact/rewrite length before sink writes; zero-write on XML-byte refusal.",
+      "ink": "Complete retained-source length/structure before write_all; zero-write on OutputBytes refusal.",
+      "transform": "LengthWriter before write_transform_to; zero-write on XmlBytes refusal."
+    },
+    "string_vec_routes": "Diagram, text body, theme palette, theme-family complete part, geometry, and color use String/Vec or source-edit APIs. Measure real typed bounds and allocation/fidelity receipts; do not fabricate Write sinks.",
+    "scanner_route": "Blip has typed input scanner limits but no complete output codec; output sink and exact-source rows are N/A.",
+    "forbidden_substitutions": [
+      "A local CountingSink after completed Vec/String is not production preflight.",
+      "A self-reported sink count is not proof of production output policy.",
+      "Do not call model3d, changed formatcode2, or Diagram/ThemeFamilyPart edits writer-only."
+    ]
+  },
+  "fidelity_policy": {
+    "exact_source": [
+      "unchanged formatcode2",
+      "changed formatcode2 retained lexical splice",
+      "SVG contextual source",
+      "Theme Family unchanged/known-field mutation",
+      "Theme-part untouched ranges",
+      "Ink profile and owner no-op/inverse"
+    ],
+    "semantic_oracle": [
+      "chart",
+      "diagram data model",
+      "text body",
+      "theme palette",
+      "model3d",
+      "geometry",
+      "color",
+      "transform",
+      "dirty canonical routes"
+    ],
+    "scanner_only": [
+      "image blip find_first_embed"
+    ],
+    "rule": "Exact-byte or semantic/oracle checks run outside timing and cover changed outputs as well as source no-ops.",
+    "additional_required_oracles": [
+      "Exercise standalone and actual contextual SVG routes distinctly. Contextual normal read/write/fidelity must call read_contextual/write_contextual_to with a real inherited namespace context, not only an output-cap preflight.",
+      "Use noncanonical retained-source formatcode2 and ThemeFamily fixtures. Parse source, mutate the parsed value, prove the expected decoded value and exact untouched lexical slices, and compare generated byte hashes/lengths before timing.",
+      "Complete ThemeFamily part add/replace output must decode to the requested family name, id and variant_id. A changed hash and family presence alone are insufficient.",
+      "Each owner committed/forward/inverse result must satisfy explicit expected semantics and preservation of unchanged fields. Compare canonical semantic receipts across baseline/candidate; retain exact source/noop/inverse bytes where promised. Document any allowed changed-byte difference explicitly.",
+      "Ink raw write preserves retained source bytes; the record and oracle must describe this current capability truthfully."
+    ]
+  },
+  "fixture_and_resource_binding": {
+    "synthetic_allowed": true,
+    "paired_fixture_identity": {
+      "required_before_timing": true,
+      "rule": "Baseline and candidate consume identical generated source, changed, and malformed bytes. Adapters may differ, but hashes must match before ABBA timing.",
+      "receipt": [
+        "Generator source path and commit",
+        "Descriptor SHA-256 and byte length",
+        "Source/changed/malformed SHA-256 and byte length per lane/operation",
+        "Mutation and expected semantic oracle",
+        "Validator rejection on any paired hash mismatch"
+      ],
+      "current_gap": "Resolved by the paired pre-ABBA fixture-preflight comparison and qualified-leg validator. Preserve exact generated source/changed/malformed hashes and byte counts across endpoints; mismatches must fail before timing."
+    },
+    "endpoint_receipt": [
+      "Baseline/candidate source HEAD/tree/status",
+      "Adapter/probe/validator hashes",
+      "Separate source/performance lock hashes",
+      "Build command/compiler/target/external binary SHA-256",
+      "Fresh child PID/argv/source binding",
+      "External RSS/VmHWM observer"
+    ],
+    "repository_rule": "No 3rdparty path, binary, or large capture is part of this plan or a committed receipt."
+  },
+  "timing_policy": {
+    "outside_clock": [
+      "Fixture generation and source parsing, except parsing is the named entry_read/read_shared operation",
+      "Native owners, prepared values, input policies, queries, mutations, forward and inverse patches, strict output cap selection",
+      "Expected semantic identities and byte hashes; source/changed/no-op/forward/inverse and malformed/limit/stale correctness verification",
+      "Per-operation detail checks BEFORE the first warmup; receipt serialization and independent resource observation outside sample timing"
+    ],
+    "inside_clock": "Only each explicitly named native operation, its required staging calls, and its documented output/sink allocation and drop. Return or black-box the native result; do not format or normalize it into ProbeFailure/JSON, copy output only for an oracle, clone a patch only for a receipt, parse a prebuilt owner, construct inverse patches, recompute cap sizes by serialization, hash, assert a refusal, or perform extra correctness work inside samples.",
+    "raw_rows": [
+      "entry_read",
+      "read_shared_when_supported",
+      "vec_write",
+      "write_to_bounded_sink",
+      "preflight_refusal",
+      "malformed_refusal"
+    ],
+    "owner_rows": [
+      "noop_commit",
+      "changed_commit",
+      "forward_replay",
+      "inverse_replay",
+      "stale_replay"
+    ],
+    "row_scope": "Successful owner commit rows start from already prepared native owners, create their native Edit, stage the named mutation if any, and commit. Replay rows apply an already prepared forward/inverse patch to a prepared matching owner. Refusal rows measure the real native boundary call and return its native error; correctness of that exact variant/reason/observed limit is proved in a distinct untimed pass before warmup. Required native output serialization remains measured only when it is intrinsic to that historical/current production operation, with scope recorded per leg.",
+    "paired_shape": "Three warmups, five ABBA blocks, twenty samples per leg, fresh processes, at least 150 ms accepted leg (target 500 ms), existing thresholds unchanged.",
+    "guard": "No route, threshold, ABBA order, sample count or minimum duration is removed or relaxed. Native performance rows for replay and refusals are distinct from their untimed proof executions; extra proof work never enters sample clocks.",
+    "clarification_of_previous_plan": "The previous outside_clock wording listed replay/refusal operations without distinguishing correctness verification from their explicitly declared performance rows. This revision preserves every existing raw and owner measurement row and requires its proof pass outside timing. It does not authorize timing assertions, receipt construction, source preparation, or byte copies added only by the harness."
+  },
+  "known_reachable_repairs": [
+    {
+      "id": "candidate-baseline-api-labels",
+      "repair": "Keep baseline TextBody read_with_options, model3d complete-Vec write_to, changed formatcode2 materialization, and chart no output cap under baseline only; use current signatures only in candidate columns."
+    },
+    {
+      "id": "candidate-output-cap-matrix",
+      "repair": "Use real typed output bounds for Chart, FormatCode2, Model3d, ThemeFamily, Ink, and Transform. Preserve Chart bounded-partial semantics; zero-write only where production preflight guarantees it."
+    },
+    {
+      "id": "source-edit-labels",
+      "repair": "Label Diagram set_text/drawing_text and ThemeFamilyPart Snapshot mutations source-edit+serialization; do not invent pure writers."
+    },
+    {
+      "id": "paired-fixture-hashes",
+      "repair": "Freeze/share generated bytes and reject source/changed/malformed hash mismatches before timing."
+    },
+    {
+      "id": "candidate-freeze",
+      "repair": "Replace pending revision with final source commit only after source, adapters, lock, and fixture receipts are frozen."
+    },
+    {
+      "scope": "coordinator 0362dvie return",
+      "repair": "Separate native operation timing from preconstructed input, output copies and proof receipts; implement contextual SVG and noncanonical lexical mutation oracles; prove actual family/owner expected semantics and compare across endpoints."
+    }
+  ],
+  "completeness_checklist": [
+    {
+      "id": "source-freeze",
+      "requirement": "Candidate commit/tree frozen and every adapter targets it",
+      "status": "pending"
+    },
+    {
+      "id": "baseline-separation",
+      "requirement": "2f7, 996, 11728, and 945 retain native APIs and locks",
+      "status": "required"
+    },
+    {
+      "id": "capability-routing",
+      "requirement": "Sink, String/Vec, source-edit, and scanner routes use actual production labels",
+      "status": "required"
+    },
+    {
+      "id": "typed-preflight",
+      "requirement": "Typed output bounds are observed; Chart records bounded partial output, not false zero-write",
+      "status": "required"
+    },
+    {
+      "id": "fidelity",
+      "requirement": "Exact or semantic/oracle checks cover source and changed outputs outside timing",
+      "status": "required"
+    },
+    {
+      "id": "fixture-identity",
+      "requirement": "Baseline/candidate generated bytes have equal hashes before timing",
+      "status": "required"
+    },
+    {
+      "id": "resources",
+      "requirement": "Source, fixture, locks, adapters, binary, child identity, and independent resource observations are bound",
+      "status": "required"
+    },
+    {
+      "id": "evidence",
+      "requirement": "Only reduced receipts are committed; binaries and large captures remain external",
+      "status": "required"
+    }
+  ],
+  "preparation_command_shape": {
+    "prepare": "python3 tools/native_qualification/prepare_drawingml_raw_inputs.py --baseline-root /external/sources/dml-lane-before --candidate-root /external/sources/final-candidate --baseline-revision LANE_BASELINE --candidate-revision PENDING_FINAL_CANDIDATE_SHA --candidate-tree 37dceb650c5c699a81229ac1dee6fbd98478b597 --perf-lock-sha256 LANE_PERF_LOCK_SHA256 --output /external/native-final/LANE-preparation.json",
+    "run": "python3 tools/native_qualification/drawingml_raw_paired_runner.py --manifest tools/native_qualification/manifests/drawingml-raw.json --phase build --cpu CPU && python3 tools/native_qualification/drawingml_raw_paired_runner.py --manifest tools/native_qualification/manifests/drawingml-raw.json --phase abba --cpu CPU",
+    "status": "Specification only until final source, adapters, paired fixture hashes, and receipts pass."
+  },
+  "carry_forward": {
+    "existing_thresholds": "No threshold, ABBA order, sample count, or minimum leg duration is weakened.",
+    "native_claim": "No native performance claim exists from this read-only review.",
+    "owner_and_rss_scope": "Owner timing and paired semantic proof are returned here. Independent RSS capture and exact eight measured-child event binding remain required and unchanged.",
+    "source_history": "Original and cf5208 plans remain preserved; this revision corrects baseline-versus-candidate endpoint semantics and output/fidelity/fixture requirements."
+  }
+}

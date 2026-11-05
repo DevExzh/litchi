@@ -1,0 +1,7 @@
+# after: built at efbdebe2de (worktree uo2-w2-pptx): CARGO_INCREMENTAL=0 cargo build --release -p litchi-ops --example pptx_p0_final_bench --example pptx_p0_bench --example pptx_contract_bench --features pptx
+# before: the same pptx_contract_bench source built on a git-archive export of trunk 184dd4d908 (record 0356 merged), with this branch's Cargo.lock
+# Runs pinned with taskset -c 7: contract before, after, after, before (x3: run{1,2,3}{a,b}); pptx_p0_final_bench x3; P0_SCENARIO=run_format_batch and shape_text_batch pptx_p0_bench x3.
+58f7ae0ab05d4fca5d2d64ba14801070b2ccaf415e6f9f897370f9bea47b08d7  after/pptx_contract_bench
+efe758268ea5650b72a1a61299bf8906166ad79203f469520596394133cf92d4  after/pptx_p0_bench
+436ccca229b1ddb2333c0fa25266ff1cd35b9b2416639a3a44cc8d0a4df3d0c4  after/pptx_p0_final_bench
+cc049ad73db35949862283f5c1b4ddb69007a1dcff85597dfdf115ba612013d9  before/pptx_contract_bench

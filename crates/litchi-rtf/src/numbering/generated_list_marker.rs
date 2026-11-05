@@ -1,6 +1,5 @@
 //! Inert generated list-marker destinations (`listtext` and `pntext`).
 
-use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
 
 pub(crate) const MAX_GENERATED_LIST_MARKERS: usize = 65_536;
@@ -25,9 +24,9 @@ impl GeneratedListMarker<'_> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self.text.is_empty() || self.text.len() > MAX_GENERATED_LIST_MARKER_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF generated list marker is empty or exceeds the safety limit".to_string(),
             ));
         }
@@ -36,7 +35,7 @@ impl GeneratedListMarker<'_> {
             .chars()
             .any(|character| character == '\0' || (character.is_control() && character != '\t'))
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF generated list marker contains a forbidden control character".to_string(),
             ));
         }

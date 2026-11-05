@@ -565,7 +565,7 @@ mod tests {
         reason = "test code panics on failure; expect keeps assertions concise"
     )]
     use super::*;
-    use crate::ooxml::{Kind, inspect, open_with};
+    use crate::ooxml::{Kind, inspect, open};
 
     const SALT: [u8; BLOCK] = [
         0x92, 0x25, 0x50, 0xf6, 0xb6, 0x4f, 0xfe, 0x5b, 0xd3, 0x96, 0xdf, 0x5e, 0xe9, 0x17, 0xda,
@@ -581,10 +581,10 @@ mod tests {
             let encrypted = encrypt(clear.clone(), "correct horse", mode, &limits)
                 .expect("encrypt Standard package");
             assert_eq!(
-                inspect(&encrypted).expect("classify package"),
+                inspect(&encrypted, &limits).expect("classify package"),
                 Kind::Encrypted(mode)
             );
-            let opened = open_with(encrypted, "correct horse", &limits).expect("decrypt package");
+            let opened = open(encrypted, "correct horse", &limits).expect("decrypt package");
             assert_eq!(opened.mode(), Some(mode));
             assert_eq!(
                 opened.integrity(),
@@ -605,7 +605,7 @@ mod tests {
         )
         .expect("encrypt Standard package");
         assert!(matches!(
-            open_with(encrypted, "wrong", &limits),
+            open(encrypted, "wrong", &limits),
             Err(Error::Password)
         ));
     }

@@ -2,38 +2,44 @@
 
 use litchi_ooxml_common::xml::is_ncname;
 
+use super::codec::Limits;
 use super::model::{Caption, CaptionTarget, MediaMetadata, TracksInfo};
 use crate::{Error, Result};
 
-pub(crate) const MAX_TRACKS: usize = 4_096;
-pub(crate) const MAX_STRING_BYTES: usize = 1024 * 1024;
-
-pub(crate) fn validate_metadata(value: &MediaMetadata) -> Result<()> {
-    if value.key.slide_part_name.is_empty() || value.key.slide_part_name.len() > MAX_STRING_BYTES {
-        return Err(invalid("media track slide part name is empty or too long"));
+pub(crate) fn validate_metadata(value: &MediaMetadata, limits: Limits) -> Result<()> {
+    if value.key.slide_part_name.is_empty() {
+        return Err(invalid("media track slide part name is empty"));
+    }
+    if value.key.slide_part_name.len() > limits.max_string_bytes() {
+        return Err(limit(
+            crate::error::CodecLimitKind::StringBytes,
+            value.key.slide_part_name.len(),
+            limits.max_string_bytes(),
+        ));
     }
     if value.key.shape_id == 0 {
         return Err(invalid("media track shape ID must be non-zero"));
     }
     if let Some(relationship_id) = &value.media_relationship_id {
-        validate_relationship_id(relationship_id, "media relationship ID")?;
+        validate_relationship_id(relationship_id, "media relationship ID", limits)?;
     }
     if let Some(tracks) = &value.tracks_info {
-        validate_tracks(tracks)?;
+        validate_tracks(tracks, limits)?;
     }
     Ok(())
 }
 
-pub(crate) fn validate_tracks(value: &TracksInfo) -> Result<()> {
-    if value.captions.len() > MAX_TRACKS {
-        return Err(Error::Limit {
-            resource: "media caption track count",
-            limit: MAX_TRACKS,
-        });
+pub(crate) fn validate_tracks(value: &TracksInfo, limits: Limits) -> Result<()> {
+    if value.captions.len() > limits.max_tracks() {
+        return Err(limit(
+            crate::error::CodecLimitKind::CaptionTracks,
+            value.captions.len(),
+            limits.max_tracks(),
+        ));
     }
     let mut ids = std::collections::HashSet::with_capacity(value.captions.len());
     for caption in &value.captions {
-        validate_caption(caption)?;
+        validate_caption(caption, limits)?;
         if !ids.insert(caption.id.as_str()) {
             return Err(invalid(format!(
                 "duplicate media caption track ID '{}'",
@@ -44,20 +50,20 @@ pub(crate) fn validate_tracks(value: &TracksInfo) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn validate_caption(value: &Caption) -> Result<()> {
+pub(crate) fn validate_caption(value: &Caption, limits: Limits) -> Result<()> {
     if !is_guid(&value.id) {
         return Err(invalid(format!(
             "invalid media caption track GUID '{}'",
             value.id
         )));
     }
-    bounded(&value.id, "media caption track ID")?;
+    bounded(&value.id, "media caption track ID", limits)?;
     if value.label.is_empty() {
         return Err(invalid("media caption track label cannot be empty"));
     }
-    bounded(&value.label, "media caption track label")?;
+    bounded(&value.label, "media caption track label", limits)?;
     if let Some(language) = &value.language {
-        bounded(language, "media caption language")?;
+        bounded(language, "media caption language", limits)?;
         if language.trim().is_empty() {
             return Err(invalid("media caption language cannot be blank"));
         }
@@ -67,14 +73,14 @@ pub(crate) fn validate_caption(value: &Caption) -> Result<()> {
             part_name,
             content_type,
         } => {
-            bounded(part_name, "media caption target part name")?;
-            bounded(content_type, "media caption target content type")?;
+            bounded(part_name, "media caption target part name", limits)?;
+            bounded(content_type, "media caption target content type", limits)?;
             if part_name.is_empty() || content_type.is_empty() {
                 return Err(invalid("internal media caption target is incomplete"));
             }
         },
         CaptionTarget::External { target } => {
-            bounded(target, "external media caption target")?;
+            bounded(target, "external media caption target", limits)?;
             if target.is_empty() {
                 return Err(invalid("external media caption target cannot be empty"));
             }
@@ -83,8 +89,8 @@ pub(crate) fn validate_caption(value: &Caption) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn validate_relationship_id(value: &str, label: &str) -> Result<()> {
-    bounded(value, label)?;
+pub(crate) fn validate_relationship_id(value: &str, label: &str, limits: Limits) -> Result<()> {
+    bounded(value, label, limits)?;
     if value.is_empty() || !is_ncname(value) {
         return Err(invalid(format!("{label} is not a valid XML NCName")));
     }
@@ -99,12 +105,13 @@ pub(crate) fn parse_boolean(value: &str, label: &str) -> Result<bool> {
     }
 }
 
-fn bounded(value: &str, _label: &str) -> Result<()> {
-    if value.len() > MAX_STRING_BYTES {
-        return Err(Error::Limit {
-            resource: "media track string",
-            limit: MAX_STRING_BYTES,
-        });
+fn bounded(value: &str, _label: &str, limits: Limits) -> Result<()> {
+    if value.len() > limits.max_string_bytes() {
+        return Err(limit(
+            crate::error::CodecLimitKind::StringBytes,
+            value.len(),
+            limits.max_string_bytes(),
+        ));
     }
     Ok(())
 }
@@ -128,4 +135,12 @@ fn is_guid(value: &str) -> bool {
 
 fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
+}
+
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }

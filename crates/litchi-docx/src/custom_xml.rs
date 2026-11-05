@@ -3,7 +3,11 @@ use crate::content_control::BindingFlavor;
 ///
 /// Custom XML parts allow storing arbitrary XML data within a Word document.
 use crate::error::Result;
-use litchi_ooxml_common::custom_xml::Conformance;
+
+#[path = "custom_xml/edit.rs"]
+mod edit;
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
+pub use litchi_ooxml_common::custom_xml::{Conformance, Item};
 use litchi_opc::PackURI;
 use litchi_opc::part::Part as OpcPart;
 use std::collections::HashMap;

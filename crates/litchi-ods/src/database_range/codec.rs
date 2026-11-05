@@ -2,6 +2,7 @@
 
 use crate::model::database_range::{Range, write_database_ranges};
 use litchi_core::{Error, Result};
+use litchi_odf_common::XmlStreamLimits;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
@@ -41,7 +42,7 @@ pub(crate) struct Location {
 enum Kind {
     Document,
     Body,
-    Spreadsheet,
+    Workbook,
     Container,
     Other,
 }
@@ -91,8 +92,10 @@ struct OpenElement {
 }
 
 /// Locate the direct spreadsheet `database-range` owner and its safe insertion point.
-pub(crate) fn locate(xml: &str) -> Result<Location> {
-    if xml.len() > MAX_XML_BYTES {
+pub(crate) fn locate(xml: &str, limits: &XmlStreamLimits) -> Result<Location> {
+    if xml.len() > MAX_XML_BYTES
+        || u64::try_from(xml.len()).unwrap_or(u64::MAX) > limits.max_bytes()
+    {
         return Err(invalid("ODS database-range source exceeds the size limit"));
     }
 
@@ -112,7 +115,7 @@ pub(crate) fn locate(xml: &str) -> Result<Location> {
         events = events
             .checked_add(1)
             .ok_or_else(|| invalid("ODS database-range XML event count overflow"))?;
-        if events > MAX_EVENTS {
+        if events > MAX_EVENTS.min(limits.max_events()) {
             return Err(invalid("ODS database-range source exceeds the event limit"));
         }
 
@@ -122,6 +125,9 @@ pub(crate) fn locate(xml: &str) -> Result<Location> {
             .map_err(|error| invalid(format!("invalid ODS database-range XML: {error}")))?;
         let namespace = namespace_kind(&resolved);
         let event_end = position(&reader)?;
+        if event_end.saturating_sub(event_start) > limits.max_token_bytes() {
+            return Err(invalid("ODS database-range XML token exceeds the limit"));
+        }
 
         // Validate the borrowed raw attributes before converting the event to
         // an owned value.  `quick-xml` can decode an attribute value while
@@ -132,6 +138,12 @@ pub(crate) fn locate(xml: &str) -> Result<Location> {
                 let parent = stack.last().map(|open| open.kind);
                 let kind = classify(parent, namespace, element.local_name().as_ref());
                 let inside_container = stack.iter().any(|open| open.kind == Kind::Container);
+                let known_attributes = validate_attributes(
+                    element,
+                    reader.resolver(),
+                    element.local_name().as_ref(),
+                    limits,
+                )?;
                 if kind == Kind::Container || inside_container {
                     let known = known_element(namespace, element.local_name().as_ref());
                     if known.is_none() {
@@ -142,11 +154,7 @@ pub(crate) fn locate(xml: &str) -> Result<Location> {
                             opaque = true;
                         }
                     }
-                    if !validate_attributes(
-                        element,
-                        reader.resolver(),
-                        element.local_name().as_ref(),
-                    )? {
+                    if !known_attributes {
                         opaque = true;
                     }
                 }
@@ -164,7 +172,7 @@ pub(crate) fn locate(xml: &str) -> Result<Location> {
                     }
                     root_seen = true;
                 }
-                if stack.len() >= MAX_DEPTH {
+                if stack.len() >= MAX_DEPTH.min(limits.max_depth()) {
                     return Err(invalid(
                         "ODS database-range source exceeds the nesting limit",
                     ));
@@ -172,7 +180,7 @@ pub(crate) fn locate(xml: &str) -> Result<Location> {
                 let parent = stack.last().map(|open| open.kind);
                 let kind = classify(parent, namespace, element.local_name().as_ref());
                 let known = known_element(namespace, element.local_name().as_ref());
-                if parent == Some(Kind::Spreadsheet)
+                if parent == Some(Kind::Workbook)
                     && is_insertion_anchor(namespace, element.local_name().as_ref())
                     && insertion.is_none()
                 {
@@ -195,14 +203,14 @@ pub(crate) fn locate(xml: &str) -> Result<Location> {
                     root_seen = true;
                     root_closed = true;
                 }
-                if stack.len() >= MAX_DEPTH {
+                if stack.len() >= MAX_DEPTH.min(limits.max_depth()) {
                     return Err(invalid(
                         "ODS database-range source exceeds the nesting limit",
                     ));
                 }
                 let parent = stack.last().map(|open| open.kind);
                 let kind = classify(parent, namespace, element.local_name().as_ref());
-                if parent == Some(Kind::Spreadsheet)
+                if parent == Some(Kind::Workbook)
                     && is_insertion_anchor(namespace, element.local_name().as_ref())
                     && insertion.is_none()
                 {
@@ -293,8 +301,8 @@ fn classify(parent: Option<Kind>, namespace: NamespaceKind, local: &[u8]) -> Kin
     } else if parent == Some(Kind::Body)
         && is_element(namespace, NamespaceKind::Office, local, b"spreadsheet")
     {
-        Kind::Spreadsheet
-    } else if parent == Some(Kind::Spreadsheet)
+        Kind::Workbook
+    } else if parent == Some(Kind::Workbook)
         && is_element(namespace, NamespaceKind::Table, local, b"database-ranges")
     {
         Kind::Container
@@ -310,7 +318,7 @@ fn record(
     container: &mut Option<Span>,
 ) -> Result<()> {
     match kind {
-        Kind::Spreadsheet => {
+        Kind::Workbook => {
             if spreadsheet.replace(span).is_some() {
                 return Err(invalid(
                     "ODS content.xml has more than one office:spreadsheet host",
@@ -333,18 +341,26 @@ pub(crate) fn replace(
     source: &str,
     location: &Location,
     ranges: Option<&[Range]>,
+    limits: &XmlStreamLimits,
 ) -> Result<String> {
-    let fragment = ranges.map(render).transpose()?;
+    if u64::try_from(source.len()).unwrap_or(u64::MAX) > limits.max_bytes() {
+        return Err(invalid("ODS database-range source exceeds the size limit"));
+    }
+    let fragment = ranges.map(|ranges| render(ranges, limits)).transpose()?;
     if let Some(container) = &location.container {
-        return splice(
-            source,
-            container.start,
-            container.end,
-            fragment.as_deref().unwrap_or_default(),
+        return ensure_output_limit(
+            splice(
+                source,
+                container.start,
+                container.end,
+                fragment.as_deref().unwrap_or_default(),
+                limits,
+            )?,
+            limits,
         );
     }
     let Some(fragment) = fragment else {
-        return Ok(source.to_owned());
+        return ensure_output_limit(source.to_owned(), limits);
     };
     let spreadsheet = &location.spreadsheet;
     if spreadsheet.empty {
@@ -354,16 +370,48 @@ pub(crate) fn replace(
         let opening = opening
             .strip_suffix("/>")
             .ok_or_else(|| invalid("empty ODS spreadsheet has no close token"))?;
-        let mut expanded = String::with_capacity(opening.len() + fragment.len() + 32);
+        let capacity = opening
+            .len()
+            .checked_add(fragment.len())
+            .and_then(|length| length.checked_add(32))
+            .ok_or_else(|| invalid("ODS database-range expansion size overflow"))?;
+        if u64::try_from(capacity).unwrap_or(u64::MAX) > limits.max_bytes() {
+            return Err(invalid("ODS database-range output exceeds the size limit"));
+        }
+        let mut expanded = String::new();
+        expanded
+            .try_reserve(capacity)
+            .map_err(|source| Error::Allocation {
+                resource: "ODS database-range expansion XML",
+                source,
+            })?;
         expanded.push_str(opening);
         expanded.push('>');
         expanded.push_str(&fragment);
         expanded.push_str("</");
         expanded.push_str(&spreadsheet.qname);
         expanded.push('>');
-        splice(source, spreadsheet.start, spreadsheet.end, &expanded)
+        ensure_output_limit(
+            splice(
+                source,
+                spreadsheet.start,
+                spreadsheet.end,
+                &expanded,
+                limits,
+            )?,
+            limits,
+        )
     } else {
-        splice(source, location.insert_at, location.insert_at, &fragment)
+        ensure_output_limit(
+            splice(
+                source,
+                location.insert_at,
+                location.insert_at,
+                &fragment,
+                limits,
+            )?,
+            limits,
+        )
     }
 }
 
@@ -494,7 +542,7 @@ fn opening_tag_end(fragment: &str) -> Option<usize> {
     None
 }
 
-fn render(ranges: &[Range]) -> Result<String> {
+fn render(ranges: &[Range], limits: &XmlStreamLimits) -> Result<String> {
     if ranges.is_empty() {
         return Ok(format!(
             "<table:database-ranges xmlns:table=\"{}\"/>",
@@ -502,7 +550,7 @@ fn render(ranges: &[Range]) -> Result<String> {
         ));
     }
     let mut output = String::new();
-    write_database_ranges(&mut output, ranges)?;
+    write_database_ranges(&mut output, ranges, limits)?;
     const ROOT: &str = "<table:database-ranges>";
     if !output.starts_with(ROOT) {
         return Err(invalid("database-range writer emitted an unexpected root"));
@@ -517,16 +565,35 @@ fn render(ranges: &[Range]) -> Result<String> {
     Ok(output)
 }
 
+fn ensure_output_limit(output: String, limits: &XmlStreamLimits) -> Result<String> {
+    if output.len() > limits.max_bytes().min(128 * 1_048_576) as usize {
+        return Err(invalid(
+            "ODS database-range replacement exceeds the configured XML limit",
+        ));
+    }
+    Ok(output)
+}
+
 fn validate_attributes(
     element: &BytesStart<'_>,
     resolver: &NamespaceResolver,
     local: &[u8],
+    limits: &XmlStreamLimits,
 ) -> Result<bool> {
     let mut known = true;
+    let mut count = 0usize;
     for attribute in element.attributes() {
         let attribute = attribute
             .map_err(|error| invalid(format!("invalid ODS database-range attribute: {error}")))?;
-        if attribute.value.len() > MAX_ATTRIBUTE_BYTES {
+        count = count
+            .checked_add(1)
+            .ok_or_else(|| invalid("ODS database-range attribute count overflow"))?;
+        if count > limits.max_attributes() {
+            return Err(invalid(
+                "ODS database-range attribute count exceeds the limit",
+            ));
+        }
+        if attribute.value.len() > MAX_ATTRIBUTE_BYTES.min(limits.max_token_bytes()) {
             return Err(invalid(
                 "ODS database-range attribute exceeds the size limit",
             ));
@@ -662,7 +729,7 @@ fn allowed_child(parent: Option<&OpenElement>, child: KnownElement) -> bool {
     let parent_kind = parent.map(|open| open.kind);
     let parent_known = parent.and_then(|open| open.known);
     match child {
-        KnownElement::DatabaseRanges => parent_kind == Some(Kind::Spreadsheet),
+        KnownElement::DatabaseRanges => parent_kind == Some(Kind::Workbook),
         KnownElement::DatabaseRange => parent_known == Some(KnownElement::DatabaseRanges),
         KnownElement::SourceSql
         | KnownElement::SourceTable
@@ -736,7 +803,13 @@ fn namespace_kind(namespace: &ResolveResult<'_>) -> NamespaceKind {
     }
 }
 
-fn splice(source: &str, start: usize, end: usize, replacement: &str) -> Result<String> {
+fn splice(
+    source: &str,
+    start: usize,
+    end: usize,
+    replacement: &str,
+    limits: &XmlStreamLimits,
+) -> Result<String> {
     if start > end
         || end > source.len()
         || !source.is_char_boundary(start)
@@ -749,7 +822,9 @@ fn splice(source: &str, start: usize, end: usize, replacement: &str) -> Result<S
         .checked_sub(end - start)
         .and_then(|length| length.checked_add(replacement.len()))
         .ok_or_else(|| invalid("ODS database-range replacement size overflow"))?;
-    if capacity > 128 * 1_048_576 {
+    if capacity > 128 * 1_048_576
+        || u64::try_from(capacity).unwrap_or(u64::MAX) > limits.max_bytes()
+    {
         return Err(invalid(
             "ODS database-range replacement exceeds the size limit",
         ));

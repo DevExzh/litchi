@@ -284,7 +284,7 @@ pub(crate) fn chart_scan_limits(limits: Limits) -> GraphLimits {
 }
 #[cfg(test)]
 pub(crate) fn chart_encoder(limits: Limits) -> Result<GraphEncoder> {
-    GraphEncoder::with_limits(BiffLimits {
+    GraphEncoder::new(BiffLimits {
         max_records: limits.max_records_per_chart,
         max_output_bytes: limits.max_workbook_bytes,
         ..BiffLimits::default()
@@ -305,7 +305,7 @@ pub(crate) fn record(kind: u16, data: &[u8]) -> Result<Vec<u8>> {
         max_output_bytes: output_bytes.max(1),
         ..BiffLimits::default()
     };
-    let mut out = GraphEncoder::with_limits(limits).map_err(|error| frame_error(kind, error))?;
+    let mut out = GraphEncoder::new(limits).map_err(|error| frame_error(kind, error))?;
     push_record(&mut out, kind, data)?;
     Ok(out.finish())
 }

@@ -19,9 +19,9 @@ litchi-opc = "0.0.1"
 ```
 
 ```rust
-use litchi_opc::{OpcPackage, Part};
+use litchi_opc::{OpcPackage, Part, SourceLimits};
 
-let pkg = OpcPackage::open("example.docx")?;
+let pkg = OpcPackage::open("example.docx", SourceLimits::default())?;
 for part in pkg.iter_parts() {
     println!("{} ({})", part.partname(), part.content_type());
 }
@@ -30,18 +30,18 @@ for part in pkg.iter_parts() {
 
 ## Bounded Ingestion
 
-All ordinary package constructors use bounded `ReadLimits::default()` values.
-For untrusted or multi-tenant input, build a checked profile from those defaults
-and use an `*_with_limits` constructor:
+All ordinary package constructors require a caller-selected `SourceLimits`
+profile. For untrusted or multi-tenant input, build a checked profile from
+those defaults and pass it to the canonical constructor:
 
 ```rust
-use litchi_opc::{OpcPackage, ReadLimits};
+use litchi_opc::{OpcPackage, SourceLimits};
 
-let limits = ReadLimits::builder()
+let limits = SourceLimits::builder()
     .max_input_bytes(32 * 1024 * 1024)?
-    .max_archive_members(10_000)?
+    .max_members(10_000)?
     .build()?;
-let package = OpcPackage::open_with_limits("untrusted.docx", limits)?;
+let package = OpcPackage::open("untrusted.docx", limits)?;
 # let _ = package;
 # Ok::<(), litchi_opc::OpcError>(())
 ```
@@ -52,17 +52,15 @@ and aggregate declared ZIP bytes at 2 GiB. It also bounds ZIP names, central
 directory metadata, compressed bytes, aggregate materialized parts,
 `[Content_Types].xml` and its mappings, relationship parts and XML, individual
 and aggregate relationships, graph nodes, XML events and depth, and
-relationship attribute and target lengths. `ReadResource` identifies the
+relationship attribute and target lengths. `SourceLimitKind` identifies the
 specific rejected resource.
 
 These ceilings are Litchi safety policy rather than ECMA-376 size maxima. They
 implement a defensive consumer boundary for the physical package and
 relationships described by ECMA-376 Part 2 sections 7.3.6 and 10, and the
-corresponding MS-OI29500 sections 2.1.1749-1752. DOCX and PPTX expose
-`Package::*_with_limits`; XLSX exposes both `Package::*_with_limits` and
-`Workbook::*_with_limits`; XLSB exposes `Workbook::new_with_limits`. Each takes
-the same `ReadLimits` profile so callers can use one contextual policy across
-OOXML formats.
+corresponding MS-OI29500 sections 2.1.1749-1752. The OOXML format owners
+forward this same `SourceLimits` profile through their canonical open and raw
+boundaries, so callers can use one contextual policy across formats.
 
 OPC readers treat macros, VBA, ActiveX, controls, OLE objects, and embedded
 code as inert blobs only when they are retained or exposed. They are never
@@ -85,10 +83,9 @@ Licensed under the Apache License, Version 2.0. Part of the [Litchi](https://git
 validating bounded XML. Noncompact XML must match retained source bytes; new XML
 must satisfy the authored compactness audit. The token shares its source buffer.
 
-`source_content_types_with_limits` and `source_relationships_with_limits` capture
-package metadata under a caller-selected `ReadLimits` profile. They check XML
-bytes, declaration or relationship counts, and XML attributes for both retained
-and regenerated XML. Their existing convenience methods use default limits.
+`source_content_types` and `source_relationships` capture package metadata under
+a caller-selected `SourceLimits` profile. They check XML bytes, declaration or
+relationship counts, and XML attributes for both retained and regenerated XML.
 Relationship capture compares the current graph with borrowed source bindings,
 avoiding metadata clones just to decide whether source bytes can be retained.
 
@@ -146,3 +143,45 @@ within the original parent; column-name selectors resolve against the owning
 table during ordinary edits. Survey snapshots retain source tokens for exact
 inverse publication and restoration of removed parts. The positional, budget-managed
 `SourceXmlPart` API remains available for source-backed package editing.
+
+## Retained prepared topologies
+
+`SourceBackedPackage::prepare_topology` returns a cheaply cloneable
+`PreparedTopology`. It owns the validated effective catalog, generated members,
+source authorizations and managed reservations. `with_candidate` reads that
+catalog lazily, and `publish_to_stream(&self, writer)` can publish it repeatedly
+or retry after a sink failure. Each publication rechecks base and transfer
+sources. Retained reservations are released when the last owner drops.
+
+`PreparedTopology::edit_xml` edits an existing source XML Part against the
+retained effective candidate and returns a new flat candidate. Prior topology
+changes survive; exact logical no-ops retain the candidate, and restoring every
+physical payload uses the exact-artifact path when no topology changes remain.
+Added Parts and authored replacements without source XML provenance still
+require further owner integration. General topology application is pending.
+
+`SourceXmlPart::begin_revision()` permits another positional edit over its
+current validated payload without reopening the archive or rescanning XML.
+Each call creates a distinct logical revision; range proofs from sibling or
+older revisions are refused, including proofs over equal bytes. Clones share
+one revision. A changed splice requires another explicit revision. Proofs keep
+their payload reservations alive, while successive revisions do not retain an
+ancestor chain. Physical replacement checks still use the original archive
+bytes and source identity. This per-part primitive does not yet supply chained
+package-wide effective catalogs.
+
+`PreparedTopology::part`, `iter_parts` and `main_document_part` provide owned,
+lazy `PreparedPartView` handles for both unchanged and edited candidates.
+Their `data()` handles retain the complete candidate and managed admissions,
+so views and payloads survive owner drop and stay on their captured revision.
+Added Parts and replacement bytes come from the effective catalog; removed
+Parts are absent. Metadata access is a captured read, while new payload/XML
+proof captures recheck base and transfer sources and execution contexts.
+Already captured bytes remain readable after a later physical source change.
+
+`physical_source_lineage`, `physical_source_version` and
+`physical_source_artifact` deliberately describe the original archive, excluding
+candidate edits. Use `publish_to_stream` for effective output; physical identity
+must not key caches of edited XML. `read_limits`, `execution_context`,
+`check_source` and `is_noop` let higher-level owners consume this state without
+retaining a second raw package for those duties.

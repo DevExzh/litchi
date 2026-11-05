@@ -1,0 +1,1340 @@
+{
+  "format": "keynote",
+  "state": "open",
+  "verbs": {
+    "get": {
+      "supported": true
+    },
+    "find": {
+      "supported": true
+    },
+    "query": {
+      "supported": true
+    },
+    "view": {
+      "supported": true
+    },
+    "evaluate": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "none: import and evaluation are worksheet operations",
+      "reason": "this format has no worksheets"
+    },
+    "set": {
+      "supported": true
+    },
+    "add": {
+      "supported": true
+    },
+    "remove": {
+      "supported": true
+    },
+    "move": {
+      "supported": true
+    },
+    "swap": {
+      "supported": true
+    },
+    "edit": {
+      "supported": true
+    },
+    "batch": {
+      "supported": true
+    },
+    "import": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "none: import and evaluation are worksheet operations",
+      "reason": "this format has no worksheets"
+    },
+    "merge": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "template merge for the ODF object formats and iWork (record 0295)",
+      "reason": "template merge fills word-processing, presentation and spreadsheet templates"
+    },
+    "replace": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0295 follow-up: a find adapter over the format's text edits",
+      "reason": "find/replace is not integrated for this format"
+    },
+    "refresh": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0295 follow-up: field refresh for PPT, RTF and the ODF object formats",
+      "reason": "this format has no field refresh adapter"
+    },
+    "save": {
+      "supported": true
+    },
+    "create": {
+      "supported": true
+    },
+    "dump": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0336 follow-up: dump plans for the remaining formats",
+      "reason": "this format's write verbs cannot yet rebuild its node tree on a created document"
+    },
+    "raw": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0336: package parts exist in OOXML and packaged ODF only",
+      "reason": "this format has no package parts"
+    },
+    "validate": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0336 follow-up: an iWork package validator from the iWork owners",
+      "reason": "iWork packages are validated by their owners on open; no report-producing validator exists"
+    },
+    "add-part": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0336: package parts exist in OOXML and packaged ODF only",
+      "reason": "this format has no package parts"
+    },
+    "raw-set": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0336: package parts exist in OOXML and packaged ODF only",
+      "reason": "this format has no package parts"
+    }
+  },
+  "views": {
+    "text": {
+      "supported": true
+    },
+    "annotated": {
+      "supported": true
+    },
+    "outline": {
+      "supported": true
+    },
+    "stats": {
+      "supported": true
+    },
+    "issues": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    "forms": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    "html": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "svg": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "screenshot": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "pdf": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    }
+  },
+  "elements": [
+    {
+      "format": "keynote",
+      "element": "presentation",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/"
+        ]
+      },
+      "children": [
+        {
+          "element": "slide",
+          "pathSegment": "slide"
+        }
+      ],
+      "properties": {
+        "slideCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      }
+    },
+    {
+      "format": "keynote",
+      "element": "slide",
+      "parent": "presentation",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "placeholder",
+          "pathSegment": "placeholder"
+        },
+        {
+          "element": "notes",
+          "pathSegment": "notes"
+        },
+        {
+          "element": "shape",
+          "pathSegment": "shape"
+        },
+        {
+          "element": "picture",
+          "pathSegment": "picture"
+        },
+        {
+          "element": "connector",
+          "pathSegment": "connector"
+        },
+        {
+          "element": "video",
+          "pathSegment": "video"
+        },
+        {
+          "element": "audio",
+          "pathSegment": "audio"
+        },
+        {
+          "element": "table",
+          "pathSegment": "table"
+        },
+        {
+          "element": "chart",
+          "pathSegment": "chart"
+        },
+        {
+          "element": "group",
+          "pathSegment": "group"
+        }
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "title": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "hidden": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "layout": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "from": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "keynote",
+      "element": "placeholder",
+      "parent": "slide",
+      "elementAliases": [
+        "ph"
+      ],
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/placeholder[title]",
+          "/slide[N]/placeholder[body]"
+        ]
+      },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "paragraph"
+        }
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "rotation": {
+          "type": "number",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "zorder": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "hidden": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "keynote",
+      "element": "notes",
+      "parent": "slide",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/notes"
+        ]
+      },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "paragraph"
+        }
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "keynote",
+      "element": "paragraph",
+      "parent": [
+        "placeholder",
+        "notes",
+        "shape"
+      ],
+      "elementAliases": [
+        "p"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/placeholder[title]/paragraph[N]",
+          "/slide[N]/notes/paragraph[N]",
+          "/slide[N]/shape[N]/paragraph[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "run",
+          "pathSegment": "run"
+        }
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "keynote",
+      "element": "run",
+      "parent": "paragraph",
+      "elementAliases": [
+        "r"
+      ],
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/shape[N]/paragraph[N]/run[N]"
+        ]
+      },
+      "properties": {
+        "bold": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "italic": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "underline": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "size": {
+          "type": "font-size",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "font.latin": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "keynote",
+      "element": "shape",
+      "parent": "slide",
+      "elementAliases": [
+        "textbox"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/shape[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "paragraph"
+        }
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "rotation": {
+          "type": "number",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "zorder": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "preset": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "keynote",
+      "element": "picture",
+      "parent": "slide",
+      "elementAliases": [
+        "image",
+        "img",
+        "pic"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/picture[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "rotation": {
+          "type": "number",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "zorder": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "src": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "keynote",
+      "element": "connector",
+      "parent": "slide",
+      "elementAliases": [
+        "connection"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/connector[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "rotation": {
+          "type": "number",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "zorder": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "keynote",
+      "element": "video",
+      "parent": "slide",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/video[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "rotation": {
+          "type": "number",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "zorder": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "keynote",
+      "element": "audio",
+      "parent": "slide",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/audio[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "rotation": {
+          "type": "number",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "zorder": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "keynote",
+      "element": "table",
+      "parent": "slide",
+      "elementAliases": [
+        "tbl"
+      ],
+      "operations": {
+        "add": true,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/table[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "tr",
+          "pathSegment": "tr"
+        }
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "rows": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "cols": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "rotation": {
+          "type": "number",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "zorder": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "data": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "keynote",
+      "element": "tr",
+      "parent": "table",
+      "elementAliases": [
+        "row"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/table[N]/tr[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "tc",
+          "pathSegment": "tc"
+        }
+      ],
+      "properties": {},
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "keynote",
+      "element": "tc",
+      "parent": "tr",
+      "elementAliases": [
+        "cell"
+      ],
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/table[N]/tr[N]/tc[N]"
+        ]
+      },
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "comment": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "type": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "value": {
+          "type": "scalar",
+          "add": false,
+          "set": true,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "keynote",
+      "element": "chart",
+      "parent": "slide",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/chart[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "rotation": {
+          "type": "number",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "zorder": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "font.size": {
+          "type": "font-size",
+          "add": false,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "keynote",
+      "element": "group",
+      "parent": "slide",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/group[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "rotation": {
+          "type": "number",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "zorder": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    }
+  ],
+  "gaps": [
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "run",
+      "context": "a new character run",
+      "code": "unsupported_capability",
+      "followUp": "IWORK_API_REQUESTS.md request 10 (Keynote character-style writes)",
+      "reason": "a run is a styled span of a paragraph; add a paragraph or set its text"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "tc",
+      "context": "cells in a formula graph",
+      "code": "unsupported_capability",
+      "followUp": "record 0309 follow-ups",
+      "reason": "slide-table cells take text, numbers, booleans and clears; a formula cell, or one a formula or chart reads, is refused so no calculation cache goes stale"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "table",
+      "context": "a deck without a slide table",
+      "code": "unsupported_capability",
+      "followUp": "record 0329 follow-up: a built-in table template",
+      "reason": "a new table copies the structure (styles, header counts, storage layout) of the deck's first slide table; a deck without one has none to copy"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "table",
+      "context": "a slide table, chart or group",
+      "code": "unsupported_capability",
+      "followUp": "record 0298 follow-up: structural removal of tables, charts and groups",
+      "reason": "the leaf's drawable removal refuses tables, charts and groups"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "video",
+      "context": "a new movie or audio clip",
+      "code": "unsupported_capability",
+      "followUp": "record 0309 follow-up: wire slide::movie and slide::audio creation",
+      "reason": "the leaf's movie and audio creation families need the clip's poster, duration and placement, which `add` does not take yet"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "video",
+      "context": "the frame of a movie, audio clip, line, table, chart or group",
+      "code": "unsupported_capability",
+      "followUp": "record 0298 follow-up: wire slide::movie::geometry; the drawable family refuses the others",
+      "reason": "the leaf's drawable geometry refuses tables, charts, groups, lines and movies"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "placeholder",
+      "context": "slide-number and object placeholders",
+      "code": "unsupported_capability",
+      "followUp": "record 0309 follow-ups",
+      "reason": "`remove` hides a title or body placeholder on its slide (and `hidden` = false shows it again); slide-number and object placeholders have no unified element"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "placeholder",
+      "context": "a new placeholder",
+      "code": "unsupported_capability",
+      "followUp": "record 0309 follow-ups",
+      "reason": "a slide's placeholders come from its layout; show a hidden one with `hidden` = false, or add a slide from a layout"
+    },
+    {
+      "subject": "view",
+      "mode": "issues",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "forms",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "html",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "svg",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "screenshot",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "pdf",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    }
+  ]
+}

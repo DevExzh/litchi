@@ -1,9 +1,9 @@
 use super::super::model::validate_list_object_style;
-use super::super::{CellPos, CellValue, CustomTableStyles, WritableCell, Writer};
+use super::super::{Builder, CellPos, CellValue, CustomTableStyles, WritableCell};
 use crate::error::{Error, Result};
 use crate::{ListObject, MapInfo};
 
-impl Writer {
+impl Builder {
     /// Install or replace the inert root-level XML-map catalog.
     ///
     /// Every existing mapped list column is resolved against the candidate

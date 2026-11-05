@@ -1,4 +1,13 @@
-//! Byte-preserving flat `OpenDocument` Image snapshots and bounded frame edits.
+//! Byte-preserving flat (single-file) `OpenDocument` Image owners and
+//! bounded frame edits.
+//!
+//! [`Image`] is the immutable owner of one `.fodi` document, opened under one
+//! [`OpenOptions`] envelope: the source `input_bytes` and the semantic
+//! `content_bytes` bound the XML, `depth` its nesting, `frames` its image
+//! frames, `map_areas` its image-map areas and `text_bytes` each image-map
+//! accessibility text. [`Image::edit`] stages an [`Edit`];
+//! [`Edit::commit`] publishes a new [`Image`] with its [`Patch`] and
+//! [`Diagnostics`]; [`Image::apply`] replays a patch onto its exact source.
 #![allow(
     clippy::arbitrary_source_item_ordering,
     reason = "The file keeps public snapshot/transaction types before their private XML machinery."
@@ -11,7 +20,7 @@ use crate::{
     source::Source,
     surface::{Surface, SurfaceLocation},
 };
-use litchi_core::{Error, FileFormat, Metadata, Result};
+use litchi_core::{Error as CoreError, FileFormat, Metadata, Result};
 use litchi_odf_common::{
     compact_xml,
     core::{MetaXmlPatch, metadata::Metadata as OdfMetadata, patch_meta_xml},
@@ -23,7 +32,18 @@ use quick_xml::{
     name::{Namespace, ResolveResult},
     reader::NsReader,
 };
-use std::{ops::Range, sync::Arc};
+use std::{io::Read, ops::Range, path::Path, sync::Arc};
+
+/// Whether a commit changed the image bytes.
+pub use litchi_core::edit::Diagnostics;
+/// A committed flat image: the published image, patch and diagnostics.
+pub type Commit = litchi_core::edit::Commit<Image, Patch>;
+/// The family error: typed limits and refusals plus the common-core payload.
+pub use litchi_odf_common::Error;
+/// The dimension named by [`Error::Limit`] and [`Error::InvalidLimit`].
+pub use litchi_odf_common::LimitKind;
+pub use litchi_odf_common::OpenOptions;
+use litchi_odf_common::{SemanticLimitKind, SemanticLimits, XmlStreamLimits};
 
 const OFFICE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const DRAW: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
@@ -32,16 +52,142 @@ const SVG: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0";
 const TEXT: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 const XLINK: &[u8] = b"http://www.w3.org/1999/xlink";
 const XML: &[u8] = b"http://www.w3.org/XML/1998/namespace";
+// The scanners' own ceilings are the largest values a caller may configure
+// (`SemanticLimits::MAXIMUM`); `Bounds` checks the configured, possibly
+// tighter, values.
 const MAX_BYTES: usize = 256 * 1024 * 1024;
-const MAX_DEPTH: usize = 256;
+const MAX_DEPTH: usize = 4_096;
 const MAX_FRAMES: usize = 1_000_000;
 const MAX_MAP_AREAS: usize = 100_000;
-const MAX_MAP_TEXT_BYTES: usize = 64 * 1024;
+const MAX_MAP_TEXT_BYTES: usize = 16 * 1024 * 1024;
+
+/// The bounds one flat image is read and edited under, resolved from its
+/// [`OpenOptions`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct Bounds {
+    bytes: usize,
+    depth: usize,
+    frames: usize,
+    map_areas: usize,
+    text_bytes: usize,
+    limits: SemanticLimits,
+    options: OpenOptions,
+}
+
+impl Default for Bounds {
+    fn default() -> Self {
+        Self::new(OpenOptions::new())
+    }
+}
+
+impl Bounds {
+    pub(crate) fn new(options: OpenOptions) -> Self {
+        let limits = options.semantic_limits_value();
+        let input =
+            usize::try_from(options.source_limits_value().max_input_bytes()).unwrap_or(usize::MAX);
+        Self {
+            bytes: input
+                .min(limits.usize_value(SemanticLimitKind::ContentBytes))
+                .min(MAX_BYTES),
+            depth: limits.usize_value(SemanticLimitKind::Depth).min(MAX_DEPTH),
+            frames: limits
+                .usize_value(SemanticLimitKind::Frames)
+                .min(MAX_FRAMES),
+            map_areas: limits
+                .usize_value(SemanticLimitKind::MapAreas)
+                .min(MAX_MAP_AREAS),
+            text_bytes: limits
+                .usize_value(SemanticLimitKind::TextBytes)
+                .min(MAX_MAP_TEXT_BYTES),
+            limits,
+            options,
+        }
+    }
+
+    fn exceeded(self, kind: SemanticLimitKind, observed: usize) -> CoreError {
+        self.limits
+            .check_core(kind, observed)
+            .err()
+            .unwrap_or_else(|| invalid("flat ODI limit accounting failed"))
+    }
+
+    fn check_input(self, observed: usize) -> Result<()> {
+        if observed <= self.bytes {
+            return Ok(());
+        }
+        if observed > self.limits.usize_value(SemanticLimitKind::ContentBytes) {
+            return Err(self.exceeded(SemanticLimitKind::ContentBytes, observed));
+        }
+        Err(CoreError::ResourceLimit(litchi_core::ResourceLimit {
+            resource: litchi_core::Resource::InputBytes,
+            observed: u64::try_from(observed).unwrap_or(u64::MAX),
+            limit: u64::try_from(self.bytes).unwrap_or(u64::MAX),
+            scope: "ODF owned package input".into(),
+        }))
+    }
+
+    /// Check the configured dimensions the scanners bound only by their
+    /// ceilings: nesting (one extra pass when the caller tightened it),
+    /// frames, image-map areas and accessibility text.
+    fn check_state(self, xml: &str, frames: &[Frame]) -> Result<()> {
+        if self.depth < MAX_DEPTH {
+            let depth = max_depth(xml)?;
+            if depth > self.depth {
+                return Err(self.exceeded(SemanticLimitKind::Depth, depth));
+            }
+        }
+        if frames.len() > self.frames {
+            return Err(self.exceeded(SemanticLimitKind::Frames, frames.len()));
+        }
+        for frame in frames {
+            let Some(map) = frame.image_map() else {
+                continue;
+            };
+            if map.areas().len() > self.map_areas {
+                return Err(self.exceeded(SemanticLimitKind::MapAreas, map.areas().len()));
+            }
+            for area in map.areas() {
+                let text = area
+                    .title()
+                    .map_or(0, str::len)
+                    .max(area.description().map_or(0, str::len));
+                if text > self.text_bytes {
+                    return Err(self.exceeded(SemanticLimitKind::TextBytes, text));
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+/// The deepest element nesting of well-formed XML (a bounded extra pass for
+/// a caller-tightened `depth`).
+fn max_depth(xml: &str) -> Result<usize> {
+    let mut reader = quick_xml::reader::Reader::from_str(xml);
+    let mut depth = 0usize;
+    let mut deepest = 0usize;
+    loop {
+        match reader
+            .read_event()
+            .map_err(|error| invalid(format!("invalid ODI XML: {error}")))?
+        {
+            Event::Start(_) => {
+                depth = depth.saturating_add(1);
+                deepest = deepest.max(depth);
+            },
+            Event::Empty(_) => deepest = deepest.max(depth.saturating_add(1)),
+            Event::End(_) => depth = depth.saturating_sub(1),
+            Event::Eof => return Ok(deepest),
+            _ => {},
+        }
+    }
+}
 
 #[derive(Debug)]
 struct State {
     bytes: Vec<u8>,
     root: Root,
+    bounds: Bounds,
     frames: Vec<Frame>,
     sites: Vec<FrameSite>,
     metadata: Option<Metadata>,
@@ -107,38 +253,147 @@ struct FrameTextEditSite {
     editable: bool,
 }
 
-/// An immutable, byte-preserving flat ODI snapshot.
+/// The immutable, byte-preserving owner of one flat ODI document.
+///
+/// Cheap to clone; a commit publishes a new image and never changes its
+/// source. The image keeps the [`OpenOptions`] it was opened with; its edits
+/// and replays use them.
 #[derive(Clone, Debug)]
-pub struct FlatImage(Arc<State>);
+pub struct Image(Arc<State>);
 
-impl FlatImage {
-    /// Opens a flat ODI document and inventories its inert image frames.
+impl Image {
+    /// Opens a flat ODI document from a path with the default
+    /// [`OpenOptions`].
     ///
     /// # Errors
     ///
-    /// Returns an error for the wrong family, malformed XML, unsupported image
-    /// sources, or exceeded input limits.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        if bytes.len() > MAX_BYTES {
-            return Err(invalid("flat ODI exceeds the input size limit"));
-        }
-        if litchi_odf_common::detect::flat(&bytes) != Some(FileFormat::Odi) {
+    /// As [`Self::from_bytes_with_options`], plus the read failure.
+    pub fn open(path: impl AsRef<Path>) -> std::result::Result<Self, Error> {
+        Self::open_with_options(path, OpenOptions::new())
+    }
+
+    /// Opens a flat ODI document from a path under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::from_bytes_with_options`], plus the read failure.
+    pub fn open_with_options(
+        path: impl AsRef<Path>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, Error> {
+        let file = std::fs::File::open(path)?;
+        Self::from_reader_with_options(file, options)
+    }
+
+    /// Reads a flat ODI document from a stream with the default
+    /// [`OpenOptions`].
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::from_bytes_with_options`], plus the read failure.
+    pub fn from_reader(reader: impl Read) -> std::result::Result<Self, Error> {
+        Self::from_reader_with_options(reader, OpenOptions::new())
+    }
+
+    /// Reads a flat ODI document from a stream under caller-selected
+    /// limits; the stream is read through a `bytes + 1` guard.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::from_bytes_with_options`], plus the read failure.
+    pub fn from_reader_with_options(
+        reader: impl Read,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, Error> {
+        let bounds = Bounds::new(options);
+        let mut bytes = Vec::new();
+        let guard = u64::try_from(bounds.bytes)
+            .unwrap_or(u64::MAX)
+            .saturating_add(1);
+        reader.take(guard).read_to_end(&mut bytes)?;
+        Ok(Self::from_flat_bytes(bytes, bounds)?)
+    }
+
+    /// Opens a flat ODI document with the default [`OpenOptions`]; the bytes
+    /// are copied.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::from_bytes_with_options`].
+    pub fn from_bytes(bytes: &[u8]) -> std::result::Result<Self, Error> {
+        Self::from_bytes_with_options(bytes, OpenOptions::new())
+    }
+
+    /// Opens a flat ODI document under caller-selected limits and
+    /// inventories its inert image frames; the bytes are copied.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Limit`] when a selected dimension is exceeded and
+    /// [`Error::Core`] for the wrong family, malformed XML or unsupported
+    /// image sources.
+    pub fn from_bytes_with_options(
+        bytes: &[u8],
+        options: OpenOptions,
+    ) -> std::result::Result<Self, Error> {
+        let bounds = Bounds::new(options);
+        bounds.check_input(bytes.len())?;
+        Ok(Self::from_flat_bytes(bytes.to_vec(), bounds)?)
+    }
+
+    pub(crate) fn from_flat_bytes(bytes: Vec<u8>, bounds: Bounds) -> Result<Self> {
+        bounds.check_input(bytes.len())?;
+        if litchi_odf_common::detect::flat(&bytes, litchi_odf_common::detect::Limits::default())
+            .ok()
+            .flatten()
+            != Some(FileFormat::Odi)
+        {
             return Err(invalid("input is not a flat ODI document"));
         }
-        Self::from_root_bytes(bytes, Root::Flat)
+        Self::from_root_bytes(bytes, Root::Flat, bounds)
     }
 
     /// Parses a packaged ODI `content.xml` part with the same bounded frame
     /// inventory and lossless edit-site scanner used for flat documents.
-    pub(crate) fn from_content_xml(bytes: Vec<u8>) -> Result<Self> {
+    pub(crate) fn from_content_xml(bytes: Vec<u8>, xml_limits: XmlStreamLimits) -> Result<Self> {
+        let bounds = Bounds::new(OpenOptions::new().xml_limits(xml_limits));
         if bytes.len() > MAX_BYTES {
             return Err(invalid("ODI content.xml exceeds the input size limit"));
         }
-        Self::from_root_bytes(bytes, Root::Content)
+        Self::from_root_bytes(bytes, Root::Content, bounds)
     }
 
-    fn from_root_bytes(bytes: Vec<u8>, root: Root) -> Result<Self> {
-        Ok(Self(Arc::new(parse(bytes, root)?)))
+    fn from_root_bytes(bytes: Vec<u8>, root: Root, bounds: Bounds) -> Result<Self> {
+        Ok(Self(Arc::new(parse(bytes, root, bounds)?)))
+    }
+
+    /// The options this image was opened with.
+    pub fn options(&self) -> OpenOptions {
+        self.0.bounds.options
+    }
+
+    pub(crate) fn bounds(&self) -> Bounds {
+        self.0.bounds
+    }
+
+    /// Replays a patch onto this exact source image.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when this image is not the patch's
+    /// exact source.
+    pub fn apply(&self, patch: &Patch) -> std::result::Result<Commit, Error> {
+        if !patch.is_applicable_to(self) {
+            return Err(Error::patch_conflict(
+                "flat.apply",
+                "the image is not the patch source",
+            ));
+        }
+        Ok(Commit::new(
+            patch.target.clone(),
+            patch.clone(),
+            Diagnostics::new(!patch.is_noop()),
+        ))
     }
 
     /// Returns the inert frames in source order.
@@ -201,18 +456,19 @@ impl FlatImage {
     /// Audits whether this exact flat XML can enter changed-byte publication.
     #[must_use]
     pub fn rewrite_capability(&self) -> crate::RewriteCapability {
-        let blockers = if compact_xml::validate(self.as_bytes()).is_ok() {
-            Vec::new()
-        } else {
-            vec![crate::RewriteBlocker::NonCompactXml]
-        };
+        let blockers =
+            if compact_xml::validate(self.as_bytes(), compact_xml::Limits::default()).is_ok() {
+                Vec::new()
+            } else {
+                vec![crate::RewriteBlocker::NonCompactXml]
+            };
         crate::RewriteCapability::new(blockers)
     }
 
-    /// Starts a source-bound transaction without changing this snapshot.
+    /// Starts a source-bound edit without changing this image.
     #[must_use]
-    pub fn transaction(&self) -> FlatImageTransaction {
-        FlatImageTransaction {
+    pub fn edit(&self) -> Edit {
+        Edit {
             source: self.clone(),
             changes: Vec::new(),
             metadata: None,
@@ -245,14 +501,26 @@ pub(crate) fn validate_content_xml(xml: &str) -> Result<()> {
     }
 }
 
-/// A source-bound mutable draft of flat ODI frame metadata.
-pub struct FlatImageTransaction {
-    source: FlatImage,
+/// A staged, source-bound edit of flat ODI frame metadata.
+pub struct Edit {
+    source: Image,
     changes: Vec<FrameChange>,
     metadata: Option<(crate::MetadataFields, crate::MetadataFields)>,
 }
 
-impl FlatImageTransaction {
+impl Edit {
+    /// The source image this edit stages against.
+    #[must_use]
+    pub fn package(&self) -> &Image {
+        &self.source
+    }
+
+    /// Discards every staged change in place.
+    pub fn reset(&mut self) {
+        self.changes.clear();
+        self.metadata = None;
+    }
+
     /// Stages a replacement for the document frame's optional name.
     ///
     /// # Errors
@@ -530,9 +798,9 @@ impl FlatImageTransaction {
         Ok(())
     }
 
-    /// Replaces the flat document keyword value.
-    pub fn set_keywords(&mut self, value: Option<String>) -> Result<()> {
-        self.metadata_mut()?.1.set_keywords(value);
+    /// Replaces the flat document keyword list; an empty list removes it.
+    pub fn set_keywords(&mut self, keywords: Vec<String>) -> Result<()> {
+        self.metadata_mut()?.1.set_keywords(keywords);
         self.remove_metadata_noop();
         Ok(())
     }
@@ -574,24 +842,34 @@ impl FlatImageTransaction {
         Ok(())
     }
 
-    /// Atomically validates and publishes an immutable edited snapshot.
+    /// Atomically validates and publishes an immutable edited image.
+    ///
+    /// An edit with no staged change commits the source itself:
+    /// `diagnostics().changed()` is false and `patch().is_noop()` holds.
     ///
     /// # Errors
     ///
     /// Returns an error if staged XML cannot be rewritten and read back safely.
-    pub fn commit(mut self) -> Result<FlatImageCommit> {
+    pub fn commit(self) -> std::result::Result<Commit, Error> {
+        Ok(self.commit_core()?)
+    }
+
+    pub(crate) fn commit_core(mut self) -> Result<Commit> {
         if self.changes.is_empty() && self.metadata.is_none() {
-            return Ok(FlatImageCommit {
-                snapshot: self.source.clone(),
-                patch: FlatImagePatch {
-                    source: self.source.clone(),
-                    target: self.source,
-                    changes: Vec::new(),
-                    metadata_change: None,
-                },
-            });
+            let patch = Patch {
+                source: self.source.clone(),
+                target: self.source,
+                changes: Vec::new(),
+                metadata_change: None,
+            };
+            return Ok(Commit::new(
+                patch.source.clone(),
+                patch,
+                Diagnostics::UNCHANGED,
+            ));
         }
         self.changes.sort_unstable_by_key(|change| change.frame);
+        let declared = root_prefix_bindings(self.source.as_bytes());
         let mut edits = Vec::with_capacity(self.changes.len() * 2);
         for change in &self.changes {
             let site = self.site(change.frame)?;
@@ -607,10 +885,10 @@ impl FlatImageTransaction {
                         .ok_or_else(|| invalid("ODI frame tag span is invalid"))?,
                 )
                 .map_err(|error| invalid(format!("ODI frame tag is not UTF-8: {error}")))?;
-                edits.push((
-                    span.clone(),
-                    rewrite_frame_tag(raw, &site.attributes, &change.before, &change.after)?,
-                ));
+                let mut tag =
+                    rewrite_frame_tag(raw, &site.attributes, &change.before, &change.after)?;
+                declare_inserted_prefixes(raw, &mut tag, &declared)?;
+                edits.push((span.clone(), tag));
             }
             let linked_source_changed = change.before.source() != change.after.source()
                 && matches!(change.after.source(), Source::Linked(_));
@@ -622,16 +900,15 @@ impl FlatImageTransaction {
                         .ok_or_else(|| invalid("ODI image tag span is invalid"))?,
                 )
                 .map_err(|error| invalid(format!("ODI image tag is not UTF-8: {error}")))?;
-                edits.push((
-                    site.image_tag.clone(),
-                    rewrite_image_tag(
-                        raw,
-                        site.href_attribute.as_deref(),
-                        &site.image_attributes,
-                        &change.before,
-                        &change.after,
-                    )?,
-                ));
+                let mut tag = rewrite_image_tag(
+                    raw,
+                    site.href_attribute.as_deref(),
+                    &site.image_attributes,
+                    &change.before,
+                    &change.after,
+                )?;
+                declare_inserted_prefixes(raw, &mut tag, &declared)?;
+                edits.push((site.image_tag.clone(), tag));
             }
             if change.before.source() != change.after.source()
                 && let Source::Embedded(bytes) = change.after.source()
@@ -674,10 +951,14 @@ impl FlatImageTransaction {
             .metadata
             .map(|(before, after)| crate::MetadataChange::new(before, after));
         if let Some(change) = &metadata_change {
-            bytes = patch_flat_metadata(&bytes, change.after())?;
+            bytes = patch_flat_metadata(
+                &bytes,
+                change.after(),
+                self.source.0.bounds.options.xml_limits_value(),
+            )?;
         }
-        compact_xml::validate(&bytes)?;
-        let snapshot = FlatImage::from_root_bytes(bytes, self.source.0.root)?;
+        compact_xml::validate(&bytes, compact_xml::Limits::default())?;
+        let snapshot = Image::from_root_bytes(bytes, self.source.0.root, self.source.0.bounds)?;
         for change in &self.changes {
             let actual = snapshot
                 .frames()
@@ -692,15 +973,17 @@ impl FlatImageTransaction {
         {
             return Err(invalid("flat ODI metadata edit failed semantic readback"));
         }
-        Ok(FlatImageCommit {
-            snapshot: snapshot.clone(),
-            patch: FlatImagePatch {
+        let changed = self.source.as_bytes() != snapshot.as_bytes();
+        Ok(Commit::new(
+            snapshot.clone(),
+            Patch {
                 source: self.source,
                 target: snapshot,
                 changes: self.changes,
                 metadata_change,
             },
-        })
+            Diagnostics::new(changed),
+        ))
     }
 
     fn frame(&self, index: usize) -> Result<&Frame> {
@@ -763,81 +1046,38 @@ impl FlatImageTransaction {
     }
 }
 
-/// A validated publication result and its reversible patch.
-pub struct FlatImageCommit {
-    snapshot: FlatImage,
-    patch: FlatImagePatch,
-}
-
-impl FlatImageCommit {
-    /// Returns the published immutable snapshot.
-    #[must_use]
-    pub fn snapshot(&self) -> &FlatImage {
-        &self.snapshot
-    }
-
-    /// Returns the exact-source-checked patch.
-    #[must_use]
-    pub fn patch(&self) -> &FlatImagePatch {
-        &self.patch
-    }
-
-    /// Returns the exact source snapshot accepted by this commit.
-    #[must_use]
-    pub const fn source(&self) -> &FlatImage {
-        &self.patch.source
-    }
-
-    /// Builds a deterministic semantic patch under explicit limits.
-    pub fn semantic_patch(&self, policy: &crate::SecurityPolicy) -> Result<crate::SemanticPatch> {
-        crate::SemanticPatch::from_flat_commit(self, policy)
-    }
-
-    /// Consumes this result and returns the published snapshot.
-    #[must_use]
-    pub fn into_snapshot(self) -> FlatImage {
-        self.snapshot
-    }
-}
-
 /// A source-checked reversible flat ODI metadata patch.
 #[derive(Clone, Debug)]
-pub struct FlatImagePatch {
-    source: FlatImage,
-    target: FlatImage,
+pub struct Patch {
+    source: Image,
+    target: Image,
     changes: Vec<FrameChange>,
     metadata_change: Option<crate::MetadataChange>,
 }
 
-impl FlatImagePatch {
+impl Patch {
     /// Returns the exact source snapshot.
     #[must_use]
-    pub const fn source(&self) -> &FlatImage {
+    pub const fn source(&self) -> &Image {
         &self.source
     }
 
     /// Returns the exact target snapshot.
     #[must_use]
-    pub const fn target(&self) -> &FlatImage {
+    pub const fn target(&self) -> &Image {
         &self.target
     }
 
     /// Returns whether the patch applies to this exact source byte sequence.
     #[must_use]
-    pub fn is_applicable_to(&self, source: &FlatImage) -> bool {
+    pub fn is_applicable_to(&self, source: &Image) -> bool {
         self.source.as_bytes() == source.as_bytes()
     }
 
-    /// Applies the patch only to its exact immutable source.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the supplied source is not byte-identical.
-    pub fn apply(&self, source: &FlatImage) -> Result<FlatImage> {
-        if !self.is_applicable_to(source) {
-            return Err(invalid("stale flat ODI patch source"));
-        }
-        FlatImage::from_bytes(self.target.as_bytes().to_vec())
+    /// Whether replaying this patch keeps the source bytes.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.source.as_bytes() == self.target.as_bytes()
     }
 
     /// Returns selector-bound metadata changes in source order.
@@ -850,6 +1090,11 @@ impl FlatImagePatch {
     #[must_use]
     pub const fn metadata_change(&self) -> Option<&crate::MetadataChange> {
         self.metadata_change.as_ref()
+    }
+
+    /// Builds a deterministic semantic patch under explicit limits.
+    pub fn semantic_patch(&self, policy: &crate::SecurityPolicy) -> Result<crate::SemanticPatch> {
+        crate::SemanticPatch::from_flat_patch(self, policy)
     }
 
     /// Returns the patch that restores the exact source snapshot.
@@ -924,7 +1169,7 @@ enum Root {
     Content,
 }
 
-fn parse(input_bytes: Vec<u8>, root: Root) -> Result<State> {
+fn parse(input_bytes: Vec<u8>, root: Root, bounds: Bounds) -> Result<State> {
     let xml = std::str::from_utf8(&input_bytes)
         .map_err(|error| invalid(format!("ODI XML is not UTF-8: {error}")))?;
     validate_structure(xml, root)?;
@@ -964,7 +1209,10 @@ fn parse(input_bytes: Vec<u8>, root: Root) -> Result<State> {
         frames.push(frame);
     }
     let metadata = if has_office_meta(xml)? {
-        Some(Metadata::from(OdfMetadata::from_xml(xml)?))
+        Some(Metadata::from(OdfMetadata::from_xml(
+            xml,
+            bounds.options.xml_limits_value(),
+        )?))
     } else {
         None
     };
@@ -982,9 +1230,11 @@ fn parse(input_bytes: Vec<u8>, root: Root) -> Result<State> {
             Root::Content => SurfaceLocation::ContentXml,
         },
     )?;
+    bounds.check_state(xml, &frames)?;
     Ok(State {
         bytes: input_bytes,
         root,
+        bounds,
         frames,
         sites,
         metadata,
@@ -1085,18 +1335,22 @@ fn has_office_meta(xml: &str) -> Result<bool> {
     }
 }
 
-fn patch_flat_metadata(bytes: &[u8], values: &crate::MetadataFields) -> Result<Vec<u8>> {
+fn patch_flat_metadata(
+    bytes: &[u8],
+    values: &crate::MetadataFields,
+    xml_limits: XmlStreamLimits,
+) -> Result<Vec<u8>> {
     let source = std::str::from_utf8(bytes)
         .map_err(|error| invalid(format!("flat ODI metadata source is not UTF-8: {error}")))?;
-    let parsed = OdfMetadata::from_xml(source)?;
+    let parsed = OdfMetadata::from_xml(source, xml_limits)?;
     let mut target = Metadata::from(parsed.clone());
     target.title = values.title().map(str::to_owned);
     target.author = values.author().map(str::to_owned);
     target.subject = values.subject().map(str::to_owned);
     target.description = values.description().map(str::to_owned);
-    target.keywords = values.keywords().map(str::to_owned);
+    target.keywords = values.keywords().to_vec();
     let patch = MetaXmlPatch::preserve_all().diff_simple_fields(&parsed, &target);
-    patch_meta_xml(source, &patch)?
+    patch_meta_xml(source, &patch, xml_limits)?
         .map(String::into_bytes)
         .ok_or_else(|| invalid("flat ODI metadata edit lost office:meta"))
 }
@@ -2184,6 +2438,63 @@ fn text_element(name: &str, value: &str) -> String {
     )
 }
 
+/// The namespace each prefix an attribute insertion writes is bound to.
+const INSERTED_PREFIXES: [(&str, &[u8]); 5] = [
+    ("svg", SVG),
+    ("draw", DRAW),
+    ("style", STYLE),
+    ("text", TEXT),
+    ("xlink", b"http://www.w3.org/1999/xlink"),
+];
+
+/// The prefixes the document root binds to the namespaces of
+/// [`INSERTED_PREFIXES`].
+fn root_prefix_bindings(source: &[u8]) -> Vec<&'static str> {
+    let mut reader = quick_xml::Reader::from_reader(source);
+    let mut buffer = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buffer) {
+            Ok(Event::Start(tag) | Event::Empty(tag)) => {
+                let raw = format!("<{}>", String::from_utf8_lossy(&tag));
+                return INSERTED_PREFIXES
+                    .iter()
+                    .filter(|(prefix, uri)| {
+                        find_attribute(&raw, &format!("xmlns:{prefix}"))
+                            .ok()
+                            .flatten()
+                            .is_some_and(|(_, value)| raw.as_bytes().get(value) == Some(*uri))
+                    })
+                    .map(|(prefix, _)| *prefix)
+                    .collect();
+            },
+            Ok(Event::Eof) | Err(_) => return Vec::new(),
+            Ok(_) => buffer.clear(),
+        }
+    }
+}
+
+/// Declare, on the rewritten `tag`, the prefix of every attribute the
+/// rewrite inserted whose namespace the root does not bind (a compact
+/// package drops unused declarations, record 0288).
+fn declare_inserted_prefixes(source: &str, tag: &mut String, declared: &[&str]) -> Result<()> {
+    for (prefix, uri) in INSERTED_PREFIXES {
+        if declared.contains(&prefix) {
+            continue;
+        }
+        let marker = format!(" {prefix}:");
+        let declaration = format!("xmlns:{prefix}");
+        if tag.contains(&marker)
+            && !source.contains(&marker)
+            && find_attribute(tag, &declaration)?.is_none()
+        {
+            let uri =
+                std::str::from_utf8(uri).map_err(|_| invalid("ODI namespace is not UTF-8"))?;
+            *tag = insert_attribute(tag, &declaration, uri)?;
+        }
+    }
+    Ok(())
+}
+
 fn rewrite_changed_attribute(
     tag: &mut String,
     existing: Option<&str>,
@@ -2379,6 +2690,6 @@ fn classify(namespace: &ResolveResult<'_>) -> NamespaceKind {
     }
 }
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn invalid(message: impl Into<String>) -> CoreError {
+    CoreError::InvalidFormat(message.into())
 }

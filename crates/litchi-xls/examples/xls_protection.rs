@@ -1,7 +1,7 @@
-use litchi_xls::Writer;
+use litchi_xls::Builder;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Protected")?;
 
     // Some sample content
@@ -14,6 +14,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Protect the sheet, including objects and scenarios, with its own password.
     writer.protect_sheet(sheet, Some("sheetpw"), true, true)?;
 
-    writer.save("xls_protection.xls")?;
+    writer.build()?.save("xls_protection.xls")?;
     Ok(())
 }

@@ -1,19 +1,25 @@
-//! Source-preserving property-set transactions for a complete DOC package.
+//! The DOC property-set edit family (record 0351 §2.3, record 0359): typed
+//! edits of the OLE `SummaryInformation`, `DocumentSummaryInformation` and
+//! user-defined property sets of one [`crate::Package`].
 //!
-//! The OLE property-set grammar and typed PID owners live in
-//! `litchi-ole-common`. This module only supplies the DOC package boundary:
-//! host validation, owned source bytes, and source-checked whole-package
-//! commits. A generic `Package<R>` cannot safely mutate in place because its
+//! [`crate::Package::property_sets`] reads the sections,
+//! [`crate::Package::edit_property_sets`] stages edits on an [`Edit`] and
+//! [`Edit::commit`] publishes a new [`crate::Package`] with an exact
+//! whole-package [`Patch`] and [`Diagnostics`];
+//! [`crate::Package::apply_property_sets`] replays the patch. The OLE
+//! property-set grammar and typed PID owners live in `litchi-ole-common`;
+//! this module supplies the DOC package boundary: host validation, owned
+//! source bytes, protection and source-checked publication. A generic `raw::Reader<R>` cannot safely mutate in place because its
 //! reader is owned by the parsed CFB file and the original artifact bytes are
 //! not recoverable from that API.
 
-use super::{Error, Result};
+use super::{Error as PackageError, Result as PackageResult};
 use crate::parts::fib::FileInformationBlock;
 use crate::parts::protection::{EditProtection, ProtectionPolicy, classify};
 use crate::user_defined_hyperlinks::{Limits, MutationError, UserDefinedHyperlinks};
-use litchi_cfb::{OleError, OleFile};
+use litchi_cfb::{OleError, OleFile, OleFileLimits};
 use litchi_ole_common::property_set::{
-    self, Binding, PropertySetReader, Section, Stream, USER_DEFINED_PROPERTIES_FMTID,
+    self, Binding, CodePage, PropertySetReader, Section, Stream, USER_DEFINED_PROPERTIES_FMTID,
 };
 use litchi_ole_common::vba_signature;
 use std::io::Cursor;
@@ -28,7 +34,7 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Parses and validates an owned DOC compound-file artifact.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
+    pub(crate) fn from_bytes(bytes: Vec<u8>) -> PackageResult<Self> {
         validate_host(&bytes)?;
         let protection = classify_host(&bytes)?;
         Ok(Self {
@@ -43,21 +49,21 @@ impl Snapshot {
         self.protection
     }
 
-    /// Parses a borrowed DOC artifact while retaining an owned source copy.
-    pub fn parse(bytes: &[u8]) -> Result<Self> {
-        Self::from_bytes(bytes.to_vec())
-    }
-
     /// Returns the exact source artifact bytes.
     #[must_use]
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
     }
 
+    /// Shared ownership of the exact source allocation.
+    pub(crate) fn bytes_shared(&self) -> Arc<[u8]> {
+        Arc::clone(&self.bytes)
+    }
+
     /// Projects the standard `SummaryInformation` section, when present.
     pub fn summary_information(
         &self,
-    ) -> Result<Option<property_set::summary_information::Snapshot>> {
+    ) -> PackageResult<Option<property_set::summary_information::Snapshot>> {
         let Some(stream) = read_stream(&self.bytes, Binding::SummaryInformation)? else {
             return Ok(None);
         };
@@ -69,7 +75,7 @@ impl Snapshot {
     /// Projects the standard `DocumentSummaryInformation` section, when present.
     pub fn document_summary_information(
         &self,
-    ) -> Result<Option<property_set::document_summary::Snapshot>> {
+    ) -> PackageResult<Option<property_set::document_summary::Snapshot>> {
         let Some(stream) = read_stream(&self.bytes, Binding::DocumentSummaryInformation)? else {
             return Ok(None);
         };
@@ -87,7 +93,7 @@ impl Snapshot {
     /// remain opaque. It never verifies certificate trust, opens a VBA
     /// project, or executes code. `None` means the property stream or the
     /// `DigitalSignature` property is absent.
-    pub fn vba_signature(&self) -> Result<Option<vba_signature::Snapshot>> {
+    pub fn vba_signature(&self) -> PackageResult<Option<vba_signature::Snapshot>> {
         self.vba_signature_with(vba_signature::Limits::default())
     }
 
@@ -95,7 +101,7 @@ impl Snapshot {
     pub fn vba_signature_with(
         &self,
         limits: vba_signature::Limits,
-    ) -> Result<Option<vba_signature::Snapshot>> {
+    ) -> PackageResult<Option<vba_signature::Snapshot>> {
         let Some(summary) = self.document_summary_information()? else {
             return Ok(None);
         };
@@ -103,51 +109,21 @@ impl Snapshot {
     }
 
     /// Returns the generic user-defined section, when present.
-    pub fn user_defined_properties(&self) -> Result<Option<Section>> {
+    pub fn user_defined_properties(&self) -> PackageResult<Option<Section>> {
         Ok(read_stream(&self.bytes, Binding::UserDefinedProperties)?
             .and_then(|stream| stream.section(USER_DEFINED_PROPERTIES_FMTID).cloned()))
     }
 
-    /// Reads `_PID_HLINKS` using caller-supplied DOC field context.
-    ///
-    /// A property-set snapshot does not own WordDocument/Table streams, so it
-    /// cannot infer field associations on its own. Pass the parsed field table
-    /// from the same source artifact to discover
-    /// [`crate::HyperlinkAssociation::FieldCandidates`]. A numeric match is
-    /// never a proven field association until the caller selects it with
-    /// [`crate::UserDefinedHyperlink::resolve_field`].
+    /// Reads `_PID_HLINKS` with explicit typed-overlay limits.
     pub fn user_defined_hyperlinks(
         &self,
         fields: Option<&crate::FieldsTable>,
-    ) -> Result<Option<UserDefinedHyperlinks>> {
-        self.user_defined_hyperlinks_with_limits(fields, Limits::default())
-    }
-
-    /// Reads `_PID_HLINKS` with explicit typed-overlay limits.
-    pub fn user_defined_hyperlinks_with_limits(
-        &self,
-        fields: Option<&crate::FieldsTable>,
         limits: Limits,
-    ) -> Result<Option<UserDefinedHyperlinks>> {
+    ) -> PackageResult<Option<UserDefinedHyperlinks>> {
         let Some(section) = self.user_defined_properties()? else {
             return Ok(None);
         };
-        crate::user_defined_hyperlinks::from_user_defined_section_with_limits(
-            &section, fields, limits,
-        )
-    }
-
-    /// Starts an isolated, source-checked property-set transaction.
-    ///
-    /// The common editor rejects signed or encrypted containers before any
-    /// mutation can be staged.
-    pub fn transaction(&self) -> Result<Transaction> {
-        self.transaction_with_policy(ProtectionPolicy::default())
-    }
-
-    /// Starts a property-set transaction with an explicit protected-edit policy.
-    pub fn transaction_with_policy(&self, policy: ProtectionPolicy) -> Result<Transaction> {
-        Transaction::new(self.clone(), policy)
+        crate::user_defined_hyperlinks::from_user_defined_section(&section, fields, limits)
     }
 
     /// Consumes the snapshot into its owned source bytes.
@@ -157,17 +133,21 @@ impl Snapshot {
     }
 }
 
-/// An isolated DOC property-set transaction over owned CFB bytes.
-pub struct Transaction {
+/// The crate-private property-set staging over owned CFB bytes, shared by
+/// [`Edit`] and the package metadata family.
+pub(crate) struct Staging {
     source: Snapshot,
-    editor: property_set::Editor,
+    editor: property_set::Edit,
     changed: bool,
     protection_policy: ProtectionPolicy,
 }
 
-impl Transaction {
-    fn new(source: Snapshot, protection_policy: ProtectionPolicy) -> Result<Self> {
-        let editor = property_set::Editor::new(source.bytes.to_vec())?;
+impl Staging {
+    pub(crate) fn new(
+        source: Snapshot,
+        protection_policy: ProtectionPolicy,
+    ) -> PackageResult<Self> {
+        let editor = property_set::Edit::new(source.bytes.to_vec(), OleFileLimits::default())?;
         Ok(Self {
             source,
             editor,
@@ -176,16 +156,22 @@ impl Transaction {
         })
     }
 
-    /// Whether a successful edit has changed the transaction state.
-    #[must_use]
-    pub const fn is_changed(&self) -> bool {
-        self.changed
+    /// The shared property-set editor, for the package metadata transaction.
+    pub(crate) const fn editor(&self) -> &property_set::Edit {
+        &self.editor
+    }
+
+    /// Mutable access to the shared editor; staging through it marks the
+    /// transaction changed.
+    pub(crate) fn editor_mut(&mut self) -> &mut property_set::Edit {
+        self.changed = true;
+        &mut self.editor
     }
 
     /// Projects the current transaction-local `SummaryInformation` section.
-    pub fn summary_information(
+    pub(crate) fn summary_information(
         &self,
-    ) -> Result<Option<property_set::summary_information::Snapshot>> {
+    ) -> PackageResult<Option<property_set::summary_information::Snapshot>> {
         let Some(section) = self.editor.property_set(Binding::SummaryInformation)? else {
             return Ok(None);
         };
@@ -195,9 +181,9 @@ impl Transaction {
     }
 
     /// Projects the current transaction-local `DocumentSummaryInformation` section.
-    pub fn document_summary_information(
+    pub(crate) fn document_summary_information(
         &self,
-    ) -> Result<Option<property_set::document_summary::Snapshot>> {
+    ) -> PackageResult<Option<property_set::document_summary::Snapshot>> {
         let Some(section) = self
             .editor
             .property_set(Binding::DocumentSummaryInformation)?
@@ -209,16 +195,11 @@ impl Transaction {
             .map_err(Into::into)
     }
 
-    /// Reads the current transaction-local inert VBA `DigSigBlob`.
-    pub fn vba_signature(&self) -> Result<Option<vba_signature::Snapshot>> {
-        self.vba_signature_with(vba_signature::Limits::default())
-    }
-
     /// Reads the current transaction-local VBA signature with explicit limits.
-    pub fn vba_signature_with(
+    pub(crate) fn vba_signature_with(
         &self,
         limits: vba_signature::Limits,
-    ) -> Result<Option<vba_signature::Snapshot>> {
+    ) -> PackageResult<Option<vba_signature::Snapshot>> {
         let Some(summary) = self.document_summary_information()? else {
             return Ok(None);
         };
@@ -228,12 +209,15 @@ impl Transaction {
     /// Replaces PIDDSI `DigitalSignature` with an already validated inert
     /// `DigSigBlob` snapshot. Its nested PKCS#7 `SignedData` and
     /// `contentInfo` form remain opaque to this package owner.
-    pub fn set_vba_signature(&mut self, signature: &vba_signature::Snapshot) -> Result<bool> {
+    pub(crate) fn set_vba_signature(
+        &mut self,
+        signature: &vba_signature::Snapshot,
+    ) -> PackageResult<bool> {
         self.edit_document_summary_information(|edit| edit.set_vba_signature(signature))
     }
 
     /// Removes PIDDSI `DigitalSignature`, when the property is present.
-    pub fn remove_vba_signature(&mut self) -> Result<bool> {
+    pub(crate) fn remove_vba_signature(&mut self) -> PackageResult<bool> {
         if self
             .editor
             .property_set(Binding::DocumentSummaryInformation)?
@@ -247,46 +231,32 @@ impl Transaction {
         })
     }
 
-    /// Edits the opaque PKCS#7 signature and certificate-store payloads
-    /// atomically. ASN.1 content form and certificate trust remain outside
-    /// this inert storage owner.
-    ///
-    /// The nested transaction rewrites only those payloads and preserves
-    /// producer-specific gaps and padding. Its closure never receives a
-    /// cryptographic verifier or a VBA execution context.
-    pub fn edit_vba_signature<F>(&mut self, edit: F) -> Result<bool>
-    where
-        F: FnOnce(&mut vba_signature::Transaction) -> std::result::Result<(), vba_signature::Error>,
-    {
-        self.edit_vba_signature_with_limits(vba_signature::Limits::default(), edit)
-    }
-
     /// Edits the opaque VBA signature using explicit nested-blob limits.
-    pub fn edit_vba_signature_with_limits<F>(
+    pub(crate) fn edit_vba_signature<F>(
         &mut self,
         limits: vba_signature::Limits,
         edit: F,
-    ) -> Result<bool>
+    ) -> PackageResult<bool>
     where
-        F: FnOnce(&mut vba_signature::Transaction) -> std::result::Result<(), vba_signature::Error>,
+        F: FnOnce(&mut vba_signature::Edit) -> std::result::Result<(), vba_signature::Error>,
     {
         let signature = self.vba_signature_with(limits)?.ok_or_else(|| {
-            Error::InvalidFormat(
+            PackageError::InvalidFormat(
                 "DocumentSummaryInformation has no VBA DigitalSignature blob".to_string(),
             )
         })?;
         let mut transaction = signature.edit();
         edit(&mut transaction).map_err(|error| {
-            Error::InvalidFormat(format!("invalid VBA signature edit: {error}"))
+            PackageError::InvalidFormat(format!("invalid VBA signature edit: {error}"))
         })?;
         let commit = transaction.commit().map_err(|error| {
-            Error::InvalidFormat(format!("invalid VBA signature edit: {error}"))
+            PackageError::InvalidFormat(format!("invalid VBA signature edit: {error}"))
         })?;
-        self.set_vba_signature(commit.snapshot())
+        self.set_vba_signature(commit.package())
     }
 
     /// Returns the current transaction-local user-defined section.
-    pub fn user_defined_properties(&self) -> Result<Option<Section>> {
+    pub(crate) fn user_defined_properties(&self) -> PackageResult<Option<Section>> {
         self.editor
             .property_set(Binding::UserDefinedProperties)
             .map_err(Into::into)
@@ -297,63 +267,72 @@ impl Transaction {
     /// The common typed transaction is committed before its replacement is
     /// handed to the common CFB editor. A no-op typed commit does not stage a
     /// stream replacement, preserving the complete source artifact byte-for-byte.
-    pub fn edit_summary_information<F>(&mut self, edit: F) -> Result<bool>
+    ///
+    /// A package without a `\x05SummaryInformation` stream (a file the
+    /// [`crate::Builder`] built without properties, for one) starts from an
+    /// empty section with the Windows-1252 code page, and the stream is
+    /// created when the edit changes it; an existing blank section (no
+    /// property, not even a code page) is treated the same way.
+    pub(crate) fn edit_summary_information<F>(&mut self, edit: F) -> PackageResult<bool>
     where
         F: for<'a> FnOnce(
             &mut property_set::summary_information::Edit<'a>,
         ) -> std::result::Result<(), OleError>,
     {
-        let source = self
-            .editor
-            .property_set(Binding::SummaryInformation)?
-            .ok_or(OleError::StreamNotFound)?;
-        let snapshot = property_set::summary_information::Snapshot::from_section(&source)?;
-        let mut transaction = snapshot.transaction()?;
-        {
-            let mut draft = transaction.edit();
-            edit(&mut draft)?;
-        }
-        let commit = transaction.commit()?;
-        if !commit.changed() {
+        let snapshot = match self.editor.property_set(Binding::SummaryInformation)? {
+            Some(source) if !source.is_empty() => {
+                property_set::summary_information::Snapshot::from_section(&source)?
+            },
+            _ => property_set::summary_information::Snapshot::new(CodePage::WINDOWS_1252)?,
+        };
+        let mut draft = snapshot.edit()?;
+        edit(&mut draft)?;
+        let commit = draft.commit()?;
+        if !commit.diagnostics().changed() {
             return Ok(false);
         }
         self.editor
-            .replace(Binding::SummaryInformation, commit.into_section())?;
+            .replace(Binding::SummaryInformation, commit.into_package())?;
         self.changed = true;
         Ok(true)
     }
 
     /// Applies a typed `DocumentSummaryInformation` edit through the common PIDDSI owner.
-    pub fn edit_document_summary_information<F>(&mut self, edit: F) -> Result<bool>
+    ///
+    /// A missing or blank section is handled as in
+    /// [`Self::edit_summary_information`]; a user-defined section already in
+    /// the stream is kept.
+    pub(crate) fn edit_document_summary_information<F>(&mut self, edit: F) -> PackageResult<bool>
     where
         F: for<'a> FnOnce(
             &mut property_set::document_summary::Edit<'a>,
         ) -> std::result::Result<(), OleError>,
     {
-        let source = self
+        let snapshot = match self
             .editor
             .property_set(Binding::DocumentSummaryInformation)?
-            .ok_or(OleError::StreamNotFound)?;
-        let snapshot = property_set::document_summary::Snapshot::from_section(&source)?;
-        let mut transaction = snapshot.transaction()?;
         {
-            let mut draft = transaction.edit();
-            edit(&mut draft)?;
-        }
-        let commit = transaction.commit()?;
-        if !commit.changed() {
+            Some(source) if !source.is_empty() => {
+                property_set::document_summary::Snapshot::from_section(&source)?
+            },
+            _ => property_set::document_summary::Snapshot::new(CodePage::WINDOWS_1252)?,
+        };
+        let mut draft = snapshot.edit()?;
+        edit(&mut draft)?;
+        let commit = draft.commit()?;
+        if !commit.diagnostics().changed() {
             return Ok(false);
         }
         self.editor
-            .replace(Binding::DocumentSummaryInformation, commit.into_section())?;
+            .replace(Binding::DocumentSummaryInformation, commit.into_package())?;
         self.changed = true;
         Ok(true)
     }
 
     /// Applies a generic user-defined property-section edit.
-    pub fn edit_user_defined_properties<F>(&mut self, edit: F) -> Result<bool>
+    pub(crate) fn edit_user_defined_properties<F>(&mut self, edit: F) -> PackageResult<bool>
     where
-        F: FnOnce(&mut Section) -> std::result::Result<(), OleError>,
+        F: FnOnce(&mut Section) -> std::result::Result<(), litchi_ole_common::Error>,
     {
         let source = self.editor.property_set(Binding::UserDefinedProperties)?;
         let mut candidate = source
@@ -374,7 +353,7 @@ impl Transaction {
 
     /// Removes the user-defined section while retaining the rest of the
     /// `DocumentSummaryInformation` stream.
-    pub fn remove_user_defined_properties(&mut self) -> Result<bool> {
+    pub(crate) fn remove_user_defined_properties(&mut self) -> PackageResult<bool> {
         if self
             .editor
             .property_set(Binding::UserDefinedProperties)?
@@ -387,22 +366,8 @@ impl Transaction {
         Ok(true)
     }
 
-    /// Replaces `_PID_HLINKS` atomically through the shared typed owner.
-    ///
-    /// Only caller-resolved field entries are serialized in the MS-DOC section
-    /// 2.4.7 story/index order. All other entries remain inert and stable
-    /// relative to one another. A changed value containing unresolved field
-    /// candidates is refused; an exact raw no-op preserves it. This
-    /// transaction never writes PIDDSI `0x15`.
-    pub fn put_user_defined_hyperlinks(
-        &mut self,
-        hyperlinks: &UserDefinedHyperlinks,
-    ) -> std::result::Result<bool, MutationError> {
-        self.put_user_defined_hyperlinks_with_limits(hyperlinks, Limits::default())
-    }
-
     /// Replaces `_PID_HLINKS` with explicit shared typed-overlay limits.
-    pub fn put_user_defined_hyperlinks_with_limits(
+    pub(crate) fn put_user_defined_hyperlinks(
         &mut self,
         hyperlinks: &UserDefinedHyperlinks,
         limits: Limits,
@@ -415,7 +380,7 @@ impl Transaction {
             hyperlinks,
             limits,
         )
-        .map_err(Error::from)
+        .map_err(PackageError::from)
         .map_err(MutationError::from)?
         {
             return Ok(false);
@@ -438,173 +403,300 @@ impl Transaction {
     ///
     /// This never writes PIDDSI `0x15` and leaves unrelated user-defined
     /// properties and dictionary entries intact.
-    pub fn remove_user_defined_hyperlinks(&mut self) -> Result<bool> {
+    pub(crate) fn remove_user_defined_hyperlinks(&mut self) -> PackageResult<bool> {
         self.edit_user_defined_properties(|section| {
             crate::user_defined_hyperlinks::remove(section, Limits::default())?;
             Ok(())
         })
     }
 
-    /// Publishes the transaction as an owned, source-checked package commit.
-    pub fn commit(self) -> Result<Commit> {
-        let before = self.source.bytes.clone();
+    /// The staged artifact bytes, authorized by the protection policy when
+    /// they differ from the source.
+    pub(crate) fn finish(self) -> PackageResult<Vec<u8>> {
         let bytes = self.editor.finish()?;
-        let changed = bytes.as_slice() != before.as_ref();
-        if changed {
+        if bytes.as_slice() != self.source.bytes.as_ref() {
             self.protection_policy.authorize(self.source.protection)?;
         }
-        // The editor can finish without staged changes, or a sequence of
-        // edits can restore the complete source artifact byte-for-byte.  The
-        // source was already validated at transaction creation, so retain
-        // that exact allocation instead of reparsing and allocating a new
-        // snapshot for the no-op result.
-        let snapshot = if bytes.as_slice() == before.as_ref() {
-            Snapshot {
-                bytes: Arc::clone(&before),
-                protection: self.source.protection,
-            }
-        } else {
-            Snapshot::from_bytes(bytes)?
-        };
-        let changed = before.as_ref() != snapshot.bytes.as_ref();
-        Ok(Commit {
-            patch: Patch {
-                source: before,
-                replacement: snapshot.bytes.clone(),
-            },
-            snapshot,
-            changed,
+        Ok(bytes)
+    }
+}
+
+crate::scoped::family!("property set");
+
+/// A staged property-set edit of one package. Dropping it discards it.
+pub struct Edit {
+    base: crate::scoped::Base,
+    inner: Option<Staging>,
+}
+
+impl std::fmt::Debug for Edit {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Edit")
+            .field("base", &self.base)
+            .finish_non_exhaustive()
+    }
+}
+
+impl Edit {
+    fn open(base: crate::scoped::Base) -> Result<Self> {
+        Ok(Self { base, inner: None })
+    }
+
+    fn inner_mut(&mut self) -> Result<&mut Staging> {
+        if self.inner.is_none() {
+            let source = Snapshot::from_bytes(self.base.to_vec()?)?;
+            self.inner = Some(Staging::new(
+                source,
+                self.base.options().protection_policy_value(),
+            )?);
+        }
+        self.inner.as_mut().ok_or_else(|| {
+            Error::Package(PackageError::InvalidFormat(
+                "property-set edit was not initialized".into(),
+            ))
         })
     }
 
-    /// Discards the transaction and recovers its exact source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
+    fn take_inner(&mut self) -> Result<Staging> {
+        self.inner_mut()?;
+        self.inner.take().ok_or_else(|| {
+            Error::Package(PackageError::InvalidFormat(
+                "property-set edit was not initialized".into(),
+            ))
+        })
+    }
+
+    /// Projects the staged `SummaryInformation` section.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the staged stream is not a valid property set.
+    pub fn summary_information(
+        &mut self,
+    ) -> Result<Option<property_set::summary_information::Snapshot>> {
+        Ok(self.inner_mut()?.summary_information()?)
+    }
+
+    /// Projects the staged `DocumentSummaryInformation` section.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the staged stream is not a valid property set.
+    pub fn document_summary_information(
+        &mut self,
+    ) -> Result<Option<property_set::document_summary::Snapshot>> {
+        Ok(self.inner_mut()?.document_summary_information()?)
+    }
+
+    /// Reads the staged inert VBA `DigSigBlob` with explicit limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the staged blob is malformed or over `limits`.
+    pub fn vba_signature(
+        &mut self,
+        limits: vba_signature::Limits,
+    ) -> Result<Option<vba_signature::Snapshot>> {
+        Ok(self.inner_mut()?.vba_signature_with(limits)?)
+    }
+
+    /// Replaces PIDDSI `DigitalSignature` with an already validated inert
+    /// `DigSigBlob` snapshot. Returns whether the staged state changed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the property set cannot hold the blob.
+    pub fn set_vba_signature(&mut self, signature: &vba_signature::Snapshot) -> Result<bool> {
+        Ok(self.inner_mut()?.set_vba_signature(signature)?)
+    }
+
+    /// Removes PIDDSI `DigitalSignature`, when present. Returns whether the
+    /// staged state changed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the staged property set is malformed.
+    pub fn remove_vba_signature(&mut self) -> Result<bool> {
+        Ok(self.inner_mut()?.remove_vba_signature()?)
+    }
+
+    /// Edits the opaque VBA signature using explicit nested-blob limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no signature is present or the edit is invalid.
+    pub fn edit_vba_signature<F>(&mut self, limits: vba_signature::Limits, edit: F) -> Result<bool>
+    where
+        F: FnOnce(&mut vba_signature::Edit) -> std::result::Result<(), vba_signature::Error>,
+    {
+        Ok(self.inner_mut()?.edit_vba_signature(limits, edit)?)
+    }
+
+    /// Returns the staged user-defined section.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the staged stream is not a valid property set.
+    pub fn user_defined_properties(&mut self) -> Result<Option<Section>> {
+        Ok(self.inner_mut()?.user_defined_properties()?)
+    }
+
+    /// Applies a typed `SummaryInformation` edit through the common PIDSI
+    /// owner. A missing or blank section starts from an empty Windows-1252
+    /// section. Returns whether the staged state changed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the edit or the staged property set is invalid.
+    pub fn edit_summary_information<F>(&mut self, edit: F) -> Result<bool>
+    where
+        F: for<'a> FnOnce(
+            &mut property_set::summary_information::Edit<'a>,
+        ) -> std::result::Result<(), OleError>,
+    {
+        Ok(self.inner_mut()?.edit_summary_information(edit)?)
+    }
+
+    /// Applies a typed `DocumentSummaryInformation` edit through the common
+    /// PIDDSI owner. Returns whether the staged state changed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the edit or the staged property set is invalid.
+    pub fn edit_document_summary_information<F>(&mut self, edit: F) -> Result<bool>
+    where
+        F: for<'a> FnOnce(
+            &mut property_set::document_summary::Edit<'a>,
+        ) -> std::result::Result<(), OleError>,
+    {
+        Ok(self.inner_mut()?.edit_document_summary_information(edit)?)
+    }
+
+    /// Applies a generic user-defined property-section edit. Returns whether
+    /// the staged state changed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the edit or the staged property set is invalid.
+    pub fn edit_user_defined_properties<F>(&mut self, edit: F) -> Result<bool>
+    where
+        F: FnOnce(&mut Section) -> std::result::Result<(), litchi_ole_common::Error>,
+    {
+        Ok(self.inner_mut()?.edit_user_defined_properties(edit)?)
+    }
+
+    /// Removes the user-defined section while retaining the rest of the
+    /// `DocumentSummaryInformation` stream. Returns whether it was present.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the staged property set is malformed.
+    pub fn remove_user_defined_properties(&mut self) -> Result<bool> {
+        Ok(self.inner_mut()?.remove_user_defined_properties()?)
+    }
+
+    /// Replaces `_PID_HLINKS` with explicit shared typed-overlay limits.
+    /// Returns whether the staged state changed.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`MutationError`] for unresolved field candidates, a limit
+    /// or an invalid staged property set.
+    pub fn put_user_defined_hyperlinks(
+        &mut self,
+        hyperlinks: &UserDefinedHyperlinks,
+        limits: Limits,
+    ) -> std::result::Result<bool, MutationError> {
+        self.inner_mut()
+            .map_err(|error| match error {
+                Error::Package(error) => MutationError::Package(error),
+                Error::Refused(_) | Error::PatchConflict | Error::Signed => {
+                    MutationError::Package(PackageError::InvalidFormat(
+                        "property-set hyperlink edit could not be initialized".into(),
+                    ))
+                },
+            })?
+            .put_user_defined_hyperlinks(hyperlinks, limits)
+    }
+
+    /// Removes only the named `_PID_HLINKS` user-defined property. Returns
+    /// whether the staged state changed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the staged property set is malformed.
+    pub fn remove_user_defined_hyperlinks(&mut self) -> Result<bool> {
+        Ok(self.inner_mut()?.remove_user_defined_hyperlinks()?)
+    }
+
+    /// Validate the staged edits and publish them as a new package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the protection policy refuses a changed write,
+    /// the package cannot be republished, or [`Error::Signed`] for a changed
+    /// signed package.
+    pub fn commit(mut self) -> Result<Commit> {
+        let after = self.take_inner()?.finish()?;
+        Ok(published(self.base.publish(after)?))
     }
 }
 
-/// An owned result of a DOC property-set transaction.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-    changed: bool,
-}
-
-impl Commit {
-    /// Whether the complete output differs from the source artifact.
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
+impl crate::Package {
+    /// The property-set read view of this package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package bytes are not a DOC host.
+    pub fn property_sets(&self) -> Result<Snapshot> {
+        Ok(Snapshot::from_bytes(self.to_bytes()?)?)
     }
 
-    /// Borrows the validated output snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
+    /// Start a property-set edit of this package under its retained edit
+    /// options.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package's property sets cannot be read for
+    /// editing (for example a signed or encrypted container).
+    pub fn edit_property_sets(&self) -> Result<Edit> {
+        Edit::open(crate::scoped::Base::capture(self)?)
     }
 
-    /// Borrows the source-checked reversible whole-package patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
+    /// Start a property-set edit of this package under explicit edit options.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package's property sets cannot be read for
+    /// editing.
+    pub fn edit_property_sets_with_options(&self, options: crate::EditOptions) -> Result<Edit> {
+        Edit::open(crate::scoped::Base::capture_with_options(self, options)?)
     }
 
-    /// Consumes the commit into its owned output bytes.
-    #[must_use]
-    pub fn into_bytes(self) -> Vec<u8> {
-        self.snapshot.into_bytes()
-    }
-
-    /// Consumes the commit into its output snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
-    }
-}
-
-/// A source-checked reversible whole-DOC package patch.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Patch {
-    source: Arc<[u8]>,
-    replacement: Arc<[u8]>,
-}
-
-impl Patch {
-    /// Returns the exact source bytes bound to this patch.
-    #[must_use]
-    pub fn source(&self) -> &[u8] {
-        &self.source
-    }
-
-    /// Returns the exact replacement bytes produced by the commit.
-    #[must_use]
-    pub fn replacement(&self) -> &[u8] {
-        &self.replacement
-    }
-
-    /// Applies the patch only to the exact source snapshot it was created from.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
-        // The destination owns the default publication policy. Reusing the
-        // policy captured by an authorized transaction would let a protected
-        // patch cross into an enforcing snapshot without an explicit caller
-        // authorization at this boundary.
-        self.apply_with_policy(source, ProtectionPolicy::default())
-    }
-
-    /// Applies the patch with an explicit protected-edit policy.
-    pub fn apply_with_policy(
-        &self,
-        source: &Snapshot,
-        policy: ProtectionPolicy,
-    ) -> Result<Snapshot> {
-        if source.bytes.as_ref() != self.source.as_ref() {
-            return Err(Error::InvalidFormat(
-                "DOC property-set patch source does not match".to_string(),
-            ));
-        }
-        if source.bytes.as_ref() != self.replacement.as_ref() {
-            policy.authorize(source.protection)?;
-        }
-        Snapshot::from_bytes(self.replacement.to_vec())
-    }
-
-    /// Reverts the patch only from its exact replacement snapshot.
-    pub fn revert(&self, replacement: &Snapshot) -> Result<Snapshot> {
-        self.revert_with_policy(replacement, ProtectionPolicy::default())
-    }
-
-    /// Reverts the patch with an explicit protected-edit policy.
-    pub fn revert_with_policy(
-        &self,
-        replacement: &Snapshot,
-        policy: ProtectionPolicy,
-    ) -> Result<Snapshot> {
-        if replacement.bytes.as_ref() != self.replacement.as_ref() {
-            return Err(Error::InvalidFormat(
-                "DOC property-set patch replacement does not match".to_string(),
-            ));
-        }
-        if replacement.bytes.as_ref() != self.source.as_ref() {
-            policy.authorize(replacement.protection)?;
-        }
-        Snapshot::from_bytes(self.source.to_vec())
+    /// Replay a property-set patch onto the exact package it was made from.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when this package is not the patch's
+    /// source, or [`Error::Signed`] for a changed signed package.
+    pub fn apply_property_sets(&self, patch: &Patch) -> Result<Commit> {
+        apply_patch(self, patch)
     }
 }
 
-fn validate_host(bytes: &[u8]) -> Result<()> {
-    let ole = OleFile::open(Cursor::new(bytes))?;
+fn validate_host(bytes: &[u8]) -> PackageResult<()> {
+    let ole = OleFile::open(Cursor::new(bytes), OleFileLimits::default())?;
     if !ole.exists(&["WordDocument"]) {
-        return Err(Error::InvalidFormat(
+        return Err(PackageError::InvalidFormat(
             "Not a valid Word document: WordDocument stream not found".to_string(),
         ));
     }
     Ok(())
 }
 
-fn classify_host(bytes: &[u8]) -> Result<EditProtection> {
-    let mut ole = OleFile::open(Cursor::new(bytes))?;
+pub(crate) fn classify_host(bytes: &[u8]) -> PackageResult<EditProtection> {
+    let mut ole = OleFile::open(Cursor::new(bytes), OleFileLimits::default())?;
     let word = match ole.open_stream(&["WordDocument"]) {
         Ok(word) => word,
         Err(OleError::StreamNotFound) => return Ok(EditProtection::Unknown),
@@ -631,16 +723,16 @@ fn classify_host(bytes: &[u8]) -> Result<EditProtection> {
     // including when a caller supplies the protected-edit capability.
     match classify(&fib, &table) {
         Ok(protection) => Ok(protection),
-        Err(Error::Corrupted(_)) => Ok(EditProtection::Unrecognized),
+        Err(PackageError::Corrupted(_)) => Ok(EditProtection::Unrecognized),
         Err(error) => Err(error),
     }
 }
 
-fn read_stream(bytes: &[u8], binding: Binding) -> Result<Option<Stream>> {
-    let mut ole = OleFile::open(Cursor::new(bytes))?;
+fn read_stream(bytes: &[u8], binding: Binding) -> PackageResult<Option<Stream>> {
+    let mut ole = OleFile::open(Cursor::new(bytes), OleFileLimits::default())?;
     match ole.property_set(binding) {
         Ok(stream) => Ok(Some(stream)),
-        Err(OleError::StreamNotFound) => Ok(None),
+        Err(litchi_ole_common::Error::Cfb(OleError::StreamNotFound)) => Ok(None),
         Err(error) => Err(error.into()),
     }
 }
@@ -648,6 +740,10 @@ fn read_stream(bytes: &[u8], binding: Binding) -> Result<Option<Stream>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn staging(snapshot: &Snapshot, policy: ProtectionPolicy) -> Staging {
+        Staging::new(snapshot.clone(), policy).unwrap()
+    }
     use crate::parts::protection::{EditProtection, ProtectionAuthorization, ProtectionPolicy};
     use litchi_cfb::{OleFile, OleWriter};
     use litchi_ole_common::property_set::{
@@ -767,7 +863,7 @@ mod tests {
             Some("before company")
         );
 
-        let mut transaction = snapshot.transaction().unwrap();
+        let mut transaction = staging(&snapshot, ProtectionPolicy::default());
         assert!(
             transaction
                 .edit_summary_information(|edit| edit.set_title("after"))
@@ -778,53 +874,99 @@ mod tests {
                 .edit_document_summary_information(|edit| edit.set_company("after company"))
                 .unwrap()
         );
-        let commit = transaction.commit().unwrap();
-        assert!(commit.changed());
+        let bytes = transaction.finish().unwrap();
+        assert_ne!(bytes, source);
+        let edited = Snapshot::from_bytes(bytes).unwrap();
         assert_eq!(
-            commit
-                .snapshot()
-                .summary_information()
-                .unwrap()
-                .unwrap()
-                .title(),
+            edited.summary_information().unwrap().unwrap().title(),
             Some("after")
         );
 
-        let mut ole = OleFile::open(Cursor::new(commit.snapshot().bytes().to_vec())).unwrap();
+        let mut ole = OleFile::open(
+            Cursor::new(edited.bytes().to_vec()),
+            OleFileLimits::default(),
+        )
+        .unwrap();
         assert_eq!(
             ole.open_stream(&["Unrelated", "Nested"]).unwrap(),
             b"untouched"
         );
-        let applied = commit.patch().apply(&snapshot).unwrap();
-        assert_eq!(applied.bytes(), commit.snapshot().bytes());
-        assert_eq!(commit.patch().revert(&applied).unwrap().bytes(), source);
+    }
+
+    #[test]
+    fn missing_and_blank_standard_sections_are_created_by_typed_edits() {
+        // A document the writer created without properties, given blank
+        // standard sections (no property, not even a code page).
+        let mut builder = crate::Builder::new();
+        builder.add_paragraph("Body").unwrap();
+        let written = builder.build().unwrap().to_bytes().unwrap();
+        let mut source =
+            OleFile::open(Cursor::new(written.clone()), OleFileLimits::default()).unwrap();
+        let mut rebuilt = OleWriter::new();
+        for path in source.list_streams() {
+            let refs: Vec<&str> = path.iter().map(String::as_str).collect();
+            let data = source.open_stream(&refs).unwrap();
+            rebuilt.create_stream(&refs, &data).unwrap();
+        }
+        for (name, format_identifier) in [
+            ("\u{0005}SummaryInformation", SUMMARY_INFORMATION_FMTID),
+            (
+                "\u{0005}DocumentSummaryInformation",
+                DOCUMENT_SUMMARY_INFORMATION_FMTID,
+            ),
+        ] {
+            let blank = PropertyStream::new(Section::new(format_identifier))
+                .to_bytes()
+                .unwrap();
+            rebuilt.create_stream(&[name], &blank).unwrap();
+        }
+        let mut output = Cursor::new(Vec::new());
+        rebuilt.write_to(&mut output).unwrap();
+
+        for bytes in [written, output.into_inner()] {
+            let snapshot = Snapshot::from_bytes(bytes).unwrap();
+            let mut transaction = staging(&snapshot, ProtectionPolicy::default());
+            assert!(
+                transaction
+                    .edit_summary_information(|edit| edit.set_title("title"))
+                    .unwrap()
+            );
+            assert!(
+                transaction
+                    .edit_document_summary_information(|edit| edit.set_company("company"))
+                    .unwrap()
+            );
+            let edited = Snapshot::from_bytes(transaction.finish().unwrap()).unwrap();
+            let summary = edited.summary_information().unwrap().unwrap();
+            assert_eq!(summary.title(), Some("title"));
+            assert_eq!(summary.codepage(), Some(CodePage::WINDOWS_1252));
+            let document_summary = edited.document_summary_information().unwrap().unwrap();
+            assert_eq!(document_summary.company(), Some("company"));
+            assert_eq!(document_summary.codepage(), Some(CodePage::WINDOWS_1252));
+        }
     }
 
     #[test]
     fn no_op_edits_return_the_exact_source_bytes() {
         let source = package_bytes(None);
         let snapshot = Snapshot::from_bytes(source.clone()).unwrap();
-        let source_pointer = snapshot.bytes().as_ptr();
-        let mut transaction = snapshot.transaction().unwrap();
+        let mut transaction = staging(&snapshot, ProtectionPolicy::default());
         assert!(!transaction.edit_summary_information(|_| Ok(())).unwrap());
-        let commit = transaction.commit().unwrap();
-        assert!(!commit.changed());
-        assert_eq!(commit.snapshot().bytes().as_ptr(), source_pointer);
-        assert_eq!(commit.into_bytes(), source);
+        assert_eq!(transaction.finish().unwrap(), source);
     }
 
     #[test]
     fn signed_and_encrypted_sources_are_refused_before_mutation() {
         assert!(
             Snapshot::from_bytes(package_bytes(Some("DigitalSignature")))
+                .map(|snapshot| Staging::new(snapshot, ProtectionPolicy::default()))
                 .unwrap()
-                .transaction()
                 .is_err()
         );
         assert!(
             Snapshot::from_bytes(package_bytes(Some("EncryptedPackage")))
+                .map(|snapshot| Staging::new(snapshot, ProtectionPolicy::default()))
                 .unwrap()
-                .transaction()
                 .is_err()
         );
     }
@@ -835,49 +977,28 @@ mod tests {
         let snapshot = Snapshot::from_bytes(source.clone()).unwrap();
         assert_eq!(snapshot.protection(), EditProtection::Document);
 
-        let no_op = snapshot.transaction().unwrap().commit().unwrap();
-        assert!(!no_op.changed());
-        assert_eq!(no_op.snapshot().bytes(), source.as_slice());
+        let no_op = staging(&snapshot, ProtectionPolicy::default())
+            .finish()
+            .unwrap();
+        assert_eq!(no_op, source);
 
-        let mut denied = snapshot.transaction().unwrap();
+        let mut denied = staging(&snapshot, ProtectionPolicy::default());
         denied
             .edit_summary_information(|edit| edit.set_title("after"))
             .unwrap();
         assert!(matches!(
-            denied.commit(),
-            Err(Error::ProtectionDenied(EditProtection::Document))
+            denied.finish(),
+            Err(PackageError::ProtectionDenied(EditProtection::Document))
         ));
 
         let authorization =
             ProtectionAuthorization::audited("test-suite", "approved metadata repair").unwrap();
         let policy = ProtectionPolicy::allow_protected(authorization);
-        let mut allowed = snapshot.transaction_with_policy(policy.clone()).unwrap();
+        let mut allowed = staging(&snapshot, policy);
         allowed
             .edit_summary_information(|edit| edit.set_title("after"))
             .unwrap();
-        let commit = allowed.commit().unwrap();
-        assert!(commit.changed());
-        assert!(matches!(
-            commit.patch().apply(&snapshot),
-            Err(Error::ProtectionDenied(EditProtection::Document))
-        ));
-        let applied = commit
-            .patch()
-            .apply_with_policy(&snapshot, policy.clone())
-            .unwrap();
-        assert_eq!(applied.bytes(), commit.snapshot().bytes());
-        assert!(matches!(
-            commit.patch().revert(&applied),
-            Err(Error::ProtectionDenied(EditProtection::Document))
-        ));
-        assert_eq!(
-            commit
-                .patch()
-                .revert_with_policy(&applied, policy)
-                .unwrap()
-                .bytes(),
-            source
-        );
+        assert_ne!(allowed.finish().unwrap(), source);
     }
 
     #[test]
@@ -890,7 +1011,7 @@ mod tests {
         malformed.write_to(&mut output).unwrap();
         let snapshot = Snapshot::from_bytes(output.into_inner()).unwrap();
         assert_eq!(snapshot.protection(), EditProtection::Unknown);
-        let mut transaction = snapshot.transaction().unwrap();
+        let mut transaction = staging(&snapshot, ProtectionPolicy::default());
         transaction
             .edit_user_defined_properties(|section| {
                 section.add(2, Value::Lpwstr("blocked".to_string()))?;
@@ -898,14 +1019,12 @@ mod tests {
             })
             .unwrap();
         assert!(matches!(
-            transaction.commit(),
-            Err(Error::ProtectionDenied(EditProtection::Unknown))
+            transaction.finish(),
+            Err(PackageError::ProtectionDenied(EditProtection::Unknown))
         ));
         let authorization =
             ProtectionAuthorization::audited("test-suite", "inspect malformed host").unwrap();
-        let mut transaction = snapshot
-            .transaction_with_policy(ProtectionPolicy::allow_protected(authorization))
-            .unwrap();
+        let mut transaction = staging(&snapshot, ProtectionPolicy::allow_protected(authorization));
         transaction
             .edit_user_defined_properties(|section| {
                 section.add(2, Value::Lpwstr("still blocked".to_string()))?;
@@ -913,8 +1032,8 @@ mod tests {
             })
             .unwrap();
         assert!(matches!(
-            transaction.commit(),
-            Err(Error::ProtectionDenied(EditProtection::Unknown))
+            transaction.finish(),
+            Err(PackageError::ProtectionDenied(EditProtection::Unknown))
         ));
 
         let mut missing_selected_table = OleWriter::new();

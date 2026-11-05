@@ -3,20 +3,24 @@ use std::io::{Read, Seek};
 use std::ops::Range;
 use std::sync::Arc;
 
-use litchi_cfb::{OleFile, OleWriter};
+use litchi_cfb::{OleError, OleFile, OleWriter};
 use litchi_core::xml::ReaderOrigin;
 use quick_xml::events::{BytesStart, Event};
+use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 
-use super::model::{Item, ItemId, Limits, Promotion, Properties, Result, Store, invalid, limit};
+use super::model::{
+    Error, Item, ItemId, Limits, Promotion, Properties, Result, Store, invalid, limit,
+};
 use super::xml::{
     escape_attribute, is_whitespace, normalize_encoding, reject_other_attributes,
-    required_attribute, resolved_element, validate_characters, validate_payload,
+    required_attribute, resolved_element, restore_encoding, validate_characters, validate_payload,
 };
 use super::{
     CUSTOM_XML_NAMESPACE, ITEM_STREAM, MODIFIED_PROMOTION_STORAGE, PROPERTIES_STREAM,
     REDUNDANT_PROMOTION_STORAGE, STORE_STORAGE,
 };
+use crate::xml_attributes::BytesStartExt as _;
 
 #[derive(Default)]
 struct PropertiesParseState {
@@ -30,25 +34,14 @@ struct PropertiesParseState {
     element_count: usize,
 }
 
-/// Inspect a complete Custom XML data store with default limits.
-///
-/// # Errors
-///
-/// Returns an error if the compound file or Custom XML store is malformed.
-pub fn inspect<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Option<Store>> {
-    inspect_with_limits(ole, Limits::default())
-}
-
-/// Inspect a complete Custom XML data store with caller-selected limits.
+/// Inspect a complete Custom XML data store under bounded resource limits
+/// ([`Limits::default`] is the default profile).
 ///
 /// # Errors
 ///
 /// Returns an error if the compound file or Custom XML store is malformed, or
 /// if it exceeds `limits`.
-pub fn inspect_with_limits<R: Read + Seek>(
-    ole: &mut OleFile<R>,
-    limits: Limits,
-) -> Result<Option<Store>> {
+pub fn inspect<R: Read + Seek>(ole: &mut OleFile<R>, limits: Limits) -> Result<Option<Store>> {
     validate_limits(&limits)?;
     let redundant = marker_exists(ole, REDUNDANT_PROMOTION_STORAGE)?;
     let modified = marker_exists(ole, MODIFIED_PROMOTION_STORAGE)?;
@@ -75,16 +68,11 @@ pub fn inspect_with_limits<R: Read + Seek>(
         return Ok(None);
     }
 
-    let store_entries = ole.list_directory_entries(&[STORE_STORAGE])?;
-    if store_entries.len() > limits.max_items {
-        return Err(limit(format!(
-            "item count {} exceeds {}",
-            store_entries.len(),
-            limits.max_items
-        )));
-    }
-    let mut names = Vec::with_capacity(store_entries.len());
-    for entry in store_entries {
+    let mut names = Vec::new();
+    ole.visit_directory_entries(&[STORE_STORAGE], limits.max_items, |ole, sid| {
+        let entry = ole
+            .directory_entry_by_sid(sid)
+            .ok_or_else(|| invalid("MsoDataStore child SID is not present"))?;
         if entry.entry_type != 1 {
             return Err(invalid(format!(
                 "MsoDataStore child '{}' is not a storage",
@@ -92,23 +80,26 @@ pub fn inspect_with_limits<R: Read + Seek>(
             )));
         }
         validate_storage_name(&entry.name)?;
+        names
+            .try_reserve_exact(1)
+            .map_err(|_| limit("custom XML item-name allocation exceeds its limit"))?;
         names.push(entry.name.clone());
-    }
+        Ok(())
+    })
+    .map_err(map_ole_limit)?;
     names.sort();
 
     let mut total_bytes = 0usize;
     let mut item_ids = HashSet::with_capacity(names.len());
     let mut items = Vec::with_capacity(names.len());
     for storage_name in names {
-        let item_entries = ole.list_directory_entries(&[STORE_STORAGE, storage_name.as_str()])?;
-        if item_entries.len() != 2 {
-            return Err(invalid(format!(
-                "custom XML sub-storage '{storage_name}' must contain exactly Item and Properties"
-            )));
-        }
         let mut item_stream_size = None;
         let mut properties_stream_size = None;
-        for entry in item_entries {
+        let mut entry_count = 0usize;
+        ole.visit_directory_entry_refs(&[STORE_STORAGE, storage_name.as_str()], 3, |entry| {
+            entry_count = entry_count
+                .checked_add(1)
+                .ok_or_else(|| limit("custom XML stream-entry count overflows usize"))?;
             match (entry.name.as_str(), entry.entry_type) {
                 (ITEM_STREAM, 2) => {
                     item_stream_size = Some(stream_size(entry.size, "Item", &limits)?);
@@ -123,6 +114,13 @@ pub fn inspect_with_limits<R: Read + Seek>(
                     )));
                 },
             }
+            Ok(())
+        })
+        .map_err(map_ole_limit)?;
+        if entry_count != 2 {
+            return Err(invalid(format!(
+                "custom XML sub-storage '{storage_name}' must contain exactly Item and Properties"
+            )));
         }
         let item_bytes =
             item_stream_size.ok_or_else(|| invalid("custom XML Item stream is missing"))?;
@@ -172,13 +170,14 @@ pub fn inspect_with_limits<R: Read + Seek>(
     Ok(Some(Store { promotion, items }))
 }
 
-/// Materialize a validated store in a newly assembled OLE writer.
+/// Materialize a validated store in a newly assembled OLE writer under the
+/// caller-selected Custom XML policy.
 ///
 /// # Errors
 ///
 /// Returns an error if `store` is invalid or the writer rejects an OLE entry.
-pub fn write(writer: &mut OleWriter, store: &Store) -> Result<()> {
-    validate_store(store, &Limits::default())?;
+pub fn write(writer: &mut OleWriter, store: &Store, limits: &Limits) -> Result<()> {
+    validate_store(store, limits)?;
     writer.create_storage(&[STORE_STORAGE])?;
     match store.promotion {
         Promotion::Unspecified => {},
@@ -203,22 +202,24 @@ pub fn write(writer: &mut OleWriter, store: &Store) -> Result<()> {
     Ok(())
 }
 
-/// Parse the schema-defined Custom XML data-store Properties stream.
+/// Parse the schema-defined Custom XML data-store Properties stream under the
+/// caller-selected module policy.
 ///
 /// # Errors
 ///
 /// Returns an error if `xml` is not a valid bounded Properties document.
-pub fn parse_properties(xml: &[u8]) -> Result<Properties> {
-    parse_properties_with_limits(xml, &Limits::default())
+pub fn parse_properties(xml: &[u8], limits: &Limits) -> Result<Properties> {
+    parse_properties_with_limits(xml, limits)
 }
 
-/// Serialize Custom XML data-store Properties in stable schema order.
+/// Serialize Custom XML data-store Properties in stable schema order under the
+/// caller-selected module policy.
 ///
 /// # Errors
 ///
 /// Returns an error if `properties` violates the supported format limits.
-pub fn write_properties(properties: &Properties) -> Result<Vec<u8>> {
-    write_properties_with_limits(properties, &Limits::default())
+pub fn write_properties(properties: &Properties, limits: &Limits) -> Result<Vec<u8>> {
+    write_properties_with_limits(properties, limits)
 }
 
 pub(crate) fn write_properties_with_limits(
@@ -226,12 +227,17 @@ pub(crate) fn write_properties_with_limits(
     limits: &Limits,
 ) -> Result<Vec<u8>> {
     validate_properties(properties, limits)?;
-    let mut output = Vec::with_capacity(256);
+    let capacity = serialized_properties_len(properties)?;
+    if capacity > limits.max_properties_bytes {
+        return Err(limit("serialized Properties XML exceeds its byte limit"));
+    }
+    let item_id = properties.item_id.to_string();
+    let mut output = Vec::with_capacity(capacity);
     output.extend_from_slice(b"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>");
     output.extend_from_slice(b"<ds:datastoreItem xmlns:ds=\"");
     output.extend_from_slice(CUSTOM_XML_NAMESPACE.as_bytes());
     output.extend_from_slice(b"\" ds:itemID=\"");
-    output.extend_from_slice(properties.item_id.to_string().as_bytes());
+    output.extend_from_slice(item_id.as_bytes());
     output.extend_from_slice(b"\">");
     if !properties.schema_references.is_empty() {
         output.extend_from_slice(b"<ds:schemaRefs>");
@@ -243,15 +249,60 @@ pub(crate) fn write_properties_with_limits(
         output.extend_from_slice(b"</ds:schemaRefs>");
     }
     output.extend_from_slice(b"</ds:datastoreItem>");
-    if output.len() > limits.max_properties_bytes {
-        return Err(limit("serialized Properties XML exceeds its byte limit"));
-    }
+    debug_assert_eq!(output.len(), capacity);
     Ok(output)
 }
 
+fn serialized_properties_len(properties: &Properties) -> Result<usize> {
+    let mut length = b"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
+        .len()
+        .checked_add(b"<ds:datastoreItem xmlns:ds=\"".len())
+        .and_then(|value| value.checked_add(CUSTOM_XML_NAMESPACE.len()))
+        .and_then(|value| value.checked_add(b"\" ds:itemID=\"".len()))
+        .and_then(|value| value.checked_add(38))
+        .and_then(|value| value.checked_add(b"\">".len()))
+        .ok_or_else(|| limit("serialized Properties XML size overflows usize"))?;
+    if !properties.schema_references.is_empty() {
+        length = length
+            .checked_add(b"<ds:schemaRefs>".len())
+            .ok_or_else(|| limit("serialized Properties XML size overflows usize"))?;
+        for uri in &properties.schema_references {
+            length = length
+                .checked_add(b"<ds:schemaRef ds:uri=\"".len())
+                .ok_or_else(|| limit("serialized Properties XML size overflows usize"))?;
+            length = length
+                .checked_add(escaped_attribute_len(uri)?)
+                .and_then(|value| value.checked_add(b"\"/>".len()))
+                .ok_or_else(|| limit("serialized Properties XML size overflows usize"))?;
+        }
+        length = length
+            .checked_add(b"</ds:schemaRefs>".len())
+            .ok_or_else(|| limit("serialized Properties XML size overflows usize"))?;
+    }
+    length
+        .checked_add(b"</ds:datastoreItem>".len())
+        .ok_or_else(|| limit("serialized Properties XML size overflows usize"))
+}
+
+fn escaped_attribute_len(value: &str) -> Result<usize> {
+    value
+        .bytes()
+        .try_fold(0usize, |length, byte| {
+            length.checked_add(match byte {
+                b'&' => 5,
+                b'<' => 4,
+                b'"' => 6,
+                b'\t' | b'\n' | b'\r' => 5,
+                _ => 1,
+            })
+        })
+        .ok_or_else(|| limit("escaped Properties XML attribute size overflows usize"))
+}
+
 /// Rewrite known properties attributes while retaining the source XML around
-/// them. A structural schema-reference edit falls back to the deterministic
-/// writer; an unchanged projection always returns the exact source allocation.
+/// them. Schema-reference count changes splice only the affected
+/// schemaRef elements, so extension attributes, comments, whitespace, and
+/// namespace declarations remain source-owned.
 pub(crate) fn rewrite_properties(
     source: &[u8],
     before: &Properties,
@@ -266,42 +317,179 @@ pub(crate) fn rewrite_properties(
     }
     validate_properties(after, limits)?;
 
-    if std::str::from_utf8(source).is_ok() {
-        let (item_id_range, schema_references) = property_attribute_spans(source, limits)?;
-        if let Some(item_id_span) = item_id_range
-            && schema_references.len() == after.schema_references.len()
-        {
-            let mut replacements = Vec::with_capacity(schema_references.len() + 1);
-            replacements.push((
-                item_id_span,
-                escaped_attribute(after.item_id.to_string().as_str()),
-            ));
-            for (span, value) in schema_references.into_iter().zip(&after.schema_references) {
-                replacements.push((span, escaped_attribute(value)));
+    let normalized = normalize_encoding(source)?;
+    let spans = property_attribute_spans(normalized.as_ref(), limits)?;
+    if spans.item_id.is_some() {
+        let output = splice_property_spans(normalized.as_ref(), &spans, after, limits)?;
+        if parse_properties_with_limits(&output, limits).is_ok_and(|value| value == *after) {
+            return restore_encoding(source, &output, limits.max_properties_bytes);
+        }
+    }
+
+    let canonical = write_properties_with_limits(after, limits)?;
+    restore_encoding(source, &canonical, limits.max_properties_bytes)
+}
+
+#[derive(Debug)]
+struct PropertySpans {
+    root: Option<ElementSpan>,
+    item_id: Option<Range<usize>>,
+    schema_refs: Option<ElementSpan>,
+    schema_references: Vec<SchemaReferenceSpan>,
+}
+
+#[derive(Debug)]
+struct ElementSpan {
+    open: Range<usize>,
+    close: Option<Range<usize>>,
+    name: Vec<u8>,
+}
+
+#[derive(Debug)]
+struct SchemaReferenceSpan {
+    element: Range<usize>,
+    value: Range<usize>,
+    name: Vec<u8>,
+    attribute: Vec<u8>,
+}
+
+fn splice_property_spans(
+    source: &[u8],
+    spans: &PropertySpans,
+    after: &Properties,
+    limits: &Limits,
+) -> Result<Vec<u8>> {
+    let mut replacements = Vec::new();
+    replacements
+        .try_reserve_exact(
+            spans
+                .schema_references
+                .len()
+                .checked_add(after.schema_references.len())
+                .and_then(|value| value.checked_add(2))
+                .ok_or_else(|| limit("Properties XML replacement count overflows usize"))?,
+        )
+        .map_err(|_| limit("Properties XML replacement allocation exceeds its limit"))?;
+    let item_id_span = spans
+        .item_id
+        .clone()
+        .ok_or_else(|| invalid("Properties XML itemID span is missing"))?;
+    let expand_empty_root_without_schema_refs =
+        spans.schema_refs.is_none() && spans.root.as_ref().is_some_and(|root| root.close.is_none());
+    if !expand_empty_root_without_schema_refs
+        || after.schema_references.len() <= spans.schema_references.len()
+    {
+        replacements.push((
+            item_id_span.clone(),
+            escaped_attribute(after.item_id.to_string().as_str()),
+        ));
+    }
+
+    let existing = &spans.schema_references;
+    let common = existing.len().min(after.schema_references.len());
+    for (span, value) in existing.iter().zip(&after.schema_references).take(common) {
+        replacements.push((span.value.clone(), escaped_attribute(value)));
+    }
+    for span in existing.iter().skip(after.schema_references.len()) {
+        replacements.push((span.element.clone(), Vec::new()));
+    }
+
+    if after.schema_references.len() > existing.len() {
+        let schema_ref_name = existing
+            .first()
+            .map(|span| span.name.clone())
+            .or_else(|| {
+                spans
+                    .schema_refs
+                    .as_ref()
+                    .and_then(|span| qualified_name_with_local(&span.name, b"schemaRef"))
+            })
+            .or_else(|| {
+                spans
+                    .root
+                    .as_ref()
+                    .and_then(|span| qualified_name_with_local(&span.name, b"schemaRef"))
+            });
+        let insertion = schema_ref_name
+            .ok_or_else(|| invalid("Properties XML schemaRef namespace prefix is missing"))?;
+        let attributes = existing
+            .first()
+            .map(|span| span.attribute.clone())
+            .or_else(|| qualified_attribute_name(&insertion, b"uri"))
+            .or_else(|| {
+                spans
+                    .schema_refs
+                    .as_ref()
+                    .and_then(|span| custom_namespace_attribute(source, &span.open))
+            })
+            .or_else(|| {
+                spans
+                    .root
+                    .as_ref()
+                    .and_then(|span| custom_namespace_attribute(source, &span.open))
+            })
+            .ok_or_else(|| invalid("Properties XML schemaRef attribute prefix is missing"))?;
+        let mut added = Vec::new();
+        for uri in &after.schema_references[existing.len()..] {
+            append_schema_reference(&mut added, &insertion, &attributes, uri);
+        }
+        if let Some(schema_refs) = spans.schema_refs.as_ref() {
+            if let Some(close) = &schema_refs.close {
+                replacements.push((close.start..close.start, added));
+            } else {
+                let replacement =
+                    expand_empty_element(source, &schema_refs.open, &schema_refs.name, &added)?;
+                replacements.push((schema_refs.open.clone(), replacement));
             }
-            let output = splice_attribute_values(source, replacements)?;
-            if output.len() <= limits.max_properties_bytes
-                && parse_properties_with_limits(&output, limits).is_ok_and(|value| value == *after)
-            {
-                return Ok(output);
+        } else {
+            let root = spans
+                .root
+                .as_ref()
+                .ok_or_else(|| invalid("Properties XML datastoreItem root span is missing"))?;
+            let schema_refs_name = qualified_name_with_local(&root.name, b"schemaRefs")
+                .ok_or_else(|| invalid("Properties XML schemaRefs namespace prefix is missing"))?;
+            let mut replacement = Vec::new();
+            append_element_start(&mut replacement, &schema_refs_name);
+            replacement.extend_from_slice(&added);
+            append_element_end(&mut replacement, &schema_refs_name);
+            if let Some(close) = &root.close {
+                replacements.push((close.start..close.start, replacement));
+            } else {
+                let replacement = if expand_empty_root_without_schema_refs {
+                    expand_empty_element_with_attribute(
+                        source,
+                        &root.open,
+                        &root.name,
+                        &replacement,
+                        &item_id_span,
+                        &escaped_attribute(after.item_id.to_string().as_str()),
+                    )?
+                } else {
+                    expand_empty_element(source, &root.open, &root.name, &replacement)?
+                };
+                replacements.push((root.open.clone(), replacement));
             }
         }
     }
 
-    write_properties_with_limits(after, limits)
+    splice_attribute_values(source, replacements, limits)
 }
 
-fn property_attribute_spans(
-    source: &[u8],
-    limits: &Limits,
-) -> Result<(Option<Range<usize>>, Vec<Range<usize>>)> {
+fn property_attribute_spans(source: &[u8], limits: &Limits) -> Result<PropertySpans> {
     let mut reader = NsReader::from_reader(source);
     let origin = ReaderOrigin::of(source);
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
     let mut depth = 0usize;
+    let mut opaque_depth = 0usize;
+    let mut schema_refs_seen = false;
+    let mut root_open = false;
+    let mut schema_refs_open = false;
+    let mut root = None;
     let mut item_id = None;
+    let mut schema_refs = None;
     let mut schema_references = Vec::new();
+    let mut open_schema_reference = None;
 
     loop {
         let event_start = origin
@@ -317,18 +505,77 @@ fn property_attribute_spans(
         match event {
             Event::Start(element) => {
                 let local_name = element.local_name();
+                let (namespace, _) = resolved_element(&reader, &element)?;
                 let raw = source
                     .get(event_start..event_end)
                     .ok_or_else(|| invalid("Properties XML element range is outside its source"))?;
-                if depth == 0 && local_name.as_ref() == b"datastoreItem" {
-                    item_id = find_attribute_value_span(raw, event_start, b"itemID")?;
-                } else if depth == 2 && local_name.as_ref() == b"schemaRef" {
+                let is_custom = namespace.as_deref() == Some(CUSTOM_XML_NAMESPACE.as_bytes());
+                if opaque_depth > 0 {
+                    opaque_depth = opaque_depth
+                        .checked_add(1)
+                        .ok_or_else(|| limit("Properties XML opaque depth overflows usize"))?;
+                } else if depth == 0
+                    && is_custom
+                    && local_name.as_ref() == b"datastoreItem"
+                    && root.is_none()
+                {
+                    let name = qualified_name(raw)?.to_vec();
+                    root = Some(ElementSpan {
+                        open: event_start..event_end,
+                        close: None,
+                        name,
+                    });
+                    item_id = find_resolved_attribute_value_span(
+                        &reader,
+                        &element,
+                        raw,
+                        event_start,
+                        CUSTOM_XML_NAMESPACE,
+                        b"itemID",
+                    )?
+                    .map(|(span, _)| span);
+                    root_open = true;
+                } else if depth == 1
+                    && is_custom
+                    && local_name.as_ref() == b"schemaRefs"
+                    && root.is_some()
+                    && !schema_refs_seen
+                {
+                    schema_refs = Some(ElementSpan {
+                        open: event_start..event_end,
+                        close: None,
+                        name: qualified_name(raw)?.to_vec(),
+                    });
+                    schema_refs_seen = true;
+                    schema_refs_open = true;
+                } else if depth == 2
+                    && is_custom
+                    && local_name.as_ref() == b"schemaRef"
+                    && schema_refs_seen
+                {
                     if schema_references.len() >= limits.max_schema_references {
                         return Err(limit("schema reference count exceeds its limit"));
                     }
-                    if let Some(span) = find_attribute_value_span(raw, event_start, b"uri")? {
-                        schema_references.push(span);
-                    }
+                    let (value, attribute) = find_resolved_attribute_value_span(
+                        &reader,
+                        &element,
+                        raw,
+                        event_start,
+                        CUSTOM_XML_NAMESPACE,
+                        b"uri",
+                    )?
+                    .ok_or_else(|| invalid("schemaRef lacks its uri attribute"))?;
+                    schema_references.push(SchemaReferenceSpan {
+                        element: event_start..event_end,
+                        value,
+                        name: qualified_name(raw)?.to_vec(),
+                        attribute,
+                    });
+                    open_schema_reference = Some(schema_references.len() - 1);
+                } else if depth > 0 {
+                    opaque_depth = 1;
+                } else {
+                    return Err(invalid("Properties XML violates datastoreItem grammar"));
                 }
                 depth = depth
                     .checked_add(1)
@@ -336,21 +583,88 @@ fn property_attribute_spans(
             },
             Event::Empty(element) => {
                 let local_name = element.local_name();
+                let (namespace, _) = resolved_element(&reader, &element)?;
                 let raw = source
                     .get(event_start..event_end)
                     .ok_or_else(|| invalid("Properties XML element range is outside its source"))?;
-                if depth == 0 && local_name.as_ref() == b"datastoreItem" {
-                    item_id = find_attribute_value_span(raw, event_start, b"itemID")?;
-                } else if depth == 2 && local_name.as_ref() == b"schemaRef" {
+                let is_custom = namespace.as_deref() == Some(CUSTOM_XML_NAMESPACE.as_bytes());
+                if opaque_depth > 0 {
+                    // The parser treats empty elements inside an opaque
+                    // subtree as opaque without changing the subtree depth.
+                } else if depth == 0
+                    && is_custom
+                    && local_name.as_ref() == b"datastoreItem"
+                    && root.is_none()
+                {
+                    item_id = find_resolved_attribute_value_span(
+                        &reader,
+                        &element,
+                        raw,
+                        event_start,
+                        CUSTOM_XML_NAMESPACE,
+                        b"itemID",
+                    )?
+                    .map(|(span, _)| span);
+                    root = Some(ElementSpan {
+                        open: event_start..event_end,
+                        close: None,
+                        name: qualified_name(raw)?.to_vec(),
+                    });
+                } else if depth == 1
+                    && is_custom
+                    && local_name.as_ref() == b"schemaRefs"
+                    && root.is_some()
+                    && !schema_refs_seen
+                {
+                    schema_refs = Some(ElementSpan {
+                        open: event_start..event_end,
+                        close: None,
+                        name: qualified_name(raw)?.to_vec(),
+                    });
+                    schema_refs_seen = true;
+                } else if depth == 2
+                    && is_custom
+                    && local_name.as_ref() == b"schemaRef"
+                    && schema_refs_seen
+                {
                     if schema_references.len() >= limits.max_schema_references {
                         return Err(limit("schema reference count exceeds its limit"));
                     }
-                    if let Some(span) = find_attribute_value_span(raw, event_start, b"uri")? {
-                        schema_references.push(span);
-                    }
+                    let (value, attribute) = find_resolved_attribute_value_span(
+                        &reader,
+                        &element,
+                        raw,
+                        event_start,
+                        CUSTOM_XML_NAMESPACE,
+                        b"uri",
+                    )?
+                    .ok_or_else(|| invalid("schemaRef lacks its uri attribute"))?;
+                    schema_references.push(SchemaReferenceSpan {
+                        element: event_start..event_end,
+                        value,
+                        name: qualified_name(raw)?.to_vec(),
+                        attribute,
+                    });
                 }
             },
             Event::End(_) => {
+                if opaque_depth > 0 {
+                    opaque_depth -= 1;
+                } else if depth == 3 {
+                    if let Some(index) = open_schema_reference.take() {
+                        schema_references[index].element.end = event_end;
+                    }
+                } else if depth == 2 && schema_refs_open {
+                    if let Some(schema_refs) = schema_refs.as_mut() {
+                        schema_refs.close = Some(event_start..event_end);
+                    }
+                    schema_refs_open = false;
+                } else if depth == 1 && root_open {
+                    if let Some(root) = root.as_mut() {
+                        root.close = Some(event_start..event_end);
+                    }
+                    root_open = false;
+                }
                 depth = depth
                     .checked_sub(1)
                     .ok_or_else(|| invalid("Properties XML has an unexpected closing tag"))?;
@@ -365,13 +679,210 @@ fn property_attribute_spans(
             | Event::GeneralRef(_) => {},
         }
     }
-    Ok((item_id, schema_references))
+    Ok(PropertySpans {
+        root,
+        item_id,
+        schema_refs,
+        schema_references,
+    })
 }
 
-fn find_attribute_value_span(
+fn qualified_name(tag: &[u8]) -> Result<&[u8]> {
+    if tag.len() < 3 || tag[0] != b'<' {
+        return Err(invalid("Properties XML element tag is malformed"));
+    }
+    let mut end = 1usize;
+    while end < tag.len() && !tag[end].is_ascii_whitespace() && !matches!(tag[end], b'/' | b'>') {
+        end += 1;
+    }
+    if end == 1 {
+        return Err(invalid("Properties XML element name is empty"));
+    }
+    Ok(&tag[1..end])
+}
+
+fn qualified_name_with_local(name: &[u8], local: &[u8]) -> Option<Vec<u8>> {
+    let mut output = name
+        .iter()
+        .rposition(|byte| *byte == b':')
+        .map_or_else(Vec::new, |index| name[..=index].to_vec());
+    output.extend_from_slice(local);
+    Some(output)
+}
+
+fn qualified_attribute_name(name: &[u8], local: &[u8]) -> Option<Vec<u8>> {
+    let prefix = name
+        .iter()
+        .rposition(|byte| *byte == b':')
+        .map(|index| &name[..=index])?;
+    let mut output = prefix.to_vec();
+    output.extend_from_slice(local);
+    Some(output)
+}
+
+fn custom_namespace_attribute(source: &[u8], open: &Range<usize>) -> Option<Vec<u8>> {
+    let tag = source.get(open.clone())?;
+    let mut cursor = 1usize;
+    while cursor < tag.len()
+        && !tag[cursor].is_ascii_whitespace()
+        && !matches!(tag[cursor], b'/' | b'>')
+    {
+        cursor += 1;
+    }
+    while cursor < tag.len() {
+        while cursor < tag.len() && tag[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+        if cursor >= tag.len() || matches!(tag[cursor], b'/' | b'>') {
+            break;
+        }
+        let name_start = cursor;
+        while cursor < tag.len()
+            && !tag[cursor].is_ascii_whitespace()
+            && !matches!(tag[cursor], b'=' | b'/' | b'>')
+        {
+            cursor += 1;
+        }
+        let name = &tag[name_start..cursor];
+        while cursor < tag.len() && tag[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+        if cursor >= tag.len() || tag[cursor] != b'=' {
+            return None;
+        }
+        cursor += 1;
+        while cursor < tag.len() && tag[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+        let delimiter = *tag.get(cursor)?;
+        if !matches!(delimiter, b'\'' | b'"') {
+            return None;
+        }
+        cursor += 1;
+        let value_start = cursor;
+        while cursor < tag.len() && tag[cursor] != delimiter {
+            cursor += 1;
+        }
+        let value = tag.get(value_start..cursor)?;
+        if let Some(prefix) = name.strip_prefix(b"xmlns:") {
+            if value == CUSTOM_XML_NAMESPACE.as_bytes() {
+                let mut attribute = prefix.to_vec();
+                attribute.extend_from_slice(b":uri");
+                return Some(attribute);
+            }
+        }
+        cursor += 1;
+    }
+    None
+}
+
+fn append_element_start(output: &mut Vec<u8>, name: &[u8]) {
+    output.push(b'<');
+    output.extend_from_slice(name);
+    output.push(b'>');
+}
+
+fn append_element_end(output: &mut Vec<u8>, name: &[u8]) {
+    output.extend_from_slice(b"</");
+    output.extend_from_slice(name);
+    output.push(b'>');
+}
+
+fn append_schema_reference(
+    output: &mut Vec<u8>,
+    element_name: &[u8],
+    attribute_name: &[u8],
+    uri: &str,
+) {
+    output.push(b'<');
+    output.extend_from_slice(element_name);
+    output.push(b' ');
+    output.extend_from_slice(attribute_name);
+    output.extend_from_slice(b"=\"");
+    escape_attribute(output, uri);
+    output.extend_from_slice(b"\"/>");
+}
+
+fn expand_empty_element(
+    source: &[u8],
+    open: &Range<usize>,
+    name: &[u8],
+    content: &[u8],
+) -> Result<Vec<u8>> {
+    let tag = source
+        .get(open.clone())
+        .ok_or_else(|| invalid("Properties XML empty element range is outside its source"))?;
+    if !tag.ends_with(b"/>") {
+        return Err(invalid("Properties XML element is not self-closing"));
+    }
+    let mut output = Vec::new();
+    output.extend_from_slice(&tag[..tag.len() - 2]);
+    output.push(b'>');
+    output.extend_from_slice(content);
+    append_element_end(&mut output, name);
+    Ok(output)
+}
+
+fn expand_empty_element_with_attribute(
+    source: &[u8],
+    open: &Range<usize>,
+    name: &[u8],
+    content: &[u8],
+    attribute: &Range<usize>,
+    value: &[u8],
+) -> Result<Vec<u8>> {
+    let tag = source
+        .get(open.clone())
+        .ok_or_else(|| invalid("Properties XML empty element range is outside its source"))?;
+    if !tag.ends_with(b"/>") {
+        return Err(invalid("Properties XML element is not self-closing"));
+    }
+    if attribute.start < open.start || attribute.end > open.end || attribute.end < attribute.start {
+        return Err(invalid("Properties XML itemID range is outside its root"));
+    }
+    let mut output = Vec::new();
+    output.extend_from_slice(&source[open.start..attribute.start]);
+    output.extend_from_slice(value);
+    output.extend_from_slice(&source[attribute.end..open.end - 2]);
+    output.push(b'>');
+    output.extend_from_slice(content);
+    append_element_end(&mut output, name);
+    Ok(output)
+}
+
+fn find_resolved_attribute_value_span(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
     tag: &[u8],
     tag_start: usize,
+    namespace: &str,
     wanted_local_name: &[u8],
+) -> Result<Option<(Range<usize>, Vec<u8>)>> {
+    let mut result = None;
+    for attribute_result in element.checked_attributes() {
+        let attribute =
+            attribute_result.map_err(|error| super::model::xml_error(error.to_string()))?;
+        let (resolved, local) = reader.resolver().resolve_attribute(attribute.key);
+        if local.as_ref() != wanted_local_name
+            || !matches!(resolved, ResolveResult::Bound(bound) if bound.as_ref() == namespace.as_bytes())
+        {
+            continue;
+        }
+        let name = attribute.key.as_ref();
+        let span = find_attribute_value_span_exact(tag, tag_start, name)?
+            .ok_or_else(|| invalid("Properties XML resolved attribute has no source span"))?;
+        if result.is_some() {
+            return Err(invalid("Properties XML has a duplicate attribute"));
+        }
+        result = Some((span, name.to_vec()));
+    }
+    Ok(result)
+}
+
+fn find_attribute_value_span_exact(
+    tag: &[u8],
+    tag_start: usize,
+    wanted_name: &[u8],
 ) -> Result<Option<Range<usize>>> {
     let mut cursor = 1usize;
     while cursor < tag.len()
@@ -419,8 +930,7 @@ fn find_attribute_value_span(
         if cursor >= tag.len() {
             return Err(invalid("Properties XML attribute is unterminated"));
         }
-        let local_name = name.rsplit(|byte| *byte == b':').next().unwrap_or(name);
-        if local_name == wanted_local_name {
+        if name == wanted_name {
             return Ok(Some(tag_start + value_start..tag_start + cursor));
         }
         cursor += 1;
@@ -437,6 +947,7 @@ fn escaped_attribute(value: &str) -> Vec<u8> {
 fn splice_attribute_values(
     source: &[u8],
     mut replacements: Vec<(Range<usize>, Vec<u8>)>,
+    limits: &Limits,
 ) -> Result<Vec<u8>> {
     replacements.sort_unstable_by_key(|(range, _)| range.start);
     let mut output_len = source.len();
@@ -452,6 +963,9 @@ fn splice_attribute_values(
             .and_then(|value| value.checked_add(replacement.len()))
             .ok_or_else(|| limit("Properties XML rewrite size overflows usize"))?;
         cursor = range.end;
+    }
+    if output_len > limits.max_properties_bytes {
+        return Err(limit("serialized Properties XML exceeds its byte limit"));
     }
     let mut output = Vec::with_capacity(output_len);
     cursor = 0;
@@ -561,9 +1075,15 @@ fn process_properties_element(
             if resolved_namespace == CUSTOM_XML_NAMESPACE.as_bytes() && !state.root_seen =>
         {
             state.item_id = Some(
-                required_attribute(reader, element, CUSTOM_XML_NAMESPACE, b"itemID")?.parse()?,
+                required_attribute(reader, element, CUSTOM_XML_NAMESPACE, b"itemID", limits)?
+                    .parse()?,
             );
-            reject_other_attributes(reader, element, &[(CUSTOM_XML_NAMESPACE, b"itemID")])?;
+            reject_other_attributes(
+                reader,
+                element,
+                &[(CUSTOM_XML_NAMESPACE, b"itemID")],
+                limits,
+            )?;
             state.root_seen = true;
         },
         (1, b"schemaRefs", Some(resolved_namespace))
@@ -571,7 +1091,7 @@ fn process_properties_element(
                 && state.root_seen
                 && !state.schema_refs_seen =>
         {
-            reject_other_attributes(reader, element, &[])?;
+            reject_other_attributes(reader, element, &[], limits)?;
             state.schema_refs_seen = true;
         },
         (2, b"schemaRef", Some(resolved_namespace))
@@ -585,8 +1105,9 @@ fn process_properties_element(
                 element,
                 CUSTOM_XML_NAMESPACE,
                 b"uri",
+                limits,
             )?);
-            reject_other_attributes(reader, element, &[(CUSTOM_XML_NAMESPACE, b"uri")])?;
+            reject_other_attributes(reader, element, &[(CUSTOM_XML_NAMESPACE, b"uri")], limits)?;
         },
         _ if state.depth > 0 => {
             if capture_opaque {
@@ -708,4 +1229,17 @@ fn marker_exists<R: Read + Seek>(ole: &OleFile<R>, name: &str) -> Result<bool> {
         return Err(invalid(format!("{name} is not a storage")));
     }
     Ok(false)
+}
+
+fn map_ole_limit(error: Error) -> Error {
+    match error {
+        Error::Ole(OleError::LimitExceeded {
+            resource,
+            observed,
+            maximum,
+        }) => limit(format!(
+            "{resource} count {observed} exceeds the configured limit {maximum}"
+        )),
+        other => other,
+    }
 }

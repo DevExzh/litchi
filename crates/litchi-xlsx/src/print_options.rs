@@ -2,11 +2,10 @@
 
 mod patch;
 mod snapshot;
-mod source;
+pub mod source;
 
-pub use patch::{Commit, Diagnostics, Patch};
+pub(crate) use patch::Patch;
 pub use snapshot::Snapshot;
-pub use source::{SourceBackedEditor, SourceEdit};
 
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
@@ -420,7 +419,7 @@ mod tests {
     }
 
     fn parse_fixture(path: &str) -> PrintOptions {
-        let package = OpcPackage::open(path).unwrap();
+        let package = OpcPackage::open(path, litchi_opc::SourceLimits::default()).unwrap();
         let uri = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
         parse_print_options(package.get_part(&uri).unwrap().blob())
             .unwrap()

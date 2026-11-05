@@ -7,12 +7,13 @@
 pub(crate) use litchi_odraw::write::prop_value;
 
 #[cfg(test)]
-pub(crate) use litchi_odraw::write::{
-    PropertyBuilder, ShapeBuilder, raw_atom as write_atom, raw_container as write_container,
-    record_type,
-};
+pub(crate) use litchi_odraw::builder::{PropertyBuilder, ShapeBuilder};
 #[cfg(test)]
 pub(crate) use litchi_odraw::write::{child_anchor as write_child_anchor, spgr as write_spgr};
+#[cfg(test)]
+pub(crate) use litchi_odraw::write::{
+    raw_atom as write_atom, raw_container as write_container, record_type,
+};
 
 #[cfg(test)]
 #[allow(
@@ -30,7 +31,7 @@ mod tests {
         builder.add_complex(0x0145, &[1, 2, 3, 4]);
 
         let mut bytes = Vec::new();
-        builder.write(&mut bytes).unwrap();
+        builder.write(&mut bytes, Default::default()).unwrap();
 
         assert_eq!(builder.size().unwrap(), 24);
         assert_eq!(u16::from_le_bytes([bytes[8], bytes[9]]), 0x4104);

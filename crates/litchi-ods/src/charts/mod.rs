@@ -14,14 +14,14 @@ mod transaction;
 mod tests;
 
 pub use model::{Chart, Limits, Part, Selector, Storage};
-pub use snapshot::{Commit, Edit, Patch, Snapshot};
-pub use transaction::{Commit as InventoryCommit, Editor, Inventory, Transaction};
+pub use snapshot::{Edit, Snapshot};
+pub use transaction::{Editor, Inventory};
 
 pub use litchi_odf_common::chart::authoring::Definition;
 pub use litchi_odf_common::chart::{Axis, DataPoint, Element, Grid, Legend, PlotArea, Series};
 
 pub(crate) fn inventory(
-    package: &crate::package::Package,
+    package: &crate::package::Archive,
     limits: Limits,
 ) -> litchi_core::Result<Inventory<'_>> {
     Inventory::load(package, limits)

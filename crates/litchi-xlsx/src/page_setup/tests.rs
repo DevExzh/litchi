@@ -12,7 +12,7 @@ fn parse(body: &str) -> Result<Option<Setup>> {
 }
 
 fn parse_fixture(path: &str) -> Result<Setup> {
-    let package = OpcPackage::open(path).unwrap();
+    let package = OpcPackage::open(path, litchi_opc::SourceLimits::default()).unwrap();
     let uri = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
     parse_worksheet_page_setup(package.get_part(&uri).unwrap().blob())?
         .ok_or_else(|| invalid("fixture has no pageSetup"))
@@ -371,7 +371,7 @@ fn loads_poi_resolution_and_relationship_fixture() {
     assert_eq!(setup.orientation, Some(Orientation::Portrait));
     assert_eq!(setup.horizontal_dpi, Some(Dpi::new(1_200).unwrap()));
     assert_eq!(setup.vertical_dpi, Some(Dpi::new(1_200).unwrap()));
-    let package = OpcPackage::open(path).unwrap();
+    let package = OpcPackage::open(path, litchi_opc::SourceLimits::default()).unwrap();
     let uri = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
     assert_eq!(
         parse_worksheet_page_setup_relationship_id(package.get_part(&uri).unwrap().blob())

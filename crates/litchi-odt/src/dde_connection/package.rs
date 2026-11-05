@@ -4,12 +4,23 @@ use super::{MAX_XML_BYTES, codec, model::Connections};
 use crate::generic::FlatMutationBudget;
 use crate::variable_declaration::{Part, Scope};
 use litchi_core::Result;
+use litchi_odf_common::XmlStreamLimits;
 use std::collections::HashSet;
 
 /// Parse all supplied ODF XML parts and validate cross-part DDE references.
+#[cfg(test)]
 pub(crate) fn parse_dde_connection_parts_with_budget(
     parts: &[(&str, Part)],
     budget: Option<&FlatMutationBudget>,
+) -> Result<Connections> {
+    parse_dde_connection_parts_with_budget_and_xml_limits(parts, budget, XmlStreamLimits::default())
+}
+
+/// Parse all supplied ODF XML parts and validate cross-part DDE references.
+pub(crate) fn parse_dde_connection_parts_with_budget_and_xml_limits(
+    parts: &[(&str, Part)],
+    budget: Option<&FlatMutationBudget>,
+    xml_limits: XmlStreamLimits,
 ) -> Result<Connections> {
     if let Some(budget) = budget {
         budget.check()?;
@@ -36,6 +47,7 @@ pub(crate) fn parse_dde_connection_parts_with_budget(
             &mut containers,
             &mut aggregate,
             budget,
+            xml_limits,
         )?;
     }
     for usage in &parsed.uses {

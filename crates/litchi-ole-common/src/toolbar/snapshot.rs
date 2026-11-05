@@ -5,7 +5,7 @@ use std::sync::Arc;
 use super::codec;
 use super::control::{Body, Control};
 use super::validation::MAX_CONTROL_BYTES;
-use super::{Error, Transaction};
+use super::{Edit, Error};
 
 /// A deterministic identity for one exact serialized toolbar control.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -150,8 +150,8 @@ impl Snapshot {
 
     /// Start an isolated typed edit.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction::new(self.clone())
+    pub fn edit(&self) -> Edit {
+        Edit::new(self.clone())
     }
 
     fn parse_inner(bytes: Arc<[u8]>, prefix_len: usize) -> Result<Self, Error> {

@@ -15,7 +15,7 @@ use std::io::Cursor;
 
 #[test]
 fn test_create_writer() {
-    let writer = Writer::new();
+    let writer = Builder::new();
     assert_eq!(writer.slides.len(), 0);
     assert_eq!(writer.slide_width, 9_144_000);
     assert_eq!(writer.slide_height, 6_858_000);
@@ -23,14 +23,14 @@ fn test_create_writer() {
 
 #[test]
 fn test_create_widescreen() {
-    let writer = Writer::new_widescreen();
+    let writer = Builder::new_widescreen();
     assert_eq!(writer.slide_width, 9_144_000);
     assert_eq!(writer.slide_height, 5_143_500);
 }
 
 #[test]
 fn test_add_slide() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let idx = writer.add_slide().unwrap();
     assert_eq!(idx, 0);
     assert_eq!(writer.slides.len(), 1);
@@ -38,7 +38,7 @@ fn test_add_slide() {
 
 #[test]
 fn test_add_multiple_slides() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let idx1 = writer.add_slide().unwrap();
     let idx2 = writer.add_slide().unwrap();
     let idx3 = writer.add_slide().unwrap();
@@ -50,7 +50,7 @@ fn test_add_multiple_slides() {
 
 #[test]
 fn test_add_and_write_freeform_shape() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     let geometry = FreeformGeometry::new(
         GeometryRect::new(0, 0, 21600, 21600),
@@ -69,13 +69,13 @@ fn test_add_and_write_freeform_shape() {
     );
 
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.encode(&mut output).unwrap();
     assert!(!output.into_inner().is_empty());
 }
 
 #[test]
 fn test_rejects_empty_freeform_geometry() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     let geometry = FreeformGeometry::new(
         GeometryRect::new(0, 0, 21600, 21600),
@@ -94,7 +94,7 @@ fn test_rejects_empty_freeform_geometry() {
 
 #[test]
 fn test_generic_styled_shape_rejects_geometryless_freeform() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
 
     let result = writer.add_styled_shape(
@@ -113,7 +113,7 @@ fn test_generic_styled_shape_rejects_geometryless_freeform() {
 
 #[test]
 fn test_add_textbox() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     writer.add_textbox(slide, 10, 10, 100, 50, "Test").unwrap();
     assert_eq!(writer.slides[0].shapes.len(), 1);
@@ -121,7 +121,7 @@ fn test_add_textbox() {
 
 #[test]
 fn test_plain_text_alignment_and_rotation_reach_escher_shape() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     writer
         .add_textbox(slide, 10, 20, 300, 100, "Centered")
@@ -141,7 +141,7 @@ fn test_plain_text_alignment_and_rotation_reach_escher_shape() {
 
 #[test]
 fn test_alignment_setter_updates_rich_paragraphs() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     writer
         .add_rich_textbox(
@@ -171,7 +171,7 @@ fn test_alignment_setter_updates_rich_paragraphs() {
 
 #[test]
 fn test_rotation_setter_rejects_non_finite_values() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     writer.add_rectangle(slide, 0, 0, 100, 100).unwrap();
 
@@ -186,7 +186,7 @@ fn test_rotation_setter_rejects_non_finite_values() {
 
 #[test]
 fn test_shape_adjustment_setter_preserves_sparse_positions() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     writer
         .add_styled_shape(
@@ -217,14 +217,14 @@ fn test_shape_adjustment_setter_preserves_sparse_positions() {
 
 #[test]
 fn test_add_textbox_invalid_slide() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let result = writer.add_textbox(0, 10, 10, 100, 50, "Test");
     assert!(result.is_err());
 }
 
 #[test]
 fn test_delete_slide() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_slide().unwrap();
     writer.add_slide().unwrap();
     writer.delete_slide(0).unwrap();
@@ -233,14 +233,14 @@ fn test_delete_slide() {
 
 #[test]
 fn test_delete_invalid_slide() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let result = writer.delete_slide(0);
     assert!(result.is_err());
 }
 
 #[test]
 fn test_add_styled_shape() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     let style = ShapeStyle::solid_no_line(ShapeColor::RED);
     writer
@@ -251,15 +251,43 @@ fn test_add_styled_shape() {
 
 #[test]
 fn test_add_rectangle() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     writer.add_rectangle(slide, 10, 10, 100, 50).unwrap();
     assert_eq!(writer.slides[0].shapes.len(), 1);
 }
 
 #[test]
+fn connector_reads_back_as_a_connector() {
+    let mut writer = Builder::new();
+    let slide = writer.add_slide().unwrap();
+    writer.add_line(slide, 0, 0, 100, 100).unwrap();
+    writer.add_connector(slide, 10, 10, 200, 50).unwrap();
+    let mut bytes = Cursor::new(Vec::new());
+    crate::raw::encode(&mut writer, &mut bytes).unwrap();
+    let package = crate::Package::from_bytes(&bytes.into_inner()).unwrap();
+    let presentation = package.presentation().unwrap();
+    let slides = presentation.slides().unwrap();
+    let shapes = slides[0].shapes().unwrap();
+    let kinds: Vec<_> = shapes
+        .iter()
+        .map(|shape| match shape {
+            crate::shapes::ShapeEnum::Line(line) => Some(line.shape_type()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        kinds,
+        [
+            Some(crate::shapes::ShapeType::Line),
+            Some(crate::shapes::ShapeType::Connector)
+        ]
+    );
+}
+
+#[test]
 fn test_add_arrow_line() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     writer.add_arrow_line(slide, 0, 0, 100, 100).unwrap();
     assert_eq!(writer.slides[0].shapes.len(), 1);
@@ -267,7 +295,7 @@ fn test_add_arrow_line() {
 
 #[test]
 fn test_set_slide_notes() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     writer
         .set_slide_notes(slide, "These are speaker notes")
@@ -280,8 +308,8 @@ fn test_set_slide_notes() {
 
 #[test]
 fn test_add_font() {
-    let mut writer = Writer::new();
-    // Writer::new() already adds Arial as default font at index 0
+    let mut writer = Builder::new();
+    // Builder::new() already adds Arial as default font at index 0
     let font = FontEntity::times_new_roman();
     let idx = writer.add_font(font);
     assert_eq!(idx, 1); // Second font at index 1
@@ -290,8 +318,8 @@ fn test_add_font() {
 
 #[test]
 fn test_add_multiple_fonts() {
-    let mut writer = Writer::new();
-    // Writer::new() already adds Arial as default font at index 0
+    let mut writer = Builder::new();
+    // Builder::new() already adds Arial as default font at index 0
     let idx1 = writer.add_font(FontEntity::arial()); // Returns 1
     let idx2 = writer.add_font(FontEntity::times_new_roman()); // Returns 2
     let idx3 = writer.add_font(FontEntity::new("Calibri")); // Returns 3
@@ -302,23 +330,23 @@ fn test_add_multiple_fonts() {
 }
 
 #[test]
-fn test_set_property() {
-    let mut writer = Writer::new();
-    writer.set_property("Title", "My Presentation");
-    writer.set_property("Author", "Test Author");
-    assert_eq!(
-        writer.properties.get("Title"),
-        Some(&"My Presentation".to_string())
-    );
-    assert_eq!(
-        writer.properties.get("Author"),
-        Some(&"Test Author".to_string())
-    );
+fn test_set_metadata() {
+    let mut writer = Builder::new();
+    writer
+        .set_metadata(litchi_core::Metadata {
+            title: Some("My Presentation".to_owned()),
+            author: Some("Test Author".to_owned()),
+            ..litchi_core::Metadata::default()
+        })
+        .unwrap();
+    let summary = writer.summary_properties().summary_information();
+    assert_eq!(summary.title(), Some("My Presentation"));
+    assert_eq!(summary.author(), Some("Test Author"));
 }
 
 #[test]
 fn test_hyperlink_collection() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let link = Hyperlink::url("https://example.com").with_display_text("Example");
     let id = writer.add_hyperlink(link);
     assert_eq!(id, 1);
@@ -346,7 +374,7 @@ fn maps_writer_hyperlinks_to_spec_link_targets() {
 
 #[test]
 fn test_add_comment() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     let comment = SlideComment::new("John Doe", "Great slide!", 100, 50);
     writer.add_comment(slide, comment).unwrap();
@@ -356,7 +384,7 @@ fn test_add_comment() {
 
 #[test]
 fn test_add_multiple_comments() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     writer
         .add_comment(slide, SlideComment::new("Alice", "First", 10, 10))
@@ -369,7 +397,7 @@ fn test_add_multiple_comments() {
 
 #[test]
 fn test_add_comment_invalid_slide() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let comment = SlideComment::new("John", "Test", 0, 0);
     let result = writer.add_comment(0, comment);
     assert!(result.is_err());
@@ -409,7 +437,7 @@ fn test_shape_properties() {
 
 #[test]
 fn test_slide_count() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     assert_eq!(writer.slide_count(), 0);
     writer.add_slide().unwrap();
     assert_eq!(writer.slide_count(), 1);
@@ -419,7 +447,7 @@ fn test_slide_count() {
 
 #[test]
 fn test_default_writer() {
-    let writer = Writer::default();
+    let writer = Builder::default();
     assert_eq!(writer.slide_count(), 0);
     assert_eq!(writer.slide_width, 9_144_000);
     assert_eq!(writer.slide_height, 6_858_000);
@@ -461,6 +489,7 @@ fn test_shape_type_variants() {
         ShapeType::TextBox,
         ShapeType::Placeholder,
         ShapeType::Line,
+        ShapeType::Connector,
         ShapeType::Ellipse,
         ShapeType::RoundRectangle,
         ShapeType::Diamond,
@@ -477,21 +506,21 @@ fn test_shape_type_variants() {
 
 #[test]
 fn test_write_to_memory() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     writer
         .add_textbox(slide, 100, 100, 400, 200, "Hello, World!")
         .unwrap();
 
     let mut buffer = Cursor::new(Vec::new());
-    let result = writer.write_to(&mut buffer);
+    let result = writer.encode(&mut buffer);
     assert!(result.is_ok());
     assert!(!buffer.get_ref().is_empty());
 }
 
 #[test]
 fn smart_tags_round_trip_through_both_output_paths() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     let tokyo = writer
         .add_smart_tag(
@@ -531,8 +560,8 @@ fn smart_tags_round_trip_through_both_output_paths() {
     );
 
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
-    let mut package = crate::Package::from_reader(Cursor::new(output.into_inner())).unwrap();
+    writer.encode(&mut output).unwrap();
+    let mut package = crate::raw::Reader::from_reader(Cursor::new(output.into_inner())).unwrap();
     let presentation = package.presentation().unwrap();
     let store = presentation.smart_tags().unwrap().unwrap();
     assert_eq!(store.types.len(), 1);
@@ -566,8 +595,10 @@ fn smart_tags_round_trip_through_both_output_paths() {
             .unwrap()
             .as_nanos()
     ));
-    writer.save(&path).unwrap();
-    let mut file_package = crate::Package::open(&path).unwrap();
+    writer
+        .encode(&mut std::fs::File::create(&path).unwrap())
+        .unwrap();
+    let mut file_package = crate::raw::Reader::open(&path).unwrap();
     let file_presentation = file_package.presentation().unwrap();
     assert_eq!(file_presentation.smart_tags().unwrap(), Some(store));
     assert_eq!(
@@ -584,11 +615,11 @@ fn smart_tags_round_trip_through_both_output_paths() {
 
 #[test]
 fn rejects_missing_smart_tag_references() {
-    let mut source = Writer::new();
+    let mut source = Builder::new();
     let dangling = source
         .add_smart_tag(SmartTagDefinition::new("urn:test", "dangling"))
         .unwrap();
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     writer
         .add_rich_textbox(
@@ -602,9 +633,9 @@ fn rejects_missing_smart_tag_references() {
             ])],
         )
         .unwrap();
-    assert!(writer.write_to(&mut Cursor::new(Vec::new())).is_err());
+    assert!(writer.encode(&mut Cursor::new(Vec::new())).is_err());
 
-    let mut empty_writer = Writer::new();
+    let mut empty_writer = Builder::new();
     let empty_slide = empty_writer.add_slide().unwrap();
     let tag = empty_writer
         .add_smart_tag(SmartTagDefinition::new("urn:test", "empty"))
@@ -621,21 +652,21 @@ fn rejects_missing_smart_tag_references() {
             ])],
         )
         .unwrap();
-    assert!(empty_writer.write_to(&mut Cursor::new(Vec::new())).is_err());
+    assert!(empty_writer.encode(&mut Cursor::new(Vec::new())).is_err());
 }
 
 #[test]
 fn test_write_empty_presentation() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let mut buffer = Cursor::new(Vec::new());
-    let result = writer.write_to(&mut buffer);
+    let result = writer.encode(&mut buffer);
     assert!(result.is_ok());
     assert!(!buffer.get_ref().is_empty());
 }
 
 #[test]
 fn test_write_multiple_slides() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
 
     let slide1 = writer.add_slide().unwrap();
     writer
@@ -649,14 +680,14 @@ fn test_write_multiple_slides() {
     writer.add_line(slide3, 0, 0, 500, 500).unwrap();
 
     let mut buffer = Cursor::new(Vec::new());
-    let result = writer.write_to(&mut buffer);
+    let result = writer.encode(&mut buffer);
     assert!(result.is_ok());
     assert!(!buffer.get_ref().is_empty());
 }
 
 #[test]
 fn test_presentation_with_hyperlink() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
 
     writer
@@ -668,13 +699,13 @@ fn test_presentation_with_hyperlink() {
     writer.set_last_shape_hyperlink(slide, link_id).unwrap();
 
     let mut buffer = Cursor::new(Vec::new());
-    let result = writer.write_to(&mut buffer);
+    let result = writer.encode(&mut buffer);
     assert!(result.is_ok());
 }
 
 #[test]
 fn test_presentation_with_comments() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     writer
         .add_textbox(slide, 100, 100, 400, 200, "Content")
@@ -684,13 +715,13 @@ fn test_presentation_with_comments() {
     writer.add_comment(slide, comment).unwrap();
 
     let mut buffer = Cursor::new(Vec::new());
-    let result = writer.write_to(&mut buffer);
+    let result = writer.encode(&mut buffer);
     assert!(result.is_ok());
 }
 
 #[test]
 fn test_presentation_with_notes() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     writer
         .add_textbox(slide, 100, 100, 400, 200, "Title")
@@ -700,13 +731,21 @@ fn test_presentation_with_notes() {
         .unwrap();
 
     let mut buffer = Cursor::new(Vec::new());
-    let result = writer.write_to(&mut buffer);
-    assert!(result.is_ok());
+    writer.encode(&mut buffer).unwrap();
+
+    let package = crate::Package::from_bytes(buffer.get_ref()).unwrap();
+    let presentation = package.presentation().unwrap();
+    let slides = presentation.slides().unwrap();
+    let notes = slides[0].speaker_notes().unwrap().unwrap();
+    assert_eq!(
+        notes.text().unwrap(),
+        "These are speaker notes for this slide"
+    );
 }
 
 #[test]
 fn test_presentation_with_multiple_shapes() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
 
     writer.add_rectangle(slide, 50, 50, 100, 100).unwrap();
@@ -718,13 +757,13 @@ fn test_presentation_with_multiple_shapes() {
     assert_eq!(writer.slides[0].shapes.len(), 3);
 
     let mut buffer = Cursor::new(Vec::new());
-    let result = writer.write_to(&mut buffer);
+    let result = writer.encode(&mut buffer);
     assert!(result.is_ok());
 }
 
 #[test]
 fn test_custom_show_support() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_slide().unwrap();
     writer.add_slide().unwrap();
     writer.add_slide().unwrap();
@@ -737,7 +776,7 @@ fn test_custom_show_support() {
 
 #[test]
 fn test_multiple_custom_shows() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     for _ in 0..5 {
         writer.add_slide().unwrap();
     }
@@ -750,20 +789,20 @@ fn test_multiple_custom_shows() {
 
 #[test]
 fn test_widescreen_write() {
-    let mut writer = Writer::new_widescreen();
+    let mut writer = Builder::new_widescreen();
     let slide = writer.add_slide().unwrap();
     writer
         .add_textbox(slide, 100, 100, 800, 100, "Widescreen")
         .unwrap();
 
     let mut buffer = Cursor::new(Vec::new());
-    let result = writer.write_to(&mut buffer);
+    let result = writer.encode(&mut buffer);
     assert!(result.is_ok());
 }
 
 #[test]
 fn test_shape_with_styling() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
 
     let style = ShapeStyle::new()
@@ -778,13 +817,13 @@ fn test_shape_with_styling() {
         .unwrap();
 
     let mut buffer = Cursor::new(Vec::new());
-    let result = writer.write_to(&mut buffer);
+    let result = writer.encode(&mut buffer);
     assert!(result.is_ok());
 }
 
 #[test]
 fn test_extended_line_style_reaches_escher_shape() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     let mut line = LineStyleConfig::with_color_and_width(ShapeColor::RED, 2.0);
     line.opacity = 50;
@@ -822,7 +861,7 @@ fn test_extended_line_style_reaches_escher_shape() {
 
 #[test]
 fn test_picture_fill_registers_and_serializes_blip_reference() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     let blip_index = writer
         .add_picture_data_as(
@@ -841,13 +880,13 @@ fn test_picture_fill_registers_and_serializes_blip_reference() {
     assert_eq!(writer.picture_count(), 1);
 
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.encode(&mut output).unwrap();
     assert!(!output.into_inner().is_empty());
 }
 
 #[test]
 fn test_invalid_slide_picture_does_not_mutate_blip_store() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
 
     assert!(
         writer
@@ -859,7 +898,7 @@ fn test_invalid_slide_picture_does_not_mutate_blip_store() {
 
 #[test]
 fn test_invalid_operations() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
 
     // Try to add shape to non-existent slide
     let result = writer.add_rectangle(0, 0, 0, 100, 100);
@@ -876,7 +915,7 @@ fn test_invalid_operations() {
 
 #[test]
 fn test_internal_slide_data() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide_idx = writer.add_slide().unwrap();
 
     // Verify slide was created with correct defaults
@@ -888,7 +927,7 @@ fn test_internal_slide_data() {
 
 #[test]
 fn test_slide_persist_tracking() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
 
     let idx1 = writer.add_slide().unwrap();
     let idx2 = writer.add_slide().unwrap();
@@ -897,4 +936,71 @@ fn test_slide_persist_tracking() {
     // (We can't check this directly, but we verify the structure)
     assert_eq!(idx1, 0);
     assert_eq!(idx2, 1);
+}
+
+#[test]
+fn shape_interaction_setters_enforce_explicit_limits_atomically() {
+    use crate::{
+        Interaction, InteractionAction, InteractionLimits, InteractionLinkTarget,
+        InteractionTrigger, TextInteraction, TextInteractionLimits, TextRange,
+    };
+
+    let mut writer = Builder::new();
+    let slide = writer.add_slide().unwrap();
+    writer
+        .add_textbox(slide, 10, 10, 240, 40, "Atomic interaction")
+        .unwrap();
+    let existing = Interaction::new(
+        InteractionTrigger::Click,
+        InteractionAction::Macro,
+        InteractionLinkTarget::Nil,
+    )
+    .with_macro_name("Existing")
+    .unwrap();
+    writer
+        .set_last_shape_interaction(slide, existing.clone())
+        .unwrap();
+    let too_small = InteractionLimits {
+        max_record_bytes: 31,
+        ..InteractionLimits::default()
+    };
+    assert!(
+        writer
+            .set_last_shape_interaction_with_limits(slide, existing, too_small)
+            .is_err()
+    );
+
+    let first = TextInteraction::new(
+        TextRange::new(0, 2).unwrap(),
+        Interaction::new(
+            InteractionTrigger::Click,
+            InteractionAction::NoAction,
+            InteractionLinkTarget::Nil,
+        ),
+    )
+    .unwrap();
+    writer
+        .set_last_shape_text_interaction(slide, first)
+        .unwrap();
+    let second = TextInteraction::new(
+        TextRange::new(3, 5).unwrap(),
+        Interaction::new(
+            InteractionTrigger::MouseOver,
+            InteractionAction::Ole,
+            InteractionLinkTarget::Nil,
+        ),
+    )
+    .unwrap();
+    assert!(
+        writer
+            .set_last_shape_text_interaction_with_limits(
+                slide,
+                second,
+                TextInteractionLimits {
+                    max_interactions: 1,
+                    ..TextInteractionLimits::default()
+                },
+            )
+            .is_err()
+    );
 }

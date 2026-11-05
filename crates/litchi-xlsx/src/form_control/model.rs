@@ -14,8 +14,8 @@ use quick_xml::reader::NsReader;
 use crate::source_payload::SourcePayload;
 
 use super::{
-    MAX_FORMULA_BYTES, MAX_ITEM_VALUE_BYTES, MAX_OPAQUE_BYTES, MAX_RETAINED_BYTES, MAX_XML_DEPTH,
-    MAX_XML_EVENTS, Result, allocation, invalid,
+    LimitKind, MAX_FORMULA_BYTES, MAX_ITEM_VALUE_BYTES, MAX_OPAQUE_BYTES, MAX_RETAINED_BYTES,
+    MAX_XML_DEPTH, MAX_XML_EVENTS, Result, allocation, invalid,
 };
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
@@ -177,7 +177,7 @@ impl FormControlFormula {
         }
         if value.len() > MAX_FORMULA_BYTES {
             return Err(super::limit(
-                "form-control formula bytes",
+                LimitKind::FormulaBytes,
                 value.len(),
                 MAX_FORMULA_BYTES,
             ));
@@ -197,7 +197,7 @@ impl FormControlFormula {
         }
         if value.len() > MAX_FORMULA_BYTES {
             return Err(super::limit(
-                "form-control formula bytes",
+                LimitKind::FormulaBytes,
                 value.len(),
                 MAX_FORMULA_BYTES,
             ));
@@ -319,7 +319,7 @@ impl OpaqueXml {
         let xml = xml.into();
         if xml.len() > MAX_OPAQUE_BYTES {
             return Err(super::limit(
-                "opaque form-control bytes",
+                LimitKind::OpaqueBytes,
                 xml.len(),
                 MAX_OPAQUE_BYTES,
             ));
@@ -426,23 +426,12 @@ impl Item {
         &self.value
     }
 
-    /// Alias matching the wire attribute name.
-    #[must_use]
-    pub fn val(&self) -> &str {
-        self.value()
-    }
-
     /// Replace the item value.
     pub fn set_value(&mut self, value: impl Into<String>) -> Result<()> {
         let value = value.into();
         validate_item_value(&value, MAX_ITEM_VALUE_BYTES)?;
         self.value = value;
         Ok(())
-    }
-
-    /// Alias matching the wire attribute name.
-    pub fn set_val(&mut self, value: impl Into<String>) -> Result<()> {
-        self.set_value(value)
     }
 
     /// Whether a source item carries opaque attributes or child markup.
@@ -476,11 +465,11 @@ impl ItemList {
         let mut retained_payload = 0usize;
         for item in values {
             if items.len() >= super::MAX_ITEMS {
-                return Err(super::limit(
-                    "item count",
-                    items.len() + 1,
-                    super::MAX_ITEMS,
-                ));
+                let observed = items
+                    .len()
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("form-control item count overflow"))?;
+                return Err(super::limit(LimitKind::Items, observed, super::MAX_ITEMS));
             }
             let item_payload = item
                 .value
@@ -516,7 +505,7 @@ impl ItemList {
                 .ok_or_else(|| invalid("form-control item retained bytes overflow"))?;
             if retained > MAX_RETAINED_BYTES {
                 return Err(super::limit(
-                    "retained form-control item bytes",
+                    LimitKind::RetainedBytes,
                     retained,
                     MAX_RETAINED_BYTES,
                 ));
@@ -1141,12 +1130,6 @@ impl Properties {
             .unwrap_or(KnownOrUnknown::Known(SelectionType::Single))
     }
 
-    /// Alias using a word-separated spelling of the wire name.
-    #[must_use]
-    pub fn effective_sel_type(&self) -> KnownOrUnknown<SelectionType> {
-        self.effective_seltype()
-    }
-
     /// Return the optional horizontal alignment.
     #[must_use]
     pub fn text_h_align(&self) -> Option<&KnownOrUnknown<TextHAlign>> {
@@ -1403,7 +1386,7 @@ impl Properties {
         if let Some(value) = value.as_deref() {
             if value.len() > MAX_OPAQUE_BYTES {
                 return Err(super::limit(
-                    "multiSel bytes",
+                    LimitKind::StringBytes,
                     value.len(),
                     MAX_OPAQUE_BYTES,
                 ));
@@ -1685,7 +1668,7 @@ impl Properties {
         if let Some(value) = self.multi_sel.as_deref() {
             if value.len() > limits.max_opaque_bytes() {
                 return Err(super::limit(
-                    "multiSel bytes",
+                    LimitKind::StringBytes,
                     value.len(),
                     limits.max_opaque_bytes(),
                 ));
@@ -1727,7 +1710,7 @@ impl Properties {
         }
         if opaque > limits.max_opaque_bytes() {
             return Err(super::limit(
-                "opaque form-control bytes",
+                LimitKind::OpaqueBytes,
                 opaque,
                 limits.max_opaque_bytes(),
             ));
@@ -1956,7 +1939,7 @@ impl Properties {
             if let Some(ScalarValue::String(value)) = value {
                 if value.len() > limits.max_opaque_bytes() {
                     return Err(super::limit(
-                        "multiSel bytes",
+                        LimitKind::StringBytes,
                         value.len(),
                         limits.max_opaque_bytes(),
                     ));
@@ -2116,7 +2099,7 @@ pub struct FormControl<'a> {
 fn check_bounded(name: &'static str, value: Option<u32>) -> Result<()> {
     if let Some(value) = value {
         if value > 30_000 {
-            return Err(super::limit(name, value as usize, 30_000));
+            return Err(invalid(format!("{name} exceeds the schema maximum 30000")));
         }
     }
     Ok(())
@@ -2128,7 +2111,7 @@ fn add_retained(total: &mut usize, amount: usize, limits: super::Limits) -> Resu
         .ok_or_else(|| invalid("form-control retained bytes overflow"))?;
     if *total > limits.max_retained_bytes() {
         return Err(super::limit(
-            "retained form-control bytes",
+            LimitKind::RetainedBytes,
             *total,
             limits.max_retained_bytes(),
         ));
@@ -2232,7 +2215,7 @@ fn add_opaque_retained(
 ) -> Result<()> {
     if value.byte_len() > limits.max_opaque_bytes() {
         return Err(super::limit(
-            "opaque form-control bytes",
+            LimitKind::OpaqueBytes,
             value.byte_len(),
             limits.max_opaque_bytes(),
         ));
@@ -2260,7 +2243,7 @@ fn check_item_list_opt(value: Option<&ItemList>, limits: super::Limits) -> Resul
 fn check_item_list(value: &ItemList, limits: super::Limits) -> Result<()> {
     if value.items.len() > limits.max_items() {
         return Err(super::limit(
-            "item count",
+            LimitKind::Items,
             value.items.len(),
             limits.max_items(),
         ));
@@ -2279,7 +2262,7 @@ fn check_item_list(value: &ItemList, limits: super::Limits) -> Result<()> {
     }
     if opaque > limits.max_opaque_bytes() {
         return Err(super::limit(
-            "opaque item/list bytes",
+            LimitKind::OpaqueBytes,
             opaque,
             limits.max_opaque_bytes(),
         ));
@@ -2289,7 +2272,11 @@ fn check_item_list(value: &ItemList, limits: super::Limits) -> Result<()> {
 
 fn validate_item_value(value: &str, maximum: usize) -> Result<()> {
     if value.len() > maximum {
-        return Err(super::limit("item value bytes", value.len(), maximum));
+        return Err(super::limit(
+            LimitKind::ItemValueBytes,
+            value.len(),
+            maximum,
+        ));
     }
     validate_xml_text(value, "item value")
 }
@@ -2311,11 +2298,7 @@ fn validate_opaque_fragment(xml: &[u8]) -> Result<()> {
             .checked_add(1)
             .ok_or_else(|| invalid("opaque XML event count overflow"))?;
         if events > MAX_XML_EVENTS {
-            return Err(super::limit(
-                "opaque XML event count",
-                events,
-                MAX_XML_EVENTS,
-            ));
+            return Err(super::limit(LimitKind::XmlEvents, events, MAX_XML_EVENTS));
         }
         let event = reader
             .read_event()
@@ -2332,7 +2315,7 @@ fn validate_opaque_fragment(xml: &[u8]) -> Result<()> {
                     .checked_add(1)
                     .ok_or_else(|| invalid("opaque XML depth overflow"))?;
                 if depth > MAX_XML_DEPTH {
-                    return Err(super::limit("opaque XML depth", depth, MAX_XML_DEPTH));
+                    return Err(super::limit(LimitKind::XmlDepth, depth, MAX_XML_DEPTH));
                 }
                 if depth == 1 {
                     root_seen = true;
@@ -2348,7 +2331,7 @@ fn validate_opaque_fragment(xml: &[u8]) -> Result<()> {
                     .ok_or_else(|| invalid("opaque XML depth overflow"))?;
                 if element_depth > MAX_XML_DEPTH {
                     return Err(super::limit(
-                        "opaque XML depth",
+                        LimitKind::XmlDepth,
                         element_depth,
                         MAX_XML_DEPTH,
                     ));
@@ -2408,7 +2391,7 @@ fn validate_opaque_attributes(
             .ok_or_else(|| invalid("opaque XML attribute count overflow"))?;
         if count > super::MAX_ATTRIBUTES {
             return Err(super::limit(
-                "opaque XML attribute count",
+                LimitKind::Attributes,
                 count,
                 super::MAX_ATTRIBUTES,
             ));

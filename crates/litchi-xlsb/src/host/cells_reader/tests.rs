@@ -15,12 +15,12 @@ use crate::package::error::Error;
 use crate::package::formula::{Context, ParsedFormula, ptg_types};
 use crate::package::records::Stream;
 use crate::package::{FormulaOpacityReason, FormulaResolutionStatus};
-use crate::raw::{Writer, kind};
+use crate::raw::{Encoder, kind};
 use litchi_core::sheet::{Cell, CellValue};
 
 fn bool_formula_worksheet(formula: &ParsedFormula) -> Vec<u8> {
     let mut worksheet = Vec::new();
-    let mut writer = Writer::new(&mut worksheet);
+    let mut writer = Encoder::new(&mut worksheet, crate::raw::Limits::DEFAULT);
     writer.write_record(kind::WS_DIM, &[0; 16]).unwrap();
     writer.write_record(kind::BEGIN_SHEET_DATA, &[]).unwrap();
 
@@ -34,7 +34,7 @@ fn bool_formula_worksheet(formula: &ParsedFormula) -> Vec<u8> {
     let mut cell = vec![0; 8];
     cell.push(1);
     cell.extend_from_slice(&0u16.to_le_bytes());
-    cell.extend_from_slice(&formula.to_bytes().unwrap());
+    cell.extend_from_slice(&formula.to_bytes(crate::raw::Limits::DEFAULT).unwrap());
     writer.write_record(kind::FMLA_BOOL, &cell).unwrap();
     writer.write_record(kind::END_SHEET_DATA, &[]).unwrap();
     writer.write_record(kind::END_SHEET, &[]).unwrap();
@@ -49,9 +49,19 @@ fn propagates_opaque_formula_status_through_cells_reader() {
     };
     let expected_rgce = formula.rgce.clone();
     let context = Context::default();
-    let iter = Stream::new(std::io::Cursor::new(bool_formula_worksheet(&formula)));
-    let mut reader =
-        CellsReader::new(iter, &[], &context, 1, crate::leniency::Leniency::Strict).unwrap();
+    let iter = Stream::new(
+        std::io::Cursor::new(bool_formula_worksheet(&formula)),
+        crate::raw::Limits::DEFAULT,
+    );
+    let mut reader = CellsReader::new(
+        iter,
+        &[],
+        &context,
+        1,
+        crate::raw::Limits::DEFAULT,
+        crate::leniency::Leniency::Strict,
+    )
+    .unwrap();
 
     let cell = reader.next_cell().unwrap().unwrap();
     assert_eq!(
@@ -69,16 +79,26 @@ fn propagates_opaque_formula_status_through_cells_reader() {
 fn propagates_missing_group_definition_as_structural_error() {
     let formula = ParsedFormula::exp(0, 0).unwrap();
     let context = Context::default();
-    let iter = Stream::new(std::io::Cursor::new(bool_formula_worksheet(&formula)));
-    let mut reader =
-        CellsReader::new(iter, &[], &context, 1, crate::leniency::Leniency::Strict).unwrap();
+    let iter = Stream::new(
+        std::io::Cursor::new(bool_formula_worksheet(&formula)),
+        crate::raw::Limits::DEFAULT,
+    );
+    let mut reader = CellsReader::new(
+        iter,
+        &[],
+        &context,
+        1,
+        crate::raw::Limits::DEFAULT,
+        crate::leniency::Leniency::Strict,
+    )
+    .unwrap();
 
     assert!(matches!(reader.next_cell(), Err(Error::InvalidFormula(_))));
 }
 
 fn rich_string_worksheet() -> Vec<u8> {
     let mut bytes = Vec::new();
-    let mut writer = Writer::new(&mut bytes);
+    let mut writer = Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT);
     writer.write_record(kind::WS_DIM, &[0; 16]).unwrap();
     writer.write_record(kind::BEGIN_COL_INFOS, &[]).unwrap();
     let mut column = 2u32.to_le_bytes().to_vec();
@@ -172,7 +192,7 @@ fn parses_iso_sheet_protection_metadata_and_matching_flags() {
     assert_eq!(Reader::sheet_protection_flags(&protection), flags);
 
     let mut worksheet = Vec::new();
-    let mut writer = Writer::new(&mut worksheet);
+    let mut writer = Encoder::new(&mut worksheet, crate::raw::Limits::DEFAULT);
     writer.write_record(kind::WS_DIM, &[0; 16]).unwrap();
     writer.write_record(kind::BEGIN_SHEET_DATA, &[]).unwrap();
     writer.write_record(kind::END_SHEET_DATA, &[]).unwrap();
@@ -182,12 +202,13 @@ fn parses_iso_sheet_protection_metadata_and_matching_flags() {
     writer.write_record(kind::SHEET_PROTECTION, &base).unwrap();
     writer.write_record(kind::END_SHEET, &[]).unwrap();
     let formula_context = Context::default();
-    let iter = Stream::new(std::io::Cursor::new(worksheet));
+    let iter = Stream::new(std::io::Cursor::new(worksheet), crate::raw::Limits::DEFAULT);
     let mut reader = CellsReader::new(
         iter,
         &[],
         &formula_context,
         1,
+        crate::raw::Limits::DEFAULT,
         crate::leniency::Leniency::Strict,
     )
     .unwrap();
@@ -200,12 +221,13 @@ fn parses_iso_sheet_protection_metadata_and_matching_flags() {
 fn reads_inline_rich_string_cells() {
     let bytes = rich_string_worksheet();
     let formula_context = Context::default();
-    let iter = Stream::new(std::io::Cursor::new(bytes));
+    let iter = Stream::new(std::io::Cursor::new(bytes), crate::raw::Limits::DEFAULT);
     let mut reader = CellsReader::new(
         iter,
         &[],
         &formula_context,
         1,
+        crate::raw::Limits::DEFAULT,
         crate::leniency::Leniency::Strict,
     )
     .unwrap();
@@ -250,7 +272,7 @@ fn reads_inline_rich_string_cells() {
 #[test]
 fn rejects_a_validation_collection_with_a_mismatched_count() {
     let mut worksheet = Vec::new();
-    let mut writer = Writer::new(&mut worksheet);
+    let mut writer = Encoder::new(&mut worksheet, crate::raw::Limits::DEFAULT);
     writer.write_record(kind::WS_DIM, &[0; 16]).unwrap();
     writer.write_record(kind::BEGIN_SHEET_DATA, &[]).unwrap();
     writer.write_record(kind::END_SHEET_DATA, &[]).unwrap();
@@ -261,12 +283,13 @@ fn rejects_a_validation_collection_with_a_mismatched_count() {
     writer.write_record(kind::END_SHEET, &[]).unwrap();
 
     let formula_context = Context::default();
-    let iter = Stream::new(std::io::Cursor::new(worksheet));
+    let iter = Stream::new(std::io::Cursor::new(worksheet), crate::raw::Limits::DEFAULT);
     let mut reader = CellsReader::new(
         iter,
         &[],
         &formula_context,
         1,
+        crate::raw::Limits::DEFAULT,
         crate::leniency::Leniency::Strict,
     )
     .unwrap();
@@ -279,7 +302,7 @@ fn rejects_a_validation_collection_with_a_mismatched_count() {
 #[test]
 fn rejects_conditional_formatting_with_a_mismatched_rule_count() {
     let mut worksheet = Vec::new();
-    let mut writer = Writer::new(&mut worksheet);
+    let mut writer = Encoder::new(&mut worksheet, crate::raw::Limits::DEFAULT);
     writer.write_record(kind::WS_DIM, &[0; 16]).unwrap();
     writer.write_record(kind::BEGIN_SHEET_DATA, &[]).unwrap();
     writer.write_record(kind::END_SHEET_DATA, &[]).unwrap();
@@ -294,12 +317,13 @@ fn rejects_conditional_formatting_with_a_mismatched_rule_count() {
     writer.write_record(kind::END_SHEET, &[]).unwrap();
 
     let formula_context = Context::default();
-    let iter = Stream::new(std::io::Cursor::new(worksheet));
+    let iter = Stream::new(std::io::Cursor::new(worksheet), crate::raw::Limits::DEFAULT);
     let mut reader = CellsReader::new(
         iter,
         &[],
         &formula_context,
         1,
+        crate::raw::Limits::DEFAULT,
         crate::leniency::Leniency::Strict,
     )
     .unwrap();
@@ -351,32 +375,46 @@ fn reads_office_2013_conditional_formatting_visualizations() {
     formatting.rules = vec![color_rule.clone(), bar_rule.clone(), icon_rule.clone()];
 
     let mut worksheet = Vec::new();
-    let mut writer = Writer::new(&mut worksheet);
+    let mut writer = Encoder::new(&mut worksheet, crate::raw::Limits::DEFAULT);
     writer.write_record(kind::WS_DIM, &[0; 16]).unwrap();
     writer.write_record(kind::BEGIN_SHEET_DATA, &[]).unwrap();
     writer.write_record(kind::END_SHEET_DATA, &[]).unwrap();
     writer
         .write_record(
             kind::BEGIN_COND_FORMATTING14,
-            &formatting.serialize_extension14_header().unwrap(),
+            &formatting
+                .serialize_extension14_header(crate::raw::Limits::DEFAULT)
+                .unwrap(),
         )
         .unwrap();
 
     writer
         .write_record(
             kind::BEGIN_CF_RULE14,
-            &color_rule.serialize_extension14().unwrap(),
+            &color_rule
+                .serialize_extension14(crate::raw::Limits::DEFAULT)
+                .unwrap(),
         )
         .unwrap();
     writer.write_record(kind::BEGIN_COLOR_SCALE14, &[]).unwrap();
     for threshold in &color_thresholds {
         writer
-            .write_record(kind::CFVO14, &threshold.serialize_extension14().unwrap())
+            .write_record(
+                kind::CFVO14,
+                &threshold
+                    .serialize_extension14(crate::raw::Limits::DEFAULT)
+                    .unwrap(),
+            )
             .unwrap();
     }
     for color in color_records {
         writer
-            .write_record(kind::COLOR14, &color.serialize_extension14().unwrap())
+            .write_record(
+                kind::COLOR14,
+                &color
+                    .serialize_extension14(crate::raw::Limits::DEFAULT)
+                    .unwrap(),
+            )
             .unwrap();
     }
     writer.write_record(kind::END_COLOR_SCALE14, &[]).unwrap();
@@ -385,20 +423,35 @@ fn reads_office_2013_conditional_formatting_visualizations() {
     writer
         .write_record(
             kind::BEGIN_CF_RULE14,
-            &bar_rule.serialize_extension14().unwrap(),
+            &bar_rule
+                .serialize_extension14(crate::raw::Limits::DEFAULT)
+                .unwrap(),
         )
         .unwrap();
     writer
-        .write_record(kind::BEGIN_DATABAR14, &bar.serialize_header().unwrap())
+        .write_record(
+            kind::BEGIN_DATABAR14,
+            &bar.serialize_header(crate::raw::Limits::DEFAULT).unwrap(),
+        )
         .unwrap();
     for threshold in [&bar.min_cfvo, &bar.max_cfvo] {
         writer
-            .write_record(kind::CFVO14, &threshold.serialize_extension14().unwrap())
+            .write_record(
+                kind::CFVO14,
+                &threshold
+                    .serialize_extension14(crate::raw::Limits::DEFAULT)
+                    .unwrap(),
+            )
             .unwrap();
     }
     for color in [bar.positive_color, bar.axis_color].into_iter().flatten() {
         writer
-            .write_record(kind::COLOR14, &color.serialize_extension14().unwrap())
+            .write_record(
+                kind::COLOR14,
+                &color
+                    .serialize_extension14(crate::raw::Limits::DEFAULT)
+                    .unwrap(),
+            )
             .unwrap();
     }
     writer.write_record(kind::END_DATABAR14, &[]).unwrap();
@@ -407,18 +460,27 @@ fn reads_office_2013_conditional_formatting_visualizations() {
     writer
         .write_record(
             kind::BEGIN_CF_RULE14,
-            &icon_rule.serialize_extension14().unwrap(),
+            &icon_rule
+                .serialize_extension14(crate::raw::Limits::DEFAULT)
+                .unwrap(),
         )
         .unwrap();
     writer
         .write_record(
             kind::BEGIN_ICON_SET14,
-            &icon_set.serialize_header().unwrap(),
+            &icon_set
+                .serialize_header(crate::raw::Limits::DEFAULT)
+                .unwrap(),
         )
         .unwrap();
     for threshold in &icon_thresholds {
         writer
-            .write_record(kind::CFVO14, &threshold.serialize_extension14().unwrap())
+            .write_record(
+                kind::CFVO14,
+                &threshold
+                    .serialize_extension14(crate::raw::Limits::DEFAULT)
+                    .unwrap(),
+            )
             .unwrap();
     }
     writer.write_record(kind::END_ICON_SET14, &[]).unwrap();
@@ -429,12 +491,13 @@ fn reads_office_2013_conditional_formatting_visualizations() {
     writer.write_record(kind::END_SHEET, &[]).unwrap();
 
     let formula_context = Context::default();
-    let iter = Stream::new(std::io::Cursor::new(worksheet));
+    let iter = Stream::new(std::io::Cursor::new(worksheet), crate::raw::Limits::DEFAULT);
     let mut reader = CellsReader::new(
         iter,
         &[],
         &formula_context,
         1,
+        crate::raw::Limits::DEFAULT,
         crate::leniency::Leniency::Strict,
     )
     .unwrap();
@@ -462,7 +525,7 @@ fn reads_office_2013_conditional_formatting_visualizations() {
 #[test]
 fn rejects_incomplete_color_scale_collection() {
     let mut worksheet = Vec::new();
-    let mut writer = Writer::new(&mut worksheet);
+    let mut writer = Encoder::new(&mut worksheet, crate::raw::Limits::DEFAULT);
     writer.write_record(kind::WS_DIM, &[0; 16]).unwrap();
     writer.write_record(kind::BEGIN_SHEET_DATA, &[]).unwrap();
     writer.write_record(kind::END_SHEET_DATA, &[]).unwrap();
@@ -489,12 +552,13 @@ fn rejects_incomplete_color_scale_collection() {
     writer.write_record(kind::END_SHEET, &[]).unwrap();
 
     let formula_context = Context::default();
-    let iter = Stream::new(std::io::Cursor::new(worksheet));
+    let iter = Stream::new(std::io::Cursor::new(worksheet), crate::raw::Limits::DEFAULT);
     let mut reader = CellsReader::new(
         iter,
         &[],
         &formula_context,
         1,
+        crate::raw::Limits::DEFAULT,
         crate::leniency::Leniency::Strict,
     )
     .unwrap();

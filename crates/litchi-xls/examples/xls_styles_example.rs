@@ -2,9 +2,9 @@ use litchi_xls::writer::formatting::{
     COLOR_AUTOMATIC, COLOR_BLACK, COLOR_RED, COLOR_WHITE, FONT_WEIGHT_BOLD, FONT_WEIGHT_NORMAL,
 };
 use litchi_xls::writer::{
-    BorderStyle, Borders, CellStyle, Column, ConditionalFormat, ConditionalFormatType,
+    BorderStyle, Borders, Builder, CellStyle, Column, ConditionalFormat, ConditionalFormatType,
     ConditionalPattern, DataValidation, DataValidationType, Fill, FillPattern, Font, FrozenPanes,
-    HorizontalAlignment, Row, VerticalAlignment, Writer,
+    HorizontalAlignment, Row, VerticalAlignment,
 };
 
 fn make_header_style() -> CellStyle {
@@ -232,7 +232,7 @@ fn make_alignment_demo_style() -> CellStyle {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Styles")?;
 
     let header_style_id = writer.add_cell_style(make_header_style())?;
@@ -326,6 +326,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Make the alignment demo row taller to better show wrapped text.
     writer.set_row_height(sheet, Row::new(6)?, 30.0)?;
 
-    writer.save("styled_output.xls")?;
+    writer.build()?.save("styled_output.xls")?;
     Ok(())
 }

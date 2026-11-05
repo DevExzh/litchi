@@ -1,6 +1,7 @@
 //! Immutable calculation-settings snapshots bound to one ODS content part.
 
 use litchi_core::{Error, Result};
+use litchi_odf_common::XmlStreamLimits;
 use litchi_odf_common::calculation::{Settings, parse};
 
 use super::codec::{Location, locate};
@@ -19,7 +20,9 @@ pub struct Snapshot<'xml> {
 }
 
 impl<'xml> Snapshot<'xml> {
-    /// Decode calculation settings from an ODS `content.xml` document.
+    /// Decode calculation settings from an ODS `content.xml` document under
+    /// the caller's raw XML policy (an owner passes the policy it retained at
+    /// ingress).
     ///
     /// The surrounding document must contain exactly one direct
     /// `office:body/office:spreadsheet` host.  Unknown XML outside the owned
@@ -28,8 +31,8 @@ impl<'xml> Snapshot<'xml> {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn from_content_xml(source: &'xml str) -> Result<Self> {
-        let calculation = parse(source)?;
+    pub fn from_content_xml(source: &'xml str, limits: XmlStreamLimits) -> Result<Self> {
+        let calculation = parse(source, limits).map_err(Error::from)?;
         let location = locate(source)?;
         if calculation.is_some() != location.calculation.is_some() {
             return Err(Error::InvalidFormat(
@@ -57,7 +60,7 @@ impl<'xml> Snapshot<'xml> {
 
     /// Start an isolated transaction against this immutable snapshot.
     #[must_use]
-    pub fn transaction(&self) -> Transaction<'xml> {
+    pub(crate) fn transaction(&self) -> Transaction<'xml> {
         Transaction::from_snapshot(self)
     }
 }

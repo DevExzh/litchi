@@ -13,7 +13,7 @@ impl super::Package {
     /// Returns an error for stale source, cancellation, invalid ownership or
     /// XML, unsupported Ink dependencies, or exhausted resource budgets.
     pub fn ink(&self) -> Result<ink::Snapshot> {
-        self.ink_with_limits(ink::Limits::default())
+        self.ink_bounded(self.semantic_limits.ink_value())
     }
 
     /// Inventory active InkML using explicit finite resource limits.
@@ -26,14 +26,14 @@ impl super::Package {
     ///
     /// Returns an error for invalid limits, stale source, cancellation, invalid
     /// package/XML data, unsupported dependencies, or an exceeded budget.
-    pub fn ink_with_limits(&self, limits: ink::Limits) -> Result<ink::Snapshot> {
-        self.package.check_execution()?;
-        self.package.source_version()?;
-        let result = ink::package::load_source(&self.package, limits);
+    pub(crate) fn ink_bounded(&self, limits: ink::Limits) -> Result<ink::Snapshot> {
+        self.physical_package()?.check_execution()?;
+        self.physical_package()?.source_version()?;
+        let result = ink::package::load_source(self.physical_package()?, limits);
         // A mutation during semantic validation must win over a stale parse
         // error, just as it does for the pinned main-document reader.
-        self.package.source_version()?;
-        self.package.check_execution()?;
+        self.physical_package()?.source_version()?;
+        self.physical_package()?.check_execution()?;
         result
     }
 }

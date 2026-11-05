@@ -827,7 +827,7 @@ fn xml_error(error: impl std::fmt::Display) -> Error {
 )]
 mod tests {
     use super::*;
-    use crate::{Builder, Presentation};
+    use crate::Builder;
 
     const PREFIX: &str = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:p="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:x="http://www.w3.org/1999/xlink"><o:body><o:presentation>"#;
     const SUFFIX: &str = "</o:presentation></o:body></o:document-content>";
@@ -861,7 +861,7 @@ mod tests {
         let mut builder = Builder::new();
         builder.add_slide_with_title("Title", "Body").unwrap();
         builder.set_pages(Some(metadata.clone())).unwrap();
-        let presentation = Presentation::from_bytes(builder.build().unwrap()).unwrap();
+        let presentation = builder.build().unwrap().presentation().unwrap();
         assert_eq!(presentation.pages().unwrap(), metadata);
     }
 

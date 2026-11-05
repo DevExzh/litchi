@@ -23,10 +23,11 @@ pub(super) use crate::alt::{Chunk, Conformance, Import, MAX_CHUNKS, Rel, is_rela
 pub(super) use crate::bibliography::{
     BibliographySource, SourceStore, discover_bibliography_source_stores,
 };
+pub(super) use crate::builder::Document as DraftDocument;
 pub(super) use crate::custom_xml::{Binding, NewStore};
 pub(super) use crate::document::Document;
 #[cfg(feature = "encryption")]
-pub(super) use crate::encryption::{Limits, Mode};
+pub(super) use crate::encryption::Mode;
 /// Package implementation for Word documents.
 pub(super) use crate::error::{Error, Result};
 pub(super) use crate::mail_merge::{
@@ -47,8 +48,8 @@ pub(super) use crate::vba_project::{
 };
 #[cfg(test)]
 pub(super) use crate::web_extensions as web;
-pub(super) use crate::writer::MutableDocument;
 pub(super) use crate::{font, glossary, web as docx_web};
+pub(super) use litchi_core::Metadata as Props;
 pub(super) use litchi_drawingml::diagram::{
     DIAGRAM_COLORS_REL, DIAGRAM_DATA_REL, DIAGRAM_LAYOUT_REL, DIAGRAM_QUICK_STYLE_REL,
 };
@@ -58,7 +59,7 @@ pub(super) use litchi_ooxml_common::custom_xml::{
     NewProps as NewCustomXmlProps, Props as CustomXmlProps,
 };
 pub(super) use litchi_ooxml_common::embedded;
-pub(super) use litchi_ooxml_common::properties::{Props, Slot};
+pub(super) use litchi_ooxml_common::properties::Slot;
 pub(super) use litchi_ooxml_common::ribbon;
 pub(super) use litchi_opc::OpcPackage;
 pub(super) use litchi_opc::constants::content_type as ct;
@@ -113,46 +114,164 @@ pub(crate) fn validate_document_main_content_type(content_type: &str) -> Result<
 /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
 /// ```
 ///
+/// Cloning shares the physical graph, metadata and retained writer state.
+/// Mutating a clone detaches that state before writing; the other handles
+/// and their owned document projections retain their original contents.
+///
 /// ## Creating a new document
 ///
-/// ```rust,no_run
-/// use litchi_docx::Package;
+/// Fresh content is authored with [`crate::Builder`]; an opened package
+/// changes only through [`Package::edit`] and its scoped `edit_*` families.
 ///
-/// // Create a new document
-/// let mut pkg = Package::new()?;
-/// let mut doc = pkg.document_mut()?;
+/// ```rust,no_run
+/// use litchi_docx::Builder;
+///
+/// // Author a new document
+/// let mut builder = Builder::new()?;
+/// let doc = builder.document()?;
 ///
 /// // Add content
 /// doc.add_paragraph_with_text("Hello, World!");
 /// doc.add_heading("Chapter 1", 1)?;
 ///
-/// // Save the document
+/// // Finalize and save the document
+/// let mut pkg = builder.build()?;
 /// pkg.save("output.docx")?;
 /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
 /// ```
+#[derive(Clone)]
 pub struct Package {
     /// The underlying OPC package
-    pub(super) opc: OpcPackage,
+    pub(super) opc: SharedOpc,
     /// Package-scoped clean paragraph memo; entries are invalidated by source
     /// allocation identity when the main relationship or payload changes.
     pub(super) paragraph_index_cache: std::sync::Arc<ParagraphIndexCache>,
-    /// Mutable document for writing (cached)
-    pub(super) mutable_doc: Option<MutableDocument>,
-    /// Whether a committed raw edit has disabled the legacy document writer.
-    pub(super) raw_edit_committed: bool,
+    /// The main-document payload the markup-compatibility admission last
+    /// proved for a transaction. Payloads are replaced, never mutated in
+    /// place, so a live allocation that is still this one holds the same
+    /// bytes; the weak reference keeps nothing alive.
+    pub(super) main_admission: std::sync::Arc<std::sync::Mutex<std::sync::Weak<Vec<u8>>>>,
     /// Authoritative, mutation-tracked core properties.
-    pub(super) properties: Slot,
+    pub(super) properties: Shared<Slot>,
     /// Custom document properties
-    pub(super) custom_props: CustomProps,
-    /// Whether the custom-property facade has unmaterialized changes.
-    pub(super) custom_props_dirty: bool,
-    /// Optional managed font-publication policy.
-    #[cfg(feature = "automatic-fonts")]
-    pub(super) font_embedding: Option<litchi_fonts::embedding::Mode>,
+    pub(super) custom_props: Shared<CustomProps>,
+    /// The semantic read budgets the package was opened or built with.
+    pub(super) semantic_limits: std::sync::Arc<crate::SemanticLimits>,
     /// Encryption profile of the opened outer package, retained to prevent an
     /// accidental plaintext downgrade on save.
     #[cfg(feature = "encryption")]
-    pub(super) source_encryption: Option<Mode>,
+    pub(super) source_encryption: litchi_ooxml_common::package_encryption::PackageEncryption,
+    /// Outer encryption resource policy retained for every managed output.
+    #[cfg(feature = "encryption")]
+    pub(super) encryption_limits: crate::encryption::Limits,
+}
+
+/// Shared immutable state; legacy mutations detach before writing.
+pub(super) struct Shared<T>(std::sync::Arc<T>);
+
+impl<T> Clone for Shared<T> {
+    fn clone(&self) -> Self {
+        Self(std::sync::Arc::clone(&self.0))
+    }
+}
+
+impl<T> From<T> for Shared<T> {
+    fn from(value: T) -> Self {
+        Self(std::sync::Arc::new(value))
+    }
+}
+
+impl<T> std::ops::Deref for Shared<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<T: Clone> std::ops::DerefMut for Shared<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        std::sync::Arc::make_mut(&mut self.0)
+    }
+}
+
+/// The OPC graph's output memo belongs with that graph, rather than in a
+/// package-wide one-entry table. Keeping the weak key and digest inline makes
+/// package clones independent without allocating an invalidation counter for
+/// every shared metadata field.
+///
+/// A clone copies the memo for the same immutable graph. `Arc::make_mut`
+/// dissociates any live weak key before an in-place mutation, so a changed
+/// branch cannot reuse its old digest while the original branch keeps its
+/// memo. A failed or no-op mutable borrow may therefore recompute on that
+/// branch, but it cannot publish a stale fingerprint.
+pub(super) struct SharedOpc {
+    value: std::sync::Arc<OpcPackage>,
+    fingerprint: std::sync::Mutex<Option<(std::sync::Weak<OpcPackage>, [u8; 32])>>,
+}
+
+impl Clone for SharedOpc {
+    fn clone(&self) -> Self {
+        Self {
+            value: std::sync::Arc::clone(&self.value),
+            fingerprint: std::sync::Mutex::new(
+                self.fingerprint
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .clone(),
+            ),
+        }
+    }
+}
+
+impl SharedOpc {
+    pub(super) fn shared(&self) -> std::sync::Arc<OpcPackage> {
+        std::sync::Arc::clone(&self.value)
+    }
+
+    pub(super) fn fingerprint(&self) -> Option<[u8; 32]> {
+        let current = std::sync::Arc::downgrade(&self.value);
+        self.fingerprint
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .as_ref()
+            .filter(|(cached, _)| cached.strong_count() != 0 && cached.ptr_eq(&current))
+            .map(|(_, fingerprint)| *fingerprint)
+    }
+
+    pub(super) fn remember_fingerprint(&self, fingerprint: [u8; 32]) {
+        *self
+            .fingerprint
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) =
+            Some((std::sync::Arc::downgrade(&self.value), fingerprint));
+    }
+}
+
+impl From<OpcPackage> for SharedOpc {
+    fn from(value: OpcPackage) -> Self {
+        Self {
+            value: std::sync::Arc::new(value),
+            fingerprint: std::sync::Mutex::new(None),
+        }
+    }
+}
+
+impl std::ops::Deref for SharedOpc {
+    type Target = OpcPackage;
+
+    fn deref(&self) -> &Self::Target {
+        &self.value
+    }
+}
+
+impl std::ops::DerefMut for SharedOpc {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        // `Arc::make_mut` dissociates live weak references before returning a
+        // mutable graph, which fences the old digest without a generation
+        // counter or a package-wide invalidation allocation.
+        std::sync::Arc::make_mut(&mut self.value)
+    }
 }
 
 pub(super) struct StoredRelationship {
@@ -162,45 +281,13 @@ pub(super) struct StoredRelationship {
     pub(super) external: bool,
 }
 
-pub(super) struct SettingsPartSnapshot {
+pub(crate) struct SettingsPartSnapshot {
     pub(super) document_uri: PackURI,
     pub(super) target: PackURI,
     pub(super) relationship_exists: bool,
     pub(super) content_type: String,
-    pub(super) xml: Vec<u8>,
+    pub(crate) xml: Vec<u8>,
     pub(super) relationships: Vec<StoredRelationship>,
-}
-
-/// Owns the DOCX state that is unpublished until the sink accepts the package.
-///
-/// The OPC snapshot is structural: built-in part payloads remain shared through
-/// their `Arc` allocations. The mutable document stays owned by this guard while
-/// materialization runs, so an error or unwind cannot drop the retryable writer.
-pub(super) struct WriteRollbackGuard {
-    package_before: OpcPackage,
-    mutable_doc: Option<MutableDocument>,
-}
-
-impl WriteRollbackGuard {
-    pub(super) fn new(package: &mut Package) -> Self {
-        Self {
-            package_before: package.opc.clone(),
-            mutable_doc: package.mutable_doc.take(),
-        }
-    }
-
-    pub(super) fn mutable_doc_mut(&mut self) -> Option<&mut MutableDocument> {
-        self.mutable_doc.as_mut()
-    }
-
-    pub(super) fn publish(self, package: &mut Package) {
-        package.mutable_doc = self.mutable_doc;
-    }
-
-    pub(super) fn rollback(self, package: &mut Package) {
-        package.opc = self.package_before;
-        package.mutable_doc = self.mutable_doc;
-    }
 }
 
 #[cfg(feature = "automatic-fonts")]
@@ -209,42 +296,30 @@ use litchi_core::id::generate_guid_bytes;
 use litchi_fonts::CollectGlyphs;
 
 #[cfg(feature = "automatic-fonts")]
-impl Package {
-    pub(super) fn embed_fonts(&mut self) -> Result<()> {
-        let Some(mode) = self.font_embedding else {
-            return Ok(());
-        };
-        let glyphs = {
-            let document = self.mutable_doc.as_ref().ok_or(Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "embed_fonts",
-                reason: "font discovery is unavailable until the document has a complete mutable model",
-            })?;
-            if !document.glyphs_are_complete() {
-                return Err(Error::UnsafeEdit {
-                    format: "DOCX",
-                    operation: "embed_fonts",
-                    reason: "the mutable document preserves unscanned source XML; embedding could omit fonts or subset away live glyphs",
-                });
-            }
-            document.collect_glyphs()
-        };
-        self.embed_fonts_with_glyphs(glyphs, mode)
+fn map_font_preparation_error(error: litchi_fonts::FontError) -> Error {
+    match error {
+        litchi_fonts::FontError::LimitExceeded { limit, actual, .. } => Error::FontLimit {
+            kind: font::LimitKind::FontPreparation,
+            actual,
+            maximum: limit,
+        },
+        error => Error::Other(error.to_string()),
     }
 }
 
 #[cfg(feature = "automatic-fonts")]
 impl Package {
-    pub(super) fn embed_fonts_for_document(&mut self, document: &MutableDocument) -> Result<()> {
-        let Some(mode) = self.font_embedding else {
-            return Ok(());
-        };
+    pub(super) fn embed_fonts_for_document(
+        &mut self,
+        document: &DraftDocument,
+        mode: litchi_fonts::embedding::Mode,
+    ) -> Result<()> {
         if !document.glyphs_are_complete() {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "embed_fonts",
-                reason: "the mutable document preserves unscanned source XML; embedding could omit fonts or subset away live glyphs",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "embed_fonts",
+                "the mutable document preserves unscanned source XML; embedding could omit fonts or subset away live glyphs",
+            ));
         }
         self.embed_fonts_with_glyphs(document.collect_glyphs(), mode)
     }
@@ -254,21 +329,22 @@ impl Package {
         glyphs: litchi_fonts::GlyphMap,
         mode: litchi_fonts::embedding::Mode,
     ) -> Result<()> {
-        let prepared = litchi_fonts::embedding::prepare(glyphs, mode)
-            .map_err(|error| Error::Other(error.to_string()))?;
+        let prepared =
+            litchi_fonts::embedding::prepare(glyphs, mode, self.semantic_limits.fonts_value())
+                .map_err(map_font_preparation_error)?;
         if prepared.is_empty() {
             return Ok(());
         }
         let subsetted = prepared.iter().any(|font| font.subsetted);
         let conformance = word_font_conformance(&self.opc)?;
         let mut staged = self.opc.clone();
-        let mut table = font::read(&staged)?.unwrap_or_default();
+        let mut table = font::package::read(&staged)?.unwrap_or_default();
         let mut fonts_changed = false;
         for prepared in prepared {
             fonts_changed |= merge_word_font(&mut table, prepared, conformance)?;
         }
         if fonts_changed {
-            let _ = font::put(&mut staged, table, conformance)?;
+            let _ = font::package::put(&mut staged, table, conformance)?;
         }
         let settings_changed = ensure_word_font_settings(&mut staged, conformance, subsetted)?;
         if fonts_changed || settings_changed {
@@ -314,7 +390,11 @@ fn merge_word_font(
         let key = font::FontKey::new(generate_guid_bytes());
         let mut obfuscated = data;
         font::obfuscate(&mut obfuscated, key)?;
-        let mut embedded = font::Embed::new(style, key, font::Resource::new(obfuscated)?);
+        let mut embedded = font::Embed::new(
+            style,
+            key,
+            font::Resource::new(obfuscated, &font::Limits::DEFAULT)?,
+        );
         if subsetted {
             embedded = embedded.with_subset(true);
         }
@@ -501,7 +581,8 @@ fn ensure_word_font_settings(
                     ct::WML_SETTINGS
                 )));
             }
-            DocumentSettings::extract_from_part(part)?;
+            let limits = mail_merge::mce_limits_for_source(&package.read_limits());
+            DocumentSettings::extract_from_part_with_mce_limits(part, &limits)?;
             part.blob().to_vec()
         },
         (true, false) => {
@@ -528,16 +609,18 @@ fn ensure_word_font_settings(
         return Ok(false);
     }
 
-    package.unsign();
+    crate::signature_policy::ensure_unsigned(package)?;
     if exists {
         let part = package.get_part(&target)?;
         let mut checked = part.clone_part();
         checked.set_blob(updated.clone());
-        DocumentSettings::extract_from_part(&*checked)?;
+        let limits = mail_merge::mce_limits_for_source(&package.read_limits());
+        DocumentSettings::extract_from_part_with_mce_limits(&*checked, &limits)?;
         package.get_part_mut(&target)?.set_blob(updated);
     } else {
         let part = BlobPart::new(target.clone(), ct::WML_SETTINGS.to_owned(), updated);
-        DocumentSettings::extract_from_part(&part)?;
+        let limits = mail_merge::mce_limits_for_source(&package.read_limits());
+        DocumentSettings::extract_from_part_with_mce_limits(&part, &limits)?;
         package.try_add_part(Box::new(part))?;
         let relationship_type = match conformance {
             font::Conformance::Transitional => litchi_opc::constants::relationship_type::SETTINGS,
@@ -552,7 +635,10 @@ fn ensure_word_font_settings(
 }
 
 impl Package {
-    /// Get the main document for reading.
+    /// Get an owned, read-only projection of the current main document.
+    ///
+    /// The projection retains its physical snapshot and may outlive this
+    /// package. Later package edits do not change its content or relationships.
     ///
     /// Returns the `Document` object which provides access to the document's
     /// content, styles, and other features.
@@ -570,15 +656,15 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn document(&self) -> Result<Document<'_>> {
+    pub fn document(&self) -> Result<Document> {
         let main_part = self
             .opc
             .main_document_part()
             .map_err(|e| Error::PartNotFound(format!("main document part: {e}")))?;
 
         // Create DocumentPart wrapper
-        let doc_part = DocumentPart::from_part_with_cache(
-            main_part,
+        let doc_part = DocumentPart::from_owned_part_with_cache(
+            main_part.clone_part(),
             std::sync::Arc::clone(&self.paragraph_index_cache),
         )?;
 
@@ -590,8 +676,23 @@ impl Package {
         // litchi-doc established. See `crate::leniency`.
         let tolerance = self.tolerance_report();
 
-        // Create and return Document with reference to OPC package
-        Ok(Document::new(doc_part, &self.opc, tolerance))
+        // Retain the same immutable graph used to select the main part.
+        Ok(Document::new(
+            doc_part,
+            self.opc.shared(),
+            tolerance,
+            std::sync::Arc::clone(&self.semantic_limits),
+        ))
+    }
+
+    /// Release the package's clean document memos: the visible main-document
+    /// projection, the paragraph offsets and the body block index that no
+    /// live document view or value still holds.
+    ///
+    /// Views keep what they hold; the next [`Self::document`] rebuilds what
+    /// was released. Results never depend on what the memos hold.
+    pub fn trim_document_memos(&self) {
+        self.paragraph_index_cache.trim_clean_all();
     }
 
     /// A snapshot of the repairs made while this package was opened, in
@@ -634,7 +735,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn set_vba(&mut self, project: litchi_vba::build::Project) -> Result<VbaProject> {
+    pub(crate) fn set_vba(&mut self, project: litchi_vba::build::Project) -> Result<VbaProject> {
         let payload = project.finish(&litchi_vba::Limits::default())?;
         self.put_vba_managed("set_vba", payload, &VbaSupplementalData::new())
     }
@@ -645,7 +746,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn set_vba_with(
+    pub(crate) fn set_vba_with(
         &mut self,
         project: litchi_vba::build::Project,
         supplemental_data: &VbaSupplementalData,
@@ -661,7 +762,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn put_vba(
+    pub(crate) fn put_vba(
         &mut self,
         payload: litchi_vba::Payload,
         supplemental_data: &VbaSupplementalData,
@@ -675,7 +776,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn clear_vba(&mut self) -> Result<bool> {
+    pub(crate) fn clear_vba(&mut self) -> Result<bool> {
         let source = self.opc.main_document_part()?.partname().clone();
         let source_part = self.opc.get_part(&source)?;
         if discover_vba_project(&self.opc, source_part)?.is_none() {
@@ -701,7 +802,7 @@ impl Package {
         {
             return Ok(project);
         }
-        let payload = std::sync::Arc::new(payload.into_bytes());
+        let payload = payload.into_bytes();
         self.edit_semantic_opc(operation, move |candidate| {
             let source = candidate.main_document_part()?.partname().clone();
             store_vba_project_in_document(candidate, &source, payload, supplemental_xml)
@@ -717,26 +818,47 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn ribbon(&self) -> Result<ribbon::Set<'_>> {
-        Ok(ribbon::load(&self.opc)?)
+        Ok(ribbon::load(&self.opc, &ribbon::Limits::standard())?)
     }
 
     /// Store opaque Ribbon XML by moving its `Vec` into package ownership.
     ///
+    /// The version and bytes the family already stores publish nothing, so a
+    /// signed package keeps its signature byte for byte. Any other store
+    /// changes the package, so a signed package is refused with
+    /// [`litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy`] before
+    /// anything is changed (ADR 0006): remove the signature explicitly first
+    /// with [`Self::unsign`].
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn put_ribbon(&mut self, version: ribbon::Version, xml: Vec<u8>) -> Result<&mut Self> {
-        ribbon::put(&mut self.opc, version, xml)?;
+    pub(crate) fn put_ribbon(
+        &mut self,
+        version: ribbon::Version,
+        xml: Vec<u8>,
+    ) -> Result<&mut Self> {
+        let mut edit = ribbon::Edit::new(&self.opc)?;
+        edit.put(version, xml)?;
+        self.opc = edit.commit()?.into_package().into();
         Ok(self)
     }
 
     /// Remove one package-level Ribbon relationship family and its orphaned part.
     ///
+    /// An absent family leaves the package untouched and returns `false`,
+    /// signed or not. Removing a family from a signed package is refused with
+    /// [`litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy`] (ADR 0006):
+    /// remove the signature explicitly first with [`Self::unsign`].
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn remove_ribbon(&mut self, family: ribbon::Family) -> Result<bool> {
-        Ok(ribbon::remove(&mut self.opc, family)?)
+    pub(crate) fn remove_ribbon(&mut self, family: ribbon::Family) -> Result<bool> {
+        let mut edit = ribbon::Edit::new(&self.opc)?;
+        let changed = edit.remove(family)?;
+        self.opc = edit.commit()?.into_package().into();
+        Ok(changed)
     }
 
     /// Read typed font metadata and inert embedded-font resources.
@@ -745,113 +867,39 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn fonts(&self) -> Result<Option<font::Table>> {
-        font::read(&self.opc)
+        font::package::read(&self.opc)
     }
 
     /// Move a complete font table into this package.
     ///
+    /// The signature policy is [`font::raw::put`]'s: a change to a signed package
+    /// is refused until [`Self::unsign`] removes the signature.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn put_fonts(
+    pub(crate) fn put_fonts(
         &mut self,
         table: font::Table,
         conformance: font::Conformance,
     ) -> Result<bool> {
-        font::put(&mut self.opc, table, conformance)
+        font::package::put(&mut self.opc, table, conformance)
     }
 
     /// Remove the font table and font resources that become unreferenced.
     ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation cannot be completed.
-    pub fn remove_fonts(&mut self) -> Result<bool> {
-        font::remove(&mut self.opc)
-    }
-
-    /// Select the font publication policy used by managed save operations.
-    #[cfg(feature = "automatic-fonts")]
+    /// The signature policy is [`font::raw::remove`]'s: removing a table from a
+    /// signed package is refused until [`Self::unsign`] removes the signature.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn set_font_embedding(&mut self, mode: litchi_fonts::embedding::Mode) -> Result<&mut Self> {
-        if self.mutable_doc.is_none() {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "set_font_embedding",
-                reason: "font discovery requires a complete mutable document model",
-            });
-        }
-        self.font_embedding = Some(mode);
-        Ok(self)
-    }
-
-    /// Select the font publication policy and return this package by value.
-    #[cfg(feature = "automatic-fonts")]
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation cannot be completed.
-    pub fn with_font_embedding(mut self, mode: litchi_fonts::embedding::Mode) -> Result<Self> {
-        self.set_font_embedding(mode)?;
-        Ok(self)
-    }
-
-    /// Disable managed font publication for subsequent saves.
-    #[cfg(feature = "automatic-fonts")]
-    pub fn clear_font_embedding(&mut self) -> &mut Self {
-        self.font_embedding = None;
-        self
+    pub(crate) fn remove_fonts(&mut self) -> Result<bool> {
+        font::package::remove(&mut self.opc)
     }
 }
 
 impl Package {
-    /// Borrows the document core properties, retaining package absence.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// use litchi_docx::Package;
-    ///
-    /// let pkg = Package::open("document.docx")?;
-    /// let props = pkg.props();
-    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
-    /// ```
-    #[must_use]
-    pub fn props(&self) -> Option<&Props> {
-        self.properties.get()
-    }
-
-    /// Mutably borrows existing core properties.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// use litchi_docx::Package;
-    ///
-    /// let mut pkg = Package::new()?;
-    /// if let Some(props) = pkg.props_mut() {
-    ///     props.title = Some("My Document".to_string());
-    /// }
-    /// pkg.save("document.docx")?;
-    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
-    /// ```
-    pub fn props_mut(&mut self) -> Option<&mut Props> {
-        self.properties.get_mut()
-    }
-
-    /// Moves a present core-properties value into the package facade.
-    pub fn put_props(&mut self, props: Props) -> Option<Props> {
-        self.properties.put(props)
-    }
-
-    /// Marks core properties absent and moves out the previous value.
-    pub fn clear_props(&mut self) -> Option<Props> {
-        self.properties.clear()
-    }
-
     /// Get a reference to the custom document properties.
     ///
     /// Custom properties allow you to attach arbitrary typed metadata to documents.
@@ -873,39 +921,34 @@ impl Package {
     pub fn custom_props(&self) -> &CustomProps {
         &self.custom_props
     }
-
-    /// Get a mutable reference to the custom document properties.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// use litchi_docx::Package;
-    /// use litchi_ooxml_common::custom::Value;
-    ///
-    /// let mut pkg = Package::new()?;
-    /// let custom = pkg.custom_props_mut();
-    ///
-    /// custom.insert("ProjectName", "MyProject")?;
-    /// custom.insert("Version", Value::I32(1))?;
-    /// custom.insert("Budget", Value::F64(50_000.0))?;
-    ///
-    /// pkg.save("document.docx")?;
-    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
-    /// ```
-    pub fn custom_props_mut(&mut self) -> &mut CustomProps {
-        self.custom_props_dirty = true;
-        &mut self.custom_props
-    }
 }
 
 #[cfg(all(test, feature = "automatic-fonts"))]
 mod font_settings_tests {
+    use litchi_fonts::FontError;
     use soapberry_zip::office::StreamingArchiveWriter;
 
     use super::*;
 
     const SETTINGS_PAYLOAD: &[u8] =
         br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#;
+
+    #[test]
+    fn automatic_font_limits_remain_typed_at_the_docx_boundary() {
+        let error = map_font_preparation_error(FontError::LimitExceeded {
+            resource: "font subsetting output bytes",
+            limit: 7,
+            actual: 8,
+        });
+        assert!(matches!(
+            error,
+            Error::FontLimit {
+                kind: font::LimitKind::FontPreparation,
+                actual: 8,
+                maximum: 7,
+            }
+        ));
+    }
 
     /// A lazily opened package with a stored `/word/settings.xml`, owned by a
     /// settings relationship or not, and optionally corrupted so that only a
@@ -922,7 +965,8 @@ mod font_settings_tests {
         } else {
             r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>"#
         };
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         for (name, payload) in [
             ("[Content_Types].xml", content_types.as_bytes()),
             (
@@ -950,7 +994,7 @@ mod font_settings_tests {
                 .expect("stored settings payload");
             bytes[offset] ^= 1;
         }
-        OpcPackage::from_vec(bytes).expect("deferred open")
+        OpcPackage::from_vec(bytes, litchi_opc::SourceLimits::default()).expect("deferred open")
     }
 
     // Found after the 0759 review: every settings lookup error read as
@@ -1001,5 +1045,108 @@ mod font_settings_tests {
                 .content_type(),
             ct::WML_SETTINGS
         );
+    }
+
+    /// `plain` with an OPC signature origin part and relationship, written
+    /// out so the signature is an ingressed source signature.
+    fn signed_source(plain: &OpcPackage) -> Vec<u8> {
+        let mut package = OpcPackage::new();
+        for relationship in plain.rels().iter() {
+            package
+                .rels_mut()
+                .try_add_relationship(
+                    relationship.reltype().to_owned(),
+                    relationship.target_ref().to_owned(),
+                    relationship.r_id().to_owned(),
+                    relationship.target_mode(),
+                )
+                .expect("package relationship");
+        }
+        let names: Vec<_> = plain
+            .iter_parts()
+            .map(|part| part.partname().clone())
+            .collect();
+        for name in names {
+            let part = plain.get_part(&name).expect("part");
+            let mut copy = BlobPart::new(
+                name.clone(),
+                part.content_type().to_owned(),
+                part.blob().to_vec(),
+            );
+            for relationship in part.rels().iter() {
+                copy.rels_mut()
+                    .try_add_relationship(
+                        relationship.reltype().to_owned(),
+                        relationship.target_ref().to_owned(),
+                        relationship.r_id().to_owned(),
+                        relationship.target_mode(),
+                    )
+                    .expect("part relationship");
+            }
+            package.try_add_part(Box::new(copy)).expect("part copy");
+        }
+        package
+            .try_add_part(Box::new(BlobPart::new(
+                PackURI::new("/_xmlsignatures/origin.sigs").expect("origin name"),
+                ct::OPC_DIGITAL_SIGNATURE_ORIGIN.to_owned(),
+                Vec::new(),
+            )))
+            .expect("origin part");
+        package.relate_to(
+            "_xmlsignatures/origin.sigs",
+            litchi_opc::constants::relationship_type::DIGITAL_SIGNATURE_ORIGIN,
+        );
+        litchi_opc::PackageWriter::to_bytes(&package).expect("signed source")
+    }
+
+    // Record 0014b: the managed font settings used to remove a signature
+    // before patching the settings part. A change to a signed package is
+    // refused instead; an unchanged one keeps the signature byte for byte.
+    #[test]
+    fn font_settings_refuse_a_signed_package_until_it_is_unsigned() {
+        let transitional = font::Conformance::Transitional;
+        for name in ["hello-world-signed.docx", "ms-office-2010-signed.docx"] {
+            let original = std::fs::read(format!(
+                "{}/../../test-data/poi/test-data/xmldsign/{name}",
+                env!("CARGO_MANIFEST_DIR")
+            ))
+            .expect("signed fixture");
+            let mut signed =
+                OpcPackage::from_vec(original.clone(), litchi_opc::SourceLimits::default())
+                    .expect("signed open");
+            let result = ensure_word_font_settings(&mut signed, transitional, true);
+            assert!(
+                matches!(
+                    result,
+                    Err(Error::Opc(
+                        litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
+                    ))
+                ),
+                "{name}: {result:?}"
+            );
+            assert_eq!(
+                litchi_opc::PackageWriter::to_bytes(&signed).expect("unchanged"),
+                original,
+                "{name}"
+            );
+
+            signed.unsign();
+            assert!(ensure_word_font_settings(&mut signed, transitional, true).expect("patched"));
+            assert!(!signed.is_signed());
+
+            // Settings that already carry the flags publish nothing, so a
+            // signed package keeps its exact source.
+            let resigned = signed_source(&signed);
+            let mut package =
+                OpcPackage::from_vec(resigned.clone(), litchi_opc::SourceLimits::default())
+                    .expect("resigned open");
+            assert!(package.is_signed());
+            assert!(!ensure_word_font_settings(&mut package, transitional, true).expect("no-op"));
+            assert_eq!(
+                litchi_opc::PackageWriter::to_bytes(&package).expect("exact"),
+                resigned,
+                "{name}"
+            );
+        }
     }
 }

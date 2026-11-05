@@ -9,15 +9,17 @@
 //! For most use cases, use the high-level [`office`] module:
 //!
 //! ```rust,no_run
-//! use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
+//! use soapberry_zip::office::{
+//!     ArchiveLimits, ArchiveReader, StreamingArchiveLimits, StreamingArchiveWriter,
+//! };
 //!
 //! // Reading
 //! let data = std::fs::read("document.docx")?;
-//! let archive = ArchiveReader::new(&data)?;
+//! let archive = ArchiveReader::new(&data, ArchiveLimits::default())?;
 //! let content = archive.read("word/document.xml")?;
 //!
 //! // Writing
-//! let mut writer = StreamingArchiveWriter::new();
+//! let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
 //! writer.write_deflated("content.xml", b"<root/>")?;
 //! let bytes = writer.finish_to_bytes()?;
 //! # Ok::<(), Box<dyn std::error::Error>>(())

@@ -273,56 +273,25 @@ pub struct Diagnostics {
 impl Diagnostics {
     /// Whether the exact source changed.
     #[must_use]
-    pub const fn changed(self) -> bool {
+    pub const fn changed(&self) -> bool {
         self.changed
     }
 
     /// Whether the changed candidate required full parsing.
     #[must_use]
-    pub const fn full_reparse_performed(self) -> bool {
+    pub const fn full_reparse_performed(&self) -> bool {
         self.full_reparse_performed
     }
 
     /// Number of semantic blocks directly targeted by the operation.
     #[must_use]
-    pub const fn touched_blocks(self) -> usize {
+    pub const fn touched_blocks(&self) -> usize {
         self.touched_blocks
     }
 }
 
-/// A validated Markdown snapshot, reversible patch, and diagnostics.
-#[derive(Debug)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-    diagnostics: Diagnostics,
-}
-
-impl Commit {
-    /// Publication diagnostics.
-    #[must_use]
-    pub const fn diagnostics(&self) -> Diagnostics {
-        self.diagnostics
-    }
-
-    /// Reversible exact-source patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Newly validated immutable snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Consume this commit into its snapshot, patch, and diagnostics.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch, Diagnostics) {
-        (self.snapshot, self.patch, self.diagnostics)
-    }
-}
+/// A validated Markdown package, reversible patch, and diagnostics.
+pub type Commit = litchi_core::edit::Commit<Snapshot, Patch, Diagnostics>;
 
 /// An in-memory reversible patch guarded by an exact complete before-image.
 #[derive(Clone, PartialEq, Eq)]
@@ -487,13 +456,11 @@ impl TransferPlan {
     }
 
     /// Inspect the validated destination commit without publishing it.
-    #[must_use]
     pub const fn planned_commit(&self) -> &Commit {
         &self.commit
     }
 
     /// Consume this preflight into its already validated commit.
-    #[must_use]
     pub fn into_commit(self) -> Commit {
         self.commit
     }
@@ -547,17 +514,17 @@ impl Patch {
             max_nesting_depth: envelope.max_nesting_depth,
             max_operations: envelope.max_operations,
         };
-        Snapshot::read_with(&envelope.before, dialect, read_limits)?;
-        Snapshot::read_with(&envelope.after, dialect, read_limits)?;
+        Snapshot::read_with_policy(&envelope.before, dialect, read_limits)?;
+        Snapshot::read_with_policy(&envelope.after, dialect, read_limits)?;
         if let Some(operations) = envelope.operations.as_deref() {
             if envelope.operation_count != operations.len() {
                 return Err(Error::InvalidPatchEnvelope {
                     reason: "operation count does not match operation array".to_owned(),
                 });
             }
-            let base = Snapshot::read_with(&envelope.before, dialect, read_limits)?;
+            let base = Snapshot::read_with_policy(&envelope.before, dialect, read_limits)?;
             let replayed = replay_semantic_operations(&base, operations)?;
-            if replayed.snapshot().source() != envelope.after {
+            if replayed.package().source() != envelope.after {
                 return Err(Error::InvalidPatchEnvelope {
                     reason: "semantic operations do not reproduce the after-image".to_owned(),
                 });
@@ -608,7 +575,7 @@ impl Patch {
         if !conflicts.is_empty() {
             return Err(JoinError::Conflicts(conflicts));
         }
-        let base = Snapshot::read_with(&self.before, self.dialect, self.limits)?;
+        let base = Snapshot::read_with_policy(&self.before, self.dialect, self.limits)?;
         replay_semantic_operations(&base, &operations).map_err(JoinError::from)
     }
 
@@ -628,7 +595,7 @@ impl Patch {
                 conflicts,
             });
         }
-        let base = Snapshot::read_with(&self.before, self.dialect, self.limits)?;
+        let base = Snapshot::read_with_policy(&self.before, self.dialect, self.limits)?;
         let commit = replay_semantic_operations(&base, &operations)?;
         Ok(MergePlan {
             commit: Some(commit),
@@ -638,7 +605,7 @@ impl Patch {
 
     /// Whether the before- and after-images are byte-identical.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before == self.after
     }
 
@@ -709,7 +676,7 @@ impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Patch")
-            .field("changed", &!self.is_empty())
+            .field("changed", &!self.is_noop())
             .field("dialect", &self.dialect)
             .finish_non_exhaustive()
     }
@@ -780,16 +747,33 @@ impl History {
     ///
     /// # Errors
     ///
-    /// Returns a stale-source or history-limit error without changing history.
+    /// Returns a stale-source, dialect, candidate-policy, or history-limit
+    /// error without changing history. A commit prepared under another read
+    /// policy is admitted only after its target is reparsed with this
+    /// history's retained policy.
     pub fn apply(&mut self, commit: Commit) -> Result<(), Error> {
-        if commit.patch.before != self.current.state.source {
+        if commit.patch().before != self.current.state.source
+            || commit.patch().dialect != self.current.dialect()
+            || commit.package().source() != commit.patch().after.as_ref()
+            || commit.package().dialect() != commit.patch().dialect
+        {
             return Err(Error::PatchConflict);
         }
-        if commit.patch.is_empty() {
-            self.current = commit.snapshot;
+        let current_policy = self.current.limits();
+        validate_patch_policy(commit.patch(), current_policy)?;
+        if commit.patch().is_noop() {
+            // The current snapshot already validates the unchanged source under
+            // the recipient's policy. Keep this path allocation-free even when
+            // the producer used a different policy envelope.
             return Ok(());
         }
-        let new_patch_bytes = patch_bytes(&commit.patch);
+        let (package, patch) = commit.into_parts();
+        let snapshot = if package.limits() == current_policy {
+            package
+        } else {
+            Snapshot::read_with_policy(&patch.after, self.current.dialect(), current_policy)?
+        };
+        let new_patch_bytes = patch_bytes(&patch);
         let next_entries = self.undo.len().saturating_add(1);
         if next_entries > self.limits.max_entries {
             return Err(Error::HistoryLimitExceeded {
@@ -816,8 +800,8 @@ impl History {
             })?;
         self.redo.clear();
         self.retained_patch_bytes = next_bytes;
-        self.undo.push(commit.patch);
-        self.current = commit.snapshot;
+        self.undo.push(patch);
+        self.current = snapshot;
         Ok(())
     }
 
@@ -845,7 +829,7 @@ impl History {
             })?;
         self.redo.pop();
         self.undo.push(patch);
-        self.current = commit.snapshot;
+        self.current = commit.into_package();
         Ok(true)
     }
 
@@ -867,7 +851,7 @@ impl History {
             })?;
         self.undo.pop();
         self.redo.push(patch);
-        self.current = commit.snapshot;
+        self.current = commit.into_package();
         Ok(true)
     }
 }
@@ -1024,7 +1008,7 @@ fn joined_operations(
             resource: "Markdown conflict set",
             source: allocation_error,
         })?;
-    let base = Snapshot::read_with(&left.before, left.dialect, left.limits)?;
+    let base = Snapshot::read_with_policy(&left.before, left.dialect, left.limits)?;
     for candidate in right_operations {
         let Some(position) = candidate.position else {
             operations.push(candidate.clone());
@@ -1079,33 +1063,40 @@ fn joined_operations(
 }
 
 pub(crate) fn apply(source: &Snapshot, patch: &Patch) -> Result<Commit, Error> {
-    if source.state.source != patch.before
-        || source.dialect() != patch.dialect
-        || source.limits() != patch.limits
-    {
+    if source.state.source != patch.before || source.dialect() != patch.dialect {
         return Err(Error::PatchConflict);
     }
-    if patch.is_empty() {
-        return Ok(Commit {
-            snapshot: source.clone(),
-            patch: patch.clone(),
-            diagnostics: Diagnostics {
+    validate_patch_policy(patch, source.limits())?;
+    if patch.is_noop() {
+        return Ok(Commit::new(
+            source.clone(),
+            patch.clone(),
+            Diagnostics {
                 changed: false,
                 touched_blocks: 0,
                 full_reparse_performed: false,
             },
-        });
+        ));
     }
-    let snapshot = Snapshot::read_with(&patch.after, patch.dialect, patch.limits)?;
-    Ok(Commit {
+    let snapshot = Snapshot::read_with_policy(&patch.after, source.dialect(), source.limits())?;
+    Ok(Commit::new(
         snapshot,
-        patch: patch.clone(),
-        diagnostics: Diagnostics {
+        patch.clone(),
+        Diagnostics {
             changed: true,
             touched_blocks: patch.operation_count,
             full_reparse_performed: true,
         },
-    })
+    ))
+}
+
+fn validate_patch_policy(patch: &Patch, limits: ReadLimits) -> Result<(), Error> {
+    if patch.operation_count > limits.max_operations {
+        return Err(Error::OperationLimitExceeded {
+            limit: limits.max_operations,
+        });
+    }
+    Ok(())
 }
 
 fn fingerprint(source: &str) -> u64 {
@@ -1259,9 +1250,9 @@ fn publish(source: &Snapshot, target: &str, intents: &[Intent]) -> Result<Commit
     if target == source.source() {
         let exact = Arc::clone(&source.state.source);
         let fingerprint = fingerprint(&exact);
-        return Ok(Commit {
-            snapshot: source.clone(),
-            patch: Patch {
+        return Ok(Commit::new(
+            source.clone(),
+            Patch {
                 before: Arc::clone(&exact),
                 after: exact,
                 dialect: source.dialect(),
@@ -1271,21 +1262,21 @@ fn publish(source: &Snapshot, target: &str, intents: &[Intent]) -> Result<Commit
                 operation_count,
                 operations: Some(operations.clone().into_boxed_slice()),
             },
-            diagnostics: Diagnostics {
+            Diagnostics {
                 changed: false,
                 touched_blocks: 0,
                 full_reparse_performed: false,
             },
-        });
+        ));
     }
-    let snapshot = Snapshot::read_with(target, source.dialect(), source.limits())?;
+    let snapshot = Snapshot::read_with_policy(target, source.dialect(), source.limits())?;
     let before = Arc::clone(&source.state.source);
     let after = Arc::clone(&snapshot.state.source);
     let source_fingerprint = fingerprint(&before);
     let target_fingerprint = fingerprint(&after);
-    Ok(Commit {
+    Ok(Commit::new(
         snapshot,
-        patch: Patch {
+        Patch {
             before,
             after,
             dialect: source.dialect(),
@@ -1295,12 +1286,12 @@ fn publish(source: &Snapshot, target: &str, intents: &[Intent]) -> Result<Commit
             operation_count,
             operations: Some(operations.into_boxed_slice()),
         },
-        diagnostics: Diagnostics {
+        Diagnostics {
             changed: true,
             touched_blocks: operation_count,
             full_reparse_performed: true,
         },
-    })
+    ))
 }
 
 fn render(source: &Snapshot, intents: &[Intent]) -> Result<String, Error> {
@@ -1410,7 +1401,7 @@ fn validate_structural_boundaries(
     if structural_positions.is_empty() {
         return Ok(());
     }
-    let candidate = Snapshot::read_with(target, source.dialect(), source.limits())?;
+    let candidate = Snapshot::read_with_policy(target, source.dialect(), source.limits())?;
     for position in structural_positions {
         let removed_before = intents
             .iter()
@@ -1462,7 +1453,7 @@ fn validate_structural_boundaries(
 }
 
 fn validate_replacement(source: &Snapshot, replacement: &str) -> Result<(), Error> {
-    let parsed = Snapshot::read_with(replacement, source.dialect(), source.limits())?;
+    let parsed = Snapshot::read_with_policy(replacement, source.dialect(), source.limits())?;
     let actual = parsed.blocks().len();
     if actual != 1 {
         return Err(Error::ReplacementBlockCount { actual });
@@ -1586,7 +1577,7 @@ fn replacement_preserves_definition(
     if replacement.is_empty() {
         return Ok(false);
     }
-    let parsed = Snapshot::read_with(replacement, source.dialect(), source.limits())?;
+    let parsed = Snapshot::read_with_policy(replacement, source.dialect(), source.limits())?;
     Ok(parsed
         .references()
         .any(|reference| reference.kind() == kind && reference.label() == Some(label)))

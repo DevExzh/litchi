@@ -226,7 +226,7 @@ fn rewrites_the_selected_view_when_multiple_owners_exist() {
 fn package_with_icon_owner() -> (OpcPackage, PackURI) {
     let bytes =
         include_bytes!("../../../../test-data/poi/test-data/spreadsheet/right-to-left.xlsx");
-    let mut package = OpcPackage::from_bytes(bytes).unwrap();
+    let mut package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     let worksheet = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
     let xml = format!(
         r#"<worksheet xmlns="{SML}" xmlns:sdt="{SHOW_DATA_TYPE_ICONS_NAMESPACE}"><sheetViews><sheetView workbookViewId="0"><extLst><ext uri="urn:producer"><u:keep xmlns:u="urn:unknown"/></ext></extLst></sheetView></sheetViews></worksheet>"#
@@ -242,7 +242,7 @@ fn package_with_icon_owner() -> (OpcPackage, PackURI) {
 fn adding_without_an_existing_extension_owner_is_explicitly_refused() {
     let bytes =
         include_bytes!("../../../../test-data/poi/test-data/spreadsheet/right-to-left.xlsx");
-    let mut package = OpcPackage::from_bytes(bytes).unwrap();
+    let mut package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     let worksheet = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
     let xml = format!(
         r#"<worksheet xmlns="{SML}" xmlns:sdt="{SHOW_DATA_TYPE_ICONS_NAMESPACE}"><sheetViews><sheetView workbookViewId="0"/></sheetViews></worksheet>"#
@@ -269,7 +269,7 @@ fn source_transaction_has_exact_noop_and_inverse_restore() {
     assert!(!noop.set_worksheet_view(0, None).unwrap());
     let noop_commit = noop.commit().unwrap();
     assert!(!noop_commit.changed());
-    assert!(noop_commit.patch().is_empty());
+    assert!(noop_commit.patch().is_noop());
     assert!(Arc::ptr_eq(&source, &noop_commit.snapshot().source_arc()));
 
     let mut edit = super::edit(&mut package, &worksheet).unwrap();
@@ -279,7 +279,7 @@ fn source_transaction_has_exact_noop_and_inverse_restore() {
     );
     let commit = edit.commit().unwrap();
     assert!(commit.changed());
-    assert!(!commit.patch().is_empty());
+    assert!(!commit.patch().is_noop());
     assert!(!commit.snapshot().worksheet_views()[0].unwrap().visible());
     let changed_xml = package.get_part(&worksheet).unwrap().blob().to_vec();
     assert!(
@@ -333,4 +333,77 @@ fn source_transaction_edits_custom_sheet_view_without_rebuilding_other_views() {
             .blob(),
         named_before.as_slice()
     );
+}
+
+#[test]
+fn every_icon_traversal_enforces_the_same_element_depth() {
+    for leaf in ["<leaf/>", "<leaf></leaf>"] {
+        for over_limit in [false, true] {
+            let depth = super::MAX_DEPTH + usize::from(over_limit);
+            let nested = |parents: usize| {
+                format!(
+                    "{}{}{}",
+                    "<node>".repeat(parents),
+                    leaf,
+                    "</node>".repeat(parents)
+                )
+            };
+            let extension = format!("<ext>{}</ext>", nested(depth - 2));
+            let worksheet = format!(
+                r#"<worksheet xmlns="{SML}"><sheetViews><sheetView workbookViewId="0"><extLst><ext uri="urn:test">{}</ext></extLst></sheetView></sheetViews></worksheet>"#,
+                nested(depth - 6)
+            );
+            let results = [
+                codec::inspect_extension(extension.as_bytes(), Target::Worksheet).map(|_| ()),
+                codec::rewrite_extension(extension.as_bytes(), Target::Worksheet, None).map(
+                    |output| {
+                        assert_eq!(output, extension.as_bytes());
+                    },
+                ),
+                codec::rewrite(worksheet.as_bytes(), OwnerKind::WorksheetView, 0, None).map(
+                    |output| {
+                        assert_eq!(output, worksheet.as_bytes());
+                    },
+                ),
+            ];
+            for result in results {
+                if over_limit {
+                    let error = result.expect_err("depth budget must refuse both XML spellings");
+                    assert!(
+                        matches!(error, crate::Error::Limit {
+                        kind: crate::LimitKind::DataTypeIcons(super::LimitKind::XmlDepth),
+                        observed,
+                        maximum,
+                    } if observed == depth as u64 && maximum == super::MAX_DEPTH as u64),
+                        "{error:?}"
+                    );
+                } else {
+                    result.expect("the exact depth boundary remains readable and writable");
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn icon_extension_byte_limit_is_distinct_from_empty_input() {
+    let oversized = vec![b' '; super::MAX_EXTENSION_BYTES + 1];
+    for result in [
+        codec::inspect_extension(&oversized, Target::Worksheet).map(|_| ()),
+        codec::rewrite_extension(&oversized, Target::Worksheet, None).map(|_| ()),
+    ] {
+        assert!(matches!(result, Err(crate::Error::Limit {
+            kind: crate::LimitKind::DataTypeIcons(super::LimitKind::ExtensionBytes),
+            observed,
+            maximum,
+        }) if observed == oversized.len() as u64 && maximum == super::MAX_EXTENSION_BYTES as u64));
+    }
+    assert!(matches!(
+        codec::inspect_extension(b"", Target::Worksheet),
+        Err(crate::Error::Invalid(_))
+    ));
+    assert!(matches!(
+        codec::rewrite_extension(b"", Target::Worksheet, None),
+        Err(crate::Error::Invalid(_))
+    ));
 }

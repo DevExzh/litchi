@@ -2,7 +2,9 @@
 
 use super::Metadata;
 use super::codec::parse_record;
-use super::validation::{decode_flags, encode_flags, is_ptg_exp};
+use super::validation::{
+    FlagDefect, decode_flags, decode_flags_preserving, encode_flags, is_ptg_exp,
+};
 
 fn payload(flags: u16, cache: u32, tokens: &[u8]) -> Vec<u8> {
     let mut data = Vec::with_capacity(22 + tokens.len());
@@ -37,8 +39,11 @@ fn parses_all_formula_flags_and_application_cache() {
 }
 
 #[test]
-fn rejects_reserved_flags_empty_tokens_and_trailing_payload() {
-    assert!(decode_flags(0x0002, &[0x16]).is_err());
+fn ignores_reserved_flags_and_rejects_empty_tokens_and_trailing_payload() {
+    // Reserved bits "MUST be ignored" ([MS-XLS] 2.4.127; record 0308).
+    let ignored = decode_flags(0xFFD2, &[0x16]).unwrap();
+    assert_eq!(ignored, decode_flags(0, &[0x16]).unwrap());
+    assert!(ignored.1.is_none());
     assert!(parse_record(&payload(0, 0, &[])).is_err());
 
     let mut data = payload(0, 0, &[0x16]);
@@ -61,9 +66,19 @@ fn string_cached_values_allow_an_empty_formula_token_stream() {
 }
 
 #[test]
-fn shared_flag_requires_ptg_exp_and_writer_refuses_orphaned_shared_state() {
+fn stale_shared_flag_is_ignored_and_writer_refuses_orphaned_shared_state() {
     assert!(!is_ptg_exp(&[0x16, 0, 0, 0, 0]));
-    assert!(decode_flags(0x0008, &[0x16]).is_err());
+    // A complete token stream is not part of a shared formula: the stale
+    // flag is ignored and reported (record 0316); the preserving decode
+    // keeps it for the explicit compatibility profile.
+    let (metadata, defect) = decode_flags(0x0008, &[0x16]).unwrap();
+    assert!(!metadata.shared_formula());
+    assert_eq!(defect, Some(FlagDefect::SharedWithoutPtgExp));
+    let (preserved, _) = decode_flags_preserving(0x0008, &[0x16]).unwrap();
+    assert!(preserved.shared_formula());
+    let (shared, defect) = decode_flags(0x0008, &[0x01, 0, 0, 0, 0]).unwrap();
+    assert!(shared.shared_formula());
+    assert!(defect.is_none());
     assert!(
         encode_flags(
             &Metadata::new().with_shared_formula(true),

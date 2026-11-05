@@ -1,0 +1,8 @@
+# docx_large_bench, record 0313. Stripped binaries are timed (measure.sh);
+# unstripped ones are run under callgrind (docx_cg.sh).
+# base: this branch with crates/{xml-minifier,litchi-opc}/src at 12724da2d5; after: this branch (the 0313 commits on 9c79d04592).
+# build: cargo build --profile profiling -p litchi-ops --features docx,doc,odp,xls,rtf,odt,pptx,ppt --example docx_large_bench
+ea37a8462ea8d822c3b4e0a1c1802ee71a84bf83f92884af43e2050ad152381f  base_bench.stripped
+de2a160593b1be7a544b303228757818c851af7cd8c740ae560122ed02a34704  after_bench.stripped
+caf1d00ffb270836498a3360d1783bc91245abc70ba24692fe292b6141724958  base_bench
+2613e6e364d4b6d4d85d92a6fb217824d0e38db7374f1b3863e7879576fe1002  after_bench

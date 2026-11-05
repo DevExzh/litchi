@@ -5,19 +5,20 @@
 //! operations in package.
 
 mod codec;
+mod edit;
 mod model;
 mod package;
 
 pub use crate::data_type_icons::ShowDataTypeIcons;
 pub use codec::{parse_named_sheet_views, write_named_sheet_views};
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 pub use model::{
     ColumnFilter, DifferentialFormat, Extension, Filter, Guid, IconSet, Markup, Range,
     SortCondition, SortConditionKind, SortRule, SortRules, View, Views,
 };
-pub use package::{
-    discover_named_sheet_views, load_worksheet_named_sheet_views,
-    remove_worksheet_named_sheet_views, store_worksheet_named_sheet_views,
-};
+#[cfg(test)]
+pub(crate) use package::store_worksheet_named_sheet_views;
+pub use package::{discover_named_sheet_views, load_worksheet_named_sheet_views};
 
 pub(crate) const NSV: &[u8] =
     b"http://schemas.microsoft.com/office/spreadsheetml/2019/namedsheetviews";
@@ -41,7 +42,6 @@ pub(crate) const MAX_FRAGMENT_NODES: usize = 100_000;
 pub(crate) const FRAGMENT_VIEW_ID: &str = "{01234567-89AB-CDEF-0123-456789ABCDEF}";
 pub(crate) const FRAGMENT_FILTER_ID: &str = "{11111111-2222-3333-4444-555555555555}";
 
-use crate::error::Error;
 use litchi_ooxml_common::Error as CommonError;
 
 pub(crate) fn invalid(value: impl Into<String>) -> Error {

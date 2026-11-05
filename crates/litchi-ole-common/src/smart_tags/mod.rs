@@ -28,4 +28,4 @@ pub use self::model::{
 };
 pub use self::patch::{Change, Patch};
 pub use self::snapshot::Snapshot;
-pub use self::transaction::{Commit, Revision, Transaction, update};
+pub use self::transaction::{Commit, Diagnostics, Edit, Revision, update};

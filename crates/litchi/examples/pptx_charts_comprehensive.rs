@@ -3,7 +3,7 @@
 //! Charts are encoded by the standalone `litchi-pptx` facade and attached to
 //! authored slides through its transactional OPC package editor.
 
-use litchi_pptx::chart::{self, encode as encode_chart};
+use litchi_pptx::chart::encode as encode_chart;
 use litchi_pptx::{Chart, ChartSeries, ChartType, Package};
 
 const X: i64 = 914_400;
@@ -128,9 +128,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== Comprehensive PPTX Charts ===");
     println!("Building typed chart models and a summary presentation...");
 
-    let mut package = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
     {
-        let presentation = package.presentation_mut()?;
+        let presentation = builder.presentation()?;
         let title = presentation.add_slide()?;
         title.set_title("Comprehensive Chart Demonstration");
         title.add_text_box(
@@ -167,17 +167,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    // Publish the managed slide model, then edit the canonical OPC graph.
-    let authored = package.to_bytes()?;
-    let mut package = Package::from_bytes(&authored)?;
-    let relationship_ids = package.edit_opc(|opc| {
+    // Finalize authoring, then edit the canonical OPC graph.
+    let mut package = builder.build()?;
+    let relationship_ids = {
+        let mut edit = package.edit_charts()?;
         let mut ids = Vec::with_capacity(charts.len());
         for (index, value) in charts.iter().enumerate() {
-            let slide_name = format!("/ppt/slides/slide{}.xml", index + 2);
-            ids.push(chart::add(opc, &slide_name, value)?);
+            // Slide `index + 2` of the deck, zero-based.
+            ids.push(edit.add(index + 1, value)?);
         }
-        Ok(ids)
-    })?;
+        package = edit.commit()?.into_package();
+        ids
+    };
 
     let bytes = package.to_bytes()?;
     let reopened = Package::from_bytes(&bytes)?;

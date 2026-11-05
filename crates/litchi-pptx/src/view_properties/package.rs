@@ -1,5 +1,6 @@
 //! Presentation package relationship loading for view properties.
 
+use super::codec::Limits;
 use super::model::ViewProperties;
 use crate::leniency::ToleranceReport;
 use crate::{Error, Result};
@@ -17,8 +18,8 @@ const CT: &str = "application/vnd.openxmlformats-officedocument.presentationml.v
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn load_from_package(package: &OpcPackage) -> Result<Option<ViewProperties>> {
-    load_from_package_with_tolerance(package, &mut ToleranceReport::default())
+pub fn load_from_package(package: &OpcPackage, limits: Limits) -> Result<Option<ViewProperties>> {
+    load_from_package_with_tolerance(package, &mut ToleranceReport::default(), limits)
 }
 
 /// [`load_from_package`], appending each view-properties repair (audit
@@ -30,6 +31,7 @@ pub fn load_from_package(package: &OpcPackage) -> Result<Option<ViewProperties>>
 pub fn load_from_package_with_tolerance(
     package: &OpcPackage,
     tolerance: &mut ToleranceReport,
+    limits: Limits,
 ) -> Result<Option<ViewProperties>> {
     let presentation = package.main_document_part()?;
     let mut found = presentation
@@ -56,7 +58,7 @@ pub fn load_from_package_with_tolerance(
         )));
     }
     let mut repairs = ToleranceReport::default();
-    let mut value = ViewProperties::parse_with_tolerance(part.blob(), &mut repairs)?;
+    let mut value = ViewProperties::parse_with_tolerance(part.blob(), &mut repairs, limits)?;
     if let Some(outline) = value.outline.as_mut() {
         for slide in &mut outline.slides {
             let relationship = part.rels().get(&slide.relationship_id).ok_or_else(|| {

@@ -2908,7 +2908,7 @@ mod tests {
     #[test]
     fn length_prefix_boundaries_are_rewritten_without_losing_opaque_fields() {
         let mut drawable = Vec::new();
-        drawable.extend(field_bytes(DRAWABLE_HYPERLINK_FIELD, &vec![b'a'; 125]));
+        drawable.extend(field_bytes(DRAWABLE_HYPERLINK_FIELD, &[b'a'; 125]));
         drawable.extend([0x7a, 0x03, 0x01, 0x02, 0x03]);
         let source = field_bytes(MOVIE_SUPER_FIELD, &drawable);
         let options = DecodeOptions::for_source(&source).with_max_output_bytes(source.len() * 3);

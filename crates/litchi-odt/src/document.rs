@@ -18,4 +18,4 @@ mod tests;
 
 pub use catalog::{SourceBackedDocumentCatalog, TextBlockCatalogEntry};
 pub use model::Document;
-pub use source::{ReadLimits, SourceBackedDocument};
+pub use source::SourceBackedDocument;

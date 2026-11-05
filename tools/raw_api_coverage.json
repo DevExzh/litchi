@@ -1,0 +1,438 @@
+{
+  "schema_version": 1,
+  "source_commit": "ef1acb5ef0b776c9a6066029a5cac35daeb0b5eb",
+  "coverage": {
+    "state": "incomplete",
+    "reason": "0362ul65-70 and the existing ODF/font/crypto/PPTX raw lanes are explicitly recorded, but final all-profile rustdoc inputs and callable dispositions have not yet been assembled.",
+    "expected_profile_source": "tools/api_glossary.json",
+    "expected_profile_source_blob": "0e4ffb67ad53c8d7dff68f17fc0d5685e84f265b",
+    "expected_workspace_source": "Cargo.toml",
+    "expected_workspace_source_blob": "806bb190ca15bb53d0ec8b29c8812b338ffaca72",
+    "approved_cargo_lock_sha256": "efff87af6c339a44e267987c5c79ba3fb1910cef734f0a9f212f08f865dac811",
+    "capture_policy": {
+      "runner_path": "/home/zhuhe/code/litchi-worktrees/uo2-gate-runner-self-attribution/docs/unified-ops/results/0362ul29/tooling/run_safe_gate.py",
+      "runner_sha256": "1904177040fc7c523582433028d9bba56efc30fe0d9d96beb554a2fab343691e",
+      "cap_wrapper_path": "/home/zhuhe/code/litchi-worktrees/uo2-gate-runner-self-attribution/docs/unified-ops/results/0362ul29/tooling/bin/cargo",
+      "cap_wrapper_sha256": "495e24c6f60b238378386d86ac4158cba904992ce8870a9494f2c4a0eedd256d",
+      "underlying_cargo_path": "/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo",
+      "underlying_cargo_sha256": "1b22a69fd625d57565041bf6c634d8ebd1a82be8b3d0006390472c86324230d8",
+      "environment": {
+        "CARGO_NET_OFFLINE": "true",
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_PROFILE_RELEASE_DEBUG": "0",
+        "RUSTC_BOOTSTRAP": "1",
+        "LITCHI_MEM_MAX": "20G",
+        "RUST_TEST_THREADS": "1",
+        "CARGO_TERM_COLOR": "never",
+        "LITCHI_CAPPED": "",
+        "LITCHI_GATE_ATTEMPT": "f5",
+        "RUSTDOCFLAGS": "",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "guards": {
+        "target_pre_max_bytes": 18000000000,
+        "target_live_max_bytes": 19000000000,
+        "target_hard_max_bytes": 20000000000,
+        "free_min_bytes": 12000000000,
+        "memory_max": "20G",
+        "memory_max_bytes": 21474836480,
+        "build_jobs": 1,
+        "test_threads": 1,
+        "incremental": 0,
+        "offline": true,
+        "locked": true
+      }
+    }
+  },
+  "profiles": [
+    {
+      "id": "ops-all",
+      "package": "litchi-ops",
+      "default_features": false,
+      "features": ["doc", "docx", "encryption", "eval", "formula", "iwork-adapter", "keynote", "markdown", "numbers", "odb", "odc", "odf-formula", "odf-objects", "odg", "odi", "odm", "odp", "ods", "odt", "opc", "oth", "pages", "ppt", "pptx", "rtf", "test-support", "xls", "xlsb", "xlsx", "yaml"]
+    },
+    {
+      "id": "rtf-minimal",
+      "package": "litchi-rtf",
+      "default_features": false,
+      "features": []
+    },
+    {
+      "id": "ops-rtf",
+      "package": "litchi-ops",
+      "default_features": false,
+      "features": ["rtf"]
+    },
+    {
+      "id": "ods",
+      "package": "litchi-ods",
+      "default_features": true,
+      "features": []
+    },
+    {
+      "id": "ops-odf",
+      "package": "litchi-ops",
+      "default_features": true,
+      "features": ["odt", "ods", "odp", "oth", "odm", "odg", "odc", "odi", "odb", "odf-formula"]
+    },
+    {
+      "id": "odf-formula",
+      "package": "litchi-odf-formula",
+      "default_features": true,
+      "features": []
+    },
+    {
+      "id": "crypto",
+      "package": "litchi-crypto",
+      "default_features": false,
+      "features": ["ooxml"]
+    },
+    {
+      "id": "pptx-minimal",
+      "package": "litchi-pptx",
+      "default_features": false,
+      "features": []
+    },
+    {
+      "id": "pptx-full",
+      "package": "litchi-pptx",
+      "default_features": false,
+      "features": ["automatic-fonts", "encryption", "vba-inspection"]
+    },
+    {
+      "id": "fonts-0362za",
+      "package": "litchi-fonts",
+      "default_features": true,
+      "features": []
+    },
+    {
+      "id": "numbers-wire-0362ul66",
+      "package": "litchi-numbers-wire",
+      "default_features": true,
+      "features": []
+    },
+    {
+      "id": "vba-0362ul67",
+      "package": "litchi-vba",
+      "default_features": true,
+      "features": []
+    },
+    {
+      "id": "xldm-0362ul68",
+      "package": "litchi-xldm",
+      "default_features": true,
+      "features": []
+    },
+    {
+      "id": "formula-0362ul69",
+      "package": "litchi-formula",
+      "default_features": true,
+      "features": []
+    },
+    {
+      "id": "markdown-0362ul70",
+      "package": "litchi-markdown",
+      "default_features": true,
+      "features": []
+    }
+  ],
+  "entries": [
+    {
+      "profile": "ops-all",
+      "path": "litchi_ops::detect::detect_file_format",
+      "kind": "raw_function",
+      "disposition": "required_raw_limits",
+      "source": {"path": "crates/litchi-ops/src/detect/functions.rs", "blob": "027e46ab5db29bf451f6f026c91b13f5e88c9ba9", "line": 53, "symbol": "detect_file_format", "symbol_kind": "rust_item"},
+      "evidence": "Current public detector requires the unified detect SourceLimits profile.",
+      "required_signature": {"inputs": ["path", "limits"], "limits_argument": "limits", "limits_type": "litchi_ops::detect::SourceLimits"}
+    },
+    {
+      "profile": "ops-all",
+      "path": "litchi_ops::detect::detect_file_format_from_bytes",
+      "kind": "raw_function",
+      "disposition": "required_raw_limits",
+      "source": {"path": "crates/litchi-ops/src/detect/functions.rs", "blob": "027e46ab5db29bf451f6f026c91b13f5e88c9ba9", "line": 167, "symbol": "detect_file_format_from_bytes", "symbol_kind": "rust_item"},
+      "evidence": "Current public byte detector requires the unified detect SourceLimits profile.",
+      "required_signature": {"inputs": ["bytes", "limits"], "limits_argument": "limits", "limits_type": "litchi_ops::detect::SourceLimits"}
+    },
+    {
+      "profile": "ops-all",
+      "path": "litchi_ops::detect::detect_format_from_reader",
+      "kind": "raw_function",
+      "disposition": "required_raw_limits",
+      "source": {"path": "crates/litchi-ops/src/detect/functions.rs", "blob": "027e46ab5db29bf451f6f026c91b13f5e88c9ba9", "line": 294, "symbol": "detect_format_from_reader", "symbol_kind": "rust_item"},
+      "evidence": "Current public reader detector requires the unified detect SourceLimits profile.",
+      "required_signature": {"inputs": ["reader", "limits"], "limits_argument": "limits", "limits_type": "litchi_ops::detect::SourceLimits"}
+    },
+    {
+      "profile": "ops-all",
+      "path": "litchi_ops::detect::detect_format_smart",
+      "kind": "raw_function",
+      "disposition": "required_raw_limits",
+      "source": {"path": "crates/litchi-ops/src/detect/detected.rs", "blob": "46b359ca6aee7218634390327c9204dd7e94928c", "line": 197, "symbol": "detect_format_smart", "symbol_kind": "rust_item"},
+      "evidence": "Current public smart detector requires the unified detect SourceLimits profile.",
+      "required_signature": {"inputs": ["bytes", "limits"], "limits_argument": "limits", "limits_type": "litchi_ops::detect::SourceLimits"}
+    },
+    {
+      "profile": "ops-all",
+      "path": "litchi_ops::detect::SourceLimits::new",
+      "kind": "semantic_method",
+      "disposition": "semantic_value",
+      "source": {"path": "crates/litchi-ops/src/detect/mod.rs", "blob": "2c2e115b4fdc21b58263473abda37a8bb6cb68b4", "line": 45, "symbol": "SourceLimits::new", "symbol_kind": "rust_item"},
+      "evidence": "This is a finite limits-value constructor, not a raw parser or codec boundary."
+    },
+    {
+      "profile": "rtf-minimal",
+      "path": "litchi_rtf::transport::is_compressed_rtf",
+      "kind": "scalar_conversion",
+      "disposition": "fixed_scalar",
+      "source": {"path": "crates/litchi-rtf/src/codec/compressed.rs", "blob": "a798d47b03241ff81c701c9f7b2840a538f0ee67", "line": 179, "symbol": "is_compressed_rtf", "symbol_kind": "rust_item"},
+      "evidence": "The probe examines only the fixed transport header and allocates no source-sized result."
+    },
+    {
+      "profile": "rtf-minimal",
+      "path": "litchi_rtf::ValidationReport::from_str",
+      "kind": "raw_method",
+      "disposition": "active_lane",
+      "lane": "0362ul65",
+      "source": {"path": "crates/litchi-rtf/src/validation.rs", "blob": "5af4b3fd32ea605c22f3a39f835b0a9ae22e1893", "line": 455, "symbol": "ValidationReport::from_str", "symbol_kind": "rust_item"},
+      "evidence": "0362ul65 audits the default raw-validation twin before final limits registration."
+    },
+    {
+      "profile": "rtf-minimal",
+      "path": "litchi_rtf::ValidationReport::from_bytes",
+      "kind": "raw_method",
+      "disposition": "active_lane",
+      "lane": "0362ul65",
+      "source": {"path": "crates/litchi-rtf/src/validation.rs", "blob": "5af4b3fd32ea605c22f3a39f835b0a9ae22e1893", "line": 467, "symbol": "ValidationReport::from_bytes", "symbol_kind": "rust_item"},
+      "evidence": "0362ul65 audits the default raw-validation twin before final limits registration."
+    },
+    {
+      "profile": "rtf-minimal",
+      "path": "litchi_rtf::transport::compress",
+      "kind": "codec_function",
+      "disposition": "active_lane",
+      "lane": "0362ul65",
+      "source": {"path": "crates/litchi-rtf/src/codec/compressed.rs", "blob": "a798d47b03241ff81c701c9f7b2840a538f0ee67", "line": 704, "symbol": "compress", "symbol_kind": "rust_item"},
+      "evidence": "0362ul65 audits output admission for the public compressed-RTF codec."
+    },
+    {
+      "profile": "numbers-wire-0362ul66",
+      "path": "litchi_numbers_wire::BncCell::parse",
+      "kind": "record_parser",
+      "disposition": "active_lane",
+      "lane": "0362ul66",
+      "source": {"path": "crates/litchi-numbers-wire/src/lib.rs", "blob": "bbe772d6b80f1c54d84016e2088b247b71960153", "line": 421, "symbol": "BncCell::parse", "symbol_kind": "rust_item"},
+      "evidence": "0362ul66 audits the variable-tail BNC owned record parser."
+    },
+    {
+      "profile": "numbers-wire-0362ul66",
+      "path": "litchi_numbers_wire::BncCellView::parse",
+      "kind": "record_parser",
+      "disposition": "active_lane",
+      "lane": "0362ul66",
+      "source": {"path": "crates/litchi-numbers-wire/src/lib.rs", "blob": "bbe772d6b80f1c54d84016e2088b247b71960153", "line": 1950, "symbol": "BncCellView::parse", "symbol_kind": "rust_item"},
+      "evidence": "0362ul66 audits the borrowed BNC record parser and retained tail boundary."
+    },
+    {
+      "profile": "numbers-wire-0362ul66",
+      "path": "litchi_numbers_wire::BncCell::encode",
+      "kind": "codec_function",
+      "disposition": "active_lane",
+      "lane": "0362ul66",
+      "source": {"path": "crates/litchi-numbers-wire/src/lib.rs", "blob": "bbe772d6b80f1c54d84016e2088b247b71960153", "line": 1733, "symbol": "BncCell::encode", "symbol_kind": "rust_item"},
+      "evidence": "0362ul66 audits the limitless owned BNC output twin."
+    },
+    {
+      "profile": "numbers-wire-0362ul66",
+      "path": "litchi_numbers_wire::cell_value::decode_cell_value",
+      "kind": "record_parser",
+      "disposition": "active_lane",
+      "lane": "0362ul66",
+      "source": {"path": "crates/litchi-numbers-wire/src/cell_value.rs", "blob": "359c4dcd9806d88b30c06c90903573fd16ffc834", "line": 104, "symbol": "decode_cell_value", "symbol_kind": "rust_item"},
+      "evidence": "0362ul66 audits the public raw value classifier that delegates to BNC parsing."
+    },
+    {
+      "profile": "vba-0362ul67",
+      "path": "litchi_vba::project::Project::read",
+      "kind": "raw_method",
+      "disposition": "active_lane",
+      "lane": "0362ul67",
+      "source": {"path": "crates/litchi-vba/src/project.rs", "blob": "1632d49857c702db6601b2eee9900b763a9828fa", "line": 915, "symbol": "Project::read", "symbol_kind": "rust_item"},
+      "evidence": "0362ul67 audits the default standalone OVBA raw parser."
+    },
+    {
+      "profile": "xldm-0362ul68",
+      "path": "litchi_xldm::inspect",
+      "kind": "raw_function",
+      "disposition": "active_lane",
+      "lane": "0362ul68",
+      "source": {"path": "crates/litchi-xldm/src/codec.rs", "blob": "0284d9f611c298ed24bde7dd17f58754c1667432", "line": 18, "symbol": "inspect", "symbol_kind": "rust_item"},
+      "evidence": "0362ul68 audits the static-only XLDM outer-storage policy."
+    },
+    {
+      "profile": "xldm-0362ul68",
+      "path": "litchi_xldm::metadata::parse_file",
+      "kind": "raw_function",
+      "disposition": "active_lane",
+      "lane": "0362ul68",
+      "source": {"path": "crates/litchi-xldm/src/metadata/codec.rs", "blob": "f3dc016ca0522b124111ace690d59a159147852d", "line": 43, "symbol": "metadata::parse_file", "symbol_kind": "rust_item"},
+      "evidence": "0362ul68 audits the static-only XLDM metadata XML parser."
+    },
+    {
+      "profile": "formula-0362ul69",
+      "path": "litchi_formula::mtef_to_latex",
+      "kind": "codec_function",
+      "disposition": "active_lane",
+      "lane": "0362ul69",
+      "source": {"path": "crates/litchi-formula/src/lib.rs", "blob": "7e0a61ff48936528e6e01dfd6842e307279315f1", "line": 168, "symbol": "mtef_to_latex", "symbol_kind": "rust_item"},
+      "evidence": "0362ul69 audits the public MTEF conversion codec."
+    },
+    {
+      "profile": "formula-0362ul69",
+      "path": "litchi_formula::omml_to_latex",
+      "kind": "codec_function",
+      "disposition": "active_lane",
+      "lane": "0362ul69",
+      "source": {"path": "crates/litchi-formula/src/lib.rs", "blob": "7e0a61ff48936528e6e01dfd6842e307279315f1", "line": 149, "symbol": "omml_to_latex", "symbol_kind": "rust_item"},
+      "evidence": "0362ul69 audits the public OMML conversion codec."
+    },
+    {
+      "profile": "formula-0362ul69",
+      "path": "litchi_formula::MtefParser::new",
+      "kind": "record_parser",
+      "disposition": "active_lane",
+      "lane": "0362ul69",
+      "source": {"path": "crates/litchi-formula/src/mtef/mod.rs", "blob": "164493404488bff2b96395f2412bb0fa811c9a9d", "line": 23, "symbol": "MtefParser::new", "symbol_kind": "rust_item"},
+      "evidence": "0362ul69 audits the public raw MTEF parser constructor."
+    },
+    {
+      "profile": "markdown-0362ul70",
+      "path": "litchi_markdown::reader::Snapshot::read",
+      "kind": "raw_method",
+      "disposition": "active_lane",
+      "lane": "0362ul70",
+      "source": {"path": "crates/litchi-markdown/src/reader/model.rs", "blob": "eda278d5375e7159b436d30c7c4e1062764bd0ca", "line": 493, "symbol": "Snapshot::read", "symbol_kind": "rust_item"},
+      "evidence": "0362ul70 decides whether the finite default Markdown reader is an owner ingress or raw policy twin."
+    },
+    {
+      "profile": "ods",
+      "path": "litchi_ods::model::tracked_changes::codec::parse_tracked_changes",
+      "kind": "record_parser",
+      "disposition": "active_lane",
+      "lane": "0362ul44",
+      "source": {"path": "crates/litchi-ods/src/model/tracked_changes/codec.rs", "blob": "da90747e26375ddb2c2ef288941fa06905c28bbc", "line": 927, "symbol": "parse_tracked_changes", "symbol_kind": "rust_item"},
+      "evidence": "The ODF raw-codec lane owns the remaining tracked-changes policy wrappers."
+    },
+    {
+      "profile": "odf-formula",
+      "path": "litchi_odf_formula::codec::serialize",
+      "kind": "codec_function",
+      "disposition": "active_lane",
+      "lane": "0362ul44",
+      "source": {"path": "crates/litchi-odf-formula/src/codec/serialize.rs", "blob": "5cb95830cf419d4d50c7bce65d2d0d0bcbfe9cea", "line": 75, "symbol": "serialize", "symbol_kind": "rust_item"},
+      "evidence": "The ODF raw-codec lane owns the formula XML output policy."
+    }
+  ],
+  "lanes": [
+    {
+      "id": "0362ul65",
+      "package": "litchi-rtf",
+      "scope": "litchi_rtf",
+      "disposition": "active_lane",
+      "source": {"path": "crates/litchi-rtf/src/validation.rs", "blob": "5af4b3fd32ea605c22f3a39f835b0a9ae22e1893", "line": 455, "symbol": "raw-validation-boundaries", "symbol_kind": "descriptive"},
+      "evidence": "RTF remaining raw boundary lane."
+    },
+    {
+      "id": "0362ul66",
+      "package": "litchi-numbers-wire",
+      "scope": "litchi_numbers_wire",
+      "disposition": "active_lane",
+      "source": {"path": "crates/litchi-numbers-wire/src/lib.rs", "blob": "bbe772d6b80f1c54d84016e2088b247b71960153", "line": 413, "symbol": "bnc-record-boundaries", "symbol_kind": "descriptive"},
+      "evidence": "Numbers wire raw record lane."
+    },
+    {
+      "id": "0362ul67",
+      "package": "litchi-vba",
+      "scope": "litchi_vba::project",
+      "disposition": "active_lane",
+      "source": {"path": "crates/litchi-vba/src/project.rs", "blob": "1632d49857c702db6601b2eee9900b763a9828fa", "line": 906, "symbol": "ovba-project-boundary", "symbol_kind": "descriptive"},
+      "evidence": "VBA raw project lane."
+    },
+    {
+      "id": "0362ul68",
+      "package": "litchi-xldm",
+      "scope": "litchi_xldm",
+      "disposition": "active_lane",
+      "source": {"path": "crates/litchi-xldm/src/codec.rs", "blob": "0284d9f611c298ed24bde7dd17f58754c1667432", "line": 17, "symbol": "xldm-boundaries", "symbol_kind": "descriptive"},
+      "evidence": "XLDM raw policy lane."
+    },
+    {
+      "id": "0362ul69",
+      "package": "litchi-formula",
+      "scope": "litchi_formula",
+      "disposition": "active_lane",
+      "source": {"path": "crates/litchi-formula/src/lib.rs", "blob": "7e0a61ff48936528e6e01dfd6842e307279315f1", "line": 149, "symbol": "formula-codec-boundaries", "symbol_kind": "descriptive"},
+      "evidence": "MTEF/OMML raw codec lane."
+    },
+    {
+      "id": "0362ul70",
+      "package": "litchi-markdown",
+      "scope": "litchi_markdown::reader",
+      "disposition": "active_lane",
+      "source": {"path": "crates/litchi-markdown/src/reader/model.rs", "blob": "eda278d5375e7159b436d30c7c4e1062764bd0ca", "line": 493, "symbol": "markdown-reader-boundaries", "symbol_kind": "descriptive"},
+      "evidence": "Markdown reader policy classification lane."
+    },
+    {
+      "id": "0362ul44",
+      "package": "litchi-ods",
+      "scope": "litchi_ods",
+      "disposition": "active_lane",
+      "source": {"path": "crates/litchi-ods/src/model/tracked_changes/codec.rs", "blob": "da90747e26375ddb2c2ef288941fa06905c28bbc", "line": 927, "symbol": "odf-raw-codecs", "symbol_kind": "descriptive"},
+      "evidence": "Existing ODF raw-codec lane."
+    },
+    {
+      "id": "0362za",
+      "package": "litchi-fonts",
+      "scope": "litchi_fonts",
+      "disposition": "active_lane",
+      "source": {"path": "crates/litchi-fonts/src/lib.rs", "blob": "79ed4efa1bb6232334db8f0c86ce1fba6b8d156a", "line": 1, "symbol": "font-raw-boundaries", "symbol_kind": "descriptive"},
+      "evidence": "Existing font raw-boundary lane."
+    },
+    {
+      "id": "crypto-raw",
+      "package": "litchi-crypto",
+      "scope": "litchi_crypto",
+      "disposition": "active_lane",
+      "source": {"path": "crates/litchi-crypto/src/lib.rs", "blob": "facff6a69630e599e7e07ed6232136d1e61d03ee", "line": 1, "symbol": "crypto-raw-boundaries", "symbol_kind": "descriptive"},
+      "evidence": "Existing crypto raw-codec lane."
+    },
+    {
+      "id": "0362ul61",
+      "package": "litchi-pptx",
+      "scope": "litchi_pptx",
+      "disposition": "active_lane",
+      "source": {"path": "crates/litchi-pptx/src/lib.rs", "blob": "e5221a941af0a18eb0906ab490a1633265237e24", "line": 1, "symbol": "pptx-raw-shapes-motion", "symbol_kind": "descriptive"},
+      "evidence": "Existing PPTX raw shapes/motion lane."
+    },
+    {
+      "id": "0362ul62",
+      "package": "litchi-pptx",
+      "scope": "litchi_pptx",
+      "disposition": "active_lane",
+      "source": {"path": "crates/litchi-pptx/src/lib.rs", "blob": "e5221a941af0a18eb0906ab490a1633265237e24", "line": 1, "symbol": "pptx-raw-content", "symbol_kind": "descriptive"},
+      "evidence": "Existing PPTX raw content lane."
+    },
+    {
+      "id": "0362ul63",
+      "package": "litchi-pptx",
+      "scope": "litchi_pptx",
+      "disposition": "active_lane",
+      "source": {"path": "crates/litchi-pptx/src/lib.rs", "blob": "e5221a941af0a18eb0906ab490a1633265237e24", "line": 1, "symbol": "pptx-raw-properties", "symbol_kind": "descriptive"},
+      "evidence": "Existing PPTX raw properties lane."
+    }
+  ]
+}

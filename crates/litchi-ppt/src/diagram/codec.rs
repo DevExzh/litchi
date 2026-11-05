@@ -22,8 +22,12 @@ const MODE_OFFSET: usize = 40;
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn parse<'data>(build_list: &Record, drawing: &'data [u8]) -> Result<Inventory<'data>> {
-    parse_with_limits(build_list, drawing, Limits::default())
+pub fn parse<'data>(
+    build_list: &Record,
+    drawing: &'data [u8],
+    limits: &Limits,
+) -> Result<Inventory<'data>> {
+    parse_with_limits(build_list, drawing, *limits)
 }
 
 /// Parse a native diagram inventory with explicit resource ceilings.
@@ -31,13 +35,13 @@ pub fn parse<'data>(build_list: &Record, drawing: &'data [u8]) -> Result<Invento
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn parse_with_limits<'data>(
+pub(crate) fn parse_with_limits<'data>(
     build_list: &Record,
     drawing: &'data [u8],
     limits: Limits,
 ) -> Result<Inventory<'data>> {
     let builds = diagram_builds(build_list, limits)?;
-    let parsed_drawing = crate::odraw::parse_drawing(drawing)?;
+    let parsed_drawing = crate::odraw::parse_drawing(drawing, &crate::odraw::Limits::default())?;
     validate_shape_ids(&parsed_drawing)?;
 
     let mut diagrams = Vec::new();
@@ -65,8 +69,12 @@ pub fn parse_with_limits<'data>(
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn parse_bytes<'data>(build_list: &[u8], drawing: &'data [u8]) -> Result<Inventory<'data>> {
-    parse_bytes_with_limits(build_list, drawing, Limits::default())
+pub fn parse_bytes<'data>(
+    build_list: &[u8],
+    drawing: &'data [u8],
+    limits: &Limits,
+) -> Result<Inventory<'data>> {
+    parse_bytes_with_limits(build_list, drawing, *limits)
 }
 
 /// Parse one exact serialized `BuildList` record with explicit limits.
@@ -74,12 +82,45 @@ pub fn parse_bytes<'data>(build_list: &[u8], drawing: &'data [u8]) -> Result<Inv
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn parse_bytes_with_limits<'data>(
+pub(crate) fn parse_bytes_with_limits<'data>(
     build_list: &[u8],
     drawing: &'data [u8],
     limits: Limits,
 ) -> Result<Inventory<'data>> {
-    let (record, consumed) = Record::parse_strict(build_list, 0)?;
+    let source_limits = &crate::SourceLimits::default()
+        .to_builder()
+        .max_input_bytes(build_list.len())?
+        .max_record_bytes(build_list.len())?
+        .max_record_payload_bytes(build_list.len().saturating_sub(8))?
+        // `max_diagrams` is the semantic inventory ceiling, not a record
+        // parser event ceiling: one DiagramBuildContainer owns several
+        // records.  The encoded stream contains at least eight bytes per
+        // event header, so this is a finite parser-only upper bound that
+        // cannot reject a valid one-diagram shape because of the domain cap.
+        .max_events(
+            build_list
+                .len()
+                .checked_div(8)
+                .unwrap_or(0)
+                .clamp(1, crate::SourceLimits::MAX_EVENTS),
+        )?
+        .max_aggregate_bytes(build_list.len())?
+        // A strict PPT record parser charges every materialized child payload
+        // against the shared aggregate budget.  Child payloads overlap their
+        // container's bytes, so the encoded input length alone is too small
+        // even for the fixed DiagramBuild/BuildAtom/Atom shape.  Bound the
+        // overlap by the parser's depth ceiling while retaining the global
+        // aggregate-payload hard cap.
+        .max_aggregate_payload_bytes(
+            build_list
+                .len()
+                // Depth is inclusive (0..=MAX_DEPTH), so a path may account
+                // one payload at each of MAX_DEPTH + 1 levels.
+                .saturating_mul(crate::SourceLimits::MAX_DEPTH.saturating_add(1))
+                .min(crate::SourceLimits::MAX_AGGREGATE_PAYLOAD_BYTES),
+        )?
+        .build()?;
+    let (record, consumed) = Record::parse_strict_with_limits(build_list, 0, *source_limits)?;
     if consumed != build_list.len() {
         return Err(Error::Corrupted("BuildList has trailing bytes".to_string()));
     }

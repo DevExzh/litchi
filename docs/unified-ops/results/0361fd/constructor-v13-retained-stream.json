@@ -1,0 +1,51 @@
+{
+  "schema": "litchi.iwa-constructor-retained-stream.v1",
+  "status": "source repair evidence; constructor end-to-end qualification pending",
+  "source": {
+    "previous_commit": "bf1109b5b9",
+    "repair": "CanonicalHeaderProbe consumes cached canonical length delimiters and compares each current field in one walk; it no longer recomputes nested encoded lengths before emitting them.",
+    "post_measurement_source_change": "MessageInfoCollection::push_new now avoids duplicate minimal-profile structural admission; this does not affect the retained_validate route measured below."
+  },
+  "method": {
+    "tool": "valgrind --tool=callgrind",
+    "event": "Ir",
+    "route": "retained_validate",
+    "message_count": 8,
+    "iterations": 12000,
+    "fixture": "64 unknown fields and a noncanonical unknown varint in the retained header; setup outside timed loop",
+    "binaries": {
+      "base": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-target-base/release/iwa-constructor-probe",
+        "sha256": "cce613ebdc209e4b272e87396a6947cfb1d4ffcc53b5898bfec64cb00993109b"
+      },
+      "candidate": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-target-candidate/release/iwa-constructor-probe",
+        "sha256": "f4073989e903927ce4c0af31587044d8619a4af0f4323fdd2d68ffda949befb0",
+        "source_state": "worktree based on bf1109b5b9 before the final push_new-only simplification; retained validation source is identical."
+      }
+    },
+    "captures": {
+      "base": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v3/retained_validate-base-8-12000-v13.out",
+        "sha256": "6e30eedbea715a1e49fffcd36fcdb0c63732ae90c79286c9769e6d5506209360"
+      },
+      "candidate": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v3/retained_validate-candidate-8-12000-v13.out",
+        "sha256": "47b8346943f03a51064d9faba2c1655161667d0f45fec828104b9e10b6b035bb"
+      }
+    },
+    "calculation": "(Ir at 12000 - Ir at 2000) / 10000; the paired 2000-iteration legs were retained in the same external directory."
+  },
+  "results": {
+    "base_ir": 110434841,
+    "candidate_ir": 90507877,
+    "candidate_over_base": 0.819,
+    "candidate_json": {
+      "checksum": 11931,
+      "output_bytes": 8556,
+      "output_sha256": "7bc9a96f894c2361619db11643c80373d56202f07e376de6930ecdadce0146af"
+    },
+    "interpretation": "The prior 1.030 retained-validation return is removed in this matched instruction count. Native latency remains unqualified."
+  },
+  "pending": "Run the updated end-to-end archive_info probe with MessageInfoCollection::push_new when the coordinator opens a quiet build window; do not treat the earlier generic push(MessageInfo) probe (107689426 Ir versus 27558801 base at N=8) as acceptance evidence."
+}

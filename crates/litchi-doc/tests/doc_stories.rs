@@ -39,7 +39,7 @@
 
 use litchi_doc::header_footer::HeaderFooter;
 use litchi_doc::parts::headers::HeaderFooterType;
-use litchi_doc::{Document, Package};
+use litchi_doc::{Document, raw::Reader};
 use std::path::PathBuf;
 
 fn fixture(name: &str) -> PathBuf {
@@ -48,8 +48,8 @@ fn fixture(name: &str) -> PathBuf {
         .join(name)
 }
 
-fn open(path: PathBuf) -> Package {
-    Package::open(&path).unwrap_or_else(|error| panic!("open {}: {error}", path.display()))
+fn open(path: PathBuf) -> Reader {
+    Reader::open(&path).unwrap_or_else(|error| panic!("open {}: {error}", path.display()))
 }
 
 fn story_text(stories: &[HeaderFooter], story_type: HeaderFooterType) -> Option<&str> {
@@ -309,7 +309,7 @@ fn document_with_truncated_table_stream() -> Option<Document> {
     // table-anchored structure (PlcfHdd, note and comment PLCs) runs past
     // the stream bounds.
     let path = fixture("DiffFirstPageHeadFoot.doc");
-    let mut package = Package::open(path).unwrap();
+    let mut package = Reader::open(path).unwrap();
     let document = package.document().unwrap();
     let word_document = document.word_document().to_vec();
 
@@ -321,7 +321,7 @@ fn document_with_truncated_table_stream() -> Option<Document> {
     let mut cursor = std::io::Cursor::new(Vec::new());
     writer.write_to(&mut cursor).unwrap();
 
-    let mut reopened = Package::from_reader(std::io::Cursor::new(cursor.into_inner())).ok()?;
+    let mut reopened = Reader::from_reader(std::io::Cursor::new(cursor.into_inner())).ok()?;
     reopened.document().ok()
 }
 
@@ -341,12 +341,12 @@ fn truncated_table_stream_is_rejected_without_panicking() {
 #[test]
 fn garbage_bytes_are_rejected_without_panicking() {
     let garbage = vec![0xA5u8; 4096];
-    assert!(Package::from_reader(std::io::Cursor::new(garbage)).is_err());
+    assert!(Reader::from_reader(std::io::Cursor::new(garbage)).is_err());
 
     let path = fixture("ThreeColHead.doc");
     let mut truncated = std::fs::read(path).unwrap();
     truncated.truncate(truncated.len() / 2);
-    if let Ok(mut package) = Package::from_reader(std::io::Cursor::new(truncated)) {
+    if let Ok(mut package) = Reader::from_reader(std::io::Cursor::new(truncated)) {
         // If CFB parsing tolerates the truncation, document parsing must
         // still fail gracefully instead of panicking.
         let _ = package.document();

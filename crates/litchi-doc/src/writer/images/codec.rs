@@ -4,8 +4,9 @@ use super::super::core::WriteError;
 use super::model::{FloatingShapeContent, FloatingShapeInfo, Picture};
 use super::validation::metafile_bounds;
 use crate::parts::spa::SPA_LEN;
-use litchi_odraw::image::Point;
-use litchi_odraw::image::write::{BlipBuilder, digest};
+use litchi_odraw::image::builder::BlipBuilder;
+use litchi_odraw::image::write::digest;
+use litchi_odraw::image::{Limits as ImageLimits, Point};
 
 /// Size of the PICF picture descriptor header ([MS-DOC] 2.9.161).
 pub(super) const PICF_HEADER_LEN: usize = 0x44;
@@ -218,7 +219,11 @@ fn write_shape_container(out: &mut Vec<u8>, shape_id: u32) {
 /// Append an `OfficeArtFBSE` record with the embedded `OfficeArtBlip` record for
 /// a picture. Used both for the Data-stream picture blocks and for the
 /// `BStoreContainer` inside the drawing group of floating pictures.
-fn write_bse_with_embedded_blip(out: &mut Vec<u8>, picture: &Picture) -> Result<(), WriteError> {
+fn write_bse_with_embedded_blip(
+    out: &mut Vec<u8>,
+    picture: &Picture,
+    limits: ImageLimits,
+) -> Result<(), WriteError> {
     let blip = picture_blip(picture)?;
     let blip_record_len = blip.wire_len()?;
     let bse_payload_len = u32::try_from(BSE_HEADER_LEN)
@@ -245,7 +250,7 @@ fn write_bse_with_embedded_blip(out: &mut Vec<u8>, picture: &Picture) -> Result<
     out.push(0); // unused2
     out.push(0); // unused3
 
-    blip.write(out)?;
+    blip.write(out, limits)?;
     Ok(())
 }
 
@@ -255,6 +260,7 @@ pub(crate) fn write_picture_block(
     picture: &Picture,
     shape_id: u32,
     out: &mut Vec<u8>,
+    limits: ImageLimits,
 ) -> Result<(), WriteError> {
     let blip_record_len = picture_blip(picture)?.wire_len()?;
     let bse_payload_len = u32::try_from(BSE_HEADER_LEN)
@@ -272,7 +278,7 @@ pub(crate) fn write_picture_block(
         .ok_or_else(|| WriteError::InvalidData("DOC picture block exceeds u32".to_string()))?;
     write_picf(out, picture, lcb);
     write_shape_container(out, shape_id);
-    write_bse_with_embedded_blip(out, picture)?;
+    write_bse_with_embedded_blip(out, picture, limits)?;
 
     let actual = out
         .len()
@@ -438,6 +444,7 @@ pub(crate) fn build_dgg_info(
     main_shapes: &[FloatingShapeInfo<'_>],
     header_shapes: &[FloatingShapeInfo<'_>],
     allocated_main_shapes: u32,
+    limits: ImageLimits,
 ) -> Result<Vec<u8>, WriteError> {
     let mut out = Vec::new();
 
@@ -505,7 +512,7 @@ pub(crate) fn build_dgg_info(
     );
     for shape in main_shapes.iter().chain(header_shapes.iter()) {
         if let FloatingShapeContent::Picture(picture) = shape.content {
-            write_bse_with_embedded_blip(&mut out, picture)?;
+            write_bse_with_embedded_blip(&mut out, picture, limits)?;
         }
     }
     patch_record_len(&mut out, bstore_start);

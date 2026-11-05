@@ -27,13 +27,16 @@ on:
       - 'crates/litchi-ole-common/**'
       - 'crates/litchi-ooxml-common/**'
       - 'crates/litchi-opc/**'
+      - 'crates/litchi-ops/**'
       - 'crates/litchi-ppt/**'
       - 'crates/litchi-pptx/**'
       - 'crates/litchi-rtf/**'
       - 'crates/litchi-sheet/**'
+      - 'crates/litchi-sheet-text/**'
       - 'crates/litchi-sign/**'
       - 'crates/litchi-spreadsheet-drawing/**'
       - 'crates/litchi-vba/**'
+      - 'crates/litchi-xldm/**'
       - 'crates/litchi-xls/**'
       - 'crates/litchi-xlsb/**'
       - 'crates/litchi-xlsx/**'
@@ -110,13 +113,16 @@ on:
       - 'crates/litchi-ole-common/**'
       - 'crates/litchi-ooxml-common/**'
       - 'crates/litchi-opc/**'
+      - 'crates/litchi-ops/**'
       - 'crates/litchi-ppt/**'
       - 'crates/litchi-pptx/**'
       - 'crates/litchi-rtf/**'
       - 'crates/litchi-sheet/**'
+      - 'crates/litchi-sheet-text/**'
       - 'crates/litchi-sign/**'
       - 'crates/litchi-spreadsheet-drawing/**'
       - 'crates/litchi-vba/**'
+      - 'crates/litchi-xldm/**'
       - 'crates/litchi-xls/**'
       - 'crates/litchi-xlsb/**'
       - 'crates/litchi-xlsx/**'
@@ -232,6 +238,8 @@ jobs:
 
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: clippy, rustfmt
 
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
@@ -239,10 +247,13 @@ jobs:
           workspaces: tools/perf-baseline -> ${{ runner.temp }}/litchi-perf-target
           cache-target: false
 
+      # Record 0272: no other job lints the standalone harness, and its
+      # findings had accumulated unnoticed.
       - name: Check standalone harness
         run: |
           cargo fmt --manifest-path "$PERF_MANIFEST" -- --check
           cargo check --locked --manifest-path "$PERF_MANIFEST"
+          cargo clippy --locked --manifest-path "$PERF_MANIFEST" --all-targets -- -D warnings
           cargo test --locked --manifest-path "$PERF_MANIFEST"
 
       - name: Run real-producer security correctness corpus

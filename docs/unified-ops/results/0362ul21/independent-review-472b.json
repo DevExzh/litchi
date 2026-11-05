@@ -1,0 +1,149 @@
+{
+  "schema": "litchi.api-capture.independent-review.v2",
+  "verified_utc": "2026-10-24T18:20:53Z",
+  "scope": "read-only verification; no Cargo command or source edit",
+  "capture": {
+    "root": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547",
+    "status": "complete",
+    "phase": "complete",
+    "package_count": 68,
+    "captured": 68,
+    "reused": 0,
+    "source_commit": "472b6705475b073e7fe08f6e11ee17fb1e29f838",
+    "source_tree": "ebc1cee05f124c0c63977aff07a23288c19e7d00",
+    "source_clean": true,
+    "cargo_toml_sha256": "f5ec007892023b38f1deaef1ce20714db58b58448a3bea088be3b847b84570de",
+    "cargo_lock": {
+      "bytes": 139606,
+      "sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1"
+    },
+    "package_set_sha256": "afeface99e189880df1fea08aa4426b5ef10fa77b23f1a279bf665a20a1cdd8f",
+    "capture_command": "env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 RUST_TEST_THREADS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_NET_OFFLINE=true LC_ALL=C CARGO_TARGET_DIR=$CAP/target TMPDIR=$CAP/output/tmp python3 $SOURCE/tools/final_api_inventory.py --root $SOURCE --output $CAP/output --target-dir $CAP/target --cargo /home/zhuhe/code/litchi-worktrees/.coord/bin/cargo --no-reuse",
+    "output_files": {
+      "run.json": {"bytes": 2103, "sha256": "0bbb223325f181f996c0d6b3f42ff2e769c390a75b12468b5265d9b55ca24f61"},
+      "packages.json": {"bytes": 15728, "sha256": "64138cbadf11856610c3d9b8261f3164d9a76290256131f59af3a36db4fcea4c"},
+      "inventory.tsv": {"bytes": 10174, "sha256": "161754e5dbe5b7d149b8631a507e6c1a1b222bf2b780e14f84cb48cdec5039c8"},
+      "disposition.tsv": {"bytes": 12634, "sha256": "57d486415c0e940160a3e0ed29bee08b79b14b013773973a06827e2b17445529"},
+      "capture.stdout.log": {"bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+      "inventory.stderr.log": {"bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}
+    },
+    "artifact_total_bytes": 1098606755,
+    "receipt_audit": {
+      "receipt_files": 68,
+      "inventory_files": 68,
+      "status_ok": 68,
+      "source_commit_matches": 68,
+      "lock_matches": 68,
+      "manifest_hash_matches": 68,
+      "artifact_exists_bytes_sha_matches": 68,
+      "artifact_json_parseable": 68,
+      "required_all_features_offline_locked_document_hidden_items": 68,
+      "logs_present": 68,
+      "log_audit": {
+        "entries": 204,
+        "unique_files": 204,
+        "stdout_stderr_time_logs": "68 each; all paths are within output/logs and names match package",
+        "time_logs_contain_rss": 68,
+        "aggregate_bytes": 148718,
+        "sha256_manifest": "f018d30c1890eafb84ac4f73bf22acebd7a39372db57194917dcea22898f7a28"
+      },
+      "max_target_post_bytes": 3748156727,
+      "max_peak_rss_bytes": 2996432896,
+      "target_hard_cap_bytes": 20000000000,
+      "rss_hard_cap_bytes": 20000000000
+    }
+  },
+  "inventory_and_disposition": {
+    "fresh_rows": 84,
+    "fresh_inventory_byte_equal_0362ul14_inventory_082": true,
+    "new_rows": 0,
+    "blank_scaffold": {
+      "path": "output/disposition.tsv",
+      "rows": 84,
+      "decision_counts": {"UNASSIGNED_REQUIRED_REVIEW": 84},
+      "blank_evidence": 84,
+      "blank_owner": 84,
+      "accepted_as_review": false
+    },
+    "reviewed_disposition": {
+      "path": "source/docs/unified-ops/results/0362ul14/reviewed-disposition-082.tsv",
+      "sha256": "3b0d48c38a4cc53e319c720d5e5ef4a1378631b10de5ec13190b03f5d3ad1a3e",
+      "rows": 84,
+      "identity_keys_match_fresh_inventory": true,
+      "validator": "validated 84 disposition rows; no approval inferred",
+      "decision_counts": {
+        "RAW_READER_METHOD": 38,
+        "WIRE_SCHEMA": 26,
+        "WIRE_REQUEST": 7,
+        "COMPOSITION_DESCRIPTOR": 4,
+        "OPC_SOURCE_PLAN_DESCRIPTOR": 4,
+        "AST_VALUE": 2,
+        "RAW_ARCHIVE_DESCRIPTOR": 1,
+        "RAW_WIRE_DESCRIPTOR": 1,
+        "OPC_XML_SPLICE_DESCRIPTOR": 1
+      }
+    }
+  },
+  "source_role_review": {
+    "historical_review": "source/docs/unified-ops/results/0362ul14/source-role-review.json",
+    "historical_review_sha256": "b15dfc42d36015e7811f6d9b8c4161b5a9fe1a50f7b8d5f4499bfeea37f5eb43",
+    "proof_rows": 84,
+    "unique_proof_source_paths": 21,
+    "unchanged_proof_entries": 81,
+    "changed_proof_entries": 3,
+    "missing_proof_entries": 0,
+    "changed_path": {
+      "path": "crates/litchi-iwa-protos/src/numbers_table_cell_storage_codec.rs",
+      "old_sha256": "3752c7a97c805d8ff94b875efa9a90dc92bcabf82d6d2b74646747df843bc415",
+      "current_sha256": "a1fadd3117237317441ca953e0d7f3a63a8d3c4da0d9e5b94cd245723a098c18",
+      "affected_rows": 3,
+      "review": "The 40-line diff removes six obsolete public Reference-suffix aliases/forwarders only. Canonical ControlCellSpecTableReferenceEdit, HeaderSizeEdit, TableDataListEntryRefCountEdit and prepare/rewrite routes remain; all three WIRE_REQUEST roles are unchanged."
+    },
+    "current_source_role_verdict": "all 84 reviewed roles remain bound; one changed path independently rechecked"
+  },
+  "residual_repairs": {
+    "docx_artifact_stream": {
+      "receipt": "source/docs/unified-ops/results/0362ul19/validation-receipt.json",
+      "receipt_sha256": "30b137b140961d2cbf98b05951ef12a9baecb5777b9a435f57527a6b71edeb83",
+      "tested_commit": "b4fc4ea3700f74964fa63d2feb6cd84ca0e87276",
+      "tested_commit_is_ancestor_of_capture": true,
+      "lock_sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
+      "validated_source_file_hashes_current": "all exact",
+      "results": "OPC artifact-stream tests 9/9, focused DOCX stream consumer 1, OPC/DOCX all-target/all-feature check, OPC/DOCX minimal/full glossary, and corrected soapberry scope profile pass"
+    },
+    "historical_supplemental": {
+      "record": "source/docs/unified-ops/results/0362ul18/glossary-sweep.json",
+      "record_sha256": "cc65ba2a976bce389c731a905e2e90b6f4370d8024da24970eb886a66246a12e",
+      "source_commit": "a3ec9799939071d535925133c483bc998aa9667c",
+      "scope": "historical 59-profile sweep; not used as current acceptance"
+    }
+  },
+  "supplemental_glossary_current": {
+    "root": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-glossary-472b670547-20261024-1819",
+    "source_commit": "472b6705475b073e7fe08f6e11ee17fb1e29f838",
+    "policy_sha256": "ccd0b4abe58d2d6eb46a54269bfaccd5cf24e27128166c3605c9e6016dd79887",
+    "checker_sha256": "7f36d39ada53f95ac457237f7d9d77eab4c2f93ea7c714a79ad438c7c7436e48",
+    "profile_count": 59,
+    "passed": 58,
+    "failed": 1,
+    "results_tsv": {"bytes": 56118, "sha256": "8f1ede1b07946716ec2a2c1d7f24dbe6fd8f0043d3381853dd0a0df1ca091f60"},
+    "provenance_txt": {"bytes": 1007, "sha256": "9266ae2171b8964eb17c1a03347750147c7e2ca6a29793a4c8bcdcec5de07718"},
+    "profiles_tsv": {"bytes": 1387, "sha256": "c7b5ff9265ed5bfde1bb0cb4caf7a04b39069df0fb1a643e217db8659a50fb3a"},
+    "failed_profile": {
+      "id": "keynote-minimal",
+      "package": "litchi-keynote",
+      "finding": "__invalidate_slide_preview exposes banned name Limits",
+      "classification": "known internal-iwork-source feature/profile mismatch; keynote-full passes; no source or policy waiver"
+    },
+    "targeted_profiles_passed": ["opc-minimal", "opc-full", "docx-minimal", "docx-full", "soapberry-zip"]
+  },
+  "verdict": {
+    "capture_protocol": "READY",
+    "source_role_and_reviewed_disposition": "READY_FROM_PRIOR_REVIEW_REVALIDATED",
+    "blank_scaffold_is_not_acceptance": true,
+    "remaining_feature_minimal_gate_boundary": [
+      "keynote-minimal supplemental mismatch remains a known feature/profile finding",
+      "feature-specific full gate and native/performance/ABBA gates are outside this API-capture receipt"
+    ]
+  }
+}

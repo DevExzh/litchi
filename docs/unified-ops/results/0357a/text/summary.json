@@ -1,0 +1,148 @@
+{
+  "probe": {
+    "after/primary": {
+      "runs": 20,
+      "written_bytes": 184320,
+      "max_rss_kb_median": 6242.0,
+      "max_rss_kb_range": [
+        6076,
+        6432
+      ],
+      "open_us": 27.2,
+      "edit_commit_us": 551.0,
+      "commit_us": 40.3,
+      "write_to_us": 2.2,
+      "total_us": 579.7
+    },
+    "after/text": {
+      "runs": 20,
+      "written_bytes": 168448,
+      "max_rss_kb_median": 5010.0,
+      "max_rss_kb_range": [
+        4960,
+        5304
+      ],
+      "open_us": 22.8,
+      "edit_commit_us": 827.8,
+      "commit_us": 520.4,
+      "write_to_us": 5.2,
+      "total_us": 856.1
+    },
+    "before/primary": {
+      "runs": 20,
+      "written_bytes": 184320,
+      "max_rss_kb_median": 6074.0,
+      "max_rss_kb_range": [
+        5856,
+        6316
+      ],
+      "open_us": 27.3,
+      "edit_commit_us": 549.5,
+      "commit_us": 40.6,
+      "write_to_us": 2.2,
+      "total_us": 579.1
+    }
+  },
+  "range_source": {
+    "ppt_owned_source_control_open": {
+      "before": {
+        "runs": 10,
+        "p50_us": 179.7,
+        "p95_us": 187.4,
+        "read_calls": [
+          "10"
+        ],
+        "read_bytes": [
+          "344064"
+        ]
+      },
+      "after": {
+        "runs": 10,
+        "p50_us": 179.6,
+        "p95_us": 186.5,
+        "read_calls": [
+          "10"
+        ],
+        "read_bytes": [
+          "344064"
+        ]
+      },
+      "after_over_before_p50": 0.999
+    },
+    "ppt_owned_source_control_open_one_shape_text": {
+      "before": {
+        "runs": 10,
+        "p50_us": 304.4,
+        "p95_us": 313.5,
+        "read_calls": [
+          "47"
+        ],
+        "read_bytes": [
+          "360875"
+        ]
+      },
+      "after": {
+        "runs": 10,
+        "p50_us": 304.5,
+        "p95_us": 313.3,
+        "read_calls": [
+          "47"
+        ],
+        "read_bytes": [
+          "360875"
+        ]
+      },
+      "after_over_before_p50": 1.0
+    },
+    "ppt_range_source_open": {
+      "before": {
+        "runs": 10,
+        "p50_us": 18258.9,
+        "p95_us": 18290.8,
+        "read_calls": [
+          "14"
+        ],
+        "read_bytes": [
+          "344064"
+        ]
+      },
+      "after": {
+        "runs": 10,
+        "p50_us": 18269.6,
+        "p95_us": 18284.6,
+        "read_calls": [
+          "14"
+        ],
+        "read_bytes": [
+          "344064"
+        ]
+      },
+      "after_over_before_p50": 1.001
+    },
+    "ppt_range_source_open_one_shape_text": {
+      "before": {
+        "runs": 10,
+        "p50_us": 57644.3,
+        "p95_us": 59431.6,
+        "read_calls": [
+          "51"
+        ],
+        "read_bytes": [
+          "360875"
+        ]
+      },
+      "after": {
+        "runs": 10,
+        "p50_us": 57689.6,
+        "p95_us": 60655.6,
+        "read_calls": [
+          "51"
+        ],
+        "read_bytes": [
+          "360875"
+        ]
+      },
+      "after_over_before_p50": 1.001
+    }
+  }
+}

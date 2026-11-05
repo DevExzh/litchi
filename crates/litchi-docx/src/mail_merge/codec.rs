@@ -34,13 +34,16 @@ impl Settings {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn to_xml(&self, conformance: Conformance) -> Result<String> {
+    pub fn to_xml(&self, conformance: Conformance, limits: &MceLimits) -> Result<String> {
         validate_model(self)?;
-        let mut xml = format!(
+        let output_len = settings_output_len(self, conformance)?;
+        check_output_bytes(output_len, limits)?;
+        let mut xml = String::with_capacity(output_len);
+        xml.push_str(&format!(
             r#"<w:mailMerge xmlns:w="{}" xmlns:r="{}">"#,
             conformance.word(),
             conformance.relationships()
-        );
+        ));
         if self.main_document_type != MainDocumentType::FormLetters {
             value_leaf(
                 &mut xml,
@@ -90,6 +93,7 @@ impl Settings {
             write_odso(&mut xml, odso);
         }
         xml.push_str("</w:mailMerge>");
+        debug_assert_eq!(xml.len(), output_len);
         Ok(xml)
     }
 }
@@ -99,8 +103,8 @@ impl Recipients {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn parse_xml(xml: &[u8]) -> Result<Self> {
-        let root = parse_tree(xml)?;
+    pub fn parse_xml(xml: &[u8], limits: &MceLimits) -> Result<Self> {
+        let root = parse_tree(xml, limits)?;
         require_word_element(&root, "recipients")?;
         ensure_no_schema_attrs(&root)?;
         let mut recipients = Vec::new();
@@ -118,7 +122,11 @@ impl Recipients {
                 )));
             }
             if recipients.len() >= MAX_RECIPIENTS {
-                return Err(invalid("too many mail-merge recipients"));
+                return Err(Error::MailMergeLimit {
+                    kind: crate::mail_merge::LimitKind::Recipients,
+                    actual: (recipients.len()).saturating_add(1),
+                    maximum: MAX_RECIPIENTS,
+                });
             }
             recipients.push(parse_recipient(child)?);
         }
@@ -129,11 +137,21 @@ impl Recipients {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn to_xml(&self, conformance: Conformance) -> Result<String> {
+    pub fn to_xml(&self, conformance: Conformance, limits: &MceLimits) -> Result<String> {
         if self.recipients.len() > MAX_RECIPIENTS {
-            return Err(invalid("too many mail-merge recipients"));
+            return Err(Error::MailMergeLimit {
+                kind: crate::mail_merge::LimitKind::Recipients,
+                actual: self.recipients.len(),
+                maximum: MAX_RECIPIENTS,
+            });
         }
-        let mut xml = format!(r#"<w:recipients xmlns:w="{}">"#, conformance.word());
+        let output_len = recipients_output_len(self, conformance)?;
+        check_output_bytes(output_len, limits)?;
+        let mut xml = String::with_capacity(output_len);
+        xml.push_str(&format!(
+            r#"<w:recipients xmlns:w="{}">"#,
+            conformance.word()
+        ));
         for recipient in &self.recipients {
             xml.push_str("<w:recipientData>");
             if !recipient.active {
@@ -156,6 +174,7 @@ impl Recipients {
             xml.push_str("</w:recipientData>");
         }
         xml.push_str("</w:recipients>");
+        debug_assert_eq!(xml.len(), output_len);
         Ok(xml)
     }
 }
@@ -164,8 +183,8 @@ impl Recipients {
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn parse_settings_mail_merge(xml: &[u8]) -> Result<Option<Settings>> {
-    parse_settings_mail_merge_with_mce_limits(xml, &MceLimits::default())
+pub fn parse_settings_mail_merge(xml: &[u8], limits: &MceLimits) -> Result<Option<Settings>> {
+    parse_settings_mail_merge_with_mce_limits(xml, limits)
 }
 
 /// Parse settings mail-merge metadata with a caller-owned MCE resource
@@ -175,8 +194,8 @@ pub(crate) fn parse_settings_mail_merge_with_mce_limits(
     xml: &[u8],
     limits: &MceLimits,
 ) -> Result<Option<Settings>> {
-    let processed = process_markup_compatibility(xml, &Capabilities::default(), limits)
-        .map_err(|error| invalid(format!("mail-merge MCE error: {error}")))?;
+    let processed =
+        process_markup_compatibility(xml, &Capabilities::default(), limits).map_err(Error::Mce)?;
     parse_settings_mail_merge_processed(processed.xml.as_ref())
 }
 
@@ -417,7 +436,11 @@ fn parse_odso(node: &Node) -> Result<DataSourceObject> {
             5 => value.first_row_header = on_off(child)?,
             6 => {
                 if value.field_maps.len() >= MAX_FIELD_MAPS {
-                    return Err(invalid("too many odso field maps"));
+                    return Err(Error::MailMergeLimit {
+                        kind: crate::mail_merge::LimitKind::FieldMaps,
+                        actual: (value.field_maps.len()).saturating_add(1),
+                        maximum: MAX_FIELD_MAPS,
+                    });
                 }
                 value.field_maps.push(parse_field_map(child)?);
             },
@@ -573,8 +596,259 @@ fn validate_model(value: &Settings) -> Result<()> {
     if let Some(odso) = &value.odso
         && odso.field_maps.len() > MAX_FIELD_MAPS
     {
-        return Err(invalid("too many odso field maps"));
+        return Err(Error::MailMergeLimit {
+            kind: crate::mail_merge::LimitKind::FieldMaps,
+            actual: odso.field_maps.len(),
+            maximum: MAX_FIELD_MAPS,
+        });
     }
+    for (description, string) in [
+        (
+            "data-source relationship id",
+            value.data_source_relationship_id.as_deref(),
+        ),
+        (
+            "header-source relationship id",
+            value.header_source_relationship_id.as_deref(),
+        ),
+    ] {
+        validate_relationship_id(description, string)?;
+    }
+    if let Some(odso) = &value.odso {
+        for (description, string) in [
+            ("odso udl", odso.udl.as_deref()),
+            ("odso table", odso.table.as_deref()),
+            ("odso source type", odso.source_type.as_deref()),
+            (
+                "odso source relationship id",
+                odso.source_relationship_id.as_deref(),
+            ),
+            (
+                "odso recipient-data relationship id",
+                odso.recipient_data_relationship_id.as_deref(),
+            ),
+        ] {
+            if description.ends_with("relationship id") {
+                validate_relationship_id(description, string)?;
+            } else {
+                validate_string(description, string)?;
+            }
+        }
+        for field in &odso.field_maps {
+            for (description, string) in [
+                ("field-map name", field.name.as_deref()),
+                ("mapped field name", field.mapped_name.as_deref()),
+                ("field-map language", field.language_id.as_deref()),
+            ] {
+                validate_string(description, string)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_string(description: &str, value: Option<&str>) -> Result<()> {
+    if value.is_some_and(|text| text.len() > MAX_STRING_BYTES) {
+        return Err(invalid(format!("{description} is too large")));
+    }
+    Ok(())
+}
+
+fn validate_relationship_id(description: &str, value: Option<&str>) -> Result<()> {
+    if value.is_some_and(|text| text.is_empty() || text.len() > MAX_RELATIONSHIP_ID_BYTES) {
+        return Err(invalid(format!("{description} has invalid length")));
+    }
+    Ok(())
+}
+
+fn settings_output_len(value: &Settings, conformance: Conformance) -> Result<usize> {
+    let mut length = format!(
+        r#"<w:mailMerge xmlns:w="{}" xmlns:r="{}">"#,
+        conformance.word(),
+        conformance.relationships()
+    )
+    .len();
+    if value.main_document_type != MainDocumentType::FormLetters {
+        add_value_leaf_len(
+            &mut length,
+            "mainDocumentType",
+            value.main_document_type.as_str(),
+        )?;
+    }
+    add_on_off_len(&mut length, "linkToQuery", value.link_to_query)?;
+    if let Some(data_type) = value.data_type {
+        add_value_leaf_len(&mut length, "dataType", data_type.as_str())?;
+    }
+    add_optional_string_leaf_len(
+        &mut length,
+        "connectString",
+        value.connect_string.as_deref(),
+    )?;
+    add_optional_string_leaf_len(&mut length, "query", value.query.as_deref())?;
+    add_relationship_leaf_len(
+        &mut length,
+        "dataSource",
+        value.data_source_relationship_id.as_deref(),
+    )?;
+    add_relationship_leaf_len(
+        &mut length,
+        "headerSource",
+        value.header_source_relationship_id.as_deref(),
+    )?;
+    add_on_off_len(
+        &mut length,
+        "doNotSuppressBlankLines",
+        value.do_not_suppress_blank_lines,
+    )?;
+    if value.destination != Destination::NewDocument {
+        add_value_leaf_len(&mut length, "destination", value.destination.as_str())?;
+    }
+    add_optional_string_leaf_len(
+        &mut length,
+        "addressFieldName",
+        value.address_field_name.as_deref(),
+    )?;
+    add_optional_string_leaf_len(&mut length, "mailSubject", value.mail_subject.as_deref())?;
+    add_on_off_len(&mut length, "mailAsAttachment", value.mail_as_attachment)?;
+    add_on_off_len(&mut length, "viewMergedData", value.view_merged_data)?;
+    if value.active_record != 1 {
+        let text = value.active_record.to_string();
+        add_value_leaf_len(&mut length, "activeRecord", &text)?;
+    }
+    if value.check_errors != 2 {
+        let text = value.check_errors.to_string();
+        add_value_leaf_len(&mut length, "checkErrors", &text)?;
+    }
+    if let Some(odso) = &value.odso {
+        add_odso_len(&mut length, odso)?;
+    }
+    add_len(&mut length, b"</w:mailMerge>".len())?;
+    Ok(length)
+}
+
+fn add_odso_len(length: &mut usize, value: &DataSourceObject) -> Result<()> {
+    add_len(length, b"<w:odso>".len())?;
+    add_optional_string_leaf_len(length, "udl", value.udl.as_deref())?;
+    add_optional_string_leaf_len(length, "table", value.table.as_deref())?;
+    add_relationship_leaf_len(length, "src", value.source_relationship_id.as_deref())?;
+    if let Some(column) = value.column_delimiter {
+        let text = column.to_string();
+        add_value_leaf_len(length, "colDelim", &text)?;
+    }
+    add_optional_string_leaf_len(length, "type", value.source_type.as_deref())?;
+    add_on_off_len(length, "fHdr", value.first_row_header)?;
+    for field in &value.field_maps {
+        add_len(length, b"<w:fieldMapData>".len())?;
+        if let Some(mapping_type) = field.mapping_type {
+            add_value_leaf_len(length, "type", mapping_type.as_str())?;
+        }
+        add_optional_string_leaf_len(length, "name", field.name.as_deref())?;
+        add_optional_string_leaf_len(length, "mappedName", field.mapped_name.as_deref())?;
+        if let Some(column) = field.column {
+            let text = column.to_string();
+            add_value_leaf_len(length, "column", &text)?;
+        }
+        add_optional_string_leaf_len(length, "lid", field.language_id.as_deref())?;
+        add_on_off_len(length, "dynamicAddress", field.dynamic_address)?;
+        add_len(length, b"</w:fieldMapData>".len())?;
+    }
+    add_relationship_leaf_len(
+        length,
+        "recipientData",
+        value.recipient_data_relationship_id.as_deref(),
+    )?;
+    add_len(length, b"</w:odso>".len())
+}
+
+fn recipients_output_len(value: &Recipients, conformance: Conformance) -> Result<usize> {
+    let mut length = format!(r#"<w:recipients xmlns:w="{}">"#, conformance.word()).len();
+    for recipient in &value.recipients {
+        add_len(&mut length, b"<w:recipientData>".len())?;
+        if !recipient.active {
+            add_len(&mut length, br#"<w:active w:val="0"/>"#.len())?;
+        }
+        if let Some(column) = recipient.column {
+            if column < 0 {
+                return Err(invalid("mail-merge recipient column cannot be negative"));
+            }
+            let text = column.to_string();
+            add_value_leaf_len(&mut length, "column", &text)?;
+        }
+        if let Some(tag) = &recipient.unique_tag {
+            if tag.is_empty() || tag.len() > MAX_UNIQUE_TAG_BYTES {
+                return Err(invalid(
+                    "mail-merge recipient unique tag has invalid length",
+                ));
+            }
+            let encoded = tag
+                .len()
+                .checked_add(2)
+                .ok_or_else(|| invalid("mail-merge recipient unique tag is too large"))?
+                / 3
+                * 4;
+            add_len(&mut length, b"<w:uniqueTag w:val=\"".len())?;
+            add_len(&mut length, encoded)?;
+            add_len(&mut length, b"\"/>".len())?;
+        }
+        add_len(&mut length, b"</w:recipientData>".len())?;
+    }
+    add_len(&mut length, b"</w:recipients>".len())?;
+    Ok(length)
+}
+
+fn add_value_leaf_len(length: &mut usize, name: &str, value: &str) -> Result<()> {
+    add_len(length, b"<w:".len())?;
+    add_len(length, name.len())?;
+    add_len(length, b" w:val=\"".len())?;
+    add_len(length, escaped_len(value)?)?;
+    add_len(length, b"\"/>".len())
+}
+
+fn add_optional_string_leaf_len(length: &mut usize, name: &str, value: Option<&str>) -> Result<()> {
+    if let Some(value) = value {
+        add_value_leaf_len(length, name, value)?;
+    }
+    Ok(())
+}
+
+fn add_relationship_leaf_len(length: &mut usize, name: &str, value: Option<&str>) -> Result<()> {
+    if let Some(value) = value {
+        add_len(length, b"<w:".len())?;
+        add_len(length, name.len())?;
+        add_len(length, b" r:id=\"".len())?;
+        add_len(length, escaped_len(value)?)?;
+        add_len(length, b"\"/>".len())?;
+    }
+    Ok(())
+}
+
+fn add_on_off_len(length: &mut usize, name: &str, value: bool) -> Result<()> {
+    if value {
+        add_len(length, b"<w:".len())?;
+        add_len(length, name.len())?;
+        add_len(length, b"/>".len())?;
+    }
+    Ok(())
+}
+
+fn escaped_len(value: &str) -> Result<usize> {
+    value.chars().try_fold(0usize, |length, character| {
+        let extra = match character {
+            '&' => 5,
+            '<' | '>' => 4,
+            '"' | '\'' => 6,
+            _ => character.len_utf8(),
+        };
+        length
+            .checked_add(extra)
+            .ok_or_else(|| invalid("mail-merge XML output length overflow"))
+    })
+}
+
+fn add_len(length: &mut usize, value: usize) -> Result<()> {
+    *length = length
+        .checked_add(value)
+        .ok_or_else(|| invalid("mail-merge XML output length overflow"))?;
     Ok(())
 }
 
@@ -686,10 +960,21 @@ impl Node {
     clippy::collapsible_match,
     reason = "separate arms document distinct OOXML states"
 )]
-fn parse_tree(xml: &[u8]) -> Result<Node> {
-    let processed = litchi_ooxml_common::mce::process_ooxml(xml)
-        .map_err(|error| invalid(format!("mail-merge MCE error: {error}")))?;
-    parse_tree_processed(processed.as_ref())
+fn parse_tree(xml: &[u8], limits: &MceLimits) -> Result<Node> {
+    let processed =
+        process_markup_compatibility(xml, &Capabilities::default(), limits).map_err(Error::Mce)?;
+    parse_tree_processed(processed.xml.as_ref())
+}
+
+fn check_output_bytes(actual: usize, limits: &MceLimits) -> Result<()> {
+    if actual > limits.max_output_bytes {
+        return Err(Error::MailMergeLimit {
+            kind: crate::mail_merge::LimitKind::XmlBytes,
+            actual,
+            maximum: limits.max_output_bytes,
+        });
+    }
+    Ok(())
 }
 
 fn parse_tree_processed(xml: &[u8]) -> Result<Node> {
@@ -716,7 +1001,11 @@ fn parse_tree_processed(xml: &[u8]) -> Result<Node> {
                     .checked_add(1)
                     .ok_or_else(|| invalid("mail-merge XML node count overflow"))?;
                 if nodes > MAX_NODES {
-                    return Err(invalid("mail-merge XML has too many nodes"));
+                    return Err(Error::MailMergeLimit {
+                        kind: crate::mail_merge::LimitKind::XmlNodes,
+                        actual: nodes,
+                        maximum: MAX_NODES,
+                    });
                 }
                 stack.push(make_node(namespace, &element, decoder, &resolver)?);
             },
@@ -725,7 +1014,11 @@ fn parse_tree_processed(xml: &[u8]) -> Result<Node> {
                     .checked_add(1)
                     .ok_or_else(|| invalid("mail-merge XML node count overflow"))?;
                 if nodes > MAX_NODES {
-                    return Err(invalid("mail-merge XML has too many nodes"));
+                    return Err(Error::MailMergeLimit {
+                        kind: crate::mail_merge::LimitKind::XmlNodes,
+                        actual: nodes,
+                        maximum: MAX_NODES,
+                    });
                 }
                 append_node(
                     make_node(namespace, &element, decoder, &resolver)?,
@@ -797,9 +1090,11 @@ fn make_node(
             continue;
         }
         if attributes.len() >= MAX_ATTRIBUTES_PER_NODE {
-            return Err(invalid(
-                "mail-merge XML has too many attributes on one node",
-            ));
+            return Err(Error::MailMergeLimit {
+                kind: crate::mail_merge::LimitKind::XmlAttributes,
+                actual: (attributes.len()).saturating_add(1),
+                maximum: MAX_ATTRIBUTES_PER_NODE,
+            });
         }
         let (namespace, _) = resolver.resolve_attribute(attribute.key);
         attributes.push(Attribute {

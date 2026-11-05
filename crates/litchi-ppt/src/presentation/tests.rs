@@ -4,7 +4,7 @@
     reason = "test assertions panic on failure by design"
 )]
 
-use super::model::Presentation;
+use super::model::{Presentation, PresentationData};
 use crate::Error;
 use crate::consts::RecordType;
 use crate::parsers::RecordParser;
@@ -51,44 +51,65 @@ fn presentation_with_vba_storage() -> Presentation {
     let mut powerpoint_document = vba_info;
     powerpoint_document.extend_from_slice(&storage);
     let mut parser = RecordParser::new();
-    parser.parse_document(&powerpoint_document).unwrap();
+    parser
+        .parse_document(&powerpoint_document, &crate::SourceLimits::default())
+        .unwrap();
     let mut persist_mapping = PersistMapping::new();
     persist_mapping.add_mapping(41, storage_offset);
 
-    Presentation {
+    #[cfg(feature = "encryption")]
+    let encryption = None;
+    Presentation::from_data(PresentationData {
         powerpoint_document: std::sync::Arc::new(powerpoint_document),
         parser,
         persist_mapping,
         slide_directory: SlideDirectory::new_for_test(0),
         pictures_data: None,
         pictures_source: None,
-        record_limits: crate::RecordLimits::default(),
+        source_limits: crate::SourceLimits::default(),
+        #[cfg(feature = "vba-inspection")]
+        vba_project_limits: crate::VbaProjectLimits::default(),
         tolerance: crate::leniency::ToleranceReport::default(),
-    }
+        source: None,
+        #[cfg(feature = "encryption")]
+        encryption,
+        shape_memo: crate::slide::ShapeMemo::default(),
+    })
 }
 
 #[test]
-fn lazy_live_document_reuses_presentation_record_limits() {
+fn lazy_live_document_reuses_presentation_source_limits() {
     let powerpoint_document = record_bytes(0x0f, 0, RecordType::Document, &[1]);
     let mut persist_mapping = PersistMapping::new();
     persist_mapping.add_mapping(1, 0);
-    let presentation = Presentation {
+    #[cfg(feature = "encryption")]
+    let encryption = None;
+    let presentation = Presentation::from_data(PresentationData {
         powerpoint_document: std::sync::Arc::new(powerpoint_document),
         parser: RecordParser::new(),
         persist_mapping,
         slide_directory: SlideDirectory::new_for_test(0),
         pictures_data: None,
         pictures_source: None,
-        record_limits: crate::RecordLimits {
+        source_limits: crate::SourceLimits {
             max_record_payload_bytes: 0,
-            ..crate::RecordLimits::default()
+            ..crate::SourceLimits::default()
         },
+        #[cfg(feature = "vba-inspection")]
+        vba_project_limits: crate::VbaProjectLimits::default(),
         tolerance: crate::leniency::ToleranceReport::default(),
-    };
+        source: None,
+        #[cfg(feature = "encryption")]
+        encryption,
+        shape_memo: crate::slide::ShapeMemo::default(),
+    });
 
     assert!(matches!(
         presentation.live_document_record(),
-        Err(Error::ResourceLimit(_))
+        Err(Error::Limit {
+            kind: crate::SourceLimitKind::RecordPayloadBytes,
+            ..
+        })
     ));
 }
 
@@ -191,31 +212,31 @@ const SHARED_SOURCE_FIXTURES: [&str; 4] = [
 
 fn open_fixture(
     relative: &str,
-) -> Option<(crate::Package<std::io::Cursor<Vec<u8>>>, Presentation)> {
+) -> Option<(crate::raw::Reader<std::io::Cursor<Vec<u8>>>, Presentation)> {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data")
         .join(relative);
     let bytes = std::fs::read(path).ok()?;
-    let mut package = crate::Package::from_reader(std::io::Cursor::new(bytes)).ok()?;
+    let mut package = crate::raw::Reader::from_reader(std::io::Cursor::new(bytes)).ok()?;
     let presentation = package.presentation().ok()?;
     Some((package, presentation))
 }
 
 fn owned_factory(presentation: &Presentation) -> crate::slide::SlideFactory<'_> {
     crate::slide::SlideFactory::new_with_limits(
-        presentation.powerpoint_document.as_slice(),
-        &presentation.persist_mapping,
-        &presentation.slide_directory,
-        presentation.record_limits,
+        presentation.inner.powerpoint_document.as_slice(),
+        &presentation.inner.persist_mapping,
+        &presentation.inner.slide_directory,
+        presentation.inner.source_limits,
     )
 }
 
 fn shared_factory(presentation: &Presentation) -> crate::slide::SlideFactory<'_> {
     crate::slide::SlideFactory::new_shared_with_limits(
-        &presentation.powerpoint_document,
-        &presentation.persist_mapping,
-        &presentation.slide_directory,
-        presentation.record_limits,
+        &presentation.inner.powerpoint_document,
+        &presentation.inner.persist_mapping,
+        &presentation.inner.slide_directory,
+        presentation.inner.source_limits,
     )
 }
 
@@ -320,21 +341,21 @@ fn the_shared_slide_factory_charges_the_same_copy_budget() {
         assert!(total > 0, "{relative}");
 
         for budget in [total, total - 1] {
-            let limits = crate::RecordLimits {
+            let limits = crate::SourceLimits {
                 max_copied_payload_bytes: budget,
-                ..presentation.record_limits
+                ..presentation.inner.source_limits
             };
             let owned = crate::slide::SlideFactory::new_with_limits(
-                presentation.powerpoint_document.as_slice(),
-                &presentation.persist_mapping,
-                &presentation.slide_directory,
+                presentation.inner.powerpoint_document.as_slice(),
+                &presentation.inner.persist_mapping,
+                &presentation.inner.slide_directory,
                 limits,
             )
             .parse_slide(persist_id);
             let shared = crate::slide::SlideFactory::new_shared_with_limits(
-                &presentation.powerpoint_document,
-                &presentation.persist_mapping,
-                &presentation.slide_directory,
+                &presentation.inner.powerpoint_document,
+                &presentation.inner.persist_mapping,
+                &presentation.inner.slide_directory,
                 limits,
             )
             .parse_slide(persist_id);
@@ -379,7 +400,7 @@ fn editing_a_shared_slide_payload_leaves_the_document_stream_intact() {
         let Ok(mut slide) = shared_factory(&presentation).parse_slide(persist_id) else {
             continue;
         };
-        let stream = presentation.powerpoint_document.as_ref().clone();
+        let stream = presentation.inner.powerpoint_document.as_ref().clone();
         let sibling = slide
             .record
             .children
@@ -387,7 +408,7 @@ fn editing_a_shared_slide_payload_leaves_the_document_stream_intact() {
             .map(|child| child.data.to_vec());
         slide.record.data.to_mut()[0] ^= 0xFF;
         assert_eq!(
-            presentation.powerpoint_document.as_ref(),
+            presentation.inner.powerpoint_document.as_ref(),
             &stream,
             "{relative}: editing a borrowed payload must not reach the stream"
         );
@@ -405,4 +426,128 @@ fn editing_a_shared_slide_payload_leaves_the_document_stream_intact() {
         return;
     }
     panic!("no fixture produced a slide to edit");
+}
+
+/// L-PPT-R2: the notes index is built once per presentation, at open, from
+/// the `DocumentContainer` the slide directory parsed. Selecting a slide
+/// parses that slide only: a factory over a stream whose `DocumentContainer`
+/// header no longer reads still finds every slide's notes page, which a
+/// factory that re-parsed the document for its own notes index could not.
+#[test]
+fn slide_selection_reads_notes_from_the_index_built_at_open() {
+    use crate::slide::{Slide, SlideFactory};
+
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/poi/test-data/slideshow/basic_test_ppt_file.ppt");
+    let package = crate::Package::open(path).unwrap();
+    let presentation = package.presentation().unwrap();
+    let expected = [
+        "These are the notes for page 1",
+        "These are the notes on page two, again lacking formatting",
+    ];
+
+    let mut document = presentation.inner.powerpoint_document.as_ref().clone();
+    let offset = presentation.inner.slide_directory.document_offset();
+    document[offset + 2..offset + 4].copy_from_slice(&0xffffu16.to_le_bytes());
+    let factory = SlideFactory::new(
+        &document,
+        &presentation.inner.persist_mapping,
+        &presentation.inner.slide_directory,
+    );
+    for (index, slide_data) in factory.slides().enumerate() {
+        let slide = Slide::from_slide_data(slide_data.unwrap(), index + 1);
+        let notes = slide.speaker_notes().unwrap().expect("notes page");
+        assert_eq!(notes.text().unwrap(), expected[index]);
+    }
+
+    // Each `slide_at` builds its own factory and shares the same index.
+    for (position, text) in expected.iter().enumerate() {
+        let slide = presentation.slide_at(position).unwrap().expect("slide");
+        let notes = slide.speaker_notes().unwrap().expect("notes page");
+        assert_eq!(notes.text().unwrap(), *text);
+    }
+}
+
+/// Record 0260: the presentation's one-slide memo shares the most recently
+/// parsed slide's shape array between handles, and is invisible otherwise.
+#[test]
+fn slide_handles_share_the_memoized_shape_array() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/ole/ppt/SampleShow.ppt");
+    let package = crate::Package::open(path).unwrap();
+    let presentation = package.presentation().unwrap();
+    let texts = |shapes: &[crate::shapes::ShapeEnum<'static>]| {
+        shapes
+            .iter()
+            .map(|shape| shape.text().unwrap())
+            .collect::<Vec<_>>()
+    };
+
+    let first = presentation
+        .slide_at(0)
+        .unwrap()
+        .unwrap()
+        .shared_shapes()
+        .unwrap();
+    let again = presentation
+        .slide_at(0)
+        .unwrap()
+        .unwrap()
+        .shared_shapes()
+        .unwrap();
+    assert!(std::sync::Arc::ptr_eq(&first, &again));
+    // A clone of the projection shares the memo.
+    let cloned = package.presentation().unwrap();
+    let shared = cloned
+        .slide_at(0)
+        .unwrap()
+        .unwrap()
+        .shared_shapes()
+        .unwrap();
+    assert!(std::sync::Arc::ptr_eq(&first, &shared));
+
+    // Another slide replaces the entry; the first slide is parsed again and
+    // reads exactly as before.
+    let second = presentation
+        .slide_at(1)
+        .unwrap()
+        .unwrap()
+        .shared_shapes()
+        .unwrap();
+    assert!(!std::sync::Arc::ptr_eq(&first, &second));
+    let reparsed = presentation
+        .slide_at(0)
+        .unwrap()
+        .unwrap()
+        .shared_shapes()
+        .unwrap();
+    assert!(!std::sync::Arc::ptr_eq(&first, &reparsed));
+    assert_eq!(texts(&first), texts(&reparsed));
+
+    // `slides()` handles consult the same memo, and the repairs a slide
+    // reports do not depend on which handle parsed it.
+    let slides = presentation.slides().unwrap();
+    assert!(std::sync::Arc::ptr_eq(
+        &slides[0].shared_shapes().unwrap(),
+        &reparsed
+    ));
+    let fresh = crate::Package::open(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/ole/ppt/SampleShow.ppt"),
+    )
+    .unwrap()
+    .presentation()
+    .unwrap();
+    for position in 0..presentation.slide_count() {
+        let memoized = presentation.slide_at(position).unwrap().unwrap();
+        let independent = fresh.slide_at(position).unwrap().unwrap();
+        assert_eq!(
+            memoized.tolerance_report().unwrap(),
+            independent.tolerance_report().unwrap()
+        );
+        assert_eq!(
+            texts(memoized.shapes().unwrap()),
+            texts(independent.shapes().unwrap())
+        );
+    }
 }

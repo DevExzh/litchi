@@ -15,8 +15,11 @@ use litchi_iwa_common::wire::{append_length_delimited_field, append_varint_field
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsch, tsd, tsk, tsp};
 use litchi_keynote::{
-    ChartLegendVisibilityDiagnostics, ChartLegendVisibilityError, ChartLegendVisibilityLimitKind,
-    ChartLegendVisibilityPatch, ChartSelector, Package, Position, SlideSelector,
+    ChartSelector, Package, Position, SlideSelector,
+    chart::legend::Diagnostics as ChartLegendVisibilityDiagnostics,
+    chart::legend::Error as ChartLegendVisibilityError,
+    chart::legend::LimitKind as ChartLegendVisibilityLimitKind,
+    chart::legend::Patch as ChartLegendVisibilityPatch,
 };
 use prost::Message as _;
 
@@ -48,7 +51,11 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
 }
 
 fn object_with_messages(identifier: u64, messages: Vec<RawMessage>) -> TestResult<ArchiveObject> {
-    Ok(ArchiveObject::new(identifier, messages)?)
+    Ok(ArchiveObject::new(
+        identifier,
+        messages,
+        Default::default(),
+    )?)
 }
 
 fn chart_payload(chart: usize) -> TestResult<Vec<u8>> {
@@ -73,11 +80,17 @@ fn chart_payload_with_graph(
         ..tsch::ChartArchive::default()
     };
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, 1, &drawable.encode_to_vec())?;
+    append_length_delimited_field(
+        &mut payload,
+        1,
+        &drawable.encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_length_delimited_field(
         &mut payload,
         CHART_EXTENSION_FIELD,
         &chart_data.encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     Ok(payload)
 }
@@ -92,7 +105,12 @@ fn non_style_payload(
 ) -> TestResult<Vec<u8>> {
     let extension = non_style_extension(visible, title, with_unknown_fields)?;
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, CHART_EXTENSION_FIELD, &extension)?;
+    append_length_delimited_field(
+        &mut payload,
+        CHART_EXTENSION_FIELD,
+        &extension,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -114,10 +132,20 @@ fn non_style_extension(
         append_varint_field(&mut extension, 21, 1)?;
     }
     if with_unknown_fields {
-        append_length_delimited_field(&mut extension, 4_001, b"opaque legend metadata")?;
+        append_length_delimited_field(
+            &mut extension,
+            4_001,
+            b"opaque legend metadata",
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     if let Some(title) = title {
-        append_length_delimited_field(&mut extension, 23, title.as_bytes())?;
+        append_length_delimited_field(
+            &mut extension,
+            23,
+            title.as_bytes(),
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     if with_unknown_fields {
         append_varint_field(&mut extension, 4_002, 9)?;
@@ -126,7 +154,10 @@ fn non_style_extension(
 }
 
 fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn synthetic_package() -> TestResult<Vec<u8>> {
@@ -231,16 +262,16 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn document_stream(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("missing synthetic document component"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn message_payload(package: &[u8], identifier: u64, type_: u32) -> TestResult<Vec<u8>> {
-    let archive = Archive::parse(&document_stream(package)?)?;
+    let archive = Archive::parse(&document_stream(package)?, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic object"))?;
@@ -267,7 +298,7 @@ fn replace_typed_message_payload(
     payload: Vec<u8>,
 ) -> TestResult<Vec<u8>> {
     let mut stream = document_stream(package)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object_mut(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic object"))?;
@@ -277,15 +308,17 @@ fn replace_typed_message_payload(
         .find(|message| message.type_ == type_)
         .ok_or_else(|| io::Error::other("missing synthetic typed message"))?;
     message.data = payload;
-    stream = archive.to_bytes()?;
-    let compressed = SnappyStream::compress(&stream)?;
-    Ok(Catalog::from_bytes(package)?.reassemble_to_bytes(
-        &[litchi_iwa_archive::package::EntryEdit::new(
-            DOCUMENT_MEMBER,
-            &compressed,
-        )],
-        Limits::default(),
-    )?)
+    stream = archive.to_bytes(Default::default())?;
+    let compressed = SnappyStream::compress(&stream, Default::default())?;
+    Ok(
+        Catalog::from_bytes(package, Default::default())?.reassemble_to_bytes(
+            &[litchi_iwa_archive::package::EntryEdit::new(
+                DOCUMENT_MEMBER,
+                &compressed,
+            )],
+            Limits::default(),
+        )?,
+    )
 }
 
 fn same_central_record_except_offset(source: &[u8], candidate: &[u8]) -> bool {
@@ -297,8 +330,8 @@ fn same_central_record_except_offset(source: &[u8], candidate: &[u8]) -> bool {
 }
 
 fn assert_only_document_payload_changed(before: &[u8], after: &[u8]) -> TestResult<()> {
-    let before_catalog = Catalog::from_bytes(before)?;
-    let after_catalog = Catalog::from_bytes(after)?;
+    let before_catalog = Catalog::from_bytes(before, Default::default())?;
+    let after_catalog = Catalog::from_bytes(after, Default::default())?;
     let mut changed = 0;
     for before_entry in before_catalog.iter() {
         if ROOT_PREVIEWS.contains(&before_entry.name()) {
@@ -352,7 +385,7 @@ fn assert_only_document_payload_changed(before: &[u8], after: &[u8]) -> TestResu
 }
 
 fn assert_root_previews_absent(package: &[u8]) -> TestResult<()> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     for preview in ROOT_PREVIEWS {
         assert!(catalog.iter().all(|entry| entry.name() != preview));
     }
@@ -583,7 +616,12 @@ fn malformed_payload(kind: &str) -> TestResult<Vec<u8>> {
             append_varint_field(&mut extension, LEGEND_VISIBLE_FIELD, 0)?;
         },
         "wrong-wire" => {
-            append_length_delimited_field(&mut extension, LEGEND_VISIBLE_FIELD, b"wrong wire")?;
+            append_length_delimited_field(
+                &mut extension,
+                LEGEND_VISIBLE_FIELD,
+                b"wrong wire",
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         },
         "noncanonical" => {
             // field 20, wire type 0, followed by a non-canonical zero varint.
@@ -591,9 +629,19 @@ fn malformed_payload(kind: &str) -> TestResult<Vec<u8>> {
         },
         other => return Err(io::Error::other(format!("unknown malformed case: {other}")).into()),
     }
-    append_length_delimited_field(&mut extension, 23, b"Revenue")?;
+    append_length_delimited_field(
+        &mut extension,
+        23,
+        b"Revenue",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, CHART_EXTENSION_FIELD, &extension)?;
+    append_length_delimited_field(
+        &mut payload,
+        CHART_EXTENSION_FIELD,
+        &extension,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -602,8 +650,18 @@ fn malformed_outer_non_style_payload(kind: &str) -> TestResult<Vec<u8>> {
     let mut payload = Vec::new();
     match kind {
         "duplicate" => {
-            append_length_delimited_field(&mut payload, CHART_EXTENSION_FIELD, &extension)?;
-            append_length_delimited_field(&mut payload, CHART_EXTENSION_FIELD, &extension)?;
+            append_length_delimited_field(
+                &mut payload,
+                CHART_EXTENSION_FIELD,
+                &extension,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
+            append_length_delimited_field(
+                &mut payload,
+                CHART_EXTENSION_FIELD,
+                &extension,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         },
         "wrong-wire" => append_varint_field(&mut payload, CHART_EXTENSION_FIELD, 1)?,
         other => {

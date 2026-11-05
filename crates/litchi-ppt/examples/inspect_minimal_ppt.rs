@@ -11,7 +11,7 @@ use litchi_ppt::Package;
 
 fn main() {
     match Package::open("minimal.ppt") {
-        Ok(mut pkg) => match pkg.presentation() {
+        Ok(pkg) => match pkg.presentation() {
             Ok(pres) => {
                 println!("Opened presentation successfully");
                 println!("Slide count: {}", pres.slide_count());

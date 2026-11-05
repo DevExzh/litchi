@@ -1,9 +1,38 @@
 use super::{
-    BrushPropertyName, ContextKind, InkEffect, MAX_ATTRIBUTE_VALUE_BYTES, MAX_DEPTH, MAX_NODES,
-    MAX_SOURCE_BYTES, SemanticType, SourceSpan, actions, read, read_metadata,
-    read_metadata_with_source_spans, read_shared, write,
+    BrushPropertyName, ContextKind, Document, InkEffect, Limits, MAX_ATTRIBUTE_VALUE_BYTES,
+    MAX_DEPTH, MAX_NODES, MAX_SOURCE_BYTES, SemanticType, SourceSpan, actions, read as raw_read,
+    read_metadata as raw_read_metadata,
+    read_metadata_with_source_spans as raw_read_metadata_with_source_spans,
+    read_shared as raw_read_shared, write as raw_write,
 };
+use crate::{Error, LimitKind};
 use std::sync::Arc;
+
+fn read(xml: &[u8]) -> crate::Result<Document> {
+    raw_read(xml, Limits::DEFAULT)
+}
+
+fn read_shared(xml: Arc<Vec<u8>>) -> crate::Result<Document> {
+    raw_read_shared(xml, Limits::DEFAULT)
+}
+
+fn read_metadata(xml: &[u8]) -> crate::Result<super::Metadata> {
+    raw_read_metadata(xml, Limits::DEFAULT)
+}
+
+fn read_metadata_with_source_spans(
+    xml: &[u8],
+    contexts: &[SourceSpan],
+    traces: &[SourceSpan],
+    properties: &[SourceSpan],
+    links: &[SourceSpan],
+) -> crate::Result<super::Metadata> {
+    raw_read_metadata_with_source_spans(xml, contexts, traces, properties, links, Limits::DEFAULT)
+}
+
+fn write(document: &Document) -> crate::Result<Vec<u8>> {
+    raw_write(document, Limits::DEFAULT)
+}
 
 const INK: &[u8] = br##"<?xml version="1.0" encoding="UTF-8"?><inkml:ink xmlns:inkml="http://www.w3.org/2003/InkML" xmlns:msink="http://schemas.microsoft.com/ink/2010/main" xmlns:a16="http://schemas.microsoft.com/office/drawing/2016/ink"><inkml:definitions><inkml:brush xml:id="br0"><inkml:brushProperty name="width" value="0.06667" units="cm"/><inkml:brushProperty name="inkEffects" value="pencil"/></inkml:brush></inkml:definitions><inkml:traceGroup><inkml:annotationXML><msink:context id="{8646EB18-6E67-4FFA-8739-E20C3C1A0F80}" type="writingRegion" semanticType="comment" rotatedBoundingBox="0,0 10,10"/></inkml:annotationXML><inkml:trace contextRef="#ctx0" brushRef="#br0">1 2 3</inkml:trace></inkml:traceGroup></inkml:ink>"##;
 
@@ -98,6 +127,55 @@ fn source_backed_write_is_byte_exact() {
     assert_eq!(write(&document).expect("source-backed write"), INK);
     let clone = document.clone();
     assert_eq!(clone, document);
+}
+
+#[test]
+fn raw_ink_limits_are_retained_as_typed_dimensions() {
+    let document = read(INK).expect("source-backed InkML fixture must parse");
+
+    let mut output_limits = Limits::DEFAULT;
+    output_limits.max_output_bytes = INK.len() - 1;
+    assert!(matches!(
+        raw_write(&document, output_limits),
+        Err(Error::Limit {
+            kind: LimitKind::InkMlOutputBytes,
+            observed,
+            maximum,
+        }) if observed == INK.len() && maximum == INK.len() - 1
+    ));
+
+    let mut source_limits = Limits::DEFAULT;
+    source_limits.max_attribute_value_bytes = 8;
+    assert!(matches!(
+        raw_read(INK, source_limits),
+        Err(Error::Limit {
+            kind: LimitKind::InkMlAttributeValueBytes,
+            observed,
+            maximum,
+        }) if observed > maximum && maximum == 8
+    ));
+
+    let mut node_limits = Limits::DEFAULT;
+    node_limits.max_xml_nodes = 1;
+    assert!(matches!(
+        raw_read(INK, node_limits),
+        Err(Error::Limit {
+            kind: LimitKind::InkMlXmlNodes,
+            observed,
+            maximum,
+        }) if observed > maximum && maximum == 1
+    ));
+
+    let mut writer_node_limits = Limits::DEFAULT;
+    writer_node_limits.max_xml_nodes = 1;
+    assert!(matches!(
+        raw_write(&document, writer_node_limits),
+        Err(Error::Limit {
+            kind: LimitKind::InkMlXmlNodes,
+            observed,
+            maximum,
+        }) if observed > maximum && maximum == 1
+    ));
 }
 
 #[test]
@@ -223,7 +301,8 @@ fn rejects_invalid_context_guid_and_points() {
 #[test]
 fn ink_actions_are_typed_and_preserved() {
     let source = br#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" lengthUnit="cm" timeUnit="s"><iact:action type="add" startTime="0.25"><iact:actionData name="stroke"/></iact:action><iact:actionGroup type="transform" startTime="1"><iact:action type="remove" startTime="2"/></iact:actionGroup></iact:actions>"#;
-    let actions = actions::read(source).expect("ink actions fixture must parse");
+    let actions =
+        actions::read(source, actions::Limits::DEFAULT).expect("ink actions fixture must parse");
     assert_eq!(actions.length_unit(), "cm");
     assert_eq!(actions.time_unit(), "s");
     assert_eq!(actions.action_group_count(), 1);
@@ -231,26 +310,37 @@ fn ink_actions_are_typed_and_preserved() {
     assert_eq!(actions.actions()[0].action_type().as_str(), "add");
     assert_eq!(actions.actions()[1].start_time(), "2");
     assert_eq!(
-        actions::write(&actions).expect("source-backed action write"),
+        actions::write(&actions, actions::Limits::DEFAULT).expect("source-backed action write"),
         source
     );
+    let mut narrow = actions::Limits::DEFAULT;
+    narrow.max_nodes = 1;
+    assert!(matches!(
+        actions::write(&actions, narrow),
+        Err(Error::Limit {
+            kind: LimitKind::Nodes,
+            observed,
+            maximum,
+        }) if observed > maximum && maximum == 1
+    ));
 }
 
 #[test]
 fn ink_actions_reject_document_level_references_and_invalid_units() {
     let trailing_reference = br#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" lengthUnit="cm" timeUnit="s"/>&future;"#;
-    assert!(actions::read(trailing_reference).is_err());
+    assert!(actions::read(trailing_reference, actions::Limits::DEFAULT).is_err());
     let empty_unit = br#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" lengthUnit="" timeUnit="s"/>"#;
-    assert!(actions::read(empty_unit).is_err());
+    assert!(actions::read(empty_unit, actions::Limits::DEFAULT).is_err());
 }
 
 #[test]
 fn ink_actions_support_ancestor_bound_prefix_fragments() {
     let source = br#"<iact:actions lengthUnit="cm" timeUnit="s"><iact:action type="add" startTime="0"/></iact:actions>"#;
-    let parsed = actions::read(source).expect("ancestor-bound action fragment");
+    let parsed =
+        actions::read(source, actions::Limits::DEFAULT).expect("ancestor-bound action fragment");
     assert_eq!(parsed.actions().len(), 1);
     assert_eq!(
-        actions::write(&parsed).expect("exact action fragment"),
+        actions::write(&parsed, actions::Limits::DEFAULT).expect("exact action fragment"),
         source
     );
 }
@@ -302,13 +392,13 @@ fn rejects_duplicate_declarations_and_bound_foreign_root_prefixes() {
 
     let action_foreign =
         br#"<iact:actions xmlns:iact="urn:foreign" lengthUnit="cm" timeUnit="s"/>"#;
-    assert!(actions::read(action_foreign).is_err());
+    assert!(actions::read(action_foreign, actions::Limits::DEFAULT).is_err());
 
     let malformed_declaration = br#"<?xml version="1.0" foo="bar"?><inkml:ink xmlns:inkml="http://www.w3.org/2003/InkML"/>"#;
     assert!(read(malformed_declaration).is_err());
     let invalid_numeric_reference =
         br#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" lengthUnit="cm" timeUnit="s">&#+65;</iact:actions>"#;
-    assert!(actions::read(invalid_numeric_reference).is_err());
+    assert!(actions::read(invalid_numeric_reference, actions::Limits::DEFAULT).is_err());
 }
 
 #[test]
@@ -316,19 +406,23 @@ fn rejects_duplicate_expanded_attributes_in_opaque_elements() {
     let duplicate = br#"<inkml:ink xmlns:inkml="http://www.w3.org/2003/InkML" xmlns:a="urn:opaque" xmlns:b="urn:opaque" a:value="one" b:value="two"/>"#;
     assert!(read(duplicate).is_err());
     let action_duplicate = br#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" xmlns:a="urn:opaque" xmlns:b="urn:opaque" lengthUnit="cm" timeUnit="s" a:value="one" b:value="two"/>"#;
-    assert!(actions::read(action_duplicate).is_err());
+    assert!(actions::read(action_duplicate, actions::Limits::DEFAULT).is_err());
 }
 
 #[test]
 fn strict_ink_actions_profile_exposes_ordered_typed_children() {
     let source = br#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" xmlns:inkml="http://www.w3.org/2003/InkML" xml:id="root" lengthUnit="cm" timeUnit="ms"><inkml:definitions><inkml:future/></inkml:definitions><iact:action xml:id="a0" type="add" startTime="0"><iact:property name="dataType"/><iact:actionDataGroup xml:id="g0" name="path"><iact:actionData xml:id="d0" name="target"><iact:transform/><inkml:trace/><inkml:traceView/></iact:actionData></iact:actionDataGroup></iact:action><iact:actionGroup xml:id="ag0" type="transform" startTime="1"><iact:action type="remove" startTime="2"/></iact:actionGroup></iact:actions>"#;
-    let profile = actions::read_profile(source).expect("strict action profile");
+    let profile =
+        actions::read_profile(source, actions::Limits::DEFAULT).expect("strict action profile");
     assert_eq!(profile.length_unit(), actions::LengthUnit::Centimeter);
     assert_eq!(profile.time_unit(), actions::TimeUnit::Millisecond);
     assert_eq!(profile.xml_id(), Some("root"));
     assert!(profile.definitions_span().is_some());
     assert_eq!(profile.children().len(), 2);
-    assert_eq!(actions::write_profile(&profile).unwrap(), source);
+    assert_eq!(
+        actions::write_profile(&profile, actions::Limits::DEFAULT).unwrap(),
+        source
+    );
 
     let actions::RootChild::Action(action) = &profile.children()[0] else {
         panic!("first root child must be an action");
@@ -377,11 +471,11 @@ fn strict_ink_actions_profile_exposes_ordered_typed_children() {
 fn strict_ink_actions_profile_rejects_invalid_structure_but_keeps_legacy_read() {
     let prefix = r#"xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" lengthUnit="cm" timeUnit="s""#;
     let legacy = br#"<iact:actions lengthUnit="cm" timeUnit="s"><iact:action type="add" startTime="0"/></iact:actions>"#;
-    assert!(actions::read(legacy).is_ok());
-    assert!(actions::read_profile(legacy).is_err());
+    assert!(actions::read(legacy, actions::Limits::DEFAULT).is_ok());
+    assert!(actions::read_profile(legacy, actions::Limits::DEFAULT).is_err());
     let legacy_opaque = br#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" xmlns:x="urn:future" lengthUnit="cm" timeUnit="s"><x:future/></iact:actions>"#;
-    assert!(actions::read(legacy_opaque).is_ok());
-    assert!(actions::read_profile(legacy_opaque).is_err());
+    assert!(actions::read(legacy_opaque, actions::Limits::DEFAULT).is_ok());
+    assert!(actions::read_profile(legacy_opaque, actions::Limits::DEFAULT).is_err());
 
     let cases = [
         format!("<iact:actions {prefix}><iact:property name=\"x\"/></iact:actions>"),
@@ -409,10 +503,14 @@ fn strict_ink_actions_profile_rejects_invalid_structure_but_keeps_legacy_read() 
         format!("<iact:actions {prefix} lengthUnit=\"px\"/>"),
     ];
     for case in cases {
-        assert!(actions::read_profile(case.as_bytes()).is_err(), "{case}");
+        assert!(
+            actions::read_profile(case.as_bytes(), actions::Limits::DEFAULT).is_err(),
+            "{case}"
+        );
     }
     assert!(actions::read_profile(
-        br#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" lengthUnit="px" timeUnit="s"/>"#
+        br#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" lengthUnit="px" timeUnit="s"/>"#,
+        actions::Limits::DEFAULT,
     )
     .is_err());
 }
@@ -420,7 +518,8 @@ fn strict_ink_actions_profile_rejects_invalid_structure_but_keeps_legacy_read() 
 #[test]
 fn strict_ink_actions_profile_preserves_opaque_descendants_and_scopes_reserved_semantics() {
     let source = br#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" xmlns:x="urn:future" xmlns:inkml="http://www.w3.org/2003/InkML" lengthUnit="m" timeUnit="s"><iact:action type="add" startTime="0"><iact:actionData><iact:transform><x:future><x:payload>opaque</x:payload></x:future></iact:transform></iact:actionData></iact:action></iact:actions>"#;
-    let profile = actions::read_profile(source).expect("opaque action descendant");
+    let profile =
+        actions::read_profile(source, actions::Limits::DEFAULT).expect("opaque action descendant");
     let actions::RootChild::Action(action) = &profile.children()[0] else {
         panic!("root action expected");
     };
@@ -435,32 +534,32 @@ fn strict_ink_actions_profile_preserves_opaque_descendants_and_scopes_reserved_s
 #[test]
 fn strict_ink_actions_profile_rejects_schema_owned_unknowns_and_canonicalizes_namespaces() {
     let encoded = br#"<iact:actions xmlns:iact="http:&#x2F;&#x2F;schemas.microsoft.com/office/powerpoint/2014/inkAction" lengthUnit="cm" timeUnit="s"/>"#;
-    assert!(actions::read_profile(encoded).is_ok());
+    assert!(actions::read_profile(encoded, actions::Limits::DEFAULT).is_ok());
 
     let unknown_root_attribute = br#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" lengthUnit="cm" timeUnit="s" future="x"/>"#;
-    assert!(actions::read_profile(unknown_root_attribute).is_err());
+    assert!(actions::read_profile(unknown_root_attribute, actions::Limits::DEFAULT).is_err());
 
     let unknown_action_attribute = br#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" lengthUnit="cm" timeUnit="s"><iact:action type="add" startTime="0" future="x"/></iact:actions>"#;
-    assert!(actions::read_profile(unknown_action_attribute).is_err());
+    assert!(actions::read_profile(unknown_action_attribute, actions::Limits::DEFAULT).is_err());
 
     let foreign_root_child = br#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" xmlns:x="urn:future" lengthUnit="cm" timeUnit="s"><x:future/></iact:actions>"#;
-    assert!(actions::read_profile(foreign_root_child).is_err());
+    assert!(actions::read_profile(foreign_root_child, actions::Limits::DEFAULT).is_err());
 
     let foreign_action_child = br#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" xmlns:x="urn:future" lengthUnit="cm" timeUnit="s"><iact:action type="add" startTime="0"><x:future/></iact:action></iact:actions>"#;
-    assert!(actions::read_profile(foreign_action_child).is_err());
+    assert!(actions::read_profile(foreign_action_child, actions::Limits::DEFAULT).is_err());
 
     let wrong_namespace_action = br#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" xmlns:x="urn:future" lengthUnit="cm" timeUnit="s"><x:action type="add" startTime="0"/></iact:actions>"#;
-    assert!(actions::read_profile(wrong_namespace_action).is_err());
+    assert!(actions::read_profile(wrong_namespace_action, actions::Limits::DEFAULT).is_err());
 
     let encoded_duplicate = br#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" xmlns:x="urn:future" xmlns:a="urn:foo&#x2F;" xmlns:b="urn:foo/" lengthUnit="cm" timeUnit="s"><iact:action type="add" startTime="0"><iact:actionData><iact:transform a:value="one" b:value="two"/></iact:actionData></iact:action></iact:actions>"#;
-    assert!(actions::read_profile(encoded_duplicate).is_err());
+    assert!(actions::read_profile(encoded_duplicate, actions::Limits::DEFAULT).is_err());
 }
 
 #[test]
 fn strict_ink_actions_profile_collapses_decimal_whitespace_and_allows_empty_user_type() {
     let source = br#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" lengthUnit="cm" timeUnit="s"><iact:action type="" startTime="&#x9; 1&#xA;"/></iact:actions>"#;
-    let profile =
-        actions::read_profile(source).expect("xsd decimal whitespace and empty user type");
+    let profile = actions::read_profile(source, actions::Limits::DEFAULT)
+        .expect("xsd decimal whitespace and empty user type");
     let actions::RootChild::Action(action) = &profile.children()[0] else {
         panic!("root action expected");
     };

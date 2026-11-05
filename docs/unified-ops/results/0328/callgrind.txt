@@ -1,0 +1,11 @@
+# Instructions per iteration (callgrind, VR_REPEAT=200 minus VR_REPEAT=0, same binaries as view-regression.txt)
+scenario	before	after	after/before
+odt_p1_format	39344	36620	0.931
+odt_root_children	3363	3574	1.063
+odt_body_children	6118	6803	1.112
+odt_query_p_formats	776542	662781	0.854
+odp_slide_children	21955	22266	1.014
+odp_shape_format	32960	33458	1.015
+rtf_root_children	1761	1879	1.067
+rtf_body_children	2328	2430	1.044
+rtf_query_p_formats	6704	7169	1.069

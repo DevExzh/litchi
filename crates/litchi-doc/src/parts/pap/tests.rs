@@ -710,6 +710,62 @@ fn parses_word6_paragraph_borders_and_pagination_controls_strictly() {
     }
 }
 
+/// [MS-DOC] §2.4.3: the table depth derives from `sprmPFInTable`,
+/// `sprmPItap` and `sprmPDtap`; a paragraph not in a table is at depth 0.
+#[test]
+fn table_depth_derives_from_the_in_table_flag_and_the_stored_depth() {
+    let in_table = [SPRM_P_F_IN_TABLE.to_le_bytes().as_slice(), &[1]].concat();
+    let itap = |depth: i32| {
+        [
+            SPRM_P_ITAP.to_le_bytes().as_slice(),
+            depth.to_le_bytes().as_slice(),
+        ]
+        .concat()
+    };
+    let dtap = |delta: i32| {
+        [
+            SPRM_P_DTAP.to_le_bytes().as_slice(),
+            delta.to_le_bytes().as_slice(),
+        ]
+        .concat()
+    };
+    let depth = |grpprl: &[u8]| {
+        let properties = ParagraphProperties::from_sprm(grpprl).unwrap();
+        (properties.table_nesting_level, properties.table_depth())
+    };
+
+    // No table properties at all.
+    assert_eq!(depth(&[]), (0, 0));
+    // Word 97: `sprmPFInTable` alone stores no depth, and the paragraph is
+    // in a top-level table.
+    assert_eq!(depth(&in_table), (0, 1));
+    // Word 2000 and later store the depth explicitly.
+    assert_eq!(depth(&[in_table.clone(), itap(1)].concat()), (1, 1));
+    assert_eq!(depth(&[in_table.clone(), itap(2)].concat()), (2, 2));
+    // An explicit zero is the same encoding as an absent `sprmPItap`.
+    assert_eq!(depth(&[in_table.clone(), itap(0)].concat()), (0, 1));
+    // A delta applies to the stored depth.
+    assert_eq!(depth(&[in_table.clone(), dtap(1)].concat()), (1, 1));
+    assert_eq!(
+        depth(&[in_table.clone(), itap(1), dtap(1)].concat()),
+        (2, 2)
+    );
+    // Without `sprmPFInTable` no stored depth puts a paragraph in a table.
+    assert_eq!(depth(&itap(2)), (2, 0));
+    assert_eq!(
+        depth(
+            &[
+                in_table,
+                itap(2),
+                SPRM_P_F_IN_TABLE.to_le_bytes().to_vec(),
+                vec![0]
+            ]
+            .concat()
+        ),
+        (2, 0)
+    );
+}
+
 #[test]
 fn parses_current_grid_table_depth_and_shading_strictly() {
     let mut grpprl = Vec::new();

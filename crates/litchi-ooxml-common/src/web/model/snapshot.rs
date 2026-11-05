@@ -2,6 +2,7 @@ use super::super::codec::{invalid, limit};
 use super::super::validation::validate_extension_list;
 use super::super::{Arc, PackURI, Result};
 use super::{Compression, Effect, ExtKind, ExtList, MAX_WEB_EXTENSION_ITEMS};
+use crate::web::LimitKind;
 /// `DrawingML` `CT_Blip` metadata used by a web-extension snapshot.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Snapshot {
@@ -46,7 +47,7 @@ impl Snapshot {
     pub fn push_effect(&mut self, effect: Effect) -> Result<&mut Self> {
         if self.effects.len() >= MAX_WEB_EXTENSION_ITEMS {
             return limit(
-                "snapshot effects",
+                LimitKind::SnapshotEffects,
                 MAX_WEB_EXTENSION_ITEMS,
                 self.effects.len().saturating_add(1),
             );

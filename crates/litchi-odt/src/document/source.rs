@@ -21,17 +21,17 @@ use std::path::Path;
 #[cfg(any(unix, windows))]
 use litchi_core::FileSource;
 use litchi_core::{Error, Metadata, ReadAt, Result, SourceVersion};
-use litchi_odf_common::core::{Content, Meta, SourceBackedPackage, SourcePackageLimits, Styles};
+use litchi_odf_common::core::{Content, Meta, SourceBackedPackage, Styles};
 use litchi_odf_common::package::{is_media_path, resolve_package_path};
+use litchi_odf_common::{
+    Error as OdfError, OpenOptions, SemanticLimitKind, SemanticLimits, XmlStreamLimits,
+};
 use zeroize::Zeroizing;
 
 use super::codec::parse_hyperlinks;
 use crate::elements::style::{StyleElements, StyleRegistry};
 use crate::elements::table::Table as ElementTable;
 use crate::elements::text::{Paragraph as ElementParagraph, TextElements};
-
-/// The bounded ZIP-index policy used by positional ODF facades.
-pub type ReadLimits = SourcePackageLimits;
 
 pub(super) const FAMILY_NAME: &str = "ODT";
 const MAX_CONTENT_BYTES: u64 = 256 * 1024 * 1024;
@@ -60,6 +60,8 @@ pub struct SourceBackedDocument {
     text_cache: OnceLock<Option<String>>,
     /// Package repairs followed by the content repairs of the open.
     tolerance: litchi_odf_common::leniency::ToleranceReport,
+    /// The caller-selected raw XML policy retained by this source owner.
+    xml_limits: XmlStreamLimits,
 }
 
 impl fmt::Debug for SourceBackedDocument {
@@ -76,91 +78,129 @@ impl fmt::Debug for SourceBackedDocument {
 
 impl SourceBackedDocument {
     /// Open an ODT from a regular filesystem file without slurping it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`litchi_odf_common::Error::Limit`] for an exceeded dimension
+    /// and [`litchi_odf_common::Error::Core`] for I/O or validation failures.
     #[cfg(any(unix, windows))]
-    pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_read_at(file_source(path)?)
+    pub fn open(path: impl AsRef<Path>) -> std::result::Result<Self, OdfError> {
+        Self::open_with_options(path, OpenOptions::new())
     }
 
-    /// Open an ODT from a regular filesystem file with explicit ZIP limits.
+    /// Open an ODT from a regular filesystem file under caller-selected
+    /// limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
     #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
-        Self::from_read_at_with_limits(file_source(path)?, limits)
+    pub fn open_with_options(
+        path: impl AsRef<Path>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, OdfError> {
+        Self::from_read_at_with_options(file_source(path)?, options)
     }
 
     /// Open a password-protected ODT from a regular filesystem file.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
     #[cfg(any(unix, windows))]
-    pub fn from_path_with_password(
+    pub fn open_with_password(
         path: impl AsRef<Path>,
         password: impl Into<String>,
-    ) -> Result<Self> {
+    ) -> std::result::Result<Self, OdfError> {
+        Self::open_with_password_and_options(path, password, OpenOptions::new())
+    }
+
+    /// Open a password-protected ODT from a regular filesystem file under
+    /// caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    #[cfg(any(unix, windows))]
+    pub fn open_with_password_and_options(
+        path: impl AsRef<Path>,
+        password: impl Into<String>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, OdfError> {
         // Enter the zeroizing owner before any fallible source-backed work.
         let mut password = Zeroizing::new(password.into());
         let source = file_source(path)?;
-        Self::from_read_at_with_password(source, std::mem::take(&mut *password))
-    }
-
-    /// Open a password-protected ODT from a regular filesystem file with
-    /// explicit ZIP limits.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits_and_password(
-        path: impl AsRef<Path>,
-        limits: ReadLimits,
-        password: impl Into<String>,
-    ) -> Result<Self> {
-        let mut password = Zeroizing::new(password.into());
-        let source = file_source(path)?;
-        Self::from_read_at_with_limits_and_password(source, limits, std::mem::take(&mut *password))
-    }
-
-    /// Alias for [`Self::from_path`].
-    #[cfg(any(unix, windows))]
-    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_path(path)
-    }
-
-    /// Alias for [`Self::from_path_with_limits`].
-    #[cfg(any(unix, windows))]
-    pub fn open_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
-        Self::from_path_with_limits(path, limits)
-    }
-
-    /// Alias for [`Self::from_path_with_password`].
-    #[cfg(any(unix, windows))]
-    pub fn open_with_password(path: impl AsRef<Path>, password: impl Into<String>) -> Result<Self> {
-        Self::from_path_with_password(path, password)
-    }
-
-    /// Alias for [`Self::from_path_with_limits_and_password`].
-    #[cfg(any(unix, windows))]
-    pub fn open_with_limits_and_password(
-        path: impl AsRef<Path>,
-        limits: ReadLimits,
-        password: impl Into<String>,
-    ) -> Result<Self> {
-        Self::from_path_with_limits_and_password(path, limits, password)
-    }
-
-    /// Open an ODT from a caller-provided positional source.
-    pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
-        Self::from_read_at_with_limits(source, ReadLimits::default())
-    }
-
-    /// Open a password-protected ODT from a caller-provided positional source.
-    pub fn from_read_at_with_password(
-        source: Arc<dyn ReadAt>,
-        password: impl Into<String>,
-    ) -> Result<Self> {
-        let mut password = Zeroizing::new(password.into());
-        Self::from_read_at_inner_with_password(
+        Self::from_read_at_with_password_and_options(
             source,
-            ReadLimits::default(),
             std::mem::take(&mut *password),
+            options,
         )
     }
 
-    /// Open an ODT from a positional source with explicit finite limits.
-    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: ReadLimits) -> Result<Self> {
-        Self::from_read_at_inner(source, limits)
+    /// Open an ODT from a caller-provided positional source.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_read_at(source: Arc<dyn ReadAt>) -> std::result::Result<Self, OdfError> {
+        Self::from_read_at_with_options(source, OpenOptions::new())
+    }
+
+    /// Open an ODT from a positional source under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_read_at_with_options(
+        source: Arc<dyn ReadAt>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, OdfError> {
+        let package = SourceBackedPackage::from_read_at_with_options(Arc::clone(&source), options)?;
+        Self::from_package(
+            source,
+            package,
+            options.semantic_limits_value(),
+            options.xml_limits_value(),
+        )
+    }
+
+    /// Open a password-protected ODT from a caller-provided positional source.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_read_at_with_password(
+        source: Arc<dyn ReadAt>,
+        password: impl Into<String>,
+    ) -> std::result::Result<Self, OdfError> {
+        Self::from_read_at_with_password_and_options(source, password, OpenOptions::new())
+    }
+
+    /// Open a password-protected ODT from a positional source under
+    /// caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_read_at_with_password_and_options(
+        source: Arc<dyn ReadAt>,
+        password: impl Into<String>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, OdfError> {
+        // SourceBackedPackage takes ownership into Zeroizing before any
+        // archive work.  This also keeps encrypted payloads lazy.
+        let mut password = Zeroizing::new(password.into());
+        let package = SourceBackedPackage::from_read_at_with_password_and_options(
+            Arc::clone(&source),
+            std::mem::take(&mut *password),
+            options,
+        )?;
+        Self::from_package(
+            source,
+            package,
+            options.semantic_limits_value(),
+            options.xml_limits_value(),
+        )
     }
 
     /// Adopt an already validated positional ODF package without rebuilding
@@ -169,55 +209,40 @@ impl SourceBackedDocument {
     /// This hidden handoff is used by the unified format detector after it has
     /// arbitrated any competing OOXML catalog on the same physical source.
     #[doc(hidden)]
-    pub fn from_source_package(package: SourceBackedPackage) -> Result<Self> {
+    pub fn from_source_package(
+        package: SourceBackedPackage,
+    ) -> std::result::Result<Self, OdfError> {
         let source = package.source_arc();
-        Self::from_package(source, package)
+        Self::from_package(
+            source,
+            package,
+            SemanticLimits::DEFAULT,
+            XmlStreamLimits::owner_default_value(),
+        )
     }
 
-    /// Open a password-protected ODT from a positional source with explicit
-    /// finite limits.
-    pub fn from_read_at_with_limits_and_password(
+    fn from_package(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
-        password: impl Into<String>,
-    ) -> Result<Self> {
-        let mut password = Zeroizing::new(password.into());
-        Self::from_read_at_inner_with_password(source, limits, std::mem::take(&mut *password))
-    }
-
-    fn from_read_at_inner(source: Arc<dyn ReadAt>, limits: ReadLimits) -> Result<Self> {
-        let package = SourceBackedPackage::from_read_at_with_limits(Arc::clone(&source), limits)?;
-        Self::from_package(source, package)
-    }
-
-    fn from_read_at_inner_with_password(
-        source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
-        password: impl Into<String>,
-    ) -> Result<Self> {
-        // SourceBackedPackage takes ownership into Zeroizing before any
-        // archive work.  This also keeps encrypted payloads lazy.
-        let package = SourceBackedPackage::from_read_at_with_limits_and_password(
-            Arc::clone(&source),
-            limits,
-            password,
-        )?;
-        Self::from_package(source, package)
-    }
-
-    fn from_package(source: Arc<dyn ReadAt>, package: SourceBackedPackage) -> Result<Self> {
+        package: SourceBackedPackage,
+        limits: SemanticLimits,
+        xml_limits: XmlStreamLimits,
+    ) -> std::result::Result<Self, OdfError> {
         let source_version = package.source_version()?;
-        let parsed = (|| {
+        let parsed = (|| -> std::result::Result<_, OdfError> {
             let mimetype = package.mimetype()?;
             super::package::validate_mimetype(mimetype)?;
 
-            if package
-                .member_materialized_size(crate::constants::ODF_CONTENT)?
-                .is_some_and(|size| size > MAX_CONTENT_BYTES)
-            {
-                return Err(Error::InvalidFormat(format!(
-                    "{FAMILY_NAME} content.xml exceeds the family limit"
-                )));
+            if let Some(size) = package.member_materialized_size(crate::constants::ODF_CONTENT)? {
+                if size > MAX_CONTENT_BYTES {
+                    return Err(Error::InvalidFormat(format!(
+                        "{FAMILY_NAME} content.xml exceeds the family limit"
+                    ))
+                    .into());
+                }
+                limits.check(SemanticLimitKind::ContentBytes, size)?;
+            }
+            if let Some(size) = package.member_materialized_size(crate::constants::ODF_STYLES)? {
+                limits.check(SemanticLimitKind::StylesBytes, size)?;
             }
             let mut content_bytes = package.get_file(crate::constants::ODF_CONTENT)?;
             let mut tolerance = package.tolerance_report().clone();
@@ -229,16 +254,21 @@ impl SourceBackedDocument {
                     0,
                 );
             }
-            let content = Content::from_vec(content_bytes)?;
+            let content = Content::from_vec(content_bytes, limits)?;
             // One fused tokenization validates the content structure and
             // collects the automatic styles; a validation error returns
             // here, before styles.xml is fetched, exactly as the historical
             // first pass early-returned.
-            let content_styles = super::open_parse::OpenParse::run(content.xml_content())?;
+            let content_styles = super::open_parse::OpenParse::run_with_xml_limits(
+                content.xml_content(),
+                xml_limits,
+            )?;
+            limits.check(SemanticLimitKind::Units, content_styles.units())?;
 
             let styles = if package.has_file(crate::constants::ODF_STYLES)? {
                 Some(Styles::from_vec(
                     package.get_file(crate::constants::ODF_STYLES)?,
+                    limits,
                 )?)
             } else {
                 None
@@ -250,6 +280,7 @@ impl SourceBackedDocument {
             let meta = if package.has_file(crate::constants::ODF_META)? {
                 Some(Meta::from_vec(
                     package.get_file(crate::constants::ODF_META)?,
+                    xml_limits,
                 )?)
             } else {
                 None
@@ -263,8 +294,9 @@ impl SourceBackedDocument {
 
             Ok((content, styles, meta, style_registry, tolerance))
         })();
-        let (content, styles, meta, style_registry, tolerance) =
-            prefer_current(source.as_ref(), source_version, parsed)?;
+        let observed = source.version()?;
+        ensure_current(source_version, observed)?;
+        let (content, styles, meta, style_registry, tolerance) = parsed?;
 
         Ok(Self {
             package,
@@ -277,6 +309,7 @@ impl SourceBackedDocument {
             text_queries: AtomicUsize::new(0),
             text_cache: OnceLock::new(),
             tolerance,
+            xml_limits,
         })
     }
 
@@ -345,7 +378,7 @@ impl SourceBackedDocument {
             if let Some(styles) = self.styles.as_ref().map(Styles::xml_content) {
                 parts.push((styles, crate::MetadataPart::Styles));
             }
-            crate::content_metadata::parse_parts(&parts)
+            crate::content_metadata::parse_parts_with_xml_limits(&parts, self.xml_limits)
         };
         prefer_current(self.source.as_ref(), self.source_version, result)
     }
@@ -354,7 +387,10 @@ impl SourceBackedDocument {
     /// source package.
     pub fn xforms_models(&self) -> Result<Vec<crate::xforms::Model>> {
         self.check_source()?;
-        let result = crate::xforms::parse_models(self.content.xml_content());
+        let result = crate::xforms::parse_models_with_xml_limits(
+            self.content.xml_content(),
+            self.xml_limits,
+        );
         prefer_current(self.source.as_ref(), self.source_version, result)
     }
 
@@ -706,15 +742,51 @@ impl SourceBackedDocument {
         prefer_current(self.source.as_ref(), self.source_version, result)
     }
 
-    /// Explicitly materialize this source into the existing mutable ODT owner.
-    pub fn materialize(self) -> Result<super::Document> {
+    /// Materialize this source into an immutable [`crate::Package`] while
+    /// keeping the source-backed document, for owners that read through it
+    /// and edit through the package.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::SourceChanged`] when the source changed since open.
+    pub fn to_package(&self) -> Result<crate::Package> {
+        ensure_current(self.source_version, self.source.version()?)?;
+        let result = self
+            .package
+            .materialize()
+            .and_then(|package| {
+                super::Document::from_owned_package_with_limits(
+                    package,
+                    SemanticLimits::DEFAULT,
+                    self.xml_limits,
+                )
+                .map_err(Error::from)
+            })
+            .map(crate::Package::from_parsed);
+        prefer_current(self.source.as_ref(), self.source_version, result)
+    }
+
+    /// Explicitly materialize this source into an immutable [`crate::Package`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::SourceChanged`] when the source changed since open.
+    pub fn materialize(self) -> Result<crate::Package> {
         let source = Arc::clone(&self.source);
         let source_version = self.source_version;
         ensure_current(source_version, source.version()?)?;
         let result = self
             .package
             .materialize()
-            .and_then(super::Document::from_owned_package);
+            .and_then(|package| {
+                super::Document::from_owned_package_with_limits(
+                    package,
+                    SemanticLimits::DEFAULT,
+                    self.xml_limits,
+                )
+                .map_err(Error::from)
+            })
+            .map(crate::Package::from_parsed);
         prefer_current(source.as_ref(), source_version, result)
     }
 }

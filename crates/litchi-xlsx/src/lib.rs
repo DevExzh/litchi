@@ -1,7 +1,9 @@
 //! Typed Excel Open XML documents.
 //!
-//! The ordinary API exposes immutable, cheap-to-share workbook and sheet
-//! handles. Package relationships and physical identifiers remain in [`raw`].
+//! [`Package`] is the immutable, cheap-to-share owner of every state verb:
+//! open, create, edit, apply and save. [`Package::workbook`] returns the owned,
+//! read-only [`Workbook`] projection with its sheet handles. Package
+//! relationships and physical identifiers remain in [`raw`].
 
 #![forbid(unsafe_code)]
 // quick-xml's checked attribute iteration is quadratic on hostile tags; read
@@ -66,8 +68,14 @@
     reason = "schema variants stay explicit and keyed unit maps preserve the required lookup representation"
 )]
 
+// Unit tests drive the source-backed families through the integration
+// tests' drivers, which name this crate `litchi_xlsx`.
+#[cfg(test)]
+extern crate self as litchi_xlsx;
+
 pub mod active_x;
 pub mod auto_filter;
+pub mod builder;
 pub mod calculation_properties;
 pub mod cell;
 pub mod cell_values;
@@ -97,29 +105,36 @@ pub mod ignored_errors;
 pub mod layout;
 pub mod leniency;
 pub mod merge;
+pub mod metadata;
 pub mod named_sheet_view;
 pub mod ole_objects;
+pub mod opc;
+mod open_options;
 mod outline;
 pub mod outline_properties;
 pub mod package;
 pub mod page_breaks;
 pub mod page_margins;
 pub mod page_setup;
+mod part_edit;
 pub mod phonetic_properties;
 pub mod pivot;
 pub mod print_options;
 pub mod query_table;
 pub mod raw;
+mod record;
 pub mod revisions;
 pub mod rich_values;
 pub mod row;
 pub mod row_visibility;
 pub mod scenarios;
+pub mod semantic_limits;
 pub mod shapes;
 pub mod sheet;
 pub mod sheet_calculation_properties;
 pub mod sheet_protection;
 pub mod sheet_view;
+mod signature_policy;
 pub mod slicer;
 #[allow(
     dead_code,
@@ -131,6 +146,7 @@ mod slicer_cache;
 pub mod smart_tags;
 pub mod sort;
 mod source_attributes;
+mod source_limits;
 mod source_payload;
 /// Bounded, sequential creation of one-sheet XLSX workbooks.
 pub mod streaming;
@@ -163,14 +179,13 @@ pub use litchi_crypto::ooxml as encryption;
 
 /// OPC resource limits used by XLSX package and workbook ingress.
 pub use litchi_opc::{
-    ReadLimits, SourceCacheDiagnostics, SourceCacheLimitError, SourceCacheLimits,
+    SourceCacheDiagnostics, SourceCacheLimitError, SourceCacheLimits, SourceLimitKind, SourceLimits,
 };
 
 pub use active_x::{
     Binary, Control, ControlProperties, ControlSet, Controls, Descriptor, Font, LoadedControl,
     Marker, ObjectAnchor, Persistence, Picture, PreviewImage, Property, PropertyObject,
-    load_from_worksheet, remove_from_worksheet, replace_controls_xml, replace_on_worksheet,
-    store_on_worksheet,
+    load_from_worksheet, replace_controls_xml,
 };
 pub use auto_filter::{
     Calendar, Condition, Custom, Customs, DateGroup, Definition, Dynamic, DynamicType, Grouping,
@@ -178,7 +193,8 @@ pub use auto_filter::{
 };
 pub use calculation_properties::{Mode, ReferenceMode};
 pub use cell::{
-    Cell, Cells, Content, Date, ErrorValue, Extents, Number, SharedStringKey, Text, Value,
+    Cell, Cells, Content, Date, ErrorValue, Extents, IndexedCells, Number, RecordIndex, RichRun,
+    RichText, SharedStringKey, Text, Value,
 };
 pub use cell_watches::{
     CellWatchConformance, CellWatchReference, CellWatches, parse_cell_watches, write_cell_watches,
@@ -193,21 +209,14 @@ pub use conditional_formatting::{
     parse_conditional_formattings, parse_differential_formats,
 };
 pub use custom_data::{
-    Commit as CustomDataCommit, CustomData, ExtensionList, Limits as CustomDataLimits,
-    Part as CustomDataPart, Patch as CustomDataPatch, Properties, Snapshot as CustomDataSnapshot,
-    Store, Transaction as CustomDataTransaction, parse_properties, validate_workbook_root,
-    write_properties,
+    CustomData, ExtensionList, Limits as CustomDataLimits, Part as CustomDataPart, Properties,
+    Snapshot as CustomDataSnapshot, parse_properties, validate_workbook_root, write_properties,
 };
 pub use data_consolidation::{
     DataConsolidation, Function, RangeReference, Reference, ReferenceSource, References,
     parse_worksheet_data_consolidation, write_worksheet_data_consolidation,
 };
-pub use data_type_icons::{
-    Commit as DataTypeIconsCommit, Patch as DataTypeIconsPatch, SHOW_DATA_TYPE_ICONS_NAMESPACE,
-    ShowDataTypeIcons, Snapshot as DataTypeIconsSnapshot, Transaction as DataTypeIconsTransaction,
-    apply_patch as apply_data_type_icons_patch, edit as edit_data_type_icons,
-    load as load_data_type_icons,
-};
+pub use data_type_icons::{SHOW_DATA_TYPE_ICONS_NAMESPACE, ShowDataTypeIcons};
 pub use data_validation::{
     Collection, Conformance, ListSource, Range, Source, Sqref, Validation, ValidationErrorStyle,
     ValidationImeMode, ValidationOperator, ValidationType, parse_data_validation_collections,
@@ -216,8 +225,8 @@ pub use data_validation::{
     write_data_validation_extensions,
 };
 pub use error::{
-    ColumnEditBlock, DefaultsEditBlock, EditBlock, Error, MergeEditBlock, RemoveBlock, RenameBlock,
-    Result, RowEditBlock, TabEditBlock,
+    ColumnEditBlock, DefaultsEditBlock, EditBlock, Error, LimitKind, MergeEditBlock, RemoveBlock,
+    RenameBlock, Result, RowEditBlock, TabEditBlock,
 };
 pub use external_links::{
     AlternateUrl, AlternateUrls, CellType, Dde, DdeItem, DdeValue, DdeValueType, DdeValues,
@@ -226,12 +235,6 @@ pub use external_links::{
 };
 pub use formula::Formula;
 pub use header_footer::{SectionKind, Settings, parse_worksheet_header_footer};
-pub use hyperlinks::{
-    Commit as HyperlinkCommit, Diagnostics as HyperlinkDiagnostics, Patch as HyperlinkPatch,
-    Snapshot as HyperlinkSnapshot, SourceBackedEditor as SourceBackedHyperlinkEditor,
-    SourceBackedHyperlinkCommit, SourceBackedHyperlinkPatch, SourceBackedHyperlinkSnapshot,
-    SourceEdit as SourceBackedHyperlinkEdit,
-};
 pub use hyperlinks::{Hyperlink, HyperlinkReference};
 pub use ignored_errors::{
     IgnoredError, IgnoredErrorRangeReference, IgnoredErrorType, IgnoredErrors,
@@ -245,14 +248,14 @@ pub use litchi_sheet::{
     Area, At, Cell as Address, Column as ColumnIndex, ColumnAt, Rect, Row as RowIndex, RowAt,
 };
 pub use named_sheet_view::{
-    load_worksheet_named_sheet_views, parse_named_sheet_views, remove_worksheet_named_sheet_views,
-    store_worksheet_named_sheet_views, write_named_sheet_views,
+    load_worksheet_named_sheet_views, parse_named_sheet_views, write_named_sheet_views,
 };
 pub use ole_objects::{
     Aspect, OleObject, OleObjectAnchor, OleObjectConformance, OleObjectMarker, OleObjectProperties,
     OleObjectRelationshipKind, OleObjectResource, OleObjectTarget, OleObjectUpdate, OleObjects,
-    load_ole_objects, parse_ole_objects, store_ole_objects, write_ole_objects,
+    load_ole_objects, parse_ole_objects, write_ole_objects,
 };
+pub use open_options::OpenOptions;
 pub use outline::{Outline, OutlineAt};
 pub use outline_properties::{OutlineProperties, parse_outline_properties};
 pub use package::Package;
@@ -268,55 +271,34 @@ pub use phonetic_properties::{
     PhoneticAlignment, PhoneticProperties, PhoneticType, parse_phonetic_properties,
 };
 pub use pivot::{
-    PivotCellAddress, PivotCellType, PivotCellValueEdit, PivotRowView,
-    PivotServerFormatAttributeEdit, PivotServerFormatsCommit, PivotServerFormatsPatch,
-    PivotServerFormatsSnapshot, PivotServerFormatsTransaction, PivotTableDataCommit,
-    PivotTableDataDiagnostic, PivotTableDataEdit, PivotTableDataLimits, PivotTableDataPatch,
-    PivotTableDataSnapshot, PivotTableDataTransaction, PivotTableDataView,
-    PivotTableDataWorkbookCommit, PivotTableDataWorkbookPatch, PivotTableSelector,
-    PivotTableServerFormats, PivotTableServerFormatsEdit, PivotTableServerFormatsWorkbookCommit,
-    PivotTableServerFormatsWorkbookPatch, PivotTableView, PivotValueAttributeEdit,
-    PivotValueCellExtraEdit, PivotValueCellExtraView, PivotValueCellView, ServerFormat,
-    ServerFormatEdit, apply_pivot_server_formats_patch, edit_pivot_server_formats,
-    edit_pivot_table_data, edit_pivot_table_data_with_limits, load_pivot_server_formats,
-    load_pivot_table_data, load_pivot_table_data_with_limits,
+    PivotCellAddress, PivotCellType, PivotRowView, PivotTableDataDiagnostic, PivotTableDataView,
+    PivotTableSelector, PivotTableServerFormats, PivotTableView, PivotValueCellExtraView,
+    PivotValueCellView, ServerFormat,
 };
 pub use print_options::{PrintOptions, parse_print_options};
+pub use semantic_limits::SemanticLimits;
 pub use streaming::{
-    StreamingCell, StreamingCellValue, StreamingValue, StreamingWorkbookLimits,
-    StreamingWorkbookWriter,
+    StreamingCell, StreamingCellValue, StreamingWorkbookLimits, StreamingWorkbookWriter,
 };
 // Query-table semantic types remain under the contextual `query_table` owner;
-// package operations are also available at this convenience facade.
-pub use data_validation::{
-    Commit as DataValidationCommit, Diagnostics as DataValidationDiagnostics,
-    Patch as DataValidationPatch, Snapshot as DataValidationSnapshot,
-    SourceBackedEditor as SourceBackedDataValidationEditor,
-    SourceEdit as SourceBackedDataValidationEdit,
-};
+// its package reads are also available at this convenience facade (edits go
+// through `Package::edit_query_tables`).
 pub use query_table::{
     QUERY_TABLE_CONTENT_TYPE, QUERY_TABLE_RELATIONSHIP_TYPE, STRICT_QUERY_TABLE_RELATIONSHIP_TYPE,
-    add_worksheet_query_table, find_worksheet_query_table, is_query_table_relationship_type,
-    load_worksheet_query_tables, parse_query_table, remove_worksheet_query_table,
-    reorder_worksheet_query_tables, replace_worksheet_query_table, update_worksheet_query_table,
-    write_query_table,
+    find_worksheet_query_table, is_query_table_relationship_type, load_worksheet_query_tables,
+    parse_query_table, write_query_table,
 };
 pub use revisions::{
-    Commit as RevisionCommit, Patch as RevisionPatch, RevisionAttribute,
-    RevisionAttributeNamespace, RevisionConformance, RevisionHeader, RevisionHeaderProperties,
-    RevisionHeaders, RevisionLog, RevisionLogPart, RevisionRecord, RevisionRecordKind,
-    RevisionUser, RevisionUsers, RevisionXmlElement, Revisions, Snapshot as RevisionSnapshot,
-    Transaction as RevisionTransaction, load_workbook_revisions, parse_revision_headers,
-    parse_revision_log, parse_revision_users, remove_workbook_revisions, store_workbook_revisions,
+    RevisionAttribute, RevisionAttributeNamespace, RevisionConformance, RevisionHeader,
+    RevisionHeaderProperties, RevisionHeaders, RevisionLog, RevisionLogPart, RevisionRecord,
+    RevisionRecordKind, RevisionUser, RevisionUsers, RevisionXmlElement, Revisions,
+    load_workbook_revisions, parse_revision_headers, parse_revision_log, parse_revision_users,
     write_revision_headers, write_revision_log, write_revision_users,
 };
 pub use rich_values::codec::{parse_feature_property_bags, write_feature_property_bags};
 pub use rich_values::package::load as load_rich_values;
 pub use rich_values::refresh_intervals::{
-    Commit as RichValueRefreshCommit, Patch as RichValueRefreshPatch, REFRESH_INTERVALS_NAMESPACE,
-    RefreshInterval, RefreshIntervals, Snapshot as RichValueRefreshSnapshot,
-    Transaction as RichValueRefreshTransaction, TypeRefreshIntervals,
-    apply_patch as apply_rich_value_refresh_patch, edit as edit_rich_value_refresh,
+    REFRESH_INTERVALS_NAMESPACE, RefreshInterval, RefreshIntervals, TypeRefreshIntervals,
     load as load_rich_value_refresh, parse_refresh_intervals, write_refresh_intervals,
 };
 pub use row::{Height, HeightAt, Row, Rows};
@@ -326,29 +308,19 @@ pub use scenarios::{
 };
 pub use sheet::{Name, NameError};
 pub use sheet_protection::{
-    Commit as SheetProtectionCommit, Diagnostics as SheetProtectionDiagnostics, Metadata,
-    Patch as SheetProtectionPatch, ProtectedRange, ProtectedRangeCollection, ProtectedRangeSource,
-    Protection, ProtectionPasswordVerifier, ProtectionRangeReference, ProtectionRangeReferenceKind,
-    ProtectionRangeSqref, Snapshot as SheetProtectionSnapshot,
-    SourceBackedEditor as SourceBackedSheetProtectionEditor,
-    SourceEdit as SourceBackedSheetProtectionEdit, StrongProtectionPasswordVerifier,
-    parse_protection, replace_protection, validate_metadata, write_core, write_extensions,
-    write_protection,
+    Metadata, ProtectedRange, ProtectedRangeCollection, ProtectedRangeSource, Protection,
+    ProtectionPasswordVerifier, ProtectionRangeReference, ProtectionRangeReferenceKind,
+    ProtectionRangeSqref, StrongProtectionPasswordVerifier, parse_protection, replace_protection,
+    validate_metadata, write_core, write_extensions, write_protection,
 };
 pub use sheet_view::parse_worksheet_views;
 pub use sort::{SortBy, SortCondition, SortMethod, SortState};
-pub use style::{LocalStyle, Style, StyleKey, StyleState, Styles, StylesIter};
+pub use style::{FontChange, LocalStyle, Style, StyleKey, StyleState, Styles, StylesIter};
 pub use survey::{
-    Binding as SurveyBinding, Commit as SurveyCommit, ElementProperties as SurveyElementProperties,
-    Guid as SurveyGuid, Id as SurveyId, Limits as SurveyLimits, Part as SurveyPart,
-    Patch as SurveyPatch, Position as SurveyPosition, Question as SurveyQuestion,
+    Binding as SurveyBinding, ElementProperties as SurveyElementProperties, Guid as SurveyGuid,
+    Id as SurveyId, Position as SurveyPosition, Question as SurveyQuestion,
     QuestionFormat as SurveyQuestionFormat, QuestionType as SurveyQuestionType,
-    Questions as SurveyQuestions, Snapshot as SurveySnapshot, Survey,
-    Transaction as SurveyTransaction, load as load_surveys,
-    load_with_limits as load_surveys_with_limits, parse as parse_survey,
-    parse_with_limits as parse_survey_with_limits, validate as validate_survey,
-    validate_with_limits as validate_surveys_with_limits, write as write_survey,
-    write_with_limits as write_survey_with_limits,
+    Questions as SurveyQuestions, Survey,
 };
 pub use table::{
     Table, TableColumn, TableFormula, TableStyleInfo, TableType, TotalsRowFunction,
@@ -360,22 +332,19 @@ pub use threaded_comments::{
     validate_timestamp, write_comments, write_persons,
 };
 pub use workbook::data_model::{
-    Commit as DataModelCommit, Definition as DataModelDefinition, Model as DataModel,
-    OpaqueXml as DataModelOpaqueXml, Patch as DataModelPatch, Payload as DataModelPayload,
-    Relationship as DataModelRelationship, Snapshot as DataModelSnapshot, Table as DataModelTable,
-    Transaction as DataModelTransaction, load_data_model, parse_data_model, store_data_model,
+    Definition as DataModelDefinition, EditOptions as DataModelEditOptions,
+    Limits as DataModelLimits, Model as DataModel, OpaqueXml as DataModelOpaqueXml,
+    Payload as DataModelPayload, Relationship as DataModelRelationship,
+    Snapshot as DataModelSnapshot, Table as DataModelTable, load_data_model, parse_data_model,
     write_data_model,
 };
 pub use workbook::{
-    ActiveTab, Change, ColumnEdit, Commit, Conflict, ConflictSet, DateSystem, DefaultsEdit,
-    DurablePatch, Edit, Flavor, FormControlEdit, History, HistoryLimits, JoinError, JoinFailure,
-    MergeChoice, MergeLimits, NewSheet, PackageChange, Patch, RowEdit, SealedPatch, Selector,
-    SourceBackedMergeCommit, SourceBackedMergeDiagnostics, SourceBackedMergeEdit,
-    SourceBackedMergeEditor, SourceBackedMergePatch, SourceBackedMergeSnapshot,
-    SourceBackedWorkbook, SourceCell, SourceCellView, SourceWorksheet, State, TabEdit,
-    ThreeWayPlan, Visibility, Workbook, Worksheet, WorksheetContentPart,
-    WorksheetContentPartOutboundRelationship, WorksheetContentPartPayload,
-    WorksheetContentPartRelationship, WorksheetEdit, WorksheetKind,
+    ActiveTab, Change, Commit, Conflict, ConflictSet, DateSystem, DurablePatch, Edit, EditOptions,
+    Flavor, History, HistoryLimits, JoinError, JoinFailure, JoinNormalization, MergeChoice,
+    MergeLimits, NewSheet, PackageChange, Patch, SealedPatch, Selector, SourceBackedWorkbook,
+    SourceCell, SourceCellView, SourceWorksheet, State, ThreeWayPlan, Visibility, Workbook,
+    Worksheet, WorksheetContentPart, WorksheetContentPartOutboundRelationship,
+    WorksheetContentPartPayload, WorksheetContentPartRelationship, WorksheetKind,
 };
 pub use workbook_metadata::{
     FutureMetadata, MetadataBehavior, MetadataBlock, MetadataRecord, MetadataType,

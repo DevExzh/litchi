@@ -1,0 +1,153 @@
+{
+  "record": "0359qe",
+  "date": "2026-10-23",
+  "scenario": "doc/batch1k_leaf_write and doc/leaf_write",
+  "integration": "3cad59be707c7431bc1a8c115e1ff534a048dc57",
+  "probe": {
+    "source_sha256": "9e1cd649268ad5eefe4314b76493f61cd047bf6ec4114c7e7872b2182b1af689",
+    "selector": "LITCHI_PROBE_ONLY",
+    "runner_argument": "1 or 3",
+    "cpu": 29
+  },
+  "source_assemblies": {
+    "candidate": {
+      "description": "3cad source as checked out",
+      "body_text_sha256": "614ce42c2dfe8ad985dc37d2c949602916bc155bd51149f2e843f24fdf378224",
+      "revision_package_sha256": "0fd67fae678e870f6e7216f0ec5d64ea62a0da7db6df7f87297a965fd9a2da86"
+    },
+    "baseline": {
+      "description": "3cad with only the body-publication diffs from ae094d7d05, 6456aa3223, and 160a00559b reversed in body_text.rs and tracked_revision/package.rs; current taxonomy, probe, and all other 3cad files retained",
+      "overlay_patch_sha256": "10765febb64c4e099f5c3ef560366124dc1d28d540d138768ae0f7cf782da2ab",
+      "body_text_sha256": "3e09f67abe5c40248959fe35ca90ea9c8ceb52609394267970b1307be09465d5",
+      "revision_package_sha256": "613beaf162033c6153906ef2b1299d21e0ece58b4283a43400924c2503dbe40a"
+    }
+  },
+  "build": {
+    "command": "cargo build --offline --locked --release -p litchi-ops --features doc,xls,rtf --example legacy_w5_source_probe",
+    "toolchain": "1.95.0",
+    "cargo_build_jobs": 1,
+    "cargo_incremental": 0,
+    "release_debug": 0,
+    "memory_cap": "20G",
+    "candidate_binary": {
+      "bytes": 13619264,
+      "sha256": "60fbee5be5cea777afd2e94cad759099a8540e454225601d25dfead17eae2e79"
+    },
+    "baseline_binary": {
+      "bytes": 13617672,
+      "sha256": "757da327e77212eaceb163cc976b7eab47105501a356b25754d15ff2f757577a"
+    }
+  },
+  "output": {
+    "ordinary": {
+      "candidate_sha256": "6bb97058e47f747c29e568395eea01db1226aa5ab8962087e1d78a1b9b82ff11",
+      "baseline_sha256": "6bb97058e47f747c29e568395eea01db1226aa5ab8962087e1d78a1b9b82ff11"
+    },
+    "batch": {
+      "candidate_sha256": "bd016a87f5d0015d6f8b910862eeeef9c0ce490033b4951c32ee5f403b7eebdf",
+      "baseline_sha256": "4a5bcc2888ab819488fbb5a1ced1b088010440bd8293f10556e0903993e448d3",
+      "candidate_bytes": 182784,
+      "baseline_bytes": 7715328,
+      "rendered_pdf_pages": 18,
+      "rendered_png_pages": 18,
+      "rendered_text_sha256": "f05c01ebac3ab0c1312ba3af0916f639f9b752f6c535d95182fa4a4776806826",
+      "rendered_page_sha256_list_sha256": "ddb17c280dafffb7f94683d67b2be15f0af5bf4baa5bbfa1f9f699608530ee13"
+    },
+    "raw_byte_note": "The batch raw OLE hashes differ because the baseline retains superseded CHPX/1Table history from publishing every toggle; the deferred candidate emits the compact final streams. LibreOffice text and 72-dpi rendered page hashes are identical. This is recorded for coordinator fidelity review, not hidden as an equal-byte result."
+  },
+  "wall_diagnostic": {
+    "batch1k_leaf_write_us_median": {
+      "candidate": 241104.356,
+      "baseline": 1319299.299,
+      "ratio": 0.182752
+    },
+    "ordinary_leaf_write_us_median": {
+      "candidate": 3425.246,
+      "baseline": 3284.835,
+      "ratio": 1.042745
+    },
+    "status": "diagnostic_only",
+    "reason": "Host load was approximately 37; no native qualification claim is made."
+  },
+  "callgrind": {
+    "ordinary_route_calls": 4,
+    "ordinary_route_ir": {
+      "candidate": 257848943,
+      "baseline": 256622212,
+      "ratio": 1.004780
+    },
+    "ordinary_edit_commit_ir": {
+      "candidate": 79843981,
+      "baseline": 73325557,
+      "ratio": 1.088897
+    },
+    "ordinary_set_character_property_override_ir": {
+      "candidate": 22463186,
+      "baseline": 32195265,
+      "ratio": 0.697717
+    },
+    "ordinary_write_to_ir": {
+      "candidate": 2019466,
+      "baseline": 2284831,
+      "ratio": 0.883858
+    },
+    "batch_route_calls": 4,
+    "batch_route_ir": {
+      "candidate": 24673833943,
+      "baseline": 60148185975,
+      "ratio": 0.410217
+    },
+    "batch_set_character_property_override_ir": {
+      "candidate": 24401629461,
+      "baseline": 59766540467,
+      "ratio": 0.408282
+    },
+    "batch_edit_commit_ir": {
+      "candidate": 116796195,
+      "baseline": 156611248,
+      "ratio": 0.745771
+    },
+    "batch_write_to_ir": {
+      "candidate": 2525852,
+      "baseline": 69272900,
+      "ratio": 0.036462
+    },
+    "artifacts": {
+      "candidate_ordinary": "4a39f0c91a5d4b07ac4899a927997ce5021e9a25991e9138b6ee5e7bca97899e",
+      "baseline_ordinary": "35ca4d58257feee9851afa19c583290235383c1f7f7fb957d4d44f8dd7b28172",
+      "candidate_batch": "3cdded22837d216881755a5ab928e8ee9618ca57dfa435447dd923a65ecae540",
+      "baseline_batch": "6989252603f52f758b2ca4ad169bb122ac8cce009e2e818a6b5d28fab6333d7a"
+    }
+  },
+  "massif": {
+    "ordinary_peak_total_bytes": {
+      "candidate": 7910440,
+      "baseline": 8228648,
+      "ratio": 0.961329
+    },
+    "batch_peak_total_bytes": {
+      "candidate": 8769392,
+      "baseline": 107252816,
+      "ratio": 0.081764
+    },
+    "artifacts": {
+      "candidate_ordinary": "b29f0f124a7eff5574313136636b470d6362498a52754e889bcf82fe894e572a",
+      "baseline_ordinary": "48c623ddc380cb93200854131f56adbd3e5bc5825a93f1b66a28342c0bf6fca2",
+      "candidate_batch": "36384b97569813649b4c10c547c8af5928b8434ef88c31dfa89891f275c78b2b",
+      "baseline_batch": "f27144b3c9faa44baca9a64e887b03d0d3406fa8b14695c97f02bbd717e8760c"
+    }
+  },
+  "tests": {
+    "candidate_litchi_doc_lib": "1210 passed, 0 failed, 2 ignored",
+    "candidate_litchi_ops_doc_unified_ops": "13 passed, 0 failed",
+    "candidate_mixed_body_formatting": "passed",
+    "baseline_overlay_build": "passed",
+    "baseline_retained_render_test": "passed",
+    "rustfmt_targeted": "passed",
+    "git_diff_check": "passed"
+  },
+  "native": {
+    "status": "pending",
+    "reason": "Host was not quiet; no ABBA block is accepted as native qualification."
+  }
+}

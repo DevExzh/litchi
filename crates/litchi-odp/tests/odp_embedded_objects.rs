@@ -3,7 +3,7 @@
     reason = "integration-test assertions panic on failure by design"
 )]
 
-use litchi_odp::Presentation;
+use litchi_odp::Package;
 use litchi_odp::core::PackageWriter;
 use litchi_odp::embedded::{Kind, Source};
 
@@ -11,12 +11,15 @@ const CONTENT: &str = r#"<?xml version="1.0"?><office:document-content xmlns:off
 
 #[test]
 fn applets_and_floating_frames_are_bounded_inert_objects() {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.presentation")
         .unwrap();
     writer.add_file("content.xml", CONTENT.as_bytes()).unwrap();
-    let presentation = Presentation::from_bytes(writer.finish_to_bytes().unwrap()).unwrap();
+    let presentation = Package::from_bytes(&writer.finish_to_bytes().unwrap())
+        .unwrap()
+        .presentation()
+        .unwrap();
 
     let objects = presentation.embedded_objects().unwrap();
     assert_eq!(objects.len(), 2);

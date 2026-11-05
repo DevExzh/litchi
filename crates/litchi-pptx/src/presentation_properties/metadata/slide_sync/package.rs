@@ -4,6 +4,7 @@ use litchi_opc::OpcPackage;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::part::BlobPart;
 
+use super::codec::Limits;
 use super::model::Part;
 use crate::{Error, Result};
 
@@ -15,15 +16,16 @@ pub const CONTENT_TYPE: &str =
 pub const RELATIONSHIP_TYPE: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideSyncData";
 
-const MAX_TOTAL_XML_BYTES: usize = 64 * 1024 * 1024;
-const MAX_PARTS: usize = 4096;
-
 fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-fn limit(what: &str) -> Error {
-    Error::Invalid(format!("exceeded maximum {what}"))
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }
 
 /// Load every synchronization part and validate its slide relationship graph.
@@ -31,7 +33,7 @@ fn limit(what: &str) -> Error {
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn load(package: &OpcPackage) -> Result<Vec<Part>> {
+pub fn load(package: &OpcPackage, limits: Limits) -> Result<Vec<Part>> {
     if package
         .rels()
         .iter()
@@ -69,8 +71,12 @@ pub fn load(package: &OpcPackage) -> Result<Vec<Part>> {
                 "slide synchronization relationship cannot be external",
             ));
         }
-        if loaded.len() >= MAX_PARTS {
-            return Err(limit("slide synchronization part count"));
+        if loaded.len() >= limits.max_parts() {
+            return Err(limit(
+                crate::error::CodecLimitKind::Parts,
+                loaded.len().checked_add(1).unwrap_or(usize::MAX),
+                limits.max_parts(),
+            ));
         }
         let target = relationship.target_partname()?;
         let part = package.get_part(&target)?;
@@ -85,17 +91,24 @@ pub fn load(package: &OpcPackage) -> Result<Vec<Part>> {
                 "slide synchronization part cannot have outbound relationships",
             ));
         }
-        total_xml_bytes = total_xml_bytes
-            .checked_add(part.blob().len())
-            .ok_or_else(|| limit("total slide synchronization XML bytes"))?;
-        if total_xml_bytes > MAX_TOTAL_XML_BYTES {
-            return Err(limit("total slide synchronization XML bytes"));
+        total_xml_bytes =
+            total_xml_bytes
+                .checked_add(part.blob().len())
+                .ok_or(Error::CapacityOverflow {
+                    resource: "total slide synchronization XML bytes",
+                })?;
+        if total_xml_bytes > limits.max_total_input_bytes() {
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                total_xml_bytes,
+                limits.max_total_input_bytes(),
+            ));
         }
         loaded.push(Part::new(
             relationship.r_id().to_owned(),
             source.partname().clone(),
             target,
-            super::model::Properties::parse(part.blob())?,
+            super::model::Properties::parse(part.blob(), limits)?,
         ));
     }
 
@@ -129,7 +142,7 @@ pub fn load(package: &OpcPackage) -> Result<Vec<Part>> {
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
-pub fn store(package: &mut OpcPackage, value: &Part) -> Result<()> {
+pub(crate) fn store(package: &mut OpcPackage, value: &Part, limits: Limits) -> Result<()> {
     validate_ncname(&value.relationship_id)?;
     let slide_name = &value.slide_part_name;
     let part_name = &value.part_name;
@@ -163,7 +176,7 @@ pub fn store(package: &mut OpcPackage, value: &Part) -> Result<()> {
         )));
     }
 
-    let xml = value.properties.to_xml()?;
+    let xml = value.properties.to_xml(limits)?;
     let target = part_name.relative_ref(slide_name.base_uri());
     package.try_add_part(Box::new(BlobPart::new(
         part_name.clone(),

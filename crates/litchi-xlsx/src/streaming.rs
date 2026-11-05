@@ -665,9 +665,6 @@ impl<W: Write> PoisonTarget<'_, W> {
     }
 }
 
-/// Convenience alias for the scalar value enum.
-pub type StreamingValue<'a> = StreamingCellValue<'a>;
-
 #[derive(Default)]
 struct ExecutionFailureState {
     error: Mutex<Option<litchi_core::ExecutionError>>,
@@ -1120,7 +1117,9 @@ mod tests {
             )
             .unwrap();
         let bytes = value_writer.finish().unwrap();
-        let package = litchi_opc::phys_pkg::PhysPkgReader::new(&bytes).unwrap();
+        let package =
+            litchi_opc::phys_pkg::PhysPkgReader::new(&bytes, litchi_opc::SourceLimits::default())
+                .unwrap();
         assert_eq!(
             package.member_names().unwrap(),
             vec![
@@ -1142,7 +1141,7 @@ mod tests {
                 .windows(b"dimension".len())
                 .any(|window| window == b"dimension")
         );
-        let workbook = crate::Workbook::from_bytes(bytes).unwrap();
+        let workbook = crate::Package::from_bytes(&bytes).unwrap();
         let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
         assert!(matches!(
             sheet.cell("A1").unwrap().stored(),
@@ -1153,7 +1152,9 @@ mod tests {
     #[test]
     fn empty_workbook_has_compact_canonical_six_part_topology() {
         let bytes = writer().finish().unwrap();
-        let package = litchi_opc::phys_pkg::PhysPkgReader::new(&bytes).unwrap();
+        let package =
+            litchi_opc::phys_pkg::PhysPkgReader::new(&bytes, litchi_opc::SourceLimits::default())
+                .unwrap();
         assert_eq!(package.len(), 6);
         for (uri, expected) in [
             (CONTENT_TYPES_URI, CONTENT_TYPES_XML),
@@ -1180,7 +1181,7 @@ mod tests {
                 .windows(b"sharedStrings".len())
                 .any(|window| window == b"sharedStrings")
         );
-        let workbook = crate::Workbook::from_bytes(bytes).unwrap();
+        let workbook = crate::Package::from_bytes(&bytes).unwrap();
         let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
         assert!(sheet.cell("A1").unwrap().is_missing());
     }
@@ -1317,7 +1318,7 @@ mod tests {
             )
             .unwrap();
         let bytes = writer.finish().unwrap();
-        let workbook = crate::Workbook::from_bytes(bytes).unwrap();
+        let workbook = crate::Package::from_bytes(&bytes).unwrap();
         let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
         assert!(matches!(
             sheet.cell("A1").unwrap().stored(),
@@ -2341,7 +2342,7 @@ mod tests {
             )
             .unwrap();
         let bytes = short.finish().unwrap().0;
-        assert!(crate::Workbook::from_bytes(bytes).is_ok());
+        assert!(crate::Package::from_bytes(&bytes).is_ok());
 
         let mut interrupted = StreamingWorkbookWriter::new(
             InterruptedOnce {

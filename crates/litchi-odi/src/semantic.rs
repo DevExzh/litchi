@@ -1,10 +1,11 @@
 //! Deterministic semantic patches, transfer, and non-mutating merge planning.
 
 use crate::{
-    Commit, Edit, FlatImage, FlatImageCommit, FrameChange, Image, MetadataFields, ResourceChange,
-    frame::Frame, map::ImageMap, source::Source,
+    Commit, Edit, FrameChange, Image, MetadataFields, Package, ResourceChange, frame::Frame,
+    map::ImageMap, source::Source,
 };
-use litchi_core::{Error, Result};
+use litchi_core::{Error as CoreError, Result};
+use litchi_odf_common::Error as PackageError;
 use quick_xml::{
     XmlVersion,
     events::Event,
@@ -20,6 +21,8 @@ const MIB: usize = 1024 * 1024;
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const STYLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:style:1.0";
 const MAX_STYLE_CLOSURE: usize = 1_024;
+
+type PackageResult<T> = std::result::Result<T, PackageError>;
 
 /// Whether a security-sensitive semantic capability is available.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -484,35 +487,48 @@ impl SemanticPlan {
     /// Applies this plan to flat XML and fully reopens the result.
     pub fn commit_flat(
         &self,
-        source: &FlatImage,
+        source: &crate::flat::Image,
         policy: &SecurityPolicy,
-    ) -> Result<FlatImageCommit> {
+    ) -> PackageResult<crate::flat::Commit> {
         self.ensure_publishable(policy)?;
         ensure_current_values(&self.operations, |key| flat_value(source, key))?;
-        let mut edit = source.transaction();
+        let mut edit = source.edit();
         for operation in &self.operations {
             apply_flat_operation(&mut edit, operation)?;
         }
-        let commit = edit.commit()?;
-        let reopened = FlatImage::from_bytes(commit.snapshot().as_bytes().to_vec())?;
-        if reopened.as_bytes() != commit.snapshot().as_bytes() {
-            return Err(invalid("ODI flat plan failed full byte reopen"));
+        let commit = edit.commit_core()?;
+        let reopened = crate::flat::Image::from_flat_bytes(
+            commit.package().as_bytes().to_vec(),
+            source.bounds(),
+        )?;
+        if reopened.as_bytes() != commit.package().as_bytes() {
+            return Err(PackageError::from(invalid(
+                "ODI flat plan failed full byte reopen",
+            )));
         }
         Ok(commit)
     }
 
     /// Applies this plan to a package and fully reopens the result.
-    pub fn commit_package(&self, source: &Image, policy: &SecurityPolicy) -> Result<Commit> {
+    pub fn commit_package(
+        &self,
+        source: &Package,
+        policy: &SecurityPolicy,
+    ) -> PackageResult<Commit> {
         self.ensure_publishable(policy)?;
-        ensure_current_values(&self.operations, |key| package_value(source, key))?;
+        ensure_current_values(&self.operations, |key| {
+            package_value(source.image_ref(), key)
+        })?;
         let mut edit = source.edit();
         for operation in &self.operations {
             apply_package_operation(&mut edit, operation)?;
         }
         let commit = edit.commit()?;
-        let reopened = Image::from_bytes(commit.image().as_bytes().to_vec())?;
-        if reopened.as_bytes() != commit.image().as_bytes() {
-            return Err(invalid("ODI package plan failed full byte reopen"));
+        let reopened = Package::from_vec(commit.package().as_bytes().to_vec())?;
+        if reopened.as_bytes() != commit.package().as_bytes() {
+            return Err(PackageError::from(invalid(
+                "ODI package plan failed full byte reopen",
+            )));
         }
         Ok(commit)
     }
@@ -547,24 +563,31 @@ pub struct SemanticPatch {
 }
 
 impl SemanticPatch {
-    pub(crate) fn from_flat_commit(
-        commit: &FlatImageCommit,
+    pub(crate) fn from_flat_patch(
+        patch: &crate::flat::Patch,
         policy: &SecurityPolicy,
     ) -> Result<Self> {
-        let mut operations = frame_operations(commit.patch().changes());
-        if let Some(change) = commit.patch().metadata_change() {
+        let mut operations = frame_operations(patch.changes());
+        if let Some(change) = patch.metadata_change() {
             operations.extend(metadata_operations(change.before(), change.after()));
         }
         Self::new(
             ArtifactKind::Flat,
-            commit.source().as_bytes(),
-            commit.snapshot().as_bytes(),
+            patch.source().as_bytes(),
+            patch.target().as_bytes(),
             operations,
             policy,
         )
     }
 
-    pub(crate) fn from_package_commit(commit: &Commit, policy: &SecurityPolicy) -> Result<Self> {
+    /// Builds a deterministic semantic patch from a committed package edit
+    /// under explicit limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an operation or the retained byte count
+    /// violates `policy`.
+    pub fn from_package_commit(commit: &Commit, policy: &SecurityPolicy) -> PackageResult<Self> {
         let mut operations = frame_operations(commit.patch().changes());
         if let Some(change) = commit.patch().metadata_change() {
             operations.extend(metadata_operations(change.before(), change.after()));
@@ -577,15 +600,23 @@ impl SemanticPatch {
             });
         }
         for change in commit.patch().resource_changes() {
-            operations.push(resource_operation(commit.source(), commit.image(), change)?);
+            operations.push(
+                resource_operation(
+                    commit.patch().source().image_ref(),
+                    commit.package().image_ref(),
+                    change,
+                )
+                .map_err(PackageError::from)?,
+            );
         }
         Self::new(
             ArtifactKind::Package,
-            commit.source().as_bytes(),
-            commit.image().as_bytes(),
+            commit.patch().source().as_bytes(),
+            commit.package().as_bytes(),
             operations,
             policy,
         )
+        .map_err(PackageError::from)
     }
 
     fn new(
@@ -648,19 +679,32 @@ impl SemanticPatch {
     }
 
     /// Applies only to the exact flat source and reparses the target bytes.
-    pub fn apply_flat(&self, source: &FlatImage) -> Result<FlatImage> {
-        if self.kind != ArtifactKind::Flat || self.source.as_slice() != source.as_bytes() {
-            return Err(invalid("stale or wrong-kind ODI semantic patch source"));
+    pub fn apply_flat(&self, source: &crate::flat::Image) -> PackageResult<crate::flat::Image> {
+        if self.kind != ArtifactKind::Flat {
+            return Err(wrong_artifact_kind("odi.semantic.apply_flat"));
         }
-        FlatImage::from_bytes(self.target.as_ref().clone())
+        if self.source.as_slice() != source.as_bytes() {
+            return Err(PackageError::patch_conflict(
+                "odi.semantic.apply_flat",
+                "the patch source does not match the image",
+            ));
+        }
+        crate::flat::Image::from_flat_bytes(self.target.as_ref().clone(), source.bounds())
+            .map_err(PackageError::from)
     }
 
     /// Applies only to the exact package source and reparses the target bytes.
-    pub fn apply_package(&self, source: &Image) -> Result<Image> {
-        if self.kind != ArtifactKind::Package || self.source.as_slice() != source.as_bytes() {
-            return Err(invalid("stale or wrong-kind ODI semantic patch source"));
+    pub fn apply_package(&self, source: &Package) -> PackageResult<Package> {
+        if self.kind != ArtifactKind::Package {
+            return Err(wrong_artifact_kind("odi.semantic.apply_package"));
         }
-        Image::from_bytes(self.target.as_ref().clone())
+        if self.source.as_slice() != source.as_bytes() {
+            return Err(PackageError::patch_conflict(
+                "odi.semantic.apply_package",
+                "the patch source does not match the package",
+            ));
+        }
+        Package::from_vec(self.target.as_ref().clone()).map_err(PackageError::from)
     }
 
     /// Joins two patches derived from the same exact source without mutation.
@@ -677,13 +721,14 @@ impl SemanticPatch {
 
     /// Plans a three-way application against current flat semantics.
     #[must_use]
-    pub fn plan_flat(&self, current: &FlatImage) -> SemanticPlan {
+    pub fn plan_flat(&self, current: &crate::flat::Image) -> SemanticPlan {
         plan_operations(&self.operations, |key| flat_value(current, key))
     }
 
     /// Plans a three-way application or cross-artifact transfer to a package.
     #[must_use]
-    pub fn plan_package(&self, current: &Image) -> SemanticPlan {
+    pub fn plan_package(&self, current: &Package) -> SemanticPlan {
+        let current = current.image_ref();
         let mut plan = plan_operations(&self.operations, |key| package_value(current, key));
         complete_package_dependencies(self, current, &mut plan);
         plan.operations
@@ -696,7 +741,7 @@ impl SemanticPatch {
 
 fn complete_package_dependencies(patch: &SemanticPatch, current: &Image, plan: &mut SemanticPlan) {
     let target_package = if patch.kind == ArtifactKind::Package {
-        Image::from_bytes(patch.target.as_ref().clone()).ok()
+        Package::from_vec(patch.target.as_ref().clone()).ok()
     } else {
         None
     };
@@ -709,7 +754,7 @@ fn complete_package_dependencies(patch: &SemanticPatch, current: &Image, plan: &
                 complete_resource_dependency(
                     patch,
                     current,
-                    target_package.as_ref(),
+                    target_package.as_ref().map(Package::image_ref),
                     *frame,
                     href,
                     operation.key(),
@@ -719,7 +764,7 @@ fn complete_package_dependencies(patch: &SemanticPatch, current: &Image, plan: &
             (FrameProperty::StyleName, SemanticValue::Text(Some(name))) => {
                 complete_style_dependency(
                     current,
-                    target_package.as_ref(),
+                    target_package.as_ref().map(Package::image_ref),
                     name,
                     "graphic",
                     operation.key(),
@@ -729,7 +774,7 @@ fn complete_package_dependencies(patch: &SemanticPatch, current: &Image, plan: &
             (FrameProperty::TextStyleName, SemanticValue::Text(Some(name))) => {
                 complete_style_dependency(
                     current,
-                    target_package.as_ref(),
+                    target_package.as_ref().map(Package::image_ref),
                     name,
                     "paragraph",
                     operation.key(),
@@ -1803,7 +1848,7 @@ fn plan_operations(
     }
 }
 
-fn flat_value(image: &FlatImage, key: &OperationKey) -> Result<Option<SemanticValue>> {
+fn flat_value(image: &crate::flat::Image, key: &OperationKey) -> Result<Option<SemanticValue>> {
     match key {
         OperationKey::Frame { frame, property } => image
             .frames()
@@ -1878,19 +1923,28 @@ fn metadata_value(fields: &MetadataFields, property: MetadataProperty) -> Semant
         MetadataProperty::Author => fields.author(),
         MetadataProperty::Subject => fields.subject(),
         MetadataProperty::Description => fields.description(),
-        MetadataProperty::Keywords => fields.keywords(),
+        // The semantic plan carries text; keywords travel as their joined
+        // `, ` form and are split back at `;` and `,` when applied.
+        MetadataProperty::Keywords => {
+            let keywords = fields.keywords();
+            return SemanticValue::Text((!keywords.is_empty()).then(|| keywords.join(", ")));
+        },
     };
     text(value)
+}
+
+/// The keyword list a semantic text value names.
+fn keyword_list(value: Option<&String>) -> Vec<String> {
+    value
+        .map(|value| litchi_core::metadata::keywords::split(value))
+        .unwrap_or_default()
 }
 
 fn text(value: Option<&str>) -> SemanticValue {
     SemanticValue::Text(value.map(str::to_owned))
 }
 
-fn apply_flat_operation(
-    edit: &mut crate::FlatImageTransaction,
-    operation: &SemanticOperation,
-) -> Result<()> {
+fn apply_flat_operation(edit: &mut crate::flat::Edit, operation: &SemanticOperation) -> Result<()> {
     match operation.key() {
         OperationKey::Frame { frame, property } => {
             apply_frame_operation(edit, *frame, *property, operation.after())
@@ -1904,7 +1958,7 @@ fn apply_flat_operation(
                 MetadataProperty::Author => edit.set_author(value.clone()),
                 MetadataProperty::Subject => edit.set_subject(value.clone()),
                 MetadataProperty::Description => edit.set_description(value.clone()),
-                MetadataProperty::Keywords => edit.set_keywords(value.clone()),
+                MetadataProperty::Keywords => edit.set_keywords(keyword_list(value.as_ref())),
             }
         },
         OperationKey::Styles => Err(invalid("ODI flat plan contains a package style operation")),
@@ -1924,18 +1978,24 @@ fn apply_package_operation(edit: &mut Edit<'_>, operation: &SemanticOperation) -
                 return Err(invalid("ODI metadata operation has the wrong value type"));
             };
             match property {
-                MetadataProperty::Title => edit.set_title(value.clone()),
-                MetadataProperty::Author => edit.set_author(value.clone()),
-                MetadataProperty::Subject => edit.set_subject(value.clone()),
-                MetadataProperty::Description => edit.set_description(value.clone()),
-                MetadataProperty::Keywords => edit.set_keywords(value.clone()),
+                MetadataProperty::Title => edit.set_title(value.clone()).map_err(CoreError::from),
+                MetadataProperty::Author => edit.set_author(value.clone()).map_err(CoreError::from),
+                MetadataProperty::Subject => {
+                    edit.set_subject(value.clone()).map_err(CoreError::from)
+                },
+                MetadataProperty::Description => {
+                    edit.set_description(value.clone()).map_err(CoreError::from)
+                },
+                MetadataProperty::Keywords => edit
+                    .set_keywords(keyword_list(value.as_ref()))
+                    .map_err(CoreError::from),
             }
         },
         OperationKey::Styles => {
             let SemanticValue::Xml(value) = operation.after() else {
                 return Err(invalid("ODI style operation has the wrong value type"));
             };
-            edit.set_styles_xml(value.clone())
+            edit.set_styles_xml(value.clone()).map_err(CoreError::from)
         },
         OperationKey::Resource(path) => {
             let SemanticValue::Resource(value) = operation.after() else {
@@ -1947,8 +2007,9 @@ fn apply_package_operation(edit: &mut Edit<'_>, operation: &SemanticOperation) -
                     resource.media_type.clone(),
                     resource.bytes.clone(),
                 )
+                .map_err(CoreError::from)
             } else {
-                edit.remove_member(path.clone())
+                edit.remove_member(path.clone()).map_err(CoreError::from)
             }
         },
     }
@@ -2204,14 +2265,22 @@ fn artifact_conflict(kind: ConflictKind) -> Conflict {
     }
 }
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn invalid(message: impl Into<String>) -> CoreError {
+    CoreError::InvalidFormat(message.into())
+}
+
+fn wrong_artifact_kind(operation: &'static str) -> PackageError {
+    PackageError::refused(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
+        operation,
+        "the semantic patch targets another ODI artifact kind",
+    )
 }
 
 fn copy_patch_bytes(bytes: &[u8], resource: &'static str) -> Result<Vec<u8>> {
     let mut copy = Vec::new();
     copy.try_reserve_exact(bytes.len())
-        .map_err(|source| Error::Allocation { resource, source })?;
+        .map_err(|source| CoreError::Allocation { resource, source })?;
     copy.extend_from_slice(bytes);
     Ok(copy)
 }

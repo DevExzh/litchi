@@ -3,54 +3,31 @@
     clippy::expect_used,
     reason = "test assertions panic on failure by design"
 )]
+//! Legacy and modern comment CRUD through the package comment families
+//! (record 0356a).
 
-use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
-use litchi_opc::{OpcPackage, PackURI, Part};
+use litchi_opc::{PackURI, Part};
+use litchi_pptx::Package;
 use litchi_pptx::comments::{
     Author as LegacyAuthor, Comment as LegacyComment, Comments as LegacyComments,
-    Conformance as LegacyConformance, List as LegacyList, add_presentation_comment,
-    add_presentation_comment_author, find_presentation_comment, find_presentation_comment_author,
-    remove_presentation_comment, remove_presentation_comment_author,
-    reorder_presentation_comment_authors, reorder_presentation_comments,
-    replace_presentation_comment, replace_presentation_comment_author, store_presentation_comments,
-    update_presentation_comment, update_presentation_comment_author,
+    Conformance as LegacyConformance, List as LegacyList,
 };
-use litchi_pptx::modern_comments::{
-    Author, Comment, Progress, Reply, add_modern_comment, add_modern_comment_author,
-    add_modern_comment_reply, find_modern_comment, find_modern_comment_reply,
-    remove_modern_comment, remove_modern_comment_author, remove_modern_comment_reply,
-    reorder_modern_comment_authors, reorder_modern_comments, replace_modern_comment,
-    replace_modern_comment_author, replace_modern_comment_reply, update_modern_comment,
-    update_modern_comment_author, update_modern_comment_reply,
-};
+use litchi_pptx::modern_comments::{Author, Comment, Progress, Reply};
 
 const SLIDE: &str = "/ppt/slides/slide1.xml";
+const SLIDE_POSITION: usize = 0;
 const AUTHOR_A: &str = "{CD37207E-7903-4ED4-8AE8-017538D2DF7E}";
 const AUTHOR_B: &str = "{0B2043D4-0908-4C42-8A79-51EA2CC309F7}";
 const COMMENT_A: &str = "{62A8A96D-E5A8-4BFC-B993-A6EAE3907CAD}";
 const COMMENT_B: &str = "{ABCDEF12-3456-4ABC-8DEF-1234567890AB}";
 const REPLY_A: &str = "{E524A04C-CF22-45D7-A60D-09322EA5A80D}";
 
-fn package() -> (OpcPackage, PackURI) {
-    let mut package = OpcPackage::new();
-    let presentation_name = PackURI::new("/ppt/presentation.xml").unwrap();
-    let slide_name = PackURI::new(SLIDE).unwrap();
-    let mut presentation = BlobPart::new(
-        presentation_name,
-        ct::PML_PRESENTATION_MAIN.into(),
-        br#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#.to_vec(),
-    );
-    presentation.relate_to("slides/slide1.xml", rt::SLIDE);
-    package.add_part(Box::new(presentation));
-    package.add_part(Box::new(BlobPart::new(
-        slide_name.clone(),
-        ct::PML_SLIDE.into(),
-        br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#
-            .to_vec(),
-    )));
-    package.relate_to("ppt/presentation.xml", rt::OFFICE_DOCUMENT);
-    (package, slide_name)
+/// A one-slide deck; its slide is `SLIDE`.
+fn package() -> Package {
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    builder.presentation().unwrap().add_slide().unwrap();
+    builder.build().unwrap()
 }
 
 fn legacy_author(id: u32, name: &str) -> LegacyAuthor {
@@ -122,7 +99,8 @@ fn modern_reply(id: &str, author_id: &str) -> Reply {
 
 #[test]
 fn legacy_author_and_slide_comment_crud_preserves_shared_target() {
-    let (mut package, _) = package();
+    let package = package();
+    let mut edit = package.edit_comments().unwrap();
     let graph = LegacyComments {
         author_relationship_id: "rIdLegacyAuthors".into(),
         author_part_name: "/ppt/commentAuthors.xml".into(),
@@ -134,200 +112,165 @@ fn legacy_author_and_slide_comment_crud_preserves_shared_target() {
             comments: vec![legacy_comment(1, 1, "first")],
         }],
     };
-    store_presentation_comments(&mut package, &graph, LegacyConformance::Transitional).unwrap();
+    edit.set(&graph, LegacyConformance::Transitional).unwrap();
 
-    add_presentation_comment_author(
-        &mut package,
-        legacy_author(2, "Grace"),
-        LegacyConformance::Transitional,
-    )
-    .unwrap();
-    add_presentation_comment(
-        &mut package,
-        SLIDE,
+    edit.add_author(legacy_author(2, "Grace"), LegacyConformance::Transitional)
+        .unwrap();
+    edit.add(
+        SLIDE_POSITION,
         legacy_comment(2, 1, "second"),
         LegacyConformance::Transitional,
     )
     .unwrap();
     let mut changed = legacy_comment(2, 1, "updated");
     changed.x = -50;
-    update_presentation_comment(
-        &mut package,
-        SLIDE,
+    edit.update(
+        SLIDE_POSITION,
         2,
         1,
         changed.clone(),
         LegacyConformance::Strict,
     )
     .unwrap();
-    replace_presentation_comment(
-        &mut package,
-        SLIDE,
+    edit.update(
+        SLIDE_POSITION,
         2,
         1,
         changed,
         LegacyConformance::Transitional,
     )
     .unwrap();
-    reorder_presentation_comments(
-        &mut package,
-        SLIDE,
+    edit.reorder(
+        SLIDE_POSITION,
         &[(2, 1), (1, 1)],
         LegacyConformance::Transitional,
     )
     .unwrap();
-    reorder_presentation_comment_authors(&mut package, &[2, 1], LegacyConformance::Transitional)
+    edit.reorder_authors(&[2, 1], LegacyConformance::Transitional)
         .unwrap();
-    let mut grace = find_presentation_comment_author(&package, 2)
-        .unwrap()
-        .unwrap();
+    let mut grace = edit.author(2).unwrap().unwrap();
     grace.name = "Grace Hopper".into();
-    update_presentation_comment_author(
-        &mut package,
-        2,
-        grace.clone(),
-        LegacyConformance::Transitional,
-    )
-    .unwrap();
-    replace_presentation_comment_author(&mut package, 2, grace, LegacyConformance::Transitional)
+    edit.update_author(2, grace.clone(), LegacyConformance::Transitional)
+        .unwrap();
+    edit.update_author(2, grace, LegacyConformance::Transitional)
         .unwrap();
     assert_eq!(
-        find_presentation_comment(&package, SLIDE, 2, 1)
-            .unwrap()
-            .unwrap()
-            .text,
+        edit.comment(SLIDE_POSITION, 2, 1).unwrap().unwrap().text,
         "updated"
     );
     assert!(
-        remove_presentation_comment_author(&mut package, 2, LegacyConformance::Transitional)
+        edit.remove_author(2, LegacyConformance::Transitional)
             .is_err()
     );
 
+    let package = edit.commit().unwrap().into_package();
     let comment_part = PackURI::new("/ppt/comments/comment1.xml").unwrap();
-    let mut shared_owner = BlobPart::new(
-        PackURI::new("/ppt/shared-owner.xml").unwrap(),
-        "application/xml".into(),
-        Vec::new(),
-    );
-    shared_owner.relate_to("comments/comment1.xml", "urn:test:shared");
-    package.add_part(Box::new(shared_owner));
+    let mut raw = package.edit_opc().unwrap();
+    raw.update(|opc| {
+        let mut shared_owner = BlobPart::new(
+            PackURI::new("/ppt/shared-owner.xml").unwrap(),
+            "application/xml".into(),
+            Vec::new(),
+        );
+        shared_owner.relate_to("comments/comment1.xml", "urn:test:shared");
+        opc.add_part(Box::new(shared_owner));
+        Ok(())
+    })
+    .unwrap();
+    let package = raw.commit().unwrap().into_package();
+    let mut edit = package.edit_comments().unwrap();
     assert!(
-        remove_presentation_comment(&mut package, SLIDE, 2, 1, LegacyConformance::Transitional)
+        edit.remove(SLIDE_POSITION, 2, 1, LegacyConformance::Transitional)
             .unwrap()
     );
     assert!(
-        remove_presentation_comment_author(&mut package, 2, LegacyConformance::Transitional)
+        edit.remove_author(2, LegacyConformance::Transitional)
             .unwrap()
     );
     assert!(
-        remove_presentation_comment(&mut package, SLIDE, 1, 1, LegacyConformance::Transitional)
+        edit.remove(SLIDE_POSITION, 1, 1, LegacyConformance::Transitional)
             .unwrap()
     );
-    assert!(package.get_part(&comment_part).is_ok());
+    let package = edit.commit().unwrap().into_package();
+    assert!(package.opc().unwrap().get_part(&comment_part).is_ok());
 }
 
 #[test]
 fn modern_author_comment_and_reply_crud_is_graph_checked() {
-    let (mut package, slide) = package();
-    add_modern_comment_author(&mut package, modern_author(AUTHOR_A, "Ada")).unwrap();
-    add_modern_comment_author(&mut package, modern_author(AUTHOR_B, "Grace")).unwrap();
+    let package = package();
+    let slide = SLIDE_POSITION;
+    let mut edit = package.edit_modern_comments().unwrap();
+    edit.add_author(modern_author(AUTHOR_A, "Ada")).unwrap();
+    edit.add_author(modern_author(AUTHOR_B, "Grace")).unwrap();
     assert!(
-        add_modern_comment(
-            &mut package,
-            &slide,
+        edit.add(
+            slide,
             modern_comment(COMMENT_A, "{11111111-1111-4111-8111-111111111111}", "bad")
         )
         .is_err()
     );
-    assert!(
-        find_modern_comment(&package, &slide, COMMENT_A)
-            .unwrap()
-            .is_none()
-    );
+    assert!(edit.comment(slide, COMMENT_A).unwrap().is_none());
 
-    add_modern_comment(
-        &mut package,
-        &slide,
-        modern_comment(COMMENT_A, AUTHOR_A, "first"),
-    )
-    .unwrap();
-    add_modern_comment(
-        &mut package,
-        &slide,
-        modern_comment(COMMENT_B, AUTHOR_B, "second"),
-    )
-    .unwrap();
+    edit.add(slide, modern_comment(COMMENT_A, AUTHOR_A, "first"))
+        .unwrap();
+    edit.add(slide, modern_comment(COMMENT_B, AUTHOR_B, "second"))
+        .unwrap();
     assert!(
-        add_modern_comment(
-            &mut package,
-            &slide,
-            modern_comment(COMMENT_A, AUTHOR_A, "duplicate")
-        )
-        .is_err()
+        edit.add(slide, modern_comment(COMMENT_A, AUTHOR_A, "duplicate"))
+            .is_err()
     );
-    add_modern_comment_reply(
-        &mut package,
-        &slide,
-        COMMENT_A,
-        modern_reply(REPLY_A, AUTHOR_B),
-    )
-    .unwrap();
+    edit.add_reply(slide, COMMENT_A, modern_reply(REPLY_A, AUTHOR_B))
+        .unwrap();
     assert!(
-        add_modern_comment_reply(
-            &mut package,
-            &slide,
-            COMMENT_B,
-            modern_reply(REPLY_A, AUTHOR_A)
-        )
-        .is_err()
+        edit.add_reply(slide, COMMENT_B, modern_reply(REPLY_A, AUTHOR_A))
+            .is_err()
     );
-    update_modern_comment(&mut package, &slide, COMMENT_A, |comment| {
+    edit.update(slide, COMMENT_A, |comment| {
         comment.title = Some("updated".into());
         comment.assigned_to = Some(vec![AUTHOR_B.into()]);
         comment.complete = Some(Progress::new(75).unwrap());
     })
     .unwrap();
     assert_eq!(
-        find_modern_comment(&package, &slide, COMMENT_A)
-            .unwrap()
-            .unwrap()
-            .complete,
+        edit.comment(slide, COMMENT_A).unwrap().unwrap().complete,
         Some(Progress::new(75).unwrap())
     );
-    update_modern_comment_reply(&mut package, &slide, COMMENT_A, REPLY_A, |reply| {
+    edit.update_reply(slide, COMMENT_A, REPLY_A, |reply| {
         reply.created = "2026-07-19T12:02:00Z".into();
     })
     .unwrap();
     let replacement_reply = modern_reply(REPLY_A, AUTHOR_B);
-    replace_modern_comment_reply(&mut package, &slide, COMMENT_A, REPLY_A, replacement_reply)
+    edit.replace_reply(slide, COMMENT_A, REPLY_A, replacement_reply)
         .unwrap();
-    let mut replacement = find_modern_comment(&package, &slide, COMMENT_B)
-        .unwrap()
-        .unwrap();
+    let mut replacement = edit.comment(slide, COMMENT_B).unwrap().unwrap();
     replacement.title = Some("replacement".into());
-    replace_modern_comment(&mut package, &slide, COMMENT_B, replacement).unwrap();
-    reorder_modern_comments(&mut package, &slide, &[COMMENT_B.into(), COMMENT_A.into()]).unwrap();
-    reorder_modern_comment_authors(&mut package, &[AUTHOR_B.into(), AUTHOR_A.into()]).unwrap();
-    update_modern_comment_author(&mut package, AUTHOR_A, |author| {
+    edit.replace(slide, COMMENT_B, replacement).unwrap();
+    edit.reorder(slide, &[COMMENT_B.into(), COMMENT_A.into()])
+        .unwrap();
+    edit.reorder_authors(&[AUTHOR_B.into(), AUTHOR_A.into()])
+        .unwrap();
+    edit.update_author(AUTHOR_A, |author| {
         author.name = "Ada Lovelace".into();
     })
     .unwrap();
     let mut ada = modern_author(AUTHOR_A, "Ada Lovelace");
     ada.initials = Some("AL".into());
-    replace_modern_comment_author(&mut package, AUTHOR_A, ada).unwrap();
+    edit.replace_author(AUTHOR_A, ada).unwrap();
     assert_eq!(
-        find_modern_comment_reply(&package, &slide, COMMENT_A, REPLY_A)
+        edit.reply(slide, COMMENT_A, REPLY_A)
             .unwrap()
             .unwrap()
             .author_id,
         AUTHOR_B
     );
-    assert!(remove_modern_comment_author(&mut package, AUTHOR_B).is_err());
-    assert!(remove_modern_comment_reply(&mut package, &slide, COMMENT_A, REPLY_A).unwrap());
-    update_modern_comment(&mut package, &slide, COMMENT_A, |comment| {
+    assert!(edit.remove_author(AUTHOR_B).is_err());
+    assert!(edit.remove_reply(slide, COMMENT_A, REPLY_A).unwrap());
+    edit.update(slide, COMMENT_A, |comment| {
         comment.assigned_to = None;
     })
     .unwrap();
-    assert!(remove_modern_comment(&mut package, &slide, COMMENT_B).unwrap());
-    assert!(remove_modern_comment_author(&mut package, AUTHOR_B).unwrap());
+    assert!(edit.remove(slide, COMMENT_B).unwrap());
+    assert!(edit.remove_author(AUTHOR_B).unwrap());
+    let committed = edit.commit().unwrap();
+    assert!(committed.diagnostics().changed());
 }

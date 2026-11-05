@@ -12,7 +12,7 @@
 use std::{fmt::Debug, fmt::Display, hint::black_box};
 
 use libfuzzer_sys::fuzz_target;
-use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, Limits, RawMessage};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, Limits, RawMessage};
 
 const MAX_PAYLOAD_BYTES: usize = 256;
 const SOURCE_IDENTIFIER: u64 = 17;
@@ -47,7 +47,7 @@ fn source_object(data: &[u8]) -> ArchiveObject {
                 data: payload(data, 1, b'B'),
             },
         ],
-    )
+     Default::default(),)
     .unwrap_or_else(|error| panic!("bounded fuzz object must build: {error}"));
 
     let first = object
@@ -61,7 +61,7 @@ fn source_object(data: &[u8]) -> ArchiveObject {
         FIRST_OBJECT_REFERENCE,
     ];
     first.data_references = vec![FIRST_DATA_REFERENCE, SECOND_DATA_REFERENCE];
-    let mut nested = FieldInfo::new(FieldPath::new(vec![1, 2, 3]));
+    let mut nested = FieldInfo::new(litchi_iwa_core::FieldPath::new(vec![1, 2, 3], litchi_iwa_core::Limits::default()).unwrap(), litchi_iwa_core::Limits::default()).unwrap();
     nested.object_references = vec![SECOND_OBJECT_REFERENCE, THIRD_OBJECT_REFERENCE];
     nested.data_references = vec![THIRD_DATA_REFERENCE, FIRST_DATA_REFERENCE];
     first.field_infos.push(nested);
@@ -76,10 +76,10 @@ fn source_object(data: &[u8]) -> ArchiveObject {
     let encoded = Archive {
         objects: vec![object],
     }
-    .to_bytes()
+    .to_bytes(Default::default())
     .unwrap_or_else(|error| panic!("bounded fuzz archive must encode: {error}"));
     let encoded = append_unknown_header(&encoded);
-    Archive::parse(&encoded)
+    Archive::parse(&encoded, Default::default())
         .unwrap_or_else(|error| panic!("bounded fuzz archive must reopen: {error}"))
         .objects
         .into_iter()
@@ -97,7 +97,7 @@ fn exercise_successful_changed_clone(source: &ArchiveObject, data: &[u8]) {
     ];
     let new_identifier = 9_000_u64.saturating_add(u64::from(control(data, 2)));
 
-    let cloned = match source.clone_with_identity_remap(new_identifier, &remap, &replacement) {
+    let cloned = match source.clone_with_identity_remap(new_identifier, &remap, &replacement, Default::default()) {
         Ok(value) => value,
         Err(error) => {
             observe_error(error);
@@ -109,7 +109,7 @@ fn exercise_successful_changed_clone(source: &ArchiveObject, data: &[u8]) {
     assert_eq!(source, &before);
 
     let repeat = source
-        .clone_with_identity_remap(new_identifier, &remap, &replacement)
+        .clone_with_identity_remap(new_identifier, &remap, &replacement, Default::default())
         .unwrap_or_else(|error| panic!("deterministic identity remap must repeat: {error}"));
     assert!(cloned.same_content_ignoring_offsets(&repeat));
     assert_eq!(source, &before);
@@ -121,6 +121,7 @@ fn exercise_successful_identity_clone(source: &ArchiveObject) {
         SOURCE_IDENTIFIER.saturating_add(1_000),
         &[],
         &source.messages,
+        Default::default(),
     ) {
         Ok(value) => value,
         Err(error) => {
@@ -157,6 +158,7 @@ fn exercise_arbitrary_rejections(source: &ArchiveObject, data: &[u8]) {
         8_000,
         &[(FIRST_OBJECT_REFERENCE, 1_001)],
         &malformed_replacement,
+        Default::default(),
     );
     if let Err(error) = result {
         observe_error(error);
@@ -167,13 +169,13 @@ fn exercise_arbitrary_rejections(source: &ArchiveObject, data: &[u8]) {
         (FIRST_OBJECT_REFERENCE, 1_001),
         (FIRST_OBJECT_REFERENCE, 1_002),
     ];
-    if let Err(error) = source.clone_with_identity_remap(8_001, &duplicate_map, &valid_replacement)
+    if let Err(error) = source.clone_with_identity_remap(8_001, &duplicate_map, &valid_replacement, Default::default())
     {
         observe_error(error);
     }
     assert_eq!(source, &before);
 
-    if let Err(error) = source.clone_with_identity_remap(0, &[], &source.messages) {
+    if let Err(error) = source.clone_with_identity_remap(0, &[], &source.messages, Default::default()) {
         observe_error(error);
     }
     assert_eq!(source, &before);
@@ -192,7 +194,7 @@ fn exercise_limits(source: &ArchiveObject, data: &[u8]) {
         .with_metadata_items(1)
         .unwrap_or_else(|error| panic!("metadata limit must construct: {error}"));
     if let Err(error) =
-        source.clone_with_identity_remap_with_limits(9_100, &remap, &replacement, metadata_limit)
+        source.clone_with_identity_remap(9_100, &remap, &replacement, metadata_limit)
     {
         observe_error(error);
     }
@@ -202,7 +204,7 @@ fn exercise_limits(source: &ArchiveObject, data: &[u8]) {
         .with_object_bytes(1)
         .unwrap_or_else(|error| panic!("object limit must construct: {error}"));
     if let Err(error) =
-        source.clone_with_identity_remap_with_limits(9_101, &remap, &replacement, object_limit)
+        source.clone_with_identity_remap(9_101, &remap, &replacement, object_limit)
     {
         observe_error(error);
     }
@@ -260,7 +262,7 @@ fn assert_clone_invariants(
         }
     }
     cloned
-        .validate()
+        .validate(Default::default())
         .unwrap_or_else(|error| panic!("remapped clone must validate: {error}"));
 }
 

@@ -8,13 +8,13 @@
 )]
 //! Package-facing glossary load/store/remove orchestration.
 
-use super::codec::invalid;
+use super::codec::{invalid, validate_catalog_limits};
 use super::graph::{
-    catalog_relationship_references, load_graph, put_graph, raw, relationship_kind, remove_graph,
-    validate_package_conformance,
+    catalog_relationship_references, raw, relationship_kind, validate_package_conformance,
 };
 use super::model::{Binding, Catalog, Conformance};
 use super::{Arc, Error, OpcError, OpcPackage, PackURI, Part, Result, ct};
+#[derive(Clone)]
 pub(in crate::glossary) struct Owner {
     pub(in crate::glossary) main: PackURI,
     pub(in crate::glossary) root: PackURI,
@@ -28,8 +28,11 @@ pub(in crate::glossary) struct Owner {
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn load(package: &OpcPackage) -> Result<Option<(Catalog, Conformance)>> {
-    let Some(graph) = load_graph(package)? else {
+pub fn load(
+    package: &OpcPackage,
+    limits: &super::Limits,
+) -> Result<Option<(Catalog, Conformance)>> {
+    let Some(graph) = raw::load(package, limits)? else {
         return Ok(None);
     };
     let binding = Binding::from_graph(&graph);
@@ -50,18 +53,25 @@ pub fn load(package: &OpcPackage) -> Result<Option<(Catalog, Conformance)>> {
 /// Move a semantic catalog into the package while preserving its auxiliary graph.
 ///
 /// An unchanged package-loaded catalog is a byte- and signature-preserving no-op.
+/// Any other catalog changes the package, so a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`] before anything is changed
+/// (ADR 0006): remove the signature explicitly first
+/// ([`OpcPackage::unsign`]).
 ///
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn put(
+pub(crate) fn put(
     package: &mut OpcPackage,
     mut catalog: Catalog,
     conformance: Conformance,
+    limits: &super::Limits,
 ) -> Result<bool> {
     validate_package_conformance(package, conformance)?;
     catalog.validate_bound_lineages()?;
-    let existing = load_graph(package)?;
+    validate_catalog_limits(&catalog, limits)?;
+    raw::admit_catalog(&catalog, limits)?;
+    let existing = super::graph::load_graph_with_limits(package, limits)?;
     let binding = catalog.binding.take();
     let bound_to_destination = binding
         .as_deref()
@@ -89,7 +99,7 @@ pub fn put(
     };
     graph.catalog = catalog;
     graph.conformance = conformance;
-    put_graph(package, &graph)
+    super::graph::put_graph_checked(package, &graph, limits)
 }
 
 pub(in crate::glossary) fn seed_semantic_graph(
@@ -220,12 +230,15 @@ pub(in crate::glossary) fn free_part_name(
 }
 
 /// Remove the glossary graph. Absence is a signature-preserving no-op.
+/// Removing a glossary from a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`] (ADR 0006): remove the
+/// signature explicitly first ([`OpcPackage::unsign`]).
 ///
 /// Use [`raw::remove`] to move the complete physical graph elsewhere.
 ///
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn remove(package: &mut OpcPackage) -> Result<bool> {
-    Ok(remove_graph(package)?.is_some())
+pub(crate) fn remove(package: &mut OpcPackage, limits: &super::Limits) -> Result<bool> {
+    Ok(super::graph::remove_graph_with_limits(package, limits)?.is_some())
 }

@@ -3,9 +3,11 @@
 use std::{hint::black_box, sync::OnceLock};
 
 use libfuzzer_sys::fuzz_target;
+use litchi_numbers_wire::Limits;
 use litchi_numbers_wire::pre_bnc::PreBncCellView;
 
 const MAX_INPUT_BYTES: usize = 64 * 1024;
+const TEST_LIMITS: Limits = Limits::DEFAULT;
 
 const FLAG_UNKNOWN_0002: u32 = 0x0000_0002;
 const FLAG_UNKNOWN_0080: u32 = 0x0000_0080;
@@ -75,7 +77,7 @@ fuzz_target!(|data: &[u8]| {
 fn exercise_source(source: &[u8]) {
     let snapshot = source.to_vec();
 
-    match PreBncCellView::parse(source) {
+    match PreBncCellView::parse(source, &TEST_LIMITS) {
         Ok(view) => {
             assert_eq!(view.source(), source);
             assert_eq!(view.source().as_ptr(), source.as_ptr());
@@ -212,7 +214,7 @@ fn run_fixed_cases() {
             ALL_FLAGS
         };
         let source = cell_with_flags(version, 9, flags, &[], &[0xca, 0xfe]);
-        let view = PreBncCellView::parse(&source)
+        let view = PreBncCellView::parse(&source, &TEST_LIMITS)
             .unwrap_or_else(|error| panic!("fixed version {version} case rejected: {error}"));
         assert_eq!(view.version(), version);
         assert_eq!(view.cell_type(), 9);
@@ -245,7 +247,7 @@ fn run_fixed_cases() {
             &[0; 20],
             &[],
         );
-        let zero_view = PreBncCellView::parse(&zero_source)
+        let zero_view = PreBncCellView::parse(&zero_source, &TEST_LIMITS)
             .unwrap_or_else(|error| panic!("fixed zero-ID version {version} rejected: {error}"));
         assert_eq!(zero_view.string_identifier(), Some(0));
         assert_eq!(zero_view.rich_text_identifier(), Some(0));
@@ -271,7 +273,7 @@ fn run_fixed_cases() {
             &unknown_payload,
         );
         source.extend_from_slice(&explicit_tail);
-        let view = PreBncCellView::parse(&source)
+        let view = PreBncCellView::parse(&source, &TEST_LIMITS)
             .unwrap_or_else(|error| panic!("unknown flag version {version} rejected: {error}"));
         let expected_tail = [&unknown_payload[..], &explicit_tail[..]].concat();
         assert_eq!(view.opaque_tail(), expected_tail.as_slice());
@@ -287,7 +289,7 @@ fn run_fixed_cases() {
         let source = cell_with_flags(version, 9, flags, &[], &[]);
         for length in 0..source.len() {
             assert!(
-                PreBncCellView::parse(&source[..length]).is_err(),
+                PreBncCellView::parse(&source[..length], &TEST_LIMITS).is_err(),
                 "fixed version {version} truncation at {length} was accepted"
             );
         }
@@ -302,7 +304,7 @@ fn run_fixed_cases() {
                     .expect("scalar flag must be present in its fixed layout");
                 source[offset..offset + 8].copy_from_slice(&raw.to_le_bytes());
                 assert!(
-                    PreBncCellView::parse(&source).is_err(),
+                    PreBncCellView::parse(&source, &TEST_LIMITS).is_err(),
                     "fixed version {version} accepted non-finite {scalar_flag:#x}"
                 );
                 exercise_source(&source);
@@ -313,7 +315,7 @@ fn run_fixed_cases() {
     for version in [5_u8, 6, u8::MAX] {
         let source = cell_with_flags(version, 3, FLAG_STRING, &[], &[]);
         assert!(
-            PreBncCellView::parse(&source).is_err(),
+            PreBncCellView::parse(&source, &TEST_LIMITS).is_err(),
             "future version {version} was accepted by the pre-BNC reader"
         );
     }

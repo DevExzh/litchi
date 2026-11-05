@@ -1,8 +1,7 @@
 use litchi_opc::OpcPackage;
 use litchi_xlsx::Package;
 use litchi_xlsx::xml_maps::{
-    XmlMap, XmlMapConformance, XmlMapInfo, XmlMapSchema, load_from_package, remove_from_package,
-    store_in_package,
+    EditOptions, XmlMap, XmlMapConformance, XmlMapInfo, XmlMapSchema, load_from_package,
 };
 
 fn fixture_info() -> XmlMapInfo {
@@ -29,31 +28,44 @@ fn fixture_info() -> XmlMapInfo {
     }
 }
 
-fn package() -> OpcPackage {
-    Package::create()
-        .expect("create workbook package")
-        .into_plain_opc()
+fn package() -> Package {
+    Package::new().expect("create workbook package")
+}
+
+fn store(package: &Package, value: XmlMapInfo) -> Package {
+    let mut edit = package
+        .edit_xml_maps_with_options(EditOptions::default().conformance(XmlMapConformance::Strict))
+        .unwrap();
+    assert!(edit.set(value).unwrap());
+    edit.commit().unwrap().into_package()
 }
 
 #[test]
 fn xml_maps_survive_direct_package_publication() {
-    let mut package = package();
     let value = fixture_info();
-    store_in_package(&mut package, &value, XmlMapConformance::Strict).unwrap();
+    let package = store(&package(), value.clone()).into_plain_opc();
     assert_eq!(load_from_package(&package).unwrap(), Some(value.clone()));
 
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("xml-maps.xlsx");
     package.save(&path).unwrap();
-    let reopened = OpcPackage::open(&path).unwrap();
+    let reopened = OpcPackage::open(&path, litchi_opc::SourceLimits::default()).unwrap();
     assert_eq!(load_from_package(&reopened).unwrap(), Some(value));
 }
 
 #[test]
 fn xml_maps_removal_is_idempotent() {
-    let mut package = package();
-    store_in_package(&mut package, &fixture_info(), XmlMapConformance::Strict).unwrap();
-    assert!(remove_from_package(&mut package).unwrap());
-    assert_eq!(load_from_package(&package).unwrap(), None);
-    assert!(!remove_from_package(&mut package).unwrap());
+    let package = store(&package(), fixture_info());
+    let mut edit = package.edit_xml_maps().unwrap();
+    assert!(edit.remove().unwrap().is_some());
+    let package = edit.commit().unwrap().into_package();
+    assert_eq!(
+        load_from_package(&package.clone().into_plain_opc()).unwrap(),
+        None
+    );
+    let mut edit = package.edit_xml_maps().unwrap();
+    assert!(edit.remove().unwrap().is_none());
+    let commit = edit.commit().unwrap();
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.patch().is_noop());
 }

@@ -9,33 +9,39 @@
 
 mod repair_support;
 
-use litchi_rtf::{RtfDocument, RtfWriter, SoftBreakKind};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{SoftBreakKind, write::Writer};
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
 #[test]
 fn parses_zero_width_break_characters_and_round_trips() {
-    let document = RtfDocument::parse(r"{\rtf1\ansi a\zwbo b\zwnbo c\zwj d\zwnj e}").unwrap();
+    let document = Tree::parse(
+        r"{\rtf1\ansi a\zwbo b\zwnbo c\zwj d\zwnj e}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(document.text(), "a\u{200B}b\u{FEFF}c\u{200D}d\u{200C}e");
 
     let output = write(&document);
     let serialized = String::from_utf8(output.clone()).unwrap();
     assert!(serialized.contains("\\zwbo "));
     assert!(serialized.contains("\\zwnbo "));
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), document.text());
 }
 
 #[test]
 fn parses_soft_break_markers_and_round_trips() {
-    let document =
-        RtfDocument::parse(r"{\rtf1 a\softline b\softpage c\softcol d\softlheight240 e}").unwrap();
+    let document = Tree::parse(
+        r"{\rtf1 a\softline b\softpage c\softcol d\softlheight240 e}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(document.text(), "abcde");
     let breaks: Vec<_> = document.soft_breaks().collect();
     assert_eq!(breaks.len(), 4);
@@ -54,7 +60,7 @@ fn parses_soft_break_markers_and_round_trips() {
     assert!(serialized.contains("\\softpage "));
     assert!(serialized.contains("\\softcol "));
     assert!(serialized.contains("\\softlheight240 "));
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), document.text());
     let reparsed_breaks: Vec<_> = reparsed.soft_breaks().collect();
     assert_eq!(reparsed_breaks.len(), 4);
@@ -79,7 +85,10 @@ fn rejects_malformed_soft_break_controls() {
     ];
     for rtf in cases {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(rtf)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                rtf,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted malformed {rtf}"
         );
     }

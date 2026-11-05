@@ -16,9 +16,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn generate_standard_2007(password: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let mut pkg = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
     {
-        let pres = pkg.presentation_mut()?;
+        let pres = builder.presentation()?;
         let slide = pres.add_slide()?;
         slide.set_title("Standard 2007 Encryption");
         slide.add_text_box(
@@ -35,14 +35,14 @@ fn generate_standard_2007(password: &str) -> Result<(), Box<dyn std::error::Erro
         "Saving Standard 2007-encrypted presentation to {}...",
         output
     );
-    write_encrypted(pkg, output, password, Mode::Standard)?;
+    write_encrypted(builder.build()?, output, password, Mode::Standard)?;
     Ok(())
 }
 
 fn generate_agile(password: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let mut pkg = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
     {
-        let pres = pkg.presentation_mut()?;
+        let pres = builder.presentation()?;
         let slide = pres.add_slide()?;
         slide.set_title("Agile Encryption");
         slide.add_text_box(
@@ -56,12 +56,12 @@ fn generate_agile(password: &str) -> Result<(), Box<dyn std::error::Error>> {
 
     let output = "pptx_open_password_agile.pptx";
     println!("Saving Agile-encrypted presentation to {}...", output);
-    write_encrypted(pkg, output, password, Mode::Agile)?;
+    write_encrypted(builder.build()?, output, password, Mode::Agile)?;
     Ok(())
 }
 
 fn write_encrypted(
-    mut package: Package,
+    package: Package,
     output: &str,
     password: &str,
     mode: Mode,

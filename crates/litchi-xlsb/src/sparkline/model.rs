@@ -6,7 +6,7 @@
 
 //! Package-neutral sparkline values and invariants.
 
-use std::num::FpCategory;
+use std::{mem::size_of, num::FpCategory};
 
 use bitflags::bitflags;
 use litchi_sheet::sparkline::{AxisType, EmptyCells, SparklineType};
@@ -58,7 +58,7 @@ pub enum Error {
         /// Required next record.
         expected: &'static str,
         /// Actual record kind or end-of-input.
-        found: String,
+        found: &'static str,
     },
     /// A begin/end delimiter carried a forbidden payload.
     #[error("{record} delimiter payload must be empty, found {length} bytes")]
@@ -74,7 +74,7 @@ pub enum Error {
         /// Record or structure name.
         record: &'static str,
         /// Rejected condition.
-        reason: String,
+        reason: &'static str,
     },
     /// A group or groups collection was empty where the grammar requires 1+.
     #[error("{collection} must contain at least one item")]
@@ -404,13 +404,8 @@ pub struct Formula {
 }
 
 impl Formula {
-    /// Validate and retain one formula with default resource limits.
-    pub fn new(rgce: Vec<u8>, rgcb: Vec<u8>) -> Result<Self> {
-        Self::with_limits(rgce, rgcb, Limits::DEFAULT)
-    }
-
-    /// Validate and retain one formula with explicit resource limits.
-    pub fn with_limits(rgce: Vec<u8>, rgcb: Vec<u8>, limits: Limits) -> Result<Self> {
+    /// Validate and retain one formula under an explicit resource policy.
+    pub fn new(rgce: Vec<u8>, rgcb: Vec<u8>, limits: Limits) -> Result<Self> {
         limits.validate()?;
         let kind = validate_formula(&rgce, &rgcb, limits)?;
         Ok(Self {
@@ -421,7 +416,7 @@ impl Formula {
     }
 
     /// Construct a workbook-name token without resolving the name table.
-    pub fn name(index: u32) -> Result<Self> {
+    pub fn name(index: u32, limits: Limits) -> Result<Self> {
         if index == 0 {
             return Err(value("FRTFormula", "PtgName index must be one-based"));
         }
@@ -430,7 +425,7 @@ impl Formula {
             .map_err(|_| allocation("formula token"))?;
         rgce.push(0x23);
         rgce.extend_from_slice(&index.to_le_bytes());
-        Self::new(rgce, Vec::new())
+        Self::new(rgce, Vec::new(), limits)
     }
 
     /// Return the structurally validated token family.
@@ -530,6 +525,11 @@ impl Formula {
             rgce: copy_boxed(rgce, "formula token")?,
             rgcb: copy_boxed(rgcb, "formula ancillary data")?,
         })
+    }
+
+    /// Return the exact allocations retained by the boxed token streams.
+    pub(crate) fn retained_bytes(&self) -> usize {
+        self.rgce.len().saturating_add(self.rgcb.len())
     }
 }
 
@@ -900,7 +900,7 @@ impl Location {
         if row >= ROWS || column >= COLUMNS {
             return Err(value(
                 "BrtSparkline",
-                format!("destination ({row}, {column}) is outside the worksheet grid"),
+                "destination (, ) is outside the worksheet grid",
             ));
         }
         Ok(Self { row, column, state })
@@ -951,6 +951,11 @@ impl Sparkline {
     pub const fn location(&self) -> Location {
         self.location
     }
+
+    /// Return the exact allocations retained by this sparkline's formula.
+    pub(crate) fn retained_bytes(&self) -> usize {
+        self.formula.as_ref().map_or(0, Formula::retained_bytes)
+    }
 }
 
 /// One XLSB sparkline group.
@@ -969,13 +974,9 @@ pub struct Group {
 }
 
 impl Group {
-    /// Construct a group using default limits and ordinary line-chart defaults.
-    pub fn new(kind: SparklineType, colors: Colors, items: Vec<Sparkline>) -> Result<Self> {
-        Self::with_limits(kind, colors, items, Limits::DEFAULT)
-    }
-
-    /// Construct a group using an explicit resource policy.
-    pub fn with_limits(
+    /// Construct a group using ordinary line-chart defaults and an explicit
+    /// resource policy.
+    pub fn new(
         kind: SparklineType,
         colors: Colors,
         items: Vec<Sparkline>,
@@ -1138,6 +1139,18 @@ impl Group {
         validate_group(&value, limits)?;
         Ok(value)
     }
+
+    /// Return all heap allocations owned by this group.
+    pub(crate) fn retained_bytes(&self) -> usize {
+        let mut total = self.items.capacity().saturating_mul(size_of::<Sparkline>());
+        if let Some(formula) = &self.date_formula {
+            total = total.saturating_add(formula.retained_bytes());
+        }
+        for item in &self.items {
+            total = total.saturating_add(item.retained_bytes());
+        }
+        total
+    }
 }
 
 /// A nonempty, ordered worksheet sparkline collection.
@@ -1151,13 +1164,8 @@ pub struct Groups {
 }
 
 impl Groups {
-    /// Construct and validate using safe defaults.
-    pub fn new(groups: Vec<Group>) -> Result<Self> {
-        Self::with_limits(groups, Limits::DEFAULT)
-    }
-
-    /// Construct and validate with an explicit policy.
-    pub fn with_limits(groups: Vec<Group>, limits: Limits) -> Result<Self> {
+    /// Construct and validate with an explicit resource policy.
+    pub fn new(groups: Vec<Group>, limits: Limits) -> Result<Self> {
         let value = Self { groups };
         value.validate(limits)?;
         Ok(value)
@@ -1179,6 +1187,15 @@ impl Groups {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.groups.is_empty()
+    }
+
+    /// Return all heap allocations owned by this collection.
+    pub(crate) fn retained_bytes(&self) -> usize {
+        let mut total = self.groups.capacity().saturating_mul(size_of::<Group>());
+        for group in &self.groups {
+            total = total.saturating_add(group.retained_bytes());
+        }
+        total
     }
 
     /// Iterate in worksheet stream order.
@@ -1337,7 +1354,7 @@ fn validate_options(options: Options) -> Result<()> {
     if unknown != 0 {
         return Err(value(
             "BrtBeginSparklineGroup",
-            format!("unknown semantic option bits 0x{unknown:04X}"),
+            "unknown semantic option bits 0x",
         ));
     }
     Ok(())
@@ -1348,25 +1365,19 @@ fn validate_line_weight(weight: f64) -> Result<()> {
     if !(0.0..=1584.0).contains(&weight) {
         return Err(value(
             "BrtBeginSparklineGroup",
-            format!("dLineWeight {weight} is outside 0..=1584"),
+            "dLineWeight is outside 0..=1584",
         ));
     }
     Ok(())
 }
 
-fn validate_xnum(number: f64, field: &'static str) -> Result<()> {
+fn validate_xnum(number: f64, _field: &'static str) -> Result<()> {
     if matches!(
         number.classify(),
         FpCategory::Nan | FpCategory::Infinite | FpCategory::Subnormal
     ) || (number == 0.0 && number.is_sign_negative())
     {
-        return Err(value(
-            "Xnum",
-            format!(
-                "{field} has forbidden IEEE-754 bits {:#018x}",
-                number.to_bits()
-            ),
-        ));
+        return Err(value("Xnum", "has forbidden IEEE-754 bits"));
     }
     Ok(())
 }
@@ -1375,40 +1386,25 @@ fn validate_color(raw: [u8; 8]) -> Result<()> {
     let valid_rgb = raw[0] & 1 != 0;
     match raw[0] >> 1 {
         1 if raw[1] <= 0x51 => Ok(()),
-        1 => Err(value(
-            "BrtColor",
-            format!("palette index {} is outside the Icv domain", raw[1]),
-        )),
+        1 => Err(value("BrtColor", "palette index is outside the Icv domain")),
         2 if valid_rgb => Ok(()),
         2 => Err(value(
             "BrtColor",
             "fValidRGB must be one for an explicit RGB color",
         )),
         3 if raw[1] <= 0x0b => Ok(()),
-        3 => Err(value(
-            "BrtColor",
-            format!("theme index {} is outside 0..=11", raw[1]),
-        )),
+        3 => Err(value("BrtColor", "theme index is outside 0..=11")),
         0 => Err(value(
             "BrtColor",
             "automatic colors are forbidden in sparkline color slots",
         )),
-        kind => Err(value(
-            "BrtColor",
-            format!("xColorType {kind} is outside 0..=3"),
-        )),
+        _kind => Err(value("BrtColor", "xColorType is outside 0..=3")),
     }
 }
 
-fn require_token_len(rgce: &[u8], expected: usize, kind: &'static str) -> Result<()> {
+fn require_token_len(rgce: &[u8], expected: usize, _kind: &'static str) -> Result<()> {
     if rgce.len() != expected {
-        return Err(value(
-            "FRTFormula",
-            format!(
-                "{kind} must occupy exactly {expected} rgce bytes, found {}",
-                rgce.len()
-            ),
-        ));
+        return Err(value("FRTFormula", "must occupy exactly rgce bytes, found"));
     }
     Ok(())
 }
@@ -1429,11 +1425,8 @@ pub(crate) fn allocation(resource: &'static str) -> Error {
     Error::Allocation { resource }
 }
 
-pub(crate) fn value(record: &'static str, reason: impl Into<String>) -> Error {
-    Error::Value {
-        record,
-        reason: reason.into(),
-    }
+pub(crate) fn value(record: &'static str, reason: &'static str) -> Error {
+    Error::Value { record, reason }
 }
 
 fn copy_boxed(bytes: &[u8], resource: &'static str) -> Result<Box<[u8]>> {

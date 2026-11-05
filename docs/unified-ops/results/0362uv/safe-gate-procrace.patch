@@ -1,0 +1,5 @@
+--- a/run_safe_gate.py
++++ b/run_safe_gate.py
+@@ -98 +98 @@
+-        except (FileNotFoundError, PermissionError, ValueError, IndexError):
++        except (FileNotFoundError, ProcessLookupError, PermissionError, ValueError, IndexError):

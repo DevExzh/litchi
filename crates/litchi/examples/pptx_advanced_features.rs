@@ -6,16 +6,20 @@
 //! inspectable summary deck. Feature-specific package mutation is intentionally
 //! left to the corresponding owner APIs.
 //!
-//! Run with: `cargo run --example pptx_advanced_features --features ooxml`
+//! Run with: `cargo run -p litchi --example pptx_advanced_features --features pptx`
 
-use litchi_pptx::animations::{Effect, EffectInstance, Sequence, Trigger};
+use litchi_pptx::Package;
+use litchi_pptx::animations::{
+    Effect, EffectInstance, Limits as AnimationLimits, Sequence, Trigger,
+};
 use litchi_pptx::chart::{Chart, Series, Type as ChartType, encode as encode_chart};
-use litchi_pptx::presentation_properties::metadata::custom_show::{List as ShowList, Show};
+use litchi_pptx::presentation_properties::metadata::custom_show::{
+    Limits as MetadataLimits, List as ShowList, Show,
+};
 use litchi_pptx::presentation_properties::metadata::handout::{Layout, Master};
 use litchi_pptx::presentation_properties::metadata::protection::Settings;
 use litchi_pptx::presentation_properties::metadata::sections::{List as SectionList, Section};
 use litchi_pptx::shape::diagram::{Builder, Graphic, Kind, Node};
-use litchi_pptx::{MutablePresentation, Package};
 use std::error::Error as StdError;
 
 const X: i64 = 914_400;
@@ -42,9 +46,9 @@ fn main() -> Result<(), Box<dyn StdError>> {
     println!("  handout: {} XML bytes", handout_xml.len());
     println!("  protection: {} XML bytes", protection_xml.len());
 
-    let mut package = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
     {
-        let presentation = package.presentation_mut()?;
+        let presentation = builder.presentation()?;
         presentation.set_widescreen_slide_size();
         add_summary_slide(
             presentation,
@@ -87,6 +91,7 @@ fn main() -> Result<(), Box<dyn StdError>> {
     }
 
     let output_path = "pptx_advanced_features.pptx";
+    let package = builder.build()?;
     package.save(output_path)?;
     let reopened = Package::open(output_path)?;
     println!("\n✓ Wrote and reopened {output_path}");
@@ -98,7 +103,7 @@ fn main() -> Result<(), Box<dyn StdError>> {
 }
 
 fn add_summary_slide(
-    presentation: &mut MutablePresentation,
+    presentation: &mut litchi_pptx::builder::Presentation,
     title: &str,
     body: &str,
 ) -> Result<(), Box<dyn StdError>> {
@@ -127,8 +132,8 @@ fn animation_demo() -> Result<String, Box<dyn StdError>> {
             .with_duration_ms(1_000),
     );
 
-    let xml = sequence.to_xml();
-    let parsed = Sequence::parse_timing_xml(&xml)?;
+    let xml = sequence.to_xml(AnimationLimits::DEFAULT)?;
+    let parsed = Sequence::parse_timing_xml(&xml, AnimationLimits::DEFAULT)?;
     assert_eq!(parsed.animations.len(), 3);
     Ok(xml)
 }
@@ -187,16 +192,22 @@ fn diagram_demo() -> Vec<(&'static str, Graphic)> {
 
 fn section_demo() -> Result<String, Box<dyn StdError>> {
     let mut sections = SectionList::new();
-    sections.add_section(Section::new("Overview", "section-overview").with_slides([256, 257]));
-    sections.add_section(Section::new("Metadata", "section-metadata").with_slides([258]));
-    Ok(sections.to_xml()?)
+    sections.add_section(
+        Section::new("Overview", "{00000000-0000-4000-8000-000000000001}").with_slides([256, 257]),
+    );
+    sections.add_section(
+        Section::new("Metadata", "{00000000-0000-4000-8000-000000000002}").with_slides([258]),
+    );
+    Ok(sections.to_xml(MetadataLimits::DEFAULT)?)
 }
 
 fn custom_show_demo() -> String {
     let mut shows = ShowList::new();
     shows.add(Show::new(1, "Quick overview").with_slides(vec![256, 258]));
     shows.add(Show::new(2, "Full presentation").with_slides(vec![256, 257, 258]));
-    shows.to_xml()
+    shows
+        .to_xml(MetadataLimits::DEFAULT)
+        .expect("default metadata limits accept the example")
 }
 
 fn handout_demo() -> String {
@@ -206,14 +217,15 @@ fn handout_demo() -> String {
         .with_footer("Created with Litchi")
         .with_slide_numbers()
         .with_date_time()
-        .to_xml()
+        .to_xml(MetadataLimits::DEFAULT)
+        .expect("default metadata limits accept the example")
 }
 
 fn protection_demo() -> Result<String, Box<dyn StdError>> {
     let settings = Settings::new()
         .with_read_only_recommended(true)
         .with_structure_protection(true);
-    let xml = settings.to_xml();
+    let xml = settings.to_xml(MetadataLimits::DEFAULT)?;
     assert!(settings.is_protected());
     Ok(xml)
 }

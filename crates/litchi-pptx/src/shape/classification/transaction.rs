@@ -1,117 +1,65 @@
 //! Detached classification edits with atomic commit semantics.
 
-use super::model::{Outcome, Snapshot};
-use super::validation::{validate_outcome, validate_snapshot};
+use super::model::Outcome;
+use super::validation::validate_outcome;
 use crate::Result;
 
 use super::codec::{self, Source};
 
-/// A detached classification edit.
-///
-/// The source snapshot is never mutated. Callers can inspect the projected
-/// snapshot during the edit and consume the editor with [`Editor::commit`].
-#[derive(Debug, Clone)]
-pub struct Editor {
-    original: Snapshot,
-    working: Snapshot,
-}
-
-impl Editor {
-    pub(super) fn new(snapshot: Snapshot) -> Self {
-        Self {
-            original: snapshot.clone(),
-            working: snapshot,
-        }
-    }
-
-    /// Replace the typed outcome while retaining every opaque extension.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn set(&mut self, outcome: Outcome) -> Result<()> {
-        validate_outcome(outcome)?;
-        self.working.outcome = Some(outcome);
-        Ok(())
-    }
-
-    /// Clear only the typed outcome, retaining opaque extensions for a later
-    /// package-level decision.
-    pub fn clear(&mut self) {
-        self.working.outcome = None;
-    }
-
-    /// Borrow the projected snapshot.
-    #[inline]
-    #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
-        &self.working
-    }
-
-    /// Whether the edit changes the semantic snapshot.
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.original != self.working
-    }
-
-    /// Validate and consume the edit into a new snapshot.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn commit(self) -> Result<Snapshot> {
-        validate_snapshot(&self.working)?;
-        Ok(self.working)
-    }
-}
-
 /// Stage a typed outcome into the selected raw shape while preserving every
 /// unrelated extension and every untouched byte range.
-pub(super) fn set(xml: &[u8], source: &Source, outcome: Outcome) -> Result<Vec<u8>> {
+pub(super) fn set(
+    xml: &[u8],
+    source: &Source,
+    outcome: Outcome,
+    max_bytes: usize,
+) -> Result<Vec<u8>> {
     validate_outcome(outcome)?;
     let generated = codec::write_classification(outcome);
     if let Some(known) = &source.layout.known {
         if let Some(element) = &known.classification {
-            return codec::replace(xml, element.span.clone(), &generated);
+            return codec::replace(xml, element.span.clone(), &generated, max_bytes);
         }
         if known.element.empty {
-            return expand_empty(xml, &known.element, &generated);
+            return expand_empty(xml, &known.element, &generated, max_bytes);
         }
         return codec::replace(
             xml,
             known.element.close_start..known.element.close_start,
             &generated,
+            max_bytes,
         );
     }
 
     if let Some(ext_lst) = &source.layout.ext_lst {
         let extension = codec::write_extension(source.layout.conformance, outcome)?;
         if ext_lst.element.empty {
-            return expand_empty(xml, &ext_lst.element, &extension);
+            return expand_empty(xml, &ext_lst.element, &extension, max_bytes);
         }
         return codec::replace(
             xml,
             ext_lst.element.close_start..ext_lst.element.close_start,
             &extension,
+            max_bytes,
         );
     }
 
     let list = codec::write_extension_list(source.layout.conformance, outcome)?;
     if source.layout.nv_pr.empty {
-        expand_empty(xml, &source.layout.nv_pr, &list)
+        expand_empty(xml, &source.layout.nv_pr, &list, max_bytes)
     } else {
         codec::replace(
             xml,
             source.layout.nv_pr.close_start..source.layout.nv_pr.close_start,
             &list,
+            max_bytes,
         )
     }
 }
 
 /// Remove the typed classification element. Unknown extension entries remain
 /// in their original source order and byte spelling.
-pub(super) fn remove(xml: &[u8], source: &Source) -> Result<Option<Vec<u8>>> {
+pub(super) fn remove(xml: &[u8], source: &Source, max_bytes: usize) -> Result<Option<Vec<u8>>> {
     let Some(known) = &source.layout.known else {
         return Ok(None);
     };
@@ -139,10 +87,15 @@ pub(super) fn remove(xml: &[u8], source: &Source) -> Result<Option<Vec<u8>>> {
     } else {
         classification.span.clone()
     };
-    Ok(Some(codec::replace(xml, replacement, &[])?))
+    Ok(Some(codec::replace(xml, replacement, &[], max_bytes)?))
 }
 
-fn expand_empty(xml: &[u8], element: &codec::Element, child: &[u8]) -> Result<Vec<u8>> {
+fn expand_empty(
+    xml: &[u8],
+    element: &codec::Element,
+    child: &[u8],
+    max_bytes: usize,
+) -> Result<Vec<u8>> {
     let raw = xml.get(element.span.clone()).ok_or_else(|| {
         crate::Error::Invalid("classification empty element range is invalid".into())
     })?;
@@ -173,7 +126,7 @@ fn expand_empty(xml: &[u8], element: &codec::Element, child: &[u8]) -> Result<Ve
     replacement.extend_from_slice(b"</");
     replacement.extend_from_slice(qname);
     replacement.push(b'>');
-    codec::replace(xml, element.span.clone(), &replacement)
+    codec::replace(xml, element.span.clone(), &replacement, max_bytes)
 }
 
 fn qualified_name(element: &[u8]) -> Result<&[u8]> {

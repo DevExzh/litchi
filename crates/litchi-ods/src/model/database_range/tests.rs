@@ -1,6 +1,11 @@
 //! Focused regression coverage for the database-range semantic and XML layers.
 
 use super::*;
+use litchi_odf_common::XmlStreamLimits;
+
+fn limits() -> XmlStreamLimits {
+    XmlStreamLimits::owner_default_value()
+}
 
 #[test]
 fn new_range_has_an_ergonomic_validated_baseline() {
@@ -12,12 +17,14 @@ fn new_range_has_an_ergonomic_validated_baseline() {
 #[test]
 fn codec_round_trip_preserves_nested_filter_metadata() {
     let xml = r#"<s xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><t:database-ranges><t:database-range t:name="Sales" t:target-range-address="Sheet1.A1:Sheet1.B20"><t:database-source-query t:database-name="sales.odb" t:query-name="OpenOrders"/><t:filter t:condition-source="self"><t:filter-and><t:filter-condition t:field-number="0" t:value="East &amp; West" t:operator="="/><t:filter-or><t:filter-condition t:field-number="1" t:value="10" t:operator=">"/></t:filter-or></t:filter-and></t:filter></t:database-range></t:database-ranges></s>"#;
-    let parsed = parse_database_ranges(xml).expect("test fixture or operation should succeed");
+    let parsed =
+        parse_database_ranges(xml, &limits()).expect("test fixture or operation should succeed");
     let mut written = String::new();
-    write_database_ranges(&mut written, &parsed).expect("test fixture or operation should succeed");
+    write_database_ranges(&mut written, &parsed, &limits())
+        .expect("test fixture or operation should succeed");
     let reparsed = parse_database_ranges(&format!(
         r#"<s xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0">{written}</s>"#
-    ))
+    ), &limits())
     .expect("test fixture or operation should succeed");
     assert_eq!(reparsed, parsed);
 }
@@ -50,7 +57,9 @@ fn validation_rejects_multiple_unnamed_ranges() {
     assert!(validate_database_range_collection(&[first.clone(), second]).is_err());
 
     let mut output = "prefix".to_string();
-    assert!(write_database_ranges(&mut output, &[first, Range::new("Sheet1.B1")]).is_err());
+    assert!(
+        write_database_ranges(&mut output, &[first, Range::new("Sheet1.B1")], &limits()).is_err()
+    );
     assert_eq!(output, "prefix");
 
     let mut named = Range::new("Sheet1.A1");
@@ -61,13 +70,13 @@ fn validation_rejects_multiple_unnamed_ranges() {
 #[test]
 fn standalone_parser_rejects_multiple_unnamed_ranges() {
     let xml = r#"<s xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><t:database-ranges><t:database-range t:target-range-address="Sheet1.A1"/><t:database-range t:target-range-address="Sheet1.B1"/></t:database-ranges></s>"#;
-    assert!(parse_database_ranges(xml).is_err());
+    assert!(parse_database_ranges(xml, &limits()).is_err());
 }
 
 #[test]
 fn filter_color_data_types_follow_odf_vocabulary() {
     let xml = r#"<s xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><t:database-ranges><t:database-range t:target-range-address="Sheet1.A1"><t:filter><t:filter-condition t:field-number="0" t:data-type="text-color" t:value="window-font-color" t:operator="="/></t:filter></t:database-range></t:database-ranges></s>"#;
-    let ranges = parse_database_ranges(xml).expect("ODF color condition should parse");
+    let ranges = parse_database_ranges(xml, &limits()).expect("ODF color condition should parse");
     assert_eq!(
         ranges[0].filter.as_ref().unwrap().expression,
         Expression::Condition(Condition {
@@ -80,19 +89,19 @@ fn filter_color_data_types_follow_odf_vocabulary() {
         })
     );
     let invalid = xml.replace("window-font-color", "not-a-color");
-    assert!(parse_database_ranges(&invalid).is_err());
+    assert!(parse_database_ranges(&invalid, &limits()).is_err());
 }
 
 #[test]
 fn database_range_children_follow_schema_order() {
     let xml = r#"<s xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><t:database-ranges><t:database-range t:target-range-address="Sheet1.A1"><t:sort><t:sort-by t:field-number="0"/></t:sort><t:filter><t:filter-condition t:field-number="0" t:value="x" t:operator="="/></t:filter></t:database-range></t:database-ranges></s>"#;
-    assert!(parse_database_ranges(xml).is_err());
+    assert!(parse_database_ranges(xml, &limits()).is_err());
 }
 
 #[test]
 fn standalone_parser_rejects_nested_leaf_source_content() {
     let xml = r#"<s xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><t:database-ranges><t:database-range t:target-range-address="Sheet1.A1"><t:database-source-query t:database-name="db" t:query-name="query"><t:database-source-table t:database-name="db" t:database-table-name="nested"/></t:database-source-query></t:database-range></t:database-ranges></s>"#;
-    assert!(parse_database_ranges(xml).is_err());
+    assert!(parse_database_ranges(xml, &limits()).is_err());
 }
 
 #[test]
@@ -107,7 +116,7 @@ fn standalone_parser_rejects_known_children_under_all_leaf_metadata() {
             r#"<s xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><t:database-ranges><t:database-range t:target-range-address="Sheet1.A1">{leaf}</t:database-range></t:database-ranges></s>"#
         );
         assert!(
-            parse_database_ranges(&xml).is_err(),
+            parse_database_ranges(&xml, &limits()).is_err(),
             "nested leaf should fail: {leaf}"
         );
     }
@@ -169,14 +178,14 @@ fn public_writer_rejects_sort_algorithm_controls_atomically() {
         ..Sort::default()
     });
     let mut output = "prefix".to_string();
-    assert!(write_database_ranges(&mut output, &[range]).is_err());
+    assert!(write_database_ranges(&mut output, &[range], &limits()).is_err());
     assert_eq!(output, "prefix");
 }
 
 #[test]
 fn standalone_parser_checks_matching_end_names_and_escaped_output_size() {
     let mismatched = r#"<s xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><t:database-ranges><t:database-range t:target-range-address="Input.A1"></t:database-ranges></s>"#;
-    assert!(parse_database_ranges(mismatched).is_err());
+    assert!(parse_database_ranges(mismatched, &limits()).is_err());
 
     let mut range = Range::new("Input.A1");
     range.source = Some(Source::Table {
@@ -184,13 +193,35 @@ fn standalone_parser_checks_matching_end_names_and_escaped_output_size() {
         table_name: "table <one>".to_string(),
     });
     let mut output = String::new();
-    write_database_ranges(&mut output, &[range.clone()]).expect("bounded writer should succeed");
+    write_database_ranges(&mut output, &[range.clone()], &limits())
+        .expect("bounded writer should succeed");
     assert!(output.contains("&amp;") && output.contains("&quot;"));
-    let reparsed = parse_database_ranges(&format!(
-        r#"<s xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0">{output}</s>"#
-    ))
+    let reparsed = parse_database_ranges(
+        &format!(
+            r#"<s xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0">{output}</s>"#
+        ),
+        &limits(),
+    )
     .expect("escaped source should parse");
     assert_eq!(reparsed, vec![range]);
+}
+
+#[test]
+fn standalone_parser_validates_structure_without_rejecting_inherited_vendor_prefixes() {
+    let valid = r#"<s xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><t:database-ranges><vendor:future><vendor:value>opaque</vendor:value></vendor:future><t:database-range t:target-range-address="Input.A1"/></t:database-ranges></s>"#;
+    assert_eq!(parse_database_ranges(valid, &limits()).unwrap().len(), 1);
+
+    for malformed in [
+        r#"<s><vendor:future>"#,
+        r#"<s/><vendor:future/>"#,
+        r#"<!DOCTYPE s><s/>"#,
+        r#"<?xml?><s/>"#,
+    ] {
+        assert!(
+            parse_database_ranges(malformed, &limits()).is_err(),
+            "malformed fragment should be rejected: {malformed}"
+        );
+    }
 }
 
 #[test]
@@ -199,7 +230,7 @@ fn standalone_parser_bounds_raw_attribute_before_decoding() {
     let xml = format!(
         r#"<s xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><t:database-ranges><t:database-range t:target-range-address="{oversized}"/></t:database-ranges></s>"#
     );
-    assert!(parse_database_ranges(&xml).is_err());
+    assert!(parse_database_ranges(&xml, &limits()).is_err());
 }
 
 #[test]
@@ -210,7 +241,7 @@ fn standalone_source_and_filter_writers_apply_validation_limits() {
         query_name: "query".to_string(),
     };
     let mut output = String::new();
-    assert!(write_database_source(&mut output, &source).is_err());
+    assert!(write_database_source(&mut output, &source, &limits()).is_err());
     assert!(output.is_empty(), "rejected source must not mutate output");
 
     let filter = Filter {
@@ -220,7 +251,7 @@ fn standalone_source_and_filter_writers_apply_validation_limits() {
         display_duplicates: None,
         expression: Expression::Condition(Condition::new(0, "=", "value")),
     };
-    assert!(write_filter(&mut output, &filter).is_err());
+    assert!(write_filter(&mut output, &filter, &limits()).is_err());
     assert!(output.is_empty(), "rejected filter must not mutate output");
 }
 
@@ -238,6 +269,37 @@ fn escaped_output_cap_is_checked_before_emission() {
         expression: Expression::Condition(condition),
     });
     let mut output = "prefix".to_string();
-    assert!(write_database_ranges(&mut output, &[range]).is_err());
+    assert!(write_database_ranges(&mut output, &[range], &limits()).is_err());
     assert_eq!(output, "prefix");
+}
+
+#[test]
+fn caller_xml_budget_is_required_and_enforced() {
+    let strict = XmlStreamLimits::new(1, 256, 100_000, 100_000, 1_048_576).unwrap();
+    let xml =
+        r#"<s xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><t:database-ranges/></s>"#;
+    assert!(parse_database_ranges(xml, &strict).is_err());
+
+    let mut output = String::new();
+    assert!(write_database_ranges(&mut output, &[Range::new("Input.A1")], &strict).is_err());
+    assert!(output.is_empty());
+}
+
+#[test]
+fn caller_budget_covers_nested_events_attributes_and_exact_output() {
+    let xml = r#"<s xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><t:database-ranges><t:database-range t:target-range-address="Input.A1"><t:filter><t:filter-and><t:filter-condition t:field-number="0" t:value="x" t:operator="="/></t:filter-and></t:filter></t:database-range></t:database-ranges></s>"#;
+    let shallow =
+        XmlStreamLimits::new(xml.len() as u64 + 1, 4, 100_000, 100_000, 64 * 1024).unwrap();
+    assert!(parse_database_ranges(xml, &shallow).is_err());
+
+    let mut expected = String::new();
+    write_database_ranges(&mut expected, &[Range::new("Input.A1")], &limits()).unwrap();
+    let exact =
+        XmlStreamLimits::new(expected.len() as u64, 256, 100_000, 100_000, 64 * 1024).unwrap();
+    let mut actual = String::new();
+    write_database_ranges(&mut actual, &[Range::new("Input.A1")], &exact).unwrap();
+    assert_eq!(actual, expected);
+
+    let attrs = XmlStreamLimits::new(xml.len() as u64 + 1, 256, 100_000, 1, 64 * 1024).unwrap();
+    assert!(parse_database_ranges(xml, &attrs).is_err());
 }

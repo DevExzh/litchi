@@ -1,19 +1,16 @@
 //! Semantic workbook snapshot and worksheet models.
 
-use std::collections::HashMap;
 use std::collections::VecDeque;
+use std::collections::{HashMap, HashSet};
 use std::convert::Infallible;
-use std::io::{Read, Write};
 use std::mem::size_of;
-use std::path::Path;
 use std::sync::{Arc, Mutex, OnceLock};
 
-use super::edit::{Commit, Edit, Patch};
 use super::worksheet;
 use super::{codec, package};
 use litchi_core::Selector as CoreSelector;
-use litchi_opc::{OpcPackage, PackURI, ReadLimits};
-use litchi_sheet::{Area, At, ColumnAt, Rect, RowAt};
+use litchi_opc::{OpcPackage, PackURI, Relationships};
+use litchi_sheet::{Area, At, Cell as Address, ColumnAt, Rect, RowAt};
 use once_cell::sync::OnceCell;
 
 use crate::cell::{Extents, SharedStringLineage, Store, Text};
@@ -21,6 +18,7 @@ use crate::error::{Error, Result, invalid};
 use crate::leniency::{Leniency, ToleranceReport};
 use crate::raw;
 use crate::style::StyleLineage;
+use crate::style::cell_format::{Format, FormatCache, FormatKey, FormatTable};
 use crate::{Cells, Column, Columns, LocalStyle, Row, Rows, Style, Styles};
 
 #[cfg(feature = "encryption")]
@@ -377,6 +375,25 @@ fn page_break_cache(
     }
 }
 
+/// Compare the public semantic fields of one OPC relationship collection.
+///
+/// The collection's source-preservation handle is intentionally ignored: it
+/// describes how the value was admitted, not the value itself.
+fn same_relationships(left: &Relationships, right: &Relationships) -> bool {
+    left.base_uri() == right.base_uri()
+        && left.source_uri() == right.source_uri()
+        && left.len() == right.len()
+        && left.iter().all(|relationship| {
+            right.get(relationship.r_id()).is_some_and(|candidate| {
+                candidate.reltype() == relationship.reltype()
+                    && candidate.target_ref() == relationship.target_ref()
+                    && candidate.target_mode() == relationship.target_mode()
+                    && candidate.base_uri() == relationship.base_uri()
+                    && candidate.source_uri() == relationship.source_uri()
+            })
+        })
+}
+
 #[derive(Debug)]
 pub(crate) struct Inner {
     pub(super) package: OpcPackage,
@@ -390,6 +407,9 @@ pub(crate) struct Inner {
     /// Repairs made while the shared-string table was parsed; published
     /// before the table itself (see `crate::leniency`).
     pub(super) shared_strings_tolerance: OnceLock<ToleranceReport>,
+    /// Ascending indexes of the shared-string items that carry rich-text
+    /// runs, scanned on first use (record 0273).
+    pub(super) rich_shared_strings: OnceLock<Box<[usize]>>,
     pub(crate) shared_string_lineage: Arc<SharedStringLineage>,
     pub(super) styles_uri: Option<PackURI>,
     pub(super) styles: OnceLock<raw::styles::Catalog>,
@@ -411,240 +431,168 @@ pub(crate) struct Inner {
     pub(super) pivot_caches: Box<[raw::PivotCache]>,
     pub(super) external_reference_ids: Box<[String]>,
     pub(super) page_break_cache: Arc<PageBreakProjectionCache>,
+    /// Weighted clean-value cache of the parsed format table, shared by the
+    /// lineage's descendant snapshots and keyed by the styles payload
+    /// allocation.
+    pub(super) format_cache: Arc<FormatCache>,
+    /// Memo of the chart inventory of the worksheet drawing read last,
+    /// shared by the lineage like `format_cache` and keyed by the drawing
+    /// payload allocation (record 0286).
+    pub(super) chart_inventories: Arc<crate::chart::edit::InventoryCache>,
     /// Repairs made while the workbook catalog was parsed at open time.
     pub(super) tolerance: ToleranceReport,
-    /// The opt-in repairs this workbook was opened with; snapshots derived
-    /// from it by edits re-open under the same policy.
-    pub(super) leniency: Leniency,
+    /// The ingress policies this workbook retains after open (its leniency,
+    /// semantic limits and encryption limits); snapshots derived from it by
+    /// edits re-open under the same policies.
+    pub(super) options: WorkbookOptions,
 }
 
-/// Immutable, cheap-to-share XLSX workbook snapshot.
+/// The policies an owned workbook snapshot actually needs after ingress.
+///
+/// Physical source limits live on the validated OPC package, while cache
+/// limits and an execution context belong only to a source-backed owner.
+/// Keeping those source-owner fields out of every eager snapshot preserves
+/// the compact immutable workbook layout without dropping any policy used by
+/// owned edits or encrypted output.
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct WorkbookOptions {
+    pub(super) leniency: Leniency,
+    pub(super) semantic_limits: crate::SemanticLimits,
+    #[cfg(feature = "encryption")]
+    pub(super) encryption_limits: crate::encryption::Limits,
+}
+
+impl WorkbookOptions {
+    fn from_open_options(options: &crate::OpenOptions) -> Self {
+        Self {
+            leniency: options.leniency,
+            semantic_limits: options.semantic_limits,
+            #[cfg(feature = "encryption")]
+            encryption_limits: options.encryption_limits,
+        }
+    }
+}
+
+/// The owned, read-only semantic projection of an XLSX [`crate::Package`].
+///
+/// A projection is cheap to clone and shares the package's immutable state;
+/// [`crate::Package::workbook`] produces one. It exposes the workbook catalog,
+/// sheet handles, cells, styles and the other semantic reads. Every state
+/// verb (open, edit, apply, save) lives on the package.
 #[derive(Debug, Clone)]
 pub struct Workbook {
     pub(super) inner: Arc<Inner>,
+    /// The policies of this snapshot that do not belong to its state;
+    /// snapshots derived from it by edits share them.
+    ///
+    /// The ordinary strict package path keeps this absent and reads its
+    /// semantic defaults from `Inner::options`.  An override (or encrypted
+    /// provenance) installs the shared policy lazily; this keeps the common
+    /// eager open path allocation-free for policy state.
+    policy: Option<Arc<Policy>>,
+}
+
+/// The semantic budgets and encryption provenance of a workbook snapshot.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct Policy {
+    semantic_limits: crate::SemanticLimits,
     #[cfg(feature = "encryption")]
     encryption: PackageEncryption,
 }
 
 impl Workbook {
-    /// Create a deterministic minimal workbook with one visible worksheet.
-    pub fn new() -> Result<Self> {
-        Self::from_package(crate::package::build_minimal_package()?)
-    }
-
-    /// Create a deterministic minimal workbook with one visible worksheet.
-    pub fn create() -> Result<Self> {
-        Self::new()
-    }
-
-    /// Open an XLSX-family package from a filesystem path.
-    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::open_with_limits(path, ReadLimits::default())
-    }
-
-    /// Open an XLSX-family package from a filesystem path with explicit OPC
-    /// resource limits.
-    pub fn open_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
-        Self::from_package(OpcPackage::open_with_limits(path, limits)?)
-    }
-
-    /// Open an ordinary or encrypted workbook using safe independent resource
-    /// policies.
-    #[cfg(feature = "encryption")]
-    pub fn open_with_password(path: impl AsRef<Path>, password: &str) -> Result<Self> {
-        crate::Package::open_with_password(path, password)?.into_workbook()
-    }
-
-    /// Open an ordinary or encrypted workbook with independent outer
-    /// encryption and inner OPC resource policies.
-    #[cfg(feature = "encryption")]
-    pub fn open_with_password_and_limits(
-        path: impl AsRef<Path>,
-        password: &str,
-        encryption_limits: &crate::encryption::Limits,
-        opc_limits: ReadLimits,
-    ) -> Result<Self> {
-        crate::Package::open_with_password_and_limits(
-            path,
-            password,
-            encryption_limits,
-            opc_limits,
-        )?
-        .into_workbook()
-    }
-
-    /// Move bytes into the XLSX parser.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, ReadLimits::default())
-    }
-
-    /// Move bytes into the XLSX parser with explicit OPC resource limits.
-    pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: ReadLimits) -> Result<Self> {
-        let package = OpcPackage::from_vec_with_limits(bytes, limits)?;
-        Self::from_package(package)
-    }
-
-    /// Move ordinary or encrypted bytes into the workbook parser using safe
-    /// independent resource policies.
-    #[cfg(feature = "encryption")]
-    pub fn from_bytes_with_password(bytes: Vec<u8>, password: &str) -> Result<Self> {
-        crate::Package::from_bytes_with_password(bytes, password)?.into_workbook()
-    }
-
-    /// Move ordinary or encrypted bytes into the workbook parser with
-    /// independent outer encryption and inner OPC resource policies.
-    #[cfg(feature = "encryption")]
-    pub fn from_bytes_with_password_and_limits(
-        bytes: Vec<u8>,
-        password: &str,
-        encryption_limits: &crate::encryption::Limits,
-        opc_limits: ReadLimits,
-    ) -> Result<Self> {
-        crate::Package::from_bytes_with_password_and_limits(
-            bytes,
-            password,
-            encryption_limits,
-            opc_limits,
-        )?
-        .into_workbook()
-    }
-
-    /// Open a borrowed XLSX byte slice.
-    pub fn from_slice(bytes: &[u8]) -> Result<Self> {
-        Self::from_slice_with_limits(bytes, ReadLimits::default())
-    }
-
-    /// Open a borrowed XLSX byte slice with explicit OPC resource limits.
-    pub fn from_slice_with_limits(bytes: &[u8], limits: ReadLimits) -> Result<Self> {
-        Self::from_package(OpcPackage::from_bytes_with_limits(bytes, limits)?)
-    }
-
-    /// Read an ordinary or encrypted borrowed byte slice using safe
-    /// independent resource policies.
-    #[cfg(feature = "encryption")]
-    pub fn from_slice_with_password(bytes: &[u8], password: &str) -> Result<Self> {
-        crate::Package::from_slice_with_password(bytes, password)?.into_workbook()
-    }
-
-    /// Read an ordinary or encrypted borrowed byte slice with independent
-    /// outer encryption and inner OPC resource policies.
-    #[cfg(feature = "encryption")]
-    pub fn from_slice_with_password_and_limits(
-        bytes: &[u8],
-        password: &str,
-        encryption_limits: &crate::encryption::Limits,
-        opc_limits: ReadLimits,
-    ) -> Result<Self> {
-        crate::Package::from_slice_with_password_and_limits(
-            bytes,
-            password,
-            encryption_limits,
-            opc_limits,
-        )?
-        .into_workbook()
-    }
-
-    /// Read an XLSX package from a synchronous reader.
-    pub fn from_reader(reader: impl Read) -> Result<Self> {
-        Self::from_reader_with_limits(reader, ReadLimits::default())
-    }
-
-    /// Read an XLSX package from a synchronous reader with explicit OPC
-    /// resource limits.
-    pub fn from_reader_with_limits(reader: impl Read, limits: ReadLimits) -> Result<Self> {
-        Self::from_package(OpcPackage::from_reader_with_limits(reader, limits)?)
-    }
-
-    /// Read an ordinary or encrypted workbook from a synchronous reader using
-    /// safe independent resource policies.
-    #[cfg(feature = "encryption")]
-    pub fn from_reader_with_password(reader: impl Read, password: &str) -> Result<Self> {
-        crate::Package::from_reader_with_password(reader, password)?.into_workbook()
-    }
-
-    /// Read an ordinary or encrypted workbook from a synchronous reader with
-    /// independent outer encryption and inner OPC resource policies.
-    #[cfg(feature = "encryption")]
-    pub fn from_reader_with_password_and_limits(
-        reader: impl Read,
-        password: &str,
-        encryption_limits: &crate::encryption::Limits,
-        opc_limits: ReadLimits,
-    ) -> Result<Self> {
-        crate::Package::from_reader_with_password_and_limits(
-            reader,
-            password,
-            encryption_limits,
-            opc_limits,
-        )?
-        .into_workbook()
-    }
-
-    /// Build a snapshot from a validated OPC package without exposing it in
-    /// ordinary sheet APIs.
-    ///
-    /// This raw compatibility boundary deliberately treats the supplied clear
-    /// OPC graph as plaintext and does not infer encryption provenance.
-    pub fn from_package(package: OpcPackage) -> Result<Self> {
+    /// Validate a clear OPC graph and build its strict projection. The
+    /// public ingress is [`crate::Package`]; this raw boundary is internal.
+    pub(crate) fn from_package(package: OpcPackage) -> Result<Self> {
         Self::from_package_with_styles(package, None)
     }
 
-    /// Adopt a parsed OPC package after validating its `SpreadsheetML` graph.
-    pub fn from_opc(package: OpcPackage) -> Result<Self> {
-        Self::from_package(package)
+    /// [`Self::from_package`] under the ingress policies `options`, which
+    /// the projection keeps.
+    pub(crate) fn from_package_with_options(
+        package: OpcPackage,
+        options: crate::OpenOptions,
+    ) -> Result<Self> {
+        Self::open_package(package, None, WorkbookOptions::from_open_options(&options))
     }
 
-    /// [`Self::from_package`] with the opt-in repairs `leniency` allows; see
-    /// [`crate::leniency`]. The Excel-compatible repairs apply under every
-    /// policy.
-    pub fn from_package_with_leniency(package: OpcPackage, leniency: Leniency) -> Result<Self> {
-        Self::open_package(package, None, leniency)
+    /// The semantic budgets of this snapshot.
+    pub(crate) fn semantic_limits(&self) -> &crate::SemanticLimits {
+        self.policy
+            .as_deref()
+            .map_or(&self.inner.options.semantic_limits, |policy| {
+                &policy.semantic_limits
+            })
     }
 
-    /// [`Self::open`] with the opt-in repairs `leniency` allows.
-    pub fn open_with_leniency(path: impl AsRef<Path>, leniency: Leniency) -> Result<Self> {
-        Self::from_package_with_leniency(OpcPackage::open(path)?, leniency)
+    /// This snapshot under the semantic budgets `limits`; the state is
+    /// shared.
+    pub(crate) fn with_semantic_limits(&self, limits: crate::SemanticLimits) -> Self {
+        let mut policy = self.policy.as_deref().copied().unwrap_or_else(|| Policy {
+            semantic_limits: self.inner.options.semantic_limits,
+            #[cfg(feature = "encryption")]
+            encryption: PackageEncryption::plain(),
+        });
+        policy.semantic_limits = limits;
+        Self {
+            inner: Arc::clone(&self.inner),
+            policy: Some(Arc::new(policy)),
+        }
     }
 
-    /// [`Self::from_slice`] with the opt-in repairs `leniency` allows.
-    pub fn from_slice_with_leniency(bytes: &[u8], leniency: Leniency) -> Result<Self> {
-        Self::from_package_with_leniency(OpcPackage::from_bytes(bytes)?, leniency)
+    #[cfg(feature = "encryption")]
+    pub(crate) fn encryption_limits(&self) -> crate::encryption::Limits {
+        self.inner.options.encryption_limits
     }
 
-    /// [`Self::from_reader`] with the opt-in repairs `leniency` allows.
-    pub fn from_reader_with_leniency(reader: impl Read, leniency: Leniency) -> Result<Self> {
-        Self::from_package_with_leniency(OpcPackage::from_reader(reader)?, leniency)
+    /// The lineage's memo of worksheet drawing chart inventories.
+    pub(crate) fn chart_inventories(&self) -> &crate::chart::edit::InventoryCache {
+        &self.inner.chart_inventories
     }
 
-    /// The opt-in repair policy this workbook was opened with.
+    /// The opt-in repair policy the owning package was opened with.
     #[must_use]
     pub fn leniency(&self) -> Leniency {
-        self.inner.leniency
+        self.inner.options.leniency
     }
 
     #[cfg(feature = "encryption")]
     pub(crate) fn from_package_with_encryption(
         package: OpcPackage,
         encryption: PackageEncryption,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
-        let mut workbook = Self::from_package(package)?;
-        workbook.encryption = encryption;
+        let mut workbook =
+            Self::open_package(package, None, WorkbookOptions::from_open_options(&options))?;
+        workbook.policy = Some(Arc::new(Policy {
+            encryption,
+            semantic_limits: workbook.semantic_limits().to_owned(),
+        }));
         Ok(workbook)
     }
 
-    pub(super) fn from_package_with_styles(
+    /// Encryption provenance retained from the owning package.
+    #[cfg(feature = "encryption")]
+    pub(crate) fn encryption_state(&self) -> PackageEncryption {
+        self.policy
+            .as_deref()
+            .map_or_else(PackageEncryption::plain, |policy| policy.encryption)
+    }
+
+    pub(crate) fn from_package_with_styles(
         package: OpcPackage,
         source: Option<&Workbook>,
     ) -> Result<Self> {
-        let leniency = source.map_or(Leniency::Strict, |source| source.inner.leniency);
-        Self::open_package(package, source, leniency)
+        let options = source.map_or_else(WorkbookOptions::default, |source| source.inner.options);
+        Self::open_package(package, source, options)
     }
 
     fn open_package(
         package: OpcPackage,
         source: Option<&Workbook>,
-        leniency: Leniency,
+        options: WorkbookOptions,
     ) -> Result<Self> {
+        let leniency = options.leniency;
         // The packaging repairs come first (they were made before the
         // workbook part could be read), then the open-time catalog sites
         // (findings 4.7/4.8); see `crate::leniency`.
@@ -659,7 +607,12 @@ impl Workbook {
                     workbook.content_type()
                 ))
             })?;
-            let catalog = raw::parse_catalog_repairing(workbook.blob(), leniency, &mut tolerance)?;
+            let catalog = raw::parse_catalog_repairing(
+                workbook.blob(),
+                &package.read_limits(),
+                leniency,
+                &mut tolerance,
+            )?;
             let sheet_parts = package::validate_sheet_graph(&package, workbook, &catalog.sheets)?;
             let shared_strings_uri = package::validate_shared_strings(&package, workbook)?;
             let styles_uri = package::validate_styles(&package, workbook)?;
@@ -701,6 +654,15 @@ impl Workbook {
             |source| Arc::clone(&source.inner.page_break_cache),
         );
         let source_page_break_caches = page_break_caches(source);
+        // A descendant reuses the lineage's cache; its allocation key keeps a
+        // rewritten styles payload from reusing an earlier table.
+        let format_cache = source.map_or_else(
+            || Arc::new(FormatCache::new()),
+            |source| Arc::clone(&source.inner.format_cache),
+        );
+        let chart_inventories = source.map_or_else(Arc::default, |source| {
+            Arc::clone(&source.inner.chart_inventories)
+        });
         let sheets = catalog
             .sheets
             .into_iter()
@@ -741,6 +703,18 @@ impl Workbook {
         });
         let sheet_name_order = sheet_name_order.into_boxed_slice();
 
+        let policy = source
+            .and_then(|source| source.policy.as_ref().map(Arc::clone))
+            .or_else(|| {
+                let semantic_limits = options.semantic_limits;
+                (semantic_limits != crate::SemanticLimits::default()).then(|| {
+                    Arc::new(Policy {
+                        semantic_limits,
+                        #[cfg(feature = "encryption")]
+                        encryption: PackageEncryption::plain(),
+                    })
+                })
+            });
         Ok(Self {
             inner: Arc::new(Inner {
                 package,
@@ -748,6 +722,7 @@ impl Workbook {
                 shared_strings_uri,
                 shared_strings: OnceLock::new(),
                 shared_strings_tolerance: OnceLock::new(),
+                rich_shared_strings: OnceLock::new(),
                 shared_string_lineage,
                 styles_uri,
                 styles: OnceLock::new(),
@@ -767,11 +742,12 @@ impl Workbook {
                 pivot_caches: catalog.pivot_caches.into_boxed_slice(),
                 external_reference_ids: catalog.external_reference_ids.into_boxed_slice(),
                 page_break_cache: lineage_page_break_cache,
+                format_cache,
+                chart_inventories,
                 tolerance,
-                leniency,
+                options,
             }),
-            #[cfg(feature = "encryption")]
-            encryption: source.map_or_else(PackageEncryption::plain, |source| source.encryption),
+            policy,
         })
     }
 
@@ -868,12 +844,108 @@ impl Workbook {
         self.inner.sheets.is_empty()
     }
 
+    /// Compare two snapshots' native OPC content without serializing either
+    /// workbook.
+    ///
+    /// The comparison walks the package relationship graph and compares every
+    /// accepted part's content type, payload bytes, and relationships.  It is
+    /// therefore suitable for deciding whether a sequence of immutable edits
+    /// returned to its original state (for example `A -> B -> A`) is a logical
+    /// no-op.  Derived workbook caches and parser tolerance reports are not
+    /// package content and are intentionally excluded.
+    ///
+    /// # Errors
+    ///
+    /// Returns the native package error when a deferred payload cannot be
+    /// decoded. Packages containing caller-defined OPC part implementations,
+    /// or separately opened opaque non-part ZIP members, return an explicit
+    /// unsupported error because their behavior or bytes cannot be proved
+    /// through the typed OPC graph.
+    pub(crate) fn same_content(&self, other: &Self) -> Result<bool> {
+        if Arc::ptr_eq(&self.inner, &other.inner) {
+            return Ok(true);
+        }
+
+        // An equal authorized exact source digest is stronger than the
+        // semantic walk below: it includes the complete archive, including
+        // ZIP members which the OPC graph does not expose. A differing digest
+        // is not enough to prove different logical content because ZIP
+        // framing, member order, and archive comments may vary.
+        if let (Some(left), Some(right)) = (
+            self.inner.package.exact_source_sha256(),
+            other.inner.package.exact_source_sha256(),
+        ) {
+            if left == right {
+                return Ok(true);
+            }
+        }
+
+        let left_package = &self.inner.package;
+        let right_package = &other.inner.package;
+
+        // A custom Part can carry behavior that is not represented by its
+        // public byte/relationship view. Equality of that view would not be
+        // a proof of equality of the package we publish.
+        if !left_package.holds_only_built_in_parts() || !right_package.holds_only_built_in_parts() {
+            return Err(Error::Unsupported {
+                feature: "content comparison of custom OPC parts",
+            });
+        }
+
+        // Non-part members are deliberately kept opaque by litchi-opc. A
+        // difference in their names/reasons proves inequality. Descendants
+        // of one immutable source archive retain a shared-owner proof for
+        // their bytes; separately opened archives need an explicit refusal
+        // because their non-part payloads are outside the typed graph.
+        if left_package.non_part_members() != right_package.non_part_members() {
+            return Ok(false);
+        }
+        if !left_package.non_part_members().is_empty()
+            && !left_package.shares_source_archive(right_package)
+        {
+            return Err(Error::Unsupported {
+                feature: "content comparison of opaque OPC members",
+            });
+        }
+
+        if left_package.part_count() != right_package.part_count()
+            || !same_relationships(left_package.rels(), right_package.rels())
+        {
+            return Ok(false);
+        }
+
+        for metadata in left_package.iter_parts() {
+            let left = left_package.get_part(metadata.partname())?;
+            let right = match right_package.get_part(metadata.partname()) {
+                Ok(part) => part,
+                Err(litchi_opc::OpcError::PartNotFound(_)) => return Ok(false),
+                Err(error) => return Err(error.into()),
+            };
+            if right.partname() != metadata.partname()
+                || right.content_type() != metadata.content_type()
+                || right.blob() != left.blob()
+                || !same_relationships(metadata.rels(), right.rels())
+            {
+                return Ok(false);
+            }
+        }
+
+        // Content types and relationship members are package-level
+        // publication manifests rather than ordinary OPC parts. Their
+        // modeled fields were covered above; retained source bytes are the
+        // remaining proof against producer extensions and skipped markup.
+        left_package
+            .same_retained_publication_manifests(right_package)
+            .map_err(Into::into)
+    }
+
     /// Iterate lightweight sheet handles in workbook order.
     #[must_use]
     pub fn sheets(&self) -> impl ExactSizeIterator<Item = Worksheet> + DoubleEndedIterator + '_ {
         self.inner.sheets.iter().cloned().map(|data| Worksheet {
             owner: Arc::clone(&self.inner),
             data,
+            policy: self.policy.as_ref().map(Arc::clone),
         })
     }
 
@@ -901,6 +973,7 @@ impl Workbook {
         Ok(data.map(|data| Worksheet {
             owner: Arc::clone(&self.inner),
             data,
+            policy: self.policy.as_ref().map(Arc::clone),
         }))
     }
 
@@ -915,6 +988,7 @@ impl Workbook {
         Some(Worksheet {
             owner: Arc::clone(&self.inner),
             data,
+            policy: self.policy.as_ref().map(Arc::clone),
         })
     }
 
@@ -922,6 +996,31 @@ impl Workbook {
     #[must_use]
     pub fn defined_names(&self) -> &[raw::DefinedName] {
         &self.inner.defined_names
+    }
+
+    /// The worksheet table whose display name, or failing that whose name,
+    /// equals `name` without regard to case, with the worksheet that owns it.
+    ///
+    /// Every worksheet is checked for ambiguous matches. A name match is
+    /// used only when no worksheet has a display-name match. Worksheets are
+    /// searched in workbook order and non-cell sheets are skipped.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Worksheet::tables`] on each worksheet searched, or
+    /// [`Error::Ambiguous`] when multiple names match.
+    pub fn table(&self, name: &str) -> Result<Option<(Worksheet, worksheet::TablePart)>> {
+        worksheet::find_workbook_table(
+            self.sheets(),
+            |sheet| {
+                if sheet.kind() == WorksheetKind::Worksheet {
+                    sheet.tables().map(Some)
+                } else {
+                    Ok(None)
+                }
+            },
+            name,
+        )
     }
 
     /// Low-level workbook pivot-cache references.
@@ -941,17 +1040,6 @@ impl Workbook {
         crate::pivot::cached_unique_names::workbook_cache(self, selector)
     }
 
-    /// Begin an ordinary semantic edit handle for one workbook PivotCache.
-    /// Select the cache field with [`crate::pivot::PivotCacheEdit::field`]
-    /// before staging an existing-name replacement.
-    #[must_use]
-    pub fn edit_pivot_cache(
-        &self,
-        selector: impl Into<crate::pivot::PivotCacheSelector>,
-    ) -> crate::pivot::PivotCacheEdit {
-        crate::pivot::cached_unique_names::edit_workbook(self, selector)
-    }
-
     /// Resolve the typed `pivotTableServerFormats` metadata for one semantic
     /// workbook PivotTable.  XML source ranges and package identities remain
     /// behind the low-level `pivot_table_server_formats_source` method.
@@ -968,8 +1056,8 @@ impl Workbook {
     pub fn pivot_table_server_formats_source<'a>(
         &self,
         selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
-    ) -> Result<crate::pivot::PivotServerFormatsSnapshot> {
-        crate::pivot::load_pivot_server_formats(&self.inner.package, selector)
+    ) -> Result<crate::pivot::server_formats::Snapshot> {
+        crate::pivot::server_formats::load(&self.inner.package, selector)
     }
 
     /// Resolve one semantic PivotTable through the ordinary workbook facade.
@@ -983,56 +1071,6 @@ impl Workbook {
         crate::pivot::server_formats::view_workbook(self, selector)
     }
 
-    /// Start an ordinary semantic PivotTable server-format edit.
-    pub fn edit_pivot_table<'a>(
-        &self,
-        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
-    ) -> Result<crate::pivot::PivotTableServerFormatsEdit> {
-        self.ensure_mutation_allowed("edit_pivot_table")?;
-        crate::pivot::server_formats::edit_workbook(self, selector)
-    }
-
-    /// Alias spelling that includes the edited extension name.
-    pub fn edit_pivot_table_server_formats<'a>(
-        &self,
-        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
-    ) -> Result<crate::pivot::PivotTableServerFormatsEdit> {
-        self.edit_pivot_table(selector)
-    }
-
-    /// Apply an exact ordinary Workbook server-format patch.
-    pub fn apply_pivot_table_server_formats_patch(
-        &self,
-        patch: &crate::pivot::PivotTableServerFormatsWorkbookPatch,
-    ) -> Result<crate::pivot::PivotTableServerFormatsWorkbookCommit> {
-        self.ensure_mutation_allowed("apply_pivot_table_server_formats_patch")?;
-        patch.apply(self)
-    }
-
-    /// Alias spelling for the pivot server-format owner.
-    pub fn apply_pivot_server_formats_patch(
-        &self,
-        patch: &crate::pivot::PivotTableServerFormatsWorkbookPatch,
-    ) -> Result<crate::pivot::PivotTableServerFormatsWorkbookCommit> {
-        self.apply_pivot_table_server_formats_patch(patch)
-    }
-
-    /// Alias for the typed extension collection view.
-    pub fn pivot_server_formats<'a>(
-        &self,
-        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
-    ) -> Result<crate::pivot::PivotTableView> {
-        self.pivot_table_server_formats(selector)
-    }
-
-    /// Low-level source-bound alias for the extension collection view.
-    pub fn pivot_server_formats_source<'a>(
-        &self,
-        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
-    ) -> Result<crate::pivot::PivotServerFormatsSnapshot> {
-        self.pivot_table_server_formats_source(selector)
-    }
-
     /// Resolve the typed `pivotTableData` payload for one semantic
     /// non-worksheet PivotTable.  A missing C444 owner is reported as `None`;
     /// malformed or ambiguous owners remain fallible diagnostics.
@@ -1040,48 +1078,34 @@ impl Workbook {
         &self,
         selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
     ) -> Result<Option<crate::pivot::PivotTableDataView>> {
-        crate::pivot::server_formats::table_data::view_workbook(self, selector)
-    }
-
-    /// Resolve C444 with a caller-lowered semantic resource policy.
-    pub fn pivot_table_data_with_limits<'a>(
-        &self,
-        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
-        limits: &crate::pivot::PivotTableDataLimits,
-    ) -> Result<Option<crate::pivot::PivotTableDataView>> {
-        crate::pivot::server_formats::table_data::view_workbook_with_limits(self, selector, limits)
-    }
-
-    /// Begin an ordinary semantic scalar edit of one `pivotTableData` owner.
-    pub fn edit_pivot_table_data<'a>(
-        &self,
-        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
-    ) -> Result<crate::pivot::PivotTableDataEdit> {
-        self.ensure_mutation_allowed("edit_pivot_table_data")?;
-        crate::pivot::server_formats::table_data::edit_workbook(self, selector)
-    }
-
-    /// Start a C444 edit with a caller-lowered semantic resource policy.
-    pub fn edit_pivot_table_data_with_limits<'a>(
-        &self,
-        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
-        limits: &crate::pivot::PivotTableDataLimits,
-    ) -> Result<crate::pivot::PivotTableDataEdit> {
-        self.ensure_mutation_allowed("edit_pivot_table_data_with_limits")?;
-        crate::pivot::server_formats::table_data::edit_workbook_with_limits(self, selector, limits)
-    }
-
-    /// Apply an exact ordinary Workbook `pivotTableData` patch.
-    pub fn apply_pivot_table_data_patch(
-        &self,
-        patch: &crate::pivot::PivotTableDataWorkbookPatch,
-    ) -> Result<crate::pivot::PivotTableDataWorkbookCommit> {
-        self.ensure_mutation_allowed("apply_pivot_table_data_patch")?;
-        patch.apply(self)
+        crate::pivot::table_data::view_workbook_with_limits(
+            self,
+            selector,
+            &self.semantic_limits().pivot_table_data_value(),
+        )
     }
 
     pub(crate) fn pivot_package(&self) -> &OpcPackage {
         &self.inner.package
+    }
+
+    /// The validated OPC graph behind this projection.
+    pub(crate) fn opc_package(&self) -> &OpcPackage {
+        &self.inner.package
+    }
+
+    /// The styles part, when the workbook has one.
+    pub(crate) fn styles_part_uri(&self) -> Option<&PackURI> {
+        self.inner.styles_uri.as_ref()
+    }
+
+    /// The OPC graph behind this projection, moved out when this is its only
+    /// owner and cloned (sharing every part payload) otherwise.
+    pub(crate) fn into_opc_package(self) -> OpcPackage {
+        match Arc::try_unwrap(self.inner) {
+            Ok(inner) => inner.package,
+            Err(inner) => inner.package.clone(),
+        }
     }
 
     pub(crate) fn adopt_published_package(&self, package: OpcPackage) -> Result<Self> {
@@ -1094,17 +1118,14 @@ impl Workbook {
         &self.inner.external_reference_ids
     }
 
-    /// Read the workbook's source-bound calculation metadata.
+    /// Read the workbook's source-bound calculation metadata under the
+    /// owning package's semantic limits
+    /// ([`crate::SemanticLimits::calculation_properties`]).
     pub fn calculation_metadata(&self) -> Result<crate::calculation_properties::Snapshot> {
-        crate::calculation_properties::Snapshot::load(&self.inner.package)
-    }
-
-    /// Read calculation metadata with a caller-supplied resource policy.
-    pub fn calculation_metadata_with_limits(
-        &self,
-        limits: &crate::calculation_properties::Limits,
-    ) -> Result<crate::calculation_properties::Snapshot> {
-        crate::calculation_properties::Snapshot::load_with_limits(&self.inner.package, limits)
+        crate::calculation_properties::Snapshot::load_with_limits(
+            &self.inner.package,
+            &self.semantic_limits().calculation_properties_value(),
+        )
     }
 
     /// Persisted Office Add-in task panes, when this package contains them.
@@ -1112,10 +1133,12 @@ impl Workbook {
     /// The complete package graph is validated on first access. Later calls
     /// borrow the model retained by this immutable workbook snapshot.
     pub fn task_panes(&self) -> Result<Option<&litchi_ooxml_common::web::Panes>> {
-        let panes = self
-            .inner
-            .task_panes
-            .get_or_try_init(|| litchi_ooxml_common::web::load(&self.inner.package))?;
+        let panes = self.inner.task_panes.get_or_try_init(|| {
+            litchi_ooxml_common::web::load(
+                &self.inner.package,
+                &litchi_ooxml_common::web::Limits::standard(),
+            )
+        })?;
         Ok(panes.as_ref())
     }
 
@@ -1131,7 +1154,11 @@ impl Workbook {
     /// duplicate survey ID, or malformed Survey XML.
     pub fn surveys(&self) -> Result<&[crate::survey::Part]> {
         let values = self.inner.surveys.get_or_try_init(|| {
-            crate::survey::load(&self.inner.package).map(Vec::into_boxed_slice)
+            crate::survey::load_with_limits(
+                &self.inner.package,
+                &self.semantic_limits().survey_value(),
+            )
+            .map(Vec::into_boxed_slice)
         })?;
         Ok(values)
     }
@@ -1146,186 +1173,72 @@ impl Workbook {
         crate::workbook_metadata::protection::parse_workbook_protection(workbook.blob())
     }
 
+    /// The workbook's people, the authors and mentions of threaded comments
+    /// (record 0322); `None` without a persons part.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed parse error for a malformed persons part.
+    pub fn people(&self) -> Result<Option<crate::threaded_comments::People>> {
+        crate::threaded_comments::package::people(&self.inner.package)
+    }
+
+    /// Parse the styles part's differential formats, the formats conditional
+    /// formatting rules reference by `dxfId`; empty without a styles part.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed parse error for malformed `dxfs` markup.
+    pub fn differential_formats(&self) -> Result<Vec<crate::conditional_formatting::Differential>> {
+        let Some(uri) = self.inner.styles_uri.as_ref() else {
+            return Ok(Vec::new());
+        };
+        crate::conditional_formatting::parse_differential_formats(
+            self.inner.package.get_part(uri)?.blob(),
+        )
+    }
+
     /// Shared immutable cell formats in this workbook snapshot.
     pub fn styles(&self) -> Result<Styles> {
         let len = self.inner.style_count()?;
         Ok(Styles::new(Arc::clone(&self.inner), len))
     }
 
-    /// Serialize the immutable package snapshot to bytes.
-    pub fn to_bytes(&self) -> Result<Vec<u8>> {
-        self.ensure_ordinary_output("to_bytes")?;
-        self.to_plain_bytes()
-    }
-
-    /// Explicitly serialize a plaintext OPC package, declassifying encrypted
-    /// source provenance for this output only.
-    pub fn to_plain_bytes(&self) -> Result<Vec<u8>> {
-        crate::writer::to_bytes(&self.inner.package)
-    }
-
-    /// Stream a finalized workbook to any sequential sink without seeking.
+    /// Release the parsed format table retained for [`Style::format`],
+    /// unless an active [`crate::style::Format`] still uses it, and return
+    /// whether a table was released.
     ///
-    /// A sink failure can leave caller-owned output incomplete. Use [`Self::save`]
-    /// for atomic filesystem replacement.
-    pub fn write_to(&self, writer: impl Write) -> Result<()> {
-        self.ensure_ordinary_output("write_to")?;
-        self.write_plain_to(writer)
+    /// The table is a clean cached value: releasing it changes no result, and
+    /// the next formatting read parses the styles part again. Snapshots
+    /// derived from this workbook by edits share the same cache.
+    pub fn release_cached_formats(&self) -> bool {
+        self.inner.format_cache.trim_clean()
     }
 
-    /// Explicitly stream the plaintext OPC package to a sequential sink.
-    pub fn write_plain_to(&self, writer: impl Write) -> Result<()> {
-        crate::writer::write_to(&self.inner.package, writer)
+    /// Remove every package signature from a copy of this snapshot; see
+    /// [`crate::Package::unsign`].
+    pub(crate) fn unsigned(&self) -> Result<Self> {
+        self.ensure_mutation_allowed("unsign")?;
+        let package = &self.inner.package;
+        if !package.is_signed() && !package.requires_signature_edit_policy() {
+            return Ok(self.clone());
+        }
+        let mut package = package.clone();
+        package.unsign();
+        Self::from_package_with_styles(package, Some(self))
     }
 
-    /// Atomically save through a finalized sibling temporary artifact.
-    ///
-    /// Serialization, flushing, and file synchronization finish before the
-    /// destination is replaced. Existing symbolic-link destinations are
-    /// refused instead of being followed or silently replaced. This is
-    /// [`Self::save_with_durability`] at `Durability::Full`.
-    pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
-        self.save_with_durability(path, litchi_core::Durability::Full)
-    }
-
-    /// Atomically save at a caller-chosen
-    /// [`Durability`](litchi_core::Durability).
-    ///
-    /// Every level serializes and flushes the same bytes into the same
-    /// sibling temporary artifact, refuses the same destinations and replaces
-    /// the destination with one rename, so a failure before the rename leaves
-    /// it untouched. A weaker level only skips the parent-directory sync
-    /// (`FileOnly`) or both the file and directory syncs (`NoSync`), with the
-    /// crash guarantees `Durability` states. The level applies to this call
-    /// only; the immutable workbook is unchanged.
-    pub fn save_with_durability(
-        &self,
-        path: impl AsRef<Path>,
-        durability: litchi_core::Durability,
-    ) -> Result<()> {
-        self.ensure_ordinary_output("save")?;
-        self.save_plain_with_durability(path, durability)
-    }
-
-    /// Explicitly save the plaintext OPC package atomically.
-    pub fn save_plain(&self, path: impl AsRef<Path>) -> Result<()> {
-        self.save_plain_with_durability(path, litchi_core::Durability::Full)
-    }
-
-    /// Explicitly save the plaintext OPC package atomically at a
-    /// caller-chosen [`Durability`](litchi_core::Durability); see
-    /// [`Self::save_with_durability`].
-    pub fn save_plain_with_durability(
-        &self,
-        path: impl AsRef<Path>,
-        durability: litchi_core::Durability,
-    ) -> Result<()> {
-        crate::writer::save(&self.inner.package, path, durability)
-    }
-
-    /// Encryption profile retained from source ingress or the latest
-    /// successful encrypted save. In-memory byte generation is side-effect-free.
-    #[cfg(feature = "encryption")]
-    #[must_use]
-    pub const fn encryption(&self) -> Option<crate::encryption::Mode> {
-        self.encryption.mode()
-    }
-
-    /// Serialize and encrypt using an explicitly selected profile.
-    #[cfg(feature = "encryption")]
-    pub fn to_encrypted(&self, password: &str, mode: crate::encryption::Mode) -> Result<Vec<u8>> {
-        self.to_encrypted_with_limits(password, mode, &crate::encryption::Limits::default())
-    }
-
-    /// Serialize and encrypt using an explicit encryption resource policy.
-    #[cfg(feature = "encryption")]
-    pub fn to_encrypted_with_limits(
-        &self,
-        password: &str,
-        mode: crate::encryption::Mode,
-        limits: &crate::encryption::Limits,
-    ) -> Result<Vec<u8>> {
-        self.encrypt_with_mode(password, mode, limits)
-    }
-
-    /// Serialize and encrypt using the source package's retained profile.
-    #[cfg(feature = "encryption")]
-    pub fn to_reencrypted(&self, password: &str) -> Result<Vec<u8>> {
-        self.to_reencrypted_with_limits(password, &crate::encryption::Limits::default())
-    }
-
-    /// Re-encrypt using the retained profile and explicit resource policy.
-    #[cfg(feature = "encryption")]
-    pub fn to_reencrypted_with_limits(
-        &self,
-        password: &str,
-        limits: &crate::encryption::Limits,
-    ) -> Result<Vec<u8>> {
-        let mode = self.retained_mode("to_reencrypted")?;
-        self.to_encrypted_with_limits(password, mode, limits)
-    }
-
-    /// Atomically save with an explicitly selected encryption profile.
-    #[cfg(feature = "encryption")]
-    pub fn save_encrypted(
-        &mut self,
-        path: impl AsRef<Path>,
-        password: &str,
-        mode: crate::encryption::Mode,
-    ) -> Result<()> {
-        self.save_encrypted_with_limits(path, password, mode, &crate::encryption::Limits::default())
-    }
-
-    /// Atomically save with explicit encryption profile and resource policy.
-    #[cfg(feature = "encryption")]
-    pub fn save_encrypted_with_limits(
-        &mut self,
-        path: impl AsRef<Path>,
-        password: &str,
-        mode: crate::encryption::Mode,
-        limits: &crate::encryption::Limits,
-    ) -> Result<()> {
-        let output = self.encrypt_with_mode(password, mode, limits)?;
-        crate::writer::save_encrypted(&output, path)?;
-        self.encryption.mark_encrypted(mode);
-        Ok(())
-    }
-
-    /// Atomically save using the encrypted source's retained profile.
-    #[cfg(feature = "encryption")]
-    pub fn save_reencrypted(&mut self, path: impl AsRef<Path>, password: &str) -> Result<()> {
-        self.save_reencrypted_with_limits(path, password, &crate::encryption::Limits::default())
-    }
-
-    /// Atomically save using the retained profile and explicit resource policy.
-    #[cfg(feature = "encryption")]
-    pub fn save_reencrypted_with_limits(
-        &mut self,
-        path: impl AsRef<Path>,
-        password: &str,
-        limits: &crate::encryption::Limits,
-    ) -> Result<()> {
-        let mode = self.retained_mode("save_reencrypted")?;
-        self.save_encrypted_with_limits(path, password, mode, limits)
-    }
-
-    /// Start an isolated semantic transaction over this immutable snapshot.
-    pub fn edit(&self) -> Result<Edit> {
-        self.ensure_mutation_allowed("edit")?;
-        Edit::new(self.clone())
-    }
-
-    /// Apply a reversible patch after checking every expected source part.
-    pub fn apply(&self, patch: &Patch) -> Result<Commit> {
-        self.ensure_mutation_allowed("apply")?;
-        patch.apply_to(self)
-    }
-
-    fn ensure_ordinary_output(&self, operation: &'static str) -> Result<()> {
+    pub(crate) fn ensure_ordinary_output(&self, operation: &'static str) -> Result<()> {
         #[cfg(feature = "encryption")]
-        self.encryption
-            .ordinary_output()
-            .map_err(|source| Error::EncryptionPolicy { operation, source })?;
+        self.policy.as_deref().map_or_else(
+            || Ok(()),
+            |policy| {
+                policy
+                    .encryption
+                    .ordinary_output()
+                    .map_err(|source| Error::EncryptionPolicy { operation, source })
+            },
+        )?;
         #[cfg(not(feature = "encryption"))]
         let _ = operation;
         Ok(())
@@ -1336,23 +1249,12 @@ impl Workbook {
     }
 
     #[cfg(feature = "encryption")]
-    fn retained_mode(&self, operation: &'static str) -> Result<crate::encryption::Mode> {
-        self.encryption
+    pub(crate) fn retained_mode(&self, operation: &'static str) -> Result<crate::encryption::Mode> {
+        self.policy
+            .as_deref()
+            .map_or_else(PackageEncryption::plain, |policy| policy.encryption)
             .require_retained_mode()
             .map_err(|source| Error::EncryptionPolicy { operation, source })
-    }
-
-    #[cfg(feature = "encryption")]
-    fn encrypt_with_mode(
-        &self,
-        password: &str,
-        mode: crate::encryption::Mode,
-        limits: &crate::encryption::Limits,
-    ) -> Result<Vec<u8>> {
-        let plaintext = self.to_plain_bytes()?;
-        Ok(crate::encryption::encrypt_with(
-            plaintext, password, mode, limits,
-        )?)
     }
 }
 
@@ -1361,6 +1263,10 @@ impl Workbook {
 pub struct Worksheet {
     pub(super) owner: Arc<Inner>,
     pub(super) data: Arc<SheetData>,
+    /// The owning package's policy, for the form-control read budget
+    /// ([`crate::SemanticLimits::form_controls`]); `None` for internal
+    /// handles that never read form controls.
+    pub(super) policy: Option<Arc<Policy>>,
 }
 
 impl Worksheet {
@@ -1416,26 +1322,50 @@ impl Worksheet {
                 sheet: self.data.name.clone(),
             });
         }
-        crate::form_control::eager_form_controls_for_sheet(&self.owner.package, &self.data.part_uri)
+        crate::form_control::eager_form_controls_for_sheet_with_limits(
+            &self.owner.package,
+            &self.data.part_uri,
+            self.policy
+                .as_ref()
+                .map_or_else(
+                    || self.owner.options.semantic_limits.form_controls_value(),
+                    |policy| policy.semantic_limits.form_controls_value(),
+                )
+                .unwrap_or_default(),
+        )
+        .map_err(crate::form_control::owner_to_xlsx)
     }
 
-    /// Read this worksheet's form controls under a caller-owned bounded
-    /// owner policy.
-    pub fn form_controls_with_limits(
-        &self,
-        limits: crate::form_control::OwnerLimits,
-    ) -> Result<crate::form_control::FormControlCollection> {
+    /// Parse this worksheet's legacy notes; `None` without a comments part.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::NotWorksheet`] for a chart or dialog sheet, and a typed error
+    /// for a malformed comments part or relationship.
+    pub fn comments(&self) -> Result<Option<crate::workbook::comments::Comments>> {
         if self.data.kind != WorksheetKind::Worksheet {
             return Err(Error::NotWorksheet {
                 sheet: self.data.name.clone(),
             });
         }
-        crate::form_control::eager_form_controls_for_sheet_with_limits(
+        Ok(crate::workbook::comments::load_from_worksheet(
             &self.owner.package,
             &self.data.part_uri,
-            limits,
-        )
-        .map_err(crate::form_control::owner_to_xlsx)
+        )?
+        .map(|part| part.comments))
+    }
+
+    /// Read this worksheet's threaded comments (record 0322); `None`
+    /// without a threaded-comments part. Only the worksheet's relationships
+    /// and that part are read; authors resolve through
+    /// [`crate::Workbook::people`].
+    pub fn threaded_comments(&self) -> Result<Option<crate::threaded_comments::Comments>> {
+        if self.data.kind != WorksheetKind::Worksheet {
+            return Err(Error::NotWorksheet {
+                sheet: self.data.name.clone(),
+            });
+        }
+        crate::threaded_comments::package::comments(&self.owner.package, &self.data.part_uri)
     }
 
     /// Resolve one form control by checked position or exact authored name.
@@ -1444,18 +1374,6 @@ impl Worksheet {
         selector: impl Into<crate::form_control::ControlSelector<'a>>,
     ) -> Result<Option<crate::form_control::FormControlView>> {
         Ok(self.form_controls()?.get(selector)?.cloned())
-    }
-
-    /// Resolve one form control under a caller-owned bounded owner policy.
-    pub fn form_control_with_limits<'a>(
-        &self,
-        selector: impl Into<crate::form_control::ControlSelector<'a>>,
-        limits: crate::form_control::OwnerLimits,
-    ) -> Result<Option<crate::form_control::FormControlView>> {
-        Ok(self
-            .form_controls_with_limits(limits)?
-            .get(selector)?
-            .cloned())
     }
 
     /// Borrow this worksheet's Office Add-in range bindings.
@@ -1471,7 +1389,7 @@ impl Worksheet {
         }
         self.data.web_bindings.get_or_try_init(|| {
             let part = self.owner.package.get_part(&self.data.part_uri)?;
-            raw::web::read(part.blob())
+            raw::web::read(part.blob(), &self.owner.package.read_limits())
         })
     }
 
@@ -1588,6 +1506,20 @@ impl Worksheet {
         worksheet::tables(self)
     }
 
+    /// The table whose display name, or failing that whose name, equals
+    /// `name` without regard to case.
+    ///
+    /// Display names are unique in a workbook, and table names within a
+    /// sheet, both compared without regard to case, so a well-formed
+    /// package has at most one match.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Self::tables`], or [`Error::Ambiguous`] when multiple names match.
+    pub fn table(&self, name: &str) -> Result<Option<worksheet::TablePart>> {
+        worksheet::find_table(self.tables()?, name)
+    }
+
     /// Load and validate every query-table part owned by this worksheet.
     pub fn query_tables(&self) -> Result<Vec<crate::query_table::Part>> {
         worksheet::query_tables(self)
@@ -1653,11 +1585,184 @@ impl Worksheet {
         Ok(Some(Style::from_raw(Arc::clone(&self.owner), key)))
     }
 
+    /// Whether the stored text at `at` carries rich-text runs: an inline
+    /// string with `r` runs, or a shared string whose item has them.
+    /// Writing a plain value to such a cell drops the runs' formatting, so
+    /// a text search refuses to rewrite it (record 0273).
+    ///
+    /// # Errors
+    ///
+    /// The errors of reading the worksheet's cell store or the
+    /// shared-string part.
+    pub fn has_rich_text<'a>(&self, at: impl Into<At<'a>>) -> Result<bool> {
+        let address = at.into().resolve()?;
+        let Some(entry) = self.store()?.entry(address) else {
+            return Ok(false);
+        };
+        if entry.inline_rich {
+            return Ok(true);
+        }
+        let Some(index) = entry.shared_string else {
+            return Ok(false);
+        };
+        Ok(self
+            .owner
+            .rich_shared_strings()?
+            .binary_search(&index)
+            .is_ok())
+    }
+
+    /// The rich-text runs of the shared string at `at`, each with its run
+    /// properties as stored (record 0295). `None` for a cell that is not a
+    /// shared string with runs, or whose item a run rewrite cannot keep
+    /// (phonetic runs, nested run-property markup). An inline rich string
+    /// is read from the worksheet part (one scan of it).
+    ///
+    /// # Errors
+    ///
+    /// The errors of reading the worksheet's cell store or the
+    /// shared-string part.
+    pub fn rich_text<'a>(&self, at: impl Into<At<'a>>) -> Result<Option<crate::RichText>> {
+        let address = at.into().resolve()?;
+        let Some(entry) = self.store()?.entry(address) else {
+            return Ok(None);
+        };
+        if entry.inline_rich {
+            let part = self.owner.package.get_part(&self.data.part_uri)?;
+            return inline_rich(part.blob(), &address.a1());
+        }
+        let Some(index) = entry.shared_string else {
+            return Ok(None);
+        };
+        if self
+            .owner
+            .rich_shared_strings()?
+            .binary_search(&index)
+            .is_err()
+        {
+            return Ok(None);
+        }
+        let Some(uri) = self.owner.shared_strings_uri.as_ref() else {
+            return Ok(None);
+        };
+        rich_item(self.owner.package.get_part(uri)?.blob(), index)
+    }
+
+    /// Read rich text for a bounded set of cells with one requested payload
+    /// pass per physical source part. Shared-string callers retain the
+    /// existing first-use rich-index census before that payload pass.
+    ///
+    /// The scalar [`Self::rich_text`] accessor is intentionally exact for one
+    /// address, but its inline and shared-string readers both start at the
+    /// beginning of their XML member. Transfers ask for a range of cells, so
+    /// restarting that scan for every address turns a rich range into a
+    /// quadratic walk. This helper retains only requested run values: cells
+    /// outside `addresses` are traversed by the XML reader but never parsed
+    /// into a `RichText` value.
+    pub(crate) fn rich_text_many(
+        &self,
+        addresses: &[Address],
+    ) -> Result<HashMap<Address, Option<crate::RichText>>> {
+        let mut values = HashMap::new();
+        values
+            .try_reserve(addresses.len())
+            .map_err(|source| Error::Allocation {
+                resource: "rich text values",
+                source,
+            })?;
+        if addresses.is_empty() {
+            return Ok(values);
+        }
+
+        let store = self.store()?;
+        let mut inline = HashMap::new();
+        inline
+            .try_reserve(addresses.len())
+            .map_err(|source| Error::Allocation {
+                resource: "inline rich-text addresses",
+                source,
+            })?;
+        let mut shared = HashSet::new();
+        shared
+            .try_reserve(addresses.len())
+            .map_err(|source| Error::Allocation {
+                resource: "rich shared-string indexes",
+                source,
+            })?;
+        let mut shared_addresses = Vec::new();
+        shared_addresses
+            .try_reserve(addresses.len())
+            .map_err(|source| Error::Allocation {
+                resource: "rich shared-string addresses",
+                source,
+            })?;
+        for &address in addresses {
+            values.entry(address).or_insert(None);
+            let Some(entry) = store.entry(address) else {
+                continue;
+            };
+            if entry.inline_rich {
+                // The scalar reader compares the raw `r` attribute with the
+                // canonical address string. Keep that exact source policy in
+                // the bulk reader instead of normalizing `$A$1` or lowercase
+                // references through `Address::from_a1`.
+                inline
+                    .entry(address.a1().into_bytes().into_boxed_slice())
+                    .or_insert(address);
+            } else if let Some(index) = entry.shared_string {
+                shared.insert(index);
+                shared_addresses.push((address, index));
+            }
+        }
+
+        if !inline.is_empty() {
+            let part = self.owner.package.get_part(&self.data.part_uri)?;
+            values.extend(inline_rich_many(part.blob(), &inline)?);
+        }
+
+        if !shared.is_empty() {
+            // The cached rich-index census keeps ordinary shared-string
+            // transfers on the existing no-part-read path. Only when a
+            // requested index is actually rich do we make the one payload
+            // pass that projects its runs.
+            let rich_indexes = self.owner.rich_shared_strings()?;
+            shared.retain(|index| rich_indexes.binary_search(index).is_ok());
+            if shared.is_empty() {
+                return Ok(values);
+            }
+            let Some(uri) = self.owner.shared_strings_uri.as_ref() else {
+                return Ok(values);
+            };
+            let part = self.owner.package.get_part(uri)?;
+            let items = rich_items_many(part.blob(), &shared)?;
+            for (address, index) in shared_addresses {
+                if let Some(value) = items.get(&index) {
+                    values.insert(address, value.clone());
+                }
+            }
+        }
+
+        Ok(values)
+    }
+
     /// Lazily traverse stored cells selected by A1 range, raw zero-based
     /// half-open bounds, or a reusable checked rectangle.
     pub fn cells<'a>(&self, area: impl Into<Area<'a>>) -> Result<Cells<'_>> {
         let range = area.into().resolve()?;
         Ok(self.store()?.cells(range))
+    }
+
+    /// The stored record at a position [`Cells::indexed`] reported for this
+    /// worksheet, with its coordinate, in O(1); `None` past the last record.
+    ///
+    /// # Errors
+    ///
+    /// The errors of reading the worksheet's cell store.
+    pub fn record(
+        &self,
+        index: crate::RecordIndex,
+    ) -> Result<Option<(litchi_sheet::Cell, &crate::Cell)>> {
+        Ok(self.store()?.record(index))
     }
 
     /// Lazily traverse validated, non-overlapping merged ranges.
@@ -1807,6 +1912,24 @@ impl Inner {
             .ok_or_else(|| invalid("shared-string cache initialization did not publish a value"))
     }
 
+    /// The ascending indexes of the shared-string items with rich runs.
+    fn rich_shared_strings(&self) -> Result<&[usize]> {
+        if let Some(indexes) = self.rich_shared_strings.get() {
+            return Ok(indexes);
+        }
+        let indexes = match self.shared_strings_uri.as_ref() {
+            Some(uri) => rich_items(self.package.get_part(uri)?.blob())?,
+            None => Box::default(),
+        };
+        let _publish_result = self.rich_shared_strings.set(indexes);
+        self.rich_shared_strings
+            .get()
+            .map(AsRef::as_ref)
+            .ok_or_else(|| {
+                invalid("rich shared-string cache initialization did not publish a value")
+            })
+    }
+
     fn style_catalog(&self) -> Result<Option<&raw::styles::Catalog>> {
         let Some(uri) = self.styles_uri.as_ref() else {
             return Ok(None);
@@ -1826,6 +1949,23 @@ impl Inner {
 
     pub(crate) fn style_count(&self) -> Result<u32> {
         Ok(self.style_catalog()?.map_or(0, raw::styles::Catalog::len))
+    }
+
+    /// Readable formatting of shared cell format `key`, read through the
+    /// lineage's format-table cache.
+    pub(crate) fn format(&self, key: u32) -> Result<Format> {
+        let uri = self
+            .styles_uri
+            .as_ref()
+            .ok_or_else(|| invalid("workbook has no styles part"))?;
+        let payload = self.package.get_part(uri)?.blob_arc();
+        let limits = self.package.read_limits();
+        let table = self
+            .format_cache
+            .get_or_build(FormatKey::allocation(&payload), || {
+                FormatTable::parse_with_limits(&payload, limits)
+            })?;
+        Format::new(table, key)
     }
 
     fn require_style(&self, key: u32) -> Result<()> {
@@ -1911,6 +2051,7 @@ impl Inner {
             let sheet = Worksheet {
                 owner: Arc::clone(self),
                 data: Arc::clone(data),
+                policy: None,
             };
             count = count
                 .checked_add(
@@ -1924,5 +2065,611 @@ impl Inner {
                 .ok_or_else(|| invalid("shared style fan-out count overflowed usize"))?;
         }
         Ok(count)
+    }
+}
+
+/// The ascending indexes of the `si` items of a shared-string part that
+/// hold `r` runs.
+fn rich_items(xml: &[u8]) -> Result<Box<[usize]>> {
+    let mut reader = quick_xml::Reader::from_reader(xml);
+    let mut depth = 0usize;
+    let mut item = None::<usize>;
+    let mut count = 0usize;
+    let mut rich = Vec::new();
+    loop {
+        match reader
+            .read_event()
+            .map_err(|error| invalid(format!("malformed shared-string part: {error}")))?
+        {
+            quick_xml::events::Event::Start(element) => {
+                depth += 1;
+                let local = element.local_name();
+                if depth == 2 && local.as_ref() == b"si" {
+                    item = Some(count);
+                    count += 1;
+                } else if depth == 3
+                    && local.as_ref() == b"r"
+                    && let Some(index) = item
+                    && rich.last() != Some(&index)
+                {
+                    rich.try_reserve(1).map_err(|source| Error::Allocation {
+                        resource: "rich shared-string indexes",
+                        source,
+                    })?;
+                    rich.push(index);
+                }
+            },
+            quick_xml::events::Event::Empty(element) => {
+                if depth == 1 && element.local_name().as_ref() == b"si" {
+                    count += 1;
+                }
+            },
+            quick_xml::events::Event::End(_) => {
+                if depth == 2 {
+                    item = None;
+                }
+                depth = depth.saturating_sub(1);
+            },
+            quick_xml::events::Event::Eof => break,
+            _ => {},
+        }
+    }
+    Ok(rich.into_boxed_slice())
+}
+
+/// The runs of shared-string item `wanted`, each with its `rPr` children
+/// as `(local name, raw attributes)`; `None` when the item has no runs or
+/// holds what a run rewrite would drop (phonetic data, nested `rPr`
+/// markup, text outside the runs).
+pub(crate) fn rich_item(xml: &[u8], wanted: usize) -> Result<Option<crate::RichText>> {
+    use quick_xml::events::Event;
+    let mut reader = quick_xml::Reader::from_reader(xml);
+    let mut depth = 0usize;
+    let mut count = 0usize;
+    loop {
+        match reader
+            .read_event()
+            .map_err(|error| invalid(format!("malformed shared-string part: {error}")))?
+        {
+            Event::Start(element) => {
+                depth += 1;
+                if depth == 2 && element.local_name().as_ref() == b"si" {
+                    if count == wanted {
+                        return read_runs(&mut reader, false).map(RunsRead::into_value);
+                    }
+                    count += 1;
+                }
+            },
+            Event::Empty(element) => {
+                if depth == 1 && element.local_name().as_ref() == b"si" {
+                    if count == wanted {
+                        return Ok(None);
+                    }
+                    count += 1;
+                }
+            },
+            Event::End(_) => depth = depth.saturating_sub(1),
+            Event::Eof => return Ok(None),
+            _ => {},
+        }
+    }
+}
+
+/// Read the requested shared-string items in one XML pass. The item indexes
+/// are the workbook's stable shared-string identities; unrelated items are
+/// skipped without constructing run values.
+pub(crate) fn rich_items_many(
+    xml: &[u8],
+    wanted: &HashSet<usize>,
+) -> Result<HashMap<usize, Option<crate::RichText>>> {
+    let mut values = HashMap::new();
+    values
+        .try_reserve(wanted.len())
+        .map_err(|source| Error::Allocation {
+            resource: "rich shared-string values",
+            source,
+        })?;
+    for &index in wanted {
+        values.insert(index, None);
+    }
+    if wanted.is_empty() {
+        return Ok(values);
+    }
+
+    use quick_xml::events::Event;
+    let mut reader = quick_xml::Reader::from_reader(xml);
+    let mut depth = 0usize;
+    let mut count = 0usize;
+    loop {
+        match reader
+            .read_event()
+            .map_err(|error| invalid(format!("malformed shared-string part: {error}")))?
+        {
+            Event::Start(element) => {
+                depth += 1;
+                if depth == 2 && element.local_name().as_ref() == b"si" {
+                    let index = count;
+                    count += 1;
+                    if wanted.contains(&index) {
+                        let value = match read_runs(&mut reader, true)? {
+                            RunsRead::Complete(value) => value,
+                            // Scalar lookup returns `None` as soon as it
+                            // sees an unsupported run shape. If the remainder
+                            // is malformed, stop this bulk projection rather
+                            // than turning that established `None` into an
+                            // error while chasing later addresses.
+                            RunsRead::Aborted => return Ok(values),
+                        };
+                        values.insert(index, value);
+                        // A complete read consumes the closing `</si>`.
+                        depth = 1;
+                    }
+                }
+            },
+            Event::Empty(element) => {
+                if depth == 1 && element.local_name().as_ref() == b"si" {
+                    let index = count;
+                    count += 1;
+                    if wanted.contains(&index) {
+                        values.insert(index, None);
+                    }
+                }
+            },
+            Event::End(_) => depth = depth.saturating_sub(1),
+            Event::Eof => return Ok(values),
+            _ => {},
+        }
+    }
+}
+
+/// The runs of the inline string of cell `a1` in worksheet `xml` (record
+/// 0295), as [`rich_item`] reads an item. One scan of the worksheet part.
+pub(crate) fn inline_rich(xml: &[u8], a1: &str) -> Result<Option<crate::RichText>> {
+    use quick_xml::events::Event;
+    let mut reader = quick_xml::Reader::from_reader(xml);
+    let mut in_cell = false;
+    let mut depth = 0usize;
+    let mut cell_depth = 0usize;
+    loop {
+        match reader
+            .read_event()
+            .map_err(|error| invalid(format!("malformed worksheet part: {error}")))?
+        {
+            Event::Start(element) => {
+                depth += 1;
+                let local = element.local_name();
+                if local.as_ref() == b"c" {
+                    in_cell = element
+                        .try_get_attribute("r")
+                        .ok()
+                        .flatten()
+                        .is_some_and(|attribute| attribute.value.as_ref() == a1.as_bytes());
+                    cell_depth = depth;
+                } else if in_cell && depth == cell_depth + 1 && local.as_ref() == b"is" {
+                    return read_runs(&mut reader, false).map(RunsRead::into_value);
+                }
+            },
+            Event::End(_) => {
+                if in_cell && depth == cell_depth {
+                    return Ok(None);
+                }
+                depth = depth.saturating_sub(1);
+            },
+            Event::Eof => return Ok(None),
+            _ => {},
+        }
+    }
+}
+
+/// Read requested inline rich cells in one worksheet XML pass. The parser
+/// keeps only the requested addresses and leaves unrelated inline strings as
+/// raw events, preserving the scalar reader's exact run/failure behavior.
+pub(crate) fn inline_rich_many(
+    xml: &[u8],
+    wanted: &HashMap<Box<[u8]>, Address>,
+) -> Result<HashMap<Address, Option<crate::RichText>>> {
+    let mut values = HashMap::new();
+    values
+        .try_reserve(wanted.len())
+        .map_err(|source| Error::Allocation {
+            resource: "inline rich-text values",
+            source,
+        })?;
+    for &address in wanted.values() {
+        values.insert(address, None);
+    }
+    if wanted.is_empty() {
+        return Ok(values);
+    }
+
+    use quick_xml::events::Event;
+    let mut reader = quick_xml::Reader::from_reader(xml);
+    let mut in_cell = None;
+    let mut depth = 0usize;
+    let mut cell_depth = 0usize;
+    loop {
+        match reader
+            .read_event()
+            .map_err(|error| invalid(format!("malformed worksheet part: {error}")))?
+        {
+            Event::Start(element) => {
+                depth += 1;
+                let local = element.local_name();
+                if local.as_ref() == b"c" {
+                    in_cell = element
+                        .try_get_attribute("r")
+                        .ok()
+                        .flatten()
+                        .and_then(|attribute| wanted.get(attribute.value.as_ref()).copied());
+                    cell_depth = depth;
+                } else if in_cell.is_some() && depth == cell_depth + 1 && local.as_ref() == b"is" {
+                    let address = in_cell.expect("inline rich cell is present");
+                    let value = match read_runs(&mut reader, true)? {
+                        RunsRead::Complete(value) => value,
+                        RunsRead::Aborted => return Ok(values),
+                    };
+                    values.insert(address, value);
+                    // A complete read consumes the closing `</is>`.
+                    depth = cell_depth;
+                }
+            },
+            Event::End(_) => {
+                if in_cell.is_some() && depth == cell_depth {
+                    in_cell = None;
+                }
+                depth = depth.saturating_sub(1);
+            },
+            Event::Eof => return Ok(values),
+            _ => {},
+        }
+    }
+}
+
+/// Read the runs of the string item whose start tag `reader` just read, up
+/// to its end tag.
+enum RunsRead {
+    Complete(Option<crate::RichText>),
+    Aborted,
+}
+
+impl RunsRead {
+    fn into_value(self) -> Option<crate::RichText> {
+        match self {
+            Self::Complete(value) => value,
+            Self::Aborted => None,
+        }
+    }
+}
+
+fn read_runs(reader: &mut quick_xml::Reader<&[u8]>, consume_invalid: bool) -> Result<RunsRead> {
+    use quick_xml::events::Event;
+    let attributes = |element: &quick_xml::events::BytesStart<'_>| -> Result<Box<str>> {
+        let raw = std::str::from_utf8(element.attributes_raw())
+            .map_err(|error| invalid(format!("string attributes are not UTF-8: {error}")))?;
+        Ok(raw.trim().into())
+    };
+    let local = |element: &quick_xml::events::BytesStart<'_>| -> Result<Box<str>> {
+        std::str::from_utf8(element.local_name().as_ref())
+            .map(Into::into)
+            .map_err(|error| invalid(format!("string element name is not UTF-8: {error}")))
+    };
+    let mut runs: Vec<crate::RichRun> = Vec::new();
+    let mut properties: Option<Vec<(Box<str>, Box<str>)>> = None;
+    let mut text = String::new();
+    // Depth below the item and where the reader is: 0 the item, 1 a run,
+    // 2 its `rPr`, 3 its `t`.
+    let mut depth = 0usize;
+    let mut place = 0u8;
+    let mut valid = true;
+    loop {
+        let event = match reader.read_event() {
+            Ok(event) => event,
+            Err(_error) if consume_invalid && !valid => return Ok(RunsRead::Aborted),
+            Err(error) => return Err(invalid(format!("malformed string item: {error}"))),
+        };
+        match event {
+            Event::Start(element) => {
+                depth += 1;
+                if !valid {
+                    if !consume_invalid {
+                        return Ok(RunsRead::Complete(None));
+                    }
+                    continue;
+                }
+                match (depth, element.local_name().as_ref(), place) {
+                    (1, b"r", 0) => {
+                        place = 1;
+                        properties = None;
+                        text.clear();
+                    },
+                    (2, b"rPr", 1) => {
+                        place = 2;
+                        properties = Some(Vec::new());
+                    },
+                    (2, b"t", 1) => place = 3,
+                    // A plain `t` beside runs, `rPh`, `phoneticPr` or
+                    // children with content are not kept by a run rewrite.
+                    _ if consume_invalid => valid = false,
+                    _ => return Ok(RunsRead::Complete(None)),
+                }
+            },
+            Event::Empty(element) => {
+                if !valid {
+                    if !consume_invalid {
+                        return Ok(RunsRead::Complete(None));
+                    }
+                    continue;
+                }
+                match (depth, place) {
+                    (2, 2) => {
+                        if let Some(properties) = properties.as_mut() {
+                            properties.push((local(&element)?, attributes(&element)?));
+                        }
+                    },
+                    (1, 1) if element.local_name().as_ref() == b"rPr" => {
+                        properties = Some(Vec::new());
+                    },
+                    (1, 1) if element.local_name().as_ref() == b"t" => {},
+                    _ if consume_invalid => valid = false,
+                    _ => return Ok(RunsRead::Complete(None)),
+                }
+            },
+            Event::Text(value) if valid && place == 3 => text.push_str(
+                &value
+                    .decode()
+                    .map_err(|error| invalid(format!("string text: {error}")))?,
+            ),
+            Event::CData(value) if valid && place == 3 => text.push_str(
+                &value
+                    .decode()
+                    .map_err(|error| invalid(format!("string text: {error}")))?,
+            ),
+            Event::GeneralRef(reference) if valid && place == 3 => {
+                text.push_str(&litchi_ooxml_common::xml::decode_xml_reference(&reference)?);
+            },
+            Event::End(_) => {
+                if depth == 0 {
+                    return Ok(RunsRead::Complete(
+                        (valid && !runs.is_empty()).then(|| crate::RichText::from_runs(runs)),
+                    ));
+                }
+                if !valid {
+                    if !consume_invalid {
+                        return Ok(RunsRead::Complete(None));
+                    }
+                    depth = depth.saturating_sub(1);
+                    continue;
+                }
+                match (depth, place) {
+                    (2, 2 | 3) => place = 1,
+                    (1, 1) => {
+                        let decoded = raw::strings::decode_spreadsheet_text(&text)?;
+                        runs.push(crate::RichRun::with_properties(
+                            properties.take().map(Vec::into_boxed_slice),
+                            decoded,
+                        ));
+                        place = 0;
+                    },
+                    _ => {},
+                }
+                depth = depth.saturating_sub(1);
+            },
+            Event::Eof => {
+                return Ok(if consume_invalid {
+                    RunsRead::Aborted
+                } else {
+                    RunsRead::Complete(None)
+                });
+            },
+            _ => {},
+        }
+    }
+}
+
+#[cfg(test)]
+mod rich_item_tests {
+    use std::collections::{HashMap, HashSet};
+
+    use litchi_sheet::Cell as Address;
+
+    #[test]
+    fn bulk_rich_readers_keep_requested_runs_only() {
+        let inline = br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><r><rPr><b/></rPr><t>outside</t></r></is></c><c r="B1" t="inlineStr"><is><r><rPr><i/></rPr><t>inside</t></r></is></c><c r="C1"><v>3</v></c></row></sheetData></worksheet>"#;
+        let requested = HashMap::from([
+            (
+                b"B1".to_vec().into_boxed_slice(),
+                Address::from_a1("B1").expect("B1"),
+            ),
+            (
+                b"C1".to_vec().into_boxed_slice(),
+                Address::from_a1("C1").expect("C1"),
+            ),
+        ]);
+        let values = super::inline_rich_many(inline, &requested).expect("inline values");
+        assert_eq!(
+            values[&Address::from_a1("B1").expect("B1")]
+                .as_ref()
+                .expect("requested runs")
+                .text(),
+            "inside"
+        );
+        assert!(values[&Address::from_a1("C1").expect("C1")].is_none());
+        assert!(!values.contains_key(&Address::from_a1("A1").expect("A1")));
+
+        // Bulk lookup keeps the scalar reader's raw-address policy: a
+        // lowercase source attribute is not normalized into the requested
+        // canonical address.
+        let noncanonical = br#"<worksheet><sheetData><row><c r="b1" t="inlineStr"><is><r><t>lowercase</t></r></is></c></row></sheetData></worksheet>"#;
+        let requested = HashMap::from([(
+            b"B1".to_vec().into_boxed_slice(),
+            Address::from_a1("B1").expect("B1"),
+        )]);
+        let values = super::inline_rich_many(noncanonical, &requested).expect("raw addresses");
+        assert!(values[&Address::from_a1("B1").expect("B1")].is_none());
+
+        // An unsupported run shape still yields the scalar reader's `None`
+        // without turning a malformed trailing tail into a new parse error.
+        let malformed_tail =
+            br#"<worksheet><sheetData><row><c r="A1" t="inlineStr"><is><r><rPh/></is></c><broken"#;
+        let requested = HashMap::from([(
+            b"A1".to_vec().into_boxed_slice(),
+            Address::from_a1("A1").expect("A1"),
+        )]);
+        let values = super::inline_rich_many(malformed_tail, &requested)
+            .expect("unsupported rich shape remains non-fatal");
+        assert!(values[&Address::from_a1("A1").expect("A1")].is_none());
+
+        let shared = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>outside</t></si><si><r><rPr><b/></rPr><t>inside</t></r></si><si><r><rPr><i/></rPr><t>also outside</t></r></si></sst>"#;
+        let requested = HashSet::from([1usize]);
+        let values = super::rich_items_many(shared, &requested).expect("shared values");
+        assert_eq!(
+            values[&1].as_ref().expect("requested runs").text(),
+            "inside"
+        );
+        assert!(!values.contains_key(&2));
+    }
+
+    #[test]
+    fn rich_items_lists_the_items_with_runs() {
+        let xml = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="4" uniqueCount="4"><si><t>plain</t></si><si><r><rPr><b/></rPr><t>rich</t></r><r><t> text</t></r></si><si/><si><t>x</t><rPh sb="0" eb="1"><t>y</t></rPh></si><si><r><t>z</t></r></si></sst>"#;
+        assert_eq!(&*super::rich_items(xml).unwrap(), &[1, 4]);
+        assert!(super::rich_items(b"<sst").is_err());
+    }
+
+    #[test]
+    fn rich_item_keeps_each_runs_properties() {
+        let xml = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>plain</t></si><si><r><rPr><b/><sz val="11"/><color rgb="FFFF0000"/></rPr><t>rich &amp; </t></r><r><t xml:space="preserve">text_x0009_</t></r></si><si><t>x</t><rPh sb="0" eb="1"><t>y</t></rPh></si><si><r><t>a</t></r><rPh sb="0" eb="1"><t>y</t></rPh></si></sst>"#;
+        assert_eq!(super::rich_item(xml, 0).unwrap(), None);
+        let rich = super::rich_item(xml, 1).unwrap().unwrap();
+        assert_eq!(rich.text(), "rich & text\t");
+        assert_eq!(rich.runs().len(), 2);
+        assert!(rich.runs()[0].is_formatted());
+        assert!(!rich.runs()[1].is_formatted());
+        let properties = rich.runs()[0].properties.as_deref().unwrap();
+        assert_eq!(&*properties[1].0, "sz");
+        assert_eq!(&*properties[1].1, r#"val="11""#);
+        assert_eq!(super::rich_item(xml, 2).unwrap(), None);
+        assert_eq!(super::rich_item(xml, 3).unwrap(), None);
+        assert_eq!(super::rich_item(xml, 9).unwrap(), None);
+    }
+}
+
+#[cfg(test)]
+mod rich_text_write_tests {
+    use crate::{Package, RichText};
+
+    /// A workbook whose `A1` shows a formatted shared string.
+    fn rich_workbook() -> crate::Result<Package> {
+        let mut edit = Package::new()?.edit()?;
+        edit.sheet("Sheet1")?
+            .expect("worksheet")
+            .set_rich_text("A1", RichText::plain("x"))?;
+        edit.commit()
+            .map(crate::workbook::edit::Commit::into_package)
+    }
+
+    #[test]
+    fn a_rewritten_rich_string_keeps_each_runs_properties() -> crate::Result<()> {
+        // A shared-string item with two runs, through the reader.
+        let item = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><r><rPr><b/><sz val="11"/></rPr><t>Hello </t></r><r><rPr><i/></rPr><t>world</t></r></si></sst>"#;
+        let mut rich = super::rich_item(item, 0)?.expect("rich item");
+        rich.set_run_text(0, "Bye ")?;
+        let mut edit = rich_workbook()?.edit()?;
+        edit.sheet("Sheet1")?
+            .expect("worksheet")
+            .set_rich_text("B2", rich)?;
+        let package = edit.commit()?.into_package();
+        let workbook = package.workbook();
+        let sheet = workbook.sheet("Sheet1")?.expect("worksheet");
+        assert!(sheet.has_rich_text("B2")?);
+        let read = sheet.rich_text("B2")?.expect("inline runs");
+        assert_eq!(read.runs().len(), 2);
+        assert_eq!(read.text(), "Bye world");
+        assert!(read.runs()[1].is_formatted());
+        let mut edit = package.edit()?;
+        let sheet = edit.sheet("Sheet1")?.expect("worksheet");
+        let crate::State::Cell {
+            content: crate::Cell::Value(crate::Value::Text(text)),
+            ..
+        } = sheet.state("B2")?
+        else {
+            panic!("a text cell");
+        };
+        assert_eq!(text.as_str(), "Bye world");
+        Ok(())
+    }
+
+    /// Typed run fonts (record 0338): reads of stored markup, changes that
+    /// keep the properties they do not name, and the source-backed read.
+    #[test]
+    fn run_fonts_read_and_change_in_place() -> crate::Result<()> {
+        use crate::style::{FontChange, FontColor, Script, Underline};
+        use crate::{Rgb, RichRun};
+
+        let item = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><r><rPr><b/><i val="0"/><sz val="11"/><color theme="1" tint="-0.25"/><rFont val="Calibri &amp; Co"/><family val="2"/><scheme val="minor"/></rPr><t>A</t></r><r><t>B</t></r></si></sst>"#;
+        let mut rich = super::rich_item(item, 0)?.expect("rich item");
+        let font = rich.runs()[0].font()?;
+        assert!(font.bold && !font.italic);
+        assert_eq!(font.size, Some(11.0));
+        assert_eq!(font.name.as_deref(), Some("Calibri & Co"));
+        assert_eq!(font.family, Some(2));
+        let color = font.color.expect("theme color");
+        assert_eq!(color.kind(), crate::style::FontColorKind::Theme(1));
+        assert_eq!(color.tint().map(|tint| tint.get()), Some(-0.25));
+        assert!(!rich.runs()[1].font()?.bold);
+
+        let run = rich.run_mut(0).expect("first run");
+        run.apply_font(
+            &FontChange::new()
+                .bold(None)
+                .underline(Some(Underline::Double))
+                .script(Some(Script::Superscript))
+                .color(Some(FontColor::rgb(Rgb::new(0xC0, 0, 0))))
+                .size(Some(14.5))?,
+        )?;
+        run.set_text("Z");
+        let font = run.font()?;
+        assert!(!font.bold);
+        assert_eq!(font.underline, Some(Underline::Double));
+        assert_eq!(font.script, Some(Script::Superscript));
+        assert_eq!(font.size, Some(14.5));
+        assert_eq!(font.family, Some(2), "an unnamed property is kept");
+        assert_eq!(font.name.as_deref(), Some("Calibri & Co"));
+        let mut plain = RichRun::new("C");
+        plain.apply_font(&FontChange::new().italic(Some(true)))?;
+        rich.insert_run(2, plain)?;
+        assert!(rich.insert_run(9, RichRun::new("x")).is_err());
+        assert_eq!(rich.remove_run(1)?.text(), "B");
+        assert_eq!(rich.text(), "ZC");
+
+        let mut edit = rich_workbook()?.edit()?;
+        edit.sheet("Sheet1")?
+            .expect("worksheet")
+            .set_rich_text("C3", rich.clone())?;
+        let bytes = edit.commit()?.into_package().to_bytes()?;
+        let reopened = Package::from_bytes(&bytes)?;
+        let read = reopened
+            .workbook()
+            .sheet("Sheet1")?
+            .expect("worksheet")
+            .rich_text("C3")?
+            .expect("runs");
+        assert_eq!(read, rich);
+        // The source-backed worksheet reads the same runs.
+        let source = crate::SourceBackedWorkbook::from_reader(std::io::Cursor::new(bytes))?;
+        let sheet = source.sheet("Sheet1")?.expect("worksheet");
+        assert_eq!(sheet.rich_text("C3")?, Some(rich));
+        assert_eq!(
+            sheet.rich_text("A1")?.map(|rich| rich.text()),
+            Some("x".to_owned())
+        );
+        assert_eq!(sheet.rich_text("Z9")?, None);
+        // Removing every property leaves an unformatted run.
+        let mut run = RichRun::new("y");
+        run.apply_font(&FontChange::new().bold(Some(true)))?;
+        assert!(run.is_formatted());
+        run.apply_font(&FontChange::new().bold(None))?;
+        assert!(!run.is_formatted());
+        Ok(())
     }
 }

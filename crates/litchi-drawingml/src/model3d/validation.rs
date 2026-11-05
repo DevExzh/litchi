@@ -3,6 +3,8 @@
 use quick_xml::{Reader, events::Event};
 use thiserror::Error;
 
+use crate::LimitKind;
+
 use super::package::{Relationship, Resolver};
 use super::{
     Child, Inert, MAX_CHILDREN, MAX_DEPTH, MAX_FRAGMENT_BYTES, MAX_NAMESPACE_DECLARATIONS,
@@ -14,12 +16,14 @@ use super::{
 #[non_exhaustive]
 pub enum Error {
     /// A bounded collection exceeded its safe limit.
-    #[error("model3d {resource} exceeds the limit of {limit}")]
+    #[error("model3d {kind} limit exceeded: observed {observed}, maximum {maximum}")]
     Limit {
-        /// Bounded resource.
-        resource: &'static str,
+        /// Typed bounded resource dimension.
+        kind: LimitKind,
+        /// First observed value beyond the bound.
+        observed: usize,
         /// Maximum accepted count or byte length.
-        limit: usize,
+        maximum: usize,
     },
     /// A required scene child is absent.
     #[error("model3d required child '{0}' is missing")]
@@ -83,6 +87,16 @@ pub enum Error {
         /// Relationship-bearing field.
         field: &'static str,
     },
+}
+
+impl Error {
+    pub(crate) const fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Self {
+        Self::Limit {
+            kind,
+            observed,
+            maximum,
+        }
+    }
 }
 
 /// Validate the typed model and its retained scene sequence.
@@ -235,16 +249,18 @@ pub fn validate_relationships<R: Resolver + ?Sized>(
 
 fn validate_counts(metadata: &Metadata) -> Result<(), Error> {
     if metadata.children.len() > MAX_CHILDREN {
-        return Err(Error::Limit {
-            resource: "children",
-            limit: MAX_CHILDREN,
-        });
+        return Err(Error::limit(
+            LimitKind::ModelChildren,
+            metadata.children.len(),
+            MAX_CHILDREN,
+        ));
     }
     if metadata.namespaces.len() > MAX_NAMESPACE_DECLARATIONS {
-        return Err(Error::Limit {
-            resource: "namespace declarations",
-            limit: MAX_NAMESPACE_DECLARATIONS,
-        });
+        return Err(Error::limit(
+            LimitKind::NamespaceDeclarations,
+            metadata.namespaces.len(),
+            MAX_NAMESPACE_DECLARATIONS,
+        ));
     }
     Ok(())
 }
@@ -253,16 +269,21 @@ fn validate_raster(raster: &Raster) -> Result<(), Error> {
     if raster.renderer_name.len() > MAX_RENDERER_TEXT_BYTES
         || raster.renderer_version.len() > MAX_RENDERER_TEXT_BYTES
     {
-        return Err(Error::Limit {
-            resource: "renderer text",
-            limit: MAX_RENDERER_TEXT_BYTES,
-        });
+        return Err(Error::limit(
+            LimitKind::RendererText,
+            raster
+                .renderer_name
+                .len()
+                .max(raster.renderer_version.len()),
+            MAX_RENDERER_TEXT_BYTES,
+        ));
     }
     if raster.children.len() > super::MAX_RASTER_CHILDREN {
-        return Err(Error::Limit {
-            resource: "raster children",
-            limit: super::MAX_RASTER_CHILDREN,
-        });
+        return Err(Error::limit(
+            LimitKind::RasterChildren,
+            raster.children.len(),
+            super::MAX_RASTER_CHILDREN,
+        ));
     }
     let mut blip = false;
     for child in &raster.children {
@@ -347,10 +368,11 @@ fn validate_target(
 
 pub(crate) fn validate_inert_fragment(value: &Inert) -> Result<(), Error> {
     if value.as_bytes().is_empty() || value.as_bytes().len() > MAX_FRAGMENT_BYTES {
-        return Err(Error::Limit {
-            resource: "inert fragment bytes",
-            limit: MAX_FRAGMENT_BYTES,
-        });
+        return Err(Error::limit(
+            LimitKind::InertFragmentBytes,
+            value.as_bytes().len(),
+            MAX_FRAGMENT_BYTES,
+        ));
     }
     let mut reader = Reader::from_reader(value.as_bytes());
     reader.config_mut().trim_text(false);
@@ -370,17 +392,19 @@ pub(crate) fn validate_inert_fragment(value: &Inert) -> Result<(), Error> {
                 }
                 nodes = nodes.saturating_add(1);
                 if nodes > MAX_NODES {
-                    return Err(Error::Limit {
-                        resource: "inert fragment nodes",
-                        limit: MAX_NODES,
-                    });
+                    return Err(Error::limit(
+                        LimitKind::InertFragmentNodes,
+                        nodes,
+                        MAX_NODES,
+                    ));
                 }
                 depth = depth.saturating_add(1);
                 if depth > MAX_DEPTH {
-                    return Err(Error::Limit {
-                        resource: "inert fragment depth",
-                        limit: MAX_DEPTH,
-                    });
+                    return Err(Error::limit(
+                        LimitKind::InertFragmentDepth,
+                        depth,
+                        MAX_DEPTH,
+                    ));
                 }
                 root_seen = true;
             },
@@ -390,10 +414,11 @@ pub(crate) fn validate_inert_fragment(value: &Inert) -> Result<(), Error> {
                 }
                 nodes = nodes.saturating_add(1);
                 if nodes > MAX_NODES {
-                    return Err(Error::Limit {
-                        resource: "inert fragment nodes",
-                        limit: MAX_NODES,
-                    });
+                    return Err(Error::limit(
+                        LimitKind::InertFragmentNodes,
+                        nodes,
+                        MAX_NODES,
+                    ));
                 }
                 if depth == 0 {
                     root_seen = true;

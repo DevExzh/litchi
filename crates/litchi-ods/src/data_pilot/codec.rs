@@ -2,6 +2,7 @@
 
 use crate::model::data_pilot::{Table, write_data_pilot_tables};
 use litchi_core::{Error, Result};
+use litchi_odf_common::XmlStreamLimits;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
@@ -41,7 +42,7 @@ pub(crate) struct Location {
 enum Kind {
     Document,
     Body,
-    Spreadsheet,
+    Workbook,
     Container,
     Other,
 }
@@ -64,8 +65,10 @@ struct OpenElement {
 }
 
 /// Locate the direct spreadsheet `DataPilot` owner and its safe insertion point.
-pub(crate) fn locate(xml: &str) -> Result<Location> {
-    if xml.len() > MAX_XML_BYTES {
+pub(crate) fn locate(xml: &str, limits: &XmlStreamLimits) -> Result<Location> {
+    if xml.len() > MAX_XML_BYTES
+        || u64::try_from(xml.len()).unwrap_or(u64::MAX) > limits.max_bytes()
+    {
         return Err(invalid("ODS DataPilot source exceeds the size limit"));
     }
 
@@ -79,13 +82,14 @@ pub(crate) fn locate(xml: &str) -> Result<Location> {
     let mut root_seen = false;
     let mut root_closed = false;
     let mut events = 0usize;
+    let mut attributes = 0usize;
     let mut opaque = false;
 
     loop {
         events = events
             .checked_add(1)
             .ok_or_else(|| invalid("ODS DataPilot XML event count overflow"))?;
-        if events > MAX_EVENTS {
+        if events > MAX_EVENTS.min(limits.max_events()) {
             return Err(invalid("ODS DataPilot source exceeds the event limit"));
         }
 
@@ -94,8 +98,21 @@ pub(crate) fn locate(xml: &str) -> Result<Location> {
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| invalid(format!("invalid ODS DataPilot XML: {error}")))?;
         let namespace = namespace_kind(&resolved);
-        let event = event.into_owned();
         let event_end = position(&reader)?;
+        if event_end.saturating_sub(event_start) > limits.max_token_bytes() {
+            return Err(invalid("ODS DataPilot XML token exceeds the limit"));
+        }
+        let mut known_attributes = true;
+        if let Event::Start(element) | Event::Empty(element) = &event {
+            known_attributes = validate_attributes(
+                element,
+                reader.resolver(),
+                element.local_name().as_ref(),
+                &mut attributes,
+                limits,
+            )?;
+        }
+        let event = event.into_owned();
 
         match event {
             Event::Start(element) => {
@@ -105,7 +122,7 @@ pub(crate) fn locate(xml: &str) -> Result<Location> {
                     }
                     root_seen = true;
                 }
-                if stack.len() >= MAX_DEPTH {
+                if stack.len() >= MAX_DEPTH.min(limits.max_depth()) {
                     return Err(invalid("ODS DataPilot source exceeds the nesting limit"));
                 }
                 let parent = stack.last().map(|open| open.kind);
@@ -115,15 +132,11 @@ pub(crate) fn locate(xml: &str) -> Result<Location> {
                     if !is_known_element(namespace, element.local_name().as_ref()) {
                         opaque = true;
                     }
-                    if !validate_attributes(
-                        &element,
-                        reader.resolver(),
-                        element.local_name().as_ref(),
-                    )? {
+                    if !known_attributes {
                         opaque = true;
                     }
                 }
-                if parent == Some(Kind::Spreadsheet)
+                if parent == Some(Kind::Workbook)
                     && is_insertion_anchor(namespace, element.local_name().as_ref())
                     && insertion.is_none()
                 {
@@ -145,7 +158,7 @@ pub(crate) fn locate(xml: &str) -> Result<Location> {
                     root_seen = true;
                     root_closed = true;
                 }
-                if stack.len() >= MAX_DEPTH {
+                if stack.len() >= MAX_DEPTH.min(limits.max_depth()) {
                     return Err(invalid("ODS DataPilot source exceeds the nesting limit"));
                 }
                 let parent = stack.last().map(|open| open.kind);
@@ -155,15 +168,11 @@ pub(crate) fn locate(xml: &str) -> Result<Location> {
                     if !is_known_element(namespace, element.local_name().as_ref()) {
                         opaque = true;
                     }
-                    if !validate_attributes(
-                        &element,
-                        reader.resolver(),
-                        element.local_name().as_ref(),
-                    )? {
+                    if !known_attributes {
                         opaque = true;
                     }
                 }
-                if parent == Some(Kind::Spreadsheet)
+                if parent == Some(Kind::Workbook)
                     && is_insertion_anchor(namespace, element.local_name().as_ref())
                     && insertion.is_none()
                 {
@@ -249,8 +258,8 @@ fn classify(parent: Option<Kind>, namespace: NamespaceKind, local: &[u8]) -> Kin
     } else if parent == Some(Kind::Body)
         && is_element(namespace, NamespaceKind::Office, local, b"spreadsheet")
     {
-        Kind::Spreadsheet
-    } else if parent == Some(Kind::Spreadsheet)
+        Kind::Workbook
+    } else if parent == Some(Kind::Workbook)
         && is_element(namespace, NamespaceKind::Table, local, b"data-pilot-tables")
     {
         Kind::Container
@@ -266,7 +275,7 @@ fn record(
     container: &mut Option<Span>,
 ) -> Result<()> {
     match kind {
-        Kind::Spreadsheet => {
+        Kind::Workbook => {
             if spreadsheet.replace(span).is_some() {
                 return Err(invalid(
                     "ODS content.xml has more than one office:spreadsheet host",
@@ -289,15 +298,24 @@ pub(crate) fn replace(
     source: &str,
     location: &Location,
     tables: Option<&[Table]>,
+    limits: &XmlStreamLimits,
 ) -> Result<String> {
-    let fragment = tables.map(render).transpose()?;
+    if u64::try_from(source.len()).unwrap_or(u64::MAX) > limits.max_bytes() {
+        return Err(invalid("ODS DataPilot source exceeds the size limit"));
+    }
+    let fragment = tables.map(|tables| render(tables, limits)).transpose()?;
     if let Some(container) = &location.container {
-        return splice(
+        let output = splice(
             source,
             container.start,
             container.end,
             fragment.as_deref().unwrap_or_default(),
-        );
+            limits,
+        )?;
+        if u64::try_from(output.len()).unwrap_or(u64::MAX) > limits.max_bytes() {
+            return Err(invalid("ODS DataPilot output exceeds the size limit"));
+        }
+        return Ok(output);
     }
     let Some(fragment) = fragment else {
         return Ok(source.to_owned());
@@ -310,28 +328,66 @@ pub(crate) fn replace(
         let opening = opening
             .strip_suffix("/>")
             .ok_or_else(|| invalid("empty ODS spreadsheet has no close token"))?;
-        let mut expanded = String::with_capacity(opening.len() + fragment.len() + 32);
+        let capacity = opening
+            .len()
+            .checked_add(fragment.len())
+            .and_then(|length| length.checked_add(32))
+            .ok_or_else(|| invalid("ODS DataPilot expansion size overflow"))?;
+        if u64::try_from(capacity).unwrap_or(u64::MAX) > limits.max_bytes() {
+            return Err(invalid("ODS DataPilot output exceeds the size limit"));
+        }
+        let mut expanded = String::new();
+        expanded
+            .try_reserve(capacity)
+            .map_err(|source| Error::Allocation {
+                resource: "ODS DataPilot expansion XML",
+                source,
+            })?;
         expanded.push_str(opening);
         expanded.push('>');
         expanded.push_str(&fragment);
         expanded.push_str("</");
         expanded.push_str(&spreadsheet.qname);
         expanded.push('>');
-        splice(source, spreadsheet.start, spreadsheet.end, &expanded)
+        let output = splice(
+            source,
+            spreadsheet.start,
+            spreadsheet.end,
+            &expanded,
+            limits,
+        )?;
+        if u64::try_from(output.len()).unwrap_or(u64::MAX) > limits.max_bytes() {
+            return Err(invalid("ODS DataPilot output exceeds the size limit"));
+        }
+        Ok(output)
     } else {
-        splice(source, location.insert_at, location.insert_at, &fragment)
+        let output = splice(
+            source,
+            location.insert_at,
+            location.insert_at,
+            &fragment,
+            limits,
+        )?;
+        if u64::try_from(output.len()).unwrap_or(u64::MAX) > limits.max_bytes() {
+            return Err(invalid("ODS DataPilot output exceeds the size limit"));
+        }
+        Ok(output)
     }
 }
 
-fn render(tables: &[Table]) -> Result<String> {
+fn render(tables: &[Table], limits: &XmlStreamLimits) -> Result<String> {
     if tables.is_empty() {
-        return Ok(format!(
+        let output = format!(
             "<table:data-pilot-tables xmlns:table=\"{}\"/>",
             String::from_utf8_lossy(TABLE_NAMESPACE)
-        ));
+        );
+        if u64::try_from(output.len()).unwrap_or(u64::MAX) > limits.max_bytes() {
+            return Err(invalid("ODS DataPilot output exceeds the size limit"));
+        }
+        return Ok(output);
     }
     let mut output = String::new();
-    write_data_pilot_tables(&mut output, tables)?;
+    write_data_pilot_tables(&mut output, tables, limits)?;
     const ROOT: &str = "<table:data-pilot-tables>";
     if !output.starts_with(ROOT) {
         return Err(invalid("DataPilot writer emitted an unexpected root"));
@@ -343,6 +399,9 @@ fn render(tables: &[Table]) -> Result<String> {
             String::from_utf8_lossy(TABLE_NAMESPACE)
         ),
     );
+    if u64::try_from(output.len()).unwrap_or(u64::MAX) > limits.max_bytes() {
+        return Err(invalid("ODS DataPilot output exceeds the size limit"));
+    }
     Ok(output)
 }
 
@@ -350,12 +409,20 @@ fn validate_attributes(
     element: &BytesStart<'_>,
     resolver: &NamespaceResolver,
     local: &[u8],
+    attributes: &mut usize,
+    limits: &XmlStreamLimits,
 ) -> Result<bool> {
     let mut known = true;
     for attribute in element.attributes() {
         let attribute = attribute
             .map_err(|error| invalid(format!("invalid ODS DataPilot attribute: {error}")))?;
-        if attribute.value.len() > MAX_ATTRIBUTE_BYTES {
+        *attributes = (*attributes)
+            .checked_add(1)
+            .ok_or_else(|| invalid("ODS DataPilot attribute count overflow"))?;
+        if *attributes > limits.max_attributes() {
+            return Err(invalid("ODS DataPilot attribute count exceeds the limit"));
+        }
+        if attribute.value.len() > MAX_ATTRIBUTE_BYTES.min(limits.max_token_bytes()) {
             return Err(invalid("ODS DataPilot attribute exceeds the size limit"));
         }
         let key = attribute.key.as_ref();
@@ -563,7 +630,13 @@ fn namespace_kind(namespace: &ResolveResult<'_>) -> NamespaceKind {
     }
 }
 
-fn splice(source: &str, start: usize, end: usize, replacement: &str) -> Result<String> {
+fn splice(
+    source: &str,
+    start: usize,
+    end: usize,
+    replacement: &str,
+    limits: &XmlStreamLimits,
+) -> Result<String> {
     if start > end
         || end > source.len()
         || !source.is_char_boundary(start)
@@ -571,7 +644,21 @@ fn splice(source: &str, start: usize, end: usize, replacement: &str) -> Result<S
     {
         return Err(invalid("invalid ODS DataPilot XML span"));
     }
-    let mut output = String::with_capacity(source.len() - (end - start) + replacement.len());
+    let capacity = source
+        .len()
+        .checked_sub(end - start)
+        .and_then(|length| length.checked_add(replacement.len()))
+        .ok_or_else(|| invalid("ODS DataPilot replacement size overflow"))?;
+    if u64::try_from(capacity).unwrap_or(u64::MAX) > limits.max_bytes() {
+        return Err(invalid("ODS DataPilot output exceeds the size limit"));
+    }
+    let mut output = String::new();
+    output
+        .try_reserve(capacity)
+        .map_err(|source| Error::Allocation {
+            resource: "ODS DataPilot replacement XML",
+            source,
+        })?;
     output.push_str(&source[..start]);
     output.push_str(replacement);
     output.push_str(&source[end..]);

@@ -6,6 +6,7 @@
     )
 )]
 
+use litchi_odf_common::XmlStreamLimits;
 use litchi_odf_common::core::{
     Cipher, Kdf, Manifest, OwnedPackage, PackageWriter, Profile, StartKey,
 };
@@ -33,7 +34,7 @@ fn profile(cipher: Cipher, argon2: bool) -> Profile {
 }
 
 fn author(profile: Profile) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer.set_encryption(PASSWORD, profile).unwrap();
     writer.add_file("content.xml", CONTENT).unwrap();
@@ -76,7 +77,7 @@ fn emits_typed_manifest_descriptors_and_fresh_randomness() {
     let package = OwnedPackage::from_bytes(first).unwrap();
     let manifest_xml =
         String::from_utf8(package.get_file("META-INF/manifest.xml").unwrap()).unwrap();
-    let manifest = Manifest::parse(&manifest_xml).unwrap();
+    let manifest = Manifest::parse(&manifest_xml, XmlStreamLimits::default()).unwrap();
     let content = manifest.get_entry("content.xml").unwrap();
     assert_eq!(content.size, Some(CONTENT.len() as u64));
     assert!(content.encryption.as_ref().unwrap().checksum.is_some());
@@ -98,7 +99,11 @@ fn rejects_wrong_password_and_ciphertext_tampering() {
     let wrong = OwnedPackage::from_bytes_with_password(bytes.clone(), "wrong").unwrap();
     assert!(wrong.get_file("content.xml").is_err());
 
-    let archive = soapberry_zip::office::ArchiveReader::new(&bytes).unwrap();
+    let archive = soapberry_zip::office::ArchiveReader::new(
+        &bytes,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
     let ciphertext = archive.read("content.xml").unwrap();
     let offset = bytes
         .windows(ciphertext.len())
@@ -143,7 +148,7 @@ fn rejects_invalid_profiles_and_late_configuration_without_mutation() {
         .is_err()
     );
 
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer
         .set_encryption(PASSWORD, Profile::compatible())

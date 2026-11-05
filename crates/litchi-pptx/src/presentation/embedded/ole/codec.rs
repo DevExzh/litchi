@@ -33,7 +33,11 @@ pub(crate) struct Attribute {
 
 pub(crate) fn parse_tree(xml_bytes: &[u8]) -> Result<Node> {
     if xml_bytes.len() > MAX_XML_BYTES {
-        return Err(limit("OLE slide XML bytes", MAX_XML_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            xml_bytes.len(),
+            MAX_XML_BYTES,
+        ));
     }
     let mce = Limits {
         max_input_bytes: MAX_XML_BYTES,
@@ -61,7 +65,11 @@ pub(crate) fn parse_tree(xml_bytes: &[u8]) -> Result<Node> {
             Event::Start(element) => {
                 increment_nodes(&mut nodes)?;
                 if stack.len() >= MAX_XML_DEPTH {
-                    return Err(limit("OLE XML depth", MAX_XML_DEPTH));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        stack.len().checked_add(1).unwrap_or(usize::MAX),
+                        MAX_XML_DEPTH,
+                    ));
                 }
                 stack.push(make_node(&element, decoder, &resolver, &namespace)?);
             },
@@ -106,7 +114,11 @@ fn make_node(
     namespace: &ResolveResult<'_>,
 ) -> Result<Node> {
     if count_up_to(element, MAX_XML_ATTRIBUTES) > MAX_XML_ATTRIBUTES {
-        return Err(limit("OLE XML attributes", MAX_XML_ATTRIBUTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlAttributes,
+            count_up_to(element, MAX_XML_ATTRIBUTES),
+            MAX_XML_ATTRIBUTES,
+        ));
     }
     let namespace = match namespace {
         ResolveResult::Bound(value) => value.0.to_vec(),
@@ -126,7 +138,7 @@ fn make_node(
             .decoded_and_normalized_value(quick_xml::XmlVersion::Explicit1_0, decoder)
             .map_err(|error| crate::Error::Xml(error.to_string()))?
             .into_owned();
-        bounded(&value, "OLE XML attribute")?;
+        bounded(&value, crate::error::CodecLimitKind::XmlAttributeBytes)?;
         attributes.push(Attribute {
             namespace: attribute_namespace,
             local: String::from_utf8_lossy(attribute.key.local_name().as_ref()).into_owned(),
@@ -154,7 +166,11 @@ pub(crate) fn inventory(root: &Node) -> Result<Vec<Parsed>> {
     let mut result = Vec::new();
     collect_frames(root, &mut result)?;
     if result.len() > MAX_OBJECTS {
-        return Err(limit("OLE object count", MAX_OBJECTS));
+        return Err(limit(
+            crate::error::CodecLimitKind::OleObjects,
+            result.len(),
+            MAX_OBJECTS,
+        ));
     }
     Ok(result)
 }
@@ -342,9 +358,10 @@ mod tests {
         matches!(
             result,
             Err(crate::Error::Limit {
-                resource: "OLE XML attributes",
-                limit: MAX_XML_ATTRIBUTES,
-            })
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlAttributes),
+                observed,
+                maximum: MAX_XML_ATTRIBUTES,
+            }) if *observed == MAX_XML_ATTRIBUTES + 1
         )
     }
 

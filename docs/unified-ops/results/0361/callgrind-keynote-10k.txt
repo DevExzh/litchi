@@ -1,0 +1,3 @@
+Record 0361 callgrind (Ir), unified-batch-closure --formats keynote --counts 10000 --rounds 3 (one process each):
+base 2042624058
+after 2041135054

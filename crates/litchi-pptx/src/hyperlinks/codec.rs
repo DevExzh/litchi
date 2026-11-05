@@ -9,8 +9,9 @@ const MAX_TOOLTIP_BYTES: usize = 1 << 20;
 pub(super) fn parse(target: &str, tooltip: Option<String>) -> Result<Hyperlink> {
     if target.len() > MAX_TARGET_BYTES {
         return Err(Error::Limit {
-            resource: "hyperlink target bytes",
-            limit: MAX_TARGET_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::StringBytes),
+            observed: target.len(),
+            maximum: MAX_TARGET_BYTES,
         });
     }
     if tooltip
@@ -18,8 +19,9 @@ pub(super) fn parse(target: &str, tooltip: Option<String>) -> Result<Hyperlink> 
         .is_some_and(|value| value.len() > MAX_TOOLTIP_BYTES)
     {
         return Err(Error::Limit {
-            resource: "hyperlink tooltip bytes",
-            limit: MAX_TOOLTIP_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::StringBytes),
+            observed: tooltip.map_or(0, |value| value.len()),
+            maximum: MAX_TOOLTIP_BYTES,
         });
     }
 

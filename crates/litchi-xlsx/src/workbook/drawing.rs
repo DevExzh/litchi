@@ -159,11 +159,6 @@ impl<'a> WorksheetContentPart<'a> {
             outbound_relationships,
         })
     }
-
-    /// Alias emphasizing that payload access is deferred and bounded.
-    pub fn payload(&self) -> Result<WorksheetContentPartPayload<'a>> {
-        self.read_payload()
-    }
 }
 
 /// Bounded payload borrowed from a resolved core SpreadsheetDrawing content
@@ -439,11 +434,6 @@ impl<'a> WorksheetPicture<'a> {
         }
     }
 
-    /// Alias for [`Self::svg`] emphasizing descriptor-only access.
-    pub fn svg_descriptor(&self) -> Result<Option<WorksheetSvgDescriptor<'a>>> {
-        self.svg()
-    }
-
     /// Read the selected embedded SVG payload without copying it.
     pub fn read_svg_image(&self) -> Result<WorksheetSvgImage<'a>> {
         let descriptor = self
@@ -459,11 +449,6 @@ impl<'a> WorksheetPicture<'a> {
             descriptor,
             bytes: part.blob(),
         })
-    }
-
-    /// Alias for [`Self::read_svg_image`].
-    pub fn svg_image(&self) -> Result<WorksheetSvgImage<'a>> {
-        self.read_svg_image()
     }
 }
 
@@ -679,10 +664,8 @@ fn read_drawing<'a>(
         });
     }
     let worksheet_part = owner.package.get_part(sheet_uri)?;
-    let worksheet_scan = WorksheetSourceScan::scan_with_limits(
-        worksheet_part.blob(),
-        worksheet_source_limits(owner),
-    )?;
+    let worksheet_scan =
+        WorksheetSourceScan::scan(worksheet_part.blob(), worksheet_source_limits(owner))?;
     let reference = worksheet_scan.drawing(ordinal)?;
     let relationship = worksheet_part
         .rels()
@@ -702,7 +685,7 @@ fn read_drawing<'a>(
             ct::OFC_DRAWING
         )));
     }
-    let source = Arc::new(SourceDrawing::scan_with_limits(
+    let source = Arc::new(SourceDrawing::scan(
         drawing_part.blob(),
         ordinal,
         drawing_source_limits(owner),
@@ -710,7 +693,7 @@ fn read_drawing<'a>(
     let text = str::from_utf8(drawing_part.blob())
         .map_err(|error| invalid(format!("worksheet drawing XML is not UTF-8: {error}")))?;
     let typed = Arc::new(
-        crate::drawing::parse_with_limits(text, &owner.package.read_limits())?
+        crate::drawing::parse(text, &owner.package.read_limits())?
             .ok_or_else(|| invalid("worksheet drawing is missing its wsDr root"))?,
     );
     let mut typed_picture_indices = Vec::new();
@@ -800,8 +783,8 @@ fn drawing_source_limits(owner: &Inner) -> source::ScanLimits {
     let part_bytes = usize::try_from(caller.max_part_bytes()).unwrap_or(usize::MAX);
     source::ScanLimits {
         max_xml_bytes: defaults.max_xml_bytes.min(part_bytes),
-        max_nodes: defaults.max_nodes.min(caller.max_xml_events()),
-        max_depth: defaults.max_depth.min(caller.max_xml_depth()),
+        max_nodes: defaults.max_nodes.min(caller.max_events()),
+        max_depth: defaults.max_depth.min(caller.max_depth()),
         max_pictures: defaults
             .max_pictures
             .min(caller.max_relationships_per_part()),
@@ -1054,7 +1037,7 @@ fn copy_outbound_relationships<'a>(
     Ok(output.into_boxed_slice())
 }
 
-fn validate_content_part_xml(part: &dyn Part, limits: litchi_opc::ReadLimits) -> Result<()> {
+fn validate_content_part_xml(part: &dyn Part, limits: litchi_opc::SourceLimits) -> Result<()> {
     litchi_opc::validate_source_xml_bytes(part.partname(), part.blob(), limits).map_err(|error| {
         invalid(format!(
             "worksheet contentPart target XML is invalid: {error}"

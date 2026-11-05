@@ -11,6 +11,7 @@
 //! content stays reachable, and anything the reader declined to model as a part
 //! is still reported.
 
+use litchi_opc::SourceLimits;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::leniency::{ContentTypeDefect, Defect};
 use litchi_opc::phys_pkg::PhysPkgReader;
@@ -25,7 +26,8 @@ const RELS_AND_XML_MANIFEST: &[u8] = br#"<Types xmlns="http://schemas.openxmlfor
 
 /// Build a ZIP archive from `(member name, contents)` pairs, in order.
 fn archive(members: &[(&str, &[u8])]) -> Vec<u8> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for (name, blob) in members {
         writer
             .write_stored(name, blob)
@@ -36,7 +38,7 @@ fn archive(members: &[(&str, &[u8])]) -> Vec<u8> {
 
 /// Parse an archive through the package reader.
 fn read(bytes: &[u8]) -> Result<PackageReader, OpcError> {
-    PackageReader::from_phys_reader(&PhysPkgReader::new(bytes)?)
+    PackageReader::from_phys_reader(&PhysPkgReader::new(bytes, SourceLimits::default())?)
 }
 
 /// Return the blob of the named part, or fail the test.
@@ -60,7 +62,7 @@ fn reports_unreferenced_untyped_member_without_losing_the_real_parts() {
         ("word/document.xml", b"<w:document/>"),
     ]);
 
-    let physical = PhysPkgReader::new(&bytes).unwrap();
+    let physical = PhysPkgReader::new(&bytes, SourceLimits::default()).unwrap();
     let reader = PackageReader::from_phys_reader(&physical).unwrap();
     assert_eq!(blob(&reader, "/word/document.xml"), b"<w:document/>");
     assert!(
@@ -124,8 +126,8 @@ fn keeps_dangling_relationships_without_inventing_their_target_part() {
         ("word/document.xml", b"<w:document/>"),
     ]);
 
-    let package =
-        OpcPackage::from_bytes(&bytes).expect("dangling target must not fail the package");
+    let package = OpcPackage::from_bytes(&bytes, SourceLimits::default())
+        .expect("dangling target must not fail the package");
     let document = package
         .get_part(&litchi_opc::PackURI::new("/word/document.xml").expect("part name"))
         .expect("present target must load");
@@ -158,7 +160,7 @@ fn accepts_the_content_types_stream_under_a_case_variant_name() {
     assert_eq!(blob(&reader, "/xl/workbook.xml"), b"<workbook/>");
     assert!(reader.non_part_members().is_empty());
     assert_eq!(
-        PhysPkgReader::new(&bytes)
+        PhysPkgReader::new(&bytes, SourceLimits::default())
             .unwrap()
             .content_types_xml()
             .unwrap(),
@@ -255,7 +257,7 @@ fn a_part_resolves_when_its_stored_name_differs_only_by_case() {
         ),
         ("xl/sharedstrings.xml", b"<sst/>"),
     ]);
-    let package = OpcPackage::from_bytes(&bytes).expect("package loads");
+    let package = OpcPackage::from_bytes(&bytes, SourceLimits::default()).expect("package loads");
 
     // The stored spelling resolves, as always.
     let stored = litchi_opc::PackURI::new("/xl/sharedstrings.xml").unwrap();

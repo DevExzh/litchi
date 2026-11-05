@@ -9,7 +9,8 @@
 use std::borrow::Cow;
 use std::ops::Range;
 
-use super::model::{MAX_DOCUMENT_VARIABLE_DEPTH, MAX_DOCUMENT_VARIABLE_XML_BYTES, Variables};
+use super::model::Variables;
+use super::raw::Limits;
 use crate::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
@@ -43,8 +44,8 @@ impl Variables {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn from_xml(xml: &[u8]) -> Result<Self> {
-        parse_variables(xml)
+    pub fn from_xml(xml: &[u8], limits: &Limits) -> Result<Self> {
+        parse_variables(xml, limits)
     }
 
     /// Serialize a standalone transitional `w:docVars` element.
@@ -52,8 +53,8 @@ impl Variables {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn to_xml(&self) -> Result<String> {
-        self.validate()?;
+    pub fn to_xml(&self, limits: &Limits) -> Result<String> {
+        self.validate_with_limits(limits)?;
         const OPEN: &str =
             r#"<w:docVars xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">"#;
         const CLOSE: &str = "</w:docVars>";
@@ -61,7 +62,7 @@ impl Variables {
             checked_len_add(OPEN.len(), document_variable_entries_len(self, "w")?)?,
             CLOSE.len(),
         )?;
-        ensure_output_limit(capacity)?;
+        ensure_output_limit(capacity, limits)?;
         let mut xml = String::new();
         xml.try_reserve_exact(capacity)
             .map_err(|source| Error::Allocation {
@@ -69,14 +70,20 @@ impl Variables {
                 source,
             })?;
         xml.push_str(OPEN);
-        self.write_entries(&mut xml, "w");
+        self.write_entries(&mut xml, "w", limits)?;
         xml.push_str(CLOSE);
         debug_assert_eq!(xml.len(), capacity);
         Ok(xml)
     }
 
     /// Append `docVar` children using the requested XML prefix.
-    pub fn write_entries(&self, xml: &mut String, prefix: &str) {
+    pub fn write_entries(&self, xml: &mut String, prefix: &str, limits: &Limits) -> Result<()> {
+        let entries = document_variable_entries_len(self, prefix)?;
+        let capacity = xml
+            .len()
+            .checked_add(entries)
+            .ok_or_else(|| invalid("document-variable output length overflows usize"))?;
+        ensure_output_limit(capacity, limits)?;
         for (name, value) in self.iter() {
             xml.push('<');
             if !prefix.is_empty() {
@@ -100,6 +107,7 @@ impl Variables {
             escape_attribute(xml, value);
             xml.push_str("\"/>");
         }
+        Ok(())
     }
 }
 
@@ -108,16 +116,26 @@ impl Variables {
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn parse_variables(xml: &[u8]) -> Result<Variables> {
-    if xml.len() > MAX_DOCUMENT_VARIABLE_XML_BYTES {
-        return Err(invalid(format!(
-            "settings XML exceeds the {MAX_DOCUMENT_VARIABLE_XML_BYTES} byte document-variable limit"
-        )));
+pub fn parse_variables(xml: &[u8], limits: &Limits) -> Result<Variables> {
+    parse_variables_with_depth(xml, limits).map(|(variables, _)| variables)
+}
+
+pub(super) fn parse_variables_with_depth(
+    xml: &[u8],
+    limits: &Limits,
+) -> Result<(Variables, usize)> {
+    if xml.len() > limits.max_xml_bytes() {
+        return Err(limit_error(
+            crate::settings::LimitKind::DocumentVariableXmlBytes,
+            xml.len(),
+            limits.max_xml_bytes(),
+        ));
     }
     let mut reader = NsReader::from_reader(xml);
     let mut variables = Variables::new();
     let mut names = Vec::new();
     let mut depth = 0usize;
+    let mut max_depth_seen = 0usize;
     let mut saw_root = false;
     let mut saw_doc_vars = false;
     let mut doc_vars_depth = None;
@@ -137,10 +155,13 @@ pub fn parse_variables(xml: &[u8]) -> Result<Variables> {
                 depth = depth
                     .checked_add(1)
                     .ok_or_else(|| invalid("document-variable XML nesting overflow"))?;
-                if depth > MAX_DOCUMENT_VARIABLE_DEPTH {
-                    return Err(invalid(format!(
-                        "document-variable XML exceeds depth {MAX_DOCUMENT_VARIABLE_DEPTH}"
-                    )));
+                max_depth_seen = max_depth_seen.max(depth);
+                if depth > limits.max_depth() {
+                    return Err(limit_error(
+                        crate::settings::LimitKind::DocumentVariableDepth,
+                        depth,
+                        limits.max_depth(),
+                    ));
                 }
                 if depth == 1 {
                     validate_settings_root(&namespace, &element, saw_root)?;
@@ -155,7 +176,14 @@ pub fn parse_variables(xml: &[u8]) -> Result<Variables> {
                     && is_wordprocessing_namespace(&namespace)
                     && element.local_name().as_ref() == b"docVar"
                 {
-                    push_parsed_variable(&mut variables, &mut names, &element, decoder, &resolver)?;
+                    push_parsed_variable(
+                        &mut variables,
+                        &mut names,
+                        &element,
+                        decoder,
+                        &resolver,
+                        limits,
+                    )?;
                     open_doc_var_depth = Some(depth);
                 } else if is_wordprocessing_namespace(&namespace)
                     && matches!(element.local_name().as_ref(), b"docVars" | b"docVar")
@@ -169,10 +197,13 @@ pub fn parse_variables(xml: &[u8]) -> Result<Variables> {
                 let child_depth = depth
                     .checked_add(1)
                     .ok_or_else(|| invalid("document-variable XML nesting overflow"))?;
-                if child_depth > MAX_DOCUMENT_VARIABLE_DEPTH {
-                    return Err(invalid(format!(
-                        "document-variable XML exceeds depth {MAX_DOCUMENT_VARIABLE_DEPTH}"
-                    )));
+                max_depth_seen = max_depth_seen.max(child_depth);
+                if child_depth > limits.max_depth() {
+                    return Err(limit_error(
+                        crate::settings::LimitKind::DocumentVariableDepth,
+                        child_depth,
+                        limits.max_depth(),
+                    ));
                 }
                 if child_depth == 1 {
                     validate_settings_root(&namespace, &element, saw_root)?;
@@ -188,7 +219,14 @@ pub fn parse_variables(xml: &[u8]) -> Result<Variables> {
                     && is_wordprocessing_namespace(&namespace)
                     && element.local_name().as_ref() == b"docVar"
                 {
-                    push_parsed_variable(&mut variables, &mut names, &element, decoder, &resolver)?;
+                    push_parsed_variable(
+                        &mut variables,
+                        &mut names,
+                        &element,
+                        decoder,
+                        &resolver,
+                        limits,
+                    )?;
                 } else if is_wordprocessing_namespace(&namespace)
                     && matches!(element.local_name().as_ref(), b"docVars" | b"docVar")
                 {
@@ -243,14 +281,16 @@ pub fn parse_variables(xml: &[u8]) -> Result<Variables> {
             duplicate[0]
         )));
     }
-    Ok(variables)
+    Ok((variables, max_depth_seen))
 }
 
-pub(crate) fn inspect_source_policy(xml: &[u8]) -> Result<SourcePolicy> {
-    if xml.len() > MAX_DOCUMENT_VARIABLE_XML_BYTES {
-        return Err(invalid(format!(
-            "settings XML exceeds the {MAX_DOCUMENT_VARIABLE_XML_BYTES} byte document-variable limit"
-        )));
+pub(crate) fn inspect_source_policy(xml: &[u8], limits: &Limits) -> Result<SourcePolicy> {
+    if xml.len() > limits.max_xml_bytes() {
+        return Err(limit_error(
+            crate::settings::LimitKind::DocumentVariableXmlBytes,
+            xml.len(),
+            limits.max_xml_bytes(),
+        ));
     }
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().check_end_names = true;
@@ -271,10 +311,12 @@ pub(crate) fn inspect_source_policy(xml: &[u8]) -> Result<SourcePolicy> {
                 depth = depth
                     .checked_add(1)
                     .ok_or_else(|| invalid("settings XML nesting overflow"))?;
-                if depth > MAX_DOCUMENT_VARIABLE_DEPTH {
-                    return Err(invalid(format!(
-                        "settings XML exceeds depth {MAX_DOCUMENT_VARIABLE_DEPTH}"
-                    )));
+                if depth > limits.max_depth() {
+                    return Err(limit_error(
+                        crate::settings::LimitKind::DocumentVariableDepth,
+                        depth,
+                        limits.max_depth(),
+                    ));
                 }
                 if depth == 1 {
                     dialect = Some(settings_root_dialect(&namespace, &element)?);
@@ -292,10 +334,12 @@ pub(crate) fn inspect_source_policy(xml: &[u8]) -> Result<SourcePolicy> {
                 let child_depth = depth
                     .checked_add(1)
                     .ok_or_else(|| invalid("settings XML nesting overflow"))?;
-                if child_depth > MAX_DOCUMENT_VARIABLE_DEPTH {
-                    return Err(invalid(format!(
-                        "settings XML exceeds depth {MAX_DOCUMENT_VARIABLE_DEPTH}"
-                    )));
+                if child_depth > limits.max_depth() {
+                    return Err(limit_error(
+                        crate::settings::LimitKind::DocumentVariableDepth,
+                        child_depth,
+                        limits.max_depth(),
+                    ));
                 }
                 if child_depth == 1 {
                     dialect = Some(settings_root_dialect(&namespace, &element)?);
@@ -374,31 +418,36 @@ fn inspect_protection_element(
 }
 
 /// Rewrite only the typed `docVars` owner in a complete settings source.
-pub(super) fn rewrite(xml: &[u8], before: &Variables, after: &Variables) -> Result<Vec<u8>> {
-    let current = parse_variables(xml)?;
+pub(super) fn rewrite(
+    xml: &[u8],
+    before: &Variables,
+    after: &Variables,
+    limits: &Limits,
+) -> Result<Vec<u8>> {
+    let current = parse_variables(xml, limits)?;
     if current != *before {
         return Err(invalid("document-variable source is stale"));
     }
-    after.validate()?;
+    after.validate_with_limits(limits)?;
 
-    let layout = scan_settings_layout(xml)?;
+    let layout = scan_settings_layout(xml, limits)?;
     let replacement_len = if after.is_empty() {
         0
     } else {
-        document_variables_element_len(&layout, after)?
+        document_variables_element_len(&layout, after, limits)?
     };
     let output_len = rewritten_settings_len(xml, &layout, replacement_len)?;
-    ensure_output_limit(output_len)?;
+    ensure_output_limit(output_len, limits)?;
     let replacement = if replacement_len == 0 {
         Vec::new()
     } else {
-        document_variables_element_fallible(&layout, after, replacement_len)?.into_bytes()
+        document_variables_element_fallible(&layout, after, replacement_len, limits)?.into_bytes()
     };
 
     let output = if let Some(range) = layout.doc_vars_range {
-        replace_range(xml, range, &replacement)?
+        replace_range(xml, range, &replacement, limits)?
     } else if let Some(range) = layout.root_empty_range {
-        expand_empty_root(xml, range, &layout.root_qname, &replacement)?
+        expand_empty_root(xml, range, &layout.root_qname, &replacement, limits)?
     } else if replacement.is_empty() {
         clone_bytes(xml, "document-variable no-op XML")?
     } else {
@@ -406,7 +455,7 @@ pub(super) fn rewrite(xml: &[u8], before: &Variables, after: &Variables) -> Resu
             .doc_vars_insert_at
             .or(layout.root_end)
             .ok_or_else(|| invalid("settings root has no document-variable insertion point"))?;
-        insert_fragment(xml, offset, &replacement)?
+        insert_fragment(xml, offset, &replacement, limits)?
     };
     debug_assert_eq!(output.len(), output_len);
     Ok(output)
@@ -414,16 +463,22 @@ pub(super) fn rewrite(xml: &[u8], before: &Variables, after: &Variables) -> Resu
 
 /// Refuse a source-backed rewrite when replacing `docVars` would discard
 /// unmodeled content inside the selected owner.
-pub(crate) fn ensure_source_backed_rewrite_safe(xml: &[u8], before: &Variables) -> Result<()> {
-    let layout = scan_settings_layout(xml)?;
+pub(crate) fn ensure_source_backed_rewrite_safe(
+    xml: &[u8],
+    before: &Variables,
+    limits: &Limits,
+) -> Result<()> {
+    let layout = scan_settings_layout(xml, limits)?;
     let Some(range) = layout.doc_vars_range.as_ref() else {
         return Ok(());
     };
-    let capacity = document_variables_element_len(&layout, before)?;
-    let canonical = document_variables_element_fallible(&layout, before, capacity)?;
+    let capacity = document_variables_element_len(&layout, before, limits)?;
+    let canonical = document_variables_element_fallible(&layout, before, capacity, limits)?;
     if xml[range.clone()] != *canonical.as_bytes() {
-        return Err(Error::DocumentVariablesPreservation(
-            "the selected docVars owner is not in the exact preservation-safe form",
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "document_variables",
+            "selected document-variable markup cannot be preserved",
         ));
     }
     Ok(())
@@ -440,11 +495,13 @@ struct SettingsLayout {
     doc_vars_insert_at: Option<usize>,
 }
 
-fn scan_settings_layout(xml: &[u8]) -> Result<SettingsLayout> {
-    if xml.len() > MAX_DOCUMENT_VARIABLE_XML_BYTES {
-        return Err(invalid(format!(
-            "settings XML exceeds the {MAX_DOCUMENT_VARIABLE_XML_BYTES} byte document-variable limit"
-        )));
+fn scan_settings_layout(xml: &[u8], limits: &Limits) -> Result<SettingsLayout> {
+    if xml.len() > limits.max_xml_bytes() {
+        return Err(limit_error(
+            crate::settings::LimitKind::DocumentVariableXmlBytes,
+            xml.len(),
+            limits.max_xml_bytes(),
+        ));
     }
 
     let mut reader = NsReader::from_reader(xml);
@@ -473,10 +530,12 @@ fn scan_settings_layout(xml: &[u8]) -> Result<SettingsLayout> {
                 depth = depth
                     .checked_add(1)
                     .ok_or_else(|| invalid("document-variable XML nesting overflow"))?;
-                if depth > MAX_DOCUMENT_VARIABLE_DEPTH {
-                    return Err(invalid(format!(
-                        "document-variable XML exceeds depth {MAX_DOCUMENT_VARIABLE_DEPTH}"
-                    )));
+                if depth > limits.max_depth() {
+                    return Err(limit_error(
+                        crate::settings::LimitKind::DocumentVariableDepth,
+                        depth,
+                        limits.max_depth(),
+                    ));
                 }
                 if depth == 1 {
                     capture_settings_root(&mut layout, &namespace, &element)?;
@@ -501,10 +560,12 @@ fn scan_settings_layout(xml: &[u8]) -> Result<SettingsLayout> {
                 let child_depth = depth
                     .checked_add(1)
                     .ok_or_else(|| invalid("document-variable XML nesting overflow"))?;
-                if child_depth > MAX_DOCUMENT_VARIABLE_DEPTH {
-                    return Err(invalid(format!(
-                        "document-variable XML exceeds depth {MAX_DOCUMENT_VARIABLE_DEPTH}"
-                    )));
+                if child_depth > limits.max_depth() {
+                    return Err(limit_error(
+                        crate::settings::LimitKind::DocumentVariableDepth,
+                        child_depth,
+                        limits.max_depth(),
+                    ));
                 }
                 if child_depth == 1 {
                     capture_settings_root(&mut layout, &namespace, &element)?;
@@ -605,7 +666,11 @@ fn is_after_doc_vars(local_name: &[u8]) -> bool {
     )
 }
 
-fn document_variables_element_len(layout: &SettingsLayout, variables: &Variables) -> Result<usize> {
+fn document_variables_element_len(
+    layout: &SettingsLayout,
+    variables: &Variables,
+    limits: &Limits,
+) -> Result<usize> {
     let prefix = match layout.word_prefix.as_deref() {
         Some(prefix) => std::str::from_utf8(prefix)
             .map(Cow::Borrowed)
@@ -637,10 +702,12 @@ fn document_variables_element_len(layout: &SettingsLayout, variables: &Variables
         capacity = checked_len_add(capacity, "\"/>".len())?;
     }
     capacity = checked_len_add(capacity, 2 + prefix.len() + ":docVars>".len())?;
-    if capacity > MAX_DOCUMENT_VARIABLE_XML_BYTES {
-        return Err(invalid(format!(
-            "encoded document variables exceed the {MAX_DOCUMENT_VARIABLE_XML_BYTES} byte limit"
-        )));
+    if capacity > limits.max_xml_bytes() {
+        return Err(limit_error(
+            crate::settings::LimitKind::DocumentVariableXmlBytes,
+            capacity,
+            limits.max_xml_bytes(),
+        ));
     }
     Ok(capacity)
 }
@@ -649,7 +716,9 @@ fn document_variables_element_fallible(
     layout: &SettingsLayout,
     variables: &Variables,
     capacity: usize,
+    limits: &Limits,
 ) -> Result<String> {
+    ensure_output_limit(capacity, limits)?;
     let prefix = match layout.word_prefix.as_deref() {
         Some(prefix) => std::str::from_utf8(prefix)
             .map(Cow::Borrowed)
@@ -741,13 +810,18 @@ fn rewritten_settings_len(
     .ok_or_else(|| invalid("rewritten settings XML length overflows usize"))
 }
 
-fn replace_range(source: &[u8], range: Range<usize>, replacement: &[u8]) -> Result<Vec<u8>> {
+fn replace_range(
+    source: &[u8],
+    range: Range<usize>,
+    replacement: &[u8],
+    limits: &Limits,
+) -> Result<Vec<u8>> {
     let capacity = source
         .len()
         .checked_sub(range.len())
         .and_then(|length| length.checked_add(replacement.len()))
         .ok_or_else(|| invalid("rewritten settings XML length overflows usize"))?;
-    ensure_output_limit(capacity)?;
+    ensure_output_limit(capacity, limits)?;
     let mut output = reserved_bytes(capacity, "rewritten document-variable settings XML")?;
     output.extend_from_slice(&source[..range.start]);
     output.extend_from_slice(replacement);
@@ -760,6 +834,7 @@ fn expand_empty_root(
     range: Range<usize>,
     root_qname: &[u8],
     replacement: &[u8],
+    limits: &Limits,
 ) -> Result<Vec<u8>> {
     let root = &source[range.clone()];
     let slash = root
@@ -772,7 +847,7 @@ fn expand_empty_root(
         .and_then(|length| length.checked_add(root_qname.len()))
         .and_then(|length| length.checked_add(2))
         .ok_or_else(|| invalid("rewritten settings XML length overflows usize"))?;
-    ensure_output_limit(capacity)?;
+    ensure_output_limit(capacity, limits)?;
     let mut output = reserved_bytes(capacity, "expanded document-variable settings XML")?;
     output.extend_from_slice(&source[..range.start]);
     output.extend_from_slice(&root[..slash]);
@@ -785,12 +860,17 @@ fn expand_empty_root(
     Ok(output)
 }
 
-fn insert_fragment(source: &[u8], offset: usize, replacement: &[u8]) -> Result<Vec<u8>> {
+fn insert_fragment(
+    source: &[u8],
+    offset: usize,
+    replacement: &[u8],
+    limits: &Limits,
+) -> Result<Vec<u8>> {
     let capacity = source
         .len()
         .checked_add(replacement.len())
         .ok_or_else(|| invalid("rewritten settings XML length overflows usize"))?;
-    ensure_output_limit(capacity)?;
+    ensure_output_limit(capacity, limits)?;
     let mut output = reserved_bytes(capacity, "inserted document-variable settings XML")?;
     output.extend_from_slice(&source[..offset]);
     output.extend_from_slice(replacement);
@@ -815,11 +895,13 @@ fn escaped_attribute_len(value: &str) -> Result<usize> {
     })
 }
 
-fn ensure_output_limit(length: usize) -> Result<()> {
-    if length > MAX_DOCUMENT_VARIABLE_XML_BYTES {
-        return Err(invalid(format!(
-            "rewritten settings XML exceeds the {MAX_DOCUMENT_VARIABLE_XML_BYTES} byte document-variable limit"
-        )));
+fn ensure_output_limit(length: usize, limits: &Limits) -> Result<()> {
+    if length > limits.max_xml_bytes() {
+        return Err(limit_error(
+            crate::settings::LimitKind::DocumentVariableXmlBytes,
+            length,
+            limits.max_xml_bytes(),
+        ));
     }
     Ok(())
 }
@@ -855,18 +937,19 @@ fn validate_settings_root(
 #[cfg(test)]
 mod allocation_boundary_tests {
     use super::*;
+    use crate::variables::MAX_DOCUMENT_VARIABLE_XML_BYTES;
 
     #[test]
     fn empty_root_expansion_accepts_exact_limit_and_rejects_one_byte_over() {
         let exact_source_len = MAX_DOCUMENT_VARIABLE_XML_BYTES - 3;
         let mut exact = vec![b'x'; exact_source_len];
         exact[..2].copy_from_slice(b"/>");
-        let output = expand_empty_root(&exact, 0..2, b"r", &[]).unwrap();
+        let output = expand_empty_root(&exact, 0..2, b"r", &[], &Limits::default()).unwrap();
         assert_eq!(output.len(), MAX_DOCUMENT_VARIABLE_XML_BYTES);
 
         let mut over = vec![b'x'; exact_source_len + 1];
         over[..2].copy_from_slice(b"/>");
-        assert!(expand_empty_root(&over, 0..2, b"r", &[]).is_err());
+        assert!(expand_empty_root(&over, 0..2, b"r", &[], &Limits::default()).is_err());
     }
 }
 
@@ -888,6 +971,7 @@ fn push_parsed_variable(
     element: &BytesStart<'_>,
     decoder: Decoder,
     resolver: &NamespaceResolver,
+    limits: &Limits,
 ) -> Result<()> {
     let name = word_attribute_value(element, b"name", decoder, resolver)?
         .ok_or_else(|| invalid("document variable name attribute is required"))?;
@@ -906,7 +990,7 @@ fn push_parsed_variable(
         source,
     })?;
     names.push(indexed_name);
-    variables.push_parsed(name, value)
+    variables.push_parsed_with_limits(name, value, limits)
 }
 
 fn is_wordprocessing_namespace(namespace: &ResolveResult<'_>) -> bool {
@@ -969,6 +1053,14 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
+fn limit_error(kind: crate::settings::LimitKind, actual: usize, maximum: usize) -> Error {
+    Error::SettingsLimit {
+        kind,
+        actual,
+        maximum,
+    }
+}
+
 fn xml_error(message: impl Into<String>) -> Error {
     Error::Xml(message.into())
 }
@@ -976,6 +1068,7 @@ fn xml_error(message: impl Into<String>) -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::variables::MAX_DOCUMENT_VARIABLE_XML_BYTES;
 
     #[test]
     fn serializes_and_parses_escaped_values() {
@@ -984,7 +1077,7 @@ mod tests {
             .insert("Company & Team", "A < B && C \"yes\"")
             .unwrap();
         variables.insert("empty", "").unwrap();
-        let xml = variables.to_xml().unwrap();
+        let xml = variables.to_xml(&Limits::default()).unwrap();
         let reparsed = parse_variables(
             format!(
                 r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docVars>{}</w:docVars></w:settings>"#,
@@ -992,6 +1085,7 @@ mod tests {
                     .trim_end_matches("</w:docVars>")
             )
             .as_bytes(),
+            &Limits::default(),
         )
         .unwrap();
         assert_eq!(reparsed.get("Company & Team"), Some("A < B && C \"yes\""));
@@ -1013,10 +1107,10 @@ mod tests {
             r#"<w:docVars><w:docVar w:name="x" w:val="1"><w:docVar w:name="y" w:val="2"/></w:docVar></w:docVars>"#,
             r#"<w:docVar w:name="x" w:val="1"/>"#,
         ] {
-            assert!(parse_variables(wrap(content).as_bytes()).is_err());
+            assert!(parse_variables(wrap(content).as_bytes(), &Limits::default()).is_err());
         }
         let oversized = vec![b' '; MAX_DOCUMENT_VARIABLE_XML_BYTES + 1];
-        assert!(parse_variables(&oversized).is_err());
+        assert!(parse_variables(&oversized, &Limits::default()).is_err());
     }
 
     #[test]
@@ -1025,14 +1119,22 @@ mod tests {
             r#"<w:settings xmlns:w="{}"><w:docVars xmlns:x="urn:selected"><w:docVar w:name="name" w:val="value"/></w:docVars></w:settings>"#,
             String::from_utf8_lossy(TRANSITIONAL_WORD_NAMESPACE)
         );
-        let variables = parse_variables(namespace.as_bytes()).unwrap();
-        assert!(ensure_source_backed_rewrite_safe(namespace.as_bytes(), &variables).is_err());
+        let variables = parse_variables(namespace.as_bytes(), &Limits::default()).unwrap();
+        assert!(ensure_source_backed_rewrite_safe(
+            namespace.as_bytes(),
+            &variables,
+            &Limits::default(),
+        )
+        .is_err());
 
         let entity = format!(
             r#"<w:settings xmlns:w="{}"><w:docVars><w:docVar w:name="name" w:val="value"/>&opaque;</w:docVars></w:settings>"#,
             String::from_utf8_lossy(TRANSITIONAL_WORD_NAMESPACE)
         );
-        let variables = parse_variables(entity.as_bytes()).unwrap();
-        assert!(ensure_source_backed_rewrite_safe(entity.as_bytes(), &variables).is_err());
+        let variables = parse_variables(entity.as_bytes(), &Limits::default()).unwrap();
+        assert!(
+            ensure_source_backed_rewrite_safe(entity.as_bytes(), &variables, &Limits::default(),)
+                .is_err()
+        );
     }
 }

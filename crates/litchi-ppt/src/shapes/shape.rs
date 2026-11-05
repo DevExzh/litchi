@@ -1,4 +1,5 @@
 use super::super::package::Error;
+use super::ShapeEnum;
 /// Base shape trait and common shape functionality.
 ///
 /// This module defines the core Shape trait that all shape types implement,
@@ -172,6 +173,20 @@ pub struct ShapeProperties {
     pub z_order: u16,
     /// Inert `PowerPoint` 12 placeholder compatibility metadata.
     pub powerpoint12_shape_metadata: Option<crate::slide_extension::ShapeMetadata>,
+    /// The shape's name (`wzName`, MS-ODRAW 2.3.4.1), as `PowerPoint` shows
+    /// it in the selection pane; `None` when the shape carries none
+    /// (L-PPT-R3).
+    pub name: Option<String>,
+    /// The shape's alternative text (`wzDescription`, MS-ODRAW 2.3.4.3);
+    /// `None` when the shape carries none (L-PPT-R3).
+    pub description: Option<String>,
+    /// The shape's stable position in its source drawing: its zero-based
+    /// index among its siblings (the drawing's top-level shapes, or its
+    /// group's children) in drawing order, counting every shape of the
+    /// drawing's shape tree, including shapes the reader does not return
+    /// (L-PPT-R4). The background shape and a group's own header are not
+    /// siblings. `None` for a shape that was not read from a drawing.
+    pub source_index: Option<usize>,
 }
 
 impl Default for ShapeProperties {
@@ -190,8 +205,31 @@ impl Default for ShapeProperties {
             hidden: false,
             z_order: 0,
             powerpoint12_shape_metadata: None,
+            name: None,
+            description: None,
+            source_index: None,
         }
     }
+}
+
+impl ShapeProperties {
+    pub(crate) fn apply_source_identity(&mut self, identity: SourceIdentity) {
+        self.name = identity.name;
+        self.description = identity.description;
+        self.source_index = Some(identity.index);
+    }
+}
+
+/// What a parsed shape keeps from its source drawing: its position among
+/// its siblings (L-PPT-R4) and its name and alternative text (L-PPT-R3).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct SourceIdentity {
+    /// Zero-based position among the shape's siblings in drawing order.
+    pub(crate) index: usize,
+    /// `wzName`, when present.
+    pub(crate) name: Option<String>,
+    /// `wzDescription`, when present.
+    pub(crate) description: Option<String>,
 }
 
 /// Base trait for all shape types in `PowerPoint` presentations.
@@ -207,9 +245,6 @@ pub trait Shape: std::any::Any {
         let props = self.properties();
         (props.x, props.y, props.width, props.height)
     }
-
-    /// Clone the shape as a boxed trait object.
-    fn clone_box(&self) -> Box<dyn Shape>;
 
     /// Check if the shape has text content.
     fn has_text(&self) -> bool;
@@ -277,12 +312,6 @@ pub trait Shape: std::any::Any {
     fn text(&self) -> Result<String, Error>;
 }
 
-impl Clone for Box<dyn Shape> {
-    fn clone(&self) -> Self {
-        self.clone_box()
-    }
-}
-
 /// Shape container that holds shape data and provides common operations.
 ///
 /// This container includes Escher text properties extracted from the shape's
@@ -291,7 +320,7 @@ impl Clone for Box<dyn Shape> {
 /// Uses `Cow<'a, [u8]>` for zero-copy optimization when parsing shapes,
 /// allowing the raw data to be borrowed from the original source when possible.
 ///
-/// Note: Child shapes use `'static` lifetime to maintain trait object safety,
+/// Child shapes own their payloads with a `'static` lifetime,
 /// while `raw_data` can be borrowed with lifetime `'a`.
 #[derive(Clone)]
 #[allow(
@@ -305,8 +334,8 @@ pub struct ShapeContainer<'a> {
     pub(crate) raw_data: Cow<'a, [u8]>,
     /// Text content (if applicable)
     pub(crate) text_content: Option<String>,
-    /// Child shapes (for group shapes) - must have 'static lifetime for trait object safety
-    pub(crate) children: Vec<Box<dyn Shape>>,
+    /// Concrete child shapes with owned payloads
+    pub(crate) children: Vec<ShapeEnum<'static>>,
 
     // Escher text properties (from OfficeArtFOPT records)
     /// Text left margin in EMUs
@@ -592,7 +621,7 @@ impl<'a> ShapeContainer<'a> {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn add_child(&mut self, shape: Box<dyn Shape>) -> Result<(), MutationError> {
+    pub fn add_child(&mut self, shape: ShapeEnum<'static>) -> Result<(), MutationError> {
         self.ensure_mutable(Mutation::Structure)?;
         self.children.push(shape);
         Ok(())
@@ -600,7 +629,7 @@ impl<'a> ShapeContainer<'a> {
 
     /// Get all child shapes.
     #[must_use]
-    pub fn children(&self) -> &[Box<dyn Shape>] {
+    pub fn children(&self) -> &[ShapeEnum<'static>] {
         &self.children
     }
 
@@ -634,6 +663,10 @@ impl<'a> ShapeContainer<'a> {
 
     pub(crate) fn mark_source_bound(&mut self) {
         self.source_bound = true;
+    }
+
+    pub(crate) fn apply_source_identity(&mut self, identity: SourceIdentity) {
+        self.properties.apply_source_identity(identity);
     }
 
     /// Set text margins from a 4-value tuple (left, top, right, bottom).
@@ -788,10 +821,6 @@ where
         self.text_content.is_some()
     }
 
-    fn clone_box(&self) -> Box<dyn Shape> {
-        Box::new(self.clone())
-    }
-
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
@@ -804,7 +833,7 @@ where
     reason = "test assertions panic on failure by design"
 )]
 mod persistence_tests {
-    use super::{Mutation, MutationError, Shape, ShapeContainer, ShapeProperties};
+    use super::{Mutation, MutationError, Shape, ShapeContainer, ShapeEnum, ShapeProperties};
 
     #[derive(Clone)]
     struct ExternalShape {
@@ -826,10 +855,6 @@ mod persistence_tests {
 
         fn has_text(&self) -> bool {
             false
-        }
-
-        fn clone_box(&self) -> Box<dyn Shape> {
-            Box::new(self.clone())
         }
 
         fn as_any(&self) -> &dyn std::any::Any {
@@ -901,7 +926,7 @@ mod persistence_tests {
         let before = shape.clone();
 
         assert_eq!(
-            shape.add_child(Box::new(ShapeContainer::new(
+            shape.add_child(ShapeEnum::TextBox(super::super::TextBox::new(
                 ShapeProperties::default(),
                 Vec::new(),
             ))),

@@ -1,0 +1,11 @@
+# record 0355a, release, CARGO_INCREMENTAL=0, CARGO_BUILD_JOBS=6:
+#   cargo build --release -p litchi-docx --example source_family_bench
+#   cargo build --release -p litchi-ops --features docx --example docx_w1_contract_bench
+# base: the tree of 3e686506f3 (record 0355) with crates/litchi-docx/examples/source_family_bench.rs
+#       replaced by source_family_bench.base.rs and docx_w1_contract_bench.rs copied from head
+# head: uo2/w1-docx at fcf1f8ff44 plus the examples as committed with this record
+# Run pinned, ABBA (base, head, head, base): taskset -c 27 ./<example>
+6aa0cdbdf1f34672427430207d2b1a9ef5ea75def709dc5be2d0b192ddb7e2b7  base/source_family_bench
+74ae9cca80fc4fda7bfecfe8e033da8ecf1c28199f7f45a0f38dff60f8b0db6b  base/docx_w1_contract_bench
+ac3e67283a4993a994c38efe62d92e3dbcf985ea929e950d9ff0004c5acbfe0c  head/source_family_bench
+6827f01bd6bdfd757c9198f4f532044e5e238c4e2c11fde7e4e63a15509130dc  head/docx_w1_contract_bench

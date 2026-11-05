@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, reason = "test assertions use unwrap for clarity")]
 
 use litchi_odf_common::core::PackageWriter;
-use litchi_odg::{Drawing, shape::ShapeKind};
+use litchi_odg::{Package, shape::ShapeKind};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const NAMESPACE_DECLARATIONS: &str = concat!(
@@ -21,7 +21,7 @@ fn document(shape: &str) -> String {
 }
 
 fn package(content: &str) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.graphics")
         .unwrap();
@@ -32,7 +32,8 @@ fn package(content: &str) -> Vec<u8> {
 fn raw_package(content: &str) -> Vec<u8> {
     const MIMETYPE: &[u8] = b"application/vnd.oasis.opendocument.graphics";
     const MANIFEST: &[u8] = br#"<?xml version="1.0"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.graphics"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/></manifest:manifest>"#;
-    let mut archive = StreamingArchiveWriter::new();
+    let mut archive =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     archive.write_stored("mimetype", MIMETYPE).unwrap();
     archive
         .write_deflated("content.xml", content.as_bytes())
@@ -44,7 +45,7 @@ fn raw_package(content: &str) -> Vec<u8> {
 }
 
 fn error_text(content: &str) -> String {
-    match Drawing::from_bytes(raw_package(content)) {
+    match Package::from_bytes(&raw_package(content)) {
         Ok(_) => panic!("fixture unexpectedly opened successfully"),
         Err(error) => error.to_string(),
     }
@@ -60,7 +61,7 @@ const VALUE_CONTENT: &str = concat!(
 
 #[test]
 fn shape_values_are_normalized_and_noop_edit_and_inverse_preserve_source() {
-    let source = Drawing::from_bytes(package(VALUE_CONTENT)).unwrap();
+    let source = Package::from_bytes(&package(VALUE_CONTENT)).unwrap();
     assert_eq!(source.pages()[0].shapes().len(), 2);
 
     let polygon = &source.pages()[0].shapes()[0];
@@ -96,30 +97,30 @@ fn shape_values_are_normalized_and_noop_edit_and_inverse_preserve_source() {
         .unwrap();
     noop.set_shape_style_name(0, 0, "gr1\t").unwrap();
     let noop_commit = noop.commit().unwrap();
-    assert!(!noop_commit.changed());
-    assert_eq!(noop_commit.snapshot().as_bytes(), source.as_bytes());
+    assert!(!noop_commit.diagnostics().changed());
+    assert_eq!(noop_commit.package().as_bytes(), source.as_bytes());
 
     let mut edit = source.edit();
     edit.set_shape_style_name(0, 0, "gr3").unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert_eq!(
-        commit.snapshot().pages()[0].shapes()[0].style_name(),
+        commit.package().pages()[0].shapes()[0].style_name(),
         Some("gr3")
     );
     let expected =
         VALUE_CONTENT.replace(r#"draw:style-name="gr1&#x9;""#, r#"draw:style-name="gr3""#);
-    assert_eq!(commit.snapshot().content_xml(), expected);
+    assert_eq!(commit.package().content_xml(), expected);
     assert_eq!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.snapshot())
+            .package()
+            .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         source.as_bytes()
     );
-    let reopened = Drawing::from_bytes(commit.snapshot().as_bytes().to_vec()).unwrap();
+    let reopened = Package::from_bytes(commit.package().as_bytes()).unwrap();
     assert_eq!(reopened.content_xml(), expected);
 }
 
@@ -132,7 +133,7 @@ ref" draw:layer="front	" svg:d="M
 (1cm 2cm)" draw:points="0,0 10,0 0,10" svg:viewBox="0 0 10 10" draw:style-name="gr1
 " draw:text-style-name="P1	" svg:x="1cm" svg:y="2cm" svg:width="3cm" svg:height="4cm"/>"#,
     );
-    let drawing = Drawing::from_bytes(raw_package(&content)).unwrap();
+    let drawing = Package::from_bytes(&raw_package(&content)).unwrap();
     let shape = &drawing.pages()[0].shapes()[0];
     assert_eq!(shape.control_reference(), Some("ctl ref"));
     assert_eq!(shape.layer(), Some("front "));
@@ -158,7 +159,7 @@ fn z_index_error_precedes_bad_geometry_value_decode() {
     let valid = content
         .replace(r#"svg:x="&bogus;""#, r#"svg:x="1cm""#)
         .replace(r#"draw:z-index="invalid""#, r#"draw:z-index="7""#);
-    assert!(Drawing::from_bytes(raw_package(&valid)).is_ok());
+    assert!(Package::from_bytes(&raw_package(&valid)).is_ok());
 }
 
 #[test]
@@ -172,7 +173,7 @@ fn frame_attribute_error_precedes_z_index_error() {
     let valid = content
         .replace(r#" svgAlias:x="2cm""#, "")
         .replace(r#"draw:z-index="invalid""#, r#"draw:z-index="7""#);
-    let drawing = Drawing::from_bytes(raw_package(&valid)).unwrap();
+    let drawing = Package::from_bytes(&raw_package(&valid)).unwrap();
     assert_eq!(drawing.pages()[0].shapes()[0].kind(), ShapeKind::Frame);
     assert_eq!(drawing.pages()[0].shapes()[0].z_index(), Some(7));
 }
@@ -191,7 +192,7 @@ fn three_dimensional_validation_precedes_z_index_error() {
             r#"dr3d:projection="neither""#,
             r#"dr3d:projection="parallel""#,
         );
-    let drawing = Drawing::from_bytes(raw_package(&valid)).unwrap();
+    let drawing = Package::from_bytes(&raw_package(&valid)).unwrap();
     assert_eq!(
         drawing.pages()[0].shapes()[0].kind(),
         ShapeKind::ThreeDimensionalScene
@@ -215,7 +216,7 @@ fn geometry_lexical_validation_precedes_bad_second_group_value_decode() {
     );
 
     let valid = valid_geometry.replace(r#"draw:control="&bogus;""#, r#"draw:control="ctl""#);
-    assert!(Drawing::from_bytes(raw_package(&valid)).is_ok());
+    assert!(Package::from_bytes(&raw_package(&valid)).is_ok());
 }
 
 #[test]
@@ -247,6 +248,6 @@ fn matching_alias_duplicate_and_malformed_unrelated_attribute_are_rejected() {
     );
 
     let valid = trailing_only.replace(" foreign:opaque/>", "/>");
-    let drawing = Drawing::from_bytes(raw_package(&valid)).unwrap();
+    let drawing = Package::from_bytes(&raw_package(&valid)).unwrap();
     assert_eq!(drawing.pages()[0].shapes()[0].layer(), Some("front"));
 }

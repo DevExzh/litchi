@@ -145,7 +145,7 @@ fn open(opc: &OpcPackage) -> Package {
 
 fn save(package: &mut Package) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    package.to_stream(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     output.into_inner()
 }
 
@@ -185,7 +185,10 @@ fn all_story_owners_share_one_payload_and_keep_signed_source_exact() {
             max_total_payload_bytes: INK.len(),
             ..Limits::default()
         };
-        let snapshot = package.ink_with_limits(limits).unwrap();
+        let snapshot = package
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().ink(limits))
+            .ink()
+            .unwrap();
         assert_eq!(snapshot.annotations().len(), 8);
         assert_eq!(snapshot.distinct_payload_count(), 1);
         assert!(snapshot.get(Position::new(8)).is_none());
@@ -355,12 +358,14 @@ fn distinct_payload_budget_and_external_targets_are_checked() {
     let package = open(&opc);
     assert_eq!(package.ink().unwrap().distinct_payload_count(), 2);
     assert!(matches!(
-        package.ink_with_limits(Limits {
-            max_total_payload_bytes: INK.len(),
-            ..Limits::default()
-        }),
+        package
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().ink(Limits {
+                max_total_payload_bytes: INK.len(),
+                ..Limits::default()
+            }))
+            .ink(),
         Err(Error::InkLimit {
-            resource: "total payload bytes",
+            kind: litchi_docx::ink::LimitKind::TotalPayloadBytes,
             ..
         })
     ));
@@ -396,10 +401,11 @@ fn inactive_unknown_choice_is_not_an_annotation_or_semantic_error() {
     let before = save(&mut package);
     assert_eq!(
         package
-            .ink_with_limits(Limits {
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().ink(Limits {
                 max_annotations: 1,
                 ..Limits::default()
-            })
+            }))
+            .ink()
             .unwrap()
             .annotations()
             .len(),
@@ -411,12 +417,14 @@ fn inactive_unknown_choice_is_not_an_annotation_or_semantic_error() {
 fn raw_archive(opc: &OpcPackage) -> Vec<u8> {
     use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
     let valid = PackageWriter::to_bytes(&source(false, false)).unwrap();
-    let archive = ArchiveReader::new(&valid).unwrap();
+    let archive =
+        ArchiveReader::new(&valid, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     let payload = opc
         .get_part(&PackURI::new("/payload/handwriting.xml").unwrap())
         .unwrap()
         .blob();
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in archive.file_names() {
         if name == "payload/handwriting.xml" {
             writer.write_stored(name, payload).unwrap();
@@ -458,15 +466,16 @@ fn payload_annotation_relationship_and_dirty_state_limits_are_enforced() {
             ..Limits::default()
         },
     ] {
-        assert!(package.ink_with_limits(limits).is_err());
+        assert!(
+            package
+                .with_semantic_limits(litchi_docx::SemanticLimits::default().ink(limits))
+                .ink()
+                .is_err()
+        );
     }
-    let mut package = Package::new().unwrap();
-    package
-        .document_mut()
-        .unwrap()
-        .add_paragraph()
-        .add_run_with_text("pending");
-    assert!(matches!(package.ink(), Err(Error::UnsafeEdit { .. })));
+    // The dirty-writer half of this test (`Builder::package()` with pending
+    // edits) was removed with `Builder::package()`: an unbuilt draft is no
+    // longer reachable as a package.
 }
 
 fn managed_source(
@@ -493,13 +502,13 @@ fn managed_source(
         )
         .unwrap(),
     );
-    let package =
-        litchi_docx::source_backed::Package::from_read_at_with_cache_limits_and_execution_context(
-            std::sync::Arc::new(litchi_core::OwnedSource::new(bytes)),
-            litchi_opc::SourceCacheLimits::new(1, 1).unwrap(),
-            execution,
-        )
-        .unwrap();
+    let package = litchi_docx::source_backed::Package::from_read_at_with_options(
+        std::sync::Arc::new(litchi_core::OwnedSource::new(bytes)),
+        litchi_docx::OpenOptions::default()
+            .cache_limits(litchi_opc::SourceCacheLimits::new(1, 1).unwrap())
+            .execution_context(execution),
+    )
+    .unwrap();
     (budget, cancellation, package)
 }
 
@@ -568,12 +577,14 @@ fn source_backed_payload_limit_refuses_before_decompression_and_releases_story_p
     let opc = source(false, true);
     let (budget, cancellation, package) = managed_source(PackageWriter::to_bytes(&opc).unwrap());
     assert!(matches!(
-        package.ink_with_limits(Limits {
-            max_payload_bytes: INK.len() - 1,
-            ..Limits::default()
-        }),
+        package
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().ink(Limits {
+                max_payload_bytes: INK.len() - 1,
+                ..Limits::default()
+            }))
+            .ink(),
         Err(Error::InkLimit {
-            resource: "payload bytes",
+            kind: litchi_docx::ink::LimitKind::PayloadBytes,
             ..
         })
     ));
@@ -700,7 +711,10 @@ fn source_backed_story_graph_and_aggregate_limits_fail_before_payload_reads() {
             _ => {},
         }
         assert!(
-            package.ink_with_limits(limits).is_err(),
+            package
+                .with_semantic_limits(litchi_docx::SemanticLimits::default().ink(limits))
+                .ink()
+                .is_err(),
             "scenario {scenario}"
         );
         assert_eq!(

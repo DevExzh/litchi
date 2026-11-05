@@ -7,6 +7,7 @@
 use super::*;
 use crate::consts::RecordType;
 use crate::master_layout::Context;
+use crate::master_layout::Limits;
 use crate::records::Record;
 
 const XML: &[u8] =
@@ -105,9 +106,12 @@ fn builds_bounded_package_and_preserves_exact_snapshot_bytes() {
 #[test]
 fn authors_notes_master_styles_atomically_and_preserves_unknown_tail() {
     let opaque = unknown(0x7abc, &[1, 2, 3]);
-    let source =
-        super::super::Snapshot::from_record(Context::Notes, notes_master(vec![opaque.clone()]))
-            .unwrap();
+    let source = super::super::Snapshot::from_record(
+        Context::Notes,
+        notes_master(vec![opaque.clone()]),
+        &Limits::default(),
+    )
+    .unwrap();
     let original = source.bytes().to_vec();
     let styles = Styles::from_xml(XML).unwrap();
 
@@ -129,8 +133,12 @@ fn authors_notes_master_styles_atomically_and_preserves_unknown_tail() {
 #[test]
 fn clears_and_rejects_wrong_context_without_mutating_the_editor() {
     let styles = Styles::from_xml(XML).unwrap();
-    let source =
-        super::super::Snapshot::from_record(Context::Notes, notes_master(Vec::new())).unwrap();
+    let source = super::super::Snapshot::from_record(
+        Context::Notes,
+        notes_master(Vec::new()),
+        &Limits::default(),
+    )
+    .unwrap();
     let mut edit = source.edit();
     edit.set_notes_styles(styles).unwrap();
     let committed = edit.commit().unwrap();
@@ -141,8 +149,12 @@ fn clears_and_rejects_wrong_context_without_mutating_the_editor() {
     assert!(cleared.notes_styles().unwrap().is_none());
 
     for context in [Context::Main, Context::Title, Context::Handout] {
-        let snapshot =
-            super::super::Snapshot::from_record(context, contextual_master(context)).unwrap();
+        let snapshot = super::super::Snapshot::from_record(
+            context,
+            contextual_master(context),
+            &Limits::default(),
+        )
+        .unwrap();
         let original = snapshot.bytes().to_vec();
         let mut rejected_edit = snapshot.edit();
         assert!(
@@ -150,9 +162,9 @@ fn clears_and_rejects_wrong_context_without_mutating_the_editor() {
                 .set_notes_styles(Styles::from_xml(XML).unwrap())
                 .is_err()
         );
-        assert!(!rejected_edit.is_changed());
+        assert!(rejected_edit.changes().is_empty());
         assert_eq!(
-            rejected_edit.snapshot().unwrap().bytes(),
+            rejected_edit.commit().unwrap().snapshot().bytes(),
             original.as_slice()
         );
     }
@@ -174,5 +186,8 @@ fn rejects_malformed_and_oversized_xml_before_authoring() {
     ));
     malformed.data = malformed.children.iter().flat_map(wire).collect();
     malformed.data_length = u32::try_from(malformed.data.len()).unwrap();
-    assert!(super::super::Snapshot::from_record(Context::Notes, malformed).is_err());
+    assert!(
+        super::super::Snapshot::from_record(Context::Notes, malformed, &Limits::default(),)
+            .is_err()
+    );
 }

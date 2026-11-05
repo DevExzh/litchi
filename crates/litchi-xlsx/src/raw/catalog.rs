@@ -596,7 +596,8 @@ impl WorkbookInfo {
 }
 
 /// Parse and validate the workbook-level catalog from `workbook.xml` bytes.
-pub fn parse_catalog(content: &[u8]) -> Result<Catalog> {
+pub fn parse_catalog(content: &[u8], limits: &litchi_opc::SourceLimits) -> Result<Catalog> {
+    super::check_source_bytes(content.len(), limits)?;
     WorkbookInfo::parse(content).map(|info| Catalog {
         sheets: info.sheets,
         active_sheet_index: info.active_tab.unwrap_or(0),
@@ -611,9 +612,11 @@ pub fn parse_catalog(content: &[u8]) -> Result<Catalog> {
 /// and appending each repair to `tolerance` (see `crate::leniency`).
 pub(crate) fn parse_catalog_repairing(
     content: &[u8],
+    limits: &litchi_opc::SourceLimits,
     leniency: Leniency,
     tolerance: &mut ToleranceReport,
 ) -> Result<Catalog> {
+    super::check_source_bytes(content.len(), limits)?;
     let mut info = WorkbookInfo::parse_repairing(content, leniency)?;
     if let Some(report) = info.tolerance.take() {
         tolerance.append(&report);
@@ -645,13 +648,16 @@ pub fn parse_catalog_with_mce(
     })
 }
 
-fn parse_workbook_details(content: &str) -> Result<Catalog> {
-    parse_catalog(content.as_bytes())
+fn parse_workbook_details(content: &str, limits: &litchi_opc::SourceLimits) -> Result<Catalog> {
+    parse_catalog(content.as_bytes(), limits)
 }
 
 /// Parse workbook metadata, returning sheets, the active sheet index, and the date system.
-fn parse_workbook_xml(content: &str) -> Result<(Vec<Sheet>, usize, bool)> {
-    parse_workbook_details(content).map(|details| {
+fn parse_workbook_xml(
+    content: &str,
+    limits: &litchi_opc::SourceLimits,
+) -> Result<(Vec<Sheet>, usize, bool)> {
+    parse_workbook_details(content, limits).map(|details| {
         (
             details.sheets,
             details.active_sheet_index,
@@ -661,13 +667,15 @@ fn parse_workbook_xml(content: &str) -> Result<(Vec<Sheet>, usize, bool)> {
 }
 
 /// Parse a standalone `sheet` element.
-pub fn parse_sheet(sheet_xml: &str) -> Result<Option<Sheet>> {
+pub fn parse_sheet(sheet_xml: &str, limits: &litchi_opc::SourceLimits) -> Result<Option<Sheet>> {
+    super::check_source_bytes(sheet_xml.len(), limits)?;
     let wrapped = format!(
         r#"<workbook xmlns="{}" xmlns:r="{}"><sheets>{sheet_xml}</sheets></workbook>"#,
         String::from_utf8_lossy(SPREADSHEETML_NAMESPACE),
         RELATIONSHIPS_NAMESPACE
     );
-    parse_workbook_xml(&wrapped).map(|(mut sheets, _, _)| sheets.pop())
+    super::check_source_bytes(wrapped.len(), limits)?;
+    parse_workbook_xml(&wrapped, limits).map(|(mut sheets, _, _)| sheets.pop())
 }
 
 fn parse_sheet_element(
@@ -807,6 +815,23 @@ mod tests {
     const STRICT_R: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships";
 
     #[test]
+    fn parse_catalog_requires_and_honors_source_limits() {
+        let limits = litchi_opc::SourceLimits::builder()
+            .max_part_bytes(1)
+            .unwrap()
+            .build()
+            .unwrap();
+        let error = parse_catalog(b"<workbook/>", &limits).unwrap_err();
+        assert!(matches!(
+            error,
+            crate::Error::Package(litchi_opc::OpcError::Limit {
+                kind: litchi_opc::SourceLimitKind::PartBytes,
+                ..
+            })
+        ));
+    }
+
+    #[test]
     fn parses_namespaced_workbook_metadata_and_decodes_attributes() {
         let xml = format!(
             r#"<x:workbook xmlns:x="{S}" xmlns:rel="{R}" xmlns:f="urn:foreign">
@@ -819,7 +844,8 @@ mod tests {
                 </x:sheets>
             </x:workbook>"#
         );
-        let (sheets, active, date_1904) = parse_workbook_xml(&xml).unwrap();
+        let (sheets, active, date_1904) =
+            parse_workbook_xml(&xml, &litchi_opc::SourceLimits::default()).unwrap();
         assert_eq!(sheets.len(), 2);
         assert_eq!(sheets[0].name, "A & B");
         assert_eq!(sheets[0].relationship_id, "custom-one");
@@ -835,15 +861,19 @@ mod tests {
                 <sheet name="Strict" sheetId="4" r:id="strictRel"/>
             </sheets></workbook>"#
         );
-        let (sheets, active, date_1904) = parse_workbook_xml(&xml).unwrap();
+        let (sheets, active, date_1904) =
+            parse_workbook_xml(&xml, &litchi_opc::SourceLimits::default()).unwrap();
         assert_eq!(sheets[0].name, "Strict");
         assert_eq!(sheets[0].relationship_id, "strictRel");
         assert_eq!(active, 0);
         assert!(!date_1904);
 
-        let sheet = parse_sheet(r#"<sheet name="One &amp; Two" sheetId="2" r:id="r9"/>"#)
-            .unwrap()
-            .unwrap();
+        let sheet = parse_sheet(
+            r#"<sheet name="One &amp; Two" sheetId="2" r:id="r9"/>"#,
+            &litchi_opc::SourceLimits::default(),
+        )
+        .unwrap()
+        .unwrap();
         assert_eq!(sheet.name, "One & Two");
         assert_eq!(sheet.relationship_id, "r9");
     }
@@ -860,7 +890,7 @@ mod tests {
                 </s:definedNames>
             </s:workbook>"#
         );
-        let details = parse_workbook_details(&xml).unwrap();
+        let details = parse_workbook_details(&xml, &litchi_opc::SourceLimits::default()).unwrap();
 
         assert_eq!(details.defined_names.len(), 2);
         assert_eq!(details.defined_names[0].name, "_xlnm.Print_Area");
@@ -882,7 +912,7 @@ mod tests {
                     publishToServer="1" workbookParameter="true">SUM(One!$A$1:$A$2)</definedName></definedNames>
             </workbook>"#
         );
-        let parsed = parse_workbook_details(&xml).unwrap();
+        let parsed = parse_workbook_details(&xml, &litchi_opc::SourceLimits::default()).unwrap();
         let name = &parsed.defined_names[0];
         assert_eq!(name.local_sheet_id, Some(0));
         assert_eq!(name.comment.as_deref(), Some("A & B"));
@@ -909,7 +939,7 @@ mod tests {
                 </s:pivotCaches>
             </s:workbook>"#
         );
-        let details = parse_workbook_details(&xml).unwrap();
+        let details = parse_workbook_details(&xml, &litchi_opc::SourceLimits::default()).unwrap();
 
         assert_eq!(
             details.pivot_caches,
@@ -955,14 +985,20 @@ mod tests {
             ),
         ];
         for xml in invalid {
-            assert!(parse_workbook_details(&xml).is_err(), "accepted {xml}");
+            assert!(
+                parse_workbook_details(&xml, &litchi_opc::SourceLimits::default()).is_err(),
+                "accepted {xml}"
+            );
         }
 
         let oversized_formula = format!(
             r#"<workbook xmlns="{S}" xmlns:r="{R}">{sheets}<definedNames><definedName name="x">{}</definedName></definedNames></workbook>"#,
             "1".repeat(MAX_DEFINED_NAME_FORMULA_BYTES + 1)
         );
-        assert!(parse_workbook_details(&oversized_formula).is_err());
+        assert!(
+            parse_workbook_details(&oversized_formula, &litchi_opc::SourceLimits::default())
+                .is_err()
+        );
     }
 
     /// Producers other than Excel repeat a defined name within one scope.
@@ -974,7 +1010,7 @@ mod tests {
         let xml = format!(
             r#"<workbook xmlns="{S}" xmlns:r="{R}">{sheets}<definedNames><definedName name="Same">1</definedName><definedName name="same">2</definedName></definedNames></workbook>"#
         );
-        let parsed = parse_workbook_details(&xml).unwrap();
+        let parsed = parse_workbook_details(&xml, &litchi_opc::SourceLimits::default()).unwrap();
         assert_eq!(parsed.defined_names.len(), 1);
         assert_eq!(parsed.defined_names[0].name, "Same");
         assert_eq!(parsed.defined_names[0].reference, "1");
@@ -987,7 +1023,7 @@ mod tests {
         let xml = format!(
             r#"<workbook xmlns="{S}" xmlns:r="{R}">{sheets}<definedNames><definedName name="x">1</definedName><definedName name="x" localSheetId="0">2</definedName></definedNames></workbook>"#
         );
-        let parsed = parse_workbook_details(&xml).unwrap();
+        let parsed = parse_workbook_details(&xml, &litchi_opc::SourceLimits::default()).unwrap();
         assert_eq!(parsed.defined_names.len(), 2);
     }
 
@@ -999,7 +1035,8 @@ mod tests {
             let xml = format!(
                 r#"<workbook xmlns="{S}" xmlns:r="{R}"><sheets><sheet name="One" sheetId="1" state="{state}" r:id="r1"/></sheets></workbook>"#
             );
-            let parsed = parse_workbook_details(&xml).unwrap_or_else(|e| panic!("{state}: {e}"));
+            let parsed = parse_workbook_details(&xml, &litchi_opc::SourceLimits::default())
+                .unwrap_or_else(|e| panic!("{state}: {e}"));
             assert_eq!(parsed.sheets.len(), 1, "{state}");
             assert_eq!(parsed.sheets[0].name, "One", "{state}");
             assert_eq!(
@@ -1030,7 +1067,10 @@ mod tests {
             ),
         ];
         for xml in invalid {
-            assert!(parse_workbook_details(&xml).is_err(), "accepted {xml}");
+            assert!(
+                parse_workbook_details(&xml, &litchi_opc::SourceLimits::default()).is_err(),
+                "accepted {xml}"
+            );
         }
     }
 
@@ -1041,7 +1081,8 @@ mod tests {
                 <sheet name="Nested" sheetId="1" r:id="r1"/>
             </f:sheets><sheets><sheet name="Real" sheetId="2" r:id="r2"/></sheets></workbook>"#
         );
-        let (sheets, _, _) = parse_workbook_xml(&foreign).unwrap();
+        let (sheets, _, _) =
+            parse_workbook_xml(&foreign, &litchi_opc::SourceLimits::default()).unwrap();
         assert_eq!(sheets.len(), 1);
         assert_eq!(sheets[0].name, "Real");
 
@@ -1051,7 +1092,7 @@ mod tests {
                 <sheet name="Other" sheetId="1" r:id="r2"/>
             </sheets></workbook>"#
         );
-        assert!(parse_workbook_xml(&duplicate).is_err());
+        assert!(parse_workbook_xml(&duplicate, &litchi_opc::SourceLimits::default()).is_err());
 
         for xml in [
             format!(r#"<workbook xmlns="{S}"><workbookPr date1904="yes"/></workbook>"#),
@@ -1063,7 +1104,10 @@ mod tests {
             ),
             format!(r#"<workbook xmlns="{S}"><sheets>"#),
         ] {
-            assert!(parse_workbook_xml(&xml).is_err(), "accepted {xml}");
+            assert!(
+                parse_workbook_xml(&xml, &litchi_opc::SourceLimits::default()).is_err(),
+                "accepted {xml}"
+            );
         }
     }
 }

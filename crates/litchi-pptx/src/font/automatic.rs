@@ -4,80 +4,54 @@ use litchi_fonts::{CollectGlyphs, GlyphMap, Prepared};
 
 use crate::font::{self, Charset, Data, Face, Family, Font, Fonts, Pitch, PitchFamily, Style};
 use crate::package::Package;
-use crate::writer::MutablePresentation;
 use crate::{Error, Result};
 
 impl Package {
-    /// Select automatic system-font publication for managed saves.
-    ///
-    /// The policy is available only to packages with a complete mutable
-    /// presentation model. Opened packages retain opaque source text and are
-    /// therefore rejected instead of risking an incomplete glyph inventory.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn set_font_embedding(
-        &mut self,
-        embedding: litchi_fonts::embedding::Mode,
-    ) -> Result<&mut Self> {
-        self.ensure_plain_mutation("set_font_embedding")?;
-        if self.mutable_pres.is_none() {
-            return Err(Error::UnsafeEdit {
-                operation: "set_font_embedding",
-                reason: "font discovery requires a complete mutable presentation model",
-            });
-        }
-        self.opc.with_fonts(match embedding {
-            litchi_fonts::embedding::Mode::Full => litchi_opc::FontEmbedding::Full,
-            litchi_fonts::embedding::Mode::Subset => litchi_opc::FontEmbedding::Subset,
-        });
-        self.font_embedding_dirty = true;
-        Ok(self)
-    }
-
-    /// Select automatic system-font publication and return this package by value.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn with_font_embedding(mut self, embedding: litchi_fonts::embedding::Mode) -> Result<Self> {
-        self.set_font_embedding(embedding)?;
-        Ok(self)
-    }
-
     pub(crate) fn embed_fonts_for_presentation(
         &mut self,
-        presentation: &MutablePresentation,
+        presentation: &crate::builder::Presentation,
+        preparation_limits: litchi_fonts::PreparationLimits,
+        eot_limits: litchi_fonts::embedding::powerpoint::Limits,
     ) -> Result<()> {
         let mode = match self.opc.save_options().fonts {
             litchi_opc::FontEmbedding::None => return Ok(()),
             litchi_opc::FontEmbedding::Full => litchi_fonts::embedding::Mode::Full,
             litchi_opc::FontEmbedding::Subset => litchi_fonts::embedding::Mode::Subset,
         };
-        self.embed_fonts_with_glyphs(presentation.collect_glyphs(), mode)
+        self.embed_fonts_with_glyphs(
+            presentation.collect_glyphs(),
+            mode,
+            preparation_limits,
+            eot_limits,
+        )
     }
 
     fn embed_fonts_with_glyphs(
         &mut self,
         glyphs: GlyphMap,
         mode: litchi_fonts::embedding::Mode,
+        preparation_limits: litchi_fonts::PreparationLimits,
+        eot_limits: litchi_fonts::embedding::powerpoint::Limits,
     ) -> Result<()> {
-        let prepared = litchi_fonts::embedding::prepare(glyphs, mode)?;
+        let prepared = litchi_fonts::embedding::prepare(glyphs, mode, preparation_limits)?;
         if prepared.is_empty() {
             return Ok(());
         }
 
-        let mut staged = self.opc.clone();
+        let mut staged = (*self.opc).clone();
         let mut fonts = font::load(&staged)?.unwrap_or_else(Fonts::new);
         let mut changed = false;
         for mut prepared in prepared {
-            let data = litchi_fonts::embedding::powerpoint::data(&mut prepared)?;
+            let data = litchi_fonts::embedding::powerpoint::encode(
+                &mut prepared,
+                litchi_fonts::embedding::powerpoint::Intent::PreviewPrint,
+                eot_limits,
+            )?;
             changed |= merge(&mut fonts, prepared, data)?;
         }
         if changed {
             let _ = font::put(&mut staged, fonts)?;
-            self.opc = staged;
+            self.opc = std::sync::Arc::new(staged);
         }
         Ok(())
     }

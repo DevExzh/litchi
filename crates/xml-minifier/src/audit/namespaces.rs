@@ -332,6 +332,31 @@ impl Namespaces {
         name
     }
 
+    /// Whether `other` has the same bindings in scope: the same prefixes,
+    /// bound to the same names by elements at the same depths, in the same
+    /// order.
+    #[cfg(debug_assertions)]
+    pub(super) fn same_bindings(&self, other: &Self) -> bool {
+        self.bindings.len() == other.bindings.len()
+            && self.names.len() == other.names.len()
+            && self
+                .bindings
+                .iter()
+                .zip(&other.bindings)
+                .all(|(left, right)| {
+                    left.depth == right.depth
+                        && self.text[left.start..left.end] == other.text[right.start..right.end]
+                        && left.split - left.start == right.split - right.start
+                })
+    }
+
+    /// How many prefixed bindings are in scope. An element whose content has
+    /// as many as its parent's content declared none of its own, so the two
+    /// share one set of bindings.
+    pub(super) fn bindings(&self) -> usize {
+        self.bindings.len()
+    }
+
     /// Ends the scope of the bindings declared by the element at `depth`.
     #[inline]
     pub(super) fn close(&mut self, depth: usize) {

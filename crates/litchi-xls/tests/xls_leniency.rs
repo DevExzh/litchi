@@ -6,7 +6,7 @@
 
 use std::path::PathBuf;
 
-use litchi_xls::{Defect, FormattingDefect, Leniency, OpenOptions, ToleranceReport, Workbook};
+use litchi_xls::{Defect, FormattingDefect, Leniency, OpenOptions, ToleranceReport, raw::Reader};
 
 fn poi_fixture(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -21,18 +21,18 @@ fn libreoffice_fixture(name: &str) -> PathBuf {
 }
 
 fn lenient_options() -> OpenOptions<'static> {
-    OpenOptions::new().with_leniency(Leniency::TolerateFormattingDefects)
+    OpenOptions::new().leniency(Leniency::TolerateFormattingDefects)
 }
 
-fn open_lenient(path: PathBuf) -> Workbook<std::fs::File> {
+fn open_lenient(path: PathBuf) -> Reader<std::fs::File> {
     let file = std::fs::File::open(&path).expect("fixture is readable");
-    Workbook::new_with_options(file, lenient_options())
+    Reader::new_with_options(file, lenient_options())
         .expect("a lenient open tolerates cosmetic formatting defects")
 }
 
 fn strict_error(path: PathBuf) -> String {
     let file = std::fs::File::open(&path).expect("fixture is readable");
-    match Workbook::new(file) {
+    match Reader::new(file) {
         Ok(_) => panic!("a strict open must still reject {}", path.display()),
         Err(error) => error.to_string(),
     }
@@ -73,11 +73,11 @@ fn assert_repaired(
 
 #[test]
 fn strict_open_is_the_default_for_every_tolerable_defect() {
-    // `Workbook::new` and a default-constructed options value must agree,
+    // `Reader::new` and a default-constructed options value must agree,
     // and both must reject what a lenient open would repair.
     let path = poi_fixture("29942.xls");
     let explicit = std::fs::File::open(&path).expect("fixture is readable");
-    assert!(Workbook::new_with_options(explicit, OpenOptions::default()).is_err());
+    assert!(Reader::new_with_options(explicit, OpenOptions::default()).is_err());
     assert!(strict_error(path).contains("Font family"));
 }
 
@@ -120,7 +120,7 @@ fn a_conforming_workbook_reports_nothing_under_either_policy() {
     for options in [OpenOptions::default(), lenient_options()] {
         let file = std::fs::File::open(poi_fixture("colwidth.xls")).expect("fixture is readable");
         let workbook =
-            Workbook::new_with_options(file, options).expect("a conforming workbook opens");
+            Reader::new_with_options(file, options).expect("a conforming workbook opens");
         assert!(workbook.tolerance_report().is_clean());
         assert_eq!(workbook.tolerance_report().total(), 0);
     }
@@ -143,7 +143,7 @@ use std::io::Cursor;
 
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_core::sheet::{Cell as SheetCell, CellValue};
-use litchi_xls::{CellFormatDefect, ExtendedFormat, Writer};
+use litchi_xls::{Builder, CellFormatDefect, ExtendedFormat};
 
 /// BIFF `Number` record type.
 const NUMBER_RECORD: u16 = 0x0203;
@@ -152,13 +152,17 @@ const NUMBER_RECORD: u16 = 0x0203;
 /// rewritten to `ixfe` — one of the most common non-Microsoft-producer
 /// defects in the wild.
 fn workbook_with_cell_ixfe(ixfe: u16) -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();
     writer.write_number(sheet, 0, 0, 42.5).unwrap();
     let mut bytes = Vec::new();
-    writer.write_to(&mut Cursor::new(&mut bytes)).unwrap();
+    writer
+        .build()
+        .unwrap()
+        .write_to(&mut Cursor::new(&mut bytes))
+        .unwrap();
 
-    let mut stream = OleFile::open(Cursor::new(&bytes))
+    let mut stream = OleFile::open(Cursor::new(&bytes), litchi_cfb::OleFileLimits::default())
         .unwrap()
         .open_stream(&["Workbook"])
         .unwrap();
@@ -188,7 +192,7 @@ fn workbook_with_cell_ixfe(ixfe: u16) -> Vec<u8> {
 /// the value is untouched, the format falls back to the default cell XF, and
 /// the repair is recorded rather than silent.
 fn assert_default_open_repairs_cell_xf(ixfe: u16) {
-    let workbook = Workbook::new(Cursor::new(workbook_with_cell_ixfe(ixfe)))
+    let workbook = Reader::new(Cursor::new(workbook_with_cell_ixfe(ixfe)))
         .expect("the default policy applies the Excel-compatible repair");
 
     let worksheet = workbook.xls_worksheet(0).unwrap();
@@ -199,12 +203,16 @@ fn assert_default_open_repairs_cell_xf(ixfe: u16) {
     assert_eq!(cell.xf_index(), ixfe);
     // ...and the resolved format is the default cell XF — the very format the
     // writer gave this cell before the mutation, since it writes ixfe 15.
-    let clean = Workbook::new(Cursor::new({
-        let mut writer = Writer::new();
+    let clean = Reader::new(Cursor::new({
+        let mut writer = Builder::new();
         let sheet = writer.add_worksheet("Sheet1").unwrap();
         writer.write_number(sheet, 0, 0, 42.5).unwrap();
         let mut bytes = Vec::new();
-        writer.write_to(&mut Cursor::new(&mut bytes)).unwrap();
+        writer
+            .build()
+            .unwrap()
+            .write_to(&mut Cursor::new(&mut bytes))
+            .unwrap();
         bytes
     }))
     .unwrap();
@@ -244,11 +252,15 @@ fn a_default_open_repairs_a_reserved_style_slot_cell_xf_reference() {
 
 #[test]
 fn a_conforming_writer_workbook_reports_nothing() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();
     writer.write_number(sheet, 0, 0, 42.5).unwrap();
     let mut bytes = Vec::new();
-    writer.write_to(&mut Cursor::new(&mut bytes)).unwrap();
-    let workbook = Workbook::new(Cursor::new(bytes)).unwrap();
+    writer
+        .build()
+        .unwrap()
+        .write_to(&mut Cursor::new(&mut bytes))
+        .unwrap();
+    let workbook = Reader::new(Cursor::new(bytes)).unwrap();
     assert!(workbook.tolerance_report().is_clean());
 }

@@ -1,5 +1,6 @@
 //! OPC/package integration for the typed XLSB workbook.
 
+use super::catalog::TabMetadata;
 use super::model::{DrawingLoadPolicy, Workbook};
 use crate::calc::Props;
 use crate::cell_values;
@@ -10,21 +11,18 @@ use crate::package::error::Result;
 use crate::package::formula::{Context, View, excel_name_eq, table::Definition as TableDefinition};
 use crate::package::styles_table::StylesTable;
 #[cfg(feature = "vba-inspection")]
-use crate::package::vba_project::{
-    VbaProject, discover_vba_project, remove_vba_project as clear_workbook_vba,
-    store_vba_project as store_workbook_vba_project,
-};
+use crate::package::vba_project::{VbaProject, discover_vba_project};
 use crate::package::web_extension_bindings::PackageAppRefs;
 use crate::raw::Records;
+use crate::sheet::{Kind, State};
 use crate::sparkline;
-use litchi_core::ExecutionContext;
 use litchi_ooxml_common::embedded;
 use litchi_ooxml_common::ribbon;
 use litchi_ooxml_common::web;
 use litchi_opc::constants::{content_type, relationship_type};
 use litchi_opc::part::Part;
 use litchi_opc::{OpcError, OpcPackage};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::{Read, Seek, Write};
 use std::sync::Arc;
 
@@ -44,6 +42,13 @@ const MACRO_SHEET_RELATIONSHIP_TYPES: &[&str] = &[
     "http://schemas.microsoft.com/office/2006/relationships/xlIntlMacrosheet",
 ];
 
+const XLSB_WORKSHEET_CONTENT_TYPE: &str = "application/vnd.ms-excel.worksheet";
+const XLSB_CHARTSHEET_CONTENT_TYPE: &str = "application/vnd.ms-excel.chartsheet";
+const XLSB_DIALOGSHEET_CONTENT_TYPE: &str = "application/vnd.ms-excel.dialogsheet";
+const XLSB_MACROSHEET_CONTENT_TYPE: &str = "application/vnd.ms-excel.macrosheet";
+const XLSB_INTL_MACROSHEET_CONTENT_TYPE: &str = "application/vnd.ms-excel.intlmacrosheet";
+const XLSB_SHARED_STRINGS_CONTENT_TYPE: &str = "application/vnd.ms-excel.sharedStrings";
+
 fn is_worksheet_relationship(reltype: &str) -> bool {
     matches!(
         reltype,
@@ -57,181 +62,32 @@ fn is_known_non_worksheet_relationship(reltype: &str) -> bool {
         || MACRO_SHEET_RELATIONSHIP_TYPES.contains(&reltype)
 }
 
+fn validate_sheet_content_type(part: &dyn Part, kind: Kind) -> Result<()> {
+    let expected = match kind {
+        Kind::Worksheet => XLSB_WORKSHEET_CONTENT_TYPE,
+        Kind::Chart => XLSB_CHARTSHEET_CONTENT_TYPE,
+        Kind::Dialog => XLSB_DIALOGSHEET_CONTENT_TYPE,
+        Kind::Macro => XLSB_MACROSHEET_CONTENT_TYPE,
+        Kind::IntlMacro => XLSB_INTL_MACROSHEET_CONTENT_TYPE,
+        Kind::Unbound => {
+            return Err(crate::package::error::Error::UnsupportedFeature(
+                "unbound XLSB tabs have no physical content type",
+            ));
+        },
+    };
+    if part.content_type() != expected {
+        return Err(crate::package::error::Error::InvalidContentType {
+            expected: "a known value",
+        });
+    }
+    Ok(())
+}
+
 impl Workbook {
-    /// Read the source-bound XLSB Custom Data catalog.
-    pub fn custom_data(&self) -> Result<crate::custom_data::Snapshot> {
-        crate::custom_data::Snapshot::load(&self.package)
-    }
-
-    /// Read Custom Data with an explicit finite policy.
-    pub fn custom_data_with_limits(
-        &self,
-        limits: crate::custom_data::Limits,
-    ) -> Result<crate::custom_data::Snapshot> {
-        crate::custom_data::Snapshot::load_with_limits(&self.package, limits)
-    }
-
-    /// Read Custom Data with an explicit policy and owned execution context.
-    pub fn custom_data_with_limits_and_context(
-        &self,
-        limits: crate::custom_data::Limits,
-        context: ExecutionContext,
-    ) -> Result<crate::custom_data::Snapshot> {
-        crate::custom_data::Snapshot::load_with_limits_and_context(
-            &self.package,
-            limits,
-            Some(context),
-        )
-    }
-
-    /// Start a detached source-bound Custom Data transaction.
-    pub fn edit_custom_data(&self) -> Result<crate::custom_data::Transaction> {
-        crate::custom_data::Transaction::from_package(self.package.clone())
-    }
-
-    /// Start a detached Custom Data transaction with an explicit finite policy.
-    pub fn edit_custom_data_with_limits(
-        &self,
-        limits: crate::custom_data::Limits,
-    ) -> Result<crate::custom_data::Transaction> {
-        crate::custom_data::Transaction::from_package_with_limits(self.package.clone(), limits)
-    }
-
-    /// Start a detached Custom Data transaction with an owned execution context.
-    pub fn edit_custom_data_with_limits_and_context(
-        &self,
-        limits: crate::custom_data::Limits,
-        context: ExecutionContext,
-    ) -> Result<crate::custom_data::Transaction> {
-        crate::custom_data::Transaction::from_package_with_limits_and_context(
-            self.package.clone(),
-            limits,
-            Some(context),
-        )
-    }
-
-    /// Apply a source-checked Custom Data commit and return its read-back snapshot.
-    pub fn apply_custom_data(
-        &mut self,
-        commit: &crate::custom_data::Commit,
-    ) -> Result<crate::custom_data::Snapshot> {
-        self.apply_custom_data_patch(commit.patch())
-    }
-
-    /// Apply a source-checked Custom Data patch through the workbook reparse seam.
-    pub fn apply_custom_data_patch(
-        &mut self,
-        patch: &crate::custom_data::Patch,
-    ) -> Result<crate::custom_data::Snapshot> {
-        let mut candidate = self.package.clone();
-        patch.apply_to_opc(&mut candidate)?;
-        let validated = self.reparse_candidate(candidate)?;
-        let snapshot = crate::custom_data::Snapshot::load_with_limits_and_context(
-            &validated.package,
-            patch.after().limits(),
-            patch.after().execution_context(),
-        )?;
-        *self = validated;
-        Ok(snapshot)
-    }
-
-    /// Read the optional workbook Theme part with conservative finite limits.
+    /// Read the optional workbook Theme part under this projection's
+    /// [`crate::SemanticLimits::theme_value`].
     pub fn theme(&self) -> Result<Option<crate::theme::Snapshot>> {
-        self.theme_with_limits(crate::theme::Limits::DEFAULT)
-    }
-
-    /// Read the optional workbook Theme part with an explicit XML policy.
-    pub fn theme_with_limits(
-        &self,
-        limits: crate::theme::Limits,
-    ) -> Result<Option<crate::theme::Snapshot>> {
-        crate::theme::read(&self.package, limits)
-    }
-
-    /// Start a detached edit of the workbook Theme part.
-    pub fn edit_theme(&self) -> Result<crate::theme::Transaction> {
-        let snapshot = self
-            .theme_with_limits(crate::theme::Limits::DEFAULT)?
-            .ok_or_else(|| {
-                crate::package::error::Error::UnsupportedFeature(
-                    "cannot edit an absent Theme part through a present-only snapshot".to_string(),
-                )
-            })?;
-        Ok(snapshot.edit())
-    }
-
-    /// Start a detached Theme edit with explicit finite limits.
-    pub fn edit_theme_with_limits(
-        &self,
-        limits: crate::theme::Limits,
-    ) -> Result<crate::theme::Transaction> {
-        let snapshot = self.theme_with_limits(limits)?.ok_or_else(|| {
-            crate::package::error::Error::UnsupportedFeature(
-                "cannot edit an absent Theme part through a present-only snapshot".to_string(),
-            )
-        })?;
-        Ok(snapshot.edit())
-    }
-
-    /// Apply an atomic, source-checked Theme commit and return its read-back
-    /// snapshot.
-    pub fn apply_theme(&mut self, commit: &crate::theme::Commit) -> Result<crate::theme::Snapshot> {
-        self.apply_theme_patch(commit.patch())
-    }
-
-    /// Apply a source-checked theme patch, including an exact inverse.
-    ///
-    /// A stale source or invalid theme graph is refused before publication.
-    pub fn apply_theme_patch(
-        &mut self,
-        patch: &crate::theme::Patch,
-    ) -> Result<crate::theme::Snapshot> {
-        patch.apply(&mut self.package)
-    }
-
-    /// Read the optional Theme owner together with the package graph needed by
-    /// create/remove publication.  Use [`Self::theme`] when a present-only
-    /// typed snapshot is sufficient.
-    pub fn theme_owner(&self) -> Result<crate::theme::OwnerSnapshot> {
-        self.theme_owner_with_limits(crate::theme::Limits::DEFAULT)
-    }
-
-    /// Read the optional Theme owner with an explicit finite XML policy.
-    pub fn theme_owner_with_limits(
-        &self,
-        limits: crate::theme::Limits,
-    ) -> Result<crate::theme::OwnerSnapshot> {
-        crate::theme::read_owner(&self.package, limits)
-    }
-
-    /// Start a detached Theme owner transaction.  The transaction can create,
-    /// replace, or remove the Workbook-owned Theme part.
-    pub fn edit_theme_owner(&self) -> Result<crate::theme::OwnerTransaction> {
-        Ok(self.theme_owner()?.edit())
-    }
-
-    /// Start a detached Theme owner transaction with explicit finite limits.
-    pub fn edit_theme_owner_with_limits(
-        &self,
-        limits: crate::theme::Limits,
-    ) -> Result<crate::theme::OwnerTransaction> {
-        Ok(self.theme_owner_with_limits(limits)?.edit())
-    }
-
-    /// Apply a source-checked Theme owner commit atomically.
-    pub fn apply_theme_owner(
-        &mut self,
-        commit: &crate::theme::OwnerCommit,
-    ) -> Result<crate::theme::OwnerSnapshot> {
-        commit.patch().apply(&mut self.package)
-    }
-
-    /// Apply a source-checked Theme owner patch atomically.
-    pub fn apply_theme_owner_patch(
-        &mut self,
-        patch: &crate::theme::OwnerPatch,
-    ) -> Result<crate::theme::OwnerSnapshot> {
-        patch.apply(&mut self.package)
+        crate::theme::read(&self.package, self.semantic_limits.theme_value())
     }
 
     /// Read and bind the Worksheet Binary Index attached to one worksheet.
@@ -242,18 +98,7 @@ impl Workbook {
         &self,
         worksheet_index: usize,
     ) -> Result<Option<crate::binary_index::WorksheetBinaryIndex>> {
-        self.worksheet_binary_index_with_limits(
-            worksheet_index,
-            crate::binary_index::Limits::DEFAULT,
-        )
-    }
-
-    /// Read a Worksheet Binary Index with explicit finite index limits.
-    pub fn worksheet_binary_index_with_limits(
-        &self,
-        worksheet_index: usize,
-        limits: crate::binary_index::Limits,
-    ) -> Result<Option<crate::binary_index::WorksheetBinaryIndex>> {
+        let limits = self.semantic_limits.binary_index_value();
         let worksheet_uri = self.worksheet_uri(worksheet_index)?;
         let worksheet = self.package.get_part(&worksheet_uri)?;
         let mut relationships = worksheet.rels().iter().filter(|relationship| {
@@ -264,25 +109,24 @@ impl Workbook {
         };
         if relationships.next().is_some() {
             return Err(crate::package::error::Error::InvalidRelationship(
-                "worksheet has multiple binary index relationships".to_string(),
+                "worksheet has multiple binary index relationships",
             ));
         }
         if relationship.is_external() {
             return Err(crate::package::error::Error::InvalidRelationship(
-                "worksheet binary index relationship is external".to_string(),
+                "worksheet binary index relationship is external",
             ));
         }
         let index_uri = relationship.target_partname()?;
         let index_part = self.package.get_part(&index_uri)?;
         if index_part.content_type() != crate::binary_index::BINARY_INDEX_CONTENT_TYPE {
             return Err(crate::package::error::Error::InvalidContentType {
-                expected: crate::binary_index::BINARY_INDEX_CONTENT_TYPE.to_string(),
-                got: index_part.content_type().to_string(),
+                expected: crate::binary_index::BINARY_INDEX_CONTENT_TYPE,
             });
         }
         if !index_part.rels().is_empty() {
             return Err(crate::package::error::Error::InvalidRelationship(
-                "worksheet binary index part must not have relationships".to_string(),
+                "worksheet binary index part must not have relationships",
             ));
         }
         crate::binary_index::WorksheetBinaryIndex::from_parts(
@@ -296,51 +140,41 @@ impl Workbook {
     /// Reparse an owned candidate while retaining this workbook's typed
     /// drawing projection boundary.
     pub(crate) fn reparse_candidate(&self, package: OpcPackage) -> Result<Self> {
-        let mut workbook = Self::from_opc_package_with_external_link_limits_and_drawing_policy(
+        Self::reparse_candidate_with_policy(
             package,
             self.external_link_limits,
             self.drawing_load_policy,
-        )?;
-        workbook.leniency = self.leniency;
-        Ok(workbook)
+            self.leniency,
+            self.raw_limits,
+        )
     }
 
-    /// Reparse bytes after a caller has already selected the projection
-    /// policy.  This is the single internal seam used by detached CRUD
-    /// validators so opaque drawing parts are never parsed accidentally.
+    /// Reparse bytes after a caller has selected the projection policies.
+    /// This is the single internal seam used by detached CRUD validators so
+    /// opaque drawing parts are never parsed accidentally.
+    ///
+    /// Raw OPC callers pass [`Leniency::Strict`] to retain the historical
+    /// strict worksheet projection; workbook-owned callers pass their
+    /// retained policy before validating lazy worksheet projections.
     pub(crate) fn reparse_candidate_with_policy(
         package: OpcPackage,
         external_link_limits: ExternalLinkLimits,
         drawing_load_policy: DrawingLoadPolicy,
+        leniency: Leniency,
+        raw_limits: crate::raw::Limits,
     ) -> Result<Self> {
-        Self::from_opc_package_with_external_link_limits_and_drawing_policy(
+        let mut workbook = Self::from_opc_package_with_external_link_limits_and_drawing_policy(
             package,
             external_link_limits,
             drawing_load_policy,
-        )
+            raw_limits,
+        )?;
+        workbook.set_projection_leniency(leniency);
+        Ok(workbook)
     }
 
-    /// Start a detached, exact-source transaction spanning sheet metadata and
-    /// dependency-managed cross-workbook cell transfer.
-    pub fn edit_workbook_structure(&self) -> Result<cell_values::WorkbookEdit> {
-        self.edit_workbook_structure_with_limits(cell_values::TransferLimits::DEFAULT)
-    }
-
-    /// Start a detached workbook transaction with explicit transfer/history
-    /// limits. Planning does not mutate this workbook.
-    pub fn edit_workbook_structure_with_limits(
-        &self,
-        limits: cell_values::TransferLimits,
-    ) -> Result<cell_values::WorkbookEdit> {
-        cell_values::WorkbookEdit::new(self, limits)
-    }
-
-    /// Atomically publish a complete source-checked workbook transaction.
-    pub fn apply_workbook_structure(&mut self, commit: &cell_values::WorkbookCommit) -> Result<()> {
-        commit.patch().apply(self)
-    }
-
-    /// Read source-bound, editable stored values on one worksheet.
+    /// Read source-bound, editable stored values on one worksheet under this
+    /// projection's [`crate::SemanticLimits::cell_values_value`].
     ///
     /// This inventories ordinary scalar cells, formula cached results, and
     /// inert formula payloads for structural editing.
@@ -349,92 +183,13 @@ impl Workbook {
     ///
     /// Returns an error for an invalid worksheet selector or malformed stream.
     pub fn cell_values(&self, worksheet_index: usize) -> Result<cell_values::Snapshot> {
-        self.cell_values_with_limits(worksheet_index, cell_values::Limits::DEFAULT)
-    }
-
-    /// Read source-bound cell values using an explicit finite policy.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for an invalid worksheet selector, malformed stream,
-    /// or exceeded cell-value resource limit.
-    pub fn cell_values_with_limits(
-        &self,
-        worksheet_index: usize,
-        limits: cell_values::Limits,
-    ) -> Result<cell_values::Snapshot> {
         let uri = self.worksheet_uri(worksheet_index)?;
         cell_values::workbook::read_with_limits_and_leniency(
             &self.package,
             &uri,
-            limits,
+            self.semantic_limits.cell_values_value(),
             self.leniency,
         )
-    }
-
-    /// Start a detached, source-checked structural cell edit.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for an invalid worksheet selector or malformed stream.
-    pub fn edit_cell_values(&self, worksheet_index: usize) -> Result<cell_values::Edit> {
-        Ok(self.cell_values(worksheet_index)?.edit())
-    }
-
-    /// Start a detached cell-value edit using an explicit finite policy.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for an invalid worksheet selector, malformed stream,
-    /// or exceeded cell-value resource limit.
-    pub fn edit_cell_values_with_limits(
-        &self,
-        worksheet_index: usize,
-        limits: cell_values::Limits,
-    ) -> Result<cell_values::Edit> {
-        Ok(self
-            .cell_values_with_limits(worksheet_index, limits)?
-            .edit())
-    }
-
-    /// Apply an exact-source cell-value commit and republish this workbook
-    /// from the candidate parse that whole-workbook readback validated.
-    ///
-    /// An exact no-op commit publishes nothing. Its patch reproduces the
-    /// stored worksheet bytes, so the candidate would be this workbook's own
-    /// package and the readback would re-derive the state this workbook
-    /// already holds; the commit's snapshot is returned unchanged instead.
-    /// Every other commit is parsed and validated as a complete candidate
-    /// workbook first, and only a candidate that passes every check replaces
-    /// this one, so a refusal leaves the published workbook untouched. The
-    /// candidate is parsed under this workbook's drawing policy, so a
-    /// drawing-skipped projection keeps that typed-inventory boundary after
-    /// publication.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for an invalid worksheet selector, stale commit,
-    /// invalid contextual index, or failed whole-workbook readback.
-    pub fn apply_cell_values(
-        &mut self,
-        worksheet_index: usize,
-        commit: &cell_values::Commit,
-    ) -> Result<cell_values::Snapshot> {
-        let uri = self.worksheet_uri(worksheet_index)?;
-        let applied = cell_values::workbook::apply_retaining_parse(
-            &self.package,
-            &uri,
-            commit,
-            self.external_link_limits,
-            self.drawing_load_policy,
-        )?;
-        match applied {
-            cell_values::workbook::Applied::Unchanged(snapshot) => Ok(snapshot),
-            cell_values::workbook::Applied::Published { snapshot, workbook } => {
-                *self = *workbook;
-                Ok(snapshot)
-            },
-        }
     }
 
     /// Read editable cell values from a worksheet selected by exact name.
@@ -446,103 +201,18 @@ impl Workbook {
         self.cell_values(self.worksheet_index(worksheet_name)?)
     }
 
-    /// Read editable cell values by exact name using an explicit finite policy.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for an invalid worksheet name, malformed stream, or
-    /// exceeded cell-value resource limit.
-    pub fn cell_values_by_name_with_limits(
-        &self,
-        worksheet_name: &str,
-        limits: cell_values::Limits,
-    ) -> Result<cell_values::Snapshot> {
-        self.cell_values_with_limits(self.worksheet_index(worksheet_name)?, limits)
-    }
-
-    /// Start a detached cell-value edit on a worksheet selected by exact name.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for an invalid worksheet name or malformed stream.
-    pub fn edit_cell_values_by_name(&self, worksheet_name: &str) -> Result<cell_values::Edit> {
-        Ok(self.cell_values_by_name(worksheet_name)?.edit())
-    }
-
-    /// Apply an exact-source cell-value commit to a worksheet selected by name.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for an invalid worksheet name, stale commit, invalid
-    /// contextual style/shared-string index, or failed whole-workbook readback.
-    pub fn apply_cell_values_by_name(
-        &mut self,
-        worksheet_name: &str,
-        commit: &cell_values::Commit,
-    ) -> Result<cell_values::Snapshot> {
-        self.apply_cell_values(self.worksheet_index(worksheet_name)?, commit)
-    }
-
-    /// Read the optional sparkline groups selected by zero-based worksheet
-    /// index using safe default limits.
+    /// Read the optional sparkline groups of the worksheet at worksheet
+    /// ordinal `worksheet_index` under this projection's
+    /// [`crate::SemanticLimits::sparklines_value`].
     pub fn sparklines(&self, worksheet_index: usize) -> Result<sparkline::Snapshot> {
-        self.sparklines_with_limits(worksheet_index, sparkline::Limits::DEFAULT)
-    }
-
-    /// Read the optional sparkline groups selected by zero-based worksheet
-    /// index using an explicit finite policy.
-    pub fn sparklines_with_limits(
-        &self,
-        worksheet_index: usize,
-        limits: sparkline::Limits,
-    ) -> Result<sparkline::Snapshot> {
         let uri = self.worksheet_uri(worksheet_index)?;
-        let snapshot = sparkline::workbook::read_with_limits(&self.package, &uri, limits)?;
-        sparkline::workbook::validate_context(&snapshot, &self.formula_context)?;
-        Ok(snapshot)
-    }
-
-    /// Start a detached sparkline edit using safe default limits.
-    pub fn edit_sparklines(&self, worksheet_index: usize) -> Result<sparkline::Edit> {
-        self.edit_sparklines_with_limits(worksheet_index, sparkline::Limits::DEFAULT)
-    }
-
-    /// Start a detached sparkline edit using an explicit finite policy.
-    pub fn edit_sparklines_with_limits(
-        &self,
-        worksheet_index: usize,
-        limits: sparkline::Limits,
-    ) -> Result<sparkline::Edit> {
-        Ok(self.sparklines_with_limits(worksheet_index, limits)?.edit())
-    }
-
-    /// Validate workbook-dependent formula indexes and publish an exact-source
-    /// sparkline commit atomically to one worksheet.
-    ///
-    /// This is the only publication boundary for authored XLSB sparkline
-    /// bytes. It proves defined-name, external-name, and `Xti` references
-    /// against the current workbook before changing the package.
-    pub fn apply_sparklines(
-        &mut self,
-        worksheet_index: usize,
-        commit: sparkline::Commit,
-    ) -> Result<sparkline::Snapshot> {
-        let uri = self.worksheet_uri(worksheet_index)?;
-        sparkline::workbook::validate_commit_context(&commit, &self.formula_context)?;
-        let applied = sparkline::workbook::apply_retaining_parse(
+        let snapshot = sparkline::workbook::read_with_limits(
             &self.package,
             &uri,
-            commit,
-            self.external_link_limits,
-            self.drawing_load_policy,
+            self.semantic_limits.sparklines_value(),
         )?;
-        match applied {
-            sparkline::workbook::Applied::Unchanged(snapshot) => Ok(snapshot),
-            sparkline::workbook::Applied::Published { snapshot, workbook } => {
-                *self = *workbook;
-                Ok(snapshot)
-            },
-        }
+        sparkline::workbook::validate_context(&snapshot, &self.formula_context)?;
+        Ok(snapshot)
     }
 
     /// Read optional sparkline groups selected by worksheet name.
@@ -555,35 +225,7 @@ impl Workbook {
     /// zero-based worksheet index.
     pub fn cell_watches(&self, worksheet_index: usize) -> Result<cell_watches::Snapshot> {
         let uri = self.worksheet_uri(worksheet_index)?;
-        cell_watches::workbook::read(&self.package, &uri)
-    }
-
-    /// Start a detached cell-watch edit for one worksheet.
-    pub fn edit_cell_watches(&self, worksheet_index: usize) -> Result<cell_watches::Edit> {
-        Ok(self.cell_watches(worksheet_index)?.edit())
-    }
-
-    /// Apply a source-checked cell-watch commit atomically to one worksheet.
-    pub fn apply_cell_watches(
-        &mut self,
-        worksheet_index: usize,
-        commit: &cell_watches::Commit,
-    ) -> Result<cell_watches::Snapshot> {
-        let uri = self.worksheet_uri(worksheet_index)?;
-        let applied = cell_watches::workbook::apply_retaining_parse(
-            &self.package,
-            &uri,
-            commit,
-            self.external_link_limits,
-            self.drawing_load_policy,
-        )?;
-        match applied {
-            cell_watches::workbook::Applied::Unchanged(snapshot) => Ok(snapshot),
-            cell_watches::workbook::Applied::Published { snapshot, workbook } => {
-                *self = *workbook;
-                Ok(snapshot)
-            },
-        }
+        cell_watches::workbook::read(&self.package, &uri, self.raw_limits)
     }
 
     /// Read the typed cell-watch and phonetic snapshot selected by worksheet
@@ -595,41 +237,17 @@ impl Workbook {
 
     /// Load inert persisted Office Add-in task panes.
     pub fn task_panes(&self) -> Result<Option<web::Panes>> {
-        Ok(web::load(&self.package)?)
+        Ok(web::load(&self.package, &web::Limits::standard())?)
     }
 
-    /// Store task panes after validating every binary worksheet `appRef`.
-    pub fn put_task_panes(
-        &mut self,
-        panes: web::Panes,
-        conformance: web::Conformance,
-    ) -> Result<&mut Self> {
-        self.validate_task_pane_bindings(&panes)?;
-        web::put(&mut self.package, panes, conformance)?;
-        Ok(self)
-    }
-
-    /// Remove task panes only when no binary worksheet binding would dangle.
-    pub fn remove_task_panes(&mut self) -> Result<bool> {
-        if !self
-            .package
-            .rels()
-            .iter()
-            .any(|relationship| relationship.reltype() == web::raw::TASK_PANES_RELATIONSHIP)
-        {
-            return Ok(false);
-        }
-        self.validate_task_pane_bindings(&web::Panes::new())?;
-        Ok(web::remove(&mut self.package)?)
-    }
-
-    fn validate_task_pane_bindings(&self, panes: &web::Panes) -> Result<()> {
+    pub(crate) fn validate_task_pane_bindings(&self, panes: &web::Panes) -> Result<()> {
         let package_refs = PackageAppRefs::new(
             panes
                 .iter()
                 .flat_map(|pane| pane.add_in().bindings().iter()),
         )?;
-        for worksheet in &self.worksheets {
+        for index in 0..self.worksheet_names.len() {
+            let worksheet = self.cached_worksheet(index)?;
             package_refs.validate(worksheet.web_extension_bindings())?;
         }
         Ok(())
@@ -637,27 +255,16 @@ impl Workbook {
 
     /// Read the bounded, inert package-level Ribbon customizations.
     pub fn ribbon(&self) -> Result<ribbon::Set<'_>> {
-        Ok(ribbon::load(&self.package)?)
-    }
-
-    /// Create or replace one Ribbon customization family.
-    pub fn put_ribbon(&mut self, version: ribbon::Version, xml: Vec<u8>) -> Result<&mut Self> {
-        ribbon::put(&mut self.package, version, xml)?;
-        Ok(self)
-    }
-
-    /// Remove one Ribbon relationship family and its unreferenced part.
-    pub fn remove_ribbon(&mut self, family: ribbon::Family) -> Result<bool> {
-        Ok(ribbon::remove(&mut self.package, family)?)
+        Ok(ribbon::load(&self.package, &ribbon::Limits::standard())?)
     }
 
     /// Discover inert embedded-object and embedded-package relationships
     /// using the shared safe default resource limits.
     ///
-    /// Use [`embedded::scan_with`] with [`Self::opc_package`] when a lower
+    /// Use [`embedded::scan`] with [`Self::opc_package`] when a lower
     /// layer needs explicitly tuned limits.
     pub fn embedded(&self) -> Result<Vec<embedded::Entry<'_>>> {
-        Ok(embedded::scan(&self.package)?)
+        Ok(embedded::scan(&self.package, &embedded::Limits::default())?)
     }
 
     /// Get the underlying OPC package.
@@ -677,29 +284,28 @@ impl Workbook {
     /// Get mutable OPC access for XLSB-internal package adapters.
     ///
     /// Public callers must use [`Self::edit_opc`], which stages a structural
-    /// candidate and reparses the complete XLSB host before publication.
+    /// candidate and reparses the complete XLSB host before publication. The
+    /// signature state is left as it is: a changed signed package is refused
+    /// when it is published.
     #[allow(
         dead_code,
         reason = "retained for BIFF12 codec completeness and staged host integration"
     )]
     pub(crate) fn opc_package_mut(&mut self) -> &mut OpcPackage {
-        self.package.unsign();
         &mut self.package
     }
 
-    /// Transactionally edit the current XLSB OPC graph.
-    ///
-    /// The closure receives a cloned candidate package. Returning an error,
-    /// producing a package whose main relationship or XLSB graph is invalid,
-    /// or unwinding leaves this workbook unchanged. A successful edit drops
-    /// package signatures, reparses workbook-owned state, and revalidates the
-    /// inert VBA and External Data Connections relationship graphs before
-    /// publication. A drawing-skipped projection remains drawing-skipped after
-    /// this reparse.
-    pub fn edit_opc<T>(&mut self, edit: impl FnOnce(&mut OpcPackage) -> Result<T>) -> Result<T> {
+    /// Run one graph change on a candidate copy of this workbook's OPC
+    /// graph, validate the candidate and adopt it (the crate-internal seam
+    /// behind the remaining in-place workbook paths). An error leaves this
+    /// workbook unchanged.
+    pub(crate) fn edit_opc<T>(
+        &mut self,
+        edit: impl FnOnce(&mut OpcPackage) -> Result<T>,
+    ) -> Result<T> {
         let mut candidate = self.package.clone();
-        candidate.unsign();
         let value = edit(&mut candidate)?;
+        candidate.validate_signature_edit_from(&self.package)?;
 
         Self::validate_edit_candidate(&candidate)?;
         let validated = self.reparse_candidate(candidate)?;
@@ -707,28 +313,21 @@ impl Workbook {
         Ok(value)
     }
 
-    fn validate_edit_candidate(package: &OpcPackage) -> Result<()> {
+    pub(crate) fn validate_edit_candidate(package: &OpcPackage) -> Result<()> {
         let workbook_uri = litchi_opc::PackURI::new("/xl/workbook.bin")?;
         let workbook = package.get_part(&workbook_uri)?;
         if workbook.content_type() != content_type::XLSB_BIN {
             return Err(crate::package::error::Error::Unrecognized {
-                typ: "XLSB workbook content type".to_string(),
-                val: format!(
-                    "expected '{}', found '{}'",
-                    content_type::XLSB_BIN,
-                    workbook.content_type()
-                ),
+                typ: "XLSB workbook content type",
+                val: "expected, found",
             });
         }
 
         let main = package.main_document_part()?;
         if main.partname() != workbook.partname() || main.content_type() != content_type::XLSB_BIN {
             return Err(crate::package::error::Error::Unrecognized {
-                typ: "XLSB main workbook relationship".to_string(),
-                val: format!(
-                    "expected '{}' to be the binary workbook main part",
-                    workbook_uri.as_str()
-                ),
+                typ: "XLSB main workbook relationship",
+                val: "expected to be the binary workbook main part",
             });
         }
 
@@ -762,50 +361,6 @@ impl Workbook {
         self.package.signatures_with(policy)
     }
 
-    /// Add a signature while preserving every existing valid signature.
-    #[cfg(feature = "sign")]
-    pub fn sign(
-        &mut self,
-        signer: &litchi_sign::Signer,
-    ) -> litchi_opc::sign::Result<litchi_opc::PackURI> {
-        self.package.sign(signer)
-    }
-
-    /// Add a signature with explicit authoring resource bounds.
-    #[cfg(feature = "sign")]
-    pub fn sign_with(
-        &mut self,
-        signer: &litchi_sign::Signer,
-        limits: &litchi_sign::Limits,
-    ) -> litchi_opc::sign::Result<litchi_opc::PackURI> {
-        self.package.sign_with(signer, limits)
-    }
-
-    /// Atomically replace all signatures with one signature.
-    #[cfg(feature = "sign")]
-    pub fn resign(
-        &mut self,
-        signer: &litchi_sign::Signer,
-    ) -> litchi_opc::sign::Result<litchi_opc::PackURI> {
-        self.package.resign(signer)
-    }
-
-    /// Atomically replace signatures with explicit authoring resource bounds.
-    #[cfg(feature = "sign")]
-    pub fn resign_with(
-        &mut self,
-        signer: &litchi_sign::Signer,
-        limits: &litchi_sign::Limits,
-    ) -> litchi_opc::sign::Result<litchi_opc::PackURI> {
-        self.package.resign_with(signer, limits)
-    }
-
-    /// Remove all package signatures.
-    pub fn unsign(&mut self) -> &mut Self {
-        self.package.unsign();
-        self
-    }
-
     /// Discover the attached MS-XLSB VBA project and declared signatures.
     ///
     /// This validates only the declared OPC relationship graph and content
@@ -815,39 +370,6 @@ impl Workbook {
     pub fn vba(&self) -> Result<Option<VbaProject>> {
         let workbook = self.package.main_document_part()?;
         discover_vba_project(&self.package, workbook)
-    }
-
-    /// Attach a cache-free, inert MS-OVBA project to this binary workbook.
-    #[cfg(feature = "vba-inspection")]
-    pub fn set_vba(&mut self, project: litchi_vba::build::Project) -> Result<VbaProject> {
-        self.set_vba_with(project, &litchi_vba::Limits::default())
-    }
-
-    /// Attach a cache-free project with explicit resource limits.
-    #[cfg(feature = "vba-inspection")]
-    pub fn set_vba_with(
-        &mut self,
-        project: litchi_vba::build::Project,
-        limits: &litchi_vba::Limits,
-    ) -> Result<VbaProject> {
-        self.put_vba(project.finish(limits)?)
-    }
-
-    /// Attach a prevalidated `vbaProject.bin` without executing it.
-    ///
-    /// Any existing legacy or Agile project signature is removed because
-    /// replacing the signed project bytes invalidates it.
-    #[cfg(feature = "vba-inspection")]
-    pub fn put_vba(&mut self, payload: litchi_vba::Payload) -> Result<VbaProject> {
-        let source = self.package.main_document_part()?.partname().clone();
-        store_workbook_vba_project(&mut self.package, &source, payload)
-    }
-
-    /// Remove the VBA project and all declared project-signature parts.
-    #[cfg(feature = "vba-inspection")]
-    pub fn clear_vba(&mut self) -> Result<bool> {
-        let source = self.package.main_document_part()?.partname().clone();
-        clear_workbook_vba(&mut self.package, &source)
     }
 
     /// The typed External Data Connections part, when the workbook declares
@@ -860,49 +382,21 @@ impl Workbook {
         self.connections.as_ref()
     }
 
-    /// Atomically add or replace the inert External Data Connections part.
-    ///
-    /// Existing package content is preserved. Connection strings, commands,
-    /// URLs, paths, and credential metadata are never resolved or executed.
-    pub fn set_connections(
-        &mut self,
-        connections: crate::package::connections::Connections,
-    ) -> Result<()> {
-        let workbook_uri = litchi_opc::PackURI::new("/xl/workbook.bin")?;
-        let canonical = crate::package::connections::package::store_on_workbook(
-            &mut self.package,
-            &workbook_uri,
-            &connections,
-        )?;
-        self.connections = Some(canonical);
-        Ok(())
-    }
-
-    /// Remove the External Data Connections relationship and part.
-    ///
-    /// Returns `true` when a graph was removed.
-    pub fn remove_connections(&mut self) -> Result<bool> {
-        let workbook_uri = litchi_opc::PackURI::new("/xl/workbook.bin")?;
-        let removed = crate::package::connections::package::remove_from_workbook(
-            &mut self.package,
-            &workbook_uri,
-        )?;
-        if removed {
-            self.connections = None;
-        }
-        Ok(removed)
-    }
     fn load_sheet_drawing(
         &self,
         sheet_index: usize,
         drawing_part: &dyn Part,
     ) -> Result<crate::package::drawing::SheetDrawing> {
         use crate::package::drawing::{EmbeddedChart, EmbeddedImage, Object, SheetDrawing};
-        let drawing_xml = std::str::from_utf8(drawing_part.blob()).map_err(|error| {
-            crate::package::error::Error::Encoding(format!("Drawings part is not UTF-8: {error}"))
+        let drawing_xml = std::str::from_utf8(drawing_part.blob()).map_err(|_error| {
+            crate::package::error::Error::Encoding("Drawings part is not UTF-8")
         })?;
-        let shapes = crate::shapes::read(drawing_xml)?.unwrap_or_default();
-        let drawing = crate::package::drawing::parse_drawing_part(drawing_part.blob())?;
+        let shape_limits = crate::shapes::Limits::from_core(self.semantic_limits.xml_parts_value());
+        let shapes = crate::shapes::read(drawing_xml, &shape_limits)?.unwrap_or_default();
+        let drawing = crate::package::drawing::parse_drawing_part(
+            drawing_part.blob(),
+            self.semantic_limits.xml_parts_value(),
+        )?;
         let mut charts = Vec::new();
         let mut images = Vec::new();
         let mut image_bytes = 0usize;
@@ -913,13 +407,10 @@ impl Workbook {
                 embed_rel_id: Some(rel_id),
             } = &anchor.object
             {
-                let relationship = drawing_part.rels().get(rel_id).ok_or_else(|| {
+                let relationship = drawing_part.rels().get(rel_id).ok_or({
                     crate::package::error::Error::Unrecognized {
-                        typ: "Drawings part".to_string(),
-                        val: format!(
-                            "picture {:?} relationship {rel_id:?} is missing",
-                            non_visual.name
-                        ),
+                        typ: "Drawings part",
+                        val: "picture relationship is missing",
                     }
                 })?;
                 if matches!(
@@ -928,8 +419,8 @@ impl Workbook {
                 ) {
                     if relationship.is_external() {
                         return Err(crate::package::error::Error::Unrecognized {
-                            typ: "Drawings part".to_string(),
-                            val: format!("image relationship {rel_id:?} is external"),
+                            typ: "Drawings part",
+                            val: "image relationship is external",
                         });
                     }
                     let image_uri = relationship.target_partname()?;
@@ -987,13 +478,10 @@ impl Workbook {
             let Some(rel_id) = &frame.rel_id else {
                 continue;
             };
-            let relationship = drawing_part.rels().get(rel_id).ok_or_else(|| {
+            let relationship = drawing_part.rels().get(rel_id).ok_or({
                 crate::package::error::Error::Unrecognized {
-                    typ: "Drawings part".to_string(),
-                    val: format!(
-                        "graphic frame {:?} relationship {rel_id:?} is missing",
-                        frame.non_visual.name
-                    ),
+                    typ: "Drawings part",
+                    val: "graphic frame relationship is missing",
                 }
             })?;
             if !matches!(
@@ -1004,8 +492,8 @@ impl Workbook {
             }
             if relationship.is_external() {
                 return Err(crate::package::error::Error::Unrecognized {
-                    typ: "Drawings part".to_string(),
-                    val: format!("chart relationship {rel_id:?} is external"),
+                    typ: "Drawings part",
+                    val: "chart relationship is external",
                 });
             }
             let chart_part = self.package.get_part(&relationship.target_partname()?)?;
@@ -1031,143 +519,85 @@ impl Workbook {
 
     /// Workbook style table loaded from `xl/styles.bin`.
     pub fn save<W: Write + Seek>(&self, writer: W) -> Result<()> {
-        self.package.to_stream(writer)?;
+        self.package.write_to(writer)?;
         Ok(())
     }
 
     /// Read and validate an XLSB workbook with the default bounded OPC limits.
     pub fn new<R: Read + Seek>(reader: R) -> Result<Self> {
-        Self::new_with_limits_and_external_link_limits(
-            reader,
-            litchi_opc::ReadLimits::default(),
-            ExternalLinkLimits::default(),
-        )
+        Self::new_with_options(reader, crate::OpenOptions::default())
     }
 
-    /// Read an XLSB workbook for cell/catalog CRUD without decoding standard
-    /// SpreadsheetDrawing parts during open.
+    /// Read and validate an XLSB workbook under explicit ingress policies.
     ///
-    /// This explicit projection retains every drawing, chart, image, and
-    /// relationship part in the underlying OPC package for lossless save, but
-    /// does not populate the typed [`Workbook::sheet_drawings`] inventory.
-    /// Callers that need typed drawing access must use [`Self::new`] instead.
-    /// The source-backed workbook remains the preferred selector-first path
-    /// when positional input and deferred worksheet payloads are available.
-    pub fn new_without_drawing_parse<R: Read + Seek>(reader: R) -> Result<Self> {
-        Self::new_without_drawing_parse_with_limits_and_external_link_limits(
-            reader,
-            litchi_opc::ReadLimits::default(),
-            ExternalLinkLimits::default(),
-        )
-    }
-
-    /// Read a cell/catalog CRUD projection with explicit OPC resource limits.
-    pub fn new_without_drawing_parse_with_limits<R: Read + Seek>(
+    /// With [`crate::OpenOptions::parse_drawings`] `false` the projection
+    /// retains every drawing, chart, image and relationship part for lossless
+    /// save but does not populate the typed [`Workbook::sheet_drawings`]
+    /// inventory.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::package::PackageError::UnsupportedOpenPolicy`] for a
+    /// cache or execution policy (positional-source only), the OPC limit and
+    /// archive errors, and the workbook validation errors.
+    pub fn new_with_options<R: Read + Seek>(
         reader: R,
-        limits: litchi_opc::ReadLimits,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
-        Self::new_without_drawing_parse_with_limits_and_external_link_limits(
-            reader,
-            limits,
-            ExternalLinkLimits::default(),
-        )
-    }
-
-    /// Read a cell/catalog CRUD projection with explicit OPC and external-link
-    /// resource limits.
-    pub fn new_without_drawing_parse_with_limits_and_external_link_limits<R: Read + Seek>(
-        reader: R,
-        limits: litchi_opc::ReadLimits,
-        external_link_limits: ExternalLinkLimits,
-    ) -> Result<Self> {
-        let package = OpcPackage::from_reader_with_limits(reader, limits)?;
-        Self::from_opc_package_with_external_link_limits_and_drawing_policy(
-            package,
-            external_link_limits,
-            DrawingLoadPolicy::Skipped,
-        )
-    }
-
-    /// Read and validate an XLSB workbook with explicit OPC resource limits.
-    pub fn new_with_limits<R: Read + Seek>(
-        reader: R,
-        limits: litchi_opc::ReadLimits,
-    ) -> Result<Self> {
-        Self::new_with_limits_and_external_link_limits(
-            reader,
-            limits,
-            ExternalLinkLimits::default(),
-        )
-    }
-
-    /// Read and validate an XLSB workbook with explicit external-link
-    /// resource limits and default OPC limits.
-    pub fn new_with_external_link_limits<R: Read + Seek>(
-        reader: R,
-        external_link_limits: ExternalLinkLimits,
-    ) -> Result<Self> {
-        Self::new_with_limits_and_external_link_limits(
-            reader,
-            litchi_opc::ReadLimits::default(),
-            external_link_limits,
-        )
-    }
-
-    /// Read and validate an XLSB workbook with independent OPC and
-    /// external-link resource limits.
-    pub fn new_with_limits_and_external_link_limits<R: Read + Seek>(
-        reader: R,
-        limits: litchi_opc::ReadLimits,
-        external_link_limits: ExternalLinkLimits,
-    ) -> Result<Self> {
-        let package = OpcPackage::from_reader_with_limits(reader, limits)?;
-        Self::from_opc_package_with_external_link_limits(package, external_link_limits)
+        options.check_owning()?;
+        let package = OpcPackage::from_reader(reader, options.source_limits)?;
+        Self::from_opc_package_with_options(package, options)
     }
 
     /// Create an XLSB workbook from an already-parsed OPC package.
     ///
     /// This is used for single-pass parsing where the OPC package has already
     /// been parsed during format detection. It avoids double-parsing.
-    ///
-    /// # Arguments
-    ///
-    /// * `package` - An already-parsed OPC package
     pub fn from_opc_package(package: OpcPackage) -> Result<Self> {
-        Self::from_opc_package_with_external_link_limits(package, ExternalLinkLimits::default())
+        Self::from_opc_package_with_options(package, crate::OpenOptions::default())
     }
 
-    /// Read an XLSB workbook with the default bounded OPC limits under an
-    /// explicit [`Leniency`].
+    /// Create an XLSB workbook from an already-parsed OPC package under
+    /// explicit semantic policies: external-link limits, leniency and the
+    /// drawing policy. The package's own source limits already applied when
+    /// it was read.
     ///
-    /// The Excel-compatible repairs are applied under every variant; see
+    /// The Excel-compatible repairs are applied under every leniency; see
     /// [`crate::leniency`]. [`Leniency::TolerateCachedNumbers`] additionally
     /// repairs non-normal cached numbers in materialized worksheets and
     /// cell-value snapshots, recording each repair in the report of the
     /// object that read the cell.
-    pub fn new_with_leniency<R: Read + Seek>(reader: R, leniency: Leniency) -> Result<Self> {
-        let mut workbook = Self::new(reader)?;
-        workbook.leniency = leniency;
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::package::PackageError::UnsupportedOpenPolicy`] for a
+    /// cache or execution policy, and the workbook validation errors.
+    pub fn from_opc_package_with_options(
+        package: OpcPackage,
+        options: crate::OpenOptions,
+    ) -> Result<Self> {
+        options.check_owning()?;
+        let mut workbook = Self::from_opc_package_with_external_link_limits_and_drawing_policy(
+            package,
+            options.external_link_limits,
+            options.drawing_load_policy(),
+            options.raw_limits,
+        )?;
+        workbook.leniency = options.leniency;
+        workbook.semantic_limits = options.semantic_limits;
         Ok(workbook)
     }
 
-    /// Create an XLSB workbook from an already-parsed OPC package under an
-    /// explicit [`Leniency`]; see [`Self::new_with_leniency`].
-    pub fn from_opc_package_with_leniency(package: OpcPackage, leniency: Leniency) -> Result<Self> {
-        let mut workbook = Self::from_opc_package(package)?;
-        workbook.leniency = leniency;
-        Ok(workbook)
-    }
-
-    /// Create an XLSB workbook from an already-parsed OPC package using
-    /// explicit external-link resource limits.
-    pub fn from_opc_package_with_external_link_limits(
+    pub(crate) fn from_opc_package_with_external_link_limits(
         package: OpcPackage,
         external_link_limits: ExternalLinkLimits,
+        raw_limits: crate::raw::Limits,
     ) -> Result<Self> {
         Self::from_opc_package_with_external_link_limits_and_drawing_policy(
             package,
             external_link_limits,
             DrawingLoadPolicy::Eager,
+            raw_limits,
         )
     }
 
@@ -1175,18 +605,22 @@ impl Workbook {
         package: OpcPackage,
         external_link_limits: ExternalLinkLimits,
         drawing_load_policy: DrawingLoadPolicy,
+        raw_limits: crate::raw::Limits,
     ) -> Result<Self> {
         let mut external_link_budget = external_link_limits.budget();
         // The packaging repairs of the OPC read come first in discovery order.
         let tolerance = ToleranceReport::from_package(package.tolerance_report());
         let mut workbook = Workbook {
             package,
+            worksheet_cache: super::cache::WorksheetCache::new(),
             worksheets: Vec::new(),
             worksheet_names: Vec::new(),
             worksheet_positions: Vec::new(),
             worksheet_rel_ids: Vec::new(),
+            sheet_tabs: Vec::new(),
             active_catalog_position: None,
             formula_context: Context::default(),
+            raw_limits,
             external_link_limits,
             shared_strings: Vec::new(),
             styles: StylesTable::default(),
@@ -1200,6 +634,7 @@ impl Workbook {
             connections: None,
             tolerance,
             leniency: Leniency::Strict,
+            semantic_limits: crate::SemanticLimits::new(),
         };
 
         workbook.load_workbook_info(
@@ -1220,8 +655,18 @@ impl Workbook {
         let workbook_part = self.package.main_document_part()?;
 
         let blob = workbook_part.blob();
-        let mut iter = Records::new(blob);
-        let info = Self::read_workbook(&mut iter, &mut self.tolerance)?;
+        let mut iter = Records::new(blob, self.raw_limits);
+        let info = Self::read_workbook(&mut iter, &mut self.tolerance, self.raw_limits)?;
+        if info.worksheet_names.len() != info.worksheet_rel_ids.len() {
+            return Err(crate::package::error::Error::InvalidFormat(
+                "XLSB sheet names and relationship identifiers have different lengths",
+            ));
+        }
+        if info.worksheet_names.len() != info.worksheet_states.len() {
+            return Err(crate::package::error::Error::InvalidFormat(
+                "XLSB sheet names and visibility states have different lengths",
+            ));
+        }
         let active_catalog_position =
             (!info.worksheet_names.is_empty()).then_some(info.active_catalog_position.unwrap_or(0));
         // BrtSupBookSrc identifiers are workbook-stream metadata. The
@@ -1235,24 +680,23 @@ impl Workbook {
                 source,
             })?;
         for rel_id in &info.external_link_rel_ids {
-            let relationship = workbook_part.rels().get(rel_id).ok_or_else(|| {
-                crate::package::error::Error::InvalidFormula(format!(
-                    "BrtSupBookSrc relationship {rel_id:?} is missing"
-                ))
+            let relationship = workbook_part.rels().get(rel_id).ok_or({
+                crate::package::error::Error::InvalidFormula(
+                    "BrtSupBookSrc relationship is missing",
+                )
             })?;
             if relationship.is_external() {
-                return Err(crate::package::error::Error::InvalidFormula(format!(
-                    "BrtSupBookSrc relationship {rel_id:?} is external"
-                )));
+                return Err(crate::package::error::Error::InvalidFormula(
+                    "BrtSupBookSrc relationship is external",
+                ));
             }
             if !matches!(
                 relationship.reltype(),
                 relationship_type::EXTERNAL_LINK | relationship_type::STRICT_EXTERNAL_LINK
             ) {
-                return Err(crate::package::error::Error::InvalidFormula(format!(
-                    "BrtSupBookSrc relationship {rel_id:?} has invalid type {:?}",
-                    relationship.reltype()
-                )));
+                return Err(crate::package::error::Error::InvalidFormula(
+                    "BrtSupBookSrc relationship has invalid type",
+                ));
             }
             external_link_uris.push(relationship.target_partname()?);
         }
@@ -1266,28 +710,27 @@ impl Workbook {
         for uri in &external_link_uris {
             external_books.push(self.load_external_book_with_budget(uri, external_link_budget)?);
         }
-        let pivot_cache_ids = Self::parse_pivot_cache_ids(workbook_part.blob())?;
+        let pivot_cache_ids = Self::parse_pivot_cache_ids(workbook_part.blob(), self.raw_limits)?;
         let mut pivot_cache_definitions = Vec::with_capacity(pivot_cache_ids.len());
         for (cache_id, rel_id) in &pivot_cache_ids {
-            let relationship = workbook_part.rels().get(rel_id).ok_or_else(|| {
-                crate::package::error::Error::InvalidFormula(format!(
-                    "PivotCache {cache_id} relationship {rel_id:?} is missing"
-                ))
-            })?;
+            let relationship = workbook_part.rels().get(rel_id).ok_or(
+                crate::package::error::Error::InvalidFormula("PivotCache relationship is missing"),
+            )?;
             if relationship.is_external()
                 || !relationship
                     .reltype()
                     .to_ascii_lowercase()
                     .ends_with("/pivotcachedefinition")
             {
-                return Err(crate::package::error::Error::InvalidFormula(format!(
-                    "PivotCache {cache_id} relationship is external or has the wrong type"
-                )));
+                return Err(crate::package::error::Error::InvalidFormula(
+                    "PivotCache relationship is external or has the wrong type",
+                ));
             }
             let part = self.package.get_part(&relationship.target_partname()?)?;
             let definition = crate::package::pivot::parse_pivot_cache_definition_recording(
                 part.blob(),
                 &mut self.tolerance,
+                self.raw_limits,
             )?;
             pivot_cache_definitions.push((*cache_id, definition));
         }
@@ -1296,6 +739,7 @@ impl Workbook {
             &self.package,
             workbook_part.partname(),
             &mut self.tolerance,
+            self.raw_limits,
         )?;
 
         let mut tables = Vec::new();
@@ -1317,73 +761,77 @@ impl Workbook {
                 resource: "eager XLSB worksheet-name map",
                 source,
             })?;
-        for (catalog_position, rel_id) in info.worksheet_rel_ids.iter().enumerate() {
-            let rel_id = rel_id.as_deref().ok_or_else(|| {
-                crate::package::error::Error::Unrecognized {
-                    typ: "sheet relationship".to_string(),
-                    val: format!(
-                        "sheet catalog position {catalog_position} has no relationship identifier"
-                    ),
-                }
+        let mut sheet_tabs = Vec::new();
+        sheet_tabs
+            .try_reserve_exact(info.worksheet_rel_ids.len())
+            .map_err(|source| crate::package::error::Error::Allocation {
+                resource: "eager XLSB sheet-tab catalog",
+                source,
             })?;
-            let relationship = workbook_part.rels().get(rel_id).ok_or_else(|| {
+        let mut sheet_targets = HashSet::new();
+        sheet_targets
+            .try_reserve(info.worksheet_rel_ids.len())
+            .map_err(|source| crate::package::error::Error::Allocation {
+                resource: "eager XLSB sheet-target validation",
+                source,
+            })?;
+        for (catalog_position, rel_id) in info.worksheet_rel_ids.iter().enumerate() {
+            let name = &info.worksheet_names[catalog_position];
+            let state = State::from_hs_state(info.worksheet_states[catalog_position])?;
+            let Some(rel_id) = rel_id.as_deref() else {
+                if state != State::VeryHidden {
+                    return Err(crate::package::error::Error::InvalidRelationship(
+                        "unbound XLSB sheet tabs must be very hidden",
+                    ));
+                }
+                sheet_tabs.push(TabMetadata::new(name.to_owned(), Kind::Unbound, state));
+                continue;
+            };
+            let relationship = workbook_part.rels().get(rel_id).ok_or({
                 crate::package::error::Error::Unrecognized {
-                    typ: "sheet relationship".to_string(),
-                    val: format!(
-                        "relationship {rel_id:?} for sheet catalog position {catalog_position} is missing"
-                    ),
+                    typ: "sheet relationship",
+                    val: "relationship for sheet catalog position is missing",
                 }
             })?;
             if relationship.is_external() {
-                return Err(crate::package::error::Error::UnsupportedFeature(format!(
-                    "sheet catalog position {catalog_position} has an external relationship"
-                )));
+                return Err(crate::package::error::Error::UnsupportedFeature(
+                    "sheet catalog position has an external relationship",
+                ));
             }
-            if !is_worksheet_relationship(relationship.reltype()) {
-                if is_known_non_worksheet_relationship(relationship.reltype()) {
-                    continue;
-                }
+            let Some(kind) = Kind::from_relationship_type(relationship.reltype()) else {
                 return Err(crate::package::error::Error::Unrecognized {
-                    typ: "sheet relationship".to_string(),
-                    val: format!(
-                        "relationship {rel_id:?} for sheet catalog position {catalog_position} has unsupported type {:?}",
-                        relationship.reltype()
-                    ),
+                    typ: "sheet relationship",
+                    val: "relationship for sheet catalog position has unsupported type",
                 });
+            };
+            let partname = relationship.target_partname()?;
+            if !sheet_targets.insert(partname.as_str().to_ascii_lowercase()) {
+                return Err(crate::package::error::Error::InvalidRelationship(
+                    "multiple XLSB sheet tabs resolve to one physical part",
+                ));
             }
-            let name = info
-                .worksheet_names
-                .get(catalog_position)
-                .cloned()
-                .ok_or_else(|| crate::package::error::Error::Unrecognized {
-                    typ: "worksheet catalog".to_string(),
-                    val: format!("missing worksheet name for catalog position {catalog_position}"),
-                })?;
-            worksheet_positions.push(catalog_position);
-            worksheet_names.push(name);
+            let sheet_part = self.package.get_part(&partname)?;
+            validate_sheet_content_type(sheet_part, kind)?;
+            sheet_tabs.push(TabMetadata::new(name.to_owned(), kind, state));
+            if kind.is_worksheet() {
+                worksheet_positions.push(catalog_position);
+                worksheet_names.push(name.to_owned());
+            }
         }
         for (sheet_index, rel_id) in info.worksheet_rel_ids.iter().enumerate() {
-            let rel_id =
-                rel_id
-                    .as_deref()
-                    .ok_or_else(|| crate::package::error::Error::Unrecognized {
-                        typ: "sheet relationship".to_string(),
-                        val: format!(
-                            "sheet catalog position {sheet_index} has no relationship identifier"
-                        ),
-                    })?;
-            let sheet_relationship = workbook_part.rels().get(rel_id).ok_or_else(|| {
+            let Some(rel_id) = rel_id.as_deref() else {
+                continue;
+            };
+            let sheet_relationship = workbook_part.rels().get(rel_id).ok_or({
                 crate::package::error::Error::Unrecognized {
-                    typ: "sheet relationship".to_string(),
-                    val: format!(
-                        "relationship {rel_id:?} for sheet catalog position {sheet_index} is missing"
-                    ),
+                    typ: "sheet relationship",
+                    val: "relationship for sheet catalog position is missing",
                 }
             })?;
             if sheet_relationship.is_external() {
-                return Err(crate::package::error::Error::UnsupportedFeature(format!(
-                    "sheet catalog position {sheet_index} has an external relationship"
-                )));
+                return Err(crate::package::error::Error::UnsupportedFeature(
+                    "sheet catalog position has an external relationship",
+                ));
             }
             let reltype = sheet_relationship.reltype();
             if !is_worksheet_relationship(reltype)
@@ -1393,10 +841,8 @@ impl Workbook {
                     continue;
                 }
                 return Err(crate::package::error::Error::Unrecognized {
-                    typ: "sheet relationship".to_string(),
-                    val: format!(
-                        "relationship {rel_id:?} for sheet catalog position {sheet_index} has unsupported type {reltype:?}"
-                    ),
+                    typ: "sheet relationship",
+                    val: "relationship for sheet catalog position has unsupported type",
                 });
             }
             let sheet_part = self
@@ -1405,27 +851,24 @@ impl Workbook {
             if CHART_SHEET_RELATIONSHIP_TYPES.contains(&sheet_relationship.reltype()) {
                 // Chart Sheet part (MS-XLSB 2.1.7.7): a BIFF12 stream. The
                 // chart itself lives in the linked XML Drawings/Chart parts.
-                let name = info
-                    .worksheet_names
-                    .get(sheet_index)
-                    .cloned()
-                    .ok_or_else(|| crate::package::error::Error::Unrecognized {
-                        typ: "BrtBundleSh".to_string(),
-                        val: format!("chart sheet index {sheet_index} out of bounds"),
-                    })?;
-                let state = info.worksheet_states.get(sheet_index).copied().unwrap_or(0);
+                let name = info.worksheet_names.get(sheet_index).cloned().ok_or(
+                    crate::package::error::Error::Unrecognized {
+                        typ: "BrtBundleSh",
+                        val: "chart sheet index out of bounds",
+                    },
+                )?;
+                let state = info.worksheet_states[sheet_index];
                 let chart_sheet = crate::package::chartsheet::parse_chart_sheet_part(
                     sheet_part.blob(),
                     name,
                     state,
+                    self.raw_limits,
                 )?;
                 if let Some(drawing_rel_id) = chart_sheet.drawing_rel_id.clone() {
-                    let relationship = sheet_part.rels().get(&drawing_rel_id).ok_or_else(|| {
+                    let relationship = sheet_part.rels().get(&drawing_rel_id).ok_or({
                         crate::package::error::Error::Unrecognized {
-                            typ: "BrtDrawing".to_string(),
-                            val: format!(
-                                "relationship {drawing_rel_id:?} on chart sheet {sheet_index} is missing"
-                            ),
+                            typ: "BrtDrawing",
+                            val: "relationship on chart sheet is missing",
                         }
                     })?;
                     if !matches!(
@@ -1434,10 +877,8 @@ impl Workbook {
                     ) || relationship.is_external()
                     {
                         return Err(crate::package::error::Error::Unrecognized {
-                            typ: "BrtDrawing".to_string(),
-                            val: format!(
-                                "relationship {drawing_rel_id:?} on chart sheet {sheet_index} is external or has the wrong type"
-                            ),
+                            typ: "BrtDrawing",
+                            val: "relationship on chart sheet is external or has the wrong type",
                         });
                     }
                     let drawing_part = self.package.get_part(&relationship.target_partname()?)?;
@@ -1451,10 +892,8 @@ impl Workbook {
             let worksheet_index = worksheet_positions
                 .binary_search(&sheet_index)
                 .map_err(|_missing_worksheet_position| crate::package::error::Error::Unrecognized {
-                    typ: "worksheet catalog".to_string(),
-                    val: format!(
-                        "worksheet relationship at catalog position {sheet_index} has no public worksheet ordinal"
-                    ),
+                    typ: "worksheet catalog",
+                    val: "worksheet relationship at catalog position has no public worksheet ordinal",
                 })?;
             // Worksheet Drawings parts (MS-XLSB 2.1.7.23) are standard
             // SpreadsheetDrawing XML parts discovered through the sheet's
@@ -1467,8 +906,8 @@ impl Workbook {
             }) {
                 if relationship.is_external() {
                     return Err(crate::package::error::Error::Unrecognized {
-                        typ: "worksheet drawing relationship".to_string(),
-                        val: "external Drawings part".to_string(),
+                        typ: "worksheet drawing relationship",
+                        val: "external Drawings part",
                     });
                 }
                 let drawing_part = self.package.get_part(&relationship.target_partname()?)?;
@@ -1479,21 +918,23 @@ impl Workbook {
             for table_rel_id in crate::package::table::parse_table_part_rel_ids_recording(
                 sheet_part.blob(),
                 &mut self.tolerance,
+                self.raw_limits,
             )? {
-                let relationship = sheet_part.rels().get(&table_rel_id).ok_or_else(|| {
-                    crate::package::error::Error::InvalidFormula(format!(
-                        "BrtListPart relationship {table_rel_id:?} on sheet {sheet_index} is missing"
-                    ))
+                let relationship = sheet_part.rels().get(&table_rel_id).ok_or({
+                    crate::package::error::Error::InvalidFormula(
+                        "BrtListPart relationship on sheet is missing",
+                    )
                 })?;
                 if relationship.is_external() {
-                    return Err(crate::package::error::Error::InvalidFormula(format!(
-                        "BrtListPart relationship {table_rel_id:?} on sheet {sheet_index} is external"
-                    )));
+                    return Err(crate::package::error::Error::InvalidFormula(
+                        "BrtListPart relationship on sheet is external",
+                    ));
                 }
                 let part = self.package.get_part(&relationship.target_partname()?)?;
                 let table = crate::package::table::parse_table_part_recording(
                     part.blob(),
                     &mut self.tolerance,
+                    self.raw_limits,
                 )?;
                 structured_tables.push((worksheet_index, table));
             }
@@ -1505,7 +946,7 @@ impl Workbook {
             }) {
                 if relationship.is_external() {
                     return Err(crate::package::error::Error::InvalidFormula(
-                        "worksheet has an external table relationship".to_string(),
+                        "worksheet has an external table relationship",
                     ));
                 }
                 let part = self.package.get_part(&relationship.target_partname()?)?;
@@ -1517,23 +958,22 @@ impl Workbook {
                     part.blob(),
                     sheet_index,
                     &mut Tolerance::recording(&mut already_recorded),
+                    self.raw_limits,
                 )?;
                 if tables
                     .iter()
                     .any(|existing: &TableDefinition| existing.table_id() == table.table_id())
                 {
-                    return Err(crate::package::error::Error::InvalidFormula(format!(
-                        "duplicate workbook table ID {}",
-                        table.table_id()
-                    )));
+                    return Err(crate::package::error::Error::InvalidFormula(
+                        "duplicate workbook table ID",
+                    ));
                 }
                 if tables.iter().any(|existing: &TableDefinition| {
                     excel_name_eq(existing.display_name(), table.display_name())
                 }) {
-                    return Err(crate::package::error::Error::InvalidFormula(format!(
-                        "duplicate workbook table display name {:?}",
-                        table.display_name()
-                    )));
+                    return Err(crate::package::error::Error::InvalidFormula(
+                        "duplicate workbook table display name",
+                    ));
                 }
                 tables.push(table);
             }
@@ -1545,31 +985,27 @@ impl Workbook {
             }) {
                 if relationship.is_external() {
                     return Err(crate::package::error::Error::InvalidFormula(
-                        "worksheet has an external PivotTable relationship".to_string(),
+                        "worksheet has an external PivotTable relationship",
                     ));
                 }
                 let part = self.package.get_part(&relationship.target_partname()?)?;
-                let view = Self::parse_pivot_view(part.blob(), sheet_index)?;
+                let view = Self::parse_pivot_view(part.blob(), sheet_index, self.raw_limits)?;
                 if !pivot_cache_ids
                     .iter()
                     .any(|(cache_id, _)| *cache_id == view.cache_id())
                 {
-                    return Err(crate::package::error::Error::InvalidFormula(format!(
-                        "PivotTable view {:?} references unknown cache {}",
-                        view.name(),
-                        view.cache_id()
-                    )));
+                    return Err(crate::package::error::Error::InvalidFormula(
+                        "PivotTable view references unknown cache",
+                    ));
                 }
                 if pivot_views.iter().any(|existing: &View| {
                     existing.cache_id() == view.cache_id()
                         && existing.sheet_index() == view.sheet_index()
                         && excel_name_eq(existing.name(), view.name())
                 }) {
-                    return Err(crate::package::error::Error::InvalidFormula(format!(
-                        "duplicate PivotTable view {:?} for cache {} on sheet {sheet_index}",
-                        view.name(),
-                        view.cache_id()
-                    )));
+                    return Err(crate::package::error::Error::InvalidFormula(
+                        "duplicate PivotTable view for cache on sheet",
+                    ));
                 }
                 pivot_views.push(view);
             }
@@ -1589,6 +1025,7 @@ impl Workbook {
         self.worksheet_names = worksheet_names;
         self.worksheet_positions = worksheet_positions;
         self.worksheet_rel_ids = info.worksheet_rel_ids;
+        self.sheet_tabs = sheet_tabs;
         self.active_catalog_position = active_catalog_position;
         self.is_1904 = info.is_1904;
         self.calc = info.calc.unwrap_or_default();
@@ -1601,22 +1038,49 @@ impl Workbook {
         Ok(())
     }
 
-    /// Load shared strings from xl/sharedStrings.bin
+    /// Load shared strings through the workbook's optional relationship.
     fn load_shared_strings(&mut self) -> Result<()> {
-        let shared_strings_uri = litchi_opc::PackURI::new("/xl/sharedStrings.bin")?;
-        match self.package.get_part(&shared_strings_uri) {
-            Ok(shared_strings_part) => {
-                let blob = shared_strings_part.blob();
-                let mut iter = Records::new(blob);
-                Self::read_shared_strings(
-                    &mut iter,
-                    &mut self.shared_strings,
-                    &mut self.tolerance,
-                )?;
-            },
-            Err(OpcError::PartNotFound(_)) => {},
-            Err(error) => return Err(error.into()),
+        let shared_strings_uri = {
+            let workbook_part = self.package.main_document_part()?;
+            let mut found = None;
+            for relationship in workbook_part.rels().iter() {
+                if !matches!(
+                    relationship.reltype(),
+                    relationship_type::SHARED_STRINGS | relationship_type::STRICT_SHARED_STRINGS
+                ) {
+                    continue;
+                }
+                if found.is_some() {
+                    return Err(crate::package::error::Error::InvalidRelationship(
+                        "XLSB workbook has multiple shared-string relationships",
+                    ));
+                }
+                if relationship.is_external() {
+                    return Err(crate::package::error::Error::InvalidRelationship(
+                        "XLSB workbook shared-string relationship is external",
+                    ));
+                }
+                found = Some(relationship.target_partname()?);
+            }
+            found
+        };
+        let Some(shared_strings_uri) = shared_strings_uri else {
+            return Ok(());
+        };
+        let shared_strings_part = self.package.get_part(&shared_strings_uri)?;
+        if shared_strings_part.content_type() != XLSB_SHARED_STRINGS_CONTENT_TYPE {
+            return Err(crate::package::error::Error::InvalidContentType {
+                expected: XLSB_SHARED_STRINGS_CONTENT_TYPE,
+            });
         }
+        let blob = shared_strings_part.blob();
+        let mut iter = Records::new(blob, self.raw_limits);
+        Self::read_shared_strings(
+            &mut iter,
+            &mut self.shared_strings,
+            &mut self.tolerance,
+            self.raw_limits,
+        )?;
 
         Ok(())
     }
@@ -1627,8 +1091,11 @@ impl Workbook {
         let styles_uri = litchi_opc::PackURI::new("/xl/styles.bin")?;
         match self.package.get_part(&styles_uri) {
             Ok(styles_part) => {
-                self.styles =
-                    StylesTable::from_bytes_with_report(styles_part.blob(), &mut self.tolerance)?;
+                self.styles = StylesTable::from_bytes_with_report(
+                    styles_part.blob(),
+                    self.raw_limits,
+                    &mut self.tolerance,
+                )?;
             },
             Err(OpcError::PartNotFound(_)) => {},
             Err(error) => return Err(error.into()),

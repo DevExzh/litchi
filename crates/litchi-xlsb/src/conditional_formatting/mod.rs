@@ -4,6 +4,7 @@
 //! record codec. Worksheet/package traversal remains in the host.
 
 mod codec;
+pub mod edit;
 mod model;
 #[cfg(test)]
 mod tests;

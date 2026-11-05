@@ -57,15 +57,20 @@ const MAX_SPIN_COUNT: u32 = 10_000_000;
 /// workbook part. The stream must start with `BrtBeginSheet` and end with
 /// `BrtEndSheet`. Records after `BrtEndSheet` are ignored. Unknown record
 /// types anywhere in the stream are skipped without failing.
-pub fn parse_chart_sheet_part(data: &[u8], name: String, state: u32) -> Result<ChartSheet> {
+pub fn parse_chart_sheet_part(
+    data: &[u8],
+    name: String,
+    state: u32,
+    limits: crate::raw::Limits,
+) -> Result<ChartSheet> {
     let state = match state {
         0 => State::Visible,
         1 => State::Hidden,
         2 => State::VeryHidden,
-        other => {
+        _other => {
             return Err(Error::Unrecognized {
-                typ: "BrtBundleSh hsState".to_string(),
-                val: other.to_string(),
+                typ: "BrtBundleSh hsState",
+                val: "unexpected value",
             });
         },
     };
@@ -83,7 +88,7 @@ pub fn parse_chart_sheet_part(data: &[u8], name: String, state: u32) -> Result<C
         legacy_drawing_rel_id: None,
         legacy_drawing_header_footer_rel_id: None,
     };
-    let mut walker = RecordWalker::new(data);
+    let mut walker = RecordWalker::new(data, limits);
     walker.required_begin(rt::BEGIN_SHEET, "BrtBeginSheet")?;
     let mut seen_cs_prop = false;
     // Strong protection parsed from `BrtCsProtectionIso`, pending the classic
@@ -111,19 +116,19 @@ pub fn parse_chart_sheet_part(data: &[u8], name: String, state: u32) -> Result<C
                     return Err(malformed("BrtCsProp", "duplicate record"));
                 }
                 seen_cs_prop = true;
-                parse_cs_prop(record.payload(), &mut sheet)?;
+                parse_cs_prop(record.payload(), &mut sheet, limits)?;
             },
             rt::CS_PAGE_SETUP => {
                 if sheet.page_setup.is_some() {
                     return Err(malformed("BrtCsPageSetup", "duplicate record"));
                 }
-                sheet.page_setup = Some(parse_cs_page_setup(record.payload())?);
+                sheet.page_setup = Some(parse_cs_page_setup(record.payload(), limits)?);
             },
             rt::CS_PROTECTION => {
                 if sheet.protection.is_some() {
                     return Err(malformed("BrtCsProtection", "duplicate record"));
                 }
-                let protection = parse_cs_protection(record.payload())?;
+                let protection = parse_cs_protection(record.payload(), limits)?;
                 if let Some((strong, iso_locked, iso_objects)) = pending_iso_protection.take() {
                     // MS-XLSB 2.4.346: the ISO record must be immediately
                     // followed by a classic record with a zero verifier and
@@ -148,29 +153,36 @@ pub fn parse_chart_sheet_part(data: &[u8], name: String, state: u32) -> Result<C
                         "duplicate protection record",
                     ));
                 }
-                pending_iso_protection = Some(parse_cs_protection_iso(record.payload())?);
+                pending_iso_protection = Some(parse_cs_protection_iso(record.payload(), limits)?);
             },
             rt::BEGIN_CS_VIEWS => parse_cs_views(&mut walker, record.payload(), &mut sheet.views)?,
-            rt::DRAWING => set_rel_id(record.payload(), "BrtDrawing", &mut sheet.drawing_rel_id)?,
+            rt::DRAWING => set_rel_id(
+                record.payload(),
+                "BrtDrawing",
+                &mut sheet.drawing_rel_id,
+                limits,
+            )?,
             rt::LEGACY_DRAWING => set_rel_id(
                 record.payload(),
                 "BrtLegacyDrawing",
                 &mut sheet.legacy_drawing_rel_id,
+                limits,
             )?,
             rt::LEGACY_DRAWING_HF => set_rel_id(
                 record.payload(),
                 "BrtLegacyDrawingHF",
                 &mut sheet.legacy_drawing_header_footer_rel_id,
+                limits,
             )?,
             other => walker.skip_unhandled(other, "Chart Sheet stream")?,
         }
     }
-    Err(Error::UnexpectedEndOfStream("BrtEndSheet".to_string()))
+    Err(Error::UnexpectedEndOfStream("BrtEndSheet"))
 }
 
 /// `BrtCsProp` payload (MS-XLSB 2.4.344).
-fn parse_cs_prop(data: &[u8], sheet: &mut ChartSheet) -> Result<()> {
-    let mut cursor = Cursor::new(data, "BrtCsProp");
+fn parse_cs_prop(data: &[u8], sheet: &mut ChartSheet, limits: crate::raw::Limits) -> Result<()> {
+    let mut cursor = Cursor::new(data, "BrtCsProp", limits);
     let flags = cursor.read_u16()?;
     sheet.published = flags & CS_PROP_PUBLISHED != 0;
     sheet.tab_color = parse_brt_color(cursor.read_bytes(BRT_COLOR_LEN)?)?;
@@ -188,18 +200,15 @@ fn parse_brt_color(data: &[u8]) -> Result<Color> {
         COLOR_TYPE_INDEXED => ColorType::Indexed,
         COLOR_TYPE_RGB => ColorType::Rgb,
         COLOR_TYPE_THEME => ColorType::Theme,
-        other => {
-            return Err(malformed("BrtColor", format!("color type {other}")));
+        _other => {
+            return Err(malformed("BrtColor", "color type"));
         },
     };
     if color_type == ColorType::Rgb && !valid_rgb {
         return Err(malformed("BrtColor", "direct color is not marked valid"));
     }
     if color_type == ColorType::Theme && data[1] > MAX_THEME_COLOR_INDEX {
-        return Err(malformed(
-            "BrtColor",
-            format!("theme color index {}", data[1]),
-        ));
+        return Err(malformed("BrtColor", "theme color index"));
     }
     Ok(Color {
         valid_rgb,
@@ -211,14 +220,14 @@ fn parse_brt_color(data: &[u8]) -> Result<Color> {
 }
 
 /// `BrtCsPageSetup` payload (MS-XLSB 2.4.343).
-fn parse_cs_page_setup(data: &[u8]) -> Result<PageSetup> {
-    let mut cursor = Cursor::new(data, "BrtCsPageSetup");
+fn parse_cs_page_setup(data: &[u8], limits: crate::raw::Limits) -> Result<PageSetup> {
+    let mut cursor = Cursor::new(data, "BrtCsPageSetup", limits);
     let paper_size = cursor.read_u32()?;
     let horizontal_resolution = cursor.read_u32()?;
     let vertical_resolution = cursor.read_u32()?;
     let copies = cursor.read_u32()?;
     if copies == 0 || copies > PAGE_SETUP_MAX_COPIES {
-        return Err(malformed("BrtCsPageSetup", format!("iCopies {copies}")));
+        return Err(malformed("BrtCsPageSetup", "iCopies"));
     }
     let page_start = cursor.read_i16()?;
     let flags = cursor.read_u16()?;
@@ -243,8 +252,8 @@ fn parse_cs_page_setup(data: &[u8]) -> Result<PageSetup> {
 }
 
 /// `BrtCsProtection` payload (MS-XLSB 2.4.345).
-fn parse_cs_protection(data: &[u8]) -> Result<Protection> {
-    let mut cursor = Cursor::new(data, "BrtCsProtection");
+fn parse_cs_protection(data: &[u8], limits: crate::raw::Limits) -> Result<Protection> {
+    let mut cursor = Cursor::new(data, "BrtCsProtection", limits);
     let protection = Protection {
         password_verifier: cursor.read_u16()?,
         locked: cursor.read_bool32()?,
@@ -259,14 +268,14 @@ fn parse_cs_protection(data: &[u8]) -> Result<Protection> {
 /// Returns the strong protection data plus the `fLocked` and `fObjects`
 /// flags, which the immediately following `BrtCsProtection` record must
 /// repeat.
-fn parse_cs_protection_iso(data: &[u8]) -> Result<(StrongProtection, bool, bool)> {
-    let mut cursor = Cursor::new(data, "BrtCsProtectionIso");
+fn parse_cs_protection_iso(
+    data: &[u8],
+    limits: crate::raw::Limits,
+) -> Result<(StrongProtection, bool, bool)> {
+    let mut cursor = Cursor::new(data, "BrtCsProtectionIso", limits);
     let spin_count = cursor.read_u32()?;
     if spin_count > MAX_SPIN_COUNT {
-        return Err(malformed(
-            "BrtCsProtectionIso",
-            format!("dwSpinCount {spin_count}"),
-        ));
+        return Err(malformed("BrtCsProtectionIso", "dwSpinCount"));
     }
     let locked = cursor.read_bool32()?;
     let objects = cursor.read_bool32()?;
@@ -302,7 +311,7 @@ fn parse_cs_views(
     if !views.is_empty() {
         return Err(malformed("BrtBeginCsViews", "duplicate collection"));
     }
-    Cursor::new(data, "BrtBeginCsViews").finish()?;
+    Cursor::new(data, "BrtBeginCsViews", walker.limits()).finish()?;
     loop {
         let record = walker.required("BrtEndCsViews")?;
         match record.kind() {
@@ -310,11 +319,11 @@ fn parse_cs_views(
                 if views.is_empty() {
                     return Err(malformed("BrtBeginCsViews", "collection without a view"));
                 }
-                Cursor::new(record.payload(), "BrtEndCsViews").finish()?;
+                Cursor::new(record.payload(), "BrtEndCsViews", walker.limits()).finish()?;
                 return Ok(());
             },
             rt::BEGIN_CS_VIEW => {
-                views.push(parse_cs_view(record.payload())?);
+                views.push(parse_cs_view(record.payload(), walker.limits())?);
                 let end = walker.required("BrtEndCsView")?;
                 if end.kind() != rt::END_CS_VIEW {
                     return Err(Error::UnexpectedRecord {
@@ -322,7 +331,7 @@ fn parse_cs_views(
                         found: end.kind().get(),
                     });
                 }
-                Cursor::new(end.payload(), "BrtEndCsView").finish()?;
+                Cursor::new(end.payload(), "BrtEndCsView", walker.limits()).finish()?;
             },
             other => walker.skip_unhandled(other, "BrtBeginCsViews collection")?,
         }
@@ -330,12 +339,12 @@ fn parse_cs_views(
 }
 
 /// `BrtBeginCsView` payload (MS-XLSB 2.4.38).
-fn parse_cs_view(data: &[u8]) -> Result<View> {
-    let mut cursor = Cursor::new(data, "BrtBeginCsView");
+fn parse_cs_view(data: &[u8], limits: crate::raw::Limits) -> Result<View> {
+    let mut cursor = Cursor::new(data, "BrtBeginCsView", limits);
     let flags = cursor.read_u16()?;
     let scale = cursor.read_u32()?;
     if scale != CS_VIEW_NO_ZOOM && !(CS_VIEW_MIN_SCALE..=CS_VIEW_MAX_SCALE).contains(&scale) {
-        return Err(malformed("BrtBeginCsView", format!("wScale {scale}")));
+        return Err(malformed("BrtBeginCsView", "wScale"));
     }
     let workbook_view_index = cursor.read_u32()?;
     cursor.finish()?;
@@ -348,11 +357,16 @@ fn parse_cs_view(data: &[u8]) -> Result<View> {
 
 /// Shared payload shape of `BrtDrawing` / `BrtLegacyDrawing` /
 /// `BrtLegacyDrawingHF`: a single `RelID` (MS-XLSB 2.5.115).
-fn set_rel_id(data: &[u8], context: &'static str, slot: &mut Option<String>) -> Result<()> {
+fn set_rel_id(
+    data: &[u8],
+    context: &'static str,
+    slot: &mut Option<String>,
+    limits: crate::raw::Limits,
+) -> Result<()> {
     if slot.is_some() {
         return Err(malformed(context, "duplicate record"));
     }
-    let mut cursor = Cursor::new(data, context);
+    let mut cursor = Cursor::new(data, context, limits);
     let rel_id = cursor.read_wide_string()?;
     if rel_id.is_empty() {
         return Err(malformed(context, "empty relationship ID"));

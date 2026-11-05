@@ -4,7 +4,7 @@ use std::sync::Arc;
 use litchi_opc::{OpcPackage, PackURI, TargetMode};
 
 use super::super::model::{Frame, Kind, Mode, Object, Target};
-use super::codec::{self, Edit, Located};
+use super::codec::{self, Located};
 use super::model::Definition;
 use super::validation::{
     MAX_OBJECTS, MAX_RELATIONSHIPS, validate_anchor, validate_kind, validate_name,
@@ -72,7 +72,8 @@ impl Snapshot {
         validate_source(source_xml.as_slice())?;
         if objects.len() > MAX_OBJECTS {
             return Err(crate::presentation::embedded::limit(
-                "OLE object count",
+                crate::error::CodecLimitKind::OleObjects,
+                objects.len(),
                 MAX_OBJECTS,
             ));
         }
@@ -147,7 +148,7 @@ impl Snapshot {
     }
 
     #[must_use]
-    pub fn edit(&self) -> Transaction {
+    pub(crate) fn edit(&self) -> Draft {
         let parts: HashMap<PackURI, &PartSource> = self
             .parts
             .iter()
@@ -168,7 +169,7 @@ impl Snapshot {
                 }),
             })
             .collect();
-        Transaction {
+        Draft {
             source: self.clone(),
             working,
         }
@@ -193,12 +194,12 @@ struct Working {
 
 /// Failure-atomic editor over one slide-owned OLE object collection.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub struct Draft {
     source: Snapshot,
     working: Vec<Working>,
 }
 
-impl Transaction {
+impl Draft {
     #[must_use]
     pub fn source(&self) -> &Snapshot {
         &self.source
@@ -218,8 +219,7 @@ impl Transaction {
             .ok_or_else(|| index_error(index, self.working.len()))
     }
 
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         if self.working.len() != self.source.objects.len() {
             return true;
         }
@@ -231,6 +231,12 @@ impl Transaction {
         })
     }
 
+    /// The outcome of this edit or commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
+    }
+
     /// Add an inert embedded or linked OLE object and return its transaction index.
     ///
     /// # Errors
@@ -240,7 +246,8 @@ impl Transaction {
         validate_definition(&definition)?;
         if self.working.len() >= MAX_OBJECTS {
             return Err(crate::presentation::embedded::limit(
-                "OLE object count",
+                crate::error::CodecLimitKind::OleObjects,
+                self.working.len().checked_add(1).unwrap_or(usize::MAX),
                 MAX_OBJECTS,
             ));
         }
@@ -453,13 +460,13 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Prepared> {
         if !self.is_changed() {
-            let patch = Patch {
+            let patch = Change {
                 before: self.source.clone(),
                 after: self.source.clone(),
             };
-            return Ok(Commit {
+            return Ok(Prepared {
                 snapshot: self.source,
                 patch,
             });
@@ -474,16 +481,11 @@ impl Transaction {
             build.parts,
             self.source.package_part_names.as_ref().clone(),
         )?;
-        let patch = Patch {
+        let patch = Change {
             before: self.source,
             after: snapshot.clone(),
         };
-        Ok(Commit { snapshot, patch })
-    }
-
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
+        Ok(Prepared { snapshot, patch })
     }
 
     fn normalize_indices(&mut self) {
@@ -503,86 +505,76 @@ impl Transaction {
 
 /// A successful detached OLE edit and its reversible source-checked patch.
 #[derive(Debug, Clone)]
-pub struct Commit {
+pub(crate) struct Prepared {
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the module's source-level tests")
+    )]
     snapshot: Snapshot,
-    patch: Patch,
+    patch: Change,
 }
 
-impl Commit {
+impl Prepared {
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    #[cfg(test)]
+    pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     #[must_use]
-    pub fn patch(&self) -> &Patch {
+    #[cfg(test)]
+    pub(crate) fn patch(&self) -> &Change {
         &self.patch
     }
 
+    #[cfg(test)]
+    fn is_changed(&self) -> bool {
+        !self.patch.is_noop()
+    }
+
+    /// The outcome of this edit or commit.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.patch.is_empty()
+    #[cfg(test)]
+    pub(crate) fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     #[must_use]
-    pub fn into_patch(self) -> Patch {
+    pub(crate) fn into_patch(self) -> Change {
         self.patch
     }
 }
 
 /// Reversible, source-checked replacement of one slide-owned OLE graph.
 #[derive(Debug, Clone)]
-pub struct Patch {
+pub(crate) struct Change {
     before: Snapshot,
     after: Snapshot,
 }
 
-impl Patch {
+impl Change {
     #[must_use]
-    pub fn before(&self) -> &Snapshot {
+    pub(crate) fn before(&self) -> &Snapshot {
         &self.before
     }
 
     #[must_use]
-    pub fn after(&self) -> &Snapshot {
+    pub(crate) fn after(&self) -> &Snapshot {
         &self.after
     }
 
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
     #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.is_empty()
-    }
-
-    #[must_use]
-    pub fn expected_revision(&self) -> Revision {
-        self.before.revision
-    }
-
-    #[must_use]
-    pub fn inverse(&self) -> Self {
+    #[cfg(test)]
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
         }
-    }
-
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn apply(&self, package: &mut OpcPackage) -> Result<Snapshot> {
-        super::package::apply_patch(package, self)
-    }
-
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn undo(&self, package: &mut OpcPackage) -> Result<Snapshot> {
-        self.inverse().apply(package)
     }
 }
 
@@ -596,7 +588,8 @@ struct Build {
 fn build_after(source: &Snapshot, working: &[Working]) -> Result<Build> {
     if working.len() > MAX_OBJECTS {
         return Err(crate::presentation::embedded::limit(
-            "OLE object count",
+            crate::error::CodecLimitKind::OleObjects,
+            working.len(),
             MAX_OBJECTS,
         ));
     }
@@ -835,7 +828,7 @@ fn build_after(source: &Snapshot, working: &[Working]) -> Result<Build> {
         .collect();
     for (index, _) in source.objects.iter().enumerate() {
         if !kept.contains(&index) {
-            edits.push(Edit {
+            edits.push(codec::Draft {
                 range: document.frames[index].frame.clone(),
                 replacement: Vec::new(),
             });
@@ -856,7 +849,7 @@ fn add_object_edits(
     located: &Located,
     before: &Object,
     after: &Object,
-    edits: &mut Vec<Edit>,
+    edits: &mut Vec<codec::Draft>,
 ) -> Result<()> {
     if before.name != after.name
         && let Some(edit) = codec::attribute_edit(
@@ -979,7 +972,8 @@ fn upsert_relationship(
     }
     if relationships.len() >= MAX_RELATIONSHIPS {
         return Err(crate::presentation::embedded::limit(
-            "OLE relationship count",
+            crate::error::CodecLimitKind::Relationships,
+            relationships.len().checked_add(1).unwrap_or(usize::MAX),
             MAX_RELATIONSHIPS,
         ));
     }
@@ -1014,7 +1008,8 @@ fn next_part_name(used: &mut HashSet<PackURI>, kind: Kind) -> Result<PackURI> {
         }
     }
     Err(crate::presentation::embedded::limit(
-        "OLE embedding part namespace",
+        crate::error::CodecLimitKind::Parts,
+        1_000_000,
         1_000_000,
     ))
 }
@@ -1069,7 +1064,8 @@ pub(crate) fn sorted_relationships(
 ) -> Result<Vec<RelationshipState>> {
     if values.len() > MAX_RELATIONSHIPS {
         return Err(crate::presentation::embedded::limit(
-            "OLE relationship count",
+            crate::error::CodecLimitKind::Relationships,
+            values.len(),
             MAX_RELATIONSHIPS,
         ));
     }
@@ -1087,7 +1083,8 @@ pub(crate) fn sorted_parts(mut values: Vec<PartSource>) -> Result<Vec<PartSource
     for part in &values {
         if part.bytes.len() > super::validation::MAX_PART_BYTES {
             return Err(crate::presentation::embedded::limit(
-                "OLE payload bytes",
+                crate::error::CodecLimitKind::PayloadBytes,
+                part.bytes.len(),
                 super::validation::MAX_PART_BYTES,
             ));
         }

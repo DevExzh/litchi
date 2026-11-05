@@ -180,7 +180,8 @@ impl ReadAt for ZeroAfterArmSource {
 }
 
 fn package_bytes(deflated: bool, payload: &[u8]) -> Vec<u8> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer.write_stored("mimetype", MIME).unwrap();
     if deflated {
         writer
@@ -212,7 +213,7 @@ fn open_versioned(bytes: Vec<u8>) -> (Arc<VersionedSource>, SourceBackedPackage)
 }
 
 fn encrypted_package_bytes() -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype(std::str::from_utf8(MIME).unwrap())
         .unwrap();

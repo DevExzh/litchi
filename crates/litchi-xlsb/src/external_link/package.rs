@@ -17,18 +17,13 @@ use super::{
     ExternalLinkLimits, Kind, Link, OLE_ITEM_DISPLAY_AS_ICON, OLE_ITEM_REQUIRED_CLASS_FLAG,
     OleItem, Result, UnknownRecord, ValueMatrix,
 };
-use crate::raw::{Writer, kind};
+use crate::raw::{Encoder, kind};
 
 const NULL_WIDE_STRING_LENGTH: u32 = u32::MAX;
 
-/// Write one canonical external-link stream without opaque records.
-pub fn write_external_link_stream(link: &Link, relationship_id: Option<&str>) -> Result<Vec<u8>> {
-    write_external_link_stream_with_limits(link, relationship_id, ExternalLinkLimits::DEFAULT)
-}
-
 /// Write one canonical external-link stream without opaque records under an
 /// explicit operation-scoped resource policy.
-pub fn write_external_link_stream_with_limits(
+pub fn write_external_link_stream(
     link: &Link,
     relationship_id: Option<&str>,
     limits: ExternalLinkLimits,
@@ -57,7 +52,7 @@ pub(crate) fn write_external_link_stream_with_unknown_and_limits(
     let records = encode_records(link, relationship_id)?;
     if records.len() != plan.known_records {
         return Err(Error::InvalidFormula(
-            "external-link known record count changed after preflight".to_string(),
+            "external-link known record count changed after preflight",
         ));
     }
     let mut bytes = Vec::new();
@@ -84,7 +79,7 @@ pub(crate) fn write_external_link_stream_with_unknown_and_limits(
     }
     if bytes.len() != plan.output_bytes {
         return Err(Error::InvalidFormula(
-            "external-link output size changed after preflight".to_string(),
+            "external-link output size changed after preflight",
         ));
     }
     Ok(bytes)
@@ -112,12 +107,12 @@ fn preflight(
     let unknown_bytes = unknown_records.iter().try_fold(0usize, |total, record| {
         total
             .checked_add(record.bytes().len())
-            .ok_or_else(|| Error::InvalidFormula("external-link output size overflow".to_string()))
+            .ok_or(Error::InvalidFormula("external-link output size overflow"))
     })?;
     plan.output_bytes = plan
         .output_bytes
         .checked_add(unknown_bytes)
-        .ok_or_else(|| Error::InvalidFormula("external-link output size overflow".to_string()))?;
+        .ok_or(Error::InvalidFormula("external-link output size overflow"))?;
 
     let mut budget = limits.budget();
     budget.begin_link_part(plan.output_bytes)?;
@@ -127,9 +122,11 @@ fn preflight(
         budget.opaque(
             unknown_records.len(),
             unknown_records.iter().try_fold(0usize, |total, record| {
-                total.checked_add(record.bytes().len()).ok_or_else(|| {
-                    Error::InvalidFormula("external-link opaque byte count overflow".to_string())
-                })
+                total
+                    .checked_add(record.bytes().len())
+                    .ok_or(Error::InvalidFormula(
+                        "external-link opaque byte count overflow",
+                    ))
             })?,
         )?;
     }
@@ -151,9 +148,7 @@ fn preflight_known_records(
         let tabs_payload = link.sheet_names().iter().try_fold(4usize, |total, name| {
             wide_string_wire_size(name)
                 .and_then(|size| total.checked_add(size))
-                .ok_or_else(|| {
-                    Error::InvalidFormula("external sheet-name size overflow".to_string())
-                })
+                .ok_or(Error::InvalidFormula("external sheet-name size overflow"))
         })?;
         add_known_record(plan, kind::SUP_TABS, tabs_payload)?;
     }
@@ -184,7 +179,7 @@ fn preflight_defined_name(plan: &mut WritePlan, entry: &DefinedName) -> Result<(
         kind::SUP_NAME_FORMULA,
         formula_len
             .checked_add(4)
-            .ok_or_else(|| Error::InvalidFormula("external formula size overflow".to_string()))?,
+            .ok_or(Error::InvalidFormula("external formula size overflow"))?,
     )?;
     add_known_record(plan, kind::SUP_NAME_BITS, 7)?;
     add_known_record(plan, kind::SUP_NAME_END, 0)
@@ -235,11 +230,11 @@ fn add_known_record(
     plan.output_bytes = plan
         .output_bytes
         .checked_add(wire_size)
-        .ok_or_else(|| Error::InvalidFormula("external-link output size overflow".to_string()))?;
+        .ok_or(Error::InvalidFormula("external-link output size overflow"))?;
     plan.known_records = plan
         .known_records
         .checked_add(1)
-        .ok_or_else(|| Error::InvalidFormula("external-link record count overflow".to_string()))?;
+        .ok_or(Error::InvalidFormula("external-link record count overflow"))?;
     Ok(())
 }
 
@@ -259,19 +254,18 @@ fn record_wire_size(record_kind: crate::raw::Kind, payload_len: usize) -> Result
     let mut length_bytes = 1usize;
     while remaining >= 0x80 {
         remaining >>= 7;
-        length_bytes = length_bytes.checked_add(1).ok_or_else(|| {
-            Error::InvalidFormula("external record header size overflow".to_string())
-        })?;
+        length_bytes = length_bytes.checked_add(1).ok_or(Error::InvalidFormula(
+            "external record header size overflow",
+        ))?;
     }
     kind_bytes
         .checked_add(length_bytes)
         .and_then(|size| size.checked_add(payload_len))
-        .ok_or_else(|| Error::InvalidFormula("external-link record size overflow".to_string()))
+        .ok_or(Error::InvalidFormula("external-link record size overflow"))
 }
 
 fn wide_string_size(value: &str) -> Result<usize> {
-    wide_string_wire_size(value)
-        .ok_or_else(|| Error::InvalidFormula("external wide-string size overflow".to_string()))
+    wide_string_wire_size(value).ok_or(Error::InvalidFormula("external wide-string size overflow"))
 }
 
 /// The retained-object accounting is deliberately stable: one Link, one
@@ -294,15 +288,14 @@ fn charge_semantics(
         Kind::Dde => charge_string(
             budget,
             link.dde_topic()
-                .ok_or_else(|| Error::InvalidFormula("DDE link has no topic".to_string()))?,
+                .ok_or(Error::InvalidFormula("DDE link has no topic"))?,
         )?,
         Kind::Ole => {
             charge_string(budget, required_relationship_id(relationship_id, "OLE")?)?;
             charge_string(
                 budget,
-                link.ole_program_id().ok_or_else(|| {
-                    Error::InvalidFormula("OLE link has no program ID".to_string())
-                })?,
+                link.ole_program_id()
+                    .ok_or(Error::InvalidFormula("OLE link has no program ID"))?,
             )?;
         },
     }
@@ -383,7 +376,7 @@ fn charge_records(
     }
     if extern_table_open {
         return Err(Error::InvalidFormula(
-            "external table cache region has no end".to_string(),
+            "external table cache region has no end",
         ));
     }
     Ok(())
@@ -400,15 +393,13 @@ fn charge_unknown_record(
     budget.record(*extern_table_open || is_start || is_end)?;
     if is_start {
         if *extern_table_open {
-            return Err(Error::InvalidFormula(
-                "nested external table cache region".to_string(),
-            ));
+            return Err(Error::InvalidFormula("nested external table cache region"));
         }
         *extern_table_open = true;
     } else if is_end {
         if !*extern_table_open {
             return Err(Error::InvalidFormula(
-                "external table cache region has no start".to_string(),
+                "external table cache region has no start",
             ));
         }
         *extern_table_open = false;
@@ -419,10 +410,12 @@ fn charge_unknown_record(
 fn encode_records(link: &Link, relationship_id: Option<&str>) -> Result<Vec<Vec<u8>>> {
     let mut records = Vec::new();
     let minimum_records = 2usize
-        .checked_add(link.entry_count().checked_mul(4).ok_or_else(|| {
-            Error::InvalidFormula("external-link record count overflow".to_string())
-        })?)
-        .ok_or_else(|| Error::InvalidFormula("external-link record count overflow".to_string()))?;
+        .checked_add(
+            link.entry_count()
+                .checked_mul(4)
+                .ok_or(Error::InvalidFormula("external-link record count overflow"))?,
+        )
+        .ok_or(Error::InvalidFormula("external-link record count overflow"))?;
     records
         .try_reserve(minimum_records)
         .map_err(|source| Error::Allocation {
@@ -431,7 +424,7 @@ fn encode_records(link: &Link, relationship_id: Option<&str>) -> Result<Vec<Vec<
         })?;
     let begin_capacity = begin_capacity(link, relationship_id)?;
     let mut begin = try_buffer(begin_capacity, "external-link header")?;
-    let mut payload = Writer::new(&mut begin);
+    let mut payload = Encoder::new(&mut begin, crate::raw::Limits::DEFAULT);
     match link.kind() {
         Kind::Workbook => {
             payload.write_u16(EXTERNAL_REFERENCE_WORKBOOK)?;
@@ -441,22 +434,23 @@ fn encode_records(link: &Link, relationship_id: Option<&str>) -> Result<Vec<Vec<
         Kind::Dde => {
             if relationship_id.is_some() {
                 return Err(Error::InvalidFormula(
-                    "DDE external link cannot have a relationship".to_string(),
+                    "DDE external link cannot have a relationship",
                 ));
             }
             payload.write_u16(EXTERNAL_REFERENCE_DDE)?;
             payload.write_wide_string(link.source())?;
             payload.write_wide_string(
                 link.dde_topic()
-                    .ok_or_else(|| Error::InvalidFormula("DDE link has no topic".to_string()))?,
+                    .ok_or(Error::InvalidFormula("DDE link has no topic"))?,
             )?;
         },
         Kind::Ole => {
             payload.write_u16(EXTERNAL_REFERENCE_OLE)?;
             payload.write_wide_string(required_relationship_id(relationship_id, "OLE")?)?;
-            payload.write_wide_string(link.ole_program_id().ok_or_else(|| {
-                Error::InvalidFormula("OLE link has no program ID".to_string())
-            })?)?;
+            payload.write_wide_string(
+                link.ole_program_id()
+                    .ok_or(Error::InvalidFormula("OLE link has no program ID"))?,
+            )?;
         },
     }
     push_record(&mut records, kind::BEGIN_SUP_BOOK, &begin)?;
@@ -465,15 +459,14 @@ fn encode_records(link: &Link, relationship_id: Option<&str>) -> Result<Vec<Vec<
         let tabs_capacity = link.sheet_names().iter().try_fold(4usize, |total, name| {
             wide_string_wire_size(name)
                 .and_then(|size| total.checked_add(size))
-                .ok_or_else(|| {
-                    Error::InvalidFormula("external sheet-name size overflow".to_string())
-                })
+                .ok_or(Error::InvalidFormula("external sheet-name size overflow"))
         })?;
         let mut tabs = try_buffer(tabs_capacity, "external sheet names")?;
-        let mut payload = Writer::new(&mut tabs);
-        payload.write_u32(u32::try_from(link.sheet_names().len()).map_err(|_| {
-            Error::InvalidFormula("external sheet-name count overflow".to_string())
-        })?)?;
+        let mut payload = Encoder::new(&mut tabs, crate::raw::Limits::DEFAULT);
+        payload.write_u32(
+            u32::try_from(link.sheet_names().len())
+                .map_err(|_| Error::InvalidFormula("external sheet-name count overflow"))?,
+        )?;
         for name in link.sheet_names() {
             payload.write_wide_string(name)?;
         }
@@ -496,14 +489,17 @@ fn encode_records(link: &Link, relationship_id: Option<&str>) -> Result<Vec<Vec<
 fn encode_record(record_kind: crate::raw::Kind, payload: &[u8]) -> Result<Vec<u8>> {
     let mut bytes = Vec::new();
     bytes
-        .try_reserve(payload.len().checked_add(8).ok_or_else(|| {
-            Error::InvalidFormula("external-link record size overflow".to_string())
-        })?)
+        .try_reserve(
+            payload
+                .len()
+                .checked_add(8)
+                .ok_or(Error::InvalidFormula("external-link record size overflow"))?,
+        )
         .map_err(|source| Error::Allocation {
             resource: "external-link record",
             source,
         })?;
-    Writer::new(&mut bytes).write_record(record_kind, payload)?;
+    Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT).write_record(record_kind, payload)?;
     Ok(bytes)
 }
 
@@ -512,13 +508,13 @@ fn write_entry_start(records: &mut Vec<Vec<u8>>, name: &str) -> Result<()> {
     payload
         .try_reserve(
             wide_string_wire_size(name)
-                .ok_or_else(|| Error::InvalidFormula("external name size overflow".to_string()))?,
+                .ok_or(Error::InvalidFormula("external name size overflow"))?,
         )
         .map_err(|source| Error::Allocation {
             resource: "external name",
             source,
         })?;
-    Writer::new(&mut payload).write_wide_string(name)?;
+    Encoder::new(&mut payload, crate::raw::Limits::DEFAULT).write_wide_string(name)?;
     push_record(records, kind::SUP_NAME_START, &payload)
 }
 
@@ -528,9 +524,10 @@ fn write_defined_name(records: &mut Vec<Vec<u8>>, entry: &DefinedName) -> Result
     let mut formula_payload = Vec::new();
     formula_payload
         .try_reserve(
-            formula.len().checked_add(4).ok_or_else(|| {
-                Error::InvalidFormula("external formula size overflow".to_string())
-            })?,
+            formula
+                .len()
+                .checked_add(4)
+                .ok_or(Error::InvalidFormula("external formula size overflow"))?,
         )
         .map_err(|source| Error::Allocation {
             resource: "external formula",
@@ -538,7 +535,7 @@ fn write_defined_name(records: &mut Vec<Vec<u8>>, entry: &DefinedName) -> Result
         })?;
     formula_payload.extend_from_slice(
         &u32::try_from(formula.len())
-            .map_err(|_| Error::InvalidFormula("external formula size overflow".to_string()))?
+            .map_err(|_| Error::InvalidFormula("external formula size overflow"))?
             .to_le_bytes(),
     );
     formula_payload.extend_from_slice(formula);
@@ -610,12 +607,12 @@ fn write_cached_values(records: &mut Vec<Vec<u8>>, values: &ValueMatrix) -> Resu
             },
             CachedValue::String(value) => {
                 let mut payload = try_buffer(
-                    wide_string_wire_size(value).ok_or_else(|| {
-                        Error::InvalidFormula("external cached string size overflow".to_string())
-                    })?,
+                    wide_string_wire_size(value).ok_or(Error::InvalidFormula(
+                        "external cached string size overflow",
+                    ))?,
                     "external cached string",
                 )?;
-                Writer::new(&mut payload).write_wide_string(value)?;
+                Encoder::new(&mut payload, crate::raw::Limits::DEFAULT).write_wide_string(value)?;
                 push_record(records, kind::SUP_NAME_STRING, &payload)?;
             },
         }
@@ -659,54 +656,50 @@ fn begin_capacity(link: &Link, relationship_id: Option<&str>) -> Result<usize> {
         Kind::Workbook => {
             let relationship_id = required_relationship_id(relationship_id, "workbook")?;
             fixed
-                .checked_add(wide_string_wire_size(relationship_id).ok_or_else(|| {
-                    Error::InvalidFormula("external-link relationship size overflow".to_string())
-                })?)
+                .checked_add(wide_string_wire_size(relationship_id).ok_or(
+                    Error::InvalidFormula("external-link relationship size overflow"),
+                )?)
                 .and_then(|size| size.checked_add(4))
-                .ok_or_else(|| {
-                    Error::InvalidFormula("external-link header size overflow".to_string())
-                })
+                .ok_or(Error::InvalidFormula("external-link header size overflow"))
         },
         Kind::Dde => {
             let topic = link
                 .dde_topic()
-                .ok_or_else(|| Error::InvalidFormula("DDE link has no topic".to_string()))?;
+                .ok_or(Error::InvalidFormula("DDE link has no topic"))?;
             fixed
                 .checked_add(
-                    wide_string_wire_size(link.source()).ok_or_else(|| {
-                        Error::InvalidFormula("DDE source size overflow".to_string())
-                    })?,
+                    wide_string_wire_size(link.source())
+                        .ok_or(Error::InvalidFormula("DDE source size overflow"))?,
                 )
                 .and_then(|size| {
                     wide_string_wire_size(topic).and_then(|topic_size| size.checked_add(topic_size))
                 })
-                .ok_or_else(|| Error::InvalidFormula("DDE header size overflow".to_string()))
+                .ok_or(Error::InvalidFormula("DDE header size overflow"))
         },
         Kind::Ole => {
             let relationship_id = required_relationship_id(relationship_id, "OLE")?;
             let program_id = link
                 .ole_program_id()
-                .ok_or_else(|| Error::InvalidFormula("OLE link has no program ID".to_string()))?;
+                .ok_or(Error::InvalidFormula("OLE link has no program ID"))?;
             fixed
-                .checked_add(wide_string_wire_size(relationship_id).ok_or_else(|| {
-                    Error::InvalidFormula("OLE relationship size overflow".to_string())
-                })?)
+                .checked_add(
+                    wide_string_wire_size(relationship_id)
+                        .ok_or(Error::InvalidFormula("OLE relationship size overflow"))?,
+                )
                 .and_then(|size| {
                     wide_string_wire_size(program_id)
                         .and_then(|program_size| size.checked_add(program_size))
                 })
-                .ok_or_else(|| Error::InvalidFormula("OLE header size overflow".to_string()))
+                .ok_or(Error::InvalidFormula("OLE header size overflow"))
         },
     }
 }
 
 fn required_relationship_id<'a>(
     relationship_id: Option<&'a str>,
-    context: &str,
+    _context: &str,
 ) -> Result<&'a str> {
     relationship_id
         .filter(|value| !value.is_empty())
-        .ok_or_else(|| {
-            Error::InvalidFormula(format!("{context} external link has no relationship"))
-        })
+        .ok_or(Error::InvalidFormula("external link has no relationship"))
 }

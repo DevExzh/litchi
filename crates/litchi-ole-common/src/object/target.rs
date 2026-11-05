@@ -5,6 +5,7 @@
 //! format crates derive targets from their own records and pass them here.
 
 use super::cfb_path::CfbPath;
+use crate::Error;
 use litchi_cfb::OleError;
 use litchi_cfb::OleFile;
 use std::io::{Read, Seek};
@@ -23,17 +24,16 @@ impl Target {
     ///
     /// Returns an error when the key is empty or a path component is not a
     /// valid `[MS-CFB]` directory name.
-    pub fn new<S, I>(key_source: impl Into<String>, path_source: I) -> Result<Self, OleError>
+    pub fn new<S, I>(key_source: impl Into<String>, path_source: I) -> Result<Self, Error>
     where
         I: IntoIterator<Item = S>,
         S: Into<String>,
     {
         let key = key_source.into();
-        let path = CfbPath::new(path_source.into_iter().map(Into::into).collect())?;
+        let path = CfbPath::new(path_source.into_iter().map(Into::into).collect())
+            .map_err(|_| Error::invalid_selector())?;
         if key.is_empty() {
-            return Err(OleError::InvalidFormat(
-                "object target key must not be empty".into(),
-            ));
+            return Err(Error::invalid_selector());
         }
         Ok(Self { key, path })
     }
@@ -43,16 +43,13 @@ impl Target {
     /// # Errors
     ///
     /// Returns an error when the path is empty or contains an invalid part.
-    pub fn from_path<I, S>(path_source: I) -> Result<Self, OleError>
+    pub fn from_path<I, S>(path_source: I) -> Result<Self, Error>
     where
         I: IntoIterator<Item = S>,
         S: Into<String>,
     {
         let path = path_source.into_iter().map(Into::into).collect::<Vec<_>>();
-        let key = path
-            .last()
-            .cloned()
-            .ok_or_else(|| OleError::InvalidFormat("object target path is empty".into()))?;
+        let key = path.last().cloned().ok_or_else(Error::invalid_selector)?;
         Self::new(key, path)
     }
 
@@ -76,11 +73,29 @@ impl Target {
         &self,
         ole: &OleFile<R>,
         max_entries: usize,
-    ) -> Result<Self, OleError> {
+    ) -> Result<Self, Error> {
+        let path = self
+            .path
+            .resolve(ole, max_entries)
+            .map_err(classify_resolution)?;
         Ok(Self {
             key: self.key.clone(),
-            path: CfbPath::new(self.path.resolve(ole, max_entries)?)?,
+            path: CfbPath::new(path).map_err(Error::from)?,
         })
+    }
+}
+
+static EMPTY_TARGETS: Targets = Targets {
+    targets: Vec::new(),
+};
+
+impl super::snapshot::EmptyValue for Targets {
+    fn empty() -> &'static Self {
+        &EMPTY_TARGETS
+    }
+
+    fn is_empty_value(&self) -> bool {
+        self.targets.is_empty()
     }
 }
 
@@ -91,12 +106,18 @@ pub struct Targets {
 }
 
 impl Targets {
+    /// Moves this collection into shared owner state; the empty (default)
+    /// collection allocates nothing.
+    pub(crate) fn into_shared(self) -> super::snapshot::Shared<Self> {
+        super::snapshot::Shared::new(self)
+    }
+
     /// Creates a target collection and rejects duplicate or overlapping paths.
     ///
     /// # Errors
     ///
     /// Returns an error when a target key is repeated or target paths overlap.
-    pub fn new<I>(targets: I) -> Result<Self, OleError>
+    pub fn new<I>(targets: I) -> Result<Self, Error>
     where
         I: IntoIterator<Item = Target>,
     {
@@ -161,36 +182,42 @@ impl Targets {
     ///
     /// Returns an error when the target key is repeated or its path overlaps
     /// an existing target path.
-    pub fn push(&mut self, target: Target) -> Result<(), OleError> {
+    pub fn push(&mut self, target: Target) -> Result<(), Error> {
         if self.targets.iter().any(|value| value.key == target.key) {
-            return Err(OleError::InvalidFormat(format!(
-                "duplicate object target key {:?}",
-                target.key
-            )));
+            return Err(Error::invalid_selector());
         }
         if self
             .targets
             .iter()
             .any(|value| value.path.overlaps(&target.path))
         {
-            return Err(OleError::InvalidFormat(format!(
-                "object target path overlaps {:?}",
-                target.path
-            )));
+            return Err(Error::invalid_selector());
         }
         self.targets.push(target);
         Ok(())
     }
 
-    pub(crate) fn without(&self, key: &str) -> Result<Self, OleError> {
+    pub(crate) fn without(&self, key: &str) -> Result<Self, Error> {
         let index = self
             .targets
             .iter()
             .position(|target| target.key == key)
-            .ok_or_else(|| OleError::InvalidFormat(format!("object target {key:?} not found")))?;
+            .ok_or_else(Error::target_not_found)?;
         let mut output = self.clone();
         output.targets.remove(index);
         Ok(output)
+    }
+}
+
+fn classify_resolution(error: OleError) -> Error {
+    match error {
+        OleError::InvalidFormat(message)
+            if message.starts_with("object storage path component ")
+                && message.ends_with(" not found") =>
+        {
+            Error::target_not_found()
+        },
+        error => Error::from(error),
     }
 }
 

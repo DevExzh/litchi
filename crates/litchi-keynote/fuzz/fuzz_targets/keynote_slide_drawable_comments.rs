@@ -24,8 +24,8 @@ use litchi_iwa_common::wire::{append_length_delimited_field, append_varint_field
 use litchi_iwa_core::{Archive, SnappyStream};
 use litchi_iwa_protos::{tsd, tsp};
 use litchi_keynote::{
-    DrawableSelector, DrawableSummary, Limits, Package, ReadOptions, ReplySelector, SemanticLimits,
-    SlideSelector,
+    DrawableSelector, OpenOptions, Package, ReplySelector, SemanticLimits, SlideSelector,
+    SourceLimits, slide::comment::transaction::DrawableSummary,
 };
 use prost::Message as _;
 
@@ -68,31 +68,33 @@ fn native_package() -> &'static Package {
     })
 }
 
-fn native_read_options() -> ReadOptions {
+fn native_read_options() -> OpenOptions {
     // The native comment routes perform a package-wide ownership census.  The
     // checked fixture contains 990 IWA objects, so the shared 256-entry fuzz
     // profile would reject this deterministic seed before semantic coverage.
     // Keep the widened profile local to native and hostile-native inputs.
-    static OPTIONS: OnceLock<ReadOptions> = OnceLock::new();
+    static OPTIONS: OnceLock<OpenOptions> = OnceLock::new();
     *OPTIONS.get_or_init(|| {
-        let archive = Limits::new(
-            MAX_PACKAGE_BYTES,
-            NATIVE_MAX_ENTRIES,
-            MAX_ENTRY_BYTES,
-            MAX_EXPANDED_BYTES,
-            MAX_IWA_STREAM_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid native archive limits: {error}"));
-        let semantic = SemanticLimits::new(
-            MAX_OBJECTS,
-            MAX_SLIDES,
-            NATIVE_MAX_REFERENCES,
-            MAX_TEXT_STORAGES,
-            MAX_TEXT_FRAGMENTS,
-            MAX_TEXT_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid native semantic limits: {error}"));
-        ReadOptions::new(archive, semantic)
+        let archive = SourceLimits::builder()
+            .max_input_bytes(MAX_PACKAGE_BYTES)
+            .and_then(|limits| limits.max_entries(NATIVE_MAX_ENTRIES))
+            .and_then(|limits| limits.max_entry_bytes(MAX_ENTRY_BYTES))
+            .and_then(|limits| limits.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+            .and_then(|limits| limits.max_component_bytes(MAX_IWA_STREAM_BYTES))
+            .and_then(|limits| limits.build())
+            .unwrap_or_else(|error| unreachable!("valid native archive limits: {error}"));
+        let semantic = SemanticLimits::builder()
+            .max_objects(MAX_OBJECTS)
+            .and_then(|limits| limits.max_slides(MAX_SLIDES))
+            .and_then(|limits| limits.max_references(NATIVE_MAX_REFERENCES))
+            .and_then(|limits| limits.max_text_storages(MAX_TEXT_STORAGES))
+            .and_then(|limits| limits.max_text_fragments(MAX_TEXT_FRAGMENTS))
+            .and_then(|limits| limits.max_text_bytes(MAX_TEXT_BYTES))
+            .and_then(|limits| limits.build())
+            .unwrap_or_else(|error| unreachable!("valid native semantic limits: {error}"));
+        OpenOptions::new()
+            .source_limits(archive)
+            .semantic_limits(semantic)
     })
 }
 
@@ -935,18 +937,18 @@ fn exercise_invalid_selectors(package: &Package, source_bytes: &[u8]) {
 fn exercise_limit_budget_once() {
     static RUN: OnceLock<()> = OnceLock::new();
     RUN.get_or_init(|| {
-        let semantic = SemanticLimits::new(
-            MAX_OBJECTS,
-            MAX_SLIDES,
-            1,
-            MAX_TEXT_STORAGES,
-            MAX_TEXT_FRAGMENTS,
-            MAX_TEXT_BYTES,
-        )
-        .unwrap_or_else(|error| panic!("finite comment semantic limit must build: {error}"));
+        let semantic = SemanticLimits::builder()
+            .max_objects(MAX_OBJECTS)
+            .and_then(|limits| limits.max_slides(MAX_SLIDES))
+            .and_then(|limits| limits.max_references(1))
+            .and_then(|limits| limits.max_text_storages(MAX_TEXT_STORAGES))
+            .and_then(|limits| limits.max_text_fragments(MAX_TEXT_FRAGMENTS))
+            .and_then(|limits| limits.max_text_bytes(MAX_TEXT_BYTES))
+            .and_then(|limits| limits.build())
+            .unwrap_or_else(|error| panic!("finite comment semantic limit must build: {error}"));
         match Package::from_bytes_with_options(
             NATIVE_KEYNOTE,
-            ReadOptions::new(Limits::default(), semantic),
+            OpenOptions::new().semantic_limits(semantic),
         ) {
             Err(error) => observe_error(error),
             Ok(package) => {
@@ -1095,7 +1097,7 @@ fn mutate_native_comment(source: &[u8], mutation: HostileMutation) -> Option<Vec
     if matches!(mutation, HostileMutation::UnknownHeader) {
         return None;
     }
-    let catalog = Catalog::from_bytes(source).ok()?;
+    let catalog = Catalog::from_bytes(source, ArchiveLimits::default()).ok()?;
     let mut comments = Vec::new();
     let mut referenced = BTreeSet::new();
     let mut duplicate_reply = None;
@@ -1103,10 +1105,10 @@ fn mutate_native_comment(source: &[u8], mutation: HostileMutation) -> Option<Vec
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let Ok(stream) = SnappyStream::decompress(entry.data()) else {
+        let Ok(stream) = SnappyStream::decompress(entry.data(), Default::default()) else {
             continue;
         };
-        let Ok(archive) = Archive::parse(&stream.into_bytes()) else {
+        let Ok(archive) = Archive::parse(&stream.into_bytes(), Default::default()) else {
             continue;
         };
         for object in &archive.objects {
@@ -1160,14 +1162,19 @@ fn mutate_native_comment(source: &[u8], mutation: HostileMutation) -> Option<Vec
         if entry.name() != component {
             continue;
         }
-        let stream = SnappyStream::decompress(entry.data()).ok()?;
-        let mut archive = Archive::parse(&stream.into_bytes()).ok()?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default()).ok()?;
+        let mut archive = Archive::parse(&stream.into_bytes(), Default::default()).ok()?;
         let object = archive.object_mut(identifier)?;
         let message = object.messages.get_mut(message_index)?;
         let mut payload = message.data.clone();
         if matches!(mutation, HostileMutation::UnknownPayload) {
-            append_length_delimited_field(&mut payload, 9_001, b"fuzz unknown comment metadata")
-                .ok()?;
+            append_length_delimited_field(
+                &mut payload,
+                9_001,
+                b"fuzz unknown comment metadata",
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )
+            .ok()?;
         } else {
             let reference = tsp::Reference {
                 identifier: reference_identifier,
@@ -1176,7 +1183,13 @@ fn mutate_native_comment(source: &[u8], mutation: HostileMutation) -> Option<Vec
             .encode_to_vec();
             let copies = usize::from(matches!(mutation, HostileMutation::DuplicateReply)) + 1;
             for _ in 0..copies {
-                append_length_delimited_field(&mut payload, 4, &reference).ok()?;
+                append_length_delimited_field(
+                    &mut payload,
+                    4,
+                    &reference,
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )
+                .ok()?;
                 object
                     .archive_info
                     .message_infos
@@ -1186,7 +1199,15 @@ fn mutate_native_comment(source: &[u8], mutation: HostileMutation) -> Option<Vec
             }
         }
         message.data = payload;
-        replacement = Some(SnappyStream::compress(&archive.to_bytes().ok()?).ok()?);
+        replacement = Some(
+            SnappyStream::compress(
+                &archive
+                    .to_bytes(litchi_iwa_core::Limits::default())
+                    .ok()?,
+                Default::default(),
+            )
+            .ok()?,
+        );
         break;
     }
     let replacement = replacement?;
@@ -1209,17 +1230,17 @@ fn mutate_native_comment(source: &[u8], mutation: HostileMutation) -> Option<Vec
 /// edits the decompressed IWA bytes directly and lets the archive parser prove
 /// that the resulting source remains well-framed.
 fn mutate_native_comment_header(source: &[u8]) -> Option<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source).ok()?;
+    let catalog = Catalog::from_bytes(source, ArchiveLimits::default()).ok()?;
     let mut comments = Vec::new();
     let mut referenced = BTreeSet::new();
     for entry in catalog.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let Ok(stream) = SnappyStream::decompress(entry.data()) else {
+        let Ok(stream) = SnappyStream::decompress(entry.data(), Default::default()) else {
             continue;
         };
-        let Ok(archive) = Archive::parse(&stream.into_bytes()) else {
+        let Ok(archive) = Archive::parse(&stream.into_bytes(), Default::default()) else {
             continue;
         };
         for object in &archive.objects {
@@ -1250,8 +1271,8 @@ fn mutate_native_comment_header(source: &[u8]) -> Option<Vec<u8>> {
         if entry.name() != component {
             continue;
         }
-        let stream = SnappyStream::decompress(entry.data()).ok()?.into_bytes();
-        let archive = Archive::parse(&stream).ok()?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default()).ok()?.into_bytes();
+        let archive = Archive::parse(&stream, Default::default()).ok()?;
         let object = archive.object(identifier)?;
         let header_offset = usize::try_from(object.header_offset).ok()?;
         let data_offset = usize::try_from(object.data_offset).ok()?;
@@ -1273,8 +1294,8 @@ fn mutate_native_comment_header(source: &[u8]) -> Option<Vec<u8>> {
         append_varint(&mut rewritten, u64::try_from(header.len()).ok()?);
         rewritten.extend_from_slice(&header);
         rewritten.extend_from_slice(stream.get(data_offset..)?);
-        Archive::parse(&rewritten).ok()?;
-        replacement = Some(SnappyStream::compress(&rewritten).ok()?);
+        Archive::parse(&rewritten, Default::default()).ok()?;
+        replacement = Some(SnappyStream::compress(&rewritten, Default::default()).ok()?);
         break;
     }
     let replacement = replacement?;

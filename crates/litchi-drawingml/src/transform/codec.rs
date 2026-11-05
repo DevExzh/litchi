@@ -1,13 +1,11 @@
 //! XML codec for `a:CT_Transform2D`.
 
-use std::{fmt::Write as _, io::Write};
+use std::{fmt, io::Write};
 
 use quick_xml::{
     events::{BytesStart, Event},
     reader::Reader,
 };
-
-use litchi_ooxml_common::xml::unqualified_attribute_value;
 
 use crate::{
     Error, Result,
@@ -21,6 +19,51 @@ use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 pub(crate) const MAX_XML_BYTES: usize = 1 << 20;
 const MAX_NODES: usize = 128;
 
+/// Caller-selected bounds for one raw transform fragment.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[must_use]
+pub struct Limits {
+    pub max_xml_bytes: usize,
+    pub max_nodes: usize,
+}
+
+impl Limits {
+    pub const DEFAULT: Self = Self {
+        max_xml_bytes: MAX_XML_BYTES,
+        max_nodes: MAX_NODES,
+    };
+
+    #[must_use]
+    pub const fn new(max_xml_bytes: usize, max_nodes: usize) -> Self {
+        Self {
+            max_xml_bytes,
+            max_nodes,
+        }
+    }
+
+    pub(crate) fn validate(self) -> Result<Self> {
+        for (kind, value, maximum) in [
+            (
+                crate::LimitKind::XmlBytes,
+                self.max_xml_bytes,
+                MAX_XML_BYTES,
+            ),
+            (crate::LimitKind::XmlNodes, self.max_nodes, MAX_NODES),
+        ] {
+            if value == 0 || value > maximum {
+                return Err(Error::invalid_limit(kind, value, maximum));
+            }
+        }
+        Ok(self)
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
 /// Read one complete `a:xfrm` element.
 ///
 /// The reader is intentionally fragment-oriented: a host may provide a
@@ -32,9 +75,14 @@ const MAX_NODES: usize = 128;
 ///
 /// Returns an error when input violates DrawingML constraints, exceeds a configured
 /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-pub fn read(xml: &[u8]) -> Result<Transform> {
-    if xml.len() > MAX_XML_BYTES {
-        return Err(limit("DrawingML transform XML", MAX_XML_BYTES));
+pub fn read(xml: &[u8], limits: &Limits) -> Result<Transform> {
+    let limits = limits.validate()?;
+    if xml.len() > limits.max_xml_bytes {
+        return Err(limit(
+            crate::LimitKind::XmlBytes,
+            xml.len(),
+            limits.max_xml_bytes,
+        ));
     }
 
     let mut reader = Reader::from_reader(xml);
@@ -55,9 +103,9 @@ pub fn read(xml: &[u8]) -> Result<Transform> {
             .into_owned();
         nodes = nodes
             .checked_add(1)
-            .ok_or_else(|| limit("DrawingML transform nodes", MAX_NODES))?;
-        if nodes > MAX_NODES {
-            return Err(limit("DrawingML transform nodes", MAX_NODES));
+            .ok_or_else(|| limit(crate::LimitKind::XmlNodes, nodes, limits.max_nodes))?;
+        if nodes > limits.max_nodes {
+            return Err(limit(crate::LimitKind::XmlNodes, nodes, limits.max_nodes));
         }
 
         match event {
@@ -89,6 +137,7 @@ pub fn read(xml: &[u8]) -> Result<Transform> {
                     &mut reader,
                     &mut buffer,
                     &mut nodes,
+                    limits.max_nodes,
                 )?;
             },
             Event::Empty(element) if root_open => {
@@ -159,19 +208,41 @@ pub fn read(xml: &[u8]) -> Result<Transform> {
 ///
 /// Returns an error when input violates DrawingML constraints, exceeds a configured
 /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-pub fn write(transform: &Transform) -> Result<Vec<u8>> {
+pub fn write(transform: &Transform, limits: &Limits) -> Result<Vec<u8>> {
+    let limits = limits.validate()?;
     validation::validate(transform)?;
 
-    let mut xml = String::with_capacity(192);
-    xml.push_str("<a:xfrm");
+    let mut length = LengthWriter::default();
+    write_transform_xml(&mut length, transform).map_err(format_error)?;
+    if length.overflow {
+        return Err(limit(
+            crate::LimitKind::XmlBytes,
+            usize::MAX,
+            limits.max_xml_bytes,
+        ));
+    }
+    if length.len > limits.max_xml_bytes {
+        return Err(limit(
+            crate::LimitKind::XmlBytes,
+            length.len,
+            limits.max_xml_bytes,
+        ));
+    }
+    let mut xml = String::with_capacity(length.len);
+    write_transform_xml(&mut xml, transform).map_err(format_error)?;
+    Ok(xml.into_bytes())
+}
+
+fn write_transform_xml<W: fmt::Write>(xml: &mut W, transform: &Transform) -> fmt::Result {
+    xml.write_str("<a:xfrm")?;
     if let Some(value) = transform.authored_rotation() {
-        write!(xml, r#" rot="{}""#, value.value()).map_err(format_error)?;
+        write!(xml, r#" rot="{}""#, value.value())?;
     }
     if let Some(value) = transform.authored_flip_horizontal() {
-        write!(xml, r#" flipH="{}""#, bool_token(value)).map_err(format_error)?;
+        write!(xml, r#" flipH="{}""#, bool_token(value))?;
     }
     if let Some(value) = transform.authored_flip_vertical() {
-        write!(xml, r#" flipV="{}""#, bool_token(value)).map_err(format_error)?;
+        write!(xml, r#" flipV="{}""#, bool_token(value))?;
     }
 
     let has_children = transform.offset().is_some()
@@ -179,25 +250,23 @@ pub fn write(transform: &Transform) -> Result<Vec<u8>> {
         || transform.child_offset().is_some()
         || transform.child_extent().is_some();
     if !has_children {
-        xml.push_str("/>");
-        return checked_output(xml.into_bytes());
+        return xml.write_str("/>");
     }
 
-    xml.push('>');
+    xml.write_char('>')?;
     if let Some(value) = transform.offset() {
-        write_point(&mut xml, "off", value).map_err(format_error)?;
+        write_point(xml, "off", value)?;
     }
     if let Some(value) = transform.extent() {
-        write_size(&mut xml, "ext", value).map_err(format_error)?;
+        write_size(xml, "ext", value)?;
     }
     if let Some(value) = transform.child_offset() {
-        write_point(&mut xml, "chOff", value).map_err(format_error)?;
+        write_point(xml, "chOff", value)?;
     }
     if let Some(value) = transform.child_extent() {
-        write_size(&mut xml, "chExt", value).map_err(format_error)?;
+        write_size(xml, "chExt", value)?;
     }
-    xml.push_str("</a:xfrm>");
-    checked_output(xml.into_bytes())
+    xml.write_str("</a:xfrm>")
 }
 
 /// Serialize a transform to a caller-owned sink.
@@ -205,9 +274,39 @@ pub fn write(transform: &Transform) -> Result<Vec<u8>> {
 ///
 /// Returns an error when input violates DrawingML constraints, exceeds a configured
 /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-pub fn write_to<W: Write>(writer: &mut W, transform: &Transform) -> Result<()> {
-    writer.write_all(&write(transform)?)?;
+pub fn write_to<W: Write>(writer: &mut W, transform: &Transform, limits: &Limits) -> Result<()> {
+    let limits = limits.validate()?;
+    validation::validate(transform)?;
+    let mut length = LengthWriter::default();
+    write_transform_xml(&mut length, transform).map_err(format_error)?;
+    if length.overflow {
+        return Err(limit(
+            crate::LimitKind::XmlBytes,
+            usize::MAX,
+            limits.max_xml_bytes,
+        ));
+    }
+    if length.len > limits.max_xml_bytes {
+        return Err(limit(
+            crate::LimitKind::XmlBytes,
+            length.len,
+            limits.max_xml_bytes,
+        ));
+    }
+    write_transform_to(writer, transform)?;
     Ok(())
+}
+
+fn write_transform_to<W: Write>(writer: &mut W, transform: &Transform) -> Result<()> {
+    let mut sink = IoFmtWriter {
+        writer,
+        error: None,
+    };
+    let result = write_transform_xml(&mut sink, transform);
+    if let Some(error) = sink.error {
+        return Err(Error::Io(error));
+    }
+    result.map_err(format_error)
 }
 
 fn parse_root_attributes(
@@ -235,10 +334,11 @@ fn parse_child_start(
     reader: &mut Reader<&[u8]>,
     buffer: &mut Vec<u8>,
     nodes: &mut usize,
+    max_nodes: usize,
 ) -> Result<()> {
     let local = element.local_name();
     let value = parse_child_value(local.as_ref(), element, decoder)?;
-    consume_leaf(reader, buffer, local.as_ref(), nodes)?;
+    consume_leaf(reader, buffer, local.as_ref(), nodes, max_nodes)?;
     set_child(transform, local.as_ref(), value)
 }
 
@@ -307,6 +407,7 @@ fn consume_leaf(
     buffer: &mut Vec<u8>,
     expected: &[u8],
     nodes: &mut usize,
+    max_nodes: usize,
 ) -> Result<()> {
     loop {
         let event = reader
@@ -315,9 +416,9 @@ fn consume_leaf(
             .into_owned();
         *nodes = nodes
             .checked_add(1)
-            .ok_or_else(|| limit("DrawingML transform nodes", MAX_NODES))?;
-        if *nodes > MAX_NODES {
-            return Err(limit("DrawingML transform nodes", MAX_NODES));
+            .ok_or_else(|| limit(crate::LimitKind::XmlNodes, *nodes, max_nodes))?;
+        if *nodes > max_nodes {
+            return Err(limit(crate::LimitKind::XmlNodes, *nodes, max_nodes));
         }
         match event {
             Event::End(element) if element.local_name().as_ref() == expected => return Ok(()),
@@ -363,10 +464,7 @@ fn validate_attributes(
             continue;
         }
         if !allowed.contains(&raw) {
-            return Err(invalid(format!(
-                "unsupported {description} attribute '{}'",
-                String::from_utf8_lossy(raw)
-            )));
+            return Err(invalid(format!("unsupported {description} attribute")));
         }
     }
     Ok(())
@@ -380,8 +478,18 @@ fn required_coordinate(
 ) -> Result<Coordinate> {
     let value = unqualified_attribute_value(element, name, decoder)?
         .ok_or_else(|| invalid(format!("DrawingML transform {description} is missing")))?;
-    Coordinate::parse(&value)
-        .map_err(|error| invalid(format!("invalid transform {description}: {error}")))
+    Coordinate::parse(&value).map_err(|error| match error {
+        crate::coordinate::ParseError::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind,
+            observed,
+            maximum,
+        },
+        _ => invalid(format!("invalid transform {description}")),
+    })
 }
 
 fn required_extent(
@@ -392,8 +500,18 @@ fn required_extent(
 ) -> Result<Extent> {
     let value = unqualified_attribute_value(element, name, decoder)?
         .ok_or_else(|| invalid(format!("DrawingML transform {description} is missing")))?;
-    Extent::parse(&value)
-        .map_err(|error| invalid(format!("invalid transform {description}: {error}")))
+    Extent::parse(&value).map_err(|error| match error {
+        crate::coordinate::ParseError::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind,
+            observed,
+            maximum,
+        },
+        _ => invalid(format!("invalid transform {description}")),
+    })
 }
 
 fn child_order(local: &[u8]) -> Option<u8> {
@@ -411,7 +529,7 @@ fn parse_bool(value: &str, name: &str) -> Result<bool> {
         "1" | "true" => Ok(true),
         "0" | "false" => Ok(false),
         _ => Err(invalid(format!(
-            "invalid DrawingML transform {name} boolean '{value}'"
+            "invalid DrawingML transform {name} boolean"
         ))),
     }
 }
@@ -420,11 +538,11 @@ fn bool_token(value: bool) -> &'static str {
     if value { "1" } else { "0" }
 }
 
-fn write_point(xml: &mut String, name: &str, point: &Point) -> std::fmt::Result {
+fn write_point<W: fmt::Write>(xml: &mut W, name: &str, point: &Point) -> fmt::Result {
     write!(xml, r#"<a:{name} x="{}" y="{}"/>"#, point.x(), point.y())
 }
 
-fn write_size(xml: &mut String, name: &str, size: Size) -> std::fmt::Result {
+fn write_size<W: fmt::Write>(xml: &mut W, name: &str, size: Size) -> fmt::Result {
     write!(
         xml,
         r#"<a:{name} cx="{}" cy="{}"/>"#,
@@ -433,32 +551,66 @@ fn write_size(xml: &mut String, name: &str, size: Size) -> std::fmt::Result {
     )
 }
 
-fn checked_output(output: Vec<u8>) -> Result<Vec<u8>> {
-    if output.len() > MAX_XML_BYTES {
-        return Err(limit("DrawingML transform output", MAX_XML_BYTES));
+struct IoFmtWriter<'a, W> {
+    writer: &'a mut W,
+    error: Option<std::io::Error>,
+}
+
+impl<W: Write> fmt::Write for IoFmtWriter<'_, W> {
+    fn write_str(&mut self, value: &str) -> fmt::Result {
+        match self.writer.write_all(value.as_bytes()) {
+            Ok(()) => Ok(()),
+            Err(error) => {
+                self.error = Some(error);
+                Err(fmt::Error)
+            },
+        }
     }
-    Ok(output)
 }
 
-fn format_error(error: std::fmt::Error) -> Error {
+#[derive(Default)]
+struct LengthWriter {
+    len: usize,
+    overflow: bool,
+}
+
+impl fmt::Write for LengthWriter {
+    fn write_str(&mut self, value: &str) -> fmt::Result {
+        match self.len.checked_add(value.len()) {
+            Some(length) => self.len = length,
+            None => {
+                self.len = usize::MAX;
+                self.overflow = true;
+            },
+        }
+        Ok(())
+    }
+}
+
+fn format_error(error: fmt::Error) -> Error {
     Error::Xml(error.to_string())
 }
 
-fn xml_error(error: impl std::fmt::Display) -> Error {
-    Error::Xml(error.to_string())
+fn xml_error(_error: impl fmt::Display) -> Error {
+    Error::Xml("malformed DrawingML transform XML".into())
 }
 
 fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-fn unsupported_child(local: &[u8]) -> Error {
-    invalid(format!(
-        "unsupported DrawingML transform child '{}'",
-        String::from_utf8_lossy(local)
-    ))
+fn unsupported_child(_local: &[u8]) -> Error {
+    invalid("unsupported DrawingML transform child")
 }
 
-fn limit(resource: &'static str, limit: usize) -> Error {
-    Error::Limit { resource, limit }
+fn unqualified_attribute_value(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: quick_xml::encoding::Decoder,
+) -> Result<Option<String>> {
+    litchi_ooxml_common::xml::unqualified_attribute_value(element, name, decoder).map_err(xml_error)
+}
+
+fn limit(kind: crate::LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::limit(kind, observed, maximum)
 }

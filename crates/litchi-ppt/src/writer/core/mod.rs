@@ -10,7 +10,7 @@ mod package;
 #[cfg(test)]
 mod tests;
 
-pub use model::{ShapeProperties, ShapeType, TextAlignment, WriteError, Writer};
+pub use model::{Builder, ShapeProperties, ShapeType, TextAlignment, WriteError};
 
 // Internal names retained for the focused owner tests.
 #[cfg(test)]

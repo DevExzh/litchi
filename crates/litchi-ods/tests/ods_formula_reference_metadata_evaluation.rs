@@ -21,7 +21,7 @@ use litchi_ods::codec::formula::{
     evaluation::{EvaluationFailure, ScalarError, ScalarValue, UnsupportedKind, evaluate_scalar},
     expression::Expression,
 };
-use litchi_ods::{Builder, Spreadsheet};
+use litchi_ods::{Builder, Package};
 
 #[derive(Debug, Clone)]
 enum CellValue {
@@ -173,7 +173,8 @@ fn execution(scope: &str) -> (Budget, CancellationSource, ExecutionContext) {
 }
 
 fn parse(source: &str) -> Expression {
-    Expression::parse(source).unwrap_or_else(|error| panic!("{source:?} should parse: {error}"))
+    Expression::parse(source, &Default::default())
+        .unwrap_or_else(|error| panic!("{source:?} should parse: {error}"))
 }
 
 #[derive(Debug, PartialEq)]
@@ -1344,12 +1345,16 @@ fn source_policy_survives_scalar_error_fallback_but_not_matrix_value_conversion(
 fn worksheet_resolver_counts_the_full_ordered_source_including_hidden_named_sheet() {
     use litchi_ods::worksheet::formula::Resolver as WorksheetResolver;
     const CONTENT: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" office:version="1.3"><office:automatic-styles><style:style style:name="hidden-sheet" style:family="table"><style:table-properties table:display="false"/></style:style></office:automatic-styles><office:body><office:spreadsheet><table:table table:name="Main"><table:table-row><table:table-cell office:value-type="float" office:value="1"><text:p>1</text:p></table:table-cell></table:table-row></table:table><table:table table:name="Hidden" table:style-name="hidden-sheet"><table:table-row><table:table-cell office:value-type="float" office:value="2"><text:p>2</text:p></table:table-cell></table:table-row></table:table><table:table table:name="Archive"><table:table-row><table:table-cell office:value-type="float" office:value="3"><text:p>3</text:p></table:table-cell></table:table-row></table:table></office:spreadsheet></office:body></office:document-content>"#;
-    let spreadsheet = Spreadsheet::from_bytes(
-        Builder::new()
+    let spreadsheet = Package::from_bytes(
+        &Builder::new()
             .content_xml(CONTENT)
             .build()
+            .expect("hidden worksheet ODS fixture should build")
+            .to_bytes()
             .expect("hidden worksheet ODS fixture should build"),
     )
+    .expect("hidden worksheet ODS fixture should parse")
+    .workbook()
     .expect("hidden worksheet ODS fixture should parse");
     assert!(
         spreadsheet

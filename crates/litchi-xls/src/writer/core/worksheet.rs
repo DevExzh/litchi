@@ -12,7 +12,7 @@ use crate::writer::biff::AutoFilterConditionWrite;
 use crate::writer::formula::{FormulaTokenizer, compile_array_formula, encode_ptg_tokens};
 use crate::{Error, Result};
 
-use super::model::Writer;
+use super::model::Builder;
 
 use crate::formula_metadata::{Cell as FormulaCell, Owner, Range as FormulaRange, array};
 
@@ -545,7 +545,7 @@ impl WritableWorksheet {
     }
 }
 
-impl Writer {
+impl Builder {
     /// Write one inert BIFF8 shared formula and its participating cells.
     ///
     /// `range` becomes the `ShrFmla` `RefU`. `participants` is the complete
@@ -662,54 +662,14 @@ impl Writer {
         range: FormulaRange,
         formula: &str,
     ) -> Result<()> {
-        self.write_array_formula_with_format_and_limits(
-            sheet,
-            range,
-            formula,
-            0,
-            array::Limits::default(),
-        )
-    }
-
-    /// Write an inert BIFF8 array formula with explicit resource limits.
-    /// # Errors
-    ///
-    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn write_array_formula_with_limits(
-        &mut self,
-        sheet: usize,
-        range: FormulaRange,
-        formula: &str,
-        limits: array::Limits,
-    ) -> Result<()> {
-        self.write_array_formula_with_format_and_limits(sheet, range, formula, 0, limits)
-    }
-
-    /// Write a formatted, inert BIFF8 array formula over a complete rectangle.
-    /// # Errors
-    ///
-    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn write_array_formula_with_format(
-        &mut self,
-        sheet: usize,
-        range: FormulaRange,
-        formula: &str,
-        format_id: u16,
-    ) -> Result<()> {
-        self.write_array_formula_with_format_and_limits(
-            sheet,
-            range,
-            formula,
-            format_id,
-            array::Limits::default(),
-        )
+        self.write_array_formula_with_format(sheet, range, formula, 0, array::Limits::default())
     }
 
     /// Write a formatted, inert BIFF8 array formula with explicit limits.
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn write_array_formula_with_format_and_limits(
+    pub fn write_array_formula_with_format(
         &mut self,
         sheet: usize,
         range: FormulaRange,

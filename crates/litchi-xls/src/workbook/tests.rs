@@ -1,7 +1,7 @@
 //! Focused tests for the layered XLS workbook owner.
 
-use super::super::{OpenOptions, Workbook};
 use super::codec::pivot_cache_stream_paths;
+use super::model::{OpenOptions, Reader};
 use crate::number_format::Formatting;
 use crate::records::Encoding;
 use litchi_biff::Records;
@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 #[cfg(test)]
 mod defined_name_tests {
-    use super::{OpenOptions, Workbook};
+    use super::{OpenOptions, Reader};
     use crate::{BuiltInName, DefinedNameKind, NameScope};
     use std::fs::File;
     use std::path::{Path, PathBuf};
@@ -22,8 +22,8 @@ mod defined_name_tests {
             .join(name)
     }
 
-    fn open(name: &str) -> Workbook<File> {
-        Workbook::new(File::open(poi_fixture(name)).unwrap()).unwrap()
+    fn open(name: &str) -> Reader<File> {
+        Reader::new(File::open(poi_fixture(name)).unwrap()).unwrap()
     }
 
     #[test]
@@ -107,9 +107,27 @@ mod defined_name_tests {
     #[test]
     fn parses_names_after_xor_decryption() {
         let file = File::open(poi_fixture("xor-encryption-abc.xls")).unwrap();
-        let workbook =
-            Workbook::new_with_options(file, OpenOptions::new().with_password("abc")).unwrap();
+        let workbook = Reader::new_with_options(file, OpenOptions::new().password("abc")).unwrap();
         assert!(workbook.defined_names().len() <= usize::from(u16::MAX));
+    }
+
+    #[test]
+    fn a_password_required_open_hands_the_parsed_container_back() {
+        let ole = litchi_cfb::OleFile::open(
+            File::open(poi_fixture("xor-encryption-abc.xls")).unwrap(),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
+        let ole = match Reader::from_ole_file_or_password_required(ole, OpenOptions::new()) {
+            Ok(Err(ole)) => ole,
+            Ok(Ok(_)) => panic!("an encrypted workbook opened without a password"),
+            Err(error) => panic!("expected the container back, got {error}"),
+        };
+        let workbook =
+            Reader::from_ole_file_or_password_required(ole, OpenOptions::new().password("abc"))
+                .unwrap()
+                .unwrap_or_else(|_| panic!("the returned container opens with its password"));
+        assert!(litchi_core::sheet::WorkbookTrait::worksheet_count(&workbook) > 0);
     }
 }
 
@@ -217,9 +235,10 @@ fn worksheet_expands_packed_numeric_and_blank_cells() {
     push_record(&mut stream, 0x00BD, &mul_rk);
     push_record(&mut stream, 0x00BE, &mul_blank);
     push_record(&mut stream, 0x000A, &[]);
-    let mut records = Records::new(&stream);
+    let mut records =
+        Records::new(&stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
 
-    let worksheet = Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+    let worksheet = Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
         &mut records,
         stream.len() as u64,
         0,
@@ -258,9 +277,10 @@ fn worksheet_resolves_formula_value_from_following_string_record() {
     push_record(&mut stream, 0x0006, &string_formula_data(4, 5));
     push_record(&mut stream, 0x0207, &string_data);
     push_record(&mut stream, 0x000A, &[]);
-    let mut records = Records::new(&stream);
+    let mut records =
+        Records::new(&stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
 
-    let worksheet = Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+    let worksheet = Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
         &mut records,
         stream.len() as u64,
         0,
@@ -306,8 +326,9 @@ fn worksheet_refuses_several_orphan_ptg_exp_formulas_deterministically() {
     }
     push_record(&mut stream, 0x000A, &[]);
     for _ in 0..32 {
-        let mut records = Records::new(&stream);
-        let error = Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+        let mut records =
+            Records::new(&stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
+        let error = Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
             &mut records,
             stream.len() as u64,
             0,
@@ -332,9 +353,10 @@ fn worksheet_rejects_formula_missing_its_string_record() {
     let mut stream = Vec::new();
     push_record(&mut stream, 0x0006, &string_formula_data(0, 0));
     push_record(&mut stream, 0x000A, &[]);
-    let mut records = Records::new(&stream);
+    let mut records =
+        Records::new(&stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
 
-    let result = Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+    let result = Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
         &mut records,
         stream.len() as u64,
         0,
@@ -372,8 +394,9 @@ fn custom_view_closing_record_restores_primary_page_setup_collection() {
     push_record(&mut stream, 0x0014, &[]);
     push_record(&mut stream, 0x000A, &[]);
 
-    let mut records = Records::new(&stream);
-    let worksheet = Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+    let mut records =
+        Records::new(&stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
+    let worksheet = Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
         &mut records,
         stream.len() as u64,
         0,
@@ -420,9 +443,10 @@ fn worksheet_resolves_string_formula_across_intervening_array_record() {
     push_record(&mut stream, 0x0221, &array);
     push_record(&mut stream, 0x0207, &string_data);
     push_record(&mut stream, 0x000A, &[]);
-    let mut records = Records::new(&stream);
+    let mut records =
+        Records::new(&stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
 
-    let worksheet = Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+    let worksheet = Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
         &mut records,
         stream.len() as u64,
         0,
@@ -464,9 +488,10 @@ fn worksheet_resolves_string_formula_spanning_continue_records() {
     push_record(&mut stream, 0x0207, &string_data);
     push_record(&mut stream, 0x003C, &continues);
     push_record(&mut stream, 0x000A, &[]);
-    let mut records = Records::new(&stream);
+    let mut records =
+        Records::new(&stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
 
-    let worksheet = Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+    let worksheet = Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
         &mut records,
         stream.len() as u64,
         0,
@@ -497,8 +522,9 @@ fn worksheet_enforces_dval_dv_ordering() {
         &dval_data(0),
     );
     push_record(&mut stream, 0x000A, &[]);
-    let mut records = Records::new(&stream);
-    let worksheet = Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+    let mut records =
+        Records::new(&stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
+    let worksheet = Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
         &mut records,
         stream.len() as u64,
         0,
@@ -527,9 +553,10 @@ fn worksheet_enforces_dval_dv_ordering() {
         &dval_data(1),
     );
     push_record(&mut stream, 0x000A, &[]);
-    let mut records = Records::new(&stream);
+    let mut records =
+        Records::new(&stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
     assert!(
-        Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+        Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
             &mut records,
             stream.len() as u64,
             0,
@@ -548,7 +575,7 @@ fn worksheet_enforces_dval_dv_ordering() {
 #[test]
 fn reads_data_validation_fixtures() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let empty = Workbook::new(
+    let empty = Reader::new(
         std::fs::File::open(root.join("test-data/poi/test-data/spreadsheet/dvEmpty.xls")).unwrap(),
     )
     .unwrap();
@@ -562,7 +589,7 @@ fn reads_data_validation_fixtures() {
     );
     assert!(sheet.data_validations().is_empty());
 
-    let validation = Workbook::new(
+    let validation = Reader::new(
         std::fs::File::open(
             root.join("test-data/libreoffice-core/sc/qa/unit/data/xls/validation.xls"),
         )
@@ -644,9 +671,10 @@ fn worksheet_rejects_malformed_optional_validation_records_and_continue() {
             stream
         },
     ] {
-        let mut records = Records::new(&stream);
+        let mut records =
+            Records::new(&stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
         assert!(
-            Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+            Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
                 &mut records,
                 stream.len() as u64,
                 0,
@@ -686,8 +714,9 @@ fn worksheet_expands_shared_formula_relative_references() {
     participant_formula[14..16].copy_from_slice(&0x0008u16.to_le_bytes());
     push_record(&mut stream, 0x0006, &participant_formula);
     push_record(&mut stream, 0x000a, &[]);
-    let mut records = Records::new(&stream);
-    let worksheet = Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+    let mut records =
+        Records::new(&stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
+    let worksheet = Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
         &mut records,
         stream.len() as u64,
         0,
@@ -728,8 +757,9 @@ fn worksheet_resolves_array_formula_for_every_cell() {
     push_record(&mut stream, 0x0221, &array);
     push_record(&mut stream, 0x0006, &formula_data(1, 2, &anchor));
     push_record(&mut stream, 0x000a, &[]);
-    let mut records = Records::new(&stream);
-    let worksheet = Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+    let mut records =
+        Records::new(&stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
+    let worksheet = Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
         &mut records,
         stream.len() as u64,
         0,
@@ -793,9 +823,10 @@ fn worksheet_rejects_orphan_and_incomplete_array_ptg_exp_links() {
     };
 
     for stream in [orphan, incomplete] {
-        let mut records = Records::new(&stream);
+        let mut records =
+            Records::new(&stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
         assert!(
-            Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+            Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
                 &mut records,
                 stream.len() as u64,
                 0,
@@ -865,9 +896,10 @@ fn worksheet_rejects_array_without_dimensions_and_second_formula_companion() {
         with_second_companion,
         cross_kind_same_anchor,
     ] {
-        let mut records = Records::new(&stream);
+        let mut records =
+            Records::new(&stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
         assert!(
-            Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+            Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
                 &mut records,
                 stream.len() as u64,
                 0,
@@ -890,9 +922,10 @@ fn worksheet_rejects_formula_companions_without_an_adjacent_formula() {
         let mut stream = Vec::new();
         push_record(&mut stream, record_type, &[]);
         push_record(&mut stream, 0x000a, &[]);
-        let mut records = Records::new(&stream);
+        let mut records =
+            Records::new(&stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
         assert!(
-            Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+            Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
                 &mut records,
                 stream.len() as u64,
                 0,
@@ -926,8 +959,9 @@ fn worksheet_indexes_many_array_ranges_and_rejects_indexed_overlap() {
         }
     }
     push_record(&mut nonoverlap, 0x000a, &[]);
-    let mut records = Records::new(&nonoverlap);
-    let worksheet = Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+    let mut records =
+        Records::new(&nonoverlap, litchi_biff::Limits::default()).expect("valid BIFF limits");
+    let worksheet = Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
         &mut records,
         nonoverlap.len() as u64,
         0,
@@ -952,9 +986,10 @@ fn worksheet_indexes_many_array_ranges_and_rejects_indexed_overlap() {
     push_record(&mut overlap, 0x0006, &formula_data(0, 1, &second_anchor));
     push_record(&mut overlap, 0x0221, &array_data(0, 0, 1, 2));
     push_record(&mut overlap, 0x000a, &[]);
-    let mut records = Records::new(&overlap);
+    let mut records =
+        Records::new(&overlap, litchi_biff::Limits::default()).expect("valid BIFF limits");
     assert!(
-        Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+        Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
             &mut records,
             overlap.len() as u64,
             0,
@@ -968,4 +1003,51 @@ fn worksheet_indexes_many_array_ranges_and_rejects_indexed_overlap() {
         )
         .is_err()
     );
+}
+
+/// An embedded chart substream (BOF ... EOF after its drawing object) holds
+/// chart-sheet records such as HEADER and its own EOF. The worksheet parser
+/// must skip it: before record 0293 it stopped at the chart's EOF, and the
+/// chart's HEADER collided with the worksheet's, so the complete reader
+/// dropped the worksheet.
+#[test]
+fn worksheet_skips_embedded_chart_substreams() {
+    let mut number = Vec::new();
+    number.extend_from_slice(&1u16.to_le_bytes());
+    number.extend_from_slice(&0u16.to_le_bytes());
+    number.extend_from_slice(&15u16.to_le_bytes());
+    number.extend_from_slice(&4.5f64.to_le_bytes());
+    let mut chart_bof = Vec::new();
+    chart_bof.extend_from_slice(&0x0600u16.to_le_bytes());
+    chart_bof.extend_from_slice(&0x0020u16.to_le_bytes());
+    chart_bof.extend_from_slice(&[0; 12]);
+
+    let mut stream = Vec::new();
+    push_record(&mut stream, 0x0014, &[0, 0, 0]);
+    push_record(&mut stream, 0x0809, &chart_bof);
+    push_record(&mut stream, 0x0014, &[0, 0, 0]);
+    push_record(&mut stream, 0x000A, &[]);
+    push_record(&mut stream, 0x0203, &number);
+    push_record(&mut stream, 0x000A, &[]);
+    let mut records =
+        Records::new(&stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
+
+    let worksheet = Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
+        &mut records,
+        stream.len() as u64,
+        0,
+        0,
+        &Encoding::Utf16Le,
+        "Sheet1",
+        Arc::new(Vec::new()),
+        Arc::new(Vec::new()),
+        None,
+        Arc::new(Formatting::default()),
+    )
+    .unwrap();
+    assert!(matches!(
+        worksheet.get_cell(1, 0).unwrap().value(),
+        litchi_core::sheet::CellValue::Float(value) if *value == 4.5
+    ));
+    assert!(records.next().is_none());
 }

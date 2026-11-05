@@ -10,7 +10,7 @@ use super::table::{Table, map_table_error};
 /// Archive adapter used while decoding one native sheet.
 ///
 /// This type is intentionally opaque outside the Numbers package adapter;
-/// callers that need archive-free semantics should use [`crate::Document`].
+/// callers that need archive-free semantics should use [`crate::Workbook`].
 #[derive(Debug, Clone)]
 pub(super) struct DecodedSheet {
     pub(crate) name: String,

@@ -20,8 +20,11 @@ fn fixture_path() -> PathBuf {
 fn prepared_source_handoff_preserves_bytes_and_semantics() -> Result<(), Box<dyn std::error::Error>>
 {
     let source: Arc<[u8]> = std::fs::read(fixture_path())?.into();
-    let prepared = PreparedSource::from_shared_bytes(Arc::clone(&source))?
-        .ok_or_else(|| std::io::Error::other("native Keynote fixture was not detected"))?;
+    let prepared = PreparedSource::from_shared_bytes(
+        Arc::clone(&source),
+        litchi_iwa_detect::Limits::default(),
+    )?
+    .ok_or_else(|| std::io::Error::other("native Keynote fixture was not detected"))?;
     assert_eq!(prepared.format(), Format::Keynote);
 
     let package = Package::__from_prepared_source(prepared, SemanticLimits::default())?;
@@ -30,7 +33,7 @@ fn prepared_source_handoff_preserves_bytes_and_semantics() -> Result<(), Box<dyn
     assert_eq!(exact_bytes(&package)?, source.as_ref());
     assert_eq!(package.show()?, direct.show()?);
     assert_eq!(
-        package.semantic_snapshot()?.slides().as_ptr(),
+        package.presentation()?.slides().as_ptr(),
         package.slides()?.as_ptr()
     );
     Ok(())

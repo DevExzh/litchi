@@ -136,8 +136,8 @@ impl Seek for Bounded {
 /// Read only the bounded `EncryptionInfo` stream for password-free classification.
 pub(super) fn read_info(bytes: &[u8], limits: &Limits) -> Result<Vec<u8>> {
     Limits::bytes("compound input", bytes.len(), limits.max_input_bytes)?;
-    let mut ole = OleFile::open_with_limits(Cursor::new(bytes), cfb_limits(limits)?)
-        .map_err(map_reader_error)?;
+    let mut ole =
+        OleFile::open(Cursor::new(bytes), cfb_limits(limits)?).map_err(map_reader_error)?;
     let info_len = ole
         .stream_len(&["EncryptionInfo"])
         .map_err(map_reader_error)?;
@@ -162,34 +162,42 @@ pub(super) fn write(info: &[u8], encrypted: Vec<u8>, limits: &Limits) -> Result<
     // a descriptor: `agile::build_info` always emits authenticated metadata.
     let mode =
         super::profile_with_policy(info, limits, super::IntegrityPolicy::AllowUnauthenticated)?;
-    let map = spaces::write_map(&expected_map()).map_err(|error| map_spaces_error(&error))?;
-    let definition = spaces::write_definition(&Definition {
-        transforms: vec![TRANSFORM.to_string()],
-    })
-    .map_err(|error| map_spaces_error(&error))?;
-    let primary = spaces::write_encryption_transform(&EncryptionTransform {
-        header: Header {
-            transform_id: ENCRYPTION_ID.to_string(),
-            transform_name: ENCRYPTION_NAME.to_string(),
-            reader: Version::V1_0,
-            updater: Version::V1_0,
-            writer: Version::V1_0,
+    let data_spaces_limits = spaces_limits(limits);
+    let map = spaces::write_map(&expected_map(), &data_spaces_limits)
+        .map_err(|error| map_spaces_error(&error))?;
+    let definition = spaces::write_definition(
+        &Definition {
+            transforms: vec![TRANSFORM.to_string()],
         },
-        encryption_name: if mode.is_standard() {
-            Some(match mode {
-                Mode::Standard => "AES 128".to_string(),
-                Mode::StandardAes192 => "AES 192".to_string(),
-                Mode::StandardAes256 => "AES 256".to_string(),
-                _ => unreachable!("standard mode is exhaustive"),
-            })
-        } else {
-            None
-        },
-        encryption_block_size: 16,
-        cipher_mode: 0,
-    })
+        &data_spaces_limits,
+    )
     .map_err(|error| map_spaces_error(&error))?;
-    let version = spaces::write_version_info(&VersionInfo::default())
+    let primary = spaces::write_encryption_transform(
+        &EncryptionTransform {
+            header: Header {
+                transform_id: ENCRYPTION_ID.to_string(),
+                transform_name: ENCRYPTION_NAME.to_string(),
+                reader: Version::V1_0,
+                updater: Version::V1_0,
+                writer: Version::V1_0,
+            },
+            encryption_name: if mode.is_standard() {
+                Some(match mode {
+                    Mode::Standard => "AES 128".to_string(),
+                    Mode::StandardAes192 => "AES 192".to_string(),
+                    Mode::StandardAes256 => "AES 256".to_string(),
+                    _ => unreachable!("standard mode is exhaustive"),
+                })
+            } else {
+                None
+            },
+            encryption_block_size: 16,
+            cipher_mode: 0,
+        },
+        &data_spaces_limits,
+    )
+    .map_err(|error| map_spaces_error(&error))?;
+    let version = spaces::write_version_info(&VersionInfo::default(), &data_spaces_limits)
         .map_err(|error| map_spaces_error(&error))?;
 
     let mut writer = OleWriter::new();
@@ -234,8 +242,8 @@ pub(super) fn write(info: &[u8], encrypted: Vec<u8>, limits: &Limits) -> Result<
 /// Read and validate the two encryption streams from a bounded compound file.
 pub(super) fn read(bytes: Vec<u8>, limits: &Limits) -> Result<(Vec<u8>, Vec<u8>)> {
     Limits::bytes("compound input", bytes.len(), limits.max_input_bytes)?;
-    let mut ole = OleFile::open_with_limits(Cursor::new(bytes), cfb_limits(limits)?)
-        .map_err(map_reader_error)?;
+    let mut ole =
+        OleFile::open(Cursor::new(bytes), cfb_limits(limits)?).map_err(map_reader_error)?;
 
     let info_len = ole
         .stream_len(&["EncryptionInfo"])
@@ -249,7 +257,10 @@ pub(super) fn read(bytes: Vec<u8>, limits: &Limits) -> Result<(Vec<u8>, Vec<u8>)
     // LibreOffice has emitted otherwise valid encrypted packages without the
     // DataSpaces storage. Retain that narrow read compatibility, but when the
     // graph exists require the complete StrongEncryption profile.
-    match spaces::inspect_ooxml(&mut ole).map_err(|error| map_spaces_error(&error))? {
+    let data_spaces_limits = spaces_limits(limits);
+    match spaces::inspect_ooxml(&mut ole, &data_spaces_limits)
+        .map_err(|error| map_spaces_error(&error))?
+    {
         Some(graph) => validate_graph(&graph, mode)?,
         None if limits.allow_missing_data_spaces => {},
         None => {
@@ -272,6 +283,21 @@ pub(super) fn read(bytes: Vec<u8>, limits: &Limits) -> Result<(Vec<u8>, Vec<u8>)
         .map_err(map_reader_error)?;
     drop(ole);
     Ok((info, encrypted))
+}
+
+fn spaces_limits(limits: &Limits) -> spaces::Limits {
+    spaces::Limits {
+        max_stream_bytes: limits
+            .max_info_bytes
+            .min(litchi_ole_common::dataspaces::MAX_STREAM_BYTES),
+        max_total_bytes: limits.max_input_bytes.min(512 * 1024 * 1024),
+        max_entries: limits.max_xml_nodes.min(65_536),
+        max_components: (limits.max_xml_nodes.saturating_mul(8)).min(65_536 * 8),
+        max_string_bytes: limits.max_xml_bytes.min(1_048_576),
+        max_xml_depth: limits.max_xml_depth.min(256),
+        max_xml_nodes: limits.max_xml_nodes.min(65_536),
+        max_output_bytes: limits.max_output_bytes.min(512 * 1024 * 1024),
+    }
 }
 
 fn declared_bytes(resource: &'static str, actual: u64, maximum: usize) -> Result<()> {
@@ -391,12 +417,16 @@ fn map_writer_error(error: OleError) -> Error {
         OleError::SourceChanged { expected, observed } => Error::Container(format!(
             "CFB positional source changed (expected {expected:?}, observed {observed:?})"
         )),
-        OleError::LimitExceeded { resource, .. } => {
-            Error::Container(format!("CFB ingress limit exceeded: {resource}"))
+        OleError::LimitExceeded {
+            resource,
+            observed,
+            maximum,
+        } => Error::Limit {
+            resource,
+            actual: observed,
+            maximum,
         },
-        OleError::InvalidLimit { resource, .. } => {
-            Error::Container(format!("Invalid CFB ingress limit: {resource}"))
-        },
+        OleError::InvalidLimit { resource, .. } => Error::InvalidLimit(resource),
     }
 }
 
@@ -415,17 +445,47 @@ fn map_reader_error(error: OleError) -> Error {
         OleError::SourceChanged { expected, observed } => Error::Container(format!(
             "CFB positional source changed (expected {expected:?}, observed {observed:?})"
         )),
-        OleError::LimitExceeded { resource, .. } => {
-            Error::Container(format!("CFB ingress limit exceeded: {resource}"))
+        OleError::LimitExceeded {
+            resource,
+            observed,
+            maximum,
+        } => Error::Limit {
+            resource,
+            actual: observed,
+            maximum,
         },
-        OleError::InvalidLimit { resource, .. } => {
-            Error::Container(format!("Invalid CFB ingress limit: {resource}"))
-        },
+        OleError::InvalidLimit { resource, .. } => Error::InvalidLimit(resource),
     }
 }
 
 fn map_spaces_error(error: &spaces::Error) -> Error {
-    Error::Container(error.to_string())
+    match error {
+        spaces::Error::InvalidLimit { .. } => Error::InvalidLimit("DataSpaces limit"),
+        spaces::Error::LimitExceeded {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            resource: spaces_limit_resource(*kind),
+            actual: u64::try_from(*observed).unwrap_or(u64::MAX),
+            maximum: u64::try_from(*maximum).unwrap_or(u64::MAX),
+        },
+        spaces::Error::Allocation { .. } => Error::Allocation("DataSpaces operation"),
+        _ => Error::Container(error.to_string()),
+    }
+}
+
+fn spaces_limit_resource(kind: spaces::LimitKind) -> &'static str {
+    match kind {
+        spaces::LimitKind::StreamBytes => "DataSpaces stream",
+        spaces::LimitKind::TotalBytes => "DataSpaces aggregate",
+        spaces::LimitKind::Entries => "DataSpaces entries",
+        spaces::LimitKind::Components => "DataSpaces components",
+        spaces::LimitKind::StringBytes => "DataSpaces string",
+        spaces::LimitKind::XmlDepth => "DataSpaces XML depth",
+        spaces::LimitKind::XmlNodes => "DataSpaces XML nodes",
+        spaces::LimitKind::OutputBytes => "DataSpaces output",
+    }
 }
 
 fn limit_io() -> std::io::Error {
@@ -443,7 +503,7 @@ mod tests {
         reason = "test code panics on failure; expect keeps assertions concise"
     )]
     use super::*;
-    use crate::spaces::{ENCRYPTION_ID, inspect_bytes};
+    use crate::spaces::{ENCRYPTION_ID, Limits as DataSpacesLimits, inspect_bytes};
 
     fn standard_info(mode: Mode, limits: &Limits) -> Vec<u8> {
         let compound = super::super::standard::encrypt(
@@ -474,7 +534,7 @@ mod tests {
         let encrypted = [4, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4];
         let bytes = write(&info, encrypted.to_vec(), &limits).expect("valid wrapper");
 
-        let graph = inspect_bytes(&bytes)
+        let graph = inspect_bytes(&bytes, &DataSpacesLimits::default())
             .expect("valid DataSpaces")
             .expect("present DataSpaces");
         assert_eq!(graph.map, expected_map());
@@ -496,7 +556,7 @@ mod tests {
         let limits = Limits::default();
         let info = standard_info(Mode::Standard, &limits);
         let bytes = write(&info, vec![0; 8], &limits).expect("valid wrapper");
-        let mut graph = inspect_bytes(&bytes)
+        let mut graph = inspect_bytes(&bytes, &DataSpacesLimits::default())
             .expect("valid DataSpaces")
             .expect("present DataSpaces");
         let encryption = graph.transforms[0]
@@ -521,7 +581,7 @@ mod tests {
         ] {
             let info = standard_info(mode, &limits);
             let bytes = write(&info, vec![0; 8], &limits).expect("valid wrapper");
-            let graph = inspect_bytes(&bytes)
+            let graph = inspect_bytes(&bytes, &DataSpacesLimits::default())
                 .expect("valid DataSpaces")
                 .expect("present DataSpaces");
             assert_eq!(
@@ -539,7 +599,7 @@ mod tests {
         let limits = Limits::default();
         let info = agile_info(Mode::Agile, &limits);
         let bytes = write(&info, vec![0; 8], &limits).expect("valid wrapper");
-        let mut graph = inspect_bytes(&bytes)
+        let mut graph = inspect_bytes(&bytes, &DataSpacesLimits::default())
             .expect("valid DataSpaces")
             .expect("present DataSpaces");
         {
@@ -643,7 +703,11 @@ mod tests {
         let error = read_info(bytes.get_ref(), &limits).expect_err("directory limit");
         assert!(matches!(
             error,
-            Error::Container(message) if message.contains("directory")
+            Error::Limit {
+                resource: "directory bytes",
+                maximum: 511,
+                ..
+            }
         ));
     }
 
@@ -664,7 +728,11 @@ mod tests {
         let error = read_info(bytes.get_ref(), &limits).expect_err("allocation-table limit");
         assert!(matches!(
             error,
-            Error::Container(message) if message.contains("allocation")
+            Error::Limit {
+                resource: "allocation table bytes",
+                maximum: 511,
+                ..
+            }
         ));
     }
 
@@ -752,5 +820,52 @@ mod tests {
         });
 
         assert!(matches!(error, Error::Allocation("FAT plan")));
+    }
+
+    #[test]
+    fn cfb_invalid_limit_keeps_its_typed_category() {
+        let error = map_reader_error(OleError::InvalidLimit {
+            resource: "directory bytes",
+            value: 0,
+            maximum: 64,
+        });
+        assert!(matches!(error, Error::InvalidLimit("directory bytes")));
+
+        let error = map_writer_error(OleError::InvalidLimit {
+            resource: "allocation table bytes",
+            value: 0,
+            maximum: 64,
+        });
+        assert!(matches!(
+            error,
+            Error::InvalidLimit("allocation table bytes")
+        ));
+    }
+
+    #[test]
+    fn dataspace_limits_keep_the_container_error_category() {
+        let exceeded = spaces::Error::LimitExceeded {
+            kind: spaces::LimitKind::TotalBytes,
+            observed: 9,
+            maximum: 8,
+        };
+        assert!(matches!(
+            map_spaces_error(&exceeded),
+            Error::Limit {
+                resource: "DataSpaces aggregate",
+                actual: 9,
+                maximum: 8,
+            }
+        ));
+
+        let invalid = spaces::Error::InvalidLimit {
+            kind: spaces::LimitKind::OutputBytes,
+            value: 0,
+            maximum: 1,
+        };
+        assert!(matches!(
+            map_spaces_error(&invalid),
+            Error::InvalidLimit("DataSpaces limit")
+        ));
     }
 }

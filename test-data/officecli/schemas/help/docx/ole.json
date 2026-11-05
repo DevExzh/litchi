@@ -1,0 +1,73 @@
+{
+  "$schema": "../_schema.json",
+  "format": "docx",
+  "element": "ole",
+  "elementAliases": ["embed", "object", "oleobject"],
+  "parent": "paragraph|body",
+  "operations": {
+    "add": true,
+    "set": true,
+    "get": true,
+    "query": true,
+    "remove": true
+  },
+  "paths": {
+    "positional": [
+      "/body/p[@paraId=X]/r[N]",
+      "/header[N]/p[@paraId=X]/r[N]",
+      "/footer[N]/p[@paraId=X]/r[N]"
+    ]
+  },
+  "note": "Aliases: oleobject, object, embed. Embeds a binary package plus a preview image. Source accepted as file path, URL, or data-URI. The OLE object is a run-level drawing: Query/Get address it at the run path (/body/p[@paraId=X]/r[N]), the same form as picture.",
+  "extends": [
+    "_shared/ole",
+    "_shared/ole.docx-pptx"
+  ],
+  "properties": {
+    "objectType": {
+      "type": "string",
+      "description": "kind of embedded object (e.g. 'ole'). Get-only readback.",
+      "add": false,
+      "set": false,
+      "get": true,
+      "readback": "object type string",
+      "enforcement": "report"
+    },
+    "display": {
+      "type": "string",
+      "description": "how the object is shown: 'icon' (DrawAspect=Icon) or 'content'. Get-only readback.",
+      "add": false,
+      "set": false,
+      "get": true,
+      "readback": "'icon' or 'content'",
+      "enforcement": "report"
+    },
+    "relId": {
+      "type": "string",
+      "description": "relationship id of the embedded OLE package part. Get-only readback (use to inspect the embedded binary).",
+      "add": false,
+      "set": false,
+      "get": true,
+      "readback": "relationship id string",
+      "enforcement": "report"
+    },
+    "fileSize": {
+      "type": "number",
+      "description": "byte size of the embedded OLE package part. Get-only readback.",
+      "add": false,
+      "set": false,
+      "get": true,
+      "readback": "size in bytes",
+      "enforcement": "report"
+    },
+    "contentType": {
+      "type": "string",
+      "description": "MIME content type of the embedded OLE package part. Accepted on Add as a round-trip carrier and echoed back by Get.",
+      "add": true,
+      "set": false,
+      "get": true,
+      "readback": "content-type string",
+      "enforcement": "report"
+    }
+  }
+}

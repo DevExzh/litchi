@@ -3,7 +3,7 @@
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI};
-use litchi_pptx::presentation_properties::metadata::handout::{Layout, Master};
+use litchi_pptx::presentation_properties::metadata::handout::{Layout, Limits, Master};
 use litchi_pptx::{Error, Package};
 use std::str::FromStr;
 
@@ -34,10 +34,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  Show date/time: {}", handout.header_footer.show_date_time);
     println!("  Auto date: {}", handout.header_footer.auto_date);
 
-    let xml = handout.to_xml();
+    let xml = handout.to_xml(Limits::DEFAULT)?;
     println!("\nGenerated XML length: {} bytes", xml.len());
     assert!(xml.contains("<p:handoutMaster"));
-    assert!(Master::parse_xml(&xml).is_ok());
+    assert!(Master::parse_xml(&xml, Limits::DEFAULT).is_ok());
 
     println!("\n--- Handout Layouts ---");
     let layouts = [
@@ -66,7 +66,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\nColored Handout:");
     println!("  Layout: {:?}", colored_handout.layout);
     println!("  Background: {:?}", colored_handout.background_color);
-    assert!(colored_handout.to_xml().contains("<p:handoutMaster"));
+    assert!(
+        colored_handout
+            .to_xml(Limits::DEFAULT)?
+            .contains("<p:handoutMaster")
+    );
 
     publish_and_reopen(&xml, &handout)?;
 
@@ -75,17 +79,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn publish_and_reopen(xml: &str, expected: &Master) -> Result<(), Box<dyn std::error::Error>> {
-    let mut package = Package::new()?;
-    package
-        .presentation_mut()?
+    let mut builder = litchi_pptx::builder::Builder::new()?;
+    builder
+        .presentation()?
         .add_slide()?
         .set_title("Handout Demo");
 
-    // Flush the typed slide writer, then make one atomic OPC edit for the
+    // Build the canonical package, then make one atomic OPC edit for the
     // handout part, relationship, and presentation-level handout ID list.
-    let bytes = package.to_bytes()?;
-    let mut package = Package::from_bytes(&bytes)?;
-    package.edit_opc(|opc| store_handout(opc, xml))?;
+    let mut package = builder.build()?;
+    {
+        let mut opc_edit = package.edit_opc()?;
+        opc_edit.update(|opc| store_handout(opc, xml))?;
+        package = opc_edit.commit()?.into_package();
+    }
 
     let bytes = package.to_bytes()?;
     let reopened = Package::from_bytes(&bytes)?;
@@ -183,5 +190,5 @@ fn load_handout(opc: &OpcPackage) -> litchi_pptx::Result<Master> {
         });
     }
     let xml = std::str::from_utf8(part.blob()).map_err(|error| Error::Xml(error.to_string()))?;
-    Master::parse_xml(xml)
+    Master::parse_xml(xml, Limits::from_source_limits(opc.read_limits()))
 }

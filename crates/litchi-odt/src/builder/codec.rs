@@ -203,8 +203,8 @@ impl Builder {
             push_metadata_element(&mut meta, "dc:description", description);
         }
 
-        if let Some(ref keywords) = self.metadata.keywords {
-            push_metadata_element(&mut meta, "meta:keyword", keywords);
+        for keyword in &self.metadata.keywords {
+            push_metadata_element(&mut meta, "meta:keyword", keyword);
         }
 
         if let Some(ref identifier) = self.metadata.identifier {
@@ -217,21 +217,13 @@ impl Builder {
 
         if let Some(created) = &self.metadata.created {
             meta.push_str("<meta:creation-date>");
-            meta.push_str(&created.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true));
-            meta.push_str("</meta:creation-date>");
-        } else if let Some(created) = &self.metadata.created_local {
-            meta.push_str("<meta:creation-date>");
-            meta.push_str(&created.format("%Y-%m-%dT%H:%M:%S%.f").to_string());
+            meta.push_str(&created.to_string());
             meta.push_str("</meta:creation-date>");
         }
 
         if let Some(modified) = &self.metadata.modified {
             meta.push_str("<dc:date>");
-            meta.push_str(&modified.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true));
-            meta.push_str("</dc:date>");
-        } else if let Some(modified) = &self.metadata.modified_local {
-            meta.push_str("<dc:date>");
-            meta.push_str(&modified.format("%Y-%m-%dT%H:%M:%S%.f").to_string());
+            meta.push_str(&modified.to_string());
             meta.push_str("</dc:date>");
         }
 
@@ -387,7 +379,9 @@ impl Builder {
             || self.notes_configurations.endnote.is_some()
         {
             let insertion = find_required(&xml, "</office:styles>")?;
-            let fragments = self.notes_configurations.to_xml_fragment()?;
+            let fragments = self
+                .notes_configurations
+                .to_xml_fragment(&litchi_odf_common::XmlStreamLimits::owner_default_value())?;
             xml.insert_str(insertion, &fragments);
         }
         if !self.ruby_styles.is_empty() {

@@ -113,6 +113,12 @@ struct Scanner {
 /// Set or clear selection for workbook view zero. A missing false state is
 /// already canonical and remains byte-exact.
 pub(crate) fn rewrite(content: &[u8], selected: bool, context: Context<'_>) -> Result<Vec<u8>> {
+    // The scan recognizes markup-compatibility names on namespace values as
+    // written; a binding spelled with references could put the view inside a
+    // branch preprocessing selects (record 0011).
+    if litchi_ooxml_common::mce::binds_namespace_by_reference(content) {
+        return Err(block(context));
+    }
     let layout = scan(content)?;
     let appended = selected
         .then(|| ("tabSelected", "1".to_owned()))
@@ -680,6 +686,16 @@ mod tests {
             sheet: "Sheet2",
             position: 1,
         }
+    }
+
+    /// Record 0011: a view inside a branch bound through a declaration that
+    /// spells the namespace with references is never edited.
+    #[test]
+    fn escaped_markup_compatibility_blocks_the_edit() {
+        let source = format!(
+            r#"<worksheet xmlns="{S}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/200&#54;"><mc:AlternateContent><mc:Choice Requires="x"><sheetViews><sheetView workbookViewId="0"/></sheetViews></mc:Choice></mc:AlternateContent><sheetData/></worksheet>"#
+        );
+        assert!(rewrite(source.as_bytes(), true, context()).is_err());
     }
 
     #[test]

@@ -6,7 +6,7 @@
 
 use super::{PartData, SourceBackedPackage};
 use crate::error::{OpcError, Result};
-use crate::limits::ReadResource;
+use crate::limits::SourceLimitKind;
 use crate::packuri::PackURI;
 use litchi_core::{ExecutionContext, ExecutionError, Reservation, Resource};
 use soapberry_zip::office::EntryId;
@@ -383,6 +383,7 @@ impl PreparedBatch {
             fence(package)?;
             let index = resolve_part_index(package, name, context)?;
             let entry_id = package
+                .catalog
                 .parts
                 .get(index)
                 .ok_or_else(|| OpcError::PartNotFound(index.to_string()))?
@@ -390,7 +391,7 @@ impl PreparedBatch {
             let declared_bytes = if context.is_some() {
                 let declared = declared_size(package, entry_id)?;
                 package.limits.check(
-                    ReadResource::PartBytes,
+                    SourceLimitKind::PartBytes,
                     declared,
                     package.limits.max_part_bytes(),
                 )?;
@@ -1161,9 +1162,9 @@ fn check_request_count(package: &SourceBackedPackage, actual: usize) -> Result<(
     let maximum = u64::try_from(package.limits.max_parts())
         .map_err(|_| batch_refusal("source-backed batch Part limit exceeds u64"))?;
     if actual > maximum {
-        return Err(OpcError::ReadLimit {
-            resource: ReadResource::Parts,
-            actual,
+        return Err(OpcError::Limit {
+            kind: SourceLimitKind::Parts,
+            observed: actual,
             maximum,
         });
     }
@@ -1175,15 +1176,15 @@ fn resolve_part_index(
     partname: &PackURI,
     context: Option<&ExecutionContext>,
 ) -> Result<usize> {
-    if let Some(index) = package.parts_by_name.get(partname).copied() {
+    if let Some(index) = package.catalog.parts_by_name.get(partname).copied() {
         return Ok(index);
     }
-    if package.casefold_order.is_some() {
+    if package.catalog.casefold_order.is_some() {
         return package
             .part_index(partname)
             .ok_or_else(|| OpcError::PartNotFound(partname.to_string()));
     }
-    for (position, part) in package.parts.iter().enumerate() {
+    for (position, part) in package.catalog.parts.iter().enumerate() {
         if let Some(context) = context
             && position & 0xff == 0
         {
@@ -1281,10 +1282,12 @@ fn batch_refusal(reason: &'static str) -> OpcError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{SourceCacheLimits, SourceLimits};
     use soapberry_zip::office::StreamingArchiveWriter;
 
     fn archive_bytes() -> Vec<u8> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer
             .write_stored(
                 "[Content_Types].xml",
@@ -1305,13 +1308,20 @@ mod tests {
 
     #[test]
     fn stale_ready_hint_after_eviction_uses_authoritative_prepared_read() {
-        let package = SourceBackedPackage::from_vec(archive_bytes()).unwrap();
+        let package = SourceBackedPackage::from_vec(
+            archive_bytes(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap();
         let index = package
+            .catalog
             .parts
             .iter()
             .position(|part| part.partname.as_str() == "/word/document.xml")
             .unwrap();
-        let entry_id = package.parts[index].entry_id;
+        let entry_id = package.catalog.parts[index].entry_id;
         let declared_bytes = package
             .archive
             .metadata_for(entry_id)

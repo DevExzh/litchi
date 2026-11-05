@@ -133,14 +133,21 @@ impl Package {
             .document
             .sheet(sheet)
             .map_err(|error| map_read_error(ReadError::Semantic(error)))?
-            .ok_or(Error::SheetNotFound)?;
+            .ok_or(Error::Refused(
+                crate::package::table_headers::Refusal::SheetNotFound,
+            ))?;
         let table_position = match table.into() {
-            TableSelector::Index(index) => selected_sheet.tables().nth(index).map(|_| index),
+            TableSelector::Position(index) => {
+                let index = index.get();
+                selected_sheet.tables().nth(index).map(|_| index)
+            },
             TableSelector::Name(name) => selected_sheet
                 .tables()
                 .position(|candidate_table| candidate_table.name() == name),
         }
-        .ok_or(Error::TableNotFound)?;
+        .ok_or(Error::Refused(
+            crate::package::table_headers::Refusal::TableNotFound,
+        ))?;
         Ok((selected_sheet.index(), table_position))
     }
 }

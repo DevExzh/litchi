@@ -1,7 +1,8 @@
 //! SpreadsheetML worksheet Printer Settings references and inert DEVMODE parts.
 
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::page_setup::parse_worksheet_page_setup_relationship_id;
+use crate::part_edit::{Staged, family};
 use litchi_core::xml::ReaderOrigin;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
@@ -173,7 +174,7 @@ pub fn load_printer_settings(
 }
 
 /// Adds one inert Printer Settings part and its `pageSetup` reference to a worksheet.
-pub fn store_printer_settings(
+pub(crate) fn store_printer_settings(
     package: &mut OpcPackage,
     worksheet_name: &PackURI,
     value: &PrinterSettings,
@@ -528,6 +529,99 @@ fn limit(name: &str) -> Error {
     invalid(format!("worksheet Printer Settings {name} limit exceeded"))
 }
 
+family!("Printer Settings");
+
+pub use crate::opc::LimitKind;
+
+/// A staged Printer Settings edit of one worksheet of a [`crate::Package`].
+/// Dropping it discards it.
+///
+/// The DEVMODE payload stays inert: it is stored, never interpreted.
+#[derive(Debug, Clone)]
+pub struct Edit {
+    staged: Staged,
+    worksheet: PackURI,
+}
+
+impl crate::Package {
+    /// Start a Printer Settings edit of one worksheet.
+    ///
+    /// # Errors
+    ///
+    /// Returns the encryption-policy error for a package whose mutations are
+    /// refused, a `NotFound` refusal for a selector that matches no sheet,
+    /// and [`Error::NotWorksheet`] for a chart or dialog sheet.
+    pub fn edit_printer_settings<'a>(
+        &self,
+        sheet: impl Into<crate::workbook::Selector<'a>>,
+    ) -> Result<Edit> {
+        let staged = Staged::new(self, "edit_printer_settings")?;
+        let worksheet = self.worksheet_part(sheet, "edit_printer_settings")?;
+        Ok(Edit { staged, worksheet })
+    }
+
+    /// Apply a Printer Settings patch to a new package; this one is
+    /// unchanged. An empty patch returns this package.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when this package is not the patch's
+    /// before state and [`Error::Signed`] for a changed patch of a signed
+    /// workbook.
+    pub fn apply_printer_settings(&self, patch: &Patch) -> Result<Commit> {
+        Ok(Commit::new((
+            patch.0.apply(self, "apply_printer_settings")?,
+            patch.0.clone(),
+        )))
+    }
+}
+
+impl Edit {
+    /// The staged Printer Settings of the worksheet, when present.
+    ///
+    /// # Errors
+    ///
+    /// Returns the validation errors of the worksheet's Printer Settings.
+    pub fn printer_settings(&self) -> Result<Option<PrinterSettings>> {
+        load_printer_settings(self.staged.opc(), &self.worksheet)
+    }
+
+    /// Add one inert Printer Settings part and its `pageSetup` reference to
+    /// a worksheet that has none.
+    ///
+    /// # Errors
+    ///
+    /// Returns the validation errors and [`Error::Signed`] for a signed
+    /// package.
+    pub fn set(
+        &mut self,
+        value: &PrinterSettings,
+        conformance: PrinterSettingsConformance,
+    ) -> Result<()> {
+        let worksheet = self.worksheet.clone();
+        self.staged.update(|candidate| {
+            crate::signature_policy::ensure_unsigned(candidate)?;
+            store_printer_settings(candidate, &worksheet, value, conformance)
+        })
+    }
+
+    /// Discard every staged change.
+    pub fn reset(&mut self) {
+        self.staged.reset();
+    }
+
+    /// Publish the staged graph to a new package. An unchanged edit returns
+    /// the source package.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Signed`] for a changed signed package and the
+    /// workbook validation errors of the staged package.
+    pub fn commit(self) -> Result<Commit> {
+        Ok(Commit::new(self.staged.commit()?))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -585,17 +679,23 @@ mod tests {
 
     #[test]
     fn loads_poi_and_libreoffice_reference_packages() {
-        let poi = OpcPackage::open(root().join("test-data/poi/test-data/spreadsheet/sample.xlsx"))
-            .unwrap();
+        let poi = OpcPackage::open(
+            root().join("test-data/poi/test-data/spreadsheet/sample.xlsx"),
+            litchi_opc::SourceLimits::default(),
+        )
+        .unwrap();
         let settings =
             load_printer_settings(&poi, &PackURI::new("/xl/worksheets/sheet1.xml").unwrap())
                 .unwrap()
                 .unwrap();
         assert_eq!(settings.reference.relationship_id, "rId1");
         assert_eq!(settings.resource.data.len(), 2452);
-        let libreoffice = OpcPackage::open(root().join(
-            "test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf136721_letter_sized_paper.xlsx",
-        ))
+        let libreoffice = OpcPackage::open(
+            root().join(
+                "test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf136721_letter_sized_paper.xlsx",
+            ),
+            litchi_opc::SourceLimits::default(),
+        )
         .unwrap();
         let settings = load_printer_settings(
             &libreoffice,
@@ -630,6 +730,41 @@ mod tests {
         assert!(text.contains("orientation=\"landscape\""));
         assert!(text.contains("r:id=\"rIdPrinter\""));
         assert!(text.find("pageSetup").unwrap() < text.find("headerFooter").unwrap());
+    }
+
+    #[test]
+    fn package_route_stores_printer_settings_and_replays_its_patch() {
+        let (mut package, uri) = package(
+            PrinterSettingsConformance::Transitional,
+            "<x:pageSetup orientation=\"landscape\"/>",
+        );
+        crate::record::adopt_worksheet(&mut package, &uri, false);
+        let source = crate::Package::from_opc(package).unwrap();
+        let mut edit = source.edit_printer_settings(0_usize).unwrap();
+        assert!(edit.printer_settings().unwrap().is_none());
+        edit.set(&value(), PrinterSettingsConformance::Transitional)
+            .unwrap();
+        assert_eq!(edit.printer_settings().unwrap(), Some(value()));
+        let commit = edit.commit().unwrap();
+        assert!(commit.diagnostics().changed());
+        let after = commit.package();
+        assert_eq!(
+            load_printer_settings(after.opc(), &uri).unwrap(),
+            Some(value())
+        );
+        let replayed = source.apply_printer_settings(commit.patch()).unwrap();
+        assert_eq!(
+            replayed.package().to_bytes().unwrap(),
+            after.to_bytes().unwrap()
+        );
+        let restored = after
+            .apply_printer_settings(&commit.patch().inverse())
+            .unwrap();
+        assert!(
+            load_printer_settings(restored.package().opc(), &uri)
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[test]

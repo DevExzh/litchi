@@ -708,7 +708,7 @@ fn census_of(part: &str, bytes: &[u8]) -> Result<MemberCensus, Box<dyn Error>> {
 
 /// Census every member of an archive.
 fn archive_census(archive: &[u8]) -> Result<Vec<MemberCensus>, Box<dyn Error>> {
-    let reader = ArchiveReader::new(archive)?;
+    let reader = ArchiveReader::new(archive, soapberry_zip::office::ArchiveLimits::default())?;
     let names = reader.file_names().map(str::to_owned).collect::<Vec<_>>();
     let mut parts = Vec::with_capacity(names.len());
     for name in &names {
@@ -722,8 +722,8 @@ fn archive_census(archive: &[u8]) -> Result<Vec<MemberCensus>, Box<dyn Error>> {
 /// Returns the writer's own package and the marked one, so a corpus can state
 /// what the production writer already emits.
 fn pptx_marker_archive() -> Result<(Vec<u8>, Vec<u8>), Box<dyn Error>> {
-    let mut package = litchi_pptx::Package::new()?;
-    let presentation = package.presentation_mut()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
+    let presentation = builder.presentation()?;
     for slide_index in 0..PPTX_MARKER_SLIDES {
         let slide = presentation.add_slide()?;
         for shape_index in 0..PPTX_MARKER_TEXT_BOXES {
@@ -736,11 +736,12 @@ fn pptx_marker_archive() -> Result<(Vec<u8>, Vec<u8>), Box<dyn Error>> {
             );
         }
     }
-    let skeleton = package.to_bytes()?;
+    let skeleton = builder.build()?.to_bytes()?;
 
-    let reader = ArchiveReader::new(&skeleton)?;
+    let reader = ArchiveReader::new(&skeleton, soapberry_zip::office::ArchiveLimits::default())?;
     let names = reader.file_names().map(str::to_owned).collect::<Vec<_>>();
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     let mut marked = 0usize;
     let mut wrapped = 0usize;
     let mut declarations = 0usize;
@@ -788,9 +789,10 @@ fn pptx_marker_archive() -> Result<(Vec<u8>, Vec<u8>), Box<dyn Error>> {
 /// Author the DOCX skeleton with the production writer, then mark it.
 fn docx_marker_archive() -> Result<(Vec<u8>, Vec<u8>), Box<dyn Error>> {
     let skeleton = semantic_docx_bytes(DOCX_MARKER_SHAPE)?;
-    let reader = ArchiveReader::new(&skeleton)?;
+    let reader = ArchiveReader::new(&skeleton, soapberry_zip::office::ArchiveLimits::default())?;
     let names = reader.file_names().map(str::to_owned).collect::<Vec<_>>();
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     let mut marked = 0usize;
     let mut paragraph_edits = 0usize;
     for name in &names {
@@ -847,9 +849,10 @@ fn strip_markers(archive: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {
     if MCE_NAMESPACE.len() != CONTROL_NAMESPACE.len() {
         return Err("the marker-stripped control namespace is not the same length".into());
     }
-    let reader = ArchiveReader::new(archive)?;
+    let reader = ArchiveReader::new(archive, soapberry_zip::office::ArchiveLimits::default())?;
     let names = reader.file_names().map(str::to_owned).collect::<Vec<_>>();
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     let mut replaced = 0usize;
     for name in &names {
         let bytes = reader.read(name.as_str())?;

@@ -316,6 +316,55 @@ pub(crate) fn parse_xf_border_fill(
     (borders, fill)
 }
 
+impl BorderStyle {
+    /// The BIFF8 `dg*` line-style code.
+    pub(crate) const fn code(self) -> u8 {
+        match self {
+            Self::None => 0,
+            Self::Thin => 1,
+            Self::Medium => 2,
+            Self::Dashed => 3,
+            Self::Dotted => 4,
+            Self::Thick => 5,
+            Self::Double => 6,
+            Self::Hair => 7,
+            Self::MediumDashed => 8,
+            Self::DashDot => 9,
+            Self::MediumDashDot => 10,
+            Self::DashDotDot => 11,
+            Self::MediumDashDotDot => 12,
+            Self::SlantedDashDot => 13,
+        }
+    }
+}
+
+impl FillPattern {
+    /// The BIFF8 `fls` code.
+    pub(crate) const fn code(self) -> u8 {
+        match self {
+            Self::None => 0,
+            Self::Solid => 1,
+            Self::MediumGray => 2,
+            Self::DarkGray => 3,
+            Self::LightGray => 4,
+            Self::DarkHorizontal => 5,
+            Self::DarkVertical => 6,
+            Self::DarkDown => 7,
+            Self::DarkUp => 8,
+            Self::DarkGrid => 9,
+            Self::DarkTrellis => 10,
+            Self::LightHorizontal => 11,
+            Self::LightVertical => 12,
+            Self::LightDown => 13,
+            Self::LightUp => 14,
+            Self::LightGrid => 15,
+            Self::LightTrellis => 16,
+            Self::Gray125 => 17,
+            Self::Gray0625 => 18,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

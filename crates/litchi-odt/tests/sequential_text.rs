@@ -14,7 +14,7 @@ use std::sync::{
 use litchi_core::{
     Error, ReadAt, SourceVersion, TextOutputError, TextOutputLimitKind, TextOutputOptions,
 };
-use litchi_odt::{Document, SourceBackedDocument};
+use litchi_odt::{Document, Package, SourceBackedDocument};
 
 const MIMETYPE: &str = "application/vnd.oasis.opendocument.text";
 const OFFICE_NS: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -69,7 +69,7 @@ fn mixed_document_writes_exact_text_in_semantic_start_order() {
         "</draw:text-box></draw:frame>after</text:p>",
         "<text:p/>",
     ));
-    let document = Document::from_bytes(bytes).unwrap();
+    let document = Package::from_bytes(&bytes).unwrap().document().unwrap();
     let expected = document.text().unwrap();
     let (output, bytes_written, objects_written) =
         write_owned(&document, TextOutputOptions::default());
@@ -106,7 +106,7 @@ fn varied_block_sizes_and_nested_blocks_match_owned_and_source_backed_output() {
         oversized = oversized,
     );
     let bytes = package(&body);
-    let eager = Document::from_bytes(bytes.clone()).unwrap();
+    let eager = Package::from_bytes(&bytes).unwrap().document().unwrap();
     let options = TextOutputOptions::new("|", "unused", 16 * 1024, 16);
     let expected = format!("small||outer-beforeouter-after|nested|{oversized}|tail");
 
@@ -129,10 +129,9 @@ fn varied_block_sizes_and_nested_blocks_match_owned_and_source_backed_output() {
 
 #[test]
 fn whitespace_entities_cdata_expansions_and_utf8_match_text() {
-    let document = Document::from_bytes(package(
+    let document = Package::from_bytes(&package(
         r#"<text:p>  lead &amp; <![CDATA[<cdata>]]><text:s text:c="2"/><text:tab/><text:line-break/>尾</text:p>"#,
-    ))
-    .unwrap();
+    )).unwrap().document().unwrap();
     let expected = document.text().unwrap();
     let (output, bytes_written, objects_written) =
         write_owned(&document, TextOutputOptions::default());
@@ -148,7 +147,7 @@ fn whitespace_entities_cdata_expansions_and_utf8_match_text() {
 
 #[test]
 fn suppressed_stored_content_matches_document_text() {
-    let document = Document::from_bytes(package(concat!(
+    let document = Package::from_bytes(&package(concat!(
         "<text:tracked-changes><text:changed-region text:id=\"change-1\">",
         "<text:deletion><text:p>stored-change</text:p></text:deletion>",
         "</text:changed-region></text:tracked-changes>",
@@ -158,6 +157,8 @@ fn suppressed_stored_content_matches_document_text() {
         "<text:ruby><text:ruby-base>base</text:ruby-base>",
         "<text:ruby-text>pronunciation</text:ruby-text></text:ruby></text:p>",
     )))
+    .unwrap()
+    .document()
     .unwrap();
     let expected = document.text().unwrap();
     let (output, bytes_written, objects_written) =
@@ -175,9 +176,11 @@ fn suppressed_stored_content_matches_document_text() {
 
 #[test]
 fn empty_object_policy_and_custom_separator_are_applied() {
-    let document = Document::from_bytes(package(
+    let document = Package::from_bytes(&package(
         "<text:p>one</text:p><text:p/><text:p>three</text:p>",
     ))
+    .unwrap()
+    .document()
     .unwrap();
 
     let (included, included_bytes, included_objects) =
@@ -197,8 +200,10 @@ fn empty_object_policy_and_custom_separator_are_applied() {
 
 #[test]
 fn object_limit_reports_the_rejected_object_without_partial_output() {
-    let document =
-        Document::from_bytes(package("<text:p>one</text:p><text:p>two</text:p>")).unwrap();
+    let document = Package::from_bytes(&package("<text:p>one</text:p><text:p>two</text:p>"))
+        .unwrap()
+        .document()
+        .unwrap();
     let mut output = Vec::new();
     let error = document
         .write_text_to(&mut output, TextOutputOptions::new("|", "unused", 64, 1))
@@ -215,8 +220,10 @@ fn object_limit_reports_the_rejected_object_without_partial_output() {
 
 #[test]
 fn output_byte_limit_reports_separator_and_next_object_extent() {
-    let document =
-        Document::from_bytes(package("<text:p>one</text:p><text:p>two</text:p>")).unwrap();
+    let document = Package::from_bytes(&package("<text:p>one</text:p><text:p>two</text:p>"))
+        .unwrap()
+        .document()
+        .unwrap();
     let mut output = Vec::new();
     let error = document
         .write_text_to(&mut output, TextOutputOptions::new("|", "unused", 6, 8))
@@ -255,7 +262,10 @@ impl Write for PrefixThenFail {
 
 #[test]
 fn sink_failure_reports_accepted_multibyte_prefix_exactly() {
-    let document = Document::from_bytes(package("<text:p>é文</text:p>")).unwrap();
+    let document = Package::from_bytes(&package("<text:p>é文</text:p>"))
+        .unwrap()
+        .document()
+        .unwrap();
     let mut sink = PrefixThenFail {
         accepted: Vec::new(),
         prefix_limit: 3,
@@ -272,8 +282,10 @@ fn sink_failure_reports_accepted_multibyte_prefix_exactly() {
 
 #[test]
 fn sink_failure_after_emitted_block_preserves_progress_and_text() {
-    let document =
-        Document::from_bytes(package("<text:p>one</text:p><text:p>two</text:p>")).unwrap();
+    let document = Package::from_bytes(&package("<text:p>one</text:p><text:p>two</text:p>"))
+        .unwrap()
+        .document()
+        .unwrap();
     let mut sink = PrefixThenFail {
         accepted: Vec::new(),
         prefix_limit: 5,
@@ -351,9 +363,11 @@ fn stale_source_precedes_separator_sink_failure_with_truthful_progress() {
 
 #[test]
 fn malformed_tail_returns_document_error_after_valid_emitted_block() {
-    let document = Document::from_bytes(package(
+    let document = Package::from_bytes(&package(
         r#"<text:p>valid</text:p><text:p>broken<text:s text:c="1000001"/></text:p>"#,
     ))
+    .unwrap()
+    .document()
     .unwrap();
     let mut output = Vec::new();
     let error = document
@@ -414,7 +428,7 @@ fn source_backed_writer_matches_owned_writer_and_rejects_stale_source_first() {
         "<text:h text:outline-level=\"1\">Heading</text:h>",
         "<text:p>body</text:p><text:p>尾</text:p>",
     ));
-    let eager = Document::from_bytes(bytes.clone()).unwrap();
+    let eager = Package::from_bytes(&bytes).unwrap().document().unwrap();
     let (source, revision) = MemorySource::new(bytes);
     let source_document = SourceBackedDocument::from_read_at(source).unwrap();
     let options = TextOutputOptions::new("|", "unused", 64, 8);
@@ -450,7 +464,7 @@ fn owned_and_source_backed_exports_match_normalized_line_endings_across_blocks()
     let (body, expected) = normalized_line_ending_fixture();
     let content_xml = content(body);
     let bytes = raw_package(content_xml.as_slice());
-    let eager = Document::from_bytes(bytes.clone()).unwrap();
+    let eager = Package::from_bytes(&bytes).unwrap().document().unwrap();
     let (source, _) = MemorySource::new(bytes);
     let source_document = SourceBackedDocument::from_read_at(source).unwrap();
 
@@ -477,7 +491,10 @@ fn owned_and_source_backed_exports_match_normalized_line_endings_across_blocks()
 #[test]
 fn normalized_output_limit_accepts_exact_length_and_refuses_one_byte_lower() {
     let (body, expected) = normalized_line_ending_fixture();
-    let document = Document::from_bytes(raw_package(content(body).as_slice())).unwrap();
+    let document = Package::from_bytes(&raw_package(content(body).as_slice()))
+        .unwrap()
+        .document()
+        .unwrap();
 
     let exact = TextOutputOptions::new("|", "unused", expected.len() as u64, 8);
     let (output, bytes_written, objects_written) = write_owned(&document, exact);

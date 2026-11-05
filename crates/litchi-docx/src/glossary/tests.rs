@@ -2,13 +2,17 @@ use super::codec::*;
 use super::graph::*;
 use super::model::*;
 use super::package::*;
+use super::transaction::Transaction;
 use super::*;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use std::sync::Arc;
 
 fn fixture(bytes: &[u8]) -> (Catalog, Conformance) {
-    let package = OpcPackage::from_bytes(bytes).expect("package");
-    load(&package).expect("load").expect("glossary")
+    let package =
+        OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).expect("package");
+    load(&package, &Limits::DEFAULT)
+        .expect("load")
+        .expect("glossary")
 }
 
 fn package_for(conformance: Conformance) -> OpcPackage {
@@ -70,6 +74,7 @@ fn entry(name: &str) -> Entry {
     Entry::new(
         name,
         format!(r#"<w:docPartBody xmlns:w="{W}"><w:p/></w:docPartBody>"#).into_bytes(),
+        &Limits::DEFAULT,
     )
     .expect("entry")
 }
@@ -183,7 +188,11 @@ fn compact_option_flags_collapse_duplicates_and_reject_unknown_or_empty_values()
 
     let mut props = Props::new(Name::new("Unknown flag").unwrap());
     props.kinds = Kind::from_bits_retain(0x80);
-    assert!(entry("Unknown flag").with_props(props).is_err());
+    assert!(
+        entry("Unknown flag")
+            .with_props(props, &Limits::DEFAULT)
+            .is_err()
+    );
 }
 
 #[test]
@@ -197,7 +206,11 @@ fn xml_forbidden_metadata_is_rejected_without_catalog_mutation() {
     let before = catalog.clone();
     let mut invalid = Props::new(Name::new("Invalid").unwrap());
     invalid.description = Some("bad\0description".to_owned());
-    assert!(entry("Invalid").with_props(invalid).is_err());
+    assert!(
+        entry("Invalid")
+            .with_props(invalid, &Limits::DEFAULT)
+            .is_err()
+    );
     assert_eq!(catalog, before);
 }
 
@@ -341,7 +354,7 @@ C</w:t></w:r></w:p></w:docPartBody>"#
     );
     let mut catalog = Catalog::new();
     catalog
-        .add(Entry::new("Line endings", body.into_bytes()).unwrap())
+        .add(Entry::new("Line endings", body.into_bytes(), &Limits::DEFAULT).unwrap())
         .unwrap();
     let output = String::from_utf8(write(&catalog, Conformance::Transitional).unwrap()).unwrap();
     assert!(output.contains("A&#xD;B\nC"), "{output}");
@@ -365,8 +378,10 @@ fn opaque_namespace_mapping_does_not_rewrite_literal_values() {
         background: None,
         background_refs: Arc::from([]),
         background_lineage: None,
-        entries: vec![Entry::new("Literal", body.into_bytes()).unwrap()],
+        entries: vec![Entry::new("Literal", body.into_bytes(), &Limits::DEFAULT).unwrap()],
         binding: None,
+        selected_limits: None,
+        enforced_limits: None,
         state: CatalogState::default(),
     };
     let strict = String::from_utf8(write(&catalog, Conformance::Strict).unwrap()).unwrap();
@@ -430,7 +445,9 @@ fn unrelated_crud_retains_ignorable_producer_content() {
     let keep = catalog.remove("Keep").unwrap().unwrap();
     let mut props = keep.props().unwrap().clone();
     props.description = Some("changed".to_owned());
-    catalog.add(keep.with_props(props).unwrap()).unwrap();
+    catalog
+        .add(keep.with_props(props, &Limits::DEFAULT).unwrap())
+        .unwrap();
     let targeted = String::from_utf8(write(&catalog, conformance).unwrap()).unwrap();
     assert!(!targeted.contains("producerExtension"), "{targeted}");
     assert!(targeted.contains(r#"w:description w:val="changed""#));
@@ -528,8 +545,13 @@ fn aggregate_projection_and_dense_content_are_bounded() {
     );
     assert!(amplified.len() < MAX);
     let root = parse_dom(amplified.as_bytes()).unwrap();
-    let error = project(&root).unwrap_err().to_string();
-    assert!(error.contains("semantic XML exceeds"), "{error}");
+    let error = project(&root, &Limits::DEFAULT, None)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("glossary graph bytes limit exceeded"),
+        "{error}"
+    );
 
     let dense = "x<!--c-->".repeat((MAX_DOM_CONTENT / 2) + 1);
     let dense = format!(
@@ -573,12 +595,15 @@ fn exact_noop_preserves_custom_root_bytes_and_signature() {
         false,
     );
     assert!(package.is_signed());
-    let (loaded, conformance) = load(&package).unwrap().unwrap();
-    assert!(!put(&mut package, loaded, conformance).unwrap());
+    let (loaded, conformance) = load(&package, &Limits::DEFAULT).unwrap().unwrap();
+    assert!(!put(&mut package, loaded, conformance, &Limits::DEFAULT).unwrap());
     assert_eq!(package.get_part(&custom).unwrap().blob(), source.as_slice());
     assert!(package.is_signed());
     assert_eq!(
-        raw::load(&package).unwrap().unwrap().root_name(),
+        raw::load(&package, &Limits::default())
+            .unwrap()
+            .unwrap()
+            .root_name(),
         custom.as_str()
     );
 }
@@ -605,9 +630,17 @@ fn semantic_create_allocates_around_unrelated_canonical_parts() {
 
     let mut catalog = Catalog::new();
     catalog.add(entry("Allocated")).unwrap();
-    assert!(put(&mut package, catalog, Conformance::Transitional).unwrap());
+    assert!(
+        put(
+            &mut package,
+            catalog,
+            Conformance::Transitional,
+            &Limits::DEFAULT,
+        )
+        .unwrap()
+    );
 
-    let graph = raw::load(&package).unwrap().unwrap();
+    let graph = raw::load(&package, &Limits::default()).unwrap().unwrap();
     assert_eq!(graph.root_name(), "/word/glossary/document1.xml");
     let names = graph
         .parts
@@ -624,7 +657,9 @@ fn semantic_create_allocates_around_unrelated_canonical_parts() {
         ])
     );
 
-    raw::remove(&mut package).unwrap().unwrap();
+    raw::remove(&mut package, &Limits::default())
+        .unwrap()
+        .unwrap();
     for (index, name) in occupied.iter().enumerate() {
         assert_eq!(
             package
@@ -637,6 +672,36 @@ fn semantic_create_allocates_around_unrelated_canonical_parts() {
 }
 
 #[test]
+fn semantic_put_admits_catalog_before_loading_existing_graph() {
+    let mut package = package();
+    add_empty_glossary(&mut package, Conformance::Transitional);
+    let limits = Limits::new(
+        MAX,
+        MAX_DEPTH,
+        MAX_NODES,
+        MAX_DOM_ATTRIBUTES,
+        MAX_DOM_CONTENT,
+        1,
+        MAX_DOM_BYTES,
+        MAX_PARTS,
+        MAX_VALUES,
+        MAX_STRING,
+        1,
+        GraphLimits::new(MAX_GRAPH_BYTES, MAX_GRAPH_METADATA_BYTES),
+    )
+    .unwrap();
+    let mut catalog = Catalog::new();
+    catalog.add(entry("Incoming")).unwrap();
+    let error = put(&mut package, catalog, Conformance::Transitional, &limits)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("glossary string bytes limit exceeded"),
+        "{error}"
+    );
+}
+
+#[test]
 fn repeated_changed_raw_graph_is_a_signature_preserving_noop() {
     let mut package = package();
     let mut initial = Catalog::new();
@@ -644,19 +709,20 @@ fn repeated_changed_raw_graph_is_a_signature_preserving_noop() {
     raw::put(
         &mut package,
         &raw::Graph::new(initial, Conformance::Transitional),
+        &Limits::default(),
     )
     .unwrap();
 
-    let mut changed = raw::load(&package).unwrap().unwrap();
+    let mut changed = raw::load(&package, &Limits::default()).unwrap().unwrap();
     changed.catalog.add(entry("Changed")).unwrap();
-    assert!(raw::put(&mut package, &changed).unwrap());
+    assert!(raw::put(&mut package, &changed, &Limits::default()).unwrap());
     mark_signed(&mut package);
     assert!(package.is_signed());
 
-    assert!(!raw::put(&mut package, &changed).unwrap());
+    assert!(!raw::put(&mut package, &changed, &Limits::default()).unwrap());
     assert!(package.is_signed());
     assert!(
-        raw::load(&package)
+        raw::load(&package, &Limits::default())
             .unwrap()
             .unwrap()
             .catalog
@@ -674,11 +740,12 @@ fn signature_namespace_auxiliary_is_rejected_atomically() {
     raw::put(
         &mut package,
         &raw::Graph::new(existing, Conformance::Transitional),
+        &Limits::default(),
     )
     .unwrap();
     mark_signed(&mut package);
 
-    let mut invalid = raw::load(&package).unwrap().unwrap();
+    let mut invalid = raw::load(&package, &Limits::default()).unwrap().unwrap();
     invalid.rels.push(raw::Rel {
         id: "rIdSignatureImage".to_owned(),
         kind: rt::IMAGE.to_owned(),
@@ -690,6 +757,7 @@ fn signature_namespace_auxiliary_is_rejected_atomically() {
             "/_XMLSIGNATURES/glossary.png",
             "image/png",
             vec![0x89, b'P', b'N', b'G'],
+            &Limits::DEFAULT
         )
         .is_err()
     );
@@ -700,10 +768,10 @@ fn signature_namespace_auxiliary_is_rejected_atomically() {
         Vec::new(),
     ));
 
-    assert!(raw::put(&mut package, &invalid).is_err());
+    assert!(raw::put(&mut package, &invalid, &Limits::default()).is_err());
     assert!(package.is_signed());
     assert!(
-        raw::load(&package)
+        raw::load(&package, &Limits::default())
             .unwrap()
             .unwrap()
             .catalog
@@ -715,12 +783,21 @@ fn signature_namespace_auxiliary_is_rejected_atomically() {
 
 #[test]
 fn reserved_parts_and_invalid_raw_metadata_are_rejected_atomically() {
-    assert!(raw::Part::new("/[Content_Types].xml", "application/xml", Vec::new()).is_err());
+    assert!(
+        raw::Part::new(
+            "/[Content_Types].xml",
+            "application/xml",
+            Vec::new(),
+            &Limits::DEFAULT
+        )
+        .is_err()
+    );
     assert!(
         raw::Part::new(
             "/word/glossary/media/image.png",
             "image/png;broken",
-            Vec::new()
+            Vec::new(),
+            &Limits::DEFAULT
         )
         .is_err()
     );
@@ -738,6 +815,7 @@ fn reserved_parts_and_invalid_raw_metadata_are_rejected_atomically() {
                 format!("/word/glossary/reserved-{index}.bin"),
                 content_type,
                 Vec::new(),
+                &Limits::DEFAULT
             )
             .is_err()
         );
@@ -757,9 +835,9 @@ fn reserved_parts_and_invalid_raw_metadata_are_rejected_atomically() {
             Arc::new(Vec::new()),
             Vec::new(),
         ));
-        assert!(raw::put(&mut candidate, &graph).is_err());
+        assert!(raw::put(&mut candidate, &graph, &Limits::default()).is_err());
         assert!(candidate.is_signed());
-        assert!(raw::load(&candidate).unwrap().is_none());
+        assert!(raw::load(&candidate, &Limits::default()).unwrap().is_none());
     }
 
     let mut package = package();
@@ -777,9 +855,9 @@ fn reserved_parts_and_invalid_raw_metadata_are_rejected_atomically() {
         Arc::new(vec![0x89, b'P', b'N', b'G']),
         Vec::new(),
     ));
-    assert!(raw::put(&mut package, &reserved).is_err());
+    assert!(raw::put(&mut package, &reserved, &Limits::default()).is_err());
     assert!(package.is_signed());
-    assert!(raw::load(&package).unwrap().is_none());
+    assert!(raw::load(&package, &Limits::default()).unwrap().is_none());
 
     let mut invalid_id = raw::Graph::new(Catalog::new(), Conformance::Transitional);
     invalid_id.rels.push(raw::Rel {
@@ -788,8 +866,187 @@ fn reserved_parts_and_invalid_raw_metadata_are_rejected_atomically() {
         target: "https://example.invalid".to_owned(),
         external: true,
     });
-    assert!(raw::put(&mut package, &invalid_id).is_err());
+    assert!(raw::put(&mut package, &invalid_id, &Limits::default()).is_err());
     assert!(package.is_signed());
+}
+
+#[test]
+fn raw_part_limits_reject_before_retaining_payload_or_relationships() {
+    let byte_limit = Limits::new(
+        MAX,
+        MAX_DEPTH,
+        MAX_NODES,
+        MAX_DOM_ATTRIBUTES,
+        MAX_DOM_CONTENT,
+        MAX_DOM_TOKENS,
+        MAX_DOM_BYTES,
+        MAX_PARTS,
+        MAX_VALUES,
+        MAX_STRING,
+        MAX_NAME_KEY,
+        GraphLimits::new(1, MAX_GRAPH_METADATA_BYTES),
+    )
+    .expect("narrow graph-byte policy");
+    assert!(
+        raw::Part::new(
+            "/word/glossary/media/too-large.bin",
+            "application/octet-stream",
+            vec![1, 2],
+            &byte_limit,
+        )
+        .is_err()
+    );
+    let name_limit = Limits::new(
+        MAX,
+        MAX_DEPTH,
+        MAX_NODES,
+        MAX_DOM_ATTRIBUTES,
+        MAX_DOM_CONTENT,
+        MAX_DOM_TOKENS,
+        MAX_DOM_BYTES,
+        MAX_PARTS,
+        MAX_VALUES,
+        MAX_STRING,
+        1,
+        GraphLimits::new(MAX_GRAPH_BYTES, MAX_GRAPH_METADATA_BYTES),
+    )
+    .expect("narrow name policy");
+    let error = raw::Part::new(
+        "/word/glossary/media/name-too-long.bin",
+        "application/octet-stream",
+        Vec::new(),
+        &name_limit,
+    )
+    .expect_err("part names use the selected name budget");
+    assert!(matches!(
+        error,
+        Error::GlossaryLimit {
+            kind: LimitKind::StringBytes,
+            actual,
+            maximum: 1,
+        } if actual == "/word/glossary/media/name-too-long.bin".len()
+    ));
+
+    let mut part = raw::Part::new(
+        "/word/glossary/media/kept.bin",
+        "application/octet-stream",
+        vec![1],
+        &Limits::DEFAULT,
+    )
+    .expect("default policy admits the original payload");
+    assert!(part.replace_data(vec![1, 2], &byte_limit).is_err());
+    assert_eq!(part.data(), [1]);
+
+    let metadata_limit = Limits::new(
+        MAX,
+        MAX_DEPTH,
+        MAX_NODES,
+        MAX_DOM_ATTRIBUTES,
+        MAX_DOM_CONTENT,
+        MAX_DOM_TOKENS,
+        MAX_DOM_BYTES,
+        MAX_PARTS,
+        MAX_VALUES,
+        MAX_STRING,
+        MAX_NAME_KEY,
+        GraphLimits::new(MAX_GRAPH_BYTES, 1),
+    )
+    .expect("narrow metadata policy");
+    assert!(
+        part.set_relationships(
+            vec![raw::Rel {
+                id: "rId1".to_owned(),
+                kind: rt::IMAGE.to_owned(),
+                target: "image.png".to_owned(),
+                external: false,
+            }],
+            &metadata_limit,
+        )
+        .is_err()
+    );
+    assert!(part.relationships().is_empty());
+}
+
+#[test]
+fn raw_graph_new_admits_generated_root_and_owner_before_staging() {
+    let root_bytes = write(&Catalog::new(), Conformance::Transitional)
+        .expect("empty glossary XML")
+        .len();
+    let graph_limit = Limits::new(
+        MAX,
+        MAX_DEPTH,
+        MAX_NODES,
+        MAX_DOM_ATTRIBUTES,
+        MAX_DOM_CONTENT,
+        MAX_DOM_TOKENS,
+        MAX_DOM_BYTES,
+        MAX_PARTS,
+        MAX_VALUES,
+        MAX_STRING,
+        MAX_NAME_KEY,
+        GraphLimits::new(root_bytes - 1, MAX_GRAPH_METADATA_BYTES),
+    )
+    .expect("graph-byte boundary policy");
+    let mut graph_package = package();
+    let error = raw::put(
+        &mut graph_package,
+        &raw::Graph::new(Catalog::new(), Conformance::Transitional),
+        &graph_limit,
+    )
+    .expect_err("generated root must be charged before staging");
+    assert!(matches!(
+        error,
+        Error::GlossaryLimit {
+            kind: LimitKind::GraphBytes,
+            ..
+        }
+    ));
+    assert!(
+        raw::load(&graph_package, &Limits::DEFAULT)
+            .unwrap()
+            .is_none()
+    );
+
+    let metadata = "/word/document.xml".len()
+        + "/word/glossary/document.xml".len()
+        + "rId1".len()
+        + "glossary/document.xml".len()
+        + "/word/glossary/document.xml".len()
+        + CT.len();
+    let metadata_limit = Limits::new(
+        MAX,
+        MAX_DEPTH,
+        MAX_NODES,
+        MAX_DOM_ATTRIBUTES,
+        MAX_DOM_CONTENT,
+        MAX_DOM_TOKENS,
+        MAX_DOM_BYTES,
+        MAX_PARTS,
+        MAX_VALUES,
+        MAX_STRING,
+        MAX_NAME_KEY,
+        GraphLimits::new(MAX_GRAPH_BYTES, metadata - 1),
+    )
+    .expect("metadata boundary policy");
+    let mut metadata_package = package();
+    let error = raw::put(
+        &mut metadata_package,
+        &raw::Graph::new(Catalog::new(), Conformance::Transitional),
+        &metadata_limit,
+    )
+    .expect_err("generated owner metadata must be charged before staging");
+    assert!(matches!(
+        error,
+        Error::GlossaryLimit {
+            kind: LimitKind::GraphMetadataBytes,
+            ..
+        }
+    ));
+    assert!(
+        raw::load(&metadata_package, &Limits::DEFAULT)
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[test]
@@ -807,6 +1064,7 @@ fn graph_wide_relationship_limit_is_failure_atomic() {
             format!("/word/glossary/{name}"),
             ct::WML_NUMBERING,
             format!(r#"<w:numbering xmlns:w="{W}"/>"#).into_bytes(),
+            &Limits::DEFAULT,
         )
         .unwrap();
         for relationship_index in 0..(MAX_VALUES / 2) {
@@ -822,10 +1080,12 @@ fn graph_wide_relationship_limit_is_failure_atomic() {
 
     let mut package = package();
     mark_signed(&mut package);
-    let error = raw::put(&mut package, &graph).unwrap_err().to_string();
+    let error = raw::put(&mut package, &graph, &Limits::default())
+        .unwrap_err()
+        .to_string();
     assert!(error.contains("graph-wide relationship limit"), "{error}");
     assert!(package.is_signed());
-    assert!(raw::load(&package).unwrap().is_none());
+    assert!(raw::load(&package, &Limits::default()).unwrap().is_none());
 }
 
 #[test]
@@ -833,7 +1093,13 @@ fn shared_inbound_owned_parts_block_changed_store_and_remove() {
     let mut package = package();
     let mut catalog = Catalog::new();
     catalog.add(entry("Keep")).unwrap();
-    put(&mut package, catalog.clone(), Conformance::Transitional).unwrap();
+    put(
+        &mut package,
+        catalog.clone(),
+        Conformance::Transitional,
+        &Limits::DEFAULT,
+    )
+    .unwrap();
     let root = PackURI::new("/word/glossary/document.xml").unwrap();
     let mut referrer = BlobPart::new(
         PackURI::new("/word/header1.xml").unwrap(),
@@ -847,8 +1113,16 @@ fn shared_inbound_owned_parts_block_changed_store_and_remove() {
 
     let mut changed = catalog;
     changed.add(entry("Changed")).unwrap();
-    assert!(put(&mut package, changed, Conformance::Transitional).is_err());
-    assert!(remove(&mut package).is_err());
+    assert!(
+        put(
+            &mut package,
+            changed,
+            Conformance::Transitional,
+            &Limits::DEFAULT
+        )
+        .is_err()
+    );
+    assert!(remove(&mut package, &Limits::DEFAULT).is_err());
     assert!(package.get_part(&root).is_ok());
 }
 
@@ -867,9 +1141,11 @@ fn auxiliary_relationships_must_match_the_package_conformance_family() {
             external: false,
         });
 
-        let error = raw::put(&mut package, &graph).unwrap_err().to_string();
+        let error = raw::put(&mut package, &graph, &Limits::default())
+            .unwrap_err()
+            .to_string();
         assert!(error.contains("conformance"), "{error}");
-        assert!(raw::load(&package).unwrap().is_none());
+        assert!(raw::load(&package, &Limits::default()).unwrap().is_none());
     }
 }
 
@@ -888,11 +1164,16 @@ fn relationship_targets_use_exact_content_type_profiles() {
             "/word/glossary/styles.png",
             "image/png",
             vec![0x89, b'P', b'N', b'G'],
+            &Limits::DEFAULT,
         )
         .unwrap(),
     );
-    assert!(raw::put(&mut invalid_package, &invalid).is_err());
-    assert!(raw::load(&invalid_package).unwrap().is_none());
+    assert!(raw::put(&mut invalid_package, &invalid, &Limits::default()).is_err());
+    assert!(
+        raw::load(&invalid_package, &Limits::default())
+            .unwrap()
+            .is_none()
+    );
 
     let mut valid_package = package();
     let mut valid = raw::Graph::new(Catalog::new(), Conformance::Transitional);
@@ -907,11 +1188,19 @@ fn relationship_targets_use_exact_content_type_profiles() {
             "/word/glossary/customizations.xml",
             CUSTOMIZATIONS_CT,
             Vec::new(),
+            &Limits::DEFAULT,
         )
         .unwrap(),
     );
-    assert!(raw::put(&mut valid_package, &valid).unwrap());
-    assert_eq!(raw::load(&valid_package).unwrap().unwrap().parts.len(), 1);
+    assert!(raw::put(&mut valid_package, &valid, &Limits::default()).unwrap());
+    assert_eq!(
+        raw::load(&valid_package, &Limits::default())
+            .unwrap()
+            .unwrap()
+            .parts
+            .len(),
+        1
+    );
 }
 
 #[test]
@@ -930,7 +1219,7 @@ fn standards_relationship_matrix_round_trips_owned_parts_and_keeps_references() 
     );
     let mut catalog = Catalog::new();
     catalog
-        .add(Entry::new("Matrix", body.into_bytes()).unwrap())
+        .add(Entry::new("Matrix", body.into_bytes(), &Limits::DEFAULT).unwrap())
         .unwrap();
     let mut graph = raw::Graph::new(catalog, Conformance::Transitional);
     graph.rels = vec![
@@ -967,6 +1256,7 @@ fn standards_relationship_matrix_round_trips_owned_parts_and_keeps_references() 
         "/word/glossary/comments.xml",
         ct::WML_COMMENTS,
         format!(r#"<w:comments xmlns:w="{W}"/>"#).into_bytes(),
+        &Limits::DEFAULT,
     )
     .unwrap();
     comments.rels = vec![
@@ -982,6 +1272,7 @@ fn standards_relationship_matrix_round_trips_owned_parts_and_keeps_references() 
         "/word/glossary/charts/chart1.xml",
         ct::DML_CHART,
         b"<c:chartSpace xmlns:c=\"urn:chart\"/>".to_vec(),
+        &Limits::DEFAULT,
     )
     .unwrap();
     chart.rels.push(relationship(
@@ -1032,6 +1323,7 @@ fn standards_relationship_matrix_round_trips_owned_parts_and_keeps_references() 
         "/word/glossary/charts/userShapes1.xml",
         ct::DML_CHARTSHAPES,
         Vec::new(),
+        &Limits::DEFAULT,
     )
     .unwrap();
     chart_shapes.rels.push(relationship(
@@ -1053,6 +1345,7 @@ fn standards_relationship_matrix_round_trips_owned_parts_and_keeps_references() 
         "/word/glossary/customXml/item1.xml",
         "application/xml",
         b"<data/>".to_vec(),
+        &Limits::DEFAULT,
     )
     .unwrap();
     custom_xml.rels.push(relationship(
@@ -1065,6 +1358,7 @@ fn standards_relationship_matrix_round_trips_owned_parts_and_keeps_references() 
         "/word/glossary/activeX/activeX1.xml",
         ACTIVE_X_DESCRIPTOR_CT,
         b"<ax:ocx xmlns:ax=\"urn:active-x\"/>".to_vec(),
+        &Limits::DEFAULT,
     )
     .unwrap();
     control.rels.push(raw::Rel {
@@ -1077,6 +1371,7 @@ fn standards_relationship_matrix_round_trips_owned_parts_and_keeps_references() 
         "/word/glossary/settings.xml",
         ct::WML_SETTINGS,
         format!(r#"<w:settings xmlns:w="{W}"/>"#).into_bytes(),
+        &Limits::DEFAULT,
     )
     .unwrap();
     settings.rels.push(relationship(
@@ -1095,6 +1390,7 @@ fn standards_relationship_matrix_round_trips_owned_parts_and_keeps_references() 
         "/word/glossary/fontTable.xml",
         ct::WML_FONT_TABLE,
         format!(r#"<w:fonts xmlns:w="{W}"/>"#).into_bytes(),
+        &Limits::DEFAULT,
     )
     .unwrap();
     font_table
@@ -1104,6 +1400,7 @@ fn standards_relationship_matrix_round_trips_owned_parts_and_keeps_references() 
         "/word/glossary/webSettings.xml",
         ct::WML_WEB_SETTINGS,
         format!(r#"<w:webSettings xmlns:w="{W}"/>"#).into_bytes(),
+        &Limits::DEFAULT,
     )
     .unwrap();
     web_settings.rels.push(relationship(
@@ -1116,6 +1413,7 @@ fn standards_relationship_matrix_round_trips_owned_parts_and_keeps_references() 
         "/word/glossary/diagram/data.xml",
         ct::DML_DIAGRAM_DATA,
         b"<d:dataModel xmlns:d=\"urn:diagram\"/>".to_vec(),
+        &Limits::DEFAULT,
     )
     .unwrap();
     diagram_data.rels.push(raw::Rel {
@@ -1134,6 +1432,7 @@ fn standards_relationship_matrix_round_trips_owned_parts_and_keeps_references() 
         "/word/glossary/customizations.xml",
         CUSTOMIZATIONS_CT,
         Vec::new(),
+        &Limits::DEFAULT,
     )
     .unwrap();
     customizations.rels.push(raw::Rel {
@@ -1149,18 +1448,21 @@ fn standards_relationship_matrix_round_trips_owned_parts_and_keeps_references() 
             "/word/glossary/charts/style1.xml",
             CHART_STYLE_CT,
             Vec::new(),
+            &Limits::DEFAULT,
         )
         .unwrap(),
         raw::Part::new(
             "/word/glossary/charts/colors1.xml",
             CHART_COLOR_STYLE_CT,
             Vec::new(),
+            &Limits::DEFAULT,
         )
         .unwrap(),
         raw::Part::new(
             "/word/glossary/charts/themeOverride1.xml",
             ct::OFC_THEME_OVERRIDE,
             Vec::new(),
+            &Limits::DEFAULT,
         )
         .unwrap(),
         chart_shapes,
@@ -1169,6 +1471,7 @@ fn standards_relationship_matrix_round_trips_owned_parts_and_keeps_references() 
             "/word/glossary/customXml/itemProps1.xml",
             litchi_ooxml_common::custom_xml::PROPS_CONTENT_TYPE,
             b"<ds:datastoreItem xmlns:ds=\"urn:custom-xml-props\"/>".to_vec(),
+            &Limits::DEFAULT,
         )
         .unwrap(),
         control,
@@ -1176,12 +1479,14 @@ fn standards_relationship_matrix_round_trips_owned_parts_and_keeps_references() 
             "/word/glossary/activeX/activeX1.bin",
             ACTIVE_X_BINARY_CT,
             vec![0, 1, 2],
+            &Limits::DEFAULT,
         )
         .unwrap(),
         raw::Part::new(
             "/word/glossary/controls/vendor.bin",
             "application/vnd.example.control",
             vec![9, 8, 7],
+            &Limits::DEFAULT,
         )
         .unwrap(),
         settings,
@@ -1189,6 +1494,7 @@ fn standards_relationship_matrix_round_trips_owned_parts_and_keeps_references() 
             "/word/glossary/recipientData.xml",
             RECIPIENT_DATA_CT,
             Vec::new(),
+            &Limits::DEFAULT,
         )
         .unwrap(),
         font_table,
@@ -1198,20 +1504,29 @@ fn standards_relationship_matrix_round_trips_owned_parts_and_keeps_references() 
             "/word/glossary/diagram/drawing.xml",
             ct::DML_DIAGRAM_DRAWING,
             Vec::new(),
+            &Limits::DEFAULT,
         )
         .unwrap(),
         raw::Part::new(
             "/word/glossary/chunks/chunk.html",
             "text/html",
             b"<p>chunk</p>".to_vec(),
+            &Limits::DEFAULT,
         )
         .unwrap(),
-        raw::Part::new("/word/glossary/fonts/font.ttf", FONT_TTF_CT, vec![0, 1, 2]).unwrap(),
+        raw::Part::new(
+            "/word/glossary/fonts/font.ttf",
+            FONT_TTF_CT,
+            vec![0, 1, 2],
+            &Limits::DEFAULT,
+        )
+        .unwrap(),
         customizations,
         raw::Part::new(
             "/word/glossary/attachedToolbars.bin",
             ATTACHED_TOOLBARS_CT,
             Vec::new(),
+            &Limits::DEFAULT,
         )
         .unwrap(),
     ];
@@ -1225,15 +1540,17 @@ fn standards_relationship_matrix_round_trips_owned_parts_and_keeps_references() 
             b"<shared/>".to_vec(),
         )))
         .unwrap();
-    assert!(raw::put(&mut package, &graph).unwrap());
-    let loaded = raw::load(&package).unwrap().unwrap();
+    assert!(raw::put(&mut package, &graph, &Limits::default()).unwrap());
+    let loaded = raw::load(&package, &Limits::default()).unwrap().unwrap();
     assert!(
         !loaded
             .parts
             .iter()
             .any(|part| part.name == reference.as_str())
     );
-    let removed = raw::remove(&mut package).unwrap().unwrap();
+    let removed = raw::remove(&mut package, &Limits::default())
+        .unwrap()
+        .unwrap();
     assert_eq!(removed.parts.len(), graph.parts.len());
     assert_eq!(package.get_part(&reference).unwrap().blob(), b"<shared/>");
 }
@@ -1266,11 +1583,12 @@ fn relationship_roles_reject_invalid_modes_names_and_content_type_spoofing() {
                         "text/html"
                     },
                     Vec::new(),
+                    &Limits::DEFAULT,
                 )
                 .unwrap(),
             );
         }
-        assert!(raw::put(&mut package(), &graph).is_err());
+        assert!(raw::put(&mut package(), &graph, &Limits::default()).is_err());
     }
 
     let mut spoofed = raw::Graph::new(Catalog::new(), Conformance::Transitional);
@@ -1280,8 +1598,13 @@ fn relationship_roles_reject_invalid_modes_names_and_content_type_spoofing() {
         target: "embedded.bin".to_owned(),
         external: false,
     });
-    let mut embedded =
-        raw::Part::new("/word/glossary/embedded.bin", ct::DML_CHART, Vec::new()).unwrap();
+    let mut embedded = raw::Part::new(
+        "/word/glossary/embedded.bin",
+        ct::DML_CHART,
+        Vec::new(),
+        &Limits::DEFAULT,
+    )
+    .unwrap();
     embedded.rels.push(raw::Rel {
         id: "rIdShapes".to_owned(),
         kind: format!("{R}/chartUserShapes"),
@@ -1290,9 +1613,15 @@ fn relationship_roles_reject_invalid_modes_names_and_content_type_spoofing() {
     });
     spoofed.parts = vec![
         embedded,
-        raw::Part::new("/word/glossary/shapes.xml", ct::DML_CHARTSHAPES, Vec::new()).unwrap(),
+        raw::Part::new(
+            "/word/glossary/shapes.xml",
+            ct::DML_CHARTSHAPES,
+            Vec::new(),
+            &Limits::DEFAULT,
+        )
+        .unwrap(),
     ];
-    assert!(raw::put(&mut package(), &spoofed).is_err());
+    assert!(raw::put(&mut package(), &spoofed, &Limits::default()).is_err());
 
     fn child_graph(
         root_kind: &str,
@@ -1308,8 +1637,13 @@ fn relationship_roles_reject_invalid_modes_names_and_content_type_spoofing() {
             target: "parent.xml".to_owned(),
             external: false,
         });
-        let mut parent =
-            raw::Part::new("/word/glossary/parent.xml", parent_content_type, Vec::new()).unwrap();
+        let mut parent = raw::Part::new(
+            "/word/glossary/parent.xml",
+            parent_content_type,
+            Vec::new(),
+            &Limits::DEFAULT,
+        )
+        .unwrap();
         parent.rels.push(raw::Rel {
             id: "rIdChild".to_owned(),
             kind: child_kind.to_owned(),
@@ -1323,7 +1657,13 @@ fn relationship_roles_reject_invalid_modes_names_and_content_type_spoofing() {
         graph.parts.push(parent);
         if let Some(content_type) = child_content_type {
             graph.parts.push(
-                raw::Part::new("/word/glossary/child.bin", content_type, Vec::new()).unwrap(),
+                raw::Part::new(
+                    "/word/glossary/child.bin",
+                    content_type,
+                    Vec::new(),
+                    &Limits::DEFAULT,
+                )
+                .unwrap(),
             );
         }
         graph
@@ -1366,7 +1706,7 @@ fn relationship_roles_reject_invalid_modes_names_and_content_type_spoofing() {
             true,
         ),
     ] {
-        assert!(raw::put(&mut package(), &invalid).is_err());
+        assert!(raw::put(&mut package(), &invalid, &Limits::default()).is_err());
     }
 }
 
@@ -1378,7 +1718,7 @@ fn semantic_catalogs_cannot_rebind_colliding_relationship_ids() {
         );
         let mut catalog = Catalog::new();
         catalog
-            .add(Entry::new("Picture", body.into_bytes()).unwrap())
+            .add(Entry::new("Picture", body.into_bytes(), &Limits::DEFAULT).unwrap())
             .unwrap();
         let mut graph = raw::Graph::new(catalog, Conformance::Transitional);
         graph.rels.push(raw::Rel {
@@ -1392,6 +1732,7 @@ fn semantic_catalogs_cannot_rebind_colliding_relationship_ids() {
                 format!("/word/glossary/media/{target}.png"),
                 "image/png",
                 payload.to_vec(),
+                &Limits::DEFAULT,
             )
             .unwrap(),
         );
@@ -1402,12 +1743,12 @@ fn semantic_catalogs_cannot_rebind_colliding_relationship_ids() {
     let destination_graph = picture_graph("destination", b"destination image");
     let mut source = package();
     let mut destination = package();
-    raw::put(&mut source, &source_graph).unwrap();
-    raw::put(&mut destination, &destination_graph).unwrap();
+    raw::put(&mut source, &source_graph, &Limits::default()).unwrap();
+    raw::put(&mut destination, &destination_graph, &Limits::default()).unwrap();
 
-    let (mut source_catalog, _) = load(&source).unwrap().unwrap();
+    let (mut source_catalog, _) = load(&source, &Limits::DEFAULT).unwrap().unwrap();
     let source_entry = source_catalog.remove("picture").unwrap().unwrap();
-    let (mut destination_catalog, _) = load(&destination).unwrap().unwrap();
+    let (mut destination_catalog, _) = load(&destination, &Limits::DEFAULT).unwrap().unwrap();
     let before = destination_catalog.clone();
     assert!(
         destination_catalog
@@ -1421,20 +1762,22 @@ fn semantic_catalogs_cannot_rebind_colliding_relationship_ids() {
         r#"<w:docPartBody xmlns:w="{W}" xmlns:r="{R}"><w:p r:embed="rIdImage"/><w:p/></w:docPartBody>"#
     );
     let destination_entry = destination_entry
-        .with_body(rebound_body.into_bytes())
+        .with_body(rebound_body.into_bytes(), &Limits::DEFAULT)
         .unwrap();
     assert!(destination_catalog.add(destination_entry).is_err());
     let background = format!(r#"<w:background xmlns:w="{W}" xmlns:r="{R}" r:id="rIdImage"/>"#);
     assert!(
         destination_catalog
-            .set_background(background.into_bytes())
+            .set_background(background.into_bytes(), &Limits::DEFAULT)
             .is_err()
     );
     assert!(destination_catalog.background().is_none());
 
-    let (foreign, conformance) = load(&source).unwrap().unwrap();
-    assert!(put(&mut destination, foreign, conformance).is_err());
-    let retained = raw::load(&destination).unwrap().unwrap();
+    let (foreign, conformance) = load(&source, &Limits::DEFAULT).unwrap().unwrap();
+    assert!(put(&mut destination, foreign, conformance, &Limits::DEFAULT).is_err());
+    let retained = raw::load(&destination, &Limits::default())
+        .unwrap()
+        .unwrap();
     assert_eq!(retained.parts[0].data(), b"destination image");
 }
 
@@ -1445,7 +1788,7 @@ fn inactive_mce_relationship_ids_remain_bound_to_their_physical_graph() {
     );
     let mut catalog = Catalog::new();
     catalog
-        .add(Entry::new("Inactive reference", body.into_bytes()).unwrap())
+        .add(Entry::new("Inactive reference", body.into_bytes(), &Limits::DEFAULT).unwrap())
         .unwrap();
     let mut graph = raw::Graph::new(catalog, Conformance::Transitional);
     graph.rels.push(raw::Rel {
@@ -1459,25 +1802,38 @@ fn inactive_mce_relationship_ids_remain_bound_to_their_physical_graph() {
             "/word/glossary/media/inactive.png",
             "image/png",
             b"inactive image".to_vec(),
+            &Limits::DEFAULT,
         )
         .unwrap(),
     );
 
     let mut source = package();
-    raw::put(&mut source, &graph).unwrap();
-    let (mut loaded, conformance) = load(&source).unwrap().unwrap();
+    raw::put(&mut source, &graph, &Limits::default()).unwrap();
+    let (mut loaded, conformance) = load(&source, &Limits::DEFAULT).unwrap().unwrap();
     assert!(
         !std::str::from_utf8(loaded.at(0).unwrap().body().unwrap())
             .unwrap()
             .contains("rIdInactiveImage")
     );
     let mut destination = package();
-    assert!(put(&mut destination, loaded.clone(), conformance).is_err());
-    assert!(raw::load(&destination).unwrap().is_none());
+    assert!(
+        put(
+            &mut destination,
+            loaded.clone(),
+            conformance,
+            &Limits::DEFAULT,
+        )
+        .is_err()
+    );
+    assert!(
+        raw::load(&destination, &Limits::default())
+            .unwrap()
+            .is_none()
+    );
 
     loaded.add(entry("Unrelated")).unwrap();
-    assert!(put(&mut source, loaded, conformance).unwrap());
-    let preserved = raw::load(&source).unwrap().unwrap();
+    assert!(put(&mut source, loaded, conformance, &Limits::DEFAULT).unwrap());
+    let preserved = raw::load(&source, &Limits::default()).unwrap().unwrap();
     assert!(
         String::from_utf8(write(&preserved.catalog, conformance).unwrap())
             .unwrap()
@@ -1505,12 +1861,15 @@ fn complete_graph_follows_valid_parts_outside_the_conventional_directory() {
             "/assets/glossary.png",
             "image/png",
             vec![0x89, b'P', b'N', b'G'],
+            &Limits::DEFAULT,
         )
         .unwrap(),
     );
     let mut package = package();
-    assert!(raw::put(&mut package, &graph).unwrap());
-    let removed = raw::remove(&mut package).unwrap().unwrap();
+    assert!(raw::put(&mut package, &graph, &Limits::default()).unwrap());
+    let removed = raw::remove(&mut package, &Limits::default())
+        .unwrap()
+        .unwrap();
     assert_eq!(removed.parts[0].name, "/assets/glossary.png");
     assert!(
         package
@@ -1529,17 +1888,28 @@ fn raw_remove_returns_a_graph_that_raw_put_can_restore() {
         target: "media/large.bin".to_owned(),
         external: false,
     });
-    graph
-        .parts
-        .push(raw::Part::new("/word/glossary/media/large.bin", "image/png", payload).unwrap());
+    graph.parts.push(
+        raw::Part::new(
+            "/word/glossary/media/large.bin",
+            "image/png",
+            payload,
+            &Limits::DEFAULT,
+        )
+        .unwrap(),
+    );
 
     let mut source = package();
-    assert!(raw::put(&mut source, &graph).unwrap());
-    let removed = raw::remove(&mut source).unwrap().unwrap();
+    assert!(raw::put(&mut source, &graph, &Limits::default()).unwrap());
+    let removed = raw::remove(&mut source, &Limits::default())
+        .unwrap()
+        .unwrap();
     let mut destination = package();
-    assert!(raw::put(&mut destination, &removed).unwrap());
+    assert!(raw::put(&mut destination, &removed, &Limits::default()).unwrap());
     assert_eq!(
-        raw::load(&destination).unwrap().unwrap().parts[0]
+        raw::load(&destination, &Limits::default())
+            .unwrap()
+            .unwrap()
+            .parts[0]
             .data()
             .len(),
         MAX + 1
@@ -1570,12 +1940,16 @@ fn raw_transfer_preserves_the_main_owner_relationship_metadata() {
         )
         .unwrap();
 
-    let graph = raw::remove(&mut source).unwrap().unwrap();
+    let graph = raw::remove(&mut source, &Limits::default())
+        .unwrap()
+        .unwrap();
     assert_eq!(graph.owner_relationship_id(), Some("rCustomGlossary"));
     assert_eq!(graph.owner_target(), Some("glossary/custom.xml"));
     let mut destination = package();
-    raw::put(&mut destination, &graph).unwrap();
-    let restored = raw::load(&destination).unwrap().unwrap();
+    raw::put(&mut destination, &graph, &Limits::default()).unwrap();
+    let restored = raw::load(&destination, &Limits::default())
+        .unwrap()
+        .unwrap();
     assert_eq!(restored.owner_relationship_id(), Some("rCustomGlossary"));
     assert_eq!(restored.owner_target(), Some("glossary/custom.xml"));
 }
@@ -1603,7 +1977,9 @@ fn raw_transfer_rebases_owner_target_and_allocates_a_free_id() {
             litchi_opc::TargetMode::Internal,
         )
         .unwrap();
-    let graph = raw::remove(&mut source).unwrap().unwrap();
+    let graph = raw::remove(&mut source, &Limits::default())
+        .unwrap()
+        .unwrap();
 
     let mut destination = OpcPackage::new();
     let destination_main = PackURI::new("/custom/main.xml").unwrap();
@@ -1634,8 +2010,10 @@ fn raw_transfer_rebases_owner_target_and_allocates_a_free_id() {
         )
         .unwrap();
 
-    assert!(raw::put(&mut destination, &graph).unwrap());
-    let restored = raw::load(&destination).unwrap().unwrap();
+    assert!(raw::put(&mut destination, &graph, &Limits::default()).unwrap());
+    let restored = raw::load(&destination, &Limits::default())
+        .unwrap()
+        .unwrap();
     assert_eq!(restored.root_name(), "/word/glossary/custom.xml");
     assert_eq!(restored.owner_main_part(), Some("/custom/main.xml"));
     assert_eq!(restored.owner_target(), Some("../word/glossary/custom.xml"));
@@ -1651,15 +2029,56 @@ fn raw_transfer_rebases_owner_target_and_allocates_a_free_id() {
         "urn:unrelated"
     );
     mark_signed(&mut destination);
-    assert!(!raw::put(&mut destination, &graph).unwrap());
+    assert!(!raw::put(&mut destination, &restored, &Limits::default()).unwrap());
     assert!(destination.is_signed());
     let mut bytes = Vec::new();
-    destination.to_stream(&mut bytes).unwrap();
-    let reopened = OpcPackage::from_bytes(&bytes).unwrap();
+    destination.write_to(&mut bytes).unwrap();
+    let reopened = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     assert_eq!(
-        raw::load(&reopened).unwrap().unwrap().owner_main_part(),
+        raw::load(&reopened, &Limits::default())
+            .unwrap()
+            .unwrap()
+            .owner_main_part(),
         Some("/custom/main.xml")
     );
+}
+
+#[test]
+fn raw_transfer_rebases_authored_owner_identity_even_when_content_matches() {
+    let mut source = package();
+    let mut catalog = Catalog::new();
+    catalog.add(entry("Owner identity")).unwrap();
+    raw::put(
+        &mut source,
+        &raw::Graph::new(catalog, Conformance::Transitional),
+        &Limits::default(),
+    )
+    .unwrap();
+    let graph = raw::load(&source, &Limits::default()).unwrap().unwrap();
+    let owner_id = graph.owner_relationship_id().unwrap().to_owned();
+
+    let mut destination = package();
+    raw::put(&mut destination, &graph, &Limits::default()).unwrap();
+    let main = destination.main_document_part().unwrap().partname().clone();
+    let relationship = destination
+        .get_part(&main)
+        .unwrap()
+        .rels()
+        .get(&owner_id)
+        .unwrap();
+    let kind = relationship.reltype().to_owned();
+    let target = relationship.target_ref().to_owned();
+    let relationships = destination.get_part_mut(&main).unwrap().rels_mut();
+    relationships.remove(&owner_id);
+    relationships.add_relationship(kind, target, "rIdDifferentOwner".to_owned(), false);
+
+    assert!(raw::put(&mut destination, &graph, &Limits::default()).unwrap());
+    let restored = raw::load(&destination, &Limits::default())
+        .unwrap()
+        .unwrap();
+    assert_eq!(restored.catalog, graph.catalog);
+    assert_eq!(restored.root_name(), graph.root_name());
+    assert_eq!(restored.owner_relationship_id(), Some(owner_id.as_str()));
 }
 
 #[test]
@@ -1686,7 +2105,9 @@ fn ownership_closure_resolves_case_varied_relationship_targets() {
         )
         .unwrap();
 
-    let graph = raw::remove(&mut package).unwrap().unwrap();
+    let graph = raw::remove(&mut package, &Limits::default())
+        .unwrap()
+        .unwrap();
     assert!(
         graph
             .parts
@@ -1694,7 +2115,7 @@ fn ownership_closure_resolves_case_varied_relationship_targets() {
             .any(|part| part.name == auxiliary.as_str())
     );
     assert!(package.get_part(&auxiliary).is_err());
-    assert!(raw::load(&package).unwrap().is_none());
+    assert!(raw::load(&package, &Limits::default()).unwrap().is_none());
 }
 
 #[test]
@@ -1713,8 +2134,16 @@ fn unowned_parts_in_the_conventional_glossary_directory_are_preserved() {
             )))
             .unwrap();
 
-        assert_eq!(raw::load(&package).unwrap().is_some(), with_root);
-        assert_eq!(raw::remove(&mut package).unwrap().is_some(), with_root);
+        assert_eq!(
+            raw::load(&package, &Limits::default()).unwrap().is_some(),
+            with_root
+        );
+        assert_eq!(
+            raw::remove(&mut package, &Limits::default())
+                .unwrap()
+                .is_some(),
+            with_root
+        );
         assert_eq!(package.get_part(&orphan).unwrap().blob(), [4, 5, 6]);
     }
 }
@@ -1722,20 +2151,133 @@ fn unowned_parts_in_the_conventional_glossary_directory_are_preserved() {
 #[test]
 fn semantic_payload_limits_fail_before_xml_parsing() {
     let oversized = vec![b'x'; MAX + 1];
-    let entry_error = Entry::new("Oversized", oversized).unwrap_err().to_string();
+    let entry_error = Entry::new("Oversized", oversized, &Limits::DEFAULT)
+        .unwrap_err()
+        .to_string();
     assert!(
-        entry_error.contains("payload exceeds 32 MiB"),
+        entry_error.contains("glossary XML bytes limit exceeded"),
         "{entry_error}"
     );
 
     let mut catalog = Catalog::new();
     let background_error = catalog
-        .set_background(vec![b'x'; MAX + 1])
+        .set_background(vec![b'x'; MAX + 1], &Limits::DEFAULT)
         .unwrap_err()
         .to_string();
     assert!(
-        background_error.contains("payload exceeds 32 MiB"),
+        background_error.contains("glossary XML bytes limit exceeded"),
         "{background_error}"
+    );
+    assert!(catalog.background().is_none());
+}
+
+#[test]
+fn unchanged_background_rebind_checks_existing_catalog() {
+    let mut catalog = Catalog::new();
+    catalog.add(entry("Existing")).unwrap();
+    let background = format!(r#"<w:background xmlns:w="{W}"/>"#).into_bytes();
+    catalog
+        .set_background(background.clone(), &Limits::DEFAULT)
+        .unwrap();
+    let narrow_nodes = Limits::new(
+        MAX,
+        MAX_DEPTH,
+        1,
+        MAX_DOM_ATTRIBUTES,
+        MAX_DOM_CONTENT,
+        MAX_DOM_TOKENS,
+        MAX_DOM_BYTES,
+        MAX_PARTS,
+        MAX_VALUES,
+        MAX_STRING,
+        MAX_NAME_KEY,
+        GraphLimits::new(MAX_GRAPH_BYTES, MAX_GRAPH_METADATA_BYTES),
+    )
+    .unwrap();
+    let error = catalog
+        .set_background(background, &narrow_nodes)
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("XML node limit exceeded"), "{error}");
+    assert!(catalog.add(entry("Still default")).is_ok());
+}
+
+#[test]
+fn changed_background_rebind_checks_existing_entries() {
+    let mut catalog = Catalog::new();
+    let props = Props {
+        description: Some("oversized".to_owned()),
+        ..Props::new(Name::new("Existing").unwrap())
+    };
+    catalog
+        .add(
+            entry("Existing")
+                .with_props(props, &Limits::DEFAULT)
+                .unwrap(),
+        )
+        .unwrap();
+    let old_background = format!(r#"<w:background xmlns:w="{W}"/>"#).into_bytes();
+    let new_background = format!(r#"<w:background xmlns:w="{W}" w:color="A"/>"#).into_bytes();
+    catalog
+        .set_background(old_background.clone(), &Limits::DEFAULT)
+        .unwrap();
+    let narrow_strings = Limits::new(
+        MAX,
+        MAX_DEPTH,
+        MAX_NODES,
+        MAX_DOM_ATTRIBUTES,
+        MAX_DOM_CONTENT,
+        MAX_DOM_TOKENS,
+        MAX_DOM_BYTES,
+        MAX_PARTS,
+        MAX_VALUES,
+        1,
+        MAX_NAME_KEY,
+        GraphLimits::new(MAX_GRAPH_BYTES, MAX_GRAPH_METADATA_BYTES),
+    )
+    .unwrap();
+    let error = catalog
+        .set_background(new_background, &narrow_strings)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("glossary string bytes limit exceeded"),
+        "{error}"
+    );
+    assert_eq!(catalog.background(), Some(old_background.as_slice()));
+}
+
+#[test]
+fn changed_background_rebind_checks_retained_graph_bytes() {
+    let mut catalog = Catalog::new();
+    let existing = entry("Existing");
+    let body_bytes = existing.body().unwrap().len();
+    catalog.add(existing).unwrap();
+    let background = format!(r#"<w:background xmlns:w="{W}"/>"#).into_bytes();
+    let graph_bytes = body_bytes + background.len() - 1;
+    let limits = Limits::new(
+        MAX,
+        MAX_DEPTH,
+        MAX_NODES,
+        MAX_DOM_ATTRIBUTES,
+        MAX_DOM_CONTENT,
+        MAX_DOM_TOKENS,
+        MAX_DOM_BYTES,
+        MAX_PARTS,
+        MAX_VALUES,
+        MAX_STRING,
+        MAX_NAME_KEY,
+        GraphLimits::new(graph_bytes, MAX_GRAPH_METADATA_BYTES),
+    )
+    .unwrap();
+
+    let error = catalog
+        .set_background(background, &limits)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("glossary graph bytes limit exceeded"),
+        "{error}"
     );
     assert!(catalog.background().is_none());
 }
@@ -1750,7 +2292,7 @@ fn aggregate_catalog_budget_is_checked_atomically() {
             ..Props::new(Name::new(&name).unwrap())
         };
         catalog
-            .add(entry(&name).with_props(props).unwrap())
+            .add(entry(&name).with_props(props, &Limits::DEFAULT).unwrap())
             .unwrap();
     }
     let before = catalog.len();
@@ -1760,10 +2302,17 @@ fn aggregate_catalog_budget_is_checked_atomically() {
         ..Props::new(Name::new(rejected_name).unwrap())
     };
     let error = catalog
-        .add(entry(rejected_name).with_props(rejected_props).unwrap())
+        .add(
+            entry(rejected_name)
+                .with_props(rejected_props, &Limits::DEFAULT)
+                .unwrap(),
+        )
         .unwrap_err()
         .to_string();
-    assert!(error.contains("exceeds 32 MiB"), "{error}");
+    assert!(
+        error.contains("glossary XML bytes limit exceeded"),
+        "{error}"
+    );
     assert_eq!(catalog.len(), before);
     assert!(catalog.get(rejected_name).unwrap().is_none());
 
@@ -1773,11 +2322,15 @@ fn aggregate_catalog_budget_is_checked_atomically() {
         ..Props::new(Name::new("Large 0").unwrap())
     };
     let replacement_error = catalog
-        .put(entry("Large 0").with_props(replacement_props).unwrap())
+        .put(
+            entry("Large 0")
+                .with_props(replacement_props, &Limits::DEFAULT)
+                .unwrap(),
+        )
         .unwrap_err()
         .to_string();
     assert!(
-        replacement_error.contains("exceeds 32 MiB"),
+        replacement_error.contains("glossary XML bytes limit exceeded"),
         "{replacement_error}"
     );
     assert!(
@@ -1796,11 +2349,11 @@ fn aggregate_catalog_budget_is_checked_atomically() {
         ">".repeat(600_000)
     );
     let background_error = catalog
-        .set_background(background.into_bytes())
+        .set_background(background.into_bytes(), &Limits::DEFAULT)
         .unwrap_err()
         .to_string();
     assert!(
-        background_error.contains("exceeds 32 MiB"),
+        background_error.contains("glossary XML bytes limit exceeded"),
         "{background_error}"
     );
     assert!(catalog.background().is_none());
@@ -1811,7 +2364,10 @@ fn canonical_write_matches_its_checked_plan() {
     let mut catalog = Catalog::new();
     catalog.add(entry("Planned")).unwrap();
     catalog
-        .set_background(format!(r#"<w:background xmlns:w="{W}" w:color="A&amp;B"/>"#).into_bytes())
+        .set_background(
+            format!(r#"<w:background xmlns:w="{W}" w:color="A&amp;B"/>"#).into_bytes(),
+            &Limits::DEFAULT,
+        )
         .unwrap();
 
     for conformance in [Conformance::Transitional, Conformance::Strict] {
@@ -1820,6 +2376,61 @@ fn canonical_write_matches_its_checked_plan() {
         assert_eq!(xml.len(), plan.bytes);
         assert_eq!(read(&xml).unwrap().1, conformance);
     }
+}
+
+#[test]
+fn raw_write_admits_generated_xml_shape_limits() {
+    let limits = Limits::new(
+        MAX,
+        MAX_DEPTH,
+        MAX_NODES,
+        MAX_DOM_ATTRIBUTES,
+        MAX_DOM_CONTENT,
+        1,
+        MAX_DOM_BYTES,
+        MAX_PARTS,
+        MAX_VALUES,
+        MAX_STRING,
+        MAX_NAME_KEY,
+        GraphLimits::new(MAX_GRAPH_BYTES, MAX_GRAPH_METADATA_BYTES),
+    )
+    .unwrap();
+    let error = raw::write(&Catalog::new(), Conformance::Transitional, &limits)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("glossary XML token limit exceeded"),
+        "{error}"
+    );
+}
+
+#[test]
+fn raw_put_admits_generated_xml_shape_before_staging() {
+    let limits = Limits::new(
+        MAX,
+        MAX_DEPTH,
+        MAX_NODES,
+        1,
+        MAX_DOM_CONTENT,
+        MAX_DOM_TOKENS,
+        MAX_DOM_BYTES,
+        MAX_PARTS,
+        MAX_VALUES,
+        MAX_STRING,
+        MAX_NAME_KEY,
+        GraphLimits::new(MAX_GRAPH_BYTES, MAX_GRAPH_METADATA_BYTES),
+    )
+    .unwrap();
+    let mut package = package();
+    let graph = raw::Graph::new(Catalog::new(), Conformance::Transitional);
+    let error = raw::put(&mut package, &graph, &limits)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("glossary XML attribute limit exceeded"),
+        "{error}"
+    );
+    assert!(raw::load(&package, &Limits::DEFAULT).unwrap().is_none());
 }
 
 #[test]
@@ -1835,18 +2446,24 @@ fn aggregate_auxiliary_payload_limit_rejects_before_mutation() {
             Vec::new(),
         ));
     }
-    assert!(raw::put(&mut package, &graph).is_err());
-    assert!(load(&package).unwrap().is_none());
+    assert!(raw::put(&mut package, &graph, &Limits::default()).is_err());
+    assert!(load(&package, &Limits::DEFAULT).unwrap().is_none());
 }
 
 #[test]
 fn transaction_creates_catalog_and_auxiliary_graph_atomically() {
     let mut package = package();
-    let mut transaction = Transaction::new(&mut package).unwrap();
+    let mut transaction = Transaction::new(&package).unwrap();
     transaction.add_entry(entry("Authored")).unwrap();
     transaction
         .add_part(
-            raw::Part::new("/word/glossary/media/image.png", "image/png", vec![1, 2, 3]).unwrap(),
+            raw::Part::new(
+                "/word/glossary/media/image.png",
+                "image/png",
+                vec![1, 2, 3],
+                &Limits::DEFAULT,
+            )
+            .unwrap(),
         )
         .unwrap();
     transaction
@@ -1858,15 +2475,120 @@ fn transaction_creates_catalog_and_auxiliary_graph_atomically() {
         })
         .unwrap();
 
-    let commit = transaction.commit().unwrap();
+    let commit = transaction.commit(&mut package).unwrap();
     assert!(commit.changed());
     assert_eq!(commit.snapshot().entries()[0].name(), Some("Authored"));
     assert_eq!(commit.snapshot().auxiliary_parts()[0].data(), [1, 2, 3]);
-    assert!(raw::load(&package).unwrap().is_some());
+    assert!(raw::load(&package, &Limits::default()).unwrap().is_some());
 
     let patch = commit.patch().clone();
-    patch.undo(&mut package).unwrap();
-    assert!(Snapshot::load(&package).unwrap().is_empty());
+    patch.undo(&mut package, &Limits::DEFAULT).unwrap();
+    assert!(
+        Snapshot::load(&package, &Limits::DEFAULT)
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[test]
+fn transaction_auxiliary_budget_is_admitted_before_staging() {
+    let mut package = package();
+    add_empty_glossary(&mut package, Conformance::Transitional);
+    let mut graph = raw::load(&package, &Limits::DEFAULT).unwrap().unwrap();
+    graph.parts.push(
+        raw::Part::new(
+            "/word/glossary/media/one.bin",
+            "image/png",
+            vec![1],
+            &Limits::DEFAULT,
+        )
+        .unwrap(),
+    );
+    graph.rels.push(raw::Rel {
+        id: "rIdOne".to_owned(),
+        kind: rt::IMAGE.to_owned(),
+        target: "media/one.bin".to_owned(),
+        external: false,
+    });
+    raw::put(&mut package, &graph, &Limits::DEFAULT).unwrap();
+    let loaded = raw::load(&package, &Limits::DEFAULT).unwrap().unwrap();
+    let graph_bytes = loaded.root_xml().unwrap().len()
+        + loaded
+            .parts()
+            .iter()
+            .map(|part| part.data().len())
+            .sum::<usize>();
+    let limits = Limits::new(
+        MAX,
+        MAX_DEPTH,
+        MAX_NODES,
+        MAX_DOM_ATTRIBUTES,
+        MAX_DOM_CONTENT,
+        MAX_DOM_TOKENS,
+        MAX_DOM_BYTES,
+        MAX_PARTS,
+        MAX_VALUES,
+        MAX_STRING,
+        MAX_NAME_KEY,
+        GraphLimits::new(graph_bytes, MAX_GRAPH_METADATA_BYTES),
+    )
+    .unwrap();
+    let mut transaction = Transaction::new_with_limits(&package, &limits).unwrap();
+    let before = transaction.auxiliary_parts().len();
+    let error = transaction
+        .add_part(
+            raw::Part::new(
+                "/word/glossary/media/two.bin",
+                "application/octet-stream",
+                vec![2],
+                &Limits::DEFAULT,
+            )
+            .unwrap(),
+        )
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("glossary graph bytes limit exceeded"),
+        "{error}"
+    );
+    assert_eq!(transaction.auxiliary_parts().len(), before);
+}
+
+#[test]
+fn transaction_catalog_growth_replans_root_bytes_before_staging() {
+    let mut package = package();
+    add_empty_glossary(&mut package, Conformance::Transitional);
+    let source_root_bytes = raw::load(&package, &Limits::DEFAULT)
+        .unwrap()
+        .unwrap()
+        .root_xml()
+        .unwrap()
+        .len();
+    let limits = Limits::new(
+        MAX,
+        MAX_DEPTH,
+        MAX_NODES,
+        MAX_DOM_ATTRIBUTES,
+        MAX_DOM_CONTENT,
+        MAX_DOM_TOKENS,
+        MAX_DOM_BYTES,
+        MAX_PARTS,
+        MAX_VALUES,
+        MAX_STRING,
+        MAX_NAME_KEY,
+        GraphLimits::new(source_root_bytes + 1, MAX_GRAPH_METADATA_BYTES),
+    )
+    .expect("tight canonical-root policy");
+    let mut transaction = Transaction::new_with_limits(&package, &limits).unwrap();
+    let error = transaction
+        .add_entry(entry("Expanded"))
+        .expect_err("the larger generated root must be admitted before staging")
+        .to_string();
+    assert!(
+        error.contains("glossary graph bytes limit exceeded"),
+        "{error}"
+    );
+    assert!(transaction.catalog().unwrap().is_empty());
 }
 
 #[test]
@@ -1877,13 +2599,14 @@ fn transaction_noop_preserves_signature_and_patch_rejects_stale_source() {
     raw::put(
         &mut package,
         &raw::Graph::new(catalog, Conformance::Transitional),
+        &Limits::default(),
     )
     .unwrap();
-    let source = Snapshot::load(&package).unwrap();
+    let source = Snapshot::load(&package, &Limits::DEFAULT).unwrap();
 
     mark_signed(&mut package);
-    let transaction = Transaction::new(&mut package).unwrap();
-    let commit = transaction.commit().unwrap();
+    let transaction = Transaction::new(&package).unwrap();
+    let commit = transaction.commit(&mut package).unwrap();
     assert!(!commit.changed());
     assert!(package.is_signed());
 
@@ -1892,12 +2615,28 @@ fn transaction_noop_preserves_signature_and_patch_rejects_stale_source() {
         .get_part_mut(&PackURI::new("/word/glossary/document.xml").unwrap())
         .unwrap()
         .set_blob(b"<stale/>".to_vec());
+    // A changed commit over the signed package is refused (it used to remove
+    // the signature); the patch below comes from an explicitly unsigned copy.
     let mut target = package.clone();
-    let mut editing = Transaction::new(&mut target).unwrap();
+    let mut refused = Transaction::new(&target).unwrap();
+    refused.add_entry(entry("New")).unwrap();
+    assert!(matches!(
+        refused.commit(&mut target),
+        Err(Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy))
+    ));
+    assert!(target.is_signed());
+
+    target.unsign();
+    let mut editing = Transaction::new(&target).unwrap();
     editing.add_entry(entry("New")).unwrap();
-    let changed = editing.commit().unwrap();
+    let changed = editing.commit(&mut target).unwrap();
     assert!(changed.changed());
-    assert!(changed.patch().apply(&mut changed_package).is_err());
+    assert!(
+        changed
+            .patch()
+            .apply(&mut changed_package, &Limits::DEFAULT)
+            .is_err()
+    );
     assert_eq!(source.entries()[0].name(), Some("Keep"));
 }
 
@@ -1912,17 +2651,23 @@ fn transaction_rejects_orphaned_auxiliary_removal_without_mutating_package() {
         external: false,
     });
     graph.parts.push(
-        raw::Part::new("/word/glossary/media/image.png", "image/png", vec![4, 5, 6]).unwrap(),
+        raw::Part::new(
+            "/word/glossary/media/image.png",
+            "image/png",
+            vec![4, 5, 6],
+            &Limits::DEFAULT,
+        )
+        .unwrap(),
     );
-    raw::put(&mut package, &graph).unwrap();
-    let before = Snapshot::load(&package).unwrap();
+    raw::put(&mut package, &graph, &Limits::default()).unwrap();
+    let before = Snapshot::load(&package, &Limits::DEFAULT).unwrap();
 
-    let mut transaction = Transaction::new(&mut package).unwrap();
+    let mut transaction = Transaction::new(&package).unwrap();
     transaction
         .remove_part("/word/glossary/media/image.png")
         .unwrap();
-    assert!(transaction.commit().is_err());
-    assert_eq!(Snapshot::load(&package).unwrap(), before);
+    assert!(transaction.commit(&mut package).is_err());
+    assert_eq!(Snapshot::load(&package, &Limits::DEFAULT).unwrap(), before);
 }
 
 #[test]
@@ -1933,17 +2678,18 @@ fn transaction_catalog_crud_preserves_opaque_entry_xml() {
     );
     let mut catalog = Catalog::new();
     catalog
-        .add(Entry::new("Keep", body.into_bytes()).unwrap())
+        .add(Entry::new("Keep", body.into_bytes(), &Limits::DEFAULT).unwrap())
         .unwrap();
     raw::put(
         &mut package,
         &raw::Graph::new(catalog, Conformance::Transitional),
+        &Limits::default(),
     )
     .unwrap();
 
-    let mut transaction = Transaction::new(&mut package).unwrap();
+    let mut transaction = Transaction::new(&package).unwrap();
     transaction.add_entry(entry("Added")).unwrap();
-    transaction.commit().unwrap();
+    transaction.commit(&mut package).unwrap();
     let root = std::str::from_utf8(
         package
             .get_part(&PackURI::new("/word/glossary/document.xml").unwrap())

@@ -13,6 +13,13 @@ pub(crate) fn load(package: &OpcPackage, worksheet: &PackURI) -> Result<Option<C
     parse(part.blob())
 }
 
+/// Replace or remove the worksheet's `smartTags` element.
+///
+/// A replacement that leaves the worksheet bytes as they are (for example
+/// removing absent smart tags) publishes nothing, so a signed package keeps
+/// its signature byte for byte. Any other replacement changes the worksheet,
+/// so a signed package is refused with [`crate::Error::Signed`] before
+/// anything is changed.
 pub(crate) fn store(
     package: &mut OpcPackage,
     worksheet: &PackURI,
@@ -21,10 +28,14 @@ pub(crate) fn store(
     let updated = {
         let part = package.get_part(worksheet)?;
         require_worksheet(part)?;
-        replace_worksheet(part.blob(), value)?
+        let updated = replace_worksheet(part.blob(), value)?;
+        if updated.as_slice() == part.blob() {
+            return Ok(());
+        }
+        updated
     };
+    crate::signature_policy::ensure_unsigned(package)?;
     package.get_part_mut(worksheet)?.set_blob(updated);
-    package.unsign();
     Ok(())
 }
 

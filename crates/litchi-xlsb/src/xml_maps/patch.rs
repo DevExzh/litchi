@@ -3,7 +3,7 @@
 use litchi_opc::{BlobPart, OpcPackage, Part, TargetMode};
 
 use super::snapshot::{SourcePart, SourceRelationship};
-use super::{ReadLimits, Snapshot};
+use super::{SemanticLimits, Snapshot};
 use crate::package::error::{Error, Result};
 
 /// A reversible replacement of the exact XML Maps-owned package graph.
@@ -29,7 +29,7 @@ impl Patch {
     }
 
     /// Whether applying this patch changes no owned source byte or topology.
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
@@ -41,7 +41,7 @@ impl Patch {
         }
     }
 
-    pub(crate) fn limits(&self) -> ReadLimits {
+    pub(crate) fn limits(&self) -> SemanticLimits {
         self.before.limits()
     }
 
@@ -52,13 +52,13 @@ impl Patch {
     ) -> Result<Snapshot> {
         let current = Snapshot::read_for_worksheets(package, worksheets, self.before.limits())?;
         if !current.same_source(&self.before) {
-            return Err(invalid("XML Maps patch source is stale"));
+            return Err(Error::PatchConflict { part: "XML Maps" });
         }
         Ok(current)
     }
 
     pub(crate) fn materialize(&self, package: &mut OpcPackage) -> Result<()> {
-        if self.is_empty() {
+        if self.is_noop() {
             return Ok(());
         }
         let before = self.before.source();
@@ -101,39 +101,9 @@ impl Patch {
     }
 }
 
-/// A detached, source-bound transaction result.
-#[derive(Clone, Debug)]
-pub struct Commit {
-    patch: Patch,
-    changed: bool,
-}
-
-impl Commit {
-    pub(crate) fn new(patch: Patch, changed: bool) -> Self {
-        Self { patch, changed }
-    }
-
-    /// Whether the transaction changes owned XML Maps source.
-    pub fn changed(&self) -> bool {
-        self.changed
-    }
-
-    /// Planned resulting snapshot.
-    pub fn snapshot(&self) -> &Snapshot {
-        self.patch.after()
-    }
-
-    /// Reversible source-checked patch.
-    pub fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consume this result into its planned snapshot and patch.
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        let snapshot = self.patch.after().clone();
-        (snapshot, self.patch)
-    }
-}
+/// The result of a Custom XML Maps edit's `commit`: the new package, the
+/// patch and the diagnostics.
+pub type Commit = litchi_core::edit::Commit<crate::Package, Patch>;
 
 fn restore_part(package: &mut OpcPackage, source: &SourcePart) -> Result<()> {
     if package.contains_part(&source.part_name) {
@@ -185,19 +155,17 @@ fn restore_relationships(part: &mut dyn Part, source: &[SourceRelationship]) -> 
 fn refuse_inbound(package: &OpcPackage, target_part: &litchi_opc::PackURI) -> Result<()> {
     for relationship in package.rels().iter() {
         if relationship_targets(relationship, target_part)? {
-            return Err(invalid(format!(
-                "cannot remove XML Maps part '{}' while another part references it",
-                target_part.as_str()
-            )));
+            return Err(invalid(
+                "cannot remove XML Maps part while another part references it",
+            ));
         }
     }
     for part in package.iter_parts() {
         for relationship in part.rels().iter() {
             if relationship_targets(relationship, target_part)? {
-                return Err(invalid(format!(
-                    "cannot remove XML Maps part '{}' while another part references it",
-                    target_part.as_str()
-                )));
+                return Err(invalid(
+                    "cannot remove XML Maps part while another part references it",
+                ));
             }
         }
     }
@@ -213,10 +181,10 @@ fn relationship_targets(
     }
     let target = relationship
         .target_partname()
-        .map_err(|error| invalid(error.to_string()))?;
+        .map_err(|_error| invalid("an XML maps relationship target is not a valid part name"))?;
     Ok(target.is_equivalent_to(target_part))
 }
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn invalid(message: &'static str) -> Error {
+    Error::InvalidFormat(message)
 }

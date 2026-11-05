@@ -331,7 +331,7 @@ fn v4_options() -> SequentialWriterOptions {
     SequentialWriterOptions::default()
         .with_sector_size(SECTOR_SIZE_V4)
         .with_publication_buffer_bytes(PUBLICATION_BUFFER_BYTES)
-        .with_limits(SequentialWriterLimits {
+        .limits(SequentialWriterLimits {
             max_stream_bytes: TWO_GIB_BYTES + 16 * 1024 * 1024,
             max_output_bytes: TWO_GIB_BYTES + 16 * 1024 * 1024,
             ..SequentialWriterLimits::default()
@@ -359,7 +359,7 @@ fn publish_large_stream(length: u64) -> SparseCfb {
 
 fn reopen(output: SparseCfb) -> OleFile<SparseCfb> {
     let limits = OleFileLimits::new(output.length).unwrap();
-    OleFile::open_with_limits(output, limits).unwrap()
+    OleFile::open(output, limits).unwrap()
 }
 
 fn assert_payload_range(file: &mut OleFile<SparseCfb>, offset: u64, length: usize) {
@@ -409,8 +409,7 @@ fn v4_payload_chain_crosses_the_lock_and_rejects_an_inbound_lock_edge() {
     output.assert_range_lock_is_zero();
     assert_eq!(output.fat_entry(RANGE_LOCK_SECTOR_V4), ENDOFCHAIN);
 
-    let default_error =
-        OleFile::open_with_limits(output.clone(), OleFileLimits::default()).unwrap_err();
+    let default_error = OleFile::open(output.clone(), OleFileLimits::default()).unwrap_err();
     assert!(matches!(
         default_error,
         litchi_cfb::OleError::LimitExceeded {
@@ -420,7 +419,7 @@ fn v4_payload_chain_crosses_the_lock_and_rejects_an_inbound_lock_edge() {
         } if observed == output.length && maximum == TWO_GIB_BYTES
     ));
     let exact_length = output.length;
-    let under_error = OleFile::open_with_limits(
+    let under_error = OleFile::open(
         output.clone(),
         OleFileLimits::new(exact_length - 1).unwrap(),
     )
@@ -443,7 +442,6 @@ fn v4_payload_chain_crosses_the_lock_and_rejects_an_inbound_lock_edge() {
     // The previous stream sector must skip the reserved sector. Pointing it
     // at the fixed hole is rejected before any user chain can consume it.
     output.patch_fat_entry(RANGE_LOCK_SECTOR_V4 - 1, RANGE_LOCK_SECTOR_V4);
-    let error =
-        OleFile::open_with_limits(output, OleFileLimits::new(exact_length).unwrap()).unwrap_err();
+    let error = OleFile::open(output, OleFileLimits::new(exact_length).unwrap()).unwrap_err();
     assert!(error.to_string().contains("range-lock"));
 }

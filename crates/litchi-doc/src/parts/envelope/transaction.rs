@@ -52,8 +52,8 @@ impl Snapshot {
 
     /// Start an independent transaction from this snapshot.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub fn edit(&self) -> Edit {
+        Edit {
             before: self.clone(),
             working: self.clone(),
         }
@@ -67,7 +67,7 @@ impl Envelope {
     }
 
     /// Start a validated semantic transaction from this envelope.
-    pub fn edit(&self) -> PackageResult<Transaction> {
+    pub fn edit(&self) -> PackageResult<Edit> {
         Ok(self.snapshot()?.edit())
     }
 }
@@ -119,51 +119,27 @@ impl Patch {
     /// Apply this patch only to its exact source snapshot.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, Error> {
         if source != &self.before {
-            return Err(Error::Conflict);
+            return Err(Error::PatchConflict);
         }
         Ok(self.after.clone())
     }
 }
 
-/// The validated result of a semantic envelope transaction.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
+/// A published edit: the new snapshot, its reversible patch and
+/// diagnostics.
+pub type Commit = litchi_core::edit::Commit<Snapshot, Patch>;
 
-impl Commit {
-    pub(crate) fn new(snapshot: Snapshot, patch: Patch) -> Self {
-        Self { snapshot, patch }
-    }
-
-    /// The immutable post-edit snapshot.
-    #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// The reversible semantic patch.
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Split the result into its snapshot and reversible patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
-    }
-}
+/// Content-free diagnostics of one commit.
+pub use litchi_core::edit::Diagnostics;
 
 /// A mutable candidate built from an immutable envelope snapshot.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub struct Edit {
     before: Snapshot,
     working: Snapshot,
 }
 
-impl Transaction {
+impl Edit {
     /// Create a transaction from an immutable snapshot.
     #[must_use]
     pub fn new(snapshot: Snapshot) -> Self {
@@ -173,21 +149,10 @@ impl Transaction {
         }
     }
 
-    /// The current staged snapshot.
+    /// The staged candidate snapshot, not yet committed.
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    pub fn staged(&self) -> &Snapshot {
         &self.working
-    }
-
-    /// Whether the staged state differs from its source.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.before != self.working
-    }
-
-    /// Restore the staged state to the source snapshot.
-    pub fn rollback(&mut self) {
-        self.working = self.before.clone();
     }
 
     /// Replace the complete optional FIB range atomically.
@@ -233,17 +198,21 @@ impl Transaction {
     /// Commit the staged state into a reversible semantic patch.
     pub fn commit(self) -> Result<Commit, Error> {
         let patch = Patch::new(self.before, self.working.clone());
-        Ok(Commit::new(self.working, patch))
+        {
+            let diagnostics = Diagnostics::new(!patch.is_noop());
+            Ok(Commit::new(self.working, patch, diagnostics))
+        }
     }
 }
 
 /// Failure modes for semantic envelope edits.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// The candidate violates a bounded `[MS-DOC]`/`[MS-OSHARED]` invariant.
     Invalid(PackageError),
     /// The patch or package transaction was created from a different snapshot.
-    Conflict,
+    PatchConflict,
     /// A message-only operation requires a present envelope.
     Missing,
     /// A message-only operation was requested for an unknown CLSID.
@@ -254,7 +223,7 @@ impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Invalid(error) => error.fmt(formatter),
-            Self::Conflict => formatter.write_str("envelope transaction snapshot conflict"),
+            Self::PatchConflict => formatter.write_str("envelope transaction snapshot conflict"),
             Self::Missing => formatter.write_str("MsoEnvelope FIB range is absent"),
             Self::Unsupported => {
                 formatter.write_str("the envelope CLSID does not select a supported message")

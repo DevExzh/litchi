@@ -2,6 +2,7 @@ use super::super::generated::{SystemGeneratedData, SystemGeneratedFile, SystemGe
 use super::super::native::{DictionaryBody, DictionaryType, NativeData, NativeFile};
 use super::codec::{validate_columns, validate_hierarchies};
 use super::*;
+use crate::Limits;
 
 fn object(class: &str, body: &str) -> String {
     format!(
@@ -59,11 +60,53 @@ fn empty_table(extra_columns: &[String]) -> String {
 #[test]
 fn parses_borrowed_table_metadata_and_writes_exact_bytes() {
     let xml = empty_table(&[]);
-    let file = parse_file("Model.1.db/Table.0.dim/Table.1.tbl.xml", xml.as_bytes()).unwrap();
+    let file = parse_file(
+        "Model.1.db/Table.0.dim/Table.1.tbl.xml",
+        xml.as_bytes(),
+        &Limits::DEFAULT,
+    )
+    .unwrap();
     assert_eq!(file.kind, MetadataFileKind::Table);
     assert_eq!(file.table.class.as_str(), "XMSimpleTable");
     assert!(std::ptr::eq(file.bytes.as_ptr(), xml.as_ptr()));
-    assert_eq!(write_file(&file).unwrap(), xml.as_bytes());
+    assert_eq!(write_file(&file, &Limits::DEFAULT).unwrap(), xml.as_bytes());
+}
+
+#[test]
+fn metadata_limits_are_typed_before_xml_projection() {
+    let xml = empty_table(&[]);
+    let mut limits = Limits::DEFAULT;
+    limits.max_metadata_bytes = xml.len() - 1;
+    assert!(matches!(
+        parse_file(
+            "Model.1.db/Table.0.dim/Table.1.tbl.xml",
+            xml.as_bytes(),
+            &limits,
+        ),
+        Err(MetadataError::Limit {
+            kind: crate::LimitKind::MetadataBytes,
+            ..
+        })
+    ));
+}
+
+#[test]
+fn metadata_entity_references_charge_the_cumulative_text_limit() {
+    let mut limits = Limits::DEFAULT;
+    limits.max_metadata_text_bytes = 1;
+    for xml in [
+        b"<XMObject>&amp;&amp;</XMObject>".as_slice(),
+        b"<XMObject>&#65;&#66;</XMObject>".as_slice(),
+    ] {
+        assert!(matches!(
+            codec::parse_xml(xml, &limits),
+            Err(MetadataError::Limit {
+                kind: crate::LimitKind::MetadataTextBytes,
+                observed: 2,
+                maximum: 1,
+            })
+        ));
+    }
 }
 
 #[test]
@@ -79,9 +122,21 @@ fn rejects_adversarial_schema_and_scalar_inputs() {
         valid.replace("XMSegment1Map", "UnknownClass"),
         format!("{valid}<XMObject class=\"XMRelationshipIndex123DIDs\"/>"),
     ] {
-        assert!(parse_file("Model.1.db/Table.0.dim/Table.1.tbl.xml", invalid.as_bytes()).is_err());
+        assert!(
+            parse_file(
+                "Model.1.db/Table.0.dim/Table.1.tbl.xml",
+                invalid.as_bytes(),
+                &Limits::DEFAULT,
+            )
+            .is_err()
+        );
     }
-    assert!(parse_file("Model.1.db/Table.0.dim/Table.1.tbl.xml", b"<!DOCTYPE x [<!ENTITY a 'x'>]><XMObject class='XMRelationshipIndex123DIDs'>&a;</XMObject>").is_err());
+    assert!(parse_file(
+        "Model.1.db/Table.0.dim/Table.1.tbl.xml",
+        b"<!DOCTYPE x [<!ENTITY a 'x'>]><XMObject class='XMRelationshipIndex123DIDs'>&a;</XMObject>",
+        &Limits::DEFAULT,
+    )
+    .is_err());
 }
 
 #[test]

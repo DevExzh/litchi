@@ -2,6 +2,7 @@ use super::codec::OLE_GRAPHIC_DATA_URI;
 use super::model::{Authored, Frame, Kind};
 use super::package::load_slide;
 use super::{Limits, Mode};
+use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::presentation::embedded::{MAX_XML_DEPTH, invalid, is_presentationml_name, limit};
 use crate::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
@@ -20,10 +21,17 @@ const MAX_NAME_CHARS: usize = 256;
 /// Add an inert embedded OLE/package payload and verify it through the read
 /// inventory before publishing the package mutation.
 ///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn add(
+pub(crate) fn add(
     package: &mut OpcPackage,
     slide_part_name: &str,
     kind: Kind,
@@ -44,7 +52,11 @@ pub fn add(
         return Err(invalid("OLE frame extents must be positive"));
     }
     if payload.is_empty() || payload.len() > MAX_PAYLOAD_BYTES {
-        return Err(limit("OLE payload bytes", MAX_PAYLOAD_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::PayloadBytes,
+            payload.len(),
+            MAX_PAYLOAD_BYTES,
+        ));
     }
     let slide_uri = PackURI::new(slide_part_name).map_err(Error::Uri)?;
     let slide = package.get_part(&slide_uri)?;
@@ -70,6 +82,7 @@ pub fn add(
     let fragment = frame_xml(shape_id, name, program_id, "rIdPending", frame);
     let _ = insert_frame(&slide_xml, fragment.as_bytes())?;
     let target = part_name.relative_ref(slide_uri.base_uri());
+    refuse_signed_change(package)?;
     let relationship_id = package
         .get_part_mut(&slide_uri)?
         .relate_to(&target, relationship_type);
@@ -92,7 +105,7 @@ pub fn add(
     }) {
         return Err(invalid("authored OLE object failed read-side verification"));
     }
-    package.unsign();
+    settle_unsigned_change(package)?;
     Ok(Authored {
         part_name,
         relationship_id,
@@ -148,7 +161,11 @@ fn insert_frame(xml: &[u8], fragment: &[u8]) -> Result<Vec<u8>> {
             Event::Start(element) => {
                 depth += 1;
                 if depth > MAX_XML_DEPTH {
-                    return Err(limit("OLE slide depth", MAX_XML_DEPTH));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        MAX_XML_DEPTH,
+                    ));
                 }
                 if depth == 1 {
                     crate::presentation::embedded::validate_root(
@@ -194,13 +211,15 @@ fn insert_frame(xml: &[u8], fragment: &[u8]) -> Result<Vec<u8>> {
     let position = insertion.ok_or_else(|| invalid("slide has no shape tree"))?;
     let size = xml.len().checked_add(fragment.len()).ok_or_else(|| {
         limit(
-            "updated slide XML bytes",
+            crate::error::CodecLimitKind::XmlBytes,
+            usize::MAX,
             crate::presentation::embedded::MAX_XML_BYTES,
         )
     })?;
     if size > crate::presentation::embedded::MAX_XML_BYTES {
         return Err(limit(
-            "updated slide XML bytes",
+            crate::error::CodecLimitKind::XmlBytes,
+            size,
             crate::presentation::embedded::MAX_XML_BYTES,
         ));
     }
@@ -253,7 +272,11 @@ fn next_part_index(package: &OpcPackage) -> Result<u32> {
             Err(error) => return Err(error.into()),
         }
     }
-    Err(limit("OLE embedding part namespace", 1_000_000))
+    Err(limit(
+        crate::error::CodecLimitKind::Parts,
+        1_000_000,
+        1_000_000,
+    ))
 }
 
 fn validate_program_id(value: &str) -> Result<()> {

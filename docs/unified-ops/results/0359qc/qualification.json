@@ -1,0 +1,119 @@
+{
+  "record": "0359qc",
+  "date": "2026-10-22",
+  "scenario": "doc/leaf_write",
+  "status": "matched_deterministic_receipts_native_pending",
+  "probe": {
+    "commit": "428bf4d44a237bc56207b07a220a3d1da3043f04",
+    "source_sha256": "9e1cd649268ad5eefe4314b76493f61cd047bf6ec4114c7e7872b2182b1af689",
+    "environment": {
+      "LITCHI_PROBE_ONLY": "doc/leaf_write",
+      "LITCHI_PROBE_BATCH_ROUNDS": "1",
+      "argv": ["legacy_w5_source_probe", "1"],
+      "runner": "/home/zhuhe/code/litchi-worktrees/.coord/doc-toggle/tmp/runner/legacy_w5_source_probe"
+    }
+  },
+  "source_assemblies": {
+    "before": {
+      "implementation_commit": "81323113be7e166d1b37ea185e9fd712d8748a62",
+      "probe_overlay": "428bf4d44a237bc56207b07a220a3d1da3043f04",
+      "implementation_files": {
+        "crates/litchi-doc/src/body_text.rs": "ae044d85d99a987ac34d08c8f6d8f605e85f5443bb66573964a88a422e047d46",
+        "crates/litchi-doc/src/tracked_revision/package.rs": "613beaf162033c6153906ef2b1299d21e0ece58b4283a43400924c2503dbe40a"
+      },
+      "binary": {
+        "path": "before-qualified-legacy_w5_source_probe",
+        "bytes": 13346048,
+        "sha256": "0c4392e6cbf5a65b5e3901fdc860cec80ce29518b11e47b70620641df405c92a"
+      }
+    },
+    "previous_after": {
+      "implementation_commit": "160a00559bb7edb905b1315753e33aedc74c3733",
+      "binary": {
+        "path": "after-qualified-legacy_w5_source_probe",
+        "bytes": 13346080,
+        "sha256": "cfdf1e3040b9b742551d80cd583fc28de4f366f9f9bc9fb7198e91aa3352384f"
+      }
+    },
+    "candidate": {
+      "implementation_commit": "76391f1a71609fcce68d4f784ab69ed5c06c9403",
+      "probe_overlay": "428bf4d44a237bc56207b07a220a3d1da3043f04",
+      "implementation_files": {
+        "crates/litchi-doc/src/body_text.rs": "b6b23536a8a73f44f49ae1d961784b92e8fa68524f0c744875b4934f78afccf3",
+        "crates/litchi-doc/src/tracked_revision/package.rs": "c5b9c1a425bed41910db0be02f2fea9992cbef3bb39e7f2e89550ed580d32eff"
+      },
+      "binary": {
+        "path": "after-76391-legacy_w5_source_probe",
+        "bytes": 13347784,
+        "sha256": "27b3928cdf131af6c186f5fbf2be7282061f2c8eb86ac596257e9f17e0664eea"
+      }
+    }
+  },
+  "build": {
+    "toolchain": "rustc 1.95.0 (59807616 2026-04-14); cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "command": "RUSTUP_TOOLCHAIN=1.95.0 LITCHI_MEM_MAX=20G CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/uo2-doc-toggle/target CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 CARGO_PROFILE_RELEASE_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/doc-toggle/tmp/repair76391 cargo build --offline --locked --release -p litchi-ops --features doc,xls,rtf --example legacy_w5_source_probe",
+    "duration": "2m10s",
+    "memory_cap": "20G; MemorySwapMax=0",
+    "target": "/home/zhuhe/code/litchi-worktrees/uo2-doc-toggle/target"
+  },
+  "output": {
+    "sha256": "6bb97058e47f747c29e568395eea01db1226aa5ab8962087e1d78a1b9b82ff11",
+    "json": {
+      "path": "after-76391-ordinary.json",
+      "bytes": 201,
+      "sha256": "130ea2051646c18febebae54ffb1bc4eb5ee798771b7a71dfb51ab87fd8d12e6"
+    },
+    "log": {
+      "path": "after-76391-ordinary.log",
+      "bytes": 42,
+      "sha256": "72546d3368e992b4c70fbfbfba571da6318da1c6846e2f0527f7ab2eefd91361"
+    }
+  },
+  "massif": {
+    "command": "systemd-run --user --scope --collect -p MemoryMax=20G -p MemorySwapMax=0 valgrind --tool=massif --pages-as-heap=no --massif-out-file=<leg>.massif <runner> 1",
+    "candidate": {
+      "path": "after-76391-ordinary.massif",
+      "bytes": 124161,
+      "sha256": "46fa5af4c2da1d999e8f0940a115516cfb553ae49c1bfb9d8e317d2548891d4a",
+      "peak_heap_bytes": 7573945,
+      "peak_extra_bytes": 46255,
+      "peak_total_bytes": 7620200,
+      "peak_tree_scope": "routes::doc_leaf_write; no doc_batch1k_leaf_write frame"
+    },
+    "ratios": {
+      "candidate_over_original_total": 0.926057355,
+      "candidate_over_previous_after_total": 1.000006299
+    }
+  },
+  "callgrind": {
+    "command": "systemd-run --user --scope --collect -p MemoryMax=20G -p MemorySwapMax=0 valgrind --tool=callgrind --callgrind-out-file=<leg>.callgrind <runner> 1",
+    "candidate": {
+      "path": "after-76391-ordinary.callgrind",
+      "bytes": 312979,
+      "sha256": "356ce08e5fc7ed01d90d87f239966a9d712951fe9dc05221654d7ffdcd040868"
+    },
+    "calls": 4,
+    "rows": [
+      {"operation": "routes::doc_leaf_write", "candidate_ir": 259551120, "original_ir": 256566637, "previous_after_ir": 258771387, "candidate_over_original": 1.011632389, "candidate_over_previous_after": 1.003013212},
+      {"operation": "Package::edit", "candidate_ir": 92244757, "original_ir": 87950819, "previous_after_ir": 92226703, "candidate_over_original": 1.048822035, "candidate_over_previous_after": 1.000195757},
+      {"operation": "Edit::commit", "candidate_ir": 81714448, "original_ir": 73309585, "previous_after_ir": 80778169, "candidate_over_original": 1.114648896, "candidate_over_previous_after": 1.011590743},
+      {"operation": "Package::from_bytes_with_options", "candidate_ir": 60063285, "original_ir": 60176893, "previous_after_ir": 59526823, "candidate_over_original": 0.998112099, "candidate_over_previous_after": 1.009012105},
+      {"operation": "set_character_property_override", "candidate_ir": 22458610, "original_ir": 32187392, "previous_after_ir": 22491847, "candidate_over_original": 0.697745564, "candidate_over_previous_after": 0.998522265},
+      {"operation": "Package::write_to", "candidate_ir": 2414007, "original_ir": 2284447, "previous_after_ir": 2413559, "candidate_over_original": 1.056713944, "candidate_over_previous_after": 1.000185618}
+    ]
+  },
+  "native": {
+    "status": "not_run_host_overload",
+    "load_average": [119.63, 138.73, 155.23],
+    "reason": "Unrelated Cargo and rustc work was active; no bounded native ABBA claim is made. 0359qb native rejects remain the retained diagnostic attempts."
+  },
+  "attempts": {
+    "callgrind_shared_tmp": "Rejected before execution: Valgrind could not create /tmp/valgrind_proc_* files. Successful capture used the private DOC TMPDIR.",
+    "artifacts": {
+      "callgrind_json": {"path": "after-76391-callgrind.json", "bytes": 207, "sha256": "23f969dadd0636553dac2534e95c1a8acd17aec265c2901227229f2b083668f3"},
+      "callgrind_log": {"path": "after-76391-callgrind.log", "bytes": 771, "sha256": "dc9688f989d819ac2619f726bbcc8feecd16e3658cb4c9cfb4e73e5e721f9760"},
+      "massif_json": {"path": "after-76391-massif.json", "bytes": 205, "sha256": "b5d3b51e79957948e4e71c8750500b0f1a63dbf721f78eaec99beae3bfae2632"},
+      "massif_log": {"path": "after-76391-massif.log", "bytes": 374, "sha256": "14e8402f8a35beb66e4cf06584876131fa1956aefd808254eb954b5d3f2d70ae"}
+    }
+  }
+}

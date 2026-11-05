@@ -2,20 +2,24 @@
 
 use super::model::DataLabelFlag;
 use super::{codec, validation};
+use crate::Error;
+use crate::Result;
 use crate::chart::data::TitleText;
 use crate::chart::model::Chart;
-use crate::chart::types::{AxisPosition, DisplayBlanks};
-use crate::{Error, Result};
+use crate::chart::types::{AxisPosition, DisplayBlanks, LegendPosition};
 use std::sync::Arc;
+
+pub use crate::LimitKind;
+pub use litchi_core::edit::Diagnostics;
 
 /// An immutable source snapshot of one host-neutral chart-space part.
 #[derive(Debug, Clone)]
-pub struct Snapshot {
+pub struct Package {
     xml: Arc<[u8]>,
     value: Chart,
 }
 
-impl Snapshot {
+impl Package {
     /// Parse and retain one bounded chart part without normalizing its bytes.
     /// # Errors
     ///
@@ -37,9 +41,7 @@ impl Snapshot {
     /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn new(value: Chart) -> Result<Self> {
         let mut xml = Vec::new();
-        crate::chart::writer::write(&mut xml, &value).map_err(|error| {
-            Error::Io(std::io::Error::new(std::io::ErrorKind::InvalidData, error))
-        })?;
+        crate::chart::writer::write(&mut xml, &value, &crate::chart::Limits::DEFAULT)?;
         drop(value);
         Self::from_xml(xml)
     }
@@ -58,8 +60,8 @@ impl Snapshot {
 
     /// Start an isolated edit from this snapshot.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub fn edit(&self) -> Edit {
+        Edit {
             base: self.clone(),
             working_xml: self.xml.as_ref().to_vec(),
             working: self.value.clone(),
@@ -69,13 +71,13 @@ impl Snapshot {
 
 /// A detached chart edit that is not visible until it commits.
 #[derive(Debug, Clone)]
-pub struct Transaction {
-    base: Snapshot,
+pub struct Edit {
+    base: Package,
     working_xml: Vec<u8>,
     working: Chart,
 }
 
-impl Transaction {
+impl Edit {
     /// Borrow the projected chart value after pending edits.
     #[must_use]
     pub const fn value(&self) -> &Chart {
@@ -214,30 +216,106 @@ impl Transaction {
         self.apply(candidate)
     }
 
-    /// Whether pending source bytes differ from the original snapshot.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.working_xml != self.base.xml.as_ref()
+    /// Show the legend at a position (`Some`) or remove it (`None`).
+    ///
+    /// An existing legend keeps its overlay, layout, entries and formatting;
+    /// only its position changes.
+    /// # Errors
+    ///
+    /// Returns an error when the chart XML is malformed or the edited
+    /// chart fails to read back.
+    pub fn set_legend(&mut self, position: Option<LegendPosition>) -> Result<&mut Self> {
+        let candidate = codec::set_legend(&self.working_xml, position)?;
+        self.apply(candidate)
     }
 
-    /// Publish the edit and return its exact snapshot plus reversible patch.
+    /// Set or clear the title of an axis selected by its ID.
+    /// # Errors
+    ///
+    /// Returns an error for a missing axis, a title whose representation
+    /// would change (literal to reference or back), or malformed XML.
+    pub fn set_axis_title(&mut self, axis_id: u32, title: Option<TitleText>) -> Result<&mut Self> {
+        let candidate = codec::set_axis_title(&self.working_xml, axis_id, title.as_ref())?;
+        drop(title);
+        self.apply(candidate)
+    }
+
+    /// Set (`Some`) or clear (`None`) the color of a series selected by its
+    /// stable index: its area fill, or for a line, scatter, stock or
+    /// unfilled radar series its line color. The color is `RRGGBB` or
+    /// `AARRGGBB`; the rest of the series' shape properties are kept.
+    ///
+    /// ```
+    /// use litchi_drawingml::chart::authoring::{Kind, Series, Spec, Variant};
+    /// use litchi_drawingml::chart::edit::Package;
+    ///
+    /// let spec = Spec::new(Variant::new(Kind::Column))
+    ///     .with_series(Series::new("East", vec![1.0, 2.0]));
+    /// let package = Package::from_xml(spec.to_xml(None)?)?;
+    /// let mut edit = package.edit();
+    /// edit.set_series_color(0, Some("C00000"))?;
+    /// let xml = edit.commit()?.into_package().xml_bytes().to_vec();
+    /// assert!(String::from_utf8_lossy(&xml).contains(r#"<a:srgbClr val="C00000"/>"#));
+    /// # Ok::<(), litchi_drawingml::Error>(())
+    /// ```
+    /// # Errors
+    ///
+    /// Returns an error for a missing series, an invalid color, a series
+    /// with more than one fill, or malformed XML.
+    pub fn set_series_color(
+        &mut self,
+        series_index: u32,
+        color: Option<&str>,
+    ) -> Result<&mut Self> {
+        let candidate = codec::set_series_color(&self.working_xml, series_index, color)?;
+        self.apply(candidate)
+    }
+
+    /// Replace the values of a series selected by its stable index (its Y
+    /// values for a scatter or bubble series).
+    ///
+    /// A literal is rewritten; a reference keeps its formula and gets a new
+    /// cache. When the number of points changes, a single-column reference
+    /// is resized from its first cell; any other reference is refused,
+    /// because the cache would no longer match the range.
+    /// # Errors
+    ///
+    /// Returns an error for a missing series, an empty or non-finite value
+    /// list, a reference that cannot be resized, or malformed XML.
+    pub fn set_series_values(&mut self, series_index: u32, values: &[f64]) -> Result<&mut Self> {
+        let candidate = codec::set_series_values(&self.working_xml, series_index, values)?;
+        self.apply(candidate)
+    }
+
+    /// Replace the category labels of every series (the X values of
+    /// scatter and bubble series), following the rules of
+    /// [`Self::set_series_values`].
+    /// # Errors
+    ///
+    /// Returns an error for an empty label list, a text label in numeric
+    /// data, a reference that cannot be resized, or malformed XML.
+    pub fn set_categories(&mut self, labels: &[String]) -> Result<&mut Self> {
+        let candidate = codec::set_categories(&self.working_xml, labels)?;
+        self.apply(candidate)
+    }
+
+    /// Publish the edit and return its exact package plus reversible patch.
     /// # Errors
     ///
     /// Returns an error when input violates DrawingML constraints, exceeds a configured
     /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn commit(self) -> Result<Commit> {
-        let snapshot = if self.is_changed() {
-            Snapshot::from_xml(self.working_xml)?
+        let changed = self.working_xml != self.base.xml.as_ref();
+        let package = if changed {
+            Package::from_xml(self.working_xml)?
         } else {
             self.base.clone()
         };
-        Ok(Commit {
-            patch: Patch {
-                before: self.base.xml.clone(),
-                after: snapshot.xml.clone(),
-            },
-            snapshot,
-        })
+        let patch = Patch {
+            before: self.base.xml.clone(),
+            after: package.xml.clone(),
+        };
+        Ok(Commit::new(package, patch, Diagnostics::new(changed)))
     }
 
     fn apply(&mut self, candidate: Vec<u8>) -> Result<&mut Self> {
@@ -252,37 +330,7 @@ impl Transaction {
 }
 
 /// A successful source-preserving chart publication.
-#[derive(Debug, Clone)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
-
-impl Commit {
-    /// Borrow the published snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Move the published snapshot out of the commit.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
-    }
-
-    /// Borrow the reversible patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Move the reversible patch out of the commit.
-    #[must_use]
-    pub fn into_patch(self) -> Patch {
-        self.patch
-    }
-}
+pub type Commit = litchi_core::edit::Commit<Package, Patch>;
 
 /// An exact, source-preconditioned and reversible chart patch.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -313,17 +361,36 @@ impl Patch {
         }
     }
 
-    /// Apply only to the exact source snapshot from which this patch came.
+    /// Whether this patch preserves the exact source bytes.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.before.as_ref() == self.after.as_ref()
+    }
+
+    /// Apply only to the exact source package from which this patch came.
     /// # Errors
     ///
     /// Returns an error when input violates DrawingML constraints, exceeds a configured
     /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+    fn apply(&self, source: &Package) -> Result<Package> {
         if source.xml.as_ref() != self.before.as_ref() {
-            return Err(Error::Invalid(
-                "chart patch source does not match its byte precondition".into(),
-            ));
+            return Err(Error::PatchConflict);
         }
-        Snapshot::from_xml(self.after.as_ref().to_vec())
+        Package::from_xml(self.after.as_ref().to_vec())
+    }
+}
+
+impl Package {
+    /// Replay a patch against this exact package and publish a commit triad.
+    ///
+    /// Exact no-op bytes remain unchanged; the resulting package is reparsed
+    /// and validated before it becomes visible, just like a changed patch.
+    pub fn apply(&self, patch: &Patch) -> Result<Commit> {
+        let package = patch.apply(self)?;
+        Ok(Commit::new(
+            package,
+            patch.clone(),
+            Diagnostics::new(!patch.is_noop()),
+        ))
     }
 }

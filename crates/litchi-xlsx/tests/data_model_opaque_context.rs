@@ -1,7 +1,7 @@
 //! Public Data Model opaque-extension context and inverse regressions.
 #![allow(clippy::unwrap_used, reason = "fixture assertions intentionally panic")]
 
-use litchi_opc::{OpcPackage, PackURI};
+use litchi_opc::{OpcPackage, PackURI, SourceLimits};
 use litchi_xlsx::Package;
 
 const SOURCE: &[u8] = include_bytes!("data/data_model/tdf167689_x15_namespace.xlsx");
@@ -10,13 +10,17 @@ const SOURCE_BASE: &str = "https://source.example/root/";
 const DESTINATION_BASE: &str = "https://destination.example/root/";
 const MAX_EXTENSION_BYTES: usize = 4 * 1024 * 1024;
 
+fn source_limits() -> SourceLimits {
+    SourceLimits::default()
+}
+
 #[test]
 fn public_parser_rejects_oversized_opaque_source_before_child_dom() {
     let text = "x".repeat(MAX_EXTENSION_BYTES);
     let xml = format!(
         "<m:dataModel xmlns:m='http://schemas.microsoft.com/office/spreadsheetml/2010/11/main'><m:extLst>{text}</m:extLst></m:dataModel>"
     );
-    assert!(litchi_xlsx::parse_data_model(xml.as_bytes()).is_err());
+    assert!(litchi_xlsx::parse_data_model(xml.as_bytes(), &source_limits()).is_err());
 }
 
 #[test]
@@ -25,13 +29,13 @@ fn public_parser_rejects_oversized_in_scope_namespace_before_unescape() {
     let xml = format!(
         "<m:dataModel xmlns:m='http://schemas.microsoft.com/office/spreadsheetml/2010/11/main' xmlns:q='{namespace}'><m:extLst/></m:dataModel>"
     );
-    assert!(litchi_xlsx::parse_data_model(xml.as_bytes()).is_err());
+    assert!(litchi_xlsx::parse_data_model(xml.as_bytes(), &source_limits()).is_err());
 }
 
 #[test]
 fn public_parser_validates_opaque_attribute_entities_without_rewriting_them() {
     let xml = "<m:dataModel xmlns:m='http://schemas.microsoft.com/office/spreadsheetml/2010/11/main'><m:extLst><v:link xmlns:v='urn:v&amp;x' href='a&amp;b' code='&#x41;'/></m:extLst></m:dataModel>";
-    let definition = litchi_xlsx::parse_data_model(xml.as_bytes()).unwrap();
+    let definition = litchi_xlsx::parse_data_model(xml.as_bytes(), &source_limits()).unwrap();
     let extension = definition.extension_list.unwrap().xml;
     let extension = String::from_utf8(extension).unwrap();
     assert!(extension.contains("xmlns:v='urn:v&amp;x'"));
@@ -46,19 +50,19 @@ fn public_parser_rejects_undeclared_or_malformed_opaque_attribute_entities() {
             "<m:dataModel xmlns:m='http://schemas.microsoft.com/office/spreadsheetml/2010/11/main'><m:extLst><v:link xmlns:v='urn:v' href='{value}'/></m:extLst></m:dataModel>"
         );
         assert!(
-            litchi_xlsx::parse_data_model(xml.as_bytes()).is_err(),
+            litchi_xlsx::parse_data_model(xml.as_bytes(), &source_limits()).is_err(),
             "accepted opaque attribute value {value:?}"
         );
     }
 
     let xml = "<m:dataModel xmlns:m='http://schemas.microsoft.com/office/spreadsheetml/2010/11/main'><m:extLst><v:link xmlns:v='urn:v&bogus;'/></m:extLst></m:dataModel>";
-    assert!(litchi_xlsx::parse_data_model(xml.as_bytes()).is_err());
+    assert!(litchi_xlsx::parse_data_model(xml.as_bytes(), &source_limits()).is_err());
 }
 
 #[test]
 fn public_model_import_closes_inherited_xml_context_without_rebasing_nested_overrides() {
     let source_bytes = source_with_context(SOURCE, SOURCE_BASE);
-    let source = Package::from_bytes(source_bytes.clone()).unwrap();
+    let source = Package::from_bytes(&source_bytes).unwrap();
     let model = source.data_model().unwrap().model().unwrap().to_owned();
     let extension = String::from_utf8(
         model
@@ -75,15 +79,20 @@ fn public_model_import_closes_inherited_xml_context_without_rebasing_nested_over
     assert!(extension.contains("xml:space=\"preserve\""));
     assert!(extension.contains("xml:base=\"../other/\""));
 
-    let mut without_model = source;
-    without_model.remove_data_model().unwrap();
+    let mut remove = source.edit_data_model().unwrap();
+    assert!(remove.remove().unwrap());
+    let without_model = remove.commit().unwrap().into_package();
     let mut destination_bytes = Vec::new();
     without_model.write_to(&mut destination_bytes).unwrap();
     let destination_bytes = replace_workbook(&destination_bytes, |xml| {
         xml.replace(SOURCE_BASE, DESTINATION_BASE)
     });
-    let mut destination = Package::from_bytes(destination_bytes).unwrap();
-    destination.put_data_model(model).unwrap();
+    let mut put = Package::from_bytes(&destination_bytes)
+        .unwrap()
+        .edit_data_model()
+        .unwrap();
+    assert!(put.set(model).unwrap());
+    let destination = put.commit().unwrap().into_package();
 
     let imported = String::from_utf8(
         destination
@@ -107,22 +116,23 @@ fn public_model_import_closes_inherited_xml_context_without_rebasing_nested_over
 #[test]
 fn public_model_context_capture_survives_descriptor_edit_and_exact_inverse() {
     let source_bytes = source_with_context(SOURCE, SOURCE_BASE);
-    let original = OpcPackage::from_bytes(&source_bytes).unwrap();
+    let original = OpcPackage::from_bytes(&source_bytes, SourceLimits::default()).unwrap();
     let original_workbook = original
         .get_part(&PackURI::new(WORKBOOK).unwrap())
         .unwrap()
         .blob()
         .to_vec();
-    let mut package = Package::from_bytes(source_bytes).unwrap();
+    let mut package = Package::from_bytes(&source_bytes).unwrap();
     let mut edit = package.edit_data_model().unwrap();
     edit.edit_definition(|definition| {
         definition.min_version_load += 1;
         Ok(())
     })
     .unwrap();
-    let patch = edit.commit().unwrap().patch().clone();
+    let (package_after, patch) = edit.commit().unwrap().into_parts();
+    package = package_after;
     let mut raw = package.into_plain_opc();
-    patch.inverse().apply(&mut raw).unwrap();
+    apply_patch(&patch.inverse(), &mut raw).unwrap();
     assert_eq!(
         raw.get_part(&PackURI::new(WORKBOOK).unwrap())
             .unwrap()
@@ -147,10 +157,16 @@ fn source_with_context(source: &[u8], base: &str) -> Vec<u8> {
 }
 
 fn replace_workbook(source: &[u8], replace: impl FnOnce(String) -> String) -> Vec<u8> {
-    let archive = soapberry_zip::office::ArchiveReader::new(source).unwrap();
+    let archive = soapberry_zip::office::ArchiveReader::new(
+        source,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
     let workbook =
         replace(String::from_utf8(archive.read("xl/workbook.xml").unwrap()).unwrap()).into_bytes();
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     for name in archive.file_names() {
         let bytes = if name == "xl/workbook.xml" {
             workbook.clone()
@@ -160,4 +176,17 @@ fn replace_workbook(source: &[u8], replace: impl FnOnce(String) -> String) -> Ve
         writer.write_deflated(name, &bytes).unwrap();
     }
     writer.finish_to_bytes().unwrap()
+}
+
+/// Replay a Data Model patch onto a raw graph through the package route.
+fn apply_patch(
+    patch: &litchi_xlsx::workbook::data_model::Patch,
+    target: &mut OpcPackage,
+) -> litchi_xlsx::Result<()> {
+    let package = Package::from_opc(target.clone())?;
+    *target = package
+        .apply_data_model(patch)?
+        .into_package()
+        .into_plain_opc();
+    Ok(())
 }

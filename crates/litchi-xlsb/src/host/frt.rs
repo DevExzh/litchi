@@ -21,20 +21,14 @@ pub(crate) fn parse_formula_header(
     let mut cursor = FrtCursor::new(data, record);
     let flags = cursor.read_u32()?;
     if flags & !0x04 != 0 {
-        return Err(invalid(
-            record,
-            format!("invalid FRTHeader flags 0x{flags:08X}"),
-        ));
+        return Err(invalid(record, "invalid FRTHeader flags"));
     }
     let mut formulas = Vec::new();
     if flags & 0x04 != 0 {
         let count = usize::try_from(cursor.read_u32()?)
             .map_err(|_| invalid(record, "FRT formula count overflow"))?;
         if count == 0 || count > maximum_formulas {
-            return Err(invalid(
-                record,
-                format!("FRT formula count {count} is outside 1..={maximum_formulas}"),
-            ));
+            return Err(invalid(record, "FRT formula count is outside 1..="));
         }
         formulas.reserve(count);
         for _ in 0..count {
@@ -50,13 +44,7 @@ pub(crate) fn serialize_formula_header(
     maximum_formulas: usize,
 ) -> Result<Vec<u8>> {
     if formulas.len() > maximum_formulas {
-        return Err(invalid(
-            "FRTHeader",
-            format!(
-                "formula count {} exceeds {maximum_formulas}",
-                formulas.len()
-            ),
-        ));
+        return Err(invalid("FRTHeader", "formula count exceeds"));
     }
     let mut data = Vec::new();
     data.extend_from_slice(&if formulas.is_empty() { 0u32 } else { 4u32 }.to_le_bytes());
@@ -89,10 +77,9 @@ pub(crate) fn serialize_formula_header(
 
 fn validate_formula(formula: &ParsedFormula) -> Result<()> {
     if formula.rgce.is_empty() || formula.rgce.len() > MAX_CELL_FORMULA_BYTES {
-        return Err(Error::InvalidFormula(format!(
-            "FRT formula token length {} is outside 1..={MAX_CELL_FORMULA_BYTES}",
-            formula.rgce.len()
-        )));
+        return Err(Error::InvalidFormula(
+            "FRT formula token length is outside its allowed range",
+        ));
     }
     Ok(())
 }
@@ -138,19 +125,16 @@ impl<'a> FrtCursor<'a> {
     fn read_formula(&mut self) -> Result<ParsedFormula> {
         let flags = self.read_u32()?;
         if flags != 2 {
-            return Err(invalid(
-                self.record,
-                format!("invalid FRTFormula flags 0x{flags:08X}"),
-            ));
+            return Err(invalid(self.record, "invalid FRTFormula flags"));
         }
         let cce = usize::try_from(self.read_u32()?)
             .map_err(|_| invalid(self.record, "formula token length overflow"))?;
         let cb = usize::try_from(self.read_u32()?)
             .map_err(|_| invalid(self.record, "formula ancillary length overflow"))?;
         if cce == 0 || cce > MAX_CELL_FORMULA_BYTES {
-            return Err(Error::InvalidFormula(format!(
-                "FRT formula token length {cce} is outside 1..={MAX_CELL_FORMULA_BYTES}"
-            )));
+            return Err(Error::InvalidFormula(
+                "FRT formula token length is outside its allowed range",
+            ));
         }
         Ok(ParsedFormula {
             rgce: self.take(cce)?.to_vec(),
@@ -159,11 +143,8 @@ impl<'a> FrtCursor<'a> {
     }
 }
 
-fn invalid(typ: impl Into<String>, val: impl Into<String>) -> Error {
-    Error::Unrecognized {
-        typ: typ.into(),
-        val: val.into(),
-    }
+fn invalid(typ: &'static str, val: &'static str) -> Error {
+    Error::Unrecognized { typ, val }
 }
 
 #[cfg(test)]

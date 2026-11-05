@@ -138,8 +138,11 @@ pub(crate) fn build_odp_streaming_corpus(shape: SemanticShape) -> Result<Corpus,
             "streaming ODP corpus report differs from its package/semantic identity".into(),
         );
     }
-    let target_payload =
-        soapberry_zip::office::ArchiveReader::new(&archive)?.read("content.xml")?;
+    let target_payload = soapberry_zip::office::ArchiveReader::new(
+        &archive,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?
+    .read("content.xml")?;
     let corpus = Corpus {
         manifest: CorpusManifest {
             name: format!("odp-streaming-slides-{}", shape.name()),

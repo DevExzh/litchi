@@ -19,9 +19,9 @@ use std::sync::{
 };
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
-use litchi_core::{ReadAt, SourceVersion};
+use litchi_core::{OwnedSource, ReadAt, SourceVersion};
 use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter};
-use litchi_xlsx::workbook::{SourceBackedMergeEditor, Workbook};
+use litchi_xlsx::SourceBackedWorkbook;
 use litchi_xlsx::{Cell, Error as XlsxError, Value};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -785,7 +785,7 @@ fn run_eager(operation: Operation) -> AnyResult<SampleRecord> {
     let fixture_target_sha256 = fixture_target_sha256(&fixture)?;
     let lifecycle_started = Instant::now();
     let preparation_started = Instant::now();
-    let workbook = Workbook::from_slice(&fixture)?;
+    let workbook = litchi_xlsx::Package::from_bytes(&fixture)?;
     let mut edit = workbook.edit()?;
     {
         let mut sheet = edit
@@ -799,7 +799,7 @@ fn run_eager(operation: Operation) -> AnyResult<SampleRecord> {
     let sink_capacity = sink.capacity();
     let primary_started = Instant::now();
     let committed = edit.commit()?;
-    let changed = committed.into_workbook();
+    let changed = committed.into_package();
     changed.write_to(&mut sink)?;
     let primary_ns = elapsed_ns(primary_started.elapsed())?;
     let sink_write_calls = sink.write_calls();
@@ -850,9 +850,9 @@ fn run_source(operation: Operation) -> AnyResult<SampleRecord> {
     let concrete_source = Arc::new(CountingSource::new(fixture.clone()));
     let source: Arc<dyn ReadAt> = concrete_source.clone();
     let preparation_started = Instant::now();
-    let editor = SourceBackedMergeEditor::from_read_at(source)?;
+    let editor = SourceBackedWorkbook::from_read_at(source)?;
     let mut edit = editor
-        .edit("Sheet1")?
+        .edit_merges("Sheet1")?
         .ok_or("source fixture worksheet disappeared")?;
     stage_source(&mut edit, operation)?;
     let preparation_metrics = concrete_source.counters();
@@ -862,7 +862,7 @@ fn run_source(operation: Operation) -> AnyResult<SampleRecord> {
     let sink_capacity = sink.capacity();
     let primary_started = Instant::now();
     let commit = edit.commit()?;
-    let _published = editor.publish_commit_to_stream(&mut sink, &commit)?;
+    commit.package().write_to(&mut sink)?;
     let primary_ns = elapsed_ns(primary_started.elapsed())?;
     let primary_metrics = concrete_source
         .counters()
@@ -912,7 +912,7 @@ fn run_source(operation: Operation) -> AnyResult<SampleRecord> {
 }
 
 fn stage_eager(
-    sheet: &mut litchi_xlsx::workbook::WorksheetEdit<'_>,
+    sheet: &mut litchi_xlsx::workbook::edit::Sheet<'_>,
     operation: Operation,
 ) -> AnyResult<()> {
     match operation {
@@ -923,7 +923,7 @@ fn stage_eager(
 }
 
 fn stage_source(
-    edit: &mut litchi_xlsx::workbook::SourceBackedMergeEdit,
+    edit: &mut litchi_xlsx::merge::source::Edit,
     operation: Operation,
 ) -> AnyResult<()> {
     match operation {
@@ -934,7 +934,7 @@ fn stage_source(
 }
 
 fn fixture_for(operation: Operation) -> AnyResult<Vec<u8>> {
-    let workbook = Workbook::new()?;
+    let workbook = litchi_xlsx::Package::new()?;
     let mut edit = workbook.edit()?;
     {
         let mut sheet = edit
@@ -946,10 +946,10 @@ fn fixture_for(operation: Operation) -> AnyResult<Vec<u8>> {
             sheet.merge("A1:B2")?;
         }
     }
-    let committed = edit.commit()?.into_workbook();
+    let committed = edit.commit()?.into_package();
     let mut output = Vec::new();
     committed.write_to(&mut output)?;
-    let mut package = OpcPackage::from_bytes(&output)?;
+    let mut package = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default())?;
     package.try_add_part(Box::new(BlobPart::new(
         PackURI::new("/xl/merge-abba-aux.bin")?,
         "application/octet-stream".to_owned(),
@@ -959,13 +959,13 @@ fn fixture_for(operation: Operation) -> AnyResult<Vec<u8>> {
 }
 
 fn fixture_target_sha256(bytes: &[u8]) -> AnyResult<String> {
-    let package = OpcPackage::from_bytes(bytes)?;
+    let package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())?;
     let uri = PackURI::new(WORKSHEET_PART)?;
     Ok(sha256_hex(package.get_part(&uri)?.blob()))
 }
 
 fn semantic_oracle(bytes: &[u8], operation: Operation) -> AnyResult<SemanticCheck> {
-    let workbook = Workbook::from_slice(bytes)?;
+    let workbook = litchi_xlsx::Package::from_bytes(bytes)?.workbook();
     let sheet = workbook
         .sheet("Sheet1")?
         .ok_or("semantic reopen lost Sheet1")?;
@@ -1017,7 +1017,7 @@ struct PartDigest {
 type PartInventory = BTreeMap<String, PartDigest>;
 
 fn package_inventory(bytes: &[u8]) -> AnyResult<PartInventory> {
-    let package = OpcPackage::from_bytes(bytes)?;
+    let package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())?;
     let mut inventory = BTreeMap::new();
     for part in package
         .try_iter_parts()
@@ -1052,12 +1052,14 @@ fn exact_worksheet_overlay(before: &PartInventory, after: &PartInventory) -> Any
 
 fn source_patch_checks(
     fixture: &[u8],
-    commit: &litchi_xlsx::workbook::SourceBackedMergeCommit,
+    commit: &litchi_xlsx::merge::source::Commit,
 ) -> AnyResult<PatchChecks> {
     let before_inventory = package_inventory(fixture)?;
-    let mut package = OpcPackage::from_bytes(fixture)?;
-    let forward_applied = commit.patch().apply(&mut package).is_ok();
-    if !forward_applied {
+    // Source-backed patches replay onto source-backed workbooks (record 0360).
+    let forward = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(fixture.to_vec())))?
+        .apply_merges(commit.patch())
+        .and_then(|commit| commit.package().to_bytes());
+    let Ok(forward) = forward else {
         return Ok(PatchChecks {
             forward_applied: Some(false),
             forward_exact_one_part_overlay: Some(false),
@@ -1065,16 +1067,30 @@ fn source_patch_checks(
             stale_refused: None,
             foreign_refused: None,
         });
-    }
+    };
+    let package = OpcPackage::from_bytes(&forward, litchi_opc::SourceLimits::default())?;
     let forward_inventory = package_inventory_from_package(&package);
     let forward_exact_one_part_overlay =
         exact_worksheet_overlay(&before_inventory, &forward_inventory)?;
-    let inverse_restored_complete_package = commit
+    let restored = commit
         .patch()
         .inverse()
-        .apply_materialized(&mut package, SINK_LIMIT)
-        .is_ok()
-        && package_inventory_from_package(&package) == before_inventory;
+        .materialized(SINK_LIMIT)
+        .and_then(|inverse| {
+            SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(forward.clone())))?
+                .apply_merges(&inverse)?
+                .package()
+                .to_bytes()
+        });
+    let inverse_restored_complete_package = match restored {
+        Ok(restored) => {
+            package_inventory_from_package(&OpcPackage::from_bytes(
+                &restored,
+                litchi_opc::SourceLimits::default(),
+            )?) == before_inventory
+        },
+        Err(_) => false,
+    };
     let foreign_refused = foreign_refusal(fixture, commit)?;
     Ok(PatchChecks {
         forward_applied: Some(true),
@@ -1104,28 +1120,32 @@ fn package_inventory_from_package(package: &OpcPackage) -> PartInventory {
 fn stale_refusal(fixture: &[u8], operation: Operation) -> AnyResult<bool> {
     let concrete_source = Arc::new(CountingSource::new(fixture.to_vec()));
     let source: Arc<dyn ReadAt> = concrete_source.clone();
-    let editor = SourceBackedMergeEditor::from_read_at(source)?;
+    let editor = SourceBackedWorkbook::from_read_at(source)?;
     let mut edit = editor
-        .edit("Sheet1")?
+        .edit_merges("Sheet1")?
         .ok_or("stale fixture worksheet disappeared")?;
     stage_source(&mut edit, operation)?;
     let commit = edit.commit()?;
     concrete_source.bump_revision();
     Ok(matches!(
-        editor.publish_commit_to_stream(io::sink(), &commit),
+        commit.package().write_to(io::sink()),
         Err(XlsxError::Package(OpcError::SourceChanged { .. }))
     ))
 }
 
-fn foreign_refusal(
-    fixture: &[u8],
-    commit: &litchi_xlsx::workbook::SourceBackedMergeCommit,
-) -> AnyResult<bool> {
-    let foreign_source = Arc::new(CountingSource::new(fixture.to_vec()));
-    let foreign: Arc<dyn ReadAt> = foreign_source;
-    let editor = SourceBackedMergeEditor::from_read_at(foreign)?;
+fn foreign_refusal(fixture: &[u8], commit: &litchi_xlsx::merge::source::Commit) -> AnyResult<bool> {
+    // A replay compares content (record 0360), so a foreign workbook is one
+    // whose selected worksheet differs from the patch's before state.
+    let mut foreign_package = OpcPackage::from_bytes(fixture, litchi_opc::SourceLimits::default())?;
+    let worksheet = PackURI::new(WORKSHEET_PART)?;
+    let mut changed = foreign_package.get_part(&worksheet)?.blob().to_vec();
+    changed.extend_from_slice(b"\n");
+    foreign_package.get_part_mut(&worksheet)?.set_blob(changed);
+    let foreign_bytes = PackageWriter::to_bytes(&foreign_package)?;
+    let foreign: Arc<dyn ReadAt> = Arc::new(CountingSource::new(foreign_bytes));
+    let editor = SourceBackedWorkbook::from_read_at(foreign)?;
     Ok(matches!(
-        editor.publish_commit_to_stream(io::sink(), commit),
+        editor.apply_merges(commit.patch()),
         Err(XlsxError::PatchConflict { .. })
     ))
 }

@@ -1,0 +1,40 @@
+{
+  "head": "0314261beb53838bbc5e5c46aa94c8515ee945c6",
+  "dirty_worktree": true,
+  "rust_toml_source_files": 8158,
+  "rust_toml_source_sha256": "26832bdf98c9c20c78dbc1ae1f5bf0e46076c670dc1879f89e9355d961130851",
+  "source_hash_method": "sorted crates/**/*.rs and crates/**/*.toml excluding target components, plus root Cargo.toml; SHA-256 of repeated UTF-8 relative path + NUL + content + NUL",
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+  "cpu": "AMD EPYC 9R45",
+  "os": "Linux x86_64",
+  "affinity_cpu": 0,
+  "build_command": "CARGO_NET_OFFLINE=true cargo build --release --locked --manifest-path tools/perf-baseline/unified-docx-batch/Cargo.toml",
+  "measure_command": "taskset -c 0 /tmp/litchi-unified-0078-{control,candidate}-bin 9",
+  "invocation_order": [
+    "control-1",
+    "candidate-1",
+    "candidate-2",
+    "control-2"
+  ],
+  "binaries": {
+    "control": {
+      "name": "litchi-unified-0078-control-bin",
+      "bytes": 105165200,
+      "sha256": "59ee78c4602e040eaaeab5dc43216f4fa0c8043c253884aadcaf177d96f0b59b",
+      "coalesce_sha256": "846ab47a2eeaac8db1bc54cff612f0d5364d14e7060e21eef5a60504c308926e"
+    },
+    "candidate": {
+      "name": "litchi-unified-0078-candidate-bin",
+      "bytes": 105142360,
+      "sha256": "ce6c922dbeb6cdd113861e34c130a29de35768b21d2b5eb3b9d422514f73fbe3",
+      "coalesce_sha256": "f8db98e9b0ec2e0737e14ed3142247b8856565502010410ea1920b122f09b8d7"
+    }
+  },
+  "harness_files": {
+    "Cargo.toml": "7420c4fe7e93e4b39a6d409857532ea73925900e0650b1ab5f08503a2ca3109c",
+    "Cargo.lock": "1a1606e6e064875f684d52c6e0176422a743be2e3f13980d6997d86b3f315d69",
+    "src/main.rs": "8f5e2dc88de8d34b9b48fcda3e9986ed518da47516fab61250e8cc8fb5e48adf",
+    "without-target-cache.patch": "18db8477277b6783bb1940237e2b20e6fc0238974daa8d8cc83c8ee408a17762",
+    "summarize.py": "ffd02eabbdde53c7e0038686b9b75ac1c7b6ba35336bb1646d9347ea317bdd70"
+  }
+}

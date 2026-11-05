@@ -158,8 +158,9 @@ fn row_tags(xml: &[u8]) -> Result<Vec<RowTag>> {
     // bytes while the rewrite is lexical over the *source* bytes, so the two
     // views must be the same bytes. The shared closure used to refuse the
     // marker as a foreign attribute; since change 0657 it copies it through,
-    // so the refusal belongs here.
-    if memchr::memmem::find(xml, litchi_ooxml_common::mce::NAMESPACE.as_bytes()).is_some() {
+    // so the refusal belongs here. A declaration that spells the namespace
+    // with references counts too, as preprocessing applies it (record 0011).
+    if litchi_ooxml_common::mce::mentions_namespace(xml) {
         return Err(invalid(
             "row-visibility edits refuse markup-compatibility content",
         ));
@@ -434,5 +435,21 @@ mod tests {
                     .contains("row-visibility edits refuse formulas")
             );
         }
+    }
+
+    /// Record 0011: a declaration that spells the namespace with references
+    /// is markup compatibility too.
+    #[test]
+    fn escaped_markup_compatibility_fails_closed() {
+        let xml = format!(
+            r#"<worksheet xmlns="{SML}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/200&#54;"><sheetData><row r="1"/></sheetData></worksheet>"#
+        );
+        let error = scan(xml.as_bytes()).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("row-visibility edits refuse markup-compatibility content"),
+            "{error}"
+        );
     }
 }

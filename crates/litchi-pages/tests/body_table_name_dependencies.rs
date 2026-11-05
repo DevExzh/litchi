@@ -12,9 +12,11 @@ use litchi_iwa_archive::{
     package::{Catalog, EntryEdit},
 };
 use litchi_iwa_common::wire::append_length_delimited_field;
-use litchi_iwa_core::{Archive, FieldInfo, FieldPath, SnappyStream};
+use litchi_iwa_core::{Archive, FieldInfo, SnappyStream};
 use litchi_iwa_protos::{tp, tsce, tsp};
-use litchi_pages::{BodyTableNameError, BodyTableSelector, Package};
+use litchi_pages::{
+    BodyTableSelector, Package, table::name::transaction::Error as BodyTableNameError,
+};
 use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn StdError>>;
@@ -54,14 +56,18 @@ fn rewrite_archive_member(
     member_name: &str,
     mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member_name)
         .ok_or_else(|| format!("missing archive member {member_name}"))?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     mutate(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(member_name, compressed.as_slice())],
         Limits::default(),
@@ -242,7 +248,12 @@ fn volatile_sheet_table_name_cells_are_readable_but_block_changed_names() -> Tes
         Ok(())
     })?;
     assert_read_and_noop(&source)?;
-    assert_changed_error(&source, BodyTableNameError::UnsupportedSource)
+    assert_changed_error(
+        &source,
+        BodyTableNameError::Refused(
+            litchi_pages::table::name::transaction::Refusal::UnsupportedSource,
+        ),
+    )
 }
 
 #[test]
@@ -283,7 +294,15 @@ fn malformed_root_calculation_engine_field_path_is_rejected_atomically() -> Test
             .message_infos
             .first_mut()
             .ok_or("missing document root metadata")?;
-        let mut field = FieldInfo::new(FieldPath::new(vec![15, ROOT_CALCULATION_ENGINE_FIELD + 1]));
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(
+                vec![15, ROOT_CALCULATION_ENGINE_FIELD + 1],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references.push(CALCULATION_ENGINE_IDENTIFIER);
         info.field_infos.push(field);
         Ok(())
@@ -327,8 +346,18 @@ fn duplicate_reachable_dependency_is_rejected_atomically() -> TestResult {
 fn selected_pivot_reference_to_physical_owner_blocks_changed_names() -> TestResult {
     let source = rewrite_table_model(SOURCE, |payload| {
         let reference = local_reference(FORMULA_OWNER_IDENTIFIER).encode_to_vec();
-        append_length_delimited_field(payload, TABLE_MODEL_PIVOT_OWNER_FIELD, &reference)?;
+        append_length_delimited_field(
+            payload,
+            TABLE_MODEL_PIVOT_OWNER_FIELD,
+            &reference,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         Ok(())
     })?;
-    assert_changed_error(&source, BodyTableNameError::UnsupportedSource)
+    assert_changed_error(
+        &source,
+        BodyTableNameError::Refused(
+            litchi_pages::table::name::transaction::Refusal::UnsupportedSource,
+        ),
+    )
 }

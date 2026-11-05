@@ -2,11 +2,15 @@
 
 use super::model::{Conformance, Slide};
 use super::{
-    MAX_ATTRIBUTE_BYTES, MAX_ATTRIBUTES, MAX_DEPTH, MAX_NODES, MAX_NOTES_XML, allocation, invalid,
+    Limits, MAX_ATTRIBUTES, MAX_NODES, MAX_SLIDE_ROOT_NODES, allocation, checked_add, invalid,
     limit, resolved, xml_error,
 };
+#[cfg(test)]
+use super::{MAX_ATTRIBUTE_BYTES, MAX_DEPTH};
 use crate::{Error, Result};
+#[cfg(test)]
 use litchi_ooxml_common::mce::process_ooxml;
+use litchi_ooxml_common::mce::{Capabilities, Limits as MceLimits, process_markup_compatibility};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event};
@@ -38,9 +42,16 @@ const NOTES_XML_SUFFIX: &str = concat!(
 );
 
 /// Return the deterministic Transitional notes-master producer template.
-#[must_use]
-pub fn master_xml() -> &'static str {
-    include_str!("resources/generated/notesMaster.xml")
+pub fn master_xml(limits: Limits) -> Result<&'static str> {
+    let xml = include_str!("resources/generated/notesMaster.xml");
+    if xml.len() > limits.max_output_bytes {
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            xml.len(),
+            limits.max_output_bytes,
+        ));
+    }
+    Ok(xml)
 }
 
 /// Encode one bounded Transitional plain-text speaker-notes slide.
@@ -48,8 +59,8 @@ pub fn master_xml() -> &'static str {
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
-pub fn write_text(text: &str) -> Result<Vec<u8>> {
-    write_text_with(Conformance::Transitional, text)
+pub fn write_text(text: &str, limits: Limits) -> Result<Vec<u8>> {
+    write_text_with(Conformance::Transitional, text, limits)
 }
 
 /// Encode one bounded plain-text speaker-notes slide in the chosen dialect.
@@ -57,17 +68,18 @@ pub fn write_text(text: &str) -> Result<Vec<u8>> {
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
-pub fn write_text_with(conformance: Conformance, text: &str) -> Result<Vec<u8>> {
-    if text.len() > MAX_NOTES_XML {
+pub fn write_text_with(conformance: Conformance, text: &str, limits: Limits) -> Result<Vec<u8>> {
+    if text.len() > limits.max_text_bytes {
         return Err(Error::Limit {
-            resource: "speaker-notes text bytes",
-            limit: MAX_NOTES_XML,
+            kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::TextBytes),
+            observed: text.len(),
+            maximum: limits.max_text_bytes,
         });
     }
     if !text.chars().all(is_xml_char) {
         return Err(invalid("speaker notes contain an invalid XML character"));
     }
-    let escaped = quick_xml::escape::escape(text);
+    let escaped_len = escaped_text_len(text)?;
     let prefix = [
         NOTES_XML_DECLARATION,
         r#"<p:notes xmlns:p=""#,
@@ -84,15 +96,17 @@ pub fn write_text_with(conformance: Conformance, text: &str) -> Result<Vec<u8>> 
         .try_fold(0usize, |len, part| len.checked_add(part.len()))
         .ok_or_else(|| invalid("speaker-notes XML length overflow"))?;
     let capacity = prefix_len
-        .checked_add(escaped.len())
+        .checked_add(escaped_len)
         .and_then(|len| len.checked_add(NOTES_XML_SUFFIX.len()))
         .ok_or_else(|| invalid("speaker-notes XML length overflow"))?;
-    if capacity > MAX_NOTES_XML {
+    if capacity > limits.max_output_bytes {
         return Err(Error::Limit {
-            resource: "speaker-notes XML bytes",
-            limit: MAX_NOTES_XML,
+            kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlBytes),
+            observed: capacity,
+            maximum: limits.max_output_bytes,
         });
     }
+    let escaped = quick_xml::escape::escape(text);
     let mut xml = String::new();
     xml.try_reserve_exact(capacity)
         .map_err(|source| allocation("speaker-notes XML", source))?;
@@ -112,40 +126,161 @@ fn is_xml_char(value: char) -> bool {
         || matches!(value as u32, 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x1_0000..=0x10_FFFF)
 }
 
+fn escaped_text_len(text: &str) -> Result<usize> {
+    text.chars()
+        .try_fold(0usize, |length, character| {
+            let escaped = match character {
+                '<' | '>' => 4,
+                '&' => 5,
+                '\'' | '"' => 6,
+                _ => character.len_utf8(),
+            };
+            length.checked_add(escaped)
+        })
+        .ok_or_else(|| invalid("speaker-notes escaped text length overflow"))
+}
+
+fn append_text(value: &mut String, text: &str, maximum: usize) -> Result<()> {
+    let next = value
+        .len()
+        .checked_add(text.len())
+        .ok_or_else(|| limit(crate::error::CodecLimitKind::TextBytes, usize::MAX, maximum))?;
+    if next > maximum {
+        return Err(limit(
+            crate::error::CodecLimitKind::TextBytes,
+            next,
+            maximum,
+        ));
+    }
+    let spare = value.capacity().saturating_sub(value.len());
+    if text.len() > spare {
+        value
+            .try_reserve_exact(text.len())
+            .map_err(|source| allocation("speaker-notes text", source))?;
+    }
+    value.push_str(text);
+    Ok(())
+}
+
+fn process_notes_xml<'a>(xml: &'a [u8], limits: Limits) -> Result<std::borrow::Cow<'a, [u8]>> {
+    let mce_limits = MceLimits {
+        max_input_bytes: limits.max_input_bytes,
+        max_output_bytes: limits.max_input_bytes,
+        max_depth: limits.max_depth,
+        ..MceLimits::default()
+    };
+    Ok(process_markup_compatibility(xml, &Capabilities::ooxml_baseline(), &mce_limits)?.xml)
+}
+
 impl Slide {
     /// Flatten the inert notes XML to its `DrawingML` text runs.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn text(&self) -> Result<Option<String>> {
-        let processed = process_ooxml(&self.data)?;
+    pub fn text(&self, limits: Limits) -> Result<Option<String>> {
+        if self.data.len() > limits.max_input_bytes {
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                self.data.len(),
+                limits.max_input_bytes,
+            ));
+        }
+        let processed = process_notes_xml(&self.data, limits)?;
+        if processed.len() > limits.max_input_bytes {
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                processed.len(),
+                limits.max_input_bytes,
+            ));
+        }
         let mut reader = Reader::from_reader(processed.as_ref());
         reader.config_mut().trim_text(false);
         let mut in_text = false;
         let mut seen_text = false;
         let mut value = String::new();
+        let mut depth = 0usize;
+        let mut nodes = 0usize;
         loop {
             match reader.read_event() {
-                Ok(Event::Start(element)) if element.local_name().as_ref() == b"t" => {
+                Ok(Event::Start(element)) => {
+                    depth = depth.checked_add(1).ok_or_else(|| {
+                        limit(
+                            crate::error::CodecLimitKind::XmlDepth,
+                            usize::MAX,
+                            limits.max_depth,
+                        )
+                    })?;
+                    nodes = nodes.checked_add(1).ok_or_else(|| {
+                        limit(
+                            crate::error::CodecLimitKind::XmlNodes,
+                            usize::MAX,
+                            limits.max_nodes,
+                        )
+                    })?;
+                    if depth > limits.max_depth {
+                        return Err(limit(
+                            crate::error::CodecLimitKind::XmlDepth,
+                            depth,
+                            limits.max_depth,
+                        ));
+                    }
+                    if nodes > limits.max_nodes {
+                        return Err(limit(
+                            crate::error::CodecLimitKind::XmlNodes,
+                            nodes,
+                            limits.max_nodes,
+                        ));
+                    }
+                    if element.local_name().as_ref() != b"t" {
+                        continue;
+                    }
                     if seen_text && !value.is_empty() {
-                        value.push('\n');
+                        append_text(&mut value, "\n", limits.max_text_bytes)?;
                     }
                     seen_text = true;
                     in_text = true;
                 },
+                Ok(Event::Empty(element)) => {
+                    nodes = nodes.checked_add(1).ok_or_else(|| {
+                        limit(
+                            crate::error::CodecLimitKind::XmlNodes,
+                            usize::MAX,
+                            limits.max_nodes,
+                        )
+                    })?;
+                    if nodes > limits.max_nodes {
+                        return Err(limit(
+                            crate::error::CodecLimitKind::XmlNodes,
+                            nodes,
+                            limits.max_nodes,
+                        ));
+                    }
+                    if element.local_name().as_ref() == b"t" {
+                        seen_text = true;
+                    }
+                },
                 Ok(Event::Text(text)) if in_text => {
                     let decoded = text.decode().map_err(xml_error)?;
                     let decoded = quick_xml::escape::unescape(&decoded).map_err(xml_error)?;
-                    value.push_str(&decoded);
+                    append_text(&mut value, &decoded, limits.max_text_bytes)?;
                 },
                 Ok(Event::CData(text)) if in_text => {
-                    value.push_str(&text.decode().map_err(xml_error)?);
+                    let decoded = text.decode().map_err(xml_error)?;
+                    append_text(&mut value, &decoded, limits.max_text_bytes)?;
                 },
                 Ok(Event::GeneralRef(reference)) if in_text => {
-                    value.push_str(&litchi_ooxml_common::xml::decode_xml_reference(&reference)?);
+                    let decoded = litchi_ooxml_common::xml::decode_xml_reference(&reference)?;
+                    append_text(&mut value, &decoded, limits.max_text_bytes)?;
                 },
-                Ok(Event::End(element)) if element.local_name().as_ref() == b"t" => in_text = false,
+                Ok(Event::End(element)) => {
+                    if element.local_name().as_ref() == b"t" {
+                        in_text = false;
+                    }
+                    depth = depth
+                        .checked_sub(1)
+                        .ok_or_else(|| invalid("unbalanced notes XML"))?;
+                },
                 Ok(Event::Eof) => break,
                 Err(error) => return Err(xml_error(error)),
                 _ => {},
@@ -159,21 +294,47 @@ impl Slide {
 /// document. All markup, namespace declarations, extension branches, and
 /// unrelated runs remain byte-identical; only the contents of existing
 /// `a:t` elements are changed.
-pub(crate) fn rewrite_text(xml: &[u8], text: &str) -> Result<Vec<u8>> {
-    if text.len() > MAX_NOTES_XML {
-        return Err(limit("speaker-notes text bytes", MAX_NOTES_XML));
+pub(crate) fn rewrite_text(xml: &[u8], text: &str, limits: Limits) -> Result<Vec<u8>> {
+    if xml.len() > limits.max_input_bytes {
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            xml.len(),
+            limits.max_input_bytes,
+        ));
+    }
+    if text.len() > limits.max_text_bytes {
+        return Err(limit(
+            crate::error::CodecLimitKind::TextBytes,
+            text.len(),
+            limits.max_text_bytes,
+        ));
     }
     if !text.chars().all(is_xml_char) {
         return Err(invalid("speaker notes contain an invalid XML character"));
     }
-    let escaped = quick_xml::escape::escape(text);
+    let escaped_len = escaped_text_len(text)?;
     let spans = text_spans(xml)?;
     let Some(_first) = spans.first() else {
         return Err(invalid("notes slide has no DrawingML text run"));
     };
     let mut output = Vec::new();
+    let capacity = xml.len().checked_add(escaped_len).ok_or_else(|| {
+        limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            usize::MAX,
+            limits.max_output_bytes,
+        )
+    })?;
+    if capacity > limits.max_output_bytes {
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            capacity,
+            limits.max_output_bytes,
+        ));
+    }
+    let escaped = quick_xml::escape::escape(text);
     output
-        .try_reserve(xml.len().saturating_add(escaped.len()))
+        .try_reserve_exact(capacity)
         .map_err(|source| allocation("speaker-notes text rewrite", source))?;
     let mut cursor = 0usize;
     for (index, span) in spans.iter().enumerate() {
@@ -195,6 +356,13 @@ pub(crate) fn rewrite_text(xml: &[u8], text: &str) -> Result<Vec<u8>> {
         cursor = span.end;
     }
     output.extend_from_slice(&xml[cursor..]);
+    if output.len() > limits.max_output_bytes {
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            output.len(),
+            limits.max_output_bytes,
+        ));
+    }
     Ok(output)
 }
 
@@ -252,7 +420,11 @@ fn text_spans(xml: &[u8]) -> Result<Vec<TextSpan>> {
             continue;
         }
         let close_prefix = {
-            let mut value = Vec::with_capacity(name.len() + 2);
+            let capacity = checked_add(name.len(), 2, "notes close-tag bytes")?;
+            let mut value = Vec::new();
+            value
+                .try_reserve_exact(capacity)
+                .map_err(|source| allocation("notes close-tag bytes", source))?;
             value.extend_from_slice(b"</");
             value.extend_from_slice(name);
             value.push(b'>');
@@ -295,14 +467,15 @@ pub(crate) struct XmlScan {
     pub(crate) slide_ids: Vec<String>,
 }
 
-pub(crate) fn validate_resource_xml(
+pub(crate) fn validate_resource_xml_with_limits(
     xml: &[u8],
     max: usize,
     conformance: Conformance,
     root: &str,
     label: &str,
+    limits: Limits,
 ) -> Result<()> {
-    let scan = scan_xml(xml, max, conformance, root)?;
+    let scan = scan_xml_with_limits(xml, max, conformance, root, limits)?;
     if !scan.relationship_attributes.is_empty() {
         return Err(invalid(format!(
             "{label} contains unsupported outbound relationship references"
@@ -311,50 +484,132 @@ pub(crate) fn validate_resource_xml(
     Ok(())
 }
 
+#[cfg(test)]
 pub(crate) fn root_conformance(xml: &[u8], max: usize, root: &str) -> Result<Conformance> {
+    root_conformance_with_limits(xml, max, root, Limits::DEFAULT)
+}
+
+pub(crate) fn root_conformance_with_limits(
+    xml: &[u8],
+    max: usize,
+    root: &str,
+    limits: Limits,
+) -> Result<Conformance> {
     for conformance in [Conformance::Transitional, Conformance::Strict] {
-        if scan_xml(xml, max, conformance, root).is_ok() {
-            return Ok(conformance);
+        match scan_xml_with_limits(xml, max, conformance, root, limits) {
+            Ok(_) => return Ok(conformance),
+            Err(error) if is_typed_resource_error(&error) => return Err(error),
+            Err(_) => {},
         }
     }
     Err(invalid(format!("invalid {root} root or namespace")))
 }
 
 /// Classify one already-MCE-processed PresentationML root with the same
-/// Transitional-then-Strict retry and generic-error masking as
-/// [`root_conformance`].  `raw_len` is checked separately because the raw
-/// notes limit is part of `scan_xml`'s contract even when the processed bytes
-/// are borrowed from a capture-local reader.
+/// Transitional-then-Strict retry as [`root_conformance`]. Malformed roots
+/// return `Ok(None)`, while typed resource failures remain errors so callers
+/// cannot turn a bounded refusal into a cacheable negative proof. `raw_len` is
+/// checked separately because the raw notes limit is part of
+/// `scan_xml_with_limits`'s
+/// contract even when the processed bytes are borrowed from a capture-local
+/// reader.
 pub(crate) fn root_conformance_from_processed(
     processed: &[u8],
     raw_len: usize,
     max: usize,
     root: &str,
-) -> Option<Conformance> {
-    [Conformance::Transitional, Conformance::Strict]
-        .into_iter()
-        .find(|&conformance| scan_processed_xml(processed, raw_len, max, conformance, root).is_ok())
+) -> Result<Option<Conformance>> {
+    root_conformance_from_processed_with_limits(processed, raw_len, max, root, Limits::DEFAULT)
 }
 
-pub(crate) fn scan_xml(
+pub(crate) fn root_conformance_from_processed_with_limits(
+    processed: &[u8],
+    raw_len: usize,
+    max: usize,
+    root: &str,
+    limits: Limits,
+) -> Result<Option<Conformance>> {
+    for conformance in [Conformance::Transitional, Conformance::Strict] {
+        match scan_processed_xml_with_limits(processed, raw_len, max, conformance, root, limits) {
+            Ok(_) => return Ok(Some(conformance)),
+            Err(error) if is_typed_resource_error(&error) => return Err(error),
+            Err(_) => {},
+        }
+    }
+    Ok(None)
+}
+
+fn is_typed_resource_error(error: &Error) -> bool {
+    matches!(error, Error::Limit { .. } | Error::Allocation { .. })
+}
+
+fn node_policy(expected_root: &str) -> (crate::error::CodecLimitKind, usize) {
+    if expected_root == "sld" {
+        (crate::error::CodecLimitKind::XmlNodes, MAX_SLIDE_ROOT_NODES)
+    } else {
+        (crate::error::CodecLimitKind::XmlNodes, MAX_NODES)
+    }
+}
+
+/// Return the byte ceiling for the selected root.
+///
+/// Slide XML is a related PresentationML root, not notes payload.  Its
+/// 16-MiB root ceiling and one-million-node admission are intentionally
+/// independent from the selected notes policy (whose default is 8 MiB and
+/// 100,000 nodes).  Every other root scanned by this codec belongs to the
+/// notes closure and remains intersected with the recipient's selected input
+/// and output limits.
+#[inline]
+fn effective_xml_limit(max: usize, expected_root: &str, limits: Limits) -> usize {
+    if expected_root == "sld" {
+        max
+    } else {
+        max.min(limits.max_input_bytes).min(limits.max_output_bytes)
+    }
+}
+
+#[inline]
+fn effective_node_limit(expected_root: &str, limits: Limits) -> usize {
+    let (_, root_limit) = node_policy(expected_root);
+    if expected_root == "sld" {
+        root_limit
+    } else {
+        root_limit.min(limits.max_nodes)
+    }
+}
+
+pub(crate) fn scan_xml_with_limits(
     xml: &[u8],
     max: usize,
     conformance: Conformance,
     expected_root: &str,
+    limits: Limits,
 ) -> Result<XmlScan> {
+    let max = effective_xml_limit(max, expected_root, limits);
     if xml.len() > max {
-        return Err(limit("notes XML bytes", max));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            xml.len(),
+            max,
+        ));
     }
-    let processed = process_ooxml(xml)?;
-    scan_processed_xml(
+    let limits = Limits {
+        max_input_bytes: max,
+        max_output_bytes: max,
+        ..limits
+    };
+    let processed = process_notes_xml(xml, limits)?;
+    scan_processed_xml_with_limits(
         processed.as_ref(),
         xml.len(),
         max,
         conformance,
         expected_root,
+        limits,
     )
 }
 
+#[cfg(test)]
 fn scan_processed_xml(
     processed: &[u8],
     raw_len: usize,
@@ -362,11 +617,34 @@ fn scan_processed_xml(
     conformance: Conformance,
     expected_root: &str,
 ) -> Result<XmlScan> {
+    scan_processed_xml_with_limits(
+        processed,
+        raw_len,
+        max,
+        conformance,
+        expected_root,
+        Limits::DEFAULT,
+    )
+}
+
+fn scan_processed_xml_with_limits(
+    processed: &[u8],
+    raw_len: usize,
+    max: usize,
+    conformance: Conformance,
+    expected_root: &str,
+    limits: Limits,
+) -> Result<XmlScan> {
+    let max = effective_xml_limit(max, expected_root, limits);
     if raw_len > max {
-        return Err(limit("notes XML bytes", max));
+        return Err(limit(crate::error::CodecLimitKind::XmlBytes, raw_len, max));
     }
     if processed.len() > max {
-        return Err(limit("processed notes XML bytes", max));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            processed.len(),
+            max,
+        ));
     }
     // A slice reader's events borrow `processed` directly, so no event is
     // copied into a scratch buffer; the parser and its errors are the ones
@@ -381,6 +659,8 @@ fn scan_processed_xml(
     let mut attribute_bytes = 0usize;
     let mut root_seen = false;
     let mut scan = XmlScan::default();
+    let (node_kind, _) = node_policy(expected_root);
+    let node_limit = effective_node_limit(expected_root, limits);
     loop {
         if pending_pop {
             resolver.pop();
@@ -392,13 +672,29 @@ fn scan_processed_xml(
                     .push(&element)
                     .map_err(quick_xml::Error::from)
                     .map_err(xml_error)?;
-                nodes += 1;
-                depth += 1;
-                if depth > MAX_DEPTH {
-                    return Err(limit("notes XML depth", MAX_DEPTH));
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        node_limit,
+                    )
+                })?;
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        limits.max_depth,
+                    )
+                })?;
+                if depth > limits.max_depth {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        limits.max_depth,
+                    ));
                 }
-                if nodes > MAX_NODES {
-                    return Err(limit("notes XML nodes", MAX_NODES));
+                if nodes > node_limit {
+                    return Err(limit(node_kind, nodes, node_limit));
                 }
                 inspect_element(
                     &resolver,
@@ -409,6 +705,7 @@ fn scan_processed_xml(
                     &mut attributes,
                     &mut attribute_bytes,
                     &mut scan,
+                    limits,
                 )?;
                 root_seen = true;
             },
@@ -418,12 +715,22 @@ fn scan_processed_xml(
                     .map_err(quick_xml::Error::from)
                     .map_err(xml_error)?;
                 pending_pop = true;
-                nodes += 1;
-                if nodes > MAX_NODES {
-                    return Err(limit("notes XML nodes", MAX_NODES));
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        node_limit,
+                    )
+                })?;
+                if nodes > node_limit {
+                    return Err(limit(node_kind, nodes, node_limit));
                 }
-                if depth >= MAX_DEPTH {
-                    return Err(limit("notes XML depth", MAX_DEPTH));
+                if depth >= limits.max_depth {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth.checked_add(1).unwrap_or(usize::MAX),
+                        limits.max_depth,
+                    ));
                 }
                 inspect_element(
                     &resolver,
@@ -434,6 +741,7 @@ fn scan_processed_xml(
                     &mut attributes,
                     &mut attribute_bytes,
                     &mut scan,
+                    limits,
                 )?;
                 root_seen = true;
             },
@@ -472,6 +780,7 @@ fn inspect_element(
     attributes: &mut usize,
     attribute_bytes: &mut usize,
     scan: &mut XmlScan,
+    limits: Limits,
 ) -> Result<()> {
     // Every name and value below is validated exactly as before but borrowed
     // from the event or the resolver; only a value the scan reports is owned.
@@ -499,20 +808,49 @@ fn inspect_element(
         if raw == b"xmlns" || raw.starts_with(b"xmlns:") {
             continue;
         }
-        *attributes += 1;
+        *attributes = (*attributes).checked_add(1).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::XmlAttributes,
+                usize::MAX,
+                MAX_ATTRIBUTES,
+            )
+        })?;
         if *attributes > MAX_ATTRIBUTES {
-            return Err(limit("notes XML attributes", MAX_ATTRIBUTES));
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlAttributes,
+                *attributes,
+                MAX_ATTRIBUTES,
+            ));
         }
         let (namespace, attr_local) = resolver.resolve_attribute(item.key);
         let namespace = resolved(namespace)?;
         let attr_local = std::str::from_utf8(attr_local.into_inner()).map_err(xml_error)?;
         let raw_value = std::str::from_utf8(item.value.as_ref()).map_err(xml_error)?;
         let value = quick_xml::escape::unescape(raw_value).map_err(xml_error)?;
-        *attribute_bytes = attribute_bytes
-            .checked_add(namespace.len() + attr_local.len() + value.len())
-            .ok_or_else(|| invalid("notes XML attribute byte count overflow"))?;
-        if *attribute_bytes > MAX_ATTRIBUTE_BYTES {
-            return Err(limit("notes XML attribute bytes", MAX_ATTRIBUTE_BYTES));
+        let added = namespace
+            .len()
+            .checked_add(attr_local.len())
+            .and_then(|length| length.checked_add(value.len()))
+            .ok_or_else(|| {
+                limit(
+                    crate::error::CodecLimitKind::XmlAttributeBytes,
+                    usize::MAX,
+                    limits.max_attribute_bytes,
+                )
+            })?;
+        *attribute_bytes = attribute_bytes.checked_add(added).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::XmlAttributeBytes,
+                usize::MAX,
+                limits.max_attribute_bytes,
+            )
+        })?;
+        if *attribute_bytes > limits.max_attribute_bytes {
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlAttributeBytes,
+                *attribute_bytes,
+                limits.max_attribute_bytes,
+            ));
         }
         if namespace == conformance.r() {
             scan.relationship_attributes.push(value.as_ref().to_owned());
@@ -556,14 +894,15 @@ mod tests {
                     raw.len(),
                     crate::notes::MAX_SLIDE_XML,
                     "sld",
-                ),
+                )
+                .expect("processed root must classify without a resource failure"),
                 Some(expected)
             );
         }
     }
 
     #[test]
-    fn processed_root_classification_keeps_generic_failure_masking_and_limits() {
+    fn processed_root_classification_keeps_malformed_proofs_and_typed_limits() {
         let processed = process_ooxml(INVALID_ROOT).expect("test root must process");
         let raw_error = root_conformance(INVALID_ROOT, crate::notes::MAX_SLIDE_XML, "sld")
             .expect_err("invalid root must be refused");
@@ -577,22 +916,36 @@ mod tests {
                 INVALID_ROOT.len(),
                 crate::notes::MAX_SLIDE_XML,
                 "sld",
-            ),
+            )
+            .expect("malformed root should be a negative proof"),
             None
         );
 
         let raw_limited = root_conformance(INVALID_ROOT, INVALID_ROOT.len() - 1, "sld")
-            .expect_err("raw notes limit must be masked by root classification");
-        assert_eq!(raw_limited.to_string(), raw_error.to_string());
-        assert_eq!(
-            root_conformance_from_processed(
-                processed.as_ref(),
-                INVALID_ROOT.len(),
-                INVALID_ROOT.len() - 1,
-                "sld",
-            ),
-            None
-        );
+            .expect_err("raw resource limits must survive root classification");
+        assert!(matches!(
+            raw_limited,
+            Error::Limit {
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlBytes),
+                observed,
+                maximum,
+            } if observed == INVALID_ROOT.len() && maximum == INVALID_ROOT.len() - 1
+        ));
+        let processed_limited = root_conformance_from_processed(
+            processed.as_ref(),
+            INVALID_ROOT.len(),
+            INVALID_ROOT.len() - 1,
+            "sld",
+        )
+        .expect_err("processed resource limits must survive root classification");
+        assert!(matches!(
+            processed_limited,
+            Error::Limit {
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlBytes),
+                observed,
+                maximum,
+            } if observed == INVALID_ROOT.len() && maximum == INVALID_ROOT.len() - 1
+        ));
 
         let processed_limit =
             scan_processed_xml(processed.as_ref(), 0, 1, Conformance::Transitional, "sld")
@@ -601,9 +954,11 @@ mod tests {
         assert!(matches!(
             processed_limit,
             Error::Limit {
-                resource: "processed notes XML bytes",
-                limit: 1,
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlBytes),
+                observed,
+                maximum: 1,
             }
+            if observed == processed.len()
         ));
     }
 
@@ -765,6 +1120,7 @@ mod tests {
             &mut attributes_seen,
             &mut attribute_bytes_seen,
             &mut scan,
+            Limits::DEFAULT,
         );
         (result, attributes_seen, attribute_bytes_seen)
     }
@@ -793,9 +1149,12 @@ mod tests {
             assert!(matches!(
                 result,
                 Err(Error::Limit {
-                    resource: "notes XML attributes",
-                    limit: MAX_ATTRIBUTES,
-                })
+                    kind: crate::error::LimitKind::Codec(
+                        crate::error::CodecLimitKind::XmlAttributes
+                    ),
+                    observed,
+                    maximum: MAX_ATTRIBUTES,
+                }) if observed == MAX_ATTRIBUTES + 1
             ));
             assert_eq!(attributes, MAX_ATTRIBUTES + 1);
             assert_eq!(attribute_bytes, 0);
@@ -805,8 +1164,11 @@ mod tests {
             assert!(matches!(
                 result,
                 Err(Error::Limit {
-                    resource: "notes XML attribute bytes",
-                    limit: MAX_ATTRIBUTE_BYTES,
+                    kind: crate::error::LimitKind::Codec(
+                        crate::error::CodecLimitKind::XmlAttributeBytes
+                    ),
+                    maximum: MAX_ATTRIBUTE_BYTES,
+                    ..
                 })
             ));
             assert_eq!(attributes, 1);
@@ -817,38 +1179,122 @@ mod tests {
     #[test]
     fn empty_attribute_tail_preserves_node_ceiling_for_start_and_empty_children() {
         for empty in [false, true] {
-            let mut xml = format!(r#"<p:sld xmlns:p="{P_NS}">"#).into_bytes();
+            let mut xml = format!(r#"<p:notes xmlns:p="{P_NS}">"#).into_bytes();
             let child: &[u8] = if empty { b"<p:x/>" } else { b"<p:x></p:x>" };
             for _ in 0..MAX_NODES {
                 xml.extend_from_slice(child);
             }
-            xml.extend_from_slice(b"</p:sld>");
+            xml.extend_from_slice(b"</p:notes>");
 
-            let expected = outcome(buffered_scan_oracle(
+            let expected = buffered_scan_oracle(
                 &xml,
                 xml.len(),
                 crate::notes::MAX_SLIDE_XML,
                 Conformance::Transitional,
-                "sld",
+                "notes",
+            )
+            .err()
+            .expect("node ceiling must refuse 100001 nodes");
+            assert!(matches!(
+                &expected,
+                Error::Limit {
+                    kind: crate::error::LimitKind::Codec(
+                        crate::error::CodecLimitKind::XmlNodes
+                    ),
+                    observed,
+                    maximum,
+                } if *observed == MAX_NODES + 1 && *maximum == MAX_NODES
             ));
             let actual = outcome(scan_processed_xml(
                 &xml,
                 xml.len(),
                 crate::notes::MAX_SLIDE_XML,
                 Conformance::Transitional,
-                "sld",
+                "notes",
             ));
             assert_eq!(
                 actual,
-                expected,
+                outcome(Err(expected)),
                 "node ceiling diverged for {} children",
                 if empty { "empty" } else { "start" }
             );
-            match &expected {
-                Err(error) => assert!(error.contains("notes XML nodes")),
-                Ok(_) => panic!("node ceiling must refuse 100001 nodes"),
-            }
         }
+    }
+
+    #[test]
+    fn slide_and_notes_root_node_ceilings_are_independent() {
+        fn empty_root(root: &str, children: usize) -> Vec<u8> {
+            let mut xml = format!(r#"<p:{root} xmlns:p="{P_NS}">"#).into_bytes();
+            for _ in 0..children {
+                xml.extend_from_slice(b"<p:x/>");
+            }
+            xml.extend_from_slice(format!("</p:{root}>").as_bytes());
+            xml
+        }
+
+        let mut slide = empty_root("sld", MAX_SLIDE_ROOT_NODES - 1);
+        assert!(
+            scan_processed_xml(
+                &slide,
+                slide.len(),
+                crate::notes::MAX_SLIDE_XML,
+                Conformance::Transitional,
+                "sld",
+            )
+            .is_ok()
+        );
+        let slide_close = b"</p:sld>";
+        let slide_close_start = slide.len() - slide_close.len();
+        slide.splice(
+            slide_close_start..slide_close_start,
+            b"<p:x/>".iter().copied(),
+        );
+        assert!(matches!(
+            scan_processed_xml(
+                &slide,
+                slide.len(),
+                crate::notes::MAX_SLIDE_XML,
+                Conformance::Transitional,
+                "sld",
+            ),
+            Err(Error::Limit {
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlNodes),
+                maximum: MAX_SLIDE_ROOT_NODES,
+                ..
+            })
+        ));
+
+        let mut notes = empty_root("notes", MAX_NODES - 1);
+        assert!(
+            scan_processed_xml(
+                &notes,
+                notes.len(),
+                crate::notes::MAX_SLIDE_XML,
+                Conformance::Transitional,
+                "notes",
+            )
+            .is_ok()
+        );
+        let notes_close = b"</p:notes>";
+        let notes_close_start = notes.len() - notes_close.len();
+        notes.splice(
+            notes_close_start..notes_close_start,
+            b"<p:x/>".iter().copied(),
+        );
+        assert!(matches!(
+            scan_processed_xml(
+                &notes,
+                notes.len(),
+                crate::notes::MAX_SLIDE_XML,
+                Conformance::Transitional,
+                "notes",
+            ),
+            Err(Error::Limit {
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlNodes),
+                maximum: MAX_NODES,
+                ..
+            })
+        ));
     }
 
     #[test]
@@ -986,11 +1432,16 @@ mod tests {
         conformance: Conformance,
         expected_root: &str,
     ) -> Result<XmlScan> {
+        let max = effective_xml_limit(max, expected_root, Limits::DEFAULT);
         if raw_len > max {
-            return Err(limit("notes XML bytes", max));
+            return Err(limit(crate::error::CodecLimitKind::XmlBytes, raw_len, max));
         }
         if processed.len() > max {
-            return Err(limit("processed notes XML bytes", max));
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                processed.len(),
+                max,
+            ));
         }
         let mut reader = NsReader::from_reader(processed);
         reader.config_mut().trim_text(false);
@@ -1001,16 +1452,21 @@ mod tests {
         let mut attribute_bytes = 0usize;
         let mut root_seen = false;
         let mut scan = XmlScan::default();
+        let (node_kind, node_limit) = node_policy(expected_root);
         loop {
             match reader.read_event_into(&mut buffer).map_err(xml_error)? {
                 Event::Start(element) => {
                     nodes += 1;
                     depth += 1;
                     if depth > MAX_DEPTH {
-                        return Err(limit("notes XML depth", MAX_DEPTH));
+                        return Err(limit(
+                            crate::error::CodecLimitKind::XmlDepth,
+                            depth,
+                            MAX_DEPTH,
+                        ));
                     }
-                    if nodes > MAX_NODES {
-                        return Err(limit("notes XML nodes", MAX_NODES));
+                    if nodes > node_limit {
+                        return Err(limit(node_kind, nodes, node_limit));
                     }
                     inspect_element_oracle(
                         &reader,
@@ -1026,11 +1482,15 @@ mod tests {
                 },
                 Event::Empty(element) => {
                     nodes += 1;
-                    if nodes > MAX_NODES {
-                        return Err(limit("notes XML nodes", MAX_NODES));
+                    if nodes > node_limit {
+                        return Err(limit(node_kind, nodes, node_limit));
                     }
                     if depth >= MAX_DEPTH {
-                        return Err(limit("notes XML depth", MAX_DEPTH));
+                        return Err(limit(
+                            crate::error::CodecLimitKind::XmlDepth,
+                            depth.checked_add(1).unwrap_or(usize::MAX),
+                            MAX_DEPTH,
+                        ));
                     }
                     inspect_element_oracle(
                         &reader,
@@ -1117,7 +1577,11 @@ mod tests {
             }
             *attributes += 1;
             if *attributes > MAX_ATTRIBUTES {
-                return Err(limit("notes XML attributes", MAX_ATTRIBUTES));
+                return Err(limit(
+                    crate::error::CodecLimitKind::XmlAttributes,
+                    *attributes,
+                    MAX_ATTRIBUTES,
+                ));
             }
             let (namespace, attr_local) = reader.resolver().resolve_attribute(item.key);
             let namespace = resolved_owned_oracle(namespace)?;
@@ -1126,11 +1590,30 @@ mod tests {
             let value = quick_xml::escape::unescape(raw_value)
                 .map_err(xml_error)?
                 .into_owned();
-            *attribute_bytes = attribute_bytes
-                .checked_add(namespace.len() + attr_local.len() + value.len())
-                .ok_or_else(|| invalid("notes XML attribute byte count overflow"))?;
+            let added = namespace
+                .len()
+                .checked_add(attr_local.len())
+                .and_then(|length| length.checked_add(value.len()))
+                .ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlAttributeBytes,
+                        usize::MAX,
+                        MAX_ATTRIBUTE_BYTES,
+                    )
+                })?;
+            *attribute_bytes = attribute_bytes.checked_add(added).ok_or_else(|| {
+                limit(
+                    crate::error::CodecLimitKind::XmlAttributeBytes,
+                    usize::MAX,
+                    MAX_ATTRIBUTE_BYTES,
+                )
+            })?;
             if *attribute_bytes > MAX_ATTRIBUTE_BYTES {
-                return Err(limit("notes XML attribute bytes", MAX_ATTRIBUTE_BYTES));
+                return Err(limit(
+                    crate::error::CodecLimitKind::XmlAttributeBytes,
+                    *attribute_bytes,
+                    MAX_ATTRIBUTE_BYTES,
+                ));
             }
             if namespace == conformance.r() {
                 scan.relationship_attributes.push(value.clone());
@@ -1337,7 +1820,9 @@ mod tests {
             let Ok(bytes) = std::fs::read(&fixture) else {
                 continue;
             };
-            let Ok(package) = litchi_opc::OpcPackage::from_vec(bytes) else {
+            let Ok(package) =
+                litchi_opc::OpcPackage::from_vec(bytes, litchi_opc::SourceLimits::default())
+            else {
                 continue;
             };
             // Package parts iterate in hash order; take them by name so the

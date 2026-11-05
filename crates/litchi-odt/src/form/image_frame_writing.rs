@@ -924,7 +924,7 @@ mod tests {
 
     #[test]
     fn builder_and_mutable_document_round_trip_without_image_io() {
-        use crate::{Builder, Document, mutable::MutableDocument};
+        use crate::{Builder, mutable::MutableDocument};
         let mut initial = ImageFrameControl::new("Image", "image");
         initial.image_data = Some("Pictures/intentionally-missing.png".into());
         let mut form = ImageFrameForm::new("Main");
@@ -932,7 +932,7 @@ mod tests {
         let mut builder = Builder::new();
         builder.add_image_frame_form(&form).unwrap();
         builder.add_paragraph("body").unwrap();
-        let document = Document::from_bytes(builder.build().unwrap()).unwrap();
+        let document = builder.build().unwrap().document().unwrap();
         let mut mutable = MutableDocument::from_document(document).unwrap();
         assert_eq!(mutable.image_frame_controls().unwrap(), [initial]);
         let inserted = ImageFrameControl::new("Inserted", "inserted");

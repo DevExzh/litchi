@@ -37,12 +37,16 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits,
     OwnedSource, ReadAt, Resource,
 };
-use litchi_doc::{Error as DocError, Limits as DocLimits, OpenOptions, Package as DocPackage};
+use litchi_doc::{
+    Error as DocError, OpenOptions, SourceLimits as DocSourceLimits, raw::Reader as DocReader,
+};
 use litchi_docx::source_backed::Package as DocxSourcePackage;
 use litchi_ole_common::object::Limits as ObjectLimits;
-use litchi_opc::{OpcError, OpcPackage, ReadLimits, ReadResource, SourceBackedPackage, TargetMode};
+use litchi_opc::{
+    OpcError, OpcPackage, SourceBackedPackage, SourceLimitKind, SourceLimits, TargetMode,
+};
 use litchi_sign::{Policy, Status};
-use litchi_xls::{Workbook as XlsWorkbook, cell_values::Snapshot as XlsSnapshot};
+use litchi_xls::raw::Reader as XlsReader;
 use sha2::{Digest, Sha256};
 
 const SIGNED_DOCX_SHA256: &str = "bc55c0362722818823a6dd95f8e0ca9869e179ace972a0915241feb4677bde5f";
@@ -130,7 +134,7 @@ fn real_producer_security_corpus_is_bounded_and_deterministic() -> Result<(), Bo
 fn signed_ooxml_security() -> Result<(), Box<dyn Error>> {
     for fixture in SIGNED_FIXTURES {
         let bytes = load_fixture(*fixture)?;
-        let package = OpcPackage::from_bytes_with_limits(&bytes, security_read_limits()?)?;
+        let package = OpcPackage::from_bytes(&bytes, security_read_limits()?)?;
         assert!(
             package.is_signed(),
             "{} lost its signature graph",
@@ -146,13 +150,22 @@ fn signed_ooxml_security() -> Result<(), Box<dyn Error>> {
             report.integrity() == Status::Valid && report.signature() == Status::Valid
         }));
 
-        let source =
-            SourceBackedPackage::from_vec_with_limits(bytes.clone(), security_read_limits()?)?;
+        let source = SourceBackedPackage::from_vec(
+            bytes.clone(),
+            security_read_limits()?,
+            litchi_opc::SourceCacheLimits::default(),
+            None,
+        )?;
         let mut no_op = Vec::new();
         source.write_part_overlays_to_stream(&mut no_op, Vec::new())?;
         assert_eq!(no_op, bytes, "{} changed on exact no-op", fixture.id);
 
-        let source = SourceBackedPackage::from_vec_with_limits(bytes, security_read_limits()?)?;
+        let source = SourceBackedPackage::from_vec(
+            bytes,
+            security_read_limits()?,
+            litchi_opc::SourceCacheLimits::default(),
+            None,
+        )?;
         let (target, replacement) = {
             let main = source.main_document_part()?;
             let target = main.partname().clone();
@@ -181,28 +194,35 @@ fn protected_docx_security() -> Result<(), Box<dyn Error>> {
     };
     let bytes = load_fixture(fixture)?;
 
-    let package =
-        SourceBackedPackage::from_vec_with_limits(bytes.clone(), security_read_limits()?)?;
+    let package = SourceBackedPackage::from_vec(
+        bytes.clone(),
+        security_read_limits()?,
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )?;
     let docx = DocxSourcePackage::from_source_backed_package(package)?;
     let no_op = docx.edit_document_variables()?.commit()?;
-    assert!(!no_op.changed());
+    assert!(!no_op.diagnostics().changed());
     let mut no_op_output = Vec::new();
-    docx.publish_document_variables_commit_to_stream(&mut no_op_output, &no_op)?;
+    no_op.package().write_to(&mut no_op_output)?;
     assert_eq!(no_op_output, bytes);
 
-    let package = SourceBackedPackage::from_vec_with_limits(bytes, security_read_limits()?)?;
+    // Record 0355a: a changed commit of a protected document is refused at
+    // commit, before any package or output exists.
+    let package = SourceBackedPackage::from_vec(
+        bytes,
+        security_read_limits()?,
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )?;
     let docx = DocxSourcePackage::from_source_backed_package(package)?;
     let mut edit = docx.edit_document_variables()?;
-    edit.set_variable("security_matrix", "must-refuse")?;
-    let commit = edit.commit()?;
-    assert!(commit.changed());
-    let mut output = Vec::new();
-    let error = match docx.publish_document_variables_commit_to_stream(&mut output, &commit) {
-        Ok(_) => return Err("protected DOCX publication unexpectedly succeeded".into()),
+    edit.set("security_matrix", "must-refuse")?;
+    let error = match edit.commit() {
+        Ok(_) => return Err("protected DOCX commit unexpectedly succeeded".into()),
         Err(error) => error,
     };
-    assert!(matches!(error, litchi_docx::Error::UnsafeEdit { .. }));
-    assert!(output.is_empty());
+    assert!(matches!(error, litchi_docx::Error::Refused(_)));
     Ok(())
 }
 
@@ -222,9 +242,8 @@ fn encrypted_ole_security() -> Result<(), Box<dyn Error>> {
 
         let mut package = open_doc_package(&bytes)?;
         assert!(matches!(
-            package.document_with_options(
-                OpenOptions::default().with_password("wrong".to_owned().into())
-            ),
+            package
+                .document_with_options(OpenOptions::default().password("wrong".to_owned().into())),
             Err(DocError::InvalidPassword)
         ));
 
@@ -234,9 +253,8 @@ fn encrypted_ole_security() -> Result<(), Box<dyn Error>> {
             "tika"
         };
         let mut package = open_doc_package(&bytes)?;
-        let document = package.document_with_options(
-            OpenOptions::default().with_password(password.to_owned().into()),
-        )?;
+        let document = package
+            .document_with_options(OpenOptions::default().password(password.to_owned().into()))?;
         let text = document.text()?;
         let semantic_digest = sha256_hex(text.as_bytes());
         assert!(!text.trim().is_empty(), "{id} has no semantic text");
@@ -253,9 +271,8 @@ fn encrypted_ole_security() -> Result<(), Box<dyn Error>> {
             sha256,
         })?;
         let mut package = open_doc_package(&second_bytes)?;
-        let document = package.document_with_options(
-            OpenOptions::default().with_password(password.to_owned().into()),
-        )?;
+        let document = package
+            .document_with_options(OpenOptions::default().password(password.to_owned().into()))?;
         assert_eq!(semantic_digest, sha256_hex(document.text()?.as_bytes()));
     }
     Ok(())
@@ -269,7 +286,7 @@ fn inert_macro_security() -> Result<(), Box<dyn Error>> {
     })?;
     let before_macro_digest = macro_stream_digest(&bytes)?;
 
-    let mut workbook = XlsWorkbook::from_ole_file(OleFile::open_with_limits(
+    let mut workbook = XlsReader::from_ole_file(OleFile::open(
         Cursor::new(bytes.clone()),
         security_ole_limits()?,
     )?)?;
@@ -282,29 +299,35 @@ fn inert_macro_security() -> Result<(), Box<dyn Error>> {
         .ok_or("macro fixture has no VBA project storage")?;
     assert!(storage.is_structurally_complete());
     assert!(storage.may_contain_macro_code());
-    let project = workbook.vba()?.ok_or("macro fixture has no VBA project")?;
+    let project = workbook
+        .vba(&litchi_vba::Limits::default())?
+        .ok_or("macro fixture has no VBA project")?;
     assert!(
         project
             .modules()
             .iter()
             .any(|module| { module.source().text().contains("Sub ") })
     );
-    let source = XlsSnapshot::from_bytes_with_limits_and_cfb(
-        bytes.clone(),
-        security_object_limits(),
-        security_ole_limits()?,
-    )?;
-    let no_op = source.edit().commit()?;
-    assert_eq!(no_op.snapshot().bytes(), bytes.as_slice());
+    let options = litchi_xls::EditOptions::new()
+        .object_limits(security_object_limits())
+        .cfb_limits(security_ole_limits()?);
+    let source = litchi_xls::Package::from_bytes(&bytes)?;
+    let no_op = source.edit_with_options(options)?.commit()?;
+    assert_eq!(no_op.patch().after(), bytes.as_slice());
     assert_eq!(
         before_macro_digest,
-        macro_stream_digest(no_op.snapshot().bytes())?
+        macro_stream_digest(no_op.patch().after())?
     );
-    let mut edit = source.edit();
-    edit.insert_rows("Sheet1".into(), 1, 1)?;
-    let error = edit.commit_source_backed().unwrap_err();
-    assert!(matches!(error, litchi_xls::Error::UnsupportedFeature(_)));
-    assert_eq!(source.bytes(), bytes.as_slice());
+    // Structural edits have no source-backed verb; the source-backed cell
+    // family's no-op republishes the macro-bearing source byte-for-byte.
+    let workbook = litchi_xls::SourceBackedWorkbook::from_read_at(std::sync::Arc::new(
+        litchi_core::OwnedSource::new(bytes.clone()),
+    ))?;
+    let source_backed = workbook.edit_cells()?.commit()?;
+    assert!(source_backed.patch().is_noop());
+    let mut republished = Vec::new();
+    source_backed.package().write_to(&mut republished)?;
+    assert_eq!(republished, bytes);
     assert_eq!(before_macro_digest, macro_stream_digest(&bytes)?);
     Ok(())
 }
@@ -315,7 +338,12 @@ fn external_target_inventory() -> Result<(), Box<dyn Error>> {
         relative_path: EXTERNAL_XLSX_PATH,
         sha256: EXTERNAL_XLSX_SHA256,
     })?;
-    let package = SourceBackedPackage::from_vec_with_limits(bytes, security_read_limits()?)?;
+    let package = SourceBackedPackage::from_vec(
+        bytes,
+        security_read_limits()?,
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )?;
     let inventory = collect_external_targets(&package);
     assert_eq!(
         inventory,
@@ -343,17 +371,22 @@ fn bounded_ingress_and_publication() -> Result<(), Box<dyn Error>> {
         relative_path: EXTERNAL_XLSX_PATH,
         sha256: EXTERNAL_XLSX_SHA256,
     })?;
-    let one_under = ReadLimits::builder()
+    let one_under = SourceLimits::builder()
         .max_input_bytes(u64::try_from(bytes.len().saturating_sub(1))?)?
         .build()?;
-    let error = match SourceBackedPackage::from_vec_with_limits(bytes.clone(), one_under) {
+    let error = match SourceBackedPackage::from_vec(
+        bytes.clone(),
+        one_under,
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    ) {
         Ok(_) => return Err("one-under input limit unexpectedly opened".into()),
         Err(error) => error,
     };
     assert!(matches!(
         error,
-        OpcError::ReadLimit {
-            resource: ReadResource::InputBytes,
+        OpcError::Limit {
+            kind: SourceLimitKind::InputBytes,
             ..
         }
     ));
@@ -371,14 +404,16 @@ fn bounded_ingress_and_publication() -> Result<(), Box<dyn Error>> {
     )?;
     let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
     let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(bytes.clone()));
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         source.clone(),
         security_read_limits()?,
-        context,
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        Some(context),
     )?;
     let artifact = package.source_artifact();
     let mut output = Vec::new();
-    let error = artifact.write_to_stream(&mut output).unwrap_err();
+    let error = artifact.write_to(&mut output).unwrap_err();
     assert!(matches!(
         error,
         OpcError::Execution(ExecutionError::ResourceLimit(ref limit))
@@ -454,12 +489,12 @@ fn security_ole_limits() -> Result<OleFileLimits, Box<dyn Error>> {
         .with_max_allocation_table_bytes(SECURITY_MAX_INPUT_BYTES)?)
 }
 
-fn security_doc_limits() -> Result<DocLimits, Box<dyn Error>> {
-    Ok(DocLimits::try_new(
-        SECURITY_MAX_INPUT_BYTES as usize,
-        SECURITY_MAX_INPUT_BYTES as usize,
-        SECURITY_MAX_INPUT_BYTES as usize,
-    )?)
+fn security_doc_limits() -> Result<DocSourceLimits, Box<dyn Error>> {
+    Ok(DocSourceLimits::builder()
+        .max_input_bytes(SECURITY_MAX_INPUT_BYTES as usize)?
+        .max_entry_bytes(SECURITY_MAX_INPUT_BYTES as usize)?
+        .max_aggregate_bytes(SECURITY_MAX_INPUT_BYTES as usize)?
+        .build()?)
 }
 
 fn security_object_limits() -> ObjectLimits {
@@ -474,24 +509,24 @@ fn security_object_limits() -> ObjectLimits {
     }
 }
 
-fn open_doc_package(bytes: &[u8]) -> Result<DocPackage<Cursor<Vec<u8>>>, Box<dyn Error>> {
-    let ole = OleFile::open_with_limits(Cursor::new(bytes.to_vec()), security_ole_limits()?)?;
-    Ok(DocPackage::from_ole_file_with_limits(
+fn open_doc_package(bytes: &[u8]) -> Result<DocReader<Cursor<Vec<u8>>>, Box<dyn Error>> {
+    let ole = OleFile::open(Cursor::new(bytes.to_vec()), security_ole_limits()?)?;
+    Ok(DocReader::from_ole_file_with_options(
         ole,
-        security_doc_limits()?,
+        OpenOptions::default().source_limits(security_doc_limits()?),
     )?)
 }
 
-fn security_read_limits() -> Result<ReadLimits, Box<dyn Error>> {
-    Ok(ReadLimits::builder()
+fn security_read_limits() -> Result<SourceLimits, Box<dyn Error>> {
+    Ok(SourceLimits::builder()
         .max_input_bytes(SECURITY_MAX_INPUT_BYTES)?
-        .max_archive_members(SECURITY_MAX_MEMBERS)?
+        .max_members(SECURITY_MAX_MEMBERS)?
         .max_archive_total_entries(SECURITY_MAX_MEMBERS)?
         .max_archive_member_name_bytes(SECURITY_MAX_MEMBER_NAME_BYTES)?
         .max_archive_metadata_bytes(SECURITY_MAX_INPUT_BYTES)?
         .max_archive_compressed_bytes(SECURITY_MAX_INPUT_BYTES)?
-        .max_archive_entry_bytes(SECURITY_MAX_INPUT_BYTES)?
-        .max_archive_total_bytes(SECURITY_MAX_INPUT_BYTES)?
+        .max_entry_bytes(SECURITY_MAX_INPUT_BYTES)?
+        .max_aggregate_bytes(SECURITY_MAX_INPUT_BYTES)?
         .max_parts(SECURITY_MAX_MEMBERS)?
         .max_part_bytes(SECURITY_MAX_INPUT_BYTES)?
         .max_total_part_bytes(SECURITY_MAX_INPUT_BYTES)?
@@ -503,9 +538,9 @@ fn security_read_limits() -> Result<ReadLimits, Box<dyn Error>> {
         .max_relationships_per_part(SECURITY_MAX_RELATIONSHIPS)?
         .max_total_relationships(SECURITY_MAX_RELATIONSHIPS)?
         .max_relationship_graph_nodes(SECURITY_MAX_MEMBERS)?
-        .max_xml_events(SECURITY_MAX_RELATIONSHIPS)?
+        .max_events(SECURITY_MAX_RELATIONSHIPS)?
         .max_total_relationship_xml_events(SECURITY_MAX_RELATIONSHIPS)?
-        .max_xml_depth(256)?
+        .max_depth(256)?
         .max_xml_attribute_bytes(SECURITY_MAX_INPUT_BYTES as usize)?
         .max_relationship_target_bytes(SECURITY_MAX_INPUT_BYTES as usize)?
         .build()?)
@@ -547,7 +582,7 @@ fn format_relationship(owner: &str, relationship: &litchi_opc::Relationship) -> 
 }
 
 fn macro_stream_digest(bytes: &[u8]) -> Result<String, Box<dyn Error>> {
-    let mut ole = OleFile::open_with_limits(Cursor::new(bytes), security_ole_limits()?)?;
+    let mut ole = OleFile::open(Cursor::new(bytes), security_ole_limits()?)?;
     let mut streams = BTreeMap::new();
     for path in ole.list_streams() {
         if !path

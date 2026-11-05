@@ -31,7 +31,8 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, OwnedSource, ReadAt,
     Resource, SourceVersion,
 };
-use litchi_opc::{OpcError, PackURI, ReadLimits, SourceBackedPackage, SourceCacheLimits};
+use litchi_opc::SourceReadPolicy;
+use litchi_opc::{OpcError, PackURI, SourceBackedPackage, SourceCacheLimits, SourceLimits};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const CONTENT_TYPES_NS: &str = "http://schemas.openxmlformats.org/package/2006/content-types";
@@ -85,7 +86,8 @@ fn fixture() -> Fixture {
         expected_by_index.push(payload(u8::try_from(index * 23 + 7).unwrap()));
     }
 
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .unwrap();
@@ -395,14 +397,14 @@ fn managed_package(source: Arc<dyn ReadAt>) -> (SourceBackedPackage, Budget) {
     let context = ExecutionContext::new(budget.clone(), token, execution_limits);
     let cache_limits =
         SourceCacheLimits::new(PAYLOAD_BYTES * PART_COUNT * 2, PART_COUNT + 4).unwrap();
-    let package =
-        SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            source,
-            ReadLimits::default(),
-            cache_limits,
-            context,
-        )
-        .unwrap();
+    let package = SourceBackedPackage::from_read_at(
+        source,
+        SourceLimits::default(),
+        cache_limits,
+        SourceReadPolicy::exact(),
+        Some(context),
+    )
+    .unwrap();
     (package, budget)
 }
 

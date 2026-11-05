@@ -13,7 +13,7 @@ fn worksheet_facade_exposes_internal_and_inert_external_hyperlinks() {
         r#"<worksheet xmlns="{MAIN}" xmlns:r="{REL}"><sheetData/><hyperlinks><hyperlink ref="A1" location="Sheet1!B2" display="local"/><hyperlink ref="C3:D4" r:id="rIdHyperlink1" tooltip="inert"/></hyperlinks></worksheet>"#
     )
     .into_bytes();
-    let mut raw = Package::create()
+    let mut raw = Package::new()
         .expect("minimal XLSX package should be created")
         .into_plain_opc();
     let part = raw
@@ -30,7 +30,7 @@ fn worksheet_facade_exposes_internal_and_inert_external_hyperlinks() {
         .expect("external hyperlink relationship should be added");
 
     let package = Package::from_opc(raw).expect("hyperlink package should validate");
-    let workbook = package.workbook().expect("workbook should open");
+    let workbook = package.workbook();
     let sheet = workbook
         .active_sheet()
         .expect("active worksheet should exist");

@@ -308,6 +308,54 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The source graph, dimensions, references, or wire framing is invalid.
+    #[error("the Keynote slide-table sort source is invalid at {path}")]
+    InvalidSource {
+        /// Content-free semantic location.
+        path: Path,
+    },
+    /// Candidate reopening or semantic locality verification failed.
+    #[error("the edited Keynote slide-table sort failed semantic verification at {path}")]
+    Verification {
+        /// Content-free semantic location.
+        path: Path,
+    },
+    /// A finite resource ceiling was exceeded.
+    #[error(
+        "Keynote slide-table sort {kind} limit exceeded at {path}: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        /// Resource category.
+        kind: LimitKind,
+        /// Observed or requested amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+        /// Content-free semantic location.
+        path: Path,
+    },
+    /// A bounded allocation failed before publication.
+    #[error("could not allocate {amount} units for the Keynote slide-table sort at {path}")]
+    Allocation {
+        /// Requested bytes or elements.
+        amount: usize,
+        /// Content-free semantic location.
+        path: Path,
+    },
+    /// A patch was applied to a package other than its exact source.
+    #[error("the Keynote slide-table sort patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The source does not have exact physical provenance for this operation.
     #[error("this Keynote source does not support physical slide-table sorting")]
     UnsupportedSource,
@@ -389,12 +437,6 @@ pub enum Error {
         /// Declared body-row count.
         body_rows: usize,
     },
-    /// The source graph, dimensions, references, or wire framing is invalid.
-    #[error("the Keynote slide-table sort source is invalid at {path}")]
-    InvalidSource {
-        /// Content-free semantic location.
-        path: Path,
-    },
     /// A sort key is missing from one body row.
     #[error("the Keynote slide-table sort key is missing at {path}")]
     MissingSortKey {
@@ -431,37 +473,39 @@ pub enum Error {
         /// Content-free semantic location.
         path: Path,
     },
-    /// Candidate reopening or semantic locality verification failed.
-    #[error("the edited Keynote slide-table sort failed semantic verification at {path}")]
-    Verification {
-        /// Content-free semantic location.
-        path: Path,
-    },
-    /// A finite resource ceiling was exceeded.
-    #[error(
-        "Keynote slide-table sort {kind} limit exceeded at {path}: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        /// Resource category.
-        kind: LimitKind,
-        /// Observed or requested amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-        /// Content-free semantic location.
-        path: Path,
-    },
-    /// A bounded allocation failed before publication.
-    #[error("could not allocate {amount} units for the Keynote slide-table sort at {path}")]
-    Allocation {
-        /// Requested bytes or elements.
-        amount: usize,
-        /// Content-free semantic location.
-        path: Path,
-    },
-    /// A patch was applied to a package other than its exact source.
-    #[error("the Keynote slide-table sort patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. }
+            | Self::UnsupportedFeature { .. }
+            | Self::UnsupportedDependency { .. }
+            | Self::UnsupportedTopology { .. }
+            | Self::SortOrderMissing { .. }
+            | Self::ScopeMismatch { .. }
+            | Self::MissingSortKey { .. }
+            | Self::UnsupportedCell { .. }
+            | Self::MixedSortKeyKinds { .. } => RefusalKind::UnsupportedContent,
+            Self::AmbiguousSelector { .. }
+            | Self::EmptySlideName { .. }
+            | Self::RowRangeOutOfBounds { .. }
+            | Self::InvalidPermutation { .. } => RefusalKind::InvalidValue,
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::TablePositionNotFound { .. } => RefusalKind::NotFound,
+            Self::TableLocked { .. } => RefusalKind::Protected,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// Content-free observations from one physical row-sort publication.
@@ -550,10 +594,6 @@ impl Diagnostics {
 /// Result type for a physical Keynote slide-table sort transaction.
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// Compatibility spelling used by callers that distinguish value errors from
-/// package transaction errors in generic code.
-pub type TransactionError = Error;
-
 /// Exact-source physical row-sort transaction types.
 ///
 /// The package adapter owns the package-bearing `Edit`, `Patch`, and `Commit`
@@ -561,9 +601,6 @@ pub type TransactionError = Error;
 /// semantic `slide::table::physical_sort` namespace while the implementation
 /// remains below the archive boundary.
 pub mod transaction {
-    pub use super::{Diagnostics, Error, LimitKind, Path, TransactionError, UnsupportedFeature};
-    pub use crate::{
-        SlideTablePhysicalSortCommit as Commit, SlideTablePhysicalSortEdit as Edit,
-        SlideTablePhysicalSortPatch as Patch,
-    };
+    pub use super::{Diagnostics, Error, LimitKind, Path, Refusal, UnsupportedFeature};
+    pub use crate::package::slide_table_physical_sort::{Commit, Edit, Patch};
 }

@@ -595,8 +595,6 @@ checksum = "b7ac824320a75a52197e8f2d787f6a38b6718bb6897a35142d749af3c0e8f4fe"
 [[package]]
 name = "flate2"
 version = "1.1.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e634e2e0ebac1ee034020da1ca582e17ffe4e0f5e985823721e168928136dcb"
 dependencies = [
  "crc32fast",
  "zlib-rs",
@@ -942,6 +940,7 @@ dependencies = [
  "base64",
  "chrono",
  "fast-float2",
+ "libc",
  "once_cell",
  "rand 0.10.2",
  "serde",
@@ -1083,6 +1082,7 @@ dependencies = [
  "signature",
  "soapberry-zip",
  "subtle",
+ "thiserror",
  "x509-cert",
  "xml-minifier",
  "zeroize",
@@ -1126,6 +1126,7 @@ name = "litchi-odraw"
 version = "0.0.1"
 dependencies = [
  "bitflags",
+ "litchi-core",
  "zerocopy",
  "zerocopy-derive",
 ]
@@ -1256,6 +1257,8 @@ dependencies = [
  "once_cell",
  "quick-xml",
  "serde_json",
+ "sha2 0.11.0",
+ "siphasher",
  "url",
  "zerocopy",
  "zerocopy-derive",
@@ -1274,6 +1277,7 @@ dependencies = [
  "litchi-drawingml",
  "litchi-ooxml-common",
  "litchi-opc",
+ "memchr",
  "quick-xml",
  "rand 0.10.2",
  "sha2 0.11.0",
@@ -1358,6 +1362,7 @@ name = "litchi-xls"
 version = "0.0.1"
 dependencies = [
  "bitflags",
+ "caseless",
  "chrono",
  "litchi-biff",
  "litchi-cfb",
@@ -1371,6 +1376,7 @@ dependencies = [
  "litchi-vba",
  "rand 0.10.2",
  "serde_json",
+ "unicode-normalization",
  "zerocopy",
  "zeroize",
 ]
@@ -1396,6 +1402,7 @@ dependencies = [
  "quick-xml",
  "ryu",
  "serde_json",
+ "sha2 0.11.0",
  "smallvec",
  "thiserror",
  "unicode-normalization",
@@ -1968,9 +1975,9 @@ checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
 
 [[package]]
 name = "siphasher"
-version = "1.0.3"
+version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ee5873ec9cce0195efcb7a4e9507a04cd49aec9c83d0389df45b1ef7ba2e649"
+checksum = "33f4fe9184a62d842c9ef383018f3306d8ba224fd9d836f56d7288308847c256"
 
 [[package]]
 name = "slab"
@@ -2475,8 +2482,6 @@ dependencies = [
 [[package]]
 name = "zlib-rs"
 version = "0.6.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b268e58e7c693d7c271f93ffc4ba3b380412554231c85bf61ca7af91042a4112"
 
 [[package]]
 name = "zmij"

@@ -7,7 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
-use litchi_rtf::{GeneratedListMarkerKind, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{GeneratedListMarkerKind, write::Writer};
 
 const SYNTHETIC: &str = concat!(
     r#"{\rtf1\ansi\ansicpg1250\uc1 A"#,
@@ -17,7 +18,7 @@ const SYNTHETIC: &str = concat!(
 
 #[test]
 fn parses_inert_markers_and_round_trips_without_visible_duplication() {
-    let document = RtfDocument::parse(SYNTHETIC).unwrap();
+    let document = Tree::parse(SYNTHETIC, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(document.text(), "ABC");
     assert_eq!(document.generated_list_markers().len(), 2);
     let modern = &document.generated_list_markers()[0];
@@ -30,19 +31,15 @@ fn parses_inert_markers_and_round_trips_without_visible_duplication() {
     assert_eq!(legacy.position, 2);
 
     let mut first = Vec::new();
-    RtfWriter::new(&mut first)
-        .write_document(&document)
-        .unwrap();
-    let reparsed = RtfDocument::parse_bytes(&first).unwrap();
+    Writer::new(&mut first).write_document(&document).unwrap();
+    let reparsed = Tree::parse_bytes(&first, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(
         reparsed.generated_list_markers(),
         document.generated_list_markers()
     );
     let mut second = Vec::new();
-    RtfWriter::new(&mut second)
-        .write_document(&reparsed)
-        .unwrap();
+    Writer::new(&mut second).write_document(&reparsed).unwrap();
     assert_eq!(first, second);
 }
 
@@ -66,13 +63,13 @@ fn rejects_malformed_placement_duplicates_active_content_and_bounds() {
     ];
     for source in malformed {
         assert!(
-            RtfDocument::parse(source).is_err(),
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
             "accepted malformed RTF: {source}"
         );
     }
 
     let oversized = format!(r"{{\rtf1{{\listtext {}}}}}", "x".repeat(4097));
-    assert!(RtfDocument::parse(&oversized).is_err());
+    assert!(Tree::parse(&oversized, litchi_rtf::read::OpenOptions::default()).is_err());
 }
 
 fn isolated_marker(fixture: &[u8], marker: &[u8], header: &[u8]) -> Vec<u8> {
@@ -109,7 +106,7 @@ fn parses_modern_and_legacy_bundled_libreoffice_markers() {
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf167569.rtf"
     );
     let source = isolated_marker(modern_fixture, br"{\listtext", br"\ansi\ansicpg1252\uc1");
-    let document = RtfDocument::parse_bytes(&source).unwrap();
+    let document = Tree::parse_bytes(&source, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(document.text(), "AB");
     let marker = &document.generated_list_markers()[0];
     assert_eq!(marker.kind, GeneratedListMarkerKind::Modern);
@@ -120,7 +117,7 @@ fn parses_modern_and_legacy_bundled_libreoffice_markers() {
         "../../../test-data/libreoffice-core/sw/qa/core/data/rtf/fail/forcepoint-4.rtf"
     );
     let source = isolated_marker(legacy_fixture, br"{\pntext", br"\ansi\ansicpg1252\uc1");
-    let document = RtfDocument::parse_bytes(&source).unwrap();
+    let document = Tree::parse_bytes(&source, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(document.text(), "AB");
     let marker = &document.generated_list_markers()[0];
     assert_eq!(marker.kind, GeneratedListMarkerKind::Legacy);

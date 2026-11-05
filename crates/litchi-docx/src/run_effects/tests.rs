@@ -115,7 +115,7 @@ fn run_path_and_writer_keep_effect_namespace_and_unknown_package_xml() {
         other => panic!("expected RGB glow color, got {other:?}"),
     }
 
-    let mut document = crate::writer::MutableDocument::new();
+    let mut document = crate::builder::Document::new();
     let mut authored = Effects::new();
     authored
         .set_glow(Some(Glow {
@@ -136,7 +136,7 @@ fn run_path_and_writer_keep_effect_namespace_and_unknown_package_xml() {
     let input = format!(
         r#"<?xml version="1.0"?><w:document xmlns:w="{WORD}" xmlns:w14="{WORD_2010}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="w14"><w:body><w:p><w:r><w:rPr><w14:glow><w14:srgbClr w14:val="010203"/></w14:glow><w14:future xmlns:w14="{WORD_2010}" w14:data="keep"/></w:rPr><w:t>kept</w:t></w:r></w:p></w:body></w:document>"#
     );
-    let mut preserved = crate::writer::MutableDocument::from_xml(&input).unwrap();
+    let mut preserved = crate::builder::Document::from_xml(&input).unwrap();
     preserved.add_paragraph_with_text("appended");
     let output = preserved.to_xml().unwrap();
     assert!(output.contains("w14:future"));
@@ -166,7 +166,7 @@ fn cached_properties_expose_the_same_effect_snapshot_as_run() {
 
 #[test]
 fn writer_effects_view_supports_validated_in_place_edits() {
-    let mut document = crate::writer::MutableDocument::new();
+    let mut document = crate::builder::Document::new();
     let run = document.add_paragraph().add_run_with_text("edited");
     run.effects_mut()
         .set_glow(Some(Glow {

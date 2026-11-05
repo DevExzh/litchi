@@ -1,7 +1,7 @@
 mod support;
 
 use litchi_ods::names::{Definition, Expression, Range, Scope};
-use litchi_ods::{Builder, Spreadsheet};
+use litchi_ods::{Builder, Package, builder::Workbook as Draft};
 
 const CONTENT: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <office:document-content
@@ -30,8 +30,12 @@ fn named_definitions_round_trip_in_order_and_scope() {
 
     let compact_content = support::compact_xml_fixture(CONTENT);
     let bytes = support::raw_package(&[("content.xml", compact_content.as_bytes(), "text/xml")]);
-    let mut spreadsheet =
-        Spreadsheet::from_bytes(bytes).expect("test fixture or operation should succeed");
+    let mut spreadsheet = Draft::from_workbook(
+        Package::from_bytes(&bytes)
+            .expect("test fixture or operation should succeed")
+            .workbook()
+            .expect("test fixture or operation should succeed"),
+    );
     spreadsheet
         .add_range(range)
         .expect("test fixture or operation should succeed");
@@ -49,8 +53,8 @@ fn named_definitions_round_trip_in_order_and_scope() {
             .collect::<Vec<_>>(),
         ["Revenue", "TaxRate", "Input"]
     );
-    assert_eq!(spreadsheet.ranges().count(), 2);
-    assert_eq!(spreadsheet.expressions().count(), 1);
+    assert_eq!(spreadsheet.workbook().ranges().count(), 2);
+    assert_eq!(spreadsheet.workbook().expressions().count(), 1);
     assert_eq!(
         spreadsheet
             .range("Input", &sheet("Sheet1"))
@@ -69,7 +73,9 @@ fn named_definitions_round_trip_in_order_and_scope() {
     spreadsheet
         .add_expression(added)
         .expect("test fixture or operation should succeed");
-    let reopened = Spreadsheet::from_bytes(spreadsheet.into_bytes())
+    let reopened = Package::from_bytes(spreadsheet.build().expect("the draft builds").as_bytes())
+        .expect("test fixture or operation should succeed")
+        .workbook()
         .expect("test fixture or operation should succeed");
     assert_eq!(
         reopened
@@ -83,37 +89,43 @@ fn named_definitions_round_trip_in_order_and_scope() {
 
 #[test]
 fn duplicate_and_invalid_definitions_are_rejected_without_mutation() {
-    let mut spreadsheet = Spreadsheet::from_bytes(
-        Builder::new()
-            .build()
-            .expect("test fixture or operation should succeed"),
-    )
-    .expect("test fixture or operation should succeed");
+    let mut spreadsheet = Draft::from_workbook(
+        Package::from_bytes(
+            &Builder::new()
+                .build()
+                .expect("test fixture or operation should succeed")
+                .to_bytes()
+                .expect("test fixture or operation should succeed"),
+        )
+        .expect("test fixture or operation should succeed")
+        .workbook()
+        .expect("test fixture or operation should succeed"),
+    );
     let first = Range::new("Total", "$Sheet1.$A$1", global())
         .expect("test fixture or operation should succeed");
     spreadsheet
         .add_range(first)
         .expect("test fixture or operation should succeed");
-    let before_xml = spreadsheet.content_xml().to_owned();
+    let before_xml = spreadsheet.workbook().content_xml().to_owned();
     let before_catalog = spreadsheet.definitions().to_vec();
 
     let duplicate = Range::new("Total", "$Sheet1.$B$1", global())
         .expect("test fixture or operation should succeed");
     assert!(spreadsheet.add_range(duplicate).is_err());
-    assert_eq!(spreadsheet.content_xml(), before_xml);
+    assert_eq!(spreadsheet.workbook().content_xml(), before_xml);
     assert_eq!(spreadsheet.definitions(), before_catalog);
 
     let mut invalid = Range::new("Broken", "$Sheet1.$C$1", global())
         .expect("test fixture or operation should succeed");
     invalid.cell_range_address = " ".to_owned();
     assert!(spreadsheet.add_range(invalid).is_err());
-    assert_eq!(spreadsheet.content_xml(), before_xml);
+    assert_eq!(spreadsheet.workbook().content_xml(), before_xml);
     assert_eq!(spreadsheet.definitions(), before_catalog);
 
     let missing_sheet = Range::new("Missing", "$Missing.$A$1", sheet("Missing"))
         .expect("test fixture or operation should succeed");
     assert!(spreadsheet.add_range(missing_sheet).is_err());
-    assert_eq!(spreadsheet.content_xml(), before_xml);
+    assert_eq!(spreadsheet.workbook().content_xml(), before_xml);
     assert_eq!(spreadsheet.definitions(), before_catalog);
 }
 

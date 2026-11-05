@@ -2,6 +2,7 @@
 
 use super::package::{Error, Result};
 use super::records::Record;
+use crate::SourceLimits;
 use crate::consts::RecordType;
 
 /// Default visibility of header and footer placeholders on newly created slides.
@@ -84,9 +85,9 @@ impl SlideExtension {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(root: &Record) -> Result<Self> {
+    pub fn parse(root: &Record, limits: &SourceLimits) -> Result<Self> {
         let mut extension = Self::default();
-        for record in root.versioned_binary_tag_records(12)? {
+        for record in root.versioned_binary_tag_records(12, limits)? {
             if record.record_type != RecordType::RoundTripHeaderFooterDefaults12Atom {
                 continue;
             }
@@ -147,7 +148,7 @@ mod tests {
         let tag_data = [name_record, blob].concat();
         let tag = record_bytes(0xf, 0, RecordType::ProgBinaryTag.as_u16(), &tag_data);
         let tags = record_bytes(0xf, 0, RecordType::ProgTags.as_u16(), &tag);
-        Record::parse(&tags, 0).unwrap().0
+        Record::parse(&tags, 0, &SourceLimits::default()).unwrap().0
     }
 
     fn root(children: Vec<Record>) -> Record {
@@ -167,7 +168,7 @@ mod tests {
         let defaults = record_bytes(0, 0, 0x0424, &[0b1011]);
         let document = root(vec![prog_tags_record(12, &defaults)]);
 
-        let parsed = SlideExtension::parse(&document).unwrap();
+        let parsed = SlideExtension::parse(&document, &SourceLimits::default()).unwrap();
         assert_eq!(
             parsed.header_footer_defaults,
             Some(HeaderFooterDefaults {
@@ -180,7 +181,7 @@ mod tests {
 
         let wrong_version = root(vec![prog_tags_record(11, &defaults)]);
         assert_eq!(
-            SlideExtension::parse(&wrong_version).unwrap(),
+            SlideExtension::parse(&wrong_version, &SourceLimits::default()).unwrap(),
             SlideExtension::default()
         );
     }
@@ -194,12 +195,12 @@ mod tests {
             record_bytes(0, 0, 0x0424, &[0x10]),
         ] {
             let document = root(vec![prog_tags_record(12, &malformed)]);
-            assert!(SlideExtension::parse(&document).is_err());
+            assert!(SlideExtension::parse(&document, &SourceLimits::default()).is_err());
         }
 
         let defaults = record_bytes(0, 0, 0x0424, &[0]);
         let duplicate = [defaults.clone(), defaults].concat();
         let document = root(vec![prog_tags_record(12, &duplicate)]);
-        assert!(SlideExtension::parse(&document).is_err());
+        assert!(SlideExtension::parse(&document, &SourceLimits::default()).is_err());
     }
 }

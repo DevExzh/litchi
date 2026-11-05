@@ -4,7 +4,7 @@ use super::super::super::support::*;
 fn supplementary_unicode_uses_utf16_code_unit_character_positions() {
     assert_eq!(utf16_code_unit_len("A😀𝄞").unwrap(), 5);
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer
         .add_paragraph_runs(
             vec![
@@ -36,8 +36,8 @@ fn supplementary_unicode_uses_utf16_code_unit_character_positions() {
     writer.add_endnote(FootnoteEntry::new(2, "Endnote 😀", 1));
 
     let mut cursor = Cursor::new(Vec::new());
-    writer.write_to(&mut cursor).unwrap();
-    let mut package = crate::Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut cursor).unwrap();
+    let mut package = crate::raw::Reader::from_reader(Cursor::new(cursor.into_inner())).unwrap();
     let document = package.document().unwrap();
 
     let paragraphs = document.paragraphs().unwrap();

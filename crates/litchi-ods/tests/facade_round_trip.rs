@@ -1,17 +1,35 @@
 use litchi_odf_common::constants;
 use litchi_ods::rdf::{Object, Subject, Triple};
-use litchi_ods::{Builder, Spreadsheet};
+use litchi_ods::{Builder, Package, builder::Workbook as Draft};
 use std::io::{Cursor, Write};
 
 #[test]
 fn builder_and_package_facade_round_trip() {
     let bytes = Builder::new()
         .build()
+        .expect("test fixture or operation should succeed")
+        .to_bytes()
         .expect("test fixture or operation should succeed");
-    let spreadsheet =
-        Spreadsheet::from_bytes(bytes.clone()).expect("test fixture or operation should succeed");
-    assert!(spreadsheet.content_xml().contains("office:spreadsheet"));
-    assert_eq!(spreadsheet.into_bytes(), bytes);
+    let spreadsheet = Draft::from_workbook(
+        Package::from_bytes(&bytes)
+            .expect("test fixture or operation should succeed")
+            .workbook()
+            .expect("test fixture or operation should succeed"),
+    );
+    assert!(
+        spreadsheet
+            .workbook()
+            .content_xml()
+            .contains("office:spreadsheet")
+    );
+    assert_eq!(
+        spreadsheet
+            .build()
+            .expect("the draft builds")
+            .as_bytes()
+            .to_vec(),
+        bytes
+    );
 }
 
 #[test]
@@ -20,9 +38,15 @@ fn spreadsheet_facade_owns_rdf_crud() {
     let bytes = Builder::new()
         .content_xml(content)
         .build()
+        .expect("test fixture or operation should succeed")
+        .to_bytes()
         .expect("test fixture or operation should succeed");
-    let mut spreadsheet =
-        Spreadsheet::from_bytes(bytes).expect("test fixture or operation should succeed");
+    let mut spreadsheet = Draft::from_workbook(
+        Package::from_bytes(&bytes)
+            .expect("test fixture or operation should succeed")
+            .workbook()
+            .expect("test fixture or operation should succeed"),
+    );
     let triple = Triple {
         subject: Subject::Iri("#sheet".to_string()),
         predicate: "https://example.invalid/schema#label".to_string(),
@@ -38,6 +62,7 @@ fn spreadsheet_facade_owns_rdf_crud() {
     assert_eq!(path, "Metadata/metadata_1.rdf");
     assert_eq!(
         spreadsheet
+            .workbook()
             .rdf_graphs()
             .expect("test fixture or operation should succeed")[0]
             .triples,
@@ -48,6 +73,7 @@ fn spreadsheet_facade_owns_rdf_crud() {
         .expect("test fixture or operation should succeed");
     assert!(
         spreadsheet
+            .workbook()
             .rdf_graphs()
             .expect("test fixture or operation should succeed")
             .is_empty()
@@ -60,7 +86,9 @@ fn spreadsheet_facade_owns_rdf_crud() {
 
 #[test]
 fn spreadsheet_facade_discovers_resources_and_extracts_local_images() {
-    let spreadsheet = Spreadsheet::from_bytes(resource_package())
+    let spreadsheet = Package::from_bytes(&resource_package())
+        .expect("test fixture or operation should succeed")
+        .workbook()
         .expect("test fixture or operation should succeed");
 
     let images = spreadsheet

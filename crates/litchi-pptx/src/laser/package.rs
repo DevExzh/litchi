@@ -1,6 +1,6 @@
 //! OPC graph ownership for persisted laser-trace extensions.
 
-use super::{Conformance, Limits, Trace, TracePoint, read_with, validate, write};
+use super::{Conformance, Limits, Trace, TracePoint, Usage, read, validate, write};
 use crate::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
 use litchi_opc::constants::content_type as ct;
@@ -10,9 +10,6 @@ use quick_xml::events::Event;
 use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 
-const MAX_SLIDE_XML_BYTES: usize = 32 * 1024 * 1024;
-const MAX_XML_NODES: usize = 250_000;
-const MAX_XML_DEPTH: usize = 128;
 const PML: &[u8] = b"http://schemas.openxmlformats.org/presentationml/2006/main";
 const STRICT_PML: &[u8] = b"http://purl.oclc.org/ooxml/presentationml/main";
 
@@ -24,7 +21,8 @@ const STRICT_PML: &[u8] = b"http://purl.oclc.org/ooxml/presentationml/main";
 pub fn load_slide_traces(
     slide_index: usize,
     slide: &dyn Part,
-    limits: &mut Limits,
+    limits: &Limits,
+    usage: &mut Usage,
 ) -> Result<Vec<Trace>> {
     if slide.content_type() != ct::PML_SLIDE {
         return Err(Error::ContentType {
@@ -32,7 +30,7 @@ pub fn load_slide_traces(
             actual: slide.content_type().to_owned(),
         });
     }
-    read_with(slide_index, slide.blob(), limits)
+    read(slide_index, slide.blob(), limits, usage)
 }
 
 /// Store one trace in a slide's extension list, preserving its dialect.
@@ -40,12 +38,15 @@ pub fn load_slide_traces(
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
-pub fn store_slide_trace(
+pub(crate) fn store_slide_trace(
     package: &mut OpcPackage,
     slide_name: &PackURI,
     points: &[TracePoint],
+    semantic_limits: Limits,
+    usage: &mut Usage,
 ) -> Result<()> {
-    validate(points)?;
+    let limits = semantic_limits.constrained_by_source(package.read_limits());
+    validate(points, &limits)?;
     let slide = package.get_part(slide_name)?;
     if slide.content_type() != ct::PML_SLIDE {
         return Err(Error::ContentType {
@@ -53,30 +54,42 @@ pub fn store_slide_trace(
             actual: slide.content_type().to_owned(),
         });
     }
-    if !load_slide_traces(0, slide, &mut Limits::default())?.is_empty() {
+    // The preflight read is deliberately local: the operation's aggregate
+    // scope is the set of successfully published replacement slides, and a
+    // slide that already owns a trace is rejected before it can contribute to
+    // that scope.  The final read-back below charges the candidate exactly
+    // once, matching patch replay's changed-part walk.
+    let mut source_usage = Usage::default();
+    if !load_slide_traces(0, slide, &limits, &mut source_usage)?.is_empty() {
         return Err(Error::Invalid(
             "slide already contains a laser-trace extension; replacement is not supported"
                 .to_owned(),
         ));
     }
 
-    let conformance = Conformance::from_namespace(slide_dialect(slide.blob())?);
-    let fragment = write(points, conformance)?;
-    let updated = insert_extension_fragment(slide.blob(), &fragment)?;
+    let conformance = Conformance::from_namespace(slide_dialect(slide.blob(), &limits)?);
+    let fragment = write(points, conformance, limits)?;
+    let updated = insert_extension_fragment(slide.blob(), &fragment, &limits)?;
     let probe = BlobPart::new(slide_name.clone(), ct::PML_SLIDE.into(), updated.clone());
-    let traces = load_slide_traces(0, &probe, &mut Limits::default())?;
+    let mut next_usage = *usage;
+    let traces = load_slide_traces(0, &probe, &limits, &mut next_usage)?;
     if traces.len() != 1 || traces[0].points().len() != points.len() {
         return Err(Error::Invalid(
             "laser-trace storage failed read-back validation".to_owned(),
         ));
     }
     package.get_part_mut(slide_name)?.set_blob(updated);
+    *usage = next_usage;
     Ok(())
 }
 
-fn slide_dialect(xml: &[u8]) -> Result<&'static str> {
-    if xml.len() > MAX_SLIDE_XML_BYTES {
-        return Err(limit("slide XML bytes", MAX_SLIDE_XML_BYTES));
+fn slide_dialect(xml: &[u8], limits: &Limits) -> Result<&'static str> {
+    if xml.len() > limits.max_slide_xml_bytes() {
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            xml.len(),
+            limits.max_slide_xml_bytes(),
+        ));
     }
     let mut reader = NsReader::from_reader(xml);
     loop {
@@ -110,9 +123,13 @@ fn slide_dialect(xml: &[u8]) -> Result<&'static str> {
     }
 }
 
-fn insert_extension_fragment(xml: &[u8], fragment: &str) -> Result<Vec<u8>> {
-    if xml.len() > MAX_SLIDE_XML_BYTES {
-        return Err(limit("slide XML bytes", MAX_SLIDE_XML_BYTES));
+fn insert_extension_fragment(xml: &[u8], fragment: &str, limits: &Limits) -> Result<Vec<u8>> {
+    if xml.len() > limits.max_slide_xml_bytes() {
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            xml.len(),
+            limits.max_slide_xml_bytes(),
+        ));
     }
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
@@ -132,12 +149,20 @@ fn insert_extension_fragment(xml: &[u8], fragment: &str) -> Result<Vec<u8>> {
             .map_err(|error| Error::Xml(error.to_string()))?;
         match event {
             Event::Start(element) => {
-                add_node(&mut nodes)?;
-                depth = depth
-                    .checked_add(1)
-                    .ok_or_else(|| limit("slide XML depth", MAX_XML_DEPTH))?;
-                if depth > MAX_XML_DEPTH {
-                    return Err(limit("slide XML depth", MAX_XML_DEPTH));
+                add_node(&mut nodes, limits)?;
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        limits.max_xml_depth(),
+                    )
+                })?;
+                if depth > limits.max_xml_depth() {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        limits.max_xml_depth(),
+                    ));
                 }
                 if depth == 1 {
                     if root_seen || !is_presentationml_name(&namespace, element.name(), b"sld") {
@@ -157,12 +182,20 @@ fn insert_extension_fragment(xml: &[u8], fragment: &str) -> Result<Vec<u8>> {
                 }
             },
             Event::Empty(element) => {
-                add_node(&mut nodes)?;
-                let child_depth = depth
-                    .checked_add(1)
-                    .ok_or_else(|| limit("slide XML depth", MAX_XML_DEPTH))?;
-                if child_depth > MAX_XML_DEPTH {
-                    return Err(limit("slide XML depth", MAX_XML_DEPTH));
+                add_node(&mut nodes, limits)?;
+                let child_depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        limits.max_xml_depth(),
+                    )
+                })?;
+                if child_depth > limits.max_xml_depth() {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        child_depth,
+                        limits.max_xml_depth(),
+                    ));
                 }
                 if child_depth == 1 {
                     if root_seen || !is_presentationml_name(&namespace, element.name(), b"sld") {
@@ -237,31 +270,60 @@ fn insert_extension_fragment(xml: &[u8], fragment: &str) -> Result<Vec<u8>> {
             .checked_add(1)
             .and_then(|size| size.checked_add(fragment.len()))
             .and_then(|size| size.checked_add(b"</p:extLst>".len()))
-            .ok_or_else(|| limit("updated slide XML bytes", MAX_SLIDE_XML_BYTES))?;
+            .ok_or_else(|| {
+                limit(
+                    crate::error::CodecLimitKind::OutputBytes,
+                    usize::MAX,
+                    limits.max_slide_xml_bytes(),
+                )
+            })?;
         let size = checked_output_size(
             xml.len()
                 .checked_sub(removed)
                 .and_then(|size| size.checked_add(replacement)),
+            limits,
         )?;
-        let mut output = Vec::with_capacity(size);
+        let mut output = Vec::new();
+        output
+            .try_reserve_exact(size)
+            .map_err(|source| Error::Allocation {
+                resource: "updated slide XML",
+                source,
+            })?;
         output.extend_from_slice(&xml[..start]);
         output.extend_from_slice(open);
         output.extend_from_slice(b">");
         output.extend_from_slice(fragment.as_bytes());
         output.extend_from_slice(b"</p:extLst>");
         output.extend_from_slice(&xml[end..]);
+        if output.len() != size {
+            return Err(Error::Invalid(
+                "updated slide XML length changed during emission".to_owned(),
+            ));
+        }
         return Ok(output);
     }
     if let Some(position) = ext_end.filter(|position| *position != usize::MAX) {
-        let size = checked_output_size(xml.len().checked_add(fragment.len()))?;
-        let mut output = Vec::with_capacity(size);
+        let size = checked_output_size(xml.len().checked_add(fragment.len()), limits)?;
+        let mut output = Vec::new();
+        output
+            .try_reserve_exact(size)
+            .map_err(|source| Error::Allocation {
+                resource: "updated slide XML",
+                source,
+            })?;
         output.extend_from_slice(&xml[..position]);
         output.extend_from_slice(fragment.as_bytes());
         output.extend_from_slice(&xml[position..]);
+        if output.len() != size {
+            return Err(Error::Invalid(
+                "updated slide XML length changed during emission".to_owned(),
+            ));
+        }
         return Ok(output);
     }
 
-    let dialect = slide_dialect(xml)?;
+    let dialect = slide_dialect(xml, limits)?;
     let size = checked_output_size(
         xml.len()
             .checked_add(b"<p:extLst xmlns:p=\"".len())
@@ -269,8 +331,15 @@ fn insert_extension_fragment(xml: &[u8], fragment: &str) -> Result<Vec<u8>> {
             .and_then(|size| size.checked_add(b"\">".len()))
             .and_then(|size| size.checked_add(fragment.len()))
             .and_then(|size| size.checked_add(b"</p:extLst>".len())),
+        limits,
     )?;
-    let mut output = Vec::with_capacity(size);
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(size)
+        .map_err(|source| Error::Allocation {
+            resource: "updated slide XML",
+            source,
+        })?;
     output.extend_from_slice(&xml[..root_end]);
     output.extend_from_slice(b"<p:extLst xmlns:p=\"");
     output.extend_from_slice(dialect.as_bytes());
@@ -278,23 +347,46 @@ fn insert_extension_fragment(xml: &[u8], fragment: &str) -> Result<Vec<u8>> {
     output.extend_from_slice(fragment.as_bytes());
     output.extend_from_slice(b"</p:extLst>");
     output.extend_from_slice(&xml[root_end..]);
+    if output.len() != size {
+        return Err(Error::Invalid(
+            "updated slide XML length changed during emission".to_owned(),
+        ));
+    }
     Ok(output)
 }
 
-fn checked_output_size(size: Option<usize>) -> Result<usize> {
-    let size = size.ok_or_else(|| limit("updated slide XML bytes", MAX_SLIDE_XML_BYTES))?;
-    if size > MAX_SLIDE_XML_BYTES {
-        return Err(limit("updated slide XML bytes", MAX_SLIDE_XML_BYTES));
+fn checked_output_size(size: Option<usize>, limits: &Limits) -> Result<usize> {
+    let size = size.ok_or_else(|| {
+        limit(
+            crate::error::CodecLimitKind::OutputBytes,
+            usize::MAX,
+            limits.max_slide_xml_bytes(),
+        )
+    })?;
+    if size > limits.max_slide_xml_bytes() {
+        return Err(limit(
+            crate::error::CodecLimitKind::OutputBytes,
+            size,
+            limits.max_slide_xml_bytes(),
+        ));
     }
     Ok(size)
 }
 
-fn add_node(nodes: &mut usize) -> Result<()> {
-    *nodes = nodes
-        .checked_add(1)
-        .ok_or_else(|| limit("slide XML node count", MAX_XML_NODES))?;
-    if *nodes > MAX_XML_NODES {
-        return Err(limit("slide XML node count", MAX_XML_NODES));
+fn add_node(nodes: &mut usize, limits: &Limits) -> Result<()> {
+    *nodes = nodes.checked_add(1).ok_or_else(|| {
+        limit(
+            crate::error::CodecLimitKind::XmlNodes,
+            usize::MAX,
+            limits.max_xml_nodes(),
+        )
+    })?;
+    if *nodes > limits.max_xml_nodes() {
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlNodes,
+            *nodes,
+            limits.max_xml_nodes(),
+        ));
     }
     Ok(())
 }
@@ -310,8 +402,12 @@ fn is_presentationml_name(namespace: &ResolveResult<'_>, name: QName<'_>, local:
     }
 }
 
-fn limit(resource: &'static str, limit: usize) -> Error {
-    Error::Limit { resource, limit }
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }
 
 #[cfg(test)]
@@ -324,6 +420,7 @@ mod tests {
     use super::*;
     use crate::time::Offset;
     use litchi_drawingml::coordinate::Coordinate;
+    use litchi_opc::{PackageWriter, SourceLimits};
 
     fn point() -> TracePoint {
         TracePoint::new(
@@ -354,9 +451,17 @@ mod tests {
         ] {
             let xml = format!(r#"<p:sld xmlns:p="{pml}"><p:cSld/><p:spTree/>{tail}</p:sld>"#);
             let (mut package, name) = package(&xml);
-            store_slide_trace(&mut package, &name, &[point()]).unwrap();
+            store_slide_trace(
+                &mut package,
+                &name,
+                &[point()],
+                Limits::DEFAULT,
+                &mut Usage::default(),
+            )
+            .unwrap();
             let slide = package.get_part(&name).unwrap();
-            let traces = load_slide_traces(0, slide, &mut Limits::default()).unwrap();
+            let mut usage = Usage::default();
+            let traces = load_slide_traces(0, slide, &Limits::DEFAULT, &mut usage).unwrap();
             assert_eq!(traces.len(), 1);
             assert_eq!(traces[0].point_count(), 1);
         }
@@ -367,10 +472,60 @@ mod tests {
         let strict = "http://purl.oclc.org/ooxml/presentationml/main";
         let xml = format!(r#"<p:sld xmlns:p="{strict}"><p:cSld/></p:sld>"#);
         let (mut package, name) = package(&xml);
-        store_slide_trace(&mut package, &name, &[point()]).unwrap();
+        store_slide_trace(
+            &mut package,
+            &name,
+            &[point()],
+            Limits::DEFAULT,
+            &mut Usage::default(),
+        )
+        .unwrap();
         let slide = package.get_part(&name).unwrap();
         let output = std::str::from_utf8(slide.blob()).unwrap();
         assert!(output.contains(strict));
-        assert!(store_slide_trace(&mut package, &name, &[point()]).is_err());
+        assert!(
+            store_slide_trace(
+                &mut package,
+                &name,
+                &[point()],
+                Limits::DEFAULT,
+                &mut Usage::default(),
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn package_writer_honors_retained_owner_output_profile_before_growth() {
+        let pml = "http://schemas.openxmlformats.org/presentationml/2006/main";
+        let xml = format!(
+            r#"<p:sld xmlns:p="{pml}"><p:cSld/><p:spTree/>{}</p:sld>"#,
+            " ".repeat(4096)
+        );
+        let (package, name) = package(&xml);
+        let bytes = PackageWriter::to_bytes(&package).unwrap();
+        let fragment = write(&[point()], Conformance::Transitional, Limits::DEFAULT).unwrap();
+        let source_profile = SourceLimits::builder()
+            .max_part_bytes((xml.len() + fragment.len() - 1) as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        let mut retained = OpcPackage::from_bytes(&bytes, source_profile).unwrap();
+        let before = retained.get_part(&name).unwrap().blob().to_vec();
+
+        assert!(matches!(
+            store_slide_trace(
+                &mut retained,
+                &name,
+                &[point()],
+                Limits::DEFAULT,
+                &mut Usage::default(),
+            ),
+            Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+                ..
+            })
+        ));
+        assert_eq!(retained.get_part(&name).unwrap().blob(), before);
     }
 }

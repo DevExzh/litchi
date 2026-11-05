@@ -1,0 +1,70 @@
+--- a/crates/litchi-ops/src/format/xlsx/write.rs
++++ b/crates/litchi-ops/src/format/xlsx/write.rs
+@@ -646,7 +646,6 @@
+     /// execute the command through the ordinary one-operation path.
+     pub(crate) struct Run {
+         base: Xlsx,
+-        resolution: Xlsx,
+         source: xlsx::Workbook,
+         edit: xlsx::workbook::Edit,
+         items: Vec<Item>,
+@@ -697,15 +696,7 @@
+                 {
+                     return Ok(None);
+                 }
+-                // Mutation already requires native promotion. Resolve
+-                // against that owner so a retained source does not stream
+-                // the worksheet again for each command in this run.
+-                let prepared = match &self.0.owner {
+-                    super::super::XlsxOwner::Source(_) => Some(self.adopt_workbook(self.editor()?)),
+-                    _ => None,
+-                };
+-                let resolved = prepared.as_ref().unwrap_or(self);
+-                let node = crate::path::resolve::get(&super::super::Nav::new(resolved), path)?;
++                let node = crate::path::resolve::get(&super::super::Nav::new(self), path)?;
+                 let Some((sheet, address)) = node.write_cell_target() else {
+                     return Ok(None);
+                 };
+@@ -730,7 +721,6 @@
+             base.check_source()?;
+             Ok(Self {
+                 base: base.clone(),
+-                resolution: base.adopt_workbook(source.clone()),
+                 source,
+                 edit,
+                 items: Vec::new(),
+@@ -738,20 +728,6 @@
+                 staged_bytes: 0,
+                 max_staged_bytes: limits.max_staged_bytes(),
+             })
+-        }
+-
+-        /// Resolve stable direct addresses through the promoted owner while
+-        /// retaining the original source's freshness fence.
+-        pub(crate) fn cell_plan(
+-            &self,
+-            target: &TargetArg<'_>,
+-            props: &Props<'_>,
+-            limits: &SemanticLimits,
+-        ) -> Result<Option<Plan>> {
+-            self.base.check_source()?;
+-            let result = self.resolution.cell_plan(target, props, limits);
+-            self.base.check_source()?;
+-            result
+         }
+ 
+         /// The first wire index in the run, used for a final fallback when a
+--- a/crates/litchi-ops/src/transaction.rs
++++ b/crates/litchi-ops/src/transaction.rs
+@@ -566,10 +566,7 @@
+         }
+         #[cfg(feature = "xlsx")]
+         if let File::Xlsx(handle) = &self.current {
+-            let planned = match &self.cells {
+-                Some(run) => run.cell_plan(_target, _props, &self.limits),
+-                None => handle.cell_plan(_target, _props, &self.limits),
+-            };
++            let planned = handle.cell_plan(_target, _props, &self.limits);
+             if planned.is_err() {
+                 // An earlier deferred native failure takes precedence over
+                 // admission failure in the following command.

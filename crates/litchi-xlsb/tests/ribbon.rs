@@ -8,8 +8,8 @@
 use litchi_ooxml_common::ribbon::{Family, Set, Version};
 use litchi_opc::constants::relationship_type;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
-use litchi_xlsb::Workbook;
-use litchi_xlsb::raw::{Kind, Writer, kind};
+use litchi_xlsb::Package;
+use litchi_xlsb::raw::{Encoder, Kind, kind};
 
 const UI_2007: &[u8] =
     br#"<customUI xmlns="http://schemas.microsoft.com/office/2006/01/customui"/>"#;
@@ -17,24 +17,36 @@ const UI_2010: &[u8] =
     br#"<customUI xmlns="http://schemas.microsoft.com/office/2009/07/customui"/>"#;
 
 #[test]
-fn workbook_ribbon_facade_creates_reads_and_removes_both_families() {
-    let mut workbook = workbook();
-    assert!(workbook.ribbon().unwrap().effective().is_none());
+fn package_ribbon_family_creates_reads_and_removes_both_families() {
+    let package = package();
+    assert!(package.ribbon().unwrap().effective().is_none());
 
     let modern_xml = UI_2010.to_vec();
     let moved_allocation = modern_xml.as_ptr();
-    workbook
-        .put_ribbon(Version::V2007, UI_2007.to_vec())
-        .unwrap()
-        .put_ribbon(Version::V2010, modern_xml)
-        .unwrap();
-    assert_both(workbook.ribbon().unwrap(), moved_allocation);
+    let mut edit = package.edit_ribbon().unwrap();
+    assert!(edit.put(Version::V2007, UI_2007.to_vec()).unwrap());
+    assert!(edit.put(Version::V2010, modern_xml).unwrap());
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    let both = commit.into_package();
+    assert_both(both.ribbon().unwrap(), moved_allocation);
+    assert!(package.ribbon().unwrap().effective().is_none());
 
-    assert!(workbook.remove_ribbon(Family::Modern).unwrap());
-    assert_legacy_effective(workbook.ribbon().unwrap());
-    assert!(!workbook.remove_ribbon(Family::Modern).unwrap());
-    assert!(workbook.remove_ribbon(Family::Legacy).unwrap());
-    assert!(workbook.ribbon().unwrap().effective().is_none());
+    let mut edit = both.edit_ribbon().unwrap();
+    assert!(edit.remove(Family::Modern).unwrap());
+    let legacy = edit.commit().unwrap().into_package();
+    assert_legacy_effective(legacy.ribbon().unwrap());
+
+    let mut edit = legacy.edit_ribbon().unwrap();
+    assert!(!edit.remove(Family::Modern).unwrap());
+    assert!(edit.remove(Family::Legacy).unwrap());
+    let cleared = edit.commit().unwrap();
+    let inverse = cleared.patch().inverse();
+    let cleared = cleared.into_package();
+    assert!(cleared.ribbon().unwrap().effective().is_none());
+
+    let restored = cleared.apply_ribbon(&inverse).unwrap().into_package();
+    assert_legacy_effective(restored.ribbon().unwrap());
 }
 
 fn assert_both(set: Set<'_>, moved_allocation: *const u8) {
@@ -53,7 +65,7 @@ fn assert_legacy_effective(set: Set<'_>) {
     assert_eq!(set.effective().unwrap().version(), Version::V2007);
 }
 
-fn workbook() -> Workbook {
+fn package() -> Package {
     let mut bundle_sheet = 0u32.to_le_bytes().to_vec();
     bundle_sheet.extend_from_slice(&1u32.to_le_bytes());
     bundle_sheet.extend_from_slice(&wide("rIdSheet1"));
@@ -95,12 +107,12 @@ fn workbook() -> Workbook {
     );
     package.add_part(Box::new(workbook_part));
     package.add_part(Box::new(sheet_part));
-    Workbook::from_opc_package(package).unwrap()
+    Package::from_opc(package).unwrap()
 }
 
 fn records(values: &[(Kind, Vec<u8>)]) -> Vec<u8> {
     let mut bytes = Vec::new();
-    let mut writer = Writer::new(&mut bytes);
+    let mut writer = Encoder::new(&mut bytes, litchi_xlsb::raw::Limits::DEFAULT);
     for (kind, payload) in values {
         writer.write_record(*kind, payload).unwrap();
     }

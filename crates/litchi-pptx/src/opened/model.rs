@@ -12,8 +12,12 @@ use crate::notes::SlideRootMemo;
 use crate::parts::{MceCapture, PresentationPart, RetainedMce};
 use crate::{Error, Result};
 
-/// Maximum selector/value pairs in one atomic same-slide text batch.
+/// Maximum selector/value pairs in one same-slide text input chunk.
 pub const MAX_SHAPE_TEXT_REPLACEMENTS: usize = 256;
+
+/// Maximum selector/property pairs accepted by one same-slide shape-property
+/// input chunk.
+pub const MAX_SHAPE_PROPERTIES_REPLACEMENTS: usize = MAX_SHAPE_TEXT_REPLACEMENTS;
 
 /// One borrowed selector/value pair in an atomic same-slide text batch.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -51,6 +55,76 @@ impl<'a> ShapeTextReplacement<'a> {
     #[must_use]
     pub const fn text(self) -> &'a str {
         self.text
+    }
+}
+
+/// One borrowed positional shape-property update in an atomic same-slide
+/// batch.
+///
+/// The update may carry visible text, complete local transform bounds, or
+/// both.  The selector is a zero-based depth-first shape position captured
+/// against one immutable scene; it is resolved for the whole batch before any
+/// bytes are staged.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct ShapePropertiesReplacement<'a> {
+    position: litchi_core::Position,
+    text: Option<&'a str>,
+    bounds: Option<(i64, i64, i64, i64)>,
+}
+
+impl fmt::Debug for ShapePropertiesReplacement<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ShapePropertiesReplacement")
+            .field("position", &self.position)
+            .field("has_text", &self.text.is_some())
+            .field("has_bounds", &self.bounds.is_some())
+            .finish()
+    }
+}
+
+impl<'a> ShapePropertiesReplacement<'a> {
+    /// Start a property update for one checked depth-first shape position.
+    #[must_use]
+    pub const fn new(position: litchi_core::Position) -> Self {
+        Self {
+            position,
+            text: None,
+            bounds: None,
+        }
+    }
+
+    /// Supply a replacement for the shape's visible text body.
+    #[must_use]
+    pub const fn with_text(mut self, text: &'a str) -> Self {
+        self.text = Some(text);
+        self
+    }
+
+    /// Supply complete local transform bounds `(x, y, width, height)` in
+    /// English Metric Units.
+    #[must_use]
+    pub const fn with_bounds(mut self, bounds: (i64, i64, i64, i64)) -> Self {
+        self.bounds = Some(bounds);
+        self
+    }
+
+    /// Checked zero-based depth-first shape position selected by this update.
+    #[must_use]
+    pub const fn position(self) -> litchi_core::Position {
+        self.position
+    }
+
+    /// Replacement visible text, when supplied.
+    #[must_use]
+    pub const fn text(self) -> Option<&'a str> {
+        self.text
+    }
+
+    /// Replacement complete local transform bounds, when supplied.
+    #[must_use]
+    pub const fn bounds(self) -> Option<(i64, i64, i64, i64)> {
+        self.bounds
     }
 }
 
@@ -121,6 +195,18 @@ impl Limits {
         self.max_patch_bytes
     }
 
+    /// Set the encoded retained-patch ceiling inherited by a detached edit.
+    ///
+    /// The caller supplies a budget that has already been validated by its
+    /// own option builder.  The edit still performs the complete native
+    /// encoded-length preflight before retaining a patch, so this is an
+    /// exact capture bound rather than an allocation-size estimate.
+    #[must_use]
+    pub const fn with_max_patch_bytes(mut self, maximum: usize) -> Self {
+        self.max_patch_bytes = maximum;
+        self
+    }
+
     /// Maximum replacement text size.
     #[must_use]
     pub const fn max_text_bytes(self) -> usize {
@@ -151,8 +237,8 @@ impl Limits {
     /// is always available.
     ///
     /// The retained bytes are observable through
-    /// [`CrossSlideCopyPlan::retained_candidate_bytes`] and released by
-    /// [`CrossSlideCopyPlan::release_retained_candidate`] or by dropping the
+    /// [`crate::cross_slide_copy::Plan::retained_candidate_bytes`] and released by
+    /// [`crate::cross_slide_copy::Plan::release_retained_candidate`] or by dropping the
     /// plan.  The default is 64 MiB.  This ceiling bounds what a plan *holds*.
     /// Applying the plan shares the retained archive with the package it
     /// opens and publishes rather than copying it (change 0751), so after an
@@ -164,8 +250,8 @@ impl Limits {
     /// candidate retention off, since no ZIP archive is
     /// one byte long.
     ///
-    /// [`CrossSlideCopyPlan::retained_candidate_bytes`]: crate::opened::CrossSlideCopyPlan::retained_candidate_bytes
-    /// [`CrossSlideCopyPlan::release_retained_candidate`]: crate::opened::CrossSlideCopyPlan::release_retained_candidate
+    /// [`crate::cross_slide_copy::Plan::retained_candidate_bytes`]: crate::cross_slide_copy::Plan::retained_candidate_bytes
+    /// [`crate::cross_slide_copy::Plan::release_retained_candidate`]: crate::cross_slide_copy::Plan::release_retained_candidate
     #[must_use]
     pub const fn max_retained_candidate_bytes(self) -> usize {
         self.max_retained_candidate_bytes
@@ -192,6 +278,24 @@ impl Limits {
     pub const fn max_retained_mce_bytes(self) -> usize {
         self.max_retained_mce_bytes
     }
+
+    /// The maximum of one typed dimension.
+    #[must_use]
+    pub const fn maximum(self, kind: super::LimitKind) -> Option<usize> {
+        match kind {
+            super::LimitKind::Parts => Some(self.max_parts),
+            super::LimitKind::PatchBytes => Some(self.max_patch_bytes),
+            super::LimitKind::TextBytes => Some(self.max_text_bytes),
+            super::LimitKind::HistoryEntries => Some(self.max_history_entries),
+            super::LimitKind::HistoryBytes => Some(self.max_history_bytes),
+            super::LimitKind::RetainedCandidateBytes => Some(self.max_retained_candidate_bytes),
+            super::LimitKind::RetainedMceBytes => Some(self.max_retained_mce_bytes),
+            // Codec and shared-service limits do not belong to the primary
+            // opened-presentation policy. They are carried by their owning
+            // codec policy and are never passed to this accessor.
+            super::LimitKind::Codec(_) | super::LimitKind::Common(_) => None,
+        }
+    }
 }
 
 impl Default for Limits {
@@ -201,7 +305,7 @@ impl Default for Limits {
 }
 
 /// Stable identity of one slide in current presentation order.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Slide {
     pub(crate) id: u32,
     pub(crate) relationship_id: String,
@@ -258,7 +362,7 @@ impl SlideNameIndex {
         Ok(Self { by_name })
     }
 
-    pub(crate) fn resolve(&self, slides: &[Slide], name: &str) -> Result<Slide> {
+    pub(crate) fn position(&self, name: &str) -> Result<usize> {
         let Some(matched) = self.by_name.get(name) else {
             return Err(Error::SlideNameNotFound(name.to_owned()));
         };
@@ -268,10 +372,20 @@ impl SlideNameIndex {
                 matches: matched.count,
             });
         }
+        Ok(matched.first)
+    }
+
+    pub(crate) fn resolve(&self, slides: &[Slide], name: &str) -> Result<Slide> {
         slides
-            .get(matched.first)
+            .get(self.position(name)?)
             .cloned()
             .ok_or_else(|| invalid("opened-presentation slide name index lost its position"))
+    }
+}
+
+impl fmt::Debug for Slide {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_struct("Slide").finish_non_exhaustive()
     }
 }
 
@@ -298,13 +412,21 @@ impl Slide {
 /// Immutable root snapshot for an opened presentation.
 #[derive(Clone)]
 pub struct Snapshot {
+    pub(crate) owner_state: Arc<crate::package::OpenedOwnerState>,
     pub(crate) package: Arc<OpcPackage>,
+    /// The facade's retained source-backed replay index when this snapshot
+    /// was captured through `Package`; raw capture callers may leave it empty
+    /// until publication attaches the owner state.
+    pub(crate) replay_index: Option<Arc<crate::package::replay_index::ReplayIndex>>,
     pub(crate) presentation_name: PackURI,
-    pub(crate) slides: Vec<Slide>,
-    pub(crate) slide_name_index: SlideNameIndex,
+    pub(crate) slides: Arc<Vec<Slide>>,
+    pub(crate) slide_name_index: Arc<SlideNameIndex>,
     pub(crate) revision: [u8; 32],
     pub(crate) limits: Limits,
     pub(crate) physical_source_provenance: bool,
+    /// Aggregate ordinary-part payload bytes observed during the same
+    /// capture pass that produced the complete-package revision.
+    pub(crate) part_bytes: u64,
     /// Serialized-archive revision of `package`, memoized with the archive
     /// bound it was taken under.
     ///
@@ -355,6 +477,22 @@ pub struct Snapshot {
 #[derive(Default)]
 pub(crate) struct PartDigests {
     entries: HashMap<(usize, usize), (Arc<Vec<u8>>, [u8; 32])>,
+    /// Aggregate visible payload bytes observed by the same fingerprint pass.
+    /// It is carried with the memo so snapshot publication does not need a
+    /// second package walk merely to retain the physical owner metric.
+    part_bytes: u64,
+    /// The slide-root memo of the capture that filled this package memo, with
+    /// the package source profile it was admitted under (record 0377).
+    ///
+    /// A package keeps one memo per graph state (`Package::part_digests`), so
+    /// every later capture of the same immutable package — each detached
+    /// `Package::edit` captures afresh — reuses the classifications and the
+    /// source admission the first capture proved for the identical payload
+    /// allocations, instead of rescanning every slide. It is consulted only
+    /// under an equal source profile, like a rebind's projection, and only
+    /// [`Snapshot::package_memo`] attaches it: [`Self::project`] and
+    /// [`Self::union`] never carry it to another package.
+    slide_roots: Option<Box<(litchi_opc::SourceLimits, Arc<SlideRootMemo>)>>,
 }
 
 impl PartDigests {
@@ -366,7 +504,11 @@ impl PartDigests {
                 resource: "opened-presentation part digests",
                 source,
             })?;
-        Ok(Self { entries })
+        Ok(Self {
+            entries,
+            part_bytes: 0,
+            slide_roots: None,
+        })
     }
 
     /// Digest memoized for exactly this allocation, if any.
@@ -398,6 +540,16 @@ impl PartDigests {
         Some(union)
     }
 
+    /// The slide-root memo a capture of a package with source profile
+    /// `limits` may consult: the one this package memo carries, when it was
+    /// admitted under the same profile.
+    fn slide_roots_for(&self, limits: litchi_opc::SourceLimits) -> Option<&SlideRootMemo> {
+        self.slide_roots
+            .as_ref()
+            .filter(|roots| roots.0 == limits)
+            .map(|roots| roots.1.as_ref())
+    }
+
     /// Return the package-owned payload allocation for an exact memo key.
     /// Retention callers use this after the owned package has been fingerprinted
     /// so foreign `blob_arc` implementations cannot donate an unverified owner.
@@ -422,6 +574,11 @@ impl PartDigests {
             })?;
         self.entries.insert(key, (blob, digest));
         Ok(())
+    }
+
+    #[must_use]
+    pub(crate) const fn part_bytes(&self) -> u64 {
+        self.part_bytes
     }
 
     /// Number of memoized payloads.
@@ -474,9 +631,14 @@ impl PartDigests {
     /// point it keeps a snapshot's memo (change 0751).
     pub(crate) fn project(&self, package: &OpcPackage) -> Result<Self> {
         if self.entries.is_empty() {
-            return Ok(Self::default());
+            return Ok(Self {
+                entries: HashMap::new(),
+                part_bytes: self.part_bytes,
+                slide_roots: None,
+            });
         }
         let mut projected = Self::with_capacity(package.part_count())?;
+        projected.part_bytes = self.part_bytes;
         for metadata in package.iter_parts() {
             let part = package.get_part(metadata.partname())?;
             let Some((key, blob)) = memo_key(part) else {
@@ -522,9 +684,7 @@ impl fmt::Debug for Snapshot {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Snapshot")
-            .field("presentation_name", &self.presentation_name)
-            .field("slides", &self.slides)
-            .field("revision", &self.revision)
+            .field("slide_count", &self.slides.len())
             .field("limits", &self.limits)
             .field("retained_mce_bytes", &self.retained_mce_bytes())
             .finish_non_exhaustive()
@@ -535,7 +695,7 @@ impl Snapshot {
     /// Slides in current presentation order.
     #[must_use]
     pub fn slides(&self) -> &[Slide] {
-        &self.slides
+        self.slides.as_ref()
     }
 
     /// Fingerprint of the complete captured OPC graph.
@@ -546,8 +706,8 @@ impl Snapshot {
 
     /// Start one detached atomic transaction.
     #[must_use]
-    pub fn edit(&self) -> super::Transaction {
-        super::Transaction::new(self.clone())
+    pub fn edit(&self) -> super::Edit {
+        super::Edit::new(self.clone())
     }
 
     /// Rebind this snapshot's validated state onto a package that carries
@@ -577,7 +737,16 @@ impl Snapshot {
         // allocation the rebound package itself holds, each retaining that
         // package's own `Arc`; like the digest projection, a table that cannot
         // be reserved is empty, which only costs a later scan (ADR 0032).
-        let slide_roots = Arc::new(self.slide_roots.project(|key| part_digests.owner_for(key)));
+        // A slide-root memo also carries the source-profile admission proved
+        // while its entries were captured. Byte-identical rebinding under a
+        // tighter physical profile must not inherit those proofs; dropping
+        // the table costs only the next bounded root scan and keeps the memo
+        // entry footprint unchanged.
+        let slide_roots = if self.package.read_limits() == package.read_limits() {
+            Arc::new(self.slide_roots.project(|key| part_digests.owner_for(key)))
+        } else {
+            Arc::new(SlideRootMemo::default())
+        };
         Self {
             // `packages_equal` proves the fingerprint inputs are identical; it
             // says nothing about ZIP ordering, compression, or retained source
@@ -599,6 +768,20 @@ impl Snapshot {
             package: owned,
             ..self.clone()
         }
+    }
+
+    /// This snapshot's payload-digest memo re-projected onto `package`'s own
+    /// allocations, carrying the slide-root memo when `package` has the
+    /// snapshot's source profile (record 0377). Every entry kept names, and
+    /// retains, an allocation `package` holds.
+    pub(crate) fn package_memo(&self, package: &OpcPackage) -> Result<PartDigests> {
+        let mut memo = self.part_digests.project(package)?;
+        let limits = package.read_limits();
+        if self.package.read_limits() == limits {
+            let roots = self.slide_roots.project(|key| memo.owner_for(key));
+            memo.slide_roots = Some(Box::new((limits, Arc::new(roots))));
+        }
+        Ok(memo)
     }
 
     /// Aggregate charged bytes held by this snapshot's optional MCE table.
@@ -630,9 +813,15 @@ impl Snapshot {
         self.limits
     }
 
-    pub(crate) fn resolve_slide(&self, key: crate::slide::Key<'_>) -> Result<Slide> {
+    /// Codec policies inherited by edits and candidate captures.
+    pub(crate) fn semantic_limits(&self) -> crate::open_options::SemanticLimits {
+        crate::open_options::selected(self.owner_state.semantic_limits.as_ref())
+    }
+
+    pub(crate) fn resolve_slide(&self, key: crate::slide::Selector<'_>) -> Result<Slide> {
         match key {
-            crate::slide::Key::Index(index) => {
+            crate::slide::Selector::Position(position) => {
+                let index = position.get();
                 self.slides
                     .get(index)
                     .cloned()
@@ -641,11 +830,14 @@ impl Snapshot {
                         len: self.slides.len(),
                     })
             },
-            crate::slide::Key::Name(name) => self.slide_name_index.resolve(&self.slides, name),
+            crate::slide::Selector::Name(name) => {
+                self.slide_name_index.resolve(&self.slides, &name)
+            },
         }
     }
 }
 
+#[cfg(test)]
 pub(crate) fn capture(
     package: &OpcPackage,
     limits: Limits,
@@ -654,10 +846,20 @@ pub(crate) fn capture(
     capture_with_provenance(package, limits, physical_source_provenance)
 }
 
+#[cfg(test)]
 pub(crate) fn capture_with_provenance(
     package: &OpcPackage,
     limits: Limits,
     physical_source_provenance: bool,
+) -> Result<Snapshot> {
+    capture_with_provenance_and_semantic_limits(package, limits, physical_source_provenance, None)
+}
+
+pub(crate) fn capture_with_provenance_and_semantic_limits(
+    package: &OpcPackage,
+    limits: Limits,
+    physical_source_provenance: bool,
+    semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
 ) -> Result<Snapshot> {
     capture_internal(
         package,
@@ -666,20 +868,16 @@ pub(crate) fn capture_with_provenance(
         Revision::Cold,
         None,
         None,
+        semantic_limits,
     )
 }
 
-/// Capture `package`, reusing `parent`'s payload digest for every payload
-/// allocation the two packages share.
-///
-/// The revision is the one [`capture_with_provenance`] would compute: a memo
-/// hit only declines to re-hash bytes whose allocation identity — and
-/// therefore whose content — is already proven.
-pub(crate) fn capture_with_parent_digests(
+pub(crate) fn capture_with_parent_digests_and_semantic_limits(
     package: &OpcPackage,
     limits: Limits,
     physical_source_provenance: bool,
     parent: &PartDigests,
+    semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
 ) -> Result<Snapshot> {
     capture_internal(
         package,
@@ -688,6 +886,29 @@ pub(crate) fn capture_with_parent_digests(
         Revision::Parent(parent),
         None,
         None,
+        semantic_limits,
+    )
+}
+
+/// Capture a candidate package assembled from `parent`'s package, reusing
+/// `parent`'s payload digests and, under the same source profile, its proved
+/// slide-root classifications and source admission for every payload
+/// allocation the candidate still shares (record 0377). Every validation of
+/// a changed or reallocated payload still runs.
+pub(crate) fn capture_with_parent_snapshot(
+    package: &OpcPackage,
+    parent: &Snapshot,
+) -> Result<Snapshot> {
+    let parent_roots = (parent.package.read_limits() == package.read_limits())
+        .then(|| parent.slide_roots.as_ref());
+    capture_internal(
+        package,
+        parent.limits,
+        parent.physical_source_provenance,
+        Revision::Parent(parent.part_digests.as_ref()),
+        None,
+        parent_roots,
+        parent.owner_state.semantic_limits.clone(),
     )
 }
 
@@ -697,6 +918,7 @@ pub(crate) fn capture_with_parent_digests(
 /// commit passes its source snapshot's; the cross-slide copy passes neither.
 /// Every validation still runs; only work whose result is proved for the
 /// identical bytes is not repeated.
+#[cfg(test)]
 pub(crate) fn capture_with_revision_and_digests_and_mce(
     package: &OpcPackage,
     limits: Limits,
@@ -706,6 +928,28 @@ pub(crate) fn capture_with_revision_and_digests_and_mce(
     parent_mce: Option<&RetainedMce>,
     parent_roots: Option<&SlideRootMemo>,
 ) -> Result<Snapshot> {
+    capture_with_revision_and_digests_and_mce_and_semantic_limits(
+        package,
+        limits,
+        physical_source_provenance,
+        revision,
+        digests,
+        parent_mce,
+        parent_roots,
+        None,
+    )
+}
+
+pub(crate) fn capture_with_revision_and_digests_and_mce_and_semantic_limits(
+    package: &OpcPackage,
+    limits: Limits,
+    physical_source_provenance: bool,
+    revision: [u8; 32],
+    digests: PartDigests,
+    parent_mce: Option<&RetainedMce>,
+    parent_roots: Option<&SlideRootMemo>,
+    semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
+) -> Result<Snapshot> {
     capture_internal(
         package,
         limits,
@@ -713,6 +957,7 @@ pub(crate) fn capture_with_revision_and_digests_and_mce(
         Revision::Known(revision, digests),
         parent_mce,
         parent_roots,
+        semantic_limits,
     )
 }
 
@@ -734,20 +979,44 @@ fn capture_internal(
     revision: Revision<'_>,
     parent_mce: Option<&RetainedMce>,
     parent_roots: Option<&SlideRootMemo>,
+    semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
 ) -> Result<Snapshot> {
     let presentation = PresentationPart::from_package(package)?;
     let presentation_name = presentation.part().partname().clone();
-    // Edit transactions keep the strict slide-list contract.
-    let references = presentation.slide_references_strict()?;
-    if references.len() > limits.max_parts {
+    let view = crate::presentation::Presentation::new_with_semantic_limits(
+        presentation,
+        package,
+        semantic_limits.clone(),
+    );
+    // Bound the tolerant catalog before capture allocates its slide table.
+    // Strict graph validation follows source admission so a malformed
+    // selected slide retains the physical-error precedence promised by the
+    // capture projection contract.
+    let catalog_len = view.capture_catalog_len()?;
+    if catalog_len > limits.max_parts {
         return Err(Error::Limit {
-            resource: "opened-presentation slides",
-            limit: limits.max_parts,
+            kind: crate::opened::LimitKind::Parts,
+            observed: catalog_len,
+            maximum: limits.max_parts,
         });
     }
-    let view = crate::presentation::Presentation::new(presentation, package);
     let mut mce_capture = MceCapture::new(parent_mce, limits.max_retained_mce_bytes());
-    let captured = view.capture_slides_with_mce(&mut mce_capture, parent_roots)?;
+    // A capture of a package whose memo already carries the slide-root
+    // proofs of an earlier capture of the same payload allocations under the
+    // same source profile reuses them (record 0377); a commit passes its
+    // source snapshot's memo explicitly.
+    let inherited_roots = match &revision {
+        Revision::Parent(parent) => parent.slide_roots_for(package.read_limits()),
+        Revision::Cold | Revision::Known(..) => None,
+    };
+    let captured = view.capture_slides_with_mce(
+        &mut mce_capture,
+        parent_roots.or(inherited_roots),
+        package.read_limits(),
+    )?;
+    // Edit transactions keep the strict slide-list contract. Delaying this
+    // check until after capture preserves physical source admission ordering.
+    let references = view.part().slide_references_strict()?;
     if references.len() != captured.slides.len() {
         return Err(invalid(
             "opened-presentation slide references do not resolve one-to-one",
@@ -817,13 +1086,24 @@ fn capture_internal(
         });
     }
     let _notes = match slide_root_proofs.as_deref() {
-        Some(proofs) => crate::notes::load_snapshot_with_slide_root_proofs(
+        Some(proofs) => {
+            let proof_limits = crate::open_options::selected(semantic_limits.as_ref()).notes();
+            crate::notes::load_snapshot_with_slide_root_proofs_and_limits(
+                package,
+                &presentation_name,
+                references.len(),
+                proofs,
+                proof_limits.constrained_by_source(package.read_limits()),
+                proof_limits,
+            )?
+        },
+        None => crate::notes::load_snapshot_with_limits(
             package,
             &presentation_name,
-            references.len(),
-            proofs,
+            crate::open_options::selected(semantic_limits.as_ref())
+                .notes()
+                .constrained_by_source(package.read_limits()),
         )?,
-        None => crate::notes::load_snapshot(package, &presentation_name)?,
     };
     let slide_name_index = SlideNameIndex::build(&slides)?;
     // The snapshot owns its package from here on, and the memo it keeps must
@@ -851,6 +1131,7 @@ fn capture_internal(
         Revision::Cold => package_fingerprint_with_memo(owned.as_ref(), None)?,
         Revision::Parent(parent) => package_fingerprint_with_memo(owned.as_ref(), Some(parent))?,
     };
+    let part_bytes = part_digests.part_bytes();
     let retained_mce = mce_capture.finish(|key| part_digests.owner_for(key));
     // The proofs borrow the input package, so every classified allocation is
     // alive while the memo is built. Each successful classification is kept
@@ -863,13 +1144,18 @@ fn capture_internal(
     )?);
     drop(slide_root_proofs);
     Ok(Snapshot {
+        owner_state: Arc::new(crate::package::OpenedOwnerState::with_semantic_limits(
+            semantic_limits,
+        )),
         package: owned,
+        replay_index: None,
         presentation_name,
-        slides,
-        slide_name_index,
+        slides: Arc::new(slides),
+        slide_name_index: Arc::new(slide_name_index),
         revision,
         limits,
         physical_source_provenance,
+        part_bytes,
         physical_revision: Arc::new(OnceLock::new()),
         part_digests: Arc::new(part_digests),
         retained_mce,
@@ -890,7 +1176,8 @@ pub(crate) fn package_fingerprint(package: &OpcPackage) -> Result<[u8; 32]> {
 }
 
 /// The `litchi-pptx-opened-v2` complete-package revision, computed over sorted
-/// per-part digests, together with the payload-digest memo it filled.
+/// opaque-member identities and sorted per-part digests, together with the
+/// payload-digest memo it filled.
 ///
 /// The proof is tiered. A payload digest covers exactly one part's payload
 /// bytes; a part digest covers the part name, the content type, that payload
@@ -934,11 +1221,12 @@ pub(crate) fn package_fingerprint_with_memo(
     root_relationships.extend(package.rels().iter());
     root_relationships.sort_unstable_by(|left, right| left.r_id().cmp(right.r_id()));
     feed_relationships(&mut digest, &root_relationships)?;
-    let non_part_count = u32::try_from(package.non_part_members().len())
+    let non_part_members = sorted_non_part_members(package)?;
+    let non_part_count = u32::try_from(non_part_members.len())
         .map_err(|_error| invalid("opened-presentation non-part member count exceeds u32"))?;
     feed(&mut digest, b"non-part-members");
     feed(&mut digest, &non_part_count.to_le_bytes());
-    for member in package.non_part_members() {
+    for member in non_part_members {
         feed(&mut digest, member.name().as_bytes());
         feed(&mut digest, member.reason().as_str().as_bytes());
     }
@@ -951,6 +1239,12 @@ pub(crate) fn package_fingerprint_with_memo(
     let (part_total, mut hashed) = (parts.len(), 0usize);
     for metadata in parts {
         let part = package.get_part(metadata.partname())?;
+        let payload_bytes = u64::try_from(part.blob().len())
+            .map_err(|_| invalid("opened-presentation payload length exceeds u64"))?;
+        memo.part_bytes = memo
+            .part_bytes
+            .checked_add(payload_bytes)
+            .ok_or_else(|| invalid("opened-presentation payload aggregate overflows u64"))?;
         let payload = match memo_key(part) {
             Some((key, blob)) => {
                 let payload = match parent.and_then(|parent| parent.get(key)) {
@@ -1088,8 +1382,8 @@ pub(crate) fn package_fingerprint_v1(package: &OpcPackage) -> Result<[u8; 32]> {
 /// content rather than by digest. A `false` result proves nothing at all, so
 /// every caller falls back to the ordinary capture.
 ///
-/// Payload comparison short-circuits on `Arc` pointer identity, which the
-/// opened-transaction path preserves for every part an edit did not rewrite.
+/// Payload comparison short-circuits on visible slice identity. Foreign
+/// shared-owner methods cannot vouch for bytes they do not actually expose.
 pub(crate) fn packages_equal(left: &OpcPackage, right: &OpcPackage) -> bool {
     if left.part_count() != right.part_count()
         || !relationships_equal(left.rels(), right.rels())
@@ -1097,10 +1391,15 @@ pub(crate) fn packages_equal(left: &OpcPackage, right: &OpcPackage) -> bool {
     {
         return false;
     }
-    if left
-        .non_part_members()
+    let Some(left_non_parts) = sorted_non_part_members(left).ok() else {
+        return false;
+    };
+    let Some(right_non_parts) = sorted_non_part_members(right).ok() else {
+        return false;
+    };
+    if left_non_parts
         .iter()
-        .zip(right.non_part_members())
+        .zip(right_non_parts)
         .any(|(left, right)| left.name() != right.name() || left.reason() != right.reason())
     {
         return false;
@@ -1118,11 +1417,33 @@ pub(crate) fn packages_equal(left: &OpcPackage, right: &OpcPackage) -> bool {
     })
 }
 
-fn blobs_equal(left: &dyn litchi_opc::Part, right: &dyn litchi_opc::Part) -> bool {
-    Arc::ptr_eq(&left.blob_arc(), &right.blob_arc()) || left.blob() == right.blob()
+/// Return opaque ZIP members in their content order rather than central
+/// directory insertion order.  Their original order remains on the owner for
+/// faithful publication; only identity/equality proofs canonicalize it.
+fn sorted_non_part_members(package: &OpcPackage) -> Result<Vec<&litchi_opc::NonPartMember>> {
+    let mut members = Vec::new();
+    members
+        .try_reserve_exact(package.non_part_members().len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation fingerprint non-part members",
+            source,
+        })?;
+    members.extend(package.non_part_members());
+    members.sort_unstable_by(|left, right| {
+        left.name()
+            .cmp(right.name())
+            .then_with(|| left.reason().as_str().cmp(right.reason().as_str()))
+    });
+    Ok(members)
 }
 
-fn relationships_equal(
+pub(super) fn blobs_equal(left: &dyn litchi_opc::Part, right: &dyn litchi_opc::Part) -> bool {
+    let left = left.blob();
+    let right = right.blob();
+    std::ptr::eq(left, right) || left == right
+}
+
+pub(crate) fn relationships_equal(
     left: &litchi_opc::Relationships,
     right: &litchi_opc::Relationships,
 ) -> bool {

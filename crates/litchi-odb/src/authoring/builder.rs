@@ -25,18 +25,24 @@ impl Builder {
         self
     }
 
-    /// Validates and packages the document bytes.
+    /// Validates, packages, and reopens the database as an immutable
+    /// [`crate::Package`]. Identical input produces identical bytes.
     ///
     /// # Errors
     ///
     /// Returns an error if content validation or package writing fails.
-    pub fn build(self) -> Result<Vec<u8>> {
-        compact_xml::validate(self.content_xml.as_bytes())?;
+    pub fn build(self) -> std::result::Result<crate::Package, litchi_odf_common::Error> {
+        Ok(self.build_core()?)
+    }
+
+    fn build_core(self) -> Result<crate::Package> {
+        compact_xml::validate(self.content_xml.as_bytes(), compact_xml::Limits::default())?;
         crate::codec::validate(&self.content_xml)?;
-        let mut writer = PackageWriter::new();
+        let mut writer =
+            PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
         writer.set_mimetype(crate::package::MIMETYPE)?;
         writer.add_file("content.xml", self.content_xml.as_bytes())?;
-        writer.finish_to_bytes()
+        crate::Package::from_published(writer.finish_to_bytes()?)
     }
 }
 

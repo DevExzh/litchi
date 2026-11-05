@@ -20,7 +20,7 @@ pub mod records;
 
 // Migration-only OfficeArt encoding internals. The typed public substrate is
 // `litchi-odraw`; numeric record builders are not part of the writer facade.
-mod escher;
+pub(crate) mod escher;
 
 /// PersistPtr offset mapping
 pub mod persist;
@@ -74,24 +74,31 @@ pub mod slide_timing;
 pub mod table;
 
 /// Bounded standalone Graph chart authoring and inert PPT object emission.
-pub mod chart;
+/// The chart draft is public as [`crate::builder::Chart`].
+pub(crate) mod chart;
 
 /// PowerPoint 11 smart-tag authoring.
 pub mod smart_tags;
 
 // Re-export public types from core
 #[cfg(feature = "encryption")]
-pub use crate::encryption::EncryptionProfile;
+pub use crate::encryption::{EncryptionEntropy, EncryptionProfile};
 pub use crate::view_info::{
     Guide, GuideOrientation, Ratio, SlideViewInfo, SlideViewPreferences, ViewKind, ViewOrigin,
     ZoomViewInfo,
 };
-pub use core::{ShapeProperties, ShapeType, TextAlignment, WriteError, Writer};
+pub use core::{Builder, ShapeProperties, ShapeType, TextAlignment, WriteError};
+
+pub(crate) fn core_encode<W: std::io::Write + std::io::Seek>(
+    builder: &mut Builder,
+    writer: &mut W,
+) -> Result<(), WriteError> {
+    builder.encode(writer)
+}
 
 // Re-export commonly used types from submodules
 pub use crate::shapes::geometry::{GeometryRect, ShapePathType};
 pub use blip::{Id as PictureId, Kind as PictureKind, PictureData, Pictures};
-pub use chart::{Chart, ChartKind, ChartSeries};
 pub use comments::{CommentDateTime, SlideComment};
 pub use custom_shows::CustomShow;
 pub use escher::FreeformGeometry;

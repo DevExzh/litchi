@@ -18,6 +18,143 @@ const MAX_LABELS: usize = 65_536;
 const MAX_EXTENSIONS: usize = 65_536;
 const MAX_XML_DEPTH: usize = 256;
 const MAX_ATTRIBUTE_BYTES: usize = 1_048_576;
+const MAX_XML_NODES: usize = 65_536;
+const MAX_OUTPUT_BYTES: usize = 16 * 1024 * 1024;
+
+/// Resource policy for one sensitivity-label parse or serialization.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Limits {
+    /// Maximum bytes in the LabelInfo XML stream.
+    pub max_xml_bytes: usize,
+    /// Maximum typed labels.
+    pub max_labels: usize,
+    /// Maximum opaque extension entries.
+    pub max_extensions: usize,
+    /// Maximum nested extension XML depth.
+    pub max_xml_depth: usize,
+    /// Maximum XML parser events.
+    pub max_xml_nodes: usize,
+    /// Maximum decoded attribute or extension URI bytes.
+    pub max_attribute_bytes: usize,
+    /// Maximum serialized LabelInfo bytes.
+    pub max_output_bytes: usize,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self {
+            max_xml_bytes: MAX_LABEL_INFO_BYTES,
+            max_labels: MAX_LABELS,
+            max_extensions: MAX_EXTENSIONS,
+            max_xml_depth: MAX_XML_DEPTH,
+            max_xml_nodes: MAX_XML_NODES,
+            max_attribute_bytes: MAX_ATTRIBUTE_BYTES,
+            max_output_bytes: MAX_OUTPUT_BYTES,
+        }
+    }
+}
+
+impl Limits {
+    fn validate(self) -> Result<Self, Error> {
+        if self.max_xml_bytes == 0 || self.max_xml_bytes > MAX_LABEL_INFO_BYTES {
+            return Err(invalid_limit(
+                LimitKind::XmlBytes,
+                self.max_xml_bytes,
+                MAX_LABEL_INFO_BYTES,
+            ));
+        }
+        if self.max_labels == 0 || self.max_labels > MAX_LABELS {
+            return Err(invalid_limit(
+                LimitKind::Labels,
+                self.max_labels,
+                MAX_LABELS,
+            ));
+        }
+        if self.max_extensions == 0 || self.max_extensions > MAX_EXTENSIONS {
+            return Err(invalid_limit(
+                LimitKind::Extensions,
+                self.max_extensions,
+                MAX_EXTENSIONS,
+            ));
+        }
+        if self.max_xml_depth == 0 || self.max_xml_depth > MAX_XML_DEPTH {
+            return Err(invalid_limit(
+                LimitKind::XmlDepth,
+                self.max_xml_depth,
+                MAX_XML_DEPTH,
+            ));
+        }
+        if self.max_xml_nodes == 0 || self.max_xml_nodes > MAX_XML_NODES {
+            return Err(invalid_limit(
+                LimitKind::XmlNodes,
+                self.max_xml_nodes,
+                MAX_XML_NODES,
+            ));
+        }
+        if self.max_attribute_bytes == 0 || self.max_attribute_bytes > MAX_ATTRIBUTE_BYTES {
+            return Err(invalid_limit(
+                LimitKind::AttributeBytes,
+                self.max_attribute_bytes,
+                MAX_ATTRIBUTE_BYTES,
+            ));
+        }
+        if self.max_output_bytes == 0 || self.max_output_bytes > MAX_OUTPUT_BYTES {
+            return Err(invalid_limit(
+                LimitKind::OutputBytes,
+                self.max_output_bytes,
+                MAX_OUTPUT_BYTES,
+            ));
+        }
+        Ok(self)
+    }
+
+    /// Derive the label profile retained by a DataSpaces inspection.
+    pub(crate) fn from_spaces(limits: &crate::spaces::Limits) -> Self {
+        Self {
+            max_xml_bytes: limits.max_stream_bytes.min(MAX_LABEL_INFO_BYTES),
+            max_labels: limits.max_entries.min(MAX_LABELS),
+            max_extensions: limits.max_entries.min(MAX_EXTENSIONS),
+            max_xml_depth: limits.max_xml_depth.min(MAX_XML_DEPTH),
+            max_xml_nodes: limits.max_xml_nodes.min(MAX_XML_NODES),
+            max_attribute_bytes: limits.max_string_bytes.min(MAX_ATTRIBUTE_BYTES),
+            max_output_bytes: limits.max_output_bytes.min(MAX_OUTPUT_BYTES),
+        }
+    }
+}
+
+/// Resource dimensions governed by a sensitivity-label profile.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum LimitKind {
+    /// LabelInfo XML bytes.
+    XmlBytes,
+    /// Typed labels.
+    Labels,
+    /// Opaque extension entries.
+    Extensions,
+    /// Nested extension XML depth.
+    XmlDepth,
+    /// XML parser events.
+    XmlNodes,
+    /// Decoded attribute or extension URI bytes.
+    AttributeBytes,
+    /// Serialized LabelInfo bytes.
+    OutputBytes,
+}
+
+impl fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            Self::XmlBytes => "XML bytes",
+            Self::Labels => "labels",
+            Self::Extensions => "extensions",
+            Self::XmlDepth => "XML depth",
+            Self::XmlNodes => "XML nodes",
+            Self::AttributeBytes => "attribute bytes",
+            Self::OutputBytes => "output bytes",
+        };
+        formatter.write_str(name)
+    }
+}
 
 /// Canonical lowercase classification GUID used by the `siteId` attribute.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -141,7 +278,21 @@ pub struct List {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
+    InvalidLimit {
+        kind: LimitKind,
+        value: usize,
+        maximum: usize,
+    },
+    LimitExceeded {
+        kind: LimitKind,
+        observed: usize,
+        maximum: usize,
+    },
+    Allocation {
+        resource: &'static str,
+    },
     Invalid(String),
     Xml(String),
 }
@@ -149,6 +300,25 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::InvalidLimit {
+                kind,
+                value,
+                maximum,
+            } => write!(
+                formatter,
+                "invalid LabelInfo {kind} limit {value}; maximum is {maximum}"
+            ),
+            Self::LimitExceeded {
+                kind,
+                observed,
+                maximum,
+            } => write!(
+                formatter,
+                "LabelInfo {kind} limit exceeded: observed {observed}, maximum {maximum}"
+            ),
+            Self::Allocation { resource } => {
+                write!(formatter, "LabelInfo allocation failed for {resource}")
+            },
             Self::Invalid(message) => write!(formatter, "invalid LabelInfo: {message}"),
             Self::Xml(message) => write!(formatter, "invalid LabelInfo XML: {message}"),
         }
@@ -157,16 +327,46 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
+struct Budget {
+    limits: Limits,
+    nodes: usize,
+}
+
+impl Budget {
+    fn new(limits: Limits) -> Self {
+        Self { limits, nodes: 0 }
+    }
+
+    fn node(&mut self) -> Result<(), Error> {
+        self.nodes = self.nodes.checked_add(1).ok_or_else(|| {
+            limit_exceeded(LimitKind::XmlNodes, usize::MAX, self.limits.max_xml_nodes)
+        })?;
+        if self.nodes > self.limits.max_xml_nodes {
+            return Err(limit_exceeded(
+                LimitKind::XmlNodes,
+                self.nodes,
+                self.limits.max_xml_nodes,
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// Parse and validate a complete `LabelInfo` XML stream.
 ///
 /// # Errors
 ///
 /// Returns [`Error::Invalid`] when the stream violates the `LabelInfo`
-/// grammar or a safety limit, and [`Error::Xml`] when the underlying XML is
-/// malformed.
-pub fn parse(xml: &[u8]) -> Result<List, Error> {
-    if xml.len() > MAX_LABEL_INFO_BYTES {
-        return Err(invalid("stream exceeds the 16 MiB safety limit"));
+/// grammar, [`Error::LimitExceeded`] when the selected profile is crossed,
+/// and [`Error::Xml`] when the underlying XML is malformed.
+pub fn parse(xml: &[u8], limits: &Limits) -> Result<List, Error> {
+    let limits = limits.validate()?;
+    if xml.len() > limits.max_xml_bytes {
+        return Err(limit_exceeded(
+            LimitKind::XmlBytes,
+            xml.len(),
+            limits.max_xml_bytes,
+        ));
     }
     let mut reader = Reader::from_reader(xml);
     reader.config_mut().trim_text(false);
@@ -174,17 +374,18 @@ pub fn parse(xml: &[u8]) -> Result<List, Error> {
     // position zero.
     let origin = ReaderOrigin::of(xml);
     let mut buffer = Vec::new();
+    let mut budget = Budget::new(limits);
 
-    let declaration = read_event(&mut reader, &mut buffer)?;
+    let declaration = read_event(&mut reader, &mut buffer, &mut budget)?;
     if !matches!(declaration, Event::Decl(_)) || reader.buffer_position() == 0 {
         return Err(invalid("XML declaration must be the initial construct"));
     }
     buffer.clear();
-    let root = match read_event(&mut reader, &mut buffer)? {
+    let root = match read_event(&mut reader, &mut buffer, &mut budget)? {
         Event::Start(root) => root.into_owned(),
         Event::Empty(root) => {
-            validate_root(&root, reader.decoder())?;
-            ensure_only_trailing_misc(&mut reader, &mut buffer)?;
+            validate_root(&root, reader.decoder(), &limits)?;
+            ensure_only_trailing_misc(&mut reader, &mut buffer, &mut budget)?;
             return Ok(List::default());
         },
         Event::End(_)
@@ -197,7 +398,7 @@ pub fn parse(xml: &[u8]) -> Result<List, Error> {
         | Event::Eof
         | Event::GeneralRef(_) => return Err(invalid("labelList must be the one root element")),
     };
-    let prefixes = validate_root(&root, reader.decoder())?;
+    let prefixes = validate_root(&root, reader.decoder(), &limits)?;
     let mut result = List::default();
     let mut seen_sites = HashSet::new();
     let mut extension_list_seen = false;
@@ -207,7 +408,7 @@ pub fn parse(xml: &[u8]) -> Result<List, Error> {
         let event_start = origin
             .offset(reader.buffer_position())
             .ok_or_else(|| invalid("XML position overflows usize"))?;
-        match read_event(&mut reader, &mut buffer)? {
+        match read_event(&mut reader, &mut buffer, &mut budget)? {
             Event::Empty(element) if has_name(&element, &prefixes, b"label") => {
                 if extension_list_seen {
                     return Err(invalid("label follows extLst"));
@@ -215,31 +416,45 @@ pub fn parse(xml: &[u8]) -> Result<List, Error> {
                 push_label(
                     &mut result,
                     &mut seen_sites,
-                    parse_label(&element, reader.decoder(), &prefixes)?,
+                    parse_label(&element, reader.decoder(), &prefixes, &limits)?,
+                    &limits,
                 )?;
             },
             Event::Start(element) if has_name(&element, &prefixes, b"label") => {
                 if extension_list_seen {
                     return Err(invalid("label follows extLst"));
                 }
-                let label = parse_label(&element, reader.decoder(), &prefixes)?;
-                expect_empty_element_body(&mut reader, &mut buffer, &prefixes, b"label")?;
-                push_label(&mut result, &mut seen_sites, label)?;
+                let label = parse_label(&element, reader.decoder(), &prefixes, &limits)?;
+                expect_empty_element_body(
+                    &mut reader,
+                    &mut buffer,
+                    &prefixes,
+                    b"label",
+                    &mut budget,
+                )?;
+                push_label(&mut result, &mut seen_sites, label, &limits)?;
             },
             Event::Start(element) if has_name(&element, &prefixes, b"extLst") => {
                 if extension_list_seen {
                     return Err(invalid("labelList contains multiple extLst elements"));
                 }
-                validate_inherited_namespace(&element, &prefixes, reader.decoder())?;
+                validate_inherited_namespace(&element, &prefixes, reader.decoder(), &limits)?;
                 reject_non_namespace_attributes(&element)?;
                 extension_list_seen = true;
-                parse_extension_list(&mut reader, &mut buffer, xml, &prefixes, &mut result)?;
+                parse_extension_list(
+                    &mut reader,
+                    &mut buffer,
+                    xml,
+                    &prefixes,
+                    &mut result,
+                    &mut budget,
+                )?;
             },
             Event::Empty(element) if has_name(&element, &prefixes, b"extLst") => {
                 if extension_list_seen {
                     return Err(invalid("labelList contains multiple extLst elements"));
                 }
-                validate_inherited_namespace(&element, &prefixes, reader.decoder())?;
+                validate_inherited_namespace(&element, &prefixes, reader.decoder(), &limits)?;
                 reject_non_namespace_attributes(&element)?;
                 extension_list_seen = true;
             },
@@ -263,8 +478,8 @@ pub fn parse(xml: &[u8]) -> Result<List, Error> {
             },
         }
     }
-    ensure_only_trailing_misc(&mut reader, &mut buffer)?;
-    validate_list(&result, false)?;
+    ensure_only_trailing_misc(&mut reader, &mut buffer, &mut budget)?;
+    validate_list(&result, false, &limits)?;
     Ok(result)
 }
 
@@ -273,58 +488,69 @@ pub fn parse(xml: &[u8]) -> Result<List, Error> {
 ///
 /// # Errors
 ///
-/// Returns [`Error::Invalid`] when the list violates validation rules or the
-/// serialized stream exceeds the 16 MiB safety limit.
-pub fn write(value: &List) -> Result<Vec<u8>, Error> {
-    validate_list(value, true)?;
+/// Returns [`Error::Invalid`] when the list violates validation rules or
+/// [`Error::LimitExceeded`] when the serialized stream exceeds the caller's
+/// output limit.
+pub fn write(value: &List, limits: &Limits) -> Result<Vec<u8>, Error> {
+    let limits = limits.validate()?;
+    validate_list(value, true, &limits)?;
     let mut output = Vec::new();
-    output.extend_from_slice(b"<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>");
-    output.extend_from_slice(b"<clbl:labelList xmlns:clbl=\"");
-    output.extend_from_slice(NAMESPACE.as_bytes());
-    output.extend_from_slice(b"\" xmlns=\"");
-    output.extend_from_slice(NAMESPACE.as_bytes());
-    output.extend_from_slice(b"\"");
+    append_output(
+        &mut output,
+        b"<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>",
+        &limits,
+    )?;
+    append_output(&mut output, b"<clbl:labelList xmlns:clbl=\"", &limits)?;
+    append_output(&mut output, NAMESPACE.as_bytes(), &limits)?;
+    append_output(&mut output, b"\" xmlns=\"", &limits)?;
+    append_output(&mut output, NAMESPACE.as_bytes(), &limits)?;
+    append_output(&mut output, b"\"", &limits)?;
     let mut declared_prefixes = HashSet::new();
     declared_prefixes.insert(b"clbl".to_vec());
     for extension in &value.extensions {
         let prefix = extension_prefix(&extension.xml)?;
         if !prefix.is_empty() && declared_prefixes.insert(prefix.to_vec()) {
-            output.extend_from_slice(b" xmlns:");
-            output.extend_from_slice(prefix);
-            output.extend_from_slice(b"=\"");
-            output.extend_from_slice(NAMESPACE.as_bytes());
-            output.extend_from_slice(b"\"");
+            append_output(&mut output, b" xmlns:", &limits)?;
+            append_output(&mut output, prefix, &limits)?;
+            append_output(&mut output, b"=\"", &limits)?;
+            append_output(&mut output, NAMESPACE.as_bytes(), &limits)?;
+            append_output(&mut output, b"\"", &limits)?;
         }
     }
-    output.extend_from_slice(b">");
+    append_output(&mut output, b">", &limits)?;
     for label in &value.labels {
-        output.extend_from_slice(b"<clbl:label id=\"");
-        push_escaped_attribute(&mut output, &label.id);
-        output.extend_from_slice(b"\" enabled=\"");
-        output.push(if label.enabled { b'1' } else { b'0' });
-        output.extend_from_slice(b"\" method=\"");
-        push_escaped_attribute(&mut output, label.method.as_str());
-        output.extend_from_slice(b"\" siteId=\"");
-        output.extend_from_slice(label.site_id.to_string().as_bytes());
+        append_output(&mut output, b"<clbl:label id=\"", &limits)?;
+        push_escaped_attribute(&mut output, &label.id, &limits)?;
+        append_output(&mut output, b"\" enabled=\"", &limits)?;
+        append_output(
+            &mut output,
+            &[if label.enabled { b'1' } else { b'0' }],
+            &limits,
+        )?;
+        append_output(&mut output, b"\" method=\"", &limits)?;
+        push_escaped_attribute(&mut output, label.method.as_str(), &limits)?;
+        append_output(&mut output, b"\" siteId=\"", &limits)?;
+        append_output(&mut output, label.site_id.to_string().as_bytes(), &limits)?;
         if let Some(bits) = label.content_bits {
-            output.extend_from_slice(b"\" contentBits=\"");
-            output.extend_from_slice(bits.bits().to_string().as_bytes());
+            append_output(&mut output, b"\" contentBits=\"", &limits)?;
+            append_output(&mut output, bits.bits().to_string().as_bytes(), &limits)?;
         }
-        output.extend_from_slice(b"\" removed=\"");
-        output.push(if label.removed { b'1' } else { b'0' });
-        output.extend_from_slice(b"\"/>");
+        append_output(&mut output, b"\" removed=\"", &limits)?;
+        append_output(
+            &mut output,
+            &[if label.removed { b'1' } else { b'0' }],
+            &limits,
+        )?;
+        append_output(&mut output, b"\"/>", &limits)?;
     }
     if !value.extensions.is_empty() {
-        output.extend_from_slice(b"<clbl:extLst>");
+        append_output(&mut output, b"<clbl:extLst>", &limits)?;
         for extension in &value.extensions {
-            output.extend_from_slice(&extension.xml);
+            append_output(&mut output, &extension.xml, &limits)?;
         }
-        output.extend_from_slice(b"</clbl:extLst>");
+        append_output(&mut output, b"</clbl:extLst>", &limits)?;
     }
-    output.extend_from_slice(b"</clbl:labelList>");
-    if output.len() > MAX_LABEL_INFO_BYTES {
-        return Err(invalid("serialized stream exceeds the 16 MiB safety limit"));
-    }
+    append_output(&mut output, b"</clbl:labelList>", &limits)?;
     Ok(output)
 }
 
@@ -334,6 +560,7 @@ fn parse_extension_list(
     xml: &[u8],
     prefixes: &HashSet<Vec<u8>>,
     result: &mut List,
+    budget: &mut Budget,
 ) -> Result<(), Error> {
     // `xml` is the reader's input; extension bytes are sliced from it.
     let origin = ReaderOrigin::of(xml);
@@ -342,20 +569,37 @@ fn parse_extension_list(
         let start = origin
             .offset(reader.buffer_position())
             .ok_or_else(|| invalid("XML position overflows usize"))?;
-        match read_event(reader, buffer)? {
+        match read_event(reader, buffer, budget)? {
             Event::Start(element) if has_name(&element, prefixes, b"ext") => {
-                validate_inherited_namespace(&element, prefixes, reader.decoder())?;
+                validate_inherited_namespace(&element, prefixes, reader.decoder(), &budget.limits)?;
                 let uri = required_attribute(&element, b"uri", reader.decoder())?;
-                if uri.is_empty() {
-                    return Err(invalid("extension URI is empty"));
+                if uri.is_empty() || uri.len() > budget.limits.max_attribute_bytes {
+                    if uri.is_empty() {
+                        return Err(invalid("extension URI is empty"));
+                    }
+                    return Err(limit_exceeded(
+                        LimitKind::AttributeBytes,
+                        uri.len(),
+                        budget.limits.max_attribute_bytes,
+                    ));
                 }
-                if result.extensions.len() >= MAX_EXTENSIONS {
-                    return Err(invalid("too many extension entries"));
+                if result.extensions.len() >= budget.limits.max_extensions {
+                    return Err(limit_exceeded(
+                        LimitKind::Extensions,
+                        result.extensions.len().saturating_add(1),
+                        budget.limits.max_extensions,
+                    ));
                 }
-                consume_extension(reader, buffer, prefixes)?;
+                consume_extension(reader, buffer, prefixes, budget)?;
                 let end = origin
                     .offset(reader.buffer_position())
                     .ok_or_else(|| invalid("XML position overflows usize"))?;
+                result
+                    .extensions
+                    .try_reserve(1)
+                    .map_err(|_error| Error::Allocation {
+                        resource: "extensions",
+                    })?;
                 result.extensions.push(Extension {
                     uri,
                     xml: xml
@@ -391,21 +635,26 @@ fn consume_extension(
     reader: &mut Reader<&[u8]>,
     buffer: &mut Vec<u8>,
     prefixes: &HashSet<Vec<u8>>,
+    budget: &mut Budget,
 ) -> Result<(), Error> {
     let mut depth = 1usize;
     let mut direct_children = 0usize;
     loop {
         buffer.clear();
-        match read_event(reader, buffer)? {
+        match read_event(reader, buffer, budget)? {
             Event::Start(_) => {
                 if depth == 1 {
                     direct_children += 1;
                 }
-                depth = depth
-                    .checked_add(1)
-                    .ok_or_else(|| invalid("XML depth overflow"))?;
-                if depth > MAX_XML_DEPTH {
-                    return Err(invalid("extension XML is too deeply nested"));
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    limit_exceeded(LimitKind::XmlDepth, usize::MAX, budget.limits.max_xml_depth)
+                })?;
+                if depth > budget.limits.max_xml_depth {
+                    return Err(limit_exceeded(
+                        LimitKind::XmlDepth,
+                        depth,
+                        budget.limits.max_xml_depth,
+                    ));
                 }
             },
             Event::Empty(_) => {
@@ -443,8 +692,9 @@ fn parse_label(
     element: &BytesStart<'_>,
     decoder: quick_xml::encoding::Decoder,
     prefixes: &HashSet<Vec<u8>>,
+    limits: &Limits,
 ) -> Result<Label, Error> {
-    validate_inherited_namespace(element, prefixes, decoder)?;
+    validate_inherited_namespace(element, prefixes, decoder, limits)?;
     let mut id = None;
     let mut enabled = None;
     let mut method = None;
@@ -460,8 +710,12 @@ fn parse_label(
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
             .map_err(|error| xml_error(error.to_string()))?
             .into_owned();
-        if value.len() > MAX_ATTRIBUTE_BYTES {
-            return Err(invalid("label attribute exceeds the 1 MiB safety limit"));
+        if value.len() > limits.max_attribute_bytes {
+            return Err(limit_exceeded(
+                LimitKind::AttributeBytes,
+                value.len(),
+                limits.max_attribute_bytes,
+            ));
         }
         let slot_was_set = match attribute.key.as_ref() {
             b"id" => id.replace(value).is_some(),
@@ -495,25 +749,47 @@ fn parse_label(
     })
 }
 
-fn validate_list(value: &List, writing: bool) -> Result<(), Error> {
-    if value.labels.len() > MAX_LABELS {
-        return Err(invalid("too many labels"));
+fn validate_list(value: &List, writing: bool, limits: &Limits) -> Result<(), Error> {
+    if value.labels.len() > limits.max_labels {
+        return Err(limit_exceeded(
+            LimitKind::Labels,
+            value.labels.len(),
+            limits.max_labels,
+        ));
     }
-    if value.extensions.len() > MAX_EXTENSIONS {
-        return Err(invalid("too many extensions"));
+    if value.extensions.len() > limits.max_extensions {
+        return Err(limit_exceeded(
+            LimitKind::Extensions,
+            value.extensions.len(),
+            limits.max_extensions,
+        ));
     }
     let mut sites = HashSet::with_capacity(value.labels.len());
     for label in &value.labels {
-        validate_label(label, writing)?;
+        validate_label(label, writing, limits)?;
         if !sites.insert(label.site_id) {
             return Err(invalid("multiple labels use the same siteId"));
         }
     }
     for extension in &value.extensions {
-        if extension.uri.is_empty() || extension.uri.len() > MAX_ATTRIBUTE_BYTES {
-            return Err(invalid("extension URI is empty or too long"));
+        if extension.xml.len() > limits.max_xml_bytes {
+            return Err(limit_exceeded(
+                LimitKind::XmlBytes,
+                extension.xml.len(),
+                limits.max_xml_bytes,
+            ));
         }
-        let parsed = parse_extension_fragment(&extension.xml)?;
+        if extension.uri.is_empty() || extension.uri.len() > limits.max_attribute_bytes {
+            if extension.uri.is_empty() {
+                return Err(invalid("extension URI is empty or too long"));
+            }
+            return Err(limit_exceeded(
+                LimitKind::AttributeBytes,
+                extension.uri.len(),
+                limits.max_attribute_bytes,
+            ));
+        }
+        let parsed = parse_extension_fragment(&extension.xml, limits)?;
         if parsed != extension.uri {
             return Err(invalid("extension URI disagrees with its XML fragment"));
         }
@@ -521,15 +797,26 @@ fn validate_list(value: &List, writing: bool) -> Result<(), Error> {
     Ok(())
 }
 
-fn validate_label(label: &Label, writing: bool) -> Result<(), Error> {
-    if label.id.is_empty() || label.id.len() > MAX_ATTRIBUTE_BYTES {
+fn validate_label(label: &Label, writing: bool, limits: &Limits) -> Result<(), Error> {
+    if label.id.is_empty() {
         return Err(invalid("label id is empty or too long"));
+    }
+    if label.id.len() > limits.max_attribute_bytes {
+        return Err(limit_exceeded(
+            LimitKind::AttributeBytes,
+            label.id.len(),
+            limits.max_attribute_bytes,
+        ));
     }
     if label.id.bytes().any(|byte| byte.is_ascii_uppercase()) {
         return Err(invalid("label id is not lowercase"));
     }
-    if label.method.as_str().len() > MAX_ATTRIBUTE_BYTES {
-        return Err(invalid("label method is too long"));
+    if label.method.as_str().len() > limits.max_attribute_bytes {
+        return Err(limit_exceeded(
+            LimitKind::AttributeBytes,
+            label.method.as_str().len(),
+            limits.max_attribute_bytes,
+        ));
     }
     if label.removed {
         if !matches!(label.method, Method::Removed) {
@@ -551,11 +838,19 @@ fn validate_label(label: &Label, writing: bool) -> Result<(), Error> {
     Ok(())
 }
 
-fn parse_extension_fragment(xml: &[u8]) -> Result<String, Error> {
+fn parse_extension_fragment(xml: &[u8], limits: &Limits) -> Result<String, Error> {
+    if xml.len() > limits.max_xml_bytes {
+        return Err(limit_exceeded(
+            LimitKind::XmlBytes,
+            xml.len(),
+            limits.max_xml_bytes,
+        ));
+    }
     let mut reader = Reader::from_reader(xml);
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
-    match read_event(&mut reader, &mut buffer)? {
+    let mut budget = Budget::new(*limits);
+    match read_event(&mut reader, &mut buffer, &mut budget)? {
         Event::Start(element) if local_name(element.name().as_ref()) == b"ext" => {
             let uri = required_attribute(&element, b"uri", reader.decoder())?;
             let prefix = element
@@ -565,8 +860,8 @@ fn parse_extension_fragment(xml: &[u8]) -> Result<String, Error> {
                 .position(|byte| *byte == b':')
                 .map_or_else(Vec::new, |index| element.name().as_ref()[..index].to_vec());
             let prefixes = HashSet::from([prefix]);
-            consume_extension(&mut reader, &mut buffer, &prefixes)?;
-            ensure_only_trailing_misc(&mut reader, &mut buffer)?;
+            consume_extension(&mut reader, &mut buffer, &prefixes, &mut budget)?;
+            ensure_only_trailing_misc(&mut reader, &mut buffer, &mut budget)?;
             Ok(uri)
         },
         Event::Start(_)
@@ -604,6 +899,7 @@ fn extension_prefix(xml: &[u8]) -> Result<&[u8], Error> {
 fn validate_root(
     root: &BytesStart<'_>,
     decoder: quick_xml::encoding::Decoder,
+    limits: &Limits,
 ) -> Result<HashSet<Vec<u8>>, Error> {
     let name = root.name();
     let bytes = name.as_ref();
@@ -635,6 +931,13 @@ fn validate_root(
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
             .map_err(|error| xml_error(error.to_string()))?;
+        if value.len() > limits.max_attribute_bytes {
+            return Err(limit_exceeded(
+                LimitKind::AttributeBytes,
+                value.len(),
+                limits.max_attribute_bytes,
+            ));
+        }
         if value == NAMESPACE {
             prefixes.insert(
                 attribute
@@ -656,6 +959,7 @@ fn validate_inherited_namespace(
     element: &BytesStart<'_>,
     prefixes: &HashSet<Vec<u8>>,
     decoder: quick_xml::encoding::Decoder,
+    limits: &Limits,
 ) -> Result<(), Error> {
     let name = element.name();
     let prefix = name
@@ -675,20 +979,42 @@ fn validate_inherited_namespace(
         key.extend_from_slice(prefix);
         key
     };
-    if optional_attribute(element, &key, decoder)?.is_some_and(|namespace| namespace != NAMESPACE) {
-        return Err(invalid("element rebinds the label namespace prefix"));
+    if let Some(namespace) = optional_attribute(element, &key, decoder)? {
+        if namespace.len() > limits.max_attribute_bytes {
+            return Err(limit_exceeded(
+                LimitKind::AttributeBytes,
+                namespace.len(),
+                limits.max_attribute_bytes,
+            ));
+        }
+        if namespace != NAMESPACE {
+            return Err(invalid("element rebinds the label namespace prefix"));
+        }
     }
     Ok(())
 }
 
-fn push_label(result: &mut List, sites: &mut HashSet<Guid>, label: Label) -> Result<(), Error> {
-    if result.labels.len() >= MAX_LABELS {
-        return Err(invalid("too many labels"));
+fn push_label(
+    result: &mut List,
+    sites: &mut HashSet<Guid>,
+    label: Label,
+    limits: &Limits,
+) -> Result<(), Error> {
+    if result.labels.len() >= limits.max_labels {
+        return Err(limit_exceeded(
+            LimitKind::Labels,
+            result.labels.len().saturating_add(1),
+            limits.max_labels,
+        ));
     }
-    validate_label(&label, false)?;
+    validate_label(&label, false, limits)?;
     if !sites.insert(label.site_id) {
         return Err(invalid("multiple labels use the same siteId"));
     }
+    result
+        .labels
+        .try_reserve(1)
+        .map_err(|_error| Error::Allocation { resource: "labels" })?;
     result.labels.push(label);
     Ok(())
 }
@@ -698,10 +1024,11 @@ fn expect_empty_element_body(
     buffer: &mut Vec<u8>,
     prefixes: &HashSet<Vec<u8>>,
     local: &[u8],
+    budget: &mut Budget,
 ) -> Result<(), Error> {
     loop {
         buffer.clear();
-        match read_event(reader, buffer)? {
+        match read_event(reader, buffer, budget)? {
             Event::End(end) if has_end_name(&end, prefixes, local) => return Ok(()),
             Event::Text(text) if whitespace(text.as_ref()) => {},
             Event::Comment(_) | Event::PI(_) => {},
@@ -723,10 +1050,11 @@ fn expect_empty_element_body(
 fn ensure_only_trailing_misc(
     reader: &mut Reader<&[u8]>,
     buffer: &mut Vec<u8>,
+    budget: &mut Budget,
 ) -> Result<(), Error> {
     loop {
         buffer.clear();
-        match read_event(reader, buffer)? {
+        match read_event(reader, buffer, budget)? {
             Event::Eof => return Ok(()),
             Event::Text(text) if whitespace(text.as_ref()) => {},
             Event::Comment(_) | Event::PI(_) => {},
@@ -834,10 +1162,18 @@ fn whitespace(bytes: &[u8]) -> bool {
     bytes.iter().all(u8::is_ascii_whitespace)
 }
 
-fn read_event<'a>(reader: &mut Reader<&[u8]>, buffer: &'a mut Vec<u8>) -> Result<Event<'a>, Error> {
-    reader
+fn read_event<'a>(
+    reader: &mut Reader<&[u8]>,
+    buffer: &'a mut Vec<u8>,
+    budget: &mut Budget,
+) -> Result<Event<'a>, Error> {
+    let event = reader
         .read_event_into(buffer)
-        .map_err(|error| xml_error(error.to_string()))
+        .map_err(|error| xml_error(error.to_string()))?;
+    if !matches!(&event, Event::Eof) {
+        budget.node()?;
+    }
+    Ok(event)
 }
 
 fn event_kind(event: &Event<'_>) -> &'static str {
@@ -856,17 +1192,52 @@ fn event_kind(event: &Event<'_>) -> &'static str {
     }
 }
 
-fn push_escaped_attribute(output: &mut Vec<u8>, value: &str) {
+fn push_escaped_attribute(output: &mut Vec<u8>, value: &str, limits: &Limits) -> Result<(), Error> {
     for byte in value.bytes() {
         match byte {
-            b'&' => output.extend_from_slice(b"&amp;"),
-            b'<' => output.extend_from_slice(b"&lt;"),
-            b'"' => output.extend_from_slice(b"&quot;"),
-            b'\t' => output.extend_from_slice(b"&#x9;"),
-            b'\n' => output.extend_from_slice(b"&#xA;"),
-            b'\r' => output.extend_from_slice(b"&#xD;"),
-            _ => output.push(byte),
+            b'&' => append_output(output, b"&amp;", limits)?,
+            b'<' => append_output(output, b"&lt;", limits)?,
+            b'"' => append_output(output, b"&quot;", limits)?,
+            b'\t' => append_output(output, b"&#x9;", limits)?,
+            b'\n' => append_output(output, b"&#xA;", limits)?,
+            b'\r' => append_output(output, b"&#xD;", limits)?,
+            _ => append_output(output, &[byte], limits)?,
         }
+    }
+    Ok(())
+}
+
+fn append_output(output: &mut Vec<u8>, bytes: &[u8], limits: &Limits) -> Result<(), Error> {
+    let end = output.len().checked_add(bytes.len()).ok_or_else(|| {
+        limit_exceeded(LimitKind::OutputBytes, usize::MAX, limits.max_output_bytes)
+    })?;
+    if end > limits.max_output_bytes {
+        return Err(limit_exceeded(
+            LimitKind::OutputBytes,
+            end,
+            limits.max_output_bytes,
+        ));
+    }
+    output
+        .try_reserve(bytes.len())
+        .map_err(|_error| Error::Allocation { resource: "output" })?;
+    output.extend_from_slice(bytes);
+    Ok(())
+}
+
+fn invalid_limit(kind: LimitKind, value: usize, maximum: usize) -> Error {
+    Error::InvalidLimit {
+        kind,
+        value,
+        maximum,
+    }
+}
+
+fn limit_exceeded(kind: LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::LimitExceeded {
+        kind,
+        observed,
+        maximum,
     }
 }
 
@@ -887,6 +1258,14 @@ mod tests {
     use super::*;
 
     const SITE: &str = "12345678-1234-5678-90ab-1234567890ab";
+
+    fn parse(xml: &[u8]) -> Result<List, Error> {
+        super::parse(xml, &Limits::default())
+    }
+
+    fn write(value: &List) -> Result<Vec<u8>, Error> {
+        super::write(value, &Limits::default())
+    }
 
     fn active_label() -> Label {
         Label {
@@ -1021,5 +1400,84 @@ mod tests {
             })
             .is_err()
         );
+    }
+
+    #[test]
+    fn caller_limits_cover_exact_size_count_depth_and_output() {
+        let invalid_profile = Limits {
+            max_output_bytes: 0,
+            ..Limits::default()
+        };
+        assert!(matches!(
+            super::write(&List::default(), &invalid_profile),
+            Err(Error::InvalidLimit {
+                kind: LimitKind::OutputBytes,
+                ..
+            })
+        ));
+
+        let value = List {
+            labels: vec![active_label()],
+            extensions: Vec::new(),
+        };
+        let xml = write(&value).unwrap();
+        let exact = Limits {
+            max_xml_bytes: xml.len(),
+            max_output_bytes: xml.len(),
+            ..Limits::default()
+        };
+        assert_eq!(super::parse(&xml, &exact).unwrap(), value);
+        assert_eq!(super::write(&value, &exact).unwrap(), xml);
+
+        let too_small_output = Limits {
+            max_output_bytes: xml.len() - 1,
+            ..Limits::default()
+        };
+        assert!(matches!(
+            super::write(&value, &too_small_output),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::OutputBytes,
+                ..
+            })
+        ));
+
+        let too_few_labels = Limits {
+            max_labels: 1,
+            ..Limits::default()
+        };
+        let two = List {
+            labels: vec![
+                active_label(),
+                Label {
+                    id: "bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee".to_string(),
+                    site_id: "87654321-4321-8765-ba09-ba9876543210".parse().unwrap(),
+                    ..active_label()
+                },
+            ],
+            extensions: Vec::new(),
+        };
+        let two_xml = super::write(&two, &Limits::default()).unwrap();
+        assert!(matches!(
+            super::parse(&two_xml, &too_few_labels),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::Labels,
+                ..
+            })
+        ));
+
+        let nested = format!(
+            "<?xml version=\"1.0\"?><x:labelList xmlns:x=\"{NAMESPACE}\"><x:extLst><x:ext uri=\"urn:test\"><x:a><x:b/></x:a></x:ext></x:extLst></x:labelList>"
+        );
+        let shallow = Limits {
+            max_xml_depth: 1,
+            ..Limits::default()
+        };
+        assert!(matches!(
+            super::parse(nested.as_bytes(), &shallow),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::XmlDepth,
+                ..
+            })
+        ));
     }
 }

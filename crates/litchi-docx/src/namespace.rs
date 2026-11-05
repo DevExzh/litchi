@@ -409,7 +409,10 @@ pub(crate) fn scan_word_element_ranges(
         &[],
         targets,
         false,
-        |target, start, length, _| emit(target, start, length),
+        |_| false,
+        |target, start, length, _| {
+            emit(target, start, length).map(|()| std::ops::ControlFlow::Continue(()))
+        },
     )
 }
 
@@ -424,9 +427,35 @@ pub(crate) fn scan_word_element_ranges_with_context(
     xml_bytes: &[u8],
     inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
     targets: &[&[u8]],
-    emit: impl FnMut(usize, u32, u32, NamespaceBindings) -> Result<()>,
+    mut emit: impl FnMut(usize, u32, u32, NamespaceBindings) -> Result<()>,
 ) -> Result<()> {
-    scan_word_element_ranges_impl(xml_bytes, inherited_namespaces, targets, true, emit)
+    scan_word_element_ranges_impl(
+        xml_bytes,
+        inherited_namespaces,
+        targets,
+        true,
+        |_| false,
+        |target, start, length, namespaces| {
+            emit(target, start, length, namespaces).map(|()| std::ops::ControlFlow::Continue(()))
+        },
+    )
+}
+
+/// [`scan_word_element_ranges_with_context`] for a positional lookup: a
+/// selected element for which `skip` returns `true` is passed over without
+/// resolving its content or reporting it, and the scan stops after the
+/// element for which `emit` returns [`std::ops::ControlFlow::Break`]. Skipped
+/// content and the rest of the fragment are not validated, so callers use it
+/// only on fragments that a complete scan already admitted (a table or row
+/// slice of a loaded document part).
+pub(crate) fn scan_word_element_ranges_with_context_until(
+    xml_bytes: &[u8],
+    inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
+    targets: &[&[u8]],
+    skip: impl FnMut(usize) -> bool,
+    emit: impl FnMut(usize, u32, u32, NamespaceBindings) -> Result<std::ops::ControlFlow<()>>,
+) -> Result<()> {
+    scan_word_element_ranges_impl(xml_bytes, inherited_namespaces, targets, true, skip, emit)
 }
 
 fn scan_word_element_ranges_impl(
@@ -434,7 +463,8 @@ fn scan_word_element_ranges_impl(
     inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
     targets: &[&[u8]],
     capture_namespaces: bool,
-    mut emit: impl FnMut(usize, u32, u32, NamespaceBindings) -> Result<()>,
+    mut skip: impl FnMut(usize) -> bool,
+    mut emit: impl FnMut(usize, u32, u32, NamespaceBindings) -> Result<std::ops::ControlFlow<()>>,
 ) -> Result<()> {
     enum ScanEvent {
         Start(usize, NamespaceBindings),
@@ -527,14 +557,26 @@ fn scan_word_element_ranges_impl(
                         .iter()
                         .position(|target| element.local_name().as_ref() == *target)
                     {
-                        ScanEvent::Start(
-                            target,
-                            if capture_namespaces {
-                                namespace_capture.capture(reader.resolver())?
-                            } else {
-                                Arc::clone(&EMPTY_NAMESPACE_BINDINGS)
-                            },
-                        )
+                        if skip(target) {
+                            // Pass over the whole element: its end tag closes
+                            // the depth its start opened.
+                            reader
+                                .read_to_end(element.name())
+                                .map_err(|error| Error::Xml(error.to_string()))?;
+                            total_depth = total_depth.checked_sub(1).ok_or_else(|| {
+                                Error::InvalidFormat("invalid Word XML nesting".to_string())
+                            })?;
+                            ScanEvent::Other
+                        } else {
+                            ScanEvent::Start(
+                                target,
+                                if capture_namespaces {
+                                    namespace_capture.capture(reader.resolver())?
+                                } else {
+                                    Arc::clone(&EMPTY_NAMESPACE_BINDINGS)
+                                },
+                            )
+                        }
                     } else {
                         ScanEvent::Other
                     }
@@ -547,14 +589,18 @@ fn scan_word_element_ranges_impl(
                         .iter()
                         .position(|target| element.local_name().as_ref() == *target)
                     {
-                        ScanEvent::Empty(
-                            target,
-                            if capture_namespaces {
-                                namespace_capture.capture(reader.resolver())?
-                            } else {
-                                Arc::clone(&EMPTY_NAMESPACE_BINDINGS)
-                            },
-                        )
+                        if skip(target) {
+                            ScanEvent::Other
+                        } else {
+                            ScanEvent::Empty(
+                                target,
+                                if capture_namespaces {
+                                    namespace_capture.capture(reader.resolver())?
+                                } else {
+                                    Arc::clone(&EMPTY_NAMESPACE_BINDINGS)
+                                },
+                            )
+                        }
                     } else {
                         ScanEvent::Other
                     }
@@ -604,14 +650,18 @@ fn scan_word_element_ranges_impl(
                     .map_err(|_source_error| {
                         Error::InvalidFormat("Word element range exceeds u32".into())
                     })?;
-                emit(
+                if emit(
                     target,
                     u32::try_from(event_start).map_err(|_source_error| {
                         Error::InvalidFormat("Word element offset exceeds u32".into())
                     })?,
                     length,
                     namespaces,
-                )?;
+                )?
+                .is_break()
+                {
+                    return Ok(());
+                }
             },
             ScanEvent::End => {
                 let Some((_, _, depth, _)) = capture.as_mut() else {
@@ -638,7 +688,9 @@ fn scan_word_element_ranges_impl(
                         .map_err(|_source_error| {
                             Error::InvalidFormat("Word element range exceeds u32".into())
                         })?;
-                    emit(target, start, length, namespaces)?;
+                    if emit(target, start, length, namespaces)?.is_break() {
+                        return Ok(());
+                    }
                 }
             },
             ScanEvent::Eof if capture.is_some() => {

@@ -6,14 +6,13 @@
 //! reuses [`litchi_drawingml`] without copying its vocabulary.
 
 mod codec;
+pub mod edit;
 mod model;
 pub mod source;
 mod svg;
 pub mod worksheet_source;
 
-pub use super::chart::Anchor;
 pub use codec::parse;
-pub(crate) use codec::parse_with_limits;
 pub use model::{Chart, ContentPartSelector, Drawing, Object, Picture, Unknown, UnknownKind, text};
 pub use source::{
     ByteRange, ContentPartProfile, ContentPartSource, DrawingDialect, ElementRange, PictureSource,

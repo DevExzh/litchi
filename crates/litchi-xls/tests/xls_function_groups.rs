@@ -2,12 +2,12 @@ use std::fs::File;
 use std::io::Cursor;
 use std::path::PathBuf;
 
-use litchi_xls::writer::{FunctionGroupOptions, Writer};
-use litchi_xls::{BuiltInFunctionCategories, Workbook};
+use litchi_xls::writer::{Builder, FunctionGroupOptions};
+use litchi_xls::{BuiltInFunctionCategories, raw::Reader};
 
 #[test]
 fn custom_function_groups_round_trip_across_record_generations() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_worksheet("Functions").unwrap();
     let custom_categories = (0..20)
         .map(|index| {
@@ -26,8 +26,8 @@ fn custom_function_groups_round_trip_across_record_generations() {
         .unwrap();
 
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
-    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let groups = workbook.function_groups().unwrap();
     assert_eq!(groups.built_in(), BuiltInFunctionCategories::Sixteen);
     assert_eq!(groups.custom_categories(), custom_categories);
@@ -40,7 +40,7 @@ fn custom_function_groups_round_trip_across_record_generations() {
 fn reads_poi_and_libreoffice_builtin_function_groups() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let poi = root.join("test-data/poi/test-data/spreadsheet/externalFunctionExample.xls");
-    let workbook = Workbook::new(File::open(poi).unwrap()).unwrap();
+    let workbook = Reader::new(File::open(poi).unwrap()).unwrap();
     assert_eq!(
         workbook.function_groups().unwrap().built_in(),
         BuiltInFunctionCategories::Sixteen,
@@ -48,7 +48,7 @@ fn reads_poi_and_libreoffice_builtin_function_groups() {
 
     let libreoffice =
         root.join("test-data/libreoffice-core/sc/qa/extras/testdocuments/tdf78897.xls");
-    let workbook = Workbook::new(File::open(libreoffice).unwrap()).unwrap();
+    let workbook = Reader::new(File::open(libreoffice).unwrap()).unwrap();
     assert_eq!(
         workbook.function_groups().unwrap().built_in(),
         BuiltInFunctionCategories::Fourteen,
@@ -59,7 +59,7 @@ fn reads_poi_and_libreoffice_builtin_function_groups() {
 fn reads_established_producer_compatibility_count_seventeen() {
     let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/ole/xls/FormulaEvalTestData.xls");
-    let workbook = Workbook::new(File::open(fixture).unwrap()).unwrap();
+    let workbook = Reader::new(File::open(fixture).unwrap()).unwrap();
     assert_eq!(
         workbook.function_groups().unwrap().built_in(),
         BuiltInFunctionCategories::SeventeenCompatibility,
@@ -68,7 +68,7 @@ fn reads_established_producer_compatibility_count_seventeen() {
 
 #[test]
 fn writer_rejects_invalid_function_group_resources() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     assert!(
         writer
             .set_function_groups(FunctionGroupOptions {

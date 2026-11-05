@@ -2,7 +2,7 @@
 
 use super::codec::scan_slide;
 use super::model::{ContentPart, Payload, Relationship, RelationshipMetadata, Target};
-use super::transaction::{Commit, Patch, RelationshipState, Snapshot};
+use super::transaction::{Change, Prepared, RelationshipState, Snapshot};
 use super::validation::{
     self, MAX_PAYLOAD_BYTES, MAX_PAYLOAD_RELATIONSHIPS, MAX_RELATIONSHIP_FIELD_BYTES,
     MAX_TOTAL_PAYLOAD_BYTES,
@@ -67,22 +67,34 @@ impl Limits {
 
     fn charge_anchor(&mut self, actual: usize) -> Result<()> {
         if actual >= self.content_parts {
-            return Err(limit("content-part count", self.content_parts));
+            return Err(limit(
+                crate::error::CodecLimitKind::ContentParts,
+                actual.checked_add(1).unwrap_or(usize::MAX),
+                self.content_parts,
+            ));
         }
         Ok(())
     }
 
     fn charge_payload(&mut self, bytes: usize) -> Result<()> {
         if bytes > self.payload_bytes {
-            return Err(limit("content-part payload bytes", self.payload_bytes));
+            return Err(limit(
+                crate::error::CodecLimitKind::PartBytes,
+                bytes,
+                self.payload_bytes,
+            ));
         }
-        let actual = self
-            .used_payload_bytes
-            .checked_add(bytes)
-            .ok_or_else(|| limit("total content-part payload bytes", self.total_payload_bytes))?;
+        let actual = self.used_payload_bytes.checked_add(bytes).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::PartBytes,
+                usize::MAX,
+                self.total_payload_bytes,
+            )
+        })?;
         if actual > self.total_payload_bytes {
             return Err(limit(
-                "total content-part payload bytes",
+                crate::error::CodecLimitKind::PartBytes,
+                actual,
                 self.total_payload_bytes,
             ));
         }
@@ -217,14 +229,14 @@ pub fn load_snapshot(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
+pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Change) -> Result<Snapshot> {
     let before = patch.before();
     let slide = package.get_part(&before.slide_part_name)?;
     let current = load_snapshot(package, before.slide_index, slide, &mut Limits::default())?;
     if !current.same_source(before) {
         return Err(validation::invalid_revision());
     }
-    if patch.is_empty() {
+    if patch.is_noop() {
         return Ok(current);
     }
     if package.is_signed() || package.requires_signature_edit_policy() {
@@ -257,11 +269,11 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
 ///
 /// Returns an error if the operation fails.
 #[inline]
-pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot> {
+pub(crate) fn apply_commit(package: &mut OpcPackage, commit: Prepared) -> Result<Snapshot> {
     apply_patch(package, commit.patch())
 }
 
-fn install_patch(package: &mut OpcPackage, patch: &Patch) -> Result<()> {
+fn install_patch(package: &mut OpcPackage, patch: &Change) -> Result<()> {
     let before = patch.before();
     let after = patch.after();
     let slide_name = before.slide_part_name.clone();
@@ -377,7 +389,8 @@ fn make_payload(part: &dyn Part, maximum_relationships: usize) -> Result<Payload
     for relationship in part.rels().iter() {
         if relationships.len() >= maximum_relationships {
             return Err(limit(
-                "content-part payload relationships",
+                crate::error::CodecLimitKind::Relationships,
+                relationships.len().checked_add(1).unwrap_or(usize::MAX),
                 maximum_relationships,
             ));
         }
@@ -400,7 +413,8 @@ fn relationship_metadata(relationship: &litchi_opc::Relationship) -> Result<Rela
     ] {
         if value.len() > MAX_RELATIONSHIP_FIELD_BYTES {
             return Err(limit(
-                "content-part relationship metadata bytes",
+                crate::error::CodecLimitKind::RelationshipBytes,
+                value.len(),
                 MAX_RELATIONSHIP_FIELD_BYTES,
             ));
         }

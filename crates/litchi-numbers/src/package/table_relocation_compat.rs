@@ -1,4 +1,5 @@
-//! Physical-topology admission for the retiring `litchi-iwa` host.
+//! Physical-topology admission for workbooks built by the retired migration
+//! host (deleted by record 0429; last present at commit `4d8a3e161f`).
 //!
 //! The normal [`Package`](super::Package) constructor deliberately projects
 //! every rooted table into the focused semantic model. Historical host-built
@@ -14,10 +15,7 @@ use super::table_relocation::{
     rewrite_bytes_for_compatibility, root_preview_deletions, verify_locality,
     verify_physical_source_state, verify_physical_target_state,
 };
-use super::{
-    Components, Document, DocumentLimits, Package, ReadOptions, SemanticLimits, State,
-    table_headers,
-};
+use super::{Components, Package, Profile, SemanticLimits, State, table_headers};
 use crate::selector::{SheetSelector, TableSelector};
 use crate::table::lock::State as LockState;
 
@@ -78,12 +76,16 @@ impl Package {
             return copy_bytes(source.state.source.as_ref(), path);
         }
         if table.locked == LockState::Locked {
-            return Err(Error::TableLocked { path });
+            return Err(Error::Refused(
+                crate::package::table_relocation::Refusal::TableLocked { path },
+            ));
         }
 
         let catalog = physical_source(&source)?;
         if !catalog.source_is_exact() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(
+                crate::package::table_relocation::Refusal::UnsupportedSource,
+            ));
         }
         let deleted_previews = root_preview_deletions(catalog)?;
         let source_parent = verify_physical_source_state(&source, operation)?;
@@ -103,7 +105,7 @@ impl Package {
 }
 
 fn physical_package(bytes: &[u8]) -> Result<Package> {
-    let options = ReadOptions::default();
+    let options = Profile::default();
     let components = Components::from_bytes(bytes, options.archive())
         .map_err(|_error| invalid_source(Path::Package))?;
     super::validate_numbers_application(&components, options.archive())
@@ -112,9 +114,11 @@ fn physical_package(bytes: &[u8]) -> Result<Package> {
         .map_err(|_error| invalid_source(Path::Package))?;
     let source = components
         .physical()
-        .ok_or(Error::UnsupportedSource)?
+        .ok_or(Error::Refused(
+            crate::package::table_relocation::Refusal::UnsupportedSource,
+        ))?
         .__source_owner();
-    let document = Document::from_sheets_with_limits(Vec::new(), DocumentLimits::default())
+    let document = crate::Workbook::from_sheets_with_limits(Vec::new(), SemanticLimits::DEFAULT)
         .map_err(|_error| invalid_source(Path::Package))?;
     Ok(Package {
         state: Arc::new(State {
@@ -123,6 +127,7 @@ fn physical_package(bytes: &[u8]) -> Result<Package> {
             index,
             document,
             options,
+            proofs: Default::default(),
         }),
     })
 }
@@ -131,11 +136,15 @@ fn resolve_sheet_position(source: &Package, selector: SheetSelector<'_>) -> Resu
     let root = Package::root_sheet_order(&source.state.components, SemanticLimits::default())
         .map_err(|_error| invalid_source(Path::Package))?;
     match selector {
-        SheetSelector::Index(index) => root
-            .sheet_references()
-            .get(index)
-            .map(|_reference| index)
-            .ok_or(Error::SheetNotFound),
+        SheetSelector::Position(index) => {
+            let index = index.get();
+            root.sheet_references()
+                .get(index)
+                .map(|_reference| index)
+                .ok_or(Error::Refused(
+                    crate::package::table_relocation::Refusal::SheetNotFound,
+                ))
+        },
         SheetSelector::Name(name) => {
             let mut found = None;
             for index in 0..root.sheet_references().len() {
@@ -144,7 +153,9 @@ fn resolve_sheet_position(source: &Package, selector: SheetSelector<'_>) -> Resu
                     return Err(invalid_source(Path::Package));
                 }
             }
-            found.ok_or(Error::SheetNotFound)
+            found.ok_or(Error::Refused(
+                crate::package::table_relocation::Refusal::SheetNotFound,
+            ))
         },
     }
 }
@@ -184,7 +195,8 @@ fn resolve_table_position(
         destination_sheet: sheet_position,
     };
     match selector {
-        TableSelector::Index(index) => {
+        TableSelector::Position(index) => {
+            let index = index.get();
             table_headers::resolve::resolve_target_physical(source, sheet_position, index)
                 .map_err(|error| map_header_error(error, path))?;
             Ok(index)
@@ -200,7 +212,9 @@ fn resolve_table_position(
                     return Err(invalid_source(path));
                 }
             }
-            found.ok_or(Error::TableNotFound)
+            found.ok_or(Error::Refused(
+                crate::package::table_relocation::Refusal::TableNotFound,
+            ))
         },
     }
 }

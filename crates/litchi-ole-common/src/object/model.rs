@@ -3,8 +3,9 @@
 use super::directory::{self, Metadata};
 use super::link::{self, Link};
 use super::target::Target;
-use crate::ole_streams::{self, NativeSnapshot, PresentationSnapshot};
+use crate::ole_streams::{self, native, presentation};
 use crate::property_set::Guid;
+use crate::{Error, LimitKind};
 use litchi_cfb::OleError;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -14,7 +15,7 @@ use std::sync::Arc;
 const MAX_PRESENTATION_STREAMS: usize = 999;
 
 /// Applies codec-owned limit validation even when the requested stream is absent.
-pub(crate) fn validate_ole_stream_limits(limits: ole_streams::Limits) -> Result<(), OleError> {
+pub(crate) fn validate_ole_stream_limits(limits: ole_streams::Limits) -> Result<(), Error> {
     limits.validate().map(|_| ())
 }
 
@@ -23,7 +24,8 @@ pub(crate) fn validate_ole_stream_limits(limits: ole_streams::Limits) -> Result<
 pub struct Limits {
     /// Maximum number of target-selected object storages.
     pub max_objects: usize,
-    /// Maximum storage nesting depth captured from the CFB root.
+    /// Maximum storage nesting depth captured from the CFB root. Also bounds
+    /// the number of descendant storages retained for one selected object.
     pub max_storage_depth: usize,
     /// Maximum streams captured for one selected object.
     pub max_streams_per_object: usize,
@@ -52,19 +54,32 @@ impl Default for Limits {
 }
 
 impl Limits {
-    pub(crate) fn validate(self) -> Result<(), OleError> {
-        if self.max_objects == 0
-            || self.max_storage_depth == 0
-            || self.max_streams_per_object == 0
-            || self.max_streams == 0
-            || self.max_stream_size == 0
-            || self.max_object_size == 0
-            || self.max_total_size == 0
-        {
-            return Err(OleError::InvalidFormat(
-                "all object limits must be non-zero".into(),
-            ));
+    #[inline(always)]
+    pub(crate) fn validate(self) -> Result<(), Error> {
+        // Check fields directly: constructing a table here makes the success
+        // path materialize all error metadata before it knows it is needed.
+        macro_rules! nonzero {
+            ($value:expr, $kind:ident, $maximum:expr) => {
+                if $value == 0 {
+                    return Err(Error::InvalidLimit {
+                        kind: LimitKind::$kind,
+                        value: 0,
+                        maximum: $maximum,
+                    });
+                }
+            };
         }
+        nonzero!(self.max_objects, Objects, usize::MAX as u64);
+        nonzero!(self.max_storage_depth, StorageDepth, usize::MAX as u64);
+        nonzero!(
+            self.max_streams_per_object,
+            ObjectStreams,
+            usize::MAX as u64
+        );
+        nonzero!(self.max_streams, PackageStreams, usize::MAX as u64);
+        nonzero!(self.max_stream_size, StreamBytes, u64::MAX);
+        nonzero!(self.max_object_size, ObjectBytes, u64::MAX);
+        nonzero!(self.max_total_size, TotalBytes, u64::MAX);
         Ok(())
     }
 
@@ -96,6 +111,24 @@ impl Limits {
             self.max_streams
         } else {
             self.max_streams_per_object
+        }
+    }
+
+    /// Intersects this requested policy with a retained ingress policy.
+    ///
+    /// An edit may tighten a package's bounds, but it can never widen the
+    /// limits under which the package was admitted.
+    pub(crate) fn constrained_by(self, retained: Self) -> Self {
+        Self {
+            max_objects: self.max_objects.min(retained.max_objects),
+            max_storage_depth: self.max_storage_depth.min(retained.max_storage_depth),
+            max_streams_per_object: self
+                .max_streams_per_object
+                .min(retained.max_streams_per_object),
+            max_streams: self.max_streams.min(retained.max_streams),
+            max_stream_size: self.max_stream_size.min(retained.max_stream_size),
+            max_object_size: self.max_object_size.min(retained.max_object_size),
+            max_total_size: self.max_total_size.min(retained.max_total_size),
         }
     }
 }
@@ -202,36 +235,21 @@ impl Stream {
     ///
     /// Returns an error when a standard OLEDS stream is malformed or exceeds
     /// the OLEDS metadata limit.
-    pub fn link(&self) -> Result<Option<Link>, OleError> {
+    pub fn link(&self, limits: link::Limits) -> Result<Option<Link>, Error> {
         if self.name() != Some(link::NAME) {
             return Ok(None);
         }
-        Link::parse_shared(Arc::clone(&self.data)).map(Some)
-    }
-
-    /// Parses this stream as an OLEDS `\x02OlePres###` presentation stream.
-    ///
-    /// Streams with other names return `Ok(None)`.  A name using the
-    /// presentation prefix but not the required three-digit suffix is treated
-    /// as malformed.  The returned snapshot shares this stream's captured
-    /// allocation and keeps presentation bytes inert and opaque.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the presentation name or payload is malformed, or
-    /// when it exceeds the default OLEDS stream limit.
-    pub fn presentation(&self) -> Result<Option<PresentationSnapshot>, OleError> {
-        self.presentation_with_limits(ole_streams::Limits::default())
+        Link::parse_shared(Arc::clone(&self.data), limits).map(Some)
     }
 
     /// Parses this stream as an OLEDS presentation stream under explicit
     /// stream limits.
     ///
     /// The source allocation is shared with the captured object stream.
-    pub fn presentation_with_limits(
+    pub fn presentation(
         &self,
         limits: ole_streams::Limits,
-    ) -> Result<Option<PresentationSnapshot>, OleError> {
+    ) -> Result<Option<presentation::Snapshot>, Error> {
         validate_ole_stream_limits(limits)?;
         let Some(name) = self.name() else {
             return Ok(None);
@@ -242,26 +260,10 @@ impl Stream {
         ole_streams::parse_named_presentation(name, Arc::clone(&self.data), limits).map(Some)
     }
 
-    /// Parses this stream as the OLEDS `\x01Ole10Native` native-data stream.
-    ///
-    /// Streams with other names return `Ok(None)`.  Native data is retained as
-    /// opaque bytes and is never opened or activated.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the native payload is malformed or exceeds the
-    /// default OLEDS stream limit.
-    pub fn native(&self) -> Result<Option<NativeSnapshot>, OleError> {
-        self.native_with_limits(ole_streams::Limits::default())
-    }
-
     /// Parses this stream as OLEDS native data under explicit stream limits.
     ///
     /// The source allocation is shared with the captured object stream.
-    pub fn native_with_limits(
-        &self,
-        limits: ole_streams::Limits,
-    ) -> Result<Option<NativeSnapshot>, OleError> {
+    pub fn native(&self, limits: ole_streams::Limits) -> Result<Option<native::Snapshot>, Error> {
         validate_ole_stream_limits(limits)?;
         if self.name() != Some(ole_streams::NATIVE_STREAM_NAME) {
             return Ok(None);
@@ -351,66 +353,37 @@ impl Object {
     ///
     /// Returns an error when the direct-child OLEDS stream is malformed or
     /// exceeds the OLEDS metadata limit.
-    pub fn link(&self) -> Result<Option<Link>, OleError> {
+    pub fn link(&self, limits: link::Limits) -> Result<Option<Link>, Error> {
         match self
             .streams
             .iter()
             .find(|stream| stream.path().len() == 1 && stream.name() == Some(link::NAME))
         {
-            Some(stream) => stream.link(),
+            Some(stream) => stream.link(limits),
             None => Ok(None),
         }
     }
 
-    /// Returns one direct-child OLEDS presentation by numeric index.
-    ///
-    /// `None` means the selected object has no stream with that index.  The
-    /// presentation name is canonicalized through
-    /// [`ole_streams::presentation_name`], so callers do not need to scan CFB
-    /// names.  The returned snapshot shares the captured stream allocation.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when `index` is outside the OLEDS name range or the
-    /// matching stream is malformed or exceeds the default stream limit.
-    pub fn presentation(&self, index: usize) -> Result<Option<PresentationSnapshot>, OleError> {
-        self.presentation_with_limits(index, ole_streams::Limits::default())
-    }
-
     /// Returns one direct-child OLEDS presentation under explicit limits.
-    pub fn presentation_with_limits(
+    pub fn presentation(
         &self,
         index: usize,
         limits: ole_streams::Limits,
-    ) -> Result<Option<PresentationSnapshot>, OleError> {
+    ) -> Result<Option<presentation::Snapshot>, Error> {
         validate_ole_stream_limits(limits)?;
         self.validate_presentation_count()?;
         let name = ole_streams::presentation_name(index)?;
         self.streams
             .iter()
             .find(|stream| stream.path().len() == 1 && stream.name() == Some(name.as_str()))
-            .map_or(Ok(None), |stream| stream.presentation_with_limits(limits))
-    }
-
-    /// Returns all direct-child OLEDS presentation streams in numeric order.
-    ///
-    /// Every stream using the OLEDS presentation prefix is parsed.  A malformed
-    /// prefixed name or payload returns an error instead of being silently
-    /// treated as an unrelated opaque stream.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when a presentation stream name/index is invalid, two
-    /// streams expose the same numeric index, or a payload exceeds `limits`.
-    pub fn presentations(&self) -> Result<Vec<(usize, PresentationSnapshot)>, OleError> {
-        self.presentations_with_limits(ole_streams::Limits::default())
+            .map_or(Ok(None), |stream| stream.presentation(limits))
     }
 
     /// Returns all direct-child OLEDS presentations under explicit limits.
-    pub fn presentations_with_limits(
+    pub fn presentations(
         &self,
         limits: ole_streams::Limits,
-    ) -> Result<Vec<(usize, PresentationSnapshot)>, OleError> {
+    ) -> Result<Vec<(usize, presentation::Snapshot)>, Error> {
         validate_ole_stream_limits(limits)?;
         self.validate_presentation_count()?;
         let mut presentations = Vec::new();
@@ -428,13 +401,14 @@ impl Object {
                 OleError::InvalidFormat("OLEDS presentation stream has no name".into())
             })?;
             let index = ole_streams::presentation_index(name)?;
-            let snapshot = stream.presentation_with_limits(limits)?.ok_or_else(|| {
+            let snapshot = stream.presentation(limits)?.ok_or_else(|| {
                 OleError::InvalidFormat("OLEDS presentation stream name disappeared".into())
             })?;
             if presentations.iter().any(|(existing, _)| *existing == index) {
                 return Err(OleError::InvalidFormat(format!(
                     "duplicate OLEDS presentation stream index {index}"
-                )));
+                ))
+                .into());
             }
             presentations.push((index, snapshot));
         }
@@ -442,7 +416,7 @@ impl Object {
         Ok(presentations)
     }
 
-    pub(crate) fn validate_presentation_count(&self) -> Result<(), OleError> {
+    pub(crate) fn validate_presentation_count(&self) -> Result<(), Error> {
         let count = self
             .streams
             .iter()
@@ -456,24 +430,14 @@ impl Object {
         if count > MAX_PRESENTATION_STREAMS {
             return Err(OleError::InvalidFormat(format!(
                 "OLEDS storage contains more than {MAX_PRESENTATION_STREAMS} presentation streams"
-            )));
+            ))
+            .into());
         }
         Ok(())
     }
 
-    /// Returns the direct-child OLEDS native-data stream, when present.
-    ///
-    /// Native data remains opaque and inert.  This accessor never opens or
-    /// activates the referenced native payload.
-    pub fn native(&self) -> Result<Option<NativeSnapshot>, OleError> {
-        self.native_with_limits(ole_streams::Limits::default())
-    }
-
     /// Returns the direct-child OLEDS native-data stream under explicit limits.
-    pub fn native_with_limits(
-        &self,
-        limits: ole_streams::Limits,
-    ) -> Result<Option<NativeSnapshot>, OleError> {
+    pub fn native(&self, limits: ole_streams::Limits) -> Result<Option<native::Snapshot>, Error> {
         validate_ole_stream_limits(limits)?;
         self.validate_presentation_count()?;
         self.streams
@@ -481,7 +445,7 @@ impl Object {
             .find(|stream| {
                 stream.path().len() == 1 && stream.name() == Some(ole_streams::NATIVE_STREAM_NAME)
             })
-            .map_or(Ok(None), |stream| stream.native_with_limits(limits))
+            .map_or(Ok(None), |stream| stream.native(limits))
     }
 
     /// Finds a captured stream by its path relative to the selected storage.
@@ -512,6 +476,20 @@ impl Object {
     }
 }
 
+static EMPTY_OBJECTS: Objects = Objects {
+    objects: Vec::new(),
+};
+
+impl super::snapshot::EmptyValue for Objects {
+    fn empty() -> &'static Self {
+        &EMPTY_OBJECTS
+    }
+
+    fn is_empty_value(&self) -> bool {
+        self.objects.is_empty()
+    }
+}
+
 /// Ordered, immutable object discovery results.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Objects {
@@ -519,14 +497,21 @@ pub struct Objects {
 }
 
 impl Objects {
-    pub(crate) fn new(objects: Vec<Object>) -> Result<Self, OleError> {
+    /// Moves these results into shared owner state; a package without
+    /// discovered objects allocates nothing.
+    pub(crate) fn into_shared(self) -> super::snapshot::Shared<Self> {
+        super::snapshot::Shared::new(self)
+    }
+
+    pub(crate) fn new(objects: Vec<Object>) -> Result<Self, Error> {
         let mut keys = HashSet::new();
         let mut paths = HashSet::new();
         for object in &objects {
             if !keys.insert(object.key()) || !paths.insert(object.path()) {
                 return Err(OleError::InvalidFormat(
                     "object discovery produced duplicate target keys or paths".into(),
-                ));
+                )
+                .into());
             }
         }
         Ok(Self { objects })

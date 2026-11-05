@@ -1,15 +1,15 @@
 use std::io::Cursor;
 
 use litchi_core::sheet::Worksheet as _;
-use litchi_xls::writer::Writer;
-use litchi_xls::{EncryptionProfile, Error, WeakEncryptionPolicy, Workbook, Worksheet};
+use litchi_xls::writer::Builder;
+use litchi_xls::{EncryptionProfile, Error, WeakEncryptionPolicy, Worksheet, raw::Reader};
 
 fn decoded_worksheet() -> Worksheet {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_worksheet("Data").unwrap();
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
-    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     workbook.xls_worksheet(0).unwrap().clone()
 }
 
@@ -44,7 +44,7 @@ fn authored_worksheet_mutations_remain_available() {
 
 #[test]
 fn xor_authoring_requires_an_explicit_policy() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     assert!(matches!(
         writer.set_password("legacy", EncryptionProfile::XorObfuscation),
         Err(Error::WeakEncryptionRequiresExplicitPolicy)

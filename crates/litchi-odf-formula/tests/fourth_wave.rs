@@ -6,7 +6,7 @@
 use litchi_odf_common::constants::ODF_FORMULA;
 use litchi_odf_formula::authoring::content::{self, Closure, NumberType, Qualifier};
 use litchi_odf_formula::{
-    ContentKind, ContentSymbol, Formula, Kind, MAX_STARMATH_SOURCE_BYTES, NodePath, OpaqueStarMath,
+    ContentKind, ContentSymbol, Kind, MAX_STARMATH_SOURCE_BYTES, NodePath, OpaqueStarMath, Package,
     StarMathVersion, codec,
 };
 use soapberry_zip::office::StreamingArchiveWriter;
@@ -63,9 +63,11 @@ fn complete_content_model_and_checked_constructor_families_full_reopen() {
     }
     codec::validate(&root).expect("complete checked tree");
 
-    let formula = Formula::create(codec::serialize(&root)).expect("authored formula");
-    let reopened = Formula::from_bytes(formula.to_bytes()).expect("full package reopen");
+    let formula = create(codec::serialize(&root, &codec::Limits::default()).expect("formula XML"))
+        .expect("authored formula");
+    let reopened = open(formula.as_bytes()).expect("full package reopen");
     let kinds: Vec<_> = reopened
+        .formula()
         .root()
         .children()
         .map(litchi_odf_formula::Element::kind)
@@ -114,16 +116,20 @@ fn recognized_starmath_is_opaque_at_open_authoring_read_and_edit_boundaries() {
         semantics,
         litchi_odf_formula::authoring::Display::Block,
     );
-    let source = Formula::create(codec::serialize(&root)).expect("opaque authored source");
-    assert_eq!(source.starmath().expect("StarMath").opaque(), &opaque);
+    let source = create(codec::serialize(&root, &codec::Limits::default()).expect("formula XML"))
+        .expect("opaque authored source");
+    assert_eq!(
+        source.formula().starmath().expect("StarMath").opaque(),
+        &opaque
+    );
 
     let replacement = OpaqueStarMath::new(StarMathVersion::V5, "y").expect("replacement");
     let mut edit = source.edit();
     edit.set_starmath(&replacement).expect("opaque edit");
-    let target = edit.commit().expect("commit").into_formula();
-    let reopened = Formula::from_bytes(target.to_bytes()).expect("full reopen");
+    let target = edit.commit().expect("commit").into_package();
+    let reopened = open(target.as_bytes()).expect("full reopen");
     assert_eq!(
-        reopened.starmath().expect("StarMath").opaque(),
+        reopened.formula().starmath().expect("StarMath").opaque(),
         &replacement
     );
 
@@ -131,8 +137,8 @@ fn recognized_starmath_is_opaque_at_open_authoring_read_and_edit_boundaries() {
     let oversized_xml = format!(
         r#"<math xmlns="{NS}"><semantics><mi>x</mi><annotation encoding="StarMath 6">{oversized}</annotation></semantics></math>"#
     );
-    assert!(Formula::create(&oversized_xml).is_err());
-    assert!(Formula::from_bytes(raw_formula_package(&oversized_xml)).is_err());
+    assert!(create(&oversized_xml).is_err());
+    assert!(open(raw_formula_package(&oversized_xml)).is_err());
 
     let mut generic_edit = source.edit();
     assert!(
@@ -145,11 +151,11 @@ fn recognized_starmath_is_opaque_at_open_authoring_read_and_edit_boundaries() {
 #[test]
 fn raw_malformed_and_prettified_packages_prove_ingress_and_exact_provenance() {
     let malformed = format!(r#"<math xmlns="{NS}"><mfrac><mi>x</mi></mfrac></math>"#);
-    assert!(Formula::from_bytes(raw_formula_package(&malformed)).is_err());
+    assert!(open(raw_formula_package(&malformed)).is_err());
 
     let pretty = format!("<?xml version=\"1.0\"?>\n<math xmlns=\"{NS}\">\n  <mi>x</mi>\n</math>\n");
     let pretty_bytes = raw_formula_package(&pretty);
-    let source = Formula::from_bytes(pretty_bytes.clone()).expect("prettified ingress");
+    let source = open(pretty_bytes.clone()).expect("prettified ingress");
     assert_eq!(source.as_bytes(), pretty_bytes);
 
     let mut edit = source.edit();
@@ -176,19 +182,20 @@ fn deterministic_mutation_corpus_never_panics_or_changes_classification() {
             );
         }
         let candidate = String::from_utf8(bytes).expect("ASCII mutation");
-        let first = Formula::create(&candidate).is_ok();
-        let second = Formula::create(&candidate).is_ok();
+        let first = create(&candidate).is_ok();
+        let second = create(&candidate).is_ok();
         assert_eq!(first, second, "case {case}");
         if first {
-            let formula = Formula::create(&candidate).expect("classified valid");
-            assert!(Formula::from_bytes(formula.to_bytes()).is_ok());
+            let formula = create(&candidate).expect("classified valid");
+            assert!(open(formula.as_bytes()).is_ok());
         }
     }
 }
 
 fn raw_formula_package(content: &str) -> Vec<u8> {
     const MANIFEST: &[u8] = br#"<?xml version="1.0"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.formula"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/></manifest:manifest>"#;
-    let mut archive = StreamingArchiveWriter::new();
+    let mut archive =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     archive
         .write_stored("mimetype", ODF_FORMULA.as_bytes())
         .expect("mimetype");
@@ -199,4 +206,12 @@ fn raw_formula_package(content: &str) -> Vec<u8> {
         .write_deflated("META-INF/manifest.xml", MANIFEST)
         .expect("manifest");
     archive.finish_to_bytes().expect("raw test package")
+}
+
+fn create(mathml: impl Into<String>) -> Result<Package, litchi_odf_formula::Error> {
+    litchi_odf_formula::Builder::from_mathml(mathml).build()
+}
+
+fn open(bytes: impl AsRef<[u8]>) -> Result<Package, litchi_odf_formula::Error> {
+    Package::from_bytes(bytes.as_ref())
 }

@@ -49,7 +49,11 @@ fn fixture(relative: &str) -> PathBuf {
 #[test]
 fn reads_plrsid_from_a_word_produced_document() {
     let path = fixture("test-data/poi/test-data/document/47950_normal.doc");
-    let mut ole = OleFile::open(File::open(&path).unwrap()).unwrap();
+    let mut ole = OleFile::open(
+        File::open(&path).unwrap(),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let word_document = ole.open_stream(&["WordDocument"]).unwrap();
     let fib = FileInformationBlock::parse(&word_document).unwrap();
     let table_name = if fib.which_table_stream() {
@@ -68,7 +72,7 @@ fn reads_plrsid_from_a_word_produced_document() {
 
 #[test]
 fn exposes_rsids_through_the_document_api() {
-    let mut package = litchi_doc::Package::from_reader(
+    let mut package = litchi_doc::raw::Reader::from_reader(
         File::open(fixture("test-data/poi/test-data/document/47950_normal.doc")).unwrap(),
     )
     .unwrap();
@@ -81,7 +85,11 @@ fn exposes_rsids_through_the_document_api() {
 fn documents_without_plrsid_report_none() {
     // Word 97 era files predate the PLRSID table.
     let path = fixture("test-data/poi/test-data/document/saved-by-table.doc");
-    let mut ole = OleFile::open(File::open(&path).unwrap()).unwrap();
+    let mut ole = OleFile::open(
+        File::open(&path).unwrap(),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let word_document = ole.open_stream(&["WordDocument"]).unwrap();
     let fib = FileInformationBlock::parse(&word_document).unwrap();
     let table_name = if fib.which_table_stream() {

@@ -37,10 +37,11 @@ const GATE_READY: u8 = 0;
 const GATE_IN_FLIGHT: u8 = 1;
 const GATE_APPLIED: u8 = 2;
 
-/// One source-coordinate edit queued by a [`Transaction`].
+/// One source-coordinate conflict-markup operation staged by
+/// [`super::Edit::apply`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum Edit {
+pub enum Operation {
     /// Replace the author of a conflict element.
     SetConflictAuthor { index: usize, author: String },
     /// Replace or remove the optional date of a conflict element.
@@ -57,13 +58,13 @@ pub enum Edit {
 
 /// An isolated edit over one exact conflict-markup source snapshot.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub(crate) struct Draft {
     base: Snapshot,
-    edits: Vec<Option<Edit>>,
+    edits: Vec<Option<Operation>>,
     edit_index: HashMap<EditKey, usize>,
 }
 
-impl Transaction {
+impl Draft {
     pub(crate) fn new(base: Snapshot) -> Self {
         Self {
             base,
@@ -80,7 +81,7 @@ impl Transaction {
 
     /// Iterate over the coalesced edits in request order.
     #[must_use]
-    pub fn edits(&self) -> impl DoubleEndedIterator<Item = &Edit> {
+    pub fn edits(&self) -> impl DoubleEndedIterator<Item = &Operation> {
         self.edits.iter().filter_map(Option::as_ref)
     }
 
@@ -95,14 +96,16 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn apply(&mut self, edit: Edit) -> Result<&mut Self> {
+    pub fn apply(&mut self, edit: Operation) -> Result<&mut Self> {
         match edit {
-            Edit::SetConflictAuthor { index, author } => self.set_conflict_author(index, author),
-            Edit::SetConflictDate { index, date } => self.set_conflict_date(index, date),
-            Edit::RemoveConflict { index } => self.remove_conflict(index),
-            Edit::SetRangeAuthor { index, author } => self.set_range_author(index, author),
-            Edit::SetRangeDate { index, date } => self.set_range_date(index, date),
-            Edit::RemoveRange { index } => self.remove_range(index),
+            Operation::SetConflictAuthor { index, author } => {
+                self.set_conflict_author(index, author)
+            },
+            Operation::SetConflictDate { index, date } => self.set_conflict_date(index, date),
+            Operation::RemoveConflict { index } => self.remove_conflict(index),
+            Operation::SetRangeAuthor { index, author } => self.set_range_author(index, author),
+            Operation::SetRangeDate { index, date } => self.set_range_date(index, date),
+            Operation::RemoveRange { index } => self.remove_range(index),
         }
     }
 
@@ -129,7 +132,7 @@ impl Transaction {
             &mut self.edit_index,
             EditKey::ConflictAuthor(index),
             (author != conflict.metadata.author)
-                .then_some(Edit::SetConflictAuthor { index, author }),
+                .then_some(Operation::SetConflictAuthor { index, author }),
         )?;
         Ok(self)
     }
@@ -151,7 +154,7 @@ impl Transaction {
             &mut self.edits,
             &mut self.edit_index,
             EditKey::ConflictDate(index),
-            (date != conflict.metadata.date).then_some(Edit::SetConflictDate { index, date }),
+            (date != conflict.metadata.date).then_some(Operation::SetConflictDate { index, date }),
         )?;
         Ok(self)
     }
@@ -181,7 +184,7 @@ impl Transaction {
                 &mut self.edits,
                 &mut self.edit_index,
                 removal,
-                Edit::RemoveConflict { index },
+                Operation::RemoveConflict { index },
             );
         }
         Ok(self)
@@ -209,7 +212,8 @@ impl Transaction {
             &mut self.edits,
             &mut self.edit_index,
             EditKey::RangeAuthor(index),
-            (author != range.metadata.author).then_some(Edit::SetRangeAuthor { index, author }),
+            (author != range.metadata.author)
+                .then_some(Operation::SetRangeAuthor { index, author }),
         )?;
         Ok(self)
     }
@@ -231,7 +235,7 @@ impl Transaction {
             &mut self.edits,
             &mut self.edit_index,
             EditKey::RangeDate(index),
-            (date != range.metadata.date).then_some(Edit::SetRangeDate { index, date }),
+            (date != range.metadata.date).then_some(Operation::SetRangeDate { index, date }),
         )?;
         Ok(self)
     }
@@ -260,7 +264,7 @@ impl Transaction {
                 &mut self.edits,
                 &mut self.edit_index,
                 removal,
-                Edit::RemoveRange { index },
+                Operation::RemoveRange { index },
             );
         }
         Ok(self)
@@ -272,11 +276,11 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn commit(&self) -> Result<Commit> {
+    pub fn commit(&self) -> Result<DraftCommit> {
         let before = self.base.source_owner();
         let source_limits = self.base.limits();
         if self.edit_index.is_empty() {
-            return Ok(Commit::new(
+            return Ok(DraftCommit::new(
                 self.base.clone(),
                 before.clone(),
                 before,
@@ -308,7 +312,7 @@ impl Transaction {
         if let Some(binding) = self.base.binding().cloned() {
             snapshot = snapshot.with_binding(binding);
         }
-        Ok(Commit::new(
+        Ok(DraftCommit::new(
             snapshot,
             before,
             after,
@@ -320,12 +324,12 @@ impl Transaction {
 
 /// A successful publication containing a parsed snapshot and reversible patch.
 #[derive(Debug, Clone)]
-pub struct Commit {
+pub(crate) struct DraftCommit {
     snapshot: Snapshot,
-    patch: Patch,
+    patch: DraftPatch,
 }
 
-impl Commit {
+impl DraftCommit {
     fn new(
         snapshot: Snapshot,
         before: Source,
@@ -333,7 +337,7 @@ impl Commit {
         source_limits: Limits,
         target_limits: Limits,
     ) -> Self {
-        let patch = Patch::new(
+        let patch = DraftPatch::new(
             before,
             after,
             source_limits,
@@ -357,7 +361,7 @@ impl Commit {
 
     /// Borrow the reversible source-checked patch.
     #[must_use]
-    pub const fn patch(&self) -> &Patch {
+    pub const fn patch(&self) -> &DraftPatch {
         &self.patch
     }
 
@@ -369,13 +373,13 @@ impl Commit {
 
     /// Move the patch out of this commit.
     #[must_use]
-    pub fn into_patch(self) -> Patch {
+    pub fn into_patch(self) -> DraftPatch {
         self.patch
     }
 
     /// Split this commit into its candidate snapshot and patch.
     #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
+    pub fn into_parts(self) -> (Snapshot, DraftPatch) {
         (self.snapshot, self.patch)
     }
 }
@@ -385,7 +389,7 @@ impl Commit {
 /// Clones share an apply-once gate. Stale or invalid attempts do not consume
 /// that gate, so callers may correct the target and retry safely.
 #[derive(Debug, Clone)]
-pub struct Patch {
+pub(crate) struct DraftPatch {
     source_fingerprint: u64,
     target_fingerprint: u64,
     before: Source,
@@ -396,7 +400,7 @@ pub struct Patch {
     gate: Arc<AtomicU8>,
 }
 
-impl Patch {
+impl DraftPatch {
     fn new(
         before: Source,
         after: Source,
@@ -592,9 +596,9 @@ struct Splice {
     replacement: Vec<u8>,
 }
 
-fn plan_edit(snapshot: &Snapshot, edit: &Edit, splices: &mut Vec<Splice>) -> Result<()> {
+fn plan_edit(snapshot: &Snapshot, edit: &Operation, splices: &mut Vec<Splice>) -> Result<()> {
     match edit {
-        Edit::SetConflictAuthor { index, author } => {
+        Operation::SetConflictAuthor { index, author } => {
             let conflict = conflict_at(snapshot, *index)?;
             replace_attribute(
                 snapshot.source(),
@@ -606,7 +610,7 @@ fn plan_edit(snapshot: &Snapshot, edit: &Edit, splices: &mut Vec<Splice>) -> Res
                 splices,
             )
         },
-        Edit::SetConflictDate { index, date } => {
+        Operation::SetConflictDate { index, date } => {
             let conflict = conflict_at(snapshot, *index)?;
             replace_attribute(
                 snapshot.source(),
@@ -618,7 +622,7 @@ fn plan_edit(snapshot: &Snapshot, edit: &Edit, splices: &mut Vec<Splice>) -> Res
                 splices,
             )
         },
-        Edit::RemoveConflict { index } => {
+        Operation::RemoveConflict { index } => {
             let conflict = conflict_at(snapshot, *index)?;
             if conflict.scope == Scope::Property || conflict.span == conflict.start_tag {
                 splices.push(Splice {
@@ -639,7 +643,7 @@ fn plan_edit(snapshot: &Snapshot, edit: &Edit, splices: &mut Vec<Splice>) -> Res
             }
             Ok(())
         },
-        Edit::SetRangeAuthor { index, author } => {
+        Operation::SetRangeAuthor { index, author } => {
             let range = range_at(snapshot, *index)?;
             replace_attribute(
                 snapshot.source(),
@@ -651,7 +655,7 @@ fn plan_edit(snapshot: &Snapshot, edit: &Edit, splices: &mut Vec<Splice>) -> Res
                 splices,
             )
         },
-        Edit::SetRangeDate { index, date } => {
+        Operation::SetRangeDate { index, date } => {
             let range = range_at(snapshot, *index)?;
             replace_attribute(
                 snapshot.source(),
@@ -663,7 +667,7 @@ fn plan_edit(snapshot: &Snapshot, edit: &Edit, splices: &mut Vec<Splice>) -> Res
                 splices,
             )
         },
-        Edit::RemoveRange { index } => {
+        Operation::RemoveRange { index } => {
             let range = range_at(snapshot, *index)?;
             splices.push(Splice {
                 span: range.start_span,
@@ -813,9 +817,11 @@ fn apply_splices(source: &[u8], splices: &mut [Splice], limit: usize) -> Result<
         .and_then(|size| size.checked_add(added))
         .ok_or_else(|| Error::Invalid("conflict output size overflow".into()))?;
     if output_len > limit {
-        return Err(Error::Invalid(format!(
-            "conflict output exceeds the {limit}-byte source limit"
-        )));
+        return Err(Error::ConflictLimit {
+            kind: crate::revision::conflict::LimitKind::OutputBytes,
+            actual: output_len,
+            maximum: limit,
+        });
     }
 
     let mut output = Vec::new();
@@ -895,10 +901,10 @@ fn refuse_removed_range(edit_index: &HashMap<EditKey, usize>, index: usize) -> R
 }
 
 fn replace_field_edit(
-    edits: &mut Vec<Option<Edit>>,
+    edits: &mut Vec<Option<Operation>>,
     edit_index: &mut HashMap<EditKey, usize>,
     key: EditKey,
-    replacement: Option<Edit>,
+    replacement: Option<Operation>,
 ) -> Result<()> {
     if let Some(index) = edit_index.get(&key).copied() {
         if let Some(replacement) = replacement {
@@ -914,7 +920,7 @@ fn replace_field_edit(
 }
 
 fn reserve_new_edit(
-    edits: &mut Vec<Option<Edit>>,
+    edits: &mut Vec<Option<Operation>>,
     edit_index: &mut HashMap<EditKey, usize>,
 ) -> Result<()> {
     if edits.len() > edit_index.len().saturating_mul(2) {
@@ -938,10 +944,10 @@ fn reserve_new_edit(
 }
 
 fn insert_reserved_edit(
-    edits: &mut Vec<Option<Edit>>,
+    edits: &mut Vec<Option<Operation>>,
     edit_index: &mut HashMap<EditKey, usize>,
     key: EditKey,
-    edit: Edit,
+    edit: Operation,
 ) {
     let position = edits.len();
     edits.push(Some(edit));
@@ -949,7 +955,7 @@ fn insert_reserved_edit(
 }
 
 fn remove_edit(
-    edits: &mut Vec<Option<Edit>>,
+    edits: &mut Vec<Option<Operation>>,
     edit_index: &mut HashMap<EditKey, usize>,
     key: EditKey,
 ) {
@@ -959,14 +965,14 @@ fn remove_edit(
     edits[position] = None;
 }
 
-fn edit_key(edit: &Edit) -> EditKey {
+fn edit_key(edit: &Operation) -> EditKey {
     match edit {
-        Edit::SetConflictAuthor { index, .. } => EditKey::ConflictAuthor(*index),
-        Edit::SetConflictDate { index, .. } => EditKey::ConflictDate(*index),
-        Edit::RemoveConflict { index } => EditKey::RemoveConflict(*index),
-        Edit::SetRangeAuthor { index, .. } => EditKey::RangeAuthor(*index),
-        Edit::SetRangeDate { index, .. } => EditKey::RangeDate(*index),
-        Edit::RemoveRange { index } => EditKey::RemoveRange(*index),
+        Operation::SetConflictAuthor { index, .. } => EditKey::ConflictAuthor(*index),
+        Operation::SetConflictDate { index, .. } => EditKey::ConflictDate(*index),
+        Operation::RemoveConflict { index } => EditKey::RemoveConflict(*index),
+        Operation::SetRangeAuthor { index, .. } => EditKey::RangeAuthor(*index),
+        Operation::SetRangeDate { index, .. } => EditKey::RangeDate(*index),
+        Operation::RemoveRange { index } => EditKey::RemoveRange(*index),
     }
 }
 
@@ -981,7 +987,7 @@ fn fingerprint(bytes: &[u8]) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use super::{Edit, Snapshot};
+    use super::{Operation, Snapshot};
 
     #[test]
     fn projected_edits_retain_request_order_after_o1_removal() {
@@ -993,7 +999,8 @@ mod tests {
             <w14:conflictIns w:id="1" w:author="first"/>
             <w14:conflictDel w:id="2" w:author="second"/>
             </w:p></w:body></w:document>"#;
-        let snapshot = Snapshot::from_xml(source.as_slice()).expect("valid conflict source");
+        let snapshot = Snapshot::from_xml(source.as_slice(), Default::default())
+            .expect("valid conflict source");
         let mut transaction = snapshot.edit();
         transaction
             .set_conflict_author(0, "temporary")
@@ -1011,7 +1018,7 @@ mod tests {
         let order: Vec<_> = transaction
             .edits()
             .map(|edit| match edit {
-                Edit::SetConflictAuthor { index, .. } => *index,
+                Operation::SetConflictAuthor { index, .. } => *index,
                 _ => usize::MAX,
             })
             .collect();

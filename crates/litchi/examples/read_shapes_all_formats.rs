@@ -3,15 +3,12 @@
 //! This example demonstrates how to read Escher shapes from all three
 //! legacy Office formats using the shared Escher module.
 //!
-//! Run with: cargo run --example read_shapes_all_formats <file.doc|file.ppt|file.xls>
+//! Run with: cargo run --example read_shapes_all_formats --features doc,ppt,xls -- <file.doc|file.ppt|file.xls>
 
 use litchi::ppt::Package as PptPackage;
-use litchi::sheet::WorkbookTrait;
-use litchi::xls::Workbook;
-use litchi_doc::Package as DocPackage;
+use litchi_doc::raw::Reader as DocPackage;
 use std::env;
 use std::error::Error;
-use std::fs::File;
 use std::path::Path;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -94,7 +91,7 @@ fn read_ppt_shapes(file_path: &str) -> Result<(), Box<dyn Error>> {
     println!("================");
     println!();
 
-    let mut pkg = PptPackage::open(file_path)?;
+    let pkg = PptPackage::open(file_path)?;
     let ppt = pkg.presentation()?;
 
     println!("Total slides: {}", ppt.slide_count());
@@ -125,10 +122,9 @@ fn read_xls_shapes(file_path: &str) -> Result<(), Box<dyn Error>> {
     println!("================");
     println!();
 
-    let file = File::open(file_path)?;
-    let workbook = Workbook::new(file)?;
-
-    println!("Worksheets: {}", workbook.worksheet_names().len());
+    // The unified API opens the workbook and counts its worksheets.
+    let file = litchi::open(file_path)?;
+    println!("Worksheets: {}", file.workbook()?.worksheet_count()?);
     println!();
 
     // Note: XLS shape extraction requires access to the raw workbook stream
@@ -137,7 +133,7 @@ fn read_xls_shapes(file_path: &str) -> Result<(), Box<dyn Error>> {
     println!("Use litchi::xls::shapes::extract_shapes_from_workbook() with raw data.");
     println!();
     println!("Example:");
-    println!("  let ole_file = OleFile::open(file)?;");
+    println!("  let ole_file = OleFile::open(file, OleFileLimits::default())?;");
     println!("  let workbook_data = ole_file.open_stream(&[\"Workbook\"])?;");
     println!("  let shapes = extract_shapes_from_workbook(&workbook_data)?;");
 

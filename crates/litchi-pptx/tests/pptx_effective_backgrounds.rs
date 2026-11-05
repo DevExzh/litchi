@@ -5,7 +5,6 @@
 )]
 
 use litchi_opc::{OpcPackage, PackURI};
-use litchi_pptx::Package;
 use litchi_pptx::SlideBackground;
 
 const SOLID_BACKGROUND: &str = include_str!("../../../test-data/ooxml/pptx/backgrounds/solid.xml");
@@ -85,10 +84,11 @@ fn effective_background(package: &OpcPackage, part_name: &str) -> Option<SlideBa
 }
 
 fn package_with_backgrounds(backgrounds: &[(&str, &str)]) -> OpcPackage {
-    let mut package = Package::new().unwrap();
-    package.presentation_mut().unwrap().add_slide().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    builder.presentation().unwrap().add_slide().unwrap();
+    let package = builder.build().unwrap();
     let bytes = package.to_bytes().unwrap();
-    let mut package = OpcPackage::from_vec(bytes).unwrap();
+    let mut package = OpcPackage::from_vec(bytes, litchi_opc::SourceLimits::default()).unwrap();
 
     for (part_name, color) in backgrounds {
         let part_name = PackURI::new(*part_name).unwrap();

@@ -19,7 +19,7 @@ fn preserves_ordered_character_property_revision_state() {
     assert_eq!(previous.is_bold, Some(true));
     assert_eq!(previous.is_italic, None);
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer
         .add_paragraph_runs(
             vec![("Tracked".to_string(), formatting)],
@@ -27,8 +27,8 @@ fn preserves_ordered_character_property_revision_state() {
         )
         .unwrap();
     let mut cursor = Cursor::new(Vec::new());
-    writer.write_to(&mut cursor).unwrap();
-    let mut package = crate::Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut cursor).unwrap();
+    let mut package = crate::raw::Reader::from_reader(Cursor::new(cursor.into_inner())).unwrap();
     let document = package.document().unwrap();
     let paragraphs = document.paragraphs().unwrap();
     let runs = paragraphs[0].runs().unwrap();

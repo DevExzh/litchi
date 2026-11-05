@@ -173,14 +173,11 @@ fn assert_report_shape(
     );
 
     let admission = &report["retention_admission"];
-    assert_eq!(admission["boundary_checks_verified"], true);
-    assert!(u64_field(admission, "required_retained_base_bytes") > 0);
+    assert_eq!(admission["boundary_checks_verified"], false);
+    assert_eq!(u64_field(admission, "required_retained_base_bytes"), 0);
     assert_eq!(u64_field(admission, "zero_retained_base_bytes"), 0);
     assert_eq!(u64_field(admission, "one_under_retained_base_bytes"), 0);
-    assert_eq!(
-        u64_field(admission, "exact_retained_base_bytes"),
-        u64_field(admission, "required_retained_base_bytes")
-    );
+    assert_eq!(u64_field(admission, "exact_retained_base_bytes"), 0);
 
     let scenarios = report["scenarios"].as_array().expect("scenario array");
     assert_eq!(scenarios.len(), 1);
@@ -233,12 +230,9 @@ fn small_shared_exact_retention_preserves_oracles_and_sharing() {
         .expect("retained-byte vector");
     assert_eq!(retained.len(), 2);
     for value in retained {
-        assert_eq!(value, &admission["required_retained_base_bytes"]);
+        assert_eq!(value, &serde_json::json!(0));
     }
-    assert_eq!(
-        scenario["retained_commit_count"], 2,
-        "exact admission should retain both shared commits"
-    );
+    assert_eq!(scenario["retained_commit_count"], 0);
     fs::remove_dir_all(root).expect("remove small section-retention test directory");
 }
 

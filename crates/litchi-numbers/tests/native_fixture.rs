@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 
-use litchi_numbers::{Package, PackageError, cell::Value, compatibility_tables_from_bytes};
+use litchi_numbers::{
+    Error as PackageError, Package, cell::Value, compatibility_tables_from_bytes,
+};
 
 fn fixture_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../test-data/iwork/numbers/basic.numbers")
@@ -15,7 +17,7 @@ fn iwork_fixture(application: &str, filename: &str) -> PathBuf {
 
 fn assert_expected_cells(package: &Package) -> Result<(), Box<dyn std::error::Error>> {
     let sheet = package
-        .document()
+        .workbook_ref()
         .sheet(0)?
         .ok_or_else(|| std::io::Error::other("native Numbers fixture has no first sheet"))?;
     let table = sheet
@@ -51,7 +53,6 @@ fn native_numbers_table_info_projection_opens_rooted_and_compatibility_paths()
     let path = fixture_path();
     let package = Package::open(&path)?;
     assert_expected_cells(&package)?;
-    assert!(package.object_count() > 0);
 
     let bytes = std::fs::read(path)?;
     let from_bytes = Package::from_bytes(&bytes)?;
@@ -65,10 +66,9 @@ fn native_numbers_table_info_projection_opens_rooted_and_compatibility_paths()
         from_bytes.extract_structured_tables()?
     );
     assert_eq!(
-        from_bytes.document().sheet_count(),
-        package.document().sheet_count()
+        from_bytes.workbook_ref().sheet_count(),
+        package.workbook_ref().sheet_count()
     );
-    assert_eq!(from_bytes.object_count(), package.object_count());
     Ok(())
 }
 
@@ -81,11 +81,11 @@ fn native_foreign_iwork_fixtures_are_typed_not_numbers() -> Result<(), Box<dyn s
         let bytes = std::fs::read(&path)?;
         assert!(matches!(
             Package::from_bytes(&bytes),
-            Err(PackageError::NotNumbers)
+            Err(PackageError::UnexpectedFormat { .. })
         ));
         assert!(matches!(
             compatibility_tables_from_bytes(&bytes),
-            Err(PackageError::NotNumbers)
+            Err(PackageError::UnexpectedFormat { .. })
         ));
     }
     Ok(())

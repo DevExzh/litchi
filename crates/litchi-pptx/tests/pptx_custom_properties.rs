@@ -4,6 +4,9 @@
     reason = "test assertions panic on failure by design"
 )]
 
+mod in_place;
+use in_place::InPlace as _;
+
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI};
@@ -23,7 +26,7 @@ fn custom_properties_are_absent_round_trip_and_remove_idempotently() {
     let mut props = Props::new();
     props.insert("Owner", "Alice").unwrap();
     props.insert("Retries", 3_i32).unwrap();
-    package.put_custom_props(props).unwrap();
+    package.put_custom_props_in_place(props).unwrap();
 
     let bytes = package.to_bytes().unwrap();
     let mut reopened = Package::from_bytes(&bytes).unwrap();
@@ -31,9 +34,9 @@ fn custom_properties_are_absent_round_trip_and_remove_idempotently() {
     assert_eq!(props.get("owner"), Some(&Value::Text("Alice".to_owned())));
     assert_eq!(props.get("RETRIES"), Some(&Value::I32(3)));
 
-    reopened.remove_custom_props().unwrap();
+    reopened.put_custom_props_in_place(Props::new()).unwrap();
     assert!(reopened.custom_props().unwrap().is_empty());
-    reopened.remove_custom_props().unwrap();
+    reopened.put_custom_props_in_place(Props::new()).unwrap();
     assert!(reopened.custom_props().unwrap().is_empty());
 }
 
@@ -92,7 +95,7 @@ fn custom_properties_reject_word_only_reserved_metadata() {
         .unwrap();
 
     assert!(props.validate_for(Host::PowerPoint).is_err());
-    assert!(package.put_custom_props(props).is_err());
+    assert!(package.put_custom_props_in_place(props).is_err());
     assert!(package.custom_props().unwrap().is_empty());
 }
 

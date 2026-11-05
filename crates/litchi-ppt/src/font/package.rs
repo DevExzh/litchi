@@ -1,5 +1,5 @@
 use super::{FontCollections, Limits};
-use crate::package::{Package, Result};
+use crate::{package::Result, raw::Reader};
 use litchi_cfb::OleFile;
 use std::io::{Cursor, Read, Seek};
 
@@ -26,33 +26,23 @@ pub struct PackageOptions<'a> {
     pub limits: PackageLimits,
 }
 
-impl<R: Read + Seek> Package<R> {
-    /// Read font semantics from the exact live persisted document.
+impl<R: Read + Seek> Reader<R> {
+    /// Read font semantics from the exact live persisted document under the
+    /// caller-selected record and font limits.
     ///
     /// # Errors
     ///
     /// Returns an error if the package cannot be opened or its font records
     /// are malformed.
-    pub fn fonts(&mut self) -> Result<FontCollections> {
-        self.presentation()?.fonts()
-    }
-
-    /// Read font semantics under explicit limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the package cannot be opened, the limits are
-    /// invalid, or the font records are malformed or exceed the limits.
-    pub fn fonts_with_limits(&mut self, limits: Limits) -> Result<FontCollections> {
-        self.presentation_with_limits(limits.records)?
-            .fonts_with_limits(limits)
+    pub fn fonts(&mut self, limits: Limits) -> Result<FontCollections> {
+        self.presentation()?.fonts_with_limits(limits)
     }
 }
 
 /// Require every unrelated stream path and payload to remain exact.
 pub(crate) fn validate_unrelated_streams(before: &[u8], after: &[u8]) -> Result<()> {
-    let mut old = OleFile::open(Cursor::new(before))?;
-    let mut new = OleFile::open(Cursor::new(after))?;
+    let mut old = OleFile::open(Cursor::new(before), litchi_cfb::OleFileLimits::default())?;
+    let mut new = OleFile::open(Cursor::new(after), litchi_cfb::OleFileLimits::default())?;
     let mut old_paths = old.list_streams();
     let mut new_paths = new.list_streams();
     old_paths.sort();
@@ -83,7 +73,7 @@ pub(crate) fn validate_unrelated_streams(before: &[u8], after: &[u8]) -> Result<
 /// Refuse nested CFB storages because the shared stream-only publisher cannot
 /// prove preservation of their CLSIDs, state bits, timestamps, or emptiness.
 pub(crate) fn require_stream_only_cfb(source: &[u8]) -> Result<()> {
-    let ole = OleFile::open(Cursor::new(source))?;
+    let ole = OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default())?;
     if ole
         .list_directory_entries(&[])?
         .iter()

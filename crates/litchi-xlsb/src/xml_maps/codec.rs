@@ -13,7 +13,7 @@ use super::model::{
 };
 use super::validation;
 use crate::package::error::{Error, Result};
-use crate::raw::{Cursor, Kind, Limits as RawLimits, Records, Writer, kind as rt};
+use crate::raw::{Cursor, Encoder, Kind, Limits as RawLimits, Records, kind as rt};
 
 const LIST_SINGLE_CELL: u32 = 1 << 1;
 const XML_CAN_BE_SINGLE: u32 = 1 << 1;
@@ -70,9 +70,10 @@ impl SingleCellsSource {
 
     pub(crate) fn ensure_removal_lossless(&self) -> Result<()> {
         if self.has_opaque {
-            return Err(Error::UnsupportedFeature(
-                "cannot losslessly edit Single Cell Tables containing opaque or FRT records"
-                    .to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_xml_maps",
+                "the Single Cell Tables source contains opaque records",
             ));
         }
         Ok(())
@@ -110,7 +111,7 @@ fn records(data: &[u8], limits: Limits) -> Result<Vec<SeenRecord<'_>>> {
             resource: "XML map BIFF12 record index",
             source,
         })?;
-    let mut iterator = Records::with_limits(
+    let mut iterator = Records::new(
         data,
         RawLimits::new(limits.max_part_bytes, limits.max_xpath_units),
     );
@@ -223,10 +224,10 @@ fn parse_table_bindings_impl(
     }
     if wrapper_depth != 0 {
         return Err(Error::UnexpectedEndOfStream(
-            "future-record wrapper before BrtBeginList".to_string(),
+            "future-record wrapper before BrtBeginList",
         ));
     }
-    let start = start.ok_or_else(|| Error::UnexpectedEndOfStream("BrtBeginList".to_string()))?;
+    let start = start.ok_or(Error::UnexpectedEndOfStream("BrtBeginList"))?;
     let (table_id, table_type) = parse_table_header(records[start].payload)?;
     let mut bindings = Vec::new();
     let mut slots = Vec::new();
@@ -254,7 +255,11 @@ fn parse_table_bindings_impl(
             rt::BEGIN_LIST_COLS
                 if !in_columns && !saw_columns && current.is_none() && xml_start.is_none() =>
             {
-                let mut cursor = Cursor::new(record.payload, "BrtBeginListCols");
+                let mut cursor = Cursor::new(
+                    record.payload,
+                    "BrtBeginListCols",
+                    crate::raw::Limits::DEFAULT,
+                );
                 declared_columns = cursor.read_u32()?;
                 cursor.finish()?;
                 in_columns = true;
@@ -301,7 +306,7 @@ fn parse_table_bindings_impl(
                 if found_columns != declared_columns {
                     return Err(validation::invalid(
                         "BrtBeginListCols",
-                        format!("declared {declared_columns} columns, found {found_columns}"),
+                        "declared columns, found",
                     ));
                 }
                 in_columns = false;
@@ -322,7 +327,7 @@ fn parse_table_bindings_impl(
             _ if known_table_structure(record.kind) => {
                 return Err(validation::invalid(
                     "Table XML bindings",
-                    format!("misplaced known record {}", record.kind.get()),
+                    "misplaced known record",
                 ));
             },
             _ => {
@@ -331,15 +336,15 @@ fn parse_table_bindings_impl(
         }
     }
     if !saw_end_list {
-        return Err(Error::UnexpectedEndOfStream("BrtEndList".to_string()));
+        return Err(Error::UnexpectedEndOfStream("BrtEndList"));
     }
     if !bindings.is_empty() && table_type != 2 {
         return Err(validation::invalid(
             "mapped table type",
-            format!("expected LTXML, found {table_type}"),
+            "expected LTXML, found",
         ));
     }
-    let value = MappedTable::new_with_limits(table_id, bindings, limits)?;
+    let value = MappedTable::bounded(table_id, bindings, limits)?;
     Ok((value, slots))
 }
 
@@ -358,14 +363,11 @@ fn known_table_structure(kind: Kind) -> bool {
 }
 
 fn parse_table_header(payload: &[u8]) -> Result<(u32, u32)> {
-    let mut cursor = Cursor::new(payload, "BrtBeginList");
+    let mut cursor = Cursor::new(payload, "BrtBeginList", crate::raw::Limits::DEFAULT);
     cursor.skip(16)?;
     let table_type = cursor.read_u32()?;
     if !matches!(table_type, 0 | 2 | 3) {
-        return Err(validation::invalid(
-            "table type",
-            format!("unknown value {table_type}"),
-        ));
+        return Err(validation::invalid("table type", "unknown value"));
     }
     let id = cursor.read_u32()?;
     validation::list_id(id, "table ID")?;
@@ -373,7 +375,7 @@ fn parse_table_header(payload: &[u8]) -> Result<(u32, u32)> {
 }
 
 fn parse_column_id(payload: &[u8]) -> Result<u32> {
-    let mut cursor = Cursor::new(payload, "BrtBeginListCol");
+    let mut cursor = Cursor::new(payload, "BrtBeginListCol", crate::raw::Limits::DEFAULT);
     let id = cursor.read_u32()?;
     validation::nonzero_id(id, "table column ID")?;
     Ok(id)
@@ -384,7 +386,7 @@ fn parse_column_binding_with_flags(
     payload: &[u8],
     limits: Limits,
 ) -> Result<(ColumnBinding, u32)> {
-    let mut cursor = Cursor::with_limits(
+    let mut cursor = Cursor::new(
         payload,
         "BrtBeginListXmlCPr",
         RawLimits::new(limits.max_part_bytes, limits.max_xpath_units),
@@ -392,7 +394,7 @@ fn parse_column_binding_with_flags(
     let map_id = cursor.read_u32()?;
     let flags = cursor.read_u32()?;
     let data_type = XmlDataType::new(cursor.read_u32()?)?;
-    let xpath = XPath::new_with_limits(cursor.read_wide_string()?, limits)?;
+    let xpath = XPath::bounded(cursor.read_wide_string()?, limits)?;
     cursor.finish()?;
     let binding = ColumnBinding::new(
         column_id,
@@ -431,7 +433,7 @@ fn serialize_column_binding_with_flags(
             source,
         })?;
     {
-        let mut writer = Writer::with_limits(
+        let mut writer = Encoder::new(
             &mut payload,
             RawLimits::new(limits.max_part_bytes, limits.max_xpath_units),
         );
@@ -454,7 +456,7 @@ fn serialize_column_binding_with_flags(
             resource: "XML column binding records",
             source,
         })?;
-    let mut writer = Writer::with_limits(
+    let mut writer = Encoder::new(
         &mut output,
         RawLimits::new(limits.max_part_bytes, limits.max_xpath_units),
     );
@@ -503,14 +505,14 @@ pub fn patch_table_bindings(
         ));
     }
     let slot_ids: HashSet<u32> = source.slots.iter().map(|slot| slot.column_id).collect();
-    if let Some(binding) = value
+    if let Some(_binding) = value
         .columns()
         .iter()
         .find(|binding| !slot_ids.contains(&binding.column_id()))
     {
         return Err(validation::invalid(
             "mapped table patch",
-            format!("column {} is absent from the source", binding.column_id()),
+            "column is absent from the source",
         ));
     }
     let target: HashMap<u32, &ColumnBinding> = value
@@ -532,10 +534,11 @@ pub fn patch_table_bindings(
             continue;
         }
         if slot.opaque_xml {
-            return Err(Error::UnsupportedFeature(format!(
-                "cannot losslessly edit opaque BrtBeginListXmlCPr for column {}",
-                slot.column_id
-            )));
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_xml_maps",
+                "the XML Maps column contains opaque records",
+            ));
         }
         let replacement = match after {
             Some(binding) => {
@@ -636,7 +639,7 @@ fn parse_single_cells_impl(
     }
     if wrapper_depth != 0 {
         return Err(Error::UnexpectedEndOfStream(
-            "future-record wrapper in Single Cell Tables".to_string(),
+            "future-record wrapper in Single Cell Tables",
         ));
     }
     let mut position = 0usize;
@@ -705,7 +708,7 @@ fn expect_kind<'a>(
     let record = records
         .get(*position)
         .copied()
-        .ok_or_else(|| Error::UnexpectedEndOfStream(format!("record {}", kind.get())))?;
+        .ok_or(Error::UnexpectedEndOfStream("record"))?;
     if record.kind != kind {
         return Err(Error::UnexpectedRecord {
             expected: kind.get(),
@@ -723,7 +726,11 @@ fn expect_kind<'a>(
 }
 
 fn parse_single_list(payload: &[u8]) -> Result<(u32, CellReference, u32, bool)> {
-    let mut cursor = Cursor::new(payload, "single-cell BrtBeginList");
+    let mut cursor = Cursor::new(
+        payload,
+        "single-cell BrtBeginList",
+        crate::raw::Limits::DEFAULT,
+    );
     let first_row = cursor.read_u32()?;
     let last_row = cursor.read_u32()?;
     let first_column = cursor.read_u32()?;
@@ -768,25 +775,26 @@ fn parse_single_list(payload: &[u8]) -> Result<(u32, CellReference, u32, bool)> 
 }
 
 fn parse_single_column(payload: &[u8]) -> Result<(u32, bool)> {
-    let mut cursor = Cursor::new(payload, "single-cell BrtBeginListCol");
+    let mut cursor = Cursor::new(
+        payload,
+        "single-cell BrtBeginListCol",
+        crate::raw::Limits::DEFAULT,
+    );
     let column_id = cursor.read_u32()?;
     validation::nonzero_id(column_id, "single-cell column ID")?;
     let totals_row_function = cursor.read_u32()?;
     if totals_row_function > 9 {
-        return Err(validation::invalid(
-            "totals-row function",
-            format!("unknown value {totals_row_function}"),
-        ));
+        return Err(validation::invalid("totals-row function", "unknown value"));
     }
     for _ in 0..3 {
         exact_cursor_u32(&mut cursor, "single-cell column DXF ID", NO_DXF)?;
     }
     exact_cursor_u32(&mut cursor, "query-table field ID", 0)?;
-    for context in ["name", "caption"] {
+    for _context in ["name", "caption"] {
         if cursor.read_nullable_wide_string()?.is_some() {
             return Err(validation::invalid(
                 "single-cell BrtBeginListCol",
-                format!("non-NULL {context}"),
+                "non-NULL",
             ));
         }
     }
@@ -806,11 +814,11 @@ fn parse_single_column(payload: &[u8]) -> Result<(u32, bool)> {
             "custom totals-row function has a non-NULL total label",
         ));
     }
-    for context in ["header style", "insert-row style", "totals style"] {
+    for _context in ["header style", "insert-row style", "totals style"] {
         if cursor.read_nullable_wide_string()?.is_some() {
             return Err(validation::invalid(
                 "single-cell BrtBeginListCol",
-                format!("non-NULL {context}"),
+                "non-NULL",
             ));
         }
     }
@@ -821,17 +829,14 @@ fn parse_single_column(payload: &[u8]) -> Result<(u32, bool)> {
 fn exact_cursor_u32(cursor: &mut Cursor<'_>, context: &'static str, expected: u32) -> Result<()> {
     let found = cursor.read_u32()?;
     if found != expected {
-        Err(validation::invalid(
-            context,
-            format!("expected 0x{expected:08X}, found 0x{found:08X}"),
-        ))
+        Err(validation::invalid(context, "expected 0x, found 0x"))
     } else {
         Ok(())
     }
 }
 
 fn exact_u32(payload: &[u8], context: &'static str, expected: u32) -> Result<()> {
-    let mut cursor = Cursor::new(payload, context);
+    let mut cursor = Cursor::new(payload, context, crate::raw::Limits::DEFAULT);
     exact_cursor_u32(&mut cursor, context, expected)?;
     cursor.finish()?;
     Ok(())
@@ -848,7 +853,7 @@ pub fn serialize_single_cells(values: &[SingleCellBinding], limits: Limits) -> R
             source,
         })?;
     let raw_limits = RawLimits::new(limits.max_part_bytes, limits.max_xpath_units);
-    let mut writer = Writer::with_limits(&mut output, raw_limits);
+    let mut writer = Encoder::new(&mut output, raw_limits);
     writer.write_record(rt::BEGIN_SINGLE_CELLS, &[])?;
     for value in values {
         let list = single_list_payload(value, limits)?;
@@ -870,7 +875,7 @@ pub fn serialize_single_cells(values: &[SingleCellBinding], limits: Limits) -> R
 
 fn single_list_payload(value: &SingleCellBinding, limits: Limits) -> Result<Vec<u8>> {
     let mut payload = checked_vec(92, "single-cell BrtBeginList")?;
-    let mut writer = Writer::with_limits(
+    let mut writer = Encoder::new(
         &mut payload,
         RawLimits::new(limits.max_part_bytes, limits.max_xpath_units),
     );
@@ -895,7 +900,7 @@ fn single_list_payload(value: &SingleCellBinding, limits: Limits) -> Result<Vec<
 
 fn single_column_payload(value: &SingleCellBinding, limits: Limits) -> Result<Vec<u8>> {
     let mut payload = checked_vec(48, "single-cell BrtBeginListCol")?;
-    let mut writer = Writer::with_limits(
+    let mut writer = Encoder::new(
         &mut payload,
         RawLimits::new(limits.max_part_bytes, limits.max_xpath_units),
     );
@@ -913,11 +918,11 @@ fn single_column_payload(value: &SingleCellBinding, limits: Limits) -> Result<Ve
 
 fn column_binding_payload(binding: &ColumnBinding, limits: Limits) -> Result<Vec<u8>> {
     let records = serialize_column_binding(binding, limits)?;
-    let mut parsed = Records::new(&records);
+    let mut parsed = Records::new(&records, crate::raw::Limits::DEFAULT);
     let first = parsed
         .next()
         .transpose()?
-        .ok_or_else(|| Error::UnexpectedEndOfStream("BrtBeginListXmlCPr".to_string()))?;
+        .ok_or(Error::UnexpectedEndOfStream("BrtBeginListXmlCPr"))?;
     clone_bytes(first.payload(), "XML column binding payload")
 }
 
@@ -932,9 +937,10 @@ pub fn patch_single_cells(
         return clone_bytes(&source.source, "single-cell no-op patch");
     }
     if source.has_opaque {
-        return Err(Error::UnsupportedFeature(
-            "cannot losslessly edit Single Cell Tables containing opaque or FRT records"
-                .to_string(),
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit_xml_maps",
+            "the Single Cell Tables source contains opaque records",
         ));
     }
     serialize_single_cells(values, limits)

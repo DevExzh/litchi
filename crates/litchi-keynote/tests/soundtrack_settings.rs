@@ -25,13 +25,13 @@ fn bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn without_soundtrack_reference(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let mut archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
         for object in &mut archive.objects {
             let Some(index) = object
                 .messages
@@ -40,7 +40,10 @@ fn without_soundtrack_reference(source: &[u8]) -> TestResult<Vec<u8>> {
             else {
                 continue;
             };
-            let view = WireView::parse(&object.messages[index].data)?;
+            let view = WireView::parse(
+                &object.messages[index].data,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
             if !view.fields().any(|field| field.number() == 17) {
                 continue;
             }
@@ -56,8 +59,10 @@ fn without_soundtrack_reference(source: &[u8]) -> TestResult<Vec<u8>> {
                     type_: 2,
                     data: rewritten,
                 },
+                Default::default(),
             )?;
-            let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+            let compressed =
+                SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
             return Ok(catalog.reassemble_to_bytes(
                 &[EntryEdit::new(entry.name(), &compressed)],
                 Limits::default(),
@@ -68,16 +73,16 @@ fn without_soundtrack_reference(source: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn soundtrack_media_fields(source: &[u8]) -> TestResult<Vec<Vec<u8>>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
         for object in &archive.objects {
             if let Some(message) = object.messages.iter().find(|message| message.type_ == 21) {
-                let view = WireView::parse(&message.data)?;
+                let view = WireView::parse(&message.data, litchi_iwa_common::WireLimits::DEFAULT)?;
                 return Ok(view
                     .fields()
                     .filter(|field| field.number() == 3)
@@ -135,7 +140,9 @@ fn synthetic_absence_reads_none_and_edit_is_typed() -> TestResult<()> {
     assert_eq!(package.soundtrack_settings()?, None);
     assert!(matches!(
         package.edit_soundtrack_settings(),
-        Err(Error::SoundtrackNotFound)
+        Err(Error::Refused(
+            litchi_keynote::soundtrack::Refusal::SoundtrackNotFound
+        ))
     ));
     assert_eq!(bytes(&package)?, absent);
     Ok(())

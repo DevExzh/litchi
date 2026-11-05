@@ -118,7 +118,8 @@ fn loads_shapes_through_the_package_graph() {
 
 #[test]
 fn poi_fixture_text_boxes_parse() {
-    let package = OpcPackage::from_bytes(POI_TEXT_BOXES).unwrap();
+    let package =
+        OpcPackage::from_bytes(POI_TEXT_BOXES, litchi_opc::SourceLimits::default()).unwrap();
     let all = load_shapes(&package).unwrap();
     let names: Vec<_> = all
         .iter()
@@ -141,8 +142,8 @@ fn poi_fixture_text_boxes_parse() {
     assert_eq!(body.properties.insets.left.as_emu(), Some(27432));
     assert_eq!(body.text(), "State-Owned Enterprise");
     let run = &body.paragraphs[0].runs[0];
-    assert_eq!(run.bold, Some(false));
-    assert_eq!(run.font_size.map(TextSize::get), Some(900));
+    assert_eq!(run.properties.bold, Some(false));
+    assert_eq!(run.properties.size.map(TextSize::get), Some(900));
     // All four fixture text boxes anchor with two-cell anchors.
     assert!(
         all.iter()

@@ -9,7 +9,7 @@
 //! Usage: `pptx_semantic_inventory input.pptx output.json`
 
 use litchi_core::OwnedSource;
-use litchi_pptx::{Package, ReadLimits, SourceBackedPresentation, SourceImageTarget};
+use litchi_pptx::{Package, SourceBackedPresentation, SourceImageTarget, SourceLimits};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::fs::{self, File, OpenOptions};
@@ -237,11 +237,11 @@ fn sha256_hex(bytes: &[u8]) -> String {
     output
 }
 
-fn inventory_read_limits() -> AnyResult<ReadLimits> {
-    Ok(ReadLimits::builder()
+fn inventory_read_limits() -> AnyResult<SourceLimits> {
+    Ok(SourceLimits::builder()
         .max_input_bytes(MAX_INPUT_BYTES)?
-        .max_archive_entry_bytes(MAX_ARCHIVE_ENTRY_BYTES)?
-        .max_archive_total_bytes(MAX_ARCHIVE_TOTAL_BYTES)?
+        .max_entry_bytes(MAX_ARCHIVE_ENTRY_BYTES)?
+        .max_aggregate_bytes(MAX_ARCHIVE_TOTAL_BYTES)?
         .max_part_bytes(MAX_ARCHIVE_ENTRY_BYTES)?
         .max_total_part_bytes(MAX_TOTAL_PART_BYTES)?
         .build()?)
@@ -325,10 +325,10 @@ fn image_target(target: &SourceImageTarget) -> AnyResult<ImageTargetInventory> {
 
 fn image_inventory_error(error: &litchi_pptx::Error) -> AnyResult<ImageInventoryError> {
     let (kind, operation, reason) = match error {
-        litchi_pptx::Error::UnsafeEdit { operation, reason } => (
-            "unsafe_edit",
-            Some((*operation).to_owned()),
-            Some((*reason).to_owned()),
+        litchi_pptx::Error::Refused(refusal) => (
+            "refused",
+            Some(refusal.operation().to_owned()),
+            Some(refusal.reason().to_owned()),
         ),
         litchi_pptx::Error::MarkupCompatibility(_) => ("markup_compatibility", None, None),
         litchi_pptx::Error::Limit { .. } => ("limit", None, None),
@@ -497,8 +497,11 @@ fn collect_source_backed(
     })
 }
 
-fn collect_eager(input: Vec<u8>, limits: ReadLimits) -> AnyResult<EagerInventory> {
-    let package = Package::from_vec_with_limits(input, limits)?;
+fn collect_eager(input: Vec<u8>, limits: SourceLimits) -> AnyResult<EagerInventory> {
+    let package = Package::from_reader_with_options(
+        std::io::Cursor::new(input),
+        litchi_pptx::OpenOptions::default().source_limits(limits),
+    )?;
     let presentation = package.presentation()?;
     let slide_count = presentation.slide_count()?;
     bounded_count(slide_count, MAX_SLIDES, "eager slide")?;
@@ -566,9 +569,9 @@ fn main() -> AnyResult<()> {
     let source_sha256 = sha256_hex(&input_bytes);
 
     let limits = inventory_read_limits()?;
-    let source = SourceBackedPresentation::from_read_at_with_limits(
+    let source = SourceBackedPresentation::from_read_at_with_options(
         Arc::new(OwnedSource::new(input_bytes.clone())),
-        limits,
+        litchi_pptx::OpenOptions::default().source_limits(limits),
     )?;
     let source_backed = collect_source_backed(&source)?;
     let eager = collect_eager(input_bytes, limits)?;

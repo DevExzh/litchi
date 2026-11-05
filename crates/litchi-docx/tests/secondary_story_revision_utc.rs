@@ -1,7 +1,7 @@
 use litchi_docx::Package;
+use litchi_docx::SectionProperties;
 use litchi_docx::header_footer::Kind;
 use litchi_docx::section::Start;
-use litchi_docx::writer::SectionProperties;
 use std::io::Cursor;
 
 const WORD: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
@@ -16,11 +16,11 @@ fn revision_story(root: &str, alias: &str, timestamp: &str) -> String {
 
 #[test]
 fn header_and_footer_revision_utc_survive_package_save_and_reopen() {
-    let mut package = Package::new().unwrap();
+    let mut builder = litchi_docx::Builder::new().unwrap();
     let header_xml = revision_story("hdr", "h", "2026-07-17T00:00:00Z");
     let footer_xml = revision_story("ftr", "f", "2026-07-18T00:00:00Z");
     {
-        let document = package.document_mut().unwrap();
+        let document = builder.document().unwrap();
         document.add_paragraph_with_text("body");
         let mut section = SectionProperties::default().with_start_type(Start::NewPage);
         section
@@ -32,11 +32,12 @@ fn header_and_footer_revision_utc_survive_package_save_and_reopen() {
             .set_footer_part(Kind::Primary, "utc-footer", footer_xml.as_str())
             .unwrap();
     }
+    let package = builder.build().unwrap();
 
     let mut bytes = Cursor::new(Vec::new());
-    package.to_stream(&mut bytes).unwrap();
+    package.write_to(&mut bytes).unwrap();
     let original_bytes = bytes.into_inner();
-    let mut reopened = Package::from_reader(Cursor::new(original_bytes.as_slice())).unwrap();
+    let reopened = Package::from_reader(Cursor::new(original_bytes.as_slice())).unwrap();
     let document = reopened.document().unwrap();
 
     let header = document.headers().unwrap().into_iter().next().unwrap();
@@ -63,6 +64,6 @@ fn header_and_footer_revision_utc_survive_package_save_and_reopen() {
             .any(|window| window == b"du:dateUtc=\"2026-07-18T00:00:00Z\"")
     );
     let mut unchanged = Cursor::new(Vec::new());
-    reopened.to_stream(&mut unchanged).unwrap();
+    reopened.write_to(&mut unchanged).unwrap();
     assert_eq!(unchanged.into_inner(), original_bytes);
 }

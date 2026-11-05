@@ -19,8 +19,9 @@ use litchi_iwa_common::{
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tsd, tsp};
 use litchi_keynote::{
-    DrawableSelector, MovieInfo, Package, ReadOptions, ReplySelector, SemanticLimits,
-    SlideDrawableCommentError, SlideDrawableCommentLimitKind, SlideSelector,
+    DrawableSelector, MovieInfo, OpenOptions, Package, ReplySelector, SemanticLimits,
+    SlideSelector, SourceLimits, slide::comment::transaction::Error as SlideDrawableCommentError,
+    slide::comment::transaction::LimitKind as SlideDrawableCommentLimitKind,
 };
 use prost::Message as _;
 
@@ -49,17 +50,17 @@ fn source_bytes() -> TestResult<Vec<u8>> {
 }
 
 fn with_unknown_comment_extensions(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut locations = BTreeMap::<u64, (String, usize)>::new();
     let mut roots = Vec::<(u64, Vec<u64>)>::new();
     for entry in catalog.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let Ok(stream) = SnappyStream::decompress(entry.data()) else {
+        let Ok(stream) = SnappyStream::decompress(entry.data(), Default::default()) else {
             continue;
         };
-        let Ok(archive) = Archive::parse(&stream.into_bytes()) else {
+        let Ok(archive) = Archive::parse(&stream.into_bytes(), Default::default()) else {
             continue;
         };
         for object in &archive.objects {
@@ -115,8 +116,8 @@ fn with_unknown_comment_extensions(source: &[u8]) -> TestResult<Vec<u8>> {
         let Some(component_targets) = targets.get(entry.name()) else {
             continue;
         };
-        let stream = SnappyStream::decompress(entry.data())?.into_bytes();
-        let mut archive = Archive::parse(&stream)?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+        let mut archive = Archive::parse(&stream, Default::default())?;
         for (identifier, message_index) in component_targets {
             let object = archive
                 .object_mut(*identifier)
@@ -130,6 +131,7 @@ fn with_unknown_comment_extensions(source: &[u8]) -> TestResult<Vec<u8>> {
                 &mut payload,
                 UNKNOWN_COMMENT_EXTENSION_FIELD,
                 UNKNOWN_COMMENT_EXTENSION_PAYLOAD,
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
             object.replace_message(
                 *message_index,
@@ -137,11 +139,12 @@ fn with_unknown_comment_extensions(source: &[u8]) -> TestResult<Vec<u8>> {
                     type_,
                     data: payload,
                 },
+                Default::default(),
             )?;
         }
         replacements.insert(
             entry.name().to_owned(),
-            SnappyStream::compress(&archive.to_bytes()?)?,
+            SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?,
         );
     }
 
@@ -162,14 +165,14 @@ fn with_unknown_comment_extensions(source: &[u8]) -> TestResult<Vec<u8>> {
 
 fn unknown_comment_extension_spans(source: &[u8]) -> TestResult<Vec<Vec<u8>>> {
     let mut spans = Vec::new();
-    for entry in Catalog::from_bytes(source)?.iter() {
+    for entry in Catalog::from_bytes(source, Default::default())?.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let Ok(stream) = SnappyStream::decompress(entry.data()) else {
+        let Ok(stream) = SnappyStream::decompress(entry.data(), Default::default()) else {
             continue;
         };
-        let Ok(archive) = Archive::parse(&stream.into_bytes()) else {
+        let Ok(archive) = Archive::parse(&stream.into_bytes(), Default::default()) else {
             continue;
         };
         for object in &archive.objects {
@@ -179,7 +182,7 @@ fn unknown_comment_extension_spans(source: &[u8]) -> TestResult<Vec<Vec<u8>>> {
                 .filter(|message| message.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
             {
                 spans.extend(
-                    WireView::parse(&message.data)?
+                    WireView::parse(&message.data, litchi_iwa_common::WireLimits::DEFAULT)?
                         .fields()
                         .filter(|field| field.number() == UNKNOWN_COMMENT_EXTENSION_FIELD)
                         .map(|field| field.raw().to_vec()),
@@ -192,16 +195,16 @@ fn unknown_comment_extension_spans(source: &[u8]) -> TestResult<Vec<Vec<u8>>> {
 }
 
 fn with_unknown_comment_header(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut selected = None;
     for entry in catalog.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let Ok(stream) = SnappyStream::decompress(entry.data()) else {
+        let Ok(stream) = SnappyStream::decompress(entry.data(), Default::default()) else {
             continue;
         };
-        let Ok(archive) = Archive::parse(&stream.into_bytes()) else {
+        let Ok(archive) = Archive::parse(&stream.into_bytes(), Default::default()) else {
             continue;
         };
         if let Some(object) = archive.objects.iter().find(|object| {
@@ -224,8 +227,8 @@ fn with_unknown_comment_header(source: &[u8]) -> TestResult<Vec<u8>> {
         .iter()
         .find(|entry| entry.name() == component)
         .ok_or_else(|| io::Error::other("comment component disappeared"))?;
-    let bytes = SnappyStream::decompress(entry.data())?.into_bytes();
-    let archive = Archive::parse(&bytes)?;
+    let bytes = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+    let archive = Archive::parse(&bytes, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("comment object disappeared"))?;
@@ -254,15 +257,19 @@ fn with_unknown_comment_header(source: &[u8]) -> TestResult<Vec<u8>> {
         &mut header,
         UNKNOWN_COMMENT_HEADER_FIELD,
         UNKNOWN_COMMENT_EXTENSION_PAYLOAD,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     let mut modified = Vec::with_capacity(bytes.len().saturating_add(header.len()));
     modified.extend_from_slice(&bytes[..header_offset]);
     encode_varint_into(&mut modified, u64::try_from(header.len())?);
     modified.extend_from_slice(&header);
     modified.extend_from_slice(&bytes[data_offset..]);
-    assert_eq!(Archive::parse(&modified)?.to_bytes()?, modified);
+    assert_eq!(
+        Archive::parse(&modified, Default::default())?.to_bytes(Default::default())?,
+        modified
+    );
 
-    let replacement = SnappyStream::compress(&modified)?;
+    let replacement = SnappyStream::compress(&modified, Default::default())?;
     let entries = catalog
         .iter()
         .map(|entry| {
@@ -347,22 +354,27 @@ fn permanent_native_fixture_is_pinned() {
 #[test]
 fn entry_limit_is_typed_and_source_stays_unchanged() -> TestResult {
     let source = source_bytes()?;
-    let limits = Limits::new(
-        8 * 1024 * 1024,
-        256,
-        2 * 1024 * 1024,
-        8 * 1024 * 1024,
-        2 * 1024 * 1024,
+    let limits = SourceLimits::builder()
+        .max_input_bytes(8 * 1024 * 1024)?
+        .max_entries(256)?
+        .max_entry_bytes(2 * 1024 * 1024)?
+        .max_aggregate_bytes(8 * 1024 * 1024)?
+        .max_component_bytes(2 * 1024 * 1024)?
+        .build()?;
+    let semantic = SemanticLimits::builder()
+        .max_objects(16 * 1024)?
+        .max_slides(512)?
+        .max_references(32 * 1024)?
+        .max_text_storages(8 * 1024)?
+        .max_text_fragments(32 * 1024)?
+        .max_text_bytes(2 * 1024 * 1024)?
+        .build()?;
+    let package = Package::from_bytes_with_options(
+        &source,
+        OpenOptions::new()
+            .source_limits(limits)
+            .semantic_limits(semantic),
     )?;
-    let semantic = SemanticLimits::new(
-        16 * 1024,
-        512,
-        32 * 1024,
-        8 * 1024,
-        32 * 1024,
-        2 * 1024 * 1024,
-    )?;
-    let package = Package::from_bytes_with_options(&source, ReadOptions::new(limits, semantic))?;
     let slide = SlideSelector::index(0);
     let inventory = package.slide_drawables(slide)?;
     let target = inventory
@@ -374,7 +386,7 @@ fn entry_limit_is_typed_and_source_stays_unchanged() -> TestResult {
     assert!(
         matches!(
             comment.as_ref(),
-            Err(SlideDrawableCommentError::LimitExceeded {
+            Err(SlideDrawableCommentError::Limit {
                 kind: SlideDrawableCommentLimitKind::Entries,
                 observed: 257,
                 maximum: 256,
@@ -385,12 +397,17 @@ fn entry_limit_is_typed_and_source_stays_unchanged() -> TestResult {
     );
     assert_eq!(exact_bytes(&package)?, source);
 
-    let package = Package::from_bytes_with_options(&source, ReadOptions::new(limits, semantic))?;
+    let package = Package::from_bytes_with_options(
+        &source,
+        OpenOptions::new()
+            .source_limits(limits)
+            .semantic_limits(semantic),
+    )?;
     let mutation = package.edit_slide_drawable_comment(slide, target);
     assert!(
         matches!(
             mutation.as_ref(),
-            Err(SlideDrawableCommentError::LimitExceeded {
+            Err(SlideDrawableCommentError::Limit {
                 kind: SlideDrawableCommentLimitKind::Entries,
                 observed: 257,
                 maximum: 256,
@@ -689,6 +706,7 @@ fn unknown_comment_payload_extensions_survive_root_and_reply_rewrites() -> TestR
             &mut field,
             UNKNOWN_COMMENT_EXTENSION_FIELD,
             UNKNOWN_COMMENT_EXTENSION_PAYLOAD,
+            litchi_iwa_common::WireLimits::DEFAULT,
         )?;
         field
     };
@@ -1006,14 +1024,14 @@ struct CommentSignature {
 
 fn comment_signatures(source: &[u8]) -> TestResult<Vec<CommentSignature>> {
     let mut signatures = Vec::new();
-    for entry in Catalog::from_bytes(source)?.iter() {
+    for entry in Catalog::from_bytes(source, Default::default())?.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let Ok(stream) = SnappyStream::decompress(entry.data()) else {
+        let Ok(stream) = SnappyStream::decompress(entry.data(), Default::default()) else {
             continue;
         };
-        let Ok(archive) = Archive::parse(&stream.into_bytes()) else {
+        let Ok(archive) = Archive::parse(&stream.into_bytes(), Default::default()) else {
             continue;
         };
         for object in &archive.objects {
@@ -1136,14 +1154,14 @@ enum HostileMutation {
 fn with_hostile_comment(source: &[u8], mutation: HostileMutation) -> TestResult<Vec<u8>> {
     let mut comments = Vec::new();
     let mut referenced = BTreeSet::new();
-    for entry in Catalog::from_bytes(source)?.iter() {
+    for entry in Catalog::from_bytes(source, Default::default())?.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let Ok(stream) = SnappyStream::decompress(entry.data()) else {
+        let Ok(stream) = SnappyStream::decompress(entry.data(), Default::default()) else {
             continue;
         };
-        let Ok(archive) = Archive::parse(&stream.into_bytes()) else {
+        let Ok(archive) = Archive::parse(&stream.into_bytes(), Default::default()) else {
             continue;
         };
         for object in &archive.objects {
@@ -1174,12 +1192,12 @@ fn with_hostile_comment(source: &[u8], mutation: HostileMutation) -> TestResult<
         .ok_or_else(|| io::Error::other("fixture has no comment storage"))?;
 
     let mut replacement = None;
-    for entry in Catalog::from_bytes(source)?.iter() {
+    for entry in Catalog::from_bytes(source, Default::default())?.iter() {
         if entry.name() != component {
             continue;
         }
-        let stream = SnappyStream::decompress(entry.data())?.into_bytes();
-        let mut parsed = Archive::parse(&stream)?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+        let mut parsed = Archive::parse(&stream, Default::default())?;
         let object = parsed
             .object_mut(identifier)
             .ok_or_else(|| io::Error::other("comment object disappeared"))?;
@@ -1199,7 +1217,12 @@ fn with_hostile_comment(source: &[u8], mutation: HostileMutation) -> TestResult<
                 ..Default::default()
             }
             .encode_to_vec();
-            append_length_delimited_field(&mut payload, 4, &reference)?;
+            append_length_delimited_field(
+                &mut payload,
+                4,
+                &reference,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         } else {
             payload = vec![0xff];
         }
@@ -1209,11 +1232,14 @@ fn with_hostile_comment(source: &[u8], mutation: HostileMutation) -> TestResult<
                 .object_references
                 .push(referenced_identifier);
         }
-        replacement = Some(SnappyStream::compress(&parsed.to_bytes()?)?);
+        replacement = Some(SnappyStream::compress(
+            &parsed.to_bytes(Default::default())?,
+            Default::default(),
+        )?);
         break;
     }
     let replacement = replacement.ok_or_else(|| io::Error::other("comment component missing"))?;
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entries = catalog
         .iter()
         .map(|entry| {
@@ -1228,4 +1254,39 @@ fn with_hostile_comment(source: &[u8], mutation: HostileMutation) -> TestResult<
         entries,
         Limits::default(),
     )?)
+}
+
+/// Record 0428: new comment storages (root and reply) derive their storage
+/// UUIDs, so two runs of the same edits agree on every comment signature. The
+/// creation date is the documented exception: it is the wall-clock instant,
+/// as the host writes it, and is masked here.
+#[test]
+fn created_comment_storage_uuids_are_deterministic() -> TestResult {
+    let source = source_bytes()?;
+    let run = || -> TestResult<Vec<CommentSignature>> {
+        let package = Package::from_bytes(&source)?;
+        let slide = SlideSelector::index(0);
+        let created = package
+            .edit_slide_drawable_comment(slide, empty_target(&package)?)?
+            .set("deterministic root")?
+            .commit()?;
+        let replied = created
+            .package()
+            .edit_slide_drawable_comment(slide, existing_target(&package)?)?
+            .add_reply("deterministic reply")?
+            .commit()?;
+        let mut signatures = comment_signatures(&exact_bytes(replied.package())?)?;
+        for signature in &mut signatures {
+            signature.creation_date = None;
+        }
+        signatures.sort_by_key(|signature| signature.identifier);
+        Ok(signatures)
+    };
+    let first = run()?;
+    assert!(first.iter().any(
+        |signature| signature.text.as_deref() == Some("deterministic reply")
+            && signature.uuid.is_some()
+    ));
+    assert_eq!(first, run()?);
+    Ok(())
 }

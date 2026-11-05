@@ -193,7 +193,7 @@ impl<'index, 'package> RelationshipClosure<'index, 'package> {
 /// borrowed references for every admitted relationship so an unrelated part
 /// cannot make a selected target fail during the inventory pass.  Aggregate
 /// edge and key allocations are bounded by the package's retained
-/// [`litchi_opc::ReadLimits`], and all fallible collection growth uses
+/// [`litchi_opc::SourceLimits`], and all fallible collection growth uses
 /// `try_reserve`.
 #[derive(Debug)]
 pub(crate) struct RelationshipIndex<'package> {
@@ -221,9 +221,9 @@ impl<'package> RelationshipIndex<'package> {
         let read_limits = package.read_limits();
         let part_count = package.part_count();
         if part_count > read_limits.max_parts() {
-            return Err(Error::Opc(OpcError::ReadLimit {
-                resource: litchi_opc::ReadResource::Parts,
-                actual: to_u64(part_count, "ink-action package part count")?,
+            return Err(Error::Opc(OpcError::Limit {
+                kind: litchi_opc::SourceLimitKind::Parts,
+                observed: to_u64(part_count, "ink-action package part count")?,
                 maximum: to_u64(read_limits.max_parts(), "ink-action package part limit")?,
             }));
         }
@@ -272,9 +272,13 @@ impl<'package> RelationshipIndex<'package> {
         // package root.  Reserve both maps before the first insertion so an
         // adversarial package cannot force an infallible growth during the
         // initial inventory pass.
-        let source_buckets = part_count
-            .checked_add(1)
-            .ok_or_else(|| limit("ink-action relationship source buckets", part_count))?;
+        let source_buckets = part_count.checked_add(1).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::Relationships,
+                usize::MAX,
+                part_count,
+            )
+        })?;
         // Outbound buckets are keyed by relationship *sources*, so they are
         // bounded by the admitted part inventory rather than the OPC graph
         // node ceiling.  That ceiling counts unique internal target nodes;
@@ -364,16 +368,8 @@ impl<'package> RelationshipIndex<'package> {
             .get(&canonical)
             .map(Vec::as_slice)
             .unwrap_or(&[]);
-        check_target_relationship_limit(
-            inbound.len(),
-            self.target_relationships,
-            "ink-action relationship edges",
-        )?;
-        check_target_relationship_limit(
-            outbound.len(),
-            self.target_relationships,
-            "ink-action relationship edges",
-        )?;
+        check_target_relationship_limit(inbound.len(), self.target_relationships)?;
+        check_target_relationship_limit(outbound.len(), self.target_relationships)?;
         for reference in outbound {
             if self.is_known_ecma_outbound(*reference)? {
                 return Err(Error::Relationship(format!(
@@ -452,37 +448,38 @@ impl<'package> RelationshipIndex<'package> {
         let mut source_edges = 0usize;
         let source_bucket_limit = self.package.part_count().checked_add(1).ok_or_else(|| {
             limit(
-                "ink-action relationship source buckets",
+                crate::error::CodecLimitKind::Parts,
+                usize::MAX,
                 self.package.part_count(),
             )
         })?;
 
         for relationship in relationships {
             source_edges = source_edges.checked_add(1).ok_or({
-                Error::Opc(OpcError::ReadLimit {
-                    resource: litchi_opc::ReadResource::RelationshipsPerPart,
-                    actual: u64::MAX,
+                Error::Opc(OpcError::Limit {
+                    kind: litchi_opc::SourceLimitKind::RelationshipsPerPart,
+                    observed: u64::MAX,
                     maximum: relationships_per_part_limit,
                 })
             })?;
             if source_edges > read_limits.max_relationships_per_part() {
-                return Err(Error::Opc(OpcError::ReadLimit {
-                    resource: litchi_opc::ReadResource::RelationshipsPerPart,
-                    actual: to_u64(source_edges, "ink-action relationships-per-part count")?,
+                return Err(Error::Opc(OpcError::Limit {
+                    kind: litchi_opc::SourceLimitKind::RelationshipsPerPart,
+                    observed: to_u64(source_edges, "ink-action relationships-per-part count")?,
                     maximum: relationships_per_part_limit,
                 }));
             }
             *total_edges = total_edges.checked_add(1).ok_or({
-                Error::Opc(OpcError::ReadLimit {
-                    resource: litchi_opc::ReadResource::TotalRelationships,
-                    actual: u64::MAX,
+                Error::Opc(OpcError::Limit {
+                    kind: litchi_opc::SourceLimitKind::TotalRelationships,
+                    observed: u64::MAX,
                     maximum: total_relationships_limit,
                 })
             })?;
             if *total_edges > read_limits.max_total_relationships() {
-                return Err(Error::Opc(OpcError::ReadLimit {
-                    resource: litchi_opc::ReadResource::TotalRelationships,
-                    actual: to_u64(*total_edges, "ink-action aggregate relationship edge count")?,
+                return Err(Error::Opc(OpcError::Limit {
+                    kind: litchi_opc::SourceLimitKind::TotalRelationships,
+                    observed: to_u64(*total_edges, "ink-action aggregate relationship edge count")?,
                     maximum: total_relationships_limit,
                 }));
             }
@@ -523,7 +520,7 @@ impl<'package> RelationshipIndex<'package> {
 
 fn validate_package_part_bytes(
     package: &OpcPackage,
-    read_limits: litchi_opc::ReadLimits,
+    read_limits: litchi_opc::SourceLimits,
 ) -> Result<()> {
     let mut total = 0u64;
     // Every part's inflated byte count is charged, so this pass decodes every
@@ -532,23 +529,23 @@ fn validate_package_part_bytes(
         let part = part?;
         let actual = to_u64(part.blob().len(), "ink-action part byte count")?;
         if actual > read_limits.max_part_bytes() {
-            return Err(Error::Opc(OpcError::ReadLimit {
-                resource: litchi_opc::ReadResource::PartBytes,
-                actual,
+            return Err(Error::Opc(OpcError::Limit {
+                kind: litchi_opc::SourceLimitKind::PartBytes,
+                observed: actual,
                 maximum: read_limits.max_part_bytes(),
             }));
         }
         total = total.checked_add(actual).ok_or_else(|| {
-            Error::Opc(OpcError::ReadLimit {
-                resource: litchi_opc::ReadResource::TotalPartBytes,
-                actual: u64::MAX,
+            Error::Opc(OpcError::Limit {
+                kind: litchi_opc::SourceLimitKind::TotalPartBytes,
+                observed: u64::MAX,
                 maximum: read_limits.max_total_part_bytes(),
             })
         })?;
         if total > read_limits.max_total_part_bytes() {
-            return Err(Error::Opc(OpcError::ReadLimit {
-                resource: litchi_opc::ReadResource::TotalPartBytes,
-                actual: total,
+            return Err(Error::Opc(OpcError::Limit {
+                kind: litchi_opc::SourceLimitKind::TotalPartBytes,
+                observed: total,
                 maximum: read_limits.max_total_part_bytes(),
             }));
         }
@@ -589,10 +586,10 @@ fn add_edge<'package>(
 ) -> Result<()> {
     if let Some(maximum_keys) = maximum_keys {
         if !index.contains_key(&key) && index.len() >= maximum_keys {
-            return Err(Error::Opc(OpcError::ReadLimit {
-                resource: litchi_opc::ReadResource::RelationshipGraphNodes,
-                actual: to_u64(
-                    index.len().saturating_add(1),
+            return Err(Error::Opc(OpcError::Limit {
+                kind: litchi_opc::SourceLimitKind::RelationshipGraphNodes,
+                observed: to_u64(
+                    index.len().checked_add(1).unwrap_or(usize::MAX),
                     "ink-action relationship graph node count",
                 )?,
                 maximum: to_u64(maximum_keys, "ink-action relationship graph node limit")?,
@@ -602,10 +599,10 @@ fn add_edge<'package>(
         // Every outbound source is one package part or the package root.  The
         // inventory count checked before indexing bounds this map separately
         // from the OPC graph-node policy, which counts unique internal targets.
-        return Err(Error::Opc(OpcError::ReadLimit {
-            resource: litchi_opc::ReadResource::Parts,
-            actual: to_u64(
-                index.len().saturating_add(1),
+        return Err(Error::Opc(OpcError::Limit {
+            kind: litchi_opc::SourceLimitKind::Parts,
+            observed: to_u64(
+                index.len().checked_add(1).unwrap_or(usize::MAX),
                 "ink-action relationship source bucket count",
             )?,
             maximum: to_u64(
@@ -620,7 +617,11 @@ fn add_edge<'package>(
     let edges = index.entry(key).or_default();
     if let Some(maximum_edges) = maximum_edges {
         if edges.len() >= maximum_edges {
-            return Err(limit(resource, maximum_edges));
+            return Err(limit(
+                crate::error::CodecLimitKind::Relationships,
+                edges.len().checked_add(1).unwrap_or(usize::MAX),
+                maximum_edges,
+            ));
         }
     }
     edges
@@ -630,13 +631,13 @@ fn add_edge<'package>(
     Ok(())
 }
 
-fn check_target_relationship_limit(
-    actual: usize,
-    maximum: usize,
-    resource: &'static str,
-) -> Result<()> {
+fn check_target_relationship_limit(actual: usize, maximum: usize) -> Result<()> {
     if actual > maximum {
-        return Err(limit(resource, maximum));
+        return Err(limit(
+            crate::error::CodecLimitKind::Relationships,
+            actual,
+            maximum,
+        ));
     }
     Ok(())
 }
@@ -683,7 +684,7 @@ fn ascii_case_insensitive_cmp(left: &str, right: &str) -> Ordering {
 
 fn check_relationship_fields(
     relationship: &Relationship,
-    read_limits: litchi_opc::ReadLimits,
+    read_limits: litchi_opc::SourceLimits,
 ) -> Result<()> {
     let field_limit = MAX_RELATIONSHIP_FIELD_BYTES.min(read_limits.max_xml_attribute_bytes());
     for (name, value) in [
@@ -692,14 +693,18 @@ fn check_relationship_fields(
         ("relationship target", relationship.target_ref()),
     ] {
         if value.len() > field_limit {
-            return Err(limit("ink-action relationship metadata bytes", field_limit));
+            return Err(limit(
+                crate::error::CodecLimitKind::RelationshipBytes,
+                value.len(),
+                field_limit,
+            ));
         }
         if name == "relationship target"
             && value.len() > read_limits.max_relationship_target_bytes()
         {
-            return Err(Error::Opc(OpcError::ReadLimit {
-                resource: litchi_opc::ReadResource::RelationshipTargetBytes,
-                actual: to_u64(value.len(), "ink-action relationship target bytes")?,
+            return Err(Error::Opc(OpcError::Limit {
+                kind: litchi_opc::SourceLimitKind::RelationshipTargetBytes,
+                observed: to_u64(value.len(), "ink-action relationship target bytes")?,
                 maximum: to_u64(
                     read_limits.max_relationship_target_bytes(),
                     "ink-action relationship target limit",
@@ -730,10 +735,11 @@ const fn target_mode_rank(mode: TargetMode) -> u8 {
     }
 }
 
-const fn limit(resource: &'static str, maximum: usize) -> Error {
+const fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
     Error::Limit {
-        resource,
-        limit: maximum,
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
     }
 }
 
@@ -1253,8 +1259,9 @@ mod tests {
         assert!(matches!(
             shared_result,
             Err(Error::Limit {
-                resource: "ink-action relationship edges",
-                limit: 1
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Relationships),
+                observed: 2,
+                maximum: 1
             })
         ));
     }

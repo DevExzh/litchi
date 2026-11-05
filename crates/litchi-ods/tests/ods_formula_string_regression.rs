@@ -121,7 +121,7 @@ fn many_short_and_empty_utf8_literals_retain_bounded_capacity() {
         }
 
         let formula = FormulaParser::new(&source)
-            .parse()
+            .parse(&Default::default())
             .expect("short and empty UTF-8 literals should parse");
         let values: Vec<_> = string_tokens(&formula).collect();
         assert_eq!(values.len(), count);
@@ -159,7 +159,7 @@ fn many_short_and_empty_utf8_literals_retain_bounded_capacity() {
 fn doubled_quotes_multibyte_values_and_source_text_are_exact() {
     let source = "  OF:=\"α🌟\"\"quoted\"+\"é\"\"Ω\"+\"\"  ";
     let formula = FormulaParser::new(source)
-        .parse()
+        .parse(&Default::default())
         .expect("doubled quotes and multibyte literals should parse");
 
     assert_eq!(formula.text, source);
@@ -174,7 +174,7 @@ fn doubled_quotes_multibyte_values_and_source_text_are_exact() {
 fn nul_is_rejected_while_non_nul_controls_remain_valid() {
     for source in ["=\"a\0\"\"b\"", "=\"a\"\"\0b\"", "=\"é\0\""] {
         let error = FormulaParser::new(source)
-            .parse()
+            .parse(&Default::default())
             .expect_err("NUL is excluded by the OpenFormula string grammar");
         assert!(
             matches!(error, Error::InvalidFormat(_)),
@@ -184,7 +184,7 @@ fn nul_is_rejected_while_non_nul_controls_remain_valid() {
 
     let source = "=\"line\n\t\u{1}é\"";
     let formula = FormulaParser::new(source)
-        .parse()
+        .parse(&Default::default())
         .expect("non-NUL controls are valid string content");
     assert_eq!(formula.text, source);
     assert!(matches!(
@@ -197,7 +197,7 @@ fn nul_is_rejected_while_non_nul_controls_remain_valid() {
 fn unterminated_and_malformed_quotes_remain_typed_syntax_errors() {
     for source in ["=\"unterminated", "=\"a\"\"b", "=\"a\"b"] {
         let error = FormulaParser::new(source)
-            .parse()
+            .parse(&Default::default())
             .expect_err("malformed string quote should be rejected");
         assert!(
             matches!(error, Error::InvalidFormat(_)),
@@ -206,7 +206,7 @@ fn unterminated_and_malformed_quotes_remain_typed_syntax_errors() {
     }
 
     let formula = FormulaParser::new("=\"\"")
-        .parse()
+        .parse(&Default::default())
         .expect("an empty quoted literal is valid");
     assert!(matches!(&formula.tokens[0], Token::String(value) if value.is_empty()));
 }
@@ -216,13 +216,13 @@ fn byte_and_token_limits_are_exact_for_string_formulas() {
     let source = "=\"é\"";
     let exact = FormulaLimits::default().with_max_bytes(source.len());
     let formula = FormulaParser::new(source)
-        .parse_with_limits(&exact)
+        .parse(&exact)
         .expect("a formula at its byte limit should be accepted");
     assert_eq!(formula.text, source);
 
     let too_small = FormulaLimits::default().with_max_bytes(source.len() - 1);
     let error = FormulaParser::new(source)
-        .parse_with_limits(&too_small)
+        .parse(&too_small)
         .expect_err("one byte over the formula limit should be refused");
     let Error::ResourceLimit(limit) = error else {
         panic!("expected a byte resource limit, got {error:?}");
@@ -234,13 +234,13 @@ fn byte_and_token_limits_are_exact_for_string_formulas() {
     let source = "=\"x\";\"y\"";
     let exact = FormulaLimits::default().with_max_tokens(3);
     let formula = FormulaParser::new(source)
-        .parse_with_limits(&exact)
+        .parse(&exact)
         .expect("three tokens at the token limit should be accepted");
     assert_eq!(formula.tokens.len(), 3);
 
     let too_small = FormulaLimits::default().with_max_tokens(2);
     let error = FormulaParser::new(source)
-        .parse_with_limits(&too_small)
+        .parse(&too_small)
         .expect_err("the third token should exceed the token limit");
     let Error::ResourceLimit(limit) = error else {
         panic!("expected a token resource limit, got {error:?}");
@@ -256,7 +256,7 @@ fn literal_allocation_failure_is_typed_and_targeted() {
     // decoded literal allocation in the fixed parser (or two-byte remaining
     // content reservation in the baseline) is the only targeted request.
     arm_literal_failure();
-    let result = FormulaParser::new("=\"x\"").parse();
+    let result = FormulaParser::new("=\"x\"").parse(&Default::default());
     let fired = injection_fired();
     disarm_literal_failure();
 

@@ -18,13 +18,67 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use litchi_core::Position;
-use litchi_doc::Package;
-use litchi_doc::body_text::{Error as BodyError, Projection, Refusal, Snapshot, TransactionLimits};
+use litchi_doc::body_text::{Error as BodyError, Projection, Refusal, TransactionLimits};
+use litchi_doc::raw::Reader;
 use litchi_doc::tracked_revision::Limits;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
 mod oracle_0730;
+
+/// The package route this harness measures (record 0359a): the body-text
+/// engine (`body_text::Snapshot`) is crate-private, so the historical
+/// `Snapshot::open_bounded -> Edit -> commit` shape runs over
+/// `Package::from_bytes` + `edit_with_options` with the same revision and
+/// transaction limits.
+#[derive(Clone)]
+pub(crate) struct Snapshot {
+    package: litchi_doc::Package,
+    options: litchi_doc::EditOptions,
+}
+
+impl Snapshot {
+    pub(crate) fn open_bounded(
+        bytes: Vec<u8>,
+        limits: Limits,
+        transaction_limits: TransactionLimits,
+    ) -> Result<Self, BoxError> {
+        Ok(Self {
+            package: litchi_doc::Package::from_bytes(&bytes)?,
+            options: litchi_doc::EditOptions::default()
+                .revision_limits(limits)
+                .transaction_limits(transaction_limits),
+        })
+    }
+
+    pub(crate) fn open(bytes: Vec<u8>, limits: Limits) -> Result<Self, BoxError> {
+        Self::open_bounded(bytes, limits, TransactionLimits::default())
+    }
+
+    pub(crate) fn edit(&self) -> Result<litchi_doc::Edit<'static>, BoxError> {
+        Ok(self.package.edit_with_options(self.options.clone())?)
+    }
+
+    pub(crate) fn paragraphs(
+        &self,
+        projection: Projection,
+    ) -> Result<Vec<litchi_doc::body_text::Paragraph>, BoxError> {
+        Ok(self.package.body_paragraphs(projection)?)
+    }
+
+    pub(crate) fn package(&self) -> &litchi_doc::Package {
+        &self.package
+    }
+
+    pub(crate) fn bytes(&self) -> Vec<u8> {
+        package_bytes(&self.package)
+    }
+}
+
+/// A package's exact bytes (the harness compares artifacts by value).
+pub(crate) fn package_bytes(package: &litchi_doc::Package) -> Vec<u8> {
+    package.to_bytes().expect("package bytes")
+}
 
 pub mod alloc_metrics;
 
@@ -301,7 +355,7 @@ fn run_case(source: &[u8], args: &Args, retention: Retention) -> Result<CaseResu
         edit.replace_paragraph(Position::new(0), requested_text)?;
         let after = edit.retained_render_bytes();
         let after_release = if retention.releases_after_stage() {
-            edit.release_retained_render();
+            edit.release_retained_render()?;
             edit.retained_render_bytes()
         } else {
             None
@@ -317,7 +371,7 @@ fn run_case(source: &[u8], args: &Args, retention: Retention) -> Result<CaseResu
     let final_retained_before_commit = edit.retained_render_bytes();
     let commit = edit.commit()?;
     let semantic_change_count = commit.patch().changes().len();
-    let output = commit.snapshot().bytes().to_vec();
+    let output = package_bytes(commit.package());
     let output_capacity = output.capacity();
     black_box(output.len());
     Ok(CaseResult {
@@ -545,7 +599,7 @@ fn final_paragraph_matches(result: &CaseResult, edits: EditCount) -> Result<bool
 }
 
 fn public_reader_reopens(result: &CaseResult) -> Result<bool, BoxError> {
-    let mut package = Package::from_reader(Cursor::new(result.output.clone()))?;
+    let mut package = Reader::from_reader(Cursor::new(result.output.clone()))?;
     package.document()?;
     Ok(true)
 }
@@ -575,10 +629,10 @@ fn patch_and_refusal_gates(
     edit.replace_paragraph(Position::new(0), FIRST_TEXT)?;
     let commit = edit.commit()?;
     let patch = commit.patch().clone();
-    let forward = patch.apply(&source_snapshot)?;
-    let forward_exact = forward.bytes() == commit.snapshot().bytes();
-    let inverse = patch.inverse().apply(commit.snapshot())?;
-    let inverse_exact = inverse.bytes() == source_snapshot.bytes();
+    let forward = source_snapshot.package().apply(&patch)?.into_package();
+    let forward_exact = package_bytes(&forward) == package_bytes(commit.package());
+    let inverse = commit.package().apply(&patch.inverse())?.into_package();
+    let inverse_exact = package_bytes(&inverse) == source_snapshot.bytes();
 
     let foreign_bytes = source_for_other_case(args.case, &args.input)?;
     let foreign = Snapshot::open_bounded(
@@ -586,8 +640,8 @@ fn patch_and_refusal_gates(
         Limits::default(),
         transaction_limits(Retention::Zero),
     )?;
-    let foreign_refused = patch.apply(&foreign).is_err();
-    let stale_refused = patch.apply(commit.snapshot()).is_err();
+    let foreign_refused = foreign.package().apply(&patch).is_err();
+    let stale_refused = commit.package().apply(&patch).is_err();
     Ok((forward_exact, inverse_exact, foreign_refused, stale_refused))
 }
 
@@ -605,14 +659,14 @@ fn exact_noop_gate(
     edit.replace_paragraph(Position::new(0), original)?;
     let no_retained_token = edit.retained_render_bytes().is_none();
     let commit = edit.commit()?;
-    let exact_source = !commit.changed()
+    let exact_source = !commit.diagnostics().changed()
         && commit.patch().is_noop()
         && commit.patch().changes().len() == 0
-        && commit.snapshot().bytes() == source
+        && package_bytes(commit.package()) == source
         && no_retained_token;
     let shares_source_allocation = Arc::ptr_eq(
-        &source_snapshot.bytes_shared(),
-        &commit.snapshot().bytes_shared(),
+        &source_snapshot.package().shared_source(),
+        &commit.package().shared_source(),
     );
     Ok((exact_source, shares_source_allocation))
 }
@@ -626,7 +680,7 @@ fn atomic_edit_controls(source: &[u8]) -> Result<(bool, bool), BoxError> {
     let mut one_operation = source_snapshot.edit()?;
     one_operation.replace_paragraph(Position::new(0), FIRST_TEXT)?;
     let one_operation_commit = one_operation.commit()?;
-    let one_operation_bytes = one_operation_commit.snapshot().bytes().to_vec();
+    let one_operation_bytes = package_bytes(one_operation_commit.package());
     let one_operation_patch_count = one_operation_commit.patch().changes().len();
 
     let mut same_value = source_snapshot.edit()?;
@@ -637,13 +691,13 @@ fn atomic_edit_controls(source: &[u8]) -> Result<(bool, bool), BoxError> {
         same_value.retained_render_bytes() == held_before_same_value;
     let same_value_commit = same_value.commit()?;
     let same_value_snapshot = Snapshot::open(
-        same_value_commit.snapshot().bytes().to_vec(),
+        package_bytes(same_value_commit.package()),
         Limits::default(),
     )?;
-    let same_value_matches_one_operation = same_value_commit.changed()
+    let same_value_matches_one_operation = same_value_commit.diagnostics().changed()
         && !same_value_commit.patch().is_noop()
         && same_value_commit.patch().changes().len() == one_operation_patch_count
-        && same_value_commit.snapshot().bytes() == one_operation_bytes
+        && package_bytes(same_value_commit.package()) == one_operation_bytes
         && paragraph_zero_text(&same_value_snapshot)? == FIRST_TEXT;
 
     let limited = TransactionLimits::new(1, 4096, 4096)
@@ -652,7 +706,7 @@ fn atomic_edit_controls(source: &[u8]) -> Result<(bool, bool), BoxError> {
     let mut limited_control = limited_snapshot.edit()?;
     limited_control.replace_paragraph(Position::new(0), FIRST_TEXT)?;
     let limited_control_commit = limited_control.commit()?;
-    let limited_control_bytes = limited_control_commit.snapshot().bytes().to_vec();
+    let limited_control_bytes = package_bytes(limited_control_commit.package());
     let limited_control_patch_count = limited_control_commit.patch().changes().len();
 
     let mut refused = limited_snapshot.edit()?;
@@ -661,18 +715,18 @@ fn atomic_edit_controls(source: &[u8]) -> Result<(bool, bool), BoxError> {
     let error = refused.replace_paragraph(Position::new(0), SECOND_TEXT);
     let typed_operation_refusal = matches!(
         error,
-        Err(BodyError::Refused(Refusal::OperationLimit { .. }))
+        Err(litchi_doc::package::edit::Error::Body(BodyError::Refused(
+            Refusal::OperationLimit { .. }
+        )))
     );
     let refusal_retention_unchanged = refused.retained_render_bytes() == held_before_refusal;
     let refusal_commit = refused.commit()?;
-    let refusal_snapshot = Snapshot::open(
-        refusal_commit.snapshot().bytes().to_vec(),
-        Limits::default(),
-    )?;
-    let refusal_output_matches_one_operation = refusal_commit.changed()
+    let refusal_snapshot =
+        Snapshot::open(package_bytes(refusal_commit.package()), Limits::default())?;
+    let refusal_output_matches_one_operation = refusal_commit.diagnostics().changed()
         && !refusal_commit.patch().is_noop()
         && refusal_commit.patch().changes().len() == limited_control_patch_count
-        && refusal_commit.snapshot().bytes() == limited_control_bytes
+        && package_bytes(refusal_commit.package()) == limited_control_bytes
         && refusal_snapshot.bytes() == limited_control_bytes
         && paragraph_zero_text(&refusal_snapshot)? == FIRST_TEXT;
     Ok((
@@ -999,7 +1053,7 @@ pub fn run(_allocator_lane: bool) -> Result<(), BoxError> {
         timing_claim: !alloc_metrics::instrumented(),
         allocator_instrumented: alloc_metrics::instrumented(),
         allocator_timing_claim: false,
-        region_definition: "public Snapshot::open_bounded source clone, one Edit with all paragraph-0 replacements and retention releases, commit, output Vec copy, and local snapshot/edit/commit destruction; source file read, references, correctness checks, hashing and JSON excluded",
+        region_definition: "public Package::from_bytes + edit_with_options source (record 0359a; was Snapshot::open_bounded), one Edit with all paragraph-0 replacements and retention releases, commit, output Vec copy, and local snapshot/edit/commit destruction; source file read, references, correctness checks, hashing and JSON excluded",
         warmups: args.warmup,
         samples_requested: args.samples,
         output_sha256,

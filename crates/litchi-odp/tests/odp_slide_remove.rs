@@ -5,7 +5,7 @@
 )]
 
 use litchi_odp::core::{OwnedPackage, PackageWriter};
-use litchi_odp::edit;
+use litchi_odp::{Package, edit};
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const DRAW: &str = "urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
@@ -27,7 +27,7 @@ fn package(content: &str) -> Vec<u8> {
 }
 
 fn package_with_macro(content: &str, with_macro: bool) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.presentation")
         .unwrap();
@@ -55,7 +55,7 @@ fn package_with_auxiliary_xml(
     auxiliary_xml: &[u8],
     media_type: &str,
 ) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.presentation")
         .unwrap();
@@ -80,24 +80,24 @@ fn dependency_free_blank_removal_is_exact_durable_reopenable_and_stale_checked()
     let last = r#"<draw:page draw:name="Last"/>"#;
     let source_bytes = package(&content(&format!("{first}{selected}{last}")));
     let source_package = OwnedPackage::from_bytes(source_bytes.clone()).unwrap();
-    let source = edit::Snapshot::from_bytes(source_bytes.clone()).unwrap();
+    let source = Package::from_bytes(&source_bytes).unwrap();
 
-    let mut transaction = source.transaction().unwrap();
+    let mut transaction = source.edit().unwrap();
     let removed = transaction
         .remove_dependency_free_blank_slide(1)
         .unwrap()
         .unwrap();
     assert_eq!(removed.index, 1);
     let commit = transaction.commit().unwrap();
-    assert!(commit.changed());
-    assert_eq!(source.bytes(), source_bytes);
-    assert_eq!(commit.snapshot().slides().len(), 2);
-    assert!(edit::Snapshot::from_bytes(commit.snapshot().bytes().to_vec()).is_ok());
+    assert!(commit.diagnostics().changed());
+    assert_eq!(source.as_bytes(), source_bytes);
+    assert_eq!(commit.package().slides().unwrap().len(), 2);
+    assert!(Package::from_bytes(commit.package().as_bytes()).is_ok());
 
-    let published_content = content_xml(commit.snapshot().bytes());
+    let published_content = content_xml(commit.package().as_bytes());
     assert!(published_content.contains(&format!("{first}{last}")));
     assert!(!published_content.contains(selected));
-    let published = OwnedPackage::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+    let published = OwnedPackage::from_bytes(commit.package().as_bytes().to_vec()).unwrap();
     for path in ["styles.xml", "meta.xml", "Producer/opaque.bin"] {
         assert_eq!(
             published.get_file(path).unwrap(),
@@ -108,18 +108,22 @@ fn dependency_free_blank_removal_is_exact_durable_reopenable_and_stale_checked()
 
     let durable =
         edit::Patch::from_durable_bytes(&commit.patch().to_durable_bytes().unwrap()).unwrap();
-    let replayed = durable.apply(&source).unwrap();
-    assert_eq!(replayed.bytes(), commit.snapshot().bytes());
+    let replayed = source.apply(&durable).unwrap().into_package();
+    assert_eq!(replayed.as_bytes(), commit.package().as_bytes());
     assert_eq!(
-        durable.inverse().apply(&replayed).unwrap().bytes(),
+        replayed
+            .apply(&durable.inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         source_bytes
     );
-    let stale = edit::Snapshot::from_bytes(package(&content(concat!(
+    let stale = Package::from_bytes(&package(&content(concat!(
         r#"<draw:page draw:name="Different"/>"#,
         r#"<draw:page draw:name="Last"/>"#,
     ))))
     .unwrap();
-    assert!(durable.apply(&stale).is_err());
+    assert!(stale.apply(&durable).is_err());
 }
 
 #[test]
@@ -128,8 +132,8 @@ fn missing_selector_is_an_exact_noop_and_final_slide_is_refused_atomically() {
         r#"<draw:page draw:name="First"/>"#,
         r#"<draw:page draw:name="Last"/>"#,
     )));
-    let source = edit::Snapshot::from_bytes(source_bytes.clone()).unwrap();
-    let mut transaction = source.transaction().unwrap();
+    let source = Package::from_bytes(&source_bytes).unwrap();
+    let mut transaction = source.edit().unwrap();
     assert!(
         transaction
             .remove_dependency_free_blank_slide("Missing")
@@ -137,19 +141,19 @@ fn missing_selector_is_an_exact_noop_and_final_slide_is_refused_atomically() {
             .is_none()
     );
     let commit = transaction.commit().unwrap();
-    assert!(!commit.changed());
-    assert_eq!(commit.snapshot().bytes(), source_bytes);
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().as_bytes(), source_bytes);
 
     let single_bytes = package(&content(r#"<draw:page draw:name="Only"/>"#));
-    let single = edit::Snapshot::from_bytes(single_bytes.clone()).unwrap();
-    let mut transaction = single.transaction().unwrap();
+    let single = Package::from_bytes(&single_bytes).unwrap();
+    let mut transaction = single.edit().unwrap();
     let error = transaction
         .remove_dependency_free_blank_slide(0)
         .unwrap_err();
     assert!(error.to_string().contains("final slide"));
     let commit = transaction.commit().unwrap();
-    assert!(!commit.changed());
-    assert_eq!(commit.snapshot().bytes(), single_bytes);
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().as_bytes(), single_bytes);
 }
 
 #[test]
@@ -198,14 +202,14 @@ fn selected_dependency_bearing_pages_are_refused_without_staging() {
     ];
     for (description, page) in cases {
         let source_bytes = package(&content(&format!(r#"<draw:page draw:name="Keep"/>{page}"#)));
-        let source = edit::Snapshot::from_bytes(source_bytes.clone()).unwrap();
-        let mut transaction = source.transaction().unwrap();
+        let source = Package::from_bytes(&source_bytes).unwrap();
+        let mut transaction = source.edit().unwrap();
         transaction
             .remove_dependency_free_blank_slide(1)
             .expect_err(description);
         let commit = transaction.commit().unwrap();
-        assert!(!commit.changed(), "{description}");
-        assert_eq!(commit.snapshot().bytes(), source_bytes, "{description}");
+        assert!(!commit.diagnostics().changed(), "{description}");
+        assert_eq!(commit.package().as_bytes(), source_bytes, "{description}");
     }
 }
 
@@ -261,8 +265,8 @@ fn inbound_name_owner_and_macro_storage_are_refused_before_mutation() {
             ),
         ),
     ] {
-        let source = edit::Snapshot::from_bytes(bytes.clone()).unwrap();
-        let mut transaction = source.transaction().unwrap();
+        let source = Package::from_bytes(&bytes).unwrap();
+        let mut transaction = source.edit().unwrap();
         let error = transaction
             .remove_dependency_free_blank_slide(1)
             .expect_err(description);
@@ -273,7 +277,7 @@ fn inbound_name_owner_and_macro_storage_are_refused_before_mutation() {
             "unexpected {description} error: {error}"
         );
         let commit = transaction.commit().unwrap();
-        assert!(!commit.changed(), "{description}");
-        assert_eq!(commit.snapshot().bytes(), bytes, "{description}");
+        assert!(!commit.diagnostics().changed(), "{description}");
+        assert_eq!(commit.package().as_bytes(), bytes, "{description}");
     }
 }

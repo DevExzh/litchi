@@ -19,10 +19,7 @@ use std::sync::Arc;
 use litchi_opc::{OpcPackage, PackURI};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
-use super::{
-    CrossSlideCopyPatch, CrossSlideCopyPlan, physical_package_fingerprint,
-    streamed_physical_revision,
-};
+use super::{physical_package_fingerprint, streamed_physical_revision};
 use crate::media_parts::Resource;
 use crate::opened::Limits;
 use crate::opened::model::fingerprint_log::{self, Entry};
@@ -48,19 +45,20 @@ fn noisy(len: usize, mut state: u32) -> Vec<u8> {
 }
 
 fn authored(prefix: &str, slides: usize) -> Result<Vec<u8>> {
-    let mut package = Package::new()?;
-    let presentation = package.presentation_mut()?;
+    let mut builder = crate::builder::Builder::new()?;
+    let presentation = builder.presentation()?;
     for index in 0..slides {
         presentation
             .add_slide()?
             .set_title(&format!("change-0751-memo-{prefix}-{index}"));
     }
+    let package = builder.build()?;
     package.to_bytes()
 }
 
 fn with_pictures(bytes: &[u8], slide: usize, pictures: &[(&str, &[u8])]) -> Result<Vec<u8>> {
     let mut package = Package::from_bytes(bytes)?;
-    let mut edit = package.opened_presentation_transaction()?;
+    let mut edit = package.edit()?;
     for (index, (part_name, data)) in pictures.iter().enumerate() {
         edit.add_picture(
             slide,
@@ -70,13 +68,15 @@ fn with_pictures(bytes: &[u8], slide: usize, pictures: &[(&str, &[u8])]) -> Resu
         )?;
     }
     let commit = edit.commit()?;
-    package.apply_opened_presentation_commit(commit)?;
+    package = commit.into_package();
     package.to_bytes()
 }
 
 fn repack_stored(bytes: &[u8], stored: &str) -> Vec<u8> {
-    let reader = ArchiveReader::new(bytes).expect("fixture archive");
-    let mut writer = StreamingArchiveWriter::new();
+    let reader = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
+        .expect("fixture archive");
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in reader.file_names() {
         let payload = reader.read(name).expect("fixture member");
         if name == stored {
@@ -110,7 +110,7 @@ fn media_pair() -> Result<(Vec<u8>, Vec<u8>)> {
     Ok((source, destination))
 }
 
-fn plan_copy(source: &Package, destination: &Package) -> Result<CrossSlideCopyPlan> {
+fn plan_copy(source: &Package, destination: &Package) -> Result<crate::cross_slide_copy::Plan> {
     destination.opened_presentation()?.plan_cross_slide_copy(
         &source.opened_presentation()?,
         SOURCE_SLIDE,
@@ -134,8 +134,8 @@ fn hashed(entries: &[Entry]) -> Vec<usize> {
 #[test]
 fn planning_hashes_only_payloads_no_snapshot_holds() -> Result<()> {
     let (source_bytes, destination_bytes) = media_pair()?;
-    let source = Package::from_vec(source_bytes)?;
-    let destination = Package::from_vec(destination_bytes)?;
+    let source = Package::from_reader(std::io::Cursor::new(source_bytes))?;
+    let destination = Package::from_reader(std::io::Cursor::new(destination_bytes))?;
     let source_snapshot = source.opened_presentation()?;
     let destination_snapshot = destination.opened_presentation()?;
     let _cold = fingerprint_log::take();
@@ -163,8 +163,8 @@ fn planning_hashes_only_payloads_no_snapshot_holds() -> Result<()> {
 #[test]
 fn an_application_hashes_only_payloads_no_memo_names() -> Result<()> {
     let (source_bytes, destination_bytes) = media_pair()?;
-    let source = Package::from_vec(source_bytes)?;
-    let mut destination = Package::from_vec(destination_bytes)?;
+    let source = Package::from_reader(std::io::Cursor::new(source_bytes))?;
+    let mut destination = Package::from_reader(std::io::Cursor::new(destination_bytes))?;
     let plan = plan_copy(&source, &destination)?;
     assert!(plan.retained_candidate_bytes().is_some());
     assert!(
@@ -179,14 +179,16 @@ fn an_application_hashes_only_payloads_no_memo_names() -> Result<()> {
 
     destination.apply_cross_slide_copy_plan(&source, &plan)?;
     let consulted = fingerprint_log::take_with_parent();
+    // The primary edit that stages the plan captures the destination first;
+    // planning filled its memo, so that capture hashes nothing (record 0356).
     assert_eq!(
         hashed(&consulted),
-        [0, 0, UNSHARED, 0],
-        "live source, live destination, candidate capture, published capture: {consulted:?}"
+        [0, 0, 0, UNSHARED, 0],
+        "edit capture, live source, live destination, candidate capture, published capture: {consulted:?}"
     );
-    assert_eq!(consulted[0].parts, source.opc.part_count());
-    assert_eq!(consulted[2].parts, destination.opc.part_count());
+    assert_eq!(consulted[1].parts, source.opc.part_count());
     assert_eq!(consulted[3].parts, destination.opc.part_count());
+    assert_eq!(consulted[4].parts, destination.opc.part_count());
     // The facade adopted the published capture's memo.
     assert_eq!(
         destination.part_digest_memo().map(|memo| memo.len()),
@@ -201,12 +203,12 @@ fn an_application_hashes_only_payloads_no_memo_names() -> Result<()> {
 fn an_application_without_facade_memos_hashes_the_live_packages_once() -> Result<()> {
     let (source_bytes, destination_bytes) = media_pair()?;
     let plan = {
-        let source = Package::from_vec(source_bytes.clone())?;
-        let destination = Package::from_vec(destination_bytes.clone())?;
+        let source = Package::from_reader(std::io::Cursor::new(source_bytes.clone()))?;
+        let destination = Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
         plan_copy(&source, &destination)?
     };
-    let source = Package::from_vec(source_bytes)?;
-    let mut destination = Package::from_vec(destination_bytes)?;
+    let source = Package::from_reader(std::io::Cursor::new(source_bytes))?;
+    let mut destination = Package::from_reader(std::io::Cursor::new(destination_bytes))?;
     assert!(source.part_digest_memo().is_none());
     assert!(destination.part_digest_memo().is_none());
     let _setup = fingerprint_log::take();
@@ -224,8 +226,8 @@ fn an_application_without_facade_memos_hashes_the_live_packages_once() -> Result
             .iter()
             .map(|entry| entry.hashed)
             .collect::<Vec<_>>(),
-        [UNSHARED, 0],
-        "candidate capture and published capture: {log:?}"
+        [0, UNSHARED, 0],
+        "live destination (answered by the memo the staging edit's capture filled), candidate capture and published capture: {log:?}"
     );
     Ok(())
 }
@@ -241,10 +243,11 @@ fn an_application_without_facade_memos_hashes_the_live_packages_once() -> Result
 #[test]
 fn durable_patch_routes_consult_the_memos() -> Result<()> {
     let (source_bytes, destination_bytes) = media_pair()?;
-    let source = Package::from_vec(source_bytes)?;
-    let mut destination = Package::from_vec(destination_bytes.clone())?;
+    let source = Package::from_reader(std::io::Cursor::new(source_bytes))?;
+    let mut destination = Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
     let plan = plan_copy(&source, &destination)?;
-    let forward = CrossSlideCopyPatch::from_bytes(&plan.patch().to_bytes()?)?;
+    let forward =
+        crate::cross_slide_copy::Patch::from_bytes(&plan.patch().to_bytes()?, Limits::default())?;
     let _planning = fingerprint_log::take();
 
     destination.apply_cross_slide_copy_patch(&source, &forward)?;
@@ -277,7 +280,7 @@ fn durable_patch_routes_consult_the_memos() -> Result<()> {
 #[test]
 fn a_capture_fills_the_facade_memo_and_the_next_capture_reuses_it() -> Result<()> {
     let (source_bytes, _destination) = media_pair()?;
-    let package = Package::from_vec(source_bytes)?;
+    let package = Package::from_reader(std::io::Cursor::new(source_bytes))?;
     assert!(package.part_digest_memo().is_none());
     let first = package.opened_presentation()?;
     let memo = package
@@ -301,9 +304,9 @@ fn a_capture_fills_the_facade_memo_and_the_next_capture_reuses_it() -> Result<()
 #[test]
 fn a_capture_memo_is_projected_onto_the_facade_allocations() -> Result<()> {
     let (source_bytes, _destination) = media_pair()?;
-    let mut package = Package::from_vec(source_bytes)?;
+    let mut package = Package::from_reader(std::io::Cursor::new(source_bytes))?;
     let custom = PackURI::new("/custom/copying.bin").expect("URI");
-    package.opc.try_add_part(Box::new(CopyingPart::new(
+    Arc::make_mut(&mut package.opc).try_add_part(Box::new(CopyingPart::new(
         custom.clone(),
         b"copied on clone".to_vec(),
     )))?;
@@ -339,7 +342,7 @@ fn a_capture_memo_is_projected_onto_the_facade_allocations() -> Result<()> {
 #[test]
 fn an_exact_source_seals_its_bound_digest_and_keeps_the_bound() -> Result<()> {
     let (source_bytes, _destination) = media_pair()?;
-    let package = OpcPackage::from_vec(source_bytes.clone())?;
+    let package = OpcPackage::from_vec(source_bytes.clone(), litchi_opc::SourceLimits::default())?;
     let limits = Limits::default();
     assert_eq!(package.exact_source_sha256(), {
         use sha2::Digest as _;
@@ -360,9 +363,10 @@ fn an_exact_source_seals_its_bound_digest_and_keeps_the_bound() -> Result<()> {
         matches!(
             refused,
             Err(Error::Limit {
-                resource: "cross-slide serialized archive bytes",
-                limit,
-            }) if limit == source_bytes.len() - 1
+                kind: crate::opened::LimitKind::PatchBytes,
+                observed,
+                maximum,
+            }) if observed == source_bytes.len() && maximum == source_bytes.len() - 1
         ),
         "{refused:?}"
     );

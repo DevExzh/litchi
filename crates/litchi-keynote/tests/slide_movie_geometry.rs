@@ -4,15 +4,15 @@ use std::io;
 
 use litchi_iwa_archive::{Limits, package::Catalog};
 use litchi_iwa_common::wire::{append_length_delimited_field, append_varint_field};
-use litchi_iwa_core::{
-    Archive, ArchiveObject, FieldInfo, FieldPath, MessageInfo, RawMessage, SnappyStream,
-};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, MessageInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsd, tsk, tsp};
 use litchi_keynote::slide::media::{
     Point, Size,
     geometry::{MovieFlipAxis, MovieGeometry, MovieTransform},
 };
-use litchi_keynote::{Package, ReadOptions, SlideMovieGeometryError};
+use litchi_keynote::{
+    OpenOptions, Package, SourceLimits, slide::movie::geometry::Error as SlideMovieGeometryError,
+};
 use prost::Message as _;
 
 const DOCUMENT: &str = "Index/Document.iwa";
@@ -59,6 +59,7 @@ fn object(id: u64, ty: u32, data: Vec<u8>) -> R<ArchiveObject> {
     Ok(ArchiveObject::new(
         id,
         vec![RawMessage { type_: ty, data }],
+        Default::default(),
     )?)
 }
 
@@ -123,7 +124,12 @@ fn component_info(id: u64, locator: &str, token: u64, ids: &[u64]) -> R<Vec<u8>>
         ..Default::default()
     }
     .encode_to_vec();
-    append_length_delimited_field(&mut value, 4_002, b"component geometry extension")?;
+    append_length_delimited_field(
+        &mut value,
+        4_002,
+        b"component geometry extension",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(value)
 }
 
@@ -144,16 +150,39 @@ fn metadata() -> R<Vec<u8>> {
     .encode_to_vec();
     let mut value = Vec::new();
     append_varint_field(&mut value, 1, 1_000)?;
-    append_length_delimited_field(&mut value, 3, &current)?;
-    append_length_delimited_field(&mut value, 3, &other)?;
+    append_length_delimited_field(
+        &mut value,
+        3,
+        &current,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut value,
+        3,
+        &other,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut value, 8, 10)?;
-    append_length_delimited_field(&mut value, 11, &versioned)?;
-    append_length_delimited_field(&mut value, 4_001, b"metadata geometry extension")?;
+    append_length_delimited_field(
+        &mut value,
+        11,
+        &versioned,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut value,
+        4_001,
+        b"metadata geometry extension",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(value)
 }
 
 fn component(objects: Vec<ArchiveObject>) -> R<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn source() -> R<Vec<u8>> {
@@ -245,15 +274,15 @@ fn bytes(package: &Package) -> R<Vec<u8>> {
     Ok(value)
 }
 fn document_stream(package: &[u8]) -> R<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|e| e.name() == DOCUMENT)
         .ok_or_else(|| io::Error::other("document"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 fn movie_payload_at(package: &[u8], id: u64) -> R<Vec<u8>> {
-    let archive = Archive::parse(&document_stream(package)?)?;
+    let archive = Archive::parse(&document_stream(package)?, Default::default())?;
     archive
         .object(id)
         .and_then(|o| o.messages.iter().find(|m| m.type_ == MOVIE_TYPE))
@@ -261,8 +290,9 @@ fn movie_payload_at(package: &[u8], id: u64) -> R<Vec<u8>> {
         .ok_or_else(|| io::Error::other("movie").into())
 }
 fn replace_document(source: &[u8], archive: Archive) -> R<Vec<u8>> {
-    let replacement = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(source)?;
+    let replacement =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     Ok(litchi_iwa_archive::package::to_bytes(
         catalog
             .iter()
@@ -279,17 +309,18 @@ fn replace_document(source: &[u8], archive: Archive) -> R<Vec<u8>> {
 }
 
 fn metadata_stream(package: &[u8]) -> R<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA)
         .ok_or_else(|| io::Error::other("metadata"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn replace_metadata(source: &[u8], archive: Archive) -> R<Vec<u8>> {
-    let replacement = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(source)?;
+    let replacement =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     Ok(litchi_iwa_archive::package::to_bytes(
         catalog
             .iter()
@@ -306,7 +337,7 @@ fn replace_metadata(source: &[u8], archive: Archive) -> R<Vec<u8>> {
 }
 
 fn with_metadata(source: &[u8], edit: impl FnOnce(&mut tsp::PackageMetadata)) -> R<Vec<u8>> {
-    let mut archive = Archive::parse(&metadata_stream(source)?)?;
+    let mut archive = Archive::parse(&metadata_stream(source)?, Default::default())?;
     let object = archive
         .object_mut(300)
         .ok_or_else(|| io::Error::other("metadata object"))?;
@@ -317,7 +348,7 @@ fn with_metadata(source: &[u8], edit: impl FnOnce(&mut tsp::PackageMetadata)) ->
 }
 
 fn with_message_alias(source: &[u8], id: u64, alias_type: u32) -> R<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     let object = archive
         .object_mut(id)
         .ok_or_else(|| io::Error::other("alias object"))?;
@@ -331,15 +362,14 @@ fn with_message_alias(source: &[u8], id: u64, alias_type: u32) -> R<Vec<u8>> {
         type_: alias_type,
         data: data.clone(),
     });
-    object
-        .archive_info
-        .message_infos
-        .push(MessageInfo::new(alias_type, u32::try_from(data.len())?));
+    object.archive_info.message_infos.push(
+        MessageInfo::new(alias_type, data.len(), litchi_iwa_core::Limits::default()).unwrap(),
+    );
     replace_document(source, archive)
 }
 
 fn with_foreign_inbound(source: &[u8], target: u64, mode: ForeignInbound) -> R<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     let mut foreign = object_refs(
         900,
         MOVIE_TYPE,
@@ -351,12 +381,14 @@ fn with_foreign_inbound(source: &[u8], target: u64, mode: ForeignInbound) -> R<V
         ForeignInbound::Object => info.object_references.push(target),
         ForeignInbound::Data => info.data_references.push(target),
         ForeignInbound::Field => info.field_infos.push(FieldInfo {
-            path: FieldPath::new(vec![99]),
+            path: litchi_iwa_core::FieldPath::new(vec![99], litchi_iwa_core::Limits::default())
+                .unwrap(),
             object_references: vec![target],
             ..FieldInfo::default()
         }),
         ForeignInbound::FieldData => info.field_infos.push(FieldInfo {
-            path: FieldPath::new(vec![100]),
+            path: litchi_iwa_core::FieldPath::new(vec![100], litchi_iwa_core::Limits::default())
+                .unwrap(),
             data_references: vec![target],
             ..FieldInfo::default()
         }),
@@ -366,7 +398,7 @@ fn with_foreign_inbound(source: &[u8], target: u64, mode: ForeignInbound) -> R<V
 }
 
 fn with_foreign_z_order(source: &[u8]) -> R<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     let foreign = object_refs(
         900,
         MOVIE_TYPE,
@@ -403,12 +435,17 @@ fn with_movie_data_id(source: &[u8], id: u64, data_identifier: u64) -> R<Vec<u8>
 fn with_duplicate_movie_data(source: &[u8], id: u64) -> R<Vec<u8>> {
     let mut payload = movie_payload_at(source, id)?;
     let data = tsp::DataReference { identifier: 2_002 }.encode_to_vec();
-    append_length_delimited_field(&mut payload, 14, &data)?;
+    append_length_delimited_field(
+        &mut payload,
+        14,
+        &data,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     with_movie(source, id, payload)
 }
 
 fn with_movie_archive_data_refs(source: &[u8], id: u64, refs: Vec<u64>) -> R<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     archive
         .object_mut(id)
         .ok_or_else(|| io::Error::other("movie"))?
@@ -419,7 +456,7 @@ fn with_movie_archive_data_refs(source: &[u8], id: u64, refs: Vec<u64>) -> R<Vec
 }
 
 fn with_style_message_type(source: &[u8], id: u64, message_type: u32) -> R<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     let style = archive
         .object_mut(id)
         .ok_or_else(|| io::Error::other("style"))?;
@@ -434,7 +471,7 @@ fn with_style_message_type(source: &[u8], id: u64, message_type: u32) -> R<Vec<u
 }
 
 fn with_duplicate_style_message(source: &[u8], id: u64, message_type: u32) -> R<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     let style = archive
         .object_mut(id)
         .ok_or_else(|| io::Error::other("style"))?;
@@ -445,7 +482,7 @@ fn with_duplicate_style_message(source: &[u8], id: u64, message_type: u32) -> R<
     style
         .archive_info
         .message_infos
-        .push(MessageInfo::new(message_type, 0));
+        .push(MessageInfo::new(message_type, 0, litchi_iwa_core::Limits::default()).unwrap());
     replace_document(source, archive)
 }
 
@@ -457,13 +494,13 @@ enum ForeignInbound {
     FieldData,
 }
 fn with_alias_member(source: &[u8], id: u64) -> R<Vec<u8>> {
-    let archive = Archive::parse(&document_stream(source)?)?;
+    let archive = Archive::parse(&document_stream(source)?, Default::default())?;
     let alias = archive
         .object(id)
         .ok_or_else(|| io::Error::other("movie"))?
         .clone();
     let alias_member = component(vec![alias])?;
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut entries = catalog
         .iter()
         .map(|entry| (entry.name(), entry.data()))
@@ -475,7 +512,7 @@ fn with_alias_member(source: &[u8], id: u64) -> R<Vec<u8>> {
     )?)
 }
 fn with_movie(source: &[u8], id: u64, payload: Vec<u8>) -> R<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     archive
         .object_mut(id)
         .ok_or_else(|| io::Error::other("movie"))?
@@ -518,12 +555,16 @@ fn with_locked_movie(source: &[u8], id: u64) -> R<Vec<u8>> {
 
 fn with_geometry_extra(source: &[u8], id: u64, extra: &[u8]) -> R<Vec<u8>> {
     let payload = movie_payload_at(source, id)?;
-    let root = litchi_iwa_common::wire::WireView::parse(&payload)?;
+    let root =
+        litchi_iwa_common::wire::WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     let super_field = root
         .fields()
         .find(|field| field.number() == 1)
         .ok_or_else(|| io::Error::other("movie super"))?;
-    let drawable = litchi_iwa_common::wire::WireView::parse(super_field.payload())?;
+    let drawable = litchi_iwa_common::wire::WireView::parse(
+        super_field.payload(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let geometry_field = drawable
         .fields()
         .find(|field| field.number() == 1)
@@ -534,7 +575,12 @@ fn with_geometry_extra(source: &[u8], id: u64, extra: &[u8]) -> R<Vec<u8>> {
     let mut drawable_output = Vec::new();
     for field in drawable.fields() {
         if field.number() == 1 {
-            append_length_delimited_field(&mut drawable_output, 1, &geometry)?;
+            append_length_delimited_field(
+                &mut drawable_output,
+                1,
+                &geometry,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         } else {
             drawable_output.extend_from_slice(field.raw());
         }
@@ -542,7 +588,12 @@ fn with_geometry_extra(source: &[u8], id: u64, extra: &[u8]) -> R<Vec<u8>> {
     let mut output = Vec::new();
     for field in root.fields() {
         if field.number() == 1 {
-            append_length_delimited_field(&mut output, 1, &drawable_output)?;
+            append_length_delimited_field(
+                &mut output,
+                1,
+                &drawable_output,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         } else {
             output.extend_from_slice(field.raw());
         }
@@ -572,12 +623,16 @@ fn with_noncanonical_super_key(source: &[u8], id: u64) -> R<Vec<u8>> {
 
 fn with_noncanonical_parent_key(source: &[u8], id: u64) -> R<Vec<u8>> {
     let payload = movie_payload_at(source, id)?;
-    let root = litchi_iwa_common::wire::WireView::parse(&payload)?;
+    let root =
+        litchi_iwa_common::wire::WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     let super_field = root
         .fields()
         .find(|field| field.number() == 1)
         .ok_or_else(|| io::Error::other("movie super"))?;
-    let drawable = litchi_iwa_common::wire::WireView::parse(super_field.payload())?;
+    let drawable = litchi_iwa_common::wire::WireView::parse(
+        super_field.payload(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let parent_field = drawable
         .fields()
         .find(|field| field.number() == 2)
@@ -592,7 +647,12 @@ fn with_noncanonical_parent_key(source: &[u8], id: u64) -> R<Vec<u8>> {
     let mut drawable_output = Vec::new();
     for field in drawable.fields() {
         if field.number() == 2 {
-            append_length_delimited_field(&mut drawable_output, 2, &reference)?;
+            append_length_delimited_field(
+                &mut drawable_output,
+                2,
+                &reference,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         } else {
             drawable_output.extend_from_slice(field.raw());
         }
@@ -600,7 +660,12 @@ fn with_noncanonical_parent_key(source: &[u8], id: u64) -> R<Vec<u8>> {
     let mut output = Vec::new();
     for field in root.fields() {
         if field.number() == 1 {
-            append_length_delimited_field(&mut output, 1, &drawable_output)?;
+            append_length_delimited_field(
+                &mut output,
+                1,
+                &drawable_output,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         } else {
             output.extend_from_slice(field.raw());
         }
@@ -638,7 +703,8 @@ fn rewrite_noncanonical_length(payload: &[u8], path: &[u32]) -> R<Vec<u8>> {
     let field_number = *path
         .first()
         .ok_or_else(|| io::Error::other("empty wire path"))?;
-    let view = litchi_iwa_common::wire::WireView::parse(payload)?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(payload.len().saturating_add(1));
     let mut matched = 0usize;
     for field in view.fields() {
@@ -654,7 +720,12 @@ fn rewrite_noncanonical_length(payload: &[u8], path: &[u32]) -> R<Vec<u8>> {
             append_noncanonical_length_field(&mut output, field_number, field.payload())?;
         } else {
             let nested = rewrite_noncanonical_length(field.payload(), &path[1..])?;
-            append_length_delimited_field(&mut output, field_number, &nested)?;
+            append_length_delimited_field(
+                &mut output,
+                field_number,
+                &nested,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         }
     }
     if matched != 1 {
@@ -692,7 +763,7 @@ fn with_field_info_path(
     object_references: &[u64],
     data_references: &[u64],
 ) -> R<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     archive
         .object_mut(id)
         .ok_or_else(|| io::Error::other("movie"))?
@@ -700,7 +771,11 @@ fn with_field_info_path(
         .message_infos[0]
         .field_infos
         .push(FieldInfo {
-            path: FieldPath::new(path.to_vec()),
+            path: litchi_iwa_core::FieldPath::new(
+                path.to_vec(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
             object_references: object_references.to_vec(),
             data_references: data_references.to_vec(),
             ..FieldInfo::default()
@@ -709,7 +784,7 @@ fn with_field_info_path(
 }
 
 fn with_invalid_slide_drawable_role(source: &[u8]) -> R<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     let slide = archive
         .object_mut(SLIDE)
         .ok_or_else(|| io::Error::other("slide"))?;
@@ -729,7 +804,7 @@ fn with_invalid_slide_drawable_role(source: &[u8]) -> R<Vec<u8>> {
 }
 
 fn with_z_order_only_reference(source: &[u8], target: u64) -> R<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     let slide = archive
         .object_mut(SLIDE)
         .ok_or_else(|| io::Error::other("slide"))?;
@@ -748,7 +823,7 @@ fn with_z_order_only_reference(source: &[u8], target: u64) -> R<Vec<u8>> {
 }
 
 fn with_refs(source: &[u8], id: u64, refs: Vec<u64>) -> R<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     archive
         .object_mut(id)
         .ok_or_else(|| io::Error::other("movie"))?
@@ -758,7 +833,7 @@ fn with_refs(source: &[u8], id: u64, refs: Vec<u64>) -> R<Vec<u8>> {
     replace_document(source, archive)
 }
 fn with_field_info(source: &[u8], id: u64, refs: Vec<u64>) -> R<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     archive
         .object_mut(id)
         .ok_or_else(|| io::Error::other("movie"))?
@@ -766,14 +841,15 @@ fn with_field_info(source: &[u8], id: u64, refs: Vec<u64>) -> R<Vec<u8>> {
         .message_infos[0]
         .field_infos
         .push(FieldInfo {
-            path: FieldPath::new(vec![99, 1]),
+            path: litchi_iwa_core::FieldPath::new(vec![99, 1], litchi_iwa_core::Limits::default())
+                .unwrap(),
             object_references: refs,
             ..FieldInfo::default()
         });
     replace_document(source, archive)
 }
 fn without_entry(source: &[u8], name: &str) -> R<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     Ok(litchi_iwa_archive::package::to_bytes(
         catalog
             .iter()
@@ -792,7 +868,12 @@ fn key(payload: &mut Vec<u8>, field: u32, wire: u8) {
     payload.push(value as u8);
 }
 fn unknowns(payload: &mut Vec<u8>) -> R<()> {
-    append_length_delimited_field(payload, UNKNOWN, UNKNOWN_BYTES)?;
+    append_length_delimited_field(
+        payload,
+        UNKNOWN,
+        UNKNOWN_BYTES,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     payload.extend_from_slice(&[0xd0, 0x05, 0x96, 0x81, 0x00]);
     key(payload, 4_092, 3);
     key(payload, 1, 2);
@@ -843,7 +924,7 @@ fn reads_file_movies_with_audio_sibling_and_media_assets() -> R<()> {
         movie_payload(1, true)
     );
     assert_eq!(
-        Catalog::from_bytes(&source)?
+        Catalog::from_bytes(&source, Default::default())?
             .iter()
             .find(|e| e.name() == "Data/movie.mov")
             .map(|e| e.data()),
@@ -910,7 +991,7 @@ fn replacement_invalidates_previews_and_preserves_unselected_graph() -> R<()> {
     assert!(commit.diagnostics().deleted_previews() > 0);
     let candidate = bytes(commit.package())?;
     assert_eq!(movie_payload_at(&candidate, MOVIES[1])?, sibling);
-    let catalog = Catalog::from_bytes(&candidate)?;
+    let catalog = Catalog::from_bytes(&candidate, Default::default())?;
     assert!(catalog.iter().all(|e| !e.name().starts_with("preview")));
     assert_eq!(
         catalog
@@ -962,7 +1043,12 @@ fn malformed_duplicate_wrong_wire_partial_and_nonfinite_geometry_reject() -> R<(
     }
     .encode_to_vec();
     let mut duplicate = original.clone();
-    append_length_delimited_field(&mut duplicate, 1, &nested)?;
+    append_length_delimited_field(
+        &mut duplicate,
+        1,
+        &nested,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     reject(&with_movie(&source, MOVIES[0], duplicate)?)?;
     let mut wrong = original.clone();
     append_varint_field(&mut wrong, 1, 7)?;
@@ -1103,7 +1189,7 @@ fn archive_info_refs_and_duplicate_physical_aliases_fail_atomically() -> R<()> {
         MOVIES[0],
         vec![CAPTION[0], CAPTION[0]],
     )?)?;
-    let mut archive = Archive::parse(&document_stream(&source)?)?;
+    let mut archive = Archive::parse(&document_stream(&source)?, Default::default())?;
     let movie = archive
         .object(MOVIES[0])
         .ok_or_else(|| io::Error::other("movie"))?
@@ -1124,19 +1210,15 @@ fn selectors_and_input_limit_fail_before_publication() -> R<()> {
     assert!(package.slide_movie_geometry(9usize, 0usize).is_err());
     assert!(package.slide_movie_geometry(0usize, 9usize).is_err());
     let defaults = Limits::default();
-    let tight = Limits::new(
-        u64::try_from(source.len().saturating_sub(1))?,
-        defaults.max_entries(),
-        defaults.max_entry_bytes(),
-        defaults.max_total_bytes(),
-        defaults.max_iwa_stream_bytes(),
-    )?;
+    let tight = SourceLimits::builder()
+        .max_input_bytes(u64::try_from(source.len().saturating_sub(1))?)?
+        .max_entries(defaults.max_entries())?
+        .max_entry_bytes(defaults.max_entry_bytes())?
+        .max_aggregate_bytes(defaults.max_total_bytes())?
+        .max_component_bytes(defaults.max_iwa_stream_bytes())?
+        .build()?;
     assert!(
-        Package::from_bytes_with_options(
-            &source,
-            ReadOptions::new(tight, litchi_keynote::SemanticLimits::default())
-        )
-        .is_err()
+        Package::from_bytes_with_options(&source, OpenOptions::new().source_limits(tight)).is_err()
     );
     let before = bytes(&package)?;
     let result = package
@@ -1495,7 +1577,9 @@ fn restore_original_size_rejects_missing_and_invalid_metadata_atomically() -> R<
         .unwrap_err();
     assert_eq!(
         missing_error,
-        SlideMovieGeometryError::UnsupportedDependency
+        SlideMovieGeometryError::Refused(
+            litchi_keynote::slide::movie::geometry::Refusal::UnsupportedDependency
+        )
     );
     assert_eq!(bytes(&missing_package)?, missing_before);
 

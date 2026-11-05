@@ -24,7 +24,7 @@ use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes,
     wire::{
         NestedFieldEdit, NestedFieldReplacement, WireDescent, WireFieldView, WireView,
-        patch_nested_fields_batched_with_limits, preflight_wire_tree_with_limits,
+        patch_nested_fields_batched, preflight_wire_tree,
     },
 };
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
@@ -145,6 +145,38 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The source package or selected envelope is malformed or unsupported.
+    #[error("the Keynote slide transition cannot be edited safely")]
+    InvalidSource,
+    /// One of the retained resource ceilings was exceeded.
+    #[error(
+        "Keynote slide-transition {kind} limit exceeded: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        kind: LimitKind,
+        observed: u64,
+        maximum: u64,
+    },
+    /// Bounded allocation failed before publication.
+    #[error("could not allocate {amount} units for the Keynote slide-transition transaction")]
+    Allocation { amount: usize },
+    /// Full reopening did not reproduce the requested semantic state.
+    #[error("the edited Keynote slide transition failed semantic verification")]
+    Verification,
+    /// A patch was supplied to a package other than its exact source artifact.
+    #[error("the Keynote slide-transition patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The source was prepared without an exact physical package artifact.
     #[error("this Keynote source does not support physical slide-transition edits")]
     UnsupportedSource,
@@ -160,9 +192,6 @@ pub enum Error {
     /// A checked semantic source position does not exist.
     #[error("the Keynote show has no slide at position {position:?}")]
     SlidePositionNotFound { position: Position },
-    /// The source package or selected envelope is malformed or unsupported.
-    #[error("the Keynote slide transition cannot be edited safely")]
-    InvalidSource,
     /// Requested settings fail the archive-free transition invariants.
     #[error("the requested Keynote slide transition is invalid")]
     InvalidSettings {
@@ -176,24 +205,32 @@ pub enum Error {
     /// The selected slide has no modern transition attributes to patch.
     #[error("the Keynote slide transition uses an unsupported legacy representation")]
     UnsupportedTransition,
-    /// One of the retained resource ceilings was exceeded.
-    #[error(
-        "Keynote slide-transition {kind} limit exceeded: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        kind: LimitKind,
-        observed: u64,
-        maximum: u64,
-    },
-    /// Bounded allocation failed before publication.
-    #[error("could not allocate {amount} units for the Keynote slide-transition transaction")]
-    Allocation { amount: usize },
-    /// Full reopening did not reproduce the requested semantic state.
-    #[error("the edited Keynote slide transition failed semantic verification")]
-    Verification,
-    /// A patch was supplied to a package other than its exact source artifact.
-    #[error("the Keynote slide-transition patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. } | Self::UnsupportedTransition { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+            Self::AmbiguousSelector { .. }
+            | Self::EmptySlideName { .. }
+            | Self::InvalidSettings { .. }
+            | Self::InvalidOpaquePayload { .. } => RefusalKind::InvalidValue,
+            Self::SlideNameNotFound { .. } | Self::SlidePositionNotFound { .. } => {
+                RefusalKind::NotFound
+            },
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// Mutable transition settings staged against one immutable package snapshot.
@@ -256,9 +293,9 @@ impl<'a> Edit<'a> {
     pub fn set(mut self, settings: Settings) -> Result<Self, Error> {
         settings
             .validate()
-            .map_err(|source| Error::InvalidSettings { source })?;
+            .map_err(|source| Error::Refused(Refusal::InvalidSettings { source }))?;
         if self.settings.is_none() {
-            return Err(Error::UnsupportedTransition);
+            return Err(Error::Refused(Refusal::UnsupportedTransition));
         }
         validate_requested_opaque_settings(
             &settings,
@@ -294,23 +331,23 @@ impl<'a> Edit<'a> {
         let mut settings = Settings::new();
         settings
             .set_animation_type(Some("Transition"))
-            .map_err(|source| Error::InvalidSettings { source })?;
+            .map_err(|source| Error::Refused(Refusal::InvalidSettings { source }))?;
         settings
             .set_effect(Some(Effect::None))
-            .map_err(|source| Error::InvalidSettings { source })?;
+            .map_err(|source| Error::Refused(Refusal::InvalidSettings { source }))?;
         settings
             .set_duration(Some(1.0))
-            .map_err(|source| Error::InvalidSettings { source })?;
+            .map_err(|source| Error::Refused(Refusal::InvalidSettings { source }))?;
         settings
             .set_delay(current.delay())
-            .map_err(|source| Error::InvalidSettings { source })?;
+            .map_err(|source| Error::Refused(Refusal::InvalidSettings { source }))?;
         settings.set_is_automatic(current.is_automatic());
         settings
             .set_animation_parameters(animation)
-            .map_err(|source| Error::InvalidSettings { source })?;
+            .map_err(|source| Error::Refused(Refusal::InvalidSettings { source }))?;
         settings
             .set_custom_parameters(CustomParameters::new())
-            .map_err(|source| Error::InvalidSettings { source })?;
+            .map_err(|source| Error::Refused(Refusal::InvalidSettings { source }))?;
         self.settings = Some(Arc::new(settings));
         Ok(self)
     }
@@ -331,7 +368,7 @@ impl<'a> Edit<'a> {
         if let Some(settings) = &self.settings {
             settings
                 .validate()
-                .map_err(|source| Error::InvalidSettings { source })?;
+                .map_err(|source| Error::Refused(Refusal::InvalidSettings { source }))?;
         }
         let catalog = physical_catalog(self.source)?;
         let source = catalog.shared_source();
@@ -351,7 +388,7 @@ impl<'a> Edit<'a> {
             });
         }
         if !catalog.source_is_exact() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         let selection = select_transition(self.source, self.position, true)?;
         if selection.node_identifier != self.node_identifier
@@ -496,6 +533,12 @@ impl Commit {
     pub fn into_package(self) -> Package {
         self.package
     }
+
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
     #[must_use]
     pub const fn patch(&self) -> &Patch {
         &self.patch
@@ -569,7 +612,7 @@ fn select_transition(
     let node_identifiers = show_snapshot.slide_node_identifiers();
     let node_identifier = *node_identifiers
         .get(position.get())
-        .ok_or(Error::SlidePositionNotFound { position })?;
+        .ok_or(Error::Refused(Refusal::SlidePositionNotFound { position }))?;
     // Checking only the selected node's occurrence is not sufficient: a
     // duplicate reference to any other node can make the rooted slide
     // traversal ambiguous while leaving the selected node's count at one.
@@ -790,7 +833,7 @@ fn validate_reference_metadata(
 
 fn strict_show_slide_references(source: &[u8], limits: WireLimits) -> Result<Vec<u64>, Error> {
     let tree = strict_nested_payload(source, SHOW_SLIDE_TREE_FIELD, limits)?;
-    let view = WireView::parse_with_limits(tree, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(tree, limits).map_err(map_wire_error)?;
     let count = view
         .fields()
         .filter(|field| field.number() == SLIDE_TREE_SLIDES_FIELD)
@@ -820,20 +863,18 @@ fn strict_node_slide_reference(
     let added = source
         .len()
         .checked_add(payload.len())
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: LimitKind::WireWork,
             observed: u64::MAX,
             maximum: limits.max_rewrite_work() as u64,
         })?;
-    let observed = aggregate_work
-        .checked_add(added)
-        .ok_or(Error::LimitExceeded {
-            kind: LimitKind::WireWork,
-            observed: u64::MAX,
-            maximum: limits.max_rewrite_work() as u64,
-        })?;
+    let observed = aggregate_work.checked_add(added).ok_or(Error::Limit {
+        kind: LimitKind::WireWork,
+        observed: u64::MAX,
+        maximum: limits.max_rewrite_work() as u64,
+    })?;
     if observed > limits.max_rewrite_work() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireWork,
             observed: observed as u64,
             maximum: limits.max_rewrite_work() as u64,
@@ -848,7 +889,7 @@ fn strict_nested_payload(
     field_number: u32,
     limits: WireLimits,
 ) -> Result<&[u8], Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut matches = view.fields().filter(|field| field.number() == field_number);
     let field = matches.next().ok_or(Error::InvalidSource)?;
     if matches.next().is_some() || field.wire_type() != 2 {
@@ -858,7 +899,7 @@ fn strict_nested_payload(
 }
 
 fn strict_reference(source: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut identifier = None;
     let mut deprecated_type_seen = false;
     let mut external = None;
@@ -925,7 +966,7 @@ const fn canonical_varint_len(mut value: u64) -> usize {
 }
 
 fn reject_top_level_groups(source: &[u8], limits: WireLimits) -> Result<(), Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     if view
         .fields()
         .any(|field| matches!(field.wire_type(), 3 | 4))
@@ -951,14 +992,19 @@ fn validate_component_framing(package: &Package, component_name: &str) -> Result
         return Err(Error::InvalidSource);
     }
     let physical_limits = package.state.options.archive();
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         physical_limits.snappy_limits().map_err(map_archive_error)?,
     )
     .map_err(map_core_error)?;
     component
         .archive()
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(
+            stream.as_bytes(),
+            physical_limits
+                .effective_archive_limits()
+                .map_err(map_archive_error)?,
+        )
         .map_err(map_core_error)
 }
 
@@ -1002,7 +1048,7 @@ fn preflight_selected_transition_payload(source: &[u8], limits: WireLimits) -> R
     // archive byte ceiling while still bypassing the configured work budget
     // for the most expensive part of this read path.
     ensure_transition_preflight_work(source.len(), limits)?;
-    let report = preflight_wire_tree_with_limits(source, limits, |visit| {
+    let report = preflight_wire_tree(source, limits, |visit| {
         if matches!(visit.field().wire_type(), 3 | 4) {
             return Err(litchi_iwa_common::Error::InvalidFormat(
                 "group-bearing transition payload".to_owned(),
@@ -1021,13 +1067,13 @@ fn preflight_selected_transition_payload(source: &[u8], limits: WireLimits) -> R
 }
 
 fn ensure_transition_preflight_work(scanned_bytes: usize, limits: WireLimits) -> Result<(), Error> {
-    let observed = scanned_bytes.checked_mul(2).ok_or(Error::LimitExceeded {
+    let observed = scanned_bytes.checked_mul(2).ok_or(Error::Limit {
         kind: LimitKind::WireWork,
         observed: u64::MAX,
         maximum: limits.max_rewrite_work() as u64,
     })?;
     if observed > limits.max_rewrite_work() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireWork,
             observed: observed as u64,
             maximum: limits.max_rewrite_work() as u64,
@@ -1049,21 +1095,21 @@ fn map_document_codec_error(error: keynote_document_codec::DecodeError) -> Error
             ),
             _ => return Error::InvalidSource,
         };
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind,
             observed,
             maximum,
         };
     }
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireFields,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireWork,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -1085,7 +1131,7 @@ fn map_show_codec_error(error: keynote_show_codec::DecodeError) -> Error {
             ),
             _ => return Error::InvalidSource,
         };
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind,
             observed,
             maximum,
@@ -1095,21 +1141,21 @@ fn map_show_codec_error(error: keynote_show_codec::DecodeError) -> Error {
         return Error::Allocation { amount };
     }
     if let Some((observed, maximum)) = error.slide_reference_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::Slides,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireFields,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireWork,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -1137,21 +1183,21 @@ fn map_transition_codec_error(
             ),
             _ => return Error::InvalidSource,
         };
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind,
             observed,
             maximum,
         };
     }
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireFields,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireWork,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -1294,15 +1340,15 @@ impl Package {
                 .select_slide(selector)
                 .map_err(map_slide_selector_error)?
                 .map(|slide| Position::new(slide.index()))
-                .ok_or(Error::SlideNameNotFound),
+                .ok_or(Error::Refused(Refusal::SlideNameNotFound)),
         }
     }
 }
 
 fn map_slide_selector_error(error: SlideSelectorError) -> Error {
     match error {
-        SlideSelectorError::EmptySlideName => Error::EmptySlideName,
-        SlideSelectorError::DuplicateSlideName { .. } => Error::AmbiguousSelector,
+        SlideSelectorError::EmptySlideName => Error::Refused(Refusal::EmptySlideName),
+        SlideSelectorError::DuplicateSlideName { .. } => Error::Refused(Refusal::AmbiguousSelector),
     }
 }
 
@@ -1312,6 +1358,12 @@ fn rewrite_transition(
     after: Option<&Settings>,
 ) -> Result<(Package, usize), Error> {
     let catalog = physical_catalog(source)?;
+    let snappy_limits = source
+        .state
+        .options
+        .archive()
+        .snappy_limits()
+        .map_err(map_archive_error)?;
     let mut compressed_components: Vec<(&str, Vec<u8>)> = Vec::new();
     let mut component_names: Vec<&str> = Vec::new();
     for component_name in [
@@ -1341,7 +1393,7 @@ fn rewrite_transition(
             .archive()
             .effective_archive_limits()
             .map_err(map_archive_error)?;
-        let stream = SnappyStream::decompress_with_limits(
+        let stream = SnappyStream::decompress(
             entry.data(),
             source
                 .state
@@ -1351,8 +1403,8 @@ fn rewrite_transition(
                 .map_err(map_archive_error)?,
         )
         .map_err(map_core_error)?;
-        let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
-            .map_err(map_core_error)?;
+        let mut archive =
+            Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
         if archive.object(selection.slide_identifier).is_some() {
             let object = archive
                 .object(selection.slide_identifier)
@@ -1364,13 +1416,13 @@ fn rewrite_transition(
             let changed = rewrite_transition_envelope(
                 &message.data,
                 &selection.transition_snapshot,
-                after.ok_or(Error::UnsupportedTransition)?,
+                after.ok_or(Error::Refused(Refusal::UnsupportedTransition))?,
                 source.wire_limits().map_err(map_wire_error)?,
             )?;
             archive
                 .object_mut(selection.slide_identifier)
                 .ok_or(Error::InvalidSource)?
-                .replace_message_preserving_header_with_limits(
+                .replace_message_preserving_header(
                     index,
                     RawMessage {
                         type_: SLIDE_MESSAGE_TYPE,
@@ -1404,7 +1456,7 @@ fn rewrite_transition(
                 archive
                     .object_mut(selection.node_identifier)
                     .ok_or(Error::InvalidSource)?
-                    .replace_message_preserving_header_with_limits(
+                    .replace_message_preserving_header(
                         index,
                         RawMessage {
                             type_: SLIDE_NODE_MESSAGE_TYPE,
@@ -1419,12 +1471,10 @@ fn rewrite_transition(
         if archive.object(selection.slide_identifier).is_none() && !node_changed {
             continue;
         }
-        let bytes = archive
-            .to_bytes_with_limits(archive_limits)
-            .map_err(map_core_error)?;
+        let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
         drop(archive);
         drop(stream);
-        let compressed = SnappyStream::compress(&bytes).map_err(map_core_error)?;
+        let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
         drop(bytes);
         compressed_components.push((name, compressed));
     }
@@ -1596,10 +1646,10 @@ fn verify_selected_object(
 }
 
 fn node_payload_preserved_except_marker(source: &[u8], candidate: &[u8], desired: bool) -> bool {
-    let Ok(source_view) = WireView::parse(source) else {
+    let Ok(source_view) = WireView::parse(source, WireLimits::DEFAULT) else {
         return false;
     };
-    let Ok(candidate_view) = WireView::parse(candidate) else {
+    let Ok(candidate_view) = WireView::parse(candidate, WireLimits::DEFAULT) else {
         return false;
     };
     let source_other = source_view
@@ -1614,7 +1664,7 @@ fn node_payload_preserved_except_marker(source: &[u8], candidate: &[u8], desired
 }
 
 fn strict_node_marker_wire(source: &[u8]) -> Result<bool, Error> {
-    let view = WireView::parse(source).map_err(map_wire_error)?;
+    let view = WireView::parse(source, WireLimits::DEFAULT).map_err(map_wire_error)?;
     let mut matches = view
         .fields()
         .filter(|field| field.number() == NODE_HAS_TRANSITION_FIELD);
@@ -1706,7 +1756,9 @@ fn settings_from_projection(
     snapshot: &TransitionSettingsSnapshot<'_>,
     limits: WireLimits,
 ) -> Result<Settings, Error> {
-    let animation = snapshot.animation.ok_or(Error::UnsupportedTransition)?;
+    let animation = snapshot
+        .animation
+        .ok_or(Error::Refused(Refusal::UnsupportedTransition))?;
     let mut settings = settings_from_snapshot(animation)?;
     let mut parameters = settings.animation_parameters().clone();
     if let Some(payload) = animation.color {
@@ -1786,8 +1838,8 @@ fn validate_requested_opaque_settings(
 
 fn map_requested_opaque_error(error: Error) -> Error {
     match error {
-        Error::LimitExceeded { .. } | Error::Allocation { .. } => error,
-        _ => Error::InvalidOpaquePayload,
+        Error::Limit { .. } | Error::Allocation { .. } => error,
+        _ => Error::Refused(Refusal::InvalidOpaquePayload),
     }
 }
 
@@ -1828,7 +1880,9 @@ fn rewrite_transition_envelope(
     settings: &Settings,
     limits: WireLimits,
 ) -> Result<Vec<u8>, Error> {
-    let animation = snapshot.animation.ok_or(Error::UnsupportedTransition)?;
+    let animation = snapshot
+        .animation
+        .ok_or(Error::Refused(Refusal::UnsupportedTransition))?;
     let parameters = settings.animation_parameters();
     let custom = settings.custom_parameters();
     let edits = [
@@ -1996,8 +2050,7 @@ fn rewrite_transition_envelope(
             NestedFieldReplacement::Fixed32(custom.travel_distance().map(f32::to_bits)),
         ),
     ];
-    let data =
-        patch_nested_fields_batched_with_limits(source, &edits, limits).map_err(map_wire_error)?;
+    let data = patch_nested_fields_batched(source, &edits, limits).map_err(map_wire_error)?;
     check_output(&data, limits)?;
     Ok(data)
 }
@@ -2013,14 +2066,13 @@ fn rewrite_node_transition_flag(
         true,
         NestedFieldReplacement::Varint(Some(u64::from(value))),
     );
-    let output =
-        patch_nested_fields_batched_with_limits(source, &[edit], limits).map_err(map_wire_error)?;
+    let output = patch_nested_fields_batched(source, &[edit], limits).map_err(map_wire_error)?;
     check_output(&output, limits)?;
     Ok(output)
 }
 fn check_output(output: &[u8], limits: WireLimits) -> Result<(), Error> {
     if output.len() > limits.max_output_bytes() {
-        Err(Error::LimitExceeded {
+        Err(Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: output.len() as u64,
             maximum: limits.max_output_bytes() as u64,
@@ -2037,7 +2089,7 @@ fn check_output(output: &[u8], limits: WireLimits) -> Result<(), Error> {
 fn physical_catalog(package: &Package) -> Result<&litchi_iwa_archive::SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
-        PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
+        PhysicalSource::Semantic(_) => Err(Error::Refused(Refusal::UnsupportedSource)),
     }
 }
 fn map_read_error(error: ReadError) -> Error {
@@ -2047,7 +2099,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 super::SemanticLimitKind::Objects => LimitKind::Entries,
                 super::SemanticLimitKind::Slides => LimitKind::Slides,
@@ -2064,7 +2116,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 super::PayloadLimitKind::Bytes => LimitKind::WireBytes,
                 super::PayloadLimitKind::Fields => LimitKind::WireFields,
@@ -2085,7 +2137,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -2108,7 +2160,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::MessageBytes => LimitKind::WireBytes,
                 litchi_iwa_core::LimitKind::HeaderFields => LimitKind::WireFields,
@@ -2130,7 +2182,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
                 litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -2394,7 +2446,7 @@ mod tests {
         .expect_err("oversized color must fail");
         assert!(matches!(
             oversized,
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::WireBytes,
                 observed: 2,
                 maximum: 1,
@@ -2410,7 +2462,7 @@ mod tests {
         .expect_err("duplicate fields must exceed the field ceiling");
         assert!(matches!(
             too_many_fields,
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::WireFields,
                 observed: 2,
                 maximum: 1,
@@ -2426,7 +2478,7 @@ mod tests {
         .expect_err("path nesting above the ceiling must fail");
         assert!(matches!(
             too_deep,
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: 2,
                 maximum: 1,
@@ -2498,7 +2550,7 @@ mod tests {
             .expect("positive rewrite-work limit");
         assert!(matches!(
             preflight_selected_transition_payload(&[0x08, 0x00], limits),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: LimitKind::WireWork,
                 observed: 4,
                 maximum: 3,
@@ -2562,7 +2614,7 @@ mod tests {
         let reduced_result = decode_transition_projection(&source, reduced_byte_limit);
         assert!(matches!(
             reduced_result,
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: LimitKind::WireBytes,
                 observed,
                 maximum,

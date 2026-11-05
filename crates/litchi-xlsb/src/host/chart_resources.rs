@@ -9,7 +9,7 @@
 //! relationship grammars as XLSX. This module validates, authors, and resolves
 //! those inert resources without opening linked targets or embedded payloads.
 
-use crate::chart::{
+use crate::builder::chart::{
     Chart, ExternalDataPart, ExternalDataTarget, Relationship, Target, UserShapesPart,
 };
 use crate::package::error::{Error, Result};
@@ -83,10 +83,7 @@ fn validate_chart_resource_metadata(chart: &Chart) -> Result<(Option<String>, Op
     for relationship in &chart.additional_relationships {
         validate_relationship(relationship, &mut total)?;
         if !chart_ids.insert(relationship.relationship_id.clone()) {
-            return Err(invalid(format!(
-                "duplicate chart relationship ID {:?}",
-                relationship.relationship_id
-            )));
+            return Err(invalid("duplicate chart relationship ID"));
         }
     }
 
@@ -101,9 +98,7 @@ fn validate_chart_resource_metadata(chart: &Chart) -> Result<(Option<String>, Op
             .unwrap_or_else(|| next_relationship_id(&chart_ids));
         validate_relationship_id(&id)?;
         if !chart_ids.insert(id.clone()) {
-            return Err(invalid(format!(
-                "conflicting chart external-data relationship ID {id:?}"
-            )));
+            return Err(invalid("conflicting chart external-data relationship ID"));
         }
     }
 
@@ -118,17 +113,13 @@ fn validate_chart_resource_metadata(chart: &Chart) -> Result<(Option<String>, Op
             .unwrap_or_else(|| next_relationship_id(&chart_ids));
         validate_relationship_id(&id)?;
         if !chart_ids.insert(id.clone()) {
-            return Err(invalid(format!(
-                "conflicting chart user-shapes relationship ID {id:?}"
-            )));
+            return Err(invalid("conflicting chart user-shapes relationship ID"));
         }
     }
 
     for id in crate::chart::relationship::fragment_ids(&chart.chart)? {
         if !chart_ids.contains(id.as_str()) {
-            return Err(invalid(format!(
-                "chart fragment references undeclared relationship {id:?}"
-            )));
+            return Err(invalid("chart fragment references undeclared relationship"));
         }
     }
     planned_special_relationship_ids(chart)
@@ -259,16 +250,12 @@ pub(crate) fn parse_chart_resources(
             .as_deref()
             .ok_or_else(|| invalid("parsed chart external data has no relationship ID"))?;
         validate_relationship_id(id)?;
-        let relationship = chart_part.rels().get(id).ok_or_else(|| {
-            invalid(format!(
-                "chart external data references missing relationship {id:?}"
-            ))
-        })?;
+        let relationship = chart_part
+            .rels()
+            .get(id)
+            .ok_or_else(|| invalid("chart external data references missing relationship"))?;
         if !crate::chart::relationship::is_external_data_type(relationship.reltype()) {
-            return Err(invalid(format!(
-                "chart external-data relationship {id:?} has invalid type {:?}",
-                relationship.reltype()
-            )));
+            return Err(invalid("chart external-data relationship has invalid type"));
         }
         consumed.insert(id.to_string());
         let target = if relationship.is_external() {
@@ -307,17 +294,16 @@ pub(crate) fn parse_chart_resources(
             .as_deref()
             .ok_or_else(|| invalid("parsed chart user shapes have no relationship ID"))?;
         validate_relationship_id(id)?;
-        let relationship = chart_part.rels().get(id).ok_or_else(|| {
-            invalid(format!(
-                "chart user shapes reference missing relationship {id:?}"
-            ))
-        })?;
+        let relationship = chart_part
+            .rels()
+            .get(id)
+            .ok_or_else(|| invalid("chart user shapes reference missing relationship"))?;
         if !crate::chart::relationship::is_user_shapes_type(relationship.reltype())
             || relationship.is_external()
         {
-            return Err(invalid(format!(
-                "chart user-shapes relationship {id:?} has invalid type or target mode"
-            )));
+            return Err(invalid(
+                "chart user-shapes relationship has invalid type or target mode",
+            ));
         }
         consumed.insert(id.to_string());
         let part = package.get_part(&relationship.target_partname()?)?;
@@ -390,12 +376,7 @@ pub(crate) fn parse_chart_resources(
 fn validate_external_data(value: &ExternalDataPart, total: &mut usize) -> Result<()> {
     validate_relationship_type(&value.relationship_type)?;
     let expected = crate::chart::relationship::external_data_content_type(&value.relationship_type)
-        .ok_or_else(|| {
-            invalid(format!(
-                "unsupported chart external-data relationship type {:?}",
-                value.relationship_type
-            ))
-        })?;
+        .ok_or_else(|| invalid("unsupported chart external-data relationship type"))?;
     match &value.target {
         ExternalDataTarget::Embedded {
             data,
@@ -404,9 +385,9 @@ fn validate_external_data(value: &ExternalDataPart, total: &mut usize) -> Result
         } => {
             validate_embedded(data, content_type, extension, total)?;
             if content_type != expected {
-                return Err(invalid(format!(
-                    "chart external-data content type {content_type:?} does not match its relationship type"
-                )));
+                return Err(invalid(
+                    "chart external-data content type does not match its relationship type",
+                ));
             }
         },
         ExternalDataTarget::Linked { target } => validate_external_target(target)?,
@@ -424,10 +405,7 @@ fn validate_user_shapes(value: &UserShapesPart, total: &mut usize) -> Result<()>
     for relationship in &value.relationships {
         validate_relationship(relationship, total)?;
         if !declared.insert(relationship.relationship_id.as_str()) {
-            return Err(invalid(format!(
-                "duplicate chart user-shapes relationship ID {:?}",
-                relationship.relationship_id
-            )));
+            return Err(invalid("duplicate chart user-shapes relationship ID"));
         }
     }
     if referenced.len() != declared.len()
@@ -476,9 +454,7 @@ fn validate_relationship_id(value: &str) -> Result<()> {
     if !(first.is_ascii_alphabetic() || first == b'_')
         || !bytes.all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.'))
     {
-        return Err(invalid(format!(
-            "chart relationship ID {value:?} is not an XML NCName"
-        )));
+        return Err(invalid("chart relationship ID is not an XML NCName"));
     }
     Ok(())
 }
@@ -491,9 +467,7 @@ fn validate_relationship_type(value: &str) -> Result<()> {
             .chars()
             .any(|character| character.is_control() || character.is_whitespace())
     {
-        return Err(invalid(format!(
-            "invalid chart relationship type URI {value:?}"
-        )));
+        return Err(invalid("invalid chart relationship type URI"));
     }
     Ok(())
 }
@@ -515,9 +489,7 @@ fn validate_extension(value: &str) -> Result<()> {
         || value.len() > MAX_EXTENSION_BYTES
         || !value.bytes().all(|byte| byte.is_ascii_alphanumeric())
     {
-        return Err(invalid(format!(
-            "invalid chart resource extension {value:?}"
-        )));
+        return Err(invalid("invalid chart resource extension"));
     }
     Ok(())
 }
@@ -573,9 +545,7 @@ fn planned_special_relationship_ids(chart: &Chart) -> Result<(Option<String>, Op
             .and_then(|value| value.relationship_id.clone())
             .unwrap_or_else(|| next_relationship_id(&used));
         if !used.insert(id.clone()) {
-            return Err(invalid(format!(
-                "conflicting chart external-data relationship ID {id:?}"
-            )));
+            return Err(invalid("conflicting chart external-data relationship ID"));
         }
         Some(id)
     } else {
@@ -589,9 +559,7 @@ fn planned_special_relationship_ids(chart: &Chart) -> Result<(Option<String>, Op
             .and_then(|value| value.relationship_id.clone())
             .unwrap_or_else(|| next_relationship_id(&used));
         if !used.insert(id.clone()) {
-            return Err(invalid(format!(
-                "conflicting chart user-shapes relationship ID {id:?}"
-            )));
+            return Err(invalid("conflicting chart user-shapes relationship ID"));
         }
         Some(id)
     } else {
@@ -656,10 +624,7 @@ fn resolve_relationship(
     } else {
         let part = package.get_part(&relationship.target_partname()?)?;
         if part.rels().iter().next().is_some() {
-            return Err(invalid(format!(
-                "chart resource part {:?} has nested relationships",
-                part.partname()
-            )));
+            return Err(invalid("chart resource part has nested relationships"));
         }
         add_resource_bytes(total, part.blob().len())?;
         Target::Embedded {
@@ -681,20 +646,18 @@ fn validated_part_extension(uri: &PackURI) -> Result<String> {
     Ok(extension.to_string())
 }
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormula(message.into())
+fn invalid(message: &'static str) -> Error {
+    Error::InvalidFormula(message)
 }
 
-fn limit(what: &str) -> Error {
-    Error::InvalidFormula(format!(
-        "{what} exceeds the XLSB chart-resource safety limit"
-    ))
+fn limit(_what: &str) -> Error {
+    Error::InvalidFormula("exceeds the XLSB chart-resource safety limit")
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::chart::{Anchor, Chart};
+    use crate::builder::chart::{Anchor, Chart};
     use litchi_drawingml::chart::ExternalData;
 
     #[test]

@@ -206,7 +206,8 @@ fn build_owned(members: &[Member], plan: FeedPlan) -> (Vec<u8>, Vec<Vec<usize>>)
 }
 
 fn assert_round_trip(bytes: &[u8], members: &[Member]) {
-    let reader = ArchiveReader::new(bytes).expect("archive reader");
+    let reader = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
+        .expect("archive reader");
     for member in members {
         assert_eq!(
             reader.read(&member.name).expect("member read"),
@@ -1225,7 +1226,7 @@ impl Write for StopSink {
 
 fn assert_io_kind(error: &ErrorKind, expected: io::ErrorKind) {
     match error {
-        ErrorKind::IO(error) | ErrorKind::Io(error) => assert_eq!(error.kind(), expected),
+        ErrorKind::IO(error) => assert_eq!(error.kind(), expected),
         other => panic!("expected I/O error, got {other:?}"),
     }
 }
@@ -1277,7 +1278,7 @@ fn owned_deflate_compressed_limit_does_not_publish_a_partial_member() {
             None => Some(entry.finish().expect_err("zero compressed limit succeeded")),
         };
         if let Some(error) = error {
-            assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+            assert!(matches!(error.kind(), ErrorKind::IO(_)));
             assert!(error.to_string().contains("compressed limit"));
         }
     }
@@ -1289,7 +1290,7 @@ fn streaming_writer_maps_owned_deflate_limit_to_typed_failure() {
     let limits = StreamingArchiveLimits::new(4, 128, 1024)
         .with_byte_limits(1 << 20, 1 << 20, 1 << 20)
         .with_compressed_size_limit(0);
-    let writer = StreamingArchiveWriter::with_limits(limits);
+    let writer = StreamingArchiveWriter::new(limits);
     let mut entry = writer
         .start_entry("limited.bin", CompressionMethod::Deflate)
         .expect("bounded Deflate entry");
@@ -1407,7 +1408,8 @@ fn fresh_streaming_reference(members: &[Member], zip64: bool) -> Vec<u8> {
 #[test]
 fn streaming_deflate_members_match_one_fresh_encoder_each() {
     let members = streaming_corpus();
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for member in &members {
         writer
             .write_deflated(&member.name, &member.payload)
@@ -1425,7 +1427,8 @@ fn streaming_deflate_members_match_one_fresh_encoder_each() {
 #[test]
 fn streaming_sized_deflate_members_match_one_fresh_encoder_each() {
     let members = streaming_corpus();
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for member in &members {
         writer
             .write_deflated_sized(&member.name, &member.payload)
@@ -1510,7 +1513,8 @@ impl Read for ChunkedReader<'_> {
 fn streaming_deflate_stream_members_match_one_fresh_encoder_each() {
     const CHUNK: usize = 4_096;
     let members = streaming_corpus();
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for member in &members {
         writer
             .write_deflated_stream(
@@ -1543,7 +1547,7 @@ fn a_refused_sized_member_leaves_the_next_member_byte_identical() {
     let kept = streaming_corpus();
     let oversized = patterned_payload(256 * 1024, 25);
 
-    let mut writer = StreamingArchiveWriter::with_limits(limits);
+    let mut writer = StreamingArchiveWriter::new(limits);
     writer
         .write_deflated_sized(&kept[3].name, &kept[3].payload)
         .expect("small member fits the compressed-size limit");
@@ -1559,7 +1563,7 @@ fn a_refused_sized_member_leaves_the_next_member_byte_identical() {
         .expect("the writer stays usable after a refused member");
     let after_refusal = writer.finish_to_bytes().expect("archive finish");
 
-    let mut clean = StreamingArchiveWriter::with_limits(limits);
+    let mut clean = StreamingArchiveWriter::new(limits);
     clean
         .write_deflated_sized(&kept[3].name, &kept[3].payload)
         .expect("small member");
@@ -1583,7 +1587,8 @@ fn a_refused_sized_member_leaves_the_next_member_byte_identical() {
 #[test]
 fn owned_and_borrowed_members_of_one_archive_keep_their_own_protocols() {
     let members = streaming_corpus();
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for (index, member) in members.iter().enumerate() {
         if index % 2 == 0 {
             let mut entry = writer
@@ -1629,7 +1634,7 @@ fn write_bounded_streaming(
             patterned_payload(70 * 1024 + 3, 61),
         ),
     ];
-    let mut writer = StreamingArchiveWriter::with_writer_and_limits(sink, limits);
+    let mut writer = StreamingArchiveWriter::with_writer(sink, limits);
     let mut splitter = Splitter::new(3);
     for (name, payload) in &payloads {
         let mut entry = writer.start_entry(name, CompressionMethod::Deflate)?;

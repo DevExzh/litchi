@@ -11,4 +11,4 @@ mod tests;
 pub use codec::{parse, parse_parts};
 pub use semantic::{Axis, Region, Style, Template};
 pub(crate) use transaction::styles_xml_for_templates;
-pub use transaction::{Commit, Edit, Patch, Snapshot};
+pub use transaction::{Edit, Snapshot};

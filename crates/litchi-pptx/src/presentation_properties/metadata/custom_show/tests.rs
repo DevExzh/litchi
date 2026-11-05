@@ -8,7 +8,7 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI};
 
-use super::*;
+use super::package::*;
 
 const PRESENTATION_XML: &[u8] = br#"<?xml version="1.0" encoding="UTF-8"?>
 <p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:future">
@@ -75,7 +75,7 @@ fn fixture() -> OpcPackage {
 #[test]
 fn snapshot_crud_preserves_opaque_xml_and_relationships() {
     let mut package = fixture();
-    let original = load_snapshot(&package).unwrap();
+    let original = load_snapshot(&package, super::Limits::DEFAULT).unwrap();
     assert_eq!(original.list().shows[0].name, "Opening & More");
     assert_eq!(original.list().shows[0].slide_ids, [256, 258]);
 
@@ -89,7 +89,7 @@ fn snapshot_crud_preserves_opaque_xml_and_relationships() {
     edit.reorder(&[9, 7]).unwrap();
 
     let commit = edit.commit().unwrap();
-    assert!(commit.is_changed());
+    assert!(commit.diagnostics().changed());
     let output = String::from_utf8_lossy(commit.snapshot().source_xml());
     assert!(output.contains("future=\"keep\""));
     assert!(output.contains("<x:listOpaque/>"));
@@ -100,7 +100,7 @@ fn snapshot_crud_preserves_opaque_xml_and_relationships() {
     assert!(output.contains("<x:afterOpaque/>"));
     apply_commit(&mut package, commit).unwrap();
 
-    let current = load_snapshot(&package).unwrap();
+    let current = load_snapshot(&package, super::Limits::DEFAULT).unwrap();
     assert_eq!(
         current
             .list()
@@ -129,11 +129,11 @@ fn snapshot_crud_preserves_opaque_xml_and_relationships() {
 #[test]
 fn no_op_commit_is_byte_exact() {
     let mut package = fixture();
-    let snapshot = load_snapshot(&package).unwrap();
+    let snapshot = load_snapshot(&package, super::Limits::DEFAULT).unwrap();
     let source = snapshot.source_xml().to_vec();
     let commit = snapshot.edit().commit().unwrap();
-    assert!(!commit.is_changed());
-    assert!(commit.patch().is_empty());
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.patch().is_noop());
     apply_commit(&mut package, commit).unwrap();
     assert_eq!(
         package.get_part(&presentation_name()).unwrap().blob(),
@@ -144,7 +144,7 @@ fn no_op_commit_is_byte_exact() {
 #[test]
 fn stale_patch_rejection_is_atomic_and_inverse_restores_bytes() {
     let mut package = fixture();
-    let original = load_snapshot(&package).unwrap();
+    let original = load_snapshot(&package, super::Limits::DEFAULT).unwrap();
     let mut edit = original.edit();
     edit.set_name(7, "Changed").unwrap();
     let patch = edit.commit().unwrap().into_patch();
@@ -166,7 +166,7 @@ fn stale_patch_rejection_is_atomic_and_inverse_restores_bytes() {
     );
 
     let mut restored = fixture();
-    let source = load_snapshot(&restored).unwrap();
+    let source = load_snapshot(&restored, super::Limits::DEFAULT).unwrap();
     patch.apply(&mut restored).unwrap();
     patch.inverse().apply(&mut restored).unwrap();
     assert_eq!(
@@ -178,7 +178,7 @@ fn stale_patch_rejection_is_atomic_and_inverse_restores_bytes() {
 #[test]
 fn invalid_slide_references_leave_staged_list_unchanged() {
     let package = fixture();
-    let snapshot = load_snapshot(&package).unwrap();
+    let snapshot = load_snapshot(&package, super::Limits::DEFAULT).unwrap();
     let mut edit = snapshot.edit();
     let before = edit.list().clone();
     assert!(edit.set_slides(7, vec![999]).is_err());

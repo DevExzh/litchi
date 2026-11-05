@@ -26,7 +26,11 @@ pub(crate) struct Parsed {
 
 pub(crate) fn scan(xml_bytes: &[u8], count: &mut usize) -> Result<Vec<Parsed>> {
     if xml_bytes.len() > MAX_SLIDE_XML_BYTES {
-        return Err(limit("control slide XML bytes", MAX_SLIDE_XML_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            xml_bytes.len(),
+            MAX_SLIDE_XML_BYTES,
+        ));
     }
     let mce = Limits {
         max_input_bytes: MAX_SLIDE_XML_BYTES,
@@ -60,11 +64,19 @@ pub(crate) fn scan(xml_bytes: &[u8], count: &mut usize) -> Result<Vec<Parsed>> {
         match event {
             Event::Start(element) => {
                 increment_nodes(&mut nodes)?;
-                depth = depth
-                    .checked_add(1)
-                    .ok_or_else(|| limit("control XML depth", MAX_XML_DEPTH))?;
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        MAX_XML_DEPTH,
+                    )
+                })?;
                 if depth > MAX_XML_DEPTH {
-                    return Err(limit("control XML depth", MAX_XML_DEPTH));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        MAX_XML_DEPTH,
+                    ));
                 }
                 if depth == 1 {
                     validate_root(&namespace, element.name(), root_seen)?;
@@ -91,11 +103,19 @@ pub(crate) fn scan(xml_bytes: &[u8], count: &mut usize) -> Result<Vec<Parsed>> {
             },
             Event::Empty(element) => {
                 increment_nodes(&mut nodes)?;
-                let child_depth = depth
-                    .checked_add(1)
-                    .ok_or_else(|| limit("control XML depth", MAX_XML_DEPTH))?;
+                let child_depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        MAX_XML_DEPTH,
+                    )
+                })?;
                 if child_depth > MAX_XML_DEPTH {
-                    return Err(limit("control XML depth", MAX_XML_DEPTH));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        child_depth,
+                        MAX_XML_DEPTH,
+                    ));
                 }
                 if child_depth == 1 {
                     validate_root(&namespace, element.name(), root_seen)?;
@@ -160,11 +180,19 @@ pub(crate) fn scan(xml_bytes: &[u8], count: &mut usize) -> Result<Vec<Parsed>> {
 }
 
 fn add_control(count: &mut usize) -> Result<()> {
-    *count = count
-        .checked_add(1)
-        .ok_or_else(|| limit("control count", MAX_CONTROLS))?;
+    *count = count.checked_add(1).ok_or_else(|| {
+        limit(
+            crate::error::CodecLimitKind::Controls,
+            usize::MAX,
+            MAX_CONTROLS,
+        )
+    })?;
     if *count > MAX_CONTROLS {
-        return Err(limit("control count", MAX_CONTROLS));
+        return Err(limit(
+            crate::error::CodecLimitKind::Controls,
+            *count,
+            MAX_CONTROLS,
+        ));
     }
     Ok(())
 }
@@ -175,12 +203,16 @@ fn parse_control(
     resolver: &NamespaceResolver,
 ) -> Result<Parsed> {
     if count_up_to(element, MAX_XML_ATTRIBUTES) > MAX_XML_ATTRIBUTES {
-        return Err(limit("control XML attributes", MAX_XML_ATTRIBUTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlAttributes,
+            count_up_to(element, MAX_XML_ATTRIBUTES),
+            MAX_XML_ATTRIBUTES,
+        ));
     }
-    let optional = |name: &[u8], label: &'static str| -> Result<Option<String>> {
+    let optional = |name: &[u8], _label: &'static str| -> Result<Option<String>> {
         let value = unqualified_attribute_value(element, name, decoder)?;
         if let Some(value) = &value {
-            bounded(value, label)?;
+            bounded(value, crate::error::CodecLimitKind::XmlAttributeBytes)?;
         }
         Ok(value)
     };
@@ -215,7 +247,11 @@ pub(crate) fn parse_descriptor(
     xml: &[u8],
 ) -> Result<(String, Option<String>, Persistence, Option<String>)> {
     if xml.len() > MAX_SLIDE_XML_BYTES {
-        return Err(limit("control descriptor XML bytes", MAX_SLIDE_XML_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            xml.len(),
+            MAX_SLIDE_XML_BYTES,
+        ));
     }
     let mut reader = NsReader::from_reader(xml);
     let mut depth = 0usize;
@@ -230,7 +266,11 @@ pub(crate) fn parse_descriptor(
             Event::Start(element) => {
                 increment_nodes(&mut depth)?;
                 if depth > MAX_XML_DEPTH {
-                    return Err(limit("control descriptor depth", MAX_XML_DEPTH));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        MAX_XML_DEPTH,
+                    ));
                 }
                 if !root {
                     root = true;
@@ -277,7 +317,11 @@ pub(crate) fn parse_descriptor(
             Event::Empty(element) => {
                 increment_nodes(&mut depth)?;
                 if depth > MAX_XML_DEPTH {
-                    return Err(limit("control descriptor depth", MAX_XML_DEPTH));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        MAX_XML_DEPTH,
+                    ));
                 }
                 if !root {
                     if element.name().local_name().as_ref() != b"ocx" {
@@ -398,9 +442,10 @@ mod tests {
         matches!(
             result,
             Err(crate::Error::Limit {
-                resource: "control XML attributes",
-                limit: MAX_XML_ATTRIBUTES,
-            })
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlAttributes),
+                observed,
+                maximum: MAX_XML_ATTRIBUTES,
+            }) if *observed == MAX_XML_ATTRIBUTES + 1
         )
     }
 

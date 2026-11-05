@@ -31,7 +31,7 @@ use std::{
 use litchi_core::{Error, ExecutionContext, ExecutionError, Resource};
 use litchi_odf_common::core::{
     GeneratedXmlEnvelope, GeneratedXmlLimits, PackageWriter, PackageWriterError,
-    PackageWriterLimitResource, PackageWriterLimits,
+    PackageWriterLimitResource, StreamingArchiveLimits,
 };
 
 const ODT_MIME: &str = "application/vnd.oasis.opendocument.text";
@@ -482,7 +482,7 @@ where
     let fixed_entry_limit = u64::try_from(fixed_entry_limit.max(8 * 1024))
         .map_err(|_| invalid("fixed ODT entry limit exceeds u64"))?;
     let max_entry_limit = content_limit.max(fixed_entry_limit);
-    let archive_limits = PackageWriterLimits::new(
+    let archive_limits = StreamingArchiveLimits::new(
         5,
         MAX_MEMBER_NAME_BYTES,
         (64 * 1024).min(limits.max_output_bytes),
@@ -501,7 +501,7 @@ where
     }
 
     let mut budgeted = BudgetedOutput::new(output, context, limits.max_output_bytes);
-    let mut package = PackageWriter::with_writer_and_limits(&mut budgeted, archive_limits);
+    let mut package = PackageWriter::with_writer(&mut budgeted, archive_limits);
     if let Err(error) = package.set_mimetype_streaming(ODT_MIME) {
         drop(package);
         return Err(map_package_error(

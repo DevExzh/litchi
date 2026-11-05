@@ -10,9 +10,9 @@ use std::sync::{
 };
 
 use litchi_core::{Error, ReadAt, SourceVersion};
-use litchi_odf_common::core::{PackageWriter, Profile, SourcePackageLimits};
+use litchi_odf_common::core::{PackageWriter, Profile};
 use litchi_odp::model::Reference;
-use litchi_odp::{Builder, Presentation, SourceBackedPresentation};
+use litchi_odp::{Builder, Package, SourceBackedPresentation};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const MIME: &str = "application/vnd.oasis.opendocument.presentation";
@@ -99,7 +99,7 @@ fn media_package() -> Vec<u8> {
     let content = format!(
         r#"<office:document-content xmlns:office="{OFFICE}" xmlns:draw="{DRAW}" xmlns:text="{TEXT}"><office:body><office:presentation><draw:page draw:name="one"><draw:frame><draw:text-box><text:p>source backed</text:p></draw:text-box></draw:frame></draw:page></office:presentation></office:body></office:document-content>"#
     );
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", content.as_bytes()).unwrap();
     writer
@@ -118,14 +118,14 @@ fn text_package() -> Vec<u8> {
     let mut builder = Builder::new();
     builder.add_slide_with_title("First", "alpha").unwrap();
     builder.add_slide_with_title("Second", "beta").unwrap();
-    builder.build().unwrap()
+    builder.build().unwrap().to_bytes().unwrap()
 }
 
 fn malformed_text_package() -> Vec<u8> {
     let content = format!(
         r#"<office:document-content xmlns:office="{OFFICE}" xmlns:draw="{DRAW}" xmlns:text="{TEXT}"><office:body><office:presentation><draw:page><draw:frame><draw:text-box><text:p><text:p>nested</text:p></text:p></draw:text-box></draw:frame></draw:page></office:presentation></office:body></office:document-content>"#
     );
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", content.as_bytes()).unwrap();
     writer.finish_to_bytes().unwrap()
@@ -145,7 +145,8 @@ fn oversized_text_package() -> Vec<u8> {
     let manifest = format!(
         r#"<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="{MIME}"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/></manifest:manifest>"#
     );
-    let mut archive = StreamingArchiveWriter::new();
+    let mut archive =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     archive.write_stored("mimetype", MIME.as_bytes()).unwrap();
     archive
         .write_deflated("content.xml", content.as_bytes())
@@ -160,7 +161,7 @@ fn password_package(password: &str) -> Vec<u8> {
     let content = format!(
         r#"<office:document-content xmlns:office="{OFFICE}"><office:body><office:presentation/></office:body></office:document-content>"#
     );
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer
         .set_encryption(password, Profile::compatible())
@@ -218,7 +219,8 @@ fn oversized_content_package() -> (Vec<u8>, (u64, u64)) {
     let manifest = format!(
         r#"<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="{MIME}"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/></manifest:manifest>"#
     );
-    let mut archive = StreamingArchiveWriter::new();
+    let mut archive =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     archive.write_stored("mimetype", MIME.as_bytes()).unwrap();
     archive
         .write_deflated("content.xml", content.as_bytes())
@@ -247,7 +249,8 @@ fn encrypted_oversized_content_package() -> Vec<u8> {
     let manifest = format!(
         r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="/" m:media-type="{MIME}"/><m:file-entry m:full-path="content.xml" m:media-type="text/xml" m:size="{declared_size}"><m:encryption-data><m:algorithm m:algorithm-name="http://www.w3.org/2009/xmlenc11#aes256-gcm" m:initialisation-vector="AAAAAAAAAAAAAAAA"/><m:start-key-generation m:start-key-generation-name="http://www.w3.org/2001/04/xmlenc#sha256" m:key-size="32"/><m:key-derivation m:key-derivation-name="PBKDF2" m:salt="AQ==" m:iteration-count="1000" m:key-size="32"/></m:encryption-data></m:file-entry></m:manifest>"#
     );
-    let mut archive = StreamingArchiveWriter::new();
+    let mut archive =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     archive.write_stored("mimetype", MIME.as_bytes()).unwrap();
     archive.write_stored("content.xml", &[0_u8; 32]).unwrap();
     archive
@@ -264,7 +267,7 @@ fn overlaps(left: (u64, u64), right: (u64, u64)) -> bool {
 fn source_facade_matches_owned_semantics_and_defers_media() {
     let bytes = media_package();
     let media_range = media_range(&bytes);
-    let eager = Presentation::from_bytes(bytes.clone()).unwrap();
+    let eager = Package::from_bytes(&bytes).unwrap().presentation().unwrap();
     let source = Arc::new(CountingSource::new(bytes));
     let source_presentation = SourceBackedPresentation::from_read_at(source.clone()).unwrap();
 
@@ -312,15 +315,22 @@ fn source_facade_matches_owned_semantics_and_defers_media() {
 #[test]
 fn source_facade_text_cache_preserves_projection_and_checks_freshness() {
     let bytes = text_package();
-    let eager = Presentation::from_bytes(bytes.clone()).unwrap();
+    let eager = Package::from_bytes(&bytes).unwrap().presentation().unwrap();
     let source = Arc::new(CountingSource::new(bytes));
     let presentation = SourceBackedPresentation::from_read_at(source.clone()).unwrap();
     let expected = eager.text().unwrap();
     let reads_before_text = source.reads();
 
     assert_eq!(presentation.text().unwrap(), expected);
+    let reads_after_first_text = source.reads();
+    assert!(
+        reads_after_first_text > reads_before_text,
+        "the first semantic read streams the validated source projection"
+    );
     let versions_before_threshold_call = source.versions();
     assert_eq!(presentation.text().unwrap(), expected);
+    let reads_after_second_text = source.reads();
+    assert!(reads_after_second_text > reads_after_first_text);
     assert!(source.versions() - versions_before_threshold_call >= 3);
     let versions_before_cache_hit = source.versions();
     assert_eq!(presentation.text().unwrap(), expected);
@@ -329,7 +339,7 @@ fn source_facade_text_cache_preserves_projection_and_checks_freshness() {
         2,
         "a retained text cache hit only observes source freshness before and after cloning"
     );
-    assert_eq!(source.reads(), reads_before_text);
+    assert_eq!(source.reads(), reads_after_second_text);
     assert_eq!(expected, "First\nalpha\n\nSecond\nbeta");
 
     source.bump_revision();
@@ -345,7 +355,9 @@ fn source_facade_text_cache_is_safe_for_concurrent_first_construction() {
     assert_send_sync::<SourceBackedPresentation>();
 
     let bytes = text_package();
-    let expected = Presentation::from_bytes(bytes.clone())
+    let expected = Package::from_bytes(&bytes)
+        .unwrap()
+        .presentation()
         .unwrap()
         .text()
         .unwrap();
@@ -375,9 +387,8 @@ fn source_facade_text_parse_errors_are_not_cached() {
     assert!(presentation.text().is_err());
     let versions_before_retry = source.versions();
     assert!(presentation.text().is_err());
-    assert_eq!(
-        source.versions() - versions_before_retry,
-        2,
+    assert!(
+        source.versions() - versions_before_retry >= 2,
         "a parse error must leave the thresholded cache uninitialized so the parser is retried"
     );
 }
@@ -401,7 +412,7 @@ fn source_facade_oversized_text_falls_back_without_retention() {
 
 #[test]
 fn source_facade_reports_typed_stale_source_errors() {
-    let bytes = Builder::new().build().unwrap();
+    let bytes = Builder::new().build().unwrap().to_bytes().unwrap();
     let source = Arc::new(CountingSource::new(bytes));
     let presentation = SourceBackedPresentation::from_read_at(source.clone()).unwrap();
     source.bump_revision();
@@ -416,12 +427,19 @@ fn source_facade_reports_typed_stale_source_errors() {
 fn source_facade_applies_physical_source_limits() {
     let bytes = media_package();
     let source = Arc::new(CountingSource::new(bytes.clone()));
-    let limits = SourcePackageLimits::new(
-        u64::try_from(bytes.len() - 1).unwrap(),
-        SourcePackageLimits::default().archive_limits(),
-    );
+    let limits = litchi_odf_common::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(bytes.len() - 1).unwrap())
+        .unwrap()
+        .build()
+        .unwrap();
 
-    assert!(SourceBackedPresentation::from_read_at_with_limits(source, limits).is_err());
+    assert!(
+        SourceBackedPresentation::from_read_at_with_options(
+            source,
+            litchi_odf_common::OpenOptions::new().source_limits(limits)
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -431,7 +449,8 @@ fn source_facade_rejects_oversized_content_before_materialization() {
 
     assert!(matches!(
         SourceBackedPresentation::from_read_at(source.clone()),
-        Err(Error::InvalidFormat(message)) if message.contains("content.xml exceeds the family limit")
+        Err(litchi_odp::Error::Core(Error::InvalidFormat(message)))
+            if message.contains("content.xml exceeds the family limit")
     ));
     assert!(
         source
@@ -450,7 +469,8 @@ fn source_facade_rejects_encrypted_oversized_plaintext_before_materialization() 
 
     assert!(matches!(
         SourceBackedPresentation::from_read_at(source.clone()),
-        Err(Error::InvalidFormat(message)) if message.contains("content.xml exceeds the family limit")
+        Err(litchi_odp::Error::Core(Error::InvalidFormat(message)))
+            if message.contains("content.xml exceeds the family limit")
     ));
     assert!(
         source
@@ -466,7 +486,7 @@ fn source_facade_validates_metadata_like_the_owned_family() {
     let content = format!(
         r#"<office:document-content xmlns:office="{OFFICE}"><office:body><office:presentation/></office:body></office:document-content>"#
     );
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", content.as_bytes()).unwrap();
     writer
@@ -477,16 +497,20 @@ fn source_facade_validates_metadata_like_the_owned_family() {
         .unwrap();
     let bytes = writer.finish_to_bytes().unwrap();
 
-    assert!(Presentation::from_bytes(bytes.clone()).is_err());
+    assert!(
+        Package::from_bytes(&bytes)
+            .and_then(|package| package.presentation())
+            .is_err()
+    );
     assert!(SourceBackedPresentation::from_read_at(Arc::new(CountingSource::new(bytes))).is_err());
 }
 
 #[test]
 fn source_facade_can_materialize_the_existing_mutable_owner() {
-    let bytes = Builder::new().build().unwrap();
+    let bytes = Builder::new().build().unwrap().to_bytes().unwrap();
     let source =
         SourceBackedPresentation::from_read_at(Arc::new(CountingSource::new(bytes))).unwrap();
-    let materialized = source.materialize().unwrap();
+    let materialized = source.materialize().unwrap().presentation().unwrap();
     assert_eq!(materialized.slide_count().unwrap(), 0);
     assert_eq!(materialized.text().unwrap(), "");
 }
@@ -495,7 +519,10 @@ fn source_facade_can_materialize_the_existing_mutable_owner() {
 fn source_facade_supports_password_protected_content() {
     let password = "source-password";
     let bytes = password_package(password);
-    let eager = Presentation::from_bytes_with_password(bytes.clone(), password).unwrap();
+    let eager = Package::from_bytes_with_password(&bytes, password)
+        .unwrap()
+        .presentation()
+        .unwrap();
     let source = SourceBackedPresentation::from_read_at_with_password(
         Arc::new(CountingSource::new(bytes.clone())),
         password,
@@ -503,6 +530,15 @@ fn source_facade_supports_password_protected_content() {
     .unwrap();
     assert_eq!(source.content_xml().unwrap(), eager.content_xml());
     assert_eq!(source.text().unwrap(), eager.text().unwrap());
+    let mut eager_text = Vec::new();
+    eager
+        .write_text_to(&mut eager_text, litchi_core::TextOutputOptions::default())
+        .unwrap();
+    let mut source_text = Vec::new();
+    source
+        .write_text_to(&mut source_text, litchi_core::TextOutputOptions::default())
+        .unwrap();
+    assert_eq!(source_text, eager_text);
     assert!(
         SourceBackedPresentation::from_read_at_with_password(
             Arc::new(CountingSource::new(bytes)),

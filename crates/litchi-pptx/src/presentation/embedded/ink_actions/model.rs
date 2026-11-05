@@ -66,27 +66,31 @@ impl Limits {
     /// Check a caller-supplied value before any package scan or allocation.
     pub(crate) fn validate(self) -> Result<()> {
         if self.anchors == 0 || self.anchors > MAX_ANCHORS {
-            return Err(Error::Limit {
-                resource: "ink-action anchor count",
-                limit: MAX_ANCHORS,
+            return Err(Error::InvalidLimit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::InkAnchors),
+                value: self.anchors,
+                maximum: MAX_ANCHORS,
             });
         }
         if self.target_bytes == 0 || self.target_bytes > MAX_TARGET_BYTES {
-            return Err(Error::Limit {
-                resource: "ink-action target bytes",
-                limit: MAX_TARGET_BYTES,
+            return Err(Error::InvalidLimit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PayloadBytes),
+                value: self.target_bytes,
+                maximum: MAX_TARGET_BYTES,
             });
         }
         if self.total_target_bytes == 0 || self.total_target_bytes > MAX_TOTAL_TARGET_BYTES {
-            return Err(Error::Limit {
-                resource: "ink-action aggregate target bytes",
-                limit: MAX_TOTAL_TARGET_BYTES,
+            return Err(Error::InvalidLimit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PayloadBytes),
+                value: self.total_target_bytes,
+                maximum: MAX_TOTAL_TARGET_BYTES,
             });
         }
         if self.target_relationships == 0 || self.target_relationships > MAX_TARGET_RELATIONSHIPS {
-            return Err(Error::Limit {
-                resource: "ink-action relationship edges",
-                limit: MAX_TARGET_RELATIONSHIPS,
+            return Err(Error::InvalidLimit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Relationships),
+                value: self.target_relationships,
+                maximum: MAX_TARGET_RELATIONSHIPS,
             });
         }
         Ok(())
@@ -532,7 +536,7 @@ pub struct Snapshot {
     pub(crate) owner_relationship_source: OwnedRelationships,
     pub(crate) package_relationship_source: OwnedRelationships,
     pub(crate) package_relationships: Arc<[PackageRelationship]>,
-    pub(crate) read_limits: litchi_opc::ReadLimits,
+    pub(crate) read_limits: litchi_opc::SourceLimits,
     pub(crate) revision: u64,
     pub(crate) limits: Limits,
 }
@@ -610,7 +614,7 @@ impl Snapshot {
 
     /// OPC read policy captured with this source snapshot.
     #[must_use]
-    pub const fn read_limits(&self) -> litchi_opc::ReadLimits {
+    pub const fn read_limits(&self) -> litchi_opc::SourceLimits {
         self.read_limits
     }
 
@@ -710,7 +714,7 @@ impl Snapshot {
                             Error::Invalid("ink-action source selector is absent".into())
                         })?;
                     if raw.fingerprint != context {
-                        return Err(Error::StaleSource);
+                        return Err(Error::PatchConflict);
                     }
                     return Err(Error::Invalid(
                         "ink-action source selector names an unsupported branch".into(),
@@ -723,7 +727,7 @@ impl Snapshot {
             len: self.anchors.len(),
         })?;
         if anchor.fingerprint != selector.context() {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         Ok(index)
     }
@@ -739,7 +743,7 @@ impl Snapshot {
         owner_relationship_source: OwnedRelationships,
         package_relationship_source: OwnedRelationships,
         package_relationships: Vec<PackageRelationship>,
-        read_limits: litchi_opc::ReadLimits,
+        read_limits: litchi_opc::SourceLimits,
         limits: Limits,
     ) -> Self {
         let revision = revision(
@@ -771,8 +775,8 @@ impl Snapshot {
 
     /// Begin a source-backed existing-target edit.
     #[must_use]
-    pub fn edit(&self) -> super::transaction::Edit {
-        super::transaction::Edit::new(self.clone())
+    pub(crate) fn edit(&self) -> super::transaction::Draft {
+        super::transaction::Draft::new(self.clone())
     }
 }
 

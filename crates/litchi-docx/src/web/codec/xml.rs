@@ -32,11 +32,18 @@ use quick_xml::reader::NsReader;
 use std::fmt::Write as _;
 
 impl Settings {
-    fn encode(&self, conformance: Conformance) -> Result<Vec<u8>> {
+    fn encode(&self, conformance: Conformance, limits: &super::super::Limits) -> Result<Vec<u8>> {
         if conformance == Conformance::Strict && self.rely_on_vml.is_some() {
             return Err(invalid("relyOnVML is not valid in Strict web settings"));
         }
         let capacity = validate_value(self)?;
+        if capacity > limits.xml_bytes() {
+            return Err(Error::WebLimit {
+                kind: crate::web::LimitKind::XmlBytes,
+                actual: capacity,
+                maximum: limits.xml_bytes(),
+            });
+        }
         let mut xml = String::new();
         xml.try_reserve_exact(capacity)
             .map_err(|source| Error::Allocation {
@@ -93,10 +100,12 @@ impl Settings {
         write_optional_on_off(&mut xml, "saveSmartTagsAsXml", self.save_smart_tags_as_xml)?;
 
         xml.push_str("</w:webSettings>");
-        if xml.len() > MAX_XML_BYTES {
-            return Err(invalid(format!(
-                "web-settings XML exceeds {MAX_XML_BYTES} bytes"
-            )));
+        if xml.len() > limits.xml_bytes() {
+            return Err(Error::WebLimit {
+                kind: crate::web::LimitKind::XmlBytes,
+                actual: xml.len(),
+                maximum: limits.xml_bytes(),
+            });
         }
         Ok(xml.into_bytes())
     }
@@ -131,9 +140,11 @@ impl Settings {
                         Error::Invalid("Word web-settings XML nesting is too deep".into())
                     })?;
                     if depth > MAX_FRAMESET_NESTING {
-                        return Err(invalid(
-                            "Word web-settings XML nesting exceeds the safety limit",
-                        ));
+                        return Err(Error::WebLimit {
+                            kind: crate::web::LimitKind::SettingsXmlDepth,
+                            actual: depth,
+                            maximum: MAX_FRAMESET_NESTING,
+                        });
                     }
                     if depth == 1 {
                         conformance = Some(validate_root(&namespace, &element, saw_root)?);
@@ -174,9 +185,11 @@ impl Settings {
                         Error::Invalid("Word web-settings XML nesting is too deep".into())
                     })?;
                     if child_depth > MAX_FRAMESET_NESTING {
-                        return Err(invalid(
-                            "Word web-settings XML nesting exceeds the safety limit",
-                        ));
+                        return Err(Error::WebLimit {
+                            kind: crate::web::LimitKind::SettingsXmlDepth,
+                            actual: child_depth,
+                            maximum: MAX_FRAMESET_NESTING,
+                        });
                     }
                     if child_depth == 1 {
                         conformance = Some(validate_root(&namespace, &element, saw_root)?);
@@ -232,16 +245,27 @@ impl Settings {
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn parse(xml: &[u8]) -> Result<(Settings, Conformance)> {
-    let processed = process_web_xml(xml)?;
+pub(crate) fn parse(xml: &[u8], limits: &super::super::Limits) -> Result<(Settings, Conformance)> {
+    super::super::raw::admit_xml(xml, limits)?;
+    let processed = process_web_xml(xml, limits)?;
+    super::super::raw::admit_xml(processed.as_ref(), limits)?;
     Settings::parse_xml(processed.as_ref())
 }
 
-pub(super) fn process_web_xml(xml: &[u8]) -> Result<std::borrow::Cow<'_, [u8]>> {
+pub(super) fn process_web_xml<'a>(
+    xml: &'a [u8],
+    limits: &super::super::Limits,
+) -> Result<std::borrow::Cow<'a, [u8]>> {
     let limits = litchi_ooxml_common::mce::Limits {
-        max_input_bytes: MAX_XML_BYTES,
-        max_output_bytes: MAX_XML_BYTES,
-        ..litchi_ooxml_common::mce::Limits::default()
+        max_input_bytes: limits.xml_bytes(),
+        max_output_bytes: limits.xml_bytes(),
+        max_depth: limits.depth(),
+        max_namespace_bindings: limits.attributes(),
+        max_directive_tokens: limits.events(),
+        max_choices_per_alternate: limits.nodes(),
+        max_attributes_per_element: limits
+            .attributes()
+            .min(litchi_ooxml_common::mce::ATTRIBUTES_PER_ELEMENT_CEILING),
     };
     litchi_ooxml_common::mce::process_markup_compatibility(
         xml,
@@ -257,8 +281,18 @@ pub(super) fn process_web_xml(xml: &[u8]) -> Result<std::borrow::Cow<'_, [u8]>> 
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn write(value: &Settings, conformance: Conformance) -> Result<Vec<u8>> {
-    value.encode(conformance)
+pub(crate) fn write(value: &Settings, conformance: Conformance) -> Result<Vec<u8>> {
+    write_with_limits(value, conformance, &super::super::Limits::DEFAULT)
+}
+
+/// Serialize a checked model while bounding the output allocation before it
+/// is created.
+pub(crate) fn write_with_limits(
+    value: &Settings,
+    conformance: Conformance,
+    limits: &super::super::Limits,
+) -> Result<Vec<u8>> {
+    value.encode(conformance, limits)
 }
 
 fn write_value_element(xml: &mut String, name: &str, value: &str) -> Result<()> {
@@ -291,9 +325,11 @@ fn write_explicit_on_off(xml: &mut String, name: &str, value: Option<bool>) -> R
 
 fn write_frameset(xml: &mut String, frameset: &Frameset, nesting: usize) -> Result<()> {
     if nesting > MAX_FRAMESET_NESTING {
-        return Err(Error::Invalid(
-            "Word web frameset nesting exceeds the supported safety limit".into(),
-        ));
+        return Err(Error::WebLimit {
+            kind: crate::web::LimitKind::FramesetDepth,
+            actual: nesting,
+            maximum: MAX_FRAMESET_NESTING,
+        });
     }
     xml.push_str("<w:frameset>");
     if let Some(value) = &frameset.size {
@@ -366,9 +402,11 @@ fn write_frameset_split_bar(xml: &mut String, split_bar: &SplitBar) -> Result<()
 
 fn write_html_div(xml: &mut String, div: &Div, nesting: usize) -> Result<()> {
     if nesting > MAX_FRAMESET_NESTING {
-        return Err(Error::Invalid(
-            "Word HTML division nesting exceeds the supported safety limit".into(),
-        ));
+        return Err(Error::WebLimit {
+            kind: crate::web::LimitKind::HtmlDivisionDepth,
+            actual: nesting,
+            maximum: MAX_FRAMESET_NESTING,
+        });
     }
     write!(xml, "<w:div w:id=\"{}\">", div.id)?;
     write_explicit_on_off(xml, "blockQuote", div.block_quote)?;
@@ -656,9 +694,11 @@ fn parse_frameset(
     budget: &mut ParseBudget,
 ) -> Result<Frameset> {
     if nesting > MAX_FRAMESET_NESTING {
-        return Err(Error::Invalid(
-            "Word web frameset nesting exceeds the supported safety limit".into(),
-        ));
+        return Err(Error::WebLimit {
+            kind: crate::web::LimitKind::FramesetDepth,
+            actual: nesting,
+            maximum: MAX_FRAMESET_NESTING,
+        });
     }
     let mut frameset = Frameset::default();
     loop {
@@ -768,9 +808,11 @@ fn parse_div_container(
     budget: &mut ParseBudget,
 ) -> Result<Vec<Div>> {
     if nesting > MAX_FRAMESET_NESTING {
-        return Err(Error::Invalid(
-            "Word HTML division nesting exceeds the supported safety limit".into(),
-        ));
+        return Err(Error::WebLimit {
+            kind: crate::web::LimitKind::HtmlDivisionDepth,
+            actual: nesting,
+            maximum: MAX_FRAMESET_NESTING,
+        });
     }
     let mut divs = Vec::new();
     loop {
@@ -1571,7 +1613,11 @@ fn skip_element(reader: &mut NsReader<&[u8]>, budget: &mut ParseBudget) -> Resul
                     .checked_add(1)
                     .ok_or_else(|| Error::Invalid("Word web XML nesting is too deep".into()))?;
                 if depth > MAX_FRAMESET_NESTING {
-                    return Err(invalid("Word web XML nesting exceeds the safety limit"));
+                    return Err(Error::WebLimit {
+                        kind: crate::web::LimitKind::XmlDepth,
+                        actual: depth,
+                        maximum: MAX_FRAMESET_NESTING,
+                    });
                 }
             },
             Event::End(_) => {

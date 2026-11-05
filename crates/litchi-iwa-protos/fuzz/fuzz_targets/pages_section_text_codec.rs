@@ -7,8 +7,8 @@ use std::ops::Range;
 use libfuzzer_sys::fuzz_target;
 use litchi_iwa_protos::{tsp::Reference, tswp::StorageArchive};
 use litchi_iwa_text_wire::{
-    RewriteBehavior, RewriteLimits, StorageRewriteExecutionLimits, decode_storage_with_limits,
-    prepare_storage_text_rewrite_with_behavior_and_limits, validate_storage_with_limits,
+    RewriteBehavior, RewriteLimits, StorageRewriteExecutionLimits, decode_storage,
+    prepare_storage_text_rewrite_with_behavior, validate_storage,
 };
 use prost::Message as _;
 
@@ -87,14 +87,14 @@ fn limits() -> RewriteLimits {
 
 fn exercise_raw(source: &[u8]) {
     let before = source.to_vec();
-    observe(validate_storage_with_limits(source, limits()));
+    observe(validate_storage(source, limits()));
     assert_eq!(source, before.as_slice(), "validation modified its source");
-    observe(decode_storage_with_limits(source, limits()));
+    observe(decode_storage(source, limits()));
     assert_eq!(source, before.as_slice(), "decode modified its source");
 
     let replacement = replacement(source);
     let range = 0..usize::from(source.first().copied().unwrap_or_default() & 7);
-    observe(prepare_storage_text_rewrite_with_behavior_and_limits(
+    observe(prepare_storage_text_rewrite_with_behavior(
         source,
         range,
         &replacement,
@@ -105,7 +105,7 @@ fn exercise_raw(source: &[u8]) {
 }
 
 fn exercise_valid_storage(source: &[u8], data: &[u8]) {
-    let validation = match validate_storage_with_limits(source, limits()) {
+    let validation = match validate_storage(source, limits()) {
         Ok(validation) => validation,
         Err(error) => {
             observe_error(error);
@@ -124,7 +124,7 @@ fn exercise_valid_storage(source: &[u8], data: &[u8]) {
         validation.has_unknown_wire_fields(),
     ));
 
-    let decoded = match decode_storage_with_limits(source, limits()) {
+    let decoded = match decode_storage(source, limits()) {
         Ok(decoded) => decoded,
         Err(error) => {
             observe_error(error);
@@ -165,7 +165,7 @@ fn exercise_rewrite(
     } else {
         RewriteBehavior::ReplaceSelection
     };
-    let prepared = match prepare_storage_text_rewrite_with_behavior_and_limits(
+    let prepared = match prepare_storage_text_rewrite_with_behavior(
         source,
         range.clone(),
         replacement,
@@ -212,7 +212,7 @@ fn exercise_rewrite(
     let replacement_units = replacement.encode_utf16().count();
     let inverse_range = range.start..range.start.saturating_add(replacement_units);
     let inverse_text = utf16_slice(text, range).unwrap_or_default();
-    let inverse = match prepare_storage_text_rewrite_with_behavior_and_limits(
+    let inverse = match prepare_storage_text_rewrite_with_behavior(
         output.bytes(),
         inverse_range,
         inverse_text,
@@ -247,7 +247,7 @@ fn exercise_rewrite(
 }
 
 fn exercise_limit_rejection(source: &[u8], range: Range<usize>, replacement: &str) {
-    let Ok(prepared) = prepare_storage_text_rewrite_with_behavior_and_limits(
+    let Ok(prepared) = prepare_storage_text_rewrite_with_behavior(
         source,
         range,
         replacement,
@@ -267,7 +267,7 @@ fn exercise_limit_rejection(source: &[u8], range: Range<usize>, replacement: &st
     };
     observe(prepared.execute(constrained));
 
-    let Ok(prepared) = prepare_storage_text_rewrite_with_behavior_and_limits(
+    let Ok(prepared) = prepare_storage_text_rewrite_with_behavior(
         source,
         0..0,
         "",

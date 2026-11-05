@@ -4,8 +4,8 @@
 )]
 
 use litchi_odc::{
-    AxisSpec, CachedCell, CachedRow, CachedTable, CachedValue, Chart, ChartClass, DataPointSpec,
-    Definition, DefinitionHistory, DefinitionSnapshot, Limits, SeriesSpec, StyleTarget,
+    AxisSpec, Builder, CachedCell, CachedRow, CachedTable, CachedValue, ChartClass, DataPointSpec,
+    Definition, History, OpenOptions, Package, SemanticLimits, SeriesSpec, StyleTarget,
     chart::Dimension,
 };
 
@@ -32,19 +32,25 @@ fn definition() -> Definition {
 
 #[test]
 fn granular_definition_crud_composes_and_survives_history() {
-    let source = DefinitionSnapshot::with_default_limits(definition()).unwrap();
+    let source = Builder::new()
+        .with_definition(definition())
+        .build()
+        .unwrap();
     let mut first_edit = source.edit();
-    first_edit
+    let definition_edit = first_edit.definition_edit().unwrap();
+    definition_edit
         .insert_axis(1, AxisSpec::new(Dimension::Y))
         .unwrap();
-    first_edit.insert_series(1, SeriesSpec::default()).unwrap();
-    first_edit
+    definition_edit
+        .insert_series(1, SeriesSpec::default())
+        .unwrap();
+    definition_edit
         .insert_data_point(1, 0, DataPointSpec::default())
         .unwrap();
-    first_edit
+    definition_edit
         .set_style(StyleTarget::Series(1), Some("second-series".into()))
         .unwrap();
-    first_edit
+    definition_edit
         .insert_cached_cell(
             false,
             0,
@@ -53,12 +59,15 @@ fn granular_definition_crud_composes_and_survives_history() {
         )
         .unwrap();
     let first = first_edit.commit().unwrap();
+    assert!(first.diagnostics().changed());
+    assert!(!first.patch().definition_changes().is_empty());
 
-    let mut second_edit = first.snapshot().edit();
-    second_edit.remove_data_point(0, 0).unwrap();
-    second_edit.remove_series(0).unwrap();
-    second_edit.remove_axis(0).unwrap();
-    second_edit
+    let mut second_edit = first.package().edit();
+    let definition_edit = second_edit.definition_edit().unwrap();
+    definition_edit.remove_data_point(0, 0).unwrap();
+    definition_edit.remove_series(0).unwrap();
+    definition_edit.remove_axis(0).unwrap();
+    definition_edit
         .update_cached_row(
             false,
             0,
@@ -68,27 +77,30 @@ fn granular_definition_crud_composes_and_survives_history() {
     let second = second_edit.commit().unwrap();
 
     let composed = first.patch().compose(second.patch()).unwrap();
-    let target = composed.apply(&source).unwrap();
-    assert_eq!(target.definition(), second.snapshot().definition());
+    let target = source.apply(&composed).unwrap().into_package();
     assert_eq!(
-        composed.inverse().apply(&target).unwrap().definition(),
-        source.definition()
+        target.chart().definition().unwrap(),
+        second.package().chart().definition().unwrap()
     );
-    assert!(composed.apply(second.snapshot()).is_err());
+    assert_eq!(
+        target
+            .apply(&composed.inverse())
+            .unwrap()
+            .package()
+            .chart()
+            .definition()
+            .unwrap(),
+        source.chart().definition().unwrap()
+    );
+    assert!(second.package().apply(&composed).is_err());
 
-    let mut history = DefinitionHistory::new(source.clone());
-    history.record(first.patch()).unwrap();
-    history.record(second.patch()).unwrap();
+    let mut history = History::new(source.clone());
+    history.record(&first).unwrap();
+    history.record(&second).unwrap();
     assert!(history.undo().unwrap());
-    assert_eq!(
-        history.current().definition(),
-        first.snapshot().definition()
-    );
+    assert_eq!(history.current().as_bytes(), first.package().as_bytes());
     assert!(history.redo().unwrap());
-    assert_eq!(
-        history.current().definition(),
-        second.snapshot().definition()
-    );
+    assert_eq!(history.current().as_bytes(), second.package().as_bytes());
 }
 
 #[test]
@@ -96,41 +108,71 @@ fn formulas_ranges_and_caller_limits_refuse_invalid_publication() {
     let mut value = definition();
     value.cached_table.as_mut().unwrap().rows[0].cells[0].formula =
         Some("of:=SUM([.B2:.B4])".into());
-    assert!(Chart::from_definition(value.clone()).is_ok());
+    assert!(
+        Builder::new()
+            .with_definition(value.clone())
+            .build()
+            .is_ok()
+    );
 
     value.cached_table.as_mut().unwrap().rows[0].cells[0].formula =
         Some("of:=SUM([.b2:.B4])".into());
-    assert!(Chart::from_definition(value).is_err());
+    assert!(Builder::new().with_definition(value).build().is_err());
 
-    let tight_axes = Limits::new().with_axes(1).unwrap();
+    let tight_axes = OpenOptions::new().semantic_limits(
+        SemanticLimits::builder()
+            .max_axes(1)
+            .unwrap()
+            .build()
+            .unwrap(),
+    );
     let mut too_many = definition();
     too_many.plot_area.axes.push(AxisSpec::new(Dimension::Y));
-    assert!(Chart::from_definition_with_limits(too_many, tight_axes).is_err());
+    assert!(
+        Builder::new()
+            .with_options(tight_axes)
+            .with_definition(too_many)
+            .build()
+            .is_err()
+    );
 
-    let bytes = Chart::from_definition(definition()).unwrap().into_bytes();
-    let tight_package = Limits::new().with_package_bytes(bytes.len() - 1).unwrap();
-    assert!(Chart::from_bytes_with_limits(bytes, tight_package).is_err());
+    let bytes = Builder::new()
+        .with_definition(definition())
+        .build()
+        .unwrap()
+        .to_bytes()
+        .unwrap();
+    let tight_package = litchi_odc::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(bytes.len() - 1).unwrap())
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        Package::from_bytes_with_options(&bytes, OpenOptions::new().source_limits(tight_package)),
+        Err(litchi_odc::Error::Limit { .. })
+    ));
 }
 
 #[test]
 fn package_styles_and_resource_crud_reopens_composes_and_reverses() {
     let styles = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" office:version="1.4"><office:styles/></office:document-styles>"#;
-    let source = Chart::from_definition(definition()).unwrap();
+    let source = Builder::new()
+        .with_definition(definition())
+        .build()
+        .unwrap();
     let mut first_edit = source.edit();
     first_edit.set_styles_xml(styles);
     first_edit
         .add_resource("Pictures/chart.bin", "application/octet-stream", b"one")
         .unwrap();
     let first = first_edit.commit().unwrap();
-    assert_eq!(first.chart().styles_xml(), Some(styles));
-    assert_eq!(first.chart().resources().len(), 1);
-    assert_eq!(first.chart().resource_bytes(0).unwrap(), b"one");
-    let reopened =
-        Chart::from_bytes_with_limits(first.chart().as_bytes().to_vec(), first.chart().limits())
-            .unwrap();
-    assert_eq!(reopened.resource_bytes(0).unwrap(), b"one");
+    assert_eq!(first.package().chart().styles_xml(), Some(styles));
+    assert_eq!(first.package().chart().resources().len(), 1);
+    assert_eq!(first.package().chart().resource_bytes(0).unwrap(), b"one");
+    let reopened = Package::from_bytes(first.package().as_bytes()).unwrap();
+    assert_eq!(reopened.chart().resource_bytes(0).unwrap(), b"one");
 
-    let mut second_edit = first.chart().edit();
+    let mut second_edit = first.package().edit();
     second_edit
         .update_resource(0, "application/octet-stream", b"two")
         .unwrap();
@@ -138,25 +180,33 @@ fn package_styles_and_resource_crud_reopens_composes_and_reverses() {
     let second = second_edit.commit().unwrap();
     let composed = first.patch().compose(second.patch()).unwrap();
     assert_eq!(
-        composed.apply(&source).unwrap().as_bytes(),
-        second.chart().as_bytes()
+        source.apply(&composed).unwrap().into_package().as_bytes(),
+        second.package().as_bytes()
     );
     assert_eq!(
-        composed.inverse().apply(second.chart()).unwrap().as_bytes(),
+        second
+            .package()
+            .apply(&composed.inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         source.as_bytes()
     );
-    assert!(composed.apply(first.chart()).is_err());
+    assert!(first.package().apply(&composed).is_err());
 
-    let mut remove = second.chart().edit();
+    let mut remove = second.package().edit();
     remove.remove_resource(0).unwrap();
     let removed = remove.commit().unwrap();
-    assert!(removed.chart().resources().is_empty());
-    assert!(removed.patch().inverse().apply(removed.chart()).is_ok());
+    assert!(removed.package().chart().resources().is_empty());
+    assert!(removed.package().apply(&removed.patch().inverse()).is_ok());
 }
 
 #[test]
 fn malformed_style_resource_and_bounded_history_are_refused() {
-    let source = Chart::from_definition(definition()).unwrap();
+    let source = Builder::new()
+        .with_definition(definition())
+        .build()
+        .unwrap();
     let mut bad_style = source.edit();
     bad_style.set_styles_xml("<office:document-styles>");
     assert!(bad_style.commit().is_err());
@@ -169,19 +219,34 @@ fn malformed_style_resource_and_bounded_history_are_refused() {
     );
     assert!(bad_media.remove_resource(0).is_err());
 
-    let limits = Limits::new().with_history(1).unwrap();
-    let initial = DefinitionSnapshot::new(definition(), limits).unwrap();
+    let one_step = OpenOptions::new().semantic_limits(
+        SemanticLimits::builder()
+            .max_history(1)
+            .unwrap()
+            .build()
+            .unwrap(),
+    );
+    let initial = Builder::new()
+        .with_definition(definition())
+        .with_options(one_step)
+        .build()
+        .unwrap();
+    assert_eq!(initial.options(), one_step);
     let mut first_edit = initial.edit();
     first_edit
+        .definition_edit()
+        .unwrap()
         .set_style(StyleTarget::Chart, Some("one".into()))
         .unwrap();
     let first = first_edit.commit().unwrap();
-    let mut second_edit = first.snapshot().edit();
+    let mut second_edit = first.package().edit();
     second_edit
+        .definition_edit()
+        .unwrap()
         .set_style(StyleTarget::Chart, Some("two".into()))
         .unwrap();
     let second = second_edit.commit().unwrap();
-    let mut history = DefinitionHistory::new(initial);
-    history.record(first.patch()).unwrap();
-    assert!(history.record(second.patch()).is_err());
+    let mut history = History::new(initial);
+    history.record(&first).unwrap();
+    assert!(history.record(&second).is_err());
 }

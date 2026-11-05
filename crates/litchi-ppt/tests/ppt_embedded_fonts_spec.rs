@@ -14,8 +14,8 @@
 #[cfg(feature = "encryption")]
 use litchi_ppt::FontPackageOptions;
 use litchi_ppt::{
-    Font, FontCollection, FontEmbeddingFlags, FontScope, FontSnapshot, Record, RecordLimits,
-    RecordType,
+    Error, Font, FontCollection, FontEmbeddingFlags, FontScope, FontSnapshot, Package, Record,
+    RecordType, SourceLimitKind, SourceLimits, font,
 };
 use std::io::Cursor;
 
@@ -57,9 +57,10 @@ fn collection(record_type: u16, payload: &[u8]) -> Vec<u8> {
 }
 
 fn parsed_collection(bytes: &[u8]) -> FontCollection {
-    let (record, consumed) = Record::parse(bytes, 0).expect("valid outer PPT record");
+    let (record, consumed) =
+        Record::parse(bytes, 0, &SourceLimits::default()).expect("valid outer PPT record");
     assert_eq!(consumed, bytes.len());
-    FontCollection::parse(&record).expect("valid MS-PPT font collection")
+    FontCollection::parse(&record, &font::Limits::default()).expect("valid MS-PPT font collection")
 }
 
 #[test]
@@ -101,8 +102,11 @@ fn base_collection_uses_ordinal_refs_and_accepts_all_four_facets() {
 
     #[cfg(feature = "fonts")]
     for facet in &fonts.fonts[0].embedded_fonts {
-        let view = litchi_fonts::embedding::powerpoint::View::parse(&facet.data)
-            .expect("fixture facet is canonical uncompressed EOT 1.0");
+        let view = litchi_fonts::embedding::powerpoint::View::parse(
+            &facet.data,
+            litchi_fonts::embedding::powerpoint::Limits::default(),
+        )
+        .expect("fixture facet is canonical uncompressed EOT 1.0");
         assert_eq!(view.family_name().decode().unwrap(), "Fixture");
     }
 }
@@ -132,29 +136,184 @@ fn international_collection_and_pp10_flags_keep_ignored_bits_inert() {
 #[test]
 fn malformed_font_names_and_entity_lengths_are_rejected() {
     let malformed_utf16 = font_entity(0, &[0xd800, 0]);
-    let parsed = Record::parse(&collection(RT_FONT_COLLECTION, &malformed_utf16), 0)
-        .unwrap()
-        .0;
-    assert!(FontCollection::parse(&parsed).is_err());
+    let parsed = Record::parse(
+        &collection(RT_FONT_COLLECTION, &malformed_utf16),
+        0,
+        &SourceLimits::default(),
+    )
+    .unwrap()
+    .0;
+    assert!(FontCollection::parse(&parsed, &font::Limits::default()).is_err());
 
     let short_entity = record(0, 0, RT_FONT_ENTITY_ATOM, &[0; 67]);
-    let record = Record::parse(&collection(RT_FONT_COLLECTION, &short_entity), 0)
-        .unwrap()
-        .0;
-    assert!(FontCollection::parse(&record).is_err());
+    let record = Record::parse(
+        &collection(RT_FONT_COLLECTION, &short_entity),
+        0,
+        &SourceLimits::default(),
+    )
+    .unwrap()
+    .0;
+    assert!(FontCollection::parse(&record, &font::Limits::default()).is_err());
 }
 
 #[test]
-fn record_limits_reject_oversize_font_records_before_materialization() {
-    let bytes = collection(RT_FONT_COLLECTION, &[0; 128]);
-    let limits = RecordLimits {
-        max_input_bytes: bytes.len(),
-        max_record_bytes: 64,
-        max_record_payload_bytes: 56,
-        max_copied_payload_bytes: 56,
-        ..RecordLimits::default()
-    };
-    assert!(Record::parse_with_limits(&bytes, 0, limits).is_err());
+fn source_limits_checked_builder_preserves_profiles_and_accepts_boundaries() {
+    let defaults = SourceLimits::default();
+    assert_eq!(
+        defaults.max_input_bytes(),
+        SourceLimits::DEFAULT_MAX_INPUT_BYTES
+    );
+    assert_eq!(
+        defaults.max_entry_bytes(),
+        SourceLimits::DEFAULT_MAX_ENTRY_BYTES
+    );
+    assert_eq!(
+        defaults.max_aggregate_bytes(),
+        SourceLimits::DEFAULT_MAX_AGGREGATE_BYTES
+    );
+    assert_eq!(defaults.max_depth(), SourceLimits::DEFAULT_MAX_DEPTH);
+
+    let custom = SourceLimits::builder()
+        .max_input_bytes(1234)
+        .unwrap()
+        .max_entry_bytes(123)
+        .unwrap()
+        .max_aggregate_bytes(5678)
+        .unwrap()
+        .max_record_bytes(4096)
+        .unwrap()
+        .max_events(17)
+        .unwrap()
+        .max_depth(9)
+        .unwrap()
+        .max_record_payload_bytes(2048)
+        .unwrap()
+        .max_aggregate_payload_bytes(8192)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert_eq!(custom.max_input_bytes(), 1234);
+    assert_eq!(custom.max_entry_bytes(), 123);
+    assert_eq!(custom.max_aggregate_bytes(), 5678);
+    assert_eq!(custom.max_record_bytes(), 4096);
+    assert_eq!(custom.max_events(), 17);
+    assert_eq!(custom.max_depth(), 9);
+    assert_eq!(custom.max_record_payload_bytes(), 2048);
+    assert_eq!(custom.max_aggregate_payload_bytes(), 8192);
+    assert_eq!(custom.to_builder().build().unwrap(), custom);
+
+    assert!(matches!(
+        SourceLimits::builder().max_input_bytes(0),
+        Err(Error::InvalidLimit {
+            kind: SourceLimitKind::InputBytes,
+            value: 0,
+            ..
+        })
+    ));
+    assert!(matches!(
+        SourceLimits::builder().max_input_bytes(SourceLimits::MAX_INPUT_BYTES + 1),
+        Err(Error::InvalidLimit {
+            kind: SourceLimitKind::InputBytes,
+            value,
+            maximum: SourceLimits::MAX_INPUT_BYTES,
+        }) if value == SourceLimits::MAX_INPUT_BYTES + 1
+    ));
+    assert!(matches!(
+        SourceLimits::builder().max_entry_bytes(0),
+        Err(Error::InvalidLimit {
+            kind: SourceLimitKind::EntryBytes,
+            value: 0,
+            ..
+        })
+    ));
+    assert!(matches!(
+        SourceLimits::builder().max_aggregate_bytes(0),
+        Err(Error::InvalidLimit {
+            kind: SourceLimitKind::AggregateBytes,
+            value: 0,
+            ..
+        })
+    ));
+    assert!(matches!(
+        SourceLimits::builder().max_record_bytes(0),
+        Err(Error::InvalidLimit {
+            kind: SourceLimitKind::RecordBytes,
+            value: 0,
+            ..
+        })
+    ));
+    assert!(matches!(
+        SourceLimits::builder().max_events(0),
+        Err(Error::InvalidLimit {
+            kind: SourceLimitKind::Events,
+            value: 0,
+            ..
+        })
+    ));
+    assert!(matches!(
+        SourceLimits::builder().max_depth(0),
+        Err(Error::InvalidLimit {
+            kind: SourceLimitKind::Depth,
+            value: 0,
+            ..
+        })
+    ));
+    assert!(matches!(
+        SourceLimits::builder().max_record_payload_bytes(0),
+        Err(Error::InvalidLimit {
+            kind: SourceLimitKind::RecordPayloadBytes,
+            value: 0,
+            ..
+        })
+    ));
+    assert!(matches!(
+        SourceLimits::builder().max_aggregate_payload_bytes(0),
+        Err(Error::InvalidLimit {
+            kind: SourceLimitKind::AggregatePayloadBytes,
+            value: 0,
+            ..
+        })
+    ));
+
+    let boundaries = SourceLimits::builder()
+        .max_input_bytes(SourceLimits::MAX_INPUT_BYTES)
+        .unwrap()
+        .max_entry_bytes(SourceLimits::MAX_ENTRY_BYTES)
+        .unwrap()
+        .max_aggregate_bytes(SourceLimits::MAX_AGGREGATE_BYTES)
+        .unwrap()
+        .max_record_bytes(SourceLimits::MAX_RECORD_BYTES)
+        .unwrap()
+        .max_events(SourceLimits::MAX_EVENTS)
+        .unwrap()
+        .max_depth(SourceLimits::MAX_DEPTH)
+        .unwrap()
+        .max_record_payload_bytes(SourceLimits::MAX_RECORD_PAYLOAD_BYTES)
+        .unwrap()
+        .max_aggregate_payload_bytes(SourceLimits::MAX_AGGREGATE_PAYLOAD_BYTES)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert_eq!(boundaries.max_input_bytes(), SourceLimits::MAX_INPUT_BYTES);
+    assert_eq!(boundaries.max_entry_bytes(), SourceLimits::MAX_ENTRY_BYTES);
+    assert_eq!(
+        boundaries.max_aggregate_bytes(),
+        SourceLimits::MAX_AGGREGATE_BYTES
+    );
+    assert_eq!(
+        boundaries.max_record_bytes(),
+        SourceLimits::MAX_RECORD_BYTES
+    );
+    assert_eq!(boundaries.max_events(), SourceLimits::MAX_EVENTS);
+    assert_eq!(boundaries.max_depth(), SourceLimits::MAX_DEPTH);
+    assert_eq!(
+        boundaries.max_record_payload_bytes(),
+        SourceLimits::MAX_RECORD_PAYLOAD_BYTES
+    );
+    assert_eq!(
+        boundaries.max_aggregate_payload_bytes(),
+        SourceLimits::MAX_AGGREGATE_PAYLOAD_BYTES
+    );
 }
 
 #[cfg(feature = "fonts")]
@@ -163,22 +322,22 @@ fn eot_parser_rejects_malformed_utf16_sizes_and_explicit_limit_overflow() {
     use litchi_fonts::embedding::powerpoint::{Limits, View};
 
     let eot = valid_eot();
-    assert!(View::parse(&eot).is_ok());
+    assert!(View::parse(&eot, Limits::default()).is_ok());
 
     let mut wrong_size = eot.clone();
     wrong_size[0..4].copy_from_slice(&0_u32.to_le_bytes());
-    assert!(View::parse(&wrong_size).is_err());
+    assert!(View::parse(&wrong_size, Limits::default()).is_err());
 
     let mut malformed_name = eot.clone();
     // The first name begins after the 82-byte fixed header and its u16 size.
     malformed_name[84..86].copy_from_slice(&0xd800_u16.to_le_bytes());
-    assert!(View::parse(&malformed_name).is_err());
+    assert!(View::parse(&malformed_name, Limits::default()).is_err());
 
     let limits = Limits {
         max_input_bytes: eot.len() - 1,
         ..Limits::default()
     };
-    assert!(View::parse_with(&eot, limits).is_err());
+    assert!(View::parse(&eot, limits).is_err());
 }
 
 #[test]
@@ -188,26 +347,25 @@ fn signed_source_allows_exact_no_op_but_refuses_changed_font_commit() {
         &["_xmlsignatures", "origin.sigs"],
         b"fixture",
     );
-    let snapshot =
-        FontSnapshot::from_bytes(source.clone()).expect("signed PPT remains inspectable");
+    let package = Package::from_bytes(&source).expect("signed PPT remains inspectable");
 
-    let commit = snapshot.edit().unwrap().commit().expect("exact no-op");
-    assert!(commit.patch().is_empty());
-    assert_eq!(commit.snapshot().bytes(), source);
+    let commit = package.edit_fonts().unwrap().commit().expect("exact no-op");
+    assert!(commit.patch().is_noop());
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().to_bytes().unwrap(), source);
 
-    let mut transaction = snapshot.edit().unwrap();
-    transaction
-        .append_font(FontScope::Base, Font::new("Changed"))
+    let mut edit = package.edit_fonts().unwrap();
+    edit.append_font(FontScope::Base, Font::new("Changed"))
         .unwrap();
-    assert!(transaction.commit().is_err());
+    assert!(matches!(edit.commit(), Err(font::Error::Signed)));
 }
 
 #[test]
 fn signed_inconsistent_save_with_fonts_flag_is_preserved_on_exact_no_op() {
     let inconsistent = with_inconsistent_save_with_fonts(unsigned_ppt());
     let source = with_stream(inconsistent, &["_xmlsignatures", "origin.sigs"], b"fixture");
-    let snapshot =
-        FontSnapshot::from_bytes(source.clone()).expect("signed PPT remains inspectable");
+    let snapshot = FontSnapshot::from_bytes(source.clone(), &font::PackageLimits::default())
+        .expect("signed PPT remains inspectable");
     assert!(snapshot.fonts().base.as_ref().is_some_and(|collection| {
         collection
             .fonts
@@ -215,14 +373,15 @@ fn signed_inconsistent_save_with_fonts_flag_is_preserved_on_exact_no_op() {
             .all(|font| font.embedded_fonts.is_empty())
     }));
 
-    let commit = snapshot.edit().unwrap().commit().expect("exact no-op");
-    assert!(commit.patch().is_empty());
-    assert_eq!(commit.snapshot().bytes(), source);
+    let package = Package::from_bytes(&source).expect("signed PPT opens");
+    let commit = package.edit_fonts().unwrap().commit().expect("exact no-op");
+    assert!(commit.patch().is_noop());
+    assert_eq!(commit.package().to_bytes().unwrap(), source);
 }
 
 #[test]
 #[cfg(feature = "encryption")]
-fn encrypted_source_allows_exact_no_op_but_refuses_changed_font_commit() {
+fn encrypted_source_allows_font_inspection_but_refuses_font_edits() {
     let password = "font fixture password";
     let source = encrypted_ppt(password);
     let snapshot = FontSnapshot::from_bytes_with_options(
@@ -233,16 +392,17 @@ fn encrypted_source_allows_exact_no_op_but_refuses_changed_font_commit() {
         },
     )
     .expect("password-authorized font inspection");
+    assert!(snapshot.fonts().base.is_some());
 
-    let commit = snapshot.edit().unwrap().commit().expect("exact no-op");
-    assert!(commit.patch().is_empty());
-    assert_eq!(commit.snapshot().bytes(), source);
-
-    let mut transaction = snapshot.edit().unwrap();
-    transaction
-        .append_font(FontScope::Base, Font::new("Changed"))
-        .unwrap();
-    assert!(transaction.commit().is_err());
+    let package = Package::from_bytes_with_options(
+        &source,
+        litchi_ppt::OpenOptions::new().password(password),
+    )
+    .expect("password-authorized open");
+    assert!(matches!(
+        package.edit_fonts(),
+        Err(font::Error::Package(Error::EncryptionPolicy))
+    ));
 }
 
 #[test]
@@ -255,15 +415,15 @@ fn empty_root_and_nested_protection_storages_refuse_changed_publication() {
         &["Nested", "\u{9}drmvIEWERcONTENT"][..],
     ] {
         let source = with_storage(unsigned_ppt(), path);
-        let snapshot = FontSnapshot::from_bytes(source.clone()).expect("protected PPT inspection");
-        let no_op = snapshot
-            .edit()
+        let package = Package::from_bytes(&source).expect("protected PPT inspection");
+        let no_op = package
+            .edit_fonts()
             .unwrap()
             .commit()
             .expect("exact protected no-op");
-        assert_eq!(no_op.snapshot().bytes(), source);
+        assert_eq!(no_op.package().to_bytes().unwrap(), source);
 
-        let mut changed = snapshot.edit().unwrap();
+        let mut changed = package.edit_fonts().unwrap();
         changed
             .append_font(FontScope::Base, Font::new("Changed"))
             .unwrap();
@@ -272,10 +432,10 @@ fn empty_root_and_nested_protection_storages_refuse_changed_publication() {
 }
 
 fn unsigned_ppt() -> Vec<u8> {
-    let mut writer = litchi_ppt::writer::Writer::new();
+    let mut writer = litchi_ppt::writer::Builder::new();
     writer.add_slide().unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    litchi_ppt::raw::encode(&mut writer, &mut output).unwrap();
     output.into_inner()
 }
 
@@ -283,20 +443,22 @@ fn unsigned_ppt() -> Vec<u8> {
 fn encrypted_ppt(password: &str) -> Vec<u8> {
     use litchi_ppt::writer::EncryptionProfile;
 
-    let mut writer = litchi_ppt::writer::Writer::new();
+    let mut writer = litchi_ppt::writer::Builder::new();
     writer.add_slide().unwrap();
     writer
         .set_password(password, EncryptionProfile::CryptoApiRc4 { key_bits: 128 })
         .unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.set_encryption_entropy(litchi_ppt::EncryptionEntropy::generate().unwrap());
+    litchi_ppt::raw::encode(&mut writer, &mut output).unwrap();
     output.into_inner()
 }
 
 fn with_stream(source: Vec<u8>, path: &[&str], payload: &[u8]) -> Vec<u8> {
     use litchi_cfb::{OleFile, OleWriter};
 
-    let mut source_file = OleFile::open(Cursor::new(source)).unwrap();
+    let mut source_file =
+        OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default()).unwrap();
     let streams = source_file
         .list_streams()
         .into_iter()
@@ -320,7 +482,8 @@ fn with_stream(source: Vec<u8>, path: &[&str], payload: &[u8]) -> Vec<u8> {
 fn with_storage(source: Vec<u8>, path: &[&str]) -> Vec<u8> {
     use litchi_cfb::{OleFile, OleWriter};
 
-    let mut source_file = OleFile::open(Cursor::new(source)).unwrap();
+    let mut source_file =
+        OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default()).unwrap();
     let streams = source_file
         .list_streams()
         .into_iter()
@@ -344,7 +507,8 @@ fn with_storage(source: Vec<u8>, path: &[&str]) -> Vec<u8> {
 fn with_inconsistent_save_with_fonts(source: Vec<u8>) -> Vec<u8> {
     use litchi_cfb::{OleFile, OleWriter};
 
-    let snapshot = FontSnapshot::from_bytes(source.clone()).unwrap();
+    let snapshot =
+        FontSnapshot::from_bytes(source.clone(), &font::PackageLimits::default()).unwrap();
     let owner = snapshot.document_bytes();
     let mut offset = 8usize;
     let flag_offset = loop {
@@ -360,7 +524,8 @@ fn with_inconsistent_save_with_fonts(source: Vec<u8>) -> Vec<u8> {
         offset += 8 + length;
     };
 
-    let mut source_file = OleFile::open(Cursor::new(source)).unwrap();
+    let mut source_file =
+        OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default()).unwrap();
     let streams = source_file
         .list_streams()
         .into_iter()

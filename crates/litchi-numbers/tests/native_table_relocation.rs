@@ -11,9 +11,7 @@ use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_core::{Archive, ArchiveInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tsd, tsp};
 use litchi_numbers::cell::Value;
-use litchi_numbers::{
-    ImageSelector, Package, SheetSelector, Table, table::relocation::transaction::Path,
-};
+use litchi_numbers::{ImageSelector, Package, SheetSelector, Table, table::relocation::Path};
 use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -82,17 +80,17 @@ fn text_at(table: &Table, address: &str) -> TestResult<String> {
 }
 
 fn image_archive(source: &[u8]) -> TestResult<ImageArchiveSnapshot> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut found = None;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = match SnappyStream::decompress(entry.data()) {
+        let stream = match SnappyStream::decompress(entry.data(), Default::default()) {
             Ok(stream) => stream,
             Err(_) => continue,
         };
-        let archive = match Archive::parse(stream.as_bytes()) {
+        let archive = match Archive::parse(stream.as_bytes(), Default::default()) {
             Ok(archive) => archive,
             Err(_) => continue,
         };
@@ -140,8 +138,8 @@ fn image_archive(source: &[u8]) -> TestResult<ImageArchiveSnapshot> {
 }
 
 fn assert_data_assets_unchanged(source: &[u8], target: &[u8]) -> TestResult {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     let mut count = 0;
     for entry in before
         .iter()
@@ -171,8 +169,8 @@ fn is_preview(name: &str) -> bool {
 }
 
 fn assert_locality(source: &[u8], target: &[u8]) -> TestResult {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     let mut changed = Vec::new();
     for entry in before.iter() {
         let Some(candidate) = after.iter().find(|other| other.name() == entry.name()) else {

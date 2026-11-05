@@ -23,9 +23,11 @@ pub(crate) const MAX_XML_NODES: usize = 1_000_000;
 
 pub(crate) fn validate_xml(xml: &[u8]) -> Result<()> {
     if xml.len() > MAX_XML_BYTES {
-        return Err(Error::InvalidFormat(format!(
-            "Word numbering XML exceeds {MAX_XML_BYTES} bytes"
-        )));
+        return Err(Error::NumberingLimit {
+            kind: crate::numbering::LimitKind::XmlBytes,
+            actual: xml.len(),
+            maximum: MAX_XML_BYTES,
+        });
     }
     Ok(())
 }

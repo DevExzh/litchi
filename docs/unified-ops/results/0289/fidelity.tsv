@@ -1,0 +1,1028 @@
+file	format	noop	detail	revert	revert_detail	structure	structure_detail
+Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestDataStorage/O14ISOStrict/Word/sectPr-Previous Section Properties-rsidSelect-004B4C75.docx	docx	exact		value-exact	/ author: 14219 -> 13850 bytes, first difference at 8833	refused	picture+comment add+set+remove: document_protected: DOCX changed document publication refused (protected): document or write protection, ...
+Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/svg.docx	docx	exact		value-exact	/ author: 74104 -> 73856 bytes, first difference at 71897	value-exact	picture+comment add+set+remove: 74104 -> 74202 bytes, first difference at 6
+iwork/directory/keynote/basic.key	keynote	exact		-		-	
+iwork/directory/keynote/basic.key/Index.zip	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 123322 -> 123308 bytes, first difference at 14	value-exact	slide duplicate+add+remove: 123322 -> 126565 bytes, first difference at 89854
+iwork/directory/numbers/basic.numbers	numbers	exact		-		-	
+iwork/directory/numbers/basic.numbers/Index.zip	numbers	exact		value-exact	/sheet[1] name: 78105 -> 78111 bytes, first difference at 58425	value-exact	table add+remove, row add+remove: 78105 -> 78139 bytes, first difference at 58425
+iwork/directory/pages/basic.pages	pages	exact		-		-	
+iwork/directory/pages/basic.pages/Index.zip	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/keynote/basic.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 500058 -> 455848 bytes, first difference at 328815	value-exact	slide duplicate+add+remove: 500058 -> 459101 bytes, first difference at 418690
+iwork/keynote/chart-arrangement-retirement-resaved.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 510176 -> 459802 bytes, first difference at 331046	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/chart-caption-native-resaved.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 495846 -> 457000 bytes, first difference at 328385	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/chart-caption-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 495463 -> 456659 bytes, first difference at 328038	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/chart-data-edited-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 495425 -> 456767 bytes, first difference at 328116	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/chart-data-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 494919 -> 456636 bytes, first difference at 328116	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/chart-grid-authored-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 76323 -> 37806 bytes, first difference at 15414	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains unmodelled native content with refer...
+iwork/keynote/chart-grid-replaced-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 79756 -> 37923 bytes, first difference at 15506	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains unmodelled native content with refer...
+iwork/keynote/chart-titles-native-resaved.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 509703 -> 459329 bytes, first difference at 330639	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/chart-titles-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 507910 -> 459260 bytes, first difference at 330600	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/drawable-comments-cross-component-native/foreign-drawable-root-and-reply.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 753709 -> 692962 bytes, first difference at 562695	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/drawable-comments-cross-component-native/foreign-drawable-root-create.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 753606 -> 692860 bytes, first difference at 562695	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/drawable-comments-cross-component-native/foreign-reply-add.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 753749 -> 693012 bytes, first difference at 562695	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/drawable-comments-cross-component-native/foreign-reply-remove.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 753346 -> 692609 bytes, first difference at 562695	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/drawable-comments-cross-component-native/foreign-reply-set.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 753647 -> 692910 bytes, first difference at 562695	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/drawable-comments-cross-component-native/foreign-root-clear.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 753256 -> 692519 bytes, first difference at 562695	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/drawable-comments-cross-component-native/foreign-root-set.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 753372 -> 692635 bytes, first difference at 562695	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/drawable-comments-cross-component-native/shared-foreign-reply-clear.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 753579 -> 692842 bytes, first difference at 562695	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/drawable-comments-cross-component-native/shared-foreign-root-set.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 753451 -> 692714 bytes, first difference at 562695	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/drawable-comments-cross-component-native/unrooted-unique-native-create-reply.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 753794 -> 693046 bytes, first difference at 562695	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/drawable-comments-source-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 753541 -> 692795 bytes, first difference at 562695	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/image-adjustments-native-resaved.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 779865 -> 684204 bytes, first difference at 556295	value-exact	slide duplicate+add+remove: 779865 -> 687708 bytes, first difference at 646414
+iwork/keynote/image-adjustments-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 779871 -> 684209 bytes, first difference at 556295	value-exact	slide duplicate+add+remove: 779871 -> 687753 bytes, first difference at 646411
+iwork/keynote/image-adjustments-retirement-resaved.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 779927 -> 684259 bytes, first difference at 556295	value-exact	slide duplicate+add+remove: 779927 -> 687861 bytes, first difference at 646476
+iwork/keynote/media-audio-comment-duplicate-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 752860 -> 692760 bytes, first difference at 562459	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/media-audio-comment-removal-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 752528 -> 692428 bytes, first difference at 562459	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/media-audio-position-focused-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 752309 -> 692209 bytes, first difference at 562459	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/media-audio-position-ui-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 752330 -> 692212 bytes, first difference at 562459	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/media-comments-baseline-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 752189 -> 692078 bytes, first difference at 562459	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/media-comments-duplicate-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 753240 -> 692789 bytes, first difference at 562733	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/media-comments-final-removal-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 743655 -> 690099 bytes, first difference at 560914	value-exact	slide duplicate+add+remove: 743655 -> 694789 bytes, first difference at 652028
+iwork/keynote/media-comments-shared-removal-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 752144 -> 692110 bytes, first difference at 562459	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/media-lifecycle-audio-duplicate-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 752241 -> 692130 bytes, first difference at 562459	value-exact	slide duplicate+add+remove: 752241 -> 697406 bytes, first difference at 653891
+iwork/keynote/media-lifecycle-audio-remove-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 559085 -> 498987 bytes, first difference at 370358	value-exact	slide duplicate+add+remove: 559085 -> 503412 bytes, first difference at 461214
+iwork/keynote/media-lifecycle-duplicate-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 752730 -> 692206 bytes, first difference at 562459	value-exact	slide duplicate+add+remove: 752730 -> 697563 bytes, first difference at 653927
+iwork/keynote/media-lifecycle-remove-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 697237 -> 649881 bytes, first difference at 521724	value-exact	slide duplicate+add+remove: 697237 -> 653929 bytes, first difference at 612306
+iwork/keynote/media-properties-audio-focused-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 752373 -> 692273 bytes, first difference at 562460	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/media-properties-file-focused-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 752361 -> 692261 bytes, first difference at 562459	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/media-properties-placeholder-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 798695 -> 733774 bytes, first difference at 603516	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/media-replacement-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 752060 -> 691960 bytes, first difference at 562459	value-exact	slide duplicate+add+remove: 752060 -> 697026 bytes, first difference at 653823
+iwork/keynote/media-replacement-retirement-resaved.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 807293 -> 742409 bytes, first difference at 613095	value-exact	slide duplicate+add+remove: 807293 -> 747476 bytes, first difference at 704286
+iwork/keynote/media-watermark-reduplicate-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 753033 -> 692515 bytes, first difference at 562459	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/media-watermark-removal-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 752302 -> 692202 bytes, first difference at 562459	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/multi-slide.key	keynote	exact		byte-exact	/slide[1]/placeholder[1] text	value-exact	slide duplicate+add+remove: 463067 -> 466285 bytes, first difference at 418835
+iwork/keynote/pie-third-wedge-native.key	keynote	exact		none		refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/slide-audio-creation-focused-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 754418 -> 694319 bytes, first difference at 564164	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/slide-layout-native-resaved.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 788504 -> 684445 bytes, first difference at 556481	value-exact	slide duplicate+add+remove: 788504 -> 687975 bytes, first difference at 646656
+iwork/keynote/slide-movie-creation-focused-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 752411 -> 692465 bytes, first difference at 562459	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/slide-movie-creation-fresh-focused-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 796954 -> 731984 bytes, first difference at 601687	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/slide-movie-creation-source-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 755911 -> 693308 bytes, first difference at 563233	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/slide-movie-geometry-focused-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 800182 -> 731945 bytes, first difference at 601687	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/slide-movie-geometry-source-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 802551 -> 736043 bytes, first difference at 605776	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/slide-movie-geometry-vertical-focused-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 799074 -> 731950 bytes, first difference at 601687	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/slide-table-merges-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 534674 -> 472171 bytes, first difference at 335338	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/slide-table-read-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 540001 -> 473709 bytes, first difference at 336363	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/keynote/table-discovery.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 535255 -> 471103 bytes, first difference at 334847	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
+iwork/numbers/audio-playback-native-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 146555 -> 89610 bytes, first difference at 68395	value-exact	table add+remove, row add+remove: 146555 -> 89633 bytes, first difference at 10088
+iwork/numbers/audio-playback-native.numbers	numbers	exact		value-exact	/sheet[1] name: 146459 -> 89692 bytes, first difference at 68478	value-exact	table add+remove, row add+remove: 146459 -> 89721 bytes, first difference at 10088
+iwork/numbers/basic.numbers	numbers	exact		value-exact	/sheet[1] name: 136357 -> 79384 bytes, first difference at 58396	value-exact	table add+remove, row add+remove: 136357 -> 79401 bytes, first difference at 58396
+iwork/numbers/cell-value-native.numbers	numbers	exact		value-exact	/sheet[1] name: 125316 -> 80319 bytes, first difference at 59187	value-exact	table add+remove, row add+remove: 125316 -> 80315 bytes, first difference at 8282
+iwork/numbers/chart-arrangement-native.numbers	numbers	exact		value-exact	/sheet[1] name: 128644 -> 81454 bytes, first difference at 59934	value-exact	table add+remove, row add+remove: 128644 -> 81455 bytes, first difference at 14
+iwork/numbers/chart-arrangement-retirement-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 128604 -> 81414 bytes, first difference at 59895	value-exact	table add+remove, row add+remove: 128604 -> 81428 bytes, first difference at 14
+iwork/numbers/chart-caption-native.numbers	numbers	exact		value-exact	/sheet[1] name: 130852 -> 81360 bytes, first difference at 59824	value-exact	table add+remove, row add+remove: 130852 -> 81389 bytes, first difference at 14
+iwork/numbers/chart-data-edited-native.numbers	numbers	exact		value-exact	/sheet[1] name: 62570 -> 20881 bytes, first difference at 14	value-exact	table add+remove, row add+remove: 62570 -> 20898 bytes, first difference at 15
+iwork/numbers/chart-data-native.numbers	numbers	exact		value-exact	/sheet[1] name: 127968 -> 81540 bytes, first difference at 60045	value-exact	table add+remove, row add+remove: 127968 -> 81562 bytes, first difference at 14
+iwork/numbers/chart-font-size-two-sheet.numbers	numbers	exact		value-exact	/sheet[1] name: 9594 -> 9594 bytes, first difference at 5256	value-exact	table add+remove, row add+remove: 9594 -> 9596 bytes, first difference at 14
+iwork/numbers/chart-grid-authored-native.numbers	numbers	exact		value-exact	/sheet[1] name: 60618 -> 20852 bytes, first difference at 14	value-exact	table add+remove, row add+remove: 60618 -> 20868 bytes, first difference at 14
+iwork/numbers/chart-grid-replaced-native.numbers	numbers	exact		value-exact	/sheet[1] name: 61042 -> 20885 bytes, first difference at 14	value-exact	table add+remove, row add+remove: 61042 -> 20905 bytes, first difference at 14
+iwork/numbers/comment-compat-native-multiroot.numbers	numbers	exact		value-exact	/sheet[1] name: 138691 -> 79668 bytes, first difference at 58655	value-exact	table add+remove, row add+remove: 138691 -> 79691 bytes, first difference at 12585
+iwork/numbers/comment-metadata-native-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 28973 -> 19136 bytes, first difference at 14	value-exact	table add+remove, row add+remove: 28973 -> 19138 bytes, first difference at 14
+iwork/numbers/comment-reader-native-created.numbers	numbers	exact		value-exact	/sheet[1] name: 136175 -> 79461 bytes, first difference at 58476	value-exact	table add+remove, row add+remove: 136175 -> 79499 bytes, first difference at 58476
+iwork/numbers/custom-datetime-native-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 137684 -> 79475 bytes, first difference at 58512	value-exact	table add+remove, row add+remove: 137684 -> 79480 bytes, first difference at 12451
+iwork/numbers/custom-datetime-native.numbers	numbers	exact		value-exact	/sheet[1] name: 136983 -> 79430 bytes, first difference at 58472	value-exact	table add+remove, row add+remove: 136983 -> 79457 bytes, first difference at 12417
+iwork/numbers/custom-number-native-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 136808 -> 79485 bytes, first difference at 58490	value-exact	table add+remove, row add+remove: 136808 -> 79490 bytes, first difference at 12432
+iwork/numbers/custom-number-native.numbers	numbers	exact		value-exact	/sheet[1] name: 136401 -> 79482 bytes, first difference at 58498	value-exact	table add+remove, row add+remove: 136401 -> 79499 bytes, first difference at 12444
+iwork/numbers/custom-retirement-cleared.numbers	numbers	exact		value-exact	/sheet[1] name: 136435 -> 79343 bytes, first difference at 58344	value-exact	table add+remove, row add+remove: 136435 -> 79361 bytes, first difference at 12333
+iwork/numbers/custom-retirement-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 137073 -> 79499 bytes, first difference at 58516	value-exact	table add+remove, row add+remove: 137073 -> 79513 bytes, first difference at 12451
+iwork/numbers/custom-text-native-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 137237 -> 79479 bytes, first difference at 58498	value-exact	table add+remove, row add+remove: 137237 -> 79492 bytes, first difference at 12437
+iwork/numbers/custom-text-native-unicode.numbers	numbers	exact		value-exact	/sheet[1] name: 136917 -> 79459 bytes, first difference at 58499	value-exact	table add+remove, row add+remove: 136917 -> 79493 bytes, first difference at 12443
+iwork/numbers/custom-text-native.numbers	numbers	exact		value-exact	/sheet[1] name: 137384 -> 79452 bytes, first difference at 58493	value-exact	table add+remove, row add+remove: 137384 -> 79481 bytes, first difference at 12437
+iwork/numbers/duration-native-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 136757 -> 79349 bytes, first difference at 58373	value-exact	table add+remove, row add+remove: 136757 -> 79369 bytes, first difference at 12330
+iwork/numbers/duration-native.numbers	numbers	exact		value-exact	/sheet[1] name: 136485 -> 78948 bytes, first difference at 57994	value-exact	table add+remove, row add+remove: 136485 -> 78978 bytes, first difference at 11961
+iwork/numbers/formula-arena-native.numbers	numbers	exact		value-exact	/sheet[1] name: 102550 -> 79037 bytes, first difference at 57990	value-exact	table add+remove, row add+remove: 102550 -> 79033 bytes, first difference at 8272
+iwork/numbers/formula-budget-native.numbers	numbers	exact		value-exact	/sheet[1] name: 101345 -> 78961 bytes, first difference at 57898	value-exact	table add+remove, row add+remove: 101345 -> 78959 bytes, first difference at 8282
+iwork/numbers/formula-envelope-native.numbers	numbers	exact		value-exact	/sheet[1] name: 104582 -> 79576 bytes, first difference at 58384	one-way	table add+remove, row add+remove: the inverse is refused: unsupported_capability: source representation does not support table lifecycle ...
+iwork/numbers/formula-events-native.numbers	numbers	exact		value-exact	/sheet[1] name: 104679 -> 79442 bytes, first difference at 58303	value-exact	table add+remove, row add+remove: 104679 -> 79444 bytes, first difference at 8283
+iwork/numbers/image-adjustments-direct-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 407242 -> 296247 bytes, first difference at 274590	value-exact	table add+remove, row add+remove: 407242 -> 296263 bytes, first difference at 215881
+iwork/numbers/image-adjustments-native-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 408848 -> 296236 bytes, first difference at 274579	value-exact	table add+remove, row add+remove: 408848 -> 296252 bytes, first difference at 215881
+iwork/numbers/image-adjustments-native.numbers	numbers	exact		value-exact	/sheet[1] name: 406626 -> 295945 bytes, first difference at 274287	value-exact	table add+remove, row add+remove: 406626 -> 295976 bytes, first difference at 215881
+iwork/numbers/image-adjustments-retirement-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 407012 -> 296017 bytes, first difference at 274381	value-exact	table add+remove, row add+remove: 407012 -> 296030 bytes, first difference at 215881
+iwork/numbers/pivot-all-summary-functions-native.numbers	numbers	exact		value-exact	/sheet[1] name: 167650 -> 105822 bytes, first difference at 80150	value-exact	table add+remove, row add+remove: 167650 -> 105867 bytes, first difference at 24357
+iwork/numbers/shared-model-native.numbers	numbers	exact		value-exact	/sheet[1] name: 105105 -> 78707 bytes, first difference at 57685	value-exact	table add+remove, row add+remove: 105105 -> 78725 bytes, first difference at 7914
+iwork/numbers/table-data-list-native.numbers	numbers	exact		value-exact	/sheet[1] name: 134196 -> 80787 bytes, first difference at 59718	value-exact	table add+remove, row add+remove: 134196 -> 80783 bytes, first difference at 13309
+iwork/numbers/table-merges-native.numbers	numbers	exact		value-exact	/sheet[1] name: 136130 -> 81278 bytes, first difference at 60132	value-exact	table add+remove, row add+remove: 136130 -> 81276 bytes, first difference at 13643
+iwork/numbers/table-relocation-native-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 427012 -> 305386 bytes, first difference at 280493	value-exact	table add+remove, row add+remove: 427012 -> 427015 bytes, first difference at 280493
+iwork/numbers/table-relocation-native.numbers	numbers	exact		value-exact	/sheet[1] name: 415992 -> 305312 bytes, first difference at 280396	value-exact	table add+remove, row add+remove: 415992 -> 305332 bytes, first difference at 215882
+iwork/numbers/volatile-highlight-native-second.numbers	numbers	exact		value-exact	/sheet[1] name: 139023 -> 80673 bytes, first difference at 59414	value-exact	table add+remove, row add+remove: 139023 -> 80682 bytes, first difference at 59414
+iwork/numbers/volatile-highlight-native.numbers	numbers	exact		value-exact	/sheet[1] name: 138300 -> 80360 bytes, first difference at 59233	value-exact	table add+remove, row add+remove: 138300 -> 80378 bytes, first difference at 13495
+iwork/pages/audio-playback-native-resaved.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/audio-playback-native.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/basic.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/body-sections-unicode.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/body-table-catalog-native.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/body-table-cells-native.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/body-table-comment-hidden-native-saved.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/body-table-cross-reference-native.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/body-table-hidden-axes-cleared-native.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/body-table-hidden-axes-focused-native.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/body-table-hidden-axes-native.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/body-table-merges-native.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/body-table-name-focused-native-saved.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/body-table-name-focused.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/body-table-name-visible-native.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/body-table-read-native.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/body-table-visible.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/chart-arrangement-native.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/chart-arrangement-retirement-resaved.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/chart-data-edited-native.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/chart-data-native.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/chart-grid-authored-native.pages	pages	exact		value-exact	/section[1] name: 66763 -> 66768 bytes, first difference at 14	value-exact	paragraph add+remove: 66763 -> 66768 bytes, first difference at 14
+iwork/pages/chart-grid-replaced-native.pages	pages	exact		value-exact	/section[1] name: 67748 -> 67753 bytes, first difference at 14	value-exact	paragraph add+remove: 67748 -> 67753 bytes, first difference at 14
+iwork/pages/image-adjustments-direct-resaved.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/image-adjustments-native-resaved.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/image-adjustments-native.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/image-adjustments-retirement-resaved.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/source-built-hidden-axes-before.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/source-built-hidden-axes-legacy.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/source-built-table-stylesheet-before.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/source-built-table-stylesheet-native-saved.pages	pages	exact		value-exact	/section[1] name: 37712 -> 37713 bytes, first difference at 14	value-exact	paragraph add+remove: 37712 -> 37713 bytes, first difference at 14
+iwork/synthetic/numbers/bench-grid.numbers	numbers	exact		value-exact	/sheet[1] name: 11482 -> 11482 bytes, first difference at 8540	value-exact	table add+remove, row add+remove: 11482 -> 11482 bytes, first difference at 8540
+iwork/synthetic/numbers/custom-focused.numbers	numbers	exact		value-exact	/sheet[1] name: 2246 -> 1841 bytes, first difference at 1003	refused	table add+remove, row add+remove: invalid_input: rooted table-lifecycle source is invalid
+libreoffice-core/chart2/qa/extras/data/odp/tdf121189.odp	odp	exact		value-exact	/slide[1] name: 16945 -> 16948 bytes, first difference at 9192	none	
+libreoffice-core/chart2/qa/extras/data/xls/chart.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: edit cells refused (unsupported_content): a position-locked drawing anchor is not shiftable witho...
+libreoffice-core/chart2/qa/extras/data/xlsx/boxWhisker.xlsx	xlsx	exact		value-exact	/ author: 13397 -> 13139 bytes, first difference at 10957	-	
+libreoffice-core/chart2/qa/extras/data/xlsx/tdf143127.xlsx	xlsx	exact		value-exact	/ author: 18486 -> 18229 bytes, first difference at 14770	-	
+libreoffice-core/dbaccess/qa/unit/data/tdf132924.odb	odb	exact		value-exact	/table[1] name: 3148 -> 2777 bytes, first difference at 7	-	
+libreoffice-core/desktop/qa/data/3page.odg	odg	exact		value-exact	/page[1] name: 11175 -> 9735 bytes, first difference at 7	-	
+libreoffice-core/desktop/qa/data/BlankDrawDocument.odg	odg	exact		value-exact	/page[1] name: 8183 -> 6844 bytes, first difference at 7	-	
+libreoffice-core/embeddedobj/qa/cppunit/data/insert-file-config.doc	doc	exact		value-exact	/body/p[1] text: 22016 -> 24576 bytes, first difference at 548	value-exact	bookmark+hyperlink add+remove: 22016 -> 23552 bytes, first difference at 548
+libreoffice-core/extras/source/database/biblio.odb	odb	exact		value-exact	/table[1] name: 2892 -> 2427 bytes, first difference at 7	-	
+libreoffice-core/filter/qa/unit/data/semi-transparent-fill.odg	odg	exact		value-exact	/page[1] name: 10597 -> 8788 bytes, first difference at 7	-	
+libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx	docx	exact		value-exact	/ author: 26014 -> 25753 bytes, first difference at 21275	value-exact	picture+comment add+set+remove: 26014 -> 26059 bytes, first difference at 6
+libreoffice-core/oox/qa/unit/data/import-mce.pptx	pptx	exact		value-exact	/ title: 33763 -> 33501 bytes, first difference at 30120	none	
+libreoffice-core/oox/qa/unit/data/shape-text-alignment.pptx	pptx	exact		value-exact	/ title: 30844 -> 30590 bytes, first difference at 26278	none	
+libreoffice-core/oox/qa/unit/data/tdf131082.pptx	pptx	exact		value-exact	/ title: 25881 -> 25619 bytes, first difference at 23198	none	
+libreoffice-core/oox/qa/unit/data/testTdf132557_footerCustomShapes.pptx	pptx	exact		value-exact	/ title: 20137 -> 19886 bytes, first difference at 17867	none	
+libreoffice-core/reportdesign/qa/unit/data/roundTrip.odb	odb	exact		value-exact	/table[1] name: 22048 -> 21693 bytes, first difference at 7	-	
+libreoffice-core/sc/qa/extras/testdocuments/NamesSheetLocal.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+libreoffice-core/sc/qa/extras/testdocuments/RecordChangesProtected.ods	ods	exact		refused	/sheet[1] name: unsupported_capability: Invalid format: ODS sheet copy refuses dependent package member 'settings.xml'	-	
+libreoffice-core/sc/qa/extras/testdocuments/ScDatabaseRangeObj.ods	ods	exact		refused	/sheet[1] name: unsupported_capability: Invalid format: ODS sheet copy refuses dependent package member 'settings.xml'	-	
+libreoffice-core/sc/qa/extras/testdocuments/tdf78897.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+libreoffice-core/sc/qa/unit/data/draw-image-link.fods	ods	exact		refused	/sheet[1] name: unsupported_capability: Invalid format: ODS sheet copy refuses MCE or unknown namespace owners	-	
+libreoffice-core/sc/qa/unit/data/draw-object-link.fods	ods	exact		refused	/sheet[1] name: unsupported_capability: Invalid format: ODS sheet copy refuses MCE or unknown namespace owners	-	
+libreoffice-core/sc/qa/unit/data/functions/dynamic_array/xlsx/DynamicArrayFixture.xlsx	xlsx	exact		value-exact	/sheet[1] name: 27708 -> 27699 bytes, first difference at 1768	-	
+libreoffice-core/sc/qa/unit/data/functions/financial/fods/couppcd.fods	ods	exact		value-exact	/sheet[1]/B3 formula: 125969 -> 128327 bytes, first difference at 93445	-	
+libreoffice-core/sc/qa/unit/data/functions/financial/fods/yielddisc.fods	ods	exact		value-exact	/sheet[1]/B3 formula: 230093 -> 233595 bytes, first difference at 161053	-	
+libreoffice-core/sc/qa/unit/data/functions/text/fods/encodeurl.fods	ods	exact		value-exact	/sheet[1]/B3 formula: 291581 -> 295083 bytes, first difference at 208537	-	
+libreoffice-core/sc/qa/unit/data/ods/change-tracking.ods	ods	exact		refused	/sheet[1] name: unsupported_capability: Invalid format: ODS sheet copy refuses dependent package member 'manifest.rdf'	-	
+libreoffice-core/sc/qa/unit/data/ods/external_hyperlink.ods	ods	exact		refused	/sheet[1] name: unsupported_capability: Invalid format: ODS sheet copy refuses dependent package member 'manifest.rdf'	-	
+libreoffice-core/sc/qa/unit/data/ods/formats.ods	ods	exact		refused	/sheet[1] name: unsupported_capability: Invalid format: ODS sheet copy refuses dependent package member 'Configurations2/accelerator/curr...	-	
+libreoffice-core/sc/qa/unit/data/xls/cell-borders.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+libreoffice-core/sc/qa/unit/data/xls/cellformat.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+libreoffice-core/sc/qa/unit/data/xls/embedded-chart.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+libreoffice-core/sc/qa/unit/data/xls/external-ref.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+libreoffice-core/sc/qa/unit/data/xls/formats.xls	xls	exact		refused	/sheet[1] name: unsupported_capability: edit cells refused (unsupported_content): a worksheet was not published by the complete XLS reader	refused	row add+remove: unsupported_capability: edit cells refused (unsupported_content): a worksheet was not published by the complete XLS reader
+libreoffice-core/sc/qa/unit/data/xls/pivottable_bool_field_filter.xls	xls	exact		byte-exact	/sheet[1] name	value-exact	row add+remove: 27136 -> 27136 bytes, first difference at 1272
+libreoffice-core/sc/qa/unit/data/xls/pivottable_dates_grouping.xls	xls	exact		value-exact	/sheet[1] name: 166912 -> 166912 bytes, first difference at 109251	byte-exact	row add+remove
+libreoffice-core/sc/qa/unit/data/xls/pivottable_empty_item.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+libreoffice-core/sc/qa/unit/data/xls/pivottable_number_grouping.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+libreoffice-core/sc/qa/unit/data/xls/tdf170189.xls	xls	exact		refused	/sheet[1] name: corrupt_file: Invalid data: Font name has 0 characters; expected 1..=31	refused	row add+remove: corrupt_file: Invalid data: Font name has 0 characters; expected 1..=31
+libreoffice-core/sc/qa/unit/data/xls/validation.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+libreoffice-core/sc/qa/unit/data/xlsb/pivottable_error_item_filter.xlsb	xlsb	exact		value-exact	/sheet[1] name: 9702 -> 7895 bytes, first difference at 6	value-exact	note add+remove: 9702 -> 7895 bytes, first difference at 6
+libreoffice-core/sc/qa/unit/data/xlsb/shared_formula.xlsb	xlsb	exact		value-exact	/sheet[1] name: 7651 -> 5717 bytes, first difference at 6	value-exact	note add+remove: 7651 -> 5717 bytes, first difference at 6
+libreoffice-core/sc/qa/unit/data/xlsb/tdf108017_calcProtection.xlsb	xlsb	exact		value-exact	/sheet[1] name: 10911 -> 8983 bytes, first difference at 6	value-exact	note add+remove: 10911 -> 8983 bytes, first difference at 6
+libreoffice-core/sc/qa/unit/data/xlsb/tdf94627.xlsb	xlsb	exact		value-exact	/sheet[1] name: 8129 -> 6158 bytes, first difference at 6	value-exact	note add+remove: 8129 -> 6158 bytes, first difference at 6
+libreoffice-core/sc/qa/unit/data/xlsx/LambdaAndRelatedFunctions.xlsx	xlsx	exact		value-exact	/sheet[1] name: 29373 -> 29344 bytes, first difference at 1851	-	
+libreoffice-core/sc/qa/unit/data/xlsx/NamedSheetViews.xlsx	xlsx	exact		value-exact	/ lastModifiedBy: 9494 -> 9499 bytes, first difference at 1032	-	
+libreoffice-core/sc/qa/unit/data/xlsx/Spill.xlsx	xlsx	exact		value-exact	/ revisionNumber: 9964 -> 9708 bytes, first difference at 5974	-	
+libreoffice-core/sc/qa/unit/data/xlsx/activex_checkbox.xlsx	xlsx	exact		value-exact	/ author: 12433 -> 12173 bytes, first difference at 10615	-	
+libreoffice-core/sc/qa/unit/data/xlsx/autofilterShowButton.xlsx	xlsx	exact		value-exact	/ author: 8367 -> 8108 bytes, first difference at 6373	-	
+libreoffice-core/sc/qa/unit/data/xlsx/dataValidity.xlsx	xlsx	exact		value-exact	/ author: 11268 -> 11008 bytes, first difference at 9675	-	
+libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx	xlsx	exact		value-exact	/ author: 8435 -> 8175 bytes, first difference at 6387	-	
+libreoffice-core/sc/qa/unit/data/xlsx/enhanced-protection.xlsx	xlsx	exact		value-exact	/ author: 8483 -> 8224 bytes, first difference at 6491	-	
+libreoffice-core/sc/qa/unit/data/xlsx/enhancedProtectionRangeShorthand.xlsx	xlsx	exact		value-exact	/ revisionNumber: 5479 -> 5488 bytes, first difference at 3464	-	
+libreoffice-core/sc/qa/unit/data/xlsx/external-refs.xlsx	xlsx	exact		value-exact	/ author: 9172 -> 8912 bytes, first difference at 6867	-	
+libreoffice-core/sc/qa/unit/data/xlsx/freezePaneStartCell.xlsx	xlsx	exact		value-exact	/ revisionNumber: 7730 -> 7703 bytes, first difference at 5045	-	
+libreoffice-core/sc/qa/unit/data/xlsx/invalid_ext_data_validation.xlsx	xlsx	exact		value-exact	/ author: 16883 -> 16625 bytes, first difference at 13696	-	
+libreoffice-core/sc/qa/unit/data/xlsx/page_scale.xlsx	xlsx	exact		value-exact	/ revisionNumber: 4243 -> 4268 bytes, first difference at 580	-	
+libreoffice-core/sc/qa/unit/data/xlsx/queryTableExport.xlsx	xlsx	exact		value-exact	/ author: 8580 -> 8547 bytes, first difference at 73	-	
+libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/3d-reference.xlsx	xlsx	exact		value-exact	/ author: 9455 -> 9196 bytes, first difference at 7167	-	
+libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/basic.xlsx	xlsx	exact		value-exact	/ author: 8984 -> 8724 bytes, first difference at 6771	-	
+libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/refupdate.xlsx	xlsx	exact		value-exact	/ author: 8671 -> 8412 bytes, first difference at 6684	-	
+libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/text-results.xlsx	xlsx	exact		value-exact	/ author: 8576 -> 8317 bytes, first difference at 6455	-	
+libreoffice-core/sc/qa/unit/data/xlsx/sheet-tab-color.xlsx	xlsx	exact		value-exact	/ author: 8408 -> 8148 bytes, first difference at 6256	-	
+libreoffice-core/sc/qa/unit/data/xlsx/subtotal-above.xlsx	xlsx	exact		value-exact	/ author: 10111 -> 9850 bytes, first difference at 7781	-	
+libreoffice-core/sc/qa/unit/data/xlsx/tdf100034.xlsx	xlsx	exact		value-exact	/ author: 18756 -> 18762 bytes, first difference at 1016	-	
+libreoffice-core/sc/qa/unit/data/xlsx/tdf105840_allRowsHidden.xlsx	xlsx	exact		value-exact	/ author: 7015 -> 6756 bytes, first difference at 5103	-	
+libreoffice-core/sc/qa/unit/data/xlsx/tdf111980_radioButtons.xlsx	xlsx	exact		value-exact	/ author: 20005 -> 19745 bytes, first difference at 16409	-	
+libreoffice-core/sc/qa/unit/data/xlsx/tdf120168.xlsx	xlsx	exact		value-exact	/sheet[1] name: 15192 -> 15186 bytes, first difference at 2401	-	
+libreoffice-core/sc/qa/unit/data/xlsx/tdf134455.xlsx	xlsx	exact		value-exact	/ author: 5288 -> 5294 bytes, first difference at 3564	-	
+libreoffice-core/sc/qa/unit/data/xlsx/tdf134459_HeaderFooterColor.xlsx	xlsx	exact		value-exact	/ lastModifiedBy: 9421 -> 9166 bytes, first difference at 7252	-	
+libreoffice-core/sc/qa/unit/data/xlsx/tdf136721_letter_sized_paper.xlsx	xlsx	exact		value-exact	/ author: 15723 -> 15463 bytes, first difference at 13476	-	
+libreoffice-core/sc/qa/unit/data/xlsx/tdf143068_top10filter.xlsx	xlsx	exact		value-exact	/sheet[1] name: 9415 -> 9402 bytes, first difference at 1746	-	
+libreoffice-core/sc/qa/unit/data/xlsx/tdf167689_xmlMaps_and_xmlColumnPr.xlsx	xlsx	exact		value-exact	/sheet[1] name: 6042 -> 6065 bytes, first difference at 6	-	
+libreoffice-core/sc/qa/unit/data/xlsx/tdf169496_hidden_graphic.xlsx	xlsx	exact		value-exact	/sheet[1] name: 12470 -> 12471 bytes, first difference at 2310	-	
+libreoffice-core/sc/qa/unit/data/xlsx/tdf66377.xlsx	xlsx	exact		byte-exact	/ revisionNumber	-	
+libreoffice-core/sc/qa/unit/data/xlsx/tdf97598_scenarios.xlsx	xlsx	exact		value-exact	/ author: 8400 -> 8140 bytes, first difference at 6257	-	
+libreoffice-core/sc/qa/unit/data/xlsx/textLengthDataValidity.xlsx	xlsx	exact		value-exact	/ author: 9244 -> 8984 bytes, first difference at 7143	-	
+libreoffice-core/sc/qa/unit/data/xlsx/totalsRowShown.xlsx	xlsx	exact		byte-exact	/ author	-	
+libreoffice-core/sc/qa/unit/data/xlsx/track-changes/simple-cell-changes.xlsx	xlsx	exact		value-exact	/ author: 15414 -> 15155 bytes, first difference at 10354	-	
+libreoffice-core/sd/qa/unit/data/BoldonseFontEmbedded.pptx	pptx	exact		value-exact	/ author: 67477 -> 67228 bytes, first difference at 63927	none	
+libreoffice-core/sd/qa/unit/data/draw-image-link.fodp	odp	exact		byte-exact	/slide[1] name	none	
+libreoffice-core/sd/qa/unit/data/draw-object-link.fodp	odp	exact		byte-exact	/slide[1] name	none	
+libreoffice-core/sd/qa/unit/data/odg/FitToFrameText.odg	odg	exact		value-exact	/page[1] name: 11847 -> 10101 bytes, first difference at 7	-	
+libreoffice-core/sd/qa/unit/data/odp/Math.fodp	odp	exact		byte-exact	/slide[1] name	none	
+libreoffice-core/sd/qa/unit/data/odp/group_rotation.odp	odp	exact		value-exact	/slide[1] name: 10429 -> 10437 bytes, first difference at 5834	none	
+libreoffice-core/sd/qa/unit/data/odp/ole_icon.odp	odp	exact		value-exact	/slide[1] name: 18926 -> 18925 bytes, first difference at 11904	none	
+libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp	odp	exact		value-exact	/slide[1] name: 13158 -> 13170 bytes, first difference at 5025	none	
+libreoffice-core/sd/qa/unit/data/odp/trailing-paragraphs.odp	odp	exact		value-exact	/slide[1] name: 11416 -> 11428 bytes, first difference at 5907	value-exact	linebreak add+remove: 11416 -> 11428 bytes, first difference at 5907
+libreoffice-core/sd/qa/unit/data/pptx/ole.pptx	pptx	exact		value-exact	/ revisionNumber: 41588 -> 41338 bytes, first difference at 36833	none	
+libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx	pptx	exact		value-exact	/ title: 108164 -> 108158 bytes, first difference at 296	byte-exact	slide move+back
+libreoffice-core/sd/qa/unit/data/pptx/slide-sections.pptx	pptx	exact		value-exact	/ title: 138108 -> 138074 bytes, first difference at 10152	byte-exact	slide move+back
+libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx	pptx	exact		value-exact	/ title: 64312 -> 64044 bytes, first difference at 58605	none	
+libreoffice-core/sd/qa/unit/data/pptx/tdf114821.pptx	pptx	exact		value-exact	/ title: 50235 -> 49982 bytes, first difference at 45095	none	
+libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx	pptx	exact		value-exact	/ author: 9579 -> 9590 bytes, first difference at 296	none	
+libreoffice-core/sd/qa/unit/data/pptx/tdf164622.pptx	pptx	exact		value-exact	/ revisionNumber: 18696 -> 18707 bytes, first difference at 283	none	
+libreoffice-core/sd/qa/unit/data/pptx/tdf169496_hidden_graphic.pptx	pptx	exact		value-exact	/ revisionNumber: 35202 -> 34952 bytes, first difference at 30335	none	
+libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx	pptx	exact		value-exact	/ revisionNumber: 24629 -> 24635 bytes, first difference at 20282	none	
+libreoffice-core/sd/qa/unit/tiledrendering/data/slide-background-link.fodp	odp	exact		byte-exact	/slide[1] name	byte-exact	linebreak add+remove
+libreoffice-core/starmath/qa/extras/data/tdf151842.odf	odf	exact		value-exact	/ starmath: 6073 -> 4725 bytes, first difference at 7	-	
+libreoffice-core/svx/qa/unit/data/FontWork.odg	odg	exact		value-exact	/page[1] name: 10515 -> 9088 bytes, first difference at 7	-	
+libreoffice-core/sw/qa/core/data/rtf/pass/fdo78900.rtf	rtf	exact		none		none	
+libreoffice-core/sw/qa/core/data/rtf/pass/fdo80924.rtf	rtf	exact		none		none	
+libreoffice-core/sw/qa/core/data/rtf/pass/tdf116851.rtf	rtf	exact		value-exact	/body/p[1]/r[1] text: 43363 -> 43377 bytes, first difference at 15239	none	
+libreoffice-core/sw/qa/core/doc/data/bookmark-delete-redline.doc	doc	exact		refused	/body/p[1] text: unsupported_capability: the format cannot perform the requested operation	value-exact	bookmark+hyperlink add+remove: 66048 -> 117760 bytes, first difference at 44
+libreoffice-core/sw/qa/core/doc/data/tdf171549.fodt	odt	exact		byte-exact	/body/tbl[1] name	one-way	tab add+remove: the inverse is refused: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the ed...
+libreoffice-core/sw/qa/core/header_footer/data/first-header-footer.odt	odt	exact		refused	/body/p[1] style: invalid_value: the ODT style does not exist	value-exact	tab add+remove: 9644 -> 7737 bytes, first difference at 7
+libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx	docx	exact		value-exact	/ author: 21260 -> 21012 bytes, first difference at 18955	value-exact	picture+comment add+set+remove: 21260 -> 21363 bytes, first difference at 6
+libreoffice-core/sw/qa/core/text/data/A011-charheight.rtf	rtf	exact		none		value-exact	paragraph move+back: 2345 -> 2653 bytes, first difference at 2330
+libreoffice-core/sw/qa/core/text/data/footnote-connect.fodt	odt	exact		byte-exact	/body/p[1] text	one-way	tab add+remove: the inverse is refused: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the ed...
+libreoffice-core/sw/qa/extras/layout/data/A020-min.rtf	rtf	exact		none		none	
+libreoffice-core/sw/qa/extras/layout/data/drop_asian_word.fodt	odt	exact		byte-exact	/body/p[1] text	one-way	tab add+remove: the inverse is refused: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the ed...
+libreoffice-core/sw/qa/extras/layout/data/field_hide_section.fodt	odt	exact		refused	/body/p[1] text: unsupported_capability: ODF edit refused: odt.body.set_text refused (unsupported_content): an ODT text set would replace...	one-way	tab add+remove: the inverse is refused: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the ed...
+libreoffice-core/sw/qa/extras/layout/data/inline-textbox-position.docx	docx	exact		value-exact	/ author: 5397 -> 5364 bytes, first difference at 448	one-way	picture+comment add+set+remove: the inverse is refused: unsupported_capability: OPC error: owned OPC source preservation is unavailable: ...
+libreoffice-core/sw/qa/extras/layout/data/tdf112256-diacritic-index-mark.fodt	odt	exact		value-exact	/body/p[1] text: 1996 -> 1946 bytes, first difference at 1830	one-way	tab add+remove: the inverse is refused: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the ed...
+libreoffice-core/sw/qa/extras/layout/data/tdf124423.odt	odt	exact		value-exact	/metadata author: 4863 -> 4467 bytes, first difference at 4	value-exact	tab add+remove: 4863 -> 4517 bytes, first difference at 4
+libreoffice-core/sw/qa/extras/layout/data/toc-inline-heading-order.fodt	odt	exact		byte-exact	/body/h[1] text	one-way	tab add+remove: the inverse is refused: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the ed...
+libreoffice-core/sw/qa/extras/layout/data/user-field-type-language.fodt	odt	exact		value-exact	/body/p[1]/r[1] text: 1378 -> 1409 bytes, first difference at 1176	one-way	tab add+remove: the inverse is refused: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the ed...
+libreoffice-core/sw/qa/extras/odfexport/data/CrossRefHeadingBookmark.fodt	odt	exact		byte-exact	/metadata author	none	
+libreoffice-core/sw/qa/extras/odfexport/data/Formcontrol needs high z-index.odt	odt	exact		value-exact	/metadata author: 25828 -> 24389 bytes, first difference at 7	value-exact	tab add+remove: 25828 -> 24457 bytes, first difference at 7
+libreoffice-core/sw/qa/extras/odfexport/data/footnote_spacing_hanging_para.rtf	rtf	exact		refused	/footnote[1] text: unsupported_capability: edit refused (unsupported_content): canonical destination edits refuse unknown RTF destinations	none	
+libreoffice-core/sw/qa/extras/odfexport/data/tdf121119.odm	odm	exact		value-exact	/body/section[1] name: 8602 -> 7248 bytes, first difference at 7	value-exact	tab add+remove: 8602 -> 7304 bytes, first difference at 7
+libreoffice-core/sw/qa/extras/odfexport/data/tdf165315.rtf	rtf	exact		refused	/body/p[2] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	value-exact	paragraph move+back: 54717 -> 55572 bytes, first difference at 22046
+libreoffice-core/sw/qa/extras/odfimport/data/draw-image-embedded.fodt	odt	exact		value-exact	/body/p[1]/frame[1] name: 963 -> 943 bytes, first difference at 581	refused	tab add+remove: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the edit added or removed a to...
+libreoffice-core/sw/qa/extras/odfimport/data/draw-image-link.fodt	odt	exact		value-exact	/body/p[1]/frame[1] name: 908 -> 888 bytes, first difference at 581	refused	tab add+remove: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the edit added or removed a to...
+libreoffice-core/sw/qa/extras/odfimport/data/draw-object-link.fodt	odt	exact		value-exact	/body/p[1]/frame[1] name: 901 -> 881 bytes, first difference at 584	refused	tab add+remove: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the edit added or removed a to...
+libreoffice-core/sw/qa/extras/ooxmlexport/data/Encrypted_LO_Standard_abc.docx	docx	locked		-		-	
+libreoffice-core/sw/qa/extras/ooxmlexport/data/Encrypted_MSO2007_abc.docx	docx	locked		-		-	
+libreoffice-core/sw/qa/extras/ooxmlexport/data/Encrypted_MSO2010_abc.docx	docx	locked		-		-	
+libreoffice-core/sw/qa/extras/ooxmlexport/data/Encrypted_MSO2013_abc.docx	docx	locked		-		-	
+libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx	docx	exact		value-exact	/ revisionNumber: 55519 -> 55260 bytes, first difference at 34711	value-exact	picture+comment add+set+remove: 55519 -> 55428 bytes, first difference at 6
+libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx	docx	exact		value-exact	/ author: 14735 -> 14488 bytes, first difference at 11234	value-exact	picture+comment add+set+remove: 14735 -> 14841 bytes, first difference at 6
+libreoffice-core/sw/qa/extras/ooxmlexport/data/decimal-numbering-no-leveltext.docx	docx	exact		value-exact	/ author: 13517 -> 13260 bytes, first difference at 10597	value-exact	picture+comment add+set+remove: 13517 -> 13589 bytes, first difference at 6
+libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx	docx	exact		byte-exact	/body/p[1] style	value-exact	picture+comment add+set+remove: 3009 -> 3842 bytes, first difference at 6
+libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx	docx	exact		value-exact	/ revisionNumber: 32450 -> 32190 bytes, first difference at 25171	value-exact	picture+comment add+set+remove: 32450 -> 31938 bytes, first difference at 6
+libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx	docx	exact		value-exact	/ revisionNumber: 17580 -> 17330 bytes, first difference at 14371	value-exact	picture+comment add+set+remove: 17580 -> 17677 bytes, first difference at 6
+libreoffice-core/sw/qa/extras/ooxmlexport/data/multi-page-toc.docx	docx	exact		value-exact	/ author: 18321 -> 18065 bytes, first difference at 15178	value-exact	picture+comment add+set+remove: 18321 -> 18327 bytes, first difference at 6
+libreoffice-core/sw/qa/extras/ooxmlexport/data/n830205.docx	docx	exact		value-exact	/ title: 33186 -> 33153 bytes, first difference at 2151	refused	picture+comment add+set+remove: unsupported_capability: the paragraph's addressable runs are not all direct or hyperlink runs
+libreoffice-core/sw/qa/extras/ooxmlexport/data/ooo39250-1-min.rtf	rtf	exact		refused	/body/p[3] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	byte-exact	paragraph move+back
+libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx	docx	exact		value-exact	/ author: 25636 -> 25386 bytes, first difference at 22780	refused	picture+comment add+set+remove: unsupported_capability: the new comment is not in the comments part
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf103389.docx	docx	exact		value-exact	/ author: 13983 -> 13735 bytes, first difference at 9691	value-exact	picture+comment add+set+remove: 13983 -> 14092 bytes, first difference at 6
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf124384.docx	docx	exact		value-exact	/ lastModifiedBy: 37437 -> 37409 bytes, first difference at 1531	one-way	picture+comment add+set+remove: the inverse is refused: unsupported_capability: OPC error: owned OPC source preservation is unavailable: ...
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf141173_missingFrames.rtf	rtf	exact		refused	/body/p[2] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	value-exact	paragraph move+back: 11123 -> 11774 bytes, first difference at 3900
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf154703_framePr2.rtf	rtf	exact		byte-exact	/header[2] text	refused	paragraph move+back: unsupported_capability: edit refused (unsupported_content): a paragraph inherits character formatting from its neigh...
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf157011_ins_del_empty_cols.docx	docx	exact		value-exact	/ author: 9954 -> 9959 bytes, first difference at 4509	value-exact	picture+comment add+set+remove: 9954 -> 10822 bytes, first difference at 6450
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf164835_nonDummyLineHeight.docx	docx	exact		value-exact	/ author: 302210 -> 301961 bytes, first difference at 300000	value-exact	picture+comment add+set+remove: 302210 -> 302308 bytes, first difference at 6
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf89731.docx	docx	exact		value-exact	/ author: 44680 -> 44416 bytes, first difference at 42460	value-exact	picture+comment add+set+remove: 44680 -> 44691 bytes, first difference at 6
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf90153.docx	docx	exact		value-exact	/ revisionNumber: 4856 -> 4878 bytes, first difference at 3492	value-exact	picture+comment add+set+remove: 4856 -> 5793 bytes, first difference at 264
+libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx	docx	exact		value-exact	/ author: 25741 -> 25482 bytes, first difference at 9987	value-exact	picture+comment add+set+remove: 25741 -> 25747 bytes, first difference at 6
+libreoffice-core/sw/qa/extras/ooxmlexport/data/testTOCFlag_u.docx	docx	exact		value-exact	/ author: 17390 -> 17133 bytes, first difference at 13919	value-exact	picture+comment add+set+remove: 17390 -> 17453 bytes, first difference at 6
+libreoffice-core/sw/qa/extras/ooxmlexport/data/testTrackChangesInsertedTableCell.docx	docx	exact		value-exact	/ author: 13842 -> 13592 bytes, first difference at 10191	value-exact	picture+comment add+set+remove: 13842 -> 13946 bytes, first difference at 6
+libreoffice-core/sw/qa/extras/ooxmlexport/data/textWatermark.docx	docx	exact		value-exact	/ author: 17870 -> 17619 bytes, first difference at 14685	value-exact	picture+comment add+set+remove: 17870 -> 17966 bytes, first difference at 6
+libreoffice-core/sw/qa/extras/ooxmlexport/data/toxmarkhyperlink.fodt	odt	exact		refused	/body/p[1] style: invalid_value: the ODT style does not exist	one-way	tab add+remove: the inverse is refused: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the ed...
+libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx	docx	exact		value-exact	/ revisionNumber: 4952 -> 4959 bytes, first difference at 3092	value-exact	picture+comment add+set+remove: 4952 -> 5816 bytes, first difference at 630
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx	docx	exact		value-exact	/ revisionNumber: 28843 -> 28594 bytes, first difference at 23734	value-exact	picture+comment add+set+remove: 28843 -> 28952 bytes, first difference at 6
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx	docx	exact		value-exact	/ author: 13876 -> 13624 bytes, first difference at 11284	value-exact	picture+comment add+set+remove: 13876 -> 13975 bytes, first difference at 6
+libreoffice-core/sw/qa/extras/pagelinespacing/data/frameWithColumns.fodt	odt	exact		byte-exact	/body/p[1]/frame[1] name	one-way	tab add+remove: the inverse is refused: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the ed...
+libreoffice-core/sw/qa/extras/pagelinespacing/data/pageColumns.fodt	odt	exact		byte-exact	/body/p[1] text	one-way	tab add+remove: the inverse is refused: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the ed...
+libreoffice-core/sw/qa/extras/rtfexport/data/4010_min.rtf	rtf	exact		refused	/body/p[2] text: document_protected: edit refused (protected): document protection refuses changed publication	refused	paragraph move+back: document_protected: edit refused (protected): document protection refuses changed publication
+libreoffice-core/sw/qa/extras/rtfexport/data/FORMDROPDOWN.rtf	rtf	exact		refused	/body/p[2] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	value-exact	paragraph move+back: 5740 -> 6602 bytes, first difference at 5026
+libreoffice-core/sw/qa/extras/rtfexport/data/FWDP90_min.rtf	rtf	exact		value-exact	/body/tbl[1]/tr[1]/tc[1] text: 21847 -> 21846 bytes, first difference at 20309	refused	paragraph move+back: unsupported_capability: edit refused (unsupported_content): a paragraph ends inside a group that continues with more...
+libreoffice-core/sw/qa/extras/rtfexport/data/btlr-cell.rtf	rtf	exact		none		none	
+libreoffice-core/sw/qa/extras/rtfexport/data/cjklist24.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	value-exact	paragraph move+back: 44275 -> 45065 bytes, first difference at 15884
+libreoffice-core/sw/qa/extras/rtfexport/data/cjklist25.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	value-exact	paragraph move+back: 44275 -> 45065 bytes, first difference at 15884
+libreoffice-core/sw/qa/extras/rtfexport/data/classification-confidential.rtf	rtf	exact		value-exact	/body/p[2]/r[1] text: 2414 -> 2428 bytes, first difference at 2390	value-exact	paragraph move+back: 2414 -> 2410 bytes, first difference at 2408
+libreoffice-core/sw/qa/extras/rtfexport/data/classification-yes.rtf	rtf	exact		value-exact	/body/p[2]/r[1] text: 2415 -> 2429 bytes, first difference at 2391	value-exact	paragraph move+back: 2415 -> 2411 bytes, first difference at 2409
+libreoffice-core/sw/qa/extras/rtfexport/data/copypaste-footnote.rtf	rtf	exact		value-exact	/body/p[1]/r[1] text: 81 -> 93 bytes, first difference at 6	none	
+libreoffice-core/sw/qa/extras/rtfexport/data/custom-doc-props.rtf	rtf	exact		none		none	
+libreoffice-core/sw/qa/extras/rtfexport/data/dplinehollow.rtf	rtf	exact		none		none	
+libreoffice-core/sw/qa/extras/rtfexport/data/dppolyline.rtf	rtf	exact		none		none	
+libreoffice-core/sw/qa/extras/rtfexport/data/dprect-anchor.rtf	rtf	exact		none		none	
+libreoffice-core/sw/qa/extras/rtfexport/data/dptxbx-relation.rtf	rtf	exact		none		none	
+libreoffice-core/sw/qa/extras/rtfexport/data/fdo38244.rtf	rtf	exact		value-exact	/comments/comment[1] text: 166 -> 165 bytes, first difference at 144	none	
+libreoffice-core/sw/qa/extras/rtfexport/data/fdo39001.rtf	rtf	exact		value-exact	/body/p[1]/r[1] text: 549 -> 561 bytes, first difference at 274	refused	paragraph move+back: unsupported_capability: edit refused (unsupported_content): the body's paragraphs are not delimited by root-level \p...
+libreoffice-core/sw/qa/extras/rtfexport/data/fdo44715.rtf	rtf	exact		none		none	
+libreoffice-core/sw/qa/extras/rtfexport/data/fdo47764.rtf	rtf	exact		value-exact	/body/p[1] text: 25 -> 23 bytes, first difference at 18	none	
+libreoffice-core/sw/qa/extras/rtfexport/data/fdo55504-1-min.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	value-exact	paragraph move+back: 9330 -> 10402 bytes, first difference at 5807
+libreoffice-core/sw/qa/extras/rtfexport/data/fdo63428.rtf	rtf	exact		value-exact	/comments/comment[1] text: 480 -> 479 bytes, first difference at 448	none	
+libreoffice-core/sw/qa/extras/rtfexport/data/fdo76633.rtf	rtf	exact		none		none	
+libreoffice-core/sw/qa/extras/rtfexport/data/fdo82006.rtf	rtf	exact		value-exact	/body/p[1] text: 84 -> 84 bytes, first difference at 70	value-exact	paragraph move+back: 84 -> 133 bytes, first difference at 71
+libreoffice-core/sw/qa/extras/rtfexport/data/fdo89496.rtf	rtf	exact		none		none	
+libreoffice-core/sw/qa/extras/rtfexport/data/gutter-left.rtf	rtf	exact		value-exact	/body/p[1] text: 127 -> 127 bytes, first difference at 124	none	
+libreoffice-core/sw/qa/extras/rtfexport/data/hidden-linebreaks.rtf	rtf	exact		refused	/body/p[1]/r[1] text: unsupported_capability: edit refused (unsupported_content): run-format editing refuses inline line breaks	none	
+libreoffice-core/sw/qa/extras/rtfexport/data/i120928.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body has mixed run or paragraph formatting	none	
+libreoffice-core/sw/qa/extras/rtfexport/data/linenumbering.rtf	rtf	exact		value-exact	/body/p[1]/r[1] text: 67 -> 80 bytes, first difference at 34	refused	paragraph move+back: unsupported_capability: edit refused (unsupported_content): a spliced paragraph does not read back with its text
+libreoffice-core/sw/qa/extras/rtfexport/data/margmirror.rtf	rtf	exact		value-exact	/body/p[1]/r[1] text: 112 -> 124 bytes, first difference at 83	refused	paragraph move+back: unsupported_capability: edit refused (unsupported_content): a paragraph inherits paragraph properties from its neigh...
+libreoffice-core/sw/qa/extras/rtfexport/data/n192129.rtf	rtf	exact		none		none	
+libreoffice-core/sw/qa/extras/rtfexport/data/n751020.rtf	rtf	exact		value-exact	/body/p[1]/r[1] text: 67 -> 80 bytes, first difference at 43	refused	paragraph move+back: unsupported_capability: edit refused (unsupported_content): a spliced paragraph does not read back with its text
+libreoffice-core/sw/qa/extras/rtfexport/data/num-override-start.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body has mixed run or paragraph formatting	none	
+libreoffice-core/sw/qa/extras/rtfexport/data/page-background.rtf	rtf	exact		none		none	
+libreoffice-core/sw/qa/extras/rtfexport/data/page-border.rtf	rtf	exact		value-exact	/body/p[1] text: 143 -> 142 bytes, first difference at 130	none	
+libreoffice-core/sw/qa/extras/rtfexport/data/redline-insdel.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	none	
+libreoffice-core/sw/qa/extras/rtfexport/data/redline.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	value-exact	paragraph move+back: 253 -> 253 bytes, first difference at 88
+libreoffice-core/sw/qa/extras/rtfexport/data/relsize.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	byte-exact	paragraph move+back
+libreoffice-core/sw/qa/extras/rtfexport/data/rhbz1065629.rtf	rtf	exact		value-exact	/body/tbl[1]/tr[1]/tc[1] text: 1802 -> 1801 bytes, first difference at 1099	none	
+libreoffice-core/sw/qa/extras/rtfexport/data/rtl-gutter.rtf	rtf	exact		value-exact	/body/p[1] text: 112 -> 112 bytes, first difference at 109	none	
+libreoffice-core/sw/qa/extras/rtfexport/data/shptxt-pard.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	value-exact	paragraph move+back: 601 -> 601 bytes, first difference at 6
+libreoffice-core/sw/qa/extras/rtfexport/data/shpz-dhgt.rtf	rtf	exact		none		none	
+libreoffice-core/sw/qa/extras/rtfexport/data/tab-stop-fill-chars.rtf	rtf	exact		value-exact	/body/p[1]/r[2] text: 981 -> 994 bytes, first difference at 238	byte-exact	paragraph move+back
+libreoffice-core/sw/qa/extras/rtfexport/data/table-rtl.rtf	rtf	exact		byte-exact	/body/tbl[1]/tr[1]/tc[1] text	none	
+libreoffice-core/sw/qa/extras/rtfexport/data/tdf100507.rtf	rtf	exact		value-exact	/body/p[1]/r[1] text: 635 -> 649 bytes, first difference at 613	none	
+libreoffice-core/sw/qa/extras/rtfexport/data/tdf107480.rtf	rtf	exact		one-way	/body/p[1] text: the set back is refused: unsupported_capability: edit refused (unsupported_content): candidate body text did not survive...	value-exact	paragraph move+back: 571 -> 606 bytes, first difference at 562
+libreoffice-core/sw/qa/extras/rtfexport/data/tdf108955.rtf	rtf	exact		value-exact	/body/p[1] text: 664 -> 663 bytes, first difference at 654	none	
+libreoffice-core/sw/qa/extras/rtfexport/data/tdf114303.rtf	rtf	exact		none		value-exact	paragraph move+back: 442 -> 444 bytes, first difference at 428
+libreoffice-core/sw/qa/extras/rtfexport/data/tdf117268.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	none	
+libreoffice-core/sw/qa/extras/rtfexport/data/tdf125719_case_2.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	value-exact	paragraph move+back: 29020 -> 29456 bytes, first difference at 27521
+libreoffice-core/sw/qa/extras/rtfexport/data/tdf126309.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body has mixed run or paragraph formatting	none	
+libreoffice-core/sw/qa/extras/rtfexport/data/tdf127806.rtf	rtf	exact		none		none	
+libreoffice-core/sw/qa/extras/rtfexport/data/tdf136445-1-min.rtf	rtf	exact		value-exact	/comments/comment[1] text: 1045 -> 1045 bytes, first difference at 710	byte-exact	paragraph move+back
+libreoffice-core/sw/qa/extras/rtfexport/data/tdf150267.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	value-exact	paragraph move+back: 42401 -> 42663 bytes, first difference at 11385
+libreoffice-core/sw/qa/extras/rtfexport/data/tdf151370.rtf	rtf	exact		none		none	
+libreoffice-core/sw/qa/extras/rtfexport/data/tdf153613_inlineAfterPgBreak.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	value-exact	paragraph move+back: 46465 -> 47031 bytes, first difference at 12307
+libreoffice-core/sw/qa/extras/rtfexport/data/tdf158762.rtf	rtf	exact		refused	/header[2] text: unsupported_capability: edit refused (unsupported_content): header/footer text has dependent positioned content	refused	paragraph move+back: unsupported_capability: edit refused (unsupported_content): a paragraph inherits paragraph properties from its neigh...
+libreoffice-core/sw/qa/extras/rtfexport/data/tdf158830.rtf	rtf	exact		byte-exact	/body/tbl[1]/tr[1]/tc[1] text	one-way	paragraph move+back: the inverse is refused: unsupported_capability: edit refused (unsupported_content): the spliced paragraph segments d...
+libreoffice-core/sw/qa/extras/rtfexport/data/tdf158982.rtf	rtf	exact		byte-exact	/body/tbl[1]/tr[1]/tc[1] text	refused	paragraph move+back: unsupported_capability: edit refused (unsupported_content): the body's paragraphs are not delimited by root-level \p...
+libreoffice-core/sw/qa/extras/rtfexport/data/tdf161878.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	refused	paragraph move+back: unsupported_capability: edit refused (unsupported_content): the body's paragraphs are not delimited by root-level \p...
+libreoffice-core/sw/qa/extras/rtfexport/data/tdf167569.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	byte-exact	paragraph move+back
+libreoffice-core/sw/qa/extras/rtfexport/data/tdf66543.rtf	rtf	exact		value-exact	/body/p[1]/r[1] text: 172 -> 185 bytes, first difference at 54	value-exact	paragraph move+back: 172 -> 159 bytes, first difference at 42
+libreoffice-core/sw/qa/extras/rtfexport/data/tdf86182.rtf	rtf	exact		value-exact	/body/p[1]/r[1] text: 42 -> 53 bytes, first difference at 15	none	
+libreoffice-core/sw/qa/extras/rtfexport/data/tdf87034.rtf	rtf	exact		value-exact	/footnote[1] text: 87 -> 86 bytes, first difference at 47	none	
+libreoffice-core/sw/qa/extras/rtfexport/data/tdf94043.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	value-exact	paragraph move+back: 449 -> 449 bytes, first difference at 8
+libreoffice-core/sw/qa/extras/rtfexport/data/tdf94377.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	none	
+libreoffice-core/sw/qa/extras/rtfexport/data/text-change-tracking.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	none	
+libreoffice-core/sw/qa/extras/rtfexport/data/text-with-comment.rtf	rtf	exact		byte-exact	/comments/comment[1] text	none	
+libreoffice-core/sw/qa/extras/rtfexport/data/watermark.rtf	rtf	exact		none		none	
+libreoffice-core/sw/qa/extras/rtfimport/data/165717.rtf	rtf	exact		value-exact	/header[1] text: 36742 -> 36743 bytes, first difference at 17642	refused	paragraph move+back: unsupported_capability: edit refused (unsupported_content): the body's paragraphs are not delimited by root-level \p...
+libreoffice-core/sw/qa/extras/rtfimport/data/fdo44984.rtf	rtf	exact		byte-exact	/body/tbl[1]/tr[1]/tc[1] text	value-exact	paragraph move+back: 529 -> 544 bytes, first difference at 12
+libreoffice-core/sw/qa/extras/rtfimport/data/fdo57708.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	none	
+libreoffice-core/sw/qa/extras/rtfimport/data/fdo82071.rtf	rtf	exact		none		none	
+libreoffice-core/sw/qa/extras/rtfimport/data/fdo85179.rtf	rtf	exact		none		none	
+libreoffice-core/sw/qa/extras/rtfimport/data/hidden-para-separator.rtf	rtf	exact		value-exact	/body/p[1]/r[1] text: 13416 -> 13430 bytes, first difference at 12747	value-exact	paragraph move+back: 13416 -> 13952 bytes, first difference at 12907
+libreoffice-core/sw/qa/extras/rtfimport/data/ole-inline.rtf	rtf	exact		none		none	
+libreoffice-core/sw/qa/extras/rtfimport/data/read-only-protect.rtf	rtf	exact		refused	/body/p[1] text: document_protected: edit refused (protected): document protection refuses changed publication	none	
+libreoffice-core/sw/qa/extras/rtfimport/data/sbkeven.rtf	rtf	exact		value-exact	/body/p[1]/r[1] text: 564 -> 578 bytes, first difference at 70	none	
+libreoffice-core/sw/qa/extras/rtfimport/data/tblrepeat.rtf	rtf	exact		byte-exact	/body/tbl[1]/tr[1]/tc[1] text	none	
+libreoffice-core/sw/qa/extras/rtfimport/data/tdf108947.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): ordinary paragraph structure editing refuses unknown RTF syntax	byte-exact	paragraph move+back
+libreoffice-core/sw/qa/extras/rtfimport/data/tdf148544.rtf	rtf	exact		value-exact	/body/tbl[1]/tr[2]/tc[1] text: 82348 -> 82348 bytes, first difference at 31826	refused	paragraph move+back: unsupported_capability: edit refused (unsupported_content): a paragraph ends inside a group that continues with more...
+libreoffice-core/sw/qa/extras/rtfimport/data/tdf163003.rtf	rtf	exact		refused	/body/p[2] text: unsupported_capability: edit refused (unsupported_content): the body has mixed run or paragraph formatting	value-exact	paragraph move+back: 58133 -> 58133 bytes, first difference at 32470
+libreoffice-core/sw/qa/extras/rtfimport/data/tdf165923.rtf	rtf	exact		byte-exact	/body/tbl[1]/tr[1]/tc[1] text	none	
+libreoffice-core/sw/qa/extras/rtfimport/data/tdf167710.rtf	rtf	exact		none		none	
+libreoffice-core/sw/qa/extras/rtfimport/data/tdf169298.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	value-exact	paragraph move+back: 188 -> 188 bytes, first difference at 43
+libreoffice-core/sw/qa/extras/rtfimport/data/tdf96308-tabpos.rtf	rtf	exact		byte-exact	/body/tbl[1]/tr[1]/tc[1] text	none	
+libreoffice-core/sw/qa/extras/rtfimport/data/tdf96326.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	value-exact	paragraph move+back: 479 -> 479 bytes, first difference at 161
+libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm	odm	exact		value-exact	/body/p[1] text: 8336 -> 7014 bytes, first difference at 7	value-exact	tab add+remove: 8336 -> 7068 bytes, first difference at 7
+libreoffice-core/sw/qa/extras/uiwriter/data/IndexElementsInHiddenSections.fodt	odt	exact		byte-exact	/body/section[1] name	none	
+libreoffice-core/sw/qa/extras/uiwriter/data/autotext-multiple.dotx	docx	exact		value-exact	/ author: 18470 -> 18220 bytes, first difference at 16624	value-exact	picture+comment add+set+remove: 18470 -> 18575 bytes, first difference at 6
+libreoffice-core/sw/qa/extras/uiwriter/data/tdf147006.rtf	rtf	exact		none		none	
+libreoffice-core/sw/qa/extras/uiwriter/data/tdf86639.rtf	rtf	exact		value-exact	/body/p[1] text: 188 -> 188 bytes, first difference at 185	none	
+libreoffice-core/sw/qa/extras/uiwriter/data/tdf91801.fodt	odt	exact		byte-exact	/body/tbl[1] name	refused	tab add+remove: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the edit added or removed a to...
+libreoffice-core/sw/qa/extras/uiwriter/data/text-with-formula.fodt	odt	exact		byte-exact	/body/p[1] text	one-way	tab add+remove: the inverse is refused: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the ed...
+libreoffice-core/sw/qa/extras/ww8import/data/changes-in-footnote.doc	doc	exact		value-exact	/body/p[1]/r[1] text: 13312 -> 14848 bytes, first difference at 516	value-exact	bookmark+hyperlink add+remove: 13312 -> 13824 bytes, first difference at 516
+libreoffice-core/sw/qa/uibase/shells/data/ole-save-preview-update.odt	odt	exact		value-exact	/metadata author: 16006 -> 14628 bytes, first difference at 7	value-exact	tab add+remove: 16006 -> 14688 bytes, first difference at 7
+libreoffice-core/sw/qa/uibase/shells/data/protectedLinkCopy.fodt	odt	exact		refused	/body/p[1] text: unsupported_capability: ODF edit refused: odt.body.set_text refused (unsupported_content): an ODT text set would replace...	one-way	tab add+remove: the inverse is refused: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the ed...
+libreoffice-core/sw/qa/uibase/uiview/data/tdf152839_formtext.rtf	rtf	exact		byte-exact	/body/tbl[1]/tr[2]/tc[2] text	none	
+libreoffice-core/sw/qa/uitest/data/redline-autocorrect.fodt	odt	exact		byte-exact	/body/p[1] text	refused	tab add+remove: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the edit added or removed a to...
+libreoffice-core/sw/qa/uitest/data/section-columns-separator.fodt	odt	exact		byte-exact	/body/section[1] name	none	
+libreoffice-core/sw/qa/uitest/data/tdf145178.fodt	odt	exact		byte-exact	/body/section[1] name	one-way	tab add+remove: the inverse is refused: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the ed...
+libreoffice-core/sw/qa/writerfilter/dmapper/data/NoFirstPageHeadFooter.rtf	rtf	exact		value-exact	/header[1] text: 24644 -> 24642 bytes, first difference at 22545	value-exact	paragraph move+back: 24644 -> 27773 bytes, first difference at 24242
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx	docx	exact		value-exact	/ author: 77621 -> 77368 bytes, first difference at 38947	value-exact	picture+comment add+set+remove: 77621 -> 77940 bytes, first difference at 6
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx	docx	exact		none		one-way	picture+comment add+set+remove: the inverse is refused: unsupported_capability: OPC error: owned OPC source preservation is unavailable: ...
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx	docx	exact		value-exact	/ author: 22007 -> 21751 bytes, first difference at 7415	value-exact	picture+comment add+set+remove: 22007 -> 22799 bytes, first difference at 6
+libreoffice-core/sw/qa/writerfilter/dmapper/data/floattable-vertical-frame-offset.rtf	rtf	exact		byte-exact	/body/tbl[1]/tr[1]/tc[1] text	refused	paragraph move+back: unsupported_capability: edit refused (unsupported_content): the body's paragraphs are not delimited by root-level \p...
+libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx	docx	exact		value-exact	/ title: 66189 -> 66150 bytes, first difference at 63173	value-exact	picture+comment add+set+remove: 66189 -> 66313 bytes, first difference at 6
+libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx	docx	exact		value-exact	/ author: 17713 -> 17465 bytes, first difference at 15282	refused	picture+comment add+set+remove: unsupported_capability: the paragraph's addressable runs are not all direct or hyperlink runs
+libreoffice-core/sw/qa/writerfilter/dmapper/data/redlined-shape-sdt.docx	docx	exact		refused	/ extended.template: corrupt_file: invalid OOXML relationship: core-properties part '/docProps/core.xml' is orphaned	refused	picture+comment add+set+remove: document_protected: DOCX changed document publication refused (protected): document or write protection, ...
+libreoffice-core/sw/qa/writerfilter/filters-test/data/pass/TCI-TN65GP-DDRHDLL-partial.rtf	rtf	exact		none		none	
+libreoffice-core/sw/qa/writerfilter/rtftok/data/endnote-at-section-end.rtf	rtf	exact		value-exact	/endnote[1] text: 253 -> 252 bytes, first difference at 197	none	
+libreoffice-core/sw/qa/writerfilter/rtftok/data/floating-table.rtf	rtf	exact		byte-exact	/body/tbl[1]/tr[1]/tc[1] text	value-exact	paragraph move+back: 410 -> 423 bytes, first difference at 88
+libreoffice-core/sw/qa/writerfilter/rtftok/data/floattable-tbl-overlap.rtf	rtf	exact		byte-exact	/body/tbl[1]/tr[1]/tc[1] text	refused	paragraph move+back: unsupported_capability: edit refused (unsupported_content): the spliced paragraph segments do not parse as RTF
+libreoffice-core/vcl/qa/cppunit/pdfexport/data/PDF_export_with_formcontrol.fodt	odt	exact		byte-exact	/metadata author	one-way	tab add+remove: the inverse is refused: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the ed...
+libreoffice-core/vcl/qa/cppunit/pdfexport/data/alternativeText.fodp	odp	exact		byte-exact	/slide[1] name	none	
+libreoffice-core/vcl/qa/cppunit/pdfexport/data/formcontrol.fodt	odt	exact		byte-exact	/metadata title	one-way	tab add+remove: the inverse is refused: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the ed...
+libreoffice-core/vcl/qa/cppunit/pdfexport/data/image-hyperlink-alttext.fodt	odt	exact		byte-exact	/metadata title	one-way	tab add+remove: the inverse is refused: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the ed...
+libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm	odm	exact		value-exact	/metadata author: 22304 -> 20649 bytes, first difference at 7	value-exact	tab add+remove: 22304 -> 20682 bytes, first difference at 7
+libreoffice-core/vcl/qa/cppunit/pdfexport/data/tdf159817.fodt	odt	exact		byte-exact	/body/p[2] text	one-way	tab add+remove: the inverse is refused: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the ed...
+libreoffice-core/writerperfect/qa/unit/data/writer/epubexport/footnote.fodt	odt	exact		byte-exact	/body/p[1] text	refused	tab add+remove: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the edit added or removed a to...
+libreoffice-core/writerperfect/qa/unit/data/writer/epubexport/simple-ruby.odt	odt	exact		refused	/body/p[1] text: unsupported_capability: ODF edit refused: odt.body.set_text refused (unsupported_content): an ODT text set would replace...	value-exact	tab add+remove: 8307 -> 6914 bytes, first difference at 7
+libreoffice-core/xmloff/qa/unit/data/differentListStylesInOneList.fodt	odt	exact		value-exact	/body/list[1]/listItem[1] text: 2173 -> 2171 bytes, first difference at 1419	refused	tab add+remove: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the edit added or removed a to...
+libreoffice-core/xmloff/qa/unit/data/floattable-wrap-all-pages2.fodt	odt	exact		byte-exact	/body/p[1] text	one-way	tab add+remove: the inverse is refused: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the ed...
+libreoffice-core/xmloff/qa/unit/data/scale-width-redline.fodt	odt	exact		byte-exact	/metadata title	one-way	tab add+remove: the inverse is refused: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the ed...
+libreoffice-core/xmloff/qa/unit/data/tdf156707_text_form_control_borders.odt	odt	exact		value-exact	/metadata language: 14711 -> 12890 bytes, first difference at 7	value-exact	tab add+remove: 14711 -> 12936 bytes, first difference at 7
+libreoffice-core/xmloff/qa/unit/data/tdf161327_LatheEndAngle.fodg	odg	exact		byte-exact	/page[1] name	-	
+libreoffice-core/xmloff/qa/unit/data/tdf162686_3D_metal_type_ODF.fods	ods	exact		refused	/sheet[1] name: unsupported_capability: Invalid format: ODS sheet copy refuses dependent package member 'settings.xml'	-	
+libreoffice-core/xmloff/qa/unit/data/tdf167358_label_form_control_borders.odt	odt	exact		value-exact	/body/p[1] text: 14503 -> 13672 bytes, first difference at 7	value-exact	tab add+remove: 14503 -> 13717 bytes, first difference at 7
+libreoffice-core/xmloff/qa/unit/data/theme.fodp	odp	exact		byte-exact	/slide[1] name	byte-exact	linebreak add+remove
+libreoffice-core/xmlsecurity/doc/OpenDocumentSignatures-Workflow.odg	odg	exact		value-exact	/page[1] name: 32729 -> 31132 bytes, first difference at 7	-	
+libreoffice-core/xmlsecurity/qa/unit/signing/data/macro.odt	odt	exact		value-exact	/metadata author: 11023 -> 9087 bytes, first difference at 7	value-exact	tab add+remove: 11023 -> 9142 bytes, first difference at 7
+libreoffice-core/xmlsecurity/qa/unit/signing/data/odb_signed_macros.odb	odb	exact		none		-	
+libreoffice-core/xmlsecurity/qa/unit/signing/data/signed_with_x509certificate_chain.odt	odt	exact		refused	/body/p[1] style: invalid_value: the ODT style does not exist	refused	tab add+remove: document_protected: ODF edit refused: odt.transaction refused (protected): packaged ODT transactions preserve signed snap...
+odf/corpus/calc-cell-styles.ods	ods	exact		refused	/sheet[1] name: unsupported_capability: Invalid format: ODS sheet copy refuses dependent package member 'manifest.rdf'	-	
+odf/corpus/calc-formulas.ods	ods	exact		value-exact	/sheet[1]/A3 formula: 6837 -> 6859 bytes, first difference at 91	-	
+odf/corpus/calc-two-sheets.ods	ods	exact		refused	/sheet[1] name: unsupported_capability: Invalid format: ODS sheet copy refuses dependent package member 'manifest.rdf'	-	
+odf/corpus/calc-unicode-chinese.ods	ods	exact		refused	/sheet[1] name: unsupported_capability: Invalid format: ODS sheet copy refuses dependent package member 'settings.xml'	-	
+odf/corpus/impress-basic.odp	odp	exact		value-exact	/slide[1] name: 14940 -> 14956 bytes, first difference at 92	value-exact	linebreak add+remove: 14940 -> 14956 bytes, first difference at 92
+odf/corpus/impress-embedded-spreadsheet.odp	odp	exact		value-exact	/slide[1] name: 16403 -> 16406 bytes, first difference at 1001	value-exact	linebreak add+remove: 16403 -> 16406 bytes, first difference at 1001
+odf/corpus/impress-master-layouts.odp	odp	exact		value-exact	/slide[1] name: 18026 -> 18039 bytes, first difference at 572	value-exact	linebreak add+remove: 18026 -> 18039 bytes, first difference at 572
+odf/corpus/writer-definition-lists.odt	odt	exact		value-exact	/metadata author: 7824 -> 6774 bytes, first difference at 10	value-exact	tab add+remove: 7824 -> 6838 bytes, first difference at 10
+odf/corpus/writer-header-footer.odt	odt	exact		value-exact	/metadata author: 7177 -> 6145 bytes, first difference at 10	value-exact	tab add+remove: 7177 -> 6197 bytes, first difference at 10
+odf/corpus/writer-images-frames.odt	odt	exact		value-exact	/metadata author: 16975 -> 15545 bytes, first difference at 10	value-exact	tab add+remove: 16975 -> 15611 bytes, first difference at 10
+odf/corpus/writer-paragraph-styles.odt	odt	exact		value-exact	/metadata author: 7194 -> 6217 bytes, first difference at 10	value-exact	tab add+remove: 7194 -> 6266 bytes, first difference at 10
+odf/corpus/writer-table-of-contents.odt	odt	exact		value-exact	/body/p[1] text: 44598 -> 43136 bytes, first difference at 7	value-exact	tab add+remove: 44598 -> 43175 bytes, first difference at 7
+odf/corpus/writer-table.odt	odt	exact		value-exact	/metadata author: 7055 -> 6019 bytes, first difference at 10	value-exact	tab add+remove: 7055 -> 6073 bytes, first difference at 10
+odf/corpus/writer-user-fields.odt	odt	exact		value-exact	/metadata author: 19410 -> 18398 bytes, first difference at 10	value-exact	tab add+remove: 19410 -> 18490 bytes, first difference at 10
+odf/drawing/fill-image-inline.fodg	odg	exact		none		-	
+odf/drawing/fill-image-linked.fodp	odp	exact		none		none	
+odf/drawing/marker-flat.fods	ods	exact		byte-exact	/sheet[1] name	-	
+odf/drawing/opacity-angles.fodg	odg	exact		none		-	
+odf/drawing/opacity-extension-stops.fodt	odt	exact		byte-exact	/body/p[1] text	refused	tab add+remove: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the edit added or removed a to...
+odf/native-resave/libreoffice-resaved/calc-two-sheets-litchi.ods	ods	exact		value-exact	/sheet[1]/A1 formula: 8969 -> 9006 bytes, first difference at 3171	-	
+odf/native-resave/libreoffice-resaved/font-styles-litchi.odf	odf	exact		value-exact	/ starmath: 3666 -> 3324 bytes, first difference at 7	-	
+odf/native-resave/libreoffice-resaved/rhbz1870501-litchi.odg	odg	exact		value-exact	/page[1] name: 421219 -> 412539 bytes, first difference at 7	-	
+odf/native-resave/libreoffice-resaved/tdf169979-litchi.odp	odp	exact		one-way	/slide[1] name: the set back is refused: unsupported_capability: ODF edit refused: odp.scene refused (unsupported_operation): the ODP pag...	value-exact	linebreak add+remove: 17198 -> 17206 bytes, first difference at 9941
+odf/native-resave/libreoffice-resaved/writer-header-footer-litchi.odt	odt	exact		value-exact	/metadata author: 9636 -> 8989 bytes, first difference at 7	value-exact	tab add+remove: 9636 -> 9052 bytes, first difference at 7
+odf/native-resave/litchi-changed/calc-two-sheets-litchi.ods	ods	exact		value-exact	/sheet[1]/A1 formula: 8739 -> 8771 bytes, first difference at 127	-	
+odf/native-resave/litchi-changed/font-styles-litchi.odf	odf	exact		value-exact	/ starmath: 4992 -> 4862 bytes, first difference at 86	-	
+odf/native-resave/litchi-changed/rhbz1870501-litchi.odg	odg	exact		value-exact	/page[1] name: 401547 -> 401241 bytes, first difference at 87	-	
+odf/native-resave/litchi-changed/tdf169979-litchi.odp	odp	exact		one-way	/slide[1] name: the set back is refused: unsupported_capability: ODF edit refused: odp.scene refused (unsupported_operation): the ODP pag...	byte-exact	linebreak add+remove
+odf/native-resave/litchi-changed/writer-header-footer-litchi.odt	odt	exact		value-exact	/metadata author: 5871 -> 5717 bytes, first difference at 83	value-exact	tab add+remove: 5871 -> 5813 bytes, first difference at 83
+odf/native-resave/source/font-styles.odf	odf	exact		value-exact	/ starmath: 6311 -> 4924 bytes, first difference at 7	-	
+odf/native-resave/source/rhbz1870501.odg	odg	exact		value-exact	/page[1] name: 403275 -> 401240 bytes, first difference at 4	-	
+odf/odc-producer-evidence/odfdom-created.odc	odc	exact		value-exact	/axis[1] name: 2352 -> 2195 bytes, first difference at 4	-	
+odf/odc-producer-evidence/odfdom-resaved.odc	odc	exact		value-exact	/axis[1] name: 2361 -> 2206 bytes, first difference at 4	-	
+odf/odp/cellspan.odp	odp	exact		value-exact	/slide[1] name: 13489 -> 13496 bytes, first difference at 7344	none	
+odf/odp/tdf102223.odp	odp	exact		value-exact	/slide[1] name: 17335 -> 17343 bytes, first difference at 12913	none	
+odf/odp/tdf105502.odp	odp	exact		value-exact	/slide[1] name: 11629 -> 11639 bytes, first difference at 3579	none	
+odf/odp/tdf169979.odp	odp	exact		value-exact	/slide[1] name: 12568 -> 12603 bytes, first difference at 755	value-exact	linebreak add+remove: 12568 -> 12603 bytes, first difference at 755
+odf/odp/text-in-image.odp	odp	exact		value-exact	/slide[1] name: 13584 -> 13591 bytes, first difference at 5250	none	
+odf/ods/conditional-formats.fods	ods	exact		refused	/sheet[1] name: unsupported_capability: Invalid format: ODS sheet copy refuses MCE or unknown namespace owners	-	
+odf/ods/grid-padding-package.ods	ods	exact		refused	/sheet[1] name: unsupported_capability: Invalid format: ODS sheet copy refuses dependent package member 'Configurations2/accelerator/curr...	-	
+odf/ods/grid-padding.fods	ods	exact		refused	/sheet[1] name: unsupported_capability: Invalid format: authored XML fragment rejected: noncompact XML FormattingWhitespace at byte 50	-	
+odf/ods/rich-text-hyperlinks.fods	ods	exact		refused	/sheet[1] name: unsupported_capability: Invalid format: ODS sheet copy refuses MCE or unknown namespace owners	-	
+odf/ods/sheet-shapes.fods	ods	exact		refused	/sheet[1] name: unsupported_capability: Invalid format: ODS sheet copy refuses MCE or unknown namespace owners	-	
+odf/ods/sparklines.fods	ods	exact		refused	/sheet[1] name: unsupported_capability: Invalid format: ODS sheet copy refuses MCE or unknown namespace owners	-	
+odf/odt/drawing-style-resources.fodt	odt	exact		byte-exact	/body/p[1] text	refused	tab add+remove: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the edit added or removed a to...
+odf/odt/font-face-declarations-flat.fodt	odt	exact		byte-exact	/body/p[1] text	refused	tab add+remove: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the edit added or removed a to...
+odf/odt/form-controls.fodt	odt	exact		value-exact	/body/p[1] text: 3431 -> 3430 bytes, first difference at 3279	refused	tab add+remove: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the edit added or removed a to...
+odf/odt/libreoffice-linked-object-compact.fodt	odt	exact		byte-exact	/body/p[1]/frame[1] name	refused	tab add+remove: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the edit added or removed a to...
+odf/odt/libreoffice-page-columns-compact.fodt	odt	exact		byte-exact	/body/p[1] text	one-way	tab add+remove: the inverse is refused: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the ed...
+odf/odt/libreoffice-user-field-compact.fodt	odt	exact		value-exact	/body/p[1]/r[1] text: 1283 -> 1314 bytes, first difference at 1091	one-way	tab add+remove: the inverse is refused: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the ed...
+odf/odt/nested-frame-paragraphs.fodt	odt	exact		byte-exact	/body/p[1] text	one-way	tab add+remove: the inverse is refused: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the ed...
+odf/odt/note-drawing.fodt	odt	exact		refused	/body/p[1]/footnote[1]/p[1] style: invalid_value: the ODT style does not exist	one-way	tab add+remove: the inverse is refused: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the ed...
+odf/odt/note-hyperlink-host.fodt	odt	exact		value-exact	/body/p[1] text: 5033 -> 5033 bytes, first difference at 3564	one-way	tab add+remove: the inverse is refused: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the ed...
+odf/odt/note-nested.fodt	odt	exact		byte-exact	/body/p[1]/r[1] text	refused	tab add+remove: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the edit added or removed a to...
+odf/odt/note-ordinary-numbering.fodt	odt	exact		value-exact	/body/list[1]/listItem[1] text: 1966 -> 1964 bytes, first difference at 1341	one-way	tab add+remove: the inverse is refused: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the ed...
+odf/odt/note-tracked-changes.fodt	odt	exact		byte-exact	/body/p[1]/r[1] text	one-way	tab add+remove: the inverse is refused: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the ed...
+odf/odt/outline-ten-level-extension.fodt	odt	exact		none		none	
+odf/odt/ruby-hyperlink.fodt	odt	exact		byte-exact	/body/p[1]/hyperlink[1] text	one-way	tab add+remove: the inverse is refused: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the ed...
+odf/odt/shape-text-in-paragraph.odt	odt	exact		refused	/body/p[1] style: invalid_value: the ODT style does not exist	value-exact	tab add+remove: 9046 -> 7626 bytes, first difference at 7
+odf/odt/table-cell-column-span.odt	odt	exact		value-exact	/body/tbl[1] name: 9254 -> 7863 bytes, first difference at 7	value-exact	tab add+remove: 9254 -> 7917 bytes, first difference at 7
+odf/odt/title-field-invalidate.fodt	odt	exact		byte-exact	/metadata title	one-way	tab add+remove: the inverse is refused: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the ed...
+odfdo/tests/samples/forms.odt	odt	exact		value-exact	/body/p[1] text: 19727 -> 19547 bytes, first difference at 10	value-exact	tab add+remove: 19727 -> 19607 bytes, first difference at 10
+odfdo/tests/samples/images.fodt	odt	exact		byte-exact	/body/p[1] text	one-way	tab add+remove: the inverse is refused: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the ed...
+odfdo/tests/samples/simple_table_named_range.ods	ods	exact		refused	/sheet[1] name: unsupported_capability: a formula or named range still references the sheet; the ODS writer rewrites no reference	-	
+odfdo/tests/samples/test_flat_lo.fods	ods	exact		refused	/sheet[1] name: unsupported_capability: Invalid format: ODS sheet copy refuses dependent package member 'settings.xml'	-	
+odfdo/tests/samples/variable.odt	odt	exact		value-exact	/metadata title: 10236 -> 8877 bytes, first difference at 7	value-exact	tab add+remove: 10236 -> 8967 bytes, first difference at 7
+odfpy/tests/examples/simpletable.odt	odt	exact		value-exact	/metadata author: 7055 -> 6019 bytes, first difference at 10	value-exact	tab add+remove: 7055 -> 6073 bytes, first difference at 10
+odfpy/xml2odf/definitionlists.xml	odt	exact		byte-exact	/metadata author	one-way	tab add+remove: the inverse is refused: unsupported_capability: ODF edit refused: odf-common.flat refused (unsupported_operation): the ed...
+office-interop/libreoffice-resaved/45543-transition-litchi.ppt	ppt	exact		none		-	
+office-interop/libreoffice-resaved/date-autofilter-litchi.xlsx	xlsx	exact		value-exact	/ author: 7311 -> 7321 bytes, first difference at 4949	-	
+office-interop/libreoffice-resaved/document-properties-litchi.docx	docx	exact		value-exact	/ title: 6825 -> 6830 bytes, first difference at 296	value-exact	picture+comment add+set+remove: 6825 -> 7696 bytes, first difference at 1404
+office-interop/libreoffice-resaved/noheadfoot-litchi.doc	doc	exact		value-exact	/body/p[1] text: 10240 -> 15360 bytes, first difference at 516	value-exact	bookmark+hyperlink add+remove: 10240 -> 14336 bytes, first difference at 516
+office-interop/libreoffice-resaved/relsize-litchi.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	byte-exact	paragraph move+back
+office-interop/libreoffice-resaved/shapes-litchi.pptx	pptx	exact		value-exact	/ title: 53239 -> 53244 bytes, first difference at 296	byte-exact	slide move+back
+office-interop/libreoffice-resaved/tdf132924-litchi.odb	odb	exact		value-exact	/table[1] name: 3198 -> 2821 bytes, first difference at 7	-	
+office-interop/libreoffice-resaved/tdf78897-litchi.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+office-interop/litchi-changed/45543-transition-litchi.ppt	ppt	exact		none		-	
+office-interop/litchi-changed/date-autofilter-litchi.xlsx	xlsx	exact		value-exact	/ author: 6604 -> 6599 bytes, first difference at 1242	-	
+office-interop/litchi-changed/document-properties-litchi.docx	docx	exact		value-exact	/ title: 11143 -> 11137 bytes, first difference at 1361	value-exact	picture+comment add+set+remove: 11143 -> 12009 bytes, first difference at 50
+office-interop/litchi-changed/noheadfoot-litchi.doc	doc	exact		refused	/body/p[1] text: corrupt_file: the file is malformed	refused	bookmark+hyperlink add+remove: corrupt_file: the file is malformed
+office-interop/litchi-changed/relsize-litchi.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	byte-exact	paragraph move+back
+office-interop/litchi-changed/shapes-litchi.pptx	pptx	exact		value-exact	/ title: 61466 -> 61461 bytes, first difference at 1444	byte-exact	slide move+back
+office-interop/litchi-changed/tdf132924-litchi.odb	odb	exact		value-exact	/table[1] name: 2897 -> 2808 bytes, first difference at 83	-	
+office-interop/litchi-changed/tdf78897-litchi.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+officecli/examples/word/revisions.docx	docx	exact		value-exact	/ author: 7238 -> 7270 bytes, first difference at 4146	value-exact	picture+comment add+set+remove: 7238 -> 8172 bytes, first difference at 5826
+ole/doc/3endnotes.doc	doc	exact		value-exact	/body/p[4] text: 35328 -> 39936 bytes, first difference at 620	value-exact	bookmark+hyperlink add+remove: 35328 -> 39424 bytes, first difference at 620
+ole/doc/DiffFirstPageHeadFoot.doc	doc	exact		value-exact	/body/p[3] text: 27648 -> 31232 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 27648 -> 31232 bytes, first difference at 540
+ole/doc/FancyFoot.doc	doc	exact		value-exact	/body/p[3] text: 27136 -> 31232 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 27136 -> 30720 bytes, first difference at 540
+ole/doc/FloatingPictures.doc	doc	exact		value-exact	/body/p[1] text: 335360 -> 353280 bytes, first difference at 92	value-exact	bookmark+hyperlink add+remove: 335360 -> 357888 bytes, first difference at 92
+ole/doc/HeaderFooterProblematic.doc	doc	exact		none		value-exact	bookmark+hyperlink add+remove: 61440 -> 68096 bytes, first difference at 44
+ole/doc/HeaderFooterUnicode.doc	doc	exact		value-exact	/body/p[1] text: 28672 -> 31232 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 28672 -> 31744 bytes, first difference at 540
+ole/doc/Lists.doc	doc	exact		value-exact	/body/p[1] text: 27648 -> 29696 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 27648 -> 28672 bytes, first difference at 540
+ole/doc/NoHeadFoot.doc	doc	exact		value-exact	/body/p[1] text: 26112 -> 28672 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 26112 -> 28160 bytes, first difference at 540
+ole/doc/PasswordProtected.doc	doc	locked		-		-	
+ole/doc/PngPicture.doc	doc	exact		value-exact	/body/p[1] text: 14336 -> 15872 bytes, first difference at 608	value-exact	bookmark+hyperlink add+remove: 14336 -> 15360 bytes, first difference at 608
+ole/doc/ThreeColFoot.doc	doc	exact		value-exact	/body/p[3] text: 27136 -> 29696 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 27136 -> 30208 bytes, first difference at 540
+ole/doc/ThreeColHead.doc	doc	exact		value-exact	/body/p[3] text: 27136 -> 29696 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 27136 -> 29184 bytes, first difference at 540
+ole/doc/ThreeColHeadFoot.doc	doc	exact		value-exact	/body/p[3] text: 27136 -> 30208 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 27136 -> 30208 bytes, first difference at 540
+ole/doc/cfb-truncated-final-sector.doc	doc	exact		value-exact	/body/p[1]/r[2] text: 24065 -> 27648 bytes, first difference at 48	value-exact	bookmark+hyperlink add+remove: 24065 -> 26624 bytes, first difference at 76
+ole/doc/cjklist30.doc	doc	exact		value-exact	/body/p[1] text: 24064 -> 27136 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 24064 -> 26112 bytes, first difference at 540
+ole/doc/cjklist31.doc	doc	exact		value-exact	/body/p[1] text: 24064 -> 27136 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 24064 -> 26112 bytes, first difference at 540
+ole/doc/cjklist34.doc	doc	exact		value-exact	/body/p[1] text: 24064 -> 27136 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 24064 -> 26112 bytes, first difference at 540
+ole/doc/cjklist35.doc	doc	exact		value-exact	/body/p[1] text: 24064 -> 27136 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 24064 -> 25600 bytes, first difference at 540
+ole/doc/commented-table.doc	doc	exact		value-exact	/body/p[2]/r[1] text: 27136 -> 29184 bytes, first difference at 548	value-exact	bookmark+hyperlink add+remove: 27136 -> 28672 bytes, first difference at 548
+ole/doc/documentProperties.doc	doc	exact		value-exact	/body/p[1] text: 9728 -> 14848 bytes, first difference at 516	value-exact	bookmark+hyperlink add+remove: 9728 -> 13824 bytes, first difference at 516
+ole/doc/empty.doc	doc	exact		none		value-exact	bookmark+hyperlink add+remove: 19456 -> 20992 bytes, first difference at 540
+ole/doc/endingnote.doc	doc	exact		value-exact	/body/p[1]/r[1] text: 9728 -> 14848 bytes, first difference at 516	value-exact	bookmark+hyperlink add+remove: 9728 -> 13824 bytes, first difference at 516
+ole/doc/equation.doc	doc	exact		value-exact	/body/p[1]/r[2] text: 13824 -> 18944 bytes, first difference at 516	value-exact	bookmark+hyperlink add+remove: 13824 -> 18432 bytes, first difference at 516
+ole/doc/first-header-footer.doc	doc	exact		value-exact	/body/p[1] text: 23552 -> 29184 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 23552 -> 29184 bytes, first difference at 540
+ole/doc/hyperlink.doc	doc	exact		value-exact	/body/p[1]/r[1] text: 9728 -> 14848 bytes, first difference at 516	value-exact	bookmark+hyperlink add+remove: 9728 -> 13824 bytes, first difference at 516
+ole/doc/image-comment-at-char.doc	doc	exact		value-exact	/body/p[1]/r[1] text: 24064 -> 26112 bytes, first difference at 552	value-exact	bookmark+hyperlink add+remove: 24064 -> 25600 bytes, first difference at 552
+ole/doc/inline-endnote-and-footnote.doc	doc	exact		value-exact	/body/p[1] text: 24576 -> 28160 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 24576 -> 27136 bytes, first difference at 540
+ole/doc/table-merged-cells.doc	doc	exact		refused	/body/tbl[1]/tr[1]/tc[1]/p[1] style: not_found: the DOC stylesheet has no such style	value-exact	bookmark+hyperlink add+remove: 17408 -> 17920 bytes, first difference at 516
+ole/doc/tdf71749_with_footnote.doc	doc	exact		value-exact	/body/p[3] text: 20480 -> 23040 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 20480 -> 22528 bytes, first difference at 540
+ole/doc/testPictures.doc	doc	exact		value-exact	/body/p[5] text: 315904 -> 320000 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 315904 -> 318464 bytes, first difference at 540
+ole/doc/watermark.doc	doc	exact		value-exact	/body/p[1] text: 20480 -> 22016 bytes, first difference at 516	value-exact	bookmark+hyperlink add+remove: 20480 -> 23040 bytes, first difference at 516
+ole/ppt/SampleShow.ppt	ppt	exact		none		-	
+ole/ppt/empty.ppt	ppt	exact		none		-	
+ole/ppt/empty_textbox.ppt	ppt	exact		none		-	
+ole/ppt/ppt_with_png.ppt	ppt	exact		none		-	
+ole/ppt/text-margins.ppt	ppt	exact		none		-	
+ole/ppt/text_shapes.ppt	ppt	exact		none		-	
+ole/xls/ComplexFunctionTestCaseData.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/ConditionalFormattingSamples copy.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: edit cells refused (unsupported_operation): row/column movement cannot read a workbook formula's ...
+ole/xls/ConditionalFormattingSamples.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: edit cells refused (unsupported_operation): row/column movement cannot read a workbook formula's ...
+ole/xls/DateFormats.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/DateTimeToNumberTestCases.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/FormulaEvalTestData.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: edit cells refused (unsupported_operation): row/column movement refuses Formula records with RgbE...
+ole/xls/FormulaRefs.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/FormulaSheetRange.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/HyperlinksOnManySheets.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: edit cells refused (unsupported_operation): row/column movement refuses a hyperlink with an inter...
+ole/xls/Simple.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/SimpleChart.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/SimpleMacro.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/SimpleMultiCell.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/SimpleScatterChart.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/SimpleWithAutofilter copy.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: edit cells refused (unsupported_operation): row/column movement only supports coordinate-free dra...
+ole/xls/SimpleWithAutofilter.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: edit cells refused (unsupported_operation): row/column movement only supports coordinate-free dra...
+ole/xls/SimpleWithChoose copy.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/SimpleWithChoose.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/SimpleWithColours copy.xls	xls	exact		byte-exact	/sheet[1] name	value-exact	row add+remove: 6144 -> 6144 bytes, first difference at 2906
+ole/xls/SimpleWithColours.xls	xls	exact		byte-exact	/sheet[1] name	value-exact	row add+remove: 6144 -> 6144 bytes, first difference at 2906
+ole/xls/SimpleWithComments copy.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/SimpleWithComments.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/SimpleWithDataFormat copy.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/SimpleWithDataFormat.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/SimpleWithFormula copy.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/SimpleWithFormula.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/SimpleWithImages copy.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/SimpleWithImages-mac copy.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/SimpleWithImages-mac.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/SimpleWithImages.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/SimpleWithPageBreaks copy.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/SimpleWithPageBreaks.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/SimpleWithPrintArea copy.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/SimpleWithPrintArea.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/SimpleWithSkip copy.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/SimpleWithSkip.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/SimpleWithStyling copy.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/SimpleWithStyling.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/SingleLetterRanges.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/WeekNumFunctionTestCaseData.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/WeekNumFunctionTestCaseData2013.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/WithChart.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/WithCheckBoxes.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: edit cells refused (unsupported_operation): row/column movement only supports coordinate-free dra...
+ole/xls/WithConditionalFormatting.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/WithCustomViews.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: edit cells refused (unsupported_operation): row/column movement cannot close dependency record
+ole/xls/WithEmbeddedObjects.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: edit cells refused (unsupported_operation): row/column movement only supports coordinate-free dra...
+ole/xls/WithExtendedStyles.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/WithFormattedGraphTitle.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/WithHyperlink.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/WithThreeCharts.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/WithTwoCharts.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/WithTwoHyperLinks.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/empty.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/password.xls	xls	locked		-		-	
+ooxml/docx/ComplexNumberedLists.docx	docx	exact		value-exact	/ author: 14458 -> 14199 bytes, first difference at 10923	value-exact	picture+comment add+set+remove: 14458 -> 14530 bytes, first difference at 6
+ooxml/docx/FancyFoot.docx	docx	exact		value-exact	/ author: 12876 -> 12617 bytes, first difference at 10824	value-exact	picture+comment add+set+remove: 12876 -> 12956 bytes, first difference at 6
+ooxml/docx/Headers.docx	docx	exact		value-exact	/ author: 13076 -> 12817 bytes, first difference at 8454	value-exact	picture+comment add+set+remove: 13076 -> 13147 bytes, first difference at 6
+ooxml/docx/Hyperlink.docx	docx	exact		value-exact	/ author: 11478 -> 11230 bytes, first difference at 7110	value-exact	picture+comment add+set+remove: 11478 -> 11588 bytes, first difference at 6
+ooxml/docx/comment.docx	docx	exact		value-exact	/ revisionNumber: 4926 -> 4934 bytes, first difference at 628	refused	picture+comment add+set+remove: unsupported_capability: the paragraph's addressable runs are not all direct or hyperlink runs
+ooxml/docx/documentProperties.docx	docx	exact		value-exact	/ title: 23503 -> 23244 bytes, first difference at 19366	value-exact	picture+comment add+set+remove: 23503 -> 23580 bytes, first difference at 6
+ooxml/docx/documentProtection_comments_no_password.docx	docx	exact		value-exact	/ author: 9868 -> 9609 bytes, first difference at 6651	refused	picture+comment add+set+remove: document_protected: DOCX changed document publication refused (protected): document or write protection, ...
+ooxml/docx/documentProtection_forms_no_password.docx	docx	exact		value-exact	/ author: 9924 -> 9664 bytes, first difference at 6706	refused	picture+comment add+set+remove: document_protected: DOCX changed document publication refused (protected): document or write protection, ...
+ooxml/docx/documentProtection_no_protection.docx	docx	exact		value-exact	/ author: 9884 -> 9626 bytes, first difference at 6666	value-exact	picture+comment add+set+remove: 9884 -> 9975 bytes, first difference at 6
+ooxml/docx/documentProtection_readonly_no_password.docx	docx	exact		value-exact	/ author: 9856 -> 9597 bytes, first difference at 6641	refused	picture+comment add+set+remove: document_protected: DOCX changed document publication refused (protected): document or write protection, ...
+ooxml/docx/drawing.docx	docx	exact		value-exact	/ author: 95247 -> 94990 bytes, first difference at 93110	value-exact	picture+comment add+set+remove: 95247 -> 95244 bytes, first difference at 6
+ooxml/docx/endnotes.docx	docx	exact		value-exact	/ author: 13553 -> 13294 bytes, first difference at 11271	value-exact	picture+comment add+set+remove: 13553 -> 13631 bytes, first difference at 6
+ooxml/docx/footnotes.docx	docx	exact		value-exact	/ author: 12823 -> 12567 bytes, first difference at 10610	value-exact	picture+comment add+set+remove: 12823 -> 12901 bytes, first difference at 6
+ooxml/docx/headerFooter.docx	docx	exact		value-exact	/ author: 28423 -> 28165 bytes, first difference at 23909	value-exact	picture+comment add+set+remove: 28423 -> 28473 bytes, first difference at 6
+ooxml/docx/headerPic.docx	docx	exact		value-exact	/ title: 16206 -> 15947 bytes, first difference at 13807	value-exact	picture+comment add+set+remove: 16206 -> 16283 bytes, first difference at 6
+ooxml/docx/table-alignment.docx	docx	exact		value-exact	/ author: 15519 -> 15486 bytes, first difference at 1034	one-way	picture+comment add+set+remove: the inverse is refused: unsupported_capability: OPC error: owned OPC source preservation is unavailable: ...
+ooxml/docx/table-indent.docx	docx	exact		byte-exact	/body/p[1] style	one-way	picture+comment add+set+remove: the inverse is refused: unsupported_capability: OPC error: owned OPC source preservation is unavailable: ...
+ooxml/docx/table_footnotes.docx	docx	exact		value-exact	/ author: 13177 -> 12921 bytes, first difference at 10962	value-exact	picture+comment add+set+remove: 13177 -> 13215 bytes, first difference at 6
+ooxml/docx/testComment.docx	docx	exact		value-exact	/ title: 65298 -> 65050 bytes, first difference at 57570	refused	picture+comment add+set+remove: unsupported_capability: the paragraph's addressable runs are not all direct or hyperlink runs
+ooxml/pptx/SmartArt.pptx	pptx	exact		value-exact	/ title: 41382 -> 41131 bytes, first difference at 36646	none	
+ooxml/pptx/activex/activex_checkbox.pptx	pptx	exact		value-exact	/ title: 39828 -> 39576 bytes, first difference at 33468	none	
+ooxml/pptx/backgrounds.pptx	pptx	exact		value-exact	/ title: 63442 -> 63183 bytes, first difference at 59089	byte-exact	slide move+back
+ooxml/pptx/connectorConnection.pptx	pptx	exact		value-exact	/ title: 33296 -> 33278 bytes, first difference at 29164	none	
+ooxml/pptx/curvedConnectors.pptx	pptx	exact		value-exact	/ title: 35029 -> 35012 bytes, first difference at 30894	none	
+ooxml/pptx/elbowConnectors.pptx	pptx	exact		value-exact	/ title: 34608 -> 34590 bytes, first difference at 30474	none	
+ooxml/pptx/line-chart.pptx	pptx	exact		value-exact	/ title: 44700 -> 44448 bytes, first difference at 40882	none	
+ooxml/pptx/pie-chart.pptx	pptx	exact		value-exact	/ title: 55297 -> 55037 bytes, first difference at 51478	none	
+ooxml/pptx/radar-chart.pptx	pptx	exact		value-exact	/ title: 43689 -> 43437 bytes, first difference at 39870	none	
+ooxml/pptx/sample.pptx	pptx	exact		value-exact	/ revisionNumber: 47215 -> 46957 bytes, first difference at 43632	byte-exact	slide move+back
+ooxml/pptx/scatter-chart.pptx	pptx	exact		value-exact	/ title: 44269 -> 44016 bytes, first difference at 40450	none	
+ooxml/pptx/shape-blur-effect.pptx	pptx	exact		value-exact	/ title: 33285 -> 33033 bytes, first difference at 28883	none	
+ooxml/pptx/shape-glow-effect.pptx	pptx	exact		value-exact	/ title: 13691 -> 13439 bytes, first difference at 10989	none	
+ooxml/pptx/shape-soft-edges.pptx	pptx	exact		value-exact	/ title: 50092 -> 50095 bytes, first difference at 296	none	
+ooxml/pptx/shape-text-glow-effect.pptx	pptx	exact		value-exact	/ author: 34693 -> 34442 bytes, first difference at 30263	none	
+ooxml/pptx/shape-text-rotate.pptx	pptx	exact		value-exact	/ title: 33784 -> 33532 bytes, first difference at 29028	none	
+ooxml/pptx/shapes.pptx	pptx	exact		value-exact	/ title: 68822 -> 68562 bytes, first difference at 64441	byte-exact	slide move+back
+ooxml/pptx/smartart-accent-process.pptx	pptx	exact		value-exact	/ title: 46326 -> 46066 bytes, first difference at 42351	none	
+ooxml/pptx/smartart-autoTxRot.pptx	pptx	exact		value-exact	/ title: 58937 -> 58684 bytes, first difference at 53382	byte-exact	slide move+back
+ooxml/pptx/smartart-autofit-sync.pptx	pptx	exact		value-exact	/ title: 41814 -> 41562 bytes, first difference at 37793	none	
+ooxml/pptx/smartart-background-drawingml-fallback.pptx	pptx	exact		value-exact	/ title: 40964 -> 40712 bytes, first difference at 37035	none	
+ooxml/pptx/smartart-background.pptx	pptx	exact		value-exact	/ title: 50424 -> 50164 bytes, first difference at 46577	none	
+ooxml/pptx/smartart-bullet-list.pptx	pptx	exact		value-exact	/ title: 40468 -> 40208 bytes, first difference at 36622	none	
+ooxml/pptx/smartart-center-cycle.pptx	pptx	exact		value-exact	/ title: 44405 -> 44146 bytes, first difference at 40558	none	
+ooxml/pptx/smartart-chevron.pptx	pptx	exact		value-exact	/ title: 34076 -> 33816 bytes, first difference at 30295	none	
+ooxml/pptx/smartart-children.pptx	pptx	exact		value-exact	/ title: 53014 -> 52751 bytes, first difference at 49162	none	
+ooxml/pptx/smartart-cnt.pptx	pptx	exact		value-exact	/ title: 47360 -> 47097 bytes, first difference at 43513	none	
+ooxml/pptx/smartart-composite-infer-right.pptx	pptx	exact		value-exact	/ title: 23250 -> 22998 bytes, first difference at 20978	none	
+ooxml/pptx/smartart-continuous-block-process.pptx	pptx	exact		value-exact	/ title: 46204 -> 45943 bytes, first difference at 42251	none	
+ooxml/pptx/smartart-cycle-matrix.pptx	pptx	exact		value-exact	/ title: 56986 -> 56725 bytes, first difference at 53005	none	
+ooxml/pptx/smartart-cycle.pptx	pptx	exact		value-exact	/ title: 35322 -> 35063 bytes, first difference at 31542	none	
+ooxml/pptx/smartart-data-follow.pptx	pptx	exact		value-exact	/ title: 56896 -> 56637 bytes, first difference at 53050	none	
+ooxml/pptx/smartart-dir.pptx	pptx	exact		value-exact	/ title: 41593 -> 41329 bytes, first difference at 37737	none	
+ooxml/pptx/smartart-font-size.pptx	pptx	exact		value-exact	/ title: 63915 -> 63655 bytes, first difference at 59503	none	
+ooxml/pptx/smartart-interopgrabbag.pptx	pptx	exact		value-exact	/ title: 39440 -> 39188 bytes, first difference at 35483	none	
+ooxml/pptx/smartart-linear-rule-vert.pptx	pptx	exact		value-exact	/ title: 73085 -> 72837 bytes, first difference at 67852	none	
+ooxml/pptx/smartart-linear-rule.pptx	pptx	exact		value-exact	/ title: 43743 -> 43482 bytes, first difference at 39766	none	
+ooxml/pptx/smartart-maxdepth.pptx	pptx	exact		value-exact	/ title: 43256 -> 42995 bytes, first difference at 39405	none	
+ooxml/pptx/smartart-missing-bullet.pptx	pptx	exact		value-exact	/ revisionNumber: 30139 -> 29880 bytes, first difference at 27304	none	
+ooxml/pptx/smartart-multidirectional.pptx	pptx	exact		value-exact	/ title: 43588 -> 43329 bytes, first difference at 39741	none	
+ooxml/pptx/smartart-org-chart.pptx	pptx	exact		value-exact	/ title: 57764 -> 57503 bytes, first difference at 53778	none	
+ooxml/pptx/smartart-org-chart2.pptx	pptx	exact		value-exact	/ title: 64524 -> 64264 bytes, first difference at 60677	none	
+ooxml/pptx/smartart-picture-strip.pptx	pptx	exact		value-exact	/ title: 52395 -> 52134 bytes, first difference at 48054	none	
+ooxml/pptx/smartart-preserve.pptx	pptx	exact		value-exact	/ title: 40598 -> 40346 bytes, first difference at 36666	none	
+ooxml/pptx/smartart-pyramid-1child.pptx	pptx	exact		value-exact	/ title: 40075 -> 39824 bytes, first difference at 36111	none	
+ooxml/pptx/smartart-recursion.pptx	pptx	exact		value-exact	/ title: 52943 -> 52683 bytes, first difference at 49095	none	
+ooxml/pptx/smartart-rightoleftblockdiagram.pptx	pptx	exact		value-exact	/ title: 43399 -> 43139 bytes, first difference at 39552	none	
+ooxml/pptx/smartart-rotation.pptx	pptx	exact		value-exact	/ title: 43886 -> 43624 bytes, first difference at 40032	none	
+ooxml/pptx/smartart-rotation2.pptx	pptx	exact		value-exact	/ title: 43658 -> 43406 bytes, first difference at 38545	none	
+ooxml/pptx/smartart-simple.pptx	pptx	exact		value-exact	/ title: 71102 -> 70849 bytes, first difference at 66096	none	
+ooxml/pptx/smartart-snake-rows.pptx	pptx	exact		value-exact	/ title: 52893 -> 52642 bytes, first difference at 47531	none	
+ooxml/pptx/smartart-tdf134221.pptx	pptx	exact		value-exact	/ title: 46706 -> 46673 bytes, first difference at 40123	none	
+ooxml/pptx/smartart-text.pptx	pptx	exact		value-exact	/ title: 38762 -> 38501 bytes, first difference at 34915	none	
+ooxml/pptx/smartart-vertical-block-list.pptx	pptx	exact		value-exact	/ title: 47533 -> 47273 bytes, first difference at 43685	none	
+ooxml/pptx/smartart-vertical-box-list.pptx	pptx	exact		value-exact	/ title: 43018 -> 42758 bytes, first difference at 39067	none	
+ooxml/pptx/trigger.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/xlsb/51519.xlsb	xlsb	exact		value-exact	/sheet[1] name: 10897 -> 8843 bytes, first difference at 6	value-exact	note add+remove: 10897 -> 8843 bytes, first difference at 6
+ooxml/xlsb/62815.xlsb	xlsb	exact		value-exact	/sheet[1] name: 10665 -> 8409 bytes, first difference at 6	value-exact	note add+remove: 10665 -> 8409 bytes, first difference at 6
+ooxml/xlsb/Simple.xlsb	xlsb	exact		value-exact	/sheet[1] name: 9161 -> 7317 bytes, first difference at 6	value-exact	note add+remove: 9161 -> 7317 bytes, first difference at 6
+ooxml/xlsb/bug66682.xlsb	xlsb	exact		value-exact	/sheet[1] name: 9580 -> 7625 bytes, first difference at 6	value-exact	note add+remove: 9580 -> 7625 bytes, first difference at 6
+ooxml/xlsb/comments.xlsb	xlsb	exact		value-exact	/sheet[1] name: 10796 -> 8865 bytes, first difference at 6	value-exact	note add+remove: 10796 -> 8878 bytes, first difference at 6
+ooxml/xlsb/cond_format.xlsb	xlsb	exact		value-exact	/sheet[1] name: 8253 -> 6281 bytes, first difference at 6	value-exact	note add+remove: 8253 -> 6281 bytes, first difference at 6
+ooxml/xlsb/date.xlsb	xlsb	exact		value-exact	/sheet[1] name: 7566 -> 5606 bytes, first difference at 6	value-exact	note add+remove: 7566 -> 5606 bytes, first difference at 6
+ooxml/xlsb/hyperlink.xlsb	xlsb	exact		value-exact	/sheet[1] name: 7882 -> 5930 bytes, first difference at 6	value-exact	note add+remove: 7882 -> 5930 bytes, first difference at 6
+ooxml/xlsb/pivot-cache-ac-prefixed.xlsb	xlsb	exact		value-exact	/sheet[1] name: 11002 -> 9057 bytes, first difference at 6	value-exact	note add+remove: 11002 -> 9057 bytes, first difference at 6
+ooxml/xlsb/sample.xlsb	xlsb	exact		value-exact	/sheet[1] name: 10843 -> 8970 bytes, first difference at 6	value-exact	note add+remove: 10843 -> 8970 bytes, first difference at 6
+ooxml/xlsb/universal-content.xlsb	xlsb	exact		value-exact	/sheet[1] name: 11087 -> 9161 bytes, first difference at 6	value-exact	note add+remove: 11087 -> 9212 bytes, first difference at 6
+ooxml/xlsx/ConditionalFormattingSamples.xlsx	xlsx	exact		value-exact	/ title: 654688 -> 654427 bytes, first difference at 627518	-	
+ooxml/xlsx/CustomXMLMappings-complex-type.xlsx	xlsx	exact		value-exact	/ author: 14979 -> 14719 bytes, first difference at 10870	-	
+ooxml/xlsx/CustomXMLMappings.xlsx	xlsx	exact		value-exact	/ author: 9906 -> 9646 bytes, first difference at 7552	-	
+ooxml/xlsx/CustomXmlMappings-inverse-order.xlsx	xlsx	exact		value-exact	/ author: 9915 -> 9655 bytes, first difference at 7556	-	
+ooxml/xlsx/DataValidationEvaluations.xlsx	xlsx	exact		value-exact	/ author: 13679 -> 13419 bytes, first difference at 11638	-	
+ooxml/xlsx/DataValidationListTooLong.xlsx	xlsx	exact		value-exact	/ author: 3286 -> 3321 bytes, first difference at 829	-	
+ooxml/xlsx/DateFormatNumberTests.xlsx	xlsx	exact		value-exact	/ author: 10981 -> 10723 bytes, first difference at 9541	-	
+ooxml/xlsx/DateFormatTests.xlsx	xlsx	exact		value-exact	/ author: 12394 -> 12136 bytes, first difference at 10955	-	
+ooxml/xlsx/ExcelPivotTableSample.xlsx	xlsx	exact		value-exact	/ author: 19460 -> 19200 bytes, first difference at 15515	-	
+ooxml/xlsx/ExcelTables.xlsx	xlsx	exact		value-exact	/sheet[1] name: 9457 -> 9466 bytes, first difference at 2262	-	
+ooxml/xlsx/FormatChoiceTests.xlsx	xlsx	exact		value-exact	/ author: 46589 -> 46330 bytes, first difference at 44381	-	
+ooxml/xlsx/FormatConditionTests.xlsx	xlsx	exact		value-exact	/ author: 14577 -> 14319 bytes, first difference at 13138	-	
+ooxml/xlsx/Formatting.xlsx	xlsx	exact		value-exact	/ author: 8847 -> 8588 bytes, first difference at 6703	-	
+ooxml/xlsx/HeaderFooterComplexFormats.xlsx	xlsx	exact		value-exact	/ lastModifiedBy: 9543 -> 9283 bytes, first difference at 6764	-	
+ooxml/xlsx/InlineString.xlsx	xlsx	exact		value-exact	/ author: 8401 -> 8142 bytes, first difference at 6340	-	
+ooxml/xlsx/InlineStrings.xlsx	xlsx	exact		value-exact	/ author: 7843 -> 7815 bytes, first difference at 5472	-	
+ooxml/xlsx/MatrixFormulaEvalTestData.xlsx	xlsx	exact		value-exact	/ author: 14875 -> 14615 bytes, first difference at 11207	-	
+ooxml/xlsx/NewStyleConditionalFormattings.xlsx	xlsx	exact		value-exact	/ author: 13378 -> 13119 bytes, first difference at 9242	-	
+ooxml/xlsx/NewlineInFormulas.xlsx	xlsx	exact		value-exact	/ author: 8935 -> 8676 bytes, first difference at 7497	-	
+ooxml/xlsx/Pivot1_Row.xlsx	xlsx	exact		value-exact	/ revisionNumber: 12707 -> 12448 bytes, first difference at 8875	-	
+ooxml/xlsx/Pivot1_Row_Grand.xlsx	xlsx	exact		value-exact	/ revisionNumber: 12709 -> 12452 bytes, first difference at 8881	-	
+ooxml/xlsx/Pivot1_Row_Grand_Subtotals.xlsx	xlsx	exact		value-exact	/ revisionNumber: 12845 -> 12588 bytes, first difference at 9016	-	
+ooxml/xlsx/Pivot2_Row.xlsx	xlsx	exact		value-exact	/ revisionNumber: 12590 -> 12333 bytes, first difference at 8763	-	
+ooxml/xlsx/Pivot2_Row_Compact.xlsx	xlsx	exact		value-exact	/ author: 12877 -> 12619 bytes, first difference at 9927	-	
+ooxml/xlsx/Pivot2_Row_Grand.xlsx	xlsx	exact		value-exact	/ revisionNumber: 12615 -> 12358 bytes, first difference at 8785	-	
+ooxml/xlsx/Pivot2_Row_Grand_Subtotals.xlsx	xlsx	exact		value-exact	/ revisionNumber: 12670 -> 12411 bytes, first difference at 8837	-	
+ooxml/xlsx/Pivot2_Row_Subtotals.xlsx	xlsx	exact		value-exact	/ revisionNumber: 12656 -> 12398 bytes, first difference at 8823	-	
+ooxml/xlsx/Pivot2_Row_Subtotals_SortDescendingAll.xlsx	xlsx	exact		value-exact	/ revisionNumber: 12677 -> 12420 bytes, first difference at 8848	-	
+ooxml/xlsx/Pivot3_Column_Grand_Subtotals.xlsx	xlsx	exact		value-exact	/ revisionNumber: 12716 -> 12460 bytes, first difference at 8886	-	
+ooxml/xlsx/Pivot4_Column_Grand_Subtotals_SortDescending.xlsx	xlsx	exact		value-exact	/ revisionNumber: 12734 -> 12477 bytes, first difference at 8904	-	
+ooxml/xlsx/SimpleMultiCell.xlsx	xlsx	exact		value-exact	/ author: 8123 -> 7863 bytes, first difference at 6025	-	
+ooxml/xlsx/SimpleNormal.xlsx	xlsx	exact		value-exact	/ author: 8871 -> 8613 bytes, first difference at 7450	-	
+ooxml/xlsx/SimpleScatterChart.xlsx	xlsx	exact		value-exact	/ author: 18278 -> 18022 bytes, first difference at 15887	-	
+ooxml/xlsx/SimpleStrict.xlsx	xlsx	exact		value-exact	/ author: 9225 -> 8967 bytes, first difference at 7803	-	
+ooxml/xlsx/SimpleWithComments.xlsx	xlsx	exact		value-exact	/ lastModifiedBy: 10060 -> 9800 bytes, first difference at 7687	-	
+ooxml/xlsx/SingleCellTable.xlsx	xlsx	exact		value-exact	/ author: 9486 -> 9227 bytes, first difference at 7352	-	
+ooxml/xlsx/Sparklines.xlsx	xlsx	exact		value-exact	/ author: 13356 -> 13097 bytes, first difference at 11278	-	
+ooxml/xlsx/StructuredReferences.xlsx	xlsx	exact		value-exact	/ author: 10459 -> 10198 bytes, first difference at 8884	-	
+ooxml/xlsx/StructuredRefs-lots-with-lookups.xlsx	xlsx	exact		value-exact	/ lastModifiedBy: 325446 -> 325188 bytes, first difference at 294898	-	
+ooxml/xlsx/Tables.xlsx	xlsx	exact		value-exact	/ title: 54387 -> 54130 bytes, first difference at 49367	-	
+ooxml/xlsx/TablesWithDifferentHeaders.xlsx	xlsx	exact		value-exact	/ author: 11359 -> 11100 bytes, first difference at 9489	-	
+ooxml/xlsx/TextColor.xlsx	xlsx	exact		value-exact	/sheet[1] name: 9531 -> 9540 bytes, first difference at 2337	-	
+ooxml/xlsx/TwoSheetsNoneHidden.xlsx	xlsx	exact		value-exact	/ author: 7938 -> 7678 bytes, first difference at 5844	-	
+ooxml/xlsx/TwoSheetsOneHidden.xlsx	xlsx	exact		value-exact	/ author: 7962 -> 7701 bytes, first difference at 5868	-	
+ooxml/xlsx/autofilter-colors-fg.xlsx	xlsx	exact		value-exact	/ author: 10750 -> 10490 bytes, first difference at 7593	-	
+ooxml/xlsx/autofilter-colors.xlsx	xlsx	exact		value-exact	/ author: 10708 -> 10448 bytes, first difference at 7559	-	
+ooxml/xlsx/autofilter.xlsx	xlsx	exact		value-exact	/ revisionNumber: 6299 -> 6307 bytes, first difference at 612	-	
+ooxml/xlsx/autofilternamedrange.xlsx	xlsx	exact		value-exact	/ lastModifiedBy: 9685 -> 9428 bytes, first difference at 6899	-	
+ooxml/xlsx/cell-borders.xlsx	xlsx	exact		value-exact	/ author: 20972 -> 20712 bytes, first difference at 18222	-	
+ooxml/xlsx/cell-multi-line.xlsx	xlsx	exact		value-exact	/ author: 9144 -> 8883 bytes, first difference at 6449	-	
+ooxml/xlsx/chart_hyperlink.xlsx	xlsx	exact		value-exact	/ author: 21564 -> 21305 bytes, first difference at 19200	-	
+ooxml/xlsx/column_style.xlsx	xlsx	exact		value-exact	/ revisionNumber: 4646 -> 4653 bytes, first difference at 613	-	
+ooxml/xlsx/condFormat_cellis.xlsx	xlsx	exact		value-exact	/ author: 9347 -> 9086 bytes, first difference at 6672	-	
+ooxml/xlsx/condformat_databar.xlsx	xlsx	exact		value-exact	/ author: 8052 -> 7791 bytes, first difference at 6112	-	
+ooxml/xlsx/condformat_theme_color.xlsx	xlsx	exact		value-exact	/ author: 8937 -> 8678 bytes, first difference at 6931	-	
+ooxml/xlsx/conditional_fmt_checkpriority.xlsx	xlsx	exact		value-exact	/ author: 10682 -> 10424 bytes, first difference at 7936	-	
+ooxml/xlsx/conditional_fmt_origin.xlsx	xlsx	exact		value-exact	/ author: 9705 -> 9445 bytes, first difference at 7033	-	
+ooxml/xlsx/conditional_formatting_multiple_ranges.xlsx	xlsx	exact		value-exact	/ author: 9487 -> 9228 bytes, first difference at 6793	-	
+ooxml/xlsx/customxml.xlsx	xlsx	exact		value-exact	/sheet[1] name: 13282 -> 13235 bytes, first difference at 6855	-	
+ooxml/xlsx/decimal-format.xlsx	xlsx	exact		value-exact	/ lastModifiedBy: 9677 -> 9687 bytes, first difference at 406	-	
+ooxml/xlsx/duplicate-defined-names.xlsx	xlsx	exact		value-exact	/ author: 18756 -> 18762 bytes, first difference at 1016	-	
+ooxml/xlsx/empty.xlsx	xlsx	exact		value-exact	/ author: 5221 -> 5245 bytes, first difference at 578	-	
+ooxml/xlsx/enhanced-protection.xlsx	xlsx	exact		value-exact	/ author: 8483 -> 8224 bytes, first difference at 6491	-	
+ooxml/xlsx/external-cache-multi-letter-column.xlsx	xlsx	exact		value-exact	/ author: 44267 -> 44008 bytes, first difference at 38320	-	
+ooxml/xlsx/external-link-path-missing.xlsx	xlsx	exact		value-exact	/ author: 15018 -> 14758 bytes, first difference at 12052	-	
+ooxml/xlsx/external-link-path-startup.xlsx	xlsx	exact		value-exact	/ lastModifiedBy: 11076 -> 10816 bytes, first difference at 8560	-	
+ooxml/xlsx/fontSize.xlsx	xlsx	exact		value-exact	/sheet[1] name: 9883 -> 9892 bytes, first difference at 2318	-	
+ooxml/xlsx/formats.xlsx	xlsx	exact		value-exact	/ author: 9295 -> 9299 bytes, first difference at 7714	-	
+ooxml/xlsx/headerFooterTest.xlsx	xlsx	exact		value-exact	/ author: 27484 -> 27224 bytes, first difference at 25402	-	
+ooxml/xlsx/hyperlink.xlsx	xlsx	exact		value-exact	/ author: 9833 -> 9573 bytes, first difference at 8287	-	
+ooxml/xlsx/hyperlink_export.xlsx	xlsx	exact		value-exact	/ author: 9100 -> 8841 bytes, first difference at 7729	-	
+ooxml/xlsx/hyperlink_formula.xlsx	xlsx	exact		value-exact	/ author: 9472 -> 9213 bytes, first difference at 7144	-	
+ooxml/xlsx/hyperlinks.xlsx	xlsx	exact		value-exact	/ author: 9068 -> 8808 bytes, first difference at 6838	-	
+ooxml/xlsx/named-ranges-global.xlsx	xlsx	exact		value-exact	/ author: 5664 -> 5670 bytes, first difference at 4310	-	
+ooxml/xlsx/named-ranges-hidden.xlsx	xlsx	exact		value-exact	/ author: 8959 -> 8700 bytes, first difference at 6933	-	
+ooxml/xlsx/noSharedStringTable.xlsx	xlsx	exact		value-exact	/ author: 7820 -> 7561 bytes, first difference at 5877	-	
+ooxml/xlsx/sample.xlsx	xlsx	exact		value-exact	/sheet[1] name: 12348 -> 12358 bytes, first difference at 2284	-	
+ooxml/xlsx/shared-strings-malformed-count.xlsx	xlsx	exact		value-exact	/ revisionNumber: 6266 -> 6210 bytes, first difference at 4169	-	
+ooxml/xlsx/shared_formulas.xlsx	xlsx	exact		value-exact	/ author: 10137 -> 9874 bytes, first difference at 7827	-	
+ooxml/xlsx/sharedhyperlink.xlsx	xlsx	exact		value-exact	/ author: 9080 -> 8820 bytes, first difference at 6983	-	
+ooxml/xlsx/sheet-names.xlsx	xlsx	exact		value-exact	/ author: 9425 -> 9165 bytes, first difference at 7182	-	
+ooxml/xlsx/sheet-state-show.xlsx	xlsx	exact		value-exact	/ author: 26753 -> 26772 bytes, first difference at 24741	-	
+ooxml/xlsx/sheet-tab-color.xlsx	xlsx	exact		value-exact	/ author: 8408 -> 8148 bytes, first difference at 6256	-	
+ooxml/xlsx/sheetProtection_allLocked.xlsx	xlsx	exact		value-exact	/ author: 7871 -> 7612 bytes, first difference at 5803	-	
+ooxml/xlsx/sheetProtection_not_protected.xlsx	xlsx	exact		value-exact	/ author: 28728 -> 28468 bytes, first difference at 26647	-	
+ooxml/xlsx/sortconditionref.xlsx	xlsx	exact		value-exact	/ author: 8993 -> 8735 bytes, first difference at 6948	-	
+ooxml/xlsx/sortconditionref2.xlsx	xlsx	exact		value-exact	/ author: 14816 -> 14558 bytes, first difference at 12308	-	
+ooxml/xlsx/style-alternate-content.xlsx	xlsx	exact		value-exact	/ author: 10103 -> 10061 bytes, first difference at 1055	-	
+ooxml/xlsx/styles.xlsx	xlsx	exact		value-exact	/ lastModifiedBy: 9309 -> 9048 bytes, first difference at 7134	-	
+ooxml/xlsx/table-sample.xlsx	xlsx	exact		value-exact	/ author: 10595 -> 10335 bytes, first difference at 8362	-	
+ooxml/xlsx/tableStyle.xlsx	xlsx	exact		value-exact	/ author: 10899 -> 10639 bytes, first difference at 9309	-	
+ooxml/xlsx/test_conditional_formatting.xlsx	xlsx	exact		value-exact	/ author: 10203 -> 9946 bytes, first difference at 7424	-	
+ooxml/xlsx/universal-content.xlsx	xlsx	exact		value-exact	/sheet[1] name: 7296 -> 7310 bytes, first difference at 4121	-	
+poi/poi-scratchpad/src/main/resources/org/apache/poi/hslf/data/empty.ppt	ppt	exact		none		-	
+poi/test-data/document/47950_normal.doc	doc	exact		value-exact	/body/p[1] text: 27136 -> 29184 bytes, first difference at 648	value-exact	bookmark+hyperlink add+remove: 27136 -> 28672 bytes, first difference at 616
+poi/test-data/document/61745.docx	docx	exact		value-exact	/ author: 37030 -> 36779 bytes, first difference at 31663	value-exact	picture+comment add+set+remove: 37030 -> 37172 bytes, first difference at 6
+poi/test-data/document/Bug53453Section.doc	doc	exact		value-exact	/body/p[1] text: 26112 -> 28672 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 26112 -> 27648 bytes, first difference at 540
+poi/test-data/document/Bug54849.docx	docx	exact		value-exact	/ revisionNumber: 27566 -> 27308 bytes, first difference at 14992	value-exact	picture+comment add+set+remove: 27566 -> 27567 bytes, first difference at 6
+poi/test-data/document/ComplexNumberedLists.docx	docx	exact		value-exact	/ author: 14458 -> 14199 bytes, first difference at 10923	value-exact	picture+comment add+set+remove: 14458 -> 14530 bytes, first difference at 6
+poi/test-data/document/EmbeddedDocument.docx	docx	exact		value-exact	/ author: 13268 -> 13287 bytes, first difference at 1121	value-exact	picture+comment add+set+remove: 13268 -> 14187 bytes, first difference at 291
+poi/test-data/document/Numbering.docx	docx	exact		value-exact	/ author: 13808 -> 13557 bytes, first difference at 9336	value-exact	picture+comment add+set+remove: 13808 -> 13914 bytes, first difference at 6
+poi/test-data/document/NumberingWOverrides.docx	docx	exact		value-exact	/ title: 15190 -> 14937 bytes, first difference at 8586	value-exact	picture+comment add+set+remove: 15190 -> 15296 bytes, first difference at 6
+poi/test-data/document/NumberingWithOutOfOrderId.docx	docx	exact		value-exact	/ author: 12978 -> 12727 bytes, first difference at 9132	value-exact	picture+comment add+set+remove: 12978 -> 13084 bytes, first difference at 6
+poi/test-data/document/au.edu.utas.www___data_assets_word_doc_0003_154335_International-Travel-Approval-Request-Form.doc	doc	exact		value-exact	/body/p[2] text: 86528 -> 123904 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 86528 -> 114688 bytes, first difference at 540
+poi/test-data/document/ca.kwsymphony.www_education_School_Concert_Seat_Booking_Form_2011-12.doc	doc	exact		refused	/body/p[1] text: unsupported_capability: the format cannot perform the requested operation	value-exact	bookmark+hyperlink add+remove: 1619457 -> 1638912 bytes, first difference at 48
+poi/test-data/document/heading123.docx	docx	exact		value-exact	/ author: 74810 -> 74551 bytes, first difference at 71487	value-exact	picture+comment add+set+remove: 74810 -> 74887 bytes, first difference at 6
+poi/test-data/document/password_password_cryptoapi.doc	doc	locked		-		-	
+poi/test-data/document/password_tika_binaryrc4.doc	doc	locked		-		-	
+poi/test-data/document/saut_page.docx	docx	exact		value-exact	/ author: 2959626 -> 2959635 bytes, first difference at 296	value-exact	picture+comment add+set+remove: 2959626 -> 2960427 bytes, first difference at 1688
+poi/test-data/document/saved-by-table.doc	doc	exact		value-exact	/body/p[10] text: 65024 -> 79872 bytes, first difference at 44	value-exact	bookmark+hyperlink add+remove: 65024 -> 80896 bytes, first difference at 44
+poi/test-data/document/test.doc	doc	exact		value-exact	/body/p[7] text: 32768 -> 22016 bytes, first difference at 888	value-exact	bookmark+hyperlink add+remove: 32768 -> 22016 bytes, first difference at 888
+poi/test-data/document/testComment.docx	docx	exact		value-exact	/ title: 65298 -> 65050 bytes, first difference at 57570	refused	picture+comment add+set+remove: unsupported_capability: the paragraph's addressable runs are not all direct or hyperlink runs
+poi/test-data/document/word_with_embeded.doc	doc	exact		value-exact	/body/p[1] text: 117248 -> 119808 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 117248 -> 119808 bytes, first difference at 540
+poi/test-data/hpsf/TestGermanWord90.doc	doc	exact		value-exact	/body/p[1] text: 19456 -> 22016 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 19456 -> 21504 bytes, first difference at 540
+poi/test-data/hpsf/TestNon4ByteBoundary.doc	doc	exact		refused	/body/p[1] text: unsupported_capability: the format cannot perform the requested operation	value-exact	bookmark+hyperlink add+remove: 11776 -> 16896 bytes, first difference at 4141
+poi/test-data/hpsf/TestUnicode.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/integration/test_recursive_embedded.docx	docx	exact		value-exact	/ revisionNumber: 27082 -> 26832 bytes, first difference at 21983	value-exact	picture+comment add+set+remove: 27082 -> 27175 bytes, first difference at 6
+poi/test-data/openxml4j/50154.xlsx	xlsx	exact		value-exact	/ author: 13583 -> 13323 bytes, first difference at 10671	-	
+poi/test-data/openxml4j/CorePropertiesHasEntities.ooxml	docx	exact		refused	/styles/Standard name: corrupt_file: shared OOXML error: invalid OOXML data: DTD is not allowed in core properties	refused	picture+comment add+set+remove: corrupt_file: shared OOXML error: invalid OOXML data: DTD is not allowed in core properties
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_AlternateTimezones.docx	docx	exact		value-exact	/ title: 13159 -> 13118 bytes, first difference at 1075	one-way	picture+comment add+set+remove: the inverse is refused: unsupported_capability: OPC error: owned OPC source preservation is unavailable: ...
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DCTermsNamespaceLimitedUseFAIL.docx	docx	exact		byte-exact	/styles/Normal name	value-exact	picture+comment add+set+remove: 9788 -> 9887 bytes, first difference at 6
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DoNotUseCompatibilityMarkupFAIL.docx	docx	exact		refused	/styles/Normal name: corrupt_file: shared OOXML error: invalid OOXML data: OPC M4.2 forbids the Markup Compatibility namespace	refused	picture+comment add+set+remove: corrupt_file: shared OOXML error: invalid OOXML data: OPC M4.2 forbids the Markup Compatibility namespace
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_NotPresentFAIL.docx	docx	exact		byte-exact	/styles/Normal name	value-exact	picture+comment add+set+remove: 9786 -> 9885 bytes, first difference at 6
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_PresentWithUnauthorizedValueFAIL.docx	docx	exact		byte-exact	/styles/Normal name	value-exact	picture+comment add+set+remove: 9787 -> 9886 bytes, first difference at 6
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_SUCCESS.docx	docx	exact		value-exact	/ title: 10058 -> 9800 bytes, first difference at 6762	value-exact	picture+comment add+set+remove: 10058 -> 10157 bytes, first difference at 6
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_UnauthorizedXMLLangAttributeFAIL.docx	docx	exact		byte-exact	/styles/Normal name	value-exact	picture+comment add+set+remove: 9814 -> 9913 bytes, first difference at 6
+poi/test-data/openxml4j/OPCCompliance_NoCoreProperties.xlsx	xlsx	exact		value-exact	/sheet[1] name: 11483 -> 11453 bytes, first difference at 1386	-	
+poi/test-data/poifs/60320-protected.xlsx	xlsx	locked		-		-	
+poi/test-data/slideshow/41246-1.ppt	ppt	exact		none		-	
+poi/test-data/slideshow/42485.ppt	ppt	exact		none		-	
+poi/test-data/slideshow/45543.ppt	ppt	exact		none		-	
+poi/test-data/slideshow/45545_Comment.pptx	pptx	exact		value-exact	/ title: 308394 -> 308135 bytes, first difference at 299902	byte-exact	slide move+back
+poi/test-data/slideshow/54880_chinese.ppt	ppt	exact		none		-	
+poi/test-data/slideshow/ArtisticEffectSample.pptx	pptx	exact		value-exact	/ title: 972788 -> 972536 bytes, first difference at 962142	byte-exact	slide move+back
+poi/test-data/slideshow/EmbeddedAudio.pptx	pptx	exact		value-exact	/ title: 90047 -> 89795 bytes, first difference at 33392	none	
+poi/test-data/slideshow/EmbeddedVideo.pptx	pptx	exact		value-exact	/ title: 201418 -> 201170 bytes, first difference at 196851	none	
+poi/test-data/slideshow/Password_Protected-56-hello.ppt	ppt	locked		-		-	
+poi/test-data/slideshow/Password_Protected-hello.ppt	ppt	locked		-		-	
+poi/test-data/slideshow/Password_Protected-np-hello.ppt	ppt	locked		-		-	
+poi/test-data/slideshow/WithComments.ppt	ppt	exact		none		-	
+poi/test-data/slideshow/WithLinks.ppt	ppt	exact		none		-	
+poi/test-data/slideshow/basic_test_ppt_file.ppt	ppt	exact		none		-	
+poi/test-data/slideshow/bug58144-headers-footers-2003.ppt	ppt	exact		none		-	
+poi/test-data/slideshow/bug58144-headers-footers-2007.ppt	ppt	exact		none		-	
+poi/test-data/slideshow/bug61881.ppt	ppt	exact		none		-	
+poi/test-data/slideshow/bug62513.pptx	pptx	exact		one-way	/ title: the set back is refused: unsupported_capability: PPTX OPC error: owned OPC source preservation is unavailable: source ZIP framin...	refused	slide move+back: unsupported_capability: PPTX OPC error: source-backed OPC Part overlay is unavailable: source ZIP archive has trailing b...
+poi/test-data/slideshow/bug65551.pptx	pptx	exact		value-exact	/ title: 34383 -> 34130 bytes, first difference at 8256	none	
+poi/test-data/slideshow/cryptoapi-proc2356.ppt	ppt	locked		-		-	
+poi/test-data/slideshow/datetime.ppt	ppt	exact		none		-	
+poi/test-data/slideshow/headers_footers.ppt	ppt	exact		none		-	
+poi/test-data/slideshow/headers_footers_2007.ppt	ppt	exact		none		-	
+poi/test-data/slideshow/incorrect_slide_order.ppt	ppt	exact		none		-	
+poi/test-data/slideshow/ole2-embedding-2003.ppt	ppt	exact		none		-	
+poi/test-data/slideshow/placeholder-layout-color.pptx	pptx	exact		value-exact	/ title: 346876 -> 346626 bytes, first difference at 344186	none	
+poi/test-data/slideshow/ppt_with_embeded.ppt	ppt	exact		none		-	
+poi/test-data/slideshow/prProps.pptx	pptx	exact		value-exact	/ title: 30976 -> 30718 bytes, first difference at 27151	none	
+poi/test-data/slideshow/slide_master.ppt	ppt	exact		none		-	
+poi/test-data/slideshow/sound.ppt	ppt	exact		none		-	
+poi/test-data/slideshow/testPPT_oleWorkbook.ppt	ppt	exact		none		-	
+poi/test-data/slideshow/text-margins.ppt	ppt	exact		none		-	
+poi/test-data/spreadsheet/15228.xls	xls	exact		refused	/sheet[1] name: unsupported_capability: edit cells refused (unsupported_content): a worksheet was not published by the complete XLS reader	refused	row add+remove: unsupported_capability: edit cells refused (unsupported_content): a worksheet was not published by the complete XLS reader
+poi/test-data/spreadsheet/24207.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/29942.xls	xls	exact		refused	/sheet[1] name: corrupt_file: Invalid data: Font family 108 is invalid; expected 0..=5	refused	row add+remove: corrupt_file: Invalid data: Font family 108 is invalid; expected 0..=5
+poi/test-data/spreadsheet/35897-type4.xls	xls	locked		-		-	
+poi/test-data/spreadsheet/41139.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: edit cells refused (unsupported_operation): row/column movement cannot read a workbook formula's ...
+poi/test-data/spreadsheet/44010-TwoCharts.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/45365-2.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/45365.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/45492.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/45540_classic_Header.xlsx	xlsx	exact		value-exact	/ author: 40213 -> 39952 bytes, first difference at 36006	-	
+poi/test-data/spreadsheet/45540_form_Footer.xlsx	xlsx	exact		value-exact	/ author: 57465 -> 57206 bytes, first difference at 51193	-	
+poi/test-data/spreadsheet/45540_form_Header.xlsx	xlsx	exact		value-exact	/ author: 57471 -> 57212 bytes, first difference at 51199	-	
+poi/test-data/spreadsheet/45761.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/46136-NoWarnings.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/47889.xlsx	xlsx	exact		value-exact	/sheet[1] name: 3555 -> 3565 bytes, first difference at 1760	-	
+poi/test-data/spreadsheet/48962.xlsx	xlsx	exact		value-exact	/ author: 50260 -> 50000 bytes, first difference at 48173	-	
+poi/test-data/spreadsheet/48968.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/49609.xlsx	xlsx	exact		one-way	/sheet[1] name: the set back is refused: unsupported_capability: OPC package error: owned OPC source preservation is unavailable: source ...	-	
+poi/test-data/spreadsheet/50939.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: edit cells refused (unsupported_operation): row/column movement cannot read the references of a s...
+poi/test-data/spreadsheet/53109.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/54016.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: edit cells refused (unsupported_operation): row/column movement cannot close dependency record
+poi/test-data/spreadsheet/54071.xlsx	xlsx	exact		value-exact	/ author: 9150 -> 8890 bytes, first difference at 6639	-	
+poi/test-data/spreadsheet/55341_CellStyleBorder.xls	xls	exact		value-exact	/sheet[1] name: 28160 -> 28160 bytes, first difference at 17920	value-exact	row add+remove: 28160 -> 28160 bytes, first difference at 13562
+poi/test-data/spreadsheet/56169.xlsx	xlsx	exact		value-exact	/ author: 10345 -> 10085 bytes, first difference at 6755	-	
+poi/test-data/spreadsheet/58106.xlsx	xlsx	exact		value-exact	/sheet[1] name: 9111 -> 9119 bytes, first difference at 2319	-	
+poi/test-data/spreadsheet/59858.xls	xls	exact		value-exact	/sheet[1] name: 1103360 -> 1103360 bytes, first difference at 974920	refused	row add+remove: unsupported_capability: edit cells refused (unsupported_operation): row/column movement only supports coordinate-free dra...
+poi/test-data/spreadsheet/60289.xlsx	xlsx	exact		value-exact	/ author: 8570 -> 8311 bytes, first difference at 6103	-	
+poi/test-data/spreadsheet/61060-conditional-number-formatting.xlsx	xlsx	exact		value-exact	/ author: 8224 -> 7965 bytes, first difference at 6292	-	
+poi/test-data/spreadsheet/62815.xlsb	xlsb	exact		value-exact	/sheet[1] name: 10665 -> 8409 bytes, first difference at 6	value-exact	note add+remove: 10665 -> 8409 bytes, first difference at 6
+poi/test-data/spreadsheet/62834.xlsx	xlsx	exact		value-exact	/ author: 9629 -> 9368 bytes, first difference at 6933	-	
+poi/test-data/spreadsheet/66365.xlsx	xlsx	exact		value-exact	/sheet[1] name: 4753 -> 4759 bytes, first difference at 2769	-	
+poi/test-data/spreadsheet/AmpersandHeader.xlsx	xlsx	exact		value-exact	/ author: 9480 -> 9220 bytes, first difference at 6688	-	
+poi/test-data/spreadsheet/ConditionalFormattingSamples.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: edit cells refused (unsupported_operation): row/column movement cannot read a workbook formula's ...
+poi/test-data/spreadsheet/ConditionalFormattingSamples.xlsx	xlsx	exact		value-exact	/ title: 654688 -> 654427 bytes, first difference at 627518	-	
+poi/test-data/spreadsheet/CustomXMLMappings.xlsx	xlsx	exact		value-exact	/ author: 9906 -> 9646 bytes, first difference at 7552	-	
+poi/test-data/spreadsheet/DBCSHeader.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/DataValidationEvaluations.xlsx	xlsx	exact		value-exact	/ author: 13679 -> 13419 bytes, first difference at 11638	-	
+poi/test-data/spreadsheet/DataValidationListTooLong.xlsx	xlsx	exact		value-exact	/ author: 3286 -> 3321 bytes, first difference at 829	-	
+poi/test-data/spreadsheet/DataValidations-49244.xlsx	xlsx	exact		value-exact	/sheet[1] name: 10705 -> 10714 bytes, first difference at 2218	-	
+poi/test-data/spreadsheet/DateFormats.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/DrawingAndComments.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_type: edit cells refused (unsupported_target): split OfficeArt records are not shiftable
+poi/test-data/spreadsheet/ExcelPivotTableSample.xlsx	xlsx	exact		value-exact	/ author: 19460 -> 19200 bytes, first difference at 15515	-	
+poi/test-data/spreadsheet/Excel_file_with_trash_item.xlsx	xlsx	exact		value-exact	/sheet[1] name: 47318 -> 47325 bytes, first difference at 2309	-	
+poi/test-data/spreadsheet/FormatKM.xlsx	xlsx	exact		value-exact	/ author: 11590 -> 11331 bytes, first difference at 7891	-	
+poi/test-data/spreadsheet/Formatting.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/HyperlinksOnManySheets.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: edit cells refused (unsupported_operation): row/column movement refuses a hyperlink with an inter...
+poi/test-data/spreadsheet/MRExtraLines.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/NewStyleConditionalFormattings.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/ShrinkToFit.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/Simple.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/SimpleMacro.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/SimpleScatterChart.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/SimpleWithColours.xls	xls	exact		byte-exact	/sheet[1] name	value-exact	row add+remove: 6144 -> 6144 bytes, first difference at 2906
+poi/test-data/spreadsheet/SimpleWithComments.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/SimpleWithPageBreaks.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/SimpleWithPrintArea.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/StructuredRefs-lots-with-lookups.xlsx	xlsx	exact		value-exact	/ lastModifiedBy: 325446 -> 325188 bytes, first difference at 294898	-	
+poi/test-data/spreadsheet/TestShiftRowSharedFormula.xlsx	xlsx	exact		value-exact	/ author: 8527 -> 8267 bytes, first difference at 6238	-	
+poi/test-data/spreadsheet/TwoSheetsOneHidden.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/UncalcedRecord.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/WithChartSheet.xlsx	xlsx	exact		value-exact	/ author: 30333 -> 30074 bytes, first difference at 25549	-	
+poi/test-data/spreadsheet/WithConditionalFormatting.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/WithEmbeded.xlsx	xlsx	exact		value-exact	/ author: 23668 -> 23409 bytes, first difference at 20892	-	
+poi/test-data/spreadsheet/WithTextBox.xlsb	xlsb	exact		value-exact	/sheet[1] name: 10076 -> 8128 bytes, first difference at 6	value-exact	note add+remove: 10076 -> 8128 bytes, first difference at 6
+poi/test-data/spreadsheet/WithTwoHyperLinks.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/XRefCalc.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/bug64512_embed.xlsx	xlsx	exact		value-exact	/ author: 49746 -> 49487 bytes, first difference at 47213	-	
+poi/test-data/spreadsheet/chart_sheet.xlsx	xlsx	exact		value-exact	/ author: 10795 -> 10535 bytes, first difference at 8256	-	
+poi/test-data/spreadsheet/colwidth.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/comments.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/customIndexedColors.xlsx	xlsx	exact		value-exact	/ author: 19534 -> 19274 bytes, first difference at 17069	-	
+poi/test-data/spreadsheet/dataValidationTableRange.xlsx	xlsx	exact		value-exact	/ author: 116554 -> 116291 bytes, first difference at 100354	-	
+poi/test-data/spreadsheet/duprich1.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/duprich2.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/dvEmpty.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/externalFunctionExample.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/external_name.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/headerFooterTest.xlsx	xlsx	exact		value-exact	/ author: 27484 -> 27224 bytes, first difference at 25402	-	
+poi/test-data/spreadsheet/link-external-workbook-b.xlsx	xlsx	exact		value-exact	/ author: 4080 -> 4099 bytes, first difference at 899	-	
+poi/test-data/spreadsheet/named-cell-in-formula-test.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/named-cell-test.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/namedinput.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/no_drawing_patriarch.xlsx	xlsx	exact		value-exact	/sheet[1] name: 672414 -> 672440 bytes, first difference at 334761	-	
+poi/test-data/spreadsheet/right-to-left.xlsx	xlsx	exact		value-exact	/sheet[1] name: 14478 -> 14468 bytes, first difference at 1817	-	
+poi/test-data/spreadsheet/sample.xlsx	xlsx	exact		value-exact	/sheet[1] name: 12348 -> 12358 bytes, first difference at 2284	-	
+poi/test-data/spreadsheet/shared_formulas.xlsx	xlsx	exact		value-exact	/ author: 10137 -> 9874 bytes, first difference at 7827	-	
+poi/test-data/spreadsheet/style-alternate-content.xlsx	xlsx	exact		value-exact	/ author: 10103 -> 10061 bytes, first difference at 1055	-	
+poi/test-data/spreadsheet/testNames.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: edit cells refused (unsupported_operation): row/column movement cannot read a workbook formula's ...
+poi/test-data/spreadsheet/testSharedFormulasRangeSetBlankBug.xlsx	xlsx	exact		value-exact	/ author: 12428 -> 12168 bytes, first difference at 10357	-	
+poi/test-data/spreadsheet/testSharedFormulasSetBlank.xlsx	xlsx	exact		value-exact	/ author: 8889 -> 8629 bytes, first difference at 7458	-	
+poi/test-data/spreadsheet/testVarious.xlsb	xlsb	exact		value-exact	/sheet[1] name: 22715 -> 19671 bytes, first difference at 6	value-exact	note add+remove: 22715 -> 19684 bytes, first difference at 6
+poi/test-data/spreadsheet/unicodeNameRecord.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+poi/test-data/spreadsheet/workbookProtection-sheet_password-2013.xlsx	xlsx	exact		value-exact	/ author: 9196 -> 8936 bytes, first difference at 6616	-	
+poi/test-data/spreadsheet/workbookProtection-workbook_password-2013.xlsx	xlsx	exact		value-exact	/ author: 8171 -> 7911 bytes, first difference at 6165	-	
+poi/test-data/spreadsheet/workbookProtection_workbook_revision_protected.xlsx	xlsx	exact		value-exact	/ author: 12468 -> 12211 bytes, first difference at 7601	-	
+poi/test-data/spreadsheet/xlookup.xlsx	xlsx	exact		value-exact	/sheet[1] name: 12031 -> 12025 bytes, first difference at 1768	-	
+poi/test-data/spreadsheet/xor-encryption-abc.xls	xls	locked		-		-	
+poi/test-data/spreadsheet/xxe_in_schema.xlsx	xlsx	exact		value-exact	/sheet[1] name: 9801 -> 9771 bytes, first difference at 5896	-	
+poi/test-data/xmldsign/hello-world-signed-twice.docx	docx	signed-exact		-		-	
+poi/test-data/xmldsign/hello-world-signed.docx	docx	signed-exact		-		-	
+poi/test-data/xmldsign/hello-world-signed.pptx	pptx	signed-exact		-		-	
+poi/test-data/xmldsign/hello-world-signed.xlsx	xlsx	signed-exact		-		-	
+poi/test-data/xmldsign/ms-office-2010-signed.docx	docx	signed-exact		-		-	
+poi/test-data/xmldsign/ms-office-2010-signed.pptx	pptx	signed-exact		-		-	
+poi/test-data/xmldsign/ms-office-2010-signed.xlsx	xlsx	signed-exact		-		-	
+rtf/background.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	none	
+rtf/barcode_display_fields.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	none	
+rtf/chtoutline.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	value-exact	paragraph move+back: 41999 -> 41999 bytes, first difference at 18683
+rtf/cjklist12.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	value-exact	paragraph move+back: 44275 -> 45065 bytes, first difference at 15884
+rtf/cjklist13.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	value-exact	paragraph move+back: 44275 -> 45065 bytes, first difference at 15884
+rtf/cjklist16.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	value-exact	paragraph move+back: 44275 -> 45065 bytes, first difference at 15884
+rtf/cjklist20.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	value-exact	paragraph move+back: 44275 -> 45065 bytes, first difference at 15884
+rtf/cjklist21.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	value-exact	paragraph move+back: 44275 -> 45065 bytes, first difference at 15884
+rtf/column-break.rtf	rtf	exact		value-exact	/body/p[1]/r[1] text: 31 -> 45 bytes, first difference at 20	none	
+rtf/fdo82071.rtf	rtf	exact		none		none	
+rtf/fdo86750.rtf	rtf	exact		refused	/body/p[2] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	value-exact	paragraph move+back: 128 -> 128 bytes, first difference at 70
+rtf/field-status-dirty-private.rtf	rtf	exact		none		none	
+rtf/field-status-edited.rtf	rtf	exact		none		none	
+rtf/field-status-locked.rtf	rtf	exact		none		none	
+rtf/hex-crlf-text.rtf	rtf	exact		none		none	
+rtf/hidden-linebreaks.rtf	rtf	exact		refused	/body/p[1]/r[1] text: unsupported_capability: edit refused (unsupported_content): run-format editing refuses inline line breaks	none	
+rtf/hyperlink-target.rtf	rtf	exact		none		none	
+rtf/hyperlink-with-backslashes.rtf	rtf	exact		none		none	
+rtf/hyperlink.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	none	
+rtf/hyperlink_empty.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	none	
+rtf/page-background.rtf	rtf	exact		none		none	
+rtf/page-border.rtf	rtf	exact		value-exact	/body/p[1] text: 143 -> 142 bytes, first difference at 130	none	
+rtf/page-break-emptyparas-spltpgpar.rtf	rtf	exact		value-exact	/body/p[1]/r[1] text: 104 -> 116 bytes, first difference at 36	byte-exact	paragraph move+back
+rtf/page-break-emptyparas.rtf	rtf	exact		value-exact	/body/p[1]/r[1] text: 105 -> 116 bytes, first difference at 27	byte-exact	paragraph move+back
+rtf/para-adjust-distribute.rtf	rtf	exact		value-exact	/body/p[1]/r[1] text: 71 -> 85 bytes, first difference at 22	byte-exact	paragraph move+back
+rtf/para-border.rtf	rtf	exact		value-exact	/body/p[1]/r[1] text: 5228 -> 5242 bytes, first difference at 4847	value-exact	paragraph move+back: 5228 -> 5654 bytes, first difference at 4415
+rtf/para-bottom-margin.rtf	rtf	exact		value-exact	/body/p[1]/r[1] text: 1136 -> 1149 bytes, first difference at 1121	none	
+rtf/para-shadow.rtf	rtf	exact		value-exact	/body/p[1]/r[1] text: 1305 -> 1319 bytes, first difference at 660	value-exact	paragraph move+back: 1305 -> 2022 bytes, first difference at 404
+rtf/para-style-bottom-margin-2.rtf	rtf	exact		none		byte-exact	paragraph move+back
+rtf/paragraph-break-then-text.rtf	rtf	exact		value-exact	/body/p[1] text: 38 -> 38 bytes, first difference at 35	byte-exact	paragraph move+back
+rtf/repeated-deftab-cjk.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	byte-exact	paragraph move+back
+rtf/repeated-deftab.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	byte-exact	paragraph move+back
+rtf/table-cell-horizontal-merge.rtf	rtf	exact		byte-exact	/body/tbl[1]/tr[1]/tc[1] text	none	
+rtf/table-cell-vertical-merge.rtf	rtf	exact		none		none	
+rtf/tdf134614_toc_indent.rtf	rtf	exact		refused	/body/p[2] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	byte-exact	paragraph move+back
+rtf/test437Encoding.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body has mixed run or paragraph formatting	refused	paragraph move+back: unsupported_capability: edit refused (unsupported_content): a paragraph ends inside a group that continues with more...
+rtf/test874Encoding.rtf	rtf	exact		value-exact	/body/p[1]/r[1] text: 4163 -> 4176 bytes, first difference at 3801	refused	paragraph move+back: unsupported_capability: edit refused (unsupported_content): the body's paragraphs are not delimited by root-level \p...
+rtf/test950Encoding.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body has mixed run or paragraph formatting	refused	paragraph move+back: unsupported_capability: edit refused (unsupported_content): the last paragraph has no \par of its own and cannot move
+rtf/testDefaultEncodingParse.rtf	rtf	exact		value-exact	/body/p[1] text: 23 -> 20 bytes, first difference at 6	none	
+rtf/testEncodingParse.rtf	rtf	exact		value-exact	/body/p[1] text: 188 -> 187 bytes, first difference at 182	none	
+rtf/testGreekEncoding.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body has mixed run or paragraph formatting	none	
+rtf/testHex.rtf	rtf	exact		value-exact	/body/p[1] text: 194 -> 184 bytes, first difference at 172	none	
+rtf/testJapaneseJisEncoding.rtf	rtf	exact		value-exact	/body/p[1] text: 134 -> 132 bytes, first difference at 113	none	
+rtf/testJapaneseJisEncodingTwoFonts.rtf	rtf	exact		value-exact	/body/p[1] text: 168 -> 166 bytes, first difference at 150	none	
+rtf/testJapaneseUtf8Encoding.rtf	rtf	exact		value-exact	/body/p[1] text: 143 -> 131 bytes, first difference at 111	none	
+rtf/testKoreanEncoding.rtf	rtf	exact		value-exact	/body/p[1] text: 285 -> 284 bytes, first difference at 280	none	
+rtf/testMultiByteHex.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body has mixed run or paragraph formatting	none	
+rtf/testNecCharacters.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body has mixed run or paragraph formatting	none	
+rtf/testNegativeUnicode.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	value-exact	paragraph move+back: 719 -> 831 bytes, first difference at 373
+rtf/testSpecialChars.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): ordinary paragraph source contains a group, binary payload, ...	value-exact	paragraph move+back: 515 -> 607 bytes, first difference at 190
+rtf/testStyles.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body has mixed run or paragraph formatting	refused	paragraph move+back: unsupported_capability: edit refused (unsupported_content): a paragraph inherits paragraph properties from its neigh...
+rtf/testTurkishEncoding.rtf	rtf	exact		value-exact	/body/p[1]/r[1] text: 246 -> 260 bytes, first difference at 219	none	
+rtf/testUnicode.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body has mixed run or paragraph formatting	value-exact	paragraph move+back: 873 -> 985 bytes, first difference at 479
+rtf/testUpr.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body has mixed run or paragraph formatting	value-exact	paragraph move+back: 8874 -> 9448 bytes, first difference at 8218
+rtf/typed_hyperlinks_and_references.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	none	
+rtf/watermark.rtf	rtf	exact		none		none	
+unified-ops/0294/comments.odp	odp	exact		value-exact	/slide[1] name: 2157 -> 2180 bytes, first difference at 91	value-exact	linebreak add+remove: 2157 -> 2180 bytes, first difference at 91
+unified-ops/0294/connectors.ppt	ppt	exact		none		-	
+unified-ops/0294/elements.ppt	ppt	exact		none		-	
+unified-ops/0294/frames.odm	odm	exact		byte-exact	/body/p[1] text	value-exact	tab add+remove: 1218 -> 1313 bytes, first difference at 98
+unified-ops/0294/frames.oth	oth	exact		byte-exact	/body/p[1] text	value-exact	tab add+remove: 1639 -> 1746 bytes, first difference at 95
+unified-ops/0294/layers.odg	odg	exact		byte-exact	/page[1] name	-	
+unified-ops/0294/marks.doc	doc	exact		value-exact	/body/p[1] text: 15360 -> 17920 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 15360 -> 17408 bytes, first difference at 540
+unified-ops/0294/modern-comments.pptx	pptx	exact		value-exact	/ title: 10725 -> 10790 bytes, first difference at 729	byte-exact	slide move+back
+unified-ops/0294/parts.odm	odm	exact		value-exact	/body/h[1] text: 3223 -> 3222 bytes, first difference at 2647	value-exact	tab add+remove: 3223 -> 3265 bytes, first difference at 98
+unified-ops/0294/parts.odp	odp	exact		value-exact	/slide[1] name: 3196 -> 3218 bytes, first difference at 91	value-exact	linebreak add+remove: 3196 -> 3218 bytes, first difference at 91
+unified-ops/0294/parts.odt	odt	exact		value-exact	/body/h[1] text: 3212 -> 3211 bytes, first difference at 2640	value-exact	tab add+remove: 3212 -> 3254 bytes, first difference at 91
+unified-ops/0294/parts.oth	oth	exact		value-exact	/body/h[1] text: 3219 -> 3218 bytes, first difference at 2644	value-exact	tab add+remove: 3219 -> 3261 bytes, first difference at 95
+unified-ops/0294/parts.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: edit refused (unsupported_content): the body contains tables or positioned structure	byte-exact	paragraph move+back
+unified-ops/0294/shapes.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 456779 -> 456773 bytes, first difference at 328815	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains unmodelled native content with refer...
+unified-ops/0294/table.xlsb	xlsb	exact		byte-exact	/sheet[1] name	byte-exact	note add+remove
+unified-ops/0294/video.ppt	ppt	exact		none		-	
+unified-ops/ppt-lazy-native-fixture.ppt	ppt	exact		none		-	

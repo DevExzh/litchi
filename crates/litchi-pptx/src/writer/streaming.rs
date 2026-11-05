@@ -1,6 +1,6 @@
 //! Forward-only, bounded authoring of small semantic PresentationML decks.
 //!
-//! This module deliberately does not hydrate [`super::MutablePresentation`].
+//! This module deliberately does not hydrate [`crate::builder::Presentation`].
 //! The caller declares the slide count up front and emits one slide at a time;
 //! each completed slide is released after its OPC member is finalized.  The
 //! writer is fresh-authoring only and intentionally models plain text boxes.
@@ -432,12 +432,14 @@ impl<W: Write> StreamingPresentationWriter<W> {
         }
         let slide_id = FIRST_SLIDE_ID
             .checked_add(u32::try_from(self.next_slide).map_err(|_| Error::Limit {
-                resource: "streaming PPTX slide ID",
-                limit: u32::MAX as usize,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::SlideIds),
+                observed: self.next_slide,
+                maximum: u32::MAX as usize,
             })?)
             .ok_or(Error::Limit {
-                resource: "streaming PPTX slide ID",
-                limit: u32::MAX as usize,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::SlideIds),
+                observed: usize::MAX,
+                maximum: u32::MAX as usize,
             })?;
         let prefix_bytes = slide_prefix_len(slide_id);
         let title_bytes = title.map_or(0, |value| {
@@ -449,8 +451,9 @@ impl<W: Write> StreamingPresentationWriter<W> {
             .ok_or_else(|| Error::Invalid("streaming PPTX slide XML length overflow".into()))?;
         if minimum > self.limits.max_slide_xml_bytes {
             return Err(Error::Limit {
-                resource: "streaming PPTX slide XML bytes",
-                limit: self.limits.max_slide_xml_bytes,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                observed: minimum,
+                maximum: self.limits.max_slide_xml_bytes,
             });
         }
         let uri = PackURI::new(format!("/ppt/slides/slide{}.xml", self.next_slide + 1))
@@ -538,8 +541,9 @@ impl<W: Write> StreamingSlideWriter<W> {
         validate_geometry(spec, self.options)?;
         if self.text_box_count >= self.limits.max_text_boxes_per_slide {
             return Err(Error::Limit {
-                resource: "streaming PPTX text boxes per slide",
-                limit: self.limits.max_text_boxes_per_slide,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBoxes),
+                observed: self.text_box_count.checked_add(1).unwrap_or(usize::MAX),
+                maximum: self.limits.max_text_boxes_per_slide,
             });
         }
         let total_text = checked_add_text(
@@ -550,13 +554,15 @@ impl<W: Write> StreamingSlideWriter<W> {
         let shape_id = 3u32
             .checked_add(
                 u32::try_from(self.text_box_count).map_err(|_| Error::Limit {
-                    resource: "streaming PPTX shape ID",
-                    limit: u32::MAX as usize,
+                    kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::ShapeIds),
+                    observed: self.text_box_count,
+                    maximum: u32::MAX as usize,
                 })?,
             )
             .ok_or(Error::Limit {
-                resource: "streaming PPTX shape ID",
-                limit: u32::MAX as usize,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::ShapeIds),
+                observed: usize::MAX,
+                maximum: u32::MAX as usize,
             })?;
         let shape_bytes =
             shape_xml_len(shape_id, spec.text, spec.x, spec.y, spec.width, spec.height);
@@ -569,8 +575,9 @@ impl<W: Write> StreamingSlideWriter<W> {
             .ok_or_else(|| Error::Invalid("streaming PPTX slide XML length overflow".into()))?;
         if next_xml_with_suffix > self.limits.max_slide_xml_bytes {
             return Err(Error::Limit {
-                resource: "streaming PPTX slide XML bytes",
-                limit: self.limits.max_slide_xml_bytes,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                observed: next_xml_with_suffix,
+                maximum: self.limits.max_slide_xml_bytes,
             });
         }
         self.write_text_shape(shape_id, spec.text, spec.x, spec.y, spec.width, spec.height)?;
@@ -617,8 +624,9 @@ impl<W: Write> StreamingSlideWriter<W> {
             .ok_or_else(|| Error::Invalid("streaming PPTX slide XML length overflow".into()))?;
         if next_xml > self.limits.max_slide_xml_bytes {
             return Err(Error::Limit {
-                resource: "streaming PPTX slide XML bytes",
-                limit: self.limits.max_slide_xml_bytes,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                observed: next_xml,
+                maximum: self.limits.max_slide_xml_bytes,
             });
         }
         self.write_fragment(SLIDE_SUFFIX.as_bytes())?;
@@ -669,8 +677,9 @@ impl<W: Write> StreamingSlideWriter<W> {
             .ok_or_else(|| Error::Invalid("streaming PPTX slide XML length overflow".into()))?;
         if next_xml_with_suffix > self.limits.max_slide_xml_bytes {
             return Err(Error::Limit {
-                resource: "streaming PPTX slide XML bytes",
-                limit: self.limits.max_slide_xml_bytes,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                observed: next_xml_with_suffix,
+                maximum: self.limits.max_slide_xml_bytes,
             });
         }
         self.write_fragment(SHAPE_START.as_bytes())?;
@@ -886,14 +895,16 @@ fn validate_configuration(
     }
     if slide_count > MAX_STREAMING_SLIDES {
         return Err(Error::Limit {
-            resource: "streaming PPTX physical ZIP slides",
-            limit: MAX_STREAMING_SLIDES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Slides),
+            observed: slide_count,
+            maximum: MAX_STREAMING_SLIDES,
         });
     }
     if slide_count > limits.max_slides {
         return Err(Error::Limit {
-            resource: "streaming PPTX slides",
-            limit: limits.max_slides,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Slides),
+            observed: slide_count,
+            maximum: limits.max_slides,
         });
     }
     if limits.max_text_boxes_per_slide == 0
@@ -907,53 +918,61 @@ fn validate_configuration(
         ));
     }
     if limits.max_text_bytes_per_box as u64 > PHYSICAL_MAX_ENTRY_BYTES {
-        return Err(Error::Limit {
-            resource: "streaming PPTX text bytes",
-            limit: usize::try_from(PHYSICAL_MAX_ENTRY_BYTES).unwrap_or(usize::MAX),
+        return Err(Error::InvalidLimit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+            value: limits.max_text_bytes_per_box,
+            maximum: usize::try_from(PHYSICAL_MAX_ENTRY_BYTES).unwrap_or(usize::MAX),
         });
     }
     if limits.max_slide_xml_bytes as u64 > PHYSICAL_MAX_ENTRY_BYTES {
-        return Err(Error::Limit {
-            resource: "streaming PPTX slide XML bytes",
-            limit: usize::try_from(PHYSICAL_MAX_ENTRY_BYTES).unwrap_or(usize::MAX),
+        return Err(Error::InvalidLimit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            value: limits.max_slide_xml_bytes,
+            maximum: usize::try_from(PHYSICAL_MAX_ENTRY_BYTES).unwrap_or(usize::MAX),
         });
     }
     if limits.max_total_text_bytes as u64 > PHYSICAL_MAX_TOTAL_BYTES {
-        return Err(Error::Limit {
-            resource: "streaming PPTX total text bytes",
-            limit: usize::try_from(PHYSICAL_MAX_TOTAL_BYTES).unwrap_or(usize::MAX),
+        return Err(Error::InvalidLimit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+            value: limits.max_total_text_bytes,
+            maximum: usize::try_from(PHYSICAL_MAX_TOTAL_BYTES).unwrap_or(usize::MAX),
         });
     }
     if limits.max_output_bytes > PHYSICAL_MAX_OUTPUT_BYTES {
-        return Err(Error::Limit {
-            resource: "streaming PPTX output bytes",
-            limit: usize::try_from(PHYSICAL_MAX_OUTPUT_BYTES).unwrap_or(usize::MAX),
+        return Err(Error::InvalidLimit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            value: usize::try_from(limits.max_output_bytes).unwrap_or(usize::MAX),
+            maximum: usize::try_from(PHYSICAL_MAX_OUTPUT_BYTES).unwrap_or(usize::MAX),
         });
     }
     StreamingPresentationOptions::new(options.slide_width, options.slide_height)?;
     let maximum_slide_id = FIRST_SLIDE_ID
         .checked_add(u32::try_from(slide_count - 1).map_err(|_| Error::Limit {
-            resource: "streaming PPTX slide ID",
-            limit: u32::MAX as usize,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::SlideIds),
+            observed: slide_count - 1,
+            maximum: u32::MAX as usize,
         })?)
         .ok_or(Error::Limit {
-            resource: "streaming PPTX slide ID",
-            limit: u32::MAX as usize,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::SlideIds),
+            observed: usize::MAX,
+            maximum: u32::MAX as usize,
         })?;
     let minimum_slide_xml = slide_prefix_len(maximum_slide_id)
         .checked_add(SLIDE_SUFFIX.len())
         .ok_or_else(|| Error::Invalid("streaming PPTX slide XML length overflow".into()))?;
     if minimum_slide_xml > limits.max_slide_xml_bytes {
         return Err(Error::Limit {
-            resource: "streaming PPTX slide XML bytes",
-            limit: limits.max_slide_xml_bytes,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: minimum_slide_xml,
+            maximum: limits.max_slide_xml_bytes,
         });
     }
     let structural_metadata_lower_bound = structural_metadata_lower_bound_bytes(slide_count)?;
     if limits.max_output_bytes < structural_metadata_lower_bound {
         return Err(Error::Limit {
-            resource: "streaming PPTX structural ZIP metadata bytes",
-            limit: usize::try_from(structural_metadata_lower_bound).unwrap_or(usize::MAX),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::ArchiveBytes),
+            observed: usize::try_from(structural_metadata_lower_bound).unwrap_or(usize::MAX),
+            maximum: usize::try_from(limits.max_output_bytes).unwrap_or(usize::MAX),
         });
     }
     Ok(())
@@ -962,8 +981,9 @@ fn validate_configuration(
 fn validate_text(text: &str, maximum: usize) -> Result<()> {
     if text.len() > maximum {
         return Err(Error::Limit {
-            resource: "streaming PPTX text bytes",
-            limit: maximum,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+            observed: text.len(),
+            maximum,
         });
     }
     if !text.chars().all(is_xml_char) {
@@ -1004,8 +1024,9 @@ fn checked_add_text(current: usize, additional: usize, maximum: usize) -> Result
         .ok_or_else(|| Error::Invalid("streaming PPTX text-byte count overflow".into()))?;
     if total > maximum {
         return Err(Error::Limit {
-            resource: "streaming PPTX total text bytes",
-            limit: maximum,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+            observed: total,
+            maximum,
         });
     }
     Ok(total)
@@ -1306,7 +1327,7 @@ fn write_static_parts<W: Write>(
     archive = write_blob(
         archive,
         NOTES_MASTER_PART,
-        crate::notes::master_xml().as_bytes(),
+        crate::notes::master_xml(crate::notes::Limits::DEFAULT)?.as_bytes(),
     )?;
     write_notes_master_relationships(archive)
 }

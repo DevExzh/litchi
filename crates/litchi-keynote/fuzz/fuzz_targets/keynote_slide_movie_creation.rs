@@ -15,8 +15,8 @@ use std::{sync::OnceLock, time::Duration};
 use libfuzzer_sys::fuzz_target;
 use litchi_iwa_common::shape::geometry::{Point, Size};
 use litchi_keynote::{
-    Limits, MediaPart, MovieSelector, Package, ReadOptions, SemanticLimits, SlideSelector,
-    slide::movie::Options,
+    MovieSelector, OpenOptions, Package, SemanticLimits, SlideSelector,
+    slide::media::data::MediaPart, slide::movie::Options,
 };
 
 use self::support::{
@@ -87,14 +87,18 @@ fn exercise_package(package: &Package, data: &[u8], source_movie: &[u8], source_
     let movie_filename = requested_movie_filename(data);
     let poster_filename = requested_poster_filename(data);
     let options = requested_options(data);
-    let commit = match package.add_slide_movie(
-        requested_slide(data),
-        &movie_filename,
-        &movie,
-        &poster_filename,
-        &poster,
-        options,
-    ) {
+    let commit = match package
+        .edit_slide_movie_creation()
+        .add(
+            requested_slide(data),
+            &movie_filename,
+            &movie,
+            &poster_filename,
+            &poster,
+            options,
+        )
+        .and_then(|edit| edit.commit())
+    {
         Ok(commit) => commit,
         Err(error) => {
             observe_error(error);
@@ -163,7 +167,8 @@ fn verify_seed_success_contract(package: &Package) {
     let (movie, poster) = native_assets_without_cache(package);
     let options = seed_options();
     let commit = package
-        .add_slide_movie(
+        .edit_slide_movie_creation()
+        .add(
             SlideSelector::index(0),
             "fuzz-seed.mov",
             &movie,
@@ -171,6 +176,7 @@ fn verify_seed_success_contract(package: &Package) {
             &poster,
             options,
         )
+        .and_then(|edit| edit.commit())
         .unwrap_or_else(|error| panic!("native movie seed must commit: {error}"));
     assert!(!commit.patch().is_noop());
     assert_eq!(commit.patch().options(), options);
@@ -222,7 +228,7 @@ fn native_assets_without_cache(package: &Package) -> (Vec<u8>, Vec<u8>) {
 
 fn assert_media_payloads(
     package: &Package,
-    patch: &litchi_keynote::SlideMovieCreationPatch,
+    patch: &litchi_keynote::slide::movie::creation::Patch,
     movie: &[u8],
     poster: &[u8],
 ) {
@@ -249,24 +255,25 @@ fn assert_media_payloads(
 }
 
 fn exercise_limit_budget(movie: &[u8], poster: &[u8]) {
-    let semantic = SemanticLimits::new(
-        MAX_OBJECTS,
-        MAX_SLIDES,
-        1,
-        MAX_TEXT_STORAGES,
-        MAX_TEXT_FRAGMENTS,
-        MAX_TEXT_BYTES,
-    )
-    .unwrap_or_else(|error| panic!("finite movie semantic limit must build: {error}"));
+    let semantic = SemanticLimits::builder()
+        .max_objects(MAX_OBJECTS)
+        .and_then(|limits| limits.max_slides(MAX_SLIDES))
+        .and_then(|limits| limits.max_references(1))
+        .and_then(|limits| limits.max_text_storages(MAX_TEXT_STORAGES))
+        .and_then(|limits| limits.max_text_fragments(MAX_TEXT_FRAGMENTS))
+        .and_then(|limits| limits.max_text_bytes(MAX_TEXT_BYTES))
+        .and_then(|limits| limits.build())
+        .unwrap_or_else(|error| panic!("finite movie semantic limit must build: {error}"));
     let package = Package::from_bytes_with_options(
         NATIVE_KEYNOTE,
-        ReadOptions::new(Limits::default(), semantic),
+        OpenOptions::new().semantic_limits(semantic),
     )
     .unwrap_or_else(|error| panic!("native movie limit seed must open: {error}"));
     let source_bytes = package_bytes(&package);
     assert!(
         package
-            .add_slide_movie(
+            .edit_slide_movie_creation()
+            .add(
                 SlideSelector::index(0),
                 "limit.mov",
                 movie,
@@ -274,6 +281,7 @@ fn exercise_limit_budget(movie: &[u8], poster: &[u8]) {
                 poster,
                 seed_options(),
             )
+            .and_then(|edit| edit.commit())
             .is_err(),
         "the tight reference budget must reject movie creation"
     );

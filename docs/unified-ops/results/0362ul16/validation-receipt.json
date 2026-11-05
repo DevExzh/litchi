@@ -1,0 +1,88 @@
+{
+  "schema": "litchi.cfb-sequential-error-layout.validation.v1",
+  "source": {
+    "base_commit": "8f5f201712d2239dfc81cb557cd2938345130488",
+    "tested_state": "base commit plus the uncommitted source patch; the resulting tracked bytes are committed as f9ee8613dff75df1058ee2df228ac9f84afedc8f",
+    "final_commit": "f9ee8613dff75df1058ee2df228ac9f84afedc8f",
+    "file": "crates/litchi-cfb/src/writer/sequential.rs",
+    "file_sha256": "c41bb4b3007f2b7fe9b80f777040929884c6cf88df760a3de769e8d2248318eb"
+  },
+  "lock": {
+    "file": "Cargo.lock",
+    "bytes": 139606,
+    "sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1"
+  },
+  "environment": {
+    "cargo": "/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo",
+    "offline": true,
+    "locked": true,
+    "cargo_build_jobs": 1,
+    "rust_test_threads": 1,
+    "memory_cap": "20G",
+    "target": "/home/zhuhe/code/litchi-worktrees/.coord/cfb-sequential-error-layout/target",
+    "target_du_sb_bytes_after": 1024944765,
+    "target_regular_file_bytes_after": 1182800909
+  },
+  "commands": [
+    {
+      "name": "fmt",
+      "argv": ["cargo", "fmt", "--all", "--check"],
+      "exit_code": 0,
+      "stdout_log": null,
+      "stdout_log_sha256": null,
+      "stdout_log_bytes": null
+    },
+    {
+      "name": "cfb_tests",
+      "argv": ["cargo", "test", "--offline", "--locked", "-p", "litchi-cfb", "--lib", "--tests"],
+      "exit_code": 0,
+      "unit_tests": 496,
+      "integration_tests": {
+        "range_lock": 2,
+        "sector_layout_corpus": 7,
+        "sector_layout_metadata": 6,
+        "sector_layout_smoke": 11,
+        "sequential_writer": 16,
+        "writer_emission_order": 5,
+        "writer_storage_determinism": 6,
+        "writer_storage_move": 6
+      },
+      "stdout_log": null,
+      "stdout_log_sha256": null,
+      "stdout_log_bytes": null
+    },
+    {
+      "name": "cfb_clippy",
+      "argv": ["cargo", "clippy", "--offline", "--locked", "-p", "litchi-cfb", "--all-targets", "--all-features", "--", "-D", "warnings"],
+      "exit_code": 0,
+      "stdout_log": null,
+      "stdout_log_sha256": null,
+      "stdout_log_bytes": null
+    },
+    {
+      "name": "legacy_consumers_check",
+      "argv": ["cargo", "check", "--offline", "--locked", "-p", "litchi-doc", "-p", "litchi-xls", "-p", "litchi-ppt", "--all-targets", "--all-features"],
+      "exit_code": 0,
+      "stdout_log": null,
+      "stdout_log_sha256": null,
+      "stdout_log_bytes": null
+    },
+    {
+      "name": "legacy_consumers_clippy",
+      "argv": ["cargo", "clippy", "--offline", "--locked", "-p", "litchi-doc", "-p", "litchi-xls", "-p", "litchi-ppt", "--all-targets", "--all-features", "--", "-D", "warnings"],
+      "exit_code": 0,
+      "stdout_log": null,
+      "stdout_log_sha256": null,
+      "stdout_log_bytes": null
+    }
+  ],
+  "log_capture": {
+    "captured": false,
+    "reason": "The validation commands wrote to the interactive terminal; no redirected command logs were created.",
+    "uncaptured_fields": ["path", "sha256", "bytes", "timestamps"]
+  },
+  "claims": {
+    "abba": false,
+    "performance_acceptance": false
+  }
+}

@@ -1,12 +1,12 @@
 //! Typed, inert ODF drawing fill-image resources.
 
+use crate::core::{ResolvedReader, XmlStreamLimits};
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
-use quick_xml::reader::NsReader;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::str::FromStr;
@@ -15,7 +15,6 @@ const OFFICE_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const DRAW_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
 const SVG_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0";
 const XLINK_NS: &[u8] = b"http://www.w3.org/1999/xlink";
-const MAX_XML_BYTES: usize = 64 * 1_048_576;
 const MAX_DEPTH: usize = 256;
 const MAX_IMAGES: usize = 65_536;
 const MAX_VALUE_BYTES: usize = 65_536;
@@ -364,14 +363,14 @@ type Attributes = HashMap<(NamespaceKind, String), String>;
 ///
 /// Returns an error if the XML is malformed, uses invalid namespaced content,
 /// or violates a fill-image resource bound.
-pub fn parse_drawing_fill_images(xml: &str) -> Result<Collection> {
+pub fn parse_drawing_fill_images(
+    xml: &str,
+    limits: XmlStreamLimits,
+) -> std::result::Result<Collection, crate::Error> {
+    let mut reader = ResolvedReader::from_xml(xml, limits)?;
     if !xml.contains("fill-image") {
         return Ok(Collection::default());
     }
-    if xml.len() > MAX_XML_BYTES {
-        return invalid("drawing fill-image XML exceeds 64 MiB");
-    }
-    let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
     let mut stack = Vec::<Frame>::new();
@@ -381,9 +380,7 @@ pub fn parse_drawing_fill_images(xml: &str) -> Result<Collection> {
     let mut inline_total = 0usize;
 
     loop {
-        let (resolved, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(|error| make_error(format!("invalid drawing fill-image XML: {error}")))?;
+        let (resolved, event) = reader.read_resolved_event_into(&mut buffer)?;
         let namespace = namespace_kind(&resolved)?;
         match event {
             Event::Start(ref element) => {
@@ -395,10 +392,12 @@ pub fn parse_drawing_fill_images(xml: &str) -> Result<Collection> {
                         || local != "binary-data"
                         || stack.len() != fill.parent_depth + 1
                     {
-                        return invalid("draw:fill-image contains an unsupported child element");
+                        return invalid_odf(
+                            "draw:fill-image contains an unsupported child element",
+                        );
                     }
                     if fill.binary_present || element.attributes().next().is_some() {
-                        return invalid("invalid or duplicate office:binary-data element");
+                        return invalid_odf("invalid or duplicate office:binary-data element");
                     }
                     fill.binary_present = true;
                     fill.binary_parent_depth = Some(stack.len());
@@ -414,7 +413,7 @@ pub fn parse_drawing_fill_images(xml: &str) -> Result<Collection> {
                 }
                 stack.push(Frame { namespace, local });
                 if stack.len() > MAX_DEPTH {
-                    return invalid(format!("fill-image XML exceeds {MAX_DEPTH} levels"));
+                    return invalid_odf(format!("fill-image XML exceeds {MAX_DEPTH} levels"));
                 }
             },
             Event::Empty(ref element) => {
@@ -428,7 +427,9 @@ pub fn parse_drawing_fill_images(xml: &str) -> Result<Collection> {
                         || fill.binary_present
                         || element.attributes().next().is_some()
                     {
-                        return invalid("draw:fill-image contains an unsupported child element");
+                        return invalid_odf(
+                            "draw:fill-image contains an unsupported child element",
+                        );
                     }
                     fill.binary_present = true;
                 } else if namespace == NamespaceKind::Draw && local == "fill-image" {
@@ -446,7 +447,7 @@ pub fn parse_drawing_fill_images(xml: &str) -> Result<Collection> {
                     && fill.binary_parent_depth == Some(stack.len())
                 {
                     if frame.namespace != NamespaceKind::Office || frame.local != "binary-data" {
-                        return invalid("unexpected office:binary-data end element");
+                        return invalid_odf("unexpected office:binary-data end element");
                     }
                     fill.binary_parent_depth = None;
                 } else if active
@@ -454,7 +455,7 @@ pub fn parse_drawing_fill_images(xml: &str) -> Result<Collection> {
                     .is_some_and(|fill| fill.parent_depth == stack.len())
                 {
                     if frame.namespace != NamespaceKind::Draw || frame.local != "fill-image" {
-                        return invalid("unexpected draw:fill-image end element");
+                        return invalid_odf("unexpected draw:fill-image end element");
                     }
                     let fill = active.take().ok_or_else(|| {
                         make_error("drawing fill-image ended without an active definition")
@@ -476,7 +477,7 @@ pub fn parse_drawing_fill_images(xml: &str) -> Result<Collection> {
                     })?;
                     append_base64(fill, &value, &mut aggregate)?;
                 } else if !value.chars().all(char::is_whitespace) {
-                    return invalid("draw:fill-image may contain only office:binary-data");
+                    return invalid_odf("draw:fill-image may contain only office:binary-data");
                 }
             },
             Event::CData(ref cdata)
@@ -494,10 +495,12 @@ pub fn parse_drawing_fill_images(xml: &str) -> Result<Collection> {
                 append_base64(fill, &value, &mut aggregate)?;
             },
             Event::CData(_) | Event::GeneralRef(_) if active.is_some() => {
-                return invalid("draw:fill-image contains unsupported character data");
+                return invalid_odf("draw:fill-image contains unsupported character data");
             },
             Event::DocType(_) | Event::PI(_) => {
-                return invalid("DTDs and processing instructions are prohibited in fill images");
+                return invalid_odf(
+                    "DTDs and processing instructions are prohibited in fill images",
+                );
             },
             Event::Eof => break,
             Event::Text(_)
@@ -509,14 +512,14 @@ pub fn parse_drawing_fill_images(xml: &str) -> Result<Collection> {
         buffer.clear();
     }
     if !stack.is_empty() || active.is_some() {
-        return invalid("unterminated drawing fill-image XML");
+        return invalid_odf("unterminated drawing fill-image XML");
     }
     result.validate()?;
     Ok(result)
 }
 
 fn parse_fill_start(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     parent_depth: usize,
     aggregate: &mut usize,
@@ -628,7 +631,7 @@ fn append_base64(fill: &mut FillBuilder, value: &str, aggregate: &mut usize) -> 
 }
 
 fn attributes(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     aggregate: &mut usize,
 ) -> Result<Attributes> {
@@ -894,6 +897,10 @@ fn decode(value: &[u8], what: &str) -> Result<String> {
 
 fn invalid<T>(message: impl Into<String>) -> Result<T> {
     Err(make_error(message))
+}
+
+fn invalid_odf<T>(message: impl Into<String>) -> std::result::Result<T, crate::Error> {
+    Err(crate::Error::from(make_error(message)))
 }
 
 fn make_error(message: impl Into<String>) -> Error {

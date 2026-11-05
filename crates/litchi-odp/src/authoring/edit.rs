@@ -3,11 +3,20 @@
 use super::mutable::MutablePresentation;
 use crate::core::OwnedPackage;
 use crate::{Presentation, Reference, Shape, Slide};
-use litchi_core::{Error, Result};
+use litchi_core::{Error as CoreError, Result as CoreResult};
+/// The family error of package-level verbs, [`Edit::commit`] and
+/// [`Package::apply`]: typed limits plus the common-core payload.
+pub use litchi_odf_common::Error as PackageError;
+
+type FamilyResult<T> = Result<T, PackageError>;
+pub use litchi_odf_common::{LimitKind, OpenOptions};
+use quick_xml::events::Event;
+use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::reader::NsReader;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use xml_minifier::audit;
 
 const MAX_PACKAGE_BYTES: usize = 128 * 1024 * 1024;
@@ -20,6 +29,7 @@ const DURABLE_PATCH_VERSION: u16 = 1;
 const DURABLE_HISTORY_MAGIC: &[u8; 16] = b"LITCHI-ODP-HIST\0";
 const DURABLE_HISTORY_VERSION: u16 = 1;
 const MAX_DURABLE_HISTORY_BYTES: usize = 512 * 1024 * 1024;
+const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 
 /// Semantic dependency domain touched by a root package patch.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -111,6 +121,21 @@ pub enum CryptoRefusal {
     EncryptionAuthoringUnavailable,
     /// Password opening must occur through the ordinary password-aware read facade.
     UsePasswordOpening,
+}
+
+impl CryptoRefusal {
+    /// The refusal class litchi-ops reports for this reason (record 0351
+    /// §2.4): the editor does not implement the lifecycle operation.
+    #[must_use]
+    pub const fn kind(self) -> litchi_core::edit::RefusalKind {
+        match self {
+            Self::SignatureVerificationUnavailable
+            | Self::SignatureAuthoringUnavailable
+            | Self::SignatureRemovalUnavailable
+            | Self::EncryptionAuthoringUnavailable
+            | Self::UsePasswordOpening => litchi_core::edit::RefusalKind::UnsupportedOperation,
+        }
+    }
 }
 
 /// Typed availability result for one cryptographic lifecycle operation.
@@ -216,9 +241,16 @@ impl CryptoCapability {
     }
 }
 
-/// An immutable presentation package and its parsed slide projection.
+/// The immutable owner of one packaged ODP artifact.
+///
+/// `Package` owns every state verb: ingress (`open*`, `from_bytes*`,
+/// `from_reader*`), the primary [`Edit`] transaction, patch application and
+/// output (`save`, `save_with_durability`, `to_bytes`, `write_to`). It is
+/// cheap to clone; clones share the exact bytes, the validated archive index
+/// and the [`Presentation`] projection. A commit publishes a new package and
+/// never mutates its source.
 #[derive(Clone)]
-pub struct Snapshot {
+pub struct Package {
     bytes: Arc<Vec<u8>>,
     /// The validated physical package retained with this immutable snapshot.
     ///
@@ -228,35 +260,271 @@ pub struct Snapshot {
     /// same bytes. The separate byte owner remains authoritative for exact
     /// lineage and patch source checks.
     package: OwnedPackage,
+    /// The read-only projection of exactly these bytes, parsed at open or,
+    /// for a freshly built package, on first use. For a password-opened
+    /// package it retains the credential needed to read encrypted parts;
+    /// `package` never does.
+    presentation: Arc<OnceLock<Presentation>>,
+    /// The bounded slide projection used by edits, parsed on first use.
+    editing: Arc<OnceLock<Editing>>,
+}
+
+struct Editing {
     resource_bytes: usize,
     slides: Arc<[Slide]>,
 }
 
-impl Snapshot {
-    /// Open an ODP editing snapshot from a path.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the file cannot be read or is not a bounded valid ODP package.
-    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_bytes(read_bounded(path.as_ref(), MAX_PACKAGE_BYTES)?)
+impl std::fmt::Debug for Package {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Package")
+            .field("bytes", &self.bytes.len())
+            .finish_non_exhaustive()
+    }
+}
+
+impl Package {
+    /// The retained physical package (metadata transactions, record 0288).
+    pub(crate) const fn owned_package(&self) -> &OwnedPackage {
+        &self.package
     }
 
-    /// Parse owned ODP package bytes into a source-bound snapshot.
+    /// Create the minimal valid presentation (no slides).
     ///
     /// # Errors
     ///
-    /// Returns an error for an oversized, malformed, or non-ODP package.
-    /// Signed and encrypted packages can be inspected but have a read-only
-    /// [`SecurityPolicy`] and cannot start a transaction.
-    pub fn from_bytes(source_bytes: Vec<u8>) -> Result<Self> {
-        if source_bytes.len() > MAX_PACKAGE_BYTES {
-            return invalid("ODP editing package exceeds the 128 MiB limit");
+    /// Returns an error only when the fixed minimal package cannot be built.
+    pub fn new() -> Result<Self, PackageError> {
+        crate::Builder::new().build()
+    }
+
+    /// Open an ODP package from a path with the default [`OpenOptions`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PackageError::Limit`] when a source dimension is exceeded and
+    /// [`PackageError::Core`] for I/O, archive or family-validation failures.
+    pub fn open(path: impl AsRef<Path>) -> Result<Self, PackageError> {
+        Self::open_with_options(path, OpenOptions::new())
+    }
+
+    /// Open an ODP package from a path under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn open_with_options(
+        path: impl AsRef<Path>,
+        options: OpenOptions,
+    ) -> Result<Self, PackageError> {
+        Self::from_reader_with_options(File::open(path)?, options)
+    }
+
+    /// Open a password-encrypted ODP package from a path.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn open_with_password(
+        path: impl AsRef<Path>,
+        password: impl Into<String>,
+    ) -> Result<Self, PackageError> {
+        Self::open_with_password_and_options(path, password, OpenOptions::new())
+    }
+
+    /// Open a password-encrypted ODP package under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn open_with_password_and_options(
+        path: impl AsRef<Path>,
+        password: impl Into<String>,
+        options: OpenOptions,
+    ) -> Result<Self, PackageError> {
+        let password = zeroize::Zeroizing::new(password.into());
+        let package = OwnedPackage::from_reader_with_password_and_options(
+            File::open(path)?,
+            password.as_str(),
+            options,
+        )?;
+        Self::from_opened(package, options)
+    }
+
+    /// Open an ODP package from bytes (the bytes are copied).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, PackageError> {
+        Self::from_bytes_with_options(bytes, OpenOptions::new())
+    }
+
+    /// Open an ODP package from bytes under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_bytes_with_options(
+        bytes: &[u8],
+        options: OpenOptions,
+    ) -> Result<Self, PackageError> {
+        let limits = options.source_limits_value();
+        check_input_bytes(bytes.len(), limits)?;
+        let package = OwnedPackage::from_bytes_with_options(
+            copy_input(bytes)?,
+            OpenOptions::new().source_limits(limits),
+        )?;
+        Self::from_opened(package, options)
+    }
+
+    /// Open a password-encrypted ODP package from bytes.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_bytes_with_password(
+        bytes: &[u8],
+        password: impl Into<String>,
+    ) -> Result<Self, PackageError> {
+        Self::from_bytes_with_password_and_options(bytes, password, OpenOptions::new())
+    }
+
+    /// Open a password-encrypted ODP package from bytes under
+    /// caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_bytes_with_password_and_options(
+        bytes: &[u8],
+        password: impl Into<String>,
+        options: OpenOptions,
+    ) -> Result<Self, PackageError> {
+        let password = zeroize::Zeroizing::new(password.into());
+        let limits = options.source_limits_value();
+        check_input_bytes(bytes.len(), limits)?;
+        let package = OwnedPackage::from_bytes_with_password_and_options(
+            copy_input(bytes)?,
+            password.as_str(),
+            OpenOptions::new().source_limits(limits),
+        )?;
+        Self::from_opened(package, options)
+    }
+
+    /// Open an ODP package from a reader with the default [`OpenOptions`].
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_reader(reader: impl Read) -> Result<Self, PackageError> {
+        Self::from_reader_with_options(reader, OpenOptions::new())
+    }
+
+    /// Open an ODP package from a reader under caller-selected limits. The
+    /// reader is consumed through an input-limit guard before indexing.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_reader_with_options(
+        reader: impl Read,
+        options: OpenOptions,
+    ) -> Result<Self, PackageError> {
+        let package = OwnedPackage::from_reader_with_options(reader, options)?;
+        Self::from_opened(package, options)
+    }
+
+    /// Adopt a packaged ODF result prepared by smart detection, reusing its
+    /// validated archive index.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::UnexpectedFormat`] (as [`PackageError::Core`]) when
+    /// the prepared package is another family.
+    pub fn from_prepared_package(
+        prepared: litchi_odf_common::PreparedPackage,
+    ) -> Result<Self, PackageError> {
+        Self::from_prepared_package_with_options(prepared, OpenOptions::new())
+    }
+
+    /// Adopt a prepared package under the semantic limits in `options`.
+    /// Its source limits were applied when the archive was prepared.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::from_prepared_package`], plus a typed semantic limit failure.
+    pub fn from_prepared_package_with_options(
+        prepared: litchi_odf_common::PreparedPackage,
+        options: OpenOptions,
+    ) -> Result<Self, PackageError> {
+        if prepared.format() != litchi_core::FileFormat::Odp {
+            return Err(CoreError::UnexpectedFormat {
+                detected: prepared.format(),
+            }
+            .into());
         }
-        Self::from_shared_bytes(Arc::new(source_bytes))
+        Self::from_opened(prepared.into_package(), options)
     }
 
-    pub(crate) fn from_shared_bytes(bytes: Arc<Vec<u8>>) -> Result<Self> {
+    fn from_opened(package: OwnedPackage, options: OpenOptions) -> Result<Self, PackageError> {
+        let semantic = options.semantic_limits_value();
+        if !semantic.is_default() {
+            if let Some(size) = package.package()?.member_materialized_size("content.xml")? {
+                semantic.check(litchi_odf_common::SemanticLimitKind::ContentBytes, size)?;
+            }
+            if let Some(size) = package.package()?.member_materialized_size("styles.xml")? {
+                semantic.check(litchi_odf_common::SemanticLimitKind::StylesBytes, size)?;
+            }
+        }
+        let presentation = Presentation::from_owned_package(package)?;
+        if !semantic.is_default() {
+            let slides = u64::try_from(presentation.slide_count()?).unwrap_or(u64::MAX);
+            semantic.check(litchi_odf_common::SemanticLimitKind::Units, slides)?;
+        }
+        Ok(Self::from_presentation(presentation))
+    }
+
+    /// Adopt a parsed projection; the package shares its exact bytes.
+    pub(crate) fn from_presentation(presentation: Presentation) -> Self {
+        let package = presentation.owned_package().clone_without_password();
+        Self {
+            bytes: package.shared_bytes(),
+            package,
+            presentation: Arc::new(OnceLock::from(presentation)),
+            editing: Arc::new(OnceLock::new()),
+        }
+    }
+
+    /// Adopt complete bytes written by the crate's own authoring codecs. The
+    /// archive is indexed and validated now; the projection is decoded on
+    /// the first [`Self::presentation`] call and the bounded slide
+    /// projection on the first edit.
+    pub(crate) fn from_authored(bytes: Vec<u8>) -> CoreResult<Self> {
+        let package = OwnedPackage::from_bytes(bytes)?;
+        Ok(Self {
+            bytes: package.shared_bytes(),
+            package,
+            presentation: Arc::new(OnceLock::new()),
+            editing: Arc::new(OnceLock::new()),
+        })
+    }
+
+    /// The parsed projection, decoded on first use.
+    fn projection(&self) -> CoreResult<&Presentation> {
+        if let Some(presentation) = self.presentation.get() {
+            return Ok(presentation);
+        }
+        let presentation = Presentation::from_owned_package(self.package.clone())?;
+        Ok(self.presentation.get_or_init(|| presentation))
+    }
+
+    /// Reopen complete bytes produced inside the crate.
+    pub(crate) fn from_vec(bytes: Vec<u8>) -> CoreResult<Self> {
+        Self::from_shared_bytes(Arc::new(bytes))
+    }
+
+    pub(crate) fn from_shared_bytes(bytes: Arc<Vec<u8>>) -> CoreResult<Self> {
         if bytes.len() > MAX_PACKAGE_BYTES {
             return invalid("ODP editing package exceeds the 128 MiB limit");
         }
@@ -264,37 +532,123 @@ impl Snapshot {
         Self::from_owned_package(package)
     }
 
-    pub(crate) fn from_owned_package(package: OwnedPackage) -> Result<Self> {
+    /// Validate a candidate package and its bounded slide projection, as
+    /// commit and patch decoding require.
+    pub(crate) fn from_owned_package(package: OwnedPackage) -> CoreResult<Self> {
         validate_package_size(package.as_bytes().len())?;
         let presentation = Presentation::from_owned_package(package)?;
-        let slides = presentation.slides()?;
-        if slides.len() > MAX_SLIDES {
-            return invalid("ODP editing snapshot exceeds the slide-count limit");
+        let editing = editing_projection(&presentation)?;
+        let owner = Self::from_presentation(presentation);
+        let _ = owner.editing.set(editing);
+        Ok(owner)
+    }
+
+    /// The bounded slide projection, parsed and checked on first use.
+    fn editing(&self) -> CoreResult<&Editing> {
+        if let Some(editing) = self.editing.get() {
+            return Ok(editing);
         }
-        let resource_bytes = slides_resource(&slides)?;
-        if resource_bytes > MAX_DRAFT_BYTES {
-            return invalid("ODP editing snapshot exceeds the aggregate draft limit");
+        validate_package_size(self.bytes.len())?;
+        let editing = editing_projection(self.projection()?)?;
+        Ok(self.editing.get_or_init(|| editing))
+    }
+
+    /// The owned read-only projection of this package (one reference-count
+    /// increment).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a freshly built package's projection cannot be
+    /// decoded; an opened package was decoded at open.
+    pub fn presentation(&self) -> FamilyResult<Presentation> {
+        Ok(self.projection()?.clone())
+    }
+
+    /// Repairs tolerated while this package was opened.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
+        match self.presentation.get() {
+            Some(presentation) => presentation.tolerance_report(),
+            None => self.package.tolerance_report(),
         }
-        let package = presentation.owned_package().clone_without_password();
-        let bytes = package.shared_bytes();
-        Ok(Self {
-            bytes,
-            package,
-            resource_bytes,
-            slides: Arc::from(slides),
-        })
     }
 
     /// Borrow the exact source package bytes.
     #[must_use]
-    pub fn bytes(&self) -> &[u8] {
+    pub fn as_bytes(&self) -> &[u8] {
         self.bytes.as_slice()
     }
 
-    /// Borrow the immutable parsed slide projection.
-    #[must_use]
-    pub fn slides(&self) -> &[Slide] {
-        &self.slides
+    /// The bounded slide projection used by edits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package exceeds the editing slide-count or
+    /// aggregate draft limits.
+    pub fn slides(&self) -> FamilyResult<&[Slide]> {
+        Ok(&self.editing()?.slides)
+    }
+
+    /// Apply a primary-transaction patch to this exact package.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PackageError::PatchConflict`] when this package is not
+    /// byte-identical to the patch source, or an error when its
+    /// signature/encryption policy makes it read-only.
+    pub fn apply(&self, patch: &Patch) -> Result<Commit, PackageError> {
+        if !same_source(&patch.before, self) {
+            return Err(PackageError::patch_conflict(
+                "odp.apply",
+                "the package is not the patch source",
+            ));
+        }
+        Ok(Commit::replayed(patch.apply(self)?, patch.clone()))
+    }
+
+    /// Atomically replace `path` with this package (full durability).
+    ///
+    /// The artifact is staged in a sibling temporary file and published with
+    /// one rename; a failure before publication leaves the destination
+    /// unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PackageError::Core`] carrying the I/O failure.
+    pub fn save(&self, path: impl AsRef<Path>) -> Result<(), PackageError> {
+        self.save_with_durability(path, litchi_core::Durability::Full)
+    }
+
+    /// Atomically replace `path` with this package under explicit durability.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::save`].
+    pub fn save_with_durability(
+        &self,
+        path: impl AsRef<Path>,
+        durability: litchi_core::Durability,
+    ) -> Result<(), PackageError> {
+        litchi_odf_common::publish::save_bytes(path.as_ref(), self.as_bytes(), durability)
+    }
+
+    /// Copy the exact package bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an allocation failure.
+    pub fn to_bytes(&self) -> Result<Vec<u8>, PackageError> {
+        Ok(copy_input(self.as_bytes())?)
+    }
+
+    /// Write the exact package bytes to a stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns the stream's I/O failure.
+    pub fn write_to(&self, mut writer: impl std::io::Write) -> Result<(), PackageError> {
+        writer.write_all(self.as_bytes())?;
+        Ok(())
     }
 
     /// Inspect the package mutation policy without staging an edit.
@@ -302,8 +656,8 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error when the retained package cannot be reopened.
-    pub fn security_policy(&self) -> Result<SecurityPolicy> {
-        package_security_policy(&self.package)
+    pub fn security_policy(&self) -> FamilyResult<SecurityPolicy> {
+        package_security_policy(&self.package).map_err(PackageError::from)
     }
 
     /// Resolve one crypto lifecycle request without mutating the package.
@@ -315,7 +669,7 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error when the retained package cannot be reopened.
-    pub fn crypto_capability(&self, operation: CryptoOperation) -> Result<CryptoCapability> {
+    pub fn crypto_capability(&self, operation: CryptoOperation) -> FamilyResult<CryptoCapability> {
         let policy = self.security_policy()?;
         Ok(match operation {
             CryptoOperation::VerifySignatures => {
@@ -354,13 +708,13 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error for malformed, ambiguous, or oversized content owners.
-    pub fn rich_content(&self) -> Result<crate::content::Inventory> {
-        crate::content::inventory(&self.package)
+    pub fn rich_content(&self) -> FamilyResult<crate::content::Inventory> {
+        crate::content::inventory(&self.package).map_err(PackageError::from)
     }
 
     /// Inspect typed drawing-layer declarations without eagerly materializing
     /// them during snapshot opening.
-    pub fn layers(&self) -> Result<crate::model::LayerInventory> {
+    pub fn layers(&self) -> FamilyResult<crate::model::LayerInventory> {
         let content = String::from_utf8(self.package.get_file("content.xml")?)
             .map_err(|error| invalid_error(format!("ODP content.xml is not UTF-8: {error}")))?;
         let styles = if self.package.has_file("styles.xml")? {
@@ -372,7 +726,7 @@ impl Snapshot {
         } else {
             None
         };
-        crate::model::layer::inventory(&content, styles.as_deref())
+        crate::model::layer::inventory(&content, styles.as_deref()).map_err(PackageError::from)
     }
 
     /// Select a slide by checked zero-based position or exact title.
@@ -380,29 +734,39 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error when a title matches more than one slide.
-    pub fn slide<'a, S>(&self, selector: S) -> Result<Option<&Slide>>
+    pub fn slide<'a, S>(&self, selector: S) -> FamilyResult<Option<&Slide>>
     where
         S: Into<Selector<'a>>,
     {
-        select(&self.slides, selector.into())
-            .map(|selected| selected.map(|position| &self.slides[position]))
+        let slides = &self.editing()?.slides;
+        select(slides, selector.into())
+            .map(|selected| selected.map(|position| &slides[position]))
+            .map_err(PackageError::from)
     }
 
     /// Start an isolated transaction over a detached staging engine.
     ///
     /// # Errors
     ///
-    /// Returns an error when the exact source package cannot be reparsed for staging or
-    /// its signature/encryption policy makes it read-only.
-    pub fn transaction(&self) -> Result<Transaction> {
-        let presentation = Presentation::from_owned_package(self.package.clone())?;
-        ensure_editable_source(presentation.owned_package())?;
-        Ok(Transaction {
+    /// Returns an error when deferred entry admission finds malformed source
+    /// XML or a signature/encryption policy that makes it read-only.  The
+    /// admission check runs on the first fallible operation or commit, not at
+    /// this O(1) constructor.
+    /// Source XML and staging errors are deferred until the first fallible
+    /// transaction operation or [`Edit::commit`].
+    pub fn edit(&self) -> Result<Edit, PackageError> {
+        Ok(self.edit_core()?)
+    }
+
+    pub(crate) fn edit_core(&self) -> CoreResult<Edit> {
+        // The security census walks the manifest and archive members, so it
+        // is part of deferred entry admission rather than this O(1) handle
+        // construction.  The semantic projection and mutable staging are
+        // likewise deferred until the first operation that needs them.
+        Ok(Edit {
             source: self.clone(),
-            draft: MutablePresentation::from_presentation_with_validated_slides(
-                &presentation,
-                &self.slides,
-            )?,
+            draft: None,
+            entry_validated: OnceLock::new(),
             changed: false,
             rdf: None,
             charts: None,
@@ -411,23 +775,14 @@ impl Snapshot {
             content: None,
             layer_operations: Vec::new(),
             media_bytes: 0,
-            resource_bytes: self.resource_bytes,
-            source_resource_bytes: self.resource_bytes,
+            resource_bytes: 0,
+            source_resource_bytes: 0,
             non_media_changed: false,
             media_changed: false,
             slide_order_changed: false,
             dependency_free_slide_copy_changed: false,
             dependency_free_slide_removal_changed: false,
         })
-    }
-
-    /// Materialize this snapshot as the ordinary read facade.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the retained package can no longer be parsed.
-    pub fn to_presentation(&self) -> Result<Presentation> {
-        Presentation::from_owned_package(self.package.clone())
     }
 
     /// Return the identity of the validated archive index retained by this
@@ -473,9 +828,10 @@ impl<'a> From<&'a str> for Selector<'a> {
 }
 
 /// An isolated mutable draft that cannot alter its source snapshot.
-pub struct Transaction {
-    source: Snapshot,
-    draft: MutablePresentation,
+pub struct Edit {
+    source: Package,
+    draft: Option<MutablePresentation>,
+    entry_validated: OnceLock<()>,
     changed: bool,
     rdf: Option<RdfDraft>,
     charts: Option<ChartDraft>,
@@ -626,6 +982,8 @@ enum DesignOperation {
         slide_index: usize,
         name: Option<String>,
     },
+    SetHandout(crate::handout_master::Master),
+    RemoveHandout,
 }
 
 struct DesignDraft {
@@ -636,6 +994,8 @@ struct DesignDraft {
     masters: Vec<crate::MasterPage>,
     original_pages: crate::page::Collection,
     pages: crate::page::Collection,
+    original_handout: Option<crate::handout_master::Master>,
+    handout: Option<crate::handout_master::Master>,
     operations: Vec<DesignOperation>,
 }
 
@@ -667,20 +1027,73 @@ struct ContentDraft {
     operations: Vec<crate::content::Operation>,
 }
 
-impl Transaction {
+impl Edit {
     /// Borrow the current staged slide projection.
-    #[must_use]
-    pub fn slides(&self) -> &[Slide] {
-        self.draft.slides()
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the deferred source slide projection cannot be
+    /// materialized under the editing limits or the source fails edit-entry
+    /// admission.
+    pub fn slides(&self) -> FamilyResult<&[Slide]> {
+        self.ensure_entry().map_err(PackageError::from)?;
+        match self.draft.as_ref() {
+            Some(draft) => Ok(draft.slides()),
+            None => self.source.slides(),
+        }
+    }
+
+    fn ensure_entry(&self) -> CoreResult<()> {
+        if self.entry_validated.get().is_some() {
+            return Ok(());
+        }
+        // Preserve the edit-boundary admission order: security policy was
+        // historically checked before semantic XML validation. Both are
+        // deferred now, and success is cached only after both pass.
+        ensure_editable_source(&self.source.package)?;
+        let presentation = self.source.projection()?;
+        validate_edit_entry(presentation)?;
+        let _ = self.entry_validated.set(());
+        Ok(())
+    }
+
+    fn ensure_draft(&mut self) -> CoreResult<()> {
+        self.ensure_entry()?;
+        if self.draft.is_some() {
+            return Ok(());
+        }
+        let presentation = self.source.projection()?.clone();
+        let editing = self.source.editing()?;
+        let resource_bytes = editing.resource_bytes;
+        let slides = Arc::clone(&editing.slides);
+        let draft =
+            MutablePresentation::from_presentation_with_validated_slides(&presentation, &slides)?;
+        self.resource_bytes = resource_bytes;
+        self.source_resource_bytes = resource_bytes;
+        self.draft = Some(draft);
+        Ok(())
+    }
+
+    fn draft_ref(&self) -> &MutablePresentation {
+        self.draft
+            .as_ref()
+            .expect("ODP mutable draft initialized before access")
+    }
+
+    fn draft_mut(&mut self) -> &mut MutablePresentation {
+        self.draft
+            .as_mut()
+            .expect("ODP mutable draft initialized before access")
     }
 
     /// Inspect drawing-layer declarations in the current transaction draft.
     ///
     /// The inventory is rebuilt from the source-bound XML after replaying the
     /// staged layer operations.  Unknown XML remains outside this typed view.
-    pub fn layers(&self) -> Result<crate::model::LayerInventory> {
+    pub fn layers(&self) -> FamilyResult<crate::model::LayerInventory> {
+        self.ensure_entry().map_err(PackageError::from)?;
         let package = self.layer_package()?;
-        crate::authoring::layer::inventory(&package)
+        crate::authoring::layer::inventory(&package).map_err(PackageError::from)
     }
 
     /// Add a drawing layer to a selected global, page-local, or master-page
@@ -689,17 +1102,18 @@ impl Transaction {
         &mut self,
         owner: crate::model::LayerOwner,
         layer: crate::model::Layer,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         self.stage_layer(crate::authoring::layer::Operation::Add { owner, layer })
+            .map_err(PackageError::from)
     }
 
     /// Add a global layer declared in `office:master-styles`.
-    pub fn add_global_layer(&mut self, layer: crate::model::Layer) -> Result<()> {
+    pub fn add_global_layer(&mut self, layer: crate::model::Layer) -> FamilyResult<()> {
         self.add_layer(crate::model::LayerOwner::master_styles(), layer)
     }
 
     /// Add a layer declared directly by a presentation page.
-    pub fn add_page_layer(&mut self, page: usize, layer: crate::model::Layer) -> Result<()> {
+    pub fn add_page_layer(&mut self, page: usize, layer: crate::model::Layer) -> FamilyResult<()> {
         self.add_layer(crate::model::LayerOwner::page(page), layer)
     }
 
@@ -708,7 +1122,7 @@ impl Transaction {
         &mut self,
         master_page: impl Into<String>,
         layer: crate::model::Layer,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         self.add_layer(crate::model::LayerOwner::master_page(master_page), layer)
     }
 
@@ -718,21 +1132,22 @@ impl Transaction {
         owner: crate::model::LayerOwner,
         from: &str,
         to: &str,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         self.stage_layer(crate::authoring::layer::Operation::Rename {
             owner,
             from: from.to_owned(),
             to: to.to_owned(),
         })
+        .map_err(PackageError::from)
     }
 
     /// Rename a global layer and its resolved shape references.
-    pub fn rename_global_layer(&mut self, from: &str, to: &str) -> Result<()> {
+    pub fn rename_global_layer(&mut self, from: &str, to: &str) -> FamilyResult<()> {
         self.rename_layer(crate::model::LayerOwner::master_styles(), from, to)
     }
 
     /// Rename a page-local layer and its resolved shape references.
-    pub fn rename_page_layer(&mut self, page: usize, from: &str, to: &str) -> Result<()> {
+    pub fn rename_page_layer(&mut self, page: usize, from: &str, to: &str) -> FamilyResult<()> {
         self.rename_layer(crate::model::LayerOwner::page(page), from, to)
     }
 
@@ -742,7 +1157,7 @@ impl Transaction {
         master_page: impl Into<String>,
         from: &str,
         to: &str,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         self.rename_layer(crate::model::LayerOwner::master_page(master_page), from, to)
     }
 
@@ -751,7 +1166,7 @@ impl Transaction {
         &mut self,
         owner: crate::model::LayerOwner,
         name: &str,
-    ) -> Result<crate::model::Layer> {
+    ) -> FamilyResult<crate::model::Layer> {
         self.remove_layer_with_replacement(owner, name, None)
     }
 
@@ -762,7 +1177,7 @@ impl Transaction {
         owner: crate::model::LayerOwner,
         name: &str,
         replacement: Option<&str>,
-    ) -> Result<crate::model::Layer> {
+    ) -> FamilyResult<crate::model::Layer> {
         let inventory = self.layers()?;
         let selected = inventory
             .sets()
@@ -781,12 +1196,16 @@ impl Transaction {
     }
 
     /// Remove a global layer without retargeting references.
-    pub fn remove_global_layer(&mut self, name: &str) -> Result<crate::model::Layer> {
+    pub fn remove_global_layer(&mut self, name: &str) -> FamilyResult<crate::model::Layer> {
         self.remove_layer(crate::model::LayerOwner::master_styles(), name)
     }
 
     /// Remove a page-local layer without retargeting references.
-    pub fn remove_page_layer(&mut self, page: usize, name: &str) -> Result<crate::model::Layer> {
+    pub fn remove_page_layer(
+        &mut self,
+        page: usize,
+        name: &str,
+    ) -> FamilyResult<crate::model::Layer> {
         self.remove_layer(crate::model::LayerOwner::page(page), name)
     }
 
@@ -795,7 +1214,7 @@ impl Transaction {
         &mut self,
         master_page: impl Into<String>,
         name: &str,
-    ) -> Result<crate::model::Layer> {
+    ) -> FamilyResult<crate::model::Layer> {
         self.remove_layer(crate::model::LayerOwner::master_page(master_page), name)
     }
 
@@ -812,16 +1231,18 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error for invalid text, exhausted limits, or ambiguous retained bindings.
-    pub fn add(&mut self, title: &str, text: &str) -> Result<()> {
+    pub fn add(&mut self, title: &str, text: &str) -> FamilyResult<()> {
         Self::check_text(title, text)?;
+        self.ensure_draft()?;
         self.check_no_slide_order_change("slide insertion")?;
         self.check_structure_edit()?;
-        if self.draft.slides().len() == MAX_SLIDES {
-            return invalid("ODP transaction exceeds the slide-count limit");
+        if self.draft_ref().slides().len() == MAX_SLIDES {
+            return invalid("ODP transaction exceeds the slide-count limit")
+                .map_err(PackageError::from);
         }
         let candidate = self.resource_candidate(0, text_resource(title, text)?)?;
-        self.draft
-            .insert_slide(self.draft.slides().len(), title, text)?;
+        let index = self.draft_ref().slides().len();
+        self.draft_mut().insert_slide(index, title, text)?;
         self.resource_bytes = candidate;
         self.mark_non_media_changed();
         Ok(())
@@ -833,21 +1254,28 @@ impl Transaction {
     ///
     /// Returns an error for an ambiguous selector, invalid text, exhausted limits, or retained
     /// declarations whose identity closure cannot be updated losslessly.
-    pub fn add_before<'a, S>(&mut self, selector: S, title: &str, text: &str) -> Result<Option<()>>
+    pub fn add_before<'a, S>(
+        &mut self,
+        selector: S,
+        title: &str,
+        text: &str,
+    ) -> FamilyResult<Option<()>>
     where
         S: Into<Selector<'a>>,
     {
         Self::check_text(title, text)?;
+        self.ensure_draft()?;
         self.check_no_slide_order_change("slide insertion")?;
         self.check_structure_edit()?;
-        if self.draft.slides().len() == MAX_SLIDES {
-            return invalid("ODP transaction exceeds the slide-count limit");
+        if self.draft_ref().slides().len() == MAX_SLIDES {
+            return invalid("ODP transaction exceeds the slide-count limit")
+                .map_err(PackageError::from);
         }
-        let Some(index) = select(self.draft.slides(), selector.into())? else {
+        let Some(index) = select(self.draft_ref().slides(), selector.into())? else {
             return Ok(None);
         };
         let candidate = self.resource_candidate(0, text_resource(title, text)?)?;
-        self.draft.insert_slide(index, title, text)?;
+        self.draft_mut().insert_slide(index, title, text)?;
         self.resource_bytes = candidate;
         self.mark_non_media_changed();
         Ok(Some(()))
@@ -861,23 +1289,29 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error for an ambiguous selector, invalid text, or a preservation-only page.
-    pub fn replace<'a, S>(&mut self, selector: S, title: &str, text: &str) -> Result<Option<()>>
+    pub fn replace<'a, S>(
+        &mut self,
+        selector: S,
+        title: &str,
+        text: &str,
+    ) -> FamilyResult<Option<()>>
     where
         S: Into<Selector<'a>>,
     {
         self.check_no_slide_order_change("slide replacement")?;
         Self::check_text(title, text)?;
-        let Some(index) = select(self.draft.slides(), selector.into())? else {
+        self.ensure_draft()?;
+        let Some(index) = select(self.draft_ref().slides(), selector.into())? else {
             return Ok(None);
         };
-        let slide = &self.draft.slides()[index];
+        let slide = &self.draft_ref().slides()[index];
         if slide.title.as_deref() == Some(title) && slide.text == text {
             return Ok(Some(()));
         }
         self.check_slide_rewrite(index)?;
         let removed = slide_primary_text_resource(slide)?;
         let candidate = self.resource_candidate(removed, text_resource(title, text)?)?;
-        self.draft.update_slide(index, title, text)?;
+        self.draft_mut().update_slide(index, title, text)?;
         self.resource_bytes = candidate;
         self.mark_non_media_changed();
         Ok(Some(()))
@@ -888,18 +1322,19 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error for an ambiguous selector or an unresolved page/declaration reference.
-    pub fn remove<'a, S>(&mut self, selector: S) -> Result<Option<Slide>>
+    pub fn remove<'a, S>(&mut self, selector: S) -> FamilyResult<Option<Slide>>
     where
         S: Into<Selector<'a>>,
     {
+        self.ensure_draft()?;
         self.check_no_slide_order_change("slide removal")?;
         self.check_structure_edit()?;
-        let Some(index) = select(self.draft.slides(), selector.into())? else {
+        let Some(index) = select(self.draft_ref().slides(), selector.into())? else {
             return Ok(None);
         };
-        let removed_bytes = slide_resource(&self.draft.slides()[index])?;
+        let removed_bytes = slide_resource(&self.draft_ref().slides()[index])?;
         let candidate = self.resource_candidate(removed_bytes, 0)?;
-        let removed = self.draft.remove_slide(index)?;
+        let removed = self.draft_mut().remove_slide(index)?;
         self.resource_bytes = candidate;
         self.mark_non_media_changed();
         Ok(Some(removed))
@@ -927,35 +1362,41 @@ impl Transaction {
     /// Returns an error for an ambiguous selector, an out-of-range destination,
     /// or a conflicting page-indexed operation. A missing selector returns
     /// `Ok(None)`. Moving to the current position is an exact no-op.
-    pub fn move_slide<'a, S>(&mut self, selector: S, position: SlidePosition) -> Result<Option<()>>
+    pub fn move_slide<'a, S>(
+        &mut self,
+        selector: S,
+        position: SlidePosition,
+    ) -> FamilyResult<Option<()>>
     where
         S: Into<Selector<'a>>,
     {
+        self.ensure_draft()?;
         if self.dependency_free_slide_copy_changed || self.dependency_free_slide_removal_changed {
             return unsupported(
                 "ODP slide move cannot be staged after a dependency-free blank-slide copy or removal",
-            );
+            ).map_err(PackageError::from);
         }
-        let Some(from) = select(self.draft.slides(), selector.into())? else {
+        let Some(from) = select(self.draft_ref().slides(), selector.into())? else {
             return Ok(None);
         };
         let to = match position {
             SlidePosition::First => 0,
-            SlidePosition::Last => self.draft.slides().len() - 1,
-            SlidePosition::Index(index) if index < self.draft.slides().len() => index,
+            SlidePosition::Last => self.draft_ref().slides().len() - 1,
+            SlidePosition::Index(index) if index < self.draft_ref().slides().len() => index,
             SlidePosition::Index(index) => {
                 return invalid(format!(
                     "ODP slide move destination {index} exceeds slide count {}",
-                    self.draft.slides().len()
-                ));
+                    self.draft_ref().slides().len()
+                ))
+                .map_err(PackageError::from);
             },
         };
         if from == to {
             return Ok(Some(()));
         }
         self.check_page_indexed_move_conflict()?;
-        self.draft.check_slide_move_supported()?;
-        self.draft.move_slide(from, to)?;
+        self.draft_mut().check_slide_move_supported()?;
+        self.draft_mut().move_slide(from, to)?;
         self.slide_order_changed = true;
         self.mark_non_media_changed();
         Ok(Some(()))
@@ -982,34 +1423,45 @@ impl Transaction {
     /// page, any dependency-bearing page markup, a read-only source, or an
     /// exhausted slide, name, fragment, draft, or package bound. Refusal leaves
     /// the transaction unchanged.
-    pub fn copy_dependency_free_blank_slide<'a, S>(&mut self, selector: S) -> Result<Option<usize>>
+    pub fn copy_dependency_free_blank_slide<'a, S>(
+        &mut self,
+        selector: S,
+    ) -> FamilyResult<Option<usize>>
     where
         S: Into<Selector<'a>>,
     {
+        self.ensure_draft()?;
         if self.dependency_free_slide_copy_changed {
             return unsupported(
                 "ODP transaction already contains a dependency-free blank-slide copy",
-            );
+            )
+            .map_err(PackageError::from);
         }
         if self.slide_order_changed {
             return unsupported(
                 "ODP dependency-free blank-slide copy cannot be staged after a slide move",
-            );
+            )
+            .map_err(PackageError::from);
         }
-        let Some(index) = select(self.draft.slides(), selector.into())? else {
+        let Some(index) = select(self.draft_ref().slides(), selector.into())? else {
             return Ok(None);
         };
         if self.changed || self.has_page_indexed_operations() {
             return unsupported(
                 "ODP dependency-free blank-slide copy cannot combine with slide or page-indexed operations",
-            );
+            ).map_err(PackageError::from);
         }
-        if self.draft.slides().len() == MAX_SLIDES {
-            return invalid("ODP transaction exceeds the slide-count limit");
+        if self.draft_ref().slides().len() == MAX_SLIDES {
+            return invalid("ODP transaction exceeds the slide-count limit")
+                .map_err(PackageError::from);
         }
-        let copy = self.draft.prepare_dependency_free_blank_slide_copy(index)?;
+        let copy = self
+            .draft_mut()
+            .prepare_dependency_free_blank_slide_copy(index)?;
         let candidate = self.resource_candidate(0, copy.resource_bytes())?;
-        let copied_index = self.draft.apply_dependency_free_blank_slide_copy(copy)?;
+        let copied_index = self
+            .draft_mut()
+            .apply_dependency_free_blank_slide_copy(copy)?;
         self.resource_bytes = candidate;
         self.dependency_free_slide_copy_changed = true;
         self.mark_non_media_changed();
@@ -1038,37 +1490,42 @@ impl Transaction {
     /// read-only source. Refusal leaves the transaction unchanged.
     pub fn transfer_dependency_free_blank_slide_from<'a, S>(
         &mut self,
-        source: &Snapshot,
+        source: &Package,
         selector: S,
-    ) -> Result<Option<usize>>
+    ) -> FamilyResult<Option<usize>>
     where
         S: Into<Selector<'a>>,
     {
+        self.ensure_draft()?;
         if self.dependency_free_slide_copy_changed {
             return unsupported(
                 "ODP transaction already contains a dependency-free blank-slide copy",
-            );
+            )
+            .map_err(PackageError::from);
         }
         if self.slide_order_changed {
             return unsupported(
                 "ODP foreign blank-slide transfer cannot be staged after a slide move",
-            );
+            )
+            .map_err(PackageError::from);
         }
-        let Some(source_index) = select(source.slides(), selector.into())? else {
+        let Some(source_index) = select(source.slides()?, selector.into())? else {
             return Ok(None);
         };
         if self.dependency_free_slide_removal_changed {
             return unsupported(
                 "ODP foreign blank-slide transfer cannot be staged after a slide removal",
-            );
+            )
+            .map_err(PackageError::from);
         }
         if self.changed || self.has_page_indexed_operations() {
             return unsupported(
                 "ODP foreign blank-slide transfer cannot combine with slide or page-indexed operations",
-            );
+            ).map_err(PackageError::from);
         }
-        if self.draft.slides().len() == MAX_SLIDES {
-            return invalid("ODP transaction exceeds the slide-count limit");
+        if self.draft_ref().slides().len() == MAX_SLIDES {
+            return invalid("ODP transaction exceeds the slide-count limit")
+                .map_err(PackageError::from);
         }
 
         let source_package = source.package.clone();
@@ -1080,9 +1537,11 @@ impl Transaction {
             audit::Limits::default(),
         )
         .map(|_report| ())
-        .map_err(|error| {
-            Error::Unsupported(format!(
-                "ODP foreign blank-slide transfer refuses unaudited donor XML: {error}"
+        .map_err(|_error| {
+            CoreError::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "odp.authoring.edit",
+                "ODP foreign blank-slide transfer refuses unaudited donor XML",
             ))
         })?;
         if source_presentation.settings()?.is_some()
@@ -1090,38 +1549,43 @@ impl Transaction {
         {
             return unsupported(
                 "ODP foreign blank-slide transfer refuses donor settings or declarations",
-            );
+            )
+            .map_err(PackageError::from);
         }
         let source_pages = source_presentation.pages()?;
         let source_page = source_pages.page(source_index).ok_or_else(|| {
             invalid_error("ODP foreign blank-slide transfer donor page metadata is missing")
         })?;
         let source_name = source_page.name.as_deref().ok_or_else(|| {
-            Error::Unsupported(
-                "ODP foreign blank-slide transfer donor requires draw:name".to_string(),
-            )
+            CoreError::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "odp.authoring.edit",
+                "ODP foreign blank-slide transfer donor requires draw:name",
+            ))
         })?;
-        let source_content =
-            crate::codec::content_source::ContentSource::parse(source_presentation.content_xml())?
-                .ok_or_else(|| {
-                    Error::Unsupported(
-                "ODP foreign blank-slide transfer requires retained donor content fragments"
-                    .to_string(),
-            )
-                })?;
+        let source_content = crate::codec::content_source::ContentSource::parse(
+            source_presentation.content_xml(),
+        )?
+        .ok_or_else(|| {
+            CoreError::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "odp.authoring.edit",
+                "ODP foreign blank-slide transfer requires retained donor content fragments",
+            ))
+        })?;
         let donor_page = source_content.page(source_index).ok_or_else(|| {
             invalid_error("ODP foreign blank-slide transfer donor page is outside content coverage")
         })?;
         let copy = self
-            .draft
+            .draft_mut()
             .prepare_foreign_dependency_free_blank_slide_copy(
                 donor_page,
-                &source.slides()[source_index],
+                &source.slides()?[source_index],
                 source_name,
             )?;
         let candidate = self.resource_candidate(0, copy.resource_bytes())?;
         let copied_index = self
-            .draft
+            .draft_mut()
             .apply_foreign_dependency_free_blank_slide_copy(copy)?;
         self.resource_bytes = candidate;
         self.dependency_free_slide_copy_changed = true;
@@ -1152,35 +1616,38 @@ impl Transaction {
     pub fn remove_dependency_free_blank_slide<'a, S>(
         &mut self,
         selector: S,
-    ) -> Result<Option<Slide>>
+    ) -> FamilyResult<Option<Slide>>
     where
         S: Into<Selector<'a>>,
     {
+        self.ensure_draft()?;
         if self.dependency_free_slide_removal_changed {
             return unsupported(
                 "ODP transaction already contains a dependency-free blank-slide removal",
-            );
+            )
+            .map_err(PackageError::from);
         }
         if self.slide_order_changed || self.dependency_free_slide_copy_changed {
             return unsupported(
                 "ODP dependency-free blank-slide removal cannot follow a slide move or copy",
-            );
+            )
+            .map_err(PackageError::from);
         }
-        let Some(index) = select(self.draft.slides(), selector.into())? else {
+        let Some(index) = select(self.draft_ref().slides(), selector.into())? else {
             return Ok(None);
         };
         if self.changed || self.has_page_indexed_operations() {
             return unsupported(
                 "ODP dependency-free blank-slide removal cannot combine with slide or page-indexed operations",
-            );
+            ).map_err(PackageError::from);
         }
-        let removed_bytes = slide_resource(&self.draft.slides()[index])?;
+        let removed_bytes = slide_resource(&self.draft_ref().slides()[index])?;
         let candidate = self.resource_candidate(removed_bytes, 0)?;
         let removal = self
-            .draft
+            .draft_mut()
             .prepare_dependency_free_blank_slide_removal(index)?;
         let removed = self
-            .draft
+            .draft_mut()
             .apply_dependency_free_blank_slide_removal(removal);
         self.resource_bytes = candidate;
         self.dependency_free_slide_removal_changed = true;
@@ -1196,21 +1663,22 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error for an ambiguous selector, invalid shape, or preservation-only page.
-    pub fn add_shape<'a, S>(&mut self, selector: S, shape: Shape) -> Result<Option<()>>
+    pub fn add_shape<'a, S>(&mut self, selector: S, shape: Shape) -> FamilyResult<Option<()>>
     where
         S: Into<Selector<'a>>,
     {
+        self.ensure_draft()?;
         self.check_no_slide_order_change("shape insertion")?;
-        let Some(index) = select(self.draft.slides(), selector.into())? else {
+        let Some(index) = select(self.draft_ref().slides(), selector.into())? else {
             return Ok(None);
         };
         self.check_slide_rewrite(index)?;
         let candidate = self.resource_candidate(0, shape_resource(&shape)?)?;
         super::builder::Builder::generate_shape_xml(
             &shape,
-            self.draft.slides()[index].shapes.len(),
+            self.draft_ref().slides()[index].shapes.len(),
         )?;
-        self.draft.add_shape(index, shape)?;
+        self.draft_mut().add_shape(index, shape)?;
         self.resource_bytes = candidate;
         self.mark_non_media_changed();
         Ok(Some(()))
@@ -1221,21 +1689,27 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error for an ambiguous selector or preservation-only page.
-    pub fn remove_shape<'a, S>(&mut self, selector: S, shape_index: usize) -> Result<Option<Shape>>
+    pub fn remove_shape<'a, S>(
+        &mut self,
+        selector: S,
+        shape_index: usize,
+    ) -> FamilyResult<Option<Shape>>
     where
         S: Into<Selector<'a>>,
     {
+        self.ensure_draft()?;
         self.check_no_slide_order_change("shape removal")?;
-        let Some(slide_index) = select(self.draft.slides(), selector.into())? else {
+        let Some(slide_index) = select(self.draft_ref().slides(), selector.into())? else {
             return Ok(None);
         };
-        if shape_index >= self.draft.slides()[slide_index].shapes.len() {
+        if shape_index >= self.draft_ref().slides()[slide_index].shapes.len() {
             return Ok(None);
         }
         self.check_slide_rewrite(slide_index)?;
-        let removed_bytes = shape_resource(&self.draft.slides()[slide_index].shapes[shape_index])?;
+        let removed_bytes =
+            shape_resource(&self.draft_ref().slides()[slide_index].shapes[shape_index])?;
         let candidate = self.resource_candidate(removed_bytes, 0)?;
-        let removed = self.draft.remove_shape(slide_index, shape_index)?;
+        let removed = self.draft_mut().remove_shape(slide_index, shape_index)?;
         self.resource_bytes = candidate;
         self.mark_non_media_changed();
         Ok(Some(removed))
@@ -1246,22 +1720,23 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error for an ambiguous selector or preservation-only page.
-    pub fn clear<'a, S>(&mut self, selector: S) -> Result<Option<()>>
+    pub fn clear<'a, S>(&mut self, selector: S) -> FamilyResult<Option<()>>
     where
         S: Into<Selector<'a>>,
     {
+        self.ensure_draft()?;
         self.check_no_slide_order_change("slide clear")?;
-        let Some(index) = select(self.draft.slides(), selector.into())? else {
+        let Some(index) = select(self.draft_ref().slides(), selector.into())? else {
             return Ok(None);
         };
-        let slide = &self.draft.slides()[index];
+        let slide = &self.draft_ref().slides()[index];
         if slide.title.is_none() && slide.text.is_empty() && slide.shapes.is_empty() {
             return Ok(Some(()));
         }
         self.check_slide_rewrite(index)?;
         let removed = slide_primary_resource(slide)?;
         let candidate = self.resource_candidate(removed, 0)?;
-        self.draft.clear_slide(index)?;
+        self.draft_mut().clear_slide(index)?;
         self.resource_bytes = candidate;
         self.mark_non_media_changed();
         Ok(Some(()))
@@ -1277,7 +1752,8 @@ impl Transaction {
         path: &str,
         payload: &[u8],
         media_type: &str,
-    ) -> Result<Reference> {
+    ) -> FamilyResult<Reference> {
+        self.ensure_draft()?;
         crate::model::media::validate_package_media_path(path)?;
         let addition = path
             .len()
@@ -1289,7 +1765,7 @@ impl Transaction {
             .checked_add(addition)
             .ok_or_else(|| invalid_error("ODP aggregate media size overflow"))?;
         self.check_projected(self.resource_bytes, media_bytes)?;
-        let reference = self.draft.embed_media(
+        let reference = self.draft_mut().embed_media(
             try_owned_str(path, "ODP media path")?,
             try_owned_bytes(payload, "ODP media payload")?,
             try_owned_str(media_type, "ODP media type")?,
@@ -1313,17 +1789,19 @@ impl Transaction {
     /// paths, media-type changes, referenced removals, signed/encrypted
     /// sources, or any invalid operation.  A failed batch leaves this
     /// transaction unchanged.
-    pub fn apply_media_changes(&mut self, changes: &[MediaChange]) -> Result<usize> {
+    pub fn apply_media_changes(&mut self, changes: &[MediaChange]) -> FamilyResult<usize> {
+        self.ensure_draft()?;
         if changes.len() > MAX_MEDIA_CHANGES {
             return invalid(format!(
                 "ODP media change batch exceeds {MAX_MEDIA_CHANGES} operations"
-            ));
+            ))
+            .map_err(PackageError::from);
         }
-        let plan = self.draft.prepare_media_changes(changes)?;
+        let plan = self.draft_mut().prepare_media_changes(changes)?;
         self.check_projected(self.resource_bytes, plan.staged_media_bytes)?;
         let changed = plan.changed;
-        self.draft.apply_media_plan(plan);
-        self.media_bytes = self.draft.staged_media_bytes()?;
+        self.draft_mut().apply_media_plan(plan);
+        self.media_bytes = self.draft_ref().staged_media_bytes()?;
         self.refresh_media_changed();
         Ok(changed)
     }
@@ -1336,9 +1814,9 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error for malformed, ambiguous, or oversized content owners.
-    pub fn rich_content(&mut self) -> Result<crate::content::Inventory> {
+    pub fn rich_content(&mut self) -> FamilyResult<crate::content::Inventory> {
         let package = self.content_package()?;
-        crate::content::inventory(&package)
+        crate::content::inventory(&package).map_err(PackageError::from)
     }
 
     /// Add a named common rich-text box to an exact presentation page.
@@ -1349,7 +1827,11 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error for an invalid page, duplicate name, malformed package, or limit.
-    pub fn add_text_box<'a, P>(&mut self, page: P, text_box: &crate::content::TextBox) -> Result<()>
+    pub fn add_text_box<'a, P>(
+        &mut self,
+        page: P,
+        text_box: &crate::content::TextBox,
+    ) -> FamilyResult<()>
     where
         P: Into<crate::charts::Page<'a>>,
     {
@@ -1360,6 +1842,7 @@ impl Transaction {
             name: text_box.name().to_string(),
             xml: text_box.xml()?,
         })
+        .map_err(PackageError::from)
     }
 
     /// Replace a named rich-text box, optionally changing its stable name.
@@ -1371,13 +1854,14 @@ impl Transaction {
         &mut self,
         name: &str,
         text_box: &crate::content::TextBox,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         self.stage_content(crate::content::Operation::ReplaceObject {
             kind: crate::content::ObjectKind::TextBox,
             name: name.to_string(),
             new_name: text_box.name().to_string(),
             xml: text_box.xml()?,
         })
+        .map_err(PackageError::from)
     }
 
     /// Replace an arbitrary source-backed text-box/list story.
@@ -1389,13 +1873,14 @@ impl Transaction {
         &mut self,
         name: &str,
         text_box: &crate::content::TextBoxModel,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         self.stage_content(crate::content::Operation::ReplaceObject {
             kind: crate::content::ObjectKind::TextBox,
             name: name.to_string(),
             new_name: text_box.name().to_string(),
             xml: text_box.xml().to_string(),
         })
+        .map_err(PackageError::from)
     }
 
     /// Atomically replace a bounded set of existing source-backed text boxes.
@@ -1416,17 +1901,18 @@ impl Transaction {
     pub fn replace_text_box_models(
         &mut self,
         replacements: &[crate::content::TextBoxModelReplacement<'_>],
-    ) -> Result<usize> {
+    ) -> FamilyResult<usize> {
         if replacements.len() > crate::content::MAX_TEXT_BOX_MODEL_REPLACEMENTS {
             return invalid(format!(
                 "ODP text-box replacement count exceeds {}",
                 crate::content::MAX_TEXT_BOX_MODEL_REPLACEMENTS
-            ));
+            ))
+            .map_err(PackageError::from);
         }
         let mut owned = Vec::new();
         owned
             .try_reserve_exact(replacements.len())
-            .map_err(|source| Error::Allocation {
+            .map_err(|source| CoreError::Allocation {
                 resource: "ODP text-box batch replacements",
                 source,
             })?;
@@ -1437,6 +1923,92 @@ impl Transaction {
                 .map(crate::content::OwnedTextBoxModelReplacement::from_borrowed),
         );
         self.stage_text_box_models(owned)
+            .map_err(PackageError::from)
+    }
+
+    /// The page index of this transaction's current `content.xml`.
+    ///
+    /// The index is built from the staged content, so it observes every
+    /// change staged so far, including earlier [`Self::splice_scene`] calls.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the staged content cannot be read or indexed.
+    pub fn scene(&mut self) -> FamilyResult<crate::scene::Scene> {
+        let package = self.content_package()?;
+        let content = String::from_utf8(package.get_file("content.xml")?)
+            .map_err(|source| invalid_error(format!("ODP content.xml is not UTF-8: {source}")))?;
+        crate::scene::Scene::parse(&content).map_err(PackageError::from)
+    }
+
+    /// Stage scene changes as checked byte splices of `content.xml`.
+    ///
+    /// Every change is resolved against the scene of the content staged
+    /// before this call ([`Self::scene`]); changes of one call must not
+    /// touch the same markup. Only the changed byte ranges are rewritten:
+    /// every other byte of `content.xml`, and every other package member,
+    /// keeps its source provenance. Returns whether anything changed; a call
+    /// whose changes are all exact no-ops stages nothing.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an address the scene does not have, overlapping
+    /// changes, text with XML-illegal characters, a page or object that
+    /// other markup references (removal and page renaming), markup the
+    /// authored-XML audit refuses, or a result the presentation parser
+    /// rejects. A refusal leaves the transaction unchanged.
+    pub fn splice_scene(&mut self, changes: &[crate::scene::Change]) -> FamilyResult<bool> {
+        self.ensure_entry().map_err(PackageError::from)?;
+        if changes.is_empty() {
+            return Ok(false);
+        }
+        self.check_no_slide_order_change("scene")?;
+        let package = self.content_package()?;
+        let Some(bytes) = crate::scene::apply_changes(&package, changes)? else {
+            return Ok(false);
+        };
+        self.publish_content(
+            bytes,
+            crate::content::Operation::SpliceScene {
+                changes: changes.to_vec(),
+            },
+        )?;
+        Ok(true)
+    }
+
+    /// Replace the package metadata projected from `meta.xml`.
+    ///
+    /// Title, author (`dc:creator`), subject, description and keywords are
+    /// written into the retained `meta.xml`; every other element keeps its
+    /// bytes. Returns whether anything changed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Unsupported`] when `metadata` changes any other
+    /// field, and an error when the source metadata cannot be read.
+    pub fn set_metadata(&mut self, metadata: &litchi_core::Metadata) -> FamilyResult<bool> {
+        self.check_no_slide_order_change("metadata")?;
+        let package = self.content_package()?;
+        let Some(bytes) = crate::authoring::metadata::apply(&package, metadata)? else {
+            return Ok(false);
+        };
+        self.publish_content(
+            bytes,
+            crate::content::Operation::SetMetadata {
+                metadata: Box::new(metadata.clone()),
+            },
+        )?;
+        Ok(true)
+    }
+
+    /// The metadata of the content staged so far.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the staged metadata cannot be read.
+    pub fn metadata(&mut self) -> FamilyResult<litchi_core::Metadata> {
+        let package = self.content_package()?;
+        crate::authoring::metadata::read(&package).map_err(PackageError::from)
     }
 
     /// Remove a named rich-text box.
@@ -1444,11 +2016,12 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error for a missing/ambiguous name or malformed package.
-    pub fn remove_text_box(&mut self, name: &str) -> Result<()> {
+    pub fn remove_text_box(&mut self, name: &str) -> FamilyResult<()> {
         self.stage_content(crate::content::Operation::RemoveObject {
             kind: crate::content::ObjectKind::TextBox,
             name: name.to_string(),
         })
+        .map_err(PackageError::from)
     }
 
     /// Add a typed rectangular table to an exact presentation page.
@@ -1456,7 +2029,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error for an invalid page, duplicate name, malformed package, or limit.
-    pub fn add_table<'a, P>(&mut self, page: P, table: &crate::content::Table) -> Result<()>
+    pub fn add_table<'a, P>(&mut self, page: P, table: &crate::content::Table) -> FamilyResult<()>
     where
         P: Into<crate::charts::Page<'a>>,
     {
@@ -1467,6 +2040,7 @@ impl Transaction {
             name: table.name().to_string(),
             xml: table.xml()?,
         })
+        .map_err(PackageError::from)
     }
 
     /// Replace a named typed table, optionally changing its stable name.
@@ -1474,13 +2048,14 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error for a missing/ambiguous name, collision, malformed package, or limit.
-    pub fn replace_table(&mut self, name: &str, table: &crate::content::Table) -> Result<()> {
+    pub fn replace_table(&mut self, name: &str, table: &crate::content::Table) -> FamilyResult<()> {
         self.stage_content(crate::content::Operation::ReplaceObject {
             kind: crate::content::ObjectKind::Table,
             name: name.to_string(),
             new_name: table.name().to_string(),
             xml: table.xml()?,
         })
+        .map_err(PackageError::from)
     }
 
     /// Replace an arbitrary source-backed table, including spans, repeats, and formulas.
@@ -1492,13 +2067,14 @@ impl Transaction {
         &mut self,
         name: &str,
         table: &crate::content::TableModel,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         self.stage_content(crate::content::Operation::ReplaceObject {
             kind: crate::content::ObjectKind::Table,
             name: name.to_string(),
             new_name: table.name().to_string(),
             xml: table.xml().to_string(),
         })
+        .map_err(PackageError::from)
     }
 
     /// Remove a named typed table.
@@ -1506,11 +2082,12 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error for a missing/ambiguous name or malformed package.
-    pub fn remove_table(&mut self, name: &str) -> Result<()> {
+    pub fn remove_table(&mut self, name: &str) -> FamilyResult<()> {
         self.stage_content(crate::content::Operation::RemoveObject {
             kind: crate::content::ObjectKind::Table,
             name: name.to_string(),
         })
+        .map_err(PackageError::from)
     }
 
     /// Add an inert typed form declaration and its visual control atomically.
@@ -1522,7 +2099,7 @@ impl Transaction {
         &mut self,
         page: P,
         control: &crate::content::FormControl,
-    ) -> Result<()>
+    ) -> FamilyResult<()>
     where
         P: Into<crate::charts::Page<'a>>,
     {
@@ -1531,6 +2108,7 @@ impl Transaction {
             page: page_index,
             control: control.clone(),
         })
+        .map_err(PackageError::from)
     }
 
     /// Replace an inert form declaration and visual control as one operation.
@@ -1542,11 +2120,12 @@ impl Transaction {
         &mut self,
         name: &str,
         control: &crate::content::FormControl,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         self.stage_content(crate::content::Operation::ReplaceControl {
             name: name.to_string(),
             control: control.clone(),
         })
+        .map_err(PackageError::from)
     }
 
     /// Replace an arbitrary source-backed form declaration/control pair atomically.
@@ -1558,13 +2137,14 @@ impl Transaction {
         &mut self,
         name: &str,
         control: &crate::content::FormControlModel,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         self.stage_content(crate::content::Operation::ReplaceControlModel {
             name: name.to_string(),
             new_name: control.name().to_string(),
             declaration_xml: control.declaration_xml().to_string(),
             visual_xml: control.visual_xml().to_string(),
         })
+        .map_err(PackageError::from)
     }
 
     /// Remove an inert form declaration and its visual control atomically.
@@ -1572,10 +2152,11 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error for a missing/ambiguous name or malformed package.
-    pub fn remove_form_control(&mut self, name: &str) -> Result<()> {
+    pub fn remove_form_control(&mut self, name: &str) -> FamilyResult<()> {
         self.stage_content(crate::content::Operation::RemoveControl {
             name: name.to_string(),
         })
+        .map_err(PackageError::from)
     }
 
     /// Transfer a dependency-closed rich-text box from another immutable deck.
@@ -1588,11 +2169,11 @@ impl Transaction {
     /// Returns an error for a missing object/page, dangling dependency, unsafe resource, or limit.
     pub fn transfer_text_box_from<'a, P>(
         &mut self,
-        source: &Snapshot,
+        source: &Package,
         source_name: &str,
         destination_page: P,
         destination_name: impl Into<String>,
-    ) -> Result<()>
+    ) -> FamilyResult<()>
     where
         P: Into<crate::charts::Page<'a>>,
     {
@@ -1603,6 +2184,7 @@ impl Transaction {
             destination_name.into(),
             crate::content::ObjectKind::TextBox,
         )
+        .map_err(PackageError::from)
     }
 
     /// Transfer a dependency-closed rich-cell table from another immutable deck.
@@ -1612,11 +2194,11 @@ impl Transaction {
     /// Returns an error for a missing object/page, dangling dependency, unsafe resource, or limit.
     pub fn transfer_table_from<'a, P>(
         &mut self,
-        source: &Snapshot,
+        source: &Package,
         source_name: &str,
         destination_page: P,
         destination_name: impl Into<String>,
-    ) -> Result<()>
+    ) -> FamilyResult<()>
     where
         P: Into<crate::charts::Page<'a>>,
     {
@@ -1627,6 +2209,7 @@ impl Transaction {
             destination_name.into(),
             crate::content::ObjectKind::Table,
         )
+        .map_err(PackageError::from)
     }
 
     /// Transfer an inert form declaration and its visual control from another deck.
@@ -1636,23 +2219,23 @@ impl Transaction {
     /// Returns an error for a missing owner/page, dangling dependency, collision, or limit.
     pub fn transfer_form_control_from<'a, P>(
         &mut self,
-        source: &Snapshot,
+        source: &Package,
         source_name: &str,
         destination_page: P,
         destination_name: impl Into<String>,
-    ) -> Result<()>
+    ) -> FamilyResult<()>
     where
         P: Into<crate::charts::Page<'a>>,
     {
         let page_index = self.content_page_index(destination_page.into())?;
-        let source_presentation = source.to_presentation()?;
+        let source_presentation = source.presentation()?;
         let operation = crate::content::prepare_control_transfer(
             source_presentation.owned_package(),
             page_index,
             source_name,
             destination_name.into(),
         )?;
-        self.stage_content(operation)
+        self.stage_content(operation).map_err(PackageError::from)
     }
 
     /// Inspect the RDF metadata graphs in the current transaction draft.
@@ -1663,12 +2246,13 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error when a declared RDF part is malformed, dangling, or over budget.
-    pub fn rdf_graphs(&mut self) -> Result<&[crate::rdf::Graph]> {
+    pub fn rdf_graphs(&mut self) -> FamilyResult<&[crate::rdf::Graph]> {
         self.ensure_rdf()?;
         self.rdf
             .as_ref()
             .map(|draft| draft.graphs.as_slice())
             .ok_or_else(|| invalid_error("ODP RDF draft initialization failed"))
+            .map_err(PackageError::from)
     }
 
     /// Add one RDF metadata graph to this package transaction.
@@ -1683,7 +2267,7 @@ impl Transaction {
         &mut self,
         preferred_path: Option<&str>,
         triples: &[crate::rdf::Triple],
-    ) -> Result<String> {
+    ) -> FamilyResult<String> {
         let package = self.rdf_package()?;
         let (bytes, path) = crate::rdf::add_graph(&package, preferred_path, triples)?;
         self.stage_rdf(
@@ -1701,7 +2285,11 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error for a missing graph, invalid triples, or a package limit.
-    pub fn replace_rdf_graph(&mut self, path: &str, triples: &[crate::rdf::Triple]) -> Result<()> {
+    pub fn replace_rdf_graph(
+        &mut self,
+        path: &str,
+        triples: &[crate::rdf::Triple],
+    ) -> FamilyResult<()> {
         let package = self.rdf_package()?;
         let bytes = crate::rdf::replace_graph(&package, path, triples)?;
         self.stage_rdf(
@@ -1711,6 +2299,7 @@ impl Transaction {
                 triples: triples.to_vec(),
             },
         )
+        .map_err(PackageError::from)
     }
 
     /// Remove one RDF metadata graph after dependency validation.
@@ -1718,7 +2307,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error for a missing graph or an incoming graph reference.
-    pub fn remove_rdf_graph(&mut self, path: &str) -> Result<()> {
+    pub fn remove_rdf_graph(&mut self, path: &str) -> FamilyResult<()> {
         let package = self.rdf_package()?;
         let bytes = crate::rdf::remove_graph(&package, path)?;
         self.stage_rdf(
@@ -1727,6 +2316,7 @@ impl Transaction {
                 path: path.to_string(),
             },
         )
+        .map_err(PackageError::from)
     }
 
     /// Append one RDF triple and return its checked projected index.
@@ -1734,7 +2324,11 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error for a missing graph, invalid triple, or graph limit.
-    pub fn add_rdf_triple(&mut self, path: &str, triple: &crate::rdf::Triple) -> Result<usize> {
+    pub fn add_rdf_triple(
+        &mut self,
+        path: &str,
+        triple: &crate::rdf::Triple,
+    ) -> FamilyResult<usize> {
         let package = self.rdf_package()?;
         let (bytes, index) = crate::rdf::add_triple(&package, path, triple)?;
         self.stage_rdf(
@@ -1758,7 +2352,7 @@ impl Transaction {
         path: &str,
         index: usize,
         triple: &crate::rdf::Triple,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         let package = self.rdf_package()?;
         let bytes = crate::rdf::replace_triple(&package, path, index, triple)?;
         self.stage_rdf(
@@ -1769,6 +2363,7 @@ impl Transaction {
                 triple: triple.clone(),
             },
         )
+        .map_err(PackageError::from)
     }
 
     /// Remove one RDF triple selected by checked zero-based position.
@@ -1776,7 +2371,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error for a missing graph or out-of-range position.
-    pub fn remove_rdf_triple(&mut self, path: &str, index: usize) -> Result<()> {
+    pub fn remove_rdf_triple(&mut self, path: &str, index: usize) -> FamilyResult<()> {
         let package = self.rdf_package()?;
         let bytes = crate::rdf::remove_triple(&package, path, index)?;
         self.stage_rdf(
@@ -1786,6 +2381,7 @@ impl Transaction {
                 index,
             },
         )
+        .map_err(PackageError::from)
     }
 
     /// Move one RDF triple to another checked zero-based position within its subject.
@@ -1793,7 +2389,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error for a missing graph, out-of-range position, or subject mismatch.
-    pub fn move_rdf_triple(&mut self, path: &str, from: usize, to: usize) -> Result<()> {
+    pub fn move_rdf_triple(&mut self, path: &str, from: usize, to: usize) -> FamilyResult<()> {
         let package = self.rdf_package()?;
         let bytes = crate::rdf::move_triple(&package, path, from, to)?;
         self.stage_rdf(
@@ -1804,6 +2400,7 @@ impl Transaction {
                 to,
             },
         )
+        .map_err(PackageError::from)
     }
 
     /// Inspect embedded charts in the current package transaction draft.
@@ -1811,12 +2408,13 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error when chart discovery encounters malformed or over-budget content.
-    pub fn charts(&mut self) -> Result<&[crate::charts::Chart]> {
+    pub fn charts(&mut self) -> FamilyResult<&[crate::charts::Chart]> {
         self.ensure_charts()?;
         self.charts
             .as_ref()
             .map(|draft| draft.charts.as_slice())
             .ok_or_else(|| invalid_error("ODP chart draft initialization failed"))
+            .map_err(PackageError::from)
     }
 
     /// Replace one embedded chart part selected by exact name or checked position.
@@ -1826,7 +2424,11 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error for a missing or ambiguous selector, malformed chart XML, or a limit.
-    pub fn replace_chart<'a, S>(&mut self, selector: S, part: crate::charts::Part) -> Result<()>
+    pub fn replace_chart<'a, S>(
+        &mut self,
+        selector: S,
+        part: crate::charts::Part,
+    ) -> FamilyResult<()>
     where
         S: Into<crate::charts::Selector<'a>>,
     {
@@ -1843,6 +2445,7 @@ impl Transaction {
                 part,
             },
         )
+        .map_err(PackageError::from)
     }
 
     /// Replace one chart from the complete typed ODF chart authoring model.
@@ -1857,7 +2460,7 @@ impl Transaction {
         &mut self,
         selector: S,
         definition: &crate::charts::Definition,
-    ) -> Result<()>
+    ) -> FamilyResult<()>
     where
         S: Into<crate::charts::Selector<'a>>,
     {
@@ -1873,7 +2476,7 @@ impl Transaction {
         &mut self,
         selector: S,
         series: &crate::charts::SeriesSpec,
-    ) -> Result<()>
+    ) -> FamilyResult<()>
     where
         S: Into<crate::charts::Selector<'a>>,
     {
@@ -1896,7 +2499,7 @@ impl Transaction {
         selector: S,
         series_index: usize,
         series: &crate::charts::SeriesSpec,
-    ) -> Result<()>
+    ) -> FamilyResult<()>
     where
         S: Into<crate::charts::Selector<'a>>,
     {
@@ -1914,7 +2517,11 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error for a missing/ambiguous chart, out-of-range series, malformed XML, or limit.
-    pub fn remove_chart_series<'a, S>(&mut self, selector: S, series_index: usize) -> Result<()>
+    pub fn remove_chart_series<'a, S>(
+        &mut self,
+        selector: S,
+        series_index: usize,
+    ) -> FamilyResult<()>
     where
         S: Into<crate::charts::Selector<'a>>,
     {
@@ -1941,7 +2548,7 @@ impl Transaction {
         row: usize,
         column: usize,
         cell: &crate::charts::CachedCell,
-    ) -> Result<()>
+    ) -> FamilyResult<()>
     where
         S: Into<crate::charts::Selector<'a>>,
     {
@@ -1959,7 +2566,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error for a missing or ambiguous selector or malformed chart package content.
-    pub fn remove_chart<'a, S>(&mut self, selector: S) -> Result<crate::charts::Chart>
+    pub fn remove_chart<'a, S>(&mut self, selector: S) -> FamilyResult<crate::charts::Chart>
     where
         S: Into<crate::charts::Selector<'a>>,
     {
@@ -1990,7 +2597,7 @@ impl Transaction {
         name: impl Into<String>,
         storage: crate::charts::Storage,
         part: crate::charts::Part,
-    ) -> Result<usize>
+    ) -> FamilyResult<usize>
     where
         P: Into<crate::charts::Page<'a>>,
     {
@@ -2029,7 +2636,7 @@ impl Transaction {
         name: impl Into<String>,
         storage: crate::charts::Storage,
         definition: &crate::charts::Definition,
-    ) -> Result<usize>
+    ) -> FamilyResult<usize>
     where
         P: Into<crate::charts::Page<'a>>,
     {
@@ -2054,12 +2661,12 @@ impl Transaction {
     /// dependency, invalid destination selector, identity collision, or resource limit.
     pub fn transfer_chart_from<'a, 'b, S, P>(
         &mut self,
-        source: &Snapshot,
+        source: &Package,
         source_chart: S,
         destination_page: P,
         destination_name: impl Into<String>,
         storage: crate::charts::Storage,
-    ) -> Result<usize>
+    ) -> FamilyResult<usize>
     where
         S: Into<crate::charts::Selector<'a>>,
         P: Into<crate::charts::Page<'b>>,
@@ -2098,12 +2705,13 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error when `styles.xml` is missing, malformed, or over budget.
-    pub fn layouts(&mut self) -> Result<&crate::layout::Collection> {
+    pub fn layouts(&mut self) -> FamilyResult<&crate::layout::Collection> {
         self.ensure_design()?;
         self.design
             .as_ref()
             .map(|draft| &draft.layouts)
             .ok_or_else(|| invalid_error("ODP design draft initialization failed"))
+            .map_err(PackageError::from)
     }
 
     /// Inspect master pages in the current package draft.
@@ -2111,12 +2719,13 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error when `styles.xml` is missing, malformed, or over budget.
-    pub fn master_pages(&mut self) -> Result<&[crate::MasterPage]> {
+    pub fn master_pages(&mut self) -> FamilyResult<&[crate::MasterPage]> {
         self.ensure_design()?;
         self.design
             .as_ref()
             .map(|draft| draft.masters.as_slice())
             .ok_or_else(|| invalid_error("ODP design draft initialization failed"))
+            .map_err(PackageError::from)
     }
 
     /// Add one named presentation page layout.
@@ -2124,8 +2733,9 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error for an invalid or duplicate layout or malformed package dependencies.
-    pub fn add_layout(&mut self, layout: &crate::layout::Layout) -> Result<()> {
+    pub fn add_layout(&mut self, layout: &crate::layout::Layout) -> FamilyResult<()> {
         self.stage_design_operation(DesignOperation::AddLayout(layout.clone()))
+            .map_err(PackageError::from)
     }
 
     /// Replace one named presentation page layout.
@@ -2133,8 +2743,9 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error when the layout is invalid or does not exist.
-    pub fn replace_page_layout(&mut self, layout: &crate::layout::Layout) -> Result<()> {
+    pub fn replace_page_layout(&mut self, layout: &crate::layout::Layout) -> FamilyResult<()> {
         self.stage_design_operation(DesignOperation::ReplaceLayout(layout.clone()))
+            .map_err(PackageError::from)
     }
 
     /// Remove one layout and optionally retarget all modeled incoming references.
@@ -2142,11 +2753,16 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error when either name is invalid or the replacement does not exist.
-    pub fn remove_page_layout(&mut self, name: &str, replacement: Option<&str>) -> Result<()> {
+    pub fn remove_page_layout(
+        &mut self,
+        name: &str,
+        replacement: Option<&str>,
+    ) -> FamilyResult<()> {
         self.stage_design_operation(DesignOperation::RemoveLayout {
             name: name.to_string(),
             replacement: replacement.map(str::to_string),
         })
+        .map_err(PackageError::from)
     }
 
     /// Reorder every named presentation layout using an exact dependency-checked name list.
@@ -2154,8 +2770,9 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error when the list is incomplete, duplicated, or contains an unknown name.
-    pub fn reorder_layouts(&mut self, names: &[String]) -> Result<()> {
+    pub fn reorder_layouts(&mut self, names: &[String]) -> FamilyResult<()> {
         self.stage_design_operation(DesignOperation::ReorderLayouts(names.to_vec()))
+            .map_err(PackageError::from)
     }
 
     /// Add one named master page.
@@ -2163,8 +2780,9 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error for invalid XML, duplicate identity, or dangling dependencies.
-    pub fn add_master_page(&mut self, master: &crate::MasterPage) -> Result<()> {
+    pub fn add_master_page(&mut self, master: &crate::MasterPage) -> FamilyResult<()> {
         self.stage_design_operation(DesignOperation::AddMaster(master.clone()))
+            .map_err(PackageError::from)
     }
 
     /// Replace one named master page.
@@ -2172,8 +2790,9 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error for invalid XML, missing identity, or dangling dependencies.
-    pub fn replace_master_page(&mut self, master: &crate::MasterPage) -> Result<()> {
+    pub fn replace_master_page(&mut self, master: &crate::MasterPage) -> FamilyResult<()> {
         self.stage_design_operation(DesignOperation::ReplaceMaster(master.clone()))
+            .map_err(PackageError::from)
     }
 
     /// Remove one master page and optionally retarget modeled incoming references.
@@ -2181,11 +2800,16 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error when either name is invalid or the replacement does not exist.
-    pub fn remove_master_page(&mut self, name: &str, replacement: Option<&str>) -> Result<()> {
+    pub fn remove_master_page(
+        &mut self,
+        name: &str,
+        replacement: Option<&str>,
+    ) -> FamilyResult<()> {
         self.stage_design_operation(DesignOperation::RemoveMaster {
             name: name.to_string(),
             replacement: replacement.map(str::to_string),
         })
+        .map_err(PackageError::from)
     }
 
     /// Reorder every master page using an exact dependency-checked name list.
@@ -2193,8 +2817,9 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error when the list is incomplete, duplicated, or contains an unknown name.
-    pub fn reorder_master_pages(&mut self, names: &[String]) -> Result<()> {
+    pub fn reorder_master_pages(&mut self, names: &[String]) -> FamilyResult<()> {
         self.stage_design_operation(DesignOperation::ReorderMasters(names.to_vec()))
+            .map_err(PackageError::from)
     }
 
     /// Assign or clear a slide's master-page dependency by checked zero-based position.
@@ -2206,11 +2831,12 @@ impl Transaction {
         &mut self,
         slide_index: usize,
         master_name: Option<&str>,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         self.stage_design_operation(DesignOperation::AssignSlideMaster {
             slide_index,
             name: master_name.map(str::to_string),
         })
+        .map_err(PackageError::from)
     }
 
     /// Assign or clear a slide's presentation-layout dependency by checked position.
@@ -2222,11 +2848,79 @@ impl Transaction {
         &mut self,
         slide_index: usize,
         layout_name: Option<&str>,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         self.stage_design_operation(DesignOperation::AssignSlideLayout {
             slide_index,
             name: layout_name.map(str::to_string),
         })
+        .map_err(PackageError::from)
+    }
+
+    /// Inspect the singleton handout master in the current package draft.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `styles.xml` is missing, malformed, or over budget.
+    pub fn handout_master(&mut self) -> FamilyResult<Option<&crate::handout_master::Master>> {
+        self.ensure_design()?;
+        self.design
+            .as_ref()
+            .map(|draft| draft.handout.as_ref())
+            .ok_or_else(|| invalid_error("ODP design draft initialization failed"))
+            .map_err(PackageError::from)
+    }
+
+    /// Insert or replace the singleton handout master.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid master or dangling layout references.
+    pub fn set_handout_master(
+        &mut self,
+        master: &crate::handout_master::Master,
+    ) -> FamilyResult<()> {
+        self.stage_design_operation(DesignOperation::SetHandout(master.clone()))
+            .map_err(PackageError::from)
+    }
+
+    /// Insert a handout master, failing if the draft already has one.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a handout master exists or the master is invalid.
+    pub fn add_handout_master(
+        &mut self,
+        master: &crate::handout_master::Master,
+    ) -> FamilyResult<()> {
+        if self.handout_master()?.is_some() {
+            return invalid("ODP package already has a handout master").map_err(PackageError::from);
+        }
+        self.set_handout_master(master)
+    }
+
+    /// Replace the handout master, failing if the draft has none.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no handout master exists or the master is invalid.
+    pub fn replace_handout_master(
+        &mut self,
+        master: &crate::handout_master::Master,
+    ) -> FamilyResult<()> {
+        if self.handout_master()?.is_none() {
+            return invalid("ODP package has no handout master").map_err(PackageError::from);
+        }
+        self.set_handout_master(master)
+    }
+
+    /// Remove the optional handout master.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `styles.xml` is missing or malformed.
+    pub fn remove_handout_master(&mut self) -> FamilyResult<()> {
+        self.stage_design_operation(DesignOperation::RemoveHandout)
+            .map_err(PackageError::from)
     }
 
     /// Inspect slide- and shape-anchored annotations in the current package draft.
@@ -2234,12 +2928,13 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error for malformed annotation XML, anchors, or resource limits.
-    pub fn annotations(&mut self) -> Result<&[crate::annotation::Info]> {
+    pub fn annotations(&mut self) -> FamilyResult<&[crate::annotation::Info]> {
         self.ensure_annotations()?;
         self.annotations
             .as_ref()
             .map(|draft| draft.annotations.as_slice())
             .ok_or_else(|| invalid_error("ODP annotation draft initialization failed"))
+            .map_err(PackageError::from)
     }
 
     /// Add an annotation at a checked page or uniquely named shape anchor.
@@ -2251,7 +2946,7 @@ impl Transaction {
         &mut self,
         anchor: &crate::annotation::Anchor,
         annotation: &crate::annotation::Annotation,
-    ) -> Result<usize> {
+    ) -> FamilyResult<usize> {
         self.ensure_annotations()?;
         let current = self.annotation_package()?;
         let mut presentation = Presentation::from_owned_package(current)?;
@@ -2275,7 +2970,7 @@ impl Transaction {
         &mut self,
         index: usize,
         annotation: &crate::annotation::Annotation,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         self.ensure_annotations()?;
         let current = self.annotation_package()?;
         let mut presentation = Presentation::from_owned_package(current)?;
@@ -2287,6 +2982,7 @@ impl Transaction {
                 annotation: annotation.clone(),
             },
         )
+        .map_err(PackageError::from)
     }
 
     /// Remove one annotation selected by checked zero-based document order.
@@ -2294,7 +2990,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error when the position is out of range or package content is malformed.
-    pub fn remove_annotation(&mut self, index: usize) -> Result<()> {
+    pub fn remove_annotation(&mut self, index: usize) -> FamilyResult<()> {
         self.ensure_annotations()?;
         let current = self.annotation_package()?;
         let mut presentation = Presentation::from_owned_package(current)?;
@@ -2303,6 +2999,7 @@ impl Transaction {
             OwnedPackage::from_bytes(presentation.to_bytes()?)?,
             AnnotationOperation::Remove { index },
         )
+        .map_err(PackageError::from)
     }
 
     /// Validate, serialize, reparse, and atomically publish the staged draft.
@@ -2310,8 +3007,17 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if validation, bounded serialization, package parsing, or semantic
-    /// readback fails. The source snapshot is never changed.
-    pub fn commit(self) -> Result<Commit> {
+    /// readback fails. The source package is never changed. A changed write
+    /// on a signed or encrypted source is refused during entry admission.
+    pub fn commit(self) -> Result<Commit, PackageError> {
+        Ok(self.commit_core()?)
+    }
+
+    pub(crate) fn commit_core(self) -> CoreResult<Commit> {
+        // Edit construction is intentionally O(1).  Validate the source XML
+        // only when the transaction is first observed or published, so a
+        // deferred no-op still refuses malformed content before publication.
+        self.ensure_entry()?;
         let rdf_changed = self
             .rdf
             .as_ref()
@@ -2375,10 +3081,12 @@ impl Transaction {
             return Ok(Commit::unchanged(self.source));
         }
         let (mut bytes, mut package, slide_candidate, mut audit_proof) = if self.changed {
-            let (package, audit_proof) = self.draft.to_owned_package_bounded(MAX_PACKAGE_BYTES)?;
+            let (package, audit_proof) = self
+                .draft_ref()
+                .to_owned_package_bounded(MAX_PACKAGE_BYTES)?;
             let bytes = package.shared_bytes();
-            let candidate = Snapshot::from_owned_package(package.clone())?;
-            if candidate.slides() != self.draft.slides() {
+            let candidate = Package::from_owned_package(package.clone())?;
+            if candidate.slides()? != self.draft_ref().slides() {
                 return invalid("ODP transaction readback differs from the staged slide model");
             }
             (bytes, package, Some(candidate), audit_proof)
@@ -2533,10 +3241,41 @@ impl Transaction {
         #[cfg(test)]
         let publication_audit_hit = proof_covers;
         if !proof_covers {
-            validate_compact_xml_parts(&reopened, &source_package)?;
+            // Scene splices publish `content.xml` through checked source
+            // ranges: every authored fragment was audited and every other
+            // byte is proven source-identical, so the part is not re-audited
+            // as a whole (producer formatting outside the splices stays as
+            // the producer wrote it). Other domains keep the full audit.
+            let scene_only = content_changed
+                && !self.changed
+                && !design_changed
+                && !annotations_changed
+                && !rdf_changed
+                && !charts_changed
+                && !layer_changed
+                && self.content.as_ref().is_some_and(|draft| {
+                    draft.operations.iter().all(|operation| {
+                        matches!(
+                            operation,
+                            crate::content::Operation::SpliceScene { .. }
+                                | crate::content::Operation::SetMetadata { .. }
+                        )
+                    })
+                });
+            if scene_only {
+                validate_compact_xml_parts_except(
+                    &reopened,
+                    &source_package,
+                    &["content.xml", "meta.xml"],
+                )?;
+            } else {
+                validate_compact_xml_parts(&reopened, &source_package)?;
+            }
         }
-        self.draft.verify_embedded_media(&reopened)?;
-        self.draft.verify_removed_media(&reopened)?;
+        if let Some(draft) = &self.draft {
+            draft.verify_embedded_media(&reopened)?;
+            draft.verify_removed_media(&reopened)?;
+        }
         if let Some(rdf) = &self.rdf
             && crate::rdf::graphs(&reopened)? != rdf.graphs
         {
@@ -2589,7 +3328,7 @@ impl Transaction {
                 candidate
             },
             (true, None) => unreachable!("a slide-only ODP commit always has a slide candidate"),
-            (false, _) => Snapshot::from_owned_package(reopened)?,
+            (false, _) => Package::from_owned_package(reopened)?,
         };
         let patch = Patch {
             before: self.source,
@@ -2605,7 +3344,7 @@ impl Transaction {
         })
     }
 
-    fn layer_package(&self) -> Result<OwnedPackage> {
+    fn layer_package(&self) -> CoreResult<OwnedPackage> {
         let mut package = self.layer_base_package()?;
         for operation in &self.layer_operations {
             package =
@@ -2614,15 +3353,16 @@ impl Transaction {
         Ok(package)
     }
 
-    fn layer_base_package(&self) -> Result<OwnedPackage> {
+    fn layer_base_package(&self) -> CoreResult<OwnedPackage> {
         if self.changed {
-            OwnedPackage::from_bytes(self.draft.to_bytes_bounded(MAX_PACKAGE_BYTES)?)
+            OwnedPackage::from_bytes(self.draft_ref().to_bytes_bounded(MAX_PACKAGE_BYTES)?)
         } else {
             Ok(self.source.package.clone())
         }
     }
 
-    fn stage_layer(&mut self, operation: crate::authoring::layer::Operation) -> Result<()> {
+    fn stage_layer(&mut self, operation: crate::authoring::layer::Operation) -> CoreResult<()> {
+        self.ensure_entry()?;
         self.check_no_slide_order_change("drawing-layer")?;
         let baseline = self.layer_base_package()?;
         let package = self.layer_package()?;
@@ -2642,7 +3382,8 @@ impl Transaction {
         Ok(())
     }
 
-    fn ensure_rdf(&mut self) -> Result<()> {
+    fn ensure_rdf(&mut self) -> CoreResult<()> {
+        self.ensure_entry()?;
         if self.rdf.is_none() {
             let package = self.source.package.clone();
             let graphs = crate::rdf::graphs(&package)?;
@@ -2656,7 +3397,7 @@ impl Transaction {
         Ok(())
     }
 
-    fn rdf_package(&mut self) -> Result<OwnedPackage> {
+    fn rdf_package(&mut self) -> CoreResult<OwnedPackage> {
         self.ensure_rdf()?;
         self.rdf
             .as_ref()
@@ -2664,7 +3405,7 @@ impl Transaction {
             .ok_or_else(|| invalid_error("ODP RDF draft initialization failed"))
     }
 
-    fn stage_rdf(&mut self, bytes: Vec<u8>, operation: RdfOperation) -> Result<()> {
+    fn stage_rdf(&mut self, bytes: Vec<u8>, operation: RdfOperation) -> CoreResult<()> {
         if bytes.len() > MAX_PACKAGE_BYTES {
             return invalid("ODP RDF transaction exceeds the 128 MiB package limit");
         }
@@ -2690,7 +3431,8 @@ impl Transaction {
         Ok(())
     }
 
-    fn ensure_charts(&mut self) -> Result<()> {
+    fn ensure_charts(&mut self) -> CoreResult<()> {
+        self.ensure_entry()?;
         if self.charts.is_none() {
             let limits = crate::charts::Limits::default();
             let snapshot =
@@ -2707,7 +3449,7 @@ impl Transaction {
         Ok(())
     }
 
-    fn chart_snapshot(&mut self) -> Result<crate::charts::Snapshot> {
+    fn chart_snapshot(&mut self) -> CoreResult<crate::charts::Snapshot> {
         self.ensure_charts()?;
         let (current_package, limits, operations) = self
             .charts
@@ -2724,7 +3466,7 @@ impl Transaction {
             return crate::charts::Snapshot::from_owned_package(current_package, limits);
         }
         let mut package =
-            OwnedPackage::from_bytes(self.draft.to_bytes_bounded(MAX_PACKAGE_BYTES)?)?;
+            OwnedPackage::from_bytes(self.draft_ref().to_bytes_bounded(MAX_PACKAGE_BYTES)?)?;
         for operation in &operations {
             package =
                 OwnedPackage::from_bytes(apply_chart_operation(&package, limits, operation)?)?;
@@ -2737,7 +3479,7 @@ impl Transaction {
         package: OwnedPackage,
         charts: Vec<crate::charts::Chart>,
         operation: ChartOperation,
-    ) -> Result<()> {
+    ) -> CoreResult<()> {
         self.check_no_slide_order_change("chart")?;
         if package.as_bytes().len() > MAX_PACKAGE_BYTES {
             return invalid("ODP chart transaction exceeds the 128 MiB package limit");
@@ -2761,13 +3503,15 @@ impl Transaction {
         Ok(())
     }
 
-    fn ensure_design(&mut self) -> Result<()> {
+    fn ensure_design(&mut self) -> CoreResult<()> {
+        self.ensure_entry()?;
         if self.design.is_none() {
             let package = self.source.package.clone();
             let presentation = Presentation::from_owned_package(package.clone())?;
             let layouts = presentation.layouts()?;
             let masters = presentation.master_pages()?;
             let pages = presentation.pages()?;
+            let handout = presentation.handout_master()?;
             self.design = Some(DesignDraft {
                 package,
                 original_layouts: layouts.clone(),
@@ -2776,13 +3520,15 @@ impl Transaction {
                 masters,
                 original_pages: pages.clone(),
                 pages,
+                original_handout: handout.clone(),
+                handout,
                 operations: Vec::new(),
             });
         }
         Ok(())
     }
 
-    fn stage_design_operation(&mut self, operation: DesignOperation) -> Result<()> {
+    fn stage_design_operation(&mut self, operation: DesignOperation) -> CoreResult<()> {
         self.check_no_slide_order_change("design")?;
         self.ensure_design()?;
         let current = self
@@ -2798,6 +3544,7 @@ impl Transaction {
         let layouts = presentation.layouts()?;
         let masters = presentation.master_pages()?;
         let pages = presentation.pages()?;
+        let handout = presentation.handout_master()?;
         let draft = self
             .design
             .as_mut()
@@ -2805,17 +3552,20 @@ impl Transaction {
         if layouts == draft.layouts
             && root_masters_equal(&masters, &draft.masters)
             && pages == draft.pages
+            && handout == draft.handout
         {
             return Ok(());
         }
         if layouts == draft.original_layouts
             && root_masters_equal(&masters, &draft.original_masters)
             && pages == draft.original_pages
+            && handout == draft.original_handout
         {
             draft.package = self.source.package.clone();
             draft.layouts = layouts;
             draft.masters = masters;
             draft.pages = pages;
+            draft.handout = handout;
             draft.operations.clear();
             return Ok(());
         }
@@ -2823,11 +3573,13 @@ impl Transaction {
         draft.layouts = layouts;
         draft.masters = masters;
         draft.pages = pages;
+        draft.handout = handout;
         draft.operations.push(operation);
         Ok(())
     }
 
-    fn ensure_annotations(&mut self) -> Result<()> {
+    fn ensure_annotations(&mut self) -> CoreResult<()> {
+        self.ensure_entry()?;
         if self.annotations.is_none() {
             let package = self.source.package.clone();
             let presentation = Presentation::from_owned_package(package.clone())?;
@@ -2842,7 +3594,7 @@ impl Transaction {
         Ok(())
     }
 
-    fn content_page_index(&mut self, page: crate::charts::Page<'_>) -> Result<usize> {
+    fn content_page_index(&mut self, page: crate::charts::Page<'_>) -> CoreResult<usize> {
         let package = self.content_package()?;
         let content = String::from_utf8(package.get_file("content.xml")?)
             .map_err(|source| invalid_error(format!("ODP content.xml is not UTF-8: {source}")))?;
@@ -2851,14 +3603,14 @@ impl Transaction {
 
     fn transfer_content_object_from(
         &mut self,
-        source: &Snapshot,
+        source: &Package,
         source_name: &str,
         destination_page: crate::charts::Page<'_>,
         destination_name: String,
         kind: crate::content::ObjectKind,
-    ) -> Result<()> {
+    ) -> CoreResult<()> {
         let page_index = self.content_page_index(destination_page)?;
-        let source_presentation = source.to_presentation()?;
+        let source_presentation = source.presentation()?;
         let operation = crate::content::prepare_object_transfer(
             source_presentation.owned_package(),
             page_index,
@@ -2869,12 +3621,13 @@ impl Transaction {
         self.stage_content(operation)
     }
 
-    fn content_bytes(&mut self) -> Result<Arc<Vec<u8>>> {
+    fn content_bytes(&mut self) -> CoreResult<Arc<Vec<u8>>> {
+        self.ensure_entry()?;
         if let Some(content) = &self.content {
             return Ok(Arc::clone(&content.bytes));
         }
         let package = if self.changed {
-            OwnedPackage::from_bytes(self.draft.to_bytes_bounded(MAX_PACKAGE_BYTES)?)?
+            OwnedPackage::from_bytes(self.draft_ref().to_bytes_bounded(MAX_PACKAGE_BYTES)?)?
         } else {
             self.source.package.clone()
         };
@@ -2887,7 +3640,7 @@ impl Transaction {
         Ok(bytes)
     }
 
-    fn content_package(&mut self) -> Result<OwnedPackage> {
+    fn content_package(&mut self) -> CoreResult<OwnedPackage> {
         self.content_bytes()?;
         self.content
             .as_ref()
@@ -2895,7 +3648,7 @@ impl Transaction {
             .ok_or_else(|| invalid_error("ODP semantic-content draft initialization failed"))
     }
 
-    fn stage_content(&mut self, operation: crate::content::Operation) -> Result<()> {
+    fn stage_content(&mut self, operation: crate::content::Operation) -> CoreResult<()> {
         self.check_no_slide_order_change("rich-content")?;
         let package = self.content_package()?;
         let bytes = crate::content::apply(&package, &operation)?;
@@ -2914,10 +3667,30 @@ impl Transaction {
         Ok(())
     }
 
+    fn publish_content(
+        &mut self,
+        bytes: Vec<u8>,
+        operation: crate::content::Operation,
+    ) -> CoreResult<()> {
+        if bytes.len() > MAX_PACKAGE_BYTES {
+            return invalid("ODP semantic-content transaction exceeds the 128 MiB package limit");
+        }
+        let package = OwnedPackage::from_bytes(bytes)?;
+        Presentation::from_owned_package(package.clone())?;
+        let draft = self
+            .content
+            .as_mut()
+            .ok_or_else(|| invalid_error("ODP semantic-content draft initialization failed"))?;
+        draft.bytes = package.shared_bytes();
+        draft.package = package;
+        draft.operations.push(operation);
+        Ok(())
+    }
+
     fn stage_text_box_models(
         &mut self,
         replacements: Vec<crate::content::OwnedTextBoxModelReplacement>,
-    ) -> Result<usize> {
+    ) -> CoreResult<usize> {
         self.check_no_slide_order_change("rich-content")?;
         let package = self.content_package()?;
         let (bytes, changed) =
@@ -2946,7 +3719,7 @@ impl Transaction {
         Ok(changed)
     }
 
-    fn annotation_package(&self) -> Result<OwnedPackage> {
+    fn annotation_package(&self) -> CoreResult<OwnedPackage> {
         self.annotations
             .as_ref()
             .map(|draft| draft.package.clone())
@@ -2957,7 +3730,7 @@ impl Transaction {
         &mut self,
         package: OwnedPackage,
         operation: AnnotationOperation,
-    ) -> Result<()> {
+    ) -> CoreResult<()> {
         self.check_no_slide_order_change("annotation")?;
         let bytes = package.shared_bytes();
         if bytes.len() > MAX_PACKAGE_BYTES {
@@ -2984,7 +3757,7 @@ impl Transaction {
         Ok(())
     }
 
-    fn check_text(title: &str, text: &str) -> Result<()> {
+    fn check_text(title: &str, text: &str) -> CoreResult<()> {
         let size = title
             .len()
             .checked_add(text.len())
@@ -3008,8 +3781,8 @@ impl Transaction {
         Ok(())
     }
 
-    fn check_structure_edit(&self) -> Result<()> {
-        if self.draft.has_source_declarations() {
+    fn check_structure_edit(&self) -> CoreResult<()> {
+        if self.draft_ref().has_source_declarations() {
             return unsupported(
                 "ODP structural editing with retained header/footer declarations is not lossless",
             );
@@ -3017,7 +3790,7 @@ impl Transaction {
         Ok(())
     }
 
-    fn check_page_indexed_move_conflict(&self) -> Result<()> {
+    fn check_page_indexed_move_conflict(&self) -> CoreResult<()> {
         let conflict = self.has_page_indexed_operations();
         if conflict {
             return unsupported(
@@ -3047,27 +3820,25 @@ impl Transaction {
                 .is_some_and(|draft| !draft.operations.is_empty())
     }
 
-    fn check_no_slide_order_change(&self, operation: &str) -> Result<()> {
+    fn check_no_slide_order_change(&self, _operation: &str) -> CoreResult<()> {
         if self.slide_order_changed {
-            return unsupported(format!(
-                "ODP {operation} operation cannot be staged after a slide move"
-            ));
+            return unsupported("ODP operation cannot be staged after a slide move");
         }
         if self.dependency_free_slide_copy_changed {
-            return unsupported(format!(
-                "ODP {operation} operation cannot be staged after a dependency-free blank-slide copy"
-            ));
+            return unsupported(
+                "ODP operation cannot be staged after a dependency-free blank-slide copy",
+            );
         }
         if self.dependency_free_slide_removal_changed {
-            return unsupported(format!(
-                "ODP {operation} operation cannot be staged after a dependency-free blank-slide removal"
-            ));
+            return unsupported(
+                "ODP operation cannot be staged after a dependency-free blank-slide removal",
+            );
         }
         Ok(())
     }
 
-    fn check_slide_rewrite(&self, index: usize) -> Result<()> {
-        if self.draft.retains_source_slide(index) {
+    fn check_slide_rewrite(&self, index: usize) -> CoreResult<()> {
+        if self.draft_ref().retains_source_slide(index) {
             return unsupported(
                 "ODP retained slide contains XML that cannot yet be proven lossless under rewrite",
             );
@@ -3075,15 +3846,15 @@ impl Transaction {
         Ok(())
     }
 
-    fn resource_candidate(&self, removed: usize, added: usize) -> Result<usize> {
+    fn resource_candidate(&self, removed: usize, added: usize) -> CoreResult<usize> {
         let candidate = bounded_candidate(self.resource_bytes, removed, added, MAX_DRAFT_BYTES)?;
         self.check_projected(candidate, self.media_bytes)?;
         Ok(candidate)
     }
 
-    fn check_projected(&self, resource_bytes: usize, media_bytes: usize) -> Result<()> {
+    fn check_projected(&self, resource_bytes: usize, media_bytes: usize) -> CoreResult<()> {
         let _projected = projected_size(
-            self.source.bytes().len(),
+            self.source.as_bytes().len(),
             self.source_resource_bytes,
             resource_bytes,
             media_bytes,
@@ -3103,14 +3874,14 @@ impl Transaction {
     }
 
     fn refresh_media_changed(&mut self) {
-        self.media_changed = self.draft.has_staged_media_changes();
+        self.media_changed = self.draft_ref().has_staged_media_changes();
         self.changed = self.non_media_changed || self.media_changed;
     }
 }
 
 /// A validated publication result containing a snapshot and reversible patch.
 pub struct Commit {
-    snapshot: Snapshot,
+    snapshot: Package,
     patch: Patch,
     changed: bool,
     #[cfg(test)]
@@ -3118,7 +3889,17 @@ pub struct Commit {
 }
 
 impl Commit {
-    fn unchanged(snapshot: Snapshot) -> Self {
+    pub(crate) fn replayed(snapshot: Package, patch: Patch) -> Self {
+        Self {
+            changed: !patch.is_noop(),
+            snapshot,
+            patch,
+            #[cfg(test)]
+            publication_audit_hit: false,
+        }
+    }
+
+    fn unchanged(snapshot: Package) -> Self {
         let patch = Patch {
             before: snapshot.clone(),
             after: snapshot.clone(),
@@ -3133,15 +3914,9 @@ impl Commit {
         }
     }
 
-    /// Return whether publication rebuilt the package.
+    /// Borrow the published immutable package.
     #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-
-    /// Borrow the published immutable snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub const fn package(&self) -> &Package {
         &self.snapshot
     }
 
@@ -3151,10 +3926,25 @@ impl Commit {
         &self.patch
     }
 
-    /// Consume the commit into its published snapshot.
+    /// Content-free facts about this commit.
     #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
+    pub fn diagnostics(&self) -> Diagnostics {
+        Diagnostics {
+            changed: self.changed,
+            domains: Arc::clone(&self.patch.domains),
+        }
+    }
+
+    /// Consume the commit into its published package.
+    #[must_use]
+    pub fn into_package(self) -> Package {
         self.snapshot
+    }
+
+    /// Consume the commit into its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.snapshot, self.patch)
     }
 
     #[cfg(test)]
@@ -3163,11 +3953,32 @@ impl Commit {
     }
 }
 
+/// Content-free facts about one [`Commit`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Diagnostics {
+    changed: bool,
+    domains: Arc<[Domain]>,
+}
+
+impl Diagnostics {
+    /// Whether publication rebuilt the package.
+    #[must_use]
+    pub const fn changed(&self) -> bool {
+        self.changed
+    }
+
+    /// The sorted semantic dependency domains the commit changed.
+    #[must_use]
+    pub fn domains(&self) -> &[Domain] {
+        &self.domains
+    }
+}
+
 /// An exact-byte-source-checked reversible ODP package patch.
 #[derive(Clone)]
 pub struct Patch {
-    before: Snapshot,
-    after: Snapshot,
+    before: Package,
+    after: Package,
     domains: Arc<[Domain]>,
 }
 
@@ -3178,7 +3989,7 @@ impl Patch {
     ///
     /// Returns an error when `source` is not byte-for-byte identical to the patch source or
     /// its signature/encryption policy makes it read-only.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn apply(&self, source: &Package) -> CoreResult<Package> {
         if !same_source(&self.before, source) {
             return invalid("stale ODP presentation patch source");
         }
@@ -3217,9 +4028,10 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error unless both patches accept the exact same source package.
-    pub fn plan_join(&self, other: &Self) -> Result<MergePlan> {
+    pub fn plan_join(&self, other: &Self) -> FamilyResult<MergePlan> {
         if !same_source(&self.before, &other.before) {
-            return invalid("ODP patch join requires an exact common source");
+            return invalid("ODP patch join requires an exact common source")
+                .map_err(PackageError::from);
         }
         let mut conflicts = Vec::new();
         for domain in self.domains.iter().copied() {
@@ -3247,7 +4059,7 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error unless both patches accept the exact same source package.
-    pub fn join(&self, other: &Self) -> Result<MergePlan> {
+    pub fn join(&self, other: &Self) -> FamilyResult<MergePlan> {
         self.plan_join(other)
     }
 
@@ -3262,10 +4074,11 @@ impl Patch {
     ///
     /// Returns an error for different sources, a reported conflict, or an RDF delta that cannot
     /// be replayed and verified over the other target.
-    pub fn join_snapshot(&self, other: &Self) -> Result<Snapshot> {
+    pub fn join_snapshot(&self, other: &Self) -> FamilyResult<Package> {
         let plan = self.plan_join(other)?;
         if !plan.is_independent() {
-            return unsupported("ODP patch join requires resolution of semantic conflicts");
+            return unsupported("ODP patch join requires resolution of semantic conflicts")
+                .map_err(PackageError::from);
         }
         if self.is_noop() {
             return Ok(other.after.clone());
@@ -3280,9 +4093,10 @@ impl Patch {
         } else if other.domains.as_ref() == [Domain::Rdf] && !self.domains.contains(&Domain::Rdf) {
             (other, self)
         } else {
-            return unsupported("ODP independent join has no bounded semantic compositor");
+            return unsupported("ODP independent join has no bounded semantic compositor")
+                .map_err(PackageError::from);
         };
-        materialize_rdf_join(rdf_patch, target_patch)
+        materialize_rdf_join(rdf_patch, target_patch).map_err(PackageError::from)
     }
 
     /// Plan a conservative three-way merge rooted at an exact base snapshot.
@@ -3290,9 +4104,10 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error when either side was not authored against `base`.
-    pub fn plan_three_way(base: &Snapshot, left: &Self, right: &Self) -> Result<MergePlan> {
+    pub fn plan_three_way(base: &Package, left: &Self, right: &Self) -> FamilyResult<MergePlan> {
         if !same_source(base, &left.before) || !same_source(base, &right.before) {
-            return invalid("ODP three-way merge patches do not share the supplied base");
+            return invalid("ODP three-way merge patches do not share the supplied base")
+                .map_err(PackageError::from);
         }
         left.plan_join(right)
     }
@@ -3302,7 +4117,7 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error when either side was not authored against `base`.
-    pub fn three_way(base: &Snapshot, left: &Self, right: &Self) -> Result<MergePlan> {
+    pub fn three_way(base: &Package, left: &Self, right: &Self) -> FamilyResult<MergePlan> {
         Self::plan_three_way(base, left, right)
     }
 
@@ -3313,7 +4128,7 @@ impl Patch {
     ///
     /// Returns an error when either patch is not rooted at `base`, the planner reports a
     /// conflict, or the bounded semantic compositor cannot verify the merged package.
-    pub fn three_way_snapshot(base: &Snapshot, left: &Self, right: &Self) -> Result<Snapshot> {
+    pub fn three_way_snapshot(base: &Package, left: &Self, right: &Self) -> FamilyResult<Package> {
         Self::plan_three_way(base, left, right)?;
         left.join_snapshot(right)
     }
@@ -3326,9 +4141,9 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an allocation or size error when the bounded envelope cannot be materialized.
-    pub fn to_durable_bytes(&self) -> Result<Vec<u8>> {
-        let before_len = self.before.bytes().len();
-        let after_len = self.after.bytes().len();
+    pub fn to_durable_bytes(&self) -> FamilyResult<Vec<u8>> {
+        let before_len = self.before.as_bytes().len();
+        let after_len = self.after.as_bytes().len();
         let capacity = DURABLE_PATCH_MAGIC
             .len()
             .checked_add(2 + 1 + 8 + 8)
@@ -3340,12 +4155,13 @@ impl Patch {
             .and_then(|size| size.checked_add(64))
             .ok_or_else(|| invalid_error("ODP durable patch limit overflow"))?;
         if capacity > maximum {
-            return invalid("ODP durable patch exceeds its package-derived size limit");
+            return invalid("ODP durable patch exceeds its package-derived size limit")
+                .map_err(PackageError::from);
         }
         let mut output = Vec::new();
         output
             .try_reserve_exact(capacity)
-            .map_err(|source| Error::Allocation {
+            .map_err(|source| CoreError::Allocation {
                 resource: "ODP durable patch envelope",
                 source,
             })?;
@@ -3354,8 +4170,8 @@ impl Patch {
         output.push(domain_bits(&self.domains));
         output.extend_from_slice(&u64::try_from(before_len).unwrap_or(u64::MAX).to_le_bytes());
         output.extend_from_slice(&u64::try_from(after_len).unwrap_or(u64::MAX).to_le_bytes());
-        output.extend_from_slice(self.before.bytes());
-        output.extend_from_slice(self.after.bytes());
+        output.extend_from_slice(self.before.as_bytes());
+        output.extend_from_slice(self.after.as_bytes());
         Ok(output)
     }
 
@@ -3365,15 +4181,17 @@ impl Patch {
     ///
     /// Returns an error for a malformed version, unknown domain, oversized artifact, trailing
     /// bytes, or invalid ODP source/target package.
-    pub fn from_durable_bytes(bytes: &[u8]) -> Result<Self> {
+    pub fn from_durable_bytes(bytes: &[u8]) -> FamilyResult<Self> {
         let header_len = DURABLE_PATCH_MAGIC.len() + 2 + 1 + 8 + 8;
         if bytes.len() < header_len || &bytes[..DURABLE_PATCH_MAGIC.len()] != DURABLE_PATCH_MAGIC {
-            return invalid("invalid ODP durable patch magic or truncated header");
+            return invalid("invalid ODP durable patch magic or truncated header")
+                .map_err(PackageError::from);
         }
         let mut offset = DURABLE_PATCH_MAGIC.len();
         let version = read_u16(bytes, &mut offset)?;
         if version != DURABLE_PATCH_VERSION {
-            return invalid(format!("unsupported ODP durable patch version {version}"));
+            return invalid(format!("unsupported ODP durable patch version {version}"))
+                .map_err(PackageError::from);
         }
         let bits = *bytes
             .get(offset)
@@ -3383,18 +4201,20 @@ impl Patch {
         let before_len = read_len(bytes, &mut offset)?;
         let after_len = read_len(bytes, &mut offset)?;
         if before_len > MAX_PACKAGE_BYTES || after_len > MAX_PACKAGE_BYTES {
-            return invalid("ODP durable patch contains an oversized package");
+            return invalid("ODP durable patch contains an oversized package")
+                .map_err(PackageError::from);
         }
         let expected = offset
             .checked_add(before_len)
             .and_then(|size| size.checked_add(after_len))
             .ok_or_else(|| invalid_error("ODP durable patch length overflow"))?;
         if expected != bytes.len() {
-            return invalid("ODP durable patch length does not match its envelope");
+            return invalid("ODP durable patch length does not match its envelope")
+                .map_err(PackageError::from);
         }
         let before_end = offset + before_len;
-        let before = Snapshot::from_bytes(bytes[offset..before_end].to_vec())?;
-        let after = Snapshot::from_bytes(bytes[before_end..].to_vec())?;
+        let before = Package::from_vec(bytes[offset..before_end].to_vec())?;
+        let after = Package::from_vec(bytes[before_end..].to_vec())?;
         Ok(Self {
             before,
             after,
@@ -3405,7 +4225,7 @@ impl Patch {
 
 /// Entry- and byte-bounded undo/redo history for immutable ODP snapshots.
 pub struct History {
-    entries: Vec<Snapshot>,
+    entries: Vec<Package>,
     cursor: usize,
     max_entries: usize,
     max_bytes: usize,
@@ -3418,14 +4238,15 @@ impl History {
     /// # Errors
     ///
     /// Returns an error for zero limits or a byte budget smaller than the root package.
-    pub fn new(initial: Snapshot, max_entries: usize, max_bytes: usize) -> Result<Self> {
+    pub fn new(initial: Package, max_entries: usize, max_bytes: usize) -> FamilyResult<Self> {
         if max_entries == 0 || max_bytes == 0 {
-            return invalid("ODP history limits must be positive");
+            return invalid("ODP history limits must be positive").map_err(PackageError::from);
         }
-        if initial.bytes().len() > max_bytes {
-            return invalid("ODP history byte budget cannot retain its initial snapshot");
+        if initial.as_bytes().len() > max_bytes {
+            return invalid("ODP history byte budget cannot retain its initial snapshot")
+                .map_err(PackageError::from);
         }
-        let retained_bytes = initial.bytes().len();
+        let retained_bytes = initial.as_bytes().len();
         Ok(Self {
             entries: vec![initial],
             cursor: 0,
@@ -3437,7 +4258,7 @@ impl History {
 
     /// Borrow the current immutable snapshot.
     #[must_use]
-    pub fn current(&self) -> &Snapshot {
+    pub fn current(&self) -> &Package {
         &self.entries[self.cursor]
     }
 
@@ -3449,20 +4270,21 @@ impl History {
     /// # Errors
     ///
     /// Returns an error for a stale commit or a target package larger than the byte budget.
-    pub fn record(&mut self, commit: &Commit) -> Result<()> {
+    pub fn record(&mut self, commit: &Commit) -> FamilyResult<()> {
         if !same_source(self.current(), &commit.patch.before) {
-            return invalid("ODP history commit source is not current");
+            return invalid("ODP history commit source is not current").map_err(PackageError::from);
         }
         if !commit.changed {
             return Ok(());
         }
-        let target_bytes = commit.snapshot.bytes().len();
+        let target_bytes = commit.snapshot.as_bytes().len();
         if target_bytes > self.max_bytes {
-            return invalid("ODP history target exceeds the byte budget");
+            return invalid("ODP history target exceeds the byte budget")
+                .map_err(PackageError::from);
         }
         if self.cursor + 1 < self.entries.len() {
             for removed in self.entries.drain(self.cursor + 1..) {
-                self.retained_bytes = self.retained_bytes.saturating_sub(removed.bytes().len());
+                self.retained_bytes = self.retained_bytes.saturating_sub(removed.as_bytes().len());
             }
         }
         self.entries.push(commit.snapshot.clone());
@@ -3473,7 +4295,7 @@ impl History {
         self.cursor = self.entries.len() - 1;
         while self.entries.len() > self.max_entries || self.retained_bytes > self.max_bytes {
             let removed = self.entries.remove(0);
-            self.retained_bytes = self.retained_bytes.saturating_sub(removed.bytes().len());
+            self.retained_bytes = self.retained_bytes.saturating_sub(removed.as_bytes().len());
             self.cursor = self.cursor.saturating_sub(1);
         }
         Ok(())
@@ -3481,7 +4303,7 @@ impl History {
 
     /// Move to the previous retained snapshot.
     #[must_use]
-    pub fn undo(&mut self) -> Option<&Snapshot> {
+    pub fn undo(&mut self) -> Option<&Package> {
         if self.cursor == 0 {
             return None;
         }
@@ -3491,7 +4313,7 @@ impl History {
 
     /// Move to the next retained snapshot.
     #[must_use]
-    pub fn redo(&mut self) -> Option<&Snapshot> {
+    pub fn redo(&mut self) -> Option<&Package> {
         if self.cursor + 1 >= self.entries.len() {
             return None;
         }
@@ -3526,20 +4348,21 @@ impl History {
     ///
     /// Returns an error when the retained history exceeds the durable bound or a native limit
     /// cannot be represented in the envelope.
-    pub fn to_durable_bytes(&self) -> Result<Vec<u8>> {
+    pub fn to_durable_bytes(&self) -> FamilyResult<Vec<u8>> {
         let header_len = DURABLE_HISTORY_MAGIC.len() + 2 + (8 * 4);
         let capacity = self.entries.iter().try_fold(header_len, |size, snapshot| {
             size.checked_add(8)
-                .and_then(|value| value.checked_add(snapshot.bytes().len()))
+                .and_then(|value| value.checked_add(snapshot.as_bytes().len()))
                 .ok_or_else(|| invalid_error("ODP durable history size overflow"))
         })?;
         if capacity > MAX_DURABLE_HISTORY_BYTES {
-            return invalid("ODP durable history exceeds the 512 MiB envelope limit");
+            return invalid("ODP durable history exceeds the 512 MiB envelope limit")
+                .map_err(PackageError::from);
         }
         let mut output = Vec::new();
         output
             .try_reserve_exact(capacity)
-            .map_err(|source| Error::Allocation {
+            .map_err(|source| CoreError::Allocation {
                 resource: "ODP durable history envelope",
                 source,
             })?;
@@ -3550,8 +4373,8 @@ impl History {
         write_len(&mut output, self.cursor)?;
         write_len(&mut output, self.entries.len())?;
         for snapshot in &self.entries {
-            write_len(&mut output, snapshot.bytes().len())?;
-            output.extend_from_slice(snapshot.bytes());
+            write_len(&mut output, snapshot.as_bytes().len())?;
+            output.extend_from_slice(snapshot.as_bytes());
         }
         Ok(output)
     }
@@ -3562,18 +4385,20 @@ impl History {
     ///
     /// Returns an error for malformed bounds, cursor/count inconsistencies, trailing bytes,
     /// oversized packages, budget violations, or invalid retained ODP artifacts.
-    pub fn from_durable_bytes(bytes: &[u8]) -> Result<Self> {
+    pub fn from_durable_bytes(bytes: &[u8]) -> FamilyResult<Self> {
         let header_len = DURABLE_HISTORY_MAGIC.len() + 2 + (8 * 4);
         if bytes.len() < header_len
             || bytes.len() > MAX_DURABLE_HISTORY_BYTES
             || &bytes[..DURABLE_HISTORY_MAGIC.len()] != DURABLE_HISTORY_MAGIC
         {
-            return invalid("invalid ODP durable history magic, size, or truncated header");
+            return invalid("invalid ODP durable history magic, size, or truncated header")
+                .map_err(PackageError::from);
         }
         let mut offset = DURABLE_HISTORY_MAGIC.len();
         let version = read_u16(bytes, &mut offset)?;
         if version != DURABLE_HISTORY_VERSION {
-            return invalid(format!("unsupported ODP durable history version {version}"));
+            return invalid(format!("unsupported ODP durable history version {version}"))
+                .map_err(PackageError::from);
         }
         let max_entries = read_len(bytes, &mut offset)?;
         let max_bytes = read_len(bytes, &mut offset)?;
@@ -3585,12 +4410,13 @@ impl History {
             || count > max_entries
             || cursor >= count
         {
-            return invalid("ODP durable history contains inconsistent bounds or cursor state");
+            return invalid("ODP durable history contains inconsistent bounds or cursor state")
+                .map_err(PackageError::from);
         }
         let mut entries = Vec::new();
         entries
             .try_reserve_exact(count)
-            .map_err(|source| Error::Allocation {
+            .map_err(|source| CoreError::Allocation {
                 resource: "ODP durable history entries",
                 source,
             })?;
@@ -3598,7 +4424,8 @@ impl History {
         for _ in 0..count {
             let length = read_len(bytes, &mut offset)?;
             if length > MAX_PACKAGE_BYTES {
-                return invalid("ODP durable history contains an oversized package");
+                return invalid("ODP durable history contains an oversized package")
+                    .map_err(PackageError::from);
             }
             let end = offset
                 .checked_add(length)
@@ -3606,7 +4433,7 @@ impl History {
             let package = bytes
                 .get(offset..end)
                 .ok_or_else(|| invalid_error("truncated ODP durable history package"))?;
-            entries.push(Snapshot::from_bytes(package.to_vec())?);
+            entries.push(Package::from_vec(package.to_vec())?);
             retained_bytes = retained_bytes
                 .checked_add(length)
                 .ok_or_else(|| invalid_error("ODP durable history byte count overflow"))?;
@@ -3615,7 +4442,8 @@ impl History {
         if offset != bytes.len() || retained_bytes > max_bytes {
             return invalid(
                 "ODP durable history length or byte budget does not match its envelope",
-            );
+            )
+            .map_err(PackageError::from);
         }
         Ok(Self {
             entries,
@@ -3627,7 +4455,7 @@ impl History {
     }
 }
 
-fn select(slides: &[Slide], selector: Selector<'_>) -> Result<Option<usize>> {
+fn select(slides: &[Slide], selector: Selector<'_>) -> CoreResult<Option<usize>> {
     match selector {
         Selector::Index(index) => Ok((index < slides.len()).then_some(index)),
         Selector::Title(title) => {
@@ -3646,7 +4474,7 @@ fn select(slides: &[Slide], selector: Selector<'_>) -> Result<Option<usize>> {
     }
 }
 
-fn same_source(left: &Snapshot, right: &Snapshot) -> bool {
+fn same_source(left: &Package, right: &Package) -> bool {
     Arc::ptr_eq(&left.bytes, &right.bytes) || left.bytes == right.bytes
 }
 
@@ -3663,7 +4491,7 @@ fn domain_bits(domains: &[Domain]) -> u8 {
     })
 }
 
-fn domains_from_bits(bits: u8) -> Result<Vec<Domain>> {
+fn domains_from_bits(bits: u8) -> CoreResult<Vec<Domain>> {
     if bits & !0b11_1111 != 0 {
         return invalid("ODP durable patch contains an unknown semantic domain");
     }
@@ -3683,7 +4511,7 @@ fn domains_from_bits(bits: u8) -> Result<Vec<Domain>> {
     Ok(domains)
 }
 
-fn read_u16(bytes: &[u8], offset: &mut usize) -> Result<u16> {
+fn read_u16(bytes: &[u8], offset: &mut usize) -> CoreResult<u16> {
     let end = offset
         .checked_add(2)
         .ok_or_else(|| invalid_error("ODP durable patch offset overflow"))?;
@@ -3694,7 +4522,7 @@ fn read_u16(bytes: &[u8], offset: &mut usize) -> Result<u16> {
     Ok(u16::from_le_bytes([value[0], value[1]]))
 }
 
-fn read_len(bytes: &[u8], offset: &mut usize) -> Result<usize> {
+fn read_len(bytes: &[u8], offset: &mut usize) -> CoreResult<usize> {
     let end = offset
         .checked_add(8)
         .ok_or_else(|| invalid_error("ODP durable patch offset overflow"))?;
@@ -3709,7 +4537,7 @@ fn read_len(bytes: &[u8], offset: &mut usize) -> Result<usize> {
         .map_err(|error| invalid_error(format!("ODP durable patch length is not native: {error}")))
 }
 
-fn write_len(output: &mut Vec<u8>, value: usize) -> Result<()> {
+fn write_len(output: &mut Vec<u8>, value: usize) -> CoreResult<()> {
     let encoded = u64::try_from(value).map_err(|source| {
         invalid_error(format!(
             "ODP durable envelope length is not representable: {source}"
@@ -3719,7 +4547,7 @@ fn write_len(output: &mut Vec<u8>, value: usize) -> Result<()> {
     Ok(())
 }
 
-fn ensure_editable_source(package: &OwnedPackage) -> Result<()> {
+fn ensure_editable_source(package: &OwnedPackage) -> CoreResult<()> {
     match package_security_policy(package)? {
         SecurityPolicy::Editable => Ok(()),
         SecurityPolicy::EncryptedReadOnly => unsupported(
@@ -3734,7 +4562,51 @@ fn ensure_editable_source(package: &OwnedPackage) -> Result<()> {
     }
 }
 
-fn package_security_policy(package: &OwnedPackage) -> Result<SecurityPolicy> {
+/// Preserve the edit-entry refusals without doing source-sized work at
+/// `Package::edit()`.  This check runs when a transaction is first observed
+/// or published, after the immutable source projection is already needed for
+/// that operation, and performs the deferred security census before success
+/// is cached.
+fn validate_edit_entry(presentation: &Presentation) -> CoreResult<()> {
+    let xml = presentation.content_xml();
+
+    let mut reader = NsReader::from_str(xml);
+    reader.config_mut().check_end_names = true;
+    reader.config_mut().trim_text(false);
+    let mut root_checked = false;
+    loop {
+        let event = reader
+            .read_event()
+            .map_err(|error| invalid_error(format!("invalid ODP content.xml: {error}")))?;
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                if !root_checked {
+                    let (resolved, local) = reader.resolver().resolve_element(element.name());
+                    let expected = matches!(resolved, ResolveResult::Bound(Namespace(uri))
+                        if uri == OFFICE_NAMESPACE
+                            && local.as_ref() == b"document-content");
+                    if !expected {
+                        return invalid("ODP editing requires an office:document-content root");
+                    }
+                    root_checked = true;
+                }
+            },
+            Event::Eof => {
+                return if root_checked {
+                    Ok(())
+                } else {
+                    invalid("ODP editing requires an office:document-content root")
+                };
+            },
+            Event::PI(_) => {
+                return invalid("ODP editing refuses active processing instructions");
+            },
+            _ => {},
+        }
+    }
+}
+
+fn package_security_policy(package: &OwnedPackage) -> CoreResult<SecurityPolicy> {
     let archive = package.package()?;
     let encrypted =
         archive.manifest().has_encrypted_entries() || package.has_zip_encrypted_entries();
@@ -3750,7 +4622,7 @@ fn package_security_policy(package: &OwnedPackage) -> Result<SecurityPolicy> {
     })
 }
 
-fn materialize_rdf_join(rdf_patch: &Patch, target_patch: &Patch) -> Result<Snapshot> {
+fn materialize_rdf_join(rdf_patch: &Patch, target_patch: &Patch) -> CoreResult<Package> {
     let base_package = rdf_patch.before.package.clone();
     let rdf_target_package = rdf_patch.after.package.clone();
     let base_graphs = crate::rdf::graphs(&base_package)?;
@@ -3812,14 +4684,14 @@ fn materialize_rdf_join(rdf_patch: &Patch, target_patch: &Patch) -> Result<Snaps
     if package.as_bytes().len() > MAX_PACKAGE_BYTES {
         return invalid("ODP joined package exceeds the 128 MiB package limit");
     }
-    let joined = Snapshot::from_owned_package(package)?;
+    let joined = Package::from_owned_package(package)?;
     if crate::rdf::graphs(&joined.package)? != expected_graphs {
         return invalid("ODP joined package RDF readback differs from the expected graph model");
     }
     Ok(joined)
 }
 
-fn apply_rdf_operation(package: &OwnedPackage, operation: &RdfOperation) -> Result<Vec<u8>> {
+fn apply_rdf_operation(package: &OwnedPackage, operation: &RdfOperation) -> CoreResult<Vec<u8>> {
     match operation {
         RdfOperation::AddGraph { path, triples } => {
             let (bytes, actual_path) = crate::rdf::add_graph(package, Some(path), triples)?;
@@ -3853,7 +4725,7 @@ fn apply_chart_operation(
     package: &OwnedPackage,
     limits: crate::charts::Limits,
     operation: &ChartOperation,
-) -> Result<Vec<u8>> {
+) -> CoreResult<Vec<u8>> {
     let snapshot = crate::charts::Snapshot::from_owned_package(package.clone(), limits)?;
     let mut edit = snapshot.edit();
     match operation {
@@ -3885,7 +4757,10 @@ fn root_charts_equal(left: &[crate::charts::Chart], right: &[crate::charts::Char
         })
 }
 
-fn apply_design_operation(package: &OwnedPackage, operation: &DesignOperation) -> Result<Vec<u8>> {
+fn apply_design_operation(
+    package: &OwnedPackage,
+    operation: &DesignOperation,
+) -> CoreResult<Vec<u8>> {
     let mut presentation = Presentation::from_owned_package(package.clone())?;
     match operation {
         DesignOperation::AddLayout(layout) => presentation.add_layout(layout)?,
@@ -3906,6 +4781,8 @@ fn apply_design_operation(package: &OwnedPackage, operation: &DesignOperation) -
         DesignOperation::AssignSlideLayout { slide_index, name } => {
             presentation.assign_slide_page_layout(*slide_index, name.as_deref())?;
         },
+        DesignOperation::SetHandout(master) => presentation.set_handout_master(master)?,
+        DesignOperation::RemoveHandout => presentation.clear_handout_master()?,
     }
     presentation.to_bytes()
 }
@@ -3935,7 +4812,7 @@ fn root_design_pages_equal(
 fn apply_annotation_operation(
     package: &OwnedPackage,
     operation: &AnnotationOperation,
-) -> Result<Vec<u8>> {
+) -> CoreResult<Vec<u8>> {
     let mut presentation = Presentation::from_owned_package(package.clone())?;
     match operation {
         AnnotationOperation::Add { anchor, annotation } => {
@@ -3962,7 +4839,12 @@ fn root_annotations_equal(
         })
 }
 
-fn bounded_candidate(current: usize, removed: usize, added: usize, limit: usize) -> Result<usize> {
+fn bounded_candidate(
+    current: usize,
+    removed: usize,
+    added: usize,
+    limit: usize,
+) -> CoreResult<usize> {
     let candidate = current
         .checked_sub(removed)
         .and_then(|value| value.checked_add(added))
@@ -3979,7 +4861,7 @@ fn projected_size(
     resource_bytes: usize,
     media_bytes: usize,
     limit: usize,
-) -> Result<usize> {
+) -> CoreResult<usize> {
     let growth = resource_bytes.saturating_sub(source_resource_bytes);
     let projected = source_bytes
         .checked_add(growth)
@@ -3991,72 +4873,67 @@ fn projected_size(
     Ok(projected)
 }
 
-fn try_owned_bytes(value: &[u8], resource: &'static str) -> Result<Vec<u8>> {
+fn try_owned_bytes(value: &[u8], resource: &'static str) -> CoreResult<Vec<u8>> {
     let mut owned = Vec::new();
     owned
         .try_reserve_exact(value.len())
-        .map_err(|source| Error::Allocation { resource, source })?;
+        .map_err(|source| CoreError::Allocation { resource, source })?;
     owned.extend_from_slice(value);
     Ok(owned)
 }
 
-fn try_owned_str(value: &str, resource: &'static str) -> Result<String> {
+fn try_owned_str(value: &str, resource: &'static str) -> CoreResult<String> {
     let mut owned = String::new();
     owned
         .try_reserve_exact(value.len())
-        .map_err(|source| Error::Allocation { resource, source })?;
+        .map_err(|source| CoreError::Allocation { resource, source })?;
     owned.push_str(value);
     Ok(owned)
 }
 
-fn read_bounded(path: &Path, limit: usize) -> Result<Vec<u8>> {
-    let mut file = File::open(path)?;
-    let declared = file.metadata()?.len();
-    let limit_u64 = u64::try_from(limit).unwrap_or(u64::MAX);
-    if declared > limit_u64 {
-        return invalid(format!(
-            "ODP editing package exceeds the {limit}-byte limit"
-        ));
+fn editing_projection(presentation: &Presentation) -> CoreResult<Editing> {
+    let slides = presentation.slides()?;
+    if slides.len() > MAX_SLIDES {
+        return invalid("ODP editing snapshot exceeds the slide-count limit");
     }
-    let capacity = usize::try_from(declared).map_err(|error| {
-        invalid_error(format!(
-            "ODP package length does not fit this platform: {error}"
-        ))
-    })?;
+    let resource_bytes = slides_resource(&slides)?;
+    if resource_bytes > MAX_DRAFT_BYTES {
+        return invalid("ODP editing snapshot exceeds the aggregate draft limit");
+    }
+    Ok(Editing {
+        resource_bytes,
+        slides: Arc::from(slides),
+    })
+}
+
+fn check_input_bytes(
+    length: usize,
+    limits: litchi_odf_common::SourceLimits,
+) -> Result<(), PackageError> {
+    let observed = u64::try_from(length).unwrap_or(u64::MAX);
+    if observed > limits.max_input_bytes() {
+        return Err(PackageError::Limit {
+            kind: LimitKind::Source(litchi_odf_common::SourceLimitKind::InputBytes),
+            observed,
+            maximum: limits.max_input_bytes(),
+        });
+    }
+    Ok(())
+}
+
+fn copy_input(source: &[u8]) -> CoreResult<Vec<u8>> {
     let mut bytes = Vec::new();
     bytes
-        .try_reserve_exact(capacity)
-        .map_err(|source| Error::Allocation {
-            resource: "ODP bounded package input",
+        .try_reserve_exact(source.len())
+        .map_err(|source| CoreError::Allocation {
+            resource: "ODP package bytes",
             source,
         })?;
-    let mut buffer = [0u8; 8 * 1024];
-    loop {
-        let read = file.read(&mut buffer)?;
-        if read == 0 {
-            break;
-        }
-        let candidate = bytes
-            .len()
-            .checked_add(read)
-            .ok_or_else(|| invalid_error("ODP bounded package input size overflow"))?;
-        if candidate > limit {
-            return invalid(format!(
-                "ODP editing package exceeds the {limit}-byte limit"
-            ));
-        }
-        bytes
-            .try_reserve_exact(read)
-            .map_err(|source| Error::Allocation {
-                resource: "ODP bounded package input",
-                source,
-            })?;
-        bytes.extend_from_slice(&buffer[..read]);
-    }
+    bytes.extend_from_slice(source);
     Ok(bytes)
 }
 
-fn slides_resource(slides: &[Slide]) -> Result<usize> {
+fn slides_resource(slides: &[Slide]) -> CoreResult<usize> {
     slides.iter().try_fold(0usize, |total, slide| {
         total
             .checked_add(slide_resource(slide)?)
@@ -4064,14 +4941,14 @@ fn slides_resource(slides: &[Slide]) -> Result<usize> {
     })
 }
 
-fn slide_resource(slide: &Slide) -> Result<usize> {
+fn slide_resource(slide: &Slide) -> CoreResult<usize> {
     let primary = slide_primary_resource(slide)?;
     primary
         .checked_add(slide.notes.as_ref().map_or(0, String::len))
         .ok_or_else(|| invalid_error("ODP slide resource size overflow"))
 }
 
-fn slide_primary_resource(slide: &Slide) -> Result<usize> {
+fn slide_primary_resource(slide: &Slide) -> CoreResult<usize> {
     slide_primary_text_resource(slide)?
         .checked_add(slide.shapes.iter().try_fold(0usize, |total, shape| {
             total
@@ -4081,23 +4958,25 @@ fn slide_primary_resource(slide: &Slide) -> Result<usize> {
         .ok_or_else(|| invalid_error("ODP slide resource size overflow"))
 }
 
-fn slide_primary_text_resource(slide: &Slide) -> Result<usize> {
+fn slide_primary_text_resource(slide: &Slide) -> CoreResult<usize> {
     text_resource(slide.title.as_deref().unwrap_or_default(), &slide.text)
 }
 
-fn text_resource(title: &str, text: &str) -> Result<usize> {
+fn text_resource(title: &str, text: &str) -> CoreResult<usize> {
     title
         .len()
         .checked_add(text.len())
         .ok_or_else(|| invalid_error("ODP text resource size overflow"))
 }
 
-fn shape_resource(root: &Shape) -> Result<usize> {
+fn shape_resource(root: &Shape) -> CoreResult<usize> {
     let mut stack = Vec::new();
-    stack.try_reserve(1).map_err(|source| Error::Allocation {
-        resource: "ODP shape resource stack",
-        source,
-    })?;
+    stack
+        .try_reserve(1)
+        .map_err(|source| CoreError::Allocation {
+            resource: "ODP shape resource stack",
+            source,
+        })?;
     stack.push(root);
     let mut total = 0usize;
     while let Some(shape) = stack.pop() {
@@ -4110,7 +4989,7 @@ fn shape_resource(root: &Shape) -> Result<usize> {
         }
         stack
             .try_reserve(shape.children().len())
-            .map_err(|source| Error::Allocation {
+            .map_err(|source| CoreError::Allocation {
                 resource: "ODP shape resource stack",
                 source,
             })?;
@@ -4119,32 +4998,46 @@ fn shape_resource(root: &Shape) -> Result<usize> {
     Ok(total)
 }
 
-fn validate_compact_xml_parts(package: &OwnedPackage, source: &OwnedPackage) -> Result<()> {
-    validate_compact_xml_parts_against(package, Some(source), true)
+fn validate_compact_xml_parts(package: &OwnedPackage, source: &OwnedPackage) -> CoreResult<()> {
+    validate_compact_xml_parts_against(package, Some(source), true, &[])
+}
+
+/// [`validate_compact_xml_parts`] for a commit whose `skip` parts were
+/// published only through checked source splices.
+fn validate_compact_xml_parts_except(
+    package: &OwnedPackage,
+    source: &OwnedPackage,
+    skip: &[&str],
+) -> CoreResult<()> {
+    validate_compact_xml_parts_against(package, Some(source), true, skip)
 }
 
 pub(crate) fn validate_raw_preserved_xml_parts(
     package: &OwnedPackage,
     source: &OwnedPackage,
-) -> Result<()> {
-    validate_compact_xml_parts_against(package, Some(source), true)
+) -> CoreResult<()> {
+    validate_compact_xml_parts_against(package, Some(source), true, &[])
 }
 
 pub(crate) fn validate_raw_preserved_referenced_xml_parts(
     package: &OwnedPackage,
     source: &OwnedPackage,
-) -> Result<()> {
-    validate_compact_xml_parts_against(package, Some(source), false)
+) -> CoreResult<()> {
+    validate_compact_xml_parts_against(package, Some(source), false, &[])
 }
 
 fn validate_compact_xml_parts_against(
     package: &OwnedPackage,
     source: Option<&OwnedPackage>,
     audit_core_parts: bool,
-) -> Result<()> {
+    skip: &[&str],
+) -> CoreResult<()> {
     let mut part_count = 0usize;
     let mut aggregate_bytes = 0usize;
     for path in package.files()? {
+        if skip.contains(&path.as_str()) {
+            continue;
+        }
         if !path.rsplit_once('.').is_some_and(|(_, extension)| {
             extension.eq_ignore_ascii_case("xml") || extension.eq_ignore_ascii_case("rdf")
         }) {
@@ -4201,15 +5094,17 @@ fn validate_compact_xml_parts_against(
         let audit_payload = payload.strip_prefix(b"\xef\xbb\xbf").unwrap_or(&payload);
         let _report =
             audit::verify(audit_payload, limits).map_err(|audit_error| match audit_error {
-                audit::Error::NotCompact(_) => Error::Unsupported(format!(
-                    "ODP XML part '{path}' is not compact: {audit_error}"
+                audit::Error::NotCompact(_) => CoreError::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odp.authoring.edit",
+                    "ODP XML part is not compact",
                 )),
                 audit::Error::Limit { .. }
                 | audit::Error::Encoding { .. }
                 | audit::Error::Malformed { .. }
                 | audit::Error::Doctype { .. }
                 | audit::Error::Allocation
-                | _ => Error::InvalidFormat(format!(
+                | _ => CoreError::InvalidFormat(format!(
                     "ODP XML part '{path}' failed audit: {audit_error}"
                 )),
             })?;
@@ -4217,46 +5112,73 @@ fn validate_compact_xml_parts_against(
     Ok(())
 }
 
-fn invalid<T>(message: impl Into<String>) -> Result<T> {
+fn invalid<T>(message: impl Into<String>) -> CoreResult<T> {
     Err(invalid_error(message))
 }
 
-fn validate_package_size(length: usize) -> Result<()> {
+fn validate_package_size(length: usize) -> CoreResult<()> {
     if length > MAX_PACKAGE_BYTES {
         return invalid("ODP editing package exceeds the 128 MiB limit");
     }
     Ok(())
 }
 
-fn invalid_error(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn invalid_error(message: impl Into<String>) -> CoreError {
+    CoreError::InvalidFormat(message.into())
 }
 
-fn unsupported<T>(message: impl Into<String>) -> Result<T> {
-    Err(Error::Unsupported(message.into()))
+fn unsupported<T>(reason: &'static str) -> CoreResult<T> {
+    Err(CoreError::Refused(litchi_core::edit::Refusal::new(
+        litchi_core::edit::RefusalKind::UnsupportedOperation,
+        "odp.authoring.edit",
+        reason,
+    )))
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        MAX_PACKAGE_BYTES, Snapshot, bounded_candidate, projected_size, read_bounded,
-        validate_package_size,
+        MAX_PACKAGE_BYTES, Package, bounded_candidate, projected_size, validate_package_size,
     };
     use crate::Builder;
-    use litchi_core::Result;
 
     #[test]
-    fn bounded_file_reader_accepts_n_and_rejects_n_plus_one() -> Result<()> {
+    fn path_ingress_input_limit_rejects_n_plus_one_before_indexing()
+    -> Result<(), litchi_odf_common::Error> {
+        let package = Builder::new().build()?;
         let file = tempfile::NamedTempFile::new()?;
-        std::fs::write(file.path(), b"1234")?;
-        assert_eq!(read_bounded(file.path(), 4)?, b"1234");
-        std::fs::write(file.path(), b"12345")?;
-        assert!(read_bounded(file.path(), 4).is_err());
+        package.save(file.path())?;
+        let length = u64::try_from(package.as_bytes().len()).unwrap_or(u64::MAX);
+        let exact = litchi_odf_common::SourceLimits::builder()
+            .max_input_bytes(length)?
+            .build()?;
+        let reopened = Package::open_with_options(
+            file.path(),
+            litchi_odf_common::OpenOptions::new().source_limits(exact),
+        )?;
+        assert_eq!(reopened.as_bytes(), package.as_bytes());
+        let below = litchi_odf_common::SourceLimits::builder()
+            .max_input_bytes(length - 1)?
+            .build()?;
+        let error = Package::open_with_options(
+            file.path(),
+            litchi_odf_common::OpenOptions::new().source_limits(below),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            litchi_odf_common::Error::Limit {
+                kind: litchi_odf_common::LimitKind::Source(
+                    litchi_odf_common::SourceLimitKind::InputBytes
+                ),
+                ..
+            }
+        ));
         Ok(())
     }
 
     #[test]
-    fn aggregate_accounting_accepts_n_and_rejects_n_plus_one() -> Result<()> {
+    fn aggregate_accounting_accepts_n_and_rejects_n_plus_one() -> litchi_core::Result<()> {
         assert_eq!(bounded_candidate(3, 0, 1, 4)?, 4);
         assert!(bounded_candidate(3, 0, 2, 4).is_err());
         assert_eq!(projected_size(3, 2, 2, 1, 4)?, 4);
@@ -4265,18 +5187,65 @@ mod tests {
     }
 
     #[test]
-    fn owned_package_size_gate_accepts_n_and_rejects_n_plus_one() -> Result<()> {
+    fn owned_package_size_gate_accepts_n_and_rejects_n_plus_one() -> litchi_core::Result<()> {
         validate_package_size(MAX_PACKAGE_BYTES)?;
         assert!(validate_package_size(MAX_PACKAGE_BYTES + 1).is_err());
         Ok(())
     }
 
     #[test]
-    fn changed_slide_commit_reports_the_authored_audit_fast_path() -> Result<()> {
+    fn edit_entry_and_no_op_commit_defer_mutable_materialization()
+    -> Result<(), litchi_odf_common::Error> {
         let mut builder = Builder::new();
         builder.add_slide_with_title("Original", "Body")?;
-        let source = Snapshot::from_bytes(builder.build()?)?;
-        let mut transaction = source.transaction()?;
+        let source = builder.build()?;
+        let source_bytes = source.as_bytes().to_vec();
+        let edit = source.edit()?;
+        assert!(edit.draft.is_none());
+        assert!(edit.source.presentation.get().is_none());
+        assert!(edit.source.editing.get().is_none());
+
+        let commit = edit.commit()?;
+        assert!(!commit.diagnostics().changed());
+        assert_eq!(commit.package().as_bytes(), source_bytes.as_slice());
+        Ok(())
+    }
+
+    #[test]
+    fn read_projection_caches_successful_entry_admission_without_a_draft()
+    -> Result<(), litchi_odf_common::Error> {
+        let mut builder = Builder::new();
+        builder.add_slide_with_title("Original", "Body")?;
+        let source = builder.build()?;
+        let edit = source.edit()?;
+        assert!(edit.entry_validated.get().is_none());
+        assert_eq!(edit.slides()?.len(), 1);
+        assert!(edit.entry_validated.get().is_some());
+        assert!(edit.draft.is_none());
+        assert_eq!(edit.slides()?.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn first_slide_operation_materializes_the_deferred_draft()
+    -> Result<(), litchi_odf_common::Error> {
+        let mut builder = Builder::new();
+        builder.add_slide_with_title("Original", "Body")?;
+        let source = builder.build()?;
+        let mut edit = source.edit()?;
+        assert!(edit.draft.is_none());
+        edit.add("Added", "Body")?;
+        assert!(edit.draft.is_some());
+        Ok(())
+    }
+
+    #[test]
+    fn changed_slide_commit_reports_the_authored_audit_fast_path()
+    -> Result<(), litchi_odf_common::Error> {
+        let mut builder = Builder::new();
+        builder.add_slide_with_title("Original", "Body")?;
+        let source = builder.build()?;
+        let mut transaction = source.edit()?;
         transaction.add("Added", "Body")?;
         let commit = transaction.commit()?;
         assert!(commit.publication_audit_hit());
@@ -4284,11 +5253,12 @@ mod tests {
     }
 
     #[test]
-    fn later_rdf_rewrite_clears_the_serialization_audit_proof() -> Result<()> {
+    fn later_rdf_rewrite_clears_the_serialization_audit_proof()
+    -> Result<(), litchi_odf_common::Error> {
         let mut builder = Builder::new();
         builder.add_slide_with_title("Original", "Body")?;
-        let source = Snapshot::from_bytes(builder.build()?)?;
-        let mut transaction = source.transaction()?;
+        let source = builder.build()?;
+        let mut transaction = source.edit()?;
         transaction.add("Added", "Body")?;
         let triple = crate::rdf::Triple {
             subject: crate::rdf::Subject::Iri("urn:litchi:test-subject".to_string()),

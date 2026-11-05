@@ -12,8 +12,9 @@ use litchi_iwa_common::wire::{WireView, append_length_delimited_field, append_va
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsd};
 use litchi_keynote::{
-    MediaPart, MediaProperties, MovieKind, MovieSelector, Package, ReadOptions, SemanticLimits,
-    SlideAudioPositionError, SlideMediaPropertiesError, SlideSelector,
+    MediaProperties, MovieKind, MovieSelector, OpenOptions, Package, SemanticLimits, SlideSelector,
+    slide::audio::position::Error as SlideAudioPositionError, slide::media::data::MediaPart,
+    slide::media::properties::Error as SlideMediaPropertiesError,
 };
 use prost::Message as _;
 
@@ -50,7 +51,7 @@ fn edit_properties(
     package: &Package,
     movie: usize,
     replacement: MediaProperties,
-) -> TestResult<litchi_keynote::SlideMediaPropertiesCommit> {
+) -> TestResult<litchi_keynote::slide::media::properties::Commit> {
     Ok(package
         .edit_slide_media_properties(SlideSelector::index(0), MovieSelector::index(movie))?
         .set(replacement)?
@@ -92,14 +93,14 @@ fn export_candidate(name: &str, bytes: &[u8]) -> TestResult {
 }
 
 fn catalog_entries(source: &[u8]) -> TestResult<BTreeMap<String, Vec<u8>>> {
-    Ok(Catalog::from_bytes(source)?
+    Ok(Catalog::from_bytes(source, Default::default())?
         .iter()
         .map(|entry| (entry.name().to_owned(), entry.data().to_vec()))
         .collect())
 }
 
 fn without_materialized_member(source: &[u8], member_name: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     if !catalog.iter().any(|entry| entry.name() == member_name) {
         return Err(io::Error::other(format!(
             "native fixture is missing materialized member {member_name}"
@@ -111,12 +112,15 @@ fn without_materialized_member(source: &[u8], member_name: &str) -> TestResult<V
 
 fn native_archives(source: &[u8]) -> TestResult<Vec<(String, Archive)>> {
     let mut archives = Vec::new();
-    for entry in Catalog::from_bytes(source)?.iter() {
+    for entry in Catalog::from_bytes(source, Default::default())?.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = SnappyStream::decompress(entry.data())?.into_bytes();
-        archives.push((entry.name().to_owned(), Archive::parse(&stream)?));
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+        archives.push((
+            entry.name().to_owned(),
+            Archive::parse(&stream, Default::default())?,
+        ));
     }
     Ok(archives)
 }
@@ -270,8 +274,9 @@ fn duplicate_first_audio_owned_drawable(source: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn replace_component(source: &[u8], name: &str, archive: &Archive) -> TestResult<Vec<u8>> {
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(source)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entries = catalog
         .iter()
         .map(|entry| {
@@ -343,7 +348,7 @@ fn mutate_movie_kind(
 ) -> TestResult<Vec<u8>> {
     mutate_movie_header(source, movie, |object, message_index| {
         let payload = object.messages[message_index].data.clone();
-        let root = WireView::parse(&payload)?;
+        let root = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?;
         let replacement_field = if root.fields().any(|field| field.number() == target_field) {
             Some(target_field)
         } else if root
@@ -388,12 +393,15 @@ fn mutate_movie_kind(
 fn without_movie_properties(source: &[u8], movie: usize) -> TestResult<Vec<u8>> {
     mutate_movie_header(source, movie, |object, message_index| {
         let payload = object.messages[message_index].data.clone();
-        let root = WireView::parse(&payload)?;
+        let root = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?;
         let super_field = root
             .fields()
             .find(|field| field.number() == 1)
             .ok_or_else(|| io::Error::other("selected movie drawable envelope is missing"))?;
-        let drawable = WireView::parse(super_field.payload())?;
+        let drawable = WireView::parse(
+            super_field.payload(),
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut drawable_payload = Vec::with_capacity(super_field.payload().len());
         for field in drawable.fields() {
             if matches!(field.number(), 4 | 5 | 7 | 8) {
@@ -438,7 +446,15 @@ fn stale_movie_field_info(source: &[u8], movie: usize) -> TestResult<Vec<u8>> {
         }) {
             field_index
         } else {
-            let mut field = FieldInfo::new(vec![if movie_data.is_some() { 14 } else { 15 }]);
+            let mut field = FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(
+                    vec![if movie_data.is_some() { 14 } else { 15 }],
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap();
             field.data_references.push(u64::MAX);
             info.field_infos.push(field);
             info.field_infos.len().saturating_sub(1)
@@ -489,10 +505,13 @@ fn without_movie_data_reference(source: &[u8], movie: usize, poster: bool) -> Te
 
 fn add_opaque_message_to_second_audio(source: &[u8]) -> TestResult<Vec<u8>> {
     mutate_movie_header(source, 1, |object, _message_index| {
-        object.push_message(RawMessage {
-            type_: OPAQUE_AUDIO_MESSAGE_TYPE,
-            data: OPAQUE_AUDIO_MESSAGE.to_vec(),
-        })?;
+        object.push_message(
+            RawMessage {
+                type_: OPAQUE_AUDIO_MESSAGE_TYPE,
+                data: OPAQUE_AUDIO_MESSAGE.to_vec(),
+            },
+            Default::default(),
+        )?;
         Ok(())
     })
 }
@@ -502,7 +521,7 @@ fn rewrite_unique_length_field(
     number: u32,
     replacement: Option<&[u8]>,
 ) -> TestResult<Vec<u8>> {
-    let view = WireView::parse(payload)?;
+    let view = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(payload.len());
     let mut found = false;
     for field in view.fields() {
@@ -515,7 +534,12 @@ fn rewrite_unique_length_field(
         }
         found = true;
         if let Some(replacement) = replacement {
-            append_length_delimited_field(&mut output, number, replacement)?;
+            append_length_delimited_field(
+                &mut output,
+                number,
+                replacement,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         }
     }
     if !found {
@@ -526,7 +550,7 @@ fn rewrite_unique_length_field(
 
 fn without_audio_geometry(source: &[u8]) -> TestResult<Vec<u8>> {
     mutate_first_audio_payload(source, |payload| {
-        let root = WireView::parse(payload)?;
+        let root = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?;
         let super_field = root
             .fields()
             .find(|field| field.number() == 1)
@@ -538,12 +562,15 @@ fn without_audio_geometry(source: &[u8]) -> TestResult<Vec<u8>> {
 
 fn duplicate_audio_geometry(source: &[u8]) -> TestResult<Vec<u8>> {
     mutate_first_audio_payload(source, |payload| {
-        let root = WireView::parse(payload)?;
+        let root = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?;
         let super_field = root
             .fields()
             .find(|field| field.number() == 1)
             .ok_or_else(|| io::Error::other("audio drawable envelope is missing"))?;
-        let drawable = WireView::parse(super_field.payload())?;
+        let drawable = WireView::parse(
+            super_field.payload(),
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let geometry = drawable
             .fields()
             .find(|field| field.number() == 1)
@@ -572,12 +599,15 @@ fn mutate_drawable_varint(
     duplicate: bool,
 ) -> TestResult<Vec<u8>> {
     mutate_first_audio_payload(source, |payload| {
-        let root = WireView::parse(payload)?;
+        let root = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?;
         let super_field = root
             .fields()
             .find(|field| field.number() == 1)
             .ok_or_else(|| io::Error::other("audio drawable envelope is missing"))?;
-        let drawable = WireView::parse(super_field.payload())?;
+        let drawable = WireView::parse(
+            super_field.payload(),
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut drawable_payload = Vec::with_capacity(super_field.payload().len() + 8);
         let mut found = false;
         for field in drawable.fields() {
@@ -608,12 +638,15 @@ fn mutate_drawable_varint(
 
 fn mutate_drawable_wrong_wire(source: &[u8], field_number: u32) -> TestResult<Vec<u8>> {
     mutate_first_audio_payload(source, |payload| {
-        let root = WireView::parse(payload)?;
+        let root = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?;
         let super_field = root
             .fields()
             .find(|field| field.number() == 1)
             .ok_or_else(|| io::Error::other("audio drawable envelope is missing"))?;
-        let drawable = WireView::parse(super_field.payload())?;
+        let drawable = WireView::parse(
+            super_field.payload(),
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut drawable_payload = Vec::with_capacity(super_field.payload().len() + 8);
         let mut found = false;
         for field in drawable.fields() {
@@ -625,10 +658,20 @@ fn mutate_drawable_wrong_wire(source: &[u8], field_number: u32) -> TestResult<Ve
                 return Err(io::Error::other("duplicate drawable property field").into());
             }
             found = true;
-            append_length_delimited_field(&mut drawable_payload, field_number, b"wrong-wire")?;
+            append_length_delimited_field(
+                &mut drawable_payload,
+                field_number,
+                b"wrong-wire",
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         }
         if !found {
-            append_length_delimited_field(&mut drawable_payload, field_number, b"wrong-wire")?;
+            append_length_delimited_field(
+                &mut drawable_payload,
+                field_number,
+                b"wrong-wire",
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         }
         rewrite_unique_length_field(payload, 1, Some(&drawable_payload))
     })
@@ -636,12 +679,12 @@ fn mutate_drawable_wrong_wire(source: &[u8], field_number: u32) -> TestResult<Ve
 
 fn archive_payloads(source: &[u8]) -> TestResult<BTreeMap<(String, u64, u32), Vec<u8>>> {
     let mut payloads = BTreeMap::new();
-    for entry in Catalog::from_bytes(source)?.iter() {
+    for entry in Catalog::from_bytes(source, Default::default())?.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = SnappyStream::decompress(entry.data())?.into_bytes();
-        let archive = Archive::parse(&stream)?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+        let archive = Archive::parse(&stream, Default::default())?;
         for object in archive.objects {
             let Some(identifier) = object.archive_info.identifier else {
                 continue;
@@ -1001,7 +1044,9 @@ fn native_media_properties_read_placeholder_fixture_and_refuse_mutation() -> Tes
         package.edit_slide_media_properties(SlideSelector::index(0), MovieSelector::index(4));
     assert!(matches!(
         error,
-        Err(SlideMediaPropertiesError::WrongMediaKind)
+        Err(SlideMediaPropertiesError::Refused(
+            litchi_keynote::slide::media::properties::Refusal::WrongMediaKind
+        ))
     ));
     assert_eq!(exact_bytes(&package)?, before);
     Ok(())
@@ -1078,7 +1123,9 @@ fn placeholder_and_live_video_properties_are_read_only_and_preserve_sparse_field
             .edit_slide_media_properties(SlideSelector::index(0), MovieSelector::index(movie));
         assert!(matches!(
             error,
-            Err(SlideMediaPropertiesError::WrongMediaKind)
+            Err(SlideMediaPropertiesError::Refused(
+                litchi_keynote::slide::media::properties::Refusal::WrongMediaKind
+            ))
         ));
         assert_eq!(exact_bytes(&package)?, before);
     }
@@ -1111,7 +1158,9 @@ fn native_media_properties_edit_rejects_sparse_materialized_data_atomically() ->
         matches!(
             error,
             Err(SlideMediaPropertiesError::InvalidSource)
-                | Err(SlideMediaPropertiesError::UnsupportedDependency)
+                | Err(SlideMediaPropertiesError::Refused(
+                    litchi_keynote::slide::media::properties::Refusal::UnsupportedDependency
+                ))
         ),
         "editing a media item without its materialized Data member must be rejected"
     );
@@ -1229,7 +1278,9 @@ fn native_audio_properties_reject_a_duplicate_geometry_envelope() -> TestResult 
     assert!(matches!(
         error,
         Err(SlideMediaPropertiesError::InvalidSource)
-            | Err(SlideMediaPropertiesError::UnsupportedDependency)
+            | Err(SlideMediaPropertiesError::Refused(
+                litchi_keynote::slide::media::properties::Refusal::UnsupportedDependency
+            ))
     ));
     assert_eq!(exact_bytes(&package)?, before);
     Ok(())
@@ -1262,7 +1313,9 @@ fn native_media_properties_reject_duplicate_slide_owned_movie_references_atomica
         .and_then(|edit| edit.commit());
     assert!(matches!(
         error,
-        Err(SlideMediaPropertiesError::UnsupportedDependency)
+        Err(SlideMediaPropertiesError::Refused(
+            litchi_keynote::slide::media::properties::Refusal::UnsupportedDependency
+        ))
     ));
     assert_eq!(exact_bytes(&package)?, before);
     Ok(())
@@ -1314,7 +1367,9 @@ fn native_media_properties_reject_stale_selected_field_info_atomically() -> Test
     assert!(matches!(
         error,
         Err(SlideMediaPropertiesError::InvalidSource)
-            | Err(SlideMediaPropertiesError::UnsupportedDependency)
+            | Err(SlideMediaPropertiesError::Refused(
+                litchi_keynote::slide::media::properties::Refusal::UnsupportedDependency
+            ))
     ));
     assert_eq!(exact_bytes(&package)?, before);
     Ok(())
@@ -1343,7 +1398,9 @@ fn native_media_properties_reject_missing_movie_and_poster_data_refs_atomically(
             matches!(
                 error,
                 Err(SlideMediaPropertiesError::InvalidSource)
-                    | Err(SlideMediaPropertiesError::UnsupportedDependency)
+                    | Err(SlideMediaPropertiesError::Refused(
+                        litchi_keynote::slide::media::properties::Refusal::UnsupportedDependency
+                    ))
             ),
             "{label} must be rejected"
         );
@@ -1384,15 +1441,8 @@ fn native_audio_properties_reject_duplicate_wrong_wire_and_noncanonical_fields_a
 
 #[test]
 fn native_media_properties_tight_reference_budget_preempts_publication_atomically() -> TestResult {
-    let semantic = SemanticLimits::new(
-        SemanticLimits::MAX_OBJECTS,
-        SemanticLimits::MAX_SLIDES,
-        1,
-        SemanticLimits::MAX_TEXT_STORAGES,
-        SemanticLimits::MAX_TEXT_FRAGMENTS,
-        SemanticLimits::MAX_TEXT_BYTES,
-    )?;
-    let options = ReadOptions::new(Limits::default(), semantic);
+    let semantic = SemanticLimits::builder().max_references(1)?.build()?;
+    let options = OpenOptions::new().semantic_limits(semantic);
     let package = Package::from_bytes_with_options(NATIVE_BASELINE, options)?;
     let before = exact_bytes(&package)?;
     let error = package

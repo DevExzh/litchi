@@ -22,7 +22,7 @@ use litchi_iwa_archive::{SourceCatalog, package::Entry};
 use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes,
     varint::encoded_len,
-    wire::{WireField, WireView, parse_wire_fields_with_limits},
+    wire::{WireField, WireView, parse_wire_fields},
 };
 use litchi_iwa_core::{
     Archive, ArchiveObject, ArchiveReferenceKind, ArchiveReferenceOccurrence,
@@ -133,36 +133,38 @@ fn usize_to_u64(value: usize) -> u64 {
     u64::try_from(value).unwrap_or(u64::MAX)
 }
 
-pub(super) fn map_chart_title_error(
-    error: super::slide_chart_title::ChartTitleError,
-) -> AxisSupportError {
-    use super::slide_chart_title::{ChartTitleError, ChartTitleLimitKind};
+pub(super) fn map_chart_title_error(error: super::slide_chart_title::Error) -> AxisSupportError {
+    use super::slide_chart_title::{Error as ChartTitleError, LimitKind as ChartTitleLimitKind};
     match error {
-        ChartTitleError::UnsupportedSource => {
+        ChartTitleError::Refused(crate::chart::title::Refusal::UnsupportedSource) => {
             AxisSupportError::Selector(AxisSupportSelectorError::UnsupportedSource)
         },
-        ChartTitleError::AmbiguousSelector => {
+        ChartTitleError::Refused(crate::chart::title::Refusal::AmbiguousSelector) => {
             AxisSupportError::Selector(AxisSupportSelectorError::AmbiguousSelector)
         },
-        ChartTitleError::EmptySlideName => {
+        ChartTitleError::Refused(crate::chart::title::Refusal::EmptySlideName) => {
             AxisSupportError::Selector(AxisSupportSelectorError::EmptySlideName)
         },
-        ChartTitleError::SlideNameNotFound => {
+        ChartTitleError::Refused(crate::chart::title::Refusal::SlideNameNotFound) => {
             AxisSupportError::Selector(AxisSupportSelectorError::SlideNameNotFound)
         },
-        ChartTitleError::SlidePositionNotFound { position } => {
+        ChartTitleError::Refused(crate::chart::title::Refusal::SlidePositionNotFound {
+            position,
+        }) => {
             AxisSupportError::Selector(AxisSupportSelectorError::SlidePositionNotFound { position })
         },
-        ChartTitleError::ChartNameNotFound => {
+        ChartTitleError::Refused(crate::chart::title::Refusal::ChartNameNotFound) => {
             AxisSupportError::Selector(AxisSupportSelectorError::ChartNameNotFound)
         },
-        ChartTitleError::ChartPositionNotFound { position } => {
+        ChartTitleError::Refused(crate::chart::title::Refusal::ChartPositionNotFound {
+            position,
+        }) => {
             AxisSupportError::Selector(AxisSupportSelectorError::ChartPositionNotFound { position })
         },
-        ChartTitleError::EmptyChartName => {
+        ChartTitleError::Refused(crate::chart::title::Refusal::EmptyChartName) => {
             AxisSupportError::Selector(AxisSupportSelectorError::EmptyChartName)
         },
-        ChartTitleError::LimitExceeded {
+        ChartTitleError::Limit {
             kind,
             observed,
             maximum,
@@ -179,6 +181,11 @@ pub(super) fn map_chart_title_error(
                 ChartTitleLimitKind::TextStorages => AxisSupportLimitKind::TextStorages,
                 ChartTitleLimitKind::TextFragments => AxisSupportLimitKind::TextFragments,
                 ChartTitleLimitKind::TextBytes => AxisSupportLimitKind::TextBytes,
+                // Selector admission is performed by the public edit entry;
+                // the shared graph proof has no separate retained-selector
+                // ledger, so preserve its semantic text-byte classification
+                // if a future caller forwards this dimension here.
+                ChartTitleLimitKind::SelectorBytes => AxisSupportLimitKind::TextBytes,
                 ChartTitleLimitKind::WireFields => AxisSupportLimitKind::WireFields,
                 ChartTitleLimitKind::WireNesting => AxisSupportLimitKind::WireNesting,
                 ChartTitleLimitKind::WireWork => AxisSupportLimitKind::WireWork,
@@ -220,8 +227,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> AxisSupportError {
         litchi_iwa_common::Error::Allocation { amount, .. } => {
             AxisSupportError::Allocation { amount }
         },
-        litchi_iwa_common::Error::InvalidFormat(_)
-        | litchi_iwa_common::Error::InvalidLimit { .. } => AxisSupportError::InvalidSource,
+        _ => AxisSupportError::InvalidSource,
     }
 }
 
@@ -513,7 +519,7 @@ pub(super) fn repeated_references(
     // decoded field scan below. This keeps repeated-reference parsing on the
     // same ledger as `accounted_wire_fields`.
     budget.charge_wire_vector(payload.len())?;
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     budget.finish_wire_scan(fields.len())?;
     let mut references = Vec::new();
     budget.charge_reference_vector(fields.len())?;
@@ -542,7 +548,7 @@ pub(super) fn accounted_wire_fields(
     budget: &mut dyn AxisSupportBudget,
 ) -> Result<Vec<WireField>, AxisSupportError> {
     budget.charge_wire_vector(payload.len())?;
-    let fields = parse_wire_fields_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = parse_wire_fields(payload, limits).map_err(map_wire_error)?;
     budget.finish_wire_scan(fields.len())?;
     Ok(fields)
 }
@@ -631,7 +637,7 @@ pub(super) fn validate_unlocked_drawable(
     budget: &mut dyn AxisSupportBudget,
 ) -> Result<(), AxisSupportError> {
     budget.charge_wire_vector(payload.len())?;
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     budget.finish_wire_scan(view.len())?;
     let mut locked = None;
     for field in view
@@ -968,7 +974,7 @@ pub(super) fn inspect_archive_references_strict(
         .map_err(map_archive_error)?;
     let mut visitor = StrictArchiveReferenceVisitor;
     object
-        .inspect_references_with_policy_and_limits(
+        .inspect_references_with_policy(
             &mut visitor,
             ArchiveReferencePolicy::RejectUnknownMetadata,
             archive_limits,
@@ -1082,7 +1088,7 @@ pub(super) fn validate_global_axis_references<'a>(
             budget.charge_work(1)?;
             charge_archive_reference_inspection(object, budget)?;
             object
-                .inspect_references_with_policy_and_limits(
+                .inspect_references_with_policy(
                     &mut visitor,
                     ArchiveReferencePolicy::RejectUnknownMetadata,
                     archive_limits,
@@ -2017,11 +2023,11 @@ fn verify_selected_archive_info_framing<B: LocalityBudget + ?Sized>(
         .map_err(map_archive_error)?;
     let source_bound = source_component
         .archive()
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_core_error)?;
     let candidate_bound = candidate_component
         .archive()
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_core_error)?;
     let source_compressed = source_entry.data();
     let candidate_compressed = candidate_entry.data();
@@ -2045,12 +2051,10 @@ fn verify_selected_archive_info_framing<B: LocalityBudget + ?Sized>(
         .archive()
         .snappy_limits()
         .map_err(map_archive_error)?;
-    let source_stream =
-        SnappyStream::decompress_with_limits(source_compressed, source_snappy_limits)
-            .map_err(map_core_error)?;
-    let candidate_stream =
-        SnappyStream::decompress_with_limits(candidate_compressed, candidate_snappy_limits)
-            .map_err(map_core_error)?;
+    let source_stream = SnappyStream::decompress(source_compressed, source_snappy_limits)
+        .map_err(map_core_error)?;
+    let candidate_stream = SnappyStream::decompress(candidate_compressed, candidate_snappy_limits)
+        .map_err(map_core_error)?;
     budget.charge_work(
         source_stream
             .as_bytes()
@@ -2110,9 +2114,8 @@ fn compare_archive_info_headers<B: LocalityBudget + ?Sized>(
 ) -> Result<(), AxisSupportError> {
     budget.charge_wire_vector(source.len())?;
     budget.charge_wire_vector(candidate.len())?;
-    let source_fields = parse_wire_fields_with_limits(source, limits).map_err(map_wire_error)?;
-    let candidate_fields =
-        parse_wire_fields_with_limits(candidate, limits).map_err(map_wire_error)?;
+    let source_fields = parse_wire_fields(source, limits).map_err(map_wire_error)?;
+    let candidate_fields = parse_wire_fields(candidate, limits).map_err(map_wire_error)?;
     budget.finish_wire_scan(source_fields.len())?;
     budget.finish_wire_scan(candidate_fields.len())?;
     if source_fields.len() != candidate_fields.len() {
@@ -2185,10 +2188,8 @@ fn compare_selected_message_info<B: LocalityBudget + ?Sized>(
     )?;
     budget.charge_wire_vector(source_payload.len())?;
     budget.charge_wire_vector(candidate_payload.len())?;
-    let source_fields =
-        parse_wire_fields_with_limits(source_payload, limits).map_err(map_wire_error)?;
-    let candidate_fields =
-        parse_wire_fields_with_limits(candidate_payload, limits).map_err(map_wire_error)?;
+    let source_fields = parse_wire_fields(source_payload, limits).map_err(map_wire_error)?;
+    let candidate_fields = parse_wire_fields(candidate_payload, limits).map_err(map_wire_error)?;
     budget.finish_wire_scan(source_fields.len())?;
     budget.finish_wire_scan(candidate_fields.len())?;
     if source_fields.len() != candidate_fields.len() {
@@ -2611,7 +2612,7 @@ mod tests {
     }
 
     fn put_bytes(output: &mut Vec<u8>, field: u32, value: &[u8]) {
-        append_length_delimited_field(output, field, value)
+        append_length_delimited_field(output, field, value, litchi_iwa_common::WireLimits::DEFAULT)
             .expect("test bytes field fits wire limits");
     }
 

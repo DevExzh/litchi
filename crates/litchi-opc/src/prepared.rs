@@ -165,6 +165,7 @@ mod tests {
     use super::PreparedOoxmlSource;
     use crate::error::OpcError;
     use crate::source_backed::SourceBackedPackage;
+    use crate::{SourceCacheLimits, SourceLimits, SourceReadPolicy};
 
     const WORD_MAIN: &str =
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml";
@@ -223,13 +224,26 @@ mod tests {
     fn open_switchable() -> (Arc<RevisionSwitchSource>, SourceBackedPackage) {
         let source = Arc::new(RevisionSwitchSource::new(docx_bytes()));
         let read_at: Arc<dyn ReadAt> = source.clone();
-        let package = SourceBackedPackage::from_read_at(read_at).expect("open");
+        let package = SourceBackedPackage::from_read_at(
+            read_at,
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .expect("open");
         (source, package)
     }
 
     #[test]
     fn prepared_source_retains_the_validated_main_part_content_type() {
-        let package = SourceBackedPackage::from_vec(docx_bytes()).expect("open");
+        let package = SourceBackedPackage::from_vec(
+            docx_bytes(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            None,
+        )
+        .expect("open");
         let prepared = PreparedOoxmlSource::new(package, WORD_MAIN).expect("prepare");
         assert_eq!(prepared.main_part_content_type(), WORD_MAIN);
         let package = prepared.into_package().expect("adopt");
@@ -238,7 +252,13 @@ mod tests {
 
     #[test]
     fn prepared_source_matches_the_declared_content_type_case_insensitively() {
-        let package = SourceBackedPackage::from_vec(docx_bytes()).expect("open");
+        let package = SourceBackedPackage::from_vec(
+            docx_bytes(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            None,
+        )
+        .expect("open");
         let prepared =
             PreparedOoxmlSource::new(package, &WORD_MAIN.to_uppercase()).expect("prepare");
         assert!(
@@ -250,7 +270,13 @@ mod tests {
 
     #[test]
     fn prepared_source_refuses_a_content_type_the_package_does_not_declare() {
-        let package = SourceBackedPackage::from_vec(docx_bytes()).expect("open");
+        let package = SourceBackedPackage::from_vec(
+            docx_bytes(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            None,
+        )
+        .expect("open");
         let Err(error) = PreparedOoxmlSource::new(package, "application/vnd.example.absent+xml")
         else {
             panic!("an undeclared main-part content type must be refused");
@@ -263,7 +289,13 @@ mod tests {
 
     #[test]
     fn prepared_source_refuses_a_blank_content_type() {
-        let package = SourceBackedPackage::from_vec(docx_bytes()).expect("open");
+        let package = SourceBackedPackage::from_vec(
+            docx_bytes(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            None,
+        )
+        .expect("open");
         let Err(error) = PreparedOoxmlSource::new(package, "   ") else {
             panic!("a blank main-part content type must be refused");
         };

@@ -17,7 +17,10 @@ const HYPERLINK_URL: &str = "https://example.test/litchi-docx-changed-relationsh
 const HYPERLINK_TEXT: &str = "litchi-docx-changed-relationship-regression";
 
 fn member(bytes: &[u8], name: &str) -> Result<Vec<u8>, Box<dyn Error>> {
-    Ok(OwnedPhysPkgReader::from_bytes(bytes.to_vec())?.read_member(name)?)
+    Ok(
+        OwnedPhysPkgReader::from_bytes(bytes.to_vec(), litchi_opc::SourceLimits::default())?
+            .read_member(name)?,
+    )
 }
 
 #[test]
@@ -28,8 +31,11 @@ fn docx_ordinary_save_preserves_document_relationship_bytes() -> Result<(), Box<
     std::fs::write(&source_path, SOURCE)?;
 
     let source_relationships = member(SOURCE, RELATIONSHIPS_MEMBER)?;
-    let mut package = Package::open(&source_path)?;
-    package.document_mut()?.add_paragraph_with_text(EDIT_MARKER);
+    let package = Package::open(&source_path)?;
+    let count = package.document_snapshot()?.paragraph_count();
+    let mut edit = package.edit()?;
+    edit.insert_paragraph(litchi_core::Position::new(count), EDIT_MARKER)?;
+    let package = edit.commit()?.into_package();
     package.save(&output_path)?;
 
     let output = std::fs::read(&output_path)?;
@@ -49,17 +55,28 @@ fn docx_ordinary_save_preserves_document_relationship_bytes() -> Result<(), Box<
 
 #[test]
 fn docx_changed_document_relationships_are_serialized() -> Result<(), Box<dyn Error>> {
+    use litchi_docx::document::{ElementPath, ElementStep, HyperlinkTarget, NewParagraph, NewRun};
+
     let directory = tempfile::tempdir()?;
     let source_path = directory.path().join("source.docx");
     let output_path = directory.path().join("output.docx");
     std::fs::write(&source_path, SOURCE)?;
 
     let source_relationships = member(SOURCE, RELATIONSHIPS_MEMBER)?;
-    let mut package = Package::open(&source_path)?;
-    package
-        .document_mut()?
-        .add_paragraph()
-        .add_hyperlink(HYPERLINK_URL, HYPERLINK_TEXT);
+    let package = Package::open(&source_path)?;
+    let mut edit = package.edit()?;
+    let position = edit.insert_paragraph_at(
+        &ElementPath::body(),
+        litchi_docx::document::ElementAnchor::End,
+        &NewParagraph::new(),
+    )?;
+    edit.insert_hyperlink_at(
+        &ElementPath::new([ElementStep::Paragraph(position)]),
+        None,
+        &HyperlinkTarget::Url(HYPERLINK_URL.to_owned()),
+        &NewRun::new(HYPERLINK_TEXT),
+    )?;
+    let package = edit.commit()?.into_package();
     package.save(&output_path)?;
 
     let output = std::fs::read(&output_path)?;

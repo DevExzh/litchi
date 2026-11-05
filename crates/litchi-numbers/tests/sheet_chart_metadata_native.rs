@@ -2,12 +2,9 @@
 
 use std::path::PathBuf;
 
-use litchi_iwa_archive::Limits;
 use litchi_iwa_common::chart::kind::Kind;
-use litchi_numbers::{
-    ChartMetadataError, ChartSelector, MAX_OBJECTS, Package, PackageReadOptions,
-    PackageSemanticLimits, SheetSelector,
-};
+use litchi_numbers::sheet::chart::metadata::Error as ChartMetadataError;
+use litchi_numbers::{ChartSelector, MAX_OBJECTS, Package, SheetSelector};
 
 #[path = "support/chart_arrangement_fixture.rs"]
 mod fixture;
@@ -106,19 +103,19 @@ fn chart_metadata_rejects_ambiguous_and_foreign_rooted_graphs() -> TestResult {
 #[test]
 fn chart_metadata_honors_the_shared_reference_budget() -> TestResult {
     let source = fixture::with_single_rooted_sheet(&fixture::fixture()?)?;
-    let semantic = PackageSemanticLimits::new(
-        MAX_OBJECTS,
-        PackageSemanticLimits::MAX_SHEETS,
-        PackageSemanticLimits::MAX_TABLES,
-        2,
-    )?;
+    let semantic = litchi_numbers::SemanticLimits::builder()
+        .max_objects(MAX_OBJECTS)
+        .and_then(|b| b.max_sheets(litchi_numbers::SemanticLimits::MAXIMUM.max_sheets()))
+        .and_then(|b| b.max_tables(litchi_numbers::SemanticLimits::MAXIMUM.max_tables()))
+        .and_then(|b| b.max_references(2))
+        .and_then(|b| b.build())?;
     let package = Package::from_bytes_with_options(
         &source,
-        PackageReadOptions::new(Limits::default(), semantic),
+        litchi_numbers::OpenOptions::new().semantic_limits(semantic),
     )?;
     let error = package
         .sheet_chart_metadata(SheetSelector::index(0), ChartSelector::index(0))
         .expect_err("metadata selection must stay within the finite reference budget");
-    assert!(matches!(error, ChartMetadataError::LimitExceeded { .. }));
+    assert!(matches!(error, ChartMetadataError::Limit { .. }));
     Ok(())
 }

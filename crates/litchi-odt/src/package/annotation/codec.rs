@@ -2,6 +2,7 @@
 
 use super::model::Annotation;
 use litchi_core::{Result, xml::escape_xml};
+use litchi_odf_common::XmlStreamLimits;
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
@@ -13,7 +14,7 @@ const META: &str = "urn:oasis:names:tc:opendocument:xmlns:meta:1.0";
 const XLINK: &str = "http://www.w3.org/1999/xlink";
 const LOEXT: &str = "urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0";
 
-pub(crate) fn serialize(annotation: &Annotation) -> Result<String> {
+pub(crate) fn serialize(annotation: &Annotation, limits: &XmlStreamLimits) -> Result<String> {
     let mut annotation = annotation.clone();
     for (prefix, uri) in [
         ("office", OFFICE),
@@ -30,7 +31,7 @@ pub(crate) fn serialize(annotation: &Annotation) -> Result<String> {
     }
     annotation.validate()?;
     let mut output = String::new();
-    annotation.write_xml(&mut output);
+    annotation.write_xml(&mut output, limits)?;
     Ok(output)
 }
 

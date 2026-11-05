@@ -9,7 +9,7 @@
 
 use litchi_pptx::Package;
 use litchi_pptx::animations::{Effect, EffectInstance, Sequence, Trigger};
-use litchi_pptx::presentation_properties::metadata::handout::{Layout, Master};
+use litchi_pptx::presentation_properties::metadata::handout::{Layout, Limits, Master};
 use litchi_pptx::presentation_properties::metadata::sections::{List as SectionList, Section};
 use std::error::Error as StdError;
 
@@ -49,7 +49,7 @@ fn test_handout_layouts() -> Result<(), Box<dyn StdError>> {
 
     for (layout, suffix, description) in layouts {
         let handout = Master::new().with_layout(layout);
-        let handout_xml = handout.to_xml();
+        let handout_xml = handout.to_xml(Limits::DEFAULT)?;
         assert!(handout_xml.contains(layout.as_str()));
         write_summary_package(
             &format!("handout_layout_{suffix}.pptx"),
@@ -84,7 +84,7 @@ fn test_background_colors() -> Result<(), Box<dyn StdError>> {
             .with_footer("Printed handout")
             .with_slide_numbers()
             .with_date_time();
-        let handout_xml = handout.to_xml();
+        let handout_xml = handout.to_xml(Limits::DEFAULT)?;
         assert!(!handout_xml.is_empty());
         write_summary_package(
             &format!("handout_bg_{name}.pptx"),
@@ -106,7 +106,7 @@ fn test_multi_slide_handout() -> Result<(), Box<dyn StdError>> {
     println!("\nTest 3: multi-slide handout package round trip...");
 
     let handout = Master::new().with_layout(Layout::SixSlides);
-    let handout_xml = handout.to_xml();
+    let handout_xml = handout.to_xml(Limits::DEFAULT)?;
     write_summary_package(
         "handout_12_slides.pptx",
         "Twelve-slide handout",
@@ -133,7 +133,7 @@ fn test_full_featured_handout() -> Result<(), Box<dyn StdError>> {
         .with_footer("© 2024 Example Corp")
         .with_slide_numbers()
         .with_date_time();
-    let handout_xml = handout.to_xml();
+    let handout_xml = handout.to_xml(Limits::DEFAULT)?;
 
     let full_body = format!(
         "Eight-slide summary deck\nSections XML: {} bytes\nAnimations XML: {} bytes\nHandout XML: {} bytes",
@@ -154,7 +154,7 @@ fn test_full_featured_handout() -> Result<(), Box<dyn StdError>> {
         .with_footer("Footer Text Here")
         .with_slide_numbers()
         .with_fixed_date("December 5, 2024")
-        .to_xml();
+        .to_xml(Limits::DEFAULT)?;
     write_summary_package(
         "handout_header_footer_test.pptx",
         "Header/footer handout",
@@ -169,7 +169,7 @@ fn test_full_featured_handout() -> Result<(), Box<dyn StdError>> {
         .with_footer("© 2024 Example Corp")
         .with_slide_numbers()
         .with_date_time()
-        .to_xml();
+        .to_xml(Limits::DEFAULT)?;
     write_summary_package(
         "handout_auto_date_test.pptx",
         "Automatic-date handout",
@@ -196,20 +196,31 @@ fn animations_xml() -> Result<String, Box<dyn StdError>> {
             .with_trigger(Trigger::AfterPrevious)
             .with_duration_ms(750),
     );
-    let xml = sequence.to_xml();
-    let parsed = Sequence::parse_timing_xml(&xml)?;
+    let xml = sequence.to_xml(litchi_pptx::animations::Limits::DEFAULT)?;
+    let parsed = Sequence::parse_timing_xml(&xml, litchi_pptx::animations::Limits::DEFAULT)?;
     assert_eq!(parsed.animations.len(), 2);
     Ok(xml)
 }
 
 fn sections_xml() -> Result<String, Box<dyn StdError>> {
     let mut sections = SectionList::new();
-    sections
-        .add_section(Section::new("Introduction", "section-introduction").with_slides([256, 257]));
-    sections.add_section(Section::new("Main Content", "section-content").with_slides([258, 259]));
-    sections.add_section(Section::new("Demonstrations", "section-demos").with_slides([260, 261]));
-    sections.add_section(Section::new("Conclusion", "section-conclusion").with_slides([262, 263]));
-    let xml = sections.to_xml()?;
+    sections.add_section(
+        Section::new("Introduction", "{00000000-0000-4000-8000-000000000001}")
+            .with_slides([256, 257]),
+    );
+    sections.add_section(
+        Section::new("Main Content", "{00000000-0000-4000-8000-000000000002}")
+            .with_slides([258, 259]),
+    );
+    sections.add_section(
+        Section::new("Demonstrations", "{00000000-0000-4000-8000-000000000003}")
+            .with_slides([260, 261]),
+    );
+    sections.add_section(
+        Section::new("Conclusion", "{00000000-0000-4000-8000-000000000004}")
+            .with_slides([262, 263]),
+    );
+    let xml = sections.to_xml(Limits::DEFAULT)?;
     assert_eq!(sections.sections().len(), 4);
     Ok(xml)
 }
@@ -277,9 +288,9 @@ fn write_summary_package(
     body: &str,
     slide_count: usize,
 ) -> Result<(), Box<dyn StdError>> {
-    let mut package = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
     {
-        let presentation = package.presentation_mut()?;
+        let presentation = builder.presentation()?;
         presentation.set_widescreen_slide_size();
         for index in 1..=slide_count {
             let slide = presentation.add_slide()?;
@@ -292,6 +303,7 @@ fn write_summary_package(
             slide.add_text_box(body, X, Y, WIDTH, HEIGHT);
         }
     }
+    let package = builder.build()?;
     package.save(path)?;
     let reopened = Package::open(path)?;
     assert_eq!(reopened.presentation()?.slide_count()?, slide_count);

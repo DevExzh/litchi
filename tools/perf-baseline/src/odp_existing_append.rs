@@ -210,7 +210,7 @@ fn source_archive_from_base(
     let meta = base.get_file("meta.xml")?;
     let opaque = opaque_payload(opaque_variant);
 
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(ODP_MIME)?;
     writer.add_file_with_media_type("content.xml", &content, ODP_XML_MEDIA_TYPE)?;
     writer.add_file_with_media_type("styles.xml", &styles, ODP_XML_MEDIA_TYPE)?;
@@ -228,16 +228,16 @@ pub(crate) fn appended_body(shape: SemanticShape) -> String {
 }
 
 fn append_once(source_bytes: &[u8], shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
-    let source = litchi_odp::authoring::edit::Snapshot::from_bytes(source_bytes.to_vec())?;
-    let mut transaction = source.transaction()?;
+    let source = litchi_odp::authoring::edit::Package::from_bytes(source_bytes)?;
+    let mut transaction = source.edit()?;
     let title = appended_title(shape);
     let body = appended_body(shape);
     transaction.add(&title, &body)?;
     let commit = transaction.commit()?;
-    if !commit.changed() || commit.patch().is_noop() {
+    if !commit.diagnostics().changed() || commit.patch().is_noop() {
         return Err("ODP append candidate reported an exact no-op".into());
     }
-    Ok(commit.snapshot().bytes().to_vec())
+    Ok(commit.package().as_bytes().to_vec())
 }
 
 pub(crate) fn member_identities(
@@ -295,7 +295,7 @@ pub(crate) fn find_member<'a>(
 pub(crate) fn semantic_slides(
     bytes: &[u8],
 ) -> Result<Vec<(Option<String>, String)>, Box<dyn Error>> {
-    let presentation = litchi_odp::Presentation::from_bytes(bytes.to_vec())?;
+    let presentation = litchi_odp::Package::from_bytes(bytes)?.presentation()?;
     let slides = presentation.slides()?;
     slides
         .into_iter()
@@ -507,28 +507,36 @@ fn verify_patch_contract(
     stale_bytes: &[u8],
     shape: SemanticShape,
 ) -> Result<(bool, bool, bool, bool), Box<dyn Error>> {
-    let source = litchi_odp::authoring::edit::Snapshot::from_bytes(source_bytes.to_vec())?;
-    let mut transaction = source.transaction()?;
+    let source = litchi_odp::authoring::edit::Package::from_bytes(source_bytes)?;
+    let mut transaction = source.edit()?;
     let title = appended_title(shape);
     let body = appended_body(shape);
     transaction.add(&title, &body)?;
     let commit = transaction.commit()?;
-    let replayed = commit.patch().apply(&source)?;
-    let replay_ok = replayed.bytes() == expected_output;
-    let inverse_ok = commit.patch().inverse().apply(&replayed)?.bytes() == source.bytes();
-    let stale = litchi_odp::authoring::edit::Snapshot::from_bytes(stale_bytes.to_vec())?;
+    let replayed = source.apply(commit.patch())?.into_package();
+    let replay_ok = replayed.as_bytes() == expected_output;
+    let inverse_ok = replayed
+        .apply(&commit.patch().inverse())?
+        .into_package()
+        .as_bytes()
+        == source.as_bytes();
+    let stale = litchi_odp::authoring::edit::Package::from_bytes(stale_bytes)?;
+    // Record 0358 made a stale source a typed patch conflict (it was an
+    // `InvalidFormat` message before); record 0377 updates this oracle.
     let stale_refused = matches!(
-        commit.patch().apply(&stale),
-        Err(litchi_core::Error::InvalidFormat(message))
-            if message == "stale ODP presentation patch source"
+        stale.apply(commit.patch()),
+        Err(litchi_odf_common::Error::PatchConflict {
+            operation: "odp.apply",
+            ..
+        })
     );
 
-    let no_op = source.transaction()?.commit()?;
-    let exact_noop = !no_op.changed()
+    let no_op = source.edit()?.commit()?;
+    let exact_noop = !no_op.diagnostics().changed()
         && no_op.patch().is_noop()
-        && no_op.snapshot().bytes().len() == source.bytes().len()
-        && no_op.snapshot().bytes().as_ptr() == source.bytes().as_ptr()
-        && no_op.snapshot().bytes() == source.bytes();
+        && no_op.package().as_bytes().len() == source.as_bytes().len()
+        && no_op.package().as_bytes().as_ptr() == source.as_bytes().as_ptr()
+        && no_op.package().as_bytes() == source.as_bytes();
     if !replay_ok || !inverse_ok || !stale_refused || !exact_noop {
         return Err("ODP append patch or exact-noop gate failed".into());
     }
@@ -725,17 +733,17 @@ pub(crate) fn run_odp_existing_append_lifecycle(
         let process_before = process_metrics::Snapshot::read().ok();
         let allocation_region = allocation_metrics::begin();
         let started = std::time::Instant::now();
-        let source = litchi_odp::authoring::edit::Snapshot::from_bytes(input)?;
-        let mut transaction = source.transaction()?;
+        let source = litchi_odp::authoring::edit::Package::from_bytes(&input)?;
+        let mut transaction = source.edit()?;
         transaction.add(&title, &body)?;
         let commit = transaction.commit()?;
-        sink.write_all(commit.snapshot().bytes())?;
+        sink.write_all(commit.package().as_bytes())?;
         let duration = started.elapsed();
         let allocation_metrics = allocation_region.finish();
         let process_after = process_metrics::Snapshot::read().ok();
 
-        let candidate = commit.snapshot().bytes();
-        if candidate != corpus.expected_output || source.bytes() != corpus.corpus.archive {
+        let candidate = commit.package().as_bytes();
+        if candidate != corpus.expected_output || source.as_bytes() != corpus.corpus.archive {
             return Err("ODP append lifecycle candidate or source lineage changed".into());
         }
         let candidate_digest = sha256_hex(candidate);
@@ -784,7 +792,7 @@ pub(crate) fn run_odp_existing_append_lifecycle(
     let source = SourceSummary {
         odp_append: Some(OdpExistingAppendSummary {
             role: "existing_append",
-            implementation: "litchi_odp::authoring::edit::Snapshot::from_bytes + Transaction::add/commit",
+            implementation: "litchi_odp::authoring::edit::Package::from_bytes + Transaction::add/commit",
             timing_scope: "owned input clone, append strings, and HashingDiscardSink construction outside; the clock includes Snapshot::from_bytes, Snapshot::transaction, exactly one transaction.add, transaction.commit, and sequential committed-snapshot write_all; digest finalization, output/source/patch/member oracles, result assembly, and dropping source/candidate occur after the clock and endpoint snapshots",
             performance_claim: "owned fully materialized existing-ODP lifecycle evidence only; no source-backed, bounded-memory, or semantic-streaming-save claim; allocation live delta intentionally retains source and candidate at endpoint snapshots",
             corpus_generator: ODP_EXISTING_APPEND_CORPUS_GENERATOR,

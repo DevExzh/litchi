@@ -209,10 +209,12 @@ pub(crate) fn rewrite_value_only_with_provenance<'a>(
     validate_column_actions(&layout, sheet, &plan.columns)?;
     validate_defaults_action(&layout, sheet, plan.defaults)?;
     let eligible = !layout.has_shared_formulas
-        && !plan
-            .cells
-            .values()
-            .any(|action| matches!(action.payload(), Some(Payload::SharedFormula { .. })))
+        && !plan.cells.values().any(|action| {
+            matches!(
+                action.payload(),
+                Some(Payload::SharedFormula { .. } | Payload::Cache(_))
+            )
+        })
         && plan.cells.keys().all(|address| {
             let Some(number) = address.row().get().checked_add(1) else {
                 return false;
@@ -489,7 +491,10 @@ fn facts_admit_plan(facts: &SourceFacts, plan: &Plan) -> bool {
     }
     plan.cells.iter().all(|(address, action)| {
         if matches!(action, Action::Remove)
-            || matches!(action.payload(), Some(Payload::SharedFormula { .. }))
+            || matches!(
+                action.payload(),
+                Some(Payload::SharedFormula { .. } | Payload::Cache(_))
+            )
         {
             return false;
         }

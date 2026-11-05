@@ -11,6 +11,7 @@
 //! [`OmmlParser`] and then through [`LatexConverter`], printing both the
 //! input markup and the resulting LaTeX for each one.
 
+use litchi_formula::omml::Limits;
 use litchi_formula::{Formula, LatexConverter, OmmlParser, omml_to_latex};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -79,7 +80,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for (label, omml) in samples {
         println!("Formula : {label}");
         println!("OMML    : {}", oneline(omml));
-        match omml_to_latex(omml) {
+        match omml_to_latex(omml, &Limits::DEFAULT) {
             Ok(latex) => println!("LaTeX   : {latex}"),
             Err(e) => println!("error   : {e}"),
         }
@@ -93,7 +94,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut converter = LatexConverter::new();
     for (label, omml) in samples {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
         let nodes = match parser.parse(omml) {
             Ok(nodes) => nodes,
             Err(e) => {

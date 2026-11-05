@@ -1,5 +1,5 @@
 use super::super::super::super::{
-    invalid,
+    invalid, limit,
     model::{
         CommonTimeNode, ConditionEvent, ConditionTarget, Duration, MotionFraction, NextAction,
         PresetClass, PresetTimeNode, PreviousAction, RuntimeTrigger, Sequence, TimeCondition,
@@ -8,10 +8,10 @@ use super::super::super::super::{
 };
 use super::semantic::TimingParser;
 use super::validation::{
-    MAX_TIMING_DEPTH, MAX_TIMING_NODES, MAX_TIMING_TEXT_BYTES, TimingValue, attribute,
-    check_attribute_count, is_presentationml_name, parse_shape_id, parse_timing_value,
-    parse_xml_bool,
+    TimingValue, attribute, check_attribute_count, is_presentationml_name, parse_shape_id,
+    parse_timing_value, parse_xml_bool,
 };
+use crate::animations::Limits;
 use crate::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
@@ -29,7 +29,7 @@ struct RecursiveNodeFrame {
     node: TimingNode,
 }
 
-pub(super) fn parse_recursive_timing_tree(xml: &str) -> Result<TimingTree> {
+pub(super) fn parse_recursive_timing_tree(xml: &str, limits: Limits) -> Result<TimingTree> {
     let mut reader = NsReader::from_reader(xml.as_bytes());
     // The retained timing source is sliced from `xml`, whose leading
     // byte-order mark precedes reader position zero.
@@ -56,12 +56,35 @@ pub(super) fn parse_recursive_timing_tree(xml: &str) -> Result<TimingTree> {
             .map_err(|error| Error::Xml(error.to_string()))?;
         match event {
             Event::Start(ref element) | Event::Empty(ref element) => {
-                depth += 1;
-                count += 1;
-                if depth > MAX_TIMING_DEPTH || count > MAX_TIMING_NODES {
-                    return Err(invalid("animation timing tree exceeds safety limit"));
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        limits.max_depth,
+                    )
+                })?;
+                if depth > limits.max_depth {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        limits.max_depth,
+                    ));
                 }
-                check_attribute_count(element)?;
+                count = count.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_nodes,
+                    )
+                })?;
+                if count > limits.max_nodes {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        count,
+                        limits.max_nodes,
+                    ));
+                }
+                check_attribute_count(element, limits)?;
                 let empty = matches!(event, Event::Empty(_));
                 if timing_depth.is_none()
                     && is_presentationml_name(&namespace, element.name(), b"timing")
@@ -338,9 +361,15 @@ pub(super) fn parse_recursive_timing_tree(xml: &str) -> Result<TimingTree> {
     let range = source_range.ok_or_else(|| invalid("animation timing subtree is missing"))?;
     let source = xml
         .get(range)
-        .ok_or_else(|| invalid("animation timing range is invalid"))?
-        .to_string()
-        .into_boxed_str();
+        .ok_or_else(|| invalid("animation timing range is invalid"))?;
+    if source.len() > limits.max_output_bytes {
+        return Err(Error::Limit {
+            kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlBytes),
+            observed: source.len(),
+            maximum: limits.max_output_bytes,
+        });
+    }
+    let source = source.to_owned().into_boxed_str();
     let mut tree = TimingTree {
         roots,
         opaque_children: Vec::new(),
@@ -391,11 +420,15 @@ fn p14_attribute(
     Ok(value)
 }
 
-pub(super) fn parse_processed_timing(xml: &[u8], require_valid_targets: bool) -> Result<Sequence> {
+pub(super) fn parse_processed_timing(
+    xml: &[u8],
+    require_valid_targets: bool,
+    limits: Limits,
+) -> Result<Sequence> {
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(true);
-    let mut parser = TimingParser::new(require_valid_targets);
+    let mut parser = TimingParser::new(require_valid_targets, limits);
     let mut depth = 0usize;
     let mut nodes = 0usize;
     let mut text_bytes = 0usize;
@@ -414,11 +447,19 @@ pub(super) fn parse_processed_timing(xml: &[u8], require_valid_targets: bool) ->
         let event_end = origin
             .offset(reader.buffer_position())
             .ok_or_else(|| invalid("animation XML offset does not fit usize"))?;
-        nodes = nodes
-            .checked_add(1)
-            .ok_or_else(|| invalid("animation XML node counter overflow"))?;
-        if nodes > MAX_TIMING_NODES {
-            return Err(invalid("animation XML node count exceeds safety limit"));
+        nodes = nodes.checked_add(1).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::XmlNodes,
+                usize::MAX,
+                limits.max_nodes,
+            )
+        })?;
+        if nodes > limits.max_nodes {
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlNodes,
+                nodes,
+                limits.max_nodes,
+            ));
         }
         match event {
             Event::Start(element) => {
@@ -431,9 +472,19 @@ pub(super) fn parse_processed_timing(xml: &[u8], require_valid_targets: bool) ->
                     event_start,
                     event_end,
                 )?;
-                depth += 1;
-                if depth > MAX_TIMING_DEPTH {
-                    return Err(invalid("animation XML depth exceeds safety limit"));
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        limits.max_depth,
+                    )
+                })?;
+                if depth > limits.max_depth {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        limits.max_depth,
+                    ));
                 }
             },
             Event::Empty(element) => parser.start(
@@ -452,19 +503,35 @@ pub(super) fn parse_processed_timing(xml: &[u8], require_valid_targets: bool) ->
                 parser.end(&namespace, element.name(), depth, event_end)?;
             },
             Event::Text(text) => {
-                text_bytes = text_bytes
-                    .checked_add(text.as_ref().len())
-                    .ok_or_else(|| invalid("animation XML text counter overflow"))?;
-                if text_bytes > MAX_TIMING_TEXT_BYTES {
-                    return Err(invalid("animation XML text exceeds safety limit"));
+                text_bytes = text_bytes.checked_add(text.as_ref().len()).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::TextBytes,
+                        usize::MAX,
+                        limits.max_text_bytes,
+                    )
+                })?;
+                if text_bytes > limits.max_text_bytes {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::TextBytes,
+                        text_bytes,
+                        limits.max_text_bytes,
+                    ));
                 }
             },
             Event::CData(text) => {
-                text_bytes = text_bytes
-                    .checked_add(text.as_ref().len())
-                    .ok_or_else(|| invalid("animation XML text counter overflow"))?;
-                if text_bytes > MAX_TIMING_TEXT_BYTES {
-                    return Err(invalid("animation XML text exceeds safety limit"));
+                text_bytes = text_bytes.checked_add(text.as_ref().len()).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::TextBytes,
+                        usize::MAX,
+                        limits.max_text_bytes,
+                    )
+                })?;
+                if text_bytes > limits.max_text_bytes {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::TextBytes,
+                        text_bytes,
+                        limits.max_text_bytes,
+                    ));
                 }
             },
             Event::DocType(_) => return Err(invalid("DOCTYPE is not allowed in animation XML")),
@@ -475,5 +542,5 @@ pub(super) fn parse_processed_timing(xml: &[u8], require_valid_targets: bool) ->
     if depth != 0 {
         return Err(invalid("incomplete animation XML"));
     }
-    parser.finish(xml)
+    parser.finish(xml, limits)
 }

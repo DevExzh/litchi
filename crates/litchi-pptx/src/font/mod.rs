@@ -12,9 +12,9 @@ pub use model::{
     Charset, Conformance, Data, Face, Family, Font, Fonts, Format, Key, License, Panose,
     Permission, Pitch, PitchFamily, Restrictions, Style,
 };
-pub use package::{conformance, load, put, remove};
-
-use crate::error::Error;
+pub use package::{conformance, load};
+mod edit;
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 
 const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
 const STRICT_PML: &str = "http://purl.oclc.org/ooxml/presentationml/main";
@@ -41,21 +41,11 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-fn limit(name: &'static str) -> Error {
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
     Error::Limit {
-        resource: name,
-        limit: match name {
-            "presentation XML bytes"
-            | "MCE-processed presentation XML bytes"
-            | "serialized embedded-font XML bytes"
-            | "updated presentation XML bytes" => MAX_XML_BYTES,
-            "XML nodes" => MAX_NODES,
-            "XML depth" | "presentation XML depth" => MAX_DEPTH,
-            "embedded fonts" => MAX_FONTS,
-            "individual font bytes" => MAX_FONT_BYTES,
-            "total font bytes" => MAX_TOTAL_FONT_BYTES,
-            "embedded-font string bytes" | "XML string bytes" => MAX_STRING_BYTES,
-            _ => usize::MAX,
-        },
+        kind: LimitKind::Codec(kind),
+        observed,
+        maximum,
     }
 }
+pub(crate) use package::{put, remove};

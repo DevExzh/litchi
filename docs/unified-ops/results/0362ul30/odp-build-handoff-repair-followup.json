@@ -1,0 +1,103 @@
+{
+  "schema": "litchi.0362ul30.odp-build-handoff-repair-followup.v1",
+  "date": "2026-10-24",
+  "claim_scope": "source-only repair evidence, packet identities and guarded commands; no Cargo build, native run, timing, heaptrack result, qualification or acceptance claim",
+  "review": {
+    "path": "/home/zhuhe/.cache/litchi-api-contract/odp-build-handoff-review-40165ae0af.json",
+    "bytes": 6500,
+    "sha256": "09ebd4f31fd554b7a5d21fc436b10cf7238b5287a1c81d9566bbaf4207c60d3c",
+    "prior_commit": "40165ae0af24ffa03db9df02ec267ea2d498220b",
+    "findings_repaired": [
+      "baseline ignored Cargo.lock must be copied and hash-fenced into disposable clone",
+      "memory TMPDIR must be exported to heaptrack and probe",
+      "heaptrack capture extension must be discovered and heaptrack_print must receive histogram output path"
+    ]
+  },
+  "preserved_prior_packet": {
+    "root": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547",
+    "input_sha256": "5992db0a0520ae3dedb47e44f5d584a8e1890c544d2611fca92db6482f6c47e6",
+    "plan_sha256": "d213e7c0158757a1e9ff51c6649c2da8a5dafa69469bb73dbcc22f99114fcc5b",
+    "build_handoff_sha256": "33943e0c7c0cce75acb104169a550506b95f1d21e3df869de277cae76898153d",
+    "memory_protocol_sha256": "f929413cb6860604148c67c95c44088c0a23ddfe3b4a722e5461643727fa8180",
+    "failed_review_counts_preserved": true
+  },
+  "repaired_packet": {
+    "root": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547-repair-40165ae0af",
+    "status": "build_required",
+    "files": [
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547-repair-40165ae0af/input.json",
+        "bytes": 1749,
+        "sha256": "a7f598369ee2698a8ae265c71921f112f352e08a9bcedbd44977ee31811a6aac",
+        "role": "corrected runner manifest"
+      },
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547-repair-40165ae0af/plan.json",
+        "bytes": 2058,
+        "sha256": "dfb286badeefbd5b036730500f7da182c5ec8b9da201dcd573cfacc5cb19a342",
+        "role": "plan with corrected executable paths"
+      },
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547-repair-40165ae0af/build-handoff.json",
+        "bytes": 14430,
+        "sha256": "41012547d456a841d260952b08bf76bfcd5c22976349b6624752e0bf5e9efa62",
+        "role": "lock-fenced builds and source-only validators"
+      },
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547-repair-40165ae0af/memory-protocol.json",
+        "bytes": 10850,
+        "sha256": "44103b2a571a3dfb309e0aad5deed383deb63b8d3226b10a496050031f9c31cf",
+        "role": "exported-TMPDIR dynamic heaptrack protocol"
+      },
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547-repair-40165ae0af/qualification-run/manifest-plan/plan.json",
+        "bytes": 2093,
+        "sha256": "a975c2d5598953e702d8079269dc441b09f6c4a599888cbc13ff3a1bc193c8f6",
+        "role": "source-only runner --plan receipt"
+      }
+    ]
+  },
+  "identities": {
+    "baseline_commit": "e4a0614f5d3a1d768346cc33a4a3b86522dda986",
+    "baseline_tree": "a1d3d5fb726673f8a162d4d9c4265f6ae79fcd4b",
+    "baseline_lock_sha256": "04665b965a919412e29c8772956ddf6267264fa40e3e0ef7c9967fd2eb584171",
+    "baseline_adapter_sha256": "47cc7a780d93b23015ff698216e98ce9597ee300ee1b34ae21a39276b2baded7",
+    "candidate_commit": "472b6705475b073e7fe08f6e11ee17fb1e29f838",
+    "candidate_tree": "ebc1cee05f124c0c63977aff07a23288c19e7d00",
+    "candidate_root_lock_sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
+    "candidate_perf_lock_sha256": "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c",
+    "candidate_probe_sha256": "c68f790247c7f83a1acb256a57f6c3928346b10cb348d5cf30d8f89705673bef",
+    "runner_sha256": "e12434a16547753571865692e6510195ea6fdab7d26274460d2c14213575d4b9",
+    "fixture_sha256": "078a83cd132a308e4609cf46f587cb68c1f928c8d2e6e1002d344223ec385cb5"
+  },
+  "repairs": {
+    "baseline_lock": {
+      "copy_before_locked_build": true,
+      "source_bytes": 139425,
+      "source_sha256": "04665b965a919412e29c8772956ddf6267264fa40e3e0ef7c9967fd2eb584171",
+      "hash_after_copy_and_build": true,
+      "git_check_ignore_fence": true,
+      "cleanup_removes_lock_and_adapter": true
+    },
+    "memory_tmpdir": {
+      "baseline_exported": true,
+      "candidate_exported": true,
+      "fresh_per_leg_paths": true
+    },
+    "heaptrack_capture": {
+      "extensions_discovered": [".gz", ".zst"],
+      "capture_path_and_sha_bound_before_print": true,
+      "histogram_output_argument": true,
+      "summary_histogram_capture_hashes_retained": true
+    }
+  },
+  "execution": {
+    "source_only_plan_returncode": 0,
+    "cargo_builds_run": false,
+    "native_probes_run": false,
+    "timing_run": false,
+    "memory_run": false,
+    "immutable_source_mutated": false,
+    "acceptance_claim": false
+  }
+}

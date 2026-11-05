@@ -58,13 +58,20 @@ use std::sync::{Arc, OnceLock};
 /// ```rust,no_run
 /// use litchi_doc::Package;
 ///
-/// let mut pkg = Package::open("document.doc")?;
-/// let doc = pkg.document()?;
+/// let pkg = Package::open("document.doc")?;
+/// let doc = pkg.document();
 /// let text = doc.text()?;
 /// println!("Document text: {}", text);
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-pub struct Document {
+/// Cheaply cloneable storage for one parsed document projection.
+///
+/// The public [`Document`] handle keeps this state behind an `Arc`, so package
+/// projections and caller handles never deep-copy the parsed tables.
+pub(in crate::document) struct DocumentState {
+    /// Physical source policy retained from package ingress for deferred raw
+    /// fragment codecs.
+    pub(in crate::document) source_limits: crate::package::SourceLimits,
     /// File Information Block from `WordDocument` stream
     pub(in crate::document) fib: FileInformationBlock,
     /// The `WordDocument` stream - main document binary data
@@ -252,4 +259,32 @@ pub struct Document {
     /// Parsed MTEF formulas rendered while their temporary parser arena is alive.
     /// Owned strings avoid a self-referential document and remain cheap to share.
     pub(in crate::document) parsed_mtef: HashMap<String, Arc<str>>,
+    /// Bounded raw source for the deferred font-table (`SttbfFfn`) parse, or
+    /// its deferred range/allocation diagnostic.
+    pub(in crate::document) font_table_source: std::result::Result<Option<Vec<u8>>, String>,
+    /// Deferred strict font-table parse, including the first parse error so
+    /// a malformed table is not reparsed.
+    pub(in crate::document) font_table:
+        OnceLock<std::result::Result<Option<crate::parts::fonts::FontTable>, String>>,
+    /// Memoized per-story element indexes (M1 L-DOC-R3), a weighted
+    /// clean-value cache; see [`Document::story_blocks`].
+    pub(in crate::document) story_indexes: super::semantic::stories::StoryIndexCache,
+}
+
+/// An owned, read-only semantic projection of a legacy Word document.
+///
+/// Cloning this handle only clones an `Arc`; the parsed document tables and
+/// retained semantic state stay shared across package and caller handles.
+pub struct Document(pub(in crate::document) Arc<DocumentState>);
+
+impl Clone for Document {
+    fn clone(&self) -> Self {
+        Self(Arc::clone(&self.0))
+    }
+}
+
+impl Document {
+    pub(in crate::document) fn from_state(state: DocumentState) -> Self {
+        Self(Arc::new(state))
+    }
 }

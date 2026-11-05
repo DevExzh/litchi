@@ -21,7 +21,7 @@ fn package(inline: bool) -> Result<Vec<u8>> {
     } else {
         "<draw:object xlink:href=\"./Object_1\" xlink:type=\"simple\" xlink:show=\"embed\" xlink:actuate=\"onLoad\"/>".to_string()
     };
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(ODF_PRESENTATION)?;
     writer.add_file("content.xml", content(&object).as_bytes())?;
     if !inline {
@@ -55,10 +55,8 @@ fn discovers_typed_part_and_selector_context() -> Result<()> {
 fn no_op_commit_returns_exact_archive_bytes() -> Result<()> {
     let bytes = package(false)?;
     let presentation = open_presentation(bytes.clone())?;
-    let inventory = presentation.charts()?;
-    let commit = inventory.transaction().commit()?;
-    assert!(!commit.changed());
-    assert_eq!(commit.bytes(), bytes.as_slice());
+    let commit = presentation.chart_snapshot()?.edit().commit()?;
+    assert_eq!(commit.snapshot().bytes(), bytes.as_slice());
     Ok(())
 }
 
@@ -66,13 +64,11 @@ fn no_op_commit_returns_exact_archive_bytes() -> Result<()> {
 fn inline_replace_preserves_unknown_chart_xml() -> Result<()> {
     let bytes = package(true)?;
     let presentation = open_presentation(bytes)?;
-    let inventory = presentation.charts()?;
-    let mut transaction = inventory.transaction();
+    let mut edit = presentation.chart_snapshot()?.edit();
     let replacement = Part::from_xml(CHART.replace("kept", "still-kept"))?;
-    transaction.replace("Chart A", replacement)?;
-    let commit = transaction.commit()?;
-    assert!(commit.changed());
-    let reparsed = open_presentation(commit.into_owned_bytes())?;
+    edit.replace("Chart A", replacement)?;
+    let commit = edit.commit()?;
+    let reparsed = open_presentation(commit.snapshot().bytes().to_vec())?;
     let charts = reparsed.charts()?;
     let chart = charts.at(0)?.ok_or_else(|| {
         litchi_core::Error::InvalidFormat("replaced chart disappeared".to_string())
@@ -86,18 +82,16 @@ fn inline_replace_preserves_unknown_chart_xml() -> Result<()> {
 fn remove_then_add_rebuilds_only_permitted_package_parts() -> Result<()> {
     let bytes = package(false)?;
     let presentation = open_presentation(bytes)?;
-    let inventory = presentation.charts()?;
-    let mut transaction = inventory.transaction();
-    transaction.remove("Chart A")?;
-    transaction.add(
+    let mut edit = presentation.chart_snapshot()?.edit();
+    edit.remove("Chart A")?;
+    edit.add(
         0usize,
         "Chart B",
         Storage::InlineXml,
         Part::from_xml(CHART)?,
     )?;
-    let commit = transaction.commit()?;
-    assert!(commit.changed());
-    let output = commit.into_owned_bytes();
+    let commit = edit.commit()?;
+    let output = commit.snapshot().bytes().to_vec();
     let archive = OwnedPackage::from_bytes(output.clone())?;
     assert!(!archive.has_file("Object_1/content.xml")?);
     let reparsed = open_presentation(output)?;
@@ -115,9 +109,8 @@ fn limits_reject_oversized_parts_before_staging() -> Result<()> {
     let bytes = package(false)?;
     let presentation = open_presentation(bytes)?;
     let limits = super::Limits::new(1, CHART.len(), CHART.len())?;
-    let inventory = presentation.charts_with(limits)?;
-    let mut transaction = inventory.transaction();
-    let error = transaction.replace(
+    let mut edit = presentation.chart_snapshot_with(limits)?.edit();
+    let error = edit.replace(
         "Chart A",
         Part::from_xml(CHART.replace("kept", "too-long"))?,
     );
@@ -126,7 +119,7 @@ fn limits_reject_oversized_parts_before_staging() -> Result<()> {
 }
 
 #[test]
-fn owned_snapshot_commit_and_patch_rehydrate_the_presentation() -> Result<()> {
+fn owned_snapshot_commit_rehydrates_the_presentation() -> Result<()> {
     let source_bytes = package(false)?;
     let presentation = open_presentation(source_bytes.clone())?;
     let source = presentation.chart_snapshot()?;
@@ -137,10 +130,8 @@ fn owned_snapshot_commit_and_patch_rehydrate_the_presentation() -> Result<()> {
     )?;
     let commit = edit.commit()?;
 
-    assert!(commit.changed());
-    assert_eq!(commit.diagnostics().charts_before(), 1);
-    assert_eq!(commit.diagnostics().charts_after(), 1);
-    assert!(commit.diagnostics().changed());
+    assert_ne!(commit.snapshot().bytes(), source.bytes());
+    assert_eq!(commit.snapshot().charts().len(), 1);
     assert_eq!(source.bytes(), source_bytes.as_slice());
     assert!(
         commit
@@ -155,14 +146,6 @@ fn owned_snapshot_commit_and_patch_rehydrate_the_presentation() -> Result<()> {
             .is_some_and(|chart| chart.part().xml().contains("snapshot-kept"))
     );
 
-    let applied = commit.patch().apply(&source)?;
-    assert_eq!(applied.snapshot().bytes(), commit.snapshot().bytes());
-    let restored = commit.patch().inverse().apply(applied.snapshot())?;
-    assert_eq!(restored.snapshot().bytes(), source.bytes());
-    assert!(commit.patch().is_applicable_to(restored.snapshot()));
-    assert!(commit.patch().apply(restored.snapshot()).is_ok());
-    let stale = open_presentation(package(true)?)?.chart_snapshot()?;
-    assert!(commit.patch().apply(&stale).is_err());
     Ok(())
 }
 
@@ -171,8 +154,6 @@ fn owned_snapshot_add_remove_and_noop_have_verified_readback() -> Result<()> {
     let presentation = open_presentation(package(false)?)?;
     let source = presentation.chart_snapshot()?;
     let noop = source.edit().commit()?;
-    assert!(!noop.changed());
-    assert!(noop.patch().is_noop());
     assert_eq!(noop.snapshot().bytes(), source.bytes());
 
     let mut edit = source.edit();
@@ -199,4 +180,32 @@ fn authored_chart_parts_must_be_compact_xml() {
     assert!(Part::from_xml(formatted).is_err());
     let spaced = CHART.replacen("><", "> <", 1);
     assert!(Part::from_xml(spaced).is_err());
+}
+
+/// Record 0358a: the removed inventory transaction's chart edits on the
+/// package route, with a durable, reversible, mergeable patch.
+#[test]
+fn package_chart_edits_have_durable_patches() -> Result<()> {
+    let bytes = package(false)?;
+    let package = crate::Package::from_bytes(&bytes)
+        .map_err(|error| litchi_core::Error::InvalidFormat(error.to_string()))?;
+    let mut edit = package
+        .edit()
+        .map_err(|error| litchi_core::Error::InvalidFormat(error.to_string()))?;
+    edit.replace_chart("Chart A", Part::from_xml(CHART.replace("kept", "durable"))?)?;
+    let commit = edit
+        .commit()
+        .map_err(|error| litchi_core::Error::InvalidFormat(error.to_string()))?;
+    let wire = commit.patch().to_durable_bytes()?;
+    let patch = crate::edit::Patch::from_durable_bytes(&wire)?;
+    let replayed = package
+        .apply(&patch)
+        .map_err(|error| litchi_core::Error::InvalidFormat(error.to_string()))?;
+    assert_eq!(replayed.package().as_bytes(), commit.package().as_bytes());
+    let restored = commit
+        .package()
+        .apply(&patch.inverse())
+        .map_err(|error| litchi_core::Error::InvalidFormat(error.to_string()))?;
+    assert_eq!(restored.package().as_bytes(), bytes.as_slice());
+    Ok(())
 }

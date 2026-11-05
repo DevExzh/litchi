@@ -7,7 +7,7 @@
 
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
 use litchi_xlsb::Package;
-use litchi_xlsb::raw::{Records, Writer, kind};
+use litchi_xlsb::raw::{Encoder, Records, kind};
 use litchi_xlsb::volatile_dependencies::{
     CachedValue, CellReference, DEFAULT_PART_NAME, Dependencies, DependencyKind, MainTopic, Topic,
     VolatileType,
@@ -28,7 +28,7 @@ fn dependencies(value: &'static str) -> Dependencies {
 }
 
 fn package_with_owner() -> Package {
-    let package = Package::create().expect("workbook");
+    let package = Package::new().expect("workbook");
     let mut edit = package
         .edit_volatile_dependencies()
         .expect("volatile snapshot");
@@ -36,7 +36,8 @@ fn package_with_owner() -> Package {
         .expect("stage owner");
     let commit = edit.commit().expect("commit owner");
     package
-        .apply_volatile_dependencies(&commit)
+        .apply_volatile_dependencies(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("publish owner")
 }
 
@@ -131,7 +132,7 @@ fn reserved_type_bits_package() -> Package {
         .expect("owner part")
         .blob();
     let mut records = Vec::new();
-    for record in Records::new(source) {
+    for record in Records::new(source, litchi_xlsb::raw::Limits::DEFAULT) {
         let record = record.expect("owner record");
         let payload = if record.kind() == kind::BEGIN_VOL_TYPE {
             let mut payload = record.payload().to_vec();
@@ -144,7 +145,7 @@ fn reserved_type_bits_package() -> Package {
         records.push((record.kind(), payload));
     }
     let mut replacement = Vec::new();
-    let mut writer = Writer::new(&mut replacement);
+    let mut writer = Encoder::new(&mut replacement, litchi_xlsb::raw::Limits::DEFAULT);
     for (record_kind, payload) in records {
         writer
             .write_record(record_kind, &payload)
@@ -211,11 +212,15 @@ fn signed_exact_noop_preserves_signature_and_bytes() {
     let package = signed_package();
     assert!(package.opc_package().is_signed());
     let before = package.to_bytes().expect("signed bytes");
-    let snapshot = package.volatile_dependencies().expect("volatile snapshot");
-    let commit = snapshot.edit().commit().expect("no-op commit");
-    assert!(!commit.changed());
+    let commit = package
+        .edit_volatile_dependencies()
+        .expect("volatile snapshot")
+        .commit()
+        .expect("no-op commit");
+    assert!(!commit.diagnostics().changed());
     let applied = package
-        .apply_volatile_dependencies(&commit)
+        .apply_volatile_dependencies(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("apply no-op");
     assert!(applied.opc_package().is_signed());
     assert_eq!(applied.to_bytes().expect("applied bytes"), before);
@@ -224,16 +229,15 @@ fn signed_exact_noop_preserves_signature_and_bytes() {
 #[test]
 fn signed_changed_edit_requires_explicit_policy() {
     let package = signed_package();
-    let snapshot = package.volatile_dependencies().expect("volatile snapshot");
-    let mut edit = snapshot.edit();
+    let mut edit = package
+        .edit_volatile_dependencies()
+        .expect("volatile snapshot");
     edit.set_dependencies(dependencies("Changed.ID"))
         .expect("stage changed owner");
     let error = edit.commit().expect_err("signed change must refuse");
     assert!(matches!(
         error,
-        litchi_xlsb::volatile_dependencies::Error::Opc(
-            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
-        )
+        litchi_xlsb::volatile_dependencies::Error::Signed
     ));
 }
 
@@ -245,14 +249,17 @@ fn explicit_unsigning_requires_a_fresh_plan_and_allows_reversible_edits() {
         .expect("signed snapshot")
         .commit()
         .expect("signed no-op");
-    let unsigned = signed.without_signatures().expect("explicitly unsigned");
+    let unsigned = signed.unsign();
     assert!(!unsigned.opc_package().is_signed());
     let error = unsigned
-        .apply_volatile_dependencies(&signed_noop)
+        .apply_volatile_dependencies(signed_noop.patch())
+        .map(litchi_core::edit::Commit::into_package)
         .expect_err("signed source plan is stale after unsigning");
     assert!(matches!(
         error,
-        litchi_xlsb::volatile_dependencies::Error::InvalidFormat(_)
+        litchi_xlsb::volatile_dependencies::Error::PatchConflict {
+            part: "volatile dependencies"
+        }
     ));
 
     let before = unsigned.to_bytes().expect("unsigned source bytes");
@@ -263,9 +270,10 @@ fn explicit_unsigning_requires_a_fresh_plan_and_allows_reversible_edits() {
     edit.set_dependencies(expected.clone()).expect("stage edit");
     let commit = edit.commit().expect("unsigned edit commit");
     let changed = unsigned
-        .apply_volatile_dependencies(&commit)
+        .apply_volatile_dependencies(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("unsigned edit publication");
-    let reopened = Package::from_bytes(changed.to_bytes().expect("changed bytes"))
+    let reopened = Package::from_bytes(&changed.to_bytes().expect("changed bytes"))
         .expect("reopen changed package");
     assert!(!reopened.opc_package().is_signed());
     assert_eq!(
@@ -276,7 +284,8 @@ fn explicit_unsigning_requires_a_fresh_plan_and_allows_reversible_edits() {
         Some(&expected)
     );
     let restored = reopened
-        .apply_volatile_dependencies_patch(&commit.patch().inverse())
+        .apply_volatile_dependencies(&commit.patch().inverse())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("inverse after reopen");
     assert_eq!(restored.to_bytes().expect("restored bytes"), before);
 }
@@ -289,19 +298,26 @@ fn nonzero_begin_type_reserved_bits_are_opaque_and_refuse_rewrite() {
         .volatile_dependencies()
         .expect("reserved bits remain readable");
     assert!(!snapshot.can_edit());
-    let noop = snapshot.edit().commit().expect("opaque no-op");
+    let noop = package
+        .edit_volatile_dependencies()
+        .expect("volatile snapshot")
+        .commit()
+        .expect("opaque no-op");
     let applied = package
-        .apply_volatile_dependencies(&noop)
+        .apply_volatile_dependencies(noop.patch())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("apply opaque no-op");
     assert_eq!(applied.to_bytes().expect("applied bytes"), before);
 
-    let mut edit = snapshot.edit();
+    let mut edit = package
+        .edit_volatile_dependencies()
+        .expect("volatile snapshot");
     let error = edit
         .set_dependencies(dependencies("Changed.ID"))
         .expect_err("opaque source rewrite");
     assert!(matches!(
         error,
-        litchi_xlsb::volatile_dependencies::Error::UnsupportedFeature(_)
+        litchi_xlsb::volatile_dependencies::Error::Refused(_)
     ));
 }
 
@@ -309,17 +325,18 @@ fn nonzero_begin_type_reserved_bits_are_opaque_and_refuse_rewrite() {
 fn case_equivalent_target_is_owned_and_inverse_restores_lexical_source() {
     let package = case_mismatched_owner_package();
     let before = package.to_bytes().expect("source bytes");
-    let snapshot = package
-        .volatile_dependencies()
-        .expect("case-equivalent owner snapshot");
-    let mut remove = snapshot.edit();
+    let mut remove = package
+        .edit_volatile_dependencies()
+        .expect("volatile snapshot");
     assert!(remove.remove().expect("stage owner removal"));
     let removal = remove.commit().expect("commit owner removal");
     let removed = package
-        .apply_volatile_dependencies(&removal)
+        .apply_volatile_dependencies(removal.patch())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("remove case-equivalent owner");
     let restored = removed
-        .apply_volatile_dependencies_patch(&removal.patch().inverse())
+        .apply_volatile_dependencies(&removal.patch().inverse())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("inverse case-equivalent owner removal");
     assert_eq!(restored.to_bytes().expect("restored bytes"), before);
 }

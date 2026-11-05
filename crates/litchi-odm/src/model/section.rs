@@ -15,7 +15,7 @@ pub struct Section {
 ///
 /// Parent and child positions index the immutable [`Tree::sections`] slice.
 /// A linked section additionally carries the position of its entry in
-/// [`crate::Master::subdocuments`].
+/// [`crate::Document::subdocuments`].
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Node {
     pub(crate) name: String,
@@ -35,7 +35,7 @@ pub struct Node {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Source {
-    /// A subdocument entry in [`crate::Master::subdocuments`].
+    /// A subdocument entry in [`crate::Document::subdocuments`].
     Linked(Position),
     /// A relationship entry in [`Tree::local_references`].
     Local(Position),

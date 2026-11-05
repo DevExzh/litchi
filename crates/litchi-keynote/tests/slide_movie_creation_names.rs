@@ -12,7 +12,9 @@ use litchi_iwa_archive::{Limits, package::Catalog};
 use litchi_iwa_common::shape::geometry::{Point, Size};
 use litchi_iwa_core::{Archive, SnappyStream};
 use litchi_iwa_protos::tsp;
-use litchi_keynote::{MediaPart, MovieSelector, Package, SlideSelector, slide::movie::Options};
+use litchi_keynote::{
+    MovieSelector, Package, SlideSelector, slide::media::data::MediaPart, slide::movie::Options,
+};
 use prost::Message as _;
 use sha1::{Digest as _, Sha1};
 
@@ -112,13 +114,13 @@ fn fresh_poster(source: &[u8]) -> TestResult<Vec<u8>> {
 
 fn metadata(package: &Package) -> TestResult<tsp::PackageMetadata> {
     let bytes = exact_bytes(package)?;
-    let catalog = Catalog::from_bytes(&bytes)?;
+    let catalog = Catalog::from_bytes(&bytes, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or_else(|| io::Error::other("missing PackageMetadata member"))?;
-    let decoded = SnappyStream::decompress(entry.data())?.into_bytes();
-    let archive = Archive::parse(&decoded)?;
+    let decoded = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+    let archive = Archive::parse(&decoded, Default::default())?;
     let mut payloads = archive.objects.iter().flat_map(|object| {
         object.messages.iter().filter_map(|message| {
             (message.type_ == METADATA_MESSAGE_TYPE).then_some(message.data.as_slice())
@@ -147,7 +149,7 @@ fn data_identifier(package: &Package, bytes: &[u8]) -> TestResult<u64> {
 
 fn append_orphan(source: &Package, name: &str, bytes: &[u8]) -> TestResult<Vec<u8>> {
     let source_bytes = exact_bytes(source)?;
-    let catalog = Catalog::from_bytes(&source_bytes)?;
+    let catalog = Catalog::from_bytes(&source_bytes, Default::default())?;
     Ok(catalog.reassemble_with_insertions_to_bytes(
         &[EntryInsertion::new(name, bytes)],
         Limits::default(),
@@ -156,7 +158,7 @@ fn append_orphan(source: &Package, name: &str, bytes: &[u8]) -> TestResult<Vec<u
 
 fn member_bytes(package: &Package, name: &str) -> TestResult<Vec<u8>> {
     let bytes = exact_bytes(package)?;
-    Catalog::from_bytes(&bytes)?
+    Catalog::from_bytes(&bytes, Default::default())?
         .iter()
         .find(|entry| entry.name() == name)
         .map(|entry| entry.data().to_vec())
@@ -170,14 +172,17 @@ fn oversized_preferred_movie_uses_short_collision_suffix_and_inverse() -> TestRe
     let (source_movie, source_poster) = source_assets(&source)?;
     let movie = fresh_movie(&source_movie);
     let poster = fresh_poster(&source_poster)?;
-    let first = source.add_slide_movie(
-        SlideSelector::index(0),
-        "first-fresh.mov",
-        &movie,
-        "first-fresh.png",
-        &poster,
-        options()?,
-    )?;
+    let first = source
+        .edit_slide_movie_creation()
+        .add(
+            SlideSelector::index(0),
+            "first-fresh.mov",
+            &movie,
+            "first-fresh.png",
+            &poster,
+            options()?,
+        )
+        .and_then(|edit| edit.commit())?;
     assert_eq!(first.patch().created_data(), 2);
     let content_identifier = data_identifier(first.package(), &movie)?;
     let collision_name = format!("Data/litchi-{content_identifier}.mov");
@@ -186,14 +191,17 @@ fn oversized_preferred_movie_uses_short_collision_suffix_and_inverse() -> TestRe
 
     let long_filename = format!("{}.mov", "m".repeat(4_092));
     assert_eq!(long_filename.len(), 4_096);
-    let second = source_with_orphan.add_slide_movie(
-        SlideSelector::index(0),
-        &long_filename,
-        &movie,
-        "suffix-poster.png",
-        &poster,
-        options()?,
-    )?;
+    let second = source_with_orphan
+        .edit_slide_movie_creation()
+        .add(
+            SlideSelector::index(0),
+            &long_filename,
+            &movie,
+            "suffix-poster.png",
+            &poster,
+            options()?,
+        )
+        .and_then(|edit| edit.commit())?;
     assert_eq!(second.patch().created_data(), 2);
 
     let short_suffix_name = format!("Data/litchi-{content_identifier}-1.mov");

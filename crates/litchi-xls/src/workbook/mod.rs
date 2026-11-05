@@ -6,7 +6,7 @@
 //! substream -> record layering.
 
 mod codec;
-mod model;
+pub(crate) mod model;
 pub mod package;
 mod query_cache;
 pub mod source;
@@ -17,9 +17,11 @@ mod tests;
 #[cfg(test)]
 mod validation_only_tests;
 
-pub use model::{OpenOptions, Workbook};
+pub use crate::LimitKind;
+pub use crate::source_limits::{SourceLimits, SourceLimitsBuilder};
+pub use model::{OpenOptions, Worksheets};
 pub use source::{
-    SourceBackedCell, SourceBackedError, SourceBackedLimits, SourceBackedOptions,
-    SourceBackedWorkbook, SourceBackedWorksheet, SourceBackedWorksheetDescriptor,
+    CellCursor, SourceBackedCell, SourceBackedError, SourceBackedLimits, SourceBackedOptions,
+    SourceBackedWorkbook, SourceBackedWorksheet, SourceBackedWorksheetDescriptor, StyleTables,
 };
 pub(crate) use validation_only::{KeptCells, ValidationWorkbook};

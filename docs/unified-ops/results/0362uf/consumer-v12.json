@@ -1,0 +1,28 @@
+{
+  "source": "7858571ad0f4afcb281d54eca313531ef39c9873",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--all-targets",
+        "--all-features",
+        "--keep-going",
+        "-p",
+        "litchi-opc",
+        "-p",
+        "soapberry-zip"
+      ],
+      "exit": 101,
+      "seconds": 11.73479641799986,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v12/check-0.log",
+      "bytes": 119910,
+      "sha256": "27af17bec1692120ea014d346c06bc9cae2d1f4223bf920e3844b13786cc625d",
+      "target_bytes_before": 18345263112,
+      "completed_test_executables_pruned": []
+    }
+  ],
+  "note": "OPC production and library tests passed compilation. OPC external integration tests exposed missing policy imports and redundant qualifications; workspace and harness not reached. Repaired in0362ul."
+}

@@ -3,25 +3,33 @@
 use super::super::super::axis;
 use super::super::super::format::Format;
 use super::super::super::model::{
-    Cache, Chart, Family, Owner, Role, Value, XlValue, cache_dimensions, dimensions_cover,
+    Cache, Family, Model, Owner, Role, Value, XlValue, cache_dimensions, dimensions_cover,
 };
 use super::links;
 use super::wire::{DATA_LAB_EXT, DATA_LAB_EXT_CONTENTS, TEXT, invalid_model, limit};
 use crate::{Error, Limits, Result};
 
-pub(super) fn validate(chart: &Chart, limits: Limits, require_topology: bool) -> Result<()> {
+pub(super) fn validate(chart: &Model, limits: Limits, require_topology: bool) -> Result<()> {
     if chart.series.len() > limits.max_series {
-        return limit("series count", chart.series.len(), limits.max_series);
+        return limit(
+            crate::LimitKind::Series,
+            chart.series.len(),
+            limits.max_series,
+        );
     }
     if chart.groups.len() > limits.max_groups {
-        return limit("group count", chart.groups.len(), limits.max_groups);
+        return limit(
+            crate::LimitKind::Groups,
+            chart.groups.len(),
+            limits.max_groups,
+        );
     }
     if chart.axes.len() > limits.max_axes {
-        return limit("axis count", chart.axes.len(), limits.max_axes);
+        return limit(crate::LimitKind::Axes, chart.axes.len(), limits.max_axes);
     }
     if chart.caches.len() > limits.max_cached_values {
         return limit(
-            "cached value count",
+            crate::LimitKind::CachedValues,
             chart.caches.len(),
             limits.max_cached_values,
         );
@@ -231,7 +239,11 @@ pub(super) fn validate(chart: &Chart, limits: Limits, require_topology: bool) ->
         if let Format::Marker { data } = format
             && data.len() > limits.biff.max_record_bytes
         {
-            return limit("record bytes", data.len(), limits.biff.max_record_bytes);
+            return limit(
+                crate::LimitKind::Biff(litchi_biff::Resource::RecordBytes),
+                data.len(),
+                limits.biff.max_record_bytes,
+            );
         }
     }
     for label in &chart.labels {
@@ -240,7 +252,7 @@ pub(super) fn validate(chart: &Chart, limits: Limits, require_topology: bool) ->
         }
         if label.data.len() > limits.biff.max_record_bytes {
             return limit(
-                "record bytes",
+                crate::LimitKind::Biff(litchi_biff::Resource::RecordBytes),
                 label.data.len(),
                 limits.biff.max_record_bytes,
             );
@@ -251,7 +263,7 @@ pub(super) fn validate(chart: &Chart, limits: Limits, require_topology: bool) ->
     for raw in &chart.unknown {
         if raw.data().len() > limits.biff.max_record_bytes {
             return limit(
-                "record bytes",
+                crate::LimitKind::Biff(litchi_biff::Resource::RecordBytes),
                 raw.data().len(),
                 limits.biff.max_record_bytes,
             );
@@ -263,7 +275,11 @@ pub(super) fn validate(chart: &Chart, limits: Limits, require_topology: bool) ->
             })?;
     }
     if total > limits.max_unknown_bytes {
-        return limit("unknown chart bytes", total, limits.max_unknown_bytes);
+        return limit(
+            crate::LimitKind::UnknownBytes,
+            total,
+            limits.max_unknown_bytes,
+        );
     }
     Ok(())
 }
@@ -299,7 +315,11 @@ pub(super) fn check_xl_string(value: &str, limits: Limits) -> Result<()> {
             resource: "cached chart string",
         })?;
     if payload > limits.biff.max_record_bytes {
-        return limit("record bytes", payload, limits.biff.max_record_bytes);
+        return limit(
+            crate::LimitKind::Biff(litchi_biff::Resource::RecordBytes),
+            payload,
+            limits.biff.max_record_bytes,
+        );
     }
     Ok(())
 }

@@ -4,9 +4,20 @@
 )]
 //! Layered `WordprocessingML` numbering model and XML codec.
 
+pub mod catalog;
 mod codec;
+mod edit;
+/// The located numbering part: definitions, levels and instances with their
+/// byte ranges, read and edited in place (record 0319).
+mod limit;
+mod lists;
 mod model;
 mod package;
+#[allow(
+    dead_code,
+    unreachable_pub,
+    reason = "the part-level draft stages the family edit; its accessors serve unit tests"
+)]
 mod transaction;
 mod validation;
 
@@ -14,6 +25,8 @@ mod validation;
 mod tests;
 
 pub use codec::parse_numbering;
+pub use lists::{AddedList, ListKind};
+pub(crate) use lists::{empty_numbering_xml, insert_lists, next_ids};
 pub use model::{
     Collection, Definition, Format, Instance, Level, MultiLevel, Override, Paragraph,
     ParseFormatError, ParseMultiLevelError, PictureBullet, Restart, Suffix,
@@ -41,4 +54,6 @@ pub(crate) fn parse_list_level(raw: &str) -> Option<(u8, bool)> {
         _ => Some((MAX_LIST_LEVEL, true)),
     }
 }
-pub use transaction::{Commit, Patch, Snapshot, Transaction};
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
+pub(crate) use transaction::Patch as DraftPatch;
+pub use transaction::Snapshot;

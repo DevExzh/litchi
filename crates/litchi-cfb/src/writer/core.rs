@@ -62,7 +62,7 @@ use super::super::consts::{
     STGTY_ROOT,
 };
 use super::super::directory_name::{MAX_DIRECTORY_NAME_CODE_UNITS, directory_name_data};
-use super::super::file::OleError;
+use super::super::file::{OleError, OleFileLimits};
 use super::difat::DifatBuilder;
 use super::directory::DirectoryBuilder;
 use super::fat::FatBuilder;
@@ -450,6 +450,10 @@ impl OleWriter {
     /// It changes only where the bytes land, and only while the writer's
     /// stream and storage set still matches the adopted artifact's.
     ///
+    /// `limits` is the required physical source-validation profile. It is
+    /// retained by the caller so adopting a larger or more tightly bounded
+    /// source cannot silently fall back to the parser defaults.
+    ///
     /// Returns `true` when the artifact was adopted. A source that the parser
     /// rejects, or whose layout cannot be represented, is simply not adopted
     /// and the writer serializes from scratch: `false` is returned rather than
@@ -459,9 +463,13 @@ impl OleWriter {
     ///
     /// Returns [`OleError::Allocation`] when the bounded metadata cannot be
     /// reserved.
-    pub fn adopt_source_layout(&mut self, source: &[u8]) -> Result<bool, OleError> {
+    pub fn adopt_source_layout(
+        &mut self,
+        source: &[u8],
+        limits: OleFileLimits,
+    ) -> Result<bool, OleError> {
         self.source_layout = None;
-        match SourceLayout::parse(source) {
+        match SourceLayout::parse(source, limits) {
             Ok(layout) => {
                 let layout = Box::new(layout);
                 // Source adoption is also the preservation boundary for a
@@ -877,23 +885,6 @@ impl OleWriter {
         Ok(())
     }
 
-    /// Update an existing stream
-    ///
-    /// This is an alias for `create_stream` since both create and update operations
-    /// have the same behavior (overwrite if exists).
-    ///
-    /// # Arguments
-    ///
-    /// * `path` - Path components
-    /// * `data` - New stream contents
-    ///
-    /// # Errors
-    ///
-    /// Same error conditions as [`Self::create_stream`].
-    pub fn update_stream(&mut self, path: &[&str], data: &[u8]) -> Result<(), OleError> {
-        self.create_stream(path, data)
-    }
-
     fn stream_position(&self, path: &[&str]) -> Option<usize> {
         self.streams.iter().position(|(candidate, _)| {
             candidate.len() == path.len()
@@ -1267,7 +1258,8 @@ impl OleWriter {
         Ok(())
     }
 
-    /// Moves an explicitly registered storage and its complete subtree.
+    /// Moves an explicitly registered storage and its complete subtree under
+    /// explicit finite work limits.
     ///
     /// Supplying a destination under the same parent renames the storage. CFB
     /// sibling names are compared case-insensitively, but a case-only rename of
@@ -1287,14 +1279,7 @@ impl OleWriter {
     /// [`OleError::InvalidFormat`] when `source` is not an explicitly
     /// registered storage. Allocation failures are returned as
     /// [`OleError::Allocation`].
-    pub fn move_storage(&mut self, source: &[&str], destination: &[&str]) -> Result<(), OleError> {
-        self.move_storage_with_limits(source, destination, StorageMoveLimits::default())
-    }
-
-    /// Moves a storage with explicit bounds on all inspected and changed paths.
-    ///
-    /// See [`Self::move_storage`] for the semantic closure and error behavior.
-    pub fn move_storage_with_limits(
+    pub fn move_storage(
         &mut self,
         source: &[&str],
         destination: &[&str],
@@ -2672,6 +2657,7 @@ mod tests {
         reason = "test assertions panic on failure by design"
     )]
     use super::*;
+    use crate::OleFileLimits;
     use crate::consts::MAGIC;
     use crate::file::OleFile;
     use std::error::Error as _;
@@ -3001,7 +2987,8 @@ mod tests {
             .unwrap();
         let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output).unwrap();
-        let ole = OleFile::open(Cursor::new(output.into_inner())).unwrap();
+        let ole =
+            OleFile::open(Cursor::new(output.into_inner()), OleFileLimits::default()).unwrap();
         let fresh = ole
             .list_directory_entries(&["Root", "Nested"])
             .unwrap()
@@ -3104,7 +3091,9 @@ mod tests {
                 )
             })
             .collect::<Vec<_>>();
-        writer.move_storage(&["source"], &["Renamed"]).unwrap();
+        writer
+            .move_storage(&["source"], &["Renamed"], StorageMoveLimits::default())
+            .unwrap();
         let after = writer
             .streams
             .iter()
@@ -3154,7 +3143,8 @@ mod tests {
 
         let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output).unwrap();
-        let ole = OleFile::open(Cursor::new(output.into_inner())).unwrap();
+        let ole =
+            OleFile::open(Cursor::new(output.into_inner()), OleFileLimits::default()).unwrap();
         let nested = ole
             .list_directory_entries(&["Renamed"])
             .unwrap()

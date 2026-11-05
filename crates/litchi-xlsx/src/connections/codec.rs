@@ -1,6 +1,5 @@
 //! Bounded `SpreadsheetML` connection-part XML codec.
 
-use super::invalid;
 use super::model::{
     CORE_NAMESPACE, Connection, ConnectionParameter, Connections, CredentialsMethod,
     DatabaseProperties, HtmlFormatting, MAX_CONNECTIONS, MAX_DOM_DEPTH, MAX_DOM_NODES,
@@ -9,10 +8,12 @@ use super::model::{
     TextImportProperties, TextQualifier, WebQueryProperties, WebTableSelector, validate,
 };
 use super::namespace::{NamespaceContext, NamespaceDecl, NamespaceLimits};
+use super::{LimitKind, invalid, limit};
+use crate::error::Result;
 use crate::error::{Error as XlsxError, Result as XlsxResult};
-use litchi_core::sheet::Result;
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
+use litchi_opc::SourceLimits;
 use quick_xml::{
     Reader, XmlVersion,
     encoding::Decoder,
@@ -68,22 +69,49 @@ pub(super) struct Node {
     content: Vec<Content>,
 }
 
+fn source_maximum(limits: &SourceLimits) -> usize {
+    limits.max_part_bytes().min(MAX_XML_BYTES as u64) as usize
+}
+
+pub(super) fn source_profile(
+    limits: &SourceLimits,
+) -> (usize, usize, usize, usize, usize, usize, usize, usize) {
+    let maximum = source_maximum(limits);
+    (
+        maximum,
+        MAX_DOM_NODES,
+        limits.max_events().min(MAX_DOM_NODES.saturating_mul(4)),
+        limits.max_depth().min(MAX_DOM_DEPTH),
+        MAX_STRING_BYTES.min(maximum),
+        MAX_XML_BYTES.min(maximum),
+        limits.max_xml_attribute_bytes().min(MAX_DOM_NODES),
+        MAX_XML_BYTES.min(maximum),
+    )
+}
+
 impl Connections {
-    pub fn parse(xml: &[u8]) -> Result<Self> {
-        if xml.len() > MAX_XML_BYTES {
-            return Err(invalid("connections part exceeds 16 MiB"));
-        }
-        // The MCE processor rejects otherwise legal processing instructions.
-        // They do not contribute to the typed connection projection, while
-        // source-bound callers retain the original bytes for exact splicing.
-        // Remove only PI events before MCE processing; all schema-bearing
-        // markup still goes through the normal full parser and validator.
-        let without_pi = strip_processing_instructions(xml)?;
-        let x = litchi_ooxml_common::mce::process_ooxml(without_pi.as_ref())?;
-        if x.len() > MAX_XML_BYTES {
-            return Err(invalid("processed connections part exceeds 16 MiB"));
-        }
-        project(&parse_dom(x.as_ref())?)
+    pub fn parse(xml: &[u8], limits: &SourceLimits) -> Result<Self> {
+        let (
+            max_bytes,
+            max_nodes,
+            max_events,
+            max_depth,
+            max_string_bytes,
+            max_namespace_bytes,
+            max_attributes,
+            max_temporary_bytes,
+        ) = source_profile(limits);
+        Self::parse_with_limits(
+            xml,
+            max_bytes,
+            max_nodes,
+            max_events,
+            max_depth,
+            max_string_bytes,
+            max_namespace_bytes,
+            max_attributes,
+            max_temporary_bytes,
+        )
     }
 
     /// Parse one connections part under a caller-selected byte ceiling.
@@ -110,11 +138,7 @@ impl Connections {
         let events = max_events;
         let depth = max_depth.min(MAX_DOM_DEPTH);
         if xml.len() > maximum {
-            return Err(connection_limit(
-                xml.len(),
-                maximum,
-                "connections input XML bytes",
-            ));
+            return Err(connection_limit(xml.len(), maximum));
         }
         preflight_xml_with_limits(
             xml,
@@ -145,41 +169,12 @@ impl Connections {
                     litchi_ooxml_common::mce::DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT,
             },
         )
-        .map_err(|error| {
-            let mapped = map_mce_error(
-                error,
-                maximum,
-                mce_output_limit,
-                depth,
-                max_attributes.min(4096),
-                events.min(4096),
-                events.min(1024),
-                "connections",
-            );
-            if mce_output_limit < maximum
-                && matches!(
-                    mapped,
-                    XlsxError::ResourceLimit(litchi_core::ResourceLimit {
-                        resource: litchi_core::Resource::OutputBytes,
-                        ..
-                    })
-                )
-            {
-                temporary_limit(
-                    mce_output_limit.saturating_add(1),
-                    mce_output_limit,
-                    "connections MCE output bytes",
-                )
-            } else {
-                mapped
-            }
-        })?;
+        .map_err(map_mce_error)?;
         if processed.xml.len() > maximum {
             return Err(xml_resource_limit(
-                litchi_core::Resource::OutputBytes,
+                LimitKind::OutputBytes,
                 processed.xml.len(),
                 maximum,
-                "connections processed XML bytes",
             ));
         }
         let root = parse_dom_with_limits(
@@ -190,18 +185,17 @@ impl Connections {
             max_string_bytes,
             max_namespace_bytes,
             max_attributes,
-        )
-        .map_err(|error| XlsxError::Invalid(error.to_string()))?;
-        project(&root).map_err(|error| XlsxError::Invalid(error.to_string()))
+        )?;
+        project(&root)
     }
-    pub fn to_xml(&self, strict: bool) -> Result<Vec<u8>> {
+    pub fn to_xml(&self, strict: bool, limits: &SourceLimits) -> Result<Vec<u8>> {
         validate(self)?;
         let ns = if strict {
             STRICT_NAMESPACE
         } else {
             CORE_NAMESPACE
         };
-        let mut x = BoundedXml::new();
+        let mut x = BoundedXml::new(source_maximum(limits));
         x.push_str(
             "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><connections xmlns=\"",
         )?;
@@ -215,66 +209,38 @@ impl Connections {
     }
 }
 
-fn connection_limit(observed: usize, maximum: usize, name: &'static str) -> XlsxError {
-    XlsxError::ResourceLimit(litchi_core::ResourceLimit {
-        resource: litchi_core::Resource::InputBytes,
-        observed: observed as u64,
-        limit: maximum as u64,
-        scope: Arc::<str>::from(format!("XLSX Custom Data {name}")),
-    })
+fn connection_limit(observed: usize, maximum: usize) -> XlsxError {
+    limit(LimitKind::XmlBytes, observed, maximum)
 }
 
-fn temporary_limit(observed: usize, maximum: usize, name: &'static str) -> XlsxError {
-    XlsxError::ResourceLimit(litchi_core::ResourceLimit {
-        resource: litchi_core::Resource::Memory,
-        observed: observed as u64,
-        limit: maximum as u64,
-        scope: Arc::<str>::from(format!("XLSX Custom Data {name}")),
-    })
+fn temporary_limit(observed: usize, maximum: usize) -> XlsxError {
+    limit(LimitKind::TemporaryBytes, observed, maximum)
 }
 
-fn xml_resource_limit(
-    resource: litchi_core::Resource,
-    observed: usize,
-    maximum: usize,
-    name: &'static str,
-) -> XlsxError {
-    XlsxError::ResourceLimit(litchi_core::ResourceLimit {
-        resource,
-        observed: observed as u64,
-        limit: maximum as u64,
-        scope: Arc::<str>::from(format!("XLSX Custom Data {name}")),
-    })
+fn xml_resource_limit(kind: LimitKind, observed: usize, maximum: usize) -> XlsxError {
+    limit(kind, observed, maximum)
 }
 
-pub(super) fn map_mce_error(
-    error: litchi_ooxml_common::mce::Error,
-    input_bytes: usize,
-    output_bytes: usize,
-    depth: usize,
-    namespace_bindings: usize,
-    directive_tokens: usize,
-    choices: usize,
-    scope: &'static str,
-) -> XlsxError {
-    let litchi_ooxml_common::mce::Error::LimitExceeded(resource) = &error else {
+pub(super) fn map_mce_error(error: litchi_ooxml_common::mce::Error) -> XlsxError {
+    let litchi_ooxml_common::mce::Error::LimitExceeded {
+        kind,
+        observed,
+        maximum,
+    } = &error
+    else {
         return XlsxError::MarkupCompatibility(error);
     };
-    let (kind, maximum) = match resource.as_str() {
-        "input bytes" => (litchi_core::Resource::InputBytes, input_bytes),
-        "output bytes" => (litchi_core::Resource::OutputBytes, output_bytes),
-        "depth" => (litchi_core::Resource::Depth, depth),
-        "namespace bindings" => (litchi_core::Resource::Objects, namespace_bindings),
-        "directive tokens" => (litchi_core::Resource::Objects, directive_tokens),
-        "choices" => (litchi_core::Resource::Objects, choices),
+    let kind = match kind {
+        litchi_ooxml_common::mce::LimitKind::InputBytes
+        | litchi_ooxml_common::mce::LimitKind::SourceBytes => LimitKind::XmlBytes,
+        litchi_ooxml_common::mce::LimitKind::OutputBytes => LimitKind::OutputBytes,
+        litchi_ooxml_common::mce::LimitKind::Depth => LimitKind::Depth,
+        litchi_ooxml_common::mce::LimitKind::NamespaceBindings => LimitKind::NamespaceBindings,
+        litchi_ooxml_common::mce::LimitKind::Events => LimitKind::Events,
+        litchi_ooxml_common::mce::LimitKind::Attributes => LimitKind::Attributes,
         _ => return XlsxError::MarkupCompatibility(error),
     };
-    XlsxError::ResourceLimit(litchi_core::ResourceLimit {
-        resource: kind,
-        observed: maximum.saturating_add(1) as u64,
-        limit: maximum as u64,
-        scope: Arc::<str>::from(format!("XLSX Custom Data {scope} MCE {resource}")),
-    })
+    limit(kind, *observed, *maximum)
 }
 
 /// Admit the borrowed lexical shape before any PI copy, MCE expansion, or
@@ -297,47 +263,29 @@ pub(super) fn preflight_xml_with_limits(
     let mut events = 0usize;
     let mut namespace_bytes = 0usize;
     loop {
-        events = events.checked_add(1).ok_or_else(|| {
-            xml_resource_limit(
-                litchi_core::Resource::Objects,
-                usize::MAX,
-                max_events,
-                "XML events",
-            )
-        })?;
+        events = events
+            .checked_add(1)
+            .ok_or_else(|| xml_resource_limit(LimitKind::Events, usize::MAX, max_events))?;
         if events > max_events {
-            return Err(xml_resource_limit(
-                litchi_core::Resource::Objects,
-                events,
-                max_events,
-                "XML events",
-            ));
+            return Err(xml_resource_limit(LimitKind::Events, events, max_events));
         }
         match reader.read_event() {
             Ok(Event::Start(element)) => {
-                nodes = nodes.checked_add(1).ok_or_else(|| {
-                    xml_resource_limit(
-                        litchi_core::Resource::Objects,
-                        usize::MAX,
-                        max_nodes,
-                        "XML nodes",
-                    )
-                })?;
+                nodes = nodes
+                    .checked_add(1)
+                    .ok_or_else(|| xml_resource_limit(LimitKind::Nodes, usize::MAX, max_nodes))?;
                 if nodes > max_nodes {
-                    return Err(xml_resource_limit(
-                        litchi_core::Resource::Objects,
-                        nodes,
-                        max_nodes,
-                        "XML nodes",
-                    ));
+                    return Err(xml_resource_limit(LimitKind::Nodes, nodes, max_nodes));
                 }
-                let prospective_depth = stack.len().saturating_add(1);
+                let prospective_depth = stack
+                    .len()
+                    .checked_add(1)
+                    .ok_or_else(|| limit(LimitKind::Depth, usize::MAX, max_depth))?;
                 if prospective_depth > max_depth {
                     return Err(xml_resource_limit(
-                        litchi_core::Resource::Depth,
+                        LimitKind::Depth,
                         prospective_depth,
                         max_depth,
-                        "XML depth",
                     ));
                 }
                 let local_namespace_bytes = preflight_element(
@@ -351,38 +299,29 @@ pub(super) fn preflight_xml_with_limits(
                     .checked_add(local_namespace_bytes)
                     .ok_or_else(|| {
                         xml_resource_limit(
-                            litchi_core::Resource::InputBytes,
+                            LimitKind::NamespaceBytes,
                             usize::MAX,
                             max_namespace_bytes,
-                            "XML namespace bytes",
                         )
                     })?;
                 stack.push(local_namespace_bytes);
             },
             Ok(Event::Empty(element)) => {
-                nodes = nodes.checked_add(1).ok_or_else(|| {
-                    xml_resource_limit(
-                        litchi_core::Resource::Objects,
-                        usize::MAX,
-                        max_nodes,
-                        "XML nodes",
-                    )
-                })?;
+                nodes = nodes
+                    .checked_add(1)
+                    .ok_or_else(|| xml_resource_limit(LimitKind::Nodes, usize::MAX, max_nodes))?;
                 if nodes > max_nodes {
-                    return Err(xml_resource_limit(
-                        litchi_core::Resource::Objects,
-                        nodes,
-                        max_nodes,
-                        "XML nodes",
-                    ));
+                    return Err(xml_resource_limit(LimitKind::Nodes, nodes, max_nodes));
                 }
-                let prospective_depth = stack.len().saturating_add(1);
+                let prospective_depth = stack
+                    .len()
+                    .checked_add(1)
+                    .ok_or_else(|| limit(LimitKind::Depth, usize::MAX, max_depth))?;
                 if prospective_depth > max_depth {
                     return Err(xml_resource_limit(
-                        litchi_core::Resource::Depth,
+                        LimitKind::Depth,
                         prospective_depth,
                         max_depth,
-                        "XML depth",
                     ));
                 }
                 preflight_element(
@@ -419,18 +358,15 @@ pub(super) fn preflight_xml_with_limits(
 }
 
 pub(super) fn contains_mce_markup(xml: &[u8]) -> bool {
-    const MCE_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
-    xml.windows(MCE_NAMESPACE.len())
-        .any(|window| window == MCE_NAMESPACE)
+    litchi_ooxml_common::mce::mentions_namespace(xml)
 }
 
 fn preflight_payload(bytes: &[u8], maximum: usize) -> XlsxResult<()> {
     if bytes.len() > maximum {
         return Err(xml_resource_limit(
-            litchi_core::Resource::InputBytes,
+            LimitKind::StringBytes,
             bytes.len(),
             maximum,
-            "XML string bytes",
         ));
     }
     Ok(())
@@ -445,46 +381,37 @@ fn preflight_element(
 ) -> XlsxResult<usize> {
     if element.name().as_ref().len() > max_string_bytes {
         return Err(xml_resource_limit(
-            litchi_core::Resource::InputBytes,
+            LimitKind::StringBytes,
             element.name().as_ref().len(),
             max_string_bytes,
-            "XML element name bytes",
         ));
     }
     let mut local_namespace_bytes = 0usize;
     let mut attribute_count = 0usize;
     for attribute in element.unchecked_attributes() {
         let attribute = attribute.map_err(|error| XlsxError::Invalid(error.to_string()))?;
-        attribute_count = attribute_count.checked_add(1).ok_or_else(|| {
-            xml_resource_limit(
-                litchi_core::Resource::Objects,
-                usize::MAX,
-                max_attributes,
-                "XML attributes",
-            )
-        })?;
+        attribute_count = attribute_count
+            .checked_add(1)
+            .ok_or_else(|| xml_resource_limit(LimitKind::Attributes, usize::MAX, max_attributes))?;
         if attribute_count > max_attributes {
             return Err(xml_resource_limit(
-                litchi_core::Resource::Objects,
+                LimitKind::Attributes,
                 attribute_count,
                 max_attributes,
-                "XML attributes",
             ));
         }
         if attribute.key.as_ref().len() > max_string_bytes {
             return Err(xml_resource_limit(
-                litchi_core::Resource::InputBytes,
+                LimitKind::StringBytes,
                 attribute.key.as_ref().len(),
                 max_string_bytes,
-                "XML attribute name bytes",
             ));
         }
         if attribute.value.as_ref().len() > max_string_bytes {
             return Err(xml_resource_limit(
-                litchi_core::Resource::InputBytes,
+                LimitKind::StringBytes,
                 attribute.value.as_ref().len(),
                 max_string_bytes,
-                "XML attribute value bytes",
             ));
         }
         let key = attribute.key.as_ref();
@@ -494,31 +421,20 @@ fn preflight_element(
                 .checked_add(prefix_bytes)
                 .and_then(|value| value.checked_add(attribute.value.as_ref().len()))
                 .ok_or_else(|| {
-                    xml_resource_limit(
-                        litchi_core::Resource::InputBytes,
-                        usize::MAX,
-                        max_namespace_bytes,
-                        "XML namespace bytes",
-                    )
+                    xml_resource_limit(LimitKind::NamespaceBytes, usize::MAX, max_namespace_bytes)
                 })?;
         }
     }
     let total = inherited_namespace_bytes
         .checked_add(local_namespace_bytes)
         .ok_or_else(|| {
-            xml_resource_limit(
-                litchi_core::Resource::InputBytes,
-                usize::MAX,
-                max_namespace_bytes,
-                "XML namespace bytes",
-            )
+            xml_resource_limit(LimitKind::NamespaceBytes, usize::MAX, max_namespace_bytes)
         })?;
     if total > max_namespace_bytes {
         return Err(xml_resource_limit(
-            litchi_core::Resource::InputBytes,
+            LimitKind::NamespaceBytes,
             total,
             max_namespace_bytes,
-            "XML namespace bytes",
         ));
     }
     Ok(local_namespace_bytes)
@@ -596,19 +512,12 @@ pub(super) fn strip_processing_instructions_with_limit<'a>(
                 }
                 let bytes = output.get_or_insert_with(Vec::new);
                 let segment = &xml[cursor..start];
-                let output_len = bytes.len().checked_add(segment.len()).ok_or_else(|| {
-                    temporary_limit(
-                        usize::MAX,
-                        max_temporary_bytes,
-                        "connections PI-filter bytes",
-                    )
-                })?;
+                let output_len = bytes
+                    .len()
+                    .checked_add(segment.len())
+                    .ok_or_else(|| temporary_limit(usize::MAX, max_temporary_bytes))?;
                 if output_len > max_temporary_bytes {
-                    return Err(temporary_limit(
-                        output_len,
-                        max_temporary_bytes,
-                        "connections PI-filter bytes",
-                    ));
+                    return Err(temporary_limit(output_len, max_temporary_bytes));
                 }
                 bytes
                     .try_reserve_exact(segment.len())
@@ -628,19 +537,12 @@ pub(super) fn strip_processing_instructions_with_limit<'a>(
         return Ok(Cow::Borrowed(xml));
     };
     let segment = &xml[cursor..];
-    let output_len = bytes.len().checked_add(segment.len()).ok_or_else(|| {
-        temporary_limit(
-            usize::MAX,
-            max_temporary_bytes,
-            "connections PI-filter bytes",
-        )
-    })?;
+    let output_len = bytes
+        .len()
+        .checked_add(segment.len())
+        .ok_or_else(|| temporary_limit(usize::MAX, max_temporary_bytes))?;
     if output_len > max_temporary_bytes {
-        return Err(temporary_limit(
-            output_len,
-            max_temporary_bytes,
-            "connections PI-filter bytes",
-        ));
+        return Err(temporary_limit(output_len, max_temporary_bytes));
     }
     bytes
         .try_reserve_exact(segment.len())
@@ -677,21 +579,30 @@ pub(super) fn parse_dom_with_limits(
     let mut rd = Reader::from_reader(xml);
     let mut stack: Vec<Node> = Vec::new();
     let mut root = None;
-    let mut count = 0;
+    let mut count = 0usize;
     let mut events = 0usize;
     loop {
         let d = rd.decoder();
         events = events
             .checked_add(1)
-            .ok_or_else(|| invalid("connections XML event count overflow"))?;
+            .ok_or_else(|| limit(LimitKind::Events, usize::MAX, max_events))?;
         if events > max_events {
-            return Err(invalid("connections XML event limit exceeded"));
+            return Err(limit(LimitKind::Events, events, max_events));
         }
         match rd.read_event() {
             Ok(Event::Start(e)) => {
-                count += 1;
-                if count > max_nodes || stack.len().saturating_add(1) > max_depth {
-                    return Err(invalid("connections XML resource limit exceeded"));
+                count = count
+                    .checked_add(1)
+                    .ok_or_else(|| limit(LimitKind::Nodes, usize::MAX, max_nodes))?;
+                if count > max_nodes {
+                    return Err(limit(LimitKind::Nodes, count, max_nodes));
+                }
+                let depth = stack
+                    .len()
+                    .checked_add(1)
+                    .ok_or_else(|| limit(LimitKind::Depth, usize::MAX, max_depth))?;
+                if depth > max_depth {
+                    return Err(limit(LimitKind::Depth, depth, max_depth));
                 }
                 stack
                     .try_reserve(1)
@@ -707,9 +618,18 @@ pub(super) fn parse_dom_with_limits(
                 )?);
             },
             Ok(Event::Empty(e)) => {
-                count += 1;
-                if count > max_nodes || stack.len().saturating_add(1) > max_depth {
-                    return Err(invalid("connections node limit exceeded"));
+                count = count
+                    .checked_add(1)
+                    .ok_or_else(|| limit(LimitKind::Nodes, usize::MAX, max_nodes))?;
+                if count > max_nodes {
+                    return Err(limit(LimitKind::Nodes, count, max_nodes));
+                }
+                let depth = stack
+                    .len()
+                    .checked_add(1)
+                    .ok_or_else(|| limit(LimitKind::Depth, usize::MAX, max_depth))?;
+                if depth > max_depth {
+                    return Err(limit(LimitKind::Depth, depth, max_depth));
                 }
                 let n = make(
                     &e,
@@ -730,11 +650,15 @@ pub(super) fn parse_dom_with_limits(
             },
             Ok(Event::Text(t)) => {
                 if t.as_ref().len() > max_string_bytes {
-                    return Err(invalid("connections XML string limit exceeded"));
+                    return Err(limit(
+                        LimitKind::StringBytes,
+                        t.as_ref().len(),
+                        max_string_bytes,
+                    ));
                 }
                 let v = t.decode().map_err(xml_error)?.into_owned();
                 if v.len() > max_string_bytes {
-                    return Err(invalid("connections XML string limit exceeded"));
+                    return Err(limit(LimitKind::StringBytes, v.len(), max_string_bytes));
                 }
                 if let Some(n) = stack.last_mut() {
                     n.content
@@ -747,7 +671,11 @@ pub(super) fn parse_dom_with_limits(
             },
             Ok(Event::CData(t)) => {
                 if t.as_ref().len() > max_string_bytes {
-                    return Err(invalid("connections XML string limit exceeded"));
+                    return Err(limit(
+                        LimitKind::StringBytes,
+                        t.as_ref().len(),
+                        max_string_bytes,
+                    ));
                 }
                 if let Some(n) = stack.last_mut() {
                     n.content
@@ -761,7 +689,11 @@ pub(super) fn parse_dom_with_limits(
             },
             Ok(Event::Comment(t)) => {
                 if t.as_ref().len() > max_string_bytes {
-                    return Err(invalid("connections XML string limit exceeded"));
+                    return Err(limit(
+                        LimitKind::StringBytes,
+                        t.as_ref().len(),
+                        max_string_bytes,
+                    ));
                 }
                 if let Some(n) = stack.last_mut() {
                     n.content
@@ -774,11 +706,15 @@ pub(super) fn parse_dom_with_limits(
             },
             Ok(Event::GeneralRef(t)) => {
                 if t.as_ref().len() > max_string_bytes {
-                    return Err(invalid("connections XML string limit exceeded"));
+                    return Err(limit(
+                        LimitKind::StringBytes,
+                        t.as_ref().len(),
+                        max_string_bytes,
+                    ));
                 }
                 let value = litchi_ooxml_common::xml::decode_xml_reference(&t)?;
                 if value.len() > max_string_bytes {
-                    return Err(invalid("connections XML string limit exceeded"));
+                    return Err(limit(LimitKind::StringBytes, value.len(), max_string_bytes));
                 }
                 if let Some(n) = stack.last_mut() {
                     n.content
@@ -818,7 +754,11 @@ fn make(
 ) -> Result<Node> {
     let raw_name = e.name();
     if raw_name.as_ref().len() > max_string_bytes {
-        return Err(invalid("connections XML string limit exceeded"));
+        return Err(limit(
+            LimitKind::StringBytes,
+            raw_name.as_ref().len(),
+            max_string_bytes,
+        ));
     }
     let q = std::str::from_utf8(raw_name.as_ref())
         .map_err(xml_error)?
@@ -832,20 +772,36 @@ fn make(
     for a in e.checked_attributes() {
         let a = a.map_err(xml_error)?;
         if raw.len() >= max_attributes {
-            return Err(invalid("connections XML attribute limit exceeded"));
+            return Err(limit(
+                LimitKind::Attributes,
+                raw.len().checked_add(1).unwrap_or(usize::MAX),
+                max_attributes,
+            ));
         }
         if a.value.as_ref().len() > max_string_bytes {
-            return Err(invalid("connections XML string limit exceeded"));
+            return Err(limit(
+                LimitKind::StringBytes,
+                a.value.as_ref().len(),
+                max_string_bytes,
+            ));
         }
         if a.key.as_ref().len() > max_string_bytes {
-            return Err(invalid("connections XML string limit exceeded"));
+            return Err(limit(
+                LimitKind::StringBytes,
+                a.key.as_ref().len(),
+                max_string_bytes,
+            ));
         }
         let qualified = std::str::from_utf8(a.key.as_ref()).map_err(xml_error)?;
         let value = a
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, d)
             .map_err(xml_error)?;
         if value.as_ref().len() > max_string_bytes {
-            return Err(invalid("connections XML string limit exceeded"));
+            return Err(limit(
+                LimitKind::StringBytes,
+                value.as_ref().len(),
+                max_string_bytes,
+            ));
         }
         if qualified == "xmlns" || qualified.starts_with("xmlns:") {
             let prefix = qualified.strip_prefix("xmlns:").unwrap_or("");
@@ -854,7 +810,11 @@ fn make(
                 .checked_add(value.len())
                 .ok_or_else(|| invalid("connections XML namespace byte count overflow"))?;
             if namespace_bytes > max_namespace_bytes {
-                return Err(invalid("connections XML namespace byte limit exceeded"));
+                return Err(limit(
+                    LimitKind::NamespaceBytes,
+                    namespace_bytes,
+                    max_namespace_bytes,
+                ));
             }
         }
         raw.try_reserve(1)
@@ -873,7 +833,7 @@ fn make(
     }))?;
     let (pr, lo) = split(&q)?;
     if lo.len() > max_string_bytes {
-        return Err(invalid("connections XML string limit exceeded"));
+        return Err(limit(LimitKind::StringBytes, lo.len(), max_string_bytes));
     }
     let local = lo.to_string();
     let ns = resolve(&context, pr)?;
@@ -887,7 +847,7 @@ fn make(
         }
         let (pr, lo) = split(&q)?;
         if lo.len() > max_string_bytes {
-            return Err(invalid("connections XML string limit exceeded"));
+            return Err(limit(LimitKind::StringBytes, lo.len(), max_string_bytes));
         }
         let ans = if pr.is_empty() {
             Arc::from("")
@@ -937,7 +897,11 @@ fn project(n: &Node) -> Result<Connections> {
             continue;
         }
         if out.len() >= MAX_CONNECTIONS {
-            return Err(invalid("connection limit exceeded"));
+            return Err(limit(
+                LimitKind::Connections,
+                out.len().checked_add(1).unwrap_or(usize::MAX),
+                MAX_CONNECTIONS,
+            ));
         }
         out.push(parse_connection(c)?);
     }
@@ -1127,7 +1091,11 @@ fn parse_tables(n: &Node) -> Result<Vec<WebTableSelector>> {
     let mut out = Vec::new();
     for c in kids(n)? {
         if out.len() >= MAX_WEB_TABLES {
-            return Err(invalid("web table selector limit exceeded"));
+            return Err(limit(
+                LimitKind::WebTables,
+                out.len().checked_add(1).unwrap_or(usize::MAX),
+                MAX_WEB_TABLES,
+            ));
         }
         expect_any(c)?;
         out.push(match c.l.as_str() {
@@ -1209,7 +1177,11 @@ fn parse_text(n: &Node) -> Result<TextImportProperties> {
         let mut fields = Vec::new();
         for e in kids(f)? {
             if fields.len() >= MAX_TEXT_FIELDS {
-                return Err(invalid("text field limit exceeded"));
+                return Err(limit(
+                    LimitKind::TextFields,
+                    fields.len().checked_add(1).unwrap_or(usize::MAX),
+                    MAX_TEXT_FIELDS,
+                ));
             }
             expect(e, "textField")?;
             fields.push(TextField {
@@ -1233,7 +1205,11 @@ fn parse_parameters(n: &Node) -> Result<Vec<ConnectionParameter>> {
     let mut out = Vec::new();
     for p in kids(n)? {
         if out.len() >= MAX_PARAMETERS {
-            return Err(invalid("parameter limit exceeded"));
+            return Err(limit(
+                LimitKind::Parameters,
+                out.len().checked_add(1).unwrap_or(usize::MAX),
+                MAX_PARAMETERS,
+            ));
         }
         expect(p, "parameter")?;
         let double = match aopt(p, "double")? {
@@ -1288,11 +1264,15 @@ fn parse_parameters(n: &Node) -> Result<Vec<ConnectionParameter>> {
 
 pub(super) struct BoundedXml {
     pub(super) bytes: Vec<u8>,
+    maximum: usize,
 }
 
 impl BoundedXml {
-    pub(super) fn new() -> Self {
-        Self { bytes: Vec::new() }
+    pub(super) fn new(maximum: usize) -> Self {
+        Self {
+            bytes: Vec::new(),
+            maximum,
+        }
     }
 
     fn push_str(&mut self, value: &str) -> Result<()> {
@@ -1311,8 +1291,8 @@ impl BoundedXml {
             .len()
             .checked_add(value.len())
             .ok_or_else(|| invalid("serialized connections length overflows"))?;
-        if length > MAX_XML_BYTES {
-            return Err(invalid("serialized connections part exceeds 16 MiB"));
+        if length > self.maximum {
+            return Err(limit(LimitKind::OutputBytes, length, self.maximum));
         }
         self.bytes
             .try_reserve_exact(value.len())
@@ -1831,7 +1811,7 @@ en!(parse_qualifier,qualifier_str,TextQualifier,"doubleQuote"=>TextQualifier::Do
 en!(parse_parameter_type,parameter_str,ParameterType,"prompt"=>ParameterType::Prompt,"value"=>ParameterType::Value,"cell"=>ParameterType::Cell);
 en!(parse_field,field_str,TextFieldType,"general"=>TextFieldType::General,"text"=>TextFieldType::Text,"MDY"=>TextFieldType::MonthDayYear,"DMY"=>TextFieldType::DayMonthYear,"YMD"=>TextFieldType::YearMonthDay,"MYD"=>TextFieldType::MonthYearDay,"DYM"=>TextFieldType::DayYearMonth,"YDM"=>TextFieldType::YearDayMonth,"skip"=>TextFieldType::Skip,"EMD"=>TextFieldType::EastAsianYearMonthDay);
 
-fn xml_error(e: impl std::fmt::Display) -> Box<dyn std::error::Error + Send + Sync> {
+fn xml_error(e: impl std::fmt::Display) -> crate::Error {
     invalid(e.to_string())
 }
 
@@ -1849,7 +1829,12 @@ pub(super) fn patch_connections_source(
     before: &Connections,
     after: &Connections,
     strict: bool,
+    limits: &SourceLimits,
 ) -> Result<Vec<u8>> {
+    let maximum = source_maximum(limits);
+    if source.len() > maximum {
+        return Err(limit(LimitKind::XmlBytes, source.len(), maximum));
+    }
     if before == after {
         return Ok(source.to_vec());
     }
@@ -1928,6 +1913,7 @@ pub(super) fn patch_connections_source(
                 &before.connections[before_index],
                 connection,
                 strict,
+                maximum,
                 &mut edits,
                 &mut extension_replacements,
             )?;
@@ -1935,7 +1921,7 @@ pub(super) fn patch_connections_source(
             let (parent, offset) = insertion.ok_or_else(|| {
                 invalid("connection source has no safe connection insertion point")
             })?;
-            let canonical = canonical_connection(connection, strict)?;
+            let canonical = canonical_connection(connection, strict, maximum)?;
             let replacement = qualify_fragment(canonical.clone(), &tree, parent)?;
             if connection.extension_xml.is_some() {
                 let extension = canonical_extension(&canonical, strict)?
@@ -1960,7 +1946,7 @@ pub(super) fn patch_connections_source(
             });
         }
     }
-    let updated = apply_source_edits(source, edits)?;
+    let updated = apply_source_edits_with_limit(source, edits, maximum)?;
     let updated = reorder_connections_source(&updated, &after.connections)?;
     verify_extension_publications(&updated, &extension_replacements)?;
     Ok(updated)
@@ -2152,6 +2138,7 @@ fn patch_connection_source(
     before: &Connection,
     after: &Connection,
     strict: bool,
+    maximum: usize,
     edits: &mut Vec<SourceEdit>,
     extension_replacements: &mut Vec<PublishedExtension>,
 ) -> Result<()> {
@@ -2329,7 +2316,7 @@ fn patch_connection_source(
         after
             .database
             .is_some()
-            .then(|| canonical_child(after, "dbPr", strict))
+            .then(|| canonical_child(after, "dbPr", strict, maximum))
             .transpose()?,
         edits,
         &mut self_closing_children,
@@ -2346,7 +2333,7 @@ fn patch_connection_source(
         after
             .olap
             .is_some()
-            .then(|| canonical_child(after, "olapPr", strict))
+            .then(|| canonical_child(after, "olapPr", strict, maximum))
             .transpose()?,
         edits,
         &mut self_closing_children,
@@ -2363,7 +2350,7 @@ fn patch_connection_source(
         after
             .web
             .is_some()
-            .then(|| canonical_child(after, "webPr", strict))
+            .then(|| canonical_child(after, "webPr", strict, maximum))
             .transpose()?,
         edits,
         &mut self_closing_children,
@@ -2380,7 +2367,7 @@ fn patch_connection_source(
         after
             .text
             .is_some()
-            .then(|| canonical_child(after, "textPr", strict))
+            .then(|| canonical_child(after, "textPr", strict, maximum))
             .transpose()?,
         edits,
         &mut self_closing_children,
@@ -2397,7 +2384,7 @@ fn patch_connection_source(
         after
             .parameters
             .is_some()
-            .then(|| canonical_child(after, "parameters", strict))
+            .then(|| canonical_child(after, "parameters", strict, maximum))
             .transpose()?,
         edits,
         &mut self_closing_children,
@@ -2414,7 +2401,7 @@ fn patch_connection_source(
         after
             .extension_xml
             .as_ref()
-            .map(|_| canonical_child(after, "extLst", strict))
+            .map(|_| canonical_child(after, "extLst", strict, maximum))
             .transpose()?,
         edits,
         &mut self_closing_children,
@@ -2424,14 +2411,19 @@ fn patch_connection_source(
     Ok(())
 }
 
-fn canonical_connection(value: &Connection, strict: bool) -> Result<Vec<u8>> {
-    let mut output = BoundedXml::new();
+fn canonical_connection(value: &Connection, strict: bool, maximum: usize) -> Result<Vec<u8>> {
+    let mut output = BoundedXml::new(maximum);
     write_connection(&mut output, value, strict)?;
     Ok(output.finish())
 }
 
-fn canonical_child(value: &Connection, name: &str, strict: bool) -> Result<Vec<u8>> {
-    let source = canonical_connection(value, strict)?;
+fn canonical_child(
+    value: &Connection,
+    name: &str,
+    strict: bool,
+    maximum: usize,
+) -> Result<Vec<u8>> {
+    let source = canonical_connection(value, strict, maximum)?;
     let namespace = if strict {
         STRICT_NAMESPACE
     } else {
@@ -2962,7 +2954,7 @@ fn patch_existing_child_source(
 }
 
 fn canonical_web_table(value: &WebTableSelector) -> Result<Vec<u8>> {
-    let mut output = BoundedXml::new();
+    let mut output = BoundedXml::new(MAX_XML_BYTES);
     match value {
         WebTableSelector::Missing => output.push_str("<m/>")?,
         WebTableSelector::String(value) => {
@@ -3004,7 +2996,7 @@ fn web_table_key(value: &WebTableSelector) -> u64 {
 }
 
 fn canonical_web_tables(values: &[WebTableSelector]) -> Result<Vec<u8>> {
-    let mut output = BoundedXml::new();
+    let mut output = BoundedXml::new(MAX_XML_BYTES);
     output.push_str("<tables")?;
     num(&mut output, "count", values.len())?;
     output.push_char('>')?;
@@ -3016,7 +3008,7 @@ fn canonical_web_tables(values: &[WebTableSelector]) -> Result<Vec<u8>> {
 }
 
 fn canonical_text_field(value: &TextField) -> Result<Vec<u8>> {
-    let mut output = BoundedXml::new();
+    let mut output = BoundedXml::new(MAX_XML_BYTES);
     output.push_str("<textField")?;
     if let Some(value) = value.field_type {
         attr(&mut output, "type", field_str(value))?;
@@ -3034,7 +3026,7 @@ fn text_field_key(value: &TextField) -> u64 {
 }
 
 fn canonical_text_fields(values: &[TextField]) -> Result<Vec<u8>> {
-    let mut output = BoundedXml::new();
+    let mut output = BoundedXml::new(MAX_XML_BYTES);
     output.push_str("<textFields")?;
     num(&mut output, "count", values.len())?;
     output.push_char('>')?;
@@ -3046,7 +3038,7 @@ fn canonical_text_fields(values: &[TextField]) -> Result<Vec<u8>> {
 }
 
 fn canonical_parameter(value: &ConnectionParameter) -> Result<Vec<u8>> {
-    let mut output = BoundedXml::new();
+    let mut output = BoundedXml::new(MAX_XML_BYTES);
     output.push_str("<parameter")?;
     str_opt(&mut output, "name", value.name.as_deref())?;
     num_opt(&mut output, "sqlType", value.sql_type)?;
@@ -3798,7 +3790,15 @@ struct SourceEdit {
     replacement: Vec<u8>,
 }
 
-fn apply_source_edits(source: &[u8], mut edits: Vec<SourceEdit>) -> Result<Vec<u8>> {
+fn apply_source_edits(source: &[u8], edits: Vec<SourceEdit>) -> Result<Vec<u8>> {
+    apply_source_edits_with_limit(source, edits, MAX_XML_BYTES)
+}
+
+fn apply_source_edits_with_limit(
+    source: &[u8],
+    mut edits: Vec<SourceEdit>,
+    maximum: usize,
+) -> Result<Vec<u8>> {
     let mut indexed = edits.drain(..).enumerate().collect::<Vec<_>>();
     indexed.sort_by(|(left_index, left), (right_index, right)| {
         left.range
@@ -3821,8 +3821,8 @@ fn apply_source_edits(source: &[u8], mut edits: Vec<SourceEdit>) -> Result<Vec<u
             .ok_or_else(|| invalid("connection source output length overflows"))?;
         covered_end = edit.range.end;
     }
-    if output_len > MAX_XML_BYTES {
-        return Err(invalid("connection source output exceeds 16 MiB"));
+    if output_len > maximum {
+        return Err(limit(LimitKind::OutputBytes, output_len, maximum));
     }
     let mut result = Vec::new();
     result
@@ -3841,6 +3841,28 @@ fn apply_source_edits(source: &[u8], mut edits: Vec<SourceEdit>) -> Result<Vec<u
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn mce_dimensions_without_connection_equivalents_remain_typed() {
+        let error = litchi_ooxml_common::mce::Error::LimitExceeded {
+            kind: litchi_ooxml_common::mce::LimitKind::EventBytes,
+            observed: 17,
+            maximum: 16,
+        };
+        let mapped = map_mce_error(error);
+        assert!(matches!(
+            mapped,
+            XlsxError::MarkupCompatibility(litchi_ooxml_common::mce::Error::LimitExceeded {
+                kind: litchi_ooxml_common::mce::LimitKind::EventBytes,
+                observed: 17,
+                maximum: 16,
+            })
+        ));
+    }
+
+    fn parse_default(xml: &[u8]) -> Result<Connections> {
+        Connections::parse(xml, &SourceLimits::default())
+    }
 
     fn connection(id: u32, name: Option<&str>) -> Connection {
         Connection {
@@ -3928,13 +3950,20 @@ mod tests {
         assert_eq!(shadowed.namespace.as_ref(), "urn:shadow");
         assert!(!Arc::ptr_eq(&shadowed.namespace, &large_nodes[0].namespace));
 
-        let before = Connections::parse(source.as_bytes()).unwrap();
+        let before = parse_default(source.as_bytes()).unwrap();
         let mut after = before.clone();
         after.connections[0].name = Some("after".into());
-        let patched = patch_connections_source(source.as_bytes(), &before, &after, false).unwrap();
+        let patched = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &after,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap();
         let expected = source.replace("name=\"before\"", "name=\"after\"");
         assert_eq!(patched, expected.as_bytes());
-        assert_eq!(Connections::parse(&patched).unwrap(), after);
+        assert_eq!(parse_default(&patched).unwrap(), after);
     }
 
     #[test]
@@ -4006,17 +4035,24 @@ mod tests {
         let source = format!(
             r#"<p:connections xmlns:p="{CORE_NAMESPACE}" xmlns:f="urn:foreign"><p:connection f:id="99" id="&#49;" refreshedVersion="7" name="before"><f:dbPr f:marker="keep"/></p:connection></p:connections>"#
         );
-        let before = Connections::parse(source.as_bytes()).unwrap();
+        let before = parse_default(source.as_bytes()).unwrap();
         assert_eq!(before.connections[0].id, 1);
         let mut after = before.clone();
         after.connections[0].name = Some("after".into());
-        let patched = patch_connections_source(source.as_bytes(), &before, &after, false).unwrap();
+        let patched = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &after,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap();
         let text = std::str::from_utf8(&patched).unwrap();
         assert!(text.contains("p:connections"));
         assert!(text.contains("f:id=\"99\""));
         assert!(text.contains("f:dbPr f:marker=\"keep\""));
         assert!(!text.contains("<connection id="));
-        assert_eq!(Connections::parse(&patched).unwrap(), after);
+        assert_eq!(parse_default(&patched).unwrap(), after);
     }
 
     #[test]
@@ -4024,26 +4060,40 @@ mod tests {
         let source = format!(
             r#"<p:connections xmlns:p="{CORE_NAMESPACE}"><p:connection id="1" refreshedVersion="7"><p:extLst/></p:connection></p:connections>"#
         );
-        let before = Connections::parse(source.as_bytes()).unwrap();
+        let before = parse_default(source.as_bytes()).unwrap();
         let mut after = before.clone();
         after.connections[0].database = Some(database_connection());
-        let patched = patch_connections_source(source.as_bytes(), &before, &after, false).unwrap();
+        let patched = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &after,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap();
         let text = std::str::from_utf8(&patched).unwrap();
         assert!(text.find("dbPr").unwrap() < text.find("extLst").unwrap());
-        assert_eq!(Connections::parse(&patched).unwrap(), after);
+        assert_eq!(parse_default(&patched).unwrap(), after);
 
         let source = format!(
             r#"<p:connections xmlns:p="{CORE_NAMESPACE}"><p:connection id="1" refreshedVersion="7"/></p:connections>"#
         );
-        let before = Connections::parse(source.as_bytes()).unwrap();
+        let before = parse_default(source.as_bytes()).unwrap();
         let mut after = before.clone();
         after.connections[0].database = Some(database_connection());
         after.connections[0].olap = Some(OlapProperties::default());
-        let patched = patch_connections_source(source.as_bytes(), &before, &after, false).unwrap();
+        let patched = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &after,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap();
         let text = std::str::from_utf8(&patched).unwrap();
         assert!(text.contains("</p:connection>"));
         assert!(text.find("dbPr").unwrap() < text.find("olapPr").unwrap());
-        assert_eq!(Connections::parse(&patched).unwrap(), after);
+        assert_eq!(parse_default(&patched).unwrap(), after);
     }
 
     #[test]
@@ -4065,18 +4115,24 @@ mod tests {
         ];
 
         for (source, closing_tag) in cases {
-            let before = Connections::parse(source.as_bytes()).unwrap();
+            let before = parse_default(source.as_bytes()).unwrap();
             let mut after = before.clone();
             after.connections[0].name = Some("after".into());
             after.connections[0].database = Some(database_connection());
 
-            let patched =
-                patch_connections_source(source.as_bytes(), &before, &after, false).unwrap();
+            let patched = patch_connections_source(
+                source.as_bytes(),
+                &before,
+                &after,
+                false,
+                &SourceLimits::default(),
+            )
+            .unwrap();
             let text = std::str::from_utf8(&patched).unwrap();
             assert!(text.contains(closing_tag));
             assert!(text.contains("name=\"after\""));
             assert!(text.contains("f:marker=\"keep\""));
-            assert_eq!(Connections::parse(&patched).unwrap(), after);
+            assert_eq!(parse_default(&patched).unwrap(), after);
         }
     }
 
@@ -4085,16 +4141,23 @@ mod tests {
         let source = format!(
             r#"<connections xmlns="{CORE_NAMESPACE}"><connection id="1" refreshedVersion="7"><dbPr connection="before"><?keep?><!--keep--></dbPr></connection></connections>"#
         );
-        let before = Connections::parse(source.as_bytes()).unwrap();
+        let before = parse_default(source.as_bytes()).unwrap();
         let mut after = before.clone();
         after.connections[0].database.as_mut().unwrap().connection = "after".into();
 
-        let patched = patch_connections_source(source.as_bytes(), &before, &after, false).unwrap();
+        let patched = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &after,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap();
         let text = std::str::from_utf8(&patched).unwrap();
         assert!(text.contains("<?keep?>"));
         assert!(text.contains("<!--keep-->"));
         assert!(text.contains("connection=\"after\""));
-        assert_eq!(Connections::parse(&patched).unwrap(), after);
+        assert_eq!(parse_default(&patched).unwrap(), after);
     }
 
     #[test]
@@ -4103,7 +4166,7 @@ mod tests {
             r#"<connections xmlns="{CORE_NAMESPACE}" xmlns:f="urn:foreign" xmlns:mc="{MCE}" xmlns:u="urn:unsupported"><connection id="1" refreshedVersion="7"><?outside-before?><extLst f:old="keep"><?old?><mc:AlternateContent><mc:Choice Requires="u"><u:old/></mc:Choice><mc:Fallback><!--old-fallback--><f:old-child/></mc:Fallback></mc:AlternateContent><!--old-comment--></extLst><?outside-after?></connection></connections>"#,
             MCE = litchi_ooxml_common::mce::NAMESPACE,
         );
-        let before = Connections::parse(source.as_bytes()).unwrap();
+        let before = parse_default(source.as_bytes()).unwrap();
         let mut after = before.clone();
         after.connections[0].extension_xml = Some(
             format!(
@@ -4114,23 +4177,36 @@ mod tests {
             .into_bytes(),
         );
 
-        let patched = patch_connections_source(source.as_bytes(), &before, &after, false).unwrap();
+        let patched = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &after,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap();
         let text = std::str::from_utf8(&patched).unwrap();
         assert!(text.contains("<?outside-before?>") && text.contains("<?outside-after?>"));
         assert!(text.contains("f:new=\"owned\"") && text.contains("f:new-child"));
         assert!(text.contains("<!--new-comment-->") && text.contains("mc:AlternateContent"));
         assert!(!text.contains("f:old=\"keep\"") && !text.contains("<?old?>"));
         assert!(!text.contains("old-fallback") && !text.contains("old-comment"));
-        Connections::parse(&patched).unwrap();
+        parse_default(&patched).unwrap();
 
         let mut removed = before.clone();
         removed.connections[0].extension_xml = None;
-        let patched =
-            patch_connections_source(source.as_bytes(), &before, &removed, false).unwrap();
+        let patched = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &removed,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap();
         let text = std::str::from_utf8(&patched).unwrap();
         assert!(text.contains("<?outside-before?>") && text.contains("<?outside-after?>"));
         assert!(!text.contains("<extLst") && !text.contains("<?old?>"));
-        Connections::parse(&patched).unwrap();
+        parse_default(&patched).unwrap();
     }
 
     #[test]
@@ -4139,14 +4215,21 @@ mod tests {
             r#"<connections xmlns="{CORE_NAMESPACE}" xmlns:mc="{MCE}" xmlns:u="urn:unsupported"><connection id="1" refreshedVersion="7"><webPr url="before"><?before?><mc:AlternateContent><mc:Choice Requires="u"><u:tables count="1"><u:m/></u:tables></mc:Choice><mc:Fallback><?inside?><tables count="1"><m/></tables></mc:Fallback></mc:AlternateContent><?after?></webPr></connection></connections>"#,
             MCE = litchi_ooxml_common::mce::NAMESPACE,
         );
-        let before = Connections::parse(source.as_bytes()).unwrap();
+        let before = parse_default(source.as_bytes()).unwrap();
         let mut after = before.clone();
         after.connections[0].web.as_mut().unwrap().url = Some("after".into());
 
-        let patched = patch_connections_source(source.as_bytes(), &before, &after, false).unwrap();
+        let patched = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &after,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap();
         let expected = source.replace("url=\"before\"", "url=\"after\"");
         assert_eq!(patched, expected.as_bytes());
-        assert_eq!(Connections::parse(&patched).unwrap(), after);
+        assert_eq!(parse_default(&patched).unwrap(), after);
     }
 
     #[test]
@@ -4154,7 +4237,7 @@ mod tests {
         let source = format!(
             r#"<connections xmlns="{CORE_NAMESPACE}"><connection id="1" refreshedVersion="7"><webPr><tables count="2"><?before?><m/><?inside?><s v="A"/></tables><?after?></webPr><textPr><textFields count="1"><?field?><textField type="text" position="1"/></textFields></textPr><parameters count="1"><parameter name="old"><?parameter?></parameter></parameters></connection></connections>"#
         );
-        let before = Connections::parse(source.as_bytes()).unwrap();
+        let before = parse_default(source.as_bytes()).unwrap();
         let mut after = before.clone();
         after.connections[0].web.as_mut().unwrap().tables = Some(vec![
             WebTableSelector::Missing,
@@ -4188,7 +4271,14 @@ mod tests {
                 cell: None,
             });
 
-        let patched = patch_connections_source(source.as_bytes(), &before, &after, false).unwrap();
+        let patched = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &after,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap();
         let text = std::str::from_utf8(&patched).unwrap();
         for marker in [
             "<?before?>",
@@ -4202,7 +4292,7 @@ mod tests {
         assert!(text.contains("<tables count=\"3\">") && text.contains("<s v=\"B\"/>"));
         assert!(text.contains("<textFields count=\"2\">") && text.contains("position=\"2\""));
         assert!(text.contains("<parameters count=\"2\">") && text.contains("name=\"new\""));
-        assert_eq!(Connections::parse(&patched).unwrap(), after);
+        assert_eq!(parse_default(&patched).unwrap(), after);
     }
 
     #[test]
@@ -4211,19 +4301,26 @@ mod tests {
             r#"<connections xmlns="{CORE_NAMESPACE}" xmlns:mc="{MCE}" xmlns:u="urn:unsupported"><connection id="1" refreshedVersion="7"><webPr><mc:AlternateContent><mc:Choice Requires="u"><u:tables count="1"><u:s v="inactive"/></u:tables></mc:Choice><mc:Fallback><?inside?><tables count="1"><m/></tables></mc:Fallback></mc:AlternateContent></webPr></connection></connections>"#,
             MCE = litchi_ooxml_common::mce::NAMESPACE,
         );
-        let before = Connections::parse(source.as_bytes()).unwrap();
+        let before = parse_default(source.as_bytes()).unwrap();
         let mut after = before.clone();
         after.connections[0].web.as_mut().unwrap().tables = Some(vec![
             WebTableSelector::Missing,
             WebTableSelector::String("active".into()),
         ]);
 
-        let patched = patch_connections_source(source.as_bytes(), &before, &after, false).unwrap();
+        let patched = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &after,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap();
         let text = std::str::from_utf8(&patched).unwrap();
         assert!(text.contains("<mc:Choice") && text.contains("v=\"inactive\""));
         assert!(text.contains("<mc:Fallback>") && text.contains("<?inside?>"));
         assert!(text.contains("<tables count=\"2\">") && text.contains("<s v=\"active\"/>"));
-        assert_eq!(Connections::parse(&patched).unwrap(), after);
+        assert_eq!(parse_default(&patched).unwrap(), after);
     }
 
     #[test]
@@ -4232,7 +4329,7 @@ mod tests {
             r#"<connections xmlns="{CORE_NAMESPACE}" xmlns:mc="{MCE}" xmlns:u="urn:unsupported"><connection id="1" refreshedVersion="7"><webPr><tables count="2"><s v="A"/><mc:AlternateContent><mc:Choice Requires="u"><u:s v="inactive"/></mc:Choice><mc:Fallback><s v="B"/></mc:Fallback></mc:AlternateContent></tables></webPr></connection></connections>"#,
             MCE = litchi_ooxml_common::mce::NAMESPACE,
         );
-        let before = Connections::parse(source.as_bytes()).unwrap();
+        let before = parse_default(source.as_bytes()).unwrap();
         assert_eq!(
             before.connections[0].web.as_ref().unwrap().tables.as_ref(),
             Some(&vec![
@@ -4246,21 +4343,34 @@ mod tests {
             WebTableSelector::String("B".into()),
         ]);
 
-        let patched = patch_connections_source(source.as_bytes(), &before, &after, false).unwrap();
+        let patched = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &after,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap();
         let text = std::str::from_utf8(&patched).unwrap();
         assert!(text.contains("<s v=\"C\"/>") && text.contains("<s v=\"B\"/>"));
         assert!(text.contains(
             "<mc:AlternateContent><mc:Choice Requires=\"u\"><u:s v=\"inactive\"/></mc:Choice><mc:Fallback><s v=\"B\"/></mc:Fallback></mc:AlternateContent>"
         ));
-        assert_eq!(Connections::parse(&patched).unwrap(), after);
+        assert_eq!(parse_default(&patched).unwrap(), after);
 
         let mut moved = before.clone();
         moved.connections[0].web.as_mut().unwrap().tables = Some(vec![
             WebTableSelector::String("B".into()),
             WebTableSelector::String("A".into()),
         ]);
-        let error =
-            patch_connections_source(source.as_bytes(), &before, &moved, false).unwrap_err();
+        let error = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &moved,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap_err();
         assert!(
             error
                 .to_string()
@@ -4273,18 +4383,25 @@ mod tests {
         let source = format!(
             r#"<connections xmlns="{CORE_NAMESPACE}"><connection id="1" refreshedVersion="7"><webPr url="before"/></connection></connections>"#
         );
-        let before = Connections::parse(source.as_bytes()).unwrap();
+        let before = parse_default(source.as_bytes()).unwrap();
         let mut after = before.clone();
         let web = after.connections[0].web.as_mut().unwrap();
         web.url = Some("after".into());
         web.tables = Some(vec![WebTableSelector::String("A".into())]);
 
-        let patched = patch_connections_source(source.as_bytes(), &before, &after, false).unwrap();
+        let patched = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &after,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap();
         let text = std::str::from_utf8(&patched).unwrap();
         assert!(
             text.contains("<webPr url=\"after\"><tables count=\"1\"><s v=\"A\"/></tables></webPr>")
         );
-        assert_eq!(Connections::parse(&patched).unwrap(), after);
+        assert_eq!(parse_default(&patched).unwrap(), after);
     }
 
     #[test]
@@ -4293,7 +4410,7 @@ mod tests {
             r#"<connections xmlns="{CORE_NAMESPACE}" xmlns:f="urn:f" xmlns:mc="{MCE}" xmlns:u="urn:u"><connection id="1" refreshedVersion="7"><webPr><tables count="2"><s v="A" xmlns:f="urn:f" f:opaque="table-a"><mc:AlternateContent><mc:Choice Requires="u"><u:inactive/></mc:Choice><mc:Fallback/></mc:AlternateContent></s><s v="B" xmlns:f="urn:f" f:opaque="table-b"/></tables></webPr><textPr><textFields count="2"><textField type="text" position="1" xmlns:f="urn:f" f:opaque="field-a"/><textField type="general" position="2" xmlns:f="urn:f" f:opaque="field-b"/></textFields></textPr><parameters count="2"><parameter name="A" xmlns:f="urn:f" f:opaque="parameter-a"/><parameter name="B" xmlns:f="urn:f" f:opaque="parameter-b"/></parameters></connection></connections>"#,
             MCE = litchi_ooxml_common::mce::NAMESPACE,
         );
-        let before = Connections::parse(source.as_bytes()).unwrap();
+        let before = parse_default(source.as_bytes()).unwrap();
         let mut after = before.clone();
         after.connections[0].web.as_mut().unwrap().tables = Some(vec![
             WebTableSelector::String("B".into()),
@@ -4314,7 +4431,14 @@ mod tests {
             after.connections[0].parameters.as_ref().unwrap()[0].clone(),
         ]);
 
-        let patched = patch_connections_source(source.as_bytes(), &before, &after, false).unwrap();
+        let patched = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &after,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap();
         let text = std::str::from_utf8(&patched).unwrap();
         for marker in [
             "f:opaque=\"table-a\"",
@@ -4336,7 +4460,7 @@ mod tests {
             text.find("f:opaque=\"parameter-b\"").unwrap()
                 < text.find("f:opaque=\"parameter-a\"").unwrap()
         );
-        assert_eq!(Connections::parse(&patched).unwrap(), after);
+        assert_eq!(parse_default(&patched).unwrap(), after);
     }
 
     #[test]
@@ -4345,15 +4469,22 @@ mod tests {
             r#"<connections xmlns="{CORE_NAMESPACE}" xmlns:mc="{MCE}" xmlns:u="urn:u"><connection id="1" refreshedVersion="7"><webPr><?before?><tables count="1"><s v="A"><?inside?><mc:AlternateContent><mc:Choice Requires="u"><u:inactive/></mc:Choice><mc:Fallback/></mc:AlternateContent></s></tables><?after?></webPr></connection></connections>"#,
             MCE = litchi_ooxml_common::mce::NAMESPACE,
         );
-        let before = Connections::parse(source.as_bytes()).unwrap();
+        let before = parse_default(source.as_bytes()).unwrap();
         let mut after = before.clone();
         after.connections[0].web.as_mut().unwrap().tables = None;
 
-        let patched = patch_connections_source(source.as_bytes(), &before, &after, false).unwrap();
+        let patched = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &after,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap();
         let text = std::str::from_utf8(&patched).unwrap();
         assert!(text.contains("<?before?>") && text.contains("<?after?>"));
         assert!(!text.contains("<tables") && !text.contains("<?inside?>"));
-        assert_eq!(Connections::parse(&patched).unwrap(), after);
+        assert_eq!(parse_default(&patched).unwrap(), after);
     }
 
     #[test]
@@ -4361,14 +4492,21 @@ mod tests {
         let source = format!(
             r#"<connections xmlns="{CORE_NAMESPACE}"><connection id="1" refreshedVersion="7" name="one"/><connection id="2" refreshedVersion="7" name="two"/></connections>"#
         );
-        let before = Connections::parse(source.as_bytes()).unwrap();
+        let before = parse_default(source.as_bytes()).unwrap();
         let mut after = before.clone();
         after.connections.swap(0, 1);
 
-        let patched = patch_connections_source(source.as_bytes(), &before, &after, false).unwrap();
+        let patched = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &after,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap();
         let text = std::str::from_utf8(&patched).unwrap();
         assert!(text.find("id=\"2\"").unwrap() < text.find("id=\"1\"").unwrap());
-        assert_eq!(Connections::parse(&patched).unwrap(), after);
+        assert_eq!(parse_default(&patched).unwrap(), after);
     }
 
     #[test]
@@ -4382,7 +4520,13 @@ mod tests {
             }],
         )
         .unwrap_err();
-        assert_eq!(error.to_string(), "connection source output exceeds 16 MiB");
+        assert!(matches!(
+            error,
+            crate::Error::Limit {
+                kind: crate::LimitKind::Connections(LimitKind::OutputBytes),
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -4391,25 +4535,39 @@ mod tests {
             r#"<p:connections xmlns:p="{CORE_NAMESPACE}" xmlns:mc="{MCE}" xmlns:u="urn:unsupported"><mc:AlternateContent><mc:Choice Requires="u"><u:connection id="9" refreshedVersion="7"/></mc:Choice><mc:Fallback><p:connection id="1" refreshedVersion="7" name="before"/></mc:Fallback></mc:AlternateContent></p:connections>"#,
             MCE = litchi_ooxml_common::mce::NAMESPACE,
         );
-        let before = Connections::parse(source.as_bytes()).unwrap();
+        let before = parse_default(source.as_bytes()).unwrap();
         let mut after = before.clone();
         after.connections[0].name = Some("after".into());
-        let patched = patch_connections_source(source.as_bytes(), &before, &after, false).unwrap();
+        let patched = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &after,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap();
         let text = std::str::from_utf8(&patched).unwrap();
         assert!(text.contains("mc:AlternateContent"));
         assert!(text.contains("mc:Fallback"));
         assert!(text.contains("u:connection"));
-        assert_eq!(Connections::parse(&patched).unwrap(), after);
+        assert_eq!(parse_default(&patched).unwrap(), after);
 
         let source = format!(
             r#"<p:connections xmlns:p="{CORE_NAMESPACE}"><p:connection id="1" refreshedVersion="7"/></p:connections>"#
         );
-        let before = Connections::parse(source.as_bytes()).unwrap();
+        let before = parse_default(source.as_bytes()).unwrap();
         let mut after = before.clone();
         after.connections.push(connection(2, None));
         after.connections.push(connection(3, None));
-        let patched = patch_connections_source(source.as_bytes(), &before, &after, false).unwrap();
-        let actual = Connections::parse(&patched).unwrap();
+        let patched = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &after,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap();
+        let actual = parse_default(&patched).unwrap();
         assert_eq!(
             actual
                 .connections
@@ -4426,14 +4584,21 @@ mod tests {
             r#"<p:connections xmlns:p="{CORE_NAMESPACE}" xmlns:mc="{MCE}" xmlns:u="urn:unsupported"><p:connection id="1" refreshedVersion="7"><mc:AlternateContent><mc:Choice Requires="u"><u:dbPr connection="inactive"/></mc:Choice><mc:Fallback><p:dbPr connection="before"/></mc:Fallback></mc:AlternateContent></p:connection></p:connections>"#,
             MCE = litchi_ooxml_common::mce::NAMESPACE,
         );
-        let before = Connections::parse(source.as_bytes()).unwrap();
+        let before = parse_default(source.as_bytes()).unwrap();
         let mut after = before.clone();
         after.connections[0].database = Some(database_connection());
-        let patched = patch_connections_source(source.as_bytes(), &before, &after, false).unwrap();
+        let patched = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &after,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap();
         let text = std::str::from_utf8(&patched).unwrap();
         assert!(text.contains("connection=\"inactive\""));
         assert!(text.contains("connection=\"Provider=opaque\""));
-        assert_eq!(Connections::parse(&patched).unwrap(), after);
+        assert_eq!(parse_default(&patched).unwrap(), after);
     }
 
     #[test]
@@ -4563,10 +4728,18 @@ impl SourceTree {
             }
             let end = source_tag_end(source, position)?;
             if nodes.len() >= MAX_DOM_NODES {
-                return Err(invalid("connection source node limit exceeded"));
+                return Err(limit(
+                    LimitKind::Nodes,
+                    nodes.len().checked_add(1).unwrap_or(usize::MAX),
+                    MAX_DOM_NODES,
+                ));
             }
             if stack.len() >= MAX_DOM_DEPTH {
-                return Err(invalid("connection source depth limit exceeded"));
+                return Err(limit(
+                    LimitKind::Depth,
+                    stack.len().checked_add(1).unwrap_or(usize::MAX),
+                    MAX_DOM_DEPTH,
+                ));
             }
             nodes
                 .try_reserve(1)
@@ -4761,7 +4934,11 @@ impl SourceTree {
                 && self.is_semantic_connection_child(index)
             {
                 if connections.len() >= MAX_CONNECTIONS {
-                    return Err(invalid("connection source connection limit exceeded"));
+                    return Err(limit(
+                        LimitKind::Connections,
+                        connections.len().checked_add(1).unwrap_or(usize::MAX),
+                        MAX_CONNECTIONS,
+                    ));
                 }
                 connections.push(index);
             }

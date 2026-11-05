@@ -5,8 +5,8 @@
 //! boundary. This example therefore writes the source data and validates the
 //! four typed chart placements without inventing a worksheet mutation API.
 
-use litchi_xlsx::chart::{Anchor, Chart};
-use litchi_xlsx::{Number, Workbook};
+use litchi_xlsx::builder::chart::{Anchor, Chart};
+use litchi_xlsx::{Number, Package};
 use std::env;
 use std::error::Error;
 
@@ -14,7 +14,7 @@ fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let args: Vec<String> = env::args().collect();
     let output_path = args.get(1).map_or("xlsx_charts_demo.xlsx", String::as_str);
 
-    let workbook = Workbook::create()?;
+    let workbook = Package::new()?;
     let mut edit = workbook.edit()?;
     edit.tab(0)?
         .ok_or("default worksheet is missing")?
@@ -81,7 +81,7 @@ fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
             Anchor::new(0, 20, 7, 32),
         )?,
     ];
-    let workbook = edit.commit()?.into_workbook();
+    let workbook = edit.commit()?.into_package();
     workbook.save(output_path)?;
     println!(
         "Saved {} chart models and source data to {output_path}",

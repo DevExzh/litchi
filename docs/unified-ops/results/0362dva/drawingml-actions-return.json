@@ -1,0 +1,103 @@
+{
+  "schema": "litchi.drawingml.actions-return-validation.v1",
+  "record": "0362dva",
+  "scope": "DrawingML action publication and builder ownership return after coordinator review",
+  "source": {
+    "precommit_parent": "9034328f32657bec6b144f607bfe71e5caf7d1f3",
+    "postcommit_source": "9e35acd7f7",
+    "postcommit_tree": "ff397ceb78307f860b156471cbc37f5ddbb471f8",
+    "followup_source": "f5514ea4135ea26e912b275050b48359f365e419",
+    "followup_tree": "57a6908516fad835d6a65994f9198f74599225f1",
+    "execution_phase": "Cargo commands ran on the prepared pre-commit working tree before the O(1) follow-up. The source and consumer changes were committed as postcommit_source; the follow-up deferral and typed-limit repair were committed as followup_source. No Cargo rerun was needed after that repair; final checks are non-Cargo static checks and status checks.",
+    "lock": {
+      "path": "Cargo.lock",
+      "source": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation/Cargo.lock",
+      "bytes": 139591,
+      "sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6"
+    }
+  },
+  "checks": [
+    {
+      "label": "drawingml-native-tests-precommit",
+      "phase": "precommit",
+      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp cargo test --package litchi-drawingml --all-features --offline --locked --target-dir /home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/target",
+      "exit_code": 0,
+      "result": "235 unit tests and DrawingML integration suites passed",
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/actions-native-tests.log",
+        "bytes": 38923,
+        "sha256": "752ace1539c0ad0f9838e5c15183147f9fd3b0032b1020cb156018050b685615"
+      }
+    },
+    {
+      "label": "pptx-consumer-check-precommit",
+      "phase": "precommit",
+      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp cargo check --package litchi-pptx --all-features --offline --locked --target-dir /home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/target",
+      "exit_code": 0,
+      "result": "litchi-pptx finished dev-profile check",
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/pptx-consumer-check.log",
+        "bytes": 168,
+        "sha256": "7aa8c73e980876904b7a4ef4b964aa6fdb3cdbf16eeba6e840c6a2c50d47a881"
+      }
+    },
+    {
+      "label": "docx-consumer-check-precommit",
+      "phase": "precommit",
+      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/target cargo check --offline --locked --workspace --all-features -p litchi-docx",
+      "exit_code": 0,
+      "result": "workspace dependency graph and litchi-docx consumer finished dev-profile check",
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/docx-consumer-check.log",
+        "bytes": 8775,
+        "sha256": "be9a00ff3d807cb573ffbc74d09ec9bebb78bf94933b5b1a0f08eebfec7a5cbf"
+      }
+    },
+    {
+      "label": "drawingml-glossary-rustdoc-precommit",
+      "phase": "precommit",
+      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --profile drawingml --target-dir /home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/glossary-target",
+      "exit_code": 1,
+      "result": "rustdoc build succeeded; gate is held by the known Error type/proc-macro namespace collision in checker traversal",
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/glossary.log",
+        "bytes": 523,
+        "sha256": "c5cfcf18e2e12bf8e227358c48a0a9dc9feb9f80512dd0c60d806dbcad0ec495"
+      },
+      "rustdoc_json": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/glossary-target/doc/litchi_drawingml.json",
+        "bytes": 28010477,
+        "sha256": "cb6a1b0e61511c7e4c486a58ada198fd546e1303f835ab0323232377af3adaea",
+        "collision_ids": [4035, 4036],
+        "requested_followup_use_ids": [4040, 4041],
+        "nominal_error_enum_id": 3675,
+        "proc_macro_error_id": 3677
+      }
+    },
+    {
+      "label": "standalone-unified-chart-add-locked-before-repair",
+      "phase": "prior-0362dv-diagnostic",
+      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp cargo check --manifest-path tools/perf-baseline/unified-chart-add/Cargo.toml --offline --locked --target-dir /home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-target",
+      "exit_code": 101,
+      "result": "tracked standalone lock was stale and --locked refused the missing local dependency graph edges",
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-check.log",
+        "bytes": 298,
+        "sha256": "408841b16b557ec63fabc2b00f3c191ca9af807b53abcfb63f326adcc7ef4d5a"
+      },
+      "minimal_offline_resolution": "The preserved-registry offline update added only local package graph edges (litchi-ops selected chrono, litchi-sheet-text, memchr, quick-xml, sha2 0.11.0; litchi-pptx selected memchr; litchi-sheet-text selected litchi-core, litchi-sheet, thiserror; litchi-xlsx selected sha2 0.11.0) and changed no registry versions or checksums. The resulting locked check passed in the 0362dv receipt."
+    }
+  ],
+  "postcommit_static": {
+    "cargo_fmt_check": "pass",
+    "git_diff_check": "pass",
+    "agents_large_evidence_and_binary_checks": "pass",
+    "working_tree_after_source_commit": "clean before adding this receipt"
+  },
+  "notes": [
+    "The large rustdoc JSON and all command logs remain outside the repository; no evidence artifact at or above 1 MiB is committed.",
+    "Prepared owner routes use Arc-held source/profile state for O(1) edit entry and exact no-op replay; edit entry validates only scalar options, while profile-wide limits are deferred to commit (including no-op commits), and changed replay is read back before publication.",
+    "LimitKind maps every stable action budget resource, including retained source admission, through the actual limit-error helper rather than remaining declaration-only vocabulary.",
+    "The glossary collision is reported as a diagnostic for the resolver/checker follow-up; no public alias or proc-macro workaround was introduced."
+  ]
+}

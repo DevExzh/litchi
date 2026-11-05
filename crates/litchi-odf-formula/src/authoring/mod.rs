@@ -3,8 +3,6 @@
 mod constructors;
 pub mod content;
 
-use litchi_core::Result;
-
 use crate::model::Element;
 
 pub use constructors::{
@@ -13,53 +11,76 @@ pub use constructors::{
     sub_superscript, subscript, superscript, table, under, under_over,
 };
 
-/// Build a Formula package from an inert `MathML` root.
+/// The `MathML` source a [`Builder`] packages.
+enum Source {
+    /// A typed tree, serialized at build time.
+    Root(Element),
+    /// Exact `MathML` text, validated and stored verbatim as `content.xml`.
+    Text(String),
+}
+
+/// Build a Formula [`crate::Package`] from inert `MathML`.
 pub struct Builder {
-    root: Element,
+    source: Source,
     template: bool,
+    limits: crate::codec::Limits,
 }
 
 impl Builder {
-    /// Start authoring a standard `.odf` package.
+    /// Start authoring a standard `.odf` package from a typed root.
     #[must_use]
     pub fn new(root: Element) -> Self {
+        Self::with_source(Source::Root(root), false)
+    }
+
+    /// Start authoring a Formula template `.otf` package from a typed root.
+    #[must_use]
+    pub fn template(root: Element) -> Self {
+        Self::with_source(Source::Root(root), true)
+    }
+
+    /// Start authoring a standard `.odf` package whose `content.xml` is the
+    /// exact `MathML` text, validated at [`Self::build`].
+    #[must_use]
+    pub fn from_mathml(mathml: impl Into<String>) -> Self {
+        Self::with_source(Source::Text(mathml.into()), false)
+    }
+
+    /// Start authoring a Formula template `.otf` package whose `content.xml`
+    /// is the exact `MathML` text, validated at [`Self::build`].
+    #[must_use]
+    pub fn template_from_mathml(mathml: impl Into<String>) -> Self {
+        Self::with_source(Source::Text(mathml.into()), true)
+    }
+
+    fn with_source(source: Source, template: bool) -> Self {
         Self {
-            root,
-            template: false,
+            source,
+            template,
+            limits: crate::codec::Limits::default(),
         }
     }
 
-    /// Start authoring a Formula template `.otf` package.
+    /// Select the finite `MathML` parser limits validated at build time and
+    /// retained by the package for later edits.
     #[must_use]
-    pub fn template(root: Element) -> Self {
-        Self {
-            root,
-            template: true,
-        }
+    pub const fn limits(mut self, limits: crate::codec::Limits) -> Self {
+        self.limits = limits;
+        self
     }
 
     /// Build and validate the package.
     ///
     /// # Errors
     ///
-    /// Returns an error when the serialized `MathML` fails validation or the
-    /// package cannot be created.
-    pub fn build(self) -> Result<crate::Formula> {
-        self.build_with_limits(crate::Limits::default())
-    }
-
-    /// Build and validate the package under caller-selected finite limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the serialized `MathML` exceeds a limit, fails
+    /// Returns an error when the `MathML` exceeds a selected limit, fails
     /// validation, or the package cannot be created.
-    pub fn build_with_limits(self, limits: crate::Limits) -> Result<crate::Formula> {
-        let xml = self.root.to_xml();
-        if self.template {
-            crate::Formula::create_template_with_limits(xml, limits)
-        } else {
-            crate::Formula::create_with_limits(xml, limits)
-        }
+    pub fn build(self) -> Result<crate::Package, crate::Error> {
+        let xml = match self.source {
+            Source::Root(root) => root.to_xml(&self.limits)?,
+            Source::Text(text) => text,
+        };
+        let formula = crate::Formula::from_mathml(&xml, self.template, self.limits)?;
+        Ok(crate::Package::from_formula(formula))
     }
 }

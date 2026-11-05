@@ -54,7 +54,11 @@ struct ContentFrame {
 /// Scan one slide owner and retain each active content-part anchor exactly.
 pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Anchor>> {
     if xml.len() > MAX_XML_BYTES {
-        return Err(limit("content-part slide XML bytes", MAX_XML_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            xml.len(),
+            MAX_XML_BYTES,
+        ));
     }
     let mut capabilities = Capabilities::ooxml_baseline();
     capabilities.understand_namespace(P14_URI);
@@ -99,11 +103,19 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Anchor>> {
                     validate_root(&namespace, element.name(), root_seen)?;
                     root_seen = true;
                 }
-                depth = depth
-                    .checked_add(1)
-                    .ok_or_else(|| limit("content-part XML depth", MAX_XML_DEPTH))?;
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        MAX_XML_DEPTH,
+                    )
+                })?;
                 if depth > MAX_XML_DEPTH {
-                    return Err(limit("content-part XML depth", MAX_XML_DEPTH));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        MAX_XML_DEPTH,
+                    ));
                 }
                 let local = element.name().local_name().as_ref().to_vec();
                 frames.push(Frame {
@@ -113,7 +125,11 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Anchor>> {
                 });
                 if is_content_part(&namespace, element.name()) {
                     if anchors.len() >= maximum {
-                        return Err(limit("content-part count", maximum));
+                        return Err(limit(
+                            crate::error::CodecLimitKind::ContentParts,
+                            anchors.len().checked_add(1).unwrap_or(usize::MAX),
+                            maximum,
+                        ));
                     }
                     let relationship_id = relationship_id(&element, reader.decoder(), &resolver)?;
                     let (bw_mode, bw_mode_key) =
@@ -130,11 +146,19 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Anchor>> {
             Event::Empty(element) => {
                 increment_nodes(&mut nodes)?;
                 validate_attributes(&element)?;
-                let child_depth = depth
-                    .checked_add(1)
-                    .ok_or_else(|| limit("content-part XML depth", MAX_XML_DEPTH))?;
+                let child_depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        MAX_XML_DEPTH,
+                    )
+                })?;
                 if child_depth > MAX_XML_DEPTH {
-                    return Err(limit("content-part XML depth", MAX_XML_DEPTH));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        child_depth,
+                        MAX_XML_DEPTH,
+                    ));
                 }
                 if child_depth == 1 {
                     if root_closed {
@@ -146,7 +170,11 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Anchor>> {
                 }
                 if is_content_part(&namespace, element.name()) {
                     if anchors.len() >= maximum {
-                        return Err(limit("content-part count", maximum));
+                        return Err(limit(
+                            crate::error::CodecLimitKind::ContentParts,
+                            anchors.len().checked_add(1).unwrap_or(usize::MAX),
+                            maximum,
+                        ));
                     }
                     let relationship_id = relationship_id(&element, reader.decoder(), &resolver)?;
                     let (bw_mode, bw_mode_key) =
@@ -243,7 +271,11 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Anchor>> {
 /// selected relationship attribute while retaining branch-local opaque XML.
 pub(crate) fn locate_content_parts(xml: &[u8]) -> Result<Vec<SourceAnchor>> {
     if xml.len() > MAX_XML_BYTES {
-        return Err(limit("content-part slide XML bytes", MAX_XML_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            xml.len(),
+            MAX_XML_BYTES,
+        ));
     }
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
@@ -276,11 +308,19 @@ pub(crate) fn locate_content_parts(xml: &[u8]) -> Result<Vec<SourceAnchor>> {
                     validate_root(&namespace, element.name(), root_seen)?;
                     root_seen = true;
                 }
-                depth = depth
-                    .checked_add(1)
-                    .ok_or_else(|| limit("content-part XML depth", MAX_XML_DEPTH))?;
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        MAX_XML_DEPTH,
+                    )
+                })?;
                 if depth > MAX_XML_DEPTH {
-                    return Err(limit("content-part XML depth", MAX_XML_DEPTH));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        MAX_XML_DEPTH,
+                    ));
                 }
                 let content = if is_content_part(&namespace, element.name()) {
                     let id = relationship_id(&element, decoder, &resolver)?;
@@ -299,11 +339,19 @@ pub(crate) fn locate_content_parts(xml: &[u8]) -> Result<Vec<SourceAnchor>> {
             Event::Empty(element) => {
                 increment_nodes(&mut nodes)?;
                 validate_attributes(&element)?;
-                let child_depth = depth
-                    .checked_add(1)
-                    .ok_or_else(|| limit("content-part XML depth", MAX_XML_DEPTH))?;
+                let child_depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        MAX_XML_DEPTH,
+                    )
+                })?;
                 if child_depth > MAX_XML_DEPTH {
-                    return Err(limit("content-part XML depth", MAX_XML_DEPTH));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        child_depth,
+                        MAX_XML_DEPTH,
+                    ));
                 }
                 if child_depth == 1 {
                     if root_closed {
@@ -598,7 +646,11 @@ pub(crate) fn rewrite_anchor_bw_mode(
         (None, None) => {},
     }
     if output.len() > MAX_XML_BYTES {
-        return Err(limit("content-part anchor XML bytes", MAX_XML_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            output.len(),
+            MAX_XML_BYTES,
+        ));
     }
     let (result, result_key) = anchor_bw_mode_with_key(&output, key.as_deref())?;
     if result != value {
@@ -758,11 +810,19 @@ pub(crate) fn shape_tree_insertion(source: &[u8]) -> Result<usize> {
             Event::Start(element) => {
                 increment_nodes(&mut nodes)?;
                 validate_attributes(&element)?;
-                let child_depth = depth
-                    .checked_add(1)
-                    .ok_or_else(|| limit("content-part XML depth", MAX_XML_DEPTH))?;
+                let child_depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        MAX_XML_DEPTH,
+                    )
+                })?;
                 if child_depth > MAX_XML_DEPTH {
-                    return Err(limit("content-part XML depth", MAX_XML_DEPTH));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        child_depth,
+                        MAX_XML_DEPTH,
+                    ));
                 }
                 if child_depth == 1 {
                     validate_root(&namespace, element.name(), root_seen)?;
@@ -842,7 +902,11 @@ pub(crate) fn replace_spans(
         upper = range.start;
     }
     if output.len() > MAX_XML_BYTES {
-        return Err(limit("content-part slide XML bytes", MAX_XML_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            output.len(),
+            MAX_XML_BYTES,
+        ));
     }
     Ok(output)
 }
@@ -1026,17 +1090,26 @@ fn validate_attributes(element: &BytesStart<'_>) -> Result<()> {
     let mut count = 0usize;
     for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
-        count = count
-            .checked_add(1)
-            .ok_or_else(|| limit("content-part XML attributes", MAX_XML_ATTRIBUTES))?;
+        count = count.checked_add(1).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::XmlAttributes,
+                usize::MAX,
+                MAX_XML_ATTRIBUTES,
+            )
+        })?;
         if count > MAX_XML_ATTRIBUTES {
-            return Err(limit("content-part XML attributes", MAX_XML_ATTRIBUTES));
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlAttributes,
+                count,
+                MAX_XML_ATTRIBUTES,
+            ));
         }
         if attribute.key.as_ref().len() > MAX_ATTRIBUTE_BYTES
             || attribute.value.len() > MAX_ATTRIBUTE_BYTES
         {
             return Err(limit(
-                "content-part XML attribute bytes",
+                crate::error::CodecLimitKind::XmlAttributeBytes,
+                attribute.key.as_ref().len().max(attribute.value.len()),
                 MAX_ATTRIBUTE_BYTES,
             ));
         }

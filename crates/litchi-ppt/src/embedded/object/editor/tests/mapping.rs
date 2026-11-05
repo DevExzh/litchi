@@ -40,7 +40,7 @@ fn editor_publishes_native_incremental_directory_and_retains_prior_chain() {
             .join("../../test-data/poi/test-data/slideshow/45543.ppt"),
     )
     .unwrap();
-    let mut editor = Editor::open_records(source).unwrap();
+    let mut editor = Editor::open_records(source, crate::SourceLimits::default()).unwrap();
     let previous_edit_offset = editor.current_edit_offset;
     let document_persist_id = editor.document_persist_id;
     let replacement = editor.persisted_record(document_persist_id).unwrap();
@@ -49,7 +49,11 @@ fn editor_publishes_native_incremental_directory_and_retains_prior_chain() {
         .unwrap();
     let published = editor.finish().unwrap();
 
-    let mut ole = OleFile::open(Cursor::new(published.as_slice())).unwrap();
+    let mut ole = OleFile::open(
+        Cursor::new(published.as_slice()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let document = ole.open_stream(&["PowerPoint Document"]).unwrap();
     let current_user = ole.open_stream(&["Current User"]).unwrap();
     let latest_edit_offset = rewrite::u32_at(&current_user, 16).unwrap();
@@ -80,7 +84,7 @@ fn editor_publishes_native_incremental_directory_and_retains_prior_chain() {
         "latest directory must resolve the appended replacement"
     );
 
-    let reopened = Editor::open_records(published).unwrap();
+    let reopened = Editor::open_records(published, crate::SourceLimits::default()).unwrap();
     assert_eq!(
         reopened.persisted_record(document_persist_id).unwrap(),
         replacement

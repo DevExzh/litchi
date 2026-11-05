@@ -7,23 +7,22 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+use litchi_rtf::raw::Tree;
 use litchi_rtf::{
-    MAX_SECTION_LINE_GRID_TWIPS, RtfDocument, RtfWriter, Section, SectionDocumentGrid,
-    SectionDocumentGridType,
+    MAX_SECTION_LINE_GRID_TWIPS, Section, SectionDocumentGrid, SectionDocumentGridType,
+    write::Writer,
 };
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
 #[test]
 fn parses_line_grid_and_grid_type_and_round_trips_in_canonical_order() {
     let source = r"{\rtf1\sectd\sectlinegrid360{\sectspecifyl}Body}";
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let grid = document.sections()[0].properties.document_grid;
     assert_eq!(
         grid,
@@ -35,7 +34,7 @@ fn parses_line_grid_and_grid_type_and_round_trips_in_canonical_order() {
     let output = write(&document);
     let serialized = String::from_utf8(output.clone()).unwrap();
     assert!(serialized.contains(r"\sectlinegrid360\sectspecifyl"));
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.sections()[0].properties.document_grid, grid);
 }
 
@@ -45,7 +44,7 @@ fn parses_bundled_libreoffice_document_grid_fixture() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/cjklist24.rtf"
     ));
-    let document = RtfDocument::parse_bytes(fixture).unwrap();
+    let document = Tree::parse_bytes(fixture, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert!(document.sections().iter().any(|section| {
         section.properties.document_grid
             == SectionDocumentGrid {
@@ -58,7 +57,7 @@ fn parses_bundled_libreoffice_document_grid_fixture() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/libreoffice-core/sw/qa/extras/rtfimport/data/tdf165923.rtf"
     ));
-    let document = RtfDocument::parse_bytes(fixture).unwrap();
+    let document = Tree::parse_bytes(fixture, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert!(document.sections().iter().any(|section| {
         section.properties.document_grid.line_grid == Some(360)
             && section.properties.document_grid.grid_type.is_none()
@@ -73,7 +72,7 @@ fn parses_all_grid_types() {
         ("sectspecifygen", SectionDocumentGridType::Default),
     ] {
         let source = format!(r"{{\rtf1\{control} X}}");
-        let document = RtfDocument::parse(&source).unwrap();
+        let document = Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).unwrap();
         assert_eq!(
             document.sections()[0].properties.document_grid.grid_type,
             Some(expected),
@@ -90,19 +89,31 @@ fn parses_all_grid_types() {
 
 #[test]
 fn preserves_missing_parameter_default_and_sectd_reset() {
-    let bare = RtfDocument::parse(r"{\rtf1\sectlinegrid X}").unwrap();
+    let bare = Tree::parse(
+        r"{\rtf1\sectlinegrid X}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(
         bare.sections()[0].properties.document_grid.line_grid,
         Some(360)
     );
 
-    let zero = RtfDocument::parse(r"{\rtf1\sectlinegrid0 X}").unwrap();
+    let zero = Tree::parse(
+        r"{\rtf1\sectlinegrid0 X}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(
         zero.sections()[0].properties.document_grid.line_grid,
         Some(0)
     );
 
-    let reset = RtfDocument::parse(r"{\rtf1\sectlinegrid312\sectspecifycl X\sectd Y}").unwrap();
+    let reset = Tree::parse(
+        r"{\rtf1\sectlinegrid312\sectspecifycl X\sectd Y}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert!(reset.sections()[0].properties.document_grid.is_empty());
 }
 
@@ -116,7 +127,7 @@ fn inert_destinations_do_not_change_document_grid() {
         r"{\rtf1 A{\footnote\sectlinegrid312\sectspecifygen Note}Body}",
         r"{\rtf1{\object\sectlinegrid312}Body}",
     ] {
-        let document = RtfDocument::parse(source).unwrap();
+        let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
         assert!(
             document
                 .sections()
@@ -136,11 +147,14 @@ fn rejects_out_of_range_pitch_and_invalid_public_writer_state() {
             MAX_SECTION_LINE_GRID_TWIPS + 1
         ),
     ] {
-        assert!(RtfDocument::parse(&source).is_err(), "accepted {source}");
+        assert!(
+            Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted {source}"
+        );
     }
 
     let mut section = Section::new();
     section.properties.document_grid.line_grid = Some(-1);
     let mut output = Vec::new();
-    assert!(RtfWriter::new(&mut output).write_section(&section).is_err());
+    assert!(Writer::new(&mut output).write_section(&section).is_err());
 }

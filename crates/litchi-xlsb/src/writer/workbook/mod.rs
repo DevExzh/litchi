@@ -10,4 +10,4 @@ mod package;
 #[cfg(test)]
 mod tests;
 
-pub use model::WorkbookWriter;
+pub use model::Builder;

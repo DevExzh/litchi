@@ -23,7 +23,7 @@ use litchi_core::sheet::{
 };
 use litchi_core::{OwnedSource, ReadAt, SourceVersion};
 use litchi_opc::{SourceCacheCounterDelta, SourceCacheDiagnostics};
-use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::{SourceBackedWorkbook, Workbook};
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::collections::BTreeSet;
@@ -513,8 +513,7 @@ impl Corpus {
         let worksheet = workbook.worksheet(sheet_index)?;
         let dimensions = worksheet.dimensions();
         let mut cells = Vec::new();
-        let mut iterator = WorksheetTrait::cells(&worksheet);
-        while let Some(cell) = iterator.next() {
+        for cell in WorksheetTrait::cells(&worksheet) {
             let cell = cell?;
             cells.push((cell.row(), cell.column(), canonical_value(cell.value())));
         }
@@ -581,7 +580,7 @@ fn generate_fixture(value: &str) -> Result<Vec<u8>> {
         return Err("synthetic fixture cell count must be in 1..=1_000_000".into());
     }
     let columns_per_row = 32_u32;
-    let mut worksheet = MutableWorksheet::new("Synthetic");
+    let mut worksheet = builder::Worksheet::new("Synthetic");
     for index in 0..cell_count {
         let row = u32::try_from(index / columns_per_row as usize)
             .map_err(|_| "synthetic fixture row exceeds XLSB bounds")?;
@@ -589,10 +588,13 @@ fn generate_fixture(value: &str) -> Result<Vec<u8>> {
             .map_err(|_| "synthetic fixture column exceeds XLSB bounds")?;
         worksheet.set_cell(row, column, index as f64);
     }
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(worksheet);
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output)?;
+    writer
+        .build()
+        .expect("build package")
+        .write_to(&mut output)?;
     Ok(output.into_inner())
 }
 

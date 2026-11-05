@@ -62,7 +62,12 @@ pub fn load_worksheet_named_sheet_views(
 ///
 /// The value is serialized as inert filter and sort metadata. Existing package
 /// graph violations are rejected before any part is changed.
-pub fn store_worksheet_named_sheet_views(
+///
+/// Storing always writes the part, so a signed package is refused with
+/// [`crate::Error::Signed`] before anything is changed, even when the
+/// serialized views equal the stored ones: remove the signature explicitly
+/// first ([`OpcPackage::unsign`]).
+pub(crate) fn store_worksheet_named_sheet_views(
     package: &mut OpcPackage,
     worksheet_part: &PackURI,
     value: &Views,
@@ -75,26 +80,31 @@ pub fn store_worksheet_named_sheet_views(
     validate_named_sheet_views_graph(package)?;
 
     if let Some(relationship) = named_sheet_views_relationship(package, worksheet_part)? {
+        crate::signature_policy::ensure_unsigned(package)?;
         package.get_part_mut(&relationship.part_name)?.set_blob(xml);
     } else {
         let part_name = next_named_sheet_views_part_name(package)?;
         let relationship_id = next_named_sheet_views_relationship_id(package, worksheet_part)?;
         let target = part_name.relative_ref(worksheet_part.base_uri());
+        crate::signature_policy::ensure_unsigned(package)?;
         package.try_add_part(Box::new(BlobPart::new(part_name, CONTENT_TYPE.into(), xml)))?;
         package
             .get_part_mut(worksheet_part)?
             .rels_mut()
             .add_relationship(RELATIONSHIP.into(), target, relationship_id, false);
     }
-
-    package.unsign();
     Ok(())
 }
 
 /// Remove a worksheet's Named Sheet Views relationship and unreferenced part.
 ///
 /// The worksheet data and its ordinary active view are left unchanged.
-pub fn remove_worksheet_named_sheet_views(
+///
+/// A worksheet without the part is left untouched and returns `false`, signed
+/// or not. Removing it changes the package, so a signed package is refused
+/// with [`crate::Error::Signed`]: remove the signature explicitly first
+/// ([`OpcPackage::unsign`]).
+pub(crate) fn remove_worksheet_named_sheet_views(
     package: &mut OpcPackage,
     worksheet_part: &PackURI,
 ) -> Result<bool> {
@@ -106,6 +116,7 @@ pub fn remove_worksheet_named_sheet_views(
     let Some(relationship) = named_sheet_views_relationship(package, worksheet_part)? else {
         return Ok(false);
     };
+    crate::signature_policy::ensure_unsigned(package)?;
 
     package
         .get_part_mut(worksheet_part)?
@@ -114,7 +125,6 @@ pub fn remove_worksheet_named_sheet_views(
     if !package_part_is_referenced(package, &relationship.part_name) {
         package.remove_part(&relationship.part_name);
     }
-    package.unsign();
     Ok(true)
 }
 

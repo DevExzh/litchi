@@ -8,10 +8,10 @@
 //! cargo run --example office_crud_demo
 //! ```
 
-use litchi::docx::Package as DocxPackage;
-use litchi::ooxml_common::Props;
+use litchi::docx::{Builder as DocxBuilder, Package as DocxPackage};
 use litchi::pptx::Package as PptxPackage;
-use litchi::xlsx::{Formula, Workbook};
+use litchi::xlsx::{Formula, Package};
+use litchi_core::Metadata;
 
 type ExampleResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
@@ -41,8 +41,8 @@ fn demo_docx_operations() -> ExampleResult<()> {
 
     // CREATE: Create a new document
     println!("Creating new Word document...");
-    let mut pkg = DocxPackage::new()?;
-    let doc = pkg.document_mut()?;
+    let mut builder = DocxBuilder::new()?;
+    let doc = builder.document()?;
 
     // Add content
     doc.add_heading("Product Catalog", 1)?;
@@ -79,12 +79,14 @@ fn demo_docx_operations() -> ExampleResult<()> {
     table.cell(3, 2).unwrap().set_text("200");
 
     // Set metadata
-    let _ = pkg.put_props(
-        Props::new()
-            .title("Product Catalog")
-            .creator("Litchi Demo")
-            .description("Demonstration of DOCX creation"),
-    );
+    let mut metadata = builder.build()?.edit_metadata();
+    metadata.set(Metadata {
+        title: Some("Product Catalog".to_owned()),
+        author: Some("Litchi Demo".to_owned()),
+        description: Some("Demonstration of DOCX creation".to_owned()),
+        ..Metadata::default()
+    });
+    let pkg = metadata.commit()?.into_package();
 
     // Save
     pkg.save("demo_catalog.docx")?;
@@ -103,23 +105,29 @@ fn demo_docx_operations() -> ExampleResult<()> {
     println!("  Found 'Widget' in {} paragraphs", matches.len());
 
     // Access metadata
-    if let Some(title) = pkg.props().and_then(|props| props.title.as_deref()) {
+    if let Some(title) = pkg.metadata().and_then(|props| props.title.as_deref()) {
         println!("  Title: {}", title);
     }
 
     // UPDATE: Modify existing document
     println!("Updating Word document...");
-    let mut pkg = DocxPackage::open("demo_catalog.docx")?;
-    let doc = pkg.document_mut()?;
-
-    doc.add_heading("Contact Information", 2)?;
-    doc.add_paragraph_with_text("For more information, please contact us:");
-    doc.add_paragraph_with_text("Email: sales@example.com");
-    doc.add_paragraph_with_text("Phone: (555) 123-4567");
-
-    if let Some(props) = pkg.props_mut() {
-        props.last_modified_by = Some("Litchi Update".to_string());
+    let pkg = DocxPackage::open("demo_catalog.docx")?;
+    let end = pkg.document_snapshot()?.paragraph_count();
+    let mut edit = pkg.edit()?;
+    for (offset, text) in [
+        "Contact Information",
+        "For more information, please contact us:",
+        "Email: sales@example.com",
+        "Phone: (555) 123-4567",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        edit.insert_paragraph(litchi::common::Position::new(end + offset), text)?;
     }
+    let mut metadata = edit.commit()?.into_package().edit_metadata();
+    metadata.update(|props| props.last_modified_by = Some("Litchi Update".to_string()));
+    let pkg = metadata.commit()?.into_package();
     pkg.save("demo_catalog_updated.docx")?;
     println!("✓ Updated: demo_catalog_updated.docx");
 
@@ -132,7 +140,7 @@ fn demo_xlsx_operations() -> ExampleResult<()> {
 
     // CREATE: Create a new workbook
     println!("Creating new Excel workbook...");
-    let wb = Workbook::create()?;
+    let wb = Package::new()?;
     let mut edit = wb.edit()?;
 
     // XLSX authoring is an atomic semantic transaction over an immutable
@@ -169,7 +177,7 @@ fn demo_xlsx_operations() -> ExampleResult<()> {
             .set("B2", Formula::new("AVERAGE(Sheet1!C2:C5)")?)?;
     }
 
-    let wb = edit.commit()?.into_workbook();
+    let wb = edit.commit()?.into_package();
 
     // Save
     wb.save("demo_employees.xlsx")?;
@@ -177,15 +185,16 @@ fn demo_xlsx_operations() -> ExampleResult<()> {
 
     // READ: Open and read the workbook
     println!("Reading Excel workbook...");
-    let wb = Workbook::open("demo_employees.xlsx")?;
+    let wb = Package::open("demo_employees.xlsx")?;
 
-    println!("  Worksheets: {}", wb.len());
-    for sheet in wb.sheets() {
+    println!("  Worksheets: {}", wb.workbook_ref().len());
+    for sheet in wb.workbook_ref().sheets() {
         println!("    - {}", sheet.name());
     }
 
     // Read data from first worksheet
     let ws = wb
+        .workbook_ref()
         .sheet(0)?
         .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "first worksheet"))?;
     println!(
@@ -200,7 +209,7 @@ fn demo_xlsx_operations() -> ExampleResult<()> {
 
     // UPDATE: Modify existing workbook
     println!("Updating Excel workbook...");
-    let wb = Workbook::open("demo_employees.xlsx")?;
+    let wb = Package::open("demo_employees.xlsx")?;
     let mut edit = wb.edit()?;
     let mut sheet = edit
         .sheet("Sheet1")?
@@ -209,7 +218,7 @@ fn demo_xlsx_operations() -> ExampleResult<()> {
         .set("A6", "Eve Davis")?
         .set("B6", "HR")?
         .set("C6", 65000_i32)?;
-    let wb = edit.commit()?.into_workbook();
+    let wb = edit.commit()?.into_package();
     wb.save("demo_employees_updated.xlsx")?;
     println!("✓ Updated: demo_employees_updated.xlsx");
 
@@ -222,8 +231,8 @@ fn demo_pptx_operations() -> ExampleResult<()> {
 
     // CREATE: Create a new presentation
     println!("Creating new PowerPoint presentation...");
-    let mut pkg = PptxPackage::new()?;
-    let pres = pkg.presentation_mut()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
+    let pres = builder.presentation()?;
 
     // Add title slide
     let slide1 = pres.add_slide()?;
@@ -266,6 +275,7 @@ fn demo_pptx_operations() -> ExampleResult<()> {
     );
 
     // Save
+    let pkg = builder.build()?;
     pkg.save("demo_presentation.pptx")?;
     println!("✓ Created: demo_presentation.pptx");
 
@@ -286,18 +296,16 @@ fn demo_pptx_operations() -> ExampleResult<()> {
 
     // UPDATE: Modify existing presentation
     //
-    // `presentation_mut` is the authoring writer and belongs to a package this
-    // process created with `Package::new`. An opened deck is never hydrated
-    // into it, so that call would refuse here with `UnsafeEdit`. Opened decks
+    // Builder authoring finishes before publication. Opened decks
     // are edited through one detached, failure-atomic transaction whose commit
     // the package publishes as a single patch; every part the transaction does
     // not name keeps its exact source bytes.
     println!("Updating PowerPoint presentation...");
     let mut pkg = PptxPackage::open("demo_presentation.pptx")?;
-    let mut edit = pkg.opened_presentation_transaction()?;
+    let mut edit = pkg.edit()?;
 
     // Retitle the closing slide and append a closing note to it.
-    let closing = edit.slides().len() - 1;
+    let closing = edit.slides()?.len() - 1;
     edit.set_shape_text(closing, 0_usize, "Financial Performance — Q4 Final")?;
     edit.add_text_box(
         closing,
@@ -306,10 +314,10 @@ fn demo_pptx_operations() -> ExampleResult<()> {
     )?;
 
     let commit = edit.commit()?;
-    if !commit.is_changed() {
+    if !commit.diagnostics().changed() {
         return Err("the opened-presentation transaction changed nothing".into());
     }
-    pkg.apply_opened_presentation_commit(commit)?;
+    pkg = commit.into_package();
 
     pkg.save("demo_presentation_updated.pptx")?;
     println!("✓ Updated: demo_presentation_updated.pptx");

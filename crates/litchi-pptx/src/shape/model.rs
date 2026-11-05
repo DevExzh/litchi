@@ -3,6 +3,16 @@
 use std::borrow::Cow;
 use std::ops::Range;
 
+use litchi_drawingml::text::body::Body;
+use litchi_drawingml::text::body::reader::{self as text_reader};
+use litchi_drawingml::transform::Transform;
+use litchi_ooxml_common::mce::InScopeNamespaces;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
+use quick_xml::XmlVersion;
+use quick_xml::events::attributes::Attribute;
+use quick_xml::events::{BytesStart, Event};
+use quick_xml::name::{Namespace, NamespaceResolver, PrefixDeclaration, QName};
+
 use crate::{Error, Result};
 
 /// A checked byte span in the markup-compatibility-processed owner XML.
@@ -209,26 +219,145 @@ pub(super) enum Kind {
     Unknown,
 }
 
+/// The relationship attribute that names a shape's payload part.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum PayloadAttribute {
+    /// An embedded picture: `a:blip/@r:embed`.
+    Embed,
+    /// A linked picture: `a:blip/@r:link`, when the blip embeds nothing.
+    Link,
+    /// A chart (`c:chart/@r:id`), an OLE object (`p:oleObj/@r:id`) or a
+    /// content part (`p:contentPart/@r:id`).
+    Id,
+    /// A diagram's data model: `dgm:relIds/@r:dm`.
+    DataModel,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(super) struct PayloadRecord {
+    /// The attribute value exactly as written, between its quotes.
+    pub(super) value: Span,
+    pub(super) attribute: PayloadAttribute,
+    pub(super) error: Option<super::raw::Error>,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub(super) struct Record {
     pub(super) span: Span,
     pub(super) subtree_end: u32,
     pub(super) parent: Option<u32>,
     pub(super) kind: Kind,
+    /// Whether a local root/shape namespace fast path is sufficient. Groups
+    /// and mid-tree declarations disable it and use the bounded ancestor walk
+    /// instead.
+    pub(super) inherits_root_namespaces: bool,
     pub(super) name: Option<TextSpan>,
     pub(super) id: Option<u32>,
     pub(super) bounds: Option<Bounds>,
     pub(super) placeholder: Option<PlaceholderRecord>,
     pub(super) text: Option<TextSpan>,
     pub(super) source_name: Option<TextSpan>,
+    /// The start tag of the shape's `cNvPr`.
+    pub(super) non_visual: Option<Span>,
+    /// The shape's own `a:xfrm` or `p:xfrm` element.
+    pub(super) transform: Option<Span>,
+    pub(super) transform_invalid: bool,
+    /// The relationship naming the shape's payload part.
+    pub(super) payload: Option<PayloadRecord>,
+    /// The shape's direct `p:txBody` element.
+    pub(super) text_body: Option<Span>,
+    /// More than one direct `p:txBody` was observed.
+    pub(super) text_body_invalid: bool,
+}
+
+/// Non-visual drawing properties a shape declares on its `cNvPr`:
+/// alternative text, title and the hidden flag, as written.
+///
+/// Values are decoded from the shape's start tag when asked for; an absent
+/// attribute is `None`.
+#[derive(Clone, Default, PartialEq, Eq)]
+pub struct NonVisual<'a> {
+    description: Option<Cow<'a, str>>,
+    title: Option<Cow<'a, str>>,
+    hidden: Option<bool>,
+}
+
+impl<'a> NonVisual<'a> {
+    /// Alternative text (`descr`).
+    #[inline]
+    #[must_use]
+    pub fn description(&self) -> Option<&str> {
+        self.description.as_deref()
+    }
+
+    /// Title (`title`).
+    #[inline]
+    #[must_use]
+    pub fn title(&self) -> Option<&str> {
+        self.title.as_deref()
+    }
+
+    /// The hidden flag (`hidden`) as written: `Some(false)` for an explicit
+    /// `hidden="0"`, `None` when the attribute is absent.
+    #[inline]
+    #[must_use]
+    pub const fn hidden(&self) -> Option<bool> {
+        self.hidden
+    }
+
+    /// Move out the alternative text, title and hidden flag; the text
+    /// borrows the owner XML where no decoding was needed.
+    #[must_use]
+    pub fn into_parts(self) -> (Option<Cow<'a, str>>, Option<Cow<'a, str>>, Option<bool>) {
+        (self.description, self.title, self.hidden)
+    }
+}
+
+/// The relationship through which a shape reaches its payload part: a
+/// picture's image, a chart, a diagram's data model, an OLE object or a
+/// content part.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct Payload<'a> {
+    raw: &'a [u8],
+    span: Span,
+    attribute: PayloadAttribute,
+}
+
+impl<'a> Payload<'a> {
+    /// The attribute that names the relationship.
+    #[inline]
+    #[must_use]
+    pub const fn attribute(self) -> PayloadAttribute {
+        self.attribute
+    }
+
+    /// The attribute value's span in the processed owner XML, between its
+    /// quotes.
+    #[inline]
+    #[must_use]
+    pub const fn span(self) -> Span {
+        self.span
+    }
+
+    /// The relationship identifier, decoded.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`super::raw::Error::InvalidAttribute`] when the value is not UTF-8 or holds a
+    /// malformed character reference.
+    pub fn relationship_id(self) -> std::result::Result<Cow<'a, str>, super::raw::Error> {
+        decode_attribute_value(self.raw).map_err(|_| super::raw::Error::InvalidAttribute)
+    }
 }
 
 /// Borrowed common properties shared by every semantic shape variant.
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct Common<'a> {
     pub(super) xml: &'a [u8],
     pub(super) records: &'a [Record],
     pub(super) strings: &'a str,
+    pub(super) limits: super::reader::Limits,
     pub(super) record: &'a Record,
     pub(super) index: usize,
 }
@@ -301,7 +430,7 @@ impl<'a> Common<'a> {
             self.xml,
             range.start,
             length,
-            &litchi_ooxml_common::mce::Limits::default(),
+            &shape_mce_limits(self.limits),
         )?)
     }
 
@@ -351,6 +480,339 @@ impl<'a> Common<'a> {
     pub fn source_name(self) -> Option<&'a str> {
         self.record.source_name?.get(self.strings)
     }
+
+    /// Span of the start tag of the shape's `cNvPr`, when it has one.
+    #[inline]
+    #[must_use]
+    pub(crate) const fn non_visual_span(self) -> Option<Span> {
+        self.record.non_visual
+    }
+
+    /// The non-visual drawing properties the shape's `cNvPr` declares:
+    /// alternative text, title and the hidden flag.
+    ///
+    /// They are decoded from the `cNvPr` start tag on each call; a shape
+    /// without `cNvPr` has none.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Invalid`] when the recorded span is no longer inside
+    /// its owner XML or `hidden` is not an XML Schema boolean, or for a value that is not UTF-8 or holds a malformed
+    /// character reference.
+    pub fn non_visual(self) -> Result<NonVisual<'a>> {
+        let Some(span) = self.record.non_visual else {
+            return Ok(NonVisual::default());
+        };
+        let range = span.range(self.xml.len())?;
+        let tag = self
+            .xml
+            .get(range)
+            .ok_or_else(|| Error::Invalid("shape cNvPr span became invalid".into()))?;
+        read_non_visual(tag)
+    }
+
+    /// Alternative text (`cNvPr/@descr`); see [`Self::non_visual`].
+    ///
+    /// # Errors
+    ///
+    /// The errors of [`Self::non_visual`].
+    pub fn description(self) -> Result<Option<Cow<'a, str>>> {
+        Ok(self.non_visual()?.description)
+    }
+
+    /// Title (`cNvPr/@title`); see [`Self::non_visual`].
+    ///
+    /// # Errors
+    ///
+    /// The errors of [`Self::non_visual`].
+    pub fn title(self) -> Result<Option<Cow<'a, str>>> {
+        Ok(self.non_visual()?.title)
+    }
+
+    /// The hidden flag (`cNvPr/@hidden`) as written; see
+    /// [`Self::non_visual`].
+    ///
+    /// # Errors
+    ///
+    /// The errors of [`Self::non_visual`].
+    pub fn hidden(self) -> Result<Option<bool>> {
+        Ok(self.non_visual()?.hidden)
+    }
+
+    /// The relationship that names the shape's payload part: an embedded or
+    /// linked picture's image, a chart frame's chart, a diagram frame's data
+    /// model, an OLE frame's object or a content part. `None` for shapes
+    /// whose content is inline, and when the payload element carries no
+    /// relationship. Competing relationships return a typed raw error.
+    pub(crate) fn payload(self) -> std::result::Result<Option<Payload<'a>>, super::raw::Error> {
+        let Some(payload) = self.record.payload else {
+            return Ok(None);
+        };
+        if let Some(error) = payload.error {
+            return Err(error);
+        }
+        let range = payload
+            .value
+            .range(self.xml.len())
+            .map_err(|_| super::raw::Error::InvalidAttribute)?;
+        Ok(Some(Payload {
+            raw: self
+                .xml
+                .get(range)
+                .ok_or(super::raw::Error::InvalidAttribute)?,
+            span: payload.value,
+            attribute: payload.attribute,
+        }))
+    }
+
+    /// Span of the shape's own transform element (`p:spPr/a:xfrm`,
+    /// `p:grpSpPr/a:xfrm` or a graphic frame's `p:xfrm`), when it has one.
+    ///
+    /// [`Self::bounds`] reads its offset and extent; this span also covers
+    /// rotation, flips and a group's child coordinate space.
+    #[inline]
+    #[must_use]
+    pub(crate) const fn transform_span(self) -> Option<Span> {
+        self.record.transform
+    }
+
+    /// The shape's own transform, decoded from its recorded owner span.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Invalid`] when the recorded span is no longer inside
+    /// its owner XML, and [`Error::Drawing`] when the transform does not
+    /// follow `a:CT_Transform2D`.
+    pub fn transform(self) -> Result<Option<Transform>> {
+        if self.record.transform_invalid {
+            return Err(Error::Invalid(
+                "shape transform is ambiguous or has invalid namespaces".into(),
+            ));
+        }
+        let Some(span) = self.record.transform else {
+            return Ok(None);
+        };
+        let range = span.range(self.xml.len())?;
+        let xml = self
+            .xml
+            .get(range)
+            .ok_or_else(|| Error::Invalid("shape transform span became invalid".into()))?;
+        let transform_limits = transform_limits_for(self.limits);
+        Ok(Some(litchi_drawingml::transform::codec::read(
+            xml,
+            &transform_limits,
+        )?))
+    }
+
+    /// Span of the shape's direct `p:txBody` element in processed owner XML.
+    ///
+    /// This is retained for the low-level [`super::raw`] view. Ordinary shape
+    /// callers should use [`Self::text_body`] so duplicate bodies and the
+    /// inherited namespace scope are checked before decoding.
+    #[inline]
+    #[must_use]
+    pub(crate) const fn text_body_span(self) -> Option<Span> {
+        self.record.text_body
+    }
+
+    /// The shape's local `DrawingML` text body.
+    ///
+    /// The body is decoded lazily in the namespace scope of its position in
+    /// the processed owner. Placeholder, master, list-style and theme
+    /// inheritance is intentionally outside this local view.
+    ///
+    /// # Errors
+    ///
+    /// Returns a content-free [`Error::Invalid`] when the shape declares
+    /// competing direct bodies or the retained span is no longer valid, and
+    /// [`Error::Drawing`] when the shared strict text-body reader rejects a
+    /// value or resource bound.
+    pub fn text_body(self) -> Result<Option<Body>> {
+        if self.record.text_body_invalid {
+            return Err(Error::Invalid(
+                "shape contains duplicate direct text bodies".into(),
+            ));
+        }
+        let Some(span) = self.record.text_body else {
+            return Ok(None);
+        };
+        let range = span.range(self.xml.len())?;
+        let scope = self.namespace_scope(range.start)?;
+        let xml = self
+            .xml
+            .get(range)
+            .ok_or_else(|| Error::Invalid("shape text body span became invalid".into()))?;
+        let limits = text_body_limits_for(self.limits, self.xml.len());
+        Ok(Some(text_reader::read(xml, scope, limits)?))
+    }
+
+    /// The paragraphs and text runs of [`Self::text_body`] (record 0348);
+    /// `None` without a body.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::text_body`].
+    pub fn text_index(self) -> Result<Option<BodyTextIndex>> {
+        self.text_body()?
+            .map(|body| crate::table::CellTextIndex::from_body(&body).map(BodyTextIndex))
+            .transpose()
+    }
+
+    /// [`Self::text_index`] of a body [`Self::text_body`] has read (record
+    /// 0348): from one pass over the body when it can, without decoding it
+    /// again, so values the reader would refuse are not checked here.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::text_body`] (for competing bodies, and for a body the pass
+    /// leaves to the reader).
+    pub fn read_text_index(self) -> Result<Option<BodyTextIndex>> {
+        if self.record.text_body_invalid {
+            return Err(Error::Invalid(
+                "shape contains duplicate direct text bodies".into(),
+            ));
+        }
+        let Some(span) = self.record.text_body else {
+            return Ok(None);
+        };
+        let range = span.range(self.xml.len())?;
+        let scope = self.namespace_scope(range.start)?;
+        let xml = self
+            .xml
+            .get(range)
+            .ok_or_else(|| Error::Invalid("shape text body span became invalid".into()))?;
+        if let Some(index) = crate::table::shape::scan_read_body_text_index(xml, scope)? {
+            return Ok(Some(BodyTextIndex(index)));
+        }
+        self.text_index()
+    }
+
+    /// Resolve the namespaces inherited by a direct child body.
+    fn namespace_scope(self, offset: usize) -> Result<NamespaceResolver> {
+        if self.record.inherits_root_namespaces {
+            let shape = self.record.span.range(self.xml.len())?;
+            let mut resolver = NamespaceResolver::default();
+            for tag in [self.xml, self.xml.get(shape.start..).unwrap_or_default()] {
+                if let Some(element) = first_start_tag(tag)? {
+                    resolver.push(&element).map_err(|_| {
+                        Error::Invalid("shape text body namespace scope is invalid".into())
+                    })?;
+                }
+            }
+            return Ok(resolver);
+        }
+        let scope = InScopeNamespaces::at_offset(self.xml, offset, &shape_mce_limits(self.limits))
+            .map_err(|_| Error::Invalid("shape text body namespace scope is invalid".into()))?;
+        let mut resolver = NamespaceResolver::default();
+        for (prefix, namespace) in scope.iter() {
+            let declaration = if prefix.is_empty() {
+                PrefixDeclaration::Default
+            } else {
+                PrefixDeclaration::Named(prefix)
+            };
+            resolver
+                .add(declaration, Namespace(namespace))
+                .map_err(|_| Error::Invalid("shape text body namespace scope is invalid".into()))?;
+        }
+        Ok(resolver)
+    }
+}
+
+fn shape_mce_limits(limits: super::reader::Limits) -> litchi_ooxml_common::mce::Limits {
+    litchi_ooxml_common::mce::Limits {
+        max_input_bytes: limits.input_bytes(),
+        max_output_bytes: limits.output_bytes(),
+        max_depth: limits.depth(),
+        ..litchi_ooxml_common::mce::Limits::default()
+    }
+}
+
+fn transform_limits_for(limits: super::reader::Limits) -> litchi_drawingml::transform::Limits {
+    litchi_drawingml::transform::Limits::new(
+        limits.input_bytes().clamp(
+            1,
+            litchi_drawingml::transform::Limits::DEFAULT.max_xml_bytes,
+        ),
+        limits
+            .nodes()
+            .clamp(1, litchi_drawingml::transform::Limits::DEFAULT.max_nodes),
+    )
+}
+
+fn text_body_limits_for(limits: super::reader::Limits, owner_bytes: usize) -> text_reader::Limits {
+    text_reader::Limits::new(
+        limits.input_bytes().min(owner_bytes).max(1),
+        limits.depth(),
+        limits.nodes(),
+        limits.retained_text_bytes(),
+    )
+    .unwrap_or(text_reader::Limits::DEFAULT)
+}
+
+/// The first start tag (or empty element) of `xml`.
+fn first_start_tag(xml: &[u8]) -> Result<Option<BytesStart<'_>>> {
+    let mut reader = quick_xml::Reader::from_reader(xml);
+    loop {
+        match reader
+            .read_event()
+            .map_err(|_| Error::Invalid("malformed shape attribute XML".into()))?
+        {
+            Event::Start(element) | Event::Empty(element) => return Ok(Some(element)),
+            Event::Eof => return Ok(None),
+            _ => {},
+        }
+    }
+}
+
+/// Decode `descr`, `title` and `hidden` from one `cNvPr` start tag.
+fn read_non_visual(tag: &[u8]) -> Result<NonVisual<'_>> {
+    let element = first_start_tag(tag)?
+        .ok_or_else(|| Error::Invalid("shape cNvPr span holds no start tag".into()))?;
+    let mut values = NonVisual::default();
+    for attribute in element.checked_attributes() {
+        let attribute =
+            attribute.map_err(|_| Error::Invalid("malformed shape attribute XML".into()))?;
+        if attribute.key.prefix().is_some() {
+            continue;
+        }
+        match attribute.key.local_name().as_ref() {
+            b"descr" => {
+                values.description = Some(decode_attribute_value(raw_in(tag, &attribute)?)?);
+            },
+            b"title" => values.title = Some(decode_attribute_value(raw_in(tag, &attribute)?)?),
+            b"hidden" => {
+                let value = decode_attribute_value(raw_in(tag, &attribute)?)?;
+                let hidden = litchi_drawingml::text::parse_bool(&value)
+                    .map_err(|_| Error::Invalid("invalid shape hidden flag".into()))?;
+                values.hidden = Some(hidden);
+            },
+            _ => {},
+        }
+    }
+    Ok(values)
+}
+
+/// The bytes of an attribute's value as a slice of `tag`, which the
+/// attribute was read from; quick-xml lends values from its input.
+fn raw_in<'a>(tag: &'a [u8], attribute: &Attribute<'_>) -> Result<&'a [u8]> {
+    let value: &[u8] = attribute.value.as_ref();
+    let start = (value.as_ptr() as usize).wrapping_sub(tag.as_ptr() as usize);
+    start
+        .checked_add(value.len())
+        .and_then(|end| tag.get(start..end))
+        .filter(|slice| slice.as_ptr() == value.as_ptr())
+        .ok_or_else(|| Error::Invalid("shape attribute value is not part of its tag".into()))
+}
+
+/// Decode an attribute value as XML 1.0 attribute-value normalization does:
+/// UTF-8, character and predefined entity references, and whitespace.
+fn decode_attribute_value(raw: &[u8]) -> Result<Cow<'_, str>> {
+    Attribute {
+        key: QName(b"value"),
+        value: Cow::Borrowed(raw),
+    }
+    .normalized_value(XmlVersion::Explicit1_0)
+    .map_err(|_| Error::Invalid("malformed shape attribute XML".into()))
 }
 
 macro_rules! leaf {
@@ -411,6 +873,7 @@ impl<'a> Group<'a> {
             xml: self.0.xml,
             records: self.0.records,
             strings: self.0.strings,
+            limits: self.0.limits,
             cursor: first,
             end,
             parent: Some(self.0.index as u32),
@@ -547,18 +1010,88 @@ impl<'a> Shape<'a> {
     pub fn text(self) -> Option<&'a str> {
         self.common().text()
     }
+
+    /// See [`Common::non_visual`].
+    ///
+    /// # Errors
+    ///
+    /// The errors of [`Common::non_visual`].
+    #[inline]
+    pub fn non_visual(self) -> Result<NonVisual<'a>> {
+        self.common().non_visual()
+    }
+
+    /// See [`Common::description`].
+    ///
+    /// # Errors
+    ///
+    /// The errors of [`Common::non_visual`].
+    #[inline]
+    pub fn description(self) -> Result<Option<Cow<'a, str>>> {
+        self.common().description()
+    }
+
+    /// See [`Common::title`].
+    ///
+    /// # Errors
+    ///
+    /// The errors of [`Common::non_visual`].
+    #[inline]
+    pub fn title(self) -> Result<Option<Cow<'a, str>>> {
+        self.common().title()
+    }
+
+    /// See [`Common::hidden`].
+    ///
+    /// # Errors
+    ///
+    /// The errors of [`Common::non_visual`].
+    #[inline]
+    pub fn hidden(self) -> Result<Option<bool>> {
+        self.common().hidden()
+    }
+
+    /// See [`Common::transform`].
+    ///
+    /// # Errors
+    ///
+    /// The errors of [`Common::transform`].
+    #[inline]
+    pub fn transform(self) -> Result<Option<Transform>> {
+        self.common().transform()
+    }
+
+    /// The shape's local `DrawingML` text body.
+    ///
+    /// # Errors
+    ///
+    /// The errors of [`Common::text_body`].
+    #[inline]
+    pub fn text_body(self) -> Result<Option<Body>> {
+        self.common().text_body()
+    }
 }
 
 /// A borrowed shape iterator.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Shapes<'a> {
     pub(super) xml: &'a [u8],
     pub(super) records: &'a [Record],
     pub(super) strings: &'a str,
+    pub(super) limits: super::reader::Limits,
     pub(super) cursor: usize,
     pub(super) end: usize,
     pub(super) parent: Option<u32>,
     pub(super) preorder: bool,
+}
+
+impl std::fmt::Debug for Shapes<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Shapes")
+            .field("cursor", &self.cursor)
+            .field("end", &self.end)
+            .finish_non_exhaustive()
+    }
 }
 
 impl<'a> Iterator for Shapes<'a> {
@@ -578,6 +1111,7 @@ impl<'a> Iterator for Shapes<'a> {
                     xml: self.xml,
                     records: self.records,
                     strings: self.strings,
+                    limits: self.limits,
                     record,
                     index,
                 };
@@ -598,3 +1132,72 @@ impl<'a> Iterator for Shapes<'a> {
 }
 
 impl std::iter::FusedIterator for Shapes<'_> {}
+
+impl std::fmt::Debug for NonVisual<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NonVisual")
+            .field("has_description", &self.description.is_some())
+            .field("has_title", &self.title.is_some())
+            .field("hidden", &self.hidden)
+            .finish()
+    }
+}
+impl std::fmt::Debug for Payload<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Payload")
+            .field("attribute", &self.attribute)
+            .finish_non_exhaustive()
+    }
+}
+
+impl std::fmt::Debug for Common<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Common")
+            .field("position", &self.index)
+            .field("kind", &self.record.kind)
+            .finish_non_exhaustive()
+    }
+}
+
+/// The paragraphs and text runs of a shape's text body (record 0348); see
+/// [`Common::text_index`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BodyTextIndex(crate::table::CellTextIndex);
+
+impl BodyTextIndex {
+    /// The number of paragraphs.
+    #[must_use]
+    pub fn paragraph_count(&self) -> usize {
+        self.0.paragraph_count(0, 0).unwrap_or(0)
+    }
+
+    /// The position among its paragraph's run children (`a:r`, `a:br`,
+    /// `a:fld`) of the `ordinal`-th text run (zero-based) of paragraph
+    /// `paragraph`; `None` when there is no such run.
+    #[must_use]
+    pub fn text_run(&self, paragraph: usize, ordinal: usize) -> Option<usize> {
+        self.0.text_run(0, 0, paragraph, ordinal)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{text_body_limits_for, transform_limits_for};
+    use crate::shape::reader;
+
+    #[test]
+    fn subordinate_readers_use_the_scene_input_budget() {
+        let limits = reader::Limits::new(173, 4096, 64, 128, 1024, 4096)
+            .expect("finite asymmetric scene limits");
+        assert_eq!(transform_limits_for(limits).max_xml_bytes, 173);
+        assert_eq!(text_body_limits_for(limits, 2048).input_bytes(), 173);
+
+        let reverse = reader::Limits::new(4096, 173, 64, 128, 1024, 4096)
+            .expect("finite reverse asymmetric scene limits");
+        assert_eq!(
+            transform_limits_for(reverse).max_xml_bytes,
+            4096.min(litchi_drawingml::transform::Limits::DEFAULT.max_xml_bytes)
+        );
+        assert_eq!(text_body_limits_for(reverse, 2048).input_bytes(), 2048);
+    }
+}

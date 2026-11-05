@@ -135,7 +135,9 @@ The checked default is 41 cases, 213 rows and 43 deterministic corpora.
 appends the existing plain RTF, ODT, ODS and ODP `semantic_text_to_sink`
 selectors across three sizes, preserving every old 201-row identity. Two full
 serial runs retain 6,390 samples and pass report/catalog and CRUD timing gates.
-The registry has 534 selectors; the coverage index's minimum remains 439.
+The registry has 652 selectors, including the 118 paired unified/leaf routes
+of M0a step S8b ([below](#paired-unified-api-and-leaf-api-routes-m0a-step-s8b));
+the CRUD coverage index binds every name.
 The source-bound [0906 census](../../docs/performance/results/change-0906/registry-final.json)
 checks all enum/name/CLI mappings and the 41 default selectors. Selector counts
 do not establish measured CRUD coverage; older change notes below retain their
@@ -595,6 +597,8 @@ an adapter-parity oracle rather than an independent parser implementation. The
 default `plain` variant is ASCII-only and remains runnable on a pre-ingress
 control build:
 
+> M0a step S9 removed `rtf_file_open` and `rtf_file_open_lifecycle`; see [Predecessors removed in M0a step S9](#predecessors-removed-in-m0a-step-s9).
+
 ```sh
 cargo run --manifest-path tools/perf-baseline/Cargo.toml --release -- \
   --case rtf_file_open,rtf_file_open_lifecycle \
@@ -692,9 +696,10 @@ refused by this reader, and holding the refusal identical across legs is the
 point. `second-cell` exists to size a repeated query on one worksheet, which is
 the scenario a retained sheet index would serve.
 
-`eager-file` and `facade-file` reject all three: neither control implements a
-source-backed whole-sheet walk or a source-backed text projection, and their
-`limitation` field says so.
+`eager-file` rejects all three: the control implements no source-backed
+whole-sheet walk or source-backed text projection, and its `limitation` field
+says so. (The `facade-file` mode, which rejected them too, timed the facade
+workbook M0a step S9 deleted, and was removed with it.)
 
 ## Change 0259 relationship-heavy OPC structural open
 
@@ -1016,6 +1021,8 @@ text), archive SHA-256, and independently opened eager OPC/property metadata
 digest guard each case. These selectors bring the
 selectable matrix to 344 names while leaving the default 36 cases / 198
 records unchanged.
+> M0a step S9 removed the `xlsx_file_*` and `xlsx_bytes_*` selectors above; see [Predecessors removed in M0a step S9](#predecessors-removed-in-m0a-step-s9).
+
 One additional opt-in native DOC semantic selector
 (`doc_semantic_paragraph_count`) times `Document::paragraph_count()` over the
 same deterministic writer corpora as `doc_semantic_list_paragraphs`. An
@@ -1032,6 +1039,8 @@ text after the clock stops. The formula-string digest is length-delimited and
 computed before timing. These selectors bring the
 selectable matrix to 349 names while leaving the default 36 cases / 198 records
 unchanged.
+> M0a step S9 removed the `pptx_file_*`, `odp_file_*`, `ods_file_*_open` and `docx_file_*` selectors this paragraph introduces; see [Predecessors removed in M0a step S9](#predecessors-removed-in-m0a-step-s9).
+
 Eight additional
 PPTX ordinary-root filesystem selectors (`pptx_file_{eager,source}_{open,
 list_slides,slide_count,selected_slide}`) are opt-in and do not alter the
@@ -1376,7 +1385,7 @@ The opt-in `pptx_cross_copy_plain_lifecycle` and
 ingress-to-publication guard over the corresponding corpus. Each retained
 sample times owned `Package::from_vec` ingress for both packages, opened
 snapshots, cross-slide planning, atomic `apply_cross_slide_copy_plan`, and
-final `OpcPackage::to_stream` publication into a pre-reserved bounded sink.
+final `OpcPackage::write_to` publication into a pre-reserved bounded sink.
 The corpus clones and sink reservation occur before the timer; reopen,
 semantic/package/closure/refusal/source-immutability checks, and package/sink
 teardown occur afterward. Their `source.pptx_cross_copy.lifecycle_ns` vector
@@ -1403,8 +1412,10 @@ post-drop retention claim. See the [0423 protocol](../../docs/performance/result
 Change 0159 adds the independent opt-in
 `pptx_source_backed_cross_copy_plain` selector over the exact same plain
 three-slide-source/two-slide-destination bytes. It calls the public
-`SourceBackedPresentationEditor::plan_cross_slide_copy` and
-`publish_cross_slide_copy_to_stream` APIs; source-backed publication's
+`source::Package::plan_cross_slide_copy` and
+`edit_cross_slide_copy` → `Edit::stage` → `commit` → `Package::write_to`
+APIs (record 0356b; formerly `SourceBackedPresentationEditor::plan_cross_slide_copy`
+and `publish_cross_slide_copy_to_stream`); source-backed publication's
 internal rerun/verification/topology work therefore remains part of the
 publication phase. Only plan and public publication durations are reported;
 setup, reopen, raw/topology/semantic gates, typed stale/foreign refusals, and
@@ -1650,6 +1661,26 @@ The stage cases separately time public editor open, `put_stream` candidate
 publication, and changed `finish` rendering. The end-to-end case times all
 three. Stage preparation, exact deterministic output comparison and a complete
 public CFB reopen of all five streams remain outside each timed interval.
+
+For the paired W5 owner/property-limit probe, use the small deterministic
+example rather than changing the large case matrix:
+
+```sh
+cargo run --release --locked --example ole_w5_probe -- \
+  --route open --warmup 10 --samples 100
+cargo run --release --locked --example ole_w5_probe -- \
+  --route read --warmup 10 --samples 100
+```
+
+The `open`, `begin_edit`, `noop_commit`, and `replace_stream` routes are the
+0359g owner routes. The `read` and `edit` routes cover the 0359h typed
+user-defined overlay. The example emits CSV rows for an external ABBA runner;
+all setup and deterministic output checks are outside the timed operation.
+Build the old API revision with
+`--no-default-features --features legacy-owner-api,legacy-property-api`.
+The owner pair is `0ce4bb8b61` to the corrected owner tip; the typed-overlay
+pair starts at `604822b441` and ends at the corrected 0359h tip. Use absolute,
+distinct target directories and record source and binary SHA-256 values.
 
 Measure the current evidence-first OPC source overlay path on its fixed
 few-large incompressible corpus:
@@ -1994,6 +2025,8 @@ recorded when exposed by the public API. After every prime and
 measured child, the parent re-reads the source and checks its pinned SHA-256
 before proceeding to the next sample.
 
+> M0a step S9 removed the `pptx_file_{eager,source}_*` selectors; see [Predecessors removed in M0a step S9](#predecessors-removed-in-m0a-step-s9).
+
 Measure the matched ordinary-root PPTX filesystem controls:
 
 ```sh
@@ -2173,7 +2206,7 @@ position 1 without media; the media-rich selector adds eight deterministic 2
 MiB PNG resources to the source and destination packages so the copied
 dependency closure exercises deterministic collision-avoidance remapping. Both selectors use the public
 `Snapshot::plan_cross_slide_copy`, `Package::apply_cross_slide_copy_plan`, and
-`OpcPackage::to_stream` APIs. The timer reports plan, commit, and sequential
+`OpcPackage::write_to` APIs. The timer reports plan, commit, and sequential
 publication phases separately; setup, reopen, semantic/package/closure,
 source-immutability, collision, durable-patch, stale/foreign/refusal, and
 output-hash checks remain untimed. This is correctness/evidence only and makes
@@ -2489,6 +2522,12 @@ Each sample times transaction creation, `set_number`/`set_numeric`, the eager
 `commit`, ordinary source-backed `commit_source_backed`, or forward-only
 `commit_source_backed_plan`, and publication separately. The plan-only commit
 includes composed semantic validation but retains no complete target artifact.
+Since record 0359a the eager selectors use the primary `Package::edit` and the
+source-backed and plan-only selectors both use the deferred
+`SourceBackedWorkbook::edit_cells` family (`litchi_xls::source_backed::cells`):
+its commit retains no target artifact, its committed workbook writes the
+checked plan, and its exact-pair patch replays and inverts; the
+`commit_source_backed*` routes above are crate-private.
 `total_ns` and the top-level `elapsed_ns` distribution are arithmetic sums of
 those four separately timed phases, not a continuous wall-clock timer.
 All publication paths write the complete target CFB to equivalently configured
@@ -3184,6 +3223,8 @@ move for them.
 
 ### Six facade selectors
 
+> M0a step S9 removed these six selectors; see [Predecessors removed in M0a step S9](#predecessors-removed-in-m0a-step-s9).
+
 ```text
 doc_facade_file_open            ppt_facade_file_open
 doc_facade_file_full_text       ppt_facade_file_full_text
@@ -3234,8 +3275,8 @@ The route is the documented one: `Package::open(path)` →
 `document_mut().add_paragraph_with_text(..)` → `Package::save(path)` for DOCX,
 `Workbook::open(path)` → `edit().sheet(..).set(..)` → `commit()` →
 `Workbook::save(path)` for XLSX, and `Package::open(path)` →
-`opened_presentation_transaction().set_shape_text(..)` →
-`apply_opened_presentation_commit(..)` → `Package::save(path)` for PPTX.
+`edit().set_shape_text(..)` →
+`Commit::into_package()` → `Package::save(path)` for PPTX.
 
 * `lifecycle` times open, edit and save together.
 * `edit` times the semantic edit alone; the open is outside the clock.
@@ -3248,7 +3289,7 @@ The route is the documented one: `Package::open(path)` →
   private workspace is prepared, and the readback, digest and cleanup happen,
   outside the clock.
 * `counting_publish` times the documented sequential serialization into a
-  bounded counting sink (`Package::to_stream`, `Workbook::write_to`, and
+  bounded counting sink (`Package::write_to`, `Workbook::write_to`, and
   `Package::to_bytes` for PPTX, which has no sequential-sink entry point).
 
 The private workspace lives under the caller's `--filesystem-root` when one is
@@ -3295,6 +3336,190 @@ digest. The report's `ordinary_save.save_durability` names the level and
 `atomic_publication_steps` lists that level's steps. Without the flag the
 documented `save` runs and the report is unchanged. The flag is refused for the
 `edit` and `counting_publish` phases and without an ordinary-save selector.
+
+## Paired unified-API and leaf-API routes (M0a step S8b)
+
+M0a moves every open and read behind `litchi::open*` and the flat
+`litchi::File` (ADR 0033; plan
+[0003](../../docs/unified-ops/0003-m0a-migration-plan.md) §5.3). The
+performance bar of [`UNIFIED_OPS_GOAL.md`](../../docs/UNIFIED_OPS_GOAL.md)
+judges that layer against the leaf APIs it wraps, one scenario at a time, so
+step S8b registers 118 opt-in selectors in pairs. None is in `Case::DEFAULT`;
+the default 41 cases / 213 rows do not move.
+
+- **Unified leg**, `<prefix>_unified_<rest>`: opens with `litchi::open`,
+  `litchi::open_bytes` or `litchi::open_bytes_with`, and reads through
+  `litchi::File`, its family views (`File::document`, `File::presentation`,
+  `File::workbook`) and its format handles (`Xlsx::sheet`,
+  `Pptx::slide_size`).
+- **Leaf leg**, `<prefix>_leaf_<rest>`: makes the same leaf calls directly on
+  the format's leaf crate. The format is known, so the leaf leg runs no format
+  detection, no signature or encryption classification and none of the
+  unified layer's own source-freshness re-checks, and builds no handle. Leaf
+  work the unified route does is included, for example the eager DOCX owner's
+  validation text pass and the XLSX, DOC and PPT property reads at open, so a
+  pair's difference is the unified layer's own work.
+
+A selector's name is its predecessor's with the leg inserted after the format
+family prefix: `docx_file_source_full_text` becomes
+`docx_file_unified_source_full_text` and `docx_file_leaf_source_full_text`.
+The OLE2 facade family drops `facade`: `doc_facade_file_open` becomes
+`doc_file_unified_open` and `doc_file_leaf_open`. Each pair mirrors its
+predecessor:
+
+- the same corpus builder and manifest;
+- the same ingress, `fs::read` plus a byte open or a path open;
+- the same untimed preparation of query roots;
+- the same timer placement: DOCX and PPTX roots drop inside the timer, XLSX
+  roots after every operation-only snapshot, and the DOC and PPT routes open
+  afresh in every sample.
+
+M0a step S9 deleted the 47 predecessors that timed the deleted facade types
+(see "Predecessors removed in M0a step S9" below); the 15 that time the
+detection functions or the DOCX leaf owner stay registered. Recorded results
+are frozen and are never rewritten.
+
+| Family | Selectors | Runner | Corpus |
+|---|---|---|---|
+| DOCX file | `docx_file_{unified,leaf}_{eager,source}_{open,paragraph_count,list_paragraphs,full_text,open_paragraph_count_lifecycle,open_full_text_lifecycle}` (24) | fresh child per sample | `docx-source-backed-media` |
+| PPTX file | `pptx_file_{unified,leaf}_{eager,source}_{open,list_slides,slide_count,selected_slide,open_slide_count_lifecycle,open_selected_slide_lifecycle}` (24) | fresh child per sample | `pptx-source-backed-media` |
+| XLSX file | `xlsx_file_{unified,leaf}_{open,open_lifecycle,selected_cell}` (6) | fresh child per sample | `xlsx-cell-values-medium` |
+| XLSX bytes | `xlsx_bytes_{unified,leaf}_{open,open_lifecycle}` (4) | in process | `xlsx-cell-values-medium` |
+| DOCX read one | `docx_semantic_{unified,leaf}_{one_paragraph,one_paragraph_text}`, `docx_producer_{unified,leaf}_source_selected_paragraph` (6) | in process | `docx-semantic-*`, `docx-producer-medium` |
+| DOC, PPT | `doc_file_{unified,leaf}_{open,full_text,one_paragraph}`, `ppt_file_{unified,leaf}_{open,full_text,one_slide_text}` (12) | in process, `--ole2-file` | the caller-named fixture |
+| RTF | `rtf_file_{unified,leaf}_{open,open_lifecycle}` (4) | in process | `rtf-semantic-*` (not `watermark`) |
+| ODT | `odt_file_{unified,leaf}_{eager,source}_{open,open_full_text_lifecycle}` (8) | in process | `odt-source-backed-repeated-text-media` |
+| ODP | `odp_file_{unified,leaf}_{eager,source}_{open,selected_slide}` (8) | in process | `odp-media-textbox-publication` |
+| ODS | `ods_file_{unified,leaf}_{eager,source}_open` (4) | in process | `ods-media-publication` |
+| Detection | `detect_{odt,ods,odp}_unified_{bytes,reader,polyglot,catalog_alias}`, `detect_{odt,ods,odp}_leaf_{bytes,reader}` (18) | in process | `*-{bytes,reader,polyglot,catalog-alias}-*` |
+
+Notes on the pairs:
+
+- **"Eager" means what it meant for the predecessor.** For DOCX it is the
+  owning `litchi_docx::Package` (`SourceMode::Eager` on the unified leg). For
+  PPTX it is the byte route, a source-backed presentation over the owned bytes
+  (`litchi::open_bytes`).
+- **Detection.** The unified detection leg calls `litchi_ops::detect`, the
+  coordinator `litchi::open` runs, without the facade's iWork tail, which
+  only runs when every other candidate has declined. The leaf leg calls
+  `litchi_odf_common::detect::{bytes, reader}`. The polyglot and
+  catalog-alias inputs are decided by the coordinator's precedence between two
+  leaf owners (ODF and OPC), so they have no leaf leg; compare them with the
+  predecessor `detect_*` selectors, which time the facade's public detector.
+- **Not paired.** `ods_file_*_selected_{cell,media}` already time the ODS leaf
+  owners, and the M0a `File` has no ODS cell or media read (`WorkbookView`
+  refuses ODS worksheet access), so their unified leg waits for M1's `get`.
+  `docx_source_selected_paragraph` is an untimed binary; the timed DOCX
+  read-one pairs are `docx_semantic_*` and `docx_producer_*`.
+- **Scopes that differ from the predecessor.** The unified views take no
+  borrowed document handle across calls, so a route whose predecessor timed a
+  query on a prepared `litchi_docx` document times the document derivation
+  too, on both legs. These routes are `docx_semantic_*_one_paragraph` and
+  `docx_producer_*`. S10 compares such a successor with its leaf twin, not with
+  the predecessor's record. The list and read-one unified legs return the
+  `litchi::compat` wrappers that M1 replaces with the node view. A route whose
+  measured work changes then gets a new name; the names here are frozen with
+  their records.
+
+Every result carries `source.unified_ops`: the leg, the predecessor, the twin,
+the calls inside the timer and an explicit no-claim statement. The in-process
+pairs also report the digest of the oracle projection every retained sample
+reproduced. The OLE2 pairs report each leg's frozen outcome, including a
+refusal, and whether the two legs reached the same outcome; two successful
+outcomes that differ fail the run. The filesystem pairs keep their
+predecessors' per-sample evidence:
+
+- the source and semantic SHA-256 and the selected-cell evidence for XLSX;
+- the timed full-text digest for the DOCX full-text lifecycles. Since M0a
+  step S8a, `File::text()` writes `\n` between DOCX paragraphs, so the DOCX
+  leaf full-text legs ask the leaf for the same text
+  (`text_with_paragraph_separator("\n")` on the eager owner,
+  `extract_text_with_paragraph_separator("\n")` on the source-backed one),
+  and the leaf signature and the fixed oracle join the paragraphs the same
+  way. Before step S10 the leaf legs timed the unseparated text, and every
+  DOCX filesystem route failed its untimed verification with "DOCX unified
+  and leaf semantic signatures differ";
+- for source-backed DOCX and PPTX routes on both legs, the untimed replay of
+  the leaf owner over the same file. That replay has the predecessor's shape
+  and does not include the unified route's detection reads.
+
+Correctness is checked outside the timer against the leaf crates and the
+corpus generators: the unified projections of both owners and the leaf
+projection must agree, and the code under measurement never builds its own
+oracle.
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml \
+  --bin litchi-perf-baseline -- --warmup 5 --samples 30 --filesystem-cache warm \
+  --case docx_file_unified_source_full_text,docx_file_leaf_source_full_text \
+  --json target/perf/docx-pair.json
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml \
+  --bin litchi-perf-baseline -- --warmup 10 --samples 100 \
+  --case doc_file_unified_open,doc_file_leaf_open,ppt_file_unified_open,ppt_file_leaf_open \
+  --ole2-file test-data/ole/doc/documentProperties.doc \
+  --ole2-file test-data/ole/ppt/SampleShow.ppt --json target/perf/ole2-pair.json
+```
+
+**How M0a step S10 uses them.** S10 answers two questions with the same
+protocol as the S1 baseline
+([`results/0003/before`](../../docs/unified-ops/results/0003/before/README.md)):
+the same CPU pin, warm cache, corpus and group sizes, with ABBA ordering.
+
+1. *Did the migration regress a scenario?* The A legs run the pre-M0a binary
+   on the predecessor selectors. The B legs run the post-S9 binary on their
+   unified successors. Predecessor and successor are matched through the route
+   table in [`s8b-perf-routes.md`](../../docs/unified-ops/s8b-perf-routes.md),
+   not by name, and only where the timed scopes match. The trigger is S1's
+   per-route rule: `max(5%, spread_all)`, with separation required above 10%
+   spread.
+2. *Is the unified layer within the goal's budgets?* The unified and leaf legs
+   of each pair run in the same post-S9 binary, alternated ABBA. Their
+   difference is the unified layer's own work. The open budget is 5% or 20 µs,
+   whichever is larger.
+
+These selectors make no performance claim.
+
+### Predecessors removed in M0a step S9
+
+M0a step S9 deleted `litchi::Document`, `litchi::Presentation`,
+`litchi::sheet::Workbook` and their element types, and with them the 47
+predecessor selectors whose timed scope ran through them. The registry went
+from 652 to 605 names, and `parse_case` refuses each removed name. Their
+frozen records keep the names, and the S10 A legs run them in the pre-M0a
+binary. The passages earlier in this file describe them as they were:
+
+| Family | Removed selectors | Successors |
+|---|---|---|
+| DOCX file | `docx_file_{eager,source}_{open,paragraph_count,list_paragraphs,full_text,open_paragraph_count_lifecycle,open_full_text_lifecycle}` (12) | `docx_file_{unified,leaf}_*` |
+| PPTX file | `pptx_file_{eager,source}_{open,list_slides,slide_count,selected_slide,open_slide_count_lifecycle,open_selected_slide_lifecycle}` (12) | `pptx_file_{unified,leaf}_*` |
+| XLSX file | `xlsx_file_open`, `xlsx_file_open_lifecycle`, `xlsx_file_selected_cell` | `xlsx_file_{unified,leaf}_*` |
+| XLSX bytes | `xlsx_bytes_open`, `xlsx_bytes_open_lifecycle` | `xlsx_bytes_{unified,leaf}_*` |
+| DOC, PPT (change 0638) | `doc_facade_file_{open,full_text,one_paragraph}`, `ppt_facade_file_{open,full_text,one_slide_text}` | `{doc,ppt}_file_{unified,leaf}_*` |
+| RTF | `rtf_file_open`, `rtf_file_open_lifecycle` | `rtf_file_{unified,leaf}_*` |
+| ODT | `odt_file_{eager,source}_open`, `odt_file_{eager,source}_open_full_text_lifecycle` | `odt_file_{unified,leaf}_*` |
+| ODP | `odp_file_{eager,source}_{open,selected_slide}` | `odp_file_{unified,leaf}_*` |
+| ODS | `ods_file_eager_open`, `ods_file_source_open` | `ods_file_{unified,leaf}_*` |
+
+What stays:
+
+- The source replays of the DOCX and PPTX source routes. The paired
+  source-backed routes keep their predecessors' untimed leaf replay, now keyed
+  by `filesystem::SourceReplay`, whose evidence still names the predecessor.
+- `ods_file_{eager,source}_selected_{cell,media}`. They time the ODS leaf
+  owners only. Their workbook-level expectations now come from the typed
+  `litchi_ods::Spreadsheet`, which reports the values the deleted facade
+  workbook did (the unified ODS routes check `litchi::File` against the same
+  owner), so the timed scope and the recorded values are unchanged.
+- The `xlsx_source_*` named-sheet oracle checks `litchi::open_bytes` and the
+  workbook view where it checked the facade workbook.
+- The binaries: `docx_source_selected_paragraph`'s untimed facade oracle reads
+  `litchi::open` and the document view; `xlsb_crud`'s `open_identify` times the
+  leaf call the deleted `sheet::open_xlsb_workbook_from_bytes` wrapped, and its
+  `full_text` case times `litchi::open_bytes` plus `File::text`, the unified
+  successor of the deleted `sheet::Workbook::from_bytes`; and
+  `xls_source_attribution` no longer has a `facade-file` mode.
+- `tests/xlsx_filesystem.rs` runs its fresh-child and cold-verified checks on
+  the unified XLSX successors, which report the same evidence.
 
 ## Opt-in marker-bearing corpora and their controls (change 0664)
 
@@ -3401,8 +3626,8 @@ docx_marker_ordinary_save_counting_publish   docx_marker_control_ordinary_save_c
 ```
 
 and the same eight names with `pptx_`. `pptx_marker_ordinary_save_edit` is
-0649's phase: `opened_presentation_transaction().set_shape_text(..)` plus
-`apply_opened_presentation_commit(..)`. The marker origins cover DOCX and PPTX
+0649's phase: `edit().set_shape_text(..)` plus
+`Commit::into_package()`. The marker origins cover DOCX and PPTX
 only; an XLSX marker origin is refused with a typed error, because change 0601's
 XLSX producer family already exists.
 
@@ -3741,7 +3966,7 @@ always truthful.
 | `large` | 10,000 | 100 × 100 | 100 | 100 |
 
 The DOCX cases use `Package::from_reader`, `document().paragraph(index)`,
-paragraph enumeration/text extraction, document transactions, and `to_stream`.
+paragraph enumeration/text extraction, document transactions, and `write_to`.
 The one-percent case uses the canonical
 `Edit::replace_body_paragraph_texts` transaction whenever the selection has
 more than one paragraph, so validation, XML emission, candidate parsing, and
@@ -3755,14 +3980,14 @@ seekable counter implementation in both binaries.
 PPTX semantic save controls use `Package::from_bytes`/`from_vec`, presentation
 slide/text views, opened-presentation transactions, and `to_bytes`; those
 legacy controls intentionally leave `sink` as `null`. The cross-presentation
-slide-copy evidence selectors use the public `OpcPackage::to_stream` writer
+slide-copy evidence selectors use the public `OpcPackage::write_to` writer
 through a bounded sequential sink and report its counters explicitly, without
 extending the claim to the other PPTX save paths.
 
 `pptx_semantic_opened_transaction_phases` is the phase decomposition of the
 one-edit control on the same semantic corpus. It records separate clocks for
 `opened_presentation`, `Snapshot::edit`, `set_shape_text`,
-`Transaction::commit`, `apply_opened_presentation_commit`, and `to_bytes`, plus
+`Edit::commit`, `Commit::into_package`, and `to_bytes`, plus
 the enclosing total. Package construction, reopen/oracle checks, and output
 digests stay outside the clocks. Every phase vector is aligned to the sorted
 total samples and every retained output must reproduce the same semantic
@@ -3771,8 +3996,8 @@ latency or allocation claim.
 
 ## Opt-in RTF semantic corpus matrix
 
-The RTF cases exercise only the ordinary native `litchi_rtf::Document` facade:
-owned-byte open, lazy paragraph enumeration, one middle paragraph, first
+The RTF cases exercise the ordinary native `litchi_rtf::Package` owner and its
+read-only document projection: owned-byte open, lazy paragraph enumeration, one middle paragraph, first
 complete-text materialization, bounded semantic-text output to a forward-only
 sink, exact source streaming, exact empty-edit publication, and
 capability-bounded one-paragraph and `ceil(1%)` paragraph edit/save. The two
@@ -3844,7 +4069,7 @@ ceiling. The corpus uses mixed-case hexadecimal digits with deterministic
 spaces/newlines, so the independent expected-output splice replaces only
 digit slots while preserving every source whitespace byte and each slot's
 case. Each selector reports separate open, stage, commit, publication, and
-lifecycle vectors; publication is `commit.snapshot().write_to` into a bounded
+lifecycle vectors; publication is `commit.package().write_to` into a bounded
 hashing sink. Untimed gates cover semantic reopen, raw unselected preservation,
 exact no-op identity, volatile patch apply/inverse, deterministic durable JSON
 serialization plus forward/inverse/stale/foreign checks, refusal cases,
@@ -3942,6 +4167,8 @@ eight freshness observations (`[2, 2, 2, 2]`), and zero source reads after
 owner preparation. The candidate records either that pre-cache shape or the
 cache-enabled `[2, 4, 2, 2]` shape (ten total observations). This is
 phase/correctness evidence only; no latency claim is made.
+
+> M0a step S9 removed the four `odt_file_*` selectors below; see [Predecessors removed in M0a step S9](#predecessors-removed-in-m0a-step-s9).
 
 Four unified-root ODT filesystem selectors (`odt_file_eager_open`,
 `odt_file_source_open`, `odt_file_eager_open_full_text_lifecycle`, and
@@ -4103,6 +4330,8 @@ bytes from uncompressed payload bytes/digest. The eager records retain the
 same semantic/media digests but intentionally have no source vectors. These
 selectors provide correctness/logical-read evidence only; they make no
 latency, physical-I/O, decompression, allocation, RSS, or release ABBA claim.
+
+> M0a step S9 removed the four `odp_file_*` selectors below; see [Predecessors removed in M0a step S9](#predecessors-removed-in-m0a-step-s9).
 
 `odp_file_eager_open` and `odp_file_source_open` are matched unified-root
 controls over the existing 12-slide/eight-2 MiB `Pictures/` corpus;
@@ -4418,12 +4647,13 @@ the existing phase counters and target hash. They are opt-in evidence only.
 Change 0144 accepts p50/p95 only for its clean, configured-simulator ABBA;
 no cold-I/O, physical-device, ambient-network, allocation, RSS, or semantic
 native-Office claim is made.
-- `doc_fresh_write_to`: construct a new `litchi_doc::writer::Writer`, add the
-  selected fixed paragraphs through its public API, and package it with public
-  `write_to`.
-- `xls_fresh_write_to`: construct a new `litchi_xls::writer::Writer`, add the
-  selected sheets and cells through its public API, and package it with public
-  `write_to`.
+- `doc_fresh_write_to`: construct a new `litchi_doc::builder::Builder`, add the
+  selected fixed paragraphs through its public API, build a `Package`, and
+  publish it with public `write_to`.
+- `xls_fresh_write_to`: construct a new `litchi_xls::Builder`, add the selected
+  sheets and cells, build a strictly admitted `Package`, and publish it with
+  public `write_to`. The timed authoring route now includes Package admission;
+  comparisons with pre-0200 revisions must account for that additional work.
 - `ppt_fresh_write_to`: construct a new `litchi_ppt::writer::Writer`, add the
   selected slides and text boxes through its public API, and package it with
   public `write_to`.
@@ -4467,7 +4697,7 @@ native-Office claim is made.
   This is correctness/attribution evidence only, with no speedup, physical-I/O,
   allocation, RSS, cold-cache, or real-producer claim.
 - `xls_semantic_open`: open the generated native workbook through the ordinary
-  `litchi_xls::Workbook` reader.
+  `litchi_xls::raw::Reader` reader.
 - `xls_semantic_list_worksheets` / `xls_semantic_one_cell` /
   `xls_semantic_full_cell_scan`: enumerate workbook tabs, resolve one middle
   numeric cell, or traverse every stored cell through the ordinary public
@@ -4559,18 +4789,18 @@ native-Office claim is made.
 - `xlsx_source_narrow_column_range_scan`: cold-read and verify every address
   and value in `B1:B<rows>` through the source-backed public API, with the same
   second-sheet deferral proof.
-- `xlsx_file_open`: open the deterministic medium cell-CRUD XLSX corpus through
+- `xlsx_file_open` (removed in M0a step S9): open the deterministic medium cell-CRUD XLSX corpus through
   the high-level `litchi::Workbook::open(Path)` filesystem route in a fresh
   child. The timed scope is exactly that public path call; untimed typed
   `litchi_xlsx::Workbook` cell/full-text checks and an independently opened
   OPC/property metadata oracle validate the exact child workbook and final
   actual source hash (the fixed ordinary pin or the aligned cold-copy hash).
-- `xlsx_file_open_lifecycle`: use the same fixed source and independent
+- `xlsx_file_open_lifecycle` (removed in M0a step S9): use the same fixed source and independent
   oracles in a fresh child, but time the high-level path open followed by
   worksheet names, worksheet count, and full text. The report classifies
   logical reads as unavailable for this facade path and makes no physical-I/O
   or speedup claim; cold-verified remains an explicit fincore/procfs proof.
-- `xlsx_file_selected_cell`: prepare `litchi::Workbook::open(Path)` outside
+- `xlsx_file_selected_cell` (removed in M0a step S9): prepare `litchi::Workbook::open(Path)` outside
   the timer, then case-insensitively select canonical `Bench01` through the
   prepared mixed-case query `bEnCh01` and read its non-first `M29` cell through
   the unified facade. The timed scope is
@@ -4607,11 +4837,11 @@ native-Office claim is made.
   and its [results](../../docs/performance/results/change-0401/); allocator
   elapsed-time, live/peak/RSS, physical-I/O, cold, throughput, other
   cell/query/range/corpus, and general XLSX claims remain excluded.
-- `xlsx_bytes_open`: move a prepared owned XLSX allocation into
+- `xlsx_bytes_open` (removed in M0a step S9): move a prepared owned XLSX allocation into
   `litchi::Workbook::from_bytes(Vec<u8>)`; the input clone and typed eager
   semantic/hash guards are outside timing, so the measured scope is exactly
   the facade bytes construction.
-- `xlsx_bytes_open_lifecycle`: use the same owned bytes path and guards, but
+- `xlsx_bytes_open_lifecycle` (removed in M0a step S9): use the same owned bytes path and guards, but
   time facade construction followed by worksheet names, worksheet count, and
   full text. These selectors are opt-in and do not claim a source-backed or
   physical-I/O result.
@@ -4632,7 +4862,8 @@ native-Office claim is made.
   caller-named real fixture supplied with `--ole2-file PATH`. See *Opt-in OLE2
   range-source selectors (change 0627)*.
 - `doc_facade_file_open` / `_full_text` / `_one_paragraph` and
-  `ppt_facade_file_open` / `_full_text` / `_one_slide_text`: the documented
+  `ppt_facade_file_open` / `_full_text` / `_one_slide_text` (removed in M0a
+  step S9): the documented
   `litchi::Document::open` and `litchi::Presentation::open` routes over a
   caller-named `--ole2-file` fixture. See *Opt-in facade and ordinary-save
   selectors (change 0638)*.
@@ -4698,7 +4929,7 @@ native-Office claim is made.
   outputs are compared byte-for-byte with the untimed numeric oracle, while
   missing and duplicate names are checked against their exact typed errors.
 - `rtf_semantic_open`: parse deterministic owned transport bytes through
-  public `Document::from_bytes`.
+  public `Package::from_bytes`.
 - `rtf_semantic_paragraph_count`: query the public exact paragraph cardinality.
 - `rtf_semantic_collect_paragraphs`: collect all lazy paragraph views so the
   allocation behavior is guarded separately from traversal.
@@ -4709,12 +4940,12 @@ native-Office claim is made.
 - `rtf_semantic_text_to_sink`: write semantic UTF-8 body text to a pre-reserved,
   bounded, forward-only non-seek sink and verify the complete output outside
   the timed interval.
-- `rtf_semantic_stream_save`: stream the immutable snapshot through public
-  `Document::write_to` and require byte-exact source output.
-- `rtf_semantic_noop_edit_save`: commit an empty edit, require shared snapshot
+- `rtf_semantic_stream_save`: stream the immutable package through public
+  `Package::write_to` and require byte-exact source output.
+- `rtf_semantic_noop_edit_save`: commit an empty edit, require shared package
   identity and exact bytes, then stream through the same forward-only sink.
 - `rtf_semantic_one_edit_save`: replace the middle paragraph through the
-  checked native transaction, stream the changed snapshot, reopen it, and
+  checked native transaction, stream the changed package, reopen it, and
   verify its complete semantic projection and sink counters.
 - `rtf_semantic_one_percent_edit_save`: select deterministic evenly spaced
   `ceil(1%)` paragraph positions, stage one bounded atomic batch, commit once,
@@ -5533,3 +5764,12 @@ preparation and validation. Operation incremental heap is the region high-water
 live bytes minus live bytes at region entry, not cumulative requested bytes or
 RSS. See `docs/performance/results/change-0477` for the frozen isolated process
 matrix, commands, source custody, and limitations.
+
+### Unified DOCX formatting batch pairs
+
+The isolated [unified DOCX batch runner](unified-docx-batch/README.md) measures
+prepared eager and source-backed owners at 1–10,000 operations, with frozen
+corpus identity, leaf/unified byte and operation-count checks, and repeated
+ABBA samples. Its separate manifest limits compilation to the DOCX dependency
+closure. Record 0078 includes an uncached-target control and scoped timing
+evidence; it does not establish full unified-API performance acceptance.

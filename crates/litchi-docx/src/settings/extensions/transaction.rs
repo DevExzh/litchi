@@ -2,14 +2,32 @@
     clippy::shadow_reuse,
     reason = "parser bindings are intentionally refined after validation"
 )]
-//! Source-preserving Word settings-extension snapshots and edits.
+//! The Word settings-extension family (record 0355): the `w14`/`w15`
+//! extensions of the settings part, read as a [`Snapshot`] and changed
+//! through an [`Edit`] that publishes a new package.
+//!
+//! ```
+//! use litchi_docx::Package;
+//! use litchi_docx::settings::extensions::OnOff;
+//!
+//! let package = Package::new()?;
+//! let mut edit = package.edit_settings_extensions();
+//! edit.set_conflict_mode(Some(OnOff::on()))?;
+//! let commit = edit.commit()?;
+//! assert!(commit.diagnostics().changed());
+//! assert_eq!(
+//!     commit.package().settings_extensions()?.extensions().conflict_mode(),
+//!     Some(OnOff::on())
+//! );
+//! assert_eq!(package.settings_extensions()?.extensions().conflict_mode(), None);
+//! # Ok::<(), litchi_docx::Error>(())
+//! ```
 
 use std::sync::Arc;
 
-use crate::{Error, Result};
-
 use super::codec;
 use super::model::{Extensions, Guid, OnOff};
+use crate::package::family::{Staged, graph_family};
 
 /// An immutable complete `w:settings` snapshot with its typed extension view.
 #[derive(Debug, Clone)]
@@ -46,224 +64,185 @@ impl Snapshot {
     pub const fn extensions(&self) -> &Extensions {
         &self.extensions
     }
+}
 
-    /// Start an isolated source-checked settings-extension edit.
-    #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
-            base: self.clone(),
-            next: self.extensions.clone(),
+graph_family!("settings-extension", own_limits);
+
+pub use super::super::limit::LimitKind;
+
+/// A staged settings-extension change over one package snapshot.
+///
+/// The settings part is read on the first staging verb. [`Self::commit`]
+/// rewrites only the extension elements that changed and publishes a new
+/// package; the source is never changed, and dropping the edit discards it.
+#[derive(Clone)]
+pub struct Edit {
+    staged: Staged,
+    extensions: Option<(Snapshot, Extensions)>,
+}
+
+impl std::fmt::Debug for Edit {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.debug_struct("Edit").finish_non_exhaustive()
+    }
+}
+
+impl Edit {
+    fn next(&mut self) -> Result<&mut Extensions> {
+        if self.extensions.is_none() {
+            let snapshot = self.staged.working().settings_extensions()?;
+            let extensions = snapshot.extensions().clone();
+            self.extensions = Some((snapshot, extensions));
         }
-    }
-}
-
-/// A settings-extension edit that has not yet been published.
-#[derive(Debug, Clone)]
-pub struct Transaction {
-    base: Snapshot,
-    next: Extensions,
-}
-
-impl Transaction {
-    /// Borrow the projected typed settings extensions.
-    #[inline]
-    #[must_use]
-    pub const fn extensions(&self) -> &Extensions {
-        &self.next
+        Ok(&mut self
+            .extensions
+            .as_mut()
+            .expect("settings extensions were loaded above")
+            .1)
     }
 
-    /// Set or remove the Word 2012 chart-reference tracking marker.
+    /// The staged extension collection.
     ///
     /// # Errors
     ///
-    /// Returns an error if the operation cannot be completed.
+    /// Returns an error if the settings part cannot be read.
+    pub fn extensions(&mut self) -> Result<&Extensions> {
+        Ok(&*self.next()?)
+    }
+
+    /// Set or remove `w14:chartTrackingRefBased`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the settings part cannot be read or the value is
+    /// invalid.
     pub fn set_chart_tracking_ref_based(&mut self, value: Option<OnOff>) -> Result<&mut Self> {
-        self.next.set_chart_tracking_ref_based(value)?;
+        self.next()?.set_chart_tracking_ref_based(value)?;
         Ok(self)
     }
 
-    /// Set or remove the Word 2010 paragraph-ID context.
+    /// Set or remove `w14:docId`.
     ///
     /// # Errors
     ///
-    /// Returns an error if the operation cannot be completed.
+    /// Returns an error if the settings part cannot be read or the value is
+    /// invalid.
     pub fn set_document_id(&mut self, value: Option<u32>) -> Result<&mut Self> {
-        self.next.set_document_id(value)?;
+        self.next()?.set_document_id(value)?;
         Ok(self)
     }
 
-    /// Set or remove the Word 2012 source-document GUID.
+    /// Set or remove `w15:docId`.
     ///
     /// # Errors
     ///
-    /// Returns an error if the operation cannot be completed.
+    /// Returns an error if the settings part cannot be read or the value is
+    /// invalid.
     pub fn set_source_document_id(&mut self, value: Option<Guid>) -> Result<&mut Self> {
-        self.next.set_source_document_id(value)?;
+        self.next()?.set_source_document_id(value)?;
         Ok(self)
     }
 
-    /// Set or remove a present Word 2012 source-document element without a
-    /// `val` attribute.
+    /// Set or remove a valueless `w15:docId`.
     ///
     /// # Errors
     ///
-    /// Returns an error if the operation cannot be completed.
+    /// Returns an error if the settings part cannot be read.
     pub fn set_source_document_id_without_value(&mut self, present: bool) -> Result<&mut Self> {
-        self.next.set_source_document_id_without_value(present)?;
+        self.next()?.set_source_document_id_without_value(present)?;
         Ok(self)
     }
 
-    /// Set or remove the Word 2010 conflict-resolution save marker.
+    /// Set or remove `w14:conflictMode`.
     ///
     /// # Errors
     ///
-    /// Returns an error if the operation cannot be completed.
+    /// Returns an error if the settings part cannot be read or the value is
+    /// invalid.
     pub fn set_conflict_mode(&mut self, value: Option<OnOff>) -> Result<&mut Self> {
-        self.next.set_conflict_mode(value)?;
+        self.next()?.set_conflict_mode(value)?;
         Ok(self)
     }
 
-    /// Set or remove the Word 2010 image-editing-data discard marker.
+    /// Set or remove `w14:discardImageEditingData`.
     ///
     /// # Errors
     ///
-    /// Returns an error if the operation cannot be completed.
+    /// Returns an error if the settings part cannot be read or the value is
+    /// invalid.
     pub fn set_discard_image_editing_data(&mut self, value: Option<OnOff>) -> Result<&mut Self> {
-        self.next.set_discard_image_editing_data(value)?;
+        self.next()?.set_discard_image_editing_data(value)?;
         Ok(self)
     }
 
-    /// Set or remove the Word 2010 default image DPI value.
+    /// Set or remove `w14:defaultImageDpi`.
     ///
     /// # Errors
     ///
-    /// Returns an error if the operation cannot be completed.
+    /// Returns an error if the settings part cannot be read or the value is
+    /// invalid.
     pub fn set_default_image_dpi(&mut self, value: Option<i32>) -> Result<&mut Self> {
-        self.next.set_default_image_dpi(value)?;
+        self.next()?.set_default_image_dpi(value)?;
         Ok(self)
     }
 
-    /// Validate and publish the edit without changing its source snapshot.
+    /// Discard every staged change, keeping the edit.
+    pub fn reset(&mut self) {
+        self.staged.reset();
+        self.extensions = None;
+    }
+
+    /// Validate the staged extensions and publish them as a new package.
+    /// Unchanged extensions publish the source package unchanged.
     ///
     /// # Errors
     ///
-    /// Returns an error if the operation cannot be completed.
-    pub fn commit(self) -> Result<Commit> {
-        self.next.validate()?;
-        if self.next == self.base.extensions {
-            let patch = Patch {
-                before: self.base.extensions.clone(),
-                after: self.base.extensions.clone(),
-                before_xml: self.base.xml.clone(),
-                after_xml: self.base.xml.clone(),
-            };
-            return Ok(Commit {
-                snapshot: self.base,
-                patch,
-            });
+    /// Returns an error for invalid staged extensions or a settings part the
+    /// rewrite cannot preserve.
+    pub fn commit(mut self) -> Result<Commit> {
+        if let Some((base, next)) = self.extensions.take() {
+            next.validate()?;
+            if &next != base.extensions() {
+                let xml = codec::rewrite(base.xml_bytes(), &next)?;
+                Snapshot::from_xml(xml.clone())?;
+                let mut working = self.staged.working().clone();
+                working.update_settings_part(xml)?;
+                *self.staged.working_mut() = working;
+            }
         }
-
-        let xml = codec::rewrite(self.base.xml_bytes(), &self.next)?;
-        let snapshot = Snapshot::from_xml(xml)?;
-        let patch = Patch {
-            before: self.base.extensions,
-            after: self.next,
-            before_xml: self.base.xml,
-            after_xml: snapshot.xml.clone(),
-        };
-        Ok(Commit { snapshot, patch })
+        commit_staged(self.staged)
     }
 }
 
-/// A successful settings-extension publication.
-#[derive(Debug, Clone)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
-
-impl Commit {
-    /// Borrow the published settings snapshot.
-    #[inline]
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Move the published settings snapshot out of the commit.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
-    }
-
-    /// Borrow the reversible source-checked patch.
-    #[inline]
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Move the reversible patch out of the commit.
-    #[must_use]
-    pub fn into_patch(self) -> Patch {
-        self.patch
-    }
-}
-
-/// A reversible patch for the typed settings-extension projection.
-#[derive(Debug, Clone)]
-pub struct Patch {
-    before: Extensions,
-    after: Extensions,
-    before_xml: Arc<[u8]>,
-    after_xml: Arc<[u8]>,
-}
-
-impl Patch {
-    /// Borrow the typed source precondition.
-    #[inline]
-    #[must_use]
-    pub const fn before(&self) -> &Extensions {
-        &self.before
-    }
-
-    /// Borrow the typed state produced by this patch.
-    #[inline]
-    #[must_use]
-    pub const fn after(&self) -> &Extensions {
-        &self.after
-    }
-
-    /// Return the inverse source-checked operation.
-    #[must_use]
-    pub fn inverse(&self) -> Self {
-        Self {
-            before: self.after.clone(),
-            after: self.before.clone(),
-            before_xml: self.after_xml.clone(),
-            after_xml: self.before_xml.clone(),
-        }
-    }
-
-    /// Apply only to the exact source snapshot captured by this patch.
+impl crate::Package {
+    /// The settings part's typed Word extensions; a package without a
+    /// settings part reads the default settings.
     ///
     /// # Errors
     ///
-    /// Returns an error if the operation cannot be completed.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
-        if source.xml.as_ref() != self.before_xml.as_ref() {
-            return Err(Error::InvalidFormat(
-                "settings extension patch source does not match its byte precondition".into(),
-            ));
+    /// Returns an error for an invalid settings graph or part.
+    pub fn settings_extensions(&self) -> Result<Snapshot> {
+        Snapshot::from_xml(self.settings_part_snapshot()?.xml)
+    }
+
+    /// Stage a settings-extension change over this package. O(1): the edit
+    /// shares the package until a verb reads or changes it.
+    #[must_use]
+    pub fn edit_settings_extensions(&self) -> Edit {
+        Edit {
+            staged: Staged::new(self),
+            extensions: None,
         }
-        if source.extensions != self.before {
-            return Err(Error::InvalidFormat(
-                "settings extension patch source does not match its semantic precondition".into(),
-            ));
-        }
-        if self.before == self.after {
-            return Ok(source.clone());
-        }
-        Snapshot::from_xml(self.after_xml.to_vec())
+    }
+
+    /// Replay a settings-extension patch onto this package, which must hold
+    /// the patch's before state.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::PatchConflict`] for a package that does not
+    /// hold the before state.
+    pub fn apply_settings_extensions(&self, patch: &Patch) -> Result<Commit> {
+        apply_patch(self, patch, "apply_settings_extensions")
     }
 }

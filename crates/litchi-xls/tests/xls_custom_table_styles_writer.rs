@@ -1,9 +1,9 @@
 use std::io::Cursor;
 
-use litchi_xls::writer::{CustomTableStyles, Writer};
+use litchi_xls::writer::{Builder, CustomTableStyles};
 use litchi_xls::{
     DifferentialFormat, DifferentialFormatId, TableStyle, TableStyleElement, TableStyleRegion,
-    TableStyles, Workbook, XfProperty,
+    TableStyles, XfProperty, raw::Reader,
 };
 
 fn configured_styles(number_format_id: u16) -> CustomTableStyles {
@@ -39,7 +39,7 @@ fn configured_styles(number_format_id: u16) -> CustomTableStyles {
 
 #[test]
 fn custom_table_styles_round_trip_from_writer_to_reader() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_worksheet("Data").unwrap();
     let number_format_id = writer.register_number_format("0.0000\"kg\"").unwrap();
     writer
@@ -47,8 +47,8 @@ fn custom_table_styles_round_trip_from_writer_to_reader() {
         .unwrap();
 
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
-    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
+    let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
 
     assert_eq!(workbook.differential_formats().len(), 2);
     assert_eq!(
@@ -109,7 +109,7 @@ fn custom_table_style_configuration_rejects_hostile_relationships() {
 
 #[test]
 fn replacement_is_atomic_and_clear_restores_unset_bytes() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_worksheet("Data").unwrap();
     let valid = configured_styles(0);
     writer.set_custom_table_styles(valid.clone()).unwrap();
@@ -122,8 +122,8 @@ fn replacement_is_atomic_and_clear_restores_unset_bytes() {
     );
 
     let mut retained = Cursor::new(Vec::new());
-    writer.write_to(&mut retained).unwrap();
-    let workbook = Workbook::new(Cursor::new(retained.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut retained).unwrap();
+    let workbook = Reader::new(Cursor::new(retained.into_inner())).unwrap();
     assert_eq!(
         workbook.differential_formats()[0].properties().properties(),
         &[XfProperty::NumberFormatId(0)]
@@ -131,11 +131,11 @@ fn replacement_is_atomic_and_clear_restores_unset_bytes() {
 
     writer.clear_custom_table_styles();
     let mut cleared = Cursor::new(Vec::new());
-    writer.write_to(&mut cleared).unwrap();
+    writer.build().unwrap().write_to(&mut cleared).unwrap();
 
-    let mut fresh = Writer::new();
+    let mut fresh = Builder::new();
     fresh.add_worksheet("Data").unwrap();
     let mut baseline = Cursor::new(Vec::new());
-    fresh.write_to(&mut baseline).unwrap();
+    fresh.build().unwrap().write_to(&mut baseline).unwrap();
     assert_eq!(cleared.into_inner(), baseline.into_inner());
 }

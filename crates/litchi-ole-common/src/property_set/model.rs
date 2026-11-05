@@ -303,6 +303,17 @@ impl Section {
         self.properties.get(&identifier)
     }
 
+    /// Whether the section holds no property at all, not even a code page or
+    /// a dictionary.
+    ///
+    /// Such a section carries no information: the format crates' property-set
+    /// transactions treat a blank `SummaryInformation` or
+    /// `DocumentSummaryInformation` section like an absent one.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.properties.is_empty() && self.dictionary.is_empty()
+    }
+
     pub fn property_name(&self, identifier: u32) -> Option<&str> {
         self.dictionary.get(&identifier).map(String::as_str)
     }
@@ -1068,17 +1079,23 @@ impl From<Metadata> for litchi_core::Metadata {
             title: ole_metadata.title,
             subject: ole_metadata.subject,
             author: ole_metadata.author,
-            keywords: ole_metadata.keywords,
+            keywords: ole_metadata
+                .keywords
+                .as_deref()
+                .map(litchi_core::metadata::keywords::split)
+                .unwrap_or_default(),
             description: ole_metadata.comments,
             identifier: None,
             language: None,
             template: ole_metadata.template,
             last_modified_by: ole_metadata.last_saved_by,
             revision: ole_metadata.revision_number,
-            created: ole_metadata.create_time,
-            created_local: None,
-            modified: ole_metadata.last_saved_time,
-            modified_local: None,
+            created: ole_metadata
+                .create_time
+                .map(litchi_core::metadata::Timestamp::Utc),
+            modified: ole_metadata
+                .last_saved_time
+                .map(litchi_core::metadata::Timestamp::Utc),
             page_count: ole_metadata.num_pages,
             word_count: ole_metadata.num_words,
             character_count: ole_metadata.num_chars,
@@ -1091,9 +1108,10 @@ impl From<Metadata> for litchi_core::Metadata {
             content_status: None,
             content_type: None,
             version: None,
-            last_printed_time: ole_metadata.last_printed_time,
-            last_printed_local: None,
-            last_backup_local: None,
+            last_printed: ole_metadata
+                .last_printed_time
+                .map(litchi_core::metadata::Timestamp::Utc),
+            last_backup: None,
             hyperlink_base: None,
             security: ole_metadata.security,
             codepage: ole_metadata.codepage,

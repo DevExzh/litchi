@@ -6,17 +6,19 @@
 //! payload vocabularies remain opaque and are never executed.
 
 mod codec;
+mod edit;
 mod model;
 mod package;
 mod transaction;
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 mod validation;
 
 pub use litchi_opc::TargetMode;
 pub use model::{
     Anchor, BlackWhiteMode, ContentPart, Payload, Relationship, RelationshipMetadata, Target,
 };
-pub use package::{Limits, apply_commit, apply_patch, load_slide, load_snapshot};
-pub use transaction::{Commit, Patch, Revision, Snapshot, Transaction};
+pub use package::{Limits, load_slide, load_snapshot};
+pub use transaction::{Draft, Revision, Snapshot};
 
 #[cfg(test)]
 mod tests;

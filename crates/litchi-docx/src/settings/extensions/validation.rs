@@ -17,9 +17,11 @@ use quick_xml::reader::NsReader;
 
 pub(super) fn validate_extensions(values: &[Extension]) -> Result<()> {
     if values.len() > MAX_EXTENSIONS {
-        return Err(invalid(format!(
-            "Word settings extension count exceeds {MAX_EXTENSIONS}"
-        )));
+        return Err(crate::Error::SettingsLimit {
+            kind: crate::settings::LimitKind::Extensions,
+            actual: values.len(),
+            maximum: MAX_EXTENSIONS,
+        });
     }
 
     let mut seen = [false; 6];
@@ -51,9 +53,11 @@ pub(super) fn validate_opaque_xml(xml: &[u8]) -> Result<()> {
         return Err(invalid("opaque settings extension cannot be empty"));
     }
     if xml.len() > MAX_OPAQUE_BYTES {
-        return Err(invalid(format!(
-            "opaque settings extension exceeds {MAX_OPAQUE_BYTES} bytes"
-        )));
+        return Err(crate::Error::SettingsLimit {
+            kind: crate::settings::LimitKind::OpaqueExtensionBytes,
+            actual: xml.len(),
+            maximum: MAX_OPAQUE_BYTES,
+        });
     }
     std::str::from_utf8(xml)
         .map_err(|_source_error| invalid("opaque settings extension is not UTF-8"))?;
@@ -77,9 +81,11 @@ pub(super) fn validate_opaque_xml(xml: &[u8]) -> Result<()> {
                     .checked_add(1)
                     .ok_or_else(|| invalid("opaque settings node counter overflow"))?;
                 if nodes > MAX_SETTINGS_XML_NODES {
-                    return Err(invalid(format!(
-                        "opaque settings extension exceeds {MAX_SETTINGS_XML_NODES} nodes"
-                    )));
+                    return Err(crate::Error::SettingsLimit {
+                        kind: crate::settings::LimitKind::OpaqueExtensionNodes,
+                        actual: nodes,
+                        maximum: MAX_SETTINGS_XML_NODES,
+                    });
                 }
                 if depth == 0 {
                     if saw_root {
@@ -91,9 +97,11 @@ pub(super) fn validate_opaque_xml(xml: &[u8]) -> Result<()> {
                     .checked_add(1)
                     .ok_or_else(|| invalid("opaque settings extension depth overflow"))?;
                 if depth > MAX_SETTINGS_XML_DEPTH {
-                    return Err(invalid(format!(
-                        "opaque settings extension exceeds depth {MAX_SETTINGS_XML_DEPTH}"
-                    )));
+                    return Err(crate::Error::SettingsLimit {
+                        kind: crate::settings::LimitKind::OpaqueExtensionDepth,
+                        actual: depth,
+                        maximum: MAX_SETTINGS_XML_DEPTH,
+                    });
                 }
             },
             Event::Empty(_) => {
@@ -101,9 +109,11 @@ pub(super) fn validate_opaque_xml(xml: &[u8]) -> Result<()> {
                     .checked_add(1)
                     .ok_or_else(|| invalid("opaque settings node counter overflow"))?;
                 if nodes > MAX_SETTINGS_XML_NODES {
-                    return Err(invalid(format!(
-                        "opaque settings extension exceeds {MAX_SETTINGS_XML_NODES} nodes"
-                    )));
+                    return Err(crate::Error::SettingsLimit {
+                        kind: crate::settings::LimitKind::OpaqueExtensionNodes,
+                        actual: nodes,
+                        maximum: MAX_SETTINGS_XML_NODES,
+                    });
                 }
                 if depth == 0 {
                     if saw_root {

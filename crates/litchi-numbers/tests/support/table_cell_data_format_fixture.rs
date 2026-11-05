@@ -18,9 +18,7 @@ use litchi_iwa_common::{
         WireView, append_length_delimited_field, append_varint_field, patch_nested_varint_field,
     },
 };
-use litchi_iwa_core::{
-    Archive, ArchiveObject, FieldInfo, FieldPath, FieldType, RawMessage, SnappyStream,
-};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldType, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tn, tsd, tsk, tsp, tst};
 use litchi_numbers_wire::{BncCell, CellDataFormatKind, StoredValue};
 use prost::Message as _;
@@ -604,7 +602,7 @@ fn custom_registry_payload(family: CustomFamily, include_second: bool) -> Fixtur
         registry.custom_formats.push(custom_archive(family, true));
     }
     let encoded = registry.encode_to_vec();
-    let view = WireView::parse(&encoded)?;
+    let view = WireView::parse(&encoded, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(encoded.len().saturating_add(64));
     for field in view.fields() {
         if field.number() != 2 {
@@ -615,8 +613,18 @@ fn custom_registry_payload(family: CustomFamily, include_second: bool) -> Fixtur
         // A nested unknown record is intentionally attached to every
         // registry archive.  Focused rewrites must preserve it even when the
         // selected custom format is copied to a new UUID.
-        append_length_delimited_field(&mut archive, 94, b"custom-archive-extension")?;
-        append_length_delimited_field(&mut output, 2, &archive)?;
+        append_length_delimited_field(
+            &mut archive,
+            94,
+            b"custom-archive-extension",
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
+        append_length_delimited_field(
+            &mut output,
+            2,
+            &archive,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     Ok(output)
 }
@@ -631,7 +639,12 @@ fn attach_custom_registry(
         // Keep unknown records both before and after the repeated custom
         // payloads.  They make registry rewrites prove order/span retention
         // instead of merely proving that one scalar survived.
-        append_length_delimited_field(&mut registry_data, 90, b"custom-registry-before")?;
+        append_length_delimited_field(
+            &mut registry_data,
+            90,
+            b"custom-registry-before",
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         append_varint_field(&mut registry_data, 91, 0xc0de_0001)?;
     }
     let registry = object(CUSTOM_REGISTRY_ID, CUSTOM_FORMAT_LIST_TYPE, registry_data)?;
@@ -740,7 +753,7 @@ pub(crate) fn rewrite_currency_secondary_identifier(
         let first = cells
             .first_mut()
             .ok_or_else(|| io::Error::other("format fixture first cell is missing"))?;
-        let parsed = BncCell::parse(first)?;
+        let parsed = BncCell::parse(first, &litchi_numbers_wire::Limits::DEFAULT)?;
         if parsed.secondary_format_identifier().is_none() {
             return Err(io::Error::other("format fixture secondary identifier is missing").into());
         }
@@ -765,7 +778,7 @@ fn currency_secondary_cell() -> FixtureResult<Vec<u8>> {
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3a, 0xb0, 0x02, 0x00,
         0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00,
     ];
-    let cell = BncCell::parse(&bytes).map_err(|error| {
+    let cell = BncCell::parse(&bytes, &litchi_numbers_wire::Limits::DEFAULT).map_err(|error| {
         io::Error::other(format!("invalid Currency secondary fixture: {error}"))
     })?;
     if cell.format_identifier() != Some(4) || cell.secondary_format_identifier() != Some(2) {
@@ -860,14 +873,14 @@ pub(crate) fn corrupted_package_for(
             let first = cells
                 .first()
                 .ok_or_else(|| io::Error::other("format fixture first cell is missing"))?;
-            let mut cell = BncCell::parse(first)?;
+            let mut cell = BncCell::parse(first, &litchi_numbers_wire::Limits::DEFAULT)?;
             cell.set_data_format_identifier(
                 SECOND_FORMAT_KEY,
                 CellDataFormatKind::NumberOrPercentage,
                 None,
             )?;
             let mut replacement = cells;
-            replacement[0] = cell.encode();
+            replacement[0] = cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
             let (storage, offsets) = pack_row(&replacement)?;
             row.cell_storage_buffer = Some(storage);
             row.cell_offsets = Some(offsets);
@@ -909,7 +922,12 @@ pub(crate) fn corrupted_package_for(
                     .first_mut()
                     .ok_or_else(|| io::Error::other("unrelated fixture message is missing"))?;
                 info.object_references.push(TILE_ID);
-                let mut field = FieldInfo::new(FieldPath::new(vec![1]));
+                let mut field = FieldInfo::new(
+                    litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default())
+                        .unwrap(),
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap();
                 field.r#type = Some(FieldType::ObjectReference);
                 field.object_references.push(TILE_ID);
                 info.field_infos.push(field);
@@ -1011,7 +1029,11 @@ fn table_model_object() -> FixtureResult<ArchiveObject> {
     let payload = table_model_payload()?.encode_to_vec();
     let mut object = object(TABLE_MODEL_ID, TABLE_MODEL_TYPE, payload)?;
     object.archive_info.message_infos[0].object_references = vec![SIDECAR_ID, TILE_ID];
-    let mut unknown = FieldInfo::new(vec![99, 1]);
+    let mut unknown = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![99, 1], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     unknown.data_references = vec![0xdead_beef];
     object.archive_info.message_infos[0]
         .field_infos
@@ -1139,21 +1161,21 @@ fn formatted_cell(format_key: u32, kind: CellDataFormatKind, value: f64) -> Fixt
     let mut cell = BncCell::minimal();
     cell.set_data_format_identifier(format_key, kind, None)?;
     cell.set_number(value)?;
-    Ok(cell.encode())
+    Ok(cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap())
 }
 
 fn formatted_text_cell(format_key: u32, string_key: u32) -> FixtureResult<Vec<u8>> {
     let mut cell = BncCell::minimal();
     cell.set_string(string_key);
     cell.set_data_format_identifier(format_key, CellDataFormatKind::Text, None)?;
-    Ok(cell.encode())
+    Ok(cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap())
 }
 
 fn formatted_date_time_cell(format_key: u32, value: f64) -> FixtureResult<Vec<u8>> {
     let mut cell = BncCell::minimal();
     cell.set_date(value)?;
     cell.set_data_format_identifier(format_key, CellDataFormatKind::DateTime, None)?;
-    Ok(cell.encode())
+    Ok(cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap())
 }
 
 fn formatted_duration_cell(format_key: u32, value: f64) -> FixtureResult<Vec<u8>> {
@@ -1200,11 +1222,13 @@ pub(crate) fn duration_cross_owner_secondary_package() -> FixtureResult<Vec<u8>>
 
         cells[0] = duration_cell_with_number_format(FIRST_FORMAT_KEY, 1234.5, SECOND_FORMAT_KEY)?;
 
-        let mut number = BncCell::parse(&cells[1])?;
+        let mut number = BncCell::parse(&cells[1], &litchi_numbers_wire::Limits::DEFAULT)?;
         number.set_plain_number(0.25)?;
         number
             .set_number_or_percentage_format_identifier_preserving_value(Some(SECOND_FORMAT_KEY))?;
-        cells[1] = number.encode();
+        cells[1] = number
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
 
         cells.push(duration_cell_with_number_format(
             FIRST_FORMAT_KEY,
@@ -1242,7 +1266,7 @@ pub(crate) fn duration_cross_owner_secondary_package() -> FixtureResult<Vec<u8>>
 /// authorize an exact preserve-mode owner edit.
 pub(crate) fn duration_non_exact_package() -> FixtureResult<Vec<u8>> {
     let flat = synthetic_package_for(FormatFamily::Duration, FormatSharing::Shared)?;
-    let catalog = Catalog::from_bytes(&flat)?;
+    let catalog = Catalog::from_bytes(&flat, Default::default())?;
     let inner_entries = catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
@@ -1298,7 +1322,7 @@ fn duration_cell_bytes(
         bytes.extend_from_slice(&secondary_key.to_le_bytes());
     }
     bytes.extend_from_slice(&format_key.to_le_bytes());
-    let cell = BncCell::parse(&bytes)
+    let cell = BncCell::parse(&bytes, &litchi_numbers_wire::Limits::DEFAULT)
         .map_err(|error| io::Error::other(format!("invalid literal Duration cell: {error}")))?;
     if cell.explicit_format_flags() != marker
         || cell.cell_format_kind() != Some(4)
@@ -1412,7 +1436,7 @@ fn sidecar_object(family: FormatFamily, sharing: FormatSharing) -> FixtureResult
             data: payload,
         });
     }
-    let mut sidecars = ArchiveObject::new(SIDECAR_ID, messages)?;
+    let mut sidecars = ArchiveObject::new(SIDECAR_ID, messages, Default::default())?;
     for info in &mut sidecars.archive_info.message_infos {
         info.data_references = vec![0x72_00 + u64::from(info.type_)];
     }
@@ -1546,21 +1570,26 @@ fn text_format_entry(key: u32, refcount: u32) -> tst::table_data_list::ListEntry
 }
 
 fn add_unknown_extension_to_format_payload(source: &[u8]) -> FixtureResult<Vec<u8>> {
-    let view = WireView::parse(source)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::new();
     for field in view.fields() {
         if field.number() != 3 {
             output.extend_from_slice(field.raw());
             continue;
         }
-        let entry_view = WireView::parse(field.payload())?;
+        let entry_view = WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
         let mut entry = Vec::new();
         let mut format_found = false;
         for entry_field in entry_view.fields() {
             if entry_field.number() == 6 && !format_found {
                 let mut format = entry_field.payload().to_vec();
                 append_varint_field(&mut format, UNKNOWN_EXTENSION_FIELD, 0x80_03)?;
-                append_length_delimited_field(&mut entry, 6, &format)?;
+                append_length_delimited_field(
+                    &mut entry,
+                    6,
+                    &format,
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )?;
                 format_found = true;
             } else {
                 entry.extend_from_slice(entry_field.raw());
@@ -1569,14 +1598,24 @@ fn add_unknown_extension_to_format_payload(source: &[u8]) -> FixtureResult<Vec<u
         if !format_found {
             return Err(io::Error::other("format payload field is missing").into());
         }
-        append_length_delimited_field(&mut output, 3, &entry)?;
+        append_length_delimited_field(
+            &mut output,
+            3,
+            &entry,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     Ok(output)
 }
 
 fn unrelated_object() -> FixtureResult<ArchiveObject> {
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, 89, b"untouched unrelated archive payload")?;
+    append_length_delimited_field(
+        &mut payload,
+        89,
+        b"untouched unrelated archive payload",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut payload, 90, 0x90_ee_7a)?;
     append_varint_field(&mut payload, 91, 0x91_ee_7a)?;
     object(UNRELATED_OBJECT_ID, 99_991, payload)
@@ -1584,7 +1623,12 @@ fn unrelated_object() -> FixtureResult<ArchiveObject> {
 
 fn view_state_object() -> FixtureResult<ArchiveObject> {
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, 89, b"deterministic view state payload")?;
+    append_length_delimited_field(
+        &mut payload,
+        89,
+        b"deterministic view state payload",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut payload, 90, 0x80_ee_7a)?;
     object(VIEW_STATE_OBJECT_ID, 777, payload)
 }
@@ -1605,10 +1649,25 @@ fn metadata_object() -> FixtureResult<ArchiveObject> {
     )?;
     let view = metadata_component(300, "ViewState", 7, &[])?;
     let versioned = metadata_component(100, "Document", 3, &[0xfeed])?;
-    append_length_delimited_field(&mut data, 3, &document)?;
-    append_length_delimited_field(&mut data, 3, &tables)?;
-    append_length_delimited_field(&mut data, 3, &view)?;
-    append_length_delimited_field(&mut data, 11, &versioned)?;
+    append_length_delimited_field(
+        &mut data,
+        3,
+        &document,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut data,
+        3,
+        &tables,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(&mut data, 3, &view, litchi_iwa_common::WireLimits::DEFAULT)?;
+    append_length_delimited_field(
+        &mut data,
+        11,
+        &versioned,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut data, 90, 0xa5_a5_a5)?;
     object(METADATA_OBJECT_ID, METADATA_TYPE, data)
 }
@@ -1653,22 +1712,27 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> FixtureResult<ArchiveOb
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
 fn compressed(objects: Vec<ArchiveObject>) -> FixtureResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 /// Read one decompressed IWA member into an owned archive.
 pub(crate) fn member_archive(source: &[u8], member: &str) -> FixtureResult<Archive> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| io::Error::other(format!("member {member} is missing")))?;
     Ok(Archive::parse(
-        SnappyStream::decompress(entry.data())?.as_bytes(),
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
     )?)
 }
 
@@ -1706,14 +1770,17 @@ pub(crate) fn rewrite_member(
 ) -> FixtureResult<Vec<u8>> {
     let mut archive = member_archive(source, member)?;
     mutate(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    Ok(Catalog::from_bytes(source)?.reassemble_to_bytes(
-        &[litchi_iwa_archive::package::EntryEdit::new(
-            member,
-            &compressed,
-        )],
-        Limits::default(),
-    )?)
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    Ok(
+        Catalog::from_bytes(source, Default::default())?.reassemble_to_bytes(
+            &[litchi_iwa_archive::package::EntryEdit::new(
+                member,
+                &compressed,
+            )],
+            Limits::default(),
+        )?,
+    )
 }
 
 /// Rewrite the table member, the target of format edits in this fixture.
@@ -1753,9 +1820,9 @@ pub(crate) fn text_inherited_first_package() -> FixtureResult<Vec<u8>> {
         let first = cells
             .first_mut()
             .ok_or_else(|| io::Error::other("format fixture first cell is missing"))?;
-        let mut cell = BncCell::parse(first)?;
+        let mut cell = BncCell::parse(first, &litchi_numbers_wire::Limits::DEFAULT)?;
         cell.clear_explicit_format();
-        *first = cell.encode();
+        *first = cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
         Ok(())
     })?;
     rewrite_format_list_payload_for_test(&source, |list| {
@@ -1778,7 +1845,9 @@ pub(crate) fn text_converted_package() -> FixtureResult<Vec<u8>> {
         let first = cells
             .first_mut()
             .ok_or_else(|| io::Error::other("format fixture first cell is missing"))?;
-        let mut encoded = BncCell::parse(first)?.encode();
+        let mut encoded = BncCell::parse(first, &litchi_numbers_wire::Limits::DEFAULT)?
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         if encoded.len() < 24 {
             return Err(io::Error::other("format fixture first cell is truncated").into());
         }
@@ -1848,7 +1917,9 @@ fn converted_text_cell_with_generic(
     source: &[u8],
     generic_identifier: u32,
 ) -> FixtureResult<Vec<u8>> {
-    let mut encoded = BncCell::parse(source)?.encode();
+    let mut encoded = BncCell::parse(source, &litchi_numbers_wire::Limits::DEFAULT)?
+        .encode(&litchi_numbers_wire::Limits::DEFAULT)
+        .unwrap();
     if encoded.len() < 24 {
         return Err(io::Error::other("format fixture Text cell is truncated").into());
     }
@@ -1882,7 +1953,9 @@ fn rewrite_converted_generic_identifier(
         let first = cells
             .first_mut()
             .ok_or_else(|| io::Error::other("format fixture first cell is missing"))?;
-        let mut encoded = BncCell::parse(first)?.encode();
+        let mut encoded = BncCell::parse(first, &litchi_numbers_wire::Limits::DEFAULT)?
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         if encoded.len() < 24 {
             return Err(io::Error::other("format fixture Text cell is truncated").into());
         }
@@ -1924,7 +1997,9 @@ fn sibling_text_identifier_without_kind(source: &[u8]) -> FixtureResult<Vec<u8>>
         let second = cells
             .get_mut(1)
             .ok_or_else(|| io::Error::other("format fixture second cell is missing"))?;
-        let mut encoded = BncCell::parse(second)?.encode();
+        let mut encoded = BncCell::parse(second, &litchi_numbers_wire::Limits::DEFAULT)?
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         if encoded.len() < 24 {
             return Err(io::Error::other("format fixture Text cell is truncated").into());
         }
@@ -1963,7 +2038,9 @@ fn sibling_text_identifier_with_wrong_kind(source: &[u8]) -> FixtureResult<Vec<u
         let second = cells
             .get_mut(1)
             .ok_or_else(|| io::Error::other("format fixture second cell is missing"))?;
-        let mut encoded = BncCell::parse(second)?.encode();
+        let mut encoded = BncCell::parse(second, &litchi_numbers_wire::Limits::DEFAULT)?
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         if encoded.len() < 24 {
             return Err(io::Error::other("format fixture Text cell is truncated").into());
         }
@@ -1999,9 +2076,9 @@ fn sibling_reserved_known_field(source: &[u8]) -> FixtureResult<Vec<u8>> {
         let second = cells
             .get_mut(1)
             .ok_or_else(|| io::Error::other("format fixture second cell is missing"))?;
-        let mut cell = BncCell::parse(second)?;
+        let mut cell = BncCell::parse(second, &litchi_numbers_wire::Limits::DEFAULT)?;
         cell.clear_explicit_format();
-        let mut encoded = cell.encode();
+        let mut encoded = cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
         if encoded.len() < 12 {
             return Err(io::Error::other("format fixture cell is truncated").into());
         }
@@ -2352,13 +2429,13 @@ pub(crate) fn format_next_list_id(source: &[u8]) -> FixtureResult<u32> {
 /// assertions.
 pub(crate) fn format_payload_by_key(source: &[u8], key: u32) -> FixtureResult<Vec<u8>> {
     let payload = format_list_payload(source)?;
-    let list = WireView::parse(&payload)?;
+    let list = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     for field in list.fields().filter(|field| field.number() == 3) {
         let entry = tst::table_data_list::ListEntry::decode(field.payload())?;
         if entry.key != key {
             continue;
         }
-        let entry_view = WireView::parse(field.payload())?;
+        let entry_view = WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
         return entry_view
             .fields()
             .find(|entry_field| entry_field.number() == 6)
@@ -2395,7 +2472,7 @@ pub(crate) fn custom_registry_facts(source: &[u8]) -> FixtureResult<Vec<((u64, u
 /// source spans remain available to preservation assertions.
 pub(crate) fn custom_archive_payload_by_name(source: &[u8], name: &str) -> FixtureResult<Vec<u8>> {
     let payload = custom_registry_payload_bytes(source)?;
-    let view = WireView::parse(&payload)?;
+    let view = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     for field in view.fields().filter(|field| field.number() == 2) {
         let archive = tsk::CustomFormatArchive::decode(field.payload())?;
         if archive.name == name {
@@ -2434,7 +2511,7 @@ pub(crate) fn custom_format_descriptor(
 
 /// Return one exact raw extension record from a decoded format payload.
 pub(crate) fn unknown_field_record(payload: &[u8], field_number: u32) -> FixtureResult<Vec<u8>> {
-    WireView::parse(payload)?
+    WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == field_number)
         .map(|field| field.raw().to_vec())
@@ -2456,7 +2533,9 @@ pub(crate) fn tile_cells(source: &[u8]) -> FixtureResult<Vec<Vec<u8>>> {
 pub(crate) fn format_keys(source: &[u8]) -> FixtureResult<Vec<Option<u32>>> {
     tile_cells(source)?
         .into_iter()
-        .map(|cell| Ok(BncCell::parse(&cell)?.format_identifier()))
+        .map(|cell| {
+            Ok(BncCell::parse(&cell, &litchi_numbers_wire::Limits::DEFAULT)?.format_identifier())
+        })
         .collect()
 }
 
@@ -2515,7 +2594,7 @@ pub(crate) fn rewrite_format_payload_by_key(
     replacement: &[u8],
 ) -> FixtureResult<Vec<u8>> {
     rewrite_format_list_raw(source, |payload| {
-        let view = WireView::parse(payload)?;
+        let view = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?;
         let mut output = Vec::with_capacity(payload.len());
         let mut replaced = false;
         for field in view.fields() {
@@ -2528,12 +2607,18 @@ pub(crate) fn rewrite_format_payload_by_key(
                 output.extend_from_slice(field.raw());
                 continue;
             }
-            let entry_view = WireView::parse(field.payload())?;
+            let entry_view =
+                WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
             let mut entry_output = Vec::with_capacity(field.payload().len());
             let mut format_found = false;
             for entry_field in entry_view.fields() {
                 if entry_field.number() == 6 && !format_found {
-                    append_length_delimited_field(&mut entry_output, 6, replacement)?;
+                    append_length_delimited_field(
+                        &mut entry_output,
+                        6,
+                        replacement,
+                        litchi_iwa_common::WireLimits::DEFAULT,
+                    )?;
                     format_found = true;
                 } else {
                     entry_output.extend_from_slice(entry_field.raw());
@@ -2542,7 +2627,12 @@ pub(crate) fn rewrite_format_payload_by_key(
             if !format_found {
                 return Err(io::Error::other("format payload field is missing").into());
             }
-            append_length_delimited_field(&mut output, 3, &entry_output)?;
+            append_length_delimited_field(
+                &mut output,
+                3,
+                &entry_output,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
             replaced = true;
         }
         if !replaced {
@@ -2617,12 +2707,12 @@ fn append_varint_unchecked(output: &mut Vec<u8>, field_number: u32, value: u64) 
 const UNKNOWN_EXTENSION_FIELD: u32 = 94;
 
 fn first_format_payload(source: &[u8]) -> FixtureResult<Vec<u8>> {
-    let view = WireView::parse(source)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)?;
     let entry = view
         .fields()
         .find(|field| field.number() == 3)
         .ok_or_else(|| io::Error::other("format entry field is missing"))?;
-    WireView::parse(entry.payload())?
+    WireView::parse(entry.payload(), litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == 6)
         .map(|field| field.payload().to_vec())
@@ -2638,7 +2728,7 @@ fn rewrite_format_payload_by_key_from_payload(
     key: u32,
     replacement: &[u8],
 ) -> FixtureResult<Vec<u8>> {
-    let view = WireView::parse(source)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(source.len());
     let mut replaced = false;
     for field in view.fields() {
@@ -2651,12 +2741,17 @@ fn rewrite_format_payload_by_key_from_payload(
             output.extend_from_slice(field.raw());
             continue;
         }
-        let entry_view = WireView::parse(field.payload())?;
+        let entry_view = WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
         let mut entry_output = Vec::with_capacity(field.payload().len());
         let mut format_found = false;
         for entry_field in entry_view.fields() {
             if entry_field.number() == 6 && !format_found {
-                append_length_delimited_field(&mut entry_output, 6, replacement)?;
+                append_length_delimited_field(
+                    &mut entry_output,
+                    6,
+                    replacement,
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )?;
                 format_found = true;
             } else {
                 entry_output.extend_from_slice(entry_field.raw());
@@ -2665,7 +2760,12 @@ fn rewrite_format_payload_by_key_from_payload(
         if !format_found {
             return Err(io::Error::other("format payload field is missing").into());
         }
-        append_length_delimited_field(&mut output, 3, &entry_output)?;
+        append_length_delimited_field(
+            &mut output,
+            3,
+            &entry_output,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         replaced = true;
     }
     if !replaced {

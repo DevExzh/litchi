@@ -13,9 +13,13 @@ use litchi_iwa_common::wire::{WireView, append_length_delimited_field, append_va
 use litchi_iwa_core::{Archive, RawMessage};
 use litchi_iwa_protos::{kn, tsch, tsd, tsp};
 use litchi_keynote::{
-    ChartArrangement, ChartArrangementCommit, ChartArrangementDiagnostics, ChartArrangementEdit,
-    ChartArrangementError, ChartArrangementLimitKind, ChartArrangementPatch, ChartSelector,
-    Package, Position, ReadOptions, SemanticLimits, SlideSelector,
+    ChartArrangement, ChartSelector, OpenOptions, Package, Position, SemanticLimits, SlideSelector,
+    SourceLimits, chart::arrangement::Commit as ChartArrangementCommit,
+    chart::arrangement::Diagnostics as ChartArrangementDiagnostics,
+    chart::arrangement::Edit as ChartArrangementEdit,
+    chart::arrangement::Error as ChartArrangementError,
+    chart::arrangement::LimitKind as ChartArrangementLimitKind,
+    chart::arrangement::Patch as ChartArrangementPatch,
 };
 
 use prost::Message as _;
@@ -66,7 +70,7 @@ fn with_drawable_arrangement(
     unknown: bool,
 ) -> TestResult<Vec<u8>> {
     let original = chart_fixture::message_payload(source, CHARTS[chart], CHART_MESSAGE_TYPE)?;
-    let drawable = WireView::parse(&original)?
+    let drawable = WireView::parse(&original, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == DRAWABLE_SUPER_FIELD)
         .ok_or_else(|| io::Error::other("missing synthetic chart drawable"))?;
@@ -91,6 +95,7 @@ fn with_drawable_arrangement(
             &mut drawable_payload,
             UNKNOWN_DRAWABLE_BYTES_FIELD,
             b"opaque drawable arrange metadata",
+            litchi_iwa_common::WireLimits::DEFAULT,
         )?;
     }
     let replacement = chart_fixture::length_delimited_field_with_key_width(
@@ -126,7 +131,7 @@ fn synthetic_package_with_states(
 fn with_unknown_title_group(source: &[u8]) -> TestResult<Vec<u8>> {
     let original =
         chart_fixture::message_payload(source, CHART_NON_STYLES[0], CHART_NON_STYLE_MESSAGE_TYPE)?;
-    let extension = WireView::parse(&original)?
+    let extension = WireView::parse(&original, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == GENERATED_CHART_EXTENSION_FIELD)
         .ok_or_else(|| io::Error::other("missing synthetic chart title extension"))?;
@@ -182,8 +187,8 @@ fn error_is_redacted<E: std::fmt::Debug + std::fmt::Display>(error: &E) {
 }
 
 fn assert_document_only_changed(before: &[u8], after: &[u8]) -> TestResult<()> {
-    let source = Catalog::from_bytes(before)?;
-    let target = Catalog::from_bytes(after)?;
+    let source = Catalog::from_bytes(before, Default::default())?;
+    let target = Catalog::from_bytes(after, Default::default())?;
     assert_eq!(source.len(), target.len());
     let mut changed = 0;
     for source_entry in source.iter() {
@@ -206,8 +211,8 @@ fn assert_document_only_changed(before: &[u8], after: &[u8]) -> TestResult<()> {
 }
 
 fn assert_previews_preserved(before: &[u8], after: &[u8]) -> TestResult<()> {
-    let source = Catalog::from_bytes(before)?;
-    let target = Catalog::from_bytes(after)?;
+    let source = Catalog::from_bytes(before, Default::default())?;
+    let target = Catalog::from_bytes(after, Default::default())?;
     for preview in PREVIEWS {
         let source_data = source
             .iter()
@@ -229,7 +234,7 @@ fn assert_previews_preserved(before: &[u8], after: &[u8]) -> TestResult<()> {
 
 fn drawable_payload(package: &[u8], chart: usize) -> TestResult<Vec<u8>> {
     let payload = chart_fixture::message_payload(package, CHARTS[chart], CHART_MESSAGE_TYPE)?;
-    let field = WireView::parse(&payload)?
+    let field = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == DRAWABLE_SUPER_FIELD)
         .ok_or_else(|| io::Error::other("missing chart drawable"))?;
@@ -237,11 +242,14 @@ fn drawable_payload(package: &[u8], chart: usize) -> TestResult<Vec<u8>> {
 }
 
 fn raw_drawable_fields(package: &[u8], chart: usize, number: u32) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(&drawable_payload(package, chart)?)?
-        .fields()
-        .filter(|field| field.number() == number)
-        .map(|field| field.raw().to_vec())
-        .collect())
+    Ok(WireView::parse(
+        &drawable_payload(package, chart)?,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?
+    .fields()
+    .filter(|field| field.number() == number)
+    .map(|field| field.raw().to_vec())
+    .collect())
 }
 
 fn with_drawable_wire(
@@ -250,7 +258,7 @@ fn with_drawable_wire(
     rewrite: impl FnOnce(&[u8]) -> TestResult<Vec<u8>>,
 ) -> TestResult<Vec<u8>> {
     let original = chart_fixture::message_payload(source, CHARTS[chart], CHART_MESSAGE_TYPE)?;
-    let drawable = WireView::parse(&original)?
+    let drawable = WireView::parse(&original, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == DRAWABLE_SUPER_FIELD)
         .ok_or_else(|| io::Error::other("missing chart drawable"))?;
@@ -266,7 +274,7 @@ fn with_drawable_wire(
 }
 
 fn empty_slide_source(source: &[u8]) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(&chart_fixture::document_stream(source)?)?;
+    let mut archive = Archive::parse(&chart_fixture::document_stream(source)?, Default::default())?;
     let slide = archive
         .object_mut(chart_fixture::SLIDE)
         .ok_or_else(|| io::Error::other("missing synthetic slide"))?;
@@ -307,7 +315,12 @@ fn malformed_arrangement_source(kind: &str) -> TestResult<Vec<u8>> {
         }),
         "wrong-locked-wire" => with_drawable_wire(&source, 0, |drawable| {
             let mut output = drawable.to_vec();
-            append_length_delimited_field(&mut output, DRAWABLE_LOCKED_FIELD, b"not a bool")?;
+            append_length_delimited_field(
+                &mut output,
+                DRAWABLE_LOCKED_FIELD,
+                b"not a bool",
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
             Ok(output)
         }),
         "wrong-aspect-ratio-wire" => with_drawable_wire(&source, 0, |drawable| {
@@ -316,6 +329,7 @@ fn malformed_arrangement_source(kind: &str) -> TestResult<Vec<u8>> {
                 &mut output,
                 DRAWABLE_ASPECT_RATIO_LOCKED_FIELD,
                 b"not a bool",
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
             Ok(output)
         }),
@@ -348,7 +362,7 @@ fn malformed_arrangement_source(kind: &str) -> TestResult<Vec<u8>> {
         },
         "duplicate-outer" => {
             let original = chart_fixture::message_payload(&source, CHARTS[0], CHART_MESSAGE_TYPE)?;
-            let field = WireView::parse(&original)?
+            let field = WireView::parse(&original, litchi_iwa_common::WireLimits::DEFAULT)?
                 .fields()
                 .find(|field| field.number() == DRAWABLE_SUPER_FIELD)
                 .ok_or_else(|| io::Error::other("missing chart drawable"))?;
@@ -364,7 +378,7 @@ fn malformed_arrangement_source(kind: &str) -> TestResult<Vec<u8>> {
 
 fn with_shared_non_style(source: &[u8]) -> TestResult<Vec<u8>> {
     let original = chart_fixture::message_payload(source, CHARTS[1], CHART_MESSAGE_TYPE)?;
-    let extension = WireView::parse(&original)?
+    let extension = WireView::parse(&original, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == GENERATED_CHART_EXTENSION_FIELD)
         .ok_or_else(|| io::Error::other("missing chart extension"))?;
@@ -385,7 +399,7 @@ fn with_shared_non_style(source: &[u8]) -> TestResult<Vec<u8>> {
 
 fn with_shared_title(source: &[u8]) -> TestResult<Vec<u8>> {
     let original = chart_fixture::message_payload(source, CHARTS[1], CHART_MESSAGE_TYPE)?;
-    let drawable = WireView::parse(&original)?
+    let drawable = WireView::parse(&original, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == DRAWABLE_SUPER_FIELD)
         .ok_or_else(|| io::Error::other("missing chart drawable"))?;
@@ -403,7 +417,7 @@ fn with_shared_title(source: &[u8]) -> TestResult<Vec<u8>> {
 
 fn with_parent_mismatch(source: &[u8]) -> TestResult<Vec<u8>> {
     let original = chart_fixture::message_payload(source, CHARTS[0], CHART_MESSAGE_TYPE)?;
-    let drawable = WireView::parse(&original)?
+    let drawable = WireView::parse(&original, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == DRAWABLE_SUPER_FIELD)
         .ok_or_else(|| io::Error::other("missing chart drawable"))?;
@@ -420,7 +434,7 @@ fn with_parent_mismatch(source: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn with_duplicate_chart_message(source: &[u8]) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(&chart_fixture::document_stream(source)?)?;
+    let mut archive = Archive::parse(&chart_fixture::document_stream(source)?, Default::default())?;
     let chart = archive
         .object_mut(CHARTS[0])
         .ok_or_else(|| io::Error::other("missing synthetic chart"))?;
@@ -431,22 +445,29 @@ fn with_duplicate_chart_message(source: &[u8]) -> TestResult<Vec<u8>> {
         .ok_or_else(|| io::Error::other("missing synthetic chart message"))?
         .data
         .clone();
-    chart.push_message(RawMessage {
-        type_: CHART_MESSAGE_TYPE,
-        data,
-    })?;
+    chart.push_message(
+        RawMessage {
+            type_: CHART_MESSAGE_TYPE,
+            data,
+        },
+        Default::default(),
+    )?;
     chart_fixture::replace_document_stream(source, archive)
 }
 
 fn with_foreign_chart_owner(source: &[u8]) -> TestResult<Vec<u8>> {
     let chart_payload = chart_fixture::message_payload(source, CHARTS[0], CHART_MESSAGE_TYPE)?;
-    let mut archive = Archive::parse(&chart_fixture::component_stream(source, FOREIGN_MEMBER)?)?;
+    let mut archive = Archive::parse(
+        &chart_fixture::component_stream(source, FOREIGN_MEMBER)?,
+        Default::default(),
+    )?;
     archive.objects.push(litchi_iwa_core::ArchiveObject::new(
         901,
         vec![RawMessage {
             type_: CHART_MESSAGE_TYPE,
             data: chart_payload,
         }],
+        Default::default(),
     )?);
     chart_fixture::replace_component_stream(source, FOREIGN_MEMBER, archive)
 }
@@ -561,23 +582,19 @@ fn arrangement_batch_malformed_second_chart_fails_atomically_and_redacted() -> T
 #[test]
 fn arrangement_batch_semantic_reference_limit_refuses_without_mutation() -> TestResult<()> {
     let source = base_source()?;
-    let semantic = SemanticLimits::new(
-        SemanticLimits::MAX_OBJECTS,
-        1,
-        1,
-        SemanticLimits::MAX_TEXT_STORAGES,
-        SemanticLimits::MAX_TEXT_FRAGMENTS,
-        SemanticLimits::MAX_TEXT_BYTES,
-    )?;
+    let semantic = SemanticLimits::builder()
+        .max_slides(1)?
+        .max_references(1)?
+        .build()?;
     let package =
-        Package::from_bytes_with_options(&source, ReadOptions::new(Limits::default(), semantic))?;
+        Package::from_bytes_with_options(&source, OpenOptions::new().semantic_limits(semantic))?;
     let before = exact_bytes(&package)?;
     let error = package
         .slide_chart_arrangements(0usize)
         .expect_err("the batch traversal must honor the semantic reference ceiling");
     assert!(matches!(
         error,
-        ChartArrangementError::LimitExceeded {
+        ChartArrangementError::Limit {
             kind: ChartArrangementLimitKind::References,
             ..
         }
@@ -641,10 +658,12 @@ fn arrangement_defaults_and_selectors_cover_all_boolean_combinations() -> TestRe
 fn arrangement_edit_exposes_only_semantic_positions_and_values() -> TestResult<()> {
     let package = Package::from_bytes(&base_source()?)?;
     let edit = package.edit_slide_chart_arrangement("Charts", "Revenue")?;
-    assert_eq!(edit.slide_position(), Position::new(0));
-    assert_eq!(edit.chart_position(), Position::new(0));
-    assert_eq!(edit.before(), ChartArrangement::default());
-    assert_eq!(edit.after(), ChartArrangement::default());
+    assert!(format!("{edit:?}").contains("has_selection: false"));
+    assert_eq!(edit.slide_position()?, Position::new(0));
+    assert_eq!(edit.chart_position()?, Position::new(0));
+    assert_eq!(edit.before()?, ChartArrangement::default());
+    assert_eq!(edit.after()?, ChartArrangement::default());
+    assert!(format!("{edit:?}").contains("has_selection: true"));
 
     let debug = format!("{edit:?}");
     for identifier in CHARTS.into_iter().chain(TITLES).chain(CHART_NON_STYLES) {
@@ -886,28 +905,36 @@ fn arrangement_selectors_fail_closed_for_missing_names_positions_and_ambiguity()
     let package = Package::from_bytes(&source)?;
     assert!(matches!(
         package.slide_chart_arrangement("missing", 0usize),
-        Err(ChartArrangementError::SlideNameNotFound)
+        Err(ChartArrangementError::Refused(
+            litchi_keynote::chart::arrangement::Refusal::SlideNameNotFound
+        ))
     ));
     assert!(matches!(
         package.slide_chart_arrangement(SlideSelector::name(""), 0usize),
-        Err(ChartArrangementError::EmptySlideName)
+        Err(ChartArrangementError::Refused(
+            litchi_keynote::chart::arrangement::Refusal::EmptySlideName
+        ))
     ));
     assert!(matches!(
         package.slide_chart_arrangement(0usize, "missing"),
-        Err(ChartArrangementError::ChartNameNotFound)
+        Err(ChartArrangementError::Refused(
+            litchi_keynote::chart::arrangement::Refusal::ChartNameNotFound
+        ))
     ));
     assert!(matches!(
         package.slide_chart_arrangement(0usize, ChartSelector::name("")),
-        Err(ChartArrangementError::EmptyChartName)
+        Err(ChartArrangementError::Refused(
+            litchi_keynote::chart::arrangement::Refusal::EmptyChartName
+        ))
     ));
     assert!(matches!(
         package.slide_chart_arrangement(Position::new(9), 0usize),
-        Err(ChartArrangementError::SlidePositionNotFound { position })
+        Err(ChartArrangementError::Refused(litchi_keynote::chart::arrangement::Refusal::SlidePositionNotFound { position }))
             if position == Position::new(9)
     ));
     assert!(matches!(
         package.slide_chart_arrangement(0usize, Position::new(9)),
-        Err(ChartArrangementError::ChartPositionNotFound { position })
+        Err(ChartArrangementError::Refused(litchi_keynote::chart::arrangement::Refusal::ChartPositionNotFound { position }))
             if position == Position::new(9)
     ));
 
@@ -921,8 +948,14 @@ fn arrangement_selectors_fail_closed_for_missing_names_positions_and_ambiguity()
     let before = exact_bytes(&duplicate)?;
     let error = duplicate
         .edit_slide_chart_arrangement(0usize, ChartSelector::name("Revenue"))
+        .and_then(|edit| edit.commit())
         .expect_err("duplicate chart names must be ambiguous");
-    assert!(matches!(error, ChartArrangementError::AmbiguousSelector));
+    assert!(matches!(
+        error,
+        ChartArrangementError::Refused(
+            litchi_keynote::chart::arrangement::Refusal::AmbiguousSelector
+        )
+    ));
     error_is_redacted(&error);
     assert_eq!(exact_bytes(&duplicate)?, before);
     Ok(())
@@ -953,6 +986,7 @@ fn arrangement_wire_validation_rejects_duplicate_wrong_noncanonical_and_invalid_
         assert!(
             package
                 .edit_slide_chart_arrangement(0usize, 0usize)
+                .and_then(|edit| edit.commit())
                 .is_err(),
             "malformed {kind} source unexpectedly opened for mutation"
         );
@@ -974,6 +1008,7 @@ fn arrangement_graph_ambiguity_and_ownership_guards_are_atomic() -> TestResult<(
         let before = exact_bytes(&package)?;
         let error = package
             .edit_slide_chart_arrangement(0usize, 0usize)
+            .and_then(|edit| edit.commit())
             .expect_err("ambiguous or malformed chart graph must fail closed");
         assert!(matches!(error, ChartArrangementError::InvalidSource));
         error_is_redacted(&error);
@@ -985,6 +1020,7 @@ fn arrangement_graph_ambiguity_and_ownership_guards_are_atomic() -> TestResult<(
     let before = exact_bytes(&package)?;
     let error = package
         .edit_slide_chart_arrangement(0usize, 0usize)
+        .and_then(|edit| edit.commit())
         .expect_err("foreign chart ownership must fail closed");
     assert!(matches!(error, ChartArrangementError::InvalidSource));
     error_is_redacted(&error);
@@ -996,7 +1032,7 @@ fn arrangement_graph_ambiguity_and_ownership_guards_are_atomic() -> TestResult<(
 fn arrangement_semantic_limits_fail_before_publication_and_output_limits_are_atomic()
 -> TestResult<()> {
     let unpadded = base_source()?;
-    let catalog = Catalog::from_bytes(&unpadded)?;
+    let catalog = Catalog::from_bytes(&unpadded, Default::default())?;
     // Give graph verification headroom so this case reaches the independent
     // output ceiling instead of an earlier aggregate retained-byte refusal.
     let padding = [0u8; 16 * 1024];
@@ -1009,9 +1045,16 @@ fn arrangement_semantic_limits_fail_before_publication_and_output_limits_are_ato
         )))
         .collect();
     let source = litchi_iwa_archive::package::to_bytes(entries.iter().copied(), Limits::default())?;
-    let semantic = SemanticLimits::new(1, 1, 1, 1, 1, 1)?;
+    let semantic = SemanticLimits::builder()
+        .max_objects(1)?
+        .max_slides(1)?
+        .max_references(1)?
+        .max_text_storages(1)?
+        .max_text_fragments(1)?
+        .max_text_bytes(1)?
+        .build()?;
     let limited =
-        Package::from_bytes_with_options(&source, ReadOptions::new(Limits::default(), semantic));
+        Package::from_bytes_with_options(&source, OpenOptions::new().semantic_limits(semantic));
     let ingress_error = limited.expect_err("semantic object limit must reject the chart graph");
     error_is_redacted(&ingress_error);
     assert!(format!("{ingress_error:?}").len() < 512);
@@ -1022,17 +1065,15 @@ fn arrangement_semantic_limits_fail_before_publication_and_output_limits_are_ato
     let candidate = exact_bytes(unrestricted.package())?;
     assert!(candidate.len() > source.len());
     let defaults = Limits::default();
-    let limits = Limits::new(
-        u64::try_from(candidate.len() - 1)?,
-        defaults.max_entries(),
-        defaults.max_entry_bytes(),
-        defaults.max_total_bytes(),
-        defaults.max_iwa_stream_bytes(),
-    )?;
-    let bounded = Package::from_bytes_with_options(
-        &source,
-        ReadOptions::new(limits, SemanticLimits::default()),
-    )?;
+    let limits = SourceLimits::builder()
+        .max_input_bytes(u64::try_from(candidate.len() - 1)?)?
+        .max_entries(defaults.max_entries())?
+        .max_entry_bytes(defaults.max_entry_bytes())?
+        .max_aggregate_bytes(defaults.max_total_bytes())?
+        .max_component_bytes(defaults.max_iwa_stream_bytes())?
+        .build()?;
+    let bounded =
+        Package::from_bytes_with_options(&source, OpenOptions::new().source_limits(limits))?;
     let before = exact_bytes(&bounded)?;
     let error = bounded
         .edit_slide_chart_arrangement(0usize, 0usize)
@@ -1041,7 +1082,7 @@ fn arrangement_semantic_limits_fail_before_publication_and_output_limits_are_ato
     assert!(
         matches!(
             error,
-            ChartArrangementError::LimitExceeded {
+            ChartArrangementError::Limit {
                 kind: ChartArrangementLimitKind::OutputBytes,
                 ..
             }

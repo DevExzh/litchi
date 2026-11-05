@@ -11,6 +11,7 @@
 
 use litchi_opc::leniency::{ContentTypeDefect, Defect, RelationshipDefect, ToleranceReport};
 use litchi_opc::{OpcPackage, PackURI, SourceBackedPackage, TargetMode};
+use litchi_opc::{SourceCacheLimits, SourceLimits};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const CONTENT_TYPES: &str = r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>"#;
@@ -25,7 +26,8 @@ const STYLES: &str =
 
 /// Build a minimal package from the given manifests.
 fn package(content_types: &str, root_rels: &str, document_rels: &str) -> Vec<u8> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .unwrap();
@@ -47,9 +49,15 @@ fn package(content_types: &str, root_rels: &str, document_rels: &str) -> Vec<u8>
 /// Open `bytes` through every ingress path and return each path's report,
 /// asserting they agree.
 fn reports(bytes: &[u8]) -> ToleranceReport {
-    let eager = OpcPackage::from_bytes(bytes).expect("eager open");
-    let owned = OpcPackage::from_vec(bytes.to_vec()).expect("owned open");
-    let source = SourceBackedPackage::from_vec(bytes.to_vec()).expect("source-backed open");
+    let eager = OpcPackage::from_bytes(bytes, SourceLimits::default()).expect("eager open");
+    let owned = OpcPackage::from_vec(bytes.to_vec(), SourceLimits::default()).expect("owned open");
+    let source = SourceBackedPackage::from_vec(
+        bytes.to_vec(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .expect("source-backed open");
     let materialized = source.to_opc_package().expect("materialize");
 
     let report = eager.tolerance_report().clone();
@@ -93,12 +101,12 @@ fn new_packages_report_clean() {
 /// A repaired package still saves, and the saved package reopens with the
 /// same repairs recorded (an untouched manifest publishes its source bytes).
 fn assert_round_trips(bytes: &[u8]) {
-    let package = OpcPackage::from_bytes(bytes).expect("open");
+    let package = OpcPackage::from_bytes(bytes, SourceLimits::default()).expect("open");
     let mut saved = Vec::new();
     package
-        .to_stream(std::io::Cursor::new(&mut saved))
+        .write_to(std::io::Cursor::new(&mut saved))
         .expect("save");
-    let reopened = OpcPackage::from_bytes(&saved).expect("reopen");
+    let reopened = OpcPackage::from_bytes(&saved, SourceLimits::default()).expect("reopen");
     assert_eq!(reopened.tolerance_report(), package.tolerance_report());
 }
 
@@ -132,7 +140,7 @@ fn duplicate_relationship_id_keeps_the_first_and_is_recorded() {
     );
     assert_eq!(report.defects()[0].value(), Some("https://example.com/"));
 
-    let package = OpcPackage::from_bytes(&bytes).unwrap();
+    let package = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
     assert_eq!(
         relationship_type(&package, "/word/document.xml", "rId1").as_deref(),
         Some(STYLES_TYPE)
@@ -163,7 +171,7 @@ fn unresolvable_internal_targets_stay_dangling_and_are_recorded() {
     );
     assert!(report.iter().all(|t| t.part() == "/word/document.xml"));
 
-    let package = OpcPackage::from_bytes(&bytes).unwrap();
+    let package = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
     let document = package
         .get_part(&PackURI::new("/word/document.xml").unwrap())
         .unwrap();
@@ -219,7 +227,7 @@ fn target_mode_is_case_insensitive_and_unknown_modes_read_as_external() {
         ]
     );
 
-    let package = OpcPackage::from_bytes(&bytes).unwrap();
+    let package = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
     let document = package
         .get_part(&PackURI::new("/word/document.xml").unwrap())
         .unwrap();
@@ -276,7 +284,7 @@ fn relationships_without_target_or_type_are_skipped_and_recorded() {
         ]
     );
 
-    let package = OpcPackage::from_bytes(&bytes).unwrap();
+    let package = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
     let document = package
         .get_part(&PackURI::new("/word/document.xml").unwrap())
         .unwrap();
@@ -321,7 +329,7 @@ fn duplicate_content_type_mappings_keep_the_first_and_are_recorded() {
         ]
     );
 
-    let package = OpcPackage::from_bytes(&bytes).unwrap();
+    let package = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
     let content_type = |name: &str| {
         package
             .get_part(&PackURI::new(name).unwrap())
@@ -384,7 +392,7 @@ fn relationships_parts_declared_with_another_type_are_read_and_recorded() {
         ]
     );
 
-    let package = OpcPackage::from_bytes(&bytes).unwrap();
+    let package = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
     assert_eq!(
         relationship_type(&package, "/word/document.xml", "rId1").as_deref(),
         Some(STYLES_TYPE)
@@ -457,7 +465,7 @@ fn manifest_shape_deviations_are_ignored_and_recorded() {
         ]
     );
 
-    let package = OpcPackage::from_bytes(&bytes).unwrap();
+    let package = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
     assert_eq!(
         relationship_type(&package, "/word/document.xml", "rId1").as_deref(),
         Some(STYLES_TYPE)
@@ -505,7 +513,7 @@ fn content_type_grammar_deviations_are_kept_verbatim_and_recorded() {
         ]
     );
 
-    let package = OpcPackage::from_bytes(&bytes).unwrap();
+    let package = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
     assert_eq!(
         package
             .get_part(&PackURI::new("/word/document.xml").unwrap())
@@ -524,11 +532,17 @@ fn content_type_grammar_deviations_are_kept_verbatim_and_recorded() {
         ),
     ] {
         assert!(
-            OpcPackage::from_bytes(&package_bytes(&fatal)).is_err(),
+            OpcPackage::from_bytes(&package_bytes(&fatal), SourceLimits::default()).is_err(),
             "{fatal}"
         );
         assert!(
-            SourceBackedPackage::from_vec(package_bytes(&fatal)).is_err(),
+            SourceBackedPackage::from_vec(
+                package_bytes(&fatal),
+                SourceLimits::default(),
+                SourceCacheLimits::default(),
+                None
+            )
+            .is_err(),
             "{fatal}"
         );
     }
@@ -544,19 +558,49 @@ fn package_bytes(content_types: &str) -> Vec<u8> {
 #[test]
 fn structural_manifest_corruption_stays_fatal() {
     let unclosed = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="urn:x" Target="styles.xml">"#;
-    assert!(OpcPackage::from_bytes(&package(CONTENT_TYPES, ROOT_RELS, unclosed)).is_err());
+    assert!(
+        OpcPackage::from_bytes(
+            &package(CONTENT_TYPES, ROOT_RELS, unclosed),
+            SourceLimits::default()
+        )
+        .is_err()
+    );
     let no_id = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Type="urn:x" Target="styles.xml"/></Relationships>"#;
-    assert!(OpcPackage::from_bytes(&package(CONTENT_TYPES, ROOT_RELS, no_id)).is_err());
+    assert!(
+        OpcPackage::from_bytes(
+            &package(CONTENT_TYPES, ROOT_RELS, no_id),
+            SourceLimits::default()
+        )
+        .is_err()
+    );
     let ill_formed = r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"></Types>"#;
-    assert!(OpcPackage::from_bytes(&package(ill_formed, ROOT_RELS, DOCUMENT_RELS)).is_err());
+    assert!(
+        OpcPackage::from_bytes(
+            &package(ill_formed, ROOT_RELS, DOCUMENT_RELS),
+            SourceLimits::default()
+        )
+        .is_err()
+    );
     // A DTD, an unbound prefix, and a wrong document element stay fatal in
     // both manifests.
     let doctype_rels = format!("<!DOCTYPE Relationships>{DOCUMENT_RELS}");
     let unbound_rels = DOCUMENT_RELS.replace("</Relationships>", "<x:Ext/></Relationships>");
     for rels in [doctype_rels.as_str(), unbound_rels.as_str()] {
         let bytes = package(CONTENT_TYPES, ROOT_RELS, rels);
-        assert!(OpcPackage::from_bytes(&bytes).is_err(), "{rels}");
-        assert!(SourceBackedPackage::from_vec(bytes).is_err(), "{rels}");
+        assert!(
+            OpcPackage::from_bytes(&bytes, SourceLimits::default()).is_err(),
+            "{rels}"
+        );
+        assert!(
+            SourceBackedPackage::from_vec(
+                bytes,
+                SourceLimits::default(),
+                SourceCacheLimits::default(),
+                None
+            )
+            .is_err(),
+            "{rels}"
+        );
     }
     let doctype_types = format!("<!DOCTYPE Types>{CONTENT_TYPES}");
     let unbound_types = CONTENT_TYPES.replace("</Types>", "<x:Ext/></Types>");
@@ -565,8 +609,20 @@ fn structural_manifest_corruption_stays_fatal() {
         .replace("</Types>", "</Kinds>");
     for types in [doctype_types, unbound_types, wrong_root] {
         let bytes = package(&types, ROOT_RELS, DOCUMENT_RELS);
-        assert!(OpcPackage::from_bytes(&bytes).is_err(), "{types}");
-        assert!(SourceBackedPackage::from_vec(bytes).is_err(), "{types}");
+        assert!(
+            OpcPackage::from_bytes(&bytes, SourceLimits::default()).is_err(),
+            "{types}"
+        );
+        assert!(
+            SourceBackedPackage::from_vec(
+                bytes,
+                SourceLimits::default(),
+                SourceCacheLimits::default(),
+                None
+            )
+            .is_err(),
+            "{types}"
+        );
     }
 }
 
@@ -592,13 +648,13 @@ fn edited_packages_keep_source_content_types_verbatim_but_check_authored_ones() 
             .unwrap();
     };
 
-    let mut edited = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut edited = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
     add(&mut edited, "application/octet-stream");
     let mut saved = Vec::new();
     edited
-        .to_stream(std::io::Cursor::new(&mut saved))
+        .write_to(std::io::Cursor::new(&mut saved))
         .expect("a source content type admitted verbatim is carried forward");
-    let reopened = OpcPackage::from_bytes(&saved).unwrap();
+    let reopened = OpcPackage::from_bytes(&saved, SourceLimits::default()).unwrap();
     assert_eq!(reopened.tolerance_report(), edited.tolerance_report());
     assert_eq!(
         reopened
@@ -608,11 +664,11 @@ fn edited_packages_keep_source_content_types_verbatim_but_check_authored_ones() 
         format!("{MAIN}; charset=utf-8")
     );
 
-    let mut authored = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut authored = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
     add(&mut authored, "application/octet-stream; x=1");
     assert!(
         authored
-            .to_stream(std::io::Cursor::new(&mut Vec::new()))
+            .write_to(std::io::Cursor::new(&mut Vec::new()))
             .is_err()
     );
 }
@@ -643,7 +699,7 @@ fn non_xml_id_relationship_ids_are_kept_verbatim_and_recorded() {
         ]
     );
 
-    let package = OpcPackage::from_bytes(&bytes).unwrap();
+    let package = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
     assert_eq!(
         relationship_type(&package, "/word/document.xml", "1").as_deref(),
         Some(STYLES_TYPE)
@@ -656,10 +712,15 @@ fn non_xml_id_relationship_ids_are_kept_verbatim_and_recorded() {
             .get("a:b")
             .is_some_and(|relationship| relationship.target_mode() == TargetMode::External)
     );
-    let materialized = SourceBackedPackage::from_vec(bytes.clone())
-        .unwrap()
-        .to_opc_package()
-        .unwrap();
+    let materialized = SourceBackedPackage::from_vec(
+        bytes.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap()
+    .to_opc_package()
+    .unwrap();
     assert_eq!(
         relationship_type(&materialized, "/word/document.xml", "1").as_deref(),
         Some(STYLES_TYPE)
@@ -672,8 +733,20 @@ fn non_xml_id_relationship_ids_are_kept_verbatim_and_recorded() {
         rels.replace(r#"Id="1""#, r#"Id="1&#1;""#),
     ] {
         let bytes = package_with_rels(&fatal);
-        assert!(OpcPackage::from_bytes(&bytes).is_err(), "{fatal}");
-        assert!(SourceBackedPackage::from_vec(bytes).is_err(), "{fatal}");
+        assert!(
+            OpcPackage::from_bytes(&bytes, SourceLimits::default()).is_err(),
+            "{fatal}"
+        );
+        assert!(
+            SourceBackedPackage::from_vec(
+                bytes,
+                SourceLimits::default(),
+                SourceCacheLimits::default(),
+                None
+            )
+            .is_err(),
+            "{fatal}"
+        );
     }
 }
 
@@ -690,7 +763,7 @@ fn edited_relationships_keep_source_ids_verbatim_but_check_authored_ones() {
     let bytes = package_with_rels(&rels);
     let document = PackURI::new("/word/document.xml").unwrap();
 
-    let mut edited = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut edited = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
     edited
         .get_part_mut(&document)
         .unwrap()
@@ -704,13 +777,13 @@ fn edited_relationships_keep_source_ids_verbatim_but_check_authored_ones() {
         .unwrap();
     let relationships = edited.get_part(&document).unwrap().rels();
     relationships
-        .plan_canonical(litchi_opc::ReadLimits::default())
+        .plan_canonical(SourceLimits::default())
         .expect("a source Id admitted verbatim is carried forward");
     let mut saved = Vec::new();
     edited
-        .to_stream(std::io::Cursor::new(&mut saved))
+        .write_to(std::io::Cursor::new(&mut saved))
         .expect("save");
-    let reopened = OpcPackage::from_bytes(&saved).unwrap();
+    let reopened = OpcPackage::from_bytes(&saved, SourceLimits::default()).unwrap();
     assert_eq!(reopened.tolerance_report(), edited.tolerance_report());
     assert_eq!(
         relationship_type(&reopened, "/word/document.xml", "1").as_deref(),
@@ -728,11 +801,7 @@ fn edited_relationships_keep_source_ids_verbatim_but_check_authored_ones() {
             TargetMode::External,
         )
         .unwrap();
-    assert!(
-        authored
-            .plan_canonical(litchi_opc::ReadLimits::default())
-            .is_err()
-    );
+    assert!(authored.plan_canonical(SourceLimits::default()).is_err());
 }
 
 /// A source-backed topology edit re-reads the opened manifest under the same
@@ -744,12 +813,18 @@ fn source_backed_topology_edits_accept_admitted_ids_but_check_added_ones() {
 
     let document = PackURI::new("/word/document.xml").unwrap();
     let publish = |bytes: &[u8], plan: SourceTopologyPlan| {
-        let source = SourceBackedPackage::from_vec(bytes.to_vec()).unwrap();
+        let source = SourceBackedPackage::from_vec(
+            bytes.to_vec(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap();
         let mut output = Vec::new();
         source
             .write_topology_to_stream(&mut output, plan)
             .expect("publish");
-        OpcPackage::from_bytes(&output).unwrap()
+        OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap()
     };
 
     // Appending to and removing from a producer-formatted manifest.
@@ -812,4 +887,42 @@ fn source_backed_topology_edits_accept_admitted_ids_but_check_added_ones() {
             .try_add_external_relationship(document, "9", "urn:test", "https://example.test/")
             .is_err()
     );
+}
+
+#[test]
+fn prepared_materialization_retains_ingress_repairs_after_edit() {
+    let rels = DOCUMENT_RELS.replace("</Relationships>", r#"<Relationship Id="rId1" Type="http://example.invalid/duplicate" Target="ignored.xml"/></Relationships>"#);
+    for changed in [false, true] {
+        let source = SourceBackedPackage::from_vec(
+            package(CONTENT_TYPES, ROOT_RELS, &rels),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap();
+        let report = source.tolerance_report().clone();
+        assert!(!report.is_clean());
+        let mut plan = litchi_opc::SourceTopologyPlan::new();
+        if changed {
+            plan.try_replace_part(
+                PackURI::new("/word/document.xml").unwrap(),
+                b"<after/>".to_vec(),
+            )
+            .unwrap();
+        }
+        let candidate = source.prepare_topology(plan).unwrap();
+        let owned = candidate.to_opc_package().unwrap();
+        assert_eq!(owned.tolerance_report(), &report);
+        assert_eq!(
+            owned
+                .get_part(&PackURI::new("/word/document.xml").unwrap())
+                .unwrap()
+                .blob(),
+            if changed {
+                b"<after/>".as_slice()
+            } else {
+                DOCUMENT.as_bytes()
+            }
+        );
+    }
 }

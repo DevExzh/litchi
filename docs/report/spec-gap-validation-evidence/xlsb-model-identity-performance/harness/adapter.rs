@@ -253,8 +253,10 @@ fn capture_semantic_identity(package: &Package) -> Result<SemanticIdentity, Stri
     let part = snapshot
         .part()
         .ok_or_else(|| String::from("semantic identity requires a Data Model part"))?;
-    let storage = litchi_xldm::inspect_shared(part.bytes()).map_err(|error| error.to_string())?;
-    let metadata = litchi_xldm::metadata::inspect(&storage).map_err(|error| error.to_string())?;
+    let storage = litchi_xldm::inspect_shared(part.bytes(), &litchi_xldm::Limits::DEFAULT)
+        .map_err(|error| error.to_string())?;
+    let metadata = litchi_xldm::metadata::inspect(&storage, &litchi_xldm::Limits::DEFAULT)
+        .map_err(|error| error.to_string())?;
     let native = litchi_xldm::native::inspect(&storage, &metadata.native_parse_options())
         .map_err(|error| error.to_string())?;
     let generated = litchi_xldm::generated::inspect_system_generated(&storage)
@@ -854,8 +856,10 @@ fn neutral_open(fixture: &Fixture) -> Result<RunResult, String> {
         .get_part(&PackURI::new("/xl/model/item.data").map_err(|error| error.to_string())?)
         .map_err(|error| error.to_string())?
         .blob();
-    let storage = litchi_xldm::inspect_shared(model).map_err(|error| error.to_string())?;
-    let metadata = litchi_xldm::metadata::inspect(&storage).map_err(|error| error.to_string())?;
+    let storage = litchi_xldm::inspect_shared(model, &litchi_xldm::Limits::DEFAULT)
+        .map_err(|error| error.to_string())?;
+    let metadata = litchi_xldm::metadata::inspect(&storage, &litchi_xldm::Limits::DEFAULT)
+        .map_err(|error| error.to_string())?;
     let native = litchi_xldm::native::inspect(&storage, &metadata.native_parse_options())
         .map_err(|error| error.to_string())?;
     let generated = litchi_xldm::generated::inspect_system_generated(&storage)
@@ -1531,8 +1535,9 @@ fn capture_manifest(
     let model_uri = PackURI::new("/xl/model/item.data").map_err(|error| error.to_string())?;
     if let Ok(model_part) = package.opc_package().get_part(&model_uri) {
         let inner_result = (|| -> Result<(), String> {
-            let storage = litchi_xldm::inspect_shared(model_part.blob())
-                .map_err(|error| error.to_string())?;
+            let storage =
+                litchi_xldm::inspect_shared(model_part.blob(), &litchi_xldm::Limits::DEFAULT)
+                    .map_err(|error| error.to_string())?;
             for (index, entry) in storage.files.iter().enumerate() {
                 let bytes = storage
                     .file_stored_bytes(index)
@@ -1546,7 +1551,8 @@ fn capture_manifest(
                 // admitted table and relationship members.
                 mutable_inner_paths.insert(String::from("BackupLog"));
                 let metadata =
-                    litchi_xldm::metadata::inspect(&storage).map_err(|error| error.to_string())?;
+                    litchi_xldm::metadata::inspect(&storage, &litchi_xldm::Limits::DEFAULT)
+                        .map_err(|error| error.to_string())?;
                 let native =
                     litchi_xldm::native::inspect(&storage, &metadata.native_parse_options())
                         .map_err(|error| error.to_string())?;

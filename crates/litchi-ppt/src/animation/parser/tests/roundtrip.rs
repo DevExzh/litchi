@@ -13,7 +13,7 @@ fn round_trips_exact_animation_info_atoms_and_containers() {
     let atom = sample_legacy_atom();
     let bytes = write_animation_info_atom(&atom).unwrap();
     assert_eq!(bytes.len(), 36);
-    let (record, consumed) = Record::parse(&bytes, 0).unwrap();
+    let (record, consumed) = Record::parse(&bytes, 0, &crate::SourceLimits::default()).unwrap();
     assert_eq!(consumed, bytes.len());
     assert_eq!(parse_animation_info_atom(&record).unwrap(), atom);
 
@@ -21,7 +21,8 @@ fn round_trips_exact_animation_info_atoms_and_containers() {
     info.legacy_atom = Some(atom.clone());
     let (container, sound_ref) = write_animation_info(&info).unwrap();
     assert_eq!(sound_ref, 42);
-    let (container_record, container_consumed) = Record::parse(&container, 0).unwrap();
+    let (container_record, container_consumed) =
+        Record::parse(&container, 0, &crate::SourceLimits::default()).unwrap();
     assert_eq!(container_consumed, container.len());
     let parsed = parse_animation_info(&container_record).unwrap();
     assert_eq!(parsed.legacy_atom, Some(atom));
@@ -44,7 +45,7 @@ fn rejects_malformed_animation_info_atoms() {
     for &(offset, value) in mutations {
         let mut bytes = valid.clone();
         bytes[offset] = value;
-        let (record, _) = Record::parse(&bytes, 0).unwrap();
+        let (record, _) = Record::parse(&bytes, 0, &crate::SourceLimits::default()).unwrap();
         assert!(
             parse_animation_info_atom(&record).is_err(),
             "accepted mutation at byte {offset}"
@@ -53,7 +54,7 @@ fn rejects_malformed_animation_info_atoms() {
 
     let mut short = valid;
     short[4..8].copy_from_slice(&27u32.to_le_bytes());
-    let (record, _) = Record::parse(&short, 0).unwrap();
+    let (record, _) = Record::parse(&short, 0, &crate::SourceLimits::default()).unwrap();
     assert!(parse_animation_info_atom(&record).is_err());
 }
 

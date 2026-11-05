@@ -255,8 +255,8 @@ pub(crate) fn read(
     section: &Section,
     fields: Option<&FieldsTable>,
     limits: Limits,
-) -> std::result::Result<Option<UserDefinedHyperlinks>, litchi_cfb::OleError> {
-    user_defined::Properties::with_limits(section, limits)?
+) -> std::result::Result<Option<UserDefinedHyperlinks>, litchi_ole_common::Error> {
+    user_defined::Properties::new(section, limits)?
         .hyperlinks()
         .map(|value| value.map(|value| UserDefinedHyperlinks::from_shared(value, fields)))
 }
@@ -264,26 +264,19 @@ pub(crate) fn put(
     section: &mut Section,
     hyperlinks: &UserDefinedHyperlinks,
     limits: Limits,
-) -> std::result::Result<(), litchi_cfb::OleError> {
-    user_defined::Edit::with_limits(section, limits)?.set_hyperlinks(hyperlinks.canonical_shared())
+) -> std::result::Result<(), litchi_ole_common::Error> {
+    user_defined::Edit::new(section, limits)?.set_hyperlinks(hyperlinks.canonical_shared())
 }
 pub(crate) fn remove(
     section: &mut Section,
     limits: Limits,
-) -> std::result::Result<bool, litchi_cfb::OleError> {
-    Ok(user_defined::Edit::with_limits(section, limits)?.remove_hyperlinks())
+) -> std::result::Result<bool, litchi_ole_common::Error> {
+    Ok(user_defined::Edit::new(section, limits)?.remove_hyperlinks())
 }
 
-/// Reads contextualized `_PID_HLINKS` metadata with default overlay limits.
-pub fn from_user_defined_section(
-    section: &Section,
-    fields: Option<&FieldsTable>,
-) -> Result<Option<UserDefinedHyperlinks>> {
-    from_user_defined_section_with_limits(section, fields, Limits::default())
-}
 /// Reads contextualized `_PID_HLINKS` metadata with explicit overlay limits.
 /// Limits apply after generic property-set parsing to the reserved BLOB overlay.
-pub fn from_user_defined_section_with_limits(
+pub fn from_user_defined_section(
     section: &Section,
     fields: Option<&FieldsTable>,
     limits: Limits,
@@ -295,14 +288,14 @@ pub(crate) fn unchanged_with_unresolved_candidates(
     section: Option<&Section>,
     hyperlinks: &UserDefinedHyperlinks,
     limits: Limits,
-) -> std::result::Result<bool, litchi_cfb::OleError> {
+) -> std::result::Result<bool, litchi_ole_common::Error> {
     if !hyperlinks.has_unresolved_candidates() {
         return Ok(false);
     }
     let Some(section) = section else {
         return Ok(false);
     };
-    let current = user_defined::Properties::with_limits(section, limits)?.hyperlinks()?;
+    let current = user_defined::Properties::new(section, limits)?.hyperlinks()?;
     Ok(current.as_ref() == Some(&hyperlinks.source_shared()))
 }
 

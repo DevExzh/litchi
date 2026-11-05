@@ -48,15 +48,30 @@
 #![forbid(unsafe_code)]
 
 pub mod audio;
+pub mod body;
+pub mod bookmark;
+pub mod builder;
+pub mod chart;
+pub mod date_time;
 mod document;
 pub mod document_options;
 /// Combined document and footnote formatter settings.
 pub mod document_settings;
+pub mod drawable;
 mod drawable_order;
 pub mod footnote;
 pub mod header_footer;
 pub mod image;
+/// Exact-source transactions for the document properties (title, author,
+/// keywords, description).
+pub mod metadata {
+    pub use crate::package::metadata_edit::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+}
+mod limits;
 pub mod movie;
+pub mod number_attachment;
 mod package;
 pub mod page_layout;
 pub mod section;
@@ -64,14 +79,16 @@ pub mod selector;
 pub mod table;
 
 pub use document::{
-    Body, DEFAULT_MAX_TEXT_BYTES, Document, DocumentReadOptions, DocumentSourceLimitKind,
-    DocumentSourceLimits, DocumentSourceLimitsError, DocumentStats, Error, IoKind,
-    MAX_BODY_STORAGES, MAX_SECTIONS, ReadError, ReadLimitKind, Result, Root, SemanticLimitKind,
-    SemanticLimits, SemanticLimitsError,
+    Body, DEFAULT_MAX_TEXT_BYTES, Document, DocumentStats, Error, MAX_BODY_STORAGES, MAX_SECTIONS,
+    Result, Root,
 };
 pub use drawable_order::{BodyDrawableHandle, BodyDrawableSelector, DrawableLayerMove};
 pub use header_footer::{HeaderFooter, HeaderFooterSelector, Kind, Template};
 pub use image::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
+pub use limits::{
+    LimitKind, OpenOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsBuilder,
+    SourceLimitKind, SourceLimits, SourceLimitsBuilder,
+};
 pub use litchi_core::Position;
 pub use litchi_iwa_common::chart::arrangement::ChartArrangement;
 pub use litchi_iwa_common::chart::data::ChartData;
@@ -79,6 +96,7 @@ pub use litchi_iwa_common::chart::metadata::ChartMetadata;
 /// Maximum bytes retained for each canonical Pages metadata sidecar.
 pub use litchi_iwa_detect::MAX_PROPERTIES_BYTES as MAX_DOCUMENT_PROPERTIES_BYTES;
 pub use litchi_iwa_text::{TextPosition, TextSpan};
+pub use package::MergeReader;
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
 pub use package::{
@@ -100,104 +118,9 @@ pub use package::{
     __semantic_document_from_prepared_source, BodyStorageDiscovery,
 };
 pub use package::{
-    BodyChartArrangementCommit, BodyChartArrangementDiagnostics, BodyChartArrangementEdit,
-    BodyChartArrangementError, BodyChartArrangementLimitKind, BodyChartArrangementPatch,
-};
-pub use package::{
-    BodyChartDataCommit, BodyChartDataDiagnostics, BodyChartDataEdit, BodyChartDataError,
-    BodyChartDataLimitKind, BodyChartDataPatch,
-};
-pub use package::{BodyChartMetadataError, BodyChartMetadataLimitKind};
-pub use package::{
-    BodyDrawableOrderCommit, BodyDrawableOrderDiagnostics, BodyDrawableOrderEdit,
-    BodyDrawableOrderError, BodyDrawableOrderLimitKind, BodyDrawableOrderPatch,
-};
-pub use package::{
-    BodyFootnoteCommit, BodyFootnoteDiagnostics, BodyFootnoteEdit, BodyFootnoteError,
-    BodyFootnoteLimitKind, BodyFootnotePatch, BodyFootnoteSnapshot,
-};
-pub use package::{
-    BodyImageAdjustmentsCommit, BodyImageAdjustmentsDiagnostics, BodyImageAdjustmentsEdit,
-    BodyImageAdjustmentsError, BodyImageAdjustmentsLimitKind, BodyImageAdjustmentsPatch,
-};
-pub use package::{
-    BodyTableAppearanceCommit, BodyTableAppearanceDiagnostics, BodyTableAppearanceEdit,
-    BodyTableAppearanceError, BodyTableAppearanceLimitKind, BodyTableAppearancePatch,
-    BodyTableAppearancePath,
-};
-pub use package::{
-    BodyTableCatalog, BodyTableCatalogError, BodyTableCatalogLimitKind, BodyTableSnapshot,
-};
-pub use package::{BodyTableCellsError, BodyTableCellsLimitKind};
-pub use package::{
-    BodyTableDeletionCommit, BodyTableDeletionDiagnostics, BodyTableDeletionError,
-    BodyTableDeletionLimitKind, BodyTableDeletionPatch,
-};
-pub use package::{
-    BodyTableDimensionCommit, BodyTableDimensionDiagnostics, BodyTableDimensionEdit,
-    BodyTableDimensionError, BodyTableDimensionLimitKind, BodyTableDimensionPatch,
-};
-pub use package::{
-    BodyTableHeaderSettingsCommit, BodyTableHeaderSettingsDiagnostics, BodyTableHeaderSettingsEdit,
-    BodyTableHeaderSettingsError, BodyTableHeaderSettingsInvalidReason,
-    BodyTableHeaderSettingsLimitKind, BodyTableHeaderSettingsPatch,
-};
-pub use package::{
-    BodyTableHiddenAxesCommit, BodyTableHiddenAxesDiagnostics, BodyTableHiddenAxesEdit,
-    BodyTableHiddenAxesError, BodyTableHiddenAxesLimitKind, BodyTableHiddenAxesPatch,
-    BodyTableHiddenAxesPath,
-};
-pub use package::{
-    BodyTableLockCommit, BodyTableLockDiagnostics, BodyTableLockEdit, BodyTableLockError,
-    BodyTableLockLimitKind, BodyTableLockPatch,
-};
-pub use package::{
-    BodyTableMergesCommit, BodyTableMergesDiagnostics, BodyTableMergesEdit, BodyTableMergesError,
-    BodyTableMergesLimitKind, BodyTableMergesPatch, MergeReader,
-};
-pub use package::{
-    BodyTableNameCommit, BodyTableNameDiagnostics, BodyTableNameEdit, BodyTableNameError,
-    BodyTableNameLimitKind, BodyTableNamePatch, BodyTableNamePath,
-};
-pub use package::{
-    BodyTableSortCommit, BodyTableSortDiagnostics, BodyTableSortEdit, BodyTableSortError,
-    BodyTableSortLimitKind, BodyTableSortPatch, BodyTableSortPath,
-};
-pub use package::{
-    BodyTableTitleCommit, BodyTableTitleDiagnostics, BodyTableTitleEdit, BodyTableTitleError,
-    BodyTableTitleLimitKind, BodyTableTitlePatch,
-};
-pub use package::{
-    FootnoteTextCommit, FootnoteTextDiagnostics, FootnoteTextEdit, FootnoteTextError,
-    FootnoteTextLimitKind, FootnoteTextPatch,
-};
-pub use package::{
-    HeaderFooterTextCommit, HeaderFooterTextDiagnostics, HeaderFooterTextEdit,
-    HeaderFooterTextError, HeaderFooterTextLimitKind, HeaderFooterTextPatch,
-};
-pub use package::{
-    Limits, MAX_OBJECTS, Package, PackageError, PackageResult, SaveError, Stats, WriteError,
-};
-pub use package::{
-    PageLayoutCommit, PageLayoutDiagnostics, PageLayoutEdit, PageLayoutError, PageLayoutLimitKind,
-    PageLayoutPatch,
-};
-pub use package::{
-    SectionNameCommit, SectionNameDiagnostics, SectionNameEdit, SectionNameError,
-    SectionNameLimitKind, SectionNamePatch,
-};
-pub use package::{
-    SectionPaginationCommit, SectionPaginationDiagnostics, SectionPaginationEdit,
-    SectionPaginationError, SectionPaginationLimitKind, SectionPaginationPatch,
-};
-pub use package::{
-    SectionTextCommit, SectionTextDiagnostics, SectionTextEdit, SectionTextError,
-    SectionTextLimitKind, SectionTextPatch,
+    MAX_OBJECTS, Package, PackageError, PackageResult, SaveError, Stats, WriteError,
 };
 pub use section::{Section, SectionType};
-pub use selector::{BodyChartSelector, BodyTableSelector, ImageSelector};
+pub use selector::{BodyChartSelector, BodyTableSelector, DrawableSelector, ImageSelector};
 pub use selector::{SectionSelector, SelectorError, SelectorResult};
-pub use table::headers::Settings as BodyTableHeaderSettings;
-pub use table::lock::BodyTableLockState;
 pub use table::merge::Region;
-pub use table::name::{Error as BodyTableNameValueError, Name as BodyTableName};

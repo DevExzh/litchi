@@ -1,7 +1,7 @@
 //! Public Pages table deletion parity and exact-source transactions.
 #![cfg(feature = "pages")]
 
-use litchi::pages::{BodyTableDeletionError, BodyTableSelector, Package};
+use litchi::pages::{BodyTableSelector, Package, table::deletion::Error as BodyTableDeletionError};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -43,7 +43,9 @@ fn pages_deletion_preserves_survivors_and_supports_inverse() -> TestResult {
                 continue;
             }
             let committed = source
-                .remove_body_table(BodyTableSelector::index(position))
+                .edit_body_table_deletion()
+                .remove(BodyTableSelector::index(position))
+                .and_then(|edit| edit.commit())
                 .map_err(|error| format!("{name}, deletion of table {position}: {error}"))?;
             assert_eq!(
                 committed.removed_table(),
@@ -109,12 +111,22 @@ fn pages_deletion_refuses_missing_tables_and_incoming_formula_dependencies() -> 
     let bytes = FIXTURES.last().expect("cross-reference fixture").1;
     let source = Package::from_bytes(bytes)?;
     assert!(matches!(
-        source.remove_body_table(BodyTableSelector::index(0)),
-        Err(BodyTableDeletionError::UnsupportedDependency)
+        source
+            .edit_body_table_deletion()
+            .remove(BodyTableSelector::index(0))
+            .and_then(|edit| edit.commit()),
+        Err(BodyTableDeletionError::Refused(
+            litchi::pages::table::deletion::Refusal::UnsupportedDependency
+        ))
     ));
     assert!(matches!(
-        source.remove_body_table(BodyTableSelector::index(usize::MAX)),
-        Err(BodyTableDeletionError::TableNotFound)
+        source
+            .edit_body_table_deletion()
+            .remove(BodyTableSelector::index(usize::MAX))
+            .and_then(|edit| edit.commit()),
+        Err(BodyTableDeletionError::Refused(
+            litchi::pages::table::deletion::Refusal::TableNotFound
+        ))
     ));
     let mut unchanged = Vec::new();
     source.write_to(&mut unchanged)?;
@@ -128,16 +140,23 @@ fn pages_deletion_resolves_names_and_can_remove_the_last_table() -> TestResult {
     let source = Package::from_bytes(bytes)?;
     let catalog = source.body_tables()?;
     let selected = catalog.get(1).expect("second native table");
-    let first = source.remove_body_table(selected.name_selector())?;
+    let first = source
+        .edit_body_table_deletion()
+        .remove(selected.name_selector())
+        .and_then(|edit| edit.commit())?;
     assert_eq!(first.removed_table(), selected);
     let second = first
         .package()
-        .remove_body_table(BodyTableSelector::index(0))?;
+        .edit_body_table_deletion()
+        .remove(BodyTableSelector::index(0))
+        .and_then(|edit| edit.commit())?;
     assert!(second.package().body_tables()?.is_empty());
     assert!(
         second
             .package()
-            .remove_body_table(BodyTableSelector::index(0))
+            .edit_body_table_deletion()
+            .remove(BodyTableSelector::index(0))
+            .and_then(|edit| edit.commit())
             .is_err()
     );
 

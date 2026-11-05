@@ -584,8 +584,6 @@ checksum = "b7ac824320a75a52197e8f2d787f6a38b6718bb6897a35142d749af3c0e8f4fe"
 [[package]]
 name = "flate2"
 version = "1.1.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e634e2e0ebac1ee034020da1ca582e17ffe4e0f5e985823721e168928136dcb"
 dependencies = [
  "crc32fast",
  "zlib-rs",
@@ -900,8 +898,6 @@ checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
 name = "litchi"
 version = "0.0.1"
 dependencies = [
- "chrono",
- "fast-float2",
  "litchi-cfb",
  "litchi-core",
  "litchi-doc",
@@ -914,6 +910,7 @@ dependencies = [
  "litchi-ole-common",
  "litchi-ooxml-common",
  "litchi-opc",
+ "litchi-ops",
  "litchi-ppt",
  "litchi-pptx",
  "litchi-rtf",
@@ -957,6 +954,7 @@ dependencies = [
  "base64",
  "chrono",
  "fast-float2",
+ "libc",
  "once_cell",
  "rand 0.10.2",
  "serde",
@@ -1049,6 +1047,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "litchi-odb"
+version = "0.0.1"
+dependencies = [
+ "litchi-core",
+ "litchi-odf-common",
+ "quick-xml",
+ "serde_json",
+]
+
+[[package]]
+name = "litchi-odc"
+version = "0.0.1"
+dependencies = [
+ "litchi-core",
+ "litchi-odf-common",
+ "quick-xml",
+]
+
+[[package]]
 name = "litchi-odf-common"
 version = "0.0.1"
 dependencies = [
@@ -1075,9 +1092,48 @@ dependencies = [
  "signature",
  "soapberry-zip",
  "subtle",
+ "thiserror",
  "x509-cert",
  "xml-minifier",
  "zeroize",
+]
+
+[[package]]
+name = "litchi-odf-formula"
+version = "0.0.1"
+dependencies = [
+ "litchi-core",
+ "litchi-odf-common",
+ "quick-xml",
+]
+
+[[package]]
+name = "litchi-odg"
+version = "0.0.1"
+dependencies = [
+ "litchi-core",
+ "litchi-odf-common",
+ "quick-xml",
+ "serde_json",
+]
+
+[[package]]
+name = "litchi-odi"
+version = "0.0.1"
+dependencies = [
+ "litchi-core",
+ "litchi-odf-common",
+ "quick-xml",
+]
+
+[[package]]
+name = "litchi-odm"
+version = "0.0.1"
+dependencies = [
+ "litchi-core",
+ "litchi-odf-common",
+ "quick-xml",
+ "serde_json",
 ]
 
 [[package]]
@@ -1099,6 +1155,7 @@ name = "litchi-odraw"
 version = "0.0.1"
 dependencies = [
  "bitflags",
+ "litchi-core",
  "zerocopy",
  "zerocopy-derive",
 ]
@@ -1214,6 +1271,62 @@ dependencies = [
 ]
 
 [[package]]
+name = "litchi-ops"
+version = "0.0.1"
+dependencies = [
+ "base64",
+ "caseless",
+ "chrono",
+ "litchi-biff",
+ "litchi-cfb",
+ "litchi-core",
+ "litchi-crypto",
+ "litchi-doc",
+ "litchi-docx",
+ "litchi-drawingml",
+ "litchi-odb",
+ "litchi-odc",
+ "litchi-odf-common",
+ "litchi-odf-formula",
+ "litchi-odg",
+ "litchi-odi",
+ "litchi-odm",
+ "litchi-odp",
+ "litchi-ods",
+ "litchi-odt",
+ "litchi-ograph",
+ "litchi-ole-common",
+ "litchi-ooxml-common",
+ "litchi-opc",
+ "litchi-oth",
+ "litchi-ppt",
+ "litchi-pptx",
+ "litchi-rtf",
+ "litchi-sheet-text",
+ "litchi-sign",
+ "litchi-vba",
+ "litchi-xls",
+ "litchi-xlsb",
+ "litchi-xlsx",
+ "memchr",
+ "quick-xml",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "soapberry-zip",
+ "unicode-normalization",
+]
+
+[[package]]
+name = "litchi-oth"
+version = "0.0.1"
+dependencies = [
+ "litchi-core",
+ "litchi-odf-common",
+ "quick-xml",
+]
+
+[[package]]
 name = "litchi-perf-baseline"
 version = "0.1.0"
 dependencies = [
@@ -1223,6 +1336,7 @@ dependencies = [
  "litchi-crypto",
  "litchi-doc",
  "litchi-docx",
+ "litchi-drawingml",
  "litchi-odf-common",
  "litchi-odp",
  "litchi-odraw",
@@ -1231,10 +1345,12 @@ dependencies = [
  "litchi-ole-common",
  "litchi-ooxml-common",
  "litchi-opc",
+ "litchi-ops",
  "litchi-ppt",
  "litchi-pptx",
  "litchi-rtf",
  "litchi-sign",
+ "litchi-vba",
  "litchi-xls",
  "litchi-xlsb",
  "litchi-xlsx",
@@ -1264,6 +1380,8 @@ dependencies = [
  "once_cell",
  "quick-xml",
  "serde_json",
+ "sha2 0.11.0",
+ "siphasher",
  "url",
  "zerocopy",
  "zerocopy-derive",
@@ -1282,6 +1400,7 @@ dependencies = [
  "litchi-drawingml",
  "litchi-ooxml-common",
  "litchi-opc",
+ "memchr",
  "quick-xml",
  "rand 0.10.2",
  "sha2 0.11.0",
@@ -1310,6 +1429,15 @@ name = "litchi-sheet"
 version = "0.0.1"
 dependencies = [
  "litchi-core",
+ "thiserror",
+]
+
+[[package]]
+name = "litchi-sheet-text"
+version = "0.0.1"
+dependencies = [
+ "litchi-core",
+ "litchi-sheet",
  "thiserror",
 ]
 
@@ -1366,6 +1494,7 @@ name = "litchi-xls"
 version = "0.0.1"
 dependencies = [
  "bitflags",
+ "caseless",
  "chrono",
  "litchi-biff",
  "litchi-cfb",
@@ -1379,6 +1508,7 @@ dependencies = [
  "litchi-vba",
  "rand 0.10.2",
  "serde_json",
+ "unicode-normalization",
  "zerocopy",
  "zeroize",
 ]
@@ -1398,6 +1528,7 @@ dependencies = [
  "litchi-xldm",
  "once_cell",
  "quick-xml",
+ "sha2 0.11.0",
  "thiserror",
 ]
 
@@ -1422,6 +1553,7 @@ dependencies = [
  "quick-xml",
  "ryu",
  "serde_json",
+ "sha2 0.11.0",
  "smallvec",
  "thiserror",
  "unicode-normalization",
@@ -1955,9 +2087,9 @@ dependencies = [
 
 [[package]]
 name = "siphasher"
-version = "1.0.3"
+version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ee5873ec9cce0195efcb7a4e9507a04cd49aec9c83d0389df45b1ef7ba2e649"
+checksum = "33f4fe9184a62d842c9ef383018f3306d8ba224fd9d836f56d7288308847c256"
 
 [[package]]
 name = "slab"
@@ -2470,9 +2602,7 @@ dependencies = [
 
 [[package]]
 name = "zlib-rs"
-version = "0.6.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34b31d188d9d685a4f9c7b46d6e36631b07058d2cfe190267adce54dc230bf12"
+version = "0.6.8"
 
 [[package]]
 name = "zmij"

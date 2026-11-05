@@ -34,16 +34,6 @@ impl fmt::Debug for LogicalSourceCatalog {
 }
 
 impl LogicalSourceCatalog {
-    /// Admit frozen logical entries under the default physical profile.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when an entry name or payload is unsafe, ambiguous,
-    /// encrypted, malformed, or exceeds a configured resource ceiling.
-    pub fn from_frozen_entries(entries: FrozenEntryStore) -> Result<Self> {
-        Self::from_frozen_entries_with_limits(entries, Limits::default())
-    }
-
     /// Admit frozen logical entries under explicit physical limits.
     ///
     /// Names must already be exact, portable slash-separated member names.
@@ -52,11 +42,9 @@ impl LogicalSourceCatalog {
     ///
     /// # Errors
     ///
-    /// Returns the same errors as [`Self::from_frozen_entries`].
-    pub fn from_frozen_entries_with_limits(
-        entries: FrozenEntryStore,
-        limits: Limits,
-    ) -> Result<Self> {
+    /// Returns an error when an entry name or payload is unsafe, ambiguous,
+    /// encrypted, malformed, or exceeds a configured resource ceiling.
+    pub fn from_frozen_entries(entries: FrozenEntryStore, limits: Limits) -> Result<Self> {
         let checked_limits = limits.validate()?;
         let component_capacity = admit_entries(&entries, checked_limits)?;
         let components = ComponentCatalog::from_validated_logical_entries(
@@ -214,12 +202,18 @@ mod tests {
                         type_: message_type,
                         data: Vec::new(),
                     }],
+                    Default::default(),
                 )
                 .expect("valid test archive object"),
             ],
         };
-        SnappyStream::compress(&archive.to_bytes().expect("encode test archive"))
-            .expect("compress test archive")
+        SnappyStream::compress(
+            &archive
+                .to_bytes(Default::default())
+                .expect("encode test archive"),
+            Default::default(),
+        )
+        .expect("compress test archive")
     }
 
     fn frozen(entries: Vec<(&str, Vec<u8>)>) -> FrozenEntryStore {
@@ -260,10 +254,11 @@ mod tests {
             ("Index/Document.iwa", document.clone()),
             ("Data/image.png", vec![1, 2, 3]),
         ]);
-        let logical =
-            LogicalSourceCatalog::from_frozen_entries(entries).expect("valid logical snapshot");
+        let logical = LogicalSourceCatalog::from_frozen_entries(entries, Default::default())
+            .expect("valid logical snapshot");
 
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer
             .write_stored("Index/CalculationEngine.iwa", &calculation)
             .expect("write calculation component");
@@ -276,9 +271,11 @@ mod tests {
         writer
             .write_stored("Data/image.png", &[1, 2, 3])
             .expect("write sidecar");
-        let direct =
-            ComponentCatalog::from_bytes(&writer.finish_to_bytes().expect("finish test ZIP"))
-                .expect("parse direct ZIP");
+        let direct = ComponentCatalog::from_bytes(
+            &writer.finish_to_bytes().expect("finish test ZIP"),
+            Default::default(),
+        )
+        .expect("parse direct ZIP");
 
         let logical_names = logical
             .components()
@@ -311,7 +308,7 @@ mod tests {
             .replace_data(0, b"mutated after freeze".to_vec())
             .expect("replace mutable entry");
 
-        let logical = LogicalSourceCatalog::from_frozen_entries(snapshot)
+        let logical = LogicalSourceCatalog::from_frozen_entries(snapshot, Default::default())
             .expect("frozen source remains valid");
         let retained_pointer = logical
             .entries()
@@ -326,14 +323,11 @@ mod tests {
     #[test]
     fn validates_exact_and_one_over_entry_payload_and_metadata_limits() {
         let one = frozen(vec![("Index/sidecar", vec![1, 2, 3, 4])]);
-        LogicalSourceCatalog::from_frozen_entries_with_limits(one.clone(), limits(1024, 1, 4, 4))
+        LogicalSourceCatalog::from_frozen_entries(one.clone(), limits(1024, 1, 4, 4))
             .expect("exact logical limits");
 
-        let error = LogicalSourceCatalog::from_frozen_entries_with_limits(
-            one.clone(),
-            limits(1024, 1, 3, 4),
-        )
-        .expect_err("one-over entry limit");
+        let error = LogicalSourceCatalog::from_frozen_entries(one.clone(), limits(1024, 1, 3, 4))
+            .expect_err("one-over entry limit");
         assert!(matches!(
             error,
             Error::Limit {
@@ -343,9 +337,8 @@ mod tests {
             }
         ));
 
-        let error =
-            LogicalSourceCatalog::from_frozen_entries_with_limits(one, limits(1024, 1, 4, 3))
-                .expect_err("one-over total limit");
+        let error = LogicalSourceCatalog::from_frozen_entries(one, limits(1024, 1, 4, 3))
+            .expect_err("one-over total limit");
         assert!(matches!(
             error,
             Error::Limit {
@@ -356,13 +349,10 @@ mod tests {
         ));
 
         let two = frozen(vec![("a", Vec::new()), ("b", Vec::new())]);
-        LogicalSourceCatalog::from_frozen_entries_with_limits(two.clone(), limits(2, 2, 1, 1))
+        LogicalSourceCatalog::from_frozen_entries(two.clone(), limits(2, 2, 1, 1))
             .expect("exact entry-count and metadata limits");
-        let error = LogicalSourceCatalog::from_frozen_entries_with_limits(
-            two.clone(),
-            limits(1024, 1, 1, 1),
-        )
-        .expect_err("one-over entry count");
+        let error = LogicalSourceCatalog::from_frozen_entries(two.clone(), limits(1024, 1, 1, 1))
+            .expect_err("one-over entry count");
         assert!(matches!(
             error,
             Error::Limit {
@@ -372,7 +362,7 @@ mod tests {
             }
         ));
 
-        let error = LogicalSourceCatalog::from_frozen_entries_with_limits(two, limits(1, 2, 1, 1))
+        let error = LogicalSourceCatalog::from_frozen_entries(two, limits(1, 2, 1, 1))
             .expect_err("aggregate name metadata exceeds profile");
         assert!(matches!(
             error,
@@ -384,14 +374,10 @@ mod tests {
         ));
 
         let exact_name = frozen(vec![("ab", Vec::new())]);
-        LogicalSourceCatalog::from_frozen_entries_with_limits(
-            exact_name.clone(),
-            limits(2, 1, 1, 1),
-        )
-        .expect("exact member-name limit");
-        let error =
-            LogicalSourceCatalog::from_frozen_entries_with_limits(exact_name, limits(1, 1, 1, 1))
-                .expect_err("one-over member-name limit");
+        LogicalSourceCatalog::from_frozen_entries(exact_name.clone(), limits(2, 1, 1, 1))
+            .expect("exact member-name limit");
+        let error = LogicalSourceCatalog::from_frozen_entries(exact_name, limits(1, 1, 1, 1))
+            .expect_err("one-over member-name limit");
         assert!(matches!(
             error,
             Error::Limit {
@@ -405,7 +391,7 @@ mod tests {
     #[test]
     fn does_not_reinterpret_input_limit_as_logical_payload_limit() {
         let entries = frozen(vec![("a", vec![0; 32])]);
-        LogicalSourceCatalog::from_frozen_entries_with_limits(entries, limits(1, 1, 32, 32))
+        LogicalSourceCatalog::from_frozen_entries(entries, limits(1, 1, 32, 32))
             .expect("logical payload is governed by expanded limits");
     }
 
@@ -420,20 +406,29 @@ mod tests {
             "Index\\Document.iwa",
             "C:/Index/Document.iwa",
         ] {
-            let error = LogicalSourceCatalog::from_frozen_entries(frozen(vec![(name, Vec::new())]))
-                .expect_err("unsafe logical name");
+            let error = LogicalSourceCatalog::from_frozen_entries(
+                frozen(vec![(name, Vec::new())]),
+                Default::default(),
+            )
+            .expect_err("unsafe logical name");
             assert!(matches!(error, Error::InvalidBundle(_)), "{name:?}");
         }
 
         for name in ["Index.zip", "nested/Index.zip"] {
-            let error = LogicalSourceCatalog::from_frozen_entries(frozen(vec![(name, Vec::new())]))
-                .expect_err("unexpanded nested index");
+            let error = LogicalSourceCatalog::from_frozen_entries(
+                frozen(vec![(name, Vec::new())]),
+                Default::default(),
+            )
+            .expect_err("unexpanded nested index");
             assert!(matches!(error, Error::InvalidBundle(_)));
         }
 
         for name in [".iwpv2", "Metadata/.iwph"] {
-            let error = LogicalSourceCatalog::from_frozen_entries(frozen(vec![(name, Vec::new())]))
-                .expect_err("encrypted marker");
+            let error = LogicalSourceCatalog::from_frozen_entries(
+                frozen(vec![(name, Vec::new())]),
+                Default::default(),
+            )
+            .expect_err("encrypted marker");
             assert!(matches!(error, Error::Encrypted));
         }
     }

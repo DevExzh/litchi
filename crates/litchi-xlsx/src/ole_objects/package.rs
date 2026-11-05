@@ -194,7 +194,7 @@ pub fn load_ole_objects(
 }
 
 /// Adds a new OLE collection and its inert relationships to one worksheet.
-pub fn store_ole_objects(
+pub(crate) fn store_ole_objects(
     package: &mut OpcPackage,
     worksheet_name: &PackURI,
     value: &OleObjects,

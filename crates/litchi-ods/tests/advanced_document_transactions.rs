@@ -5,15 +5,14 @@ use std::{fs, path::Path};
 use litchi_core::{MergeChoice, Result};
 use litchi_odf_common::{chart::ChartClass, core::OwnedPackage};
 use litchi_ods::{
-    Builder, Cell, CellValue, Row, Sheet, Spreadsheet,
+    Builder, Cell, CellValue, Package, Row, Sheet,
     document::{
         BoundFormControl, CellProperties, CellStyle, CellStyleNode, ChartObject, Collision,
         DataStyleNode, Drawing, DrawingFrame, DrawingGeometry, DrawingGeometryKind, DrawingPoint,
         DrawingPolygon, EncryptionProfile, EncryptionWriteCapability, EncryptionWritePolicy,
         EncryptionWriteRefusal, FormControl, FormControlKind, FormEvent, History, JoinFailure,
         NumberStyleNode, Resource, RichFormControl, RichRun, RichText, SecurityCapability,
-        SecurityWritePolicy, SignatureWritePolicy, Snapshot, StyleGraph, TextProperties,
-        TextStyleNode,
+        SecurityWritePolicy, SignatureWritePolicy, StyleGraph, TextProperties, TextStyleNode,
     },
     model::{
         conditional_format::{Condition, Format},
@@ -31,7 +30,7 @@ fn compact_source() -> Result<Vec<u8>> {
         0,
         Cell::new(CellValue::Text("seed".to_string()), "seed"),
     )?;
-    builder.build()
+    Ok(builder.build()?.to_bytes()?)
 }
 
 fn deep_style_graph() -> StyleGraph {
@@ -106,16 +105,16 @@ fn deep_style_graph() -> StyleGraph {
 #[test]
 fn automatic_style_replace_remove_and_package_resolution_are_durable() -> Result<()> {
     let source = compact_source()?;
-    let snapshot = Snapshot::from_bytes(source)?;
+    let snapshot = Package::from_bytes(&source)?;
     let security = snapshot.security_capabilities()?;
     assert_eq!(security.decrypt, SecurityCapability::NotApplicable);
     assert_eq!(security.reencrypt, SecurityCapability::NotApplicable);
     assert_eq!(security.encrypt, SecurityCapability::Available);
     assert_eq!(security.sign, SecurityCapability::RefusedUnsupported);
-    let mut create = snapshot.edit();
+    let mut create = snapshot.edit()?;
     create.put_style_graph(&deep_style_graph())?;
     let created = create.commit()?;
-    let effective = created.snapshot().effective_cell_style("MoneyInput")?;
+    let effective = created.package().effective_cell_style("MoneyInput")?;
     assert_eq!(
         effective.lineage,
         vec!["BaseInput".to_string(), "MoneyInput".to_string()]
@@ -130,7 +129,8 @@ fn automatic_style_replace_remove_and_package_resolution_are_durable() -> Result
         "<number:boolean-style",
     ] {
         assert!(
-            Spreadsheet::from_bytes(created.snapshot().as_bytes().to_vec())?
+            Package::from_bytes(created.package().as_bytes())?
+                .workbook()?
                 .content_xml()
                 .contains(element)
         );
@@ -148,7 +148,7 @@ fn automatic_style_replace_remove_and_package_resolution_are_durable() -> Result
     ]
     .map(str::to_string)
     .to_vec();
-    let mut referenced = created.snapshot().edit();
+    let mut referenced = created.package().edit()?;
     referenced.set_cell_style("Data", 0, 0, "MoneyInput")?;
     let referenced_before = referenced.as_bytes().to_vec();
     assert!(referenced.remove_automatic_styles(&names).is_err());
@@ -157,26 +157,25 @@ fn automatic_style_replace_remove_and_package_resolution_are_durable() -> Result
     let mut replacement = deep_style_graph();
     replacement.cell_styles[1].cell.background = Some("#cceeff".to_string());
     replacement.cell_styles[1].text.bold = Some(true);
-    let mut replace = created.snapshot().edit();
+    let mut replace = created.package().edit()?;
     replace.replace_style_graph(&replacement)?;
     let replaced = replace.commit()?;
-    let effective = replaced.snapshot().effective_cell_style("MoneyInput")?;
+    let effective = replaced.package().effective_cell_style("MoneyInput")?;
     assert_eq!(effective.cell.background.as_deref(), Some("#cceeff"));
     assert_eq!(effective.text.bold, Some(true));
     assert_eq!(
         replaced
-            .patch()
-            .inverse()
-            .apply(replaced.snapshot())?
-            .snapshot()
+            .package()
+            .apply(&replaced.patch().inverse())?
+            .into_package()
             .as_bytes(),
-        created.snapshot().as_bytes()
+        created.package().as_bytes()
     );
 
-    let mut remove = replaced.snapshot().edit();
+    let mut remove = replaced.package().edit()?;
     remove.remove_automatic_styles(&names)?;
     let removed = remove.commit()?;
-    let reopened = Spreadsheet::from_bytes(removed.snapshot().as_bytes().to_vec())?;
+    let reopened = Package::from_bytes(removed.package().as_bytes())?.workbook()?;
     for name in names {
         assert!(
             !reopened
@@ -186,7 +185,7 @@ fn automatic_style_replace_remove_and_package_resolution_are_durable() -> Result
     }
     assert!(
         removed
-            .snapshot()
+            .package()
             .effective_cell_style("MoneyInput")
             .is_err()
     );
@@ -201,7 +200,7 @@ fn package_style_resolution_crosses_common_and_automatic_parts() -> Result<()> {
         ("content.xml", content, "text/xml"),
         ("styles.xml", styles, "text/xml"),
     ]);
-    let snapshot = Snapshot::from_bytes(package)?;
+    let snapshot = Package::from_bytes(&package)?;
     let effective = snapshot.effective_cell_style("AutoChild")?;
     assert_eq!(
         effective.lineage,
@@ -218,7 +217,7 @@ fn package_style_resolution_crosses_common_and_automatic_parts() -> Result<()> {
         ("content.xml", content, "text/xml"),
         ("styles.xml", duplicated_styles.as_bytes(), "text/xml"),
     ]);
-    if let Ok(invalid) = Snapshot::from_bytes(invalid_bytes) {
+    if let Ok(invalid) = Package::from_bytes(&invalid_bytes) {
         assert!(invalid.effective_cell_style("AutoChild").is_err());
     }
     Ok(())
@@ -227,7 +226,7 @@ fn package_style_resolution_crosses_common_and_automatic_parts() -> Result<()> {
 #[test]
 fn terminal_encryption_is_bounded_machine_readable_and_password_reopenable() -> Result<()> {
     let source = compact_source()?;
-    let snapshot = Snapshot::from_bytes(source.clone())?;
+    let snapshot = Package::from_bytes(&source)?;
     assert_eq!(
         snapshot.encryption_write_capability(SignatureWritePolicy::Refuse)?,
         EncryptionWriteCapability::Available
@@ -239,10 +238,15 @@ fn terminal_encryption_is_bounded_machine_readable_and_password_reopenable() -> 
     );
     let encrypted =
         snapshot.encrypt_to_bytes("ods-test-password", EncryptionProfile::Compatible)?;
-    assert!(Snapshot::from_bytes(encrypted.clone()).is_err());
-    assert!(Spreadsheet::from_bytes_with_password(encrypted.clone(), "wrong-password").is_err());
-    let reopened = Spreadsheet::from_bytes_with_password(encrypted.clone(), "ods-test-password")?;
-    let original = Spreadsheet::from_bytes(source)?;
+    assert!(Package::from_bytes(&encrypted).is_err());
+    assert!(
+        Package::from_bytes_with_password(&encrypted, "wrong-password")
+            .and_then(|package| package.workbook())
+            .is_err()
+    );
+    let reopened =
+        Package::from_bytes_with_password(&encrypted, "ods-test-password")?.workbook()?;
+    let original = Package::from_bytes(&source)?.workbook()?;
     assert_eq!(reopened.content_xml(), original.content_xml());
     let archive = OwnedPackage::from_bytes_with_password(encrypted, "ods-test-password")?;
     assert!(archive.package()?.manifest().has_encrypted_entries());
@@ -252,8 +256,8 @@ fn terminal_encryption_is_bounded_machine_readable_and_password_reopenable() -> 
 #[test]
 fn rich_form_vocabulary_and_drawing_geometry_reopen_durably() -> Result<()> {
     let source = compact_source()?;
-    let snapshot = Snapshot::from_bytes(source.clone())?;
-    let mut edit = snapshot.edit();
+    let snapshot = Package::from_bytes(&source)?;
+    let mut edit = snapshot.edit()?;
     let mut controls = vec![
         RichFormControl {
             id: "choice".to_string(),
@@ -405,7 +409,7 @@ fn rich_form_vocabulary_and_drawing_geometry_reopen_durably() -> Result<()> {
         )?;
     }
     let commit = edit.commit()?;
-    let reopened = Spreadsheet::from_bytes(commit.snapshot().as_bytes().to_vec())?;
+    let reopened = Package::from_bytes(commit.package().as_bytes())?.workbook()?;
     for expected in [
         "<form:radio",
         "<form:date",
@@ -438,10 +442,9 @@ fn rich_form_vocabulary_and_drawing_geometry_reopen_durably() -> Result<()> {
     }
     assert_eq!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.snapshot())?
-            .snapshot()
+            .package()
+            .apply(&commit.patch().inverse())?
+            .into_package()
             .as_bytes(),
         source
     );
@@ -451,8 +454,8 @@ fn rich_form_vocabulary_and_drawing_geometry_reopen_durably() -> Result<()> {
 #[test]
 fn deep_style_form_drawing_and_chart_dependencies_are_atomic_and_durable() -> Result<()> {
     let source = compact_source()?;
-    let snapshot = Snapshot::from_bytes(source.clone())?;
-    let mut edit = snapshot.edit();
+    let snapshot = Package::from_bytes(&source)?;
+    let mut edit = snapshot.edit()?;
     let rich = RichText::new(vec![vec![
         RichRun::Text("Total ".to_string()),
         RichRun::Span {
@@ -501,7 +504,7 @@ fn deep_style_form_drawing_and_chart_dependencies_are_atomic_and_durable() -> Re
     )?;
 
     let commit = edit.commit()?;
-    let reopened = Spreadsheet::from_bytes(commit.snapshot().as_bytes().to_vec())?;
+    let reopened = Package::from_bytes(commit.package().as_bytes())?.workbook()?;
     let charts = reopened.charts()?;
     assert_eq!(charts.len(), 1);
     assert!(charts.named("SalesChart")?.is_some());
@@ -520,20 +523,19 @@ fn deep_style_form_drawing_and_chart_dependencies_are_atomic_and_durable() -> Re
         "Pictures/frame.png",
         "Object_1/content.xml",
     ] {
-        assert!(commit.snapshot().resource(path)?.is_some());
+        assert!(commit.package().resource(path)?.is_some());
     }
     let wire = commit.patch().to_deterministic_json()?;
     let decoded = litchi_ods::document::Patch::from_deterministic_json(&wire, snapshot.limits())?;
     assert_eq!(
-        decoded.apply(&snapshot)?.snapshot().as_bytes(),
-        commit.snapshot().as_bytes()
+        snapshot.apply(&decoded)?.into_package().as_bytes(),
+        commit.package().as_bytes()
     );
     assert_eq!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.snapshot())?
-            .snapshot()
+            .package()
+            .apply(&commit.patch().inverse())?
+            .into_package()
             .as_bytes(),
         source
     );
@@ -542,8 +544,8 @@ fn deep_style_form_drawing_and_chart_dependencies_are_atomic_and_durable() -> Re
 
 #[test]
 fn deep_dependency_failures_leave_the_candidate_unchanged() -> Result<()> {
-    let snapshot = Snapshot::from_bytes(compact_source()?)?;
-    let mut edit = snapshot.edit();
+    let snapshot = Package::from_bytes(&compact_source()?)?;
+    let mut edit = snapshot.edit()?;
     let before = edit.as_bytes().to_vec();
     let unresolved_rich = RichText::new(vec![vec![RichRun::Span {
         text: "unresolved".to_string(),
@@ -667,8 +669,8 @@ fn deep_dependency_failures_leave_the_candidate_unchanged() -> Result<()> {
 #[test]
 fn unified_advanced_crud_reopens_and_is_durable() -> Result<()> {
     let source = compact_source()?;
-    let snapshot = Snapshot::from_bytes(source.clone())?;
-    let mut edit = snapshot.edit();
+    let snapshot = Package::from_bytes(&source)?;
+    let mut edit = snapshot.edit()?;
     edit.put_cell_style(&CellStyle {
         name: "Emphasis".to_string(),
         background: Some("#ffeeaa".to_string()),
@@ -737,7 +739,7 @@ fn unified_advanced_crud_reopens_and_is_durable() -> Result<()> {
     );
 
     let commit = edit.commit()?;
-    let reopened = Spreadsheet::from_bytes(commit.snapshot().as_bytes().to_vec())?;
+    let reopened = Package::from_bytes(commit.package().as_bytes())?.workbook()?;
     assert_eq!(reopened.sheets().len(), 2);
     assert!(reopened.content_xml().contains("<text:span"));
     assert!(
@@ -748,21 +750,20 @@ fn unified_advanced_crud_reopens_and_is_durable() -> Result<()> {
     assert!(reopened.content_xml().contains("<calcext:sparkline-groups"));
     assert!(reopened.content_xml().contains("<office:forms"));
     assert!(reopened.content_xml().contains("RevenueImage"));
-    assert!(commit.snapshot().resource("Pictures/chart.bin")?.is_some());
+    assert!(commit.package().resource("Pictures/chart.bin")?.is_some());
     assert_eq!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.snapshot())?
-            .snapshot()
+            .package()
+            .apply(&commit.patch().inverse())?
+            .into_package()
             .as_bytes(),
         source
     );
     let wire = commit.patch().to_deterministic_json()?;
     let decoded = litchi_ods::document::Patch::from_deterministic_json(&wire, snapshot.limits())?;
     assert_eq!(
-        decoded.apply(&snapshot)?.snapshot().as_bytes(),
-        commit.snapshot().as_bytes()
+        snapshot.apply(&decoded)?.into_package().as_bytes(),
+        commit.package().as_bytes()
     );
     Ok(())
 }
@@ -772,14 +773,15 @@ fn real_calc_pretty_xml_keeps_source_formatting_outside_splice() -> Result<()> {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/odf/corpus/calc-two-sheets.ods");
     let source = fs::read(path)?;
-    let snapshot = Snapshot::from_bytes(source)?;
-    let before = Spreadsheet::from_bytes(snapshot.as_bytes().to_vec())?
+    let snapshot = Package::from_bytes(&source)?;
+    let before = Package::from_bytes(snapshot.as_bytes())?
+        .workbook()?
         .content_xml()
         .to_string();
-    let mut edit = snapshot.edit();
+    let mut edit = snapshot.edit()?;
     edit.set_cell_formula("sheet1", 0, 0, "of:=1+2")?;
     let commit = edit.commit()?;
-    let reopened = Spreadsheet::from_bytes(commit.snapshot().as_bytes().to_vec())?;
+    let reopened = Package::from_bytes(commit.package().as_bytes())?.workbook()?;
     assert_eq!(reopened.sheets().len(), 2);
     assert!(reopened.content_xml().contains("table:formula=\"of:=1+2\""));
     let preserved_prefix = before
@@ -792,16 +794,18 @@ fn real_calc_pretty_xml_keeps_source_formatting_outside_splice() -> Result<()> {
 
 #[test]
 fn raw_zip_pretty_provenance_and_malformed_negative_stay_test_only() -> Result<()> {
-    let compact = Spreadsheet::from_bytes(compact_source()?)?
+    let compact = Package::from_bytes(&compact_source()?)?
+        .workbook()?
         .content_xml()
         .to_string();
     let pretty = compact.replace("><", ">\n  <");
     let raw = support::raw_package(&[("content.xml", pretty.as_bytes(), "text/xml")]);
-    let snapshot = Snapshot::from_bytes(raw)?;
-    let mut edit = snapshot.edit();
+    let snapshot = Package::from_bytes(&raw)?;
+    let mut edit = snapshot.edit()?;
     edit.set_cell_formula("Data", 0, 0, "of:=40+2")?;
     let commit = edit.commit()?;
-    let content = Spreadsheet::from_bytes(commit.snapshot().as_bytes().to_vec())?
+    let content = Package::from_bytes(commit.package().as_bytes())?
+        .workbook()?
         .content_xml()
         .to_string();
     let untouched = pretty
@@ -816,13 +820,14 @@ fn raw_zip_pretty_provenance_and_malformed_negative_stay_test_only() -> Result<(
         b"<office:document-content><office:body>",
         "text/xml",
     )]);
-    assert!(Snapshot::from_bytes(malformed).is_err());
+    assert!(Package::from_bytes(&malformed).is_err());
     Ok(())
 }
 
 #[test]
 fn explicit_signature_policy_strips_stale_signatures_for_commit_and_apply() -> Result<()> {
-    let content = Spreadsheet::from_bytes(compact_source()?)?
+    let content = Package::from_bytes(&compact_source()?)?
+        .workbook()?
         .content_xml()
         .to_string();
     let signed_bytes = support::raw_package(&[
@@ -833,7 +838,7 @@ fn explicit_signature_policy_strips_stale_signatures_for_commit_and_apply() -> R
             "text/xml",
         ),
     ]);
-    let signed = Snapshot::from_bytes(signed_bytes)?;
+    let signed = Package::from_bytes(&signed_bytes)?;
     assert_eq!(
         signed.encryption_write_capability(SignatureWritePolicy::Refuse)?,
         EncryptionWriteCapability::Refused(EncryptionWriteRefusal::SignedSourceRequiresStripPolicy)
@@ -845,7 +850,7 @@ fn explicit_signature_policy_strips_stale_signatures_for_commit_and_apply() -> R
     )?;
     let encrypted_package = OwnedPackage::from_bytes_with_password(encrypted, "strip-signature")?;
     assert!(!encrypted_package.has_file("META-INF/documentsignatures.xml")?);
-    let mut refused = signed.edit();
+    let mut refused = signed.edit()?;
     refused.set_cell_formula("Data", 0, 0, "of:=6*7")?;
     assert!(refused.commit().is_err());
 
@@ -853,27 +858,26 @@ fn explicit_signature_policy_strips_stale_signatures_for_commit_and_apply() -> R
         signatures: SignatureWritePolicy::StripInvalidated,
         encryption: EncryptionWritePolicy::Refuse,
     };
-    let mut allowed = signed.edit();
+    let mut allowed = signed.edit()?;
     allowed.set_cell_formula("Data", 0, 0, "of:=6*7")?;
     let commit = allowed.commit_with_security(policy)?;
-    let package = OwnedPackage::from_bytes(commit.snapshot().as_bytes().to_vec())?;
+    let package = OwnedPackage::from_bytes(commit.package().as_bytes().to_vec())?;
     assert!(!package.has_file("META-INF/documentsignatures.xml")?);
-    assert!(commit.patch().apply(&signed).is_err());
+    assert!(signed.apply(commit.patch()).is_err());
     assert_eq!(
-        commit
-            .patch()
-            .apply_with_security(&signed, policy)?
-            .snapshot()
+        signed
+            .apply_with_security(commit.patch(), policy)?
+            .into_package()
             .as_bytes(),
-        commit.snapshot().as_bytes()
+        commit.package().as_bytes()
     );
     Ok(())
 }
 
 #[test]
 fn dependency_and_adversarial_inputs_fail_atomically() -> Result<()> {
-    let snapshot = Snapshot::from_bytes(compact_source()?)?;
-    let mut edit = snapshot.edit();
+    let snapshot = Package::from_bytes(&compact_source()?)?;
+    let mut edit = snapshot.edit()?;
     let before = edit.as_bytes().to_vec();
     let mismatch = edit.put_drawing_with_resource(
         "Data",
@@ -905,13 +909,13 @@ fn dependency_and_adversarial_inputs_fail_atomically() -> Result<()> {
     );
     assert_eq!(edit.as_bytes(), before);
 
-    let mut source_edit = snapshot.edit();
+    let mut source_edit = snapshot.edit()?;
     let _source_disposition = source_edit.put_resource(
         Resource::new("Pictures/source.bin", "image/png", vec![8, 9])?,
         Collision::Reject,
     )?;
-    let transfer_source = source_edit.commit()?.into_snapshot();
-    let mut destination_edit = snapshot.edit();
+    let transfer_source = source_edit.commit()?.into_package();
+    let mut destination_edit = snapshot.edit()?;
     let _transfer_disposition = destination_edit.transfer_drawing(
         &transfer_source,
         "Pictures/source.bin",
@@ -923,12 +927,13 @@ fn dependency_and_adversarial_inputs_fail_atomically() -> Result<()> {
     let transferred = destination_edit.commit()?;
     assert!(
         transferred
-            .snapshot()
+            .package()
             .resource("Pictures/copied.bin")?
             .is_some()
     );
     assert!(
-        Spreadsheet::from_bytes(transferred.snapshot().as_bytes().to_vec())?
+        Package::from_bytes(transferred.package().as_bytes())?
+            .workbook()?
             .content_xml()
             .contains("xlink:href=\"Pictures/copied.bin\"")
     );
@@ -937,8 +942,8 @@ fn dependency_and_adversarial_inputs_fail_atomically() -> Result<()> {
 
 #[test]
 fn advanced_operations_use_join_three_way_and_history() -> Result<()> {
-    let snapshot = Snapshot::from_bytes(compact_source()?)?;
-    let mut rich_edit = snapshot.edit();
+    let snapshot = Package::from_bytes(&compact_source()?)?;
+    let mut rich_edit = snapshot.edit()?;
     rich_edit.set_rich_cell_text(
         "Data",
         0,
@@ -947,7 +952,7 @@ fn advanced_operations_use_join_three_way_and_history() -> Result<()> {
     )?;
     let rich_commit = rich_edit.commit()?;
 
-    let mut resource_edit = snapshot.edit();
+    let mut resource_edit = snapshot.edit()?;
     let _disposition = resource_edit.put_resource(
         Resource::new("Data/independent.bin", "application/octet-stream", vec![7])?,
         Collision::Reject,
@@ -957,20 +962,16 @@ fn advanced_operations_use_join_three_way_and_history() -> Result<()> {
         .patch()
         .join(resource_commit.patch())
         .map_err(|error| litchi_core::Error::InvalidFormat(error.detail().to_string()))?;
-    let joined_commit = joined.apply(&snapshot)?;
+    let joined_commit = snapshot.apply(&joined)?.into_package();
+    assert!(joined_commit.resource("Data/independent.bin")?.is_some());
     assert!(
-        joined_commit
-            .snapshot()
-            .resource("Data/independent.bin")?
-            .is_some()
-    );
-    assert!(
-        Spreadsheet::from_bytes(joined_commit.snapshot().as_bytes().to_vec())?
+        Package::from_bytes(joined_commit.as_bytes())?
+            .workbook()?
             .content_xml()
             .contains("left")
     );
 
-    let mut competing_edit = snapshot.edit();
+    let mut competing_edit = snapshot.edit()?;
     competing_edit.set_cell_formula("Data", 0, 0, "of:=2")?;
     let competing = competing_edit.commit()?;
     let conflict = rich_commit.patch().join(competing.patch()).err();
@@ -983,15 +984,10 @@ fn advanced_operations_use_join_three_way_and_history() -> Result<()> {
     let mut plan = litchi_ods::document::Patch::three_way(rich_commit.patch(), competing.patch())?;
     let _plan = plan.resolve(MergeChoice::Left);
     assert!(
-        Spreadsheet::from_bytes(
-            plan.finish()?
-                .apply(&snapshot)?
-                .snapshot()
-                .as_bytes()
-                .to_vec()
-        )?
-        .content_xml()
-        .contains("left")
+        Package::from_bytes(snapshot.apply(&plan.finish()?)?.into_package().as_bytes())?
+            .workbook()?
+            .content_xml()
+            .contains("left")
     );
 
     let mut history = History::new(snapshot);

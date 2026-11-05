@@ -19,10 +19,7 @@ pub use litchi_iwa_common::table::axis::Result;
 /// Exact-source transactions for one rooted Pages body table's hidden axes.
 pub mod transaction {
     pub use crate::package::body_table_hidden_axes::{
-        BodyTableHiddenAxesCommit as Commit, BodyTableHiddenAxesDiagnostics as Diagnostics,
-        BodyTableHiddenAxesEdit as Edit, BodyTableHiddenAxesError as Error,
-        BodyTableHiddenAxesLimitKind as LimitKind, BodyTableHiddenAxesPatch as Patch,
-        BodyTableHiddenAxesPath as Path,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path, Refusal,
     };
 }
 

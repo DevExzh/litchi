@@ -1,6 +1,6 @@
 //! Regression tests for the XLS OLE-object owner.
 
-use super::super::package::{read_workbook, targets_for_sheets};
+use super::super::package::{Editor, read_workbook, targets_for_sheets};
 use super::super::*;
 use crate::error::Error;
 use litchi_cfb::{OleFile, OleWriter};
@@ -95,7 +95,14 @@ fn bounds_workbook_read_before_stream_materialization() {
     };
     let error = read_workbook(&output.into_inner(), limits)
         .expect_err("oversized Workbook must be rejected before reading");
-    assert!(matches!(error, Error::InvalidData(message) if message.contains("read limit")));
+    assert!(matches!(
+        error,
+        Error::Limit {
+            kind: crate::LimitKind::OleObject(LimitKind::StreamBytes),
+            observed: 128,
+            maximum: 64
+        }
+    ));
 }
 
 fn record(kind: u16, body: &[u8]) -> Vec<u8> {
@@ -217,7 +224,11 @@ fn add_form_control_is_typed_atomic_and_lossless() {
     assert_eq!(editor.form_controls(0).unwrap().len(), 2);
 
     let bytes = editor.finish().expect("transaction should finish");
-    let mut ole = OleFile::open(Cursor::new(bytes.clone())).expect("CFB should reopen");
+    let mut ole = OleFile::open(
+        Cursor::new(bytes.clone()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .expect("CFB should reopen");
     let workbook = ole
         .open_stream(&["Workbook"])
         .expect("Workbook stream should remain present");
@@ -231,7 +242,8 @@ fn add_form_control_is_typed_atomic_and_lossless() {
         .add_form_control(0, second_authored.clone())
         .expect("second typed control should be authored");
     let bytes = editor.finish().expect("second transaction should finish");
-    let mut ole = OleFile::open(Cursor::new(bytes)).expect("second CFB should reopen");
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+        .expect("second CFB should reopen");
     let workbook = ole
         .open_stream(&["Workbook"])
         .expect("second Workbook stream should remain present");
@@ -292,7 +304,9 @@ fn workbook_reader_rejects_filepass_and_active_biff_protection_before_editing() 
             matches!(
                 error,
                 Error::PasswordProtected
-                    | Error::UnsafeEdit(_)
+                    | Error::Refused(_)
+                    | Error::PatchConflict { .. }
+                    | Error::Internal(_)
                     | Error::InvalidRecord { .. }
                     | Error::InvalidLength { .. }
             ),
@@ -329,7 +343,9 @@ fn workbook_reader_refuses_pidssi_digital_signature() {
         Limits::default(),
     )
     .expect_err("a stale PIDDSI signature must not be rewritten");
-    assert!(matches!(error, Error::UnsafeEdit(message) if message.contains("DigitalSignature")));
+    assert!(
+        matches!(error, Error::Refused(refusal) if refusal.reason().contains("DigitalSignature"))
+    );
 }
 
 #[test]

@@ -204,7 +204,7 @@ pub(super) struct DocxStoryHyperlinkPublicationSummary {
     deterministic_output_verified: bool,
     source_immutability_verified: bool,
     stale_source_refusal_verified: bool,
-    foreign_source_refusal_verified: bool,
+    matching_source_replay_verified: bool,
     signed_refusal_verified: bool,
     unknown_owner_refusal_verified: bool,
     partial_sink_refusal_verified: bool,
@@ -469,7 +469,7 @@ fn build_archive() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
 }
 
 fn archive_members(bytes: &[u8]) -> Result<BTreeMap<String, Vec<u8>>, Box<dyn std::error::Error>> {
-    let archive = ArchiveReader::new(bytes)?;
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())?;
     let mut members = BTreeMap::new();
     for name in archive.file_names() {
         members.insert(name.to_owned(), archive.read(name)?);
@@ -754,7 +754,7 @@ pub(super) fn build_corpus() -> Result<Corpus, Box<dyn std::error::Error>> {
     if source_members.is_empty() {
         return Err("DOCX story publication corpus has no ZIP members".into());
     }
-    let package = OpcPackage::from_bytes(&archive)?;
+    let package = OpcPackage::from_bytes(&archive, litchi_opc::SourceLimits::default())?;
     let uncompressed_payload_bytes = package
         .try_iter_parts()
         .map(|part| part.expect("part payload decodes"))
@@ -812,9 +812,10 @@ fn publish(
     sink: &mut impl Write,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let package = source_package(corpus.archive.clone())?;
-    let plan = package.plan_story_hyperlink_redaction(target_urls, Mode::Strict)?;
-    let commit = plan.apply()?;
-    package.publish_story_hyperlink_redaction_to_stream(sink, &commit)?;
+    let commit = package
+        .edit_story_hyperlink_redaction(target_urls, Mode::Strict)?
+        .commit()?;
+    commit.package().write_to(sink)?;
     Ok(())
 }
 
@@ -1025,7 +1026,7 @@ fn signed_archive(_corpus: &Corpus) -> Result<Vec<u8>, Box<dyn std::error::Error
 }
 
 fn unknown_owner_archive(corpus: &Corpus) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    let mut package = OpcPackage::from_bytes(&corpus.archive)?;
+    let mut package = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     let mut custom = BlobPart::new(
         PackURI::new("/word/opaque/custom-owner.xml")?,
         "application/xml".to_owned(),
@@ -1051,30 +1052,32 @@ fn verify_refusal_gates(
     });
     let stale_package = source_backed::Package::from_read_at(Arc::clone(&versioned))?;
     let stale_commit = stale_package
-        .plan_story_hyperlink_redaction(&[SHARED_TARGET], Mode::Strict)?
-        .apply()?;
+        .edit_story_hyperlink_redaction(&[SHARED_TARGET], Mode::Strict)?
+        .commit()?;
     revision.fetch_add(1, Ordering::SeqCst);
     let mut stale_output = Vec::new();
     let stale_refusal = stale_package
-        .publish_story_hyperlink_redaction_to_stream(&mut stale_output, &stale_commit)
+        .apply_story_hyperlink_redaction(stale_commit.patch())
+        .and_then(|committed| committed.package().write_to(&mut stale_output))
         .is_err()
         && stale_output.is_empty();
 
     let foreign_first = source_package(corpus.archive.clone())?;
     let foreign_second = source_package(corpus.archive.clone())?;
     let foreign_commit = foreign_first
-        .plan_story_hyperlink_redaction(&[SHARED_TARGET], Mode::Strict)?
-        .apply()?;
+        .edit_story_hyperlink_redaction(&[SHARED_TARGET], Mode::Strict)?
+        .commit()?;
     let mut foreign_output = Vec::new();
-    let foreign_refusal = foreign_second
-        .publish_story_hyperlink_redaction_to_stream(&mut foreign_output, &foreign_commit)
-        .is_err()
-        && foreign_output.is_empty();
+    let matching_source_replay = foreign_second
+        .apply_story_hyperlink_redaction(foreign_commit.patch())
+        .and_then(|committed| committed.package().write_to(&mut foreign_output))
+        .is_ok()
+        && !foreign_output.is_empty();
 
     let signed_refusal = match signed_archive(corpus) {
         Ok(signed) => match source_package(signed) {
             Ok(signed_package) => signed_package
-                .plan_story_hyperlink_redaction(&[SHARED_TARGET], Mode::Strict)
+                .edit_story_hyperlink_redaction(&[SHARED_TARGET], Mode::Strict)
                 .is_err(),
             Err(_) => false,
         },
@@ -1084,7 +1087,7 @@ fn verify_refusal_gates(
     let unknown_refusal = match unknown_owner_archive(corpus) {
         Ok(unknown) => match source_package(unknown) {
             Ok(unknown_package) => unknown_package
-                .plan_story_hyperlink_redaction(&[SHARED_TARGET], Mode::Strict)
+                .edit_story_hyperlink_redaction(&[SHARED_TARGET], Mode::Strict)
                 .is_err(),
             Err(_) => false,
         },
@@ -1093,32 +1096,34 @@ fn verify_refusal_gates(
 
     let package = source_package(corpus.archive.clone())?;
     let commit = package
-        .plan_story_hyperlink_redaction(&[SHARED_TARGET], Mode::Strict)?
-        .apply()?;
+        .edit_story_hyperlink_redaction(&[SHARED_TARGET], Mode::Strict)?
+        .commit()?;
     let mut partial = FailingSink {
         accepted: 0,
         fail_after: 1,
     };
     let partial_refusal = package
-        .publish_story_hyperlink_redaction_to_stream(&mut partial, &commit)
+        .apply_story_hyperlink_redaction(commit.patch())
+        .and_then(|committed| committed.package().write_to(&mut partial))
         .is_err()
         && partial.accepted > 0;
     let package = source_package(corpus.archive.clone())?;
     let commit = package
-        .plan_story_hyperlink_redaction(&[SHARED_TARGET], Mode::Strict)?
-        .apply()?;
+        .edit_story_hyperlink_redaction(&[SHARED_TARGET], Mode::Strict)?
+        .commit()?;
     let mut zero = FailingSink {
         accepted: 0,
         fail_after: 0,
     };
     let zero_refusal = package
-        .publish_story_hyperlink_redaction_to_stream(&mut zero, &commit)
+        .apply_story_hyperlink_redaction(commit.patch())
+        .and_then(|committed| committed.package().write_to(&mut zero))
         .is_err()
         && zero.accepted == 0;
 
     Ok((
         stale_refusal,
-        foreign_refusal,
+        matching_source_replay,
         signed_refusal,
         unknown_refusal,
         partial_refusal,
@@ -1177,7 +1182,7 @@ pub(super) fn run(
     let deterministic_output_verified = repeated_output == expected_output;
     let (
         stale_source_refusal_verified,
-        foreign_source_refusal_verified,
+        matching_source_replay_verified,
         signed_refusal_verified,
         unknown_owner_refusal_verified,
         partial_sink_refusal_verified,
@@ -1191,14 +1196,14 @@ pub(super) fn run(
         || !xml_semantic_oracle_verified
         || !deterministic_output_verified
         || !stale_source_refusal_verified
-        || !foreign_source_refusal_verified
+        || !matching_source_replay_verified
         || !signed_refusal_verified
         || !unknown_owner_refusal_verified
         || !partial_sink_refusal_verified
         || !zero_sink_refusal_verified
     {
         return Err(format!(
-            "DOCX story publication correctness gates failed: source_hash={source_hash_verified}, source_zip={source_zip_oracle_verified}, noop={no_op_exact_bytes_verified}, locality={changed_member_locality_verified}, rels={relationship_oracle_verified}, xml={xml_semantic_oracle_verified}, deterministic={deterministic_output_verified}, stale={stale_source_refusal_verified}, foreign={foreign_source_refusal_verified}, signed={signed_refusal_verified}, unknown={unknown_owner_refusal_verified}, partial={partial_sink_refusal_verified}, zero={zero_sink_refusal_verified}"
+            "DOCX story publication correctness gates failed: source_hash={source_hash_verified}, source_zip={source_zip_oracle_verified}, noop={no_op_exact_bytes_verified}, locality={changed_member_locality_verified}, rels={relationship_oracle_verified}, xml={xml_semantic_oracle_verified}, deterministic={deterministic_output_verified}, stale={stale_source_refusal_verified}, foreign={matching_source_replay_verified}, signed={signed_refusal_verified}, unknown={unknown_owner_refusal_verified}, partial={partial_sink_refusal_verified}, zero={zero_sink_refusal_verified}"
         )
         .into());
     }
@@ -1289,14 +1294,14 @@ pub(super) fn run(
             let open_ns = super::elapsed_ns(open_started.elapsed())?;
 
             let plan_started = Instant::now();
-            let plan = package.plan_story_hyperlink_redaction(target_urls, Mode::Strict)?;
-            let commit = plan.apply()?;
+            let commit = package
+                .edit_story_hyperlink_redaction(target_urls, Mode::Strict)?
+                .commit()?;
             let plan_ns = super::elapsed_ns(plan_started.elapsed())?;
             cache_diagnostics = Some(package.cache_diagnostics());
 
             let publication_started = Instant::now();
-            let publication_result =
-                package.publish_story_hyperlink_redaction_to_stream(&mut sink, &commit);
+            let publication_result = commit.package().write_to(&mut sink);
             let publication_ns = super::elapsed_ns(publication_started.elapsed())?;
             publication_result?;
             Ok((open_ns, plan_ns, publication_ns))
@@ -1501,7 +1506,7 @@ pub(super) fn run(
         deterministic_output_verified,
         source_immutability_verified,
         stale_source_refusal_verified,
-        foreign_source_refusal_verified,
+        matching_source_replay_verified,
         signed_refusal_verified,
         unknown_owner_refusal_verified,
         partial_sink_refusal_verified,
@@ -1622,7 +1627,7 @@ mod tests {
             assert!(summary.deterministic_output_verified);
             assert!(summary.source_immutability_verified);
             assert!(summary.stale_source_refusal_verified);
-            assert!(summary.foreign_source_refusal_verified);
+            assert!(summary.matching_source_replay_verified);
             assert!(summary.signed_refusal_verified);
             assert!(summary.unknown_owner_refusal_verified);
             assert!(summary.partial_sink_refusal_verified);
@@ -1664,17 +1669,17 @@ mod tests {
         let _allocation_test_lock = crate::allocation_metrics::TEST_LOCK.lock().unwrap();
         let corpus = build_corpus().expect("DOCX story publication corpus");
         let package = source_package(corpus.archive.clone()).expect("source package");
-        let plan = package
-            .plan_story_hyperlink_redaction(&[SHARED_TARGET], Mode::Strict)
+        let commit = package
+            .edit_story_hyperlink_redaction(&[SHARED_TARGET], Mode::Strict)
             .expect("redaction plan")
-            .apply()
+            .commit()
             .expect("redaction commit");
         let mut sink = FailingSink {
             accepted: 0,
             fail_after: 1,
         };
         let region = crate::allocation_metrics::begin();
-        let result = package.publish_story_hyperlink_redaction_to_stream(&mut sink, &plan);
+        let result = commit.package().write_to(&mut sink);
         let allocation = region
             .finish()
             .unwrap_or_else(crate::allocation_metrics::unavailable_sample);

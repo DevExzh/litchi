@@ -3,10 +3,9 @@
 use std::{io, sync::Arc};
 
 use litchi_iwa_archive::package::Catalog;
-use litchi_iwa_core::{FieldInfo, FieldPath};
+use litchi_iwa_core::FieldInfo;
 use litchi_numbers::{
-    Package, PackageLimits, PackageReadOptions, PackageSemanticLimits, SheetSelector,
-    TableSelector,
+    Package, SheetSelector, TableSelector,
     table::{
         headers::{
             Count, Settings,
@@ -52,7 +51,11 @@ fn changed_settings(base: Settings) -> Settings {
 }
 
 fn declared_field(path: &[u32], references: &[u64]) -> FieldInfo {
-    let mut field = FieldInfo::new(FieldPath::new(path.to_vec()));
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(path.to_vec(), litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     field.object_references = references.to_vec();
     field
 }
@@ -96,8 +99,8 @@ fn native_selectors_presence_noop_change_apply_inverse_and_locality() -> TestRes
     );
 
     let target = commit.package().exact_bytes();
-    let source_catalog = Catalog::from_bytes(&source)?;
-    let target_catalog = Catalog::from_bytes(&target)?;
+    let source_catalog = Catalog::from_bytes(&source, Default::default())?;
+    let target_catalog = Catalog::from_bytes(&target, Default::default())?;
     for (before, after) in source_catalog.iter().zip(target_catalog.iter()) {
         if before.data() == after.data() {
             assert_eq!(
@@ -140,11 +143,15 @@ fn selector_bounds_and_public_values_are_checked_and_thread_safe() -> TestResult
     let package = Package::open(fixture_path())?;
     assert!(matches!(
         package.table_header_settings("missing", 0usize),
-        Err(Error::SheetNotFound)
+        Err(Error::Refused(
+            litchi_numbers::table::headers::transaction::Refusal::SheetNotFound
+        ))
     ));
     assert!(matches!(
         package.table_header_settings(0usize, "missing"),
-        Err(Error::TableNotFound)
+        Err(Error::Refused(
+            litchi_numbers::table::headers::transaction::Refusal::TableNotFound
+        ))
     ));
     assert_eq!(Count::new(1)?, Count::ONE);
     assert!(Count::new(0).is_err());
@@ -183,7 +190,12 @@ fn native_manager_backed_count_change_refuses_without_publication() -> TestResul
         .set(requested)
         .commit()
         .expect_err("rooted HeaderNameMgr count dependency must refuse publication");
-    assert!(matches!(error, Error::UnsupportedDependency { .. }));
+    assert!(matches!(
+        error,
+        Error::Refused(
+            litchi_numbers::table::headers::transaction::Refusal::UnsupportedDependency { .. }
+        )
+    ));
     assert_eq!(package.exact_bytes(), source);
     Ok(())
 }
@@ -209,9 +221,11 @@ fn locked_table_allows_exact_header_noop_and_refuses_change() -> TestResult<()> 
         .expect_err("locked table must refuse a changed header transaction");
     assert!(matches!(
         error,
-        Error::TableLocked {
-            path: Path::Table { sheet: 0, table: 0 }
-        }
+        Error::Refused(
+            litchi_numbers::table::headers::transaction::Refusal::TableLocked {
+                path: Path::Table { sheet: 0, table: 0 }
+            }
+        )
     ));
     Ok(())
 }
@@ -232,7 +246,7 @@ fn raw_selected_header_scalars_fail_without_normalizing_source() -> TestResult<(
         let Ok(package) = Package::from_bytes(&malformed) else {
             // Some wrong-wire mutations are already rejected by the broader
             // semantic package ingress. That is an equally atomic refusal.
-            Catalog::from_bytes(&malformed)?;
+            Catalog::from_bytes(&malformed, Default::default())?;
             continue;
         };
         let before = package.exact_bytes();
@@ -371,10 +385,12 @@ fn synthetic_bounds_and_dependency_role_aliases_fail_atomically() -> TestResult<
             .edit_table_headers(0usize, 0usize)?
             .set(invalid_bounds)
             .commit(),
-        Err(Error::InvalidSettings {
-            path: Path::Table { sheet: 0, table: 0 },
-            ..
-        })
+        Err(Error::Refused(
+            litchi_numbers::table::headers::transaction::Refusal::InvalidSettings {
+                path: Path::Table { sheet: 0, table: 0 },
+                ..
+            }
+        ))
     ));
     assert_eq!(package.exact_bytes(), base_bytes);
 
@@ -457,16 +473,21 @@ fn inverse_apply_preflights_the_retained_target_work_before_reopen() -> TestResu
     let maximum = observed
         .checked_sub(1)
         .ok_or_else(|| io::Error::other("transaction work must be non-zero"))?;
-    let archive_limits = PackageLimits::new(
-        PackageLimits::MAX_INPUT_BYTES,
-        PackageLimits::MAX_ENTRIES,
-        PackageLimits::MAX_ENTRY_BYTES,
-        u64::try_from(maximum)?,
-        PackageLimits::MAX_IWA_STREAM_BYTES,
-    )?;
+    let aggregate = u64::try_from(maximum)?;
+    let archive_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_input_bytes())
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| b.max_aggregate_bytes(aggregate))
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
     let restricted = Package::from_bytes_with_options(
         &candidate,
-        PackageReadOptions::new(archive_limits, PackageSemanticLimits::default()),
+        litchi_numbers::OpenOptions::new()
+            .source_limits(archive_limits)
+            .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
     )?;
     let unchanged = restricted.exact_bytes();
     let error = restricted
@@ -474,7 +495,7 @@ fn inverse_apply_preflights_the_retained_target_work_before_reopen() -> TestResu
         .expect_err("retained inverse target must be included in transaction work");
     assert!(matches!(
         error,
-        Error::LimitExceeded {
+        Error::Limit {
             kind: LimitKind::TransactionWork,
             observed: actual,
             maximum: limit,
@@ -493,7 +514,10 @@ fn assert_invalid_change_preserves(bytes: &[u8], settings: Settings) -> TestResu
             .edit_table_headers(0usize, 0usize)?
             .set(settings)
             .commit(),
-        Err(Error::InvalidSource { .. }) | Err(Error::UnsupportedDependency { .. })
+        Err(Error::InvalidSource { .. })
+            | Err(Error::Refused(
+                litchi_numbers::table::headers::transaction::Refusal::UnsupportedDependency { .. }
+            ))
     ));
     assert_eq!(package.exact_bytes(), source);
     Ok(())

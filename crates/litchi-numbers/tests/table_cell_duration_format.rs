@@ -23,10 +23,7 @@ use litchi_numbers::cell::data_format::{
     scientific::transaction as scientific_transaction,
     text::transaction as text_transaction,
 };
-use litchi_numbers::{
-    CellPosition, Package, PackageLimits, PackageReadOptions, PackageSemanticLimits, SheetSelector,
-    TableSelector,
-};
+use litchi_numbers::{At, Package, SheetSelector, TableSelector};
 use litchi_numbers_wire::{BncCell, CachedScalar, CellDataFormatKind, StoredValue};
 use prost::Message as _;
 
@@ -48,12 +45,12 @@ impl ExactBytes for Package {
     }
 }
 
-fn selected_position() -> CellPosition {
-    CellPosition::new(fixture::FIRST_CELL.0 as u32, fixture::FIRST_CELL.1 as u32)
+fn selected_position() -> At {
+    At::new(fixture::FIRST_CELL.0 as u32, fixture::FIRST_CELL.1 as u32)
 }
 
-fn sibling_position() -> CellPosition {
-    CellPosition::new(fixture::SECOND_CELL.0 as u32, fixture::SECOND_CELL.1 as u32)
+fn sibling_position() -> At {
+    At::new(fixture::SECOND_CELL.0 as u32, fixture::SECOND_CELL.1 as u32)
 }
 
 fn source() -> TestResult<Vec<u8>> {
@@ -97,8 +94,8 @@ fn native_unit(unit: Unit) -> u32 {
 }
 
 fn assert_exact_locality(source: &[u8], target: &[u8]) -> TestResult {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     let mut changed = Vec::new();
     for entry in before.iter() {
         let candidate = after
@@ -129,9 +126,11 @@ fn assert_exact_locality(source: &[u8], target: &[u8]) -> TestResult {
 }
 
 fn normalized_cell(cell: &[u8]) -> TestResult<Vec<u8>> {
-    let mut parsed = BncCell::parse(cell)?;
+    let mut parsed = BncCell::parse(cell, &litchi_numbers_wire::Limits::DEFAULT)?;
     parsed.clear_explicit_format();
-    Ok(parsed.encode())
+    Ok(parsed
+        .encode(&litchi_numbers_wire::Limits::DEFAULT)
+        .unwrap())
 }
 
 fn assert_non_format_bnc_bytes(source: &[u8], target: &[u8]) -> TestResult {
@@ -139,8 +138,8 @@ fn assert_non_format_bnc_bytes(source: &[u8], target: &[u8]) -> TestResult {
     let after = fixture::tile_cells(target)?;
     assert_eq!(before.len(), after.len());
     for (before, after) in before.iter().zip(after.iter()) {
-        let before_cell = BncCell::parse(before)?;
-        let after_cell = BncCell::parse(after)?;
+        let before_cell = BncCell::parse(before, &litchi_numbers_wire::Limits::DEFAULT)?;
+        let after_cell = BncCell::parse(after, &litchi_numbers_wire::Limits::DEFAULT)?;
         assert_eq!(
             before_cell.cached_scalar()?,
             after_cell.cached_scalar()?,
@@ -160,7 +159,10 @@ fn first_cell(source: &[u8]) -> TestResult<BncCell> {
     let bytes = cells
         .first()
         .ok_or_else(|| io::Error::other("Duration fixture first cell is missing"))?;
-    Ok(BncCell::parse(bytes)?)
+    Ok(BncCell::parse(
+        bytes,
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?)
 }
 
 fn assert_owner_rejects(source: &[u8]) -> TestResult {
@@ -205,7 +207,7 @@ fn assert_rejected_or_owner(source: &[u8]) -> TestResult {
 }
 
 fn raw_field_record(source: &[u8], number: u32) -> TestResult<Vec<u8>> {
-    let mut fields = RawWireFields::new(source);
+    let mut fields = RawWireFields::new(source, litchi_iwa_common::wire::RawWireLimits::default());
     while let Some(field) = fields.next()? {
         if field.number() == number {
             return Ok(field.raw().to_vec());
@@ -215,7 +217,7 @@ fn raw_field_record(source: &[u8], number: u32) -> TestResult<Vec<u8>> {
 }
 
 fn raw_field_numbers(source: &[u8]) -> TestResult<Vec<u32>> {
-    let mut fields = RawWireFields::new(source);
+    let mut fields = RawWireFields::new(source, litchi_iwa_common::wire::RawWireLimits::default());
     let mut numbers = Vec::new();
     while let Some(field) = fields.next()? {
         numbers.push(field.number());
@@ -224,7 +226,7 @@ fn raw_field_numbers(source: &[u8]) -> TestResult<Vec<u32>> {
 }
 
 fn raw_varint_field(source: &[u8], number: u32) -> TestResult<u32> {
-    let mut fields = RawWireFields::new(source);
+    let mut fields = RawWireFields::new(source, litchi_iwa_common::wire::RawWireLimits::default());
     while let Some(field) = fields.next()? {
         if field.number() != number || field.wire_type() != 0 {
             continue;
@@ -241,12 +243,18 @@ fn raw_varint_field(source: &[u8], number: u32) -> TestResult<u32> {
 
 fn raw_format_payload_by_key(source: &[u8], key: u32) -> TestResult<Vec<u8>> {
     let list_payload = fixture::format_list_payload(source)?;
-    let mut list_fields = RawWireFields::new(&list_payload);
+    let mut list_fields = RawWireFields::new(
+        &list_payload,
+        litchi_iwa_common::wire::RawWireLimits::default(),
+    );
     while let Some(entry_field) = list_fields.next()? {
         if entry_field.number() != 3 {
             continue;
         }
-        let mut entry_fields = RawWireFields::new(entry_field.payload());
+        let mut entry_fields = RawWireFields::new(
+            entry_field.payload(),
+            litchi_iwa_common::wire::RawWireLimits::default(),
+        );
         let mut matching_key = false;
         while let Some(field) = entry_fields.next()? {
             if field.number() == 1 {
@@ -415,11 +423,15 @@ fn duration_selectors_and_option_semantics_are_explicit() -> TestResult {
     );
     assert!(matches!(
         package.table_cell_duration_format("missing sheet", 0usize, selected_position()),
-        Err(Error::SheetNotFound)
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::duration::transaction::Refusal::SheetNotFound
+        ))
     ));
     assert!(matches!(
         package.table_cell_duration_format(0usize, "missing table", selected_position()),
-        Err(Error::TableNotFound)
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::duration::transaction::Refusal::TableNotFound
+        ))
     ));
 
     let cleared = package
@@ -450,18 +462,18 @@ fn duration_selectors_and_option_semantics_are_explicit() -> TestResult {
 fn duration_coordinate_boundaries_return_cell_not_found_without_mutation() -> TestResult {
     let package = Package::from_bytes(&source()?)?;
     let before = package.exact_bytes();
-    for position in [
-        CellPosition::new(1, 0),
-        CellPosition::new(0, 2),
-        CellPosition::new(u32::MAX, u32::MAX),
-    ] {
+    for position in [At::new(1, 0), At::new(0, 2), At::new(u32::MAX, u32::MAX)] {
         assert!(matches!(
             package.table_cell_duration_format(0usize, 0usize, position),
-            Err(Error::CellNotFound)
+            Err(Error::Refused(
+                litchi_numbers::cell::data_format::duration::transaction::Refusal::CellNotFound
+            ))
         ));
         assert!(matches!(
             package.edit_table_cell_duration_format(0usize, 0usize, position),
-            Err(Error::CellNotFound)
+            Err(Error::Refused(
+                litchi_numbers::cell::data_format::duration::transaction::Refusal::CellNotFound
+            ))
         ));
     }
     assert_eq!(package.exact_bytes(), before);
@@ -785,11 +797,11 @@ fn duration_wrong_family_boundaries_are_typed_and_symmetric() -> TestResult {
         let before = package.exact_bytes();
         assert!(matches!(
             package.table_cell_duration_format(0usize, 0usize, selected_position()),
-            Err(Error::WrongFormatFamily { .. })
+            Err(Error::Refused(litchi_numbers::cell::data_format::duration::transaction::Refusal::WrongFormatFamily { .. }))
         ));
         assert!(matches!(
             package.edit_table_cell_duration_format(0usize, 0usize, selected_position()),
-            Err(Error::WrongFormatFamily { .. })
+            Err(Error::Refused(litchi_numbers::cell::data_format::duration::transaction::Refusal::WrongFormatFamily { .. }))
         ));
         assert_eq!(package.exact_bytes(), before);
     }
@@ -798,33 +810,41 @@ fn duration_wrong_family_boundaries_are_typed_and_symmetric() -> TestResult {
     let package = Package::from_bytes(&source)?;
     assert!(matches!(
         package.table_cell_number_format(0usize, 0usize, selected_position()),
-        Err(number_transaction::Error::WrongFormatFamily { .. })
+        Err(number_transaction::Error::Refused(
+            litchi_numbers::cell::data_format::number::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     assert!(matches!(
         package.table_cell_percentage_format(0usize, 0usize, selected_position()),
-        Err(percentage_transaction::Error::WrongFormatFamily { .. })
+        Err(percentage_transaction::Error::Refused(litchi_numbers::cell::data_format::percentage::transaction::Refusal::WrongFormatFamily { .. }))
     ));
     assert!(matches!(
         package.table_cell_currency_format(0usize, 0usize, selected_position()),
         Err(
-            litchi_numbers::cell::data_format::currency::transaction::Error::WrongFormatFamily { .. }
+            litchi_numbers::cell::data_format::currency::transaction::Error::Refused(litchi_numbers::cell::data_format::currency::transaction::Refusal::WrongFormatFamily { .. })
         )
     ));
     assert!(matches!(
         package.table_cell_scientific_format(0usize, 0usize, selected_position()),
-        Err(scientific_transaction::Error::WrongFormatFamily { .. })
+        Err(scientific_transaction::Error::Refused(litchi_numbers::cell::data_format::scientific::transaction::Refusal::WrongFormatFamily { .. }))
     ));
     assert!(matches!(
         package.table_cell_fraction_format(0usize, 0usize, selected_position()),
-        Err(fraction_transaction::Error::WrongFormatFamily { .. })
+        Err(fraction_transaction::Error::Refused(
+            litchi_numbers::cell::data_format::fraction::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     assert!(matches!(
         package.table_cell_date_time_format(0usize, 0usize, selected_position()),
-        Err(date_time_transaction::Error::WrongFormatFamily { .. })
+        Err(date_time_transaction::Error::Refused(
+            litchi_numbers::cell::data_format::date_time::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     assert!(matches!(
         package.table_cell_text_format(0usize, 0usize, selected_position()),
-        Err(text_transaction::Error::WrongFormatFamily { .. })
+        Err(text_transaction::Error::Refused(
+            litchi_numbers::cell::data_format::text::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     Ok(())
 }
@@ -845,13 +865,13 @@ fn duration_changed_edit_refuses_locked_table_atomically() -> TestResult {
         .expect_err("a changed Duration edit must refuse a locked table");
     assert!(matches!(
         error,
-        Error::TableLocked {
+        Error::Refused(litchi_numbers::cell::data_format::duration::transaction::Refusal::TableLocked {
             path: Path::Cell {
                 sheet: 0,
                 table: 0,
                 position,
             }
-        } if position == selected_position()
+        }) if position == selected_position()
     ));
     assert_eq!(package.exact_bytes(), before);
     Ok(())
@@ -929,7 +949,7 @@ fn duration_secondary_number_edge_is_validated_preserved_and_removed_with_primar
     assert_eq!(fixture::format_keys(&source)?, vec![Some(1), Some(1)]);
     assert_eq!(fixture::format_entry_facts(&source)?, vec![(1, 2), (2, 2)]);
     for cell in fixture::tile_cells(&source)? {
-        let cell = BncCell::parse(&cell)?;
+        let cell = BncCell::parse(&cell, &litchi_numbers_wire::Limits::DEFAULT)?;
         assert_eq!(
             cell.explicit_format_flags(),
             litchi_numbers_wire::EXPLICIT_DURATION_WITH_NUMBER_FORMAT
@@ -1015,16 +1035,19 @@ fn duration_secondary_number_edge_is_validated_preserved_and_removed_with_primar
         cross_cells
             .first()
             .ok_or_else(|| io::Error::other("cross-owner first cell is missing"))?,
+        &litchi_numbers_wire::Limits::DEFAULT,
     )?;
     let number_primary = BncCell::parse(
         cross_cells
             .get(1)
             .ok_or_else(|| io::Error::other("cross-owner Number cell is missing"))?,
+        &litchi_numbers_wire::Limits::DEFAULT,
     )?;
     let third_duration = BncCell::parse(
         cross_cells
             .get(2)
             .ok_or_else(|| io::Error::other("cross-owner third cell is missing"))?,
+        &litchi_numbers_wire::Limits::DEFAULT,
     )?;
     for cell in [&first_duration, &third_duration] {
         assert_eq!(
@@ -1063,7 +1086,7 @@ fn duration_secondary_number_edge_is_validated_preserved_and_removed_with_primar
     );
     assert!(
         cross_package
-            .table_cell_duration_format(0usize, 0usize, CellPosition::new(0, 2))?
+            .table_cell_duration_format(0usize, 0usize, At::new(0, 2))?
             .is_some()
     );
     let number_payload = fixture::format_payload_by_key(&cross_source, 2)?;
@@ -1094,7 +1117,7 @@ fn duration_secondary_number_edge_is_validated_preserved_and_removed_with_primar
     assert!(
         first_duration_cleared
             .package()
-            .table_cell_duration_format(0usize, 0usize, CellPosition::new(0, 2))?
+            .table_cell_duration_format(0usize, 0usize, At::new(0, 2))?
             .is_some()
     );
     assert!(
@@ -1107,7 +1130,7 @@ fn duration_secondary_number_edge_is_validated_preserved_and_removed_with_primar
 
     let both_durations_cleared = first_duration_cleared
         .package()
-        .edit_table_cell_duration_format(0usize, 0usize, CellPosition::new(0, 2))?
+        .edit_table_cell_duration_format(0usize, 0usize, At::new(0, 2))?
         .clear()
         .commit()?;
     let both_durations_cleared_bytes = both_durations_cleared.package().exact_bytes();
@@ -1168,10 +1191,20 @@ fn duration_secondary_number_edge_is_validated_preserved_and_removed_with_primar
         .edit_table_cell_duration_format(0usize, 0usize, selected_position())?
         .set(baseline_duration())
         .commit();
-    assert!(matches!(unchanged_edit, Err(Error::UnsupportedSource)));
+    assert!(matches!(
+        unchanged_edit,
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::duration::transaction::Refusal::UnsupportedSource
+        ))
+    ));
     assert_eq!(non_exact.exact_bytes(), non_exact_before);
     let unchanged_apply = non_exact.apply_table_cell_duration_format(no_op.patch());
-    assert!(matches!(unchanged_apply, Err(Error::UnsupportedSource)));
+    assert!(matches!(
+        unchanged_apply,
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::duration::transaction::Refusal::UnsupportedSource
+        ))
+    ));
     assert_eq!(non_exact.exact_bytes(), non_exact_before);
     Ok(())
 }
@@ -1188,13 +1221,13 @@ fn duration_does_not_reuse_a_number_or_fraction_entry() -> TestResult {
             let sibling = cells
                 .get_mut(1)
                 .ok_or_else(|| io::Error::other("Duration fixture sibling cell is missing"))?;
-            let mut cell = BncCell::parse(sibling)?;
+            let mut cell = BncCell::parse(sibling, &litchi_numbers_wire::Limits::DEFAULT)?;
             // Keep the live Number/Percentage/Fraction entry on the first
             // cell, but make the selected sibling a genuinely unformatted
             // native Duration value before installing Duration metadata.
             cell.set_number_or_percentage_format_identifier_preserving_value(None)?;
             cell.set_duration(0.25)?;
-            *sibling = cell.encode();
+            *sibling = cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
             Ok(())
         })?;
         let source = fixture::rewrite_format_list_payload_for_test(&source, |list| {
@@ -1259,7 +1292,7 @@ fn duration_rewrite_preserves_empty_value_style_comment_and_opaque_cell_bytes() 
         empty.set_style_identifier(Some(107));
         empty.set_comment_identifier(Some(113));
         empty.set_duration_format_identifier_preserving_value(Some(fixture::FIRST_FORMAT_KEY))?;
-        let mut encoded = empty.encode();
+        let mut encoded = empty.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
         encoded.extend_from_slice(b"empty-duration-tail");
         *first = encoded;
         Ok(())
@@ -1269,7 +1302,10 @@ fn duration_rewrite_preserves_empty_value_style_comment_and_opaque_cell_bytes() 
         package.table_cell_duration_format(0usize, 0usize, selected_position())?,
         Some(baseline_duration())
     );
-    let before = BncCell::parse(&fixture::tile_cells(&source)?[0])?;
+    let before = BncCell::parse(
+        &fixture::tile_cells(&source)?[0],
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
     assert_eq!(before.stored_value(), StoredValue::Empty);
     assert_eq!(before.cached_scalar()?, None);
 
@@ -1279,7 +1315,10 @@ fn duration_rewrite_preserves_empty_value_style_comment_and_opaque_cell_bytes() 
         .set(desired)
         .commit()?;
     let target = commit.package().exact_bytes();
-    let after = BncCell::parse(&fixture::tile_cells(&target)?[0])?;
+    let after = BncCell::parse(
+        &fixture::tile_cells(&target)?[0],
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
     assert_eq!(after.stored_value(), StoredValue::Empty);
     assert_eq!(after.cached_scalar()?, None);
     assert_eq!(after.style_identifier(), before.style_identifier());
@@ -1295,20 +1334,25 @@ fn duration_rewrite_preserves_formula_cached_duration_and_unrelated_cell_bytes()
         let first = cells
             .first_mut()
             .ok_or_else(|| io::Error::other("Duration fixture first cell is missing"))?;
-        let mut formula = BncCell::parse(first)?;
+        let mut formula = BncCell::parse(first, &litchi_numbers_wire::Limits::DEFAULT)?;
         formula.set_formula_reference(71);
         // set_formula_cached_number follows the cell's Duration semantics and
         // stores a typed Duration cache measured in seconds.
         formula.set_formula_cached_number(-98.25)?;
         formula.set_style_identifier(Some(127));
         formula.set_comment_identifier(Some(131));
-        let mut encoded = formula.encode();
+        let mut encoded = formula
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         encoded.extend_from_slice(b"formula-duration-tail");
         *first = encoded;
         Ok(())
     })?;
     let package = Package::from_bytes(&source)?;
-    let before = BncCell::parse(&fixture::tile_cells(&source)?[0])?;
+    let before = BncCell::parse(
+        &fixture::tile_cells(&source)?[0],
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
     let before_value = before.stored_value();
     let before_cache = before.cached_scalar()?;
     assert_eq!(before_value, StoredValue::Formula(71));
@@ -1319,7 +1363,10 @@ fn duration_rewrite_preserves_formula_cached_duration_and_unrelated_cell_bytes()
         .set(custom(Style::FullNames, Unit::Hours, Unit::Milliseconds))
         .commit()?;
     let target = commit.package().exact_bytes();
-    let after = BncCell::parse(&fixture::tile_cells(&target)?[0])?;
+    let after = BncCell::parse(
+        &fixture::tile_cells(&target)?[0],
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
     assert_eq!(after.stored_value(), before_value);
     assert_eq!(after.cached_scalar()?, before_cache);
     assert_eq!(after.style_identifier(), before.style_identifier());
@@ -1334,7 +1381,12 @@ fn duration_unknown_wire_fields_and_nested_groups_survive_source_rewrite() -> Te
     let mut payload = raw_format_payload_by_key(&source, fixture::FIRST_FORMAT_KEY)?;
     let nested_before = fixture::unknown_field_record(&payload, 94)?;
     append_varint_field(&mut payload, 46, 0x80_03)?;
-    append_length_delimited_field(&mut payload, 47, b"duration extension")?;
+    append_length_delimited_field(
+        &mut payload,
+        47,
+        b"duration extension",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     payload.extend_from_slice(&encode_varint((48_u64 << 3) | 5));
     payload.extend_from_slice(&[0x11, 0x22, 0x33, 0x44]);
     payload.extend_from_slice(&encode_varint((49_u64 << 3) | 1));
@@ -1454,6 +1506,7 @@ fn duration_malformed_format_entries_fail_closed_and_remain_atomic() -> TestResu
         &mut wrong_wire,
         1,
         &fixture::NATIVE_DURATION_FORMAT_TYPE.to_le_bytes(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     for (field, value) in [(7, 1), (15, 4), (16, 32), (40, 1)] {
         append_varint_field(&mut wrong_wire, field, value)?;
@@ -1462,7 +1515,12 @@ fn duration_malformed_format_entries_fail_closed_and_remain_atomic() -> TestResu
 
     let mut wrong_boolean_wire = native_payload(1, 4, 32, true)?;
     // A length-delimited field 40 is not a protobuf boolean varint.
-    append_length_delimited_field(&mut wrong_boolean_wire, 40, &[1])?;
+    append_length_delimited_field(
+        &mut wrong_boolean_wire,
+        40,
+        &[1],
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     assert_rejected_or_owner(&rewrite_payload(&source, &wrong_boolean_wire)?)?;
 
     // Native 268 with an overlong terminating zero is refused by the strict
@@ -1501,9 +1559,11 @@ fn duration_wrong_bnc_family_and_ambiguous_value_shapes_fail_without_mutation() 
         let first = cells
             .first_mut()
             .ok_or_else(|| io::Error::other("Duration fixture first cell is missing"))?;
-        let mut replacement = BncCell::parse(first)?;
+        let mut replacement = BncCell::parse(first, &litchi_numbers_wire::Limits::DEFAULT)?;
         replacement.set_plain_number(42.5)?;
-        *first = replacement.encode();
+        *first = replacement
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         Ok(())
     })?;
     assert_owner_rejects(&plain_number)?;
@@ -1512,13 +1572,15 @@ fn duration_wrong_bnc_family_and_ambiguous_value_shapes_fail_without_mutation() 
         let first = cells
             .first()
             .ok_or_else(|| io::Error::other("Duration fixture first cell is missing"))?;
-        let mut replacement = BncCell::parse(first)?;
+        let mut replacement = BncCell::parse(first, &litchi_numbers_wire::Limits::DEFAULT)?;
         replacement.set_data_format_identifier(
             fixture::FIRST_FORMAT_KEY,
             CellDataFormatKind::NumericControlNumberOrPercentage,
             Some(77),
         )?;
-        cells[0] = replacement.encode();
+        cells[0] = replacement
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         Ok(())
     })?;
     assert_owner_rejects(&control)?;
@@ -1527,14 +1589,16 @@ fn duration_wrong_bnc_family_and_ambiguous_value_shapes_fail_without_mutation() 
         let first = cells
             .first()
             .ok_or_else(|| io::Error::other("Duration fixture first cell is missing"))?;
-        let mut replacement = BncCell::parse(first)?;
+        let mut replacement = BncCell::parse(first, &litchi_numbers_wire::Limits::DEFAULT)?;
         replacement.set_string(7);
         replacement.set_data_format_identifier(
             fixture::FIRST_FORMAT_KEY,
             CellDataFormatKind::Text,
             None,
         )?;
-        cells[0] = replacement.encode();
+        cells[0] = replacement
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         Ok(())
     })?;
     assert_owner_rejects(&text)?;
@@ -1618,41 +1682,58 @@ fn duration_patch_apply_rejects_stale_foreign_and_malformed_sources_atomically()
 #[test]
 fn duration_input_and_operation_budgets_reject_before_publication() -> TestResult {
     let source = source()?;
-    let exact_limits = PackageLimits::new(
-        u64::try_from(source.len())?,
-        PackageLimits::MAX_ENTRIES,
-        PackageLimits::MAX_ENTRY_BYTES,
-        PackageLimits::MAX_TOTAL_BYTES,
-        PackageLimits::MAX_IWA_STREAM_BYTES,
-    )?;
+    let exact_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(source.len())?)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
     let exact = Package::from_bytes_with_options(
         &source,
-        PackageReadOptions::new(exact_limits, PackageSemanticLimits::default()),
+        litchi_numbers::OpenOptions::new()
+            .source_limits(exact_limits)
+            .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
     )?;
     assert_eq!(
         exact.table_cell_duration_format(0usize, 0usize, selected_position())?,
         Some(baseline_duration())
     );
 
-    let tight = PackageLimits::new(
-        u64::try_from(source.len().saturating_sub(1))?,
-        PackageLimits::MAX_ENTRIES,
-        PackageLimits::MAX_ENTRY_BYTES,
-        PackageLimits::MAX_TOTAL_BYTES,
-        PackageLimits::MAX_IWA_STREAM_BYTES,
-    )?;
+    let tight = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(source.len().saturating_sub(1))?)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
     assert!(
         Package::from_bytes_with_options(
             &source,
-            PackageReadOptions::new(tight, PackageSemanticLimits::default()),
+            litchi_numbers::OpenOptions::new()
+                .source_limits(tight)
+                .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
         )
         .is_err()
     );
-    let semantic = PackageSemanticLimits::new(1, 1, 1, 1)?;
+    let semantic = litchi_numbers::SemanticLimits::builder()
+        .max_objects(1)
+        .and_then(|b| b.max_sheets(1))
+        .and_then(|b| b.max_tables(1))
+        .and_then(|b| b.max_references(1))
+        .and_then(|b| b.build())?;
     assert!(
         Package::from_bytes_with_options(
             &source,
-            PackageReadOptions::new(PackageLimits::default(), semantic),
+            litchi_numbers::OpenOptions::new().semantic_limits(semantic),
         )
         .is_err()
     );
@@ -1663,7 +1744,7 @@ fn duration_input_and_operation_budgets_reject_before_publication() -> TestResul
         .set(custom(Style::FullNames, Unit::Days, Unit::Seconds))
         .commit();
     assert!(
-        matches!(result, Err(Error::LimitExceeded { .. })),
+        matches!(result, Err(Error::Limit { .. })),
         "unexpected operation-budget result: {result:?}"
     );
     assert_eq!(exact.exact_bytes(), before);
@@ -1768,11 +1849,8 @@ fn duration_reopened_package_keeps_family_and_selector_equivalence() -> TestResu
 #[test]
 fn duration_missing_metadata_is_rejected_without_publication() -> TestResult {
     let source = source()?;
-    let without_metadata = Catalog::from_bytes(&source)?.reassemble_with_deletions_to_bytes(
-        &[],
-        &[fixture::METADATA_MEMBER],
-        Limits::default(),
-    )?;
+    let without_metadata = Catalog::from_bytes(&source, Default::default())?
+        .reassemble_with_deletions_to_bytes(&[], &[fixture::METADATA_MEMBER], Limits::default())?;
     assert_rejected_or_owner(&without_metadata)?;
     Ok(())
 }

@@ -1,3 +1,4 @@
+use super::LimitKind;
 use super::{Limits, RevisionType, parse_revisions_with_limits};
 use crate::{Error, Paragraph};
 
@@ -39,7 +40,7 @@ fn public_revision_limits_accept_exact_budgets_and_report_each_resource() {
         max_inherited_namespace_bytes: 0,
     };
     assert_eq!(
-        paragraph.revisions_with_limits(exact).unwrap()[0].text(),
+        super::Reader::new(exact).paragraph(&paragraph).unwrap()[0].text(),
         "x"
     );
     for (resource, limits) in [
@@ -101,8 +102,8 @@ fn public_revision_limits_accept_exact_budgets_and_report_each_resource() {
         ),
     ] {
         assert!(
-            matches!(paragraph.revisions_with_limits(limits),
-            Err(Error::RevisionLimit { resource: actual, .. }) if actual == resource),
+            matches!(super::Reader::new(limits).paragraph(&paragraph),
+            Err(Error::RevisionLimit { kind: actual, .. }) if actual.as_str() == resource),
             "{resource}"
         );
     }
@@ -206,7 +207,7 @@ fn nested_revision_metadata_and_text_are_retained_in_source_order_and_charged() 
         max_text_bytes: 23,
         ..Limits::default()
     };
-    let revisions = paragraph.revisions_with_limits(exact).unwrap();
+    let revisions = super::Reader::new(exact).paragraph(&paragraph).unwrap();
     assert_eq!(revisions.len(), 2);
     assert_eq!(
         (revisions[0].id(), revisions[0].text()),
@@ -216,12 +217,13 @@ fn nested_revision_metadata_and_text_are_retained_in_source_order_and_charged() 
     assert_eq!(revisions[1].author(), Some("B"));
     assert_eq!(revisions[1].date_utc(), Some("2026-01-02T00:00:00Z"));
     assert!(matches!(
-        paragraph.revisions_with_limits(Limits {
+        super::Reader::new(Limits {
             max_text_bytes: 22,
             ..exact
-        }),
+        })
+        .paragraph(&paragraph),
         Err(Error::RevisionLimit {
-            resource: "text bytes",
+            kind: LimitKind::TextBytes,
             actual: 23,
             maximum: 22
         })
@@ -281,7 +283,7 @@ fn metadata_namespace_and_decoded_byte_limits_are_contextual() {
             }
         ),
         Err(Error::RevisionLimit {
-            resource: "inherited namespaces",
+            kind: LimitKind::InheritedNamespaces,
             ..
         })
     ));
@@ -306,7 +308,7 @@ fn metadata_namespace_and_decoded_byte_limits_are_contextual() {
             }
         ),
         Err(Error::RevisionLimit {
-            resource: "inherited namespace bytes",
+            kind: LimitKind::InheritedNamespaceBytes,
             ..
         })
     ));
@@ -325,7 +327,7 @@ fn empty_elements_and_metadata_markers_cannot_bypass_depth_or_content_checks() {
             }
         ),
         Err(Error::RevisionLimit {
-            resource: "depth",
+            kind: LimitKind::Depth,
             actual: 2,
             maximum: 1
         })
@@ -346,23 +348,23 @@ fn every_table_read_facade_applies_the_record_limit() {
         ..Limits::default()
     };
     assert!(matches!(
-        crate::Table::new(marker.clone()).revisions_with_limits(limits),
+        super::Reader::new(limits).table(&crate::Table::new(marker.clone())),
         Err(Error::RevisionLimit {
-            resource: "records",
+            kind: LimitKind::Records,
             ..
         })
     ));
     assert!(matches!(
-        crate::Row::new(marker.clone()).revisions_with_limits(limits),
+        super::Reader::new(limits).row(&crate::Row::new(marker.clone())),
         Err(Error::RevisionLimit {
-            resource: "records",
+            kind: LimitKind::Records,
             ..
         })
     ));
     assert!(matches!(
-        crate::Cell::new(marker).revisions_with_limits(limits),
+        super::Reader::new(limits).cell(&crate::Cell::new(marker)),
         Err(Error::RevisionLimit {
-            resource: "records",
+            kind: LimitKind::Records,
             ..
         })
     ));

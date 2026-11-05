@@ -9,20 +9,27 @@ use super::super::model::Editor;
 use crate::package::{Error as PackageError, Result};
 use crate::parts::fib::FileInformationBlock;
 use crate::parts::protection::{ProtectionPolicy, classify};
-use litchi_ole_common::object::Editor as ObjectEditor;
+use litchi_ole_common::object::{OpenOptions, Package as ObjectPackage};
 
 impl Editor {
-    pub fn open(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
+    #[cfg(test)]
+    pub(crate) fn open(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
         Self::open_with_policy(bytes, limits, ProtectionPolicy::default())
     }
 
-    pub fn open_with_policy(
+    pub(crate) fn open_with_policy(
         bytes: Vec<u8>,
         limits: Limits,
         protection_policy: ProtectionPolicy,
     ) -> Result<Self> {
         let (targets, object_pool_exists) = discover_targets(&bytes, limits)?;
-        let package = ObjectEditor::open(bytes, targets, limits).map_err(PackageError::from)?;
+        let package = ObjectPackage::open_with_options(
+            bytes,
+            OpenOptions::new().targets(targets).limits(limits),
+        )
+        .map_err(PackageError::from)?
+        .edit()
+        .map_err(PackageError::from)?;
         let word_path = vec!["WordDocument".to_string()];
         let word = package
             .stream(&word_path)

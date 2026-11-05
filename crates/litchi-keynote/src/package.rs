@@ -4,63 +4,90 @@
 //! package member in its original byte stream. The archive, Snappy, detection,
 //! and protobuf layers remain in their focused IWA infrastructure crates.
 
+mod blank_layout;
+pub(crate) use blank_layout::{FreshError, FreshSettings};
 #[cfg(feature = "internal-iwork-source")]
 mod catalog_table_appearance;
 mod chart_axis_support;
-mod edit;
-mod image_adjustments;
-mod limits;
+pub(crate) mod edit;
+mod identity;
+pub(crate) mod image_adjustments;
+mod locale;
+pub(crate) mod media_assets;
 mod rendering_invalidation;
 mod save;
 pub(crate) mod show_settings;
 mod slide_audio_creation;
-mod slide_audio_position;
-mod slide_background;
-mod slide_build_order;
-mod slide_chart_arrangement;
-mod slide_chart_axis_title;
-mod slide_chart_caption;
-mod slide_chart_data;
-mod slide_chart_legend;
-mod slide_chart_metadata;
-mod slide_chart_title;
-mod slide_chart_value_axis;
+pub(crate) mod slide_audio_position;
+pub(crate) mod slide_background;
+pub(crate) mod slide_build;
+pub(crate) mod slide_build_order;
+pub(crate) mod slide_chart_arrangement;
+pub(crate) mod slide_chart_axis_title;
+pub(crate) mod slide_chart_caption;
+pub(crate) mod slide_chart_data;
+pub(crate) mod slide_chart_font;
+pub(crate) mod slide_chart_legend;
+pub(crate) mod slide_chart_lifecycle;
+pub(crate) mod slide_chart_metadata;
+pub(crate) mod slide_chart_reference_lines;
+pub(crate) mod slide_chart_series;
+pub(crate) mod slide_chart_style;
+pub(crate) mod slide_chart_title;
+pub(crate) mod slide_chart_value_axis;
+pub(crate) mod slide_creation;
 pub(crate) mod slide_delete;
-mod slide_drawable_comments;
-mod slide_media_lifecycle;
-mod slide_media_properties;
-mod slide_media_replacement;
-mod slide_movie_caption;
+pub(crate) mod slide_drawable;
+pub(crate) mod slide_drawable_comments;
+pub(crate) mod slide_image_lifecycle;
+pub(crate) mod slide_image_text;
+pub(crate) mod slide_media_lifecycle;
+pub(crate) mod slide_media_properties;
+pub(crate) mod slide_media_replacement;
+pub(crate) mod slide_movie_caption;
 mod slide_movie_creation;
-mod slide_movie_geometry;
-mod slide_movie_playback;
-mod slide_movie_title;
-mod slide_notes;
-mod slide_order;
+pub(crate) mod slide_movie_geometry;
+pub(crate) mod slide_movie_playback;
+pub(crate) mod slide_movie_title;
+pub(crate) mod slide_notes;
+pub(crate) mod slide_order;
 pub(crate) mod slide_table_appearance;
+pub(crate) mod slide_table_cell_appearance;
+pub(crate) mod slide_table_cell_format;
+pub(crate) mod slide_table_cell_list;
 pub(crate) mod slide_table_cell_number_format;
+mod slide_table_cell_rich_text;
+pub(crate) mod slide_table_cell_text;
 pub(crate) mod slide_table_cells;
+pub(crate) mod slide_table_comments;
+pub(crate) mod slide_table_conditional_highlight;
 pub(crate) mod slide_table_core;
 pub(crate) mod slide_table_dimension;
 pub(crate) mod slide_table_headers;
+pub(crate) mod slide_table_hidden_axes;
+pub(crate) mod slide_table_layout;
+pub(crate) mod slide_table_lifecycle;
 pub(crate) mod slide_table_lock_state;
 pub(crate) mod slide_table_merges;
 pub(crate) mod slide_table_name;
-mod slide_table_physical_sort;
+pub(crate) mod slide_table_physical_sort;
 pub(crate) mod slide_table_sort_order;
-mod slide_table_title;
+pub(crate) mod slide_table_title;
+pub(crate) mod slide_table_topology;
 
 pub(crate) mod slide_placeholder_visibility;
 mod slide_preview;
-mod slide_text;
+pub(crate) mod slide_text;
 pub(crate) mod slide_transition;
+mod snappy_failure;
 pub(crate) mod soundtrack_items;
 pub(crate) mod soundtrack_order;
 pub(crate) mod soundtrack_physical;
 pub(crate) mod soundtrack_settings;
+mod structure;
 
 use std::fmt;
-use std::fs::{Metadata, OpenOptions};
+use std::fs::{Metadata, OpenOptions as FsOpenOptions};
 use std::io::{Read, Write};
 use std::path::Path;
 use std::str;
@@ -72,7 +99,7 @@ use std::time::Duration;
 use litchi_iwa_archive::{ComponentCatalog, Limits as ArchiveLimits, SourceCatalog};
 use litchi_iwa_common::{
     WireLimits,
-    wire::{WireDescent, WireFieldView, WireView, preflight_wire_tree_with_limits},
+    wire::{WireDescent, WireFieldView, WireView, preflight_wire_tree},
 };
 use litchi_iwa_core::{ArchiveObject, RawMessage};
 use litchi_iwa_detect::{Format, PreparedSource};
@@ -92,10 +119,10 @@ use once_cell::sync::OnceCell;
 use serde::Deserialize;
 use thiserror::Error;
 
+use crate::limits::{OpenOptions, SemanticLimitKind, SemanticLimits, SourceLimits};
 use crate::show::{Mode, Settings, Show, Size};
 use crate::{
-    AnimationType, Build, Document, DocumentStats, MovieInfo, MovieKind, Seconds, Slide,
-    Transition,
+    AnimationType, Build, MovieInfo, MovieKind, Seconds, Slide, Transition,
     slide::media::{MediaLoopMode, MediaPlaybackSettings, MediaVolume, geometry::MovieTransform},
     slide::media::{Point as MediaPoint, Size as MediaSize},
     transition::Effect,
@@ -112,153 +139,84 @@ pub use image_adjustments::{__decode_image_adjustments_payload, ImageAdjustments
 #[doc(hidden)]
 pub use slide_preview::{__invalidate_slide_preview, SlidePreviewInvalidationError};
 
-pub use edit::{Commit, Diagnostics, Edit, EditError, Patch};
-pub use image_adjustments::{
-    SlideImageAdjustmentsCommit, SlideImageAdjustmentsDiagnostics, SlideImageAdjustmentsEdit,
-    SlideImageAdjustmentsError, SlideImageAdjustmentsLimitKind, SlideImageAdjustmentsPatch,
-};
-pub use limits::{
-    MAX_OBJECTS, MAX_REFERENCES, MAX_SLIDES, MAX_TEXT_BYTES, MAX_TEXT_FRAGMENTS, MAX_TEXT_STORAGES,
-    ReadOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsError,
-};
+use crate::presentation::{Presentation, Stats as PresentationStats};
+pub(crate) use edit::Edit;
 pub use save::SaveError;
-pub use slide_audio_position::{
-    SlideAudioPositionCommit, SlideAudioPositionDiagnostics, SlideAudioPositionEdit,
-    SlideAudioPositionError, SlideAudioPositionLimitKind, SlideAudioPositionPatch,
-};
-pub use slide_background::{
-    SlideBackgroundCommit, SlideBackgroundDiagnostics, SlideBackgroundEdit, SlideBackgroundError,
-    SlideBackgroundLimitKind, SlideBackgroundPatch,
-};
-pub use slide_build_order::{
-    SlideBuildOrderCommit, SlideBuildOrderDiagnostics, SlideBuildOrderEdit, SlideBuildOrderError,
-    SlideBuildOrderLimitKind, SlideBuildOrderPatch,
-};
-pub use slide_chart_arrangement::{
-    ChartArrangementCommit, ChartArrangementDiagnostics, ChartArrangementEdit,
-    ChartArrangementError, ChartArrangementLimitKind, ChartArrangementPatch,
-};
-pub use slide_chart_axis_title::{
-    ChartAxisTitleCommit, ChartAxisTitleDiagnostics, ChartAxisTitleEdit, ChartAxisTitleError,
-    ChartAxisTitleLimitKind, ChartAxisTitlePatch,
-};
-pub use slide_chart_caption::{
-    ChartCaptionCommit, ChartCaptionDiagnostics, ChartCaptionEdit, ChartCaptionError,
-    ChartCaptionLimitKind, ChartCaptionPatch,
-};
-pub use slide_chart_data::{
-    SlideChartDataCommit, SlideChartDataDiagnostics, SlideChartDataEdit, SlideChartDataError,
-    SlideChartDataLimitKind, SlideChartDataPatch,
-};
-pub use slide_chart_legend::{
-    ChartLegendVisibilityCommit, ChartLegendVisibilityDiagnostics, ChartLegendVisibilityEdit,
-    ChartLegendVisibilityError, ChartLegendVisibilityLimitKind, ChartLegendVisibilityPatch,
-};
-pub use slide_chart_metadata::{SlideChartMetadataError, SlideChartMetadataLimitKind};
-pub use slide_chart_title::{
-    ChartTitleCommit, ChartTitleDiagnostics, ChartTitleEdit, ChartTitleError, ChartTitleLimitKind,
-    ChartTitlePatch,
-};
-pub use slide_chart_value_axis::{
-    ChartValueAxisCommit, ChartValueAxisDiagnostics, ChartValueAxisEdit, ChartValueAxisError,
-    ChartValueAxisLimitKind, ChartValueAxisPatch,
-};
-pub use slide_drawable_comments::{
-    DrawableSummary, SlideDrawableCommentCommit, SlideDrawableCommentDiagnostics,
-    SlideDrawableCommentEdit, SlideDrawableCommentError, SlideDrawableCommentLimitKind,
-    SlideDrawableCommentPatch,
-};
-pub use slide_media_lifecycle::{
-    SlideMediaLifecycleCommit, SlideMediaLifecycleDiagnostics, SlideMediaLifecycleError,
-    SlideMediaLifecycleLimitKind, SlideMediaLifecyclePatch,
-};
-pub use slide_media_properties::{
-    SlideMediaPropertiesCommit, SlideMediaPropertiesDiagnostics, SlideMediaPropertiesEdit,
-    SlideMediaPropertiesError, SlideMediaPropertiesLimitKind, SlideMediaPropertiesPatch,
-};
-pub use slide_media_replacement::{
-    MediaPart, SlideMediaData, SlideMediaDataCommit, SlideMediaDataDiagnostics, SlideMediaDataEdit,
-    SlideMediaDataError, SlideMediaDataLimitKind, SlideMediaDataPatch,
-};
-pub use slide_movie_caption::{
-    SlideMovieCaptionCommit, SlideMovieCaptionDiagnostics, SlideMovieCaptionEdit,
-    SlideMovieCaptionError, SlideMovieCaptionLimitKind, SlideMovieCaptionPatch,
-};
-pub use slide_movie_geometry::{
-    SlideMovieGeometryCommit, SlideMovieGeometryDiagnostics, SlideMovieGeometryEdit,
-    SlideMovieGeometryError, SlideMovieGeometryLimitKind, SlideMovieGeometryPatch,
-};
-pub use slide_movie_playback::{
-    SlideMoviePlaybackCommit, SlideMoviePlaybackDiagnostics, SlideMoviePlaybackEdit,
-    SlideMoviePlaybackError, SlideMoviePlaybackLimitKind, SlideMoviePlaybackPatch,
-};
-pub use slide_movie_title::{
-    SlideMovieTitleCommit, SlideMovieTitleDiagnostics, SlideMovieTitleEdit, SlideMovieTitleError,
-    SlideMovieTitleLimitKind, SlideMovieTitlePatch,
-};
-pub use slide_notes::{
-    SlideNotesCommit, SlideNotesDiagnostics, SlideNotesEdit, SlideNotesError, SlideNotesLimitKind,
-    SlideNotesPatch,
-};
-pub use slide_order::{
-    SlideOrderCommit, SlideOrderDiagnostics, SlideOrderEdit, SlideOrderError, SlideOrderLimitKind,
-    SlideOrderPatch,
-};
-pub use slide_table_appearance::{
-    SlideTableAppearanceCommit, SlideTableAppearanceDiagnostics, SlideTableAppearanceEdit,
-    SlideTableAppearanceError, SlideTableAppearanceLimitKind, SlideTableAppearancePatch,
-    SlideTableAppearancePath,
-};
-pub use slide_table_cell_number_format::{
-    SlideTableCellNumberFormatCommit, SlideTableCellNumberFormatDiagnostics,
-    SlideTableCellNumberFormatEdit, SlideTableCellNumberFormatError,
-    SlideTableCellNumberFormatLimitKind, SlideTableCellNumberFormatPatch,
-    SlideTableCellNumberFormatPath,
-};
-pub use slide_table_cells::{SlideTableCellsError, SlideTableCellsLimitKind, SlideTableCellsPath};
-pub use slide_table_dimension::{
-    SlideTableDimensionCommit, SlideTableDimensionDiagnostics, SlideTableDimensionEdit,
-    SlideTableDimensionError, SlideTableDimensionLimitKind, SlideTableDimensionPatch,
-    SlideTableDimensionPath,
-};
-pub use slide_table_headers::{
-    SlideTableHeaderCommit, SlideTableHeaderDiagnostics, SlideTableHeaderEdit,
-    SlideTableHeaderError, SlideTableHeaderInvalidReason, SlideTableHeaderLimitKind,
-    SlideTableHeaderPatch, SlideTableHeaderPath,
-};
-pub use slide_table_lock_state::{
-    SlideTableLockStateCommit, SlideTableLockStateDiagnostics, SlideTableLockStateEdit,
-    SlideTableLockStateError, SlideTableLockStateLimitKind, SlideTableLockStatePatch,
-    SlideTableLockStatePath,
-};
-pub use slide_table_merges::{
-    MergeReader, SlideTableMergesCommit, SlideTableMergesDiagnostics, SlideTableMergesEdit,
-    SlideTableMergesError, SlideTableMergesLimitKind, SlideTableMergesPatch, SlideTableMergesPath,
-};
-pub use slide_table_name::{
-    SlideTableNameCommit, SlideTableNameDiagnostics, SlideTableNameEdit, SlideTableNameError,
-    SlideTableNameLimitKind, SlideTableNamePatch, SlideTableNamePath,
-};
-pub use slide_table_physical_sort::{
-    KEYNOTE_PHYSICAL_SORT_OWNER_ACTIVE, SlideTablePhysicalSortCommit,
-    SlideTablePhysicalSortDiagnostics, SlideTablePhysicalSortEdit, SlideTablePhysicalSortError,
-    SlideTablePhysicalSortLimitKind, SlideTablePhysicalSortPatch, SlideTablePhysicalSortPath,
-};
-pub use slide_table_sort_order::{
-    SlideTableSortCommit, SlideTableSortDiagnostics, SlideTableSortEdit, SlideTableSortError,
-    SlideTableSortLimitKind, SlideTableSortPatch, SlideTableSortPath,
-};
-pub use slide_table_title::{
-    SlideTableTitleCommit, SlideTableTitleDiagnostics, SlideTableTitleEdit, SlideTableTitleError,
-    SlideTableTitleLimitKind, SlideTableTitlePatch,
-};
-pub use slide_text::{
-    SlideTextCommit, SlideTextDiagnostics, SlideTextEdit, SlideTextError, SlideTextLimitKind,
-    SlideTextPatch,
-};
+pub(crate) use slide_order::Error as SlideOrderError;
+pub use slide_table_physical_sort::KEYNOTE_PHYSICAL_SORT_OWNER_ACTIVE;
 
-/// Checked physical resource limits for Keynote package ingress.
-pub use litchi_iwa_archive::Limits;
+/// The checked physical and semantic profiles retained by one package.
+///
+/// The physical profile is the iWork archive profile actually used at
+/// ingress; a package handed over by the focused iWork coordinator carries
+/// the coordinator's validated profile, which [`OpenOptions`] describes
+/// through [`SourceLimits`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Profile {
+    archive: ArchiveLimits,
+    source: SourceLimits,
+    semantic: SemanticLimits,
+}
+
+impl Profile {
+    pub(crate) fn new(archive: ArchiveLimits, semantic: SemanticLimits) -> Self {
+        Self {
+            archive,
+            source: SourceLimits::from_archive(archive),
+            semantic,
+        }
+    }
+
+    /// Translate a caller-selected envelope into the ingress profile.
+    pub(crate) fn from_options(options: OpenOptions) -> ReadResult<Self> {
+        let source = options.source_limits_value();
+        Ok(Self {
+            archive: source.archive_limits()?,
+            source,
+            semantic: options.semantic_limits_value(),
+        })
+    }
+
+    pub(crate) const fn archive(self) -> ArchiveLimits {
+        self.archive
+    }
+
+    pub(crate) const fn semantic(self) -> SemanticLimits {
+        self.semantic
+    }
+
+    pub(crate) const fn source(self) -> SourceLimits {
+        self.source
+    }
+
+    pub(crate) const fn options(self) -> OpenOptions {
+        OpenOptions::new()
+            .source_limits(self.source)
+            .semantic_limits(self.semantic)
+    }
+}
+
+impl Default for Profile {
+    fn default() -> Self {
+        Self::new(ArchiveLimits::default(), SemanticLimits::default())
+    }
+}
+
+/// Map a recognized iWork application onto the workspace format vocabulary.
+pub(crate) const fn file_format(format: Format) -> litchi_core::FileFormat {
+    match format {
+        Format::Pages => litchi_core::FileFormat::Pages,
+        Format::Keynote => litchi_core::FileFormat::Keynote,
+        Format::Numbers => litchi_core::FileFormat::Numbers,
+    }
+}
+
+/// The error raised for a recognized iWork package of another application.
+pub(crate) const fn unexpected_format(format: Format) -> ReadError {
+    ReadError::UnexpectedFormat {
+        detected: file_format(format),
+    }
+}
 
 const DOCUMENT_MESSAGE_TYPE: u32 = 1;
 const LITCHI_SOURCE_BUILT_TEMPLATE: &str = "Application/Litchi/Blank/Wide";
@@ -364,9 +322,12 @@ pub enum ReadError {
     /// iWork format detection rejected the input.
     #[error(transparent)]
     Detection(#[from] litchi_iwa_detect::Error),
-    /// The package is valid iWork data but is not a Keynote presentation.
-    #[error("iWork package is not a Keynote presentation")]
-    NotKeynote,
+    /// The package is valid iWork data of another application.
+    #[error("iWork package is a {detected:?} document, not a Keynote presentation")]
+    UnexpectedFormat {
+        /// The application the package belongs to.
+        detected: litchi_core::FileFormat,
+    },
     /// The package does not contain the Keynote structure required by this reader.
     #[error("invalid Keynote package: {0}")]
     InvalidFormat(String),
@@ -509,6 +470,64 @@ pub struct Package {
     state: Arc<State>,
 }
 
+/// The shared table engines (`litchi-iwa-table`, record 0379) read the
+/// package through its catalog, object index and ingress limits.
+impl litchi_iwa_table::TableSource for Package {
+    fn catalog(&self) -> &ComponentCatalog {
+        self.state.source.components()
+    }
+
+    fn physical(&self) -> Option<&SourceCatalog> {
+        match &self.state.source {
+            PhysicalSource::Package(source) => Some(source),
+            PhysicalSource::Semantic(_) => None,
+        }
+    }
+
+    fn resolve_object(
+        &self,
+        identifier: u64,
+    ) -> Result<Option<litchi_iwa_table::ResolvedObject<'_>>, litchi_iwa_table::ResolveError> {
+        let Ok(position) = self
+            .state
+            .object_index
+            .binary_search_by_key(&identifier, |locator| locator.identifier)
+        else {
+            return Ok(None);
+        };
+        let locator = self.state.object_index[position];
+        let object = self
+            .state
+            .source
+            .components()
+            .get_index(locator.component)
+            .and_then(|component| component.archive().objects.get(locator.object))
+            .filter(|object| object.archive_info.identifier == Some(identifier))
+            .ok_or(litchi_iwa_table::ResolveError)?;
+        Ok(Some(litchi_iwa_table::ResolvedObject {
+            messages: &object.messages,
+            component_index: locator.component,
+            object_index: locator.object,
+        }))
+    }
+
+    fn source_bytes(&self) -> &[u8] {
+        Self::source_bytes(self)
+    }
+
+    fn archive_limits(&self) -> ArchiveLimits {
+        self.state.options.archive()
+    }
+
+    fn max_objects(&self) -> usize {
+        self.state.options.semantic().max_objects()
+    }
+
+    fn max_references(&self) -> usize {
+        self.state.options.semantic().max_references()
+    }
+}
+
 impl fmt::Debug for Package {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.debug_struct("Package").finish_non_exhaustive()
@@ -518,10 +537,10 @@ impl fmt::Debug for Package {
 #[derive(Debug)]
 struct State {
     source: PhysicalSource,
-    options: ReadOptions,
+    options: Profile,
     object_index: Box<[ObjectLocator]>,
     total_objects: usize,
-    semantic: OnceCell<Document>,
+    semantic: OnceCell<Presentation>,
     #[cfg(test)]
     semantic_decode_attempts: AtomicUsize,
     #[cfg(all(test, feature = "internal-iwork-source"))]
@@ -671,38 +690,52 @@ impl Package {
     /// Returns an error when the file cannot be read, is not a bounded valid
     /// iWork package, or does not contain a Keynote document root.
     ///
-    /// Path ingress accepts regular files only. It opens the final filesystem
-    /// object without following Unix symbolic links or Windows reparse points,
-    /// rejects Win32 device namespaces and non-disk handles, grows the source
-    /// buffer under the configured input ceiling, and checks descriptor
-    /// identity and mutation metadata before publishing package state.
-    /// Platforms without this descriptor-safe profile fail closed; portable
-    /// callers can use [`Self::from_bytes`] instead.
+    /// Path ingress accepts a regular file or an app-authored package
+    /// directory. A regular file is opened without following Unix symbolic
+    /// links or Windows reparse points; Win32 device namespaces and non-disk
+    /// handles are rejected, the source buffer grows under the configured
+    /// input ceiling, and descriptor identity and mutation metadata are
+    /// checked before package state is published. Platforms without this
+    /// descriptor-safe profile fail closed; portable callers can use
+    /// [`Self::from_bytes`] instead.
+    ///
+    /// A package directory (the bundle form Keynote writes when "Save as
+    /// package" is selected) is captured once and converted into its
+    /// single-file form ([`litchi_iwa_archive::bundle::capture`], record
+    /// 0306): the `Index.zip` members followed by every other file of the
+    /// bundle in byte order of its relative name. The result is an ordinary
+    /// exact-source package: it edits like a single-file package,
+    /// [`Self::save`] and [`Self::write_to`] publish the single-file form,
+    /// and [`Self::save_directory`] writes the bundle form back.
     pub fn open(path: impl AsRef<Path>) -> ReadResult<Self> {
-        Self::open_with_options(path, ReadOptions::default())
+        Self::open_with_options(path, OpenOptions::default())
     }
 
-    /// Open a Keynote package from a filesystem path with explicit limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns the same errors as [`Self::open`] while enforcing `limits`
-    /// before materializing the complete source and at the physical ZIP and
-    /// IWA boundaries.
-    pub fn open_with_limits(path: impl AsRef<Path>, limits: Limits) -> ReadResult<Self> {
-        Self::open_with_options(path, ReadOptions::new(limits, SemanticLimits::default()))
-    }
-
-    /// Open a Keynote package with independent physical and semantic limits.
+    /// Open a Keynote package with explicit physical and semantic limits.
     ///
     /// # Errors
     ///
     /// Returns the same errors as [`Self::open`]. Physical and object-index
     /// limits are enforced before this returns; slide, reference, and text
     /// limits are enforced lazily on first semantic access or [`Self::validate`].
-    pub fn open_with_options(path: impl AsRef<Path>, options: ReadOptions) -> ReadResult<Self> {
-        let source = read_source(path.as_ref(), options.archive())?;
-        Self::from_source_with_options(source, options)
+    pub fn open_with_options(path: impl AsRef<Path>, options: OpenOptions) -> ReadResult<Self> {
+        let profile = Profile::from_options(options)?;
+        let path = path.as_ref();
+        if litchi_iwa_archive::bundle::is_directory(path) {
+            let archive = profile.archive();
+            let bytes = litchi_iwa_archive::bundle::capture(path, archive.into(), archive)
+                .map_err(litchi_iwa_archive::Error::from)?;
+            // The bundle's files were bounded while they were captured; the
+            // converted package adds only ZIP framing, so its own input bound
+            // is its length.
+            let archive = litchi_iwa_archive::bundle::converted_limits(archive, bytes.len())?;
+            return Self::from_source_with_options(
+                bytes.into(),
+                Profile::new(archive, profile.semantic()),
+            );
+        }
+        let source = read_source(path, profile.archive())?;
+        Self::from_source_with_options(source, profile)
     }
 
     /// Parse a Keynote package from complete ZIP bytes with default limits.
@@ -711,36 +744,26 @@ impl Package {
     ///
     /// Returns an error when the input is not a bounded valid Keynote package.
     pub fn from_bytes(bytes: &[u8]) -> ReadResult<Self> {
-        Self::from_bytes_with_options(bytes, ReadOptions::default())
+        Self::from_bytes_with_options(bytes, OpenOptions::default())
     }
 
-    /// Parse a Keynote package from complete ZIP bytes with explicit limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the ZIP, Snappy/IWA components, document root,
-    /// or requested resource profile is invalid.
-    pub fn from_bytes_with_limits(bytes: &[u8], limits: Limits) -> ReadResult<Self> {
-        Self::from_bytes_with_options(bytes, ReadOptions::new(limits, SemanticLimits::default()))
-    }
-
-    /// Parse complete Keynote ZIP bytes with independent physical and semantic limits.
+    /// Parse complete Keynote ZIP bytes with explicit physical and semantic limits.
     ///
     /// # Errors
     ///
     /// Returns an error when physical ingress, format detection, or the object
     /// index exceeds its profile. Remaining semantic limits are enforced lazily
     /// on first semantic access or [`Self::validate`].
-    pub fn from_bytes_with_options(bytes: &[u8], options: ReadOptions) -> ReadResult<Self> {
-        let limits = options.archive();
+    pub fn from_bytes_with_options(bytes: &[u8], options: OpenOptions) -> ReadResult<Self> {
+        let profile = Profile::from_options(options)?;
         check_input_size(
             u64::try_from(bytes.len()).map_err(|_error| {
                 ReadError::InvalidFormat("Keynote input length does not fit u64".to_owned())
             })?,
-            limits,
+            profile.archive(),
         )?;
         let source = copy_source(bytes)?;
-        Self::from_source_with_options(source, options)
+        Self::from_source_with_options(source, profile)
     }
 
     /// Parse an already shared exact source without copying its byte
@@ -751,21 +774,22 @@ impl Package {
     #[doc(hidden)]
     pub fn __from_shared_source_with_options(
         source: Arc<[u8]>,
-        options: ReadOptions,
+        options: OpenOptions,
     ) -> ReadResult<Self> {
+        let profile = Profile::from_options(options)?;
         check_input_size(
             u64::try_from(source.len()).map_err(|_error| {
                 ReadError::InvalidFormat("Keynote input length does not fit u64".to_owned())
             })?,
-            options.archive(),
+            profile.archive(),
         )?;
-        Self::from_source_with_options(source, options)
+        Self::from_source_with_options(source, profile)
     }
 
-    fn from_source_with_options(source: Arc<[u8]>, options: ReadOptions) -> ReadResult<Self> {
+    fn from_source_with_options(source: Arc<[u8]>, options: Profile) -> ReadResult<Self> {
         let limits = options.archive();
-        let source_catalog = SourceCatalog::from_shared_bytes_with_limits(source, limits)?;
-        Self::from_source_catalog(source_catalog, options.semantic())
+        let source_catalog = SourceCatalog::from_shared_bytes(source, limits)?;
+        Self::from_source_catalog(source_catalog, options)
     }
 
     /// Consume one source prepared by the focused iWork coordinator.
@@ -785,23 +809,21 @@ impl Package {
         semantic: SemanticLimits,
     ) -> ReadResult<Self> {
         if source.format() != Format::Keynote {
-            return Err(ReadError::NotKeynote);
+            return Err(unexpected_format(source.format()));
         }
         let source_catalog = source.__into_source_catalog().ok_or_else(|| {
             ReadError::InvalidFormat(
                 "directory-backed Keynote sources support semantic projection only".to_owned(),
             )
         })?;
-        Self::from_classified_source_catalog(source_catalog, semantic, 0)
+        let profile = Profile::new(source_catalog.limits(), semantic);
+        Self::from_classified_source_catalog(source_catalog, profile, 0)
     }
 
-    fn from_source_catalog(
-        source_catalog: SourceCatalog,
-        semantic: SemanticLimits,
-    ) -> ReadResult<Self> {
+    fn from_source_catalog(source_catalog: SourceCatalog, profile: Profile) -> ReadResult<Self> {
         match litchi_iwa_detect::component_catalog(source_catalog.components())? {
             Some(Format::Keynote) => {},
-            Some(_) => return Err(ReadError::NotKeynote),
+            Some(other) => return Err(unexpected_format(other)),
             None => {
                 return Err(ReadError::InvalidFormat(
                     "package has no recognized iWork application root".to_owned(),
@@ -809,18 +831,23 @@ impl Package {
             },
         }
 
-        Self::from_classified_source_catalog(source_catalog, semantic, 1)
+        Self::from_classified_source_catalog(source_catalog, profile, 1)
     }
 
     fn from_classified_source_catalog(
         source_catalog: SourceCatalog,
-        semantic: SemanticLimits,
+        profile: Profile,
         source_classification_attempts: usize,
     ) -> ReadResult<Self> {
         debug_assert!(source_classification_attempts <= 1);
-        let (object_index, total_objects) =
-            build_object_index(source_catalog.components(), semantic.max_objects())?;
-        let options = ReadOptions::new(source_catalog.limits(), semantic);
+        let (object_index, total_objects) = build_object_index(
+            source_catalog.components(),
+            profile.semantic().max_objects(),
+        )?;
+        let options = Profile {
+            archive: source_catalog.limits(),
+            ..profile
+        };
 
         let package = Self {
             state: Arc::new(State {
@@ -849,7 +876,7 @@ impl Package {
         let package = Self {
             state: Arc::new(State {
                 source: PhysicalSource::Semantic(components),
-                options: ReadOptions::new(archive, semantic),
+                options: Profile::new(archive, semantic),
                 object_index,
                 total_objects,
                 semantic: OnceCell::new(),
@@ -873,11 +900,11 @@ impl Package {
     /// their existing physical-source requirements.
     pub(super) fn from_merge_components(
         components: Arc<ComponentCatalog>,
-        options: ReadOptions,
+        options: Profile,
     ) -> ReadResult<Self> {
         match litchi_iwa_detect::component_catalog(&components)? {
             Some(Format::Keynote) => {},
-            Some(_) => return Err(ReadError::NotKeynote),
+            Some(other) => return Err(unexpected_format(other)),
             None => {
                 return Err(ReadError::InvalidFormat(
                     "package has no recognized iWork application root".to_owned(),
@@ -998,22 +1025,58 @@ impl Package {
         save::save(self, path)
     }
 
-    /// Return the checked physical limits used when this package was parsed.
-    #[must_use]
-    pub fn limits(&self) -> Limits {
-        self.state.options.archive()
+    /// Save this package as an app-style package directory at `path`
+    /// (`IWORK_API_REQUESTS.md` request 16, record 0306): `Index.zip` holds
+    /// the `Index/` members with their records unchanged, and every other
+    /// member (metadata sidecars, previews, `Data/` media) is a plain file.
+    /// Opening the directory again gives back this package's exact bytes.
+    ///
+    /// The bundle is written into a sibling staging directory; an existing
+    /// destination directory is swapped out only after the new one is
+    /// complete and synchronized.
+    ///
+    /// # Errors
+    ///
+    /// [`SaveError::Publication`] when the destination exists and is not a
+    /// directory or the staging, synchronization or swap fails;
+    /// [`SaveError::Bundling`] when a staged file cannot be written;
+    /// [`SaveError::Bundle`] when the index archive cannot be assembled or a
+    /// member name cannot be a file.
+    pub fn save_directory(&self, path: impl AsRef<Path>) -> Result<(), SaveError> {
+        let source = self.state.source.package_source();
+        litchi_iwa_archive::bundle::save(
+            source.package(),
+            source.limits(),
+            path.as_ref(),
+            SaveError::Bundle,
+            SaveError::Bundling,
+        )
     }
 
-    /// Return both checked resource profiles retained by this package.
+    /// Return the ingress envelope this package was parsed under.
+    ///
+    /// A package handed over by the focused iWork coordinator reports the
+    /// coordinator's validated physical profile.
+    pub fn options(&self) -> OpenOptions {
+        self.state.options.options()
+    }
+
+    /// Return the checked physical limits used when this package was parsed.
     #[must_use]
-    pub fn read_options(&self) -> ReadOptions {
-        self.state.options
+    pub fn source_limits(&self) -> SourceLimits {
+        self.state.options.source()
     }
 
     /// Return the checked semantic limits used for lazy projection.
     #[must_use]
     pub fn semantic_limits(&self) -> SemanticLimits {
         self.state.options.semantic()
+    }
+
+    /// Return the physical archive profile used when this package was parsed.
+    #[must_use]
+    pub(crate) fn limits(&self) -> ArchiveLimits {
+        self.state.options.archive()
     }
 
     /// Extract reachable textual content in semantic presentation order.
@@ -1048,12 +1111,12 @@ impl Package {
         Ok(self.semantic_document()?.show())
     }
 
-    /// Return a cheap archive-free semantic Keynote document snapshot.
+    /// Return the cheap archive-free semantic [`Presentation`] projection.
     ///
     /// # Errors
     ///
     /// Returns an error when the native Keynote show cannot be decoded.
-    pub fn semantic_snapshot(&self) -> ReadResult<Document> {
+    pub fn presentation(&self) -> ReadResult<Presentation> {
         Ok(self.semantic_document()?.snapshot())
     }
 
@@ -1141,10 +1204,10 @@ impl Package {
         })
     }
 
-    fn semantic_document(&self) -> ReadResult<&Document> {
+    fn semantic_document(&self) -> ReadResult<&Presentation> {
         self.state
             .semantic
-            .get_or_try_init(|| Ok(Document::from_show(self.decode_show()?)))
+            .get_or_try_init(|| Ok(Presentation::from_show(self.decode_show()?)))
     }
 
     fn root_document_payload(&self) -> ReadResult<&[u8]> {
@@ -1368,7 +1431,7 @@ impl Package {
             "Keynote slide",
         )?;
         let wire_limits = self.semantic_wire_limits()?;
-        let view = WireView::parse_with_limits(payload, wire_limits).map_err(|error| {
+        let view = WireView::parse(payload, wire_limits).map_err(|error| {
             map_wire_preflight_error(error, "Keynote slide", SemanticPath::Slide { index })
         })?;
         let mut name = None;
@@ -1710,6 +1773,13 @@ impl Package {
             map_wire_preflight_error(error, "Keynote semantic payload", SemanticPath::Package)
         })
     }
+
+    /// Return the raw Numbers-wire profile selected by this package's
+    /// semantic and archive ingress limits.
+    pub(crate) fn numbers_wire_limits(&self) -> ReadResult<litchi_numbers_wire::Limits> {
+        let wire = self.semantic_wire_limits()?;
+        Ok(litchi_numbers_wire::Limits::from_wire_limits(wire))
+    }
 }
 
 fn slide_placeholder_role(
@@ -1742,19 +1812,19 @@ fn slide_placeholder_role(
 /// its Keynote graph is malformed or exceeds the supplied semantic limits.
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
-pub fn __semantic_document_from_prepared_source(
+pub fn __presentation_from_prepared_source(
     source: PreparedSource,
     semantic: SemanticLimits,
-) -> ReadResult<Document> {
-    semantic_document_from_prepared_source(source, semantic)
+) -> ReadResult<Presentation> {
+    presentation_from_prepared_source(source, semantic)
 }
 
-pub(crate) fn semantic_document_from_prepared_source(
+pub(crate) fn presentation_from_prepared_source(
     source: PreparedSource,
     semantic: SemanticLimits,
-) -> ReadResult<Document> {
+) -> ReadResult<Presentation> {
     if source.format() != Format::Keynote {
-        return Err(ReadError::NotKeynote);
+        return Err(unexpected_format(source.format()));
     }
     let (components, archive, properties) = source.__into_semantic_parts()?;
     let package = Package::from_classified_components(components, archive, semantic)?;
@@ -1764,10 +1834,10 @@ pub(crate) fn semantic_document_from_prepared_source(
         slide_count: show.slides().len(),
     };
     let metadata = metadata_from_show_and_properties(&show, properties.as_deref())?;
-    Ok(Document::from_source(
+    Ok(Presentation::from_source(
         show,
         metadata,
-        DocumentStats {
+        PresentationStats {
             slide_count: package_stats.slide_count,
         },
     ))
@@ -1921,7 +1991,7 @@ impl SemanticBudget {
             reason: TextStorageFailure::Projection,
             path,
         })?;
-        let storage = litchi_iwa_text_wire::from_bytes_with_limits(payload, text_limits)
+        let storage = litchi_iwa_text_wire::from_bytes(payload, text_limits)
             .map_err(|error| self.map_text_error(&error, text_limits, path))?;
         self.charge_fragments(storage.runs().len(), path)?;
         self.charge_text(storage.len(), path)?;
@@ -2001,7 +2071,7 @@ fn preflight_document(payload: &[u8], wire_limits: WireLimits) -> ReadResult<()>
     let mut show_fields = 0usize;
     let mut show_identifier_fields = 0usize;
     let mut super_fields = 0usize;
-    preflight_wire_tree_with_limits(payload, wire_limits, |visit| {
+    preflight_wire_tree(payload, wire_limits, |visit| {
         let field = visit.field();
         match (visit.path(), field.number()) {
             ([], 2) => {
@@ -2354,7 +2424,7 @@ fn preflight_show(
     let mut root_slide_node_fields = 0usize;
     let mut slides = 0usize;
     let maximum = budget.limits.max_slides();
-    let result = preflight_wire_tree_with_limits(payload, wire_limits, |visit| {
+    let result = preflight_wire_tree(payload, wire_limits, |visit| {
         let field = visit.field();
         match (visit.path(), field.number()) {
             ([], UI_STATE_FIELD) => {
@@ -2530,7 +2600,7 @@ fn validate_reference_payload(
     limits: WireLimits,
     context: &'static str,
 ) -> litchi_iwa_common::Result<u64> {
-    let view = WireView::parse_with_limits(payload, limits)?;
+    let view = WireView::parse(payload, limits)?;
     let mut identifier_fields = 0usize;
     let mut deprecated_type_fields = 0usize;
     let mut deprecated_external_fields = 0usize;
@@ -2559,7 +2629,7 @@ fn validate_reference_payload(
 }
 
 fn validate_size(payload: &[u8], limits: WireLimits) -> litchi_iwa_common::Result<()> {
-    let view = WireView::parse_with_limits(payload, limits)?;
+    let view = WireView::parse(payload, limits)?;
     let mut width_fields = 0usize;
     let mut height_fields = 0usize;
     for field in view.fields() {
@@ -2599,7 +2669,7 @@ fn preflight_slide<'source>(
     let mut database_duration = None;
     let mut animation_duration = None;
 
-    preflight_wire_tree_with_limits(payload, wire_limits, |visit| {
+    preflight_wire_tree(payload, wire_limits, |visit| {
         let field = visit.field();
         match (visit.path(), field.number()) {
             ([], 1) => {
@@ -2818,7 +2888,7 @@ fn preflight_movie(
     path: SemanticPath,
 ) -> ReadResult<MoviePreflight> {
     let mut movie = MoviePreflight::default();
-    preflight_wire_tree_with_limits(payload, wire_limits, |visit| {
+    preflight_wire_tree(payload, wire_limits, |visit| {
         let field = visit.field();
         match (visit.path(), field.number()) {
             ([], 1) => {
@@ -3168,7 +3238,7 @@ fn preflight_build<'source>(
     let mut database_duration = None;
     let mut animation_effect = None;
     let mut animation_duration = None;
-    preflight_wire_tree_with_limits(payload, wire_limits, |visit| {
+    preflight_wire_tree(payload, wire_limits, |visit| {
         let field = visit.field();
         match (visit.path(), field.number()) {
             ([], 2) => {
@@ -3253,7 +3323,7 @@ fn decode_slide_node_projection(
 ) -> ReadResult<(u64, bool)> {
     let is_skipped = strict_slide_node_skipped(payload, wire_limits)
         .map_err(|error| map_wire_preflight_error(error, "Keynote slide node", path))?;
-    let view = WireView::parse_with_limits(payload, wire_limits)
+    let view = WireView::parse(payload, wire_limits)
         .map_err(|error| map_wire_preflight_error(error, "Keynote slide node", path))?;
     let mut slide_fields = 0usize;
     let mut slide_identifier = None;
@@ -3487,7 +3557,7 @@ fn decode_slide_repeated_references(
     context: &'static str,
     path: SemanticPath,
 ) -> ReadResult<Vec<u64>> {
-    let view = WireView::parse_with_limits(payload, wire_limits)
+    let view = WireView::parse(payload, wire_limits)
         .map_err(|error| map_wire_preflight_error(error, "Keynote slide", path))?;
     let mut references = Vec::new();
     references
@@ -3543,7 +3613,7 @@ fn decode_shape_storage_reference(
     let mut shape_super_fields = 0usize;
     let mut shape_drawable_super_fields = 0usize;
     let mut owned_storage_fields = 0usize;
-    preflight_wire_tree_with_limits(payload, wire_limits, |visit| {
+    preflight_wire_tree(payload, wire_limits, |visit| {
         let field = visit.field();
         match (visit.path(), field.number()) {
             ([], 1) => {
@@ -3579,16 +3649,15 @@ fn decode_shape_storage_reference(
             "Keynote shape base archive is missing or duplicated".to_owned(),
         ));
     }
-    let view = WireView::parse_with_limits(payload, wire_limits)
+    let view = WireView::parse(payload, wire_limits)
         .map_err(|error| map_wire_preflight_error(error, "Keynote drawable shape", path))?;
     let mut storage_reference = None;
     for field in view.fields() {
         match field.number() {
             1 => {
-                let shape =
-                    WireView::parse_with_limits(field.payload(), wire_limits).map_err(|error| {
-                        map_wire_preflight_error(error, "Keynote shape base archive", path)
-                    })?;
+                let shape = WireView::parse(field.payload(), wire_limits).map_err(|error| {
+                    map_wire_preflight_error(error, "Keynote shape base archive", path)
+                })?;
                 let drawable = shape
                     .fields()
                     .find(|field| field.number() == 1)
@@ -3598,7 +3667,7 @@ fn decode_shape_storage_reference(
                                 .to_owned(),
                         )
                     })?;
-                WireView::parse_with_limits(drawable.payload(), wire_limits).map_err(|error| {
+                WireView::parse(drawable.payload(), wire_limits).map_err(|error| {
                     map_wire_preflight_error(error, "Keynote shape drawable archive", path)
                 })?;
             },
@@ -4061,6 +4130,7 @@ fn map_wire_preflight_error(
         | litchi_iwa_common::Error::InvalidLimit { .. }) => {
             ReadError::InvalidFormat(format!("{context} wire preflight failed: {other}"))
         },
+        _ => ReadError::InvalidFormat(format!("{context} wire preflight failed")),
     }
 }
 
@@ -4258,7 +4328,7 @@ fn strict_slide_node_skipped(data: &[u8], limits: WireLimits) -> litchi_iwa_comm
     let mut has_builds_fields = 0usize;
     let mut has_transition_fields = 0usize;
     let mut skipped = false;
-    preflight_wire_tree_with_limits(data, limits, |visit| {
+    preflight_wire_tree(data, limits, |visit| {
         let field = visit.field();
         if !visit.path().is_empty() {
             return Ok(WireDescent::Skip);
@@ -4308,7 +4378,7 @@ fn strict_slide_node_skipped(data: &[u8], limits: WireLimits) -> litchi_iwa_comm
 
 const INITIAL_SOURCE_CAPACITY: usize = 64 * 1024;
 
-fn read_source(path: &Path, limits: Limits) -> ReadResult<Arc<[u8]>> {
+fn read_source(path: &Path, limits: ArchiveLimits) -> ReadResult<Arc<[u8]>> {
     #[cfg(windows)]
     if windows_path_uses_device_namespace(path) {
         return Err(ReadError::InvalidFormat(
@@ -4316,7 +4386,7 @@ fn read_source(path: &Path, limits: Limits) -> ReadResult<Arc<[u8]>> {
         ));
     }
 
-    let mut options = OpenOptions::new();
+    let mut options = FsOpenOptions::new();
     options.read(true);
     if !configure_source_open_options(&mut options) {
         return Err(ReadError::InvalidFormat(
@@ -4374,7 +4444,7 @@ fn read_source(path: &Path, limits: Limits) -> ReadResult<Arc<[u8]>> {
 }
 
 #[cfg(unix)]
-fn configure_source_open_options(options: &mut OpenOptions) -> bool {
+fn configure_source_open_options(options: &mut FsOpenOptions) -> bool {
     use std::os::unix::fs::OpenOptionsExt;
 
     // Nonblocking prevents a FIFO from stalling before descriptor metadata
@@ -4496,7 +4566,7 @@ fn windows_file_name_is_dos_device(path: &Path) -> bool {
 }
 
 #[cfg(windows)]
-fn configure_source_open_options(options: &mut OpenOptions) -> bool {
+fn configure_source_open_options(options: &mut FsOpenOptions) -> bool {
     use std::os::windows::fs::OpenOptionsExt;
 
     // Open the final reparse point itself.  Metadata below rejects the
@@ -4514,7 +4584,7 @@ fn configure_source_open_options(options: &mut OpenOptions) -> bool {
 }
 
 #[cfg(not(any(unix, windows)))]
-fn configure_source_open_options(_options: &mut OpenOptions) -> bool {
+fn configure_source_open_options(_options: &mut FsOpenOptions) -> bool {
     false
 }
 
@@ -4534,7 +4604,7 @@ fn ensure_source_unchanged(
 fn read_source_with_reported_length(
     reader: &mut impl Read,
     reported_length: u64,
-    limits: Limits,
+    limits: ArchiveLimits,
 ) -> ReadResult<Arc<[u8]>> {
     check_input_size(reported_length, limits)?;
 
@@ -4629,14 +4699,14 @@ fn copy_source(bytes: &[u8]) -> ReadResult<Arc<[u8]>> {
     Ok(source.into())
 }
 
-fn check_input_size(size: u64, limits: Limits) -> ReadResult<()> {
+fn check_input_size(size: u64, limits: ArchiveLimits) -> ReadResult<()> {
     if size > limits.max_input_bytes() {
         return Err(input_limit_error(size, limits));
     }
     Ok(())
 }
 
-fn input_limit_error(observed: u64, limits: Limits) -> ReadError {
+fn input_limit_error(observed: u64, limits: ArchiveLimits) -> ReadError {
     ReadError::Archive(litchi_iwa_archive::Error::Limit {
         kind: litchi_iwa_archive::LimitKind::InputBytes,
         observed,
@@ -4764,7 +4834,10 @@ fn metadata_from_show_and_properties(
         .or(diagnostic.document_author)
         .or(diagnostic.sfwp_author)
         .map(PropertyScalar::into_string);
-    metadata.keywords = diagnostic.keywords.map(PropertyScalar::into_string);
+    metadata.keywords = diagnostic
+        .keywords
+        .map(|keywords| litchi_core::metadata::keywords::split(&keywords.into_string()))
+        .unwrap_or_default();
     metadata.description = diagnostic.comments.map(PropertyScalar::into_string);
     metadata.revision = diagnostic
         .revision
@@ -4784,6 +4857,7 @@ mod tests {
     use std::thread;
 
     use super::*;
+    use litchi_iwa_archive::Limits;
     use litchi_iwa_protos::kn;
     use prost::Message as _;
     use tempfile::NamedTempFile;
@@ -5135,18 +5209,9 @@ mod tests {
     fn selected_slide_record_charges_every_traversed_reference()
     -> Result<(), Box<dyn std::error::Error>> {
         let bytes = std::fs::read(native_fixture_path())?;
-        let semantic = SemanticLimits::new(
-            MAX_OBJECTS,
-            MAX_SLIDES,
-            2,
-            MAX_TEXT_STORAGES,
-            MAX_TEXT_FRAGMENTS,
-            MAX_TEXT_BYTES,
-        )?;
-        let package = Package::from_bytes_with_options(
-            &bytes,
-            ReadOptions::new(Limits::default(), semantic),
-        )?;
+        let semantic = SemanticLimits::builder().max_references(2)?.build()?;
+        let package =
+            Package::from_bytes_with_options(&bytes, OpenOptions::new().semantic_limits(semantic))?;
         let Err(error) = package.slide_record_at(0) else {
             panic!("the selected node-to-slide edge must count against the reference ceiling");
         };
@@ -5160,18 +5225,9 @@ mod tests {
             }
         ));
 
-        let semantic = SemanticLimits::new(
-            MAX_OBJECTS,
-            MAX_SLIDES,
-            3,
-            MAX_TEXT_STORAGES,
-            MAX_TEXT_FRAGMENTS,
-            MAX_TEXT_BYTES,
-        )?;
-        let package = Package::from_bytes_with_options(
-            &bytes,
-            ReadOptions::new(Limits::default(), semantic),
-        )?;
+        let semantic = SemanticLimits::builder().max_references(3)?.build()?;
+        let package =
+            Package::from_bytes_with_options(&bytes, OpenOptions::new().semantic_limits(semantic))?;
         assert!(package.slide_record_at(0)?.is_some());
         Ok(())
     }
@@ -5181,7 +5237,11 @@ mod tests {
     fn prepared_source_skips_redundant_keynote_classification()
     -> Result<(), Box<dyn std::error::Error>> {
         let source: Arc<[u8]> = std::fs::read(native_fixture_path())?.into();
-        let Some(prepared) = PreparedSource::from_shared_bytes(Arc::clone(&source))? else {
+        let Some(prepared) = PreparedSource::from_shared_bytes(
+            Arc::clone(&source),
+            litchi_iwa_detect::Limits::default(),
+        )?
+        else {
             panic!("the native fixture must be recognized as Keynote");
         };
 
@@ -5200,7 +5260,7 @@ mod tests {
         let source: Arc<[u8]> = std::fs::read(native_fixture_path())?.into();
         let package = Package::__from_shared_source_with_options(
             Arc::clone(&source),
-            ReadOptions::default(),
+            OpenOptions::default(),
         )?;
         assert!(Arc::ptr_eq(&source, &package.state.source.shared_source()));
         Ok(())
@@ -5254,18 +5314,9 @@ mod tests {
     fn failed_semantic_initialization_remains_retryable() -> Result<(), Box<dyn std::error::Error>>
     {
         let bytes = std::fs::read(native_fixture_path())?;
-        let semantic = SemanticLimits::new(
-            MAX_OBJECTS,
-            MAX_SLIDES,
-            MAX_REFERENCES,
-            MAX_TEXT_STORAGES,
-            MAX_TEXT_FRAGMENTS,
-            1,
-        )?;
-        let package = Package::from_bytes_with_options(
-            &bytes,
-            ReadOptions::new(Limits::default(), semantic),
-        )?;
+        let semantic = SemanticLimits::builder().max_text_bytes(1)?.build()?;
+        let package =
+            Package::from_bytes_with_options(&bytes, OpenOptions::new().semantic_limits(semantic))?;
 
         for _ in 0..2 {
             let Err(error) = package.show() else {
@@ -5291,11 +5342,21 @@ mod tests {
         Ok(())
     }
 
+    fn one_byte_options() -> Result<OpenOptions, crate::Error> {
+        let limits = SourceLimits::builder()
+            .max_input_bytes(1)?
+            .max_entries(1)?
+            .max_entry_bytes(1)?
+            .max_aggregate_bytes(1)?
+            .max_component_bytes(1)?
+            .build()?;
+        Ok(OpenOptions::new().source_limits(limits))
+    }
+
     #[test]
     fn borrowed_input_exceeding_limit_is_rejected_before_copy()
     -> Result<(), Box<dyn std::error::Error>> {
-        let limits = Limits::new(1, 1, 1, 1, 1)?;
-        let Err(error) = Package::from_bytes_with_limits(&[0, 1], limits) else {
+        let Err(error) = Package::from_bytes_with_options(&[0, 1], one_byte_options()?) else {
             panic!("oversized borrowed input should fail");
         };
 
@@ -5309,8 +5370,7 @@ mod tests {
         let mut file = NamedTempFile::new()?;
         file.write_all(&[0, 1])?;
 
-        let limits = Limits::new(1, 1, 1, 1, 1)?;
-        let Err(error) = Package::open_with_limits(file.path(), limits) else {
+        let Err(error) = Package::open_with_options(file.path(), one_byte_options()?) else {
             panic!("oversized path input should fail");
         };
 
@@ -5325,12 +5385,12 @@ mod tests {
         let path = directory.path().join("concurrent-readers.key");
         std::fs::copy(native_fixture_path(), &path)?;
 
-        let mut first_options = OpenOptions::new();
+        let mut first_options = FsOpenOptions::new();
         first_options.read(true);
         assert!(configure_source_open_options(&mut first_options));
         let first = first_options.open(&path)?;
 
-        let mut second_options = OpenOptions::new();
+        let mut second_options = FsOpenOptions::new();
         second_options.read(true);
         assert!(configure_source_open_options(&mut second_options));
         let second = second_options.open(&path)?;

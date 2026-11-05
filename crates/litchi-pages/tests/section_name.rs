@@ -1,11 +1,13 @@
 use std::io;
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_common::{WireLimits, decode_varint_from_bytes, encode_varint_into, wire::WireView};
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tp, tsp, tswp};
 use litchi_pages::{
-    Limits, Package, Position, SectionNameError, SectionNameLimitKind, SectionSelector,
+    Package, Position, SectionSelector, section::name::Error as SectionNameError,
+    section::name::LimitKind as SectionNameLimitKind,
 };
 use prost::Message as _;
 
@@ -45,19 +47,23 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
 fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn component_with_unknown_header(
     objects: Vec<ArchiveObject>,
     target_identifier: u64,
 ) -> TestResult<Vec<u8>> {
-    let bytes = Archive { objects }.to_bytes()?;
-    let parsed = Archive::parse(&bytes)?;
+    let bytes = Archive { objects }.to_bytes(Default::default())?;
+    let parsed = Archive::parse(&bytes, Default::default())?;
     let object = parsed
         .object(target_identifier)
         .ok_or_else(|| io::Error::other("synthetic target object is missing"))?;
@@ -91,9 +97,9 @@ fn component_with_unknown_header(
     with_unknown.extend_from_slice(&header);
     with_unknown.extend_from_slice(&bytes[data_offset..]);
 
-    let reparsed = Archive::parse(&with_unknown)?;
-    assert_eq!(reparsed.to_bytes()?, with_unknown);
-    Ok(SnappyStream::compress(&with_unknown)?)
+    let reparsed = Archive::parse(&with_unknown, Default::default())?;
+    assert_eq!(reparsed.to_bytes(Default::default())?, with_unknown);
+    Ok(SnappyStream::compress(&with_unknown, Default::default())?)
 }
 
 fn section_message(name: &str, unknown_value: u64) -> TestResult<RawMessage> {
@@ -144,10 +150,12 @@ fn synthetic_package(first_name: &str, second_name: &str) -> TestResult<Vec<u8>>
                 data: b"after-section-payload".to_vec(),
             },
         ],
+        Default::default(),
     )?;
     let second_section = ArchiveObject::new(
         SECOND_SECTION_IDENTIFIER,
         vec![section_message(second_name, 8_888)?],
+        Default::default(),
     )?;
     let document = component_with_unknown_header(
         vec![
@@ -175,7 +183,7 @@ fn synthetic_package(first_name: &str, second_name: &str) -> TestResult<Vec<u8>>
 }
 
 fn legacy_package_bytes(flat: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(flat)?;
+    let catalog = Catalog::from_bytes(flat, Default::default())?;
     let inner_entries = catalog
         .iter()
         .filter(|entry| {
@@ -199,17 +207,17 @@ fn legacy_package_bytes(flat: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn document_stream(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("missing synthetic Pages document member"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn message_payload(package: &[u8], identifier: u64, type_: u32) -> TestResult<Vec<u8>> {
     let stream = document_stream(package)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic Pages object"))?;
@@ -223,7 +231,7 @@ fn message_payload(package: &[u8], identifier: u64, type_: u32) -> TestResult<Ve
 
 fn object_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
     let stream = document_stream(package)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic Pages object"))?;
@@ -248,7 +256,7 @@ fn object_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
 }
 
 fn normalize_message_length(header: &[u8], target_index: usize) -> TestResult<Vec<u8>> {
-    let view = WireView::parse(header)?;
+    let view = WireView::parse(header, WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(header.len());
     let mut message_index = 0usize;
     for field in view.fields() {
@@ -264,7 +272,7 @@ fn normalize_message_length(header: &[u8], target_index: usize) -> TestResult<Ve
 
         output.extend_from_slice(field.key());
         output.extend_from_slice(b"<message-info>");
-        let message = WireView::parse(field.payload())?;
+        let message = WireView::parse(field.payload(), WireLimits::DEFAULT)?;
         let effective_length = message
             .fields()
             .enumerate()
@@ -288,7 +296,7 @@ fn normalize_message_length(header: &[u8], target_index: usize) -> TestResult<Ve
 }
 
 fn fields_except_name(payload: &[u8]) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse_with_limits(payload, WireLimits::default())?
+    Ok(WireView::parse(payload, WireLimits::default())?
         .fields()
         .filter(|field| field.number() != 26)
         .map(|field| field.raw().to_vec())
@@ -310,8 +318,8 @@ fn expansive_name() -> String {
 }
 
 fn assert_untouched_zip_members(before: &[u8], after: &[u8]) -> TestResult<()> {
-    let before_catalog = Catalog::from_bytes(before)?;
-    let after_catalog = Catalog::from_bytes(after)?;
+    let before_catalog = Catalog::from_bytes(before, Default::default())?;
+    let after_catalog = Catalog::from_bytes(after, Default::default())?;
     let before_entries = before_catalog.iter().collect::<Vec<_>>();
     let after_entries = after_catalog.iter().collect::<Vec<_>>();
     assert_eq!(before_entries.len(), after_entries.len());
@@ -448,7 +456,9 @@ fn selector_first_name_convenience_methods_share_transaction_boundaries() -> Tes
 
     assert!(matches!(
         package.set_section_name(SectionSelector::name("Missing"), Some("x")),
-        Err(SectionNameError::NameNotFound)
+        Err(SectionNameError::Refused(
+            litchi_pages::section::name::Refusal::NameNotFound
+        ))
     ));
     assert!(matches!(
         package.set_section_name(SectionSelector::name("Alpha"), Some("bad\0name")),
@@ -465,29 +475,37 @@ fn selector_and_name_validation_fail_before_publication() -> TestResult<()> {
 
     assert!(matches!(
         package.section_name(SectionSelector::name("Missing")),
-        Err(SectionNameError::NameNotFound)
+        Err(SectionNameError::Refused(
+            litchi_pages::section::name::Refusal::NameNotFound
+        ))
     ));
     assert!(matches!(
         package.section_name(SectionSelector::index(2)),
-        Err(SectionNameError::PositionNotFound { .. })
+        Err(SectionNameError::Refused(
+            litchi_pages::section::name::Refusal::PositionNotFound { .. }
+        ))
     ));
     assert!(matches!(
         package.section_name(SectionSelector::name("Same")),
-        Err(SectionNameError::AmbiguousSelector { .. })
+        Err(SectionNameError::Refused(
+            litchi_pages::section::name::Refusal::AmbiguousSelector { .. }
+        ))
     ));
 
     assert!(matches!(
         package.edit_section_name(SectionSelector::name("Missing")),
-        Err(SectionNameError::NameNotFound)
+        Err(SectionNameError::Refused(
+            litchi_pages::section::name::Refusal::NameNotFound
+        ))
     ));
     assert!(matches!(
         package.edit_section_name(SectionSelector::index(2)),
-        Err(SectionNameError::PositionNotFound { position })
+        Err(SectionNameError::Refused(litchi_pages::section::name::Refusal::PositionNotFound { position }))
             if position == Position::new(2)
     ));
     assert!(matches!(
         package.edit_section_name(SectionSelector::name("Same")),
-        Err(SectionNameError::AmbiguousSelector { first, duplicate })
+        Err(SectionNameError::Refused(litchi_pages::section::name::Refusal::AmbiguousSelector { first, duplicate }))
             if first == Position::new(0) && duplicate == Position::new(1)
     ));
 
@@ -544,7 +562,9 @@ fn no_op_reuses_exact_source_and_applies_to_legacy_source() -> TestResult<()> {
     legacy_changed.set_name(Some("Changed"))?;
     assert!(matches!(
         legacy_changed.commit(),
-        Err(SectionNameError::UnsupportedSource)
+        Err(SectionNameError::Refused(
+            litchi_pages::section::name::Refusal::UnsupportedSource
+        ))
     ));
     Ok(())
 }
@@ -602,7 +622,7 @@ fn changed_name_preserves_unrelated_content_and_reversible_patch() -> TestResult
         fields_except_name(&source_first_payload)?
     );
     assert!(
-        WireView::parse(&target_first_payload)?
+        WireView::parse(&target_first_payload, WireLimits::DEFAULT)?
             .fields()
             .any(|field| field.number() == 99)
     );
@@ -612,7 +632,7 @@ fn changed_name_preserves_unrelated_content_and_reversible_patch() -> TestResult
         "only the renamed message length may change in the opaque archive header"
     );
     assert!(
-        WireView::parse(&target_first_header)?
+        WireView::parse(&target_first_header, WireLimits::DEFAULT)?
             .fields()
             .any(|field| field.number() == 99)
     );
@@ -669,13 +689,16 @@ fn changed_name_respects_retained_tight_output_limit() -> TestResult<()> {
     let bytes = synthetic_package("Alpha", "Beta")?;
     let input_bytes = u64::try_from(bytes.len())?;
     let limits = Limits::new(input_bytes, 8, 1_024 * 1_024, 1_024 * 1_024, 1_024 * 1_024)?;
-    let package = Package::from_bytes_with_limits(&bytes, limits)?;
+    let package = Package::from_bytes_with_options(
+        &bytes,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    )?;
     let replacement = expansive_name();
     let mut edit = package.edit_section_name(SectionSelector::index(0))?;
     edit.set_name(Some(&replacement))?;
     assert!(matches!(
         edit.commit(),
-        Err(SectionNameError::LimitExceeded {
+        Err(SectionNameError::Limit {
             kind: SectionNameLimitKind::OutputBytes,
             ..
         })

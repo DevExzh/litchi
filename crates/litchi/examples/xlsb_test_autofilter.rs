@@ -1,7 +1,7 @@
 //! Test XLSB AutoFilter skeleton
 //!
 //! This example creates a worksheet with a small table and configures a basic
-//! auto-filter range via `MutableWorksheet::set_auto_filter`. The writer
+//! auto-filter range via `builder::Worksheet::set_auto_filter`. The writer
 //! emits a `BrtBeginAFilter`/`BrtEndAFilter` pair for the specified range.
 //!
 //! Run with:
@@ -10,14 +10,14 @@
 //! ```
 
 use litchi::sheet::CellValue;
-use litchi::xlsb::writer::{MutableWorksheet, WorkbookWriter};
+use litchi::xlsb::builder::{self, Builder};
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating XLSB with a basic AutoFilter range...");
 
-    let mut workbook = WorkbookWriter::new();
-    let mut sheet = MutableWorksheet::new("AutoFilter");
+    let mut workbook = Builder::new();
+    let mut sheet = builder::Worksheet::new("AutoFilter");
 
     // Header row (row 0)
     sheet.set_cell(0, 0, CellValue::String("Name".to_string()));
@@ -46,7 +46,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     workbook.add_worksheet(sheet);
 
     let file = File::create("xlsb_test_autofilter.xlsb")?;
-    workbook.save(file)?;
+    workbook.build()?.write_to(file)?;
 
     println!("\n[32m✓ Created xlsb_test_autofilter.xlsb[0m");
     Ok(())

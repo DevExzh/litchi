@@ -16,18 +16,18 @@ impl FontCollections {
     ///
     /// Returns an error if the limits are invalid or any collection violates
     /// them.
-    pub fn validate_with_limits(&self, limits: Limits) -> Result<()> {
+    pub(crate) fn validate_with_limits(&self, limits: Limits) -> Result<()> {
         validation::validate_collections(self, limits)
     }
 
-    /// Parse font semantics from a live `DocumentContainer` with default limits.
+    /// Parse font semantics from a live `DocumentContainer` under `limits`.
     ///
     /// # Errors
     ///
     /// Returns an error if the record tree is not a valid live document font
     /// owner or contains malformed or unsupported font records.
-    pub fn parse(root: &Record) -> Result<Self> {
-        Self::parse_with_limits(root, Limits::default())
+    pub fn parse(root: &Record, limits: &Limits) -> Result<Self> {
+        Self::parse_with_limits(root, *limits)
     }
 
     /// Parse only the live document's direct `Environment` and document-level
@@ -36,10 +36,10 @@ impl FontCollections {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_with_limits(root: &Record, limits: Limits) -> Result<Self> {
+    pub(crate) fn parse_with_limits(root: &Record, limits: Limits) -> Result<Self> {
         validation::validate_limits(limits)?;
         let mut session = RecordParseSession::new(limits.records, root.data.len())?;
-        session.account_existing(0)?;
+        session.account_existing(root, 0)?;
         if root.record_type != RecordType::Document || root.version != 0x0f || root.instance != 0 {
             return Err(Error::Corrupted(
                 "font owner is not a valid live DocumentContainer".into(),
@@ -62,8 +62,8 @@ impl FontCollections {
                 "Environment has an invalid owner header".into(),
             ));
         }
-        if !environments.is_empty() {
-            session.account_existing(1)?;
+        if let Some(environment) = environments.first() {
+            session.account_existing(environment, 1)?;
         }
         let base_records: Vec<_> = environments
             .first()
@@ -451,14 +451,14 @@ impl FontEmbeddingFlags {
 }
 
 impl FontCollection {
-    /// Parse a font collection record with default limits.
+    /// Parse a font collection record under `limits`.
     ///
     /// # Errors
     ///
     /// Returns an error if the record is malformed or violates the default
     /// limits.
-    pub fn parse(record: &Record) -> Result<Self> {
-        Self::parse_with_limits(record, Limits::default())
+    pub fn parse(record: &Record, limits: &Limits) -> Result<Self> {
+        Self::parse_with_limits(record, *limits)
     }
 
     /// Parse a font collection record, enforcing `limits`.
@@ -467,7 +467,7 @@ impl FontCollection {
     ///
     /// Returns an error if the limits are invalid, the record is malformed, or
     /// it violates `limits`.
-    pub fn parse_with_limits(record: &Record, limits: Limits) -> Result<Self> {
+    pub(crate) fn parse_with_limits(record: &Record, limits: Limits) -> Result<Self> {
         validation::validate_limits(limits)?;
         let mut session = RecordParseSession::new(limits.records, record.data.len())?;
         Self::parse_with_session(record, limits, &mut session, 0, false, false)
@@ -482,7 +482,7 @@ impl FontCollection {
         children_already_accounted: bool,
     ) -> Result<Self> {
         if !owner_already_accounted {
-            session.account_existing(logical_depth)?;
+            session.account_existing(record, logical_depth)?;
         }
         #[allow(
             clippy::wildcard_enum_match_arm,
@@ -498,27 +498,36 @@ impl FontCollection {
                 "font collection has an invalid header".into(),
             ));
         }
-        let child_depth = logical_depth
-            .checked_add(1)
-            .ok_or_else(|| Error::ResourceLimit("font record depth overflow".into()))?;
+        let child_depth = logical_depth.checked_add(1).ok_or(Error::Limit {
+            kind: crate::SourceLimitKind::Depth,
+            observed: usize::MAX,
+            maximum: limits.records.max_depth,
+        })?;
         let parsed;
         let children = if record.children.is_empty() {
             parsed = session.parse_sequence(&record.data, "font collection", child_depth)?;
             parsed.as_slice()
         } else if !children_already_accounted {
-            for _ in &record.children {
-                session.account_existing(child_depth)?;
+            for child in &record.children {
+                session.account_existing(child, child_depth)?;
             }
             record.children.as_slice()
         } else {
             record.children.as_slice()
         };
-        if children.len() > limits.records.max_records
-            || (!children.is_empty() && limits.records.max_depth == 0)
-        {
-            return Err(Error::ResourceLimit(
-                "font collection exceeds its record-count or depth limit".into(),
-            ));
+        if children.len() > limits.records.max_records {
+            return Err(Error::Limit {
+                kind: crate::SourceLimitKind::Events,
+                observed: children.len(),
+                maximum: limits.records.max_records,
+            });
+        }
+        if !children.is_empty() && limits.records.max_depth == 0 {
+            return Err(Error::Limit {
+                kind: crate::SourceLimitKind::Depth,
+                observed: child_depth,
+                maximum: limits.records.max_depth,
+            });
         }
         let mut collection = FontCollection::new(scope);
         collection
@@ -529,16 +538,24 @@ impl FontCollection {
         let mut facets = 0usize;
         let mut embedded_bytes = 0usize;
         for child in children {
-            let encoded =
-                child.data.len().checked_add(8).ok_or_else(|| {
-                    Error::ResourceLimit("font child record size overflow".into())
-                })?;
-            if child.data.len() > limits.records.max_record_payload_bytes
-                || encoded > limits.records.max_record_bytes
-            {
-                return Err(Error::ResourceLimit(
-                    "font child exceeds its record byte limit".into(),
-                ));
+            let encoded = child.data.len().checked_add(8).ok_or(Error::Limit {
+                kind: crate::SourceLimitKind::RecordBytes,
+                observed: usize::MAX,
+                maximum: limits.records.max_record_bytes,
+            })?;
+            if child.data.len() > limits.records.max_record_payload_bytes {
+                return Err(Error::Limit {
+                    kind: crate::SourceLimitKind::RecordPayloadBytes,
+                    observed: child.data.len(),
+                    maximum: limits.records.max_record_payload_bytes,
+                });
+            }
+            if encoded > limits.records.max_record_bytes {
+                return Err(Error::Limit {
+                    kind: crate::SourceLimitKind::RecordBytes,
+                    observed: encoded,
+                    maximum: limits.records.max_record_bytes,
+                });
             }
             #[allow(
                 clippy::wildcard_enum_match_arm,
@@ -621,14 +638,14 @@ impl FontCollection {
     ///
     /// Returns an error if the record is malformed, violates `limits`, or the
     /// drained payloads lose alignment with the parsed facets.
-    pub fn take_with_limits(record: &mut Record, limits: Limits) -> Result<Self> {
+    pub(crate) fn take_with_limits(record: &mut Record, limits: Limits) -> Result<Self> {
         let mut session = RecordParseSession::new(limits.records, record.data.len())?;
-        session.account_existing(0)?;
+        session.account_existing(record, 0)?;
         if record.children.is_empty() {
             record.children = session.parse_sequence(&record.data, "owned font collection", 1)?;
         } else {
-            for _ in &record.children {
-                session.account_existing(1)?;
+            for child in &record.children {
+                session.account_existing(child, 1)?;
             }
         }
         let mut payloads = Vec::new();
@@ -698,7 +715,7 @@ impl FontCollection {
     ///
     /// Returns an error if the collection fails validation or serialization
     /// exceeds `limits`.
-    pub fn to_record_bytes_with_limits(&self, limits: Limits) -> Result<Vec<u8>> {
+    pub(crate) fn to_record_bytes_with_limits(&self, limits: Limits) -> Result<Vec<u8>> {
         encode_record(&self.to_record_with_limits(limits, true)?, limits.records)
     }
 
@@ -1015,7 +1032,7 @@ fn ppt10_records(
     let Some(doc_info) = doc_info_lists.first().copied() else {
         return Ok(None);
     };
-    session.account_existing(1)?;
+    session.account_existing(doc_info, 1)?;
     if doc_info.version != 0x0f || doc_info.instance != 0 {
         return Err(Error::Corrupted(
             "DocInfoList has an invalid owner header".into(),
@@ -1034,7 +1051,7 @@ fn ppt10_records(
     let Some(prog_tags) = prog_tag_owners.first().copied() else {
         return Ok(None);
     };
-    session.account_existing(2)?;
+    session.account_existing(prog_tags, 2)?;
     if prog_tags.version != 0x0f || prog_tags.instance != 0 {
         return Err(Error::Corrupted(
             "DocProgTags has an invalid owner header".into(),
@@ -1091,7 +1108,7 @@ fn edit_ppt10_records_optional(
     edit: impl FnOnce(&mut Vec<Record>) -> Result<()>,
 ) -> Result<bool> {
     let mut session = RecordParseSession::new(limits.records, root.data.len())?;
-    session.account_existing(0)?;
+    session.account_existing(root, 0)?;
     let doc_info_positions: Vec<_> = root
         .children
         .iter()
@@ -1106,7 +1123,7 @@ fn edit_ppt10_records_optional(
         ));
     }
     let doc_info = &mut root.children[doc_info_positions[0]];
-    session.account_existing(1)?;
+    session.account_existing(doc_info, 1)?;
     if doc_info.version != 0x0f || doc_info.instance != 0 {
         return Err(Error::Corrupted(
             "DocInfoList has an invalid owner header".into(),
@@ -1124,7 +1141,7 @@ fn edit_ppt10_records_optional(
         ));
     }
     let prog_tags = &mut doc_info.children[prog_positions[0]];
-    session.account_existing(2)?;
+    session.account_existing(prog_tags, 2)?;
     if prog_tags.version != 0x0f || prog_tags.instance != 0 {
         return Err(Error::Corrupted(
             "DocProgTags has an invalid owner header".into(),
@@ -1242,7 +1259,7 @@ fn one_blob_mut(pair: &mut [Record]) -> Result<&mut Record> {
 
 pub(crate) fn encode_sequence(
     records: &[Record],
-    limits: crate::package::RecordLimits,
+    limits: crate::package::SourceLimits,
 ) -> Result<Vec<u8>> {
     let capacity = records
         .iter()
@@ -1262,7 +1279,7 @@ pub(crate) fn encode_sequence(
 
 pub(crate) fn encode_record(
     record: &Record,
-    limits: crate::package::RecordLimits,
+    limits: crate::package::SourceLimits,
 ) -> Result<Vec<u8>> {
     let nested;
     let payload = if record.children.is_empty() {
@@ -1275,10 +1292,19 @@ pub(crate) fn encode_record(
         .len()
         .checked_add(8)
         .ok_or_else(|| Error::Corrupted("record size overflow".into()))?;
-    if total > limits.max_record_bytes || payload.len() > limits.max_record_payload_bytes {
-        return Err(Error::Corrupted(
-            "serialized PPT record exceeds configured limits".into(),
-        ));
+    if payload.len() > limits.max_record_payload_bytes {
+        return Err(Error::Limit {
+            kind: crate::SourceLimitKind::RecordPayloadBytes,
+            observed: payload.len(),
+            maximum: limits.max_record_payload_bytes,
+        });
+    }
+    if total > limits.max_record_bytes {
+        return Err(Error::Limit {
+            kind: crate::SourceLimitKind::RecordBytes,
+            observed: total,
+            maximum: limits.max_record_bytes,
+        });
     }
     let length = u32::try_from(payload.len())
         .map_err(|_err| Error::Corrupted("record payload exceeds u32".into()))?;
@@ -1299,16 +1325,25 @@ fn append_leaf_record(
     instance: u16,
     record_type: u16,
     payload: &[u8],
-    limits: crate::package::RecordLimits,
+    limits: crate::package::SourceLimits,
 ) -> Result<()> {
     let total = payload
         .len()
         .checked_add(8)
         .ok_or_else(|| Error::Corrupted("record size overflow".into()))?;
-    if total > limits.max_record_bytes || payload.len() > limits.max_record_payload_bytes {
-        return Err(Error::ResourceLimit(
-            "serialized font record exceeds configured limits".into(),
-        ));
+    if payload.len() > limits.max_record_payload_bytes {
+        return Err(Error::Limit {
+            kind: crate::SourceLimitKind::RecordPayloadBytes,
+            observed: payload.len(),
+            maximum: limits.max_record_payload_bytes,
+        });
+    }
+    if total > limits.max_record_bytes {
+        return Err(Error::Limit {
+            kind: crate::SourceLimitKind::RecordBytes,
+            observed: total,
+            maximum: limits.max_record_bytes,
+        });
     }
     let length = u32::try_from(payload.len())
         .map_err(|_err| Error::Corrupted("record payload exceeds u32".into()))?;

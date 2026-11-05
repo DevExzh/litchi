@@ -87,16 +87,11 @@ impl VbaProject {
         &self.signatures
     }
 
-    /// Parse the `vbaProject.bin` payload with default resource limits.
-    pub fn project(&self, package: &OpcPackage) -> Result<Project> {
-        self.project_with(package, &Limits::default())
-    }
-
     /// Parse the `vbaProject.bin` payload with explicit resource limits.
     ///
     /// Declared signature payloads remain separate opaque relationship
     /// metadata and are not treated as trust decisions.
-    pub fn project_with(&self, package: &OpcPackage, limits: &Limits) -> Result<Project> {
+    pub fn project(&self, package: &OpcPackage, limits: &Limits) -> Result<Project> {
         Ok(read_project_part(package, &self.project_part_name, limits)?)
     }
 }
@@ -112,10 +107,9 @@ pub(crate) fn discover_vba_project(
 ) -> Result<Option<VbaProject>> {
     let main = package.main_document_part()?;
     if source.partname() != main.partname() || source.content_type() != content_type::XLSB_BIN {
-        return Err(Error::InvalidFormat(format!(
-            "XLSB VBA source '{}' is not the binary Workbook main part",
-            source.partname().as_str()
-        )));
+        return Err(Error::InvalidFormat(
+            "XLSB VBA source is not the binary Workbook main part",
+        ));
     }
     let mut projects = source
         .rels()
@@ -126,37 +120,25 @@ pub(crate) fn discover_vba_project(
         return Ok(None);
     };
     if projects.next().is_some() {
-        return Err(Error::InvalidFormat(format!(
-            "Workbook part '{}' has multiple VBA Project relationships",
-            source.partname().as_str()
-        )));
+        return Err(Error::InvalidFormat(
+            "Workbook part has multiple VBA Project relationships",
+        ));
     }
     if relationship.is_external() {
-        return Err(Error::InvalidFormat(format!(
-            "VBA Project relationship '{}' from '{}' cannot be external",
-            relationship.r_id(),
-            source.partname().as_str()
-        )));
+        return Err(Error::InvalidFormat(
+            "VBA Project relationship from cannot be external",
+        ));
     }
 
-    let project_part_name = relationship.target_partname().map_err(|error| {
-        Error::InvalidFormat(format!(
-            "invalid VBA Project relationship '{}' from '{}': {error}",
-            relationship.r_id(),
-            source.partname().as_str()
-        ))
-    })?;
-    let project_part = package.get_part(&project_part_name).map_err(|error| {
-        Error::FileNotFound(format!(
-            "VBA Project target '{}' from '{}': {error}",
-            project_part_name.as_str(),
-            source.partname().as_str()
-        ))
-    })?;
+    let project_part_name = relationship
+        .target_partname()
+        .map_err(|_error| Error::InvalidFormat("invalid VBA Project relationship"))?;
+    let project_part = package
+        .get_part(&project_part_name)
+        .map_err(|_error| Error::FileNotFound("VBA Project target"))?;
     if project_part.content_type() != content_type::OFC_VBA_PROJECT {
         return Err(Error::InvalidContentType {
-            expected: content_type::OFC_VBA_PROJECT.to_string(),
-            got: project_part.content_type().to_string(),
+            expected: content_type::OFC_VBA_PROJECT,
         });
     }
 
@@ -173,10 +155,9 @@ pub(crate) fn discover_vba_project(
                 content_type::OFC_VBA_PROJECT_SIGNATURE_AGILE,
             ),
             _ => {
-                return Err(Error::InvalidFormat(format!(
-                    "VBA Project part '{}' has a forbidden relationship",
-                    project_part_name.as_str()
-                )));
+                return Err(Error::InvalidFormat(
+                    "VBA Project part has a forbidden relationship",
+                ));
             },
         };
         let signature = discover_signature(
@@ -191,10 +172,9 @@ pub(crate) fn discover_vba_project(
             VbaProjectSignatureKind::Agile => &mut agile_signature,
         };
         if slot.replace(signature).is_some() {
-            return Err(Error::InvalidFormat(format!(
-                "VBA Project part '{}' has multiple {kind:?} signature relationships",
-                project_part_name.as_str()
-            )));
+            return Err(Error::InvalidFormat(
+                "VBA Project part has multiple signature relationships",
+            ));
         }
     }
 
@@ -252,12 +232,12 @@ fn store_vba_bytes_in_place(
     source: &PackURI,
     payload: Arc<Vec<u8>>,
 ) -> Result<VbaProject> {
+    crate::signature_policy::ensure_unsigned(package)?;
     let existing = {
         let source_part = package.get_part(source)?;
         discover_vba_project(package, source_part)?
     };
-    let canonical =
-        PackURI::new(PROJECT_PART).map_err(|error| Error::InvalidUri(error.to_string()))?;
+    let canonical = PackURI::new(PROJECT_PART)?;
     if existing
         .as_ref()
         .is_none_or(|project| project.project_part_name != canonical)
@@ -279,12 +259,11 @@ fn store_vba_bytes_in_place(
     package
         .get_part_mut(source)?
         .relate_to(PROJECT_TARGET, relationship_type::VBA_PROJECT);
-    package.unsign();
 
     let source_part = package.get_part(source)?;
-    discover_vba_project(package, source_part)?.ok_or_else(|| {
-        Error::InvalidFormat("stored XLSB VBA project was not discoverable".to_string())
-    })
+    discover_vba_project(package, source_part)?.ok_or(Error::InvalidFormat(
+        "stored XLSB VBA project was not discoverable",
+    ))
 }
 
 /// Remove an XLSB VBA project and all declared project-signature parts.
@@ -304,9 +283,8 @@ pub(crate) fn remove_vba_project(package: &mut OpcPackage, source: &PackURI) -> 
 }
 
 fn remove_vba_project_in_place(package: &mut OpcPackage, project: &VbaProject) -> Result<()> {
-    remove_discovered_graph(package, project)?;
-    package.unsign();
-    Ok(())
+    crate::signature_policy::ensure_unsigned(package)?;
+    remove_discovered_graph(package, project)
 }
 
 fn remove_discovered_graph(package: &mut OpcPackage, project: &VbaProject) -> Result<()> {
@@ -331,7 +309,7 @@ fn ensure_no_orphan_vba_parts(package: &OpcPackage) -> Result<()> {
         )
     }) {
         return Err(Error::InvalidFormat(
-            "XLSB package contains an orphan VBA project or project-signature part".to_string(),
+            "XLSB package contains an orphan VBA project or project-signature part",
         ));
     }
     Ok(())
@@ -356,10 +334,9 @@ fn ensure_graph_parts_are_unique(package: &OpcPackage, project: &VbaProject) -> 
             _ => continue,
         };
         if expected != Some(part.partname()) {
-            return Err(Error::InvalidFormat(format!(
-                "XLSB package contains an unexpected VBA graph part '{}'",
-                part.partname().as_str()
-            )));
+            return Err(Error::InvalidFormat(
+                "XLSB package contains an unexpected VBA graph part",
+            ));
         }
     }
     Ok(())
@@ -367,43 +344,31 @@ fn ensure_graph_parts_are_unique(package: &OpcPackage, project: &VbaProject) -> 
 
 fn discover_signature(
     package: &OpcPackage,
-    project_part_name: &PackURI,
+    _project_part_name: &PackURI,
     relationship: &Relationship,
     kind: VbaProjectSignatureKind,
-    expected_content_type: &str,
+    expected_content_type: &'static str,
 ) -> Result<VbaProjectSignature> {
     if relationship.is_external() {
-        return Err(Error::InvalidFormat(format!(
-            "{kind:?} VBA Project Signature relationship '{}' from '{}' cannot be external",
-            relationship.r_id(),
-            project_part_name.as_str()
-        )));
+        return Err(Error::InvalidFormat(
+            "VBA Project Signature relationship from cannot be external",
+        ));
     }
-    let part_name = relationship.target_partname().map_err(|error| {
-        Error::InvalidFormat(format!(
-            "invalid {kind:?} VBA Project Signature relationship '{}' from '{}': {error}",
-            relationship.r_id(),
-            project_part_name.as_str()
-        ))
-    })?;
-    let part = package.get_part(&part_name).map_err(|error| {
-        Error::FileNotFound(format!(
-            "{kind:?} VBA Project Signature target '{}' from '{}': {error}",
-            part_name.as_str(),
-            project_part_name.as_str()
-        ))
-    })?;
+    let part_name = relationship
+        .target_partname()
+        .map_err(|_error| Error::InvalidFormat("invalid VBA Project Signature relationship"))?;
+    let part = package
+        .get_part(&part_name)
+        .map_err(|_error| Error::FileNotFound("VBA Project Signature target"))?;
     if part.content_type() != expected_content_type {
         return Err(Error::InvalidContentType {
-            expected: expected_content_type.to_string(),
-            got: part.content_type().to_string(),
+            expected: expected_content_type,
         });
     }
     if part.rels().iter().next().is_some() {
-        return Err(Error::InvalidFormat(format!(
-            "{kind:?} VBA Project Signature part '{}' has a forbidden relationship",
-            part_name.as_str()
-        )));
+        return Err(Error::InvalidFormat(
+            "VBA Project Signature part has a forbidden relationship",
+        ));
     }
     Ok(VbaProjectSignature {
         kind,
@@ -415,7 +380,8 @@ fn discover_signature(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::package::{MutableWorksheet, Workbook, WorkbookWriter};
+    use crate::builder::{self, Builder};
+    use crate::package::Workbook;
     use litchi_opc::part::BlobPart;
     use litchi_vba::{Limits, Payload, build};
     use std::io::Cursor;
@@ -510,10 +476,10 @@ mod tests {
 
     #[test]
     fn parsed_xlsb_workbook_exposes_inert_project_metadata() {
-        let mut writer = WorkbookWriter::new();
-        writer.add_worksheet(MutableWorksheet::new("Sheet1"));
+        let mut writer = Builder::new();
+        writer.add_worksheet(builder::Worksheet::new("Sheet1"));
         let mut bytes = Cursor::new(Vec::new());
-        writer.save(&mut bytes).unwrap();
+        writer.build().unwrap().write_to(&mut bytes).unwrap();
 
         let mut workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
         let workbook_name = workbook
@@ -552,10 +518,10 @@ mod tests {
     }
 
     fn generated_workbook() -> Workbook {
-        let mut writer = WorkbookWriter::new();
-        writer.add_worksheet(MutableWorksheet::new("Sheet1"));
+        let mut writer = Builder::new();
+        writer.add_worksheet(builder::Worksheet::new("Sheet1"));
         let mut bytes = Cursor::new(Vec::new());
-        writer.save(&mut bytes).unwrap();
+        writer.build().unwrap().write_to(&mut bytes).unwrap();
         Workbook::new(Cursor::new(bytes.into_inner())).unwrap()
     }
 
@@ -568,7 +534,9 @@ mod tests {
         workbook.save(&mut bytes).unwrap();
         let mut reopened = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
         let metadata = reopened.vba().unwrap().unwrap();
-        let parsed = metadata.project(reopened.opc_package()).unwrap();
+        let parsed = metadata
+            .project(reopened.opc_package(), &Limits::default())
+            .unwrap();
         assert_eq!(parsed.name(), "BinaryWorkbookProject");
         assert_eq!(parsed.modules().len(), 1);
 
@@ -584,15 +552,15 @@ mod tests {
 
     #[test]
     fn workbook_writer_attaches_validated_project() {
-        let mut writer = WorkbookWriter::new();
-        writer.add_worksheet(MutableWorksheet::new("Sheet1"));
+        let mut writer = Builder::new();
+        writer.add_worksheet(builder::Worksheet::new("Sheet1"));
         let limits = Limits::default();
         writer.put_vba(authored_project().finish(&limits).unwrap());
 
         let mut first = Cursor::new(Vec::new());
-        writer.save(&mut first).unwrap();
+        writer.build().unwrap().write_to(&mut first).unwrap();
         let mut second = Cursor::new(Vec::new());
-        writer.save(&mut second).unwrap();
+        writer.build().unwrap().write_to(&mut second).unwrap();
 
         for bytes in [first.into_inner(), second.into_inner()] {
             let workbook = Workbook::new(Cursor::new(bytes)).unwrap();
@@ -600,7 +568,7 @@ mod tests {
             assert_eq!(metadata.project_part_name().as_str(), PROJECT_PART);
             assert_eq!(
                 metadata
-                    .project_with(workbook.opc_package(), &limits)
+                    .project(workbook.opc_package(), &limits)
                     .unwrap()
                     .name(),
                 "BinaryWorkbookProject"
@@ -780,7 +748,10 @@ mod tests {
         let preserved = workbook.vba().unwrap().unwrap();
         assert_eq!(preserved.relationship_id(), relationship_id);
         assert_eq!(
-            preserved.project(workbook.opc_package()).unwrap().name(),
+            preserved
+                .project(workbook.opc_package(), &Limits::default())
+                .unwrap()
+                .name(),
             "BinaryWorkbookProject"
         );
     }

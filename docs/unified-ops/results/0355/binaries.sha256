@@ -1,0 +1,8 @@
+# docx_w1_contract_bench, release, CARGO_INCREMENTAL=0, CARGO_BUILD_JOBS=6:
+#   cargo build --release -p litchi-ops --features docx --example docx_w1_contract_bench
+# base: the tree of e652864de8 (the wave's cut) with crates/litchi-ops/examples/docx_w1_contract_bench.rs
+#       copied from this record's head (the example compiles against both APIs)
+# head: uo2/w1-docx at 88d253579b plus the example as committed with this record
+# Run pinned, ABBA (base, head, head, base): taskset -c 27 ./docx_w1_contract_bench
+ef248e334f6906fc2fbe3b7eb64ced951a9d715c3f5272cf405b603c510d1d08  base/docx_w1_contract_bench
+cd5f21b2001eee8a1e8cfe0292058783c6d1477fab6a3d4ffd1f5cd0664aa7e6  head/docx_w1_contract_bench

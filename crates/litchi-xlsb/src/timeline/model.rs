@@ -30,8 +30,8 @@ impl Level {
             "2" => Ok(Self::Month),
             "3" => Ok(Self::Day),
             _ => Err(Error::Unrecognized {
-                typ: "timeline level".to_string(),
-                val: value.to_string(),
+                typ: "timeline level",
+                val: "an unknown level",
             }),
         }
     }
@@ -155,8 +155,8 @@ impl FilterType {
             "M12" => Self::M12,
             _ => {
                 return Err(Error::Unrecognized {
-                    typ: "timeline filter type".to_string(),
-                    val: value.to_string(),
+                    typ: "timeline filter type",
+                    val: "an unknown filter type",
                 });
             },
         };
@@ -379,8 +379,8 @@ fn bounded(value: &str, field: &'static str, allow_empty: bool) -> Result<()> {
     if (!allow_empty && value.is_empty()) || value.len() > MAX_STRING_BYTES || value.contains('\0')
     {
         return Err(Error::Unrecognized {
-            typ: field.to_string(),
-            val: "empty, oversized, or NUL-containing value".to_string(),
+            typ: field,
+            val: "empty, oversized, or NUL-containing value",
         });
     }
     Ok(())
@@ -398,18 +398,18 @@ fn parse_datetime(value: &str) -> Option<i64> {
 pub(crate) fn validate_range(value: &Range) -> Result<()> {
     bounded(&value.start_date, "timeline startDate", false)?;
     bounded(&value.end_date, "timeline endDate", false)?;
-    let start = parse_datetime(&value.start_date).ok_or_else(|| Error::Unrecognized {
-        typ: "timeline startDate".to_string(),
-        val: value.start_date.clone(),
+    let start = parse_datetime(&value.start_date).ok_or(Error::Unrecognized {
+        typ: "timeline startDate",
+        val: "unexpected value",
     })?;
-    let end = parse_datetime(&value.end_date).ok_or_else(|| Error::Unrecognized {
-        typ: "timeline endDate".to_string(),
-        val: value.end_date.clone(),
+    let end = parse_datetime(&value.end_date).ok_or(Error::Unrecognized {
+        typ: "timeline endDate",
+        val: "unexpected value",
     })?;
     if start > end {
         return Err(Error::Unrecognized {
-            typ: "timeline range".to_string(),
-            val: "startDate is after endDate".to_string(),
+            typ: "timeline range",
+            val: "startDate is after endDate",
         });
     }
     Ok(())
@@ -432,8 +432,8 @@ pub(crate) fn validate_cache(value: &Cache) -> Result<()> {
         bounded(&pivot.name, "timeline PivotTable name", false)?;
         if !pivots.insert((pivot.tab_id, pivot.name.to_ascii_lowercase())) {
             return Err(Error::Unrecognized {
-                typ: "timeline PivotTable collection".to_string(),
-                val: "duplicate PivotTable reference".to_string(),
+                typ: "timeline PivotTable collection",
+                val: "duplicate PivotTable reference",
             });
         }
     }
@@ -457,30 +457,26 @@ pub(crate) fn validate_state(value: &State) -> Result<()> {
     validate_range(&value.bounds)?;
     if let Some(selection) = &value.selection {
         validate_range(selection)?;
-        let bounds_start =
-            parse_datetime(&value.bounds.start_date).ok_or_else(|| Error::Unrecognized {
-                typ: "timeline bounds".to_string(),
-                val: "invalid start dateTime".to_string(),
-            })?;
-        let bounds_end =
-            parse_datetime(&value.bounds.end_date).ok_or_else(|| Error::Unrecognized {
-                typ: "timeline bounds".to_string(),
-                val: "invalid end dateTime".to_string(),
-            })?;
-        let selection_start =
-            parse_datetime(&selection.start_date).ok_or_else(|| Error::Unrecognized {
-                typ: "timeline selection".to_string(),
-                val: "invalid start dateTime".to_string(),
-            })?;
-        let selection_end =
-            parse_datetime(&selection.end_date).ok_or_else(|| Error::Unrecognized {
-                typ: "timeline selection".to_string(),
-                val: "invalid end dateTime".to_string(),
-            })?;
+        let bounds_start = parse_datetime(&value.bounds.start_date).ok_or(Error::Unrecognized {
+            typ: "timeline bounds",
+            val: "invalid start dateTime",
+        })?;
+        let bounds_end = parse_datetime(&value.bounds.end_date).ok_or(Error::Unrecognized {
+            typ: "timeline bounds",
+            val: "invalid end dateTime",
+        })?;
+        let selection_start = parse_datetime(&selection.start_date).ok_or(Error::Unrecognized {
+            typ: "timeline selection",
+            val: "invalid start dateTime",
+        })?;
+        let selection_end = parse_datetime(&selection.end_date).ok_or(Error::Unrecognized {
+            typ: "timeline selection",
+            val: "invalid end dateTime",
+        })?;
         if selection_start < bounds_start || selection_end > bounds_end {
             return Err(Error::Unrecognized {
-                typ: "timeline selection".to_string(),
-                val: "selection lies outside bounds".to_string(),
+                typ: "timeline selection",
+                val: "selection lies outside bounds",
             });
         }
     }
@@ -500,8 +496,8 @@ pub(crate) fn validate_views(value: &Views) -> Result<()> {
         bounded(&view.cache, "timeline cache", false)?;
         if !names.insert(view.name.to_ascii_lowercase()) {
             return Err(Error::Unrecognized {
-                typ: "timeline collection".to_string(),
-                val: "duplicate timeline name".to_string(),
+                typ: "timeline collection",
+                val: "duplicate timeline name",
             });
         }
         if let Some(value) = &view.uid {

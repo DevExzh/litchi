@@ -4,7 +4,7 @@ use litchi_core::sheet::{CellValue, Result};
 use super::super::{EvalCtx, evaluate_expression, flatten_range_expr, to_bool, to_number};
 use super::helpers::values_equal;
 
-pub(crate) async fn eval_vlookup(
+pub(crate) fn eval_vlookup(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -16,10 +16,10 @@ pub(crate) async fn eval_vlookup(
         ));
     }
 
-    let lookup_val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
-    let table = flatten_range_expr(ctx, current_sheet, &args[1]).await?;
+    let lookup_val = evaluate_expression(ctx, current_sheet, &args[0])?;
+    let table = flatten_range_expr(ctx, current_sheet, &args[1])?;
 
-    let col_index_val = evaluate_expression(ctx, current_sheet, &args[2]).await?;
+    let col_index_val = evaluate_expression(ctx, current_sheet, &args[2])?;
     let col_index = match to_number(&col_index_val) {
         Some(n) if n >= 1.0 => n as i64,
         _ => {
@@ -30,7 +30,7 @@ pub(crate) async fn eval_vlookup(
     };
 
     let exact_match_only = if args.len() == 4 {
-        let rl_val = evaluate_expression(ctx, current_sheet, &args[3]).await?;
+        let rl_val = evaluate_expression(ctx, current_sheet, &args[3])?;
         !to_bool(&rl_val)
     } else {
         true
@@ -63,7 +63,7 @@ pub(crate) async fn eval_vlookup(
     Ok(CellValue::Error("VLOOKUP: value not found".to_string()))
 }
 
-pub(crate) async fn eval_hlookup(
+pub(crate) fn eval_hlookup(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -75,10 +75,10 @@ pub(crate) async fn eval_hlookup(
         ));
     }
 
-    let lookup_val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
-    let table = flatten_range_expr(ctx, current_sheet, &args[1]).await?;
+    let lookup_val = evaluate_expression(ctx, current_sheet, &args[0])?;
+    let table = flatten_range_expr(ctx, current_sheet, &args[1])?;
 
-    let row_index_val = evaluate_expression(ctx, current_sheet, &args[2]).await?;
+    let row_index_val = evaluate_expression(ctx, current_sheet, &args[2])?;
     let row_index = match to_number(&row_index_val) {
         Some(n) if n >= 1.0 => n as i64,
         _ => {
@@ -89,7 +89,7 @@ pub(crate) async fn eval_hlookup(
     };
 
     let exact_match_only = if args.len() == 4 {
-        let rl_val = evaluate_expression(ctx, current_sheet, &args[3]).await?;
+        let rl_val = evaluate_expression(ctx, current_sheet, &args[3])?;
         !to_bool(&rl_val)
     } else {
         true
@@ -150,8 +150,8 @@ mod tests {
         })
     }
 
-    #[tokio::test]
-    async fn test_vlookup_basic() {
+    #[test]
+    fn test_vlookup_basic() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
@@ -178,12 +178,12 @@ mod tests {
             range_expr("Sheet1", 1, 1, 3, 3),
             num_expr(2.0),
         ];
-        let result = eval_vlookup(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_vlookup(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("Bob".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_vlookup_third_column() {
+    #[test]
+    fn test_vlookup_third_column() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
@@ -203,12 +203,12 @@ mod tests {
             range_expr("Sheet1", 1, 1, 2, 3),
             num_expr(3.0),
         ];
-        let result = eval_vlookup(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_vlookup(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(200));
     }
 
-    #[tokio::test]
-    async fn test_vlookup_not_found() {
+    #[test]
+    fn test_vlookup_not_found() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
@@ -225,15 +225,15 @@ mod tests {
             range_expr("Sheet1", 1, 1, 2, 2),
             num_expr(2.0),
         ];
-        let result = eval_vlookup(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_vlookup(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("not found")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_vlookup_col_index_out_of_bounds() {
+    #[test]
+    fn test_vlookup_col_index_out_of_bounds() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
@@ -245,15 +245,15 @@ mod tests {
             range_expr("Sheet1", 1, 1, 1, 2),
             num_expr(5.0),
         ];
-        let result = eval_vlookup(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_vlookup(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("out of bounds")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_vlookup_string_lookup() {
+    #[test]
+    fn test_vlookup_string_lookup() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
@@ -271,12 +271,12 @@ mod tests {
             range_expr("Sheet1", 1, 1, 2, 2),
             num_expr(2.0),
         ];
-        let result = eval_vlookup(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_vlookup(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(200));
     }
 
-    #[tokio::test]
-    async fn test_hlookup_basic() {
+    #[test]
+    fn test_hlookup_basic() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
@@ -301,12 +301,12 @@ mod tests {
             range_expr("Sheet1", 1, 1, 2, 4),
             num_expr(2.0),
         ];
-        let result = eval_hlookup(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_hlookup(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(200));
     }
 
-    #[tokio::test]
-    async fn test_hlookup_not_found() {
+    #[test]
+    fn test_hlookup_not_found() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
@@ -323,15 +323,15 @@ mod tests {
             range_expr("Sheet1", 1, 1, 2, 2),
             num_expr(2.0),
         ];
-        let result = eval_hlookup(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_hlookup(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("not found")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_hlookup_row_index_out_of_bounds() {
+    #[test]
+    fn test_hlookup_row_index_out_of_bounds() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
@@ -343,7 +343,7 @@ mod tests {
             range_expr("Sheet1", 1, 1, 1, 2),
             num_expr(5.0),
         ];
-        let result = eval_hlookup(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_hlookup(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("out of bounds")),
             _ => panic!("Expected Error"),

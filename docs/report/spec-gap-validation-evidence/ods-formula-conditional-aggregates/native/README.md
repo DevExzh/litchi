@@ -48,3 +48,8 @@ tolerance `1e-13`, requiring exact zero.  The test is bounded cached-value
 corroboration, not full LibreOffice conformance, complete fixture recalculation,
 native Office acceptance, or a general application round-trip claim.  Upstream
 fixture data is distributed under the retained MPL 2.0 license.
+
+`cached-results.json` (5.5 MiB) was purged by the 2026-10-05 history
+rewrite. The test now reads its lossless compact re-encoding,
+`test-data/odf/formula-conditional-native/observations.json` (record 0358;
+see the `PROVENANCE.md` beside it).

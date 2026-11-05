@@ -2,10 +2,29 @@ use super::model::{
     Catalog, Guid, Header, Info, RawRecord, RevisionHeaders, RevisionLog, ShortDateTime, User,
     UserNames,
 };
-use super::{apply, read, store};
-use crate::raw::{Kind, Records, Writer};
-use litchi_opc::constants::{content_type, relationship_type};
-use litchi_opc::{BlobPart, OpcPackage, PackURI};
+use super::package::store;
+use super::{Edit, Patch, Snapshot};
+use crate::raw::{Encoder, Kind, Records};
+use litchi_opc::{OpcPackage, PackURI};
+
+fn read(package: &OpcPackage) -> super::Result<Snapshot> {
+    Snapshot::read(package, crate::raw::Limits::DEFAULT)
+}
+
+fn start_edit(package: &OpcPackage) -> Edit {
+    crate::Package::from_opc(package.clone())
+        .unwrap()
+        .edit_shared_workbook()
+        .unwrap()
+}
+
+fn apply(package: &mut OpcPackage, patch: &Patch) -> super::Result<Snapshot> {
+    let published = crate::Package::from_opc(package.clone())?
+        .apply_shared_workbook(patch)?
+        .into_package();
+    *package = published.into_opc();
+    Snapshot::read(package, crate::raw::Limits::DEFAULT)
+}
 
 const FUTURE_KIND: u16 = 0x3fff;
 
@@ -14,8 +33,8 @@ fn snapshot_noop_preserves_exact_owner_bytes() {
     let (mut package, _) = fixture();
     let before = owner_image(&package);
     let snapshot = read(&package).unwrap();
-    let commit = snapshot.edit().commit().unwrap();
-    assert!(commit.patch().is_empty());
+    let commit = start_edit(&package).commit().unwrap();
+    assert!(commit.patch().is_noop());
     let applied = apply(&mut package, commit.patch()).unwrap();
     assert_eq!(applied, snapshot);
     assert_eq!(owner_image(&package), before);
@@ -25,7 +44,7 @@ fn snapshot_noop_preserves_exact_owner_bytes() {
 fn typed_metadata_edit_preserves_unknown_revision_header_records() {
     let (mut package, header_part) = fixture();
     let mut bytes = package.get_part(&header_part).unwrap().blob().to_vec();
-    let mut writer = Writer::new(&mut bytes);
+    let mut writer = Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT);
     writer
         .write_record(Kind::new(FUTURE_KIND).unwrap(), b"future-header")
         .unwrap();
@@ -40,7 +59,7 @@ fn typed_metadata_edit_preserves_unknown_revision_header_records() {
             .iter()
             .any(|record| record.kind == FUTURE_KIND)
     );
-    let mut edit = snapshot.edit();
+    let mut edit = start_edit(&package);
     let mut info = snapshot.headers().unwrap().info.clone();
     info.revision_id = 7;
     edit.set_info(info).unwrap();
@@ -56,9 +75,12 @@ fn typed_metadata_edit_preserves_unknown_revision_header_records() {
             .iter()
             .any(|record| record.kind == FUTURE_KIND && record.payload == b"future-header")
     );
-    let reparsed = Records::new(package.get_part(&header_part).unwrap().blob())
-        .map(Result::unwrap)
-        .collect::<Vec<_>>();
+    let reparsed = Records::new(
+        package.get_part(&header_part).unwrap().blob(),
+        crate::raw::Limits::DEFAULT,
+    )
+    .map(Result::unwrap)
+    .collect::<Vec<_>>();
     assert_eq!(reparsed.last().unwrap().kind().get(), FUTURE_KIND);
 }
 
@@ -66,7 +88,7 @@ fn typed_metadata_edit_preserves_unknown_revision_header_records() {
 fn user_crud_and_stale_patches_are_source_checked_and_atomic() {
     let (mut package, _) = fixture();
     let snapshot = read(&package).unwrap();
-    let mut edit = snapshot.edit();
+    let mut edit = start_edit(&package);
     let mut user = snapshot.users().unwrap().users[0].clone();
     user.name = "Alicia".to_string();
     edit.upsert_user(user).unwrap();
@@ -75,15 +97,19 @@ fn user_crud_and_stale_patches_are_source_checked_and_atomic() {
     let applied = apply(&mut package, commit.patch()).unwrap();
     assert_eq!(applied.users().unwrap().users[0].name, "Alicia");
     let before_stale_apply = owner_image(&package);
-    assert!(apply(&mut package, commit.patch()).is_err());
+    let error = apply(&mut package, commit.patch()).expect_err("stale patch");
+    assert!(matches!(
+        error,
+        crate::package::PackageError::PatchConflict { .. }
+    ));
     assert_eq!(owner_image(&package), before_stale_apply);
 
-    let mut invalid = applied.edit();
-    let before = invalid.catalog().clone();
+    let mut invalid = start_edit(&package);
+    let before = invalid.catalog().unwrap().clone();
     let mut info = applied.headers().unwrap().info.clone();
     info.version = 0;
     assert!(invalid.set_info(info).is_err());
-    assert_eq!(invalid.catalog(), &before);
+    assert_eq!(invalid.catalog().unwrap(), &before);
 }
 
 #[test]
@@ -99,25 +125,16 @@ fn opaque_revision_records_are_borrowed_without_replay() {
 
 #[test]
 fn malformed_biff12_records_are_rejected_without_partial_metadata() {
-    assert!(super::codec::parse_log(&[0x80]).is_err());
+    assert!(super::codec::parse_log(&[0x80], crate::raw::Limits::DEFAULT).is_err());
 
     let mut users = Vec::new();
-    let mut writer = Writer::new(&mut users);
+    let mut writer = Encoder::new(&mut users, crate::raw::Limits::DEFAULT);
     writer.write_record(Kind::new(401).unwrap(), &[]).unwrap();
-    assert!(super::codec::parse_users(&users).is_err());
+    assert!(super::codec::parse_users(&users, crate::raw::Limits::DEFAULT).is_err());
 }
 
 fn fixture() -> (OpcPackage, PackURI) {
-    let mut package = OpcPackage::new();
-    let workbook = PackURI::new("/xl/workbook.bin").unwrap();
-    package.add_part(Box::new(BlobPart::new(
-        workbook,
-        content_type::XLSB_BIN.to_string(),
-        Vec::new(),
-    )));
-    package
-        .rels_mut()
-        .get_or_add(relationship_type::OFFICE_DOCUMENT, "xl/workbook.bin");
+    let mut package = crate::Package::new().unwrap().into_opc();
 
     let guid = Guid::from_bytes([1; 16]);
     let date = ShortDateTime {
@@ -164,7 +181,7 @@ fn fixture() -> (OpcPackage, PackURI) {
             b"opaque-log".to_vec(),
         )])],
     };
-    store(&mut package, &catalog).unwrap();
+    store(&mut package, &catalog, crate::raw::Limits::DEFAULT).unwrap();
     let headers = package
         .iter_parts()
         .find(|part| part.content_type() == super::package::HEADERS_CONTENT_TYPE)

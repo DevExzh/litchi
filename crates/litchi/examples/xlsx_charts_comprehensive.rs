@@ -16,8 +16,8 @@ use litchi_drawingml::chart::plot_area::{
 };
 use litchi_drawingml::chart::series::Series;
 use litchi_drawingml::chart::types::{AxisPosition, LegendPosition, RadarStyle};
-use litchi_xlsx::chart::{Anchor, Chart as WorksheetChart};
-use litchi_xlsx::{Edit, Number, Workbook};
+use litchi_xlsx::builder::chart::{Anchor, Chart as WorksheetChart};
+use litchi_xlsx::{Edit, Number, Package};
 use std::env;
 use std::error::Error;
 
@@ -27,7 +27,7 @@ fn main() -> ExampleResult<()> {
     let output = env::args()
         .nth(1)
         .unwrap_or_else(|| "charts_all_types.xlsx".to_string());
-    let workbook = Workbook::create()?;
+    let workbook = Package::new()?;
     let mut edit = workbook.edit()?;
     write_basic_data(&mut edit)?;
     write_pie_data(&mut edit)?;
@@ -95,7 +95,7 @@ fn main() -> ExampleResult<()> {
             Anchor::new(0, 5, 12, 17),
         )?,
     ];
-    let workbook = edit.commit()?.into_workbook();
+    let workbook = edit.commit()?.into_package();
     workbook.save(&output)?;
     println!(
         "Saved source data for {} typed chart models to {output}",

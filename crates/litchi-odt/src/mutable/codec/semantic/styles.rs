@@ -9,14 +9,14 @@ use litchi_core::Result;
 
 impl MutableDocument {
     /// Return typed named ruby styles from the current `styles.xml`.
-    pub fn ruby_styles(&self) -> Result<crate::ruby_family::Styles> {
+    pub(crate) fn ruby_styles(&self) -> Result<crate::ruby_family::Styles> {
         self.styles_xml
             .as_deref()
             .map_or_else(|| Ok(Default::default()), crate::parse_ruby_styles)
     }
 
     /// Insert or replace one named ruby style definition and return the old value.
-    pub fn set_ruby_style(
+    pub(crate) fn set_ruby_style(
         &mut self,
         style: &crate::ruby_family::Style,
     ) -> Result<Option<crate::ruby_family::Style>> {
@@ -34,7 +34,10 @@ impl MutableDocument {
     ///
     /// Existing `text:ruby` style references are preserved verbatim, so callers
     /// can intentionally manage their lifecycle separately.
-    pub fn remove_ruby_style(&mut self, name: &str) -> Result<Option<crate::ruby_family::Style>> {
+    pub(crate) fn remove_ruby_style(
+        &mut self,
+        name: &str,
+    ) -> Result<Option<crate::ruby_family::Style>> {
         let old = self.ruby_styles()?.get(name).cloned();
         let Some(styles) = self.styles_xml.as_deref() else {
             return Ok(None);
@@ -47,10 +50,14 @@ impl MutableDocument {
     ///
     /// Linked font resources remain inert metadata. This does not fetch a URI,
     /// load a font, or inspect embedded font data.
-    pub fn styles_font_face_declarations(&self) -> Result<Option<crate::font_face::Declarations>> {
+    pub(crate) fn styles_font_face_declarations(
+        &self,
+    ) -> Result<Option<crate::font_face::Declarations>> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(None),
-            crate::font_face::parse_styles_font_face_declarations,
+            |styles| {
+                crate::font_face::parse_styles_font_face_declarations(styles, &self.xml_limits)
+            },
         )
     }
 
@@ -58,7 +65,7 @@ impl MutableDocument {
     ///
     /// This edits `styles.xml` only. It does not fetch linked font resources,
     /// load a font, or inspect embedded font data.
-    pub fn set_styles_font_face_declarations(
+    pub(crate) fn set_styles_font_face_declarations(
         &mut self,
         declarations: &crate::font_face::Declarations,
     ) -> Result<Option<crate::font_face::Declarations>> {
@@ -66,8 +73,11 @@ impl MutableDocument {
             .styles_xml
             .clone()
             .unwrap_or_else(Structure::default_styles_xml);
-        let (updated, old) =
-            crate::font_face::set_styles_font_face_declarations_xml(&styles, declarations)?;
+        let (updated, old) = crate::font_face::set_styles_font_face_declarations_xml(
+            &styles,
+            declarations,
+            &self.xml_limits,
+        )?;
         self.styles_xml = Some(updated);
         Ok(old)
     }
@@ -76,13 +86,14 @@ impl MutableDocument {
     ///
     /// This edits `styles.xml` only. Existing style references remain
     /// verbatim so callers can manage their lifecycle separately.
-    pub fn clear_styles_font_face_declarations(
+    pub(crate) fn clear_styles_font_face_declarations(
         &mut self,
     ) -> Result<Option<crate::font_face::Declarations>> {
         let Some(styles) = self.styles_xml.as_deref() else {
             return Ok(None);
         };
-        let (updated, old) = crate::font_face::remove_styles_font_face_declarations_xml(styles)?;
+        let (updated, old) =
+            crate::font_face::remove_styles_font_face_declarations_xml(styles, &self.xml_limits)?;
         self.styles_xml = Some(updated);
         Ok(old)
     }
@@ -91,10 +102,18 @@ impl MutableDocument {
     ///
     /// This exposes stored common-style resources only. It does not resolve
     /// style use sites, load external data, or render gradients.
-    pub fn drawing_gradients(&self) -> Result<crate::drawing::resources::gradient::Collection> {
+    pub(crate) fn drawing_gradients(
+        &self,
+    ) -> Result<crate::drawing::resources::gradient::Collection> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(Default::default()),
-            crate::drawing::resources::gradient::parse_drawing_gradients,
+            |styles| {
+                crate::drawing::resources::gradient::parse_drawing_gradients(
+                    styles,
+                    self.xml_limits,
+                )
+                .map_err(litchi_core::Error::from)
+            },
         )
     }
 
@@ -102,10 +121,13 @@ impl MutableDocument {
     ///
     /// This exposes stored common-style resources only. It does not resolve
     /// style use sites or render hatches.
-    pub fn drawing_hatches(&self) -> Result<crate::drawing::resources::hatch::Collection> {
+    pub(crate) fn drawing_hatches(&self) -> Result<crate::drawing::resources::hatch::Collection> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(Default::default()),
-            crate::drawing::resources::hatch::parse_drawing_hatches,
+            |styles| {
+                crate::drawing::resources::hatch::parse_drawing_hatches(styles, self.xml_limits)
+                    .map_err(litchi_core::Error::from)
+            },
         )
     }
 
@@ -113,12 +135,18 @@ impl MutableDocument {
     ///
     /// This exposes stored common-style resources only. It does not resolve
     /// style use sites or render strokes.
-    pub fn drawing_stroke_dashes(
+    pub(crate) fn drawing_stroke_dashes(
         &self,
     ) -> Result<crate::drawing::resources::stroke_dash::Collection> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(Default::default()),
-            crate::drawing::resources::stroke_dash::parse_drawing_stroke_dashes,
+            |styles| {
+                crate::drawing::resources::stroke_dash::parse_drawing_stroke_dashes(
+                    styles,
+                    self.xml_limits,
+                )
+                .map_err(litchi_core::Error::from)
+            },
         )
     }
 
@@ -126,10 +154,18 @@ impl MutableDocument {
     ///
     /// This exposes stored common-style metadata only. It does not resolve
     /// style use sites, follow links, load linked resources, or render images.
-    pub fn drawing_fill_images(&self) -> Result<crate::drawing::resources::fill_image::Collection> {
+    pub(crate) fn drawing_fill_images(
+        &self,
+    ) -> Result<crate::drawing::resources::fill_image::Collection> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(Default::default()),
-            crate::drawing::resources::fill_image::parse_drawing_fill_images,
+            |styles| {
+                crate::drawing::resources::fill_image::parse_drawing_fill_images(
+                    styles,
+                    self.xml_limits,
+                )
+                .map_err(litchi_core::Error::from)
+            },
         )
     }
 
@@ -137,10 +173,13 @@ impl MutableDocument {
     ///
     /// This exposes stored common-style metadata only. It does not resolve
     /// style use sites or render marker paths.
-    pub fn drawing_markers(&self) -> Result<crate::drawing::resources::marker::Collection> {
+    pub(crate) fn drawing_markers(&self) -> Result<crate::drawing::resources::marker::Collection> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(Default::default()),
-            crate::drawing::resources::marker::parse_drawing_markers,
+            |styles| {
+                crate::drawing::resources::marker::parse_drawing_markers(styles, self.xml_limits)
+                    .map_err(litchi_core::Error::from)
+            },
         )
     }
 
@@ -148,10 +187,15 @@ impl MutableDocument {
     ///
     /// This exposes stored common-style metadata only. It does not resolve
     /// style use sites or render opacity gradients.
-    pub fn drawing_opacities(&self) -> Result<crate::drawing::resources::opacity::Collection> {
+    pub(crate) fn drawing_opacities(
+        &self,
+    ) -> Result<crate::drawing::resources::opacity::Collection> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(Default::default()),
-            crate::drawing::resources::opacity::parse_drawing_opacities,
+            |styles| {
+                crate::drawing::resources::opacity::parse_drawing_opacities(styles, self.xml_limits)
+                    .map_err(litchi_core::Error::from)
+            },
         )
     }
 
@@ -159,17 +203,20 @@ impl MutableDocument {
     ///
     /// The result describes style metadata only. It never renumbers, lays out,
     /// or renders notes.
-    pub fn notes_configurations(&self) -> Result<crate::notes_configuration::Configurations> {
-        self.styles_xml
-            .as_deref()
-            .map_or_else(|| Ok(Default::default()), crate::notes_configuration::parse)
+    pub(crate) fn notes_configurations(
+        &self,
+    ) -> Result<crate::notes_configuration::Configurations> {
+        self.styles_xml.as_deref().map_or_else(
+            || Ok(Default::default()),
+            |styles| crate::notes_configuration::parse(styles, &self.xml_limits),
+        )
     }
 
     /// Return stored outline numbering styles from current styles metadata.
     ///
     /// The result does not apply styles to headings, generate labels, or
     /// update tables of contents.
-    pub fn outline_styles(&self) -> Result<crate::outline_style::Styles> {
+    pub(crate) fn outline_styles(&self) -> Result<crate::outline_style::Styles> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(Default::default()),
             crate::outline_style::parse_outline_styles,
@@ -180,7 +227,7 @@ impl MutableDocument {
     ///
     /// This edits `styles.xml` only and returns the previous style with the
     /// same name. It does not alter heading structure or cached index content.
-    pub fn set_outline_style(
+    pub(crate) fn set_outline_style(
         &mut self,
         style: &crate::outline_style::Style,
     ) -> Result<Option<crate::outline_style::Style>> {
@@ -198,7 +245,7 @@ impl MutableDocument {
     ///
     /// Existing heading references are retained verbatim, allowing callers to
     /// manage those references separately.
-    pub fn remove_outline_style(
+    pub(crate) fn remove_outline_style(
         &mut self,
         name: &str,
     ) -> Result<Option<crate::outline_style::Style>> {
@@ -214,7 +261,7 @@ impl MutableDocument {
     ///
     /// This edits `styles.xml` only and returns the prior configuration for the
     /// same note class. It never changes note anchors, citations, or numbering.
-    pub fn set_notes_configuration(
+    pub(crate) fn set_notes_configuration(
         &mut self,
         configuration: &crate::notes_configuration::Configuration,
     ) -> Result<Option<crate::notes_configuration::Configuration>> {
@@ -227,7 +274,11 @@ impl MutableDocument {
             .styles_xml
             .clone()
             .unwrap_or_else(Structure::default_styles_xml);
-        self.styles_xml = Some(crate::notes_configuration::set_xml(&styles, configuration)?);
+        self.styles_xml = Some(crate::notes_configuration::set_xml(
+            &styles,
+            configuration,
+            &self.xml_limits,
+        )?);
         Ok(old)
     }
 
@@ -235,7 +286,7 @@ impl MutableDocument {
     ///
     /// An absent class is removed from `styles.xml`. This updates metadata only and
     /// never recalculates citations, sequence numbers, or page layout.
-    pub fn set_notes_configurations(
+    pub(crate) fn set_notes_configurations(
         &mut self,
         configurations: &crate::notes_configuration::Configurations,
     ) -> Result<crate::notes_configuration::Configurations> {
@@ -253,8 +304,12 @@ impl MutableDocument {
             .unwrap_or_else(Structure::default_styles_xml);
         for note_class in crate::notes_configuration::Class::ALL {
             styles = match configurations.get(note_class) {
-                Some(configuration) => crate::notes_configuration::set_xml(&styles, configuration)?,
-                None => crate::notes_configuration::remove_xml(&styles, note_class)?,
+                Some(configuration) => {
+                    crate::notes_configuration::set_xml(&styles, configuration, &self.xml_limits)?
+                },
+                None => {
+                    crate::notes_configuration::remove_xml(&styles, note_class, &self.xml_limits)?
+                },
             };
         }
         self.styles_xml = Some(styles);
@@ -265,7 +320,7 @@ impl MutableDocument {
     ///
     /// This edits style metadata only. Existing notes and their cached citations
     /// are preserved verbatim.
-    pub fn clear_notes_configuration(
+    pub(crate) fn clear_notes_configuration(
         &mut self,
         note_class: crate::notes_configuration::Class,
     ) -> Result<Option<crate::notes_configuration::Configuration>> {
@@ -273,7 +328,11 @@ impl MutableDocument {
         let Some(styles) = self.styles_xml.as_deref() else {
             return Ok(None);
         };
-        self.styles_xml = Some(crate::notes_configuration::remove_xml(styles, note_class)?);
+        self.styles_xml = Some(crate::notes_configuration::remove_xml(
+            styles,
+            note_class,
+            &self.xml_limits,
+        )?);
         Ok(old)
     }
 
@@ -281,12 +340,17 @@ impl MutableDocument {
     ///
     /// The policy is styles metadata only. It is never used to generate
     /// bibliography entries, resolve citations, or access external sources.
-    pub fn bibliography_configuration(
+    pub(crate) fn bibliography_configuration(
         &self,
     ) -> Result<Option<crate::bibliography_configuration::Configuration>> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(None),
-            crate::bibliography_configuration::parse_bibliography_configuration,
+            |styles| {
+                crate::bibliography_configuration::parse_bibliography_configuration_with_xml_limits(
+                    styles,
+                    self.xml_limits,
+                )
+            },
         )
     }
 
@@ -294,7 +358,7 @@ impl MutableDocument {
     ///
     /// This edits `styles.xml` only and returns the prior policy. It does not
     /// regenerate bibliography entries or modify bibliography marks.
-    pub fn set_bibliography_configuration(
+    pub(crate) fn set_bibliography_configuration(
         &mut self,
         configuration: &crate::bibliography_configuration::Configuration,
     ) -> Result<Option<crate::bibliography_configuration::Configuration>> {
@@ -305,9 +369,10 @@ impl MutableDocument {
             .clone()
             .unwrap_or_else(Structure::default_styles_xml);
         self.styles_xml = Some(
-            crate::bibliography_configuration::set_bibliography_configuration_xml(
+            crate::bibliography_configuration::set_bibliography_configuration_xml_with_xml_limits(
                 &styles,
                 configuration,
+                self.xml_limits,
             )?,
         );
         Ok(old)
@@ -317,15 +382,19 @@ impl MutableDocument {
     ///
     /// This edits styles metadata only. Existing bibliography entries and
     /// source marks are preserved verbatim.
-    pub fn clear_bibliography_configuration(
+    pub(crate) fn clear_bibliography_configuration(
         &mut self,
     ) -> Result<Option<crate::bibliography_configuration::Configuration>> {
         let old = self.bibliography_configuration()?;
         let Some(styles) = self.styles_xml.as_deref() else {
             return Ok(None);
         };
-        self.styles_xml =
-            Some(crate::bibliography_configuration::remove_bibliography_configuration_xml(styles)?);
+        self.styles_xml = Some(
+            crate::bibliography_configuration::remove_bibliography_configuration_xml_with_xml_limits(
+                styles,
+                self.xml_limits,
+            )?,
+        );
         Ok(old)
     }
 
@@ -333,7 +402,7 @@ impl MutableDocument {
     ///
     /// The result is presentation metadata only. It is never used to paginate
     /// the document or generate line numbers.
-    pub fn line_numbering_configuration(
+    pub(crate) fn line_numbering_configuration(
         &self,
     ) -> Result<Option<crate::line_numbering::Configuration>> {
         self.styles_xml
@@ -345,7 +414,7 @@ impl MutableDocument {
     ///
     /// This updates stored style metadata only. It never calculates page or
     /// line numbers.
-    pub fn set_line_numbering_configuration(
+    pub(crate) fn set_line_numbering_configuration(
         &mut self,
         configuration: &crate::line_numbering::Configuration,
     ) -> Result<Option<crate::line_numbering::Configuration>> {
@@ -360,7 +429,7 @@ impl MutableDocument {
     }
 
     /// Remove document line-numbering configuration and return its old value.
-    pub fn clear_line_numbering_configuration(
+    pub(crate) fn clear_line_numbering_configuration(
         &mut self,
     ) -> Result<Option<crate::line_numbering::Configuration>> {
         let old = self.line_numbering_configuration()?;
@@ -372,14 +441,15 @@ impl MutableDocument {
     }
 
     /// Parse the document's master pages and current header/footer regions.
-    pub fn master_pages(&self) -> Result<Vec<Master>> {
-        self.styles_xml
-            .as_deref()
-            .map_or_else(|| Ok(Vec::new()), read)
+    pub(crate) fn master_pages(&self) -> Result<Vec<Master>> {
+        self.styles_xml.as_deref().map_or_else(
+            || Ok(Vec::new()),
+            |styles| read(styles, self.xml_limits).map_err(litchi_core::Error::from),
+        )
     }
 
     /// Parse automatic page layouts, their properties, and header/footer styles.
-    pub fn page_layouts(&self) -> Result<Vec<PageLayout>> {
+    pub(crate) fn page_layouts(&self) -> Result<Vec<PageLayout>> {
         self.styles_xml
             .as_deref()
             .map_or_else(|| Ok(Vec::new()), parse_page_layouts)
@@ -391,7 +461,7 @@ impl MutableDocument {
     /// element whose `style:name` matches `page_layout_name`. This supports all
     /// page properties and nested header/footer styles while preserving every
     /// unrelated byte in `styles.xml`.
-    pub fn set_page_layout_xml(
+    pub(crate) fn set_page_layout_xml(
         &mut self,
         page_layout_name: &str,
         page_layout_xml: &str,
@@ -409,8 +479,25 @@ impl MutableDocument {
         Ok(())
     }
 
+    /// Apply one advanced-layout edit (section layouts, layout transfers)
+    /// to the retained `styles.xml` (record 0358).
+    pub(crate) fn edit_layout_styles(
+        &mut self,
+        update: impl FnOnce(&mut crate::header_footer::Transaction) -> Result<()>,
+    ) -> Result<()> {
+        let styles = self.styles_xml.clone().ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(
+                "document has no styles.xml layout owner to modify".to_string(),
+            )
+        })?;
+        let mut edit = crate::header_footer::Snapshot::parse(styles, self.xml_limits)?.edit();
+        update(&mut edit)?;
+        self.styles_xml = Some(edit.commit()?.into_snapshot().source_xml().to_owned());
+        Ok(())
+    }
+
     /// Create or replace typed header/footer properties in one page layout.
-    pub fn set_page_layout_header_footer_properties(
+    pub(crate) fn set_page_layout_header_footer_properties(
         &mut self,
         page_layout_name: &str,
         region: crate::header_footer::properties::Region,
@@ -438,7 +525,7 @@ impl MutableDocument {
     }
 
     /// Create or replace typed columns in one existing page layout.
-    pub fn set_page_layout_columns(
+    pub(crate) fn set_page_layout_columns(
         &mut self,
         page_layout_name: &str,
         columns: &crate::style::columns::Columns,
@@ -463,7 +550,7 @@ impl MutableDocument {
     }
 
     /// Create or replace the typed footnote separator in one existing page layout.
-    pub fn set_page_layout_footnote_separator(
+    pub(crate) fn set_page_layout_footnote_separator(
         &mut self,
         page_layout_name: &str,
         separator: &crate::footnote_separator::Separator,
@@ -490,7 +577,7 @@ impl MutableDocument {
 
     /// Add an empty master page and its referenced page layout.
     /// Replace one existing named list level's modern label alignment.
-    pub fn set_list_level_label_alignment(
+    pub(crate) fn set_list_level_label_alignment(
         &mut self,
         item: &crate::list_label_alignment::Style,
     ) -> Result<()> {
@@ -505,7 +592,7 @@ impl MutableDocument {
 
     /// Add an empty master page and its referenced page layout.
     /// Replace, insert, or remove one existing paragraph style's direct drop cap.
-    pub fn set_paragraph_style_drop_cap(
+    pub(crate) fn set_paragraph_style_drop_cap(
         &mut self,
         style: &crate::style::paragraph::drop_cap::Style,
     ) -> Result<()> {
@@ -519,7 +606,7 @@ impl MutableDocument {
     }
 
     /// Replace, insert, or remove typed row properties on an existing table-row style.
-    pub fn set_table_row_style_properties(
+    pub(crate) fn set_table_row_style_properties(
         &mut self,
         style: &crate::style::table::row::Style,
     ) -> Result<()> {
@@ -533,7 +620,7 @@ impl MutableDocument {
     }
 
     /// Replace, insert, or remove typed properties on an existing table style.
-    pub fn set_table_style_properties(
+    pub(crate) fn set_table_style_properties(
         &mut self,
         style: &crate::style::table::table::Style,
     ) -> Result<()> {
@@ -550,51 +637,51 @@ impl MutableDocument {
     ///
     /// A minimal page layout is created in `office:automatic-styles` when a
     /// layout with `page_layout_name` does not already exist.
-    pub fn add_master_page(&mut self, name: &str, page_layout_name: &str) -> Result<()> {
+    pub(crate) fn add_master_page(&mut self, name: &str, page_layout_name: &str) -> Result<()> {
         let styles = self
             .styles_xml
             .get_or_insert_with(Structure::default_styles_xml);
-        *styles = add(styles, name, page_layout_name)?;
+        *styles = add(styles, name, page_layout_name, self.xml_limits)?;
         Ok(())
     }
 
     /// Insert a complete typed master page without rewriting unrelated styles.
-    pub fn insert_master_page(&mut self, page: &Master) -> Result<()> {
+    pub(crate) fn insert_master_page(&mut self, page: &Master) -> Result<()> {
         let fragment = page.to_xml_fragment()?;
         let styles = self
             .styles_xml
             .get_or_insert_with(Structure::default_styles_xml);
-        *styles = insert(styles, &fragment)?;
+        *styles = insert(styles, &fragment, self.xml_limits)?;
         Ok(())
     }
 
     /// Replace one named master page without rewriting unrelated styles.
-    pub fn replace_master_page(&mut self, name: &str, page: &Master) -> Result<()> {
+    pub(crate) fn replace_master_page(&mut self, name: &str, page: &Master) -> Result<()> {
         let fragment = page.to_xml_fragment()?;
         let styles = self.styles_xml.as_deref().ok_or_else(|| {
             litchi_core::Error::InvalidFormat(
                 "document has no styles.xml master page to modify".to_string(),
             )
         })?;
-        self.styles_xml = Some(replace(styles, name, &fragment)?);
+        self.styles_xml = Some(replace(styles, name, &fragment, self.xml_limits)?);
         Ok(())
     }
 
     /// Remove one named master page without rewriting unrelated styles.
-    pub fn remove_master_page(&mut self, name: &str) -> Result<()> {
+    pub(crate) fn remove_master_page(&mut self, name: &str) -> Result<()> {
         let styles = self.styles_xml.as_deref().ok_or_else(|| {
             litchi_core::Error::InvalidFormat(
                 "document has no styles.xml master page to modify".to_string(),
             )
         })?;
-        self.styles_xml = Some(remove(styles, name)?);
+        self.styles_xml = Some(remove(styles, name, self.xml_limits)?);
         Ok(())
     }
 
     /// Set plain text in one header/footer region of an existing master page.
     ///
     /// Only the selected region is rewritten; all unrelated style XML is preserved.
-    pub fn set_header_footer_text(
+    pub(crate) fn set_header_footer_text(
         &mut self,
         master_page_name: &str,
         kind: crate::header_footer::Kind,
@@ -605,7 +692,13 @@ impl MutableDocument {
                 "document has no styles.xml master page to modify".to_string(),
             )
         })?;
-        self.styles_xml = Some(set_text(styles, master_page_name, kind, Some(text))?);
+        self.styles_xml = Some(set_text(
+            styles,
+            master_page_name,
+            kind,
+            Some(text),
+            self.xml_limits,
+        )?);
         Ok(())
     }
 
@@ -614,7 +707,7 @@ impl MutableDocument {
     /// The fragment must be exactly one self-contained `style:header`,
     /// `style:footer`, or corresponding first/left variant matching `kind`.
     /// This preserves rich text, fields, tables, drawings, and extension content.
-    pub fn set_header_footer_xml(
+    pub(crate) fn set_header_footer_xml(
         &mut self,
         master_page_name: &str,
         kind: crate::header_footer::Kind,
@@ -625,12 +718,18 @@ impl MutableDocument {
                 "document has no styles.xml master page to modify".to_string(),
             )
         })?;
-        self.styles_xml = Some(set_xml(styles, master_page_name, kind, xml)?);
+        self.styles_xml = Some(set_xml(
+            styles,
+            master_page_name,
+            kind,
+            xml,
+            self.xml_limits,
+        )?);
         Ok(())
     }
 
     /// Remove one header/footer region from an existing master page.
-    pub fn clear_header_footer(
+    pub(crate) fn clear_header_footer(
         &mut self,
         master_page_name: &str,
         kind: crate::header_footer::Kind,
@@ -640,7 +739,13 @@ impl MutableDocument {
                 "document has no styles.xml master page to modify".to_string(),
             )
         })?;
-        self.styles_xml = Some(set_text(styles, master_page_name, kind, None)?);
+        self.styles_xml = Some(set_text(
+            styles,
+            master_page_name,
+            kind,
+            None,
+            self.xml_limits,
+        )?);
         Ok(())
     }
 }

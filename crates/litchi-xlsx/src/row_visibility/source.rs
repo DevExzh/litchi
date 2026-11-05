@@ -1,17 +1,164 @@
-//! Guarded source-backed existing-row visibility transactions.
+//! Guarded source-backed existing-row visibility edits of a
+//! [`SourceBackedWorkbook`] (record 0360, the 0355a §1 shape).
+//!
+//! [`SourceBackedWorkbook::edit_row_visibility`] stages hide/unhide changes of
+//! existing row owners of one worksheet; [`Edit::commit`] returns a
+//! [`Commit`] whose output is the one-worksheet topology publication of the
+//! value-only family; [`SourceBackedWorkbook::apply_row_visibility`] replays
+//! a [`Patch`].
 
 use std::collections::BTreeMap;
 use std::io::Write;
-use std::sync::Arc;
 
-use litchi_core::{ExecutionContext, ReadAt};
-use litchi_opc::{ReadLimits, SourceBackedPackage, SourceCacheLimits};
+use litchi_opc::SourceBackedPackage;
 use litchi_sheet::Row;
 
-use super::{Commit, Patch, Snapshot, rewrite};
-use crate::Selector;
-use crate::cell_values;
-use crate::error::{Error, Result, invalid};
+use super::patch::Record;
+use super::{Snapshot, rewrite};
+use crate::error::{Result, invalid};
+use crate::{Selector, SourceBackedWorkbook};
+
+crate::workbook::source::deferred::source_family!(
+    "row-visibility",
+    Record,
+    own_limits,
+    own_diagnostics
+);
+
+crate::record::limit_kinds!("source-backed row-visibility", RowVisibility {
+    /// Unique rows of one batch ([`MAX_BATCH_EDITS`]).
+    BatchEdits => "rows of one row-visibility batch",
+});
+
+/// What a committed row-visibility change changed.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Diagnostics {
+    changed_rows: usize,
+}
+
+impl Diagnostics {
+    /// Whether at least one row owner changed.
+    #[must_use]
+    pub const fn changed(&self) -> bool {
+        self.changed_rows != 0
+    }
+
+    /// Number of existing row owners whose `hidden` attribute changed.
+    #[must_use]
+    pub const fn changed_rows(&self) -> usize {
+        self.changed_rows
+    }
+
+    /// Number of worksheet parts replaced (zero or one).
+    #[must_use]
+    pub const fn touched_worksheets(&self) -> usize {
+        if self.changed_rows == 0 { 0 } else { 1 }
+    }
+}
+
+impl crate::workbook::source::deferred::Report for Record {
+    type Diagnostics = Diagnostics;
+
+    fn diagnostics(&self) -> Diagnostics {
+        Diagnostics {
+            changed_rows: self.changed_rows(),
+        }
+    }
+}
+
+impl Patch {
+    /// The exact worksheet state the patch requires.
+    #[must_use]
+    pub fn before(&self) -> &Snapshot {
+        self.0.before()
+    }
+
+    /// The exact worksheet state the patch produces.
+    #[must_use]
+    pub fn after(&self) -> &Snapshot {
+        self.0.after()
+    }
+
+    /// The patch with its target worksheet payload copied out of a managed
+    /// source's reservation under an explicit `maximum_bytes` bound, so a
+    /// patch made over a managed source replays onto a workbook outside that
+    /// budget.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the payload exceeds the bound.
+    pub fn materialized(&self, maximum_bytes: usize) -> Result<Self> {
+        Ok(Self(
+            std::sync::Arc::new(self.0.materialized(maximum_bytes)?),
+            None,
+        ))
+    }
+}
+
+impl crate::workbook::source::deferred::Change for Record {
+    fn is_noop(&self) -> bool {
+        self.is_empty()
+    }
+
+    fn inverse(&self) -> Self {
+        Record::inverse(self)
+    }
+
+    fn check(&self, package: &SourceBackedPackage) -> Result<()> {
+        crate::workbook::source::deferred::Change::check(self.inner(), package)
+    }
+
+    fn write(&self, package: &SourceBackedPackage, writer: &mut dyn Write) -> Result<()> {
+        crate::workbook::source::deferred::Change::write(self.inner(), package, writer)
+    }
+
+    fn write_authenticated(
+        &self,
+        package: &SourceBackedPackage,
+        writer: &mut dyn Write,
+    ) -> Result<()> {
+        crate::workbook::source::deferred::Change::write_authenticated(
+            self.inner(),
+            package,
+            writer,
+        )
+    }
+}
+
+impl SourceBackedWorkbook {
+    /// Begin one atomic existing-row visibility edit of one worksheet.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the selector does not name a worksheet, its row
+    /// closure is unsafe to edit, or the source cannot be read.
+    pub fn edit_row_visibility<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Edit> {
+        let before = self.edit_sheet_values(selector)?.before()?.clone();
+        let mut staged = Vec::new();
+        staged
+            .try_reserve_exact(MAX_BATCH_EDITS)
+            .map_err(|source| Error::Allocation {
+                resource: "row-visibility batch staging",
+                source,
+            })?;
+        Ok(Edit {
+            workbook: self.clone(),
+            before: Snapshot::from_inner(before)?,
+            staged,
+        })
+    }
+
+    /// Replay a row-visibility patch onto this workbook.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when the worksheet does not hold the
+    /// patch's before state, and the signed-source refusal for a changed patch
+    /// on a signed source.
+    pub fn apply_row_visibility(&self, patch: &Patch) -> Result<Commit> {
+        apply_change(self, patch)
+    }
+}
 
 /// Maximum unique existing row owners in one atomic visibility transaction.
 pub const MAX_BATCH_EDITS: usize = 256;
@@ -19,12 +166,12 @@ pub const MAX_BATCH_EDITS: usize = 256;
 /// One direct visibility edit for an existing row owner.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
-pub struct RowVisibilityEdit {
+pub struct Change {
     row: Row,
     hidden: bool,
 }
 
-impl RowVisibilityEdit {
+impl Change {
     /// Construct a checked hide operation.
     #[must_use]
     pub const fn hide(row: Row) -> Self {
@@ -50,136 +197,15 @@ impl RowVisibilityEdit {
     }
 }
 
-/// Owning source-backed editor for one exact XLSX artifact.
-pub struct SourceBackedEditor {
-    inner: cell_values::SourceBackedEditor,
-}
-
-/// Clone-staged atomic row-visibility changes over one exact source worksheet.
-pub struct SourceEdit {
+/// Clone-staged atomic row-visibility changes over one exact source worksheet
+/// of a [`SourceBackedWorkbook`]. Dropping it discards it.
+pub struct Edit {
+    workbook: SourceBackedWorkbook,
     before: Snapshot,
-    staged: Vec<RowVisibilityEdit>,
+    staged: Vec<Change>,
 }
 
-impl SourceBackedEditor {
-    /// Open with the standard bounded OPC policy.
-    pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
-        Self::from_read_at_with_limits(source, ReadLimits::default())
-    }
-
-    /// Open with explicit OPC ingress limits.
-    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: ReadLimits) -> Result<Self> {
-        Ok(Self {
-            inner: cell_values::SourceBackedEditor::from_read_at_with_limits(source, limits)?,
-        })
-    }
-
-    /// Open with an explicit caller-owned execution context and the default
-    /// finite deferred-Part cache. Retained and in-flight worksheet payloads
-    /// remain attached to the context's hierarchical budget through the
-    /// delegated cell-values editor. Changed publication also reserves
-    /// bounded OPC topology-planning memory from that same budget.
-    pub fn from_read_at_with_execution_context(
-        source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            source,
-            limits,
-            SourceCacheLimits::default(),
-            context,
-        )
-    }
-
-    /// Open with explicit read and caller-owned execution policies while
-    /// retaining the default finite deferred-Part cache.
-    pub fn from_read_at_with_limits_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_execution_context(source, limits, context)
-    }
-
-    /// Open with explicit read, cache, and caller-owned execution policies.
-    /// The managed budget covers retained and in-flight OPC `PartData`
-    /// payload reservations and bounded transient topology-planning memory;
-    /// parsed row state, rewritten XML, and output buffers remain governed by
-    /// their existing bounded operations.
-    pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
-        cache_limits: SourceCacheLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Ok(Self {
-            inner: cell_values::SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                source,
-                limits,
-                cache_limits,
-                context,
-            )?,
-        })
-    }
-
-    /// Build a row-visibility editor from an already indexed source-backed
-    /// package. Managed package execution and payload retention are delegated
-    /// unchanged to the cell-values editor.
-    pub fn from_source_backed_package(package: SourceBackedPackage) -> Result<Self> {
-        Ok(Self {
-            inner: cell_values::SourceBackedEditor::from_source_backed_package(package)?,
-        })
-    }
-
-    /// Capture the exact safe visibility closure for one selected worksheet.
-    pub fn snapshot<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Snapshot> {
-        Snapshot::from_inner(self.inner.snapshot(selector)?)
-    }
-
-    /// Begin one atomic existing-row visibility edit.
-    pub fn edit<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<SourceEdit> {
-        let mut staged = Vec::new();
-        staged
-            .try_reserve_exact(MAX_BATCH_EDITS)
-            .map_err(|source| Error::Allocation {
-                resource: "row-visibility batch staging",
-                source,
-            })?;
-        Ok(SourceEdit {
-            before: self.snapshot(selector)?,
-            staged,
-        })
-    }
-
-    /// Content-free deferred-Part cache diagnostics.
-    #[must_use]
-    pub fn cache_diagnostics(&self) -> litchi_opc::SourceCacheDiagnostics {
-        self.inner.cache_diagnostics()
-    }
-
-    /// Publish one exact-source-checked worksheet overlay to a sequential sink.
-    /// For a managed editor, changed publication needs the retained selected
-    /// payload plus bounded transient topology-planning headroom from the
-    /// caller's budget. A planning reservation refusal occurs before the
-    /// first output byte and does not detach the retained payload reservation.
-    pub fn publish_commit_to_stream<W: Write>(
-        self,
-        writer: W,
-        commit: &Commit,
-    ) -> Result<Snapshot> {
-        let target = if commit.patch().is_empty() {
-            commit.patch().before().clone()
-        } else {
-            commit.patch().after().clone()
-        };
-        self.inner
-            .publish_patch_to_stream(writer, commit.patch().inner())?;
-        Ok(target)
-    }
-}
-
-impl SourceEdit {
+impl Edit {
     /// Exact source snapshot captured at transaction start.
     #[must_use]
     pub const fn before(&self) -> &Snapshot {
@@ -200,19 +226,16 @@ impl SourceEdit {
 
     /// Stage canonical hiding of one existing row owner.
     pub fn hide(&mut self, row: Row) -> Result<()> {
-        self.apply_batch([RowVisibilityEdit::hide(row)])
+        self.apply_batch([Change::hide(row)])
     }
 
     /// Stage canonical unhiding of one existing row owner.
     pub fn unhide(&mut self, row: Row) -> Result<()> {
-        self.apply_batch([RowVisibilityEdit::unhide(row)])
+        self.apply_batch([Change::unhide(row)])
     }
 
     /// Stage a bounded visibility batch atomically.
-    pub fn apply_batch(
-        &mut self,
-        edits: impl IntoIterator<Item = RowVisibilityEdit>,
-    ) -> Result<()> {
+    pub fn apply_batch(&mut self, edits: impl IntoIterator<Item = Change>) -> Result<()> {
         self.before.check_execution()?;
         let mut pending = Vec::new();
         pending
@@ -224,9 +247,11 @@ impl SourceEdit {
         for edit in edits {
             self.before.check_execution()?;
             if self.staged.len() + pending.len() == MAX_BATCH_EDITS {
-                return Err(invalid(format!(
-                    "row-visibility batch exceeds {MAX_BATCH_EDITS} unique rows"
-                )));
+                return Err(Error::limit(
+                    LimitKind::BatchEdits,
+                    MAX_BATCH_EDITS + 1,
+                    MAX_BATCH_EDITS,
+                ));
             }
             if self
                 .staged
@@ -257,7 +282,13 @@ impl SourceEdit {
         Ok(())
     }
 
-    /// Validate, rewrite once, and freeze an exact reversible commit.
+    /// Discard every staged change in place.
+    pub fn reset(&mut self) {
+        self.staged.clear();
+    }
+
+    /// Validate and rewrite the staged changes and return the committed
+    /// workbook, the exact patch and the diagnostics.
     pub fn commit(self) -> Result<Commit> {
         self.before.check_execution()?;
         let actions = self
@@ -268,9 +299,9 @@ impl SourceEdit {
         let (output, changed_rows) = rewrite::rewrite(self.before.source_xml(), &actions)?;
         self.before.check_execution()?;
         if changed_rows == 0 {
-            let patch = Patch::new(self.before.clone(), self.before.clone());
+            let patch = Record::new(self.before.clone(), self.before.clone(), 0);
             self.before.check_execution()?;
-            return Ok(Commit::new(self.before, patch, 0));
+            return commit_change(&self.workbook, patch);
         }
         let snapshot = Snapshot::from_rewritten_source(&self.before, output)?;
         snapshot.check_execution()?;
@@ -282,7 +313,9 @@ impl SourceEdit {
             }
         }
         self.before.check_execution()?;
-        let patch = Patch::new(self.before, snapshot.clone());
-        Ok(Commit::new(snapshot, patch, changed_rows))
+        commit_change(
+            &self.workbook,
+            Record::new(self.before, snapshot, changed_rows),
+        )
     }
 }

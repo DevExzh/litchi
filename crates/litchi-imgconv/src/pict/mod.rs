@@ -58,7 +58,8 @@ pub fn convert_pict(
         background_color: image::Rgba([255, 255, 255, 255]),
         ..PictToRasterOptions::default()
     };
-    let parser = PictParser::new_bounded(pict_data, 100_000, 256 * 1024 * 1024)?;
+    let limits = crate::Limits::default();
+    let parser = PictParser::new(pict_data, &limits)?;
 
     let converter = PictConverter::new(parser, options);
     converter.convert_to_format(format)

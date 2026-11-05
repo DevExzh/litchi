@@ -28,6 +28,7 @@ bitflags! {
 
 /// A malformed or unsupported RC4 `CryptoAPI` header or operation.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     Malformed(String),
     UnsupportedVersion { major: u16, minor: u16 },
@@ -56,6 +57,17 @@ pub struct Header {
     encrypted_verifier: [u8; 16],
     encrypted_verifier_hash: [u8; 20],
     key_bits: usize,
+}
+
+impl Header {
+    /// The normalized RC4 key length declared by this header.
+    ///
+    /// A wire `keyBits` value of zero is normalized to the profile default of
+    /// 40 bits during parsing, so consumers can project the validated profile
+    /// without reinterpreting the header bytes.
+    pub const fn key_bits(&self) -> usize {
+        self.key_bits
+    }
 }
 
 /// Password-derived RC4 `CryptoAPI` key material with zeroizing storage.
@@ -446,6 +458,23 @@ mod tests {
             assert!(
                 parse_header(&malformed).is_err(),
                 "accepted field at {offset}"
+            );
+        }
+    }
+
+    #[test]
+    fn header_exposes_normalized_key_length() {
+        for key_bits in [0_u32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128] {
+            let mut header = crypto_api_header();
+            header[28..32].copy_from_slice(&key_bits.to_le_bytes());
+            let parsed = parse_header(&header).unwrap();
+            assert_eq!(
+                parsed.key_bits(),
+                if key_bits == 0 {
+                    40
+                } else {
+                    usize::try_from(key_bits).unwrap()
+                }
             );
         }
     }

@@ -17,7 +17,7 @@ use litchi_iwa_common::wire::{RawWireFields, RawWireLimits};
 use litchi_iwa_core::{ArchiveObject, MessageInfo, RawMessage};
 use litchi_iwa_protos::numbers_table_cell_dependency_codec as dependency_codec;
 
-use super::{BodyTableNameError, Package, TABLE_MODEL_MESSAGE_TYPE};
+use super::{Error, Package, TABLE_MODEL_MESSAGE_TYPE};
 use crate::package::{page_layout, table_lock};
 
 const DOCUMENT_COMPONENT: &str = "Index/Document.iwa";
@@ -57,7 +57,7 @@ pub(super) fn validate(
     package: &Package,
     target: &table_lock::BodyTableTarget,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableNameError> {
+) -> Result<(), Error> {
     reject_selected_model_pivot(package, target, budget)?;
     let Some(engine) = rooted_calculation_engine(package, budget)? else {
         return Ok(());
@@ -89,7 +89,7 @@ pub(super) fn validate(
     let mut owner_ids = HashSet::new();
     owner_ids
         .try_reserve(owner_payloads.len())
-        .map_err(|_| BodyTableNameError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: owner_payloads.len(),
         })?;
 
@@ -99,7 +99,7 @@ pub(super) fn validate(
         // parity proof.  Raw field traversal below establishes the repeated
         // field cardinality and archive-header declaration path.
         if !owner_ids.insert(owner_identifier) {
-            return Err(BodyTableNameError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         validate_declared_reference(
             engine.info,
@@ -110,7 +110,7 @@ pub(super) fn validate(
         )?;
         let owner = find_object(package, owner_identifier, budget)?;
         let owner_message = unique_message(owner, FORMULA_OWNER_MESSAGE_TYPE, budget)?
-            .ok_or(BodyTableNameError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         validate_formula_owner_metadata(owner_message.info, budget)?;
         validate_formula_owner_payload(package, owner_message, budget)?;
     }
@@ -125,7 +125,7 @@ pub(super) fn validate(
 fn rooted_calculation_engine<'a>(
     package: &'a Package,
     budget: &mut table_lock::WireBudget,
-) -> Result<Option<MessageLocation<'a>>, BodyTableNameError> {
+) -> Result<Option<MessageLocation<'a>>, Error> {
     let mut root_component = None;
     for (component_index, component) in package.state.source.components().iter().enumerate() {
         budget.charge_payload_work(1).map_err(map_lock_error)?;
@@ -136,11 +136,11 @@ fn rooted_calculation_engine<'a>(
             .replace((component_index, component))
             .is_some()
         {
-            return Err(BodyTableNameError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     let Some((root_component_index, component)) = root_component else {
-        return Err(BodyTableNameError::InvalidSource);
+        return Err(Error::InvalidSource);
     };
     let mut root = None;
     for (object_index, object) in component.archive().objects.iter().enumerate() {
@@ -149,11 +149,11 @@ fn rooted_calculation_engine<'a>(
             continue;
         }
         if root.replace((object_index, object)).is_some() {
-            return Err(BodyTableNameError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     let Some((_root_object_index, root_object)) = root else {
-        return Err(BodyTableNameError::InvalidSource);
+        return Err(Error::InvalidSource);
     };
     let root_location = ObjectLocation {
         component_index: root_component_index,
@@ -161,7 +161,7 @@ fn rooted_calculation_engine<'a>(
     };
     let root_message = unique_message(root_location, ROOT_MESSAGE_TYPE, budget)?;
     let Some(root_message) = root_message else {
-        return Err(BodyTableNameError::InvalidSource);
+        return Err(Error::InvalidSource);
     };
     let root_info = root_message.info;
     validate_message_metadata(root_object, root_message.message_index, ROOT_MESSAGE_TYPE)?;
@@ -194,12 +194,14 @@ fn rooted_calculation_engine<'a>(
         .source
         .components()
         .get_index(engine_object.component_index)
-        .ok_or(BodyTableNameError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if !is_calculation_engine_component(engine_component.name()) {
-        return Err(BodyTableNameError::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::table::name::transaction::Refusal::UnsupportedSource,
+        ));
     }
     let engine_message = unique_message(engine_object, CALCULATION_ENGINE_MESSAGE_TYPE, budget)?
-        .ok_or(BodyTableNameError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     validate_message_metadata(
         engine_object.object,
         engine_message.message_index,
@@ -216,7 +218,7 @@ fn reject_stale_engine_declarations(
     package: &Package,
     info: &MessageInfo,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableNameError> {
+) -> Result<(), Error> {
     for field in &info.field_infos {
         budget
             .charge_payload_work(field.path.path.len())
@@ -226,15 +228,15 @@ fn reject_stale_engine_declarations(
         if field.path.as_slice() == REFERENCE_PATH_DOCUMENT_ENGINE
             && (!field.object_references.is_empty() || !field.data_references.is_empty())
         {
-            return Err(BodyTableNameError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     for identifier in &info.object_references {
         let Some(location) = find_object_optional(package, *identifier, budget)? else {
-            return Err(BodyTableNameError::InvalidSource);
+            return Err(Error::InvalidSource);
         };
         if unique_message(location, CALCULATION_ENGINE_MESSAGE_TYPE, budget)?.is_some() {
-            return Err(BodyTableNameError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(())
@@ -244,35 +246,37 @@ fn reject_selected_model_pivot(
     package: &Package,
     target: &table_lock::BodyTableTarget,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableNameError> {
+) -> Result<(), Error> {
     let component = package
         .state
         .source
         .components()
         .get_index(target.model_component_index)
-        .ok_or(BodyTableNameError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let object = component
         .archive()
         .objects
         .get(target.model_object_index)
-        .ok_or(BodyTableNameError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if object.archive_info.identifier != Some(target.model_identifier.get()) {
-        return Err(BodyTableNameError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let message = object
         .messages
         .get(target.model_message_index)
         .filter(|message| message.type_ == TABLE_MODEL_MESSAGE_TYPE)
-        .ok_or(BodyTableNameError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     validate_message_metadata(object, target.model_message_index, message.type_)?;
     let pivot = pivot_owner_identifier(message.data.as_slice(), budget)?;
     if let Some(identifier) = pivot {
         if find_object_optional(package, identifier, budget)?.is_none() {
-            return Err(BodyTableNameError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     if pivot.is_some() {
-        return Err(BodyTableNameError::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::table::name::transaction::Refusal::UnsupportedSource,
+        ));
     }
     Ok(())
 }
@@ -280,15 +284,15 @@ fn reject_selected_model_pivot(
 fn pivot_owner_identifier(
     source: &[u8],
     budget: &mut table_lock::WireBudget,
-) -> Result<Option<u64>, BodyTableNameError> {
+) -> Result<Option<u64>, Error> {
     let remaining_fields = budget.remaining_wire_fields();
     let remaining_work = budget.remaining_wire_work();
     if !source.is_empty() && (remaining_fields == 0 || remaining_work == 0) {
-        return Err(BodyTableNameError::LimitExceeded {
+        return Err(Error::Limit {
             kind: if remaining_fields == 0 {
-                super::BodyTableNameLimitKind::WireFields
+                super::LimitKind::WireFields
             } else {
-                super::BodyTableNameLimitKind::WireWork
+                super::LimitKind::WireWork
             },
             observed: 1,
             maximum: 0,
@@ -310,7 +314,7 @@ fn pivot_owner_identifier(
     budget
         .charge_payload_work(source.len())
         .map_err(map_lock_error)?;
-    let mut fields = RawWireFields::with_limits(source, limits);
+    let mut fields = RawWireFields::new(source, limits);
     let mut pivot = None;
     let mut max_depth = 0usize;
     while let Some(field) = fields.next().map_err(map_raw_wire_error)? {
@@ -318,21 +322,21 @@ fn pivot_owner_identifier(
             field
                 .depth()
                 .checked_add(field.group_depth())
-                .ok_or(BodyTableNameError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         );
         if field.number() != MODEL_PIVOT_OWNER_FIELD {
             continue;
         }
         if field.wire_type() != 2 || pivot.is_some() {
-            return Err(BodyTableNameError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if !field.key_is_canonical() || !field.length_is_canonical() {
-            return Err(BodyTableNameError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         pivot = Some(parse_local_reference(field.payload(), budget)?);
     }
-    let max_depth = u32::try_from(max_depth).map_err(|_| BodyTableNameError::LimitExceeded {
-        kind: super::BodyTableNameLimitKind::WireNesting,
+    let max_depth = u32::try_from(max_depth).map_err(|_| Error::Limit {
+        kind: super::LimitKind::WireNesting,
         observed: u64::MAX,
         maximum: usize_to_u64(budget.wire_limits().max_nesting()),
     })?;
@@ -346,7 +350,7 @@ fn validate_formula_owner_payload(
     package: &Package,
     message: MessageLocation<'_>,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableNameError> {
+) -> Result<(), Error> {
     let options = dependency_options(budget, message.message.data.len())?;
     budget
         .charge_payload_work(message.message.data.len())
@@ -359,7 +363,7 @@ fn validate_formula_owner_payload(
     charge_dependency_report(budget, report)?;
     if let Some(reference) = owner.formula_owner() {
         if reference.deprecated_type().is_some() || reference.deprecated_is_external().is_some() {
-            return Err(BodyTableNameError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let raw_reference = optional_length_field(
             &message.message.data,
@@ -367,12 +371,12 @@ fn validate_formula_owner_payload(
             1,
             budget,
         )?
-        .ok_or(BodyTableNameError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
         let identifier = parse_local_reference(raw_reference, budget)?;
         if identifier != reference.identifier()
             || find_object_optional(package, identifier, budget)?.is_none()
         {
-            return Err(BodyTableNameError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         validate_declared_reference(
             message.info,
@@ -388,7 +392,9 @@ fn validate_formula_owner_payload(
     }
     if let Some(volatile) = owner.volatile_dependencies() {
         if volatile_name_cells_present(volatile, budget)? {
-            return Err(BodyTableNameError::UnsupportedSource);
+            return Err(Error::Refused(
+                crate::table::name::transaction::Refusal::UnsupportedSource,
+            ));
         }
     }
     Ok(())
@@ -397,7 +403,7 @@ fn validate_formula_owner_payload(
 fn validate_formula_owner_metadata(
     info: &MessageInfo,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableNameError> {
+) -> Result<(), Error> {
     budget
         .charge_payload_work(info.field_infos.len())
         .and_then(|_| budget.charge_payload_references(info.object_references.len()))
@@ -409,7 +415,7 @@ fn validate_formula_owner_metadata(
             .iter()
             .any(|field| !field.data_references.is_empty())
     {
-        return Err(BodyTableNameError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -420,7 +426,7 @@ fn validate_declared_reference(
     accepted_path: &[u32],
     require_aggregate: bool,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableNameError> {
+) -> Result<(), Error> {
     budget
         .charge_payload_items(info.field_infos.len())
         .and_then(|_| budget.charge_payload_references(info.object_references.len()))
@@ -433,10 +439,10 @@ fn validate_declared_reference(
         .filter(|candidate| **candidate == identifier)
         .count();
     if (require_aggregate && aggregate != 1) || (!require_aggregate && aggregate > 1) {
-        return Err(BodyTableNameError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if info.data_references.contains(&identifier) {
-        return Err(BodyTableNameError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut field_occurrences = 0usize;
     for field in &info.field_infos {
@@ -446,7 +452,7 @@ fn validate_declared_reference(
             .and_then(|_| budget.charge_payload_references(field.data_references.len()))
             .map_err(map_lock_error)?;
         if field.data_references.contains(&identifier) {
-            return Err(BodyTableNameError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let occurrences = field
             .object_references
@@ -457,17 +463,17 @@ fn validate_declared_reference(
             continue;
         }
         if occurrences != 1 || field.path.as_slice() != accepted_path {
-            return Err(BodyTableNameError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field_occurrences = field_occurrences
             .checked_add(1)
-            .ok_or(BodyTableNameError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if !field.data_references.is_empty() {
-            return Err(BodyTableNameError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     if field_occurrences > 1 {
-        return Err(BodyTableNameError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -476,7 +482,7 @@ fn validate_absent_reference_path(
     info: &MessageInfo,
     path: &[u32],
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableNameError> {
+) -> Result<(), Error> {
     for field in &info.field_infos {
         budget
             .charge_payload_work(field.path.path.len())
@@ -486,7 +492,7 @@ fn validate_absent_reference_path(
         if field.path.as_slice() == path
             && (!field.object_references.is_empty() || !field.data_references.is_empty())
         {
-            return Err(BodyTableNameError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(())
@@ -495,14 +501,14 @@ fn validate_absent_reference_path(
 fn volatile_name_cells_present(
     source: &[u8],
     budget: &mut table_lock::WireBudget,
-) -> Result<bool, BodyTableNameError> {
+) -> Result<bool, Error> {
     let view = budget.parse(source, 2).map_err(map_lock_error)?;
     let mut seen = [false; 8];
     let mut present = false;
     for field in view.fields() {
         field
             .validate_canonical_framing()
-            .map_err(|_| BodyTableNameError::InvalidSource)?;
+            .map_err(|_| Error::InvalidSource)?;
         let index = match field.number() {
             1 => 0,
             2 => 1,
@@ -510,10 +516,10 @@ fn volatile_name_cells_present(
             4 => 3,
             5 => 4,
             7 => 6,
-            _ => return Err(BodyTableNameError::InvalidSource),
+            _ => return Err(Error::InvalidSource),
         };
         if field.wire_type() != 2 || seen[index] {
-            return Err(BodyTableNameError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         seen[index] = true;
         if field.number() != VOLATILE_SHEET_TABLE_NAME_FIELD {
@@ -523,9 +529,9 @@ fn volatile_name_cells_present(
         for column in nested.fields() {
             column
                 .validate_canonical_framing()
-                .map_err(|_| BodyTableNameError::InvalidSource)?;
+                .map_err(|_| Error::InvalidSource)?;
             if column.number() != 1 || column.wire_type() != 2 {
-                return Err(BodyTableNameError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             let entry = budget.parse(column.payload(), 4).map_err(map_lock_error)?;
             let mut column_seen = false;
@@ -533,7 +539,7 @@ fn volatile_name_cells_present(
             for entry_field in entry.fields() {
                 entry_field
                     .validate_canonical_framing()
-                    .map_err(|_| BodyTableNameError::InvalidSource)?;
+                    .map_err(|_| Error::InvalidSource)?;
                 match entry_field.number() {
                     1 if entry_field.wire_type() == 0 && !column_seen => {
                         column_seen = true;
@@ -541,11 +547,11 @@ fn volatile_name_cells_present(
                     2 if entry_field.wire_type() == 2 && !row_set_seen => {
                         row_set_seen = true;
                     },
-                    _ => return Err(BodyTableNameError::InvalidSource),
+                    _ => return Err(Error::InvalidSource),
                 }
             }
             if !column_seen || !row_set_seen {
-                return Err(BodyTableNameError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             present = true;
         }
@@ -558,7 +564,7 @@ fn repeated_length_fields<'a>(
     number: u32,
     depth: usize,
     budget: &mut table_lock::WireBudget,
-) -> Result<Vec<&'a [u8]>, BodyTableNameError> {
+) -> Result<Vec<&'a [u8]>, Error> {
     let view = budget.parse(source, depth).map_err(map_lock_error)?;
     let count = view
         .fields()
@@ -571,13 +577,13 @@ fn repeated_length_fields<'a>(
     let mut values = Vec::new();
     values
         .try_reserve_exact(count)
-        .map_err(|_| BodyTableNameError::Allocation { amount: count })?;
+        .map_err(|_| Error::Allocation { amount: count })?;
     for field in view.fields().filter(|field| field.number() == number) {
         field
             .validate_canonical_framing()
-            .map_err(|_| BodyTableNameError::InvalidSource)?;
+            .map_err(|_| Error::InvalidSource)?;
         if field.wire_type() != 2 {
-            return Err(BodyTableNameError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         values.push(field.payload());
     }
@@ -589,19 +595,16 @@ fn optional_length_field<'a>(
     number: u32,
     depth: usize,
     budget: &mut table_lock::WireBudget,
-) -> Result<Option<&'a [u8]>, BodyTableNameError> {
+) -> Result<Option<&'a [u8]>, Error> {
     let values = repeated_length_fields(source, number, depth, budget)?;
     match values.as_slice() {
         [] => Ok(None),
         [value] => Ok(Some(*value)),
-        _ => Err(BodyTableNameError::InvalidSource),
+        _ => Err(Error::InvalidSource),
     }
 }
 
-fn parse_local_reference(
-    source: &[u8],
-    budget: &mut table_lock::WireBudget,
-) -> Result<u64, BodyTableNameError> {
+fn parse_local_reference(source: &[u8], budget: &mut table_lock::WireBudget) -> Result<u64, Error> {
     table_lock::parse_local_reference(budget, source, 2)
         .map(|identifier| identifier.get())
         .map_err(map_lock_error)
@@ -611,15 +614,15 @@ fn find_object<'a>(
     package: &'a Package,
     identifier: u64,
     budget: &mut table_lock::WireBudget,
-) -> Result<ObjectLocation<'a>, BodyTableNameError> {
-    find_object_optional(package, identifier, budget)?.ok_or(BodyTableNameError::InvalidSource)
+) -> Result<ObjectLocation<'a>, Error> {
+    find_object_optional(package, identifier, budget)?.ok_or(Error::InvalidSource)
 }
 
 fn find_object_optional<'a>(
     package: &'a Package,
     identifier: u64,
     budget: &mut table_lock::WireBudget,
-) -> Result<Option<ObjectLocation<'a>>, BodyTableNameError> {
+) -> Result<Option<ObjectLocation<'a>>, Error> {
     let mut found = None;
     for (component_index, component) in package.state.source.components().iter().enumerate() {
         budget.charge_payload_work(1).map_err(map_lock_error)?;
@@ -629,7 +632,7 @@ fn find_object_optional<'a>(
                 continue;
             }
             if found.is_some() {
-                return Err(BodyTableNameError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             found = Some(ObjectLocation {
                 component_index,
@@ -644,7 +647,7 @@ fn unique_message<'a>(
     object: ObjectLocation<'a>,
     message_type: u32,
     budget: &mut table_lock::WireBudget,
-) -> Result<Option<MessageLocation<'a>>, BodyTableNameError> {
+) -> Result<Option<MessageLocation<'a>>, Error> {
     let mut found = None;
     for (message_index, message) in object.object.messages.iter().enumerate() {
         budget.charge_payload_work(1).map_err(map_lock_error)?;
@@ -656,9 +659,9 @@ fn unique_message<'a>(
             .archive_info
             .message_infos
             .get(message_index)
-            .ok_or(BodyTableNameError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if found.is_some() {
-            return Err(BodyTableNameError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         found = Some(MessageLocation {
             message_index,
@@ -673,22 +676,22 @@ fn validate_message_metadata(
     object: &ArchiveObject,
     message_index: usize,
     message_type: u32,
-) -> Result<(), BodyTableNameError> {
+) -> Result<(), Error> {
     let message = object
         .messages
         .get(message_index)
-        .ok_or(BodyTableNameError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let info = object
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(BodyTableNameError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if message.type_ != message_type
         || info.type_ != message.type_
         || usize::try_from(info.length).ok() != Some(message.data.len())
         || object.header_length == 0
     {
-        return Err(BodyTableNameError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     page_layout::validate_selected_metadata(object, message_index)
         .map_err(super::map_page_layout_error)
@@ -710,11 +713,11 @@ fn is_calculation_engine_component(name: &str) -> bool {
 fn dependency_options(
     budget: &table_lock::WireBudget,
     source_len: usize,
-) -> Result<dependency_codec::DecodeOptions, BodyTableNameError> {
+) -> Result<dependency_codec::DecodeOptions, Error> {
     let limits = budget.wire_limits();
     if source_len > limits.max_input_bytes() {
-        return Err(BodyTableNameError::LimitExceeded {
-            kind: super::BodyTableNameLimitKind::WireBytes,
+        return Err(Error::Limit {
+            kind: super::LimitKind::WireBytes,
             observed: usize_to_u64(source_len),
             maximum: usize_to_u64(limits.max_input_bytes()),
         });
@@ -724,22 +727,22 @@ fn dependency_options(
     let remaining_work = budget.remaining_wire_work();
     let remaining_references = budget.remaining_payload_references();
     if source_len != 0 && remaining_fields == 0 {
-        return Err(BodyTableNameError::LimitExceeded {
-            kind: super::BodyTableNameLimitKind::WireFields,
+        return Err(Error::Limit {
+            kind: super::LimitKind::WireFields,
             observed: 1,
             maximum: 0,
         });
     }
     if source_len != 0 && remaining_work == 0 {
-        return Err(BodyTableNameError::LimitExceeded {
-            kind: super::BodyTableNameLimitKind::WireWork,
+        return Err(Error::Limit {
+            kind: super::LimitKind::WireWork,
             observed: 1,
             maximum: 0,
         });
     }
     if source_len != 0 && remaining_references == 0 {
-        return Err(BodyTableNameError::LimitExceeded {
-            kind: super::BodyTableNameLimitKind::PayloadReferences,
+        return Err(Error::Limit {
+            kind: super::LimitKind::PayloadReferences,
             observed: 1,
             maximum: 0,
         });
@@ -766,7 +769,7 @@ fn dependency_options(
 fn charge_dependency_report(
     budget: &mut table_lock::WireBudget,
     report: dependency_codec::DecodeReport,
-) -> Result<(), BodyTableNameError> {
+) -> Result<(), Error> {
     budget
         .charge_codec_report(
             report.fields(),
@@ -778,97 +781,80 @@ fn charge_dependency_report(
     let retained = report
         .reference_bytes()
         .checked_add(report.text_bytes())
-        .ok_or(BodyTableNameError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.charge_payload_work(retained).map_err(map_lock_error)
 }
 
-fn map_dependency_error(error: dependency_codec::DecodeError) -> BodyTableNameError {
+fn map_dependency_error(error: dependency_codec::DecodeError) -> Error {
     if let Some(amount) = error.allocation_requested() {
-        return BodyTableNameError::Allocation { amount };
+        return Error::Allocation { amount };
     }
     let Some(limit) = error.resource_limit() else {
-        return BodyTableNameError::InvalidSource;
+        return Error::InvalidSource;
     };
     let (kind, observed, maximum) = match limit {
         dependency_codec::DecodeLimit::Bytes { observed, maximum } => {
-            (super::BodyTableNameLimitKind::WireBytes, observed, maximum)
+            (super::LimitKind::WireBytes, observed, maximum)
         },
-        dependency_codec::DecodeLimit::References { observed, maximum } => (
-            super::BodyTableNameLimitKind::PayloadReferences,
-            observed,
-            maximum,
-        ),
-        dependency_codec::DecodeLimit::Text { observed, maximum } => (
-            super::BodyTableNameLimitKind::PayloadBytes,
-            observed,
-            maximum,
-        ),
+        dependency_codec::DecodeLimit::References { observed, maximum } => {
+            (super::LimitKind::PayloadReferences, observed, maximum)
+        },
+        dependency_codec::DecodeLimit::Text { observed, maximum } => {
+            (super::LimitKind::PayloadBytes, observed, maximum)
+        },
         dependency_codec::DecodeLimit::Fields { observed, maximum } => {
-            (super::BodyTableNameLimitKind::WireFields, observed, maximum)
+            (super::LimitKind::WireFields, observed, maximum)
         },
         dependency_codec::DecodeLimit::Work { observed, maximum } => {
-            (super::BodyTableNameLimitKind::WireWork, observed, maximum)
+            (super::LimitKind::WireWork, observed, maximum)
         },
         dependency_codec::DecodeLimit::Nesting { observed, maximum } => (
-            super::BodyTableNameLimitKind::WireNesting,
+            super::LimitKind::WireNesting,
             observed as usize,
             maximum as usize,
         ),
-        dependency_codec::DecodeLimit::Retained { observed, maximum } => (
-            super::BodyTableNameLimitKind::PayloadBytes,
-            observed,
-            maximum,
-        ),
-        dependency_codec::DecodeLimit::Allocation { requested } => {
-            return BodyTableNameError::Allocation { amount: requested };
+        dependency_codec::DecodeLimit::Retained { observed, maximum } => {
+            (super::LimitKind::PayloadBytes, observed, maximum)
         },
-        _ => return BodyTableNameError::InvalidSource,
+        dependency_codec::DecodeLimit::Allocation { requested } => {
+            return Error::Allocation { amount: requested };
+        },
+        _ => return Error::InvalidSource,
     };
-    BodyTableNameError::LimitExceeded {
+    Error::Limit {
         kind,
         observed: usize_to_u64(observed),
         maximum: usize_to_u64(maximum),
     }
 }
 
-fn map_raw_wire_error(error: litchi_iwa_common::Error) -> BodyTableNameError {
+fn map_raw_wire_error(error: litchi_iwa_common::Error) -> Error {
     match error {
         litchi_iwa_common::Error::LimitExceeded {
             kind,
             observed,
             limit,
-        } => BodyTableNameError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_common::LimitKind::InputBytes => {
-                    super::BodyTableNameLimitKind::WireBytes
-                },
-                litchi_iwa_common::LimitKind::OutputBytes => {
-                    super::BodyTableNameLimitKind::WireOutputBytes
-                },
-                litchi_iwa_common::LimitKind::Fields => super::BodyTableNameLimitKind::WireFields,
-                litchi_iwa_common::LimitKind::Nesting => super::BodyTableNameLimitKind::WireNesting,
-                litchi_iwa_common::LimitKind::RewriteWork => {
-                    super::BodyTableNameLimitKind::WireWork
-                },
+                litchi_iwa_common::LimitKind::InputBytes => super::LimitKind::WireBytes,
+                litchi_iwa_common::LimitKind::OutputBytes => super::LimitKind::WireOutputBytes,
+                litchi_iwa_common::LimitKind::Fields => super::LimitKind::WireFields,
+                litchi_iwa_common::LimitKind::Nesting => super::LimitKind::WireNesting,
+                litchi_iwa_common::LimitKind::RewriteWork => super::LimitKind::WireWork,
                 litchi_iwa_common::LimitKind::TableRows
                 | litchi_iwa_common::LimitKind::TableColumns
                 | litchi_iwa_common::LimitKind::TableCells
-                | litchi_iwa_common::LimitKind::MaterializedCells => {
-                    super::BodyTableNameLimitKind::PayloadItems
-                },
+                | litchi_iwa_common::LimitKind::MaterializedCells => super::LimitKind::PayloadItems,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
-        litchi_iwa_common::Error::Allocation { amount, .. } => {
-            BodyTableNameError::Allocation { amount }
-        },
-        litchi_iwa_common::Error::InvalidFormat(_)
-        | litchi_iwa_common::Error::InvalidLimit { .. } => BodyTableNameError::InvalidSource,
+        litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_lock_error(error: table_lock::BodyTableLockError) -> BodyTableNameError {
+fn map_lock_error(error: table_lock::Error) -> Error {
     super::map_lock_error(error)
 }
 
@@ -911,23 +897,17 @@ mod tests {
     #[test]
     fn volatile_name_cells_distinguish_empty_and_active_sets() {
         let empty = [0x22, 0x00];
-        assert_eq!(
-            volatile_name_cells_present(&empty, &mut budget()).expect("empty volatile set"),
-            false
-        );
+        assert!(!volatile_name_cells_present(&empty, &mut budget()).expect("empty volatile set"));
 
         // field 4 -> CellCoordSetArchive.field 1 -> ColumnEntry with its
         // required column and row-set fields.
         let active = [0x22, 0x06, 0x0a, 0x04, 0x08, 0x01, 0x12, 0x00];
-        assert_eq!(
-            volatile_name_cells_present(&active, &mut budget()).expect("active volatile set"),
-            true
-        );
+        assert!(volatile_name_cells_present(&active, &mut budget()).expect("active volatile set"));
 
         let unknown = [0x08, 0x00];
         assert!(matches!(
             volatile_name_cells_present(&unknown, &mut budget()),
-            Err(super::BodyTableNameError::InvalidSource)
+            Err(super::Error::InvalidSource)
         ));
     }
 
@@ -956,7 +936,7 @@ mod tests {
         let duplicate = [0xaa, 0x05, 0x02, 0x08, 0x01, 0xaa, 0x05, 0x02, 0x08, 0x01];
         assert!(matches!(
             pivot_owner_identifier(&duplicate, &mut budget()),
-            Err(super::BodyTableNameError::InvalidSource)
+            Err(super::Error::InvalidSource)
         ));
     }
 
@@ -967,13 +947,13 @@ mod tests {
         let duplicate_outer = [0x7a, 0x00, 0x7a, 0x00];
         assert!(matches!(
             optional_length_field(&duplicate_outer, 15, 1, &mut budget()),
-            Err(super::BodyTableNameError::InvalidSource)
+            Err(super::Error::InvalidSource)
         ));
 
         let duplicate_engine = [0x22, 0x00, 0x22, 0x00];
         assert!(matches!(
             optional_length_field(&duplicate_engine, 4, 2, &mut budget()),
-            Err(super::BodyTableNameError::InvalidSource)
+            Err(super::Error::InvalidSource)
         ));
     }
 }

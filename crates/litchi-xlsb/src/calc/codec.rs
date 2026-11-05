@@ -3,7 +3,7 @@
 use std::io::Write;
 
 use crate::leniency::{ReservedFieldDefect, Tolerance};
-use crate::raw::{Cursor, Writer, kind};
+use crate::raw::{Cursor, Encoder, kind};
 
 use super::{Error, Mode, Opts, Props, Result, Threads};
 
@@ -19,16 +19,28 @@ use super::{Error, Mode, Opts, Props, Result, Threads};
 /// This standalone function cannot report repairs, so it also rejects the
 /// reserved option bits and trailing bytes an opened workbook repairs and
 /// records; see [`crate::leniency`].
-pub fn read(payload: &[u8]) -> Result<Props> {
-    read_with(payload, Tolerance::refusing())
+pub fn read(payload: &[u8], limits: crate::raw::Limits) -> Result<Props> {
+    read_with(payload, limits, Tolerance::refusing())
 }
 
 /// Read a `BrtCalcProp` payload, masking undefined option bits and ignoring
 /// trailing payload bytes through `tolerance`.
 ///
 /// Mode, iteration, delta, and thread-count domains stay strict.
-pub(crate) fn read_with(payload: &[u8], mut tolerance: Tolerance<'_>) -> Result<Props> {
-    let mut cursor = Cursor::new(payload, "BrtCalcProp");
+pub(crate) fn read_with(
+    payload: &[u8],
+    limits: crate::raw::Limits,
+    mut tolerance: Tolerance<'_>,
+) -> Result<Props> {
+    limits.validate()?;
+    if payload.len() > limits.payload() {
+        return Err(Error::Wire(crate::raw::Error::PayloadLimit {
+            length: payload.len(),
+            limit: limits.payload(),
+            offset: 0,
+        }));
+    }
+    let mut cursor = Cursor::new(payload, "BrtCalcProp", limits);
     let id = cursor.read_u32()?;
     let mode = Mode::read(cursor.read_u32()?)?;
     let iters = cursor.read_u32()?;
@@ -67,11 +79,11 @@ pub(crate) fn read_with(payload: &[u8], mut tolerance: Tolerance<'_>) -> Result<
     Ok(Props::from_wire(id, mode, iters, delta, threads, opts))
 }
 
-/// Stream one exact `BrtCalcProp` payload through [`Writer`].
+/// Stream one exact `BrtCalcProp` payload through [`Encoder`].
 ///
 /// This writes exactly [`super::LEN`] bytes and does not allocate an intermediate
 /// payload buffer.
-pub fn write<W: Write>(props: &Props, writer: &mut Writer<W>) -> Result<()> {
+pub fn write<W: Write>(props: &Props, writer: &mut Encoder<W>) -> Result<()> {
     writer.write_u32(props.id())?;
     writer.write_u32(props.mode().wire())?;
     writer.write_u32(props.iters())?;

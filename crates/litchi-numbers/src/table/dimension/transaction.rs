@@ -74,7 +74,52 @@ impl fmt::Display for LimitKind {
 /// A content-redacted row or column size transaction failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum TransactionError {
+pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// Rooted ownership, routing, metadata, or wire framing is invalid.
+    #[error("the Numbers table-dimension source is invalid at {path:?}")]
+    InvalidSource {
+        /// Content-free semantic location.
+        path: Path,
+    },
+    /// A finite resource ceiling was exceeded.
+    #[error(
+        "Numbers table-dimension {kind} limit exceeded: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        /// Resource category.
+        kind: LimitKind,
+        /// Observed or requested amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+        /// Content-free semantic location.
+        path: Path,
+    },
+    /// A bounded allocation failed before publication.
+    #[error("could not allocate {amount} units for the Numbers table-dimension transaction")]
+    Allocation {
+        /// Requested bytes or elements.
+        amount: usize,
+        /// Content-free semantic location.
+        path: Path,
+    },
+    /// Candidate reopening, reselection, or locality verification failed.
+    #[error("the edited Numbers table dimension failed semantic verification")]
+    Verification,
+    /// The patch was applied to a package other than its exact source.
+    #[error("the table-dimension patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// No rooted sheet matched the selector.
     #[error("the Numbers workbook has no sheet matching the requested selector")]
     SheetNotFound,
@@ -101,40 +146,26 @@ pub enum TransactionError {
     /// The source lacks exact physical provenance for changed publication.
     #[error("this Numbers source does not support exact table-dimension editing")]
     UnsupportedSource,
-    /// Rooted ownership, routing, metadata, or wire framing is invalid.
-    #[error("the Numbers table-dimension source is invalid at {path:?}")]
-    InvalidSource {
-        /// Content-free semantic location.
-        path: Path,
-    },
-    /// A finite resource ceiling was exceeded.
-    #[error(
-        "Numbers table-dimension {kind} limit exceeded: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        /// Resource category.
-        kind: LimitKind,
-        /// Observed or requested amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-        /// Content-free semantic location.
-        path: Path,
-    },
-    /// A bounded allocation failed before publication.
-    #[error("could not allocate {amount} units for the Numbers table-dimension transaction")]
-    Allocation {
-        /// Requested bytes or elements.
-        amount: usize,
-        /// Content-free semantic location.
-        path: Path,
-    },
-    /// Candidate reopening, reselection, or locality verification failed.
-    #[error("the edited Numbers table dimension failed semantic verification")]
-    Verification,
-    /// The patch was applied to a package other than its exact source.
-    #[error("the table-dimension patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::SheetNotFound { .. } | Self::TableNotFound { .. } => RefusalKind::NotFound,
+            Self::AmbiguousSelector { .. } | Self::OutOfBounds { .. } => RefusalKind::InvalidValue,
+            Self::TableLocked { .. } => RefusalKind::Protected,
+            Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// Mutable size staged against one immutable package snapshot.
@@ -187,7 +218,7 @@ impl Edit<'_> {
     /// # Errors
     ///
     /// Returns a typed selector, source, lock, resource, or verification error.
-    pub fn commit(self) -> Result<Commit, TransactionError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         crate::package::table_dimension::commit(self)
     }
 }
@@ -340,6 +371,12 @@ impl Commit {
     #[must_use]
     pub fn into_package(self) -> Package {
         self.package
+    }
+
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
     }
     /// Borrow the reversible exact-source patch.
     #[must_use]

@@ -56,7 +56,7 @@ impl TextBookmark {
     /// record bytes cannot be re-parsed exactly.
     pub fn to_record(&self) -> Result<Record> {
         let bytes = self.to_record_bytes()?;
-        let (record, end) = Record::parse(&bytes, 0)?;
+        let (record, end) = Record::parse(&bytes, 0, &crate::SourceLimits::default())?;
         if end != bytes.len() {
             return corrupted("canonical TextBookmarkAtom did not consume its bytes");
         }
@@ -141,7 +141,9 @@ mod tests {
             .to_record_bytes()
             .unwrap();
         bytes[0] = 1;
-        let record = Record::parse(&bytes, 0).unwrap().0;
+        let record = Record::parse(&bytes, 0, &crate::SourceLimits::default())
+            .unwrap()
+            .0;
         assert!(TextBookmark::parse(&record).is_err());
     }
 }

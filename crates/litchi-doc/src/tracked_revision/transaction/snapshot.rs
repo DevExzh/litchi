@@ -13,7 +13,7 @@ use std::sync::Arc;
 /// publication therefore never renders a replacement package, and unknown
 /// streams, table blocks, and SPRM bytes remain owned by the source artifact.
 #[derive(Clone)]
-pub struct Snapshot {
+pub(crate) struct Snapshot {
     source: Arc<[u8]>,
     limits: Limits,
     pub(super) protection: EditProtection,
@@ -22,7 +22,7 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Opens and validates an owned DOC artifact with explicit resource limits.
-    pub fn open(input: impl Into<Vec<u8>>, limits: Limits) -> PackageResult<Self> {
+    pub(crate) fn open(input: impl Into<Vec<u8>>, limits: Limits) -> PackageResult<Self> {
         Self::open_with_policy(input, limits, ProtectionPolicy::default())
     }
 
@@ -32,7 +32,7 @@ impl Snapshot {
     /// publishes changed bytes. An explicit caller-granted
     /// [`ProtectionPolicy::AllowProtected`] capability can be carried by this
     /// snapshot for an intentional edit.
-    pub fn open_with_policy(
+    pub(crate) fn open_with_policy(
         input: impl Into<Vec<u8>>,
         limits: Limits,
         protection_policy: ProtectionPolicy,
@@ -49,56 +49,51 @@ impl Snapshot {
     }
 
     /// Parses a borrowed DOC artifact using the default resource limits.
-    pub fn parse(input: &[u8]) -> PackageResult<Self> {
+    pub(crate) fn parse(input: &[u8]) -> PackageResult<Self> {
         Self::open(input.to_vec(), Limits::default())
     }
 
     /// Parses an owned DOC artifact using the default resource limits.
-    pub fn from_bytes(input: Vec<u8>) -> PackageResult<Self> {
+    pub(crate) fn from_bytes(input: Vec<u8>) -> PackageResult<Self> {
         Self::open(input, Limits::default())
     }
 
     /// Returns the exact source CFB bytes captured by this snapshot.
     #[must_use]
-    pub fn bytes(&self) -> &[u8] {
+    pub(crate) fn bytes(&self) -> &[u8] {
         &self.source
     }
 
     /// Returns shared ownership of the exact source allocation.
     #[must_use]
-    pub fn bytes_shared(&self) -> Arc<[u8]> {
+    pub(crate) fn bytes_shared(&self) -> Arc<[u8]> {
         Arc::clone(&self.source)
     }
 
     /// Returns a stable first-stage fingerprint for stale-source checks.
     #[must_use]
-    pub fn fingerprint(&self) -> u64 {
+    pub(crate) fn fingerprint(&self) -> u64 {
         fingerprint(&self.source)
     }
 
     /// Lists the typed tracked revisions in source order.
-    pub fn revisions(&self) -> PackageResult<Vec<Revision>> {
+    pub(crate) fn revisions(&self) -> PackageResult<Vec<Revision>> {
         self.editor()?.revisions()
     }
 
     /// Returns the revision-author table in its stored order.
-    pub fn authors(&self) -> PackageResult<Vec<String>> {
+    pub(crate) fn authors(&self) -> PackageResult<Vec<String>> {
         Ok(self.editor()?.authors().to_vec())
     }
 
     /// Starts an isolated clone-first tracked-revision transaction.
-    pub fn edit(&self) -> Result<Transaction> {
+    pub(crate) fn edit(&self) -> Result<Transaction> {
         Transaction::new(self.clone())
-    }
-
-    /// Alias for [`Self::edit`].
-    pub fn transaction(&self) -> Result<Transaction> {
-        self.edit()
     }
 
     /// Returns the exact source bytes. A snapshot itself is always a no-op.
     #[must_use]
-    pub fn finish(&self) -> Vec<u8> {
+    pub(crate) fn finish(&self) -> Vec<u8> {
         self.source.as_ref().to_vec()
     }
 

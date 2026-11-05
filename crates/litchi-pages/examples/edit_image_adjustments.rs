@@ -14,8 +14,8 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use litchi_pages::{
-    BodyImageAdjustmentsError, ImageAdjustment, ImageAdjustments, ImageEnhancement, ImageSelector,
-    Package,
+    ImageAdjustment, ImageAdjustments, ImageEnhancement, ImageSelector, Package,
+    image::adjustments::Error as BodyImageAdjustmentsError,
 };
 use tempfile::NamedTempFile;
 

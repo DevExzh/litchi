@@ -12,7 +12,9 @@ use litchi_iwa_archive::{
 };
 use litchi_iwa_common::shape::geometry::{Point, Size};
 use litchi_iwa_core::{Archive, FieldInfo, SnappyStream};
-use litchi_keynote::{MediaPart, MovieSelector, Package, SlideSelector, slide::movie::Options};
+use litchi_keynote::{
+    MovieSelector, Package, SlideSelector, slide::media::data::MediaPart, slide::movie::Options,
+};
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
@@ -29,12 +31,12 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 
 fn object_ids(source: &[u8]) -> TestResult<BTreeSet<u64>> {
     let mut identifiers = BTreeSet::new();
-    for entry in Catalog::from_bytes(source)?.iter() {
+    for entry in Catalog::from_bytes(source, Default::default())?.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = SnappyStream::decompress(entry.data())?;
-        let archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
         for object in archive.objects {
             identifiers.insert(
                 object
@@ -48,25 +50,34 @@ fn object_ids(source: &[u8]) -> TestResult<BTreeSet<u64>> {
 }
 
 fn with_dangling_header_reference(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     for entry in catalog.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = SnappyStream::decompress(entry.data())?;
-        let mut archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
         let mut changed = false;
         for object in &mut archive.objects {
-            for message_info in &mut object.archive_info.message_infos {
+            if let Some(message_info) = object.archive_info.message_infos.first_mut() {
                 if message_info.field_infos.is_empty() {
-                    message_info.field_infos.push(FieldInfo::new(vec![99_999]));
+                    message_info.field_infos.push(
+                        FieldInfo::new(
+                            litchi_iwa_core::FieldPath::new(
+                                vec![99_999],
+                                litchi_iwa_core::Limits::default(),
+                            )
+                            .unwrap(),
+                            litchi_iwa_core::Limits::default(),
+                        )
+                        .unwrap(),
+                    );
                 }
                 message_info.object_references.push(DANGLING_REFERENCE);
                 message_info.field_infos[0]
                     .object_references
                     .push(DANGLING_REFERENCE);
                 changed = true;
-                break;
             }
             if changed {
                 break;
@@ -75,7 +86,8 @@ fn with_dangling_header_reference(source: &[u8]) -> TestResult<Vec<u8>> {
         if !changed {
             continue;
         }
-        let replacement = SnappyStream::compress(&archive.to_bytes()?)?;
+        let replacement =
+            SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
         return Ok(catalog.reassemble_to_bytes(
             &[EntryEdit::new(entry.name(), &replacement)],
             Limits::default(),
@@ -118,14 +130,17 @@ fn fresh_movie_ids_follow_dangling_aggregate_and_field_header_references() -> Te
         height: 180.0,
     })?;
 
-    let commit = package.add_slide_movie(
-        SlideSelector::index(0),
-        "reserved-id-movie.mov",
-        &movie,
-        "reserved-id-poster.png",
-        &poster,
-        options,
-    )?;
+    let commit = package
+        .edit_slide_movie_creation()
+        .add(
+            SlideSelector::index(0),
+            "reserved-id-movie.mov",
+            &movie,
+            "reserved-id-poster.png",
+            &poster,
+            options,
+        )
+        .and_then(|edit| edit.commit())?;
     assert_eq!(commit.patch().created_objects(), 5);
 
     let candidate = exact_bytes(commit.package())?;
@@ -144,12 +159,12 @@ fn fresh_movie_ids_follow_dangling_aggregate_and_field_header_references() -> Te
 
     let mut aggregate_preserved = false;
     let mut field_preserved = false;
-    for entry in Catalog::from_bytes(&candidate)?.iter() {
+    for entry in Catalog::from_bytes(&candidate, Default::default())?.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = SnappyStream::decompress(entry.data())?;
-        let archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
         for object in archive.objects {
             for message_info in object.archive_info.message_infos {
                 aggregate_preserved |= message_info.object_references.contains(&DANGLING_REFERENCE);

@@ -5,9 +5,10 @@
 //! Glossary package planning and failure-bounded XML assembly.
 
 use super::super::MAX;
+use super::super::limit::Limits;
 use super::super::model::{Catalog, Conformance};
 use super::super::{Arc, Error, Result};
-use super::semantic::{prepare_opaque_for, write_entry};
+use super::semantic::{prepare_opaque_for_with_limits, write_entry};
 use super::validation::{invalid, validate_catalog_fields};
 use super::xml::{Node, XmlSink, XmlSize, node_write};
 
@@ -46,10 +47,11 @@ pub(in crate::glossary) fn replace_sizes(
     ])
 }
 
-pub(in crate::glossary) fn validate_catalog_sizes(
+pub(in crate::glossary) fn validate_catalog_sizes_with_limits(
     entry_bytes: [usize; 2],
     background_bytes: [usize; 2],
     entry_count: usize,
+    limits: &Limits,
 ) -> Result<()> {
     for conformance in [Conformance::Transitional, Conformance::Strict] {
         let mut size = XmlSize::default();
@@ -64,8 +66,12 @@ pub(in crate::glossary) fn validate_catalog_sizes(
             .checked_add(background_bytes[index])
             .and_then(|bytes| bytes.checked_add(entry_bytes[index]))
             .ok_or_else(|| invalid("glossary catalog size overflow"))?;
-        if bytes > MAX {
-            return Err(invalid("serialized glossary document exceeds 32 MiB"));
+        if bytes > MAX || bytes > limits.xml_bytes() {
+            return Err(crate::Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::XmlBytes,
+                actual: bytes,
+                maximum: limits.xml_bytes().min(MAX),
+            });
         }
     }
     Ok(())
@@ -84,15 +90,24 @@ pub(in crate::glossary) fn write_catalog_open<X: XmlSink>(
     x.push_str(r#"">"#)
 }
 
+#[cfg(test)]
 pub(in crate::glossary) fn plan_write(
     value: &Catalog,
     conformance: Conformance,
+) -> Result<WritePlan> {
+    plan_write_with_limits(value, conformance, &Limits::DEFAULT)
+}
+
+pub(in crate::glossary) fn plan_write_with_limits(
+    value: &Catalog,
+    conformance: Conformance,
+    limits: &Limits,
 ) -> Result<WritePlan> {
     validate_catalog_fields(value)?;
     let background = value
         .background
         .as_deref()
-        .map(|xml| prepare_opaque_for(xml, "background", conformance))
+        .map(|xml| prepare_opaque_for_with_limits(xml, "background", conformance, limits))
         .transpose()?;
     let mut bodies = Vec::new();
     bodies
@@ -120,7 +135,7 @@ pub(in crate::glossary) fn plan_write(
             entry
                 .body
                 .as_deref()
-                .map(|xml| prepare_opaque_for(xml, "docPartBody", conformance))
+                .map(|xml| prepare_opaque_for_with_limits(xml, "docPartBody", conformance, limits))
                 .transpose()?
         });
     }

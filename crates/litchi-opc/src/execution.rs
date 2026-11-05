@@ -5,7 +5,7 @@
 //! session. It is intentionally separate from ordinary [`crate::OpcPackage`]
 //! constructors: those constructors remain synchronous and serial.
 
-use crate::{OpcError, OpcPackage, ReadLimits, Result};
+use crate::{OpcError, OpcPackage, Result, SourceLimits};
 use litchi_core::{
     AffinityPolicy, ExecutionContext, ExecutionError, Reservation, Resource, ScopedWorkers,
 };
@@ -98,20 +98,20 @@ impl OpenSession {
     ///
     /// Returns a typed OPC, execution, or local-session error when opening
     /// cannot complete. Cancellation discards the incomplete package.
-    pub fn from_bytes(&self, data: &[u8], limits: ReadLimits) -> Result<OpcPackage> {
+    pub fn from_bytes(&self, data: &[u8], limits: SourceLimits) -> Result<OpcPackage> {
         OpcPackage::from_bytes_with_open_session(data, limits, self)
     }
 
     /// Opens an owned archive under explicit OPC and execution limits.
     ///
     /// The successful package retains authorization for exact owned-source
-    /// no-op publication, exactly like [`OpcPackage::from_vec_with_limits`].
+    /// no-op publication, exactly like [`OpcPackage::from_vec`].
     ///
     /// # Errors
     ///
     /// Returns a typed OPC, execution, or local-session error when opening
     /// cannot complete. Cancellation discards the incomplete package.
-    pub fn from_vec(&self, data: Vec<u8>, limits: ReadLimits) -> Result<OpcPackage> {
+    pub fn from_vec(&self, data: Vec<u8>, limits: SourceLimits) -> Result<OpcPackage> {
         OpcPackage::from_vec_with_open_session(data, limits, self)
     }
 
@@ -145,9 +145,9 @@ impl OpenSession {
                 .and_then(|metadata| {
                     total
                         .checked_add(metadata.uncompressed_size())
-                        .ok_or(OpcError::ReadLimit {
-                            resource: crate::ReadResource::TotalPartBytes,
-                            actual: u64::MAX,
+                        .ok_or(OpcError::Limit {
+                            kind: crate::SourceLimitKind::TotalPartBytes,
+                            observed: u64::MAX,
                             maximum: u64::MAX,
                         })
                 })
@@ -457,7 +457,9 @@ mod tests {
     }
 
     fn cache_isolation_archive() -> Vec<u8> {
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         writer
             .write_stored(
                 "[Content_Types].xml",
@@ -503,8 +505,9 @@ mod tests {
     #[test]
     fn explicit_opens_match_serial_parts_deterministically() {
         let bytes = archive();
-        let expected = package_parts(&OpcPackage::from_bytes(&bytes).unwrap());
-        let limits = ReadLimits::builder()
+        let expected =
+            package_parts(&OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap());
+        let limits = SourceLimits::builder()
             .max_input_bytes(bytes.len() as u64)
             .unwrap()
             .build()
@@ -524,13 +527,15 @@ mod tests {
         let bytes = cache_isolation_archive();
         let (_source, context) = execution_context(16 * MIB);
         let session = OpenSession::new(context).unwrap();
-        let physical = crate::phys_pkg::PhysPkgReader::new(&bytes).unwrap();
+        let physical =
+            crate::phys_pkg::PhysPkgReader::new(&bytes, SourceLimits::default()).unwrap();
         let _reader =
             crate::pkgreader::PackageReader::from_phys_reader_with_session(&physical, &session)
                 .unwrap();
         assert_eq!(physical.archive().cache_size(), 0);
 
-        let serial_physical = crate::phys_pkg::PhysPkgReader::new(&bytes).unwrap();
+        let serial_physical =
+            crate::phys_pkg::PhysPkgReader::new(&bytes, SourceLimits::default()).unwrap();
         let _serial_reader =
             crate::pkgreader::PackageReader::from_phys_reader(&serial_physical).unwrap();
         assert_eq!(serial_physical.archive().cache_size(), 2);
@@ -542,7 +547,7 @@ mod tests {
         let (_source, context) = execution_context(16 * MIB);
         let session = OpenSession::new(context).unwrap();
         let package =
-            OpcPackage::from_vec_with_execution(bytes.clone(), ReadLimits::default(), &session)
+            OpcPackage::from_vec_with_execution(bytes.clone(), SourceLimits::default(), &session)
                 .unwrap();
 
         assert_eq!(PackageWriter::to_bytes(&package).unwrap(), bytes);
@@ -556,7 +561,7 @@ mod tests {
         source.cancel();
 
         assert!(matches!(
-            session.from_bytes(&bytes, ReadLimits::default()),
+            session.from_bytes(&bytes, SourceLimits::default()),
             Err(OpcError::Cancelled)
         ));
     }
@@ -568,7 +573,7 @@ mod tests {
         let session = OpenSession::new(context).unwrap();
 
         assert!(matches!(
-            session.from_bytes(&bytes, ReadLimits::default()),
+            session.from_bytes(&bytes, SourceLimits::default()),
             Err(OpcError::Execution(ExecutionError::ResourceLimit(limit)))
                 if limit.resource == Resource::Memory
         ));
@@ -577,7 +582,12 @@ mod tests {
     #[test]
     fn explicit_zip_read_refuses_zero_io_before_member_payload_read() {
         let bytes = archive();
-        let reader = LazyArchiveReader::new(&bytes).unwrap();
+        let reader = LazyArchiveReader::new(
+            &bytes,
+            soapberry_zip::office::ArchiveLimits::default(),
+            soapberry_zip::office::LazyArchiveCacheLimits::default(),
+        )
+        .unwrap();
         let budget = Budget::root(
             "opc-open-zero-io",
             Limits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX)
@@ -618,8 +628,18 @@ mod tests {
         let (_second_source, second_context) = direct_read_context(second_budget, 4);
         let first = OpenSession::new(first_context).unwrap();
         let second = OpenSession::new(second_context).unwrap();
-        let first_reader = LazyArchiveReader::new(&bytes).unwrap();
-        let second_reader = LazyArchiveReader::new(&bytes).unwrap();
+        let first_reader = LazyArchiveReader::new(
+            &bytes,
+            soapberry_zip::office::ArchiveLimits::default(),
+            soapberry_zip::office::LazyArchiveCacheLimits::default(),
+        )
+        .unwrap();
+        let second_reader = LazyArchiveReader::new(
+            &bytes,
+            soapberry_zip::office::ArchiveLimits::default(),
+            soapberry_zip::office::LazyArchiveCacheLimits::default(),
+        )
+        .unwrap();
 
         let first_result = first.read_many(&first_reader, &names).unwrap();
         assert_eq!(first.zip.local_pool_worker_count(), 2);
@@ -642,7 +662,12 @@ mod tests {
     #[test]
     fn zero_cpu_budget_refuses_before_retaining_a_zip_pool() {
         let bytes = archive();
-        let reader = LazyArchiveReader::new(&bytes).unwrap();
+        let reader = LazyArchiveReader::new(
+            &bytes,
+            soapberry_zip::office::ArchiveLimits::default(),
+            soapberry_zip::office::LazyArchiveCacheLimits::default(),
+        )
+        .unwrap();
         let budget = Budget::root(
             "opc-open-zero-cpu",
             Limits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX)
@@ -674,7 +699,12 @@ mod tests {
     #[test]
     fn zip_byte_cap_that_splits_every_batch_does_not_retain_a_pool() {
         let bytes = archive();
-        let reader = LazyArchiveReader::new(&bytes).unwrap();
+        let reader = LazyArchiveReader::new(
+            &bytes,
+            soapberry_zip::office::ArchiveLimits::default(),
+            soapberry_zip::office::LazyArchiveCacheLimits::default(),
+        )
+        .unwrap();
         let budget = Budget::root(
             "opc-open-serial-batches",
             Limits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX)
@@ -703,7 +733,12 @@ mod tests {
     #[test]
     fn explicit_zip_read_preflights_oversized_members_before_cpu_admission() {
         let bytes = archive();
-        let reader = LazyArchiveReader::new(&bytes).unwrap();
+        let reader = LazyArchiveReader::new(
+            &bytes,
+            soapberry_zip::office::ArchiveLimits::default(),
+            soapberry_zip::office::LazyArchiveCacheLimits::default(),
+        )
+        .unwrap();
         let budget = Budget::root(
             "opc-open-oversized-member",
             Limits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX)
@@ -742,7 +777,7 @@ mod tests {
         let bytes = archive();
         let (_source, context) = execution_context(16 * MIB);
         let session = OpenSession::new(context).unwrap();
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_input_bytes(3)
             .unwrap()
             .build()
@@ -750,8 +785,8 @@ mod tests {
 
         assert!(matches!(
             session.from_bytes(&bytes, limits),
-            Err(OpcError::ReadLimit {
-                resource: crate::ReadResource::InputBytes,
+            Err(OpcError::Limit {
+                kind: crate::SourceLimitKind::InputBytes,
                 ..
             })
         ));
@@ -764,7 +799,7 @@ mod tests {
         let session = OpenSession::new(context).unwrap();
 
         assert!(matches!(
-            session.from_vec(b"not an OPC ZIP".to_vec(), ReadLimits::default()),
+            session.from_vec(b"not an OPC ZIP".to_vec(), SourceLimits::default()),
             Err(OpcError::ZipError(_))
         ));
         assert_eq!(session.context().budget().used(Resource::InputBytes), 0);
@@ -774,7 +809,7 @@ mod tests {
     fn explicit_owned_open_rejects_input_limit_before_zip_and_input_charge() {
         let (_source, context) = execution_context(16 * MIB);
         let session = OpenSession::new(context).unwrap();
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_input_bytes(3)
             .unwrap()
             .build()
@@ -782,9 +817,9 @@ mod tests {
 
         assert!(matches!(
             session.from_vec(b"four".to_vec(), limits),
-            Err(OpcError::ReadLimit {
-                resource: crate::ReadResource::InputBytes,
-                actual: 4,
+            Err(OpcError::Limit {
+                kind: crate::SourceLimitKind::InputBytes,
+                observed: 4,
                 maximum: 3,
             })
         ));

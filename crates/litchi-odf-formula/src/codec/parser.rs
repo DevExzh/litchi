@@ -9,33 +9,23 @@ use quick_xml::reader::NsReader;
 use super::Limits;
 use crate::model::{Attribute, Content, Element, MATHML_NAMESPACE};
 
-/// Parse bounded `MathML` markup into an inert element tree.
+/// Parse bounded `MathML` markup into an inert element tree under
+/// caller-selected finite limits ([`Limits::default`] for the defaults).
 ///
 /// # Errors
 ///
 /// Returns an error when the markup is not well-formed, when the root is not
-/// a `math` element in the `MathML` namespace, or when a safety limit on
-/// depth, node count, attribute count or size, or text size is exceeded.
-///
-pub fn parse(xml: &str) -> Result<Element> {
-    parse_with_limits(xml, Limits::default())
-}
-
-/// Parse inert `MathML` using caller-selected finite limits.
-///
-/// # Errors
-///
-/// Returns an error for malformed markup, an invalid root, or any exceeded
-/// byte, depth, element, attribute, or text ceiling.
-pub fn parse_with_limits(xml: &str, limits: Limits) -> Result<Element> {
+/// a `math` element in the `MathML` namespace, or when a byte, depth, node,
+/// attribute or text ceiling of `limits` is exceeded.
+pub fn parse(xml: &str, limits: &Limits) -> Result<Element> {
     parse_internal(xml, limits, true)
 }
 
-pub(crate) fn parse_fragment_with_limits(xml: &str, limits: Limits) -> Result<Element> {
+pub(crate) fn parse_fragment_with_limits(xml: &str, limits: &Limits) -> Result<Element> {
     parse_internal(xml, limits, false)
 }
 
-fn parse_internal(xml: &str, limits: Limits, require_math_root: bool) -> Result<Element> {
+fn parse_internal(xml: &str, limits: &Limits, require_math_root: bool) -> Result<Element> {
     if xml.len() > limits.xml_bytes() {
         return Err(Error::InvalidFormat(format!(
             "formula content.xml has {} bytes, exceeding the {} byte limit",
@@ -68,7 +58,7 @@ fn parse_internal(xml: &str, limits: Limits, require_math_root: bool) -> Result<
                     resolved_namespace_uri,
                     element,
                     &mut node_count,
-                    limits,
+                    *limits,
                 )?;
                 if require_math_root
                     && stack.is_empty()
@@ -109,7 +99,7 @@ fn parse_internal(xml: &str, limits: Limits, require_math_root: bool) -> Result<
                         resolved_namespace_uri,
                         element,
                         &mut node_count,
-                        limits,
+                        *limits,
                     )?;
                     if require_math_root
                         && (node.namespace_uri() != Some(MATHML_NAMESPACE)
@@ -131,7 +121,7 @@ fn parse_internal(xml: &str, limits: Limits, require_math_root: bool) -> Result<
                     resolved_namespace_uri,
                     element,
                     &mut node_count,
-                    limits,
+                    *limits,
                 )?;
                 if !inside_annotation_xml(&stack) {
                     super::validation::validate_element(&node)?;
@@ -167,7 +157,7 @@ fn parse_internal(xml: &str, limits: Limits, require_math_root: bool) -> Result<
                 let top = stack.last_mut().ok_or_else(|| {
                     Error::InvalidFormat("MathML text stack is empty".to_string())
                 })?;
-                push_text(top, value.into_owned(), &mut text_bytes, limits)?;
+                push_text(top, value.into_owned(), &mut text_bytes, *limits)?;
             },
             Event::CData(ref text) if !stack.is_empty() => {
                 let value = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
@@ -176,13 +166,13 @@ fn parse_internal(xml: &str, limits: Limits, require_math_root: bool) -> Result<
                 let top = stack.last_mut().ok_or_else(|| {
                     Error::InvalidFormat("MathML CDATA stack is empty".to_string())
                 })?;
-                push_text(top, value.into_owned(), &mut text_bytes, limits)?;
+                push_text(top, value.into_owned(), &mut text_bytes, *limits)?;
             },
             Event::GeneralRef(ref reference) if !stack.is_empty() => {
                 let top = stack.last_mut().ok_or_else(|| {
                     Error::InvalidFormat("MathML entity stack is empty".to_string())
                 })?;
-                push_text(top, decode_reference(reference)?, &mut text_bytes, limits)?;
+                push_text(top, decode_reference(reference)?, &mut text_bytes, *limits)?;
             },
             Event::Text(ref text) if !text.iter().all(u8::is_ascii_whitespace) => {
                 return Err(Error::InvalidFormat(

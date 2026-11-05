@@ -9,9 +9,10 @@
 
 mod repair_support;
 
-use litchi_rtf::{ParagraphFontAlignment, ParagraphWrapping, RtfDocument, RtfWriter, StyleBlock};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{ParagraphFontAlignment, ParagraphWrapping, StyleBlock, write::Writer};
 
-fn block<'a>(document: &'a RtfDocument<'a>, needle: &str) -> &'a StyleBlock<'a> {
+fn block<'a>(document: &'a Tree<'a>, needle: &str) -> &'a StyleBlock<'a> {
     document
         .blocks()
         .iter()
@@ -29,7 +30,7 @@ fn parses_group_inheritance_resets_destinations_and_all_selectors() {
         r#"\nooverflow\faroman Overflow\par "#,
         r#"\wrapdefault\favar Variable\par \fafixed Fixed\par }"#,
     );
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let outer = block(&document, "Outer").paragraph.line_breaking;
     assert!(outer.automatic_hyphenation && outer.auto_space_alphabetic && outer.auto_space_numbers);
     assert!(outer.adjust_right_indent);
@@ -81,8 +82,8 @@ fn parses_group_inheritance_resets_destinations_and_all_selectors() {
 
 #[test]
 fn deterministic_writer_and_stylesheet_round_trip() {
-    let document = RtfDocument::parse(
-        r"{\rtf1{\stylesheet{\s7\hyphpar\aspalpha\aspnum\nooverflow\facenter\adjustright Body;}}\pard\hyphpar\aspalpha\aspnum\nooverflow\facenter\adjustright Body}",
+    let document = Tree::parse(
+        r"{\rtf1{\stylesheet{\s7\hyphpar\aspalpha\aspnum\nooverflow\facenter\adjustright Body;}}\pard\hyphpar\aspalpha\aspnum\nooverflow\facenter\adjustright Body}", litchi_rtf::read::OpenOptions::default()
     ).unwrap();
     let expected = document
         .stylesheet()
@@ -93,12 +94,10 @@ fn deterministic_writer_and_stylesheet_round_trip() {
         .line_breaking;
     assert_eq!(expected, block(&document, "Body").paragraph.line_breaking);
     let mut first = Vec::new();
-    RtfWriter::new(&mut first)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut first).write_document(&document).unwrap();
     let text = String::from_utf8(first.clone()).unwrap();
     assert!(text.contains(r"\hyphpar\nooverflow\aspalpha\aspnum\facenter\adjustright"));
-    let reparsed = RtfDocument::parse_bytes(&first).unwrap();
+    let reparsed = Tree::parse_bytes(&first, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         reparsed
             .stylesheet()
@@ -110,9 +109,7 @@ fn deterministic_writer_and_stylesheet_round_trip() {
         expected
     );
     let mut second = Vec::new();
-    RtfWriter::new(&mut second)
-        .write_document(&reparsed)
-        .unwrap();
+    Writer::new(&mut second).write_document(&reparsed).unwrap();
     assert_eq!(first, second);
 }
 
@@ -144,7 +141,7 @@ fn parses_real_libreoffice_fixture() {
     let mut isolated = br"{\rtf1\ansi".to_vec();
     isolated.extend_from_slice(&bytes[start..end.unwrap()]);
     isolated.push(b'}');
-    let document = RtfDocument::parse_bytes(&isolated).unwrap();
+    let document = Tree::parse_bytes(&isolated, litchi_rtf::read::OpenOptions::default()).unwrap();
     let heading = document
         .stylesheet()
         .get(3)
@@ -178,7 +175,10 @@ fn rejects_invalid_parameters() {
         r"{\rtf1\fafixed1 X}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted {source}"
         );
     }

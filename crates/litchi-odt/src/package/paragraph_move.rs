@@ -11,7 +11,7 @@
 use crate::{
     constants::ODF_CONTENT,
     protection::Policy,
-    transaction::{EnvelopeKind, Snapshot},
+    transaction::{EnvelopeKind, Package},
 };
 use litchi_core::{Error, Result};
 use litchi_odf_common::core::{AuthoredXmlFragment, XmlSourcePart, XmlSplicePublication};
@@ -32,7 +32,7 @@ const MAX_PARAGRAPHS: usize = 4_096;
 const MAX_EVENTS: usize = 1_048_576;
 const MAX_DEPTH: usize = 64;
 
-pub(crate) fn move_plain_paragraph(source: &Snapshot, from: usize, to: usize) -> Result<Snapshot> {
+pub(crate) fn move_plain_paragraph(source: &Package, from: usize, to: usize) -> Result<Package> {
     match source.envelope_kind()? {
         EnvelopeKind::Plain => {},
         EnvelopeKind::Signed => return unsupported("signed packages"),
@@ -94,7 +94,7 @@ pub(crate) fn move_plain_paragraph(source: &Snapshot, from: usize, to: usize) ->
     }
     let target_bytes =
         replace_content_xml_spliced(document.transaction_package(), &candidate, publication)?;
-    let target = Snapshot::from_bytes(target_bytes)?;
+    let target = Package::from_vec_with_xml_limits(target_bytes, source.xml_limits_value())?;
     let target_document = target.document()?;
     require_raw_untouched_members(
         document.transaction_package(),
@@ -411,8 +411,10 @@ fn invalid_error(message: impl Into<String>) -> Error {
     Error::InvalidFormat(message.into())
 }
 
-fn unsupported<T>(what: &str) -> Result<T> {
-    Err(Error::Unsupported(format!(
-        "ODT exact plain paragraph move refuses {what}"
+fn unsupported<T>(_what: &str) -> Result<T> {
+    Err(Error::Refused(litchi_core::edit::Refusal::new(
+        litchi_core::edit::RefusalKind::UnsupportedOperation,
+        "odt.package.paragraph_move",
+        "ODT exact plain paragraph move refuses this source",
     )))
 }

@@ -8,14 +8,15 @@ use std::io::Cursor;
 use std::path::PathBuf;
 
 use litchi_cfb::OleWriter;
+use litchi_core::edit::RefusalKind;
 use litchi_ograph::chart::Kind as GraphKind;
 use litchi_ppt::chart::{Chart, Frame, Kind};
 use litchi_ppt::embedded::object::{
-    ColorFollow, ContainerKind, Definition, DimensionPolicy, DrawAspect, EmbedPreferences,
+    self, ColorFollow, ContainerKind, Definition, DimensionPolicy, DrawAspect, EmbedPreferences,
     ExternalObject, Metadata, ObjectSubtype, ObjectType,
 };
 use litchi_ppt::embedded::storage::{Kind as StorageKind, Storage};
-use litchi_ppt::{Editor, Package};
+use litchi_ppt::{Package, raw::Reader};
 
 const BOF: u16 = 0x0809;
 const EOF: u16 = 0x000A;
@@ -115,14 +116,16 @@ fn uncompressed(data: Vec<u8>) -> Storage {
     Storage::uncompressed(StorageKind::OleObject, data).unwrap()
 }
 
-fn editor_with_seed(seed: u32) -> Editor {
+/// A package-level object edit over a fixture whose six objects carry ids
+/// 1..=6; adding ids above the seed raises it.
+fn objects_edit() -> object::Edit {
     let original = std::fs::read(fixture("ppt_with_embeded.ppt")).expect("read fixture");
-    let mut package = Package::from_reader(Cursor::new(original.clone())).expect("open fixture");
+    let package = Package::from_bytes(&original).expect("open fixture");
     let presentation = package.presentation().expect("read presentation");
-    let mut objects = presentation
-        .ole_objects()
-        .expect("parse objects")
-        .expect("fixture object list");
+    assert!(
+        presentation.ole_objects().expect("parse objects").is_some(),
+        "fixture must carry an external-object list"
+    );
     assert!(
         presentation
             .charts()
@@ -130,13 +133,20 @@ fn editor_with_seed(seed: u32) -> Editor {
             .is_empty(),
         "fixture itself must not contain native chart objects"
     );
-    objects.id_seed = seed;
-    Editor::open(original, objects).expect("open package editor")
+    package
+        .edit_objects()
+        .expect("open package-level object edit")
+}
+
+fn committed_bytes(edit: object::Edit) -> Vec<u8> {
+    let commit = edit.commit().expect("commit object edit");
+    assert!(commit.diagnostics().changed());
+    commit.package().to_bytes().expect("committed bytes")
 }
 
 #[test]
 fn graph_and_excel_objects_use_neutral_typed_views() {
-    let mut editor = editor_with_seed(9);
+    let mut editor = objects_edit();
     editor
         .add(
             chart_object(7, ObjectSubtype::Graph, "MSGraph.Chart.8"),
@@ -156,8 +166,8 @@ fn graph_and_excel_objects_use_neutral_typed_views() {
         )
         .expect("add corrupt object");
 
-    let bytes = editor.finish().expect("finish package edit");
-    let mut package = Package::from_reader(Cursor::new(bytes)).expect("reopen package");
+    let bytes = committed_bytes(editor);
+    let mut package = Reader::from_reader(Cursor::new(bytes)).expect("reopen package");
     let presentation = package.presentation().expect("read presentation");
     let inventory = presentation.charts().expect("enumerate charts");
 
@@ -182,11 +192,12 @@ fn graph_and_excel_objects_use_neutral_typed_views() {
     let graph_chart = typed_graph
         .book()
         .charts()
+        .expect("validated chart streams")
         .next()
         .expect("one chart")
         .expect("validated chart");
     assert_eq!(graph_chart.kind(), GraphKind::Graph);
-    assert_eq!(graph_chart.records().count(), 3);
+    assert_eq!(graph_chart.records().expect("validated records").count(), 3);
     assert!(graph_chart.offset() > 0);
 
     let excel = inventory.get(1).expect("Excel chart");
@@ -199,11 +210,12 @@ fn graph_and_excel_objects_use_neutral_typed_views() {
     let excel_chart = typed_excel
         .book()
         .charts()
+        .expect("validated chart streams")
         .next()
         .expect("one chart")
         .expect("validated chart");
     assert_eq!(excel_chart.kind(), GraphKind::Excel);
-    assert_eq!(excel_chart.records().count(), 3);
+    assert_eq!(excel_chart.records().expect("validated records").count(), 3);
     assert!(excel_chart.offset() > 0);
 
     assert!(
@@ -218,7 +230,7 @@ fn graph_and_excel_objects_use_neutral_typed_views() {
 
 #[test]
 fn program_identifies_chart_when_subtype_is_default() {
-    let mut editor = editor_with_seed(7);
+    let mut editor = objects_edit();
     editor
         .add(
             chart_object(7, ObjectSubtype::Default, "Excel.Chart.8"),
@@ -226,8 +238,8 @@ fn program_identifies_chart_when_subtype_is_default() {
         )
         .expect("add chart");
 
-    let bytes = editor.finish().expect("finish package edit");
-    let mut package = Package::from_reader(Cursor::new(bytes)).expect("reopen package");
+    let bytes = committed_bytes(editor);
+    let mut package = Reader::from_reader(Cursor::new(bytes)).expect("reopen package");
     let presentation = package.presentation().expect("read presentation");
     let inventory = presentation.charts().expect("enumerate charts");
     assert_eq!(inventory.failures().count(), 0);
@@ -236,39 +248,64 @@ fn program_identifies_chart_when_subtype_is_default() {
 }
 
 #[test]
-fn graph_package_replacement_uses_typed_host_storage_transaction() {
-    let mut seed = editor_with_seed(9);
+fn graph_package_replacement_publishes_through_the_object_edit() {
+    let mut seed = objects_edit();
     seed.add(
         chart_object(7, ObjectSubtype::Graph, "MSGraph.Chart.8"),
         uncompressed(compound(&graph_workbook())),
     )
     .expect("add Graph object");
-    let objects = seed.objects().clone();
-    let original = seed.finish().expect("finish initial package");
+    let original = Package::from_bytes(&committed_bytes(seed)).expect("seeded package");
+    let original_bytes = original.to_bytes().expect("seeded bytes");
 
-    let mut package = Package::from_reader(Cursor::new(original.clone())).expect("open package");
-    let presentation = package.presentation().expect("read presentation");
+    let presentation = original.presentation().expect("read presentation");
     let inventory = presentation.charts().expect("enumerate charts");
     let graph = match inventory.get(0).expect("Graph chart") {
         Chart::Graph(graph) => graph,
         Chart::Excel(_) => panic!("expected Graph chart"),
     };
     let persist_id = graph.info().persist_id();
+    let original_storage = presentation
+        .ole_storage(persist_id)
+        .expect("read storage")
+        .expect("Graph storage");
+
+    // An untouched draft is the exact source package and stages no change.
+    let untouched = graph.draft_package().expect("open chart package draft");
+    assert!(!untouched.view().expect("draft view").is_dirty());
+    let mut edit = original.edit_objects().expect("open object edit");
+    graph
+        .replace_package(&mut edit, untouched)
+        .expect("stage untouched draft");
+    let no_op = edit.commit().expect("commit untouched draft");
+    assert!(!no_op.diagnostics().changed());
+    assert!(no_op.patch().is_noop());
+    assert_eq!(no_op.package().to_bytes().unwrap(), original_bytes);
+
     let replacement = graph_chart(&[9, 8, 7]);
-    let mut chart_package = graph.edit_package().expect("open chart package");
+    let mut chart_package = graph.draft_package().expect("open chart package draft");
     chart_package
         .replace_chart(
-            litchi_ograph::chart::Stream::open(replacement.clone())
-                .expect("typed Graph chart stream"),
+            litchi_ograph::chart::Stream::open(
+                replacement.clone(),
+                litchi_ograph::Limits::default(),
+            )
+            .expect("typed Graph chart stream"),
         )
         .expect("stage chart replacement");
-    let mut host = Editor::open(original, objects).expect("open host editor");
+    assert_eq!(
+        chart_package.view().expect("draft view").chart().as_bytes(),
+        replacement.as_slice()
+    );
+    let mut edit = original.edit_objects().expect("open object edit");
     graph
-        .replace_package(&mut host, chart_package)
+        .replace_package(&mut edit, chart_package)
         .expect("stage typed host replacement");
-    let rewritten = host.finish().expect("finish host transaction");
+    let commit = edit.commit().expect("commit chart replacement");
+    assert!(commit.diagnostics().changed());
+    let rewritten = commit.package().to_bytes().expect("rewritten bytes");
 
-    let mut reopened = Package::from_reader(Cursor::new(rewritten)).expect("reopen package");
+    let mut reopened = Reader::from_reader(Cursor::new(rewritten.clone())).expect("reopen package");
     let rewritten_presentation = reopened
         .presentation()
         .expect("read rewritten presentation");
@@ -286,12 +323,62 @@ fn graph_package_replacement_uses_typed_host_storage_transaction() {
     assert_eq!(workbook.chart().as_bytes(), replacement.as_slice());
     assert_eq!(rewritten_graph.info().object_id(), 7);
     assert_eq!(rewritten_graph.info().persist_id(), persist_id);
+    // The object list is untouched: only the storage record moved.
+    assert_eq!(
+        rewritten_presentation.ole_objects().unwrap(),
+        presentation.ole_objects().unwrap()
+    );
+    assert_ne!(
+        rewritten_presentation.ole_storage(persist_id).unwrap(),
+        Some(original_storage)
+    );
+
+    // The patch replays exactly onto its source and its inverse restores it.
+    let replayed = original
+        .apply_objects(commit.patch())
+        .expect("replay object patch");
+    assert_eq!(replayed.package().to_bytes().unwrap(), rewritten);
+    let restored = commit
+        .package()
+        .apply_objects(&commit.patch().inverse())
+        .expect("invert object patch");
+    assert_eq!(restored.package().to_bytes().unwrap(), original_bytes);
+    assert!(matches!(
+        commit.package().apply_objects(commit.patch()),
+        Err(object::Error::PatchConflict)
+    ));
+}
+
+#[test]
+fn graph_package_replacement_refuses_a_missing_host_object() {
+    let mut seed = objects_edit();
+    seed.add(
+        chart_object(7, ObjectSubtype::Graph, "MSGraph.Chart.8"),
+        uncompressed(compound(&graph_workbook())),
+    )
+    .expect("add Graph object");
+    let original = Package::from_bytes(&committed_bytes(seed)).expect("seeded package");
+    let presentation = original.presentation().expect("read presentation");
+    let inventory = presentation.charts().expect("enumerate charts");
+    let Chart::Graph(graph) = inventory.get(0).expect("Graph chart") else {
+        panic!("expected Graph chart");
+    };
+
+    let mut edit = original.edit_objects().expect("open object edit");
+    edit.remove(7).expect("stage chart object removal");
+    let error = graph
+        .replace_package(&mut edit, graph.draft_package().unwrap())
+        .expect_err("removed chart object is absent");
+    assert!(matches!(
+        error,
+        object::Error::Refused(ref refusal) if refusal.kind() == RefusalKind::NotFound
+    ));
 }
 
 #[test]
 fn presentation_without_charts_yields_empty_inventory() {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../test-data/ole/ppt/empty.ppt");
-    let mut package = Package::open(path).expect("open empty fixture");
+    let mut package = Reader::open(path).expect("open empty fixture");
     let presentation = package.presentation().expect("read presentation");
     assert!(presentation.charts().expect("enumerate charts").is_empty());
 }

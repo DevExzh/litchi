@@ -1,0 +1,128 @@
+[
+  {
+    "median_us": 72.2264,
+    "min_us": 71.2024,
+    "samples": 31,
+    "scenario": "leaf/open"
+  },
+  {
+    "median_us": 410.31440000000003,
+    "min_us": 404.7022,
+    "samples": 31,
+    "scenario": "leaf/set"
+  },
+  {
+    "median_us": 407.1524,
+    "min_us": 403.3362000000001,
+    "samples": 31,
+    "scenario": "leaf/set_save"
+  },
+  {
+    "median_us": 1290.228,
+    "min_us": 1278.737,
+    "samples": 31,
+    "scenario": "leaf/batch1k"
+  },
+  {
+    "median_us": 160.1548,
+    "min_us": 157.65699999999998,
+    "samples": 31,
+    "scenario": "source/open_get"
+  },
+  {
+    "median_us": 766.5486,
+    "min_us": 759.6504,
+    "samples": 31,
+    "scenario": "source/set"
+  },
+  {
+    "median_us": 759.8324,
+    "min_us": 754.0704,
+    "samples": 31,
+    "scenario": "source/set_save"
+  },
+  {
+    "median_us": 1679.8580000000002,
+    "min_us": 1644.1115999999997,
+    "samples": 31,
+    "scenario": "source/format"
+  },
+  {
+    "median_us": 18.2682,
+    "min_us": 18.1322,
+    "samples": 31,
+    "scenario": "source/metadata"
+  },
+  {
+    "median_us": 2608.585,
+    "min_us": 2487.005,
+    "samples": 31,
+    "scenario": "source/batch1k"
+  },
+  {
+    "median_us": 193.5592,
+    "min_us": 191.46099999999998,
+    "samples": 31,
+    "scenario": "eager/open_get"
+  },
+  {
+    "median_us": 413.42240000000004,
+    "min_us": 408.0124,
+    "samples": 31,
+    "scenario": "eager/set"
+  },
+  {
+    "median_us": 406.1444,
+    "min_us": 401.01640000000003,
+    "samples": 31,
+    "scenario": "eager/set_save"
+  },
+  {
+    "median_us": 1193.3428,
+    "min_us": 1188.141,
+    "samples": 31,
+    "scenario": "eager/format"
+  },
+  {
+    "median_us": 35.12820000000001,
+    "min_us": 34.5122,
+    "samples": 31,
+    "scenario": "eager/metadata"
+  },
+  {
+    "median_us": 2028.362,
+    "min_us": 2014.681,
+    "samples": 31,
+    "scenario": "eager/batch1k"
+  },
+  {
+    "median_us": 45.8262,
+    "min_us": 45.3564,
+    "samples": 31,
+    "scenario": "eager/comment"
+  },
+  {
+    "median_us": 40.5904,
+    "min_us": 40.2422,
+    "samples": 31,
+    "scenario": "eager/hyperlink"
+  },
+  {
+    "median_us": 1771.1804,
+    "min_us": 1763.7903999999999,
+    "samples": 31,
+    "scenario": "eager/name"
+  },
+  {
+    "median_us": 960.1116,
+    "min_us": 954.4976,
+    "samples": 31,
+    "scenario": "eager/merge"
+  },
+  {
+    "median_us": 2956.7792,
+    "min_us": 2851.0988,
+    "samples": 31,
+    "scenario": "eager/chain"
+  }
+]

@@ -7,7 +7,7 @@
 /// A neutral table-cell value.
 pub use litchi_iwa_common::table::cell::value::Value;
 /// A checked sparse table coordinate.
-pub use litchi_iwa_common::table::coordinate::CellPosition;
+pub use litchi_iwa_common::table::coordinate::At;
 /// A positioned semantic table-cell comment.
 pub use litchi_iwa_common::table::read::CellComment as TableCellComment;
 /// A semantic table-cell comment value.
@@ -20,3 +20,6 @@ pub use litchi_iwa_common::table::read::CommentReply as TableCommentReply;
 pub use litchi_iwa_common::table::read::CommentTimestamp as TableCommentTimestamp;
 /// A sparse semantic table read, including its positioned cell comments.
 pub use litchi_iwa_common::table::read::TableRead;
+
+// Exact-source transaction vocabulary of this family (ADR 0034 W1).
+pub use crate::package::slide_table_cells::{Error, LimitKind, Path};

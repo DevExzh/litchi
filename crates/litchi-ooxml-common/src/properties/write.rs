@@ -1,14 +1,24 @@
+#[cfg(test)]
+use super::graph;
 use super::{
-    Dialect, Keywords, MAX_PROPERTY_TEXT, MAX_XML_BYTES, MAX_XML_EVENTS, Props, graph,
-    keyword::Item,
+    Core, Dialect, Keywords, MAX_PROPERTY_TEXT, MAX_XML_BYTES, MAX_XML_EVENTS, keyword::Item,
 };
+#[cfg(test)]
+use crate::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
+use litchi_core::metadata::Metadata;
+#[cfg(test)]
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+#[cfg(test)]
 use litchi_opc::part::BlobPart;
+#[cfg(test)]
 use litchi_opc::rel::TargetMode;
+#[cfg(test)]
 use litchi_opc::{OpcPackage, PackURI};
 
+#[cfg(test)]
 const CANONICAL_PART: &str = "/docProps/core.xml";
+#[cfg(test)]
 const MAX_PART_CANDIDATES: u32 = 10_000;
 // Reserve enough reader events for the declaration, root, every other
 // property, and EOF. A nonempty structured keyword value costs Start, Text,
@@ -23,11 +33,17 @@ const CORE_CLOSE: &str = "</cp:coreProperties>";
 ///
 /// Existing nonstandard target paths, relationship IDs, and Strict versus
 /// Transitional dialects are retained. Returns whether package bytes changed.
+/// An equal value publishes nothing, so a signed package keeps its signature;
+/// a change to a signed package is refused before it mutates anything (ADR
+/// 0006): remove the signature explicitly first, with
+/// [`OpcPackage::unsign`] or the format facade's `unsign`.
 /// # Errors
 ///
-/// Returns an error when input violates OOXML constraints, exceeds a configured
-/// bound, or an underlying XML or package operation fails.
-pub fn write(package: &mut OpcPackage, props: Props) -> Result<bool> {
+/// Returns [`Error::Signed`] for a change to a signed package, and an error
+/// when input violates OOXML constraints, exceeds a configured bound, or an
+/// underlying XML or package operation fails.
+#[cfg(test)]
+pub(crate) fn write_core(package: &mut OpcPackage, props: Core) -> Result<bool> {
     let result = sync(package, &props);
     drop(props);
     result
@@ -35,13 +51,18 @@ pub fn write(package: &mut OpcPackage, props: Props) -> Result<bool> {
 
 /// Removes the validated core-properties graph.
 ///
-/// Absence is a successful no-op. Shared or ambiguous parts are rejected before
-/// mutation. Signatures are removed only after a real package mutation.
+/// Absence is a successful no-op, which keeps a signed package's signature.
+/// Shared or ambiguous parts are rejected before mutation. Removing a present
+/// graph from a signed package is refused before it mutates anything (ADR
+/// 0006): remove the signature explicitly first, with
+/// [`OpcPackage::unsign`] or the format facade's `unsign`.
 /// # Errors
 ///
-/// Returns an error when input violates OOXML constraints, exceeds a configured
-/// bound, or an underlying XML or package operation fails.
-pub fn clear(package: &mut OpcPackage) -> Result<bool> {
+/// Returns [`Error::Signed`] for a change to a signed package, and an error
+/// when input violates OOXML constraints, exceeds a configured bound, or an
+/// underlying XML or package operation fails.
+#[cfg(test)]
+pub(crate) fn clear(package: &mut OpcPackage) -> Result<bool> {
     let graph = graph::inspect(package)?;
     let Some(part_name) = graph.part else {
         return Ok(false);
@@ -58,6 +79,7 @@ pub fn clear(package: &mut OpcPackage) -> Result<bool> {
         )));
     }
 
+    refuse_signed_change(package)?;
     if !package.remove_part(&part_name) {
         return Err(Error::Missing(format!(
             "core-properties part '{}' disappeared during removal",
@@ -65,11 +87,12 @@ pub fn clear(package: &mut OpcPackage) -> Result<bool> {
         )));
     }
     *package.rels_mut() = relationships;
-    package.unsign();
+    settle_unsigned_change(package)?;
     Ok(true)
 }
 
-pub(super) fn sync(package: &mut OpcPackage, props: &Props) -> Result<bool> {
+#[cfg(test)]
+pub(super) fn sync(package: &mut OpcPackage, props: &Core) -> Result<bool> {
     let graph = graph::inspect(package)?;
     match (graph.part, graph.dialect) {
         (Some(part_name), Some(dialect)) => {
@@ -91,8 +114,9 @@ pub(super) fn sync(package: &mut OpcPackage, props: &Props) -> Result<bool> {
             if current.blob() == xml.as_slice() {
                 return Ok(false);
             }
+            refuse_signed_change(package)?;
             package.get_part_mut(&part_name)?.set_blob(xml);
-            package.unsign();
+            settle_unsigned_change(package)?;
             Ok(true)
         },
         (None, None) => {
@@ -110,9 +134,10 @@ pub(super) fn sync(package: &mut OpcPackage, props: &Props) -> Result<bool> {
             package.validate_new_part_name(&part_name)?;
             let part = BlobPart::new(part_name, ct::OPC_CORE_PROPERTIES.to_owned(), xml);
 
+            refuse_signed_change(package)?;
             package.add_part(Box::new(part));
             *package.rels_mut() = relationships;
-            package.unsign();
+            settle_unsigned_change(package)?;
             Ok(true)
         },
         _ => Err(Error::Relationship(
@@ -121,8 +146,20 @@ pub(super) fn sync(package: &mut OpcPackage, props: &Props) -> Result<bool> {
     }
 }
 
-pub(super) fn encode(props: &Props, dialect: Dialect) -> Result<String> {
+#[cfg(test)]
+pub(super) fn encode(props: &Core, dialect: Dialect) -> Result<String> {
     let encoded_bytes = preflight(props, dialect)?;
+    encode_preflighted(props, dialect, encoded_bytes)
+}
+
+/// Encode a core-properties value after its exact output length has already
+/// been admitted. Keeping the prepared length avoids a second codec walk in
+/// the metadata transaction's publication phase.
+pub(super) fn encode_preflighted(
+    props: &Core,
+    dialect: Dialect,
+    encoded_bytes: usize,
+) -> Result<String> {
     let mut xml = BoundedXml::with_capacity(encoded_bytes)?;
     xml.push_str(XML_DECLARATION)?;
     xml.push_str(CORE_OPEN_PREFIX)?;
@@ -173,7 +210,42 @@ pub(super) fn encode(props: &Props, dialect: Dialect) -> Result<String> {
     xml.finish()
 }
 
-fn preflight(props: &Props, dialect: Dialect) -> Result<usize> {
+/// Return the exact UTF-8 length produced by [`encode_preflighted`] without allocating
+/// the XML string. Metadata admission uses this before retaining an after
+/// image of a core-properties part.
+pub(super) fn encoded_len(props: &Core, dialect: Dialect) -> Result<usize> {
+    preflight(props, dialect)
+}
+
+/// Validate the core fields supplied by an edit before they are merged with
+/// retained source state. Keeping this boundary separate makes a lexical
+/// failure in an authored value an invalid value, while failures from the
+/// retained source remain package corruption.
+pub(super) fn validate_target(target: &Metadata) -> Result<()> {
+    for (property, value) in [
+        ("dc:title", target.title.as_deref()),
+        ("dc:subject", target.subject.as_deref()),
+        ("dc:creator", target.author.as_deref()),
+        ("dc:description", target.description.as_deref()),
+        ("dc:identifier", target.identifier.as_deref()),
+        ("cp:lastModifiedBy", target.last_modified_by.as_deref()),
+        ("cp:category", target.category.as_deref()),
+        ("cp:contentStatus", target.content_status.as_deref()),
+        ("cp:revision", target.revision.as_deref()),
+        ("cp:version", target.version.as_deref()),
+        ("dc:language", target.language.as_deref()),
+    ] {
+        if let Some(value) = value {
+            validate_text(value, property)?;
+        }
+    }
+    for value in &target.keywords {
+        validate_text(value, "cp:keywords")?;
+    }
+    Ok(())
+}
+
+fn preflight(props: &Core, dialect: Dialect) -> Result<usize> {
     let mut bytes = 0usize;
     add_xml_bytes(&mut bytes, XML_DECLARATION.len())?;
     add_xml_bytes(&mut bytes, CORE_OPEN_PREFIX.len())?;
@@ -250,9 +322,9 @@ fn add_typed_time_bytes(
 fn keyword_xml_bytes(keywords: &Keywords) -> Result<usize> {
     if keywords.items.len() > MAX_KEYWORD_ITEMS {
         return Err(Error::Limit {
-            resource: "core keyword items",
-            max: MAX_KEYWORD_ITEMS,
-            actual: keywords.items.len(),
+            kind: crate::LimitKind::CoreKeywordItems,
+            maximum: MAX_KEYWORD_ITEMS,
+            observed: keywords.items.len(),
         });
     }
 
@@ -299,9 +371,9 @@ fn keyword_xml_bytes(keywords: &Keywords) -> Result<usize> {
 fn escaped_xml_bytes(value: &str, property: &str) -> Result<usize> {
     if value.len() > MAX_PROPERTY_TEXT {
         return Err(Error::Limit {
-            resource: "core property text bytes",
-            max: MAX_PROPERTY_TEXT,
-            actual: value.len(),
+            kind: crate::LimitKind::CorePropertyTextBytes,
+            maximum: MAX_PROPERTY_TEXT,
+            observed: value.len(),
         });
     }
     let mut bytes = 0usize;
@@ -319,9 +391,9 @@ fn escaped_xml_bytes(value: &str, property: &str) -> Result<usize> {
             _ => character.len_utf8(),
         };
         bytes = bytes.checked_add(additional).ok_or(Error::Limit {
-            resource: "core-properties XML bytes",
-            max: MAX_XML_BYTES,
-            actual: usize::MAX,
+            kind: crate::LimitKind::CorePropertiesXmlBytes,
+            maximum: MAX_XML_BYTES,
+            observed: usize::MAX,
         })?;
     }
     Ok(bytes)
@@ -329,15 +401,15 @@ fn escaped_xml_bytes(value: &str, property: &str) -> Result<usize> {
 
 fn add_xml_bytes(total: &mut usize, additional: usize) -> Result<()> {
     let actual = total.checked_add(additional).ok_or(Error::Limit {
-        resource: "core-properties XML bytes",
-        max: MAX_XML_BYTES,
-        actual: usize::MAX,
+        kind: crate::LimitKind::CorePropertiesXmlBytes,
+        maximum: MAX_XML_BYTES,
+        observed: usize::MAX,
     })?;
     if actual > MAX_XML_BYTES {
         return Err(Error::Limit {
-            resource: "core-properties XML bytes",
-            max: MAX_XML_BYTES,
-            actual,
+            kind: crate::LimitKind::CorePropertiesXmlBytes,
+            maximum: MAX_XML_BYTES,
+            observed: actual,
         });
     }
     *total = actual;
@@ -357,9 +429,9 @@ impl BoundedXml {
     fn with_capacity(capacity: usize) -> Result<Self> {
         if capacity > MAX_XML_BYTES {
             return Err(Error::Limit {
-                resource: "core-properties XML bytes",
-                max: MAX_XML_BYTES,
-                actual: capacity,
+                kind: crate::LimitKind::CorePropertiesXmlBytes,
+                maximum: MAX_XML_BYTES,
+                observed: capacity,
             });
         }
         let mut bytes = Vec::new();
@@ -381,15 +453,15 @@ impl BoundedXml {
             .len()
             .checked_add(value.len())
             .ok_or(Error::Limit {
-                resource: "core-properties XML bytes",
-                max: MAX_XML_BYTES,
-                actual: usize::MAX,
+                kind: crate::LimitKind::CorePropertiesXmlBytes,
+                maximum: MAX_XML_BYTES,
+                observed: usize::MAX,
             })?;
         if length > MAX_XML_BYTES {
             return Err(Error::Limit {
-                resource: "core-properties XML bytes",
-                max: MAX_XML_BYTES,
-                actual: length,
+                kind: crate::LimitKind::CorePropertiesXmlBytes,
+                maximum: MAX_XML_BYTES,
+                observed: length,
             });
         }
         self.bytes.try_reserve_exact(value.len()).map_err(|error| {
@@ -412,7 +484,9 @@ impl BoundedXml {
     }
 
     fn finish(self) -> Result<String> {
-        String::from_utf8(self.bytes).map_err(|error| {
+        let mut bytes = self.bytes;
+        bytes.shrink_to_fit();
+        String::from_utf8(bytes).map_err(|error| {
             Error::Invalid(format!("core-properties XML output was not UTF-8: {error}"))
         })
     }
@@ -482,15 +556,15 @@ fn push_keywords(xml: &mut BoundedXml, keywords: Option<&Keywords>) -> Result<()
 
 fn add_keyword_bytes(total: &mut usize, additional: usize) -> Result<()> {
     *total = total.checked_add(additional).ok_or(Error::Limit {
-        resource: "core property text bytes",
-        max: MAX_PROPERTY_TEXT,
-        actual: usize::MAX,
+        kind: crate::LimitKind::CorePropertyTextBytes,
+        maximum: MAX_PROPERTY_TEXT,
+        observed: usize::MAX,
     })?;
     if *total > MAX_PROPERTY_TEXT {
         return Err(Error::Limit {
-            resource: "core property text bytes",
-            max: MAX_PROPERTY_TEXT,
-            actual: *total,
+            kind: crate::LimitKind::CorePropertyTextBytes,
+            maximum: MAX_PROPERTY_TEXT,
+            observed: *total,
         });
     }
     Ok(())
@@ -514,9 +588,9 @@ fn push_text(xml: &mut BoundedXml, element: &str, value: Option<&str>) -> Result
 fn validate_text(value: &str, property: &str) -> Result<()> {
     if value.len() > MAX_PROPERTY_TEXT {
         return Err(Error::Limit {
-            resource: "core property text bytes",
-            max: MAX_PROPERTY_TEXT,
-            actual: value.len(),
+            kind: crate::LimitKind::CorePropertyTextBytes,
+            maximum: MAX_PROPERTY_TEXT,
+            observed: value.len(),
         });
     }
     validate_xml_text(value, property)
@@ -537,6 +611,7 @@ fn is_xml_10_char(character: char) -> bool {
         || matches!(u32::from(character), 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x10FFFF)
 }
 
+#[cfg(test)]
 fn available_part_name(package: &OpcPackage) -> Result<PackURI> {
     for index in 1..=MAX_PART_CANDIDATES {
         let candidate = if index == 1 {
@@ -550,12 +625,13 @@ fn available_part_name(package: &OpcPackage) -> Result<PackURI> {
         }
     }
     Err(Error::Limit {
-        resource: "core-properties part-name candidates",
-        max: MAX_PART_CANDIDATES as usize,
-        actual: MAX_PART_CANDIDATES as usize,
+        kind: crate::LimitKind::CorePropertiesPartNameCandidates,
+        maximum: MAX_PART_CANDIDATES as usize,
+        observed: MAX_PART_CANDIDATES as usize,
     })
 }
 
+#[cfg(test)]
 fn next_relationship_id(relationships: &litchi_opc::Relationships) -> Result<String> {
     let mut index = 1u32;
     loop {
@@ -564,9 +640,9 @@ fn next_relationship_id(relationships: &litchi_opc::Relationships) -> Result<Str
             return Ok(candidate);
         }
         index = index.checked_add(1).ok_or(Error::Limit {
-            resource: "package relationship identifiers",
-            max: u32::MAX as usize,
-            actual: usize::MAX,
+            kind: crate::LimitKind::PackageRelationshipIdentifiers,
+            maximum: u32::MAX as usize,
+            observed: usize::MAX,
         })?;
     }
 }
@@ -576,8 +652,8 @@ mod tests {
     use super::*;
     use crate::properties::{STRICT_CORE_PROPERTIES_RELATIONSHIP, Slot, read};
 
-    fn read_props(package: &OpcPackage) -> Result<Option<Props>> {
-        crate::properties::read_with_report(
+    fn read_props(package: &OpcPackage) -> Result<Option<Core>> {
+        crate::properties::read_core_with_report(
             package,
             &mut crate::leniency::ToleranceReport::default(),
         )
@@ -598,7 +674,7 @@ mod tests {
 
     #[test]
     fn writes_reads_and_clears_nonstandard_target() {
-        let original = encode(&Props::new().title("Before"), Dialect::Transitional)
+        let original = encode(&Core::new().title("Before"), Dialect::Transitional)
             .unwrap()
             .into_bytes();
         let mut package = package_with_core("/odd/Metadata.XML", rt::CORE_PROPERTIES, original);
@@ -610,7 +686,7 @@ mod tests {
             .r_id()
             .to_owned();
 
-        assert!(write(&mut package, Props::new().title("After")).unwrap());
+        assert!(write_core(&mut package, Core::new().title("After")).unwrap());
         assert_eq!(
             read_props(&package).unwrap().unwrap().title.as_deref(),
             Some("After")
@@ -630,9 +706,9 @@ mod tests {
 
     #[test]
     fn preserves_strict_dialect_and_byte_identical_write_is_a_noop() {
-        let props = Props::new().title("Strict");
+        let props = Core::new().title("Strict");
         let original = format!(
-            "<?xml version=\"1.0\"?>\n<cp:coreProperties xmlns:cp=\"{}\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\">\n  <dc:title>Strict</dc:title>\n</cp:coreProperties>",
+            "<?xml version=\"1.0\"?>\n<cp:coreProperties xmlns:cp=\"{}\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\">\n  <!--inert & opaque--><?keep data?>\n  <dc:title>Strict</dc:title>\n</cp:coreProperties>",
             Dialect::Strict.namespace()
         )
         .into_bytes();
@@ -642,7 +718,7 @@ mod tests {
             original.clone(),
         );
 
-        assert!(!write(&mut package, props.clone()).unwrap());
+        assert!(!write_core(&mut package, props.clone()).unwrap());
         assert_eq!(
             package
                 .get_part(&PackURI::new("/strict/core.xml").unwrap())
@@ -650,7 +726,7 @@ mod tests {
                 .blob(),
             original
         );
-        assert!(write(&mut package, props.title("Changed")).unwrap());
+        assert!(write_core(&mut package, props.title("Changed")).unwrap());
         let xml = package
             .get_part(&PackURI::new("/strict/core.xml").unwrap())
             .unwrap()
@@ -672,7 +748,7 @@ mod tests {
             package_with_core("/metadata/core.xml", rt::CORE_PROPERTIES, original.clone());
         add_signature_origin(&mut package);
         let mut slot = Slot::load(&package).unwrap();
-        slot.put(Props::new().title("Same"));
+        slot.put(Core::new().title("Same").metadata());
 
         assert!(!slot.flush(&mut package).unwrap());
         assert!(package.is_signed());
@@ -684,7 +760,20 @@ mod tests {
             original
         );
 
+        // A changed value refuses the signed package and leaves the slot dirty
+        // until the signature is removed explicitly (ADR 0006).
         slot.get_mut().unwrap().title = Some("Changed".to_owned());
+        assert!(matches!(slot.flush(&mut package), Err(Error::Signed)));
+        assert!(slot.is_dirty());
+        assert!(package.is_signed());
+        assert_eq!(
+            package
+                .get_part(&PackURI::new("/metadata/core.xml").unwrap())
+                .unwrap()
+                .blob(),
+            original
+        );
+        package.unsign();
         assert!(slot.flush(&mut package).unwrap());
         assert!(!package.is_signed());
     }
@@ -694,17 +783,17 @@ mod tests {
         let absent = OpcPackage::new();
         assert!(read_props(&absent).unwrap().is_none());
 
-        let xml = encode(&Props::new(), Dialect::Transitional)
+        let xml = encode(&Core::new(), Dialect::Transitional)
             .unwrap()
             .into_bytes();
         let present = package_with_core("/docProps/core.xml", rt::CORE_PROPERTIES, xml);
-        assert_eq!(read_props(&present).unwrap(), Some(Props::new()));
+        assert_eq!(read_props(&present).unwrap(), Some(Core::new()));
     }
 
     #[test]
     fn revision_writer_validates_even_empty_and_opaque_lexical_values() {
         for value in ["", "seven", "0007", " 7 "] {
-            let xml = Props::new().revision(value).xml().unwrap();
+            let xml = Core::new().revision(value).xml().unwrap();
             assert!(xml.contains("<cp:revision>"));
             assert_eq!(
                 read::decode(&xml).unwrap().0.revision.as_deref(),
@@ -713,16 +802,16 @@ mod tests {
         }
 
         assert!(matches!(
-            Props::new().revision("bad\0value").xml(),
+            Core::new().revision("bad\0value").xml(),
             Err(Error::Invalid(_))
         ));
         let oversized = "x".repeat(MAX_PROPERTY_TEXT + 1);
         assert!(matches!(
-            Props::new().revision(oversized).xml(),
+            Core::new().revision(oversized).xml(),
             Err(Error::Limit {
-                resource: "core property text bytes",
-                max: MAX_PROPERTY_TEXT,
-                actual,
+                kind: crate::LimitKind::CorePropertyTextBytes,
+                maximum: MAX_PROPERTY_TEXT,
+                observed: actual,
             }) if actual == MAX_PROPERTY_TEXT + 1
         ));
     }
@@ -731,9 +820,12 @@ mod tests {
     fn rejects_keyword_item_and_encoded_xml_budgets_before_package_mutation() {
         let maximum = Keywords {
             lang: None,
-            items: vec![Item::Value(super::super::keyword::Value::new("x")); MAX_KEYWORD_ITEMS],
+            items: vec![
+                Item::Value(litchi_core::metadata::keywords::Value::new("x"));
+                MAX_KEYWORD_ITEMS
+            ],
         };
-        let maximum_xml = Props::new().keywords(maximum).xml().unwrap();
+        let maximum_xml = Core::new().keywords(maximum).xml().unwrap();
         assert_eq!(
             read::decode(&maximum_xml)
                 .unwrap()
@@ -747,34 +839,37 @@ mod tests {
 
         let keywords = Keywords {
             lang: None,
-            items: vec![Item::Value(super::super::keyword::Value::new("x")); MAX_KEYWORD_ITEMS + 1],
+            items: vec![
+                Item::Value(litchi_core::metadata::keywords::Value::new("x"));
+                MAX_KEYWORD_ITEMS + 1
+            ],
         };
         assert!(matches!(
-            Props::new().keywords(keywords).xml(),
+            Core::new().keywords(keywords).xml(),
             Err(Error::Limit {
-                resource: "core keyword items",
-                max: MAX_KEYWORD_ITEMS,
-                actual,
+                kind: crate::LimitKind::CoreKeywordItems,
+                maximum: MAX_KEYWORD_ITEMS,
+                observed: actual,
             }) if actual == MAX_KEYWORD_ITEMS + 1
         ));
 
-        let original = encode(&Props::new().title("Before"), Dialect::Transitional)
+        let original = encode(&Core::new().title("Before"), Dialect::Transitional)
             .unwrap()
             .into_bytes();
         let mut package =
             package_with_core("/docProps/core.xml", rt::CORE_PROPERTIES, original.clone());
         add_signature_origin(&mut package);
         let escaped = "&".repeat(MAX_PROPERTY_TEXT);
-        let oversized = Props::new()
+        let oversized = Core::new()
             .title(escaped.clone())
             .subject(escaped.clone())
             .creator(escaped.clone())
             .description(escaped);
         assert!(matches!(
-            write(&mut package, oversized),
+            write_core(&mut package, oversized),
             Err(Error::Limit {
-                resource: "core-properties XML bytes",
-                max: MAX_XML_BYTES,
+                kind: crate::LimitKind::CorePropertiesXmlBytes,
+                maximum: MAX_XML_BYTES,
                 ..
             })
         ));
@@ -798,9 +893,9 @@ mod tests {
         assert!(matches!(
             result,
             Err(Error::Limit {
-                resource: "core-properties XML bytes",
-                max: MAX_XML_BYTES,
-                actual,
+                kind: crate::LimitKind::CorePropertiesXmlBytes,
+                maximum: MAX_XML_BYTES,
+                observed: actual,
             }) if actual == MAX_XML_BYTES + 1
         ));
         assert_eq!(xml.len(), MAX_XML_BYTES - 1);
@@ -818,7 +913,7 @@ mod tests {
         add_signature_origin(&mut package);
 
         assert!(matches!(
-            write(&mut package, Props::new().title("Known")),
+            write_core(&mut package, Core::new().title("Known")),
             Err(Error::Invalid(_))
         ));
         assert!(package.is_signed());
@@ -830,6 +925,16 @@ mod tests {
             unknown
         );
 
+        assert!(matches!(clear(&mut package), Err(Error::Signed)));
+        assert!(package.is_signed());
+        assert_eq!(
+            package
+                .get_part(&PackURI::new("/docProps/core.xml").unwrap())
+                .unwrap()
+                .blob(),
+            unknown
+        );
+        package.unsign();
         assert!(clear(&mut package).unwrap());
         assert!(!package.is_signed());
         assert!(read_props(&package).unwrap().is_none());
@@ -837,7 +942,7 @@ mod tests {
 
     #[test]
     fn shared_inbound_allows_read_and_update_but_blocks_clear_before_mutation() {
-        let original = encode(&Props::new().title("Before"), Dialect::Transitional)
+        let original = encode(&Core::new().title("Before"), Dialect::Transitional)
             .unwrap()
             .into_bytes();
         let mut package =
@@ -851,7 +956,7 @@ mod tests {
             read_props(&package).unwrap().unwrap().title.as_deref(),
             Some("Before")
         );
-        assert!(write(&mut package, Props::new().title("After")).unwrap());
+        assert!(write_core(&mut package, Core::new().title("After")).unwrap());
         assert_eq!(
             read_props(&package).unwrap().unwrap().title.as_deref(),
             Some("After")
@@ -878,7 +983,7 @@ mod tests {
         const EXTENSION_RELATIONSHIP: &str = "urn:test:core-properties-extension";
         let core_name = PackURI::new("/metadata/core.xml").unwrap();
         let extension_name = PackURI::new("/metadata/extension.xml").unwrap();
-        let original = encode(&Props::new().title("Before"), Dialect::Transitional)
+        let original = encode(&Core::new().title("Before"), Dialect::Transitional)
             .unwrap()
             .into_bytes();
         let mut package = package_with_core(core_name.as_str(), rt::CORE_PROPERTIES, original);
@@ -892,7 +997,7 @@ mod tests {
             .unwrap()
             .relate_to("extension.xml", EXTENSION_RELATIONSHIP);
 
-        assert!(write(&mut package, Props::new().title("After")).unwrap());
+        assert!(write_core(&mut package, Core::new().title("After")).unwrap());
         let extension_relationship = package
             .get_part(&core_name)
             .unwrap()
@@ -931,7 +1036,7 @@ mod tests {
             "application/xml".to_owned(),
             b"<unrelated/>".to_vec(),
         )));
-        assert!(write(&mut package, Props::new().title("New")).unwrap());
+        assert!(write_core(&mut package, Core::new().title("New")).unwrap());
         let graph = graph::inspect(&package).unwrap();
         assert_eq!(graph.part.unwrap().as_str(), "/docProps/core2.xml");
         assert_eq!(

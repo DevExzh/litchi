@@ -133,22 +133,15 @@ impl Hyperlink {
         self
     }
 
-    /// Parse a `BrtHLink` payload.
+    /// Parse a `BrtHLink` payload under an explicit raw profile.
     #[inline]
-    pub fn parse(data: &[u8]) -> Result<Self> {
-        super::codec::parse(data)
+    pub fn parse(data: &[u8], limits: crate::raw::Limits) -> Result<Self> {
+        super::codec::parse(data, limits)
     }
 
-    /// Serialize a `BrtHLink` payload with checked resource limits.
+    /// Serialize a `BrtHLink` payload under an explicit raw profile.
     #[inline]
-    pub fn try_serialize(&self) -> Result<Vec<u8>> {
-        super::codec::serialize(self)
-    }
-
-    /// Serialize to a `BrtHLink` payload using the historical infallible
-    /// writer. Untrusted callers should prefer [`Self::try_serialize`].
-    #[must_use]
-    pub fn serialize(&self) -> Vec<u8> {
-        super::codec::serialize_legacy(self)
+    pub fn serialize(&self, limits: crate::raw::Limits) -> Result<Vec<u8>> {
+        super::codec::serialize(self, limits)
     }
 }

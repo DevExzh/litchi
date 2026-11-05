@@ -1,5 +1,10 @@
 //! Focused tests for the typed diagram data model and XML codec.
 use super::*;
+use crate::LimitKind;
+
+fn parse(xml: &str) -> crate::Result<DiagramDataModel> {
+    DiagramDataModel::parse(xml, &Limits::default())
+}
 
 const TRANSITIONAL: &str = concat!(
     "<?xml version=\"1.0\"?>",
@@ -43,7 +48,7 @@ const STRICT: &str = concat!(
 
 #[test]
 fn parses_transitional_model_with_hierarchy_and_multi_run_text() {
-    let model = DiagramDataModel::parse(TRANSITIONAL).unwrap();
+    let model = parse(TRANSITIONAL).unwrap();
     assert_eq!(model.points.len(), 6);
     assert_eq!(model.connections.len(), 4);
     let root = model.document_point().unwrap();
@@ -78,7 +83,7 @@ fn parses_transitional_model_with_hierarchy_and_multi_run_text() {
 
 #[test]
 fn parses_strict_namespace_model() {
-    let model = DiagramDataModel::parse(STRICT).unwrap();
+    let model = parse(STRICT).unwrap();
     assert_eq!(model.points.len(), 3);
     let connection_id: Id = "{00000000-0000-0000-0000-000000000004}".parse().unwrap();
     assert_eq!(
@@ -106,8 +111,8 @@ fn tolerates_cycles_and_dangling_connections() {
         "<dgm:cxn modelId=\"13\" srcId=\"0\" destId=\"9\" srcOrd=\"1\" destOrd=\"0\"/>",
         "</dgm:cxnLst></dgm:dataModel>"
     );
-    let model = DiagramDataModel::parse(xml).unwrap();
-    assert!(model.validate().is_err());
+    let model = parse(xml).unwrap();
+    assert!(model.validate(&Limits::default()).is_err());
     let tree = model.node_tree();
     assert_eq!(tree.len(), 1);
     assert_eq!(tree[0].children.len(), 1);
@@ -117,13 +122,13 @@ fn tolerates_cycles_and_dangling_connections() {
 #[test]
 fn rejects_wrong_root_and_dtd() {
     assert!(
-            DiagramDataModel::parse(
+            parse(
                 "<dgm:layoutDef xmlns:dgm=\"http://schemas.openxmlformats.org/drawingml/2006/diagram\"/>"
             )
             .is_err()
         );
     assert!(
-            DiagramDataModel::parse(
+            parse(
                 "<!DOCTYPE dgm:dataModel><dgm:dataModel xmlns:dgm=\"http://schemas.openxmlformats.org/drawingml/2006/diagram\"/>"
             )
             .is_err()
@@ -133,13 +138,13 @@ fn rejects_wrong_root_and_dtd() {
 #[test]
 fn rejects_missing_ids() {
     assert!(
-            DiagramDataModel::parse(
+            parse(
                 "<dgm:dataModel xmlns:dgm=\"http://schemas.openxmlformats.org/drawingml/2006/diagram\"><dgm:ptLst><dgm:pt type=\"doc\"/></dgm:ptLst></dgm:dataModel>"
             )
             .is_err()
         );
     assert!(
-            DiagramDataModel::parse(
+            parse(
                 "<dgm:dataModel xmlns:dgm=\"http://schemas.openxmlformats.org/drawingml/2006/diagram\"><dgm:ptLst/><dgm:cxnLst><dgm:cxn modelId=\"1\" srcId=\"0\"/></dgm:cxnLst></dgm:dataModel>"
             )
             .is_err()
@@ -165,7 +170,7 @@ fn enforces_data_model_structure_and_unqualified_schema_attributes() {
         ),
     ] {
         assert!(
-            DiagramDataModel::parse(&invalid_xml).is_err(),
+            parse(&invalid_xml).is_err(),
             "accepted structurally invalid XML: {invalid_xml}"
         );
     }
@@ -181,10 +186,7 @@ fn extracts_only_drawingml_text_leaf_content() {
         "  <a:r><a:t>Beta</a:t></a:r></a:p>\n",
         "</dgm:t></dgm:pt></dgm:ptLst></dgm:dataModel>"
     );
-    assert_eq!(
-        DiagramDataModel::parse(xml).unwrap().points[0].text,
-        "Alpha Beta"
-    );
+    assert_eq!(parse(xml).unwrap().points[0].text, "Alpha Beta");
 }
 
 #[test]
@@ -217,7 +219,7 @@ fn rejects_values_outside_fixed_point_and_connection_domains() {
         "<dgm:ptLst><dgm:pt modelId=\"1\" type=\"futureNode\"/></dgm:ptLst>",
         "</dgm:dataModel>"
     );
-    assert!(DiagramDataModel::parse(invalid_point).is_err());
+    assert!(parse(invalid_point).is_err());
 
     let invalid_connection = concat!(
         "<dgm:dataModel xmlns:dgm=\"http://schemas.openxmlformats.org/drawingml/2006/diagram\">",
@@ -225,14 +227,14 @@ fn rejects_values_outside_fixed_point_and_connection_domains() {
         "<dgm:cxnLst><dgm:cxn modelId=\"1\" type=\"futureRelation\" srcId=\"2\" destId=\"3\" srcOrd=\"0\" destOrd=\"0\"/></dgm:cxnLst>",
         "</dgm:dataModel>"
     );
-    assert!(DiagramDataModel::parse(invalid_connection).is_err());
+    assert!(parse(invalid_connection).is_err());
 
     let invalid_identifier = concat!(
         "<dgm:dataModel xmlns:dgm=\"http://schemas.openxmlformats.org/drawingml/2006/diagram\">",
         "<dgm:ptLst><dgm:pt modelId=\"node-one\"/></dgm:ptLst>",
         "</dgm:dataModel>"
     );
-    assert!(DiagramDataModel::parse(invalid_identifier).is_err());
+    assert!(parse(invalid_identifier).is_err());
 }
 
 #[test]
@@ -245,7 +247,7 @@ fn accepts_all_schema_connection_types_without_string_fallback() {
         "<dgm:cxn modelId=\"4\" type=\"unknownRelationship\" srcId=\"2\" destId=\"3\" srcOrd=\"1\" destOrd=\"0\"/>",
         "</dgm:cxnLst></dgm:dataModel>"
     );
-    let model = DiagramDataModel::parse(xml).unwrap();
+    let model = parse(xml).unwrap();
     assert_eq!(
         model.connections[0].kind,
         ConnectionType::PresentationParent
@@ -286,15 +288,19 @@ fn canonical_writer_round_trips_both_conformance_classes() {
         ))
         .unwrap();
 
-    let xml = model.to_xml(Conformance::Transitional).unwrap();
+    let xml = model
+        .to_xml(Conformance::Transitional, &Limits::default())
+        .unwrap();
     assert!(xml.contains("parTransId=\"2\" sibTransId=\"3\""));
     assert!(xml.contains("type=\"presOf\" presId=\"urn:test/layout\""));
-    assert_eq!(DiagramDataModel::parse(&xml).unwrap(), model);
+    assert_eq!(parse(&xml).unwrap(), model);
 
-    let xml = model.to_xml(Conformance::Strict).unwrap();
+    let xml = model
+        .to_xml(Conformance::Strict, &Limits::default())
+        .unwrap();
     assert!(xml.contains(DGM_NAMESPACE_STRICT));
     assert!(xml.contains("http://purl.oclc.org/ooxml/drawingml/main"));
-    assert_eq!(DiagramDataModel::parse(&xml).unwrap(), model);
+    assert_eq!(parse(&xml).unwrap(), model);
 }
 
 #[test]
@@ -326,7 +332,7 @@ fn semantic_crud_guards_duplicates_and_cascades_dependencies() {
             0,
         ))
         .unwrap();
-    assert!(model.validate().is_ok());
+    assert!(model.validate(&Limits::default()).is_ok());
     assert!(
         model
             .add_point(Point::node(Id::number(10), "collision"))
@@ -336,12 +342,16 @@ fn semantic_crud_guards_duplicates_and_cascades_dependencies() {
     let mut broken_transition = model.clone();
     broken_transition.point_mut(Id::number(2)).unwrap().kind =
         PointType::ParentTransition(Id::number(99));
-    assert!(broken_transition.validate().is_err());
-    assert!(broken_transition.to_xml(Conformance::Transitional).is_err());
+    assert!(broken_transition.validate(&Limits::default()).is_err());
+    assert!(
+        broken_transition
+            .to_xml(Conformance::Transitional, &Limits::default())
+            .is_err()
+    );
 
     let mut cross_domain_collision = model.clone();
     cross_domain_collision.connections[0].id = Id::number(1);
-    assert!(cross_domain_collision.validate().is_err());
+    assert!(cross_domain_collision.validate(&Limits::default()).is_err());
 
     let conflicting_parent = Connection::new(
         Id::number(11),
@@ -353,7 +363,7 @@ fn semantic_crud_guards_duplicates_and_cascades_dependencies() {
     );
     assert!(model.add_connection(conflicting_parent.clone()).is_err());
     model.connections.push(conflicting_parent);
-    assert!(model.validate().is_err());
+    assert!(model.validate(&Limits::default()).is_err());
     model.connections.pop();
 
     model
@@ -401,11 +411,19 @@ fn canonical_writer_enforces_xml_and_aggregate_size_budgets() {
     invalid_text
         .add_point(Point::node(Id::number(0), "invalid\0text"))
         .unwrap();
-    assert!(invalid_text.to_xml(Conformance::Transitional).is_err());
+    assert!(
+        invalid_text
+            .to_xml(Conformance::Transitional, &Limits::default())
+            .is_err()
+    );
     let mut destination = "unchanged".to_string();
     assert!(
         invalid_text
-            .write_xml(&mut destination, Conformance::Transitional)
+            .write_xml(
+                &mut destination,
+                Conformance::Transitional,
+                &Limits::default(),
+            )
             .is_err()
     );
     assert_eq!(destination, "unchanged");
@@ -427,6 +445,53 @@ fn canonical_writer_enforces_xml_and_aggregate_size_budgets() {
             0,
         ))
         .unwrap();
-    assert!(oversized.validate().is_err());
-    assert!(oversized.to_xml(Conformance::Transitional).is_err());
+    assert!(oversized.validate(&Limits::default()).is_err());
+    assert!(
+        oversized
+            .to_xml(Conformance::Transitional, &Limits::default())
+            .is_err()
+    );
+}
+
+#[test]
+fn raw_policy_reports_invalid_and_output_limits_before_allocation() {
+    let defaults = Limits::DEFAULT;
+    let invalid = Limits::new(
+        0,
+        defaults.output_bytes_value(),
+        defaults.xml_nodes_value(),
+        defaults.xml_depth_value(),
+        defaults.points_value(),
+        defaults.connections_value(),
+        defaults.data_text_bytes_value(),
+        defaults.nodes_value(),
+        defaults.node_depth_value(),
+        defaults.node_text_bytes_value(),
+    );
+    assert!(parse(TRANSITIONAL).is_ok());
+    assert!(matches!(
+        DiagramDataModel::parse(TRANSITIONAL, &invalid),
+        Err(crate::Error::InvalidLimit { .. })
+    ));
+
+    let tiny_output = Limits::new(
+        defaults.input_bytes_value(),
+        1,
+        defaults.xml_nodes_value(),
+        defaults.xml_depth_value(),
+        defaults.points_value(),
+        defaults.connections_value(),
+        defaults.data_text_bytes_value(),
+        defaults.nodes_value(),
+        defaults.node_depth_value(),
+        defaults.node_text_bytes_value(),
+    );
+    let model = DiagramDataModel::new();
+    assert!(matches!(
+        model.to_xml(Conformance::Transitional, &tiny_output),
+        Err(crate::Error::Limit {
+            kind: LimitKind::DiagramDataModelBytes,
+            ..
+        })
+    ));
 }

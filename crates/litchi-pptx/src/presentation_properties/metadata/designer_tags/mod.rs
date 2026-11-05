@@ -6,6 +6,7 @@
 //! deliberately refuses that ambiguous producer state.
 
 mod codec;
+mod edit;
 mod model;
 mod package;
 mod transaction;
@@ -14,8 +15,13 @@ mod transaction;
 mod tests;
 
 pub use crate::shape::designer::{Limits, Tag, Tags};
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 pub use model::{Binding, Snapshot};
-pub use package::{
-    apply_commit, apply_patch, load, load_snapshot, load_snapshot_with_limits, remove, store,
-};
-pub use transaction::{Commit, Edit, Patch, Revision};
+pub use package::{load, load_snapshot};
+pub use transaction::Revision;
+
+#[cfg(test)]
+pub(crate) use package::apply_patch;
+pub(crate) use package::load_snapshot_with_limits;
+pub(crate) use package::{remove, store};
+pub(crate) use transaction::{Change, Draft, Prepared};

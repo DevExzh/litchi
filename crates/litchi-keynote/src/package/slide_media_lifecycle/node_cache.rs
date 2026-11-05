@@ -10,12 +10,12 @@
 use std::mem::size_of;
 
 use litchi_iwa_common::WireLimits;
-use litchi_iwa_core::{Archive, ArchiveLimits, ArchiveObject, RawMessage};
+use litchi_iwa_core::{Archive, ArchiveObject, Limits as ArchiveLimits, RawMessage};
 use litchi_iwa_protos::keynote_media_lifecycle_codec as lifecycle_codec;
 
 use super::budget::LifecycleBudget;
 use super::graph::MediaGraphSelection;
-use super::{Package, SlideMediaLifecycleError};
+use super::{Error, Package};
 
 const SLIDE_NODE_MESSAGE_TYPE: u32 = 4;
 
@@ -41,35 +41,37 @@ pub(super) fn prepare_slide_node_build_cache(
     archive_limits: ArchiveLimits,
     wire_limits: WireLimits,
     budget: &mut LifecycleBudget,
-) -> Result<Option<NodeCacheComponentEdit>, SlideMediaLifecycleError> {
+) -> Result<Option<NodeCacheComponentEdit>, Error> {
     if selection.build_ids.is_empty() && selection.chunk_ids.is_empty() {
         return Ok(None);
     }
 
     let slide_record = source
         .slide_record_at(selection.slide_position.get())
-        .map_err(|_| SlideMediaLifecycleError::Read)?
-        .ok_or(SlideMediaLifecycleError::SlidePositionNotFound {
-            position: selection.slide_position,
-        })?;
+        .map_err(|_| Error::Read)?
+        .ok_or(Error::Refused(
+            crate::slide::media::lifecycle::Refusal::SlidePositionNotFound {
+                position: selection.slide_position,
+            },
+        ))?;
     if slide_record.slide_identifier != selection.slide_identifier {
-        return Err(SlideMediaLifecycleError::PatchConflict);
+        return Err(Error::PatchConflict);
     }
     let node_identifier = slide_record.node_identifier;
     if node_identifier == 0 {
-        return Err(SlideMediaLifecycleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let (node_component_name, source_node) = source
         .object_with_component(node_identifier)
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if node_component_name == super::METADATA_COMPONENT {
-        return Err(SlideMediaLifecycleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let source_node_index = unique_slide_node_message(source_node)?;
     let source_node_payload = source_node
         .messages
         .get(source_node_index)
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?
+        .ok_or(Error::InvalidSource)?
         .data
         .as_slice();
     if source_node_cache_is_invalidated(source_node_payload, wire_limits, budget)? {
@@ -93,7 +95,7 @@ pub(super) fn prepare_slide_node_build_cache(
         .source
         .components()
         .get(node_component_name)
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let node_archive =
         clone_component_with_budget(source_component.archive(), archive_limits, budget)?;
     let mut node_archive = node_archive;
@@ -121,13 +123,13 @@ pub(super) fn validate_candidate_node_cache(
     node_identifier: u64,
     wire_limits: WireLimits,
     budget: &mut LifecycleBudget,
-) -> Result<(), SlideMediaLifecycleError> {
+) -> Result<(), Error> {
     let object = find_archive_object(candidate_node_archive, node_identifier, budget)?;
     let index = unique_slide_node_message(object)?;
     let payload = object
         .messages
         .get(index)
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?
+        .ok_or(Error::InvalidSource)?
         .data
         .as_slice();
     let options = super::lifecycle_options(wire_limits, payload.len())?;
@@ -137,7 +139,7 @@ pub(super) fn validate_candidate_node_cache(
     charge_node_cache_decode_report(report, budget)?;
 
     if !is_invalidated(snapshot) {
-        return Err(SlideMediaLifecycleError::Verification);
+        return Err(Error::Verification);
     }
     Ok(())
 }
@@ -148,33 +150,35 @@ pub(super) fn validate_candidate_package_node_cache(
     selection: &MediaGraphSelection,
     wire_limits: WireLimits,
     budget: &mut LifecycleBudget,
-) -> Result<(), SlideMediaLifecycleError> {
+) -> Result<(), Error> {
     if selection.build_ids.is_empty() && selection.chunk_ids.is_empty() {
         return Ok(());
     }
     let slide_record = candidate
         .slide_record_at(selection.slide_position.get())
-        .map_err(|_| SlideMediaLifecycleError::Read)?
-        .ok_or(SlideMediaLifecycleError::SlidePositionNotFound {
-            position: selection.slide_position,
-        })?;
+        .map_err(|_| Error::Read)?
+        .ok_or(Error::Refused(
+            crate::slide::media::lifecycle::Refusal::SlidePositionNotFound {
+                position: selection.slide_position,
+            },
+        ))?;
     if slide_record.slide_identifier != selection.slide_identifier
         || slide_record.node_identifier == 0
     {
-        return Err(SlideMediaLifecycleError::Verification);
+        return Err(Error::Verification);
     }
     let (_, node) = candidate
         .object_with_component(slide_record.node_identifier)
-        .ok_or(SlideMediaLifecycleError::Verification)?;
+        .ok_or(Error::Verification)?;
     let index = unique_slide_node_message(node)?;
     let payload = node
         .messages
         .get(index)
-        .ok_or(SlideMediaLifecycleError::Verification)?
+        .ok_or(Error::Verification)?
         .data
         .as_slice();
     if !source_node_cache_is_invalidated(payload, wire_limits, budget)? {
-        return Err(SlideMediaLifecycleError::Verification);
+        return Err(Error::Verification);
     }
     Ok(())
 }
@@ -183,7 +187,7 @@ fn source_node_cache_is_invalidated(
     payload: &[u8],
     wire_limits: WireLimits,
     budget: &mut LifecycleBudget,
-) -> Result<bool, SlideMediaLifecycleError> {
+) -> Result<bool, Error> {
     let options = super::lifecycle_options(wire_limits, payload.len())?;
     let (snapshot, report) =
         lifecycle_codec::node_cache::decode_slide_node_build_cache_with_report(payload, options)
@@ -205,7 +209,7 @@ fn rewrite_node_cache(
     archive_limits: ArchiveLimits,
     wire_limits: WireLimits,
     budget: &mut LifecycleBudget,
-) -> Result<(), SlideMediaLifecycleError> {
+) -> Result<(), Error> {
     let index = {
         let object = find_archive_object(archive, node_identifier, budget)?;
         unique_slide_node_message(object)?
@@ -213,7 +217,7 @@ fn rewrite_node_cache(
     let source_payload = archive
         .object(node_identifier)
         .and_then(|object| object.messages.get(index))
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?
+        .ok_or(Error::InvalidSource)?
         .data
         .as_slice();
     let options = super::lifecycle_options(wire_limits, source_payload.len())?;
@@ -233,14 +237,14 @@ fn rewrite_node_cache(
 
     let source_object = archive
         .object(node_identifier)
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let narrowed_limits =
         super::graph::reserve_core_header_work(source_object, 0, archive_limits, budget)?;
     let object = archive
         .object_mut(node_identifier)
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             index,
             RawMessage {
                 type_: SLIDE_NODE_MESSAGE_TYPE,
@@ -252,9 +256,9 @@ fn rewrite_node_cache(
         .map_err(map_archive_error)
 }
 
-fn unique_slide_node_message(object: &ArchiveObject) -> Result<usize, SlideMediaLifecycleError> {
+fn unique_slide_node_message(object: &ArchiveObject) -> Result<usize, Error> {
     if object.archive_info.message_infos.len() != object.messages.len() {
-        return Err(SlideMediaLifecycleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut index = None;
     for (position, message) in object.messages.iter().enumerate() {
@@ -262,42 +266,38 @@ fn unique_slide_node_message(object: &ArchiveObject) -> Result<usize, SlideMedia
             continue;
         }
         if index.replace(position).is_some() {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
-    index.ok_or(SlideMediaLifecycleError::InvalidSource)
+    index.ok_or(Error::InvalidSource)
 }
 
 fn find_archive_object<'archive>(
     archive: &'archive Archive,
     identifier: u64,
     budget: &mut LifecycleBudget,
-) -> Result<&'archive ArchiveObject, SlideMediaLifecycleError> {
+) -> Result<&'archive ArchiveObject, Error> {
     budget.charge_wire_work(archive.objects.len())?;
     archive
         .objects
         .iter()
         .find(|object| object.archive_info.identifier == Some(identifier))
-        .ok_or(SlideMediaLifecycleError::InvalidSource)
+        .ok_or(Error::InvalidSource)
 }
 
 fn clone_component_with_budget(
     source: &Archive,
     archive_limits: ArchiveLimits,
     budget: &mut LifecycleBudget,
-) -> Result<Archive, SlideMediaLifecycleError> {
+) -> Result<Archive, Error> {
     let object_count = source.objects.len();
     budget.charge_entries(object_count)?;
     // Admit the complete source-relative traversal before asking the core to
     // calculate its encoded bound.  This prevents an archive clone from
     // hiding linear metadata work behind an infallible `Clone` implementation.
-    budget.charge_wire_work(
-        object_count
-            .checked_mul(128)
-            .ok_or(SlideMediaLifecycleError::InvalidSource)?,
-    )?;
+    budget.charge_wire_work(object_count.checked_mul(128).ok_or(Error::InvalidSource)?)?;
     let encoded_bytes = source
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_archive_error)?;
     let mut messages = 0usize;
     let mut message_infos = 0usize;
@@ -306,23 +306,23 @@ fn clone_component_with_budget(
     for object in &source.objects {
         messages = messages
             .checked_add(object.messages.len())
-            .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         message_infos = message_infos
             .checked_add(object.archive_info.message_infos.len())
-            .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         for info in &object.archive_info.message_infos {
             fields = fields
                 .checked_add(info.field_infos.len())
-                .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             references = references
                 .checked_add(info.object_references.len())
                 .and_then(|total| total.checked_add(info.data_references.len()))
-                .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             for field in &info.field_infos {
                 references = references
                     .checked_add(field.object_references.len())
                     .and_then(|total| total.checked_add(field.data_references.len()))
-                    .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
             }
         }
     }
@@ -336,23 +336,20 @@ fn clone_component_with_budget(
             bytes.checked_add(fields.checked_mul(size_of::<litchi_iwa_core::FieldInfo>())?)
         })
         .and_then(|bytes| bytes.checked_add(references.checked_mul(size_of::<u64>())?))
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let allocation_bound = encoded_bytes
         .checked_add(structural_bytes)
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.charge_allocations(allocation_bound)?;
     Ok(source.clone())
 }
 
-fn copy_component_name(
-    name: &str,
-    budget: &mut LifecycleBudget,
-) -> Result<Box<str>, SlideMediaLifecycleError> {
+fn copy_component_name(name: &str, budget: &mut LifecycleBudget) -> Result<Box<str>, Error> {
     budget.charge_allocations(name.len())?;
     let mut output = String::new();
     output
         .try_reserve_exact(name.len())
-        .map_err(|_| SlideMediaLifecycleError::Allocation { amount: name.len() })?;
+        .map_err(|_| Error::Allocation { amount: name.len() })?;
     output.push_str(name);
     Ok(output.into_boxed_str())
 }
@@ -360,20 +357,19 @@ fn copy_component_name(
 fn charge_node_cache_decode_report(
     report: lifecycle_codec::DecodeReport,
     budget: &mut LifecycleBudget,
-) -> Result<(), SlideMediaLifecycleError> {
+) -> Result<(), Error> {
     super::charge_lifecycle_decode_report(report, budget)
 }
 
 fn charge_node_cache_rewrite_report(
     report: lifecycle_codec::RewriteReport,
     budget: &mut LifecycleBudget,
-) -> Result<(), SlideMediaLifecycleError> {
+) -> Result<(), Error> {
     budget.charge_output(report.output_bytes())?;
     budget.charge_wire_fields(report.fields())?;
     budget.charge_wire_work(report.work_bytes())?;
-    budget.charge_nesting(
-        usize::try_from(report.max_depth()).map_err(|_| SlideMediaLifecycleError::InvalidSource)?,
-    )?;
+    budget
+        .charge_nesting(usize::try_from(report.max_depth()).map_err(|_| Error::InvalidSource)?)?;
     budget.charge_allocations(report.scratch_bytes())?;
     for _ in 0..report.allocations() {
         budget.charge_allocations(0)?;
@@ -381,73 +377,61 @@ fn charge_node_cache_rewrite_report(
     Ok(())
 }
 
-fn map_lifecycle_decode_error(error: lifecycle_codec::DecodeError) -> SlideMediaLifecycleError {
+fn map_lifecycle_decode_error(error: lifecycle_codec::DecodeError) -> Error {
     use lifecycle_codec::DecodeLimit;
     let Some(limit) = error.resource_limit() else {
-        return SlideMediaLifecycleError::InvalidSource;
+        return Error::InvalidSource;
     };
     let (kind, observed, maximum) = match limit {
-        DecodeLimit::Bytes { observed, maximum } => (
-            super::SlideMediaLifecycleLimitKind::InputBytes,
-            observed,
-            maximum,
-        ),
-        DecodeLimit::Fields { observed, maximum } => (
-            super::SlideMediaLifecycleLimitKind::WireFields,
-            observed,
-            maximum,
-        ),
-        DecodeLimit::Work { observed, maximum } => (
-            super::SlideMediaLifecycleLimitKind::WireWork,
-            observed,
-            maximum,
-        ),
-        DecodeLimit::OutputBytes { observed, maximum } => (
-            super::SlideMediaLifecycleLimitKind::OutputBytes,
-            observed,
-            maximum,
-        ),
-        DecodeLimit::References { observed, maximum } => (
-            super::SlideMediaLifecycleLimitKind::References,
-            observed,
-            maximum,
-        ),
+        DecodeLimit::Bytes { observed, maximum } => {
+            (super::LimitKind::InputBytes, observed, maximum)
+        },
+        DecodeLimit::Fields { observed, maximum } => {
+            (super::LimitKind::WireFields, observed, maximum)
+        },
+        DecodeLimit::Work { observed, maximum } => (super::LimitKind::WireWork, observed, maximum),
+        DecodeLimit::OutputBytes { observed, maximum } => {
+            (super::LimitKind::OutputBytes, observed, maximum)
+        },
+        DecodeLimit::References { observed, maximum } => {
+            (super::LimitKind::References, observed, maximum)
+        },
         DecodeLimit::Nesting { observed, maximum } => {
-            return SlideMediaLifecycleError::LimitExceeded {
-                kind: super::SlideMediaLifecycleLimitKind::WireNesting,
+            return Error::Limit {
+                kind: super::LimitKind::WireNesting,
                 observed: u64::from(observed),
                 maximum: u64::from(maximum),
             };
         },
-        _ => return SlideMediaLifecycleError::InvalidSource,
+        _ => return Error::InvalidSource,
     };
     let observed = match u64::try_from(observed) {
         Ok(value) => value,
-        Err(_) => return SlideMediaLifecycleError::InvalidSource,
+        Err(_) => return Error::InvalidSource,
     };
     let maximum = match u64::try_from(maximum) {
         Ok(value) => value,
-        Err(_) => return SlideMediaLifecycleError::InvalidSource,
+        Err(_) => return Error::InvalidSource,
     };
-    SlideMediaLifecycleError::LimitExceeded {
+    Error::Limit {
         kind,
         observed,
         maximum,
     }
 }
 
-fn map_archive_error(error: litchi_iwa_core::Error) -> SlideMediaLifecycleError {
+fn map_archive_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
             observed, maximum, ..
-        } => SlideMediaLifecycleError::LimitExceeded {
-            kind: super::SlideMediaLifecycleLimitKind::Entries,
+        } => Error::Limit {
+            kind: super::LimitKind::Entries,
             observed: u64::try_from(observed).unwrap_or(u64::MAX),
             maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
         },
         litchi_iwa_core::Error::Allocation { requested, .. } => {
-            SlideMediaLifecycleError::Allocation { amount: requested }
+            Error::Allocation { amount: requested }
         },
-        _ => SlideMediaLifecycleError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }

@@ -49,16 +49,17 @@
 //! # Example
 //!
 //! ```rust,no_run
-//! use litchi_doc::Writer;
+//! use litchi_doc::Builder;
 //!
-//! let mut writer = Writer::new();
+//! let mut builder = Builder::new();
 //!
 //! // Add paragraphs
-//! writer.add_paragraph("Hello, World!")?;
-//! writer.add_paragraph("This is a second paragraph.")?;
+//! builder.add_paragraph("Hello, World!")?;
+//! builder.add_paragraph("This is a second paragraph.")?;
 //!
 //! // Save the document
-//! writer.save("output.doc")?;
+//! let mut package = builder.build()?;
+//! package.save("output.doc")?;
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
@@ -67,7 +68,7 @@
 //! Generated DOC files are compatible with:
 //! - Microsoft Word 97-2003
 //! - Microsoft Word 2007+ (compatibility mode)
-//! - LibreOffice Writer
+//! - LibreOffice Builder
 //! - Apache POI (HWPF)
 //! - Other OLE2-based Word readers
 
@@ -79,8 +80,8 @@ mod package;
 mod tests;
 
 pub use model::{
-    CharacterFormatting, HeaderFooterParagraph, HeaderKind, LineSpacing, ParagraphFormatting,
-    WriteError, Writer,
+    Builder, CharacterFormatting, HeaderFooterParagraph, HeaderKind, LineSpacing,
+    ParagraphFormatting, WriteError,
 };
 
 pub(super) use model::pack_dttm;

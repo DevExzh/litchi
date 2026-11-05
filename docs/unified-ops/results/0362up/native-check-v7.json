@@ -1,0 +1,47 @@
+{
+  "source": "62c11a3dde0db3a8fdb4357a42b6eeb9315f7057",
+  "pid": 2856907,
+  "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation",
+  "command": [
+    "python3",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/run-semantic-checks-disk-guarded.py",
+    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/native-check-v7-commands.json",
+    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/native-check-v7"
+  ],
+  "started_unix_seconds": 1792773853.5585551,
+  "target": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target",
+  "lock_sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--all-targets",
+        "--all-features",
+        "--keep-going",
+        "-p",
+        "litchi-docx",
+        "-p",
+        "litchi-pptx",
+        "-p",
+        "litchi-xlsx",
+        "-p",
+        "litchi-xlsb",
+        "-p",
+        "litchi-ops",
+        "-p",
+        "litchi-xls"
+      ],
+      "exit": 101,
+      "seconds": 103.66003543199986,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/native-check-v7/check-0.log",
+      "bytes": 8799,
+      "sha256": "d87dde584c89e520a3ae01136750cba2ee689f076df6fb853699c1325ff9df8d",
+      "target_bytes_before": 639513903,
+      "completed_test_executables_pruned": []
+    }
+  ],
+  "note": "Combined check reached native libraries/tests and stopped on stale PPTX size-helper call syntax, the existing OPC payload-length API, consumed reservation assignment and test imports/font/unused-variable errors. Fixes preserve size-only planning without a duplicate graph validation. No native/facade or no-feature pass is claimed."
+}

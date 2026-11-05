@@ -1,0 +1,57 @@
+[
+  {
+    "median_us": 345120.455,
+    "min_us": 343938.089,
+    "output_bytes": 4461175,
+    "output_siphash": "1f1eb07c14698826",
+    "peak_heap_bytes": 173261551,
+    "route": "after (record 0358a families)",
+    "samples": 15,
+    "scenario": "ods/cells1",
+    "source_bytes": 4461076
+  },
+  {
+    "median_us": 1465439.729,
+    "min_us": 1456917.9130000002,
+    "output_bytes": 4491708,
+    "output_siphash": "95add1fad039987a",
+    "peak_heap_bytes": 177662754,
+    "route": "after (record 0358a families)",
+    "samples": 15,
+    "scenario": "ods/cells100",
+    "source_bytes": 4461076
+  },
+  {
+    "median_us": 248992.459,
+    "min_us": 248530.647,
+    "output_bytes": 4461103,
+    "output_siphash": "9e36ed2a335f8d7e",
+    "peak_heap_bytes": 78645830,
+    "route": "after (record 0358a families)",
+    "samples": 15,
+    "scenario": "ods/dde",
+    "source_bytes": 4461076
+  },
+  {
+    "median_us": 408746.58200000005,
+    "min_us": 385283.254,
+    "output_bytes": 4461285,
+    "output_siphash": "d8f5eef33434688c",
+    "peak_heap_bytes": 250324515,
+    "route": "after (record 0358a families)",
+    "samples": 15,
+    "scenario": "ods/sheet_metadata",
+    "source_bytes": 4461076
+  },
+  {
+    "median_us": 13314.163,
+    "min_us": 13098.972,
+    "output_bytes": 4215645,
+    "output_siphash": "4cf78f925d7faf0d",
+    "peak_heap_bytes": 6107267,
+    "route": "after (record 0358a families)",
+    "samples": 15,
+    "scenario": "odp/tail_append",
+    "source_bytes": 4215428
+  }
+]

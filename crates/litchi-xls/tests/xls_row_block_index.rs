@@ -1,6 +1,6 @@
 use std::fs::File;
 
-use litchi_xls::{CompatibilityProfile, OpenOptions, Workbook};
+use litchi_xls::{CompatibilityProfile, OpenOptions, raw::Reader};
 
 #[test]
 fn parses_poi_simple_and_multirow_indexes() {
@@ -8,7 +8,7 @@ fn parses_poi_simple_and_multirow_indexes() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/poi/test-data/spreadsheet/Simple.xls"
     );
-    let workbook = Workbook::new(File::open(simple_path).unwrap()).unwrap();
+    let workbook = Reader::new(File::open(simple_path).unwrap()).unwrap();
     let index = workbook
         .xls_worksheet(0)
         .unwrap()
@@ -31,7 +31,7 @@ fn parses_poi_simple_and_multirow_indexes() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/poi/test-data/spreadsheet/48968.xls"
     );
-    let workbook = Workbook::new(File::open(multi_path).unwrap()).unwrap();
+    let workbook = Reader::new(File::open(multi_path).unwrap()).unwrap();
     let index = workbook
         .xls_worksheet(0)
         .unwrap()
@@ -59,18 +59,24 @@ fn parses_real_sparse_and_rowless_dbcell_blocks() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/ole/xls/ConditionalFormattingSamples.xls"
     );
-    let strict = Workbook::new(File::open(sparse_path).unwrap()).unwrap();
+    // The strict profile ignores the stale flag and records the repair
+    // (record 0316); the explicit profile keeps it.
+    let strict = Reader::new(File::open(sparse_path).unwrap()).unwrap();
     assert!(
         strict
             .sheet(13)
             .and_then(litchi_xls::SheetMetadata::parsed_worksheet_index)
-            .is_none(),
-        "strict workbook parsing must not accept the malformed Formula metadata"
+            .is_some(),
+        "strict workbook parsing reads the formula and ignores its stale fShrFmla flag"
     );
+    assert!(strict.tolerance_report().defects().iter().any(|defect| {
+        defect.defect()
+            == litchi_xls::Defect::Worksheet(litchi_xls::WorksheetDefect::SharedFormulaFlag)
+    }));
     let compatibility_profile = CompatibilityProfile::SharedFormulaFlagWithoutPtgExpV1;
-    let workbook = Workbook::new_with_options(
+    let workbook = Reader::new_with_options(
         File::open(sparse_path).unwrap(),
-        OpenOptions::new().with_compatibility_profile(compatibility_profile),
+        OpenOptions::new().compatibility_profile(compatibility_profile),
     )
     .unwrap();
     let worksheet_index = workbook

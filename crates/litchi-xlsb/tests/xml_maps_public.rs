@@ -13,16 +13,68 @@
 
 use std::io::Cursor;
 
+use litchi_core::edit::RefusalKind;
 use litchi_ooxml_common::spreadsheet_xml_maps::{
     DataBinding, XmlMap, XmlMapConformance, XmlMapInfo, XmlSchema,
 };
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 use litchi_xlsb::Workbook;
+use litchi_xlsb::builder::{self, Builder};
+use litchi_xlsb::package::PackageError;
 use litchi_xlsb::package::table::{Column, Range, Table, Type};
-use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
 use litchi_xlsb::xml_maps::{
-    CellReference, ColumnBinding, MappedTable, ReadLimits, SingleCellBinding, XPath, XmlDataType,
+    CellReference, ColumnBinding, MappedTable, SemanticLimits, SingleCellBinding, XPath,
+    XmlDataType,
 };
+
+#[path = "support/projection.rs"]
+mod projection;
+
+use projection::{InPlace, OwnedWorkbook, Reprojected};
+
+/// Sequential XML-map steps on an owned workbook projection: each step runs
+/// the public package route and adopts the published package.
+trait XmlMapSteps {
+    fn xml_maps_edit(&self) -> litchi_xlsb::xml_maps::Edit;
+    fn publish_xml_maps(
+        &mut self,
+        commit: &litchi_xlsb::xml_maps::Commit,
+    ) -> litchi_xlsb::package::PackageResult<litchi_xlsb::xml_maps::Snapshot>;
+    fn publish_xml_maps_patch(
+        &mut self,
+        patch: &litchi_xlsb::xml_maps::Patch,
+    ) -> litchi_xlsb::package::PackageResult<litchi_xlsb::xml_maps::Snapshot>;
+    fn unsign_in_place(&mut self);
+}
+
+impl XmlMapSteps for Workbook {
+    fn xml_maps_edit(&self) -> litchi_xlsb::xml_maps::Edit {
+        self.to_package().edit_xml_maps().unwrap()
+    }
+
+    fn publish_xml_maps(
+        &mut self,
+        commit: &litchi_xlsb::xml_maps::Commit,
+    ) -> litchi_xlsb::package::PackageResult<litchi_xlsb::xml_maps::Snapshot> {
+        self.publish_xml_maps_patch(commit.patch())
+    }
+
+    fn publish_xml_maps_patch(
+        &mut self,
+        patch: &litchi_xlsb::xml_maps::Patch,
+    ) -> litchi_xlsb::package::PackageResult<litchi_xlsb::xml_maps::Snapshot> {
+        *self = self
+            .to_package()
+            .apply_xml_maps(patch)?
+            .into_package()
+            .owned_workbook()?;
+        self.xml_maps()
+    }
+
+    fn unsign_in_place(&mut self) {
+        *self = self.to_package().unsign().owned_workbook().unwrap();
+    }
+}
 
 const WORKBOOK_PART: &str = "/xl/workbook.bin";
 const WORKSHEET_PART: &str = "/xl/worksheets/sheet1.bin";
@@ -383,17 +435,29 @@ fn public_reader_rejects_malformed_relationships_content_types_and_outbound_rels
         maps_content_type: wrong,
         ..Shape::default()
     };
-    cases.push(("MapInfo content type", shape, "Invalid content type"));
+    cases.push((
+        "MapInfo content type",
+        shape,
+        "does not have the content type",
+    ));
     shape = Shape {
         single_content_type: wrong,
         ..Shape::default()
     };
-    cases.push(("single-cell content type", shape, "Invalid content type"));
+    cases.push((
+        "single-cell content type",
+        shape,
+        "does not have the content type",
+    ));
     shape = Shape {
         table_content_type: wrong,
         ..Shape::default()
     };
-    cases.push(("table content type", shape, "Invalid content type"));
+    cases.push((
+        "table content type",
+        shape,
+        "does not have the content type",
+    ));
     shape = Shape {
         omit_maps_relationship: true,
         ..Shape::default()
@@ -531,41 +595,47 @@ fn public_reader_rejects_malformed_relationships_content_types_and_outbound_rels
 fn public_reader_enforces_exact_xml_binary_and_graph_limits() {
     let workbook = open(valid_package());
 
-    let mut exact = ReadLimits::default();
+    let mut exact = SemanticLimits::default();
     exact.xml_maps.max_part_bytes = MAP_INFO_XML.len();
     exact.bindings.max_part_bytes = 248;
     workbook
-        .xml_maps_with_limits(exact)
+        .reprojected(litchi_xlsb::SemanticLimits::new().xml_maps(exact))
+        .unwrap()
+        .xml_maps()
         .expect("exact source limits are inclusive");
 
     let mut cases = Vec::new();
-    let mut limits = ReadLimits::default();
+    let mut limits = SemanticLimits::default();
     limits.xml_maps.max_part_bytes = MAP_INFO_XML.len() - 1;
     cases.push(("XML part bytes", limits));
-    limits = ReadLimits::default();
+    limits = SemanticLimits::default();
     limits.bindings.max_part_bytes = 247;
     cases.push(("binary part bytes", limits));
-    limits = ReadLimits::default();
+    limits = SemanticLimits::default();
     limits.bindings.max_xpath_units = 10;
     cases.push(("XPath units", limits));
-    limits = ReadLimits::default();
+    limits = SemanticLimits::default();
     limits.bindings.max_bindings = 0;
     cases.push(("binding count", limits));
-    limits = ReadLimits::default();
+    limits = SemanticLimits::default();
     limits.bindings.max_records = 7;
     cases.push(("record count", limits));
-    limits = ReadLimits::default();
+    limits = SemanticLimits::default();
     limits.max_parts = 2;
     cases.push(("part count", limits));
-    limits = ReadLimits::default();
+    limits = SemanticLimits::default();
     limits.max_relationships = 2;
     cases.push(("relationship count", limits));
-    limits = ReadLimits::default();
+    limits = SemanticLimits::default();
     limits.max_total_bytes = MAP_INFO_XML.len();
     cases.push(("aggregate bytes", limits));
 
     for (label, limits) in cases {
-        let error = workbook.xml_maps_with_limits(limits).expect_err(label);
+        let error = workbook
+            .reprojected(litchi_xlsb::SemanticLimits::new().xml_maps(limits))
+            .unwrap()
+            .xml_maps()
+            .expect_err(label);
         assert!(
             !error.to_string().is_empty(),
             "{label} returned an empty error"
@@ -633,21 +703,33 @@ fn caller_xml_limits_are_inclusive_at_every_public_boundary() {
         "XML events",
     );
 
-    let mut exact = ReadLimits::default();
+    let mut exact = SemanticLimits::default();
     exact.max_total_bindings = 2;
     exact.max_total_xpath_units = 22;
-    workbook.xml_maps_with_limits(exact).unwrap();
+    workbook
+        .reprojected(litchi_xlsb::SemanticLimits::new().xml_maps(exact))
+        .unwrap()
+        .xml_maps()
+        .unwrap();
     let mut below = exact;
     below.max_total_bindings = 1;
     assert_error_contains(
-        workbook.xml_maps_with_limits(below).unwrap_err(),
+        workbook
+            .reprojected(litchi_xlsb::SemanticLimits::new().xml_maps(below))
+            .unwrap()
+            .xml_maps()
+            .unwrap_err(),
         "binding",
         "aggregate binding boundary",
     );
     below = exact;
     below.max_total_xpath_units = 21;
     assert_error_contains(
-        workbook.xml_maps_with_limits(below).unwrap_err(),
+        workbook
+            .reprojected(litchi_xlsb::SemanticLimits::new().xml_maps(below))
+            .unwrap()
+            .xml_maps()
+            .unwrap_err(),
         "XPath",
         "aggregate XPath boundary",
     );
@@ -680,14 +762,12 @@ fn no_op_is_byte_exact_and_preserves_a_signature_origin() {
     let before = physical_state(&workbook);
 
     let commit = workbook
-        .xml_maps()
-        .unwrap()
-        .edit()
+        .xml_maps_edit()
         .commit()
         .expect("commit exact no-op");
-    assert!(commit.patch().is_empty());
+    assert!(commit.patch().is_noop());
     workbook
-        .apply_xml_maps(&commit)
+        .publish_xml_maps(&commit)
         .expect("publish exact no-op");
 
     assert!(workbook.is_signed());
@@ -705,15 +785,15 @@ fn patch_is_stale_checked_retryable_apply_once_and_exactly_invertible() {
     let original_single = part_bytes(&workbook, SINGLE_CELLS_PART);
     let original_table = part_bytes(&workbook, TABLE_PART);
 
-    let mut transaction = workbook.xml_maps().unwrap().edit();
+    let mut transaction = workbook.xml_maps_edit();
     assert!(transaction.set_map_name(7, "Renamed").unwrap());
     let commit = transaction.commit().expect("build source-bound commit");
-    assert!(!commit.patch().is_empty());
+    assert!(!commit.patch().is_noop());
     let inverse = commit.patch().inverse();
 
     let mut stale = open(valid_package());
     stale
-        .edit_opc(|package| {
+        .edit_opc_in_place(|package| {
             let uri = PackURI::new(MAP_INFO_PART)?;
             let mut changed = package.get_part(&uri)?.blob().to_vec();
             changed.extend_from_slice(b"\n");
@@ -723,12 +803,12 @@ fn patch_is_stale_checked_retryable_apply_once_and_exactly_invertible() {
         .expect("make a still-valid but physically stale source");
     let stale_before = physical_state(&stale);
     stale
-        .apply_xml_maps(&commit)
+        .publish_xml_maps(&commit)
         .expect_err("stale source must reject publication");
     assert_eq!(physical_state(&stale), stale_before);
 
     workbook
-        .apply_xml_maps(&commit)
+        .publish_xml_maps(&commit)
         .expect("the same commit remains retryable on its real source");
     assert_eq!(workbook.xml_maps().unwrap().maps()[0].name, "Renamed");
     assert_eq!(part_bytes(&workbook, SINGLE_CELLS_PART), original_single);
@@ -736,18 +816,21 @@ fn patch_is_stale_checked_retryable_apply_once_and_exactly_invertible() {
 
     let changed = physical_state(&workbook);
     workbook
-        .apply_xml_maps(&commit)
+        .publish_xml_maps(&commit)
         .expect_err("a source-bound patch applies only once");
     assert_eq!(physical_state(&workbook), changed);
 
     workbook
-        .apply_xml_maps_patch(&inverse)
+        .publish_xml_maps_patch(&inverse)
         .expect("publish inverse patch");
     assert_eq!(physical_state(&workbook), before);
 }
 
+/// A real change to a signed workbook is refused until the signature is
+/// removed explicitly (ADR 0006); the change then preserves every untouched
+/// binary part.
 #[test]
-fn a_real_change_unsigns_but_preserves_untouched_binary_parts() {
+fn a_real_change_needs_an_explicit_unsign_and_preserves_untouched_binary_parts() {
     let mut shape = Shape::default();
     shape.signed = true;
     let mut workbook = open(package_with(
@@ -771,11 +854,17 @@ fn a_real_change_unsigns_but_preserves_untouched_binary_parts() {
     ));
     let single = part_bytes(&workbook, SINGLE_CELLS_PART);
     let table = part_bytes(&workbook, TABLE_PART);
-    let mut transaction = workbook.xml_maps().unwrap().edit();
+    let mut transaction = workbook.xml_maps_edit();
     transaction.set_map_name(7, "Changed").unwrap();
-    let commit = transaction.commit().unwrap();
 
-    workbook.apply_xml_maps(&commit).unwrap();
+    assert_signature_refusal(transaction.commit().unwrap_err());
+    assert!(workbook.is_signed());
+    workbook.unsign_in_place();
+    let mut transaction = workbook.xml_maps_edit();
+    transaction.set_map_name(7, "Changed").unwrap();
+    workbook
+        .publish_xml_maps(&transaction.commit().unwrap())
+        .unwrap();
 
     assert!(!workbook.is_signed());
     assert!(
@@ -789,10 +878,10 @@ fn a_real_change_unsigns_but_preserves_untouched_binary_parts() {
 
 #[test]
 fn public_writer_authors_both_families_and_reopens_through_the_reader() {
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.set_xml_maps(semantic_map_info()).unwrap();
 
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = builder::Worksheet::new("Sheet1");
     sheet
         .add_table(Table {
             id: 2,
@@ -847,7 +936,11 @@ fn public_writer_authors_both_families_and_reopens_through_the_reader() {
     writer.add_worksheet(sheet);
 
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output).expect("save authored XLSB");
+    writer
+        .build()
+        .expect("build package")
+        .write_to(&mut output)
+        .expect("save authored XLSB");
     let reopened = Workbook::new(Cursor::new(output.into_inner())).expect("reopen authored XLSB");
     let snapshot = reopened.xml_maps().expect("read authored XML Maps");
 
@@ -881,17 +974,17 @@ fn opaque_records_and_ignored_flags_are_preserved_and_block_owned_singleton_edit
         u32::MAX & !2
     );
 
-    let no_op = workbook.xml_maps().unwrap().edit().commit().unwrap();
-    assert!(no_op.patch().is_empty());
-    workbook.apply_xml_maps(&no_op).unwrap();
+    let no_op = workbook.xml_maps_edit().commit().unwrap();
+    assert!(no_op.patch().is_noop());
+    workbook.publish_xml_maps(&no_op).unwrap();
     assert_eq!(physical_state(&workbook), before);
 
     let single_before = part_bytes(&workbook, SINGLE_CELLS_PART);
     let table_before = part_bytes(&workbook, TABLE_PART);
-    let mut rename = workbook.xml_maps().unwrap().edit();
+    let mut rename = workbook.xml_maps_edit();
     rename.set_map_name(7, "Renamed").unwrap();
     let renamed = rename.commit().unwrap();
-    workbook.apply_xml_maps(&renamed).unwrap();
+    workbook.publish_xml_maps(&renamed).unwrap();
     assert_eq!(part_bytes(&workbook, SINGLE_CELLS_PART), single_before);
     assert_eq!(part_bytes(&workbook, TABLE_PART), table_before);
     let expected_xml = String::from_utf8(MAP_INFO_XML.to_vec())
@@ -903,7 +996,7 @@ fn opaque_records_and_ignored_flags_are_preserved_and_block_owned_singleton_edit
         Some(expected_xml.as_slice())
     );
 
-    let mut owned = workbook.xml_maps().unwrap().edit();
+    let mut owned = workbook.xml_maps_edit();
     assert!(
         owned
             .put_single_cell_binding(
@@ -920,11 +1013,7 @@ fn opaque_records_and_ignored_flags_are_preserved_and_block_owned_singleton_edit
             )
             .unwrap()
     );
-    assert_error_contains(
-        owned.commit().unwrap_err(),
-        "losslessly edit Single Cell Tables",
-        "owned opaque singleton edit",
-    );
+    assert_unsupported_content(owned.commit().unwrap_err(), "owned opaque singleton edit");
 }
 
 #[test]
@@ -933,12 +1022,12 @@ fn catalog_create_remove_dependency_edit_and_conformance_are_reversible() {
     let empty = physical_state(&workbook);
     assert!(workbook.xml_maps().unwrap().map_info().is_none());
 
-    let mut create = workbook.xml_maps().unwrap().edit();
+    let mut create = workbook.xml_maps_edit();
     assert!(create.set_catalog(semantic_map_info()).unwrap());
     assert!(create.set_conformance(XmlMapConformance::Strict).unwrap());
     let create = create.commit().unwrap();
     let uncreate = create.patch().inverse();
-    workbook.apply_xml_maps(&create).unwrap();
+    workbook.publish_xml_maps(&create).unwrap();
     assert!(workbook.xml_maps().unwrap().conformance().is_strict());
     assert!(
         workbook
@@ -946,11 +1035,11 @@ fn catalog_create_remove_dependency_edit_and_conformance_are_reversible() {
             .contains_part(&PackURI::new(MAP_INFO_PART).unwrap())
     );
     let created = physical_state(&workbook);
-    workbook.apply_xml_maps_patch(&uncreate).unwrap();
+    workbook.publish_xml_maps_patch(&uncreate).unwrap();
     assert_eq!(physical_state(&workbook), empty);
 
-    workbook.apply_xml_maps(&create).unwrap();
-    let mut edit = workbook.xml_maps().unwrap().edit();
+    workbook.publish_xml_maps(&create).unwrap();
+    let mut edit = workbook.xml_maps_edit();
     assert!(
         edit.edit_map(7, |map| {
             map.name = "Edited".to_owned();
@@ -960,27 +1049,27 @@ fn catalog_create_remove_dependency_edit_and_conformance_are_reversible() {
     );
     let edit = edit.commit().unwrap();
     let unedit = edit.patch().inverse();
-    workbook.apply_xml_maps(&edit).unwrap();
+    workbook.publish_xml_maps(&edit).unwrap();
     assert_eq!(workbook.xml_maps().unwrap().maps()[0].name, "Edited");
-    workbook.apply_xml_maps_patch(&unedit).unwrap();
+    workbook.publish_xml_maps_patch(&unedit).unwrap();
     assert_eq!(physical_state(&workbook), created);
 
-    let mut remove = workbook.xml_maps().unwrap().edit();
+    let mut remove = workbook.xml_maps_edit();
     assert!(remove.remove_catalog().unwrap().is_some());
     let remove = remove.commit().unwrap();
     let restore = remove.patch().inverse();
-    workbook.apply_xml_maps(&remove).unwrap();
+    workbook.publish_xml_maps(&remove).unwrap();
     assert!(workbook.xml_maps().unwrap().map_info().is_none());
     assert!(
         !workbook
             .opc_package()
             .contains_part(&PackURI::new(MAP_INFO_PART).unwrap())
     );
-    workbook.apply_xml_maps_patch(&restore).unwrap();
+    workbook.publish_xml_maps_patch(&restore).unwrap();
     assert_eq!(physical_state(&workbook), created);
 
     let bound = open(valid_package());
-    let mut refused = bound.xml_maps().unwrap().edit();
+    let mut refused = bound.xml_maps_edit();
     assert_error_contains(
         refused.remove_catalog().unwrap_err(),
         "binary bindings depend",
@@ -992,7 +1081,7 @@ fn catalog_create_remove_dependency_edit_and_conformance_are_reversible() {
 fn public_binding_crud_create_last_remove_and_inverse_are_exact() {
     let mut workbook = open(valid_package());
     let before = physical_state(&workbook);
-    let mut replace = workbook.xml_maps().unwrap().edit();
+    let mut replace = workbook.xml_maps_edit();
     assert!(
         replace
             .put_table_column_binding(
@@ -1026,7 +1115,7 @@ fn public_binding_crud_create_last_remove_and_inverse_are_exact() {
     );
     let replace = replace.commit().unwrap();
     let undo = replace.patch().inverse();
-    workbook.apply_xml_maps(&replace).unwrap();
+    workbook.publish_xml_maps(&replace).unwrap();
     assert_eq!(
         workbook.xml_maps().unwrap().mapped_tables()[0].columns()[0]
             .data_type()
@@ -1043,16 +1132,16 @@ fn public_binding_crud_create_last_remove_and_inverse_are_exact() {
             .as_str(),
         "/root/@code"
     );
-    workbook.apply_xml_maps_patch(&undo).unwrap();
+    workbook.publish_xml_maps_patch(&undo).unwrap();
     assert_eq!(physical_state(&workbook), before);
 
     let original_table = part_bytes(&workbook, TABLE_PART);
-    let mut remove = workbook.xml_maps().unwrap().edit();
+    let mut remove = workbook.xml_maps_edit();
     assert!(remove.remove_table_column_binding(2, 1).unwrap().is_some());
     assert!(remove.remove_single_cell_binding(0, 1).unwrap().is_some());
     let remove = remove.commit().unwrap();
     let restore = remove.patch().inverse();
-    workbook.apply_xml_maps(&remove).unwrap();
+    workbook.publish_xml_maps(&remove).unwrap();
     assert!(workbook.xml_maps().unwrap().mapped_tables().is_empty());
     assert!(
         workbook
@@ -1089,11 +1178,11 @@ fn public_binding_crud_create_last_remove_and_inverse_are_exact() {
             .iter()
             .any(|relationship| relationship.reltype() == SINGLE_CELLS_REL)
     );
-    workbook.apply_xml_maps_patch(&restore).unwrap();
+    workbook.publish_xml_maps_patch(&restore).unwrap();
     assert_eq!(physical_state(&workbook), before);
 
     let empty = open(empty_package());
-    let mut missing = empty.xml_maps().unwrap().edit();
+    let mut missing = empty.xml_maps_edit();
     assert_error_contains(
         missing
             .put_single_cell_binding(
@@ -1126,11 +1215,11 @@ fn public_binding_crud_create_last_remove_and_inverse_are_exact() {
                 .unwrap(),
             )
             .unwrap_err(),
-        "mapped table ID 99 was not found",
+        "mapped table ID was not found",
         "missing mapped table",
     );
 
-    let mut absent_column = open(valid_package()).xml_maps().unwrap().edit();
+    let mut absent_column = open(valid_package()).xml_maps_edit();
     let error = absent_column
         .put_table_column_binding(
             2,
@@ -1146,7 +1235,7 @@ fn public_binding_crud_create_last_remove_and_inverse_are_exact() {
         .unwrap_err();
     assert_error_contains(
         error,
-        "column 99 is absent from physical table ID 2",
+        "column is absent from physical table ID",
         "absent physical column",
     );
 }
@@ -1168,7 +1257,7 @@ fn single_cell_first_binding_creates_canonical_part_reads_back_and_inverts_exact
     )
     .unwrap();
 
-    let mut transaction = workbook.xml_maps().unwrap().edit();
+    let mut transaction = workbook.xml_maps_edit();
     assert!(
         transaction
             .put_single_cell_binding(0, binding.clone())
@@ -1176,7 +1265,7 @@ fn single_cell_first_binding_creates_canonical_part_reads_back_and_inverts_exact
     );
     let commit = transaction.commit().unwrap();
     let inverse = commit.patch().inverse();
-    workbook.apply_xml_maps(&commit).unwrap();
+    workbook.publish_xml_maps(&commit).unwrap();
 
     assert_eq!(
         workbook.xml_maps().unwrap().single_cell_bindings(0),
@@ -1228,7 +1317,7 @@ fn single_cell_first_binding_creates_canonical_part_reads_back_and_inverts_exact
     assert_eq!(single_part.content_type(), SINGLE_CELLS_CONTENT_TYPE);
     assert!(single_part.rels().is_empty());
 
-    workbook.apply_xml_maps_patch(&inverse).unwrap();
+    workbook.publish_xml_maps_patch(&inverse).unwrap();
     assert_eq!(physical_state(&workbook), before);
 }
 
@@ -1239,7 +1328,7 @@ fn single_cell_first_binding_failure_is_atomic_and_retryable() {
     package.remove_part(&PackURI::new(SINGLE_CELLS_PART).unwrap());
     let mut workbook = open(package);
     let before = physical_state(&workbook);
-    let mut transaction = workbook.xml_maps().unwrap().edit();
+    let mut transaction = workbook.xml_maps_edit();
     let invalid = SingleCellBinding::new(
         1,
         1,
@@ -1268,7 +1357,7 @@ fn single_cell_first_binding_failure_is_atomic_and_retryable() {
             .unwrap()
     );
     let commit = transaction.commit().unwrap();
-    workbook.apply_xml_maps(&commit).unwrap();
+    workbook.publish_xml_maps(&commit).unwrap();
     assert_eq!(
         workbook.xml_maps().unwrap().single_cell_bindings(0),
         Some(std::slice::from_ref(&valid))
@@ -1301,7 +1390,7 @@ fn existing_empty_single_cell_part_remains_an_exact_no_op() {
         Some(&[][..])
     );
 
-    let mut transaction = workbook.xml_maps().unwrap().edit();
+    let mut transaction = workbook.xml_maps_edit();
     assert!(
         transaction
             .remove_single_cell_binding(0, 99)
@@ -1309,8 +1398,8 @@ fn existing_empty_single_cell_part_remains_an_exact_no_op() {
             .is_none()
     );
     let commit = transaction.commit().unwrap();
-    assert!(commit.patch().is_empty());
-    workbook.apply_xml_maps(&commit).unwrap();
+    assert!(commit.patch().is_noop());
+    workbook.publish_xml_maps(&commit).unwrap();
     assert_eq!(physical_state(&workbook), before);
     assert!(
         workbook
@@ -1327,7 +1416,7 @@ fn existing_empty_single_cell_part_remains_an_exact_no_op() {
 fn opaque_single_cell_last_removal_is_refused_without_mutation() {
     let workbook = open(opaque_package());
     let before = physical_state(&workbook);
-    let mut transaction = workbook.xml_maps().unwrap().edit();
+    let mut transaction = workbook.xml_maps_edit();
     assert!(
         transaction
             .remove_single_cell_binding(0, 1)
@@ -1335,18 +1424,14 @@ fn opaque_single_cell_last_removal_is_refused_without_mutation() {
             .is_some()
     );
     let error = transaction.commit().unwrap_err();
-    assert_error_contains(
-        error,
-        "losslessly edit Single Cell Tables",
-        "opaque singleton removal",
-    );
+    assert_unsupported_content(error, "opaque singleton removal");
     assert_eq!(physical_state(&workbook), before);
 }
 
 #[test]
 fn single_cell_last_remove_rejects_foreign_and_unowned_sources_atomically() {
     let source = open(valid_package());
-    let mut transaction = source.xml_maps().unwrap().edit();
+    let mut transaction = source.xml_maps_edit();
     assert!(
         transaction
             .remove_single_cell_binding(0, 1)
@@ -1357,7 +1442,7 @@ fn single_cell_last_remove_rejects_foreign_and_unowned_sources_atomically() {
 
     let mut foreign = open(valid_package());
     foreign
-        .edit_opc(|package| {
+        .edit_opc_in_place(|package| {
             let uri = PackURI::new(SINGLE_CELLS_PART)?;
             let changed = replace_utf16(
                 package.get_part(&uri)?.blob().to_vec(),
@@ -1372,7 +1457,7 @@ fn single_cell_last_remove_rejects_foreign_and_unowned_sources_atomically() {
 
     let mut inbound = open(valid_package());
     inbound
-        .edit_opc(|package| {
+        .edit_opc_in_place(|package| {
             let mut owner = BlobPart::new(
                 PackURI::new("/custom/sct-owner.bin")?,
                 "application/octet-stream".to_owned(),
@@ -1388,22 +1473,21 @@ fn single_cell_last_remove_rejects_foreign_and_unowned_sources_atomically() {
             Ok(())
         })
         .unwrap();
-    let mut inbound_transaction = inbound.xml_maps().unwrap().edit();
+    let mut inbound_transaction = inbound.xml_maps_edit();
     assert!(
         inbound_transaction
             .remove_single_cell_binding(0, 1)
             .unwrap()
             .is_some()
     );
-    let inbound_commit = inbound_transaction.commit().unwrap();
-    assert_failed_apply(&mut inbound, &inbound_commit, "another part references");
+    assert_failed_commit(&inbound, inbound_transaction, "another part references");
 }
 
 #[test]
 fn single_cell_last_remove_rejects_package_root_inbound_reference_atomically() {
     let mut workbook = open(valid_package());
     workbook
-        .edit_opc(|package| {
+        .edit_opc_in_place(|package| {
             package.rels_mut().add_relationship(
                 "urn:litchi:fixture:root-dependency".to_owned(),
                 "xl/tables/singleCells1.bin".to_owned(),
@@ -1413,22 +1497,21 @@ fn single_cell_last_remove_rejects_package_root_inbound_reference_atomically() {
             Ok(())
         })
         .unwrap();
-    let mut transaction = workbook.xml_maps().unwrap().edit();
+    let mut transaction = workbook.xml_maps_edit();
     assert!(
         transaction
             .remove_single_cell_binding(0, 1)
             .unwrap()
             .is_some()
     );
-    let commit = transaction.commit().unwrap();
-    assert_failed_apply(&mut workbook, &commit, "another part references");
+    assert_failed_commit(&workbook, transaction, "another part references");
 }
 
 #[test]
 fn single_cell_last_remove_rejects_case_equivalent_internal_target_atomically() {
     let mut workbook = open(valid_package());
     workbook
-        .edit_opc(|package| {
+        .edit_opc_in_place(|package| {
             let mut owner = BlobPart::new(
                 PackURI::new("/custom/case-owner.bin")?,
                 "application/octet-stream".to_owned(),
@@ -1444,15 +1527,14 @@ fn single_cell_last_remove_rejects_case_equivalent_internal_target_atomically() 
             Ok(())
         })
         .unwrap();
-    let mut transaction = workbook.xml_maps().unwrap().edit();
+    let mut transaction = workbook.xml_maps_edit();
     assert!(
         transaction
             .remove_single_cell_binding(0, 1)
             .unwrap()
             .is_some()
     );
-    let commit = transaction.commit().unwrap();
-    assert_failed_apply(&mut workbook, &commit, "another part references");
+    assert_failed_commit(&workbook, transaction, "another part references");
 }
 
 #[test]
@@ -1470,7 +1552,7 @@ fn single_cell_last_remove_accepts_absolute_equivalent_worksheet_target() {
             false,
         );
     let mut workbook = open(package);
-    let mut transaction = workbook.xml_maps().unwrap().edit();
+    let mut transaction = workbook.xml_maps_edit();
     assert!(
         transaction
             .remove_single_cell_binding(0, 1)
@@ -1478,7 +1560,7 @@ fn single_cell_last_remove_accepts_absolute_equivalent_worksheet_target() {
             .is_some()
     );
     let commit = transaction.commit().unwrap();
-    workbook.apply_xml_maps(&commit).unwrap();
+    workbook.publish_xml_maps(&commit).unwrap();
     assert!(
         workbook
             .xml_maps()
@@ -1522,10 +1604,10 @@ fn single_cell_first_binding_allocates_around_case_equivalent_part_name() {
         XPath::new("/root/value").unwrap(),
     )
     .unwrap();
-    let mut transaction = workbook.xml_maps().unwrap().edit();
+    let mut transaction = workbook.xml_maps_edit();
     assert!(transaction.put_single_cell_binding(0, binding).unwrap());
     workbook
-        .apply_xml_maps(&transaction.commit().unwrap())
+        .publish_xml_maps(&transaction.commit().unwrap())
         .unwrap();
 
     let worksheet = workbook
@@ -1561,7 +1643,7 @@ fn single_cell_first_binding_rejects_dangling_case_equivalent_root_alias_atomica
         "rIdDanglingSctAlias".to_owned(),
         false,
     );
-    let mut workbook = open(package);
+    let workbook = open(package);
     let before = physical_state(&workbook);
     let binding = SingleCellBinding::new(
         1,
@@ -1572,10 +1654,9 @@ fn single_cell_first_binding_rejects_dangling_case_equivalent_root_alias_atomica
         XPath::new("/root/value").unwrap(),
     )
     .unwrap();
-    let mut transaction = workbook.xml_maps().unwrap().edit();
+    let mut transaction = workbook.xml_maps_edit();
     assert!(transaction.put_single_cell_binding(0, binding).unwrap());
-    let commit = transaction.commit().unwrap();
-    let error = workbook.apply_xml_maps(&commit).unwrap_err();
+    let error = transaction.commit().unwrap_err();
     assert_error_contains(
         error,
         "another part references",
@@ -1584,8 +1665,10 @@ fn single_cell_first_binding_rejects_dangling_case_equivalent_root_alias_atomica
     assert_eq!(physical_state(&workbook), before);
 }
 
+/// Removing the last single-cell binding of a signed workbook needs an
+/// explicit unsign; the inverse restores the payloads but never the signature.
 #[test]
-fn signed_single_cell_last_remove_unsigns_and_inverse_restores_payloads_only() {
+fn signed_single_cell_last_remove_needs_unsign_and_inverse_restores_payloads_only() {
     let mut shape = Shape::default();
     shape.signed = true;
     let mut workbook = open(package_with(
@@ -1603,18 +1686,24 @@ fn signed_single_cell_last_remove_unsigns_and_inverse_restores_payloads_only() {
     ));
     let original_single = part_bytes(&workbook, SINGLE_CELLS_PART);
     let original_table = part_bytes(&workbook, TABLE_PART);
-    let mut transaction = workbook.xml_maps().unwrap().edit();
-    assert!(
-        transaction
-            .remove_single_cell_binding(0, 1)
-            .unwrap()
-            .is_some()
-    );
-    let commit = transaction.commit().unwrap();
-    let inverse = commit.patch().inverse();
+    let remove_last = |workbook: &Workbook| {
+        let mut transaction = workbook.xml_maps_edit();
+        assert!(
+            transaction
+                .remove_single_cell_binding(0, 1)
+                .unwrap()
+                .is_some()
+        );
+        transaction.commit()
+    };
 
     assert!(workbook.is_signed());
-    workbook.apply_xml_maps(&commit).unwrap();
+    assert_signature_refusal(remove_last(&workbook).unwrap_err());
+    assert!(workbook.is_signed());
+    workbook.unsign_in_place();
+    let commit = remove_last(&workbook).unwrap();
+    let inverse = commit.patch().inverse();
+    workbook.publish_xml_maps(&commit).unwrap();
     assert!(!workbook.is_signed());
     assert!(
         !workbook
@@ -1629,7 +1718,7 @@ fn signed_single_cell_last_remove_unsigns_and_inverse_restores_payloads_only() {
             .is_none()
     );
 
-    workbook.apply_xml_maps_patch(&inverse).unwrap();
+    workbook.publish_xml_maps_patch(&inverse).unwrap();
     assert!(!workbook.is_signed());
     assert_eq!(part_bytes(&workbook, SINGLE_CELLS_PART), original_single);
     assert_eq!(part_bytes(&workbook, TABLE_PART), original_table);
@@ -1667,7 +1756,7 @@ fn isolated_shared_sct_and_singleton_geometry_fail_at_the_intended_reader_invari
             ),
             Shape::default(),
         ),
-        "single-cell XML mapping 1 overlaps an ordinary table",
+        "single-cell XML mapping overlaps an ordinary table",
     );
 
     let mut auto_filter_overlap = package_with(
@@ -1687,7 +1776,7 @@ fn isolated_shared_sct_and_singleton_geometry_fail_at_the_intended_reader_invari
     assert_reader_error(
         "singleton cell overlaps worksheet AutoFilter",
         auto_filter_overlap,
-        "single-cell XML mapping 1 overlaps the worksheet AutoFilter",
+        "single-cell XML mapping overlaps the worksheet AutoFilter",
     );
 }
 
@@ -1795,7 +1884,7 @@ fn hostile_graph_ownership_orphans_global_ids_geometry_and_conformance_are_rejec
     assert_reader_error(
         "global duplicate list ID",
         duplicate_id,
-        "duplicate XML mapping table ID 1",
+        "duplicate XML mapping table ID",
     );
 
     let mut outside_dimension = valid_package();
@@ -1890,7 +1979,7 @@ fn hostile_graph_ownership_orphans_global_ids_geometry_and_conformance_are_rejec
             ),
             Shape::default(),
         ),
-        "missing connection ID 9",
+        "missing connection ID",
     );
 }
 
@@ -1949,7 +2038,7 @@ fn ordinary_table_edits_preserve_unrelated_opacity_and_refuse_owned_block_opacit
         Shape::default(),
     ));
     let before = part_bytes(&workbook, TABLE_PART);
-    let mut edit = workbook.xml_maps().unwrap().edit();
+    let mut edit = workbook.xml_maps_edit();
     edit.put_table_column_binding(
         2,
         ColumnBinding::new(
@@ -1963,7 +2052,7 @@ fn ordinary_table_edits_preserve_unrelated_opacity_and_refuse_owned_block_opacit
     )
     .unwrap();
     let commit = edit.commit().unwrap();
-    workbook.apply_xml_maps(&commit).unwrap();
+    workbook.publish_xml_maps(&commit).unwrap();
     let after = part_bytes(&workbook, TABLE_PART);
     assert_eq!(
         remove_first_record_pair(&before, BRT_BEGIN_LIST_XML_CPR, BRT_END_LIST_XML_CPR),
@@ -1987,7 +2076,7 @@ fn ordinary_table_edits_preserve_unrelated_opacity_and_refuse_owned_block_opacit
         owned_opaque,
         Shape::default(),
     ));
-    let mut edit = workbook.xml_maps().unwrap().edit();
+    let mut edit = workbook.xml_maps_edit();
     let error = edit
         .put_table_column_binding(
             2,
@@ -2001,21 +2090,19 @@ fn ordinary_table_edits_preserve_unrelated_opacity_and_refuse_owned_block_opacit
             .unwrap(),
         )
         .unwrap_err();
-    assert_error_contains(
-        error,
-        "losslessly edit",
-        "owned opaque ordinary-table XML property block",
-    );
+    assert_unsupported_content(error, "owned opaque ordinary-table XML property block");
 }
 
 #[test]
 fn additive_crud_aggregate_limits_and_signed_inverse_are_publicly_enforced() {
     let mut workbook = open(valid_package());
-    let mut remove = workbook.xml_maps().unwrap().edit();
+    let mut remove = workbook.xml_maps_edit();
     remove.remove_table_column_binding(2, 1).unwrap();
-    workbook.apply_xml_maps(&remove.commit().unwrap()).unwrap();
+    workbook
+        .publish_xml_maps(&remove.commit().unwrap())
+        .unwrap();
     assert!(workbook.xml_maps().unwrap().mapped_tables().is_empty());
-    let mut add_table = workbook.xml_maps().unwrap().edit();
+    let mut add_table = workbook.xml_maps_edit();
     add_table
         .put_table_column_binding(
             2,
@@ -2030,11 +2117,11 @@ fn additive_crud_aggregate_limits_and_signed_inverse_are_publicly_enforced() {
         )
         .unwrap();
     workbook
-        .apply_xml_maps(&add_table.commit().unwrap())
+        .publish_xml_maps(&add_table.commit().unwrap())
         .unwrap();
     assert_eq!(workbook.xml_maps().unwrap().mapped_tables().len(), 1);
 
-    let mut add_single = workbook.xml_maps().unwrap().edit();
+    let mut add_single = workbook.xml_maps_edit();
     add_single
         .put_single_cell_binding(
             0,
@@ -2050,7 +2137,7 @@ fn additive_crud_aggregate_limits_and_signed_inverse_are_publicly_enforced() {
         )
         .unwrap();
     workbook
-        .apply_xml_maps(&add_single.commit().unwrap())
+        .publish_xml_maps(&add_single.commit().unwrap())
         .unwrap();
     assert_eq!(
         workbook
@@ -2063,16 +2150,18 @@ fn additive_crud_aggregate_limits_and_signed_inverse_are_publicly_enforced() {
     );
 
     let source = open(valid_package());
-    let mut exact = ReadLimits::default();
+    let mut exact = SemanticLimits::default();
     exact.max_total_bindings = 2;
     exact.max_total_xpath_units = 22;
-    let snapshot = source.xml_maps_with_limits(exact).unwrap();
-    assert!(snapshot.edit().commit().unwrap().patch().is_empty());
-    let mut within = snapshot.edit();
+    let snapshot = source
+        .reprojected(litchi_xlsb::SemanticLimits::new().xml_maps(exact))
+        .unwrap();
+    assert!(snapshot.xml_maps_edit().commit().unwrap().patch().is_noop());
+    let mut within = snapshot.xml_maps_edit();
     within.set_map_name(7, "WithinLimits").unwrap();
-    within.commit().unwrap();
+    let _ = within.commit().unwrap();
 
-    let mut over_bindings = snapshot.edit();
+    let mut over_bindings = snapshot.xml_maps_edit();
     let error = over_bindings
         .put_single_cell_binding(
             0,
@@ -2089,12 +2178,14 @@ fn additive_crud_aggregate_limits_and_signed_inverse_are_publicly_enforced() {
         .unwrap_err();
     assert_error_contains(error, "aggregate XML binding", "one-over binding mutation");
     over_bindings.set_map_name(7, "RetryBinding").unwrap();
-    over_bindings.commit().unwrap();
+    let _ = over_bindings.commit().unwrap();
 
     let mut xpath_limits = exact;
     xpath_limits.max_total_bindings = 3;
-    let xpath_snapshot = source.xml_maps_with_limits(xpath_limits).unwrap();
-    let mut over_xpath = xpath_snapshot.edit();
+    let xpath_snapshot = source
+        .reprojected(litchi_xlsb::SemanticLimits::new().xml_maps(xpath_limits))
+        .unwrap();
+    let mut over_xpath = xpath_snapshot.xml_maps_edit();
     let error = over_xpath
         .put_single_cell_binding(
             0,
@@ -2115,7 +2206,7 @@ fn additive_crud_aggregate_limits_and_signed_inverse_are_publicly_enforced() {
         "one-over XPath mutation",
     );
     over_xpath.set_map_name(7, "RetryXPath").unwrap();
-    over_xpath.commit().unwrap();
+    let _ = over_xpath.commit().unwrap();
 
     let mut shape = Shape::default();
     shape.signed = true;
@@ -2132,13 +2223,18 @@ fn additive_crud_aggregate_limits_and_signed_inverse_are_publicly_enforced() {
         ),
         shape,
     ));
-    let mut rename = signed.xml_maps().unwrap().edit();
-    rename.set_map_name(7, "Unsigned").unwrap();
-    let rename = rename.commit().unwrap();
+    let rename_map = |workbook: &Workbook| {
+        let mut rename = workbook.xml_maps_edit();
+        rename.set_map_name(7, "Unsigned").unwrap();
+        rename.commit()
+    };
+    assert_signature_refusal(rename_map(&signed).unwrap_err());
+    signed.unsign_in_place();
+    let rename = rename_map(&signed).unwrap();
     let inverse = rename.patch().inverse();
-    signed.apply_xml_maps(&rename).unwrap();
+    signed.publish_xml_maps(&rename).unwrap();
     assert!(!signed.is_signed());
-    signed.apply_xml_maps_patch(&inverse).unwrap();
+    signed.publish_xml_maps_patch(&inverse).unwrap();
     assert_eq!(signed.xml_maps().unwrap().maps()[0].name, "Orders");
     assert!(
         !signed.is_signed(),
@@ -2149,13 +2245,13 @@ fn additive_crud_aggregate_limits_and_signed_inverse_are_publicly_enforced() {
 #[test]
 fn stale_content_type_relationship_and_topology_are_failure_atomic() {
     let source = open(valid_package());
-    let mut transaction = source.xml_maps().unwrap().edit();
+    let mut transaction = source.xml_maps_edit();
     transaction.set_map_name(7, "Staged").unwrap();
     let commit = transaction.commit().unwrap();
 
     let mut content_type = open(valid_package());
     content_type
-        .edit_opc(|package| {
+        .edit_opc_in_place(|package| {
             let uri = PackURI::new(MAP_INFO_PART)?;
             let bytes = package.get_part(&uri)?.blob().to_vec();
             package.remove_part(&uri);
@@ -2167,11 +2263,19 @@ fn stale_content_type_relationship_and_topology_are_failure_atomic() {
             Ok(())
         })
         .unwrap();
-    assert_failed_apply(&mut content_type, &commit, "content type");
+    let content_type_before = physical_state(&content_type);
+    let content_type_error = content_type.publish_xml_maps(&commit).unwrap_err();
+    assert!(matches!(
+        content_type_error,
+        PackageError::InvalidContentType {
+            expected: "application/xml"
+        }
+    ));
+    assert_eq!(physical_state(&content_type), content_type_before);
 
     let mut relationship = open(valid_package());
     relationship
-        .edit_opc(|package| {
+        .edit_opc_in_place(|package| {
             let uri = PackURI::new(WORKBOOK_PART)?;
             package.get_part_mut(&uri)?.rels_mut().remove("rIdXmlMaps");
             package.get_part_mut(&uri)?.rels_mut().add_relationship(
@@ -2187,7 +2291,7 @@ fn stale_content_type_relationship_and_topology_are_failure_atomic() {
 
     let mut topology = open(valid_package());
     topology
-        .edit_opc(|package| {
+        .edit_opc_in_place(|package| {
             package.add_part(Box::new(BlobPart::new(
                 PackURI::new("/custom/extra.bin")?,
                 "application/octet-stream".to_owned(),
@@ -2202,11 +2306,13 @@ fn stale_content_type_relationship_and_topology_are_failure_atomic() {
 #[test]
 fn catalog_removal_refuses_an_unowned_inbound_dependency() {
     let mut workbook = open(empty_package());
-    let mut create = workbook.xml_maps().unwrap().edit();
+    let mut create = workbook.xml_maps_edit();
     create.set_catalog(semantic_map_info()).unwrap();
-    workbook.apply_xml_maps(&create.commit().unwrap()).unwrap();
     workbook
-        .edit_opc(|package| {
+        .publish_xml_maps(&create.commit().unwrap())
+        .unwrap();
+    workbook
+        .edit_opc_in_place(|package| {
             let mut owner = BlobPart::new(
                 PackURI::new("/custom/owner.bin")?,
                 "application/octet-stream".to_owned(),
@@ -2222,11 +2328,10 @@ fn catalog_removal_refuses_an_unowned_inbound_dependency() {
             Ok(())
         })
         .unwrap();
-    let mut remove = workbook.xml_maps().unwrap().edit();
+    let mut remove = workbook.xml_maps_edit();
     remove.remove_catalog().unwrap();
-    let remove = remove.commit().unwrap();
     let before = physical_state(&workbook);
-    let error = workbook.apply_xml_maps(&remove).unwrap_err();
+    let error = remove.commit().unwrap_err();
     assert_error_contains(
         error,
         "another part references",
@@ -2970,6 +3075,19 @@ fn assert_base_open_error(label: &str, package: OpcPackage, context: &str) {
     assert_error_contains(error, context, label);
 }
 
+/// A changed publication over a signed workbook is refused (ADR 0006).
+#[track_caller]
+fn assert_signature_refusal(error: PackageError) {
+    assert!(
+        matches!(
+            error,
+            PackageError::Signed
+                | PackageError::Opc(litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+        ),
+        "expected a signature refusal, got {error:?}"
+    );
+}
+
 fn assert_error_contains(error: impl std::fmt::Display, context: &str, label: &str) {
     let error = error.to_string();
     assert!(
@@ -2980,34 +3098,56 @@ fn assert_error_contains(error: impl std::fmt::Display, context: &str, label: &s
     );
 }
 
+fn assert_unsupported_content(error: PackageError, label: &str) {
+    match error {
+        PackageError::Refused(refusal) => assert_eq!(
+            refusal.kind(),
+            RefusalKind::UnsupportedContent,
+            "{label}: expected an unsupported-content refusal, found {refusal:?}"
+        ),
+        error => panic!("{label}: expected a refusal, found {error:?}"),
+    }
+}
+
 fn assert_xml_limit_boundary(
     workbook: &Workbook,
     upper: usize,
-    set: impl Fn(&mut ReadLimits, usize),
+    set: impl Fn(&mut SemanticLimits, usize),
     label: &str,
 ) {
     let mut low = 0usize;
     let mut high = upper;
     while low < high {
         let mid = low + (high - low) / 2;
-        let mut limits = ReadLimits::default();
+        let mut limits = SemanticLimits::default();
         set(&mut limits, mid);
-        if workbook.xml_maps_with_limits(limits).is_ok() {
+        if workbook
+            .reprojected(litchi_xlsb::SemanticLimits::new().xml_maps(limits))
+            .unwrap()
+            .xml_maps()
+            .is_ok()
+        {
             high = mid;
         } else {
             low = mid + 1;
         }
     }
     assert!(low > 0, "{label} limit was not enforced");
-    let mut exact = ReadLimits::default();
+    let mut exact = SemanticLimits::default();
     set(&mut exact, low);
     workbook
-        .xml_maps_with_limits(exact)
+        .reprojected(litchi_xlsb::SemanticLimits::new().xml_maps(exact))
+        .unwrap()
+        .xml_maps()
         .unwrap_or_else(|error| panic!("exact {label} boundary {low} failed: {error}"));
-    let mut below = ReadLimits::default();
+    let mut below = SemanticLimits::default();
     set(&mut below, low - 1);
     assert!(
-        workbook.xml_maps_with_limits(below).is_err(),
+        workbook
+            .reprojected(litchi_xlsb::SemanticLimits::new().xml_maps(below))
+            .unwrap()
+            .xml_maps()
+            .is_err(),
         "one below {label} boundary unexpectedly passed"
     );
 }
@@ -3018,8 +3158,19 @@ fn assert_failed_apply(
     context: &str,
 ) {
     let before = physical_state(workbook);
-    let error = workbook.apply_xml_maps(commit).unwrap_err();
-    assert_error_contains(error, context, "stale patch");
+    let error = workbook.publish_xml_maps(commit).unwrap_err();
+    assert!(
+        matches!(error, PackageError::PatchConflict { .. }),
+        "{context}: expected a typed patch conflict, found {error:?}"
+    );
+    assert_eq!(physical_state(workbook), before);
+}
+
+/// A refused commit reports `context` and leaves the source untouched.
+fn assert_failed_commit(workbook: &Workbook, edit: litchi_xlsb::xml_maps::Edit, context: &str) {
+    let before = physical_state(workbook);
+    let error = edit.commit().unwrap_err();
+    assert_error_contains(error, context, "refused commit");
     assert_eq!(physical_state(workbook), before);
 }
 

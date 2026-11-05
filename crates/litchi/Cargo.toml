@@ -11,8 +11,6 @@ readme = "../../README.md"
 keywords = ["office", "docx", "xlsx", "pptx", "parser"]
 categories = ["parser-implementations", "encoding", "text-processing"]
 exclude = [
-    # Reference materials and third-party projects
-    "3rdparty/*",
     # Examples
     "examples/*",
     # Test files
@@ -46,40 +44,84 @@ exclude = [
 default = []
 
 # Format leaves
-doc = ["dep:litchi-doc", "cfb", "ole"]
-docx = ["dep:litchi-docx", "opc"]
-ppt = ["dep:litchi-ppt", "cfb", "ole"]
-pptx = ["dep:litchi-pptx", "opc", "ooxml-common", "drawingml"]
-xls = ["dep:litchi-xls", "cfb", "ole", "sheet"]
-xlsx = ["dep:litchi-xlsx", "opc", "ooxml-common", "drawingml", "sheet"]
-xlsb = ["dep:litchi-xlsb", "opc", "ooxml-common", "sheet"]
-rtf = ["dep:litchi-rtf", "dep:chrono"]
-odt = ["dep:litchi-odt", "odf-common"]
-ods = ["dep:litchi-ods", "odf-common", "sheet"]
-odp = ["dep:litchi-odp", "odf-common"]
-pages = ["dep:litchi-pages", "dep:litchi-iwa-detect"]
-keynote = ["dep:litchi-keynote", "dep:litchi-iwa-detect"]
-numbers = ["dep:litchi-numbers", "dep:litchi-iwa-detect", "sheet"]
-iwork = [
-    "pages",
-    "keynote",
-    "numbers",
-    "dep:litchi-iwa-structured",
-    "litchi-pages/internal-iwork-source",
-    "litchi-keynote/internal-iwork-source",
-    "litchi-numbers/internal-iwork-source",
+doc = ["dep:litchi-doc", "cfb", "ole", "dep:litchi-ops", "litchi-ops/doc"]
+docx = ["dep:litchi-docx", "opc", "dep:litchi-ops", "litchi-ops/docx"]
+ppt = ["dep:litchi-ppt", "cfb", "ole", "dep:litchi-ops", "litchi-ops/ppt"]
+pptx = [
+    "dep:litchi-pptx",
+    "opc",
+    "ooxml-common",
+    "drawingml",
+    "dep:litchi-ops",
+    "litchi-ops/pptx",
 ]
+xls = ["dep:litchi-xls", "cfb", "ole", "sheet", "dep:litchi-ops", "litchi-ops/xls"]
+xlsx = [
+    "dep:litchi-xlsx",
+    "opc",
+    "ooxml-common",
+    "drawingml",
+    "sheet",
+    "dep:litchi-ops",
+    "litchi-ops/xlsx",
+]
+xlsb = [
+    "dep:litchi-xlsb",
+    "opc",
+    "ooxml-common",
+    "sheet",
+    "dep:litchi-ops",
+    "litchi-ops/xlsb",
+]
+rtf = ["dep:litchi-rtf", "dep:litchi-ops", "litchi-ops/rtf"]
+odt = ["dep:litchi-odt", "odf-common", "dep:litchi-ops", "litchi-ops/odt"]
+ods = ["dep:litchi-ods", "odf-common", "sheet", "dep:litchi-ops", "litchi-ops/ods"]
+odp = ["dep:litchi-odp", "odf-common", "dep:litchi-ops", "litchi-ops/odp"]
+# OpenDocument HTML templates and master documents open through the unified
+# ODT adapter (record 0282).
+oth = ["odt", "litchi-ops/oth"]
+odm = ["odt", "litchi-ops/odm"]
+# The OpenDocument object formats open through the unified object-tree
+# adapter (record 0282).
+odg = ["odf-common", "dep:litchi-ops", "litchi-ops/odg"]
+odc = ["odf-common", "dep:litchi-ops", "litchi-ops/odc"]
+odi = ["odf-common", "dep:litchi-ops", "litchi-ops/odi"]
+odb = ["odf-common", "dep:litchi-ops", "litchi-ops/odb"]
+odf-formula = ["odf-common", "dep:litchi-ops", "litchi-ops/odf-formula"]
+pages = [
+    "dep:litchi-pages",
+    "dep:litchi-iwa-detect",
+    "dep:litchi-ops",
+    "litchi-ops/pages",
+]
+keynote = [
+    "dep:litchi-keynote",
+    "dep:litchi-iwa-detect",
+    "dep:litchi-ops",
+    "litchi-ops/keynote",
+]
+numbers = [
+    "dep:litchi-numbers",
+    "dep:litchi-iwa-detect",
+    "sheet",
+    "dep:litchi-ops",
+    "litchi-ops/numbers",
+]
+iwork = ["pages", "keynote", "numbers"]
 
 # Low-level and opt-in capabilities
 cfb = ["dep:litchi-cfb"]
 ole = ["dep:litchi-ole-common"]
-opc = ["dep:litchi-opc"]
+opc = ["dep:litchi-opc", "litchi-ops?/opc"]
 ooxml-common = ["dep:litchi-ooxml-common"]
 drawingml = ["dep:litchi-drawingml"]
 odf-common = ["dep:litchi-odf-common"]
-sheet = ["dep:litchi-sheet", "dep:fast-float2"]
+sheet = ["dep:litchi-sheet"]
+# Delimited (CSV/TSV/PRN), SYLK, DIF and fixed-width text workbooks (record 0354).
+sheet-text = ["sheet", "dep:litchi-sheet-text"]
 sign = [
     "dep:litchi-sign",
+    "litchi-ops?/sign",
     "litchi-opc?/sign",
     "litchi-docx?/sign",
     "litchi-ppt?/sign",
@@ -89,6 +131,7 @@ encryption = [
     "dep:litchi-crypto",
     "litchi-docx?/encryption",
     "litchi-ooxml-common?/encryption",
+    "litchi-ops?/encryption",
     "litchi-ppt?/encryption",
     "litchi-pptx?/encryption",
     "litchi-xlsx?/encryption",
@@ -101,7 +144,12 @@ vba-inspection = [
     "litchi-xlsb?/vba-inspection",
     "litchi-xlsx?/vba-inspection",
 ]
-formula = ["dep:litchi-formula", "litchi-doc?/formula", "litchi-ppt?/formula"]
+formula = [
+    "dep:litchi-formula",
+    "litchi-doc?/formula",
+    "litchi-ops?/formula",
+    "litchi-ppt?/formula",
+]
 fonts = [
     "dep:litchi-fonts",
     "litchi-docx?/fonts",
@@ -131,15 +179,15 @@ automatic-fonts = [
     "litchi-pptx?/automatic-fonts",
 ]
 images = ["dep:litchi-imgconv", "dep:litchi-odraw"]
-eval = ["dep:litchi-eval"]
+eval = ["dep:litchi-eval", "litchi-ops?/eval"]
 web-functions = ["eval", "litchi-eval/web_functions"]
-markdown = ["dep:base64", "dep:litchi-markdown", "dep:memchr"]
-yaml = ["dep:serde-saphyr"]
+markdown = ["dep:litchi-markdown", "litchi-ops?/markdown"]
+yaml = ["dep:serde-saphyr", "litchi-ops?/yaml"]
 
 # Format and convenience aggregates
 legacy = ["doc", "ppt", "xls", "cfb", "ole"]
 ooxml = ["docx", "pptx", "xlsx", "xlsb", "opc", "ooxml-common", "drawingml"]
-odf = ["odt", "ods", "odp", "odf-common"]
+odf = ["odt", "ods", "odp", "oth", "odm", "odg", "odc", "odi", "odb", "odf-formula", "odf-common"]
 word = ["doc", "docx", "rtf", "odt", "pages"]
 slides = ["ppt", "pptx", "odp", "keynote"]
 spreadsheets = ["xls", "xlsx", "xlsb", "ods", "numbers", "sheet"]
@@ -154,6 +202,7 @@ all = [
     "drawingml",
     "odf-common",
     "sheet",
+    "sheet-text",
     "sign",
     "encryption",
     "vba-inspection",
@@ -167,9 +216,6 @@ all = [
 ]
 
 [dependencies]
-base64 = { workspace = true, optional = true } # Self-contained Markdown image data URIs
-chrono = { version = "0", features = ["serde"], optional = true } # RTF metadata timestamps
-fast-float2 = { version = "0.2", optional = true } # Text-sheet numeric parsing
 litchi-cfb = { workspace = true, optional = true } # Compound File Binary substrate
 litchi-core = { workspace = true } # Common types, traits, and utilities
 litchi-crypto = { workspace = true, features = ["ooxml"], optional = true } # Office encryption support
@@ -181,7 +227,6 @@ litchi-fonts = { workspace = true, optional = true } # Font support
 litchi-formula = { workspace = true, optional = true } # Formula parsing and conversion
 litchi-imgconv = { workspace = true, optional = true } # Legacy image conversion
 litchi-iwa-detect = { workspace = true, optional = true } # Bounded iWork package detection
-litchi-iwa-structured = { workspace = true, optional = true } # Archive-free iWork semantic aggregation
 litchi-keynote = { workspace = true, optional = true } # Apple Keynote support
 litchi-markdown = { workspace = true, optional = true } # Markdown emission
 litchi-numbers = { workspace = true, optional = true } # Apple Numbers support
@@ -193,23 +238,27 @@ litchi-odt = { workspace = true, optional = true } # OpenDocument Text support
 litchi-ole-common = { workspace = true, optional = true } # Shared OLE2 vocabulary
 litchi-ooxml-common = { workspace = true, optional = true } # Shared OOXML vocabulary
 litchi-opc = { workspace = true, optional = true } # Open Packaging Conventions support
+litchi-ops = { workspace = true, optional = true } # Unified operations layer; owns format detection
 litchi-pages = { workspace = true, optional = true } # Apple Pages support
 litchi-ppt = { workspace = true, optional = true } # Legacy PowerPoint binary support
 litchi-pptx = { workspace = true, optional = true } # PresentationML support
 litchi-rtf = { workspace = true, optional = true } # Rich Text Format support
 litchi-sheet = { workspace = true, optional = true } # Shared spreadsheet vocabulary
+litchi-sheet-text = { workspace = true, optional = true } # Text workbooks
 litchi-sign = { workspace = true, optional = true } # Office signature support
 litchi-xls = { workspace = true, optional = true } # Legacy Excel BIFF support
 litchi-xlsb = { workspace = true, optional = true } # BIFF12 support
 litchi-xlsx = { workspace = true, optional = true } # SpreadsheetML support
-memchr = { version = "2.7", optional = true } # Markdown escaping
 serde-saphyr = { version = "0", optional = true } # YAML metadata serialization
 
 [build-dependencies]
-# (none) — iwa proto compilation lives in `crates/litchi-iwa-protos/build.rs`.
+# (none) — `build.rs` derives `cfg(litchi_unified)` from the format features
+# above without dependencies (record 0334); iwa proto compilation lives in
+# `crates/litchi-iwa-protos/build.rs`.
 
 [dev-dependencies]
 clap = { version = "4", features = ["derive"] }
+litchi-ops = { workspace = true, features = ["test-support"] }
 proptest = "1.5"
 tempfile = "3"
 tokio = { workspace = true }
@@ -221,7 +270,7 @@ required-features = ["docx", "automatic-fonts"]
 
 [[example]]
 name = "core_props_office"
-required-features = ["opc", "ooxml-common"]
+required-features = ["docx", "pptx", "xlsx"]
 
 [[example]]
 name = "minimal_font_test"
@@ -541,19 +590,19 @@ required-features = ["xlsx", "eval"]
 
 [[example]]
 name = "text_formats_api_demo"
-required-features = ["sheet"]
+required-features = ["sheet-text"]
 
 [[example]]
 name = "text_formats_demo"
-required-features = ["sheet"]
+required-features = ["sheet-text"]
 
 [[example]]
 name = "text_formats_roundtrip"
-required-features = ["sheet"]
+required-features = ["sheet-text"]
 
 [[example]]
 name = "text_formats_simple"
-required-features = ["sheet"]
+required-features = ["sheet-text"]
 
 [[example]]
 name = "to_markdown"

@@ -56,7 +56,7 @@ ABBA/allocator evidence supports one.
 This is a format-completion slice rather than another XLSX or RTF measurement.
 `StreamingWorkbookWriter::write_row` already provides ordered sparse-row
 creation with reusable row scratch ([streaming.rs](../../../../crates/litchi-xlsx/src/streaming.rs#L345-L390)),
-and `StreamingRtfWriter` already documents fresh forward-only paragraph/run
+and `streaming::Writer` already documents fresh forward-only paragraph/run
 creation without a document-wide model ([streaming.rs](../../../../crates/litchi-rtf/src/streaming.rs#L1-L8),
 [streaming.rs](../../../../crates/litchi-rtf/src/streaming.rs#L252-L313)). The
 performance harness recognizes streaming creation only for those two formats

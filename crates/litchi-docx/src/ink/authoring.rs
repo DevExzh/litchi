@@ -10,6 +10,7 @@
     clippy::arbitrary_source_item_ordering,
     reason = "the host grammar is kept beside its detached values"
 )]
+use crate::ink::LimitKind;
 use std::fmt::Write as FmtWrite;
 use std::sync::Arc;
 
@@ -1644,11 +1645,11 @@ fn wordprocessing_drawing_namespace(dialect: StoryDialect) -> &'static str {
 }
 
 fn strict_extension_refusal() -> Error {
-    Error::UnsafeEdit {
-        format: "DOCX",
-        operation: "author_ink_host",
-        reason: "Strict WordprocessingML has no accepted Word 2010 Ink extension relationship policy",
-    }
+    Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
+        "author_ink_host",
+        "Strict WordprocessingML has no accepted Word 2010 Ink extension relationship policy",
+    )
 }
 
 fn invalid(message: impl Into<String>) -> Error {
@@ -1657,7 +1658,7 @@ fn invalid(message: impl Into<String>) -> Error {
 
 fn image_limit(actual: usize) -> Error {
     Error::InkLimit {
-        resource: "fallback image bytes",
+        kind: LimitKind::FallbackImageBytes,
         actual,
         maximum: MAX_FALLBACK_IMAGE_BYTES,
     }
@@ -1688,7 +1689,7 @@ impl Output {
             .ok_or_else(|| invalid("DOCX Ink host output size overflow"))?;
         if new_len > MAX_HOST_BYTES {
             return Err(Error::InkLimit {
-                resource: "host output bytes",
+                kind: LimitKind::HostOutputBytes,
                 actual: new_len,
                 maximum: MAX_HOST_BYTES,
             });
@@ -1980,7 +1981,7 @@ mod tests {
         let style = Style::drawing(Placement::inline(extent()), image());
         assert!(matches!(
             render(&style, StoryDialect::Strict, "ink", Some("image"), 1),
-            Err(Error::UnsafeEdit { .. })
+            Err(Error::Refused(_))
         ));
         let fallback = render_fallback(&image(), StoryDialect::Strict, "image", 1)
             .expect("standalone fallback");

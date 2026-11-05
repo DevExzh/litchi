@@ -2,12 +2,12 @@ use std::io::Cursor;
 
 use litchi_opc::{BlobPart, PackURI, Part, TargetMode};
 use litchi_xlsb::Package;
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::data_model::{
     ContentType, DATA_MODEL_CONTENT_TYPE, DATA_MODEL_PART_NAME, Definition, Model, Table,
     TimeGrouping, TimeGroupingColumn,
 };
 use litchi_xlsb::package::connections::{Connection, Connections, SourceType};
-use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
 
 const EMPTY_RELATIONSHIPS: &[u8] =
     br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>"#;
@@ -51,24 +51,39 @@ fn connections() -> Connections {
 }
 
 fn package() -> Package {
-    let mut writer = WorkbookWriter::new();
-    writer.add_worksheet(MutableWorksheet::new("Sheet1"));
+    let mut writer = Builder::new();
+    writer.add_worksheet(builder::Worksheet::new("Sheet1"));
     writer.set_connections(connections()).expect("connections");
     writer
-        .set_data_model(Model::from_bytes(definition(), vec![1, 2, 3, 4]).expect("model"))
+        .set_data_model(
+            Model::from_bytes(
+                definition(),
+                vec![1, 2, 3, 4],
+                litchi_xlsb::data_model::SemanticLimits::DEFAULT,
+            )
+            .expect("model"),
+        )
         .expect("set model");
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output).expect("save");
-    Package::from_bytes(output.into_inner()).expect("package")
+    writer
+        .build()
+        .expect("build package")
+        .write_to(&mut output)
+        .expect("save");
+    Package::from_bytes(&output.into_inner()).expect("package")
 }
 
 fn empty_package() -> Package {
-    let mut writer = WorkbookWriter::new();
-    writer.add_worksheet(MutableWorksheet::new("Sheet1"));
+    let mut writer = Builder::new();
+    writer.add_worksheet(builder::Worksheet::new("Sheet1"));
     writer.set_connections(connections()).expect("connections");
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output).expect("save");
-    Package::from_bytes(output.into_inner()).expect("package")
+    writer
+        .build()
+        .expect("build package")
+        .write_to(&mut output)
+        .expect("save");
+    Package::from_bytes(&output.into_inner()).expect("package")
 }
 
 fn package_with_case_variant_model_part() -> Package {
@@ -105,15 +120,19 @@ fn package_with_explicit_empty_model_relationships_with_padding(padding: usize) 
     let package = package().into_opc();
     let content_types = noncanonical_content_types_with_padding(
         package
-            .source_content_types()
+            .source_content_types(litchi_opc::SourceLimits::default())
             .expect("content types")
             .bytes(),
         padding,
     );
     let root = PackURI::new("/").expect("root URI");
-    let root_relationships = package.source_relationships(&root).expect("root rels");
+    let root_relationships = package
+        .source_relationships(&root, litchi_opc::SourceLimits::default())
+        .expect("root rels");
     let model = PackURI::new(DATA_MODEL_PART_NAME).expect("model URI");
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     writer
         .write_stored("[Content_Types].xml", &content_types)
         .expect("content types member");
@@ -130,7 +149,7 @@ fn package_with_explicit_empty_model_relationships_with_padding(padding: usize) 
             .write_stored(part.partname().membername(), part.blob())
             .expect("part member");
         let relationships = package
-            .source_relationships(part.partname())
+            .source_relationships(part.partname(), litchi_opc::SourceLimits::default())
             .expect("part relationships");
         if part.partname().is_equivalent_to(&model) {
             writer
@@ -155,14 +174,13 @@ fn package_with_explicit_empty_model_relationships_with_padding(padding: usize) 
         }
     }
     let zip = writer.finish_to_bytes().expect("opened ZIP fixture bytes");
-    let opc = if content_types.len() > litchi_opc::ReadLimits::default().max_content_types_bytes() {
-        litchi_opc::OpcPackage::from_bytes_with_limits(
-            &zip,
-            elevated_opc_limits(content_types.len()),
-        )
-        .expect("open elevated ZIP fixture")
+    let opc = if content_types.len() > litchi_opc::SourceLimits::default().max_content_types_bytes()
+    {
+        litchi_opc::OpcPackage::from_bytes(&zip, elevated_opc_limits(content_types.len()))
+            .expect("open elevated ZIP fixture")
     } else {
-        litchi_opc::OpcPackage::from_bytes(&zip).expect("open ZIP fixture")
+        litchi_opc::OpcPackage::from_bytes(&zip, litchi_opc::SourceLimits::default())
+            .expect("open ZIP fixture")
     };
     Package::from_opc(opc).expect("package from ZIP fixture")
 }
@@ -179,8 +197,8 @@ fn noncanonical_content_types_with_padding(source: &[u8], padding: usize) -> Vec
     swap_content_type_attributes(xml, "Override", "PartName", "ContentType").into_bytes()
 }
 
-fn elevated_opc_limits(content_types_bytes: usize) -> litchi_opc::ReadLimits {
-    litchi_opc::ReadLimits::builder()
+fn elevated_opc_limits(content_types_bytes: usize) -> litchi_opc::SourceLimits {
+    litchi_opc::SourceLimits::builder()
         .max_content_types_bytes(content_types_bytes)
         .expect("content types limit")
         .build()
@@ -313,13 +331,19 @@ fn writer_emits_relationship_free_model_part_and_typed_workbook_records() {
 
 #[test]
 fn writer_requires_a_connection_for_each_model_table() {
-    let mut writer = WorkbookWriter::new();
-    writer.add_worksheet(MutableWorksheet::new("Sheet1"));
+    let mut writer = Builder::new();
+    writer.add_worksheet(builder::Worksheet::new("Sheet1"));
     writer
-        .set_data_model(Model::from_bytes(definition(), vec![1, 2, 3]).expect("model"))
+        .set_data_model(
+            Model::from_bytes(
+                definition(),
+                vec![1, 2, 3],
+                litchi_xlsb::data_model::SemanticLimits::DEFAULT,
+            )
+            .expect("model"),
+        )
         .expect("set model before its owner");
-    let mut output = Cursor::new(Vec::new());
-    let error = writer.save(&mut output).expect_err("missing owner");
+    let error = writer.build().expect_err("missing owner");
     assert!(error.to_string().contains("External Data Connections part"));
 }
 
@@ -327,15 +351,26 @@ fn writer_requires_a_connection_for_each_model_table() {
 fn table_connection_binding_is_case_insensitive() {
     let mut value = definition();
     value.tables[0].connection = "connection".to_string();
-    let mut writer = WorkbookWriter::new();
-    writer.add_worksheet(MutableWorksheet::new("Sheet1"));
+    let mut writer = Builder::new();
+    writer.add_worksheet(builder::Worksheet::new("Sheet1"));
     writer.set_connections(connections()).expect("connections");
     writer
-        .set_data_model(Model::from_bytes(value.clone(), vec![1, 2, 3]).expect("model"))
+        .set_data_model(
+            Model::from_bytes(
+                value.clone(),
+                vec![1, 2, 3],
+                litchi_xlsb::data_model::SemanticLimits::DEFAULT,
+            )
+            .expect("model"),
+        )
         .expect("case-insensitive binding");
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output).expect("save");
-    let reopened = Package::from_bytes(output.into_inner()).expect("package");
+    writer
+        .build()
+        .expect("build package")
+        .write_to(&mut output)
+        .expect("save");
+    let reopened = Package::from_bytes(&output.into_inner()).expect("package");
     assert_eq!(
         reopened
             .data_model()
@@ -350,7 +385,7 @@ fn table_connection_binding_is_case_insensitive() {
 fn load_version_edit_is_source_checked_and_reversible() {
     let package = package();
     let before = package.data_model().expect("before");
-    let mut transaction = before.edit();
+    let mut transaction = package.edit_data_model().expect("before");
     transaction
         .edit_definition(|definition| {
             definition.min_version_load = 6;
@@ -358,7 +393,10 @@ fn load_version_edit_is_source_checked_and_reversible() {
         })
         .expect("version edit");
     let commit = transaction.commit().expect("commit");
-    let changed = package.apply_data_model(&commit).expect("apply");
+    let changed = package
+        .apply_data_model(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
+        .expect("apply");
     assert_eq!(
         changed
             .data_model()
@@ -370,7 +408,8 @@ fn load_version_edit_is_source_checked_and_reversible() {
     );
 
     let restored = changed
-        .apply_data_model_patch(&commit.patch().inverse())
+        .apply_data_model(&commit.patch().inverse())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("inverse");
     assert_eq!(restored.data_model().expect("restored"), before);
 }
@@ -379,18 +418,24 @@ fn load_version_edit_is_source_checked_and_reversible() {
 fn empty_transaction_is_an_exact_noop() {
     let package = package();
     let before = package.data_model().expect("before");
-    let commit = before.edit().commit().expect("no-op commit");
-    assert!(!commit.changed());
-    assert!(commit.patch().is_empty());
-    let after = package.apply_data_model(&commit).expect("no-op apply");
+    let commit = package
+        .edit_data_model()
+        .expect("before")
+        .commit()
+        .expect("no-op commit");
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.patch().is_noop());
+    let after = package
+        .apply_data_model(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
+        .expect("no-op apply");
     assert_eq!(after.data_model().expect("after"), before);
 }
 
 #[test]
 fn identity_edits_are_refused_while_payload_is_opaque() {
     let package = package();
-    let before = package.data_model().expect("before");
-    let mut transaction = before.edit();
+    let mut transaction = package.edit_data_model().expect("before");
     let error = transaction
         .edit_definition(|definition| {
             definition.tables[0].name = "Renamed".to_string();
@@ -403,8 +448,7 @@ fn identity_edits_are_refused_while_payload_is_opaque() {
 #[test]
 fn connection_source_change_is_stale_even_when_model_and_workbook_bytes_are_unchanged() {
     let package = package();
-    let before = package.data_model().expect("before");
-    let mut transaction = before.edit();
+    let mut transaction = package.edit_data_model().expect("before");
     transaction
         .edit_definition(|definition| {
             definition.min_version_load = 6;
@@ -428,13 +472,22 @@ fn connection_source_change_is_stale_even_when_model_and_workbook_bytes_are_unch
         .blob()
         .to_vec();
 
-    let mut workbook = package.workbook().expect("workbook");
-    let mut changed = workbook.connections().expect("connections").clone();
+    let mut changed = package
+        .workbook()
+        .expect("workbook")
+        .connections()
+        .expect("connections")
+        .clone();
     changed.connections[0].description = Some("changed source metadata".to_string());
-    workbook.set_connections(changed).expect("change source");
+    let mut edit = package.edit_connections().expect("connections edit");
+    edit.replace(Some(changed)).expect("change source");
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).expect("save changed source");
-    let changed_package = Package::from_bytes(output.into_inner()).expect("reopen");
+    edit.commit()
+        .expect("commit changed source")
+        .package()
+        .write_to(&mut output)
+        .expect("save changed source");
+    let changed_package = Package::from_bytes(&output.into_inner()).expect("reopen");
 
     assert_eq!(
         changed_package
@@ -452,7 +505,12 @@ fn connection_source_change_is_stale_even_when_model_and_workbook_bytes_are_unch
             .blob(),
         model_bytes.as_slice()
     );
-    assert!(changed_package.apply_data_model(&commit).is_err());
+    assert!(
+        changed_package
+            .apply_data_model(commit.patch())
+            .map(litchi_core::edit::Commit::into_package)
+            .is_err()
+    );
 }
 
 #[test]
@@ -460,28 +518,41 @@ fn creation_removal_and_stale_source_checks_are_atomic() {
     let empty = empty_package();
     assert!(!empty.data_model().expect("empty model").is_present());
 
-    let mut create = empty.data_model().expect("empty model").edit();
+    let mut create = empty.edit_data_model().expect("empty model");
     create
         .replace_model(Some(
-            Model::from_bytes(definition(), vec![9, 8, 7]).expect("model"),
+            Model::from_bytes(
+                definition(),
+                vec![9, 8, 7],
+                litchi_xlsb::data_model::SemanticLimits::DEFAULT,
+            )
+            .expect("model"),
         ))
         .expect("create");
     let create_commit = create.commit().expect("create commit");
     let created = empty
-        .apply_data_model(&create_commit)
+        .apply_data_model(create_commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("create apply");
     assert!(created.data_model().expect("created model").is_present());
-    assert!(created.apply_data_model(&create_commit).is_err());
+    assert!(
+        created
+            .apply_data_model(create_commit.patch())
+            .map(litchi_core::edit::Commit::into_package)
+            .is_err()
+    );
 
-    let mut remove = created.data_model().expect("created model").edit();
+    let mut remove = created.edit_data_model().expect("created model");
     remove.remove_model().expect("remove");
     let remove_commit = remove.commit().expect("remove commit");
     let removed = created
-        .apply_data_model(&remove_commit)
+        .apply_data_model(remove_commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("remove apply");
     assert!(!removed.data_model().expect("removed model").is_present());
     let restored = removed
-        .apply_data_model_patch(&remove_commit.patch().inverse())
+        .apply_data_model(&remove_commit.patch().inverse())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("inverse");
     assert_eq!(
         restored.data_model().expect("restored"),
@@ -528,15 +599,16 @@ fn case_equivalent_model_and_connection_owners_are_resolved_by_physical_name() {
             .part_name(),
         "/xl/MODEL/ITEM.DATA"
     );
-    let before = variant_model.data_model().expect("before");
-    let mut transaction = before.edit();
+    let mut transaction = variant_model.edit_data_model().expect("before");
     transaction.remove_model().expect("remove variant model");
     let commit = transaction.commit().expect("variant remove commit");
     let removed = variant_model
-        .apply_data_model(&commit)
+        .apply_data_model(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("remove variant model");
     let restored = removed
-        .apply_data_model_patch(&commit.patch().inverse())
+        .apply_data_model(&commit.patch().inverse())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("restore variant model");
     assert_eq!(
         restored
@@ -555,22 +627,30 @@ fn case_equivalent_model_and_connection_owners_are_resolved_by_physical_name() {
             .connection_names(),
         Some(&["Connection".to_owned()][..])
     );
-    let mut workbook = variant_connection.workbook().expect("variant workbook");
-    workbook
-        .set_connections(connections())
+    let mut edit = variant_connection
+        .edit_connections()
+        .expect("connections edit");
+    edit.replace(Some(connections()))
         .expect("replace physical case-variant connections owner");
+    let replaced = edit.commit().expect("commit replacement").into_package();
     assert_eq!(
-        workbook
+        replaced
+            .workbook()
+            .expect("replaced workbook")
             .connections()
             .map(|value| value.connections[0].name.as_str()),
         Some("Connection")
     );
+    let mut edit = replaced.edit_connections().expect("connections edit");
+    assert!(edit.replace(None).expect("remove connections owner"));
+    let removed = edit.commit().expect("commit removal").into_package();
     assert!(
-        workbook
-            .remove_connections()
-            .expect("remove connections owner")
+        removed
+            .workbook()
+            .expect("workbook")
+            .connections()
+            .is_none()
     );
-    assert!(workbook.connections().is_none());
 }
 
 #[test]
@@ -583,8 +663,11 @@ fn source_tokens_restore_explicit_empty_model_relationships_after_reopened_zip_i
         .membername()
         .to_owned();
     let before_zip = package.to_bytes().expect("opened ZIP bytes");
-    let before_archive =
-        soapberry_zip::office::ArchiveReader::new(&before_zip).expect("opened ZIP archive");
+    let before_archive = soapberry_zip::office::ArchiveReader::new(
+        &before_zip,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .expect("opened ZIP archive");
     let before_content_types = before_archive
         .read("[Content_Types].xml")
         .expect("content types member");
@@ -608,18 +691,25 @@ fn source_tokens_restore_explicit_empty_model_relationships_after_reopened_zip_i
     );
     assert_eq!(before_relationships, EMPTY_RELATIONSHIPS);
     let before = package.data_model().expect("before snapshot");
-    let mut transaction = before.edit();
+    let mut transaction = package.edit_data_model().expect("before snapshot");
     transaction.remove_model().expect("remove model");
     let commit = transaction.commit().expect("remove commit");
-    let removed = package.apply_data_model(&commit).expect("remove model");
+    let removed = package
+        .apply_data_model(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
+        .expect("remove model");
     let removed_zip = removed.to_bytes().expect("removed ZIP bytes");
-    let reopened_removed = Package::from_bytes(removed_zip).expect("reopen removed ZIP");
+    let reopened_removed = Package::from_bytes(&removed_zip).expect("reopen removed ZIP");
     let restored = reopened_removed
-        .apply_data_model_patch(&commit.patch().inverse())
+        .apply_data_model(&commit.patch().inverse())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("inverse model");
     let restored_zip = restored.to_bytes().expect("restored ZIP bytes");
-    let restored_archive =
-        soapberry_zip::office::ArchiveReader::new(&restored_zip).expect("restored ZIP archive");
+    let restored_archive = soapberry_zip::office::ArchiveReader::new(
+        &restored_zip,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .expect("restored ZIP archive");
     assert_eq!(
         restored_archive
             .read("[Content_Types].xml")
@@ -632,7 +722,7 @@ fn source_tokens_restore_explicit_empty_model_relationships_after_reopened_zip_i
             .expect("restored model relationships member"),
         EMPTY_RELATIONSHIPS
     );
-    let reopened = Package::from_bytes(restored_zip).expect("reopen restored ZIP");
+    let reopened = Package::from_bytes(&restored_zip).expect("reopen restored ZIP");
     assert_eq!(reopened.data_model().expect("reopened snapshot"), before);
 }
 
@@ -647,13 +737,16 @@ fn elevated_source_tokens_survive_reopened_inverse_with_large_content_types() {
         .membername()
         .to_owned();
     let before_zip = package.to_bytes().expect("large source ZIP bytes");
-    let before_archive =
-        soapberry_zip::office::ArchiveReader::new(&before_zip).expect("large source archive");
+    let before_archive = soapberry_zip::office::ArchiveReader::new(
+        &before_zip,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .expect("large source archive");
     let before_content_types = before_archive
         .read("[Content_Types].xml")
         .expect("large content types member");
     assert!(
-        before_content_types.len() > litchi_opc::ReadLimits::default().max_content_types_bytes()
+        before_content_types.len() > litchi_opc::SourceLimits::default().max_content_types_bytes()
     );
     assert_eq!(
         before_archive
@@ -662,29 +755,41 @@ fn elevated_source_tokens_survive_reopened_inverse_with_large_content_types() {
         EMPTY_RELATIONSHIPS
     );
 
-    let mut limits = litchi_xlsb::data_model::ReadLimits::DEFAULT;
+    let mut limits = litchi_xlsb::data_model::SemanticLimits::DEFAULT;
     limits.max_part_bytes = 16 * 1024 * 1024;
     limits.max_metadata_bytes = 16 * 1024 * 1024;
     let before = package
-        .data_model_with_limits(limits)
+        .with_semantic_limits(litchi_xlsb::SemanticLimits::new().data_model(limits))
+        .data_model()
         .expect("elevated Data Model snapshot");
-    let mut transaction = before.edit();
+    let mut transaction = package
+        .edit_data_model_with_options(
+            litchi_xlsb::data_model::EditOptions::default().limits(limits),
+        )
+        .expect("elevated Data Model edit");
     transaction.remove_model().expect("remove model");
     let commit = transaction.commit().expect("remove commit");
-    let removed = package.apply_data_model(&commit).expect("remove model");
+    let removed = package
+        .apply_data_model(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
+        .expect("remove model");
     let removed_zip = removed.to_bytes().expect("removed ZIP bytes");
-    let reopened_removed_opc = litchi_opc::OpcPackage::from_bytes_with_limits(
+    let reopened_removed_opc = litchi_opc::OpcPackage::from_bytes(
         &removed_zip,
         elevated_opc_limits(before_content_types.len()),
     )
     .expect("reopen removed ZIP with elevated limits");
     let reopened_removed = Package::from_opc(reopened_removed_opc).expect("removed package");
     let restored = reopened_removed
-        .apply_data_model_patch(&commit.patch().inverse())
+        .apply_data_model(&commit.patch().inverse())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("inverse model");
     let restored_zip = restored.to_bytes().expect("restored ZIP bytes");
-    let restored_archive =
-        soapberry_zip::office::ArchiveReader::new(&restored_zip).expect("restored ZIP archive");
+    let restored_archive = soapberry_zip::office::ArchiveReader::new(
+        &restored_zip,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .expect("restored ZIP archive");
     assert_eq!(
         restored_archive
             .read("[Content_Types].xml")
@@ -697,7 +802,7 @@ fn elevated_source_tokens_survive_reopened_inverse_with_large_content_types() {
             .expect("restored model relationships member"),
         EMPTY_RELATIONSHIPS
     );
-    let reopened_opc = litchi_opc::OpcPackage::from_bytes_with_limits(
+    let reopened_opc = litchi_opc::OpcPackage::from_bytes(
         &restored_zip,
         elevated_opc_limits(before_content_types.len()),
     )
@@ -705,7 +810,8 @@ fn elevated_source_tokens_survive_reopened_inverse_with_large_content_types() {
     let reopened = Package::from_opc(reopened_opc).expect("restored package");
     assert_eq!(
         reopened
-            .data_model_with_limits(limits)
+            .with_semantic_limits(litchi_xlsb::SemanticLimits::new().data_model(limits))
+            .data_model()
             .expect("reopened elevated snapshot"),
         before
     );
@@ -714,21 +820,31 @@ fn elevated_source_tokens_survive_reopened_inverse_with_large_content_types() {
 #[test]
 fn data_model_limits_bound_borrowed_graph_metadata_before_snapshot_ownership() {
     let package = package();
-    let mut limits = litchi_xlsb::data_model::ReadLimits::DEFAULT;
+    let mut limits = litchi_xlsb::data_model::SemanticLimits::DEFAULT;
     limits.max_metadata_bytes = 1;
     let error = package
-        .data_model_with_limits(limits)
+        .with_semantic_limits(litchi_xlsb::SemanticLimits::new().data_model(limits))
+        .data_model()
         .expect_err("metadata admission must be bounded");
-    assert!(error.to_string().contains("metadata"));
+    assert!(matches!(
+        error,
+        litchi_xlsb::package::PackageError::Limit {
+            kind: litchi_xlsb::package::LimitKind::DataModel(
+                litchi_xlsb::data_model::LimitKind::MetadataBytes
+            ),
+            ..
+        }
+    ));
 }
 
 #[test]
 fn data_model_limits_bound_connection_count_before_typed_load() {
     let package = package();
-    let mut limits = litchi_xlsb::data_model::ReadLimits::DEFAULT;
+    let mut limits = litchi_xlsb::data_model::SemanticLimits::DEFAULT;
     limits.max_connections = 0;
     let error = package
-        .data_model_with_limits(limits)
+        .with_semantic_limits(litchi_xlsb::SemanticLimits::new().data_model(limits))
+        .data_model()
         .expect_err("connection admission must be bounded");
     assert!(error.to_string().contains("External Data Connections"));
 }
@@ -739,74 +855,31 @@ fn signed_noop_preserves_and_signed_change_requires_explicit_disposition() {
     assert!(signed.opc_package().is_signed());
     let before_bytes = signed.to_bytes().expect("signed bytes");
     let noop = signed
-        .data_model()
+        .edit_data_model()
         .expect("signed snapshot")
-        .edit()
         .commit()
         .expect("noop");
-    let unchanged = signed.apply_data_model(&noop).expect("signed noop");
+    let unchanged = signed
+        .apply_data_model(noop.patch())
+        .map(litchi_core::edit::Commit::into_package)
+        .expect("signed noop");
     assert!(unchanged.opc_package().is_signed());
     assert_eq!(unchanged.to_bytes().expect("noop bytes"), before_bytes);
 
-    let mut edit = signed.data_model().expect("signed snapshot").edit();
+    let mut edit = signed.edit_data_model().expect("signed snapshot");
     edit.edit_definition(|definition| {
         definition.min_version_load = 6;
         Ok(())
     })
     .expect("stage signed edit");
     let error = edit.commit().expect_err("signed change must refuse");
-    assert!(matches!(
-        error,
-        litchi_xlsb::data_model::Error::Opc(
-            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
-        )
-    ));
-
-    let mut workbook = signed.workbook().expect("signed workbook facade");
-    let workbook_before = {
-        let mut output = Cursor::new(Vec::new());
-        workbook.save(&mut output).expect("signed workbook bytes");
-        output.into_inner()
-    };
-    let workbook_noop = workbook
-        .data_model()
-        .expect("signed workbook snapshot")
-        .edit()
-        .commit()
-        .expect("signed workbook noop");
-    workbook
-        .apply_data_model(&workbook_noop)
-        .expect("signed workbook noop apply");
-    assert!(workbook.opc_package().is_signed());
-    let workbook_after = {
-        let mut output = Cursor::new(Vec::new());
-        workbook.save(&mut output).expect("signed workbook bytes");
-        output.into_inner()
-    };
-    assert_eq!(workbook_after, workbook_before);
-
-    let mut workbook_edit = workbook
-        .data_model()
-        .expect("signed workbook snapshot")
-        .edit();
-    workbook_edit
-        .edit_definition(|definition| {
-            definition.min_version_load = 6;
-            Ok(())
-        })
-        .expect("stage signed workbook edit");
-    assert!(matches!(
-        workbook_edit.commit(),
-        Err(litchi_xlsb::data_model::Error::Opc(
-            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
-        ))
-    ));
+    assert!(matches!(error, litchi_xlsb::data_model::Error::Signed));
 }
 
 #[test]
 fn time_grouping_edit_requires_inner_xldm_identity_proof_before_draft_change() {
     let package = package();
-    let mut edit = package.data_model().expect("Data Model snapshot").edit();
+    let mut edit = package.edit_data_model().expect("Data Model snapshot");
     let error = edit
         .add_time_grouping(time_grouping())
         .expect_err("opaque bytes without XLDM metadata cannot admit a grouping");
@@ -814,6 +887,7 @@ fn time_grouping_edit_requires_inner_xldm_identity_proof_before_draft_change() {
     assert!(
         edit.definition()
             .expect("staged Data Model definition")
+            .expect("model")
             .time_groupings
             .is_empty()
     );
@@ -821,17 +895,34 @@ fn time_grouping_edit_requires_inner_xldm_identity_proof_before_draft_change() {
 
 #[test]
 fn writer_rejects_time_grouping_before_retaining_unproven_opaque_payload() {
-    let mut writer = WorkbookWriter::new();
-    writer.add_worksheet(MutableWorksheet::new("Sheet1"));
+    let mut writer = Builder::new();
+    writer.add_worksheet(builder::Worksheet::new("Sheet1"));
     writer.set_connections(connections()).expect("connections");
     let mut definition = definition();
     definition.time_groupings.push(time_grouping());
-    let error = match writer
-        .set_data_model(Model::from_bytes(definition, vec![1, 2, 3, 4]).expect("model"))
-    {
+    let error = match writer.set_data_model(
+        Model::from_bytes(
+            definition,
+            vec![1, 2, 3, 4],
+            litchi_xlsb::data_model::SemanticLimits::DEFAULT,
+        )
+        .expect("model"),
+    ) {
         Ok(_) => panic!("writer must prove retained groupings before staging"),
         Err(error) => error,
     };
     assert!(error.to_string().contains("XLDM outer proof failed"));
     assert!(writer.data_model().is_none());
+}
+
+#[test]
+fn model_payload_is_admitted_under_caller_limits() {
+    let mut limits = litchi_xlsb::data_model::SemanticLimits::DEFAULT;
+    limits.max_part_bytes = 4;
+    assert!(Model::from_bytes(definition(), vec![1, 2, 3, 4], limits).is_ok());
+    limits.max_part_bytes = 3;
+    assert!(matches!(
+        Model::from_bytes(definition(), vec![1, 2, 3, 4], limits),
+        Err(litchi_xlsb::package::PackageError::Limit { .. })
+    ));
 }

@@ -17,7 +17,8 @@ use std::sync::Arc;
 use litchi_core::SourceVersion;
 
 use crate::{
-    AllocationDefect, OleError, OleFile, SharedOleFile, ToleranceReport, writer::OleWriter,
+    AllocationDefect, OleError, OleFile, OleFileLimits, SharedOleFile, SharedOleFileLimits,
+    ToleranceReport, writer::OleWriter,
 };
 
 fn build(streams: &[(&[&str], &[u8])]) -> Vec<u8> {
@@ -33,9 +34,13 @@ fn build(streams: &[(&[&str], &[u8])]) -> Vec<u8> {
 /// Opens `bytes` through both readers and returns the cursor reader's report
 /// after checking that the positional reader agrees.
 fn open_report(bytes: &[u8]) -> ToleranceReport {
-    let file = OleFile::open(Cursor::new(bytes.to_vec())).unwrap();
-    let shared =
-        SharedOleFile::open_owned(Arc::from(bytes.to_vec()), SourceVersion::new(0x7a, 0)).unwrap();
+    let file = OleFile::open(Cursor::new(bytes.to_vec()), OleFileLimits::default()).unwrap();
+    let shared = SharedOleFile::open_owned(
+        Arc::from(bytes.to_vec()),
+        SourceVersion::new(0x7a, 0),
+        SharedOleFileLimits::default(),
+    )
+    .unwrap();
     assert_eq!(file.tolerance_report(), shared.tolerance_report());
     file.tolerance_report().clone()
 }
@@ -156,9 +161,13 @@ fn recorded(report: &ToleranceReport) -> Vec<(crate::Defect, u32)> {
 }
 
 fn read_both(bytes: &[u8], path: &[&str]) -> Vec<u8> {
-    let mut file = OleFile::open(Cursor::new(bytes.to_vec())).unwrap();
-    let shared =
-        SharedOleFile::open_owned(Arc::from(bytes.to_vec()), SourceVersion::new(0x7b, 0)).unwrap();
+    let mut file = OleFile::open(Cursor::new(bytes.to_vec()), OleFileLimits::default()).unwrap();
+    let shared = SharedOleFile::open_owned(
+        Arc::from(bytes.to_vec()),
+        SourceVersion::new(0x7b, 0),
+        SharedOleFileLimits::default(),
+    )
+    .unwrap();
     let data = file.open_stream(path).unwrap();
     assert_eq!(shared.open_stream(path).unwrap(), data);
     let mut tail = vec![0; 3.min(data.len())];
@@ -278,7 +287,7 @@ fn chain_faults_within_the_declared_length_stay_fatal() {
         let mut faulted = bytes.clone();
         let at = fat_offset(&faulted, sectors[3]);
         write_u32(&mut faulted, at, link);
-        match OleFile::open(Cursor::new(faulted)) {
+        match OleFile::open(Cursor::new(faulted), OleFileLimits::default()) {
             Err(OleError::CorruptedFile(message)) => {
                 assert!(message.contains(expected), "{expected}: {message}");
             },
@@ -310,7 +319,7 @@ fn empty_stream_with_a_stale_start_sector_reads_as_empty_and_is_recorded() {
         );
         assert!(read_both(&faulted, &["Empty"]).is_empty());
         assert_eq!(read_both(&faulted, &["Data"]), data);
-        let file = OleFile::open(Cursor::new(faulted)).unwrap();
+        let file = OleFile::open(Cursor::new(faulted), OleFileLimits::default()).unwrap();
         let repaired = file.directory_entry_by_sid(sid).unwrap();
         assert_eq!(repaired.start_sector, crate::consts::ENDOFCHAIN);
     }
@@ -400,12 +409,17 @@ fn misordered_sibling_tree_opens_and_every_name_still_resolves() {
     // Lookups are case-insensitive as before, and a missing name is still
     // not found by either reader.
     assert_eq!(read_both(&bytes, &["ALPHA"]), contents[0]);
-    let mut file = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+    let mut file = OleFile::open(Cursor::new(bytes.clone()), OleFileLimits::default()).unwrap();
     assert!(matches!(
         file.open_stream(&["Missing"]),
         Err(OleError::StreamNotFound)
     ));
-    let shared = SharedOleFile::open_owned(Arc::from(bytes), SourceVersion::new(0x7c, 0)).unwrap();
+    let shared = SharedOleFile::open_owned(
+        Arc::from(bytes),
+        SourceVersion::new(0x7c, 0),
+        SharedOleFileLimits::default(),
+    )
+    .unwrap();
     assert!(matches!(
         shared.open_stream(&["Store", "Missing"]),
         Err(OleError::StreamNotFound)
@@ -427,7 +441,7 @@ fn sibling_tree_cycles_stay_fatal_when_ordering_is_tolerated() {
     // Point the tree root's left link back at itself.
     write_u32(&mut bytes, directory[root_tree as usize] + 68, root_tree);
     assert!(matches!(
-        OleFile::open(Cursor::new(bytes)),
+        OleFile::open(Cursor::new(bytes), OleFileLimits::default()),
         Err(OleError::CorruptedFile(message)) if message.contains("repeated SID")
     ));
 }
@@ -487,7 +501,7 @@ fn unreachable_directory_entry_is_ignored_and_recorded() {
         [(crate::DirectoryDefect::UnreachableEntry.into(), orphan)]
     );
 
-    let mut file = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+    let mut file = OleFile::open(Cursor::new(bytes.clone()), OleFileLimits::default()).unwrap();
     assert!(file.directory_entry_by_sid(orphan).is_none());
     assert!(matches!(
         file.open_stream(&[orphan_name.as_str()]),
@@ -604,13 +618,13 @@ fn table_start_count_repairs_never_invent_missing_tables() {
     let mut mini = build(&[(&["Data"], b"small")]);
     assert_ne!(read_u32(&mini, 0x40), 0);
     write_u32(&mut mini, 0x3c, crate::consts::ENDOFCHAIN);
-    assert!(OleFile::open(Cursor::new(mini)).is_err());
+    assert!(OleFile::open(Cursor::new(mini), OleFileLimits::default()).is_err());
 
     // A nonzero DIFAT count without a start sector stays fatal.
     let mut difat = build(&[(&["Data"], &pattern(5000, 14))]);
     write_u32(&mut difat, 0x48, 1);
     assert!(matches!(
-        OleFile::open(Cursor::new(difat)),
+        OleFile::open(Cursor::new(difat), OleFileLimits::default()),
         Err(OleError::InvalidFormat(message)) if message.contains("DIFAT start sector")
     ));
 }
@@ -659,7 +673,7 @@ fn meaningless_directory_entry_fields_are_ignored_and_recorded() {
         recorded(&open_report(&child)),
         [(D::StreamChildLink.into(), data_sid)]
     );
-    let mut file = OleFile::open(Cursor::new(child.clone())).unwrap();
+    let mut file = OleFile::open(Cursor::new(child.clone()), OleFileLimits::default()).unwrap();
     assert!(matches!(
         file.open_stream(&["Data", "Inner"]),
         Err(OleError::StreamNotFound)
@@ -707,7 +721,7 @@ fn names_with_forbidden_characters_stay_readable_and_are_recorded() {
     );
     assert_eq!(read_both(&bytes, &["D:ta"]), data);
     assert_eq!(read_both(&bytes, &["d:TA"]), data);
-    let file = OleFile::open(Cursor::new(bytes)).unwrap();
+    let file = OleFile::open(Cursor::new(bytes), OleFileLimits::default()).unwrap();
     assert_eq!(file.list_streams(), [vec!["D:ta".to_owned()]]);
 }
 
@@ -724,7 +738,7 @@ fn directory_entry_framing_stays_fatal() {
             faulted[offset + 8..offset + 10].copy_from_slice(b"x\0");
         }
         assert!(
-            OleFile::open(Cursor::new(faulted)).is_err(),
+            OleFile::open(Cursor::new(faulted), OleFileLimits::default()).is_err(),
             "field {field} = {value}"
         );
     }

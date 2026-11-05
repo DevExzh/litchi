@@ -1,0 +1,4 @@
+# Built at 34685b9c25: CARGO_INCREMENTAL=0 cargo build --release -p litchi-ops --example pptx_p0_final_bench --example pptx_p0_bench --features pptx
+# Run pinned: taskset -c 7 ./pptx_p0_final_bench; P0_SCENARIO=run_format_batch and shape_text_batch taskset -c 7 ./pptx_p0_bench (three runs each)
+8aab87077b02cfcf389cbd8dbe2ffbbfd2c19c84151c394fe245c92ecf5655a4  pptx_p0_final_bench
+9bf75f51060c33a4279a43ac7f05328a485ccbcc120d401e3eb76b783a62aecd  pptx_p0_bench

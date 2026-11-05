@@ -1,4 +1,4 @@
-use litchi_ods::{MutableSpreadsheet, Sheet, Spreadsheet};
+use litchi_ods::{Package, Sheet, builder::Workbook as Draft};
 
 const PACKAGE_FIXTURE: &[u8] =
     include_bytes!("../../../test-data/odf/ods/grid-padding-package.ods");
@@ -20,7 +20,9 @@ fn signature(sheets: &[Sheet]) -> Vec<(String, usize, usize)> {
 
 #[test]
 fn producer_package_opens_without_expanding_grid_padding() {
-    let spreadsheet = Spreadsheet::from_bytes(PACKAGE_FIXTURE.to_vec())
+    let spreadsheet = Package::from_bytes(PACKAGE_FIXTURE)
+        .expect("test fixture or operation should succeed")
+        .workbook()
         .expect("test fixture or operation should succeed");
     let sheets = spreadsheet.sheets();
 
@@ -41,12 +43,16 @@ fn producer_package_opens_without_expanding_grid_padding() {
 
 #[test]
 fn padded_package_survives_mutable_round_trip() {
-    let spreadsheet = Spreadsheet::from_bytes(PACKAGE_FIXTURE.to_vec())
+    let spreadsheet = Package::from_bytes(PACKAGE_FIXTURE)
+        .expect("test fixture or operation should succeed")
+        .workbook()
         .expect("test fixture or operation should succeed");
     let before = signature(spreadsheet.sheets());
 
-    let mutable = MutableSpreadsheet::from_spreadsheet(spreadsheet);
-    let reopened = Spreadsheet::from_bytes(mutable.to_bytes())
+    let mutable = Draft::from_workbook(spreadsheet);
+    let reopened = Package::from_bytes(mutable.build().expect("the draft builds").as_bytes())
+        .expect("test fixture or operation should succeed")
+        .workbook()
         .expect("test fixture or operation should succeed");
 
     assert_eq!(signature(reopened.sheets()), before);

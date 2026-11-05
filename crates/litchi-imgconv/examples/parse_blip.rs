@@ -6,7 +6,7 @@
 use std::path::PathBuf;
 
 use litchi_imgconv::{Options, to_png};
-use litchi_odraw::image::{Blip, Kind, write::BlipBuilder};
+use litchi_odraw::image::{Blip, Kind, builder::BlipBuilder};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
@@ -22,12 +22,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let png = std::fs::read("test-data/images/png/lena.png")?;
             let builder = BlipBuilder::bitmap(Kind::Png, png)?;
             let mut bytes = Vec::new();
-            builder.write(&mut bytes)?;
+            builder.write(&mut bytes, litchi_odraw::image::Limits::default())?;
             bytes
         },
     };
 
-    let blip = Blip::parse(&blip_bytes)?;
+    let blip = Blip::parse(&blip_bytes, Default::default())?;
     println!("kind: {:?}, data bytes: {}", blip.kind(), blip.data().len());
     let png = to_png(&blip, Options::default())?;
     std::fs::write(&output, png)?;

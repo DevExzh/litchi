@@ -8,52 +8,107 @@
 
 use std::{fmt, sync::Arc};
 
-use litchi_core::id::generate_guid_bytes;
 use litchi_iwa_archive::package::{EntryEdit, SharedBytes};
 use litchi_iwa_common::WireLimits;
 use litchi_iwa_core::{Archive, Limits, RawMessage, SnappyStream};
 use litchi_numbers_wire::table_merges as merge_wire;
 
-use super::{
-    Budget, Package, TableMergesError, TableMergesLimitKind, decode_model_merges,
-    select_semantic_positions,
-};
+use super::{Budget, Package, decode_model_merges, select_semantic_positions};
 use crate::table::merge::Region;
-use crate::{SheetSelector, TableSelector};
+use crate::table::merge::transaction::Error as TableMergesError;
+use crate::table::merge::transaction::LimitKind as TableMergesLimitKind;
+use crate::{
+    SheetSelector, TableSelector,
+    selector::{OwnedSheetSelector, OwnedTableSelector},
+};
 
 /// A mutable, selector-first merge state staged against one immutable package.
 ///
 /// The state starts with the source order.  Removing an existing region and
 /// adding it again keeps the final source order; newly added regions retain
 /// their staging order after all surviving source regions.
-pub struct TableMergesEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
-    sheet_position: usize,
-    table_position: usize,
-    before: Vec<Region>,
-    regions: Vec<Region>,
-    max_regions: usize,
-    budget: Budget,
-    rows: u32,
-    columns: u32,
+    sheet_selector: OwnedSheetSelector,
+    table_selector: OwnedTableSelector,
+    sheet_position: Option<usize>,
+    table_position: Option<usize>,
+    before: Option<Vec<Region>>,
+    regions: Option<Vec<Region>>,
+    max_regions: Option<usize>,
+    budget: Option<Budget>,
+    rows: Option<u32>,
+    columns: Option<u32>,
 }
 
-impl fmt::Debug for TableMergesEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("TableMergesEdit")
-            .field("sheet_position", &self.sheet_position)
-            .field("table_position", &self.table_position)
-            .field("regions", &self.regions)
+            .debug_struct("Edit")
+            .field("loaded", &self.regions.is_some())
             .finish_non_exhaustive()
     }
 }
 
-impl TableMergesEdit<'_> {
+impl Edit<'_> {
+    fn ensure_loaded(&mut self) -> Result<(), TableMergesError> {
+        if self.regions.is_some() {
+            return Ok(());
+        }
+        let mut budget = self.budget.take().ok_or(TableMergesError::InvalidSource)?;
+        let loaded = (|| {
+            let (sheet_position, table_position) = select_semantic_positions(
+                self.source,
+                self.sheet_selector.as_selector(),
+                self.table_selector.as_selector(),
+                &mut budget,
+            )?;
+            let target = super::super::table_headers::resolve::resolve_target(
+                self.source,
+                sheet_position,
+                table_position,
+            )
+            .map_err(map_header_error)?;
+            let model = super::super::table_headers::rewrite::selected_payload(self.source, target)
+                .map_err(map_header_error)?;
+            let before = decode_model_merges(model, &mut budget)?;
+            let regions = clone_regions(&before)?;
+            Ok((
+                sheet_position,
+                table_position,
+                target.rows,
+                target.columns,
+                before,
+                regions,
+                budget.max_regions,
+            ))
+        })();
+        match loaded {
+            Ok((sheet_position, table_position, rows, columns, before, regions, max_regions)) => {
+                self.max_regions = Some(max_regions);
+                self.rows = Some(rows);
+                self.columns = Some(columns);
+                self.sheet_position = Some(sheet_position);
+                self.table_position = Some(table_position);
+                self.before = Some(before);
+                self.regions = Some(regions);
+                self.budget = Some(budget);
+                Ok(())
+            },
+            Err(error) => {
+                self.budget = Some(budget);
+                Err(error)
+            },
+        }
+    }
+
     /// Return the currently staged merged regions.
-    #[must_use]
-    pub fn regions(&self) -> &[Region] {
-        &self.regions
+    #[must_use = "inspect the merged regions result"]
+    pub fn regions(&mut self) -> Result<&[Region], TableMergesError> {
+        self.ensure_loaded()?;
+        self.regions
+            .as_deref()
+            .ok_or(TableMergesError::InvalidSource)
     }
 
     /// Stage one new merged-cell rectangle.
@@ -63,35 +118,48 @@ impl TableMergesEdit<'_> {
     ///
     /// This changes merge geometry while preserving the underlying cell values.
     pub fn merge(&mut self, region: Region) -> Result<&mut Self, TableMergesError> {
-        if region.end_row() >= self.rows || region.end_column() >= self.columns {
-            return Err(TableMergesError::InvalidRegion);
-        }
-        self.budget
-            .charge_work(self.regions.len().saturating_add(1))?;
-        if self
+        self.ensure_loaded()?;
+        let rows = self.rows.ok_or(TableMergesError::InvalidSource)?;
+        let columns = self.columns.ok_or(TableMergesError::InvalidSource)?;
+        let max_regions = self.max_regions.ok_or(TableMergesError::InvalidSource)?;
+        let regions = self
             .regions
+            .as_mut()
+            .ok_or(TableMergesError::InvalidSource)?;
+        let budget = self
+            .budget
+            .as_mut()
+            .ok_or(TableMergesError::InvalidSource)?;
+        if region.end_row() >= rows || region.end_column() >= columns {
+            return Err(TableMergesError::Refused(
+                crate::package::table_merges::Refusal::InvalidRegion,
+            ));
+        }
+        budget.charge_work(regions.len().saturating_add(1))?;
+        if regions
             .iter()
             .copied()
             .any(|existing| existing.overlaps(region))
         {
-            return Err(TableMergesError::OverlappingRegion);
+            return Err(TableMergesError::Refused(
+                crate::package::table_merges::Refusal::OverlappingRegion,
+            ));
         }
-        let observed = self
-            .regions
+        let observed = regions
             .len()
             .checked_add(1)
             .ok_or(TableMergesError::InvalidSource)?;
-        if observed > self.max_regions {
-            return Err(TableMergesError::LimitExceeded {
+        if observed > max_regions {
+            return Err(TableMergesError::Limit {
                 kind: TableMergesLimitKind::Regions,
                 observed: usize_as_u64(observed),
-                maximum: usize_as_u64(self.max_regions),
+                maximum: usize_as_u64(max_regions),
             });
         }
-        self.regions
+        regions
             .try_reserve(1)
             .map_err(|_| TableMergesError::Allocation { amount: 1 })?;
-        self.regions.push(region);
+        regions.push(region);
         Ok(self)
     }
 
@@ -101,70 +169,81 @@ impl TableMergesEdit<'_> {
     /// native Numbers operation's `false` result without exposing that host
     /// mutation API at this focused boundary.
     pub fn unmerge(&mut self, region: Region) -> Result<bool, TableMergesError> {
-        self.budget
-            .charge_work(self.regions.len().saturating_add(1))?;
-        if let Some(index) = self
+        self.ensure_loaded()?;
+        let regions = self
             .regions
-            .iter()
-            .position(|candidate| *candidate == region)
-        {
-            self.regions.remove(index);
+            .as_mut()
+            .ok_or(TableMergesError::InvalidSource)?;
+        self.budget
+            .as_mut()
+            .ok_or(TableMergesError::InvalidSource)?
+            .charge_work(regions.len().saturating_add(1))?;
+        if let Some(index) = regions.iter().position(|candidate| *candidate == region) {
+            regions.remove(index);
             return Ok(true);
         }
         Ok(false)
     }
 
     /// Commit the staged state as a fully reopened exact-source package.
-    pub fn commit(self) -> Result<TableMergesCommit, TableMergesError> {
+    pub fn commit(mut self) -> Result<Commit, TableMergesError> {
+        self.ensure_loaded()?;
         let source_catalog = physical_source(self.source)?;
         let source_bytes = source_catalog.__source_owner();
         let source_fingerprint = fingerprint(&source_bytes);
         let mut edit = self;
-        let after = normalize_regions(&edit.before, &edit.regions, &mut edit.budget)?;
+        let before = edit.before.take().ok_or(TableMergesError::InvalidSource)?;
+        let regions = edit.regions.take().ok_or(TableMergesError::InvalidSource)?;
+        let mut budget = edit.budget.take().ok_or(TableMergesError::InvalidSource)?;
+        let sheet_position = edit.sheet_position.ok_or(TableMergesError::InvalidSource)?;
+        let table_position = edit.table_position.ok_or(TableMergesError::InvalidSource)?;
+        let after = normalize_regions(&before, &regions, &mut budget)?;
 
-        if after == edit.before {
-            return Ok(TableMergesCommit {
+        if after == before {
+            return Ok(Commit {
                 package: edit.source.snapshot(),
-                patch: TableMergesPatch {
+                patch: Patch {
                     source: source_bytes.clone(),
                     target: source_bytes,
                     source_fingerprint,
                     target_fingerprint: source_fingerprint,
-                    sheet_position: edit.sheet_position,
-                    table_position: edit.table_position,
-                    before: edit.before,
+                    sheet_position,
+                    table_position,
+                    before,
                     after,
                 },
-                diagnostics: TableMergesDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
 
         if !source_catalog.source_is_exact() {
-            return Err(TableMergesError::UnsupportedSource);
+            return Err(TableMergesError::Refused(
+                crate::package::table_merges::Refusal::UnsupportedSource,
+            ));
         }
 
         let package = rewrite(
             edit.source,
-            edit.sheet_position,
-            edit.table_position,
-            edit.before.len(),
+            sheet_position,
+            table_position,
+            before.len(),
             &after,
-            &mut edit.budget,
+            &mut budget,
         )?;
         let target = physical_source(&package)?.__source_owner();
         let target_fingerprint = fingerprint(&target);
-        let patch = TableMergesPatch {
+        let patch = Patch {
             source: source_bytes,
             target,
             source_fingerprint,
             target_fingerprint,
-            sheet_position: edit.sheet_position,
-            table_position: edit.table_position,
-            before: edit.before,
+            sheet_position,
+            table_position,
+            before,
             after,
         };
-        let diagnostics = TableMergesDiagnostics::published(&patch.before, &patch.after);
-        Ok(TableMergesCommit {
+        let diagnostics = Diagnostics::published(&patch.before, &patch.after);
+        Ok(Commit {
             package,
             patch,
             diagnostics,
@@ -174,7 +253,7 @@ impl TableMergesEdit<'_> {
 
 /// An exact-source reversible table-merges patch.
 #[derive(Clone, PartialEq, Eq)]
-pub struct TableMergesPatch {
+pub struct Patch {
     source: SharedBytes,
     target: SharedBytes,
     source_fingerprint: u64,
@@ -185,10 +264,10 @@ pub struct TableMergesPatch {
     after: Vec<Region>,
 }
 
-impl fmt::Debug for TableMergesPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("TableMergesPatch")
+            .debug_struct("Patch")
             .field("sheet_position", &self.sheet_position)
             .field("table_position", &self.table_position)
             .field("before", &self.before)
@@ -197,7 +276,7 @@ impl fmt::Debug for TableMergesPatch {
     }
 }
 
-impl TableMergesPatch {
+impl Patch {
     /// Return the source merge state required before applying this patch.
     #[must_use]
     pub fn before(&self) -> &[Region] {
@@ -236,7 +315,7 @@ impl TableMergesPatch {
 
 /// Compact evidence describing one committed merge transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct TableMergesDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     full_reparse_performed: bool,
@@ -244,7 +323,7 @@ pub struct TableMergesDiagnostics {
     regions_removed: usize,
 }
 
-impl TableMergesDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -307,13 +386,13 @@ impl TableMergesDiagnostics {
 /// The fully reopened immutable result of one merge transaction.
 #[must_use = "a Numbers table-merges commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct TableMergesCommit {
+pub struct Commit {
     package: Package,
-    patch: TableMergesPatch,
-    diagnostics: TableMergesDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl TableMergesCommit {
+impl Commit {
     /// Borrow the fully reopened package snapshot.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -326,15 +405,21 @@ impl TableMergesCommit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the reversible exact-source patch.
     #[must_use]
-    pub const fn patch(&self) -> &TableMergesPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Borrow compact publication diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> &TableMergesDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
@@ -345,38 +430,41 @@ impl Package {
         &self,
         sheet: impl Into<SheetSelector<'sheet>>,
         table: impl Into<TableSelector<'table>>,
-    ) -> Result<TableMergesEdit<'_>, TableMergesError> {
+    ) -> Result<Edit<'_>, TableMergesError> {
         let mut budget = Budget::new(self)?;
-        let (sheet_position, table_position) =
-            select_semantic_positions(self, sheet.into(), table.into(), &mut budget)?;
-        let target = super::super::table_headers::resolve::resolve_target(
-            self,
-            sheet_position,
-            table_position,
-        )
-        .map_err(map_header_error)?;
-        let model = super::super::table_headers::rewrite::selected_payload(self, target)
-            .map_err(map_header_error)?;
-        let before = decode_model_merges(model, &mut budget)?;
-        let regions = clone_regions(&before)?;
-        Ok(TableMergesEdit {
+        let sheet = sheet.into();
+        let maximum_sheet_name_bytes = budget.remaining_retained()?;
+        if let Some(amount) = OwnedSheetSelector::name_bytes(sheet) {
+            budget.charge_retained(amount)?;
+            budget.charge_allocations(1)?;
+        }
+        let sheet_selector = OwnedSheetSelector::try_from(sheet, maximum_sheet_name_bytes)
+            .map_err(|amount| TableMergesError::Allocation { amount })?;
+        let table = table.into();
+        let maximum_table_name_bytes = budget.remaining_retained()?;
+        if let Some(amount) = OwnedTableSelector::name_bytes(table) {
+            budget.charge_retained(amount)?;
+            budget.charge_allocations(1)?;
+        }
+        let table_selector = OwnedTableSelector::try_from(table, maximum_table_name_bytes)
+            .map_err(|amount| TableMergesError::Allocation { amount })?;
+        Ok(Edit {
             source: self,
-            sheet_position,
-            table_position,
-            before,
-            regions,
-            max_regions: budget.max_regions,
-            budget,
-            rows: target.rows,
-            columns: target.columns,
+            sheet_selector,
+            table_selector,
+            sheet_position: None,
+            table_position: None,
+            before: None,
+            regions: None,
+            max_regions: None,
+            budget: Some(budget),
+            rows: None,
+            columns: None,
         })
     }
 
     /// Apply an exact-source-checked reversible merge patch.
-    pub fn apply_table_merges(
-        &self,
-        patch: &TableMergesPatch,
-    ) -> Result<TableMergesCommit, TableMergesError> {
+    pub fn apply_table_merges(&self, patch: &Patch) -> Result<Commit, TableMergesError> {
         let source_catalog = physical_source(self)?;
         if fingerprint(source_catalog.source_bytes()) != patch.source_fingerprint
             || source_catalog.source_bytes() != patch.source.as_ref()
@@ -399,10 +487,10 @@ impl Package {
             {
                 return Err(TableMergesError::PatchConflict);
             }
-            return Ok(TableMergesCommit {
+            return Ok(Commit {
                 package: self.snapshot(),
                 patch: patch.clone(),
-                diagnostics: TableMergesDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         if !source_catalog.source_is_exact()
@@ -423,10 +511,10 @@ impl Package {
         if actual != patch.after {
             return Err(TableMergesError::Verification);
         }
-        Ok(TableMergesCommit {
+        Ok(Commit {
             package: candidate,
             patch: patch.clone(),
-            diagnostics: TableMergesDiagnostics::published(&patch.before, &patch.after),
+            diagnostics: Diagnostics::published(&patch.before, &patch.after),
         })
     }
 }
@@ -459,7 +547,9 @@ fn rewrite(
         .find(|entry| entry.name() == component_name)
         .ok_or(TableMergesError::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(TableMergesError::UnsupportedSource);
+        return Err(TableMergesError::Refused(
+            crate::package::table_merges::Refusal::UnsupportedSource,
+        ));
     }
     let physical_limits = source_catalog.limits();
     let archive_limits = physical_limits
@@ -473,13 +563,13 @@ fn rewrite(
     let cached_object_count = cached_archive.objects.len();
     let cached_message_count = archive_message_count(cached_archive)?;
     let cached_encoded_len = cached_archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(super::map_core_error)?;
     budget.charge_objects(cached_object_count)?;
     budget.charge_messages(cached_message_count)?;
     budget.charge_work(entry.data().len())?;
     budget.charge_work(cached_encoded_len)?;
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         physical_limits
             .snappy_limits()
@@ -489,10 +579,10 @@ fn rewrite(
     if stream.as_bytes().len() != cached_encoded_len {
         return Err(TableMergesError::InvalidSource);
     }
-    let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
-        .map_err(super::map_core_error)?;
+    let mut archive =
+        Archive::parse(stream.as_bytes(), archive_limits).map_err(super::map_core_error)?;
     archive
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
         .map_err(super::map_core_error)?;
     if archive.objects.len() != cached_object_count
         || archive_message_count(&archive)? != cached_message_count
@@ -522,12 +612,12 @@ fn rewrite(
         archive_limits.max_archive_bytes(),
         budget,
     )?;
-    let written =
-        merge_wire::rewrite_table_merges(source_payload, after, generate_guid_bytes(), limits)
-            .map_err(|error| {
-                super::charge_attempted(budget, &error);
-                super::map_merge_error(error)
-            })?;
+    let written = merge_wire::rewrite_table_merges_derived(source_payload, after, limits).map_err(
+        |error| {
+            super::charge_attempted(budget, &error);
+            super::map_merge_error(error)
+        },
+    )?;
     budget.charge_wire_report(
         written.report.input_bytes(),
         written.report.fields(),
@@ -545,7 +635,7 @@ fn rewrite(
     super::super::table_headers::resolve::validate_message_metadata(object, target.message_index)
         .map_err(map_header_error)?;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             target.message_index,
             RawMessage {
                 type_: target.message_type,
@@ -555,12 +645,12 @@ fn rewrite(
         )
         .map_err(super::map_core_error)?;
     let encoded_bound = archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(super::map_core_error)?;
     budget.charge_work(encoded_bound)?;
     budget.charge_scratch(encoded_bound)?;
     let rewritten = archive
-        .to_bytes_with_limits(archive_limits)
+        .to_bytes(archive_limits)
         .map_err(super::map_core_error)?;
     if rewritten.len() > encoded_bound {
         return Err(TableMergesError::Verification);
@@ -568,18 +658,12 @@ fn rewrite(
     let snappy_limits = physical_limits
         .snappy_limits()
         .map_err(super::map_archive_error)?;
-    let compressed_bound =
-        SnappyStream::maximum_compressed_len(encoded_bound).map_err(super::map_core_error)?;
-    if compressed_bound > snappy_limits.max_compressed_stream() {
-        return Err(TableMergesError::LimitExceeded {
-            kind: TableMergesLimitKind::EntryBytes,
-            observed: usize_as_u64(compressed_bound),
-            maximum: usize_as_u64(snappy_limits.max_compressed_stream()),
-        });
-    }
+    let compressed_bound = SnappyStream::maximum_compressed_len(encoded_bound, snappy_limits)
+        .map_err(super::map_core_error)?;
     budget.charge_work(compressed_bound)?;
     drop(archive);
-    let compressed = SnappyStream::compress(&rewritten).map_err(super::map_core_error)?;
+    let compressed =
+        SnappyStream::compress(&rewritten, snappy_limits).map_err(super::map_core_error)?;
     if compressed.len() > compressed_bound {
         return Err(TableMergesError::Verification);
     }
@@ -713,7 +797,7 @@ fn candidate_inventory(
         stream_bytes = stream_bytes
             .checked_add(
                 archive
-                    .encoded_len_with_limits(archive_limits)
+                    .encoded_len(archive_limits)
                     .map_err(super::map_core_error)?,
             )
             .ok_or(TableMergesError::InvalidSource)?;
@@ -784,15 +868,21 @@ fn physical_source(
 fn map_header_error(error: super::super::table_headers::Error) -> TableMergesError {
     use super::super::table_headers::{Error, LimitKind};
     match error {
-        Error::SheetNotFound => TableMergesError::SheetNotFound,
-        Error::TableNotFound => TableMergesError::TableNotFound,
-        Error::UnsupportedSource => TableMergesError::UnsupportedSource,
-        Error::LimitExceeded {
+        Error::Refused(crate::package::table_headers::Refusal::SheetNotFound) => {
+            TableMergesError::Refused(crate::package::table_merges::Refusal::SheetNotFound)
+        },
+        Error::Refused(crate::package::table_headers::Refusal::TableNotFound) => {
+            TableMergesError::Refused(crate::package::table_merges::Refusal::TableNotFound)
+        },
+        Error::Refused(crate::package::table_headers::Refusal::UnsupportedSource) => {
+            TableMergesError::Refused(crate::package::table_merges::Refusal::UnsupportedSource)
+        },
+        Error::Limit {
             kind,
             observed,
             maximum,
             ..
-        } => TableMergesError::LimitExceeded {
+        } => TableMergesError::Limit {
             kind: match kind {
                 LimitKind::InputBytes => TableMergesLimitKind::InputBytes,
                 LimitKind::OutputBytes => TableMergesLimitKind::OutputBytes,
@@ -811,6 +901,12 @@ fn map_header_error(error: super::super::table_headers::Error) -> TableMergesErr
                 LimitKind::WireFields => TableMergesLimitKind::WireFields,
                 LimitKind::WireNesting => TableMergesLimitKind::WireNesting,
                 LimitKind::WireWork => TableMergesLimitKind::WireWork,
+                // This legacy merge adapter exposes only its aggregate wire
+                // work budget; the focused table-header/comment routes keep
+                // these codec dimensions distinct before this boundary.
+                LimitKind::WireAllocations
+                | LimitKind::WireRetainedBytes
+                | LimitKind::WireScratchBytes => TableMergesLimitKind::WireWork,
                 LimitKind::TransactionWork => TableMergesLimitKind::WireWork,
             },
             observed,
@@ -820,9 +916,11 @@ fn map_header_error(error: super::super::table_headers::Error) -> TableMergesErr
         Error::Verification => TableMergesError::Verification,
         Error::PatchConflict => TableMergesError::PatchConflict,
         Error::InvalidSource { .. }
-        | Error::InvalidSettings { .. }
-        | Error::TableLocked { .. }
-        | Error::UnsupportedDependency { .. } => TableMergesError::InvalidSource,
+        | Error::Refused(crate::package::table_headers::Refusal::InvalidSettings { .. })
+        | Error::Refused(crate::package::table_headers::Refusal::TableLocked { .. })
+        | Error::Refused(crate::package::table_headers::Refusal::UnsupportedDependency {
+            ..
+        }) => TableMergesError::InvalidSource,
     }
 }
 

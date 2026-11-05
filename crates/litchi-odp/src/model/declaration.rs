@@ -1015,7 +1015,7 @@ fn xml_error(error: impl std::fmt::Display) -> Error {
 )]
 mod tests {
     use super::*;
-    use crate::{Builder, Presentation};
+    use crate::Builder;
 
     const PREFIX: &str = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:p="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><o:body><o:presentation>"#;
     const SUFFIX: &str = "</o:presentation></o:body></o:document-content>";
@@ -1065,7 +1065,7 @@ mod tests {
         builder
             .set_declarations(Some(declarations.clone()))
             .unwrap();
-        let presentation = Presentation::from_bytes(builder.build().unwrap()).unwrap();
+        let presentation = builder.build().unwrap().presentation().unwrap();
         assert_eq!(presentation.declarations().unwrap(), declarations);
     }
 

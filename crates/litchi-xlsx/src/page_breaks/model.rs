@@ -7,6 +7,26 @@ pub const MAX_HORIZONTAL_BREAKS: usize = 1_022;
 /// Maximum number of vertical breaks accepted by desktop Office.
 pub const MAX_VERTICAL_BREAKS: usize = 1_023;
 
+/// A bounded dimension of the page-break family: Office's collection
+/// limits.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Row breaks of one worksheet ([`MAX_HORIZONTAL_BREAKS`]).
+    HorizontalBreaks,
+    /// Column breaks of one worksheet ([`MAX_VERTICAL_BREAKS`]).
+    VerticalBreaks,
+}
+
+impl LimitKind {
+    pub(crate) const fn of(axis: Axis) -> Self {
+        match axis {
+            Axis::Horizontal => Self::HorizontalBreaks,
+            Axis::Vertical => Self::VerticalBreaks,
+        }
+    }
+}
+
 const LAST_ROW: u32 = 1_048_575;
 const LAST_COLUMN: u32 = 16_383;
 
@@ -144,7 +164,11 @@ impl Collection {
                 Axis::Vertical => MAX_VERTICAL_BREAKS,
             };
             if breaks.len() >= maximum {
-                return Err(invalid("page-break collection exceeds the Office limit"));
+                return Err(crate::Error::limit(
+                    LimitKind::of(axis),
+                    breaks.len().saturating_add(1),
+                    maximum,
+                ));
             }
             value.validate(axis)?;
             breaks.push(value);

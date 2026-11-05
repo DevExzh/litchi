@@ -8,13 +8,14 @@ use std::sync::Arc;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
 use litchi_sheet::Rect;
+use soapberry_zip::office::StreamingArchiveWriter;
 
 use super::*;
 use crate::Cell;
 use crate::cell::{Extents, Value};
 use crate::error::Error;
 use crate::formula::Cache;
-use crate::{LocalStyle, Package, ReadLimits, Style, Styles};
+use crate::{LocalStyle, Package, SourceLimits, Style, Styles};
 
 const CHARTSHEET_REL: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet";
@@ -47,13 +48,13 @@ fn with_eocd_comment(mut archive: Vec<u8>, comment: &[u8]) -> Vec<u8> {
 #[test]
 fn owned_workbook_noop_output_preserves_exact_archive() {
     let source = with_eocd_comment(
-        Workbook::new()
+        Package::new()
             .expect("valid workbook")
             .to_bytes()
             .expect("serialize workbook"),
         b"xlsx exact source",
     );
-    let workbook = Workbook::from_bytes(source.clone()).expect("open owned workbook");
+    let workbook = Package::from_bytes(&source).expect("open owned workbook");
 
     assert_eq!(
         workbook.to_bytes().expect("serialize no-op workbook"),
@@ -63,8 +64,8 @@ fn owned_workbook_noop_output_preserves_exact_archive() {
 
 #[test]
 fn new_workbook_is_deterministic_and_selector_first() {
-    let first = Workbook::new().expect("valid baseline");
-    let second = Workbook::new().expect("valid baseline");
+    let first = Package::new().expect("valid baseline");
+    let second = Package::new().expect("valid baseline");
 
     assert_eq!(first.to_bytes().ok(), second.to_bytes().ok());
 
@@ -74,7 +75,7 @@ fn new_workbook_is_deterministic_and_selector_first() {
         streamed.0,
         first.to_bytes().expect("buffered serialization")
     );
-    let streamed = Workbook::from_slice(&streamed.0).expect("reopen streamed workbook");
+    let streamed = Package::from_bytes(&streamed.0).expect("reopen streamed workbook");
     assert_eq!(streamed.len(), 1);
     assert_eq!(
         streamed
@@ -110,7 +111,7 @@ fn new_workbook_is_deterministic_and_selector_first() {
     assert_eq!(extents.content(), None);
     assert_eq!(extents.styled(), None);
 
-    let reopened = Workbook::from_bytes(first.to_bytes().expect("serialize"))
+    let reopened = Package::from_bytes(&first.to_bytes().expect("serialize"))
         .expect("reopen generated workbook");
     assert_eq!(
         reopened.active_sheet().map(|sheet| sheet.name().to_owned()),
@@ -119,18 +120,257 @@ fn new_workbook_is_deterministic_and_selector_first() {
 }
 
 #[test]
+fn same_content_ignores_zip_framing_when_native_graph_matches() {
+    let bytes = Package::new()
+        .expect("valid workbook")
+        .to_bytes()
+        .expect("serialize workbook");
+    let left = Package::from_bytes(&bytes).expect("left workbook");
+    let right = Package::from_bytes(&with_eocd_comment(bytes, b"different ZIP comment"))
+        .expect("right workbook");
+
+    assert_ne!(
+        left.inner.package.exact_source_sha256(),
+        right.inner.package.exact_source_sha256(),
+        "the test must exercise the native graph comparison"
+    );
+    assert!(left.same_content(&right).expect("compare native graph"));
+}
+
+#[test]
+fn same_content_uses_shared_source_proof_for_opaque_members() {
+    let source =
+        Package::from_bytes(&workbook_with_opaque_member()).expect("workbook with opaque member");
+    assert_eq!(source.inner.package.non_part_members().len(), 1);
+
+    // Replacing a part with the same bytes revokes exact-source publication,
+    // while the cloned package still shares the immutable source archive and
+    // therefore retains a proof for the opaque member's bytes.
+    let worksheet = PackURI::new("/xl/worksheets/sheet1.xml").expect("worksheet URI");
+    let mut package = source.inner.package.clone();
+    let bytes = package
+        .get_part(&worksheet)
+        .expect("worksheet part")
+        .blob()
+        .to_vec();
+    package
+        .get_part_mut(&worksheet)
+        .expect("mutable worksheet part")
+        .set_blob(bytes);
+    let target = Package::from_opc(package).expect("target workbook");
+
+    assert!(!target.inner.package.is_unmodified_owned_source());
+    assert!(source.same_content(&target).expect("compare opaque graph"));
+}
+
+#[test]
+fn same_content_refuses_unshared_opaque_members() {
+    let left = Package::from_bytes(&workbook_with_opaque_member()).expect("left workbook");
+    let right = Package::from_bytes(&workbook_with_opaque_payload(b"different opaque bytes"))
+        .expect("right workbook");
+
+    assert!(matches!(
+        left.same_content(&right),
+        Err(Error::Unsupported {
+            feature: "content comparison of opaque OPC members"
+        })
+    ));
+}
+
+#[test]
+fn same_content_rejects_unmodeled_publication_manifests() {
+    let manifest_left =
+        Package::from_bytes(&workbook_with_unmodeled_metadata("one", "same", "same"))
+            .expect("manifest-left workbook");
+    let manifest_right =
+        Package::from_bytes(&workbook_with_unmodeled_metadata("two", "same", "same"))
+            .expect("manifest-right workbook");
+    assert!(
+        !manifest_left
+            .same_content(&manifest_right)
+            .expect("compare content-type manifests")
+    );
+
+    let relationship_left =
+        Package::from_bytes(&workbook_with_unmodeled_metadata("same", "one", "same"))
+            .expect("relationship-left workbook");
+    let relationship_right =
+        Package::from_bytes(&workbook_with_unmodeled_metadata("same", "two", "same"))
+            .expect("relationship-right workbook");
+    assert!(
+        !relationship_left
+            .same_content(&relationship_right)
+            .expect("compare relationship manifests")
+    );
+
+    let part_relationship_left =
+        Package::from_bytes(&workbook_with_unmodeled_metadata("same", "same", "one"))
+            .expect("part-relationship-left workbook");
+    let part_relationship_right =
+        Package::from_bytes(&workbook_with_unmodeled_metadata("same", "same", "two"))
+            .expect("part-relationship-right workbook");
+    assert!(
+        !part_relationship_left
+            .same_content(&part_relationship_right)
+            .expect("compare part relationship manifests")
+    );
+}
+
+#[test]
+fn patch_exposes_endpoints_and_conservative_retention() {
+    let source = Package::new().expect("source workbook");
+    let mut edit = source.edit().expect("start edit");
+    edit.sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("Sheet1")
+        .set("A1", "changed")
+        .expect("set cell");
+    let commit = edit.commit().expect("commit edit");
+    let patch = commit.patch().clone();
+
+    assert!(
+        patch
+            .source()
+            .expect("patch source")
+            .same_content(&source)
+            .unwrap()
+    );
+    assert!(!patch.is_noop());
+    assert!(patch.retained_bytes() > 0);
+    assert!(Patch::default().source().is_err());
+    assert_eq!(Patch::default().retained_bytes(), 0);
+}
+
+fn workbook_with_opaque_member() -> Vec<u8> {
+    workbook_with_opaque_payload(b"opaque member bytes")
+}
+
+fn workbook_with_opaque_payload(payload: &[u8]) -> Vec<u8> {
+    const MAIN: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+    const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+    const PACKAGE_REL: &str = "http://schemas.openxmlformats.org/package/2006/relationships";
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
+    writer
+        .write_stored(
+            "[Content_Types].xml",
+            format!(
+                r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="{workbook}"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="{worksheet}"/></Types>"#,
+                workbook = ct::SML_SHEET_MAIN,
+                worksheet = ct::SML_WORKSHEET,
+            )
+            .as_bytes(),
+        )
+        .expect("content types");
+    writer
+        .write_stored(
+            "_rels/.rels",
+            format!(
+                r#"<Relationships xmlns="{PACKAGE_REL}"><Relationship Id="rId1" Type="{REL}/officeDocument" Target="xl/workbook.xml"/></Relationships>"#
+            )
+            .as_bytes(),
+        )
+        .expect("package relationships");
+    writer
+        .write_stored(
+            "xl/workbook.xml",
+            format!(
+                r#"<workbook xmlns="{MAIN}" xmlns:r="{REL}"><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets></workbook>"#
+            )
+            .as_bytes(),
+        )
+        .expect("workbook");
+    writer
+        .write_stored(
+            "xl/_rels/workbook.xml.rels",
+            format!(
+                r#"<Relationships xmlns="{PACKAGE_REL}"><Relationship Id="rId1" Type="{REL}/worksheet" Target="worksheets/sheet1.xml"/></Relationships>"#
+            )
+            .as_bytes(),
+        )
+        .expect("workbook relationships");
+    writer
+        .write_stored(
+            "xl/worksheets/sheet1.xml",
+            format!(r#"<worksheet xmlns="{MAIN}"><sheetData/></worksheet>"#).as_bytes(),
+        )
+        .expect("worksheet");
+    writer
+        .write_stored("opaque.bin", payload)
+        .expect("opaque member");
+    writer.finish_to_bytes().expect("finish workbook")
+}
+
+fn workbook_with_unmodeled_metadata(
+    content_marker: &str,
+    relationship_marker: &str,
+    part_relationship_marker: &str,
+) -> Vec<u8> {
+    const MAIN: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+    const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+    const PACKAGE_REL: &str = "http://schemas.openxmlformats.org/package/2006/relationships";
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
+    writer
+        .write_stored(
+            "[Content_Types].xml",
+            format!(
+                r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types" xmlns:x="urn:litchi:test"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml" x:marker="{content_marker}"/><Override PartName="/xl/workbook.xml" ContentType="{workbook}"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="{worksheet}"/></Types>"#,
+                workbook = ct::SML_SHEET_MAIN,
+                worksheet = ct::SML_WORKSHEET,
+            )
+            .as_bytes(),
+        )
+        .expect("content types");
+    writer
+        .write_stored(
+            "_rels/.rels",
+            format!(
+                r#"<Relationships xmlns="{PACKAGE_REL}" xmlns:x="urn:litchi:test"><Relationship Id="rId1" Type="{REL}/officeDocument" Target="xl/workbook.xml" x:marker="{relationship_marker}"/></Relationships>"#
+            )
+            .as_bytes(),
+        )
+        .expect("package relationships");
+    writer
+        .write_stored(
+            "xl/workbook.xml",
+            format!(
+                r#"<workbook xmlns="{MAIN}" xmlns:r="{REL}"><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets></workbook>"#
+            )
+            .as_bytes(),
+        )
+        .expect("workbook");
+    writer
+        .write_stored(
+            "xl/_rels/workbook.xml.rels",
+            format!(
+                r#"<Relationships xmlns="{PACKAGE_REL}" xmlns:x="urn:litchi:test"><Relationship Id="rId1" Type="{REL}/worksheet" Target="worksheets/sheet1.xml" x:marker="{part_relationship_marker}"/></Relationships>"#
+            )
+            .as_bytes(),
+        )
+        .expect("workbook relationships");
+    writer
+        .write_stored(
+            "xl/worksheets/sheet1.xml",
+            format!(r#"<worksheet xmlns="{MAIN}"><sheetData/></worksheet>"#).as_bytes(),
+        )
+        .expect("worksheet");
+    writer.finish_to_bytes().expect("finish workbook")
+}
+
+#[test]
 fn package_and_workbook_ingress_honor_exact_read_limits() {
-    let bytes = Workbook::new()
+    let bytes = Package::new()
         .expect("minimal workbook")
         .to_bytes()
         .expect("serialize minimal workbook");
     let input_bytes = u64::try_from(bytes.len()).expect("input length fits u64");
-    let exact = ReadLimits::builder()
+    let exact = SourceLimits::builder()
         .max_input_bytes(input_bytes)
         .expect("exact input limit")
         .build()
         .expect("valid exact limit");
-    let over = ReadLimits::builder()
+    let over = SourceLimits::builder()
         .max_input_bytes(input_bytes - 1)
         .expect("smaller input limit")
         .build()
@@ -139,31 +379,136 @@ fn package_and_workbook_ingress_honor_exact_read_limits() {
     std::fs::write(file.path(), &bytes).expect("write workbook");
 
     assert!(Package::open(file.path()).is_ok());
-    assert!(Package::from_bytes(bytes.clone()).is_ok());
-    assert!(Package::from_slice(&bytes).is_ok());
+    assert!(Package::from_bytes(&bytes).is_ok());
+    assert!(Package::from_bytes(&bytes).is_ok());
     assert!(Package::from_reader(Cursor::new(bytes.clone())).is_ok());
-    assert!(Workbook::open(file.path()).is_ok());
-    assert!(Workbook::from_bytes(bytes.clone()).is_ok());
-    assert!(Workbook::from_slice(&bytes).is_ok());
-    assert!(Workbook::from_reader(Cursor::new(bytes.clone())).is_ok());
+    assert!(Package::open(file.path()).is_ok());
+    assert!(Package::from_bytes(&bytes).is_ok());
+    assert!(Package::from_bytes(&bytes).is_ok());
+    assert!(Package::from_reader(Cursor::new(bytes.clone())).is_ok());
 
-    assert!(Package::open_with_limits(file.path(), exact).is_ok());
-    assert!(Package::from_bytes_with_limits(bytes.clone(), exact).is_ok());
-    assert!(Package::from_slice_with_limits(&bytes, exact).is_ok());
-    assert!(Package::from_reader_with_limits(Cursor::new(bytes.clone()), exact).is_ok());
-    assert!(Workbook::open_with_limits(file.path(), exact).is_ok());
-    assert!(Workbook::from_bytes_with_limits(bytes.clone(), exact).is_ok());
-    assert!(Workbook::from_slice_with_limits(&bytes, exact).is_ok());
-    assert!(Workbook::from_reader_with_limits(Cursor::new(bytes.clone()), exact).is_ok());
+    assert!(
+        Package::open_with_options(file.path(), crate::OpenOptions::new().source_limits(exact))
+            .is_ok()
+    );
+    assert!(
+        Package::from_bytes_with_options(&bytes, crate::OpenOptions::new().source_limits(exact))
+            .is_ok()
+    );
+    assert!(
+        Package::from_bytes_with_options(&bytes, crate::OpenOptions::new().source_limits(exact))
+            .is_ok()
+    );
+    assert!(
+        Package::from_reader_with_options(
+            Cursor::new(bytes.clone()),
+            crate::OpenOptions::new().source_limits(exact)
+        )
+        .is_ok()
+    );
+    assert!(
+        Package::open_with_options(file.path(), crate::OpenOptions::new().source_limits(exact))
+            .is_ok()
+    );
+    assert!(
+        Package::from_bytes_with_options(&bytes, crate::OpenOptions::new().source_limits(exact))
+            .is_ok()
+    );
+    assert!(
+        Package::from_bytes_with_options(&bytes, crate::OpenOptions::new().source_limits(exact))
+            .is_ok()
+    );
+    assert!(
+        Package::from_reader_with_options(
+            Cursor::new(bytes.clone()),
+            crate::OpenOptions::new().source_limits(exact)
+        )
+        .is_ok()
+    );
 
-    assert!(Package::open_with_limits(file.path(), over).is_err());
-    assert!(Package::from_bytes_with_limits(bytes.clone(), over).is_err());
-    assert!(Package::from_slice_with_limits(&bytes, over).is_err());
-    assert!(Package::from_reader_with_limits(Cursor::new(bytes.clone()), over).is_err());
-    assert!(Workbook::open_with_limits(file.path(), over).is_err());
-    assert!(Workbook::from_bytes_with_limits(bytes.clone(), over).is_err());
-    assert!(Workbook::from_slice_with_limits(&bytes, over).is_err());
-    assert!(Workbook::from_reader_with_limits(Cursor::new(bytes), over).is_err());
+    assert!(
+        Package::open_with_options(file.path(), crate::OpenOptions::new().source_limits(over))
+            .is_err()
+    );
+    assert!(
+        Package::from_bytes_with_options(&bytes, crate::OpenOptions::new().source_limits(over))
+            .is_err()
+    );
+    assert!(
+        Package::from_bytes_with_options(&bytes, crate::OpenOptions::new().source_limits(over))
+            .is_err()
+    );
+    assert!(
+        Package::from_reader_with_options(
+            Cursor::new(bytes.clone()),
+            crate::OpenOptions::new().source_limits(over)
+        )
+        .is_err()
+    );
+    assert!(
+        Package::open_with_options(file.path(), crate::OpenOptions::new().source_limits(over))
+            .is_err()
+    );
+    assert!(
+        Package::from_bytes_with_options(&bytes, crate::OpenOptions::new().source_limits(over))
+            .is_err()
+    );
+    assert!(
+        Package::from_bytes_with_options(&bytes, crate::OpenOptions::new().source_limits(over))
+            .is_err()
+    );
+    assert!(
+        Package::from_reader_with_options(
+            Cursor::new(bytes),
+            crate::OpenOptions::new().source_limits(over)
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn derived_owned_edit_keeps_the_physical_part_limit() {
+    let baseline = Package::new().expect("minimal workbook");
+    let baseline_bytes = baseline.to_bytes().expect("serialize minimal workbook");
+    let maximum_part = baseline
+        .opc()
+        .try_iter_parts()
+        .map(|part| part.expect("baseline part").blob().len())
+        .max()
+        .expect("baseline parts");
+    let limits = SourceLimits::builder()
+        .max_part_bytes(maximum_part as u64)
+        .expect("part limit")
+        .build()
+        .expect("source limits");
+    let package = Package::from_bytes_with_options(
+        &baseline_bytes,
+        crate::OpenOptions::new().source_limits(limits),
+    )
+    .expect("limited workbook");
+    assert_eq!(package.opc().read_limits(), limits);
+    let before = package.to_bytes().expect("serialize source");
+
+    let mut edit = package.edit().expect("start edit");
+    edit.sheet(0usize)
+        .expect("lookup")
+        .expect("worksheet")
+        .set("A1", "x".repeat(maximum_part))
+        .expect("stage oversized cell");
+    let committed = edit.commit().expect("derived edit remains valid");
+    assert_eq!(committed.package().opc().read_limits(), limits);
+    assert!(
+        Package::from_bytes_with_options(
+            &committed
+                .package()
+                .to_bytes()
+                .expect("serialize derived edit"),
+            crate::OpenOptions::new().source_limits(limits),
+        )
+        .is_err()
+    );
+    assert_eq!(package.to_bytes().expect("source remains readable"), before);
+    assert_eq!(package.opc().read_limits(), limits);
 }
 
 #[test]
@@ -177,7 +522,7 @@ fn clones_share_the_snapshot_and_handles_pin_it() {
     assert_send_sync::<LocalStyle>();
     assert_send_sync::<Extents>();
 
-    let workbook = Workbook::new().expect("valid baseline");
+    let workbook = Package::new().expect("valid baseline");
     let clone = workbook.clone();
     let sheet = workbook.active_sheet().expect("active sheet");
     let style = workbook
@@ -204,9 +549,21 @@ fn web_facades_are_lazy_borrowed_and_snapshot_scoped() {
         AddIn, Conformance, Pane, Panes, Reference, Store as CatalogStore,
     };
 
-    let baseline = Workbook::new().expect("valid baseline");
-    assert!(baseline.task_panes().expect("load absent panes").is_none());
-    assert!(baseline.task_panes().expect("reuse absent panes").is_none());
+    let baseline = Package::new().expect("valid baseline");
+    assert!(
+        baseline
+            .workbook_ref()
+            .task_panes()
+            .expect("load absent panes")
+            .is_none()
+    );
+    assert!(
+        baseline
+            .workbook_ref()
+            .task_panes()
+            .expect("reuse absent panes")
+            .is_none()
+    );
 
     let mut package = baseline.inner.package.clone();
     let reference = Reference::new("wa1", "1.0.0.0", CatalogStore::Omex).expect("valid reference");
@@ -216,16 +573,19 @@ fn web_facades_are_lazy_borrowed_and_snapshot_scoped() {
             AddIn::new("add-in-1", reference).expect("valid add-in"),
         ))
         .expect("valid pane");
-    litchi_ooxml_common::web::put(&mut package, panes, Conformance::Transitional)
-        .expect("install task panes");
+    let mut edit = litchi_ooxml_common::web::Edit::new(&package).expect("task-pane edit");
+    edit.put(panes, Conformance::Transitional)
+        .expect("stage task panes");
+    package = edit.commit().expect("install task panes").into_package();
 
-    let with_panes = Workbook::from_package(package).expect("reopen task-pane workbook");
+    let with_panes = Package::from_opc(package).expect("reopen task-pane workbook");
     std::thread::scope(|scope| {
         let reads = (0..8)
             .map(|_| {
                 let workbook = with_panes.clone();
                 scope.spawn(move || {
                     workbook
+                        .workbook_ref()
                         .task_panes()
                         .expect("load task panes concurrently")
                         .expect("task panes present")
@@ -238,10 +598,12 @@ fn web_facades_are_lazy_borrowed_and_snapshot_scoped() {
         }
     });
     let first = with_panes
+        .workbook_ref()
         .task_panes()
         .expect("load task panes")
         .expect("task panes present");
     let second = with_panes
+        .workbook_ref()
         .task_panes()
         .expect("reuse task panes")
         .expect("task panes present");
@@ -258,7 +620,7 @@ fn web_facades_are_lazy_borrowed_and_snapshot_scoped() {
             include_bytes!("../../../../test-data/ooxml/web_extensions/worksheet_bindings.xml")
                 .to_vec(),
         );
-    let with_bindings = Workbook::from_package(package).expect("reopen binding workbook");
+    let with_bindings = Package::from_opc(package).expect("reopen binding workbook");
     let sheet = with_bindings
         .sheet("Sheet1")
         .expect("lookup")
@@ -306,7 +668,7 @@ fn flavor_is_content_derived() {
     )));
     package.relate_to("custom/main.xml", rt::OFFICE_DOCUMENT);
 
-    let workbook = Workbook::from_package(package).expect("valid template");
+    let workbook = Package::from_opc(package).expect("valid template");
     let sheet = workbook.sheet("Data").expect("lookup").expect("present");
     assert_eq!(workbook.flavor(), Flavor::Template);
     assert!(workbook.flavor().is_template());
@@ -329,7 +691,7 @@ fn duplicate_names_and_dangling_relationships_are_typed_errors() {
         )));
     }
     assert!(matches!(
-        Workbook::from_package(package),
+        Package::from_opc(package),
         Err(Error::SheetNameConflict {
             first: 0,
             second: 1,
@@ -339,7 +701,7 @@ fn duplicate_names_and_dangling_relationships_are_typed_errors() {
 
     let dangling_xml = br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Missing" sheetId="1" r:id="absent"/></sheets></workbook>"#;
     assert!(matches!(
-        Workbook::from_package(package_with_workbook(dangling_xml)),
+        Package::from_opc(package_with_workbook(dangling_xml)),
         Err(Error::Invalid(_))
     ));
 
@@ -364,14 +726,14 @@ fn duplicate_names_and_dangling_relationships_are_typed_errors() {
         br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData/></worksheet>"#.to_vec(),
     )));
     assert!(matches!(
-        Workbook::from_package(package),
+        Package::from_opc(package),
         Err(Error::Invalid(message)) if message.contains("referenced by both 'One' and 'Two'")
     ));
 }
 
 #[test]
 fn styles_graph_table_and_cell_references_are_checked() {
-    let baseline = Workbook::new().expect("baseline");
+    let baseline = Package::new().expect("baseline");
 
     let mut duplicate = baseline.inner.package.clone();
     duplicate
@@ -386,7 +748,7 @@ fn styles_graph_table_and_cell_references_are_checked() {
         )
         .expect("second styles relationship");
     assert!(matches!(
-        Workbook::from_package(duplicate),
+        Package::from_opc(duplicate),
         Err(Error::Invalid(message)) if message.contains("multiple styles relationships")
     ));
 
@@ -404,7 +766,7 @@ fn styles_graph_table_and_cell_references_are_checked() {
     )
     .expect("external styles relationship");
     assert!(matches!(
-        Workbook::from_package(external),
+        Package::from_opc(external),
         Err(Error::Invalid(message)) if message.contains("cannot be external")
     ));
 
@@ -416,7 +778,7 @@ fn styles_graph_table_and_cell_references_are_checked() {
         .set_content_type("application/xml".into())
         .expect("replace content type");
     assert!(matches!(
-        Workbook::from_package(wrong_type),
+        Package::from_opc(wrong_type),
         Err(Error::Invalid(message)) if message.contains("styles part has content type")
     ));
 
@@ -427,7 +789,7 @@ fn styles_graph_table_and_cell_references_are_checked() {
         .set_blob(
             br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cellXfs count="2"><xf/></cellXfs></styleSheet>"#.to_vec(),
         );
-    let malformed = Workbook::from_package(malformed).expect("graph remains lazy");
+    let malformed = Package::from_opc(malformed).expect("graph remains lazy");
     assert!(matches!(malformed.styles(), Err(Error::Invalid(_))));
 
     let mut dangling = baseline.inner.package.clone();
@@ -439,7 +801,7 @@ fn styles_graph_table_and_cell_references_are_checked() {
         );
     // Audit finding 4.2: a stale style index no longer kills the sheet. It
     // reads with the default format (cellXfs 0) and the repair is recorded.
-    let dangling = Workbook::from_package(dangling).expect("lazy worksheet");
+    let dangling = Package::from_opc(dangling).expect("lazy worksheet");
     let sheet = dangling.sheet(0usize).expect("lookup").expect("sheet");
     sheet.cell("A1").expect("stale cell style is repaired");
     assert_eq!(sheet.store().expect("store").entries()[0].style, Some(0));
@@ -456,7 +818,7 @@ fn styles_graph_table_and_cell_references_are_checked() {
         .set_blob(
             br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="2" max="2" style="1"/></cols><sheetData/></worksheet>"#.to_vec(),
         );
-    let dangling_column = Workbook::from_package(dangling_column).expect("lazy column style");
+    let dangling_column = Package::from_opc(dangling_column).expect("lazy column style");
     let sheet = dangling_column
         .sheet(0usize)
         .expect("lookup")
@@ -485,7 +847,7 @@ fn styles_graph_table_and_cell_references_are_checked() {
         .set_blob(
             br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="2" s="1" customFormat="1"/></sheetData></worksheet>"#.to_vec(),
         );
-    let dangling_row = Workbook::from_package(dangling_row).expect("lazy row style");
+    let dangling_row = Package::from_opc(dangling_row).expect("lazy row style");
     let sheet = dangling_row.sheet(0usize).expect("lookup").expect("sheet");
     sheet.row(1).expect("stale row style is repaired");
     assert_eq!(
@@ -501,7 +863,7 @@ fn styles_graph_table_and_cell_references_are_checked() {
     );
 }
 
-fn assert_style_repair(workbook: &Workbook, sheet: &Worksheet, location: crate::ToleranceLocation) {
+fn assert_style_repair(workbook: &Package, sheet: &Worksheet, location: crate::ToleranceLocation) {
     let defect = crate::Defect::Cell(crate::CellDefect::StyleIndexOutOfRange);
     let report = sheet.tolerance_report().expect("sheet report");
     assert_eq!(report.total(), 1);
@@ -516,7 +878,7 @@ fn assert_style_repair(workbook: &Workbook, sheet: &Worksheet, location: crate::
 
 #[test]
 fn concurrent_snapshot_reads_need_no_public_locking() {
-    let workbook = Workbook::new().expect("valid baseline");
+    let workbook = Package::new().expect("valid baseline");
     std::thread::scope(|scope| {
         for _ in 0..8 {
             let workbook = workbook.clone();
@@ -532,7 +894,7 @@ fn concurrent_snapshot_reads_need_no_public_locking() {
 
 #[test]
 fn cell_facade_is_sparse_exact_and_non_mutating() {
-    let workbook = Workbook::from_package(package_with_cells()).expect("valid workbook");
+    let workbook = Package::from_opc(package_with_cells()).expect("valid workbook");
     let bytes_before = workbook.to_bytes().expect("serialize before lazy read");
     let sheet = workbook.sheet("data").expect("lookup").expect("present");
 
@@ -602,7 +964,7 @@ fn cell_facade_is_sparse_exact_and_non_mutating() {
 
 #[test]
 fn concurrent_first_cell_read_publishes_one_safe_snapshot() {
-    let workbook = Workbook::from_package(package_with_cells()).expect("valid workbook");
+    let workbook = Package::from_opc(package_with_cells()).expect("valid workbook");
     let barrier = Arc::new(std::sync::Barrier::new(8));
     std::thread::scope(|scope| {
         for _ in 0..8 {
@@ -647,7 +1009,7 @@ fn worksheet_operations_reject_other_sheet_kinds_without_parsing_them() {
     )));
     package.relate_to("xl/workbook.xml", rt::OFFICE_DOCUMENT);
 
-    let workbook = Workbook::from_package(package).expect("valid chart graph");
+    let workbook = Package::from_opc(package).expect("valid chart graph");
     let chart = workbook.sheet("Chart").expect("lookup").expect("present");
     assert!(matches!(
         chart.cell((0, 0)),
@@ -674,7 +1036,7 @@ fn poi_and_libreoffice_shared_formula_oracles_match() {
         if !path.exists() {
             continue;
         }
-        let workbook = Workbook::open(path).expect("corpus workbook");
+        let workbook = Package::open(path).expect("corpus workbook");
         let sheet = workbook.sheet(0usize).expect("lookup").expect("present");
         let Some(Cell::Formula(formula)) = sheet.cell(address).expect("formula lookup").stored()
         else {
@@ -757,7 +1119,7 @@ fn package_with_cells() -> OpcPackage {
 fn validated_worksheet_store_adoption_requires_exact_bytes_and_lineage() {
     use super::model::ValidatedWorksheetStore;
 
-    let source = Workbook::new().expect("source workbook");
+    let source = Package::new().expect("source workbook");
     let uri = source.inner.sheets[0].part_uri.clone();
 
     let same_lineage =
@@ -787,7 +1149,7 @@ fn validated_worksheet_store_adoption_requires_exact_bytes_and_lineage() {
     assert!(same_lineage.inner.sheets[0].cells.get().is_none());
 
     let distinct_lineage =
-        Workbook::from_package(source.inner.package.clone()).expect("distinct-lineage target");
+        Package::from_opc(source.inner.package.clone()).expect("distinct-lineage target");
     let exact_content = distinct_lineage
         .inner
         .package
@@ -814,7 +1176,7 @@ fn validated_worksheet_store_adoption_requires_exact_bytes_and_lineage() {
 /// control reports clean; malformed worksheet XML is still fatal.
 #[test]
 fn dangling_shared_string_reference_opens_with_a_recorded_repair() {
-    let baseline = Workbook::new().expect("valid baseline");
+    let baseline = Package::new().expect("valid baseline");
     let sheet_uri = PackURI::new("/xl/worksheets/sheet1.xml").expect("sheet URI");
     let with_sheet = |xml: &[u8]| {
         let mut package = baseline.inner.package.clone();
@@ -822,7 +1184,7 @@ fn dangling_shared_string_reference_opens_with_a_recorded_repair() {
             .get_part_mut(&sheet_uri)
             .expect("sheet part")
             .set_blob(xml.to_vec());
-        Workbook::from_package(package).expect("lazy worksheet")
+        Package::from_opc(package).expect("lazy worksheet")
     };
 
     let dangling = with_sheet(

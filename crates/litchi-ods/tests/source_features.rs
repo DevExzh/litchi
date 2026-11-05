@@ -1,18 +1,23 @@
 use litchi_ods::{
-    Builder, Spreadsheet,
+    Builder, Package, Workbook,
+    builder::Workbook as Draft,
     dde::{AutomaticUpdate, ConversionMode},
     scenario::OptionalSetting,
 };
 
 const CONTENT: &str = r##"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.4"><office:body><office:spreadsheet><table:table table:name="Base"><office:dde-source office:dde-application="soffice" office:dde-topic="file:///never-contacted.ods" office:dde-item="Sheet1.A1:B2" office:name="Reference" office:conversion-mode="keep-text" office:automatic-update="true"/><table:table-row><table:table-cell office:value-type="string"><text:p>Pre <text:span text:style-name="Bold">styled <text:a xlink:href="https://never-fetched.invalid/" xlink:type="simple">link</text:a></text:span> tail</text:p></table:table-cell></table:table-row></table:table><table:table table:name="Scenario"><table:scenario table:scenario-ranges="$Scenario.$A$1:.$B$2 'Q1 Sales'.$C$3:.$D$4" table:is-active="true" table:display-border="false" table:border-color="#12AbEF" table:copy-back="true" table:copy-styles="false" table:copy-formulas="true" table:comment="Best &amp; worst" table:protected="false"/><table:table-row/></table:table><table:dde-links><table:dde-link><office:dde-source office:dde-application="calc" office:dde-topic="file:///never-opened.ods" office:dde-item="Prices.A1"/><table:table><table:table-row><table:table-cell office:value-type="float" office:value="42"/></table:table-row></table:table></table:dde-link></table:dde-links></office:spreadsheet></office:body></office:document-content>"##;
 
-fn spreadsheet() -> Spreadsheet {
-    Spreadsheet::from_bytes(
-        Builder::new()
+fn spreadsheet() -> Workbook {
+    Package::from_bytes(
+        &Builder::new()
             .content_xml(CONTENT)
             .build()
+            .expect("test fixture or operation should succeed")
+            .to_bytes()
             .expect("test fixture or operation should succeed"),
     )
+    .expect("test fixture or operation should succeed")
+    .workbook()
     .expect("test fixture or operation should succeed")
 }
 
@@ -85,13 +90,15 @@ fn detached_metadata_values_reject_invalid_states() {
 
 #[test]
 fn no_op_package_round_trip_preserves_compact_rich_text_xml_exactly() {
-    let spreadsheet = spreadsheet();
-    assert_eq!(spreadsheet.content_xml(), CONTENT);
+    let spreadsheet = Draft::from_workbook(spreadsheet());
+    assert_eq!(spreadsheet.workbook().content_xml(), CONTENT);
     assert_eq!(
         spreadsheet.sheets()[0].rows[0].cells[0].text,
         "Pre styled link tail"
     );
-    let reopened = Spreadsheet::from_bytes(spreadsheet.into_bytes())
+    let reopened = Package::from_bytes(spreadsheet.build().expect("the draft builds").as_bytes())
+        .expect("test fixture or operation should succeed")
+        .workbook()
         .expect("test fixture or operation should succeed");
     assert_eq!(reopened.content_xml(), CONTENT);
     assert!(!reopened.content_xml().contains("\n  "));
@@ -100,22 +107,30 @@ fn no_op_package_round_trip_preserves_compact_rich_text_xml_exactly() {
 #[test]
 fn bounded_owners_reject_malformed_or_oversized_metadata() {
     let malformed = CONTENT.replace("office:dde-item=\"Sheet1.A1:B2\" ", "");
-    let spreadsheet = Spreadsheet::from_bytes(
-        Builder::new()
+    let spreadsheet = Package::from_bytes(
+        &Builder::new()
             .content_xml(malformed)
             .build()
+            .expect("test fixture or operation should succeed")
+            .to_bytes()
             .expect("test fixture or operation should succeed"),
     )
+    .expect("test fixture or operation should succeed")
+    .workbook()
     .expect("test fixture or operation should succeed");
     assert!(spreadsheet.dde().is_err());
 
     let malformed = CONTENT.replace(" table:is-active=\"true\"", "");
-    let spreadsheet = Spreadsheet::from_bytes(
-        Builder::new()
+    let spreadsheet = Package::from_bytes(
+        &Builder::new()
             .content_xml(malformed)
             .build()
+            .expect("test fixture or operation should succeed")
+            .to_bytes()
             .expect("test fixture or operation should succeed"),
     )
+    .expect("test fixture or operation should succeed")
+    .workbook()
     .expect("test fixture or operation should succeed");
     assert!(spreadsheet.scenarios().is_err());
 

@@ -3,13 +3,13 @@
 use super::super::{
     ASCII_CONTROL_LIMIT, DrawingStoryTextMode, EndnoteRestart, Field, FieldOwner, FieldType,
     FootnoteRestart, HeaderFooter, HeaderFooterType, Note, NoteNumberingStyle, PageBorders,
-    PageOrientation, Revision, RevisionType, RtfWriter, Section, SectionBreakType,
-    SectionFootnotePlacement, SectionLineNumberRestart, SectionNoteOptions, SectionRendering,
-    Shape, ShapeGroup, StoryDrawing, StoryEvent, TextDirection, VerticalAlignment, Write, field,
+    PageOrientation, Revision, RevisionType, Section, SectionBreakType, SectionFootnotePlacement,
+    SectionLineNumberRestart, SectionNoteOptions, SectionRendering, Shape, ShapeGroup,
+    StoryDrawing, StoryEvent, TextDirection, VerticalAlignment, Write, Writer, field,
     invalid_story_reference, io,
 };
 
-impl<W: Write> RtfWriter<W> {
+impl<W: Write> Writer<W> {
     /// Write a control word
     ///
     /// # Errors
@@ -72,11 +72,14 @@ impl<W: Write> RtfWriter<W> {
                 c if c.is_ascii() => continue,
                 c => {
                     self.write_text_span(text, plain_start, offset)?;
-                    // Write Unicode character
-                    let code = c as i32;
-                    self.write_control_word("u", Some(code))?;
-                    // Fallback character
-                    self.write_str("?")?;
+                    // RTF stores signed UTF-16 units, including a surrogate
+                    // pair for astral scalars. Each unit has its own fallback.
+                    let mut units = [0u16; 2];
+                    for unit in c.encode_utf16(&mut units) {
+                        let signed = i16::from_ne_bytes(unit.to_ne_bytes());
+                        self.write_control_word("u", Some(i32::from(signed)))?;
+                        self.write_str("?")?;
+                    }
                     plain_start = offset + ch.len_utf8();
                     continue;
                 },
@@ -302,11 +305,11 @@ impl<W: Write> RtfWriter<W> {
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
         self.write_str("{")?;
 
-        // Write note type control word
-        if note.is_footnote {
-            self.write_control_word("footnote", None)?;
-        } else {
-            self.write_control_word("endnote", None)?;
+        // Write note type control word; RTF marks an endnote as a
+        // `\footnote` destination carrying `\ftnalt`.
+        self.write_control_word("footnote", None)?;
+        if !note.is_footnote {
+            self.write_control_word("ftnalt", None)?;
         }
 
         // Write reference number/marker

@@ -5,6 +5,7 @@ pub mod fill;
 pub mod geometry;
 pub mod image;
 pub mod line;
+pub mod native;
 pub mod path;
 pub mod shadow;
 pub mod stroke;

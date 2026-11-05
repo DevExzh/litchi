@@ -1,0 +1,22 @@
+[
+  {
+    "leaf_us": 768.87045,
+    "scenario": "text_set",
+    "unified_us": 1915.8363000000002
+  },
+  {
+    "leaf_us": 1118.4492,
+    "scenario": "add_paragraph",
+    "unified_us": 2364.4416
+  },
+  {
+    "leaf_us": null,
+    "scenario": "run_bold",
+    "unified_us": 1535.48835
+  },
+  {
+    "leaf_us": null,
+    "scenario": "find",
+    "unified_us": 5352.6869
+  }
+]

@@ -1,0 +1,316 @@
+{
+ "sb": [
+  {
+   "scenario": "ods/cells1",
+   "before_us": 349265.1,
+   "after_us": 345592.6,
+   "ratio": 0.989,
+   "before_runs": [
+    347076.57800000004,
+    351453.56799999997
+   ],
+   "after_runs": [
+    346064.815,
+    345120.455
+   ],
+   "before_peak_heap_bytes": 173260855,
+   "after_peak_heap_bytes": 173261551,
+   "peak_heap_ratio": 1.0,
+   "outputs_identical_siphash": true
+  },
+  {
+   "scenario": "ods/cells100",
+   "before_us": 1447716.8,
+   "after_us": 1472592.8,
+   "ratio": 1.017,
+   "before_runs": [
+    1472611.43,
+    1422822.257
+   ],
+   "after_runs": [
+    1479745.831,
+    1465439.729
+   ],
+   "before_peak_heap_bytes": 177662058,
+   "after_peak_heap_bytes": 177662754,
+   "peak_heap_ratio": 1.0,
+   "outputs_identical_siphash": true
+  },
+  {
+   "scenario": "ods/dde",
+   "before_us": 240769.4,
+   "after_us": 248514.2,
+   "ratio": 1.032,
+   "before_runs": [
+    241232.77500000002,
+    240305.935
+   ],
+   "after_runs": [
+    248035.93099999998,
+    248992.459
+   ],
+   "before_peak_heap_bytes": 78645881,
+   "after_peak_heap_bytes": 78645830,
+   "peak_heap_ratio": 1.0,
+   "outputs_identical_siphash": true
+  },
+  {
+   "scenario": "ods/sheet_metadata",
+   "before_us": 405341.0,
+   "after_us": 407771.5,
+   "ratio": 1.006,
+   "before_runs": [
+    404423.783,
+    406258.214
+   ],
+   "after_runs": [
+    406796.482,
+    408746.58200000005
+   ],
+   "before_peak_heap_bytes": 277738418,
+   "after_peak_heap_bytes": 250324515,
+   "peak_heap_ratio": 0.901,
+   "outputs_identical_siphash": true
+  },
+  {
+   "scenario": "odp/tail_append",
+   "before_us": 13114.0,
+   "after_us": 13305.2,
+   "ratio": 1.015,
+   "before_runs": [
+    13131.943,
+    13096.092
+   ],
+   "after_runs": [
+    13296.182999999999,
+    13314.163
+   ],
+   "before_peak_heap_bytes": 5513403,
+   "after_peak_heap_bytes": 6107267,
+   "peak_heap_ratio": 1.108,
+   "outputs_identical_siphash": true
+  }
+ ],
+ "w6": [
+  {
+   "scenario": "odt/open_get",
+   "before_us": 140.2,
+   "after_us": 139.9,
+   "ratio": 0.998,
+   "before_runs": [
+    139.7066,
+    140.61880000000002
+   ],
+   "after_runs": [
+    140.0206,
+    139.72279999999998
+   ]
+  },
+  {
+   "scenario": "odt/set",
+   "before_us": 412.8,
+   "after_us": 441.6,
+   "ratio": 1.07,
+   "before_runs": [
+    412.5464,
+    413.0382000000001
+   ],
+   "after_runs": [
+    442.9103999999999,
+    440.3384
+   ]
+  },
+  {
+   "scenario": "odt/batch1k",
+   "before_us": 1801.9,
+   "after_us": 1844.2,
+   "ratio": 1.023,
+   "before_runs": [
+    1801.81,
+    1802.01
+   ],
+   "after_runs": [
+    1843.71,
+    1844.75
+   ]
+  },
+  {
+   "scenario": "ods/open_get",
+   "before_us": 1282.2,
+   "after_us": 1245.1,
+   "ratio": 0.971,
+   "before_runs": [
+    1283.3652,
+    1281.123
+   ],
+   "after_runs": [
+    1253.991,
+    1236.1245999999999
+   ]
+  },
+  {
+   "scenario": "ods/set",
+   "before_us": 11.5,
+   "after_us": 11.7,
+   "ratio": 1.018,
+   "before_runs": [
+    11.492,
+    11.432199999999998
+   ],
+   "after_runs": [
+    11.738000000000001,
+    11.592
+   ]
+  },
+  {
+   "scenario": "ods/batch1k",
+   "before_us": 5146.2,
+   "after_us": 5122.4,
+   "ratio": 0.995,
+   "before_runs": [
+    5141.3589999999995,
+    5151.048
+   ],
+   "after_runs": [
+    5121.568,
+    5123.298
+   ]
+  },
+  {
+   "scenario": "odp/open_get",
+   "before_us": 121.3,
+   "after_us": 121.1,
+   "ratio": 0.999,
+   "before_runs": [
+    120.36659999999999,
+    122.14260000000002
+   ],
+   "after_runs": [
+    120.62460000000002,
+    121.6606
+   ]
+  },
+  {
+   "scenario": "odp/set",
+   "before_us": 426.6,
+   "after_us": 433.3,
+   "ratio": 1.016,
+   "before_runs": [
+    424.3464,
+    428.91819999999996
+   ],
+   "after_runs": [
+    431.92839999999995,
+    434.6884
+   ]
+  },
+  {
+   "scenario": "odg/open_get",
+   "before_us": 2312.0,
+   "after_us": 2276.7,
+   "ratio": 0.985,
+   "before_runs": [
+    2306.22095,
+    2317.83415
+   ],
+   "after_runs": [
+    2254.8113500000004,
+    2298.5055500000003
+   ]
+  },
+  {
+   "scenario": "odg/set",
+   "before_us": 10156.6,
+   "after_us": 10019.5,
+   "ratio": 0.987,
+   "before_runs": [
+    10164.2991,
+    10148.9003
+   ],
+   "after_runs": [
+    10045.178100000001,
+    9993.8105
+   ]
+  },
+  {
+   "scenario": "odc/open_get",
+   "before_us": 78.3,
+   "after_us": 78.1,
+   "ratio": 0.997,
+   "before_runs": [
+    76.93164,
+    79.64084
+   ],
+   "after_runs": [
+    78.41962,
+    77.74962
+   ]
+  },
+  {
+   "scenario": "odc/set",
+   "before_us": 206.9,
+   "after_us": 204.9,
+   "ratio": 0.99,
+   "before_runs": [
+    205.88365,
+    207.9181
+   ],
+   "after_runs": [
+    205.75560000000002,
+    203.96910000000003
+   ]
+  },
+  {
+   "scenario": "fodt/open_get",
+   "before_us": 379.7,
+   "after_us": 413.9,
+   "ratio": 1.09,
+   "before_runs": [
+    379.966,
+    379.43199999999996
+   ],
+   "after_runs": [
+    415.7742,
+    412.0022
+   ]
+  },
+  {
+   "scenario": "fods/open_get",
+   "before_us": 2207.0,
+   "after_us": 2188.2,
+   "ratio": 0.992,
+   "before_runs": [
+    2191.926,
+    2221.9742
+   ],
+   "after_runs": [
+    2196.2936,
+    2180.156
+   ]
+  }
+ ],
+ "sb_outputs_sha256_identical": {
+  "odp_tail_append": true,
+  "ods_cells1": true,
+  "ods_cells100": true,
+  "ods_dde": true,
+  "ods_sheet_metadata": true
+ },
+ "sb_outputs_sha256": {
+  "odp_tail_append": [
+   "0a3d3c1bb44deccf5c426218e5e7b59b9ea57c800cb8a2d1cab074e66cf372fa"
+  ],
+  "ods_cells1": [
+   "98d8be62ebd6e3680da4e6fcd01931ba8dab2b362d24b7ef7c7c6d09afef0d26"
+  ],
+  "ods_cells100": [
+   "9ca490cd1ea2d1deecd354ff26320cffbce05c0f776d139048bc99d0e83aa3dc"
+  ],
+  "ods_dde": [
+   "676b83c808842b2618ae7be4e5d3cd196961a2565a229d1518267141d22516b2"
+  ],
+  "ods_sheet_metadata": [
+   "09180c36b939ac4fb28df86ab6f3bd44feaeee3d936dc48065696936a2d095ff"
+  ]
+ }
+}

@@ -1,7 +1,7 @@
 //! Immutable source-preserving link snapshots.
 
-use super::{Link, Patch, Revision, Transaction, validation};
-use litchi_cfb::OleError;
+use super::{Edit, Limits, Link, Patch, Revision, validation};
+use crate::Error;
 use std::sync::Arc;
 
 /// An immutable, cheaply clonable snapshot of one OLEDS `\x01Ole` stream.
@@ -13,6 +13,7 @@ use std::sync::Arc;
 pub struct Snapshot {
     pub(crate) link: Link,
     pub(crate) revision: Revision,
+    pub(crate) limits: Limits,
 }
 
 impl Snapshot {
@@ -22,8 +23,8 @@ impl Snapshot {
     ///
     /// Returns an error when the stream is malformed or exceeds the OLEDS
     /// metadata limit.
-    pub fn parse(bytes: &[u8]) -> Result<Self, OleError> {
-        Self::parse_shared(Arc::<[u8]>::from(bytes))
+    pub fn parse(bytes: &[u8], limits: Limits) -> Result<Self, Error> {
+        Self::parse_shared(Arc::<[u8]>::from(bytes), limits)
     }
 
     /// Parses an already shared OLEDS link stream without copying its bytes.
@@ -32,9 +33,10 @@ impl Snapshot {
     ///
     /// Returns an error when the stream is malformed or exceeds the OLEDS
     /// metadata limit.
-    pub fn parse_shared(bytes: Arc<[u8]>) -> Result<Self, OleError> {
-        let link = Link::parse_shared(bytes)?;
-        Self::from_link(link)
+    pub fn parse_shared(bytes: Arc<[u8]>, limits: Limits) -> Result<Self, Error> {
+        let limits = limits.validate()?;
+        let link = Link::parse_shared(bytes, limits)?;
+        Self::from_link(link, limits)
     }
 
     /// Captures an existing parsed link as a source-preserving snapshot.
@@ -43,10 +45,22 @@ impl Snapshot {
     ///
     /// Returns an error when the parsed link has inconsistent field offsets or
     /// otherwise violates the OLEDS layout invariants.
-    pub fn from_link(link: Link) -> Result<Self, OleError> {
+    pub fn from_link(link: Link, limits: Limits) -> Result<Self, Error> {
+        let limits = limits.validate()?;
         validation::validate(&link)?;
+        if link.bytes().len() > limits.max_bytes {
+            return Err(Error::Limit {
+                kind: crate::LimitKind::StreamBytes,
+                observed: link.bytes().len() as u64,
+                maximum: limits.max_bytes as u64,
+            });
+        }
         let revision = Revision::of(link.bytes());
-        Ok(Self { link, revision })
+        Ok(Self {
+            link,
+            revision,
+            limits,
+        })
     }
 
     /// Borrows the complete typed link projection.
@@ -79,10 +93,16 @@ impl Snapshot {
         self.revision.value()
     }
 
+    /// Limits retained for subsequent edits and replay.
+    #[must_use]
+    pub const fn limits(&self) -> Limits {
+        self.limits
+    }
+
     /// Starts an isolated typed edit based on this snapshot.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction::new(self.clone())
+    pub fn edit(&self) -> Edit {
+        Edit::new(self.clone())
     }
 
     pub(crate) fn patch_to(&self, after: &Snapshot) -> Patch {

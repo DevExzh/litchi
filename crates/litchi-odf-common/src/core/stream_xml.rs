@@ -39,17 +39,32 @@ const UTF8_BOM_LEN: usize = 3;
 // ceilings already used by the common generated-XML and validation paths.
 // Callers may narrow them with `XmlStreamLimits::new`, but an execution
 // context must never be asked to admit an unbounded parser plan.
-const MAX_BYTES_CEILING: u64 = 256 * 1024 * 1024;
+const MAX_BYTES_CEILING: u64 = 512 * 1024 * 1024;
 const MAX_DEPTH_CEILING: usize = 4_096;
 const MAX_EVENTS_CEILING: usize = 4_000_000;
 const MAX_ATTRIBUTES_CEILING: usize = 1_000_000;
-const MAX_TOKEN_BYTES_CEILING: usize = 64 * 1024 * 1024;
+// The package-owner envelope admits 256 MiB XML members.  Keep that as the
+// checked upper bound for an explicitly selected owner profile; the direct
+// raw-scanner default below remains the much smaller 64 KiB window.
+const MAX_TOKEN_BYTES_CEILING: usize = 256 * 1024 * 1024;
+const MAX_NAMESPACE_SCOPE_DEPTH_CEILING: usize = 4_096;
+const MAX_NAMESPACE_DECLARATIONS_CEILING: usize = 256;
+const MAX_NAMESPACE_BINDINGS_CEILING: usize = 256 * 1_024;
+const MAX_NAMESPACE_BYTES_CEILING: usize = 16 * 1024 * 1024;
+const MAX_NAMESPACE_PREFIX_BYTES_CEILING: usize = 64 * 1024;
+const MAX_NAMESPACE_URI_BYTES_CEILING: usize = 64 * 1024;
 
 const DEFAULT_MAX_BYTES: u64 = 256 * 1024 * 1024;
 const DEFAULT_MAX_DEPTH: usize = 256;
 const DEFAULT_MAX_EVENTS: usize = 4_000_000;
 const DEFAULT_MAX_ATTRIBUTES: usize = 1_000_000;
 const DEFAULT_MAX_TOKEN_BYTES: usize = 64 * 1024;
+const DEFAULT_MAX_NAMESPACE_SCOPE_DEPTH: usize = 1_024;
+const DEFAULT_MAX_NAMESPACE_DECLARATIONS: usize = 256;
+const DEFAULT_MAX_NAMESPACE_BINDINGS: usize = 256 * 1_024;
+const DEFAULT_MAX_NAMESPACE_BYTES: usize = 16 * 1024 * 1024;
+const DEFAULT_MAX_NAMESPACE_PREFIX_BYTES: usize = 64 * 1024;
+const DEFAULT_MAX_NAMESPACE_URI_BYTES: usize = 64 * 1024;
 
 const MAX_NAMESPACE_DECLARATIONS_PER_ELEMENT: u64 = 256;
 const XMLNS_NAMESPACE_URI: &[u8] = b"http://www.w3.org/2000/xmlns/";
@@ -92,6 +107,12 @@ pub struct XmlStreamLimits {
     max_events: usize,
     max_attributes: usize,
     max_token_bytes: usize,
+    max_namespace_scope_depth: usize,
+    max_namespace_declarations: usize,
+    max_namespace_bindings: usize,
+    max_namespace_bytes: usize,
+    max_namespace_prefix_bytes: usize,
+    max_namespace_uri_bytes: usize,
 }
 
 impl XmlStreamLimits {
@@ -143,7 +164,79 @@ impl XmlStreamLimits {
             max_events,
             max_attributes,
             max_token_bytes,
+            max_namespace_scope_depth: DEFAULT_MAX_NAMESPACE_SCOPE_DEPTH,
+            max_namespace_declarations: DEFAULT_MAX_NAMESPACE_DECLARATIONS,
+            max_namespace_bindings: DEFAULT_MAX_NAMESPACE_BINDINGS,
+            max_namespace_bytes: DEFAULT_MAX_NAMESPACE_BYTES,
+            max_namespace_prefix_bytes: DEFAULT_MAX_NAMESPACE_PREFIX_BYTES,
+            max_namespace_uri_bytes: DEFAULT_MAX_NAMESPACE_URI_BYTES,
         })
+    }
+
+    /// Narrow the namespace resolver envelope used by raw XML readers.
+    ///
+    /// The existing five-dimensional constructor remains useful for the
+    /// bounded streaming scanner.  Raw namespace-aware readers must pass the
+    /// resulting carrier as their required policy; this setter makes every
+    /// namespace dimension explicit without adding a second limits type.
+    pub fn namespace_limits(
+        mut self,
+        max_scope_depth: usize,
+        max_declarations: usize,
+        max_bindings: usize,
+        max_bytes: usize,
+        max_prefix_bytes: usize,
+        max_uri_bytes: usize,
+    ) -> Result<Self> {
+        if max_scope_depth == 0 || max_scope_depth > MAX_NAMESPACE_SCOPE_DEPTH_CEILING {
+            return Err(invalid_limits(
+                "max_namespace_scope_depth",
+                max_scope_depth as u64,
+                MAX_NAMESPACE_SCOPE_DEPTH_CEILING as u64,
+            ));
+        }
+        if max_declarations == 0 || max_declarations > MAX_NAMESPACE_DECLARATIONS_CEILING {
+            return Err(invalid_limits(
+                "max_namespace_declarations",
+                max_declarations as u64,
+                MAX_NAMESPACE_DECLARATIONS_CEILING as u64,
+            ));
+        }
+        if max_bindings == 0 || max_bindings > MAX_NAMESPACE_BINDINGS_CEILING {
+            return Err(invalid_limits(
+                "max_namespace_bindings",
+                max_bindings as u64,
+                MAX_NAMESPACE_BINDINGS_CEILING as u64,
+            ));
+        }
+        if max_bytes == 0 || max_bytes > MAX_NAMESPACE_BYTES_CEILING {
+            return Err(invalid_limits(
+                "max_namespace_bytes",
+                max_bytes as u64,
+                MAX_NAMESPACE_BYTES_CEILING as u64,
+            ));
+        }
+        if max_prefix_bytes == 0 || max_prefix_bytes > MAX_NAMESPACE_PREFIX_BYTES_CEILING {
+            return Err(invalid_limits(
+                "max_namespace_prefix_bytes",
+                max_prefix_bytes as u64,
+                MAX_NAMESPACE_PREFIX_BYTES_CEILING as u64,
+            ));
+        }
+        if max_uri_bytes == 0 || max_uri_bytes > MAX_NAMESPACE_URI_BYTES_CEILING {
+            return Err(invalid_limits(
+                "max_namespace_uri_bytes",
+                max_uri_bytes as u64,
+                MAX_NAMESPACE_URI_BYTES_CEILING as u64,
+            ));
+        }
+        self.max_namespace_scope_depth = max_scope_depth;
+        self.max_namespace_declarations = max_declarations;
+        self.max_namespace_bindings = max_bindings;
+        self.max_namespace_bytes = max_bytes;
+        self.max_namespace_prefix_bytes = max_prefix_bytes;
+        self.max_namespace_uri_bytes = max_uri_bytes;
+        Ok(self)
     }
 
     /// Return the total input-byte ceiling.
@@ -174,6 +267,42 @@ impl XmlStreamLimits {
     #[must_use]
     pub const fn max_token_bytes(self) -> usize {
         self.max_token_bytes
+    }
+
+    /// Return the maximum namespace scope depth retained by a raw reader.
+    #[must_use]
+    pub const fn max_namespace_scope_depth(self) -> usize {
+        self.max_namespace_scope_depth
+    }
+
+    /// Return the maximum namespace declarations accepted on one element.
+    #[must_use]
+    pub const fn max_namespace_declarations(self) -> usize {
+        self.max_namespace_declarations
+    }
+
+    /// Return the maximum active namespace bindings.
+    #[must_use]
+    pub const fn max_namespace_bindings(self) -> usize {
+        self.max_namespace_bindings
+    }
+
+    /// Return the maximum active namespace prefix and URI bytes.
+    #[must_use]
+    pub const fn max_namespace_bytes(self) -> usize {
+        self.max_namespace_bytes
+    }
+
+    /// Return the maximum lexical bytes of one namespace prefix.
+    #[must_use]
+    pub const fn max_namespace_prefix_bytes(self) -> usize {
+        self.max_namespace_prefix_bytes
+    }
+
+    /// Return the maximum normalized bytes of one namespace URI.
+    #[must_use]
+    pub const fn max_namespace_uri_bytes(self) -> usize {
+        self.max_namespace_uri_bytes
     }
 
     /// Return a conservative parser-memory envelope for execution admission.
@@ -281,12 +410,50 @@ impl XmlStreamLimits {
 
 impl Default for XmlStreamLimits {
     fn default() -> Self {
+        Self::default_value()
+    }
+}
+
+impl XmlStreamLimits {
+    /// The checked default raw XML policy used by ordinary ODF ingress.
+    ///
+    /// This is a `const` companion to [`Default::default`] so the shared
+    /// `OpenOptions::new` constructor can remain a constant value constructor.
+    pub const fn default_value() -> Self {
         Self {
             max_bytes: DEFAULT_MAX_BYTES,
             max_depth: DEFAULT_MAX_DEPTH,
             max_events: DEFAULT_MAX_EVENTS,
             max_attributes: DEFAULT_MAX_ATTRIBUTES,
             max_token_bytes: DEFAULT_MAX_TOKEN_BYTES,
+            max_namespace_scope_depth: DEFAULT_MAX_NAMESPACE_SCOPE_DEPTH,
+            max_namespace_declarations: DEFAULT_MAX_NAMESPACE_DECLARATIONS,
+            max_namespace_bindings: DEFAULT_MAX_NAMESPACE_BINDINGS,
+            max_namespace_bytes: DEFAULT_MAX_NAMESPACE_BYTES,
+            max_namespace_prefix_bytes: DEFAULT_MAX_NAMESPACE_PREFIX_BYTES,
+            max_namespace_uri_bytes: DEFAULT_MAX_NAMESPACE_URI_BYTES,
+        }
+    }
+
+    /// The finite policy retained by packaged ODF owners when the caller
+    /// selects [`OpenOptions::new`](crate::OpenOptions).  The raw scanner's
+    /// direct `Default` remains deliberately narrow; owner ingress has
+    /// historically admitted a complete ODF member up to its package
+    /// envelope, including a single large text/comment token.  Callers that
+    /// provide `OpenOptions::xml_limits` bypass this profile exactly.
+    pub const fn owner_default_value() -> Self {
+        Self {
+            max_bytes: DEFAULT_MAX_BYTES,
+            max_depth: MAX_DEPTH_CEILING,
+            max_events: DEFAULT_MAX_EVENTS,
+            max_attributes: DEFAULT_MAX_ATTRIBUTES,
+            max_token_bytes: DEFAULT_MAX_BYTES as usize,
+            max_namespace_scope_depth: MAX_NAMESPACE_SCOPE_DEPTH_CEILING,
+            max_namespace_declarations: DEFAULT_MAX_NAMESPACE_DECLARATIONS,
+            max_namespace_bindings: DEFAULT_MAX_NAMESPACE_BINDINGS,
+            max_namespace_bytes: DEFAULT_MAX_NAMESPACE_BYTES,
+            max_namespace_prefix_bytes: DEFAULT_MAX_NAMESPACE_PREFIX_BYTES,
+            max_namespace_uri_bytes: DEFAULT_MAX_NAMESPACE_URI_BYTES,
         }
     }
 }
@@ -862,6 +1029,15 @@ struct ExpandedAttributeName<'a> {
 
 pub(crate) fn validate_event_bytes(event: &Event<'_>, offset: u64) -> Result<()> {
     let bytes: &[u8] = event;
+    // ASCII tab, line feed, carriage return and 0x20..=0x7F are UTF-8 and
+    // XML 1.0 characters, so such an event (almost every event) passes
+    // without decoding (record 0377a); anything else takes the full check.
+    if bytes
+        .iter()
+        .all(|&byte| (0x20..0x80).contains(&byte) || matches!(byte, b'\t' | b'\n' | b'\r'))
+    {
+        return Ok(());
+    }
     let text = str::from_utf8(bytes)
         .map_err(|error| invalid_xml(offset, format!("XML is not UTF-8: {error}")))?;
     if text.chars().any(|character| !is_xml10_character(character)) {
@@ -1213,7 +1389,7 @@ pub(crate) fn validate_end_element(
     reject_unknown_namespace(&resolved_element.0, offset)
 }
 
-fn validate_qname(bytes: &[u8], offset: u64, kind: &str) -> Result<()> {
+pub(crate) fn validate_qname(bytes: &[u8], offset: u64, kind: &str) -> Result<()> {
     let Some(colon) = bytes.iter().position(|byte| *byte == b':') else {
         return validate_name(bytes, offset, kind);
     };
@@ -1228,6 +1404,18 @@ fn validate_qname(bytes: &[u8], offset: u64, kind: &str) -> Result<()> {
 }
 
 pub(crate) fn validate_name(bytes: &[u8], offset: u64, kind: &str) -> Result<()> {
+    // An ASCII name needs no UTF-8 decoding; its bytes are its characters
+    // (record 0377a). The classification is the same as below.
+    if let Some((&first, rest)) = bytes.split_first()
+        && bytes.is_ascii()
+    {
+        if !is_xml_name_start(char::from(first))
+            || rest.iter().any(|&byte| !is_xml_name_char(char::from(byte)))
+        {
+            return Err(invalid_xml(offset, format!("malformed {kind} name")));
+        }
+        return Ok(());
+    }
     let text = str::from_utf8(bytes)
         .map_err(|error| invalid_xml(offset, format!("{kind} name is not UTF-8: {error}")))?;
     let mut chars = text.chars();
@@ -1240,7 +1428,7 @@ pub(crate) fn validate_name(bytes: &[u8], offset: u64, kind: &str) -> Result<()>
     Ok(())
 }
 
-fn validate_references(bytes: &[u8], offset: u64) -> Result<()> {
+pub(crate) fn validate_references(bytes: &[u8], offset: u64) -> Result<()> {
     let mut remaining = bytes;
     while let Some(index) = memchr::memchr(b'&', remaining) {
         let after_ampersand = &remaining[index + 1..];
@@ -1261,7 +1449,7 @@ fn validate_references(bytes: &[u8], offset: u64) -> Result<()> {
     Ok(())
 }
 
-fn reject_unknown_namespace(result: &ResolveResult<'_>, offset: u64) -> Result<()> {
+pub(crate) fn reject_unknown_namespace(result: &ResolveResult<'_>, offset: u64) -> Result<()> {
     if matches!(result, ResolveResult::Unknown(_)) {
         return Err(invalid_xml(offset, "unknown namespace prefix"));
     }
@@ -1337,7 +1525,7 @@ fn invalid_memory_bound_with_label(label: &str) -> Error {
     ))
 }
 
-fn invalid_xml(offset: u64, message: impl Into<String>) -> Error {
+pub(super) fn invalid_xml(offset: u64, message: impl Into<String>) -> Error {
     Error::InvalidFormat(format!(
         "malformed XML at byte {offset}: {}",
         message.into()

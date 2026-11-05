@@ -29,10 +29,12 @@ pub mod package;
 pub mod views;
 
 pub use crud::*;
-pub use package::{load_slicer_caches, store_slicer_cache};
+pub use package::load_slicer_caches;
+pub(crate) use package::store_slicer_cache;
+pub(crate) use views::store_slicer_part;
 pub use views::{
     Slicer, SlicerExtensionList, SlicerPart, Slicers, load_slicer_parts, parse_slicers,
-    store_slicer_part, write_slicers,
+    write_slicers,
 };
 
 pub const SLICER_CACHE_CONTENT_TYPE: &str = "application/vnd.ms-excel.slicerCache+xml";
@@ -198,7 +200,7 @@ impl BoundedXml {
             return Err(limit(self.resource));
         }
         self.bytes
-            .try_reserve(bytes.len())
+            .try_reserve_exact(bytes.len())
             .map_err(|source| allocation(self.resource, source))?;
         self.bytes.extend_from_slice(bytes);
         Ok(())
@@ -488,9 +490,18 @@ pub fn parse(xml: &[u8]) -> Result<Definition> {
     Ok(value)
 }
 
+pub(crate) fn parse_limited(xml: &[u8], limits: &litchi_opc::SourceLimits) -> Result<Definition> {
+    crate::raw::check_xml_limits(xml, limits)?;
+    parse(xml)
+}
+
 pub fn write(value: &Definition) -> Result<Vec<u8>> {
+    write_limited(value, MAX_PART_BYTES)
+}
+
+pub(crate) fn write_limited(value: &Definition, maximum: usize) -> Result<Vec<u8>> {
     validate(value)?;
-    let mut output = BoundedXml::new(MAX_PART_BYTES, "serialized part bytes");
+    let mut output = BoundedXml::new(maximum.min(MAX_PART_BYTES), "serialized part bytes");
     output.append(b"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>")?;
     output.append(b"<x14:slicerCacheDefinition xmlns:x14=\"")?;
     output.escape(X14)?;

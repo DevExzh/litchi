@@ -1,7 +1,7 @@
 //! `OfficeArt` shape wire traversal and typed decoding.
 
 use crate::prop::{Id, Props};
-use crate::{Container, Error, Limit, Limits, Record, RecordKind, Result};
+use crate::{Container, Error, LimitKind, Limits, Record, RecordKind, Result};
 
 use super::model::{Bounds, Flags, Kind, Shape};
 use super::validation::{
@@ -9,14 +9,26 @@ use super::validation::{
     validate_container_header, validate_container_record, validate_meta,
 };
 
-impl<'data> TryFrom<Record<'data>> for Shape<'data> {
-    type Error = Error;
-
+impl<'data> Shape<'data> {
     /// Builds one typed shape from an `SpContainer` or `SpgrContainer`.
-    fn try_from(record: Record<'data>) -> Result<Self> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the record is not a valid shape container, its
+    /// contents exceed the supplied limits, or the depth limit exceeds the
+    /// implementation's safe maximum.
+    pub fn from_record(record: Record<'data>, limits: Limits) -> Result<Self> {
+        validate_limits(limits)?;
+        if record.len() > limits.max_record_bytes {
+            return Err(Error::LimitExceeded {
+                limit: LimitKind::RecordBytes,
+                observed: u64::from(record.len()),
+                maximum: limits.max_record_bytes,
+            });
+        }
         let kind = record.kind();
         let container = Container::try_new(record)?;
-        let mut budget = Budget::new(Limits::default());
+        let mut budget = Budget::new(limits);
         budget.visit()?;
         match kind {
             RecordKind::SpContainer => {
@@ -83,16 +95,6 @@ impl Bounds {
     }
 }
 
-/// Parses the user-visible shapes in one `OfficeArt` drawing.
-///
-/// # Errors
-///
-/// Returns an error under the same conditions as [`parse_with`] with the
-/// default [`Limits`].
-pub fn parse(data: &[u8]) -> Result<Vec<Shape<'_>>> {
-    parse_with(data, Limits::default())
-}
-
 /// Parses user-visible shapes within explicit depth and record ceilings.
 ///
 /// # Errors
@@ -105,20 +107,13 @@ pub fn parse(data: &[u8]) -> Result<Vec<Shape<'_>>> {
 /// `Error::LimitExceeded` if a depth or record ceiling is reached, or
 /// `Error::MalformedShape` if the root is not a drawing or shape container
 /// or any nested record is structurally invalid.
-pub fn parse_with(data: &[u8], limits: Limits) -> Result<Vec<Shape<'_>>> {
-    const MAX_SAFE_DEPTH: u16 = 64;
-
-    if limits.max_depth > MAX_SAFE_DEPTH {
-        return Err(Error::InvalidLimit {
-            limit: Limit::Depth,
-            maximum: u32::from(MAX_SAFE_DEPTH),
-        });
-    }
+pub fn parse(data: &[u8], limits: Limits) -> Result<Vec<Shape<'_>>> {
+    validate_limits(limits)?;
     if data.is_empty() {
         return Ok(Vec::new());
     }
 
-    let (record, consumed) = Record::parse(data, 0)?;
+    let (record, consumed) = Record::parse(data, 0, limits)?;
     if consumed != data.len() {
         return Err(Error::TrailingData { offset: consumed });
     }
@@ -182,7 +177,7 @@ fn drawing<'data>(
     let mut dg = false;
     let mut root_group_seen = false;
     let mut shapes = Vec::new();
-    for child_result in container.children() {
+    for child_result in container.children_under(budget.limits()) {
         let child = child_result?;
         budget.visit()?;
         match child.kind() {
@@ -268,7 +263,7 @@ fn root_group<'data>(
 ) -> Result<Vec<Shape<'data>>> {
     validate_container_header(container, RecordKind::SpgrContainer)?;
     budget.depth(depth)?;
-    let mut children = container.children();
+    let mut children = container.children_under(budget.limits());
     let header = children.next().ok_or(Error::MalformedShape {
         reason: "shape-group container has no group header",
     })??;
@@ -348,7 +343,7 @@ fn build_group<'data>(
 ) -> Result<Shape<'data>> {
     validate_container_header(&container, RecordKind::SpgrContainer)?;
     budget.depth(depth)?;
-    let mut records = container.children();
+    let mut records = container.children_under(budget.limits());
     let header = records.next().ok_or(Error::MalformedShape {
         reason: "shape-group container has no group header",
     })??;
@@ -471,4 +466,18 @@ fn build<'data>(
         records.textbox,
         records.client_anchor,
     ))
+}
+
+#[inline]
+fn validate_limits(limits: Limits) -> Result<()> {
+    const MAX_SAFE_DEPTH: u16 = 64;
+
+    if limits.max_depth > MAX_SAFE_DEPTH {
+        return Err(Error::InvalidLimit {
+            limit: LimitKind::Depth,
+            value: u32::from(limits.max_depth),
+            maximum: u32::from(MAX_SAFE_DEPTH),
+        });
+    }
+    Ok(())
 }

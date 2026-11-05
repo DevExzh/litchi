@@ -1,47 +1,48 @@
-//! Unified spreadsheet API for Excel and Numbers files.
+//! The module holds the vocabulary the workbook formats share:
 //!
-//! This module provides a unified interface for working with spreadsheets,
-//! supporting multiple formats with automatic detection.
+//! - The generic sheet traits: [`WorkbookTrait`](crate::sheet::WorkbookTrait),
+//!   [`Worksheet`](crate::sheet::Worksheet) and [`Cell`](crate::sheet::Cell),
+//!   over [`CellValue`](crate::sheet::CellValue). They dispatch statically:
+//!   each implementation names its worksheet, cell and iterator types as
+//!   associated types, and the iterators are standard [`Iterator`]s.
+//! - `text` (the `sheet-text` feature): the `litchi-sheet-text` crate's CSV,
+//!   TSV, PRN, SYLK, DIF and fixed-width text workbooks.
+//! - [`view`](crate::sheet::view): worksheet-view semantics shared by XLSX
+//!   and XLSB.
+//! - `FormulaEvaluator` (the `eval` feature): formula evaluation over any
+//!   `WorkbookTrait`.
 //!
-//! # Supported Formats
+//! # Reading workbooks
 //!
-//! - `.xls` - Microsoft Excel 97-2003 (OLE2)
-//! - `.xlsx` - Microsoft Excel 2007+ (Office Open XML)
-//! - `.xlsb` - Microsoft Excel Binary Workbook
-//! - `.ods` - OpenDocument Spreadsheet
-//! - `.numbers` - Apple Numbers (iWork Archive)
+//! Open an XLS, XLSX, XLSB or ODS workbook with `litchi::open`. Its workbook
+//! view (`File::workbook`) lists the worksheets and implements
+//! `WorkbookTrait` by static dispatch, so generic sheet code and the formula
+//! evaluator borrow it directly; its worksheets and cells are the
+//! `litchi_ops::view::sheet` types. The traits report boxed errors.
 //!
-//! # Quick Start
+//! ```
+//! # #[cfg(feature = "xlsx")]
+//! # {
+//! use litchi::sheet::{WorkbookTrait, Worksheet as _};
 //!
-//! ```rust,ignore
-//! use litchi::sheet::Workbook;
+//! # let path = concat!(
+//! #     env!("CARGO_MANIFEST_DIR"),
+//! #     "/../../test-data/ooxml/xlsx/ExcelTables.xlsx"
+//! # );
+//! let file = litchi::open(path)?;
+//! let workbook = file.workbook()?;
+//! assert_eq!(workbook.worksheet_names()?, ["ExcelTable"]);
 //!
-//! # fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-//! // Open any spreadsheet format - auto-detected
-//! let workbook = Workbook::open("data.numbers")?;
-//!
-//! // Get worksheet names
-//! let names = workbook.worksheet_names()?;
-//! println!("Worksheets: {:?}", names);
-//!
-//! // Extract all text
-//! let text = workbook.text()?;
-//! println!("{}", text);
-//!
-//! // Get metadata
-//! let metadata = workbook.metadata()?;
-//! if let Some(title) = metadata.title {
-//!     println!("Title: {}", title);
-//! }
-//! # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
+//! // The same view through the generic sheet trait.
+//! let sheet = WorkbookTrait::worksheet_by_index(&workbook, 0)?;
+//! assert_eq!(sheet.name(), "ExcelTable");
 //! # }
+//! # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
 //! ```
 //!
-//! # Architecture
-//!
-//! The module provides both:
-//! - **Unified API**: `Workbook` struct for high-level operations
-//! - **Trait-based API**: `Workbook`, `Worksheet`, `Cell` traits for advanced use
+//! The text workbooks are concrete types: open one with
+//! `text::Workbook`, or read rows with `text::{delimited, sylk, dif,
+//! fixed_width}::read` (the `sheet-text` feature).
 
 /// Canonical worksheet-view semantics shared by XLSX and XLSB.
 pub mod view {
@@ -51,69 +52,19 @@ pub mod view {
 
 pub use litchi_core::sheet::{traits, types};
 
-// Unified workbook facade implementations require a concrete workbook format.
+/// Formula evaluation over any [`WorkbookTrait`].
 #[cfg(feature = "eval")]
 pub mod eval {
     pub use litchi_eval::*;
 }
-#[cfg(any(
-    feature = "xls",
-    feature = "xlsx",
-    feature = "xlsb",
-    feature = "ods",
-    feature = "numbers"
-))]
-mod adapters;
-#[cfg(any(
-    feature = "xls",
-    feature = "xlsx",
-    feature = "xlsb",
-    feature = "ods",
-    feature = "numbers"
-))]
-pub mod functions;
-#[cfg(feature = "xlsx")]
-mod selection;
-pub mod text;
-#[cfg(any(
-    feature = "xls",
-    feature = "xlsx",
-    feature = "xlsb",
-    feature = "ods",
-    feature = "numbers"
-))]
-pub(crate) mod workbook;
-#[cfg(any(
-    feature = "xls",
-    feature = "xlsx",
-    feature = "xlsb",
-    feature = "ods",
-    feature = "numbers"
-))]
-mod workbook_types;
+/// Delimited, SYLK, DIF and fixed-width text workbooks (`litchi-sheet-text`).
+#[cfg(feature = "sheet-text")]
+pub mod text {
+    pub use litchi_sheet_text::*;
+}
 
-// Re-exports
-#[cfg(feature = "xlsx")]
-pub use crate::xlsx::{Address, Area, At, Rect};
 #[cfg(feature = "eval")]
 pub use eval::FormulaEvaluator;
-#[cfg(any(
-    feature = "xls",
-    feature = "xlsx",
-    feature = "xlsb",
-    feature = "ods",
-    feature = "numbers"
-))]
-pub use functions::*;
-#[cfg(feature = "xlsx")]
-pub use selection::{SelectedCell, SelectedCellView, SelectedWorksheet, WorksheetSelector};
-pub use traits::{Cell, CellIterator, RowIterator, WorkbookTrait, Worksheet, WorksheetIterator};
-pub use types::{CellValue, Result};
-#[cfg(any(
-    feature = "xls",
-    feature = "xlsx",
-    feature = "xlsb",
-    feature = "ods",
-    feature = "numbers"
-))]
-pub use workbook::Workbook;
+pub use litchi_core::sheet::{Error, LimitKind, Result, error};
+pub use traits::{Cell, WorkbookTrait, Worksheet};
+pub use types::CellValue;

@@ -41,7 +41,7 @@ macro_rules! marker {
             ///
             /// # Errors
             ///
-            /// Returns [`crate::Error::Biff`] if the encoder rejects the
+            /// Returns [`crate::Error::Limit`] if the encoder rejects the
             /// record.
             pub fn write(self, out: &mut Encoder) -> Result<()> {
                 out.push(Self::KIND, &[])?;
@@ -78,13 +78,13 @@ mod tests {
 
     #[test]
     fn marker_is_empty_and_typed() {
-        let mut out = Encoder::new();
+        let mut out = Encoder::new(Limits::default()).expect("valid BIFF limits");
         Begin.write(&mut out).expect("write");
         End.write(&mut out).expect("write");
         let input = out.finish();
         assert_eq!(input, [0x33, 0x10, 0, 0, 0x34, 0x10, 0, 0]);
 
-        let mut records = Records::new(&input);
+        let mut records = Records::new(&input, Limits::default()).expect("valid BIFF limits");
         let begin = records.next().expect("record").expect("valid");
         assert_eq!(begin.offset(), 0);
         assert_eq!(Begin::parse(begin).expect("Begin"), Begin);
@@ -102,7 +102,7 @@ mod tests {
             max_records: 1,
             ..Limits::default()
         };
-        let mut records = Records::with_limits(&input, limits).expect("limits");
+        let mut records = Records::new(&input, limits).expect("limits");
         assert!(records.next().expect("first record").is_ok());
         assert!(matches!(
             records.next(),
@@ -115,7 +115,9 @@ mod tests {
 
         let malformed = [0x33, 0x10, 1, 0];
         assert!(matches!(
-            Records::new(&malformed).next(),
+            Records::new(&malformed, Limits::default())
+                .expect("valid BIFF limits")
+                .next(),
             Some(Err(BiffError::TruncatedPayload {
                 offset: 0,
                 declared: 1,

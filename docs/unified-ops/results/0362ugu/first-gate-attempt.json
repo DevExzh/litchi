@@ -1,0 +1,257 @@
+{
+  "source": {
+    "commit": "2dfc4f134d94195dd9b41f2d806887b38ef10c58",
+    "status": "",
+    "branch": "uo2/budget-validation",
+    "cargo_locks": {
+      "Cargo.lock": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+      "tools/perf-baseline/Cargo.lock": "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184",
+      "tools/native-resave/Cargo.lock": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378",
+      "crates/litchi-core/fuzz/Cargo.lock": "395413860f3740a461efa0273b823449323b7860956e9c01cd1c6b1d654eccf2",
+      "crates/litchi-ops/fuzz/Cargo.lock": "10708241205e4a90c0120b3f41a77e7548715761801d66da2d55911e59e9ab8a",
+      "crates/litchi/fuzz/Cargo.lock": "c499d5efe6bba3991672c52f75f78a39a294a5b80e98f62a6ee2bb28dd2a2eb6"
+    }
+  },
+  "selection": {
+    "only": null,
+    "start_at": null,
+    "indexes": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39,
+      40,
+      41,
+      42,
+      43,
+      44,
+      45,
+      46,
+      47,
+      48,
+      49,
+      50,
+      51,
+      52
+    ],
+    "full_step_count": 53,
+    "partial": false
+  },
+  "status": "failed at formatting; no acceptance claim",
+  "rows": [
+    {
+      "index": 0,
+      "total": 53,
+      "name": "fmt",
+      "attempt": "1792815904599553077-3713346",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "environment": {
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target",
+        "CARGO_NET_OFFLINE": "true",
+        "LITCHI_MEM_MAX": "20G",
+        "CARGO_BUILD_JOBS": "1",
+        "RUST_TEST_THREADS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "LITCHI_GATE_ATTEMPT": "1792815904599553077-3713346"
+      },
+      "exit": 1,
+      "seconds": 81.77977728843689,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-2dfc4f134d/00-fmt-attempt-1792815904599553077-3713346.log",
+      "log_bytes": 10644,
+      "log_sha256": "929e9bf021a568ce3217a2f9b7185cb9c2c9a95dfe910a4583938dbd3a5c088f",
+      "target_bytes_after": 4706726230,
+      "post_exit": {
+        "target_bytes": 4706726230,
+        "samples": [
+          {
+            "at": 1792815984.342899,
+            "target_bytes": 4706726230,
+            "owned": [],
+            "builders": []
+          },
+          {
+            "at": 1792815984.5024269,
+            "target_bytes": 4706726230,
+            "owned": [],
+            "builders": []
+          },
+          {
+            "at": 1792815984.7005496,
+            "target_bytes": 4706726230,
+            "owned": [],
+            "builders": []
+          }
+        ]
+      },
+      "source_after": {
+        "commit": "2dfc4f134d94195dd9b41f2d806887b38ef10c58",
+        "status": "",
+        "branch": "uo2/budget-validation",
+        "cargo_locks": {
+          "Cargo.lock": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+          "tools/perf-baseline/Cargo.lock": "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184",
+          "tools/native-resave/Cargo.lock": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378",
+          "crates/litchi-core/fuzz/Cargo.lock": "395413860f3740a461efa0273b823449323b7860956e9c01cd1c6b1d654eccf2",
+          "crates/litchi-ops/fuzz/Cargo.lock": "10708241205e4a90c0120b3f41a77e7548715761801d66da2d55911e59e9ab8a",
+          "crates/litchi/fuzz/Cargo.lock": "c499d5efe6bba3991672c52f75f78a39a294a5b80e98f62a6ee2bb28dd2a2eb6"
+        }
+      },
+      "cargo_locks_before": {
+        "Cargo.lock": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+        "tools/perf-baseline/Cargo.lock": "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184",
+        "tools/native-resave/Cargo.lock": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378",
+        "crates/litchi-core/fuzz/Cargo.lock": "395413860f3740a461efa0273b823449323b7860956e9c01cd1c6b1d654eccf2",
+        "crates/litchi-ops/fuzz/Cargo.lock": "10708241205e4a90c0120b3f41a77e7548715761801d66da2d55911e59e9ab8a",
+        "crates/litchi/fuzz/Cargo.lock": "c499d5efe6bba3991672c52f75f78a39a294a5b80e98f62a6ee2bb28dd2a2eb6"
+      },
+      "cargo_locks_after": {
+        "Cargo.lock": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+        "tools/perf-baseline/Cargo.lock": "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184",
+        "tools/native-resave/Cargo.lock": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378",
+        "crates/litchi-core/fuzz/Cargo.lock": "395413860f3740a461efa0273b823449323b7860956e9c01cd1c6b1d654eccf2",
+        "crates/litchi-ops/fuzz/Cargo.lock": "10708241205e4a90c0120b3f41a77e7548715761801d66da2d55911e59e9ab8a",
+        "crates/litchi/fuzz/Cargo.lock": "c499d5efe6bba3991672c52f75f78a39a294a5b80e98f62a6ee2bb28dd2a2eb6"
+      },
+      "cargo_target_trace": [
+        {
+          "pid": "3714205",
+          "cargo_command": "fmt",
+          "target": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target"
+        }
+      ],
+      "cargo_target_sizes": {
+        "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target": {
+          "bytes": 4706726230
+        }
+      },
+      "cargo_target_trace_file": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-2dfc4f134d/00-fmt-attempt-1792815904599553077-3713346-cargo-targets.tsv",
+      "cargo_target_trace_bytes": 78,
+      "cargo_target_trace_sha256": "0e26396910bc53c4772375e5a5c4c8de7aa838bd9a36cf7eb58f60a6eba7b725",
+      "preflight": {
+        "started": 1792815905.6793208,
+        "target_bytes": 4706726230,
+        "free_bytes": 1423270576128,
+        "builders": [
+          {
+            "pid": 3696118,
+            "ppid": 151389,
+            "pgrp": 3696118,
+            "executable": "cargo",
+            "cwd": "/home/zhuhe/code/litchi-worktrees/numbers-sheet-lifecycle-admission3-20261024",
+            "command": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo test -p litchi-numbers --test sheet_lifecycle_native --offline -- --nocapture"
+          },
+          {
+            "pid": 3702195,
+            "ppid": 3696118,
+            "pgrp": 3696118,
+            "executable": "rustc",
+            "cwd": "/home/zhuhe/code/litchi-worktrees/numbers-sheet-lifecycle-admission3-20261024",
+            "command": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/rustc --crate-name litchi_iwa_protos --edition=2024 crates/litchi-iwa-protos/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debuginfo=2 --deny=clippy::all --deny=unused --deny=rust_2018_idioms --deny=nonstandard_style --deny=future_incompatible --deny=unused_qualifications --deny=unused_must_use --deny=unreachable_pub --deny=unknown_lints --deny=unfulfilled_lint_expectations --deny=unexpected_cfgs --deny=rustdoc::unescaped_backticks --deny=trivial_numeric_casts --deny=trivial_casts --deny=text_direction_codepoint_in_literal --deny=text_direction_codepoint_in_comment --deny=renamed_and_removed_lints --deny=rustdoc::redundant_explicit_links --deny=rustdoc::private_intra_doc_links --deny=non_ascii_idents --allow=clippy::needless_return --allow=clippy::manual_saturating_arithmetic --allow=clippy::manual_is_multiple_of --deny=rustdoc::invalid_rust_codeblocks --deny=rustdoc::invalid_html_tags --deny=rustdoc::invalid_codeblock_attributes --allow=clippy::if_same_then_else --allow=clippy::disallowed_methods --allow=clippy::collapsible_match --allow=clippy::collapsible_if --deny=rustdoc::broken_intra_doc_links --deny=rustdoc::bare_urls --check-cfg cfg(docsrs,test) --check-cfg cfg(feature, values()) -C metadata=31d7c06035ab34a3 -C extra-filename=-bde58bcef3c9e0f5 --out-dir /home/zhuhe/code/litchi-worktrees/numbers-sheet-lifecycle-admission3-20261024/target/debug/deps -C incremental=/home/zhuhe/code/litchi-worktrees/numbers-sheet-lifecycle-admission3-20261024/target/debug/incremental -L dependency=/home/zhuhe/code/litchi-worktrees/numbers-sheet-lifecycle-admission3-20261024/target/debug/deps --extern buffa=/home/zhuhe/code/litchi-worktrees/numbers-sheet-lifecycle-admission3-20261024/target/debug/deps/libbuffa-7c96d1f508021962.rmeta --extern prost=/home/zhuhe/code/litchi-worktrees/numbers-sheet-lifecycle-admission3-20261024/target/debug/deps/libprost-c55388d3e668e27b.rmeta --extern ryu=/home/zhuhe/code/litchi-worktrees/numbers-sheet-lifecycle-admission3-20261024/target/debug/deps/libryu-75dd9af2fed51ac2.rmeta"
+          },
+          {
+            "pid": 3708504,
+            "ppid": 3708471,
+            "pgrp": 3708471,
+            "executable": "cargo",
+            "cwd": "/home/zhuhe/code/litchi-worktrees/iwa-numbers-formula-stroke-parity-20261024",
+            "command": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo check --offline -p litchi-numbers --lib"
+          },
+          {
+            "pid": 3708957,
+            "ppid": 151389,
+            "pgrp": 3708957,
+            "executable": "cargo",
+            "cwd": "/home/zhuhe/code/litchi-worktrees/keynote-builder-review-20261024",
+            "command": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo test -p litchi-keynote --lib"
+          },
+          {
+            "pid": 3709032,
+            "ppid": 151389,
+            "pgrp": 3709032,
+            "executable": "cargo",
+            "cwd": "/home/zhuhe/code/litchi-worktrees/pages-media-lifecycle-admission-repair-20261024",
+            "command": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo check -q -p litchi-pages --lib"
+          },
+          {
+            "pid": 3709163,
+            "ppid": 3708957,
+            "pgrp": 3708957,
+            "executable": "rustc",
+            "cwd": "/home/zhuhe/code/litchi-worktrees/keynote-builder-review-20261024",
+            "command": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/rustc --crate-name litchi_keynote --edition=2024 crates/litchi-keynote/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --deny=clippy::all --deny=unused --deny=rust_2018_idioms --deny=nonstandard_style --deny=future_incompatible --deny=unused_qualifications --deny=unused_must_use --deny=unreachable_pub --deny=unknown_lints --deny=unfulfilled_lint_expectations --deny=unexpected_cfgs --deny=rustdoc::unescaped_backticks --deny=trivial_numeric_casts --deny=trivial_casts --deny=text_direction_codepoint_in_literal --deny=text_direction_codepoint_in_comment --deny=renamed_and_removed_lints --deny=rustdoc::redundant_explicit_links --deny=rustdoc::private_intra_doc_links --deny=non_ascii_idents --allow=clippy::needless_return --allow=clippy::manual_saturating_arithmetic --allow=clippy::manual_is_multiple_of --deny=rustdoc::invalid_rust_codeblocks --deny=rustdoc::invalid_html_tags --deny=rustdoc::invalid_codeblock_attributes --allow=clippy::if_same_then_else --allow=clippy::disallowed_methods --allow=clippy::collapsible_match --allow=clippy::collapsible_if --deny=rustdoc::broken_intra_doc_links --deny=rustdoc::bare_urls --test --cfg feature=\"default\" --check-cfg cfg(docsrs,test) --check-cfg cfg(feature, values(\"default\", \"internal-iwork-source\")) -C metadata=ab32742bb99af7bc -C extra-filename=-3a6ee72d10660bbb --out-dir /home/zhuhe/code/litchi-worktrees/keynote-builder-review-20261024/target/debug/deps -C incremental=/home/zhuhe/code/litchi-worktrees/keynote-builder-review-20261024/target/debug/incremental -L dependency=/home/zhuhe/code/litchi-worktrees/keynote-builder-review-20261024/target/debug/deps --extern libc=/home/zhuhe/code/litchi-worktrees/keynote-builder-review-20261024/target/debug/deps/liblibc-b437f8992049e083.rlib --extern litchi_core=/home/zhuhe/code/litchi-worktrees/keynote-builder-review-20261024/target/debug/deps/liblitchi_core-1dda91e65d76fcf6.rlib --extern litchi_iwa_archive=/home/zhuhe/code/litchi-worktrees/keynote-builder-review-20261024/target/debug/deps/liblitchi_iwa_archive-4cacbb218e1b16b8.rlib --extern litchi_iwa_common=/home/zhuhe/code/litchi-worktrees/keynote-builder-review-20261024/target/debug/deps/liblitchi_iwa_common-23ff4a0fc4e4f948.rlib --extern litchi_iwa_core=/home/zhuhe/code/litchi-worktrees/keynote-builder-review-20261024/target/debug/deps/liblitchi_iwa_core-f68cfff292aafcfd.rlib --extern litchi_iwa_detect=/home/zhuhe/code/litchi-worktrees/keynote-builder-review-20261024/target/debug/deps/liblitchi_iwa_detect-e915b733d80ed1d2.rlib --extern litchi_iwa_protos=/home/zhuhe/code/litchi-worktrees/keynote-builder-review-20261024/target/debug/deps/liblitchi_iwa_protos-ea645e61455a9db3.rlib --extern litchi_iwa_text=/home/zhuhe/code/litchi-worktrees/keynote-builder-review-20261024/target/debug/deps/liblitchi_iwa_text-abeb9cc85be97a0b.rlib --extern litchi_iwa_text_wire=/home/zhuhe/code/litchi-worktrees/keynote-builder-review-20261024/target/debug/deps/liblitchi_iwa_text_wire-c3138bcd4c154ac3.rlib --extern litchi_numbers_wire=/home/zhuhe/code/litchi-worktrees/keynote-builder-review-20261024/target/debug/deps/liblitchi_numbers_wire-69490a3e974f5901.rlib --extern once_cell=/home/zhuhe/code/litchi-worktrees/keynote-builder-review-20261024/target/debug/deps/libonce_cell-6fe0e84c103b3d0a.rlib --extern plist=/home/zhuhe/code/litchi-worktrees/keynote-builder-review-20261024/target/debug/deps/libplist-60ee4519fff1b2b4.rlib --extern prost=/home/zhuhe/code/litchi-worktrees/keynote-builder-review-20261024/target/debug/deps/libprost-c55388d3e668e27b.rlib --extern serde=/home/zhuhe/code/litchi-worktrees/keynote-builder-review-20261024/target/debug/deps/libserde-a40cff966c7acb8e.rlib --extern sha1=/home/zhuhe/code/litchi-worktrees/keynote-builder-review-20261024/target/debug/deps/libsha1-26cbb8abcaca0ac6.rlib --extern tempfile=/home/zhuhe/code/litchi-worktrees/keynote-builder-review-20261024/target/debug/deps/libtempfile-0fd951be31bb51ff.rlib --extern thiserror=/home/zhuhe/code/litchi-worktrees/keynote-builder-review-20261024/target/debug/deps/libthiserror-6f947b24755587c7.rlib"
+          },
+          {
+            "pid": 3711496,
+            "ppid": 151389,
+            "pgrp": 3711496,
+            "executable": "cargo",
+            "cwd": "/home/zhuhe/code/litchi-worktrees/keynote-chart-review-20261024",
+            "command": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo check -p litchi-keynote"
+          },
+          {
+            "pid": 3713679,
+            "ppid": 3711496,
+            "pgrp": 3711496,
+            "executable": "rustc",
+            "cwd": "/home/zhuhe/code/litchi-worktrees/keynote-chart-review-20261024",
+            "command": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/rustc --crate-name build_script_build --edition=2024 crates/litchi-iwa-protos/build.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type bin --emit=dep-info,link -C embed-bitcode=no --deny=clippy::all --deny=unused --deny=rust_2018_idioms --deny=nonstandard_style --deny=future_incompatible --deny=unused_qualifications --deny=unused_must_use --deny=unreachable_pub --deny=unknown_lints --deny=unfulfilled_lint_expectations --deny=unexpected_cfgs --deny=rustdoc::unescaped_backticks --deny=trivial_numeric_casts --deny=trivial_casts --deny=text_direction_codepoint_in_literal --deny=text_direction_codepoint_in_comment --deny=renamed_and_removed_lints --deny=rustdoc::redundant_explicit_links --deny=rustdoc::private_intra_doc_links --deny=non_ascii_idents --allow=clippy::needless_return --allow=clippy::manual_saturating_arithmetic --allow=clippy::manual_is_multiple_of --deny=rustdoc::invalid_rust_codeblocks --deny=rustdoc::invalid_html_tags --deny=rustdoc::invalid_codeblock_attributes --allow=clippy::if_same_then_else --allow=clippy::disallowed_methods --allow=clippy::collapsible_match --allow=clippy::collapsible_if --deny=rustdoc::broken_intra_doc_links --deny=rustdoc::bare_urls --check-cfg cfg(docsrs,test) --check-cfg cfg(feature, values()) -C metadata=f9a51dbc210e6933 -C extra-filename=-bae9be800bb63603 --out-dir /home/zhuhe/code/litchi-worktrees/keynote-chart-review-20261024/target/debug/build/litchi-iwa-protos-bae9be800bb63603 -C incremental=/home/zhuhe/code/litchi-worktrees/keynote-chart-review-20261024/target/debug/incremental -L dependency=/home/zhuhe/code/litchi-worktrees/keynote-chart-review-20261024/target/debug/deps --extern buffa_build=/home/zhuhe/code/litchi-worktrees/keynote-chart-review-20261024/target/debug/deps/libbuffa_build-4afb4647098b51a9.rlib --extern prost_build=/home/zhuhe/code/litchi-worktrees/keynote-chart-review-20261024/target/debug/deps/libprost_build-a5813bfc4c329ef3.rlib --extern sha2=/home/zhuhe/code/litchi-worktrees/keynote-chart-review-20261024/target/debug/deps/libsha2-022193c1b183ecd0.rlib"
+          },
+          {
+            "pid": 3713819,
+            "ppid": 3696118,
+            "pgrp": 3696118,
+            "executable": "rustc",
+            "cwd": "/home/zhuhe/code/litchi-worktrees/numbers-sheet-lifecycle-admission3-20261024",
+            "command": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/rustc --crate-name litchi_numbers --edition=2024 crates/litchi-numbers/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debuginfo=2 --deny=clippy::all --deny=unused --deny=rust_2018_idioms --deny=nonstandard_style --deny=future_incompatible --deny=unused_qualifications --deny=unused_must_use --deny=unreachable_pub --deny=unknown_lints --deny=unfulfilled_lint_expectations --deny=unexpected_cfgs --deny=rustdoc::unescaped_backticks --deny=trivial_numeric_casts --deny=trivial_casts --deny=text_direction_codepoint_in_literal --deny=text_direction_codepoint_in_comment --deny=renamed_and_removed_lints --deny=rustdoc::redundant_explicit_links --deny=rustdoc::private_intra_doc_links --deny=non_ascii_idents --allow=clippy::needless_return --allow=clippy::manual_saturating_arithmetic --allow=clippy::manual_is_multiple_of --deny=rustdoc::invalid_rust_codeblocks --deny=rustdoc::invalid_html_tags --deny=rustdoc::invalid_codeblock_attributes --allow=clippy::if_same_then_else --allow=clippy::disallowed_methods --allow=clippy::collapsible_match --allow=clippy::collapsible_if --deny=rustdoc::broken_intra_doc_links --deny=rustdoc::bare_urls --cfg feature=\"default\" --check-cfg cfg(docsrs,test) --check-cfg cfg(feature, values(\"default\", \"internal-iwork-source\")) -C metadata=e3c1a00986a81a10 -C extra-filename=-6d86056ee59116a4 --out-dir /home/zhuhe/code/litchi-worktrees/numbers-sheet-lifecycle-admission3-20261024/target/debug/deps -C incremental=/home/zhuhe/code/litchi-worktrees/numbers-sheet-lifecycle-admission3-20261024/target/debug/incremental -L dependency=/home/zhuhe/code/litchi-worktrees/numbers-sheet-lifecycle-admission3-20261024/target/debug/deps --extern libc=/home/zhuhe/code/litchi-worktrees/numbers-sheet-lifecycle-admission3-20261024/target/debug/deps/liblibc-b437f8992049e083.rmeta --extern litchi_core=/home/zhuhe/code/litchi-worktrees/numbers-sheet-lifecycle-admission3-20261024/target/debug/deps/liblitchi_core-101e4d84945960b5.rmeta --extern litchi_iwa_archive=/home/zhuhe/code/litchi-worktrees/numbers-sheet-lifecycle-admission3-20261024/target/debug/deps/liblitchi_iwa_archive-d6f18a4a7be22392.rmeta --extern litchi_iwa_common=/home/zhuhe/code/litchi-worktrees/numbers-sheet-lifecycle-admission3-20261024/target/debug/deps/liblitchi_iwa_common-23ff4a0fc4e4f948.rmeta --extern litchi_iwa_core=/home/zhuhe/code/litchi-worktrees/numbers-sheet-lifecycle-admission3-20261024/target/debug/deps/liblitchi_iwa_core-ccce07b5402061e1.rmeta --extern litchi_iwa_detect=/home/zhuhe/code/litchi-worktrees/numbers-sheet-lifecycle-admission3-20261024/target/debug/deps/liblitchi_iwa_detect-873f16f599de5a23.rmeta --extern litchi_iwa_protos=/home/zhuhe/code/litchi-worktrees/numbers-sheet-lifecycle-admission3-20261024/target/debug/deps/liblitchi_iwa_protos-bde58bcef3c9e0f5.rmeta --extern litchi_iwa_text_wire=/home/zhuhe/code/litchi-worktrees/numbers-sheet-lifecycle-admission3-20261024/target/debug/deps/liblitchi_iwa_text_wire-cfa07d22f0355fd4.rmeta --extern litchi_numbers_wire=/home/zhuhe/code/litchi-worktrees/numbers-sheet-lifecycle-admission3-20261024/target/debug/deps/liblitchi_numbers_wire-0bbf7ebb3a0b8837.rmeta --extern phf=/home/zhuhe/code/litchi-worktrees/numbers-sheet-lifecycle-admission3-20261024/target/debug/deps/libphf-d19846519f5fdb11.rmeta --extern plist=/home/zhuhe/code/litchi-worktrees/numbers-sheet-lifecycle-admission3-20261024/target/debug/deps/libplist-0f6b0179efa5cfe6.rmeta --extern ryu=/home/zhuhe/code/litchi-worktrees/numbers-sheet-lifecycle-admission3-20261024/target/debug/deps/libryu-75dd9af2fed51ac2.rmeta --extern thiserror=/home/zhuhe/code/litchi-worktrees/numbers-sheet-lifecycle-admission3-20261024/target/debug/deps/libthiserror-6f947b24755587c7.rmeta"
+          }
+        ]
+      },
+      "free_bytes_after": 1447522914304,
+      "effective_exit": 1,
+      "status": "failed"
+    }
+  ],
+  "external_state": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-2dfc4f134d/state.json",
+  "external_state_sha256": "293eec04f0251bb0c082457cdd89e287eed7dc592a3d8e7c7d93d411fd479753"
+}

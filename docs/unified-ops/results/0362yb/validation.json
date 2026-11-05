@@ -1,0 +1,53 @@
+{
+  "record": "0362yb",
+  "scope": "ODP source-backed streamed semantic projections",
+  "base": "bd7a095a56",
+  "source_probe": {
+    "path": "/tmp/odp_stream_probe-0362yb.rs",
+    "bytes": 5694,
+    "sha256": "73daf4691cdbc49b83a9e71eb0a10dc9f988ed53a9a8c3929ef3ce09c83f5e3c",
+    "command": "cargo run --offline --release -p litchi-ops --features odp --example odp_stream_probe"
+  },
+  "workload": {
+    "slides": 2000,
+    "content_xml_bytes": 591185,
+    "media_bytes": 4194304,
+    "source_archive_bytes": 4215428
+  },
+  "allocator_probe": {
+    "source_clone_before_measurement": true,
+    "open": {"peak": 116001, "allocated": 200325, "allocations": 72, "reallocations": 7},
+    "first_slide": {"peak": 116001, "allocated": 2714155, "allocations": 20087, "reallocations": 21},
+    "first_text": {"peak": 990891, "allocated": 4175837, "allocations": 34084, "reallocations": 7945},
+    "write_text": {"peak": 937560, "allocated": 2705503, "allocations": 18080, "reallocations": 31},
+    "append_commit_write": {"peak": 612845, "allocated": 5853743, "allocations": 36185, "reallocations": 99}
+  },
+  "paired_eager_arc_string_reference": {
+    "open": {"peak": 693231, "allocated": 777932},
+    "first_slide": {"peak": 693231, "allocated": 3211442},
+    "first_text": {"peak": 1501373, "allocated": 4673124},
+    "append_commit_write": {"peak": 1204071, "allocated": 6431822}
+  },
+  "accepted_0358a_reference": {
+    "before_peak": 5513403,
+    "after_peak_legs": [6107267, 6107267],
+    "samples": 15,
+    "output_bytes": 4215645,
+    "source_bytes": 4215428,
+    "before_median_us": 13131.943,
+    "after_median_us": [13296.183, 13314.163],
+    "files": [
+      "docs/unified-ops/results/0358a/sb-before-1.json",
+      "docs/unified-ops/results/0358a/sb-after-2.json",
+      "docs/unified-ops/results/0358a/sb-after-3.json"
+    ]
+  },
+  "checks": {
+    "odp_lib_tests": {"command": "cargo test --offline -p litchi-odp --lib -- --test-threads=4", "passed": 223},
+    "source_backed_tests": {"command": "cargo test --offline -p litchi-odp --test source_backed -- --test-threads=4", "passed": 12},
+    "sequential_text_tests": {"command": "cargo test --offline -p litchi-odp --test sequential_text -- --test-threads=4", "passed": 16},
+    "strict_clippy": {"command": "cargo clippy --offline -p litchi-odp --lib --tests -- -D warnings", "passed": true},
+    "native_abba": "open",
+    "callgrind": "open"
+  }
+}

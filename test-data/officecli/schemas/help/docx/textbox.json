@@ -1,0 +1,206 @@
+{
+  "$schema": "../_schema.json",
+  "format": "docx",
+  "element": "textbox",
+  "elementAliases": [
+    "txbx"
+  ],
+  "parent": "body",
+  "operations": {
+    "add": true,
+    "set": true,
+    "get": true,
+    "query": false,
+    "remove": true
+  },
+  "paths": {
+    "positional": [
+      "/body/textbox[N]"
+    ]
+  },
+  "note": "Floating text box — a DrawingML anchored shape (wps:wsp) that carries a text body, added inside a run+paragraph. Created via `add --type textbox`; Get returns the raw drawing tree and Remove deletes the host paragraph. Set supports the spPr surface (fill / line.* / width / height / geometry) in place; position/anchor/wrap/inset/text/rotation/shadow props are add-only (use Remove + re-Add, or the raw-set path, to change those). For an empty graphic shape with no text body use `shape`; for inline pictures use `picture`.",
+  "properties": {
+    "text": {
+      "type": "string",
+      "description": "initial text placed in the text box body.",
+      "add": true,
+      "examples": ["--prop text=\"Sidebar note\""]
+    },
+    "width": {
+      "type": "length",
+      "description": "box width (cm/in/pt/EMU). Default ~6cm.",
+      "add": true,
+      "set": true,
+      "examples": ["--prop width=6cm"]
+    },
+    "height": {
+      "type": "length",
+      "description": "box height (cm/in/pt/EMU). Default ~2.4cm.",
+      "add": true,
+      "set": true,
+      "examples": ["--prop height=3cm"]
+    },
+    "geometry": {
+      "type": "string",
+      "description": "preset shape outline of the box (rect, roundRect, ellipse, ...). Aliases: shape.",
+      "aliases": ["shape"],
+      "add": true,
+      "set": true,
+      "examples": ["--prop geometry=roundRect"]
+    },
+    "wrap": {
+      "type": "enum",
+      "description": "text-wrap mode of surrounding body text around the box.",
+      "values": ["square", "tight", "through", "topAndBottom", "behind", "front", "none"],
+      "default": "square",
+      "add": true,
+      "examples": ["--prop wrap=square"]
+    },
+    "hAlign": {
+      "type": "enum",
+      "description": "relative horizontal alignment (emits <wp:align>, replaces a positional offset on the X axis). Aliases: halign.",
+      "values": ["left", "center", "right", "inside", "outside"],
+      "aliases": ["halign"],
+      "add": true,
+      "examples": ["--prop hAlign=center"]
+    },
+    "vAlign": {
+      "type": "enum",
+      "description": "relative vertical alignment (emits <wp:align> on the Y axis). Aliases: valign.",
+      "values": ["top", "center", "bottom", "inside", "outside"],
+      "aliases": ["valign"],
+      "add": true,
+      "examples": ["--prop vAlign=top"]
+    },
+    "hRelative": {
+      "type": "enum",
+      "description": "what the horizontal position/alignment is measured from. Aliases: hrelative.",
+      "values": ["margin", "page", "column", "character", "leftMargin", "rightMargin", "insideMargin", "outsideMargin"],
+      "aliases": ["hrelative"],
+      "add": true,
+      "examples": ["--prop hRelative=margin"]
+    },
+    "vRelative": {
+      "type": "enum",
+      "description": "what the vertical position/alignment is measured from. Aliases: vrelative.",
+      "values": ["margin", "page", "paragraph", "line", "topMargin", "bottomMargin", "insideMargin", "outsideMargin"],
+      "aliases": ["vrelative"],
+      "add": true,
+      "examples": ["--prop vRelative=paragraph"]
+    },
+    "anchor.x": {
+      "type": "length",
+      "description": "horizontal position offset from hRelative origin. Alias: hposition. Ignored when hAlign is set.",
+      "aliases": ["hposition"],
+      "add": true,
+      "examples": ["--prop anchor.x=2cm"]
+    },
+    "anchor.y": {
+      "type": "length",
+      "description": "vertical position offset from vRelative origin. Alias: vposition. Ignored when vAlign is set.",
+      "aliases": ["vposition"],
+      "add": true,
+      "examples": ["--prop anchor.y=1cm"]
+    },
+    "fill": {
+      "type": "color",
+      "description": "fill color (hex/name), or 'none' for no fill. Alias: fillcolor.",
+      "aliases": ["fillcolor"],
+      "add": true,
+      "set": true,
+      "examples": ["--prop fill=EAF2FF", "--prop fill=none"]
+    },
+    "fill.gradient": {
+      "type": "string",
+      "description": "gradient fill spec (overrides solid fill). Alias: gradient.",
+      "aliases": ["gradient"],
+      "add": true
+    },
+    "fill.opacity": {
+      "type": "string",
+      "description": "fill opacity percentage. Alias: opacity.",
+      "aliases": ["opacity"],
+      "add": true,
+      "examples": ["--prop fill.opacity=50"]
+    },
+    "line.color": {
+      "type": "color",
+      "description": "outline color. Alias: linecolor.",
+      "aliases": ["linecolor"],
+      "add": true,
+      "set": true,
+      "examples": ["--prop line.color=2B579A"]
+    },
+    "line.width": {
+      "type": "length",
+      "description": "outline width. Alias: linewidth.",
+      "aliases": ["linewidth"],
+      "add": true,
+      "set": true,
+      "examples": ["--prop line.width=1pt"]
+    },
+    "line.style": {
+      "type": "string",
+      "description": "outline dash style. Alias: linestyle.",
+      "aliases": ["linestyle"],
+      "add": true,
+      "set": true
+    },
+    "inset.left": {
+      "type": "length",
+      "description": "internal left padding between the box edge and its text. Default 0.1in.",
+      "add": true
+    },
+    "inset.top": {
+      "type": "length",
+      "description": "internal top padding. Default 0.05in.",
+      "add": true
+    },
+    "inset.right": {
+      "type": "length",
+      "description": "internal right padding. Default 0.1in.",
+      "add": true
+    },
+    "inset.bottom": {
+      "type": "length",
+      "description": "internal bottom padding. Default 0.05in.",
+      "add": true
+    },
+    "textDirection": {
+      "type": "string",
+      "description": "text flow direction inside the box (e.g. vertical). Alias: vert.",
+      "aliases": ["vert"],
+      "add": true
+    },
+    "textAnchor": {
+      "type": "string",
+      "description": "vertical anchoring of text within the box (top/center/bottom).",
+      "add": true
+    },
+    "autoFit": {
+      "type": "bool",
+      "description": "resize the box to fit its text (<a:spAutoFit/>).",
+      "add": true,
+      "examples": ["--prop autoFit=true"]
+    },
+    "rotation": {
+      "type": "string",
+      "description": "rotation in degrees. Alias: rot.",
+      "aliases": ["rot"],
+      "add": true,
+      "examples": ["--prop rotation=90"]
+    },
+    "shadow": {
+      "type": "string",
+      "description": "drop-shadow preset.",
+      "add": true
+    },
+    "alt": {
+      "type": "string",
+      "description": "accessibility / object name (docPr name). Alias: name. Default 'Text Box'.",
+      "aliases": ["name"],
+      "add": true,
+      "examples": ["--prop alt=\"Callout\""]
+    }
+  }
+}

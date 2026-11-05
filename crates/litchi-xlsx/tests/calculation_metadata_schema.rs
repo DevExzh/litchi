@@ -18,7 +18,7 @@ fn workbook_xml(body: &str) -> Vec<u8> {
 }
 
 fn package_with_workbook_xml(xml: Vec<u8>) -> Package {
-    let mut raw = Package::create().expect("minimal package").into_plain_opc();
+    let mut raw = Package::new().expect("minimal package").into_plain_opc();
     let workbook = raw
         .main_document_part()
         .expect("main workbook part")
@@ -31,7 +31,7 @@ fn package_with_workbook_xml(xml: Vec<u8>) -> Package {
 }
 
 fn reopen(package: &Package) -> Package {
-    Package::from_bytes(package.to_bytes().expect("serialize package"))
+    Package::from_bytes(&package.to_bytes().expect("serialize package"))
         .expect("reopen serialized package")
 }
 
@@ -39,16 +39,24 @@ fn set_properties(package: &mut Package, properties: Properties) {
     let mut edit = package
         .edit_calculation_metadata()
         .expect("calculation metadata edit");
-    assert!(edit.set_properties(properties));
-    assert!(edit.commit().expect("metadata commit").changed());
+    assert!(edit.set_properties(properties).unwrap());
+    *package = {
+        let commit = edit.commit().expect("metadata commit");
+        assert!(commit.diagnostics().changed());
+        commit.into_package()
+    };
 }
 
 fn set_features(package: &mut Package, features: Features) {
     let mut edit = package
         .edit_calculation_metadata()
         .expect("calculation metadata edit");
-    assert!(edit.set_features(features));
-    assert!(edit.commit().expect("metadata commit").changed());
+    assert!(edit.set_features(features).unwrap());
+    *package = {
+        let commit = edit.commit().expect("metadata commit");
+        assert!(commit.diagnostics().changed());
+        commit.into_package()
+    };
 }
 
 fn properties(snapshot: &Snapshot) -> &Properties {
@@ -97,7 +105,7 @@ fn all_thirteen_calc_pr_setters_insert_and_round_trip_exact_authored_values() {
     expected.set_concurrent_manual_count(Some(4_000_000_002));
     expected.set_force_full_calculation(Some(true));
 
-    let mut package = Package::create().expect("fresh package");
+    let mut package = Package::new().expect("fresh package");
     assert!(
         package
             .calculation_metadata()
@@ -169,7 +177,11 @@ fn existing_calc_pr_rewrite_removes_each_authored_attribute_and_then_the_tag() {
         Ok(())
     })
     .expect("edit every property");
-    assert!(edit.commit().expect("rewrite commit").changed());
+    package = {
+        let commit = edit.commit().expect("rewrite commit");
+        assert!(commit.diagnostics().changed());
+        commit.into_package()
+    };
 
     let rewritten = reopen(&package);
     let snapshot = rewritten
@@ -199,8 +211,12 @@ fn existing_calc_pr_rewrite_removes_each_authored_attribute_and_then_the_tag() {
 
     let mut rewritten = rewritten;
     let mut remove = rewritten.edit_calculation_metadata().expect("remove edit");
-    assert!(remove.remove_properties());
-    assert!(remove.commit().expect("remove commit").changed());
+    assert!(remove.remove_properties().unwrap());
+    rewritten = {
+        let commit = remove.commit().expect("remove commit");
+        assert!(commit.diagnostics().changed());
+        commit.into_package()
+    };
     let removed = reopen(&rewritten);
     let snapshot = removed.calculation_metadata().expect("removed metadata");
     assert!(snapshot.properties().is_none());
@@ -218,7 +234,12 @@ fn xsd_atomic_whitespace_and_leading_zero_unsigned_are_canonicalized_and_plus_re
         r#"calcCompleted=" 0 " calcOnSave=" true " concurrentCalc=" false " "#,
         r#"concurrentManualCount=" &#xA;0009 " forceFullCalc=" 1 "/>"#,
     ));
-    let parsed = parse(&xml).expect("xsd lexical forms").expect("calcPr");
+    let parsed = parse(
+        &xml,
+        &litchi_xlsx::calculation_properties::Limits::default(),
+    )
+    .expect("xsd lexical forms")
+    .expect("calcPr");
     let specified = parsed.specified();
     assert_eq!(specified.calculation_id(), Some(42));
     assert_eq!(specified.calculation_mode(), Some(Mode::Manual));
@@ -234,7 +255,7 @@ fn xsd_atomic_whitespace_and_leading_zero_unsigned_are_canonicalized_and_plus_re
     assert_eq!(specified.concurrent_manual_count(), Some(9));
     assert_eq!(specified.force_full_calculation(), Some(true));
 
-    let mut package = Package::create().expect("fresh package");
+    let mut package = Package::new().expect("fresh package");
     set_properties(&mut package, parsed);
     let reopened = reopen(&package);
     let snapshot = reopened.calculation_metadata().expect("canonical metadata");
@@ -248,7 +269,11 @@ fn xsd_atomic_whitespace_and_leading_zero_unsigned_are_canonicalized_and_plus_re
 
     for attribute in ["calcId", "iterateCount", "concurrentManualCount"] {
         let invalid = workbook_xml(&format!(r#"<calcPr {attribute}=" &#x9;+1&#xD; "/>"#));
-        let error = parse(&invalid).expect_err("leading plus is not an unsignedInt lexical form");
+        let error = parse(
+            &invalid,
+            &litchi_xlsx::calculation_properties::Limits::default(),
+        )
+        .expect_err("leading plus is not an unsignedInt lexical form");
         assert!(
             matches!(error, Error::Invalid(_)),
             "{attribute} returned the wrong error class: {error}"
@@ -263,9 +288,10 @@ fn complete_xsd_double_special_value_space_round_trips_through_public_setter() {
         ("-INF", f64::NEG_INFINITY),
         ("NaN", f64::NAN),
     ] {
-        let parsed = parse(&workbook_xml(&format!(
-            r#"<calcPr iterateDelta="{lexical}"/>"#
-        )))
+        let parsed = parse(
+            &workbook_xml(&format!(r#"<calcPr iterateDelta="{lexical}"/>"#)),
+            &litchi_xlsx::calculation_properties::Limits::default(),
+        )
         .expect("special xsd:double lexical")
         .expect("calcPr");
         let parsed_value = parsed.specified().iteration_delta().expect("parsed delta");
@@ -279,7 +305,7 @@ fn complete_xsd_double_special_value_space_round_trips_through_public_setter() {
         properties
             .set_iteration_delta(Some(value))
             .expect("public setter accepts xsd:double value space");
-        let mut package = Package::create().expect("fresh package");
+        let mut package = Package::new().expect("fresh package");
         set_properties(&mut package, properties);
         let reopened = reopen(&package);
         let snapshot = reopened.calculation_metadata().expect("reopened metadata");
@@ -362,7 +388,11 @@ fn malformed_calc_features_schema_boundaries_are_rejected() {
     ];
 
     for (label, body) in cases {
-        let error = parse_features(&workbook_xml(&body)).expect_err(label);
+        let error = parse_features(
+            &workbook_xml(&body),
+            &litchi_xlsx::calculation_properties::Limits::default(),
+        )
+        .expect_err(label);
         if label == "duplicate feature name" {
             assert!(
                 matches!(error, Error::Xml(_)),
@@ -394,7 +424,7 @@ fn xsd_string_feature_names_preserve_empty_whitespace_and_supplementary_scalars(
             .collect(),
     )
     .expect("nonempty feature collection");
-    let mut package = Package::create().expect("fresh package");
+    let mut package = Package::new().expect("fresh package");
     set_features(&mut package, features);
 
     let reopened = reopen(&package);
@@ -414,14 +444,17 @@ fn xsd_string_feature_names_preserve_empty_whitespace_and_supplementary_scalars(
     assert!(xml.contains("\u{10000}"));
     assert!(xml.contains("\u{10ffff}"));
 
-    let parsed = parse_features(&workbook_xml(&format!(
-        concat!(
-            r#"<extLst><ext uri="{}"><xcalcf:calcFeatures>"#,
-            r#"<xcalcf:feature name="&#x9;&#xA;&#xD;"/>"#,
-            r#"</xcalcf:calcFeatures></ext></extLst>"#,
-        ),
-        CALC_FEATURES_URI
-    )))
+    let parsed = parse_features(
+        &workbook_xml(&format!(
+            concat!(
+                r#"<extLst><ext uri="{}"><xcalcf:calcFeatures>"#,
+                r#"<xcalcf:feature name="&#x9;&#xA;&#xD;"/>"#,
+                r#"</xcalcf:calcFeatures></ext></extLst>"#,
+            ),
+            CALC_FEATURES_URI
+        )),
+        &litchi_xlsx::calculation_properties::Limits::default(),
+    )
     .expect("parse xsd:string whitespace")
     .expect("calcFeatures");
     assert_eq!(parsed.get(0).unwrap().as_str(), "\t\n\r");
@@ -429,7 +462,7 @@ fn xsd_string_feature_names_preserve_empty_whitespace_and_supplementary_scalars(
 
 #[test]
 fn strict_prefixed_noncanonical_workbook_writes_and_reopens_calc_pr() {
-    let mut raw = Package::create().expect("minimal package").into_plain_opc();
+    let mut raw = Package::new().expect("minimal package").into_plain_opc();
     let workbook_name = raw
         .main_document_part()
         .expect("workbook part")
@@ -488,7 +521,7 @@ fn strict_prefixed_noncanonical_workbook_writes_and_reopens_calc_pr() {
 
 #[test]
 fn strict_prefixed_workbook_inserts_calc_features_with_strict_core_qnames() {
-    let mut raw = Package::create().expect("minimal package").into_plain_opc();
+    let mut raw = Package::new().expect("minimal package").into_plain_opc();
     let workbook_name = raw
         .main_document_part()
         .expect("workbook part")
@@ -560,7 +593,7 @@ fn strict_prefixed_workbook_inserts_calc_features_with_strict_core_qnames() {
 #[test]
 fn mce_selected_calc_features_are_readable_but_changed_edit_is_refused() {
     const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
-    let mut raw = Package::create().expect("minimal package").into_plain_opc();
+    let mut raw = Package::new().expect("minimal package").into_plain_opc();
     let workbook_name = raw.main_document_part().unwrap().partname().clone();
     let xml = std::str::from_utf8(raw.get_part(&workbook_name).unwrap().blob())
         .unwrap()
@@ -583,7 +616,7 @@ fn mce_selected_calc_features_are_readable_but_changed_edit_is_refused() {
     raw.get_part_mut(&workbook_name)
         .expect("mutable workbook")
         .set_blob(xml.clone());
-    let mut package = Package::from_opc(raw).expect("MCE fixture");
+    let package = Package::from_opc(raw).expect("MCE fixture");
     let snapshot = package.calculation_metadata().expect("projected metadata");
     assert_eq!(
         snapshot.features().unwrap().get(0).unwrap().as_str(),
@@ -591,7 +624,10 @@ fn mce_selected_calc_features_are_readable_but_changed_edit_is_refused() {
     );
 
     let mut edit = package.edit_calculation_metadata().expect("feature edit");
-    assert!(edit.set_features(Features::new(Feature::new("changed").unwrap())));
+    assert!(
+        edit.set_features(Features::new(Feature::new("changed").unwrap()))
+            .unwrap()
+    );
     let error = edit.commit().expect_err("projected edit must be refused");
     assert!(matches!(error, Error::Invalid(_)));
     assert!(error.to_string().contains("projected through MCE"));

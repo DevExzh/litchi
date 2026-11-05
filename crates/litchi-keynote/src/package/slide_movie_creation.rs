@@ -23,21 +23,50 @@ use super::slide_audio_creation::{
     physical_catalog, plan_movie_metadata, prepare_movie_builds, read_movie_content_and_poster,
     resolve_context, verify_movie_graph,
 };
-use crate::slide::audio::creation::{SlideAudioCreationError, SlideAudioCreationLimitKind};
+use crate::slide::audio::creation::{
+    Error as SlideAudioCreationError, LimitKind as SlideAudioCreationLimitKind,
+};
 use crate::slide::movie::Options;
 use crate::slide::movie::creation::{
-    SlideMovieCreationCommit, SlideMovieCreationDiagnostics, SlideMovieCreationError,
-    SlideMovieCreationLimitKind, SlideMovieCreationPatch,
+    Commit as SlideMovieCreationCommit, Diagnostics as SlideMovieCreationDiagnostics,
+    Error as SlideMovieCreationError, LimitKind as SlideMovieCreationLimitKind,
+    Patch as SlideMovieCreationPatch,
 };
 use crate::{MovieKind, SlideSelector};
 
 impl Package {
-    /// Create one independently positioned, file-backed movie on a slide.
+    /// Start an immutable single-creation slide movie edit.
+    ///
+    /// ```no_run
+    /// use std::fs;
+    /// use litchi_keynote::{Package, SlideSelector, slide::movie::Options};
+    ///
+    /// # fn create(options: Options) -> Result<(), Box<dyn std::error::Error>> {
+    /// let source = Package::open("presentation.key")?;
+    /// let (movie, poster) = (fs::read("clip.mov")?, fs::read("poster.png")?);
+    /// let commit = source
+    ///     .edit_slide_movie_creation()
+    ///     .add(SlideSelector::index(0), "clip.mov", &movie, "poster.png", &poster, options)?
+    ///     .commit()?;
+    /// let restored = commit
+    ///     .package()
+    ///     .apply_slide_movie_creation(&commit.patch().inverse())?;
+    /// # Ok(())
+    /// # }
+    /// # fn main() {}
+    /// ```
+    #[must_use]
+    pub const fn edit_slide_movie_creation(&self) -> crate::slide::movie::creation::Edit<'_> {
+        crate::slide::movie::creation::Edit::new(self)
+    }
+
+    /// Create one independently positioned, file-backed movie on a slide: the
+    /// commit of [`crate::slide::movie::creation::Edit`].
     ///
     /// Both movie and poster bytes are borrowed until the exact candidate has
     /// been assembled and reopened. The source package remains unchanged and
     /// the returned patch authorizes replay only for that exact source.
-    pub fn add_slide_movie<'slide>(
+    pub(crate) fn create_slide_movie<'slide>(
         &self,
         slide: impl Into<SlideSelector<'slide>>,
         preferred_movie_filename: &str,
@@ -267,13 +296,25 @@ fn validate_input(
 ) -> Result<(), SlideMovieCreationError> {
     super::slide_audio_creation::validate_media_input(package, filename, bytes, expected).map_err(
         |error| match error {
-            SlideAudioCreationError::InvalidFilename => match kind {
-                InputKind::Movie => SlideMovieCreationError::InvalidMovieFilename,
-                InputKind::Poster => SlideMovieCreationError::InvalidPosterFilename,
+            SlideAudioCreationError::Refused(
+                crate::slide::audio::creation::Refusal::InvalidFilename,
+            ) => match kind {
+                InputKind::Movie => SlideMovieCreationError::Refused(
+                    crate::slide::movie::creation::Refusal::InvalidMovieFilename,
+                ),
+                InputKind::Poster => SlideMovieCreationError::Refused(
+                    crate::slide::movie::creation::Refusal::InvalidPosterFilename,
+                ),
             },
-            SlideAudioCreationError::UnsupportedAudio => match kind {
-                InputKind::Movie => SlideMovieCreationError::UnsupportedMovie,
-                InputKind::Poster => SlideMovieCreationError::UnsupportedPoster,
+            SlideAudioCreationError::Refused(
+                crate::slide::audio::creation::Refusal::UnsupportedAudio,
+            ) => match kind {
+                InputKind::Movie => SlideMovieCreationError::Refused(
+                    crate::slide::movie::creation::Refusal::UnsupportedMovie,
+                ),
+                InputKind::Poster => SlideMovieCreationError::Refused(
+                    crate::slide::movie::creation::Refusal::UnsupportedPoster,
+                ),
             },
             other => map_error(other),
         },
@@ -447,21 +488,43 @@ fn verify_created_movie_semantics(
 
 fn map_error(error: SlideAudioCreationError) -> SlideMovieCreationError {
     match error {
-        SlideAudioCreationError::UnsupportedSource => SlideMovieCreationError::UnsupportedSource,
-        SlideAudioCreationError::EmptySlideName => SlideMovieCreationError::EmptySlideName,
-        SlideAudioCreationError::SlideNameNotFound => SlideMovieCreationError::SlideNameNotFound,
-        SlideAudioCreationError::AmbiguousSelector => SlideMovieCreationError::AmbiguousSelector,
-        SlideAudioCreationError::SlidePositionNotFound { position } => {
-            SlideMovieCreationError::SlidePositionNotFound { position }
+        SlideAudioCreationError::Refused(
+            crate::slide::audio::creation::Refusal::UnsupportedSource,
+        ) => SlideMovieCreationError::Refused(
+            crate::slide::movie::creation::Refusal::UnsupportedSource,
+        ),
+        SlideAudioCreationError::Refused(
+            crate::slide::audio::creation::Refusal::EmptySlideName,
+        ) => {
+            SlideMovieCreationError::Refused(crate::slide::movie::creation::Refusal::EmptySlideName)
         },
+        SlideAudioCreationError::Refused(
+            crate::slide::audio::creation::Refusal::SlideNameNotFound,
+        ) => SlideMovieCreationError::Refused(
+            crate::slide::movie::creation::Refusal::SlideNameNotFound,
+        ),
+        SlideAudioCreationError::Refused(
+            crate::slide::audio::creation::Refusal::AmbiguousSelector,
+        ) => SlideMovieCreationError::Refused(
+            crate::slide::movie::creation::Refusal::AmbiguousSelector,
+        ),
+        SlideAudioCreationError::Refused(
+            crate::slide::audio::creation::Refusal::SlidePositionNotFound { position },
+        ) => SlideMovieCreationError::Refused(
+            crate::slide::movie::creation::Refusal::SlidePositionNotFound { position },
+        ),
         SlideAudioCreationError::InvalidSource
-        | SlideAudioCreationError::InvalidFilename
-        | SlideAudioCreationError::UnsupportedAudio => SlideMovieCreationError::InvalidSource,
-        SlideAudioCreationError::LimitExceeded {
+        | SlideAudioCreationError::Refused(
+            crate::slide::audio::creation::Refusal::InvalidFilename,
+        )
+        | SlideAudioCreationError::Refused(
+            crate::slide::audio::creation::Refusal::UnsupportedAudio,
+        ) => SlideMovieCreationError::InvalidSource,
+        SlideAudioCreationError::Limit {
             kind,
             observed,
             maximum,
-        } => SlideMovieCreationError::LimitExceeded {
+        } => SlideMovieCreationError::Limit {
             kind: map_limit_kind(kind),
             observed,
             maximum,
@@ -471,6 +534,16 @@ fn map_error(error: SlideAudioCreationError) -> SlideMovieCreationError {
         },
         SlideAudioCreationError::Verification => SlideMovieCreationError::Verification,
         SlideAudioCreationError::PatchConflict => SlideMovieCreationError::PatchConflict,
+        SlideAudioCreationError::Refused(
+            crate::slide::audio::creation::Refusal::OperationAlreadyStaged,
+        ) => SlideMovieCreationError::Refused(
+            crate::slide::movie::creation::Refusal::OperationAlreadyStaged,
+        ),
+        SlideAudioCreationError::Refused(
+            crate::slide::audio::creation::Refusal::NoStagedOperation,
+        ) => SlideMovieCreationError::Refused(
+            crate::slide::movie::creation::Refusal::NoStagedOperation,
+        ),
     }
 }
 

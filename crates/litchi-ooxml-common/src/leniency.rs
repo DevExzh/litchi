@@ -491,7 +491,9 @@ mod tests {
                 .join("../../test-data")
                 .join(fixture);
             let bytes = std::fs::read(&path).expect("fixture");
-            let package = litchi_opc::OpcPackage::from_bytes(&bytes).expect("open");
+            let package =
+                litchi_opc::OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default())
+                    .expect("open");
             assert!(package.tolerance_report().is_clean(), "{fixture}");
 
             let mut report = ToleranceReport::default();

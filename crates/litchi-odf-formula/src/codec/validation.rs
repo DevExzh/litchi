@@ -2,7 +2,7 @@
 //!
 //! ODF 1.4 Part 3, 2.2.1(B.4), requires a `math`-rooted `content.xml`
 //! to validate against the `MathML` 2.0 schema.  The ODF Relax NG schema in
-//! `3rdparty/specs/OpenDocument-v1.4-os.zip` deliberately uses an `anyName`
+//! (OASIS `OpenDocument-v1.4-os.zip`) deliberately uses an `anyName`
 //! placeholder for `MathML`, so this module implements the bounded presentation
 //! and content subset of the referenced `MathML` 2 schema that the model
 //! exposes.

@@ -10,7 +10,8 @@
 
 use std::collections::HashMap;
 
-use litchi_opc::{PackURI, ReadLimits, SourceBackedPackage};
+use litchi_opc::SourceCacheLimits;
+use litchi_opc::{PackURI, SourceBackedPackage, SourceLimits};
 use soapberry_zip::office::ArchiveLimits;
 use soapberry_zip::{PreservationIndex, ZipArchive};
 
@@ -32,15 +33,15 @@ fn pack(uri: &str) -> PackURI {
     PackURI::new(uri).unwrap()
 }
 
-fn interoperability_limits() -> ReadLimits {
+fn interoperability_limits() -> SourceLimits {
     // The ZIP64 member is admitted by its declared 4 GiB archive/part
     // ceilings, while the physical corpus remains bounded by the ordinary
     // input and compressed-byte policies.  The test never requests the large
     // decoded payload.
-    ReadLimits::builder()
-        .max_archive_entry_bytes(LARGE_DECLARED_BYTES)
+    SourceLimits::builder()
+        .max_entry_bytes(LARGE_DECLARED_BYTES)
         .unwrap()
-        .max_archive_total_bytes(LARGE_DECLARED_BYTES + MAX_PHYSICAL_SOURCE_BYTES as u64)
+        .max_aggregate_bytes(LARGE_DECLARED_BYTES + MAX_PHYSICAL_SOURCE_BYTES as u64)
         .unwrap()
         .max_part_bytes(LARGE_DECLARED_BYTES)
         .unwrap()
@@ -53,9 +54,7 @@ fn interoperability_limits() -> ReadLimits {
 fn raw_records(data: &[u8]) -> HashMap<Vec<u8>, RawRecord> {
     let archive = ZipArchive::from_slice(data).unwrap().into_zip_archive();
     let mut scratch = vec![0; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index =
-        PreservationIndex::new_with_limits(&archive, &mut scratch, ArchiveLimits::UNBOUNDED)
-            .unwrap();
+    let index = PreservationIndex::new(&archive, &mut scratch, ArchiveLimits::UNBOUNDED).unwrap();
 
     index
         .entries()
@@ -100,7 +99,7 @@ fn independent_zip64_source_metadata_and_small_xml_edit_preserve_large_member() 
     assert_eq!(source_bytes.len() as u64, source_length);
 
     let limits = interoperability_limits();
-    let package = SourceBackedPackage::from_path_with_limits(&source_path, limits)
+    let package = SourceBackedPackage::from_path(&source_path, limits)
         .expect("independent ZIP64 OPC source should open with the declared-size profile");
 
     package
@@ -141,13 +140,14 @@ fn independent_zip64_source_metadata_and_small_xml_edit_preserve_large_member() 
     // A fresh source-backed package performs the small selected read needed by
     // the overlay. The 4 GiB member remains a raw preservation span throughout.
     let mut output = Vec::new();
-    SourceBackedPackage::from_path_with_limits(&source_path, limits)
+    SourceBackedPackage::from_path(&source_path, limits)
         .unwrap()
         .write_part_overlay_to_stream(&mut output, &pack(DOCUMENT_URI), REPLACEMENT.to_vec())
         .expect("small XML edit should publish while retaining ZIP64 source members");
 
-    let output_package = SourceBackedPackage::from_vec_with_limits(output.clone(), limits)
-        .expect("edited ZIP64 publication should reopen as an OPC package");
+    let output_package =
+        SourceBackedPackage::from_vec(output.clone(), limits, SourceCacheLimits::default(), None)
+            .expect("edited ZIP64 publication should reopen as an OPC package");
     output_package
         .validate_topology_source_boundary()
         .expect("edited ZIP64 publication should retain a valid source topology");

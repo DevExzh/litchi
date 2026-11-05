@@ -12,12 +12,16 @@ use litchi_core::patch::{
 };
 use serde_json::Value;
 
+#[cfg(test)]
+use super::Commit;
 use super::{
-    Commit, CompositionLimits, Edit, HistoryLimits, MAX_DOCUMENT_XML_BYTES, MAX_OPERATIONS,
-    ManagedAdmission, Operation, Patch, RevisionAction, RevisionKind, Snapshot, SourceIdentity,
-    TableCellAddress, TransactionError, TransactionResult, TransferGraph, TransferPart,
-    TransferRelationship, XmlStorage,
+    CompositionLimits, Edit, Error as TransactionError, GraphChange, HistoryLimits,
+    MAX_DOCUMENT_XML_BYTES, MAX_OPERATIONS, ManagedAdmission, Operation, Patch, ReplacedPart,
+    Result as TransactionResult, RevisionAction, RevisionKind, Snapshot, SourceIdentity,
+    TableCellAddress, TransferGraph, TransferPart, TransferRelationship, XmlStorage,
 };
+
+const MAX_TRANSFER_GRAPH_BYTES: usize = 64 * 1024 * 1024;
 
 const FORMAT_NAME: &str = "litchi-docx/document";
 const RESTORE_OPERATION: &str = "document.restore";
@@ -81,11 +85,11 @@ struct TransferGraphDecoder<'a> {
 }
 
 /// One independently prepared DOCX document edit.
-pub struct PreparedEdit {
+pub struct Prepared {
     inner: SubEdit<Lineage, Vec<Operation>>,
 }
 
-impl PreparedEdit {
+impl Prepared {
     /// Stable caller-selected composition identifier.
     #[must_use]
     pub fn identifier(&self) -> &str {
@@ -99,12 +103,12 @@ impl PreparedEdit {
     }
 }
 
-impl fmt::Debug for PreparedEdit {
+impl fmt::Debug for Prepared {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("PreparedEdit")
-            .field("identifier", &self.identifier())
-            .field("operations", &self.operations())
+            .debug_struct("Prepared")
+            .field("identifier_bytes", &self.identifier().len())
+            .field("operations", &self.operations().len())
             .finish()
     }
 }
@@ -112,7 +116,7 @@ impl fmt::Debug for PreparedEdit {
 /// Recoverable failure to join one prepared document edit.
 pub struct JoinError {
     failure: Box<litchi_core::patch::SubEditJoinFailure>,
-    rejected: Box<PreparedEdit>,
+    rejected: Box<Prepared>,
 }
 
 impl JoinError {
@@ -124,7 +128,7 @@ impl JoinError {
 
     /// Recover the rejected prepared edit.
     #[must_use]
-    pub fn into_rejected(self) -> PreparedEdit {
+    pub fn into_rejected(self) -> Prepared {
         *self.rejected
     }
 }
@@ -133,7 +137,6 @@ impl fmt::Debug for JoinError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("JoinError")
-            .field("failure", &self.failure)
             .field("rejected", &self.rejected)
             .finish()
     }
@@ -143,20 +146,36 @@ impl fmt::Debug for JoinError {
 pub struct Composition {
     source: Snapshot,
     joined: JoinedSubEdits<Lineage, Vec<Operation>>,
+    artifact_fingerprint: Option<[u8; 32]>,
 }
 
 impl Composition {
+    /// Borrow the exact immutable source used by this composition.
+    #[must_use]
+    pub const fn source(&self) -> &Snapshot {
+        &self.source
+    }
+
+    /// Bind this plan to the complete package artifact that supplied its
+    /// source document. Package owners use this proof to reject a package
+    /// whose untouched parts differ while still accepting an independently
+    /// reopened equal-content artifact.
+    pub(crate) fn with_artifact_fingerprint(mut self, fingerprint: [u8; 32]) -> Self {
+        self.artifact_fingerprint = Some(fingerprint);
+        self
+    }
+
     /// Join work only when its exact source and semantic effects are disjoint.
     ///
     /// # Errors
     ///
     /// Returns a structured common refusal while retaining the rejected edit.
-    pub fn join(&mut self, incoming: PreparedEdit) -> Result<&mut Self, JoinError> {
+    pub fn join(&mut self, incoming: Prepared) -> Result<&mut Self, JoinError> {
         if let Err(error) = self.joined.join(incoming.inner) {
             let (failure, rejected) = error.into_parts();
             return Err(JoinError {
                 failure: Box::new(failure),
-                rejected: Box::new(PreparedEdit { inner: rejected }),
+                rejected: Box::new(Prepared { inner: rejected }),
             });
         }
         Ok(self)
@@ -174,20 +193,20 @@ impl Composition {
         self.joined.is_empty()
     }
 
-    /// Commit every accepted edit atomically in stable identifier order.
+    /// Consume the plan into its exact source and one stable operation batch.
     ///
-    /// # Errors
-    ///
-    /// Returns a semantic precondition, bound, or XML validation error without
-    /// changing the immutable source snapshot.
-    pub fn commit(self) -> TransactionResult<Commit> {
-        let mut edit = self.source.edit();
-        for prepared in self.joined.into_sub_edits() {
-            for operation in prepared.into_payload() {
-                edit.apply_operation(&operation)?;
-            }
-        }
-        edit.commit()
+    /// Publication is owned by an eager or source-backed package. Keeping this
+    /// extraction crate-private prevents a composition from publishing a raw
+    /// document snapshot while retaining the one validation/commit pass of the
+    /// planner.
+    pub(crate) fn into_parts(self) -> (Snapshot, Vec<Operation>, Option<[u8; 32]>) {
+        let artifact_fingerprint = self.artifact_fingerprint;
+        let operations = self
+            .joined
+            .into_sub_edits()
+            .flat_map(|prepared| prepared.into_payload())
+            .collect();
+        (self.source, operations, artifact_fingerprint)
     }
 }
 
@@ -225,7 +244,6 @@ impl fmt::Debug for ThreeWayError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("ThreeWayError")
-            .field("failure", &self.failure)
             .finish_non_exhaustive()
     }
 }
@@ -234,6 +252,7 @@ impl fmt::Debug for ThreeWayError {
 pub struct ThreeWayPlan {
     source: Snapshot,
     inner: ThreeWayMergePlan<Lineage, Vec<Operation>>,
+    artifact_fingerprint: Option<[u8; 32]>,
 }
 
 impl ThreeWayPlan {
@@ -263,12 +282,21 @@ impl ThreeWayPlan {
     ///
     /// Returns this unchanged plan while conflicts remain unresolved.
     pub fn finish(self) -> Result<Composition, Box<Self>> {
-        let Self { source, inner } = self;
+        let Self {
+            source,
+            inner,
+            artifact_fingerprint,
+        } = self;
         match inner.finish() {
-            Ok(joined) => Ok(Composition { source, joined }),
+            Ok(joined) => Ok(Composition {
+                source,
+                joined,
+                artifact_fingerprint,
+            }),
             Err(unresolved) => Err(Box::new(Self {
                 source,
                 inner: *unresolved,
+                artifact_fingerprint,
             })),
         }
     }
@@ -278,7 +306,7 @@ impl fmt::Debug for ThreeWayPlan {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("ThreeWayPlan")
-            .field("conflicts", self.conflicts())
+            .field("conflicts", &self.conflicts().len())
             .finish_non_exhaustive()
     }
 }
@@ -341,15 +369,17 @@ impl History {
         self.inner.limits()
     }
 
-    pub(crate) fn ensure_can_record(&self, commit: &Commit) -> TransactionResult<()> {
-        if self.current().is_managed() || commit.snapshot().is_managed() {
-            return Err(TransactionError::Document(crate::Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "document.history.ensure_can_record",
-                reason: "managed history metadata has no retained reservation ledger",
-            }));
+    pub(crate) fn ensure_can_record<P>(
+        &self,
+        commit: &crate::document::Commit<P>,
+    ) -> TransactionResult<()> {
+        if self.current().is_managed() || commit.patch().target().is_managed() {
+            return Err(TransactionError::Document(crate::Error::internal(
+                "document.history.ensure_can_record",
+                "managed history metadata has no retained reservation ledger",
+            )));
         }
-        let bytes = history_weight(commit)?;
+        let bytes = history_weight(commit.patch().target(), commit.patch())?;
         if bytes > self.limits().max_weight() {
             return Err(litchi_core::patch::PatchError::HistoryWeight {
                 observed: bytes,
@@ -371,16 +401,49 @@ impl History {
     ///
     /// Returns a history-weight error without changing history when the
     /// published transition alone exceeds the configured byte budget.
-    pub fn record(&mut self, commit: Commit) -> TransactionResult<Vec<Snapshot>> {
-        if self.current().is_managed() || commit.snapshot().is_managed() {
-            return Err(TransactionError::Document(crate::Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "document.history.record",
-                reason: "managed history metadata has no retained reservation ledger",
-            }));
+    pub fn record<P>(
+        &mut self,
+        commit: crate::document::Commit<P>,
+    ) -> TransactionResult<Vec<Snapshot>> {
+        if self.current().is_managed() || commit.patch().target().is_managed() {
+            return Err(TransactionError::Document(crate::Error::internal(
+                "document.history.record",
+                "managed history metadata has no retained reservation ledger",
+            )));
         }
-        let weight = history_weight(&commit)?;
-        let graph = history_graph_transition(commit.patch.operations())?;
+        let weight = history_weight(commit.patch().target(), commit.patch())?;
+        let graph = history_graph_transition(commit.patch().operations())?;
+        let invalidated_redo = self.redo_graph.len();
+        let discarded = self
+            .inner
+            .record(commit.patch().target().clone(), weight)
+            .map_err(TransactionError::from)?;
+        self.pending_graph = None;
+        self.redo_graph.clear();
+        self.undo_graph.push_back(graph);
+        let evicted = discarded.len().saturating_sub(invalidated_redo);
+        for _ in 0..evicted {
+            let _discarded = self.undo_graph.pop_front();
+        }
+        Ok(discarded)
+    }
+
+    /// Record an internal codec transaction for the transaction module's
+    /// differential tests. Public callers record the canonical owner commit
+    /// through [`Self::record`].
+    #[cfg(test)]
+    pub(crate) fn record_transaction(
+        &mut self,
+        commit: Commit,
+    ) -> TransactionResult<Vec<Snapshot>> {
+        if self.current().is_managed() || commit.snapshot().is_managed() {
+            return Err(TransactionError::Document(crate::Error::internal(
+                "document.history.record_transaction",
+                "managed history metadata has no retained reservation ledger",
+            )));
+        }
+        let weight = history_weight(commit.snapshot(), commit.patch())?;
+        let graph = history_graph_transition(commit.patch().operations())?;
         let invalidated_redo = self.redo_graph.len();
         let discarded = self
             .inner
@@ -432,6 +495,7 @@ impl Snapshot {
         Composition {
             source: self.clone(),
             joined: JoinedSubEdits::new(self.lineage(), limits),
+            artifact_fingerprint: None,
         }
     }
 
@@ -453,11 +517,26 @@ impl Snapshot {
                 right: Box::new(right),
             });
         }
+        let artifact_fingerprint = match (left.artifact_fingerprint, right.artifact_fingerprint) {
+            (Some(left), Some(right)) if left == right => Some(left),
+            (None, None) => None,
+            _ => {
+                return Err(ThreeWayError {
+                    failure: ThreeWayMergeFailure::DifferentLineage,
+                    left: Box::new(left),
+                    right: Box::new(right),
+                });
+            },
+        };
         let source = self.clone();
         let left_source = left.source.clone();
         let right_source = right.source.clone();
         match ThreeWayMergePlan::new(left.joined, right.joined) {
-            Ok(inner) => Ok(ThreeWayPlan { source, inner }),
+            Ok(inner) => Ok(ThreeWayPlan {
+                source,
+                inner,
+                artifact_fingerprint,
+            }),
             Err(error) => {
                 let failure = error.failure().clone();
                 let (left_joined, right_joined) = error.into_branches();
@@ -466,10 +545,12 @@ impl Snapshot {
                     left: Box::new(Composition {
                         source: left_source,
                         joined: left_joined,
+                        artifact_fingerprint,
                     }),
                     right: Box::new(Composition {
                         source: right_source,
                         joined: right_joined,
+                        artifact_fingerprint,
                     }),
                 })
             },
@@ -491,11 +572,10 @@ impl Snapshot {
     /// stale artifact hashes, or failed semantic preconditions.
     pub fn apply_durable<Mode>(&self, patch: &CorePatch<Mode>) -> TransactionResult<Self> {
         if self.is_managed() {
-            return Err(TransactionError::Document(crate::Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "document.apply_durable",
-                reason: "durable replay has no source-owner publication authority",
-            }));
+            return Err(TransactionError::Document(crate::Error::internal(
+                "document.apply_durable",
+                "durable replay has no source-owner publication authority",
+            )));
         }
         if patch.format() != FORMAT_NAME {
             return Err(invalid_durable("unsupported format"));
@@ -505,9 +585,9 @@ impl Snapshot {
         }
         if patch.operations().len() > MAX_OPERATIONS {
             return Err(TransactionError::Limit {
-                resource: "durable operations",
-                max: MAX_OPERATIONS,
-                actual: patch.operations().len(),
+                kind: crate::document::LimitKind::DurableOperations,
+                maximum: MAX_OPERATIONS,
+                observed: patch.operations().len(),
             });
         }
         let expected_artifact = BlobId::of(self.xml_bytes()).as_hex();
@@ -518,7 +598,7 @@ impl Snapshot {
                 .and_then(Value::as_str)
                 .ok_or_else(|| invalid_durable("missing artifact hash precondition"))?;
             if artifact != expected_artifact {
-                return Err(TransactionError::StaleSource);
+                return Err(TransactionError::PatchConflict);
             }
         }
 
@@ -591,14 +671,7 @@ impl Edit {
         self,
         limits: CompositionLimits,
         identifier: impl Into<String>,
-    ) -> TransactionResult<PreparedEdit> {
-        if self.base.is_managed() {
-            return Err(TransactionError::Document(crate::Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "document.edit.prepare",
-                reason: "durable composition metadata has no managed owner reservation",
-            }));
-        }
+    ) -> TransactionResult<Prepared> {
         let (reads, writes) = operation_effects(&self.operations, self.base.paragraph_count());
         let inner = SubEdit::new(
             self.base.lineage(),
@@ -608,7 +681,7 @@ impl Edit {
             writes,
             self.operations,
         )?;
-        Ok(PreparedEdit { inner })
+        Ok(Prepared { inner })
     }
 }
 
@@ -625,11 +698,10 @@ impl Patch {
         limits: PatchLimits,
     ) -> Result<CorePatch<Reversible>, TransactionError> {
         if self.before.is_managed() || self.after.is_managed() {
-            return Err(TransactionError::Document(crate::Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "document.patch.to_durable",
-                reason: "durable serialization has no managed owner reservation",
-            }));
+            return Err(TransactionError::Document(crate::Error::internal(
+                "document.patch.to_durable",
+                "durable serialization has no managed owner reservation",
+            )));
         }
         let forward_artifact = BlobId::of(self.before.xml_bytes()).as_hex();
         let reverse_artifact = BlobId::of(self.after.xml_bytes()).as_hex();
@@ -689,27 +761,37 @@ impl<'a> TransferGraphDecoder<'a> {
         Ok(Self { bytes, offset: 5 })
     }
 
-    fn count(&mut self, resource: &'static str, max: usize) -> TransactionResult<usize> {
+    fn count(
+        &mut self,
+        kind: crate::document::LimitKind,
+        maximum: usize,
+    ) -> TransactionResult<usize> {
         let count_bytes = self.take(8)?;
         let encoded = u64::from_le_bytes(
             count_bytes
                 .try_into()
                 .map_err(|_error| invalid_durable("invalid transfer graph count"))?,
         );
-        let count = usize::try_from(encoded)
-            .map_err(|_error| invalid_durable("transfer graph count does not fit usize"))?;
-        if count > max {
+        let count = usize::try_from(encoded).map_err(|_error| TransactionError::Limit {
+            kind,
+            observed: usize::MAX,
+            maximum,
+        })?;
+        if count > maximum {
             return Err(TransactionError::Limit {
-                resource,
-                max,
-                actual: count,
+                kind,
+                maximum,
+                observed: count,
             });
         }
         Ok(count)
     }
 
     fn bytes(&mut self) -> TransactionResult<&'a [u8]> {
-        let length = self.count("field bytes", 64 * 1024 * 1024)?;
+        let length = self.count(
+            crate::document::LimitKind::FieldBytes,
+            MAX_TRANSFER_GRAPH_BYTES,
+        )?;
         self.take(length)
     }
 
@@ -785,28 +867,27 @@ pub(crate) fn durable_transfer_operations<Mode>(
         .collect()
 }
 
-fn history_weight(commit: &Commit) -> TransactionResult<u64> {
-    let mut bytes = u64::try_from(commit.snapshot().xml_bytes().len()).map_err(|_error| {
-        TransactionError::Limit {
-            resource: "history transition bytes",
-            max: usize::MAX,
-            actual: commit.snapshot().xml_bytes().len(),
-        }
-    })?;
-    if let Some(transition) = history_graph_transition(commit.patch.operations())? {
+fn history_weight(snapshot: &Snapshot, patch: &Patch) -> TransactionResult<u64> {
+    let mut bytes =
+        u64::try_from(snapshot.xml_bytes().len()).map_err(|_error| TransactionError::Limit {
+            kind: crate::document::LimitKind::HistoryTransitionBytes,
+            maximum: usize::MAX,
+            observed: snapshot.xml_bytes().len(),
+        })?;
+    if let Some(transition) = history_graph_transition(patch.operations())? {
         for part in transition.graph.parts.iter() {
             let part_bytes =
                 u64::try_from(part.blob.len()).map_err(|_error| TransactionError::Limit {
-                    resource: "history dependency bytes",
-                    max: usize::MAX,
-                    actual: part.blob.len(),
+                    kind: crate::document::LimitKind::HistoryDependencyBytes,
+                    maximum: usize::MAX,
+                    observed: part.blob.len(),
                 })?;
             bytes = bytes
                 .checked_add(part_bytes)
                 .ok_or(TransactionError::Limit {
-                    resource: "history transition bytes",
-                    max: usize::MAX,
-                    actual: usize::MAX,
+                    kind: crate::document::LimitKind::HistoryTransitionBytes,
+                    maximum: usize::MAX,
+                    observed: usize::MAX,
                 })?;
         }
     }
@@ -846,6 +927,8 @@ fn history_graph_transition(
             | Operation::ReplaceParagraphText { .. }
             | Operation::ReplaceHyperlinkText { .. }
             | Operation::ReplaceRunText { .. }
+            | Operation::ReplaceRunTextNode { .. }
+            | Operation::MarkCachedRunFieldDirty { .. }
             | Operation::ReplaceSimpleFieldText { .. }
             | Operation::ReplaceComplexFieldText { .. }
             | Operation::ReplaceRevisionText { .. }
@@ -860,7 +943,17 @@ fn history_graph_transition(
             | Operation::ReplaceNestedCellParagraphText { .. }
             | Operation::ReplaceNestedCellParagraphHyperlinkText { .. }
             | Operation::InsertParagraph { .. }
-            | Operation::RemoveParagraph { .. } => None,
+            | Operation::RemoveParagraph { .. }
+            | Operation::ReplaceRunProperties { .. }
+            | Operation::ReplaceParagraphProperties { .. }
+            | Operation::InsertParagraphFragment { .. }
+            | Operation::RemoveParagraphFragment { .. }
+            | Operation::InsertRun { .. }
+            | Operation::RemoveRun { .. }
+            | Operation::ReplaceElement { .. }
+            | Operation::InsertElement { .. }
+            | Operation::RemoveElement { .. }
+            | Operation::ChangeGraph { .. } => None,
         };
         if let Some(selected_transition) = candidate {
             if selected.is_some() {
@@ -952,6 +1045,24 @@ fn operation_effects(
                 reads.push(format!("body/paragraph:{}/all-text", paragraph.get()));
                 writes.push(format!(
                     "body/paragraph:{}/run:{}/text",
+                    paragraph.get(),
+                    run.get()
+                ));
+            },
+            Operation::ReplaceRunTextNode { paragraph, run, .. } => {
+                reads.push("body/paragraph-order".to_owned());
+                reads.push(format!("body/paragraph:{}/all-text", paragraph.get()));
+                writes.push(format!(
+                    "body/paragraph:{}/run:{}/text-node",
+                    paragraph.get(),
+                    run.get()
+                ));
+            },
+            Operation::MarkCachedRunFieldDirty { paragraph, run, .. } => {
+                reads.push("body/paragraph-order".to_owned());
+                reads.push(format!("body/paragraph:{}/all-text", paragraph.get()));
+                writes.push(format!(
+                    "body/paragraph:{}/run:{}/cached-field-dirty",
                     paragraph.get(),
                     run.get()
                 ));
@@ -1133,8 +1244,53 @@ fn operation_effects(
             Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::InsertTransferredParagraph { .. }
-            | Operation::RemoveTransferredParagraph { .. } => {
+            | Operation::RemoveTransferredParagraph { .. }
+            | Operation::InsertParagraphFragment { .. }
+            | Operation::RemoveParagraphFragment { .. } => {
                 writes.push("body/paragraph-order".to_owned());
+            },
+            Operation::ReplaceRunProperties { paragraph, run, .. } => {
+                // A property container changes neither the run's text nor
+                // the paragraph's run order, so it composes with text edits
+                // of the same paragraph; whole-paragraph rewrites (revision
+                // dispositions, run insertion and removal) write the
+                // paragraph's `all-text` key and conflict.
+                reads.push("body/paragraph-order".to_owned());
+                reads.push(format!("body/paragraph:{}/all-text", paragraph.get()));
+                writes.push(format!(
+                    "body/paragraph:{}/run:{}/properties",
+                    paragraph.get(),
+                    run.get()
+                ));
+            },
+            Operation::ReplaceParagraphProperties { paragraph, .. } => {
+                reads.push("body/paragraph-order".to_owned());
+                reads.push(format!("body/paragraph:{}/all-text", paragraph.get()));
+                writes.push(format!("body/paragraph:{}/properties", paragraph.get()));
+            },
+            Operation::InsertRun { paragraph, .. } | Operation::RemoveRun { paragraph, .. } => {
+                // The run order of the paragraph changes: every inline
+                // selector of the paragraph reads this key.
+                reads.push("body/paragraph-order".to_owned());
+                writes.push(format!("body/paragraph:{}/all-text", paragraph.get()));
+            },
+            Operation::ReplaceElement { path, .. } => {
+                // A path-addressed element is reached through the body's
+                // block order; a direct-body paragraph's whole text changes
+                // with it.
+                reads.push("body/paragraph-order".to_owned());
+                if let Some(super::ElementStep::Paragraph(position)) = path.steps().first() {
+                    writes.push(format!("body/paragraph:{}/all-text", position.get()));
+                }
+                writes.push(format!("body/element:{path}"));
+            },
+            Operation::InsertElement { container, .. }
+            | Operation::RemoveElement { container, .. } => {
+                writes.push("body/paragraph-order".to_owned());
+                writes.push(format!("body/element:{container}/children"));
+            },
+            Operation::ChangeGraph { .. } => {
+                writes.push("package/graph".to_owned());
             },
         }
     }
@@ -1202,6 +1358,35 @@ fn durable_operation(
                 "run.text.replace",
                 format!("paragraph:{}/run:{}", paragraph.get(), run.get()),
                 Value::String(after.clone()),
+            )
+        },
+        Operation::ReplaceRunTextNode {
+            paragraph,
+            run,
+            before,
+            after,
+        } => {
+            preconditions.insert("before".to_owned(), markup_value(before, "run text node")?);
+            (
+                "run.text-node.replace",
+                format!("paragraph:{}/run:{}", paragraph.get(), run.get()),
+                markup_value(after, "run text node")?,
+            )
+        },
+        Operation::MarkCachedRunFieldDirty {
+            paragraph,
+            run,
+            before,
+            after,
+        } => {
+            preconditions.insert(
+                "before".to_owned(),
+                markup_value(before, "cached field marker")?,
+            );
+            (
+                "run.cached-field-dirty.mark",
+                format!("paragraph:{}/run:{}", paragraph.get(), run.get()),
+                markup_value(after, "cached field marker")?,
             )
         },
         Operation::ReplaceSimpleFieldText {
@@ -1510,8 +1695,136 @@ fn durable_operation(
                 Value::String(identifier.as_hex()),
             )
         },
+        Operation::ReplaceRunProperties {
+            paragraph,
+            run,
+            before,
+            after,
+        } => {
+            preconditions.insert("before".to_owned(), markup_value(before, "run properties")?);
+            (
+                "run.properties.replace",
+                format!("paragraph:{}/run:{}", paragraph.get(), run.get()),
+                markup_value(after, "run properties")?,
+            )
+        },
+        Operation::ReplaceParagraphProperties {
+            paragraph,
+            before,
+            after,
+        } => {
+            preconditions.insert(
+                "before".to_owned(),
+                markup_value(before, "paragraph properties")?,
+            );
+            (
+                "paragraph.properties.replace",
+                format!("paragraph:{}", paragraph.get()),
+                markup_value(after, "paragraph properties")?,
+            )
+        },
+        Operation::InsertParagraphFragment {
+            child,
+            position,
+            xml,
+        } => (
+            "paragraph.fragment.insert",
+            format!("body-child:{}/paragraph:{}", child.get(), position.get()),
+            markup_value(xml, "paragraph")?,
+        ),
+        Operation::RemoveParagraphFragment {
+            child,
+            position,
+            xml,
+        } => (
+            "paragraph.fragment.remove",
+            format!("body-child:{}/paragraph:{}", child.get(), position.get()),
+            markup_value(xml, "paragraph")?,
+        ),
+        Operation::InsertRun {
+            paragraph,
+            child,
+            run,
+            xml,
+        } => (
+            "run.fragment.insert",
+            format!(
+                "paragraph:{}/child:{}/run:{}",
+                paragraph.get(),
+                child.get(),
+                run.get()
+            ),
+            markup_value(xml, "run")?,
+        ),
+        Operation::RemoveRun {
+            paragraph,
+            child,
+            run,
+            xml,
+        } => (
+            "run.fragment.remove",
+            format!(
+                "paragraph:{}/child:{}/run:{}",
+                paragraph.get(),
+                child.get(),
+                run.get()
+            ),
+            markup_value(xml, "run")?,
+        ),
+        Operation::ChangeGraph { change, forward } => {
+            let identifier = blobs.insert(&encode_graph_change(change)?)?;
+            (
+                "graph.change",
+                if *forward {
+                    "package-graph:forward".to_owned()
+                } else {
+                    "package-graph:inverse".to_owned()
+                },
+                Value::String(identifier.as_hex()),
+            )
+        },
+        Operation::ReplaceElement {
+            path,
+            before,
+            after,
+        } => {
+            preconditions.insert("before".to_owned(), markup_value(before, "element")?);
+            (
+                "element.replace",
+                format!("element:{path}"),
+                markup_value(after, "element")?,
+            )
+        },
+        Operation::InsertElement {
+            container,
+            child,
+            xml,
+        } => (
+            "element.insert",
+            format!("container:{container}/child:{}", child.get()),
+            markup_value(xml, "element")?,
+        ),
+        Operation::RemoveElement {
+            container,
+            child,
+            xml,
+        } => (
+            "element.remove",
+            format!("container:{container}/child:{}", child.get()),
+            markup_value(xml, "element")?,
+        ),
     };
     PatchOperation::new(limits, name, target, preconditions, value)
+}
+
+/// Exact markup carried in a durable operation as a JSON string.
+fn markup_value(
+    xml: &Arc<Vec<u8>>,
+    field: &'static str,
+) -> Result<Value, litchi_core::patch::PatchError> {
+    String::from_utf8(xml.as_slice().to_vec())
+        .map(Value::String)
+        .map_err(|_error| litchi_core::patch::PatchError::InvalidText { field })
 }
 
 fn noop_operation(
@@ -1582,6 +1895,8 @@ fn restore_transfer_operation(
         | Operation::ReplaceParagraphText { .. }
         | Operation::ReplaceHyperlinkText { .. }
         | Operation::ReplaceRunText { .. }
+        | Operation::ReplaceRunTextNode { .. }
+        | Operation::MarkCachedRunFieldDirty { .. }
         | Operation::ReplaceSimpleFieldText { .. }
         | Operation::ReplaceComplexFieldText { .. }
         | Operation::ReplaceRevisionText { .. }
@@ -1596,7 +1911,17 @@ fn restore_transfer_operation(
         | Operation::ReplaceNestedCellParagraphText { .. }
         | Operation::ReplaceNestedCellParagraphHyperlinkText { .. }
         | Operation::InsertParagraph { .. }
-        | Operation::RemoveParagraph { .. } => return Ok(None),
+        | Operation::RemoveParagraph { .. }
+        | Operation::ReplaceRunProperties { .. }
+        | Operation::ReplaceParagraphProperties { .. }
+        | Operation::InsertParagraphFragment { .. }
+        | Operation::RemoveParagraphFragment { .. }
+        | Operation::InsertRun { .. }
+        | Operation::RemoveRun { .. }
+        | Operation::ReplaceElement { .. }
+        | Operation::InsertElement { .. }
+        | Operation::RemoveElement { .. }
+        | Operation::ChangeGraph { .. } => return Ok(None),
     };
     let graph_identifier = blobs.insert(encode_transfer_graph(graph)?)?;
     let mut preconditions = artifact_precondition(artifact);
@@ -1655,6 +1980,74 @@ fn encode_transfer_graph(graph: &TransferGraph) -> Result<Vec<u8>, litchi_core::
     Ok(output)
 }
 
+/// A package-graph change: its transfer-graph form, then its replaced
+/// parts (name, before, after).
+fn encode_graph_change(change: &GraphChange) -> Result<Vec<u8>, litchi_core::patch::PatchError> {
+    let mut output = encode_transfer_graph(&TransferGraph {
+        main_relationships: Arc::clone(&change.relationships),
+        parts: Arc::clone(&change.parts),
+    })?;
+    put_transfer_count(&mut output, change.replaced.len())?;
+    for replaced in change.replaced.iter() {
+        put_transfer_bytes(&mut output, replaced.name.as_bytes())?;
+        put_transfer_bytes(&mut output, replaced.before.as_slice())?;
+        put_transfer_bytes(&mut output, replaced.after.as_slice())?;
+    }
+    Ok(output)
+}
+
+fn decode_graph_change(bytes: &[u8]) -> TransactionResult<GraphChange> {
+    let mut decoder = TransferGraphDecoder::new(bytes)?;
+    let main_count = decoder.count(crate::document::LimitKind::MainRelationships, 64)?;
+    let mut relationships = Vec::with_capacity(main_count);
+    for _ in 0..main_count {
+        relationships.push(decoder.relationship()?);
+    }
+    let part_count = decoder.count(crate::document::LimitKind::Parts, 256)?;
+    let mut parts = Vec::with_capacity(part_count);
+    let mut total_bytes = 0usize;
+    for _ in 0..part_count {
+        let name = decoder.string()?;
+        let content_type = decoder.string()?;
+        let blob = decoder.bytes()?;
+        total_bytes = checked_transfer_graph_bytes(total_bytes, blob.len())?;
+        let blob = blob.to_vec();
+        let relationship_count =
+            decoder.count(crate::document::LimitKind::PartRelationships, 256)?;
+        let mut part_relationships = Vec::with_capacity(relationship_count);
+        for _ in 0..relationship_count {
+            part_relationships.push(decoder.relationship()?);
+        }
+        parts.push(TransferPart {
+            name,
+            content_type,
+            blob: Arc::new(blob),
+            relationships: part_relationships.into(),
+        });
+    }
+    let replaced_count = decoder.count(crate::document::LimitKind::Parts, 256)?;
+    let mut replaced = Vec::with_capacity(replaced_count);
+    for _ in 0..replaced_count {
+        let name = decoder.string()?;
+        let before = decoder.bytes()?;
+        total_bytes = checked_transfer_graph_bytes(total_bytes, before.len())?;
+        let before = Arc::new(before.to_vec());
+        let after = decoder.bytes()?;
+        total_bytes = checked_transfer_graph_bytes(total_bytes, after.len())?;
+        replaced.push(ReplacedPart {
+            name,
+            before,
+            after: Arc::new(after.to_vec()),
+        });
+    }
+    decoder.finish()?;
+    Ok(GraphChange {
+        relationships: relationships.into(),
+        parts: parts.into(),
+        replaced: replaced.into(),
+    })
+}
+
 fn encode_transfer_relationship(
     output: &mut Vec<u8>,
     relationship: &TransferRelationship,
@@ -1687,7 +2080,7 @@ fn put_transfer_bytes(
 
 fn decode_transfer_graph(bytes: &[u8]) -> TransactionResult<TransferGraph> {
     let mut decoder = TransferGraphDecoder::new(bytes)?;
-    let main_count = decoder.count("main relationships", 64)?;
+    let main_count = decoder.count(crate::document::LimitKind::MainRelationships, 64)?;
     let mut main_relationships = Vec::new();
     main_relationships
         .try_reserve_exact(main_count)
@@ -1695,7 +2088,7 @@ fn decode_transfer_graph(bytes: &[u8]) -> TransactionResult<TransferGraph> {
     for _ in 0..main_count {
         main_relationships.push(decoder.relationship()?);
     }
-    let part_count = decoder.count("parts", 256)?;
+    let part_count = decoder.count(crate::document::LimitKind::Parts, 256)?;
     let mut parts = Vec::new();
     parts
         .try_reserve_exact(part_count)
@@ -1704,14 +2097,11 @@ fn decode_transfer_graph(bytes: &[u8]) -> TransactionResult<TransferGraph> {
     for _ in 0..part_count {
         let name = decoder.string()?;
         let content_type = decoder.string()?;
-        let blob = decoder.bytes()?.to_vec();
-        total_bytes = total_bytes
-            .checked_add(blob.len())
-            .ok_or_else(|| invalid_durable("transfer graph byte count overflowed"))?;
-        if total_bytes > 64 * 1024 * 1024 {
-            return Err(invalid_durable("transfer graph bytes exceed limit"));
-        }
-        let relationship_count = decoder.count("part relationships", 256)?;
+        let blob = decoder.bytes()?;
+        total_bytes = checked_transfer_graph_bytes(total_bytes, blob.len())?;
+        let blob = blob.to_vec();
+        let relationship_count =
+            decoder.count(crate::document::LimitKind::PartRelationships, 256)?;
         let mut relationships = Vec::new();
         relationships
             .try_reserve_exact(relationship_count)
@@ -1776,6 +2166,24 @@ fn parse_durable_operation(
                 run,
                 before: before()?,
                 after: after()?,
+            })
+        },
+        "run.text-node.replace" if operation.preconditions.len() == 3 => {
+            let (paragraph, run) = parse_paragraph_child_target(&operation.target, "/run:")?;
+            Ok(Operation::ReplaceRunTextNode {
+                paragraph,
+                run,
+                before: Arc::new(before()?.into_bytes()),
+                after: Arc::new(after()?.into_bytes()),
+            })
+        },
+        "run.cached-field-dirty.mark" if operation.preconditions.len() == 3 => {
+            let (paragraph, run) = parse_paragraph_child_target(&operation.target, "/run:")?;
+            Ok(Operation::MarkCachedRunFieldDirty {
+                paragraph,
+                run,
+                before: Arc::new(before()?.into_bytes()),
+                after: Arc::new(after()?.into_bytes()),
             })
         },
         "field.result-text.replace" if operation.preconditions.len() == 3 => {
@@ -1946,6 +2354,136 @@ fn parse_durable_operation(
                 text: after()?,
             })
         },
+        "run.properties.replace" if operation.preconditions.len() == 3 => {
+            let (paragraph, run) = parse_paragraph_child_target(&operation.target, "/run:")?;
+            Ok(Operation::ReplaceRunProperties {
+                paragraph,
+                run,
+                before: Arc::new(before()?.into_bytes()),
+                after: Arc::new(after()?.into_bytes()),
+            })
+        },
+        "paragraph.properties.replace" if operation.preconditions.len() == 3 => {
+            Ok(Operation::ReplaceParagraphProperties {
+                paragraph: parse_single_target(&operation.target, "paragraph:")?,
+                before: Arc::new(before()?.into_bytes()),
+                after: Arc::new(after()?.into_bytes()),
+            })
+        },
+        "paragraph.fragment.insert" | "paragraph.fragment.remove"
+            if operation.preconditions.len() == 2 =>
+        {
+            let rest = operation
+                .target
+                .strip_prefix("body-child:")
+                .ok_or_else(|| invalid_durable("invalid paragraph fragment target"))?;
+            let (child, position) = rest
+                .split_once("/paragraph:")
+                .ok_or_else(|| invalid_durable("invalid paragraph fragment target"))?;
+            let (child, position) = (parse_position(child)?, parse_position(position)?);
+            let xml = Arc::new(after()?.into_bytes());
+            Ok(if operation.op == "paragraph.fragment.insert" {
+                Operation::InsertParagraphFragment {
+                    child,
+                    position,
+                    xml,
+                }
+            } else {
+                Operation::RemoveParagraphFragment {
+                    child,
+                    position,
+                    xml,
+                }
+            })
+        },
+        "graph.change" if operation.preconditions.len() == 2 => {
+            let forward = match operation.target.as_str() {
+                "package-graph:forward" => true,
+                "package-graph:inverse" => false,
+                _ => return Err(invalid_durable("invalid package graph target")),
+            };
+            let identifier = operation
+                .value
+                .as_str()
+                .ok_or_else(|| invalid_durable("graph change value must be a blob identifier"))?;
+            let blob_id = blobs
+                .ids()
+                .find(|candidate| candidate.as_hex() == identifier)
+                .ok_or_else(|| invalid_durable("missing graph change blob"))?;
+            let bytes = blobs
+                .get(blob_id)
+                .ok_or_else(|| invalid_durable("missing graph change blob"))?;
+            Ok(Operation::ChangeGraph {
+                change: Arc::new(decode_graph_change(bytes)?),
+                forward,
+            })
+        },
+        "element.replace" if operation.preconditions.len() == 3 => {
+            let path = operation
+                .target
+                .strip_prefix("element:")
+                .and_then(super::ElementPath::parse)
+                .ok_or_else(|| invalid_durable("invalid element target"))?;
+            Ok(Operation::ReplaceElement {
+                path,
+                before: Arc::new(before()?.into_bytes()),
+                after: Arc::new(after()?.into_bytes()),
+            })
+        },
+        "element.insert" | "element.remove" if operation.preconditions.len() == 2 => {
+            let target = || invalid_durable("invalid element container target");
+            let rest = operation
+                .target
+                .strip_prefix("container:")
+                .ok_or_else(target)?;
+            let (container, child) = rest.rsplit_once("/child:").ok_or_else(target)?;
+            let container = super::ElementPath::parse(container).ok_or_else(target)?;
+            let child = parse_position(child)?;
+            let xml = Arc::new(after()?.into_bytes());
+            Ok(if operation.op == "element.insert" {
+                Operation::InsertElement {
+                    container,
+                    child,
+                    xml,
+                }
+            } else {
+                Operation::RemoveElement {
+                    container,
+                    child,
+                    xml,
+                }
+            })
+        },
+        "run.fragment.insert" | "run.fragment.remove" if operation.preconditions.len() == 2 => {
+            let target = || invalid_durable("invalid run fragment target");
+            let rest = operation
+                .target
+                .strip_prefix("paragraph:")
+                .ok_or_else(target)?;
+            let (paragraph, rest) = rest.split_once("/child:").ok_or_else(target)?;
+            let (child, run) = rest.split_once("/run:").ok_or_else(target)?;
+            let (paragraph, child, run) = (
+                parse_position(paragraph)?,
+                parse_position(child)?,
+                parse_position(run)?,
+            );
+            let xml = Arc::new(after()?.into_bytes());
+            Ok(if operation.op == "run.fragment.insert" {
+                Operation::InsertRun {
+                    paragraph,
+                    child,
+                    run,
+                    xml,
+                }
+            } else {
+                Operation::RemoveRun {
+                    paragraph,
+                    child,
+                    run,
+                    xml,
+                }
+            })
+        },
         "paragraph.transfer.insert" | "paragraph.transfer.remove"
             if matches!(operation.preconditions.len(), 4 | 5) =>
         {
@@ -2073,7 +2611,7 @@ fn validate_semantic_blobs<Mode>(patch: &CorePatch<Mode>) -> TransactionResult<(
     for operation in patch.operations().iter().filter(|operation| {
         matches!(
             operation.op.as_str(),
-            "paragraph.transfer.insert" | "paragraph.transfer.remove"
+            "paragraph.transfer.insert" | "paragraph.transfer.remove" | "graph.change"
         )
     }) {
         referenced.insert(
@@ -2166,9 +2704,9 @@ fn restore_snapshot<Mode>(
         .ok_or_else(|| invalid_durable("missing restore artifact"))?;
     if bytes.len() > MAX_DOCUMENT_XML_BYTES {
         return Err(TransactionError::Limit {
-            resource: "restore artifact bytes",
-            max: MAX_DOCUMENT_XML_BYTES,
-            actual: bytes.len(),
+            kind: crate::document::LimitKind::RestoreArtifactBytes,
+            maximum: MAX_DOCUMENT_XML_BYTES,
+            observed: bytes.len(),
         });
     }
     if let Some(identity) = identity {
@@ -2237,9 +2775,9 @@ fn parse_position_path(value: &str) -> TransactionResult<Arc<[Position]>> {
     let components = value.split(',').collect::<Vec<_>>();
     if components.len() > MAX_OPERATIONS {
         return Err(TransactionError::Limit {
-            resource: "durable selector path",
-            max: MAX_OPERATIONS,
-            actual: components.len(),
+            kind: crate::document::LimitKind::DurableSelectorPath,
+            maximum: MAX_OPERATIONS,
+            observed: components.len(),
         });
     }
     components
@@ -2291,9 +2829,9 @@ fn parse_nested_cell_target(
     let steps = path.split(';').collect::<Vec<_>>();
     if steps.len() > MAX_OPERATIONS {
         return Err(TransactionError::Limit {
-            resource: "durable nested table path",
-            max: MAX_OPERATIONS,
-            actual: steps.len(),
+            kind: crate::document::LimitKind::DurableNestedTablePath,
+            maximum: MAX_OPERATIONS,
+            observed: steps.len(),
         });
     }
     let addresses = steps
@@ -2337,4 +2875,52 @@ fn parse_position(value: &str) -> TransactionResult<Position> {
 
 fn invalid_durable(message: &str) -> TransactionError {
     TransactionError::InvalidDurable(message.to_owned())
+}
+
+fn checked_transfer_graph_bytes(current: usize, additional: usize) -> TransactionResult<usize> {
+    let observed = current.saturating_add(additional);
+    if observed > MAX_TRANSFER_GRAPH_BYTES {
+        return Err(TransactionError::Limit {
+            kind: crate::document::LimitKind::TransferGraphBytes,
+            observed,
+            maximum: MAX_TRANSFER_GRAPH_BYTES,
+        });
+    }
+    Ok(observed)
+}
+
+#[cfg(test)]
+mod limit_tests {
+    use super::*;
+
+    #[test]
+    fn transfer_graph_aggregate_limit_reports_boundary_and_overflow() {
+        assert_eq!(
+            checked_transfer_graph_bytes(MAX_TRANSFER_GRAPH_BYTES - 1, 1).unwrap(),
+            MAX_TRANSFER_GRAPH_BYTES
+        );
+        for (current, additional, expected) in [
+            (MAX_TRANSFER_GRAPH_BYTES, 1, MAX_TRANSFER_GRAPH_BYTES + 1),
+            (usize::MAX, 1, usize::MAX),
+        ] {
+            assert!(
+                matches!(checked_transfer_graph_bytes(current, additional), Err(TransactionError::Limit { kind: crate::document::LimitKind::TransferGraphBytes, observed, maximum: MAX_TRANSFER_GRAPH_BYTES }) if observed == expected)
+            );
+        }
+    }
+
+    #[test]
+    fn decoder_reports_typed_relationship_count_before_reading_records() {
+        let mut bytes = b"LDXG1".to_vec();
+        bytes.extend_from_slice(&65u64.to_le_bytes());
+        let mut decoder = TransferGraphDecoder::new(&bytes).unwrap();
+        assert!(matches!(
+            decoder.count(crate::document::LimitKind::MainRelationships, 64),
+            Err(TransactionError::Limit {
+                kind: crate::document::LimitKind::MainRelationships,
+                observed: 65,
+                maximum: 64
+            })
+        ));
+    }
 }

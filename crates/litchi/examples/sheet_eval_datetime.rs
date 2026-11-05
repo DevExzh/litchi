@@ -6,11 +6,11 @@
 //! Run with:
 //!
 //! ```bash
-//! cargo run --example sheet_eval_datetime --features ooxml -- sheet_eval_datetime.xlsx
+//! cargo run --example sheet_eval_datetime --features xlsx,eval -- sheet_eval_datetime.xlsx
 //! ```
 
-use litchi::sheet::{FormulaEvaluator, functions::open_workbook};
-use litchi::xlsx::{Formula, Workbook};
+use litchi::sheet::FormulaEvaluator;
+use litchi::xlsx::{Formula, Package};
 use std::env;
 use std::error::Error;
 
@@ -27,8 +27,11 @@ async fn main() -> ExampleResult<()> {
 
     build_sample_xlsx(path)?;
 
-    let xlsx_wb = open_workbook(path)?;
-    let evaluator = FormulaEvaluator::new(xlsx_wb.as_ref());
+    // Reopen the workbook with `litchi::open`. Its workbook view implements
+    // `WorkbookTrait` by static dispatch, so the evaluator borrows it directly.
+    let file = litchi::open(path)?;
+    let workbook = file.workbook()?;
+    let evaluator = FormulaEvaluator::new(&workbook);
 
     println!("Evaluating date/time functions on DateTime in {}", path);
 
@@ -54,7 +57,7 @@ async fn main() -> ExampleResult<()> {
 }
 
 fn build_sample_xlsx(path: &str) -> ExampleResult<()> {
-    let wb = Workbook::create()?;
+    let wb = Package::new()?;
     let mut edit = wb.edit()?;
     edit.tab(0)?
         .ok_or("missing worksheet tab")?
@@ -103,7 +106,7 @@ fn build_sample_xlsx(path: &str) -> ExampleResult<()> {
         )?;
     }
 
-    edit.commit()?.into_workbook().save(path)?;
+    edit.commit()?.into_package().save(path)?;
     println!("Created date/time test workbook at {}", path);
 
     Ok(())

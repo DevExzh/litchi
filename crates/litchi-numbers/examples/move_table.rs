@@ -3,7 +3,7 @@
 //! The input must contain both the source and destination sheets. The example
 //! intentionally accepts the package path from the caller so it can be used
 //! with an Apple-authored two-sheet fixture without manufacturing a package or
-//! depending on the legacy `litchi-iwa` facade.
+//! depending on a migration host.
 
 #![allow(
     clippy::print_stdout,
@@ -16,7 +16,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use litchi_numbers::cell::Value;
-use litchi_numbers::{CellPosition, Dimensions, Package, SheetSelector, Table, TableSelector};
+use litchi_numbers::{At, Dimensions, Package, SheetSelector, Table, TableSelector};
 
 const USAGE: &str = "usage: move_table <input.numbers> <output.numbers> \\
                      <source-sheet-selector> <table-selector> \\
@@ -49,7 +49,7 @@ impl Selector {
 struct TableSnapshot {
     name: String,
     dimensions: Dimensions,
-    cells: Vec<(CellPosition, Value)>,
+    cells: Vec<(At, Value)>,
     column_headers: Vec<String>,
     row_headers: Vec<String>,
 }

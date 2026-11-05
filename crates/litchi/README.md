@@ -18,36 +18,45 @@ litchi = { version = "0", features = ["docx", "pptx", "xlsx"] }
 ```
 
 ```rust
-use litchi::{Document, Presentation, Workbook};
+fn main() -> litchi::Result<()> {
+    // One entry point for every format: the content decides the format.
+    let file = litchi::open("report.docx")?;
+    println!("{}", file.text()?);
 
-fn main() -> Result<(), litchi::Error> {
-    let doc = Document::open("report.docx")?;
-    println!("{}", doc.text()?);
+    let deck = litchi::open("slides.pptx")?;
+    println!("slides: {}", deck.presentation()?.slide_count()?);
 
-    let pres = Presentation::open("slides.pptx")?;
-    println!("slides: {}", pres.slide_count()?);
-
-    let wb = Workbook::open("data.xlsx")?;
-    println!("sheets: {}", wb.worksheet_count());
+    let book = litchi::open("data.xlsx")?;
+    println!("sheets: {:?}", book.workbook()?.worksheet_names()?);
     Ok(())
 }
 ```
 
 ## Entry Points
 
-- `Document::open` — unified Word reader (`.doc`, `.docx`, `.odt`, `.rtf`, `.pages`).
-- `Presentation::open` — unified PowerPoint reader (`.ppt`, `.pptx`, `.odp`, `.key`).
-- `Workbook::open` — unified spreadsheet reader (`.xls`, `.xlsx`, `.xlsb`, `.ods`, `.numbers`).
-- `detect_file_format` / `detect_file_format_from_bytes` — format sniffing without parsing.
+- `litchi::open` / `litchi::open_bytes` — detect the format from the content
+  in one pass and return a `File`, one variant per format (`.doc`, `.docx`,
+  `.rtf`, `.odt`, `.ppt`, `.pptx`, `.odp`, `.xls`, `.xlsx`, `.xlsb`, `.ods`,
+  and Apple `.pages`, `.key` and `.numbers` packages and package directories),
+  plus `File::Locked` for an encrypted input and `File::Signed` for a signed
+  one. `open_with` / `open_bytes_with` take `OpenOptions` for limits and
+  policy.
+- `File::document`, `File::presentation`, `File::workbook` — the family views;
+  each refuses a file of another family and names the format it found.
+- `detect_file_format` / `detect_file_format_from_bytes` — format sniffing
+  without parsing.
+
+Every failure is one `litchi::Error` with a stable `litchi::Code`.
 
 ## Bounded OOXML Ingestion
 
-`docx`, `pptx`, `xlsx`, and `xlsb` re-export `ReadLimits`, the shared checked
+`docx`, `pptx`, `xlsx`, and `xlsb` re-export `SourceLimits`, the shared checked
 OPC package-ingestion policy. Ordinary constructors use bounded defaults.
-Construct a profile from those defaults with `ReadLimits::builder()` and supply
-it to the matching contextual API: DOCX and PPTX `Package::*_with_limits`,
-XLSX `Package::*_with_limits` or `Workbook::*_with_limits`, and XLSB
-`Workbook::new_with_limits`.
+Construct a profile from those defaults with `SourceLimits::builder()` and supply
+it through the format's `OpenOptions` (`Package::open_with_options`,
+`from_bytes_with_options`, …). The unified owner passes its
+`litchi::OpenOptions::ooxml_limits` policy to `open_with` and `open_bytes_with`;
+the direct detection functions take the required `&SourceLimits` explicitly.
 
 The policy bounds compressed input, ZIP member counts, names, directory
 metadata, compressed and uncompressed member sizes, materialized OPC parts,
@@ -57,13 +66,16 @@ MS-OI29500 §2.1.1749-1752 for hostile input; it is a Litchi safety policy,
 not a specification maximum.
 
 ```rust
-use litchi::docx::{Package, ReadLimits};
+use litchi::docx::{OpenOptions, Package, SourceLimits};
 
-let limits = ReadLimits::builder()
+let limits = SourceLimits::builder()
     .max_input_bytes(32 * 1024 * 1024)?
-    .max_archive_members(10_000)?
+    .max_members(10_000)?
     .build()?;
-let package = Package::open_with_limits("untrusted.docx", limits)?;
+let package = Package::open_with_options(
+    "untrusted.docx",
+    OpenOptions::default().source_limits(limits),
+)?;
 # let _ = package;
 # Ok::<(), litchi::Error>(())
 ```
@@ -76,7 +88,7 @@ activates them.
 
 With the `numbers` feature enabled, the focused reader vocabulary is also
 available below `litchi::numbers::semantic`. It keeps selectors and values
-typed at the facade boundary: use `CellPosition`/`CellRange` for A1
+typed at the facade boundary: use `At`/`Area` for A1
 coordinates, `Value` for cell values, and `Storage` to distinguish a missing
 cell from an explicitly stored empty value. The semantic namespace does not
 re-export package objects, native identifiers, or wire records.
@@ -84,10 +96,10 @@ re-export package objects, native identifiers, or wire records.
 ```rust,no_run
 use litchi::numbers::semantic::{
     cell::Value,
-    table::{CellPosition, cells::Storage},
+    table::{At, cells::Storage},
 };
 
-let coordinate = CellPosition::from_a1("B2")?;
+let coordinate = At::from_a1("B2")?;
 let value = Value::number(42.0)?;
 assert_eq!(value.as_number(), Some(42.0));
 

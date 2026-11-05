@@ -33,6 +33,18 @@ pub enum InvalidNumberFormat {
         /// Number of Unicode scalar values in the rejected code.
         length: usize,
     },
+    /// The code contains an XML 1.0-forbidden character.
+    InvalidCharacter {
+        /// The rejected character.
+        character: char,
+    },
+    /// A quoted literal, bracket expression, or character operand is incomplete.
+    InvalidSyntax {
+        /// The structural defect.
+        reason: &'static str,
+    },
+    /// Excel supports no more than four display sections.
+    TooManySections,
     /// A user-defined format used an ID from the reserved built-in range
     /// `0..=163`; custom formats must use [`FIRST_CUSTOM_ID`] or above.
     ReservedId {
@@ -50,6 +62,17 @@ impl fmt::Display for InvalidNumberFormat {
                 "number-format code has {length} characters, exceeding Excel's \
                  {MAX_CODE_LENGTH}-character limit"
             ),
+            Self::InvalidCharacter { character } => write!(
+                formatter,
+                "number-format code contains forbidden character U+{:04X}",
+                *character as u32
+            ),
+            Self::InvalidSyntax { reason } => {
+                write!(formatter, "invalid number-format code: {reason}")
+            },
+            Self::TooManySections => {
+                formatter.write_str("number-format code has more than four sections")
+            },
             Self::ReservedId { id } => write!(
                 formatter,
                 "number-format ID {id} is in the reserved built-in range 0..={}",
@@ -82,8 +105,23 @@ impl NumberFormat {
     ///
     /// Returns [`InvalidNumberFormat::EmptyCode`] for an empty code and
     /// [`InvalidNumberFormat::CodeTooLong`] for a code above Excel's
-    /// 255-character limit.
+    /// 255-character limit. Other code errors follow [`Self::validate_code`].
     pub fn new(id: u32, code: String) -> Result<Self, InvalidNumberFormat> {
+        Self::validate_code(&code)?;
+        Ok(Self { id, code })
+    }
+
+    /// Validate a number-format code without allocating a format record.
+    ///
+    /// Checks XML characters and Excel's structural authoring limits. This is
+    /// not a full evaluator of locale-specific number-format tokens. Reading
+    /// existing files remains lossless through the deserialization path.
+    ///
+    /// # Errors
+    ///
+    /// Rejects empty or overlong codes, forbidden XML characters, unclosed
+    /// literals/brackets, missing character operands, or more than four sections.
+    pub fn validate_code(code: &str) -> Result<(), InvalidNumberFormat> {
         if code.is_empty() {
             return Err(InvalidNumberFormat::EmptyCode);
         }
@@ -91,7 +129,55 @@ impl NumberFormat {
         if length > MAX_CODE_LENGTH {
             return Err(InvalidNumberFormat::CodeTooLong { length });
         }
-        Ok(Self { id, code })
+        let mut quoted = false;
+        let mut bracket = false;
+        let mut sections = 1;
+        let mut operand = false;
+        for character in code.chars() {
+            if !matches!(character as u32, 0x9 | 0xA | 0xD | 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x10FFFF)
+            {
+                return Err(InvalidNumberFormat::InvalidCharacter { character });
+            }
+            if operand {
+                operand = false;
+                continue;
+            }
+            if character == '"' {
+                quoted = !quoted;
+                continue;
+            }
+            if quoted {
+                continue;
+            }
+            match character {
+                '\\' | '_' | '*' => operand = true,
+                '[' if bracket => {
+                    return Err(InvalidNumberFormat::InvalidSyntax {
+                        reason: "nested brackets",
+                    });
+                },
+                '[' => bracket = true,
+                ']' if !bracket => {
+                    return Err(InvalidNumberFormat::InvalidSyntax {
+                        reason: "unmatched closing bracket",
+                    });
+                },
+                ']' => bracket = false,
+                ';' if !bracket => {
+                    sections += 1;
+                    if sections > 4 {
+                        return Err(InvalidNumberFormat::TooManySections);
+                    }
+                },
+                _ => {},
+            }
+        }
+        if quoted || bracket || operand {
+            return Err(InvalidNumberFormat::InvalidSyntax {
+                reason: "unclosed literal, bracket, or character operand",
+            });
+        }
+        Ok(())
     }
 
     /// Create a user-defined number format, reserving the built-in ID range.
@@ -195,10 +281,6 @@ pub fn is_date_format(format: &str) -> bool {
 ///
 /// Returns `None` if the ID is not a recognized built-in format.
 /// Built-in formats are Excel's standard formats (0-163).
-#[allow(
-    dead_code,
-    reason = "reserved for parsing additional built-in number-format families"
-)]
 pub(crate) fn builtin_format_code(id: u32) -> Option<&'static str> {
     match id {
         0 => Some("General"),
@@ -236,6 +318,59 @@ pub(crate) fn builtin_format_code(id: u32) -> Option<&'static str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn validates_authoring_structure_and_escaped_literals() {
+        for code in [
+            "General",
+            "0.00",
+            "[Red][>=100]0;0;0;@",
+            r#"0\""#,
+            r#"0"quoted;[text]""#,
+            r"0\;0",
+            "0_;0",
+            "0*;0",
+            "[$€-407]#,##0.00",
+            "[h]:mm:ss",
+        ] {
+            assert!(
+                NumberFormat::validate_code(code).is_ok(),
+                "rejected {code:?}"
+            );
+        }
+        for code in [
+            "",
+            "0\u{0}",
+            "0\u{b}",
+            "0;0;0;0;@",
+            "[Red",
+            "0]",
+            "[[Red]]0",
+            "0\\",
+            "0_",
+            "0*",
+            "\"unclosed",
+        ] {
+            assert!(
+                NumberFormat::validate_code(code).is_err(),
+                "accepted {code:?}"
+            );
+        }
+        assert!(NumberFormat::validate_code(&"0".repeat(255)).is_ok());
+        assert!(matches!(
+            NumberFormat::validate_code(&"0".repeat(256)),
+            Err(InvalidNumberFormat::CodeTooLong { length: 256 })
+        ));
+        assert!(NumberFormat::validate_code(&format!("\"{}\"", "€".repeat(253))).is_ok());
+        for id in 0..164 {
+            if let Some(code) = builtin_format_code(id) {
+                assert!(
+                    NumberFormat::validate_code(code).is_ok(),
+                    "invalid builtin {id}: {code}"
+                );
+            }
+        }
+    }
 
     #[test]
     fn test_number_format_new() {

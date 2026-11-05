@@ -5,7 +5,7 @@ use crate::{
     map::{Area, AreaKind, ImageMap},
     source::Source,
 };
-use litchi_core::{Error, Result};
+use litchi_core::Error;
 use litchi_odf_common::{compact_xml, core::PackageWriter};
 
 const MAX_RESOURCES: usize = 100_000;
@@ -27,7 +27,7 @@ pub struct Builder {
 }
 
 impl Builder {
-    /// Creates a builder pre-filled with an empty image content document.
+    /// Creates a builder pre-filled with one frame holding an inline 1x1 PNG.
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -95,18 +95,24 @@ impl Builder {
     /// # Errors
     ///
     /// Returns an error if content validation or package writing fails.
-    pub fn build(self) -> Result<Vec<u8>> {
+    pub fn build(self) -> Result<crate::Package, litchi_odf_common::Error> {
         if self.resources.len() > MAX_RESOURCES {
             return Err(Error::InvalidFormat(format!(
                 "ODI resource count exceeds {MAX_RESOURCES}"
-            )));
+            ))
+            .into());
         }
-        compact_xml::validate(self.content_xml.as_bytes())?;
+        compact_xml::validate(self.content_xml.as_bytes(), compact_xml::Limits::default())
+            .map_err(Error::from)?;
         crate::codec::validate(&self.content_xml)?;
         for xml in [&self.styles_xml, &self.meta_xml].into_iter().flatten() {
-            compact_xml::validate(xml.as_bytes())?;
+            compact_xml::validate(xml.as_bytes(), compact_xml::Limits::default())
+                .map_err(Error::from)?;
         }
-        let mut writer = PackageWriter::new_bounded(256 * 1024 * 1024);
+        let mut writer = PackageWriter::new_bounded(
+            256 * 1024 * 1024,
+            litchi_odf_common::core::StreamingArchiveLimits::default(),
+        );
         writer.set_mimetype(crate::package::MIMETYPE)?;
         writer.add_file("content.xml", self.content_xml.as_bytes())?;
         if let Some(styles_xml) = self.styles_xml {
@@ -123,7 +129,7 @@ impl Builder {
             )?;
         }
         let bytes = writer.finish_to_bounded_bytes()?;
-        crate::package::Snapshot::from_bytes(bytes).map(crate::package::Snapshot::into_bytes)
+        Ok(crate::Package::from_vec(bytes)?)
     }
 }
 

@@ -8,6 +8,7 @@ use crate::model::page_layout::{
     set_xml as set_page_layout_xml,
 };
 use litchi_core::{Error, Result};
+use litchi_odf_common::XmlStreamLimits;
 use litchi_odf_common::style::master::Master as SharedMasterPage;
 use litchi_odf_common::style::master::reader::read as parse_master_pages;
 use quick_xml::events::{BytesStart, Event};
@@ -173,7 +174,8 @@ impl MasterPage {
         let validation_xml = format!(
             "<office:document-styles xmlns:office=\"{OFFICE}\"><office:master-styles>{xml}</office:master-styles></office:document-styles>"
         );
-        let parsed = parse_master_pages(&validation_xml)?;
+        let parsed = parse_master_pages(&validation_xml, XmlStreamLimits::owner_default_value())
+            .map_err(Error::from)?;
         if parsed.len() != 1 || parsed[0].name != self.master_page.name {
             return invalid("serialized master page did not roundtrip");
         }
@@ -185,12 +187,15 @@ impl Presentation {
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn master_pages(&self) -> Result<Vec<MasterPage>> {
-        masters_from_xml(required_styles(self)?)
+        masters_from_xml(
+            required_styles(self)?,
+            XmlStreamLimits::owner_default_value(),
+        )
     }
 
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn add_layout(&mut self, layout: &Layout) -> Result<()> {
+    pub(crate) fn add_layout(&mut self, layout: &Layout) -> Result<()> {
         layout.validate()?;
         let styles = required_styles(self)?.to_string();
         if definitions(&styles, STYLE, "presentation-page-layout", STYLE, "name")?
@@ -208,7 +213,7 @@ impl Presentation {
 
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn replace_page_layout(&mut self, layout: &Layout) -> Result<()> {
+    pub(crate) fn replace_page_layout(&mut self, layout: &Layout) -> Result<()> {
         layout.validate()?;
         let styles = required_styles(self)?.to_string();
         if !definitions(&styles, STYLE, "presentation-page-layout", STYLE, "name")?
@@ -226,7 +231,11 @@ impl Presentation {
 
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn remove_page_layout(&mut self, name: &str, replacement: Option<&str>) -> Result<()> {
+    pub(crate) fn remove_page_layout(
+        &mut self,
+        name: &str,
+        replacement: Option<&str>,
+    ) -> Result<()> {
         validate_name(name, "presentation page layout name")?;
         if replacement == Some(name) {
             return invalid("layout replacement must differ from removed layout");
@@ -264,7 +273,7 @@ impl Presentation {
 
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn reorder_layouts(&mut self, names: &[String]) -> Result<()> {
+    pub(crate) fn reorder_layouts(&mut self, names: &[String]) -> Result<()> {
         let styles = reorder(
             required_styles(self)?,
             STYLE,
@@ -279,7 +288,7 @@ impl Presentation {
 
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn add_master_page(&mut self, master: &MasterPage) -> Result<()> {
+    pub(crate) fn add_master_page(&mut self, master: &MasterPage) -> Result<()> {
         let fragment = master.fragment()?;
         let styles = required_styles(self)?.to_string();
         if definitions(&styles, STYLE, "master-page", STYLE, "name")?.contains_key(master.name()) {
@@ -292,7 +301,7 @@ impl Presentation {
 
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn replace_master_page(&mut self, master: &MasterPage) -> Result<()> {
+    pub(crate) fn replace_master_page(&mut self, master: &MasterPage) -> Result<()> {
         let fragment = master.fragment()?;
         let styles = required_styles(self)?.to_string();
         let masters = definitions(&styles, STYLE, "master-page", STYLE, "name")?;
@@ -306,7 +315,11 @@ impl Presentation {
 
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn remove_master_page(&mut self, name: &str, replacement: Option<&str>) -> Result<()> {
+    pub(crate) fn remove_master_page(
+        &mut self,
+        name: &str,
+        replacement: Option<&str>,
+    ) -> Result<()> {
         validate_name(name, "master page name")?;
         if replacement == Some(name) {
             return invalid("master replacement must differ from removed master");
@@ -348,7 +361,7 @@ impl Presentation {
 
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn reorder_master_pages(&mut self, names: &[String]) -> Result<()> {
+    pub(crate) fn reorder_master_pages(&mut self, names: &[String]) -> Result<()> {
         let styles = reorder(
             required_styles(self)?,
             STYLE,
@@ -363,7 +376,7 @@ impl Presentation {
 
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn assign_slide_master_page(
+    pub(crate) fn assign_slide_master_page(
         &mut self,
         slide_index: usize,
         master_name: Option<&str>,
@@ -389,7 +402,7 @@ impl Presentation {
 
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn assign_slide_page_layout(
+    pub(crate) fn assign_slide_page_layout(
         &mut self,
         slide_index: usize,
         layout_name: Option<&str>,
@@ -427,7 +440,8 @@ impl Presentation {
     pub(crate) fn commit_design(&mut self, styles: &str, content: &str) -> Result<()> {
         validate_references(styles, content)?;
         let package = self.owned_package().package()?;
-        let mut writer = PackageWriter::new();
+        let mut writer =
+            PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
         writer.set_mimetype(package.mimetype())?;
         writer.add_file("content.xml", content.as_bytes())?;
         writer.add_file("styles.xml", styles.as_bytes())?;
@@ -866,8 +880,19 @@ fn rewrite_attr(
     apply(xml, edits)
 }
 
-fn masters_from_xml(xml: &str) -> Result<Vec<MasterPage>> {
-    let parsed = parse_master_pages(xml)?;
+/// Parse the master pages of a `styles.xml` part (or a flat presentation
+/// document) in document order, without opening a package.
+///
+/// # Errors
+///
+/// Returns an error when the XML is malformed or exceeds the definition
+/// limits.
+pub fn parse_masters(styles_xml: &str, limits: XmlStreamLimits) -> Result<Vec<MasterPage>> {
+    masters_from_xml(styles_xml, limits)
+}
+
+fn masters_from_xml(xml: &str, limits: XmlStreamLimits) -> Result<Vec<MasterPage>> {
+    let parsed = parse_master_pages(xml, limits).map_err(Error::from)?;
     if parsed.len() > MAX_DEFINITIONS {
         return invalid("ODP styles exceed 65536 master pages");
     }
@@ -908,7 +933,7 @@ fn validate_references(styles: &str, content: &str) -> Result<()> {
         definitions(styles, STYLE, "presentation-page-layout", STYLE, "name")?
             .into_keys()
             .collect();
-    let masters = masters_from_xml(styles)?;
+    let masters = masters_from_xml(styles, XmlStreamLimits::owner_default_value())?;
     let master_names: HashSet<String> = masters.iter().map(|m| m.name().to_string()).collect();
     let style_spans = scan(styles)?;
     let content_spans = scan(content)?;
@@ -1211,4 +1236,78 @@ fn error(message: impl Into<String>) -> Error {
 }
 fn invalid<T>(message: impl Into<String>) -> Result<T> {
     Err(error(message))
+}
+
+/// The identity of one master page, read without classifying its children.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct MasterSummary {
+    /// `style:name`.
+    pub name: String,
+    /// `style:display-name`.
+    pub display_name: Option<String>,
+    /// `style:page-layout-name`.
+    pub page_layout_name: Option<String>,
+    /// `draw:style-name`, the master's drawing-page style.
+    pub drawing_style_name: Option<String>,
+}
+
+/// List the master pages of a `styles.xml` part (or a flat presentation
+/// document) by their identity attributes only.
+///
+/// Unlike [`parse_masters`], this tolerates master-page children the shared
+/// semantic reader does not classify (such as LibreOffice's `loext:theme`),
+/// because it reads no child.
+///
+/// # Errors
+///
+/// Returns an error when the XML is malformed or holds more than 65,536
+/// master pages.
+pub fn list_masters(styles_xml: &str) -> Result<Vec<MasterSummary>> {
+    const STYLE_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:style:1.0";
+    const DRAW_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
+    let mut reader = NsReader::from_str(styles_xml);
+    reader.config_mut().check_end_names = true;
+    let mut masters = Vec::new();
+    loop {
+        let (resolved, event) = reader
+            .read_resolved_event()
+            .map_err(|source| error(format!("invalid ODP styles XML: {source}")))?;
+        let is_style =
+            matches!(resolved, ResolveResult::Bound(Namespace(namespace)) if namespace == STYLE_NS);
+        match event {
+            Event::Start(element) | Event::Empty(element)
+                if is_style && element.local_name().as_ref() == b"master-page" =>
+            {
+                if masters.len() >= MAX_DEFINITIONS {
+                    return invalid("ODP styles exceed 65536 master pages");
+                }
+                let mut summary = MasterSummary::default();
+                for attribute in element.attributes() {
+                    let attribute = attribute
+                        .map_err(|source| error(format!("invalid ODP attribute: {source}")))?;
+                    let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
+                    let namespace = match namespace {
+                        ResolveResult::Bound(Namespace(namespace)) => namespace,
+                        _ => continue,
+                    };
+                    let value = attribute
+                        .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                        .map_err(|source| error(format!("invalid ODP attribute: {source}")))?
+                        .into_owned();
+                    match (namespace, local.as_ref()) {
+                        (STYLE_NS, b"name") => summary.name = value,
+                        (STYLE_NS, b"display-name") => summary.display_name = Some(value),
+                        (STYLE_NS, b"page-layout-name") => summary.page_layout_name = Some(value),
+                        (DRAW_NS, b"style-name") => summary.drawing_style_name = Some(value),
+                        _ => {},
+                    }
+                }
+                masters.push(summary);
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    Ok(masters)
 }

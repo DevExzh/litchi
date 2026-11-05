@@ -9,7 +9,7 @@
 
 use crate::conditional_formatting::model::*;
 use crate::formula::ParsedFormula;
-use crate::raw::{Writer, kind};
+use crate::raw::{Encoder, kind};
 use std::collections::HashSet;
 use std::io::Write;
 
@@ -24,7 +24,7 @@ use super::wire::{parse_range_list, serialize_rule_extension_guid, write_bin_ran
 
 /// Write all classic and Office 2013 conditional-formatting collections for a worksheet.
 pub fn write_conditional_formattings<W: Write>(
-    writer: &mut Writer<W>,
+    writer: &mut Encoder<W>,
     cond_fmts: &[Formatting],
 ) -> Result<()> {
     validate_extension_links(cond_fmts)?;
@@ -36,10 +36,7 @@ pub fn write_conditional_formattings<W: Write>(
                 i64::from(metadata.priority)
             });
         if priority > 0 && !priorities.insert(priority) {
-            return Err(invalid(
-                "BrtBeginCFRule priority",
-                format!("duplicate {priority}"),
-            ));
+            return Err(invalid("BrtBeginCFRule priority", "duplicate"));
         }
     }
     for formatting in cond_fmts {
@@ -52,15 +49,18 @@ pub fn write_conditional_formattings<W: Write>(
 }
 
 fn write_single_cond_formatting<W: Write>(
-    writer: &mut Writer<W>,
+    writer: &mut Encoder<W>,
     formatting: &Formatting,
 ) -> Result<()> {
     writer.write_record(
         kind::BEGIN_COND_FORMATTING,
-        &serialize_cond_formatting_header(formatting)?,
+        &serialize_cond_formatting_header(formatting, writer.limits())?,
     )?;
     for rule in &formatting.rules {
-        writer.write_record(kind::BEGIN_CF_RULE, &serialize_cf_rule(rule)?)?;
+        writer.write_record(
+            kind::BEGIN_CF_RULE,
+            &serialize_cf_rule(rule, writer.limits())?,
+        )?;
         write_rule_visualization(writer, rule)?;
         if let Some(guid) = rule.classic_extension_guid {
             writer.write_record(kind::CF_RULE_EXT, &serialize_rule_extension_guid(guid))?;
@@ -72,15 +72,18 @@ fn write_single_cond_formatting<W: Write>(
 }
 
 fn write_single_cond_formatting14<W: Write>(
-    writer: &mut Writer<W>,
+    writer: &mut Encoder<W>,
     formatting: &Formatting,
 ) -> Result<()> {
     writer.write_record(
         kind::BEGIN_COND_FORMATTING14,
-        &formatting.serialize_extension14_header()?,
+        &formatting.serialize_extension14_header(writer.limits())?,
     )?;
     for rule in &formatting.rules {
-        writer.write_record(kind::BEGIN_CF_RULE14, &rule.serialize_extension14()?)?;
+        writer.write_record(
+            kind::BEGIN_CF_RULE14,
+            &rule.serialize_extension14(writer.limits())?,
+        )?;
         write_rule_visualization14(writer, rule)?;
         writer.write_record(kind::END_CF_RULE14, &[])?;
     }
@@ -88,7 +91,10 @@ fn write_single_cond_formatting14<W: Write>(
     Ok(())
 }
 
-pub(crate) fn serialize_cond_formatting_header(formatting: &Formatting) -> Result<Vec<u8>> {
+pub(crate) fn serialize_cond_formatting_header(
+    formatting: &Formatting,
+    limits: crate::raw::Limits,
+) -> Result<Vec<u8>> {
     let rule_count = u32::try_from(formatting.rules.len())
         .map_err(|_| invalid("BrtBeginConditionalFormatting", "too many rules"))?;
     let mut ranges = Vec::new();
@@ -98,17 +104,18 @@ pub(crate) fn serialize_cond_formatting_header(formatting: &Formatting) -> Resul
     if ranges.is_empty() || ranges.len() > 8_192 {
         return Err(invalid(
             "BrtBeginConditionalFormatting",
-            format!("classic range count {} is outside 1..=8192", ranges.len()),
+            "classic range count is outside 1..=8192",
         ));
     }
     let mut payload = Vec::with_capacity(12 + ranges.len() * 16);
     payload.extend_from_slice(&rule_count.to_le_bytes());
     payload.extend_from_slice(&u32::from(formatting.pivot_only).to_le_bytes());
     write_bin_range_list(&ranges, &mut payload)?;
+    super::wire::admit_payload(payload.len(), limits)?;
     Ok(payload)
 }
 
-pub(crate) fn serialize_cf_rule(rule: &Rule) -> Result<Vec<u8>> {
+pub(crate) fn serialize_cf_rule(rule: &Rule, limits: crate::raw::Limits) -> Result<Vec<u8>> {
     validate_rule_metadata(rule)?;
     let parameter = effective_rule_parameter(rule)?;
     let formulas = effective_rule_formulas(rule)?;
@@ -151,18 +158,19 @@ pub(crate) fn serialize_cf_rule(rule: &Rule) -> Result<Vec<u8>> {
     payload.extend_from_slice(&flags.to_le_bytes());
     for formula in &slots {
         let size = formula.map_or(0, |formula| formula.rgce.len());
-        let size = u32::try_from(size)
-            .map_err(|_| Error::InvalidFormula("formula is too large".to_string()))?;
+        let size =
+            u32::try_from(size).map_err(|_| Error::InvalidFormula("formula is too large"))?;
         payload.extend_from_slice(&size.to_le_bytes());
     }
-    write_nullable_wide_string(&mut payload, rule.text.as_deref())?;
+    write_nullable_wide_string(&mut payload, rule.text.as_deref(), limits)?;
     for formula in slots.into_iter().flatten() {
-        payload.extend_from_slice(&formula.to_bytes()?);
+        payload.extend_from_slice(&formula.to_bytes(limits)?);
     }
+    super::wire::admit_payload(payload.len(), limits)?;
     Ok(payload)
 }
 
-fn write_rule_visualization<W: Write>(writer: &mut Writer<W>, rule: &Rule) -> Result<()> {
+fn write_rule_visualization<W: Write>(writer: &mut Encoder<W>, rule: &Rule) -> Result<()> {
     match rule.rule_type {
         RuleType::ColorScale => {
             let scale = rule.color_scale.as_ref().expect("validated color scale");
@@ -199,10 +207,7 @@ fn write_rule_visualization<W: Write>(writer: &mut Writer<W>, rule: &Rule) -> Re
             let set = rule.icon_set.as_ref().expect("validated icon set");
             let expected = icon_count(set.icon_set_type)?;
             if set.cfvos.len() != expected {
-                return Err(invalid(
-                    "BrtBeginIconSet",
-                    format!("expected {expected} thresholds, found {}", set.cfvos.len()),
-                ));
+                return Err(invalid("BrtBeginIconSet", "expected thresholds, found"));
             }
             if set.cfvos.iter().any(|cfvo| matches!(cfvo.cfvo_type, 2 | 3)) {
                 return Err(invalid(
@@ -231,7 +236,7 @@ fn write_rule_visualization<W: Write>(writer: &mut Writer<W>, rule: &Rule) -> Re
     Ok(())
 }
 
-fn write_rule_visualization14<W: Write>(writer: &mut Writer<W>, rule: &Rule) -> Result<()> {
+fn write_rule_visualization14<W: Write>(writer: &mut Encoder<W>, rule: &Rule) -> Result<()> {
     if rule.color_scale.is_some() || rule.data_bar.is_some() || rule.icon_set.is_some() {
         return Err(invalid(
             "BrtBeginCFRule14",
@@ -280,7 +285,10 @@ fn write_rule_visualization14<W: Write>(writer: &mut Writer<W>, rule: &Rule) -> 
                 .ok_or_else(|| invalid("BrtBeginCFRule14", "missing extension metadata"))?
                 .priority;
             validate_data_bar14(bar, priority)?;
-            writer.write_record(kind::BEGIN_DATABAR14, &bar.serialize_header()?)?;
+            writer.write_record(
+                kind::BEGIN_DATABAR14,
+                &bar.serialize_header(writer.limits())?,
+            )?;
             write_cfvo14(writer, &bar.min_cfvo, false)?;
             write_cfvo14(writer, &bar.max_cfvo, false)?;
             for color in [
@@ -293,7 +301,10 @@ fn write_rule_visualization14<W: Write>(writer: &mut Writer<W>, rule: &Rule) -> 
             .into_iter()
             .flatten()
             {
-                writer.write_record(kind::COLOR14, &color.serialize_extension14()?)?;
+                writer.write_record(
+                    kind::COLOR14,
+                    &color.serialize_extension14(writer.limits())?,
+                )?;
             }
             writer.write_record(kind::END_DATABAR14, &[])?;
         },
@@ -309,13 +320,16 @@ fn write_rule_visualization14<W: Write>(writer: &mut Writer<W>, rule: &Rule) -> 
                 ));
             }
             validate_icon_set14(set)?;
-            writer.write_record(kind::BEGIN_ICON_SET14, &set.serialize_header()?)?;
+            writer.write_record(
+                kind::BEGIN_ICON_SET14,
+                &set.serialize_header(writer.limits())?,
+            )?;
             for cfvo in &set.cfvos {
                 write_cfvo14(writer, cfvo, true)?;
             }
             if let Some(icons) = &set.custom_icons {
                 for icon in icons {
-                    writer.write_record(kind::CF_ICON, &icon.serialize()?)?;
+                    writer.write_record(kind::CF_ICON, &icon.serialize(writer.limits())?)?;
                 }
             }
             writer.write_record(kind::END_ICON_SET14, &[])?;
@@ -335,7 +349,7 @@ fn write_rule_visualization14<W: Write>(writer: &mut Writer<W>, rule: &Rule) -> 
     Ok(())
 }
 
-fn write_cfvo14<W: Write>(writer: &mut Writer<W>, cfvo: &Value, icon_set: bool) -> Result<()> {
+fn write_cfvo14<W: Write>(writer: &mut Encoder<W>, cfvo: &Value, icon_set: bool) -> Result<()> {
     let formula = effective_cfvo_formula(cfvo)?;
     let numeric_value = if formula.is_none() && matches!(cfvo.cfvo_type, 1 | 4 | 5) {
         cfvo.value
@@ -351,28 +365,29 @@ fn write_cfvo14<W: Write>(writer: &mut Writer<W>, cfvo: &Value, icon_set: bool) 
             formula.as_ref(),
             numeric_value,
             icon_set || cfvo.save_greater_than_or_equal,
+            writer.limits(),
         )?,
     )?;
     Ok(())
 }
 
-fn write_color14<W: Write>(writer: &mut Writer<W>, record: Color, legacy_argb: u32) -> Result<()> {
+fn write_color14<W: Write>(writer: &mut Encoder<W>, record: Color, legacy_argb: u32) -> Result<()> {
     let record = if record.argb == Some(legacy_argb) || (record.argb.is_none() && legacy_argb == 0)
     {
         record
     } else {
         Color::from_argb(legacy_argb)
     };
-    writer.write_record(kind::COLOR14, &record.serialize_extension14()?)?;
+    writer.write_record(
+        kind::COLOR14,
+        &record.serialize_extension14(writer.limits())?,
+    )?;
     Ok(())
 }
 
-fn write_cfvo<W: Write>(writer: &mut Writer<W>, cfvo: &Value, icon_set: bool) -> Result<()> {
+fn write_cfvo<W: Write>(writer: &mut Encoder<W>, cfvo: &Value, icon_set: bool) -> Result<()> {
     if !matches!(cfvo.cfvo_type, 1 | 2 | 3 | 4 | 5 | 7) {
-        return Err(invalid(
-            "BrtCFVO",
-            format!("invalid type {}", cfvo.cfvo_type),
-        ));
+        return Err(invalid("BrtCFVO", "invalid type"));
     }
     let formula = effective_cfvo_formula(cfvo)?;
     if matches!(cfvo.cfvo_type, 2 | 3) && formula.is_some() {
@@ -405,36 +420,41 @@ fn write_cfvo<W: Write>(writer: &mut Writer<W>, cfvo: &Value, icon_set: bool) ->
     let formula_size = formula.as_ref().map_or(0, |formula| formula.rgce.len());
     payload.extend_from_slice(
         &u32::try_from(formula_size)
-            .map_err(|_| Error::InvalidFormula("formula is too large".to_string()))?
+            .map_err(|_| Error::InvalidFormula("formula is too large"))?
             .to_le_bytes(),
     );
     if let Some(formula) = formula {
-        payload.extend_from_slice(&formula.to_bytes()?);
+        payload.extend_from_slice(&formula.to_bytes(writer.limits())?);
     }
     writer.write_record(kind::CFVO, &payload)?;
     Ok(())
 }
 
-fn write_color<W: Write>(writer: &mut Writer<W>, record: Color, legacy_argb: u32) -> Result<()> {
+fn write_color<W: Write>(writer: &mut Encoder<W>, record: Color, legacy_argb: u32) -> Result<()> {
     let record = if record.argb == Some(legacy_argb) || (record.argb.is_none() && legacy_argb == 0)
     {
         record
     } else {
         Color::from_argb(legacy_argb)
     };
-    writer.write_record(kind::COLOR, &record.to_bytes()?)?;
+    writer.write_record(kind::COLOR, &record.to_bytes(writer.limits())?)?;
     Ok(())
 }
 
-fn write_nullable_wide_string(payload: &mut Vec<u8>, value: Option<&str>) -> Result<()> {
+fn write_nullable_wide_string(
+    payload: &mut Vec<u8>,
+    value: Option<&str>,
+    limits: crate::raw::Limits,
+) -> Result<()> {
     let Some(value) = value else {
         payload.extend_from_slice(&u32::MAX.to_le_bytes());
         return Ok(());
     };
     let units = value.encode_utf16().count();
+    super::wire::admit_units(units, limits, 0)?;
     payload.extend_from_slice(
         &u32::try_from(units)
-            .map_err(|_| Error::Encoding("conditional-format text is too long".to_string()))?
+            .map_err(|_| Error::Encoding("conditional-format text is too long"))?
             .to_le_bytes(),
     );
     payload.reserve(units.saturating_mul(2));

@@ -7,27 +7,29 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
-use litchi_rtf::{DocumentLanguageDefaults, LanguageId, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{DocumentLanguageDefaults, LanguageId, write::Writer};
 use std::fs;
 
 fn language(value: u32) -> LanguageId {
     LanguageId::new(value).unwrap()
 }
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
 #[test]
 fn parses_header_defaults_and_language_run_boundaries() {
-    let document = RtfDocument::parse(concat!(
-        r#"{\rtf1\deflang1033\deflangfe2052\adeflang1025 "#,
-        r#"English {\lang1049\langfe1049 Russian} English again}"#,
-    ))
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1\deflang1033\deflangfe2052\adeflang1025 "#,
+            r#"English {\lang1049\langfe1049 Russian} English again}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     assert_eq!(document.language_defaults().primary, Some(language(1033)));
     assert_eq!(
@@ -46,7 +48,8 @@ fn parses_header_defaults_and_language_run_boundaries() {
     assert_eq!(russian.formatting.language, Some(language(1049)));
     assert_eq!(russian.formatting.east_asian_language, Some(language(1049)));
 
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.language_defaults(), document.language_defaults());
     assert_eq!(reparsed.text(), document.text());
     assert!(
@@ -59,11 +62,14 @@ fn parses_header_defaults_and_language_run_boundaries() {
 
 #[test]
 fn plain_restores_document_languages_and_clears_no_proof() {
-    let document = RtfDocument::parse(concat!(
-        r#"{\rtf1\deflang1033\deflangfe2052 "#,
-        r#"{\lang1024\langfe1024\langnp1060\langfenp1060\noproof unchecked}"#,
-        r#"\plain checked}"#,
-    ))
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1\deflang1033\deflangfe2052 "#,
+            r#"{\lang1024\langfe1024\langnp1060\langfenp1060\noproof unchecked}"#,
+            r#"\plain checked}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     let unchecked = document
         .blocks()
@@ -91,7 +97,8 @@ fn plain_restores_document_languages_and_clears_no_proof() {
 
 #[test]
 fn mutation_writer_and_language_id_validation() {
-    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
+    let mut document =
+        Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     let defaults = DocumentLanguageDefaults {
         primary: Some(language(1031)),
         east_asian: Some(language(1041)),
@@ -103,7 +110,7 @@ fn mutation_writer_and_language_id_validation() {
     assert!(serialized.contains(r"\deflang1031"));
     assert!(serialized.contains(r"\deflangfe1041"));
     assert!(serialized.contains(r"\adeflang1025"));
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(*reparsed.language_defaults(), defaults);
     assert_eq!(reparsed.text(), "Body");
 
@@ -114,8 +121,20 @@ fn mutation_writer_and_language_id_validation() {
     );
     assert!(LanguageId::new(65_535).is_ok());
     assert!(LanguageId::new(65_536).is_err());
-    assert!(RtfDocument::parse(r"{\rtf1\lang-1 bad}").is_err());
-    assert!(RtfDocument::parse(r"{\rtf1\lang65536 bad}").is_err());
+    assert!(
+        Tree::parse(
+            r"{\rtf1\lang-1 bad}",
+            litchi_rtf::read::OpenOptions::default()
+        )
+        .is_err()
+    );
+    assert!(
+        Tree::parse(
+            r"{\rtf1\lang65536 bad}",
+            litchi_rtf::read::OpenOptions::default()
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -131,7 +150,7 @@ fn parses_bundled_libreoffice_language_and_proofing_fixtures() {
     );
     for fixture in FIXTURES {
         let bytes = fs::read(format!("{root}/{fixture}")).unwrap();
-        let document = RtfDocument::parse_bytes(&bytes)
+        let document = Tree::parse_bytes(&bytes, litchi_rtf::read::OpenOptions::default())
             .unwrap_or_else(|error| panic!("failed to parse {fixture}: {error}"));
         assert!(
             document.blocks().iter().any(|block| {

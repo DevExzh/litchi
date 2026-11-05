@@ -1,5 +1,5 @@
 use litchi_iwa_archive::{SourceCatalog, package::EntryEdit};
-use litchi_iwa_common::{WireLimits, wire::parse_wire_fields_with_limits};
+use litchi_iwa_common::{WireLimits, wire::parse_wire_fields};
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::numbers_sheet_order_codec::ReferenceSnapshot;
 
@@ -41,7 +41,9 @@ pub(super) fn rewrite(
     previews: &[&str],
 ) -> Result<Rewritten, Error> {
     if target.document.component_index != target.sidebar_root.component_index {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::package::sheet_order::Refusal::UnsupportedSource,
+        ));
     }
     let source_catalog = physical_source(source)?;
     let component = source
@@ -57,7 +59,9 @@ pub(super) fn rewrite(
         .find(|entry| entry.name() == component_name)
         .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::package::sheet_order::Refusal::UnsupportedSource,
+        ));
     }
     let decoded_extent = archive_extent(component.archive())?;
     let decoded_allocation = archive_allocation_cost(component.archive())?;
@@ -70,18 +74,18 @@ pub(super) fn rewrite(
             .ok_or(Error::InvalidSource)?,
     )?;
     let physical_limits = source_catalog.limits();
+    let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         physical_limits.snappy_limits().map_err(map_archive_error)?,
     )
     .map_err(map_core_error)?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     archive
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
         .map_err(map_core_error)?;
     drop(stream);
 
@@ -154,11 +158,9 @@ pub(super) fn rewrite(
     drop(reordered_child_identifiers);
 
     budget.charge_transaction_work(decoded_extent.saturating_mul(3))?;
-    let rewritten = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
+    let rewritten = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     drop(archive);
-    let compressed = SnappyStream::compress(&rewritten).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&rewritten, snappy_limits).map_err(map_core_error)?;
     let compressed_len = compressed.len();
     drop(rewritten);
     let package_bound = source
@@ -186,7 +188,8 @@ pub(super) fn rewrite(
     )?;
     budget.charge_transaction_work(target_reopen.work)?;
     budget.charge_references(target_reopen.references)?;
-    let candidate = Package::from_shared_bytes_with_options(output.into(), source.state.options)
+    let candidate = source
+        .reopen_candidate(output.into())
         .map_err(map_candidate_read_error)?;
     let candidate_target = resolve_native_target(&candidate, budget)?;
     if candidate_target.prepared() != target.prepared()
@@ -241,7 +244,7 @@ fn rewrite_owner(
     }
     budget.charge_transaction_work(report.work)?;
     object
-        .replace_message_reordering_object_references_preserving_header_with_limits(
+        .replace_message_reordering_object_references_preserving_header(
             target.message_index,
             RawMessage {
                 type_: target.message_type,
@@ -305,7 +308,7 @@ fn reorder_raw_records(
     destination_position: usize,
 ) -> Result<RawReorder, Error> {
     let limits = wire_limits(source.len())?;
-    let fields = parse_wire_fields_with_limits(source, limits).map_err(map_wire_error)?;
+    let fields = parse_wire_fields(source, limits).map_err(map_wire_error)?;
     let selected_count = fields
         .iter()
         .filter(|field| field.number() == field_number)
@@ -685,11 +688,9 @@ pub(super) fn root_preview_deletions(source: &SourceCatalog) -> Result<Vec<&'sta
 }
 
 pub(super) fn physical_source(package: &Package) -> Result<&SourceCatalog, Error> {
-    package
-        .state
-        .components
-        .physical()
-        .ok_or(Error::UnsupportedSource)
+    package.state.components.physical().ok_or(Error::Refused(
+        crate::package::sheet_order::Refusal::UnsupportedSource,
+    ))
 }
 
 pub(super) fn preflight_transaction_work(
@@ -914,10 +915,10 @@ fn raw_records_reordered_exact(
     {
         return Ok(false);
     }
-    let source_fields = parse_wire_fields_with_limits(source, wire_limits(source.len())?)
-        .map_err(map_wire_error)?;
-    let candidate_fields = parse_wire_fields_with_limits(candidate, wire_limits(candidate.len())?)
-        .map_err(map_wire_error)?;
+    let source_fields =
+        parse_wire_fields(source, wire_limits(source.len())?).map_err(map_wire_error)?;
+    let candidate_fields =
+        parse_wire_fields(candidate, wire_limits(candidate.len())?).map_err(map_wire_error)?;
     if source_fields.len() != candidate_fields.len() {
         return Ok(false);
     }
@@ -1166,6 +1167,7 @@ mod tests {
         Ok(ArchiveObject::new(
             identifier,
             vec![RawMessage { type_, data }],
+            Default::default(),
         )?)
     }
 
@@ -1187,7 +1189,12 @@ mod tests {
         document.archive_info.message_infos[0].object_references =
             [SHEETS.as_slice(), &[SIDEBAR]].concat();
         if field_attribution {
-            let mut field = FieldInfo::new(vec![1]);
+            let mut field = FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default())
+                    .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap();
             field.object_references = SHEETS.to_vec();
             document.archive_info.message_infos[0]
                 .field_infos
@@ -1233,7 +1240,10 @@ mod tests {
                 .encode_to_vec(),
             )?);
         }
-        let document_member = SnappyStream::compress(&Archive { objects }.to_bytes()?)?;
+        let document_member = SnappyStream::compress(
+            &Archive { objects }.to_bytes(Default::default())?,
+            Default::default(),
+        )?;
         let previews = [
             ("preview.jpg", b"preview".as_slice()),
             ("preview-micro.jpg", b"micro".as_slice()),
@@ -1258,7 +1268,7 @@ mod tests {
         assert_eq!(
             commit
                 .package()
-                .document()
+                .workbook_ref()
                 .sheets()
                 .iter()
                 .map(crate::sheet::Sheet::name)
@@ -1288,7 +1298,7 @@ mod tests {
         assert_eq!(
             reverse
                 .package()
-                .document()
+                .workbook_ref()
                 .sheets()
                 .iter()
                 .map(crate::sheet::Sheet::name)
@@ -1303,7 +1313,9 @@ mod tests {
         let attributed = Package::from_bytes(&package_bytes(true, false, 3)?)?;
         assert!(matches!(
             attributed.edit_sheet_order().move_sheet(0usize, 2),
-            Err(Error::UnsupportedSource)
+            Err(Error::Refused(
+                crate::package::sheet_order::Refusal::UnsupportedSource
+            ))
         ));
         let malformed = Package::from_bytes(&package_bytes(false, true, 3)?)?;
         assert!(matches!(
@@ -1318,7 +1330,12 @@ mod tests {
         let source = package_bytes(false, false, 2)?;
         let package = Package::from_bytes(&source)?;
         let result = package.edit_sheet_order().move_sheet(0usize, 2)?.commit();
-        assert!(matches!(result, Err(Error::UnsupportedSource)));
+        assert!(matches!(
+            result,
+            Err(Error::Refused(
+                crate::package::sheet_order::Refusal::UnsupportedSource
+            ))
+        ));
         assert_eq!(exact_bytes(&package)?, source);
         Ok(())
     }
@@ -1333,9 +1350,15 @@ mod tests {
                 &mut payload,
                 1,
                 &reference(*identifier).encode_to_vec(),
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
         }
-        append_length_delimited_field(&mut payload, 5, &reference(SIDEBAR).encode_to_vec())?;
+        append_length_delimited_field(
+            &mut payload,
+            5,
+            &reference(SIDEBAR).encode_to_vec(),
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let options = numbers_sheet_order_codec::DecodeOptions::new(
             payload.len(),
             payload.len().saturating_mul(2),
@@ -1362,6 +1385,7 @@ mod tests {
                 data: rewritten_data.clone(),
             },
             &reordered,
+            Default::default(),
         )?;
         assert_eq!(owner.messages[0].data, rewritten_data);
         assert_eq!(

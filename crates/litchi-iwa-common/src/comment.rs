@@ -71,6 +71,7 @@ macro_rules! nonzero_id {
 
 /// Validation failures for a compact comment identifier.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     /// A native zero sentinel was supplied where an object must exist.
     #[error("{kind} identifier must be non-zero")]

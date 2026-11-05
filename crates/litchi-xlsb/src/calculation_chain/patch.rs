@@ -35,9 +35,9 @@ impl Patch {
         &self.after
     }
 
-    /// Whether publication changes the owner bytes or graph topology.
+    /// Whether publication changes no owner byte or graph topology.
     #[must_use]
-    pub const fn is_empty(&self) -> bool {
+    pub const fn is_noop(&self) -> bool {
         !self.changed
     }
 
@@ -51,7 +51,7 @@ impl Patch {
         }
     }
 
-    pub(crate) fn limits(&self) -> super::ReadLimits {
+    pub(crate) fn limits(&self) -> super::SemanticLimits {
         self.before.limits()
     }
 
@@ -65,18 +65,16 @@ impl Patch {
             .map(|graph| &graph.part_name);
         let current = Snapshot::read_with_probe(package, self.limits(), probe_target)?;
         if !current.same_source(&self.before) {
-            return Err(Error::InvalidFormat(
-                "Calculation Chain patch source is stale".to_string(),
-            ));
+            return Err(Error::PatchConflict {
+                part: "calculation chain",
+            });
         }
         Ok(current)
     }
 
     pub(crate) fn check_publication_policy(&self, package: &OpcPackage) -> Result<()> {
         if package.is_signed() || package.requires_signature_edit_policy() {
-            return Err(Error::Opc(
-                litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy,
-            ));
+            return Err(Error::Signed);
         }
         Ok(())
     }
@@ -93,7 +91,7 @@ impl Patch {
         candidate: &mut OpcPackage,
         current: Snapshot,
     ) -> Result<Snapshot> {
-        if self.is_empty() {
+        if self.is_noop() {
             return Ok(current);
         }
         self.check_publication_policy(candidate)?;
@@ -102,8 +100,7 @@ impl Patch {
         let resulting = Snapshot::read_with_limits(candidate, self.limits())?;
         if !resulting.same_state(&self.after) {
             return Err(Error::InvalidFormat(
-                "Calculation Chain publication changed the planned owned graph or source"
-                    .to_string(),
+                "Calculation Chain publication changed the planned owned graph or source",
             ));
         }
         Ok(resulting)
@@ -113,7 +110,7 @@ impl Patch {
         let workbook_name = package.main_document_part()?.partname().clone();
         if !workbook_name.is_equivalent_to(&PackURIRef::new(&self.before.source().workbook.name)?) {
             return Err(Error::InvalidFormat(
-                "Calculation Chain Workbook owner changed".to_string(),
+                "Calculation Chain Workbook owner changed",
             ));
         }
         match (
@@ -129,9 +126,10 @@ impl Patch {
             )?,
             (None, None) => {},
             (Some(_), Some(_)) => {
-                return Err(Error::UnsupportedFeature(
-                    "Calculation Chain payload replacement is unsupported without its binary grammar"
-                        .to_string(),
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "edit_calculation_chain",
+                    "Calculation Chain payload replacement has no supported binary grammar",
                 ));
             },
         }
@@ -139,40 +137,9 @@ impl Patch {
     }
 }
 
-/// A detached result containing a planned snapshot and reversible patch.
-#[derive(Clone, Debug)]
-pub struct Commit {
-    patch: Patch,
-    changed: bool,
-}
-
-impl Commit {
-    pub(crate) fn new(patch: Patch, changed: bool) -> Self {
-        Self { patch, changed }
-    }
-
-    /// Whether the transaction changes owner bytes or topology.
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-
-    /// Planned resulting snapshot.
-    pub fn snapshot(&self) -> &Snapshot {
-        self.patch.after()
-    }
-
-    /// Reversible source-checked patch.
-    pub fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consume the commit into its snapshot and patch.
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        let snapshot = self.patch.after().clone();
-        (snapshot, self.patch)
-    }
-}
+/// The result of a Calculation Chain edit's `commit`: the new package, the
+/// patch and the diagnostics.
+pub type Commit = litchi_core::edit::Commit<crate::Package, Patch>;
 
 fn remove_graph(
     package: &mut OpcPackage,
@@ -185,12 +152,12 @@ fn remove_graph(
         .remove(&graph.relationship_id);
     if removed_relationship.is_none() {
         return Err(Error::InvalidFormat(
-            "Calculation Chain Workbook relationship is missing during removal".to_string(),
+            "Calculation Chain Workbook relationship is missing during removal",
         ));
     }
     if !package.remove_part(&graph.part_name) {
         return Err(Error::InvalidFormat(
-            "Calculation Chain physical owner is missing during removal".to_string(),
+            "Calculation Chain physical owner is missing during removal",
         ));
     }
     Ok(())
@@ -202,15 +169,15 @@ fn add_graph(
     graph: &Graph,
     owner: Option<&SourcePart>,
 ) -> Result<()> {
-    let owner = owner.ok_or_else(|| {
-        Error::InvalidFormat("Calculation Chain source owner is missing during inverse".to_string())
-    })?;
+    let owner = owner.ok_or(Error::InvalidFormat(
+        "Calculation Chain source owner is missing during inverse",
+    ))?;
     if owner.content_type != CONTENT_TYPE
         || graph.content_type != CONTENT_TYPE
         || owner.content_type != graph.content_type
     {
         return Err(Error::InvalidFormat(
-            "Calculation Chain inverse owner is not a relationship-free typed part".to_string(),
+            "Calculation Chain inverse owner is not a relationship-free typed part",
         ));
     }
     package.validate_new_part_name(&graph.part_name)?;
@@ -222,7 +189,7 @@ fn add_graph(
     let workbook = package.get_part_mut(workbook_name)?;
     if workbook.rels().get(&graph.relationship_id).is_some() {
         return Err(Error::InvalidFormat(
-            "Calculation Chain inverse relationship ID is already present".to_string(),
+            "Calculation Chain inverse relationship ID is already present",
         ));
     }
     workbook.rels_mut().try_add_relationship(
@@ -237,23 +204,24 @@ fn add_graph(
 pub(crate) fn remove_owner(
     package: &mut OpcPackage,
     source: &SourceState,
-    limits: super::ReadLimits,
+    limits: super::SemanticLimits,
 ) -> Result<()> {
-    let graph = source.graph.as_ref().ok_or_else(|| {
-        Error::InvalidFormat("Calculation Chain owner is already absent".to_string())
-    })?;
+    let graph = source.graph.as_ref().ok_or(Error::InvalidFormat(
+        "Calculation Chain owner is already absent",
+    ))?;
     let workbook_name = package.main_document_part()?.partname().clone();
     if !workbook_name.is_equivalent_to(&PackURIRef::new(&source.workbook.name)?) {
         return Err(Error::InvalidFormat(
-            "Calculation Chain Workbook owner changed".to_string(),
+            "Calculation Chain Workbook owner changed",
         ));
     }
     let workbook = package.get_part(&workbook_name)?;
-    let relationship = workbook.rels().get(&graph.relationship_id).ok_or_else(|| {
-        Error::InvalidFormat(
-            "Calculation Chain Workbook relationship is missing while removing".to_string(),
-        )
-    })?;
+    let relationship = workbook
+        .rels()
+        .get(&graph.relationship_id)
+        .ok_or(Error::InvalidFormat(
+            "Calculation Chain Workbook relationship is missing while removing",
+        ))?;
     if relationship.reltype() != graph.relationship_type
         || relationship.target_ref() != graph.target_ref
         || relationship.target_mode() != TargetMode::Internal
@@ -263,7 +231,7 @@ pub(crate) fn remove_owner(
         || package.get_part(&graph.part_name)?.content_type() != CONTENT_TYPE
     {
         return Err(Error::InvalidFormat(
-            "Calculation Chain owner graph changed while removing".to_string(),
+            "Calculation Chain owner graph changed while removing",
         ));
     }
     let workbook_relationships = source
@@ -288,7 +256,7 @@ pub(crate) fn remove_owner(
 fn restore_lexical_tokens(
     package: &mut OpcPackage,
     source: &SourceState,
-    limits: super::ReadLimits,
+    limits: super::SemanticLimits,
 ) -> Result<()> {
     let opc_limits = super::snapshot::opc_capture_limits(limits)?;
     restore_lexical_tokens_from_parts(
@@ -307,31 +275,31 @@ fn restore_lexical_tokens_from_parts(
     workbook_relationships: &litchi_opc::OwnedRelationships,
     owner_relationships: Option<&litchi_opc::OwnedRelationships>,
     content_types: &litchi_opc::OwnedContentTypes,
-    limits: litchi_opc::ReadLimits,
+    limits: litchi_opc::SourceLimits,
 ) -> Result<()> {
     let root_name = PackURIRef::new("/")?;
-    let current_root = package.source_relationships_with_limits(&root_name, limits)?;
+    let current_root = package.source_relationships(&root_name, limits)?;
     if current_root != *root_relationships {
-        package.try_replace_relationships(&current_root, root_relationships)?;
+        package.try_replace_relationships(&current_root, root_relationships, limits)?;
     }
 
     let workbook_name = package.main_document_part()?.partname().clone();
-    let current_workbook = package.source_relationships_with_limits(&workbook_name, limits)?;
+    let current_workbook = package.source_relationships(&workbook_name, limits)?;
     if current_workbook != *workbook_relationships {
-        package.try_replace_relationships(&current_workbook, workbook_relationships)?;
+        package.try_replace_relationships(&current_workbook, workbook_relationships, limits)?;
     }
 
     if let Some(owner_relationships) = owner_relationships {
         let owner_name = owner_relationships.owner().clone();
-        let current_owner = package.source_relationships_with_limits(&owner_name, limits)?;
+        let current_owner = package.source_relationships(&owner_name, limits)?;
         if current_owner != *owner_relationships {
-            package.try_replace_relationships(&current_owner, owner_relationships)?;
+            package.try_replace_relationships(&current_owner, owner_relationships, limits)?;
         }
     }
 
-    let current_content_types = package.source_content_types_with_limits(limits)?;
+    let current_content_types = package.source_content_types(limits)?;
     if current_content_types != *content_types {
-        package.try_replace_content_types(current_content_types.bytes(), content_types)?;
+        package.try_replace_content_types(current_content_types.bytes(), content_types, limits)?;
     }
     Ok(())
 }

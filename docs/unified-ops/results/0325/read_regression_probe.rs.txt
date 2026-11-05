@@ -1,0 +1,73 @@
+//! Temporary before/after read regression probe for record 0325 (public
+//! `File` API only, so the same source builds on the base and the branch).
+use std::hint::black_box;
+use std::time::Instant;
+
+fn median(mut v: Vec<f64>) -> f64 {
+    v.sort_by(f64::total_cmp);
+    v[v.len() / 2]
+}
+
+fn time(label: &str, repeat: u32, mut run: impl FnMut()) {
+    for _ in 0..3 {
+        run();
+    }
+    let mut samples = Vec::new();
+    for _ in 0..15 {
+        let started = Instant::now();
+        for _ in 0..repeat {
+            run();
+        }
+        samples.push(started.elapsed().as_secs_f64() * 1e9 / f64::from(repeat));
+    }
+    println!("{label}\t{:.0}", median(samples));
+}
+
+fn main() {
+    let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../../test-data/");
+    let read = |name: &str| std::fs::read(format!("{root}{name}")).expect(name);
+    for (mode, label) in [
+        (litchi_ops::SourceMode::Auto, "source"),
+        (litchi_ops::SourceMode::Eager, "eager"),
+    ] {
+        let open = |bytes: Vec<u8>| {
+            litchi_ops::open_bytes_with(bytes, &litchi_ops::OpenOptions::new().source_mode(mode))
+                .expect("open")
+        };
+        let deck = open(read("ooxml/pptx/shapes.pptx"));
+        time(&format!("pptx shape[1] format {label}"), 200, || {
+            let node = deck.get("/slide[1]/shape[1]").expect("shape");
+            black_box(node.view().format().expect("format").count());
+        });
+        time(&format!("pptx query shape+format {label}"), 20, || {
+            for node in deck.query("shape").expect("query") {
+                let node = node.expect("node");
+                black_box(node.view().format().expect("format").count());
+            }
+        });
+        time(&format!("pptx run format {label}"), 200, || {
+            let node = deck.get("/slide[1]/shape[1]/paragraph[1]/run[1]").expect("run");
+            black_box(node.view().format().expect("format").count());
+        });
+        let doc = open(read("poi/test-data/document/heading123.docx"));
+        time(&format!("docx p[3] format {label}"), 200, || {
+            let node = doc.get("/body/p[3]").expect("p");
+            black_box(node.view().format().expect("format").count());
+        });
+        time(&format!("docx query paragraph+format {label}"), 20, || {
+            for node in doc.query("paragraph").expect("query") {
+                black_box(node.expect("node").view().format().expect("format").count());
+            }
+        });
+        let headers = open(read("ooxml/docx/headerFooter.docx"));
+        time(&format!("docx header text {label}"), 200, || {
+            let node = headers.get("/header[1]").expect("header");
+            black_box(node.view().text().expect("text").map(|text| text.len()));
+        });
+        let toc = open(read("libreoffice-core/sw/qa/extras/ooxmlexport/data/multi-page-toc.docx"));
+        time(&format!("docx field[1] format {label}"), 50, || {
+            let node = toc.get("/field[1]").expect("field");
+            black_box(node.view().format().expect("format").count());
+        });
+    }
+}

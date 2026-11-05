@@ -1,0 +1,229 @@
+{
+  "format": "odf",
+  "elements": [
+    {
+      "format": "odf",
+      "element": "math",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/"
+        ]
+      },
+      "children": [
+        {
+          "element": "element",
+          "pathSegment": "element"
+        }
+      ],
+      "properties": {
+        "starmath": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "starmathVersion": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "elementCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "display": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      }
+    },
+    {
+      "format": "odf",
+      "element": "element",
+      "parent": [
+        "math",
+        "element"
+      ],
+      "elementAliases": [
+        "node"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/element[N]",
+          "/element[N]/element[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "element",
+          "pathSegment": "element"
+        }
+      ],
+      "properties": {
+        "tag": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "mathvariant": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "childCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    }
+  ],
+  "gaps": [
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "element",
+      "context": "a MathML element with attributes other than `mathvariant`, or a subtree",
+      "code": "unsupported_capability",
+      "followUp": "0292 formula subtree authoring",
+      "reason": "`add` creates one element from `tag`, `text` and `mathvariant`; nested subtrees are built by further adds, and other attributes need typed values"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "element",
+      "context": "the `text` of a layout (non-token) element",
+      "code": "unsupported_capability",
+      "followUp": "0282 formula layout text",
+      "reason": "only MathML token elements hold character data"
+    },
+    {
+      "subject": "operation",
+      "verb": "get",
+      "element": "metadata",
+      "context": "path-read",
+      "code": "unsupported_capability",
+      "followUp": "0288 ODF object metadata node",
+      "reason": "`set(\"/metadata\", ..)` writes meta.xml through the ODF metadata family; the path is set-only, and reads go through File::metadata()"
+    },
+    {
+      "subject": "view",
+      "mode": "issues",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "forms",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "html",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "svg",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "screenshot",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "pdf",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    }
+  ],
+  "setKeywords": {
+    "verb": "replace",
+    "support": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0295 follow-up: a find adapter over the format's text edits",
+      "reason": "find/replace is not integrated for this format"
+    },
+    "keywords": {
+      "find": {
+        "type": "string",
+        "constraint": {
+          "notEmpty": true
+        },
+        "set": true
+      },
+      "replace": {
+        "type": "string",
+        "set": true
+      },
+      "matchCase": {
+        "type": "bool",
+        "default": true,
+        "set": true
+      },
+      "wholeWord": {
+        "type": "bool",
+        "default": false,
+        "set": true
+      },
+      "regex": {
+        "type": "bool",
+        "default": false,
+        "set": true,
+        "writeGap": {
+          "code": "unsupported_capability",
+          "followUp": "record 0010 Q3: an owner-approved regular-expression dependency",
+          "reason": "Litchi has no approved regular-expression engine; `regex=true` and OfficeCLI's `r\"...\"` patterns are refused"
+        }
+      }
+    }
+  }
+}

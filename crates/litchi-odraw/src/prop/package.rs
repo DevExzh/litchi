@@ -1,14 +1,21 @@
-use crate::{Container, RecordKind, Result};
+use crate::{Container, Limits, RecordKind, Result};
 use std::collections::HashMap;
 
 use super::geometry::Geometry;
 use super::model::{Array, ColorRef, Id, Prop, Value};
 
 /// An ordered `OfficeArt` shape-property collection.
-#[derive(Debug)]
 pub struct Props<'data> {
     pub(super) properties: Vec<Prop<'data>>,
     pub(super) by_id: HashMap<Id, usize>,
+}
+
+impl std::fmt::Debug for Props<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Props")
+            .field("property_count", &self.properties.len())
+            .finish_non_exhaustive()
+    }
 }
 
 impl<'data> Props<'data> {
@@ -30,9 +37,9 @@ impl<'data> Props<'data> {
     /// preceding the match is malformed, and `Error::MalformedProperties`
     /// or `Error::ArithmeticOverflow` from `Props::parse` when the Opt
     /// table itself is malformed.
-    pub fn from_container(container: &Container<'data>) -> Result<Self> {
+    pub fn from_container(container: &Container<'data>, limits: Limits) -> Result<Self> {
         match container.find(RecordKind::Opt)? {
-            Some(opt) => Self::parse(&opt),
+            Some(opt) => Self::parse(&opt, limits),
             None => Ok(Self::new()),
         }
     }
@@ -41,6 +48,9 @@ impl<'data> Props<'data> {
     #[inline]
     #[must_use]
     pub fn prop(&self, id: Id) -> Option<&Prop<'data>> {
+        if self.by_id.is_empty() {
+            return self.properties.iter().find(|property| property.id() == id);
+        }
         self.by_id
             .get(&id)
             .and_then(|index| self.properties.get(*index))
@@ -112,7 +122,7 @@ impl<'data> Props<'data> {
     #[inline]
     #[must_use]
     pub fn has(&self, id: Id) -> bool {
-        self.by_id.contains_key(&id)
+        self.prop(id).is_some()
     }
 
     /// Returns the number of descriptors.
@@ -275,15 +285,19 @@ impl<'data> Props<'data> {
     ///
     /// The returned projection borrows a valid UTF-16 name and retains the
     /// exact raw flags, including undefined producer bits.  Use
-    /// [`super::picture::Snapshot`] when an immutable record snapshot and
-    /// lossless edit transaction are required.
+    /// [`super::picture::Package`] for immutable editing and content-matched
+    /// patch replay. This projection applies the name and descriptor-count
+    /// ceilings; the record-byte ceiling applies at record admission.
     ///
     /// # Errors
     ///
-    /// Returns `Error::MalformedProperties` when the picture-name or
-    /// BLIP-flag properties are malformed or the name is not valid UTF-16.
-    pub fn picture(&self) -> Result<Option<super::picture::Metadata<'data>>> {
-        super::picture::parse_properties(self)
+    /// Returns `picture::Error::Format` for malformed name or flag metadata,
+    /// or `picture::Error::Limit` when the projection exceeds its policy.
+    pub fn picture(
+        &self,
+        limits: super::picture::Limits,
+    ) -> super::picture::Result<Option<super::picture::Metadata<'data>>> {
+        super::picture::parse_properties(self, limits)
     }
 }
 impl Default for Props<'_> {

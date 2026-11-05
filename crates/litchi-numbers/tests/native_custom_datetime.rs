@@ -18,7 +18,7 @@ use litchi_numbers::cell::{
     data_format::custom::{Custom, DateTime as CustomDateTime, DateTimePattern, Name},
 };
 use litchi_numbers::table::cells::Storage;
-use litchi_numbers::{CellPosition, Package};
+use litchi_numbers::{At, Package};
 use litchi_numbers_wire::{BncCell, CachedScalar, StoredValue};
 use prost::Message as _;
 
@@ -47,12 +47,12 @@ fn resaved_fixture_path() -> PathBuf {
         .join("../../test-data/iwork/numbers/custom-datetime-native-resaved.numbers")
 }
 
-fn position() -> CellPosition {
-    CellPosition::new(1, 1)
+fn position() -> At {
+    At::new(1, 1)
 }
 
-fn marker_position() -> CellPosition {
-    CellPosition::new(1, 2)
+fn marker_position() -> At {
+    At::new(1, 2)
 }
 
 fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
@@ -85,7 +85,10 @@ fn date_value(package: &Package) -> TestResult<f64> {
 }
 
 fn date_cache(source: &[u8]) -> TestResult<CachedScalar> {
-    let cell = BncCell::parse(&native_date_cell(source)?)?;
+    let cell = BncCell::parse(
+        &native_date_cell(source)?,
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
     if cell.stored_value() != StoredValue::Date {
         return Err(io::Error::other("native Date & Time B2 cell is not a date").into());
     }
@@ -100,13 +103,13 @@ fn date_cache(source: &[u8]) -> TestResult<CachedScalar> {
 }
 
 fn native_date_cell(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == TILE_MEMBER)
         .ok_or_else(|| io::Error::other("native tile member is missing"))?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let archive = Archive::parse(stream.as_bytes(), Default::default())?;
     let tile = archive
         .objects
         .iter()
@@ -197,8 +200,8 @@ fn assert_datetime(package: &Package, expected: &CustomDateTime) -> TestResult {
 }
 
 fn assert_exact_locality(source: &[u8], target: &[u8]) -> TestResult {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     for member in [fixture::DOCUMENT_MEMBER, FORMAT_MEMBER, TILE_MEMBER] {
         if !before.iter().any(|entry| entry.name() == member) {
             return Err(io::Error::other(format!(
@@ -261,12 +264,15 @@ fn rewrite_document_root(source: &[u8], corruption: RouteCorruption) -> TestResu
 }
 
 fn corrupt_document_route(source: &[u8], corruption: RouteCorruption) -> TestResult<Vec<u8>> {
-    let root = WireView::parse(source)?;
+    let root = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)?;
     let super_field = root
         .fields()
         .find(|field| field.number() == DOCUMENT_SUPER_FIELD)
         .ok_or_else(|| io::Error::other("native TSA super envelope is missing"))?;
-    let tsa = WireView::parse(super_field.payload())?;
+    let tsa = WireView::parse(
+        super_field.payload(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let registry = tsa
         .fields()
         .find(|field| field.number() == TSA_REGISTRY_FIELD)
@@ -279,6 +285,7 @@ fn corrupt_document_route(source: &[u8], corruption: RouteCorruption) -> TestRes
                 &mut tsa_payload,
                 TSA_REGISTRY_FIELD,
                 registry.payload(),
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
             Ok(patch_length_delimited_field(
                 source,
@@ -293,6 +300,7 @@ fn corrupt_document_route(source: &[u8], corruption: RouteCorruption) -> TestRes
                 &mut root_payload,
                 DOCUMENT_SUPER_FIELD,
                 super_field.payload(),
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
             Ok(root_payload)
         },
@@ -302,6 +310,7 @@ fn corrupt_document_route(source: &[u8], corruption: RouteCorruption) -> TestRes
                 &mut root_payload,
                 DOCUMENT_REGISTRY_FIELD,
                 registry.payload(),
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
             Ok(root_payload)
         },

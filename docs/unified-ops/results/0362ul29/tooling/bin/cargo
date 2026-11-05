@@ -1,0 +1,64 @@
+#!/bin/sh
+# Gate-local Cargo policy.  This is outside the checkout and is placed first
+# on PATH by run_safe_gate.py, so nested Python and shell helpers use the same
+# offline/locked/memory-capped invocation as direct steps.
+set -eu
+real=/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo
+command=${1-}
+gate_target=${LITCHI_GATE_TARGET_ROOT-}
+requested_target=${CARGO_TARGET_DIR-}
+expect_target=0
+before_double_dash=1
+for arg in "$@"; do
+  case "$arg" in
+    --)
+      before_double_dash=0
+      ;;
+    --target-dir=*)
+      [ "$before_double_dash" = 1 ] && requested_target=${arg#--target-dir=}
+      ;;
+    --target-dir)
+      [ "$before_double_dash" = 1 ] && expect_target=1
+      ;;
+    *)
+      if [ "$before_double_dash" = 1 ] && [ "$expect_target" = 1 ]; then requested_target=$arg; expect_target=0; fi
+      ;;
+  esac
+done
+if [ -n "$gate_target" ] && [ -n "$requested_target" ]; then
+  case "$(realpath -m "$requested_target")" in
+    "$(realpath -m "$gate_target")"|"$(realpath -m "$gate_target")"/*) ;;
+    *) echo "gate Cargo target escaped LITCHI_GATE_TARGET_ROOT: $requested_target" >&2; exit 125 ;;
+  esac
+fi
+if [ -n "${LITCHI_GATE_TARGET_TRACE-}" ]; then
+  printf '%s\t%s\t%s\n' "$$" "$command" "$requested_target" >> "$LITCHI_GATE_TARGET_TRACE"
+fi
+case "$command" in
+  build|check|clippy|doc|metadata|run|rustdoc|test|tree)
+    shift
+    has_offline=0
+    has_locked=0
+    before_double_dash=1
+    for arg in "$@"; do
+      if [ "$before_double_dash" = 1 ] && [ "$arg" = "--" ]; then
+        before_double_dash=0
+      elif [ "$before_double_dash" = 1 ]; then
+        [ "$arg" = "--offline" ] && has_offline=1
+        [ "$arg" = "--locked" ] && has_locked=1
+      fi
+    done
+    if [ "$has_offline" = 0 ] && [ "$has_locked" = 0 ]; then
+      exec "$real" "$command" --offline --locked "$@"
+    elif [ "$has_offline" = 0 ]; then
+      exec "$real" "$command" --offline "$@"
+    elif [ "$has_locked" = 0 ]; then
+      exec "$real" "$command" --locked "$@"
+    else
+      exec "$real" "$command" "$@"
+    fi
+    ;;
+  *)
+    exec "$real" "$@"
+    ;;
+esac

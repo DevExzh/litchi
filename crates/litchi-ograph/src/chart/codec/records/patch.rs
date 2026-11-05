@@ -5,7 +5,7 @@ use super::wire::{
     CELL_LABEL, EXCEL_BLANK, EXCEL_BOOL_ERR, EXCEL_NUMBER, GRAPH_BLANK, GRAPH_NUMBER, SI_INDEX,
 };
 use crate::chart::transaction::{CacheValue, Request};
-use crate::chart::{Cache, Chart, Kind, Limits};
+use crate::chart::{Cache, Kind, Limits, Model};
 use crate::{Error, Result};
 use litchi_biff::{Encoder, RecordRef, Records};
 
@@ -14,7 +14,7 @@ struct PhysicalEdit {
     payload: Vec<u8>,
 }
 
-pub(crate) fn patch(chart: &mut Chart, requests: &[Request]) -> Result<()> {
+pub(crate) fn patch(chart: &mut Model, requests: &[Request]) -> Result<()> {
     if requests.is_empty() {
         return Ok(());
     }
@@ -24,10 +24,11 @@ pub(crate) fn patch(chart: &mut Chart, requests: &[Request]) -> Result<()> {
     let stream = match &mut chart.origin {
         crate::chart::model::Origin::Parsed(stream) => stream,
         crate::chart::model::Origin::Fresh => {
-            return Err(Error::UnsupportedMutation {
-                operation: "cache-value-patch",
-                reason: "the source chart is not a parsed replayable stream",
-            });
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "cache-value-patch",
+                "the source chart is not a parsed replayable stream",
+            )));
         },
     };
     let source = stream.as_bytes();
@@ -50,7 +51,7 @@ pub(crate) fn patch(chart: &mut Chart, requests: &[Request]) -> Result<()> {
 
     let mut section = None;
     let mut cache_index = 0usize;
-    for item in Records::new(source) {
+    for item in Records::new(source, limits.biff)? {
         let record = item?;
         if record.kind() == SI_INDEX && kind == Kind::Excel {
             section = Some(read_section(record)?);
@@ -71,7 +72,7 @@ pub(crate) fn patch(chart: &mut Chart, requests: &[Request]) -> Result<()> {
         else {
             continue;
         };
-        let current = caches.get(index).ok_or(Error::UnsupportedMutation {
+        let current = caches.get(index).ok_or(Error::PatchConflict {
             operation: "cache-value-patch",
             reason: "source cache inventory no longer matches the semantic snapshot",
         })?;
@@ -85,7 +86,7 @@ pub(crate) fn patch(chart: &mut Chart, requests: &[Request]) -> Result<()> {
     }
 
     if cache_index != caches.len() {
-        return Err(Error::UnsupportedMutation {
+        return Err(Error::PatchConflict {
             operation: "cache-value-patch",
             reason: "source cache inventory no longer matches the semantic snapshot",
         });
@@ -108,13 +109,12 @@ pub(crate) fn patch(chart: &mut Chart, requests: &[Request]) -> Result<()> {
                 .ok_or(Error::SizeOverflow {
                     resource: "cache record payload",
                 })?;
-        let target =
-            bytes
-                .get_mut(payload_start..payload_end)
-                .ok_or(Error::UnsupportedMutation {
-                    operation: "cache-value-patch",
-                    reason: "cache record payload falls outside the source stream",
-                })?;
+        let target = bytes
+            .get_mut(payload_start..payload_end)
+            .ok_or(Error::PatchConflict {
+                operation: "cache-value-patch",
+                reason: "cache record payload falls outside the source stream",
+            })?;
         target.copy_from_slice(&edit.payload);
     }
     Ok(())
@@ -225,22 +225,26 @@ fn encode_replacement(
         _ => return identity_error(),
     };
 
-    let mut encoder = Encoder::with_limits(limits.biff)?;
+    let mut encoder = Encoder::new(limits.biff)?;
     cache::encode_cache(&mut encoder, &replacement)?;
     let record_bytes = encoder.finish();
-    let mut records = Records::new(&record_bytes);
-    let record = records.next().ok_or(Error::UnsupportedMutation {
-        operation: "cache-value-patch",
-        reason: "replacement did not produce one cache record",
-    })??;
+    let mut records = Records::new(&record_bytes, limits.biff)?;
+    let record = records
+        .next()
+        .ok_or(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "cache-value-patch",
+            "replacement did not produce one cache record",
+        )))??;
     if records.next().is_some()
         || record.kind() != source.kind()
         || record.payload().len() != source.payload().len()
     {
-        return Err(Error::UnsupportedMutation {
-            operation: "cache-value-patch",
-            reason: "replacement changes the physical cache record length or class",
-        });
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "cache-value-patch",
+            "replacement changes the physical cache record length or class",
+        )));
     }
     let mut payload = Vec::new();
     payload
@@ -259,7 +263,7 @@ fn u16_at(payload: &[u8], offset: usize) -> Option<u16> {
 }
 
 fn identity_error<T>() -> Result<T> {
-    Err(Error::UnsupportedMutation {
+    Err(Error::PatchConflict {
         operation: "cache-value-patch",
         reason: "source cache identity no longer matches the semantic snapshot",
     })

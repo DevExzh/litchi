@@ -189,8 +189,20 @@ pub(super) fn validate_chart_companion_xml(
         return Err(limit("chart companion bytes"));
     }
     let result = match root_name {
-        "chartStyle" => litchi_drawingml::chart::style::parse(xml).map(|_| ()),
-        "colorStyle" => litchi_drawingml::chart::style::parse_color(xml).map(|_| ()),
+        "chartStyle" => {
+            let mut limits = litchi_drawingml::chart::Limits::DEFAULT;
+            limits.max_input_bytes = max_bytes.min(limits.max_input_bytes);
+            limits.max_output_bytes = max_bytes.min(limits.max_output_bytes);
+            limits.max_style_bytes = max_bytes.min(limits.max_style_bytes);
+            litchi_drawingml::chart::style::parse(xml, &limits).map(|_| ())
+        },
+        "colorStyle" => {
+            let mut limits = litchi_drawingml::chart::Limits::DEFAULT;
+            limits.max_input_bytes = max_bytes.min(limits.max_input_bytes);
+            limits.max_output_bytes = max_bytes.min(limits.max_output_bytes);
+            limits.max_style_bytes = max_bytes.min(limits.max_style_bytes);
+            litchi_drawingml::chart::style::parse_color(xml, &limits).map(|_| ())
+        },
         _ => {
             return Err(invalid(format!(
                 "unsupported chart companion root '{root_name}'"

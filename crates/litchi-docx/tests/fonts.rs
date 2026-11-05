@@ -13,11 +13,25 @@ fn package_delegates_fonts_to_the_canonical_docx_owner() {
     assert!(fonts.get("Arial").is_err());
     assert!(fonts.get(usize::MAX).expect("lookup").is_none());
 
-    package
-        .put_fonts(fonts, Conformance::Transitional)
-        .expect("move font table");
+    package = {
+        let mut edit = package.edit_fonts();
+        edit.put(fonts, Conformance::Transitional)
+            .expect("move font table");
+        edit.commit().expect("move font table").into_package()
+    };
     assert!(package.fonts().expect("read fonts").is_some());
-    assert!(package.remove_fonts().expect("remove fonts"));
+    assert!({
+        let mut edit = package.edit_fonts();
+        let value = edit.remove().expect("remove fonts");
+        package = edit.commit().expect("remove fonts").into_package();
+        value
+    });
     assert!(package.fonts().expect("read fonts").is_none());
-    assert!(!package.remove_fonts().expect("already absent"));
+    assert!(!{
+        let mut edit = package.edit_fonts();
+        let value = edit.remove().expect("already absent");
+        package = edit.commit().expect("already absent").into_package();
+        value
+    });
+    assert!(package.fonts().expect("read fonts").is_none());
 }

@@ -7,11 +7,15 @@
 use std::mem::size_of;
 
 use litchi_keynote::{
-    ChartValueAxisCommit, ChartValueAxisDiagnostics, ChartValueAxisEdit, ChartValueAxisError,
-    ChartValueAxisLimitKind, ChartValueAxisPatch,
     chart::axis::{
         Axis, Bound, Bounds, MajorStepCount, MinorStepCount, Scale, Steps, ValueAxisSettings,
     },
+    chart::value_axis::Commit as ChartValueAxisCommit,
+    chart::value_axis::Diagnostics as ChartValueAxisDiagnostics,
+    chart::value_axis::Edit as ChartValueAxisEdit,
+    chart::value_axis::Error as ChartValueAxisError,
+    chart::value_axis::LimitKind as ChartValueAxisLimitKind,
+    chart::value_axis::Patch as ChartValueAxisPatch,
 };
 
 #[test]

@@ -31,9 +31,36 @@ fn owned_presentation_noop_output_preserves_exact_archive() {
             .expect("serialize presentation"),
         b"pptx exact source",
     );
-    let mut package = Package::from_vec(source.clone()).expect("open owned presentation");
+    let package = Package::from_reader(std::io::Cursor::new(source.clone()))
+        .expect("open owned presentation");
 
     assert_eq!(package.to_bytes().expect("serialize no-op package"), source);
+}
+
+#[test]
+fn replay_index_ingress_does_not_decode_unrelated_slide_payload() {
+    let mut builder = crate::builder::Builder::new().expect("new presentation");
+    builder
+        .presentation()
+        .expect("presentation")
+        .add_slide()
+        .expect("slide");
+    let source = builder
+        .build()
+        .expect("build presentation")
+        .to_bytes()
+        .expect("serialize presentation");
+    let package = Package::from_reader(std::io::Cursor::new(source)).expect("open presentation");
+    let slide_name = PackURI::new("/ppt/slides/slide1.xml").expect("slide name");
+    let slide = package
+        .opc
+        .iter_parts()
+        .find(|part| part.partname() == &slide_name)
+        .expect("slide metadata");
+    assert!(
+        !slide.payload_is_decoded(),
+        "replay ingress must use admitted metadata lengths, not hydrate unrelated slides"
+    );
 }
 
 fn task_panes() -> Panes {
@@ -48,15 +75,16 @@ fn task_panes() -> Panes {
 
 #[test]
 fn new_writer_round_trips_the_bounded_slide_graph() {
-    let mut package = Package::new().expect("new package");
+    let mut builder = crate::builder::Builder::new().expect("new package");
     {
-        let presentation = package.presentation_mut().expect("mutable presentation");
+        let presentation = builder.presentation().expect("mutable presentation");
         let slide = presentation.add_slide().expect("slide");
         slide.set_title("Canonical owner");
         slide.add_text_box("Hello & goodbye", 914_400, 914_400, 2_743_200, 914_400);
         presentation.set_widescreen_slide_size();
     }
 
+    let package = builder.build().expect("new package");
     let bytes = package.to_bytes().expect("serialize package");
     let reopened = Package::from_bytes(&bytes).expect("reopen package");
     let presentation = reopened.presentation().expect("presentation");
@@ -79,69 +107,26 @@ fn new_writer_round_trips_the_bounded_slide_graph() {
 }
 
 #[test]
-fn opened_package_refuses_unsafe_mutable_hydration() {
-    let mut package = Package::new().expect("new package");
-    let bytes = package.to_bytes().expect("serialize package");
-    let mut opened = Package::from_bytes(&bytes).expect("reopen package");
-    assert!(opened.presentation_mut().is_err());
-}
-
-#[test]
-fn failed_typed_edit_restores_pending_presentation_state() {
-    let mut package = Package::new().expect("new package");
-    let presentation_part = PackURI::new("/ppt/presentation.xml").expect("part URI");
-    let before = package
-        .opc
-        .get_part(&presentation_part)
-        .expect("presentation part")
-        .blob()
-        .to_vec();
-
-    {
-        let presentation = package.presentation_mut().expect("mutable presentation");
-        presentation
-            .add_slide()
-            .expect("pending slide")
-            .set_title("must remain pending");
-    }
-    package.opc.rels_mut().add_relationship(
-        rt::CUSTOM_PROPERTIES.to_owned(),
-        "https://example.invalid/custom.xml".to_owned(),
-        "rIdInvalidCustom".to_owned(),
-        true,
-    );
-
-    let mut props = Props::new();
-    props.insert("Owner", "Alice").expect("property");
-    assert!(package.put_custom_props(props).is_err());
-    assert_eq!(
+fn fresh_and_opened_packages_have_canonical_edit_roots() {
+    let package = Package::new().expect("new package");
+    assert!(
         package
-            .opc
-            .get_part(&presentation_part)
-            .expect("presentation part")
-            .blob(),
-        before.as_slice()
+            .edit()
+            .expect("edit")
+            .commit()
+            .expect("commit")
+            .patch()
+            .is_noop()
     );
-    assert!(package.mutable_pres.is_some());
-
-    let _ = package.opc.rels_mut().remove("rIdInvalidCustom");
-    let bytes = package.to_bytes().expect("flush restored presentation");
-    let reopened = Package::from_bytes(&bytes).expect("reopen package");
-    assert_eq!(
-        reopened
-            .presentation()
-            .expect("presentation")
-            .slide_count()
-            .expect("slide count"),
-        1
-    );
+    let bytes = package.to_bytes().expect("serialize package");
+    let opened = Package::from_bytes(&bytes).expect("reopen package");
+    assert!(package.same_content(&opened).expect("same content"));
 }
 
 #[test]
-fn custom_property_no_ops_preserve_signatures_and_changes_invalidate_them() {
+fn custom_property_no_ops_preserve_signatures_and_changes_require_explicit_unsign() {
     let mut package = Package::new().expect("new package");
-    package
-        .opc
+    std::sync::Arc::make_mut(&mut package.opc)
         .relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
     assert!(package.opc.is_signed());
 
@@ -150,15 +135,29 @@ fn custom_property_no_ops_preserve_signatures_and_changes_invalidate_them() {
         .expect("empty custom properties are a no-op");
     assert!(package.opc.is_signed());
 
-    let mut props = Props::new();
-    props.insert("Owner", "Alice").expect("property");
+    // A change is refused with the crate's typed signed error and leaves the
+    // package unchanged until the signature is removed explicitly (ADR 0006;
+    // the shared owner used to remove it).
+    let owner = || {
+        let mut props = Props::new();
+        props.insert("Owner", "Alice").expect("property");
+        props
+    };
+    assert!(matches!(
+        package.put_custom_props(owner()),
+        Err(crate::Error::Opc(
+            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
+        ))
+    ));
+    assert!(package.opc.is_signed());
+    assert!(package.custom_props().expect("read").is_empty());
+    package = package.unsign().expect("explicit unsign");
     package
-        .put_custom_props(props)
+        .put_custom_props(owner())
         .expect("write custom properties");
     assert!(!package.opc.is_signed());
 
-    package
-        .opc
+    std::sync::Arc::make_mut(&mut package.opc)
         .relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
     let props = package.custom_props().expect("read custom properties");
     package
@@ -169,19 +168,17 @@ fn custom_property_no_ops_preserve_signatures_and_changes_invalidate_them() {
 
 #[test]
 fn task_panes_facade_publishes_compact_source_checked_reversible_patches() {
-    let mut package = Package::new().expect("new package");
-    let patch = package
-        .task_panes_patch(task_panes(), Conformance::Transitional)
-        .expect("plan task panes");
-    assert!(!patch.is_empty());
-    let inverse = patch.inverse();
-
+    let package = Package::new().expect("new package");
+    let mut edit = package.edit_task_panes().expect("edit task panes");
     assert!(
-        package
-            .apply_task_panes_patch(&patch)
-            .expect("publish task panes")
+        edit.set(task_panes(), Conformance::Transitional)
+            .expect("stage task panes")
     );
-    let loaded = package
+    let commit = edit.commit().expect("publish task panes");
+    assert!(commit.diagnostics().changed());
+    let inverse = commit.patch().inverse();
+    let published = commit.into_package();
+    let loaded = published
         .task_panes()
         .expect("load task panes")
         .expect("panes");
@@ -195,7 +192,7 @@ fn task_panes_facade_publishes_compact_source_checked_reversible_patches() {
             .store(),
         Store::Omex
     );
-    for part in package
+    for part in published
         .opc
         .try_iter_parts()
         .map(|part| part.expect("part payload decodes"))
@@ -204,31 +201,26 @@ fn task_panes_facade_publishes_compact_source_checked_reversible_patches() {
         assert!(!part.blob().contains(&b'\n'));
         assert!(!part.blob().contains(&b'\r'));
     }
+    assert!(package.task_panes().expect("source unchanged").is_none());
 
-    assert!(
-        package
-            .apply_task_panes_patch(&inverse)
-            .expect("revert task panes")
-    );
-    assert!(package.task_panes().expect("load removed panes").is_none());
+    let reverted = published
+        .apply_task_panes(&inverse)
+        .expect("revert task panes")
+        .into_package();
+    assert!(reverted.task_panes().expect("load removed panes").is_none());
 }
 
 #[test]
 fn empty_task_pane_patch_preserves_signatures() {
     let mut package = Package::new().expect("new package");
-    package
-        .opc
+    std::sync::Arc::make_mut(&mut package.opc)
         .relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
     assert!(package.opc.is_signed());
 
-    let patch = package
-        .clear_task_panes_patch()
-        .expect("plan empty task-pane removal");
-    assert!(patch.is_empty());
-    assert!(
-        !package
-            .apply_task_panes_patch(&patch)
-            .expect("apply empty patch")
-    );
+    let mut edit = package.edit_task_panes().expect("edit task panes");
+    assert!(!edit.remove().expect("stage empty task-pane removal"));
+    let commit = edit.commit().expect("commit empty removal");
+    assert!(commit.patch().is_noop());
+    assert!(commit.package().opc.is_signed());
     assert!(package.opc.is_signed());
 }

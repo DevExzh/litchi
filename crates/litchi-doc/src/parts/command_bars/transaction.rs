@@ -39,8 +39,8 @@ impl Snapshot {
 
     /// Starts an independent semantic transaction.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub fn edit(&self) -> Edit {
+        Edit {
             before: self.clone(),
             working: self.clone(),
         }
@@ -54,35 +54,29 @@ impl CommandBars<'_> {
     }
 
     /// Starts a validated semantic transaction from this command-bar range.
-    pub fn edit(&self) -> PackageResult<Transaction> {
+    pub fn edit(&self) -> PackageResult<Edit> {
         Ok(self.snapshot()?.edit())
     }
 }
 
 /// A staged, reversible command-bar metadata edit.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub struct Edit {
     before: Snapshot,
     working: Snapshot,
 }
 
-impl Transaction {
+impl Edit {
     /// Returns the immutable source snapshot.
     #[must_use]
     pub fn before(&self) -> &Snapshot {
         &self.before
     }
 
-    /// Returns the current staged snapshot.
+    /// The staged candidate snapshot, not yet committed.
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    pub fn staged(&self) -> &Snapshot {
         &self.working
-    }
-
-    /// Whether the staged semantic state differs from its source.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.before != self.working
     }
 
     /// Replaces the complete optional command-bar range atomically.
@@ -103,21 +97,20 @@ impl Transaction {
 
     /// Commits the staged edit and returns its reversible semantic patch.
     pub fn commit(self) -> Result<Commit, Error> {
-        Ok(Commit {
-            before: self.before,
-            after: self.working,
-        })
+        let patch = Patch::new(self.before, self.working.clone());
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(self.working, patch, diagnostics))
     }
 }
 
 /// A reversible change between two command-bar snapshots.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
+pub struct Patch {
     before: Snapshot,
     after: Snapshot,
 }
 
-impl Commit {
+impl Patch {
     pub(crate) fn new(before: Snapshot, after: Snapshot) -> Self {
         Self { before, after }
     }
@@ -130,7 +123,7 @@ impl Commit {
 
     /// The result snapshot.
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    pub fn after(&self) -> &Snapshot {
         &self.after
     }
 
@@ -143,7 +136,7 @@ impl Commit {
     /// Applies this patch only to the exact source snapshot.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, Error> {
         if source != &self.before {
-            return Err(Error::Conflict);
+            return Err(Error::PatchConflict);
         }
         Ok(self.after.clone())
     }
@@ -158,20 +151,28 @@ impl Commit {
     }
 }
 
+/// A published edit: the new snapshot, its reversible patch and
+/// diagnostics.
+pub type Commit = litchi_core::edit::Commit<Snapshot, Patch>;
+
+/// Content-free diagnostics of one commit.
+pub use litchi_core::edit::Diagnostics;
+
 /// Errors produced while staging or applying a command-bar edit.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// The candidate violates a bounded command-bar invariant.
     Invalid(PackageError),
-    /// The transaction was created from a different snapshot.
-    Conflict,
+    /// The patch was created from a different snapshot.
+    PatchConflict,
 }
 
 impl std::fmt::Display for Error {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Invalid(error) => error.fmt(formatter),
-            Self::Conflict => formatter.write_str("command-bar transaction snapshot conflict"),
+            Self::PatchConflict => formatter.write_str("command-bar transaction snapshot conflict"),
         }
     }
 }

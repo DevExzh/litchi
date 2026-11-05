@@ -1,8 +1,9 @@
 //! ODS chart discovery, inline-root adaptation, and bounded XML spans.
 
 use super::model::{Chart, Limits, Location, Part, Storage};
-use crate::package::Package;
+use crate::package::Archive;
 use litchi_core::{Error, Result};
+use litchi_odf_common::XmlStreamLimits;
 use litchi_odf_common::chart::authoring::{Definition, serialize_content};
 use litchi_odf_common::chart::read;
 use litchi_odf_common::constants::{ODF_CHART, ODF_CHART_TEMPLATE};
@@ -18,7 +19,7 @@ const OFFICE_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const DRAW_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
 
 /// Read all content-level embedded chart occurrences from an ODS package.
-pub(crate) fn inventory(package: &Package, limits: Limits) -> Result<Vec<Chart>> {
+pub(crate) fn inventory(package: &Archive, limits: Limits) -> Result<Vec<Chart>> {
     let owned = package.package();
     let borrowed = owned.package()?;
     let objects = scan_package(package.content_xml(), None, &borrowed)?;
@@ -61,7 +62,11 @@ pub(crate) fn inventory(package: &Package, limits: Limits) -> Result<Vec<Chart>>
                 let xml = String::from_utf8(bytes).map_err(|_error| {
                     invalid_error("embedded ODS chart content.xml is not UTF-8")
                 })?;
-                let part = Part::from_xml_with_limit(xml, limits.max_part_bytes())?;
+                let part = Part::from_xml_with_limit(
+                    xml,
+                    limits.max_part_bytes(),
+                    package.xml_limits_value(),
+                )?;
                 (
                     part,
                     Storage::PackageSubdocument,
@@ -79,7 +84,11 @@ pub(crate) fn inventory(package: &Package, limits: Limits) -> Result<Vec<Chart>>
                 if !is_chart_media_type(Some(media_type.as_str())) {
                     continue;
                 }
-                let part = Part::from_inline_with_limit(xml, limits.max_part_bytes())?;
+                let part = Part::from_inline_with_limit(
+                    xml,
+                    limits.max_part_bytes(),
+                    package.xml_limits_value(),
+                )?;
                 let (payload_start, payload_end) = span
                     .payload
                     .ok_or_else(|| invalid_error("inline ODS chart payload span is missing"))?;
@@ -130,7 +139,11 @@ impl Part {
     /// # Errors
     /// Returns an error when the operation cannot be completed.
     pub fn from_xml(xml: impl Into<String>) -> Result<Self> {
-        Self::from_xml_with_limit(xml.into(), Limits::default().max_part_bytes())
+        Self::from_xml_with_limit(
+            xml.into(),
+            Limits::default().max_part_bytes(),
+            XmlStreamLimits::owner_default_value(),
+        )
     }
 
     /// Serialize and validate a typed common ODF chart definition.
@@ -146,21 +159,33 @@ impl Part {
     /// # Errors
     /// Returns an error when the operation cannot be completed.
     pub fn from_inline_xml(xml: impl Into<String>) -> Result<Self> {
-        Self::from_inline_with_limit(xml.into(), Limits::default().max_part_bytes())
+        Self::from_inline_with_limit(
+            xml.into(),
+            Limits::default().max_part_bytes(),
+            XmlStreamLimits::owner_default_value(),
+        )
     }
 
-    fn from_xml_with_limit(xml: String, max_bytes: usize) -> Result<Self> {
+    fn from_xml_with_limit(
+        xml: String,
+        max_bytes: usize,
+        xml_limits: XmlStreamLimits,
+    ) -> Result<Self> {
         if xml.is_empty() || xml.len() > max_bytes {
             return invalid("ODS chart content is empty or exceeds its byte limit");
         }
-        let chart = read(&xml)?;
+        let chart = read(&xml, xml_limits).map_err(Error::from)?;
         Ok(Self {
             xml: Arc::from(xml),
             chart: Arc::new(chart),
         })
     }
 
-    fn from_inline_with_limit(xml: String, max_bytes: usize) -> Result<Self> {
+    fn from_inline_with_limit(
+        xml: String,
+        max_bytes: usize,
+        xml_limits: XmlStreamLimits,
+    ) -> Result<Self> {
         let Some(media_type) = inline_mimetype(&xml)? else {
             return invalid("inline ODS chart has no office:mimetype");
         };
@@ -168,7 +193,7 @@ impl Part {
             return invalid("inline ODS object is not an OpenDocument chart");
         }
         let content = rename_document_root(&xml, "document", "document-content", None)?;
-        Self::from_xml_with_limit(content, max_bytes)
+        Self::from_xml_with_limit(content, max_bytes, xml_limits)
     }
 }
 

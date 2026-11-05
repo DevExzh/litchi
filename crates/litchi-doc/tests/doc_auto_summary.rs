@@ -47,7 +47,11 @@ fn fixture(relative: &str) -> PathBuf {
 }
 
 fn parse_auto_summary(relative: &str) -> Option<DocumentAutoSummary> {
-    let mut ole = OleFile::open(File::open(fixture(relative)).unwrap()).unwrap();
+    let mut ole = OleFile::open(
+        File::open(fixture(relative)).unwrap(),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let word_document = ole.open_stream(&["WordDocument"]).unwrap();
     let fib = FileInformationBlock::parse(&word_document).unwrap();
     let table_name = if fib.which_table_stream() {
@@ -69,7 +73,7 @@ fn documents_without_asumy_report_none() {
 
 #[test]
 fn document_api_reports_none_without_asumy() {
-    let mut package = litchi_doc::Package::from_reader(
+    let mut package = litchi_doc::raw::Reader::from_reader(
         File::open(fixture("test-data/ole/doc/ThreeColHeadFoot.doc")).unwrap(),
     )
     .unwrap();

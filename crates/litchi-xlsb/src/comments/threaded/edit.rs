@@ -1,8 +1,15 @@
-//! Snapshot-based edits for XLSB threaded comments and workbook persons.
+//! Immutable edits of XLSB threaded comments and workbook persons (record
+//! 0360b).
 //!
-//! The editor owns only the typed threaded-comments/persons graph. Package
-//! application is source checked and clone staged so semantic or relationship
-//! failures cannot partially publish an OPC mutation.
+//! [`crate::Package::threaded_comments`] reads the typed graph;
+//! [`crate::Package::edit_threaded_comments`] starts an [`Edit`] that stages
+//! people, worksheet collections, comments and threads against it, each
+//! staging validated as a complete graph. [`Edit::commit`] stores the graph,
+//! reads it back and returns a [`Commit`] with the new package, the exact,
+//! reversible part-level [`Patch`] and the [`Diagnostics`];
+//! [`crate::Package::apply_threaded_comments`] replays a patch onto an equal
+//! package. An unchanged graph publishes nothing, and a changed edit of a
+//! signed workbook is refused with [`Error::Signed`].
 
 use std::sync::Arc;
 
@@ -12,7 +19,56 @@ use litchi_opc::{OpcPackage, TargetMode};
 use super::package;
 use super::semantic::{Comment, Comments, CommentsPart, Graph, People, PeoplePart, Person, Thread};
 use super::validation;
-use crate::package::error::{Error, Result};
+use crate::package::error::Result;
+use crate::part_edit::{Staged, family};
+
+family!("threaded-comment");
+
+/// A bounded dimension of this family.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Serialized bytes of one threaded-comments or persons part
+    /// ([`super::MAX_PART_BYTES`]).
+    PartBytes,
+    /// Persons of one workbook ([`super::MAX_PERSONS`]).
+    Persons,
+}
+
+impl crate::Package {
+    /// The typed threaded-comments/persons graph of this package.
+    ///
+    /// # Errors
+    ///
+    /// Returns the graph, decoding and validation errors.
+    pub fn threaded_comments(&self) -> Result<Snapshot> {
+        Snapshot::read(self.opc_package())
+    }
+
+    /// Start a threaded-comments edit. Starting one copies no part payload.
+    ///
+    /// The graph is read on the first operation or commit, so dropping an
+    /// untouched edit does not decode threaded-comments parts.
+    pub fn edit_threaded_comments(&self) -> Result<Edit> {
+        Ok(Edit {
+            staged: Staged::of_package(self)?,
+            base: None,
+            graph: Graph::default(),
+        })
+    }
+
+    /// Apply a threaded-comments patch to a new package; this one is
+    /// unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when this package is not the patch's
+    /// before state and [`Error::Signed`] for a changed patch of a signed
+    /// workbook.
+    pub fn apply_threaded_comments(&self, patch: &Patch) -> Result<Commit> {
+        Ok(Commit::new((patch.0.apply(self)?, patch.0.clone())))
+    }
+}
 
 /// An immutable package-backed threaded-comments/persons snapshot.
 #[derive(Debug, Clone)]
@@ -56,10 +112,6 @@ impl Snapshot {
     }
 
     /// Whether this snapshot is bound to exact package source context.
-    ///
-    /// A changed [`Commit`] is intentionally detached because package part
-    /// names and relationship IDs may be allocated by `store_graph`. The
-    /// successful package [`Patch::apply`] result is source bound again.
     #[must_use]
     pub fn is_source_bound(&self) -> bool {
         self.source.is_some()
@@ -73,15 +125,6 @@ impl Snapshot {
             .iter()
             .find(|part| part.worksheet_part_name == worksheet_part_name)
             .map(|part| &part.comments)
-    }
-
-    /// Start a detached transaction against this snapshot.
-    #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
-            base: self.clone(),
-            graph: self.graph.clone(),
-        }
     }
 
     /// Whether the package owner has no threaded-comments/persons parts.
@@ -99,28 +142,94 @@ impl PartialEq for Snapshot {
 
 impl Eq for Snapshot {}
 
-/// A detached, source-checked threaded-comments/persons transaction.
+/// A staged threaded-comments/persons edit. Dropping it discards it.
 #[derive(Debug, Clone)]
-pub struct Transaction {
-    base: Snapshot,
+pub struct Edit {
+    staged: Staged,
+    base: Option<Graph>,
     graph: Graph,
 }
 
-impl Transaction {
+impl Edit {
+    fn ensure_prepared(&mut self) -> Result<()> {
+        if self.base.is_some() {
+            return Ok(());
+        }
+        let base = package::load_graph(self.staged.opc())?;
+        self.graph = base.clone();
+        self.base = Some(base);
+        Ok(())
+    }
+
+    fn base(&self) -> Result<&Graph> {
+        self.base
+            .as_ref()
+            .ok_or_else(|| invalid_state("threaded-comments edit is not prepared"))
+    }
+
+    /// Discard every staged change.
+    pub fn reset(&mut self) -> Result<()> {
+        self.ensure_prepared()?;
+        self.graph = self.base()?.clone();
+        Ok(())
+    }
+
+    /// Replace the complete staged graph.
+    ///
+    /// # Errors
+    ///
+    /// Returns the graph validation errors.
+    pub fn replace(&mut self, graph: Graph) -> Result<()> {
+        self.ensure_prepared()?;
+        validate(&graph)?;
+        self.graph = graph;
+        Ok(())
+    }
+
+    /// Remove every threaded-comments and persons part. Returns whether the
+    /// staged graph had any.
+    pub fn clear(&mut self) -> Result<bool> {
+        self.ensure_prepared()?;
+        let present = self.graph.persons.is_some() || !self.graph.worksheets.is_empty();
+        self.graph = Graph::default();
+        Ok(present)
+    }
+
+    /// Remove the workbook persons part when no comment or mention still
+    /// references a person. Returns whether one was staged.
+    ///
+    /// # Errors
+    ///
+    /// Returns the graph validation errors.
+    pub fn remove_people(&mut self) -> Result<bool> {
+        self.ensure_prepared()?;
+        if self.graph.persons.is_none() {
+            return Ok(false);
+        }
+        let mut candidate = self.graph.clone();
+        candidate.persons = None;
+        validate(&candidate)?;
+        self.graph = candidate;
+        Ok(true)
+    }
+
     /// Borrow the currently staged graph.
     #[must_use]
-    pub const fn graph(&self) -> &Graph {
-        &self.graph
+    pub fn graph(&mut self) -> Result<&Graph> {
+        self.ensure_prepared()?;
+        Ok(&self.graph)
     }
 
     /// Borrow the currently staged workbook people.
     #[must_use]
-    pub fn people(&self) -> Option<&People> {
-        self.graph.persons.as_ref().map(|part| &part.persons)
+    pub fn people(&mut self) -> Result<Option<&People>> {
+        self.ensure_prepared()?;
+        Ok(self.graph.persons.as_ref().map(|part| &part.persons))
     }
 
     /// Replace workbook people, retaining the existing package identity.
     pub fn set_people(&mut self, people: People) -> Result<()> {
+        self.ensure_prepared()?;
         let mut candidate = self.graph.clone();
         if let Some(part) = candidate.persons.as_mut() {
             part.persons = people;
@@ -138,7 +247,8 @@ impl Transaction {
 
     /// Add or replace one workbook person by stable GUID.
     pub fn upsert_person(&mut self, person: Person) -> Result<()> {
-        let mut people = self.people().cloned().unwrap_or_default();
+        self.ensure_prepared()?;
+        let mut people = self.people()?.cloned().unwrap_or_default();
         if let Some(existing) = people.persons.iter_mut().find(|item| item.id == person.id) {
             *existing = person;
         } else {
@@ -149,10 +259,12 @@ impl Transaction {
 
     /// Remove a workbook person when no comment or mention still references it.
     pub fn remove_person(&mut self, person_id: &str) -> Result<Option<Person>> {
-        let Some(current) = self.people() else {
+        self.ensure_prepared()?;
+        let Some(current) = self.graph.persons.as_ref() else {
             return Ok(None);
         };
         let Some(index) = current
+            .persons
             .persons
             .iter()
             .position(|person| person.id == person_id)
@@ -184,12 +296,14 @@ impl Transaction {
 
     /// Borrow one staged worksheet threaded-comments collection.
     #[must_use]
-    pub fn worksheet(&self, worksheet_part_name: &str) -> Option<&Comments> {
-        self.graph
+    pub fn worksheet(&mut self, worksheet_part_name: &str) -> Result<Option<&Comments>> {
+        self.ensure_prepared()?;
+        Ok(self
+            .graph
             .worksheets
             .iter()
             .find(|part| part.worksheet_part_name == worksheet_part_name)
-            .map(|part| &part.comments)
+            .map(|part| &part.comments))
     }
 
     /// Replace one worksheet's threaded comments, retaining package identity.
@@ -198,6 +312,7 @@ impl Transaction {
         worksheet_part_name: impl Into<String>,
         comments: Comments,
     ) -> Result<()> {
+        self.ensure_prepared()?;
         let worksheet_part_name = worksheet_part_name.into();
         let mut candidate = self.graph.clone();
         if let Some(part) = candidate
@@ -224,6 +339,7 @@ impl Transaction {
 
     /// Append one root or reply comment to an existing worksheet collection.
     pub fn add_comment(&mut self, worksheet_part_name: &str, comment: Comment) -> Result<()> {
+        self.ensure_prepared()?;
         let mut candidate = self.graph.clone();
         let part = candidate
             .worksheets
@@ -242,7 +358,8 @@ impl Transaction {
         worksheet_part_name: &str,
         root_id: &str,
     ) -> Result<Option<Thread>> {
-        let Some(current) = self.worksheet(worksheet_part_name) else {
+        self.ensure_prepared()?;
+        let Some(current) = self.worksheet(worksheet_part_name)? else {
             return Ok(None);
         };
         let threads = validation::group_threads(current).map_err(map_validation_error)?;
@@ -268,6 +385,7 @@ impl Transaction {
 
     /// Remove one worksheet's complete threaded-comments part from the graph.
     pub fn remove_worksheet(&mut self, worksheet_part_name: &str) -> Result<bool> {
+        self.ensure_prepared()?;
         let mut candidate = self.graph.clone();
         let old_len = candidate.worksheets.len();
         candidate
@@ -281,127 +399,55 @@ impl Transaction {
         Ok(true)
     }
 
-    /// Validate and produce an immutable commit and reversible patch.
-    pub fn commit(self) -> Result<Commit> {
+    /// Validate the staged graph, store it, read it back and publish a new
+    /// package. An unchanged graph returns the source package.
+    ///
+    /// # Errors
+    ///
+    /// Returns the graph validation errors, [`Error::Signed`] for a changed
+    /// edit of a signed workbook and the workbook validation errors of the
+    /// result.
+    pub fn commit(mut self) -> Result<Commit> {
+        self.ensure_prepared()?;
         validate(&self.graph)?;
-        let changed = self.graph != self.base.graph;
-        let source = Arc::clone(self.base.source.as_ref().ok_or_else(|| {
-            Error::UnsupportedFeature(
-                "threaded-comments edit snapshot is not source bound".to_string(),
-            )
-        })?);
-        Ok(Commit {
-            snapshot: Snapshot {
-                graph: self.graph.clone(),
-                source: (!changed).then_some(Arc::clone(&source)),
-            },
-            patch: Patch {
-                before: source,
-                after: self.graph,
-                changed,
-            },
-        })
-    }
-}
-
-/// A successful immutable transaction result.
-#[derive(Debug, Clone)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
-
-impl Commit {
-    /// Borrow the committed semantic snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Borrow the source-checked package patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Split the commit into snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
-    }
-}
-
-/// A source-checked, clone-staged package patch.
-#[derive(Debug, Clone)]
-pub struct Patch {
-    before: Arc<SourceState>,
-    after: Graph,
-    changed: bool,
-}
-
-impl Patch {
-    /// Whether applying this patch leaves the owner byte streams untouched.
-    #[must_use]
-    pub const fn is_empty(&self) -> bool {
-        !self.changed
-    }
-
-    /// Apply this patch only to the exact source owner graph.
-    pub fn apply(&self, package: &mut OpcPackage) -> Result<Snapshot> {
-        let current = SourceState::capture(package)?;
-        if current != *self.before {
-            return Err(Error::UnsupportedFeature(
-                "threaded-comments patch source snapshot does not match".to_string(),
-            ));
+        let changed = {
+            let base = self.base()?;
+            self.graph != *base
+        };
+        if changed {
+            let graph = self.graph.clone();
+            self.staged.update(|candidate| {
+                package::store_graph(candidate, &graph)?;
+                let stored = package::load_graph(candidate)?;
+                validate(&stored)
+            })?;
         }
-        if !self.changed {
-            return Snapshot::read(package);
-        }
-
-        let mut candidate = package.clone();
-        package::store_graph(&mut candidate, &self.after)?;
-        let snapshot = Snapshot::read(&candidate)?;
-        *package = candidate;
-        Ok(snapshot)
+        Ok(Commit::new(self.staged.commit()?))
     }
-
-    /// Apply the patch's exact before-image guard without publishing a partial
-    /// package mutation. This is an alias suited to transaction pipelines.
-    pub fn commit(&self, package: &mut OpcPackage) -> Result<Snapshot> {
-        self.apply(package)
-    }
-}
-
-/// Read the threaded-comments/persons snapshot for an OPC package.
-pub fn read(package: &OpcPackage) -> Result<Snapshot> {
-    Snapshot::read(package)
-}
-
-/// Apply a previously committed patch atomically to an OPC package.
-pub fn apply(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
-    patch.apply(package)
 }
 
 fn validate(graph: &Graph) -> Result<()> {
     validation::validate_graph(graph).map_err(map_validation_error)
 }
 
-fn map_validation_error(error: validation::Error) -> Error {
-    Error::Unrecognized {
-        typ: "XLSB threaded-comments edit".to_string(),
-        val: error.to_string(),
-    }
+fn map_validation_error(_error: validation::Error) -> Error {
+    Error::refused(
+        litchi_core::edit::RefusalKind::InvalidValue,
+        "edit_threaded_comments",
+        "the threaded-comments graph is invalid",
+    )
 }
 
-fn missing_worksheet(worksheet_part_name: &str) -> Error {
-    Error::Unrecognized {
-        typ: "XLSB threaded-comments edit".to_string(),
-        val: format!("worksheet '{worksheet_part_name}' has no threaded-comments part"),
-    }
+fn missing_worksheet(_worksheet_part_name: &str) -> Error {
+    Error::refused(
+        litchi_core::edit::RefusalKind::NotFound,
+        "edit_threaded_comments",
+        "the threaded-comments target was not found",
+    )
 }
 
-fn invalid_state(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(format!("XLSB threaded-comments edit: {}", message.into()))
+fn invalid_state(_message: impl Into<String>) -> Error {
+    Error::InvalidFormat("XLSB threaded-comments edit")
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

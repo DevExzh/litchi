@@ -10,7 +10,7 @@ use quick_xml::{XmlVersion, events::Event, reader::Reader};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use super::codec::{parse, write, xml_error};
+use super::codec::{parse, xml_error};
 use super::model::{
     Conformance, FONT_CT, FT_CT, MAX_ALL_FONTS, MAX_FONT, MAX_NODES, MAX_XML, Resource, Table,
     bounded, invalid, is_font_relationship, is_font_table_relationship, name_key,
@@ -19,18 +19,34 @@ use super::model::{
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 impl Table {
-    fn extract_from_part(part: &dyn Part, pkg: &OpcPackage) -> Result<Self> {
+    fn extract_from_part(
+        part: &dyn Part,
+        pkg: &OpcPackage,
+        limits: &super::Limits,
+    ) -> Result<Self> {
         if part.content_type() != FT_CT {
             return Err(Error::ContentType {
                 expected: FT_CT.into(),
                 actual: part.content_type().into(),
             });
         }
-        let mut v = parse(part.blob())?;
-        v.resolve(part, pkg)?;
+        let mut v = parse(part.blob(), limits)?;
+        v.resolve(part, pkg, limits)?;
         Ok(v)
     }
-    fn resolve(&mut self, source: &dyn Part, pkg: &OpcPackage) -> Result<()> {
+    fn resolve(
+        &mut self,
+        source: &dyn Part,
+        pkg: &OpcPackage,
+        limits: &super::Limits,
+    ) -> Result<()> {
+        if self.fonts.len() > limits.fonts() {
+            return Err(Error::FontLimit {
+                kind: crate::font::LimitKind::FontCount,
+                actual: self.fonts.len(),
+                maximum: limits.fonts(),
+            });
+        }
         validate_font_relationship_sources(pkg, source.partname())?;
         let mut used = HashSet::new();
         let mut cached = HashMap::<String, Resource>::new();
@@ -74,11 +90,29 @@ impl Table {
                 if part.blob().len() < 32 {
                     return Err(invalid(format!("embedded font '{uri}' is too short")));
                 }
+                if part.blob().len() > limits.embedded_font_bytes() {
+                    return Err(Error::FontLimit {
+                        kind: crate::font::LimitKind::EmbeddedFontBytes,
+                        actual: part.blob().len(),
+                        maximum: limits.embedded_font_bytes(),
+                    });
+                }
                 total = total
                     .checked_add(part.blob().len())
                     .ok_or_else(|| invalid("embedded-font size overflow"))?;
                 if total > MAX_ALL_FONTS {
-                    return Err(invalid("embedded fonts exceed total size limit"));
+                    return Err(Error::FontLimit {
+                        kind: crate::font::LimitKind::EmbeddedFontBytes,
+                        actual: total,
+                        maximum: MAX_ALL_FONTS,
+                    });
+                }
+                if total > limits.aggregate_font_bytes() {
+                    return Err(Error::FontLimit {
+                        kind: crate::font::LimitKind::AggregateBytes,
+                        actual: total,
+                        maximum: limits.aggregate_font_bytes(),
+                    });
                 }
                 if part.rels().iter().next().is_some() {
                     return Err(invalid(format!(
@@ -116,7 +150,14 @@ impl Table {
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn read(package: &OpcPackage) -> Result<Option<Table>> {
+pub(crate) fn read(package: &OpcPackage) -> Result<Option<Table>> {
+    read_with_limits(package, &super::Limits::DEFAULT)
+}
+
+pub(crate) fn read_with_limits(
+    package: &OpcPackage,
+    limits: &super::Limits,
+) -> Result<Option<Table>> {
     let (main_name, table_name, _) = locate_font_table(package)?;
     validate_font_table_relationship_sources(package, &main_name)?;
     let Some(table_name) = table_name else {
@@ -124,7 +165,7 @@ pub fn read(package: &OpcPackage) -> Result<Option<Table>> {
         return Ok(None);
     };
     let part = package.get_part(&table_name)?;
-    Ok(Some(Table::extract_from_part(part, package)?))
+    Ok(Some(Table::extract_from_part(part, package, limits)?))
 }
 
 /// Move a complete font table into the package after validating the staged XML
@@ -132,17 +173,36 @@ pub fn read(package: &OpcPackage) -> Result<Option<Table>> {
 ///
 /// Font bytes are stored exactly as supplied. Callers that have unobfuscated
 /// bytes must explicitly call [`crate::font::obfuscate`] first. The API
-/// operates on an already decrypted in-memory `OpcPackage` and invalidates any
-/// package signatures immediately before the mutation phase. Moving a default,
+/// operates on an already decrypted in-memory `OpcPackage`. Moving a default,
 /// empty [`Table`] removes the optional font-table graph and any font resources
 /// that become unreferenced.
+///
+/// An equal table (or an empty one where no table exists) publishes nothing,
+/// so a signed package keeps its signature byte for byte. Any other table
+/// changes the package, so a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`] before the mutation phase
+/// (ADR 0006): remove the signature explicitly first
+/// ([`OpcPackage::unsign`]).
 ///
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn put(package: &mut OpcPackage, mut value: Table, conformance: Conformance) -> Result<bool> {
+pub(crate) fn put(
+    package: &mut OpcPackage,
+    value: Table,
+    conformance: Conformance,
+) -> Result<bool> {
+    put_checked(package, value, conformance, &super::Limits::DEFAULT)
+}
+
+pub(crate) fn put_checked(
+    package: &mut OpcPackage,
+    mut value: Table,
+    conformance: Conformance,
+    limits: &super::Limits,
+) -> Result<bool> {
     validate_package_conformance(package, conformance)?;
-    let old = read(package)?.unwrap_or_default();
+    let old = read_with_limits(package, limits)?.unwrap_or_default();
     let (main_name, old_table_name, old_table_relationship_id) = locate_font_table(package)?;
     if value.fonts.is_empty()
         && value.namespaces.is_empty()
@@ -181,8 +241,8 @@ pub fn put(package: &mut OpcPackage, mut value: Table, conformance: Conformance)
         }
     }
 
-    let xml = write(&value, conformance)?;
-    let staged = parse(&xml)?;
+    let xml = super::raw::write(&value, conformance, limits)?;
+    let staged = parse(&xml, limits)?;
     if !same_metadata(&staged, &value) {
         return Err(invalid("staged font-table XML did not round-trip"));
     }
@@ -305,7 +365,7 @@ pub fn put(package: &mut OpcPackage, mut value: Table, conformance: Conformance)
                 .map_err(Error::Uri)
         })
         .collect::<Result<Vec<_>>>()?;
-    package.unsign();
+    crate::signature_policy::ensure_unsigned(package)?;
 
     for (uri, content_type, data) in resource_parts {
         match package.get_part_mut(&uri) {
@@ -373,14 +433,22 @@ pub fn put(package: &mut OpcPackage, mut value: Table, conformance: Conformance)
 /// Remove the optional font-table graph and every font resource that becomes
 /// unreferenced.
 ///
-/// The complete relationship graph is validated before signatures, parts, or
-/// relationships are mutated. Resources shared by another source are retained.
+/// The complete relationship graph is validated before parts or relationships
+/// are mutated. Resources shared by another source are retained. A package
+/// without a font table is left untouched and returns `false`, signed or not;
+/// removing one from a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`] (ADR 0006): remove the
+/// signature explicitly first ([`OpcPackage::unsign`]).
 ///
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn remove(package: &mut OpcPackage) -> Result<bool> {
-    let old = read(package)?.unwrap_or_default();
+pub(crate) fn remove(package: &mut OpcPackage) -> Result<bool> {
+    remove_with_limits(package, &super::Limits::DEFAULT)
+}
+
+pub(crate) fn remove_with_limits(package: &mut OpcPackage, limits: &super::Limits) -> Result<bool> {
+    let old = read_with_limits(package, limits)?.unwrap_or_default();
     let (main_name, table_name, relationship_id) = locate_font_table(package)?;
     remove_graph(
         package,
@@ -446,7 +514,7 @@ fn remove_graph(
     }
     validate_all_internal_relationship_targets(package)?;
 
-    package.unsign();
+    crate::signature_policy::ensure_unsigned(package)?;
     package
         .get_part_mut(main_name)?
         .rels_mut()
@@ -848,7 +916,11 @@ fn directly_used_font_names(package: &OpcPackage) -> Result<HashSet<String>> {
                 {
                     nodes += 1;
                     if nodes > MAX_NODES {
-                        return Err(invalid("font-usage XML node limit exceeded"));
+                        return Err(Error::FontLimit {
+                            kind: crate::font::LimitKind::XmlNode,
+                            actual: nodes,
+                            maximum: MAX_NODES,
+                        });
                     }
                     for attribute in element.checked_attributes() {
                         let attribute = attribute.map_err(xml_error)?;

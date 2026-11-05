@@ -15,7 +15,7 @@ use litchi_numbers::cell::{
     data_format::duration::{Duration, Style, Unit, UnitRange, Units},
 };
 use litchi_numbers::table::cells::Storage;
-use litchi_numbers::{CellPosition, Package};
+use litchi_numbers::{At, Package};
 use litchi_numbers_wire::{BncCell, CachedScalar, StoredValue};
 use prost::Message as _;
 
@@ -36,12 +36,12 @@ fn resaved_fixture_path() -> PathBuf {
         .join("../../test-data/iwork/numbers/duration-native-resaved.numbers")
 }
 
-fn position() -> CellPosition {
-    CellPosition::new(1, 1)
+fn position() -> At {
+    At::new(1, 1)
 }
 
-fn marker_position() -> CellPosition {
-    CellPosition::new(1, 2)
+fn marker_position() -> At {
+    At::new(1, 2)
 }
 
 fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
@@ -68,7 +68,10 @@ fn duration_value(package: &Package) -> TestResult<f64> {
 }
 
 fn duration_cache(source: &[u8]) -> TestResult<CachedScalar> {
-    let cell = BncCell::parse(&native_duration_cell(source)?)?;
+    let cell = BncCell::parse(
+        &native_duration_cell(source)?,
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
     if cell.stored_value() != StoredValue::Duration {
         return Err(io::Error::other("native Duration B2 cell is not a duration").into());
     }
@@ -83,13 +86,13 @@ fn duration_cache(source: &[u8]) -> TestResult<CachedScalar> {
 }
 
 fn native_duration_cell(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == TILE_MEMBER)
         .ok_or_else(|| io::Error::other("native Duration tile member is missing"))?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let archive = Archive::parse(stream.as_bytes(), Default::default())?;
     let tile = archive
         .objects
         .iter()
@@ -178,8 +181,8 @@ fn assert_duration(package: &Package, expected: Duration) -> TestResult {
 }
 
 fn assert_exact_locality(source: &[u8], target: &[u8]) -> TestResult {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     for member in [FORMAT_MEMBER, TILE_MEMBER] {
         if !before.iter().any(|entry| entry.name() == member) {
             return Err(io::Error::other(format!(

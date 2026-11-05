@@ -2,12 +2,14 @@
 //!
 //! These tests exercise the adapter's namespace boundary: lexical event bytes
 //! stay available for source ranges while declaration values are normalized
-//! once before namespace resolution.  Generic document validation (root
-//! cardinality, matching end tags, and application vocabulary) belongs to the
-//! caller and is intentionally outside this fixture.
+//! once before namespace resolution.  Fragment callers keep the low-level
+//! mode; complete-document callers opt into root cardinality, declaration,
+//! and matching-end-tag validation with `from_xml_document`.
 
-use litchi_odf_common::ResolvedReader;
 use litchi_odf_common::namespace::MAX_NAMESPACE_URI_BYTES;
+use litchi_odf_common::{
+    Error as OdfError, LimitKind, RawXmlLimitKind, ResolvedReader, XmlStreamLimits,
+};
 use quick_xml::events::Event;
 use quick_xml::name::{DEFAULT_MAX_DECLARATIONS_PER_ELEMENT, Namespace, ResolveResult};
 
@@ -24,7 +26,7 @@ fn expect_element(
     expected_name: &[u8],
     expected_namespace: ExpectedNamespace<'_>,
     expected_level: u16,
-) -> quick_xml::Result<()> {
+) -> litchi_core::Result<()> {
     let (namespace, event) = reader.read_resolved_event()?;
     assert_namespace(&namespace, expected_namespace);
     match (expected_event, event) {
@@ -44,6 +46,24 @@ fn expect_element(
     drop(namespace);
     assert_eq!(reader.resolver().level(), expected_level);
     Ok(())
+}
+
+fn limits() -> XmlStreamLimits {
+    XmlStreamLimits::new(256 << 20, 1_024, 4_000_000, 1_000_000, 64 * 1024 * 1024)
+        .expect("test XML limits are finite")
+        .namespace_limits(
+            1_024,
+            256,
+            256 * 1_024,
+            16 * 1024 * 1024,
+            64 * 1024,
+            64 * 1024,
+        )
+        .expect("test namespace limits are finite")
+}
+
+fn reader<'a>(source: &'a str) -> litchi_core::Result<ResolvedReader<'a>> {
+    Ok(ResolvedReader::from_xml(source, limits())?)
 }
 
 #[derive(Debug)]
@@ -67,7 +87,7 @@ fn assert_namespace(namespace: &ResolveResult<'_>, expected: ExpectedNamespace<'
 }
 
 fn first_error(source: &str) -> String {
-    let mut reader = ResolvedReader::from_xml(source);
+    let mut reader = reader(source).expect("test XML fits the explicit limits");
     match reader.read_resolved_event() {
         Ok(_) => panic!("invalid namespace source was accepted"),
         Err(error) => error.to_string(),
@@ -75,11 +95,11 @@ fn first_error(source: &str) -> String {
 }
 
 #[test]
-fn source_events_and_ranges_are_retained_while_namespace_values_normalize() -> quick_xml::Result<()>
-{
+fn source_events_and_ranges_are_retained_while_namespace_values_normalize()
+-> litchi_core::Result<()> {
     let source = r#"<root xmlns:p="urn:a&amp;amp;"><p:item attr="&amp;"/></root>"#;
     let source_bytes = source.as_bytes();
-    let mut reader = ResolvedReader::from_xml(source);
+    let mut reader = reader(source)?;
 
     let start = reader.buffer_position() as usize;
     let (namespace, event) = reader.read_resolved_event()?;
@@ -134,9 +154,9 @@ fn source_events_and_ranges_are_retained_while_namespace_values_normalize() -> q
 }
 
 #[test]
-fn buffered_events_retain_the_same_lexical_source_range() -> quick_xml::Result<()> {
+fn buffered_events_retain_the_same_lexical_source_range() -> litchi_core::Result<()> {
     let source = r#"<root xmlns:p="urn:a&amp;amp;"><p:item/></root>"#;
-    let mut reader = ResolvedReader::from_xml(source);
+    let mut reader = reader(source)?;
     let mut buffer = Vec::new();
     let start = reader.buffer_position() as usize;
 
@@ -162,10 +182,10 @@ fn buffered_events_retain_the_same_lexical_source_range() -> quick_xml::Result<(
 }
 
 #[test]
-fn borrowed_resolution_keeps_the_raw_event_and_re_resolves_the_next_event() -> quick_xml::Result<()>
-{
+fn borrowed_resolution_keeps_the_raw_event_and_re_resolves_the_next_event()
+-> litchi_core::Result<()> {
     let source = r#"<root xmlns:p="urn:p"><p:item/></root>"#;
-    let mut reader = ResolvedReader::from_xml(source);
+    let mut reader = reader(source)?;
 
     let (namespace, event) = reader.read_resolved_event()?;
     assert_namespace(&namespace, ExpectedNamespace::Unbound);
@@ -185,12 +205,13 @@ fn borrowed_resolution_keeps_the_raw_event_and_re_resolves_the_next_event() -> q
 }
 
 #[test]
-fn escaped_xml_binding_is_admitted_and_literal_entity_text_decodes_once() -> quick_xml::Result<()> {
+fn escaped_xml_binding_is_admitted_and_literal_entity_text_decodes_once() -> litchi_core::Result<()>
+{
     let source = concat!(
         r#"<root xmlns:xml="http:&#x2F;&#x2F;www.w3.org&#x2F;XML&#x2F;1998&#x2F;namespace" "#,
         r#"xmlns:p="urn:a&amp;amp;"><p:item/></root>"#,
     );
-    let mut reader = ResolvedReader::from_xml(source);
+    let mut reader = reader(source)?;
 
     let (namespace, event) = reader.read_resolved_event()?;
     assert_namespace(&namespace, ExpectedNamespace::Unbound);
@@ -223,8 +244,8 @@ fn escaped_xml_binding_is_admitted_and_literal_entity_text_decodes_once() -> qui
 }
 
 #[test]
-fn inherited_shadowed_and_popped_scopes_apply_to_start_and_empty_elements() -> quick_xml::Result<()>
-{
+fn inherited_shadowed_and_popped_scopes_apply_to_start_and_empty_elements()
+-> litchi_core::Result<()> {
     let source = concat!(
         r#"<root xmlns="urn:root" xmlns:p="urn:root:p">"#,
         r#"<branch xmlns="urn:branch" xmlns:p="urn:branch:p">"#,
@@ -235,7 +256,7 @@ fn inherited_shadowed_and_popped_scopes_apply_to_start_and_empty_elements() -> q
         r#"<empty-shadow xmlns:p="urn:empty:p"/>"#,
         r#"<p:after-empty/></root>"#,
     );
-    let mut reader = ResolvedReader::from_xml(source);
+    let mut reader = reader(source)?;
 
     expect_element(
         &mut reader,
@@ -346,9 +367,9 @@ fn inherited_shadowed_and_popped_scopes_apply_to_start_and_empty_elements() -> q
 }
 
 #[test]
-fn unknown_prefixes_are_reported_without_changing_source_events() -> quick_xml::Result<()> {
+fn unknown_prefixes_are_reported_without_changing_source_events() -> litchi_core::Result<()> {
     let source = r#"<root xmlns:p="urn:p"><q:item/></root>"#;
-    let mut reader = ResolvedReader::from_xml(source);
+    let mut reader = reader(source)?;
 
     let (namespace, event) = reader.read_resolved_event()?;
     drop(namespace);
@@ -458,7 +479,7 @@ fn duplicate_and_malformed_namespace_attributes_are_rejected() {
 }
 
 #[test]
-fn namespace_declarations_have_a_bounded_per_element_profile() -> quick_xml::Result<()> {
+fn namespace_declarations_have_a_bounded_per_element_profile() -> litchi_core::Result<()> {
     let mut accepted = String::from("<root");
     for index in 0..DEFAULT_MAX_DECLARATIONS_PER_ELEMENT {
         accepted.push_str(" xmlns:p");
@@ -469,7 +490,7 @@ fn namespace_declarations_have_a_bounded_per_element_profile() -> quick_xml::Res
     }
     accepted.push_str("/>");
 
-    let mut reader = ResolvedReader::from_xml(&accepted);
+    let mut reader = reader(&accepted)?;
     let (namespace, event) = reader.read_resolved_event()?;
     assert_namespace(&namespace, ExpectedNamespace::Unbound);
     assert!(matches!(event, Event::Empty(_)));
@@ -494,7 +515,7 @@ fn namespace_declarations_have_a_bounded_per_element_profile() -> quick_xml::Res
 }
 
 #[test]
-fn nested_namespace_scopes_stop_at_the_bounded_depth_profile() -> quick_xml::Result<()> {
+fn nested_namespace_scopes_stop_at_the_bounded_depth_profile() -> litchi_core::Result<()> {
     // The adapter's retained scope profile is four times quick-xml's
     // per-element declaration profile.  Keep this as a stream test: matching
     // end tags are the caller's structural-validation responsibility.
@@ -504,7 +525,7 @@ fn nested_namespace_scopes_stop_at_the_bounded_depth_profile() -> quick_xml::Res
         source.push_str("<e>");
     }
 
-    let mut reader = ResolvedReader::from_xml(&source);
+    let mut reader = reader(&source)?;
     for expected_level in 1..=max_depth {
         let (namespace, event) = reader.read_resolved_event()?;
         assert_namespace(&namespace, ExpectedNamespace::Unbound);
@@ -519,7 +540,7 @@ fn nested_namespace_scopes_stop_at_the_bounded_depth_profile() -> quick_xml::Res
         },
         Err(error) => error.to_string(),
     };
-    assert!(error.contains("namespace") || error.contains("declaration"));
+    assert!(error.contains("depth"));
     Ok(())
 }
 
@@ -540,7 +561,7 @@ fn active_namespace_bytes_are_bounded_before_resolver_growth() {
     source.push_str("/>");
 
     let error = first_error(&source);
-    assert!(error.contains("active namespace") || error.contains("namespace byte"));
+    assert!(error.contains("raw_xml_namespace_bytes") || error.contains("namespace byte"));
     assert!(
         error.len() <= 4096,
         "active-scope error appeared to retain an input payload: {} bytes",
@@ -567,4 +588,140 @@ fn namespace_uri_and_prefix_errors_do_not_echo_oversized_payloads() {
         "oversized prefix appeared in the error payload: {} bytes",
         prefix_error.len()
     );
+}
+
+#[test]
+fn retained_policy_reports_namespace_scope_as_a_typed_dimension() -> litchi_core::Result<()> {
+    let strict = limits()
+        .namespace_limits(1, 256, 256 * 1_024, 16 * 1024 * 1024, 64 * 1024, 64 * 1024)
+        .expect("strict namespace policy is finite");
+    let mut reader = ResolvedReader::from_xml("<root><child/></root>", strict)?;
+    let _ = reader.read_resolved_event()?;
+    let error = reader
+        .read_resolved_event()
+        .expect_err("the retained scope policy must reach event reads");
+    assert!(matches!(
+        &error,
+        OdfError::Limit {
+            kind: LimitKind::RawXml(RawXmlLimitKind::NamespaceScopeDepth),
+            observed: 2,
+            maximum: 1,
+        }
+    ));
+
+    let mut replay = ResolvedReader::from_xml("<root><child/></root>", strict)?;
+    let _ = replay.read_resolved_event()?;
+    let replay_error = replay
+        .read_resolved_event()
+        .expect_err("an independent reader must retain the same policy");
+    assert!(matches!(
+        replay_error,
+        OdfError::Limit {
+            kind: LimitKind::RawXml(RawXmlLimitKind::NamespaceScopeDepth),
+            observed: 2,
+            maximum: 1,
+        }
+    ));
+    Ok(())
+}
+
+#[test]
+fn retained_policy_preserves_raw_depth_and_declaration_kinds() -> litchi_core::Result<()> {
+    let depth_limits = XmlStreamLimits::new(256 << 20, 1, 4_000_000, 1_000_000, 64 * 1024 * 1024)
+        .expect("depth policy is finite")
+        .namespace_limits(
+            1_024,
+            256,
+            256 * 1_024,
+            16 * 1024 * 1024,
+            64 * 1024,
+            64 * 1024,
+        )
+        .expect("namespace policy is finite");
+    let mut depth_reader = ResolvedReader::from_xml("<root><child/></root>", depth_limits)?;
+    let _ = depth_reader.read_resolved_event()?;
+    let depth_error = depth_reader
+        .read_resolved_event()
+        .expect_err("the retained depth policy must reach event reads");
+    assert!(matches!(
+        depth_error,
+        OdfError::Limit {
+            kind: LimitKind::RawXml(RawXmlLimitKind::Depth),
+            observed: 2,
+            maximum: 1,
+        }
+    ));
+
+    let declaration_limits = limits()
+        .namespace_limits(
+            1_024,
+            1,
+            256 * 1_024,
+            16 * 1024 * 1024,
+            64 * 1024,
+            64 * 1024,
+        )
+        .expect("declaration policy is finite");
+    let mut declaration_reader = ResolvedReader::from_xml(
+        r#"<root xmlns:p="urn:p" xmlns:q="urn:q"/>"#,
+        declaration_limits,
+    )?;
+    let declaration_error = declaration_reader
+        .read_resolved_event()
+        .expect_err("the retained declaration policy must reach event reads");
+    assert!(matches!(
+        declaration_error,
+        OdfError::Limit {
+            kind: LimitKind::RawXml(RawXmlLimitKind::NamespaceDeclarations),
+            observed: 2,
+            maximum: 1,
+        }
+    ));
+    Ok(())
+}
+
+fn document_error(source: &str, limits: XmlStreamLimits) -> OdfError {
+    let mut reader = ResolvedReader::from_xml_document(source, limits)
+        .expect("document test source fits the explicit limits");
+    loop {
+        match reader.read_resolved_event() {
+            Ok((_, Event::Eof)) => panic!("invalid document was accepted: {source:?}"),
+            Ok(_) => {},
+            Err(error) => return error,
+        }
+    }
+}
+
+#[test]
+fn document_mode_restores_global_xml_validation() {
+    for source in [
+        r#"<root/><second/>"#,
+        r#"<root>"#,
+        r#"<?xml version="1.0" encoding="UTF-16"?><root/>"#,
+        r#"<?xml version="1.0" standalone="maybe"?><root/>"#,
+        r#"<!-- comment --><?xml version="1.0"?><root/>"#,
+        r#"<p:root/>"#,
+        "<root>\u{1}</root>",
+    ] {
+        let error = document_error(source, limits());
+        assert!(
+            error.to_string().contains("XML") || matches!(error, OdfError::Limit { .. }),
+            "unexpected document validation error for {source:?}: {error}"
+        );
+    }
+}
+
+#[test]
+fn document_mode_counts_xml_declaration_attributes() -> litchi_core::Result<()> {
+    let limits = XmlStreamLimits::new(256 << 20, 1_024, 4_000_000, 1, 64 * 1024 * 1024)?;
+    let error = document_error(r#"<?xml version="1.0"?><root attribute="1"/>"#, limits);
+    assert!(matches!(
+        error,
+        OdfError::Limit {
+            kind: LimitKind::RawXml(RawXmlLimitKind::Attributes),
+            observed: 2,
+            maximum: 1,
+        }
+    ));
+    Ok(())
 }

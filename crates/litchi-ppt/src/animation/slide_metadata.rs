@@ -76,7 +76,10 @@ impl Flags {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_record_with_limits(record: &Record, limits: SlideMetadataLimits) -> Result<Self> {
+    pub(crate) fn parse_record_with_limits(
+        record: &Record,
+        limits: SlideMetadataLimits,
+    ) -> Result<Self> {
         let payload = validate_record(
             record,
             RecordType::SlideFlags10Atom,
@@ -105,7 +108,10 @@ impl Flags {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_bytes_with_limits(bytes: &[u8], limits: SlideMetadataLimits) -> Result<Self> {
+    pub(crate) fn parse_bytes_with_limits(
+        bytes: &[u8],
+        limits: SlideMetadataLimits,
+    ) -> Result<Self> {
         let payload = validate_bytes(
             bytes,
             RecordType::SlideFlags10Atom,
@@ -185,7 +191,10 @@ impl SlideTime {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_record_with_limits(record: &Record, limits: SlideMetadataLimits) -> Result<Self> {
+    pub(crate) fn parse_record_with_limits(
+        record: &Record,
+        limits: SlideMetadataLimits,
+    ) -> Result<Self> {
         let payload = validate_record(
             record,
             RecordType::SlideTime10Atom,
@@ -212,7 +221,10 @@ impl SlideTime {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_bytes_with_limits(bytes: &[u8], limits: SlideMetadataLimits) -> Result<Self> {
+    pub(crate) fn parse_bytes_with_limits(
+        bytes: &[u8],
+        limits: SlideMetadataLimits,
+    ) -> Result<Self> {
         let payload = validate_bytes(
             bytes,
             RecordType::SlideTime10Atom,

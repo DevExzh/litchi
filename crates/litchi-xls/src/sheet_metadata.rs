@@ -31,6 +31,22 @@ pub struct SheetMetadata {
 }
 
 impl SheetMetadata {
+    pub(crate) fn from_parts(
+        workbook_index: usize,
+        name: String,
+        visibility: SheetVisibility,
+        kind: SheetKind,
+        parsed_worksheet_index: Option<usize>,
+    ) -> Self {
+        Self {
+            workbook_index,
+            name,
+            visibility,
+            kind,
+            parsed_worksheet_index,
+        }
+    }
+
     #[must_use]
     pub fn workbook_index(&self) -> usize {
         self.workbook_index
@@ -47,7 +63,7 @@ impl SheetMetadata {
     pub fn kind(&self) -> SheetKind {
         self.kind
     }
-    /// Index accepted by `Workbook::xls_worksheet`, when this entry was parsed as a worksheet.
+    /// Index accepted by `Reader::xls_worksheet`, when this entry was parsed as a worksheet.
     #[must_use]
     pub fn parsed_worksheet_index(&self) -> Option<usize> {
         self.parsed_worksheet_index
@@ -86,7 +102,7 @@ impl SheetMetadata {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Workbook;
+    use crate::raw::Reader;
     use std::fs::File;
     use std::path::{Path, PathBuf};
 
@@ -98,7 +114,7 @@ mod tests {
 
     #[test]
     fn reads_hidden_and_very_hidden_poi_sheets() {
-        let workbook = Workbook::new(File::open(fixture("45761.xls")).unwrap()).unwrap();
+        let workbook = Reader::new(File::open(fixture("45761.xls")).unwrap()).unwrap();
         let sheets = workbook.sheets();
         assert_eq!(sheets.len(), 3);
         assert_eq!(sheets[0].name(), "VisibleSheet");
@@ -113,14 +129,14 @@ mod tests {
                 .all(|sheet| sheet.kind() == SheetKind::WorksheetOrDialog)
         );
 
-        let hidden = Workbook::new(File::open(fixture("TwoSheetsOneHidden.xls")).unwrap()).unwrap();
+        let hidden = Reader::new(File::open(fixture("TwoSheetsOneHidden.xls")).unwrap()).unwrap();
         assert_eq!(hidden.sheets()[0].visibility(), SheetVisibility::Hidden);
         assert_eq!(hidden.sheets()[1].visibility(), SheetVisibility::Visible);
     }
 
     #[test]
     fn catalogs_chart_sheets_without_parsing_them_as_worksheets() {
-        let workbook = Workbook::new(File::open(fixture("44010-TwoCharts.xls")).unwrap()).unwrap();
+        let workbook = Reader::new(File::open(fixture("44010-TwoCharts.xls")).unwrap()).unwrap();
         let sheets = workbook.sheets();
         assert_eq!(sheets.len(), 3);
         assert_eq!(sheets[0].kind(), SheetKind::WorksheetOrDialog);

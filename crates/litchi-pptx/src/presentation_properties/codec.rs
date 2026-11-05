@@ -7,18 +7,257 @@ use super::model::{
 };
 use super::{
     A_NS, A_STRICT, A14_NS, BROWSE_MODE_URI, CHART_TRACKING_REF_BASED_URI, DEFAULT_IMAGE_DPI_URI,
-    DISCARD_IMAGE_EDIT_DATA_URI, LASER_COLOR_URI, MATH_URI, MAX_BYTES, MAX_DEPTH, MAX_EXTENSIONS,
-    MAX_NODES, MAX_STRING, P_NS, P_STRICT, P14_NS, P15_NS, P1710_NS, R_NS, R_STRICT,
-    READONLY_RECOMMENDED_URI, SHOW_MEDIA_CONTROLS_URI,
+    DISCARD_IMAGE_EDIT_DATA_URI, LASER_COLOR_URI, MATH_URI, P_NS, P_STRICT, P14_NS, P15_NS,
+    P1710_NS, R_NS, R_STRICT, READONLY_RECOMMENDED_URI, SHOW_MEDIA_CONTROLS_URI,
 };
 use crate::{Error, Result};
 use litchi_ooxml_common::mce::{Capabilities, Limits as MceLimits, process_markup_compatibility};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
+use litchi_opc::SourceLimits;
 use quick_xml::{
     Reader, XmlVersion,
     encoding::Decoder,
     events::{BytesStart, Event},
 };
+use std::collections::TryReserveError;
+
+/// Exact, bounded output sink shared by the count and emission passes.
+pub(crate) struct XmlSink {
+    value: Option<String>,
+    len: usize,
+    limit: usize,
+    failure: Option<SinkFailure>,
+}
+
+enum SinkFailure {
+    Limit(usize),
+    Overflow,
+    Allocation(TryReserveError),
+}
+
+impl XmlSink {
+    fn count(limit: usize) -> Self {
+        Self {
+            value: None,
+            len: 0,
+            limit,
+            failure: None,
+        }
+    }
+
+    pub(crate) fn output(capacity: usize, limit: usize) -> Result<Self> {
+        let mut value = String::new();
+        value
+            .try_reserve_exact(capacity)
+            .map_err(|source| Error::Allocation {
+                resource: "presentation-properties XML output",
+                source,
+            })?;
+        Ok(Self {
+            value: Some(value),
+            len: 0,
+            limit,
+            failure: None,
+        })
+    }
+
+    pub(crate) fn push(&mut self, value: char) {
+        let mut encoded = [0; 4];
+        self.push_str(value.encode_utf8(&mut encoded));
+    }
+
+    pub(crate) fn push_str(&mut self, value: &str) {
+        if self.failure.is_some() {
+            return;
+        }
+        let Some(new_len) = self.len.checked_add(value.len()) else {
+            self.failure = Some(SinkFailure::Overflow);
+            return;
+        };
+        if new_len > self.limit {
+            self.failure = Some(SinkFailure::Limit(new_len));
+            return;
+        }
+        if let Some(out) = self.value.as_mut() {
+            if let Err(source) = out.try_reserve(value.len()) {
+                self.failure = Some(SinkFailure::Allocation(source));
+                return;
+            }
+            out.push_str(value);
+        }
+        self.len = new_len;
+    }
+
+    #[must_use]
+    pub(crate) fn len(&self) -> usize {
+        self.len
+    }
+
+    pub(crate) fn check(&mut self) -> Result<()> {
+        match self.failure.take() {
+            None => Ok(()),
+            Some(SinkFailure::Limit(observed)) => Err(limit(
+                crate::error::CodecLimitKind::OutputBytes,
+                observed,
+                self.limit,
+            )),
+            Some(SinkFailure::Overflow) => Err(Error::CapacityOverflow {
+                resource: "presentation-properties XML output",
+            }),
+            Some(SinkFailure::Allocation(source)) => Err(Error::Allocation {
+                resource: "presentation-properties XML output",
+                source,
+            }),
+        }
+    }
+
+    pub(crate) fn finish(mut self) -> Result<Vec<u8>> {
+        self.check()?;
+        Ok(self
+            .value
+            .take()
+            .expect("output sink always owns a string")
+            .into_bytes())
+    }
+}
+
+/// Caller-selected bounds for one presentation-properties XML operation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub struct Limits {
+    max_input_bytes: usize,
+    max_output_bytes: usize,
+    max_depth: usize,
+    max_nodes: usize,
+    max_string_bytes: usize,
+    max_attribute_bytes: usize,
+    max_extensions: usize,
+    max_colors: usize,
+}
+
+impl Limits {
+    /// The historical presentation-properties safety profile.
+    pub const DEFAULT: Self = Self {
+        max_input_bytes: 8 * 1024 * 1024,
+        max_output_bytes: 8 * 1024 * 1024,
+        max_depth: 128,
+        max_nodes: 100_000,
+        max_string_bytes: 1024 * 1024,
+        max_attribute_bytes: 1024 * 1024,
+        max_extensions: 1024,
+        max_colors: 10,
+    };
+
+    /// Derive the presentation-properties policy from the retained OPC source
+    /// profile.
+    #[must_use = "the derived presentation-properties bounds must be retained for the operation"]
+    pub fn from_source_limits(source: SourceLimits) -> Self {
+        let default = Self::DEFAULT;
+        let part_bytes = usize::try_from(source.max_part_bytes()).unwrap_or(usize::MAX);
+        let events = source.max_events();
+        let depth = source.max_depth();
+        let strings = source.max_xml_attribute_bytes();
+        Self {
+            max_input_bytes: default.max_input_bytes.min(part_bytes),
+            max_output_bytes: default.max_output_bytes.min(part_bytes),
+            max_depth: default.max_depth.min(depth),
+            max_nodes: default.max_nodes.min(events),
+            max_string_bytes: default.max_string_bytes.min(strings),
+            max_attribute_bytes: default.max_attribute_bytes.min(strings),
+            max_extensions: default.max_extensions.min(events),
+            max_colors: default.max_colors.min(events),
+        }
+    }
+
+    /// Construct a tighter policy without widening the historical ceilings.
+    #[must_use]
+    pub const fn new(
+        max_input_bytes: usize,
+        max_output_bytes: usize,
+        max_depth: usize,
+        max_nodes: usize,
+        max_string_bytes: usize,
+        max_extensions: usize,
+        max_colors: usize,
+    ) -> Option<Self> {
+        let default = Self::DEFAULT;
+        if max_input_bytes == 0
+            || max_input_bytes > default.max_input_bytes
+            || max_output_bytes == 0
+            || max_output_bytes > default.max_output_bytes
+            || max_depth == 0
+            || max_depth > default.max_depth
+            || max_nodes == 0
+            || max_nodes > default.max_nodes
+            || max_string_bytes == 0
+            || max_string_bytes > default.max_string_bytes
+            || max_extensions == 0
+            || max_extensions > default.max_extensions
+            || max_colors == 0
+            || max_colors > default.max_colors
+        {
+            return None;
+        }
+        Some(Self {
+            max_input_bytes,
+            max_output_bytes,
+            max_depth,
+            max_nodes,
+            max_string_bytes,
+            max_attribute_bytes: max_string_bytes,
+            max_extensions,
+            max_colors,
+        })
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn max_input_bytes(self) -> usize {
+        self.max_input_bytes
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn max_output_bytes(self) -> usize {
+        self.max_output_bytes
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn max_depth(self) -> usize {
+        self.max_depth
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn max_nodes(self) -> usize {
+        self.max_nodes
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn max_string_bytes(self) -> usize {
+        self.max_string_bytes
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn max_extensions(self) -> usize {
+        self.max_extensions
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn max_colors(self) -> usize {
+        self.max_colors
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
 
 impl Properties {
     /// Parse a presentation-properties part (`p:presentationPr`).
@@ -30,8 +269,12 @@ impl Properties {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(xml: &[u8]) -> Result<Self> {
-        Self::parse_inner(xml, Some(&mut crate::leniency::ToleranceReport::default()))
+    pub fn parse(xml: &[u8], limits: Limits) -> Result<Self> {
+        Self::parse_inner(
+            xml,
+            Some(&mut crate::leniency::ToleranceReport::default()),
+            limits,
+        )
     }
 
     /// [`Self::parse`], recording a skipped processing instruction as
@@ -44,8 +287,9 @@ impl Properties {
     pub fn parse_with_tolerance(
         xml: &[u8],
         tolerance: &mut crate::leniency::ToleranceReport,
+        limits: Limits,
     ) -> Result<Self> {
-        Self::parse_inner(xml, Some(tolerance))
+        Self::parse_inner(xml, Some(tolerance), limits)
     }
 
     /// Parse without any repair: a processing instruction is an error. The
@@ -55,16 +299,36 @@ impl Properties {
     ///
     /// Returns an error if the input cannot be read, is malformed, or
     /// carries a processing instruction.
-    pub fn parse_strict(xml: &[u8]) -> Result<Self> {
-        Self::parse_inner(xml, None)
+    pub fn parse_strict(xml: &[u8], limits: Limits) -> Result<Self> {
+        Self::parse_inner(xml, None, limits)
+    }
+
+    /// Parse markup that this crate has already admitted and processed through
+    /// MCE.  The processed stream is bounded by output bytes, not ingress
+    /// bytes, and must not be sent back through the public ingress contract.
+    pub(crate) fn parse_processed_mce(xml: &[u8], limits: Limits) -> Result<Self> {
+        if xml.len() > limits.max_output_bytes() {
+            return Err(limit(
+                crate::error::CodecLimitKind::OutputBytes,
+                xml.len(),
+                limits.max_output_bytes(),
+            ));
+        }
+        let root = parse_dom_processed(xml, limits)?;
+        project(&root)
     }
 
     fn parse_inner(
         xml: &[u8],
         tolerance: Option<&mut crate::leniency::ToleranceReport>,
+        limits: Limits,
     ) -> Result<Self> {
-        if xml.len() > MAX_BYTES {
-            return Err(invalid("presentation properties exceed 8 MiB"));
+        if xml.len() > limits.max_input_bytes() {
+            return Err(limit(
+                crate::error::CodecLimitKind::InputBytes,
+                xml.len(),
+                limits.max_input_bytes(),
+            ));
         }
         let (xml, instructions) = crate::markup::without_processing_instructions(xml)?;
         if instructions {
@@ -76,51 +340,76 @@ impl Properties {
         let xml = xml.as_ref();
         let mut capabilities = Capabilities::ooxml_baseline();
         capabilities.understand_namespace(P1710_NS);
-        let processed =
-            process_markup_compatibility(xml, &capabilities, &MceLimits::default())?.xml;
-        if processed.len() > MAX_BYTES {
-            return Err(invalid("processed presentation properties exceed 8 MiB"));
+        let mce_limits = MceLimits {
+            max_input_bytes: limits.max_input_bytes(),
+            max_output_bytes: limits.max_output_bytes(),
+            max_depth: limits.max_depth(),
+            max_namespace_bindings: 4096.min(limits.max_nodes()),
+            max_directive_tokens: 4096.min(limits.max_nodes()),
+            max_choices_per_alternate: 1024.min(limits.max_nodes()),
+            max_attributes_per_element:
+                litchi_ooxml_common::mce::DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT,
+        };
+        let processed = process_markup_compatibility(xml, &capabilities, &mce_limits)?.xml;
+        if processed.len() > limits.max_output_bytes() {
+            return Err(limit(
+                crate::error::CodecLimitKind::OutputBytes,
+                processed.len(),
+                limits.max_output_bytes(),
+            ));
         }
-        let root = parse_dom(processed.as_ref())?;
+        let root = parse_dom_processed(processed.as_ref(), limits)?;
         project(&root)
     }
     /// # Errors
     ///
     /// Returns an error if the output cannot be encoded or written.
-    pub fn to_xml(&self, strict: bool) -> Result<Vec<u8>> {
-        validate(self)?;
-        let p = if strict { P_STRICT } else { P_NS };
-        let a = if strict { A_STRICT } else { A_NS };
-        let r = if strict { R_STRICT } else { R_NS };
-        let mut x = format!(
-            r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:presentationPr xmlns:p="{p}" xmlns:a="{a}" xmlns:r="{r}">"#
-        );
-        if let Some(v) = &self.html_publish {
-            write_html(&mut x, v, strict)?;
+    pub fn to_xml(&self, strict: bool, limits: Limits) -> Result<Vec<u8>> {
+        validate(self, limits)?;
+        let mut count = XmlSink::count(limits.max_output_bytes());
+        write_document(self, strict, limits, &mut count)?;
+        count.check()?;
+        let size = count.len();
+        let mut output = XmlSink::output(size, limits.max_output_bytes())?;
+        write_document(self, strict, limits, &mut output)?;
+        if output.len() != size {
+            return Err(Error::CapacityOverflow {
+                resource: "presentation-properties XML output changed between passes",
+            });
         }
-        if let Some(v) = &self.web {
-            write_web(&mut x, v, strict)?;
-        }
-        if let Some(v) = &self.print {
-            write_print(&mut x, v, strict)?;
-        }
-        if let Some(v) = &self.show {
-            write_show(&mut x, v, strict)?;
-        }
-        if !self.recent_colors.is_empty() {
-            x.push_str("<p:clrMru>");
-            for c in &self.recent_colors {
-                write_opaque(&mut x, &c.xml, strict)?;
-            }
-            x.push_str("</p:clrMru>");
-        }
-        write_presentation_extensions(&mut x, &self.extensions, strict)?;
-        x.push_str("</p:presentationPr>");
-        if x.len() > MAX_BYTES {
-            return Err(invalid("serialized presentation properties exceed 8 MiB"));
-        }
-        Ok(x.into_bytes())
+        output.finish()
     }
+}
+
+fn write_document(value: &Properties, strict: bool, limits: Limits, x: &mut XmlSink) -> Result<()> {
+    let p = if strict { P_STRICT } else { P_NS };
+    let a = if strict { A_STRICT } else { A_NS };
+    let r = if strict { R_STRICT } else { R_NS };
+    x.push_str(&format!(
+        r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:presentationPr xmlns:p="{p}" xmlns:a="{a}" xmlns:r="{r}">"#
+    ));
+    if let Some(v) = &value.html_publish {
+        write_html(x, v, strict, limits)?;
+    }
+    if let Some(v) = &value.web {
+        write_web(x, v, strict, limits)?;
+    }
+    if let Some(v) = &value.print {
+        write_print(x, v, strict, limits)?;
+    }
+    if let Some(v) = &value.show {
+        write_show(x, v, strict, limits)?;
+    }
+    if !value.recent_colors.is_empty() {
+        x.push_str("<p:clrMru>");
+        for c in &value.recent_colors {
+            write_opaque(x, &c.xml, strict, limits)?;
+        }
+        x.push_str("</p:clrMru>");
+    }
+    write_presentation_extensions(x, &value.extensions, strict, limits)?;
+    x.push_str("</p:presentationPr>");
+    x.check()
 }
 
 #[derive(Clone, Debug)]
@@ -131,6 +420,10 @@ struct Attr {
     value: String,
 }
 #[derive(Clone, Debug)]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "the parser keeps Node inline to avoid an allocation for every XML element"
+)]
 enum Content {
     Node(Node),
     Text(String),
@@ -145,37 +438,101 @@ struct Node {
     attrs: Vec<Attr>,
     bindings: Vec<(String, String)>,
     content: Vec<Content>,
+    limits: Limits,
+    source_start: usize,
+    capture_raw: bool,
+    raw: Option<Box<[u8]>>,
 }
-fn parse_dom(xml: &[u8]) -> Result<Node> {
+/// Parse markup already emitted by the bounded MCE processor.  The processor
+/// admitted its output against `max_output_bytes`; this pass must retain that
+/// distinction and apply only the selected structural limits.
+fn parse_dom_processed(xml: &[u8], limits: Limits) -> Result<Node> {
+    if xml.len() > limits.max_output_bytes() {
+        return Err(limit(
+            crate::error::CodecLimitKind::OutputBytes,
+            xml.len(),
+            limits.max_output_bytes(),
+        ));
+    }
+    parse_dom_inner(xml, limits)
+}
+
+fn parse_dom_inner(xml: &[u8], limits: Limits) -> Result<Node> {
     std::str::from_utf8(xml).map_err(xml_error)?;
     let mut reader = Reader::from_reader(xml);
     let mut stack: Vec<Node> = Vec::new();
     let mut root = None;
     let mut nodes = 0usize;
     loop {
+        let before = usize::try_from(reader.buffer_position())
+            .map_err(|_| invalid("presentation-properties source offset overflows usize"))?;
         let d = reader.decoder();
         match reader.read_event() {
             Ok(Event::Start(e)) => {
-                nodes += 1;
-                if nodes > MAX_NODES {
-                    return Err(invalid("presentation-properties node limit exceeded"));
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_nodes(),
+                    )
+                })?;
+                if nodes > limits.max_nodes() {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        nodes,
+                        limits.max_nodes(),
+                    ));
                 }
-                if stack.len() >= MAX_DEPTH {
-                    return Err(invalid("presentation-properties depth limit exceeded"));
+                if stack.len() >= limits.max_depth() {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        stack.len().checked_add(1).unwrap_or(usize::MAX),
+                        limits.max_depth(),
+                    ));
                 }
-                let node = make_node(&e, d, &stack)?;
+                let mut node = make_node(&e, d, &stack, limits)?;
+                node.source_start = before;
                 stack.push(node);
             },
             Ok(Event::Empty(e)) => {
-                nodes += 1;
-                if nodes > MAX_NODES {
-                    return Err(invalid("presentation-properties node limit exceeded"));
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_nodes(),
+                    )
+                })?;
+                if nodes > limits.max_nodes() {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        nodes,
+                        limits.max_nodes(),
+                    ));
                 }
-                let node = make_node(&e, d, &stack)?;
+                if stack.len() >= limits.max_depth() {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        stack.len().checked_add(1).unwrap_or(usize::MAX),
+                        limits.max_depth(),
+                    ));
+                }
+                let mut node = make_node(&e, d, &stack, limits)?;
+                if node.capture_raw {
+                    let after = usize::try_from(reader.buffer_position()).map_err(|_| {
+                        invalid("presentation-properties source offset overflows usize")
+                    })?;
+                    node.raw = Some(
+                        xml.get(before..after)
+                            .ok_or_else(|| {
+                                invalid("presentation-properties source span is invalid")
+                            })?
+                            .into(),
+                    );
+                }
                 attach(&mut stack, &mut root, node)?;
             },
             Ok(Event::End(e)) => {
-                let node = stack
+                let mut node = stack
                     .pop()
                     .ok_or_else(|| invalid("unexpected closing element"))?;
                 if node.qname.as_bytes() != e.name().as_ref() {
@@ -184,10 +541,23 @@ fn parse_dom(xml: &[u8]) -> Result<Node> {
                         node.qname
                     )));
                 }
+                if node.capture_raw {
+                    let after = usize::try_from(reader.buffer_position()).map_err(|_| {
+                        invalid("presentation-properties source offset overflows usize")
+                    })?;
+                    node.raw = Some(
+                        xml.get(node.source_start..after)
+                            .ok_or_else(|| {
+                                invalid("presentation-properties source span is invalid")
+                            })?
+                            .into(),
+                    );
+                }
                 attach(&mut stack, &mut root, node)?;
             },
             Ok(Event::Text(t)) => {
                 let text = t.decode().map_err(xml_error)?.into_owned();
+                bounded_string(&text, limits)?;
                 if let Some(n) = stack.last_mut() {
                     n.content.push(Content::Text(text));
                 } else if !text.trim().is_empty() {
@@ -196,6 +566,7 @@ fn parse_dom(xml: &[u8]) -> Result<Node> {
             },
             Ok(Event::CData(t)) => {
                 let text = t.decode().map_err(xml_error)?.into_owned();
+                bounded_string(&text, limits)?;
                 if let Some(n) = stack.last_mut() {
                     n.content.push(Content::CData(text));
                 } else {
@@ -204,6 +575,7 @@ fn parse_dom(xml: &[u8]) -> Result<Node> {
             },
             Ok(Event::GeneralRef(r)) => {
                 let text = litchi_ooxml_common::xml::decode_xml_reference(&r)?;
+                bounded_string(&text, limits)?;
                 if let Some(n) = stack.last_mut() {
                     n.content.push(Content::Text(text));
                 } else {
@@ -211,10 +583,10 @@ fn parse_dom(xml: &[u8]) -> Result<Node> {
                 }
             },
             Ok(Event::Comment(c)) => {
+                let text = c.decode().map_err(xml_error)?.into_owned();
+                bounded_string(&text, limits)?;
                 if let Some(n) = stack.last_mut() {
-                    n.content.push(Content::Comment(
-                        c.decode().map_err(xml_error)?.into_owned(),
-                    ));
+                    n.content.push(Content::Comment(text));
                 }
             },
             Ok(Event::DocType(_) | Event::PI(_)) => {
@@ -230,7 +602,7 @@ fn parse_dom(xml: &[u8]) -> Result<Node> {
     }
     root.ok_or_else(|| invalid("missing presentationPr root"))
 }
-fn make_node(e: &BytesStart<'_>, d: Decoder, stack: &[Node]) -> Result<Node> {
+fn make_node(e: &BytesStart<'_>, d: Decoder, stack: &[Node], limits: Limits) -> Result<Node> {
     let q = std::str::from_utf8(e.name().as_ref())
         .map_err(xml_error)?
         .to_string();
@@ -238,13 +610,16 @@ fn make_node(e: &BytesStart<'_>, d: Decoder, stack: &[Node]) -> Result<Node> {
     let mut raw = Vec::new();
     for a in e.checked_attributes() {
         let a = a.map_err(xml_error)?;
+        let value = a
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, d)
+            .map_err(xml_error)?
+            .into_owned();
+        bounded_attribute(&value, limits)?;
         raw.push((
             std::str::from_utf8(a.key.as_ref())
                 .map_err(xml_error)?
                 .to_string(),
-            a.decoded_and_normalized_value(XmlVersion::Implicit1_0, d)
-                .map_err(xml_error)?
-                .into_owned(),
+            value,
         ));
     }
     for (k, v) in &raw {
@@ -259,6 +634,12 @@ fn make_node(e: &BytesStart<'_>, d: Decoder, stack: &[Node]) -> Result<Node> {
     }
     let (p, l) = split(&q)?;
     let local = l.to_string();
+    let capture_raw = matches!(
+        local.as_str(),
+        "ext" | "extLst" | "clrMru" | "penClr" | "laserClr"
+    ) || stack
+        .last()
+        .is_some_and(|parent| matches!(parent.local.as_str(), "clrMru" | "penClr" | "laserClr"));
     let ns = resolve(&bindings, p)?;
     let mut attrs = Vec::new();
     for (k, v) in raw {
@@ -286,6 +667,10 @@ fn make_node(e: &BytesStart<'_>, d: Decoder, stack: &[Node]) -> Result<Node> {
         attrs,
         bindings,
         content: Vec::new(),
+        limits,
+        source_start: 0,
+        capture_raw,
+        raw: None,
     })
 }
 fn attach(stack: &mut [Node], root: &mut Option<Node>, node: Node) -> Result<()> {
@@ -298,6 +683,7 @@ fn attach(stack: &mut [Node], root: &mut Option<Node>, node: Node) -> Result<()>
 }
 
 fn project(root: &Node) -> Result<Properties> {
+    let limits = root.limits;
     expect(root, P_NS, P_STRICT, "presentationPr")?;
     no_attrs(root)?;
     let mut out = Properties::default();
@@ -351,8 +737,12 @@ fn project(root: &Node) -> Result<Properties> {
                 for color in children(child)? {
                     out.recent_colors.push(parse_color(color)?);
                 }
-                if out.recent_colors.len() > 10 {
-                    return Err(invalid("clrMru permits at most ten colors"));
+                if out.recent_colors.len() > limits.max_colors() {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::Colors,
+                        out.recent_colors.len(),
+                        limits.max_colors(),
+                    ));
                 }
             },
             5 => {
@@ -365,7 +755,7 @@ fn project(root: &Node) -> Result<Properties> {
             _ => unreachable!(),
         }
     }
-    validate(&out)?;
+    validate(&out, limits)?;
     Ok(out)
 }
 fn parse_html(n: &Node) -> Result<HtmlPublish> {
@@ -391,7 +781,7 @@ fn parse_html(n: &Node) -> Result<HtmlPublish> {
             if ext.is_some() {
                 return Err(invalid("duplicate htmlPubPr extLst"));
             }
-            ext = Some(node_xml(c, false)?);
+            ext = Some(node_xml(c, false, n.limits)?);
         } else {
             if slides.is_some() || ext.is_some() {
                 return Err(invalid("invalid HTML slide selection order"));
@@ -592,15 +982,19 @@ fn parse_color(n: &Node) -> Result<Color> {
     Ok(Color {
         kind,
         attributes,
-        xml: node_xml(n, false)?,
+        xml: node_xml(n, false, n.limits)?,
     })
 }
 
 fn parse_presentation_extensions(n: &Node) -> Result<Vec<Extension>> {
     no_attrs(n)?;
     let extensions = children(n)?;
-    if extensions.len() > MAX_EXTENSIONS {
-        return Err(invalid("presentation extension count exceeds limit"));
+    if extensions.len() > n.limits.max_extensions() {
+        return Err(limit(
+            crate::error::CodecLimitKind::Extensions,
+            extensions.len(),
+            n.limits.max_extensions(),
+        ));
     }
     let mut out = Vec::with_capacity(extensions.len());
     let mut discard = false;
@@ -646,16 +1040,17 @@ fn parse_presentation_extensions(n: &Node) -> Result<Vec<Extension>> {
                 }
                 math_seen = true;
                 let payload = extension_payload(ext, A14_NS, "m")?;
-                Extension::Math(crate::presentation_properties::math::parse(&node_xml(
-                    payload, false,
-                )?)?)
+                Extension::Math(crate::presentation_properties::math::parse(
+                    &node_xml(payload, false, n.limits)?,
+                    n.limits,
+                )?)
             },
             READONLY_RECOMMENDED_URI => {
                 if readonly_seen {
                     return Err(invalid("duplicate readonlyRecommended extension"));
                 }
                 readonly_seen = true;
-                Extension::ReadonlyRecommended(parse_extension_bool(
+                Extension::ReadOnlyRecommended(parse_extension_bool(
                     ext,
                     P1710_NS,
                     "readonlyRecommended",
@@ -663,7 +1058,7 @@ fn parse_presentation_extensions(n: &Node) -> Result<Vec<Extension>> {
             },
             _ => Extension::Unknown(OpaqueExtension {
                 uri,
-                xml: node_xml(ext, false)?,
+                xml: node_xml(ext, false, n.limits)?,
             }),
         };
         out.push(value);
@@ -673,8 +1068,12 @@ fn parse_presentation_extensions(n: &Node) -> Result<Vec<Extension>> {
 fn parse_show_extensions(n: &Node) -> Result<Vec<ShowExtension>> {
     no_attrs(n)?;
     let extensions = children(n)?;
-    if extensions.len() > MAX_EXTENSIONS {
-        return Err(invalid("slide-show extension count exceeds limit"));
+    if extensions.len() > n.limits.max_extensions() {
+        return Err(limit(
+            crate::error::CodecLimitKind::Extensions,
+            extensions.len(),
+            n.limits.max_extensions(),
+        ));
     }
     let mut out = Vec::with_capacity(extensions.len());
     let mut browse_mode = false;
@@ -720,7 +1119,7 @@ fn parse_show_extensions(n: &Node) -> Result<Vec<ShowExtension>> {
             },
             _ => ShowExtension::Unknown(OpaqueExtension {
                 uri,
-                xml: node_xml(ext, false)?,
+                xml: node_xml(ext, false, n.limits)?,
             }),
         };
         out.push(value);
@@ -768,7 +1167,7 @@ fn parse_extension_u32(n: &Node, namespace: &str, local: &str) -> Result<u32> {
     Ok(value)
 }
 
-fn write_html(x: &mut String, v: &HtmlPublish, s: bool) -> Result<()> {
+fn write_html(x: &mut XmlSink, v: &HtmlPublish, s: bool, limits: Limits) -> Result<()> {
     x.push_str("<p:htmlPubPr");
     bool_opt_write(x, "showSpeakerNotes", v.show_speaker_notes);
     if let Some(b) = v.browser {
@@ -779,12 +1178,12 @@ fn write_html(x: &mut String, v: &HtmlPublish, s: bool) -> Result<()> {
     x.push_str("\">");
     write_selection(x, &v.slides);
     if let Some(e) = &v.extension_xml {
-        write_opaque(x, e, s)?;
+        write_opaque(x, e, s, limits)?;
     }
     x.push_str("</p:htmlPubPr>");
     Ok(())
 }
-fn write_web(x: &mut String, v: &Web, s: bool) -> Result<()> {
+fn write_web(x: &mut XmlSink, v: &Web, s: bool, limits: Limits) -> Result<()> {
     x.push_str("<p:webPr");
     for (n, b) in [
         ("showAnimation", v.show_animation),
@@ -807,14 +1206,14 @@ fn write_web(x: &mut String, v: &Web, s: bool) -> Result<()> {
     }
     if let Some(e) = &v.extension_xml {
         x.push('>');
-        write_opaque(x, e, s)?;
+        write_opaque(x, e, s, limits)?;
         x.push_str("</p:webPr>");
     } else {
         x.push_str("/>");
     }
     Ok(())
 }
-fn write_print(x: &mut String, v: &Print, s: bool) -> Result<()> {
+fn write_print(x: &mut XmlSink, v: &Print, s: bool, limits: Limits) -> Result<()> {
     x.push_str("<p:prnPr");
     if let Some(z) = v.output {
         attr_write(x, "prnWhat", output_str(z));
@@ -831,14 +1230,14 @@ fn write_print(x: &mut String, v: &Print, s: bool) -> Result<()> {
     }
     if let Some(e) = &v.extension_xml {
         x.push('>');
-        write_opaque(x, e, s)?;
+        write_opaque(x, e, s, limits)?;
         x.push_str("</p:prnPr>");
     } else {
         x.push_str("/>");
     }
     Ok(())
 }
-fn write_show(x: &mut String, v: &Show, s: bool) -> Result<()> {
+fn write_show(x: &mut XmlSink, v: &Show, s: bool, limits: Limits) -> Result<()> {
     x.push_str("<p:showPr");
     for (n, b) in [
         ("loop", v.loop_show),
@@ -871,14 +1270,14 @@ fn write_show(x: &mut String, v: &Show, s: bool) -> Result<()> {
     }
     if let Some(c) = &v.pen_color {
         x.push_str("<p:penClr>");
-        write_opaque(x, &c.xml, s)?;
+        write_opaque(x, &c.xml, s, limits)?;
         x.push_str("</p:penClr>");
     }
-    write_show_extensions(x, &v.extensions, s)?;
+    write_show_extensions(x, &v.extensions, s, limits)?;
     x.push_str("</p:showPr>");
     Ok(())
 }
-fn write_selection(x: &mut String, v: &SlideSelection) {
+fn write_selection(x: &mut XmlSink, v: &SlideSelection) {
     match v {
         SlideSelection::All => x.push_str("<p:sldAll/>"),
         SlideSelection::Range { start, end } => {
@@ -887,7 +1286,12 @@ fn write_selection(x: &mut String, v: &SlideSelection) {
         SlideSelection::CustomShow(id) => x.push_str(&format!("<p:custShow id=\"{id}\"/>")),
     }
 }
-fn write_presentation_extensions(x: &mut String, v: &[Extension], strict: bool) -> Result<()> {
+fn write_presentation_extensions(
+    x: &mut XmlSink,
+    v: &[Extension],
+    strict: bool,
+    limits: Limits,
+) -> Result<()> {
     if v.is_empty() {
         return Ok(());
     }
@@ -921,10 +1325,10 @@ fn write_presentation_extensions(x: &mut String, v: &[Extension], strict: bool) 
                 x.push_str("<p:ext uri=\"");
                 x.push_str(MATH_URI);
                 x.push_str("\">");
-                crate::presentation_properties::math::write(x, value, strict)?;
+                crate::presentation_properties::math::write(x, value, strict, limits)?;
                 x.push_str("</p:ext>");
             },
-            Extension::ReadonlyRecommended(value) => {
+            Extension::ReadOnlyRecommended(value) => {
                 write_bool_extension(
                     x,
                     READONLY_RECOMMENDED_URI,
@@ -933,13 +1337,18 @@ fn write_presentation_extensions(x: &mut String, v: &[Extension], strict: bool) 
                     *value,
                 );
             },
-            Extension::Unknown(value) => write_unknown_extension(x, value, strict)?,
+            Extension::Unknown(value) => write_unknown_extension(x, value, strict, limits)?,
         }
     }
     x.push_str("</p:extLst>");
     Ok(())
 }
-fn write_show_extensions(x: &mut String, v: &[ShowExtension], strict: bool) -> Result<()> {
+fn write_show_extensions(
+    x: &mut XmlSink,
+    v: &[ShowExtension],
+    strict: bool,
+    limits: Limits,
+) -> Result<()> {
     if v.is_empty() {
         return Ok(());
     }
@@ -961,19 +1370,19 @@ fn write_show_extensions(x: &mut String, v: &[ShowExtension], strict: bool) -> R
                 x.push_str("\"><p14:laserClr xmlns:p14=\"");
                 x.push_str(P14_NS);
                 x.push_str("\">");
-                write_opaque(x, &color.xml, strict)?;
+                write_opaque(x, &color.xml, strict, limits)?;
                 x.push_str("</p14:laserClr></p:ext>");
             },
             ShowExtension::ShowMediaControls(value) => {
                 write_bool_extension(x, SHOW_MEDIA_CONTROLS_URI, "p14", "showMediaCtrls", *value);
             },
-            ShowExtension::Unknown(value) => write_unknown_extension(x, value, strict)?,
+            ShowExtension::Unknown(value) => write_unknown_extension(x, value, strict, limits)?,
         }
     }
     x.push_str("</p:extLst>");
     Ok(())
 }
-fn write_bool_extension(x: &mut String, uri: &str, prefix: &str, local: &str, value: bool) {
+fn write_bool_extension(x: &mut XmlSink, uri: &str, prefix: &str, local: &str, value: bool) {
     x.push_str("<p:ext uri=\"");
     x.push_str(uri);
     x.push_str("\"><");
@@ -993,9 +1402,18 @@ fn write_bool_extension(x: &mut String, uri: &str, prefix: &str, local: &str, va
     x.push_str(if value { "1" } else { "0" });
     x.push_str("\"/></p:ext>");
 }
-fn write_unknown_extension(x: &mut String, v: &OpaqueExtension, strict: bool) -> Result<()> {
-    bounded(&v.uri)?;
-    let node = parse_dom(&v.xml)?;
+fn write_unknown_extension(
+    x: &mut XmlSink,
+    v: &OpaqueExtension,
+    _strict: bool,
+    limits: Limits,
+) -> Result<()> {
+    write_opaque(x, &v.xml, false, limits)
+}
+
+fn validate_unknown_extension(v: &OpaqueExtension, limits: Limits) -> Result<()> {
+    bounded(&v.uri, limits)?;
+    let node = parse_dom_processed(&v.xml, limits)?;
     let uri = extension_uri(&node)?;
     if uri != v.uri {
         return Err(invalid("opaque extension uri does not match its XML"));
@@ -1005,7 +1423,7 @@ fn write_unknown_extension(x: &mut String, v: &OpaqueExtension, strict: bool) ->
             "known presentation extension cannot be stored as opaque",
         ));
     }
-    write_opaque(x, &v.xml, strict)
+    Ok(())
 }
 fn known_extension_uri(uri: &str) -> bool {
     matches!(
@@ -1020,25 +1438,37 @@ fn known_extension_uri(uri: &str) -> bool {
             | SHOW_MEDIA_CONTROLS_URI
     )
 }
-fn write_opaque(x: &mut String, v: &[u8], strict: bool) -> Result<()> {
-    validate_fragment(v)?;
-    let mut text = std::str::from_utf8(v).map_err(xml_error)?.to_string();
-    if strict {
-        text = text
-            .replace(P_NS, P_STRICT)
-            .replace(A_NS, A_STRICT)
-            .replace(R_NS, R_STRICT);
-    } else {
-        text = text
-            .replace(P_STRICT, P_NS)
-            .replace(A_STRICT, A_NS)
-            .replace(R_STRICT, R_NS);
-    }
-    x.push_str(&text);
+fn write_opaque(x: &mut XmlSink, v: &[u8], _strict: bool, _limits: Limits) -> Result<()> {
+    let text = std::str::from_utf8(v).map_err(xml_error)?;
+    x.push_str(text);
+    x.check()?;
     Ok(())
 }
 
-fn validate(v: &Properties) -> Result<()> {
+fn validate(v: &Properties, limits: Limits) -> Result<()> {
+    if v.recent_colors.len() > limits.max_colors() {
+        return Err(limit(
+            crate::error::CodecLimitKind::Colors,
+            v.recent_colors.len(),
+            limits.max_colors(),
+        ));
+    }
+    if v.extensions.len() > limits.max_extensions() {
+        return Err(limit(
+            crate::error::CodecLimitKind::Extensions,
+            v.extensions.len(),
+            limits.max_extensions(),
+        ));
+    }
+    if let Some(show) = &v.show
+        && show.extensions.len() > limits.max_extensions()
+    {
+        return Err(limit(
+            crate::error::CodecLimitKind::Extensions,
+            show.extensions.len(),
+            limits.max_extensions(),
+        ));
+    }
     v.validate()?;
     for c in v
         .recent_colors
@@ -1054,7 +1484,7 @@ fn validate(v: &Properties) -> Result<()> {
                 }),
         )
     {
-        validate_fragment(&c.xml)?;
+        validate_fragment(&c.xml, limits)?;
     }
     for e in [
         v.html_publish
@@ -1066,7 +1496,7 @@ fn validate(v: &Properties) -> Result<()> {
     .into_iter()
     .flatten()
     {
-        validate_fragment(e)?;
+        validate_fragment(e, limits)?;
     }
     for e in v
         .extensions
@@ -1085,31 +1515,110 @@ fn validate(v: &Properties) -> Result<()> {
                 }),
         )
     {
-        let mut sink = String::new();
-        write_unknown_extension(&mut sink, e, false)?;
+        validate_unknown_extension(e, limits)?;
     }
     if let Some(h) = &v.html_publish {
-        bounded(&h.target.relationship_id)?;
+        bounded(&h.target.relationship_id, limits)?;
     }
     if let Some(w) = &v.web
         && let Some(e) = &w.encoding
     {
-        bounded(e)?;
+        bounded(e, limits)?;
     }
     Ok(())
 }
-fn validate_fragment(v: &[u8]) -> Result<()> {
-    if v.len() > MAX_BYTES {
-        return Err(invalid("opaque presentation-properties XML exceeds limit"));
+
+fn validate_fragment(v: &[u8], limits: Limits) -> Result<()> {
+    if v.len() > limits.max_output_bytes() {
+        return Err(limit(
+            crate::error::CodecLimitKind::OutputBytes,
+            v.len(),
+            limits.max_output_bytes(),
+        ));
     }
-    parse_dom(v).map(|_| ())
+    parse_dom_processed(v, limits).map(|_| ())
 }
-fn node_xml(n: &Node, strict: bool) -> Result<Vec<u8>> {
-    let mut x = String::new();
-    write_node(&mut x, n, strict)?;
-    Ok(x.into_bytes())
+fn node_xml(n: &Node, _strict: bool, limits: Limits) -> Result<Vec<u8>> {
+    if let Some(raw) = &n.raw {
+        let bindings = in_scope_bindings(n)?;
+        let in_scope = litchi_ooxml_common::mce::InScopeNamespaces::from_declarations(bindings);
+        let fragment = in_scope.make_self_contained(raw, &fragment_mce_limits(limits))?;
+        return match fragment {
+            std::borrow::Cow::Borrowed(value) => clone_fragment(value, limits),
+            std::borrow::Cow::Owned(value) => Ok(value),
+        };
+    }
+    let mut count = XmlSink::count(limits.max_output_bytes());
+    write_node(&mut count, n)?;
+    count.check()?;
+    let mut output = XmlSink::output(count.len(), limits.max_output_bytes())?;
+    write_node(&mut output, n)?;
+    output.finish()
 }
-fn write_node(x: &mut String, n: &Node, strict: bool) -> Result<()> {
+
+fn in_scope_bindings(n: &Node) -> Result<Vec<(Box<[u8]>, Box<[u8]>)>> {
+    let mut bindings = Vec::new();
+    bindings
+        .try_reserve_exact(n.bindings.len())
+        .map_err(|source| Error::Allocation {
+            resource: "presentation-properties opaque namespace bindings",
+            source,
+        })?;
+    for (prefix, namespace) in &n.bindings {
+        bindings.push((
+            boxed_copy(
+                prefix.as_bytes(),
+                "presentation-properties opaque namespace prefix",
+            )?,
+            boxed_copy(
+                namespace.as_bytes(),
+                "presentation-properties opaque namespace URI",
+            )?,
+        ));
+    }
+    Ok(bindings)
+}
+
+fn boxed_copy(value: &[u8], resource: &'static str) -> Result<Box<[u8]>> {
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(value.len())
+        .map_err(|source| Error::Allocation { resource, source })?;
+    bytes.extend_from_slice(value);
+    Ok(bytes.into_boxed_slice())
+}
+
+fn clone_fragment(value: &[u8], limits: Limits) -> Result<Vec<u8>> {
+    if value.len() > limits.max_output_bytes() {
+        return Err(limit(
+            crate::error::CodecLimitKind::OutputBytes,
+            value.len(),
+            limits.max_output_bytes(),
+        ));
+    }
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(value.len())
+        .map_err(|source| Error::Allocation {
+            resource: "presentation-properties opaque fragment",
+            source,
+        })?;
+    bytes.extend_from_slice(value);
+    Ok(bytes)
+}
+
+fn fragment_mce_limits(limits: Limits) -> MceLimits {
+    MceLimits {
+        max_input_bytes: limits.max_input_bytes(),
+        max_output_bytes: limits.max_output_bytes(),
+        max_depth: limits.max_depth(),
+        max_namespace_bindings: 4096.min(limits.max_nodes()),
+        max_directive_tokens: 4096.min(limits.max_nodes()),
+        max_choices_per_alternate: 1024.min(limits.max_nodes()),
+        max_attributes_per_element: litchi_ooxml_common::mce::DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT,
+    }
+}
+fn write_node(x: &mut XmlSink, n: &Node) -> Result<()> {
     x.push('<');
     x.push_str(&n.qname);
     for (p, u) in &n.bindings {
@@ -1118,12 +1627,7 @@ fn write_node(x: &mut String, n: &Node, strict: bool) -> Result<()> {
             x.push_str(p);
             x.push_str("=\"");
         }
-        let value = if strict {
-            map_ns(u, true)
-        } else {
-            map_ns(u, false)
-        };
-        esc_attr(x, value);
+        esc_attr(x, u);
         x.push('"');
     }
     for a in &n.attrs {
@@ -1140,7 +1644,7 @@ fn write_node(x: &mut String, n: &Node, strict: bool) -> Result<()> {
     x.push('>');
     for c in &n.content {
         match c {
-            Content::Node(v) => write_node(x, v, strict)?,
+            Content::Node(v) => write_node(x, v)?,
             Content::Text(v) => esc_text(x, v),
             Content::CData(v) => {
                 x.push_str("<![CDATA[");
@@ -1159,24 +1663,6 @@ fn write_node(x: &mut String, n: &Node, strict: bool) -> Result<()> {
     x.push('>');
     Ok(())
 }
-fn map_ns(v: &str, s: bool) -> &str {
-    if s {
-        match v {
-            P_NS => P_STRICT,
-            A_NS => A_STRICT,
-            R_NS => R_STRICT,
-            _ => v,
-        }
-    } else {
-        match v {
-            P_STRICT => P_NS,
-            A_STRICT => A_NS,
-            R_STRICT => R_NS,
-            _ => v,
-        }
-    }
-}
-
 fn children(n: &Node) -> Result<Vec<&Node>> {
     let mut v = Vec::new();
     for c in &n.content {
@@ -1217,7 +1703,7 @@ fn attr_opt(n: &Node, ns: &str, l: &str) -> Result<Option<String>> {
             if v.is_some() {
                 return Err(invalid("duplicate attribute"));
             }
-            bounded(&a.value)?;
+            bounded(&a.value, n.limits)?;
             v = Some(a.value.clone());
         }
     }
@@ -1285,7 +1771,7 @@ fn single_ext(n: &Node) -> Result<Option<Vec<u8>>> {
         if e.local != "extLst" {
             return Err(invalid("unexpected property child"));
         }
-        Ok(Some(node_xml(e, false)?))
+        Ok(Some(node_xml(e, false, n.limits)?))
     } else {
         Ok(None)
     }
@@ -1308,26 +1794,54 @@ fn resolve(bindings: &[(String, String)], p: &str) -> Result<String> {
         .map(|x| x.1.clone())
         .ok_or_else(|| invalid(format!("unbound namespace prefix '{p}'")))
 }
-fn bounded(v: &str) -> Result<()> {
-    if v.len() > MAX_STRING {
-        Err(invalid("presentation property string exceeds 1 MiB"))
+fn bounded(v: &str, limits: Limits) -> Result<()> {
+    if v.len() > limits.max_string_bytes() {
+        Err(limit(
+            crate::error::CodecLimitKind::StringBytes,
+            v.len(),
+            limits.max_string_bytes(),
+        ))
     } else {
         Ok(())
     }
 }
-fn attr_write(x: &mut String, n: &str, v: &str) {
+
+fn bounded_string(v: &str, limits: Limits) -> Result<()> {
+    bounded(v, limits)
+}
+
+fn bounded_attribute(v: &str, limits: Limits) -> Result<()> {
+    if v.len() > limits.max_attribute_bytes {
+        Err(limit(
+            crate::error::CodecLimitKind::XmlAttributeBytes,
+            v.len(),
+            limits.max_attribute_bytes,
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
+}
+fn attr_write(x: &mut XmlSink, n: &str, v: &str) {
     x.push(' ');
     x.push_str(n);
     x.push_str("=\"");
     esc_attr(x, v);
     x.push('"');
 }
-fn bool_opt_write(x: &mut String, n: &str, v: Option<bool>) {
+fn bool_opt_write(x: &mut XmlSink, n: &str, v: Option<bool>) {
     if let Some(v) = v {
         attr_write(x, n, if v { "1" } else { "0" });
     }
 }
-fn esc_attr(x: &mut String, v: &str) {
+fn esc_attr(x: &mut XmlSink, v: &str) {
     for c in v.chars() {
         match c {
             '&' => x.push_str("&amp;"),
@@ -1340,7 +1854,7 @@ fn esc_attr(x: &mut String, v: &str) {
         }
     }
 }
-fn esc_text(x: &mut String, v: &str) {
+fn esc_text(x: &mut XmlSink, v: &str) {
     for c in v.chars() {
         match c {
             '&' => x.push_str("&amp;"),
@@ -1374,9 +1888,12 @@ mod tests {
 
     #[test]
     fn parses_local_presentation_properties_fixture() {
-        let value = Properties::parse(include_bytes!(
-            "../../../../test-data/ooxml/pptx/presentation-properties/basic_presentation.xml"
-        ))
+        let value = Properties::parse(
+            include_bytes!(
+                "../../../../test-data/ooxml/pptx/presentation-properties/basic_presentation.xml"
+            ),
+            Limits::default(),
+        )
         .unwrap();
         let show = value.show.as_ref().unwrap();
         assert_eq!(show.mode, Some(ShowMode::Kiosk { restart: Some(5) }));
@@ -1386,8 +1903,8 @@ mod tests {
                 show_status: Some(false)
             }]
         );
-        let strict = value.to_xml(true).unwrap();
-        let again = Properties::parse(&strict).unwrap();
+        let strict = value.to_xml(true, Limits::default()).unwrap();
+        let again = Properties::parse(&strict, Limits::default()).unwrap();
         assert_eq!(again.show, value.show);
     }
     #[test]
@@ -1395,7 +1912,7 @@ mod tests {
         let xml = format!(
             r#"<p:presentationPr xmlns:p="{P_STRICT}" xmlns:r="{R_STRICT}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:u="urn:u" mc:Ignorable="u"><mc:AlternateContent><mc:Choice Requires="u"><u:x/></mc:Choice><mc:Fallback><p:webPr showAnimation="1" imgSz="1920x1200" clr="browser"/></mc:Fallback></mc:AlternateContent><p:prnPr prnWhat="handouts6" clrMode="gray"/><p:showPr loop="1"><p:kiosk restart="5"/><p:sldRg st="2" end="4"/></p:showPr></p:presentationPr>"#
         );
-        let v = Properties::parse(xml.as_bytes()).unwrap();
+        let v = Properties::parse(xml.as_bytes(), Limits::default()).unwrap();
         assert_eq!(v.web.unwrap().image_size, Some(WebScreenSize::S1920x1200));
         assert_eq!(v.print.unwrap().output, Some(PrintOutput::Handouts6));
         assert_eq!(
@@ -1408,7 +1925,7 @@ mod tests {
         let xml = format!(
             r#"<q:presentationPr xmlns:q="{P_NS}" xmlns:z="{R_NS}"><q:htmlPubPr z:id="rIdHtml"><q:sldAll/></q:htmlPubPr><q:webPr showAnimation="1"/></q:presentationPr>"#
         );
-        let value = Properties::parse(xml.as_bytes()).unwrap();
+        let value = Properties::parse(xml.as_bytes(), Limits::default()).unwrap();
         assert_eq!(value.web.unwrap().show_animation, Some(true));
         assert_eq!(
             value.html_publish.unwrap().target.relationship_id,
@@ -1426,7 +1943,7 @@ mod tests {
             ..Properties::default()
         };
         assert!(invalid_range.validate().is_err());
-        assert!(invalid_range.to_xml(false).is_err());
+        assert!(invalid_range.to_xml(false, Limits::default()).is_err());
 
         let duplicate_extension = Properties {
             extensions: vec![
@@ -1443,7 +1960,7 @@ mod tests {
         let xml = format!(
             r#"<p:presentationPr xmlns:p="{P_NS}" xmlns:r="{R_NS}" xmlns:p14="{P14_NS}" xmlns:p15="{P15_NS}" xmlns:a="{A_NS}" xmlns:v="urn:producer"><p:showPr><p:extLst><p:ext uri="{LASER_COLOR_URI}"><p14:laserClr><a:schemeClr val="accent1"/></p14:laserClr></p:ext><p:ext uri="urn:producer:show"><v:payload r:id="rIdNeverFetched"><v:nested value="opaque"/></v:payload></p:ext><p:ext uri="{SHOW_MEDIA_CONTROLS_URI}"><p14:showMediaCtrls val="0"/></p:ext></p:extLst></p:showPr><p:extLst><p:ext uri="{DISCARD_IMAGE_EDIT_DATA_URI}"><p14:discardImageEditData val="1"/></p:ext><p:ext uri="urn:producer:root"><v:data href="https://example.invalid/not-opened"/></p:ext><p:ext uri="{DEFAULT_IMAGE_DPI_URI}"><p14:defaultImageDpi val="4294967295"/></p:ext><p:ext uri="{CHART_TRACKING_REF_BASED_URI}"><p15:chartTrackingRefBased val="false"/></p:ext></p:extLst></p:presentationPr>"#
         );
-        let value = Properties::parse(xml.as_bytes()).unwrap();
+        let value = Properties::parse(xml.as_bytes(), Limits::default()).unwrap();
         let show = value.show.as_ref().unwrap();
         assert!(
             matches!(&show.extensions[..],[ShowExtension::LaserColor(_),ShowExtension::Unknown(OpaqueExtension{uri,..}),ShowExtension::ShowMediaControls(false)] if uri=="urn:producer:show")
@@ -1452,8 +1969,8 @@ mod tests {
             matches!(&value.extensions[..],[Extension::DiscardImageEditData(true),Extension::Unknown(OpaqueExtension{uri,..}),Extension::DefaultImageDpi(u32::MAX),Extension::ChartTrackingReferenceBased(false)] if uri=="urn:producer:root")
         );
         for strict in [false, true] {
-            let written = value.to_xml(strict).unwrap();
-            let again = Properties::parse(&written).unwrap();
+            let written = value.to_xml(strict, Limits::default()).unwrap();
+            let again = Properties::parse(&written, Limits::default()).unwrap();
             assert_eq!(
                 again
                     .extensions
@@ -1482,14 +1999,17 @@ mod tests {
     #[test]
     fn readonly_recommended_writer_uses_the_p1710_namespace() {
         let properties = Properties {
-            extensions: vec![Extension::ReadonlyRecommended(true)],
+            extensions: vec![Extension::ReadOnlyRecommended(true)],
             ..Properties::default()
         };
-        let xml = properties.to_xml(false).unwrap();
+        let xml = properties.to_xml(false, Limits::default()).unwrap();
         assert!(std::str::from_utf8(&xml).unwrap().contains(
             "xmlns:p1710=\"http://schemas.microsoft.com/office/powerpoint/2017/10/main\""
         ));
-        assert_eq!(Properties::parse(&xml).unwrap(), properties);
+        assert_eq!(
+            Properties::parse(&xml, Limits::default()).unwrap(),
+            properties
+        );
     }
 
     #[test]
@@ -1497,14 +2017,14 @@ mod tests {
         let xml = format!(
             r#"<p:presentationPr xmlns:p="{P_NS}" xmlns:p1710="{P1710_NS}"><p:extLst><p:ext uri="{READONLY_RECOMMENDED_URI}"><p1710:readonlyRecommended val="1"/></p:ext><p:ext uri="{READONLY_RECOMMENDED_URI}"><p1710:readonlyRecommended val="0"/></p:ext></p:extLst></p:presentationPr>"#
         );
-        assert!(Properties::parse(xml.as_bytes()).is_err());
+        assert!(Properties::parse(xml.as_bytes(), Limits::default()).is_err());
     }
     #[test]
     fn browse_mode_extension_round_trips() {
         let xml = format!(
             r#"<p:presentationPr xmlns:p="{P_NS}" xmlns:p14="{P14_NS}"><p:showPr><p:extLst><p:ext uri="{BROWSE_MODE_URI}"><p14:browseMode showStatus="0"/></p:ext></p:extLst></p:showPr></p:presentationPr>"#
         );
-        let value = Properties::parse(xml.as_bytes()).unwrap();
+        let value = Properties::parse(xml.as_bytes(), Limits::default()).unwrap();
         assert_eq!(
             value.show.as_ref().unwrap().extensions,
             vec![ShowExtension::BrowseMode {
@@ -1512,8 +2032,8 @@ mod tests {
             }]
         );
         for strict in [false, true] {
-            let written = value.to_xml(strict).unwrap();
-            let again = Properties::parse(&written).unwrap();
+            let written = value.to_xml(strict, Limits::default()).unwrap();
+            let again = Properties::parse(&written, Limits::default()).unwrap();
             assert_eq!(again.show, value.show);
         }
 
@@ -1521,7 +2041,7 @@ mod tests {
             r#"<p:presentationPr xmlns:p="{P_NS}" xmlns:p14="{P14_NS}"><p:showPr><p:extLst><p:ext uri="{BROWSE_MODE_URI}"><p14:browseMode/></p:ext></p:extLst></p:showPr></p:presentationPr>"#
         );
         assert!(matches!(
-            Properties::parse(no_status.as_bytes()),
+            Properties::parse(no_status.as_bytes(), Limits::default()),
             Ok(Properties {
                 show: Some(Show {
                     extensions,
@@ -1568,10 +2088,13 @@ mod tests {
             ),
         ];
         for xml in cases {
-            assert!(Properties::parse(xml.as_bytes()).is_err(), "accepted {xml}");
+            assert!(
+                Properties::parse(xml.as_bytes(), Limits::default()).is_err(),
+                "accepted {xml}"
+            );
         }
         let value = Properties {
-            extensions: (0..=MAX_EXTENSIONS)
+            extensions: (0..=Limits::DEFAULT.max_extensions())
                 .map(|i| {
                     Extension::Unknown(OpaqueExtension {
                         uri: format!("urn:vendor:{i}"),
@@ -1582,7 +2105,7 @@ mod tests {
                 .collect(),
             ..Properties::default()
         };
-        assert!(value.to_xml(false).is_err());
+        assert!(value.to_xml(false, Limits::default()).is_err());
     }
     #[test]
     fn rejects_malformed_and_unsafe() {
@@ -1595,14 +2118,17 @@ mod tests {
             ),
             format!(r#"<!DOCTYPE x><p:presentationPr xmlns:p="{P_NS}"/>"#),
         ] {
-            assert!(Properties::parse(x.as_bytes()).is_err(), "accepted {x}");
+            assert!(
+                Properties::parse(x.as_bytes(), Limits::default()).is_err(),
+                "accepted {x}"
+            );
         }
         let mut v = Properties::default();
         v.extensions.push(Extension::Unknown(OpaqueExtension {
             uri: "urn:bad".into(),
             xml: b"<?bad?><p:extLst/>".to_vec(),
         }));
-        assert!(v.to_xml(false).is_err());
+        assert!(v.to_xml(false, Limits::default()).is_err());
     }
 
     #[test]
@@ -1610,6 +2136,70 @@ mod tests {
         let xml = format!(
             r#"<p:presentationPr xmlns:p="{P_NS}"><p:showPr></p:webPr></p:presentationPr>"#
         );
-        assert!(Properties::parse(xml.as_bytes()).is_err());
+        assert!(Properties::parse(xml.as_bytes(), Limits::default()).is_err());
+    }
+
+    #[test]
+    fn explicit_limits_bound_parse_and_serialize() {
+        let limits = Limits::new(1, 1, 1, 1, 1, 1, 1).expect("narrow presentation policy");
+        let xml = format!(r#"<p:presentationPr xmlns:p="{P_NS}"/>"#);
+        assert!(matches!(
+            Properties::parse(xml.as_bytes(), limits),
+            Err(Error::Limit { maximum: 1, .. })
+        ));
+        assert!(matches!(
+            Properties::default().to_xml(false, limits),
+            Err(Error::Limit { maximum: 1, .. })
+        ));
+    }
+
+    #[test]
+    fn opaque_fragment_preserves_namespace_uri_text_and_attributes() {
+        let xml = format!(
+            r#"<p:presentationPr xmlns:p="{P_NS}" xmlns:u="urn:opaque"><p:extLst>
+  <p:ext uri="urn:opaque"><u:fragment  note='urn:opaque' data="urn:opaque"><!-- keep -->literal urn:opaque</u:fragment></p:ext>
+</p:extLst></p:presentationPr>"#
+        );
+        let value = Properties::parse(xml.as_bytes(), Limits::default()).unwrap();
+        let expected = format!(
+            r#"<p:ext uri="urn:opaque" xmlns:p="{P_NS}" xmlns:u="urn:opaque"><u:fragment  note='urn:opaque' data="urn:opaque"><!-- keep -->literal urn:opaque</u:fragment></p:ext>"#
+        );
+        let Extension::Unknown(extension) = &value.extensions[0] else {
+            panic!("opaque extension was projected as a typed extension");
+        };
+        assert_eq!(extension.xml.as_slice(), expected.as_bytes());
+        let output = String::from_utf8(value.to_xml(true, Limits::default()).unwrap()).unwrap();
+        assert!(
+            output
+                .as_bytes()
+                .windows(expected.len())
+                .any(|window| window == expected.as_bytes())
+        );
+    }
+
+    #[test]
+    fn mce_expansion_uses_output_budget_for_processed_parse() {
+        let xml = format!(
+            r#"<p:presentationPr xmlns:p="{P_NS}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:n="urn:namespace-closure-expands-each-descendant"><p:webPr/></p:presentationPr>"#
+        );
+        let processed = process_markup_compatibility(
+            xml.as_bytes(),
+            &Capabilities::ooxml_baseline(),
+            &MceLimits::default(),
+        )
+        .unwrap()
+        .xml;
+        assert!(processed.len() > xml.len());
+        let limits = Limits::new(
+            xml.len(),
+            processed.len(),
+            Limits::DEFAULT.max_depth(),
+            Limits::DEFAULT.max_nodes(),
+            Limits::DEFAULT.max_string_bytes(),
+            Limits::DEFAULT.max_extensions(),
+            Limits::DEFAULT.max_colors(),
+        )
+        .unwrap();
+        assert!(Properties::parse(xml.as_bytes(), limits).is_ok());
     }
 }

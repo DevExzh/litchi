@@ -14,10 +14,8 @@ use litchi_iwa_archive::{
 use litchi_iwa_common::table::merge::Region;
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tn, tsce, tst};
-use litchi_numbers::{
-    MergeReader, Package, PackageLimits, PackageReadOptions, PackageSemanticLimits, SheetSelector,
-    TableMergesError, TableSelector,
-};
+use litchi_numbers::table::merge::transaction::Error as TableMergesError;
+use litchi_numbers::{MergeReader, Package, SheetSelector, TableSelector};
 use prost::Message as _;
 
 const NATIVE_SOURCE: &[u8] = include_bytes!(concat!(
@@ -60,7 +58,7 @@ fn rewrite_table_model(
     select: impl Fn(&tst::TableModelArchive) -> bool,
     mutate: impl FnOnce(&mut tst::TableModelArchive),
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut replacement = None;
     let mut mutate = Some(mutate);
 
@@ -68,8 +66,8 @@ fn rewrite_table_model(
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let mut archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
         let mut changed = false;
         for object in &mut archive.objects {
             for message_index in 0..object.messages.len() {
@@ -92,6 +90,7 @@ fn rewrite_table_model(
                         type_: TABLE_MODEL_MESSAGE_TYPE,
                         data: model.encode_to_vec(),
                     },
+                    Default::default(),
                 )?;
                 changed = true;
                 break;
@@ -103,7 +102,8 @@ fn rewrite_table_model(
         if changed {
             replacement = Some((
                 entry.name().to_owned(),
-                SnappyStream::compress(&archive.to_bytes()?)?.to_vec(),
+                SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?
+                    .to_vec(),
             ));
             break;
         }
@@ -130,14 +130,14 @@ fn rewrite_native_table_model(
 /// this BNC tile and refuse; MergeReader must stop before it and still return
 /// the selected merge geometry.
 fn rewrite_native_table_tile_as_malformed(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut tile_identifier = None;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
         for object in &archive.objects {
             for message in &object.messages {
                 if message.type_ != TABLE_MODEL_MESSAGE_TYPE {
@@ -174,8 +174,8 @@ fn rewrite_native_table_tile_as_malformed(source: &[u8]) -> TestResult<Vec<u8>> 
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let mut archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
         let mut changed = false;
         for object in &mut archive.objects {
             if object.archive_info.identifier != Some(tile_identifier) {
@@ -192,6 +192,7 @@ fn rewrite_native_table_tile_as_malformed(source: &[u8]) -> TestResult<Vec<u8>> 
                     type_: TILE_MESSAGE_TYPE,
                     data: vec![0xff],
                 },
+                Default::default(),
             )?;
             changed = true;
             break;
@@ -199,7 +200,8 @@ fn rewrite_native_table_tile_as_malformed(source: &[u8]) -> TestResult<Vec<u8>> 
         if changed {
             replacement = Some((
                 entry.name().to_owned(),
-                SnappyStream::compress(&archive.to_bytes()?)?.to_vec(),
+                SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?
+                    .to_vec(),
             ));
             break;
         }
@@ -218,13 +220,13 @@ fn rewrite_native_table_tile_as_malformed(source: &[u8]) -> TestResult<Vec<u8>> 
 /// index positions remain distinct, so only an exact name selector is
 /// ambiguous.
 fn duplicate_rooted_oracle_table_name(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == "Index/Document.iwa")
         .ok_or_else(|| "rooted oracle document component is missing".to_owned())?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let mut archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
     let mut changed = false;
     for object in &mut archive.objects {
         for message_index in 0..object.messages.len() {
@@ -245,6 +247,7 @@ fn duplicate_rooted_oracle_table_name(source: &[u8]) -> TestResult<Vec<u8>> {
                     type_: TABLE_MODEL_MESSAGE_TYPE,
                     data: model.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             changed = true;
         }
@@ -252,7 +255,8 @@ fn duplicate_rooted_oracle_table_name(source: &[u8]) -> TestResult<Vec<u8>> {
     if !changed {
         return Err("rooted oracle second table model is missing".into());
     }
-    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    let component =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(entry.name(), component.as_slice())],
         ArchiveLimits::default(),
@@ -264,13 +268,13 @@ fn duplicate_rooted_oracle_table_name(source: &[u8]) -> TestResult<Vec<u8>> {
 /// multiply-rooted owner instead of selecting whichever repeated protobuf
 /// field happens to be visited first.
 fn duplicate_native_document_sheet_edge(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == "Index/Document.iwa")
         .ok_or_else(|| "native Numbers document component is missing".to_owned())?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let mut archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
     let document = archive
         .objects
         .iter_mut()
@@ -298,8 +302,10 @@ fn duplicate_native_document_sheet_edge(source: &[u8]) -> TestResult<Vec<u8>> {
             type_: DOCUMENT_MESSAGE_TYPE,
             data: decoded.encode_to_vec(),
         },
+        Default::default(),
     )?;
-    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    let component =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(entry.name(), component.as_slice())],
         ArchiveLimits::default(),
@@ -310,14 +316,14 @@ fn duplicate_native_document_sheet_edge(source: &[u8]) -> TestResult<Vec<u8>> {
 /// sheet message metadata's aggregate references unchanged.  This exercises
 /// the same ownership invariant at the table level.
 fn duplicate_native_sheet_table_edge(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut replacement = None;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let mut archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
         let mut changed = false;
         for object in &mut archive.objects {
             let Some(message_index) = object.messages.iter().position(|message| {
@@ -345,6 +351,7 @@ fn duplicate_native_sheet_table_edge(source: &[u8]) -> TestResult<Vec<u8>> {
                     type_: SHEET_MESSAGE_TYPE,
                     data: sheet.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             changed = true;
             break;
@@ -352,7 +359,8 @@ fn duplicate_native_sheet_table_edge(source: &[u8]) -> TestResult<Vec<u8>> {
         if changed {
             replacement = Some((
                 entry.name().to_owned(),
-                SnappyStream::compress(&archive.to_bytes()?)?.to_vec(),
+                SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?
+                    .to_vec(),
             ));
             break;
         }
@@ -373,15 +381,15 @@ fn duplicate_native_sheet_table_edge(source: &[u8]) -> TestResult<Vec<u8>> {
 /// `FieldInfo.path` declaration. Keeping both changes in this helper makes
 /// the integration test exercise the complete ownership contract.
 fn rewrite_native_sheet_as_form_based(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut replacement = None;
 
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let mut archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
         let mut changed = false;
         for object in &mut archive.objects {
             let Some(message_index) = object.messages.iter().position(|message| {
@@ -413,6 +421,7 @@ fn rewrite_native_sheet_as_form_based(source: &[u8]) -> TestResult<Vec<u8>> {
                     type_: FORM_BASED_SHEET_MESSAGE_TYPE,
                     data: form.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             let info = object
                 .archive_info
@@ -421,7 +430,12 @@ fn rewrite_native_sheet_as_form_based(source: &[u8]) -> TestResult<Vec<u8>> {
                 .ok_or_else(|| "selected Numbers sheet metadata is missing".to_owned())?;
             info.type_ = FORM_BASED_SHEET_MESSAGE_TYPE;
             info.field_infos.clear();
-            let mut drawables = litchi_iwa_core::FieldInfo::new(vec![1, 2]);
+            let mut drawables = litchi_iwa_core::FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(vec![1, 2], litchi_iwa_core::Limits::default())
+                    .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap();
             drawables.object_references = drawable_references;
             info.field_infos.push(drawables);
             changed = true;
@@ -430,7 +444,8 @@ fn rewrite_native_sheet_as_form_based(source: &[u8]) -> TestResult<Vec<u8>> {
         if changed {
             replacement = Some((
                 entry.name().to_owned(),
-                SnappyStream::compress(&archive.to_bytes()?)?.to_vec(),
+                SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?
+                    .to_vec(),
             ));
             break;
         }
@@ -450,13 +465,13 @@ fn rewrite_native_sheet_as_form_based(source: &[u8]) -> TestResult<Vec<u8>> {
 /// the focused merge reader proves the root, sheet, and table-info ownership
 /// edges before it inspects the selected model.
 fn decorate_rooted_oracle_metadata(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == "Index/Document.iwa")
         .ok_or_else(|| "Numbers document component is missing".to_owned())?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let mut archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
 
     for object in &mut archive.objects {
         let (message_type, references) = match object.archive_info.identifier {
@@ -479,7 +494,8 @@ fn decorate_rooted_oracle_metadata(source: &[u8]) -> TestResult<Vec<u8>> {
             .object_references = references;
     }
 
-    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    let component =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(entry.name(), component.as_slice())],
         ArchiveLimits::default(),
@@ -493,7 +509,7 @@ fn rewrite_message_metadata(
     select: impl Fn(&ArchiveObject, usize) -> bool,
     mutate: impl FnOnce(&mut ArchiveObject, usize),
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut replacement = None;
     let mut mutate = Some(mutate);
 
@@ -501,8 +517,8 @@ fn rewrite_message_metadata(
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let mut archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
         let mut changed = false;
         for object in &mut archive.objects {
             for message_index in 0..object.messages.len() {
@@ -525,7 +541,8 @@ fn rewrite_message_metadata(
         if changed {
             replacement = Some((
                 entry.name().to_owned(),
-                SnappyStream::compress(&archive.to_bytes()?)?.to_vec(),
+                SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?
+                    .to_vec(),
             ));
             break;
         }
@@ -685,9 +702,24 @@ fn selectors_report_typed_not_found_errors_without_native_identifiers() -> TestR
         .table_merges(usize::MAX, 0usize)
         .expect_err("out-of-range sheet must be rejected");
 
-    assert_eq!(missing_sheet, TableMergesError::SheetNotFound);
-    assert_eq!(missing_table, TableMergesError::TableNotFound);
-    assert_eq!(out_of_range, TableMergesError::SheetNotFound);
+    assert_eq!(
+        missing_sheet,
+        TableMergesError::Refused(
+            litchi_numbers::table::merge::transaction::Refusal::SheetNotFound
+        )
+    );
+    assert_eq!(
+        missing_table,
+        TableMergesError::Refused(
+            litchi_numbers::table::merge::transaction::Refusal::TableNotFound
+        )
+    );
+    assert_eq!(
+        out_of_range,
+        TableMergesError::Refused(
+            litchi_numbers::table::merge::transaction::Refusal::SheetNotFound
+        )
+    );
 
     for error in [&missing_sheet, &missing_table, &out_of_range] {
         let rendered = format!("{error:?}\n{error}");
@@ -717,7 +749,9 @@ fn merge_selection_follows_rooted_order_and_excludes_detached_models() -> TestRe
     assert_eq!(package.extract_structured_tables()?.len(), 3);
     assert_eq!(
         package.table_merges("Rooted sheet", "Detached legacy"),
-        Err(TableMergesError::TableNotFound)
+        Err(TableMergesError::Refused(
+            litchi_numbers::table::merge::transaction::Refusal::TableNotFound
+        ))
     );
     assert!(package.table_merges(0usize, 0usize)?.is_empty());
     assert!(package.table_merges(0usize, 1usize)?.is_empty());
@@ -906,19 +940,27 @@ fn metadata_reader_reports_typed_selector_errors_and_ambiguity() -> TestResult {
 
     assert_eq!(
         reader.table_merges("missing sheet", TABLE_NAME),
-        Err(TableMergesError::SheetNotFound)
+        Err(TableMergesError::Refused(
+            litchi_numbers::table::merge::transaction::Refusal::SheetNotFound
+        ))
     );
     assert_eq!(
         reader.table_merges(SHEET_NAME, "missing table"),
-        Err(TableMergesError::TableNotFound)
+        Err(TableMergesError::Refused(
+            litchi_numbers::table::merge::transaction::Refusal::TableNotFound
+        ))
     );
     assert_eq!(
         reader.table_merges(usize::MAX, 0usize),
-        Err(TableMergesError::SheetNotFound)
+        Err(TableMergesError::Refused(
+            litchi_numbers::table::merge::transaction::Refusal::SheetNotFound
+        ))
     );
     assert_eq!(
         reader.table_merges(0usize, usize::MAX),
-        Err(TableMergesError::TableNotFound)
+        Err(TableMergesError::Refused(
+            litchi_numbers::table::merge::transaction::Refusal::TableNotFound
+        ))
     );
 
     let rooted = decorate_rooted_oracle_metadata(&decode_hex(ROOTED_ORACLE_HEX)?)?;
@@ -926,7 +968,9 @@ fn metadata_reader_reports_typed_selector_errors_and_ambiguity() -> TestResult {
     let duplicate_reader = MergeReader::from_bytes(&duplicate)?;
     assert_eq!(
         duplicate_reader.table_merges("Rooted sheet", "First canonical"),
-        Err(TableMergesError::AmbiguousSelector)
+        Err(TableMergesError::Refused(
+            litchi_numbers::table::merge::transaction::Refusal::AmbiguousSelector
+        ))
     );
     assert_eq!(
         duplicate_reader.table_merges(0usize, 0usize)?,
@@ -977,9 +1021,14 @@ fn metadata_reader_accepts_malformed_unneeded_cell_storage() -> TestResult {
 
 #[test]
 fn metadata_reader_honors_tight_projection_profile_without_materializing_cells() -> TestResult {
-    let semantic = PackageSemanticLimits::default()
-        .with_projection_limits(1, PackageSemanticLimits::MAX_OUTPUT_TEXT_BYTES)?;
-    let options = PackageReadOptions::new(PackageLimits::default(), semantic);
+    let semantic = litchi_numbers::SemanticLimits::DEFAULT
+        .to_builder()
+        .max_materialized_cells(1)
+        .and_then(|b| {
+            b.max_output_text_bytes(litchi_numbers::SemanticLimits::MAXIMUM.max_output_text_bytes())
+        })
+        .and_then(|b| b.build())?;
+    let options = litchi_numbers::OpenOptions::new().semantic_limits(semantic);
 
     assert!(
         Package::from_bytes_with_options(NATIVE_SOURCE, options).is_err(),
@@ -995,13 +1044,13 @@ fn metadata_reader_honors_tight_projection_profile_without_materializing_cells()
 
 #[test]
 fn metadata_reader_applies_sheet_and_table_limits_during_selection() -> TestResult {
-    let semantic = PackageSemanticLimits::new(
-        PackageSemanticLimits::MAX_OBJECTS,
-        1,
-        1,
-        PackageSemanticLimits::MAX_REFERENCES,
-    )?;
-    let options = PackageReadOptions::new(PackageLimits::default(), semantic);
+    let semantic = litchi_numbers::SemanticLimits::builder()
+        .max_objects(litchi_numbers::SemanticLimits::MAXIMUM.max_objects())
+        .and_then(|b| b.max_sheets(1))
+        .and_then(|b| b.max_tables(1))
+        .and_then(|b| b.max_references(litchi_numbers::SemanticLimits::MAXIMUM.max_references()))
+        .and_then(|b| b.build())?;
+    let options = litchi_numbers::OpenOptions::new().semantic_limits(semantic);
     let native = MergeReader::from_bytes_with_options(NATIVE_SOURCE, options)?;
     assert_eq!(
         native.table_merges(0usize, 0usize)?,
@@ -1013,8 +1062,8 @@ fn metadata_reader_applies_sheet_and_table_limits_during_selection() -> TestResu
     let reader = MergeReader::from_bytes_with_options(&rooted, options)?;
     assert!(matches!(
         reader.table_merges(0usize, 1usize),
-        Err(TableMergesError::LimitExceeded {
-            kind: litchi_numbers::TableMergesLimitKind::Tables,
+        Err(TableMergesError::Limit {
+            kind: litchi_numbers::table::merge::transaction::LimitKind::Tables,
             ..
         })
     ));
@@ -1092,10 +1141,12 @@ fn metadata_reader_keeps_form_based_and_selected_topology_strict() -> TestResult
 
 #[test]
 fn missing_name_queries_charge_fields_without_charging_opaque_bytes_as_fields() -> TestResult {
-    let physical = PackageLimits::default().with_archive_limits(
-        litchi_iwa_core::ArchiveLimits::default().with_header_fields(2_048)?,
-    )?;
-    let options = PackageReadOptions::new(physical, PackageSemanticLimits::default());
+    let physical = litchi_numbers::SourceLimits::builder()
+        .max_header_fields(2_048)?
+        .build()?;
+    let options = litchi_numbers::OpenOptions::new()
+        .source_limits(physical)
+        .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT);
 
     for many_fields in [false, true] {
         let padding = if many_fields {
@@ -1119,13 +1170,15 @@ fn missing_name_queries_charge_fields_without_charging_opaque_bytes_as_fields() 
                 let mut message = object.messages[index].clone();
                 message.data.extend_from_slice(&padding);
                 object
-                    .replace_message_preserving_header(index, message)
+                    .replace_message_preserving_header(index, message, Default::default())
                     .expect("unknown payload padding preserves the IWA envelope");
             },
         )?;
         assert_eq!(
             MergeReader::from_bytes(&source)?.table_merges(SHEET_NAME, "missing table"),
-            Err(TableMergesError::TableNotFound),
+            Err(TableMergesError::Refused(
+                litchi_numbers::table::merge::transaction::Refusal::TableNotFound
+            )),
             "the padded metadata remains valid with default budgets"
         );
         let reader = MergeReader::from_bytes_with_options(&source, options)?;
@@ -1133,13 +1186,18 @@ fn missing_name_queries_charge_fields_without_charging_opaque_bytes_as_fields() 
         if many_fields {
             assert!(matches!(
                 result,
-                Err(TableMergesError::LimitExceeded {
-                    kind: litchi_numbers::TableMergesLimitKind::WireFields,
+                Err(TableMergesError::Limit {
+                    kind: litchi_numbers::table::merge::transaction::LimitKind::WireFields,
                     ..
                 })
             ));
         } else {
-            assert_eq!(result, Err(TableMergesError::TableNotFound));
+            assert_eq!(
+                result,
+                Err(TableMergesError::Refused(
+                    litchi_numbers::table::merge::transaction::Refusal::TableNotFound
+                ))
+            );
         }
     }
     Ok(())

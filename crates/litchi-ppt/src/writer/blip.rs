@@ -7,7 +7,8 @@
 
 use std::io::{self, Write};
 
-use litchi_odraw::image::write::{BlipBuilder, StoreBuilder, digest};
+use litchi_odraw::image::builder::{BlipBuilder, StoreBuilder};
+use litchi_odraw::image::write::digest;
 pub use litchi_odraw::image::{Id, Kind, Uid};
 use litchi_odraw::image::{Point, Rect};
 
@@ -143,7 +144,8 @@ impl Pictures {
     ///
     /// Returns an error if serialization fails or the underlying writer reports an error.
     pub fn write_store<W: Write>(&self, writer: &mut W) -> io::Result<()> {
-        self.builder()?.write_store(writer)
+        self.builder()?
+            .write_store(writer, litchi_odraw::image::Limits::default())
     }
 
     /// Streams the headerless `Pictures` `BStoreDelay` sequence.
@@ -152,7 +154,8 @@ impl Pictures {
     ///
     /// Returns an error if serialization fails or the underlying writer reports an error.
     pub fn write_delay<W: Write>(&self, writer: &mut W) -> io::Result<()> {
-        self.builder()?.write_delay(writer)
+        self.builder()?
+            .write_delay(writer, litchi_odraw::image::Limits::default())
     }
 
     /// Builds the Dgg `BStoreContainer` bytes.
@@ -331,9 +334,12 @@ mod tests {
 
         let store_bytes = pictures.store().expect("BStore");
         let delay = pictures.delay().expect("Pictures stream");
-        let store = Store::parse(&store_bytes).expect("parse BStore");
+        let store = Store::parse(&store_bytes, Default::default()).expect("parse BStore");
         let blip = store
-            .resolve(id, Context::new().with_delay(Delay::new(&delay)))
+            .resolve(
+                id,
+                Context::new().with_delay(Delay::new(&delay, Default::default())),
+            )
             .expect("resolve")
             .expect("image");
         assert_eq!(blip.kind(), Kind::Png);

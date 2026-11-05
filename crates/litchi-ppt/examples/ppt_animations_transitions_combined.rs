@@ -10,7 +10,7 @@
 //!
 //! Run with: cargo run --example `ppt_animations_transitions_combined`
 
-use litchi_ppt::Writer;
+use litchi_ppt::Builder;
 use litchi_ppt::animation::writer::write_animation_info;
 use litchi_ppt::animation::{
     AfterEffect, AnimationEffect, AnimationInfo, AnimationTrigger, BuildInfo, BuildLevel,
@@ -26,13 +26,13 @@ use std::io::Write;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating comprehensive PPT with animations and transitions...");
 
-    let mut writer = Writer::new_widescreen();
-    writer.set_property("Title", "Complete Animation & Transition Demo");
-    writer.set_property("Author", "Litchi Comprehensive Demo");
-    writer.set_property(
-        "Subject",
-        "Showcasing PPT Animation and Transition Features",
-    );
+    let mut writer = Builder::new_widescreen();
+    writer.set_metadata(litchi_core::Metadata {
+        title: Some("Complete Animation & Transition Demo".to_owned()),
+        author: Some("Litchi Comprehensive Demo".to_owned()),
+        subject: Some("Showcasing PPT Animation and Transition Features".to_owned()),
+        ..litchi_core::Metadata::default()
+    })?;
 
     // SLIDE 1: Title Slide with Fade Transition
     println!("Creating slide 1: Title with Fade transition");
@@ -320,7 +320,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Save the presentation
     println!("Saving to ppt_complete_showcase.ppt...");
-    writer.save("ppt_complete_showcase.ppt")?;
+    writer.build()?.save("ppt_complete_showcase.ppt")?;
 
     // Save sample data for all slides
     println!("Saving animation and transition samples...");

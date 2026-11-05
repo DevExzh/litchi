@@ -6,24 +6,136 @@
 
 use litchi_core::Position;
 
-pub use self::number_format::CellPosition;
+pub use self::number_format::At;
 
 /// Effective appearance settings for a table's style graph.
 pub mod appearance;
 /// Archive-free values and comments returned by focused table reads.
 pub mod cells;
+/// Exact-source table-cell comment and direct-reply transactions.
+pub mod comments {
+    pub use crate::package::slide_table_comments::{
+        SlideTableCommentCommit as Commit, SlideTableCommentDiagnostics as Diagnostics,
+        SlideTableCommentEdit as Edit, SlideTableCommentError as Error,
+        SlideTableCommentLimitKind as LimitKind, SlideTableCommentPatch as Patch,
+        SlideTableCommentPath as Path,
+    };
+    pub use litchi_iwa_common::table::read::{
+        Comment, CommentAuthor, CommentReply, CommentTimestamp,
+    };
+}
 /// Checked row and column point-size values.
 pub mod dimension;
 /// Formula values shared through the neutral iWork semantic model.
 pub mod formula;
 /// Lossless header, footer, freeze, and print-repetition settings.
 pub mod headers;
+/// Hidden rows and columns of a slide table (record 0379).
+pub mod hidden_axes;
 /// Interactive lock state for a table.
 pub mod lock;
 /// Compact, archive-free merged-cell geometry and topology algebra.
 pub mod merge;
 /// Validated display names for a table.
 pub mod name;
+/// One character or paragraph property of whole slide-table cells' text,
+/// started by [`crate::Package::edit_slide_table_cell_text`] and read by
+/// [`crate::Package::slide_table_cell_text`] (record 0412).
+pub mod cell_text {
+    pub use crate::package::slide_table_cell_text::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_common::table::coordinate::At;
+    pub use litchi_iwa_text_wire::paragraph_style::{Property, PropertyKind};
+}
+/// Paragraph lists of slide-table cells' text, started by
+/// [`crate::Package::edit_slide_table_cell_lists`]: a plain cell is promoted
+/// to rich text on its first list change (record 0412).
+pub mod cell_list {
+    pub use crate::package::slide_table_cell_list::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_common::table::coordinate::At;
+    pub use litchi_iwa_text::paragraph::list::{
+        ParagraphList, ParagraphListBullet, ParagraphListBulletBaselineOffset,
+        ParagraphListBulletGeometry, ParagraphListBulletScale, ParagraphListIndentation,
+        ParagraphListLabelColor, ParagraphListLabelIndent, ParagraphListLevel,
+        ParagraphListLevelPlacement, ParagraphListNumberFormat, ParagraphListNumberPunctuation,
+        ParagraphListNumberScale, ParagraphListNumberSequence, ParagraphListNumberTiering,
+        ParagraphListNumbering, ParagraphListPlacement, ParagraphListStart, ParagraphListTextGap,
+    };
+    pub use litchi_iwa_text::position::TextPosition;
+    pub use litchi_iwa_text_wire::list::{Property, PropertyKind};
+}
+/// Display formats of stored slide-table cells: one family over the neutral
+/// `DataFormat` (record 0379).
+pub mod format {
+    pub use crate::package::slide_table_cell_format::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_common::table::cell::data_format::DataFormat;
+    pub use litchi_iwa_common::table::coordinate::At;
+}
+/// Fill, text layout and edge strokes of slide-table cells, over the shared
+/// cell-appearance engine (record 0372).
+pub mod cell_appearance {
+    pub use crate::package::slide_table_cell_appearance::{
+        Commit, Diagnostics, Edit, Error, Patch, Refusal,
+    };
+    pub use litchi_iwa_common::shape::fill::Fill;
+    pub use litchi_iwa_common::shape::stroke::Stroke;
+    pub use litchi_iwa_common::table::cell::layout::{
+        Inset, Insets, Layout, TextWrap, VerticalAlignment,
+    };
+    pub use litchi_iwa_common::table::cell::{BorderSide, Borders};
+
+    /// One cell's effective appearance.
+    #[derive(Debug, Clone, PartialEq)]
+    #[non_exhaustive]
+    pub struct Appearance {
+        /// The fill the cell shows (`Fill::None` when no style sets one).
+        pub fill: Fill,
+        /// Text wrapping, vertical alignment and insets.
+        pub layout: Layout,
+        /// The explicit edge strokes (`None`: the table style's edge, or an
+        /// explicitly cleared one).
+        pub borders: Borders,
+    }
+}
+/// Slide-table duplication and removal over the shared table structure set
+/// (record 0372).
+pub mod lifecycle {
+    pub use crate::package::slide_table_lifecycle::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+}
+/// Ordered conditional-highlight rules of slide-table cells over the shared
+/// conditional-highlight engine (record 0412f).
+pub mod conditional_highlight {
+    pub use crate::package::slide_table_conditional_highlight::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_common::table::cell::conditional_highlight::{
+        Condition, Date, DateRange, Error as ValueError, Number, Offset, OffsetDirection, Period,
+        PeriodUnit, Range, Rule, Style, Text,
+    };
+}
+/// Exact-source resize and frame of one rooted slide table, rows and
+/// columns sized uniformly to fill the frame (record 0412g).
+pub mod layout {
+    pub use crate::package::slide_table_layout::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use crate::slide::drawable::Geometry;
+}
+/// Exact-source row and column insertion and removal in one rooted slide
+/// table over the shared table-topology engine (record 0412e).
+pub mod topology {
+    pub use crate::package::slide_table_topology::{
+        ColumnDeletion, ColumnInsertion, Commit, Diagnostics, Edit, Error, LimitKind, Patch,
+        Refusal, RowDeletion, RowInsertion, Unsupported,
+    };
+}
 /// Decimal number display formats for existing table cells.
 pub mod number_format;
 /// Physical row-sort transaction values for a Keynote slide table.

@@ -204,17 +204,6 @@ impl fmt::Debug for FrozenDirectoryBundle {
 }
 
 impl FrozenDirectoryBundle {
-    /// Snapshot a legacy directory bundle under the default physical limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the root or index representation is missing,
-    /// ambiguous, unsafe, malformed, changes during capture, or exceeds a
-    /// physical resource ceiling.
-    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::open_with_limits(path, Limits::default())
-    }
-
     /// Snapshot a legacy directory bundle under explicit physical limits.
     ///
     /// Exactly one of `Index.zip` and `Index/` must exist. Symbolic links and
@@ -229,8 +218,10 @@ impl FrozenDirectoryBundle {
     ///
     /// # Errors
     ///
-    /// Returns the same errors as [`Self::open`].
-    pub fn open_with_limits(path: impl AsRef<Path>, limits: Limits) -> Result<Self> {
+    /// Returns an error when the root or index representation is missing,
+    /// ambiguous, unsafe, malformed, changes during capture, or exceeds a
+    /// physical resource ceiling.
+    pub fn open(path: impl AsRef<Path>, limits: Limits) -> Result<Self> {
         Self::open_with_profile(path.as_ref(), limits, CaptureProfile::None)
     }
 
@@ -242,7 +233,7 @@ impl FrozenDirectoryBundle {
     ///
     /// # Errors
     ///
-    /// Returns the same errors as [`Self::open_with_limits`] and charges the
+    /// Returns the same errors as [`Self::open`] and charges the
     /// optional diagnostic as one logical entry before allocating its bytes.
     #[doc(hidden)]
     pub fn open_with_properties(path: impl AsRef<Path>, limits: Limits) -> Result<Self> {
@@ -2646,13 +2637,18 @@ mod tests {
                     type_: message_type,
                     data: vec![1, 2, 3],
                 }],
+                Default::default(),
             )?],
         };
-        Ok(SnappyStream::compress(&archive.to_bytes()?)?)
+        Ok(SnappyStream::compress(
+            &archive.to_bytes(Default::default())?,
+            Default::default(),
+        )?)
     }
 
     fn index_zip(entries: &[(&str, Vec<u8>)]) -> Result<Vec<u8>> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         for (name, bytes) in entries {
             writer.write_stored(name, bytes)?;
         }
@@ -2664,7 +2660,7 @@ mod tests {
     fn windows_directory_ingress_fails_closed() -> Result<()> {
         let temp = Temp::new()?;
         assert!(matches!(
-            FrozenDirectoryBundle::open(temp.path()),
+            FrozenDirectoryBundle::open(temp.path(), Default::default()),
             Err(Error::InvalidBundle(message)) if message.contains("unsupported on Windows")
         ));
         Ok(())
@@ -2676,7 +2672,7 @@ mod tests {
         let bytes = index_zip(&[("Index/Document.iwa", iwa(1, 10_000)?)])?;
         fs::write(temp.path().join("Index.zip"), &bytes)?;
 
-        let frozen = FrozenDirectoryBundle::open(temp.path())?;
+        let frozen = FrozenDirectoryBundle::open(temp.path(), Default::default())?;
 
         assert_eq!(frozen.provenance(), DirectoryProvenance::IndexZip);
         assert_eq!(frozen.index_zip_bytes(), Some(bytes.as_slice()));
@@ -2721,7 +2717,7 @@ mod tests {
             Limits::MAX_TOTAL_BYTES,
             Limits::MAX_IWA_STREAM_BYTES,
         )?;
-        let index_only = FrozenDirectoryBundle::open_with_limits(temp.path(), limits)?;
+        let index_only = FrozenDirectoryBundle::open(temp.path(), limits)?;
         assert_eq!(index_only.properties_plist(), None);
         let frozen = FrozenDirectoryBundle::open_with_properties(temp.path(), limits)?;
         assert_eq!(frozen.properties_plist(), Some(properties.as_slice()));
@@ -3046,7 +3042,7 @@ mod tests {
         )?;
         fs::write(temp.path().join("Metadata/DocumentIdentifier"), sidecars[2])?;
 
-        let source = FrozenDirectoryBundle::open(temp.path())?;
+        let source = FrozenDirectoryBundle::open(temp.path(), Default::default())?;
         let index_entries = source.state.index_report.entries;
         let expanded = source
             .state
@@ -3185,7 +3181,7 @@ mod tests {
         fs::write(temp.path().join("Metadata/Properties.plist"), b"p")?;
         fs::write(temp.path().join("Metadata/BuildVersionHistory.plist"), b"b")?;
         fs::write(temp.path().join("Metadata/DocumentIdentifier"), b"i")?;
-        let index = FrozenDirectoryBundle::open(temp.path())?;
+        let index = FrozenDirectoryBundle::open(temp.path(), Default::default())?;
         let exact_metadata = index
             .state
             .index_report
@@ -3242,7 +3238,9 @@ mod tests {
         use std::os::unix::fs::symlink;
         use std::os::unix::net::UnixListener;
 
-        let temp = Temp::new()?;
+        // Unix socket paths are bounded by SUN_LEN; keep this fixture's
+        // parent under /tmp even when the test harness has a long TMPDIR.
+        let temp = tempfile::tempdir_in("/tmp")?;
         fs::write(
             temp.path().join("Index.zip"),
             index_zip(&[("Index/Document.iwa", iwa(1, 10_000)?)])?,
@@ -3299,7 +3297,7 @@ mod tests {
             Limits::MAX_TOTAL_BYTES,
             Limits::MAX_IWA_STREAM_BYTES,
         )?;
-        let frozen = FrozenDirectoryBundle::open_with_limits(temp.path(), limits)?;
+        let frozen = FrozenDirectoryBundle::open(temp.path(), limits)?;
         assert!(frozen.properties_plist().is_none());
         let (_components, sidecars) = frozen.into_pages_semantic_parts();
         assert!(sidecars.properties_plist().is_none());
@@ -3383,7 +3381,7 @@ mod tests {
         fs::write(index.join("Alpha.iwa"), iwa(1, 6_000)?)?;
         fs::write(index.join("opaque.bin"), b"opaque")?;
 
-        let frozen = FrozenDirectoryBundle::open(temp.path())?;
+        let frozen = FrozenDirectoryBundle::open(temp.path(), Default::default())?;
 
         assert_eq!(frozen.provenance(), DirectoryProvenance::LooseIndex);
         assert!(frozen.index_zip_bytes().is_none());
@@ -3414,7 +3412,7 @@ mod tests {
         fs::write(temp.path().join("index.xml"), [])?;
         fs::write(temp.path().join("index.apxl"), [])?;
 
-        let frozen = FrozenDirectoryBundle::open(temp.path())?;
+        let frozen = FrozenDirectoryBundle::open(temp.path(), Default::default())?;
 
         assert!(frozen.markers().pages());
         assert!(frozen.markers().keynote());
@@ -3434,7 +3432,7 @@ mod tests {
             fs::write(temp.path().join(location), b"encrypted")?;
 
             assert!(matches!(
-                FrozenDirectoryBundle::open(temp.path()),
+                FrozenDirectoryBundle::open(temp.path(), Default::default()),
                 Err(Error::Encrypted)
             ));
         }
@@ -3450,7 +3448,7 @@ mod tests {
             fs::write(temp.path().join("Index").join(name), b"unsafe")?;
 
             assert!(matches!(
-                FrozenDirectoryBundle::open(temp.path()),
+                FrozenDirectoryBundle::open(temp.path(), Default::default()),
                 Err(Error::InvalidBundle(message))
                     if message.contains("not an exact portable basename")
             ));
@@ -3468,7 +3466,7 @@ mod tests {
             index_zip(&[("Index/Document.iwa", iwa(1, 10_000)?)])?,
         )?;
         assert!(matches!(
-            FrozenDirectoryBundle::open(temp.path()),
+            FrozenDirectoryBundle::open(temp.path(), Default::default()),
             Err(Error::InvalidBundle(message)) if message.contains("both Index.zip and Index/")
         ));
 
@@ -3479,7 +3477,7 @@ mod tests {
             index_zip(&[("legacy.pages/Index.zip", inner)])?,
         )?;
         assert!(matches!(
-            FrozenDirectoryBundle::open(nested.path()),
+            FrozenDirectoryBundle::open(nested.path(), Default::default()),
             Err(Error::InvalidBundle(message)) if message.contains("contains nested index")
         ));
         Ok(())
@@ -3509,7 +3507,7 @@ mod tests {
             Limits::MAX_IWA_STREAM_BYTES,
         )?;
         assert!(matches!(
-            FrozenDirectoryBundle::open_with_limits(temp.path(), count_limited),
+            FrozenDirectoryBundle::open(temp.path(), count_limited),
             Err(Error::Limit {
                 kind: LimitKind::Entries,
                 observed: 2,
@@ -3525,7 +3523,7 @@ mod tests {
             Limits::MAX_IWA_STREAM_BYTES,
         )?;
         assert!(matches!(
-            FrozenDirectoryBundle::open_with_limits(temp.path(), total_limited),
+            FrozenDirectoryBundle::open(temp.path(), total_limited),
             Err(Error::Limit { kind: LimitKind::TotalBytes, observed, maximum })
                 if observed == total && maximum == total - 1
         ));
@@ -3538,7 +3536,7 @@ mod tests {
             Limits::MAX_IWA_STREAM_BYTES,
         )?;
         assert!(matches!(
-            FrozenDirectoryBundle::open_with_limits(temp.path(), aggregate_input_limited),
+            FrozenDirectoryBundle::open(temp.path(), aggregate_input_limited),
             Err(Error::Limit {
                 kind: LimitKind::InputBytes,
                 observed,
@@ -3560,7 +3558,7 @@ mod tests {
         let root_link = parent.path().join("linked.pages");
         symlink(target.path(), &root_link)?;
         assert!(matches!(
-            FrozenDirectoryBundle::open(&root_link),
+            FrozenDirectoryBundle::open(&root_link, Default::default()),
             Err(Error::InvalidBundle(message)) if message.contains("symbolic link")
         ));
 
@@ -3570,7 +3568,7 @@ mod tests {
         fs::write(&outside, iwa(1, 10_000)?)?;
         symlink(&outside, member.path().join("Index/Document.iwa"))?;
         assert!(matches!(
-            FrozenDirectoryBundle::open(member.path()),
+            FrozenDirectoryBundle::open(member.path(), Default::default()),
             Err(Error::InvalidBundle(message)) if message.contains("symbolic link")
         ));
         Ok(())
@@ -3581,13 +3579,15 @@ mod tests {
     fn rejects_special_nodes_in_loose_index() -> Result<()> {
         use std::os::unix::net::UnixListener;
 
-        let temp = Temp::new()?;
+        // Unix socket paths are bounded by SUN_LEN; keep this fixture's
+        // parent under /tmp even when the test harness has a long TMPDIR.
+        let temp = tempfile::tempdir_in("/tmp")?;
         fs::create_dir(temp.path().join("Index"))?;
         fs::write(temp.path().join("Index/Document.iwa"), iwa(1, 10_000)?)?;
         let _socket = UnixListener::bind(temp.path().join("Index/socket.iwa"))?;
 
         assert!(matches!(
-            FrozenDirectoryBundle::open(temp.path()),
+            FrozenDirectoryBundle::open(temp.path(), Default::default()),
             Err(Error::InvalidBundle(message)) if message.contains("not a regular file or directory")
         ));
         Ok(())
@@ -3774,7 +3774,8 @@ mod tests {
         let ancestor = parent.path().join("ancestor-link");
         symlink(&actual, &ancestor)?;
 
-        let frozen = FrozenDirectoryBundle::open(ancestor.join("document.pages"))?;
+        let frozen =
+            FrozenDirectoryBundle::open(ancestor.join("document.pages"), Default::default())?;
         assert_eq!(frozen.components().len(), 1);
         Ok(())
     }

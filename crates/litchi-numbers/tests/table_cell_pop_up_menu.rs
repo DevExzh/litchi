@@ -14,11 +14,9 @@ use litchi_iwa_archive::{Limits, package::Catalog};
 use litchi_iwa_common::wire::{WireView, append_length_delimited_field, append_varint_field};
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldType, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tn, tsce, tsd, tsk, tsp, tst};
-use litchi_numbers::CellPosition;
+use litchi_numbers::At;
 use litchi_numbers::cell::data_format::pop_up_menu::{InitialSelection, PopUpMenu};
-use litchi_numbers::{
-    Package, PackageReadOptions, PackageSemanticLimits, SheetSelector, TableSelector,
-};
+use litchi_numbers::{Package, SheetSelector, TableSelector};
 use litchi_numbers_wire::{BncCell, CellDataFormatKind};
 use prost::Message as _;
 
@@ -114,6 +112,7 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
@@ -138,7 +137,7 @@ fn cell(format_identifier: Option<u32>, control_identifier: Option<u32>) -> Test
             Some(control_identifier),
         )?;
     }
-    Ok(cell.encode())
+    Ok(cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap())
 }
 
 fn tile(mode: FixtureMode) -> TestResult<tst::Tile> {
@@ -147,7 +146,9 @@ fn tile(mode: FixtureMode) -> TestResult<tst::Tile> {
     let second = if matches!(mode, FixtureMode::NonPopupCell | FixtureMode::SinglePopup) {
         let mut number = BncCell::minimal();
         number.set_number(42.0)?;
-        number.encode()
+        number
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap()
     } else {
         cell(popup.then_some(FORMAT_KEY), popup.then_some(CONTROL_KEY))?
     };
@@ -285,7 +286,7 @@ fn sidecars(mode: FixtureMode) -> TestResult<ArchiveObject> {
         }
         .encode_to_vec(),
     });
-    let mut sidecars = ArchiveObject::new(SIDECAR_ID, messages)?;
+    let mut sidecars = ArchiveObject::new(SIDECAR_ID, messages, Default::default())?;
     let control_message_index = sidecars.messages.iter().position(|message| {
         message.type_ == TABLE_DATA_LIST_TYPE
             && tst::TableDataList::decode(message.data.as_slice())
@@ -299,7 +300,15 @@ fn sidecars(mode: FixtureMode) -> TestResult<ArchiveObject> {
         && matches!(mode, FixtureMode::SharedPopup | FixtureMode::SinglePopup)
     {
         info.object_references = vec![POPUP_MODEL_ID];
-        let mut field = FieldInfo::new(vec![3, CONTROL_KEY]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(
+                vec![3, CONTROL_KEY],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.r#type = Some(FieldType::ObjectReference);
         field.object_references = vec![POPUP_MODEL_ID];
         info.field_infos.push(field);
@@ -395,15 +404,28 @@ fn metadata(mode: FixtureMode) -> TestResult<Vec<u8>> {
         ..Default::default()
     }
     .encode_to_vec();
-    append_length_delimited_field(&mut data, 3, &document)?;
-    append_length_delimited_field(&mut data, 3, &view)?;
-    append_length_delimited_field(&mut data, 11, &versioned)?;
+    append_length_delimited_field(
+        &mut data,
+        3,
+        &document,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(&mut data, 3, &view, litchi_iwa_common::WireLimits::DEFAULT)?;
+    append_length_delimited_field(
+        &mut data,
+        11,
+        &versioned,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut data, 90, 0xfeed_beef)?;
     Ok(data)
 }
 
 fn compressed(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn fixture(mode: FixtureMode) -> TestResult<Vec<u8>> {
@@ -448,7 +470,11 @@ fn fixture(mode: FixtureMode) -> TestResult<Vec<u8>> {
         table_model().encode_to_vec(),
     )?;
     model.archive_info.message_infos[0].object_references = vec![SIDECAR_ID, TILE_ID];
-    let mut model_unknown = FieldInfo::new(vec![99, 1]);
+    let mut model_unknown = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![99, 1], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     model_unknown.data_references = vec![700];
     model.archive_info.message_infos[0]
         .field_infos
@@ -497,13 +523,14 @@ fn popup<T: AsRef<str>>(items: &[T], selection: InitialSelection) -> TestResult<
 }
 
 fn member_archive(source: &[u8], member: &str) -> TestResult<Archive> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| io::Error::other(format!("member {member} is missing")))?;
     Ok(Archive::parse(
-        SnappyStream::decompress(entry.data())?.as_bytes(),
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
     )?)
 }
 
@@ -528,14 +555,18 @@ fn rewrite_member(
     member: &str,
     mut rewrite: impl FnMut(&mut Archive) -> TestResult,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| io::Error::other(format!("member {member} is missing")))?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     rewrite(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             member,
@@ -747,7 +778,12 @@ fn metadata_root(source: &[u8]) -> TestResult<tsp::PackageMetadata> {
 }
 
 fn document_metadata_component(source: &[u8], identifier: u64) -> TestResult<tsp::ComponentInfo> {
-    for field in WireView::parse(&metadata_payload(source)?)?.fields() {
+    for field in WireView::parse(
+        &metadata_payload(source)?,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?
+    .fields()
+    {
         if field.number() != 3 {
             continue;
         }
@@ -760,8 +796,8 @@ fn document_metadata_component(source: &[u8], identifier: u64) -> TestResult<tsp
 }
 
 fn changed_members(source: &[u8], target: &[u8]) -> TestResult<Vec<String>> {
-    let source = Catalog::from_bytes(source)?;
-    let target = Catalog::from_bytes(target)?;
+    let source = Catalog::from_bytes(source, Default::default())?;
+    let target = Catalog::from_bytes(target, Default::default())?;
     let mut changed = Vec::new();
     for before in source.iter() {
         let Some(after) = target.iter().find(|entry| entry.name() == before.name()) else {
@@ -778,8 +814,8 @@ fn changed_members(source: &[u8], target: &[u8]) -> TestResult<Vec<String>> {
 }
 
 fn assert_previews_invalidated(source: &[u8], target: &[u8]) -> TestResult {
-    let source = Catalog::from_bytes(source)?;
-    let target = Catalog::from_bytes(target)?;
+    let source = Catalog::from_bytes(source, Default::default())?;
+    let target = Catalog::from_bytes(target, Default::default())?;
     for name in ["preview.jpg", "preview-micro.jpg", "preview-web.jpg"] {
         assert!(
             source.iter().any(|entry| entry.name() == name),
@@ -799,7 +835,7 @@ fn assert_popup_read_rejects(source: &[u8], label: &str) -> TestResult {
         Ok(package) => match package.table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         ) {
             Err(_) => Ok(()),
             Ok(_) => Err(io::Error::other(format!(
@@ -820,7 +856,7 @@ fn assert_changed_edit_rejects_atomically(source: &[u8], label: &str) -> TestRes
     let edit = match package.edit_table_cell_pop_up_menu_format(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
     ) {
         Err(_) => {
             assert_eq!(package.exact_bytes(), before);
@@ -845,7 +881,7 @@ fn assert_reset_rejects_atomically(source: &[u8], label: &str) -> TestResult {
     let edit = match package.edit_table_cell_pop_up_menu_format(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
     ) {
         Err(_) => {
             assert_eq!(package.exact_bytes(), before);
@@ -1089,7 +1125,7 @@ fn append_unknown_popup_wire(source: &[u8]) -> TestResult<(Vec<u8>, Vec<u8>)> {
 }
 
 fn with_physical_popup_alias(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let alias_data = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
@@ -1153,14 +1189,18 @@ fn with_orphan_popup_model(source: &[u8], versioned_uuid: bool) -> TestResult<Ve
 }
 
 fn with_cross_component_popup_inbound(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut entries = catalog
         .iter()
         .map(|entry| (entry.name().to_owned(), entry.data().to_vec()))
         .collect::<Vec<_>>();
     let mut inbound = object(700, 9_999, b"opaque inbound owner".to_vec())?;
     inbound.archive_info.message_infos[0].object_references = vec![POPUP_MODEL_ID];
-    let mut opaque_field = FieldInfo::new(vec![99, 7]);
+    let mut opaque_field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![99, 7], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     opaque_field.object_references = vec![POPUP_MODEL_ID];
     inbound.archive_info.message_infos[0]
         .field_infos
@@ -1169,7 +1209,8 @@ fn with_cross_component_popup_inbound(source: &[u8]) -> TestResult<Vec<u8>> {
         &Archive {
             objects: vec![inbound],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     entries.push(("Index/PopupInbound.iwa".to_owned(), inbound_bytes));
     let source = litchi_iwa_archive::package::to_bytes(
@@ -1372,7 +1413,7 @@ fn shared_popup_read_noop_replace_inverse_apply_and_locality() -> TestResult {
         package.table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?,
         Some(expected.clone())
     );
@@ -1380,7 +1421,7 @@ fn shared_popup_read_noop_replace_inverse_apply_and_locality() -> TestResult {
         package.table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::name("Pop-Up Menus"),
-            CellPosition::new(1, 0),
+            At::new(1, 0),
         )?,
         Some(expected.clone())
     );
@@ -1389,7 +1430,7 @@ fn shared_popup_read_noop_replace_inverse_apply_and_locality() -> TestResult {
         .edit_table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(expected.clone())
         .commit()?;
@@ -1403,7 +1444,7 @@ fn shared_popup_read_noop_replace_inverse_apply_and_locality() -> TestResult {
         .edit_table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(replacement.clone())
         .commit()?;
@@ -1416,7 +1457,7 @@ fn shared_popup_read_noop_replace_inverse_apply_and_locality() -> TestResult {
         commit.package().table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?,
         Some(replacement)
     );
@@ -1427,7 +1468,7 @@ fn shared_popup_read_noop_replace_inverse_apply_and_locality() -> TestResult {
         commit.package().table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(1, 0),
+            At::new(1, 0),
         )?,
         Some(expected)
     );
@@ -1471,7 +1512,7 @@ fn popup_create_reuses_shared_model_and_final_reset_culls() -> TestResult {
         package.table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?,
         None
     );
@@ -1480,7 +1521,7 @@ fn popup_create_reuses_shared_model_and_final_reset_culls() -> TestResult {
         .edit_table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(menu.clone())
         .commit()?;
@@ -1505,7 +1546,7 @@ fn popup_create_reuses_shared_model_and_final_reset_culls() -> TestResult {
         .edit_table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(1, 0),
+            At::new(1, 0),
         )?
         .set(menu.clone())
         .commit()?;
@@ -1520,7 +1561,7 @@ fn popup_create_reuses_shared_model_and_final_reset_culls() -> TestResult {
         .edit_table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(blank)
         .commit()?;
@@ -1534,7 +1575,7 @@ fn popup_create_reuses_shared_model_and_final_reset_culls() -> TestResult {
         .edit_table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .reset()
         .commit()?;
@@ -1551,7 +1592,7 @@ fn popup_create_reuses_shared_model_and_final_reset_culls() -> TestResult {
         .edit_table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(1, 0),
+            At::new(1, 0),
         )?
         .reset()
         .commit()?;
@@ -1597,7 +1638,7 @@ fn popup_allocator_respects_metadata_ambiguous_identifiers() -> TestResult {
         .edit_table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(popup(&["Reserved", "Safe"], InitialSelection::FirstItem)?)
         .commit()?;
@@ -1616,7 +1657,7 @@ fn popup_selector_conflict_and_non_popup_cells_are_typed_and_atomic() -> TestRes
     let edit = package.edit_table_cell_pop_up_menu_format(
         SheetSelector::name("Pop-Up Menu Sheet"),
         TableSelector::name("Pop-Up Menus"),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
     )?;
     let commit = edit.set(menu).commit()?;
     assert!(
@@ -1629,7 +1670,7 @@ fn popup_selector_conflict_and_non_popup_cells_are_typed_and_atomic() -> TestRes
             .table_cell_pop_up_menu_format(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(99, 0),
+                At::new(99, 0),
             )
             .is_err()
     );
@@ -1640,7 +1681,7 @@ fn popup_selector_conflict_and_non_popup_cells_are_typed_and_atomic() -> TestRes
         non_popup.table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(1, 0),
+            At::new(1, 0),
         )?,
         None
     );
@@ -1650,7 +1691,7 @@ fn popup_selector_conflict_and_non_popup_cells_are_typed_and_atomic() -> TestRes
             .edit_table_cell_pop_up_menu_format(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(1, 0),
+                At::new(1, 0),
             )?
             .set(popup(&["One", "Two"], InitialSelection::FirstItem)?)
             .commit()
@@ -1720,11 +1761,8 @@ fn popup_cross_component_physical_alias_is_rejected_atomically() -> TestResult {
 #[test]
 fn popup_missing_metadata_and_tight_ingress_fail_before_publication() -> TestResult {
     let source = fixture(FixtureMode::EmptyCells)?;
-    let without_metadata = Catalog::from_bytes(&source)?.reassemble_with_deletions_to_bytes(
-        &[],
-        &[METADATA_MEMBER],
-        Limits::default(),
-    )?;
+    let without_metadata = Catalog::from_bytes(&source, Default::default())?
+        .reassemble_with_deletions_to_bytes(&[], &[METADATA_MEMBER], Limits::default())?;
     let package = Package::from_bytes(&without_metadata)?;
     let before = package.exact_bytes();
     let menu = popup(&["One", "Two"], InitialSelection::Blank)?;
@@ -1733,7 +1771,7 @@ fn popup_missing_metadata_and_tight_ingress_fail_before_publication() -> TestRes
             .edit_table_cell_pop_up_menu_format(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(0, 0),
+                At::new(0, 0),
             )?
             .set(menu)
             .commit()
@@ -1741,17 +1779,23 @@ fn popup_missing_metadata_and_tight_ingress_fail_before_publication() -> TestRes
     );
     assert_eq!(package.exact_bytes(), before);
 
-    let tight = Limits::new(
-        u64::try_from(source.len().saturating_sub(1))?,
-        Limits::MAX_ENTRIES,
-        Limits::MAX_ENTRY_BYTES,
-        Limits::MAX_TOTAL_BYTES,
-        Limits::MAX_IWA_STREAM_BYTES,
-    )?;
+    let tight = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(source.len().saturating_sub(1))?)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
     assert!(
         Package::from_bytes_with_options(
             &source,
-            PackageReadOptions::new(tight, PackageSemanticLimits::default()),
+            litchi_numbers::OpenOptions::new()
+                .source_limits(tight)
+                .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
         )
         .is_err()
     );
@@ -1768,7 +1812,7 @@ fn popup_unknown_metadata_and_payload_bytes_survive_rewrite() -> TestResult {
         .edit_table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(menu)
         .commit()?;
@@ -1779,18 +1823,21 @@ fn popup_unknown_metadata_and_payload_bytes_survive_rewrite() -> TestResult {
         .ok_or_else(|| io::Error::other("target popup payload is missing"))?
         .1;
     assert!(
-        !WireView::parse(&target_payload)?
+        !WireView::parse(&target_payload, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .filter(|field| field.number() == 90)
             .collect::<Vec<_>>()
             .is_empty()
     );
     assert!(
-        !WireView::parse(&metadata_payload(&target)?)?
-            .fields()
-            .filter(|field| field.number() == 90)
-            .collect::<Vec<_>>()
-            .is_empty()
+        !WireView::parse(
+            &metadata_payload(&target)?,
+            litchi_iwa_common::WireLimits::DEFAULT
+        )?
+        .fields()
+        .filter(|field| field.number() == 90)
+        .collect::<Vec<_>>()
+        .is_empty()
     );
     Ok(())
 }
@@ -1808,7 +1855,7 @@ fn popup_unknown_overlong_and_group_bytes_are_preserved_when_ingress_admits_them
         .edit_table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(popup(&["Opaque", "Future"], InitialSelection::Blank)?)
         .commit();
@@ -1830,11 +1877,12 @@ fn popup_unknown_overlong_and_group_bytes_are_preserved_when_ingress_admits_them
 #[test]
 fn popup_public_physical_and_semantic_limits_fail_before_publication() -> TestResult {
     let source_with_previews = fixture(FixtureMode::SharedPopup)?;
-    let source = Catalog::from_bytes(&source_with_previews)?.reassemble_with_deletions_to_bytes(
-        &[],
-        &["preview.jpg", "preview-micro.jpg", "preview-web.jpg"],
-        Limits::default(),
-    )?;
+    let source = Catalog::from_bytes(&source_with_previews, Default::default())?
+        .reassemble_with_deletions_to_bytes(
+            &[],
+            &["preview.jpg", "preview-micro.jpg", "preview-web.jpg"],
+            Limits::default(),
+        )?;
     // The replacement keeps the existing graph but grows the selected popup
     // payload beyond the source, allowing exact output-limit replay without
     // exceeding the codec's source-derived item budget.
@@ -1849,17 +1897,23 @@ fn popup_public_physical_and_semantic_limits_fail_before_publication() -> TestRe
 
     // Physical input/stream ceilings reject the source before a Package can
     // expose an editable snapshot.
-    let source_limits = Limits::new(
-        u64::try_from(source.len().saturating_sub(1))?,
-        Limits::MAX_ENTRIES,
-        Limits::MAX_ENTRY_BYTES,
-        Limits::MAX_TOTAL_BYTES,
-        Limits::MAX_IWA_STREAM_BYTES,
-    )?;
+    let source_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(source.len().saturating_sub(1))?)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
     assert!(
         Package::from_bytes_with_options(
             &source,
-            PackageReadOptions::new(source_limits, PackageSemanticLimits::default()),
+            litchi_numbers::OpenOptions::new()
+                .source_limits(source_limits)
+                .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
         )
         .is_err()
     );
@@ -1871,49 +1925,199 @@ fn popup_public_physical_and_semantic_limits_fail_before_publication() -> TestRe
         .edit_table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(menu.clone())
         .commit()?;
     let target_bytes = target.package().exact_bytes();
     assert!(target_bytes.len() > source.len());
-    let exact_output_limits = Limits::new(
-        u64::try_from(target_bytes.len())?,
-        Limits::MAX_ENTRIES,
-        Limits::MAX_ENTRY_BYTES,
-        Limits::MAX_TOTAL_BYTES,
-        4 * 1024,
+
+    // The retained physical profile also supplies the Snappy compressed
+    // stream ceiling and the component chunk size.  First obtain the exact
+    // output under that retained profile, then admit it at exactly the
+    // largest encoded member and repeat one byte below that ceiling.  The
+    // latter must fail as a typed physical refusal and leave the snapshot
+    // untouched.
+    let profile_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_input_bytes())
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
+    let profile_package = Package::from_bytes_with_options(
+        &source,
+        litchi_numbers::OpenOptions::new()
+            .source_limits(profile_limits)
+            .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
     )?;
+    let profile_target_bytes = profile_package
+        .edit_table_cell_pop_up_menu_format(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            At::new(0, 0),
+        )?
+        .set(menu.clone())
+        .commit()?
+        .package()
+        .exact_bytes();
+    let source_catalog = Catalog::from_bytes(&source, Default::default())?;
+    let profile_target_catalog = Catalog::from_bytes(&profile_target_bytes, Default::default())?;
+    let source_max_entry = source_catalog
+        .iter()
+        .map(|entry| entry.data().len())
+        .max()
+        .ok_or_else(|| io::Error::other("source has no entries"))?;
+    let profile_target_max_entry = profile_target_catalog
+        .iter()
+        .map(|entry| entry.data().len())
+        .max()
+        .ok_or_else(|| io::Error::other("profile target has no entries"))?;
+    assert!(profile_target_max_entry > source_max_entry);
+    let profile_target_max_entry = u64::try_from(profile_target_max_entry)?;
+    let exact_snappy_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_input_bytes())
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(profile_target_max_entry))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
+    let exact_snappy_package = Package::from_bytes_with_options(
+        &source,
+        litchi_numbers::OpenOptions::new()
+            .source_limits(exact_snappy_limits)
+            .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
+    )?;
+    let exact_source_limits = exact_snappy_package.open_options().source_limits_value();
+    assert_eq!(
+        exact_source_limits.max_entry_bytes(),
+        profile_target_max_entry,
+        "the admitted physical profile must retain the selected entry ceiling"
+    );
+    let exact_archive_limits = Limits::new(
+        exact_source_limits.max_input_bytes(),
+        exact_source_limits.max_members(),
+        exact_source_limits.max_entry_bytes(),
+        exact_source_limits.max_aggregate_bytes(),
+        exact_source_limits.max_component_bytes(),
+    )?;
+    assert_eq!(
+        exact_archive_limits.max_entry_bytes(),
+        profile_target_max_entry,
+        "the catalog profile must retain the selected entry ceiling"
+    );
+    assert_eq!(
+        exact_archive_limits
+            .snappy_limits()?
+            .max_compressed_stream(),
+        usize::try_from(profile_target_max_entry)?,
+        "the physical Snappy profile must use the selected compressed ceiling"
+    );
+    let exact_snappy_commit = exact_snappy_package
+        .edit_table_cell_pop_up_menu_format(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            At::new(0, 0),
+        )?
+        .set(menu.clone())
+        .commit()?;
+    let exact_bytes = exact_snappy_commit.package().exact_bytes();
+    let exact_catalog = Catalog::from_bytes(&exact_bytes, Default::default())?;
+    assert_eq!(
+        exact_catalog.iter().map(|entry| entry.data().len()).max(),
+        usize::try_from(profile_target_max_entry).ok()
+    );
+    assert_eq!(
+        exact_snappy_commit.package().exact_bytes(),
+        profile_target_bytes
+    );
+
+    let one_under_snappy_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_input_bytes())
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(profile_target_max_entry - 1))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
+    let one_under_package = Package::from_bytes_with_options(
+        &source,
+        litchi_numbers::OpenOptions::new()
+            .source_limits(one_under_snappy_limits)
+            .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
+    )?;
+    let one_under_before = one_under_package.exact_bytes();
+    let one_under_error = one_under_package
+        .edit_table_cell_pop_up_menu_format(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            At::new(0, 0),
+        )?
+        .set(menu.clone())
+        .commit()
+        .expect_err("one byte below the encoded member ceiling must refuse");
+    assert!(
+        format!("{one_under_error:?}").contains("CompressedBytes"),
+        "expected typed compressed-budget refusal, got {one_under_error:?}"
+    );
+    assert_eq!(one_under_package.exact_bytes(), one_under_before);
+
+    let exact_output_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(target_bytes.len())?)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| b.max_component_bytes(4 * 1024))
+        .and_then(|b| b.build())?;
     let exact_package = Package::from_bytes_with_options(
         &source,
-        PackageReadOptions::new(exact_output_limits, PackageSemanticLimits::default()),
+        litchi_numbers::OpenOptions::new()
+            .source_limits(exact_output_limits)
+            .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
     )?;
     let exact_commit = exact_package
         .edit_table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(menu.clone())
         .commit()?;
     assert_eq!(exact_commit.package().exact_bytes(), target_bytes);
 
-    let limited_output_limits = Limits::new(
-        u64::try_from(target_bytes.len().saturating_sub(1))?,
-        Limits::MAX_ENTRIES,
-        Limits::MAX_ENTRY_BYTES,
-        Limits::MAX_TOTAL_BYTES,
-        4 * 1024,
-    )?;
+    let limited_output_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(target_bytes.len().saturating_sub(1))?)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| b.max_component_bytes(4 * 1024))
+        .and_then(|b| b.build())?;
     let output_limited = Package::from_bytes_with_options(
         &source,
-        PackageReadOptions::new(limited_output_limits, PackageSemanticLimits::default()),
+        litchi_numbers::OpenOptions::new()
+            .source_limits(limited_output_limits)
+            .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
     )?;
     let before = output_limited.exact_bytes();
     let output_edit = output_limited.edit_table_cell_pop_up_menu_format(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
     )?;
     assert!(output_edit.set(menu.clone()).commit().is_err());
     assert_eq!(output_limited.exact_bytes(), before);
@@ -1921,22 +2125,26 @@ fn popup_public_physical_and_semantic_limits_fail_before_publication() -> TestRe
     // A deliberately small native stream ceiling is independently typed by
     // the public archive options.  If ingress accepts it as an opaque source,
     // the changed transaction must still leave its exact snapshot untouched.
-    let stream_limits = Limits::new(
-        u64::try_from(source.len())?,
-        Limits::MAX_ENTRIES,
-        Limits::MAX_ENTRY_BYTES,
-        Limits::MAX_TOTAL_BYTES,
-        1,
-    )?;
+    let stream_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(source.len())?)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| b.max_component_bytes(1))
+        .and_then(|b| b.build())?;
     if let Ok(package) = Package::from_bytes_with_options(
         &source,
-        PackageReadOptions::new(stream_limits, PackageSemanticLimits::default()),
+        litchi_numbers::OpenOptions::new()
+            .source_limits(stream_limits)
+            .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
     ) {
         let before = package.exact_bytes();
         let edit = package.edit_table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         );
         if let Ok(edit) = edit {
             assert!(edit.set(menu).commit().is_err());
@@ -1945,12 +2153,17 @@ fn popup_public_physical_and_semantic_limits_fail_before_publication() -> TestRe
     }
 
     // Public semantic object/reference ceilings are ingress-level controls;
-    // there are no public codec fields/work knobs on PackageReadOptions.
-    let semantic = PackageSemanticLimits::new(1, 1, 1, 1)?;
+    // there are no public codec fields/work knobs on litchi_numbers::OpenOptions.
+    let semantic = litchi_numbers::SemanticLimits::builder()
+        .max_objects(1)
+        .and_then(|b| b.max_sheets(1))
+        .and_then(|b| b.max_tables(1))
+        .and_then(|b| b.max_references(1))
+        .and_then(|b| b.build())?;
     assert!(
         Package::from_bytes_with_options(
             &source,
-            PackageReadOptions::new(Limits::default(), semantic),
+            litchi_numbers::OpenOptions::new().semantic_limits(semantic),
         )
         .is_err()
     );
@@ -1987,7 +2200,7 @@ fn popup_orphan_matching_model_missing_or_versioned_uuid_is_not_reused() -> Test
             .edit_table_cell_pop_up_menu_format(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(0, 0),
+                At::new(0, 0),
             )?
             .set(menu)
             .commit();
@@ -2075,7 +2288,7 @@ fn popup_effective_locator_uses_explicit_locator_and_inverse() -> TestResult {
         .edit_table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(replacement.clone())
         .commit()?;
@@ -2083,7 +2296,7 @@ fn popup_effective_locator_uses_explicit_locator_and_inverse() -> TestResult {
         commit.package().table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?,
         Some(replacement)
     );
@@ -2114,7 +2327,7 @@ fn popup_replacement_preserves_unselected_document_objects_exactly() -> TestResu
         .edit_table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(replacement)
         .commit()?
@@ -2174,4 +2387,41 @@ fn control_entries(source: &[u8]) -> TestResult<Vec<tst::table_data_list::ListEn
         }
     }
     Err(io::Error::other("control-cell-spec list is missing").into())
+}
+
+/// Callgrind probe (record 0379): create, replace and clear a menu on an
+/// empty cell, serializing each output. Measured before and after the shared
+/// `litchi-iwa-table` engine move with
+/// `--toggle-collect=*table_cell_pop_up_menu::pop_up_menu_probe_routes*`.
+#[inline(never)]
+fn pop_up_menu_probe_routes(source: &[u8]) -> TestResult<usize> {
+    let package = Package::from_bytes(source)?;
+    let first = package
+        .edit_table_cell_pop_up_menu_format(0usize, 0usize, At::new(0, 0))?
+        .set(popup(
+            &["Low", "Medium", "High"],
+            InitialSelection::FirstItem,
+        )?)
+        .commit()?;
+    let second = first
+        .package()
+        .edit_table_cell_pop_up_menu_format(0usize, 0usize, At::new(0, 0))?
+        .set(popup(&["Yes", "No"], InitialSelection::Blank)?)
+        .commit()?;
+    let third = second
+        .package()
+        .edit_table_cell_pop_up_menu_format(0usize, 0usize, At::new(0, 0))?
+        .clear()
+        .commit()?;
+    Ok(first.package().exact_bytes().len()
+        + second.package().exact_bytes().len()
+        + third.package().exact_bytes().len())
+}
+
+#[test]
+#[ignore = "callgrind probe; run explicitly"]
+fn pop_up_menu_cost_probe() -> TestResult {
+    let source = fixture(FixtureMode::EmptyCells)?;
+    assert!(pop_up_menu_probe_routes(&source)? > 0);
+    Ok(())
 }

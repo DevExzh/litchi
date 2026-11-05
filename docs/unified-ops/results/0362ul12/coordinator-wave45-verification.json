@@ -1,0 +1,44 @@
+{
+  "created_utc": "2026-10-24T14:36:56.091543+00:00",
+  "status": "passed",
+  "staging_head": "5c67e58938c30d76bf281f722c849a7060b506e9",
+  "artifacts": {
+    "manifest.json": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave45/manifest.json",
+      "bytes": 77181,
+      "sha256": "e0a194b80dc035527c04d2e13475b56586b2c571e2a331331805bb467ecd34d1"
+    },
+    "receipt.json": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave45/receipt.json",
+      "bytes": 141937,
+      "sha256": "127330ee126473832f835162c44fdbc09d62b1cd40f56010e1d7e37c81ce9a24"
+    },
+    "restore-check.json": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave45/restore-check.json",
+      "bytes": 2836,
+      "sha256": "818cf3b9769ee2b5ee1176242f6876ba03dfdeddcc22f8b1c03e17c8d2860d0e"
+    }
+  },
+  "leaves": [
+    {
+      "name": "drawingml-limits",
+      "head": "28402d25172b9bde944c6005bbfbdf6b8fcdf46b",
+      "records": 3,
+      "preserved_bytes": 205676,
+      "removed": true,
+      "branch_retained": true,
+      "ancestor": true
+    },
+    {
+      "name": "rtf-native-adapter-repair",
+      "head": "2b794c52702eefef8c96f7eecc6256c3884f41e1",
+      "records": 4,
+      "preserved_bytes": 274027,
+      "removed": true,
+      "branch_retained": true,
+      "ancestor": true
+    }
+  ],
+  "preserved_payload_bytes": 479703,
+  "note": "Independent payload/hash/mode/ref/ancestry checks; worker restore exercises retained. Quarantine bytes are preserved, not reclaimed space."
+}

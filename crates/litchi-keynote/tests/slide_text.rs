@@ -6,9 +6,11 @@ use litchi_iwa_common::{decode_varint_from_bytes, encode_varint_into, wire::Wire
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsk, tsp, tswp};
 use litchi_keynote::{
-    Package, Position, ReadOptions, SemanticLimits, SlideSelector, SlideTextCommit,
-    SlideTextDiagnostics, SlideTextEdit, SlideTextError, SlideTextLimitKind, SlideTextPatch,
-    TextPosition, TextSpan, slide::placeholder::Kind,
+    OpenOptions, Package, Position, SemanticLimits, SlideSelector, SourceLimits, TextPosition,
+    TextSpan, slide::placeholder::Kind, slide::text::Commit as SlideTextCommit,
+    slide::text::Diagnostics as SlideTextDiagnostics, slide::text::Edit as SlideTextEdit,
+    slide::text::Error as SlideTextError, slide::text::LimitKind as SlideTextLimitKind,
+    slide::text::Patch as SlideTextPatch,
 };
 use prost::Message as _;
 
@@ -65,6 +67,7 @@ fn object(identifier: u64, type_: u32, value: &impl prost::Message) -> TestResul
             type_,
             data: value.encode_to_vec(),
         }],
+        Default::default(),
     )?)
 }
 
@@ -94,6 +97,7 @@ fn storage(identifier: u64, fragments: &[&str]) -> TestResult<ArchiveObject> {
                 data: format!("after-storage-{identifier}").into_bytes(),
             },
         ],
+        Default::default(),
     )?)
 }
 
@@ -101,8 +105,8 @@ fn component_with_unknown_header(
     objects: Vec<ArchiveObject>,
     target_identifier: u64,
 ) -> TestResult<Vec<u8>> {
-    let bytes = Archive { objects }.to_bytes()?;
-    let parsed = Archive::parse(&bytes)?;
+    let bytes = Archive { objects }.to_bytes(Default::default())?;
+    let parsed = Archive::parse(&bytes, Default::default())?;
     let object = parsed
         .object(target_identifier)
         .ok_or_else(|| io::Error::other("synthetic target object is missing"))?;
@@ -135,9 +139,9 @@ fn component_with_unknown_header(
     with_unknown.extend_from_slice(&header);
     with_unknown.extend_from_slice(&bytes[data_offset..]);
 
-    let reparsed = Archive::parse(&with_unknown)?;
-    assert_eq!(reparsed.to_bytes()?, with_unknown);
-    Ok(SnappyStream::compress(&with_unknown)?)
+    let reparsed = Archive::parse(&with_unknown, Default::default())?;
+    assert_eq!(reparsed.to_bytes(Default::default())?, with_unknown);
+    Ok(SnappyStream::compress(&with_unknown, Default::default())?)
 }
 
 fn slide(
@@ -303,6 +307,7 @@ fn synthetic_package(dependent_title_content: bool) -> TestResult<Vec<u8>> {
                 data: b"after-title-storage".to_vec(),
             },
         ],
+        Default::default(),
     )?;
     title_storage_object.archive_info.message_infos[1].object_references =
         dependent_title_content.then_some(500).into_iter().collect();
@@ -328,7 +333,11 @@ fn synthetic_package(dependent_title_content: bool) -> TestResult<Vec<u8>> {
 
     let mut first_node_object = object(3, 4, &first_node)?;
     first_node_object.archive_info.message_infos[0].data_references = vec![7_001, 7_002];
-    let mut thumbnail_field = FieldInfo::new(vec![16]);
+    let mut thumbnail_field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![16], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     thumbnail_field.data_references = vec![7_001, 7_002];
     first_node_object.archive_info.message_infos[0]
         .field_infos
@@ -356,6 +365,7 @@ fn synthetic_package(dependent_title_content: bool) -> TestResult<Vec<u8>> {
                     type_: 999,
                     data: PRIVATE_MARKER.to_vec(),
                 }],
+                Default::default(),
             )?,
         ],
         TITLE_STORAGE,
@@ -368,9 +378,11 @@ fn synthetic_package(dependent_title_content: bool) -> TestResult<Vec<u8>> {
                     type_: 999,
                     data: b"unrelated-iwa-component".to_vec(),
                 }],
+                Default::default(),
             )?],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     Ok(litchi_iwa_archive::package::to_bytes(
         [
@@ -386,12 +398,12 @@ fn synthetic_package(dependent_title_content: bool) -> TestResult<Vec<u8>> {
 }
 
 fn document_stream(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("missing synthetic Keynote document member"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn rewrite_document(
@@ -399,10 +411,11 @@ fn rewrite_document(
     mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
     let stream = document_stream(package)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     mutate(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(package)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(DOCUMENT_MEMBER, &compressed)],
         Limits::default(),
@@ -411,7 +424,7 @@ fn rewrite_document(
 
 fn with_overlong_object_length_prefix(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
     let mut stream = document_stream(package)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic Keynote object"))?;
@@ -422,9 +435,9 @@ fn with_overlong_object_length_prefix(package: &[u8], identifier: u64) -> TestRe
     }
     stream[offset] |= 0x80;
     stream.insert(offset + 1, 0);
-    Archive::parse(&stream)?;
-    let compressed = SnappyStream::compress(&stream)?;
-    let catalog = Catalog::from_bytes(package)?;
+    Archive::parse(&stream, Default::default())?;
+    let compressed = SnappyStream::compress(&stream, Default::default())?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(DOCUMENT_MEMBER, &compressed)],
         Limits::default(),
@@ -452,6 +465,7 @@ fn with_title_storage_topology(
                 data: placeholder_storage_topology(owned_storage, deprecated_storage)
                     .encode_to_vec(),
             },
+            Default::default(),
         )?;
         let mut references = Vec::with_capacity(2);
         if let Some(identifier) = owned_storage {
@@ -485,6 +499,7 @@ fn with_placeholder_kind(package: &[u8], owner: u64, kind: Option<i32>) -> TestR
                 type_: PLACEHOLDER_MESSAGE_TYPE,
                 data: value.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -501,7 +516,7 @@ fn with_owned_storage_reference_unknown(package: &[u8], owner: u64) -> TestResul
             .position(|message| message.type_ == PLACEHOLDER_MESSAGE_TYPE)
             .ok_or_else(|| io::Error::other("missing placeholder message"))?;
         let source = object.messages[index].data.as_slice();
-        let placeholder = WireView::parse(source)?;
+        let placeholder = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)?;
         let mut rewritten_placeholder = Vec::with_capacity(source.len() + 8);
         let mut selected_super = false;
         for field in placeholder.fields() {
@@ -513,7 +528,7 @@ fn with_owned_storage_reference_unknown(package: &[u8], owner: u64) -> TestResul
                 return Err(io::Error::other("ambiguous placeholder super field").into());
             }
             let source_shape = field.canonical_payload()?;
-            let shape = WireView::parse(source_shape)?;
+            let shape = WireView::parse(source_shape, litchi_iwa_common::WireLimits::DEFAULT)?;
             let mut rewritten_shape = Vec::with_capacity(source_shape.len() + 8);
             let mut selected_storage = false;
             for shape_field in shape.fields() {
@@ -530,6 +545,7 @@ fn with_owned_storage_reference_unknown(package: &[u8], owner: u64) -> TestResul
                     &mut rewritten_shape,
                     4,
                     &owned_storage,
+                    litchi_iwa_common::WireLimits::DEFAULT,
                 )?;
             }
             if !selected_storage {
@@ -539,6 +555,7 @@ fn with_owned_storage_reference_unknown(package: &[u8], owner: u64) -> TestResul
                 &mut rewritten_placeholder,
                 1,
                 &rewritten_shape,
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
         }
         if !selected_super {
@@ -550,6 +567,7 @@ fn with_owned_storage_reference_unknown(package: &[u8], owner: u64) -> TestResul
                 type_: PLACEHOLDER_MESSAGE_TYPE,
                 data: rewritten_placeholder,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -580,6 +598,7 @@ fn with_unrelated_placeholder(
                     data: b"after-unrelated-placeholder".to_vec(),
                 },
             ],
+            Default::default(),
         )?;
         let mut references = Vec::with_capacity(2);
         if let Some(identifier) = owned_storage {
@@ -612,6 +631,7 @@ fn with_unrelated_placeholder(
                 type_: SLIDE_MESSAGE_TYPE,
                 data: value.encode_to_vec(),
             },
+            Default::default(),
         )?;
         slide.archive_info.message_infos[index]
             .object_references
@@ -622,7 +642,7 @@ fn with_unrelated_placeholder(
 
 fn message_payload(package: &[u8], identifier: u64, type_: u32) -> TestResult<Vec<u8>> {
     let stream = document_stream(package)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic Keynote object"))?;
@@ -636,7 +656,7 @@ fn message_payload(package: &[u8], identifier: u64, type_: u32) -> TestResult<Ve
 
 fn object_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
     let stream = document_stream(package)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic Keynote object"))?;
@@ -654,19 +674,21 @@ fn object_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
 }
 
 fn raw_fields(payload: &[u8], number: u32) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(payload)?
-        .fields()
-        .filter(|field| field.number() == number)
-        .map(|field| field.raw().to_vec())
-        .collect())
+    Ok(
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .filter(|field| field.number() == number)
+            .map(|field| field.raw().to_vec())
+            .collect(),
+    )
 }
 
 fn assert_document_changed_previews_removed_and_other_entries_preserved(
     before: &[u8],
     after: &[u8],
 ) -> TestResult<()> {
-    let before_catalog = Catalog::from_bytes(before)?;
-    let after_catalog = Catalog::from_bytes(after)?;
+    let before_catalog = Catalog::from_bytes(before, Default::default())?;
+    let after_catalog = Catalog::from_bytes(after, Default::default())?;
     let before_entries = before_catalog.iter().collect::<Vec<_>>();
     let after_entries = after_catalog.iter().collect::<Vec<_>>();
     assert_eq!(
@@ -706,7 +728,7 @@ fn assert_document_changed_previews_removed_and_other_entries_preserved(
 }
 
 fn assert_root_previews_absent(package: &[u8]) -> TestResult<()> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     for member in PREVIEW_MEMBERS {
         assert!(catalog.iter().all(|entry| entry.name() != member));
     }
@@ -714,8 +736,8 @@ fn assert_root_previews_absent(package: &[u8]) -> TestResult<()> {
 }
 
 fn assert_root_previews_restored(before: &[u8], restored: &[u8]) -> TestResult<()> {
-    let before = Catalog::from_bytes(before)?;
-    let restored = Catalog::from_bytes(restored)?;
+    let before = Catalog::from_bytes(before, Default::default())?;
+    let restored = Catalog::from_bytes(restored, Default::default())?;
     for member in PREVIEW_MEMBERS {
         let source = before
             .iter()
@@ -737,7 +759,7 @@ fn assert_root_previews_restored(before: &[u8], restored: &[u8]) -> TestResult<(
 
 fn assert_first_slide_node_cache_invalidated(package: &[u8]) -> TestResult<()> {
     let stream = document_stream(package)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .objects
         .iter()
@@ -772,14 +794,14 @@ fn assert_first_slide_node_cache_invalidated(package: &[u8]) -> TestResult<()> {
 
 fn assert_first_slide_node_restored(before: &[u8], restored: &[u8]) -> TestResult<()> {
     let before_stream = document_stream(before)?;
-    let before_archive = Archive::parse(&before_stream)?;
+    let before_archive = Archive::parse(&before_stream, Default::default())?;
     let before = before_archive
         .objects
         .iter()
         .find(|object| object.messages.iter().any(|message| message.type_ == 4))
         .ok_or_else(|| io::Error::other("source slide node is missing"))?;
     let restored_stream = document_stream(restored)?;
-    let restored_archive = Archive::parse(&restored_stream)?;
+    let restored_archive = Archive::parse(&restored_stream, Default::default())?;
     let restored = restored_archive
         .objects
         .iter()
@@ -822,8 +844,12 @@ fn title_body_reads_are_role_distinct_and_preserve_absent_vs_empty() -> TestResu
     assert_ne!(package.show()?.slides()[0].name(), Some(TITLE));
 
     assert!(matches!(
-        package.edit_slide_body("Existing Empty"),
-        Err(SlideTextError::TextStorageNotFound { role: Kind::Body })
+        package
+            .edit_slide_body("Existing Empty")
+            .and_then(|edit| edit.commit()),
+        Err(SlideTextError::Refused(
+            litchi_keynote::slide::text::Refusal::TextStorageNotFound { role: Kind::Body }
+        ))
     ));
     Ok(())
 }
@@ -910,15 +936,22 @@ fn deprecated_storage_must_duplicate_the_mandatory_owned_storage() -> TestResult
     let mismatch = with_title_storage_topology(&bytes, Some(TITLE_STORAGE), Some(BODY_STORAGE))?;
     let mismatch_package = Package::from_bytes(&mismatch)?;
     assert!(matches!(
-        mismatch_package.edit_slide_title("Agenda"),
-        Err(SlideTextError::DependentContent | SlideTextError::InvalidSource)
+        mismatch_package
+            .edit_slide_title("Agenda")
+            .and_then(|edit| edit.commit()),
+        Err(
+            SlideTextError::Refused(litchi_keynote::slide::text::Refusal::DependentContent)
+                | SlideTextError::InvalidSource
+        )
     ));
     assert_eq!(mismatch_package.exact_bytes(), mismatch);
 
     let deprecated_only = with_title_storage_topology(&bytes, None, Some(TITLE_STORAGE))?;
     let deprecated_only_package = Package::from_bytes(&deprecated_only)?;
     assert!(matches!(
-        deprecated_only_package.edit_slide_title("Agenda"),
+        deprecated_only_package
+            .edit_slide_title("Agenda")
+            .and_then(|edit| edit.commit()),
         Err(SlideTextError::InvalidSource)
     ));
     assert_eq!(deprecated_only_package.exact_bytes(), deprecated_only);
@@ -999,7 +1032,9 @@ fn unrelated_placeholder_cannot_alias_selected_storage_by_modern_or_legacy_edge(
         edit.set("must not publish across an unrelated owner")?;
         assert!(matches!(
             edit.commit(),
-            Err(SlideTextError::DependentContent)
+            Err(SlideTextError::Refused(
+                litchi_keynote::slide::text::Refusal::DependentContent
+            ))
         ));
         assert_eq!(package.exact_bytes(), adversarial);
     }
@@ -1016,9 +1051,11 @@ fn selector_first_utf16_operations_cover_both_roles() -> TestResult<()> {
 
     let span = TextSpan::from_utf16_indexes(7, 9)?;
     let mut edit = package.edit_slide_title("Agenda")?;
-    assert_eq!(edit.position(), Position::new(0));
+    assert!(format!("{edit:?}").contains("has_snapshot: false"));
+    assert_eq!(edit.position()?, Position::new(0));
     assert_eq!(edit.role(), Kind::Title);
-    assert_eq!(edit.text(), TITLE);
+    assert_eq!(edit.text()?, TITLE);
+    assert!(format!("{edit:?}").contains("has_snapshot: true"));
     edit.replace(span, "東京😀")?;
     assert_eq!(edit.span(), Some(span));
     let commit = edit.commit()?;
@@ -1072,7 +1109,7 @@ fn selector_first_utf16_operations_cover_both_roles() -> TestResult<()> {
     let cleared = clear.commit()?;
     assert_eq!(cleared.package().slide_body("Agenda")?, Some(String::new()));
     let mut refill = cleared.package().edit_slide_body("Agenda")?;
-    assert_eq!(refill.text(), "");
+    assert_eq!(refill.text()?, "");
     refill.set("Restored body")?;
     assert_eq!(
         refill.commit()?.package().slide_body("Agenda")?,
@@ -1088,42 +1125,52 @@ fn utf16_boundaries_selector_and_staging_errors_leave_source_unchanged() -> Test
     let source_snapshot = package.exact_bytes();
 
     assert!(matches!(
-        package.edit_slide_title("Missing"),
-        Err(SlideTextError::SlideNameNotFound)
+        package
+            .edit_slide_title("Missing")
+            .and_then(|edit| edit.commit()),
+        Err(SlideTextError::Refused(
+            litchi_keynote::slide::text::Refusal::SlideNameNotFound
+        ))
     ));
     assert!(matches!(
-        package.edit_slide_text(SlideSelector::index(2), Kind::Title),
-        Err(SlideTextError::SlidePositionNotFound { position }) if position == Position::new(2)
+        package
+            .edit_slide_text(SlideSelector::index(2), Kind::Title)
+            .and_then(|edit| edit.commit()),
+        Err(SlideTextError::Refused(litchi_keynote::slide::text::Refusal::SlidePositionNotFound { position })) if position == Position::new(2)
     ));
 
     let mut split_start = package.edit_slide_title("Agenda")?;
     assert!(matches!(
         split_start.replace(TextSpan::from_utf16_indexes(8, 9)?, "x"),
-        Err(SlideTextError::SurrogateBoundary { position })
+        Err(SlideTextError::Refused(litchi_keynote::slide::text::Refusal::SurrogateBoundary { position }))
             if position == TextPosition::from_utf16_code_units(8)
     ));
     let mut split_end = package.edit_slide_title("Agenda")?;
     assert!(matches!(
         split_end.delete(TextSpan::from_utf16_indexes(7, 8)?),
-        Err(SlideTextError::SurrogateBoundary { position })
+        Err(SlideTextError::Refused(litchi_keynote::slide::text::Refusal::SurrogateBoundary { position }))
             if position == TextPosition::from_utf16_code_units(8)
     ));
     let mut out_of_bounds = package.edit_slide_body("Agenda")?;
     assert!(matches!(
         out_of_bounds.delete(TextSpan::from_utf16_indexes(0, 100)?),
-        Err(SlideTextError::SpanOutOfBounds { length, .. })
+        Err(SlideTextError::Refused(litchi_keynote::slide::text::Refusal::SpanOutOfBounds { length, .. }))
             if length == TextPosition::from_utf16_code_units(9)
     ));
     let mut marker = package.edit_slide_title("Agenda")?;
     assert!(matches!(
         marker.insert(TextPosition::ZERO, "bad\u{fffc}marker"),
-        Err(SlideTextError::ObjectMarkerReplacement)
+        Err(SlideTextError::Refused(
+            litchi_keynote::slide::text::Refusal::ObjectMarkerReplacement
+        ))
     ));
     let mut one_operation = package.edit_slide_body("Agenda")?;
     one_operation.insert(TextPosition::ZERO, "first")?;
     assert!(matches!(
         one_operation.insert(TextPosition::ZERO, "second"),
-        Err(SlideTextError::OperationAlreadyStaged)
+        Err(SlideTextError::Refused(
+            litchi_keynote::slide::text::Refusal::OperationAlreadyStaged
+        ))
     ));
     assert_eq!(package.exact_bytes(), bytes);
     assert_eq!(package.exact_bytes(), source_snapshot);
@@ -1311,7 +1358,7 @@ fn changed_text_preserves_unknowns_scope_siblings_and_exact_inverse() -> TestRes
         Some(TITLE.to_owned())
     );
 
-    let catalog = Catalog::from_bytes(&bytes)?;
+    let catalog = Catalog::from_bytes(&bytes, Default::default())?;
     let equivalent_bytes = catalog.reassemble_to_bytes(
         &[EntryEdit::new(
             "Data/sentinel.bin",
@@ -1394,6 +1441,7 @@ fn duplicate_slide_names_are_typed_as_ambiguous_without_affecting_positions() ->
                 type_: SLIDE_MESSAGE_TYPE,
                 data: value.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -1401,11 +1449,17 @@ fn duplicate_slide_names_are_typed_as_ambiguous_without_affecting_positions() ->
 
     assert!(matches!(
         package.slide_title("Agenda"),
-        Err(SlideTextError::AmbiguousSelector)
+        Err(SlideTextError::Refused(
+            litchi_keynote::slide::text::Refusal::AmbiguousSelector
+        ))
     ));
     assert!(matches!(
-        package.edit_slide_body("Agenda"),
-        Err(SlideTextError::AmbiguousSelector)
+        package
+            .edit_slide_body("Agenda")
+            .and_then(|edit| edit.commit()),
+        Err(SlideTextError::Refused(
+            litchi_keynote::slide::text::Refusal::AmbiguousSelector
+        ))
     ));
     assert_eq!(
         package.slide_title(SlideSelector::index(0))?,
@@ -1459,8 +1513,12 @@ fn explicit_placeholder_kinds_are_role_checked_for_both_roles() -> TestResult<()
             let contradictory = with_placeholder_kind(&bytes, owner, Some(kind))?;
             let package = Package::from_bytes(&contradictory)?;
             assert!(matches!(
-                package.edit_slide_text("Agenda", role),
-                Err(SlideTextError::DependentContent)
+                package
+                    .edit_slide_text("Agenda", role)
+                    .and_then(|edit| edit.commit()),
+                Err(SlideTextError::Refused(
+                    litchi_keynote::slide::text::Refusal::DependentContent
+                ))
             ));
             assert_eq!(package.exact_bytes(), contradictory);
         }
@@ -1485,6 +1543,7 @@ fn duplicate_body_payload_and_field_path_ownership_fail_closed() -> TestResult<(
             &mut data,
             6,
             &reference(BODY_OWNER).encode_to_vec(),
+            litchi_iwa_common::WireLimits::DEFAULT,
         )?;
         object.replace_message_preserving_header(
             index,
@@ -1492,12 +1551,15 @@ fn duplicate_body_payload_and_field_path_ownership_fail_closed() -> TestResult<(
                 type_: SLIDE_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
     let package = Package::from_bytes(&duplicate_body_payload)?;
     assert!(matches!(
-        package.edit_slide_body("Agenda"),
+        package
+            .edit_slide_body("Agenda")
+            .and_then(|edit| edit.commit()),
         Err(SlideTextError::InvalidSource)
     ));
     assert_eq!(package.exact_bytes(), duplicate_body_payload);
@@ -1506,7 +1568,11 @@ fn duplicate_body_payload_and_field_path_ownership_fail_closed() -> TestResult<(
         let object = archive
             .object_mut(FIRST_SLIDE)
             .ok_or_else(|| io::Error::other("missing first slide"))?;
-        let mut field = FieldInfo::new(vec![6]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![6], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references.push(BODY_OWNER);
         object.archive_info.message_infos[0]
             .field_infos
@@ -1518,7 +1584,9 @@ fn duplicate_body_payload_and_field_path_ownership_fail_closed() -> TestResult<(
     edit.set("duplicate metadata must not publish")?;
     assert!(matches!(
         edit.commit(),
-        Err(SlideTextError::DependentContent)
+        Err(SlideTextError::Refused(
+            litchi_keynote::slide::text::Refusal::DependentContent
+        ))
     ));
     assert_eq!(package.exact_bytes(), duplicate_field_path);
     Ok(())
@@ -1542,8 +1610,19 @@ fn selected_storage_merge_and_diff_metadata_refuse_changed_commits() -> TestResu
                 0 => object.archive_info.should_merge = Some(true),
                 1 => info.base_message_index = Some(0),
                 2 => info.diff_merge_version.push(1),
-                3 => info.diff_field_path = Some(vec![1].into()),
-                4 => info.fields_to_remove.push(vec![1].into()),
+                3 => {
+                    info.diff_field_path = Some(
+                        litchi_iwa_core::FieldPath::new(
+                            vec![1],
+                            litchi_iwa_core::Limits::default(),
+                        )
+                        .unwrap(),
+                    )
+                },
+                4 => info.fields_to_remove.push(
+                    litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default())
+                        .unwrap(),
+                ),
                 5 => info.diff_read_version.push(1),
                 _ => return Err(io::Error::other("unknown metadata mutation").into()),
             }
@@ -1554,7 +1633,9 @@ fn selected_storage_merge_and_diff_metadata_refuse_changed_commits() -> TestResu
         edit.set("merge metadata must remain opaque")?;
         assert!(matches!(
             edit.commit(),
-            Err(SlideTextError::DependentContent)
+            Err(SlideTextError::Refused(
+                litchi_keynote::slide::text::Refusal::DependentContent
+            ))
         ));
         assert_eq!(package.exact_bytes(), adversarial);
     }
@@ -1579,6 +1660,7 @@ fn malformed_and_aliased_role_graphs_fail_closed() -> TestResult<()> {
                 &mut data,
                 5,
                 &reference(TITLE_OWNER).encode_to_vec(),
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
             object.replace_message_preserving_header(
                 index,
@@ -1586,6 +1668,7 @@ fn malformed_and_aliased_role_graphs_fail_closed() -> TestResult<()> {
                     type_: SLIDE_MESSAGE_TYPE,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })?,
@@ -1599,7 +1682,7 @@ fn malformed_and_aliased_role_graphs_fail_closed() -> TestResult<()> {
             let object = archive
                 .object_mut(TITLE_OWNER)
                 .ok_or_else(|| io::Error::other("missing title owner"))?;
-            object.push_message(object.messages[0].clone())?;
+            object.push_message(object.messages[0].clone(), Default::default())?;
             Ok(())
         })?,
         rewrite_document(&bytes, |archive| {
@@ -1612,6 +1695,7 @@ fn malformed_and_aliased_role_graphs_fail_closed() -> TestResult<()> {
                     type_: PLACEHOLDER_MESSAGE_TYPE,
                     data: Vec::new(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })?,
@@ -1631,7 +1715,7 @@ fn malformed_and_aliased_role_graphs_fail_closed() -> TestResult<()> {
                 .find(|message| message.type_ == STORAGE_MESSAGE_TYPE)
                 .ok_or_else(|| io::Error::other("missing storage message"))?
                 .clone();
-            object.push_message(duplicate)?;
+            object.push_message(duplicate, Default::default())?;
             Ok(())
         })?,
         rewrite_document(&bytes, |archive| {
@@ -1649,6 +1733,7 @@ fn malformed_and_aliased_role_graphs_fail_closed() -> TestResult<()> {
                     type_: STORAGE_MESSAGE_TYPE,
                     data: vec![0x1a, 0x80],
                 },
+                Default::default(),
             )?;
             Ok(())
         })?,
@@ -1667,6 +1752,7 @@ fn malformed_and_aliased_role_graphs_fail_closed() -> TestResult<()> {
                     type_: STORAGE_MESSAGE_TYPE,
                     data: vec![0x1a, 0x01, 0xff],
                 },
+                Default::default(),
             )?;
             Ok(())
         })?,
@@ -1685,6 +1771,7 @@ fn malformed_and_aliased_role_graphs_fail_closed() -> TestResult<()> {
                     type_: STORAGE_MESSAGE_TYPE,
                     data: vec![0x18, 0x01],
                 },
+                Default::default(),
             )?;
             Ok(())
         })?,
@@ -1692,7 +1779,9 @@ fn malformed_and_aliased_role_graphs_fail_closed() -> TestResult<()> {
 
     for malformed_bytes in malformed {
         let package = Package::from_bytes(&malformed_bytes)?;
-        let result = package.edit_slide_title(SlideSelector::index(0));
+        let result = package
+            .edit_slide_title(SlideSelector::index(0))
+            .and_then(|edit| edit.commit());
         assert!(
             matches!(result, Err(SlideTextError::InvalidSource)),
             "unexpected malformed slide-text result: {result:?}"
@@ -1710,6 +1799,7 @@ fn malformed_and_aliased_role_graphs_fail_closed() -> TestResult<()> {
                 type_: PLACEHOLDER_MESSAGE_TYPE,
                 data: placeholder(TITLE_STORAGE).encode_to_vec(),
             },
+            Default::default(),
         )?;
         object.archive_info.message_infos[0].object_references = vec![TITLE_STORAGE];
         Ok(())
@@ -1719,7 +1809,9 @@ fn malformed_and_aliased_role_graphs_fail_closed() -> TestResult<()> {
     edit.set("must not rewrite aliased storage")?;
     assert!(matches!(
         edit.commit(),
-        Err(SlideTextError::DependentContent)
+        Err(SlideTextError::Refused(
+            litchi_keynote::slide::text::Refusal::DependentContent
+        ))
     ));
     assert_eq!(package.exact_bytes(), alias);
     Ok(())
@@ -1747,6 +1839,7 @@ fn exact_noop_commit_and_apply_do_not_require_mutation_ownership() -> TestResult
                 type_: PLACEHOLDER_MESSAGE_TYPE,
                 data: placeholder(TITLE_STORAGE).encode_to_vec(),
             },
+            Default::default(),
         )?;
         object.archive_info.message_infos[0].object_references = vec![TITLE_STORAGE];
         Ok(())
@@ -1814,7 +1907,9 @@ fn ownership_metadata_and_dependent_text_are_proven_before_publish() -> TestResu
     intersects.delete(TextSpan::from_utf16_indexes(7, 9)?)?;
     assert!(matches!(
         intersects.commit(),
-        Err(SlideTextError::DependentContent)
+        Err(SlideTextError::Refused(
+            litchi_keynote::slide::text::Refusal::DependentContent
+        ))
     ));
     let mut unrelated = package.edit_slide_title("Agenda")?;
     unrelated.replace(TextSpan::from_utf16_indexes(0, 1)?, "X")?;
@@ -1837,10 +1932,12 @@ fn errors_and_transaction_debug_are_content_free() -> TestResult<()> {
     assert!(!edit_debug.contains("Agenda"));
 
     let errors = [
-        SlideTextError::SlideNameNotFound,
-        SlideTextError::TextStorageNotFound { role: Kind::Title },
+        SlideTextError::Refused(litchi_keynote::slide::text::Refusal::SlideNameNotFound),
+        SlideTextError::Refused(litchi_keynote::slide::text::Refusal::TextStorageNotFound {
+            role: Kind::Title,
+        }),
         SlideTextError::PatchConflict,
-        SlideTextError::LimitExceeded {
+        SlideTextError::Limit {
             kind: SlideTextLimitKind::OutputBytes,
             observed: 11,
             maximum: 10,
@@ -1861,34 +1958,34 @@ fn errors_and_transaction_debug_are_content_free() -> TestResult<()> {
 fn selected_text_limit_is_inclusive_and_one_over_is_typed() -> TestResult<()> {
     let bytes = synthetic_package(false)?;
     let semantic = SemanticLimits::default();
-    let exact = SemanticLimits::new(
-        semantic.max_objects(),
-        semantic.max_slides(),
-        semantic.max_references(),
-        semantic.max_text_storages(),
-        semantic.max_text_fragments(),
-        TITLE.len(),
-    )?;
+    let exact = SemanticLimits::builder()
+        .max_objects(semantic.max_objects())?
+        .max_slides(semantic.max_slides())?
+        .max_references(semantic.max_references())?
+        .max_text_storages(semantic.max_text_storages())?
+        .max_text_fragments(semantic.max_text_fragments())?
+        .max_text_bytes(TITLE.len())?
+        .build()?;
     let exact_package =
-        Package::from_bytes_with_options(&bytes, ReadOptions::new(Limits::default(), exact))?;
+        Package::from_bytes_with_options(&bytes, OpenOptions::new().semantic_limits(exact))?;
     assert_eq!(
         exact_package.slide_title(SlideSelector::index(0))?,
         Some(TITLE.to_owned())
     );
 
-    let one_under = SemanticLimits::new(
-        semantic.max_objects(),
-        semantic.max_slides(),
-        semantic.max_references(),
-        semantic.max_text_storages(),
-        semantic.max_text_fragments(),
-        TITLE.len() - 1,
-    )?;
+    let one_under = SemanticLimits::builder()
+        .max_objects(semantic.max_objects())?
+        .max_slides(semantic.max_slides())?
+        .max_references(semantic.max_references())?
+        .max_text_storages(semantic.max_text_storages())?
+        .max_text_fragments(semantic.max_text_fragments())?
+        .max_text_bytes(TITLE.len() - 1)?
+        .build()?;
     let limited_package =
-        Package::from_bytes_with_options(&bytes, ReadOptions::new(Limits::default(), one_under))?;
+        Package::from_bytes_with_options(&bytes, OpenOptions::new().semantic_limits(one_under))?;
     assert!(matches!(
         limited_package.slide_title(SlideSelector::index(0)),
-        Err(SlideTextError::LimitExceeded {
+        Err(SlideTextError::Limit {
             kind: SlideTextLimitKind::TextBytes,
             observed,
             maximum,
@@ -1902,16 +1999,16 @@ fn selected_text_limit_is_inclusive_and_one_over_is_typed() -> TestResult<()> {
 fn candidate_text_limit_is_checked_when_staging_with_exact_amounts() -> TestResult<()> {
     let bytes = synthetic_package(false)?;
     let semantic = SemanticLimits::default();
-    let limits = SemanticLimits::new(
-        semantic.max_objects(),
-        semantic.max_slides(),
-        semantic.max_references(),
-        semantic.max_text_storages(),
-        semantic.max_text_fragments(),
-        TITLE.len(),
-    )?;
+    let limits = SemanticLimits::builder()
+        .max_objects(semantic.max_objects())?
+        .max_slides(semantic.max_slides())?
+        .max_references(semantic.max_references())?
+        .max_text_storages(semantic.max_text_storages())?
+        .max_text_fragments(semantic.max_text_fragments())?
+        .max_text_bytes(TITLE.len())?
+        .build()?;
     let package =
-        Package::from_bytes_with_options(&bytes, ReadOptions::new(Limits::default(), limits))?;
+        Package::from_bytes_with_options(&bytes, OpenOptions::new().semantic_limits(limits))?;
     let mut edit = package.edit_slide_title(SlideSelector::index(0))?;
     let error = edit
         .insert(TextPosition::ZERO, "x")
@@ -1920,7 +2017,7 @@ fn candidate_text_limit_is_checked_when_staging_with_exact_amounts() -> TestResu
 
     assert!(matches!(
         error,
-        SlideTextError::LimitExceeded {
+        SlideTextError::Limit {
             kind: SlideTextLimitKind::TextBytes,
             observed,
             maximum,
@@ -1935,8 +2032,15 @@ fn candidate_text_limit_is_checked_when_staging_with_exact_amounts() -> TestResu
 fn changed_slide_text_respects_the_retained_output_limit() -> TestResult<()> {
     let bytes = synthetic_package(false)?;
     let input_bytes = u64::try_from(bytes.len())?;
-    let limits = Limits::new(input_bytes, 16, 1024 * 1024, 1024 * 1024, 1024 * 1024)?;
-    let package = Package::from_bytes_with_limits(&bytes, limits)?;
+    let limits = SourceLimits::builder()
+        .max_input_bytes(input_bytes)?
+        .max_entries(16)?
+        .max_entry_bytes(1024 * 1024)?
+        .max_aggregate_bytes(1024 * 1024)?
+        .max_component_bytes(1024 * 1024)?
+        .build()?;
+    let package =
+        Package::from_bytes_with_options(&bytes, OpenOptions::new().source_limits(limits))?;
     let mut edit = package.edit_slide_title("Agenda")?;
     let mut expanded = String::with_capacity(128 * 1_024);
     let mut state = 0x5eed_1234_89ab_cdef_u64;
@@ -1950,7 +2054,7 @@ fn changed_slide_text_respects_the_retained_output_limit() -> TestResult<()> {
     edit.insert(TextPosition::ZERO, &expanded)?;
     assert!(matches!(
         edit.commit(),
-        Err(SlideTextError::LimitExceeded {
+        Err(SlideTextError::Limit {
             kind: SlideTextLimitKind::OutputBytes,
             ..
         })

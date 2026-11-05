@@ -37,7 +37,7 @@ use quick_xml::{
     reader::NsReader,
 };
 
-use crate::{Error, Result};
+use crate::{Error, LimitKind, Result};
 
 use super::{
     DRAWINGML_NAMESPACE, DRAWINGML_NAMESPACE_STRICT, Family, MAX_ATTRIBUTE_VALUE_BYTES,
@@ -75,6 +75,43 @@ const MAX_ACTIVE_NAMESPACE_BINDINGS: usize = MAX_ACTIVE_NAMESPACE_DECLARATIONS +
 
 /// Maximum complete theme-part bytes inspected by this owner.
 pub const MAX_XML_BYTES: usize = theme_codec::MAX_XML_BYTES;
+
+/// Caller-selected bounds for complete Theme-part family operations.
+///
+/// The part codec has one public mutation/read policy rather than a
+/// limit-less entry and a second `_with_limit` spelling.  The XML byte bound
+/// is the caller's output admission policy; the other grammar ceilings remain
+/// the fixed DrawingML schema bounds declared by this module.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub struct Limits {
+    /// Maximum complete Theme-part bytes accepted or produced.
+    pub max_xml_bytes: usize,
+}
+
+impl Limits {
+    /// The historical bounded Theme-part policy.
+    pub const DEFAULT: Self = Self {
+        max_xml_bytes: MAX_XML_BYTES,
+    };
+
+    /// Construct a caller-selected complete-part byte policy.
+    #[must_use]
+    pub const fn new(max_xml_bytes: usize) -> Self {
+        Self { max_xml_bytes }
+    }
+
+    fn validate(self) -> Result<Self> {
+        validate_output_limit(self.max_xml_bytes)?;
+        Ok(self)
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
 
 /// The extension URI profile that owns a parsed family.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -116,14 +153,14 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Parse a complete Theme part and retain its source bytes.
-    pub fn from_xml(xml: impl AsRef<[u8]>) -> Result<Self> {
-        read(xml.as_ref())
+    pub fn from_xml(xml: impl AsRef<[u8]>, limits: Limits) -> Result<Self> {
+        read(xml.as_ref(), limits)
     }
 
     /// Parse a complete Theme part while retaining an existing source
     /// allocation.
-    pub fn from_shared_xml(xml: Arc<[u8]>) -> Result<Self> {
-        read_shared(xml)
+    pub fn from_shared_xml(xml: Arc<[u8]>, limits: Limits) -> Result<Self> {
+        read_shared(xml, limits)
     }
 
     /// Borrow the exact source XML.
@@ -162,70 +199,52 @@ impl Snapshot {
         self.family.is_some()
     }
 
-    /// Replace the existing family, or add it when the owner is absent.
+    /// Replace the existing family, or add it when the owner is absent,
+    /// under the caller's complete-part output bound.
     ///
     /// When an owner exists, only the three typed scalar values from `family`
     /// are applied to the source-backed current family. This deliberately
     /// ignores any opaque source carried by an incoming value, so a detached
     /// value is safe and a value from another document cannot replace unknown
     /// attributes or extension children by accident.
-    pub fn replace_family(&self, family: &Family) -> Result<Vec<u8>> {
-        replace_family_source(self.source.as_ref(), family)
+    pub fn replace_family(&self, family: &Family, limits: Limits) -> Result<Vec<u8>> {
+        replace_family_source_with_limit(self.source.as_ref(), family, limits.max_xml_bytes)
     }
 
-    /// Replace the family while enforcing a caller-specific complete-part
-    /// output bound before allocating the patched source.
-    pub fn replace_family_with_limit(
-        &self,
-        family: &Family,
-        max_xml_bytes: usize,
-    ) -> Result<Vec<u8>> {
-        replace_family_source_with_limit(self.source.as_ref(), family, max_xml_bytes)
-    }
-
-    /// Add a family using the normative extension URI.
+    /// Add a family using the normative extension URI under the caller's
+    /// complete-part output bound.
     ///
     /// A leading standalone UTF-8 BOM on the incoming fragment is stripped
     /// before embedding; an XML declaration remains invalid as child markup.
-    pub fn add_family(&self, family: &Family) -> Result<Vec<u8>> {
-        add_family_source(self.source.as_ref(), family, EXTENSION_URI)
+    pub fn add_family(&self, family: &Family, limits: Limits) -> Result<Vec<u8>> {
+        add_family_source_with_limit(
+            self.source.as_ref(),
+            family,
+            EXTENSION_URI,
+            limits.max_xml_bytes,
+        )
     }
 
-    /// Add a normative family with a caller-specific complete-part bound.
-    pub fn add_family_with_limit(&self, family: &Family, max_xml_bytes: usize) -> Result<Vec<u8>> {
-        add_family_source_with_limit(self.source.as_ref(), family, EXTENSION_URI, max_xml_bytes)
-    }
-
-    /// Add a family using an explicitly admitted extension URI profile.
+    /// Add a family using an explicitly admitted extension URI profile under
+    /// the caller's complete-part output bound.
     ///
     /// A leading standalone UTF-8 BOM is stripped before embedding; an XML
     /// declaration remains invalid as child markup.
-    pub fn add_family_with_uri(&self, family: &Family, uri: &str) -> Result<Vec<u8>> {
-        add_family_source(self.source.as_ref(), family, uri)
-    }
-
-    /// Add a family with an admitted URI and caller-specific complete-part
-    /// output bound.
-    pub fn add_family_with_uri_limit(
+    pub fn add_family_with_uri(
         &self,
         family: &Family,
         uri: &str,
-        max_xml_bytes: usize,
+        limits: Limits,
     ) -> Result<Vec<u8>> {
-        add_family_source_with_limit(self.source.as_ref(), family, uri, max_xml_bytes)
+        add_family_source_with_limit(self.source.as_ref(), family, uri, limits.max_xml_bytes)
     }
 
     /// Remove the recognized direct family owner and its semantically empty
-    /// extension/list containers. XML whitespace alone does not retain a
-    /// container; comments, unrelated content, and foreign attributes do.
-    pub fn remove_family(&self) -> Result<Vec<u8>> {
-        remove_family_source(self.source.as_ref())
-    }
-
-    /// Remove the family while enforcing a caller-specific complete-part
-    /// output bound before allocating the patched source.
-    pub fn remove_family_with_limit(&self, max_xml_bytes: usize) -> Result<Vec<u8>> {
-        remove_family_source_with_limit(self.source.as_ref(), max_xml_bytes)
+    /// extension/list containers under the caller's complete-part output
+    /// bound. XML whitespace alone does not retain a container; comments,
+    /// unrelated content, and foreign attributes do.
+    pub fn remove_family(&self, limits: Limits) -> Result<Vec<u8>> {
+        remove_family_source_with_limit(self.source.as_ref(), limits.max_xml_bytes)
     }
 
     /// Borrow the complete source-backed owner range, when present.
@@ -236,13 +255,14 @@ impl Snapshot {
 }
 
 /// Parse a complete DrawingML Theme part.
-pub fn read(xml: &[u8]) -> Result<Snapshot> {
+pub fn read(xml: &[u8], limits: Limits) -> Result<Snapshot> {
+    let limits = limits.validate()?;
     // Validate the borrowed input before allocating the retained source.
-    if xml.len() > MAX_XML_BYTES {
-        return Err(limit("theme XML bytes", MAX_XML_BYTES));
+    if xml.len() > limits.max_xml_bytes {
+        return Err(limit(LimitKind::XmlBytes, xml.len(), limits.max_xml_bytes));
     }
     let scanned = scan(xml)?;
-    let (family, owner) = parse_candidate(xml, &scanned)?;
+    let (family, owner) = parse_candidate(xml, &scanned, limits.max_xml_bytes)?;
     Ok(Snapshot {
         source: Arc::<[u8]>::from(xml),
         family,
@@ -251,12 +271,17 @@ pub fn read(xml: &[u8]) -> Result<Snapshot> {
 }
 
 /// Parse a complete DrawingML Theme part from an existing source allocation.
-pub fn read_shared(source: Arc<[u8]>) -> Result<Snapshot> {
-    if source.len() > MAX_XML_BYTES {
-        return Err(limit("theme XML bytes", MAX_XML_BYTES));
+pub fn read_shared(source: Arc<[u8]>, limits: Limits) -> Result<Snapshot> {
+    let limits = limits.validate()?;
+    if source.len() > limits.max_xml_bytes {
+        return Err(limit(
+            LimitKind::XmlBytes,
+            source.len(),
+            limits.max_xml_bytes,
+        ));
     }
     let scanned = scan(source.as_ref())?;
-    let (family, owner) = parse_candidate(source.as_ref(), &scanned)?;
+    let (family, owner) = parse_candidate(source.as_ref(), &scanned, limits.max_xml_bytes)?;
     Ok(Snapshot {
         source,
         family,
@@ -272,27 +297,30 @@ pub fn read_shared(source: Arc<[u8]>) -> Result<Snapshot> {
 /// Theme, the returned [`Family::source`] includes injected namespace
 /// declarations so the family codec can write a standalone value. Use
 /// [`family_range`] with the original Theme bytes for the exact raw span.
-pub fn read_family(xml: &[u8]) -> Result<Option<Family>> {
-    if xml.len() > MAX_XML_BYTES {
-        return Err(limit("theme XML bytes", MAX_XML_BYTES));
+pub fn read_family(xml: &[u8], limits: Limits) -> Result<Option<Family>> {
+    let limits = limits.validate()?;
+    if xml.len() > limits.max_xml_bytes {
+        return Err(limit(LimitKind::XmlBytes, xml.len(), limits.max_xml_bytes));
     }
     let scanned = scan(xml)?;
-    parse_family(xml, &scanned)
+    parse_family(xml, &scanned, limits.max_xml_bytes)
 }
 
 /// Return the direct family owner span without copying the complete part.
-pub fn family_range(xml: &[u8]) -> Result<Option<Range<usize>>> {
-    if xml.len() > MAX_XML_BYTES {
-        return Err(limit("theme XML bytes", MAX_XML_BYTES));
+pub fn family_range(xml: &[u8], limits: Limits) -> Result<Option<Range<usize>>> {
+    let limits = limits.validate()?;
+    if xml.len() > limits.max_xml_bytes {
+        return Err(limit(LimitKind::XmlBytes, xml.len(), limits.max_xml_bytes));
     }
     Ok(scan(xml)?.candidate.map(|candidate| candidate.family_range))
 }
 
 /// Return the profile of the direct recognized family owner without copying
 /// the complete part.
-pub fn family_profile(xml: &[u8]) -> Result<Option<ExtensionProfile>> {
-    if xml.len() > MAX_XML_BYTES {
-        return Err(limit("theme XML bytes", MAX_XML_BYTES));
+pub fn family_profile(xml: &[u8], limits: Limits) -> Result<Option<ExtensionProfile>> {
+    let limits = limits.validate()?;
+    if xml.len() > limits.max_xml_bytes {
+        return Err(limit(LimitKind::XmlBytes, xml.len(), limits.max_xml_bytes));
     }
     let scanned = scan(xml)?;
     Ok(scanned
@@ -301,65 +329,36 @@ pub fn family_profile(xml: &[u8]) -> Result<Option<ExtensionProfile>> {
         .and_then(|candidate| ExtensionProfile::from_uri(&candidate.uri)))
 }
 
-/// Replace an existing family or add a new normative family in a complete
-/// Theme part.
-pub fn replace_family(xml: &[u8], family: &Family) -> Result<Vec<u8>> {
-    replace_family_source(xml, family)
+/// Replace an existing family or add a new normative family under the
+/// caller's complete-part output bound.
+pub fn replace_family(xml: &[u8], family: &Family, limits: Limits) -> Result<Vec<u8>> {
+    replace_family_source_with_limit(xml, family, limits.validate()?.max_xml_bytes)
 }
 
-/// Replace an existing family or add one while enforcing a caller-specific
-/// complete-part output bound before allocating the patched source.
-pub fn replace_family_with_limit(
-    xml: &[u8],
-    family: &Family,
-    max_xml_bytes: usize,
-) -> Result<Vec<u8>> {
-    replace_family_source_with_limit(xml, family, max_xml_bytes)
+/// Add a normative family under the caller's complete-part output bound. A
+/// leading standalone UTF-8 BOM on the incoming fragment is stripped before
+/// embedding; an XML declaration remains invalid as child markup.
+pub fn add_family(xml: &[u8], family: &Family, limits: Limits) -> Result<Vec<u8>> {
+    add_family_source_with_limit(xml, family, EXTENSION_URI, limits.validate()?.max_xml_bytes)
 }
 
-/// Add a normative family to a complete Theme part. A leading standalone
-/// UTF-8 BOM on the incoming fragment is stripped before embedding; an XML
-/// declaration remains invalid as child markup.
-pub fn add_family(xml: &[u8], family: &Family) -> Result<Vec<u8>> {
-    add_family_source(xml, family, EXTENSION_URI)
-}
-
-/// Add a normative family with a caller-specific complete-part bound.
-pub fn add_family_with_limit(xml: &[u8], family: &Family, max_xml_bytes: usize) -> Result<Vec<u8>> {
-    add_family_source_with_limit(xml, family, EXTENSION_URI, max_xml_bytes)
-}
-
-/// Add a family with an explicitly admitted extension URI. A leading
-/// standalone UTF-8 BOM is stripped before embedding; an XML declaration
-/// remains invalid as child markup.
-pub fn add_family_with_uri(xml: &[u8], family: &Family, uri: &str) -> Result<Vec<u8>> {
-    add_family_source(xml, family, uri)
-}
-
-/// Add a family with an admitted URI and caller-specific complete-part bound.
-pub fn add_family_with_uri_limit(
+/// Add a family with an explicitly admitted extension URI under the caller's
+/// complete-part output bound. A leading standalone UTF-8 BOM is stripped
+/// before embedding; an XML declaration remains invalid as child markup.
+pub fn add_family_with_uri(
     xml: &[u8],
     family: &Family,
     uri: &str,
-    max_xml_bytes: usize,
+    limits: Limits,
 ) -> Result<Vec<u8>> {
-    add_family_source_with_limit(xml, family, uri, max_xml_bytes)
+    add_family_source_with_limit(xml, family, uri, limits.validate()?.max_xml_bytes)
 }
 
 /// Remove a direct recognized family and empty enclosing extension/list
-/// containers. Preserve comments, unrelated content, and foreign attributes.
-pub fn remove_family(xml: &[u8]) -> Result<Vec<u8>> {
-    remove_family_source(xml)
-}
-
-/// Remove a direct recognized family with a caller-specific complete-part
-/// output bound.
-pub fn remove_family_with_limit(xml: &[u8], max_xml_bytes: usize) -> Result<Vec<u8>> {
-    remove_family_source_with_limit(xml, max_xml_bytes)
-}
-
-fn replace_family_source(xml: &[u8], incoming: &Family) -> Result<Vec<u8>> {
-    replace_family_source_with_limit(xml, incoming, MAX_XML_BYTES)
+/// containers under the caller's complete-part output bound. Preserve
+/// comments, unrelated content, and foreign attributes.
+pub fn remove_family(xml: &[u8], limits: Limits) -> Result<Vec<u8>> {
+    remove_family_source_with_limit(xml, limits.validate()?.max_xml_bytes)
 }
 
 fn replace_family_source_with_limit(
@@ -369,21 +368,21 @@ fn replace_family_source_with_limit(
 ) -> Result<Vec<u8>> {
     validate_output_limit(max_xml_bytes)?;
     if xml.len() > MAX_XML_BYTES {
-        return Err(limit("theme XML bytes", MAX_XML_BYTES));
+        return Err(limit(LimitKind::XmlBytes, xml.len(), MAX_XML_BYTES));
     }
     let scanned = scan(xml)?;
     let Some(candidate) = scanned.candidate.as_ref() else {
         return add_family_from_scan(xml, incoming, &scanned, EXTENSION_URI, max_xml_bytes);
     };
     if xml.len() > max_xml_bytes {
-        return Err(limit("patched Theme XML bytes", max_xml_bytes));
+        return Err(limit(LimitKind::XmlBytes, xml.len(), max_xml_bytes));
     }
     if scanned.hidden_owner {
         return Err(invalid(
             "Theme Family owner is also hidden in an MCE branch; mutation is ambiguous",
         ));
     }
-    let (current, owner) = parse_candidate(xml, &scanned)?;
+    let (current, owner) = parse_candidate(xml, &scanned, max_xml_bytes)?;
     let mut staged = current.ok_or_else(|| invalid("Theme Family candidate has no projection"))?;
     if staged == *incoming {
         return Ok(xml.to_vec());
@@ -396,7 +395,7 @@ fn replace_family_source_with_limit(
     let owner = owner.ok_or_else(|| invalid("Theme Family candidate owner is missing"))?;
     let replacement_len = family_child_len(&staged, &owner.inherited_bindings, max_xml_bytes)?;
     ensure_splice_output_limit(xml, &candidate.family_range, replacement_len, max_xml_bytes)?;
-    let replacement = family_child_bytes(&staged, &owner.inherited_bindings)?;
+    let replacement = family_child_bytes(&staged, &owner.inherited_bindings, max_xml_bytes)?;
     let output = splice_with_limit(
         xml,
         &[Replacement {
@@ -405,17 +404,13 @@ fn replace_family_source_with_limit(
         }],
         max_xml_bytes,
     )?;
-    let parsed = validate_result(&output)?;
+    let parsed = validate_result(&output, max_xml_bytes)?;
     if parsed.candidate.is_none() {
         return Err(invalid(
             "updated Theme Family is not a direct recognized owner",
         ));
     }
     Ok(output)
-}
-
-fn add_family_source(xml: &[u8], family: &Family, uri: &str) -> Result<Vec<u8>> {
-    add_family_source_with_limit(xml, family, uri, MAX_XML_BYTES)
 }
 
 fn add_family_source_with_limit(
@@ -426,7 +421,7 @@ fn add_family_source_with_limit(
 ) -> Result<Vec<u8>> {
     validate_output_limit(max_xml_bytes)?;
     if xml.len() > MAX_XML_BYTES {
-        return Err(limit("theme XML bytes", MAX_XML_BYTES));
+        return Err(limit(LimitKind::XmlBytes, xml.len(), MAX_XML_BYTES));
     }
     let scanned = scan(xml)?;
     add_family_from_scan(xml, family, &scanned, uri, max_xml_bytes)
@@ -459,7 +454,7 @@ fn add_family_from_scan(
         let length = serialized_ext_list_len(&scanned.root.element_prefix, uri, family_len)?;
         ensure_root_insertion_limit(xml, &scanned.root, length, max_xml_bytes)?;
     }
-    let family = family_child_bytes(family, &[])?;
+    let family = family_child_bytes(family, &[], max_xml_bytes)?;
     let output = if let Some(ext) = scanned.root.admitted_ext.as_ref() {
         // Preserve a native discriminator already present in the Theme part.
         insert_into_ext(xml, ext, &family, max_xml_bytes)?
@@ -479,7 +474,7 @@ fn add_family_from_scan(
         let ext_list = make_ext_list(&scanned.root.element_prefix, uri, &family)?;
         insert_before_root_close(xml, &scanned.root, &ext_list, max_xml_bytes)?
     };
-    let parsed = validate_result(&output)?;
+    let parsed = validate_result(&output, max_xml_bytes)?;
     if parsed.candidate.is_none() {
         return Err(invalid(
             "inserted Theme Family is not a direct recognized owner",
@@ -488,14 +483,10 @@ fn add_family_from_scan(
     Ok(output)
 }
 
-fn remove_family_source(xml: &[u8]) -> Result<Vec<u8>> {
-    remove_family_source_with_limit(xml, MAX_XML_BYTES)
-}
-
 fn remove_family_source_with_limit(xml: &[u8], max_xml_bytes: usize) -> Result<Vec<u8>> {
     validate_output_limit(max_xml_bytes)?;
     if xml.len() > MAX_XML_BYTES {
-        return Err(limit("theme XML bytes", MAX_XML_BYTES));
+        return Err(limit(LimitKind::XmlBytes, xml.len(), MAX_XML_BYTES));
     }
     let scanned = scan(xml)?;
     if scanned.hidden_owner {
@@ -505,14 +496,14 @@ fn remove_family_source_with_limit(xml: &[u8], max_xml_bytes: usize) -> Result<V
     }
     let Some(candidate) = scanned.candidate.as_ref() else {
         if xml.len() > max_xml_bytes {
-            return Err(limit("patched Theme XML bytes", max_xml_bytes));
+            return Err(limit(LimitKind::XmlBytes, xml.len(), max_xml_bytes));
         }
         return Ok(xml.to_vec());
     };
     // Validate the recognized fragment before deleting its source span. A
     // malformed supported owner must refuse the edit rather than being
     // silently sanitized by removal.
-    let _ = parse_family(xml, &scanned)?;
+    let _ = parse_family(xml, &scanned, max_xml_bytes)?;
     let mut removal = candidate.family_range.clone();
     if let Some(extension) = scanned.root.admitted_ext.as_ref()
         && empty_container_after_removal(
@@ -538,7 +529,7 @@ fn remove_family_source_with_limit(xml: &[u8], max_xml_bytes: usize) -> Result<V
         }],
         max_xml_bytes,
     )?;
-    let parsed = validate_result(&output)?;
+    let parsed = validate_result(&output, max_xml_bytes)?;
     if parsed.candidate.is_some() {
         return Err(invalid("removed Theme Family owner remains present"));
     }
@@ -582,7 +573,7 @@ fn only_xml_whitespace(xml: &[u8]) -> Result<bool> {
             Event::Text(value) if is_xml_whitespace(value.as_ref()) => {},
             Event::CData(value) if is_xml_whitespace(value.as_ref()) => {},
             Event::GeneralRef(value)
-                if family_codec::validate_general_ref(&value)?
+                if family_codec::validate_general_ref(&value, family_codec::Limits::DEFAULT)?
                     .is_some_and(is_xml_whitespace_character) => {},
             Event::Eof => return Ok(true),
             _ => return Ok(false),
@@ -696,20 +687,24 @@ struct Classifier<'a> {
     hidden_owner: &'a mut bool,
 }
 
-fn parse_family(xml: &[u8], scanned: &Scanned) -> Result<Option<Family>> {
+fn parse_family(xml: &[u8], scanned: &Scanned, max_xml_bytes: usize) -> Result<Option<Family>> {
     let Some(candidate) = scanned.candidate.as_ref() else {
         return Ok(None);
     };
-    let decorated = decorate_family(xml, candidate)?;
-    let family = family_codec::read(&decorated)?;
+    let decorated = decorate_family(xml, candidate, max_xml_bytes)?;
+    let family = family_codec::read(&decorated, family_limits(max_xml_bytes))?;
     Ok(Some(family))
 }
 
-fn parse_candidate(xml: &[u8], scanned: &Scanned) -> Result<(Option<Family>, Option<Owner>)> {
+fn parse_candidate(
+    xml: &[u8],
+    scanned: &Scanned,
+    max_xml_bytes: usize,
+) -> Result<(Option<Family>, Option<Owner>)> {
     let Some(candidate) = scanned.candidate.as_ref() else {
         return Ok((None, None));
     };
-    let family = parse_family(xml, scanned)?;
+    let family = parse_family(xml, scanned, max_xml_bytes)?;
     let profile = ExtensionProfile::from_uri(&candidate.uri)
         .ok_or_else(|| invalid("internal Theme Family URI profile is unsupported"))?;
     Ok((
@@ -757,7 +752,12 @@ fn scan(xml: &[u8]) -> Result<Scanned> {
     let mut declaration_seen = false;
     let mut pre_root_markup = false;
     let mut ext_list_seen = false;
-    let mut hidden_owner = false;
+    // Element names are resolved on namespace values as written, so an MCE
+    // branch bound through a declaration spelled with references stays
+    // invisible to the classification below while preprocessing applies it.
+    // Treat such a part as hiding an owner: its mutations are ambiguous
+    // (record 0011).
+    let mut hidden_owner = litchi_ooxml_common::mce::binds_namespace_by_reference(xml);
     let mut nodes = 0usize;
 
     loop {
@@ -814,7 +814,7 @@ fn scan(xml: &[u8]) -> Result<Scanned> {
                 let qualified_name = element.name().as_ref().to_vec();
                 let depth = stack.len();
                 if depth >= MAX_DEPTH {
-                    return Err(limit("Theme XML depth", MAX_DEPTH));
+                    return Err(limit(LimitKind::XmlDepth, stack.len() + 1, MAX_DEPTH));
                 }
                 let kind = if !root_seen {
                     if local != b"theme" || !is_drawingml_namespace(&namespace) {
@@ -894,7 +894,7 @@ fn scan(xml: &[u8]) -> Result<Scanned> {
                 let qualified_name = element.name().as_ref().to_vec();
                 let depth = stack.len();
                 if depth >= MAX_DEPTH {
-                    return Err(limit("Theme XML depth", MAX_DEPTH));
+                    return Err(limit(LimitKind::XmlDepth, stack.len() + 1, MAX_DEPTH));
                 }
                 let kind = if !root_seen {
                     if local != b"theme" || !is_drawingml_namespace(&namespace) {
@@ -1020,7 +1020,8 @@ fn scan(xml: &[u8]) -> Result<Scanned> {
                 if !root_seen || root_closed {
                     return Err(invalid("Theme XML has a reference outside its root"));
                 }
-                let character = family_codec::validate_general_ref(&reference)?;
+                let character =
+                    family_codec::validate_general_ref(&reference, family_codec::Limits::DEFAULT)?;
                 if element_only_context(&stack, &extensions)
                     && !character.is_some_and(is_xml_whitespace_character)
                 {
@@ -1584,18 +1585,15 @@ fn effective_inherited_bindings(record: &FamilyRecord) -> Vec<Binding> {
     result
 }
 
-fn decorate_family(source: &[u8], candidate: &Candidate) -> Result<Vec<u8>> {
+fn decorate_family(source: &[u8], candidate: &Candidate, max_xml_bytes: usize) -> Result<Vec<u8>> {
     let fragment = source
         .get(candidate.family_range.clone())
         .ok_or_else(|| invalid("Theme Family source range is invalid"))?;
-    if fragment.len() > super::MAX_XML_BYTES {
-        return Err(limit(
-            "decorated Theme Family XML bytes",
-            super::MAX_XML_BYTES,
-        ));
+    if fragment.len() > max_xml_bytes {
+        return Err(limit(LimitKind::XmlBytes, fragment.len(), max_xml_bytes));
     }
     if candidate.inherited_bindings.is_empty() {
-        let mut output = family_buffer(fragment.len())?;
+        let mut output = family_buffer(fragment.len(), max_xml_bytes)?;
         output.extend_from_slice(fragment);
         return Ok(output);
     }
@@ -1632,11 +1630,8 @@ fn decorate_family(source: &[u8], candidate: &Candidate) -> Result<Vec<u8>> {
         .len()
         .checked_add(declaration_bytes)
         .ok_or_else(|| invalid("decorated Theme Family XML length overflows"))?;
-    if output_len > super::MAX_XML_BYTES {
-        return Err(limit(
-            "decorated Theme Family XML bytes",
-            super::MAX_XML_BYTES,
-        ));
+    if output_len > max_xml_bytes {
+        return Err(limit(LimitKind::XmlBytes, output_len, max_xml_bytes));
     }
     let mut declarations = String::new();
     declarations
@@ -1655,15 +1650,19 @@ fn decorate_family(source: &[u8], candidate: &Candidate) -> Result<Vec<u8>> {
         ));
         declarations.push('"');
     }
-    let mut output = family_buffer(output_len)?;
+    let mut output = family_buffer(output_len, max_xml_bytes)?;
     output.extend_from_slice(&fragment[..insertion]);
     output.extend_from_slice(declarations.as_bytes());
     output.extend_from_slice(&fragment[insertion..]);
     Ok(output)
 }
 
-fn family_child_bytes(family: &Family, inherited: &[Binding]) -> Result<Vec<u8>> {
-    let mut bytes = family_codec::write(family)?;
+fn family_child_bytes(
+    family: &Family,
+    inherited: &[Binding],
+    max_xml_bytes: usize,
+) -> Result<Vec<u8>> {
+    let mut bytes = family_codec::write(family, family_limits(max_xml_bytes))?;
     // A UTF-8 BOM frames a standalone XML document; it is not character data
     // that can be embedded between extension elements. Strip only the exact
     // leading BOM after the fragment codec has validated the source.
@@ -1673,7 +1672,7 @@ fn family_child_bytes(family: &Family, inherited: &[Binding]) -> Result<Vec<u8>>
     if has_xml_declaration(&bytes) {
         return Err(invalid("Theme Family child contains an XML declaration"));
     }
-    remove_inherited_namespace_declarations(bytes, inherited)
+    remove_inherited_namespace_declarations(bytes, inherited, max_xml_bytes)
 }
 
 fn has_xml_declaration(bytes: &[u8]) -> bool {
@@ -1766,10 +1765,10 @@ fn inherited_namespace_removal_ranges(
 }
 
 fn family_child_len(family: &Family, inherited: &[Binding], max_xml_bytes: usize) -> Result<usize> {
-    let mut length = family_codec::serialized_len(family)?;
+    let mut length = family_codec::serialized_len(family, family_limits(max_xml_bytes))?;
     // The standalone intermediate must also fit the caller's cap.
     if length > max_xml_bytes {
-        return Err(limit("patched Theme XML bytes", max_xml_bytes));
+        return Err(limit(LimitKind::XmlBytes, length, max_xml_bytes));
     }
     if let Some(source) = family.source_state() {
         if has_xml_declaration(source.xml.as_ref()) {
@@ -1793,6 +1792,7 @@ fn family_child_len(family: &Family, inherited: &[Binding], max_xml_bytes: usize
 fn remove_inherited_namespace_declarations(
     bytes: Vec<u8>,
     inherited: &[Binding],
+    max_xml_bytes: usize,
 ) -> Result<Vec<u8>> {
     if inherited.is_empty() {
         return Ok(bytes);
@@ -1811,6 +1811,7 @@ fn remove_inherited_namespace_declarations(
             .len()
             .checked_sub(removed)
             .ok_or_else(|| invalid("Theme Family namespace removal underflows"))?,
+        max_xml_bytes,
     )?;
     let mut previous = 0usize;
     for range in ranges {
@@ -1851,7 +1852,7 @@ fn ensure_splice_output_limit(
         .and_then(|value| value.checked_add(replacement_len))
         .ok_or_else(|| invalid("Theme XML patched length overflows"))?;
     if output_len > max_xml_bytes {
-        return Err(limit("patched Theme XML bytes", max_xml_bytes));
+        return Err(limit(LimitKind::XmlBytes, output_len, max_xml_bytes));
     }
     Ok(())
 }
@@ -2190,7 +2191,7 @@ fn splice_with_limit(
         previous = replacement.range.end;
     }
     if output_len > max_xml_bytes {
-        return Err(limit("patched Theme XML bytes", max_xml_bytes));
+        return Err(limit(LimitKind::XmlBytes, output_len, max_xml_bytes));
     }
     let mut output = theme_buffer(output_len)?;
     let mut cursor = 0usize;
@@ -2203,17 +2204,28 @@ fn splice_with_limit(
     Ok(output)
 }
 
-fn validate_result(xml: &[u8]) -> Result<Scanned> {
+fn validate_result(xml: &[u8], max_xml_bytes: usize) -> Result<Scanned> {
     let scanned = scan(xml)?;
-    let _ = parse_family(xml, &scanned)?;
+    let _ = parse_family(xml, &scanned, max_xml_bytes)?;
     Ok(scanned)
+}
+
+fn family_limits(max_xml_bytes: usize) -> family_codec::Limits {
+    // The complete Theme-part owner permits a larger document than the
+    // standalone family codec's fixed fragment ceiling. Propagate a narrower
+    // caller cap, while retaining that independent family grammar ceiling
+    // instead of manufacturing an invalid nested policy for the historical
+    // part default.
+    family_codec::Limits::new(max_xml_bytes.min(super::MAX_XML_BYTES))
 }
 
 fn validate_output_limit(max_xml_bytes: usize) -> Result<()> {
     if max_xml_bytes == 0 || max_xml_bytes > MAX_XML_BYTES {
-        return Err(invalid(format!(
-            "Theme XML output limit must be between 1 and {MAX_XML_BYTES}"
-        )));
+        return Err(Error::InvalidLimit {
+            kind: LimitKind::XmlBytes,
+            value: max_xml_bytes,
+            maximum: MAX_XML_BYTES,
+        });
     }
     Ok(())
 }
@@ -2221,7 +2233,8 @@ fn validate_output_limit(max_xml_bytes: usize) -> Result<()> {
 fn validate_namespace_prefix(prefix: &[u8]) -> Result<()> {
     if prefix.len() > MAX_NAMESPACE_BYTES {
         return Err(limit(
-            "Theme XML namespace prefix bytes",
+            LimitKind::NamespacePrefixBytes,
+            prefix.len(),
             MAX_NAMESPACE_BYTES,
         ));
     }
@@ -2230,7 +2243,7 @@ fn validate_namespace_prefix(prefix: &[u8]) -> Result<()> {
 
 fn theme_buffer(length: usize) -> Result<Vec<u8>> {
     if length > MAX_XML_BYTES {
-        return Err(limit("Theme XML bytes", MAX_XML_BYTES));
+        return Err(limit(LimitKind::XmlBytes, length, MAX_XML_BYTES));
     }
     let mut output = Vec::new();
     output
@@ -2239,9 +2252,9 @@ fn theme_buffer(length: usize) -> Result<Vec<u8>> {
     Ok(output)
 }
 
-fn family_buffer(length: usize) -> Result<Vec<u8>> {
-    if length > super::MAX_XML_BYTES {
-        return Err(limit("Theme Family XML bytes", super::MAX_XML_BYTES));
+fn family_buffer(length: usize, max_xml_bytes: usize) -> Result<Vec<u8>> {
+    if length > max_xml_bytes {
+        return Err(limit(LimitKind::XmlBytes, length, max_xml_bytes));
     }
     let mut output = Vec::new();
     output
@@ -2275,7 +2288,11 @@ fn apply_namespace_declarations(
         let value = decode_attribute(&attribute, reader)?;
         family_codec::validate_namespace_binding(prefix, &value)?;
         if value.len() > MAX_NAMESPACE_BYTES {
-            return Err(limit("Theme XML namespace bytes", MAX_NAMESPACE_BYTES));
+            return Err(limit(
+                LimitKind::NamespaceBytes,
+                value.len(),
+                MAX_NAMESPACE_BYTES,
+            ));
         }
         let binding_bytes = prefix
             .len()
@@ -2283,7 +2300,8 @@ fn apply_namespace_declarations(
             .ok_or_else(|| invalid("Theme XML namespace scope length overflows"))?;
         if scope.len() >= MAX_ACTIVE_NAMESPACE_BINDINGS {
             return Err(limit(
-                "Theme XML active namespace bindings",
+                LimitKind::NamespaceDeclarations,
+                scope.len() + 1,
                 MAX_ACTIVE_NAMESPACE_BINDINGS,
             ));
         }
@@ -2291,7 +2309,7 @@ fn apply_namespace_declarations(
             .checked_add(binding_bytes)
             .ok_or_else(|| invalid("Theme XML namespace scope length overflows"))?;
         if *scope_bytes > MAX_XML_BYTES {
-            return Err(limit("Theme XML namespace scope bytes", MAX_XML_BYTES));
+            return Err(limit(LimitKind::XmlBytes, *scope_bytes, MAX_XML_BYTES));
         }
         scope.push(Binding {
             prefix: prefix.to_vec(),
@@ -2313,7 +2331,7 @@ fn validate_element_attributes(
         let attribute = attribute.map_err(xml_error)?;
         count += 1;
         if count > MAX_ATTRIBUTES {
-            return Err(limit("Theme XML attributes", MAX_ATTRIBUTES));
+            return Err(limit(LimitKind::XmlAttributes, count, MAX_ATTRIBUTES));
         }
         let raw = attribute.key.as_ref();
         validate_namespace_prefix(namespace_declaration(raw).unwrap_or_else(|| qname_prefix(raw)))?;
@@ -2323,7 +2341,8 @@ fn validate_element_attributes(
         let value = decode_attribute(&attribute, reader)?;
         if value.len() > MAX_ATTRIBUTE_VALUE_BYTES {
             return Err(limit(
-                "Theme XML attribute value bytes",
+                LimitKind::AttributeValueBytes,
+                value.len(),
                 MAX_ATTRIBUTE_VALUE_BYTES,
             ));
         }
@@ -2357,6 +2376,7 @@ fn decode_attribute(
     reader: &NsReader<&[u8]>,
 ) -> Result<String> {
     family_codec::validate_raw_attribute_value(attribute.value.as_ref(), "Theme XML attribute")?;
+    crate::preflight_attribute_value_bytes(attribute.value.as_ref(), MAX_ATTRIBUTE_VALUE_BYTES)?;
     let value = attribute
         .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
         .map(|value| value.into_owned())
@@ -2403,7 +2423,11 @@ fn resolved_namespace(resolved: &ResolveResult<'_>) -> Result<Vec<u8>> {
     match resolved {
         ResolveResult::Bound(Namespace(value)) => {
             if value.len() > MAX_NAMESPACE_BYTES {
-                return Err(limit("Theme XML namespace bytes", MAX_NAMESPACE_BYTES));
+                return Err(limit(
+                    LimitKind::NamespaceBytes,
+                    value.len(),
+                    MAX_NAMESPACE_BYTES,
+                ));
             }
             std::str::from_utf8(value).map_err(xml_error)?;
             Ok(value.to_vec())
@@ -2501,7 +2525,7 @@ fn bump_nodes(nodes: &mut usize) -> Result<()> {
         .checked_add(1)
         .ok_or_else(|| invalid("Theme XML node count overflows"))?;
     if *nodes > MAX_NODES {
-        return Err(limit("Theme XML nodes", MAX_NODES));
+        return Err(limit(LimitKind::XmlNodes, *nodes, MAX_NODES));
     }
     Ok(())
 }
@@ -2510,8 +2534,8 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-fn limit(resource: &'static str, limit: usize) -> Error {
-    Error::Limit { resource, limit }
+fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::limit(kind, observed, maximum)
 }
 
 fn xml_error(error: impl fmt::Display) -> Error {

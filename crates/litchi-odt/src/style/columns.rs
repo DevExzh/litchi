@@ -277,7 +277,7 @@ impl Columns {
     }
 }
 
-impl crate::Package {
+impl crate::GenericPackage {
     pub fn style_columns(&self) -> Result<Vec<Columns>> {
         let mut result = parse(self.styles_xml()?.as_deref().unwrap_or_default())?;
         result.extend(parse(&self.content_xml()?)?);

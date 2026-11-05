@@ -57,13 +57,14 @@ impl fmt::Display for AddressError {
 
 /// Failure while constructing or parsing a compact coordinate selector.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     /// The range bounds are inverted on at least one axis.
     InvalidRange {
         /// Inclusive start coordinate.
-        start: CellPosition,
+        start: At,
         /// Exclusive end coordinate.
-        end: CellPosition,
+        end: At,
     },
     /// A platform-sized coordinate does not fit the compact representation.
     CoordinateOverflow {
@@ -116,12 +117,12 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// identifier. Use [`Self::from_a1`] for the human-readable selector form.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct CellPosition {
+pub struct At {
     pub(crate) row: u32,
     pub(crate) column: u32,
 }
 
-impl CellPosition {
+impl At {
     /// Creates a zero-based coordinate from compact components.
     #[must_use]
     pub const fn new(row: u32, column: u32) -> Self {
@@ -232,7 +233,7 @@ impl CellPosition {
     }
 }
 
-impl fmt::Display for CellPosition {
+impl fmt::Display for At {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut one_based_column = u64::from(self.column) + 1;
         let mut labels = [0_u8; 7];
@@ -253,19 +254,19 @@ impl fmt::Display for CellPosition {
 /// A zero-based, half-open rectangular cell range.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct CellRange {
-    pub(crate) start: CellPosition,
-    pub(crate) end: CellPosition,
+pub struct Area {
+    pub(crate) start: At,
+    pub(crate) end: At,
 }
 
-impl CellRange {
+impl Area {
     /// Creates a half-open range without checking a table's declared extent.
     ///
     /// # Errors
     ///
     /// Returns [`Error::InvalidRange`] when the end precedes the start on
     /// either axis.
-    pub fn new(start: CellPosition, end: CellPosition) -> Result<Self> {
+    pub fn new(start: At, end: At) -> Result<Self> {
         if start.row > end.row || start.column > end.column {
             return Err(Error::InvalidRange { start, end });
         }
@@ -277,7 +278,7 @@ impl CellRange {
     /// `B3` selects one cell. `B3:D5` selects the inclusive rectangle from
     /// `B3` through `D5`; its semantic end is therefore `E6`. Parsing is
     /// allocation-free and accepts the same absolute markers as
-    /// [`CellPosition::from_a1`].
+    /// [`At::from_a1`].
     ///
     /// # Errors
     ///
@@ -285,7 +286,7 @@ impl CellRange {
     /// an endpoint that cannot be advanced to an exclusive bound.
     pub fn from_a1(address: &str) -> Result<Self> {
         let Some(separator) = address.as_bytes().iter().position(|byte| *byte == b':') else {
-            let position = CellPosition::from_a1(address)?;
+            let position = At::from_a1(address)?;
             return Self::single_with_index(position, 0);
         };
         if let Some(extra) = address.as_bytes()[separator + 1..]
@@ -298,8 +299,8 @@ impl CellRange {
             ));
         }
 
-        let start = CellPosition::from_a1(&address[..separator])?;
-        let end_inclusive = CellPosition::from_a1(&address[separator + 1..])?;
+        let start = At::from_a1(&address[..separator])?;
+        let end_inclusive = At::from_a1(&address[separator + 1..])?;
         let end = exclusive_end(end_inclusive, separator + 1)?;
         Self::new(start, end)
     }
@@ -310,25 +311,25 @@ impl CellRange {
     ///
     /// Returns [`Error::InvalidAddress`] if advancing the coordinate to the
     /// exclusive end would overflow the compact domain.
-    pub fn single(position: CellPosition) -> Result<Self> {
+    pub fn single(position: At) -> Result<Self> {
         Self::single_with_index(position, 0)
     }
 
     /// Returns the inclusive start and exclusive end coordinates.
     #[must_use]
-    pub const fn bounds(self) -> (CellPosition, CellPosition) {
+    pub const fn bounds(self) -> (At, At) {
         (self.start, self.end)
     }
 
     /// Returns the first coordinate.
     #[must_use]
-    pub const fn start(self) -> CellPosition {
+    pub const fn start(self) -> At {
         self.start
     }
 
     /// Returns the exclusive end coordinate.
     #[must_use]
-    pub const fn end(self) -> CellPosition {
+    pub const fn end(self) -> At {
         self.end
     }
 
@@ -348,20 +349,20 @@ impl CellRange {
 
     /// Returns whether a coordinate belongs to the range.
     #[must_use]
-    pub const fn contains(self, position: CellPosition) -> bool {
+    pub const fn contains(self, position: At) -> bool {
         position.row >= self.start.row
             && position.row < self.end.row
             && position.column >= self.start.column
             && position.column < self.end.column
     }
 
-    fn single_with_index(position: CellPosition, error_index: usize) -> Result<Self> {
+    fn single_with_index(position: At, error_index: usize) -> Result<Self> {
         let end = exclusive_end(position, error_index)?;
         Self::new(position, end)
     }
 }
 
-fn exclusive_end(position: CellPosition, error_index: usize) -> Result<CellPosition> {
+fn exclusive_end(position: At, error_index: usize) -> Result<At> {
     let row = position
         .row
         .checked_add(1)
@@ -370,7 +371,7 @@ fn exclusive_end(position: CellPosition, error_index: usize) -> Result<CellPosit
         .column
         .checked_add(1)
         .ok_or_else(|| invalid(AddressError::RangeOverflow, error_index))?;
-    Ok(CellPosition::new(row, column))
+    Ok(At::new(row, column))
 }
 
 fn invalid(kind: AddressError, index: usize) -> Error {
@@ -396,58 +397,55 @@ mod tests {
 
     #[test]
     fn coordinates_are_compact_and_round_trip_a1_without_allocation() {
-        assert_eq!(size_of::<CellPosition>(), 8);
-        assert_eq!(size_of::<CellRange>(), 16);
+        assert_eq!(size_of::<At>(), 8);
+        assert_eq!(size_of::<Area>(), 16);
 
-        let position = CellPosition::from_a1("$bc$12")
+        let position = At::from_a1("$bc$12")
             .unwrap_or_else(|error| panic!("unexpected coordinate error: {error}"));
-        assert_eq!(position, CellPosition::new(11, 54));
+        assert_eq!(position, At::new(11, 54));
         assert_eq!(position.to_string(), "BC12");
     }
 
     #[test]
     fn ranges_accept_single_cells_and_expand_inclusive_a1_endpoints() {
-        let single = CellRange::from_a1("C4")
-            .unwrap_or_else(|error| panic!("unexpected range error: {error}"));
-        assert_eq!(
-            single.bounds(),
-            (CellPosition::new(3, 2), CellPosition::new(4, 3))
-        );
+        let single =
+            Area::from_a1("C4").unwrap_or_else(|error| panic!("unexpected range error: {error}"));
+        assert_eq!(single.bounds(), (At::new(3, 2), At::new(4, 3)));
 
-        let range = CellRange::from_a1("B3:D5")
+        let range = Area::from_a1("B3:D5")
             .unwrap_or_else(|error| panic!("unexpected range error: {error}"));
-        assert_eq!(range.start(), CellPosition::new(2, 1));
-        assert_eq!(range.end(), CellPosition::new(5, 4));
+        assert_eq!(range.start(), At::new(2, 1));
+        assert_eq!(range.end(), At::new(5, 4));
         assert_eq!(range.area(), Some(9));
-        assert!(range.contains(CellPosition::new(4, 3)));
-        assert!(!range.contains(CellPosition::new(5, 3)));
+        assert!(range.contains(At::new(4, 3)));
+        assert!(!range.contains(At::new(5, 3)));
     }
 
     #[test]
     fn malformed_a1_selectors_return_precise_typed_errors() {
         assert!(matches!(
-            CellPosition::from_a1("A0"),
+            At::from_a1("A0"),
             Err(Error::InvalidAddress {
                 kind: AddressError::ZeroRow,
                 ..
             })
         ));
         assert!(matches!(
-            CellPosition::from_a1("A1!"),
+            At::from_a1("A1!"),
             Err(Error::InvalidAddress {
                 kind: AddressError::TrailingInput,
                 index: 2
             })
         ));
         assert!(matches!(
-            CellRange::from_a1("A1:B2:C3"),
+            Area::from_a1("A1:B2:C3"),
             Err(Error::InvalidAddress {
                 kind: AddressError::MultipleSeparators,
                 index: 5
             })
         ));
         assert!(matches!(
-            CellPosition::try_from_usize(usize::MAX, 0),
+            At::try_from_usize(usize::MAX, 0),
             Err(Error::CoordinateOverflow { .. })
         ));
     }

@@ -11,6 +11,7 @@ use std::fmt;
 use std::str::FromStr;
 
 use crate::{Error, Result};
+use litchi_drawingml::geometry::Limits as GeometryLimits;
 
 #[allow(
     clippy::arbitrary_source_item_ordering,
@@ -36,7 +37,7 @@ pub enum Aspect {
 }
 
 impl Aspect {
-    #[must_use]
+    #[must_use = "use the selected shape-reader limits"]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Content => "DVASPECT_CONTENT",
@@ -52,7 +53,7 @@ impl FromStr for Aspect {
         match value {
             "DVASPECT_CONTENT" => Ok(Self::Content),
             "DVASPECT_ICON" => Ok(Self::Icon),
-            _ => Err(invalid(format!("invalid OLE data/view aspect '{value}'"))),
+            _ => Err(invalid("invalid OLE data/view aspect")),
         }
     }
 }
@@ -81,6 +82,191 @@ pub(crate) const MAX_OBJECTS_PER_DRAWING: usize = 100_000;
 pub(crate) const MAX_GROUP_DEPTH: usize = 32;
 pub(crate) const MAX_XML_DEPTH: usize = 256;
 pub(crate) const MAX_TEXT_BYTES: usize = 1024 * 1024;
+pub(crate) const MAX_TEXT_ELEMENTS: usize = 100_000;
+
+/// Caller-selected bounds for the raw SpreadsheetDrawing shape inventory.
+///
+/// The policy is retained only for the duration of one read. The owner of a
+/// package derives it from its own retained input policy and passes it to
+/// [`super::read`]; no raw shape read silently falls back to a global policy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[must_use]
+pub struct Limits {
+    /// Maximum serialized drawing bytes accepted before MCE processing.
+    pub max_drawing_part_bytes: usize,
+    /// Maximum anchors retained by the inventory.
+    pub max_anchors: usize,
+    /// Maximum objects retained, including group descendants.
+    pub max_objects: usize,
+    /// Maximum nested group depth.
+    pub max_group_depth: usize,
+    /// Maximum XML nesting depth.
+    pub max_xml_depth: usize,
+    /// Maximum retained shape text bytes.
+    pub max_text_bytes: usize,
+    /// Maximum text-body XML elements.
+    pub max_text_elements: usize,
+    /// Bounds forwarded to the shared custom-geometry reader.
+    pub geometry: GeometryLimits,
+}
+
+impl Limits {
+    /// The established finite shape-reader policy.
+    pub const DEFAULT: Self = Self {
+        max_drawing_part_bytes: MAX_DRAWING_PART_BYTES,
+        max_anchors: MAX_ANCHORS_PER_DRAWING,
+        max_objects: MAX_OBJECTS_PER_DRAWING,
+        max_group_depth: MAX_GROUP_DEPTH,
+        max_xml_depth: MAX_XML_DEPTH,
+        max_text_bytes: MAX_TEXT_BYTES,
+        max_text_elements: MAX_TEXT_ELEMENTS,
+        geometry: GeometryLimits::DEFAULT,
+    };
+
+    /// Construct an explicit shape-reader policy.
+    #[must_use = "use the limits derived from the owner's core policy"]
+    pub const fn new(
+        max_drawing_part_bytes: usize,
+        max_anchors: usize,
+        max_objects: usize,
+        max_group_depth: usize,
+        max_xml_depth: usize,
+        max_text_bytes: usize,
+        max_text_elements: usize,
+        geometry: GeometryLimits,
+    ) -> Self {
+        Self {
+            max_drawing_part_bytes,
+            max_anchors,
+            max_objects,
+            max_group_depth,
+            max_xml_depth,
+            max_text_bytes,
+            max_text_elements,
+            geometry,
+        }
+    }
+
+    /// Derive shape bounds from an XLSB owner's retained XML resource policy.
+    /// The shared hard ceilings remain in force even for a wider owner.
+    #[must_use = "use the limits derived from the owner's core policy"]
+    pub fn from_core(limits: litchi_core::Limits) -> Self {
+        fn bounded(value: u64, maximum: usize) -> usize {
+            usize::try_from(value)
+                .unwrap_or(usize::MAX)
+                .min(maximum)
+                .max(1)
+        }
+        let input = bounded(
+            limits.get(litchi_core::Resource::InputBytes),
+            MAX_DRAWING_PART_BYTES,
+        );
+        let objects = bounded(
+            limits.get(litchi_core::Resource::Objects),
+            MAX_OBJECTS_PER_DRAWING,
+        );
+        let depth = bounded(limits.get(litchi_core::Resource::Depth), MAX_XML_DEPTH);
+        let geometry = GeometryLimits::new(
+            bounded(
+                limits.get(litchi_core::Resource::Objects),
+                GeometryLimits::DEFAULT.max_adjust_handles,
+            ),
+            bounded(
+                limits.get(litchi_core::Resource::Objects),
+                GeometryLimits::DEFAULT.max_connection_sites,
+            ),
+            bounded(
+                limits.get(litchi_core::Resource::Objects),
+                GeometryLimits::DEFAULT.max_guides,
+            ),
+            bounded(
+                limits.get(litchi_core::Resource::Objects),
+                GeometryLimits::DEFAULT.max_paths,
+            ),
+            bounded(
+                limits.get(litchi_core::Resource::Objects),
+                GeometryLimits::DEFAULT.max_path_commands,
+            ),
+            input.min(1 << 20),
+        );
+        Self {
+            max_drawing_part_bytes: input,
+            max_anchors: objects.min(MAX_ANCHORS_PER_DRAWING),
+            max_objects: objects,
+            max_group_depth: depth.min(MAX_GROUP_DEPTH),
+            max_xml_depth: depth,
+            max_text_bytes: input.min(MAX_TEXT_BYTES),
+            max_text_elements: objects.min(MAX_TEXT_ELEMENTS),
+            geometry,
+        }
+    }
+
+    /// Derive shape bounds from an OPC owner's retained source policy.
+    ///
+    /// A worksheet drawing is one retained OPC part, so its part-byte ceiling
+    /// supplies the input and text budgets while the event ceiling bounds the
+    /// number of anchors, objects, and geometry structures admitted from it.
+    /// The shared hard ceilings remain in force even when the owner policy is
+    /// wider.
+    #[must_use = "use the limits derived from the retained source policy"]
+    pub fn from_source_limits(limits: litchi_opc::SourceLimits) -> Self {
+        fn bounded(value: u64, maximum: usize) -> usize {
+            usize::try_from(value)
+                .unwrap_or(usize::MAX)
+                .min(maximum)
+                .max(1)
+        }
+        let input = bounded(limits.max_part_bytes(), MAX_DRAWING_PART_BYTES);
+        let objects = limits.max_events().clamp(1, MAX_OBJECTS_PER_DRAWING);
+        let depth = limits.max_depth().clamp(1, MAX_XML_DEPTH);
+        let geometry = GeometryLimits::new(
+            objects.min(GeometryLimits::DEFAULT.max_adjust_handles),
+            objects.min(GeometryLimits::DEFAULT.max_connection_sites),
+            objects.min(GeometryLimits::DEFAULT.max_guides),
+            objects.min(GeometryLimits::DEFAULT.max_paths),
+            objects.min(GeometryLimits::DEFAULT.max_path_commands),
+            input.min(1 << 20),
+        );
+        Self {
+            max_drawing_part_bytes: input,
+            max_anchors: objects.min(MAX_ANCHORS_PER_DRAWING),
+            max_objects: objects,
+            max_group_depth: depth.min(MAX_GROUP_DEPTH),
+            max_xml_depth: depth,
+            max_text_bytes: input.min(MAX_TEXT_BYTES),
+            max_text_elements: objects.min(MAX_TEXT_ELEMENTS),
+            geometry,
+        }
+    }
+
+    /// Validate the policy against the shared hard safety ceilings.
+    pub fn validate(self) -> Result<Self> {
+        for (kind, value) in [
+            (crate::LimitKind::DrawingBytes, self.max_drawing_part_bytes),
+            (crate::LimitKind::Anchors, self.max_anchors),
+            (crate::LimitKind::Objects, self.max_objects),
+            (crate::LimitKind::GroupDepth, self.max_group_depth),
+            (crate::LimitKind::XmlDepth, self.max_xml_depth),
+            (crate::LimitKind::TextBytes, self.max_text_bytes),
+            (crate::LimitKind::TextElements, self.max_text_elements),
+        ] {
+            let maximum = kind.maximum();
+            if value == 0 || value > maximum {
+                return Err(Error::invalid_limit(kind, value, maximum));
+            }
+        }
+        Ok(Self {
+            geometry: self.geometry.validate().map_err(Error::Drawing)?,
+            ..self
+        })
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
 
 /// An offset or extent in English Metric Units (EMU), the `DrawingML` length unit.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -215,7 +401,7 @@ pub enum Anchor {
 }
 
 /// Mutually exclusive `DrawingML` geometry of a worksheet shape.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum Geometry {
     /// A schema-defined preset (`a:prstGeom`).
     Preset(Preset),
@@ -258,6 +444,15 @@ impl From<Preset> for Geometry {
     }
 }
 
+impl fmt::Debug for Geometry {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Preset(preset) => formatter.debug_tuple("Preset").field(preset).finish(),
+            Self::Custom(_) => formatter.write_str("CustomGeometry(..)"),
+        }
+    }
+}
+
 impl From<CustomGeometry> for Geometry {
     fn from(geometry: CustomGeometry) -> Self {
         Self::Custom(Box::new(geometry))
@@ -265,7 +460,7 @@ impl From<CustomGeometry> for Geometry {
 }
 
 /// Non-visual identity shared by all drawing objects (`xdr:cNvPr` and lock flags).
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Clone, Default, PartialEq, Eq)]
 pub struct NonVisual {
     /// Unknown attributes and child elements retained from the source object.
     pub opaque: Opaque,
@@ -371,7 +566,7 @@ pub struct Group {
 ///
 /// The referenced payload and link targets are recorded as relationship IDs
 /// only; they are never resolved, fetched, or activated.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Clone, Default, PartialEq, Eq)]
 pub struct OleObject {
     /// Non-visual identity of the hosting graphic frame.
     pub non_visual: NonVisual,
@@ -390,7 +585,7 @@ pub struct OleObject {
 }
 
 /// One XML attribute retained because the shape owner does not interpret it.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct UnknownAttribute {
     name: Box<str>,
     value: Box<str>,
@@ -422,7 +617,7 @@ impl UnknownAttribute {
 }
 
 /// A bounded XML element retained without interpreting its semantics.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct UnknownElement {
     xml: Box<[u8]>,
 }
@@ -453,7 +648,7 @@ impl UnknownElement {
 }
 
 /// Unknown shape-owned markup retained as inert, bounded data.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Clone, Default, PartialEq, Eq)]
 pub struct Opaque {
     attributes: Vec<UnknownAttribute>,
     elements: Vec<UnknownElement>,
@@ -490,7 +685,7 @@ impl Opaque {
 }
 
 /// An unknown drawing object preserved as its bounded XML fragment.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Unknown {
     element: UnknownElement,
 }
@@ -550,7 +745,7 @@ pub struct AnchoredObject {
 }
 
 /// Shape inventory of one worksheet drawing part.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Shapes {
     /// Worksheet name from the workbook.
     pub worksheet_name: String,
@@ -558,4 +753,85 @@ pub struct Shapes {
     pub worksheet_part_name: String,
     /// Anchored objects in drawing order.
     pub objects: Vec<AnchoredObject>,
+}
+
+impl fmt::Debug for NonVisual {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("NonVisual")
+            .field("id", &self.id)
+            .field("name_present", &self.name.is_some())
+            .field("description_present", &self.description.is_some())
+            .field("hidden", &self.hidden)
+            .field("locked", &self.locked)
+            .field("opaque", &self.opaque)
+            .finish()
+    }
+}
+
+impl fmt::Debug for OleObject {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("OleObject")
+            .field("non_visual", &self.non_visual)
+            .field("program_id_present", &self.program_id.is_some())
+            .field("shape_id", &self.shape_id)
+            .field("data_or_view_aspect", &self.data_or_view_aspect)
+            .field("auto_load", &self.auto_load)
+            .field("relationship_id_present", &self.relationship_id.is_some())
+            .field(
+                "link_relationship_id_present",
+                &self.link_relationship_id.is_some(),
+            )
+            .finish()
+    }
+}
+
+impl fmt::Debug for UnknownAttribute {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("UnknownAttribute")
+            .field("name_bytes", &self.name.len())
+            .field("value_bytes", &self.value.len())
+            .finish()
+    }
+}
+
+impl fmt::Debug for UnknownElement {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("UnknownElement")
+            .field("bytes", &self.xml.len())
+            .finish()
+    }
+}
+
+impl fmt::Debug for Opaque {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Opaque")
+            .field("attribute_count", &self.attributes.len())
+            .field("element_count", &self.elements.len())
+            .finish()
+    }
+}
+
+impl fmt::Debug for Unknown {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Unknown")
+            .field("element", &self.element)
+            .finish()
+    }
+}
+
+impl fmt::Debug for Shapes {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Shapes")
+            .field("worksheet_name_bytes", &self.worksheet_name.len())
+            .field("worksheet_part_name_bytes", &self.worksheet_part_name.len())
+            .field("objects", &self.objects)
+            .finish()
+    }
 }

@@ -3,7 +3,8 @@
 use std::path::PathBuf;
 
 use litchi_keynote::{
-    ChartData, ChartSelector, Package, Position, SlideChartDataError, SlideSelector,
+    ChartData, ChartSelector, Package, Position, SlideSelector,
+    chart::data::Error as SlideChartDataError,
 };
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -106,17 +107,19 @@ fn chart_data_rejects_unknown_selectors_before_reading_a_grid() -> TestResult {
 
     assert!(matches!(
         package.slide_chart_data(SlideSelector::index(0), ChartSelector::index(1)),
-        Err(SlideChartDataError::ChartPositionNotFound { position })
+        Err(SlideChartDataError::Refused(litchi_keynote::chart::data::Refusal::ChartPositionNotFound { position }))
             if position == Position::new(1)
     ));
     assert!(matches!(
         package.slide_chart_data(SlideSelector::index(1), ChartSelector::index(0)),
-        Err(SlideChartDataError::SlidePositionNotFound { position })
+        Err(SlideChartDataError::Refused(litchi_keynote::chart::data::Refusal::SlidePositionNotFound { position }))
             if position == Position::new(1)
     ));
     assert!(matches!(
         package.slide_chart_data(SlideSelector::index(0), ChartSelector::name("")),
-        Err(SlideChartDataError::EmptyChartName)
+        Err(SlideChartDataError::Refused(
+            litchi_keynote::chart::data::Refusal::EmptyChartName
+        ))
     ));
     assert_eq!(exact_bytes(&package)?, source);
     Ok(())
@@ -136,10 +139,9 @@ fn native_chart_data_transaction_rewrites_values_and_restores_exact_source() -> 
         values,
     )?;
 
-    let noop = package
-        .edit_slide_chart_data(SlideSelector::index(0), ChartSelector::index(0))?
-        .set(before.clone())
-        .commit()?;
+    let edit = package.edit_slide_chart_data(SlideSelector::index(0), ChartSelector::index(0))?;
+    assert!(format!("{edit:?}").contains("has_selection: false"));
+    let noop = edit.set(before.clone()).commit()?;
     assert!(noop.patch().is_noop());
     assert!(!noop.diagnostics().changed());
     assert_eq!(exact_bytes(noop.package())?, source);
@@ -193,7 +195,9 @@ fn chart_data_transaction_refuses_label_and_shape_changes() -> TestResult {
             .edit_slide_chart_data(SlideSelector::index(0), ChartSelector::index(0))?
             .set(changed_labels)
             .commit(),
-        Err(SlideChartDataError::LabelsChanged)
+        Err(SlideChartDataError::Refused(
+            litchi_keynote::chart::data::Refusal::LabelsChanged
+        ))
     ));
 
     let mut changed_shape = before.values().to_owned();
@@ -212,7 +216,9 @@ fn chart_data_transaction_refuses_label_and_shape_changes() -> TestResult {
             .edit_slide_chart_data(SlideSelector::index(0), ChartSelector::index(0))?
             .set(changed_shape)
             .commit(),
-        Err(SlideChartDataError::LabelsChanged)
+        Err(SlideChartDataError::Refused(
+            litchi_keynote::chart::data::Refusal::LabelsChanged
+        ))
     ));
     Ok(())
 }

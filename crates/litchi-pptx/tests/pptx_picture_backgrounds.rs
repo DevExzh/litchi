@@ -4,6 +4,9 @@
     reason = "test assertions panic on failure by design"
 )]
 
+mod in_place;
+use in_place::InPlace as _;
+
 use litchi_opc::PackURI;
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::part::BlobPart;
@@ -58,7 +61,7 @@ fn picture_background_rejects_external_image_relationships() {
         .r_id()
         .to_string();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             let slide = opc.get_part_mut(&slide_name)?;
             slide.rels_mut().remove(&relationship_id);
             slide.rels_mut().add_relationship(
@@ -96,19 +99,20 @@ fn expected_background() -> SlideBackground {
 
 fn package_with_picture_background() -> Package {
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
-    let mut package = Package::new().unwrap();
-    package
-        .presentation_mut()
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    builder
+        .presentation()
         .unwrap()
         .add_slide()
         .unwrap()
         .set_background(expected_background());
+    let package = builder.build().unwrap();
     package.save(output.path()).unwrap();
     let mut package = Package::open(output.path()).unwrap();
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
     let image_name = PackURI::new("/ppt/media/background.png").unwrap();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             let slide = opc.get_part_mut(&slide_name)?;
             let xml = std::str::from_utf8(slide.blob()).unwrap();
             let updated = xml.replace("<a:blip/>", r#"<a:blip r:embed="rIdBackground"/>"#);

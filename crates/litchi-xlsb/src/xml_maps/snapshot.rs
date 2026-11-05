@@ -17,12 +17,11 @@ use super::{
     Limits, MappedTable, SingleCellBinding, SingleCellTable, XmlMapConformance, XmlMapInfo,
     XmlMapLimits,
 };
-use crate::external_link::ExternalLinkLimits;
 use crate::package::error::Result;
 
 /// Finite package and codec ceilings for one XLSB XML Maps snapshot.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ReadLimits {
+pub struct SemanticLimits {
     /// Limits for the shared SpreadsheetML MapInfo XML codec.
     pub xml_maps: XmlMapLimits,
     /// Limits for BIFF12 table and single-cell binding streams.
@@ -39,9 +38,12 @@ pub struct ReadLimits {
     pub max_total_bindings: usize,
     /// Maximum UTF-16 XPath units accumulated across every XML binding.
     pub max_total_xpath_units: usize,
+    /// Raw BIFF12 record and string limits for the table and connection
+    /// streams the snapshot reads.
+    pub raw: crate::raw::Limits,
 }
 
-impl ReadLimits {
+impl SemanticLimits {
     /// Conservative finite XML Maps package limits.
     pub const DEFAULT: Self = Self {
         xml_maps: XmlMapLimits::DEFAULT,
@@ -52,10 +54,11 @@ impl ReadLimits {
         max_total_bytes: 512 * 1024 * 1024,
         max_total_bindings: 1_000_000,
         max_total_xpath_units: 64 * 1024 * 1024,
+        raw: crate::raw::Limits::DEFAULT,
     };
 }
 
-impl Default for ReadLimits {
+impl Default for SemanticLimits {
     fn default() -> Self {
         Self::DEFAULT
     }
@@ -69,45 +72,15 @@ pub struct Snapshot {
     mapped_tables: Vec<MappedTable>,
     single_cell_tables: Vec<SingleCellTable>,
     single_cell_ranges: Vec<Option<Range<usize>>>,
-    limits: ReadLimits,
+    limits: SemanticLimits,
     source: SourceState,
 }
 
 impl Snapshot {
-    /// Read an XLSB XML Maps snapshot using conservative finite defaults.
-    pub fn read(package: &OpcPackage) -> Result<Self> {
-        Self::read_with_limits(package, ReadLimits::DEFAULT)
-    }
-
-    /// Read an XLSB XML Maps snapshot with explicit finite limits.
-    pub fn read_with_limits(package: &OpcPackage, limits: ReadLimits) -> Result<Self> {
-        Self::read_with_limits_and_external_link_limits(
-            package,
-            limits,
-            ExternalLinkLimits::default(),
-        )
-    }
-
-    /// Read an XLSB XML Maps snapshot with independent XML Maps and
-    /// external-link resource policies.
-    pub fn read_with_limits_and_external_link_limits(
-        package: &OpcPackage,
-        limits: ReadLimits,
-        external_link_limits: ExternalLinkLimits,
-    ) -> Result<Self> {
-        super::package::preflight(package, limits)?;
-        let workbook = crate::Workbook::from_opc_package_with_external_link_limits(
-            package.clone(),
-            external_link_limits,
-        )?;
-        let worksheets = workbook.xml_maps_worksheet_parts()?;
-        Self::read_for_worksheets(package, worksheets, limits)
-    }
-
     pub(crate) fn read_for_worksheets(
         package: &OpcPackage,
         worksheets: Vec<PackURI>,
-        limits: ReadLimits,
+        limits: SemanticLimits,
     ) -> Result<Self> {
         let loaded = super::package::read_with_limits(package, worksheets, limits)?;
         let workbook = package.main_document_part()?;
@@ -144,12 +117,6 @@ impl Snapshot {
             .map(SourcePart::bytes)
     }
 
-    /// Start a detached, source-bound XML Maps transaction.
-    #[must_use]
-    pub fn edit(&self) -> super::Transaction {
-        super::Transaction::new(self.clone())
-    }
-
     /// Borrow the individual XML maps, or an empty slice when no catalog exists.
     pub fn maps(&self) -> &[super::XmlMap] {
         self.map_info.as_ref().map_or(&[], |info| &info.maps)
@@ -174,7 +141,7 @@ impl Snapshot {
     }
 
     /// Return the exact limits used to parse this snapshot.
-    pub const fn limits(&self) -> ReadLimits {
+    pub const fn limits(&self) -> SemanticLimits {
         self.limits
     }
 
@@ -265,7 +232,7 @@ impl Snapshot {
             mapped_tables: Vec::new(),
             single_cell_tables: Vec::new(),
             single_cell_ranges: Vec::new(),
-            limits: ReadLimits::DEFAULT,
+            limits: SemanticLimits::DEFAULT,
             source: SourceState {
                 root_relationships,
                 workbook: SourcePart {

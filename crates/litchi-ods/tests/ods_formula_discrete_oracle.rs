@@ -100,7 +100,8 @@ fn compare_function(function: &str) {
     let context = Context::new(&execution, Position::new("Main", 0, 0));
     for row in rows.iter().filter(|row| row["function"] == function) {
         let formula = row["formula"].as_str().expect("formula");
-        let expression = Expression::parse(formula).expect("closed expression parses");
+        let expression =
+            Expression::parse(formula, &Default::default()).expect("closed expression parses");
         let result = evaluate(&expression, &NoCells, &context, &Limits::default())
             .unwrap_or_else(|error| panic!("{formula}: {error}"));
         check(

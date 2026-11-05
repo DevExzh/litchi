@@ -1,0 +1,2 @@
+{"native_median_us":58.084199999999996,"native_min_us":57.3212,"order":"ABBA","ratio":1.7322352722427095,"repeats":10,"rounds":15,"scenario":"doc_text_set","unified_median_us":100.61549999999998,"unified_min_us":99.7315}
+{"native_median_us":98.5554,"native_min_us":95.1394,"order":"ABBA","ratio":1.025122925785903,"repeats":10,"rounds":15,"scenario":"doc_package_text_set","unified_median_us":101.03139999999999,"unified_min_us":97.8385}

@@ -30,6 +30,19 @@ use crate::parts::{PresentationPart, SlideReference};
 use crate::{Error, Result, SlideCopyRefusal};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
+#[cfg(test)]
+macro_rules! assert_refused_kind {
+    ($operation:expr, $expected:expr) => {{
+        match $operation {
+            Err(Error::Refused(refusal)) => {
+                assert_eq!(refusal.kind(), $expected);
+            },
+            Err(error) => panic!("unexpected error: {error:?}"),
+            Ok(_) => panic!("operation unexpectedly succeeded"),
+        }
+    }};
+}
+
 const MAX_XML_DEPTH: usize = 256;
 const MAX_XML_NODES: usize = 1_000_000;
 const MAX_STAGING_OVERHEAD: usize = 256;
@@ -41,6 +54,8 @@ const TRANSITIONAL_REL_NAMESPACE: &[u8] =
     b"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const STRICT_REL_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/officeDocument/relationships";
 const STRICT_PML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/presentationml/main";
+const TRANSITIONAL_PML_NAMESPACE: &[u8] =
+    b"http://schemas.openxmlformats.org/presentationml/2006/main";
 const TRANSITIONAL_DML_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/main";
 const STRICT_DML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/main";
 const TRANSITIONAL_CHART_NAMESPACE: &[u8] =
@@ -85,7 +100,7 @@ impl RootNamespace {
 /// or more direct embedded images and chart hosts, and no diagram, table,
 /// notes, comments, external, or shared-owner relationship. No inverse or
 /// durable patch is represented.
-pub struct SourceBackedCrossSlideCopyPlan {
+pub(crate) struct SourceBackedCrossSlideCopyPlan {
     source: SourceBackedPresentation,
     source_position: usize,
     destination_slide_position: usize,
@@ -308,7 +323,7 @@ enum PreparedSlideRelationship {
 
 /// Semantic result of one published source-backed cross-presentation copy.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SourceBackedCrossSlideCopySnapshot {
+pub struct CopiedSlide {
     source_position: usize,
     destination_slide_position: usize,
     insertion_position: usize,
@@ -317,32 +332,43 @@ pub struct SourceBackedCrossSlideCopySnapshot {
 }
 
 impl SourceBackedCrossSlideCopyPlan {
+    /// What publishing this plan reports.
+    pub(crate) fn predicted(&self) -> Result<CopiedSlide> {
+        Ok(CopiedSlide {
+            source_position: self.source_position,
+            destination_slide_position: self.destination_slide_position,
+            insertion_position: self.insertion_position,
+            destination_slide_count: self.destination_slide_count,
+            source_name: clone_string(&self.source_name, "source-backed planned slide name")?,
+        })
+    }
+
     /// Source zero-based slide position captured by this plan.
     #[must_use]
-    pub const fn source_position(&self) -> usize {
+    pub(crate) const fn source_position(&self) -> usize {
         self.source_position
     }
 
     /// Destination slide position whose registered layout is reused.
     #[must_use]
-    pub const fn destination_slide_position(&self) -> usize {
+    pub(crate) const fn destination_slide_position(&self) -> usize {
         self.destination_slide_position
     }
 
     /// Destination zero-based insertion position captured by this plan.
     #[must_use]
-    pub const fn insertion_position(&self) -> usize {
+    pub(crate) const fn insertion_position(&self) -> usize {
         self.insertion_position
     }
 
     /// Destination slide count after the planned insertion.
     #[must_use]
-    pub const fn destination_slide_count(&self) -> usize {
+    pub(crate) const fn destination_slide_count(&self) -> usize {
         self.destination_slide_count
     }
 }
 
-impl SourceBackedCrossSlideCopySnapshot {
+impl CopiedSlide {
     /// Source zero-based slide position published by this operation.
     #[must_use]
     pub const fn source_position(&self) -> usize {
@@ -385,7 +411,7 @@ impl SourceBackedPresentationEditor {
     /// and `insertion_position` selects the destination slide-list position.
     /// Unnamed slides keep their absent or empty producer names. Nonempty name
     /// collisions are refused until an explicit resolver is supplied.
-    pub fn plan_cross_slide_copy(
+    pub(crate) fn plan_cross_slide_copy(
         &self,
         source: &SourceBackedPresentation,
         source_position: usize,
@@ -442,18 +468,18 @@ impl SourceBackedPresentationEditor {
     /// revisions before output. The OPC topology publisher owns raw ZIP
     /// preservation, content-types, canonical relationship members, ZIP32
     /// limits, and incomplete-output classification.
-    pub fn publish_cross_slide_copy_to_stream<W: Write>(
+    pub(crate) fn publish_cross_slide_copy_to_stream<W: Write>(
         self,
         writer: W,
         plan: &SourceBackedCrossSlideCopyPlan,
-    ) -> Result<SourceBackedCrossSlideCopySnapshot> {
+    ) -> Result<CopiedSlide> {
         self.package.check_execution()?;
         plan.source.check_source()?;
         let execution_context = self.package.execution_context();
         if self.package.source_lineage() != plan.destination_lineage
             || plan.source.inner.package.source_lineage() != plan.source_lineage
         {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         let current = prepare(
             &self,
@@ -464,7 +490,7 @@ impl SourceBackedPresentationEditor {
             Some(plan),
         )?;
         if !current.matches(plan) {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         verify_candidate(&self, &plan.source, &current)?;
         let _memory_reservation = current.memory_reservation.clone();
@@ -489,7 +515,7 @@ impl SourceBackedPresentationEditor {
                 other => other,
             });
         }
-        Ok(SourceBackedCrossSlideCopySnapshot {
+        Ok(CopiedSlide {
             source_position: plan.source_position,
             destination_slide_position: plan.destination_slide_position,
             insertion_position: plan.insertion_position,
@@ -861,14 +887,14 @@ fn prepare(
     if source_refs.len() != source.inner.slides.len()
         || destination_refs.len() != editor.slides.len()
     {
-        return Err(Error::StaleSource);
+        return Err(Error::PatchConflict);
     }
     for (reference, slide) in source_refs.iter().zip(source.inner.slides.iter()) {
         check_execution(execution_context)?;
         if reference.id() != slide.slide_id
             || reference.relationship_id() != slide.binding.slide_reference_id
         {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
     }
     for (reference, slide) in destination_refs.iter().zip(editor.slides.iter()) {
@@ -876,7 +902,7 @@ fn prepare(
         if reference.id() != slide.slide_id
             || reference.relationship_id() != slide.binding.slide_reference_id
         {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
     }
     validate_registered_slide_parts(
@@ -1101,9 +1127,8 @@ fn prepare(
                 } else {
                     let source_chart_part = source.inner.package.part(&source_chart_uri).map_err(
                         |error| match error {
-                            litchi_opc::OpcError::PartNotFound(_) => Error::SlideCopyPlan {
-                                kind: SlideCopyRefusal::AmbiguousTopology,
-                                detail: "embedded chart target part is missing".into(),
+                            litchi_opc::OpcError::PartNotFound(_) => {
+                                Error::slide_copy_refused(SlideCopyRefusal::AmbiguousTopology)
                             },
                             other => Error::Opc(other),
                         },
@@ -1178,9 +1203,8 @@ fn prepare(
                     .package
                     .part(&source_image_uri)
                     .map_err(|error| match error {
-                        litchi_opc::OpcError::PartNotFound(_) => Error::SlideCopyPlan {
-                            kind: SlideCopyRefusal::AmbiguousTopology,
-                            detail: "embedded image target part is missing".into(),
+                        litchi_opc::OpcError::PartNotFound(_) => {
+                            Error::slide_copy_refused(SlideCopyRefusal::AmbiguousTopology)
                         },
                         other => Error::Opc(other),
                     })?;
@@ -1231,34 +1255,20 @@ fn prepare(
         )?);
         slide_relationship_order.push(PreparedSlideRelationship::Image(relationship_index));
     }
-    let source_layouts = registered_layouts(
+    validate_registered_source_layout(
         &source.inner.package,
         &source_presentation_view,
         source_presentation_data.as_bytes(),
-        source_dialect,
-        "source",
+        &source_layout_uri,
         execution_context,
     )?;
-    let mut source_layout_registered = false;
-    for uri in &source_layouts {
-        check_execution(execution_context)?;
-        if uri.is_equivalent_to(&source_layout_uri) {
-            source_layout_registered = true;
-            break;
-        }
-    }
-    if !source_layout_registered {
-        return refusal(
-            SlideCopyRefusal::AmbiguousTopology,
-            "source slide layout is not registered by a slide master",
-        );
-    }
     let destination_layouts = registered_layouts(
         &editor.package,
         &destination_presentation_view,
         destination_presentation_data.as_bytes(),
         destination_dialect,
         "destination",
+        false,
         execution_context,
     )?;
     let destination_anchor = editor.slides[destination_slide_position].clone();
@@ -1333,10 +1343,7 @@ fn prepare(
         execution_context,
     )?;
     let source_name = crate::namespace::presentation_name(source_slide_data.as_bytes())?
-        .ok_or_else(|| Error::SlideCopyPlan {
-            kind: SlideCopyRefusal::AmbiguousTopology,
-            detail: "source slide common data is missing".into(),
-        })?;
+        .ok_or_else(|| Error::slide_copy_refused(SlideCopyRefusal::AmbiguousTopology))?;
     if !source_name.is_empty() && names.contains(&normalize_name(&source_name)?) {
         return refusal(
             SlideCopyRefusal::AmbiguousTopology,
@@ -1548,13 +1555,16 @@ fn prepare(
         check_execution(execution_context)?;
         let declared_size =
             usize::try_from(image_part.declared_size).map_err(|_| Error::Limit {
-                resource: "source-backed embedded image bytes",
-                limit: usize::MAX,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::SourceBytes),
+                observed: usize::MAX,
+                maximum: usize::MAX,
             })?;
         if image_part.declared_size > editor.limits.max_total_part_bytes() {
             return Err(Error::Limit {
-                resource: "source-backed embedded image bytes",
-                limit: usize::try_from(editor.limits.max_total_part_bytes()).unwrap_or(usize::MAX),
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::SourceBytes),
+                observed: usize::try_from(image_part.declared_size).unwrap_or(usize::MAX),
+                maximum: usize::try_from(editor.limits.max_total_part_bytes())
+                    .unwrap_or(usize::MAX),
             });
         }
         image_size = image_size
@@ -1566,13 +1576,16 @@ fn prepare(
         check_execution(execution_context)?;
         let declared_size =
             usize::try_from(chart_part.declared_size).map_err(|_| Error::Limit {
-                resource: "source-backed embedded chart bytes",
-                limit: usize::MAX,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::SourceBytes),
+                observed: usize::MAX,
+                maximum: usize::MAX,
             })?;
         if chart_part.declared_size > editor.limits.max_total_part_bytes() {
             return Err(Error::Limit {
-                resource: "source-backed embedded chart bytes",
-                limit: usize::try_from(editor.limits.max_total_part_bytes()).unwrap_or(usize::MAX),
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::SourceBytes),
+                observed: usize::try_from(chart_part.declared_size).unwrap_or(usize::MAX),
+                maximum: usize::try_from(editor.limits.max_total_part_bytes())
+                    .unwrap_or(usize::MAX),
             });
         }
         chart_size = chart_size
@@ -1784,8 +1797,9 @@ fn prepare(
         let actual_size = data.as_bytes().len();
         let declared_size =
             usize::try_from(image_part.declared_size).map_err(|_| Error::Limit {
-                resource: "source-backed embedded image bytes",
-                limit: usize::MAX,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::SourceBytes),
+                observed: usize::MAX,
+                maximum: usize::MAX,
             })?;
         if actual_size != declared_size {
             return Err(Error::Invalid(
@@ -1844,8 +1858,9 @@ fn prepare(
         let actual_size = data.as_bytes().len();
         let declared_size =
             usize::try_from(chart_part.declared_size).map_err(|_| Error::Limit {
-                resource: "source-backed embedded chart bytes",
-                limit: usize::MAX,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::SourceBytes),
+                observed: usize::MAX,
+                maximum: usize::MAX,
             })?;
         if actual_size != declared_size {
             return Err(Error::Invalid(
@@ -2044,26 +2059,29 @@ fn verify_candidate(
     let source_data = source_view.data()?;
     if let Some(original) = &prepared.source_slide_original_xml {
         if source_data.as_bytes() != original.as_slice() {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
     } else if source_data.as_bytes() != prepared.source_slide_xml.as_slice() {
-        return Err(Error::StaleSource);
+        return Err(Error::PatchConflict);
     }
     let mut second_read_bytes = 0usize;
     for image in &prepared.images {
         check_execution(execution_context)?;
         let declared_size = usize::try_from(image.declared_size).map_err(|_| Error::Limit {
-            resource: "source-backed candidate image bytes",
-            limit: usize::MAX,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::SourceBytes),
+            observed: usize::MAX,
+            maximum: usize::MAX,
         })?;
         if image.declared_size > editor.limits.max_total_part_bytes() {
             return Err(Error::Limit {
-                resource: "source-backed candidate image bytes",
-                limit: usize::try_from(editor.limits.max_total_part_bytes()).unwrap_or(usize::MAX),
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::SourceBytes),
+                observed: usize::try_from(image.declared_size).unwrap_or(usize::MAX),
+                maximum: usize::try_from(editor.limits.max_total_part_bytes())
+                    .unwrap_or(usize::MAX),
             });
         }
         if declared_size != image.bytes.len() {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         let image_view =
             source
@@ -2071,15 +2089,15 @@ fn verify_candidate(
                 .package
                 .part(&image.source_uri)
                 .map_err(|error| match error {
-                    litchi_opc::OpcError::PartNotFound(_) => Error::StaleSource,
+                    litchi_opc::OpcError::PartNotFound(_) => Error::PatchConflict,
                     other => Error::Opc(other),
                 })?;
         if image_view.declared_uncompressed_size()? != image.declared_size {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         if image_view.content_type() != image.content_type.as_str() || !image_view.rels().is_empty()
         {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         second_read_bytes = second_read_bytes
             .checked_add(declared_size)
@@ -2088,17 +2106,20 @@ fn verify_candidate(
     for chart in &prepared.charts {
         check_execution(execution_context)?;
         let declared_size = usize::try_from(chart.declared_size).map_err(|_| Error::Limit {
-            resource: "source-backed candidate chart bytes",
-            limit: usize::MAX,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::SourceBytes),
+            observed: usize::MAX,
+            maximum: usize::MAX,
         })?;
         if chart.declared_size > editor.limits.max_total_part_bytes() {
             return Err(Error::Limit {
-                resource: "source-backed candidate chart bytes",
-                limit: usize::try_from(editor.limits.max_total_part_bytes()).unwrap_or(usize::MAX),
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::SourceBytes),
+                observed: usize::try_from(chart.declared_size).unwrap_or(usize::MAX),
+                maximum: usize::try_from(editor.limits.max_total_part_bytes())
+                    .unwrap_or(usize::MAX),
             });
         }
         if declared_size != chart.bytes.len() {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         let chart_view =
             source
@@ -2106,14 +2127,14 @@ fn verify_candidate(
                 .package
                 .part(&chart.source_uri)
                 .map_err(|error| match error {
-                    litchi_opc::OpcError::PartNotFound(_) => Error::StaleSource,
+                    litchi_opc::OpcError::PartNotFound(_) => Error::PatchConflict,
                     other => Error::Opc(other),
                 })?;
         if chart_view.declared_uncompressed_size()? != chart.declared_size
             || chart_view.content_type() != chart.content_type.as_str()
             || !chart_view.rels().is_empty()
         {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         second_read_bytes = second_read_bytes
             .checked_add(declared_size)
@@ -2146,14 +2167,14 @@ fn verify_candidate(
                 .package
                 .part(&image.source_uri)
                 .map_err(|error| match error {
-                    litchi_opc::OpcError::PartNotFound(_) => Error::StaleSource,
+                    litchi_opc::OpcError::PartNotFound(_) => Error::PatchConflict,
                     other => Error::Opc(other),
                 })?;
         if image_view.declared_uncompressed_size()? != image.declared_size
             || image_view.content_type() != image.content_type.as_str()
             || !image_view.rels().is_empty()
         {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         let image_data = image_view.data()?;
         let actual_size = u64::try_from(image_data.as_bytes().len())
@@ -2163,7 +2184,7 @@ fn verify_candidate(
             || image_view.content_type() != image.content_type.as_str()
             || !image_view.rels().is_empty()
         {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
     }
     let staged_source_dialect = validate_source_slide_xml(
@@ -2179,20 +2200,20 @@ fn verify_candidate(
                 .package
                 .part(&chart.source_uri)
                 .map_err(|error| match error {
-                    litchi_opc::OpcError::PartNotFound(_) => Error::StaleSource,
+                    litchi_opc::OpcError::PartNotFound(_) => Error::PatchConflict,
                     other => Error::Opc(other),
                 })?;
         if chart_view.declared_uncompressed_size()? != chart.declared_size
             || chart_view.content_type() != chart.content_type.as_str()
             || !chart_view.rels().is_empty()
         {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         let chart_data = chart_view.data()?;
         let actual_size = u64::try_from(chart_data.as_bytes().len())
             .map_err(|_| invalid("embedded chart byte count exceeds u64"))?;
         if actual_size != chart.declared_size || chart_data.as_bytes() != chart.bytes.as_slice() {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         validate_chart_xml(
             chart_data.as_bytes(),
@@ -2788,11 +2809,9 @@ fn direct_embedded_images(
                             );
                         }
                     }
-                    let relationship_id =
-                        chart_relationship_id.ok_or_else(|| Error::SlideCopyPlan {
-                            kind: SlideCopyRefusal::UnknownSemanticSurface,
-                            detail: "source slide chart host has no chart relationship".into(),
-                        })?;
+                    let relationship_id = chart_relationship_id.ok_or_else(|| {
+                        Error::slide_copy_refused(SlideCopyRefusal::UnknownSemanticSurface)
+                    })?;
                     let relationship_key = chart_relationship_key
                         .as_deref()
                         .ok_or_else(|| invalid("source slide chart relationship key is missing"))?;
@@ -2955,12 +2974,9 @@ fn direct_embedded_images(
                             }
                         }
                     }
-                    let relationship_id =
-                        blip_relationship_id.ok_or_else(|| Error::SlideCopyPlan {
-                            kind: SlideCopyRefusal::UnknownSemanticSurface,
-                            detail: "source slide picture has no embedded image relationship"
-                                .into(),
-                        })?;
+                    let relationship_id = blip_relationship_id.ok_or_else(|| {
+                        Error::slide_copy_refused(SlideCopyRefusal::UnknownSemanticSurface)
+                    })?;
                     let relationship_key = blip_relationship_key
                         .as_deref()
                         .ok_or_else(|| invalid("source slide image relationship key is missing"))?;
@@ -3185,10 +3201,7 @@ fn embed_attribute_range(
             .checked_add(1)
             .ok_or_else(|| invalid("source slide image attribute offset overflow"))?;
     }
-    found.ok_or_else(|| Error::SlideCopyPlan {
-        kind: SlideCopyRefusal::UnknownSemanticSurface,
-        detail: "source slide picture embed attribute range is missing".into(),
-    })
+    found.ok_or_else(|| Error::slide_copy_refused(SlideCopyRefusal::UnknownSemanticSurface))
 }
 
 const EMBED_ATTRIBUTE_EXECUTION_CHECK_STRIDE: usize = 64;
@@ -3318,7 +3331,7 @@ fn stage_inserted_source_xml(
     target_bytes: &[u8],
 ) -> Result<SourceXmlPart> {
     if source_xml.bytes() != source_bytes {
-        return Err(Error::StaleSource);
+        return Err(Error::PatchConflict);
     }
     if target_bytes.len() <= source_bytes.len() {
         return Err(invalid(
@@ -3403,7 +3416,7 @@ fn stage_rewritten_source_xml(
     execution_context: Option<&ExecutionContext>,
 ) -> Result<SourceXmlPart> {
     if source_xml.bytes() != source_bytes {
-        return Err(Error::StaleSource);
+        return Err(Error::PatchConflict);
     }
     let references = rewrite_references(image_references, chart_references, execution_context)?;
     let mut edits = Vec::new();
@@ -3469,10 +3482,7 @@ fn mapped_relationship_id<'a>(
             found = Some(relationship.target_relationship_id.as_str());
         }
     }
-    found.ok_or_else(|| Error::SlideCopyPlan {
-        kind: SlideCopyRefusal::AmbiguousTopology,
-        detail: "source slide relationship mapping is missing".into(),
-    })
+    found.ok_or_else(|| Error::slide_copy_refused(SlideCopyRefusal::AmbiguousTopology))
 }
 
 fn rewritten_embedded_xml_len(
@@ -3582,12 +3592,19 @@ enum Dialect {
     Strict,
 }
 
+/// The layouts the presentation's slide masters register. With `lenient`
+/// (slide removal, record 0303), a master's own content is not held to the
+/// copy surface: unknown extension namespaces, relationships besides its
+/// layouts and theme (background pictures, for instance) and a theme with
+/// its own relationships are admitted, because removal reads only the
+/// layout registration.
 fn registered_layouts(
     package: &SourceBackedPackage,
     presentation: &PartView<'_>,
     xml: &[u8],
     dialect: Dialect,
     context: &'static str,
+    lenient: bool,
     execution_context: Option<&ExecutionContext>,
 ) -> Result<Vec<PackURI>> {
     let master_ids = relationship_list(xml, b"sldMasterIdLst", b"sldMasterId", execution_context)?;
@@ -3650,19 +3667,24 @@ fn registered_layouts(
             });
         }
         let master_data = master.data()?;
-        if validate_xml(
-            master_data.as_bytes(),
-            b"sldMaster",
-            RootNamespace::PresentationMl,
-            true,
-            true,
-            true,
-            false,
-            false,
-            "slide master",
-            execution_context,
-        )? != dialect
-        {
+        crate::source_limits::validate_xml_limits(master_data.as_bytes(), package.read_limits())?;
+        let master_dialect = if lenient {
+            root_dialect(master_data.as_bytes(), b"sldMaster", "slide master")?
+        } else {
+            validate_xml(
+                master_data.as_bytes(),
+                b"sldMaster",
+                RootNamespace::PresentationMl,
+                true,
+                true,
+                true,
+                false,
+                false,
+                "slide master",
+                execution_context,
+            )?
+        };
+        if master_dialect != dialect {
             return refusal(
                 SlideCopyRefusal::UnknownSemanticSurface,
                 format!("{context} slide master mixes dialects"),
@@ -3687,7 +3709,7 @@ fn registered_layouts(
                 relation_count = relation_count
                     .checked_add(1)
                     .ok_or_else(|| invalid("relationship count overflow"))?;
-            } else {
+            } else if !lenient {
                 return refusal(
                     SlideCopyRefusal::UnsupportedRelationship,
                     format!("{context} slide master has an unsupported relationship"),
@@ -3731,6 +3753,11 @@ fn registered_layouts(
                     format!("{context} repeats a slide layout"),
                 );
             }
+            let layout_data = layout.data()?;
+            crate::source_limits::validate_xml_limits(
+                layout_data.as_bytes(),
+                package.read_limits(),
+            )?;
             result.push(layout_uri);
         }
         let mut theme = None;
@@ -3746,14 +3773,168 @@ fn registered_layouts(
         check_execution(execution_context)?;
         validate_internal(theme, dialect, rt::THEME, STRICT_THEME_REL, "theme")?;
         let theme_part = package.part(&theme.target_partname()?)?;
-        if theme_part.content_type() != ct::OFC_THEME || !theme_part.rels().is_empty() {
+        if theme_part.content_type() != ct::OFC_THEME || (!lenient && !theme_part.rels().is_empty())
+        {
             return refusal(
                 SlideCopyRefusal::UnsupportedRelationship,
                 format!("{context} theme is not a leaf part"),
             );
         }
+        let theme_data = theme_part.data()?;
+        crate::source_limits::validate_xml_limits(theme_data.as_bytes(), package.read_limits())?;
     }
     Ok(result)
+}
+
+/// Select one registered source layout by its exact producer-visible name.
+///
+/// This is intentionally a metadata-only companion to [`registered_layouts`].
+/// It validates the same physical master/layout/theme graph and reads only the
+/// selected layout XML needed for its `p:cSld@name`; it does not acquire the
+/// detached shape scenes used by the public source layout snapshots.
+///
+/// Slide insertion reads only the layout registration, so the presentation
+/// root's extensions (a section list, slide guides) and the masters' own
+/// content are read leniently, as for removal (record 0303); the root's
+/// slide bindings are proven separately by the insertion planner.
+pub(super) fn registered_source_layout_by_name(
+    package: &SourceBackedPackage,
+    presentation: &PartView<'_>,
+    xml: &[u8],
+    layout_name: &str,
+    execution_context: Option<&ExecutionContext>,
+) -> Result<PackURI> {
+    const CONTEXT: &str = "source";
+
+    check_execution(execution_context)?;
+    crate::source_limits::validate_xml_limits(xml, package.read_limits())?;
+    let dialect = validate_xml(
+        xml,
+        b"presentation",
+        RootNamespace::PresentationMl,
+        true,
+        true,
+        true,
+        false,
+        true,
+        CONTEXT,
+        execution_context,
+    )?;
+    let registered = registered_layouts(
+        package,
+        presentation,
+        xml,
+        dialect,
+        CONTEXT,
+        true,
+        execution_context,
+    )?;
+    let mut selected = None;
+    let mut matches = 0usize;
+    for layout_uri in registered {
+        check_execution(execution_context)?;
+        let layout = package.part(&layout_uri)?;
+        let data = layout.data()?;
+        let name = crate::namespace::presentation_name(data.as_bytes())?
+            .unwrap_or_else(|| layout_uri.to_string());
+        if name == layout_name {
+            matches = matches
+                .checked_add(1)
+                .ok_or_else(|| invalid("source layout match count overflow"))?;
+            selected = Some(layout_uri);
+        }
+    }
+    if matches > 1 {
+        return Err(Error::AmbiguousSlideLayoutName {
+            name: layout_name.to_owned(),
+            matches,
+        });
+    }
+    selected.ok_or_else(|| Error::SlideLayoutNameNotFound(layout_name.to_owned()))
+}
+
+pub(super) fn validate_registered_source_layout(
+    package: &SourceBackedPackage,
+    presentation: &PartView<'_>,
+    xml: &[u8],
+    selected: &PackURI,
+    execution_context: Option<&ExecutionContext>,
+) -> Result<()> {
+    registered_source_layout(
+        package,
+        presentation,
+        xml,
+        selected,
+        true,
+        execution_context,
+    )
+}
+
+/// Prove that `selected` is a layout a slide master registers, for a slide
+/// removal. Removal leaves the presentation root's extensions and other
+/// surfaces untouched; the removal planner proves separately that none of
+/// them names the removed slide (record 0303). Only the root's dialect and
+/// the master/layout graph are checked here.
+pub(super) fn validate_registered_removal_layout(
+    package: &SourceBackedPackage,
+    presentation: &PartView<'_>,
+    xml: &[u8],
+    selected: &PackURI,
+    execution_context: Option<&ExecutionContext>,
+) -> Result<()> {
+    registered_source_layout(
+        package,
+        presentation,
+        xml,
+        selected,
+        false,
+        execution_context,
+    )
+}
+
+fn registered_source_layout(
+    package: &SourceBackedPackage,
+    presentation: &PartView<'_>,
+    xml: &[u8],
+    selected: &PackURI,
+    reject_presentation_surfaces: bool,
+    execution_context: Option<&ExecutionContext>,
+) -> Result<()> {
+    const CONTEXT: &str = "source";
+
+    check_execution(execution_context)?;
+    crate::source_limits::validate_xml_limits(xml, package.read_limits())?;
+    let dialect = validate_xml(
+        xml,
+        b"presentation",
+        RootNamespace::PresentationMl,
+        true,
+        true,
+        true,
+        reject_presentation_surfaces,
+        !reject_presentation_surfaces,
+        CONTEXT,
+        execution_context,
+    )?;
+    let registered = registered_layouts(
+        package,
+        presentation,
+        xml,
+        dialect,
+        CONTEXT,
+        !reject_presentation_surfaces,
+        execution_context,
+    )?;
+    if registered
+        .iter()
+        .any(|layout| layout.is_equivalent_to(selected))
+    {
+        return Ok(());
+    }
+    refusal(
+        SlideCopyRefusal::AmbiguousTopology,
+        "source slide layout is not registered by a slide master",
+    )
 }
 
 fn prove_graphs(
@@ -4166,7 +4347,7 @@ fn validate_presentation_slide_bindings(
     execution_context: Option<&ExecutionContext>,
 ) -> Result<()> {
     if references.len() != slides.len() {
-        return Err(Error::StaleSource);
+        return Err(Error::PatchConflict);
     }
     for (reference, slide) in references.iter().zip(slides.iter()) {
         check_execution(execution_context)?;
@@ -4185,9 +4366,8 @@ fn validate_presentation_slide_bindings(
             );
         }
         let target_part = package.part(&target).map_err(|error| match error {
-            litchi_opc::OpcError::PartNotFound(_) => Error::SlideCopyPlan {
-                kind: SlideCopyRefusal::AmbiguousTopology,
-                detail: format!("{context} slide relationship target is missing"),
+            litchi_opc::OpcError::PartNotFound(_) => {
+                Error::slide_copy_refused(SlideCopyRefusal::AmbiguousTopology)
             },
             other => Error::Opc(other),
         })?;
@@ -4221,10 +4401,7 @@ fn allocate_slide_id(
         if used_id == candidate {
             candidate = candidate
                 .checked_add(1)
-                .ok_or_else(|| Error::SlideCopyPlan {
-                    kind: SlideCopyRefusal::AmbiguousTopology,
-                    detail: "slide ID space is exhausted".into(),
-                })?;
+                .ok_or_else(|| Error::slide_copy_refused(SlideCopyRefusal::AmbiguousTopology))?;
         } else if used_id > candidate {
             break;
         }
@@ -4355,10 +4532,7 @@ fn allocate_media_uri(
         .rsplit('/')
         .next()
         .filter(|name| !name.is_empty())
-        .ok_or_else(|| Error::SlideCopyPlan {
-            kind: SlideCopyRefusal::AmbiguousTopology,
-            detail: "embedded image target has no media member name".into(),
-        })?;
+        .ok_or_else(|| Error::slide_copy_refused(SlideCopyRefusal::AmbiguousTopology))?;
     let (stem, extension) = source_name.rsplit_once('.').unwrap_or((source_name, ""));
     let maximum = physical_names
         .len()
@@ -4572,10 +4746,9 @@ fn assigned_relationship_id<'a>(
                 .ok_or_else(|| invalid("prepared target relationship ID is missing"));
         }
     }
-    Err(Error::SlideCopyPlan {
-        kind: SlideCopyRefusal::AmbiguousTopology,
-        detail: "prepared source relationship ID is missing".into(),
-    })
+    Err(Error::slide_copy_refused(
+        SlideCopyRefusal::AmbiguousTopology,
+    ))
 }
 
 fn folded_ascii_name(value: &str, resource: &'static str) -> Result<String> {
@@ -4623,12 +4796,8 @@ fn destination_names(
             });
         }
         let data = view.data()?;
-        let name = crate::namespace::presentation_name(data.as_bytes())?.ok_or_else(|| {
-            Error::SlideCopyPlan {
-                kind: SlideCopyRefusal::AmbiguousTopology,
-                detail: "destination slide common data is missing".into(),
-            }
-        })?;
+        let name = crate::namespace::presentation_name(data.as_bytes())?
+            .ok_or_else(|| Error::slide_copy_refused(SlideCopyRefusal::AmbiguousTopology))?;
         // An absent or empty optional name is not a shared slide identity.
         // Position, native slide ID, relationship and source checks identify it.
         if !name.is_empty() && !names.insert(normalize_name(&name)?) {
@@ -4757,8 +4926,13 @@ fn reject_package_features(
     }
     let text =
         std::str::from_utf8(presentation_xml).map_err(|error| Error::Xml(error.to_string()))?;
-    if crate::presentation_properties::metadata::protection::Settings::parse_xml(text)?
-        .is_protected()
+    if crate::presentation_properties::metadata::protection::Settings::parse_xml(
+        text,
+        crate::presentation_properties::metadata::protection::Limits::from_source_limits(
+            package.read_limits(),
+        ),
+    )?
+    .is_protected()
     {
         return refusal(
             SlideCopyRefusal::ProtectedPresentation,
@@ -4984,8 +5158,11 @@ fn validate_xml_with_policy(
                     .ok_or_else(|| invalid("XML node count overflow"))?;
                 if nodes > MAX_XML_NODES || depth >= MAX_XML_DEPTH {
                     return Err(Error::Limit {
-                        resource: "source-backed cross-copy XML",
-                        limit: MAX_XML_NODES,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlNodes,
+                        ),
+                        observed: nodes,
+                        maximum: MAX_XML_NODES,
                     });
                 }
                 let value = match &namespace {
@@ -5306,6 +5483,41 @@ fn validate_xml_with_policy(
             format!("{context} has no OOXML namespace"),
         ),
     }
+}
+
+/// The PresentationML dialect of a document element named `root`, without
+/// checking the rest of the XML (lenient slide-removal reads, record 0303).
+fn root_dialect(xml: &[u8], root: &[u8], context: &'static str) -> Result<Dialect> {
+    let mut reader = NsReader::from_reader(xml);
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                if element.local_name().as_ref() != root {
+                    break;
+                }
+                return match namespace {
+                    ResolveResult::Bound(Namespace(value))
+                        if value == TRANSITIONAL_PML_NAMESPACE =>
+                    {
+                        Ok(Dialect::Transitional)
+                    },
+                    ResolveResult::Bound(Namespace(value)) if value == STRICT_PML_NAMESPACE => {
+                        Ok(Dialect::Strict)
+                    },
+                    _ => break,
+                };
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    refusal(
+        SlideCopyRefusal::UnknownSemanticSurface,
+        format!("{context} has an unexpected root"),
+    )
 }
 
 fn valid_xml_reference(reference: &BytesRef<'_>) -> bool {
@@ -5741,7 +5953,7 @@ fn digest_touched(
 fn reserve_memory(
     context: Option<&ExecutionContext>,
     bytes: usize,
-    limits: litchi_opc::ReadLimits,
+    limits: litchi_opc::SourceLimits,
 ) -> Result<Option<Arc<Reservation>>> {
     let bytes = bytes
         .checked_add(MAX_STAGING_OVERHEAD)
@@ -5749,8 +5961,9 @@ fn reserve_memory(
     let bytes_u64 = u64::try_from(bytes).map_err(|_| invalid("cross-copy staging exceeds u64"))?;
     if bytes_u64 > limits.max_total_part_bytes() {
         return Err(Error::Limit {
-            resource: "source-backed cross-copy staged bytes",
-            limit: usize::try_from(limits.max_total_part_bytes()).unwrap_or(usize::MAX),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::SourceBytes),
+            observed: usize::try_from(bytes_u64).unwrap_or(usize::MAX),
+            maximum: usize::try_from(limits.max_total_part_bytes()).unwrap_or(usize::MAX),
         });
     }
     let Some(context) = context else {
@@ -5960,11 +6173,8 @@ fn map_execution_error(error: ExecutionError) -> Error {
 fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
-fn refusal<T>(kind: SlideCopyRefusal, detail: impl Into<String>) -> Result<T> {
-    Err(Error::SlideCopyPlan {
-        kind,
-        detail: detail.into(),
-    })
+fn refusal<T>(kind: SlideCopyRefusal, _detail: impl Into<String>) -> Result<T> {
+    Err(Error::slide_copy_refused(kind))
 }
 
 struct SourceCheckedWriter<W> {
@@ -6056,13 +6266,10 @@ mod tests {
     #[test]
     fn foreign_markup_compatibility_wrapper_is_unknown_not_mce() {
         let xml = br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:foreign="http://purl.oclc.org/ooxml/markup-compatibility/2006"><p:cSld><p:spTree><foreign:wrapper><p:pic/></foreign:wrapper></p:spTree></p:cSld></p:sld>"#;
-        assert!(matches!(
+        assert_refused_kind!(
             validate_source_slide_xml(xml, "foreign MCE wrapper", None),
-            Err(Error::SlideCopyPlan {
-                kind: SlideCopyRefusal::UnknownSemanticSurface,
-                ..
-            })
-        ));
+            SlideCopyRefusal::UnknownSemanticSurface.kind()
+        );
     }
 
     #[test]
@@ -6215,19 +6422,17 @@ mod tests {
             )
             .unwrap(),
         );
-        let package =
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                Arc::new(litchi_core::OwnedSource::new(
-                    include_bytes!(
-                        "../../../../test-data/poi/test-data/slideshow/EmbeddedVideo.pptx"
-                    )
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(litchi_core::OwnedSource::new(
+                include_bytes!("../../../../test-data/poi/test-data/slideshow/EmbeddedVideo.pptx")
                     .to_vec(),
-                )),
-                litchi_opc::ReadLimits::default(),
-                litchi_opc::SourceCacheLimits::new(1, 1).unwrap(),
-                context.clone(),
-            )
-            .unwrap();
+            )),
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::new(1, 1).unwrap(),
+            litchi_opc::SourceReadPolicy::exact(),
+            Some(context.clone()),
+        )
+        .unwrap();
         let source_uri = PackURI::new("/ppt/media/image1.png").unwrap();
         let target_uri = PackURI::new("/ppt/media/copy.png").unwrap();
         let (data, capture) = read_copy_payload(&package.part(&source_uri).unwrap(), true).unwrap();
@@ -6387,3 +6592,7 @@ mod tests {
 #[cfg(test)]
 #[path = "source_cross_copy/payload_guard_tests.rs"]
 mod payload_guard_tests;
+
+#[cfg(test)]
+#[path = "source_cross_copy/registered_layout_limits.rs"]
+mod registered_layout_limits;

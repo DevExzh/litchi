@@ -9,9 +9,10 @@
 
 mod repair_support;
 
+use litchi_rtf::raw::Tree;
 use litchi_rtf::{
     LegacyParagraphNumberingAlignment, LegacyParagraphNumberingFormat,
-    LegacyParagraphNumberingLevel, LegacyParagraphNumberingUnderline, RtfDocument, RtfWriter,
+    LegacyParagraphNumberingLevel, LegacyParagraphNumberingUnderline, write::Writer,
 };
 
 const PRODUCER: &str = r"{\rtf1\ansi\ansicpg1252
@@ -20,7 +21,7 @@ const PRODUCER: &str = r"{\rtf1\ansi\ansicpg1252
 
 #[test]
 fn parses_owns_and_canonically_round_trips_pn_metadata() {
-    let document = RtfDocument::parse(PRODUCER).unwrap();
+    let document = Tree::parse(PRODUCER, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(document.legacy_paragraph_numbering_records().len(), 2);
     let alpha = document
         .blocks()
@@ -56,12 +57,13 @@ fn parses_owns_and_canonically_round_trips_pn_metadata() {
     assert_eq!(second.level, LegacyParagraphNumberingLevel::Bullet);
     assert_eq!(second.format, Some(LegacyParagraphNumberingFormat::GbLip));
     let mut first_bytes = Vec::new();
-    RtfWriter::new(&mut first_bytes)
+    Writer::new(&mut first_bytes)
         .write_document(&document)
         .unwrap();
-    let reparsed = RtfDocument::parse_bytes(&first_bytes).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&first_bytes, litchi_rtf::read::OpenOptions::default()).unwrap();
     let mut second_bytes = Vec::new();
-    RtfWriter::new(&mut second_bytes)
+    Writer::new(&mut second_bytes)
         .write_document(&reparsed)
         .unwrap();
     assert_eq!(first_bytes, second_bytes);
@@ -69,9 +71,11 @@ fn parses_owns_and_canonically_round_trips_pn_metadata() {
 
 #[test]
 fn pn_is_inert_and_paragraph_scoped() {
-    let document =
-        RtfDocument::parse(r"{\rtf1{\pn\pnlvlbody\pndec{\pntxtb NOT-BODY}}One\par\pard Two}")
-            .unwrap();
+    let document = Tree::parse(
+        r"{\rtf1{\pn\pnlvlbody\pndec{\pntxtb NOT-BODY}}One\par\pard Two}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(document.text(), "One\nTwo");
     let one = document
         .blocks()
@@ -118,7 +122,10 @@ fn rejects_adversarial_pn_destinations() {
     ];
     for source in malformed {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted malformed RTF: {source}"
         );
     }

@@ -4,8 +4,6 @@
 //! `None` is absent, while `Some(false)` is an explicit native false.
 
 pub use crate::package::body_table_title::{
-    BodyTableTitleCommit as Commit, BodyTableTitleDiagnostics as Diagnostics,
-    BodyTableTitleEdit as Edit, BodyTableTitleError as Error, BodyTableTitleLimitKind as LimitKind,
-    BodyTableTitlePatch as Patch,
+    Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
 };
 pub use litchi_iwa_common::table::title::Settings;

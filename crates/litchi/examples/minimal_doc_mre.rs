@@ -6,7 +6,7 @@
 //! Run with:
 //!   cargo run --example minimal_doc_mre --features doc --no-default-features
 
-use litchi_doc::Writer;
+use litchi_doc::builder::Builder;
 use std::env;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -16,11 +16,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap_or_else(|| "minimal_mre.doc".to_string());
 
     // Build the tiniest document: a single paragraph with a paragraph mark
-    let mut doc = Writer::new();
+    let mut doc = Builder::new();
     doc.add_paragraph("Hello")?;
 
     // Save
-    doc.save(&out)?;
+    doc.build()?.save(&out)?;
 
     println!("Minimal DOC MRE written to: {}", out);
     println!(

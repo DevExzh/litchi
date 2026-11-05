@@ -128,56 +128,85 @@ fn strict_aliases_round_trip_without_transitional_namespace_leakage() {
 
 #[test]
 fn facade_publishes_and_reverses_exact_source_checked_commit() {
-    let mut authored = Package::new().unwrap();
-    let slide = authored.presentation_mut().unwrap().add_slide().unwrap();
+    let mut builder = crate::builder::Builder::new().unwrap();
+    let slide = builder.presentation().unwrap().add_slide().unwrap();
     slide.add_text_box("Title", 0, 0, 100, 100);
     slide.add_ellipse(0, 0, 100, 100, None);
+    let authored = builder.build().unwrap();
     let bytes = authored.to_bytes().unwrap();
-    let mut package = Package::from_bytes(&bytes).unwrap();
+    let package = Package::from_bytes(&bytes).unwrap();
 
     let source = package.change_tracking(0_usize).unwrap();
-    let mut edit = source.edit();
-    edit.set_creation_id(7_u32);
-    edit.set_shape_modification_id(0_usize, 11_u32).unwrap();
+    let mut edit = package.edit_change_tracking().unwrap();
+    edit.set_creation_id(0_usize, 7_u32).unwrap();
+    edit.set_shape_modification_id(0_usize, 0_usize, 11_u32)
+        .unwrap();
     let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
     let inverse = commit.patch().inverse();
-    package.apply_change_tracking_commit(commit).unwrap();
+    let (changed, forward) = commit.into_parts();
 
-    let stored = package.change_tracking(0_usize).unwrap();
+    let stored = changed.change_tracking(0_usize).unwrap();
     assert_eq!(stored.state().creation_id(), Some(Id::new(7)));
     assert_eq!(
         stored.state().shapes()[0].modification_id(),
         Some(Id::new(11))
     );
-    package.apply_change_tracking_patch(&inverse).unwrap();
     assert_eq!(
         package.change_tracking(0_usize).unwrap().state(),
         source.state()
     );
+    let replayed = package.apply_change_tracking(&forward).unwrap();
+    assert!(replayed.package().same_content(&changed).unwrap());
+    let restored = changed
+        .apply_change_tracking(&inverse)
+        .unwrap()
+        .into_package();
+    assert_eq!(
+        restored.change_tracking(0_usize).unwrap().state(),
+        source.state()
+    );
+    // A patch for another base conflicts.
+    assert!(matches!(
+        restored.apply_change_tracking(&inverse),
+        Err(crate::Error::PatchConflict)
+    ));
 
-    package.opc.relate_to(
+    let mut signed = restored;
+    std::sync::Arc::make_mut(&mut signed.opc).relate_to(
         "_xmlsignatures/origin.sigs",
         litchi_opc::constants::relationship_type::DIGITAL_SIGNATURE_ORIGIN,
     );
-    let no_op = package
-        .change_tracking(0_usize)
-        .unwrap()
-        .edit()
-        .commit()
-        .unwrap();
-    assert!(!no_op.is_changed());
-    package.apply_change_tracking_commit(no_op).unwrap();
-    assert!(package.opc.is_signed());
+    let no_op = signed.edit_change_tracking().unwrap().commit().unwrap();
+    assert!(no_op.patch().is_noop());
+    assert!(!no_op.diagnostics().changed());
+    assert!(no_op.package().opc.is_signed());
 
-    let mut stale_edit = source.edit();
-    stale_edit.set_creation_id(99_u32);
-    let stale_commit = stale_edit.commit().unwrap();
-    let mut current = package.change_tracking(0_usize).unwrap().edit();
-    current.set_creation_id(100_u32);
-    package
-        .apply_change_tracking_commit(current.commit().unwrap())
-        .unwrap();
-    assert!(package.apply_change_tracking_commit(stale_commit).is_err());
+    // A changed edit refuses the signed package (ADR 0006) and leaves it
+    // untouched; it is published after the signature is removed explicitly.
+    let mut edit = signed.edit_change_tracking().unwrap();
+    assert!(matches!(
+        edit.set_creation_id(0_usize, 100_u32),
+        Err(crate::Error::Opc(
+            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
+        ))
+    ));
+    assert!(edit.commit().unwrap().patch().is_noop());
+    assert!(signed.opc.is_signed());
+    signed = signed.unsign().unwrap();
+    let mut edit = signed.edit_change_tracking().unwrap();
+    edit.set_creation_id(0_usize, 100_u32).unwrap();
+    let unsigned = edit.commit().unwrap().into_package();
+    assert!(!unsigned.opc.is_signed());
+    assert_eq!(
+        unsigned
+            .change_tracking(0_usize)
+            .unwrap()
+            .state()
+            .creation_id(),
+        Some(Id::new(100))
+    );
+    assert!(unsigned.apply_change_tracking(&forward).is_err());
 }
 
 #[test]

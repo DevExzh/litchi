@@ -8,6 +8,9 @@ mod model;
 mod package;
 
 pub use model::Project;
-pub use package::{discover, remove, store};
+pub use package::discover;
 
 pub(crate) const MAX_PAYLOAD_BYTES: usize = 64 * 1024 * 1024;
+
+mod edit;
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};

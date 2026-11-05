@@ -21,14 +21,6 @@ pub struct Options {
 /// Exact-source transaction vocabulary for creating slide audio.
 pub mod creation;
 
-/// Package transaction types for an existing audio control's position.
-pub mod transaction {
-    pub use crate::{
-        SlideAudioPositionCommit, SlideAudioPositionDiagnostics, SlideAudioPositionEdit,
-        SlideAudioPositionError, SlideAudioPositionLimitKind, SlideAudioPositionPatch,
-    };
-}
-
 impl Options {
     /// Validate and canonicalize slide-audio placement and duration.
     ///
@@ -76,6 +68,13 @@ impl Options {
     pub const fn duration_seconds(self) -> f32 {
         self.duration_seconds
     }
+}
+
+/// Exact-source transactions for one audio control's position.
+pub mod position {
+    pub use crate::package::slide_audio_position::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
 }
 
 #[cfg(test)]

@@ -457,7 +457,11 @@ impl List {
         validate_def(&style)?;
         self.ensure_unique_id(style.id, None)?;
         if self.defs.len() >= MAX_STYLES {
-            return Err(limit("table-style count", MAX_STYLES));
+            return Err(limit(
+                crate::error::CodecLimitKind::TableStyles,
+                self.defs.len().checked_add(1).unwrap_or(usize::MAX),
+                MAX_STYLES,
+            ));
         }
         self.defs
             .try_reserve(1)

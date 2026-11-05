@@ -7,6 +7,12 @@ use once_cell::unsync::OnceCell;
 impl<'doc> Slide<'doc> {
     /// Create a slide from parsed slide data.
     #[must_use]
+    /// Consult and update a presentation's one-slide shape memo.
+    pub(crate) const fn with_shape_memo(mut self, memo: &'doc super::ShapeMemo) -> Self {
+        self.shape_memo = Some(memo);
+        self
+    }
+
     pub fn from_slide_data(data: SlideData<'doc>, slide_number: usize) -> Self {
         let source = data.source();
         Self {
@@ -15,10 +21,12 @@ impl<'doc> Slide<'doc> {
             slide_list_text: data.slide_list_text,
             outline_text_interactions: data.outline_text_interactions,
             outline_text_refs: data.outline_text_refs,
+            outline_text_bodies: data.outline_text_bodies,
             slide_number,
             source,
             record: data.record,
             shapes: OnceCell::new(),
+            shape_memo: None,
             text_cache: OnceCell::new(),
             animations: OnceCell::new(),
             animation_extension: OnceCell::new(),
@@ -27,8 +35,12 @@ impl<'doc> Slide<'doc> {
             round_trip_metadata: OnceCell::new(),
             notes_descriptor: data.note_descriptor,
             speaker_notes: OnceCell::new(),
-            record_limits: data.record_limits,
+            source_limits: data.source_limits,
         }
+    }
+
+    pub(crate) const fn source_limits(&self) -> crate::SourceLimits {
+        self.source_limits
     }
 }
 

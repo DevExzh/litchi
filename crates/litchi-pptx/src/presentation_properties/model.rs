@@ -132,7 +132,7 @@ pub enum Extension {
     ///
     /// This is an inert Office hint. It does not restrict editing or change
     /// package mutation policy.
-    ReadonlyRecommended(bool),
+    ReadOnlyRecommended(bool),
     Unknown(OpaqueExtension),
 }
 
@@ -300,7 +300,7 @@ fn validate_extension_uris(values: &[Extension]) -> Result<()> {
                 value.validate()?;
                 Some(3)
             },
-            Extension::ReadonlyRecommended(_) => Some(4),
+            Extension::ReadOnlyRecommended(_) => Some(4),
             Extension::Unknown(value) => {
                 if value.uri.is_empty() || value.uri.len() > MAX_STRING {
                     return Err(invalid("opaque presentation extension URI is invalid"));

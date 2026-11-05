@@ -1,0 +1,30 @@
+import sys, collections
+from pathlib import Path
+sys.path.insert(0,"tools")
+import officecli_corpus as c, officecli_capability_delta as cd
+repo=Path(".")
+old=Path(sys.argv[1]).read_text()
+oldcalls=[]; script=None
+for raw in old.splitlines():
+    if not raw or raw.startswith("#"): continue
+    if raw.startswith("@ "): continue
+    oldcalls.append(raw.split("\t")[5])
+calls=c.parse((repo/c.OUTCOMES).read_text()); loaded=c.registries(repo)
+disp=cd.Dispositions.load(repo/cd.DISPOSITIONS); deltas,_,_=cd.classified(repo/c.VENDORED,repo,disp)
+cl=c.CorpusDispositions(disp,deltas,loaded)
+groups=collections.Counter(); res={}
+for i,call in enumerate(calls):
+    d=oldcalls[i].split(";skipped:")[-1]
+    if not any(n.startswith("+") for n in d.split(",")): continue
+    oldnames=set(n for n in d.split(",") if not n.startswith("+"))
+    for (cc,v) in c.call_skipped(call, loaded):
+        name=v.rule.rsplit("|",1)[-1]
+        if name in oldnames: continue
+        groups[v.rule]+=1
+        r=cl.group(v.rule) if v.kind=="gap" else None
+        res[v.rule]=(v.kind, r.cell() if r else "", r.via if r else "", r.tier if r else "")
+print(len(groups),"groups")
+bytier=collections.Counter((res[k][3],res[k][1].split(" (")[0]) for k in groups)
+print(bytier)
+for k,n in sorted(groups.items()):
+    print(n, k, res[k])

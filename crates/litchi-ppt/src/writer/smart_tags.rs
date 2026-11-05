@@ -394,7 +394,8 @@ mod tests {
         let mut tags = RecordBuilder::new(0x0f, 0, record_type::PROG_TAGS);
         tags.write_child(binary_tag);
         let bytes = tags.build().unwrap();
-        let (programmable_tags, consumed) = Record::parse(&bytes, 0).unwrap();
+        let (programmable_tags, consumed) =
+            Record::parse(&bytes, 0, &crate::SourceLimits::default()).unwrap();
         assert_eq!(consumed, bytes.len());
         Record {
             record_type: RecordType::Document,
@@ -414,9 +415,12 @@ mod tests {
             SmartTagDefinition::new("urn:geo", "place").with_property("city", "Paris"),
         ];
         let binary_tag = build_document_binary_tag(&entries).unwrap().unwrap();
-        let store = SmartTagStore::parse(&root_with_document_tag(&binary_tag))
-            .unwrap()
-            .unwrap();
+        let store = SmartTagStore::parse(
+            &root_with_document_tag(&binary_tag),
+            &crate::SourceLimits::default(),
+        )
+        .unwrap()
+        .unwrap();
         assert_eq!(store.types.len(), 1);
         assert_eq!(store.tags.len(), 2);
         assert_eq!(store.tags[0].properties[0].value, "東京");
@@ -427,7 +431,7 @@ mod tests {
         let bytes = build_shape_programmable_tags(&[vec![0, 1], Vec::new(), vec![1]])
             .unwrap()
             .unwrap();
-        let (record, consumed) = Record::parse(&bytes, 0).unwrap();
+        let (record, consumed) = Record::parse(&bytes, 0, &crate::SourceLimits::default()).unwrap();
         assert_eq!(consumed, bytes.len());
         let tags =
             ShapeProgrammableTags::parse(&record, ShapeProgrammableTagLimits::default()).unwrap();

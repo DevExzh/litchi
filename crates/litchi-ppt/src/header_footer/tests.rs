@@ -21,7 +21,8 @@ const POI_NOTES_BYTES: &[u8] = &[
 ];
 
 fn parsed(bytes: &[u8], scope: HeaderFooterScope) -> HeaderFooter {
-    let (record, consumed) = Record::parse(bytes, 0).expect("record");
+    let (record, consumed) =
+        Record::parse(bytes, 0, &crate::SourceLimits::default()).expect("record");
     assert_eq!(consumed, bytes.len());
     HeaderFooter::parse_record(&record, scope).expect("header/footer")
 }
@@ -91,7 +92,7 @@ fn malformed_record_matrix_is_rejected() {
     cases.push(invalid_utf16);
 
     for bytes in cases {
-        let rejected = Record::parse(&bytes, 0)
+        let rejected = Record::parse(&bytes, 0, &crate::SourceLimits::default())
             .and_then(|(record, _)| {
                 HeaderFooter::parse_record(&record, HeaderFooterScope::PresentationSlides)
                     .map(|_| (record, 0))
@@ -136,7 +137,8 @@ fn illegal_header_controls_and_oversize_user_date_are_rejected() {
 
 #[test]
 fn placement_duplicate_and_order_violations_are_rejected() {
-    let (container, _) = Record::parse(POI_SLIDE_BYTES, 0).unwrap();
+    let (container, _) =
+        Record::parse(POI_SLIDE_BYTES, 0, &crate::SourceLimits::default()).unwrap();
     let atom = container.children[0].clone();
     let footer = container.children[1].clone();
 

@@ -1,0 +1,69 @@
+[package]
+name = "unified-batch-closure-baseline"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# Record 0337: one binary for every claimed format; each format is a feature
+# so a partial build can measure one family. `default` builds all 21.
+[features]
+default = [
+    "docx", "xlsx", "pptx", "xlsb", "doc", "xls", "ppt", "rtf",
+    "odt", "ods", "odp", "odg", "odc", "odi", "odb", "oth", "odm", "odf-formula",
+    "pages", "keynote", "numbers",
+]
+docx = ["litchi-ops/docx", "dep:litchi-docx", "dep:litchi-opc"]
+xlsx = ["litchi-ops/xlsx", "dep:litchi-xlsx"]
+pptx = ["litchi-ops/pptx", "dep:litchi-pptx"]
+xlsb = ["litchi-ops/xlsb", "dep:litchi-xlsb"]
+doc = ["litchi-ops/doc", "dep:litchi-doc"]
+xls = ["litchi-ops/xls", "dep:litchi-xls", "dep:tempfile"]
+ppt = ["litchi-ops/ppt", "dep:litchi-ppt"]
+rtf = ["litchi-ops/rtf", "dep:litchi-rtf"]
+odt = ["litchi-ops/odt", "dep:litchi-odt"]
+ods = ["litchi-ops/ods", "dep:litchi-ods"]
+odp = ["litchi-ops/odp", "dep:litchi-odp"]
+odg = ["litchi-ops/odg", "dep:litchi-odg"]
+odc = ["litchi-ops/odc", "dep:litchi-odc"]
+odi = ["litchi-ops/odi", "dep:litchi-odi"]
+odb = ["litchi-ops/odb", "dep:litchi-odb"]
+oth = ["litchi-ops/oth", "dep:litchi-oth", "dep:litchi-odt"]
+odm = ["litchi-ops/odm", "dep:litchi-odm", "dep:litchi-odt"]
+odf-formula = ["litchi-ops/odf-formula", "dep:litchi-odf-formula"]
+pages = ["litchi-ops/pages", "dep:litchi-pages"]
+keynote = ["litchi-ops/keynote", "dep:litchi-keynote"]
+numbers = ["litchi-ops/numbers", "dep:litchi-numbers"]
+
+[dependencies]
+litchi-core = { path = "../../../crates/litchi-core" }
+litchi-ops = { path = "../../../crates/litchi-ops" }
+litchi-docx = { path = "../../../crates/litchi-docx", optional = true }
+litchi-opc = { path = "../../../crates/litchi-opc", optional = true }
+litchi-xlsx = { path = "../../../crates/litchi-xlsx", optional = true }
+litchi-pptx = { path = "../../../crates/litchi-pptx", optional = true }
+litchi-xlsb = { path = "../../../crates/litchi-xlsb", optional = true }
+litchi-doc = { path = "../../../crates/litchi-doc", optional = true }
+litchi-xls = { path = "../../../crates/litchi-xls", optional = true }
+litchi-ppt = { path = "../../../crates/litchi-ppt", optional = true }
+litchi-rtf = { path = "../../../crates/litchi-rtf", optional = true }
+litchi-odt = { path = "../../../crates/litchi-odt", optional = true }
+litchi-ods = { path = "../../../crates/litchi-ods", optional = true }
+litchi-odp = { path = "../../../crates/litchi-odp", optional = true }
+litchi-odg = { path = "../../../crates/litchi-odg", optional = true }
+litchi-odc = { path = "../../../crates/litchi-odc", optional = true }
+litchi-odi = { path = "../../../crates/litchi-odi", optional = true }
+litchi-odb = { path = "../../../crates/litchi-odb", optional = true }
+litchi-oth = { path = "../../../crates/litchi-oth", optional = true }
+litchi-odm = { path = "../../../crates/litchi-odm", optional = true }
+litchi-odf-formula = { path = "../../../crates/litchi-odf-formula", optional = true }
+litchi-pages = { path = "../../../crates/litchi-pages", optional = true }
+litchi-keynote = { path = "../../../crates/litchi-keynote", optional = true }
+litchi-numbers = { path = "../../../crates/litchi-numbers", optional = true }
+serde_json = "1"
+tempfile = { version = "3", optional = true }
+zip = { version = "8", default-features = false, features = ["deflate"] }
+
+[profile.release]
+debug = 1
+
+[workspace]

@@ -26,7 +26,11 @@ pub(crate) struct Summary {
 
 pub(crate) fn scan_slide(xml: &[u8]) -> Result<Vec<String>> {
     if xml.len() > MAX_SLIDE_BYTES {
-        return Err(limit("InkML slide XML bytes", MAX_SLIDE_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            xml.len(),
+            MAX_SLIDE_BYTES,
+        ));
     }
     let xml = process_ooxml(xml)?;
     let mut reader = NsReader::from_reader(xml.as_ref());
@@ -46,11 +50,19 @@ pub(crate) fn scan_slide(xml: &[u8]) -> Result<Vec<String>> {
         match event {
             Event::Start(element) => {
                 increment_nodes(&mut nodes)?;
-                depth = depth
-                    .checked_add(1)
-                    .ok_or_else(|| limit("InkML slide depth", MAX_XML_DEPTH))?;
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        MAX_XML_DEPTH,
+                    )
+                })?;
                 if depth > MAX_XML_DEPTH {
-                    return Err(limit("InkML slide depth", MAX_XML_DEPTH));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        MAX_XML_DEPTH,
+                    ));
                 }
                 if depth == 1 {
                     validate_root(&namespace, element.name(), root_seen)?;
@@ -62,11 +74,19 @@ pub(crate) fn scan_slide(xml: &[u8]) -> Result<Vec<String>> {
             },
             Event::Empty(element) => {
                 increment_nodes(&mut nodes)?;
-                let child_depth = depth
-                    .checked_add(1)
-                    .ok_or_else(|| limit("InkML slide depth", MAX_XML_DEPTH))?;
+                let child_depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        MAX_XML_DEPTH,
+                    )
+                })?;
                 if child_depth > MAX_XML_DEPTH {
-                    return Err(limit("InkML slide depth", MAX_XML_DEPTH));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        child_depth,
+                        MAX_XML_DEPTH,
+                    ));
                 }
                 if child_depth == 1 {
                     validate_root(&namespace, element.name(), root_seen)?;
@@ -112,7 +132,11 @@ fn push_id(
     resolver: &quick_xml::name::NamespaceResolver,
 ) -> Result<()> {
     if ids.len() >= MAX_CONTENT_PARTS {
-        return Err(limit("InkML content-part count", MAX_CONTENT_PARTS));
+        return Err(limit(
+            crate::error::CodecLimitKind::ContentParts,
+            ids.len().checked_add(1).unwrap_or(usize::MAX),
+            MAX_CONTENT_PARTS,
+        ));
     }
     let id = relationship_value(element, b"id", decoder, resolver)?
         .ok_or_else(|| invalid("PresentationML contentPart is missing r:id"))?;
@@ -125,7 +149,11 @@ fn push_id(
 
 pub(crate) fn inspect(xml: &[u8]) -> Result<Summary> {
     if xml.len() > MAX_INK_BYTES {
-        return Err(limit("InkML part bytes", MAX_INK_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::PartBytes,
+            xml.len(),
+            MAX_INK_BYTES,
+        ));
     }
     let mut reader = NsReader::from_reader(xml);
     let mut result = Summary::default();
@@ -140,11 +168,19 @@ pub(crate) fn inspect(xml: &[u8]) -> Result<Summary> {
         match event {
             Event::Start(element) => {
                 increment_nodes(&mut nodes)?;
-                depth = depth
-                    .checked_add(1)
-                    .ok_or_else(|| limit("InkML depth", MAX_XML_DEPTH))?;
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        MAX_XML_DEPTH,
+                    )
+                })?;
                 if depth > MAX_XML_DEPTH {
-                    return Err(limit("InkML depth", MAX_XML_DEPTH));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        MAX_XML_DEPTH,
+                    ));
                 }
                 if depth == 1 {
                     validate_ink_root(&namespace, element.name(), root_seen)?;
@@ -154,11 +190,19 @@ pub(crate) fn inspect(xml: &[u8]) -> Result<Summary> {
             },
             Event::Empty(element) => {
                 increment_nodes(&mut nodes)?;
-                let child_depth = depth
-                    .checked_add(1)
-                    .ok_or_else(|| limit("InkML depth", MAX_XML_DEPTH))?;
+                let child_depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        MAX_XML_DEPTH,
+                    )
+                })?;
                 if child_depth > MAX_XML_DEPTH {
-                    return Err(limit("InkML depth", MAX_XML_DEPTH));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        child_depth,
+                        MAX_XML_DEPTH,
+                    ));
                 }
                 if child_depth == 1 {
                     validate_ink_root(&namespace, element.name(), root_seen)?;
@@ -198,17 +242,28 @@ fn observe(result: &mut Summary, namespace: &ResolveResult<'_>, name: QName<'_>)
         result.traces = result
             .traces
             .checked_add(1)
-            .ok_or_else(|| limit("InkML trace count", MAX_TRACES))?;
+            .ok_or_else(|| limit(crate::error::CodecLimitKind::Traces, usize::MAX, MAX_TRACES))?;
         if result.traces > MAX_TRACES {
-            return Err(limit("InkML trace count", MAX_TRACES));
+            return Err(limit(
+                crate::error::CodecLimitKind::Traces,
+                result.traces,
+                MAX_TRACES,
+            ));
         }
     } else if is_ink_name(namespace, name, b"traceGroup") {
-        result.groups = result
-            .groups
-            .checked_add(1)
-            .ok_or_else(|| limit("InkML trace-group count", MAX_TRACE_GROUPS))?;
+        result.groups = result.groups.checked_add(1).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::TraceGroups,
+                usize::MAX,
+                MAX_TRACE_GROUPS,
+            )
+        })?;
         if result.groups > MAX_TRACE_GROUPS {
-            return Err(limit("InkML trace-group count", MAX_TRACE_GROUPS));
+            return Err(limit(
+                crate::error::CodecLimitKind::TraceGroups,
+                result.groups,
+                MAX_TRACE_GROUPS,
+            ));
         }
     }
     Ok(())

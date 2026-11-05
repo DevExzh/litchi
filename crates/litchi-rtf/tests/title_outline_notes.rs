@@ -9,20 +9,19 @@
 
 //! Round-trip tests for `\titlepg`, `\endnhere`, and `\outlinelevelN`.
 
-use litchi_rtf::{RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::write::Writer;
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
 #[test]
 fn title_page_and_endnote_here_round_trip() {
     let source = r"{\rtf1\ansi\titlepg\endnhere Body\par}";
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let properties = &document.sections()[0].properties;
     assert!(properties.title_page);
     assert!(properties.note_options.endnote_here);
@@ -38,7 +37,7 @@ fn title_page_and_endnote_here_round_trip() {
         "missing endnhere in {serialized}"
     );
 
-    let reparsed = RtfDocument::parse(&serialized).unwrap();
+    let reparsed = Tree::parse(&serialized, litchi_rtf::read::OpenOptions::default()).unwrap();
     let properties = &reparsed.sections()[0].properties;
     assert!(properties.title_page);
     assert!(properties.note_options.endnote_here);
@@ -47,7 +46,7 @@ fn title_page_and_endnote_here_round_trip() {
 #[test]
 fn outline_level_round_trips() {
     let source = r"{\rtf1\ansi\outlinelevel2 Heading\par Body\par}";
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let heading = document
         .blocks()
         .iter()
@@ -62,7 +61,7 @@ fn outline_level_round_trips() {
         "missing outlinelevel in {serialized}"
     );
 
-    let reparsed = RtfDocument::parse(&serialized).unwrap();
+    let reparsed = Tree::parse(&serialized, litchi_rtf::read::OpenOptions::default()).unwrap();
     let heading = reparsed
         .blocks()
         .iter()
@@ -73,7 +72,25 @@ fn outline_level_round_trips() {
 
 #[test]
 fn outline_level_out_of_range_is_rejected() {
-    assert!(RtfDocument::parse(r"{\rtf1\ansi\outlinelevel10 X\par}").is_err());
-    assert!(RtfDocument::parse(r"{\rtf1\ansi\outlinelevel-1 X\par}").is_err());
-    assert!(RtfDocument::parse(r"{\rtf1\ansi\outlinelevel9 X\par}").is_ok());
+    assert!(
+        Tree::parse(
+            r"{\rtf1\ansi\outlinelevel10 X\par}",
+            litchi_rtf::read::OpenOptions::default()
+        )
+        .is_err()
+    );
+    assert!(
+        Tree::parse(
+            r"{\rtf1\ansi\outlinelevel-1 X\par}",
+            litchi_rtf::read::OpenOptions::default()
+        )
+        .is_err()
+    );
+    assert!(
+        Tree::parse(
+            r"{\rtf1\ansi\outlinelevel9 X\par}",
+            litchi_rtf::read::OpenOptions::default()
+        )
+        .is_ok()
+    );
 }

@@ -1,4 +1,8 @@
 #![allow(
+    clippy::redundant_closure_call,
+    reason = "raw OPC test edits stage one closure over the edit's graph"
+)]
+#![allow(
     clippy::unwrap_used,
     clippy::expect_used,
     reason = "test assertions panic on failure by design"
@@ -55,60 +59,65 @@ enum Shape {
 
 fn signed_package(shape: Shape) -> Package {
     let mut package = Package::new().unwrap();
-    package
-        .edit_opc(|opc: &mut OpcPackage| {
-            opc.try_add_part(Box::new(BlobPart::new(
-                PackURI::new(ORIGIN).unwrap(),
-                ct::OPC_DIGITAL_SIGNATURE_ORIGIN.to_owned(),
-                b"origin".to_vec(),
-            )))?;
-            opc.rels_mut().add_relationship(
-                rt::DIGITAL_SIGNATURE_ORIGIN.to_owned(),
-                "_xmlsignatures/origin.sigs".to_owned(),
-                "rIdOrigin".to_owned(),
-                false,
-            );
-
-            let signatures: &[(&str, &str)] = match shape {
-                Shape::Once => &[("sig1.xml", "rIdSignatureAlpha")],
-                Shape::Twice | Shape::TwiceTampered => &[
-                    ("sig1.xml", "rIdSignatureAlpha"),
-                    ("sig2.xml", "rIdSignatureBeta"),
-                ],
-            };
-            for (target, r_id) in signatures {
-                let payload = if shape == Shape::TwiceTampered && *target == "sig2.xml" {
-                    "<Signature>tampered</Signature>".to_owned()
-                } else {
-                    format!("<Signature>{target}</Signature>")
-                };
+    package = {
+        let mut edit = package.edit_opc();
+        (|opc: &mut OpcPackage| -> litchi_docx::Result<_> {
+            {
                 opc.try_add_part(Box::new(BlobPart::new(
-                    PackURI::new(format!("/_xmlsignatures/{target}")).unwrap(),
-                    ct::OPC_DIGITAL_SIGNATURE_XMLSIGNATURE.to_owned(),
-                    payload.into_bytes(),
+                    PackURI::new(ORIGIN).unwrap(),
+                    ct::OPC_DIGITAL_SIGNATURE_ORIGIN.to_owned(),
+                    b"origin".to_vec(),
                 )))?;
-                opc.get_part_mut(&PackURI::new(ORIGIN).unwrap())?
-                    .rels_mut()
-                    .add_relationship(
-                        SIGNATURE_RELATIONSHIP.to_owned(),
-                        (*target).to_owned(),
-                        (*r_id).to_owned(),
-                        false,
-                    );
-                if shape != Shape::Once {
-                    // Extra root-level signature relationships exercise the
-                    // token's root loop as well as its per-part loop.
-                    opc.rels_mut().add_relationship(
-                        SIGNATURE_RELATIONSHIP.to_owned(),
-                        format!("_xmlsignatures/{target}"),
-                        format!("{r_id}Root"),
-                        false,
-                    );
+                opc.rels_mut().add_relationship(
+                    rt::DIGITAL_SIGNATURE_ORIGIN.to_owned(),
+                    "_xmlsignatures/origin.sigs".to_owned(),
+                    "rIdOrigin".to_owned(),
+                    false,
+                );
+
+                let signatures: &[(&str, &str)] = match shape {
+                    Shape::Once => &[("sig1.xml", "rIdSignatureAlpha")],
+                    Shape::Twice | Shape::TwiceTampered => &[
+                        ("sig1.xml", "rIdSignatureAlpha"),
+                        ("sig2.xml", "rIdSignatureBeta"),
+                    ],
+                };
+                for (target, r_id) in signatures {
+                    let payload = if shape == Shape::TwiceTampered && *target == "sig2.xml" {
+                        "<Signature>tampered</Signature>".to_owned()
+                    } else {
+                        format!("<Signature>{target}</Signature>")
+                    };
+                    opc.try_add_part(Box::new(BlobPart::new(
+                        PackURI::new(format!("/_xmlsignatures/{target}")).unwrap(),
+                        ct::OPC_DIGITAL_SIGNATURE_XMLSIGNATURE.to_owned(),
+                        payload.into_bytes(),
+                    )))?;
+                    opc.get_part_mut(&PackURI::new(ORIGIN).unwrap())?
+                        .rels_mut()
+                        .add_relationship(
+                            SIGNATURE_RELATIONSHIP.to_owned(),
+                            (*target).to_owned(),
+                            (*r_id).to_owned(),
+                            false,
+                        );
+                    if shape != Shape::Once {
+                        // Extra root-level signature relationships exercise the
+                        // token's root loop as well as its per-part loop.
+                        opc.rels_mut().add_relationship(
+                            SIGNATURE_RELATIONSHIP.to_owned(),
+                            format!("_xmlsignatures/{target}"),
+                            format!("{r_id}Root"),
+                            false,
+                        );
+                    }
                 }
+                Ok::<_, Error>(())
             }
-            Ok::<_, Error>(())
-        })
+        })(edit.package_mut())
         .unwrap();
+        edit.commit().unwrap().into_package()
+    };
     package
 }
 
@@ -116,12 +125,14 @@ fn signed_package(shape: Shape) -> Package {
 /// against an independent build of the same package.
 fn noop_across_two_builds(shape: Shape) -> litchi_docx::Result<()> {
     let source = signed_package(shape);
-    let mut target = signed_package(shape);
-    let snapshot = source.content_control_snapshot()?;
-    let commit = snapshot.edit()?.commit()?;
-    assert!(!commit.changed(), "the transaction stages no edit");
+    let target = signed_package(shape);
+    let commit = source.edit_content_controls().commit()?;
+    assert!(
+        !commit.diagnostics().changed(),
+        "the transaction stages no edit"
+    );
     assert!(commit.patch().is_noop(), "the patch is an exact no-op");
-    target.apply_content_controls(&commit)
+    target.apply_content_controls(commit.patch()).map(|_| ())
 }
 
 #[test]
@@ -146,13 +157,17 @@ fn single_signature_packages_keep_accepting_their_noop() {
 }
 
 #[test]
-fn a_genuinely_different_signature_graph_is_still_refused() {
+fn a_noop_patch_publishes_nothing_on_a_different_signature_graph() {
     let source = signed_package(Shape::Twice);
-    let mut target = signed_package(Shape::TwiceTampered);
-    let snapshot = source.content_control_snapshot().unwrap();
-    let commit = snapshot.edit().unwrap().commit().unwrap();
-    assert!(
-        target.apply_content_controls(&commit).is_err(),
-        "a changed signature payload must still be refused"
+    let target = signed_package(Shape::TwiceTampered);
+    // An exact no-op patch publishes nothing anywhere: the tampered target is
+    // returned unchanged, its signature graph included (record 0355).
+    let commit = source.edit_content_controls().commit().unwrap();
+    assert!(commit.patch().is_noop());
+    let replayed = target.apply_content_controls(commit.patch()).ok().unwrap();
+    assert!(!replayed.diagnostics().changed());
+    assert_eq!(
+        replayed.package().to_bytes().unwrap(),
+        target.to_bytes().unwrap()
     );
 }

@@ -1,0 +1,129 @@
+{
+  "schema": "litchi.native-qualification.v1",
+  "lane": "w4b-xlsb",
+  "output_dir": "$NATIVE_QUAL_OUTPUT",
+  "path_prepend": ["$LITCHI_COORD_BIN"],
+  "rounds": 31,
+  "abba_order": ["before", "after", "after", "before"],
+  "validators": [
+    {
+      "id": "historical-analyze",
+      "script": "$W4B_ANALYZER",
+      "argv": ["python3", "$W4B_ANALYZER", "{output_dir}"],
+      "cwd": "{output_dir}",
+      "outputs": ["{output_dir}/summary.json"],
+      "require_stdout": true
+    }
+  ],
+  "shared": {
+    "probe_paths": [
+      "crates/litchi-ops/examples/xlsb_w4b_probe.rs",
+      "crates/litchi-ops/examples/sheet_dispatch_bench.rs",
+      "tools/perf-baseline/src/bin/xlsb_crud.rs"
+    ],
+    "fixture_paths": ["$W4B_XLSB_FIXTURE"]
+  },
+  "legs": {
+    "before": {
+      "source_root": "$W4B_BEFORE_SOURCE",
+      "target_dir": "$W4B_TARGET_ROOT/before",
+      "allow_dirty": true,
+      "lock_paths": ["Cargo.lock", "tools/perf-baseline/Cargo.lock"],
+      "build": [
+        {
+          "id": "xlsb_w4b_probe",
+          "argv": ["cargo", "build", "--release", "-p", "litchi-ops", "--features", "xlsb", "--example", "xlsb_w4b_probe"],
+          "artifacts": ["{target_dir}/release/examples/xlsb_w4b_probe"]
+        },
+        {
+          "id": "sheet_dispatch_bench",
+          "argv": ["cargo", "build", "--release", "-p", "litchi-ops", "--features", "xlsx,xlsb,xls,eval", "--example", "sheet_dispatch_bench"],
+          "artifacts": ["{target_dir}/release/examples/sheet_dispatch_bench"]
+        },
+        {
+          "id": "xlsb_crud",
+          "cwd": "tools/perf-baseline",
+          "argv": ["cargo", "build", "--release", "--features", "xlsb-crud", "--bin", "xlsb_crud"],
+          "artifacts": ["{target_dir}/release/xlsb_crud"]
+        }
+      ],
+      "programs": [
+        {
+          "id": "probe",
+          "binary": "{target_dir}/release/examples/xlsb_w4b_probe",
+          "argv": ["{rounds}"],
+          "stdout": "{output_dir}/probe-{leg}-{index}.json",
+          "stderr": "{output_dir}/probe-{leg}-{index}.stderr",
+          "require_stdout": true
+        },
+        {
+          "id": "sheet",
+          "binary": "{target_dir}/release/examples/sheet_dispatch_bench",
+          "argv": [],
+          "stdout": "{output_dir}/sheet-{leg}-{index}.txt",
+          "stderr": "{output_dir}/sheet-{leg}-{index}.stderr",
+          "require_stdout": true
+        },
+        {
+          "id": "crud",
+          "binary": "{target_dir}/release/xlsb_crud",
+          "argv": ["--case", "all", "--backend", "owned", "--fixture", "{fixture}", "--warmup", "3", "--samples", "{rounds}", "--json", "{output}"],
+          "outputs": ["{output_dir}/crud-{leg}-{index}.json"],
+          "stdout": "{output_dir}/crud-{leg}-{index}.stdout",
+          "stderr": "{output_dir}/crud-{leg}-{index}.stderr",
+          "require_stdout": false
+        }
+      ]
+    },
+    "after": {
+      "source_root": "$W4B_AFTER_SOURCE",
+      "target_dir": "$W4B_TARGET_ROOT/after",
+      "lock_paths": ["Cargo.lock", "tools/perf-baseline/Cargo.lock"],
+      "build": [
+        {
+          "id": "xlsb_w4b_probe",
+          "argv": ["cargo", "build", "--release", "-p", "litchi-ops", "--features", "xlsb", "--example", "xlsb_w4b_probe"],
+          "artifacts": ["{target_dir}/release/examples/xlsb_w4b_probe"]
+        },
+        {
+          "id": "sheet_dispatch_bench",
+          "argv": ["cargo", "build", "--release", "-p", "litchi-ops", "--features", "xlsx,xlsb,xls,eval", "--example", "sheet_dispatch_bench"],
+          "artifacts": ["{target_dir}/release/examples/sheet_dispatch_bench"]
+        },
+        {
+          "id": "xlsb_crud",
+          "cwd": "tools/perf-baseline",
+          "argv": ["cargo", "build", "--release", "--features", "xlsb-crud", "--bin", "xlsb_crud"],
+          "artifacts": ["{target_dir}/release/xlsb_crud"]
+        }
+      ],
+      "programs": [
+        {
+          "id": "probe",
+          "binary": "{target_dir}/release/examples/xlsb_w4b_probe",
+          "argv": ["{rounds}"],
+          "stdout": "{output_dir}/probe-{leg}-{index}.json",
+          "stderr": "{output_dir}/probe-{leg}-{index}.stderr",
+          "require_stdout": true
+        },
+        {
+          "id": "sheet",
+          "binary": "{target_dir}/release/examples/sheet_dispatch_bench",
+          "argv": [],
+          "stdout": "{output_dir}/sheet-{leg}-{index}.txt",
+          "stderr": "{output_dir}/sheet-{leg}-{index}.stderr",
+          "require_stdout": true
+        },
+        {
+          "id": "crud",
+          "binary": "{target_dir}/release/xlsb_crud",
+          "argv": ["--case", "all", "--backend", "owned", "--fixture", "{fixture}", "--warmup", "3", "--samples", "{rounds}", "--json", "{output}"],
+          "outputs": ["{output_dir}/crud-{leg}-{index}.json"],
+          "stdout": "{output_dir}/crud-{leg}-{index}.stdout",
+          "stderr": "{output_dir}/crud-{leg}-{index}.stderr",
+          "require_stdout": false
+        }
+      ]
+    }
+  }
+}

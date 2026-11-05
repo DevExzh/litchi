@@ -6,20 +6,20 @@
 //! ```
 
 use litchi::sheet::CellValue;
-use litchi::xlsb::writer::{MutableWorksheet, WorkbookWriter};
+use litchi::xlsb::builder::{self, Builder};
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Test 4: Creating XLSB with two rows...");
 
-    let mut workbook = WorkbookWriter::new();
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut workbook = Builder::new();
+    let mut sheet = builder::Worksheet::new("Sheet1");
     sheet.set_cell(0, 0, CellValue::String("A1".to_string()));
     sheet.set_cell(1, 0, CellValue::String("A2".to_string()));
     workbook.add_worksheet(sheet);
 
     let file = File::create("test_04_two_rows.xlsb")?;
-    workbook.save(file)?;
+    workbook.build()?.write_to(file)?;
 
     println!("✓ Created test_04_two_rows.xlsb");
     Ok(())

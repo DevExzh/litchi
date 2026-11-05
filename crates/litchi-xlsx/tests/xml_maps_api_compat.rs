@@ -1,17 +1,17 @@
-use litchi_core::sheet::Result;
+use litchi_xlsx::Result;
 use litchi_xlsx::xml_maps::{
-    DataBinding, XmlMap, XmlMapConformance, XmlMapDataBinding, XmlMapInfo, XmlMapSchema, XmlSchema,
-    parse_map_info, parse_xml_map_info, serialize_map_info, serialize_xml_map_info,
+    XmlMap, XmlMapConformance, XmlMapDataBinding, XmlMapInfo, XmlMapSchema, parse_xml_map_info,
+    serialize_xml_map_info,
 };
 
 fn legacy_value() -> XmlMapInfo {
-    let schema: XmlMapSchema = XmlSchema {
+    let schema = XmlMapSchema {
         id: "schema-1".to_owned(),
         schema_reference: None,
         namespace: Some("urn:example".to_owned()),
         payload_xml: None,
     };
-    let binding: XmlMapDataBinding = DataBinding {
+    let binding = XmlMapDataBinding {
         data_binding_name: None,
         file_binding: None,
         connection_id: None,
@@ -50,13 +50,11 @@ fn legacy_types_struct_literals_and_inherent_methods_remain_usable() -> Result<(
 }
 
 #[test]
-fn xlsx_adapters_retain_the_boxed_error_result_surface() -> Result<()> {
+fn xlsx_adapters_return_the_typed_crate_result() -> Result<()> {
     let _: fn(&[u8]) -> Result<XmlMapInfo> = XmlMapInfo::parse;
     let _: fn(&XmlMapInfo, bool) -> Result<Vec<u8>> = XmlMapInfo::to_xml;
     let _: fn(&[u8]) -> Result<XmlMapInfo> = parse_xml_map_info;
-    let _: fn(&[u8]) -> Result<XmlMapInfo> = parse_map_info;
     let _: fn(&XmlMapInfo, XmlMapConformance) -> Result<Vec<u8>> = serialize_xml_map_info;
-    let _: fn(&XmlMapInfo, XmlMapConformance) -> Result<Vec<u8>> = serialize_map_info;
 
     let value = legacy_value();
     let xml = serialize_xml_map_info(&value, XmlMapConformance::Transitional)?;

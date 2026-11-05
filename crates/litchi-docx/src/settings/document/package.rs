@@ -34,15 +34,37 @@ pub(crate) fn is_attached_template_relationship(value: &str) -> bool {
 ///
 /// Markup-compatibility preprocessing and OPC ownership remain host concerns;
 /// the validated model and XML codec belong to `litchi-docx`.
-pub(crate) fn extract_document_variables(part: &dyn Part) -> Result<Variables> {
-    let limit = crate::variables::MAX_DOCUMENT_VARIABLE_XML_BYTES;
+pub(crate) fn variable_limits_for_mce(
+    mce_limits: &MceLimits,
+) -> Result<crate::variables::raw::Limits> {
+    let max_xml_bytes = crate::variables::MAX_DOCUMENT_VARIABLE_XML_BYTES
+        .min(mce_limits.max_input_bytes)
+        .min(mce_limits.max_output_bytes);
+    let max_depth = crate::variables::MAX_DOCUMENT_VARIABLE_DEPTH.min(mce_limits.max_depth);
+    crate::variables::raw::Limits::new(
+        max_xml_bytes,
+        max_depth,
+        crate::variables::MAX_DOCUMENT_VARIABLES,
+        crate::variables::MAX_DOCUMENT_VARIABLE_NAME_CHARS,
+        crate::variables::MAX_DOCUMENT_VARIABLE_VALUE_CHARS,
+    )
+}
+
+pub(crate) fn extract_document_variables(
+    part: &dyn Part,
+    mce_limits: &MceLimits,
+) -> Result<Variables> {
+    let variable_limits = variable_limits_for_mce(mce_limits)?;
+    let limit = variable_limits.max_xml_bytes();
     if part.blob().len() > limit {
-        return Err(Error::InvalidFormat(format!(
-            "settings XML exceeds the {limit} byte document-variable limit"
-        )));
+        return Err(Error::SettingsLimit {
+            kind: crate::settings::LimitKind::DocumentVariableXmlBytes,
+            actual: part.blob().len(),
+            maximum: limit,
+        });
     }
-    let xml = litchi_ooxml_common::mce::process_part(part)?;
-    crate::parse_variables(xml.as_ref())
+    let xml = super::super::extensions::process_bytes_with_limits(part.blob(), mce_limits)?;
+    crate::parse_variables(xml.as_ref(), &variable_limits)
 }
 
 impl DocumentSettings {
@@ -55,9 +77,22 @@ impl DocumentSettings {
     /// # Returns
     ///
     /// A Settings object
+    #[cfg(test)]
     pub(crate) fn extract_from_part(part: &dyn Part) -> Result<Self> {
-        let xml = super::super::extensions::process_part(part)?;
-        let mut settings = Self::extract_from_xml(xml.as_ref())?;
+        Self::extract_from_part_with_mce_limits(part, &MceLimits::default())
+    }
+
+    /// Extract settings after applying the caller-owned MCE resource policy.
+    ///
+    /// Package owners use this entry point with the policy retained at source
+    /// admission; the default compatibility helper above is only for
+    /// detached legacy tests and non-package callers.
+    pub(crate) fn extract_from_part_with_mce_limits(
+        part: &dyn Part,
+        mce_limits: &MceLimits,
+    ) -> Result<Self> {
+        let xml = super::super::extensions::process_bytes_with_limits(part.blob(), mce_limits)?;
+        let mut settings = Self::extract_from_xml_with_mce_limits(xml.as_ref(), mce_limits)?;
         validate_mail_merge_relationships(part, settings.mail_merge.as_ref())?;
         validate_attached_template_relationship(part.rels(), &mut settings)?;
         Ok(settings)

@@ -8,6 +8,8 @@
 //! package layer coordinates relationship-backed graph edits.
 
 mod codec;
+pub(crate) mod family;
+pub(crate) mod graph_patch;
 mod model;
 mod package;
 pub mod story;

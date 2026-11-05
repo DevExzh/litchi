@@ -32,9 +32,11 @@ impl Angle {
     /// Returns an error when input violates DrawingML constraints, exceeds a configured
     /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn parse(value: &str) -> Result<Self> {
-        value.trim().parse::<i32>().map(Self).map_err(|_error| {
-            Error::Invalid(format!("invalid DrawingML transform angle '{value}'"))
-        })
+        value
+            .trim()
+            .parse::<i32>()
+            .map(Self)
+            .map_err(|_error| Error::Invalid("invalid DrawingML transform angle".into()))
     }
 
     /// Return the raw 60,000ths-of-a-degree value.
@@ -368,6 +370,6 @@ impl Transform {
     }
 }
 
-fn coordinate_error(field: &'static str, error: impl fmt::Display) -> Error {
-    Error::Invalid(format!("invalid DrawingML transform {field}: {error}"))
+fn coordinate_error(field: &'static str, _error: impl fmt::Display) -> Error {
+    Error::Invalid(format!("invalid DrawingML transform {field}"))
 }

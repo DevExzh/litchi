@@ -4,22 +4,23 @@ use super::super::super::{
 use super::super::cache::{Cache, Value};
 use super::super::context::{Context, Count, GroupId, Order, Props, Rect};
 use super::super::groups::{Family, Group};
-use super::super::inventory::{Edit, Label, Legend, Origin, Raw};
+use super::super::inventory::{ItemsMut, Label, Legend, Origin, Raw};
 use super::super::series::{Link, Owner, Role, RowCol, Series, Source};
 use super::validation::{cache_dimensions, check_add, dimensions_cover, reserve_one};
 use crate::{Error, Limits, Result};
 
-/// Host-neutral semantic chart.
+/// Host-neutral semantic chart model: the mutable codec model of one chart
+/// substream (record 0359 renamed it from `Chart`, an owner noun).
 ///
 /// Parsed values retain their exact [`Stream`]. An untouched parsed value can
 /// therefore be encoded byte-for-byte without copying. Mutation is allowed for
 /// inspection workflows, but encoding such a value is refused until a future
 /// lossless record editor can prove placement of every opaque record.
 /// Fresh values can be assembled through the deliberately scoped standalone
-/// Graph profile. Other fresh values return [`Error::UnsupportedAuthoring`],
+/// Graph profile. Other fresh values return [`Error::Refused`],
 /// so self-consistent but unsupported streams cannot escape the crate.
 #[derive(Debug)]
-pub struct Chart {
+pub struct Model {
     pub(in crate::chart) context: Context,
     pub(in crate::chart) rect: Rect,
     pub(in crate::chart) props: Props,
@@ -64,7 +65,7 @@ pub enum GraphFamily {
     Pie,
 }
 
-impl Chart {
+impl Model {
     /// Creates a fresh chart using conservative limits.
     ///
     /// # Errors
@@ -180,24 +181,32 @@ impl Chart {
 
     fn validate_graph_authoring(&self) -> Result<()> {
         if self.context.kind() != Kind::Graph {
-            return Err(Error::UnsupportedAuthoring {
-                reason: "standalone Graph authoring requires a Graph producer context",
-            });
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "author",
+                "standalone Graph authoring requires a Graph producer context",
+            )));
         }
         if !matches!(&self.origin, Origin::Fresh) {
-            return Err(Error::UnsupportedAuthoring {
-                reason: "parsed chart replacement remains on the source-bound edit path",
-            });
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "author",
+                "parsed chart replacement remains on the source-bound edit path",
+            )));
         }
         if self.parents.len() != 1 || self.parents[0].id() != axis::ParentId::PRIMARY {
-            return Err(Error::UnsupportedAuthoring {
-                reason: "the fresh Graph profile has exactly one primary AxisParent",
-            });
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "author",
+                "the fresh Graph profile has exactly one primary AxisParent",
+            )));
         }
         if self.groups.len() != 1 {
-            return Err(Error::UnsupportedAuthoring {
-                reason: "fresh Graph authoring supports one chart group only",
-            });
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "author",
+                "fresh Graph authoring supports one chart group only",
+            )));
         }
         let group = self.groups.first().ok_or(Error::InvalidModel {
             field: "groups",
@@ -208,9 +217,11 @@ impl Chart {
             || !group.lines.is_empty()
             || !group.drop_bars.is_empty()
         {
-            return Err(Error::UnsupportedAuthoring {
-                reason: "Graph authoring does not support secondary or opaque group children",
-            });
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "author",
+                "Graph authoring does not support secondary or opaque group children",
+            )));
         }
         let family = match group.family {
             Family::Bar {
@@ -233,16 +244,20 @@ impl Chart {
             | Family::Bar { .. }
             | Family::Line { .. }
             | Family::Pie { .. } => {
-                return Err(Error::UnsupportedAuthoring {
-                    reason: "the selected Graph family settings are outside the authoring profile",
-                });
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "author",
+                    "the selected Graph family settings are outside the authoring profile",
+                )));
             },
         };
         match family {
             GraphFamily::Pie if !self.axes.is_empty() => {
-                return Err(Error::UnsupportedAuthoring {
-                    reason: "pie chart groups must not contain axes",
-                });
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "author",
+                    "pie chart groups must not contain axes",
+                )));
             },
             GraphFamily::Bar | GraphFamily::Line => {
                 if self.axes.len() != 2
@@ -253,22 +268,28 @@ impl Chart {
                         .iter()
                         .any(|value| value.parent != axis::ParentId::PRIMARY)
                 {
-                    return Err(Error::UnsupportedAuthoring {
-                        reason: "bar and line charts require one primary category and value axis",
-                    });
+                    return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
+                        "author",
+                        "bar and line charts require one primary category and value axis",
+                    )));
                 }
             },
             GraphFamily::Pie => {},
         }
         if matches!(family, GraphFamily::Bar | GraphFamily::Line) && !self.props.plot_area {
-            return Err(Error::UnsupportedAuthoring {
-                reason: "the standalone Graph profile requires a chart plot area",
-            });
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "author",
+                "the standalone Graph profile requires a chart plot area",
+            )));
         }
         if family == GraphFamily::Pie && self.props.plot_area {
-            return Err(Error::UnsupportedAuthoring {
-                reason: "the standalone Graph pie profile has no AXES PlotArea record",
-            });
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "author",
+                "the standalone Graph pie profile has no AXES PlotArea record",
+            )));
         }
         if self.series.is_empty() {
             return Err(Error::InvalidModel {
@@ -277,9 +298,11 @@ impl Chart {
             });
         }
         if !self.formats.is_empty() || !self.labels.is_empty() || !self.unknown.is_empty() {
-            return Err(Error::UnsupportedAuthoring {
-                reason: "fresh Graph authoring does not synthesize opaque format or label records",
-            });
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "author",
+                "fresh Graph authoring does not synthesize opaque format or label records",
+            )));
         }
         let first_count = self
             .series
@@ -451,7 +474,7 @@ impl Chart {
     pub fn parse_with(input: Ref<'_>, context: Context, limits: Limits) -> Result<Self> {
         let validated = limits.validate()?;
         let mut chart = codec::parse(input, context, validated)?;
-        chart.origin = Origin::Parsed(input.own_with(validated)?);
+        chart.origin = Origin::Parsed(input.own(validated)?);
         Ok(chart)
     }
 
@@ -489,8 +512,8 @@ impl Chart {
     /// identity, and record position. Unknown records, series identities,
     /// coordinates, formatting indices, and structural `PlotArea` presence
     /// therefore remain untouched.
-    pub fn edit(self) -> Result<crate::chart::transaction::Editor> {
-        crate::chart::transaction::Editor::new(self)
+    pub fn edit(self) -> Result<crate::chart::transaction::Edit> {
+        crate::chart::transaction::Edit::new(self)
     }
 
     /// Replays an untouched parsed chart, or emits a proven fresh profile.
@@ -501,15 +524,19 @@ impl Chart {
 
     /// Consumes and replays under explicit bounds.
     ///
-    /// Parsed mutations return [`Error::UnsafeEdit`]; fresh values outside the
-    /// supported standalone Graph profile return [`Error::UnsupportedAuthoring`].
+    /// Parsed mutations and fresh values outside the
+    /// supported standalone Graph profile return [`Error::Refused`].
     pub fn encode_with(mut self, limits: Limits) -> Result<Stream> {
         let limits = limits.validate()?;
         let origin = std::mem::replace(&mut self.origin, Origin::Fresh);
         match origin {
-            Origin::Parsed(_stream) if self.dirty => Err(Error::UnsafeEdit {
-                reason: "opaque or reserved source records could not be placed losslessly",
-            }),
+            Origin::Parsed(_stream) if self.dirty => {
+                Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "encode",
+                    "opaque or reserved source records could not be placed losslessly",
+                )))
+            },
             Origin::Parsed(stream) => stream.relimit(limits),
             Origin::Fresh => {
                 if self.graph_authoring_profile {
@@ -520,7 +547,7 @@ impl Chart {
                     self.validate_graph_authoring()?;
                 }
                 let bytes = codec::encode(&self, limits)?;
-                Stream::with_limits(bytes, limits)
+                Stream::open(bytes, limits)
             },
         }
     }
@@ -590,8 +617,8 @@ impl Chart {
     }
 
     /// Mutably borrows series and marks parsed input dirty only on mutation.
-    pub fn series_mut(&mut self) -> Edit<'_, Series> {
-        Edit {
+    pub fn series_mut(&mut self) -> ItemsMut<'_, Series> {
+        ItemsMut {
             values: &mut self.series,
             dirty: &mut self.dirty,
             parsed: matches!(&self.origin, Origin::Parsed(_)),
@@ -637,7 +664,11 @@ impl Chart {
                 });
             }
         }
-        check_add(self.series.len(), self.limits.max_series, "series count")?;
+        check_add(
+            self.series.len(),
+            self.limits.max_series,
+            crate::LimitKind::Series,
+        )?;
         reserve_one(&mut self.series, "chart series")?;
         self.touch();
         self.series.push(value);
@@ -723,8 +754,8 @@ impl Chart {
     }
 
     /// Mutably borrows chart groups and marks parsed input dirty only on mutation.
-    pub fn groups_mut(&mut self) -> Edit<'_, Group> {
-        Edit {
+    pub fn groups_mut(&mut self) -> ItemsMut<'_, Group> {
+        ItemsMut {
             values: &mut self.groups,
             dirty: &mut self.dirty,
             parsed: matches!(&self.origin, Origin::Parsed(_)),
@@ -732,7 +763,11 @@ impl Chart {
     }
 
     pub fn add_group(&mut self, value: Group) -> Result<()> {
-        check_add(self.groups.len(), self.limits.max_groups, "group count")?;
+        check_add(
+            self.groups.len(),
+            self.limits.max_groups,
+            crate::LimitKind::Groups,
+        )?;
         if self
             .parents
             .get(value.parent.index())
@@ -812,8 +847,8 @@ impl Chart {
     }
 
     /// Mutably borrows axes and marks parsed input dirty only on mutation.
-    pub fn axes_mut(&mut self) -> Edit<'_, axis::Axis> {
-        Edit {
+    pub fn axes_mut(&mut self) -> ItemsMut<'_, axis::Axis> {
+        ItemsMut {
             values: &mut self.axes,
             dirty: &mut self.dirty,
             parsed: matches!(&self.origin, Origin::Parsed(_)),
@@ -831,7 +866,11 @@ impl Chart {
                 reason: "axis refers to a missing axis parent",
             });
         }
-        check_add(self.axes.len(), self.limits.max_axes, "axis count")?;
+        check_add(
+            self.axes.len(),
+            self.limits.max_axes,
+            crate::LimitKind::Axes,
+        )?;
         reserve_one(&mut self.axes, "chart axes")?;
         self.touch();
         self.axes.push(value);
@@ -853,8 +892,8 @@ impl Chart {
     }
 
     /// Mutably borrows axis-parent metadata.
-    pub fn parents_mut(&mut self) -> Edit<'_, axis::Parent> {
-        Edit {
+    pub fn parents_mut(&mut self) -> ItemsMut<'_, axis::Parent> {
+        ItemsMut {
             values: &mut self.parents,
             dirty: &mut self.dirty,
             parsed: matches!(&self.origin, Origin::Parsed(_)),
@@ -904,8 +943,8 @@ impl Chart {
 
     /// Mutably borrows cached cells and marks parsed input dirty only on mutation.
     /// Call [`Self::sync_dimensions`] after changing cell coordinates.
-    pub fn caches_mut(&mut self) -> Edit<'_, Cache> {
-        Edit {
+    pub fn caches_mut(&mut self) -> ItemsMut<'_, Cache> {
+        ItemsMut {
             values: &mut self.caches,
             dirty: &mut self.dirty,
             parsed: matches!(&self.origin, Origin::Parsed(_)),
@@ -922,7 +961,7 @@ impl Chart {
         check_add(
             self.caches.len(),
             self.limits.max_cached_values,
-            "cached value count",
+            crate::LimitKind::CachedValues,
         )?;
         reserve_one(&mut self.caches, "chart cache")?;
         self.caches.push(value);
@@ -969,8 +1008,8 @@ impl Chart {
         &self.formats
     }
 
-    pub fn formats_mut(&mut self) -> Edit<'_, format::Format> {
-        Edit {
+    pub fn formats_mut(&mut self) -> ItemsMut<'_, format::Format> {
+        ItemsMut {
             values: &mut self.formats,
             dirty: &mut self.dirty,
             parsed: matches!(&self.origin, Origin::Parsed(_)),
@@ -981,7 +1020,7 @@ impl Chart {
         check_add(
             self.formats.len(),
             self.limits.max_chart_records,
-            "chart record count",
+            crate::LimitKind::ChartRecords,
         )?;
         reserve_one(&mut self.formats, "chart formats")?;
         self.touch();
@@ -994,8 +1033,8 @@ impl Chart {
         &self.labels
     }
 
-    pub fn labels_mut(&mut self) -> Edit<'_, Label> {
-        Edit {
+    pub fn labels_mut(&mut self) -> ItemsMut<'_, Label> {
+        ItemsMut {
             values: &mut self.labels,
             dirty: &mut self.dirty,
             parsed: matches!(&self.origin, Origin::Parsed(_)),
@@ -1006,7 +1045,7 @@ impl Chart {
         check_add(
             self.labels.len(),
             self.limits.max_chart_records,
-            "chart record count",
+            crate::LimitKind::ChartRecords,
         )?;
         reserve_one(&mut self.labels, "chart labels")?;
         self.touch();

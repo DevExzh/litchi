@@ -1,0 +1,1 @@
+'Q1 Data'!row[Salary>5000 and (Region=EMEA or not(Region=APAC))]

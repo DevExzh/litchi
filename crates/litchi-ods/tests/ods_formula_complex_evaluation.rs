@@ -40,7 +40,8 @@ fn new_execution(scope: &str) -> (Budget, CancellationSource, ExecutionContext) 
 }
 
 fn parse(source: &str) -> Expression {
-    Expression::parse(source).unwrap_or_else(|error| panic!("{source:?} should parse: {error}"))
+    Expression::parse(source, &Default::default())
+        .unwrap_or_else(|error| panic!("{source:?} should parse: {error}"))
 }
 
 fn evaluate<'a>(

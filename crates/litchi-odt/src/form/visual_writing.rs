@@ -1432,14 +1432,14 @@ mod tests {
 
     #[test]
     fn builder_and_mutable_document_round_trip() {
-        use crate::{Builder, Document, mutable::MutableDocument};
+        use crate::{Builder, mutable::MutableDocument};
         let mut form = VisualForm::new("Main");
         form.add_control(RadioControl::new("Group", "radio"))
             .unwrap();
         let mut builder = Builder::new();
         builder.add_visual_form(&form).unwrap();
         builder.add_paragraph("body").unwrap();
-        let document = Document::from_bytes(builder.build().unwrap()).unwrap();
+        let document = builder.build().unwrap().document().unwrap();
         let mut mutable = MutableDocument::from_document(document).unwrap();
         assert_eq!(mutable.visual_controls().unwrap().len(), 1);
         let image: VisualControl = ImageControl::new("Image", "image").into();

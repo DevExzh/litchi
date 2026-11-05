@@ -1,0 +1,649 @@
+{
+  "format": "numbers",
+  "state": "open",
+  "verbs": {
+    "get": {
+      "supported": true
+    },
+    "find": {
+      "supported": true
+    },
+    "query": {
+      "supported": true
+    },
+    "view": {
+      "supported": true
+    },
+    "evaluate": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "none: import and evaluation are worksheet operations",
+      "reason": "this format has no worksheets"
+    },
+    "set": {
+      "supported": true
+    },
+    "add": {
+      "supported": true
+    },
+    "remove": {
+      "supported": true
+    },
+    "move": {
+      "supported": true
+    },
+    "swap": {
+      "supported": true
+    },
+    "edit": {
+      "supported": true
+    },
+    "batch": {
+      "supported": true
+    },
+    "import": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "none: import and evaluation are worksheet operations",
+      "reason": "this format has no worksheets"
+    },
+    "merge": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "template merge for the ODF object formats and iWork (record 0295)",
+      "reason": "template merge fills word-processing, presentation and spreadsheet templates"
+    },
+    "replace": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0295 follow-up: a find adapter over the format's text edits",
+      "reason": "find/replace is not integrated for this format"
+    },
+    "refresh": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0295 follow-up: field refresh for PPT, RTF and the ODF object formats",
+      "reason": "this format has no field refresh adapter"
+    },
+    "save": {
+      "supported": true
+    },
+    "create": {
+      "supported": true
+    },
+    "dump": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0336 follow-up: dump plans for the remaining formats",
+      "reason": "this format's write verbs cannot yet rebuild its node tree on a created document"
+    },
+    "raw": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0336: package parts exist in OOXML and packaged ODF only",
+      "reason": "this format has no package parts"
+    },
+    "validate": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0336 follow-up: an iWork package validator from the iWork owners",
+      "reason": "iWork packages are validated by their owners on open; no report-producing validator exists"
+    },
+    "add-part": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0336: package parts exist in OOXML and packaged ODF only",
+      "reason": "this format has no package parts"
+    },
+    "raw-set": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0336: package parts exist in OOXML and packaged ODF only",
+      "reason": "this format has no package parts"
+    }
+  },
+  "views": {
+    "text": {
+      "supported": true
+    },
+    "annotated": {
+      "supported": true
+    },
+    "outline": {
+      "supported": true
+    },
+    "stats": {
+      "supported": true
+    },
+    "issues": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    "forms": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    "html": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "svg": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "screenshot": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "pdf": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    }
+  },
+  "elements": [
+    {
+      "format": "numbers",
+      "element": "workbook",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/"
+        ]
+      },
+      "children": [
+        {
+          "element": "sheet",
+          "pathSegment": "sheet"
+        }
+      ],
+      "properties": {
+        "sheetCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      }
+    },
+    {
+      "format": "numbers",
+      "element": "sheet",
+      "parent": "workbook",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "stable": [
+          "/<sheet name>"
+        ],
+        "positional": [
+          "/sheet[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "table",
+          "pathSegment": "table"
+        },
+        {
+          "element": "chart",
+          "pathSegment": "chart"
+        }
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "tableCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "numbers",
+      "element": "table",
+      "parent": "sheet",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "stable": [
+          "/<sheet name>/<table name>"
+        ],
+        "positional": [
+          "/sheet[N]/table[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "cell",
+          "pathSegment": "A1"
+        },
+        {
+          "element": "mergeCell",
+          "pathSegment": "mergeCell"
+        },
+        {
+          "element": "row",
+          "pathSegment": "row"
+        },
+        {
+          "element": "col",
+          "pathSegment": "col"
+        }
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "rowCount": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "columnCount": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "mergeCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "numbers",
+      "element": "cell",
+      "parent": "table",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/sheet[N]/table[N]/A1"
+        ]
+      },
+      "properties": {
+        "type": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "value": {
+          "type": "scalar",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "formula": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "cachedValue": {
+          "type": "scalar",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "comment": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "merge": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "mergeAnchor": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "numberFormat": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.bold": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.italic": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.underline": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.strike": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.size": {
+          "type": "font-size",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.name": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.color": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type",
+          "value"
+        ],
+        "aliases": {
+          "bold": "font.bold",
+          "color": "font.color",
+          "font": "font.name",
+          "italic": "font.italic",
+          "size": "font.size"
+        }
+      }
+    },
+    {
+      "format": "numbers",
+      "element": "mergeCell",
+      "parent": "table",
+      "operations": {
+        "add": true,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/sheet[N]/table[N]/mergeCell[N]"
+        ]
+      },
+      "properties": {
+        "ref": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "numbers",
+      "element": "row",
+      "parent": "table",
+      "operations": {
+        "add": true,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/sheet[N]/table[N]/row[N]"
+        ]
+      },
+      "properties": {},
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ],
+        "headerColumns": true
+      }
+    },
+    {
+      "format": "numbers",
+      "element": "col",
+      "parent": "table",
+      "elementAliases": [
+        "column"
+      ],
+      "operations": {
+        "add": true,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/sheet[N]/table[N]/col[N]"
+        ]
+      },
+      "properties": {},
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "numbers",
+      "element": "chart",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/sheet[N]/chart[N]"
+        ]
+      },
+      "properties": {
+        "font.size": {
+          "type": "font-size",
+          "add": false,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    }
+  ],
+  "gaps": [
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "cell",
+      "context": "cross-table formula references",
+      "code": "unsupported_capability",
+      "followUp": "record 0297 follow-ups (IWORK_API_REQUESTS.md)",
+      "reason": "formula text is parsed with local A1 references and the authorable function subset; references to other tables need source-bound table handles"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "table",
+      "context": "a workbook without a table",
+      "code": "unsupported_capability",
+      "followUp": "record 0301 follow-ups (IWORK_API_REQUESTS.md request 5)",
+      "reason": "a new table copies the structure (styles, sizes, storage layout) of the workbook's first table; a workbook with no table has no template yet"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "row",
+      "context": "formulas the coordinate shift refuses, merges",
+      "code": "unsupported_capability",
+      "followUp": "record 0329 follow-ups (IWORK_API_REQUESTS.md request 6)",
+      "reason": "rows and columns move every formula reference into the table, the table's own formulas and other tables' (record 0318); a removed row or column a surviving formula reads turns into #REF! (ranges shrink), and a shared formula whose cells diverge is split (record 0329); refused: a chart or other non-table owner reading the table, volatile, spanning, error or spill dependency state, a removal whose cells the cell writer cannot clear under a range that reads them, merged cells, filters, categories, pivots and (for columns) sort rules, and removing a hidden or bordered row or column"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "row",
+      "context": "height and visibility",
+      "code": "unsupported_capability",
+      "followUp": "record 0309 follow-ups",
+      "reason": "rows and columns are structural only here: their sizes and hidden states are not wired to the leaf's dimension transaction"
+    },
+    {
+      "subject": "operation",
+      "verb": "move",
+      "element": "row",
+      "context": "rows and columns",
+      "code": "unsupported_capability",
+      "followUp": "record 0347 F1 (a row and column move in `table::topology`)",
+      "reason": "the leaf topology transaction inserts and removes rows and columns but does not reorder them; reordering must carry storage, headers, UIDs, borders, merges and every formula coordinate that reads the table"
+    },
+    {
+      "subject": "operation",
+      "verb": "swap",
+      "element": "row",
+      "context": "rows and columns",
+      "code": "unsupported_capability",
+      "followUp": "record 0347 F1 (a row and column move in `table::topology`)",
+      "reason": "a swap is two moves, and the leaf topology transaction does not reorder rows or columns; sheets and tables swap"
+    },
+    {
+      "subject": "view",
+      "mode": "issues",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "forms",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "html",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "svg",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "screenshot",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "pdf",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    }
+  ]
+}

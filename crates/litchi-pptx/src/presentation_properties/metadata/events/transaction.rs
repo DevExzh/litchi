@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use litchi_opc::OpcPackage;
 
-use super::codec::{self, LoadLimits, Located};
+use super::codec::{self, Limits, LoadLimits, Located};
 use super::model::{Draft, Event, Kind};
 use super::validation::{validate_draft, validate_events};
 use crate::time::Offset;
@@ -20,6 +20,7 @@ pub struct Snapshot {
     pub(crate) source_xml: Arc<Vec<u8>>,
     pub(crate) events: Vec<Event>,
     pub(crate) layout: Located,
+    pub(crate) limits: Limits,
     pub(crate) revision: Revision,
 }
 
@@ -32,35 +33,26 @@ impl Snapshot {
     pub fn load(
         package: &OpcPackage,
         slide_part_name: &litchi_opc::PackURI,
+        limits: Limits,
     ) -> Result<Option<Self>> {
-        super::package::load_snapshot(package, slide_part_name)
-    }
-
-    /// Alias for [`Self::load`] emphasizing the source-bound result.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn read(
-        package: &OpcPackage,
-        slide_part_name: &litchi_opc::PackURI,
-    ) -> Result<Option<Self>> {
-        Self::load(package, slide_part_name)
+        super::package::load_snapshot(package, slide_part_name, limits)
     }
 
     pub(crate) fn from_located(
         slide_part_name: String,
         source_xml: Arc<Vec<u8>>,
         layout: Located,
+        limits: Limits,
     ) -> Result<Self> {
         let drafts: Vec<_> = layout.events.iter().map(Draft::from_event).collect();
-        validate_events(&drafts)?;
+        validate_events(&drafts, limits)?;
         Ok(Self {
             slide_part_name,
             revision: fingerprint(source_xml.as_slice()),
             source_xml,
             events: layout.events.clone(),
             layout,
+            limits,
         })
     }
 
@@ -94,8 +86,8 @@ impl Snapshot {
 
     /// Start an atomic detached edit over the typed event sequence.
     #[inline]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub(crate) fn edit(&self) -> ListDraft {
+        ListDraft {
             original: self.clone(),
             working: self.events.iter().map(Draft::from_event).collect(),
         }
@@ -114,12 +106,12 @@ impl Snapshot {
 
 /// A bounded edit staged against one existing event list.
 #[derive(Clone, Debug)]
-pub struct Transaction {
+pub struct ListDraft {
     original: Snapshot,
     working: Vec<Draft>,
 }
 
-impl Transaction {
+impl ListDraft {
     /// Borrow the projected typed draft sequence.
     #[inline]
     #[must_use]
@@ -127,16 +119,7 @@ impl Transaction {
         &self.working
     }
 
-    /// Alias for [`Self::events`].
-    #[inline]
-    #[must_use]
-    pub fn snapshot(&self) -> &[Draft] {
-        self.events()
-    }
-
-    /// Return whether the staged semantic sequence differs from the source.
-    #[inline]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.working
             != self
                 .original
@@ -146,13 +129,19 @@ impl Transaction {
                 .collect::<Vec<_>>()
     }
 
+    /// The outcome of this edit or commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
+    }
+
     /// Replace all typed records while retaining the owning extension bytes.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
     pub fn replace(&mut self, events: Vec<Draft>) -> Result<bool> {
-        validate_events(&events)?;
+        validate_events(&events, self.original.limits)?;
         if self.working == events {
             return Ok(false);
         }
@@ -176,10 +165,10 @@ impl Transaction {
             .cloned()
             .ok_or_else(|| index_error(index, self.working.len()))?;
         edit(&mut candidate)?;
-        validate_draft(&candidate)?;
+        validate_draft(&candidate, self.original.limits)?;
         let mut working = self.working.clone();
         working[index] = candidate;
-        validate_events(&working)?;
+        validate_events(&working, self.original.limits)?;
         self.working = working;
         Ok(())
     }
@@ -228,7 +217,7 @@ impl Transaction {
     pub fn push(&mut self, event: Draft) -> Result<()> {
         let mut candidate = self.working.clone();
         candidate.push(event);
-        validate_events(&candidate)?;
+        validate_events(&candidate, self.original.limits)?;
         self.working = candidate;
         Ok(())
     }
@@ -244,7 +233,7 @@ impl Transaction {
         }
         let mut candidate = self.working.clone();
         candidate.insert(index, event);
-        validate_events(&candidate)?;
+        validate_events(&candidate, self.original.limits)?;
         self.working = candidate;
         Ok(())
     }
@@ -265,7 +254,7 @@ impl Transaction {
         }
         let mut candidate = self.working.clone();
         let removed = candidate.remove(index);
-        validate_events(&candidate)?;
+        validate_events(&candidate, self.original.limits)?;
         self.working = candidate;
         Ok(removed)
     }
@@ -285,7 +274,7 @@ impl Transaction {
         let mut candidate = self.working.clone();
         let event = candidate.remove(from);
         candidate.insert(to, event);
-        validate_events(&candidate)?;
+        validate_events(&candidate, self.original.limits)?;
         self.working = candidate;
         Ok(true)
     }
@@ -295,25 +284,31 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Prepared> {
         if !self.is_changed() {
-            let patch = Patch::new(self.original.clone(), self.original.clone());
-            return Ok(Commit {
+            let patch = Change::new(self.original.clone(), self.original.clone());
+            return Ok(Prepared {
                 snapshot: self.original,
                 patch,
                 changed: false,
             });
         }
-        validate_events(&self.working)?;
+        validate_events(&self.working, self.original.limits)?;
         let updated = codec::rewrite(
             self.original.source_xml.as_slice(),
             &self.original.layout,
             &self.working,
+            self.original.limits,
         )?;
         let updated = Arc::new(updated);
         let slide_index = self.original.events.first().map_or(0, Event::slide_index);
-        let located = codec::locate(slide_index, updated.as_slice(), &mut LoadLimits::default())?
-            .ok_or_else(|| invalid("edited slide-show event list disappeared"))?;
+        let located = codec::locate(
+            slide_index,
+            updated.as_slice(),
+            self.original.limits,
+            &mut LoadLimits::default(),
+        )?
+        .ok_or_else(|| invalid("edited slide-show event list disappeared"))?;
         let parsed: Vec<_> = located.events.iter().map(Draft::from_event).collect();
         if parsed != self.working {
             return Err(invalid(
@@ -324,9 +319,10 @@ impl Transaction {
             self.original.slide_part_name.clone(),
             Arc::clone(&updated),
             located,
+            self.original.limits,
         )?;
-        let patch = Patch::new(self.original, snapshot.clone());
-        Ok(Commit {
+        let patch = Change::new(self.original, snapshot.clone());
+        Ok(Prepared {
             snapshot,
             patch,
             changed: true,
@@ -336,56 +332,57 @@ impl Transaction {
 
 /// A successful event edit and its reversible package patch.
 #[derive(Clone, Debug)]
-pub struct Commit {
+pub(crate) struct Prepared {
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the module's source-level tests")
+    )]
     snapshot: Snapshot,
-    patch: Patch,
+    patch: Change,
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the module's source-level tests")
+    )]
     changed: bool,
 }
 
-impl Commit {
-    /// Whether publication changes the exact slide bytes.
-    #[inline]
-    #[must_use]
-    pub const fn changed(&self) -> bool {
+impl Prepared {
+    #[cfg(test)]
+    fn is_changed(&self) -> bool {
         self.changed
     }
 
-    /// Alias for [`Self::changed`].
-    #[inline]
+    /// The outcome of this edit or commit.
     #[must_use]
-    pub const fn is_changed(&self) -> bool {
-        self.changed
+    #[cfg(test)]
+    pub(crate) fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Borrow the projected post-edit snapshot.
     #[inline]
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    #[cfg(test)]
+    pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Borrow the reversible source-checked patch.
     #[inline]
     #[must_use]
-    pub fn patch(&self) -> &Patch {
+    pub(crate) fn patch(&self) -> &Change {
         &self.patch
-    }
-
-    /// Consume the commit into its patch.
-    #[must_use]
-    pub fn into_patch(self) -> Patch {
-        self.patch
     }
 }
 
 /// A reversible source-checked replacement of one slide's event list.
 #[derive(Clone, Debug)]
-pub struct Patch {
+pub(crate) struct Change {
     before: Snapshot,
     after: Snapshot,
 }
 
-impl Patch {
+impl Change {
     fn new(before: Snapshot, after: Snapshot) -> Self {
         Self { before, after }
     }
@@ -393,53 +390,48 @@ impl Patch {
     /// Source context required before publication.
     #[inline]
     #[must_use]
-    pub fn before(&self) -> &Snapshot {
+    pub(crate) fn before(&self) -> &Snapshot {
         &self.before
     }
 
     /// Source context produced by publication.
     #[inline]
     #[must_use]
-    pub fn after(&self) -> &Snapshot {
+    pub(crate) fn after(&self) -> &Snapshot {
         &self.after
     }
 
     /// Whether this patch is an exact no-op.
     #[inline]
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
-    }
-
-    /// Alias for [`Self::is_empty`].
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.is_empty()
     }
 
     /// Return the exact inverse patch.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    #[cfg(test)]
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
         }
     }
 
-    /// Return the source fingerprint required for publication.
-    #[inline]
-    #[must_use]
-    pub const fn expected_revision(&self) -> Revision {
-        self.before.revision
-    }
-
     /// Apply this patch atomically after checking the complete slide source.
+    ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) before anything is mutated: remove the signature explicitly
+    /// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+    /// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+    /// no-op keeps the signature.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn apply(&self, target: &mut OpcPackage) -> Result<Snapshot> {
+    #[cfg(test)]
+    pub(crate) fn apply(&self, target: &mut OpcPackage) -> Result<Snapshot> {
         super::package::apply_patch(target, self)
     }
 }

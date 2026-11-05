@@ -9,35 +9,44 @@
 
 use std::borrow::Cow;
 
-use litchi_rtf::{DocumentWindowCaption, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{DocumentWindowCaption, write::Writer};
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
 #[test]
 fn parses_starred_and_legacy_unstarred_string_destinations() {
-    let starred =
-        RtfDocument::parse(r"{\rtf1{\*\windowcaption Release \u20320? \{A\} \\ status}Body}")
-            .unwrap();
+    let starred = Tree::parse(
+        r"{\rtf1{\*\windowcaption Release \u20320? \{A\} \\ status}Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(
         starred.window_caption().unwrap().text,
         "Release 你 {A} \\ status"
     );
     assert_eq!(starred.text(), "Body");
 
-    let unstarred = RtfDocument::parse(r"{\rtf1{\windowcaption Legacy title}Body}").unwrap();
+    let unstarred = Tree::parse(
+        r"{\rtf1{\windowcaption Legacy title}Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(unstarred.window_caption().unwrap().text, "Legacy title");
     assert_eq!(unstarred.text(), "Body");
 }
 
 #[test]
 fn writer_canonicalizes_to_starred_destination_and_preserves_string_spacing() {
-    let document = RtfDocument::parse(r"{\rtf1{\windowcaption  padded }Body}").unwrap();
+    let document = Tree::parse(
+        r"{\rtf1{\windowcaption  padded }Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(document.window_caption().unwrap().text, " padded ");
 
     let output = write(&document);
@@ -45,14 +54,15 @@ fn writer_canonicalizes_to_starred_destination_and_preserves_string_spacing() {
     assert!(serialized.contains(r"{\*\windowcaption  padded }"));
     assert!(!serialized.contains(r"{\windowcaption"));
 
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.window_caption(), document.window_caption());
     assert_eq!(reparsed.text(), "Body");
 }
 
 #[test]
 fn typed_api_is_inert_and_clearable() {
-    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
+    let mut document =
+        Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     document
         .set_window_caption(
             DocumentWindowCaption::new(Cow::Borrowed("file:///never-opened")).unwrap(),
@@ -64,7 +74,8 @@ fn typed_api_is_inert_and_clearable() {
     );
     assert_eq!(document.text(), "Body");
 
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.window_caption(), document.window_caption());
     assert_eq!(reparsed.text(), "Body");
 
@@ -85,7 +96,7 @@ fn rejects_misplaced_duplicate_empty_active_nested_and_binary_destinations() {
         r"{\rtf1{\windowcaption \bin1 x}Body}",
     ] {
         assert!(
-            RtfDocument::parse(source).is_err(),
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
             "accepted malformed {source}"
         );
     }
@@ -98,5 +109,5 @@ fn enforces_caption_model_and_parser_resource_bounds() {
 
     let oversized = "x".repeat(litchi_rtf::MAX_WINDOW_CAPTION_BYTES + 1);
     let source = format!(r"{{\rtf1{{\*\windowcaption {oversized}}}Body}}");
-    assert!(RtfDocument::parse(&source).is_err());
+    assert!(Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).is_err());
 }

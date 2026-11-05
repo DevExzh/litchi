@@ -16,9 +16,10 @@ use crate::{
     Part,
     constants::{ODF_CONTENT, ODF_STYLES},
     core::OwnedPackage,
-    transaction::{Commit, EnvelopeKind, Snapshot},
+    transaction::{Commit, EnvelopeKind, Package},
 };
 use litchi_core::{Error, Result};
+use litchi_odf_common::Error as OdfError;
 use litchi_odf_common::{
     embedded::{Kind as ObjectKind, Source as ObjectSource, scan_package as scan_objects},
     media::{Source as ImageSource, scan_package as scan_images},
@@ -42,6 +43,8 @@ const MANIFEST_PATH: &str = "META-INF/manifest.xml";
 const MAX_CANDIDATES: usize = 256;
 const MAX_PACKAGE_ENTRIES: usize = 16_384;
 const MAX_REFERENCE_XML_BYTES: usize = 64 * 1024 * 1024;
+
+type FamilyResult<T> = std::result::Result<T, OdfError>;
 
 /// Maximum UTF-8 bytes accepted in one embedded-resource GC candidate path.
 ///
@@ -101,6 +104,27 @@ pub enum EmbeddedResourceGcRefusal {
     },
 }
 
+impl EmbeddedResourceGcRefusal {
+    /// The refusal class litchi-ops reports for this reason (record 0351
+    /// §2.4).
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsafePath
+            | Self::MissingArchiveEntry
+            | Self::MissingManifestEntry
+            | Self::InvalidSubdocument
+            | Self::OverlappingCandidate
+            | Self::PackageNamespaceCollision
+            | Self::UnknownReference { .. } => RefusalKind::UnsupportedContent,
+            Self::SignedPackage | Self::EncryptedPackage | Self::ProtectedDocument => {
+                RefusalKind::Protected
+            },
+        }
+    }
+}
+
 /// The deterministic decision for one candidate.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -148,7 +172,7 @@ impl EmbeddedResourceGcPlanEntry {
 
 /// Non-mutating, bounded embedded-resource garbage-collection plan.
 pub struct EmbeddedResourceGcPlan {
-    source: Snapshot,
+    source: Package,
     entries: Vec<EmbeddedResourceGcPlanEntry>,
 }
 
@@ -171,13 +195,18 @@ impl EmbeddedResourceGcPlan {
     /// Every untouched ZIP member is raw-copied. The manifest is changed by
     /// deleting only the planned `manifest:file-entry` byte spans. The result
     /// is fully reopened before a reversible package commit is returned.
-    pub fn apply(&self, source: &Snapshot) -> Result<Commit> {
+    pub fn apply(&self, source: &Package) -> FamilyResult<Commit> {
         if source.as_bytes() != self.source.as_bytes() {
-            return invalid("ODT embedded-resource GC plan source does not match");
+            return Err(OdfError::patch_conflict(
+                "odt.package.resource_gc",
+                "the plan is not for the package being edited",
+            ));
         }
         if !self.is_applicable() {
-            return Err(Error::Unsupported(
-                "ODT embedded-resource GC plan contains a typed refusal".to_string(),
+            return Err(OdfError::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odt.package.resource_gc",
+                "ODT embedded-resource GC plan contains a typed refusal",
             ));
         }
         let package = source.document()?.transaction_package().clone();
@@ -185,7 +214,7 @@ impl EmbeddedResourceGcPlan {
         let after = if bytes.as_slice() == source.as_bytes() {
             source.clone()
         } else {
-            Snapshot::from_bytes(bytes)?
+            Package::from_vec_with_xml_limits(bytes, source.xml_limits_value())?
         };
         Ok(crate::transaction::embedded_resource_gc_commit(
             source.clone(),
@@ -213,7 +242,7 @@ impl EmbeddedResourceGcPlan {
     }
 }
 
-impl Snapshot {
+impl Package {
     /// Inventory explicitly named detached payloads without changing the package.
     ///
     /// This operation never discovers arbitrary files as garbage and is never
@@ -222,13 +251,13 @@ impl Snapshot {
     pub fn plan_embedded_resource_gc(
         &self,
         candidates: &[EmbeddedResourceGcCandidate],
-    ) -> Result<EmbeddedResourceGcPlan> {
-        plan(self.clone(), candidates)
+    ) -> FamilyResult<EmbeddedResourceGcPlan> {
+        Ok(plan(self.clone(), candidates)?)
     }
 }
 
 pub(crate) fn plan(
-    source: Snapshot,
+    source: Package,
     candidates: &[EmbeddedResourceGcCandidate],
 ) -> Result<EmbeddedResourceGcPlan> {
     if candidates.len() > MAX_CANDIDATES {
@@ -312,7 +341,7 @@ fn set_global_refusal(candidates: &mut [NormalizedCandidate], refusal: EmbeddedR
     }
 }
 
-fn finish_plan(source: Snapshot, normalized: Vec<NormalizedCandidate>) -> EmbeddedResourceGcPlan {
+fn finish_plan(source: Package, normalized: Vec<NormalizedCandidate>) -> EmbeddedResourceGcPlan {
     let entries = normalized
         .into_iter()
         .map(|item| {
@@ -518,8 +547,11 @@ fn classify_references(
     candidates: &mut [NormalizedCandidate],
 ) -> Result<()> {
     let archive = package.package()?;
-    let zip_metadata =
-        soapberry_zip::office::ArchiveReader::new(package.as_bytes()).map_err(zip_error)?;
+    let zip_metadata = soapberry_zip::office::ArchiveReader::new(
+        package.as_bytes(),
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .map_err(zip_error)?;
     for object in scan_objects(content, styles, &archive)? {
         if !matches!(object.part, Part::Content | Part::Styles) {
             continue;
@@ -761,7 +793,12 @@ fn rewrite_package(
         .map_err(zip_error)?
         .into_zip_archive();
     let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer).map_err(zip_error)?;
+    let index = PreservationIndex::new(
+        &archive,
+        &mut buffer,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .map_err(zip_error)?;
     let mut records = archive.entries(&mut buffer);
     let mut seen = BTreeSet::new();
     let mut replaced_manifest = false;
@@ -850,7 +887,8 @@ fn generated_manifest_member(
     manifest: &[u8],
     compression: CompressionMethod,
 ) -> Result<(Vec<u8>, Vec<u8>)> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     match compression {
         CompressionMethod::Store => writer.write_stored(MANIFEST_PATH, manifest),
         CompressionMethod::Deflate => writer.write_deflated(MANIFEST_PATH, manifest),
@@ -862,7 +900,12 @@ fn generated_manifest_member(
         .map_err(zip_error)?
         .into_zip_archive();
     let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer).map_err(zip_error)?;
+    let index = PreservationIndex::new(
+        &archive,
+        &mut buffer,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .map_err(zip_error)?;
     if index.entries().len() != 1 {
         return invalid("generated ODT manifest ZIP has an unexpected entry count");
     }

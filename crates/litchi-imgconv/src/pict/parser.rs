@@ -205,21 +205,19 @@ pub struct PictParser {
 }
 
 impl PictParser {
-    /// Create a new PICT parser from raw data
-    pub fn new(data: &[u8]) -> Result<Self> {
-        Self::new_bounded(data, 100_000, 256 * 1024 * 1024)
-    }
-
-    /// Parse under explicit input and record ceilings.
-    pub fn new_bounded(data: &[u8], max_records: usize, max_bytes: usize) -> Result<Self> {
-        if max_records == 0 || max_bytes == 0 {
+    /// Create a new PICT parser from raw data under the caller's resource
+    /// policy.  PICT is variable-sized: the input and record ceilings are
+    /// checked before any owned copies or record-vector capacity are created.
+    pub fn new(data: &[u8], limits: &crate::Limits) -> Result<Self> {
+        if limits.max_records == 0 || limits.max_uncompressed_bytes == 0 {
             return Err(Error::ParseError(
                 "PICT parser limits must be greater than zero".into(),
             ));
         }
-        if data.len() > max_bytes {
+        if data.len() > limits.max_uncompressed_bytes {
             return Err(Error::ParseError(format!(
-                "PICT input exceeds limit {max_bytes} bytes"
+                "PICT input exceeds limit {} bytes",
+                limits.max_uncompressed_bytes
             )));
         }
         let header = PictHeader::parse(data)?;
@@ -232,14 +230,20 @@ impl PictParser {
             offset += 4; // Skip version opcode and data
         }
 
-        let mut records = Vec::new();
+        let record_capacity = data
+            .len()
+            .saturating_sub(offset)
+            .saturating_div(2)
+            .min(limits.max_records);
+        let mut records = Vec::with_capacity(record_capacity);
         let mut saw_end = false;
 
         // Parse records
         while offset < data.len() {
-            if records.len() >= max_records {
+            if records.len() >= limits.max_records {
                 return Err(Error::ParseError(format!(
-                    "PICT record count exceeds limit {max_records}"
+                    "PICT record count exceeds limit {}",
+                    limits.max_records
                 )));
             }
             if offset + 2 > data.len() {
@@ -267,6 +271,12 @@ impl PictParser {
             if offset + data_size > data.len() {
                 return Err(Error::ParseError(format!(
                     "PICT opcode 0x{opcode:04X} extends beyond input"
+                )));
+            }
+            if data_size > limits.max_uncompressed_bytes {
+                return Err(Error::ParseError(format!(
+                    "PICT record size {} exceeds limit {}",
+                    data_size, limits.max_uncompressed_bytes
                 )));
             }
 
@@ -357,5 +367,30 @@ mod tests {
     fn test_pict_opcodes() {
         assert_eq!(PictOpcode::from_u16(0x00FF), Some(PictOpcode::EndPic));
         assert_eq!(PictOpcode::from_u16(0x0011), Some(PictOpcode::Version));
+    }
+
+    #[test]
+    fn parser_requires_and_enforces_caller_limits() {
+        let mut data = vec![0_u8; 10];
+        data.extend_from_slice(&[0x00, 0xff]);
+
+        let mut limits = crate::Limits {
+            max_uncompressed_bytes: data.len(),
+            max_records: 1,
+            ..crate::Limits::default()
+        };
+        assert_eq!(PictParser::new(&data, &limits).unwrap().records.len(), 1);
+
+        limits.max_uncompressed_bytes = data.len() - 1;
+        assert!(PictParser::new(&data, &limits).is_err());
+
+        let mut too_many_records = vec![0_u8; 10];
+        too_many_records.extend_from_slice(&[0, 0, 0, 0xff]);
+        limits.max_uncompressed_bytes = too_many_records.len();
+        limits.max_records = 1;
+        assert!(PictParser::new(&too_many_records, &limits).is_err());
+
+        limits.max_records = 0;
+        assert!(PictParser::new(&data, &limits).is_err());
     }
 }

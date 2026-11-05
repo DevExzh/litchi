@@ -6,20 +6,29 @@ use super::model::{Conformance, Link};
 use super::package::Entry;
 use super::{invalid, limit};
 use crate::error::Result;
+use litchi_opc::SourceLimits;
 
 /// Validate one inert external-link model before package publication.
-pub fn link(value: &Link, conformance: Conformance) -> Result<()> {
-    let xml = value.to_xml_with_conformance(conformance)?;
+pub fn link(value: &Link, conformance: Conformance, limits: &SourceLimits) -> Result<()> {
+    let xml = value.to_xml_with_conformance(conformance, limits)?;
     if xml.len() > super::model::MAX_CACHE_TEXT_BYTES {
-        return Err(limit("serialized XML"));
+        return Err(limit(
+            super::LimitKind::CacheTextBytes,
+            xml.len(),
+            super::model::MAX_CACHE_TEXT_BYTES,
+        ));
     }
     Ok(())
 }
 
 /// Validate the typed entries and their stable workbook ownership metadata.
-pub fn entries(values: &[Entry], conformance: Conformance) -> Result<()> {
+pub fn entries(values: &[Entry], conformance: Conformance, limits: &SourceLimits) -> Result<()> {
     if values.len() > super::model::MAX_LINK_ITEMS {
-        return Err(limit("workbook external links"));
+        return Err(limit(
+            super::LimitKind::Items,
+            values.len(),
+            super::model::MAX_LINK_ITEMS,
+        ));
     }
     let mut relationship_ids = HashSet::with_capacity(values.len());
     let mut part_names = HashSet::with_capacity(values.len());
@@ -42,7 +51,7 @@ pub fn entries(values: &[Entry], conformance: Conformance) -> Result<()> {
                 entry.part_uri
             )));
         }
-        link(&entry.link, conformance)?;
+        link(&entry.link, conformance, limits)?;
     }
     Ok(())
 }

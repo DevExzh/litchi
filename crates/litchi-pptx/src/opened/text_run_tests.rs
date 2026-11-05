@@ -22,13 +22,14 @@ use crate::{Error, Package, Result};
 const SLIDE: &str = "/ppt/slides/slide1.xml";
 
 fn text_box_package(texts: &[&str]) -> Result<Package> {
-    let mut package = Package::new()?;
-    let slide = package.presentation_mut()?.add_slide()?;
+    let mut builder = crate::builder::Builder::new()?;
+    let slide = builder.presentation()?.add_slide()?;
     for (index, text) in texts.iter().enumerate() {
         let offset = i64::try_from(index).map_err(|_| Error::Invalid("offset".into()))?;
         slide.add_text_box(text, 10, 20 + offset * 500, 300, 400);
     }
-    Package::from_vec(package.to_bytes()?)
+    let package = builder.build()?;
+    Package::from_reader(std::io::Cursor::new(package.to_bytes()?))
 }
 
 fn slide_xml(package: &Package) -> Result<String> {
@@ -40,7 +41,9 @@ fn slide_xml(package: &Package) -> Result<String> {
 
 fn set_slide_xml(package: &mut Package, xml: Vec<u8>) -> Result<()> {
     let name = PackURI::new(SLIDE).map_err(Error::Invalid)?;
-    package.opc.get_part_mut(&name)?.set_blob(xml);
+    std::sync::Arc::make_mut(&mut package.opc)
+        .get_part_mut(&name)?
+        .set_blob(xml);
     Ok(())
 }
 
@@ -117,6 +120,7 @@ fn well_formed_empty_text_runs_still_edit() -> Result<()> {
             .package
             .get_part(&PackURI::new(SLIDE).map_err(Error::Invalid)?)?
             .blob(),
+        crate::shape::Limits::DEFAULT,
     )?
     .at(0)
     .map_err(|error| Error::Invalid(error.to_string()))?
@@ -177,7 +181,7 @@ fn no_text_verb_panics_on_mutated_text_run_markup() -> Result<()> {
     let mut refused = 0usize;
     let mut edited = 0usize;
     for (index, variant) in variants.iter().enumerate() {
-        let mut package = Package::from_opc_package(base.opc.clone())?;
+        let mut package = Package::from_opc_package((*base.opc).clone())?;
         set_slide_xml(&mut package, variant.clone().into_bytes())?;
         let outcome = catch_unwind(AssertUnwindSafe(|| -> (usize, usize) {
             let mut refused = 0usize;
@@ -248,12 +252,36 @@ fn a_byte_order_marked_slide_is_edited_correctly_and_keeps_its_mark() -> Result<
         .blob()
         .to_vec();
     assert!(blob.starts_with(&[0xef, 0xbb, 0xbf]), "the mark is kept");
-    let text = crate::shape::Scene::read(&blob)?
+    let text = crate::shape::Scene::read(&blob, crate::shape::Limits::DEFAULT)?
         .at(0)
         .map_err(|error| Error::Invalid(error.to_string()))?
         .common()
         .text()
         .map(str::to_owned);
     assert_eq!(text.as_deref(), Some("edited"));
+    Ok(())
+}
+
+#[test]
+fn explicit_empty_text_body_can_be_cleared_and_filled_through_both_verbs() -> Result<()> {
+    let source = text_box_package(&["original"])?;
+    let mut edit = source.edit()?;
+    assert!(edit.set_shape_text(0_usize, 0_usize, "")?);
+    let cleared = edit.commit()?.into_package();
+    let root = cleared.opened_presentation()?;
+    let part = cleared.opc.get_part(root.slides()[0].part_name())?;
+    let scene = crate::shape::Scene::read(part.blob(), crate::shape::Limits::DEFAULT)?;
+    assert_eq!(scene.at(0)?.common().text(), Some(""));
+    let mut edit = cleared.edit()?;
+    assert!(!edit.set_shape_text(0_usize, 0_usize, "")?);
+    assert_eq!(
+        edit.set_shape_texts(
+            0_usize,
+            &[ShapeTextReplacement::new(0_usize.into(), "refilled")]
+        )?,
+        1
+    );
+    let filled = edit.commit()?.into_package();
+    assert_eq!(filled.presentation()?.slides()?[0].text()?, "refilled");
     Ok(())
 }

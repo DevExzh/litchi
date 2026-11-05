@@ -8,12 +8,12 @@
 //!
 //! `quick_xml` exposes predefined and numeric references as separate
 //! `Event::GeneralRef` events.  The standalone worksheet parser used by
-//! `Builder::sheets` and the fused parser used by `Spreadsheet::from_bytes`
+//! `Builder::sheets` and the fused parser used by `Workbook::from_bytes`
 //! must append those events exactly once and reject unresolved or illegal
 //! references consistently.
 
 use litchi_odf_common::{constants, core::PackageWriter};
-use litchi_ods::{Builder, Spreadsheet};
+use litchi_ods::{Builder, Package, builder::Workbook as Draft};
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TABLE: &str = "urn:oasis:names:tc:opendocument:xmlns:table:1.0";
@@ -49,7 +49,7 @@ fn invalid_reference_content(reference: &str) -> String {
 }
 
 fn raw_package(content_xml: &str) -> litchi_core::Result<Vec<u8>> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(constants::ODF_SPREADSHEET)?;
     writer.add_file("content.xml", content_xml.as_bytes())?;
     writer.finish_to_bytes()
@@ -76,10 +76,20 @@ fn standalone_and_fused_parsers_decode_mixed_references_once() -> litchi_core::R
         link_start..link_start + EXPECTED_LINK_TEXT.len()
     );
 
-    let bytes = Builder::new().content_xml(MIXED_REFERENCES).build()?;
-    let spreadsheet = Spreadsheet::from_bytes(bytes.clone())?;
+    let bytes = Builder::new()
+        .content_xml(MIXED_REFERENCES)
+        .build()?
+        .to_bytes()?;
+    let spreadsheet = Draft::from_workbook(Package::from_bytes(&bytes)?.workbook()?);
     assert_eq!(spreadsheet.sheets(), standalone.as_slice());
-    assert_eq!(spreadsheet.into_bytes(), bytes);
+    assert_eq!(
+        spreadsheet
+            .build()
+            .expect("the draft builds")
+            .as_bytes()
+            .to_vec(),
+        bytes
+    );
     Ok(())
 }
 
@@ -133,7 +143,9 @@ fn unknown_and_illegal_numeric_references_are_rejected_by_both_open_paths() {
 
         let bytes = raw_package(&content).expect("raw ODS package");
         assert!(
-            Spreadsheet::from_bytes(bytes).is_err(),
+            Package::from_bytes(&bytes)
+                .and_then(|package| package.workbook())
+                .is_err(),
             "fused parser accepted {reference}"
         );
     }

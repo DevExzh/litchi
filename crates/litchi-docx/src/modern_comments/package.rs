@@ -15,6 +15,7 @@ use super::codec::{
 };
 use super::model::{Conformance, Metadata, RelationshipIds};
 use crate::{Error, Result};
+use litchi_ooxml_common::mce::Limits as MceLimits;
 use litchi_opc::part::{Part, XmlPart};
 use litchi_opc::{OpcPackage, PackURI};
 use std::collections::HashSet;
@@ -53,6 +54,7 @@ pub fn load_modern_comment_metadata(
     package: &OpcPackage,
     document_part_name: &PackURI,
 ) -> Result<Metadata> {
+    let limits = crate::mail_merge::mce_limits_for_source(&package.read_limits());
     reject_misplaced_relationships(package, document_part_name)?;
     let document = package.get_part(document_part_name).map_err(|error| {
         Error::Invalid(format!(
@@ -68,6 +70,7 @@ pub fn load_modern_comment_metadata(
             COMMENTS_EXTENDED_RELATIONSHIP,
             COMMENTS_EXTENDED_CONTENT_TYPE,
             parse_comments_extended,
+            &limits,
         )?,
         comments_ids: load_part(
             package,
@@ -75,6 +78,7 @@ pub fn load_modern_comment_metadata(
             COMMENTS_IDS_RELATIONSHIP,
             COMMENTS_IDS_CONTENT_TYPE,
             parse_comments_ids,
+            &limits,
         )?,
         comments_extensible: load_part(
             package,
@@ -82,6 +86,7 @@ pub fn load_modern_comment_metadata(
             COMMENTS_EXTENSIBLE_RELATIONSHIP,
             COMMENTS_EXTENSIBLE_CONTENT_TYPE,
             parse_comments_extensible,
+            &limits,
         )?,
         people: load_part(
             package,
@@ -89,6 +94,7 @@ pub fn load_modern_comment_metadata(
             PEOPLE_RELATIONSHIP,
             PEOPLE_CONTENT_TYPE,
             parse_people,
+            &limits,
         )?,
     };
     validate_metadata(&metadata)?;
@@ -106,6 +112,7 @@ pub fn store_modern_comment_metadata(
     relationship_ids: &RelationshipIds,
     conformance: Conformance,
 ) -> Result<()> {
+    let limits = crate::mail_merge::mce_limits_for_source(&package.read_limits());
     validate_metadata(metadata)?;
     let document = package.get_part(document_part_name).map_err(|error| {
         Error::Invalid(format!(
@@ -119,7 +126,7 @@ pub fn store_modern_comment_metadata(
             metadata
                 .comments_extended
                 .as_ref()
-                .map(|items| write_comments_extended(items, conformance)),
+                .map(|items| write_comments_extended(items, conformance, &limits)),
             relationship_ids.comments_extended.as_deref(),
             "/word/commentsExtended.xml",
             COMMENTS_EXTENDED_RELATIONSHIP,
@@ -129,7 +136,7 @@ pub fn store_modern_comment_metadata(
             metadata
                 .comments_ids
                 .as_ref()
-                .map(|items| write_comments_ids(items, conformance)),
+                .map(|items| write_comments_ids(items, conformance, &limits)),
             relationship_ids.comments_ids.as_deref(),
             "/word/commentsIds.xml",
             COMMENTS_IDS_RELATIONSHIP,
@@ -139,7 +146,7 @@ pub fn store_modern_comment_metadata(
             metadata
                 .comments_extensible
                 .as_ref()
-                .map(|items| write_comments_extensible(items, conformance)),
+                .map(|items| write_comments_extensible(items, conformance, &limits)),
             relationship_ids.comments_extensible.as_deref(),
             "/word/commentsExtensible.xml",
             COMMENTS_EXTENSIBLE_RELATIONSHIP,
@@ -149,7 +156,7 @@ pub fn store_modern_comment_metadata(
             metadata
                 .people
                 .as_ref()
-                .map(|items| write_people(items, conformance)),
+                .map(|items| write_people(items, conformance, &limits)),
             relationship_ids.people.as_deref(),
             "/word/people.xml",
             PEOPLE_RELATIONSHIP,
@@ -211,7 +218,8 @@ fn load_part<T>(
     document: &dyn Part,
     relationship_type: &str,
     content_type: &str,
-    parser: fn(&[u8]) -> Result<Vec<T>>,
+    parser: fn(&[u8], &MceLimits) -> Result<Vec<T>>,
+    limits: &MceLimits,
 ) -> Result<Option<Vec<T>>> {
     let relationships: Vec<_> = document
         .rels()
@@ -251,12 +259,7 @@ fn load_part<T>(
             target.as_str()
         ));
     }
-    parser(part.blob()).map(Some).map_err(|error| {
-        Error::Invalid(format!(
-            "invalid modern comment part '{}': {error}",
-            target.as_str()
-        ))
-    })
+    parser(part.blob(), limits).map(Some)
 }
 
 fn reject_misplaced_relationships(package: &OpcPackage, document_name: &PackURI) -> Result<()> {
@@ -325,10 +328,15 @@ mod tests {
         "../../../../test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx"
     );
 
+    fn limits() -> MceLimits {
+        MceLimits::default()
+    }
+
     #[test]
     fn loads_poi_and_libreoffice_reference_packages() {
         for bytes in [POI_DOCX, LO_DOCX] {
-            let package = OpcPackage::from_bytes(bytes).unwrap();
+            let package =
+                OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
             let metadata = load_modern_comment_metadata(
                 &package,
                 &PackURI::new("/word/document.xml").unwrap(),
@@ -338,7 +346,7 @@ mod tests {
             assert_eq!(metadata.comments_ids.as_ref().unwrap().len(), 1);
             assert_eq!(metadata.comments_extensible.as_ref().unwrap().len(), 1);
         }
-        let package = OpcPackage::from_bytes(LO_DOCX).unwrap();
+        let package = OpcPackage::from_bytes(LO_DOCX, litchi_opc::SourceLimits::default()).unwrap();
         let metadata =
             load_modern_comment_metadata(&package, &PackURI::new("/word/document.xml").unwrap())
                 .unwrap();
@@ -351,13 +359,15 @@ mod tests {
         let extended = write_comments_extended(
             metadata.comments_extended.as_ref().unwrap(),
             Conformance::Strict,
+            &limits(),
         )
         .unwrap();
         assert_eq!(
             extended,
             write_comments_extended(
                 metadata.comments_extended.as_ref().unwrap(),
-                Conformance::Strict
+                Conformance::Strict,
+                &limits(),
             )
             .unwrap()
         );
@@ -367,27 +377,40 @@ mod tests {
                 .contains(STRICT_WORD_NAMESPACE)
         );
         assert_eq!(
-            parse_comments_extended(&extended).unwrap(),
+            parse_comments_extended(&extended, &limits()).unwrap(),
             metadata.comments_extended.unwrap()
         );
 
-        let ids = write_comments_ids(metadata.comments_ids.as_ref().unwrap(), Conformance::Strict)
-            .unwrap();
+        let ids = write_comments_ids(
+            metadata.comments_ids.as_ref().unwrap(),
+            Conformance::Strict,
+            &limits(),
+        )
+        .unwrap();
         assert_eq!(
-            parse_comments_ids(&ids).unwrap(),
+            parse_comments_ids(&ids, &limits()).unwrap(),
             metadata.comments_ids.unwrap()
         );
         let extensible = write_comments_extensible(
             metadata.comments_extensible.as_ref().unwrap(),
             Conformance::Strict,
+            &limits(),
         )
         .unwrap();
         assert_eq!(
-            parse_comments_extensible(&extensible).unwrap(),
+            parse_comments_extensible(&extensible, &limits()).unwrap(),
             metadata.comments_extensible.unwrap()
         );
-        let people = write_people(metadata.people.as_ref().unwrap(), Conformance::Strict).unwrap();
-        assert_eq!(parse_people(&people).unwrap(), metadata.people.unwrap());
+        let people = write_people(
+            metadata.people.as_ref().unwrap(),
+            Conformance::Strict,
+            &limits(),
+        )
+        .unwrap();
+        assert_eq!(
+            parse_people(&people, &limits()).unwrap(),
+            metadata.people.unwrap()
+        );
     }
 
     #[test]
@@ -396,7 +419,7 @@ mod tests {
             r#"<w15:commentsEx xmlns:w15="{WORD_2012_NAMESPACE}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:unsupported"><mc:AlternateContent><mc:Choice Requires="x"><w15:commentEx w15:paraId="AAAAAAAA"/></mc:Choice><mc:Fallback><w15:commentEx w15:paraId="BBBBBBBB"/></mc:Fallback></mc:AlternateContent></w15:commentsEx>"#
         );
         assert_eq!(
-            parse_comments_extended(xml.as_bytes()).unwrap()[0].paragraph_id,
+            parse_comments_extended(xml.as_bytes(), &limits()).unwrap()[0].paragraph_id,
             0xBBBB_BBBB
         );
     }
@@ -432,15 +455,15 @@ mod tests {
 
     #[test]
     fn rejects_malformed_xml_graph_and_cross_part_ids() {
-        assert!(parse_comments_extended(br#"<!DOCTYPE x><x/>"#).is_err());
+        assert!(parse_comments_extended(br#"<!DOCTYPE x><x/>"#, &limits()).is_err());
         let bad_hex = format!(
             r#"<w15:commentsEx xmlns:w15="{WORD_2012_NAMESPACE}"><w15:commentEx w15:paraId="123"/></w15:commentsEx>"#
         );
-        assert!(parse_comments_extended(bad_hex.as_bytes()).is_err());
+        assert!(parse_comments_extended(bad_hex.as_bytes(), &limits()).is_err());
         let bad_date = format!(
             r#"<w16cex:commentsExtensible xmlns:w16cex="{COMMENTS_EXTENSIBLE_NAMESPACE}"><w16cex:commentExtensible w16cex:durableId="00000001" w16cex:dateUtc="2026-01-01T01:00:00+01:00"/></w16cex:commentsExtensible>"#
         );
-        assert!(parse_comments_extensible(bad_date.as_bytes()).is_err());
+        assert!(parse_comments_extensible(bad_date.as_bytes(), &limits()).is_err());
 
         let mut metadata = sample_metadata();
         metadata.comments_extensible.as_mut().unwrap()[0].durable_id = 2;
@@ -468,16 +491,122 @@ mod tests {
 
     #[test]
     fn enforces_size_depth_count_and_reaction_constraints() {
-        assert!(parse_people(&vec![b' '; MAX_MODERN_COMMENT_PART_BYTES + 1]).is_err());
+        assert!(parse_people(&vec![b' '; MAX_MODERN_COMMENT_PART_BYTES + 1], &limits()).is_err());
         let deep = format!(
             "{}{}",
             "<x>".repeat(MAX_MODERN_COMMENT_DEPTH + 1),
             "</x>".repeat(MAX_MODERN_COMMENT_DEPTH + 1)
         );
-        assert!(parse_people(deep.as_bytes()).is_err());
+        assert!(parse_people(deep.as_bytes(), &limits()).is_err());
         let mut metadata = sample_metadata();
         metadata.comments_extensible.as_mut().unwrap()[0].reactions[0].reaction_type = 0;
         assert!(validate_metadata(&metadata).is_err());
+    }
+
+    #[test]
+    fn writers_refuse_output_over_the_callers_mce_budget() {
+        let metadata = sample_metadata();
+        let limits = MceLimits {
+            max_output_bytes: 1,
+            ..MceLimits::default()
+        };
+        assert!(matches!(
+            write_people(
+                metadata.people.as_ref().unwrap(),
+                Conformance::Strict,
+                &limits,
+            ),
+            Err(Error::ModernCommentLimit {
+                kind: crate::modern_comments::LimitKind::OutputBytes,
+                actual,
+                maximum: 1,
+            }) if actual > 1
+        ));
+    }
+
+    #[test]
+    fn writers_report_aggregate_string_and_item_limits() {
+        let text = "x".repeat(MAX_MODERN_COMMENT_STRING_BYTES / 2 + 1);
+        let people = vec![
+            Person {
+                author: text.clone(),
+                presence: None,
+            },
+            Person {
+                author: text.clone(),
+                presence: None,
+            },
+        ];
+        assert!(matches!(
+            write_people(&people, Conformance::Strict, &limits()),
+            Err(Error::ModernCommentLimit {
+                kind: crate::modern_comments::LimitKind::StringBytes,
+                ..
+            })
+        ));
+
+        let comments = vec![
+            Comment {
+                durable_id: 1,
+                date_utc: None,
+                intelligent_placeholder: None,
+                reactions: vec![Reaction {
+                    reaction_type: 1,
+                    reactions: vec![ReactionInfo {
+                        date_utc: None,
+                        user: Some(ReactionUser {
+                            user_id: "u1".into(),
+                            user_name: text.clone(),
+                            user_provider: "p".into(),
+                            extensions: None,
+                        }),
+                        extensions: None,
+                    }],
+                    extensions: None,
+                }],
+            },
+            Comment {
+                durable_id: 2,
+                date_utc: None,
+                intelligent_placeholder: None,
+                reactions: vec![Reaction {
+                    reaction_type: 1,
+                    reactions: vec![ReactionInfo {
+                        date_utc: None,
+                        user: Some(ReactionUser {
+                            user_id: "u2".into(),
+                            user_name: text,
+                            user_provider: "p".into(),
+                            extensions: None,
+                        }),
+                        extensions: None,
+                    }],
+                    extensions: None,
+                }],
+            },
+        ];
+        assert!(matches!(
+            write_comments_extensible(&comments, Conformance::Strict, &limits()),
+            Err(Error::ModernCommentLimit {
+                kind: crate::modern_comments::LimitKind::StringBytes,
+                ..
+            })
+        ));
+
+        let items = vec![
+            Person {
+                author: "author".into(),
+                presence: None,
+            };
+            MAX_MODERN_COMMENT_ITEMS + 1
+        ];
+        assert!(matches!(
+            write_people(&items, Conformance::Strict, &limits()),
+            Err(Error::ModernCommentLimit {
+                kind: crate::modern_comments::LimitKind::Items,
+                ..
+            })
+        ));
     }
 
     fn sample_metadata() -> Metadata {
@@ -527,6 +656,10 @@ mod reaction_extension_list_tests {
     use super::super::model::*;
     use super::*;
 
+    fn limits() -> MceLimits {
+        MceLimits::default()
+    }
+
     fn comments_with_reaction(reaction_body: &str) -> String {
         format!(
             r#"<w16cex:commentsExtensible xmlns:w16cex="{COMMENTS_EXTENSIBLE_NAMESPACE}" xmlns:w16="{WORD_2018_NAMESPACE}" xmlns:cr="{REACTIONS_NAMESPACE}" xmlns:oel="{OFFICE_EXTENSION_LIST_NAMESPACE}" xmlns:x="urn:example:unknown"><w16cex:commentExtensible w16cex:durableId="00000001"><w16cex:extLst><w16:ext w16:uri="{REACTIONS_EXTENSION_URI}"><cr:reactions><cr:reaction reactionType="1">{reaction_body}</cr:reaction></cr:reactions></w16:ext></w16cex:extLst></w16cex:commentExtensible></w16cex:commentsExtensible>"#
@@ -538,7 +671,7 @@ mod reaction_extension_list_tests {
         let xml = comments_with_reaction(
             r#"<cr:reactionInfo dateUtc="2026-07-17T01:00:00Z"><cr:user userId="alice" userName="Alice" userProvider="O365"><oel:extLst><oel:ext uri="  urn:user   metadata  "><x:userData x:flag="1">opaque &amp; <x:value>mixed</x:value></x:userData></oel:ext></oel:extLst></cr:user><oel:extLst><oel:ext><x:infoData><x:value>42</x:value></x:infoData></oel:ext></oel:extLst></cr:reactionInfo><oel:extLst><oel:ext uri="urn:reaction"><x:reactionData/></oel:ext></oel:extLst>"#,
         );
-        let mut comments = parse_comments_extensible(xml.as_bytes()).unwrap();
+        let mut comments = parse_comments_extensible(xml.as_bytes(), &limits()).unwrap();
         let reaction = &comments[0].reactions[0];
         assert_eq!(
             reaction.extensions.as_ref().unwrap().extensions()[0].uri(),
@@ -565,9 +698,11 @@ mod reaction_extension_list_tests {
                 .contains("xmlns:x=\"urn:example:unknown\"")
         );
 
-        let first = write_comments_extensible(&comments, Conformance::Transitional).unwrap();
-        let reparsed = parse_comments_extensible(&first).unwrap();
-        let second = write_comments_extensible(&reparsed, Conformance::Transitional).unwrap();
+        let first =
+            write_comments_extensible(&comments, Conformance::Transitional, &limits()).unwrap();
+        let reparsed = parse_comments_extensible(&first, &limits()).unwrap();
+        let second =
+            write_comments_extensible(&reparsed, Conformance::Transitional, &limits()).unwrap();
         assert_eq!(first, second);
         assert_eq!(comments, reparsed);
 
@@ -589,8 +724,8 @@ mod reaction_extension_list_tests {
             .unwrap();
         let removed = user_list.remove(1).unwrap();
         assert_eq!(removed.uri(), None);
-        let mutated = write_comments_extensible(&comments, Conformance::Strict).unwrap();
-        let reparsed = parse_comments_extensible(&mutated).unwrap();
+        let mutated = write_comments_extensible(&comments, Conformance::Strict, &limits()).unwrap();
+        let reparsed = parse_comments_extensible(&mutated, &limits()).unwrap();
         let extension = &reparsed[0].reactions[0].reactions[0]
             .user
             .as_ref()
@@ -617,7 +752,8 @@ mod reaction_extension_list_tests {
             r#"<cr:reactionInfo><cr:user userId="a" userId="b" userName="A" userProvider="P"/></cr:reactionInfo>"#,
         ] {
             assert!(
-                parse_comments_extensible(comments_with_reaction(body).as_bytes()).is_err(),
+                parse_comments_extensible(comments_with_reaction(body).as_bytes(), &limits())
+                    .is_err(),
                 "accepted {body}"
             );
         }

@@ -1,6 +1,6 @@
 //! Bounded, forward-only authoring of small plain-text RTF documents.
 //!
-//! [`StreamingRtfWriter`] is deliberately narrower than [`crate::write::Writer`].
+//! [`Writer`] is deliberately narrower than [`crate::write::Writer`].
 //! It creates a fresh document whose body is made up of explicitly ordered
 //! paragraphs and plain runs.  The caller owns the sequencing: no seekable
 //! output, document-wide model, or deferred final serialization is required.
@@ -31,9 +31,9 @@ const DEFAULT_MAX_PARAGRAPHS: u64 = 1_000_000;
 const DEFAULT_MAX_RUNS: u64 = 4_000_000;
 const HEX: &[u8; 16] = b"0123456789abcdef";
 
-/// Finite limits for [`StreamingRtfWriter`].
+/// Finite limits for [`Writer`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct StreamingRtfLimits {
+pub struct Limits {
     /// Maximum UTF-8 input bytes accepted by all runs.
     pub max_input_bytes: u64,
     /// Maximum bytes accepted by the output sink.
@@ -47,7 +47,7 @@ pub struct StreamingRtfLimits {
     pub max_scratch_bytes: u64,
 }
 
-impl StreamingRtfLimits {
+impl Limits {
     /// Creates an explicit finite limit set.
     #[must_use]
     pub const fn new(
@@ -66,26 +66,24 @@ impl StreamingRtfLimits {
         }
     }
 
-    fn validate(self) -> Result<(), StreamingRtfError> {
+    fn validate(self) -> Result<(), Error> {
         if self.max_scratch_bytes < FIXED_SCRATCH_BYTES {
-            return Err(StreamingRtfError::InvalidInput {
+            return Err(Error::InvalidInput {
                 message: format!(
                     "streaming RTF scratch limit must be at least {FIXED_SCRATCH_BYTES} bytes"
                 ),
                 written: 0,
             });
         }
-        usize::try_from(self.max_scratch_bytes).map_err(|_error| {
-            StreamingRtfError::InvalidInput {
-                message: "streaming RTF scratch limit exceeds usize".to_string(),
-                written: 0,
-            }
+        usize::try_from(self.max_scratch_bytes).map_err(|_error| Error::InvalidInput {
+            message: "streaming RTF scratch limit exceeds usize".to_string(),
+            written: 0,
         })?;
         Ok(())
     }
 }
 
-impl Default for StreamingRtfLimits {
+impl Default for Limits {
     fn default() -> Self {
         Self {
             max_input_bytes: DEFAULT_MAX_BYTES,
@@ -97,16 +95,16 @@ impl Default for StreamingRtfLimits {
     }
 }
 
-/// Header choices for [`StreamingRtfWriter`].
+/// Header choices for [`Writer`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct StreamingRtfOptions {
+pub struct Options {
     /// Legacy code page declaration and escape policy.
     pub charset: Charset,
     /// Default font index declared by `\\deff`.
     pub default_font: u16,
 }
 
-impl Default for StreamingRtfOptions {
+impl Default for Options {
     fn default() -> Self {
         Self {
             charset: Charset::WINDOWS_1252,
@@ -118,7 +116,7 @@ impl Default for StreamingRtfOptions {
 /// Failure from a bounded forward-only RTF authoring operation.
 #[derive(Debug)]
 #[non_exhaustive]
-pub enum StreamingRtfError {
+pub enum Error {
     /// The sink failed after accepting the reported number of output bytes.
     Io {
         /// Underlying I/O category.
@@ -154,7 +152,7 @@ pub enum StreamingRtfError {
     },
 }
 
-impl StreamingRtfError {
+impl Error {
     /// Output bytes accepted before this failure.
     #[must_use]
     pub const fn written(&self) -> u64 {
@@ -167,7 +165,7 @@ impl StreamingRtfError {
     }
 }
 
-impl fmt::Display for StreamingRtfError {
+impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Io {
@@ -199,7 +197,7 @@ impl fmt::Display for StreamingRtfError {
     }
 }
 
-impl std::error::Error for StreamingRtfError {}
+impl std::error::Error for Error {}
 
 #[derive(Debug, Clone)]
 enum PoisonReason {
@@ -217,14 +215,14 @@ enum PoisonReason {
 }
 
 impl PoisonReason {
-    fn error(&self, written: u64) -> StreamingRtfError {
+    fn error(&self, written: u64) -> Error {
         match self {
-            Self::Io { kind, message } => StreamingRtfError::Io {
+            Self::Io { kind, message } => Error::Io {
                 kind: *kind,
                 message: message.clone(),
                 written,
             },
-            Self::InvalidInput(message) => StreamingRtfError::InvalidInput {
+            Self::InvalidInput(message) => Error::InvalidInput {
                 message: message.clone(),
                 written,
             },
@@ -232,13 +230,13 @@ impl PoisonReason {
                 resource,
                 observed,
                 limit,
-            } => StreamingRtfError::LimitExceeded {
+            } => Error::LimitExceeded {
                 resource,
                 observed: *observed,
                 limit: *limit,
                 written,
             },
-            Self::Cancelled => StreamingRtfError::Cancelled { written },
+            Self::Cancelled => Error::Cancelled { written },
         }
     }
 }
@@ -250,11 +248,11 @@ enum Phase {
 }
 
 /// Sequential authoring state for a fresh plain-text RTF document.
-pub struct StreamingRtfWriter<W: Write> {
+pub struct Writer<W: Write> {
     writer: W,
     context: ExecutionContext,
-    limits: StreamingRtfLimits,
-    options: StreamingRtfOptions,
+    limits: Limits,
+    options: Options,
     phase: Phase,
     paragraphs: u64,
     runs: u64,
@@ -267,27 +265,23 @@ pub struct StreamingRtfWriter<W: Write> {
     poison: Option<PoisonReason>,
 }
 
-impl<W: Write> StreamingRtfWriter<W> {
+impl<W: Write> Writer<W> {
     /// Creates a writer and immediately publishes its deterministic header.
     ///
     /// The sink only needs [`Write`].  The returned writer is ready for
     /// [`Self::start_paragraph`], and an empty document can be completed with
     /// [`Self::finish`].
-    pub fn new(
-        writer: W,
-        context: ExecutionContext,
-        limits: StreamingRtfLimits,
-    ) -> Result<Self, StreamingRtfError> {
-        Self::with_options(writer, context, limits, StreamingRtfOptions::default())
+    pub fn new(writer: W, context: ExecutionContext, limits: Limits) -> Result<Self, Error> {
+        Self::with_options(writer, context, limits, Options::default())
     }
 
     /// Creates a writer with an explicit legacy charset and default font.
     pub fn with_options(
         writer: W,
         context: ExecutionContext,
-        limits: StreamingRtfLimits,
-        options: StreamingRtfOptions,
-    ) -> Result<Self, StreamingRtfError> {
+        limits: Limits,
+        options: Options,
+    ) -> Result<Self, Error> {
         limits.validate()?;
         context.check().map_err(|error| map_execution(error, 0))?;
         let scratch = context
@@ -345,7 +339,7 @@ impl<W: Write> StreamingRtfWriter<W> {
     }
 
     /// Start the next logical paragraph.
-    pub fn start_paragraph(&mut self) -> Result<(), StreamingRtfError> {
+    pub fn start_paragraph(&mut self) -> Result<(), Error> {
         self.ensure_usable()?;
         if !matches!(self.phase, Phase::Ready) {
             return Err(self.state_error("a paragraph is already open"));
@@ -368,7 +362,7 @@ impl<W: Write> StreamingRtfWriter<W> {
     }
 
     /// Start a plain run in the currently open paragraph.
-    pub fn start_run(&mut self) -> Result<(), StreamingRtfError> {
+    pub fn start_run(&mut self) -> Result<(), Error> {
         self.ensure_usable()?;
         if !matches!(self.phase, Phase::Paragraph { run_open: false }) {
             return Err(self.state_error("a paragraph must be open without another run"));
@@ -391,7 +385,7 @@ impl<W: Write> StreamingRtfWriter<W> {
     }
 
     /// Finish the current run.
-    pub fn finish_run(&mut self) -> Result<(), StreamingRtfError> {
+    pub fn finish_run(&mut self) -> Result<(), Error> {
         self.ensure_usable()?;
         if !matches!(self.phase, Phase::Paragraph { run_open: true }) {
             return Err(self.state_error("no run is open"));
@@ -406,7 +400,7 @@ impl<W: Write> StreamingRtfWriter<W> {
     }
 
     /// Finish the current paragraph.
-    pub fn finish_paragraph(&mut self) -> Result<(), StreamingRtfError> {
+    pub fn finish_paragraph(&mut self) -> Result<(), Error> {
         self.ensure_usable()?;
         if !matches!(self.phase, Phase::Paragraph { run_open: false }) {
             return Err(self.state_error("finish the open run before the paragraph"));
@@ -421,7 +415,7 @@ impl<W: Write> StreamingRtfWriter<W> {
     }
 
     /// Finish the document and return the owned non-seek sink.
-    pub fn finish(mut self) -> Result<W, StreamingRtfError> {
+    pub fn finish(mut self) -> Result<W, Error> {
         self.ensure_usable()?;
         if !matches!(self.phase, Phase::Ready) {
             return Err(self.state_error("finish the current paragraph first"));
@@ -434,20 +428,20 @@ impl<W: Write> StreamingRtfWriter<W> {
         Ok(self.writer)
     }
 
-    fn ensure_usable(&self) -> Result<(), StreamingRtfError> {
+    fn ensure_usable(&self) -> Result<(), Error> {
         self.poison
             .as_ref()
             .map_or(Ok(()), |reason| Err(reason.error(self.output_bytes)))
     }
 
-    fn state_error(&self, message: &str) -> StreamingRtfError {
-        StreamingRtfError::InvalidInput {
+    fn state_error(&self, message: &str) -> Error {
+        Error::InvalidInput {
             message: message.to_string(),
             written: self.output_bytes,
         }
     }
 
-    fn fail_invalid(&mut self, message: &str) -> StreamingRtfError {
+    fn fail_invalid(&mut self, message: &str) -> Error {
         self.poison = Some(PoisonReason::InvalidInput(message.to_string()));
         self.poison.as_ref().map_or_else(
             || self.state_error(message),
@@ -455,12 +449,7 @@ impl<W: Write> StreamingRtfWriter<W> {
         )
     }
 
-    fn fail_limit(
-        &mut self,
-        resource: &'static str,
-        observed: u64,
-        limit: u64,
-    ) -> StreamingRtfError {
+    fn fail_limit(&mut self, resource: &'static str, observed: u64, limit: u64) -> Error {
         self.poison = Some(PoisonReason::Limit {
             resource,
             observed,
@@ -472,7 +461,7 @@ impl<W: Write> StreamingRtfWriter<W> {
         )
     }
 
-    fn fail_execution(&mut self, error: ExecutionError) -> StreamingRtfError {
+    fn fail_execution(&mut self, error: ExecutionError) -> Error {
         let reason = poison_from_execution(error);
         self.poison = Some(reason);
         self.poison.as_ref().map_or_else(
@@ -481,7 +470,7 @@ impl<W: Write> StreamingRtfWriter<W> {
         )
     }
 
-    fn fail_io(&mut self, error: io::Error) -> StreamingRtfError {
+    fn fail_io(&mut self, error: io::Error) -> Error {
         self.poison = Some(PoisonReason::Io {
             kind: error.kind(),
             message: error.to_string(),
@@ -498,7 +487,7 @@ impl<W: Write> StreamingRtfWriter<W> {
         self.output_bytes = self.output_bytes.saturating_add(accepted);
     }
 
-    fn emit(&mut self, bytes: &[u8]) -> Result<(), StreamingRtfError> {
+    fn emit(&mut self, bytes: &[u8]) -> Result<(), Error> {
         self.ensure_usable()?;
         if bytes.is_empty() {
             return Ok(());
@@ -551,7 +540,7 @@ impl<W: Write> StreamingRtfWriter<W> {
         }
     }
 
-    fn emit_decimal(&mut self, value: u32) -> Result<(), StreamingRtfError> {
+    fn emit_decimal(&mut self, value: u32) -> Result<(), Error> {
         let mut divisor = 1_u32;
         while value / divisor >= 10 {
             divisor = divisor.saturating_mul(10);
@@ -569,7 +558,7 @@ impl<W: Write> StreamingRtfWriter<W> {
         text: &str,
         accepted: &mut usize,
         input_already_counted: bool,
-    ) -> Result<(), StreamingRtfError> {
+    ) -> Result<(), Error> {
         let bytes = text.as_bytes();
         let mut offset = 0usize;
         while offset < bytes.len() {
@@ -618,7 +607,7 @@ impl<W: Write> StreamingRtfWriter<W> {
         span: &[u8],
         accepted: &mut usize,
         input_already_counted: bool,
-    ) -> Result<bool, StreamingRtfError> {
+    ) -> Result<bool, Error> {
         if span.len() < 2 || span.len() > MAX_ASCII_BATCH_BYTES {
             return Ok(false);
         }
@@ -654,7 +643,7 @@ impl<W: Write> StreamingRtfWriter<W> {
         input_already_counted: bool,
         work: Reservation,
         output: Reservation,
-    ) -> Result<(), StreamingRtfError> {
+    ) -> Result<(), Error> {
         let requested = bytes.len();
         let requested_u64 = u64::try_from(requested).unwrap_or(u64::MAX);
         let mut written = 0usize;
@@ -757,7 +746,7 @@ impl<W: Write> StreamingRtfWriter<W> {
             .saturating_add(u64::try_from(written).unwrap_or(u64::MAX));
     }
 
-    fn write_utf8(&mut self, bytes: &[u8]) -> Result<usize, StreamingRtfError> {
+    fn write_utf8(&mut self, bytes: &[u8]) -> Result<usize, Error> {
         if bytes.is_empty() {
             return Ok(0);
         }
@@ -785,11 +774,7 @@ impl<W: Write> StreamingRtfWriter<W> {
         result.map(|()| accepted)
     }
 
-    fn process_utf8(
-        &mut self,
-        bytes: &[u8],
-        accepted: &mut usize,
-    ) -> Result<(), StreamingRtfError> {
+    fn process_utf8(&mut self, bytes: &[u8], accepted: &mut usize) -> Result<(), Error> {
         let mut offset = 0usize;
         if self.pending_len != 0 {
             let expected = utf8_sequence_len(self.pending_utf8[0])
@@ -850,7 +835,7 @@ impl<W: Write> StreamingRtfWriter<W> {
         }
     }
 
-    fn emit_character(&mut self, character: char) -> Result<(), StreamingRtfError> {
+    fn emit_character(&mut self, character: char) -> Result<(), Error> {
         self.context
             .consume(Resource::Work, 1)
             .map_err(|error| self.fail_execution(error))?;
@@ -872,7 +857,7 @@ impl<W: Write> StreamingRtfWriter<W> {
         self.emit(&encoded[..length])
     }
 
-    fn flush_pending_cr(&mut self) -> Result<(), StreamingRtfError> {
+    fn flush_pending_cr(&mut self) -> Result<(), Error> {
         if self.pending_cr {
             self.pending_cr = false;
             self.emit(b"\\line ")?;
@@ -881,7 +866,7 @@ impl<W: Write> StreamingRtfWriter<W> {
     }
 }
 
-impl<W: Write> Write for StreamingRtfWriter<W> {
+impl<W: Write> Write for Writer<W> {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
         match self.write_utf8(bytes) {
             Ok(count) => Ok(count),
@@ -903,34 +888,34 @@ impl<W: Write> Write for StreamingRtfWriter<W> {
     }
 }
 
-fn io_kind(error: &StreamingRtfError) -> io::ErrorKind {
+fn io_kind(error: &Error) -> io::ErrorKind {
     match error {
-        StreamingRtfError::Io { kind, .. } => *kind,
-        StreamingRtfError::InvalidInput { .. } => io::ErrorKind::InvalidInput,
-        StreamingRtfError::LimitExceeded { .. } => io::ErrorKind::QuotaExceeded,
-        StreamingRtfError::Cancelled { .. } => io::ErrorKind::Interrupted,
+        Error::Io { kind, .. } => *kind,
+        Error::InvalidInput { .. } => io::ErrorKind::InvalidInput,
+        Error::LimitExceeded { .. } => io::ErrorKind::QuotaExceeded,
+        Error::Cancelled { .. } => io::ErrorKind::Interrupted,
     }
 }
 
-fn map_execution(error: ExecutionError, written: u64) -> StreamingRtfError {
+fn map_execution(error: ExecutionError, written: u64) -> Error {
     match poison_from_execution(error) {
         PoisonReason::Limit {
             resource,
             observed,
             limit,
-        } => StreamingRtfError::LimitExceeded {
+        } => Error::LimitExceeded {
             resource,
             observed,
             limit,
             written,
         },
-        PoisonReason::Cancelled => StreamingRtfError::Cancelled { written },
-        PoisonReason::Io { kind, message } => StreamingRtfError::Io {
+        PoisonReason::Cancelled => Error::Cancelled { written },
+        PoisonReason::Io { kind, message } => Error::Io {
             kind,
             message,
             written,
         },
-        PoisonReason::InvalidInput(message) => StreamingRtfError::InvalidInput { message, written },
+        PoisonReason::InvalidInput(message) => Error::InvalidInput { message, written },
     }
 }
 
@@ -1089,7 +1074,7 @@ fn write_decimal(output: &mut [u8], value: i32) -> usize {
     offset
 }
 
-fn emit_header<W: Write>(writer: &mut StreamingRtfWriter<W>) -> Result<(), StreamingRtfError> {
+fn emit_header<W: Write>(writer: &mut Writer<W>) -> Result<(), Error> {
     writer.emit(b"{\\rtf1")?;
     match writer.options.charset {
         Charset::Ansi(page) => {
@@ -1119,8 +1104,8 @@ fn copy_char(output: &mut [u8; 32], character: char) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Document;
-    use litchi_core::{Budget, CancellationSource, ExecutionLimits, Limits};
+    use crate::Package;
+    use litchi_core::{Budget, CancellationSource, ExecutionLimits, Limits as CoreLimits};
     use std::mem::size_of;
     use std::num::{NonZeroU64, NonZeroUsize};
 
@@ -1133,7 +1118,7 @@ mod tests {
     ) -> ExecutionContext {
         let budget = Budget::root(
             "rtf-stream-test",
-            Limits::new(memory, input, output, objects, 64, work),
+            CoreLimits::new(memory, input, output, objects, 64, work),
         );
         let (_source, token) = CancellationSource::pair();
         let execution = ExecutionLimits::new(
@@ -1151,8 +1136,8 @@ mod tests {
     }
 
     fn hierarchical_context(
-        parent_limits: Limits,
-        child_limits: Limits,
+        parent_limits: CoreLimits,
+        child_limits: CoreLimits,
     ) -> (Budget, ExecutionContext) {
         let parent = Budget::root("rtf-stream-parent", parent_limits);
         let child = parent.child("rtf-stream-child", child_limits);
@@ -1167,16 +1152,11 @@ mod tests {
         (parent, ExecutionContext::new(child, token, execution))
     }
 
-    fn writer() -> StreamingRtfWriter<Vec<u8>> {
-        StreamingRtfWriter::new(
-            Vec::new(),
-            context(16 * 1024 * 1024),
-            StreamingRtfLimits::default(),
-        )
-        .expect("writer")
+    fn writer() -> Writer<Vec<u8>> {
+        Writer::new(Vec::new(), context(16 * 1024 * 1024), Limits::default()).expect("writer")
     }
 
-    fn finish_one_run<W: Write>(writer: &mut StreamingRtfWriter<W>, text: &str) {
+    fn finish_one_run<W: Write>(writer: &mut Writer<W>, text: &str) {
         writer.start_paragraph().expect("paragraph");
         writer.start_run().expect("run");
         writer.write_all(text.as_bytes()).expect("text");
@@ -1241,7 +1221,7 @@ mod tests {
         ];
         for text in inputs {
             let input_bytes = u64::try_from(text.len()).expect("input length");
-            let limits = StreamingRtfLimits::new(input_bytes, 1_048_576, 1, 1, 64);
+            let limits = Limits::new(input_bytes, 1_048_576, 1, 1, 64);
             let context = configured_context(
                 1_048_576,
                 input_bytes,
@@ -1249,8 +1229,8 @@ mod tests {
                 16,
                 input_bytes.saturating_add(64),
             );
-            let mut value = StreamingRtfWriter::new(InstrumentedSink::default(), context, limits)
-                .expect("writer");
+            let mut value =
+                Writer::new(InstrumentedSink::default(), context, limits).expect("writer");
             finish_one_run(&mut value, &text);
             let sink = value.finish().expect("finish");
             let legacy_calls = legacy_write_calls(&text);
@@ -1262,7 +1242,7 @@ mod tests {
             );
 
             assert!(sink.max_request <= MAX_ASCII_BATCH_BYTES);
-            let document = Document::from_bytes(&sink.bytes).expect("reopen");
+            let document = Package::from_bytes(&sink.bytes).expect("reopen");
             assert_eq!(
                 document
                     .body()
@@ -1301,7 +1281,7 @@ mod tests {
         for (text, expected) in cases {
             let input_bytes = u64::try_from(text.len()).expect("input length");
             let output_bytes = u64::try_from(expected.len()).expect("output length");
-            let limits = StreamingRtfLimits::new(input_bytes, output_bytes, 1, 1, 64);
+            let limits = Limits::new(input_bytes, output_bytes, 1, 1, 64);
             let context = configured_context(
                 1_048_576,
                 input_bytes,
@@ -1309,8 +1289,8 @@ mod tests {
                 16,
                 input_bytes.saturating_add(64),
             );
-            let mut value = StreamingRtfWriter::new(InstrumentedSink::default(), context, limits)
-                .expect("writer");
+            let mut value =
+                Writer::new(InstrumentedSink::default(), context, limits).expect("writer");
             finish_one_run(&mut value, text);
             let sink = value.finish().expect("finish");
             assert_eq!(sink.bytes, expected);
@@ -1321,18 +1301,18 @@ mod tests {
     fn hierarchical_work_one_under_falls_back_to_scalar_progress() {
         let span = b"abcdefgh";
         let (parent, context) = hierarchical_context(
-            Limits::new(1_048_576, 1024, 1024, 16, 64, 9),
-            Limits::new(1_048_576, 1024, 1024, 16, 64, 1024),
+            CoreLimits::new(1_048_576, 1024, 1024, 16, 64, 9),
+            CoreLimits::new(1_048_576, 1024, 1024, 16, 64, 1024),
         );
-        let limits = StreamingRtfLimits::new(span.len() as u64, 1024, 1, 1, 64);
-        let mut value = StreamingRtfWriter::new(Vec::new(), context, limits).expect("writer");
+        let limits = Limits::new(span.len() as u64, 1024, 1, 1, 64);
+        let mut value = Writer::new(Vec::new(), context, limits).expect("writer");
         value.start_paragraph().expect("paragraph");
         value.start_run().expect("run");
         let prefix = value.output_bytes();
         let error = value.write_utf8(span).expect_err("one-under parent Work");
         assert!(matches!(
             error,
-            StreamingRtfError::LimitExceeded {
+            Error::LimitExceeded {
                 resource: "work",
                 observed: 10,
                 limit: 9,
@@ -1356,18 +1336,18 @@ mod tests {
         .expect("prefix length");
         let output_limit = prefix + span.len() as u64 - 1;
         let (parent, context) = hierarchical_context(
-            Limits::new(1_048_576, 1024, output_limit, 16, 64, 1024),
-            Limits::new(1_048_576, 1024, 1024, 16, 64, 1024),
+            CoreLimits::new(1_048_576, 1024, output_limit, 16, 64, 1024),
+            CoreLimits::new(1_048_576, 1024, 1024, 16, 64, 1024),
         );
-        let limits = StreamingRtfLimits::new(span.len() as u64, 1024, 1, 1, 64);
-        let mut value = StreamingRtfWriter::new(Vec::new(), context, limits).expect("writer");
+        let limits = Limits::new(span.len() as u64, 1024, 1, 1, 64);
+        let mut value = Writer::new(Vec::new(), context, limits).expect("writer");
         value.start_paragraph().expect("paragraph");
         value.start_run().expect("run");
         assert_eq!(value.output_bytes(), prefix);
         let error = value.write_utf8(span).expect_err("one-under parent output");
         assert!(matches!(
             error,
-            StreamingRtfError::LimitExceeded {
+            Error::LimitExceeded {
                 resource: "output bytes",
                 observed,
                 limit,
@@ -1386,7 +1366,7 @@ mod tests {
         let second = writer().finish().expect("finish");
         assert_eq!(first, second);
         assert_eq!(first, b"{\\rtf1\\ansi\\ansicpg1252\\uc1\\deff0 }");
-        let document = Document::from_bytes(&first).expect("parse");
+        let document = Package::from_bytes(&first).expect("parse");
         assert!(document.is_empty());
     }
 
@@ -1404,7 +1384,7 @@ mod tests {
         value.start_paragraph().expect("second paragraph");
         value.finish_paragraph().expect("empty paragraph");
         let bytes = value.finish().expect("finish");
-        let document = Document::from_bytes(&bytes).expect("parse");
+        let document = Package::from_bytes(&bytes).expect("parse");
         let paragraphs: Vec<String> = document
             .body()
             .paragraphs()
@@ -1430,7 +1410,7 @@ mod tests {
         assert!(text.contains(r"\u"));
         assert!(text.contains(r"\line "));
         assert!(text.contains(r"\tab "));
-        let document = Document::from_bytes(&bytes).expect("parse");
+        let document = Package::from_bytes(&bytes).expect("parse");
         assert_eq!(
             document
                 .body()
@@ -1454,7 +1434,7 @@ mod tests {
         let bytes = value.finish().expect("finish");
         let wire = String::from_utf8(bytes.clone()).expect("wire");
         assert_eq!(wire.matches(r"\line ").count(), 1);
-        let document = Document::from_bytes(&bytes).expect("parse");
+        let document = Package::from_bytes(&bytes).expect("parse");
         assert_eq!(
             document
                 .body()
@@ -1468,36 +1448,34 @@ mod tests {
 
     #[test]
     fn limits_are_exact_and_one_over() {
-        let limits = StreamingRtfLimits::new(3, 1024, 1, 1, 64);
-        let mut value = StreamingRtfWriter::new(Vec::new(), context(4096), limits).expect("writer");
+        let limits = Limits::new(3, 1024, 1, 1, 64);
+        let mut value = Writer::new(Vec::new(), context(4096), limits).expect("writer");
         value.start_paragraph().expect("paragraph");
         value.start_run().expect("run");
         assert_eq!(value.write(b"abc").expect("exact input"), 3);
         assert!(value.write(b"d").is_err());
 
-        let mut value = StreamingRtfWriter::new(Vec::new(), context(4096), limits).expect("writer");
+        let mut value = Writer::new(Vec::new(), context(4096), limits).expect("writer");
         value.start_paragraph().expect("paragraph");
         value.start_run().expect("run");
         assert!(value.write_all(b"a").is_ok());
         assert!(value.start_paragraph().is_err());
         assert!(!value.is_poisoned(), "state errors remain retryable");
 
-        let paragraph_limits = StreamingRtfLimits {
+        let paragraph_limits = Limits {
             max_paragraphs: 1,
-            ..StreamingRtfLimits::default()
+            ..Limits::default()
         };
-        let mut value =
-            StreamingRtfWriter::new(Vec::new(), context(4096), paragraph_limits).expect("writer");
+        let mut value = Writer::new(Vec::new(), context(4096), paragraph_limits).expect("writer");
         value.start_paragraph().expect("exact paragraph");
         value.finish_paragraph().expect("paragraph");
         assert!(value.start_paragraph().is_err());
 
-        let run_limits = StreamingRtfLimits {
+        let run_limits = Limits {
             max_runs: 1,
-            ..StreamingRtfLimits::default()
+            ..Limits::default()
         };
-        let mut value =
-            StreamingRtfWriter::new(Vec::new(), context(4096), run_limits).expect("writer");
+        let mut value = Writer::new(Vec::new(), context(4096), run_limits).expect("writer");
         value.start_paragraph().expect("paragraph");
         value.start_run().expect("exact run");
         value.finish_run().expect("run");
@@ -1507,29 +1485,28 @@ mod tests {
     #[test]
     fn fixed_memory_and_budget_dimensions_are_exact_and_one_under() {
         let under = configured_context(FIXED_SCRATCH_BYTES - 1, 4096, 4096, 16, 16);
-        let error = StreamingRtfWriter::new(Vec::new(), under, StreamingRtfLimits::default())
+        let error = Writer::new(Vec::new(), under, Limits::default())
             .err()
             .expect("one-under fixed scratch");
         assert!(matches!(
             error,
-            StreamingRtfError::LimitExceeded {
+            Error::LimitExceeded {
                 resource: "memory",
                 ..
             }
         ));
 
         let exact = configured_context(FIXED_SCRATCH_BYTES, 4096, 4096, 16, 16);
-        StreamingRtfWriter::new(Vec::new(), exact, StreamingRtfLimits::default())
-            .expect("exact fixed scratch");
+        Writer::new(Vec::new(), exact, Limits::default()).expect("exact fixed scratch");
 
         let baseline = writer();
         let header_bytes = baseline.output_bytes();
         drop(baseline);
-        let output_limits = StreamingRtfLimits {
+        let output_limits = Limits {
             max_output_bytes: header_bytes,
-            ..StreamingRtfLimits::default()
+            ..Limits::default()
         };
-        StreamingRtfWriter::new(
+        Writer::new(
             Vec::new(),
             configured_context(FIXED_SCRATCH_BYTES, 4096, header_bytes, 16, 16),
             output_limits,
@@ -1537,12 +1514,12 @@ mod tests {
         .expect("exact header output")
         .finish()
         .expect_err("closing brace is one over");
-        let output_under = StreamingRtfLimits {
+        let output_under = Limits {
             max_output_bytes: header_bytes.saturating_sub(1),
-            ..StreamingRtfLimits::default()
+            ..Limits::default()
         };
         assert!(
-            StreamingRtfWriter::new(
+            Writer::new(
                 Vec::new(),
                 configured_context(FIXED_SCRATCH_BYTES, 4096, header_bytes, 16, 16),
                 output_under,
@@ -1550,30 +1527,29 @@ mod tests {
             .is_err()
         );
 
-        let mut value = StreamingRtfWriter::new(
+        let mut value = Writer::new(
             Vec::new(),
             configured_context(FIXED_SCRATCH_BYTES, 4096, 4096, 0, 16),
-            StreamingRtfLimits::default(),
+            Limits::default(),
         )
         .expect("writer");
         assert!(value.start_paragraph().is_err());
         assert!(value.is_poisoned());
 
-        let mut value = StreamingRtfWriter::new(
+        let mut value = Writer::new(
             Vec::new(),
             configured_context(FIXED_SCRATCH_BYTES, 4096, 4096, 16, 0),
-            StreamingRtfLimits::default(),
+            Limits::default(),
         )
         .expect("writer");
         assert!(value.start_paragraph().is_err());
         assert!(value.is_poisoned());
 
-        let input_limits = StreamingRtfLimits {
+        let input_limits = Limits {
             max_input_bytes: 1,
-            ..StreamingRtfLimits::default()
+            ..Limits::default()
         };
-        let mut value =
-            StreamingRtfWriter::new(Vec::new(), context(4096), input_limits).expect("writer");
+        let mut value = Writer::new(Vec::new(), context(4096), input_limits).expect("writer");
         value.start_paragraph().expect("paragraph");
         value.start_run().expect("run");
         assert_eq!(value.write(b"x").expect("exact input"), 1);
@@ -1606,13 +1582,12 @@ mod tests {
         }
     }
 
-    fn counted_writer() -> StreamingRtfWriter<CountingSink> {
-        let limits = StreamingRtfLimits {
+    fn counted_writer() -> Writer<CountingSink> {
+        let limits = Limits {
             max_input_bytes: 2_000_000,
-            ..StreamingRtfLimits::default()
+            ..Limits::default()
         };
-        StreamingRtfWriter::new(CountingSink::default(), context(2_000_000), limits)
-            .expect("writer")
+        Writer::new(CountingSink::default(), context(2_000_000), limits).expect("writer")
     }
 
     fn write_counted_run(repetitions: usize) -> CountingSink {
@@ -1645,10 +1620,7 @@ mod tests {
             large_state.write_all(b"x").expect("large text");
         }
         assert_eq!(size_of_val(&small_state), size_of_val(&large_state));
-        assert_eq!(
-            size_of_val(&small_state),
-            size_of::<StreamingRtfWriter<CountingSink>>()
-        );
+        assert_eq!(size_of_val(&small_state), size_of::<Writer<CountingSink>>());
         assert_eq!(
             small_state.pending_utf8.len(),
             large_state.pending_utf8.len()
@@ -1673,13 +1645,12 @@ mod tests {
             }
         }
 
-        let limits = StreamingRtfLimits {
+        let limits = Limits {
             max_input_bytes: 1_000_000,
-            ..StreamingRtfLimits::default()
+            ..Limits::default()
         };
-        let mut value =
-            StreamingRtfWriter::new(NonSeek(CountingSink::default()), context(2_000_000), limits)
-                .expect("writer");
+        let mut value = Writer::new(NonSeek(CountingSink::default()), context(2_000_000), limits)
+            .expect("writer");
         value.start_paragraph().expect("paragraph");
         value.start_run().expect("run");
         for _ in 0..100_000 {
@@ -1701,7 +1672,7 @@ mod tests {
         value.finish_run().expect("run");
         value.finish_paragraph().expect("paragraph");
         let bytes = value.finish().expect("finish");
-        let document = Document::from_bytes(&bytes).expect("parse");
+        let document = Package::from_bytes(&bytes).expect("parse");
         assert_eq!(
             document
                 .body()
@@ -1731,13 +1702,13 @@ mod tests {
                 Ok(())
             }
         }
-        let mut failing = StreamingRtfWriter::new(
+        let mut failing = Writer::new(
             Partial {
                 bytes: Vec::new(),
                 remaining: 60,
             },
             context(4096),
-            StreamingRtfLimits::default(),
+            Limits::default(),
         )
         .expect("writer");
         failing.start_paragraph().expect("paragraph");
@@ -1761,7 +1732,7 @@ mod tests {
             .expect_err("malformed suffix");
         assert!(matches!(
             error,
-            StreamingRtfError::InvalidInput { written, .. } if written
+            Error::InvalidInput { written, .. } if written
                 == output_prefix + u64::try_from(ascii_prefix.len()).expect("prefix length")
         ));
         assert_eq!(
@@ -1792,7 +1763,7 @@ mod tests {
         value.finish_run().expect("run");
         value.finish_paragraph().expect("paragraph");
         let bytes = value.finish().expect("finish");
-        let document = Document::from_bytes(&bytes).expect("parse");
+        let document = Package::from_bytes(&bytes).expect("parse");
         assert_eq!(
             document
                 .body()
@@ -1818,7 +1789,7 @@ mod tests {
             .write_utf8(b"\x28suffix")
             .expect_err("malformed split continuation");
         let accepted = split_prefix.len().saturating_add(2);
-        assert!(matches!(error, StreamingRtfError::InvalidInput { .. }));
+        assert!(matches!(error, Error::InvalidInput { .. }));
         assert_eq!(
             value.input_bytes(),
             u64::try_from(accepted).expect("accepted malformed prefix")
@@ -1833,7 +1804,7 @@ mod tests {
         value.start_run().expect("run");
         assert_eq!(value.write(&[0xe2]).expect("prefix"), 1);
         let error = value.finish_run().expect_err("incomplete run");
-        assert!(matches!(error, StreamingRtfError::InvalidInput { .. }));
+        assert!(matches!(error, Error::InvalidInput { .. }));
         assert!(value.is_poisoned());
     }
 
@@ -1974,8 +1945,8 @@ mod tests {
         .expect("prefix length")
     }
 
-    fn batched_limits() -> StreamingRtfLimits {
-        StreamingRtfLimits::new(8, 1024, 1, 1, 64)
+    fn batched_limits() -> Limits {
+        Limits::new(8, 1024, 1, 1, 64)
     }
 
     fn batched_context() -> ExecutionContext {
@@ -1993,8 +1964,7 @@ mod tests {
             zero_after: false,
             flush_error: false,
         };
-        let mut value =
-            StreamingRtfWriter::new(sink, batched_context(), batched_limits()).expect("writer");
+        let mut value = Writer::new(sink, batched_context(), batched_limits()).expect("writer");
         value.start_paragraph().expect("paragraph");
         value.start_run().expect("run");
         let error = value
@@ -2002,7 +1972,7 @@ mod tests {
             .expect_err("partial batched sink");
         assert!(matches!(
             error,
-            StreamingRtfError::Io {
+            Error::Io {
                 kind: io::ErrorKind::BrokenPipe,
                 written,
                 ..
@@ -2029,8 +1999,7 @@ mod tests {
             zero_after: true,
             flush_error: false,
         };
-        let mut value =
-            StreamingRtfWriter::new(sink, batched_context(), batched_limits()).expect("writer");
+        let mut value = Writer::new(sink, batched_context(), batched_limits()).expect("writer");
         value.start_paragraph().expect("paragraph");
         value.start_run().expect("run");
         let error = value
@@ -2038,7 +2007,7 @@ mod tests {
             .expect_err("zero batched sink");
         assert!(matches!(
             error,
-            StreamingRtfError::Io {
+            Error::Io {
                 kind: io::ErrorKind::WriteZero,
                 written,
                 ..
@@ -2055,7 +2024,7 @@ mod tests {
     fn batched_ascii_cancellation_between_short_writes_commits_exact_prefix() {
         let budget = Budget::root(
             "rtf-stream-batched-cancel-test",
-            Limits::new(1_048_576, 1024, 1024, 16, 64, 1024),
+            CoreLimits::new(1_048_576, 1024, 1024, 16, 64, 1024),
         );
         let (source, token) = CancellationSource::pair();
         let execution = ExecutionLimits::new(
@@ -2071,7 +2040,7 @@ mod tests {
             armed: false,
             accepted: 0,
         };
-        let mut value = StreamingRtfWriter::new(sink, context, batched_limits()).expect("writer");
+        let mut value = Writer::new(sink, context, batched_limits()).expect("writer");
         value.start_paragraph().expect("paragraph");
         value.start_run().expect("run");
         value.writer.armed = true;
@@ -2081,7 +2050,7 @@ mod tests {
             .expect_err("cancellation between short writes");
         assert!(matches!(
             error,
-            StreamingRtfError::Cancelled { written } if written == prefix + 2
+            Error::Cancelled { written } if written == prefix + 2
         ));
         assert_eq!(value.output_bytes(), prefix + 2);
         assert_eq!(value.input_bytes(), 3);
@@ -2097,7 +2066,7 @@ mod tests {
     fn batched_ascii_full_write_cancellation_commits_one_bounded_chunk() {
         let budget = Budget::root(
             "rtf-stream-batched-full-cancel-test",
-            Limits::new(1_048_576, 1024, 1024, 16, 64, 1024),
+            CoreLimits::new(1_048_576, 1024, 1024, 16, 64, 1024),
         );
         let (source, token) = CancellationSource::pair();
         let execution = ExecutionLimits::new(
@@ -2113,8 +2082,8 @@ mod tests {
             armed: false,
             accepted: 0,
         };
-        let limits = StreamingRtfLimits::new(64, 1024, 1, 1, 64);
-        let mut value = StreamingRtfWriter::new(sink, context, limits).expect("writer");
+        let limits = Limits::new(64, 1024, 1, 1, 64);
+        let mut value = Writer::new(sink, context, limits).expect("writer");
         value.start_paragraph().expect("paragraph");
         value.start_run().expect("run");
         value.writer.armed = true;
@@ -2125,7 +2094,7 @@ mod tests {
         let chunk = u64::try_from(MAX_ASCII_BATCH_BYTES).expect("batch length");
         assert!(matches!(
             error,
-            StreamingRtfError::Cancelled { written } if written == prefix + chunk
+            Error::Cancelled { written } if written == prefix + chunk
         ));
         assert_eq!(value.output_bytes(), prefix + chunk);
         assert_eq!(value.input_bytes(), chunk);
@@ -2140,7 +2109,7 @@ mod tests {
 
     #[test]
     fn batched_ascii_excess_progress_poison_reports_attempted_prefix() {
-        let mut value = StreamingRtfWriter::new(
+        let mut value = Writer::new(
             ExcessProgressBatchSink::default(),
             batched_context(),
             batched_limits(),
@@ -2155,7 +2124,7 @@ mod tests {
             .expect_err("excess batch progress");
         assert!(matches!(
             error,
-            StreamingRtfError::InvalidInput { written, .. } if written == prefix
+            Error::InvalidInput { written, .. } if written == prefix
         ));
         assert_eq!(value.output_bytes(), prefix);
         assert_eq!(value.input_bytes(), 1);
@@ -2174,8 +2143,7 @@ mod tests {
             zero_after: false,
             flush_error: false,
         };
-        let mut value = StreamingRtfWriter::new(sink, context(4096), StreamingRtfLimits::default())
-            .expect("writer");
+        let mut value = Writer::new(sink, context(4096), Limits::default()).expect("writer");
         finish_one_run(&mut value, "short");
         let sink = value.finish().expect("finish");
         assert!(sink.accepted > 0);
@@ -2191,8 +2159,7 @@ mod tests {
             zero_after: true,
             flush_error: false,
         };
-        let mut value = StreamingRtfWriter::new(sink, context(4096), StreamingRtfLimits::default())
-            .expect("writer");
+        let mut value = Writer::new(sink, context(4096), Limits::default()).expect("writer");
         value.start_paragraph().expect("paragraph");
         value.start_run().expect("run");
         let error = value.write(&[b'x'; 128]).expect_err("write zero");
@@ -2203,7 +2170,7 @@ mod tests {
 
     #[test]
     fn flush_failure_poison_and_final_brace_failure_preserve_progress() {
-        let mut flush_writer = StreamingRtfWriter::new(
+        let mut flush_writer = Writer::new(
             FaultSink {
                 accepted: 0,
                 fail_after: None,
@@ -2213,7 +2180,7 @@ mod tests {
                 flush_error: true,
             },
             context(4096),
-            StreamingRtfLimits::default(),
+            Limits::default(),
         )
         .expect("writer");
         finish_one_run(&mut flush_writer, "flush");
@@ -2224,7 +2191,7 @@ mod tests {
         let mut prefix = writer();
         finish_one_run(&mut prefix, "final");
         let prefix_bytes = prefix.output_bytes();
-        let mut final_writer = StreamingRtfWriter::new(
+        let mut final_writer = Writer::new(
             FaultSink {
                 accepted: 0,
                 fail_after: Some(prefix_bytes),
@@ -2234,14 +2201,14 @@ mod tests {
                 flush_error: false,
             },
             context(4096),
-            StreamingRtfLimits::default(),
+            Limits::default(),
         )
         .expect("writer");
         finish_one_run(&mut final_writer, "final");
         let error = final_writer.finish().expect_err("final brace failure");
         assert!(matches!(
             error,
-            StreamingRtfError::Io {
+            Error::Io {
                 kind: io::ErrorKind::WriteZero,
                 written,
                 ..
@@ -2253,7 +2220,7 @@ mod tests {
     fn cancellation_is_observed_before_next_output() {
         let budget = Budget::root(
             "rtf-stream-cancel-test",
-            Limits::new(1024, 1024, 1024, 16, 64, 1024),
+            CoreLimits::new(1024, 1024, 1024, 16, 64, 1024),
         );
         let (source, token) = CancellationSource::pair();
         let execution = ExecutionLimits::new(
@@ -2264,15 +2231,14 @@ mod tests {
         )
         .expect("valid limits");
         let context = ExecutionContext::new(budget, token, execution);
-        let mut value = StreamingRtfWriter::new(Vec::new(), context, StreamingRtfLimits::default())
-            .expect("writer");
+        let mut value = Writer::new(Vec::new(), context, Limits::default()).expect("writer");
         source.cancel();
         let error = value.start_paragraph().expect_err("cancelled");
-        assert!(matches!(error, StreamingRtfError::Cancelled { .. }));
+        assert!(matches!(error, Error::Cancelled { .. }));
 
         let budget = Budget::root(
             "rtf-stream-flush-cancel-test",
-            Limits::new(1024, 1024, 1024, 16, 64, 1024),
+            CoreLimits::new(1024, 1024, 1024, 16, 64, 1024),
         );
         let (source, token) = CancellationSource::pair();
         let execution = ExecutionLimits::new(
@@ -2283,9 +2249,7 @@ mod tests {
         )
         .expect("valid limits");
         let context = ExecutionContext::new(budget, token, execution);
-        let mut flush_value =
-            StreamingRtfWriter::new(Vec::new(), context, StreamingRtfLimits::default())
-                .expect("writer");
+        let mut flush_value = Writer::new(Vec::new(), context, Limits::default()).expect("writer");
         source.cancel();
         let flush_error = flush_value.flush().expect_err("cancelled flush");
         assert_eq!(flush_error.kind(), io::ErrorKind::Interrupted);
@@ -2334,7 +2298,7 @@ mod tests {
 
         let budget = Budget::root(
             "rtf-stream-cancel-retry-test",
-            Limits::new(1024, 1024, 1024, 16, 64, 1024),
+            CoreLimits::new(1024, 1024, 1024, 16, 64, 1024),
         );
         let (source, token) = CancellationSource::pair();
         let execution = ExecutionLimits::new(
@@ -2347,7 +2311,7 @@ mod tests {
         let context = ExecutionContext::new(budget, token, execution);
         let armed = Arc::new(AtomicBool::new(false));
         let calls = Arc::new(AtomicUsize::new(0));
-        let mut value = StreamingRtfWriter::new(
+        let mut value = Writer::new(
             CancellingSink {
                 source: source.clone(),
                 armed: Arc::clone(&armed),
@@ -2355,7 +2319,7 @@ mod tests {
                 interrupted_after_cancel: 0,
             },
             context,
-            StreamingRtfLimits::default(),
+            Limits::default(),
         )
         .expect("writer");
         let header_bytes = value.output_bytes();
@@ -2367,7 +2331,7 @@ mod tests {
             .expect_err("cancellation after a short sink write");
         assert!(matches!(
             error,
-            StreamingRtfError::Cancelled { written } if written == header_bytes + 1
+            Error::Cancelled { written } if written == header_bytes + 1
         ));
         assert_eq!(value.output_bytes(), header_bytes + 1);
         assert_eq!(calls.load(Ordering::SeqCst), calls_before_body + 1);

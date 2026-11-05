@@ -117,6 +117,44 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The selected presentation state cannot safely support the requested change.
+    #[error("the Keynote placeholder visibility cannot be edited safely")]
+    InvalidSource,
+    /// A finite transaction resource ceiling was exceeded.
+    #[error(
+        "Keynote placeholder-visibility {kind} limit exceeded: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        /// Resource whose ceiling was exceeded.
+        kind: LimitKind,
+        /// Exact observed or requested amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A bounded transaction allocation failed.
+    #[error("could not allocate {amount} units for the Keynote placeholder-visibility transaction")]
+    Allocation {
+        /// Requested elements or bytes.
+        amount: usize,
+    },
+    /// Candidate semantic or rendering verification failed.
+    #[error("the edited Keynote placeholder visibility failed verification")]
+    Verification,
+    /// A process-local patch was applied to a different exact package snapshot.
+    #[error("the Keynote placeholder-visibility patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The source cannot support a changed exact-source visibility transaction.
     #[error("this Keynote source does not support placeholder-visibility edits")]
     UnsupportedSource,
@@ -138,33 +176,27 @@ pub enum Error {
         /// Missing semantic role.
         kind: Kind,
     },
-    /// The selected presentation state cannot safely support the requested change.
-    #[error("the Keynote placeholder visibility cannot be edited safely")]
-    InvalidSource,
-    /// A finite transaction resource ceiling was exceeded.
-    #[error(
-        "Keynote placeholder-visibility {kind} limit exceeded: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        /// Resource whose ceiling was exceeded.
-        kind: LimitKind,
-        /// Exact observed or requested amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-    },
-    /// A bounded transaction allocation failed.
-    #[error("could not allocate {amount} units for the Keynote placeholder-visibility transaction")]
-    Allocation {
-        /// Requested elements or bytes.
-        amount: usize,
-    },
-    /// Candidate semantic or rendering verification failed.
-    #[error("the edited Keynote placeholder visibility failed verification")]
-    Verification,
-    /// A process-local patch was applied to a different exact package snapshot.
-    #[error("the Keynote placeholder-visibility patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+            Self::AmbiguousSelector { .. } => RefusalKind::InvalidValue,
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::PlaceholderNotFound { .. } => RefusalKind::NotFound,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// One staged visibility value against an immutable package.
@@ -251,7 +283,7 @@ impl<'a> Edit<'a> {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::UnsupportedSource`] when a changed exact-source
+    /// Returns [`Refusal::UnsupportedSource`] when a changed exact-source
     /// publication is unavailable, or a typed source, resource, allocation, or
     /// verification error. Failures do not publish a partial package.
     ///
@@ -285,7 +317,7 @@ impl<'a> Edit<'a> {
             });
         }
         if !catalog.source_is_exact() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         let mut budget = TransactionBudget::new(self.source)?;
         let selection = select_with_budget(
@@ -489,6 +521,12 @@ impl Commit {
     pub fn into_package(self) -> Package {
         self.package
     }
+
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
     #[must_use]
     /// Borrow the process-local exact-source patch.
     pub const fn patch(&self) -> &Patch {
@@ -587,7 +625,7 @@ impl TransactionBudget {
             .checked_add(amount)
             .ok_or(Error::InvalidSource)?;
         if self.references > self.maximum_references {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::References,
                 observed: self.references as u64,
                 maximum: self.maximum_references as u64,
@@ -599,7 +637,7 @@ impl TransactionBudget {
     pub(super) fn charge_work(&mut self, amount: usize) -> Result<(), Error> {
         self.work = self.work.checked_add(amount).ok_or(Error::InvalidSource)?;
         if self.work > self.maximum_work {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireWork,
                 observed: self.work as u64,
                 maximum: self.maximum_work as u64,
@@ -614,7 +652,7 @@ impl TransactionBudget {
             .checked_add(amount)
             .ok_or(Error::InvalidSource)?;
         if self.fields > self.maximum_fields {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireFields,
                 observed: self.fields as u64,
                 maximum: self.maximum_fields as u64,
@@ -653,19 +691,15 @@ impl TransactionBudget {
                 observed,
                 maximum: _,
             } => match kind {
-                crate::package::slide_preview::InvalidationBudgetKind::References => {
-                    Error::LimitExceeded {
-                        kind: LimitKind::References,
-                        observed: self.references.saturating_add(observed) as u64,
-                        maximum: self.maximum_references as u64,
-                    }
+                crate::package::slide_preview::InvalidationBudgetKind::References => Error::Limit {
+                    kind: LimitKind::References,
+                    observed: self.references.saturating_add(observed) as u64,
+                    maximum: self.maximum_references as u64,
                 },
-                crate::package::slide_preview::InvalidationBudgetKind::Work => {
-                    Error::LimitExceeded {
-                        kind: LimitKind::WireWork,
-                        observed: self.work.saturating_add(observed) as u64,
-                        maximum: self.maximum_work as u64,
-                    }
+                crate::package::slide_preview::InvalidationBudgetKind::Work => Error::Limit {
+                    kind: LimitKind::WireWork,
+                    observed: self.work.saturating_add(observed) as u64,
+                    maximum: self.maximum_work as u64,
                 },
             },
         }
@@ -708,7 +742,7 @@ impl Package {
     /// slide-number preference.
     ///
     /// # Errors
-    /// Returns [`Error::PlaceholderNotFound`] when the requested role is
+    /// Returns [`Refusal::PlaceholderNotFound`] when the requested role is
     /// absent, selector errors for a missing or ambiguous slide, or typed
     /// source, resource, and allocation failures from focused resolution.
     ///
@@ -723,7 +757,7 @@ impl Package {
         kind: Kind,
     ) -> Result<Edit<'_>, Error> {
         let selection = select(self, selector.into(), kind, false)?
-            .ok_or(Error::PlaceholderNotFound { kind })?;
+            .ok_or(Error::Refused(Refusal::PlaceholderNotFound { kind }))?;
         Ok(Edit::new(self, selection, kind))
     }
 
@@ -756,7 +790,7 @@ impl Package {
             });
         }
         if !catalog.source_is_exact() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         let mut budget = TransactionBudget::new(self)?;
         let selection = select_with_budget(
@@ -1036,7 +1070,7 @@ fn validate_rooted_placeholder_locality(
         if info.object_references.contains(&placeholder_identifier) {
             return Err(Error::InvalidSource);
         }
-        let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+        let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
         for field in view.fields() {
             field.validate_canonical_framing().map_err(map_wire_error)?;
             if matches!(field.wire_type(), 3 | 4) {
@@ -1067,7 +1101,7 @@ fn visibility_snapshot(
     node_slide_number_visible: bool,
     limits: WireLimits,
 ) -> Result<Option<(u64, State)>, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let role_field = match kind {
         Kind::Title => TITLE_REFERENCE_FIELD,
         Kind::Body => BODY_REFERENCE_FIELD,
@@ -1147,7 +1181,7 @@ fn strict_reference_with_zero(
     if field.wire_type() != 2 {
         return Err(Error::InvalidSource);
     }
-    let view = WireView::parse_with_limits(field.payload(), limits).map_err(map_wire_error)?;
+    let view = WireView::parse(field.payload(), limits).map_err(map_wire_error)?;
     let mut identifier = None;
     let mut deprecated_type_seen = false;
     let mut external = None;
@@ -1368,7 +1402,7 @@ fn validate_placeholder_reference_closure(
     if drawable.wire_type() != 2 {
         return Err(Error::InvalidSource);
     }
-    let view = WireView::parse_with_limits(drawable.payload(), limits).map_err(map_wire_error)?;
+    let view = WireView::parse(drawable.payload(), limits).map_err(map_wire_error)?;
     let dependency_count = view
         .fields()
         .filter(|field| matches!(field.number(), 6 | 9 | 10 | 11))
@@ -1678,7 +1712,7 @@ fn validate_component_framing(
     if entry.is_opaque() {
         return Err(Error::InvalidSource);
     }
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         package
             .state
@@ -1691,7 +1725,15 @@ fn validate_component_framing(
     budget.charge_work(stream.as_bytes().len())?;
     component
         .archive()
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(
+            stream.as_bytes(),
+            package
+                .state
+                .options
+                .archive()
+                .effective_archive_limits()
+                .map_err(map_archive_error)?,
+        )
         .map_err(map_core_error)
 }
 
@@ -1708,7 +1750,7 @@ fn validate_mutation_payload(
     budget: &mut TransactionBudget,
 ) -> Result<(), Error> {
     let limits = package.wire_limits().map_err(map_wire_error)?;
-    let slide = WireView::parse_with_limits(slide_payload, limits).map_err(map_wire_error)?;
+    let slide = WireView::parse(slide_payload, limits).map_err(map_wire_error)?;
     let field_count = slide.fields().count();
     let mut builds = HashSet::new();
     builds
@@ -1748,7 +1790,7 @@ fn validate_mutation_payload(
                     return Err(Error::InvalidSource);
                 }
             },
-            3 => return Err(Error::UnsupportedSource),
+            3 => return Err(Error::Refused(Refusal::UnsupportedSource)),
             TITLE_REFERENCE_FIELD
             | BODY_REFERENCE_FIELD
             | SLIDE_NUMBER_PLACEHOLDER_FIELD
@@ -1789,7 +1831,7 @@ fn validate_mutation_payload(
                     return Err(Error::InvalidSource);
                 }
                 if number == 43 {
-                    return Err(Error::UnsupportedSource);
+                    return Err(Error::Refused(Refusal::UnsupportedSource));
                 }
                 if kind == Kind::SlideNumber && !other_roles.insert(identifier) {
                     return Err(Error::InvalidSource);
@@ -1965,7 +2007,7 @@ fn validate_placeholder_owner(
             if identifier != 0 {
                 budget.charge_reference()?;
             }
-            Ok(identifier)
+            Ok::<_, Error>(identifier)
         })
         .transpose()?;
     let modern = nested_unique_field(payload, &[1, 4], limits)?
@@ -1974,7 +2016,7 @@ fn validate_placeholder_owner(
             if identifier != 0 {
                 budget.charge_reference()?;
             }
-            Ok(identifier)
+            Ok::<_, Error>(identifier)
         })
         .transpose()?;
     if deprecated.is_some() && modern.is_some() && deprecated != modern {
@@ -2014,8 +2056,7 @@ fn validate_style_visibility(
     budget.charge_work(payload.len())?;
     reject_groups(payload, limits)?;
     if let Some(properties) = nested_unique_field(payload, &[11], limits)? {
-        let view =
-            WireView::parse_with_limits(properties.payload(), limits).map_err(map_wire_error)?;
+        let view = WireView::parse(properties.payload(), limits).map_err(map_wire_error)?;
         for field in view.fields() {
             field.validate_canonical_framing().map_err(map_wire_error)?;
             let selected_override = match kind {
@@ -2023,7 +2064,7 @@ fn validate_style_visibility(
                 Kind::SlideNumber => field.number() == 6,
             };
             if selected_override {
-                return Err(Error::UnsupportedSource);
+                return Err(Error::Refused(Refusal::UnsupportedSource));
             }
         }
     }
@@ -2050,7 +2091,7 @@ fn validate_build_dependency(
             .get(index)
             .ok_or(Error::InvalidSource)?,
     )?;
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let field_count = view.fields().count();
     let payload_work = field_count
         .checked_mul(2)
@@ -2074,7 +2115,7 @@ fn validate_build_dependency(
         }
     }
     if build_target == Some(placeholder_identifier) {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     if let Some(target) = build_target {
         validate_reference_metadata(object, index, target, &[1])?;
@@ -2083,7 +2124,7 @@ fn validate_build_dependency(
 }
 
 fn reject_groups(source: &[u8], limits: WireLimits) -> Result<(), Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     for field in view.fields() {
         field.validate_canonical_framing().map_err(map_wire_error)?;
         if matches!(field.wire_type(), 3 | 4) {
@@ -2101,7 +2142,7 @@ fn nested_unique_field<'a>(
     let Some((&number, rest)) = path.split_first() else {
         return Err(Error::InvalidSource);
     };
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut found = None;
     for field in view.fields() {
         field.validate_canonical_framing().map_err(map_wire_error)?;
@@ -2126,7 +2167,7 @@ fn nested_unique_field<'a>(
 
 #[cfg(test)]
 mod tests {
-    use litchi_iwa_core::{FieldInfo, FieldPath};
+    use litchi_iwa_core::FieldInfo;
 
     use super::*;
 
@@ -2173,7 +2214,11 @@ mod tests {
         for identifier in &identifiers {
             info.object_references.push(*identifier);
             info.field_infos.push(FieldInfo {
-                path: FieldPath::new(vec![1, 1, 1, 9]),
+                path: litchi_iwa_core::FieldPath::new(
+                    vec![1, 1, 1, 9],
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap(),
                 object_references: vec![*identifier],
                 ..FieldInfo::default()
             });
@@ -2190,7 +2235,11 @@ mod tests {
         object.archive_info.message_infos[message_index]
             .field_infos
             .push(FieldInfo {
-                path: FieldPath::new(vec![1, 1, 1, 9]),
+                path: litchi_iwa_core::FieldPath::new(
+                    vec![1, 1, 1, 9],
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap(),
                 object_references: vec![identifiers[0]],
                 ..FieldInfo::default()
             });
@@ -2215,7 +2264,7 @@ mod tests {
     }
 
     fn legacy_package_bytes(flat: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-        let catalog = litchi_iwa_archive::package::Catalog::from_bytes(flat)?;
+        let catalog = litchi_iwa_archive::package::Catalog::from_bytes(flat, Default::default())?;
         let inner_entries = catalog
             .iter()
             .filter(|entry| {
@@ -2271,7 +2320,7 @@ mod tests {
         let before = legacy.source_bytes().to_vec();
         assert!(matches!(
             legacy.apply_slide_placeholder_visibility(&forged),
-            Err(Error::UnsupportedSource)
+            Err(Error::Refused(Refusal::UnsupportedSource))
         ));
         assert_eq!(legacy.source_bytes(), before.as_slice());
 

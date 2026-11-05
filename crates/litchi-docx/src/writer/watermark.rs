@@ -7,10 +7,6 @@
     reason = "serialization preserves the established byte-emission path"
 )]
 #![expect(
-    clippy::module_name_repetitions,
-    reason = "public names retain established OOXML facade terminology"
-)]
-#![expect(
     clippy::shadow_reuse,
     reason = "parser bindings are intentionally refined after validation"
 )]
@@ -1148,17 +1144,15 @@ mod tests {
         use tempfile::NamedTempFile;
 
         let file = NamedTempFile::with_suffix(".docx").unwrap();
-        let mut package = Package::new().unwrap();
+        let mut builder = crate::Builder::new().unwrap();
         let mut watermark = Watermark::text("NEED TO KNOW");
         watermark.set_font("Consolas");
         watermark.set_font_size_points(3.5).unwrap();
         watermark.set_color("#445566");
         watermark.set_layout(WatermarkLayout::Horizontal);
         watermark.set_semitransparent(false);
-        package
-            .document_mut()
-            .unwrap()
-            .set_watermark(watermark.clone());
+        builder.document().unwrap().set_watermark(watermark.clone());
+        let package = builder.build().unwrap();
         package.save(file.path()).unwrap();
 
         let reopened = Package::open(file.path()).unwrap();
@@ -1173,13 +1167,11 @@ mod tests {
 
         let payload = minimal_png(120, 60);
         let file = NamedTempFile::with_suffix(".docx").unwrap();
-        let mut package = Package::new().unwrap();
+        let mut builder = crate::Builder::new().unwrap();
         let mut watermark = ImageWatermark::new(payload.clone()).unwrap();
         watermark.set_scale(2.0).unwrap();
-        package
-            .document_mut()
-            .unwrap()
-            .set_image_watermark(watermark);
+        builder.document().unwrap().set_image_watermark(watermark);
+        let package = builder.build().unwrap();
         package.save(file.path()).unwrap();
 
         let reopened = Package::open(file.path()).unwrap();
@@ -1210,9 +1202,9 @@ mod tests {
         use tempfile::NamedTempFile;
 
         let file = NamedTempFile::with_suffix(".docx").unwrap();
-        let mut package = Package::new().unwrap();
+        let mut builder = crate::Builder::new().unwrap();
         {
-            let document = package.document_mut().unwrap();
+            let document = builder.document().unwrap();
             document.set_watermark(Watermark::text("DRAFT"));
             document.set_image_watermark(ImageWatermark::new(minimal_png(10, 10)).unwrap());
             document.remove_watermark();
@@ -1220,6 +1212,7 @@ mod tests {
             assert!(!document.has_watermark());
             assert!(!document.has_image_watermark());
         }
+        let package = builder.build().unwrap();
         package.save(file.path()).unwrap();
 
         let reopened = Package::open(file.path()).unwrap();
@@ -1235,13 +1228,14 @@ mod tests {
 
         let payload = minimal_png(48, 48);
         let file = NamedTempFile::with_suffix(".docx").unwrap();
-        let mut package = Package::new().unwrap();
+        let mut builder = crate::Builder::new().unwrap();
         {
-            let document = package.document_mut().unwrap();
+            let document = builder.document().unwrap();
             document.add_paragraph_with_text("content page");
             document.set_watermark(Watermark::text("CONFIDENTIAL"));
             document.set_image_watermark(ImageWatermark::new(payload.clone()).unwrap());
         }
+        let package = builder.build().unwrap();
         package.save(file.path()).unwrap();
 
         let reopened = Package::open(file.path()).unwrap();

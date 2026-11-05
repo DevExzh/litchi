@@ -6,8 +6,8 @@
 use litchi_core::Result;
 use litchi_odf_common::{constants, core::PackageWriter, package::raw_identical_members};
 use litchi_ods::{
-    Spreadsheet,
-    document::{Patch, SheetPosition, Snapshot},
+    Package,
+    document::{Patch, SheetPosition},
 };
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -38,7 +38,7 @@ fn plain_table(name: &str, token: &str) -> String {
 }
 
 fn package(content_xml: &str, additions: &[(&str, &[u8], &str)]) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype(constants::ODF_SPREADSHEET)
         .expect("fixed ODS mimetype");
@@ -61,7 +61,8 @@ fn package(content_xml: &str, additions: &[(&str, &[u8], &str)]) -> Vec<u8> {
 }
 
 fn names(bytes: &[u8]) -> Result<Vec<String>> {
-    Ok(Spreadsheet::from_bytes(bytes.to_vec())?
+    Ok(Package::from_bytes(bytes)?
+        .workbook()?
         .sheets()
         .iter()
         .map(|sheet| sheet.name.clone())
@@ -94,20 +95,21 @@ fn scalar_sheet_transfer_preserves_fragment_members_and_durable_inverse() -> Res
             "application/octet-stream",
         )],
     );
-    let source = Snapshot::from_bytes(source_bytes.clone())?;
+    let source = Package::from_bytes(&source_bytes)?;
     for (position, expected) in [
         (SheetPosition::First, vec!["Source copy", "A", "B"]),
         (SheetPosition::Index(1), vec!["A", "Source copy", "B"]),
         (SheetPosition::Last, vec!["A", "B", "Source copy"]),
     ] {
-        let destination = Snapshot::from_bytes(destination_bytes.clone())?;
-        let mut edit = destination.edit();
+        let destination = Package::from_bytes(&destination_bytes)?;
+        let mut edit = destination.edit()?;
         edit.transfer_plain_scalar_sheet_from(&source, "Source", "Source copy", position)?;
         assert_eq!(names(edit.as_bytes())?, expected);
         assert_eq!(source.as_bytes(), source_bytes.as_slice());
 
         let copied = scalar_table("Source copy", "1.50");
-        let target_xml = Spreadsheet::from_bytes(edit.as_bytes().to_vec())?
+        let target_xml = Package::from_bytes(edit.as_bytes())?
+            .workbook()?
             .content_xml()
             .to_string();
         assert!(target_xml.contains(&copied));
@@ -121,7 +123,7 @@ fn scalar_sheet_transfer_preserves_fragment_members_and_durable_inverse() -> Res
         let commit = edit.commit()?;
         assert_eq!(commit.patch().operations()[0].op, "ods.sheet.transfer");
         assert!(commit.patch().operations()[0].target.contains("source:"));
-        let identical = raw_identical_members(&destination_bytes, commit.snapshot().as_bytes())
+        let identical = raw_identical_members(&destination_bytes, commit.package().as_bytes())
             .ok_or_else(|| {
                 litchi_core::Error::InvalidFormat("raw comparison failed".to_string())
             })?;
@@ -131,16 +133,16 @@ fn scalar_sheet_transfer_preserves_fragment_members_and_durable_inverse() -> Res
         let wire = commit.patch().to_deterministic_json()?;
         let durable = Patch::from_deterministic_json(&wire, destination.limits())?;
         assert_eq!(
-            durable.apply(&destination)?.snapshot().as_bytes(),
-            commit.snapshot().as_bytes()
+            destination.apply(&durable)?.into_package().as_bytes(),
+            commit.package().as_bytes()
         );
-        assert!(durable.apply(&source).is_err());
+        assert!(source.apply(&durable).is_err());
         let inverse = Patch::from_deterministic_json(
             &durable.inverse().to_deterministic_json()?,
             destination.limits(),
         )?;
         assert_eq!(
-            inverse.apply(commit.snapshot())?.snapshot().as_bytes(),
+            commit.package().apply(&inverse)?.into_package().as_bytes(),
             destination_bytes.as_slice()
         );
     }
@@ -150,9 +152,9 @@ fn scalar_sheet_transfer_preserves_fragment_members_and_durable_inverse() -> Res
 #[test]
 fn scalar_sheet_transfer_refuses_dependencies_and_keeps_destination_atomic() -> Result<()> {
     let destination_bytes = package(&content(&plain_table("Dest", "keep"), ""), &[]);
-    let destination = Snapshot::from_bytes(destination_bytes.clone())?;
+    let destination = Package::from_bytes(&destination_bytes)?;
     let transfer_source =
-        Snapshot::from_bytes(package(&content(&plain_table("Source", "value"), ""), &[]))?;
+        Package::from_bytes(&package(&content(&plain_table("Source", "value"), ""), &[]))?;
     let refused = [
         r#"<t:table t:name="Source"><t:table-row><t:table-cell t:formula="of:=A1"/></t:table-row></t:table>"#
             .to_string(),
@@ -171,11 +173,11 @@ fn scalar_sheet_transfer_refuses_dependencies_and_keeps_destination_atomic() -> 
     ];
     let mut transfer_checked = 0usize;
     for table in refused {
-        let Ok(source) = Snapshot::from_bytes(package(&content(&table, ""), &[])) else {
+        let Ok(source) = Package::from_bytes(&package(&content(&table, ""), &[])) else {
             continue;
         };
         transfer_checked += 1;
-        let mut edit = destination.edit();
+        let mut edit = destination.edit()?;
         assert!(
             edit.transfer_plain_scalar_sheet_from(&source, "Source", "Copied", SheetPosition::Last)
                 .is_err()
@@ -184,21 +186,21 @@ fn scalar_sheet_transfer_refuses_dependencies_and_keeps_destination_atomic() -> 
     }
     assert!(transfer_checked >= 4);
 
-    let unknown = Snapshot::from_bytes(package(
+    let unknown = Package::from_bytes(&package(
         &content(
             r#"<t:table t:name="Source"><t:table-row><t:table-cell><x:p>opaque</x:p><u:extension/></t:table-cell></t:table-row></t:table>"#,
             r#"xmlns:u="urn:example:unknown""#,
         ),
         &[],
     ))?;
-    let mut edit = destination.edit();
+    let mut edit = destination.edit()?;
     assert!(
         edit.transfer_plain_scalar_sheet_from(&unknown, "Source", "Copied", SheetPosition::Last)
             .is_err()
     );
     assert_eq!(edit.as_bytes(), destination_bytes.as_slice());
 
-    let signed = Snapshot::from_bytes(package(
+    let signed = Package::from_bytes(&package(
         &content(&plain_table("Source", "signed"), ""),
         &[(
             "META-INF/documentsignatures.xml",
@@ -206,14 +208,14 @@ fn scalar_sheet_transfer_refuses_dependencies_and_keeps_destination_atomic() -> 
             "application/xml",
         )],
     ))?;
-    let mut edit = destination.edit();
+    let mut edit = destination.edit()?;
     assert!(
         edit.transfer_plain_scalar_sheet_from(&signed, "Source", "Copied", SheetPosition::Last)
             .is_err()
     );
     assert_eq!(edit.as_bytes(), destination_bytes.as_slice());
 
-    let signed_destination = Snapshot::from_bytes(package(
+    let signed_destination = Package::from_bytes(&package(
         &content(&plain_table("Dest", "keep"), ""),
         &[(
             "META-INF/documentsignatures.xml",
@@ -222,7 +224,7 @@ fn scalar_sheet_transfer_refuses_dependencies_and_keeps_destination_atomic() -> 
         )],
     ))?;
     let signed_before = signed_destination.as_bytes().to_vec();
-    let mut signed_edit = signed_destination.edit();
+    let mut signed_edit = signed_destination.edit()?;
     assert!(
         signed_edit
             .transfer_plain_scalar_sheet_from(
@@ -235,7 +237,7 @@ fn scalar_sheet_transfer_refuses_dependencies_and_keeps_destination_atomic() -> 
     );
     assert_eq!(signed_edit.as_bytes(), signed_before.as_slice());
 
-    let protected_destination = Snapshot::from_bytes(package(
+    let protected_destination = Package::from_bytes(&package(
         &content(
             r#"<t:table t:name="Dest" t:protected="true"><t:table-row><t:table-cell office:value-type="string"><x:p>keep</x:p></t:table-cell></t:table-row></t:table>"#,
             "",
@@ -243,7 +245,7 @@ fn scalar_sheet_transfer_refuses_dependencies_and_keeps_destination_atomic() -> 
         &[],
     ))?;
     let protected_before = protected_destination.as_bytes().to_vec();
-    let mut protected_edit = protected_destination.edit();
+    let mut protected_edit = protected_destination.edit()?;
     assert!(
         protected_edit
             .transfer_plain_scalar_sheet_from(
@@ -260,37 +262,37 @@ fn scalar_sheet_transfer_refuses_dependencies_and_keeps_destination_atomic() -> 
 
 #[test]
 fn scalar_sheet_transfer_refuses_name_and_namespace_ambiguity() -> Result<()> {
-    let source = Snapshot::from_bytes(package(&content(&plain_table("Source", "value"), ""), &[]))?;
-    let collision = Snapshot::from_bytes(package(&content(&plain_table("Dest", "a"), ""), &[]))?;
+    let source = Package::from_bytes(&package(&content(&plain_table("Source", "value"), ""), &[]))?;
+    let collision = Package::from_bytes(&package(&content(&plain_table("Dest", "a"), ""), &[]))?;
     let before = collision.as_bytes().to_vec();
-    let mut edit = collision.edit();
+    let mut edit = collision.edit()?;
     assert!(
         edit.transfer_plain_scalar_sheet_from(&source, "Source", "Dest", SheetPosition::Last)
             .is_err()
     );
     assert_eq!(edit.as_bytes(), before.as_slice());
 
-    let destination = Snapshot::from_bytes(package(
+    let destination = Package::from_bytes(&package(
         &format!(
             r#"<?xml version="1.0"?><office:document-content xmlns:office="{OFFICE}" xmlns:t="{TABLE}" xmlns:y="{TEXT}" office:version="1.3"><office:body><office:spreadsheet><t:table t:name="Dest"><t:table-row><t:table-cell office:value-type="string"><y:p>value</y:p></t:table-cell></t:table-row></t:table></office:spreadsheet></office:body></office:document-content>"#
         ),
         &[],
     ))?;
-    let mut edit = destination.edit();
+    let mut edit = destination.edit()?;
     assert!(
         edit.transfer_plain_scalar_sheet_from(&source, "Source", "Copied", SheetPosition::Last)
             .is_err()
     );
     assert_eq!(edit.as_bytes(), destination.as_bytes());
 
-    let shadow_destination = Snapshot::from_bytes(package(
+    let shadow_destination = Package::from_bytes(&package(
         &format!(
             r#"<?xml version="1.0"?><office:document-content xmlns:office="{OFFICE}" xmlns:t="{TABLE}" xmlns:d="{TABLE}" xmlns:x="{TEXT}" xmlns:y="{TEXT}" office:version="1.3"><office:body><office:spreadsheet xmlns:t="urn:example:shadow"><d:table d:name="Dest"><d:table-row><d:table-cell office:value-type="string"><y:p>value</y:p></d:table-cell></d:table-row></d:table></office:spreadsheet></office:body></office:document-content>"#
         ),
         &[],
     ))?;
     let shadow_before = shadow_destination.as_bytes().to_vec();
-    let mut shadow_edit = shadow_destination.edit();
+    let mut shadow_edit = shadow_destination.edit()?;
     assert!(
         shadow_edit
             .transfer_plain_scalar_sheet_from(&source, "Source", "Copied", SheetPosition::Last,)
@@ -298,14 +300,14 @@ fn scalar_sheet_transfer_refuses_name_and_namespace_ambiguity() -> Result<()> {
     );
     assert_eq!(shadow_edit.as_bytes(), shadow_before.as_slice());
 
-    let self_closing_destination = Snapshot::from_bytes(package(
+    let self_closing_destination = Package::from_bytes(&package(
         &format!(
             r#"<?xml version="1.0"?><office:document-content xmlns:office="{OFFICE}" xmlns:t="{TABLE}" xmlns:x="{TEXT}" office:version="1.3"><office:body><office:spreadsheet/></office:body></office:document-content>"#
         ),
         &[],
     ))?;
     let self_closing_before = self_closing_destination.as_bytes().to_vec();
-    let mut self_closing_edit = self_closing_destination.edit();
+    let mut self_closing_edit = self_closing_destination.edit()?;
     assert!(
         self_closing_edit
             .transfer_plain_scalar_sheet_from(&source, "Source", "Copied", SheetPosition::Last,)
@@ -313,7 +315,7 @@ fn scalar_sheet_transfer_refuses_name_and_namespace_ambiguity() -> Result<()> {
     );
     assert_eq!(self_closing_edit.as_bytes(), self_closing_before.as_slice());
 
-    let mut edit = Snapshot::from_bytes(destination_bytes_for_empty())?.edit();
+    let mut edit = Package::from_bytes(&destination_bytes_for_empty())?.edit()?;
     assert!(
         edit.transfer_plain_scalar_sheet_from(&source, "Source", "", SheetPosition::Last)
             .is_err()

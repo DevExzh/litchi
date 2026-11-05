@@ -23,7 +23,7 @@ use litchi_iwa_archive::package::{EntryEdit, ExactArtifacts};
 use litchi_iwa_common::WireLimits;
 use litchi_iwa_core::{RawMessage, SnappyStream};
 use litchi_iwa_protos::table_sort_order_codec as codec;
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::slide_table_core as core;
 use super::{Package, PayloadLimitKind, ReadError, SemanticLimitKind};
@@ -36,7 +36,7 @@ const TABLE_MODEL_MESSAGE_TYPE: u32 = 6_001;
 /// Finite resource categories enforced by a slide-table sort transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum SlideTableSortLimitKind {
+pub enum LimitKind {
     InputBytes,
     OutputBytes,
     Entries,
@@ -54,7 +54,7 @@ pub enum SlideTableSortLimitKind {
     Components,
 }
 
-impl fmt::Display for SlideTableSortLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -79,12 +79,12 @@ impl fmt::Display for SlideTableSortLimitKind {
 /// Content-free semantic path for a slide-table sort operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum SlideTableSortPath {
+pub enum Path {
     Package,
     Table { slide: Position, table: Position },
 }
 
-impl fmt::Display for SlideTableSortPath {
+impl fmt::Display for Path {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Package => f.write_str("package"),
@@ -96,9 +96,36 @@ impl fmt::Display for SlideTableSortPath {
 }
 
 /// Failure from a Keynote slide-table sort read or transaction.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum SlideTableSortError {
+pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    #[error("the selected Keynote slide-table sort source is invalid")]
+    InvalidSource,
+    #[error(
+        "Keynote slide-table sort {kind} limit exceeded: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        kind: LimitKind,
+        observed: u64,
+        maximum: u64,
+    },
+    #[error("could not allocate {amount} units for the Keynote slide-table sort transaction")]
+    Allocation { amount: usize },
+    #[error("the edited Keynote slide-table sort failed semantic verification")]
+    Verification,
+    #[error("the Keynote slide-table sort patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     #[error("this Keynote source does not support persisted slide-table sort edits")]
     UnsupportedSource,
     #[error("the requested Keynote slide-table sort graph is outside the supported scope")]
@@ -117,34 +144,44 @@ pub enum SlideTableSortError {
     TablePositionNotFound { position: Position },
     #[error("the selected Keynote slide-table is locked")]
     Locked,
-    #[error("the selected Keynote slide-table sort source is invalid")]
-    InvalidSource,
-    #[error(
-        "Keynote slide-table sort {kind} limit exceeded: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        kind: SlideTableSortLimitKind,
-        observed: u64,
-        maximum: u64,
-    },
-    #[error("could not allocate {amount} units for the Keynote slide-table sort transaction")]
-    Allocation { amount: usize },
-    #[error("the edited Keynote slide-table sort failed semantic verification")]
-    Verification,
-    #[error("the Keynote slide-table sort patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. }
+            | Self::UnsupportedDependency { .. }
+            | Self::UnsupportedTopology { .. } => RefusalKind::UnsupportedContent,
+            Self::AmbiguousSelector { .. } | Self::EmptySlideName { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::TablePositionNotFound { .. } => RefusalKind::NotFound,
+            Self::Locked { .. } => RefusalKind::Protected,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// One mutable sort value staged against an immutable package snapshot.
-pub struct SlideTableSortEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
     selection: SortSelection,
     after: Option<Order>,
 }
 
-impl fmt::Debug for SlideTableSortEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("SlideTableSortEdit")
+        f.debug_struct("Edit")
             .field("path", &self.selection.path())
             .field("before", &self.selection.before)
             .field("after", &self.after)
@@ -152,9 +189,9 @@ impl fmt::Debug for SlideTableSortEdit<'_> {
     }
 }
 
-impl SlideTableSortEdit<'_> {
+impl Edit<'_> {
     #[must_use]
-    pub fn path(&self) -> SlideTableSortPath {
+    pub fn path(&self) -> Path {
         self.selection.path()
     }
     #[must_use]
@@ -179,23 +216,23 @@ impl SlideTableSortEdit<'_> {
     pub fn reset(self) -> Self {
         self.clear()
     }
-    pub fn commit(self) -> Result<SlideTableSortCommit, SlideTableSortError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         commit_edit(self.source, &self.selection, self.after)
     }
 }
 
 /// Exact-source checked reversible slide-table sort patch.
 #[derive(Clone, PartialEq, Eq)]
-pub struct SlideTableSortPatch {
+pub struct Patch {
     artifacts: ExactArtifacts,
     selection: SortSelection,
     before: Option<Order>,
     after: Option<Order>,
 }
 
-impl fmt::Debug for SlideTableSortPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("SlideTableSortPatch")
+        f.debug_struct("Patch")
             .field("path", &self.selection.path())
             .field("before", &self.before)
             .field("after", &self.after)
@@ -203,7 +240,7 @@ impl fmt::Debug for SlideTableSortPatch {
     }
 }
 
-impl SlideTableSortPatch {
+impl Patch {
     #[must_use]
     pub fn before(&self) -> Option<&Order> {
         self.before.as_ref()
@@ -237,14 +274,14 @@ impl SlideTableSortPatch {
 
 /// Diagnostics for one persisted slide-table sort publication.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SlideTableSortDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     deleted_previews: usize,
     full_reparse_performed: bool,
 }
 
-impl SlideTableSortDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -282,13 +319,13 @@ impl SlideTableSortDiagnostics {
 /// Fully verified result of one slide-table sort transaction.
 #[must_use = "a Keynote slide-table sort commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct SlideTableSortCommit {
+pub struct Commit {
     package: Package,
-    patch: SlideTableSortPatch,
-    diagnostics: SlideTableSortDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl SlideTableSortCommit {
+impl Commit {
     #[must_use]
     pub const fn package(&self) -> &Package {
         &self.package
@@ -297,12 +334,18 @@ impl SlideTableSortCommit {
     pub fn into_package(self) -> Package {
         self.package
     }
+
+    /// Consume the commit and return its package and patch.
     #[must_use]
-    pub const fn patch(&self) -> &SlideTableSortPatch {
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+    #[must_use]
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
     #[must_use]
-    pub const fn diagnostics(&self) -> &SlideTableSortDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
@@ -326,8 +369,8 @@ impl fmt::Debug for SortSelection {
 }
 
 impl SortSelection {
-    const fn path(&self) -> SlideTableSortPath {
-        SlideTableSortPath::Table {
+    const fn path(&self) -> Path {
+        Path::Table {
             slide: self.target.slide_position,
             table: self.target.table_position,
         }
@@ -340,7 +383,7 @@ impl Package {
         &self,
         slide: impl Into<SlideSelector<'slide>>,
         table: impl Into<TableSelector>,
-    ) -> Result<Option<Order>, SlideTableSortError> {
+    ) -> Result<Option<Order>, Error> {
         let mut budget = core::Budget::new(self).map_err(map_graph_error)?;
         Ok(select_table(self, slide.into(), table.into(), &mut budget)?.before)
     }
@@ -350,10 +393,10 @@ impl Package {
         &self,
         slide: impl Into<SlideSelector<'slide>>,
         table: impl Into<TableSelector>,
-    ) -> Result<SlideTableSortEdit<'_>, SlideTableSortError> {
+    ) -> Result<Edit<'_>, Error> {
         let mut budget = core::Budget::new(self).map_err(map_graph_error)?;
         let selection = select_table(self, slide.into(), table.into(), &mut budget)?;
-        Ok(SlideTableSortEdit {
+        Ok(Edit {
             source: self,
             after: selection.before.clone(),
             selection,
@@ -361,13 +404,10 @@ impl Package {
     }
 
     /// Apply an exact-source checked reversible slide-table sort patch.
-    pub fn apply_slide_table_sort_order(
-        &self,
-        patch: &SlideTableSortPatch,
-    ) -> Result<SlideTableSortCommit, SlideTableSortError> {
+    pub fn apply_slide_table_sort_order(&self, patch: &Patch) -> Result<Commit, Error> {
         let catalog = core::physical_catalog(self).map_err(map_graph_error)?;
         if !patch.artifacts.authorizes_source(&catalog.shared_source()) {
-            return Err(SlideTableSortError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let mut budget = core::Budget::new(self).map_err(map_graph_error)?;
         let current = select_table(
@@ -377,14 +417,14 @@ impl Package {
             &mut budget,
         )?;
         if !same_selection(&current, &patch.selection) || current.before != patch.before {
-            return Err(SlideTableSortError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if patch.is_noop() {
             self.validate().map_err(map_read_error)?;
-            return Ok(SlideTableSortCommit {
+            return Ok(Commit {
                 package: self.snapshot(),
                 patch: patch.clone(),
-                diagnostics: SlideTableSortDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         reopen_patch(self, patch, budget)
@@ -395,29 +435,29 @@ fn commit_edit(
     source: &Package,
     selection: &SortSelection,
     after: Option<Order>,
-) -> Result<SlideTableSortCommit, SlideTableSortError> {
+) -> Result<Commit, Error> {
     let mut budget = selection.budget;
     if selection.before == after {
         let bytes = shared_source_artifact(source, &mut budget)?;
-        return Ok(SlideTableSortCommit {
+        return Ok(Commit {
             package: source.snapshot(),
-            patch: SlideTableSortPatch {
+            patch: Patch {
                 artifacts: ExactArtifacts::new(Arc::clone(&bytes), bytes),
                 selection: selection.clone(),
                 before: selection.before.clone(),
                 after,
             },
-            diagnostics: SlideTableSortDiagnostics::unchanged(),
+            diagnostics: Diagnostics::unchanged(),
         });
     }
     if !core::physical_catalog(source)
         .map_err(map_graph_error)?
         .source_is_exact()
     {
-        return Err(SlideTableSortError::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     if selection.target.locked {
-        return Err(SlideTableSortError::Locked);
+        return Err(Error::Refused(Refusal::Locked));
     }
     let candidate = rewrite_sort(source, selection, after.clone(), &mut budget)?;
     let selected = select_table(
@@ -427,29 +467,29 @@ fn commit_edit(
         &mut budget,
     )?;
     if !same_selection(&selected, selection) || selected.before != after {
-        return Err(SlideTableSortError::Verification);
+        return Err(Error::Verification);
     }
     core::verify_locality(source, &candidate, &selection.target, false, &mut budget)
         .map_err(map_graph_error)?;
     let target = shared_source_artifact(&candidate, &mut budget)?;
     let source_artifact = shared_source_artifact(source, &mut budget)?;
-    Ok(SlideTableSortCommit {
+    Ok(Commit {
         package: candidate,
-        patch: SlideTableSortPatch {
+        patch: Patch {
             artifacts: ExactArtifacts::new(source_artifact, target),
             selection: selection.clone(),
             before: selection.before.clone(),
             after,
         },
-        diagnostics: SlideTableSortDiagnostics::published(),
+        diagnostics: Diagnostics::published(),
     })
 }
 
 fn reopen_patch(
     source: &Package,
-    patch: &SlideTableSortPatch,
+    patch: &Patch,
     mut budget: core::Budget,
-) -> Result<SlideTableSortCommit, SlideTableSortError> {
+) -> Result<Commit, Error> {
     let target_source = patch.artifacts.target();
     let candidate = parse_candidate(Arc::clone(&target_source), source, &mut budget)?;
     let selected = select_table(
@@ -459,7 +499,7 @@ fn reopen_patch(
         &mut budget,
     )?;
     if !same_selection(&selected, &patch.selection) || selected.before != patch.after {
-        return Err(SlideTableSortError::Verification);
+        return Err(Error::Verification);
     }
     core::verify_locality(
         source,
@@ -469,10 +509,10 @@ fn reopen_patch(
         &mut budget,
     )
     .map_err(map_graph_error)?;
-    Ok(SlideTableSortCommit {
+    Ok(Commit {
         package: candidate,
         patch: patch.clone(),
-        diagnostics: SlideTableSortDiagnostics::published(),
+        diagnostics: Diagnostics::published(),
     })
 }
 
@@ -481,7 +521,7 @@ fn select_table(
     slide_selector: SlideSelector<'_>,
     table_selector: TableSelector,
     budget: &mut core::Budget,
-) -> Result<SortSelection, SlideTableSortError> {
+) -> Result<SortSelection, Error> {
     let target = core::select_table(package, slide_selector, table_selector, budget)
         .map_err(map_graph_error)?;
     let payload = core::model_payload(package, &target).map_err(map_graph_error)?;
@@ -503,7 +543,7 @@ fn rewrite_sort(
     selection: &SortSelection,
     after: Option<Order>,
     budget: &mut core::Budget,
-) -> Result<Package, SlideTableSortError> {
+) -> Result<Package, Error> {
     if let Some(order) = &after {
         validate_columns(order, selection.column_count, budget)?;
     }
@@ -512,11 +552,12 @@ fn rewrite_sort(
         .package()
         .iter()
         .find(|entry| entry.name() == selection.target.model.component.as_ref())
-        .ok_or(SlideTableSortError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(SlideTableSortError::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let physical_limits = source.state.options.archive();
+    let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(map_archive_error)?;
@@ -525,17 +566,17 @@ fn rewrite_sort(
             .map_err(map_graph_error)?;
     let object = archive
         .object(selection.target.model.identifier)
-        .ok_or(SlideTableSortError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let original = object
         .messages
         .get(selection.target.model_message_index)
         .filter(|message| message.type_ == TABLE_MODEL_MESSAGE_TYPE)
-        .ok_or(SlideTableSortError::InvalidSource)?
+        .ok_or(Error::InvalidSource)?
         .data
         .as_slice();
     let current = decode_sort(original, source, budget)?;
     if current != selection.before {
-        return Err(SlideTableSortError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let residual = budget.residual(source).map_err(map_graph_error)?;
     let options = codec_options(
@@ -572,17 +613,17 @@ fn rewrite_sort(
         || report.retained_bytes() != requirements.retained_bytes
         || report.scratch_bytes() != requirements.scratch_bytes
     {
-        return Err(SlideTableSortError::Verification);
+        return Err(Error::Verification);
     }
     let rewritten = output.into_bytes();
     let verified = decode_sort(&rewritten, source, budget)?;
     if verified != after {
-        return Err(SlideTableSortError::Verification);
+        return Err(Error::Verification);
     }
     archive
         .object_mut(selection.target.model.identifier)
-        .ok_or(SlideTableSortError::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .ok_or(Error::InvalidSource)?
+        .replace_message_preserving_header(
             selection.target.model_message_index,
             RawMessage {
                 type_: TABLE_MODEL_MESSAGE_TYPE,
@@ -592,10 +633,10 @@ fn rewrite_sort(
         )
         .map_err(map_core_error)?;
     let encoded_len = archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_core_error)?;
     let compressed_bound =
-        SnappyStream::maximum_compressed_len(encoded_len).map_err(map_core_error)?;
+        SnappyStream::maximum_compressed_len(encoded_len, snappy_limits).map_err(map_core_error)?;
     budget
         .output(
             encoded_len
@@ -604,15 +645,13 @@ fn rewrite_sort(
                 .map_err(map_graph_error)?,
         )
         .map_err(map_graph_error)?;
-    let bytes = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
+    let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     if bytes.len() != encoded_len {
-        return Err(SlideTableSortError::Verification);
+        return Err(Error::Verification);
     }
-    let compressed = SnappyStream::compress(&bytes).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
     if compressed.len() > compressed_bound {
-        return Err(SlideTableSortError::Verification);
+        return Err(Error::Verification);
     }
     let edits = [EntryEdit::new(
         selection.target.model.component.as_ref(),
@@ -635,7 +674,7 @@ fn rewrite_sort(
 fn order_to_snapshot(
     order: Option<&Order>,
     budget: &mut core::Budget,
-) -> Result<Option<codec::SortOrderSnapshot>, SlideTableSortError> {
+) -> Result<Option<codec::SortOrderSnapshot>, Error> {
     order
         .map(|value| {
             let scope = match value.scope() {
@@ -664,8 +703,7 @@ fn order_to_snapshot(
                         .map_err(map_graph_error)?,
                 )
                 .map_err(map_graph_error)?;
-            codec::SortOrderSnapshot::new(scope, rules)
-                .map_err(|_| SlideTableSortError::InvalidSource)
+            codec::SortOrderSnapshot::new(scope, rules).map_err(|_| Error::InvalidSource)
         })
         .transpose()
 }
@@ -673,7 +711,7 @@ fn order_to_snapshot(
 fn snapshot_to_order(
     snapshot: Option<codec::SortOrderSnapshot>,
     budget: &mut core::Budget,
-) -> Result<Option<Order>, SlideTableSortError> {
+) -> Result<Option<Order>, Error> {
     snapshot
         .map(|value| {
             let scope = match value.scope() {
@@ -694,21 +732,21 @@ fn snapshot_to_order(
                 )
                 .map_err(map_graph_error)?;
             let mut rules = Vec::new();
-            rules.try_reserve_exact(value.rules().len()).map_err(|_| {
-                SlideTableSortError::Allocation {
+            rules
+                .try_reserve_exact(value.rules().len())
+                .map_err(|_| Error::Allocation {
                     amount: value.rules().len(),
-                }
-            })?;
+                })?;
             for rule in value.rules() {
-                let column = ColumnIndex::from_native(rule.column())
-                    .map_err(|_| SlideTableSortError::InvalidSource)?;
+                let column =
+                    ColumnIndex::from_native(rule.column()).map_err(|_| Error::InvalidSource)?;
                 let direction = match rule.direction() {
                     codec::SortDirection::Ascending => Direction::Ascending,
                     codec::SortDirection::Descending => Direction::Descending,
                 };
                 rules.push(Rule::new(column, direction));
             }
-            Order::with_scope(scope, rules).map_err(|_| SlideTableSortError::InvalidSource)
+            Order::with_scope(scope, rules).map_err(|_| Error::InvalidSource)
         })
         .transpose()
 }
@@ -717,7 +755,7 @@ fn decode_sort(
     payload: &[u8],
     package: &Package,
     budget: &mut core::Budget,
-) -> Result<Option<Order>, SlideTableSortError> {
+) -> Result<Option<Order>, Error> {
     let limits = budget.residual(package).map_err(map_graph_error)?;
     let options = codec_options(
         payload,
@@ -749,18 +787,14 @@ fn codec_options(
     .with_max_allocations(max_allocations)
 }
 
-fn validate_columns(
-    order: &Order,
-    count: u32,
-    budget: &mut core::Budget,
-) -> Result<(), SlideTableSortError> {
+fn validate_columns(order: &Order, count: u32, budget: &mut core::Budget) -> Result<(), Error> {
     budget.work(order.rules().len()).map_err(map_graph_error)?;
     budget
         .references(order.rules().len())
         .map_err(map_graph_error)?;
     order.rules().iter().try_for_each(|rule| {
         if rule.column().native_value() >= count {
-            Err(SlideTableSortError::InvalidSource)
+            Err(Error::InvalidSource)
         } else {
             Ok(())
         }
@@ -774,7 +808,7 @@ fn same_selection(a: &SortSelection, b: &SortSelection) -> bool {
 fn shared_source_artifact(
     package: &Package,
     budget: &mut core::Budget,
-) -> Result<Arc<[u8]>, SlideTableSortError> {
+) -> Result<Arc<[u8]>, Error> {
     let source = core::physical_catalog(package)
         .map_err(map_graph_error)?
         .shared_source();
@@ -786,7 +820,7 @@ fn parse_candidate(
     source: Arc<[u8]>,
     original: &Package,
     budget: &mut core::Budget,
-) -> Result<Package, SlideTableSortError> {
+) -> Result<Package, Error> {
     budget
         .preflight_candidate(original, source.len())
         .map_err(map_graph_error)?;
@@ -799,17 +833,17 @@ fn parse_candidate(
     Ok(candidate)
 }
 
-fn map_read_error(error: ReadError) -> SlideTableSortError {
+fn map_read_error(error: ReadError) -> Error {
     match error {
         ReadError::SemanticLimit {
             kind,
             observed,
             maximum,
             ..
-        } => SlideTableSortError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                SemanticLimitKind::References => SlideTableSortLimitKind::References,
-                _ => SlideTableSortLimitKind::WireWork,
+                SemanticLimitKind::References => LimitKind::References,
+                _ => LimitKind::WireWork,
             },
             observed: observed as u64,
             maximum: maximum as u64,
@@ -819,176 +853,166 @@ fn map_read_error(error: ReadError) -> SlideTableSortError {
             observed,
             maximum,
             ..
-        } => SlideTableSortError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                PayloadLimitKind::Bytes => SlideTableSortLimitKind::InputBytes,
-                PayloadLimitKind::Fields => SlideTableSortLimitKind::WireFields,
-                PayloadLimitKind::Nesting => SlideTableSortLimitKind::WireNesting,
-                PayloadLimitKind::Work => SlideTableSortLimitKind::WireWork,
+                PayloadLimitKind::Bytes => LimitKind::InputBytes,
+                PayloadLimitKind::Fields => LimitKind::WireFields,
+                PayloadLimitKind::Nesting => LimitKind::WireNesting,
+                PayloadLimitKind::Work => LimitKind::WireWork,
             },
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        ReadError::Allocation { amount, .. } => SlideTableSortError::Allocation { amount },
+        ReadError::Allocation { amount, .. } => Error::Allocation { amount },
         ReadError::Archive(error) => map_archive_error(error),
-        _ => SlideTableSortError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
-fn map_codec_error(error: codec::DecodeError) -> SlideTableSortError {
+fn map_codec_error(error: codec::DecodeError) -> Error {
     if let Some(amount) = error.allocation_amount() {
-        return SlideTableSortError::Allocation { amount };
+        return Error::Allocation { amount };
     }
     let Some(limit) = error.resource_limit() else {
-        return SlideTableSortError::InvalidSource;
+        return Error::InvalidSource;
     };
     let (kind, observed, maximum) = match limit {
         codec::DecodeLimit::InputBytes { observed, maximum } => {
-            (SlideTableSortLimitKind::InputBytes, observed, maximum)
+            (LimitKind::InputBytes, observed, maximum)
         },
         codec::DecodeLimit::OutputBytes { observed, maximum } => {
-            (SlideTableSortLimitKind::OutputBytes, observed, maximum)
+            (LimitKind::OutputBytes, observed, maximum)
         },
         codec::DecodeLimit::Fields { observed, maximum } => {
-            (SlideTableSortLimitKind::WireFields, observed, maximum)
+            (LimitKind::WireFields, observed, maximum)
         },
         codec::DecodeLimit::WorkBytes { observed, maximum } => {
-            (SlideTableSortLimitKind::WireWork, observed, maximum)
+            (LimitKind::WireWork, observed, maximum)
         },
-        codec::DecodeLimit::Nesting { observed, maximum } => (
-            SlideTableSortLimitKind::WireNesting,
-            observed as usize,
-            maximum as usize,
-        ),
-        codec::DecodeLimit::Rules { observed, maximum } => {
-            (SlideTableSortLimitKind::WireWork, observed, maximum)
+        codec::DecodeLimit::Nesting { observed, maximum } => {
+            (LimitKind::WireNesting, observed as usize, maximum as usize)
         },
+        codec::DecodeLimit::Rules { observed, maximum } => (LimitKind::WireWork, observed, maximum),
         codec::DecodeLimit::Columns { observed, maximum } => {
-            (SlideTableSortLimitKind::WireWork, observed, maximum)
+            (LimitKind::WireWork, observed, maximum)
         },
         codec::DecodeLimit::Allocations { observed, maximum } => {
-            (SlideTableSortLimitKind::Allocations, observed, maximum)
+            (LimitKind::Allocations, observed, maximum)
         },
         codec::DecodeLimit::RetainedBytes { observed, maximum } => {
-            (SlideTableSortLimitKind::Retained, observed, maximum)
+            (LimitKind::Retained, observed, maximum)
         },
         codec::DecodeLimit::ScratchBytes { observed, maximum } => {
-            (SlideTableSortLimitKind::Scratch, observed, maximum)
+            (LimitKind::Scratch, observed, maximum)
         },
-        _ => return SlideTableSortError::InvalidSource,
+        _ => return Error::InvalidSource,
     };
-    SlideTableSortError::LimitExceeded {
+    Error::Limit {
         kind,
         observed: observed as u64,
         maximum: maximum as u64,
     }
 }
-fn map_archive_error(error: litchi_iwa_archive::Error) -> SlideTableSortError {
+fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     match error {
         litchi_iwa_archive::Error::Limit {
             kind,
             observed,
             maximum,
-        } => SlideTableSortError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_archive::LimitKind::InputBytes => SlideTableSortLimitKind::InputBytes,
-                litchi_iwa_archive::LimitKind::OutputBytes => SlideTableSortLimitKind::OutputBytes,
-                litchi_iwa_archive::LimitKind::Entries => SlideTableSortLimitKind::Entries,
+                litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
+                litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_archive::LimitKind::Entries => LimitKind::Entries,
                 litchi_iwa_archive::LimitKind::EntryBytes
-                | litchi_iwa_archive::LimitKind::CompressedEntryBytes => {
-                    SlideTableSortLimitKind::EntryBytes
-                },
-                litchi_iwa_archive::LimitKind::TotalBytes => SlideTableSortLimitKind::TotalBytes,
-                _ => SlideTableSortLimitKind::WireWork,
+                | litchi_iwa_archive::LimitKind::CompressedEntryBytes => LimitKind::EntryBytes,
+                litchi_iwa_archive::LimitKind::TotalBytes => LimitKind::TotalBytes,
+                _ => LimitKind::WireWork,
             },
             observed,
             maximum,
         },
-        litchi_iwa_archive::Error::Allocation { amount, .. } => {
-            SlideTableSortError::Allocation { amount }
-        },
+        litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
         litchi_iwa_archive::Error::Iwa(error) => map_core_error(error),
-        _ => SlideTableSortError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_graph_error(error: core::Error) -> SlideTableSortError {
+fn map_graph_error(error: core::Error) -> Error {
     match error {
-        core::Error::UnsupportedSource => SlideTableSortError::UnsupportedSource,
-        core::Error::UnsupportedDependency => SlideTableSortError::UnsupportedDependency,
-        core::Error::UnsupportedTopology => SlideTableSortError::UnsupportedTopology,
-        core::Error::AmbiguousSelector => SlideTableSortError::AmbiguousSelector,
-        core::Error::EmptySlideName => SlideTableSortError::EmptySlideName,
-        core::Error::SlideNameNotFound => SlideTableSortError::SlideNameNotFound,
+        core::Error::UnsupportedSource => Error::Refused(Refusal::UnsupportedSource),
+        core::Error::UnsupportedDependency => Error::Refused(Refusal::UnsupportedDependency),
+        core::Error::UnsupportedTopology => Error::Refused(Refusal::UnsupportedTopology),
+        core::Error::AmbiguousSelector => Error::Refused(Refusal::AmbiguousSelector),
+        core::Error::EmptySlideName => Error::Refused(Refusal::EmptySlideName),
+        core::Error::SlideNameNotFound => Error::Refused(Refusal::SlideNameNotFound),
         core::Error::SlidePositionNotFound(position) => {
-            SlideTableSortError::SlidePositionNotFound { position }
+            Error::Refused(Refusal::SlidePositionNotFound { position })
         },
         core::Error::TablePositionNotFound(position) => {
-            SlideTableSortError::TablePositionNotFound { position }
+            Error::Refused(Refusal::TablePositionNotFound { position })
         },
         core::Error::Limit {
             kind,
             observed,
             maximum,
-        } => SlideTableSortError::LimitExceeded {
+        } => Error::Limit {
             kind: map_limit_kind(kind),
             observed,
             maximum,
         },
-        core::Error::Allocation(amount) => SlideTableSortError::Allocation { amount },
+        core::Error::Allocation(amount) => Error::Allocation { amount },
         core::Error::InvalidSource
         | core::Error::Read
         | core::Error::Wire
         | core::Error::Codec
         | core::Error::Archive
-        | core::Error::Verification => SlideTableSortError::InvalidSource,
+        | core::Error::Verification => Error::InvalidSource,
     }
 }
 
-fn map_limit_kind(kind: core::LimitKind) -> SlideTableSortLimitKind {
+fn map_limit_kind(kind: core::LimitKind) -> LimitKind {
     match kind {
-        core::LimitKind::InputBytes => SlideTableSortLimitKind::InputBytes,
-        core::LimitKind::OutputBytes => SlideTableSortLimitKind::OutputBytes,
-        core::LimitKind::Entries => SlideTableSortLimitKind::Entries,
-        core::LimitKind::EntryBytes => SlideTableSortLimitKind::EntryBytes,
-        core::LimitKind::TotalBytes => SlideTableSortLimitKind::TotalBytes,
-        core::LimitKind::PayloadObjects => SlideTableSortLimitKind::PayloadObjects,
-        core::LimitKind::PayloadMessages => SlideTableSortLimitKind::PayloadMessages,
-        core::LimitKind::References => SlideTableSortLimitKind::References,
-        core::LimitKind::WireFields => SlideTableSortLimitKind::WireFields,
-        core::LimitKind::WireNesting => SlideTableSortLimitKind::WireNesting,
-        core::LimitKind::WireWork => SlideTableSortLimitKind::WireWork,
-        core::LimitKind::Allocations => SlideTableSortLimitKind::Allocations,
-        core::LimitKind::Retained => SlideTableSortLimitKind::Retained,
-        core::LimitKind::Scratch => SlideTableSortLimitKind::Scratch,
-        core::LimitKind::Components => SlideTableSortLimitKind::Components,
+        core::LimitKind::InputBytes => LimitKind::InputBytes,
+        core::LimitKind::OutputBytes => LimitKind::OutputBytes,
+        core::LimitKind::Entries => LimitKind::Entries,
+        core::LimitKind::EntryBytes => LimitKind::EntryBytes,
+        core::LimitKind::TotalBytes => LimitKind::TotalBytes,
+        core::LimitKind::PayloadObjects => LimitKind::PayloadObjects,
+        core::LimitKind::PayloadMessages => LimitKind::PayloadMessages,
+        core::LimitKind::References => LimitKind::References,
+        core::LimitKind::WireFields => LimitKind::WireFields,
+        core::LimitKind::WireNesting => LimitKind::WireNesting,
+        core::LimitKind::WireWork => LimitKind::WireWork,
+        core::LimitKind::Allocations => LimitKind::Allocations,
+        core::LimitKind::Retained => LimitKind::Retained,
+        core::LimitKind::Scratch => LimitKind::Scratch,
+        core::LimitKind::Components => LimitKind::Components,
     }
 }
 
-fn map_core_error(error: litchi_iwa_core::Error) -> SlideTableSortError {
+fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
             kind,
             observed,
             maximum,
-        } => SlideTableSortError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_core::LimitKind::Objects => SlideTableSortLimitKind::PayloadObjects,
+                litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
                 litchi_iwa_core::LimitKind::Messages
-                | litchi_iwa_core::LimitKind::MessagesPerObject => {
-                    SlideTableSortLimitKind::PayloadMessages
-                },
-                litchi_iwa_core::LimitKind::HeaderNesting => SlideTableSortLimitKind::WireNesting,
+                | litchi_iwa_core::LimitKind::MessagesPerObject => LimitKind::PayloadMessages,
+                litchi_iwa_core::LimitKind::HeaderNesting => LimitKind::WireNesting,
                 litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
                 | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes
-                | litchi_iwa_core::LimitKind::SnappyFrames => SlideTableSortLimitKind::EntryBytes,
-                _ => SlideTableSortLimitKind::WireWork,
+                | litchi_iwa_core::LimitKind::SnappyFrames => LimitKind::EntryBytes,
+                _ => LimitKind::WireWork,
             },
             observed: observed as u64,
             maximum: maximum as u64,
         },
         litchi_iwa_core::Error::Allocation { requested, .. } => {
-            SlideTableSortError::Allocation { amount: requested }
+            Error::Allocation { amount: requested }
         },
-        _ => SlideTableSortError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }

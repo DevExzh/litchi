@@ -11,6 +11,9 @@ use litchi_iwa_common::formula::FiniteF64;
 use litchi_numbers_wire::cell_value::{
     CellValueSource, DecodeError, ValueSource, decode_cell_value,
 };
+use litchi_numbers_wire::{Error, LimitKind, Limits};
+
+const TEST_LIMITS: Limits = Limits::DEFAULT;
 
 const PRE_FORMULA: u32 = 0x0000_0008;
 const PRE_STRING: u32 = 0x0000_0010;
@@ -104,7 +107,7 @@ fn assert_value(actual: ValueSource, expected: ValueSource) {
 }
 
 fn assert_decoded(source: &[u8], expected: ValueSource, comment_identifier: Option<u32>) {
-    let decoded = decode_cell_value(source).expect("handwritten cell should decode");
+    let decoded = decode_cell_value(source, &TEST_LIMITS).expect("handwritten cell should decode");
     assert_value(decoded.value, expected);
     assert_eq!(decoded.comment_identifier, comment_identifier);
 }
@@ -760,7 +763,10 @@ fn formula_references_override_cached_values_but_retain_comment_references() {
 
 #[test]
 fn malformed_headers_truncated_fields_and_unknown_versions_fail_closed() {
-    assert!(matches!(decode_cell_value(&[]), Err(DecodeError::Empty)));
+    assert!(matches!(
+        decode_cell_value(&[], &TEST_LIMITS),
+        Err(DecodeError::Empty)
+    ));
     for version in 0..=4 {
         let source = pre_cell(
             version,
@@ -777,7 +783,7 @@ fn malformed_headers_truncated_fields_and_unknown_versions_fail_closed() {
         for length in 1..source.len() {
             assert!(
                 matches!(
-                    decode_cell_value(&source[..length]),
+                    decode_cell_value(&source[..length], &TEST_LIMITS),
                     Err(DecodeError::PreBnc(_))
                 ),
                 "pre-BNC v{version} accepted truncation at {length}"
@@ -799,7 +805,7 @@ fn malformed_headers_truncated_fields_and_unknown_versions_fail_closed() {
     for length in 1..source.len() {
         assert!(
             matches!(
-                decode_cell_value(&source[..length]),
+                decode_cell_value(&source[..length], &TEST_LIMITS),
                 Err(DecodeError::Bnc(_))
             ),
             "BNC accepted truncation at {length}"
@@ -807,33 +813,40 @@ fn malformed_headers_truncated_fields_and_unknown_versions_fail_closed() {
     }
     for version in [6, 7, u8::MAX] {
         assert!(matches!(
-            decode_cell_value(&[version, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+            decode_cell_value(&[version, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &TEST_LIMITS),
             Err(DecodeError::UnsupportedVersion(actual)) if actual == version
         ));
     }
     assert!(matches!(
-        decode_cell_value(&pre_cell(2, 1, 0, None, None, None, None, None, None, None)),
+        decode_cell_value(
+            &pre_cell(2, 1, 0, None, None, None, None, None, None, None),
+            &TEST_LIMITS
+        ),
         Err(DecodeError::UnsupportedCellType(1))
     ));
     assert!(matches!(
-        decode_cell_value(&bnc_cell(
-            1, 0, None, None, None, None, None, None, None, None
-        )),
+        decode_cell_value(
+            &bnc_cell(1, 0, None, None, None, None, None, None, None, None),
+            &TEST_LIMITS
+        ),
         Err(DecodeError::UnsupportedCellType(1))
     ));
     assert!(matches!(
-        decode_cell_value(&bnc_cell(
-            0,
-            0x8000_0000,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None
-        )),
+        decode_cell_value(
+            &bnc_cell(
+                0,
+                0x8000_0000,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None
+            ),
+            &TEST_LIMITS
+        ),
         Err(DecodeError::Bnc(_))
     ));
 }
@@ -858,7 +871,7 @@ fn non_finite_scalars_are_rejected_before_formula_precedence() {
                 None,
             );
             assert!(matches!(
-                decode_cell_value(&source),
+                decode_cell_value(&source, &TEST_LIMITS),
                 Err(DecodeError::PreBnc(_))
             ));
         }
@@ -882,7 +895,7 @@ fn non_finite_scalars_are_rejected_before_formula_precedence() {
             None,
         );
         assert!(matches!(
-            decode_cell_value(&source),
+            decode_cell_value(&source, &TEST_LIMITS),
             Err(DecodeError::Bnc(_))
         ));
     }
@@ -912,8 +925,35 @@ fn projection_is_copy_drop_free_and_survives_source_storage() {
             None,
             Some(9),
         );
-        decode_cell_value(&source).expect("cell source should decode")
+        decode_cell_value(&source, &TEST_LIMITS).expect("cell source should decode")
     };
     assert_value(decoded.value, ValueSource::Number(finite(12.345)));
     assert_eq!(decoded.comment_identifier, Some(9));
+}
+
+#[test]
+fn decode_requires_the_selected_input_budget() {
+    let source = bnc_cell(
+        2,
+        BNC_NUMBER,
+        None,
+        Some(12.5),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    );
+    let limits = TEST_LIMITS
+        .with_input_bytes(source.len().saturating_sub(1).max(1))
+        .unwrap();
+    assert!(matches!(
+        decode_cell_value(&source, &limits),
+        Err(DecodeError::Bnc(Error::LimitExceeded {
+            kind: LimitKind::InputBytes,
+            observed,
+            maximum,
+        })) if observed == source.len() && maximum + 1 == observed
+    ));
 }

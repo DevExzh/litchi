@@ -17,8 +17,6 @@ const PLCF_FACTOID: usize = 132;
 
 #[path = "smart_tags/codec.rs"]
 mod codec;
-#[path = "smart_tags/package.rs"]
-mod package;
 #[path = "smart_tags/semantic.rs"]
 mod semantic;
 #[path = "smart_tags/transaction.rs"]
@@ -27,9 +25,8 @@ mod transaction;
 mod validation;
 
 pub use litchi_ole_common::smart_tags::Limits;
-pub use package::Editor;
 pub use semantic::{TableKind, TableRange, Topology};
-pub use transaction::{Commit, Error as TransactionError, Patch, Snapshot, Transaction};
+pub use transaction::{Commit, Diagnostics, Edit, Error, Patch, Snapshot};
 
 /// Producer that originally created a smart-tag factoid.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -609,7 +606,7 @@ mod transaction_tests;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Package;
+    use crate::raw::Reader;
     use std::path::PathBuf;
 
     #[test]
@@ -715,7 +712,7 @@ mod tests {
             "test-data/ole/doc/FloatingPictures.doc",
         ];
         for path in cases {
-            let mut package = Package::open(fixture(path)).unwrap();
+            let mut package = Reader::open(fixture(path)).unwrap();
             let document = package.document().unwrap();
             let smart_tags = document
                 .smart_tags()

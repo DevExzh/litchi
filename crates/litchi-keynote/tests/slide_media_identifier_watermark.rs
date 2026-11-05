@@ -13,7 +13,10 @@ use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_common::wire::{WireView, append_length_delimited_field};
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsd, tsp};
-use litchi_keynote::{MovieSelector, Package, SlideMediaLifecycleError, SlideSelector};
+use litchi_keynote::{
+    MovieSelector, Package, SlideSelector,
+    slide::media::lifecycle::Error as SlideMediaLifecycleError,
+};
 use prost::Message as _;
 
 #[path = "support/slide_media_fixture.rs"]
@@ -65,13 +68,13 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn metadata(source: &[u8]) -> TestResult<tsp::PackageMetadata> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == fixture::METADATA_MEMBER)
         .ok_or_else(|| io::Error::other("missing metadata component"))?;
-    let decompressed = SnappyStream::decompress(entry.data())?.into_bytes();
-    let archive = Archive::parse(&decompressed)?;
+    let decompressed = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+    let archive = Archive::parse(&decompressed, Default::default())?;
     let payload = archive
         .objects
         .iter()
@@ -136,14 +139,14 @@ fn known_metadata_maximum(source: &[u8]) -> TestResult<u64> {
 }
 
 fn physical_maximum(source: &[u8]) -> TestResult<u64> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut maximum = 0;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let decompressed = SnappyStream::decompress(entry.data())?.into_bytes();
-        let archive = Archive::parse(&decompressed)?;
+        let decompressed = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+        let archive = Archive::parse(&decompressed, Default::default())?;
         for object in archive.objects {
             let identifier = object
                 .archive_info
@@ -156,14 +159,14 @@ fn physical_maximum(source: &[u8]) -> TestResult<u64> {
 }
 
 fn physical_ids(source: &[u8]) -> TestResult<BTreeSet<u64>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut identifiers = BTreeSet::new();
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let decompressed = SnappyStream::decompress(entry.data())?.into_bytes();
-        let archive = Archive::parse(&decompressed)?;
+        let decompressed = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+        let archive = Archive::parse(&decompressed, Default::default())?;
         for object in archive.objects {
             identifiers.insert(
                 object
@@ -177,7 +180,7 @@ fn physical_ids(source: &[u8]) -> TestResult<BTreeSet<u64>> {
 }
 
 fn media_ids(source: &[u8]) -> TestResult<Vec<u64>> {
-    let archive = Archive::parse(&fixture::document_stream(source)?)?;
+    let archive = Archive::parse(&fixture::document_stream(source)?, Default::default())?;
     let slide = archive
         .object(fixture::SLIDE)
         .ok_or_else(|| io::Error::other("missing fixture slide"))?;
@@ -195,13 +198,13 @@ fn media_ids(source: &[u8]) -> TestResult<Vec<u64>> {
 }
 
 fn native_media_ids(source: &[u8]) -> TestResult<Vec<u64>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let decompressed = SnappyStream::decompress(entry.data())?.into_bytes();
-        let archive = Archive::parse(&decompressed)?;
+        let decompressed = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+        let archive = Archive::parse(&decompressed, Default::default())?;
         for object in &archive.objects {
             if object.archive_info.identifier != Some(NATIVE_SLIDE) {
                 continue;
@@ -252,7 +255,7 @@ fn export_candidate(package: &Package, name: &str) -> TestResult {
 }
 
 fn append_movie_comment(payload: &[u8], root_identifier: u64) -> TestResult<Vec<u8>> {
-    let root = WireView::parse(payload)?;
+    let root = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     let comment = tsp::Reference {
         identifier: root_identifier,
         ..Default::default()
@@ -268,7 +271,7 @@ fn append_movie_comment(payload: &[u8], root_identifier: u64) -> TestResult<Vec<
         drawable_count = drawable_count
             .checked_add(1)
             .ok_or_else(|| io::Error::other("movie drawable count overflow"))?;
-        let drawable = WireView::parse(field.payload())?;
+        let drawable = WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
         let mut rewritten_drawable = Vec::with_capacity(field.payload().len() + comment.len() + 8);
         if drawable.fields().any(|nested| nested.number() == 6) {
             return Err(io::Error::other("fixture movie already has a comment").into());
@@ -276,8 +279,18 @@ fn append_movie_comment(payload: &[u8], root_identifier: u64) -> TestResult<Vec<
         for nested in drawable.fields() {
             rewritten_drawable.extend_from_slice(nested.raw());
         }
-        append_length_delimited_field(&mut rewritten_drawable, 6, &comment)?;
-        append_length_delimited_field(&mut rewritten_root, 1, &rewritten_drawable)?;
+        append_length_delimited_field(
+            &mut rewritten_drawable,
+            6,
+            &comment,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
+        append_length_delimited_field(
+            &mut rewritten_root,
+            1,
+            &rewritten_drawable,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     if drawable_count != 1 {
         return Err(io::Error::other("fixture movie must have one drawable").into());
@@ -286,7 +299,7 @@ fn append_movie_comment(payload: &[u8], root_identifier: u64) -> TestResult<Vec<
 }
 
 fn add_high_movie(source: &[u8], movie_identifier: u64) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(&fixture::document_stream(source)?)?;
+    let mut archive = Archive::parse(&fixture::document_stream(source)?, Default::default())?;
     let mut movie = archive
         .object(fixture::MOVIES[1])
         .cloned()
@@ -358,7 +371,7 @@ fn add_high_movie(source: &[u8], movie_identifier: u64) -> TestResult<Vec<u8>> {
 
 fn add_shared_comment_root(source: &[u8]) -> TestResult<Vec<u8>> {
     let source = add_high_movie(source, HIGHEST_COMMENTED_MOVIE)?;
-    let mut archive = Archive::parse(&fixture::document_stream(&source)?)?;
+    let mut archive = Archive::parse(&fixture::document_stream(&source)?, Default::default())?;
     for movie_identifier in [fixture::MOVIES[1], HIGHEST_COMMENTED_MOVIE] {
         let movie = archive
             .object_mut(movie_identifier)
@@ -374,21 +387,25 @@ fn add_shared_comment_root(source: &[u8]) -> TestResult<Vec<u8>> {
             .object_references
             .push(SHARED_COMMENT_ROOT);
     }
-    archive.insert_object(ArchiveObject::new(
-        SHARED_COMMENT_ROOT,
-        vec![RawMessage {
-            type_: COMMENT_STORAGE_MESSAGE_TYPE,
-            data: tsd::CommentStorageArchive {
-                text: Some("Shared watermark comment".to_owned()),
-                storage_uuid: Some(tsp::Uuid {
-                    lower: 0xfeed_face_dead_beef,
-                    upper: 0x0123_4567_89ab_cdef,
-                }),
-                ..Default::default()
-            }
-            .encode_to_vec(),
-        }],
-    )?)?;
+    archive.insert_object(
+        ArchiveObject::new(
+            SHARED_COMMENT_ROOT,
+            vec![RawMessage {
+                type_: COMMENT_STORAGE_MESSAGE_TYPE,
+                data: tsd::CommentStorageArchive {
+                    text: Some("Shared watermark comment".to_owned()),
+                    storage_uuid: Some(tsp::Uuid {
+                        lower: 0xfeed_face_dead_beef,
+                        upper: 0x0123_4567_89ab_cdef,
+                    }),
+                    ..Default::default()
+                }
+                .encode_to_vec(),
+            }],
+            Default::default(),
+        )?,
+        Default::default(),
+    )?;
     let source = fixture::replace_document_archive(&source, archive)?;
 
     let mut metadata = metadata(&source)?;
@@ -431,14 +448,18 @@ fn add_high_versioned_object(source: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn add_survivor_above_watermark(source: &[u8]) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(&fixture::document_stream(source)?)?;
-    archive.insert_object(ArchiveObject::new(
-        MALFORMED_SURVIVOR,
-        vec![RawMessage {
-            type_: 9_999,
-            data: Vec::new(),
-        }],
-    )?)?;
+    let mut archive = Archive::parse(&fixture::document_stream(source)?, Default::default())?;
+    archive.insert_object(
+        ArchiveObject::new(
+            MALFORMED_SURVIVOR,
+            vec![RawMessage {
+                type_: 9_999,
+                data: Vec::new(),
+            }],
+            Default::default(),
+        )?,
+        Default::default(),
+    )?;
     fixture::replace_document_archive(source, archive)
 }
 
@@ -457,7 +478,10 @@ fn removing_current_highest_physical_media_lowers_watermark_to_survivors() -> Te
     assert_eq!(watermark(&source)?, HIGHEST_MOVIE);
     assert_eq!(physical_maximum(&source)?, HIGHEST_MOVIE);
     let package = Package::from_bytes(&source)?;
-    let commit = package.remove_slide_media(SlideSelector::index(0), MovieSelector::index(3))?;
+    let commit = package
+        .edit_slide_media_lifecycle()
+        .remove(SlideSelector::index(0), MovieSelector::index(3))
+        .and_then(|edit| edit.commit())?;
     let candidate = exact_bytes(commit.package())?;
     assert_eq!(
         media_ids(&candidate)?,
@@ -480,7 +504,10 @@ fn removing_current_highest_physical_media_lowers_watermark_to_survivors() -> Te
 fn removing_nonhighest_media_preserves_watermark_and_inverts_exactly() -> TestResult {
     let source = add_high_movie(&fixture::synthetic_package()?, HIGHEST_MOVIE)?;
     let package = Package::from_bytes(&source)?;
-    let commit = package.remove_slide_media(SlideSelector::index(0), MovieSelector::index(0))?;
+    let commit = package
+        .edit_slide_media_lifecycle()
+        .remove(SlideSelector::index(0), MovieSelector::index(0))
+        .and_then(|edit| edit.commit())?;
     let candidate = exact_bytes(commit.package())?;
     assert_eq!(watermark(&candidate)?, HIGHEST_MOVIE);
     assert_eq!(physical_maximum(&candidate)?, HIGHEST_MOVIE);
@@ -495,12 +522,17 @@ fn removing_nonhighest_media_preserves_watermark_and_inverts_exactly() -> TestRe
 fn remove_then_duplicate_allocates_above_released_watermark_and_inverts() -> TestResult {
     let source = add_high_movie(&fixture::synthetic_package()?, HIGHEST_MOVIE)?;
     let package = Package::from_bytes(&source)?;
-    let removal = package.remove_slide_media(SlideSelector::index(0), MovieSelector::index(3))?;
+    let removal = package
+        .edit_slide_media_lifecycle()
+        .remove(SlideSelector::index(0), MovieSelector::index(3))
+        .and_then(|edit| edit.commit())?;
     let after_removal = exact_bytes(removal.package())?;
     let released = watermark(&after_removal)?;
     let duplicate = removal
         .package()
-        .duplicate_slide_media(SlideSelector::index(0), MovieSelector::index(0))?;
+        .edit_slide_media_lifecycle()
+        .duplicate(SlideSelector::index(0), MovieSelector::index(0))
+        .and_then(|edit| edit.commit())?;
     let after_duplicate = exact_bytes(duplicate.package())?;
     let before_ids = media_ids(&after_removal)?;
     let duplicate_id = media_ids(&after_duplicate)?
@@ -539,7 +571,10 @@ fn versioned_metadata_identifier_forces_post_release_allocation_above_known_maxi
     )?)?;
     assert!(known_metadata_maximum(&source)? >= HIGH_VERSIONED_OBJECT);
     let package = Package::from_bytes(&source)?;
-    let removal = package.remove_slide_media(SlideSelector::index(0), MovieSelector::index(3))?;
+    let removal = package
+        .edit_slide_media_lifecycle()
+        .remove(SlideSelector::index(0), MovieSelector::index(3))
+        .and_then(|edit| edit.commit())?;
     let after_removal = exact_bytes(removal.package())?;
     assert!(watermark(&after_removal)? < HIGH_VERSIONED_OBJECT);
     assert_eq!(
@@ -552,7 +587,9 @@ fn versioned_metadata_identifier_forces_post_release_allocation_above_known_maxi
     );
     let duplicate = removal
         .package()
-        .duplicate_slide_media(SlideSelector::index(0), MovieSelector::index(0))?;
+        .edit_slide_media_lifecycle()
+        .duplicate(SlideSelector::index(0), MovieSelector::index(0))
+        .and_then(|edit| edit.commit())?;
     let after_duplicate = exact_bytes(duplicate.package())?;
     let before_ids = media_ids(&after_removal)?;
     let duplicate_id = media_ids(&after_duplicate)?
@@ -581,14 +618,17 @@ fn retained_shared_comment_storage_participates_in_released_watermark() -> TestR
     assert_eq!(watermark(&source)?, HIGHEST_COMMENTED_MOVIE);
     assert_eq!(physical_maximum(&source)?, HIGHEST_COMMENTED_MOVIE);
     let package = Package::from_bytes(&source)?;
-    let removal = package.remove_slide_media(SlideSelector::index(0), MovieSelector::index(3))?;
+    let removal = package
+        .edit_slide_media_lifecycle()
+        .remove(SlideSelector::index(0), MovieSelector::index(3))
+        .and_then(|edit| edit.commit())?;
     let candidate = exact_bytes(removal.package())?;
     assert_eq!(
         media_ids(&candidate)?,
         vec![fixture::MOVIES[0], fixture::MOVIES[1], fixture::AUDIO]
     );
     assert!(
-        Archive::parse(&fixture::document_stream(&candidate)?)?
+        Archive::parse(&fixture::document_stream(&candidate)?, Default::default())?
             .object(SHARED_COMMENT_ROOT)
             .is_some(),
         "shared comment storage must survive removal of one owner"
@@ -617,7 +657,10 @@ fn survivor_above_old_watermark_rejects_release_atomically() -> TestResult {
     let package = Package::from_bytes(&source)?;
     let before = exact_bytes(&package)?;
     assert!(matches!(
-        package.remove_slide_media(SlideSelector::index(0), MovieSelector::index(3)),
+        package
+            .edit_slide_media_lifecycle()
+            .remove(SlideSelector::index(0), MovieSelector::index(3))
+            .and_then(|edit| edit.commit()),
         Err(SlideMediaLifecycleError::InvalidSource)
     ));
     assert_eq!(exact_bytes(&package)?, before);
@@ -631,8 +674,10 @@ fn native_comment_duplicate_remove_releases_watermark_and_reuses_ids() -> TestRe
     let source = exact_bytes(&source_package)?;
     assert_eq!(native_media_ids(&source)?.len(), 4);
 
-    let duplicate =
-        source_package.duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(2))?;
+    let duplicate = source_package
+        .edit_slide_media_lifecycle()
+        .duplicate_movie(SlideSelector::index(0), MovieSelector::index(2))
+        .and_then(|edit| edit.commit())?;
     let duplicate_bytes = exact_bytes(duplicate.package())?;
     assert_eq!(native_media_ids(&duplicate_bytes)?.len(), 5);
     let duplicate_id = newly_allocated_media_id(&duplicate_bytes, &source)?;
@@ -644,7 +689,9 @@ fn native_comment_duplicate_remove_releases_watermark_and_reuses_ids() -> TestRe
 
     let removed = duplicate
         .package()
-        .remove_slide_movie(SlideSelector::index(0), MovieSelector::index(4))?;
+        .edit_slide_media_lifecycle()
+        .remove_movie(SlideSelector::index(0), MovieSelector::index(4))
+        .and_then(|edit| edit.commit())?;
     let removed_bytes = exact_bytes(removed.package())?;
     assert_eq!(native_media_ids(&removed_bytes)?.len(), 4);
     let removed_watermark = watermark(&removed_bytes)?;
@@ -654,7 +701,9 @@ fn native_comment_duplicate_remove_releases_watermark_and_reuses_ids() -> TestRe
 
     let redoubled = removed
         .package()
-        .duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(2))?;
+        .edit_slide_media_lifecycle()
+        .duplicate_movie(SlideSelector::index(0), MovieSelector::index(2))
+        .and_then(|edit| edit.commit())?;
     let redoubled_bytes = exact_bytes(redoubled.package())?;
     assert_eq!(native_media_ids(&redoubled_bytes)?.len(), 5);
     let redoubled_id = newly_allocated_media_id(&redoubled_bytes, &removed_bytes)?;
@@ -698,9 +747,9 @@ fn assert_native_saved_candidate(
 fn assert_native_saved_bytes(bytes: &[u8], expected_media_count: usize) -> TestResult {
     let package = Package::from_bytes(bytes)?;
     package.validate()?;
-    assert_eq!(native_media_ids(&bytes)?.len(), expected_media_count);
-    let saved_watermark = watermark(&bytes)?;
-    let saved_physical_maximum = physical_maximum(&bytes)?;
+    assert_eq!(native_media_ids(bytes)?.len(), expected_media_count);
+    let saved_watermark = watermark(bytes)?;
+    let saved_physical_maximum = physical_maximum(bytes)?;
     assert!(saved_watermark >= saved_physical_maximum);
     eprintln!(
         "native saved watermark receipt: watermark={saved_watermark}, physical_maximum={saved_physical_maximum}, media_count={expected_media_count}"

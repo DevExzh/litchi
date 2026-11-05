@@ -297,7 +297,7 @@ fn clone_message_info_with_identity_remap(
 
     let message_info = MessageInfo {
         type_: source.type_,
-        versions: try_copy_slice(&source.versions, "IWA clone message versions")?,
+        versions: try_copy_versions(&source.versions, "IWA clone message versions")?,
         length: replacement_length,
         field_infos,
         object_references: map_object_references(
@@ -329,12 +329,10 @@ fn clone_message_info_with_identity_remap(
             "IWA clone diff read versions",
         )?,
     };
-    message_info
-        .validate_with_limits(limits)
-        .map_err(|error| match error {
-            Error::InvalidArchive { .. } | Error::Limit { .. } | Error::Allocation { .. } => error,
-            _ => Error::invalid_archive(message_index, "cloned MessageInfo is invalid"),
-        })?;
+    message_info.validate(limits).map_err(|error| match error {
+        Error::InvalidArchive { .. } | Error::Limit { .. } | Error::Allocation { .. } => error,
+        _ => Error::invalid_archive(message_index, "cloned MessageInfo is invalid"),
+    })?;
     Ok(message_info)
 }
 
@@ -582,25 +580,18 @@ pub(super) fn retained_clone_source_header<'a>(
     canonical: &'a [u8],
     limits: Limits,
 ) -> Result<&'a [u8]> {
-    match (
-        object.original_header.as_deref(),
-        object.original_canonical_header.as_deref(),
-    ) {
-        (Some(original), Some(original_canonical)) if original_canonical == canonical => {
+    match object.source_headers() {
+        Some((original, original_canonical)) if original_canonical == canonical => {
             preflight_header(original, HeaderKind::ArchiveInfo, limits)?;
             Ok(original)
         },
-        (None, None) => {
+        None => {
             preflight_header(canonical, HeaderKind::ArchiveInfo, limits)?;
             Ok(canonical)
         },
-        (Some(_), Some(_)) => Err(Error::invalid_archive(
+        Some(_) => Err(Error::invalid_archive(
             0,
             "retained ArchiveInfo header provenance is stale",
-        )),
-        _ => Err(Error::invalid_archive(
-            0,
-            "retained ArchiveInfo header provenance is incomplete",
         )),
     }
 }
@@ -625,7 +616,7 @@ pub(super) fn preflight_clone_archive_info_header_length(
         ));
     }
     let wire_limits = header_wire_limits(limits)?;
-    let fields = parse_wire_fields_with_limits(source, wire_limits)
+    let fields = parse_wire_fields(source, wire_limits)
         .map_err(|error| map_wire_error(error, HeaderKind::ArchiveInfo))?;
     let source_identifier = before
         .identifier
@@ -728,7 +719,7 @@ fn preflight_clone_message_info_length(
             "clone message type differs from neutral metadata",
         ));
     }
-    let fields = parse_wire_fields_with_limits(source, wire_limits)
+    let fields = parse_wire_fields(source, wire_limits)
         .map_err(|error| map_wire_error(error, HeaderKind::MessageInfo))?;
     let _type_field = effective_required_varint_field(
         source,
@@ -807,7 +798,7 @@ fn preflight_clone_field_info_length(
     wire_limits: WireLimits,
     message_index: usize,
 ) -> Result<usize> {
-    let fields = parse_wire_fields_with_limits(source, wire_limits)
+    let fields = parse_wire_fields(source, wire_limits)
         .map_err(|error| map_wire_error(error, HeaderKind::MessageInfo))?;
     let mut output_length = source.len();
     for field in fields.iter().copied() {
@@ -1032,7 +1023,7 @@ pub(super) fn rewrite_clone_archive_info_header(
         ));
     }
     let wire_limits = header_wire_limits(limits)?;
-    let fields = parse_wire_fields_with_limits(source, wire_limits)
+    let fields = parse_wire_fields(source, wire_limits)
         .map_err(|error| map_wire_error(error, HeaderKind::ArchiveInfo))?;
     let source_identifier = before
         .identifier
@@ -1194,7 +1185,7 @@ fn rewrite_clone_message_info(
         ));
     }
     let current_length = before.length;
-    let fields = parse_wire_fields_with_limits(source, wire_limits)
+    let fields = parse_wire_fields(source, wire_limits)
         .map_err(|error| map_wire_error(error, HeaderKind::MessageInfo))?;
     let _type_field = effective_required_varint_field(
         source,
@@ -1275,7 +1266,7 @@ fn rewrite_clone_field_info(
     limits: Limits,
     message_index: usize,
 ) -> Result<Option<HeaderFieldRewrite>> {
-    let fields = parse_wire_fields_with_limits(source, wire_limits)
+    let fields = parse_wire_fields(source, wire_limits)
         .map_err(|error| map_wire_error(error, HeaderKind::MessageInfo))?;
     let mut rewrites = retained_field_rewrites(fields.len())?;
     for (field_index, field) in fields.iter().copied().enumerate() {

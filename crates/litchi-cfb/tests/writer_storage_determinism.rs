@@ -161,7 +161,7 @@ fn single_storage_output_is_byte_identical_to_the_pre_fix_writer() {
 fn the_deterministic_output_is_a_conforming_compound_file() {
     let order: Vec<usize> = (0..8).rev().collect();
     let bytes = sibling_storages(&order).unwrap();
-    let mut file = OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut file = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
 
     let mut streams = file.list_streams();
     streams.sort();
@@ -191,7 +191,7 @@ fn the_deterministic_nested_output_is_a_conforming_compound_file() {
         &["Gamma"],
     ];
     let bytes = nested_storages(&order).unwrap();
-    let mut file = OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut file = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
 
     for path in order {
         assert!(

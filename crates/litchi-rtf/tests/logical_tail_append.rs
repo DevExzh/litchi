@@ -9,21 +9,35 @@ use litchi_core::{
     Limits as CoreLimits, Resource,
 };
 use litchi_rtf::tail_append::{
-    DurableTailAppendPatch, PlainParagraph, PlainRun, TailAppendError, TailAppendLimits,
-    TailAppendOutputProgress, TailAppendPublicationError, TailAppendPublicationLimits,
-    TailSelector,
+    DurableTailAppendPatch, EditOptions, Error, LimitKind, PlainParagraph, PlainRun,
+    SemanticLimits, TailAppendOutputProgress, TailAppendPublicationError,
+    TailAppendPublicationLimits, TailSelector,
 };
-use litchi_rtf::{Document, ParseLimits, ProtectionType};
+use litchi_rtf::{OpenOptions, Package, SourceLimits};
 use std::io::{self, Write};
 use std::num::{NonZeroU64, NonZeroUsize};
 
-fn patch_limits() -> TailAppendLimits {
-    TailAppendLimits::new(8, 32, 128, 1024, 4096, 16 * 1024)
+fn patch_limits() -> SemanticLimits {
+    SemanticLimits::builder()
+        .max_paragraphs(8)
+        .unwrap()
+        .max_runs(32)
+        .unwrap()
+        .max_input_bytes(128)
+        .unwrap()
+        .max_inserted_bytes(1024)
+        .unwrap()
+        .max_output_bytes(4096)
+        .unwrap()
+        .max_patch_bytes(16 * 1024)
+        .unwrap()
+        .build()
+        .unwrap()
 }
 
-fn retained_bytes(document: &Document) -> Vec<u8> {
+fn retained_bytes(document: &Package) -> Vec<u8> {
     let commit = document
-        .tail_append(TailSelector::Body)
+        .edit_tail_append(TailSelector::Body)
         .commit()
         .expect("empty append should be valid for this source");
     let mut output = Vec::new();
@@ -123,15 +137,17 @@ impl Write for PublicationSink {
 }
 
 fn changed_publication_plan(
-    source: &Document,
+    source: &Package,
     text: &str,
-    limits: TailAppendLimits,
+    limits: SemanticLimits,
     publication_limits: TailAppendPublicationLimits,
 ) -> litchi_rtf::tail_append::TailAppendPublicationPlan {
-    let mut edit = source.tail_append_with_limits(TailSelector::Body, limits);
+    let mut edit = source.edit_tail_append_with_options(
+        TailSelector::Body,
+        EditOptions::new().semantic_limits(limits),
+    );
     edit.append_text_paragraphs(&[text]).unwrap();
-    edit.publication_plan_with_limits(publication_limits)
-        .unwrap()
+    edit.publication_plan(publication_limits).unwrap()
 }
 
 fn replace_once(mut bytes: Vec<u8>, from: &[u8], to: &[u8]) -> Vec<u8> {
@@ -194,21 +210,21 @@ fn mutate_numeric_field(mut bytes: Vec<u8>, field: &[u8]) -> Vec<u8> {
 
 #[test]
 fn empty_append_is_an_exact_noop_and_shares_snapshot() {
-    let source = Document::parse("{\\rtf1\\ansi  A\\par B}\n").unwrap();
+    let source = Package::parse("{\\rtf1\\ansi  A\\par B}\n").unwrap();
     let exact = retained_bytes(&source);
-    let mut edit = source.tail_append(TailSelector::Body);
+    let mut edit = source.edit_tail_append(TailSelector::Body);
     edit.append_text_paragraphs(&[]).unwrap();
     let commit = edit.commit().unwrap();
     assert!(!commit.diagnostics().changed());
-    assert!(commit.snapshot().same_snapshot(&source));
-    assert_eq!(retained_bytes(commit.snapshot()), exact);
+    assert!(commit.package().same_snapshot(&source));
+    assert_eq!(retained_bytes(commit.package()), exact);
     assert_eq!(commit.diagnostics().inserted_bytes(), 0);
 
-    let mut empty_runs = source.tail_append(TailSelector::Body);
+    let mut empty_runs = source.edit_tail_append(TailSelector::Body);
     empty_runs.append_runs(&[]).unwrap();
     let empty_run_commit = empty_runs.commit().unwrap();
     assert!(!empty_run_commit.diagnostics().changed());
-    assert!(empty_run_commit.snapshot().same_snapshot(&source));
+    assert!(empty_run_commit.package().same_snapshot(&source));
 
     let durable = commit.patch().to_durable(patch_limits()).unwrap();
     let durable_inverse = durable.inverse();
@@ -223,18 +239,21 @@ fn empty_append_is_an_exact_noop_and_shares_snapshot() {
 #[test]
 fn appends_plain_paragraphs_before_the_exact_root_close() {
     let source_bytes = b"{\\rtf1\\ansi  A\\par {\\b B}\\par C} \r\n";
-    let source = Document::from_bytes(source_bytes).unwrap();
+    let source = Package::from_bytes(source_bytes).unwrap();
     let first = [PlainRun::new("D"), PlainRun::new(" + E")];
     let second = [PlainRun::new("F{G}\\H\tI")];
     let paragraphs = [PlainParagraph::new(&first), PlainParagraph::new(&second)];
 
-    let mut edit = source.tail_append_with_limits(TailSelector::Body, patch_limits());
+    let mut edit = source.edit_tail_append_with_options(
+        TailSelector::Body,
+        EditOptions::new().semantic_limits(patch_limits()),
+    );
     edit.append_paragraphs(&paragraphs).unwrap();
     let commit = edit.commit().unwrap();
     let mut output = Vec::new();
     commit.write_to(&mut output, patch_limits()).unwrap();
 
-    assert_eq!(commit.snapshot().text(), " A\nB\nC\nD + E\nF{G}\\H\tI\n");
+    assert_eq!(commit.package().text(), " A\nB\nC\nD + E\nF{G}\\H\tI\n");
     assert!(output.starts_with(br"{\rtf1\ansi  A\par {\b B}\par C"));
     assert!(output.ends_with(b"} \r\n"));
     assert!(
@@ -253,34 +272,37 @@ fn appends_plain_paragraphs_before_the_exact_root_close() {
 
 #[test]
 fn appending_after_an_existing_paragraph_break_does_not_add_an_empty_paragraph() {
-    let source = Document::parse(r"{\rtf1\ansi A\par }").unwrap();
-    let mut edit = source.tail_append(TailSelector::Body);
+    let source = Package::parse(r"{\rtf1\ansi A\par }").unwrap();
+    let mut edit = source.edit_tail_append(TailSelector::Body);
     edit.append_text_paragraphs(&["B"]).unwrap();
     let commit = edit.commit().unwrap();
-    assert_eq!(commit.snapshot().text(), "A\nB\n");
-    assert_eq!(commit.snapshot().paragraph_count(), 2);
+    assert_eq!(commit.package().text(), "A\nB\n");
+    assert_eq!(commit.package().paragraph_count(), 2);
 }
 
 #[test]
 fn unicode_appends_reset_the_source_unicode_fallback_state_locally() {
-    let source = Document::parse(r"{\rtf1\ansi\uc0 A}").unwrap();
-    let mut edit = source.tail_append(TailSelector::Body);
+    let source = Package::parse(r"{\rtf1\ansi\uc0 A}").unwrap();
+    let mut edit = source.edit_tail_append(TailSelector::Body);
     edit.append_text_paragraphs(&["é😀"]).unwrap();
     let commit = edit.commit().unwrap();
-    assert_eq!(commit.snapshot().text(), "A\né😀\n");
+    assert_eq!(commit.package().text(), "A\né😀\n");
 }
 
 #[test]
 fn exact_source_patch_and_durable_inverse_round_trip_bytes() {
-    let source = Document::parse(r"{\rtf1\ansi Before}").unwrap();
-    let mut edit = source.tail_append(TailSelector::Body);
+    let source = Package::parse(r"{\rtf1\ansi Before}").unwrap();
+    let mut edit = source.edit_tail_append(TailSelector::Body);
     edit.append_text_paragraphs(&["After"]).unwrap();
     let commit = edit.commit().unwrap();
     let patch = commit.patch();
 
-    let applied = patch.apply(&source).unwrap();
-    assert_eq!(retained_bytes(&applied), retained_bytes(commit.snapshot()));
-    let restored = patch.inverse().apply(&applied).unwrap();
+    let applied = source.apply_tail_append(patch).unwrap().into_package();
+    assert_eq!(retained_bytes(&applied), retained_bytes(commit.package()));
+    let restored = applied
+        .apply_tail_append(&patch.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(retained_bytes(&restored), retained_bytes(&source));
 
     let durable = patch.to_durable(patch_limits()).unwrap();
@@ -291,7 +313,7 @@ fn exact_source_patch_and_durable_inverse_round_trip_bytes() {
     let durable_applied = decoded.apply(&source).unwrap();
     assert_eq!(
         retained_bytes(&durable_applied),
-        retained_bytes(commit.snapshot())
+        retained_bytes(commit.package())
     );
     let inverse = decoded.inverse();
     let inverse_encoded = inverse.to_deterministic_json().unwrap();
@@ -300,17 +322,17 @@ fn exact_source_patch_and_durable_inverse_round_trip_bytes() {
     let durable_restored = inverse_decoded.apply(&durable_applied).unwrap();
     assert_eq!(retained_bytes(&durable_restored), retained_bytes(&source));
 
-    let foreign = Document::parse(r"{\rtf1\ansi Foreign}").unwrap();
+    let foreign = Package::parse(r"{\rtf1\ansi Foreign}").unwrap();
     assert!(matches!(
-        patch.apply(&foreign),
-        Err(TailAppendError::PatchConflict)
+        foreign.apply_tail_append(patch),
+        Err(Error::PatchConflict)
     ));
 }
 
 #[test]
 fn durable_wire_rejects_noncanonical_digests_forged_noops_and_bounds() {
-    let source = Document::parse(r"{\rtf1\ansi Before} ").unwrap();
-    let mut edit = source.tail_append(TailSelector::Body);
+    let source = Package::parse(r"{\rtf1\ansi Before} ").unwrap();
+    let mut edit = source.edit_tail_append(TailSelector::Body);
     edit.append_text_paragraphs(&["After"]).unwrap();
     let commit = edit.commit().unwrap();
     let patch = commit.patch();
@@ -320,17 +342,17 @@ fn durable_wire_rejects_noncanonical_digests_forged_noops_and_bounds() {
     let uppercase = uppercase_after_digest(encoded.clone());
     assert!(matches!(
         DurableTailAppendPatch::from_deterministic_json(&uppercase, patch_limits()),
-        Err(TailAppendError::DurablePatch(_))
+        Err(Error::DurablePatch(_))
     ));
 
     let forged_sizes = mutate_numeric_field(encoded.clone(), b"after_bytes\":");
     assert!(matches!(
         DurableTailAppendPatch::from_deterministic_json(&forged_sizes, patch_limits()),
-        Err(TailAppendError::DurablePatch(_))
+        Err(Error::DurablePatch(_))
     ));
 
     let no_op = source
-        .tail_append(TailSelector::Body)
+        .edit_tail_append(TailSelector::Body)
         .commit()
         .unwrap()
         .patch()
@@ -345,23 +367,51 @@ fn durable_wire_rejects_noncanonical_digests_forged_noops_and_bounds() {
     );
     assert!(matches!(
         DurableTailAppendPatch::from_deterministic_json(&forged_no_op, patch_limits()),
-        Err(TailAppendError::DurablePatch(_))
+        Err(Error::DurablePatch(_))
     ));
 
-    let tiny_output = TailAppendLimits::new(8, 32, 128, 1024, 1, 16 * 1024);
+    let tiny_output = SemanticLimits::builder()
+        .max_paragraphs(8)
+        .unwrap()
+        .max_runs(32)
+        .unwrap()
+        .max_input_bytes(128)
+        .unwrap()
+        .max_inserted_bytes(1024)
+        .unwrap()
+        .max_output_bytes(1)
+        .unwrap()
+        .max_patch_bytes(16 * 1024)
+        .unwrap()
+        .build()
+        .unwrap();
     assert!(matches!(
         DurableTailAppendPatch::from_deterministic_json(&encoded, tiny_output),
-        Err(TailAppendError::LimitExceeded {
-            resource: "patch offset" | "output bytes",
+        Err(Error::Limit {
+            kind: LimitKind::PatchOffset | LimitKind::OutputBytes,
             ..
         })
     ));
 
-    let too_small_patch = TailAppendLimits::new(8, 32, 128, 1024, 4096, encoded.len() - 1);
+    let too_small_patch = SemanticLimits::builder()
+        .max_paragraphs(8)
+        .unwrap()
+        .max_runs(32)
+        .unwrap()
+        .max_input_bytes(128)
+        .unwrap()
+        .max_inserted_bytes(1024)
+        .unwrap()
+        .max_output_bytes(4096)
+        .unwrap()
+        .max_patch_bytes(encoded.len() - 1)
+        .unwrap()
+        .build()
+        .unwrap();
     assert!(matches!(
         patch.to_durable(too_small_patch),
-        Err(TailAppendError::LimitExceeded {
-            resource: "patch bytes",
+        Err(Error::Limit {
+            kind: LimitKind::PatchBytes,
             ..
         })
     ));
@@ -369,8 +419,8 @@ fn durable_wire_rejects_noncanonical_digests_forged_noops_and_bounds() {
 
 #[test]
 fn durable_remove_checks_output_bound_before_publish_and_noop_proof() {
-    let source = Document::parse(r"{\rtf1\ansi Before} ").unwrap();
-    let mut edit = source.tail_append(TailSelector::Body);
+    let source = Package::parse(r"{\rtf1\ansi Before} ").unwrap();
+    let mut edit = source.edit_tail_append(TailSelector::Body);
     edit.append_text_paragraphs(&["After"]).unwrap();
     let commit = edit.commit().unwrap();
     let inverse = commit.patch().inverse();
@@ -379,25 +429,32 @@ fn durable_remove_checks_output_bound_before_publish_and_noop_proof() {
         .unwrap()
         .to_deterministic_json()
         .unwrap();
-    let low_output = TailAppendLimits::new(
-        8,
-        32,
-        128,
-        1024,
-        retained_bytes(&source).len() - 1,
-        16 * 1024,
-    );
+    let low_output = SemanticLimits::builder()
+        .max_paragraphs(8)
+        .unwrap()
+        .max_runs(32)
+        .unwrap()
+        .max_input_bytes(128)
+        .unwrap()
+        .max_inserted_bytes(1024)
+        .unwrap()
+        .max_output_bytes(retained_bytes(&source).len() - 1)
+        .unwrap()
+        .max_patch_bytes(16 * 1024)
+        .unwrap()
+        .build()
+        .unwrap();
     assert!(matches!(
         DurableTailAppendPatch::from_deterministic_json(&encoded, low_output),
-        Err(TailAppendError::LimitExceeded {
-            resource: "output bytes",
+        Err(Error::Limit {
+            kind: LimitKind::OutputBytes,
             ..
         })
     ));
 
-    let protected = Document::parse(r"{\rtf1\ansi\readprot\enforceprot1 A}").unwrap();
+    let protected = Package::parse(r"{\rtf1\ansi\readprot\enforceprot1 A}").unwrap();
     let protected_noop = protected
-        .tail_append(TailSelector::Body)
+        .edit_tail_append(TailSelector::Body)
         .commit()
         .unwrap()
         .patch()
@@ -409,30 +466,35 @@ fn durable_remove_checks_output_bound_before_publish_and_noop_proof() {
         DurableTailAppendPatch::from_deterministic_json(&protected_noop, patch_limits()).unwrap();
     assert!(matches!(
         protected_noop.apply(&protected),
-        Err(TailAppendError::ProtectedDocument(ProtectionType::ReadOnly))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::Protected
     ));
 }
 
 #[test]
 fn durable_append_checks_source_limit_before_reserve() {
     let source_bytes = br"{\rtf1\ansi A}";
-    let source = Document::from_bytes(source_bytes).unwrap();
-    let mut edit = source.tail_append(TailSelector::Body);
+    let source = Package::from_bytes(source_bytes).unwrap();
+    let mut edit = source.edit_tail_append(TailSelector::Body);
     edit.append_text_paragraphs(&["B"]).unwrap();
     let commit = edit.commit().unwrap();
     let durable = commit.patch().to_durable(patch_limits()).unwrap();
     let encoded = durable.to_deterministic_json().unwrap();
-    let strict_source = Document::from_bytes_with_limits(
+    let strict_limits = SourceLimits::builder()
+        .max_input_bytes(source_bytes.len())
+        .expect("source-byte limit is representable")
+        .build()
+        .expect("source profile is consistent");
+    let strict_source = Package::from_bytes_with_options(
         source_bytes,
-        ParseLimits::default().with_max_source_bytes(source_bytes.len()),
+        OpenOptions::new().source_limits(strict_limits),
     )
     .unwrap();
     let decoded =
         DurableTailAppendPatch::from_deterministic_json(&encoded, patch_limits()).unwrap();
     assert!(matches!(
         decoded.apply(&strict_source),
-        Err(TailAppendError::LimitExceeded {
-            resource: "source bytes",
+        Err(Error::Limit {
+            kind: LimitKind::SourceBytes,
             ..
         })
     ));
@@ -440,25 +502,42 @@ fn durable_append_checks_source_limit_before_reserve() {
 
 #[test]
 fn staging_and_commit_limits_fail_atomically() {
-    let source = Document::parse(r"{\rtf1\ansi A}").unwrap();
-    let limits = TailAppendLimits::new(1, 1, 2, 4, 128, 256);
-    let mut edit = source.tail_append_with_limits(TailSelector::Body, limits);
+    let source = Package::parse(r"{\rtf1\ansi A}").unwrap();
+    let limits = SemanticLimits::builder()
+        .max_paragraphs(1)
+        .unwrap()
+        .max_runs(1)
+        .unwrap()
+        .max_input_bytes(2)
+        .unwrap()
+        .max_inserted_bytes(4)
+        .unwrap()
+        .max_output_bytes(128)
+        .unwrap()
+        .max_patch_bytes(256)
+        .unwrap()
+        .build()
+        .unwrap();
+    let mut edit = source.edit_tail_append_with_options(
+        TailSelector::Body,
+        EditOptions::new().semantic_limits(limits),
+    );
     let runs = [PlainRun::new("a"), PlainRun::new("b")];
     let paragraphs = [PlainParagraph::new(&runs)];
     assert!(matches!(
         edit.append_paragraphs(&paragraphs),
-        Err(TailAppendError::LimitExceeded {
-            resource: "runs",
+        Err(Error::Limit {
+            kind: LimitKind::Runs,
             observed: 2,
-            limit: 1
+            maximum: 1
         })
     ));
     assert_eq!(edit.paragraph_count(), 0);
     edit.append_text_paragraphs(&["ab"]).unwrap();
     assert!(matches!(
         edit.commit(),
-        Err(TailAppendError::LimitExceeded {
-            resource: "inserted bytes",
+        Err(Error::Limit {
+            kind: LimitKind::InsertedBytes,
             ..
         })
     ));
@@ -466,19 +545,19 @@ fn staging_and_commit_limits_fail_atomically() {
 
 #[test]
 fn unsupported_active_opaque_protected_compressed_and_binary_sources_refuse() {
-    let active = Document::parse(
+    let active = Package::parse(
         r#"{\rtf1\ansi {\field{\*\fldinst INCLUDETEXT "file:///tmp/x"}{\fldrslt x}}}"#,
     )
     .unwrap();
-    let mut active_edit = active.tail_append(TailSelector::Body);
+    let mut active_edit = active.edit_tail_append(TailSelector::Body);
     active_edit.append_text_paragraphs(&["x"]).unwrap();
     assert!(matches!(
         active_edit.commit(),
-        Err(TailAppendError::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
-    let opaque = Document::parse(r"{\rtf1\ansi A\future42 B}").unwrap();
-    let mut opaque_edit = opaque.tail_append(TailSelector::Body);
+    let opaque = Package::parse(r"{\rtf1\ansi A\future42 B}").unwrap();
+    let mut opaque_edit = opaque.edit_tail_append(TailSelector::Body);
     opaque_edit.append_text_paragraphs(&["x"]).unwrap();
     let opaque_commit = opaque_edit.commit().unwrap();
     let mut opaque_output = Vec::new();
@@ -490,55 +569,74 @@ fn unsupported_active_opaque_protected_compressed_and_binary_sources_refuse() {
             .windows(br"\future42".len())
             .any(|window| window == br"\future42")
     );
-    assert_eq!(opaque_commit.snapshot().text(), "AB\nx\n");
+    assert_eq!(opaque_commit.package().text(), "AB\nx\n");
 
-    let protected = Document::parse(r"{\rtf1\ansi\readprot\enforceprot1 A}").unwrap();
-    let mut protected_edit = protected.tail_append(TailSelector::Body);
+    let protected = Package::parse(r"{\rtf1\ansi\readprot\enforceprot1 A}").unwrap();
+    let mut protected_edit = protected.edit_tail_append(TailSelector::Body);
     protected_edit.append_text_paragraphs(&["x"]).unwrap();
     assert!(matches!(
         protected_edit.commit(),
-        Err(TailAppendError::ProtectedDocument(ProtectionType::ReadOnly))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::Protected
     ));
 
-    let compressed = litchi_rtf::transport::compress(br"{\rtf1\ansi A}", true).unwrap();
-    let compressed = Document::from_bytes(&compressed).unwrap();
-    let mut compressed_edit = compressed.tail_append(TailSelector::Body);
+    let compressed = litchi_rtf::transport::compress(
+        br"{\rtf1\ansi A}",
+        true,
+        litchi_rtf::transport::CompressionLimits::default(),
+    )
+    .unwrap();
+    let compressed = Package::from_bytes(&compressed).unwrap();
+    let mut compressed_edit = compressed.edit_tail_append(TailSelector::Body);
     compressed_edit.append_text_paragraphs(&["x"]).unwrap();
     assert!(matches!(
         compressed_edit.commit(),
-        Err(TailAppendError::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
-    let binary = Document::parse(r"{\rtf1\ansi {\pict\pngblip\bin1 X} A}");
+    let binary = Package::parse(r"{\rtf1\ansi {\pict\pngblip\bin1 X} A}");
     if let Ok(binary) = binary {
-        let mut binary_edit = binary.tail_append(TailSelector::Body);
+        let mut binary_edit = binary.edit_tail_append(TailSelector::Body);
         binary_edit.append_text_paragraphs(&["x"]).unwrap();
         assert!(matches!(
             binary_edit.commit(),
-            Err(TailAppendError::UnsupportedSource(_))
+            Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
         ));
     }
 }
 
 #[test]
 fn malformed_durable_envelopes_and_plain_text_controls_refuse() {
-    let source = Document::parse(r"{\rtf1\ansi A}").unwrap();
-    let mut edit = source.tail_append(TailSelector::Body);
+    let source = Package::parse(r"{\rtf1\ansi A}").unwrap();
+    let mut edit = source.edit_tail_append(TailSelector::Body);
     assert!(matches!(
         edit.append_text_paragraphs(&["bad\ntext"]),
-        Err(TailAppendError::InvalidText(_))
+        Err(Error::InvalidText(_))
     ));
     assert_eq!(edit.paragraph_count(), 0);
 
     assert!(matches!(
         DurableTailAppendPatch::from_deterministic_json(b"{}", patch_limits()),
-        Err(TailAppendError::DurablePatch(_))
+        Err(Error::DurablePatch(_))
     ));
-    let limits = TailAppendLimits::new(8, 32, 128, 1024, 4096, 4);
+    let limits = SemanticLimits::builder()
+        .max_paragraphs(8)
+        .unwrap()
+        .max_runs(32)
+        .unwrap()
+        .max_input_bytes(128)
+        .unwrap()
+        .max_inserted_bytes(1024)
+        .unwrap()
+        .max_output_bytes(4096)
+        .unwrap()
+        .max_patch_bytes(4)
+        .unwrap()
+        .build()
+        .unwrap();
     assert!(matches!(
         DurableTailAppendPatch::from_deterministic_json(br#"{"x":1}"#, limits),
-        Err(TailAppendError::LimitExceeded {
-            resource: "patch bytes",
+        Err(Error::Limit {
+            kind: LimitKind::PatchBytes,
             ..
         })
     ));
@@ -567,8 +665,8 @@ impl Write for PartialSink {
 
 #[test]
 fn sequential_sink_reports_partial_progress() {
-    let source = Document::parse(r"{\rtf1\ansi A}").unwrap();
-    let mut edit = source.tail_append(TailSelector::Body);
+    let source = Package::parse(r"{\rtf1\ansi A}").unwrap();
+    let mut edit = source.edit_tail_append(TailSelector::Body);
     edit.append_text_paragraphs(&["B"]).unwrap();
     let commit = edit.commit().unwrap();
     let mut sink = PartialSink {
@@ -578,7 +676,7 @@ fn sequential_sink_reports_partial_progress() {
     let error = commit.write_to(&mut sink, patch_limits()).unwrap_err();
     assert!(matches!(
         error,
-        TailAppendError::Sink {
+        Error::Sink {
             kind: io::ErrorKind::BrokenPipe,
             written: 7
         }
@@ -588,11 +686,14 @@ fn sequential_sink_reports_partial_progress() {
 
 #[test]
 fn publication_plan_emits_exact_reopenable_bytes_with_hard_windows() {
-    let source = Document::from_bytes(b"{\\rtf1\\ansi A\\par {\\b B}} \r\n").unwrap();
+    let source = Package::from_bytes(b"{\\rtf1\\ansi A\\par {\\b B}} \r\n").unwrap();
     let publication_limits = TailAppendPublicationLimits::new(5, 3);
     let plan = changed_publication_plan(&source, "C{D}\\E", patch_limits(), publication_limits);
 
-    let mut semantic_edit = source.tail_append_with_limits(TailSelector::Body, patch_limits());
+    let mut semantic_edit = source.edit_tail_append_with_options(
+        TailSelector::Body,
+        EditOptions::new().semantic_limits(patch_limits()),
+    );
     semantic_edit.append_text_paragraphs(&["C{D}\\E"]).unwrap();
     let semantic_commit = semantic_edit.commit().unwrap();
     let mut expected = Vec::new();
@@ -614,16 +715,16 @@ fn publication_plan_emits_exact_reopenable_bytes_with_hard_windows() {
     assert_eq!(report.inserted_bytes(), plan.inserted_bytes());
     assert_eq!(report.largest_write(), 3);
     assert!(sink.largest <= 3);
-    let reopened = Document::from_bytes(&sink.output).unwrap();
+    let reopened = Package::from_bytes(&sink.output).unwrap();
     assert_eq!(reopened.text(), "A\nB\nC{D}\\E\n");
 }
 
 #[test]
 fn publication_plan_noop_preserves_source_identity_and_bytes() {
-    let source = Document::from_bytes(br"{\rtf1\ansi A B}").unwrap();
+    let source = Package::from_bytes(br"{\rtf1\ansi A B}").unwrap();
     let plan = source
-        .tail_append(TailSelector::Body)
-        .publication_plan_with_limits(TailAppendPublicationLimits::new(4, 2))
+        .edit_tail_append(TailSelector::Body)
+        .publication_plan(TailAppendPublicationLimits::new(4, 2))
         .unwrap();
     assert!(plan.is_noop());
     assert!(plan.source().same_snapshot(&source));
@@ -643,14 +744,14 @@ fn publication_plan_noop_preserves_source_identity_and_bytes() {
 
 #[test]
 fn context_aware_publication_planning_reserves_before_encoding() {
-    let source = Document::parse(r"{\rtf1\ansi A}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi A}").unwrap();
     let publication_limits = TailAppendPublicationLimits::new(4, 3);
 
     let (_budget, _cancellation, context) = publication_context(0, 4096, 4096, 4096);
-    let mut edit = source.tail_append(TailSelector::Body);
+    let mut edit = source.edit_tail_append(TailSelector::Body);
     edit.append_text_paragraphs(&["B"]).unwrap();
     let error = edit
-        .publication_plan_with_limits_and_context(publication_limits, &context)
+        .publication_plan_with_context(publication_limits, &context)
         .unwrap_err();
     assert!(matches!(
         error,
@@ -661,10 +762,10 @@ fn context_aware_publication_planning_reserves_before_encoding() {
     ));
 
     let (budget, _cancellation, context) = publication_context(4096, 4096, 4096, 4096);
-    let mut edit = source.tail_append(TailSelector::Body);
+    let mut edit = source.edit_tail_append(TailSelector::Body);
     edit.append_text_paragraphs(&["B"]).unwrap();
     let plan = edit
-        .publication_plan_with_limits_and_context(publication_limits, &context)
+        .publication_plan_with_context(publication_limits, &context)
         .unwrap();
     assert!(budget.used(Resource::Memory) >= plan.inserted_bytes() as u64);
     let mut sink = PublicationSink::accepting(2);
@@ -676,14 +777,14 @@ fn context_aware_publication_planning_reserves_before_encoding() {
 
 #[test]
 fn publication_plan_rejects_foreign_source_before_output() {
-    let source = Document::parse(r"{\rtf1\ansi A}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi A}").unwrap();
     let plan = changed_publication_plan(
         &source,
         "B",
         patch_limits(),
         TailAppendPublicationLimits::new(8, 4),
     );
-    let foreign = Document::parse(r"{\rtf1\ansi A}").unwrap();
+    let foreign = Package::parse(r"{\rtf1\ansi A}").unwrap();
     let (_budget, _cancellation, context) = publication_context(16 * 1024, 4096, 4096, 4096);
     let mut sink = PublicationSink::accepting(4);
     let error = plan
@@ -698,38 +799,43 @@ fn publication_plan_rejects_foreign_source_before_output() {
 
 #[test]
 fn publication_plan_refuses_active_protected_and_compressed_sources_before_output() {
-    let active = Document::parse(
+    let active = Package::parse(
         r#"{\rtf1\ansi {\field{\*\fldinst INCLUDETEXT "file:///tmp/x"}{\fldrslt x}}}"#,
     )
     .unwrap();
-    let mut active_edit = active.tail_append(TailSelector::Body);
+    let mut active_edit = active.edit_tail_append(TailSelector::Body);
     active_edit.append_text_paragraphs(&["x"]).unwrap();
     assert!(matches!(
-        active_edit.publication_plan_with_limits(TailAppendPublicationLimits::new(8, 4)),
-        Err(TailAppendError::UnsupportedSource(_))
+        active_edit.publication_plan(TailAppendPublicationLimits::new(8, 4)),
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
-    let protected = Document::parse(r"{\rtf1\ansi\readprot\enforceprot1 A}").unwrap();
-    let mut protected_edit = protected.tail_append(TailSelector::Body);
+    let protected = Package::parse(r"{\rtf1\ansi\readprot\enforceprot1 A}").unwrap();
+    let mut protected_edit = protected.edit_tail_append(TailSelector::Body);
     protected_edit.append_text_paragraphs(&["x"]).unwrap();
     assert!(matches!(
-        protected_edit.publication_plan_with_limits(TailAppendPublicationLimits::new(8, 4)),
-        Err(TailAppendError::ProtectedDocument(ProtectionType::ReadOnly))
+        protected_edit.publication_plan(TailAppendPublicationLimits::new(8, 4)),
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::Protected
     ));
 
-    let compressed = litchi_rtf::transport::compress(br"{\rtf1\ansi A}", true).unwrap();
-    let compressed = Document::from_bytes(&compressed).unwrap();
-    let mut compressed_edit = compressed.tail_append(TailSelector::Body);
+    let compressed = litchi_rtf::transport::compress(
+        br"{\rtf1\ansi A}",
+        true,
+        litchi_rtf::transport::CompressionLimits::default(),
+    )
+    .unwrap();
+    let compressed = Package::from_bytes(&compressed).unwrap();
+    let mut compressed_edit = compressed.edit_tail_append(TailSelector::Body);
     compressed_edit.append_text_paragraphs(&["x"]).unwrap();
     assert!(matches!(
-        compressed_edit.publication_plan_with_limits(TailAppendPublicationLimits::new(8, 4)),
-        Err(TailAppendError::UnsupportedSource(_))
+        compressed_edit.publication_plan(TailAppendPublicationLimits::new(8, 4)),
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 }
 
 #[test]
 fn publication_plan_reports_partial_zero_interrupted_and_excess_sinks() {
-    let source = Document::parse(r"{\rtf1\ansi A}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi A}").unwrap();
     let plan = changed_publication_plan(
         &source,
         "B",
@@ -792,7 +898,7 @@ fn publication_plan_reports_partial_zero_interrupted_and_excess_sinks() {
 
 #[test]
 fn publication_plan_checks_cancellation_and_all_resource_dimensions() {
-    let source = Document::parse(r"{\rtf1\ansi A}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi A}").unwrap();
     let plan = changed_publication_plan(
         &source,
         "B",
@@ -880,7 +986,7 @@ fn publication_plan_checks_cancellation_and_all_resource_dimensions() {
 
 #[test]
 fn publication_plan_enforces_exact_and_over_output_bounds() {
-    let source = Document::parse(r"{\rtf1\ansi A}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi A}").unwrap();
     let broad = changed_publication_plan(
         &source,
         "B",
@@ -888,7 +994,21 @@ fn publication_plan_enforces_exact_and_over_output_bounds() {
         TailAppendPublicationLimits::new(8, 4),
     );
     let exact_output = broad.output_bytes();
-    let exact_limits = TailAppendLimits::new(8, 32, 128, 1024, exact_output, 16 * 1024);
+    let exact_limits = SemanticLimits::builder()
+        .max_paragraphs(8)
+        .unwrap()
+        .max_runs(32)
+        .unwrap()
+        .max_input_bytes(128)
+        .unwrap()
+        .max_inserted_bytes(1024)
+        .unwrap()
+        .max_output_bytes(exact_output)
+        .unwrap()
+        .max_patch_bytes(16 * 1024)
+        .unwrap()
+        .build()
+        .unwrap();
     let exact = changed_publication_plan(
         &source,
         "B",
@@ -907,14 +1027,30 @@ fn publication_plan_enforces_exact_and_over_output_bounds() {
         exact_output
     );
 
-    let over_limits =
-        TailAppendLimits::new(8, 32, 128, 1024, exact_output.saturating_sub(1), 16 * 1024);
-    let mut edit = source.tail_append_with_limits(TailSelector::Body, over_limits);
+    let over_limits = SemanticLimits::builder()
+        .max_paragraphs(8)
+        .unwrap()
+        .max_runs(32)
+        .unwrap()
+        .max_input_bytes(128)
+        .unwrap()
+        .max_inserted_bytes(1024)
+        .unwrap()
+        .max_output_bytes(exact_output.saturating_sub(1))
+        .unwrap()
+        .max_patch_bytes(16 * 1024)
+        .unwrap()
+        .build()
+        .unwrap();
+    let mut edit = source.edit_tail_append_with_options(
+        TailSelector::Body,
+        EditOptions::new().semantic_limits(over_limits),
+    );
     edit.append_text_paragraphs(&["B"]).unwrap();
     assert!(matches!(
-        edit.publication_plan_with_limits(TailAppendPublicationLimits::new(8, 4)),
-        Err(TailAppendError::LimitExceeded {
-            resource: "output bytes",
+        edit.publication_plan(TailAppendPublicationLimits::new(8, 4)),
+        Err(Error::Limit {
+            kind: LimitKind::OutputBytes,
             ..
         })
     ));
@@ -922,7 +1058,7 @@ fn publication_plan_enforces_exact_and_over_output_bounds() {
 
 #[test]
 fn publication_plan_preserves_unknown_source_bytes_and_semantic_closure() {
-    let source = Document::parse(r"{\rtf1\ansi A\future42 B}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi A\future42 B}").unwrap();
     let plan = changed_publication_plan(
         &source,
         "C",
@@ -937,6 +1073,148 @@ fn publication_plan_preserves_unknown_source_bytes_and_semantic_closure() {
             .windows(br"\future42".len())
             .any(|window| window == br"\future42")
     );
-    let reopened = Document::from_bytes(&sink.output).unwrap();
+    let reopened = Package::from_bytes(&sink.output).unwrap();
     assert_eq!(reopened.text(), "AB\nC\n");
+}
+
+#[test]
+fn native_replay_preserves_recipient_policy_and_noop_identity() {
+    let bytes = br"{\rtf1\ansi A}";
+    let source = Package::from_bytes(bytes).unwrap();
+    let options = OpenOptions::new().source_limits(
+        SourceLimits::builder()
+            .max_input_bytes(bytes.len())
+            .unwrap()
+            .build()
+            .unwrap(),
+    );
+    let recipient = Package::from_bytes_with_options(bytes, options).unwrap();
+    let noop = source
+        .edit_tail_append(TailSelector::Body)
+        .commit()
+        .unwrap();
+    assert!(noop.patch().is_noop());
+    assert!(
+        recipient
+            .apply_tail_append(noop.patch())
+            .unwrap()
+            .into_package()
+            .same_snapshot(&recipient)
+    );
+    let mut edit = source.edit_tail_append(TailSelector::Body);
+    edit.append_text_paragraphs(&["additional text"]).unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(!commit.patch().is_noop());
+    assert!(matches!(
+        recipient.apply_tail_append(commit.patch()),
+        Err(Error::Rtf(litchi_rtf::Error::Limit {
+            kind: litchi_rtf::SourceLimitKind::InputBytes,
+            ..
+        }))
+    ));
+    assert_eq!(recipient.open_options(), options);
+    assert_eq!(recipient.to_bytes().unwrap(), bytes);
+
+    let (package, patch) = commit.into_parts();
+    assert_eq!(
+        source
+            .apply_tail_append(&patch)
+            .unwrap()
+            .into_package()
+            .to_bytes()
+            .unwrap(),
+        package.to_bytes().unwrap()
+    );
+    assert_eq!(
+        package
+            .apply_tail_append(&patch.inverse())
+            .unwrap()
+            .into_package()
+            .to_bytes()
+            .unwrap(),
+        bytes
+    );
+    assert!(
+        source
+            .edit_tail_append(TailSelector::Body)
+            .commit()
+            .unwrap()
+            .into_package()
+            .same_snapshot(&source)
+    );
+}
+
+#[test]
+fn native_replay_retains_distinct_admitting_recipient_profile() {
+    let bytes = br"{\rtf1\ansi A}";
+    let source = Package::from_bytes(bytes).unwrap();
+    let options = OpenOptions::new().source_limits(
+        SourceLimits::builder()
+            .max_input_bytes(4096)
+            .unwrap()
+            .build()
+            .unwrap(),
+    );
+    let recipient = Package::from_bytes_with_options(bytes, options).unwrap();
+    let mut edit = source.edit_tail_append(TailSelector::Body);
+    edit.append_text_paragraphs(&["B"]).unwrap();
+    let commit = edit.commit().unwrap();
+    let applied = recipient
+        .apply_tail_append(commit.patch())
+        .unwrap()
+        .into_package();
+    assert_eq!(applied.open_options(), options);
+    assert_eq!(
+        applied.to_bytes().unwrap(),
+        commit.package().to_bytes().unwrap()
+    );
+    let restored = applied
+        .apply_tail_append(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
+    assert_eq!(restored.open_options(), options);
+    assert_eq!(restored.to_bytes().unwrap(), bytes);
+}
+
+#[test]
+fn replay_commit_diagnostics_measure_forward_inverse_and_noop_output() {
+    let source_bytes = br"{\rtf1\ansi A\par}";
+    let source = Package::from_bytes(source_bytes).unwrap();
+    let mut edit = source.edit_tail_append(TailSelector::Body);
+    edit.append_text_paragraphs(&["B"]).unwrap();
+    let original = edit.commit().unwrap();
+    let forward = source.apply_tail_append(original.patch()).unwrap();
+    let output_bytes = forward.package().to_bytes().unwrap();
+    let facts = forward.diagnostics();
+    assert!(facts.changed());
+    assert_eq!(facts.source_bytes(), source_bytes.len());
+    assert_eq!(facts.output_bytes(), output_bytes.len());
+    assert_eq!(
+        facts.inserted_bytes(),
+        output_bytes.len() - source_bytes.len()
+    );
+
+    let inverse = forward
+        .package()
+        .apply_tail_append(&forward.patch().inverse())
+        .unwrap();
+    let facts = inverse.diagnostics();
+    assert!(facts.changed());
+    assert_eq!(facts.source_bytes(), output_bytes.len());
+    assert_eq!(facts.output_bytes(), source_bytes.len());
+    assert_eq!(facts.inserted_bytes(), 0, "inverse replay removes bytes");
+    assert_eq!(inverse.package().to_bytes().unwrap(), source_bytes);
+
+    let no_op = source
+        .edit_tail_append(TailSelector::Body)
+        .commit()
+        .unwrap();
+    let replayed_no_op = source.apply_tail_append(no_op.patch()).unwrap();
+    let facts = replayed_no_op.diagnostics();
+    assert!(!facts.changed());
+    assert_eq!(facts.operation_count(), 0);
+    assert_eq!(facts.source_bytes(), source_bytes.len());
+    assert_eq!(facts.output_bytes(), source_bytes.len());
+    assert_eq!(facts.inserted_bytes(), 0);
+    assert!(replayed_no_op.package().same_snapshot(&source));
 }

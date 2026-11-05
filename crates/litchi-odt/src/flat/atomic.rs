@@ -209,9 +209,11 @@ fn ensure_publication_supported() -> Result<()> {
     }
     #[cfg(not(any(unix, windows)))]
     {
-        Err(Error::Unsupported(
-            "atomic flat ODT publication is unavailable on this platform".to_string(),
-        ))
+        Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odt.flat.atomic",
+            "atomic flat ODT publication is unavailable on this platform",
+        )))
     }
 }
 

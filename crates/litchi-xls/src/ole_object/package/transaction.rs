@@ -1,8 +1,9 @@
 //! Workbook and CFB transaction layer for XLS OLE objects.
 
+use super::super::LimitKind;
 use super::super::codec::{parse_subrecords, ranges, u32_at};
 use super::super::semantic::{
-    EmbeddedObjectDraft, EmbeddedPayload, FormControl, ObjectMetadataEdit, OleObjectRecord,
+    EmbeddedObjectDraft, EmbeddedPayload, FormControl, ObjectMetadataChange, OleObjectRecord,
     validate_compound_file_for_publication,
 };
 use super::super::validation::validate_picture_formula;
@@ -13,7 +14,10 @@ use crate::protection::{
     PROTECT_TYPE, SCENPROTECT_TYPE, WINPROTECT_TYPE, WRITEPROTECT_TYPE,
 };
 use litchi_cfb::OleFile;
-use litchi_ole_common::object::{Editor as ObjectEditor, Target, Targets};
+use litchi_core::edit::RefusalKind;
+use litchi_ole_common::object::{
+    Edit as ObjectEditor, OpenOptions, Package as ObjectPackage, Target, Targets,
+};
 use litchi_ole_common::property_set::document_summary::DIGITAL_SIGNATURE;
 use litchi_ole_common::property_set::{Binding, PropertySetReader};
 use std::collections::{HashMap, HashSet};
@@ -59,8 +63,10 @@ impl OpaqueObjectIdentity {
 
     fn require_topology_proof(&self) -> Result<()> {
         if self.ambiguous {
-            return Err(Error::UnsafeEdit(
-                "an opaque Obj has an unproven identity; the requested object-topology edit is refused".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedContent,
+                "edit OLE objects",
+                "an opaque Obj has an unproven identity; the requested object-topology edit is refused",
             ));
         }
         Ok(())
@@ -82,8 +88,10 @@ impl OpaqueObjectIdentity {
 
     fn check_storage_rewrite(&self, storage: &str) -> Result<()> {
         if self.ambiguous || self.storages.contains(storage) {
-            return Err(Error::UnsafeEdit(
-                "an opaque Obj may alias the selected storage; payload rewrite is refused".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedContent,
+                "edit OLE objects",
+                "an opaque Obj may alias the selected storage; payload rewrite is refused",
             ));
         }
         Ok(())
@@ -91,7 +99,7 @@ impl OpaqueObjectIdentity {
 }
 
 #[derive(Clone)]
-pub struct Editor {
+pub(crate) struct Editor {
     package: ObjectEditor,
     limits: Limits,
     workbook_path: Vec<String>,
@@ -109,14 +117,18 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn new(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
+    pub(crate) fn new(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
         // Workbook metadata is XLS-owned. Read and parse it before handing
         // the original CFB bytes to the neutral object editor so the target
         // catalog can be derived solely from Obj/FtPictFmla records.
         let (workbook_path, workbook) = read_workbook(&bytes, limits)?;
         let (sheets, form_controls, opaque_identity) = parse_workbook(&workbook)?;
         let targets = targets_for_sheets(&sheets)?;
-        let package = ObjectEditor::open(bytes, targets, limits)?;
+        let package = ObjectPackage::open_with_options(
+            bytes,
+            OpenOptions::new().targets(targets).limits(limits),
+        )?
+        .edit()?;
         let preserved_control_counts = form_controls.iter().map(Vec::len).collect();
         Ok(Self {
             package,
@@ -133,7 +145,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn objects(&self, worksheet: usize) -> Result<&[OleObjectRecord]> {
+    pub(crate) fn objects(&self, worksheet: usize) -> Result<&[OleObjectRecord]> {
         self.sheets
             .get(worksheet)
             .map(Vec::as_slice)
@@ -145,7 +157,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn form_controls(&self, worksheet: usize) -> Result<&[FormControl]> {
+    pub(crate) fn form_controls(&self, worksheet: usize) -> Result<&[FormControl]> {
         self.form_controls
             .get(worksheet)
             .map(Vec::as_slice)
@@ -165,7 +177,11 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn add_form_control(&mut self, worksheet: usize, control: FormControl) -> Result<()> {
+    pub(crate) fn add_form_control(
+        &mut self,
+        worksheet: usize,
+        control: FormControl,
+    ) -> Result<()> {
         control.validate()?;
         let object_id = control.object_id();
         self.opaque_identity.require_topology_proof()?;
@@ -199,7 +215,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn add(
+    pub(crate) fn add(
         &mut self,
         worksheet: usize,
         object: OleObjectRecord,
@@ -256,7 +272,7 @@ impl Editor {
     /// Returns an error if the worksheet or object identity is invalid, the
     /// identity is already present, or the payload cannot be admitted by the
     /// bounded common CFB editor.
-    pub fn add_embedded_payload(
+    pub(crate) fn add_embedded_payload(
         &mut self,
         worksheet: usize,
         draft: EmbeddedObjectDraft,
@@ -278,7 +294,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn remove(&mut self, worksheet: usize, object_id: u16) -> Result<OleObjectRecord> {
+    pub(crate) fn remove(&mut self, worksheet: usize, object_id: u16) -> Result<OleObjectRecord> {
         self.opaque_identity.require_topology_proof()?;
         let mut candidate = self.clone();
         let sheet = candidate
@@ -298,8 +314,10 @@ impl Editor {
                 .any(|value| value.storage_name().as_deref() == Some(&storage))
         {
             if candidate.opaque_identity.storages.contains(&storage) {
-                return Err(Error::UnsafeEdit(
-                    "removing the selected Obj would orphan an opaque MBD/LNK reference".into(),
+                return Err(Error::refused(
+                    RefusalKind::UnsupportedContent,
+                    "edit OLE objects",
+                    "removing the selected Obj would orphan an opaque MBD/LNK reference",
                 ));
             }
             let target = target_for_storage(storage)?;
@@ -322,7 +340,11 @@ impl Editor {
     ///
     /// Returns an error if the selected object is absent or is not a valid
     /// storage-backed embedded object.
-    pub fn remove_embedded_payload(&mut self, worksheet: usize, object_id: u16) -> Result<()> {
+    pub(crate) fn remove_embedded_payload(
+        &mut self,
+        worksheet: usize,
+        object_id: u16,
+    ) -> Result<()> {
         self.embedded_storage(worksheet, object_id)?;
         self.remove(worksheet, object_id).map(|_| ())
     }
@@ -330,7 +352,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn reorder(&mut self, worksheet: usize, ids: &[u16]) -> Result<()> {
+    pub(crate) fn reorder(&mut self, worksheet: usize, ids: &[u16]) -> Result<()> {
         let mut candidate = self.clone();
         let sheet = candidate
             .sheets
@@ -350,9 +372,10 @@ impl Editor {
             return Ok(());
         }
         if candidate.opaque_identity.present {
-            return Err(Error::UnsafeEdit(
-                "reordering typed Obj records with opaque Obj records is not source-complete"
-                    .into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedContent,
+                "edit OLE objects",
+                "reordering typed Obj records with opaque Obj records is not source-complete",
             ));
         }
         let mut remaining = sheet.clone();
@@ -373,11 +396,11 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn update_object_metadata(
+    pub(crate) fn update_object_metadata(
         &mut self,
         worksheet: usize,
         object_id: u16,
-        edit: ObjectMetadataEdit,
+        edit: ObjectMetadataChange,
     ) -> Result<()> {
         let object = self
             .sheets
@@ -418,7 +441,11 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn replace_storage(&mut self, storage_name: &str, compound_file: Vec<u8>) -> Result<()> {
+    pub(crate) fn replace_storage(
+        &mut self,
+        storage_name: &str,
+        compound_file: Vec<u8>,
+    ) -> Result<()> {
         let storage = self
             .sheets
             .iter()
@@ -462,7 +489,7 @@ impl Editor {
     /// Returns an error if the worksheet/object identity is absent or is not
     /// a storage-backed embedded object, or if the replacement CFB is invalid,
     /// protected, or exceeds the configured limits.
-    pub fn replace_embedded_payload(
+    pub(crate) fn replace_embedded_payload(
         &mut self,
         worksheet: usize,
         object_id: u16,
@@ -475,8 +502,8 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn finish(self) -> Result<Vec<u8>> {
-        self.package.finish().map_err(Into::into)
+    pub(crate) fn finish(self) -> Result<Vec<u8>> {
+        crate::scoped::object_editor_bytes(&self.package)
     }
 
     fn commit(&mut self) -> Result<()> {
@@ -540,10 +567,10 @@ impl Editor {
         }
         let count = targets_for_sheets(&self.sheets)?.len();
         if count >= self.limits.max_objects {
-            return Err(Error::InvalidData(format!(
-                "adding storage would exceed the configured object limit of {}",
-                self.limits.max_objects
-            )));
+            return Err(LimitKind::Objects.exceeded(
+                count.saturating_add(1) as u64,
+                self.limits.max_objects as u64,
+            ));
         }
         Ok(())
     }
@@ -552,11 +579,13 @@ impl Editor {
 pub(crate) fn read_workbook(bytes: &[u8], limits: Limits) -> Result<(Vec<String>, Vec<u8>)> {
     let max_size = limits.max_stream_size.min(limits.max_total_size);
     if max_size == 0 {
-        return Err(Error::InvalidData(
-            "Workbook stream limits must be non-zero".into(),
-        ));
+        return Err(if limits.max_stream_size == 0 {
+            LimitKind::StreamBytes.invalid_zero()
+        } else {
+            LimitKind::AggregateBytes.invalid_zero()
+        });
     }
-    let mut ole = OleFile::open(Cursor::new(bytes))?;
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())?;
     let max_entries = limits
         .max_objects
         .saturating_mul(limits.max_storage_depth)
@@ -594,23 +623,17 @@ pub(crate) fn read_workbook(bytes: &[u8], limits: Limits) -> Result<(Vec<String>
     }
     if let Some(size) = document_summary_size {
         if size > max_size {
-            return Err(Error::InvalidData(
-                "DocumentSummaryInformation exceeds configured read limit".into(),
-            ));
+            return Err(LimitKind::StreamBytes.exceeded(size, max_size));
         }
     }
     reject_document_summary_signature(&mut ole)?;
     if let Some((actual_name, declared_size)) = workbook_stream.or(book_stream) {
         if declared_size > max_size {
-            return Err(Error::InvalidData(format!(
-                "{actual_name} stream exceeds configured read limit"
-            )));
+            return Err(LimitKind::StreamBytes.exceeded(declared_size, max_size));
         }
         let workbook = ole.open_stream(&[actual_name.as_str()])?;
         if workbook.len() as u64 > max_size {
-            return Err(Error::InvalidData(format!(
-                "{actual_name} stream exceeds configured read limit"
-            )));
+            return Err(LimitKind::StreamBytes.exceeded(workbook.len() as u64, max_size));
         }
         reject_protected_workbook(&workbook)?;
         return Ok((vec![actual_name], workbook));
@@ -628,13 +651,15 @@ fn reject_document_summary_signature<R: std::io::Read + std::io::Seek>(
                 .iter()
                 .any(|section| section.property(DIGITAL_SIGNATURE).is_some())
             {
-                return Err(Error::UnsafeEdit(
-                    "DocumentSummaryInformation contains PIDDSI DigitalSignature; refusing a rewrite".into(),
+                return Err(Error::refused(
+                    RefusalKind::UnsupportedOperation,
+                    "edit OLE objects",
+                    "DocumentSummaryInformation contains PIDDSI DigitalSignature; refusing a rewrite",
                 ));
             }
         },
-        Err(litchi_cfb::OleError::StreamNotFound) => {},
-        Err(error) => return Err(Error::Cfb(error)),
+        Err(litchi_ole_common::Error::Cfb(litchi_cfb::OleError::StreamNotFound)) => {},
+        Err(error) => return Err(error.into()),
     }
     Ok(())
 }
@@ -672,9 +697,11 @@ fn reject_protected_workbook(input: &[u8]) -> Result<()> {
             _ => false,
         };
         if active {
-            return Err(Error::UnsafeEdit(format!(
-                "BIFF protection record 0x{kind:04X} is active"
-            )));
+            return Err(Error::refused(
+                RefusalKind::Protected,
+                "edit OLE objects",
+                "BIFF protection record is active",
+            ));
         }
     }
     Ok(())

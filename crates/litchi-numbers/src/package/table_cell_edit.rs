@@ -1,11 +1,9 @@
 //! Exact-source selector-first Numbers table-cell mutations.
 
 mod budget;
-mod cache;
 mod cache_commit;
+mod column_counts;
 mod formula_author;
-mod formula_list;
-mod formula_metadata;
 mod lists;
 mod locality;
 mod metadata;
@@ -18,6 +16,10 @@ mod sparse_commit;
 pub(super) mod tile;
 
 use std::{cell::Cell, mem::size_of, sync::Arc};
+
+use litchi_numbers_wire::{
+    formula_cache as cache, formula_dependencies as formula_metadata, formula_list,
+};
 
 use litchi_iwa_protos::package_metadata_codec::{
     Batch, ObjectUuidAddition, PreparedPackageMetadataRewrite, UuidBits,
@@ -325,7 +327,7 @@ fn prepare_formula_dependency_tiles(
     plan_remaining.transaction_work = plan_remaining
         .transaction_work
         .checked_sub(structural_usage.transaction_work)
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: crate::package::table_cells::LimitKind::TransactionWork,
             observed: structural_usage.transaction_work,
             maximum: remaining.transaction_work,
@@ -513,8 +515,8 @@ impl Package {
         let target_package = patch
             .target_package()
             .ok_or(Error::Verification { path: patch.path() })?;
-        if source_package.read_options() != self.read_options()
-            || target_package.read_options() != self.read_options()
+        if source_package.state.options != self.state.options
+            || target_package.state.options != self.state.options
         {
             return Err(Error::PatchConflict);
         }
@@ -534,7 +536,7 @@ impl Package {
                 .ok_or(Error::InvalidSource { path: patch.path() })?,
         );
         if locality_byte_bound > locality_remaining.locality_bytes {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: crate::package::table_cells::LimitKind::TransactionWork,
                 observed: locality_byte_bound,
                 maximum: locality_remaining.locality_bytes,
@@ -546,7 +548,7 @@ impl Package {
         let locality_work = locality_remaining
             .transaction_work
             .checked_sub(admitted_apply_work)
-            .ok_or(Error::LimitExceeded {
+            .ok_or(Error::Limit {
                 kind: crate::package::table_cells::LimitKind::TransactionWork,
                 observed: admitted_apply_work,
                 maximum: locality_remaining.transaction_work,
@@ -629,10 +631,12 @@ fn commit_plan(plan: Plan<'_>) -> Result<Commit, Error> {
     for change in &changes {
         let position = change.position();
         if position.row() >= dimensions.rows() || position.column() >= dimensions.columns() {
-            return Err(Error::OutOfBounds {
-                position,
-                dimensions,
-            });
+            return Err(Error::Refused(
+                crate::package::table_cells::Refusal::OutOfBounds {
+                    position,
+                    dimensions,
+                },
+            ));
         }
     }
 
@@ -647,15 +651,15 @@ fn commit_plan(plan: Plan<'_>) -> Result<Commit, Error> {
     };
     let selected = resolve_table(
         source,
-        SheetSelector::Index(sheet_position),
-        TableSelector::Index(table_position),
+        SheetSelector::index(sheet_position),
+        TableSelector::index(table_position),
     )?;
     let requested = changes.len();
     let mut changed_count = 0usize;
     let mut changed_owned_value_bytes = 0usize;
     for change in &changes {
         if !semantic_change_is_noop(selected.table, change) {
-            changed_count = changed_count.checked_add(1).ok_or(Error::LimitExceeded {
+            changed_count = changed_count.checked_add(1).ok_or(Error::Limit {
                 kind: crate::package::table_cells::LimitKind::Updates,
                 observed: u64::MAX,
                 maximum: u64::MAX - 1,
@@ -663,7 +667,7 @@ fn commit_plan(plan: Plan<'_>) -> Result<Commit, Error> {
             })?;
             changed_owned_value_bytes = changed_owned_value_bytes
                 .checked_add(change.input_ref().map_or(0, Input::owned_bytes))
-                .ok_or(Error::LimitExceeded {
+                .ok_or(Error::Limit {
                     kind: crate::package::table_cells::LimitKind::OwnedValueBytes,
                     observed: u64::MAX,
                     maximum: u64::MAX - 1,
@@ -792,18 +796,21 @@ fn commit_existing_scalar_tiles(
     // formula/cache no-op can still be proved below; every remaining
     // non-formula mutation must retain the ordinary locked-table refusal.
     if target.native.locked == crate::table::lock::State::Locked && !has_formula_input {
-        return Err(Error::TableLocked { path });
+        return Err(Error::Refused(
+            crate::package::table_cells::Refusal::TableLocked { path },
+        ));
     }
     let needs_formula_context = has_formula_input || target.storage.lists.formula.entries != 0;
     let mut formula_context = if needs_formula_context {
-        let selected_owner =
-            target
-                .dependencies
-                .selected_formula_owner
-                .ok_or(Error::UnsupportedDependency {
+        let selected_owner = target
+            .dependencies
+            .selected_formula_owner
+            .ok_or(Error::Refused(
+                crate::package::table_cells::Refusal::UnsupportedDependency {
                     path,
                     kind: crate::package::table_cells::DependencyKind::Formula,
-                })?;
+                },
+            ))?;
         let local_path = formula_author::ReferencedTablePath {
             sheet: u32::try_from(sheet_position).map_err(|_| Error::InvalidSource { path })?,
             table: u32::try_from(table_position).map_err(|_| Error::InvalidSource { path })?,
@@ -992,10 +999,12 @@ fn commit_existing_scalar_tiles(
                     .binary_search_by_key(referenced, |(path, _)| *path)
                     .is_err()
         }) {
-            return Err(Error::UnsupportedDependency {
-                path,
-                kind: crate::package::table_cells::DependencyKind::Formula,
-            });
+            return Err(Error::Refused(
+                crate::package::table_cells::Refusal::UnsupportedDependency {
+                    path,
+                    kind: crate::package::table_cells::DependencyKind::Formula,
+                },
+            ));
         }
         let authored = formula_author::prepare(
             source,
@@ -1113,7 +1122,9 @@ fn commit_existing_scalar_tiles(
                 ));
             }
             if target.native.locked == crate::table::lock::State::Locked {
-                return Err(Error::TableLocked { path });
+                return Err(Error::Refused(
+                    crate::package::table_cells::Refusal::TableLocked { path },
+                ));
             }
             let orchestration_work = existing
                 .formula_list
@@ -1715,10 +1726,12 @@ fn commit_existing_scalar_tiles(
             .is_err()
     }) {
         if !cache_prepared.tiles.is_empty() {
-            return Err(Error::UnsupportedDependency {
-                path,
-                kind: crate::package::table_cells::DependencyKind::FormulaCache,
-            });
+            return Err(Error::Refused(
+                crate::package::table_cells::Refusal::UnsupportedDependency {
+                    path,
+                    kind: crate::package::table_cells::DependencyKind::FormulaCache,
+                },
+            ));
         }
         return sparse_commit::commit_sparse_scalar_tiles(
             source,
@@ -1806,10 +1819,12 @@ fn commit_existing_scalar_tiles(
         text_change_indices.push(change_index);
     }
     if !text_requests.is_empty() && !target.storage.lists.string.segments.is_empty() {
-        return Err(Error::UnsupportedDependency {
-            path,
-            kind: crate::package::table_cells::DependencyKind::SharedString,
-        });
+        return Err(Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedDependency {
+                path,
+                kind: crate::package::table_cells::DependencyKind::SharedString,
+            },
+        ));
     }
     let string_list_payload = message_payload(source, target.storage.lists.string.message, path)?;
     let mut string_keys = Vec::new();
@@ -1885,22 +1900,21 @@ fn commit_existing_scalar_tiles(
         .tiles
         .iter()
         .try_fold(0usize, |count, tile| count.checked_add(tile.changes.len()))
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: crate::package::table_cells::LimitKind::RetainedElements,
             observed: u64::MAX,
             maximum: budget.limits().max_retained_elements,
             path,
         })?;
-    let final_row_capacity =
-        changes
-            .len()
-            .checked_add(cache_row_capacity)
-            .ok_or(Error::LimitExceeded {
-                kind: crate::package::table_cells::LimitKind::RetainedElements,
-                observed: u64::MAX,
-                maximum: budget.limits().max_retained_elements,
-                path,
-            })?;
+    let final_row_capacity = changes
+        .len()
+        .checked_add(cache_row_capacity)
+        .ok_or(Error::Limit {
+            kind: crate::package::table_cells::LimitKind::RetainedElements,
+            observed: u64::MAX,
+            maximum: budget.limits().max_retained_elements,
+            path,
+        })?;
     let formula_list_binding_capacity = if prepared_formula_list.is_some() {
         target
             .storage
@@ -1932,8 +1946,9 @@ fn commit_existing_scalar_tiles(
         .and_then(|count| count.checked_add(changes.len()))
         .and_then(|count| count.checked_add(cache_prepared.tiles.len()))
         .and_then(|count| count.checked_add(final_row_capacity))
-        .and_then(|count| count.checked_add(1))
-        .ok_or(Error::LimitExceeded {
+        // The string list and the column-header bucket.
+        .and_then(|count| count.checked_add(2))
+        .ok_or(Error::Limit {
             kind: crate::package::table_cells::LimitKind::RetainedElements,
             observed: u64::MAX,
             maximum: budget.limits().max_retained_elements,
@@ -1957,6 +1972,11 @@ fn commit_existing_scalar_tiles(
             amount: changes.len(),
         })?;
     require_exact_capacity(&releases, changes.len(), path)?;
+    let column_capacity = changes.len().min(
+        usize::try_from(target.native.columns).map_err(|_error| Error::InvalidSource { path })?,
+    );
+    reserve_retained_vec::<(u32, i64)>(&mut budget, column_capacity, path)?;
+    let mut column_deltas = column_counts::Deltas::with_capacity(column_capacity)?;
     let mut final_rows = Vec::new();
     reserve_retained_vec::<sparse::FinalRowCount>(&mut budget, final_row_capacity, path)?;
     final_rows
@@ -2017,10 +2037,12 @@ fn commit_existing_scalar_tiles(
             .binary_search_by_key(&tile_id, |route| route.tile_id)
             .ok()
             .and_then(|index| target.storage.tiles.get(index))
-            .ok_or(Error::UnsupportedDependency {
-                path,
-                kind: crate::package::table_cells::DependencyKind::CellStorage,
-            })?;
+            .ok_or(Error::Refused(
+                crate::package::table_cells::Refusal::UnsupportedDependency {
+                    path,
+                    kind: crate::package::table_cells::DependencyKind::CellStorage,
+                },
+            ))?;
         let source_payload = message_payload(source, route.message, path)?;
         let mut tile_changes = Vec::new();
         reserve_retained_vec::<tile::TileChange>(&mut budget, end - start, path)?;
@@ -2050,7 +2072,7 @@ fn commit_existing_scalar_tiles(
             });
         }
         let maximum_wire = source.state.options.archive().max_iwa_stream_bytes();
-        let maximum_work = maximum_wire.checked_mul(32).ok_or(Error::LimitExceeded {
+        let maximum_work = maximum_wire.checked_mul(32).ok_or(Error::Limit {
             kind: crate::package::table_cells::LimitKind::WireWork,
             observed: u64::MAX,
             maximum: usize_u64(maximum_wire),
@@ -2157,6 +2179,14 @@ fn commit_existing_scalar_tiles(
             &mut releases,
             path,
         )?;
+        let mut recorded = Ok(());
+        plan.visit_transitions(|transition| {
+            if recorded.is_ok() {
+                recorded = column_deltas.record(&transition, path);
+            }
+        })
+        .map_err(|error| map_tile_error(error, path))?;
+        recorded?;
         if plan.execution_requirements().output_bytes() == 0
             && (rich_prepared.keys[start..end].iter().any(Option::is_none)
                 || !cache_changes.is_empty())
@@ -2211,10 +2241,12 @@ fn commit_existing_scalar_tiles(
             .storage
             .row_headers
             .get(usize::try_from(bucket_index).map_err(|_error| Error::InvalidSource { path })?)
-            .ok_or(Error::UnsupportedDependency {
-                path,
-                kind: crate::package::table_cells::DependencyKind::CellStorage,
-            })?;
+            .ok_or(Error::Refused(
+                crate::package::table_cells::Refusal::UnsupportedDependency {
+                    path,
+                    kind: crate::package::table_cells::DependencyKind::CellStorage,
+                },
+            ))?;
         let remaining = budget.remaining()?;
         let limits = sparse_commit::sparse_limits(source, row_end - row_start, remaining, path)?;
         budget.authorize(remaining)?;
@@ -2261,10 +2293,12 @@ fn commit_existing_scalar_tiles(
     let mut prepared_string_list = None;
     if !text_requests.is_empty() || !releases.is_empty() {
         if !target.storage.lists.string.segments.is_empty() {
-            return Err(Error::UnsupportedDependency {
-                path,
-                kind: crate::package::table_cells::DependencyKind::SharedString,
-            });
+            return Err(Error::Refused(
+                crate::package::table_cells::Refusal::UnsupportedDependency {
+                    path,
+                    kind: crate::package::table_cells::DependencyKind::SharedString,
+                },
+            ));
         }
         let remaining = budget.remaining()?;
         let limits = string_list_limits(source, changes.len(), path, remaining)?;
@@ -2307,6 +2341,26 @@ fn commit_existing_scalar_tiles(
         prepared_string_list = Some(prepared_list);
     }
 
+    if column_deltas.changes() {
+        let bucket = message_payload(source, target.storage.column_headers, path)?;
+        let envelope = column_deltas.envelope(bucket.len(), path)?;
+        budget.authorize(envelope)?;
+        let payload = match column_deltas.apply(bucket, &target.storage, path) {
+            Ok(payload) => payload,
+            Err(error) => {
+                budget.cancel_authorization();
+                return Err(error);
+            },
+        };
+        budget.record_authorized(envelope)?;
+        if let Some(payload) = payload {
+            prepared.push(PreparedReplacement {
+                route: target.storage.column_headers,
+                payload,
+                references: None,
+            });
+        }
+    }
     let future_component_capacity = prepared_capacity
         .checked_add(1)
         .ok_or(Error::InvalidSource { path })?;
@@ -4040,10 +4094,12 @@ fn ensure_formula_owner_context_coverage(
             .ok_or(Error::InvalidSource { path })?;
     budget.record_authorized(usage)?;
     if !external_valid || !owners_covered {
-        return Err(Error::UnsupportedDependency {
-            path,
-            kind: crate::package::table_cells::DependencyKind::Formula,
-        });
+        return Err(Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedDependency {
+                path,
+                kind: crate::package::table_cells::DependencyKind::Formula,
+            },
+        ));
     }
     Ok(())
 }
@@ -4185,16 +4241,19 @@ fn extend_formula_referenced_paths(
                 if target_owner == selected_owner {
                     continue;
                 }
-                let referenced = owner_index
+                // A precedent owner without a table (the group-by a category
+                // reference reads, record 0424) adds no table path: the cache
+                // engine validates it against the registered owners. A workbook
+                // with another table reaches this scan, as a native pivot's
+                // does (record 0432).
+                if let Some(referenced) = owner_index
                     .binary_search_by_key(&target_owner, |entry| entry.0)
                     .ok()
                     .and_then(|index| owner_index.get(index))
                     .map(|entry| entry.1)
-                    .ok_or(Error::UnsupportedDependency {
-                        path,
-                        kind: crate::package::table_cells::DependencyKind::FormulaCache,
-                    })?;
-                final_paths.push(referenced);
+                {
+                    final_paths.push(referenced);
+                }
             }
         }
         final_paths.sort_unstable();
@@ -4236,14 +4295,15 @@ fn prepare_formula_cache_registry<'source>(
     ),
     Error,
 > {
-    let selected_owner =
-        selected
-            .dependencies
-            .selected_formula_owner
-            .ok_or(Error::UnsupportedDependency {
+    let selected_owner = selected
+        .dependencies
+        .selected_formula_owner
+        .ok_or(Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedDependency {
                 path,
                 kind: crate::package::table_cells::DependencyKind::FormulaCache,
-            })?;
+            },
+        ))?;
     let table_count = context
         .external_targets
         .len()
@@ -4337,14 +4397,15 @@ fn prepare_formula_cache_registry<'source>(
                 .map_err(|_| Error::InvalidSource { path })?,
         });
         for (referenced, target) in &context.external_targets {
-            let owner =
-                target
-                    .dependencies
-                    .selected_formula_owner
-                    .ok_or(Error::UnsupportedDependency {
+            let owner = target
+                .dependencies
+                .selected_formula_owner
+                .ok_or(Error::Refused(
+                    crate::package::table_cells::Refusal::UnsupportedDependency {
                         path,
                         kind: crate::package::table_cells::DependencyKind::FormulaCache,
-                    })?;
+                    },
+                ))?;
             let table = source
                 .sheets()
                 .get(usize::try_from(referenced.sheet).map_err(|_| Error::InvalidSource { path })?)
@@ -4413,14 +4474,15 @@ fn prepare_narrow_formula_metadata<'source>(
     budget: &mut budget::TransactionBudget,
     path: crate::package::table_cells::Path,
 ) -> Result<formula_metadata::PreparedGraph<'source>, Error> {
-    let selected =
-        target
-            .dependencies
-            .selected_formula_owner
-            .ok_or(Error::UnsupportedDependency {
+    let selected = target
+        .dependencies
+        .selected_formula_owner
+        .ok_or(Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedDependency {
                 path,
                 kind: crate::package::table_cells::DependencyKind::Formula,
-            })?;
+            },
+        ))?;
     let owner = target
         .dependencies
         .formula_owners
@@ -4428,10 +4490,12 @@ fn prepare_narrow_formula_metadata<'source>(
         .find(|candidate| {
             candidate.formula_owner_object_id == Some(target.native.drawable_identifier)
         })
-        .ok_or(Error::UnsupportedDependency {
-            path,
-            kind: crate::package::table_cells::DependencyKind::Formula,
-        })?;
+        .ok_or(Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedDependency {
+                path,
+                kind: crate::package::table_cells::DependencyKind::Formula,
+            },
+        ))?;
     let authored = context.authored.formulas.as_slice();
     for formula in authored {
         let coordinate = (formula.position.row(), formula.position.column());
@@ -4444,13 +4508,12 @@ fn prepare_narrow_formula_metadata<'source>(
             return Err(Error::Verification { path });
         }
     }
-    let engine_route = target
-        .dependencies
-        .engine
-        .ok_or(Error::UnsupportedDependency {
+    let engine_route = target.dependencies.engine.ok_or(Error::Refused(
+        crate::package::table_cells::Refusal::UnsupportedDependency {
             path,
             kind: crate::package::table_cells::DependencyKind::Formula,
-        })?;
+        },
+    ))?;
     if selected.message != owner.message
         || selected.internal_owner_id != owner.internal_owner_id
         || selected.uid_lower != owner.uid_lower
@@ -4460,10 +4523,12 @@ fn prepare_narrow_formula_metadata<'source>(
         || !owner.range_precedent_tiles.is_empty()
         || !existing.formula_list.segments.is_empty()
     {
-        return Err(Error::UnsupportedDependency {
-            path,
-            kind: crate::package::table_cells::DependencyKind::Formula,
-        });
+        return Err(Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedDependency {
+                path,
+                kind: crate::package::table_cells::DependencyKind::Formula,
+            },
+        ));
     }
     let existing_host_count = existing.formula_list.hosts.len();
     let engine = metadata_source_message(source, engine_route, path)?;
@@ -4827,7 +4892,7 @@ fn prepare_narrow_formula_metadata<'source>(
         || precedent_upper > limits.max_precedents
         || source_fact_upper > limits.max_ranges
     {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             path,
             kind: crate::package::table_cells::LimitKind::FormulaWork,
             observed: usize_u64(
@@ -4920,14 +4985,12 @@ fn reserve_retained_vec<T>(
     capacity: usize,
     path: crate::package::table_cells::Path,
 ) -> Result<(), Error> {
-    let bytes = capacity
-        .checked_mul(size_of::<T>())
-        .ok_or(Error::LimitExceeded {
-            kind: crate::package::table_cells::LimitKind::RetainedBytes,
-            observed: u64::MAX,
-            maximum: budget.limits().max_retained_bytes,
-            path,
-        })?;
+    let bytes = capacity.checked_mul(size_of::<T>()).ok_or(Error::Limit {
+        kind: crate::package::table_cells::LimitKind::RetainedBytes,
+        observed: u64::MAX,
+        maximum: budget.limits().max_retained_bytes,
+        path,
+    })?;
     budget.reserve_retained(
         usize_u64(capacity),
         usize_u64(bytes),
@@ -5122,7 +5185,7 @@ fn preflight_usage(
     macro_rules! require {
         ($field:ident, $kind:expr) => {
             if usage.$field > remaining.$field {
-                return Err(Error::LimitExceeded {
+                return Err(Error::Limit {
                     kind: $kind,
                     observed: usage.$field,
                     maximum: remaining.$field,
@@ -5175,7 +5238,7 @@ fn caller_staging_usage(
         staging_usage
             .change_capacity()
             .checked_add(updates)
-            .ok_or(Error::LimitExceeded {
+            .ok_or(Error::Limit {
                 kind: crate::package::table_cells::LimitKind::RetainedElements,
                 observed: u64::MAX,
                 maximum: budget.limits().max_retained_elements,
@@ -5186,11 +5249,11 @@ fn caller_staging_usage(
         .checked_mul(size_of::<crate::table::cells::Change>())
         .and_then(|bytes| {
             updates
-                .checked_mul(size_of::<crate::table::CellPosition>())
+                .checked_mul(size_of::<crate::table::At>())
                 .and_then(|live| bytes.checked_add(live))
         })
         .and_then(|bytes| bytes.checked_add(owned_value_bytes))
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: crate::package::table_cells::LimitKind::RetainedBytes,
             observed: u64::MAX,
             maximum: budget.limits().max_retained_bytes,
@@ -5202,7 +5265,7 @@ fn caller_staging_usage(
         retained_elements: usize_u64(retained_elements),
         retained_bytes: usize_u64(retained_bytes),
         allocation_events: usize_u64(staging_usage.allocation_events().checked_add(1).ok_or(
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: crate::package::table_cells::LimitKind::TransactionWork,
                 observed: u64::MAX,
                 maximum: budget.limits().max_allocation_events,
@@ -5226,7 +5289,7 @@ fn resolve_usage(
         .work
         .checked_add(report.ownership.transaction_work)
         .and_then(|work| work.checked_add(report.codecs.work_bytes))
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: crate::package::table_cells::LimitKind::TransactionWork,
             observed: u64::MAX,
             maximum: budget.limits().max_transaction_work,
@@ -5245,7 +5308,7 @@ fn resolve_usage(
                 .codecs
                 .references
                 .checked_add(report.ownership.references)
-                .ok_or(Error::LimitExceeded {
+                .ok_or(Error::Limit {
                     kind: crate::package::table_cells::LimitKind::References,
                     observed: u64::MAX,
                     maximum: budget.limits().max_references,
@@ -5280,7 +5343,7 @@ fn tile_usage(
             .checked_add(report.cell_slots_scanned)
             .and_then(|work| work.checked_add(report.cell_slots_written))
             .and_then(|work| work.checked_add(report.output_bytes))
-            .ok_or(Error::LimitExceeded {
+            .ok_or(Error::Limit {
                 kind: crate::package::table_cells::LimitKind::TransactionWork,
                 observed: u64::MAX,
                 maximum: budget.limits().max_transaction_work,
@@ -5345,16 +5408,15 @@ fn formula_list_usage(
     report: formula_list::Report,
     path: crate::package::table_cells::Path,
 ) -> Result<budget::Usage, Error> {
-    let transaction_work =
-        report
-            .work
-            .checked_add(report.output_bytes)
-            .ok_or(Error::LimitExceeded {
-                kind: crate::package::table_cells::LimitKind::TransactionWork,
-                observed: u64::MAX,
-                maximum: u64::MAX,
-                path,
-            })?;
+    let transaction_work = report
+        .work
+        .checked_add(report.output_bytes)
+        .ok_or(Error::Limit {
+            kind: crate::package::table_cells::LimitKind::TransactionWork,
+            observed: u64::MAX,
+            maximum: u64::MAX,
+            path,
+        })?;
     Ok(budget::Usage {
         wire_bytes: usize_u64(report.input_bytes),
         wire_fields: usize_u64(report.fields),
@@ -5455,37 +5517,37 @@ fn map_formula_list_error(
 ) -> Error {
     match error {
         formula_list::Error::Limit {
-            resource,
+            kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
-            kind: match resource {
-                formula_list::Resource::InputBytes => {
+        } => Error::Limit {
+            kind: match kind {
+                formula_list::LimitKind::InputBytes => {
                     crate::package::table_cells::LimitKind::WireBytes
                 },
-                formula_list::Resource::OutputBytes => {
+                formula_list::LimitKind::OutputBytes => {
                     crate::package::table_cells::LimitKind::OutputBytes
                 },
-                formula_list::Resource::Fields => {
+                formula_list::LimitKind::Fields => {
                     crate::package::table_cells::LimitKind::WireFields
                 },
-                formula_list::Resource::Work => crate::package::table_cells::LimitKind::WireWork,
-                formula_list::Resource::Entries | formula_list::Resource::Hosts => {
+                formula_list::LimitKind::Work => crate::package::table_cells::LimitKind::WireWork,
+                formula_list::LimitKind::Entries | formula_list::LimitKind::Hosts => {
                     crate::package::table_cells::LimitKind::RetainedElements
                 },
-                formula_list::Resource::References => {
+                formula_list::LimitKind::References => {
                     crate::package::table_cells::LimitKind::References
                 },
-                formula_list::Resource::RetainedElements => {
+                formula_list::LimitKind::RetainedElements => {
                     crate::package::table_cells::LimitKind::RetainedElements
                 },
-                formula_list::Resource::RetainedBytes => {
+                formula_list::LimitKind::RetainedBytes => {
                     crate::package::table_cells::LimitKind::RetainedBytes
                 },
-                formula_list::Resource::ScratchBytes => {
+                formula_list::LimitKind::ScratchBytes => {
                     crate::package::table_cells::LimitKind::PeakScratchBytes
                 },
-                formula_list::Resource::Allocations => {
+                formula_list::LimitKind::Allocations => {
                     crate::package::table_cells::LimitKind::AllocationEvents
                 },
             },
@@ -5500,6 +5562,7 @@ fn map_formula_list_error(
         formula_list::Error::InvalidSource
         | formula_list::Error::Wire
         | formula_list::Error::Strict => Error::InvalidSource { path },
+        _ => Error::InvalidSource { path },
     }
 }
 
@@ -5717,24 +5780,37 @@ fn map_formula_metadata_error(
             amount: requested,
         },
         formula_metadata::Error::Limit {
-            resource,
+            kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
-            kind: if resource.contains("output") {
-                crate::package::table_cells::LimitKind::OutputBytes
-            } else if resource.contains("field") {
-                crate::package::table_cells::LimitKind::WireFields
-            } else if resource.contains("reference") {
-                crate::package::table_cells::LimitKind::References
-            } else if resource.contains("allocation") {
-                crate::package::table_cells::LimitKind::AllocationEvents
-            } else if resource.contains("scratch") {
-                crate::package::table_cells::LimitKind::PeakScratchBytes
-            } else if resource.contains("retained") {
-                crate::package::table_cells::LimitKind::RetainedBytes
-            } else {
-                crate::package::table_cells::LimitKind::WireWork
+        } => Error::Limit {
+            kind: match kind {
+                formula_metadata::LimitKind::OutputBytes => {
+                    crate::package::table_cells::LimitKind::OutputBytes
+                },
+                formula_metadata::LimitKind::Fields => {
+                    crate::package::table_cells::LimitKind::WireFields
+                },
+                formula_metadata::LimitKind::References => {
+                    crate::package::table_cells::LimitKind::References
+                },
+                formula_metadata::LimitKind::Allocations => {
+                    crate::package::table_cells::LimitKind::AllocationEvents
+                },
+                formula_metadata::LimitKind::ScratchBytes => {
+                    crate::package::table_cells::LimitKind::PeakScratchBytes
+                },
+                formula_metadata::LimitKind::RetainedBytes => {
+                    crate::package::table_cells::LimitKind::RetainedBytes
+                },
+                formula_metadata::LimitKind::SourceBytes
+                | formula_metadata::LimitKind::Work
+                | formula_metadata::LimitKind::Messages
+                | formula_metadata::LimitKind::Hosts
+                | formula_metadata::LimitKind::Precedents
+                | formula_metadata::LimitKind::Ranges => {
+                    crate::package::table_cells::LimitKind::WireWork
+                },
             },
             observed: usize_u64(observed),
             maximum: usize_u64(maximum),
@@ -5743,6 +5819,7 @@ fn map_formula_metadata_error(
         formula_metadata::Error::InvalidGraph
         | formula_metadata::Error::StrictDependency
         | formula_metadata::Error::Wire => Error::InvalidSource { path },
+        _ => Error::InvalidSource { path },
     }
 }
 
@@ -5778,10 +5855,12 @@ fn rich_archive_reference_delta(
                 || rich.after.contains(identifier)
         })
     {
-        return Err(Error::UnsupportedDependency {
-            path,
-            kind: crate::package::table_cells::DependencyKind::RichText,
-        });
+        return Err(Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedDependency {
+                path,
+                kind: crate::package::table_cells::DependencyKind::RichText,
+            },
+        ));
     }
     let info = source
         .state
@@ -5792,10 +5871,12 @@ fn rich_archive_reference_delta(
         .and_then(|object| object.archive_info.message_infos.get(route.message_index))
         .ok_or(Error::InvalidSource { path })?;
     if !info.field_infos.is_empty() {
-        return Err(Error::UnsupportedDependency {
-            path,
-            kind: crate::package::table_cells::DependencyKind::RichText,
-        });
+        return Err(Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedDependency {
+                path,
+                kind: crate::package::table_cells::DependencyKind::RichText,
+            },
+        ));
     }
     for identifier in &rich.removed {
         if info
@@ -5845,10 +5926,12 @@ fn scalar_change(
 ) -> Result<tile::BncChange, Error> {
     Ok(match change.input_ref() {
         Some(Input::Formula { .. }) => {
-            return Err(Error::UnsupportedDependency {
-                path,
-                kind: crate::package::table_cells::DependencyKind::Formula,
-            });
+            return Err(Error::Refused(
+                crate::package::table_cells::Refusal::UnsupportedDependency {
+                    path,
+                    kind: crate::package::table_cells::DependencyKind::Formula,
+                },
+            ));
         },
         None => tile::BncChange::Clear,
         Some(Input::Number(value)) => tile::BncChange::Set(tile::ScalarInput::Number(*value)),
@@ -5897,10 +5980,12 @@ fn validate_prepared_tile_transitions(
                         && !(owned_rich == transition.before_references.rich_text
                             && owned_rich == transition.after_references.rich_text)
                     {
-                        validation_error = Some(Error::UnsupportedDependency {
-                            path,
-                            kind: crate::package::table_cells::DependencyKind::RichText,
-                        });
+                        validation_error = Some(Error::Refused(
+                            crate::package::table_cells::Refusal::UnsupportedDependency {
+                                path,
+                                kind: crate::package::table_cells::DependencyKind::RichText,
+                            },
+                        ));
                         return;
                     }
                     let authorized_formula_replacement = formula_publication
@@ -5941,10 +6026,12 @@ fn validate_prepared_tile_transitions(
                                 tile::CellValue::Formula { .. } | tile::CellValue::Error(_)
                             ))
                     {
-                        validation_error = Some(Error::UnsupportedDependency {
-                            path,
-                            kind: crate::package::table_cells::DependencyKind::Formula,
-                        });
+                        validation_error = Some(Error::Refused(
+                            crate::package::table_cells::Refusal::UnsupportedDependency {
+                                path,
+                                kind: crate::package::table_cells::DependencyKind::Formula,
+                            },
+                        ));
                         return;
                     }
                     cursor += 1;
@@ -5979,7 +6066,7 @@ fn string_list_limits(
     remaining: budget::Remaining,
 ) -> Result<lists::ListLimits, Error> {
     let package_wire = source.state.options.archive().max_iwa_stream_bytes();
-    let package_work = package_wire.checked_mul(32).ok_or(Error::LimitExceeded {
+    let package_work = package_wire.checked_mul(32).ok_or(Error::Limit {
         kind: crate::package::table_cells::LimitKind::WireWork,
         observed: u64::MAX,
         maximum: usize_u64(package_wire),
@@ -6041,7 +6128,7 @@ fn string_list_prepare_usage(
         wire_bytes: usize_u64(
             root.source_bytes()
                 .checked_add(entries.source_bytes())
-                .ok_or(Error::LimitExceeded {
+                .ok_or(Error::Limit {
                     kind: crate::package::table_cells::LimitKind::WireWork,
                     observed: u64::MAX,
                     maximum: u64::MAX,
@@ -6111,7 +6198,7 @@ fn assignment_usage(
         wire_bytes: usize_u64(
             root.source_bytes()
                 .checked_add(entries.source_bytes())
-                .ok_or(Error::LimitExceeded {
+                .ok_or(Error::Limit {
                     kind: crate::package::table_cells::LimitKind::WireWork,
                     observed: u64::MAX,
                     maximum: budget.limits().max_wire_bytes,
@@ -6160,7 +6247,7 @@ fn map_list_error(error: lists::Failure, path: crate::package::table_cells::Path
         },
         lists::Failure::LimitExceeded {
             observed, maximum, ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: crate::package::table_cells::LimitKind::TransactionWork,
             observed: usize_u64(observed),
             maximum: usize_u64(maximum),
@@ -6175,22 +6262,28 @@ fn map_list_error(error: lists::Failure, path: crate::package::table_cells::Path
 
 fn map_tile_error(error: tile::TileError, path: crate::package::table_cells::Path) -> Error {
     match error {
-        tile::TileError::NeedSparse { .. } => Error::UnsupportedDependency {
-            path,
-            kind: crate::package::table_cells::DependencyKind::CellStorage,
-        },
+        tile::TileError::NeedSparse { .. } => Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedDependency {
+                path,
+                kind: crate::package::table_cells::DependencyKind::CellStorage,
+            },
+        ),
         tile::TileError::Allocation { amount } => Error::Allocation {
             kind: crate::package::table_cells::LimitKind::PeakScratchBytes,
             amount,
         },
-        tile::TileError::LimitExceeded { observed, maximum } => Error::LimitExceeded {
+        tile::TileError::LimitExceeded { observed, maximum } => Error::Limit {
             kind: crate::package::table_cells::LimitKind::WireWork,
             observed,
             maximum,
             path,
         },
-        tile::TileError::UnsupportedValue { .. } => Error::UnsupportedSource { path },
-        tile::TileError::UnsupportedSource { .. } => Error::UnsupportedSource { path },
+        tile::TileError::UnsupportedValue { .. } => {
+            Error::Refused(crate::package::table_cells::Refusal::UnsupportedSource { path })
+        },
+        tile::TileError::UnsupportedSource { .. } => {
+            Error::Refused(crate::package::table_cells::Refusal::UnsupportedSource { path })
+        },
         tile::TileError::InvalidSource
         | tile::TileError::DuplicateOrUnsortedChange { .. }
         | tile::TileError::OutOfBounds { .. } => Error::InvalidSource { path },
@@ -6202,13 +6295,15 @@ fn map_rewrite_error(
     path: crate::package::table_cells::Path,
 ) -> Error {
     match error {
-        rewrite::RewriteError::UnsupportedSource => Error::UnsupportedSource { path },
+        rewrite::RewriteError::UnsupportedSource => {
+            Error::Refused(crate::package::table_cells::Refusal::UnsupportedSource { path })
+        },
         rewrite::RewriteError::InvalidSource => Error::InvalidSource { path },
         rewrite::RewriteError::Allocation { amount } => Error::Allocation {
             kind: crate::package::table_cells::LimitKind::PeakScratchBytes,
             amount,
         },
-        rewrite::RewriteError::Limit => Error::LimitExceeded {
+        rewrite::RewriteError::Limit => Error::Limit {
             kind: crate::package::table_cells::LimitKind::TransactionWork,
             observed: u64::MAX,
             maximum: u64::MAX - 1,
@@ -6233,7 +6328,7 @@ fn verify_evidence_locality(
         .archive()
         .max_input_bytes()
         .checked_mul(64)
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: crate::package::table_cells::LimitKind::TransactionWork,
             observed: u64::MAX,
             maximum: source.state.options.archive().max_input_bytes(),
@@ -6307,11 +6402,9 @@ fn verify_evidence_locality_with_report(
         }
         messages.push(locality_message);
     }
-    let source_catalog = source
-        .state
-        .components
-        .physical()
-        .ok_or(Error::UnsupportedSource { path })?;
+    let source_catalog = source.state.components.physical().ok_or(Error::Refused(
+        crate::package::table_cells::Refusal::UnsupportedSource { path },
+    ))?;
     let candidate_catalog = candidate
         .state
         .components
@@ -6428,8 +6521,8 @@ fn verify_semantic_changes(
 ) -> Result<(), Error> {
     let selected = resolve_table(
         candidate,
-        SheetSelector::Index(sheet_position),
-        TableSelector::Index(table_position),
+        SheetSelector::index(sheet_position),
+        TableSelector::index(table_position),
     )?;
     for change in changes {
         let valid = match change.input_ref() {
@@ -6491,7 +6584,7 @@ mod tests {
         formula::{BinaryOperator, CachedValue, CellReference, Expression},
         package::table_cells::{DependencyKind, Error, Path},
         table::{
-            CellPosition,
+            At,
             cells::{Change, Input},
         },
     };
@@ -6516,14 +6609,12 @@ mod tests {
             .try_reserve_exact(3)
             .expect("staged change capacity");
         changes.push(Change::set(
-            CellPosition::from_a1("B3").expect("B3 parses"),
+            At::from_a1("B3").expect("B3 parses"),
             Input::number(42.0).expect("finite no-op number"),
         ));
-        changes.push(Change::clear(
-            CellPosition::from_a1("A1").expect("A1 parses"),
-        ));
+        changes.push(Change::clear(At::from_a1("A1").expect("A1 parses")));
         changes.push(Change::set(
-            CellPosition::from_a1("G22").expect("G22 parses"),
+            At::from_a1("G22").expect("G22 parses"),
             Input::number(43.0).expect("finite changed number"),
         ));
         let capacity = changes.capacity();
@@ -6534,7 +6625,7 @@ mod tests {
         assert_eq!(changes.len(), 1);
         assert_eq!(
             changes[0].position(),
-            CellPosition::from_a1("G22").expect("G22 parses")
+            At::from_a1("G22").expect("G22 parses")
         );
     }
 
@@ -6565,7 +6656,7 @@ mod tests {
         let payload = patch_varint_field(&message.data, 6, true, Some(513))
             .expect("raw-preserving row-count seed patch");
         let (resolved, _report) =
-            super::resolve::resolve_changed_target(&source, 0, 0, &[CellPosition::new(2, 1)])
+            super::resolve::resolve_changed_target(&source, 0, 0, &[At::new(2, 1)])
                 .expect("original body coordinate resolves dependencies");
         let owner_route = resolved
             .dependencies
@@ -6576,7 +6667,8 @@ mod tests {
                 else {
                     return false;
                 };
-                let Ok(view) = WireView::parse(payload) else {
+                let Ok(view) = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+                else {
                     return false;
                 };
                 let mut owner = None;
@@ -6684,7 +6776,7 @@ mod tests {
     fn synthetic_wide_source(columns: u32) -> Package {
         let source = Package::open(fixture()).expect("native basic fixture opens");
         let (target, _report) =
-            super::resolve::resolve_changed_target(&source, 0, 0, &[CellPosition::new(1, 1)])
+            super::resolve::resolve_changed_target(&source, 0, 0, &[At::new(1, 1)])
                 .expect("basic body coordinate resolves");
         assert!(columns > target.native.columns);
 
@@ -6908,7 +7000,7 @@ mod tests {
     fn synthetic_formula_cache_source(unsupported_formula: bool) -> Package {
         let source = Package::open(fixture()).expect("native basic fixture opens");
         let (target, _report) =
-            super::resolve::resolve_changed_target(&source, 0, 0, &[CellPosition::new(2, 1)])
+            super::resolve::resolve_changed_target(&source, 0, 0, &[At::new(2, 1)])
                 .expect("basic body coordinate resolves");
         let tile_route = target.storage.tiles.first().expect("basic has tile zero");
         let mut a2 = BncCell::minimal();
@@ -6934,9 +7026,9 @@ mod tests {
         let row_one_wide = row_one.has_wide_offsets.unwrap_or(false);
         let mut row_one_cells = decoded_test_row(row_one, 7);
         assert!(row_one_cells[1].is_some());
-        row_one_cells[1] = Some(a2.encode());
-        row_one_cells[2] = Some(b2.encode());
-        row_one_cells[3] = Some(c2.encode());
+        row_one_cells[1] = Some(a2.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap());
+        row_one_cells[2] = Some(b2.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap());
+        row_one_cells[3] = Some(c2.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap());
         let (row_one_storage, row_one_offsets) = encoded_test_row(&row_one_cells, row_one_wide);
         row_one.cell_count =
             u32::try_from(row_one_cells.iter().flatten().count()).expect("count fits");
@@ -6950,7 +7042,7 @@ mod tests {
         let row_two_wide = row_two.has_wide_offsets.unwrap_or(false);
         let mut row_two_cells = decoded_test_row(row_two, 7);
         assert!(row_two_cells[1].is_some());
-        row_two_cells[1] = Some(a3.encode());
+        row_two_cells[1] = Some(a3.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap());
         let (row_two_storage, row_two_offsets) = encoded_test_row(&row_two_cells, row_two_wide);
         row_two.cell_count =
             u32::try_from(row_two_cells.iter().flatten().count()).expect("count fits");
@@ -7077,7 +7169,7 @@ mod tests {
         const HOSTS_PER_ROW: usize = 4_096;
         let columns = u32::try_from(formulas.min(HOSTS_PER_ROW) + 8).expect("formula width fits");
         let source = synthetic_wide_source(columns);
-        let source_position = CellPosition::new(1, 7);
+        let source_position = At::new(1, 7);
         let (target, _report) =
             super::resolve::resolve_changed_target(&source, 0, 0, &[source_position])
                 .expect("wide formula source resolves");
@@ -7117,7 +7209,11 @@ mod tests {
             if host_row == 0 {
                 let mut source_cell = BncCell::minimal();
                 source_cell.set_number(1.0).expect("finite formula source");
-                cells[7] = Some(source_cell.encode());
+                cells[7] = Some(
+                    source_cell
+                        .encode(&litchi_numbers_wire::Limits::DEFAULT)
+                        .unwrap(),
+                );
             }
             let start = host_row * HOSTS_PER_ROW;
             let end = formulas.min(start + HOSTS_PER_ROW);
@@ -7127,7 +7223,7 @@ mod tests {
                 host.set_number(2.0).expect("finite formula cache");
                 host.set_formula_reference(1);
                 cells[usize::try_from(column).expect("formula column fits usize")] =
-                    Some(host.encode());
+                    Some(host.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap());
                 records.push(tsce::CellRecordExpandedArchive {
                     row: row_index,
                     column,
@@ -7250,7 +7346,7 @@ mod tests {
 
     fn synthetic_unique_rich_source() -> (Package, u64, u64) {
         let source = Package::open(fixture()).expect("native basic fixture opens");
-        let position = CellPosition::from_a1("C2").expect("C2 is canonical");
+        let position = At::from_a1("C2").expect("C2 is canonical");
         let (target, _report) = super::resolve::resolve_changed_target(&source, 0, 0, &[position])
             .expect("basic body coordinate resolves");
         let rich_index = target
@@ -7347,7 +7443,11 @@ mod tests {
         let mut cells = decoded_test_row(row, 7);
         let mut rich_cell = BncCell::minimal();
         rich_cell.set_rich_text(1);
-        cells[usize::try_from(position.column()).expect("column fits")] = Some(rich_cell.encode());
+        cells[usize::try_from(position.column()).expect("column fits")] = Some(
+            rich_cell
+                .encode(&litchi_numbers_wire::Limits::DEFAULT)
+                .unwrap(),
+        );
         let (storage, offsets) = encoded_test_row(&cells, wide);
         row.cell_count = u32::try_from(cells.iter().flatten().count()).expect("cell count fits");
         row.cell_storage_buffer = Some(storage);
@@ -7388,6 +7488,7 @@ mod tests {
                 type_: 6_218,
                 data: rich_payload,
             }],
+            Default::default(),
         )
         .expect("synthetic rich payload object is valid");
         payload_object.archive_info.message_infos[0]
@@ -7399,6 +7500,7 @@ mod tests {
                 type_: 2_001,
                 data: rich_storage,
             }],
+            Default::default(),
         )
         .expect("synthetic rich storage object is valid");
         storage_object.archive_info.message_infos[0]
@@ -7410,6 +7512,7 @@ mod tests {
                 type_: 2_002,
                 data: Vec::new(),
             }],
+            Default::default(),
         )
         .expect("synthetic style object is valid");
 
@@ -7495,11 +7598,11 @@ mod tests {
         )
     }
 
-    fn formula_cache_number(package: &Package, position: CellPosition) -> f64 {
+    fn formula_cache_number(package: &Package, position: At) -> f64 {
         crate::package::table_headers::resolve::resolve_target(package, 0, 0)
             .expect("formula seed native target resolves");
         let (target, _report) =
-            super::resolve::resolve_changed_target(package, 0, 0, &[CellPosition::new(1, 1)])
+            super::resolve::resolve_changed_target(package, 0, 0, &[At::new(1, 1)])
                 .expect("formula seed resolves");
         let tile_id = position.row() / target.storage.tile_size;
         let route = target
@@ -7536,7 +7639,11 @@ mod tests {
             .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
             .find(|offset| *offset != u16::MAX)
             .map_or(storage.len(), usize::from);
-        let cell = BncCell::parse(&storage[start..end]).expect("formula BNC parses");
+        let cell = BncCell::parse(
+            &storage[start..end],
+            &crate::cell::wire::limits_for_source(&storage[start..end]),
+        )
+        .expect("formula BNC parses");
         match cell.cached_scalar().expect("cached scalar decodes") {
             Some(CachedScalar::Number(value)) => value.get(),
             other => panic!("expected numeric formula cache, got {other:?}"),
@@ -7555,7 +7662,7 @@ mod tests {
             for index in 0..changes {
                 edit = edit
                     .set(
-                        CellPosition::new(
+                        At::new(
                             u32::try_from(index / 4_096 + 1).expect("wide row fits"),
                             u32::try_from(index % 4_096 + 7).expect("wide coordinate fits"),
                         ),
@@ -7681,10 +7788,12 @@ mod tests {
         );
         assert_eq!((small.tile_reads, large.tile_reads), (2, 2));
         assert_eq!((small.tile_writes, large.tile_writes), (1, 1));
-        assert_eq!((small.component_encodes, large.component_encodes), (2, 2));
+        // The tile, the row-header bucket and the column-header bucket,
+        // whose columns all gain cells.
+        assert_eq!((small.component_encodes, large.component_encodes), (3, 3));
         assert_eq!(
             (small.components_reassembled, large.components_reassembled),
-            (2, 2)
+            (3, 3)
         );
     }
 
@@ -7700,7 +7809,7 @@ mod tests {
             for index in 0..4_096 {
                 edit = edit
                     .set(
-                        CellPosition::new(
+                        At::new(
                             1,
                             u32::try_from(index + 7).expect("refusal coordinate fits"),
                         ),
@@ -7712,7 +7821,7 @@ mod tests {
         });
         assert!(matches!(
             result,
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: crate::package::table_cells::LimitKind::Updates,
                 observed: 4_096,
                 maximum: 4_095,
@@ -7745,7 +7854,7 @@ mod tests {
         let run = || {
             source
                 .edit_table_cells(0usize, 0usize)?
-                .set_formula_cached(CellPosition::new(2, 2), expression.clone(), cache.clone())?
+                .set_formula_cached(At::new(2, 2), expression.clone(), cache.clone())?
                 .commit()
         };
 
@@ -7871,7 +7980,7 @@ mod tests {
             super::aggregate_testing::set_authorization_limits(limits);
             let (result, usage) = super::budget::testing::observe(None, run);
             match result {
-                Err(Error::LimitExceeded {
+                Err(Error::Limit {
                     kind,
                     observed,
                     maximum,
@@ -7923,7 +8032,7 @@ mod tests {
                 source
                     .edit_table_cells(0usize, 0usize)?
                     .set(
-                        CellPosition::new(512, 6),
+                        At::new(512, 6),
                         Input::number(513.0).expect("finite sparse evidence input"),
                     )?
                     .commit()
@@ -7953,7 +8062,7 @@ mod tests {
         );
         assert!(matches!(
             result,
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: crate::package::table_cells::LimitKind::TransactionWork,
                 observed,
                 maximum: reported_maximum,
@@ -7969,14 +8078,14 @@ mod tests {
         fn measured(formulas: usize) -> super::budget::Usage {
             let source = synthetic_formula_fanout_source(formulas);
             let (target, _report) =
-                super::resolve::resolve_changed_target(&source, 0, 0, &[CellPosition::new(1, 7)])
+                super::resolve::resolve_changed_target(&source, 0, 0, &[At::new(1, 7)])
                     .expect("rooted formula target resolves");
             assert_eq!(target.path(), Path::Table { sheet: 0, table: 0 });
             let (commit, usage) = super::budget::testing::observe(None, || {
                 source
                     .edit_table_cells(0usize, 0usize)?
                     .set(
-                        CellPosition::new(1, 7),
+                        At::new(1, 7),
                         Input::number(2.0).expect("finite formula source update"),
                     )?
                     .commit()
@@ -8038,7 +8147,7 @@ mod tests {
                 let mut edit = source.edit_table_cells(0usize, 0usize)?;
                 for index in 0..formulas {
                     edit = edit.set_formula_cached(
-                        CellPosition::new(
+                        At::new(
                             u32::try_from(1 + index / HOSTS_PER_ROW).expect("formula row fits"),
                             u32::try_from(8 + index % HOSTS_PER_ROW).expect("formula column fits"),
                         ),
@@ -8122,7 +8231,7 @@ mod tests {
 
     fn row_header_cell_count(package: &Package, row: u32) -> Option<u32> {
         let (target, _report) =
-            super::resolve::resolve_changed_target(package, 0, 0, &[CellPosition::new(row, 1)])
+            super::resolve::resolve_changed_target(package, 0, 0, &[At::new(row, 1)])
                 .expect("row-header target resolves");
         let bucket =
             usize::try_from(row / super::sparse::HEADER_BUCKET_ROWS).expect("header bucket fits");
@@ -8141,6 +8250,66 @@ mod tests {
             .map(|header| header.number_of_cells)
     }
 
+    fn column_header_cell_count(package: &Package, column: u32) -> Option<u32> {
+        let (target, _report) =
+            super::resolve::resolve_changed_target(package, 0, 0, &[At::new(2, column)])
+                .expect("column-header target resolves");
+        let payload = super::message_payload(package, target.storage.column_headers, Path::Package)
+            .expect("column-header bucket payload exists");
+        let bucket =
+            tst::HeaderStorageBucket::decode(payload).expect("column-header bucket decodes");
+        bucket
+            .headers
+            .iter()
+            .find(|header| header.index == column)
+            .map(|header| header.number_of_cells)
+    }
+
+    #[test]
+    fn native_column_header_counts_track_value_writes_exactly() -> TestResult {
+        let source = Package::open(fixture())?;
+        let source_bytes = source.source_bytes().to_vec();
+        let counts = |package: &Package| {
+            [1, 2, 5].map(|column: u32| column_header_cell_count(package, column))
+        };
+        // Column B stores B2 and B3; C has no header; F's header carries a
+        // width and counts no cell.
+        assert_eq!(counts(&source), [Some(2), None, Some(0)]);
+        assert_eq!(row_header_cell_count(&source, 2), Some(1));
+
+        // Cleared, B3 keeps its styled record, so both axes still count it.
+        let commit = source
+            .edit_table_cells(0usize, 0usize)?
+            .set_a1("C3", Input::boolean(true))?
+            .clear_a1("B3")?
+            .set_a1("B2", Input::number(7.0)?)?
+            .set_a1("F3", Input::boolean(true))?
+            .commit()?;
+        assert_eq!(counts(commit.package()), [Some(2), Some(1), Some(1)]);
+        assert_eq!(row_header_cell_count(commit.package(), 2), Some(3));
+        assert_eq!(
+            source
+                .apply_table_cells(commit.patch())?
+                .package()
+                .source_bytes(),
+            commit.package().source_bytes()
+        );
+        let restored = commit
+            .package()
+            .apply_table_cells(&commit.patch().inverse())?;
+        assert_eq!(restored.package().source_bytes(), source_bytes);
+
+        // A bare header left counting no cell goes; a sized one stays.
+        let cleared = commit
+            .package()
+            .edit_table_cells(0usize, 0usize)?
+            .clear_a1("C3")?
+            .clear_a1("F3")?
+            .commit()?;
+        assert_eq!(counts(cleared.package()), [Some(2), None, Some(0)]);
+        Ok(())
+    }
+
     #[test]
     fn native_body_number_commit_apply_and_inverse_are_exact() -> TestResult {
         let source = Package::open(fixture())?;
@@ -8151,7 +8320,7 @@ mod tests {
             .commit()?;
         let state = commit
             .package()
-            .table_cell(0usize, 0usize, CellPosition::from_a1("B3")?)?;
+            .table_cell(0usize, 0usize, At::from_a1("B3")?)?;
         assert!(matches!(
             state.storage().value(),
             Some(Value::Number(value)) if value.get() == 43.0
@@ -8174,7 +8343,7 @@ mod tests {
     fn native_existing_row_header_count_tracks_insert_and_delete_exactly() -> TestResult {
         let source = Package::open(fixture())?;
         let source_bytes = source.source_bytes().to_vec();
-        let position = CellPosition::from_a1("C3")?;
+        let position = At::from_a1("C3")?;
         assert!(
             source
                 .table_cell(0usize, 0usize, position)?
@@ -8248,7 +8417,7 @@ mod tests {
             .commit()?;
         let state = commit
             .package()
-            .table_cell(0usize, 0usize, CellPosition::from_a1("B2")?)?;
+            .table_cell(0usize, 0usize, At::from_a1("B2")?)?;
         assert!(matches!(
             state.storage().value(),
             Some(Value::Text(value)) if value == "replacement"
@@ -8275,7 +8444,7 @@ mod tests {
         // evidence gate and intentionally is not copied into the repository.
         let source = Package::open(path)?;
         let before = source.source_bytes().to_vec();
-        let position = CellPosition::from_a1("C2")?;
+        let position = At::from_a1("C2")?;
         let commit = source
             .edit_table_cells(0usize, 0usize)?
             .set(position, Input::text("CELL: Café changed")?)?
@@ -8301,7 +8470,7 @@ mod tests {
     fn synthetic_unique_rich_commit_apply_inverse_and_reference_release_are_exact() -> TestResult {
         let (source, storage_identifier, style_identifier) = synthetic_unique_rich_source();
         let before = source.source_bytes().to_vec();
-        let position = CellPosition::from_a1("C2")?;
+        let position = At::from_a1("C2")?;
         let state = source.table_cell(0usize, 0usize, position)?;
         assert!(matches!(
             state.storage().value(),
@@ -8359,7 +8528,7 @@ mod tests {
     #[test]
     fn synthetic_unique_rich_output_is_behind_the_aggregate_execution_barrier() -> TestResult {
         let (source, _storage_identifier, _style_identifier) = synthetic_unique_rich_source();
-        let position = CellPosition::from_a1("C2")?;
+        let position = At::from_a1("C2")?;
         let run = || {
             source
                 .edit_table_cells(0usize, 0usize)?
@@ -8396,7 +8565,7 @@ mod tests {
             super::aggregate_testing::set_authorization_limits(limits);
             let (result, usage) = super::budget::testing::observe(None, run);
             assert!(
-                matches!(result, Err(Error::LimitExceeded { .. })),
+                matches!(result, Err(Error::Limit { .. })),
                 "{name} max-minus-one refuses"
             );
             assert_eq!(super::aggregate_testing::observation().1, 0, "{name}");
@@ -8412,9 +8581,9 @@ mod tests {
     fn synthetic_body_formula_chain_refreshes_once_and_replays_exactly() -> TestResult {
         let source = synthetic_formula_cache_source(false);
         let before = source.source_bytes().to_vec();
-        let precedent = CellPosition::from_a1("B2")?;
-        let first_formula = CellPosition::from_a1("C2")?;
-        let downstream_formula = CellPosition::from_a1("D2")?;
+        let precedent = At::from_a1("B2")?;
+        let first_formula = At::from_a1("C2")?;
+        let downstream_formula = At::from_a1("D2")?;
         assert_eq!(formula_cache_number(&source, first_formula), 323.0);
         assert_eq!(formula_cache_number(&source, downstream_formula), 646.0);
 
@@ -8451,11 +8620,11 @@ mod tests {
             .set_a1("B3", Input::number(204.0)?)?
             .commit()?;
         assert_eq!(
-            formula_cache_number(commit.package(), CellPosition::from_a1("C2")?),
+            formula_cache_number(commit.package(), At::from_a1("C2")?),
             325.0
         );
         assert_eq!(
-            formula_cache_number(commit.package(), CellPosition::from_a1("D2")?),
+            formula_cache_number(commit.package(), At::from_a1("D2")?),
             650.0
         );
         assert_eq!(commit.diagnostics().refreshed_formula_caches(), 2);
@@ -8482,10 +8651,12 @@ mod tests {
             .expect_err("unsupported reachable formula refuses");
         assert!(matches!(
             error,
-            Error::UnsupportedDependency {
-                kind: DependencyKind::FormulaCache,
-                ..
-            }
+            Error::Refused(
+                crate::package::table_cells::Refusal::UnsupportedDependency {
+                    kind: DependencyKind::FormulaCache,
+                    ..
+                }
+            )
         ));
         assert_eq!(source.source_bytes(), before);
         Ok(())
@@ -8495,7 +8666,7 @@ mod tests {
     fn synthetic_513_row_sparse_commit_apply_and_inverse_are_exact() -> TestResult {
         let source = synthetic_513_row_source();
         let before = source.source_bytes().to_vec();
-        let position = CellPosition::new(512, 6);
+        let position = At::new(512, 6);
         let (resolved, _report) =
             super::resolve::resolve_changed_target(&source, 0, 0, &[position])?;
         assert!(resolved.dependencies.cell_record_tiles.is_empty());

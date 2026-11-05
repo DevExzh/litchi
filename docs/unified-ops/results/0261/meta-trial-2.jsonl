@@ -1,0 +1,18 @@
+{"corpus":"new","pair":"unified-source / leaf-source","leaf_ns":18900,"unified_ns":19590,"ratio":1.0365}
+{"corpus":"new","pair":"unified-source / leaf-eager","leaf_ns":31310,"unified_ns":19570,"ratio":0.6250}
+{"corpus":"new","pair":"unified-eager / leaf-eager","leaf_ns":32160,"unified_ns":35380,"ratio":1.1001}
+{"corpus":"new","pair":"save: unified-source / leaf-source","leaf_ns":48641,"unified_ns":49550,"ratio":1.0187}
+{"corpus":"new","pair":"save: unified-source / leaf-eager","leaf_ns":58500,"unified_ns":50991,"ratio":0.8716}
+{"corpus":"new","pair":"save: unified-eager / leaf-eager","leaf_ns":57830,"unified_ns":62700,"ratio":1.0842}
+{"corpus":"Simple.xlsb","pair":"unified-source / leaf-source","leaf_ns":32250,"unified_ns":33150,"ratio":1.0279}
+{"corpus":"Simple.xlsb","pair":"unified-source / leaf-eager","leaf_ns":53730,"unified_ns":33260,"ratio":0.6190}
+{"corpus":"Simple.xlsb","pair":"unified-eager / leaf-eager","leaf_ns":54491,"unified_ns":60450,"ratio":1.1094}
+{"corpus":"Simple.xlsb","pair":"save: unified-source / leaf-source","leaf_ns":77920,"unified_ns":79591,"ratio":1.0214}
+{"corpus":"Simple.xlsb","pair":"save: unified-source / leaf-eager","leaf_ns":96101,"unified_ns":82501,"ratio":0.8585}
+{"corpus":"Simple.xlsb","pair":"save: unified-eager / leaf-eager","leaf_ns":93730,"unified_ns":103121,"ratio":1.1002}
+{"corpus":"8x2000 cells","pair":"unified-source / leaf-source","leaf_ns":30030,"unified_ns":30590,"ratio":1.0186}
+{"corpus":"8x2000 cells","pair":"unified-source / leaf-eager","leaf_ns":132311,"unified_ns":30390,"ratio":0.2297}
+{"corpus":"8x2000 cells","pair":"unified-eager / leaf-eager","leaf_ns":134091,"unified_ns":142021,"ratio":1.0591}
+{"corpus":"8x2000 cells","pair":"save: unified-source / leaf-source","leaf_ns":91521,"unified_ns":93011,"ratio":1.0163}
+{"corpus":"8x2000 cells","pair":"save: unified-source / leaf-eager","leaf_ns":189381,"unified_ns":97291,"ratio":0.5137}
+{"corpus":"8x2000 cells","pair":"save: unified-eager / leaf-eager","leaf_ns":188531,"unified_ns":204231,"ratio":1.0833}

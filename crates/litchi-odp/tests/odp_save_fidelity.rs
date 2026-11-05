@@ -5,7 +5,7 @@
     reason = "integration-test assertions panic on failure by design"
 )]
 
-use litchi_odp::{Presentation, core::OwnedPackage, edit};
+use litchi_odp::{Package, core::OwnedPackage};
 
 macro_rules! fixture {
     ($name:literal) => {
@@ -19,7 +19,9 @@ macro_rules! fixture {
 }
 
 fn deck_text(bytes: Vec<u8>) -> String {
-    Presentation::from_bytes(bytes)
+    Package::from_bytes(&bytes)
+        .unwrap()
+        .presentation()
         .unwrap()
         .slides()
         .unwrap()
@@ -30,11 +32,11 @@ fn deck_text(bytes: Vec<u8>) -> String {
 }
 
 fn assert_exact_noop(bytes: Vec<u8>) {
-    let source = edit::Snapshot::from_bytes(bytes.clone()).unwrap();
-    let commit = source.transaction().unwrap().commit().unwrap();
-    assert!(!commit.changed());
+    let source = Package::from_bytes(&bytes).unwrap();
+    let commit = source.edit().unwrap().commit().unwrap();
+    assert!(!commit.diagnostics().changed());
     assert!(commit.patch().is_noop());
-    assert_eq!(commit.snapshot().bytes(), bytes);
+    assert_eq!(commit.package().as_bytes(), bytes);
 }
 
 #[test]
@@ -76,7 +78,9 @@ fn table_spans_fonts_and_automatic_styles_are_retained_byte_exactly() {
 #[test]
 fn empty_style_name_reference_opens_and_is_an_exact_noop() {
     let bytes = fixture!("tdf169979.odp");
-    Presentation::from_bytes(bytes.clone())
+    Package::from_bytes(&bytes)
+        .unwrap()
+        .presentation()
         .unwrap()
         .slides()
         .unwrap();

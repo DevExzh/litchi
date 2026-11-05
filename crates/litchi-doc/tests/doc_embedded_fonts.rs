@@ -47,7 +47,11 @@ fn fixture(relative: &str) -> PathBuf {
 }
 
 fn parse_embedded_fonts(relative: &str) -> Option<DocumentEmbeddedFonts> {
-    let mut ole = OleFile::open(File::open(fixture(relative)).unwrap()).unwrap();
+    let mut ole = OleFile::open(
+        File::open(fixture(relative)).unwrap(),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let word_document = ole.open_stream(&["WordDocument"]).unwrap();
     let fib = FileInformationBlock::parse(&word_document).unwrap();
     let table_name = if fib.which_table_stream() {
@@ -75,7 +79,7 @@ fn documents_without_the_table_report_none() {
 
 #[test]
 fn exposes_embedded_fonts_through_the_document_api() {
-    let mut package = litchi_doc::Package::from_reader(
+    let mut package = litchi_doc::raw::Reader::from_reader(
         File::open(fixture(
             "test-data/poi/test-data/hpsf/TestNon4ByteBoundary.doc",
         ))

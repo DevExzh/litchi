@@ -22,18 +22,18 @@ fn fixture_path(name: &str) -> PathBuf {
 
 fn verify_fixture(name: &str) -> Result<CorpusSummary, Box<dyn Error>> {
     let source = fs::read(fixture_path(name))?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     assert!(
         catalog.source_is_exact(),
         "native flat package unexpectedly lost exact-source authority: {name}"
     );
     assert_eq!(
-        catalog.to_bytes()?,
+        catalog.to_bytes(Default::default())?,
         source,
         "catalog no-op changed package bytes in {name}"
     );
     let mut streamed = Vec::new();
-    catalog.write_to(&mut streamed)?;
+    catalog.write_to(&mut streamed, Default::default())?;
     assert_eq!(
         streamed, source,
         "streaming catalog no-op changed package bytes in {name}"
@@ -64,9 +64,9 @@ fn verify_fixture(name: &str) -> Result<CorpusSummary, Box<dyn Error>> {
             "native IWA component unexpectedly remained opaque: {}",
             entry.name()
         );
-        let stream = SnappyStream::decompress(entry.data())?;
-        let archive = Archive::parse(stream.as_bytes())?;
-        let encoded = archive.to_bytes()?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
+        let encoded = archive.to_bytes(Default::default())?;
         assert_eq!(
             encoded,
             stream.as_bytes(),
@@ -131,7 +131,7 @@ fn native_iwa_headers_and_payloads_are_exactly_preserved() -> Result<(), Box<dyn
 
 fn verify_native_reassembly_patch(name: &str) -> Result<(), Box<dyn Error>> {
     let source = fs::read(fixture_path(name))?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let selected = catalog
         .iter()
         .find(|entry| {
@@ -153,7 +153,7 @@ fn verify_native_reassembly_patch(name: &str) -> Result<(), Box<dyn Error>> {
         Limits::default(),
     )?;
     let target = patch.apply(&source)?;
-    let target_catalog = Catalog::from_bytes(&target)?;
+    let target_catalog = Catalog::from_bytes(&target, Default::default())?;
     assert_eq!(target_catalog.len(), catalog.len());
     let source_archive = soapberry_zip::ZipArchive::from_slice(&source)?;
     let target_archive = soapberry_zip::ZipArchive::from_slice(&target)?;

@@ -72,7 +72,7 @@
 //!   stamped with the owner part name when read through a part view.
 //! * A slide transition ([`crate::transition::Transition`], from
 //!   [`crate::transition::read`] or
-//!   [`crate::SourceBackedSlideSnapshot::transition`]) carries the repairs
+//!   [`crate::source::Slide::transition`]) carries the repairs
 //!   its read applied in
 //!   [`crate::transition::Transition::tolerance_report`]; the snapshot
 //!   stamps its slide part name. The report shares the value's retained
@@ -189,7 +189,7 @@
 //! missing `id`/`r:id`, an ID outside `ST_SlideId` (256..2^31), a stray
 //! `p:sldId` outside the list, repeated lists, XML well-formedness, and the
 //! slide-count limit stay hard errors. The lossless edit planners —
-//! [`crate::SourceBackedPresentationEditor`], cross-presentation copy, and
+//! [`crate::source::Package`], cross-presentation copy, and
 //! the opened-presentation transactions — keep the strict contract and
 //! refuse a slide list that needed a repair.
 //!
@@ -247,7 +247,7 @@
 //! `shape/classification/codec.rs`), change tracking
 //! (`change_tracking/codec.rs`), the source-bound metadata layouts
 //! (`comments/collaboration/codec.rs`, `presentation_properties/
-//! {readonly_recommended, package.rs root-dialect probe}`,
+//! {read_only_recommended, package.rs root-dialect probe}`,
 //! `presentation_properties/metadata/{guides, events, custom_show,
 //! structure layout}`, `modern_comments/wire/*`), the transition and
 //! animation-template validators used by edits
@@ -1117,6 +1117,30 @@ impl ToleranceReport {
                 tolerated.part = Some(Arc::clone(&part));
             }
         }
+    }
+
+    /// The logical number of heap bytes this report keeps: its defect slots,
+    /// consecutive shared part names once, and the item and value text.
+    /// Nonconsecutive shared names may be counted repeatedly. This is a
+    /// conservative cache weight, not an allocator measurement.
+    pub(crate) fn heap_bytes(&self) -> usize {
+        let mut total = self
+            .defects
+            .capacity()
+            .saturating_mul(size_of::<ToleratedDefect>());
+        let mut last_part: Option<&Arc<str>> = None;
+        for tolerated in &self.defects {
+            if let Some(part) = tolerated.part.as_ref()
+                && !last_part.is_some_and(|last| Arc::ptr_eq(last, part))
+            {
+                total = total.saturating_add(part.len());
+                last_part = Some(part);
+            }
+            total = total
+                .saturating_add(tolerated.item.as_deref().map_or(0, str::len))
+                .saturating_add(tolerated.value.as_deref().map_or(0, str::len));
+        }
+        total
     }
 
     /// Merge another parse's report into this one, keeping discovery order.

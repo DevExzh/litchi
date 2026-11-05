@@ -4,11 +4,12 @@
 )]
 
 use super::anchor::{validate, write_all};
+use super::builder::{Anchor, Chart, Series};
 use super::relationship::{
     ExternalDataPart, ExternalDataTarget, is_external_data_type, is_user_shapes_type,
     user_shapes_ids,
 };
-use super::{Anchor, Chart, Series, read, write};
+use super::{read, write};
 
 #[test]
 fn anchor_validation_preserves_worksheet_bounds_and_offsets() {

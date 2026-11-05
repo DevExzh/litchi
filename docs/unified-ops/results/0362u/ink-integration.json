@@ -1,0 +1,89 @@
+{
+  "source_parents": [
+    "cc76bd50de",
+    "f97f0eef7a"
+  ],
+  "tests_and_clippy": [
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-docx",
+        "--all-features",
+        "--test",
+        "ink_inventory",
+        "--test",
+        "source_backed_tail_append",
+        "--test",
+        "source_backed_tail_append_stream",
+        "--test",
+        "source_backed_paragraph_copy"
+      ],
+      "exit": 0,
+      "seconds": 54.257765701040626,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/ink-assembly-v1/check-0.log",
+      "bytes": 13229,
+      "sha256": "cd4694a0c60c20a620dbe3a0eef0527dca93289e84b8515e1253f67cbb1946ef"
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-docx",
+        "-p",
+        "litchi-ops",
+        "-p",
+        "litchi-xlsb",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 452.6136858749669,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/ink-assembly-v1/check-1.log",
+      "bytes": 4606,
+      "sha256": "429128cb4fb1da2817829a9b2cc52166c0975b5379ab60299c4651c80360797f"
+    }
+  ],
+  "api_gates": [
+    {
+      "command": [
+        "python3",
+        "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/ink-gates.py"
+      ],
+      "exit": 0,
+      "seconds": 109.90734756505117,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/ink-gates-v1/check-0.log",
+      "bytes": 5260,
+      "sha256": "2aee690117c4f7faadf74841b40e8fc9037373fd55fbb87b280ac929aa7dd81c"
+    }
+  ],
+  "rustdoc_captures": [
+    {
+      "profile": "docx-minimal",
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/ink-docx-minimal.json",
+      "bytes": 76823695,
+      "sha256": "8347e8b03faa249b36e9e402fd6302fc062a733005f9e09a5e57d820c5efa1c7"
+    },
+    {
+      "profile": "docx-full",
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/ink-docx-full.json",
+      "bytes": 78540789,
+      "sha256": "37d58f6058a454da7b3d770df05e27d83c311dd3e9c876a787b61809d99d75f0"
+    }
+  ],
+  "test_count": 144,
+  "result_contracts": {
+    "docx-minimal": 42,
+    "docx-full": 43
+  },
+  "performance": "No new timing claim; native qualification remains required."
+}

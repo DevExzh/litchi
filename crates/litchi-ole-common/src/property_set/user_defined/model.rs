@@ -1,6 +1,7 @@
 use super::{HYPERLINKS, LINK_BASE, codec};
 use crate::property_set::model::try_clone_property_set;
 use crate::property_set::{CodePage, Section, USER_DEFINED_PROPERTIES_FMTID, Value};
+use crate::{Error, LimitKind};
 use litchi_cfb::OleError;
 
 const MIN_NAMED_PROPERTY_ID: u32 = 2;
@@ -113,26 +114,18 @@ impl LimitsBuilder {
     /// # Errors
     ///
     /// Returns an error if any configured cap is zero.
-    pub fn build(self) -> Result<Limits, OleError> {
+    pub fn build(self) -> Result<Limits, Error> {
         if self.blob_bytes == 0 {
-            return Err(invalid(
-                "user-defined hyperlink maximum blob bytes must be nonzero",
-            ));
+            return Err(invalid_limit(LimitKind::UserDefinedBlobBytes));
         }
         if self.link_count == 0 {
-            return Err(invalid(
-                "user-defined hyperlink maximum link count must be nonzero",
-            ));
+            return Err(invalid_limit(LimitKind::UserDefinedLinks));
         }
         if self.string_units == 0 {
-            return Err(invalid(
-                "user-defined hyperlink maximum string units must be nonzero",
-            ));
+            return Err(invalid_limit(LimitKind::UserDefinedStringUnits));
         }
         if self.total_utf16_units == 0 {
-            return Err(invalid(
-                "user-defined hyperlink maximum aggregate string units must be nonzero",
-            ));
+            return Err(invalid_limit(LimitKind::UserDefinedTotalUtf16Units));
         }
         Ok(Limits {
             blob_bytes: self.blob_bytes,
@@ -155,9 +148,9 @@ impl LinkBase {
     /// # Errors
     ///
     /// Returns an error if `value` contains a NUL character.
-    pub fn new(value: impl Into<String>) -> Result<Self, OleError> {
+    pub fn new(value: impl Into<String>) -> Result<Self, Error> {
         let text = value.into();
-        validate_text(&text, "link base")?;
+        validate_text(&text, "link base").map_err(Error::from)?;
         Ok(Self { value: text })
     }
 
@@ -191,11 +184,11 @@ impl Hyperlink {
         info: i32,
         target: impl Into<String>,
         location: impl Into<String>,
-    ) -> Result<Self, OleError> {
+    ) -> Result<Self, Error> {
         let target_text = target.into();
         let location_text = location.into();
-        validate_text(&target_text, "hyperlink target")?;
-        validate_text(&location_text, "hyperlink location")?;
+        validate_text(&target_text, "hyperlink target").map_err(Error::from)?;
+        validate_text(&location_text, "hyperlink location").map_err(Error::from)?;
         Ok(Self {
             stored_hash: hyperlink_hash(&target_text, &location_text),
             app,
@@ -319,21 +312,12 @@ pub struct Properties<'a> {
 }
 
 impl<'a> Properties<'a> {
-    /// Creates a lazy view using [`Limits::default`].
+    /// Creates a lazy view using the caller's typed-overlay limits.
     ///
     /// # Errors
     ///
     /// Returns an error if `section` is not a `UserDefinedProperties` section.
-    pub fn new(section: &'a Section) -> Result<Self, OleError> {
-        Self::with_limits(section, Limits::default())
-    }
-
-    /// Creates a lazy view using caller-supplied validated limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `section` is not a `UserDefinedProperties` section.
-    pub fn with_limits(section: &'a Section, limits: Limits) -> Result<Self, OleError> {
+    pub fn new(section: &'a Section, limits: Limits) -> Result<Self, Error> {
         validate_section(section)?;
         Ok(Self { section, limits })
     }
@@ -346,7 +330,7 @@ impl<'a> Properties<'a> {
 
     /// Returns the limits used for subsequent lazy reads.
     #[must_use]
-    pub const fn limits(&self) -> Limits {
+    pub const fn limits_value(&self) -> Limits {
         self.limits
     }
 
@@ -356,7 +340,7 @@ impl<'a> Properties<'a> {
     ///
     /// Returns an error if the named property is not a BLOB or its payload
     /// violates the configured decoding limits.
-    pub fn link_base(&self) -> Result<Option<LinkBase>, OleError> {
+    pub fn link_base(&self) -> Result<Option<LinkBase>, Error> {
         self.named_blob(LINK_BASE)?
             .map(|value| codec::decode_link_base(value, self.limits))
             .transpose()
@@ -368,17 +352,19 @@ impl<'a> Properties<'a> {
     ///
     /// Returns an error if the named property is not a BLOB or its payload
     /// violates the configured decoding limits.
-    pub fn hyperlinks(&self) -> Result<Option<Hyperlinks>, OleError> {
+    pub fn hyperlinks(&self) -> Result<Option<Hyperlinks>, Error> {
         self.named_blob(HYPERLINKS)?
             .map(|value| codec::decode_hyperlinks(value, self.limits))
             .transpose()
     }
 
-    fn named_blob(&self, name: &str) -> Result<Option<&'a [u8]>, OleError> {
+    fn named_blob(&self, name: &str) -> Result<Option<&'a [u8]>, Error> {
         match self.section.find_named(name) {
             None => Ok(None),
             Some((_, Value::Blob(value))) => Ok(Some(value)),
-            Some(_) => Err(invalid(format!("{name} must be a VT_BLOB property"))),
+            Some(_) => Err(Error::from(invalid(format!(
+                "{name} must be a VT_BLOB property"
+            )))),
         }
     }
 }
@@ -393,23 +379,13 @@ pub struct Edit<'a> {
 }
 
 impl<'a> Edit<'a> {
-    /// Creates an editor using [`Limits::default`].
+    /// Creates an editor using the caller's typed-overlay limits.
     ///
     /// # Errors
     ///
     /// Returns an error if `section` is not a `UserDefinedProperties` section or
     /// an existing reserved property has an invalid identifier.
-    pub fn new(section: &'a mut Section) -> Result<Self, OleError> {
-        Self::with_limits(section, Limits::default())
-    }
-
-    /// Creates an editor using caller-supplied validated limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `section` is not a `UserDefinedProperties` section or
-    /// an existing reserved property has an invalid identifier.
-    pub fn with_limits(section: &'a mut Section, limits: Limits) -> Result<Self, OleError> {
+    pub fn new(section: &'a mut Section, limits: Limits) -> Result<Self, Error> {
         validate_edit_section(section)?;
         Ok(Self { section, limits })
     }
@@ -430,7 +406,7 @@ impl<'a> Edit<'a> {
         clippy::needless_pass_by_value,
         reason = "the public edit API intentionally accepts temporary validated values by value"
     )]
-    pub fn set_link_base(&mut self, value: LinkBase) -> Result<(), OleError> {
+    pub fn set_link_base(&mut self, value: LinkBase) -> Result<(), Error> {
         let encoded_value = Value::Blob(codec::encode_link_base(&value, self.limits)?);
         self.set_named(LINK_BASE, encoded_value)
     }
@@ -450,7 +426,7 @@ impl<'a> Edit<'a> {
         clippy::needless_pass_by_value,
         reason = "the public edit API intentionally accepts temporary validated values by value"
     )]
-    pub fn set_hyperlinks(&mut self, value: Hyperlinks) -> Result<(), OleError> {
+    pub fn set_hyperlinks(&mut self, value: Hyperlinks) -> Result<(), Error> {
         let encoded_value = Value::Blob(codec::encode_hyperlinks(&value, self.limits)?);
         self.set_named(HYPERLINKS, encoded_value)
     }
@@ -460,7 +436,7 @@ impl<'a> Edit<'a> {
         self.remove_named(HYPERLINKS)
     }
 
-    fn set_named(&mut self, name: &str, value: Value) -> Result<(), OleError> {
+    fn set_named(&mut self, name: &str, value: Value) -> Result<(), Error> {
         let mut draft = try_clone_property_set(self.section)?;
         if draft.page().is_none() {
             draft.set_page(CodePage::WINDOWS_1252);
@@ -485,6 +461,14 @@ impl<'a> Edit<'a> {
 
 fn invalid(message: impl Into<String>) -> OleError {
     OleError::InvalidFormat(message.into())
+}
+
+fn invalid_limit(kind: LimitKind) -> Error {
+    Error::InvalidLimit {
+        kind,
+        value: 0,
+        maximum: u64::try_from(usize::MAX).unwrap_or(u64::MAX),
+    }
 }
 
 fn validate_section(section: &Section) -> Result<(), OleError> {

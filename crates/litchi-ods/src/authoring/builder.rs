@@ -2,9 +2,9 @@ use crate::model::database_range::Range as DatabaseRange;
 use crate::model::names::{Definition, Expression, Range};
 use crate::worksheet::{Cell, Sheet};
 use litchi_core::{Error, Result};
-use litchi_odf_common::ResolvedReader;
 use litchi_odf_common::calculation::Settings;
 use litchi_odf_common::core::PackageWriter;
+use litchi_odf_common::{ResolvedReader, XmlStreamLimits};
 use quick_xml::{
     events::Event,
     name::{Namespace, ResolveResult},
@@ -59,7 +59,8 @@ impl Builder {
     /// # Errors
     /// Returns an error when the operation cannot be completed.
     pub fn set_metadata(&mut self, metadata: litchi_core::Metadata) -> Result<&mut Self> {
-        let snapshot = crate::metadata::Snapshot::from_source(None)?;
+        let snapshot =
+            crate::metadata::Snapshot::from_source(None, XmlStreamLimits::owner_default_value())?;
         let mut transaction = snapshot.transaction();
         transaction.replace(metadata.clone())?;
         self.metadata = metadata;
@@ -179,9 +180,9 @@ impl Builder {
     /// Stage source-checked inert database-range CRUD in the builder.
     pub fn edit_database_ranges<F>(&mut self, update: F) -> Result<&mut Self>
     where
-        F: FnOnce(&mut crate::database_range::ContentEdit) -> Result<()>,
+        F: FnOnce(&mut crate::database_range::Draft) -> Result<()>,
     {
-        let mut edit = crate::database_range::ContentEdit::from_source(&self.content_xml)?;
+        let mut edit = crate::database_range::Draft::from_source(&self.content_xml)?;
         update(&mut edit)?;
         let commit = edit.commit()?;
         if commit.changed() {
@@ -358,28 +359,49 @@ impl Builder {
         Ok(self)
     }
 
+    /// Build the spreadsheet into an immutable [`crate::Package`].
+    ///
+    /// Output (`save`, `save_with_durability`, `to_bytes`, `write_to`) lives
+    /// on the returned package. Building never consults the clock or any
+    /// other ambient state: two builders with equal inputs produce
+    /// byte-identical packages.
     ///
     /// # Errors
-    /// Returns an error when the operation cannot be completed.
-    pub fn build(self) -> Result<Vec<u8>> {
+    ///
+    /// Returns an error when an authored part fails validation or cannot be
+    /// serialized.
+    pub fn build(self) -> std::result::Result<crate::Package, crate::Error> {
+        Ok(crate::Package::from_authored(self.build_bytes()?)?)
+    }
+
+    /// Build the complete package bytes (crate-internal authoring helper).
+    pub(crate) fn build_bytes(self) -> Result<Vec<u8>> {
         let mut content_xml = if self.definitions.is_empty() {
             self.content_xml
         } else {
             crate::codec::names::replace(&self.content_xml, &self.definitions)?
         };
         if let Some(settings) = &self.settings {
-            let snapshot = crate::settings::Snapshot::from_content_xml(&content_xml)?;
+            // Authored content is admitted under the documented owner default.
+            let snapshot = crate::settings::Snapshot::from_content_xml(
+                &content_xml,
+                XmlStreamLimits::owner_default_value(),
+            )?;
             let mut transaction = snapshot.transaction();
             transaction.replace(settings.clone())?;
             content_xml = transaction.commit()?.into_owned();
         }
         validate_content_xml(&content_xml)?;
         crate::worksheet::codec::parse(&content_xml)?;
-        let mut writer = PackageWriter::new();
+        let mut writer =
+            PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
         writer.set_mimetype(MIMETYPE)?;
         writer.add_file("content.xml", content_xml.as_bytes())?;
         if self.metadata.has_data() {
-            let snapshot = crate::metadata::Snapshot::from_source(None)?;
+            let snapshot = crate::metadata::Snapshot::from_source(
+                None,
+                XmlStreamLimits::owner_default_value(),
+            )?;
             let mut transaction = snapshot.transaction();
             transaction.replace(self.metadata)?;
             if let Some(metadata_xml) = transaction.commit()?.into_owned_xml() {
@@ -405,7 +427,14 @@ impl Builder {
 pub(crate) fn validate_content_xml(xml: &str) -> Result<()> {
     validate_size(xml)?;
 
-    let mut reader = ResolvedReader::from_xml(xml);
+    let xml_limits = XmlStreamLimits::new(
+        MAX_CONTENT_XML_BYTES as u64,
+        MAX_CONTENT_XML_DEPTH,
+        4_000_000,
+        1_000_000,
+        MAX_CONTENT_XML_BYTES,
+    )?;
+    let mut reader = ResolvedReader::from_xml(xml, xml_limits)?;
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
     let mut depth = 0usize;
@@ -417,7 +446,9 @@ pub(crate) fn validate_content_xml(xml: &str) -> Result<()> {
     loop {
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
-            .map_err(|error| Error::InvalidFormat(format!("invalid ODS content.xml: {error}")))?;
+            .map_err(|error| {
+                litchi_odf_common::map_resolved_reader_error(error, "invalid ODS content.xml")
+            })?;
 
         match event {
             Event::Start(element) => {

@@ -498,7 +498,7 @@ impl Style {
 // leaking the retired monolith vocabulary into rustdoc or downstream code.
 
 /// Low-level, lossless XML details that normal font authoring can ignore.
-pub mod raw {
+pub(super) mod raw {
     use super::{bounded, validate_attr_name};
     use crate::Result;
 
@@ -573,7 +573,25 @@ impl Resource {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn new(data: Vec<u8>) -> Result<Self> {
+    pub fn new(data: Vec<u8>, limits: &super::Limits) -> Result<Self> {
+        // Validate the caller-selected budget before turning the payload into
+        // a shared allocation.  The hard format bound remains the first
+        // check, so an invalid embedded-font payload is never retained.
+        validate_resource_len(data.len())?;
+        if data.len() > limits.embedded_font_bytes() {
+            return Err(Error::FontLimit {
+                kind: crate::font::LimitKind::EmbeddedFontBytes,
+                actual: data.len(),
+                maximum: limits.embedded_font_bytes(),
+            });
+        }
+        if data.len() > limits.aggregate_font_bytes() {
+            return Err(Error::FontLimit {
+                kind: crate::font::LimitKind::AggregateBytes,
+                actual: data.len(),
+                maximum: limits.aggregate_font_bytes(),
+            });
+        }
         Self::from_shared(Arc::new(data))
     }
 
@@ -1113,7 +1131,11 @@ pub(in crate::font) fn validate_table_value(value: &Table, require_resources: bo
                         .checked_add(resource.data.len())
                         .ok_or_else(|| invalid("embedded-font size overflow"))?;
                     if total > MAX_ALL_FONTS {
-                        return Err(invalid("embedded fonts exceed total size limit"));
+                        return Err(Error::FontLimit {
+                            kind: crate::font::LimitKind::EmbeddedFontBytes,
+                            actual: total,
+                            maximum: MAX_ALL_FONTS,
+                        });
                     }
                 }
             }
@@ -1180,7 +1202,11 @@ pub(in crate::font) fn bounded(v: &str) -> Result<()> {
     if v.len() <= MAX_TEXT {
         Ok(())
     } else {
-        Err(invalid("font-table string limit exceeded"))
+        Err(Error::FontLimit {
+            kind: crate::font::LimitKind::StringBytes,
+            actual: v.len(),
+            maximum: MAX_TEXT,
+        })
     }
 }
 pub(in crate::font) fn validate_attr_name(value: &str) -> Result<()> {

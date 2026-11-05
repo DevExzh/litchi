@@ -226,7 +226,7 @@ fn odp_buffered_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
         let body = odp_buffered_body(index);
         builder.add_slide_with_title(&title, &body)?;
     }
-    Ok(builder.build()?)
+    Ok(builder.build()?.to_bytes()?)
 }
 
 fn verify_odp_buffered_default_parts(
@@ -306,7 +306,10 @@ fn verify_odp_buffered_compression(bytes: &[u8]) -> Result<(), Box<dyn Error>> {
 
 fn verify_odp_buffered_manifest(archive: &ArchiveReader<'_>) -> Result<(), Box<dyn Error>> {
     let manifest_xml = String::from_utf8(archive.read("META-INF/manifest.xml")?)?;
-    let manifest = litchi_odf_common::core::Manifest::parse(&manifest_xml)?;
+    let manifest = litchi_odf_common::core::Manifest::parse(
+        &manifest_xml,
+        litchi_odf_common::XmlStreamLimits::owner_default_value(),
+    )?;
     let root = manifest
         .get_entry("/")
         .ok_or("buffered ODP manifest root entry is missing")?;
@@ -343,7 +346,7 @@ pub(super) fn inspect_odp_buffered_archive(
     bytes: &[u8],
     shape: SemanticShape,
 ) -> Result<OdpBufferedIdentity, Box<dyn Error>> {
-    let archive = ArchiveReader::new(bytes)?;
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())?;
     let names = archive.file_names().collect::<Vec<_>>();
     let actual_set = names.iter().copied().collect::<BTreeSet<_>>();
     let expected_set = ODP_BUFFERED_MEMBER_NAMES
@@ -368,7 +371,7 @@ pub(super) fn inspect_odp_buffered_archive(
     verify_odp_buffered_default_parts(&styles_xml, &meta_xml)?;
     content_structure::verify_odp_buffered_content_structure(&content_xml, shape)?;
 
-    let presentation = litchi_odp::Presentation::from_bytes(bytes.to_vec())?;
+    let presentation = litchi_odp::Package::from_bytes(bytes)?.presentation()?;
     let slides = presentation.slides()?;
     let expected_slide_count = odp_buffered_slide_count(shape);
     if slides.len() != expected_slide_count {
@@ -458,7 +461,11 @@ pub(super) fn verify_odp_corpus_binding(
     expected_generator: &str,
     expected_name: &str,
 ) -> Result<(), Box<dyn Error>> {
-    let reopened_target = ArchiveReader::new(&corpus.archive)?.read("content.xml")?;
+    let reopened_target = ArchiveReader::new(
+        &corpus.archive,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?
+    .read("content.xml")?;
     if corpus.target_name != "content.xml"
         || corpus.manifest.target_entry != "content.xml"
         || corpus.target_payload != reopened_target
@@ -504,7 +511,9 @@ pub(super) fn verify_odp_corpus_binding(
 pub(crate) fn build_odp_buffered_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Error>> {
     let archive = odp_buffered_bytes(shape)?;
     let identity = inspect_odp_buffered_archive(&archive, shape)?;
-    let target_payload = ArchiveReader::new(&archive)?.read("content.xml")?;
+    let target_payload =
+        ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?
+            .read("content.xml")?;
     let corpus = Corpus {
         manifest: CorpusManifest {
             name: format!("odp-buffered-slides-{}", shape.name()),
@@ -720,7 +729,8 @@ mod tests {
                 .unwrap();
         }
         let error = builder.build().unwrap_err();
-        let litchi_core::Error::InvalidFormat(message) = error else {
+        let litchi_odf_common::Error::Core(litchi_core::Error::InvalidFormat(message)) = error
+        else {
             panic!("unexpected oversized deck refusal: {error}");
         };
         assert!(message.contains("XML publication rejected for 'content.xml'"));
@@ -754,8 +764,10 @@ mod tests {
             mutated[offset] = value;
             assert!(verify_odp_buffered_compression(&mutated).is_err());
         }
-        let reader = ArchiveReader::new(&original).unwrap();
-        let mut writer = StreamingArchiveWriter::new();
+        let reader =
+            ArchiveReader::new(&original, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         for path in [
             "content.xml",
             "mimetype",
@@ -777,8 +789,13 @@ mod tests {
     #[test]
     fn buffered_oracle_rejects_manifest_binding_mutation() {
         let mut corpus = build_odp_buffered_corpus(SemanticShape::Tiny).unwrap();
-        let reader = ArchiveReader::new(&corpus.archive).unwrap();
-        let mut writer = StreamingArchiveWriter::new();
+        let reader = ArchiveReader::new(
+            &corpus.archive,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         for name in reader.file_names() {
             let mut payload = reader.read(name).unwrap();
             if name == "META-INF/manifest.xml" {
@@ -811,8 +828,13 @@ mod tests {
     #[test]
     fn buffered_oracle_rejects_semantic_content_mutation() {
         let mut corpus = build_odp_buffered_corpus(SemanticShape::Tiny).unwrap();
-        let reader = ArchiveReader::new(&corpus.archive).unwrap();
-        let mut writer = StreamingArchiveWriter::new();
+        let reader = ArchiveReader::new(
+            &corpus.archive,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         for name in reader.file_names() {
             let mut payload = reader.read(name).unwrap();
             if name == "content.xml" {

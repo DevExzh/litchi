@@ -8,6 +8,7 @@ use crate::raw::Error as WireError;
 use thiserror::Error as ThisError;
 
 mod codec;
+mod entries;
 mod model;
 #[cfg(test)]
 mod tests;
@@ -30,8 +31,10 @@ pub enum Error {
     InvalidLength { expected: usize, found: usize },
     /// A defined-name invariant is invalid.
     #[error("invalid formula: {0}")]
-    InvalidFormula(String),
+    InvalidFormula(&'static str),
 }
 
 pub use codec::{MAX_RECORD_BYTES, area3d_formula, parse};
+pub use entries::Entry;
+pub(crate) use entries::read as read_entries;
 pub use model::{Definition, validate_name};

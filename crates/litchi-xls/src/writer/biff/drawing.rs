@@ -4,11 +4,12 @@ use crate::writer::shape::Anchor;
 use crate::writer::{ShapeFill, ShapeLine, ShapeText, ShapeTextRun, ShapeWrite};
 use crate::{Error, Result};
 use litchi_odraw::{
+    builder::{PropertyBuilder, ShapeBuilder},
     prop::Id,
     shape::{Flags, Native},
     write::{
-        Atom as WriteAtom, Container as WriteContainer, PropertyBuilder, ShapeBuilder,
-        atom as write_escher_atom, atom_header as write_atom_header, container as write_container,
+        Atom as WriteAtom, Container as WriteContainer, atom as write_escher_atom,
+        atom_header as write_atom_header, container as write_container,
         container_header as write_container_header,
     },
 };
@@ -108,30 +109,55 @@ fn group_prefix(drawing_id: u32, object_count: usize, shapes_size: usize) -> Res
         .ok_or_else(|| Error::InvalidData("worksheet drawing size overflows".to_string()))?;
     let patriarch = drawing_id << 10;
     let mut out = Vec::with_capacity(80);
-    write_container_header(&mut out, 0, WriteContainer::Dg, dg_length)?;
+    write_container_header(
+        &mut out,
+        0,
+        WriteContainer::Dg,
+        dg_length,
+        Default::default(),
+    )?;
     write_atom_header(
         &mut out,
         crate::utils::truncate_u32_to_u16(drawing_id),
         WriteAtom::Dg,
         8,
+        Default::default(),
     )?;
     out.extend_from_slice(&shape_count.to_le_bytes());
     out.extend_from_slice(
         &(patriarch + crate::utils::truncate_usize_to_u32(object_count)).to_le_bytes(),
     );
-    write_container_header(&mut out, 0, WriteContainer::Spgr, spgr_length)?;
+    write_container_header(
+        &mut out,
+        0,
+        WriteContainer::Spgr,
+        spgr_length,
+        Default::default(),
+    )?;
     let mut patriarch_children = Vec::with_capacity(40);
-    write_atom_header(&mut patriarch_children, 0, WriteAtom::Spgr, 16)?;
+    write_atom_header(
+        &mut patriarch_children,
+        0,
+        WriteAtom::Spgr,
+        16,
+        Default::default(),
+    )?;
     patriarch_children.extend_from_slice(&[0; 16]);
     ShapeBuilder::new(Native::FREEFORM, patriarch)
         .with_flags(Flags::GROUP | Flags::PATRIARCH)
-        .write(&mut patriarch_children)?;
-    write_container(&mut out, 0, WriteContainer::Sp, &patriarch_children)?;
+        .write(&mut patriarch_children, Default::default())?;
+    write_container(
+        &mut out,
+        0,
+        WriteContainer::Sp,
+        &patriarch_children,
+        Default::default(),
+    )?;
     Ok(out)
 }
 
 pub(super) fn write_xls_anchor<W: Write>(writer: &mut W, anchor: &Anchor) -> Result<()> {
-    write_atom_header(writer, 0, WriteAtom::ClientAnchor, 18)?;
+    write_atom_header(writer, 0, WriteAtom::ClientAnchor, 18, Default::default())?;
     for value in anchor.fields() {
         writer.write_all(&value.to_le_bytes())?;
     }
@@ -202,16 +228,35 @@ fn primitive_shape(shape: &ShapeWrite, shape_id: u32) -> Result<(Vec<u8>, bool)>
     let mut children = Vec::with_capacity(112);
     ShapeBuilder::new(Native::from_raw(shape.kind.officeart_type()), shape_id)
         .with_flags(Flags::HAVE_ANCHOR | Flags::HAVE_SPT)
-        .write(&mut children)?;
-    style_properties(shape.locked, shape.fill, shape.line, shape.visible).write(&mut children)?;
+        .write(&mut children, Default::default())?;
+    style_properties(shape.locked, shape.fill, shape.line, shape.visible)
+        .write(&mut children, Default::default())?;
     write_xls_anchor(&mut children, &shape.anchor)?;
     let has_textbox = shape.kind == crate::writer::ShapeKind::TextBox || shape.text.is_some();
-    write_escher_atom(&mut children, 0, WriteAtom::ClientData, &[])?;
+    write_escher_atom(
+        &mut children,
+        0,
+        WriteAtom::ClientData,
+        &[],
+        Default::default(),
+    )?;
     if has_textbox {
-        write_escher_atom(&mut children, 0, WriteAtom::ClientTextbox, &[])?;
+        write_escher_atom(
+            &mut children,
+            0,
+            WriteAtom::ClientTextbox,
+            &[],
+            Default::default(),
+        )?;
     }
     let mut out = Vec::with_capacity(children.len() + 8);
-    write_container(&mut out, 0, WriteContainer::Sp, &children)?;
+    write_container(
+        &mut out,
+        0,
+        WriteContainer::Sp,
+        &children,
+        Default::default(),
+    )?;
     split_client_textbox(out, has_textbox)
 }
 
@@ -219,20 +264,38 @@ fn pivot_shape(shape_id: u32) -> Result<Vec<u8>> {
     let mut children = Vec::with_capacity(82);
     ShapeBuilder::new(Native::from_raw(201), shape_id)
         .with_flags(Flags::HAVE_ANCHOR | Flags::HAVE_SPT)
-        .write(&mut children)?;
+        .write(&mut children, Default::default())?;
     let mut properties = PropertyBuilder::new();
     properties.add_simple(Id::LockAgainstGrouping, 0x0104_0104);
     properties.add_simple(Id::TextBooleanProperties, 0x0008_0008);
     properties.add_simple(Id::NoLineDrawDash, 0x0008_0000);
     properties.add_simple(Id::from(0x03BF), 0x0002_0000);
-    properties.write(&mut children)?;
-    write_atom_header(&mut children, 0, WriteAtom::ClientAnchor, 18)?;
+    properties.write(&mut children, Default::default())?;
+    write_atom_header(
+        &mut children,
+        0,
+        WriteAtom::ClientAnchor,
+        18,
+        Default::default(),
+    )?;
     for field in [1u16, 1, 0, 0, 0, 2, 0, 1, 0] {
         children.extend_from_slice(&field.to_le_bytes());
     }
-    write_escher_atom(&mut children, 0, WriteAtom::ClientData, &[])?;
+    write_escher_atom(
+        &mut children,
+        0,
+        WriteAtom::ClientData,
+        &[],
+        Default::default(),
+    )?;
     let mut out = Vec::with_capacity(children.len() + 8);
-    write_container(&mut out, 0, WriteContainer::Sp, &children)?;
+    write_container(
+        &mut out,
+        0,
+        WriteContainer::Sp,
+        &children,
+        Default::default(),
+    )?;
     Ok(out)
 }
 
@@ -365,7 +428,13 @@ fn write_shape_txo<W: Write>(writer: &mut W, text: Option<&ShapeText>) -> Result
 
 fn write_client_textbox<W: Write>(writer: &mut W) -> Result<()> {
     let mut textbox = Vec::with_capacity(8);
-    write_escher_atom(&mut textbox, 0, WriteAtom::ClientTextbox, &[])?;
+    write_escher_atom(
+        &mut textbox,
+        0,
+        WriteAtom::ClientTextbox,
+        &[],
+        Default::default(),
+    )?;
     write_mso(writer, &textbox)
 }
 
@@ -491,14 +560,15 @@ pub(crate) fn write_worksheet_drawing<W: Write>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::writer::shape::{Behavior, Point};
+    use crate::AnchorBehavior;
+    use crate::writer::shape::Point;
 
     #[test]
     fn checked_anchor_serializes_exact_client_anchor_bytes() {
         let anchor = Anchor::new(
             Point::new(1, 1).unwrap().offset(20, 10).unwrap(),
             Point::new(6, 4).unwrap().offset(200, 900).unwrap(),
-            Behavior::MoveAndSize,
+            AnchorBehavior::Absolute,
         )
         .unwrap();
         let mut bytes = Vec::new();

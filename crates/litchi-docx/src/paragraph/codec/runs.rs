@@ -43,6 +43,17 @@ impl Paragraph {
         let source = self.xml_data.xml_ref()?;
         let _parser_admission = source.parser_admission()?;
         let mut reader = NsReader::from_reader(xml_bytes);
+        for (prefix, namespace) in self.xml_data.inherited_namespaces()?.iter() {
+            let prefix = prefix.as_deref().map_or(
+                quick_xml::name::PrefixDeclaration::Default,
+                quick_xml::name::PrefixDeclaration::Named,
+            );
+            reader
+                .resolver_mut()
+                .add(prefix, quick_xml::name::Namespace(namespace))
+                .map_err(|_| Error::Xml("invalid inherited run namespace".into()))?;
+        }
+        let mut namespaces = crate::namespace::NamespaceCapture::default();
         let origin = ReaderOrigin::of(xml_bytes);
         let mut runs = SmallVec::new();
         let mut run_start = None;
@@ -123,6 +134,9 @@ impl Paragraph {
                 },
                 RunEvent::Empty => {
                     Self::push_run_slice(&mut runs, &source, event_start, event_end)?;
+                    if let Some(run) = runs.last_mut() {
+                        run.namespaces = Some(namespaces.capture(reader.resolver())?);
+                    }
                 },
                 RunEvent::End => {
                     run_depth = run_depth.checked_sub(1).ok_or_else(|| {
@@ -135,6 +149,9 @@ impl Paragraph {
                             ));
                         };
                         Self::push_run_slice(&mut runs, &source, start, event_end)?;
+                        if let Some(run) = runs.last_mut() {
+                            run.namespaces = Some(namespaces.capture(reader.resolver())?);
+                        }
                     }
                 },
                 RunEvent::Eof if run_start.is_some() => {
@@ -166,11 +183,11 @@ impl Paragraph {
         let source = self.xml_data.xml_ref()?;
         let _parser_admission = source.parser_admission()?;
         let Some(source_slice) = source.as_unmanaged_slice() else {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "paragraph.smart_tags",
-                reason: "managed paragraph views cannot detach smart-tag XmlSlice ownership",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "paragraph.smart_tags",
+                "managed paragraph views cannot detach smart-tag XmlSlice ownership",
+            ));
         };
         let source_arc = source_slice.arc();
         let base_offset = source_slice.start();
@@ -301,7 +318,7 @@ impl Paragraph {
             .collect()
     }
 
-    fn push_run_slice(
+    pub(super) fn push_run_slice(
         runs: &mut SmallVec<[Run; 8]>,
         source: &XmlRef,
         start: usize,

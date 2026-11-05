@@ -30,7 +30,7 @@ use litchi_core::{
     Position, ReadAt, Resource, SourceVersion,
 };
 use litchi_docx::document::ParagraphTextReplacement;
-use litchi_docx::{ReadLimits, source_backed};
+use litchi_docx::{SourceLimits, source_backed};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcPackage, PackURI, SourceCacheDiagnostics, SourceCacheLimits};
 use sha2::{Digest, Sha256};
@@ -487,7 +487,8 @@ fn build_fixture(paragraph_count: usize, replacement_count: usize) -> AnyResult<
         r#"<Relationships xmlns="{RELATIONSHIPS_NS}"><Relationship Id="rIdDocument" Type="{office_document}" Target="{MAIN}"/></Relationships>"#,
         office_document = rt::OFFICE_DOCUMENT,
     );
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer.write_stored("[Content_Types].xml", content_types.as_bytes())?;
     writer.write_stored("_rels/.rels", relationships.as_bytes())?;
     writer.write_stored(MEDIA, &media)?;
@@ -509,16 +510,20 @@ fn build_fixture(paragraph_count: usize, replacement_count: usize) -> AnyResult<
 fn build_preflight(fixture: &Fixture, mode: EditMode) -> AnyResult<Preflight> {
     let package =
         source_backed::Package::from_read_at(Arc::new(OwnedSource::new(fixture.archive.clone())))?;
-    let mut edit = package.edit_document()?;
+    let mut edit = package.edit()?;
     stage_edit(&mut edit, fixture, mode)?;
     let commit = edit.commit()?;
     let patch = commit.patch().clone();
     let forward = patch.apply(patch.source())?;
-    let inverse = patch.inverse().apply(commit.snapshot())?;
-    let forward_ok = forward.xml_bytes() == commit.snapshot().xml_bytes();
+    let inverse = patch.inverse().apply(commit.patch().target())?;
+    let forward_ok = forward.xml_bytes() == commit.patch().target().xml_bytes();
     let inverse_ok = inverse.xml_bytes() == patch.source().xml_bytes();
     let mut expected_output = Vec::new();
-    package.publish_document_commit_to_stream(&mut expected_output, &commit)?;
+    package.apply(commit.patch()).and_then(|committed| {
+        let package = committed.into_package();
+        package.write_to(&mut expected_output)?;
+        package.document_snapshot()
+    })?;
     let expected_output_sha256 = sha256_hex(&expected_output);
     if !verify_output(fixture, &expected_output, &fixture.replacement_text)? {
         return Err("unmanaged preflight semantic oracle failed".into());
@@ -543,25 +548,29 @@ fn build_managed_preflight(
 ) -> AnyResult<(bool, bool, bool)> {
     let (budget, _cancellation_source, context) = managed_context()?;
     let budget_before = BudgetSnapshot::from_budget(&budget);
-    let package =
-        source_backed::Package::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            Arc::new(OwnedSource::new(fixture.archive.clone())),
-            ReadLimits::default(),
-            SourceCacheLimits::new(CACHE_BYTES, CACHE_ENTRIES)?,
-            context,
-        )?;
-    let mut edit = package.edit_document()?;
+    let package = source_backed::Package::from_read_at_with_options(
+        Arc::new(OwnedSource::new(fixture.archive.clone())),
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .cache_limits(SourceCacheLimits::new(CACHE_BYTES, CACHE_ENTRIES)?)
+            .execution_context(context),
+    )?;
+    let mut edit = package.edit()?;
     stage_edit(&mut edit, fixture, mode)?;
     let commit = edit.commit()?;
     let patch = commit.patch().clone();
     let forward = patch.apply(patch.source())?;
-    let inverse = patch.inverse().apply(commit.snapshot())?;
-    let forward_ok = forward.xml_bytes() == commit.snapshot().xml_bytes();
+    let inverse = patch.inverse().apply(commit.patch().target())?;
+    let forward_ok = forward.xml_bytes() == commit.patch().target().xml_bytes();
     let inverse_ok = inverse.xml_bytes() == patch.source().xml_bytes();
     drop(forward);
     drop(inverse);
     let mut output = Vec::with_capacity(expected_output.len());
-    let published = package.publish_document_commit_to_stream(&mut output, &commit)?;
+    let published = package.apply(commit.patch()).and_then(|committed| {
+        let package = committed.into_package();
+        package.write_to(&mut output)?;
+        package.document_snapshot()
+    })?;
     drop(published);
     drop(commit);
     drop(patch);
@@ -579,8 +588,8 @@ fn build_managed_preflight(
     Ok((forward_ok, inverse_ok, output_exact_ok))
 }
 
-fn stage_edit(
-    edit: &mut litchi_docx::document::Edit,
+fn stage_edit<P: Clone>(
+    edit: &mut litchi_docx::document::Edit<P>,
     fixture: &Fixture,
     mode: EditMode,
 ) -> AnyResult<()> {
@@ -649,18 +658,18 @@ fn run_sample(
     let operation_started = Instant::now();
 
     let phase_started = Instant::now();
-    let package =
-        source_backed::Package::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            source.clone(),
-            ReadLimits::default(),
-            SourceCacheLimits::new(CACHE_BYTES, CACHE_ENTRIES)?,
-            context,
-        )?;
+    let package = source_backed::Package::from_read_at_with_options(
+        source.clone(),
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .cache_limits(SourceCacheLimits::new(CACHE_BYTES, CACHE_ENTRIES)?)
+            .execution_context(context),
+    )?;
     let open_ns = elapsed_ns(phase_started)?;
     let cache_before = package.cache_diagnostics();
 
     let phase_started = Instant::now();
-    let mut edit = package.edit_document()?;
+    let mut edit = package.edit()?;
     stage_edit(&mut edit, fixture, config.mode)?;
     let edit_ns = elapsed_ns(phase_started)?;
 
@@ -671,7 +680,11 @@ fn run_sample(
     let budget_live = BudgetSnapshot::from_budget(&budget);
 
     let phase_started = Instant::now();
-    let published = package.publish_document_commit_to_stream(&mut output, &commit)?;
+    let published = package.apply(commit.patch()).and_then(|committed| {
+        let package = committed.into_package();
+        package.write_to(&mut output)?;
+        package.document_snapshot()
+    })?;
     drop(published);
     let publish_ns = elapsed_ns(phase_started)?;
 
@@ -771,7 +784,7 @@ fn verify_untouched_members(fixture: &Fixture, output: &[u8]) -> AnyResult<bool>
 }
 
 fn part_blob(bytes: &[u8], name: &str) -> AnyResult<Vec<u8>> {
-    let package = OpcPackage::from_bytes(bytes)?;
+    let package = OpcPackage::from_bytes(bytes, SourceLimits::default())?;
     let part = package.get_part(&PackURI::new(format!("/{name}"))?)?;
     Ok(part.blob().to_vec())
 }

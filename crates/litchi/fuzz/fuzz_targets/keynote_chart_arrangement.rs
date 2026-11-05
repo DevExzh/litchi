@@ -15,8 +15,8 @@ use std::sync::OnceLock;
 
 use libfuzzer_sys::fuzz_target;
 use litchi::keynote::{
-    ChartArrangement, ChartSelector, Limits, Package, ReadError, ReadOptions, SemanticLimits,
-    SlideSelector,
+    ChartArrangement, ChartSelector, OpenOptions, Package, ReadError, SemanticLimits,
+    SlideSelector, SourceLimits,
 };
 
 const MAX_INPUT_BYTES: u64 = 1024 * 1024;
@@ -67,27 +67,33 @@ fuzz_target!(|data: &[u8]| {
     exercise_redacted_malformed_ingress();
 });
 
-fn fuzz_options() -> ReadOptions {
-    static OPTIONS: OnceLock<ReadOptions> = OnceLock::new();
+fn fuzz_options() -> OpenOptions {
+    static OPTIONS: OnceLock<OpenOptions> = OnceLock::new();
     *OPTIONS.get_or_init(|| {
-        let archive = Limits::new(
-            MAX_INPUT_BYTES,
-            MAX_ENTRIES,
-            MAX_ENTRY_BYTES,
-            MAX_EXPANDED_BYTES,
-            MAX_IWA_STREAM_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid chart-arrangement archive limits: {error}"));
-        let semantic = SemanticLimits::new(
-            MAX_OBJECTS,
-            MAX_SLIDES,
-            MAX_REFERENCES,
-            MAX_TEXT_STORAGES,
-            MAX_TEXT_FRAGMENTS,
-            MAX_TEXT_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid chart-arrangement semantic limits: {error}"));
-        ReadOptions::new(archive, semantic)
+        let archive = SourceLimits::builder()
+            .max_input_bytes(MAX_INPUT_BYTES)
+            .and_then(|limits| limits.max_entries(MAX_ENTRIES))
+            .and_then(|limits| limits.max_entry_bytes(MAX_ENTRY_BYTES))
+            .and_then(|limits| limits.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+            .and_then(|limits| limits.max_component_bytes(MAX_IWA_STREAM_BYTES))
+            .and_then(|limits| limits.build())
+            .unwrap_or_else(|error| {
+                unreachable!("valid chart-arrangement archive limits: {error}")
+            });
+        let semantic = SemanticLimits::builder()
+            .max_objects(MAX_OBJECTS)
+            .and_then(|limits| limits.max_slides(MAX_SLIDES))
+            .and_then(|limits| limits.max_references(MAX_REFERENCES))
+            .and_then(|limits| limits.max_text_storages(MAX_TEXT_STORAGES))
+            .and_then(|limits| limits.max_text_fragments(MAX_TEXT_FRAGMENTS))
+            .and_then(|limits| limits.max_text_bytes(MAX_TEXT_BYTES))
+            .and_then(|limits| limits.build())
+            .unwrap_or_else(|error| {
+                unreachable!("valid chart-arrangement semantic limits: {error}")
+            });
+        OpenOptions::new()
+            .source_limits(archive)
+            .semantic_limits(semantic)
     })
 }
 
@@ -199,7 +205,15 @@ fn exercise_arrangement(
             return;
         },
     };
-    assert_eq!(edit.before(), before);
+    let observed_before = match edit.before() {
+        Ok(value) => value,
+        Err(error) => {
+            observe_error(error);
+            assert_eq!(package_bytes(package), source);
+            return;
+        },
+    };
+    assert_eq!(observed_before, before);
 
     // Cover both independent setter methods, complete replacements, and an
     // exact no-op.  `ChartArrangement` is Copy, so no input-derived heap
@@ -211,8 +225,15 @@ fn exercise_arrangement(
         3 => edit.set(ChartArrangement::new(true, false)),
         _ => edit.set(ChartArrangement::new(true, true)),
     };
-    let requested = edit.after();
-    assert_eq!(edit.after(), requested);
+    let requested = match edit.after() {
+        Ok(value) => value,
+        Err(error) => {
+            observe_error(error);
+            assert_eq!(package_bytes(package), source);
+            return;
+        },
+    };
+    assert_eq!(edit.after(), Ok(requested));
     let commit = match edit.commit() {
         Ok(commit) => commit,
         Err(error) => {
@@ -336,10 +357,12 @@ fn exercise_malformed_packages() {
         if let Err(error) = batch {
             observe_error(error);
         }
-        let edit = package.edit_slide_chart_arrangement(
-            SlideSelector::name("Charts"),
-            ChartSelector::name(PRIVATE_SELECTOR),
-        );
+        let edit = package
+            .edit_slide_chart_arrangement(
+                SlideSelector::name("Charts"),
+                ChartSelector::name(PRIVATE_SELECTOR),
+            )
+            .and_then(|edit| edit.commit());
         assert!(edit.is_err(), "malformed chart arrangement edit was staged");
         if let Err(error) = edit {
             observe_redacted(error, PRIVATE_SELECTOR);
@@ -357,28 +380,36 @@ fn exercise_limit_guards() {
         Ok(_) => panic!("oversized Keynote chart input was accepted"),
     }
 
-    let low_archive = Limits::new(1, 1, 1, 1, 1)
+    let low_archive = SourceLimits::builder()
+        .max_input_bytes(1)
+        .and_then(|limits| limits.max_entries(1))
+        .and_then(|limits| limits.max_entry_bytes(1))
+        .and_then(|limits| limits.max_aggregate_bytes(1))
+        .and_then(|limits| limits.max_component_bytes(1))
+        .and_then(|limits| limits.build())
         .unwrap_or_else(|error| unreachable!("valid low chart archive limits: {error}"));
     match Package::from_bytes_with_options(
         VALID_PACKAGE,
-        ReadOptions::new(low_archive, SemanticLimits::default()),
+        OpenOptions::new().source_limits(low_archive),
     ) {
         Err(error) => observe_error(error),
         Ok(_) => panic!("low physical chart package limits were not enforced"),
     }
 
-    let low_semantic = SemanticLimits::new(
-        1,
-        MAX_SLIDES,
-        MAX_REFERENCES,
-        MAX_TEXT_STORAGES,
-        MAX_TEXT_FRAGMENTS,
-        MAX_TEXT_BYTES,
-    )
-    .unwrap_or_else(|error| unreachable!("valid low chart semantic limits: {error}"));
+    let low_semantic = SemanticLimits::builder()
+        .max_objects(1)
+        .and_then(|limits| limits.max_slides(MAX_SLIDES))
+        .and_then(|limits| limits.max_references(MAX_REFERENCES))
+        .and_then(|limits| limits.max_text_storages(MAX_TEXT_STORAGES))
+        .and_then(|limits| limits.max_text_fragments(MAX_TEXT_FRAGMENTS))
+        .and_then(|limits| limits.max_text_bytes(MAX_TEXT_BYTES))
+        .and_then(|limits| limits.build())
+        .unwrap_or_else(|error| unreachable!("valid low chart semantic limits: {error}"));
     match Package::from_bytes_with_options(
         VALID_PACKAGE,
-        ReadOptions::new(fuzz_options().archive(), low_semantic),
+        OpenOptions::new()
+            .source_limits(fuzz_options().source_limits_value())
+            .semantic_limits(low_semantic),
     ) {
         Err(error) => observe_error(error),
         Ok(package) => {

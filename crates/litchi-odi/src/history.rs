@@ -1,5 +1,5 @@
 //! Bounded, source-checked history shared by flat and packaged ODI snapshots.
-use crate::{Commit, FlatImage, FlatImageCommit, Image};
+use crate::{Commit, Package};
 use litchi_core::{Error, Result};
 
 const MAX_HISTORY_STATES: usize = 1_024;
@@ -18,33 +18,33 @@ pub trait CommittedTransition<T: HistoryArtifact> {
     fn target(&self) -> &T;
 }
 
-impl CommittedTransition<Image> for Commit {
-    fn source(&self) -> &Image {
-        self.source()
+impl CommittedTransition<Package> for Commit {
+    fn source(&self) -> &Package {
+        self.patch().source()
     }
 
-    fn target(&self) -> &Image {
-        self.image()
-    }
-}
-
-impl CommittedTransition<FlatImage> for FlatImageCommit {
-    fn source(&self) -> &FlatImage {
-        self.source()
-    }
-
-    fn target(&self) -> &FlatImage {
-        self.snapshot()
+    fn target(&self) -> &Package {
+        self.package()
     }
 }
 
-impl HistoryArtifact for FlatImage {
+impl CommittedTransition<crate::flat::Image> for crate::flat::Commit {
+    fn source(&self) -> &crate::flat::Image {
+        self.patch().source()
+    }
+
+    fn target(&self) -> &crate::flat::Image {
+        self.package()
+    }
+}
+
+impl HistoryArtifact for crate::flat::Image {
     fn history_bytes(&self) -> &[u8] {
         self.as_bytes()
     }
 }
 
-impl HistoryArtifact for Image {
+impl HistoryArtifact for Package {
     fn history_bytes(&self) -> &[u8] {
         self.as_bytes()
     }

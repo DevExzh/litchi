@@ -12,6 +12,7 @@
 //! authenticated by this passive owner.
 
 mod codec;
+mod family;
 mod model;
 mod package;
 mod transaction;
@@ -21,12 +22,16 @@ mod validation;
 mod tests;
 
 pub use codec::{parse, parse_bytes, to_bytes};
+pub use family::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Result};
 pub use model::{DeliveryOption, EditKind, Metadata, NarrowString, Protection, Recipient};
-pub use package::{Commit as PackageCommit, Editor, Snapshot as PackageSnapshot};
-pub use transaction::{
-    Commit, Error as TransactionError, Patch, RecipientSelectionError, RecipientSelector, Snapshot,
-    Transaction,
-};
+pub use transaction::{RecipientSelectionError, RecipientSelector};
+
+/// The part-level route-slip codec: the semantic [`record::Snapshot`] of one
+/// route-slip range and its [`record::Edit`] staging, which publishes a new
+/// semantic snapshot; package edits go through [`Edit`].
+pub mod record {
+    pub use super::transaction::{Commit, Diagnostics, Edit, Error, Patch, Snapshot};
+}
 
 /// FIB index of `fcRouteSlip`/`lcbRouteSlip` in `FibRgFcLcb97`.
 pub const FIB_INDEX_ROUTE_SLIP: usize = validation::ROUTE_SLIP_FIB_INDEX;

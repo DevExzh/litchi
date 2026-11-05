@@ -47,8 +47,8 @@ impl DocumentRsids {
     /// Parse the `PLRSID` from the table stream, or `None` when the document
     /// predates revision-save identifiers.
     ///
-    /// Word-compatible repairs are applied but their record is discarded; use
-    /// [`Self::parse_recording`] to enumerate them.
+    /// Word-compatible repairs are applied but their record is discarded
+    /// by this convenience parser.
     pub fn parse(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<Option<DocumentRsids>> {
         Self::parse_recording(fib, table_stream).map(|(table, _)| table)
     }

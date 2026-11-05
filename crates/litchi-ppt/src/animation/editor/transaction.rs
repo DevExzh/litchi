@@ -6,7 +6,7 @@ use super::super::{
     write_extended_time_node,
 };
 use super::semantic::{
-    Editor, EditorLimits, LegacyShapeAnimation, PersistAnimation, Scope, Timeline,
+    Editor, EditorLimits, LegacyShapeAnimation, PersistAnimation, Scope, SourceAnimation, Timeline,
 };
 use super::validation::{validate_extension, validate_limits};
 use crate::consts::RecordType;
@@ -20,14 +20,17 @@ use super::semantic::{ESCHER_CLIENT_DATA, ESCHER_SP, ESCHER_SP_CONTAINER};
 impl Editor {
     /// Opens an animation editor over the persisted records of a package.
     ///
+    /// A signed package opens for staging and reading; [`Self::into_net_bytes`]
+    /// refuses to publish a net change of it.
+    ///
     /// # Errors
     ///
     /// Returns an error if `limits` is invalid, the package or one of its
     /// persisted records is malformed, or the animation data exceeds the
     /// configured limits.
-    pub fn open(bytes: Vec<u8>, limits: EditorLimits) -> Result<Self> {
+    pub(crate) fn open(bytes: Vec<u8>, limits: EditorLimits) -> Result<Self> {
         validate_limits(limits)?;
-        let package = ObjectEditor::open_records(bytes)?;
+        let package = ObjectEditor::open_records_admitting_signature(bytes, limits.source_limits)?;
         let ids = package.persist_ids();
         if ids.len() > limits.max_persist_records {
             return invalid("persisted-record count exceeds animation editor limit");
@@ -46,7 +49,7 @@ impl Editor {
             } else {
                 continue;
             };
-            let (parsed, consumed) = Record::parse(&record, 0)?;
+            let (parsed, consumed) = Record::parse(&record, 0, &limits.source_limits)?;
             if consumed != record.len() || parsed.data_length as usize + 8 != record.len() {
                 return corrupted("persisted slide/master record has trailing or truncated bytes");
             }
@@ -69,21 +72,59 @@ impl Editor {
                 legacy,
             });
         }
+        let sources = entries
+            .iter()
+            .map(|entry| SourceAnimation {
+                extension: entry.extension.clone(),
+                legacy: entry.legacy.clone(),
+            })
+            .collect();
         Ok(Self {
             package,
             entries,
+            sources,
             limits,
-            changed: false,
         })
     }
 
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.changed
+    /// The package bytes with every net record change, or `None` when the
+    /// staged records equal the source.
+    ///
+    /// A staged record whose bytes equal its source record is no change. A
+    /// staged record whose animation model (timeline, build list and legacy
+    /// shape animations) equals the source model was rewritten back to its
+    /// source meaning: the source record is kept, byte for byte, instead of
+    /// a re-encoding of it. Only the remaining records are published.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a record cannot be read or the rewritten package
+    /// cannot be serialized (a net change of a signed source is refused).
+    pub(crate) fn into_net_bytes(mut self) -> Result<Option<Vec<u8>>> {
+        for (entry, source) in self.entries.iter().zip(&self.sources) {
+            if !self.package.is_record_staged(entry.persist_id) {
+                continue;
+            }
+            let same_bytes = self.package.source_record(entry.persist_id)? == entry.record;
+            if same_bytes || source.same_as(entry) {
+                self.package.unstage_record(entry.persist_id);
+            }
+        }
+        if !self.package.has_staged_records() {
+            return Ok(None);
+        }
+        self.package.finish().map(Some)
+    }
+
+    /// Whether the slide or main master `persist_id` owns shape `shape_id`.
+    pub(crate) fn has_shape(&self, persist_id: u32, shape_id: u32) -> bool {
+        self.entries
+            .iter()
+            .any(|entry| entry.persist_id == persist_id && entry.shape_ids.contains(&shape_id))
     }
 
     #[must_use]
-    pub fn timelines(&self) -> Vec<Timeline> {
+    pub(crate) fn timelines(&self) -> Vec<Timeline> {
         self.entries
             .iter()
             .map(|entry| Timeline {
@@ -95,7 +136,7 @@ impl Editor {
     }
 
     #[must_use]
-    pub fn find(&self, persist_id: u32) -> Option<Timeline> {
+    pub(crate) fn find(&self, persist_id: u32) -> Option<Timeline> {
         self.entries
             .iter()
             .find(|entry| entry.persist_id == persist_id)
@@ -107,7 +148,7 @@ impl Editor {
     }
 
     #[must_use]
-    pub fn legacy_shape_animations(&self) -> Vec<LegacyShapeAnimation> {
+    pub(crate) fn legacy_shape_animations(&self) -> Vec<LegacyShapeAnimation> {
         self.entries
             .iter()
             .flat_map(|entry| entry.legacy.clone())
@@ -115,7 +156,11 @@ impl Editor {
     }
 
     #[must_use]
-    pub fn find_shape(&self, persist_id: u32, shape_id: u32) -> Option<LegacyShapeAnimation> {
+    pub(crate) fn find_shape(
+        &self,
+        persist_id: u32,
+        shape_id: u32,
+    ) -> Option<LegacyShapeAnimation> {
         self.entries
             .iter()
             .find(|entry| entry.persist_id == persist_id)
@@ -128,7 +173,12 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn add(&mut self, persist_id: u32, index: usize, node: ExtendedTimeNode) -> Result<()> {
+    pub(crate) fn add(
+        &mut self,
+        persist_id: u32,
+        index: usize,
+        node: ExtendedTimeNode,
+    ) -> Result<()> {
         let mut candidate = self.clone();
         let entry = candidate.entry_mut(persist_id)?;
         let mut root = entry.extension.time_node.clone().unwrap_or_default();
@@ -147,7 +197,12 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn update(&mut self, persist_id: u32, index: usize, node: ExtendedTimeNode) -> Result<()> {
+    pub(crate) fn update(
+        &mut self,
+        persist_id: u32,
+        index: usize,
+        node: ExtendedTimeNode,
+    ) -> Result<()> {
         let mut candidate = self.clone();
         let entry = candidate.entry_mut(persist_id)?;
         let root = entry
@@ -170,7 +225,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn replace(
+    pub(crate) fn replace(
         &mut self,
         persist_id: u32,
         root: Option<ExtendedTimeNode>,
@@ -191,7 +246,7 @@ impl Editor {
     ///
     /// Returns an error if the persist ID is unknown, the timeline has no root
     /// node, `index` is out of range, or the rewritten record fails validation.
-    pub fn remove(&mut self, persist_id: u32, index: usize) -> Result<ExtendedTimeNode> {
+    pub(crate) fn remove(&mut self, persist_id: u32, index: usize) -> Result<ExtendedTimeNode> {
         let mut candidate = self.clone();
         let entry = candidate.entry_mut(persist_id)?;
         let root = entry
@@ -215,7 +270,7 @@ impl Editor {
     /// Returns an error if the persist ID is unknown, the timeline has no root
     /// node, `order` is not a permutation of every child index, or the
     /// rewritten record fails validation.
-    pub fn reorder(&mut self, persist_id: u32, order: &[usize]) -> Result<()> {
+    pub(crate) fn reorder(&mut self, persist_id: u32, order: &[usize]) -> Result<()> {
         let mut candidate = self.clone();
         let entry = candidate.entry_mut(persist_id)?;
         let root = entry
@@ -246,7 +301,7 @@ impl Editor {
     ///
     /// Returns an error if the persist ID is unknown, `index` is out of range,
     /// or the rewritten record fails validation.
-    pub fn add_build(
+    pub(crate) fn add_build(
         &mut self,
         persist_id: u32,
         index: usize,
@@ -274,7 +329,7 @@ impl Editor {
     /// Returns an error if the persist ID is unknown, the slide/master has no
     /// build list, `index` is out of range, or the rewritten record fails
     /// validation.
-    pub fn update_build(
+    pub(crate) fn update_build(
         &mut self,
         persist_id: u32,
         index: usize,
@@ -304,7 +359,7 @@ impl Editor {
     /// Returns an error if the persist ID is unknown, the slide/master has no
     /// build list, `index` is out of range, or the rewritten record fails
     /// validation.
-    pub fn remove_build(&mut self, persist_id: u32, index: usize) -> Result<BuildListEntry> {
+    pub(crate) fn remove_build(&mut self, persist_id: u32, index: usize) -> Result<BuildListEntry> {
         let mut candidate = self.clone();
         let entry = candidate.entry_mut(persist_id)?;
         let list = entry
@@ -328,7 +383,7 @@ impl Editor {
     /// Returns an error if the persist ID is unknown, the slide/master has no
     /// build list, `order` is not a permutation of every entry index, or the
     /// rewritten record fails validation.
-    pub fn reorder_builds(&mut self, persist_id: u32, order: &[usize]) -> Result<()> {
+    pub(crate) fn reorder_builds(&mut self, persist_id: u32, order: &[usize]) -> Result<()> {
         let mut candidate = self.clone();
         let entry = candidate.entry_mut(persist_id)?;
         let list = entry
@@ -360,7 +415,7 @@ impl Editor {
     /// Returns an error if the persist ID is unknown, the target shape does not
     /// exist, the animation fails serialization, or the shape's `OfficeArt`
     /// container is missing or malformed.
-    pub fn replace_shape_animation(
+    pub(crate) fn replace_shape_animation(
         &mut self,
         persist_id: u32,
         shape_id: u32,
@@ -404,18 +459,8 @@ impl Editor {
                 .legacy
                 .sort_by_key(|value| value.shape_id);
         }
-        candidate.changed = true;
         *self = candidate;
         Ok(())
-    }
-
-    /// Finishes the transaction and returns the rewritten package bytes.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the rewritten package cannot be serialized.
-    pub fn finish(self) -> Result<Vec<u8>> {
-        self.package.finish()
     }
 
     fn entry_mut(&mut self, persist_id: u32) -> Result<&mut PersistAnimation> {
@@ -445,7 +490,7 @@ impl Editor {
             return invalid("animation extension exceeds record limit");
         }
         let record = rewrite_ppt10_payload(&self.entries[index].record, &payload)?;
-        let (parsed, consumed) = Record::parse(&record, 0)?;
+        let (parsed, consumed) = Record::parse(&record, 0, &self.limits.source_limits)?;
         if consumed != record.len() || parsed.data_length as usize + 8 != record.len() {
             return corrupted("rewritten slide/master record failed length validation");
         }
@@ -462,8 +507,28 @@ impl Editor {
         self.entries[index].record = record;
         self.entries[index].extension_payload = Some(payload);
         self.entries[index].extension = reparsed;
-        self.changed = true;
         Ok(())
+    }
+}
+
+impl SourceAnimation {
+    /// Whether `entry` carries this source animation model: the same
+    /// timeline and build list, and the same legacy shape animations
+    /// (compared by shape id and serialized `AnimationInfo`; an animation
+    /// that cannot be serialized compares unequal).
+    fn same_as(&self, entry: &PersistAnimation) -> bool {
+        let encoded = |value: &LegacyShapeAnimation| {
+            write_animation_info(&value.animation)
+                .ok()
+                .map(|bytes| (value.shape_id, bytes.0))
+        };
+        let mut source = self.legacy.iter().map(encoded).collect::<Option<Vec<_>>>();
+        let mut staged = entry.legacy.iter().map(encoded).collect::<Option<Vec<_>>>();
+        if let (Some(source), Some(staged)) = (source.as_mut(), staged.as_mut()) {
+            source.sort();
+            staged.sort();
+        }
+        self.extension == entry.extension && source.is_some() && source == staged
     }
 }
 
@@ -644,7 +709,7 @@ fn collect_escher(
                         while ppt < value.len() {
                             let item = raw_record(value, ppt)?;
                             if raw_type(item)? == RecordType::AnimationInfo.as_u16() {
-                                let (parsed, used) = Record::parse(item, 0)?;
+                                let (parsed, used) = Record::parse(item, 0, &limits.source_limits)?;
                                 if used != item.len() {
                                     return corrupted("AnimationInfo length mismatch");
                                 }

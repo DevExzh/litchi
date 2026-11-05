@@ -1,0 +1,80 @@
+{
+  "schema": "litchi.file.integrated-harness-build.v1",
+  "parent": "8d6abdab69e1303719bf33913203ace89252f4be",
+  "upstream": "dd1052e06d",
+  "status": "build and lint passed; integrated route validation and native qualification pending",
+  "source_files": [
+    {
+      "path": "crates/litchi-ops/examples/file_w8_qualified_probe.rs",
+      "bytes": 74747,
+      "sha256": "3a01dd2cbb971b4eba54e2eccffa99e1b3c4557db14af03e61869f99f0a0cc27"
+    },
+    {
+      "path": "docs/unified-ops/results/0362h/analyze.py",
+      "bytes": 20453,
+      "sha256": "9df74cae64e3776dc077bea54815dea71f9be5287371c62e1fbf4b8afe1ff1a0"
+    },
+    {
+      "path": "docs/unified-ops/results/0362h/validate.py",
+      "bytes": 7632,
+      "sha256": "44eec454e1639712dae058a04dfc5cb1657d5a9ed5621aa3ad2e1a6fe2d302f8"
+    }
+  ],
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "-p",
+        "litchi-ops",
+        "--",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 2.696465337066911,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/harness-v1/check-0.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-ops",
+        "--all-features",
+        "--example",
+        "file_w8_qualified_probe"
+      ],
+      "exit": 0,
+      "seconds": 317.2282706340775,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/harness-v1/check-1.log",
+      "bytes": 8089,
+      "sha256": "67afa43b0d6d94836a8075ae3ebe58913e7e6f66af681da731696db7e1b94681"
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-ops",
+        "--all-features",
+        "--example",
+        "file_w8_qualified_probe",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 229.61452200694475,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/harness-v1/check-2.log",
+      "bytes": 7332,
+      "sha256": "0f1c0faf1e81f58840b9ba3063dda4dd98e8a4d174d3ee720c689e64110b7c1a"
+    }
+  ],
+  "python_syntax": "All results/0362h/*.py parsed with ast.parse without generating bytecode"
+}

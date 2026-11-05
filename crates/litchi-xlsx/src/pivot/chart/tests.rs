@@ -536,7 +536,8 @@ mod legacy_tests {
 
     #[test]
     fn poi_fixture_pivot_chart_part_parses() {
-        let package = OpcPackage::from_bytes(POI_PIVOT_CHART).unwrap();
+        let package =
+            OpcPackage::from_bytes(POI_PIVOT_CHART, litchi_opc::SourceLimits::default()).unwrap();
         let chart_part = package
             .get_part(&PackURI::new("/xl/charts/chart1.xml").unwrap())
             .unwrap();
@@ -553,7 +554,8 @@ mod legacy_tests {
 
     #[test]
     fn poi_fixture_pivot_tables_and_chartsheet_chart_load() {
-        let package = OpcPackage::from_bytes(POI_PIVOT_CHART).unwrap();
+        let package =
+            OpcPackage::from_bytes(POI_PIVOT_CHART, litchi_opc::SourceLimits::default()).unwrap();
         // The workbook contains a chartsheet; the pivot-table read path that
         // used to reject it now tolerates it.
         let tables = read_pivot_tables(&package).unwrap();
@@ -671,7 +673,7 @@ mod legacy_tests {
             PivotAxis, PivotDataField, PivotFieldRole, PivotTable, PivotValueFunction,
         };
 
-        let mut workbook = crate::Workbook::create().unwrap();
+        let mut workbook = crate::Package::new().unwrap();
         {
             let worksheet = workbook.worksheet_mut(0).unwrap();
             worksheet.set_cell_value(1, 1, "Region");
@@ -742,7 +744,7 @@ mod legacy_tests {
         let path = temp_xlsx_path("round-trip");
         workbook.save(&path).unwrap();
 
-        let reopened = Workbook::open(&path).unwrap();
+        let reopened = Package::open(&path).unwrap();
         std::fs::remove_file(&path).ok();
         // The authored pivot table survives the round trip.
         let tables = reopened.pivot_tables().unwrap();
@@ -827,7 +829,7 @@ mod legacy_tests {
         let path = temp_xlsx_path("pivot-chartsheet");
         workbook.save(&path).unwrap();
 
-        let reopened = Workbook::open(&path).unwrap();
+        let reopened = Package::open(&path).unwrap();
         std::fs::remove_file(&path).ok();
         let sheets = load(reopened.package()).unwrap();
         assert_eq!(sheets.len(), 1);

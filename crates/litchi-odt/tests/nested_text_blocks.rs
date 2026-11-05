@@ -6,7 +6,7 @@
 //! paragraphs is real user content, so the readers surface each as its own
 //! block in document order rather than rejecting the document.
 
-use litchi_odt::Document;
+use litchi_odt::Package;
 use litchi_odt::elements::text::TextElements;
 use litchi_odt::generic::Family;
 
@@ -176,7 +176,7 @@ fn producer_written_frame_captions_round_trip_through_the_flat_reader() {
     // LibreOffice writes an anchored caption frame as a `text:p` that contains a
     // `draw:text-box` with its own `text:p`. Before frames were reachable this
     // shape made `text()` fail outright for the whole document.
-    let flat = litchi_odt::generic::FlatDocument::open(
+    let flat = litchi_odt::generic::flat::Document::open(
         "../../test-data/odf/odt/nested-frame-paragraphs.fodt",
     )
     .unwrap();
@@ -190,7 +190,10 @@ fn producer_written_frame_captions_round_trip_through_the_flat_reader() {
 fn packaged_documents_reach_shape_paragraphs_too() {
     // A shape anchored to a paragraph stores its label as a `text:p` inside the
     // `draw:custom-shape`, which sits inside the anchoring `text:p`.
-    let document = Document::open("../../test-data/odf/odt/shape-text-in-paragraph.odt").unwrap();
+    let document = Package::open("../../test-data/odf/odt/shape-text-in-paragraph.odt")
+        .unwrap()
+        .document()
+        .unwrap();
 
     assert_eq!(document.paragraph_count().unwrap(), 2);
     assert_eq!(document.text().unwrap(), "\nText Inside The Rectangle");

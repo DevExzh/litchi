@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use libfuzzer_sys::fuzz_target;
 use litchi::keynote::{
-    Limits, MovieSelector, Package, ReadOptions, SemanticLimits, SlideSelector,
+    MovieSelector, OpenOptions, Package, SemanticLimits, SlideSelector, SourceLimits,
     slide::media::{MediaLoopMode, MediaPlaybackSettings, MediaVolume},
 };
 
@@ -38,27 +38,29 @@ fuzz_target!(|data: &[u8]| {
     exercise_input_limit();
 });
 
-fn fuzz_options() -> ReadOptions {
-    static OPTIONS: OnceLock<ReadOptions> = OnceLock::new();
+fn fuzz_options() -> OpenOptions {
+    static OPTIONS: OnceLock<OpenOptions> = OnceLock::new();
     *OPTIONS.get_or_init(|| {
-        let archive = Limits::new(
-            MAX_INPUT_BYTES,
-            MAX_ENTRIES,
-            MAX_ENTRY_BYTES,
-            MAX_EXPANDED_BYTES,
-            MAX_IWA_STREAM_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid Keynote fuzz archive limits: {error}"));
-        let semantic = SemanticLimits::new(
-            MAX_OBJECTS,
-            MAX_SLIDES,
-            MAX_REFERENCES,
-            MAX_TEXT_STORAGES,
-            MAX_TEXT_FRAGMENTS,
-            MAX_TEXT_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid Keynote fuzz semantic limits: {error}"));
-        ReadOptions::new(archive, semantic)
+        let archive = SourceLimits::builder()
+            .max_input_bytes(MAX_INPUT_BYTES)
+            .and_then(|limits| limits.max_entries(MAX_ENTRIES))
+            .and_then(|limits| limits.max_entry_bytes(MAX_ENTRY_BYTES))
+            .and_then(|limits| limits.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+            .and_then(|limits| limits.max_component_bytes(MAX_IWA_STREAM_BYTES))
+            .and_then(|limits| limits.build())
+            .unwrap_or_else(|error| unreachable!("valid Keynote fuzz archive limits: {error}"));
+        let semantic = SemanticLimits::builder()
+            .max_objects(MAX_OBJECTS)
+            .and_then(|limits| limits.max_slides(MAX_SLIDES))
+            .and_then(|limits| limits.max_references(MAX_REFERENCES))
+            .and_then(|limits| limits.max_text_storages(MAX_TEXT_STORAGES))
+            .and_then(|limits| limits.max_text_fragments(MAX_TEXT_FRAGMENTS))
+            .and_then(|limits| limits.max_text_bytes(MAX_TEXT_BYTES))
+            .and_then(|limits| limits.build())
+            .unwrap_or_else(|error| unreachable!("valid Keynote fuzz semantic limits: {error}"));
+        OpenOptions::new()
+            .source_limits(archive)
+            .semantic_limits(semantic)
     })
 }
 
@@ -183,21 +185,18 @@ fn changed_settings(before: MediaPlaybackSettings, data: &[u8]) -> MediaPlayback
 }
 
 fn exercise_input_limit() {
-    let defaults = Limits::default();
-    let tight = Limits::new(
-        u64::try_from(NATIVE_KEYNOTE.len().saturating_sub(1)).unwrap_or(0),
-        defaults.max_entries(),
-        defaults.max_entry_bytes(),
-        defaults.max_total_bytes(),
-        defaults.max_iwa_stream_bytes(),
-    )
-    .unwrap_or_else(|error| panic!("finite limit must construct: {error}"));
+    let defaults = SourceLimits::default();
+    let tight = SourceLimits::builder()
+        .max_input_bytes(u64::try_from(NATIVE_KEYNOTE.len().saturating_sub(1)).unwrap_or(0))
+        .and_then(|limits| limits.max_entries(defaults.max_entries()))
+        .and_then(|limits| limits.max_entry_bytes(defaults.max_entry_bytes()))
+        .and_then(|limits| limits.max_aggregate_bytes(defaults.max_aggregate_bytes()))
+        .and_then(|limits| limits.max_component_bytes(defaults.max_component_bytes()))
+        .and_then(|limits| limits.build())
+        .unwrap_or_else(|error| panic!("finite limit must construct: {error}"));
     assert!(
-        Package::from_bytes_with_options(
-            NATIVE_KEYNOTE,
-            ReadOptions::new(tight, SemanticLimits::default()),
-        )
-        .is_err()
+        Package::from_bytes_with_options(NATIVE_KEYNOTE, OpenOptions::new().source_limits(tight),)
+            .is_err()
     );
 }
 

@@ -9,7 +9,8 @@
 //! validation walk must admit both.
 
 use litchi_cfb::{
-    DirectoryEntry, OleError, OleFile, OleWriter, SectorLayoutPolicy, validate_source,
+    DirectoryEntry, OleError, OleFile, OleFileLimits, OleWriter, SectorLayoutPolicy,
+    validate_source,
 };
 use litchi_core::OwnedSource;
 use std::collections::BTreeSet;
@@ -94,7 +95,7 @@ fn walk_storages(
 }
 
 fn capture(bytes: &[u8]) -> Result<Model, OleError> {
-    let mut ole = OleFile::open(Cursor::new(bytes.to_vec()))?;
+    let mut ole = OleFile::open(Cursor::new(bytes.to_vec()), OleFileLimits::default())?;
     let sector_size = ole.sector_size();
     let mut storages = Vec::new();
     walk_storages(&ole, &[], &mut storages)?;
@@ -116,7 +117,9 @@ fn serialize(model: &Model, source: Option<&[u8]>, policy: SectorLayoutPolicy) -
     let mut writer = OleWriter::with_sector_size(model.sector_size).expect("sector size");
     writer.set_sector_layout_policy(policy);
     if let Some(source) = source {
-        writer.adopt_source_layout(source).expect("adoption");
+        writer
+            .adopt_source_layout(source, OleFileLimits::default())
+            .expect("adoption");
     }
     let mut ordered = model.storages.clone();
     ordered.sort_by(|left, right| left.len().cmp(&right.len()).then_with(|| left.cmp(right)));
@@ -138,7 +141,7 @@ fn serialize(model: &Model, source: Option<&[u8]>, policy: SectorLayoutPolicy) -
 }
 
 fn entries_of(bytes: &[u8]) -> Vec<(Vec<String>, u8, String)> {
-    let ole = OleFile::open(Cursor::new(bytes.to_vec())).expect("reopen");
+    let ole = OleFile::open(Cursor::new(bytes.to_vec()), OleFileLimits::default()).expect("reopen");
     let mut out = Vec::new();
     let mut pending: Vec<Vec<String>> = vec![Vec::new()];
     while let Some(prefix) = pending.pop() {
@@ -170,7 +173,8 @@ fn u32_at(bytes: &[u8], offset: usize) -> u32 {
 fn directory_catalog(
     bytes: &[u8],
 ) -> std::collections::BTreeMap<Vec<String>, (u32, u8, u64, bool)> {
-    let ole = OleFile::open(Cursor::new(bytes.to_vec())).expect("directory catalog");
+    let ole = OleFile::open(Cursor::new(bytes.to_vec()), OleFileLimits::default())
+        .expect("directory catalog");
     let mut out = std::collections::BTreeMap::new();
     let root = ole.root_entry().expect("root entry");
     out.insert(
@@ -316,8 +320,12 @@ fn compare(
             .collect::<Vec<_>>(),
         "{label}: directory shape"
     );
-    let report = validate_source(Arc::new(OwnedSource::new(reused.to_vec())))
-        .unwrap_or_else(|error| panic!("{label}: validation walk: {error}"));
+    let report = validate_source(
+        Arc::new(OwnedSource::new(reused.to_vec())),
+        litchi_cfb::SharedOleFileLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
+    .unwrap_or_else(|error| panic!("{label}: validation walk: {error}"));
     assert!(
         report.is_complete(),
         "{label}: validation walk did not complete on the reused layout: {report:?}"
@@ -411,7 +419,9 @@ fn every_ole2_fixture_agrees_stream_by_stream_under_both_policies() {
             .1
             .extend(std::iter::repeat_n(0xA5u8, padding));
         let mut writer = OleWriter::with_sector_size(model.sector_size).expect("sector size");
-        writer.adopt_source_layout(&bytes).expect("adoption");
+        writer
+            .adopt_source_layout(&bytes, OleFileLimits::default())
+            .expect("adoption");
         let mut ordered = grown.storages.clone();
         ordered.sort_by(|left, right| left.len().cmp(&right.len()).then_with(|| left.cmp(right)));
         for storage in &ordered {
@@ -501,7 +511,9 @@ fn sector_layout_counts_over_the_corpus() {
                 _ => {},
             }
             let mut writer = OleWriter::with_sector_size(edited.sector_size).expect("sector size");
-            writer.adopt_source_layout(&bytes).expect("adoption");
+            writer
+                .adopt_source_layout(&bytes, OleFileLimits::default())
+                .expect("adoption");
             let mut ordered = edited.storages.clone();
             ordered
                 .sort_by(|left, right| left.len().cmp(&right.len()).then_with(|| left.cmp(right)));
@@ -617,7 +629,7 @@ fn reused_layout_is_deterministic_across_processes() {
         );
         let digest = String::from_utf8_lossy(&output.stdout)
             .lines()
-            .find_map(|line| line.strip_prefix("LAYOUT_DIGEST="))
+            .find_map(|line| line.split_once("LAYOUT_DIGEST=").map(|(_, digest)| digest))
             .expect("child should report a layout digest")
             .to_owned();
         digests.push(digest);
@@ -799,7 +811,9 @@ fn a_mutated_source_never_steers_the_layout() {
                 *slot = pattern;
             }
             let mut writer = OleWriter::with_sector_size(model.sector_size).expect("sector size");
-            let adopted = writer.adopt_source_layout(&mutated).expect("adoption");
+            let adopted = writer
+                .adopt_source_layout(&mutated, OleFileLimits::default())
+                .expect("adoption");
             let mut ordered = model.storages.clone();
             ordered
                 .sort_by(|left, right| left.len().cmp(&right.len()).then_with(|| left.cmp(right)));

@@ -1,9 +1,10 @@
-//! Focused snapshot, semantic-edit, and package-atomicity coverage.
+//! Focused source-read, typed graph edit and package-atomicity coverage.
 
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
 
-use super::{Snapshot, Transaction, validate_graph};
+use super::{Comment, load_from_worksheet, validate_graph};
+use crate::Package;
 
 const COMMENTS_XML: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <comments xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
@@ -47,7 +48,13 @@ fn fixture() -> (OpcPackage, PackURI) {
         false,
     );
     validate_graph(&package).unwrap();
+    crate::record::adopt_worksheet(&mut package, &worksheet, false);
     (package, worksheet)
+}
+
+fn adopted() -> (Package, PackURI) {
+    let (package, worksheet) = fixture();
+    (Package::from_opc(package).unwrap(), worksheet)
 }
 
 fn comments_source(package: &OpcPackage) -> Vec<u8> {
@@ -67,11 +74,11 @@ fn vml_source(package: &OpcPackage) -> Vec<u8> {
 }
 
 #[test]
-fn snapshot_retains_exact_source_and_inert_shape_identity() {
+fn source_read_retains_exact_source_and_inert_shape_identity() {
     let (package, worksheet) = fixture();
-    let snapshot = Snapshot::load(&package, &worksheet).unwrap();
-    assert_eq!(snapshot.source_xml(), Some(COMMENTS_XML));
-    let comment = snapshot.comments().unwrap().get("A1").unwrap();
+    let part = load_from_worksheet(&package, &worksheet).unwrap().unwrap();
+    assert_eq!(comments_source(&package), COMMENTS_XML);
+    let comment = part.comments.get("A1").unwrap();
     assert_eq!(comment.author, "Alice");
     assert_eq!(comment.text, "legacy note");
     assert_eq!(comment.shape_id, Some(1026));
@@ -80,9 +87,10 @@ fn snapshot_retains_exact_source_and_inert_shape_identity() {
 
 #[test]
 fn semantic_no_op_keeps_exact_bytes_and_relationships() {
-    let (mut package, worksheet) = fixture();
-    let source = comments_source(&package);
+    let (package, worksheet) = adopted();
+    let source = comments_source(package.opc());
     let relationship_ids: Vec<_> = package
+        .opc()
         .get_part(&worksheet)
         .unwrap()
         .rels()
@@ -90,13 +98,22 @@ fn semantic_no_op_keeps_exact_bytes_and_relationships() {
         .map(|relationship| relationship.r_id().to_owned())
         .collect();
 
-    let mut transaction = Transaction::new(&mut package, &worksheet).unwrap();
-    assert!(!transaction.set("A1", "Alice", "legacy note").unwrap());
-    let commit = transaction.commit().unwrap();
-    assert!(!commit.changed());
-    assert!(commit.patch().is_empty());
-    assert_eq!(comments_source(&package), source);
-    let current_ids: Vec<_> = package
+    let mut edit = package.edit_comments().unwrap();
+    let existing: Comment = edit
+        .comments(0)
+        .unwrap()
+        .unwrap()
+        .get("A1")
+        .unwrap()
+        .clone();
+    assert!(!edit.set_comment(0, existing).unwrap());
+    let commit = edit.commit().unwrap();
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.patch().is_noop());
+    assert_eq!(comments_source(commit.package().opc()), source);
+    let current_ids: Vec<_> = commit
+        .package()
+        .opc()
         .get_part(&worksheet)
         .unwrap()
         .rels()
@@ -108,53 +125,98 @@ fn semantic_no_op_keeps_exact_bytes_and_relationships() {
 
 #[test]
 fn checked_edits_are_atomic_and_preserve_vml_shape_ids() {
-    let (mut package, worksheet) = fixture();
-    let vml_before = vml_source(&package);
-    let mut transaction = Transaction::new(&mut package, &worksheet).unwrap();
-    let before = transaction.comments().cloned();
-    assert!(transaction.set("A0", "Alice", "invalid").is_err());
-    assert_eq!(transaction.comments().cloned(), before);
-    assert!(transaction.set_author(99, "Nobody").is_err());
-    assert_eq!(transaction.comments().cloned(), before);
+    let (package, _) = adopted();
+    let vml_before = vml_source(package.opc());
+    let mut edit = package.edit_comments().unwrap();
+    let before = edit.comments(0).unwrap();
+    let mut invalid = before.as_ref().unwrap().get("A1").unwrap().clone();
+    invalid.cell_ref = "A0".into();
+    assert!(edit.set_comment(0, invalid).is_err());
+    assert_eq!(edit.comments(0).unwrap(), before);
+    assert!(edit.set_author(0, 99, "Nobody").is_err());
+    assert_eq!(edit.comments(0).unwrap(), before);
 
-    assert!(transaction.set("A1", "Bob", "updated").unwrap());
-    assert!(transaction.rename_author("Bob", "Robert").unwrap());
-    let commit = transaction.commit().unwrap();
-    let comment = commit.snapshot().comments().unwrap().get("A1").unwrap();
+    let mut updated = before.as_ref().unwrap().get("A1").unwrap().clone();
+    updated.author = "Bob".into();
+    updated.author_id = 1;
+    updated.text = "updated".into();
+    assert!(edit.set_comment(0, updated).unwrap());
+    assert!(edit.rename_author(0, "Bob", "Robert").unwrap());
+    let after = edit.commit().unwrap().into_package();
+    let part = load_from_worksheet(
+        after.opc(),
+        &PackURI::new("/xl/worksheets/sheet1.xml").unwrap(),
+    )
+    .unwrap()
+    .unwrap();
+    let comment = part.comments.get("A1").unwrap();
     assert_eq!(comment.author, "Robert");
     assert_eq!(comment.text, "updated");
     assert_eq!(comment.author_id, 1);
     assert_eq!(comment.shape_id, Some(1026));
-    assert_eq!(vml_source(&package), vml_before);
+    assert_eq!(vml_source(after.opc()), vml_before);
 }
 
 #[test]
 fn patch_replays_exact_source_and_inverse_atomically() {
-    let (mut package, worksheet) = fixture();
-    let original = comments_source(&package);
-    let mut transaction = Transaction::new(&mut package, &worksheet).unwrap();
-    assert!(transaction.set("A1", "Alice", "changed").unwrap());
-    let commit = transaction.commit().unwrap();
+    let (package, _) = adopted();
+    let original = comments_source(package.opc());
+    let mut edit = package.edit_comments().unwrap();
+    let mut changed = edit
+        .comments(0)
+        .unwrap()
+        .unwrap()
+        .get("A1")
+        .unwrap()
+        .clone();
+    changed.text = "changed".into();
+    assert!(edit.set_comment(0, changed).unwrap());
+    let commit = edit.commit().unwrap();
     let patch = commit.patch().clone();
-    let changed = comments_source(&package);
+    let changed = comments_source(commit.package().opc());
 
-    let (mut replay, replay_worksheet) = fixture();
-    assert_eq!(worksheet, replay_worksheet);
-    patch.apply(&mut replay).unwrap();
-    assert_eq!(comments_source(&replay), changed);
-    patch.inverse().apply(&mut replay).unwrap();
-    assert_eq!(comments_source(&replay), original);
-    assert_eq!(vml_source(&replay), VML_XML);
+    let (replay, _) = adopted();
+    let replayed = replay.apply_comments(&patch).unwrap().into_package();
+    assert_eq!(comments_source(replayed.opc()), changed);
+    let restored = replayed
+        .apply_comments(&patch.inverse())
+        .unwrap()
+        .into_package();
+    assert_eq!(comments_source(restored.opc()), original);
+    assert_eq!(vml_source(restored.opc()), VML_XML);
+}
+
+#[test]
+fn clear_removes_the_comments_part_and_keeps_the_vml_drawing() {
+    let (package, worksheet) = adopted();
+    let mut edit = package.edit_comments().unwrap();
+    assert!(edit.clear(0).unwrap());
+    assert!(!edit.clear(0).unwrap());
+    let after = edit.commit().unwrap().into_package();
+    assert!(
+        load_from_worksheet(after.opc(), &worksheet)
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(vml_source(after.opc()), VML_XML);
 }
 
 #[test]
 fn patch_conflict_does_not_publish_partial_relationship_changes() {
-    let (mut source, worksheet) = fixture();
-    let mut transaction = Transaction::new(&mut source, &worksheet).unwrap();
-    assert!(transaction.set("A1", "Alice", "changed").unwrap());
-    let patch = transaction.commit().unwrap().patch().clone();
+    let (source, _) = adopted();
+    let mut edit = source.edit_comments().unwrap();
+    let mut changed = edit
+        .comments(0)
+        .unwrap()
+        .unwrap()
+        .get("A1")
+        .unwrap()
+        .clone();
+    changed.text = "changed".into();
+    assert!(edit.set_comment(0, changed).unwrap());
+    let patch = edit.commit().unwrap().patch().clone();
 
-    let (mut target, target_worksheet) = fixture();
+    let (mut target, _) = fixture();
     let conflicting = String::from_utf8(COMMENTS_XML.to_vec())
         .unwrap()
         .replace("legacy note", "different source");
@@ -162,23 +224,11 @@ fn patch_conflict_does_not_publish_partial_relationship_changes() {
         .get_part_mut(&PackURI::new("/xl/comments1.xml").unwrap())
         .unwrap()
         .set_blob(conflicting.into_bytes());
-    let before = comments_source(&target);
-    let ids_before: Vec<_> = target
-        .get_part(&target_worksheet)
-        .unwrap()
-        .rels()
-        .iter()
-        .map(|relationship| relationship.r_id().to_owned())
-        .collect();
-
-    assert!(patch.apply(&mut target).is_err());
-    assert_eq!(comments_source(&target), before);
-    let ids_after: Vec<_> = target
-        .get_part(&target_worksheet)
-        .unwrap()
-        .rels()
-        .iter()
-        .map(|relationship| relationship.r_id().to_owned())
-        .collect();
-    assert_eq!(ids_after, ids_before);
+    let target = Package::from_opc(target).unwrap();
+    let before = comments_source(target.opc());
+    assert!(matches!(
+        target.apply_comments(&patch),
+        Err(crate::Error::PatchConflict { .. })
+    ));
+    assert_eq!(comments_source(target.opc()), before);
 }

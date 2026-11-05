@@ -1,15 +1,15 @@
 //! Immutable chart package ownership and bounded content-part rebuilding.
 
-use crate::FlatChart;
+use crate::flat::Chart as FlatChart;
 use litchi_core::{Error, Metadata, Result};
 use litchi_odf_common::{
-    compact_xml,
+    OpenOptions, compact_xml,
     core::{
-        AuthoredXmlFragment, OwnedPackage, PackageWriter, SourcePackageLimits, XmlSourcePart,
+        AuthoredXmlFragment, OwnedPackage, PackageWriter, SourceLimits, XmlSourcePart,
         XmlSplicePublication, family::Package,
     },
 };
-use std::{fs, io::Write, path::Path, sync::Arc};
+use std::{io::Write, path::Path, sync::Arc};
 
 pub(crate) const MIMETYPE: &str = "application/vnd.oasis.opendocument.chart";
 pub(crate) const TEMPLATE_MIMETYPE: &str = "application/vnd.oasis.opendocument.chart-template";
@@ -82,25 +82,65 @@ pub(crate) enum StylesReplacement<'a> {
 pub(crate) struct Snapshot(Arc<State>);
 
 impl Snapshot {
-    pub(crate) fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::open_with_limits(path, crate::Limits::default())
+    /// The retained physical package (metadata transactions, record 0288).
+    pub(crate) fn owned_package(&self) -> &OwnedPackage {
+        self.0.package.package()
     }
 
-    pub(crate) fn open_with_limits(path: impl AsRef<Path>, limits: crate::Limits) -> Result<Self> {
-        Self::from_bytes_with_limits(fs::read(path)?, limits)
-    }
-
-    pub(crate) fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, crate::Limits::default())
-    }
-
+    /// Index and validate package bytes under the retained chart limits
+    /// only (builder output, durable patches and rebuilt packages).
     pub(crate) fn from_bytes_with_limits(bytes: Vec<u8>, limits: crate::Limits) -> Result<Self> {
         if bytes.len() > limits.max_package_bytes() {
             return Err(Error::InvalidFormat(
                 "ODC package exceeds the caller-selected byte limit".into(),
             ));
         }
-        let archive = OwnedPackage::from_bytes_with_limits(bytes, SourcePackageLimits::default())?;
+        let archive = OwnedPackage::from_bytes_with_options(
+            bytes,
+            OpenOptions::new().source_limits(SourceLimits::default()),
+        )?;
+        Self::from_archive(archive, limits, OpenOptions::new()).map_err(Error::from)
+    }
+
+    /// Read a package from a stream under one ingress envelope.
+    pub(crate) fn from_reader_with_options(
+        reader: impl std::io::Read,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        let archive = OwnedPackage::from_reader_with_options(reader, options)?;
+        Self::from_owned_with_options(archive, options)
+    }
+
+    /// Decode package bytes under one ingress envelope.
+    pub(crate) fn from_bytes_with_options(
+        bytes: Vec<u8>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        let archive = OwnedPackage::from_bytes_with_options(bytes, options)?;
+        Self::from_owned_with_options(archive, options)
+    }
+
+    /// Adopt an indexed archive under one ingress envelope. The envelope
+    /// bounds ingress only; the retained chart limits keep their defaults.
+    pub(crate) fn from_owned_with_options(
+        archive: OwnedPackage,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        let limits = crate::Limits::default();
+        if archive.as_bytes().len() > limits.max_package_bytes() {
+            return Err(Error::InvalidFormat(
+                "ODC package exceeds the retained package byte limit".into(),
+            )
+            .into());
+        }
+        Self::from_archive(archive, limits, options)
+    }
+
+    fn from_archive(
+        archive: OwnedPackage,
+        limits: crate::Limits,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
         let mimetype = archive.mimetype()?.to_owned();
         let kind = ChartPackageKind::from_mime(&mimetype)?;
         let owned_manifest = archive.package()?;
@@ -108,11 +148,14 @@ impl Snapshot {
         // The chart reader performs namespace-aware content validation after
         // the package MIME check; a lexical body marker would reject valid
         // producer documents that use a different namespace prefix.
-        Self::from_package(
-            Package::from_owned_package(archive, kind.mime_type(), "", "ODC")?,
-            kind,
-            limits,
-        )
+        let package = Package::from_owned_package_with_options(
+            archive,
+            options,
+            kind.mime_type(),
+            "",
+            "ODC",
+        )?;
+        Ok(Self::from_package(package, kind, limits)?)
     }
 
     fn from_package(
@@ -150,6 +193,10 @@ impl Snapshot {
         self.0.package.styles_xml()
     }
 
+    pub(crate) fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
+        self.0.package.tolerance_report()
+    }
+
     pub(crate) fn metadata(&self) -> Option<&Metadata> {
         self.0.package.metadata()
     }
@@ -160,13 +207,6 @@ impl Snapshot {
 
     pub(crate) fn files(&self) -> Result<Vec<String>> {
         self.0.package.files()
-    }
-
-    pub(crate) fn into_bytes(self) -> Vec<u8> {
-        match Arc::try_unwrap(self.0) {
-            Ok(state) => state.package.into_bytes(),
-            Err(state) => state.package.as_bytes().to_vec(),
-        }
     }
 
     pub(crate) fn content_snapshot(&self) -> FlatChart {
@@ -200,7 +240,7 @@ impl Snapshot {
     pub(crate) fn rebuild(
         &self,
         content: &str,
-        content_splice: Option<&crate::FlatChartPatch>,
+        content_splice: Option<&crate::flat::Patch>,
         styles: StylesReplacement<'_>,
         replacements: &[ResourceReplacement<'_>],
     ) -> Result<Self> {
@@ -210,19 +250,23 @@ impl Snapshot {
             ));
         }
         if self.0.encrypted {
-            return Err(Error::Unsupported(
-                "ODC package edits refuse encrypted package members".to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odc.package.snapshot",
+                "ODC package edits refuse encrypted package members",
+            )));
         }
         let compact_limits =
             compact_xml::Limits::new(self.0.limits.max_content_bytes(), self.0.limits.max_depth())
                 .map_err(Error::from)?;
         if content_splice.is_none() {
-            compact_xml::validate_with_limits(content.as_bytes(), compact_limits)
-                .map_err(Error::from)?;
+            compact_xml::validate(content.as_bytes(), compact_limits).map_err(Error::from)?;
         }
         crate::codec::validate(content)?;
-        let mut writer = PackageWriter::new_bounded(self.0.limits.max_package_bytes());
+        let mut writer = PackageWriter::new_bounded(
+            self.0.limits.max_package_bytes(),
+            litchi_odf_common::core::StreamingArchiveLimits::default(),
+        );
         writer.set_mimetype(self.0.kind.mime_type())?;
         if let Some(patch) = content_splice {
             publish_content_splice(self.0.package.package(), patch, content, &mut writer)?;
@@ -236,8 +280,7 @@ impl Snapshot {
                 }
             },
             StylesReplacement::Replace(xml) => {
-                compact_xml::validate_with_limits(xml.as_bytes(), compact_limits)
-                    .map_err(Error::from)?;
+                compact_xml::validate(xml.as_bytes(), compact_limits).map_err(Error::from)?;
                 crate::codec::validate_styles(xml, self.0.limits)?;
                 writer.add_file("styles.xml", xml.as_bytes())?;
             },
@@ -316,7 +359,7 @@ fn validate_manifest_contract(
 
 fn publish_content_splice<W: Write>(
     source: &OwnedPackage,
-    patch: &crate::FlatChartPatch,
+    patch: &crate::flat::Patch,
     content: &str,
     writer: &mut PackageWriter<W>,
 ) -> Result<()> {
@@ -407,7 +450,7 @@ pub(crate) fn validate_authored_resource(
         || media_type == "text/xml"
         || media_type.ends_with("+xml");
     if is_xml {
-        compact_xml::validate_with_limits(bytes, limits).map_err(Error::from)?;
+        compact_xml::validate(bytes, limits).map_err(Error::from)?;
     }
     Ok(())
 }

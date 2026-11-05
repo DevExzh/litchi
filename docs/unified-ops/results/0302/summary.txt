@@ -1,0 +1,41 @@
+DOCX docx_fanout_bench ratio (1 ¶ / 100 ¶):
+  base-1 1:1.125 (leaf 7.55 µs, unified 8.50 µs) 100:1.065 (leaf 350.43 µs, unified 373.26 µs)
+  after-1 1:1.111 (leaf 7.45 µs, unified 8.28 µs) 100:1.062 (leaf 339.79 µs, unified 360.83 µs)
+  after-2 1:1.105 (leaf 7.58 µs, unified 8.37 µs) 100:1.059 (leaf 344.97 µs, unified 365.37 µs)
+  base-2 1:1.110 (leaf 7.72 µs, unified 8.57 µs) 100:1.057 (leaf 349.01 µs, unified 368.95 µs)
+ODT m4_formats_bench 10,000 ¶ (after: b046c2a64c binary):
+  base-1 odt_find_1 10000 leaf 2589.7 µs unified 2858.9 µs ratio 1.104
+  base-1 odt_find_10000 10000 leaf 9356.6 µs unified 9652.0 µs ratio 1.032
+  base-1 odt_merge 10000 leaf 8544.2 µs unified 9132.9 µs ratio 1.069
+  after-1 odt_find_1 10000 leaf 2597.0 µs unified 2639.0 µs ratio 1.016
+  after-1 odt_find_10000 10000 leaf 9766.5 µs unified 9824.8 µs ratio 1.006
+  after-1 odt_merge 10000 leaf 8372.2 µs unified 8921.6 µs ratio 1.066
+  after-2 odt_find_1 10000 leaf 2524.2 µs unified 2568.1 µs ratio 1.017
+  after-2 odt_find_10000 10000 leaf 9025.3 µs unified 8941.2 µs ratio 0.991
+  after-2 odt_merge 10000 leaf 8045.8 µs unified 8760.3 µs ratio 1.089
+  base-2 odt_find_1 10000 leaf 2598.7 µs unified 2880.5 µs ratio 1.108
+  base-2 odt_find_10000 10000 leaf 9277.2 µs unified 9545.4 µs ratio 1.029
+  base-2 odt_merge 10000 leaf 8195.0 µs unified 8778.1 µs ratio 1.071
+Pages pages_bench (10,000-paragraph document):
+  base-1 batch_1 leaf 2284 µs unified 3707 µs ratio 1.629
+  base-1 batch_1000 leaf 2364 µs unified 4101 µs ratio 1.736
+  base-1 batch_10000 leaf 3088 µs unified 7627 µs ratio 2.474
+  after-1 batch_1 leaf 2124 µs unified 2173 µs ratio 1.017
+  after-1 batch_1000 leaf 2195 µs unified 2414 µs ratio 1.101
+  after-1 batch_10000 leaf 2947 µs unified 4724 µs ratio 1.608
+  after-2 batch_1 leaf 2200 µs unified 2238 µs ratio 1.019
+  after-2 batch_1000 leaf 2280 µs unified 2484 µs ratio 1.098
+  after-2 batch_10000 leaf 2918 µs unified 4717 µs ratio 1.615
+  base-2 batch_1 leaf 2278 µs unified 3714 µs ratio 1.629
+  base-2 batch_1000 leaf 2371 µs unified 4089 µs ratio 1.728
+  base-2 batch_10000 leaf 3091 µs unified 7454 µs ratio 2.418
+Numbers numbers_unified_bench:
+  base-1 open_get:1.259 set:1.002 batch_1000:1.443
+  after-1 open_get:1.236 set:1.014 batch_1000:1.320
+  after-2 open_get:1.256 set:1.026 batch_1000:1.336
+  base-2 open_get:1.249 set:1.009 batch_1000:1.488
+RTF rtf_destination_bench (fan-out / Plan route / edit-closure batch):
+  base-1 table_cell_textx1:1.140/1.108/1.076 table_cell_textx100:1.047/1.062/1.123 table_cell_textx1000:1.044/1.045/1.086 footnote_textx1:1.128/1.087/1.079 footnote_textx100:1.024/1.020/1.061 footnote_textx1000:1.012/1.013/1.064 header_paragraph_textx1:-/-/1.070 header_paragraph_textx100:-/-/1.225 header_paragraph_textx1000:-/-/1.155 comment_textx1:1.120/1.085/1.049 comment_textx100:1.033/1.025/1.047 comment_textx1000:1.010/1.010/1.035 picture_removalx1:1.260/1.164/1.075 picture_removalx64:1.352/1.337/1.521
+  after-1 table_cell_textx1:1.155/1.117/1.077 table_cell_textx100:1.035/1.053/1.106 table_cell_textx1000:1.036/1.037/1.075 footnote_textx1:1.119/1.081/1.073 footnote_textx100:1.021/1.014/1.059 footnote_textx1000:1.009/1.008/1.055 header_paragraph_textx1:-/-/1.087 header_paragraph_textx100:-/-/1.229 header_paragraph_textx1000:-/-/1.215 comment_textx1:1.113/1.084/1.061 comment_textx100:1.026/1.014/1.064 comment_textx1000:1.011/1.012/1.037 picture_removalx1:1.247/1.153/1.056 picture_removalx64:1.357/1.343/1.540
+  after-2 table_cell_textx1:1.156/1.114/1.069 table_cell_textx100:1.045/1.056/1.117 table_cell_textx1000:1.043/1.042/1.079 footnote_textx1:1.127/1.087/1.068 footnote_textx100:1.016/1.010/1.061 footnote_textx1000:1.006/1.006/1.050 header_paragraph_textx1:-/-/1.069 header_paragraph_textx100:-/-/1.248 header_paragraph_textx1000:-/-/1.228 comment_textx1:1.123/1.085/1.061 comment_textx100:1.013/1.002/1.057 comment_textx1000:1.038/1.039/1.041 picture_removalx1:1.270/1.183/1.063 picture_removalx64:1.358/1.342/1.536
+  base-2 table_cell_textx1:1.148/1.115/1.073 table_cell_textx100:1.066/1.040/1.053 table_cell_textx1000:1.046/1.046/1.083 footnote_textx1:1.119/1.089/1.080 footnote_textx100:1.014/1.009/1.057 footnote_textx1000:1.008/1.007/1.049 header_paragraph_textx1:-/-/1.075 header_paragraph_textx100:-/-/1.223 header_paragraph_textx1000:-/-/1.237 comment_textx1:1.136/1.102/1.067 comment_textx100:1.018/1.017/1.069 comment_textx1000:1.011/1.011/1.063 picture_removalx1:1.266/1.162/1.074 picture_removalx64:1.353/1.348/1.533

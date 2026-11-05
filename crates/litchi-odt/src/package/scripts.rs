@@ -8,6 +8,7 @@ use crate::document_scripts::{
 };
 use crate::package::charts::{Addition, rebuild_package};
 use litchi_core::{Error, Result};
+use litchi_odf_common::XmlStreamLimits;
 use litchi_odf_common::package::resolve_package_path;
 use quick_xml::events::Event;
 use quick_xml::name::ResolveResult;
@@ -53,8 +54,8 @@ pub struct ScriptResourceSpec {
     pub bytes: Vec<u8>,
 }
 
-pub(crate) fn document_scripts(content: &str) -> Result<Option<Scripts>> {
-    crate::document_scripts::package::read(content)
+pub(crate) fn document_scripts(content: &str, limits: &XmlStreamLimits) -> Result<Option<Scripts>> {
+    crate::document_scripts::package::read(content, limits)
 }
 
 pub(crate) fn resources(package: &OwnedPackage) -> Result<Vec<ScriptResource>> {
@@ -106,12 +107,13 @@ pub(crate) fn set_document_scripts(
     package: &OwnedPackage,
     content: &str,
     scripts: Option<&Scripts>,
+    limits: &XmlStreamLimits,
 ) -> Result<Vec<u8>> {
     if let Some(scripts) = scripts {
         validate_script_links(scripts)?;
     }
-    let updated = replace_scripts_element(content, scripts)?;
-    let staged = parse_scripts(&updated)?;
+    let updated = replace_scripts_element(content, scripts, limits)?;
+    let staged = parse_scripts(&updated, limits)?;
     if staged.as_ref().map(|value| value.scripts.len()) != scripts.map(|value| value.scripts.len())
     {
         return invalid("staged office:scripts mutation did not round-trip");
@@ -130,12 +132,13 @@ pub(crate) fn add_embedded_script(
     package: &OwnedPackage,
     content: &str,
     script: &EmbeddedScript,
+    limits: &XmlStreamLimits,
 ) -> Result<(Vec<u8>, usize)> {
-    let mut scripts = parse_scripts(content)?.unwrap_or_default();
+    let mut scripts = parse_scripts(content, limits)?.unwrap_or_default();
     let index = scripts.scripts.len();
     scripts.scripts.push(script.clone());
     Ok((
-        set_document_scripts(package, content, Some(&scripts))?,
+        set_document_scripts(package, content, Some(&scripts), limits)?,
         index,
     ))
 }
@@ -145,26 +148,28 @@ pub(crate) fn replace_embedded_script(
     content: &str,
     index: usize,
     script: &EmbeddedScript,
+    limits: &XmlStreamLimits,
 ) -> Result<Vec<u8>> {
-    let mut scripts = require_scripts(content)?;
+    let mut scripts = require_scripts(content, limits)?;
     *scripts
         .scripts
         .get_mut(index)
         .ok_or_else(|| bounds("script", index))? = script.clone();
-    set_document_scripts(package, content, Some(&scripts))
+    set_document_scripts(package, content, Some(&scripts), limits)
 }
 
 pub(crate) fn remove_embedded_script(
     package: &OwnedPackage,
     content: &str,
     index: usize,
+    limits: &XmlStreamLimits,
 ) -> Result<Vec<u8>> {
-    let mut scripts = require_scripts(content)?;
+    let mut scripts = require_scripts(content, limits)?;
     if index >= scripts.scripts.len() {
         return Err(bounds("script", index));
     }
     scripts.scripts.remove(index);
-    set_document_scripts(package, content, Some(&scripts))
+    set_document_scripts(package, content, Some(&scripts), limits)
 }
 
 pub(crate) fn move_embedded_script(
@@ -172,22 +177,24 @@ pub(crate) fn move_embedded_script(
     content: &str,
     from: usize,
     to: usize,
+    limits: &XmlStreamLimits,
 ) -> Result<Vec<u8>> {
-    let mut scripts = require_scripts(content)?;
+    let mut scripts = require_scripts(content, limits)?;
     move_item(&mut scripts.scripts, from, to, "script")?;
-    set_document_scripts(package, content, Some(&scripts))
+    set_document_scripts(package, content, Some(&scripts), limits)
 }
 
 pub(crate) fn add_event_listener(
     package: &OwnedPackage,
     content: &str,
     listener: &EventListener,
+    limits: &XmlStreamLimits,
 ) -> Result<(Vec<u8>, usize)> {
-    let mut scripts = parse_scripts(content)?.unwrap_or_default();
+    let mut scripts = parse_scripts(content, limits)?.unwrap_or_default();
     let index = scripts.event_listeners.len();
     scripts.event_listeners.push(listener.clone());
     Ok((
-        set_document_scripts(package, content, Some(&scripts))?,
+        set_document_scripts(package, content, Some(&scripts), limits)?,
         index,
     ))
 }
@@ -197,26 +204,28 @@ pub(crate) fn replace_event_listener(
     content: &str,
     index: usize,
     listener: &EventListener,
+    limits: &XmlStreamLimits,
 ) -> Result<Vec<u8>> {
-    let mut scripts = require_scripts(content)?;
+    let mut scripts = require_scripts(content, limits)?;
     *scripts
         .event_listeners
         .get_mut(index)
         .ok_or_else(|| bounds("event listener", index))? = listener.clone();
-    set_document_scripts(package, content, Some(&scripts))
+    set_document_scripts(package, content, Some(&scripts), limits)
 }
 
 pub(crate) fn remove_event_listener(
     package: &OwnedPackage,
     content: &str,
     index: usize,
+    limits: &XmlStreamLimits,
 ) -> Result<Vec<u8>> {
-    let mut scripts = require_scripts(content)?;
+    let mut scripts = require_scripts(content, limits)?;
     if index >= scripts.event_listeners.len() {
         return Err(bounds("event listener", index));
     }
     scripts.event_listeners.remove(index);
-    set_document_scripts(package, content, Some(&scripts))
+    set_document_scripts(package, content, Some(&scripts), limits)
 }
 
 pub(crate) fn move_event_listener(
@@ -224,10 +233,11 @@ pub(crate) fn move_event_listener(
     content: &str,
     from: usize,
     to: usize,
+    limits: &XmlStreamLimits,
 ) -> Result<Vec<u8>> {
-    let mut scripts = require_scripts(content)?;
+    let mut scripts = require_scripts(content, limits)?;
     move_item(&mut scripts.event_listeners, from, to, "event listener")?;
-    set_document_scripts(package, content, Some(&scripts))
+    set_document_scripts(package, content, Some(&scripts), limits)
 }
 
 pub(crate) fn add_resource(
@@ -294,12 +304,13 @@ pub(crate) fn remove_resource(
     package: &OwnedPackage,
     content: &str,
     path: &str,
+    limits: &XmlStreamLimits,
 ) -> Result<Vec<u8>> {
     let path = safe_script_path(path, None)?;
     if find_resource(package, &path)?.is_none() {
         return invalid(format!("script resource '{path}' was not found"));
     }
-    if resource_is_referenced(content, &path)? {
+    if resource_is_referenced(content, &path, limits)? {
         return invalid(format!(
             "script resource '{path}' is still referenced by an event listener"
         ));
@@ -314,8 +325,8 @@ pub(crate) fn remove_resource(
     )
 }
 
-fn require_scripts(content: &str) -> Result<Scripts> {
-    parse_scripts(content)?
+fn require_scripts(content: &str, limits: &XmlStreamLimits) -> Result<Scripts> {
+    parse_scripts(content, limits)?
         .ok_or_else(|| Error::InvalidFormat("document has no office:scripts element".to_string()))
 }
 
@@ -333,10 +344,14 @@ fn move_item<T>(items: &mut Vec<T>, from: usize, to: usize, what: &str) -> Resul
     Ok(())
 }
 
-fn replace_scripts_element(content: &str, scripts: Option<&Scripts>) -> Result<String> {
+fn replace_scripts_element(
+    content: &str,
+    scripts: Option<&Scripts>,
+    limits: &XmlStreamLimits,
+) -> Result<String> {
     let (span, root_open_end) = locate_scripts_element(content)?;
     let replacement = scripts
-        .map(Scripts::to_xml)
+        .map(|scripts| scripts.to_xml(limits))
         .transpose()?
         .unwrap_or_default();
     let (start, end) = span.unwrap_or((root_open_end, root_open_end));
@@ -471,8 +486,8 @@ fn uri_scheme(value: &str) -> Option<&str> {
     .then_some(scheme)
 }
 
-fn resource_is_referenced(content: &str, path: &str) -> Result<bool> {
-    let Some(scripts) = parse_scripts(content)? else {
+fn resource_is_referenced(content: &str, path: &str, limits: &XmlStreamLimits) -> Result<bool> {
+    let Some(scripts) = parse_scripts(content, limits)? else {
         return Ok(false);
     };
     for listener in scripts.event_listeners {
@@ -697,7 +712,10 @@ fn invalid<T>(message: impl Into<String>) -> Result<T> {
 macro_rules! script_facade_methods {
     () => {
         pub fn document_scripts(&self) -> litchi_core::Result<Option<crate::Scripts>> {
-            crate::package::scripts::document_scripts(self.content.xml_content())
+            crate::package::scripts::document_scripts(
+                self.state.content.xml_content(),
+                &self.state.xml_limits,
+            )
         }
         #[deprecated(
             since = "0.0.1",
@@ -709,9 +727,10 @@ macro_rules! script_facade_methods {
             scripts: Option<&crate::Scripts>,
         ) -> litchi_core::Result<()> {
             let bytes = crate::package::scripts::set_document_scripts(
-                &self.package,
-                self.content.xml_content(),
+                &self.state.package,
+                self.state.content.xml_content(),
                 scripts,
+                &self.state.xml_limits,
             )?;
             *self = Self::from_bytes(bytes)?;
             Ok(())
@@ -726,9 +745,10 @@ macro_rules! script_facade_methods {
             script: &crate::EmbeddedScript,
         ) -> litchi_core::Result<usize> {
             let (bytes, index) = crate::package::scripts::add_embedded_script(
-                &self.package,
-                self.content.xml_content(),
+                &self.state.package,
+                self.state.content.xml_content(),
                 script,
+                &self.state.xml_limits,
             )?;
             *self = Self::from_bytes(bytes)?;
             Ok(index)
@@ -744,10 +764,11 @@ macro_rules! script_facade_methods {
             script: &crate::EmbeddedScript,
         ) -> litchi_core::Result<()> {
             let bytes = crate::package::scripts::replace_embedded_script(
-                &self.package,
-                self.content.xml_content(),
+                &self.state.package,
+                self.state.content.xml_content(),
                 index,
                 script,
+                &self.state.xml_limits,
             )?;
             *self = Self::from_bytes(bytes)?;
             Ok(())
@@ -759,9 +780,10 @@ macro_rules! script_facade_methods {
         #[allow(dead_code, reason = "legacy direct script mutation is crate-private")]
         pub(crate) fn remove_document_script(&mut self, index: usize) -> litchi_core::Result<()> {
             let bytes = crate::package::scripts::remove_embedded_script(
-                &self.package,
-                self.content.xml_content(),
+                &self.state.package,
+                self.state.content.xml_content(),
                 index,
+                &self.state.xml_limits,
             )?;
             *self = Self::from_bytes(bytes)?;
             Ok(())
@@ -777,10 +799,11 @@ macro_rules! script_facade_methods {
             to: usize,
         ) -> litchi_core::Result<()> {
             let bytes = crate::package::scripts::move_embedded_script(
-                &self.package,
-                self.content.xml_content(),
+                &self.state.package,
+                self.state.content.xml_content(),
                 from,
                 to,
+                &self.state.xml_limits,
             )?;
             *self = Self::from_bytes(bytes)?;
             Ok(())
@@ -795,9 +818,10 @@ macro_rules! script_facade_methods {
             listener: &crate::EventListener,
         ) -> litchi_core::Result<usize> {
             let (bytes, index) = crate::package::scripts::add_event_listener(
-                &self.package,
-                self.content.xml_content(),
+                &self.state.package,
+                self.state.content.xml_content(),
                 listener,
+                &self.state.xml_limits,
             )?;
             *self = Self::from_bytes(bytes)?;
             Ok(index)
@@ -813,10 +837,11 @@ macro_rules! script_facade_methods {
             listener: &crate::EventListener,
         ) -> litchi_core::Result<()> {
             let bytes = crate::package::scripts::replace_event_listener(
-                &self.package,
-                self.content.xml_content(),
+                &self.state.package,
+                self.state.content.xml_content(),
                 index,
                 listener,
+                &self.state.xml_limits,
             )?;
             *self = Self::from_bytes(bytes)?;
             Ok(())
@@ -831,9 +856,10 @@ macro_rules! script_facade_methods {
             index: usize,
         ) -> litchi_core::Result<()> {
             let bytes = crate::package::scripts::remove_event_listener(
-                &self.package,
-                self.content.xml_content(),
+                &self.state.package,
+                self.state.content.xml_content(),
                 index,
+                &self.state.xml_limits,
             )?;
             *self = Self::from_bytes(bytes)?;
             Ok(())
@@ -849,71 +875,23 @@ macro_rules! script_facade_methods {
             to: usize,
         ) -> litchi_core::Result<()> {
             let bytes = crate::package::scripts::move_event_listener(
-                &self.package,
-                self.content.xml_content(),
+                &self.state.package,
+                self.state.content.xml_content(),
                 from,
                 to,
+                &self.state.xml_limits,
             )?;
             *self = Self::from_bytes(bytes)?;
             Ok(())
         }
         pub fn script_resources(&self) -> litchi_core::Result<Vec<crate::ScriptResource>> {
-            crate::package::scripts::resources(&self.package)
+            crate::package::scripts::resources(&self.state.package)
         }
         pub fn find_script_resource(
             &self,
             path: &str,
         ) -> litchi_core::Result<Option<crate::ScriptResource>> {
-            crate::package::scripts::find_resource(&self.package, path)
-        }
-        #[deprecated(
-            since = "0.0.1",
-            note = "use Document::edit().add_script_resource() and Commit::results()"
-        )]
-        pub fn add_script_resource(
-            &mut self,
-            resource: &crate::ScriptResourceSpec,
-        ) -> litchi_core::Result<String> {
-            let mut edit = self.edit()?;
-            edit.add_script_resource(resource)?;
-            self.publish_transaction_path(edit.commit()?)
-        }
-        #[deprecated(
-            since = "0.0.1",
-            note = "use Document::edit().replace_script_resource() and commit"
-        )]
-        pub fn replace_script_resource(
-            &mut self,
-            path: &str,
-            resource: &crate::ScriptResourceSpec,
-        ) -> litchi_core::Result<()> {
-            let mut edit = self.edit()?;
-            edit.replace_script_resource(path, resource)?;
-            self.publish_transaction(edit.commit()?)
-        }
-        #[deprecated(
-            since = "0.0.1",
-            note = "use Document::edit().replace_script_resource() and commit"
-        )]
-        #[allow(
-            deprecated,
-            reason = "compatibility alias delegates to the deprecated direct wrapper"
-        )]
-        pub fn update_script_resource(
-            &mut self,
-            path: &str,
-            resource: &crate::ScriptResourceSpec,
-        ) -> litchi_core::Result<()> {
-            self.replace_script_resource(path, resource)
-        }
-        #[deprecated(
-            since = "0.0.1",
-            note = "use Document::edit().remove_script_resource() and commit"
-        )]
-        pub fn remove_script_resource(&mut self, path: &str) -> litchi_core::Result<()> {
-            let mut edit = self.edit()?;
-            edit.remove_script_resource(path)?;
-            self.publish_transaction(edit.commit()?)
+            crate::package::scripts::find_resource(&self.state.package, path)
         }
     };
 }

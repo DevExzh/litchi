@@ -4,7 +4,7 @@
 )]
 
 use litchi_core::Position;
-use litchi_oth::{Builder, Patch, Template, change, index, table};
+use litchi_oth::{Builder, Package, Patch, change, index, table};
 
 const XML_PREFIX: &str = concat!(
     r##"<?xml version="1.0" encoding="UTF-8"?><office:document-content "##,
@@ -51,11 +51,11 @@ fn content(body: &str) -> String {
     xml
 }
 
-fn template(body: &str) -> Template {
-    Template::from_bytes(Builder::new().content_xml(content(body)).build().unwrap()).unwrap()
+fn template(body: &str) -> Package {
+    Builder::new().content_xml(content(body)).build().unwrap()
 }
 
-fn template_with_escaped_table_alias(body: &str) -> Template {
+fn template_with_escaped_table_alias(body: &str) -> Package {
     let prefix = XML_PREFIX.replace(
         r#"xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" "#,
         r#"xmlns:tbl="urn:oasis:names&#x3A;tc&#x3A;opendocument&#x3A;xmlns&#x3A;table&#x3A;1.0" "#,
@@ -65,7 +65,7 @@ fn template_with_escaped_table_alias(body: &str) -> Template {
     xml.push_str(&prefix);
     xml.push_str(&body);
     xml.push_str(XML_SUFFIX);
-    Template::from_bytes(Builder::new().content_xml(xml).build().unwrap()).unwrap()
+    Builder::new().content_xml(xml).build().unwrap()
 }
 
 fn table_by_name<'a>(tables: &'a [table::Table], name: &str) -> &'a table::Table {
@@ -85,7 +85,7 @@ fn index_by_name<'a>(indexes: &'a [index::Index], name: &str) -> &'a index::Inde
 #[test]
 fn table_metadata_covers_scalars_source_layout_and_typed_values() {
     let source = template(BODY);
-    let body = source.text_body().unwrap();
+    let body = source.document().text_body().unwrap();
     let tables = body.tables().unwrap();
     assert_eq!(tables.len(), 2);
 
@@ -136,10 +136,13 @@ fn table_metadata_covers_scalars_source_layout_and_typed_values() {
         "table:mode=\"copy-all\"",
     ));
     assert_eq!(
-        table_by_name(copy_all.text_body().unwrap().tables().unwrap(), "Data")
-            .source()
-            .unwrap()
-            .mode(),
+        table_by_name(
+            copy_all.document().text_body().unwrap().tables().unwrap(),
+            "Data"
+        )
+        .source()
+        .unwrap()
+        .mode(),
         Some(table::TableSourceMode::CopyAll)
     );
 
@@ -183,7 +186,16 @@ fn table_metadata_covers_scalars_source_layout_and_typed_values() {
         "table:visibility=\"visible\" table:number-columns-repeated=\"1\" xml:id=\"column-visible\"",
     ));
     assert_eq!(
-        table_by_name(explicit_one.text_body().unwrap().tables().unwrap(), "Data").columns()[1]
+        table_by_name(
+            explicit_one
+                .document()
+                .text_body()
+                .unwrap()
+                .tables()
+                .unwrap(),
+            "Data"
+        )
+        .columns()[1]
             .declared_repeat_count(),
         Some(1)
     );
@@ -259,7 +271,7 @@ fn table_metadata_covers_scalars_source_layout_and_typed_values() {
 #[test]
 fn entity_escaped_table_namespace_alias_projects_the_same_table_family() {
     let source = template_with_escaped_table_alias(BODY);
-    let body = source.text_body().unwrap();
+    let body = source.document().text_body().unwrap();
     let tables = body.tables().unwrap();
     assert_eq!(tables.len(), 2);
     assert_eq!(
@@ -277,7 +289,7 @@ fn xsd_double_special_lexicals_are_accepted_and_retained() {
     let source = template(
         r#"<table:table table:name="SpecialDoubles"><table:table-row><table:table-cell office:value-type="float" office:value="INF"/><table:table-cell office:value-type="percentage" office:value="-INF"/><table:table-cell office:value-type="currency" office:value="NaN" office:currency="USD"/></table:table-row></table:table>"#,
     );
-    let body = source.text_body().unwrap();
+    let body = source.document().text_body().unwrap();
     let table = table_by_name(body.tables().unwrap(), "SpecialDoubles");
     let cells = table.rows()[0].cells();
     assert_eq!(cells[0].typed_value().unwrap().lexical(), Some("INF"));
@@ -289,7 +301,7 @@ fn xsd_double_special_lexicals_are_accepted_and_retained() {
 #[test]
 fn index_metadata_covers_all_admitted_source_families_and_cached_text() {
     let source = template(BODY);
-    let body = source.text_body().unwrap();
+    let body = source.document().text_body().unwrap();
     let indexes = body.indexes().unwrap();
     assert_eq!(indexes.len(), 7);
 
@@ -360,7 +372,12 @@ fn index_metadata_covers_all_admitted_source_families_and_cached_text() {
         "text:caption-sequence-format=\"text\"",
     ));
     match index_by_name(
-        text_format.text_body().unwrap().indexes().unwrap(),
+        text_format
+            .document()
+            .text_body()
+            .unwrap()
+            .indexes()
+            .unwrap(),
         "Illustrations",
     )
     .source_options()
@@ -488,7 +505,7 @@ fn index_metadata_covers_all_admitted_source_families_and_cached_text() {
 #[test]
 fn annotation_scalars_and_rich_opaque_content_remain_readable_and_source_owned() {
     let source = template(BODY);
-    let body = source.text_body().unwrap();
+    let body = source.document().text_body().unwrap();
     let annotations = body.annotations().unwrap();
     assert_eq!(annotations.len(), 1);
     let annotation = &annotations[0];
@@ -501,12 +518,19 @@ fn annotation_scalars_and_rich_opaque_content_remain_readable_and_source_owned()
     assert_eq!(annotation.text(), "rich & list");
     assert!(
         source
+            .document()
             .content_xml()
             .contains("draw:caption=\"Comment &amp; caption\"")
     );
-    assert!(source.content_xml().contains("<text:list><text:list-item>"));
     assert!(
         source
+            .document()
+            .content_xml()
+            .contains("<text:list><text:list-item>")
+    );
+    assert!(
+        source
+            .document()
             .content_xml()
             .contains("<![CDATA[opaque &lt;bytes&gt;]]>")
     );
@@ -515,7 +539,7 @@ fn annotation_scalars_and_rich_opaque_content_remain_readable_and_source_owned()
 #[test]
 fn tracked_change_metadata_keeps_exact_ids_markers_and_change_info() {
     let source = template(BODY);
-    let body = source.text_body().unwrap();
+    let body = source.document().text_body().unwrap();
     let tracking = body.change_tracking().unwrap().unwrap();
     assert_eq!(tracking.track_changes(), Some(false));
 
@@ -590,12 +614,12 @@ fn tracked_change_metadata_keeps_exact_ids_markers_and_change_info() {
 #[test]
 fn tracked_change_declaration_absence_differs_from_present_without_flag() {
     let absent = template(r##"<text:p>plain</text:p>"##);
-    let absent_body = absent.text_body().unwrap();
+    let absent_body = absent.document().text_body().unwrap();
     assert!(absent_body.change_tracking().unwrap().is_none());
     assert!(absent_body.changes().unwrap().is_empty());
 
     let present_without_flag = template(&BODY.replace(" text:track-changes=\"false\"", ""));
-    let present_body = present_without_flag.text_body().unwrap();
+    let present_body = present_without_flag.document().text_body().unwrap();
     let tracking = present_body.change_tracking().unwrap().unwrap();
     assert_eq!(tracking.track_changes(), None);
     assert_eq!(present_body.changes().unwrap().len(), 6);
@@ -606,6 +630,7 @@ fn tracked_change_declaration_absence_differs_from_present_without_flag() {
     ));
     assert_eq!(
         present_true
+            .document()
             .text_body()
             .unwrap()
             .change_tracking()
@@ -663,7 +688,7 @@ fn malformed_metadata_refuses_typed_projection_without_publishing_partial_values
     ];
     for (case, invalid_content) in invalid_table_values.into_iter().enumerate() {
         let source = template(&invalid_content);
-        let body = source.text_body().unwrap();
+        let body = source.document().text_body().unwrap();
         assert!(body.tables().is_err(), "invalid table case {case}");
         assert!(body.tables().is_err(), "invalid table case {case} retry");
     }
@@ -672,7 +697,7 @@ fn malformed_metadata_refuses_typed_projection_without_publishing_partial_values
         "text:use-outline-level=\"true\"",
         "text:use-outline-level=\"maybe\"",
     ));
-    let invalid_index_body = invalid_index.text_body().unwrap();
+    let invalid_index_body = invalid_index.document().text_body().unwrap();
     assert!(invalid_index_body.indexes().is_err());
     assert!(invalid_index_body.indexes().is_err());
 
@@ -680,7 +705,14 @@ fn malformed_metadata_refuses_typed_projection_without_publishing_partial_values
         "text:index-scope=\"chapter\"",
         "text:index-scope=\"section\"",
     ));
-    assert!(invalid_index_scope.text_body().unwrap().indexes().is_err());
+    assert!(
+        invalid_index_scope
+            .document()
+            .text_body()
+            .unwrap()
+            .indexes()
+            .is_err()
+    );
 
     let invalid_caption_format = template(&BODY.replace(
         "text:caption-sequence-format=\"category-and-value\"",
@@ -688,6 +720,7 @@ fn malformed_metadata_refuses_typed_projection_without_publishing_partial_values
     ));
     assert!(
         invalid_caption_format
+            .document()
             .text_body()
             .unwrap()
             .indexes()
@@ -697,6 +730,7 @@ fn malformed_metadata_refuses_typed_projection_without_publishing_partial_values
     let missing_user_index_name = template(&BODY.replace(" text:index-name=\"UserMarks\"", ""));
     assert!(
         missing_user_index_name
+            .document()
             .text_body()
             .unwrap()
             .indexes()
@@ -707,22 +741,44 @@ fn malformed_metadata_refuses_typed_projection_without_publishing_partial_values
         "text:change-id=\"change-forward\"",
         "text:change-id=\"missing-region\"",
     ));
-    assert!(unresolved_marker.text_body().unwrap().changes().is_err());
+    assert!(
+        unresolved_marker
+            .document()
+            .text_body()
+            .unwrap()
+            .changes()
+            .is_err()
+    );
 
     let missing_xml_id = template(&BODY.replace(" xml:id=\"change-forward\"", ""));
-    assert!(missing_xml_id.text_body().unwrap().changes().is_err());
+    assert!(
+        missing_xml_id
+            .document()
+            .text_body()
+            .unwrap()
+            .changes()
+            .is_err()
+    );
 
     let text_id_only_region = template(&BODY.replace(
         "xml:id=\"change-delete\" text:id=\"change-delete\"",
         "text:id=\"change-delete\"",
     ));
-    assert!(text_id_only_region.text_body().unwrap().changes().is_err());
+    assert!(
+        text_id_only_region
+            .document()
+            .text_body()
+            .unwrap()
+            .changes()
+            .is_err()
+    );
 
     let text_id_only_legacy_shape = template(
         r##"<text:tracked-changes><text:changed-region text:id="legacy"><text:insertion><text:p>legacy</text:p></text:insertion></text:changed-region></text:tracked-changes>"##,
     );
     assert!(
         text_id_only_legacy_shape
+            .document()
             .text_body()
             .unwrap()
             .changes()
@@ -733,6 +789,7 @@ fn malformed_metadata_refuses_typed_projection_without_publishing_partial_values
         template(&BODY.replace("text:id=\"change-delete\"", "text:id=\"different-region\""));
     assert!(
         mismatched_deprecated_id
+            .document()
             .text_body()
             .unwrap()
             .changes()
@@ -745,6 +802,7 @@ fn malformed_metadata_refuses_typed_projection_without_publishing_partial_values
     ));
     assert!(
         invalid_marker_lexical
+            .document()
             .text_body()
             .unwrap()
             .changes()
@@ -757,6 +815,7 @@ fn malformed_metadata_refuses_typed_projection_without_publishing_partial_values
     ));
     assert!(
         missing_change_info_creator
+            .document()
             .text_body()
             .unwrap()
             .changes()
@@ -769,6 +828,7 @@ fn malformed_metadata_refuses_typed_projection_without_publishing_partial_values
     ));
     assert!(
         invalid_change_info_order
+            .document()
             .text_body()
             .unwrap()
             .changes()
@@ -811,6 +871,7 @@ fn changed_region_shape_rejects_extra_siblings_nonleading_info_and_payload() {
     for (case, invalid_body) in cases {
         assert!(
             template(&invalid_body)
+                .document()
                 .text_body()
                 .unwrap()
                 .changes()
@@ -876,6 +937,7 @@ fn cell_value_type_rejects_incompatible_companion_attributes() {
     for (case, invalid_body) in cases {
         assert!(
             template(&invalid_body)
+                .document()
                 .text_body()
                 .unwrap()
                 .tables()
@@ -891,7 +953,14 @@ fn duplicate_expanded_attributes_refuse_projection() {
         r#"<table:table table:name="Data""#,
         r#"<table:table xmlns:tbl="urn:oasis:names:tc:opendocument:xmlns:table:1.0" table:name="Data" tbl:name="Duplicate""#,
     );
-    assert!(template(&duplicate).text_body().unwrap().tables().is_err());
+    assert!(
+        template(&duplicate)
+            .document()
+            .text_body()
+            .unwrap()
+            .tables()
+            .is_err()
+    );
 }
 
 #[test]
@@ -902,6 +971,7 @@ fn duplicate_table_and_index_metadata_children_refuse_projection() {
     );
     assert!(
         template(&duplicate_table_source)
+            .document()
             .text_body()
             .unwrap()
             .tables()
@@ -914,6 +984,7 @@ fn duplicate_table_and_index_metadata_children_refuse_projection() {
     );
     assert!(
         template(&duplicate_index_source)
+            .document()
             .text_body()
             .unwrap()
             .indexes()
@@ -926,6 +997,7 @@ fn duplicate_table_and_index_metadata_children_refuse_projection() {
     );
     assert!(
         template(&duplicate_index_body)
+            .document()
             .text_body()
             .unwrap()
             .indexes()
@@ -954,7 +1026,7 @@ fn xsd_date_and_datetime_lexicals_follow_the_odf_grammar() {
         ),
     ] {
         let source = template(&date_value_table_body(value));
-        let body = source.text_body().unwrap();
+        let body = source.document().text_body().unwrap();
         let tables = body.tables().unwrap();
         let cell = &tables[0].rows()[0].cells()[0];
         assert_eq!(
@@ -966,7 +1038,7 @@ fn xsd_date_and_datetime_lexicals_follow_the_odf_grammar() {
 
     let change_date = "2024-01-01T00:00:00.12345678901234567890Z";
     let source = template(&BODY.replace("2026-09-02T03:04:05Z", change_date));
-    let body = source.text_body().unwrap();
+    let body = source.document().text_body().unwrap();
     let insertion = body
         .changes()
         .unwrap()
@@ -991,7 +1063,7 @@ fn xsd_date_and_datetime_lexicals_refuse_year_zero_bad_timezone_and_invalid_frac
     ] {
         let source = template(&date_value_table_body(value));
         assert!(
-            source.text_body().unwrap().tables().is_err(),
+            source.document().text_body().unwrap().tables().is_err(),
             "invalid date lexical was accepted: {label}"
         );
     }
@@ -1009,7 +1081,7 @@ fn xsd_date_and_datetime_lexicals_refuse_year_zero_bad_timezone_and_invalid_frac
     ] {
         let source = template(&BODY.replace("2026-09-02T03:04:05Z", value));
         assert!(
-            source.text_body().unwrap().changes().is_err(),
+            source.document().text_body().unwrap().changes().is_err(),
             "invalid change-info date lexical was accepted: {label}"
         );
     }
@@ -1026,7 +1098,7 @@ fn stray_direct_changed_region_is_rejected_outside_the_unique_tracking_prelude()
         STRAY_AND_MARKER,
     );
     let source = template(&body);
-    let body = source.text_body().unwrap();
+    let body = source.document().text_body().unwrap();
     assert!(
         body.changes().is_err(),
         "a direct office:text region outside text:tracked-changes was projected"
@@ -1049,7 +1121,7 @@ fn tracked_change_declarations_require_one_direct_non_nested_owner() {
         ("nested declaration", nested),
     ] {
         let source = template(&invalid_body);
-        let body = source.text_body().unwrap();
+        let body = source.document().text_body().unwrap();
         assert!(
             body.change_tracking().is_err(),
             "accepted invalid tracked-change ownership: {label}"
@@ -1068,7 +1140,7 @@ fn office_forms_may_precede_the_tracking_prelude() {
         r#"<office:forms/><text:tracked-changes text:track-changes="false">"#,
     );
     let source = template(&with_forms);
-    let body = source.text_body().unwrap();
+    let body = source.document().text_body().unwrap();
     assert!(body.forms().is_empty());
     assert_eq!(
         body.change_tracking().unwrap().unwrap().track_changes(),
@@ -1091,7 +1163,7 @@ fn expanded_prelude_body() -> String {
 #[test]
 fn expanded_office_text_prelude_preserves_all_distinct_declarations() {
     let source = template(&expanded_prelude_body());
-    let body = source.text_body().unwrap();
+    let body = source.document().text_body().unwrap();
     assert!(body.forms().is_empty());
     assert_eq!(
         body.change_tracking().unwrap().unwrap().track_changes(),
@@ -1123,7 +1195,7 @@ fn expanded_office_text_prelude_rejects_reordering_and_duplicates() {
     ];
     for (label, invalid_body) in cases {
         let source = template(&invalid_body);
-        let body = source.text_body().unwrap();
+        let body = source.document().text_body().unwrap();
         assert!(
             body.change_tracking().is_err(),
             "accepted invalid expanded prelude: {label}"
@@ -1138,7 +1210,7 @@ fn late_tracking_declaration_after_body_content_is_refused() {
         r#"<text:p>content before tracked changes</text:p><text:tracked-changes text:track-changes="false">"#,
     );
     let source = template(&late);
-    let body = source.text_body().unwrap();
+    let body = source.document().text_body().unwrap();
     assert!(body.change_tracking().is_err());
     assert!(body.changes().is_err());
 }
@@ -1147,39 +1219,76 @@ fn late_tracking_declaration_after_body_content_is_refused() {
 fn no_op_and_inverse_keep_the_exact_metadata_source_and_opaque_markup() {
     let source = template(BODY);
     let source_xml = content(BODY);
-    assert_eq!(source.content_xml(), source_xml);
+    assert_eq!(source.document().content_xml(), source_xml);
 
     let no_op = source.edit().commit().unwrap();
-    assert!(!no_op.changed());
-    assert_eq!(no_op.template().as_bytes(), source.as_bytes());
-    assert_eq!(no_op.template().content_xml(), source_xml);
+    assert!(!no_op.diagnostics().changed());
+    assert_eq!(no_op.package().as_bytes(), source.as_bytes());
+    assert_eq!(no_op.package().document().content_xml(), source_xml);
 
     let mut edit = source.edit();
     edit.set_section_text(Position::new(0), "edited section")
         .unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.changed());
-    assert!(commit.template().content_xml().contains("edited section"));
-    assert!(commit.template().content_xml().contains("section-comment"));
+    assert!(commit.diagnostics().changed());
     assert!(
         commit
-            .template()
+            .package()
+            .document()
+            .content_xml()
+            .contains("edited section")
+    );
+    assert!(
+        commit
+            .package()
+            .document()
+            .content_xml()
+            .contains("section-comment")
+    );
+    assert!(
+        commit
+            .package()
+            .document()
             .content_xml()
             .contains("<![CDATA[opaque &lt;bytes&gt;]]>")
     );
-    assert!(commit.template().content_xml().contains("foreign:wrapper"));
-    assert!(commit.template().content_xml().contains("TOC template"));
-    assert!(commit.template().content_xml().contains("rich &amp; list"));
     assert!(
         commit
-            .template()
+            .package()
+            .document()
+            .content_xml()
+            .contains("foreign:wrapper")
+    );
+    assert!(
+        commit
+            .package()
+            .document()
+            .content_xml()
+            .contains("TOC template")
+    );
+    assert!(
+        commit
+            .package()
+            .document()
+            .content_xml()
+            .contains("rich &amp; list")
+    );
+    assert!(
+        commit
+            .package()
+            .document()
             .content_xml()
             .contains("draw:caption=\"Comment &amp; caption\"")
     );
 
     let inverse = Patch::from_bytes(&commit.patch().inverse().to_bytes().unwrap()).unwrap();
     assert_eq!(
-        inverse.apply(commit.template()).unwrap().as_bytes(),
+        commit
+            .package()
+            .apply(&inverse)
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         source.as_bytes()
     );
 }
@@ -1187,7 +1296,7 @@ fn no_op_and_inverse_keep_the_exact_metadata_source_and_opaque_markup() {
 #[test]
 fn foreign_same_named_roots_remain_inert_to_metadata_projection() {
     let source = template(BODY);
-    let body = source.text_body().unwrap();
+    let body = source.document().text_body().unwrap();
     assert_eq!(body.tables().unwrap().len(), 2);
     assert_eq!(body.indexes().unwrap().len(), 7);
     assert_eq!(body.changes().unwrap().len(), 6);
@@ -1196,9 +1305,8 @@ fn foreign_same_named_roots_remain_inert_to_metadata_projection() {
 #[test]
 fn native_oth_fixture_keeps_its_empty_metadata_boundary() {
     let template =
-        Template::from_bytes(include_bytes!("fixtures/libreoffice-desktop-html.oth").to_vec())
-            .unwrap();
-    let body = template.text_body().unwrap();
+        Package::from_bytes(include_bytes!("fixtures/libreoffice-desktop-html.oth")).unwrap();
+    let body = template.document().text_body().unwrap();
     assert!(body.tables().unwrap().is_empty());
     assert!(body.indexes().unwrap().is_empty());
     assert!(body.changes().unwrap().is_empty());

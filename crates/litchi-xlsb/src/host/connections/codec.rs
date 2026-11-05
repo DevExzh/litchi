@@ -14,17 +14,20 @@ pub(crate) struct Source {
 }
 
 /// Parse a complete connections stream while retaining future records.
-pub(crate) fn parse_source(data: &[u8]) -> Result<Source> {
-    parse_connections_part(data)?;
+pub(crate) fn parse_source(data: &[u8], raw_limits: crate::raw::Limits) -> Result<Source> {
+    parse_connections_part(data, raw_limits)?;
     let mut unknown_records = Vec::new();
     let mut owner = None;
     let mut root_known = 0usize;
     let mut local_known = 0usize;
     let mut opaque_bytes = 0usize;
 
-    for record in crate::raw::Records::with_limits(
+    for record in crate::raw::Records::new(
         data,
-        crate::raw::Limits::new(write::MAX_CONNECTIONS_PART_BYTES, 1_048_576),
+        crate::raw::Limits::new(
+            write::MAX_CONNECTIONS_PART_BYTES.min(raw_limits.payload()),
+            raw_limits.string_units().min(1_048_576),
+        ),
     ) {
         let record = record?;
         let kind = record.kind();
@@ -50,14 +53,17 @@ pub(crate) fn parse_source(data: &[u8]) -> Result<Source> {
         let offset = record.offset();
         let (_, header_len) = crate::raw::Header::parse(
             &data[offset..],
-            crate::raw::Limits::new(write::MAX_CONNECTIONS_PART_BYTES, 1_048_576),
+            crate::raw::Limits::new(
+                write::MAX_CONNECTIONS_PART_BYTES.min(raw_limits.payload()),
+                raw_limits.string_units().min(1_048_576),
+            ),
         )?;
         let end = offset
             .checked_add(header_len)
             .and_then(|value| value.checked_add(record.len()))
-            .ok_or_else(|| crate::package::error::Error::Unrecognized {
-                typ: "ExternalDataConnections".to_string(),
-                val: "opaque record range overflow".to_string(),
+            .ok_or(crate::package::error::Error::Unrecognized {
+                typ: "ExternalDataConnections",
+                val: "opaque record range overflow",
             })?;
         let bytes: Arc<[u8]> = Arc::from(data[offset..end].to_vec());
         opaque_bytes = opaque_bytes.saturating_add(bytes.len());
@@ -65,8 +71,8 @@ pub(crate) fn parse_source(data: &[u8]) -> Result<Source> {
             || opaque_bytes > write::MAX_UNKNOWN_BYTES
         {
             return Err(crate::package::error::Error::Unrecognized {
-                typ: "ExternalDataConnections".to_string(),
-                val: "opaque record bound exceeded".to_string(),
+                typ: "ExternalDataConnections",
+                val: "opaque record bound exceeded",
             });
         }
         unknown_records.push(UnknownRecord::new(

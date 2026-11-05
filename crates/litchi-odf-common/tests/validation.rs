@@ -6,9 +6,7 @@
 use std::io::{Cursor, Write};
 
 use litchi_core::{CheckStatus, IssueSeverity, ValidationLimitKind, ValidationLimits};
-use litchi_odf_common::{
-    OdfValidationError, OdfValidationLimits, validate_package, validate_package_with_limits,
-};
+use litchi_odf_common::{OdfValidationError, OdfValidationLimits, validate_package};
 use zip::{
     CompressionMethod, ZipWriter,
     write::{FullFileOptions, SimpleFileOptions},
@@ -143,7 +141,12 @@ fn accepts_minimal_text_spreadsheet_and_presentation_packages() {
         ("application/vnd.oasis.opendocument.text-template", "text"),
     ];
     for (mimetype, family) in fixtures {
-        let report = validate_package(&valid_package(mimetype, family)).unwrap();
+        let report = validate_package(
+            &valid_package(mimetype, family),
+            OdfValidationLimits::default(),
+            ValidationLimits::default(),
+        )
+        .unwrap();
         assert!(report.is_complete());
         assert!(!report.has_errors());
         assert!(report.issues().is_empty());
@@ -156,7 +159,12 @@ fn accepts_minimal_text_spreadsheet_and_presentation_packages() {
 
 #[test]
 fn malformed_zip_stops_every_dependent_capability_without_panicking() {
-    let report = validate_package(b"not a zip").unwrap();
+    let report = validate_package(
+        b"not a zip",
+        OdfValidationLimits::default(),
+        ValidationLimits::default(),
+    )
+    .unwrap();
     assert!(report.has_fatal());
     assert!(has_code(&report, "odf.zip.invalid"));
     assert!(matches!(
@@ -181,8 +189,18 @@ fn malformed_manifest_and_xml_are_content_free_deterministic_issues() {
         b"<office:document-content>",
         &[],
     );
-    let first = validate_package(&bytes).unwrap();
-    let second = validate_package(&bytes).unwrap();
+    let first = validate_package(
+        &bytes,
+        OdfValidationLimits::default(),
+        ValidationLimits::default(),
+    )
+    .unwrap();
+    let second = validate_package(
+        &bytes,
+        OdfValidationLimits::default(),
+        ValidationLimits::default(),
+    )
+    .unwrap();
     assert_eq!(
         first
             .issues()
@@ -212,7 +230,12 @@ fn malformed_manifest_and_xml_are_content_free_deterministic_issues() {
         b"<office:document-content>",
         &[],
     );
-    let report = validate_package(&malformed_xml).unwrap();
+    let report = validate_package(
+        &malformed_xml,
+        OdfValidationLimits::default(),
+        ValidationLimits::default(),
+    )
+    .unwrap();
     assert!(has_code(&report, "odf.xml.malformed"));
     assert!(matches!(
         status(&report, "odf.package.root_xml"),
@@ -233,7 +256,12 @@ fn malformed_manifest_and_xml_are_content_free_deterministic_issues() {
         &[],
     );
     assert!(has_code(
-        &validate_package(&fake).unwrap(),
+        &validate_package(
+            &fake,
+            OdfValidationLimits::default(),
+            ValidationLimits::default()
+        )
+        .unwrap(),
         "odf.manifest.root_invalid"
     ));
 
@@ -247,7 +275,12 @@ fn malformed_manifest_and_xml_are_content_free_deterministic_issues() {
         &[],
     );
     assert!(has_code(
-        &validate_package(&misplaced_bytes).unwrap(),
+        &validate_package(
+            &misplaced_bytes,
+            OdfValidationLimits::default(),
+            ValidationLimits::default()
+        )
+        .unwrap(),
         "odf.manifest.encryption_placement_invalid"
     ));
 
@@ -261,7 +294,12 @@ fn malformed_manifest_and_xml_are_content_free_deterministic_issues() {
         &[],
     );
     assert!(has_code(
-        &validate_package(&duplicate_bytes).unwrap(),
+        &validate_package(
+            &duplicate_bytes,
+            OdfValidationLimits::default(),
+            ValidationLimits::default()
+        )
+        .unwrap(),
         "odf.manifest.encryption_placement_invalid"
     ));
 }
@@ -276,7 +314,12 @@ fn reports_mimetype_catalog_and_hostile_path_failures() {
         content("text", "", "").as_bytes(),
         &[("../evil.bin", b"hostile")],
     );
-    let report = validate_package(&bytes).unwrap();
+    let report = validate_package(
+        &bytes,
+        OdfValidationLimits::default(),
+        ValidationLimits::default(),
+    )
+    .unwrap();
     assert!(has_code(&report, "odf.mimetype.inconsistent"));
     assert!(has_code(&report, "odf.catalog.inconsistent"));
     assert!(has_code(&report, "odf.catalog.hostile_path"));
@@ -290,7 +333,12 @@ fn reports_mimetype_catalog_and_hostile_path_failures() {
         &[],
     );
     assert!(has_code(
-        &validate_package(&unknown_bytes).unwrap(),
+        &validate_package(
+            &unknown_bytes,
+            OdfValidationLimits::default(),
+            ValidationLimits::default()
+        )
+        .unwrap(),
         "odf.mimetype.inconsistent"
     ));
 }
@@ -305,7 +353,12 @@ fn duplicate_normalized_member_names_are_an_ingress_rejection() {
         content("text", "", "").as_bytes(),
         &[("evil.bin", b"first"), ("../evil.bin", b"second")],
     );
-    let report = validate_package(&bytes).unwrap();
+    let report = validate_package(
+        &bytes,
+        OdfValidationLimits::default(),
+        ValidationLimits::default(),
+    )
+    .unwrap();
     assert!(has_code(&report, "odf.zip.invalid"));
     assert!(report.has_fatal());
     assert!(matches!(
@@ -338,7 +391,12 @@ fn mimetype_local_header_extra_fields_are_a_layout_error() {
     .unwrap();
     zip.write_all(content("text", "", "").as_bytes()).unwrap();
     let bytes = remove_first_central_extra(zip.finish().unwrap().into_inner());
-    let report = validate_package(&bytes).unwrap();
+    let report = validate_package(
+        &bytes,
+        OdfValidationLimits::default(),
+        ValidationLimits::default(),
+    )
+    .unwrap();
     assert!(has_code(&report, "odf.mimetype.layout"));
 }
 
@@ -366,7 +424,12 @@ fn one_valid_extended_timestamp_gets_the_narrow_repair_diagnostic() {
     .unwrap();
     zip.write_all(content("text", "", "").as_bytes()).unwrap();
     let bytes = remove_first_central_extra(zip.finish().unwrap().into_inner());
-    let report = validate_package(&bytes).unwrap();
+    let report = validate_package(
+        &bytes,
+        OdfValidationLimits::default(),
+        ValidationLimits::default(),
+    )
+    .unwrap();
     assert!(has_code(&report, "odf.mimetype.local_header_extra"));
     let issue = report
         .issues()
@@ -390,17 +453,32 @@ fn mimetype_header_mismatches_never_advertise_the_repair() {
 
     let mut crc_mismatch = base.clone();
     crc_mismatch[local + 14] ^= 1;
-    let report = validate_package(&crc_mismatch).unwrap();
+    let report = validate_package(
+        &crc_mismatch,
+        OdfValidationLimits::default(),
+        ValidationLimits::default(),
+    )
+    .unwrap();
     assert!(!has_code(&report, "odf.mimetype.local_header_extra"));
 
     let mut size_mismatch = base.clone();
     size_mismatch[local + 22] ^= 1;
-    let report = validate_package(&size_mismatch).unwrap();
+    let report = validate_package(
+        &size_mismatch,
+        OdfValidationLimits::default(),
+        ValidationLimits::default(),
+    )
+    .unwrap();
     assert!(!has_code(&report, "odf.mimetype.local_header_extra"));
 
     let mut name_mismatch = base.clone();
     name_mismatch[local + 30] = b'M';
-    let report = validate_package(&name_mismatch).unwrap();
+    let report = validate_package(
+        &name_mismatch,
+        OdfValidationLimits::default(),
+        ValidationLimits::default(),
+    )
+    .unwrap();
     assert!(!has_code(&report, "odf.mimetype.local_header_extra"));
     assert!(has_code(&report, "odf.mimetype.layout") || has_code(&report, "odf.zip.invalid"));
 
@@ -412,7 +490,12 @@ fn mimetype_header_mismatches_never_advertise_the_repair() {
     descriptor_flags[local + 6..local + 8].copy_from_slice(&(local_flags | 0x08).to_le_bytes());
     descriptor_flags[central + 8..central + 10]
         .copy_from_slice(&(central_flags | 0x08).to_le_bytes());
-    let report = validate_package(&descriptor_flags).unwrap();
+    let report = validate_package(
+        &descriptor_flags,
+        OdfValidationLimits::default(),
+        ValidationLimits::default(),
+    )
+    .unwrap();
     assert!(!has_code(&report, "odf.mimetype.local_header_extra"));
 }
 
@@ -438,7 +521,7 @@ fn central_file_comments_are_charged_to_the_raw_metadata_ceiling() {
     .unwrap();
     zip.write_all(content("text", "", "").as_bytes()).unwrap();
     let bytes = zip.finish().unwrap().into_inner();
-    let report = validate_package_with_limits(
+    let report = validate_package(
         &bytes,
         OdfValidationLimits::default().with_max_archive_metadata_bytes(128),
         ValidationLimits::default(),
@@ -454,7 +537,8 @@ fn central_file_comments_are_charged_to_the_raw_metadata_ceiling() {
 fn reports_encryption_signature_external_and_macro_presence_only() {
     use litchi_odf_common::core::{PackageWriter, Profile};
 
-    let mut encrypted_writer = PackageWriter::new();
+    let mut encrypted_writer =
+        PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     encrypted_writer
         .set_mimetype("application/vnd.oasis.opendocument.text")
         .unwrap();
@@ -465,7 +549,12 @@ fn reports_encryption_signature_external_and_macro_presence_only() {
         .add_file("content.xml", content("text", "", "").as_bytes())
         .unwrap();
     let encrypted = encrypted_writer.finish().unwrap();
-    let encrypted_report = validate_package(&encrypted).unwrap();
+    let encrypted_report = validate_package(
+        &encrypted,
+        OdfValidationLimits::default(),
+        ValidationLimits::default(),
+    )
+    .unwrap();
     assert!(has_code(
         &encrypted_report,
         "odf.encryption.infrastructure_present"
@@ -491,7 +580,12 @@ fn reports_encryption_signature_external_and_macro_presence_only() {
         b"ciphertext",
         &[],
     );
-    let unsupported_report = validate_package(&unsupported_encryption).unwrap();
+    let unsupported_report = validate_package(
+        &unsupported_encryption,
+        OdfValidationLimits::default(),
+        ValidationLimits::default(),
+    )
+    .unwrap();
     assert!(has_code(
         &unsupported_report,
         "odf.encryption.infrastructure_present"
@@ -518,7 +612,12 @@ fn reports_encryption_signature_external_and_macro_presence_only() {
             ("Basic/module.xml", b"<macro/>"),
         ],
     );
-    let report = validate_package(&bytes).unwrap();
+    let report = validate_package(
+        &bytes,
+        OdfValidationLimits::default(),
+        ValidationLimits::default(),
+    )
+    .unwrap();
     assert!(has_code(&report, "odf.signature.infrastructure_present"));
     assert!(has_code(&report, "odf.external_reference.present"));
     assert!(has_code(&report, "odf.macro.storage_present"));
@@ -542,7 +641,12 @@ fn reports_encryption_signature_external_and_macro_presence_only() {
         &[],
     );
     assert!(has_code(
-        &validate_package(&whitespace_padded).unwrap(),
+        &validate_package(
+            &whitespace_padded,
+            OdfValidationLimits::default(),
+            ValidationLimits::default()
+        )
+        .unwrap(),
         "odf.external_reference.present"
     ));
 
@@ -557,7 +661,12 @@ fn reports_encryption_signature_external_and_macro_presence_only() {
         internal_links.as_bytes(),
         &[],
     );
-    let internal_report = validate_package(&internal).unwrap();
+    let internal_report = validate_package(
+        &internal,
+        OdfValidationLimits::default(),
+        ValidationLimits::default(),
+    )
+    .unwrap();
     assert!(matches!(
         status(
             &internal_report,
@@ -591,7 +700,12 @@ fn reports_encryption_signature_external_and_macro_presence_only() {
             &[],
         );
         assert!(has_code(
-            &validate_package(&unsafe_package).unwrap(),
+            &validate_package(
+                &unsafe_package,
+                OdfValidationLimits::default(),
+                ValidationLimits::default()
+            )
+            .unwrap(),
             "odf.external_reference.present"
         ));
     }
@@ -601,7 +715,7 @@ fn reports_encryption_signature_external_and_macro_presence_only() {
 fn input_archive_manifest_xml_and_report_limits_are_distinguished() {
     let bytes = valid_package("application/vnd.oasis.opendocument.text", "text");
 
-    let source = validate_package_with_limits(
+    let source = validate_package(
         &bytes,
         OdfValidationLimits::default().with_max_input_bytes(1),
         ValidationLimits::default(),
@@ -616,7 +730,7 @@ fn input_archive_manifest_xml_and_report_limits_are_distinguished() {
         CheckStatus::StoppedBy { .. }
     ));
 
-    let entries = validate_package_with_limits(
+    let entries = validate_package(
         &bytes,
         OdfValidationLimits::default().with_max_entries(2),
         ValidationLimits::default(),
@@ -627,7 +741,7 @@ fn input_archive_manifest_xml_and_report_limits_are_distinguished() {
         CheckStatus::Blocked { .. }
     ));
 
-    let entry_bytes = validate_package_with_limits(
+    let entry_bytes = validate_package(
         &bytes,
         OdfValidationLimits::default().with_max_archive_entry_bytes(1),
         ValidationLimits::default(),
@@ -638,7 +752,7 @@ fn input_archive_manifest_xml_and_report_limits_are_distinguished() {
         CheckStatus::Blocked { .. }
     ));
 
-    let manifest_limit_report = validate_package_with_limits(
+    let manifest_limit_report = validate_package(
         &bytes,
         OdfValidationLimits::default().with_max_manifest_bytes(1),
         ValidationLimits::default(),
@@ -653,7 +767,7 @@ fn input_archive_manifest_xml_and_report_limits_are_distinguished() {
         CheckStatus::StoppedBy { .. }
     ));
 
-    let manifest_entries = validate_package_with_limits(
+    let manifest_entries = validate_package(
         &bytes,
         OdfValidationLimits::default().with_max_manifest_entries(1),
         ValidationLimits::default(),
@@ -664,7 +778,7 @@ fn input_archive_manifest_xml_and_report_limits_are_distinguished() {
         CheckStatus::Blocked { .. }
     ));
 
-    let xml_bytes = validate_package_with_limits(
+    let xml_bytes = validate_package(
         &bytes,
         OdfValidationLimits::default().with_max_root_xml_bytes(1),
         ValidationLimits::default(),
@@ -675,7 +789,7 @@ fn input_archive_manifest_xml_and_report_limits_are_distinguished() {
         CheckStatus::Blocked { .. }
     ));
 
-    let xml_events = validate_package_with_limits(
+    let xml_events = validate_package(
         &bytes,
         OdfValidationLimits::default().with_max_xml_events(1),
         ValidationLimits::default(),
@@ -687,8 +801,8 @@ fn input_archive_manifest_xml_and_report_limits_are_distinguished() {
     ));
 
     let report_limits = ValidationLimits::new(7, 32, 4, 4, 128, 512, 256, 256, 256, 16_384);
-    let error = validate_package_with_limits(&bytes, OdfValidationLimits::default(), report_limits)
-        .unwrap_err();
+    let error =
+        validate_package(&bytes, OdfValidationLimits::default(), report_limits).unwrap_err();
     assert!(matches!(
         error,
         OdfValidationError::Report(litchi_core::ValidationReportError::Limit {
@@ -705,8 +819,7 @@ fn input_archive_manifest_xml_and_report_limits_are_distinguished() {
     );
     let issue_limits = ValidationLimits::new(8, 0, 4, 4, 128, 512, 256, 256, 256, 16_384);
     let issue_error =
-        validate_package_with_limits(&hostile, OdfValidationLimits::default(), issue_limits)
-            .unwrap_err();
+        validate_package(&hostile, OdfValidationLimits::default(), issue_limits).unwrap_err();
     assert!(matches!(
         issue_error,
         OdfValidationError::Report(litchi_core::ValidationReportError::Limit {
@@ -722,14 +835,24 @@ fn doctype_and_depth_limit_do_not_fetch_or_expand_entities() {
     let mimetype = "application/vnd.oasis.opendocument.text";
     let doctype = b"<!DOCTYPE office [<!ENTITY leaked SYSTEM 'file:///secret'>]><office:document-content xmlns:office='urn:oasis:names:tc:opendocument:xmlns:office:1.0'><office:body>&leaked;</office:body></office:document-content>";
     let bytes = build_package(mimetype, manifest(mimetype, "").as_bytes(), doctype, &[]);
-    let report = validate_package(&bytes).unwrap();
+    let report = validate_package(
+        &bytes,
+        OdfValidationLimits::default(),
+        ValidationLimits::default(),
+    )
+    .unwrap();
     assert!(has_code(&report, "odf.xml.doctype_forbidden"));
 
     let undeclared = b"<office:document-content xmlns:office='urn:oasis:names:tc:opendocument:xmlns:office:1.0'><office:body>&leaked;</office:body></office:document-content>";
     let undeclared_bytes =
         build_package(mimetype, manifest(mimetype, "").as_bytes(), undeclared, &[]);
     assert!(has_code(
-        &validate_package(&undeclared_bytes).unwrap(),
+        &validate_package(
+            &undeclared_bytes,
+            OdfValidationLimits::default(),
+            ValidationLimits::default()
+        )
+        .unwrap(),
         "odf.xml.malformed"
     ));
 
@@ -741,7 +864,12 @@ fn doctype_and_depth_limit_do_not_fetch_or_expand_entities() {
         &[],
     );
     assert!(has_code(
-        &validate_package(&invalid_content_bytes).unwrap(),
+        &validate_package(
+            &invalid_content_bytes,
+            OdfValidationLimits::default(),
+            ValidationLimits::default()
+        )
+        .unwrap(),
         "odf.xml.malformed"
     ));
 
@@ -755,7 +883,12 @@ fn doctype_and_depth_limit_do_not_fetch_or_expand_entities() {
         &[],
     );
     assert!(has_code(
-        &validate_package(&invalid_manifest_bytes).unwrap(),
+        &validate_package(
+            &invalid_manifest_bytes,
+            OdfValidationLimits::default(),
+            ValidationLimits::default()
+        )
+        .unwrap(),
         "odf.manifest.invalid"
     ));
 
@@ -766,7 +899,7 @@ fn doctype_and_depth_limit_do_not_fetch_or_expand_entities() {
         nested.as_bytes(),
         &[],
     );
-    let limited = validate_package_with_limits(
+    let limited = validate_package(
         &nested_bytes,
         OdfValidationLimits::default().with_max_xml_depth(2),
         ValidationLimits::default(),

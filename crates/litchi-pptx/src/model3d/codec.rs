@@ -1,17 +1,20 @@
 //! Bounded `PresentationML` graphic-frame and shared model3d wire codecs.
 
-use std::ops::Range;
+use std::{borrow::Cow, ops::Range};
 
 use litchi_core::xml::ReaderOrigin;
 use litchi_drawingml::model3d as drawing;
+use litchi_drawingml::{Error as DrawingError, LimitKind};
 use litchi_ooxml_common::xml::unqualified_attribute_value;
+use litchi_opc::SourceLimits;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use super::model::Scene;
 use super::{
-    GRAPHIC_URI, MAX_MODELS_PER_SLIDE, MAX_SHAPES_PER_SLIDE, MAX_SLIDE_XML_BYTES, MAX_XML_DEPTH,
+    GRAPHIC_URI, MAX_LINK_BYTES, MAX_MODEL_BYTES, MAX_MODELS_PER_SLIDE, MAX_PREVIEW_BYTES,
+    MAX_SHAPES_PER_SLIDE, MAX_SLIDE_XML_BYTES, MAX_TOTAL_PAYLOAD_BYTES, MAX_XML_DEPTH,
 };
 use crate::{Error, Result};
 
@@ -28,6 +31,248 @@ const SHAPES: &[&[u8]] = &[
     b"cxnSp",
     b"contentPart",
 ];
+
+/// Caller-selected bounds for one PPTX model3d XML operation.
+///
+/// The shared DrawingML codec owns the model3d grammar.  This adapter keeps a
+/// distinct PPTX policy type so host callers cannot accidentally pass an
+/// unrelated format's limits, while preserving the same byte and tree
+/// dimensions at the wire boundary.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub struct Limits {
+    max_xml_bytes: usize,
+    max_fragment_bytes: usize,
+    max_output_bytes: usize,
+    max_children: usize,
+    max_raster_children: usize,
+    max_depth: usize,
+    max_nodes: usize,
+    max_model_bytes: usize,
+    max_preview_bytes: usize,
+    max_total_payload_bytes: usize,
+    max_link_bytes: usize,
+}
+
+impl Limits {
+    /// The historical PPTX model3d bounds.
+    pub const DEFAULT: Self = {
+        let shared = drawing::codec::Limits::DEFAULT;
+        Self {
+            max_xml_bytes: MAX_SLIDE_XML_BYTES,
+            max_fragment_bytes: shared.max_fragment_bytes,
+            max_output_bytes: MAX_SLIDE_XML_BYTES,
+            max_children: MAX_MODELS_PER_SLIDE,
+            max_raster_children: shared.max_raster_children,
+            max_depth: MAX_XML_DEPTH,
+            max_nodes: MAX_SHAPES_PER_SLIDE.saturating_mul(32),
+            max_model_bytes: MAX_MODEL_BYTES,
+            max_preview_bytes: MAX_PREVIEW_BYTES,
+            max_total_payload_bytes: MAX_TOTAL_PAYLOAD_BYTES,
+            max_link_bytes: MAX_LINK_BYTES,
+        }
+    };
+
+    /// Derive the model3d policy from the selected OPC source profile.
+    ///
+    /// The semantic ceilings are never widened beyond the format defaults;
+    /// a tighter owner profile is carried through every package and slide
+    /// projection that reads or writes a model3d fragment.
+    #[must_use = "the derived model3d bounds must be retained for the operation"]
+    pub fn from_source_limits(source: SourceLimits) -> Self {
+        let default = Self::DEFAULT;
+        let part_bytes = usize::try_from(source.max_part_bytes()).unwrap_or(usize::MAX);
+        let total_part_bytes = usize::try_from(source.max_total_part_bytes()).unwrap_or(usize::MAX);
+        let relationship_target_bytes = source.max_relationship_target_bytes();
+        let events = source.max_events();
+        let depth = source.max_depth();
+        let max_xml_bytes = default.max_xml_bytes.min(part_bytes);
+        let max_fragment_bytes = default.max_fragment_bytes.min(part_bytes);
+        let max_output_bytes = default.max_output_bytes.min(part_bytes);
+        let max_children = default.max_children.min(events);
+        let max_raster_children = default.max_raster_children.min(events);
+        let max_depth = default.max_depth.min(depth);
+        let max_nodes = default.max_nodes.min(events);
+        let max_model_bytes = default.max_model_bytes.min(part_bytes);
+        let max_preview_bytes = default.max_preview_bytes.min(part_bytes);
+        let max_total_payload_bytes = default.max_total_payload_bytes.min(total_part_bytes);
+        let max_link_bytes = default.max_link_bytes.min(relationship_target_bytes);
+        Self {
+            max_xml_bytes,
+            max_fragment_bytes,
+            max_output_bytes,
+            max_children,
+            max_raster_children,
+            max_depth,
+            max_nodes,
+            max_model_bytes,
+            max_preview_bytes,
+            max_total_payload_bytes,
+            max_link_bytes,
+        }
+    }
+
+    /// Construct a policy with the historical tree ceilings and selected byte
+    /// budgets.
+    #[must_use]
+    pub const fn new(
+        max_xml_bytes: usize,
+        max_fragment_bytes: usize,
+        max_output_bytes: usize,
+    ) -> Option<Self> {
+        Self::with_tree(
+            max_xml_bytes,
+            max_fragment_bytes,
+            max_output_bytes,
+            Self::DEFAULT.max_children,
+            Self::DEFAULT.max_raster_children,
+            Self::DEFAULT.max_depth,
+            Self::DEFAULT.max_nodes,
+        )
+    }
+
+    /// Construct a policy with explicit byte and tree ceilings.
+    #[must_use]
+    pub const fn with_tree(
+        max_xml_bytes: usize,
+        max_fragment_bytes: usize,
+        max_output_bytes: usize,
+        max_children: usize,
+        max_raster_children: usize,
+        max_depth: usize,
+        max_nodes: usize,
+    ) -> Option<Self> {
+        let default = Self::DEFAULT;
+        if max_xml_bytes == 0
+            || max_xml_bytes > default.max_xml_bytes
+            || max_fragment_bytes == 0
+            || max_fragment_bytes > default.max_fragment_bytes
+            || max_output_bytes == 0
+            || max_output_bytes > default.max_output_bytes
+            || max_children == 0
+            || max_children > default.max_children
+            || max_raster_children == 0
+            || max_raster_children > default.max_raster_children
+            || max_depth == 0
+            || max_depth > default.max_depth
+            || max_nodes == 0
+            || max_nodes > default.max_nodes
+        {
+            return None;
+        }
+        Some(Self {
+            max_xml_bytes,
+            max_fragment_bytes,
+            max_output_bytes,
+            max_children,
+            max_raster_children,
+            max_depth,
+            max_nodes,
+            max_model_bytes: default.max_model_bytes,
+            max_preview_bytes: default.max_preview_bytes,
+            max_total_payload_bytes: default.max_total_payload_bytes,
+            max_link_bytes: default.max_link_bytes,
+        })
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn max_xml_bytes(self) -> usize {
+        self.max_xml_bytes
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn max_fragment_bytes(self) -> usize {
+        self.max_fragment_bytes
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn max_output_bytes(self) -> usize {
+        self.max_output_bytes
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn max_children(self) -> usize {
+        self.max_children
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn max_raster_children(self) -> usize {
+        self.max_raster_children
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn max_depth(self) -> usize {
+        self.max_depth
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn max_nodes(self) -> usize {
+        self.max_nodes
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn max_model_bytes(self) -> usize {
+        self.max_model_bytes
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn max_preview_bytes(self) -> usize {
+        self.max_preview_bytes
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn max_total_payload_bytes(self) -> usize {
+        self.max_total_payload_bytes
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn max_link_bytes(self) -> usize {
+        self.max_link_bytes
+    }
+
+    fn drawing(self) -> drawing::codec::Limits {
+        drawing::codec::Limits {
+            max_xml_bytes: self
+                .max_xml_bytes
+                .min(drawing::codec::Limits::DEFAULT.max_xml_bytes),
+            max_fragment_bytes: self
+                .max_fragment_bytes
+                .min(drawing::codec::Limits::DEFAULT.max_fragment_bytes),
+            max_output_bytes: self
+                .max_output_bytes
+                .min(drawing::codec::Limits::DEFAULT.max_output_bytes),
+            max_children: self
+                .max_children
+                .min(drawing::codec::Limits::DEFAULT.max_children),
+            max_raster_children: self
+                .max_raster_children
+                .min(drawing::codec::Limits::DEFAULT.max_raster_children),
+            max_depth: self
+                .max_depth
+                .min(drawing::codec::Limits::DEFAULT.max_depth),
+            max_nodes: self
+                .max_nodes
+                .min(drawing::codec::Limits::DEFAULT.max_nodes),
+        }
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
 
 /// A checked model3d element location and its semantic shape anchor.
 #[derive(Debug, Clone)]
@@ -50,10 +295,10 @@ pub(crate) struct Inventory {
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn read(xml: &[u8]) -> Result<Scene> {
-    let prepared = prepare_fragment(xml)?;
+pub fn read(xml: &[u8], limits: Limits) -> Result<Scene> {
+    let prepared = prepare_fragment(xml, limits)?;
     Ok(Scene::from_wire(
-        drawing::codec::read(&prepared).map_err(super::model::drawing_error)?,
+        drawing::codec::read(&prepared, limits.drawing()).map_err(super::model::drawing_error)?,
     ))
 }
 
@@ -62,24 +307,20 @@ pub fn read(xml: &[u8]) -> Result<Scene> {
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
-pub fn write(scene: &Scene) -> Result<Vec<u8>> {
-    let mut wire = scene.wire.clone();
-    if !wire
-        .namespaces
-        .iter()
-        .any(|namespace| namespace.prefix() == Some("m3d"))
-    {
-        wire.namespaces.push(
-            drawing::Namespace::new(Some("m3d"), GRAPHIC_URI)
-                .map_err(|error| invalid(error.to_string()))?,
-        );
-    }
-    drawing::codec::write(&wire).map_err(super::model::drawing_error)
+pub fn write(scene: &Scene, limits: Limits) -> Result<Vec<u8>> {
+    // The shared writer supplies missing model and relationship namespace
+    // declarations itself. Passing the borrowed wire directly keeps its
+    // structural/output preflight ahead of any clone of retained opaque XML.
+    drawing::codec::write(&scene.wire, limits.drawing()).map_err(super::model::drawing_error)
 }
 
-pub(crate) fn locate(xml: &[u8]) -> Result<Inventory> {
-    if xml.len() > MAX_SLIDE_XML_BYTES {
-        return Err(limit("model3d slide XML bytes", MAX_SLIDE_XML_BYTES));
+pub(crate) fn locate_with_limits(xml: &[u8], limits: Limits) -> Result<Inventory> {
+    if xml.len() > limits.max_xml_bytes() {
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            xml.len(),
+            limits.max_xml_bytes(),
+        ));
     }
 
     let mut reader = NsReader::from_reader(xml);
@@ -103,28 +344,45 @@ pub(crate) fn locate(xml: &[u8]) -> Result<Inventory> {
         let end = position(&reader, origin)?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
-        nodes = nodes
-            .checked_add(1)
-            .ok_or_else(|| limit("model3d slide XML nodes", MAX_SHAPES_PER_SLIDE))?;
-        if nodes > MAX_SHAPES_PER_SLIDE.saturating_mul(32) {
+        nodes = nodes.checked_add(1).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::XmlNodes,
+                usize::MAX,
+                limits.max_nodes(),
+            )
+        })?;
+        if nodes > limits.max_nodes() {
             return Err(limit(
-                "model3d slide XML nodes",
-                MAX_SHAPES_PER_SLIDE.saturating_mul(32),
+                crate::error::CodecLimitKind::XmlNodes,
+                nodes,
+                limits.max_nodes(),
             ));
         }
 
         match event {
             Event::Start(element) => {
-                depth = depth
-                    .checked_add(1)
-                    .ok_or_else(|| limit("model3d XML depth", MAX_XML_DEPTH))?;
-                if depth > MAX_XML_DEPTH {
-                    return Err(limit("model3d XML depth", MAX_XML_DEPTH));
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        limits.max_depth(),
+                    )
+                })?;
+                if depth > limits.max_depth() {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        limits.max_depth(),
+                    ));
                 }
 
                 if is_shape(&namespace, element.name()) {
-                    if shape_names.len() >= MAX_SHAPES_PER_SLIDE {
-                        return Err(limit("model3d slide shapes", MAX_SHAPES_PER_SLIDE));
+                    if shape_names.len() >= limits.max_nodes() {
+                        return Err(limit(
+                            crate::error::CodecLimitKind::ModelEntries,
+                            shape_names.len().checked_add(1).unwrap_or(usize::MAX),
+                            limits.max_nodes(),
+                        ));
                     }
                     let index = shape_names.len();
                     shape_names.push(None);
@@ -155,18 +413,30 @@ pub(crate) fn locate(xml: &[u8]) -> Result<Inventory> {
                     let Some((shape_index, _)) = shape_stack.last().copied() else {
                         return Err(invalid("model3d element has no shape anchor"));
                     };
-                    if locations.len() >= MAX_MODELS_PER_SLIDE {
-                        return Err(limit("model3d instances", MAX_MODELS_PER_SLIDE));
+                    if locations.len() >= limits.max_children() {
+                        return Err(limit(
+                            crate::error::CodecLimitKind::ModelEntries,
+                            locations.len().checked_add(1).unwrap_or(usize::MAX),
+                            limits.max_children(),
+                        ));
                     }
                     model_stack.push((start, depth, shape_index));
                 }
             },
             Event::Empty(element) => {
-                let child_depth = depth
-                    .checked_add(1)
-                    .ok_or_else(|| limit("model3d XML depth", MAX_XML_DEPTH))?;
-                if child_depth > MAX_XML_DEPTH {
-                    return Err(limit("model3d XML depth", MAX_XML_DEPTH));
+                let child_depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        limits.max_depth(),
+                    )
+                })?;
+                if child_depth > limits.max_depth() {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        child_depth,
+                        limits.max_depth(),
+                    ));
                 }
                 if is_cnvpr(&namespace, element.name())
                     && let Some((index, _)) = shape_stack.last().copied()
@@ -175,8 +445,12 @@ pub(crate) fn locate(xml: &[u8]) -> Result<Inventory> {
                         unqualified_attribute_value(&element, b"name", decoder)?.map(Into::into);
                 }
                 if is_shape(&namespace, element.name()) {
-                    if shape_names.len() >= MAX_SHAPES_PER_SLIDE {
-                        return Err(limit("model3d slide shapes", MAX_SHAPES_PER_SLIDE));
+                    if shape_names.len() >= limits.max_nodes() {
+                        return Err(limit(
+                            crate::error::CodecLimitKind::ModelEntries,
+                            shape_names.len().checked_add(1).unwrap_or(usize::MAX),
+                            limits.max_nodes(),
+                        ));
                     }
                     shape_names.push(None);
                 }
@@ -238,18 +512,31 @@ pub(crate) fn locate(xml: &[u8]) -> Result<Inventory> {
     })
 }
 
-pub(crate) fn replace(xml: &[u8], range: Range<usize>, replacement: &[u8]) -> Result<Vec<u8>> {
+pub(crate) fn replace(
+    xml: &[u8],
+    range: Range<usize>,
+    replacement: &[u8],
+    limits: Limits,
+) -> Result<Vec<u8>> {
     if range.start > range.end || range.end > xml.len() {
         return Err(invalid("model3d replacement range is outside the slide"));
     }
     let new_len = xml
         .len()
-        .saturating_sub(range.end.saturating_sub(range.start))
-        .saturating_add(replacement.len());
-    if new_len > MAX_SLIDE_XML_BYTES {
+        .checked_sub(range.end - range.start)
+        .and_then(|length| length.checked_add(replacement.len()))
+        .ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                usize::MAX,
+                limits.max_xml_bytes(),
+            )
+        })?;
+    if new_len > limits.max_xml_bytes() {
         return Err(limit(
-            "model3d updated slide XML bytes",
-            MAX_SLIDE_XML_BYTES,
+            crate::error::CodecLimitKind::XmlBytes,
+            new_len,
+            limits.max_xml_bytes(),
         ));
     }
     let mut output = Vec::new();
@@ -304,15 +591,34 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(format!("PPTX model3d {}", message.into()))
 }
 
-fn limit(resource: &'static str, limit: usize) -> Error {
-    Error::Limit { resource, limit }
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
+}
+
+fn drawing_limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Drawing(DrawingError::Limit {
+        kind,
+        observed,
+        maximum,
+    })
 }
 
 /// A model element is usually namespace-contextualized by its slide root.
 /// The shared codec intentionally accepts one self-contained fragment, so a
 /// package adapter supplies the inherited model and relationship declarations
 /// when the selected element did not repeat them locally.
-fn prepare_fragment(xml: &[u8]) -> Result<Vec<u8>> {
+fn prepare_fragment<'a>(xml: &'a [u8], limits: Limits) -> Result<Cow<'a, [u8]>> {
+    if xml.len() > limits.max_xml_bytes {
+        return Err(drawing_limit(
+            LimitKind::XmlBytes,
+            xml.len(),
+            limits.max_xml_bytes,
+        ));
+    }
     let open_end = opening_tag_end(xml)?;
     let opening = &xml[..open_end];
     let model_prefix =
@@ -339,14 +645,33 @@ fn prepare_fragment(xml: &[u8]) -> Result<Vec<u8>> {
         }
     }
     if declarations.is_empty() {
-        return Ok(xml.to_vec());
+        return Ok(Cow::Borrowed(xml));
     }
-    let mut prepared = Vec::with_capacity(xml.len().saturating_add(declarations.len()));
+    let prepared_len =
+        xml.len()
+            .checked_add(declarations.len())
+            .ok_or(Error::CapacityOverflow {
+                resource: "model3d prepared XML",
+            })?;
+    if prepared_len > limits.max_xml_bytes {
+        return Err(drawing_limit(
+            LimitKind::XmlBytes,
+            prepared_len,
+            limits.max_xml_bytes,
+        ));
+    }
+    let mut prepared = Vec::new();
+    prepared
+        .try_reserve_exact(prepared_len)
+        .map_err(|source| Error::Allocation {
+            resource: "model3d prepared XML",
+            source,
+        })?;
     prepared.extend_from_slice(&xml[..open_end - 1]);
     prepared.extend_from_slice(&declarations);
     prepared.push(b'>');
     prepared.extend_from_slice(&xml[open_end..]);
-    Ok(prepared)
+    Ok(Cow::Owned(prepared))
 }
 
 fn opening_tag_end(xml: &[u8]) -> Result<usize> {

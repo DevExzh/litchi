@@ -1,0 +1,46 @@
+# Record 0326: PPTX query bisect. unified-query harness built (release,
+# debug=1) from `git archive` of each first-parent trunk commit;
+# `valgrind --tool=callgrind --cache-sim=yes --branch-sim=yes
+#  --toggle-collect='*profiled*' unified-query profile ROUTE CALLS`
+# (instructions inside the timed loop only). Harness SHA-256 prefixes:
+# 30eed270b5 a1c658ede517, dea0630741 1118591277c4, ba7669242a c61547173589,
+# fc274041da 9d9486a42823 (bisect binaries are not kept).
+#
+# commit       what it is                                   route                                  calls  Ir
+30eed270b5     record 0315 base                             pptx_small_bytes_all_shape_v1          5      606,011
+dea0630741     trunk before the 0321 merge (0316-0320)      pptx_small_bytes_all_shape_v1          5      605,150
+ba7669242a     the 0321 merge (PPTX elements)               pptx_small_bytes_all_shape_v1          5      657,726
+fc274041da     trunk (0321-0324 and 0315's walker step)     pptx_small_bytes_all_shape_v1          5      606,630
+30eed270b5                                                  pptx_large_bytes_all_shape_v1          1      21,976,728
+dea0630741                                                  pptx_large_bytes_all_shape_v1          1      21,971,814
+ba7669242a                                                  pptx_large_bytes_all_shape_v1          1      23,365,993
+fc274041da                                                  pptx_large_bytes_all_shape_v1          1      21,587,983
+30eed270b5                                                  pptx_small_bytes_all_shape_width_v1    1      167,950
+dea0630741                                                  pptx_small_bytes_all_shape_width_v1    1      165,904
+ba7669242a                                                  pptx_small_bytes_all_shape_width_v1    1      177,080
+fc274041da                                                  pptx_small_bytes_all_shape_width_v1    1      155,199
+30eed270b5                                                  pptx_small_bytes_all_shape_contains_v1 1      135,970
+dea0630741                                                  pptx_small_bytes_all_shape_contains_v1 1      135,533
+ba7669242a                                                  pptx_small_bytes_all_shape_contains_v1 1      144,906
+fc274041da                                                  pptx_small_bytes_all_shape_contains_v1 1      124,986
+#
+# pptx_large_bytes_all_shape_v1 x1, by function (callgrind_annotate, self):
+#                         memcpy Ir   walker step Ir (mispredicts)          Children::next Ir
+# dea0630741              5,781,580   next_found 2,624,790 (517)            1,960,866
+# ba7669242a              6,438,804   next_found 2,624,288; advance 1,189,075 (20,503)   2,156,426
+# fc274041da              6,408,624   next_fast_map 3,677,918 (21,013)      1,899,875
+# fix (this record)       see callgrind-summary.txt
+# The extra mispredicts are one per match at `match result` of
+# Walk::next_fast_map (walk.rs), on the niche-encoded Result<Option<Node>>.
+#
+# pptx Node sizes (size_of, format::pptx::tests::query_items_stay_as_small_as_a_text_item):
+#   before 0321: Item 144, Node 168 (TextItem 136 was the largest variant)
+#   trunk:       Item 152, Node 176 (LinkItem = Owner(TextItem|TreeItem) + Arc)
+#   this record: Item 120, Node 144, TreeItem 112 -> 88
+#
+# Wall clock, one process each, taskset -c 30, `time pptx_large_bytes_all_shape_v1 7`
+# (unified median / leaf median µs, ratio):
+# dea0630741 1637.8/279.1 5.874; ba7669242a 2219.3/277.5 8.001; fc274041da 2136.7/277.5 7.707
+# fc274041da 2135.4/283.5 7.611; ba7669242a 1847.3/284.0 6.502; dea0630741 1801.4/278.7 6.456
+# with the fix: 1667.2/278.4 5.986, 1699.0/279.2 6.104 (against dea 1690.2/1822.9, fc 2133.6/2315.2
+# in the same interleaved run)

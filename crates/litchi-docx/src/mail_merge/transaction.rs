@@ -19,6 +19,7 @@
 use std::sync::Arc;
 
 use litchi_core::xml::ReaderOrigin;
+use litchi_ooxml_common::mce::Limits as MceLimits;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
@@ -38,6 +39,7 @@ pub struct Snapshot {
     recipients_xml: Option<Arc<Vec<u8>>>,
     recipients: Option<Recipients>,
     conformance: Conformance,
+    limits: MceLimits,
     revision: Revision,
 }
 
@@ -47,8 +49,8 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn from_xml(xml: impl Into<Vec<u8>>) -> Result<Self> {
-        Self::from_parts(xml.into(), None)
+    pub fn from_xml(xml: impl Into<Vec<u8>>, limits: &MceLimits) -> Result<Self> {
+        Self::from_parts(xml.into(), None, limits)
     }
 
     /// Parse settings and an optional inert recipient-data XML source.
@@ -56,15 +58,20 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn from_parts(xml: impl Into<Vec<u8>>, recipients_xml: Option<Vec<u8>>) -> Result<Self> {
+    pub fn from_parts(
+        xml: impl Into<Vec<u8>>,
+        recipients_xml: Option<Vec<u8>>,
+        limits: &MceLimits,
+    ) -> Result<Self> {
         let xml = xml.into();
-        let settings = super::parse_settings_mail_merge(&xml)?
+        let settings = super::parse_settings_mail_merge(&xml, limits)?
             .ok_or_else(|| invalid("settings XML does not contain mailMerge"))?;
         let conformance = detect_conformance(&xml)?;
         let recipients = recipients_xml
             .as_deref()
-            .map(Recipients::parse_xml)
+            .map(|xml| Recipients::parse_xml(xml, limits))
             .transpose()?;
+        let limits = limits.clone();
         let xml = Arc::new(xml);
         let recipients_xml = recipients_xml.map(Arc::new);
         let revision = fingerprint(&xml, recipients_xml.as_deref().map(Vec::as_slice));
@@ -74,6 +81,7 @@ impl Snapshot {
             recipients_xml,
             recipients,
             conformance,
+            limits,
             revision,
         })
     }
@@ -122,7 +130,7 @@ impl Snapshot {
 
     /// Start an isolated typed edit.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
+    pub(crate) fn edit(&self) -> Transaction {
         Transaction {
             original: self.clone(),
             settings: self.settings.clone(),
@@ -141,7 +149,7 @@ impl Snapshot {
 
 /// A typed mail-merge edit that has not yet been published.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub(crate) struct Transaction {
     original: Snapshot,
     settings: Settings,
     recipients: Option<Recipients>,
@@ -173,7 +181,7 @@ impl Transaction {
     ) -> Result<&mut Self> {
         let mut candidate = self.settings.clone();
         edit(&mut candidate)?;
-        candidate.to_xml(self.original.conformance)?;
+        candidate.to_xml(self.original.conformance, &self.original.limits)?;
         self.settings = candidate;
         Ok(self)
     }
@@ -184,7 +192,7 @@ impl Transaction {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn replace_settings(&mut self, value: Settings) -> Result<&mut Self> {
-        value.to_xml(self.original.conformance)?;
+        value.to_xml(self.original.conformance, &self.original.limits)?;
         self.settings = value;
         Ok(self)
     }
@@ -196,7 +204,7 @@ impl Transaction {
     /// Returns an error if the operation cannot be completed.
     pub fn set_recipients(&mut self, value: Option<Recipients>) -> Result<&mut Self> {
         if let Some(value) = &value {
-            value.to_xml(self.original.conformance)?;
+            value.to_xml(self.original.conformance, &self.original.limits)?;
         }
         self.recipients = value;
         Ok(self)
@@ -234,7 +242,7 @@ impl Transaction {
             },
             None => return Err(invalid("mail-merge field-map index is out of range")),
         }
-        settings.to_xml(self.original.conformance)?;
+        settings.to_xml(self.original.conformance, &self.original.limits)?;
         self.settings = settings;
         Ok(self)
     }
@@ -245,7 +253,8 @@ impl Transaction {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn commit(self) -> Result<Commit> {
-        self.settings.to_xml(self.original.conformance)?;
+        self.settings
+            .to_xml(self.original.conformance, &self.original.limits)?;
         let semantic_changed =
             self.settings != self.original.settings || self.recipients != self.original.recipients;
         if !semantic_changed {
@@ -267,6 +276,7 @@ impl Transaction {
                 &self.original.settings,
                 &self.settings,
                 self.original.conformance,
+                &self.original.limits,
             )?
         };
         let recipients_xml = match (&self.original.recipients, &self.recipients) {
@@ -279,8 +289,13 @@ impl Transaction {
                 before,
                 after,
                 self.original.conformance,
+                &self.original.limits,
             )?),
-            (None, Some(after)) => Some(after.to_xml(self.original.conformance)?.into_bytes()),
+            (None, Some(after)) => Some(
+                after
+                    .to_xml(self.original.conformance, &self.original.limits)?
+                    .into_bytes(),
+            ),
             (_, None) => None,
             (Some(_), Some(_)) => self
                 .original
@@ -288,7 +303,7 @@ impl Transaction {
                 .as_ref()
                 .map(|xml| xml.as_ref().clone()),
         };
-        let snapshot = Snapshot::from_parts(settings_xml, recipients_xml)?;
+        let snapshot = Snapshot::from_parts(settings_xml, recipients_xml, &self.original.limits)?;
         let patch = Patch {
             before: self.original,
             after: snapshot.clone(),
@@ -303,7 +318,7 @@ impl Transaction {
 
 /// A successful typed mail-merge publication.
 #[derive(Debug, Clone)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     patch: Patch,
     changed: bool,
@@ -341,7 +356,7 @@ impl Commit {
 
 /// A reversible source-checked typed patch.
 #[derive(Debug, Clone)]
-pub struct Patch {
+pub(crate) struct Patch {
     before: Snapshot,
     after: Snapshot,
 }
@@ -397,8 +412,9 @@ fn rewrite_settings(
     before: &Settings,
     after: &Settings,
     conformance: Conformance,
+    limits: &MceLimits,
 ) -> Result<Vec<u8>> {
-    if super::parse_settings_mail_merge(source)?.as_ref() != Some(before) {
+    if super::parse_settings_mail_merge(source, limits)?.as_ref() != Some(before) {
         return Err(invalid("mail-merge settings source is stale"));
     }
     let layout = scan(source)?;
@@ -409,9 +425,15 @@ fn rewrite_settings(
         source,
         &layout,
         mail,
-        after.to_xml(conformance)?.into_bytes(),
+        after.to_xml(conformance, limits)?.into_bytes(),
     );
-    let mut output = Vec::with_capacity(source.len() - (mail.end - mail.start) + replacement.len());
+    let capacity = source
+        .len()
+        .checked_sub(mail.end - mail.start)
+        .and_then(|size| size.checked_add(replacement.len()))
+        .ok_or_else(|| invalid("mail-merge settings output length overflow"))?;
+    check_output_bytes(capacity, limits)?;
+    let mut output = Vec::with_capacity(capacity);
     output.extend_from_slice(&source[..mail.start]);
     output.extend_from_slice(&replacement);
     output.extend_from_slice(&source[mail.end..]);
@@ -423,21 +445,39 @@ fn rewrite_recipients(
     before: &Recipients,
     after: &Recipients,
     conformance: Conformance,
+    limits: &MceLimits,
 ) -> Result<Vec<u8>> {
-    if Recipients::parse_xml(source)? != *before {
+    if Recipients::parse_xml(source, limits)? != *before {
         return Err(invalid("mail-merge recipient source is stale"));
     }
     let layout = scan(source)?;
     let root = layout
         .root
         .ok_or_else(|| invalid("recipient root is missing"))?;
-    let canonical = after.to_xml(conformance)?.into_bytes();
+    let canonical = after.to_xml(conformance, limits)?.into_bytes();
     let replacement = opaque_preserving_fragment(source, &layout, root, canonical);
-    let mut output = Vec::with_capacity(source.len() - (root.end - root.start) + replacement.len());
+    let capacity = source
+        .len()
+        .checked_sub(root.end - root.start)
+        .and_then(|size| size.checked_add(replacement.len()))
+        .ok_or_else(|| invalid("mail-merge recipients output length overflow"))?;
+    check_output_bytes(capacity, limits)?;
+    let mut output = Vec::with_capacity(capacity);
     output.extend_from_slice(&source[..root.start]);
     output.extend_from_slice(&replacement);
     output.extend_from_slice(&source[root.end..]);
     Ok(output)
+}
+
+fn check_output_bytes(actual: usize, limits: &MceLimits) -> Result<()> {
+    if actual > limits.max_output_bytes {
+        return Err(Error::MailMergeLimit {
+            kind: crate::mail_merge::LimitKind::XmlBytes,
+            actual,
+            maximum: limits.max_output_bytes,
+        });
+    }
+    Ok(())
 }
 
 fn opaque_preserving_fragment(

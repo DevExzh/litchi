@@ -12,24 +12,23 @@ use super::Context;
 
 impl Context {
     pub(super) fn validate_active_pivot_scope(&self) -> Result<&Scope> {
-        let scope_key = self.active_pivot_scope.as_ref().ok_or_else(|| {
+        let scope_key = self.active_pivot_scope.as_ref().ok_or({
             Error::UnresolvedDependency(
-                "PtgSxName requires an explicit pivot cache, sheet, and view scope".to_string(),
+                "PtgSxName requires an explicit pivot cache, sheet, and view scope",
             )
         })?;
         let cache_id = scope_key.cache_id();
         let sheet_index = scope_key.sheet_index();
         let view_name = scope_key.view_name();
         if sheet_index >= self.worksheet_names.len() {
-            return Err(Error::UnresolvedDependency(format!(
-                "pivot sheet index {sheet_index} is outside the workbook sheet range"
-            )));
+            return Err(Error::UnresolvedDependency(
+                "pivot sheet index is outside the workbook sheet range",
+            ));
         }
         if self.current_sheet != Some(sheet_index) {
-            return Err(Error::InvalidFormula(format!(
-                "pivot scope sheet {sheet_index} does not match the formula sheet {:?}",
-                self.current_sheet
-            )));
+            return Err(Error::InvalidFormula(
+                "pivot scope sheet does not match the formula sheet",
+            ));
         }
 
         let mut views = self.pivot_views.iter().filter(|view| {
@@ -37,15 +36,13 @@ impl Context {
                 && view.sheet_index == sheet_index
                 && view.name.eq_ignore_ascii_case(view_name)
         });
-        let _view = views.next().ok_or_else(|| {
-            Error::UnresolvedDependency(format!(
-                "PivotTable view {view_name:?} on sheet {sheet_index} does not use cache {cache_id}"
-            ))
-        })?;
+        let _view = views.next().ok_or(Error::UnresolvedDependency(
+            "PivotTable view on sheet does not use cache",
+        ))?;
         if views.next().is_some() {
-            return Err(Error::UnresolvedDependency(format!(
-                "PivotTable view {view_name:?} on sheet {sheet_index} and cache {cache_id} is ambiguous"
-            )));
+            return Err(Error::UnresolvedDependency(
+                "PivotTable view on sheet and cache is ambiguous",
+            ));
         }
 
         let mut scopes = self.pivot_name_scopes.iter().filter(|scope| {
@@ -53,30 +50,27 @@ impl Context {
                 && scope.sheet_index == sheet_index
                 && scope.view_name.eq_ignore_ascii_case(view_name)
         });
-        let scope = scopes.next().ok_or_else(|| {
-            Error::UnresolvedDependency(format!(
-                "calculated-name metadata is missing for PivotTable view {view_name:?}"
-            ))
-        })?;
+        let scope = scopes.next().ok_or(Error::UnresolvedDependency(
+            "calculated-name metadata is missing for PivotTable view",
+        ))?;
         if scopes.next().is_some() {
-            return Err(Error::UnresolvedDependency(format!(
-                "calculated-name metadata for PivotTable view {view_name:?} is ambiguous"
-            )));
+            return Err(Error::UnresolvedDependency(
+                "calculated-name metadata for PivotTable view is ambiguous",
+            ));
         }
         Ok(scope)
     }
 
     pub(super) fn resolve_pivot_name(&self, index: u32) -> Result<String> {
         let scope = self.validate_active_pivot_scope()?;
-        let index = usize::try_from(index).map_err(|_| {
-            Error::InvalidFormula("pivot calculated-name index overflow".to_string())
-        })?;
-        let reference = scope.references.get(index).ok_or_else(|| {
-            Error::UnresolvedDependency(format!(
-                "pivot calculated-name index {index} is outside 0..{}",
-                scope.references.len()
-            ))
-        })?;
+        let index = usize::try_from(index)
+            .map_err(|_| Error::InvalidFormula("pivot calculated-name index overflow"))?;
+        let reference = scope
+            .references
+            .get(index)
+            .ok_or(Error::UnresolvedDependency(
+                "pivot calculated-name index is outside 0..",
+            ))?;
         Ok(reference.to_formula_text())
     }
 }

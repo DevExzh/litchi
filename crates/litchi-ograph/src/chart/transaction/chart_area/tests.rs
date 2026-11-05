@@ -4,7 +4,7 @@
     reason = "test assertions panic by design"
 )]
 
-use super::super::super::{Cache, Chart, Context, Rect, RowCol, Series, Value};
+use super::super::super::{Cache, Context, Model, Rect, RowCol, Series, Value};
 use crate::Error;
 use crate::chart::cache;
 use litchi_biff::{Encoder, Kind, Records};
@@ -15,7 +15,7 @@ const EOF: Kind = Kind::from_wire(0x000A);
 
 fn fixture(rect: Rect) -> crate::chart::Stream {
     let context = Context::graph();
-    let mut chart = Chart::new(context).expect("chart");
+    let mut chart = Model::new(context).expect("chart");
     chart
         .add_series(Series::new(context))
         .expect("regular series");
@@ -33,8 +33,10 @@ fn fixture(rect: Rect) -> crate::chart::Stream {
 }
 
 fn with_unknown(source: &crate::chart::Stream) -> crate::chart::Stream {
-    let mut output = Encoder::new();
-    for item in Records::new(source.as_bytes()) {
+    let mut output = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
+    for item in
+        Records::new(source.as_bytes(), litchi_biff::Limits::default()).expect("valid BIFF limits")
+    {
         let record = item.expect("fixture record");
         if record.kind() == EOF {
             output
@@ -43,11 +45,12 @@ fn with_unknown(source: &crate::chart::Stream) -> crate::chart::Stream {
         }
         output.push_ref(record).expect("record replay");
     }
-    crate::chart::Stream::open(output.finish()).expect("framed fixture")
+    crate::chart::Stream::open(output.finish(), crate::Limits::default()).expect("framed fixture")
 }
 
 fn encoded_records(bytes: &[u8]) -> Vec<Vec<u8>> {
-    Records::new(bytes)
+    Records::new(bytes, litchi_biff::Limits::default())
+        .expect("valid BIFF limits")
         .map(|record| record.expect("encoded record").encoded().to_vec())
         .collect()
 }
@@ -58,7 +61,7 @@ fn edits_only_the_fixed_chart_area_and_replays_unknown_records() {
     let original = source.as_bytes().to_vec();
     let pointer = source.as_bytes().as_ptr();
     let original_records = encoded_records(&original);
-    let chart = Chart::open(source, Context::graph()).expect("parsed chart");
+    let chart = Model::open(source, Context::graph()).expect("parsed chart");
     let target = Rect {
         x: 0,
         y: 0,
@@ -71,12 +74,12 @@ fn edits_only_the_fixed_chart_area_and_replays_unknown_records() {
     assert_eq!(edit.len(), 1);
     assert!(!edit.is_empty());
     let commit = edit.commit().expect("commit");
-    assert_eq!(commit.patch().len(), 1);
+    assert_eq!(commit.patch().change_count(), 1);
     let change = commit.patch().chart_area().expect("chart-area change");
     assert_eq!(change.before(), Rect::default());
     assert_eq!(change.after(), target);
 
-    let changed = commit.into_chart().encode().expect("round trip");
+    let changed = commit.into_package().encode().expect("round trip");
     assert_eq!(changed.as_bytes().as_ptr(), pointer);
     let changed_records = encoded_records(changed.as_bytes());
     assert_eq!(changed_records.len(), original_records.len());
@@ -87,7 +90,7 @@ fn edits_only_the_fixed_chart_area_and_replays_unknown_records() {
             assert_eq!(before, after);
         }
     }
-    let reparsed = Chart::open(changed, Context::graph()).expect("reparse");
+    let reparsed = Model::open(changed, Context::graph()).expect("reparse");
     assert_eq!(reparsed.rect(), target);
     assert_eq!(reparsed.unknown().len(), 1);
     assert_eq!(reparsed.unknown()[0].kind(), UNKNOWN);
@@ -97,7 +100,7 @@ fn edits_only_the_fixed_chart_area_and_replays_unknown_records() {
 fn inverse_restores_the_exact_source_allocation() {
     let source = with_unknown(&fixture(Rect::default()));
     let original = source.as_bytes().to_vec();
-    let chart = Chart::open(source, Context::graph()).expect("parsed chart");
+    let chart = Model::open(source, Context::graph()).expect("parsed chart");
     let target = Rect {
         x: 0,
         y: 0,
@@ -110,9 +113,9 @@ fn inverse_restores_the_exact_source_allocation() {
     let restored = commit
         .patch()
         .inverse()
-        .apply(commit.into_chart())
+        .apply(commit.into_package())
         .expect("inverse commit")
-        .into_chart()
+        .into_package()
         .encode()
         .expect("restored stream");
     assert_eq!(restored.as_bytes(), original.as_slice());
@@ -122,7 +125,7 @@ fn inverse_restores_the_exact_source_allocation() {
 fn invalid_or_conflicting_area_edits_fail_before_publication() {
     let source = with_unknown(&fixture(Rect::default()));
     let original = source.as_bytes().to_vec();
-    let chart = Chart::open(source, Context::graph()).expect("parsed chart");
+    let chart = Model::open(source, Context::graph()).expect("parsed chart");
     let mut edit = chart.edit().expect("transaction");
     assert!(matches!(
         edit.set_rect(Rect {
@@ -140,7 +143,7 @@ fn invalid_or_conflicting_area_edits_fail_before_publication() {
     assert_eq!(
         edit.commit()
             .expect("rejected request leaves a no-op transaction")
-            .into_chart()
+            .into_package()
             .encode()
             .expect("exact replay")
             .as_bytes(),
@@ -148,7 +151,7 @@ fn invalid_or_conflicting_area_edits_fail_before_publication() {
     );
 
     let source = fixture(Rect::default());
-    let chart = Chart::open(source, Context::graph()).expect("source chart");
+    let chart = Model::open(source, Context::graph()).expect("source chart");
     let target = Rect {
         x: 0,
         y: 0,
@@ -158,7 +161,7 @@ fn invalid_or_conflicting_area_edits_fail_before_publication() {
     let mut edit = chart.edit().expect("transaction");
     edit.set_rect(target).expect("stage");
     let patch = edit.commit().expect("commit").patch().clone();
-    let other = Chart::open(
+    let other = Model::open(
         fixture(Rect {
             x: 0,
             y: 0,
@@ -170,7 +173,7 @@ fn invalid_or_conflicting_area_edits_fail_before_publication() {
     .expect("different source chart");
     assert!(matches!(
         patch.apply(other),
-        Err(Error::UnsupportedMutation {
+        Err(Error::PatchConflict {
             operation: "chart-area-patch",
             reason: "patch source rectangle does not match the target snapshot",
         })

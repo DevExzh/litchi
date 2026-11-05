@@ -7,12 +7,12 @@ use crate::leniency::EncodingDefect;
 use crate::number_format::{DateSystem, Formatting};
 use crate::protection;
 use crate::records::{BofRecord, BoundSheetRecord, Encoding, SharedStringTable};
-use crate::workbook::model::Workbook;
+use crate::workbook::model::Reader;
 use litchi_biff::Records;
 use std::io::{Read, Seek};
 use std::sync::Arc;
 
-impl<R: Read + Seek> Workbook<R> {
+impl<R: Read + Seek> Reader<R> {
     /// Parse workbook globals (SST, bound sheets, etc.)
     pub(crate) fn parse_workbook_globals(
         &mut self,

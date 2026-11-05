@@ -24,7 +24,7 @@ use std::io::Write;
 
 use super::super::model::{Block, Document, Element};
 
-impl<'a> Document<'a> {
+impl Document {
     /// Get all text content from the document.
     ///
     /// This extracts all text from all paragraphs in the document,
@@ -46,6 +46,36 @@ impl<'a> Document<'a> {
     /// Returns an error if the operation cannot be completed.
     pub fn text(&self) -> Result<String> {
         self.part.extract_text()
+    }
+
+    /// Get all text from the document, with `separator` between paragraphs.
+    ///
+    /// The text is [`Self::text`]'s, with `separator` before every paragraph
+    /// after the first. The paragraphs are the ones [`Self::paragraphs`]
+    /// returns: a paragraph nested in another one, such as a text box's,
+    /// stays part of the paragraph that anchors it, and an empty paragraph
+    /// adds an empty segment. For well-formed XML the result is the paragraph
+    /// texts joined by `separator`; malformed XML fails as [`Self::text`]
+    /// fails.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi_docx::Package;
+    ///
+    /// let pkg = Package::open("document.docx")?;
+    /// let text = pkg.document()?.text_with_paragraph_separator("\n")?;
+    /// for line in text.lines() {
+    ///     println!("{line}");
+    /// }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::text`].
+    pub fn text_with_paragraph_separator(&self, separator: &str) -> Result<String> {
+        self.part.extract_text_with_paragraph_separator(separator)
     }
 
     /// Stream visible main-document paragraphs to a caller-owned sink.
@@ -267,7 +297,7 @@ impl<'a> Document<'a> {
     /// This provides lower-level access to the document XML.
     #[inline]
     #[must_use]
-    pub fn part(&self) -> &DocumentPart<'a> {
+    pub fn part(&self) -> &DocumentPart<'static> {
         &self.part
     }
 
@@ -315,16 +345,10 @@ impl<'a> Document<'a> {
     /// # Errors
     /// Returns malformed metadata, XML, or revision resource-limit errors.
     pub fn revisions(&self) -> Result<smallvec::SmallVec<[crate::revision::Revision; 4]>> {
-        self.revisions_with_limits(crate::revision::Limits::default())
+        self.revisions_bounded(self.limits.revisions_value())
     }
 
-    /// Read document revisions with explicit parser and retention limits.
-    ///
-    /// Repairs are recorded as for [`Self::revisions`].
-    ///
-    /// # Errors
-    /// Returns malformed metadata, XML, or revision resource-limit errors.
-    pub fn revisions_with_limits(
+    pub(crate) fn revisions_bounded(
         &self,
         limits: crate::revision::Limits,
     ) -> Result<smallvec::SmallVec<[crate::revision::Revision; 4]>> {
@@ -453,6 +477,85 @@ impl<'a> Document<'a> {
         self.part.alts()
     }
 
+    /// The direct block children of the main document's `w:body`, indexed in
+    /// visible order (see [`crate::Blocks`]).
+    ///
+    /// The index is built in one pass over the visible main document the
+    /// first time any view of an unchanged main part asks for it, and every
+    /// later view shares it; it is a clean, evictable package memo.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the visible XML is malformed or a bound on the
+    /// index is reached; nothing is retained then.
+    pub fn body_blocks(&self) -> Result<crate::Blocks> {
+        self.part.body_blocks()
+    }
+
+    /// The number of direct body blocks of every kind.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of [`Self::body_blocks`].
+    pub fn body_block_count(&self) -> Result<usize> {
+        Ok(self.body_blocks()?.len())
+    }
+
+    /// The direct body block at zero-based `index`, counting every kind.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of [`Self::body_blocks`].
+    pub fn body_block(&self, index: litchi_core::Position) -> Result<Option<crate::IndexedBlock>> {
+        Ok(self.body_blocks()?.get(index))
+    }
+
+    /// The direct body paragraph at zero-based `index`: `/body/p[index + 1]`,
+    /// with `w:customXml` wrappers flattened and display equations excluded.
+    ///
+    /// Unlike [`Self::paragraph`], which counts every outermost paragraph of
+    /// the main story (table cells and content controls included), this
+    /// counts only the body's own paragraphs.
+    ///
+    /// ```no_run
+    /// use litchi_docx::Package;
+    ///
+    /// let package = Package::open("report.docx")?;
+    /// let document = package.document()?;
+    /// if let Some(paragraph) = document.body_paragraph(litchi_core::Position::new(0))? {
+    ///     println!("{}", paragraph.text()?);
+    /// }
+    /// # Ok::<(), litchi_docx::Error>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of [`Self::body_blocks`].
+    pub fn body_paragraph(&self, index: litchi_core::Position) -> Result<Option<Paragraph>> {
+        Ok(self.body_blocks()?.paragraph(index))
+    }
+
+    /// The direct body table at zero-based `index`.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of [`Self::body_blocks`].
+    pub fn body_table(&self, index: litchi_core::Position) -> Result<Option<Table>> {
+        Ok(self.body_blocks()?.table(index))
+    }
+
+    /// The direct body content control (`w:sdt`) at zero-based `index`.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of [`Self::body_blocks`].
+    pub fn body_sdt(
+        &self,
+        index: litchi_core::Position,
+    ) -> Result<Option<crate::BlockContentControl>> {
+        Ok(self.body_blocks()?.content_control(index))
+    }
+
     /// Get a specific paragraph by index.
     ///
     /// # Arguments
@@ -579,7 +682,7 @@ impl<'a> Document<'a> {
     #[inline]
     #[must_use]
     pub fn opc_package(&self) -> &OpcPackage {
-        self.opc
+        &self.opc
     }
 
     /// Search for text in the document.
@@ -779,14 +882,14 @@ impl<'a> Document<'a> {
     // ========================================
     // WRITE OPERATIONS
     // ========================================
-    // Note: Write operations are primarily handled by the MutableDocument API
+    // Note: Write operations are primarily handled by the DraftDocument API
     // in the writer module. See src/ooxml/docx/writer/doc.rs for full API.
     //
     // ✅ COMPLETED: Modification operations (ECMA-376 Section 17.2.2)
     // - Add/insert/remove paragraphs: add_paragraph(), insert_paragraph(),
-    //   remove_paragraph() on MutableDocument
+    //   remove_paragraph() on DraftDocument
     // - Add/insert/remove tables: add_table(), insert_table(), remove_table()
-    // - Modify runs: MutableRun::bold(), italic(), font_name(), color()
+    // - Modify runs: DraftRun::bold(), italic(), font_name(), color()
     //   reached through the paragraph()/table() accessors
     // ✅ COMPLETED: Note and comment removal
     // - remove_footnote()/remove_endnote() strip typed w:footnoteReference /
@@ -823,7 +926,7 @@ impl<'a> Document<'a> {
     // - Run::breaks() preserves text-wrapping, page, and column breaks plus clear behavior
     // - Rendered pagination hints remain distinguishable from authored breaks
     // ✅ COMPLETED: Section-break insertion and mutation
-    // - MutableDocument::insert_section_break() authors paragraph-level w:pPr/w:sectPr;
+    // - DraftDocument::insert_section_break() authors paragraph-level w:pPr/w:sectPr;
     //   section_mut() edits the body-final section
     // - section_break(), update_section_break(), remove_section_break(),
     //   move_section_break() cover per-section page setup mutation

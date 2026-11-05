@@ -15,7 +15,7 @@ use std::sync::OnceLock;
 
 use libfuzzer_sys::fuzz_target;
 use litchi::keynote::{
-    Limits, Package, ReadError, ReadOptions, SemanticLimits, SlideSelector,
+    OpenOptions, Package, ReadError, SemanticLimits, SlideSelector, SourceLimits,
     slide::table::{TableSelector, lock::State},
 };
 
@@ -52,27 +52,33 @@ fuzz_target!(|data: &[u8]| {
     exercise_semantic_limit(data);
 });
 
-fn fuzz_options() -> ReadOptions {
-    static OPTIONS: OnceLock<ReadOptions> = OnceLock::new();
+fn fuzz_options() -> OpenOptions {
+    static OPTIONS: OnceLock<OpenOptions> = OnceLock::new();
     *OPTIONS.get_or_init(|| {
-        let archive = Limits::new(
-            MAX_INPUT_BYTES,
-            MAX_ENTRIES,
-            MAX_ENTRY_BYTES,
-            MAX_EXPANDED_BYTES,
-            MAX_IWA_STREAM_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid Keynote lock-state archive limits: {error}"));
-        let semantic = SemanticLimits::new(
-            MAX_OBJECTS,
-            MAX_SLIDES,
-            MAX_REFERENCES,
-            MAX_TEXT_STORAGES,
-            MAX_TEXT_FRAGMENTS,
-            MAX_TEXT_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid Keynote lock-state semantic limits: {error}"));
-        ReadOptions::new(archive, semantic)
+        let archive = SourceLimits::builder()
+            .max_input_bytes(MAX_INPUT_BYTES)
+            .and_then(|limits| limits.max_entries(MAX_ENTRIES))
+            .and_then(|limits| limits.max_entry_bytes(MAX_ENTRY_BYTES))
+            .and_then(|limits| limits.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+            .and_then(|limits| limits.max_component_bytes(MAX_IWA_STREAM_BYTES))
+            .and_then(|limits| limits.build())
+            .unwrap_or_else(|error| {
+                unreachable!("valid Keynote lock-state archive limits: {error}")
+            });
+        let semantic = SemanticLimits::builder()
+            .max_objects(MAX_OBJECTS)
+            .and_then(|limits| limits.max_slides(MAX_SLIDES))
+            .and_then(|limits| limits.max_references(MAX_REFERENCES))
+            .and_then(|limits| limits.max_text_storages(MAX_TEXT_STORAGES))
+            .and_then(|limits| limits.max_text_fragments(MAX_TEXT_FRAGMENTS))
+            .and_then(|limits| limits.max_text_bytes(MAX_TEXT_BYTES))
+            .and_then(|limits| limits.build())
+            .unwrap_or_else(|error| {
+                unreachable!("valid Keynote lock-state semantic limits: {error}")
+            });
+        OpenOptions::new()
+            .source_limits(archive)
+            .semantic_limits(semantic)
     })
 }
 
@@ -166,13 +172,29 @@ fn exercise_noop(
             return;
         },
     };
-    assert_eq!(edit.before(), before);
+    let observed_before = match edit.before() {
+        Ok(value) => value,
+        Err(error) => {
+            observe_error(error);
+            assert_eq!(package_bytes(package), source);
+            return;
+        },
+    };
+    assert_eq!(observed_before, before);
     if before == State::Locked {
         edit.lock();
     } else {
         edit.unlock();
     }
-    assert_eq!(edit.state(), before);
+    let observed_state = match edit.state() {
+        Ok(value) => value,
+        Err(error) => {
+            observe_error(error);
+            assert_eq!(package_bytes(package), source);
+            return;
+        },
+    };
+    assert_eq!(observed_state, before);
     let commit = match edit.commit() {
         Ok(commit) => commit,
         Err(error) => {
@@ -216,7 +238,14 @@ fn exercise_changed(
     } else {
         edit.lock();
     }
-    let after = edit.state();
+    let after = match edit.state() {
+        Ok(value) => value,
+        Err(error) => {
+            observe_error(error);
+            assert_eq!(package_bytes(package), source);
+            return;
+        },
+    };
     assert_ne!(after, before);
     let commit = match edit.commit() {
         Ok(commit) => commit,
@@ -280,7 +309,10 @@ fn exercise_selector_failures(package: &Package, source: &[u8]) {
         SlideSelector::name(PRIVATE_SLIDE_NAME),
     ] {
         observe_result(package.slide_table_lock_state(selector, TableSelector::index(0)));
-        if let Err(error) = package.edit_slide_table_lock_state(selector, TableSelector::index(0)) {
+        if let Err(error) = package
+            .edit_slide_table_lock_state(selector, TableSelector::index(0))
+            .and_then(|edit| edit.commit())
+        {
             observe_error(error);
         }
     }
@@ -301,15 +333,17 @@ fn exercise_input_limit() {
 }
 
 fn exercise_archive_limit() {
-    let archive = Limits::new(
-        MAX_INPUT_BYTES,
-        1,
-        MAX_ENTRY_BYTES,
-        MAX_EXPANDED_BYTES,
-        MAX_IWA_STREAM_BYTES,
-    )
-    .unwrap_or_else(|error| panic!("valid Keynote entry-limit profile: {error}"));
-    let options = ReadOptions::new(archive, fuzz_options().semantic());
+    let archive = SourceLimits::builder()
+        .max_input_bytes(MAX_INPUT_BYTES)
+        .and_then(|limits| limits.max_entries(1))
+        .and_then(|limits| limits.max_entry_bytes(MAX_ENTRY_BYTES))
+        .and_then(|limits| limits.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+        .and_then(|limits| limits.max_component_bytes(MAX_IWA_STREAM_BYTES))
+        .and_then(|limits| limits.build())
+        .unwrap_or_else(|error| panic!("valid Keynote entry-limit profile: {error}"));
+    let options = OpenOptions::new()
+        .source_limits(archive)
+        .semantic_limits(fuzz_options().semantic_limits_value());
     match Package::from_bytes_with_options(source_built_bytes(), options) {
         Err(error) => observe_error(error),
         Ok(_) => panic!("one-entry Keynote archive ceiling accepted the source-built package"),
@@ -322,18 +356,20 @@ fn exercise_semantic_limit(data: &[u8]) {
     } else {
         MAX_OBJECTS
     };
-    let semantic = SemanticLimits::new(
-        max_objects,
-        1,
-        MAX_REFERENCES,
-        MAX_TEXT_STORAGES,
-        MAX_TEXT_FRAGMENTS,
-        MAX_TEXT_BYTES,
-    );
+    let semantic = SemanticLimits::builder()
+        .max_objects(max_objects)
+        .and_then(|limits| limits.max_slides(1))
+        .and_then(|limits| limits.max_references(MAX_REFERENCES))
+        .and_then(|limits| limits.max_text_storages(MAX_TEXT_STORAGES))
+        .and_then(|limits| limits.max_text_fragments(MAX_TEXT_FRAGMENTS))
+        .and_then(|limits| limits.max_text_bytes(MAX_TEXT_BYTES))
+        .and_then(|limits| limits.build());
     let Ok(semantic) = semantic else {
         return;
     };
-    let options = ReadOptions::new(fuzz_options().archive(), semantic);
+    let options = OpenOptions::new()
+        .source_limits(fuzz_options().source_limits_value())
+        .semantic_limits(semantic);
     match Package::from_bytes_with_options(source_built_bytes(), options) {
         Ok(package) => {
             let _ = black_box(package.show().map(|show| show.slides().len()));

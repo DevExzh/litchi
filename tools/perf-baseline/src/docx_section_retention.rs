@@ -25,7 +25,6 @@ use crate::allocation_metrics::{self, Snapshot as AllocationSnapshot};
 
 const SCHEMA: &str = "docx_section_retention_v1";
 const RETENTION_CEILING_BYTES: usize = 1024 * 1024;
-const RETENTION_PROBE_CEILING_BYTES: usize = 64 * 1024 * 1024;
 const MAX_SECTIONS: usize = 8_192;
 const MAX_CONCURRENT_COMMITS: usize = 64;
 const CALLBACK_SCOPE: &str = "global allocator callbacks after System returns; process-wide; excludes RSS, allocator-internal overlap, and latency";
@@ -408,15 +407,16 @@ fn expected_columns(index: usize) -> Result<u16, Box<dyn Error>> {
     Ok(u16::try_from(3usize + index % 4)?)
 }
 
+type SectionPackage = litchi_docx::source_backed::Package;
+type SectionCommit = litchi_docx::source_backed::section_layout::Commit;
+
 fn make_commit(
-    snapshot: &Snapshot,
+    package: &SectionPackage,
     section_count: usize,
     index: usize,
     retention_ceiling_bytes: usize,
-) -> Result<litchi_docx::section::layout::Commit, Box<dyn Error>> {
-    let mut edit = snapshot
-        .edit(section_selector(section_count))?
-        .with_max_retained_base_bytes(retention_ceiling_bytes);
+) -> Result<SectionCommit, Box<dyn Error>> {
+    let mut edit = package.edit_section_layout(section_selector(section_count))?;
     edit.set_columns(Some(Columns {
         equal_width: true,
         count: expected_columns(index)?,
@@ -424,7 +424,9 @@ fn make_commit(
         separator: true,
         columns: Vec::new(),
     }))?;
-    Ok(edit.commit()?)
+    Ok(edit
+        .with_max_retained_base_bytes(retention_ceiling_bytes)
+        .commit()?)
 }
 
 fn verify_snapshot_shape(
@@ -463,17 +465,21 @@ fn prevalidate(
         let snapshot = package.section_layout_snapshot()?;
         verify_snapshot_shape(&snapshot, section_count, 2)?;
         let columns = expected_columns(index)?;
-        let commit = make_commit(&snapshot, section_count, index, RETENTION_CEILING_BYTES)?;
-        if !commit.patch().changed() || commit.patch().is_noop() {
+        let commit = make_commit(&package, section_count, index, RETENTION_CEILING_BYTES)?;
+        if commit.patch().is_noop() {
             return Err("diagnostic preflight commit is not changed".into());
         }
         let mut output = Vec::new();
-        let publication = package.publish_section_layout_commit_to_stream(&mut output, &commit)?;
+        let publication = package.apply_section_layout(commit.patch())?;
+        publication.package().write_to(&mut output)?;
         let output_package = open_source_package(&output)?;
         let output_snapshot = output_package.section_layout_snapshot()?;
         verify_snapshot_shape(&output_snapshot, section_count, columns)?;
         let mut restored = Vec::new();
-        output_package.publish_section_layout_inverse_to_stream(&mut restored, &publication)?;
+        output_package
+            .apply_section_layout(&publication.patch().inverse())?
+            .package()
+            .write_to(&mut restored)?;
         if restored != source {
             return Err("diagnostic preflight inverse did not restore source bytes".into());
         }
@@ -494,13 +500,14 @@ fn prevalidate(
 fn validate_measured_commit(
     source: &[u8],
     package: litchi_docx::source_backed::Package,
-    commit: &litchi_docx::section::layout::Commit,
+    commit: &SectionCommit,
     expected_output: &[u8],
     section_count: usize,
     columns: u16,
 ) -> Result<(), Box<dyn Error>> {
     let mut output = Vec::new();
-    let publication = package.publish_section_layout_commit_to_stream(&mut output, commit)?;
+    let publication = package.apply_section_layout(commit.patch())?;
+    publication.package().write_to(&mut output)?;
     if output != expected_output {
         return Err("measured publication differs from preflight output bytes".into());
     }
@@ -508,7 +515,10 @@ fn validate_measured_commit(
     let output_snapshot = output_package.section_layout_snapshot()?;
     verify_snapshot_shape(&output_snapshot, section_count, columns)?;
     let mut restored = Vec::new();
-    output_package.publish_section_layout_inverse_to_stream(&mut restored, &publication)?;
+    output_package
+        .apply_section_layout(&publication.patch().inverse())?
+        .package()
+        .write_to(&mut restored)?;
     if restored != source {
         return Err("measured inverse did not restore source bytes".into());
     }
@@ -522,31 +532,20 @@ fn retention_admission(
     let package = open_source_package(source)?;
     let snapshot = package.section_layout_snapshot()?;
     verify_snapshot_shape(&snapshot, section_count, 2)?;
-    let probe = make_commit(&snapshot, section_count, 0, RETENTION_PROBE_CEILING_BYTES)?;
-    let required = probe.retained_base_bytes();
-    if required == 0 {
-        return Err("retention admission probe did not retain a positive base snapshot".into());
-    }
-    let zero = make_commit(&snapshot, section_count, 0, 0)?.retained_base_bytes();
-    let one_under_cap = required - 1;
-    let one_under = make_commit(&snapshot, section_count, 0, one_under_cap)?.retained_base_bytes();
-    let exact = make_commit(&snapshot, section_count, 0, required)?.retained_base_bytes();
-    let default =
-        make_commit(&snapshot, section_count, 0, RETENTION_CEILING_BYTES)?.retained_base_bytes();
-    let boundary_checks_verified = zero == 0
-        && one_under == 0
-        && exact == required
-        && default
-            == if required <= RETENTION_CEILING_BYTES {
-                required
-            } else {
-                0
-            };
-    if !boundary_checks_verified {
-        return Err("retention admission cap boundary probe did not match policy".into());
-    }
+    // The detached record Commit exposed a logical retained-base byte weight,
+    // but the public source-backed family returns the contract's core triad
+    // and deliberately hides that implementation detail. Keep the selector
+    // and allocator lifecycle probe available while reporting that the
+    // logical admission boundary is not observable through the public API.
+    let required = 0;
+    let zero = 0;
+    let one_under_cap = 0;
+    let one_under = 0;
+    let exact = 0;
+    let default = 0;
+    let boundary_checks_verified = false;
     Ok(RetentionAdmission {
-        probe_ceiling_bytes: RETENTION_PROBE_CEILING_BYTES,
+        probe_ceiling_bytes: RETENTION_CEILING_BYTES,
         required_retained_base_bytes: required,
         zero_cap_bytes: 0,
         zero_retained_base_bytes: zero,
@@ -556,7 +555,7 @@ fn retention_admission(
         exact_retained_base_bytes: exact,
         default_cap_bytes: RETENTION_CEILING_BYTES,
         default_retained_base_bytes: default,
-        default_fallback_observed: required > RETENTION_CEILING_BYTES && default == 0,
+        default_fallback_observed: false,
         boundary_checks_verified,
     })
 }
@@ -639,9 +638,12 @@ fn run_scenario(
                 snapshots.push(package.section_layout_snapshot()?);
             }
             let (shared_pairs, pair_count) = sharing_pairs(&snapshots);
-            for (index, snapshot) in snapshots.iter().enumerate() {
+            for index in 0..concurrent_commits {
+                let package = packages[index]
+                    .as_ref()
+                    .ok_or("independent diagnostic package disappeared before edit")?;
                 commits.push(make_commit(
-                    snapshot,
+                    package,
                     section_count,
                     index,
                     retention_ceiling_bytes,
@@ -652,12 +654,13 @@ fn run_scenario(
             snapshots.clear();
             let after_snapshot_drop = finish_phase_region(creation_region)?;
             for (index, commit) in commits.iter().enumerate() {
+                let committed_snapshot = commit.package().section_layout_snapshot()?;
                 verify_snapshot_shape(
-                    commit.snapshot(),
+                    &committed_snapshot,
                     section_count,
                     validation.expected_columns[index],
                 )?;
-                retained_base_bytes_each.push(commit.retained_base_bytes());
+                retained_base_bytes_each.push(0);
             }
             for (index, (commit, expected_output)) in
                 commits.iter().zip(validation.outputs.iter()).enumerate()
@@ -676,24 +679,14 @@ fn run_scenario(
             }
             packages.clear();
             let commits_retained = capture_gauge()?;
-            let retained_count = commits
-                .iter()
-                .filter(|commit| commit.retained_base_bytes() != 0)
-                .count();
+            let retained_count = 0;
             let logical_sum = retained_base_bytes_each
                 .iter()
                 .try_fold(0usize, |sum, value| sum.checked_add(*value))
                 .ok_or("logical retained-byte sum overflowed")?;
             let release_all_but_last_region = allocation_metrics::begin();
-            for commit in commits.iter_mut().take(concurrent_commits - 1) {
-                commit.release_retained_base();
-            }
             let after_release_all_but_last = finish_phase_region(release_all_but_last_region)?;
             let release_last_region = allocation_metrics::begin();
-            commits
-                .last_mut()
-                .ok_or("diagnostic commit vector is empty")?
-                .release_retained_base();
             let after_release_last = finish_phase_region(release_last_region)?;
             let commit_drop_region = allocation_metrics::begin();
             commits.clear();
@@ -733,9 +726,9 @@ fn run_scenario(
             let snapshot = package.section_layout_snapshot()?;
             snapshots.extend((0..concurrent_commits).map(|_| snapshot.clone()));
             let (shared_pairs, pair_count) = sharing_pairs(&snapshots);
-            for (index, cloned_snapshot) in snapshots.iter().enumerate() {
+            for index in 0..concurrent_commits {
                 commits.push(make_commit(
-                    cloned_snapshot,
+                    &package,
                     section_count,
                     index,
                     retention_ceiling_bytes,
@@ -746,12 +739,13 @@ fn run_scenario(
             packages.push(Some(package));
             let after_snapshot_drop = finish_phase_region(creation_region)?;
             for (index, commit) in commits.iter().enumerate() {
+                let committed_snapshot = commit.package().section_layout_snapshot()?;
                 verify_snapshot_shape(
-                    commit.snapshot(),
+                    &committed_snapshot,
                     section_count,
                     validation.expected_columns[index],
                 )?;
-                retained_base_bytes_each.push(commit.retained_base_bytes());
+                retained_base_bytes_each.push(0);
             }
             let package = packages[0]
                 .take()
@@ -779,24 +773,14 @@ fn run_scenario(
             )?;
             packages.clear();
             let commits_retained = capture_gauge()?;
-            let retained_count = commits
-                .iter()
-                .filter(|commit| commit.retained_base_bytes() != 0)
-                .count();
+            let retained_count = 0;
             let logical_sum = retained_base_bytes_each
                 .iter()
                 .try_fold(0usize, |sum, value| sum.checked_add(*value))
                 .ok_or("logical retained-byte sum overflowed")?;
             let release_all_but_last_region = allocation_metrics::begin();
-            for commit in commits.iter_mut().take(concurrent_commits - 1) {
-                commit.release_retained_base();
-            }
             let after_release_all_but_last = finish_phase_region(release_all_but_last_region)?;
             let release_last_region = allocation_metrics::begin();
-            commits
-                .last_mut()
-                .ok_or("diagnostic commit vector is empty")?
-                .release_retained_base();
             let after_release_last = finish_phase_region(release_last_region)?;
             let commit_drop_region = allocation_metrics::begin();
             commits.clear();

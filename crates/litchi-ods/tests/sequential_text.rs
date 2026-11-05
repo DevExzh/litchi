@@ -14,7 +14,7 @@ use litchi_core::{
     Error, OwnedSource, ReadAt, SourceVersion, TextOutputError, TextOutputLimitKind,
     TextOutputOptions,
 };
-use litchi_ods::{Builder, SourceBackedSpreadsheet, Spreadsheet};
+use litchi_ods::{Builder, Package, SourceBackedSpreadsheet, Workbook};
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TABLE: &str = "urn:oasis:names:tc:opendocument:xmlns:table:1.0";
@@ -26,11 +26,12 @@ fn content(body: &str) -> String {
     )
 }
 
-fn spreadsheet(body: &str) -> Spreadsheet {
+fn spreadsheet(body: &str) -> Workbook {
     Builder::new()
         .content_xml(content(body))
         .build()
-        .and_then(Spreadsheet::from_bytes)
+        .unwrap()
+        .workbook()
         .unwrap()
 }
 
@@ -44,7 +45,7 @@ fn cell(text: &str) -> String {
     )
 }
 
-fn write_owned(document: &Spreadsheet, options: TextOutputOptions<'_>) -> (Vec<u8>, u64, u64) {
+fn write_owned(document: &Workbook, options: TextOutputOptions<'_>) -> (Vec<u8>, u64, u64) {
     let mut output = Vec::new();
     let report = document.write_text_to(&mut output, options).unwrap();
     (output, report.bytes_written(), report.objects_written())
@@ -472,8 +473,13 @@ fn source_backed_sink_matches_owned_and_rejects_stale_source_before_work() {
         row(&cell("one")),
         row(&cell("two")),
     );
-    let bytes = Builder::new().content_xml(content(&body)).build().unwrap();
-    let eager = Spreadsheet::from_bytes(bytes.clone()).unwrap();
+    let bytes = Builder::new()
+        .content_xml(content(&body))
+        .build()
+        .unwrap()
+        .to_bytes()
+        .unwrap();
+    let eager = Package::from_bytes(&bytes).unwrap().workbook().unwrap();
     let (source, revision) = MutableSource::new(bytes);
     let source_document = SourceBackedSpreadsheet::from_read_at(source).unwrap();
     let options = TextOutputOptions::new("|", "unused", 64, 8);
@@ -509,7 +515,12 @@ fn stale_source_precedes_separator_sink_failure_with_truthful_progress() {
         row(&cell("one")),
         row(&cell("two")),
     );
-    let bytes = Builder::new().content_xml(content(&body)).build().unwrap();
+    let bytes = Builder::new()
+        .content_xml(content(&body))
+        .build()
+        .unwrap()
+        .to_bytes()
+        .unwrap();
     let (source, revision) = MutableSource::new(bytes);
     let document = SourceBackedSpreadsheet::from_read_at(source).unwrap();
     let mut sink = RevisionThenFail::new(revision, 3);
@@ -536,7 +547,12 @@ fn stale_source_after_full_output_still_takes_precedence() {
         row(&cell("one")),
         row(&cell("two")),
     );
-    let bytes = Builder::new().content_xml(content(&body)).build().unwrap();
+    let bytes = Builder::new()
+        .content_xml(content(&body))
+        .build()
+        .unwrap()
+        .to_bytes()
+        .unwrap();
     let (source, revision) = MutableSource::new(bytes);
     let document = SourceBackedSpreadsheet::from_read_at(source).unwrap();
     let mut sink = RevisionAfterComplete {
@@ -567,7 +583,12 @@ fn stable_source_writer_reuses_retained_projection_without_new_reads() {
         r#"<table:table table:name="Sheet">{}</table:table>"#,
         row(&cell("stable")),
     );
-    let bytes = Builder::new().content_xml(content(&body)).build().unwrap();
+    let bytes = Builder::new()
+        .content_xml(content(&body))
+        .build()
+        .unwrap()
+        .to_bytes()
+        .unwrap();
     let reads = Arc::new(AtomicUsize::new(0));
     let source = Arc::new(CountingSource {
         bytes: Arc::new(bytes),
@@ -590,7 +611,12 @@ fn concurrent_arc_source_backed_writers_have_independent_progress() {
         row(&cell("one")),
         row(&cell("two")),
     );
-    let bytes = Builder::new().content_xml(content(&body)).build().unwrap();
+    let bytes = Builder::new()
+        .content_xml(content(&body))
+        .build()
+        .unwrap()
+        .to_bytes()
+        .unwrap();
     let document =
         Arc::new(SourceBackedSpreadsheet::from_read_at(Arc::new(OwnedSource::new(bytes))).unwrap());
     let handles = (0..4)
@@ -620,7 +646,12 @@ fn source_backed_sink_does_not_change_existing_text_projection() {
         r#"<table:table table:name="Sheet">{}</table:table>"#,
         row(&cell("stable")),
     );
-    let bytes = Builder::new().content_xml(content(&body)).build().unwrap();
+    let bytes = Builder::new()
+        .content_xml(content(&body))
+        .build()
+        .unwrap()
+        .to_bytes()
+        .unwrap();
     let source_document =
         SourceBackedSpreadsheet::from_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
     let before = source_document.text().unwrap();

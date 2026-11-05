@@ -28,14 +28,14 @@ use litchi_iwa_archive::package::ExactArtifacts;
 use litchi_iwa_common::{
     decode_varint_from_bytes,
     varint::encoded_len,
-    wire::{WireDescent, WireFieldView, WireView, preflight_wire_tree_with_limits},
+    wire::{WireDescent, WireFieldView, WireView, preflight_wire_tree},
 };
 use litchi_iwa_core::{
     ArchiveObject, ArchiveReferenceKind, ArchiveReferenceOccurrence, ArchiveReferencePolicy,
     ArchiveReferenceScope, ArchiveReferenceVisitor, FieldType, MessageInfo,
 };
 use litchi_iwa_protos::keynote_media_properties_codec;
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::slide_media_lifecycle::graph_caption_witness::CaptionWitnessBudget;
 use super::slide_movie_geometry::{
@@ -72,27 +72,24 @@ const SLIDE_NAME_FIELD: u32 = 10;
 const MAX_PROPERTY_BYTES: usize = 64 * 1024 * 1024;
 
 impl CaptionWitnessBudget for GeometryBudget {
-    type Error = SlideMediaPropertiesError;
+    type Error = Error;
 
     fn invalid_source() -> Self::Error {
-        SlideMediaPropertiesError::InvalidSource
+        Error::InvalidSource
     }
 
     fn charge_codec_pass(&mut self, payload: &[u8]) -> Result<(), Self::Error> {
-        self.fields(payload.len().max(1))
-            .map_err(SlideMediaPropertiesError::from)?;
+        self.fields(payload.len().max(1)).map_err(Error::from)?;
         self.work(
             payload
                 .len()
                 .checked_mul(32)
-                .ok_or(SlideMediaPropertiesError::InvalidSource)?
+                .ok_or(Error::InvalidSource)?
                 .max(1),
         )
-        .map_err(SlideMediaPropertiesError::from)?;
-        self.allocations(1)
-            .map_err(SlideMediaPropertiesError::from)?;
-        self.scratch(payload.len().max(1))
-            .map_err(SlideMediaPropertiesError::from)
+        .map_err(Error::from)?;
+        self.allocations(1).map_err(Error::from)?;
+        self.scratch(payload.len().max(1)).map_err(Error::from)
     }
 
     fn charge_header_metadata(&mut self, info: &MessageInfo) -> Result<(), Self::Error> {
@@ -114,23 +111,17 @@ impl CaptionWitnessBudget for GeometryBudget {
                 })
             })
             .ok_or_else(Self::invalid_source)?;
-        self.fields(fields)
-            .map_err(SlideMediaPropertiesError::from)?;
-        self.references(references)
-            .map_err(SlideMediaPropertiesError::from)?;
-        self.work(
-            fields
-                .checked_add(references)
-                .ok_or(SlideMediaPropertiesError::InvalidSource)?,
-        )
-        .map_err(SlideMediaPropertiesError::from)
+        self.fields(fields).map_err(Error::from)?;
+        self.references(references).map_err(Error::from)?;
+        self.work(fields.checked_add(references).ok_or(Error::InvalidSource)?)
+            .map_err(Error::from)
     }
 }
 
 /// Resource categories reported by a media-properties transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum SlideMediaPropertiesLimitKind {
+pub enum LimitKind {
     /// Complete input package bytes.
     InputBytes,
     /// Complete rewritten package or payload bytes.
@@ -165,7 +156,7 @@ pub enum SlideMediaPropertiesLimitKind {
     Components,
 }
 
-impl fmt::Display for SlideMediaPropertiesLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -189,9 +180,44 @@ impl fmt::Display for SlideMediaPropertiesLimitKind {
 }
 
 /// Content-redacted failure raised by a media-properties transaction.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum SlideMediaPropertiesError {
+pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The selected media graph or payload was malformed.
+    #[error("the Keynote media-properties source is invalid")]
+    InvalidSource,
+    /// A finite operation resource ceiling was exceeded.
+    #[error(
+        "Keynote media properties {kind} limit exceeded: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        /// Resource category that exceeded its limit.
+        kind: LimitKind,
+        /// Observed or requested amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A bounded destination allocation failed before publication.
+    #[error("could not allocate {amount} units for the Keynote media-properties transaction")]
+    Allocation { amount: usize },
+    /// Candidate reopening did not reproduce the staged properties and locality.
+    #[error("the edited Keynote media properties failed semantic verification")]
+    Verification,
+    /// The patch does not belong to this exact immutable package artifact.
+    #[error("the Keynote media-properties patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The source was not retained as an exact physical package.
     #[error("this Keynote source does not support physical media-property edits")]
     UnsupportedSource,
@@ -216,35 +242,37 @@ pub enum SlideMediaPropertiesError {
     /// The selected media is not supported by the mutation path.
     #[error("the selected Keynote media kind is unsupported for properties")]
     WrongMediaKind,
-    /// The selected media graph or payload was malformed.
-    #[error("the Keynote media-properties source is invalid")]
-    InvalidSource,
-    /// A finite operation resource ceiling was exceeded.
-    #[error(
-        "Keynote media properties {kind} limit exceeded: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        /// Resource category that exceeded its limit.
-        kind: SlideMediaPropertiesLimitKind,
-        /// Observed or requested amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-    },
-    /// A bounded destination allocation failed before publication.
-    #[error("could not allocate {amount} units for the Keynote media-properties transaction")]
-    Allocation { amount: usize },
-    /// Candidate reopening did not reproduce the staged properties and locality.
-    #[error("the edited Keynote media properties failed semantic verification")]
-    Verification,
-    /// The patch does not belong to this exact immutable package artifact.
-    #[error("the Keynote media-properties patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::WrongMediaKind { .. } => RefusalKind::UnsupportedTarget,
+            Self::UnsupportedSource { .. } | Self::UnsupportedDependency { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+            Self::AmbiguousSelector { .. } | Self::EmptySlideName { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::MoviePositionNotFound { .. } => RefusalKind::NotFound,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// One mutable media-properties value staged against an immutable package
 /// snapshot.
-pub struct SlideMediaPropertiesEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
     budget: GeometryBudget,
     selection: MediaPropertiesSelection,
@@ -252,10 +280,10 @@ pub struct SlideMediaPropertiesEdit<'a> {
     after: Arc<MediaProperties>,
 }
 
-impl fmt::Debug for SlideMediaPropertiesEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SlideMediaPropertiesEdit")
+            .debug_struct("Edit")
             .field("slide_position", &self.selection.slide_position)
             .field("movie_position", &self.selection.movie_position)
             .field("before", self.before.as_ref())
@@ -264,12 +292,12 @@ impl fmt::Debug for SlideMediaPropertiesEdit<'_> {
     }
 }
 
-impl<'a> SlideMediaPropertiesEdit<'a> {
+impl<'a> Edit<'a> {
     fn new<'slide>(
         source: &'a Package,
         slide: impl Into<SlideSelector<'slide>>,
         movie: impl Into<MovieSelector>,
-    ) -> Result<Self, SlideMediaPropertiesError> {
+    ) -> Result<Self, Error> {
         let mut budget = GeometryBudget::new(source)?;
         budget.source(physical_catalog(source)?.source_bytes().len())?;
         let selection = select_media_properties(source, slide.into(), movie.into(), &mut budget)?;
@@ -308,7 +336,7 @@ impl<'a> SlideMediaPropertiesEdit<'a> {
     }
 
     /// Stage a complete replacement of the four modeled properties.
-    pub fn set(mut self, properties: MediaProperties) -> Result<Self, SlideMediaPropertiesError> {
+    pub fn set(mut self, properties: MediaProperties) -> Result<Self, Error> {
         validate_properties(&properties)?;
         self.budget.allocations(1)?;
         let adopted_bytes = properties
@@ -316,14 +344,14 @@ impl<'a> SlideMediaPropertiesEdit<'a> {
             .map_or(0, str::len)
             .checked_add(properties.accessibility_description().map_or(0, str::len))
             .and_then(|bytes| bytes.checked_add(size_of::<MediaProperties>()))
-            .ok_or(SlideMediaPropertiesError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         self.budget.retained(adopted_bytes)?;
         self.after = Arc::new(properties);
         Ok(self)
     }
 
     /// Validate and atomically publish the staged immutable candidate.
-    pub fn commit(self) -> Result<SlideMediaPropertiesCommit, SlideMediaPropertiesError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         commit_edit(
             self.source,
             &self.selection,
@@ -336,7 +364,7 @@ impl<'a> SlideMediaPropertiesEdit<'a> {
 
 /// An exact-source checked reversible media-properties patch.
 #[derive(Clone, PartialEq)]
-pub struct SlideMediaPropertiesPatch {
+pub struct Patch {
     artifacts: ExactArtifacts,
     selection: MediaPropertiesSelection,
     before: Arc<MediaProperties>,
@@ -347,10 +375,10 @@ pub struct SlideMediaPropertiesPatch {
     target_previews_absent: bool,
 }
 
-impl fmt::Debug for SlideMediaPropertiesPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SlideMediaPropertiesPatch")
+            .debug_struct("Patch")
             .field("slide_position", &self.selection.slide_position)
             .field("movie_position", &self.selection.movie_position)
             .field("before", &self.before)
@@ -359,7 +387,7 @@ impl fmt::Debug for SlideMediaPropertiesPatch {
     }
 }
 
-impl SlideMediaPropertiesPatch {
+impl Patch {
     /// Return the properties required from the source package.
     #[must_use]
     pub fn before(&self) -> &MediaProperties {
@@ -420,14 +448,14 @@ impl SlideMediaPropertiesPatch {
 
 /// Compact evidence describing one media-properties publication.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SlideMediaPropertiesDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     deleted_previews: usize,
     full_reparse_performed: bool,
 }
 
-impl SlideMediaPropertiesDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -474,13 +502,13 @@ impl SlideMediaPropertiesDiagnostics {
 /// Fully verified result of one media-properties transaction.
 #[must_use = "a media-properties commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct SlideMediaPropertiesCommit {
+pub struct Commit {
     package: Package,
-    patch: SlideMediaPropertiesPatch,
-    diagnostics: SlideMediaPropertiesDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl SlideMediaPropertiesCommit {
+impl Commit {
     /// Borrow the fully reopened immutable package snapshot.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -493,15 +521,21 @@ impl SlideMediaPropertiesCommit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the reversible exact-source patch.
     #[must_use]
-    pub const fn patch(&self) -> &SlideMediaPropertiesPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Borrow compact publication diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> &SlideMediaPropertiesDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
@@ -547,7 +581,7 @@ impl Package {
         &self,
         slide: impl Into<SlideSelector<'slide>>,
         movie: impl Into<MovieSelector>,
-    ) -> Result<MediaProperties, SlideMediaPropertiesError> {
+    ) -> Result<MediaProperties, Error> {
         let mut budget = GeometryBudget::new(self)?;
         budget.source(physical_catalog(self)?.source_bytes().len())?;
         let selection =
@@ -579,15 +613,12 @@ impl Package {
         &self,
         slide: impl Into<SlideSelector<'slide>>,
         movie: impl Into<MovieSelector>,
-    ) -> Result<SlideMediaPropertiesEdit<'_>, SlideMediaPropertiesError> {
-        SlideMediaPropertiesEdit::new(self, slide, movie)
+    ) -> Result<Edit<'_>, Error> {
+        Edit::new(self, slide, movie)
     }
 
     /// Apply an exact-source checked media-properties patch.
-    pub fn apply_slide_media_properties(
-        &self,
-        patch: &SlideMediaPropertiesPatch,
-    ) -> Result<SlideMediaPropertiesCommit, SlideMediaPropertiesError> {
+    pub fn apply_slide_media_properties(&self, patch: &Patch) -> Result<Commit, Error> {
         let mut budget = GeometryBudget::new(self)?;
         let catalog = physical_catalog(self)?;
         let source_len = catalog.source_bytes().len();
@@ -595,10 +626,10 @@ impl Package {
         budget.work(source_len)?;
         let source = catalog.shared_source();
         if !patch.artifacts.authorizes_source(&source) {
-            return Err(SlideMediaPropertiesError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if previews_absent(self)? != patch.source_previews_absent {
-            return Err(SlideMediaPropertiesError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let current = select_media_properties(
             self,
@@ -607,18 +638,18 @@ impl Package {
             &mut budget,
         )?;
         if !same_selection(&current, &patch.selection) || current.before != patch.before {
-            return Err(SlideMediaPropertiesError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if patch.is_noop() {
             budget.validate_package(self)?;
-            return Ok(SlideMediaPropertiesCommit {
+            return Ok(Commit {
                 package: self.snapshot(),
                 patch: patch.clone(),
-                diagnostics: SlideMediaPropertiesDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         if !catalog.source_is_exact() {
-            return Err(SlideMediaPropertiesError::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         reopen_target_patch(self, patch, &mut budget)
     }
@@ -630,7 +661,7 @@ fn commit_edit(
     before: Arc<MediaProperties>,
     after: Arc<MediaProperties>,
     mut budget: GeometryBudget,
-) -> Result<SlideMediaPropertiesCommit, SlideMediaPropertiesError> {
+) -> Result<Commit, Error> {
     validate_properties(after.as_ref())?;
     if before == after {
         let catalog = physical_catalog(source)?;
@@ -638,9 +669,9 @@ fn commit_edit(
         budget.work(source.source_bytes().len())?;
         let bytes = catalog.shared_source();
         let previews_absent = previews_absent(source)?;
-        return Ok(SlideMediaPropertiesCommit {
+        return Ok(Commit {
             package: source.snapshot(),
-            patch: SlideMediaPropertiesPatch {
+            patch: Patch {
                 artifacts: ExactArtifacts::new(Arc::clone(&bytes), bytes),
                 selection: selection.clone(),
                 before: Arc::clone(&before),
@@ -650,12 +681,12 @@ fn commit_edit(
                 source_previews_absent: previews_absent,
                 target_previews_absent: previews_absent,
             },
-            diagnostics: SlideMediaPropertiesDiagnostics::unchanged(),
+            diagnostics: Diagnostics::unchanged(),
         });
     }
     let catalog = physical_catalog(source)?;
     if !catalog.source_is_exact() {
-        return Err(SlideMediaPropertiesError::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let current = select_media_properties(
         source,
@@ -664,7 +695,7 @@ fn commit_edit(
         &mut budget,
     )?;
     if !same_selection(&current, selection) || current.before != before {
-        return Err(SlideMediaPropertiesError::PatchConflict);
+        return Err(Error::PatchConflict);
     }
     let (candidate, deleted_previews) = rewrite_geometry_message(
         source,
@@ -698,7 +729,7 @@ fn commit_edit(
     )?;
     budget.validate_package(&candidate)?;
     if !previews_absent(&candidate)? {
-        return Err(SlideMediaPropertiesError::Verification);
+        return Err(Error::Verification);
     }
     let selected = select_media_properties(
         &candidate,
@@ -707,7 +738,7 @@ fn commit_edit(
         &mut budget,
     )?;
     if !same_selection(&selected, selection) || selected.before.as_ref() != after.as_ref() {
-        return Err(SlideMediaPropertiesError::Verification);
+        return Err(Error::Verification);
     }
     verify_locality(
         source,
@@ -720,9 +751,9 @@ fn commit_edit(
     )?;
     let source_bytes = catalog.shared_source();
     let target = physical_catalog(&candidate)?.shared_source();
-    Ok(SlideMediaPropertiesCommit {
+    Ok(Commit {
         package: candidate,
-        patch: SlideMediaPropertiesPatch {
+        patch: Patch {
             artifacts: ExactArtifacts::new(source_bytes, target),
             selection: selection.clone(),
             before,
@@ -732,15 +763,15 @@ fn commit_edit(
             source_previews_absent: previews_absent(source)?,
             target_previews_absent: true,
         },
-        diagnostics: SlideMediaPropertiesDiagnostics::published(deleted_previews),
+        diagnostics: Diagnostics::published(deleted_previews),
     })
 }
 
 fn reopen_target_patch(
     source: &Package,
-    patch: &SlideMediaPropertiesPatch,
+    patch: &Patch,
     budget: &mut GeometryBudget,
-) -> Result<SlideMediaPropertiesCommit, SlideMediaPropertiesError> {
+) -> Result<Commit, Error> {
     budget.candidate_reopen(patch.artifacts.target().len())?;
     budget.allocations(1)?;
     budget.retained(patch.artifacts.target().len())?;
@@ -750,7 +781,7 @@ fn reopen_target_patch(
             .map_err(map_read_error)?;
     budget.validate_package(&candidate)?;
     if previews_absent(&candidate)? != patch.target_previews_absent {
-        return Err(SlideMediaPropertiesError::Verification);
+        return Err(Error::Verification);
     }
     let selected = select_media_properties(
         &candidate,
@@ -759,7 +790,7 @@ fn reopen_target_patch(
         budget,
     )?;
     if !same_selection(&selected, &patch.selection) || selected.before != patch.after {
-        return Err(SlideMediaPropertiesError::Verification);
+        return Err(Error::Verification);
     }
     verify_locality(
         source,
@@ -770,10 +801,10 @@ fn reopen_target_patch(
         patch.target_previews_absent,
         budget,
     )?;
-    Ok(SlideMediaPropertiesCommit {
+    Ok(Commit {
         package: candidate,
         patch: patch.clone(),
-        diagnostics: SlideMediaPropertiesDiagnostics::published(patch.deleted_previews),
+        diagnostics: Diagnostics::published(patch.deleted_previews),
     })
 }
 
@@ -782,14 +813,14 @@ fn select_media_properties(
     slide_selector: SlideSelector<'_>,
     movie_selector: MovieSelector,
     budget: &mut GeometryBudget,
-) -> Result<MediaPropertiesSelection, SlideMediaPropertiesError> {
+) -> Result<MediaPropertiesSelection, Error> {
     let selection = select_media_property_fields(package, slide_selector, movie_selector, budget)?;
     // Placeholder and live-video archives expose the same four semantic
     // drawable fields, but their media closure is owned by the slide layout
     // or camera subsystem. Keep their read path available while refusing to
     // route those records through a file/audio asset rewrite transaction.
     if !matches!(selection.kind, MovieKind::File | MovieKind::Audio) {
-        return Err(SlideMediaPropertiesError::WrongMediaKind);
+        return Err(Error::Refused(Refusal::WrongMediaKind));
     }
     let assets = data::validate_selected_media_assets(
         package,
@@ -798,7 +829,7 @@ fn select_media_properties(
         budget,
     )?;
     if assets.content.is_empty() || assets.poster.is_some_and(|poster| poster.is_empty()) {
-        return Err(SlideMediaPropertiesError::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     Ok(selection)
 }
@@ -808,17 +839,17 @@ fn select_media_property_fields(
     slide_selector: SlideSelector<'_>,
     movie_selector: MovieSelector,
     budget: &mut GeometryBudget,
-) -> Result<MediaPropertiesSelection, SlideMediaPropertiesError> {
+) -> Result<MediaPropertiesSelection, Error> {
     let slide_position = resolve_slide_position(package, slide_selector, budget)?;
     let record = package
         .slide_record_at(slide_position.get())
         .map_err(map_read_error)?
-        .ok_or(SlideMediaPropertiesError::SlidePositionNotFound {
+        .ok_or(Error::Refused(Refusal::SlidePositionNotFound {
             position: slide_position,
-        })?;
+        }))?;
     let (component_name, slide) = package
         .object_with_component(record.slide_identifier)
-        .ok_or(SlideMediaPropertiesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let (slide_message_index, slide_payload) = unique_message(slide, SLIDE_MESSAGE_TYPE, budget)?;
     let limits = package.semantic_wire_limits().map_err(map_read_error)?;
     let drawable_ids =
@@ -837,30 +868,28 @@ fn select_media_property_fields(
     for identifier in drawable_ids.iter().copied() {
         let (movie_component, object) = package
             .object_with_component(identifier)
-            .ok_or(SlideMediaPropertiesError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let Some((message_index, payload)) = optional_message(object, MOVIE_MESSAGE_TYPE, budget)?
         else {
             continue;
         };
         let current_position = Position::new(movie_position);
-        movie_position = movie_position
-            .checked_add(1)
-            .ok_or(SlideMediaPropertiesError::InvalidSource)?;
+        movie_position = movie_position.checked_add(1).ok_or(Error::InvalidSource)?;
         if current_position != requested_movie_position {
             continue;
         }
         if movie_component != component_name {
-            return Err(SlideMediaPropertiesError::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         if object.archive_info.identifier != Some(identifier) {
-            return Err(SlideMediaPropertiesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let kind = classify_movie_kind(payload, limits, budget)?;
         if movie_parent(payload, limits, budget)? != record.slide_identifier {
-            return Err(SlideMediaPropertiesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         super::slide_media_replacement::validate_selected_message_metadata(object, message_index)
-            .map_err(|_| SlideMediaPropertiesError::InvalidSource)?;
+            .map_err(|_| Error::InvalidSource)?;
         validate_selected_movie_references(
             package,
             component_name,
@@ -880,11 +909,11 @@ fn select_media_property_fields(
     }
     let (movie_identifier, message_index, kind, before) = selected.ok_or_else(|| {
         if requested_movie_position.get() >= movie_position {
-            SlideMediaPropertiesError::MoviePositionNotFound {
+            Error::Refused(Refusal::MoviePositionNotFound {
                 position: requested_movie_position,
-            }
+            })
         } else {
-            SlideMediaPropertiesError::InvalidSource
+            Error::InvalidSource
         }
     })?;
     budget.allocations(1)?;
@@ -925,16 +954,16 @@ fn resolve_slide_position(
     package: &Package,
     selector: SlideSelector<'_>,
     budget: &mut GeometryBudget,
-) -> Result<Position, SlideMediaPropertiesError> {
+) -> Result<Position, Error> {
     match selector {
         SlideSelector::Position(position) => package
             .slide_record_at(position.get())
             .map_err(map_read_error)?
             .map(|_| position)
-            .ok_or(SlideMediaPropertiesError::SlidePositionNotFound { position }),
+            .ok_or(Error::Refused(Refusal::SlidePositionNotFound { position })),
         SlideSelector::Name(name) => {
             if name.is_empty() {
-                return Err(SlideMediaPropertiesError::EmptySlideName);
+                return Err(Error::Refused(Refusal::EmptySlideName));
             }
             let maximum = package.semantic_limits().max_slides();
             let mut match_position = None;
@@ -945,16 +974,16 @@ fn resolve_slide_position(
                 };
                 let (_, slide) = package
                     .object_with_component(record.slide_identifier)
-                    .ok_or(SlideMediaPropertiesError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
                 let (_, payload) = unique_message(slide, SLIDE_MESSAGE_TYPE, budget)?;
                 let limits = package.semantic_wire_limits().map_err(map_read_error)?;
                 if slide_name(payload, limits, budget)?.is_some_and(|value| value == name) {
                     if match_position.replace(position).is_some() {
-                        return Err(SlideMediaPropertiesError::AmbiguousSelector);
+                        return Err(Error::Refused(Refusal::AmbiguousSelector));
                     }
                 }
             }
-            match_position.ok_or(SlideMediaPropertiesError::SlideNameNotFound)
+            match_position.ok_or(Error::Refused(Refusal::SlideNameNotFound))
         },
     }
 }
@@ -963,7 +992,7 @@ fn slide_name<'a>(
     payload: &'a [u8],
     limits: litchi_iwa_common::WireLimits,
     budget: &mut GeometryBudget,
-) -> Result<Option<&'a str>, SlideMediaPropertiesError> {
+) -> Result<Option<&'a str>, Error> {
     let view = parse_wire(payload, limits, budget)?;
     let mut name = None;
     for field in view
@@ -971,15 +1000,12 @@ fn slide_name<'a>(
         .filter(|field| field.number() == SLIDE_NAME_FIELD)
     {
         if name.is_some() || field.wire_type() != 2 {
-            return Err(SlideMediaPropertiesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field
             .validate_canonical_framing()
-            .map_err(|_| SlideMediaPropertiesError::InvalidSource)?;
-        name = Some(
-            std::str::from_utf8(field.payload())
-                .map_err(|_| SlideMediaPropertiesError::InvalidSource)?,
-        );
+            .map_err(|_| Error::InvalidSource)?;
+        name = Some(std::str::from_utf8(field.payload()).map_err(|_| Error::InvalidSource)?);
     }
     Ok(name)
 }
@@ -988,27 +1014,26 @@ fn parse_wire<'a>(
     payload: &'a [u8],
     limits: litchi_iwa_common::WireLimits,
     budget: &mut GeometryBudget,
-) -> Result<WireView<'a>, SlideMediaPropertiesError> {
+) -> Result<WireView<'a>, Error> {
     // Skip visits inspect this payload once without descending into opaque
     // length-delimited fields. Reserve that work before the preflight.
     budget.work(payload.len())?;
-    let report = preflight_wire_tree_with_limits(payload, limits, |_visit| Ok(WireDescent::Skip))
-        .map_err(|_| SlideMediaPropertiesError::InvalidSource)?;
+    let report = preflight_wire_tree(payload, limits, |_visit| Ok(WireDescent::Skip))
+        .map_err(|_| Error::InvalidSource)?;
     budget.fields(report.fields())?;
     budget.nesting(report.max_depth())?;
     let field_storage = report
         .fields()
         .checked_mul(size_of::<WireFieldView<'static>>())
         .and_then(|bytes| bytes.checked_mul(2))
-        .ok_or(SlideMediaPropertiesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     // WireView may grow its span vector while parsing; one reserve per field
     // is a conservative ceiling for all allocation attempts.
     budget.allocations(report.fields())?;
     budget.scratch(field_storage)?;
     budget.fields(report.fields())?;
     budget.work(payload.len())?;
-    let view = WireView::parse_with_limits(payload, limits)
-        .map_err(|_| SlideMediaPropertiesError::InvalidSource)?;
+    let view = WireView::parse(payload, limits).map_err(|_| Error::InvalidSource)?;
     Ok(view)
 }
 
@@ -1016,17 +1041,17 @@ fn unique_message<'a>(
     object: &'a ArchiveObject,
     message_type: u32,
     budget: &mut GeometryBudget,
-) -> Result<(usize, &'a [u8]), SlideMediaPropertiesError> {
-    optional_message(object, message_type, budget)?.ok_or(SlideMediaPropertiesError::InvalidSource)
+) -> Result<(usize, &'a [u8]), Error> {
+    optional_message(object, message_type, budget)?.ok_or(Error::InvalidSource)
 }
 
 fn optional_message<'a>(
     object: &'a ArchiveObject,
     message_type: u32,
     budget: &mut GeometryBudget,
-) -> Result<Option<(usize, &'a [u8])>, SlideMediaPropertiesError> {
+) -> Result<Option<(usize, &'a [u8])>, Error> {
     if object.messages.len() != object.archive_info.message_infos.len() {
-        return Err(SlideMediaPropertiesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut found = None;
     for (index, message) in object.messages.iter().enumerate() {
@@ -1034,24 +1059,24 @@ fn optional_message<'a>(
             .archive_info
             .message_infos
             .get(index)
-            .ok_or(SlideMediaPropertiesError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if info.type_ != message.type_
             || usize::try_from(info.length).ok() != Some(message.data.len())
         {
-            return Err(SlideMediaPropertiesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         budget.work(
             message
                 .data
                 .len()
                 .checked_add(1)
-                .ok_or(SlideMediaPropertiesError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )?;
         if message.type_ != message_type {
             continue;
         }
         if found.replace((index, message.data.as_slice())).is_some() {
-            return Err(SlideMediaPropertiesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(found)
@@ -1063,15 +1088,15 @@ fn validate_slide_header(
     message_index: usize,
     drawable_ids: &[u64],
     budget: &mut GeometryBudget,
-) -> Result<(), SlideMediaPropertiesError> {
+) -> Result<(), Error> {
     if slide.archive_info.identifier != Some(slide_identifier) {
-        return Err(SlideMediaPropertiesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let Some(info) = slide.archive_info.message_infos.get(message_index) else {
-        return Err(SlideMediaPropertiesError::InvalidSource);
+        return Err(Error::InvalidSource);
     };
     if info.type_ != SLIDE_MESSAGE_TYPE {
-        return Err(SlideMediaPropertiesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut seen = HashSet::new();
     budget.allocations(usize::from(!info.object_references.is_empty()))?;
@@ -1080,15 +1105,15 @@ fn validate_slide_header(
         .len()
         .checked_mul(size_of::<u64>())
         .and_then(|bytes| bytes.checked_mul(2))
-        .ok_or(SlideMediaPropertiesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.retained(seen_storage)?;
     seen.try_reserve(info.object_references.len())
-        .map_err(|_| SlideMediaPropertiesError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: info.object_references.len(),
         })?;
     for identifier in &info.object_references {
         if !seen.insert(*identifier) {
-            return Err(SlideMediaPropertiesError::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
     }
     for identifier in drawable_ids {
@@ -1099,7 +1124,7 @@ fn validate_slide_header(
             .count()
             != 1
         {
-            return Err(SlideMediaPropertiesError::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
     }
     for field in &info.field_infos {
@@ -1107,7 +1132,7 @@ fn validate_slide_header(
             && (field.object_references.as_slice() != drawable_ids
                 || !field.data_references.is_empty())
         {
-            return Err(SlideMediaPropertiesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(())
@@ -1118,7 +1143,7 @@ fn repeated_references(
     field_number: u32,
     limits: litchi_iwa_common::WireLimits,
     budget: &mut GeometryBudget,
-) -> Result<Vec<u64>, SlideMediaPropertiesError> {
+) -> Result<Vec<u64>, Error> {
     let view = parse_wire(payload, limits, budget)?;
     let count = view
         .fields()
@@ -1129,18 +1154,18 @@ fn repeated_references(
     budget.retained(
         count
             .checked_mul(size_of::<u64>())
-            .ok_or(SlideMediaPropertiesError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     result
         .try_reserve_exact(count)
-        .map_err(|_| SlideMediaPropertiesError::Allocation { amount: count })?;
+        .map_err(|_| Error::Allocation { amount: count })?;
     for field in view.fields().filter(|field| field.number() == field_number) {
         if field.wire_type() != 2 {
-            return Err(SlideMediaPropertiesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field
             .validate_canonical_framing()
-            .map_err(|_| SlideMediaPropertiesError::InvalidSource)?;
+            .map_err(|_| Error::InvalidSource)?;
         result.push(reference_identifier(field.payload(), limits, budget)?);
     }
     budget.references(count)?;
@@ -1151,34 +1176,34 @@ fn reference_identifier(
     payload: &[u8],
     limits: litchi_iwa_common::WireLimits,
     budget: &mut GeometryBudget,
-) -> Result<u64, SlideMediaPropertiesError> {
+) -> Result<u64, Error> {
     let view = parse_wire(payload, limits, budget)?;
     let mut identifier = None;
     for field in view.fields() {
         field
             .validate_canonical_framing()
-            .map_err(|_| SlideMediaPropertiesError::InvalidSource)?;
+            .map_err(|_| Error::InvalidSource)?;
         if field.number() != 1 {
-            return Err(SlideMediaPropertiesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if identifier.is_some() || field.wire_type() != 0 {
-            return Err(SlideMediaPropertiesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
-        let (value, width) = decode_varint_from_bytes(field.payload())
-            .map_err(|_| SlideMediaPropertiesError::InvalidSource)?;
+        let (value, width) =
+            decode_varint_from_bytes(field.payload()).map_err(|_| Error::InvalidSource)?;
         if value == 0 || width != encoded_len(value) {
-            return Err(SlideMediaPropertiesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         identifier = Some(value);
     }
-    identifier.ok_or(SlideMediaPropertiesError::InvalidSource)
+    identifier.ok_or(Error::InvalidSource)
 }
 
 fn classify_movie_kind(
     payload: &[u8],
     limits: litchi_iwa_common::WireLimits,
     budget: &mut GeometryBudget,
-) -> Result<MovieKind, SlideMediaPropertiesError> {
+) -> Result<MovieKind, Error> {
     let view = parse_wire(payload, limits, budget)?;
     let mut audio = None;
     let mut flags = None;
@@ -1196,24 +1221,22 @@ fn classify_movie_kind(
                 live = Some(unique_bool(field, live, "live")?);
             },
             MOVIE_SUPER_FIELD => {
-                super_fields = super_fields
-                    .checked_add(1)
-                    .ok_or(SlideMediaPropertiesError::InvalidSource)?;
+                super_fields = super_fields.checked_add(1).ok_or(Error::InvalidSource)?;
                 if super_fields > 1 {
-                    return Err(SlideMediaPropertiesError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 if field.wire_type() != 2 {
-                    return Err(SlideMediaPropertiesError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 field
                     .validate_canonical_framing()
-                    .map_err(|_| SlideMediaPropertiesError::InvalidSource)?;
+                    .map_err(|_| Error::InvalidSource)?;
             },
             _ => {},
         }
     }
     if super_fields != 1 {
-        return Err(SlideMediaPropertiesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(if live == Some(true) {
         MovieKind::LiveVideo
@@ -1230,17 +1253,17 @@ fn unique_bool(
     field: WireFieldView<'_>,
     current: Option<bool>,
     _context: &str,
-) -> Result<bool, SlideMediaPropertiesError> {
+) -> Result<bool, Error> {
     if current.is_some() || field.wire_type() != 0 {
-        return Err(SlideMediaPropertiesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     field
         .validate_canonical_framing()
-        .map_err(|_| SlideMediaPropertiesError::InvalidSource)?;
-    let (value, width) = decode_varint_from_bytes(field.payload())
-        .map_err(|_| SlideMediaPropertiesError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?;
+    let (value, width) =
+        decode_varint_from_bytes(field.payload()).map_err(|_| Error::InvalidSource)?;
     if width != encoded_len(value) || value > 1 {
-        return Err(SlideMediaPropertiesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(value != 0)
 }
@@ -1249,17 +1272,17 @@ fn unique_u32(
     field: WireFieldView<'_>,
     current: Option<u32>,
     _context: &str,
-) -> Result<u32, SlideMediaPropertiesError> {
+) -> Result<u32, Error> {
     if current.is_some() || field.wire_type() != 0 {
-        return Err(SlideMediaPropertiesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     field
         .validate_canonical_framing()
-        .map_err(|_| SlideMediaPropertiesError::InvalidSource)?;
-    let (value, width) = decode_varint_from_bytes(field.payload())
-        .map_err(|_| SlideMediaPropertiesError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?;
+    let (value, width) =
+        decode_varint_from_bytes(field.payload()).map_err(|_| Error::InvalidSource)?;
     if value > u64::from(u32::MAX) || width != encoded_len(value) {
-        return Err(SlideMediaPropertiesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(value as u32)
 }
@@ -1268,7 +1291,7 @@ fn movie_parent(
     payload: &[u8],
     limits: litchi_iwa_common::WireLimits,
     budget: &mut GeometryBudget,
-) -> Result<u64, SlideMediaPropertiesError> {
+) -> Result<u64, Error> {
     let root = parse_wire(payload, limits, budget)?;
     let mut parent = None;
     for field in root
@@ -1276,7 +1299,7 @@ fn movie_parent(
         .filter(|field| field.number() == MOVIE_SUPER_FIELD)
     {
         if field.wire_type() != 2 {
-            return Err(SlideMediaPropertiesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let drawable = parse_wire(field.payload(), limits, budget)?;
         for child in drawable
@@ -1284,15 +1307,15 @@ fn movie_parent(
             .filter(|child| child.number() == DRAWABLE_PARENT_FIELD)
         {
             if parent.is_some() || child.wire_type() != 2 {
-                return Err(SlideMediaPropertiesError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             child
                 .validate_canonical_framing()
-                .map_err(|_| SlideMediaPropertiesError::InvalidSource)?;
+                .map_err(|_| Error::InvalidSource)?;
             parent = Some(reference_identifier(child.payload(), limits, budget)?);
         }
     }
-    parent.ok_or(SlideMediaPropertiesError::InvalidSource)
+    parent.ok_or(Error::InvalidSource)
 }
 
 fn validate_selected_movie_references(
@@ -1303,23 +1326,23 @@ fn validate_selected_movie_references(
     payload: &[u8],
     limits: litchi_iwa_common::WireLimits,
     budget: &mut GeometryBudget,
-) -> Result<(), SlideMediaPropertiesError> {
+) -> Result<(), Error> {
     let root = parse_wire(payload, limits, budget)?;
     let super_field = root
         .fields()
         .find(|field| field.number() == MOVIE_SUPER_FIELD)
-        .ok_or(SlideMediaPropertiesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let drawable = parse_wire(super_field.payload(), limits, budget)?;
     budget.allocations(1)?;
     budget.retained(
         4usize
             .checked_mul(size_of::<(u64, u32)>())
-            .ok_or(SlideMediaPropertiesError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     let mut references = Vec::new();
     references
         .try_reserve_exact(4)
-        .map_err(|_| SlideMediaPropertiesError::Allocation { amount: 4 })?;
+        .map_err(|_| Error::Allocation { amount: 4 })?;
     let mut style_seen = false;
     let mut comment_seen = false;
     let mut title_seen = false;
@@ -1330,7 +1353,7 @@ fn validate_selected_movie_references(
         .filter(|field| field.number() == MOVIE_STYLE_FIELD)
     {
         if std::mem::replace(&mut style_seen, true) {
-            return Err(SlideMediaPropertiesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         append_movie_reference(field, MOVIE_STYLE_FIELD, &mut references, limits, budget)?;
     }
@@ -1348,7 +1371,7 @@ fn validate_selected_movie_references(
             &mut comment_seen
         };
         if std::mem::replace(seen, true) {
-            return Err(SlideMediaPropertiesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         append_movie_reference(field, field.number(), &mut references, limits, budget)?;
     }
@@ -1358,12 +1381,12 @@ fn validate_selected_movie_references(
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(SlideMediaPropertiesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let extra_object_reference_count = info
         .object_references
         .len()
         .checked_sub(references.len())
-        .ok_or(SlideMediaPropertiesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let style_witnesses = if extra_object_reference_count == 0 {
         [None, None]
     } else {
@@ -1384,7 +1407,7 @@ fn validate_selected_movie_references(
         if transitive_style_count == transitive_style_ids.len()
             || transitive_style_ids[..transitive_style_count].contains(&identifier)
         {
-            return Err(SlideMediaPropertiesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         transitive_style_ids[transitive_style_count] = identifier;
         transitive_style_count += 1;
@@ -1393,7 +1416,7 @@ fn validate_selected_movie_references(
     let expected_object_reference_count = references
         .len()
         .checked_add(transitive_style_count)
-        .ok_or(SlideMediaPropertiesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if info.object_references.len() != expected_object_reference_count
         || references.iter().any(|(identifier, _)| {
             info.object_references
@@ -1415,16 +1438,16 @@ fn validate_selected_movie_references(
                 && !transitive_style_ids[..transitive_style_count].contains(identifier)
         })
     {
-        return Err(SlideMediaPropertiesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     validate_selected_movie_header_metadata(info, &references, &data_references)?;
 
     for (identifier, field_number) in references {
         let (reference_component, referenced) = package
             .object_with_component(identifier)
-            .ok_or(SlideMediaPropertiesError::UnsupportedDependency)?;
+            .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
         if reference_component != component_name && field_number != MOVIE_STYLE_FIELD {
-            return Err(SlideMediaPropertiesError::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         let allowed = match field_number {
             MOVIE_TITLE_FIELD | MOVIE_CAPTION_FIELD => {
@@ -1432,22 +1455,22 @@ fn validate_selected_movie_references(
             },
             MOVIE_COMMENT_FIELD => &[MOVIE_COMMENT_MESSAGE_TYPE][..],
             MOVIE_STYLE_FIELD => &[MOVIE_STYLE_MESSAGE_TYPE, MOVIE_AUDIO_STYLE_MESSAGE_TYPE][..],
-            _ => return Err(SlideMediaPropertiesError::InvalidSource),
+            _ => return Err(Error::InvalidSource),
         };
         let Some(_) = reference_message_type(referenced, allowed, budget)? else {
-            return Err(SlideMediaPropertiesError::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         };
     }
     for &identifier in &transitive_style_ids[..transitive_style_count] {
         let (reference_component, referenced) = package
             .object_with_component(identifier)
-            .ok_or(SlideMediaPropertiesError::UnsupportedDependency)?;
+            .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
         if reference_component != component_name {
-            return Err(SlideMediaPropertiesError::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         let Some(_) = reference_message_type(referenced, &[MOVIE_STYLE_MESSAGE_TYPE], budget)?
         else {
-            return Err(SlideMediaPropertiesError::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         };
     }
     Ok(())
@@ -1459,16 +1482,16 @@ fn append_movie_reference(
     references: &mut Vec<(u64, u32)>,
     limits: litchi_iwa_common::WireLimits,
     budget: &mut GeometryBudget,
-) -> Result<(), SlideMediaPropertiesError> {
+) -> Result<(), Error> {
     if field.number() != expected_number || field.wire_type() != 2 {
-        return Err(SlideMediaPropertiesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     field
         .validate_canonical_framing()
-        .map_err(|_| SlideMediaPropertiesError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?;
     let identifier = reference_identifier(field.payload(), limits, budget)?;
     if references.iter().any(|(known, _)| *known == identifier) {
-        return Err(SlideMediaPropertiesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     budget.references(1)?;
     references.push((identifier, expected_number));
@@ -1479,7 +1502,7 @@ fn movie_data_references(
     root: WireView<'_>,
     limits: litchi_iwa_common::WireLimits,
     budget: &mut GeometryBudget,
-) -> Result<Vec<(u32, u64)>, SlideMediaPropertiesError> {
+) -> Result<Vec<(u32, u64)>, Error> {
     let count = root
         .fields()
         .filter(|field| matches!(field.number(), MOVIE_DATA_FIELD | MOVIE_POSTER_DATA_FIELD))
@@ -1488,12 +1511,12 @@ fn movie_data_references(
     budget.retained(
         count
             .checked_mul(size_of::<(u32, u64)>())
-            .ok_or(SlideMediaPropertiesError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     let mut references = Vec::new();
     references
         .try_reserve_exact(count)
-        .map_err(|_| SlideMediaPropertiesError::Allocation { amount: count })?;
+        .map_err(|_| Error::Allocation { amount: count })?;
     for field in root
         .fields()
         .filter(|field| matches!(field.number(), MOVIE_DATA_FIELD | MOVIE_POSTER_DATA_FIELD))
@@ -1503,11 +1526,11 @@ fn movie_data_references(
                 .iter()
                 .any(|(number, _)| *number == field.number())
         {
-            return Err(SlideMediaPropertiesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field
             .validate_canonical_framing()
-            .map_err(|_| SlideMediaPropertiesError::InvalidSource)?;
+            .map_err(|_| Error::InvalidSource)?;
         let identifier = reference_identifier(field.payload(), limits, budget)?;
         budget.references(1)?;
         references.push((field.number(), identifier));
@@ -1519,7 +1542,7 @@ fn validate_selected_movie_header_metadata(
     info: &MessageInfo,
     references: &[(u64, u32)],
     data_references: &[(u32, u64)],
-) -> Result<(), SlideMediaPropertiesError> {
+) -> Result<(), Error> {
     if info.data_references.len() != data_references.len()
         || data_references.iter().any(|(_, identifier)| {
             info.data_references
@@ -1529,7 +1552,7 @@ fn validate_selected_movie_header_metadata(
                 != 1
         })
     {
-        return Err(SlideMediaPropertiesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
 
     for field in &info.field_infos {
@@ -1542,16 +1565,16 @@ fn validate_selected_movie_header_metadata(
                 _ => None,
             };
             let Some(expected_number) = expected else {
-                return Err(SlideMediaPropertiesError::InvalidSource);
+                return Err(Error::InvalidSource);
             };
             let Some((identifier, _)) = references
                 .iter()
                 .find(|(_, number)| *number == expected_number)
             else {
-                return Err(SlideMediaPropertiesError::InvalidSource);
+                return Err(Error::InvalidSource);
             };
             if field.object_references.as_slice() != [*identifier] {
-                return Err(SlideMediaPropertiesError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
         if !field.data_references.is_empty() {
@@ -1560,19 +1583,19 @@ fn validate_selected_movie_header_metadata(
                 [MOVIE_POSTER_DATA_FIELD] => Some(MOVIE_POSTER_DATA_FIELD),
                 _ => None,
             }) else {
-                return Err(SlideMediaPropertiesError::InvalidSource);
+                return Err(Error::InvalidSource);
             };
             if field.r#type != Some(FieldType::DataReference) || field.data_references.len() != 1 {
-                return Err(SlideMediaPropertiesError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             let Some((_, identifier)) = data_references
                 .iter()
                 .find(|(number, _)| *number == expected_number)
             else {
-                return Err(SlideMediaPropertiesError::InvalidSource);
+                return Err(Error::InvalidSource);
             };
             if field.data_references.as_slice() != [*identifier] {
-                return Err(SlideMediaPropertiesError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
     }
@@ -1583,9 +1606,9 @@ fn reference_message_type(
     object: &ArchiveObject,
     allowed: &[u32],
     budget: &mut GeometryBudget,
-) -> Result<Option<u32>, SlideMediaPropertiesError> {
+) -> Result<Option<u32>, Error> {
     if object.messages.len() != object.archive_info.message_infos.len() {
-        return Err(SlideMediaPropertiesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut found = None;
     for (index, message) in object.messages.iter().enumerate() {
@@ -1593,24 +1616,24 @@ fn reference_message_type(
             .archive_info
             .message_infos
             .get(index)
-            .ok_or(SlideMediaPropertiesError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if info.type_ != message.type_
             || usize::try_from(info.length).ok() != Some(message.data.len())
         {
-            return Err(SlideMediaPropertiesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         budget.work(
             message
                 .data
                 .len()
                 .checked_add(1)
-                .ok_or(SlideMediaPropertiesError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )?;
         if !allowed.contains(&message.type_) {
             continue;
         }
         if found.replace(message.type_).is_some() {
-            return Err(SlideMediaPropertiesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(found)
@@ -1623,26 +1646,26 @@ fn validate_single_drawable_ownership(
     expected_component: &str,
     limits: litchi_iwa_common::WireLimits,
     budget: &mut GeometryBudget,
-) -> Result<(), SlideMediaPropertiesError> {
+) -> Result<(), Error> {
     let mut object_matches = 0usize;
     let mut object_component_matches = false;
     let mut total_references = 0usize;
     let mut selected_references = 0usize;
     let (_, slide_object) = package
         .object_with_component(slide_identifier)
-        .ok_or(SlideMediaPropertiesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let slide_message_index = slide_object
         .archive_info
         .message_infos
         .iter()
         .enumerate()
         .find_map(|(index, info)| (info.type_ == SLIDE_MESSAGE_TYPE).then_some(index))
-        .ok_or(SlideMediaPropertiesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let expected_metadata_references = slide_object
         .archive_info
         .message_infos
         .get(slide_message_index)
-        .ok_or(SlideMediaPropertiesError::InvalidSource)?
+        .ok_or(Error::InvalidSource)?
         .object_references
         .iter()
         .filter(|identifier| **identifier == movie_identifier)
@@ -1652,14 +1675,14 @@ fn validate_single_drawable_ownership(
                 .archive_info
                 .message_infos
                 .get(slide_message_index)
-                .ok_or(SlideMediaPropertiesError::InvalidSource)?
+                .ok_or(Error::InvalidSource)?
                 .field_infos
                 .iter()
                 .flat_map(|field| field.object_references.iter())
                 .filter(|identifier| **identifier == movie_identifier)
                 .count(),
         )
-        .ok_or(SlideMediaPropertiesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let mut metadata_census = MovieInboundMetadataCensus {
         package,
         movie_identifier,
@@ -1673,7 +1696,7 @@ fn validate_single_drawable_ownership(
         .options
         .archive()
         .effective_archive_limits()
-        .map_err(|_| SlideMediaPropertiesError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?;
 
     for component in package.state.source.components().iter() {
         for object in &component.archive().objects {
@@ -1681,11 +1704,11 @@ fn validate_single_drawable_ownership(
                 .messages
                 .len()
                 .checked_add(1)
-                .ok_or(SlideMediaPropertiesError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             budget.work(inventory_work)?;
             let object_identifier = object.archive_info.identifier;
             if object.messages.len() != object.archive_info.message_infos.len() {
-                return Err(SlideMediaPropertiesError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             let mut metadata_fields = 0usize;
             let mut metadata_references = 0usize;
@@ -1697,20 +1720,20 @@ fn validate_single_drawable_ownership(
                 if message.type_ != info.type_
                     || usize::try_from(info.length).ok() != Some(message.data.len())
                 {
-                    return Err(SlideMediaPropertiesError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 metadata_fields = metadata_fields
                     .checked_add(info.field_infos.len())
-                    .ok_or(SlideMediaPropertiesError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
                 metadata_references = metadata_references
                     .checked_add(info.object_references.len())
                     .and_then(|value| value.checked_add(info.data_references.len()))
-                    .ok_or(SlideMediaPropertiesError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
                 for field in &info.field_infos {
                     metadata_references = metadata_references
                         .checked_add(field.object_references.len())
                         .and_then(|value| value.checked_add(field.data_references.len()))
-                        .ok_or(SlideMediaPropertiesError::InvalidSource)?;
+                        .ok_or(Error::InvalidSource)?;
                 }
             }
             budget.fields(metadata_fields)?;
@@ -1718,19 +1741,17 @@ fn validate_single_drawable_ownership(
             budget.work(
                 metadata_fields
                     .checked_add(metadata_references)
-                    .ok_or(SlideMediaPropertiesError::InvalidSource)?,
+                    .ok_or(Error::InvalidSource)?,
             )?;
             object
-                .inspect_references_with_policy_and_limits(
+                .inspect_references_with_policy(
                     &mut metadata_census,
                     ArchiveReferencePolicy::KnownReferences,
                     archive_limits,
                 )
-                .map_err(|_| SlideMediaPropertiesError::InvalidSource)?;
+                .map_err(|_| Error::InvalidSource)?;
             if object_identifier == Some(movie_identifier) {
-                object_matches = object_matches
-                    .checked_add(1)
-                    .ok_or(SlideMediaPropertiesError::InvalidSource)?;
+                object_matches = object_matches.checked_add(1).ok_or(Error::InvalidSource)?;
                 object_component_matches = component.name() == expected_component;
             }
             if !object
@@ -1741,7 +1762,7 @@ fn validate_single_drawable_ownership(
                 continue;
             }
             if object.messages.len() != object.archive_info.message_infos.len() {
-                return Err(SlideMediaPropertiesError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             for (message_index, message) in object.messages.iter().enumerate() {
                 if message.type_ != SLIDE_MESSAGE_TYPE {
@@ -1751,11 +1772,11 @@ fn validate_single_drawable_ownership(
                     .archive_info
                     .message_infos
                     .get(message_index)
-                    .ok_or(SlideMediaPropertiesError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
                 if info.type_ != message.type_
                     || usize::try_from(info.length).ok() != Some(message.data.len())
                 {
-                    return Err(SlideMediaPropertiesError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 budget.work(1)?;
                 let view = parse_wire(&message.data, limits, budget)?;
@@ -1764,11 +1785,11 @@ fn validate_single_drawable_ownership(
                     .filter(|field| field.number() == SLIDE_OWNED_DRAWABLES_FIELD)
                 {
                     if field.wire_type() != 2 {
-                        return Err(SlideMediaPropertiesError::InvalidSource);
+                        return Err(Error::InvalidSource);
                     }
                     field
                         .validate_canonical_framing()
-                        .map_err(|_| SlideMediaPropertiesError::InvalidSource)?;
+                        .map_err(|_| Error::InvalidSource)?;
                     let identifier = reference_identifier(field.payload(), limits, budget)?;
                     budget.references(1)?;
                     if identifier != movie_identifier {
@@ -1776,14 +1797,14 @@ fn validate_single_drawable_ownership(
                     }
                     total_references = total_references
                         .checked_add(1)
-                        .ok_or(SlideMediaPropertiesError::InvalidSource)?;
+                        .ok_or(Error::InvalidSource)?;
                     if object_identifier == Some(slide_identifier) {
                         selected_references = selected_references
                             .checked_add(1)
-                            .ok_or(SlideMediaPropertiesError::InvalidSource)?;
+                            .ok_or(Error::InvalidSource)?;
                     }
                     if total_references > 1 {
-                        return Err(SlideMediaPropertiesError::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                 }
             }
@@ -1797,7 +1818,7 @@ fn validate_single_drawable_ownership(
         || metadata_census.invalid
         || metadata_census.selected_references != expected_metadata_references
     {
-        return Err(SlideMediaPropertiesError::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     Ok(())
 }
@@ -1874,15 +1895,15 @@ impl ArchiveReferenceVisitor for MovieInboundMetadataCensus<'_> {
     }
 }
 
-fn validate_properties(properties: &MediaProperties) -> Result<(), SlideMediaPropertiesError> {
+fn validate_properties(properties: &MediaProperties) -> Result<(), Error> {
     let bytes = properties
         .hyperlink_url()
         .map_or(0, str::len)
         .checked_add(properties.accessibility_description().map_or(0, str::len))
-        .ok_or(SlideMediaPropertiesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if bytes > MAX_PROPERTY_BYTES {
-        return Err(SlideMediaPropertiesError::LimitExceeded {
-            kind: SlideMediaPropertiesLimitKind::PropertyBytes,
+        return Err(Error::Limit {
+            kind: LimitKind::PropertyBytes,
             observed: bytes as u64,
             maximum: MAX_PROPERTY_BYTES as u64,
         });
@@ -1893,7 +1914,7 @@ fn validate_properties(properties: &MediaProperties) -> Result<(), SlideMediaPro
 fn owned_properties(
     snapshot: keynote_media_properties_codec::MoviePropertiesSnapshot<'_>,
     budget: &mut GeometryBudget,
-) -> Result<MediaProperties, SlideMediaPropertiesError> {
+) -> Result<MediaProperties, Error> {
     Ok(MediaProperties::from_parts(
         owned_string(snapshot.hyperlink_url(), budget)?,
         snapshot.locked(),
@@ -1905,7 +1926,7 @@ fn owned_properties(
 fn clone_properties(
     properties: &MediaProperties,
     budget: &mut GeometryBudget,
-) -> Result<MediaProperties, SlideMediaPropertiesError> {
+) -> Result<MediaProperties, Error> {
     Ok(MediaProperties::from_parts(
         owned_string(properties.hyperlink_url(), budget)?,
         properties.locked(),
@@ -1917,16 +1938,13 @@ fn clone_properties(
 fn shared_properties(
     properties: MediaProperties,
     budget: &mut GeometryBudget,
-) -> Result<Arc<MediaProperties>, SlideMediaPropertiesError> {
+) -> Result<Arc<MediaProperties>, Error> {
     budget.allocations(1)?;
     budget.retained(size_of::<MediaProperties>())?;
     Ok(Arc::new(properties))
 }
 
-fn owned_string(
-    value: Option<&str>,
-    budget: &mut GeometryBudget,
-) -> Result<Option<String>, SlideMediaPropertiesError> {
+fn owned_string(value: Option<&str>, budget: &mut GeometryBudget) -> Result<Option<String>, Error> {
     let Some(value) = value else {
         return Ok(None);
     };
@@ -1935,7 +1953,7 @@ fn owned_string(
     let mut output = String::new();
     output
         .try_reserve_exact(value.len())
-        .map_err(|_| SlideMediaPropertiesError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: value.len(),
         })?;
     output.push_str(value);
@@ -1946,10 +1964,9 @@ fn property_codec_options(
     package: &Package,
     payload: &[u8],
     budget: &GeometryBudget,
-) -> Result<keynote_media_properties_codec::DecodeOptions, SlideMediaPropertiesError> {
+) -> Result<keynote_media_properties_codec::DecodeOptions, Error> {
     let limits = budget.residual(package)?;
-    let recursion = u32::try_from(limits.max_nesting())
-        .map_err(|_| SlideMediaPropertiesError::InvalidSource)?;
+    let recursion = u32::try_from(limits.max_nesting()).map_err(|_| Error::InvalidSource)?;
     let output = budget.remaining_output()?.min(limits.max_output_bytes());
     let allocations = budget.remaining_allocations()?;
     let retained = budget.remaining_retained()?;
@@ -1969,7 +1986,7 @@ fn property_codec_options(
 fn budget_property_report(
     budget: &mut GeometryBudget,
     report: keynote_media_properties_codec::DecodeReport,
-) -> Result<(), SlideMediaPropertiesError> {
+) -> Result<(), Error> {
     budget.source(report.input_bytes())?;
     budget.allocations(report.allocations())?;
     budget.retained(report.retained_bytes())?;
@@ -1983,7 +2000,7 @@ fn budget_property_report(
 fn budget_property_requirements(
     budget: &mut GeometryBudget,
     requirements: keynote_media_properties_codec::RewriteExecutionRequirements,
-) -> Result<(), SlideMediaPropertiesError> {
+) -> Result<(), Error> {
     budget.output(requirements.output_bytes)?;
     budget.fields(requirements.fields)?;
     budget.work(requirements.work_bytes)?;
@@ -1994,190 +2011,158 @@ fn budget_property_requirements(
     Ok(())
 }
 
-fn map_properties_codec_error(
-    error: keynote_media_properties_codec::DecodeError,
-) -> SlideMediaPropertiesError {
+fn map_properties_codec_error(error: keynote_media_properties_codec::DecodeError) -> Error {
     if let Some(limit) = error.resource_limit() {
         let (kind, observed, maximum) = match limit {
             keynote_media_properties_codec::DecodeLimit::Bytes { observed, maximum } => {
-                (SlideMediaPropertiesLimitKind::WireBytes, observed, maximum)
+                (LimitKind::WireBytes, observed, maximum)
             },
             keynote_media_properties_codec::DecodeLimit::Fields { observed, maximum } => {
-                (SlideMediaPropertiesLimitKind::WireFields, observed, maximum)
+                (LimitKind::WireFields, observed, maximum)
             },
             keynote_media_properties_codec::DecodeLimit::Work { observed, maximum } => {
-                (SlideMediaPropertiesLimitKind::WireWork, observed, maximum)
+                (LimitKind::WireWork, observed, maximum)
             },
-            keynote_media_properties_codec::DecodeLimit::Nesting { observed, maximum } => (
-                SlideMediaPropertiesLimitKind::WireNesting,
-                observed as usize,
-                maximum as usize,
-            ),
-            keynote_media_properties_codec::DecodeLimit::Allocations { observed, maximum } => (
-                SlideMediaPropertiesLimitKind::Allocations,
-                observed,
-                maximum,
-            ),
+            keynote_media_properties_codec::DecodeLimit::Nesting { observed, maximum } => {
+                (LimitKind::WireNesting, observed as usize, maximum as usize)
+            },
+            keynote_media_properties_codec::DecodeLimit::Allocations { observed, maximum } => {
+                (LimitKind::Allocations, observed, maximum)
+            },
             keynote_media_properties_codec::DecodeLimit::Retained { observed, maximum } => {
-                (SlideMediaPropertiesLimitKind::Retained, observed, maximum)
+                (LimitKind::Retained, observed, maximum)
             },
             keynote_media_properties_codec::DecodeLimit::Scratch { observed, maximum } => {
-                (SlideMediaPropertiesLimitKind::Scratch, observed, maximum)
+                (LimitKind::Scratch, observed, maximum)
             },
-            keynote_media_properties_codec::DecodeLimit::Output { observed, maximum } => (
-                SlideMediaPropertiesLimitKind::OutputBytes,
-                observed,
-                maximum,
-            ),
-            _ => return SlideMediaPropertiesError::InvalidSource,
+            keynote_media_properties_codec::DecodeLimit::Output { observed, maximum } => {
+                (LimitKind::OutputBytes, observed, maximum)
+            },
+            _ => return Error::InvalidSource,
         };
-        return SlideMediaPropertiesError::LimitExceeded {
+        return Error::Limit {
             kind,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
-    SlideMediaPropertiesError::InvalidSource
+    Error::InvalidSource
 }
 
-fn to_geometry_error(
-    error: SlideMediaPropertiesError,
-) -> super::slide_movie_geometry::SlideMovieGeometryError {
-    use super::slide_movie_geometry::{SlideMovieGeometryError, SlideMovieGeometryLimitKind};
+fn to_geometry_error(error: Error) -> super::slide_movie_geometry::Error {
+    use super::slide_movie_geometry::{
+        Error as SlideMovieGeometryError, LimitKind as SlideMovieGeometryLimitKind,
+    };
     match error {
-        SlideMediaPropertiesError::UnsupportedSource => SlideMovieGeometryError::UnsupportedSource,
-        SlideMediaPropertiesError::UnsupportedDependency
-        | SlideMediaPropertiesError::WrongMediaKind => {
-            SlideMovieGeometryError::UnsupportedDependency
+        Error::Refused(Refusal::UnsupportedSource) => SlideMovieGeometryError::Refused(
+            crate::slide::movie::geometry::Refusal::UnsupportedSource,
+        ),
+        Error::Refused(Refusal::UnsupportedDependency)
+        | Error::Refused(Refusal::WrongMediaKind) => SlideMovieGeometryError::Refused(
+            crate::slide::movie::geometry::Refusal::UnsupportedDependency,
+        ),
+        Error::Refused(Refusal::AmbiguousSelector) => SlideMovieGeometryError::Refused(
+            crate::slide::movie::geometry::Refusal::AmbiguousSelector,
+        ),
+        Error::Refused(Refusal::EmptySlideName) => {
+            SlideMovieGeometryError::Refused(crate::slide::movie::geometry::Refusal::EmptySlideName)
         },
-        SlideMediaPropertiesError::AmbiguousSelector => SlideMovieGeometryError::AmbiguousSelector,
-        SlideMediaPropertiesError::EmptySlideName => SlideMovieGeometryError::EmptySlideName,
-        SlideMediaPropertiesError::SlideNameNotFound => SlideMovieGeometryError::SlideNameNotFound,
-        SlideMediaPropertiesError::SlidePositionNotFound { position } => {
-            SlideMovieGeometryError::SlidePositionNotFound { position }
+        Error::Refused(Refusal::SlideNameNotFound) => SlideMovieGeometryError::Refused(
+            crate::slide::movie::geometry::Refusal::SlideNameNotFound,
+        ),
+        Error::Refused(Refusal::SlidePositionNotFound { position }) => {
+            SlideMovieGeometryError::Refused(
+                crate::slide::movie::geometry::Refusal::SlidePositionNotFound { position },
+            )
         },
-        SlideMediaPropertiesError::MoviePositionNotFound { position } => {
-            SlideMovieGeometryError::MoviePositionNotFound { position }
+        Error::Refused(Refusal::MoviePositionNotFound { position }) => {
+            SlideMovieGeometryError::Refused(
+                crate::slide::movie::geometry::Refusal::MoviePositionNotFound { position },
+            )
         },
-        SlideMediaPropertiesError::InvalidSource => SlideMovieGeometryError::InvalidSource,
-        SlideMediaPropertiesError::LimitExceeded {
+        Error::InvalidSource => SlideMovieGeometryError::InvalidSource,
+        Error::Limit {
             kind,
             observed,
             maximum,
-        } => SlideMovieGeometryError::LimitExceeded {
+        } => SlideMovieGeometryError::Limit {
             kind: match kind {
-                SlideMediaPropertiesLimitKind::InputBytes => {
-                    SlideMovieGeometryLimitKind::InputBytes
-                },
-                SlideMediaPropertiesLimitKind::OutputBytes => {
-                    SlideMovieGeometryLimitKind::OutputBytes
-                },
-                SlideMediaPropertiesLimitKind::WireBytes => SlideMovieGeometryLimitKind::WireBytes,
-                SlideMediaPropertiesLimitKind::Entries => SlideMovieGeometryLimitKind::Entries,
-                SlideMediaPropertiesLimitKind::EntryBytes => {
-                    SlideMovieGeometryLimitKind::EntryBytes
-                },
-                SlideMediaPropertiesLimitKind::TotalBytes => {
-                    SlideMovieGeometryLimitKind::TotalBytes
-                },
-                SlideMediaPropertiesLimitKind::Slides => SlideMovieGeometryLimitKind::Slides,
-                SlideMediaPropertiesLimitKind::References => {
-                    SlideMovieGeometryLimitKind::References
-                },
-                SlideMediaPropertiesLimitKind::WireFields => {
-                    SlideMovieGeometryLimitKind::WireFields
-                },
-                SlideMediaPropertiesLimitKind::WireNesting => {
-                    SlideMovieGeometryLimitKind::WireNesting
-                },
-                SlideMediaPropertiesLimitKind::WireWork => SlideMovieGeometryLimitKind::WireWork,
-                SlideMediaPropertiesLimitKind::PropertyBytes => {
-                    SlideMovieGeometryLimitKind::GeometryBytes
-                },
-                SlideMediaPropertiesLimitKind::Allocations => {
-                    SlideMovieGeometryLimitKind::Allocations
-                },
-                SlideMediaPropertiesLimitKind::Retained => SlideMovieGeometryLimitKind::Retained,
-                SlideMediaPropertiesLimitKind::Scratch => SlideMovieGeometryLimitKind::Scratch,
-                SlideMediaPropertiesLimitKind::Components => {
-                    SlideMovieGeometryLimitKind::Components
-                },
+                LimitKind::InputBytes => SlideMovieGeometryLimitKind::InputBytes,
+                LimitKind::OutputBytes => SlideMovieGeometryLimitKind::OutputBytes,
+                LimitKind::WireBytes => SlideMovieGeometryLimitKind::WireBytes,
+                LimitKind::Entries => SlideMovieGeometryLimitKind::Entries,
+                LimitKind::EntryBytes => SlideMovieGeometryLimitKind::EntryBytes,
+                LimitKind::TotalBytes => SlideMovieGeometryLimitKind::TotalBytes,
+                LimitKind::Slides => SlideMovieGeometryLimitKind::Slides,
+                LimitKind::References => SlideMovieGeometryLimitKind::References,
+                LimitKind::WireFields => SlideMovieGeometryLimitKind::WireFields,
+                LimitKind::WireNesting => SlideMovieGeometryLimitKind::WireNesting,
+                LimitKind::WireWork => SlideMovieGeometryLimitKind::WireWork,
+                LimitKind::PropertyBytes => SlideMovieGeometryLimitKind::GeometryBytes,
+                LimitKind::Allocations => SlideMovieGeometryLimitKind::Allocations,
+                LimitKind::Retained => SlideMovieGeometryLimitKind::Retained,
+                LimitKind::Scratch => SlideMovieGeometryLimitKind::Scratch,
+                LimitKind::Components => SlideMovieGeometryLimitKind::Components,
             },
             observed,
             maximum,
         },
-        SlideMediaPropertiesError::Allocation { amount } => {
-            SlideMovieGeometryError::Allocation { amount }
-        },
-        SlideMediaPropertiesError::Verification => SlideMovieGeometryError::Verification,
-        SlideMediaPropertiesError::PatchConflict => SlideMovieGeometryError::PatchConflict,
+        Error::Allocation { amount } => SlideMovieGeometryError::Allocation { amount },
+        Error::Verification => SlideMovieGeometryError::Verification,
+        Error::PatchConflict => SlideMovieGeometryError::PatchConflict,
     }
 }
 
-impl From<super::slide_movie_geometry::SlideMovieGeometryError> for SlideMediaPropertiesError {
-    fn from(error: super::slide_movie_geometry::SlideMovieGeometryError) -> Self {
-        use super::slide_movie_geometry::{SlideMovieGeometryError, SlideMovieGeometryLimitKind};
+impl From<super::slide_movie_geometry::Error> for Error {
+    fn from(error: super::slide_movie_geometry::Error) -> Self {
+        use super::slide_movie_geometry::{
+            Error as SlideMovieGeometryError, LimitKind as SlideMovieGeometryLimitKind,
+        };
         match error {
-            SlideMovieGeometryError::UnsupportedSource => Self::UnsupportedSource,
-            SlideMovieGeometryError::UnsupportedDependency => Self::UnsupportedDependency,
-            SlideMovieGeometryError::AmbiguousSelector => Self::AmbiguousSelector,
-            SlideMovieGeometryError::EmptySlideName => Self::EmptySlideName,
-            SlideMovieGeometryError::SlideNameNotFound => Self::SlideNameNotFound,
-            SlideMovieGeometryError::SlidePositionNotFound { position } => {
-                Self::SlidePositionNotFound { position }
-            },
-            SlideMovieGeometryError::MoviePositionNotFound { position } => {
-                Self::MoviePositionNotFound { position }
-            },
+            SlideMovieGeometryError::Refused(
+                crate::slide::movie::geometry::Refusal::UnsupportedSource,
+            ) => Self::Refused(Refusal::UnsupportedSource),
+            SlideMovieGeometryError::Refused(
+                crate::slide::movie::geometry::Refusal::UnsupportedDependency,
+            ) => Self::Refused(Refusal::UnsupportedDependency),
+            SlideMovieGeometryError::Refused(
+                crate::slide::movie::geometry::Refusal::AmbiguousSelector,
+            ) => Self::Refused(Refusal::AmbiguousSelector),
+            SlideMovieGeometryError::Refused(
+                crate::slide::movie::geometry::Refusal::EmptySlideName,
+            ) => Self::Refused(Refusal::EmptySlideName),
+            SlideMovieGeometryError::Refused(
+                crate::slide::movie::geometry::Refusal::SlideNameNotFound,
+            ) => Self::Refused(Refusal::SlideNameNotFound),
+            SlideMovieGeometryError::Refused(
+                crate::slide::movie::geometry::Refusal::SlidePositionNotFound { position },
+            ) => Self::Refused(Refusal::SlidePositionNotFound { position }),
+            SlideMovieGeometryError::Refused(
+                crate::slide::movie::geometry::Refusal::MoviePositionNotFound { position },
+            ) => Self::Refused(Refusal::MoviePositionNotFound { position }),
             SlideMovieGeometryError::InvalidSource => Self::InvalidSource,
-            SlideMovieGeometryError::LimitExceeded {
+            SlideMovieGeometryError::Limit {
                 kind,
                 observed,
                 maximum,
-            } => Self::LimitExceeded {
+            } => Self::Limit {
                 kind: match kind {
-                    SlideMovieGeometryLimitKind::InputBytes => {
-                        SlideMediaPropertiesLimitKind::InputBytes
-                    },
-                    SlideMovieGeometryLimitKind::OutputBytes => {
-                        SlideMediaPropertiesLimitKind::OutputBytes
-                    },
-                    SlideMovieGeometryLimitKind::WireBytes => {
-                        SlideMediaPropertiesLimitKind::WireBytes
-                    },
-                    SlideMovieGeometryLimitKind::EntryBytes => {
-                        SlideMediaPropertiesLimitKind::EntryBytes
-                    },
-                    SlideMovieGeometryLimitKind::Entries => SlideMediaPropertiesLimitKind::Entries,
-                    SlideMovieGeometryLimitKind::TotalBytes => {
-                        SlideMediaPropertiesLimitKind::TotalBytes
-                    },
-                    SlideMovieGeometryLimitKind::Slides => SlideMediaPropertiesLimitKind::Slides,
-                    SlideMovieGeometryLimitKind::References => {
-                        SlideMediaPropertiesLimitKind::References
-                    },
-                    SlideMovieGeometryLimitKind::WireFields => {
-                        SlideMediaPropertiesLimitKind::WireFields
-                    },
-                    SlideMovieGeometryLimitKind::WireNesting => {
-                        SlideMediaPropertiesLimitKind::WireNesting
-                    },
-                    SlideMovieGeometryLimitKind::WireWork => {
-                        SlideMediaPropertiesLimitKind::WireWork
-                    },
-                    SlideMovieGeometryLimitKind::GeometryBytes => {
-                        SlideMediaPropertiesLimitKind::PropertyBytes
-                    },
-                    SlideMovieGeometryLimitKind::Allocations => {
-                        SlideMediaPropertiesLimitKind::Allocations
-                    },
-                    SlideMovieGeometryLimitKind::Retained => {
-                        SlideMediaPropertiesLimitKind::Retained
-                    },
-                    SlideMovieGeometryLimitKind::Scratch => SlideMediaPropertiesLimitKind::Scratch,
-                    SlideMovieGeometryLimitKind::Components => {
-                        SlideMediaPropertiesLimitKind::Components
-                    },
+                    SlideMovieGeometryLimitKind::InputBytes => LimitKind::InputBytes,
+                    SlideMovieGeometryLimitKind::OutputBytes => LimitKind::OutputBytes,
+                    SlideMovieGeometryLimitKind::WireBytes => LimitKind::WireBytes,
+                    SlideMovieGeometryLimitKind::EntryBytes => LimitKind::EntryBytes,
+                    SlideMovieGeometryLimitKind::Entries => LimitKind::Entries,
+                    SlideMovieGeometryLimitKind::TotalBytes => LimitKind::TotalBytes,
+                    SlideMovieGeometryLimitKind::Slides => LimitKind::Slides,
+                    SlideMovieGeometryLimitKind::References => LimitKind::References,
+                    SlideMovieGeometryLimitKind::WireFields => LimitKind::WireFields,
+                    SlideMovieGeometryLimitKind::WireNesting => LimitKind::WireNesting,
+                    SlideMovieGeometryLimitKind::WireWork => LimitKind::WireWork,
+                    SlideMovieGeometryLimitKind::GeometryBytes => LimitKind::PropertyBytes,
+                    SlideMovieGeometryLimitKind::Allocations => LimitKind::Allocations,
+                    SlideMovieGeometryLimitKind::Retained => LimitKind::Retained,
+                    SlideMovieGeometryLimitKind::Scratch => LimitKind::Scratch,
+                    SlideMovieGeometryLimitKind::Components => LimitKind::Components,
                 },
                 observed,
                 maximum,
@@ -2185,37 +2170,39 @@ impl From<super::slide_movie_geometry::SlideMovieGeometryError> for SlideMediaPr
             SlideMovieGeometryError::Allocation { amount } => Self::Allocation { amount },
             SlideMovieGeometryError::Verification => Self::Verification,
             SlideMovieGeometryError::PatchConflict => Self::PatchConflict,
-            SlideMovieGeometryError::Locked => Self::UnsupportedDependency,
+            SlideMovieGeometryError::Refused(crate::slide::movie::geometry::Refusal::Locked) => {
+                Self::Refused(Refusal::UnsupportedDependency)
+            },
         }
     }
 }
 
-fn map_read_error(error: ReadError) -> SlideMediaPropertiesError {
+fn map_read_error(error: ReadError) -> Error {
     match error {
         ReadError::SemanticLimit {
             kind,
             observed,
             maximum,
             ..
-        } => SlideMediaPropertiesError::limit_from_semantic(kind, observed, maximum),
+        } => Error::limit_from_semantic(kind, observed, maximum),
         ReadError::PayloadLimit {
             kind,
             observed,
             maximum,
             ..
-        } => SlideMediaPropertiesError::limit_from_payload(kind, observed, maximum),
-        ReadError::Allocation { amount, .. } => SlideMediaPropertiesError::Allocation { amount },
-        _ => SlideMediaPropertiesError::InvalidSource,
+        } => Error::limit_from_payload(kind, observed, maximum),
+        ReadError::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-impl SlideMediaPropertiesError {
+impl Error {
     fn limit_from_semantic(kind: SemanticLimitKind, observed: usize, maximum: usize) -> Self {
-        Self::LimitExceeded {
+        Self::Limit {
             kind: match kind {
-                SemanticLimitKind::Slides => SlideMediaPropertiesLimitKind::Slides,
-                SemanticLimitKind::References => SlideMediaPropertiesLimitKind::References,
-                _ => SlideMediaPropertiesLimitKind::WireWork,
+                SemanticLimitKind::Slides => LimitKind::Slides,
+                SemanticLimitKind::References => LimitKind::References,
+                _ => LimitKind::WireWork,
             },
             observed: observed as u64,
             maximum: maximum as u64,
@@ -2223,12 +2210,12 @@ impl SlideMediaPropertiesError {
     }
 
     fn limit_from_payload(kind: super::PayloadLimitKind, observed: usize, maximum: usize) -> Self {
-        Self::LimitExceeded {
+        Self::Limit {
             kind: match kind {
-                super::PayloadLimitKind::Bytes => SlideMediaPropertiesLimitKind::WireBytes,
-                super::PayloadLimitKind::Fields => SlideMediaPropertiesLimitKind::WireFields,
-                super::PayloadLimitKind::Nesting => SlideMediaPropertiesLimitKind::WireNesting,
-                super::PayloadLimitKind::Work => SlideMediaPropertiesLimitKind::WireWork,
+                super::PayloadLimitKind::Bytes => LimitKind::WireBytes,
+                super::PayloadLimitKind::Fields => LimitKind::WireFields,
+                super::PayloadLimitKind::Nesting => LimitKind::WireNesting,
+                super::PayloadLimitKind::Work => LimitKind::WireWork,
             },
             observed: observed as u64,
             maximum: maximum as u64,

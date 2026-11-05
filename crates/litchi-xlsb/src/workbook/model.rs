@@ -1,16 +1,19 @@
 //! Typed XLSB workbook state and its public model accessors.
 
+use super::cache::{Stats, WorksheetCache};
+use super::catalog::TabMetadata;
 use crate::calc::Props;
 use crate::external_link::{ExternalLinkLimits, Link};
 use crate::package::Cell;
-use crate::package::formula::{Context, ExternalBook, View, table::Definition as TableDefinition};
+use crate::package::formula::{
+    Context, ExternalBook, View, excel_name_eq, table::Definition as TableDefinition,
+};
 use crate::package::shared_strings::SharedString;
 use crate::package::styles_table::{CellFormat, StylesTable};
-use crate::sheet::Worksheet;
-use litchi_core::sheet::{
-    Result as SheetResult, Worksheet as SheetTrait, WorksheetIterator as SheetIterator,
-};
+use crate::sheet::{Grid, Selector, Tab, Worksheet};
+use litchi_core::Position;
 use litchi_opc::OpcPackage;
+use std::sync::Arc;
 
 /// Typed drawing projection selected when the workbook was opened.
 ///
@@ -31,6 +34,8 @@ pub(crate) enum DrawingLoadPolicy {
 )]
 pub struct Workbook {
     pub(crate) package: OpcPackage,
+    /// Owner-scoped bounded retention for parsed worksheet snapshots.
+    pub(super) worksheet_cache: WorksheetCache,
     pub(super) worksheets: Vec<Worksheet>,
     /// Worksheet-only names in public worksheet ordinal order.
     pub(super) worksheet_names: Vec<String>,
@@ -38,9 +43,16 @@ pub struct Workbook {
     pub(super) worksheet_positions: Vec<usize>,
     /// Relationship identifiers in full workbook sheet-catalog order.
     pub(super) worksheet_rel_ids: Vec<Option<String>>,
+    /// The validated semantic metadata of every tab, in full workbook
+    /// sheet-catalog order. The formula context retains its own full-name
+    /// projection for formula resolution; native IDs and part names remain
+    /// in `worksheet_rel_ids` and never enter this semantic value.
+    pub(super) sheet_tabs: Vec<TabMetadata>,
     /// Primary `BrtBookView.itabCur` position in full workbook sheet order.
     pub(super) active_catalog_position: Option<usize>,
     pub(crate) formula_context: Context,
+    /// Caller-selected raw BIFF12 policy retained for lazy workbook reads.
+    pub(super) raw_limits: crate::raw::Limits,
     pub(super) external_link_limits: ExternalLinkLimits,
     pub(super) shared_strings: Vec<SharedString>,
     pub(super) styles: StylesTable,
@@ -56,13 +68,16 @@ pub struct Workbook {
     pub(super) tolerance: crate::leniency::ToleranceReport,
     /// Opt-in repair policy applied to lazily parsed worksheet content.
     pub(super) leniency: crate::leniency::Leniency,
+    /// The semantic budgets of the family reads of this projection.
+    pub(super) semantic_limits: crate::SemanticLimits,
 }
 
 impl std::fmt::Debug for Workbook {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Workbook")
-            .field("worksheet_names", &self.formula_context.worksheet_names)
-            .field("worksheet_rel_ids", &self.worksheet_rel_ids)
+            .field("sheet_tab_count", &self.sheet_tabs.len())
+            .field("worksheet_count", &self.worksheet_names.len())
+            .field("active_catalog_position", &self.active_catalog_position)
             .field("shared_strings_count", &self.shared_strings.len())
             .field("cell_xfs_count", &self.styles.cell_xfs.len())
             .field("calc", &self.calc)
@@ -73,6 +88,32 @@ impl std::fmt::Debug for Workbook {
 }
 
 impl Workbook {
+    pub(crate) fn cached_worksheet(
+        &self,
+        index: usize,
+    ) -> crate::package::error::Result<Arc<Worksheet>> {
+        let catalog_position = self.catalog_position_for_worksheet(index)?;
+        if let Some(worksheet) = self.worksheet_cache.get(catalog_position, true) {
+            return Ok(worksheet);
+        }
+        let worksheet = Arc::new(self.parse_worksheet(index, catalog_position)?);
+        let weight = worksheet.retained_bytes();
+        Ok(self
+            .worksheet_cache
+            .publish(catalog_position, worksheet, weight))
+    }
+
+    /// Content-free diagnostics for the owner-scoped worksheet cache.
+    #[must_use]
+    pub fn semantic_cache_diagnostics(&self) -> Stats {
+        self.worksheet_cache.stats()
+    }
+
+    /// Release parsed worksheet values that no grid or legacy handle pins.
+    pub fn trim_semantic_cache(&self) -> usize {
+        self.worksheet_cache.trim_clean()
+    }
+
     /// Every repair applied while this workbook was opened.
     ///
     /// Covers the OPC package read that admitted the workbook (its
@@ -93,9 +134,53 @@ impl Workbook {
         self.leniency
     }
 
-    /// Consume the workbook and keep only its open-time repair report.
-    pub(crate) fn into_tolerance_report(self) -> crate::leniency::ToleranceReport {
-        self.tolerance
+    /// Clone the physical package owner while retaining this workbook's policies.
+    ///
+    /// Payloads retain their existing shared ownership; the workbook projection
+    /// and its worksheet caches are not copied.
+    #[must_use]
+    pub fn to_package(&self) -> crate::Package {
+        crate::Package::from_workbook(self)
+    }
+
+    /// Consume this workbook into its physical package owner without reparsing.
+    ///
+    /// The OPC graph, external-link limits, drawing projection, worksheet
+    /// repair policy and open-time tolerance report are retained.
+    ///
+    /// ```
+    /// # fn main() -> litchi_xlsb::package::PackageResult<()> {
+    /// let bytes = litchi_xlsb::Package::new()?.to_bytes()?;
+    /// let workbook = litchi_xlsb::Workbook::new(std::io::Cursor::new(bytes))?;
+    /// let package = workbook.into_package();
+    /// assert_eq!(package.leniency(), litchi_xlsb::Leniency::Strict);
+    /// assert!(package.drawings_parsed());
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn into_package(self) -> crate::Package {
+        crate::Package::from_validated_workbook(self)
+    }
+
+    pub(crate) fn set_projection_leniency(&mut self, leniency: crate::leniency::Leniency) {
+        self.leniency = leniency;
+    }
+
+    pub(crate) fn set_semantic_limits(&mut self, limits: crate::SemanticLimits) {
+        self.semantic_limits = limits;
+    }
+
+    /// The semantic budgets of this projection's family reads.
+    #[must_use]
+    pub const fn semantic_limits(&self) -> crate::SemanticLimits {
+        self.semantic_limits
+    }
+
+    /// The BIFF12 raw policy retained by this workbook projection.
+    #[must_use]
+    pub const fn raw_limits_value(&self) -> crate::raw::Limits {
+        self.raw_limits
     }
 
     /// Return the drawing projection boundary selected when this workbook was
@@ -108,15 +193,105 @@ impl Workbook {
     }
     /// Translate a public worksheet ordinal to the full workbook sheet-catalog
     /// position used by formula and package metadata.
+    /// The workbook's defined names in record order, with their scope and
+    /// formula text.
+    ///
+    /// # Errors
+    ///
+    /// Returns the record and defined-name decoding errors of the workbook
+    /// stream.
+    pub fn defined_name_entries(
+        &self,
+    ) -> crate::package::error::Result<Vec<crate::named_ranges::Entry>> {
+        let part = self.package.main_document_part()?;
+        crate::named_ranges::read_entries(part.blob(), &self.formula_context, self.raw_limits)
+    }
+
+    /// The worksheet ordinal of a complete-catalog position, when that tab is
+    /// a worksheet.
+    pub(crate) fn worksheet_for_catalog_position(&self, catalog_position: usize) -> Option<usize> {
+        self.worksheet_positions
+            .iter()
+            .position(|position| *position == catalog_position)
+    }
+
     pub(crate) fn catalog_position_for_worksheet(
         &self,
         index: usize,
     ) -> crate::package::error::Result<usize> {
-        self.worksheet_positions.get(index).copied().ok_or_else(|| {
-            crate::package::error::Error::InvalidFormat(format!(
-                "Worksheet index {index} out of bounds"
-            ))
-        })
+        self.worksheet_positions.get(index).copied().ok_or(
+            crate::package::error::Error::InvalidFormat("Worksheet index out of bounds"),
+        )
+    }
+
+    /// Every workbook tab in workbook order, including chart, dialog, and
+    /// macro tabs. The worksheet-only APIs continue to expose only entries
+    /// whose [`Tab::worksheet_position`] is `Some`.
+    pub fn sheets(&self) -> impl ExactSizeIterator<Item = Tab<'_>> + DoubleEndedIterator + '_ {
+        self.sheet_tabs
+            .iter()
+            .enumerate()
+            .map(|(position, tab)| self.tab_at(position, tab))
+    }
+
+    /// Select any workbook tab by its semantic name or checked zero-based
+    /// position in complete workbook order.
+    pub fn sheet<'a>(
+        &self,
+        selector: impl Into<Selector<'a>>,
+    ) -> crate::package::error::Result<Option<Tab<'_>>> {
+        let position = match selector.into() {
+            Selector::Position(position) => Some(position.get()),
+            Selector::Name(name) => self
+                .sheet_tabs
+                .iter()
+                .position(|tab| excel_name_eq(tab.name(), &name)),
+        };
+        Ok(position.and_then(|position| {
+            self.sheet_tabs
+                .get(position)
+                .map(|tab| self.tab_at(position, tab))
+        }))
+    }
+
+    /// Select a semantic workbook tab and return its immutable worksheet grid.
+    ///
+    /// A missing name or position returns `Ok(None)`. A selected chart,
+    /// dialog, macro, or unbound tab returns a typed unsupported-feature
+    /// error because those tabs do not own a worksheet grid.
+    pub fn grid<'a>(
+        &self,
+        selector: impl Into<Selector<'a>>,
+    ) -> crate::package::error::Result<Option<Grid>> {
+        let Some(tab) = self.sheet(selector)? else {
+            return Ok(None);
+        };
+        let Some(position) = tab.worksheet_position() else {
+            return Err(crate::package::error::Error::UnsupportedFeature(
+                "selected XLSB tab has no worksheet grid",
+            ));
+        };
+        // `Tab::worksheet_position` is the worksheet-only ordinal. The
+        // catalog position was already used to select the tab above, so do
+        // not feed this ordinal back into the catalog-position helper when a
+        // chart or other non-worksheet tab precedes it.
+        self.cached_worksheet(position.get())
+            .map(|worksheet| Some(Grid::from_arc(worksheet)))
+    }
+
+    fn tab_at<'a>(&'a self, position: usize, tab: &'a TabMetadata) -> Tab<'a> {
+        let worksheet_position = self
+            .worksheet_positions
+            .binary_search(&position)
+            .ok()
+            .map(Position::new);
+        Tab::new(
+            tab.name(),
+            Position::new(position),
+            worksheet_position,
+            tab.kind(),
+            tab.state(),
+        )
     }
 
     /// Workbook and sheet-scoped defined names in `PtgName` index order.
@@ -321,16 +496,22 @@ impl Workbook {
 }
 
 impl litchi_core::sheet::WorkbookTrait for Workbook {
+    /// The worksheet snapshot the owner's cache retains, shared rather than
+    /// copied.
+    type Error = crate::package::error::Error;
+    type Worksheet<'a> = Arc<Worksheet>;
+    type Worksheets<'a> = Worksheets<'a>;
+
     fn active_sheet_index(&self) -> usize {
         self.active_worksheet_index().unwrap_or(0)
     }
 
-    fn active_worksheet(&self) -> SheetResult<Box<dyn SheetTrait + '_>> {
-        let index = self.active_worksheet_index().ok_or_else(|| {
-            Box::new(crate::package::error::Error::UnsupportedFeature(
-                "XLSB active sheet is not a worksheet".to_string(),
-            ))
-        })?;
+    fn active_worksheet(&self) -> crate::package::error::Result<Arc<Worksheet>> {
+        let index = self.active_worksheet_index().ok_or(
+            crate::package::error::Error::UnsupportedFeature(
+                "XLSB active sheet is not a worksheet",
+            ),
+        )?;
         self.worksheet_by_index(index)
     }
 
@@ -343,27 +524,24 @@ impl litchi_core::sheet::WorkbookTrait for Workbook {
         &self.worksheet_names
     }
 
-    fn worksheet_by_index(&self, index: usize) -> SheetResult<Box<dyn SheetTrait + '_>> {
-        let worksheet = self.worksheet(index)?;
-        Ok(Box::new(worksheet))
+    fn worksheet_by_index(&self, index: usize) -> crate::package::error::Result<Arc<Worksheet>> {
+        self.cached_worksheet(index)
     }
 
-    fn worksheet_by_name(&self, name: &str) -> SheetResult<Box<dyn SheetTrait + '_>> {
+    fn worksheet_by_name(&self, name: &str) -> crate::package::error::Result<Arc<Worksheet>> {
         for (i, ws_name) in self.worksheet_names.iter().enumerate() {
             if ws_name == name {
                 return self.worksheet_by_index(i);
             }
         }
-        Err(Box::new(crate::package::error::Error::InvalidFormat(
-            format!("Worksheet '{}' not found", name),
-        )))
+        Err(crate::package::error::Error::InvalidFormat("Worksheet not"))
     }
 
-    fn worksheets<'a>(&'a self) -> Box<dyn SheetIterator<'a> + 'a> {
-        Box::new(WorksheetIterator {
+    fn worksheets(&self) -> Worksheets<'_> {
+        Worksheets {
             workbook: self,
             index: 0,
-        })
+        }
     }
 
     fn is_1904_date_system(&self) -> bool {
@@ -371,24 +549,24 @@ impl litchi_core::sheet::WorkbookTrait for Workbook {
     }
 }
 
-pub struct WorksheetIterator<'a> {
+/// The worksheets of an eager XLSB workbook, in workbook order: the iterator
+/// [`WorkbookTrait::worksheets`](litchi_core::sheet::WorkbookTrait::worksheets)
+/// returns. A worksheet that fails to parse yields its error, and iteration
+/// continues with the next one.
+pub struct Worksheets<'a> {
     workbook: &'a Workbook,
     index: usize,
 }
 
-impl<'a> SheetIterator<'a> for WorksheetIterator<'a> {
-    fn next(&mut self) -> Option<SheetResult<Box<dyn SheetTrait + 'a>>> {
+impl Iterator for Worksheets<'_> {
+    type Item = crate::package::error::Result<Arc<Worksheet>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
         if self.index < self.workbook.worksheet_names.len() {
-            match self.workbook.worksheet(self.index) {
-                Ok(worksheet) => {
-                    self.index += 1;
-                    Some(Ok(Box::new(worksheet)))
-                },
-                Err(e) => {
-                    self.index += 1; // Continue to next worksheet even on error
-                    Some(Err(Box::new(e)))
-                },
-            }
+            let result = self.workbook.cached_worksheet(self.index);
+            // Continue to the next worksheet even on error.
+            self.index += 1;
+            Some(result)
         } else {
             None
         }

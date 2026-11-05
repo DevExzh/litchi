@@ -9,10 +9,15 @@
 /// configuration.
 pub mod transaction {
     pub use crate::package::body_table_sort::{
-        BodyTableSortCommit as Commit, BodyTableSortDiagnostics as Diagnostics,
-        BodyTableSortEdit as Edit, BodyTableSortError as Error,
-        BodyTableSortLimitKind as LimitKind, BodyTableSortPatch as Patch,
-        BodyTableSortPath as Path,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path, Refusal,
+    };
+}
+
+/// Exact-source execution of a body table's persisted sort order (the
+/// body rows move; record 0371).
+pub mod execution {
+    pub use crate::package::body_table_sort_execution::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal, Unsupported,
     };
 }
 

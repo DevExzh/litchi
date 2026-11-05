@@ -6,8 +6,8 @@
 //! header as inert metadata; the layout algorithm and style bodies are not
 //! interpreted.
 
-use crate::diagram::{DGM_NAMESPACE, DGM_NAMESPACE_STRICT};
-use crate::{Error, Result};
+use crate::diagram::{DGM_NAMESPACE, DGM_NAMESPACE_STRICT, Limits};
+use crate::{Error, LimitKind, Result};
 use litchi_ooxml_common::mce::process_str;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::events::{BytesStart, Event};
@@ -46,8 +46,8 @@ impl DiagramDefinition {
     ///
     /// Returns an error when input violates DrawingML constraints, exceeds a configured
     /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-    pub fn parse_layout(xml: &str) -> Result<Self> {
-        Self::parse(xml, "layoutDef")
+    pub fn parse_layout(xml: &str, limits: &Limits) -> Result<Self> {
+        Self::parse(xml, "layoutDef", limits)
     }
 
     /// Parse a diagram quick-style part (`dgm:styleDef`).
@@ -55,8 +55,8 @@ impl DiagramDefinition {
     ///
     /// Returns an error when input violates DrawingML constraints, exceeds a configured
     /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-    pub fn parse_quick_style(xml: &str) -> Result<Self> {
-        Self::parse(xml, "styleDef")
+    pub fn parse_quick_style(xml: &str, limits: &Limits) -> Result<Self> {
+        Self::parse(xml, "styleDef", limits)
     }
 
     /// Parse a diagram colors part (`dgm:colorsDef`).
@@ -64,17 +64,19 @@ impl DiagramDefinition {
     ///
     /// Returns an error when input violates DrawingML constraints, exceeds a configured
     /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-    pub fn parse_colors(xml: &str) -> Result<Self> {
-        Self::parse(xml, "colorsDef")
+    pub fn parse_colors(xml: &str, limits: &Limits) -> Result<Self> {
+        Self::parse(xml, "colorsDef", limits)
     }
 
-    fn parse(xml: &str, root_name: &str) -> Result<Self> {
-        if xml.len() > MAX_DEFINITION_XML {
-            return Err(limit("definition XML bytes"));
+    fn parse(xml: &str, root_name: &str, limits: &Limits) -> Result<Self> {
+        limits.validate()?;
+        let max_input = limits.input_bytes_value().min(MAX_DEFINITION_XML);
+        if xml.len() > max_input {
+            return Err(limit(LimitKind::XmlBytes, xml.len(), max_input));
         }
         let processed = process_str(xml)?;
-        if processed.len() > MAX_DEFINITION_XML {
-            return Err(limit("processed definition XML bytes"));
+        if processed.len() > max_input {
+            return Err(limit(LimitKind::XmlBytes, processed.len(), max_input));
         }
         let mut reader = NsReader::from_reader(processed.as_bytes());
         reader.config_mut().trim_text(true);
@@ -84,42 +86,74 @@ impl DiagramDefinition {
             root_name,
             root_seen: false,
             nodes: 0,
+            max_nodes: limits.xml_nodes_value().min(MAX_NODES),
+            max_depth: limits.xml_depth_value().min(MAX_DEPTH),
+            max_categories: limits.nodes_value(),
         };
         let mut buffer = Vec::new();
         let mut depth = 0usize;
+        let mut root_closed = false;
 
         loop {
             match reader.read_event_into(&mut buffer).map_err(xml_error)? {
                 Event::Start(element) => {
+                    if root_closed {
+                        return Err(invalid("trailing markup follows the diagram definition"));
+                    }
+                    if depth == 0 && scan.root_seen {
+                        return Err(invalid("the diagram definition has multiple roots"));
+                    }
                     depth = depth
                         .checked_add(1)
-                        .ok_or_else(|| limit("definition XML depth"))?;
+                        .ok_or_else(|| invalid("definition XML depth overflows"))?;
                     scan.visit(&reader, &element, depth)?;
                 },
                 Event::Empty(element) => {
+                    if root_closed {
+                        return Err(invalid("trailing markup follows the diagram definition"));
+                    }
                     let child_depth = depth
                         .checked_add(1)
-                        .ok_or_else(|| limit("definition XML depth"))?;
+                        .ok_or_else(|| invalid("definition XML depth overflows"))?;
+                    if depth == 0 && scan.root_seen {
+                        return Err(invalid("the diagram definition has multiple roots"));
+                    }
                     scan.visit(&reader, &element, child_depth)?;
+                    if depth == 0 {
+                        root_closed = true;
+                    }
                 },
                 Event::End(_) => {
-                    if depth == 0 {
+                    if depth == 0 || !scan.root_seen {
                         return Err(invalid("unexpected definition closing element"));
                     }
                     depth -= 1;
+                    if depth == 0 {
+                        root_closed = true;
+                    }
                 },
                 Event::DocType(_) => return Err(invalid("DTDs are rejected")),
                 Event::CData(_) => return Err(invalid("CDATA is rejected")),
                 Event::Eof => break,
-                Event::Text(_)
-                | Event::Comment(_)
-                | Event::Decl(_)
-                | Event::PI(_)
-                | Event::GeneralRef(_) => {},
+                Event::Text(text) => {
+                    if (!scan.root_seen || root_closed)
+                        && text.as_ref().iter().any(|byte| !byte.is_ascii_whitespace())
+                    {
+                        return Err(invalid(
+                            "non-whitespace text is outside the diagram definition",
+                        ));
+                    }
+                },
+                Event::GeneralRef(_) if !scan.root_seen || root_closed => {
+                    return Err(invalid(
+                        "entity reference is outside the diagram definition",
+                    ));
+                },
+                Event::Comment(_) | Event::Decl(_) | Event::PI(_) | Event::GeneralRef(_) => {},
             }
             buffer.clear();
         }
-        if !scan.root_seen || depth != 0 {
+        if !scan.root_seen || !root_closed || depth != 0 {
             return Err(invalid("missing or unterminated definition root"));
         }
         Ok(scan.definition)
@@ -131,6 +165,9 @@ struct DefinitionScan<'a> {
     root_name: &'a str,
     root_seen: bool,
     nodes: usize,
+    max_nodes: usize,
+    max_depth: usize,
+    max_categories: usize,
 }
 
 impl DefinitionScan<'_> {
@@ -143,9 +180,12 @@ impl DefinitionScan<'_> {
         self.nodes = self
             .nodes
             .checked_add(1)
-            .ok_or_else(|| limit("definition XML node count"))?;
-        if self.nodes > MAX_NODES || depth > MAX_DEPTH {
-            return Err(limit("definition XML structure"));
+            .ok_or_else(|| invalid("definition XML node count overflows"))?;
+        if depth > self.max_depth {
+            return Err(limit(LimitKind::XmlDepth, depth, self.max_depth));
+        }
+        if self.nodes > self.max_nodes {
+            return Err(limit(LimitKind::XmlNodes, self.nodes, self.max_nodes));
         }
         let namespace = element_namespace(reader, element)?;
         let local = local_name(element)?;
@@ -156,6 +196,9 @@ impl DefinitionScan<'_> {
             self.root_seen = true;
             self.definition.unique_id = attribute(element, "uniqueId")?;
             return Ok(());
+        }
+        if is_dgm(&namespace) && local == self.root_name {
+            return Err(invalid("the diagram definition has a nested root"));
         }
         if !is_dgm(&namespace) {
             return Ok(());
@@ -177,6 +220,13 @@ impl DefinitionScan<'_> {
             },
             "cat" => {
                 if let Some(category_type) = attribute(element, "type")? {
+                    if self.definition.categories.len() >= self.max_categories {
+                        return Err(limit(
+                            LimitKind::DiagramNodes,
+                            self.definition.categories.len() + 1,
+                            self.max_categories,
+                        ));
+                    }
                     let priority = attribute(element, "pri")?.and_then(|value| value.parse().ok());
                     self.definition.categories.push(DiagramCategory {
                         category_type,
@@ -236,13 +286,25 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-fn limit(label: &str) -> Error {
-    invalid(format!("diagram {label} limit exceeded"))
+fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::limit(kind, observed, maximum)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn parse_layout(xml: &str) -> Result<DiagramDefinition> {
+        DiagramDefinition::parse_layout(xml, &Limits::default())
+    }
+
+    fn parse_quick_style(xml: &str) -> Result<DiagramDefinition> {
+        DiagramDefinition::parse_quick_style(xml, &Limits::default())
+    }
+
+    fn parse_colors(xml: &str) -> Result<DiagramDefinition> {
+        DiagramDefinition::parse_colors(xml, &Limits::default())
+    }
 
     #[test]
     fn parses_layout_definition() {
@@ -255,7 +317,7 @@ mod tests {
             "<dgm:layoutNode name=\"diagram\"/>",
             "</dgm:layoutDef>"
         );
-        let definition = DiagramDefinition::parse_layout(xml).unwrap();
+        let definition = parse_layout(xml).unwrap();
         assert_eq!(
             definition.unique_id.as_deref(),
             Some("urn:microsoft.com/office/officeart/2005/8/layout/cycle2")
@@ -285,7 +347,7 @@ mod tests {
             "<dgm:catLst><dgm:cat type=\"simple\" pri=\"10100\"/></dgm:catLst>",
             "</dgm:styleDef>"
         );
-        let definition = DiagramDefinition::parse_quick_style(style).unwrap();
+        let definition = parse_quick_style(style).unwrap();
         assert_eq!(
             definition.unique_id.as_deref(),
             Some("urn:test/quickstyle/simple1")
@@ -298,7 +360,7 @@ mod tests {
             "<dgm:catLst><dgm:cat type=\"accent1\" pri=\"11200\"/></dgm:catLst>",
             "</dgm:colorsDef>"
         );
-        let definition = DiagramDefinition::parse_colors(colors).unwrap();
+        let definition = parse_colors(colors).unwrap();
         assert_eq!(
             definition.unique_id.as_deref(),
             Some("urn:test/colors/accent1_2")
@@ -309,7 +371,35 @@ mod tests {
     #[test]
     fn rejects_mismatched_root() {
         let xml = "<dgm:colorsDef xmlns:dgm=\"http://schemas.openxmlformats.org/drawingml/2006/diagram\"/>";
-        assert!(DiagramDefinition::parse_layout(xml).is_err());
-        assert!(DiagramDefinition::parse_colors(xml).is_ok());
+        assert!(parse_layout(xml).is_err());
+        assert!(parse_colors(xml).is_ok());
+    }
+
+    #[test]
+    fn rejects_duplicate_or_trailing_layout_roots() {
+        let duplicate = concat!(
+            "<dgm:layoutDef xmlns:dgm=\"http://schemas.openxmlformats.org/drawingml/2006/diagram\"/>",
+            "<dgm:layoutDef xmlns:dgm=\"http://schemas.openxmlformats.org/drawingml/2006/diagram\"/>"
+        );
+        assert!(matches!(parse_layout(duplicate), Err(Error::Invalid(_))));
+
+        let trailing = concat!(
+            "<dgm:layoutDef xmlns:dgm=\"http://schemas.openxmlformats.org/drawingml/2006/diagram\"/>",
+            "trailing"
+        );
+        assert!(matches!(parse_layout(trailing), Err(Error::Invalid(_))));
+    }
+
+    #[test]
+    fn rejects_unterminated_or_nested_layout_root() {
+        let unterminated = "<dgm:layoutDef xmlns:dgm=\"http://schemas.openxmlformats.org/drawingml/2006/diagram\">";
+        assert!(matches!(parse_layout(unterminated), Err(Error::Invalid(_))));
+
+        let nested = concat!(
+            "<dgm:layoutDef xmlns:dgm=\"http://schemas.openxmlformats.org/drawingml/2006/diagram\">",
+            "<dgm:layoutDef/>",
+            "</dgm:layoutDef>"
+        );
+        assert!(matches!(parse_layout(nested), Err(Error::Invalid(_))));
     }
 }

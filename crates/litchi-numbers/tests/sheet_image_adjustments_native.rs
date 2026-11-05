@@ -12,9 +12,10 @@ use litchi_iwa_common::wire::WireView;
 use litchi_iwa_core::{Archive, SnappyStream};
 use litchi_iwa_protos::tsd;
 use litchi_numbers::cell::Value;
+use litchi_numbers::shape::image::adjustments::Error as SheetImageAdjustmentsError;
 use litchi_numbers::{
-    ImageAdjustment, ImageAdjustments, ImageEnhancement, Package, SheetImageAdjustmentsError,
-    SheetSelector, shape::image::ImageSelector,
+    ImageAdjustment, ImageAdjustments, ImageEnhancement, Package, SheetSelector,
+    shape::image::ImageSelector,
 };
 use prost::Message as _;
 
@@ -46,17 +47,17 @@ struct ImagePayload {
 }
 
 fn image_payload(source: &[u8]) -> TestResult<ImagePayload> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut found = None;
     for entry in catalog.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = match SnappyStream::decompress(entry.data()) {
+        let stream = match SnappyStream::decompress(entry.data(), Default::default()) {
             Ok(stream) => stream,
             Err(_) => continue,
         };
-        let archive = match Archive::parse(stream.as_bytes()) {
+        let archive = match Archive::parse(stream.as_bytes(), Default::default()) {
             Ok(archive) => archive,
             Err(_) => continue,
         };
@@ -107,8 +108,8 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn assert_member_locality(source: &[u8], target: &[u8], changed_member: &str) -> TestResult {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     let mut changed = Vec::new();
     for entry in before.iter() {
         let candidate = after
@@ -140,8 +141,8 @@ fn assert_member_locality(source: &[u8], target: &[u8], changed_member: &str) ->
 }
 
 fn assert_image_assets_untouched(source: &[u8], target: &[u8]) -> TestResult {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     let mut assets = 0;
     for entry in before
         .iter()
@@ -164,7 +165,7 @@ fn assert_image_assets_untouched(source: &[u8], target: &[u8]) -> TestResult {
 }
 
 fn unknown_image_wire(source: &[u8]) -> TestResult<Vec<Vec<u8>>> {
-    let root = WireView::parse(source)?;
+    let root = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)?;
     let adjustments = root
         .fields()
         .find(|field| field.number() == IMAGE_ADJUSTMENTS_FIELD)
@@ -175,25 +176,31 @@ fn unknown_image_wire(source: &[u8]) -> TestResult<Vec<Vec<u8>>> {
         .map(|field| field.raw().to_vec())
         .collect::<Vec<_>>();
     records.extend(
-        WireView::parse(adjustments.payload())?
-            .fields()
-            .filter(|field| !ADJUSTMENT_FIELDS.contains(&field.number()))
-            .map(|field| field.raw().to_vec()),
+        WireView::parse(
+            adjustments.payload(),
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?
+        .fields()
+        .filter(|field| !ADJUSTMENT_FIELDS.contains(&field.number()))
+        .map(|field| field.raw().to_vec()),
     );
     Ok(records)
 }
 
 fn sharpness_wire(source: &[u8]) -> TestResult<Vec<Vec<u8>>> {
-    let root = WireView::parse(source)?;
+    let root = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)?;
     let adjustments = root
         .fields()
         .find(|field| field.number() == IMAGE_ADJUSTMENTS_FIELD)
         .ok_or_else(|| io::Error::other("native image-adjustments field is missing"))?;
-    Ok(WireView::parse(adjustments.payload())?
-        .fields()
-        .filter(|field| field.number() == SHARPNESS_FIELD)
-        .map(|field| field.raw().to_vec())
-        .collect())
+    Ok(WireView::parse(
+        adjustments.payload(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?
+    .fields()
+    .filter(|field| field.number() == SHARPNESS_FIELD)
+    .map(|field| field.raw().to_vec())
+    .collect())
 }
 
 fn sharpness_value(source: &[u8]) -> TestResult<Option<f32>> {

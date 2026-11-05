@@ -1,0 +1,29 @@
+unified-query profile xlsx_1000_bytes_all_cell_v1 5 [base] 10,079,376
+unified-query profile xlsx_1000_bytes_all_cell_v1 5 [after] 9,222,731
+unified-query profile xlsx_1000_bytes_all_cell_value_gt_v1 5 [base] 16,503,046
+unified-query profile xlsx_1000_bytes_all_cell_value_gt_v1 5 [after] 14,255,036
+unified-query profile xlsb_1000_bytes_all_cell_v1 5 [base] 12,288,823
+unified-query profile xlsb_1000_bytes_all_cell_v1 5 [after] 11,687,598
+unified-query profile xlsb_1000_bytes_all_cell_value_gt_v1 5 [base] 27,091,083
+unified-query profile xlsb_1000_bytes_all_cell_value_gt_v1 5 [after] 25,446,308
+unified-query profile pptx_small_bytes_all_shape_v1 5 [base] 606,281
+unified-query profile pptx_small_bytes_all_shape_v1 5 [after] 636,346
+unified-query profile pptx_small_bytes_all_shape_width_v1 5 [base] 838,966
+unified-query profile pptx_small_bytes_all_shape_width_v1 5 [after] 814,331
+unified-query profile pptx_small_bytes_all_shape_contains_v1 5 [base] 679,546
+unified-query profile pptx_small_bytes_all_shape_contains_v1 5 [after] 659,771
+unified-query profile docx_drawing_bytes_all_run_bold_v1 5 [base] 401,164,627
+unified-query profile docx_drawing_bytes_all_run_bold_v1 5 [after] 399,984,345
+unified-query profile docx_saut_bytes_all_run_bold_v1 5 [base] 1,851,939
+unified-query profile docx_saut_bytes_all_run_bold_v1 5 [after] 1,838,390
+xls_read_bench unified_get 1000 cells eager (1001 gets + text) [base] 7,139,456
+xls_read_bench unified_scan 1000 cells eager [base] 3,692,167
+xls_read_bench unified_get 1000 cells eager (1001 gets + text) [after] 5,235,186
+xls_read_bench unified_scan 1000 cells eager [after] 3,553,851
+xls_read_bench unified_get 1000 cells positional (1001 gets + text) [base] 15,807,575
+xls_read_bench unified_scan 1000 cells positional [base] 7,065,979
+xls_read_bench unified_get 1000 cells positional (1001 gets + text) [after] 13,932,068
+xls_read_bench unified_scan 1000 cells positional [after] 6,913,120
+ods_unified_bench unified_query (query_warm, 1+1+4 calls) [base] 19,740,870
+ods_unified_bench unified_query (query_warm, 1+1+4 calls) [after] 17,899,892
+done

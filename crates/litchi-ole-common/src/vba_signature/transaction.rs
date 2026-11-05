@@ -38,13 +38,13 @@ impl Revision {
 
 /// An isolated typed edit over one immutable VBA signature snapshot.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub struct Edit {
     source: Snapshot,
     signature: Vec<u8>,
     certificate_store: Vec<u8>,
 }
 
-impl Transaction {
+impl Edit {
     pub(super) fn new(source: Snapshot) -> Self {
         Self {
             signature: source.info().signature().to_vec(),
@@ -73,7 +73,7 @@ impl Transaction {
 
     /// Whether either opaque payload differs from the source projection.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn has_changes(&self) -> bool {
         self.signature != self.source.info().signature()
             || self.certificate_store != self.source.info().certificate_store()
     }
@@ -166,22 +166,6 @@ impl Transaction {
         self.stage(&mut signature, certificate_store)
     }
 
-    /// Projects the current draft as a validated immutable snapshot.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error`] when the staged payloads cannot be serialized under
-    /// the source limits.
-    pub fn snapshot(&self) -> Result<Snapshot, Error> {
-        self.materialize()
-    }
-
-    /// Discards all staged changes and recovers the exact source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
-    }
-
     /// Publishes the draft as a reversible source-checked edit.
     ///
     /// # Errors
@@ -191,16 +175,8 @@ impl Transaction {
     pub fn commit(self) -> Result<Commit, Error> {
         let snapshot = self.materialize()?;
         let patch = Patch::new(self.source, snapshot.clone());
-        Ok(Commit { snapshot, patch })
-    }
-
-    /// Alias for [`Self::commit`] using writer terminology.
-    ///
-    /// # Errors
-    ///
-    /// Returns the same errors as [`Self::commit`].
-    pub fn finish(self) -> Result<Commit, Error> {
-        self.commit()
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(snapshot, patch, diagnostics))
     }
 
     fn stage(
@@ -223,7 +199,7 @@ impl Transaction {
     }
 
     fn materialize(&self) -> Result<Snapshot, Error> {
-        if !self.is_changed() {
+        if !self.has_changes() {
             return Ok(self.source.clone());
         }
         let bytes = codec::rewrite(
@@ -242,50 +218,12 @@ impl Transaction {
     }
 }
 
-/// A successful immutable VBA signature publication and its reversible patch.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
+/// A published edit: the new snapshot, its reversible patch and
+/// diagnostics.
+pub type Commit = litchi_core::edit::Commit<Snapshot, Patch>;
 
-impl Commit {
-    /// Whether publication changed any source byte.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        !self.patch.is_noop()
-    }
-
-    /// Borrows the published immutable snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Borrows the reversible source-checked patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consumes the publication into its target snapshot.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
-    }
-
-    /// Consumes the publication into its reversible patch.
-    #[must_use]
-    pub fn into_patch(self) -> Patch {
-        self.patch
-    }
-
-    /// Splits the publication into its target snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
-    }
-}
+/// Content-free diagnostics of one commit.
+pub use litchi_core::edit::Diagnostics;
 
 /// Runs one isolated payload edit and publishes it atomically.
 ///
@@ -295,7 +233,7 @@ impl Commit {
 /// be represented under the source limits.
 pub fn update<F>(snapshot: &Snapshot, edit: F) -> Result<Commit, Error>
 where
-    F: FnOnce(&mut Transaction) -> Result<(), Error>,
+    F: FnOnce(&mut Edit) -> Result<(), Error>,
 {
     let mut transaction = snapshot.edit();
     edit(&mut transaction)?;

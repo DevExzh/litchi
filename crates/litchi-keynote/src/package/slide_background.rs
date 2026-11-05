@@ -39,7 +39,7 @@ use litchi_iwa_protos::package_metadata_codec::{
     RemovalBatch, RewriteOptions as MetadataRewriteOptions, UuidBits,
     inspect_package_metadata_with_visitor, remove_package_metadata, rewrite_package_metadata,
 };
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::{Package, PhysicalSource, ReadError, SLIDE_MESSAGE_TYPE, SemanticLimitKind};
 use crate::{Background, Gradient, Kind, SlideSelector, SlideSelectorError, Stop};
@@ -89,7 +89,7 @@ const CHILDREN_FIELD: u32 = 2;
 /// A finite resource governed while a slide-background transaction runs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum SlideBackgroundLimitKind {
+pub enum LimitKind {
     /// Complete package input bytes.
     InputBytes,
     /// Complete rewritten package output bytes.
@@ -114,7 +114,7 @@ pub enum SlideBackgroundLimitKind {
     WireWork,
 }
 
-impl fmt::Display for SlideBackgroundLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -133,9 +133,41 @@ impl fmt::Display for SlideBackgroundLimitKind {
 }
 
 /// A content-redacted slide-background package failure.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum SlideBackgroundError {
+pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The selected graph or payload is not safe to edit.
+    #[error("the Keynote slide-background source cannot be edited safely")]
+    InvalidSource,
+    /// A finite resource ceiling was exceeded.
+    #[error(
+        "Keynote slide-background {kind} limit exceeded: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        kind: LimitKind,
+        observed: u64,
+        maximum: u64,
+    },
+    /// A bounded allocation failed.
+    #[error("could not allocate {amount} units for the Keynote slide-background transaction")]
+    Allocation { amount: usize },
+    /// Candidate reopening did not reproduce the requested semantic state.
+    #[error("the edited Keynote slide background failed semantic verification")]
+    Verification,
+    /// The patch does not belong to this exact immutable package artifact.
+    #[error("the Keynote slide-background patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The source was prepared without an exact physical package artifact.
     #[error("this Keynote source does not support physical slide-background edits")]
     UnsupportedSource,
@@ -151,32 +183,34 @@ pub enum SlideBackgroundError {
     /// A name selector matched multiple slides.
     #[error("the Keynote slide-background selector is ambiguous")]
     AmbiguousSelector,
-    /// The selected graph or payload is not safe to edit.
-    #[error("the Keynote slide-background source cannot be edited safely")]
-    InvalidSource,
-    /// A finite resource ceiling was exceeded.
-    #[error(
-        "Keynote slide-background {kind} limit exceeded: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        kind: SlideBackgroundLimitKind,
-        observed: u64,
-        maximum: u64,
-    },
-    /// A bounded allocation failed.
-    #[error("could not allocate {amount} units for the Keynote slide-background transaction")]
-    Allocation { amount: usize },
-    /// Candidate reopening did not reproduce the requested semantic state.
-    #[error("the edited Keynote slide background failed semantic verification")]
-    Verification,
-    /// The patch does not belong to this exact immutable package artifact.
-    #[error("the Keynote slide-background patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+            Self::EmptySlideName { .. } | Self::AmbiguousSelector { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::SlideNameNotFound { .. } | Self::SlidePositionNotFound { .. } => {
+                RefusalKind::NotFound
+            },
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// One mutable semantic slide-background edit staged against an immutable
 /// package snapshot.
-pub struct SlideBackgroundEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
     slide_position: Position,
     slide_identifier: u64,
@@ -192,10 +226,10 @@ enum Desired {
     Reset,
 }
 
-impl fmt::Debug for SlideBackgroundEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SlideBackgroundEdit")
+            .debug_struct("Edit")
             .field("slide_position", &self.slide_position)
             .field("has_before_override", &self.before_override.is_some())
             .field("desired", &self.desired)
@@ -203,8 +237,8 @@ impl fmt::Debug for SlideBackgroundEdit<'_> {
     }
 }
 
-impl<'a> SlideBackgroundEdit<'a> {
-    fn new(source: &'a Package, position: Position) -> Result<Self, SlideBackgroundError> {
+impl<'a> Edit<'a> {
+    fn new(source: &'a Package, position: Position) -> Result<Self, Error> {
         let selection = select_slide(source, position)?;
         let before = selection.effective;
         Ok(Self {
@@ -246,44 +280,44 @@ impl<'a> SlideBackgroundEdit<'a> {
     }
 
     /// Stage a semantic background value, including explicit [`Background::None`].
-    pub fn set(mut self, background: Background) -> Result<Self, SlideBackgroundError> {
+    pub fn set(mut self, background: Background) -> Result<Self, Error> {
         if matches!(&background, Background::Unsupported) {
-            return Err(SlideBackgroundError::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         self.desired = Desired::Set(background);
         Ok(self)
     }
 
     /// Stage an explicit solid fill.
-    pub fn set_solid(self, color: Rgba) -> Result<Self, SlideBackgroundError> {
+    pub fn set_solid(self, color: Rgba) -> Result<Self, Error> {
         self.set(Background::Solid(color))
     }
 
     /// Stage a validated native gradient.
-    pub fn set_gradient(self, gradient: Gradient) -> Result<Self, SlideBackgroundError> {
+    pub fn set_gradient(self, gradient: Gradient) -> Result<Self, Error> {
         self.set(Background::Gradient(gradient))
     }
 
     /// Stage removal of the direct override and restoration of inheritance.
-    pub fn clear(mut self) -> Result<Self, SlideBackgroundError> {
+    pub fn clear(mut self) -> Result<Self, Error> {
         self.desired = Desired::Reset;
         Ok(self)
     }
 
     /// Alias for [`Self::clear`].
-    pub fn reset(self) -> Result<Self, SlideBackgroundError> {
+    pub fn reset(self) -> Result<Self, Error> {
         self.clear()
     }
 
     /// Validate and publish the immutable candidate.
-    pub fn commit(self) -> Result<SlideBackgroundCommit, SlideBackgroundError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         commit_edit(self)
     }
 }
 
 /// An exact-source-checked reversible semantic slide-background patch.
 #[derive(Clone)]
-pub struct SlideBackgroundPatch {
+pub struct Patch {
     artifacts: ExactArtifacts,
     slide_position: Position,
     slide_identifier: u64,
@@ -299,10 +333,10 @@ pub struct SlideBackgroundPatch {
     deleted_previews: usize,
 }
 
-impl fmt::Debug for SlideBackgroundPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SlideBackgroundPatch")
+            .debug_struct("Patch")
             .field("slide_position", &self.slide_position)
             .field("reset", &self.reset)
             .field("source_fingerprint", &self.artifacts.source_fingerprint())
@@ -311,7 +345,7 @@ impl fmt::Debug for SlideBackgroundPatch {
     }
 }
 
-impl SlideBackgroundPatch {
+impl Patch {
     /// Return the selected semantic slide position.
     #[must_use]
     pub const fn slide_position(&self) -> Position {
@@ -389,7 +423,7 @@ impl SlideBackgroundPatch {
     }
 }
 
-impl PartialEq for SlideBackgroundPatch {
+impl PartialEq for Patch {
     fn eq(&self, other: &Self) -> bool {
         self.artifacts == other.artifacts
             && self.slide_position == other.slide_position
@@ -409,14 +443,14 @@ impl PartialEq for SlideBackgroundPatch {
 
 /// Compact publication diagnostics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct SlideBackgroundDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     deleted_previews: usize,
     full_reparse_performed: bool,
 }
 
-impl SlideBackgroundDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -458,13 +492,13 @@ impl SlideBackgroundDiagnostics {
 /// Fully verified result of one immutable slide-background transaction.
 #[must_use = "a Keynote slide-background commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct SlideBackgroundCommit {
+pub struct Commit {
     package: Package,
-    patch: SlideBackgroundPatch,
-    diagnostics: SlideBackgroundDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl SlideBackgroundCommit {
+impl Commit {
     /// Borrow the fully reopened package snapshot.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -475,14 +509,20 @@ impl SlideBackgroundCommit {
     pub fn into_package(self) -> Package {
         self.package
     }
+
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
     /// Borrow the exact reversible patch.
     #[must_use]
-    pub const fn patch(&self) -> &SlideBackgroundPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
     /// Borrow compact diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> &SlideBackgroundDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
@@ -492,7 +532,7 @@ impl Package {
     pub fn slide_background<'selector>(
         &self,
         selector: impl Into<SlideSelector<'selector>>,
-    ) -> Result<Background, SlideBackgroundError> {
+    ) -> Result<Background, Error> {
         let position = resolve_slide_position(self, selector.into())?;
         Ok(select_slide(self, position)?.effective)
     }
@@ -501,7 +541,7 @@ impl Package {
     pub fn slide_background_override<'selector>(
         &self,
         selector: impl Into<SlideSelector<'selector>>,
-    ) -> Result<Option<Background>, SlideBackgroundError> {
+    ) -> Result<Option<Background>, Error> {
         let position = resolve_slide_position(self, selector.into())?;
         Ok(select_slide(self, position)?.direct)
     }
@@ -510,16 +550,13 @@ impl Package {
     pub fn edit_slide_background<'selector>(
         &self,
         selector: impl Into<SlideSelector<'selector>>,
-    ) -> Result<SlideBackgroundEdit<'_>, SlideBackgroundError> {
+    ) -> Result<Edit<'_>, Error> {
         let position = resolve_slide_position(self, selector.into())?;
-        SlideBackgroundEdit::new(self, position)
+        Edit::new(self, position)
     }
 
     /// Apply an exact-source-checked slide-background patch.
-    pub fn apply_slide_background(
-        &self,
-        patch: &SlideBackgroundPatch,
-    ) -> Result<SlideBackgroundCommit, SlideBackgroundError> {
+    pub fn apply_slide_background(&self, patch: &Patch) -> Result<Commit, Error> {
         apply_patch(self, patch)
     }
 }
@@ -551,13 +588,13 @@ struct StyleState {
 fn resolve_slide_position(
     package: &Package,
     selector: SlideSelector<'_>,
-) -> Result<Position, SlideBackgroundError> {
+) -> Result<Position, Error> {
     match selector {
         SlideSelector::Position(position) => package
             .slide_record_at(position.get())
             .map_err(map_read_error)?
             .map(|_| position)
-            .ok_or(SlideBackgroundError::SlidePositionNotFound { position }),
+            .ok_or(Error::Refused(Refusal::SlidePositionNotFound { position })),
         SlideSelector::Name(name) => {
             let selector = SlideSelector::try_name(name).map_err(map_slide_selector_error)?;
             package
@@ -566,24 +603,24 @@ fn resolve_slide_position(
                 .select_slide(selector)
                 .map_err(map_slide_selector_error)?
                 .map(|slide| Position::new(slide.index()))
-                .ok_or(SlideBackgroundError::SlideNameNotFound)
+                .ok_or(Error::Refused(Refusal::SlideNameNotFound))
         },
     }
 }
 
-fn select_slide(package: &Package, position: Position) -> Result<Selection, SlideBackgroundError> {
+fn select_slide(package: &Package, position: Position) -> Result<Selection, Error> {
     let record = package
         .slide_record_at(position.get())
         .map_err(map_read_error)?
-        .ok_or(SlideBackgroundError::SlidePositionNotFound { position })?;
+        .ok_or(Error::Refused(Refusal::SlidePositionNotFound { position }))?;
     let (slide_component, slide_object) = package
         .object_with_component(record.slide_identifier)
-        .ok_or(SlideBackgroundError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let slide_payload = exactly_one_payload(slide_object, SLIDE_MESSAGE_TYPE)?;
     let style_identifier = required_reference_field(package, &slide_payload, SLIDE_STYLE_FIELD)?;
     let (style_component, _) = package
         .object_with_component(style_identifier)
-        .ok_or(SlideBackgroundError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let style = read_style(package, style_identifier)?;
     let stylesheet_identifier = style.stylesheet.unwrap_or(0);
     let stylesheet_component = if stylesheet_identifier == 0 {
@@ -592,7 +629,7 @@ fn select_slide(package: &Package, position: Position) -> Result<Selection, Slid
         package
             .object_with_component(stylesheet_identifier)
             .map(|(component, _)| component.to_owned())
-            .ok_or(SlideBackgroundError::InvalidSource)?
+            .ok_or(Error::InvalidSource)?
     };
     let direct = if style.variation == Some(true) {
         style
@@ -617,15 +654,12 @@ fn select_slide(package: &Package, position: Position) -> Result<Selection, Slid
     })
 }
 
-fn resolve_effective(
-    package: &Package,
-    initial_style: u64,
-) -> Result<Background, SlideBackgroundError> {
+fn resolve_effective(package: &Package, initial_style: u64) -> Result<Background, Error> {
     let mut style_identifier = initial_style;
     let mut visited = HashSet::new();
     loop {
         if !visited.insert(style_identifier) {
-            return Err(SlideBackgroundError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let style = read_style(package, style_identifier)?;
         if let Some(fill) = style.fill.as_deref() {
@@ -638,15 +672,15 @@ fn resolve_effective(
     }
 }
 
-fn read_style(package: &Package, identifier: u64) -> Result<StyleState, SlideBackgroundError> {
+fn read_style(package: &Package, identifier: u64) -> Result<StyleState, Error> {
     let (_component, object) = package
         .object_with_component(identifier)
-        .ok_or(SlideBackgroundError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let raw = exactly_one_payload(object, SLIDE_STYLE_MESSAGE_TYPE)?;
     let limits = package.wire_limits().map_err(map_wire_error)?;
-    let outer = WireView::parse_with_limits(&raw, limits).map_err(map_wire_error)?;
+    let outer = WireView::parse(&raw, limits).map_err(map_wire_error)?;
     let super_payload = required_bytes(&outer, &raw, STYLE_SUPER_FIELD)?;
-    let super_view = WireView::parse_with_limits(super_payload, limits).map_err(map_wire_error)?;
+    let super_view = WireView::parse(super_payload, limits).map_err(map_wire_error)?;
     let parent = optional_reference(&super_view, super_payload, STYLE_PARENT_FIELD, limits)?;
     let variation = optional_bool(&super_view, STYLE_VARIATION_FIELD)?;
     let stylesheet =
@@ -670,7 +704,7 @@ fn read_style(package: &Package, identifier: u64) -> Result<StyleState, SlideBac
     })
 }
 
-fn decode_background(package: &Package, source: &[u8]) -> Result<Background, SlideBackgroundError> {
+fn decode_background(package: &Package, source: &[u8]) -> Result<Background, Error> {
     let options = codec_options(package, source)?;
     let wire_limits = package.wire_limits().map_err(map_wire_error)?;
     let (snapshot, _report) =
@@ -682,7 +716,7 @@ fn snapshot_to_background(
     snapshot: codec::BackgroundSnapshot<'_>,
     options: codec::DecodeOptions,
     wire_limits: WireLimits,
-) -> Result<Background, SlideBackgroundError> {
+) -> Result<Background, Error> {
     match snapshot {
         codec::BackgroundSnapshot::None { .. } => Ok(Background::None),
         codec::BackgroundSnapshot::Opaque { .. } | codec::BackgroundSnapshot::Image { .. } => {
@@ -708,9 +742,8 @@ fn snapshot_to_background(
 fn gradient_wire_has_only_semantic_fields(
     gradient: codec::GradientSnapshot<'_>,
     limits: WireLimits,
-) -> Result<bool, SlideBackgroundError> {
-    let gradient_view =
-        WireView::parse_with_limits(gradient.raw, limits).map_err(map_wire_error)?;
+) -> Result<bool, Error> {
+    let gradient_view = WireView::parse(gradient.raw, limits).map_err(map_wire_error)?;
     if !has_only_field_numbers(
         &gradient_view,
         &[
@@ -725,7 +758,7 @@ fn gradient_wire_has_only_semantic_fields(
     }
 
     let angle = required_bytes(&gradient_view, gradient.raw, GRADIENT_ANGLE_FIELD)?;
-    let angle_view = WireView::parse_with_limits(angle, limits).map_err(map_wire_error)?;
+    let angle_view = WireView::parse(angle, limits).map_err(map_wire_error)?;
     if !has_exact_field_numbers(&angle_view, &[ANGLE_RADIANS_FIELD]) {
         return Ok(false);
     }
@@ -735,10 +768,10 @@ fn gradient_wire_has_only_semantic_fields(
         .filter(|field| field.number() == GRADIENT_STOP_FIELD)
     {
         if field.wire_type() != 2 {
-            return Err(SlideBackgroundError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let stop = field.payload();
-        let stop_view = WireView::parse_with_limits(stop, limits).map_err(map_wire_error)?;
+        let stop_view = WireView::parse(stop, limits).map_err(map_wire_error)?;
         if !has_exact_field_numbers(
             &stop_view,
             &[STOP_COLOR_FIELD, STOP_POSITION_FIELD, STOP_MIDPOINT_FIELD],
@@ -746,7 +779,7 @@ fn gradient_wire_has_only_semantic_fields(
             return Ok(false);
         }
         let color = required_bytes(&stop_view, stop, STOP_COLOR_FIELD)?;
-        let color_view = WireView::parse_with_limits(color, limits).map_err(map_wire_error)?;
+        let color_view = WireView::parse(color, limits).map_err(map_wire_error)?;
         if !has_only_field_numbers(
             &color_view,
             &[
@@ -764,7 +797,7 @@ fn gradient_wire_has_only_semantic_fields(
     Ok(true)
 }
 
-fn rgba_from_color(color: codec::ColorSnapshot) -> Result<Rgba, SlideBackgroundError> {
+fn rgba_from_color(color: codec::ColorSnapshot) -> Result<Rgba, Error> {
     if color.model != 1
         || color.cyan.is_some()
         || color.magenta.is_some()
@@ -772,67 +805,53 @@ fn rgba_from_color(color: codec::ColorSnapshot) -> Result<Rgba, SlideBackgroundE
         || color.black.is_some()
         || color.white.is_some()
     {
-        return Err(SlideBackgroundError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let (Some(red), Some(green), Some(blue), Some(space)) =
         (color.red, color.green, color.blue, color.rgb_space)
     else {
-        return Err(SlideBackgroundError::InvalidSource);
+        return Err(Error::InvalidSource);
     };
     let color_space = match space {
         1 => RgbColorSpace::Srgb,
         2 => RgbColorSpace::DisplayP3,
-        _ => return Err(SlideBackgroundError::InvalidSource),
+        _ => return Err(Error::InvalidSource),
     };
     Rgba::new(red, green, blue, color.alpha.unwrap_or(1.0), color_space)
-        .map_err(|_| SlideBackgroundError::InvalidSource)
+        .map_err(|_| Error::InvalidSource)
 }
 
 fn gradient_from_snapshot(
     gradient: codec::GradientSnapshot<'_>,
     options: codec::DecodeOptions,
-) -> Result<Gradient, SlideBackgroundError> {
+) -> Result<Gradient, Error> {
     let kind = match gradient.gradient_type {
         Some(0) => Kind::Linear,
         Some(1) => Kind::Radial,
-        _ => return Err(SlideBackgroundError::InvalidSource),
+        _ => return Err(Error::InvalidSource),
     };
-    let opacity = Opacity::new(
-        gradient
-            .opacity
-            .ok_or(SlideBackgroundError::InvalidSource)?,
-    )
-    .map_err(|_| SlideBackgroundError::InvalidSource)?;
-    let advanced = gradient
-        .advanced
-        .ok_or(SlideBackgroundError::InvalidSource)?;
-    let angle = crate::Angle::from_radians(
-        gradient
-            .angle_radians
-            .ok_or(SlideBackgroundError::InvalidSource)?,
-    )
-    .map_err(|_| SlideBackgroundError::InvalidSource)?;
+    let opacity = Opacity::new(gradient.opacity.ok_or(Error::InvalidSource)?)
+        .map_err(|_| Error::InvalidSource)?;
+    let advanced = gradient.advanced.ok_or(Error::InvalidSource)?;
+    let angle = crate::Angle::from_radians(gradient.angle_radians.ok_or(Error::InvalidSource)?)
+        .map_err(|_| Error::InvalidSource)?;
     if gradient.transform.is_some() {
-        return Err(SlideBackgroundError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut stops = Vec::new();
     for stop in gradient.stops(options) {
         let stop = stop.map_err(map_codec_error)?;
-        let color = rgba_from_color(stop.color.ok_or(SlideBackgroundError::InvalidSource)?)?;
-        let position = StopPosition::new(stop.fraction.ok_or(SlideBackgroundError::InvalidSource)?)
-            .map_err(|_| SlideBackgroundError::InvalidSource)?;
-        let midpoint =
-            StopMidpoint::new(stop.inflection.ok_or(SlideBackgroundError::InvalidSource)?)
-                .map_err(|_| SlideBackgroundError::InvalidSource)?;
+        let color = rgba_from_color(stop.color.ok_or(Error::InvalidSource)?)?;
+        let position = StopPosition::new(stop.fraction.ok_or(Error::InvalidSource)?)
+            .map_err(|_| Error::InvalidSource)?;
+        let midpoint = StopMidpoint::new(stop.inflection.ok_or(Error::InvalidSource)?)
+            .map_err(|_| Error::InvalidSource)?;
         stops.push(Stop::new(color, position, midpoint));
     }
-    Gradient::from_parts(kind, stops, opacity, advanced, angle)
-        .map_err(|_| SlideBackgroundError::InvalidSource)
+    Gradient::from_parts(kind, stops, opacity, advanced, angle).map_err(|_| Error::InvalidSource)
 }
 
-fn commit_edit(
-    edit: SlideBackgroundEdit<'_>,
-) -> Result<SlideBackgroundCommit, SlideBackgroundError> {
+fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     let catalog = physical_catalog(edit.source)?;
     let source_bytes = catalog.shared_source();
     let source_selection = select_slide(edit.source, edit.slide_position)?;
@@ -841,7 +860,7 @@ fn commit_edit(
         || source_selection.effective != edit.before
         || source_selection.direct != edit.before_override
     {
-        return Err(SlideBackgroundError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let (after, reset) = match &edit.desired {
         Desired::Set(value) => (Some(value.clone()), false),
@@ -860,7 +879,7 @@ fn commit_edit(
     let before_override = edit.before_override.clone();
     if unchanged {
         edit.source.validate().map_err(map_read_error)?;
-        let patch = SlideBackgroundPatch {
+        let patch = Patch {
             artifacts: ExactArtifacts::new(Arc::clone(&source_bytes), source_bytes),
             slide_position: edit.slide_position,
             slide_identifier: edit.slide_identifier,
@@ -875,24 +894,21 @@ fn commit_edit(
             touched_components: 0,
             deleted_previews: 0,
         };
-        return Ok(SlideBackgroundCommit {
+        return Ok(Commit {
             package: edit.source.snapshot(),
             patch,
-            diagnostics: SlideBackgroundDiagnostics::unchanged(),
+            diagnostics: Diagnostics::unchanged(),
         });
     }
     if edit.before == Background::Unsupported {
-        return Err(SlideBackgroundError::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     if !catalog.source_is_exact() {
-        return Err(SlideBackgroundError::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     edit.source.validate().map_err(map_read_error)?;
     let reset_effective = if reset {
-        let parent = source_selection
-            .style
-            .parent
-            .ok_or(SlideBackgroundError::InvalidSource)?;
+        let parent = source_selection.style.parent.ok_or(Error::InvalidSource)?;
         Some(resolve_effective(edit.source, parent)?)
     } else {
         None
@@ -904,23 +920,17 @@ fn commit_edit(
     let candidate_ok = if reset {
         candidate_selection.direct.is_none()
             && candidate_selection.effective
-                == reset_effective
-                    .clone()
-                    .ok_or(SlideBackgroundError::Verification)?
+                == reset_effective.clone().ok_or(Error::Verification)?
     } else {
         candidate_selection.direct.as_ref() == after.as_ref()
-            && candidate_selection.effective
-                == after
-                    .as_ref()
-                    .ok_or(SlideBackgroundError::Verification)?
-                    .clone()
+            && candidate_selection.effective == after.as_ref().ok_or(Error::Verification)?.clone()
     };
     if !candidate_ok || candidate_selection.slide_identifier != edit.slide_identifier {
-        return Err(SlideBackgroundError::Verification);
+        return Err(Error::Verification);
     }
     let target_effective = candidate_selection.effective.clone();
     let target = physical_catalog(&candidate)?.shared_source();
-    let patch = SlideBackgroundPatch {
+    let patch = Patch {
         artifacts: ExactArtifacts::new(source_bytes, Arc::clone(&target)),
         slide_position: edit.slide_position,
         slide_identifier: edit.slide_identifier,
@@ -935,21 +945,18 @@ fn commit_edit(
         touched_components: touched,
         deleted_previews,
     };
-    Ok(SlideBackgroundCommit {
+    Ok(Commit {
         package: candidate,
         patch,
-        diagnostics: SlideBackgroundDiagnostics::published(touched, deleted_previews),
+        diagnostics: Diagnostics::published(touched, deleted_previews),
     })
 }
 
-fn apply_patch(
-    source: &Package,
-    patch: &SlideBackgroundPatch,
-) -> Result<SlideBackgroundCommit, SlideBackgroundError> {
+fn apply_patch(source: &Package, patch: &Patch) -> Result<Commit, Error> {
     let catalog = physical_catalog(source)?;
     let source_bytes = catalog.shared_source();
     if !patch.artifacts.authorizes_source(&source_bytes) {
-        return Err(SlideBackgroundError::PatchConflict);
+        return Err(Error::PatchConflict);
     }
     let selection = select_slide(source, patch.slide_position)?;
     if selection.slide_identifier != patch.slide_identifier
@@ -957,18 +964,18 @@ fn apply_patch(
         || selection.effective != patch.before
         || selection.direct != patch.before_override
     {
-        return Err(SlideBackgroundError::PatchConflict);
+        return Err(Error::PatchConflict);
     }
     if patch.is_noop() {
         source.validate().map_err(map_read_error)?;
-        return Ok(SlideBackgroundCommit {
+        return Ok(Commit {
             package: source.snapshot(),
             patch: patch.clone(),
-            diagnostics: SlideBackgroundDiagnostics::unchanged(),
+            diagnostics: Diagnostics::unchanged(),
         });
     }
     if !catalog.source_is_exact() {
-        return Err(SlideBackgroundError::PatchConflict);
+        return Err(Error::PatchConflict);
     }
     let candidate =
         Package::from_source_with_options(patch.artifacts.target(), source.state.options)
@@ -981,22 +988,19 @@ fn apply_patch(
         || candidate_selection.slide_identifier != patch.slide_identifier
         || candidate_selection.style_identifier != patch.target_style_identifier
     {
-        return Err(SlideBackgroundError::Verification);
+        return Err(Error::Verification);
     }
-    Ok(SlideBackgroundCommit {
+    Ok(Commit {
         package: candidate,
         patch: patch.clone(),
-        diagnostics: SlideBackgroundDiagnostics::published(
-            patch.touched_components,
-            patch.deleted_previews,
-        ),
+        diagnostics: Diagnostics::published(patch.touched_components, patch.deleted_previews),
     })
 }
 
-fn physical_catalog(package: &Package) -> Result<&SourceCatalog, SlideBackgroundError> {
+fn physical_catalog(package: &Package) -> Result<&SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
-        PhysicalSource::Semantic(_) => Err(SlideBackgroundError::UnsupportedSource),
+        PhysicalSource::Semantic(_) => Err(Error::Refused(Refusal::UnsupportedSource)),
     }
 }
 
@@ -1005,19 +1009,25 @@ fn rewrite_package(
     selection: &Selection,
     after: Option<&Background>,
     reset: bool,
-) -> Result<(Package, usize, usize), SlideBackgroundError> {
+) -> Result<(Package, usize, usize), Error> {
     let catalog = physical_catalog(source)?;
     if selection.stylesheet_identifier == 0 || selection.stylesheet_component.is_empty() {
-        return Err(SlideBackgroundError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if selection.style_component != selection.stylesheet_component {
-        return Err(SlideBackgroundError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let archive_limits = source
         .state
         .options
         .archive()
         .effective_archive_limits()
+        .map_err(map_archive_error)?;
+    let snappy_limits = source
+        .state
+        .options
+        .archive()
+        .snappy_limits()
         .map_err(map_archive_error)?;
     let metadata_component = metadata_component_name(source)?;
     let mut names = vec![
@@ -1039,11 +1049,11 @@ fn rewrite_package(
             .package()
             .iter()
             .find(|entry| entry.name() == name)
-            .ok_or(SlideBackgroundError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if entry.is_opaque() {
-            return Err(SlideBackgroundError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
-        let stream = SnappyStream::decompress_with_limits(
+        let stream = SnappyStream::decompress(
             entry.data(),
             source
                 .state
@@ -1053,8 +1063,7 @@ fn rewrite_package(
                 .map_err(map_archive_error)?,
         )
         .map_err(map_core_error)?;
-        let archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
-            .map_err(map_core_error)?;
+        let archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
         archives.push((name.to_owned(), archive));
     }
     let new_id = next_object_identifier(source)?;
@@ -1062,7 +1071,7 @@ fn rewrite_package(
     if reset {
         mutate_reset(source, selection, &mut archives, new_id, archive_limits)?;
     } else {
-        let desired = after.ok_or(SlideBackgroundError::InvalidSource)?;
+        let desired = after.ok_or(Error::InvalidSource)?;
         mutate_set(
             source,
             selection,
@@ -1083,10 +1092,8 @@ fn rewrite_package(
     }
     let mut compressed = Vec::new();
     for (name, archive) in &archives {
-        let bytes = archive
-            .to_bytes_with_limits(archive_limits)
-            .map_err(map_core_error)?;
-        let data = SnappyStream::compress(&bytes).map_err(map_core_error)?;
+        let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
+        let data = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
         compressed.push((name.clone(), data));
     }
     let edits = compressed
@@ -1111,23 +1118,20 @@ fn metadata_mutation_for(
     selection: &Selection,
     new_id: u64,
     reset: bool,
-) -> Result<MetadataMutation, SlideBackgroundError> {
+) -> Result<MetadataMutation, Error> {
     if reset {
         if selection.style.variation != Some(true)
             || selection.style.parent.is_none()
             || selection.style.fill.is_none()
         {
-            return Err(SlideBackgroundError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let collapsible = style_is_collapsible(source, selection)?;
         let exclusive = style_is_exclusive(source, selection)?;
         if collapsible {
             return Ok(MetadataMutation::Replace {
                 old_style: selection.style_identifier,
-                new_style: selection
-                    .style
-                    .parent
-                    .ok_or(SlideBackgroundError::InvalidSource)?,
+                new_style: selection.style.parent.ok_or(Error::InvalidSource)?,
                 new_last_identifier: new_id,
                 remove_uuid: exclusive,
                 add_uuid: false,
@@ -1156,23 +1160,17 @@ fn metadata_mutation_for(
     }
 }
 
-fn next_object_identifier(package: &Package) -> Result<u64, SlideBackgroundError> {
+fn next_object_identifier(package: &Package) -> Result<u64, Error> {
     let mut maximum = 0_u64;
     let limits = package.wire_limits().map_err(map_wire_error)?;
     for component in package.state.source.components().iter() {
         for object in &component.archive().objects {
-            maximum = maximum.max(
-                object
-                    .archive_info
-                    .identifier
-                    .ok_or(SlideBackgroundError::InvalidSource)?,
-            );
+            maximum = maximum.max(object.archive_info.identifier.ok_or(Error::InvalidSource)?);
             for message in &object.messages {
                 if message.type_ != PACKAGE_METADATA_MESSAGE_TYPE {
                     continue;
                 }
-                let view =
-                    WireView::parse_with_limits(&message.data, limits).map_err(map_wire_error)?;
+                let view = WireView::parse(&message.data, limits).map_err(map_wire_error)?;
                 if let Some(last) = optional_varint(&view, 1)? {
                     maximum = maximum.max(last);
                 }
@@ -1180,17 +1178,15 @@ fn next_object_identifier(package: &Package) -> Result<u64, SlideBackgroundError
             }
         }
     }
-    maximum
-        .checked_add(1)
-        .ok_or(SlideBackgroundError::InvalidSource)
+    maximum.checked_add(1).ok_or(Error::InvalidSource)
 }
 
 /// Return the greatest object/component/data identifier carried by the
 /// PackageMetadata registries.  The watermark is not authoritative for
 /// partially-saved native packages, so allocation must also account for
 /// registry records and cross-component references.
-fn metadata_identifier_max(source: &[u8], limits: WireLimits) -> Result<u64, SlideBackgroundError> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+fn metadata_identifier_max(source: &[u8], limits: WireLimits) -> Result<u64, Error> {
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut maximum = 0_u64;
     for field in view.fields() {
         match field.number() {
@@ -1219,11 +1215,8 @@ fn metadata_identifier_max(source: &[u8], limits: WireLimits) -> Result<u64, Sli
     Ok(maximum)
 }
 
-fn metadata_component_identifier_max(
-    source: &[u8],
-    limits: WireLimits,
-) -> Result<u64, SlideBackgroundError> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+fn metadata_component_identifier_max(source: &[u8], limits: WireLimits) -> Result<u64, Error> {
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut maximum = 0_u64;
     for field in view.fields() {
         match field.number() {
@@ -1253,11 +1246,8 @@ fn metadata_component_identifier_max(
     Ok(maximum)
 }
 
-fn metadata_external_identifier(
-    source: &[u8],
-    limits: WireLimits,
-) -> Result<u64, SlideBackgroundError> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+fn metadata_external_identifier(source: &[u8], limits: WireLimits) -> Result<u64, Error> {
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut maximum = 0_u64;
     for field in view.fields() {
         match field.number() {
@@ -1268,17 +1258,14 @@ fn metadata_external_identifier(
     Ok(maximum)
 }
 
-fn metadata_data_reference_identifier(
-    source: &[u8],
-    limits: WireLimits,
-) -> Result<u64, SlideBackgroundError> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+fn metadata_data_reference_identifier(source: &[u8], limits: WireLimits) -> Result<u64, Error> {
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut maximum = 0_u64;
     for field in view.fields() {
         match field.number() {
             1 => maximum = maximum.max(metadata_field_varint(&field)?),
             2 => {
-                let nested = WireView::parse_with_limits(metadata_field_bytes(&field)?, limits)
+                let nested = WireView::parse(metadata_field_bytes(&field)?, limits)
                     .map_err(map_wire_error)?;
                 for nested_field in nested.fields().filter(|field| field.number() == 1) {
                     maximum = maximum.max(metadata_field_varint(&nested_field)?);
@@ -1290,11 +1277,8 @@ fn metadata_data_reference_identifier(
     Ok(maximum)
 }
 
-fn metadata_uuid_identifier(
-    source: &[u8],
-    limits: WireLimits,
-) -> Result<u64, SlideBackgroundError> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+fn metadata_uuid_identifier(source: &[u8], limits: WireLimits) -> Result<u64, Error> {
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     view.fields()
         .filter(|field| field.number() == 1)
         .map(|field| metadata_field_varint(&field))
@@ -1303,11 +1287,8 @@ fn metadata_uuid_identifier(
         .map(|value| value.unwrap_or(0))
 }
 
-fn metadata_data_info_identifier(
-    source: &[u8],
-    limits: WireLimits,
-) -> Result<u64, SlideBackgroundError> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+fn metadata_data_info_identifier(source: &[u8], limits: WireLimits) -> Result<u64, Error> {
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     view.fields()
         .filter(|field| field.number() == 1)
         .map(|field| metadata_field_varint(&field))
@@ -1316,11 +1297,8 @@ fn metadata_data_info_identifier(
         .map(|value| value.unwrap_or(0))
 }
 
-fn metadata_reference_identifier(
-    source: &[u8],
-    limits: WireLimits,
-) -> Result<u64, SlideBackgroundError> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+fn metadata_reference_identifier(source: &[u8], limits: WireLimits) -> Result<u64, Error> {
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     view.fields()
         .filter(|field| field.number() == 1)
         .map(|field| metadata_field_varint(&field))
@@ -1329,23 +1307,23 @@ fn metadata_reference_identifier(
         .map(|value| value.unwrap_or(0))
 }
 
-fn metadata_field_bytes<'a>(field: &WireFieldView<'a>) -> Result<&'a [u8], SlideBackgroundError> {
+fn metadata_field_bytes<'a>(field: &WireFieldView<'a>) -> Result<&'a [u8], Error> {
     if field.wire_type() != 2 {
-        return Err(SlideBackgroundError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     field.validate_canonical_framing().map_err(map_wire_error)?;
     Ok(field.payload())
 }
 
-fn metadata_field_varint(field: &WireFieldView<'_>) -> Result<u64, SlideBackgroundError> {
+fn metadata_field_varint(field: &WireFieldView<'_>) -> Result<u64, Error> {
     if field.wire_type() != 0 {
-        return Err(SlideBackgroundError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     field.validate_canonical_key().map_err(map_wire_error)?;
     canonical_varint(field.payload())
 }
 
-fn metadata_field_varint_or_packed(field: &WireFieldView<'_>) -> Result<u64, SlideBackgroundError> {
+fn metadata_field_varint_or_packed(field: &WireFieldView<'_>) -> Result<u64, Error> {
     if field.wire_type() == 0 {
         return metadata_field_varint(field);
     }
@@ -1354,14 +1332,14 @@ fn metadata_field_varint_or_packed(field: &WireFieldView<'_>) -> Result<u64, Sli
     let mut remaining = payload;
     while !remaining.is_empty() {
         let (value, used) =
-            decode_varint_from_bytes(remaining).map_err(|_| SlideBackgroundError::InvalidSource)?;
+            decode_varint_from_bytes(remaining).map_err(|_| Error::InvalidSource)?;
         maximum = maximum.max(value);
         remaining = &remaining[used..];
     }
     Ok(maximum)
 }
 
-fn metadata_component_name(package: &Package) -> Result<Option<String>, SlideBackgroundError> {
+fn metadata_component_name(package: &Package) -> Result<Option<String>, Error> {
     let mut selected = None;
     for component in package.state.source.components().iter() {
         for object in &component.archive().objects {
@@ -1371,7 +1349,7 @@ fn metadata_component_name(package: &Package) -> Result<Option<String>, SlideBac
                 .any(|message| message.type_ == PACKAGE_METADATA_MESSAGE_TYPE)
             {
                 if selected.replace(component.name().to_owned()).is_some() {
-                    return Err(SlideBackgroundError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
             }
         }
@@ -1425,22 +1403,17 @@ impl MetadataFacts {
         }
     }
 
-    fn selectors(
-        &self,
-    ) -> Result<(ComponentSelector<'_>, ComponentSelector<'_>), SlideBackgroundError> {
-        let slide = self
-            .slide_components
-            .first()
-            .ok_or(SlideBackgroundError::InvalidSource)?;
+    fn selectors(&self) -> Result<(ComponentSelector<'_>, ComponentSelector<'_>), Error> {
+        let slide = self.slide_components.first().ok_or(Error::InvalidSource)?;
         let stylesheet = self
             .stylesheet_components
             .first()
-            .ok_or(SlideBackgroundError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if self.slide_components.len() != 1
             || self.stylesheet_components.len() != 1
             || stylesheet.identifier != self.stylesheet_identifier
         {
-            return Err(SlideBackgroundError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         Ok((
             ComponentSelector::new(slide.identifier, &slide.locator),
@@ -1448,16 +1421,16 @@ impl MetadataFacts {
         ))
     }
 
-    fn old_uuid(&self) -> Result<UuidBits, SlideBackgroundError> {
+    fn old_uuid(&self) -> Result<UuidBits, Error> {
         if self.old_uuids.len() != 1 {
-            return Err(SlideBackgroundError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         Ok(self.old_uuids[0])
     }
 
-    fn old_external_weakness(&self) -> Result<Option<bool>, SlideBackgroundError> {
+    fn old_external_weakness(&self) -> Result<Option<bool>, Error> {
         if self.old_external_weaknesses.len() != 1 {
-            return Err(SlideBackgroundError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         Ok(self.old_external_weaknesses[0])
     }
@@ -1556,7 +1529,7 @@ fn metadata_locator(name: &str) -> &str {
 fn metadata_options(
     package: &Package,
     max_additions: usize,
-) -> Result<MetadataRewriteOptions, SlideBackgroundError> {
+) -> Result<MetadataRewriteOptions, Error> {
     let wire = package.wire_limits().map_err(map_wire_error)?;
     let recursion_limit = u32::try_from(wire.max_nesting()).unwrap_or(u32::MAX);
     let semantic = package.semantic_limits();
@@ -1572,13 +1545,10 @@ fn metadata_options(
     ))
 }
 
-fn metadata_payload(archive: &Archive) -> Result<(u64, usize, Vec<u8>), SlideBackgroundError> {
+fn metadata_payload(archive: &Archive) -> Result<(u64, usize, Vec<u8>), Error> {
     let mut selected = None;
     for object in &archive.objects {
-        let identifier = object
-            .archive_info
-            .identifier
-            .ok_or(SlideBackgroundError::InvalidSource)?;
+        let identifier = object.archive_info.identifier.ok_or(Error::InvalidSource)?;
         for (index, message) in object.messages.iter().enumerate() {
             if message.type_ != PACKAGE_METADATA_MESSAGE_TYPE {
                 continue;
@@ -1587,11 +1557,11 @@ fn metadata_payload(archive: &Archive) -> Result<(u64, usize, Vec<u8>), SlideBac
                 .replace((identifier, index, message.data.clone()))
                 .is_some()
             {
-                return Err(SlideBackgroundError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
     }
-    selected.ok_or(SlideBackgroundError::InvalidSource)
+    selected.ok_or(Error::InvalidSource)
 }
 
 fn replace_metadata_payload(
@@ -1600,13 +1570,13 @@ fn replace_metadata_payload(
     index: usize,
     data: Vec<u8>,
     limits: litchi_iwa_core::Limits,
-) -> Result<(), SlideBackgroundError> {
+) -> Result<(), Error> {
     let object = archive
         .object_mut(object_identifier)
-        .ok_or(SlideBackgroundError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     validate_rewrite_metadata(object, index)?;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             index,
             RawMessage {
                 type_: PACKAGE_METADATA_MESSAGE_TYPE,
@@ -1622,7 +1592,7 @@ fn metadata_facts(
     package: &Package,
     source: &[u8],
     selection: &Selection,
-) -> Result<(MetadataFacts, u64), SlideBackgroundError> {
+) -> Result<(MetadataFacts, u64), Error> {
     let options = metadata_options(package, 8)?;
     let mut facts = MetadataFacts::new(selection);
     let inspection = inspect_package_metadata_with_visitor(source, options, &mut facts)
@@ -1647,7 +1617,7 @@ fn rewrite_metadata_for_change(
     selection: &Selection,
     change: MetadataMutation,
     archive_limits: litchi_iwa_core::Limits,
-) -> Result<(), SlideBackgroundError> {
+) -> Result<(), Error> {
     if !matches!(change, MetadataMutation::None) {
         let (object_identifier, index, source) = metadata_payload(archive)?;
         let (facts, last) = metadata_facts(package, &source, selection)?;
@@ -1736,10 +1706,10 @@ fn new_style_object(
     data: Vec<u8>,
     parent: u64,
     stylesheet: u64,
-) -> Result<ArchiveObject, SlideBackgroundError> {
+) -> Result<ArchiveObject, Error> {
     let source = package
         .object(source_identifier)
-        .ok_or(SlideBackgroundError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if source.messages.len() != 1
         || source.messages[0].type_ != SLIDE_STYLE_MESSAGE_TYPE
         || source.archive_info.message_infos.len() != 1
@@ -1748,12 +1718,12 @@ fn new_style_object(
         // messages cannot be copied safely without knowing whether their
         // internal references are identity-relative, so fail closed instead
         // of silently dropping or misbinding them.
-        return Err(SlideBackgroundError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let source_info = &source.archive_info.message_infos[0];
     validate_rewrite_metadata(source, 0)?;
     if !source_info.data_references.is_empty() {
-        return Err(SlideBackgroundError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let source_style = parse_style_metadata(package, &source.messages[0].data)?;
     if source_style.stylesheet != Some(stylesheet)
@@ -1762,11 +1732,11 @@ fn new_style_object(
             .iter()
             .any(|reference| *reference != stylesheet && Some(*reference) != source_style.parent)
     {
-        return Err(SlideBackgroundError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     for field in &source_info.field_infos {
         if !field.data_references.is_empty() {
-            return Err(SlideBackgroundError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let path = field.path.path.as_slice();
         let valid = if path == [STYLE_SUPER_FIELD, STYLE_PARENT_FIELD] {
@@ -1783,7 +1753,7 @@ fn new_style_object(
             field.object_references.is_empty()
         };
         if !valid {
-            return Err(SlideBackgroundError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
 
@@ -1793,6 +1763,7 @@ fn new_style_object(
             type_: SLIDE_STYLE_MESSAGE_TYPE,
             data,
         }],
+        Default::default(),
     )
     .map_err(map_core_error)?;
     let info = &mut replacement.archive_info.message_infos[0];
@@ -1823,16 +1794,14 @@ fn mutate_set(
     archives: &mut [(String, Archive)],
     new_id: u64,
     archive_limits: litchi_iwa_core::Limits,
-) -> Result<(), SlideBackgroundError> {
+) -> Result<(), Error> {
     let wire_limits = source.wire_limits().map_err(map_wire_error)?;
     let old_style = &selection.style;
     let stylesheet_id = selection.stylesheet_identifier;
     let disposable =
         style_is_collapsible(source, selection)? && style_is_exclusive(source, selection)?;
     let parent = if disposable {
-        old_style
-            .parent
-            .ok_or(SlideBackgroundError::InvalidSource)?
+        old_style.parent.ok_or(Error::InvalidSource)?
     } else {
         selection.style_identifier
     };
@@ -1869,10 +1838,10 @@ fn mutate_set(
     if disposable {
         stylesheet_archive
             .remove_object(selection.style_identifier)
-            .ok_or(SlideBackgroundError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     stylesheet_archive
-        .insert_object_with_limits(style_object, archive_limits)
+        .insert_object(style_object, archive_limits)
         .map_err(map_core_error)?;
     Ok(())
 }
@@ -1883,13 +1852,13 @@ fn mutate_reset(
     archives: &mut [(String, Archive)],
     new_id: u64,
     archive_limits: litchi_iwa_core::Limits,
-) -> Result<(), SlideBackgroundError> {
+) -> Result<(), Error> {
     let wire_limits = source.wire_limits().map_err(map_wire_error)?;
     let style = &selection.style;
     if style.variation != Some(true) || style.parent.is_none() || style.fill.is_none() {
-        return Err(SlideBackgroundError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
-    let parent = style.parent.ok_or(SlideBackgroundError::InvalidSource)?;
+    let parent = style.parent.ok_or(Error::InvalidSource)?;
     validate_style_background_reset_metadata(source, selection)?;
     let collapsible = style_is_collapsible(source, selection)?;
     let exclusive = style_is_exclusive(source, selection)?;
@@ -1916,7 +1885,7 @@ fn mutate_reset(
             )?;
             stylesheet_archive
                 .remove_object(selection.style_identifier)
-                .ok_or(SlideBackgroundError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
         }
         return Ok(());
     }
@@ -1957,7 +1926,7 @@ fn mutate_reset(
             archive_limits,
         )?;
         stylesheet_archive
-            .insert_object_with_limits(replacement, archive_limits)
+            .insert_object(replacement, archive_limits)
             .map_err(map_core_error)?;
     }
     Ok(())
@@ -1966,24 +1935,24 @@ fn mutate_reset(
 fn archive_mut<'a>(
     archives: &'a mut [(String, Archive)],
     name: &str,
-) -> Result<&'a mut Archive, SlideBackgroundError> {
+) -> Result<&'a mut Archive, Error> {
     archives
         .iter_mut()
         .find(|(candidate, _)| candidate == name)
         .map(|(_, archive)| archive)
-        .ok_or(SlideBackgroundError::InvalidSource)
+        .ok_or(Error::InvalidSource)
 }
 
 fn validate_slide_style_metadata_for_rewrite(
     object: &ArchiveObject,
     message_index: usize,
     old_style: u64,
-) -> Result<(), SlideBackgroundError> {
+) -> Result<(), Error> {
     let info = object
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(SlideBackgroundError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if info
         .object_references
         .iter()
@@ -1991,10 +1960,10 @@ fn validate_slide_style_metadata_for_rewrite(
         .count()
         != 1
     {
-        return Err(SlideBackgroundError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if info.data_references.contains(&old_style) {
-        return Err(SlideBackgroundError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
 
     let mut canonical_references = 0usize;
@@ -2004,7 +1973,7 @@ fn validate_slide_style_metadata_for_rewrite(
                 .r#type
                 .is_some_and(|field_type| field_type != FieldType::ObjectReference)
         {
-            return Err(SlideBackgroundError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let references = field
             .object_references
@@ -2015,17 +1984,17 @@ fn validate_slide_style_metadata_for_rewrite(
             continue;
         }
         if field.path.path.as_slice() != [SLIDE_STYLE_FIELD] {
-            return Err(SlideBackgroundError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if field.data_references.contains(&old_style) {
-            return Err(SlideBackgroundError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         canonical_references = canonical_references
             .checked_add(references)
-            .ok_or(SlideBackgroundError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     if canonical_references > 1 {
-        return Err(SlideBackgroundError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -2037,15 +2006,15 @@ fn patch_slide_style(
     new_style: u64,
     wire_limits: WireLimits,
     limits: litchi_iwa_core::Limits,
-) -> Result<(), SlideBackgroundError> {
+) -> Result<(), Error> {
     let object = archive
         .object_mut(slide_identifier)
-        .ok_or(SlideBackgroundError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let index = one_message_index(&object.messages, SLIDE_MESSAGE_TYPE)?;
     validate_rewrite_metadata(object, index)?;
     validate_slide_style_metadata_for_rewrite(object, index, old_style)?;
     let data = object.messages[index].data.clone();
-    let slide_view = WireView::parse_with_limits(&data, wire_limits).map_err(map_wire_error)?;
+    let slide_view = WireView::parse(&data, wire_limits).map_err(map_wire_error)?;
     if slide_view
         .fields()
         .any(|field| !matches!(field.number(), 1..=7 | 10..=31 | 34..=45))
@@ -2053,17 +2022,17 @@ fn patch_slide_style(
         // Unknown slide fields can carry an additional style edge that this
         // focused transaction cannot retarget safely. Preserve the source by
         // refusing the edit instead of rewriting only the canonical field 1.
-        return Err(SlideBackgroundError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let payload = required_bytes_from_slice(&data, SLIDE_STYLE_FIELD, wire_limits)?;
     if required_reference_payload(&payload, wire_limits)? != old_style {
-        return Err(SlideBackgroundError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let replacement = rewrite_reference_identifier(&payload, new_style, wire_limits)?;
     let rewritten =
         rewrite_length_field(&data, SLIDE_STYLE_FIELD, Some(&replacement), wire_limits)?;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             index,
             RawMessage {
                 type_: SLIDE_MESSAGE_TYPE,
@@ -2090,14 +2059,14 @@ fn replace_style_data(
     style_identifier: u64,
     data: Vec<u8>,
     limits: litchi_iwa_core::Limits,
-) -> Result<(), SlideBackgroundError> {
+) -> Result<(), Error> {
     let object = archive
         .object_mut(style_identifier)
-        .ok_or(SlideBackgroundError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let index = one_message_index(&object.messages, SLIDE_STYLE_MESSAGE_TYPE)?;
     validate_rewrite_metadata(object, index)?;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             index,
             RawMessage {
                 type_: SLIDE_STYLE_MESSAGE_TYPE,
@@ -2113,21 +2082,11 @@ fn replace_style_data(
     Ok(())
 }
 
-fn style_without_background(
-    style: &StyleState,
-    wire_limits: WireLimits,
-) -> Result<Vec<u8>, SlideBackgroundError> {
-    let properties = style
-        .properties
-        .as_deref()
-        .ok_or(SlideBackgroundError::InvalidSource)?;
+fn style_without_background(style: &StyleState, wire_limits: WireLimits) -> Result<Vec<u8>, Error> {
+    let properties = style.properties.as_deref().ok_or(Error::InvalidSource)?;
     let properties = rewrite_length_field(properties, PROPERTIES_FILL_FIELD, None, wire_limits)?;
-    let count = style
-        .override_count
-        .ok_or(SlideBackgroundError::InvalidSource)?;
-    let count = count
-        .checked_sub(1)
-        .ok_or(SlideBackgroundError::InvalidSource)?;
+    let count = style.override_count.ok_or(Error::InvalidSource)?;
+    let count = count.checked_sub(1).ok_or(Error::InvalidSource)?;
     let mut output = rewrite_length_field(
         &style.raw,
         STYLE_PROPERTIES_FIELD,
@@ -2150,7 +2109,7 @@ fn new_style_data_from_style(
     stylesheet: u64,
     fill: &[u8],
     wire_limits: WireLimits,
-) -> Result<Vec<u8>, SlideBackgroundError> {
+) -> Result<Vec<u8>, Error> {
     let super_payload = required_bytes_from_slice(&source.raw, STYLE_SUPER_FIELD, wire_limits)?;
     // A new variation must not inherit the base style's producer identity.
     // Retaining either value makes the child look like an independently
@@ -2191,11 +2150,7 @@ fn new_style_data_from_style(
     dead_code,
     reason = "Kept as a compact fallback for future synthetic style producers."
 )]
-fn new_style_data(
-    parent: u64,
-    stylesheet: u64,
-    fill: &[u8],
-) -> Result<Vec<u8>, SlideBackgroundError> {
+fn new_style_data(parent: u64, stylesheet: u64, fill: &[u8]) -> Result<Vec<u8>, Error> {
     let mut super_payload = Vec::new();
     append_length(
         &mut super_payload,
@@ -2221,7 +2176,7 @@ fn encode_background(
     package: &Package,
     inherited: &[u8],
     background: &Background,
-) -> Result<Vec<u8>, SlideBackgroundError> {
+) -> Result<Vec<u8>, Error> {
     let limits = package.wire_limits().map_err(map_wire_error)?;
     let options = codec_options(package, inherited)?;
     let rewritten = match background {
@@ -2278,15 +2233,15 @@ fn encode_background(
                 options,
             )
         },
-        Background::Unsupported => return Err(SlideBackgroundError::UnsupportedSource),
+        Background::Unsupported => return Err(Error::Refused(Refusal::UnsupportedSource)),
     };
     rewritten
         .map(|(bytes, _report)| bytes)
         .map_err(map_codec_error)
         .and_then(|bytes| {
             if bytes.len() > limits.max_output_bytes() {
-                Err(SlideBackgroundError::LimitExceeded {
-                    kind: SlideBackgroundLimitKind::OutputBytes,
+                Err(Error::Limit {
+                    kind: LimitKind::OutputBytes,
                     observed: usize_to_u64(bytes.len()),
                     maximum: usize_to_u64(limits.max_output_bytes()),
                 })
@@ -2296,10 +2251,7 @@ fn encode_background(
         })
 }
 
-fn style_is_collapsible(
-    package: &Package,
-    selection: &Selection,
-) -> Result<bool, SlideBackgroundError> {
+fn style_is_collapsible(package: &Package, selection: &Selection) -> Result<bool, Error> {
     let style = &selection.style;
     if style.variation != Some(true)
         || style.parent.is_none()
@@ -2316,15 +2268,11 @@ fn style_is_collapsible(
         return Ok(false);
     }
     let limits = package.wire_limits().map_err(map_wire_error)?;
-    let outer = WireView::parse_with_limits(&style.raw, limits).map_err(map_wire_error)?;
+    let outer = WireView::parse(&style.raw, limits).map_err(map_wire_error)?;
     let super_payload = required_bytes(&outer, &style.raw, STYLE_SUPER_FIELD)?;
-    let properties = style
-        .properties
-        .as_deref()
-        .ok_or(SlideBackgroundError::InvalidSource)?;
-    let super_view = WireView::parse_with_limits(super_payload, limits).map_err(map_wire_error)?;
-    let properties_view =
-        WireView::parse_with_limits(properties, limits).map_err(map_wire_error)?;
+    let properties = style.properties.as_deref().ok_or(Error::InvalidSource)?;
+    let super_view = WireView::parse(super_payload, limits).map_err(map_wire_error)?;
+    let properties_view = WireView::parse(properties, limits).map_err(map_wire_error)?;
     // Unknown fields and any additional native property mean that culling the
     // variation would silently discard producer-authored state.
     Ok(has_exact_field_numbers(
@@ -2344,27 +2292,21 @@ fn style_is_collapsible(
     ) && has_exact_field_numbers(&properties_view, &[PROPERTIES_FILL_FIELD]))
 }
 
-fn stylesheet_allows_culling(
-    package: &Package,
-    selection: &Selection,
-) -> Result<bool, SlideBackgroundError> {
+fn stylesheet_allows_culling(package: &Package, selection: &Selection) -> Result<bool, Error> {
     let stylesheet = package
         .object(selection.stylesheet_identifier)
-        .ok_or(SlideBackgroundError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let index = one_message_index(&stylesheet.messages, STYLESHEET_MESSAGE_TYPE)?;
     validate_rewrite_metadata(stylesheet, index)?;
     let payload = stylesheet.messages[index].data.clone();
     let limits = package.wire_limits().map_err(map_wire_error)?;
-    let view = WireView::parse_with_limits(&payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(&payload, limits).map_err(map_wire_error)?;
     if optional_bool(&view, STYLESHEET_CAN_CULL_FIELD)? != Some(true) {
         return Ok(false);
     }
 
     let target = selection.style_identifier;
-    let expected_parent = selection
-        .style
-        .parent
-        .ok_or(SlideBackgroundError::InvalidSource)?;
+    let expected_parent = selection.style.parent.ok_or(Error::InvalidSource)?;
     let mut direct = 0usize;
     let mut child = 0usize;
     for field in view.fields() {
@@ -2380,8 +2322,7 @@ fn stylesheet_allows_culling(
             },
             STYLESHEET_IDENTIFIER_MAP_FIELD => {
                 let entry = field.canonical_payload().map_err(map_wire_error)?;
-                let entry_view =
-                    WireView::parse_with_limits(entry, limits).map_err(map_wire_error)?;
+                let entry_view = WireView::parse(entry, limits).map_err(map_wire_error)?;
                 if !has_exact_field_numbers(&entry_view, &[1, IDENTIFIED_STYLE_REFERENCE_FIELD]) {
                     return Ok(false);
                 }
@@ -2405,8 +2346,7 @@ fn stylesheet_allows_culling(
             },
             STYLESHEET_CHILDREN_FIELD => {
                 let entry = field.canonical_payload().map_err(map_wire_error)?;
-                let entry_view =
-                    WireView::parse_with_limits(entry, limits).map_err(map_wire_error)?;
+                let entry_view = WireView::parse(entry, limits).map_err(map_wire_error)?;
                 if !has_exact_field_numbers(&entry_view, &[CHILD_PARENT_FIELD, CHILDREN_FIELD]) {
                     return Ok(false);
                 }
@@ -2453,7 +2393,7 @@ fn stylesheet_allows_culling(
         .archive_info
         .message_infos
         .get(index)
-        .ok_or(SlideBackgroundError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if info
         .object_references
         .iter()
@@ -2481,8 +2421,8 @@ fn versioned_styles_reference(
     source: &[u8],
     target: u64,
     limits: WireLimits,
-) -> Result<bool, SlideBackgroundError> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+) -> Result<bool, Error> {
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     for field in view.fields() {
         match field.number() {
             VERSIONED_STYLES_FIELD => {
@@ -2496,8 +2436,7 @@ fn versioned_styles_reference(
             },
             VERSIONED_IDENTIFIER_MAP_FIELD => {
                 let entry = field.canonical_payload().map_err(map_wire_error)?;
-                let entry_view =
-                    WireView::parse_with_limits(entry, limits).map_err(map_wire_error)?;
+                let entry_view = WireView::parse(entry, limits).map_err(map_wire_error)?;
                 if !has_exact_field_numbers(&entry_view, &[1, IDENTIFIED_STYLE_REFERENCE_FIELD])
                     || required_reference_field_from_slice(
                         entry,
@@ -2510,8 +2449,7 @@ fn versioned_styles_reference(
             },
             VERSIONED_CHILDREN_FIELD => {
                 let entry = field.canonical_payload().map_err(map_wire_error)?;
-                let entry_view =
-                    WireView::parse_with_limits(entry, limits).map_err(map_wire_error)?;
+                let entry_view = WireView::parse(entry, limits).map_err(map_wire_error)?;
                 if !has_exact_field_numbers(&entry_view, &[CHILD_PARENT_FIELD, CHILDREN_FIELD]) {
                     return Ok(true);
                 }
@@ -2535,10 +2473,10 @@ fn versioned_styles_reference(
 fn style_archive_metadata_allows_culling(
     package: &Package,
     selection: &Selection,
-) -> Result<bool, SlideBackgroundError> {
+) -> Result<bool, Error> {
     let style = package
         .object(selection.style_identifier)
-        .ok_or(SlideBackgroundError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if style.messages.len() != 1 || style.archive_info.message_infos.len() != 1 {
         return Ok(false);
     }
@@ -2549,10 +2487,7 @@ fn style_archive_metadata_allows_culling(
     if !info.data_references.is_empty() {
         return Ok(false);
     }
-    let parent = selection
-        .style
-        .parent
-        .ok_or(SlideBackgroundError::InvalidSource)?;
+    let parent = selection.style.parent.ok_or(Error::InvalidSource)?;
     if info
         .object_references
         .iter()
@@ -2588,19 +2523,16 @@ fn style_archive_metadata_allows_culling(
 fn validate_style_background_reset_metadata(
     package: &Package,
     selection: &Selection,
-) -> Result<(), SlideBackgroundError> {
+) -> Result<(), Error> {
     let style = package
         .object(selection.style_identifier)
-        .ok_or(SlideBackgroundError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if style.messages.len() != 1 || style.archive_info.message_infos.len() != 1 {
-        return Err(SlideBackgroundError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     validate_rewrite_metadata(style, 0)?;
     let info = &style.archive_info.message_infos[0];
-    let parent = selection
-        .style
-        .parent
-        .ok_or(SlideBackgroundError::InvalidSource)?;
+    let parent = selection.style.parent.ok_or(Error::InvalidSource)?;
 
     // Parent and stylesheet references are the conventional aggregate style
     // ownership edges. Every other aggregate reference must be attributable
@@ -2615,7 +2547,7 @@ fn validate_style_background_reset_metadata(
             .iter()
             .any(|field| field.object_references.contains(reference))
         {
-            return Err(SlideBackgroundError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     for reference in &info.data_references {
@@ -2624,7 +2556,7 @@ fn validate_style_background_reset_metadata(
             .iter()
             .any(|field| field.data_references.contains(reference))
         {
-            return Err(SlideBackgroundError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
 
@@ -2643,7 +2575,7 @@ fn validate_style_background_reset_metadata(
         {
             // Removing fill metadata must never make either surviving style
             // identity edge look unowned at the aggregate level.
-            return Err(SlideBackgroundError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if identity {
             let expected = if path[1] == STYLE_PARENT_FIELD {
@@ -2657,7 +2589,7 @@ fn validate_style_background_reset_metadata(
                 .any(|reference| *reference != expected)
                 || !field.data_references.is_empty()
             {
-                return Err(SlideBackgroundError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
         if field
@@ -2669,7 +2601,7 @@ fn validate_style_background_reset_metadata(
                 .iter()
                 .any(|reference| !info.data_references.contains(reference))
         {
-            return Err(SlideBackgroundError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(())
@@ -2679,8 +2611,8 @@ fn stylesheet_payload_references_target(
     source: &[u8],
     target: u64,
     limits: WireLimits,
-) -> Result<bool, SlideBackgroundError> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+) -> Result<bool, Error> {
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     for field in view.fields() {
         match field.number() {
             STYLESHEET_STYLES_FIELD => {
@@ -2694,8 +2626,7 @@ fn stylesheet_payload_references_target(
             },
             STYLESHEET_IDENTIFIER_MAP_FIELD => {
                 let entry = field.canonical_payload().map_err(map_wire_error)?;
-                let entry_view =
-                    WireView::parse_with_limits(entry, limits).map_err(map_wire_error)?;
+                let entry_view = WireView::parse(entry, limits).map_err(map_wire_error)?;
                 if !has_exact_field_numbers(&entry_view, &[1, IDENTIFIED_STYLE_REFERENCE_FIELD]) {
                     return Ok(true);
                 }
@@ -2719,8 +2650,7 @@ fn stylesheet_payload_references_target(
             },
             STYLESHEET_CHILDREN_FIELD => {
                 let entry = field.canonical_payload().map_err(map_wire_error)?;
-                let entry_view =
-                    WireView::parse_with_limits(entry, limits).map_err(map_wire_error)?;
+                let entry_view = WireView::parse(entry, limits).map_err(map_wire_error)?;
                 if !has_exact_field_numbers(&entry_view, &[CHILD_PARENT_FIELD, CHILDREN_FIELD]) {
                     return Ok(true);
                 }
@@ -2752,10 +2682,7 @@ fn stylesheet_payload_references_target(
     Ok(false)
 }
 
-fn style_is_exclusive(
-    package: &Package,
-    selection: &Selection,
-) -> Result<bool, SlideBackgroundError> {
+fn style_is_exclusive(package: &Package, selection: &Selection) -> Result<bool, Error> {
     let style_identifier = selection.style_identifier;
     let wire_limits = package.wire_limits().map_err(map_wire_error)?;
     let mut slides = 0usize;
@@ -2766,7 +2693,7 @@ fn style_is_exclusive(
                     .archive_info
                     .message_infos
                     .get(message_index)
-                    .ok_or(SlideBackgroundError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
                 let aggregate_owners = info
                     .object_references
                     .iter()
@@ -2788,8 +2715,8 @@ fn style_is_exclusive(
                     return Ok(false);
                 }
                 if message.type_ == SLIDE_MESSAGE_TYPE {
-                    let slide_view = WireView::parse_with_limits(&message.data, wire_limits)
-                        .map_err(map_wire_error)?;
+                    let slide_view =
+                        WireView::parse(&message.data, wire_limits).map_err(map_wire_error)?;
                     if slide_view
                         .fields()
                         .any(|field| !matches!(field.number(), 1..=7 | 10..=31 | 34..=45))
@@ -2862,7 +2789,7 @@ fn style_is_exclusive(
                         .map(|message| message.data.clone())
                 })
             })
-            .ok_or(SlideBackgroundError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let options = metadata_options(package, 8)?;
         let mut ownership = MetadataOwnershipFacts {
             stylesheet_identifier: selection.stylesheet_identifier,
@@ -2880,11 +2807,8 @@ fn style_is_exclusive(
     Ok(true)
 }
 
-fn other_style_payload_allows_culling(
-    source: &[u8],
-    limits: WireLimits,
-) -> Result<bool, SlideBackgroundError> {
-    let outer = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+fn other_style_payload_allows_culling(source: &[u8], limits: WireLimits) -> Result<bool, Error> {
+    let outer = WireView::parse(source, limits).map_err(map_wire_error)?;
     if !has_only_field_numbers(
         &outer,
         &[
@@ -2896,7 +2820,7 @@ fn other_style_payload_allows_culling(
         return Ok(false);
     }
     let super_payload = required_bytes(&outer, source, STYLE_SUPER_FIELD)?;
-    let super_view = WireView::parse_with_limits(super_payload, limits).map_err(map_wire_error)?;
+    let super_view = WireView::parse(super_payload, limits).map_err(map_wire_error)?;
     if !has_only_field_numbers(&super_view, &[1, 2, 3, 4, 5]) {
         return Ok(false);
     }
@@ -2908,7 +2832,7 @@ fn other_style_payload_allows_culling(
         }
     }
     if let Some(properties) = optional_bytes(&outer, source, STYLE_PROPERTIES_FIELD)? {
-        let properties = WireView::parse_with_limits(properties, limits).map_err(map_wire_error)?;
+        let properties = WireView::parse(properties, limits).map_err(map_wire_error)?;
         if !has_only_field_numbers(&properties, &[1, 2, 3, 4, 5, 6, 7]) {
             return Ok(false);
         }
@@ -2923,10 +2847,10 @@ fn patch_stylesheet(
     insertion: Option<(u64, u64)>,
     wire_limits: WireLimits,
     limits: litchi_iwa_core::Limits,
-) -> Result<(), SlideBackgroundError> {
+) -> Result<(), Error> {
     let object = archive
         .object_mut(stylesheet_identifier)
-        .ok_or(SlideBackgroundError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let index = one_message_index(&object.messages, STYLESHEET_MESSAGE_TYPE)?;
     validate_rewrite_metadata(object, index)?;
     let data = object.messages[index].data.clone();
@@ -2937,7 +2861,7 @@ fn patch_stylesheet(
             .map(|payload| required_reference_payload(payload, wire_limits))
             .collect::<Result<Vec<_>, _>>()?;
         if style_ids.iter().filter(|id| **id == old).count() != 1 {
-            return Err(SlideBackgroundError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         styles = styles
             .into_iter()
@@ -2952,7 +2876,7 @@ fn patch_stylesheet(
             .collect::<Result<Vec<_>, _>>()?
             .contains(&new_id)
         {
-            return Err(SlideBackgroundError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         styles.push(encode_reference(new_id));
     }
@@ -2979,7 +2903,7 @@ fn patch_stylesheet(
         if let Some((insert_parent, new_id)) = insertion {
             if parent == insert_parent {
                 if matched_parent {
-                    return Err(SlideBackgroundError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 matched_parent = true;
                 child_refs.push(encode_reference(new_id));
@@ -3009,7 +2933,7 @@ fn patch_stylesheet(
         wire_limits,
     )?;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             index,
             RawMessage {
                 type_: STYLESHEET_MESSAGE_TYPE,
@@ -3071,47 +2995,38 @@ fn update_stylesheet_field_metadata(
     }
 }
 
-fn exactly_one_payload(
-    object: &ArchiveObject,
-    message_type: u32,
-) -> Result<Vec<u8>, SlideBackgroundError> {
+fn exactly_one_payload(object: &ArchiveObject, message_type: u32) -> Result<Vec<u8>, Error> {
     let mut selected = None;
     for message in &object.messages {
         if message.type_ != message_type {
             continue;
         }
         if selected.replace(message.data.clone()).is_some() {
-            return Err(SlideBackgroundError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
-    selected.ok_or(SlideBackgroundError::InvalidSource)
+    selected.ok_or(Error::InvalidSource)
 }
 
-fn one_message_index(
-    messages: &[RawMessage],
-    message_type: u32,
-) -> Result<usize, SlideBackgroundError> {
+fn one_message_index(messages: &[RawMessage], message_type: u32) -> Result<usize, Error> {
     let mut selected = None;
     for (index, message) in messages.iter().enumerate() {
         if message.type_ != message_type {
             continue;
         }
         if selected.replace(index).is_some() {
-            return Err(SlideBackgroundError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
-    selected.ok_or(SlideBackgroundError::InvalidSource)
+    selected.ok_or(Error::InvalidSource)
 }
 
-fn validate_rewrite_metadata(
-    object: &ArchiveObject,
-    message_index: usize,
-) -> Result<(), SlideBackgroundError> {
+fn validate_rewrite_metadata(object: &ArchiveObject, message_index: usize) -> Result<(), Error> {
     let info = object
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(SlideBackgroundError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if object.archive_info.should_merge == Some(true)
         || info.base_message_index.is_some()
         || !info.diff_merge_version.is_empty()
@@ -3119,18 +3034,14 @@ fn validate_rewrite_metadata(
         || !info.fields_to_remove.is_empty()
         || !info.diff_read_version.is_empty()
     {
-        return Err(SlideBackgroundError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
 
-fn required_reference_field(
-    package: &Package,
-    source: &[u8],
-    number: u32,
-) -> Result<u64, SlideBackgroundError> {
+fn required_reference_field(package: &Package, source: &[u8], number: u32) -> Result<u64, Error> {
     let limits = package.wire_limits().map_err(map_wire_error)?;
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let payload = required_bytes(&view, source, number)?;
     required_reference_payload(payload, limits)
 }
@@ -3139,35 +3050,29 @@ fn required_reference_field_from_slice(
     source: &[u8],
     number: u32,
     limits: WireLimits,
-) -> Result<u64, SlideBackgroundError> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+) -> Result<u64, Error> {
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let payload = required_bytes(&view, source, number)?;
     required_reference_payload(payload, limits)
 }
 
-fn required_reference_payload(
-    source: &[u8],
-    limits: WireLimits,
-) -> Result<u64, SlideBackgroundError> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+fn required_reference_payload(source: &[u8], limits: WireLimits) -> Result<u64, Error> {
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let field = unique_field(&view, 1)?;
-    let field = field.ok_or(SlideBackgroundError::InvalidSource)?;
+    let field = field.ok_or(Error::InvalidSource)?;
     if field.wire_type() != 0 {
-        return Err(SlideBackgroundError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     field.validate_canonical_key().map_err(map_wire_error)?;
     let value = canonical_varint(field.payload())?;
     if value == 0 {
-        return Err(SlideBackgroundError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(value)
 }
 
-fn reference_payload_allows_removal(
-    source: &[u8],
-    limits: WireLimits,
-) -> Result<bool, SlideBackgroundError> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+fn reference_payload_allows_removal(source: &[u8], limits: WireLimits) -> Result<bool, Error> {
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     required_reference_payload(source, limits)?;
     if !has_only_field_numbers(&view, &[1, 2, 3]) {
         return Ok(false);
@@ -3182,7 +3087,7 @@ fn optional_reference(
     source: &[u8],
     number: u32,
     limits: WireLimits,
-) -> Result<Option<u64>, SlideBackgroundError> {
+) -> Result<Option<u64>, Error> {
     let Some(payload) = optional_bytes(view, source, number)? else {
         return Ok(None);
     };
@@ -3193,23 +3098,20 @@ fn optional_reference_from_payload(
     package: &Package,
     source: &[u8],
     number: u32,
-) -> Result<Option<u64>, SlideBackgroundError> {
+) -> Result<Option<u64>, Error> {
     let limits = package.wire_limits().map_err(map_wire_error)?;
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let Some(payload) = optional_bytes(&view, source, number)? else {
         return Ok(None);
     };
     required_reference_payload(payload, limits).map(Some)
 }
 
-fn parse_style_metadata(
-    package: &Package,
-    source: &[u8],
-) -> Result<StyleState, SlideBackgroundError> {
+fn parse_style_metadata(package: &Package, source: &[u8]) -> Result<StyleState, Error> {
     let limits = package.wire_limits().map_err(map_wire_error)?;
-    let outer = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let outer = WireView::parse(source, limits).map_err(map_wire_error)?;
     let super_payload = required_bytes(&outer, source, STYLE_SUPER_FIELD)?;
-    let super_view = WireView::parse_with_limits(super_payload, limits).map_err(map_wire_error)?;
+    let super_view = WireView::parse(super_payload, limits).map_err(map_wire_error)?;
     Ok(StyleState {
         raw: source.to_vec(),
         parent: optional_reference(&super_view, super_payload, STYLE_PARENT_FIELD, limits)?,
@@ -3225,31 +3127,31 @@ fn required_bytes<'a>(
     view: &WireView<'a>,
     source: &'a [u8],
     number: u32,
-) -> Result<&'a [u8], SlideBackgroundError> {
-    optional_bytes(view, source, number)?.ok_or(SlideBackgroundError::InvalidSource)
+) -> Result<&'a [u8], Error> {
+    optional_bytes(view, source, number)?.ok_or(Error::InvalidSource)
 }
 
 fn required_bytes_from_slice(
     source: &[u8],
     number: u32,
     limits: WireLimits,
-) -> Result<Vec<u8>, SlideBackgroundError> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+) -> Result<Vec<u8>, Error> {
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     optional_bytes(&view, source, number)
         .map(|payload| payload.map(ToOwned::to_owned))?
-        .ok_or(SlideBackgroundError::InvalidSource)
+        .ok_or(Error::InvalidSource)
 }
 
 fn optional_bytes<'a>(
     view: &WireView<'a>,
     _source: &'a [u8],
     number: u32,
-) -> Result<Option<&'a [u8]>, SlideBackgroundError> {
+) -> Result<Option<&'a [u8]>, Error> {
     let Some(field) = unique_field(view, number)? else {
         return Ok(None);
     };
     if field.wire_type() != 2 {
-        return Err(SlideBackgroundError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     field.validate_canonical_framing().map_err(map_wire_error)?;
     Ok(Some(field.payload()))
@@ -3259,41 +3161,38 @@ fn optional_bytes_in_payload(
     source: &[u8],
     number: u32,
     limits: WireLimits,
-) -> Result<Option<&[u8]>, SlideBackgroundError> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+) -> Result<Option<&[u8]>, Error> {
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     optional_bytes(&view, source, number)
 }
 
-fn optional_varint(view: &WireView<'_>, number: u32) -> Result<Option<u64>, SlideBackgroundError> {
+fn optional_varint(view: &WireView<'_>, number: u32) -> Result<Option<u64>, Error> {
     let Some(field) = unique_field(view, number)? else {
         return Ok(None);
     };
     if field.wire_type() != 0 {
-        return Err(SlideBackgroundError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     field.validate_canonical_key().map_err(map_wire_error)?;
     canonical_varint(field.payload()).map(Some)
 }
 
-fn optional_bool(view: &WireView<'_>, number: u32) -> Result<Option<bool>, SlideBackgroundError> {
+fn optional_bool(view: &WireView<'_>, number: u32) -> Result<Option<bool>, Error> {
     let Some(value) = optional_varint(view, number)? else {
         return Ok(None);
     };
     match value {
         0 => Ok(Some(false)),
         1 => Ok(Some(true)),
-        _ => Err(SlideBackgroundError::InvalidSource),
+        _ => Err(Error::InvalidSource),
     }
 }
 
-fn unique_field<'a>(
-    view: &WireView<'a>,
-    number: u32,
-) -> Result<Option<WireFieldView<'a>>, SlideBackgroundError> {
+fn unique_field<'a>(view: &WireView<'a>, number: u32) -> Result<Option<WireFieldView<'a>>, Error> {
     let mut selected = None;
     for field in view.fields().filter(|field| field.number() == number) {
         if selected.replace(field).is_some() {
-            return Err(SlideBackgroundError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(selected)
@@ -3315,11 +3214,10 @@ fn has_only_field_numbers(view: &WireView<'_>, allowed: &[u32]) -> bool {
     view.fields().all(|field| allowed.contains(&field.number()))
 }
 
-fn canonical_varint(payload: &[u8]) -> Result<u64, SlideBackgroundError> {
-    let (value, used) =
-        decode_varint_from_bytes(payload).map_err(|_| SlideBackgroundError::InvalidSource)?;
+fn canonical_varint(payload: &[u8]) -> Result<u64, Error> {
+    let (value, used) = decode_varint_from_bytes(payload).map_err(|_| Error::InvalidSource)?;
     if used != payload.len() {
-        return Err(SlideBackgroundError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(value)
 }
@@ -3335,9 +3233,9 @@ fn rewrite_reference_identifier(
     source: &[u8],
     identifier: u64,
     limits: WireLimits,
-) -> Result<Vec<u8>, SlideBackgroundError> {
+) -> Result<Vec<u8>, Error> {
     if identifier == 0 {
-        return Err(SlideBackgroundError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     required_reference_payload(source, limits)?;
     rewrite_varint_field(source, 1, Some(identifier), limits)
@@ -3348,8 +3246,8 @@ fn rewrite_reference_field(
     number: u32,
     identifier: u64,
     limits: WireLimits,
-) -> Result<Vec<u8>, SlideBackgroundError> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+) -> Result<Vec<u8>, Error> {
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let replacement = match optional_bytes(&view, source, number)? {
         Some(reference) => rewrite_reference_identifier(reference, identifier, limits)?,
         None => encode_reference(identifier),
@@ -3357,20 +3255,17 @@ fn rewrite_reference_field(
     rewrite_length_field(source, number, Some(&replacement), limits)
 }
 
-fn append_length(
-    output: &mut Vec<u8>,
-    number: u32,
-    payload: &[u8],
-) -> Result<(), SlideBackgroundError> {
-    litchi_iwa_common::wire::append_length_delimited_field(output, number, payload)
-        .map_err(map_wire_error)
+fn append_length(output: &mut Vec<u8>, number: u32, payload: &[u8]) -> Result<(), Error> {
+    litchi_iwa_common::wire::append_length_delimited_field(
+        output,
+        number,
+        payload,
+        WireLimits::DEFAULT,
+    )
+    .map_err(map_wire_error)
 }
 
-fn append_varint(
-    output: &mut Vec<u8>,
-    number: u32,
-    value: u64,
-) -> Result<(), SlideBackgroundError> {
+fn append_varint(output: &mut Vec<u8>, number: u32, value: u64) -> Result<(), Error> {
     litchi_iwa_common::wire::append_varint_field(output, number, value).map_err(map_wire_error)
 }
 
@@ -3379,8 +3274,8 @@ fn rewrite_length_field(
     number: u32,
     replacement: Option<&[u8]>,
     limits: WireLimits,
-) -> Result<Vec<u8>, SlideBackgroundError> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+) -> Result<Vec<u8>, Error> {
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut output = Vec::new();
     let mut seen = false;
     for field in view.fields() {
@@ -3389,7 +3284,7 @@ fn rewrite_length_field(
             continue;
         }
         if seen || field.wire_type() != 2 {
-            return Err(SlideBackgroundError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field.validate_canonical_framing().map_err(map_wire_error)?;
         seen = true;
@@ -3411,8 +3306,8 @@ fn rewrite_varint_field(
     number: u32,
     replacement: Option<u64>,
     limits: WireLimits,
-) -> Result<Vec<u8>, SlideBackgroundError> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+) -> Result<Vec<u8>, Error> {
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut output = Vec::new();
     let mut seen = false;
     for field in view.fields() {
@@ -3421,7 +3316,7 @@ fn rewrite_varint_field(
             continue;
         }
         if seen || field.wire_type() != 0 {
-            return Err(SlideBackgroundError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field.validate_canonical_key().map_err(map_wire_error)?;
         canonical_varint(field.payload())?;
@@ -3443,12 +3338,12 @@ fn repeated_payloads(
     source: &[u8],
     number: u32,
     limits: WireLimits,
-) -> Result<Vec<Vec<u8>>, SlideBackgroundError> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+) -> Result<Vec<Vec<u8>>, Error> {
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut payloads = Vec::new();
     for field in view.fields().filter(|field| field.number() == number) {
         if field.wire_type() != 2 {
-            return Err(SlideBackgroundError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field.validate_canonical_framing().map_err(map_wire_error)?;
         payloads.push(field.payload().to_vec());
@@ -3461,8 +3356,8 @@ fn rewrite_repeated_length_field(
     number: u32,
     replacements: &[Vec<u8>],
     limits: WireLimits,
-) -> Result<Vec<u8>, SlideBackgroundError> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+) -> Result<Vec<u8>, Error> {
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut output = Vec::new();
     let mut selected = 0usize;
     for field in view.fields() {
@@ -3471,7 +3366,7 @@ fn rewrite_repeated_length_field(
             continue;
         }
         if field.wire_type() != 2 {
-            return Err(SlideBackgroundError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field.validate_canonical_framing().map_err(map_wire_error)?;
         if let Some(payload) = replacements.get(selected) {
@@ -3486,10 +3381,10 @@ fn rewrite_repeated_length_field(
     Ok(output)
 }
 
-fn check_wire_output(output: &[u8], limits: WireLimits) -> Result<(), SlideBackgroundError> {
+fn check_wire_output(output: &[u8], limits: WireLimits) -> Result<(), Error> {
     if output.len() > limits.max_output_bytes() {
-        return Err(SlideBackgroundError::LimitExceeded {
-            kind: SlideBackgroundLimitKind::OutputBytes,
+        return Err(Error::Limit {
+            kind: LimitKind::OutputBytes,
             observed: usize_to_u64(output.len()),
             maximum: usize_to_u64(limits.max_output_bytes()),
         });
@@ -3548,10 +3443,7 @@ fn prune_background_metadata(info: &mut litchi_iwa_core::MessageInfo) {
     });
 }
 
-fn codec_options(
-    package: &Package,
-    _source: &[u8],
-) -> Result<codec::DecodeOptions, SlideBackgroundError> {
+fn codec_options(package: &Package, _source: &[u8]) -> Result<codec::DecodeOptions, Error> {
     let limits = package.wire_limits().map_err(map_wire_error)?;
     let maximum = limits.max_input_bytes();
     let nesting = u32::try_from(limits.max_nesting()).unwrap_or(u32::MAX);
@@ -3559,114 +3451,110 @@ fn codec_options(
         .with_resource_limits(limits.max_fields(), limits.max_rewrite_work()))
 }
 
-fn map_codec_error(error: codec::DecodeError) -> SlideBackgroundError {
+fn map_codec_error(error: codec::DecodeError) -> Error {
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return SlideBackgroundError::LimitExceeded {
-            kind: SlideBackgroundLimitKind::WireFields,
+        return Error::Limit {
+            kind: LimitKind::WireFields,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return SlideBackgroundError::LimitExceeded {
-            kind: SlideBackgroundLimitKind::WireWork,
+        return Error::Limit {
+            kind: LimitKind::WireWork,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some(limit) = error.wire_resource_limit() {
         return match limit {
-            codec::WireResourceLimit::Bytes { observed, maximum } => {
-                SlideBackgroundError::LimitExceeded {
-                    kind: SlideBackgroundLimitKind::WireBytes,
-                    observed: usize_to_u64(observed),
-                    maximum: usize_to_u64(maximum),
-                }
+            codec::WireResourceLimit::Bytes { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireBytes,
+                observed: usize_to_u64(observed),
+                maximum: usize_to_u64(maximum),
             },
-            codec::WireResourceLimit::Nesting { observed, maximum } => {
-                SlideBackgroundError::LimitExceeded {
-                    kind: SlideBackgroundLimitKind::WireNesting,
-                    observed: u64::from(observed),
-                    maximum: u64::from(maximum),
-                }
+            codec::WireResourceLimit::Nesting { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireNesting,
+                observed: u64::from(observed),
+                maximum: u64::from(maximum),
             },
-            _ => SlideBackgroundError::InvalidSource,
+            _ => Error::InvalidSource,
         };
     }
-    SlideBackgroundError::InvalidSource
+    Error::InvalidSource
 }
 
-fn map_metadata_error(error: metadata_codec::RewriteError) -> SlideBackgroundError {
+fn map_metadata_error(error: metadata_codec::RewriteError) -> Error {
     if let Some(limit) = error.resource_limit() {
         let (kind, observed, maximum) = match limit {
             metadata_codec::RewriteLimit::InputBytes { observed, maximum } => (
-                SlideBackgroundLimitKind::WireBytes,
+                LimitKind::WireBytes,
                 usize_to_u64(observed),
                 usize_to_u64(maximum),
             ),
             metadata_codec::RewriteLimit::OutputBytes { observed, maximum } => (
-                SlideBackgroundLimitKind::OutputBytes,
+                LimitKind::OutputBytes,
                 usize_to_u64(observed),
                 usize_to_u64(maximum),
             ),
             metadata_codec::RewriteLimit::Fields { observed, maximum } => (
-                SlideBackgroundLimitKind::WireFields,
+                LimitKind::WireFields,
                 usize_to_u64(observed),
                 usize_to_u64(maximum),
             ),
             metadata_codec::RewriteLimit::Work { observed, maximum } => (
-                SlideBackgroundLimitKind::WireWork,
+                LimitKind::WireWork,
                 usize_to_u64(observed),
                 usize_to_u64(maximum),
             ),
             metadata_codec::RewriteLimit::Nesting { observed, maximum } => (
-                SlideBackgroundLimitKind::WireNesting,
+                LimitKind::WireNesting,
                 u64::from(observed),
                 u64::from(maximum),
             ),
             metadata_codec::RewriteLimit::Components { observed, maximum }
             | metadata_codec::RewriteLimit::References { observed, maximum }
             | metadata_codec::RewriteLimit::Additions { observed, maximum } => (
-                SlideBackgroundLimitKind::References,
+                LimitKind::References,
                 usize_to_u64(observed),
                 usize_to_u64(maximum),
             ),
-            _ => return SlideBackgroundError::InvalidSource,
+            _ => return Error::InvalidSource,
         };
-        return SlideBackgroundError::LimitExceeded {
+        return Error::Limit {
             kind,
             observed,
             maximum,
         };
     }
     if let Some(amount) = error.allocation_request() {
-        return SlideBackgroundError::Allocation { amount };
+        return Error::Allocation { amount };
     }
-    SlideBackgroundError::InvalidSource
+    Error::InvalidSource
 }
 
-fn map_slide_selector_error(error: SlideSelectorError) -> SlideBackgroundError {
+fn map_slide_selector_error(error: SlideSelectorError) -> Error {
     match error {
-        SlideSelectorError::EmptySlideName => SlideBackgroundError::EmptySlideName,
-        SlideSelectorError::DuplicateSlideName { .. } => SlideBackgroundError::AmbiguousSelector,
+        SlideSelectorError::EmptySlideName => Error::Refused(Refusal::EmptySlideName),
+        SlideSelectorError::DuplicateSlideName { .. } => Error::Refused(Refusal::AmbiguousSelector),
     }
 }
 
-fn map_read_error(error: ReadError) -> SlideBackgroundError {
+fn map_read_error(error: ReadError) -> Error {
     match error {
         ReadError::SemanticLimit {
             kind,
             observed,
             maximum,
             ..
-        } => SlideBackgroundError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                SemanticLimitKind::Objects => SlideBackgroundLimitKind::Entries,
-                SemanticLimitKind::Slides => SlideBackgroundLimitKind::Slides,
-                SemanticLimitKind::References => SlideBackgroundLimitKind::References,
+                SemanticLimitKind::Objects => LimitKind::Entries,
+                SemanticLimitKind::Slides => LimitKind::Slides,
+                SemanticLimitKind::References => LimitKind::References,
                 SemanticLimitKind::TextStorages
                 | SemanticLimitKind::TextFragments
-                | SemanticLimitKind::TextBytes => SlideBackgroundLimitKind::WireBytes,
+                | SemanticLimitKind::TextBytes => LimitKind::WireBytes,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
@@ -3676,89 +3564,83 @@ fn map_read_error(error: ReadError) -> SlideBackgroundError {
             observed,
             maximum,
             ..
-        } => SlideBackgroundError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                super::PayloadLimitKind::Bytes => SlideBackgroundLimitKind::WireBytes,
-                super::PayloadLimitKind::Fields => SlideBackgroundLimitKind::WireFields,
-                super::PayloadLimitKind::Nesting => SlideBackgroundLimitKind::WireNesting,
-                super::PayloadLimitKind::Work => SlideBackgroundLimitKind::WireWork,
+                super::PayloadLimitKind::Bytes => LimitKind::WireBytes,
+                super::PayloadLimitKind::Fields => LimitKind::WireFields,
+                super::PayloadLimitKind::Nesting => LimitKind::WireNesting,
+                super::PayloadLimitKind::Work => LimitKind::WireWork,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         },
-        ReadError::Allocation { amount, .. } => SlideBackgroundError::Allocation { amount },
-        _ => SlideBackgroundError::InvalidSource,
+        ReadError::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_wire_error(error: litchi_iwa_common::Error) -> SlideBackgroundError {
+fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
     match error {
         litchi_iwa_common::Error::LimitExceeded {
             kind,
             observed,
             limit,
-        } => SlideBackgroundError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_common::LimitKind::InputBytes => SlideBackgroundLimitKind::WireBytes,
-                litchi_iwa_common::LimitKind::OutputBytes => SlideBackgroundLimitKind::OutputBytes,
+                litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
+                litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,
                 litchi_iwa_common::LimitKind::Fields
                 | litchi_iwa_common::LimitKind::TableRows
                 | litchi_iwa_common::LimitKind::TableColumns
                 | litchi_iwa_common::LimitKind::TableCells
-                | litchi_iwa_common::LimitKind::MaterializedCells => {
-                    SlideBackgroundLimitKind::WireFields
-                },
-                litchi_iwa_common::LimitKind::Nesting => SlideBackgroundLimitKind::WireNesting,
-                litchi_iwa_common::LimitKind::RewriteWork => SlideBackgroundLimitKind::WireWork,
+                | litchi_iwa_common::LimitKind::MaterializedCells => LimitKind::WireFields,
+                litchi_iwa_common::LimitKind::Nesting => LimitKind::WireNesting,
+                litchi_iwa_common::LimitKind::RewriteWork => LimitKind::WireWork,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
-        litchi_iwa_common::Error::Allocation { amount, .. } => {
-            SlideBackgroundError::Allocation { amount }
-        },
-        _ => SlideBackgroundError::InvalidSource,
+        litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_archive_error(error: litchi_iwa_archive::Error) -> SlideBackgroundError {
+fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     match error {
         litchi_iwa_archive::Error::Limit {
             kind,
             observed,
             maximum,
-        } => SlideBackgroundError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_archive::LimitKind::InputBytes => SlideBackgroundLimitKind::InputBytes,
-                litchi_iwa_archive::LimitKind::OutputBytes => SlideBackgroundLimitKind::OutputBytes,
-                litchi_iwa_archive::LimitKind::Entries => SlideBackgroundLimitKind::Entries,
-                litchi_iwa_archive::LimitKind::EntryBytes => SlideBackgroundLimitKind::EntryBytes,
-                litchi_iwa_archive::LimitKind::TotalBytes => SlideBackgroundLimitKind::TotalBytes,
-                _ => SlideBackgroundLimitKind::WireBytes,
+                litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
+                litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_archive::LimitKind::Entries => LimitKind::Entries,
+                litchi_iwa_archive::LimitKind::EntryBytes => LimitKind::EntryBytes,
+                litchi_iwa_archive::LimitKind::TotalBytes => LimitKind::TotalBytes,
+                _ => LimitKind::WireBytes,
             },
             observed,
             maximum,
         },
-        litchi_iwa_archive::Error::Allocation { amount, .. } => {
-            SlideBackgroundError::Allocation { amount }
-        },
-        _ => SlideBackgroundError::InvalidSource,
+        litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_core_error(error: litchi_iwa_core::Error) -> SlideBackgroundError {
+fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
             kind,
             observed,
             maximum,
-        } => SlideBackgroundError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_core::LimitKind::ArchiveBytes => SlideBackgroundLimitKind::TotalBytes,
+                litchi_iwa_core::LimitKind::ArchiveBytes => LimitKind::TotalBytes,
                 litchi_iwa_core::LimitKind::Objects
                 | litchi_iwa_core::LimitKind::Messages
                 | litchi_iwa_core::LimitKind::MessagesPerObject
-                | litchi_iwa_core::LimitKind::MetadataItems => SlideBackgroundLimitKind::Entries,
+                | litchi_iwa_core::LimitKind::MetadataItems => LimitKind::Entries,
                 litchi_iwa_core::LimitKind::ObjectBytes
                 | litchi_iwa_core::LimitKind::MessageBytes
                 | litchi_iwa_core::LimitKind::HeaderBytes
@@ -3766,32 +3648,28 @@ fn map_core_error(error: litchi_iwa_core::Error) -> SlideBackgroundError {
                 | litchi_iwa_core::LimitKind::SnappyChunkBytes
                 | litchi_iwa_core::LimitKind::SnappyStreamBytes
                 | litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
-                | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes => {
-                    SlideBackgroundLimitKind::WireBytes
-                },
-                litchi_iwa_core::LimitKind::HeaderFields => SlideBackgroundLimitKind::WireFields,
-                litchi_iwa_core::LimitKind::HeaderNesting => SlideBackgroundLimitKind::WireNesting,
-                litchi_iwa_core::LimitKind::SnappyFrames => SlideBackgroundLimitKind::WireWork,
+                | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes => LimitKind::WireBytes,
+                litchi_iwa_core::LimitKind::HeaderFields => LimitKind::WireFields,
+                litchi_iwa_core::LimitKind::HeaderNesting => LimitKind::WireNesting,
+                litchi_iwa_core::LimitKind::SnappyFrames => LimitKind::WireWork,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         },
         litchi_iwa_core::Error::Allocation { requested, .. } => {
-            SlideBackgroundError::Allocation { amount: requested }
+            Error::Allocation { amount: requested }
         },
-        _ => SlideBackgroundError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_rendering_error(
-    error: super::rendering_invalidation::RenderingInvalidationError,
-) -> SlideBackgroundError {
+fn map_rendering_error(error: super::rendering_invalidation::RenderingInvalidationError) -> Error {
     match error {
         super::rendering_invalidation::RenderingInvalidationError::Allocation { amount } => {
-            SlideBackgroundError::Allocation { amount }
+            Error::Allocation { amount }
         },
         super::rendering_invalidation::RenderingInvalidationError::InvalidSource => {
-            SlideBackgroundError::InvalidSource
+            Error::InvalidSource
         },
     }
 }
@@ -3810,7 +3688,7 @@ mod tests {
         let target = Background::Solid(
             Rgba::new(0.25, 0.5, 0.75, 1.0, RgbColorSpace::Srgb).expect("test color is valid"),
         );
-        let patch = SlideBackgroundPatch {
+        let patch = Patch {
             artifacts: ExactArtifacts::new(Arc::clone(&source), source),
             slide_position: Position::new(0),
             slide_identifier: 1,
@@ -3836,7 +3714,7 @@ mod tests {
         let background = Background::Solid(
             Rgba::new(0.25, 0.5, 0.75, 1.0, RgbColorSpace::Srgb).expect("test color is valid"),
         );
-        let patch = SlideBackgroundPatch {
+        let patch = Patch {
             artifacts: ExactArtifacts::new(Arc::clone(&source), source),
             slide_position: Position::new(0),
             slide_identifier: 1,

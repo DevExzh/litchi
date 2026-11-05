@@ -41,8 +41,51 @@ pub fn load_from_worksheet(
     }))
 }
 
+/// Load the notes of one worksheet of a source-backed package: only the
+/// worksheet's relationships and its comments part are read.
+pub(crate) fn load_from_source(
+    package: &litchi_opc::SourceBackedPackage,
+    worksheet_part: &PackURI,
+) -> Result<Option<Comments>> {
+    package.check_execution()?;
+    let worksheet = package.part(worksheet_part)?;
+    let mut relationships = worksheet
+        .rels()
+        .iter()
+        .filter(|relationship| is_comments_relationship(relationship.reltype()));
+    let Some(relationship) = relationships.next() else {
+        return Ok(None);
+    };
+    if relationships.next().is_some() {
+        return Err(invalid(
+            "worksheet has multiple classic comments relationships",
+        ));
+    }
+    if relationship.is_external() {
+        return Err(invalid(
+            "worksheet comments relationship cannot be external",
+        ));
+    }
+    let part = package.part(&relationship.target_partname()?)?;
+    if part.content_type() != COMMENTS_CONTENT_TYPE {
+        return Err(invalid("worksheet comments target is not a comments part"));
+    }
+    if part.declared_uncompressed_size()? > super::MAX_PART_BYTES as u64 {
+        return Err(invalid("classic comments part exceeds the size limit"));
+    }
+    let data = part.data()?;
+    let xml = std::str::from_utf8(data.as_bytes())
+        .map_err(|error| invalid(format!("classic comments XML is not UTF-8: {error}")))?;
+    parse_comments(xml).map(Some)
+}
+
 /// Store or replace the worksheet's sole classic comments part.
-pub fn store_on_worksheet(
+///
+/// Storing always writes the part, so a signed package is refused with
+/// [`crate::Error::Signed`] before anything is changed, even when the
+/// serialized comments equal the stored ones: remove the signature explicitly
+/// first ([`OpcPackage::unsign`]).
+pub(crate) fn store_on_worksheet(
     package: &mut OpcPackage,
     worksheet_part: &PackURI,
     value: &Comments,
@@ -72,6 +115,7 @@ pub fn store_on_worksheet(
         };
 
     let xml = write_comments(value)?;
+    crate::signature_policy::ensure_unsigned(package)?;
     match package.get_part(&part_name) {
         Ok(_) => package.get_part_mut(&part_name)?.set_blob(xml),
         Err(OpcError::PartNotFound(_)) => {
@@ -99,7 +143,6 @@ pub fn store_on_worksheet(
                 false,
             );
     }
-    package.unsign();
     Ok(CommentsPart {
         worksheet_part_name: worksheet_part.to_string(),
         relationship_id,
@@ -109,7 +152,9 @@ pub fn store_on_worksheet(
 }
 
 /// Replace the worksheet's classic comments graph atomically at the semantic level.
-pub fn replace_on_worksheet(
+///
+/// The signature policy is [`store_on_worksheet`]'s.
+pub(crate) fn replace_on_worksheet(
     package: &mut OpcPackage,
     worksheet_part: &PackURI,
     value: &Comments,
@@ -118,7 +163,15 @@ pub fn replace_on_worksheet(
 }
 
 /// Remove the worksheet's classic comments relationship and unreferenced part.
-pub fn remove_from_worksheet(package: &mut OpcPackage, worksheet_part: &PackURI) -> Result<bool> {
+///
+/// A worksheet without comments is left untouched and returns `false`, signed
+/// or not. Removing comments changes the package, so a signed package is
+/// refused with [`crate::Error::Signed`]: remove the signature explicitly
+/// first ([`OpcPackage::unsign`]).
+pub(crate) fn remove_from_worksheet(
+    package: &mut OpcPackage,
+    worksheet_part: &PackURI,
+) -> Result<bool> {
     let Some((relationship_id, part_name)) = find_relationship(package.get_part(worksheet_part)?)?
         .map(|relationship| {
             Ok::<_, crate::Error>((
@@ -130,6 +183,7 @@ pub fn remove_from_worksheet(package: &mut OpcPackage, worksheet_part: &PackURI)
     else {
         return Ok(false);
     };
+    crate::signature_policy::ensure_unsigned(package)?;
     package
         .get_part_mut(worksheet_part)?
         .rels_mut()
@@ -137,7 +191,6 @@ pub fn remove_from_worksheet(package: &mut OpcPackage, worksheet_part: &PackURI)
     if !part_is_referenced(package, &part_name) {
         package.remove_part(&part_name);
     }
-    package.unsign();
     Ok(true)
 }
 
@@ -317,6 +370,7 @@ mod tests {
                 text: "note".into(),
                 guid: None,
                 shape_id: None,
+                runs: Vec::new(),
             },
         );
         comments

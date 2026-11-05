@@ -6,6 +6,14 @@ pub use litchi_iwa_common::shape::image::{
     Error, ImageAdjustment, ImageAdjustments, ImageEnhancement,
 };
 
+/// Selector-first exact-source image-adjustment transactions:
+/// [`crate::Package::edit_sheet_image_adjustments`].
+pub mod adjustments {
+    pub use crate::package::families::image_adjustments::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+}
+
 /// Selects one image by its zero-based position in a sheet's source order.
 ///
 /// The selector contains only a checked semantic position. Native object

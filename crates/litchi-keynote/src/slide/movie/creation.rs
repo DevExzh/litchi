@@ -8,15 +8,15 @@ use std::fmt;
 
 use litchi_core::Position;
 use litchi_iwa_archive::package::ExactArtifacts;
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::Options;
-use crate::Package;
+use crate::{Package, SlideSelector};
 
 /// Finite resources consumed by one movie-creation transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum SlideMovieCreationLimitKind {
+pub enum LimitKind {
     /// Source package bytes.
     InputBytes,
     /// Candidate package bytes.
@@ -45,7 +45,7 @@ pub enum SlideMovieCreationLimitKind {
     Allocations,
 }
 
-impl fmt::Display for SlideMovieCreationLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "source package bytes",
@@ -66,9 +66,39 @@ impl fmt::Display for SlideMovieCreationLimitKind {
 }
 
 /// Content-redacted failures from fresh slide-movie creation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum SlideMovieCreationError {
+pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The source graph or metadata cannot safely admit creation.
+    #[error("the Keynote source graph cannot safely admit slide movie creation")]
+    InvalidSource,
+    /// A configured finite resource ceiling was exceeded.
+    #[error("slide movie creation {kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        kind: LimitKind,
+        observed: u64,
+        maximum: u64,
+    },
+    /// An allocation failed before publication.
+    #[error("could not allocate {amount} units for slide movie creation")]
+    Allocation { amount: usize },
+    /// The reopened candidate did not reproduce the planned graph and movie.
+    #[error("the created slide movie failed verification")]
+    Verification,
+    /// The patch is not authorized for this exact source snapshot.
+    #[error("the slide movie creation patch does not match this exact source")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The package has no exact physical source suitable for this transaction.
     #[error("this Keynote source does not support slide movie creation")]
     UnsupportedSource,
@@ -84,9 +114,6 @@ pub enum SlideMovieCreationError {
     /// The requested slide position is absent.
     #[error("Keynote slide position {position:?} was not found")]
     SlidePositionNotFound { position: Position },
-    /// The source graph or metadata cannot safely admit creation.
-    #[error("the Keynote source graph cannot safely admit slide movie creation")]
-    InvalidSource,
     /// The movie filename is not a bounded safe video filename.
     #[error("slide movie requires one safe recognized movie filename")]
     InvalidMovieFilename,
@@ -99,28 +126,47 @@ pub enum SlideMovieCreationError {
     /// The poster payload is empty or has no recognized image signature.
     #[error("slide movie requires a nonempty recognized poster payload")]
     UnsupportedPoster,
-    /// A configured finite resource ceiling was exceeded.
-    #[error("slide movie creation {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
-        kind: SlideMovieCreationLimitKind,
-        observed: u64,
-        maximum: u64,
-    },
-    /// An allocation failed before publication.
-    #[error("could not allocate {amount} units for slide movie creation")]
-    Allocation { amount: usize },
-    /// The reopened candidate did not reproduce the planned graph and movie.
-    #[error("the created slide movie failed verification")]
-    Verification,
-    /// The patch is not authorized for this exact source snapshot.
-    #[error("the slide movie creation patch does not match this exact source")]
-    PatchConflict,
+    /// The edit already stages its one creation.
+    #[error("the slide movie creation edit already stages a movie")]
+    OperationAlreadyStaged,
+    /// The edit was committed without a staged creation.
+    #[error("the slide movie creation edit stages no movie")]
+    NoStagedOperation,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. }
+            | Self::UnsupportedMovie { .. }
+            | Self::UnsupportedPoster { .. } => RefusalKind::UnsupportedContent,
+            Self::EmptySlideName { .. }
+            | Self::AmbiguousSelector { .. }
+            | Self::InvalidMovieFilename { .. }
+            | Self::InvalidPosterFilename { .. } => RefusalKind::InvalidValue,
+            Self::SlideNameNotFound { .. } | Self::SlidePositionNotFound { .. } => {
+                RefusalKind::NotFound
+            },
+            Self::OperationAlreadyStaged { .. } | Self::NoStagedOperation { .. } => {
+                RefusalKind::UnsupportedOperation
+            },
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// Exact source and target artifacts for creating one slide-owned movie.
 #[must_use]
 #[derive(Clone)]
-pub struct SlideMovieCreationPatch {
+pub struct Patch {
     pub(crate) artifacts: ExactArtifacts,
     pub(crate) slide_position: Position,
     pub(crate) movie_position: Position,
@@ -141,10 +187,10 @@ pub struct SlideMovieCreationPatch {
     pub(crate) restored_previews: usize,
 }
 
-impl fmt::Debug for SlideMovieCreationPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SlideMovieCreationPatch")
+            .debug_struct("Patch")
             .field("slide_position", &self.slide_position)
             .field("movie_position", &self.movie_position)
             .field("source_media_count", &self.source_media_count)
@@ -163,7 +209,7 @@ impl fmt::Debug for SlideMovieCreationPatch {
     }
 }
 
-impl SlideMovieCreationPatch {
+impl Patch {
     /// Return the diagnostic fingerprint of the exact source artifact.
     #[must_use]
     pub const fn source_fingerprint(&self) -> u64 {
@@ -299,7 +345,7 @@ impl SlideMovieCreationPatch {
 
 /// Resource and topology evidence for a verified creation or its inverse.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SlideMovieCreationDiagnostics {
+pub struct Diagnostics {
     pub(crate) changed: bool,
     pub(crate) source_media_count: usize,
     pub(crate) target_media_count: usize,
@@ -312,8 +358,8 @@ pub struct SlideMovieCreationDiagnostics {
     pub(crate) restored_previews: usize,
 }
 
-impl SlideMovieCreationDiagnostics {
-    pub(crate) fn for_patch(patch: &SlideMovieCreationPatch) -> Self {
+impl Diagnostics {
+    pub(crate) fn for_patch(patch: &Patch) -> Self {
         Self {
             changed: !patch.is_noop(),
             source_media_count: patch.source_media_count,
@@ -392,13 +438,13 @@ impl SlideMovieCreationDiagnostics {
 /// A reopened package and its exact-source reversible creation patch.
 #[must_use]
 #[derive(Debug)]
-pub struct SlideMovieCreationCommit {
+pub struct Commit {
     pub(crate) package: Package,
-    pub(crate) patch: SlideMovieCreationPatch,
-    pub(crate) diagnostics: SlideMovieCreationDiagnostics,
+    pub(crate) patch: Patch,
+    pub(crate) diagnostics: Diagnostics,
 }
 
-impl SlideMovieCreationCommit {
+impl Commit {
     /// Borrow the verified package.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -411,14 +457,117 @@ impl SlideMovieCreationCommit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the exact-source patch.
-    pub const fn patch(&self) -> &SlideMovieCreationPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Borrow the creation diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> &SlideMovieCreationDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
+    }
+}
+
+/// One staged slide movie creation.
+#[derive(Debug, Clone, Copy)]
+struct Staged<'a> {
+    slide: SlideSelector<'a>,
+    preferred_movie_filename: &'a str,
+    movie_data: &'a [u8],
+    preferred_poster_filename: &'a str,
+    poster_data: &'a [u8],
+    options: Options,
+}
+
+/// One immutable edit that stages exactly one independently positioned,
+/// file-backed movie on a slide.
+///
+/// Start it with [`Package::edit_slide_movie_creation`]; the source package is
+/// never changed, and dropping the edit discards the staged movie. Both movie
+/// and poster bytes stay borrowed until the commit has assembled and reopened
+/// the candidate.
+pub struct Edit<'a> {
+    source: &'a Package,
+    staged: Option<Staged<'a>>,
+}
+
+impl fmt::Debug for Edit<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Edit")
+            .field("slide", &self.staged.as_ref().map(|staged| staged.slide))
+            .field(
+                "movie_data_len",
+                &self.staged.as_ref().map(|staged| staged.movie_data.len()),
+            )
+            .finish_non_exhaustive()
+    }
+}
+
+impl<'a> Edit<'a> {
+    pub(crate) const fn new(source: &'a Package) -> Self {
+        Self {
+            source,
+            staged: None,
+        }
+    }
+
+    /// Stage one movie on the selected slide: `movie_data` (named after
+    /// `preferred_movie_filename`) with the poster frame `poster_data` (named
+    /// after `preferred_poster_filename`), placed by `options`.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::OperationAlreadyStaged`] after one creation.
+    pub fn add(
+        mut self,
+        slide: impl Into<SlideSelector<'a>>,
+        preferred_movie_filename: &'a str,
+        movie_data: &'a [u8],
+        preferred_poster_filename: &'a str,
+        poster_data: &'a [u8],
+        options: Options,
+    ) -> Result<Self, Error> {
+        if self.staged.is_some() {
+            return Err(Error::Refused(Refusal::OperationAlreadyStaged));
+        }
+        self.staged = Some(Staged {
+            slide: slide.into(),
+            preferred_movie_filename,
+            movie_data,
+            preferred_poster_filename,
+            poster_data,
+            options,
+        });
+        Ok(self)
+    }
+
+    /// Validate, publish and reopen the staged movie as one exact-source
+    /// transaction; the returned patch authorizes replay only for that exact
+    /// source.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::NoStagedOperation`] for an empty edit; selector, input,
+    /// source, resource and verification errors. Failure never publishes a
+    /// partial package.
+    pub fn commit(self) -> Result<Commit, Error> {
+        let staged = self
+            .staged
+            .ok_or(Error::Refused(Refusal::NoStagedOperation))?;
+        self.source.create_slide_movie(
+            staged.slide,
+            staged.preferred_movie_filename,
+            staged.movie_data,
+            staged.preferred_poster_filename,
+            staged.poster_data,
+            staged.options,
+        )
     }
 }

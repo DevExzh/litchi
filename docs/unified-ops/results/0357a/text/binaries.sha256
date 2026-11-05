@@ -1,0 +1,6 @@
+# release, no LTO; before = 910d5de31d (item 1), after = item 2 working tree; host binaries kept outside the repository
+ea76bf8556a58e15e8d451559ff00293ecab3632087a821f913aaa87223493b5  before
+5b6ffeec796a2d8a51c414bfa8c5e5b4952bbb85065690c8474298807898afd6  after
+0748868047fa787c9e4376202e33d53d7f2e54bce1e74e5fa0b7dce20127cec4  perf-before
+fb9d067eca3b3108d8ae3e61100d8bc978ffa2f69a327756d7c17b3a6a4cff5e  perf-after
+4e06c88e65c3c338bdd474a3fc92bfc0e33a0077cfc2360d809b8ea2758866fc  deck1000.ppt

@@ -242,10 +242,11 @@ impl TablePatch {
 
 /// A checked failure while applying a bounded table patch.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     /// The caller supplied a stream, range, fingerprint, or `ccpText` that is
     /// not the source captured by this patch.
-    SourceConflict(String),
+    PatchConflict(String),
     /// The patch itself cannot be represented safely.
     Invalid(String),
 }
@@ -253,7 +254,7 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::SourceConflict(message) => {
+            Self::PatchConflict(message) => {
                 write!(formatter, "subdocument patch conflict: {message}")
             },
             Self::Invalid(message) => {
@@ -363,12 +364,12 @@ impl WireImage {
                         })?,
                     );
                     if actual != Some(expected) {
-                        return Err(Error::SourceConflict(format!("{name} source bytes differ")));
+                        return Err(Error::PatchConflict(format!("{name} source bytes differ")));
                     }
                 },
                 (None, None) => {},
                 _ => {
-                    return Err(Error::SourceConflict(format!(
+                    return Err(Error::PatchConflict(format!(
                         "{name} source presence differs"
                     )));
                 },
@@ -438,14 +439,14 @@ impl SourceContext {
 
     fn check_stream(self, table_stream: &[u8], main_document_chars: u32) -> Result<(), Error> {
         if self.main_document_chars != main_document_chars {
-            return Err(Error::SourceConflict(
+            return Err(Error::PatchConflict(
                 "main-document character count differs".to_string(),
             ));
         }
         if self.table_stream_length != table_stream.len()
             || self.fingerprint != fingerprint(table_stream)
         {
-            return Err(Error::SourceConflict(
+            return Err(Error::PatchConflict(
                 "table-stream context differs".to_string(),
             ));
         }

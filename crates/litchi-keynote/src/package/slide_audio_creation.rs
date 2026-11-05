@@ -16,7 +16,7 @@ use litchi_iwa_archive::SourceCatalog;
 use litchi_iwa_archive::package::{EntryEdit, EntryInsertion, ExactArtifacts};
 use litchi_iwa_common::WireLimits;
 use litchi_iwa_core::archive::{FieldObjectReferenceTransition, ObjectReferenceTransition};
-use litchi_iwa_core::{Archive, ArchiveLimits, ArchiveObject, RawMessage, SnappyStream};
+use litchi_iwa_core::{Archive, ArchiveObject, Limits as ArchiveLimits, RawMessage, SnappyStream};
 use litchi_iwa_protos::{
     keynote_media_creation_codec as media_creation_codec,
     keynote_media_lifecycle_codec as lifecycle_codec, keynote_show_codec,
@@ -24,10 +24,12 @@ use litchi_iwa_protos::{
 };
 use sha1::{Digest as _, Sha1};
 
+use super::snappy_failure::SnappyFailure;
 use super::{Package, PhysicalSource};
 use crate::slide::audio::creation::{
-    SlideAudioCreationCommit, SlideAudioCreationDiagnostics, SlideAudioCreationError,
-    SlideAudioCreationLimitKind, SlideAudioCreationPatch,
+    Commit as SlideAudioCreationCommit, Diagnostics as SlideAudioCreationDiagnostics,
+    Error as SlideAudioCreationError, LimitKind as SlideAudioCreationLimitKind,
+    Patch as SlideAudioCreationPatch,
 };
 use crate::soundtrack::items::MAX_FILENAME_BYTES;
 use crate::{MovieKind, SlideSelector};
@@ -263,7 +265,9 @@ impl CreationBudget {
         let source = match &package.state.source {
             PhysicalSource::Package(source) if source.source_is_exact() => source,
             PhysicalSource::Package(_) | PhysicalSource::Semantic(_) => {
-                return Err(SlideAudioCreationError::UnsupportedSource);
+                return Err(SlideAudioCreationError::Refused(
+                    crate::slide::audio::creation::Refusal::UnsupportedSource,
+                ));
             },
         };
         budget.charge_input(source.source_bytes().len())?;
@@ -505,11 +509,7 @@ impl CreationBudget {
 }
 
 impl Package {
-    /// Create one independently positioned, slide-owned audio control.
-    ///
-    /// The source remains unchanged. The returned commit contains the candidate
-    /// package and an exact patch whose inverse restores the original bytes.
-    /// Identical materialized audio is reused when its metadata is unambiguous.
+    /// Start an immutable single-creation slide audio edit.
     ///
     /// ```no_run
     /// use std::{fs, time::Duration};
@@ -519,11 +519,21 @@ impl Package {
     /// let source = Package::from_bytes(&fs::read("presentation.key")?)?;
     /// let audio = fs::read("narration.wav")?;
     /// let options = Options::new(Point { x: 120.0, y: 240.0 }, Duration::from_secs(8))?;
-    /// let commit = source.add_slide_audio(SlideSelector::index(0), "narration.wav", &audio, options)?;
+    /// let commit = source
+    ///     .edit_slide_audio_creation()
+    ///     .add(SlideSelector::index(0), "narration.wav", &audio, options)?
+    ///     .commit()?;
     /// commit.package().write_to(&mut fs::File::create("narrated.key")?)?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn add_slide_audio<'slide>(
+    #[must_use]
+    pub const fn edit_slide_audio_creation(&self) -> crate::slide::audio::creation::Edit<'_> {
+        crate::slide::audio::creation::Edit::new(self)
+    }
+
+    /// Create one independently positioned, slide-owned audio control: the
+    /// commit of [`crate::slide::audio::creation::Edit`].
+    pub(crate) fn create_slide_audio<'slide>(
         &self,
         slide: impl Into<SlideSelector<'slide>>,
         preferred_filename: &str,
@@ -834,7 +844,7 @@ pub(super) fn publish_candidate(
     budget.charge_allocation_events(1)?;
     let appended = media_objects.into_iter().chain(builds).collect::<Vec<_>>();
     slide_archive
-        .append_objects_with_limits(appended, context.archive_limits)
+        .append_objects(appended, context.archive_limits)
         .map_err(|_| SlideAudioCreationError::InvalidSource)?;
     rewrite_slide_archive(
         &mut slide_archive,
@@ -966,26 +976,36 @@ pub(super) fn validate_media_input(
         || filename == "."
         || filename == ".."
     {
-        return Err(SlideAudioCreationError::InvalidFilename);
+        return Err(SlideAudioCreationError::Refused(
+            crate::slide::audio::creation::Refusal::InvalidFilename,
+        ));
     }
     let Some(dot) = filename.rfind('.') else {
-        return Err(SlideAudioCreationError::InvalidFilename);
+        return Err(SlideAudioCreationError::Refused(
+            crate::slide::audio::creation::Refusal::InvalidFilename,
+        ));
     };
     if dot == 0 || dot + 1 >= filename.len() {
-        return Err(SlideAudioCreationError::InvalidFilename);
+        return Err(SlideAudioCreationError::Refused(
+            crate::slide::audio::creation::Refusal::InvalidFilename,
+        ));
     }
     if litchi_iwa_common::media::Type::from_extension(&filename[dot + 1..]) != expected {
-        return Err(SlideAudioCreationError::InvalidFilename);
+        return Err(SlideAudioCreationError::Refused(
+            crate::slide::audio::creation::Refusal::InvalidFilename,
+        ));
     }
     if data.len() > maximum {
-        return Err(SlideAudioCreationError::LimitExceeded {
+        return Err(SlideAudioCreationError::Limit {
             kind: SlideAudioCreationLimitKind::EntryBytes,
             observed: u64::try_from(data.len()).unwrap_or(u64::MAX),
             maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
         });
     }
     if data.is_empty() || litchi_iwa_common::media::Type::from_bytes(data) != expected {
-        return Err(SlideAudioCreationError::UnsupportedAudio);
+        return Err(SlideAudioCreationError::Refused(
+            crate::slide::audio::creation::Refusal::UnsupportedAudio,
+        ));
     }
     Ok(())
 }
@@ -996,7 +1016,9 @@ pub(super) fn physical_catalog(
     match &package.state.source {
         PhysicalSource::Package(catalog) if catalog.source_is_exact() => Ok(catalog),
         PhysicalSource::Package(_) | PhysicalSource::Semantic(_) => {
-            Err(SlideAudioCreationError::UnsupportedSource)
+            Err(SlideAudioCreationError::Refused(
+                crate::slide::audio::creation::Refusal::UnsupportedSource,
+            ))
         },
     }
 }
@@ -1012,26 +1034,38 @@ pub(super) fn resolve_context(
             .slide_record_at(position.get())
             .map_err(|_| SlideAudioCreationError::InvalidSource)?
             .map(|_| position)
-            .ok_or(SlideAudioCreationError::SlidePositionNotFound { position })?,
+            .ok_or(SlideAudioCreationError::Refused(
+                crate::slide::audio::creation::Refusal::SlidePositionNotFound { position },
+            ))?,
         SlideSelector::Name(name) => {
             if name.is_empty() {
-                return Err(SlideAudioCreationError::EmptySlideName);
+                return Err(SlideAudioCreationError::Refused(
+                    crate::slide::audio::creation::Refusal::EmptySlideName,
+                ));
             }
             package
                 .show()
                 .map_err(|_| SlideAudioCreationError::InvalidSource)?
                 .select_slide(SlideSelector::name(name))
-                .map_err(|_| SlideAudioCreationError::AmbiguousSelector)?
+                .map_err(|_| {
+                    SlideAudioCreationError::Refused(
+                        crate::slide::audio::creation::Refusal::AmbiguousSelector,
+                    )
+                })?
                 .map(|slide| Position::new(slide.index()))
-                .ok_or(SlideAudioCreationError::SlideNameNotFound)?
+                .ok_or(SlideAudioCreationError::Refused(
+                    crate::slide::audio::creation::Refusal::SlideNameNotFound,
+                ))?
         },
     };
     let record = package
         .slide_record_at(slide_position.get())
         .map_err(|_| SlideAudioCreationError::InvalidSource)?
-        .ok_or(SlideAudioCreationError::SlidePositionNotFound {
-            position: slide_position,
-        })?;
+        .ok_or(SlideAudioCreationError::Refused(
+            crate::slide::audio::creation::Refusal::SlidePositionNotFound {
+                position: slide_position,
+            },
+        ))?;
     let (slide_component, slide_object) = package
         .object_with_component(record.slide_identifier)
         .ok_or(SlideAudioCreationError::InvalidSource)?;
@@ -1157,7 +1191,7 @@ fn stylesheet_style_identifiers(
     expected_count: usize,
     budget: &mut CreationBudget,
 ) -> Result<Vec<u64>, SlideAudioCreationError> {
-    let fields = litchi_iwa_common::wire::WireView::parse_with_limits(payload, limits)
+    let fields = litchi_iwa_common::wire::WireView::parse(payload, limits)
         .map_err(|_| SlideAudioCreationError::InvalidSource)?;
     let count = fields.fields().filter(|field| field.number() == 1).count();
     if count != expected_count || count == 0 {
@@ -1305,7 +1339,7 @@ pub(super) fn references_in_field(
     limits: WireLimits,
     budget: &mut CreationBudget,
 ) -> Result<Vec<u64>, SlideAudioCreationError> {
-    let view = litchi_iwa_common::wire::WireView::parse_with_limits(payload, limits)
+    let view = litchi_iwa_common::wire::WireView::parse(payload, limits)
         .map_err(|_| SlideAudioCreationError::InvalidSource)?;
     budget.charge_wire_fields(view.len())?;
     budget.charge_work(payload.len().max(1))?;
@@ -1337,7 +1371,7 @@ pub(super) fn reference_identifier(
     limits: WireLimits,
     budget: &mut CreationBudget,
 ) -> Result<u64, SlideAudioCreationError> {
-    let view = litchi_iwa_common::wire::WireView::parse_with_limits(payload, limits)
+    let view = litchi_iwa_common::wire::WireView::parse(payload, limits)
         .map_err(|_| SlideAudioCreationError::InvalidSource)?;
     budget.charge_wire_fields(view.len())?;
     budget.charge_work(payload.len().max(1))?;
@@ -1397,7 +1431,15 @@ pub(super) fn allocate_ids(
     let last = first
         .checked_add(4)
         .ok_or(SlideAudioCreationError::InvalidSource)?;
-    let bytes = litchi_core::id::generate_guid_bytes();
+    // The host draws random GUIDs here. Leaf output must be a pure function
+    // of its input (record 0428), so every UUID is derived from the fresh
+    // identifier it names (above the package watermark) with the SplitMix64
+    // scheme of record 0375a §2.1; the build UUID is salted apart from the
+    // build object's own map UUID.
+    let build = first
+        .checked_add(3)
+        .ok_or(SlideAudioCreationError::InvalidSource)?;
+    let bytes = derived_guid(build, BUILD_UUID_SALT);
     let build_uuid = uuid_from_guid(&bytes);
     let random_number_seed = u32::from_le_bytes(
         bytes[..4]
@@ -1405,8 +1447,11 @@ pub(super) fn allocate_ids(
             .map_err(|_| SlideAudioCreationError::InvalidSource)?,
     );
     let mut object_uuids = [identity_codec::UuidBits::new(0, 0); 4];
-    for uuid in &mut object_uuids {
-        *uuid = uuid_from_guid(&litchi_core::id::generate_guid_bytes());
+    for (offset, uuid) in (0u64..).zip(&mut object_uuids) {
+        let identifier = first
+            .checked_add(offset)
+            .ok_or(SlideAudioCreationError::InvalidSource)?;
+        *uuid = uuid_from_guid(&derived_guid(identifier, OBJECT_UUID_SALT));
     }
     Ok(CreationIds {
         drawable: first,
@@ -1416,9 +1461,7 @@ pub(super) fn allocate_ids(
         caption: first
             .checked_add(2)
             .ok_or(SlideAudioCreationError::InvalidSource)?,
-        build: first
-            .checked_add(3)
-            .ok_or(SlideAudioCreationError::InvalidSource)?,
+        build,
         chunk: first
             .checked_add(4)
             .ok_or(SlideAudioCreationError::InvalidSource)?,
@@ -1508,6 +1551,23 @@ fn metadata_last_object_identifier(
 struct MetadataWatermarkVisitor;
 
 impl identity_codec::PackageMetadataVisitor for MetadataWatermarkVisitor {}
+
+const OBJECT_UUID_SALT: u64 = 0x6f62_6a65_6374_7575;
+const BUILD_UUID_SALT: u64 = 0x6275_696c_6475_7569;
+
+/// A deterministic RFC 4122 version 4, variant 1 GUID for `identifier`
+/// (SplitMix64, record 0375a §2.1; record 0428). Never nil.
+fn derived_guid(identifier: u64, salt: u64) -> [u8; 16] {
+    use litchi_numbers_wire::table_create::mix;
+    let lower = mix(identifier ^ salt);
+    let upper = mix(lower ^ identifier.rotate_left(17) ^ salt.rotate_left(32));
+    let mut bytes = [0_u8; 16];
+    bytes[..8].copy_from_slice(&lower.to_le_bytes());
+    bytes[8..].copy_from_slice(&upper.to_le_bytes());
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    bytes
+}
 
 fn uuid_from_guid(bytes: &[u8; 16]) -> identity_codec::UuidBits {
     let mut lower = [0u8; 8];
@@ -1716,7 +1776,7 @@ pub(super) fn new_archive_object(
     data_references: &[u64],
     limits: ArchiveLimits,
 ) -> Result<ArchiveObject, SlideAudioCreationError> {
-    let mut object = ArchiveObject::new_with_limits(
+    let mut object = ArchiveObject::new(
         identifier,
         vec![RawMessage {
             type_: message_type,
@@ -1730,7 +1790,7 @@ pub(super) fn new_archive_object(
         .message_infos
         .get_mut(0)
         .ok_or(SlideAudioCreationError::InvalidSource)?;
-    info.versions = versions.to_vec();
+    info.versions = versions.to_vec().into();
     info.object_references = object_references.to_vec();
     info.data_references = data_references.to_vec();
     Ok(object)
@@ -2129,7 +2189,7 @@ fn replace_slide_message_with_refs(
         });
     }
     object
-        .replace_message_transitioning_object_references_preserving_header_with_limits(
+        .replace_message_transitioning_object_references_preserving_header(
             message_index,
             RawMessage {
                 type_: SLIDE_MESSAGE_TYPE,
@@ -2172,7 +2232,7 @@ pub(super) fn archive_clone_allocation_bound(
     limits: ArchiveLimits,
 ) -> Result<usize, SlideAudioCreationError> {
     let mut amount = archive
-        .encoded_len_with_limits(limits)
+        .encoded_len(limits)
         .map_err(|_| SlideAudioCreationError::InvalidSource)?;
     amount = amount
         .checked_add(size_of::<Archive>())
@@ -2187,7 +2247,7 @@ pub(super) fn archive_clone_allocation_bound(
         .ok_or(SlideAudioCreationError::InvalidSource)?;
     for object in &archive.objects {
         // ArchiveObject keeps raw and canonical header copies private in the
-        // neutral archive layer.  `encoded_len_with_limits` accounts for the
+        // neutral archive layer.  `encoded_len` accounts for the
         // serialized framing, so reserve two additional header-sized buffers
         // for the retained source-preserving pair without exposing either
         // buffer or changing the archive's preservation behavior.
@@ -2326,7 +2386,7 @@ pub(super) fn prepare_node_cache_edit(
         let node = slide_archive
             .object_mut(context.slide_node_identifier)
             .ok_or(SlideAudioCreationError::InvalidSource)?;
-        node.replace_message_preserving_header_with_limits(
+        node.replace_message_preserving_header(
             message_index,
             RawMessage {
                 type_: SLIDE_NODE_MESSAGE_TYPE,
@@ -2350,7 +2410,7 @@ pub(super) fn prepare_node_cache_edit(
     let node = archive
         .object_mut(context.slide_node_identifier)
         .ok_or(SlideAudioCreationError::InvalidSource)?;
-    node.replace_message_preserving_header_with_limits(
+    node.replace_message_preserving_header(
         message_index,
         RawMessage {
             type_: SLIDE_NODE_MESSAGE_TYPE,
@@ -2386,22 +2446,21 @@ pub(super) fn serialize_component(
     budget: &mut CreationBudget,
 ) -> Result<Vec<u8>, SlideAudioCreationError> {
     let expected = archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(|_| SlideAudioCreationError::InvalidSource)?;
     budget.charge_allocations(expected)?;
     let bytes = archive
-        .to_bytes_with_limits(archive_limits)
+        .to_bytes(archive_limits)
         .map_err(|_| SlideAudioCreationError::InvalidSource)?;
     if bytes.len() != expected {
         return Err(SlideAudioCreationError::InvalidSource);
     }
-    let compressed_bound = SnappyStream::maximum_compressed_len(bytes.len())
-        .map_err(|_| SlideAudioCreationError::InvalidSource)?;
+    let compressed_bound = SnappyStream::maximum_compressed_len(bytes.len(), snappy_limits)
+        .map_err(map_snappy_error)?;
     budget.charge_allocations(compressed_bound)?;
-    let compressed =
-        SnappyStream::compress(&bytes).map_err(|_| SlideAudioCreationError::InvalidSource)?;
+    let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_snappy_error)?;
     if compressed.len() > snappy_limits.max_compressed_stream() {
-        return Err(SlideAudioCreationError::LimitExceeded {
+        return Err(SlideAudioCreationError::Limit {
             kind: SlideAudioCreationLimitKind::EntryBytes,
             observed: u64::try_from(compressed.len()).unwrap_or(u64::MAX),
             maximum: u64::try_from(snappy_limits.max_compressed_stream()).unwrap_or(u64::MAX),
@@ -2532,9 +2591,35 @@ fn limit(
     observed: usize,
     maximum: usize,
 ) -> SlideAudioCreationError {
-    SlideAudioCreationError::LimitExceeded {
+    SlideAudioCreationError::Limit {
         kind,
         observed: u64::try_from(observed).unwrap_or(u64::MAX),
         maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+    }
+}
+
+/// Preserve a retained Snappy encoder refusal as a typed owner failure
+/// (see [`SnappyFailure`]).
+pub(super) fn map_snappy_error(error: litchi_iwa_core::Error) -> SlideAudioCreationError {
+    match SnappyFailure::from(error) {
+        SnappyFailure::CompressedBytes { observed, maximum } => SlideAudioCreationError::Limit {
+            kind: SlideAudioCreationLimitKind::EntryBytes,
+            observed,
+            maximum,
+        },
+        SnappyFailure::DecodedBytes { observed, maximum } => SlideAudioCreationError::Limit {
+            kind: SlideAudioCreationLimitKind::EntryBytes,
+            observed,
+            maximum,
+        },
+        SnappyFailure::Work { observed, maximum } => SlideAudioCreationError::Limit {
+            kind: SlideAudioCreationLimitKind::WireWork,
+            observed,
+            maximum,
+        },
+        SnappyFailure::Allocation { requested } => {
+            SlideAudioCreationError::Allocation { amount: requested }
+        },
+        SnappyFailure::Invalid => SlideAudioCreationError::InvalidSource,
     }
 }

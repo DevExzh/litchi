@@ -48,30 +48,30 @@ pub enum Change {
 
 /// The changes and revisions produced by one successful commit.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChangeSet {
+pub(crate) struct RecordPatch {
     base: Revision,
     target: Revision,
     changes: Vec<Change>,
 }
 
-impl ChangeSet {
+impl RecordPatch {
     #[must_use]
-    pub const fn base(&self) -> Revision {
+    pub(crate) const fn base(&self) -> Revision {
         self.base
     }
 
     #[must_use]
-    pub const fn target(&self) -> Revision {
+    pub(crate) const fn target(&self) -> Revision {
         self.target
     }
 
     #[must_use]
-    pub fn changes(&self) -> &[Change] {
+    pub(crate) fn changes(&self) -> &[Change] {
         &self.changes
     }
 
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.changes.is_empty()
     }
 
@@ -80,7 +80,7 @@ impl ChangeSet {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
         if current.revision() != self.target {
             return invalid("cannot undo against a different master-layout revision");
         }
@@ -107,7 +107,7 @@ impl ChangeSet {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
         if current.revision() != self.base {
             return invalid("cannot redo against a different master-layout revision");
         }
@@ -133,24 +133,24 @@ impl ChangeSet {
 
 /// A successful commit containing the new immutable snapshot and its patch.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
+pub(crate) struct RecordCommit {
     snapshot: Snapshot,
-    changes: ChangeSet,
+    changes: RecordPatch,
 }
 
-impl Commit {
+impl RecordCommit {
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     #[must_use]
-    pub const fn changes(&self) -> &ChangeSet {
+    pub(crate) const fn changes(&self) -> &RecordPatch {
         &self.changes
     }
 
     #[must_use]
-    pub fn into_parts(self) -> (Snapshot, ChangeSet) {
+    pub(crate) fn into_parts(self) -> (Snapshot, RecordPatch) {
         (self.snapshot, self.changes)
     }
 }
@@ -201,13 +201,13 @@ impl<'a> View<'a> {
 /// An isolated transactional editor. Every mutator works on a private clone;
 /// commit encodes, reparses, and validates the candidate before publishing it.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub(crate) struct RecordEdit {
     source: Snapshot,
     root: Record,
     changes: Vec<Change>,
 }
 
-impl Transaction {
+impl RecordEdit {
     pub(super) fn open(source: Snapshot) -> Self {
         Self {
             root: source.root.clone(),
@@ -217,52 +217,28 @@ impl Transaction {
     }
 
     #[must_use]
-    pub const fn context(&self) -> Context {
+    pub(crate) const fn context(&self) -> Context {
         self.source.context
     }
 
     #[must_use]
-    pub fn source(&self) -> &Snapshot {
-        &self.source
-    }
-
-    #[must_use]
-    pub fn view(&self) -> View<'_> {
+    pub(crate) fn view(&self) -> View<'_> {
         View::new(self.context(), &self.root, self.revision())
     }
 
     #[must_use]
-    pub fn record(&self) -> &Record {
+    pub(crate) fn record(&self) -> &Record {
         &self.root
     }
 
     #[must_use]
-    pub fn revision(&self) -> Revision {
+    pub(crate) fn revision(&self) -> Revision {
         Revision::from_bytes(&self.encoded_for_revision())
     }
 
     #[must_use]
-    pub fn is_dirty(&self) -> bool {
-        !self.changes.is_empty()
-    }
-
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.is_dirty()
-    }
-
-    #[must_use]
-    pub fn changes(&self) -> &[Change] {
+    pub(crate) fn changes(&self) -> &[Change] {
         &self.changes
-    }
-
-    /// Capture the current validated candidate as an immutable snapshot.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn snapshot(&self) -> Result<Snapshot> {
-        snapshot_from_root(self.context(), self.root.clone(), self.source.limits)
     }
 
     /// Insert one child at a checked position under `parent`.
@@ -270,7 +246,12 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn add(&mut self, parent: impl Into<Path>, index: usize, record: Record) -> Result<()> {
+    pub(crate) fn add(
+        &mut self,
+        parent: impl Into<Path>,
+        index: usize,
+        record: Record,
+    ) -> Result<()> {
         let parent_path = parent.into();
         let limits = self.source.limits;
         let _ = codec::encode(&record, limits)?;
@@ -301,7 +282,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn append(&mut self, parent: impl Into<Path>, record: Record) -> Result<()> {
+    pub(crate) fn append(&mut self, parent: impl Into<Path>, record: Record) -> Result<()> {
         let parent_path = parent.into();
         let index = child_count(&mut self.root, parent_path.as_slice(), self.source.limits)?;
         self.add(parent_path, index, record)
@@ -313,7 +294,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn remove(&mut self, path: impl Into<Path>) -> Result<Record> {
+    pub(crate) fn remove(&mut self, path: impl Into<Path>) -> Result<Record> {
         let removal_path = path.into();
         let limits = self.source.limits;
         let mut candidate = self.root.clone();
@@ -332,7 +313,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn replace(&mut self, path: impl Into<Path>, record: Record) -> Result<Record> {
+    pub(crate) fn replace(&mut self, path: impl Into<Path>, record: Record) -> Result<Record> {
         let target_path = path.into();
         let limits = self.source.limits;
         let _ = codec::encode(&record, limits)?;
@@ -358,7 +339,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<RecordCommit> {
         let limits = self.source.limits;
         let bytes = codec::encode(&self.root, limits)?;
         let root = codec::parse(&bytes, limits)?;
@@ -369,30 +350,15 @@ impl Transaction {
             bytes,
             limits,
         };
-        let changes = ChangeSet {
+        let changes = RecordPatch {
             base: self.source.revision(),
             target: target.revision(),
             changes: self.changes,
         };
-        Ok(Commit {
+        Ok(RecordCommit {
             snapshot: target,
             changes,
         })
-    }
-
-    /// Alias for callers using move-owned writer terminology.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn finish(self) -> Result<Commit> {
-        self.commit()
-    }
-
-    /// Discard the private candidate and recover the source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
     }
 
     fn encoded_for_revision(&self) -> Vec<u8> {
@@ -478,21 +444,4 @@ fn split_path(path: &Path) -> Result<(Path, usize)> {
         .split_last()
         .ok_or_else(|| Error::InvalidFormat("the master-layout root cannot be addressed".into()))?;
     Ok((Path::from(parent), *index))
-}
-
-fn snapshot_from_root(
-    context: Context,
-    mut root: Record,
-    limits: super::model::Limits,
-) -> Result<Snapshot> {
-    codec::sync(&mut root, limits)?;
-    let bytes = codec::encode(&root, limits)?;
-    let reparsed = codec::parse(&bytes, limits)?;
-    validation::validate(context, &reparsed, limits)?;
-    Ok(Snapshot {
-        context,
-        root: reparsed,
-        bytes,
-        limits,
-    })
 }

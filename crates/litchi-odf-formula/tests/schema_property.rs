@@ -4,7 +4,7 @@
 )]
 
 use litchi_odf_common::core::OwnedPackage;
-use litchi_odf_formula::{Formula, NodePath, OpaqueStarMath, Patch, StarMathVersion, codec};
+use litchi_odf_formula::{NodePath, OpaqueStarMath, Package, Patch, StarMathVersion, codec};
 
 const NS: &str = "http://www.w3.org/1998/Math/MathML";
 
@@ -38,9 +38,9 @@ fn w3c_content_signatures_accept_broader_safe_forms() {
     ];
 
     for xml in schema_examples {
-        let formula = Formula::create(&xml).expect("W3C schema/signature example");
-        let reopened = Formula::from_bytes(formula.to_bytes()).expect("full package reopen");
-        codec::validate(reopened.root()).expect("reopened schema projection");
+        let formula = create(&xml).expect("W3C schema/signature example");
+        let reopened = open(formula.as_bytes()).expect("full package reopen");
+        codec::validate(reopened.formula().root()).expect("reopened schema projection");
     }
 }
 
@@ -55,15 +55,15 @@ fn independent_recursive_grammar_satisfies_parse_package_and_reopen_properties()
         };
         let expression = grammar.expression(3);
         let xml = format!(r#"<math xmlns="{NS}">{declaration}{expression}</math>"#);
-        let parsed = codec::parse(&xml).unwrap_or_else(|error| {
+        let parsed = codec::parse(&xml, &codec::Limits::default()).unwrap_or_else(|error| {
             panic!("independently generated XML case {case} failed: {error}: {xml}")
         });
         codec::validate(&parsed).expect("independent grammar must satisfy the checked projection");
-        let compact = codec::serialize(&parsed);
+        let compact = codec::serialize(&parsed, &codec::Limits::default()).expect("compact XML");
         assert!(!compact.contains('\n'));
-        let formula = Formula::create(&xml).expect("generated package");
-        let reopened = Formula::from_bytes(formula.to_bytes()).expect("generated full reopen");
-        assert_eq!(reopened.root(), &parsed, "generated case {case}");
+        let formula = create(&xml).expect("generated package");
+        let reopened = open(formula.as_bytes()).expect("generated full reopen");
+        assert_eq!(reopened.formula().root(), &parsed, "generated case {case}");
     }
 }
 
@@ -126,8 +126,8 @@ fn independent_schema_breakers_reject_one_rule_at_a_time() {
     ]);
 
     for (case, xml) in malformed.into_iter().enumerate() {
-        let first = Formula::create(&xml).is_err();
-        let second = Formula::create(&xml).is_err();
+        let first = create(&xml).is_err();
+        let second = create(&xml).is_err();
         assert!(
             first && second,
             "accepted independent breaker {case}: {xml}"
@@ -147,15 +147,15 @@ fn arbitrary_byte_stream_fuzz_corpus_is_panic_free_and_repeatable() {
             bytes.push(state.to_le_bytes()[0]);
         }
 
-        let package_first = Formula::from_bytes(bytes.clone()).is_ok();
-        let package_second = Formula::from_bytes(bytes.clone()).is_ok();
+        let package_first = open(bytes.clone()).is_ok();
+        let package_second = open(bytes.clone()).is_ok();
         assert_eq!(package_first, package_second, "package fuzz case {case}");
         if let Ok(xml) = std::str::from_utf8(&bytes) {
-            let parse_first = codec::parse(xml).is_ok();
-            let parse_second = codec::parse(xml).is_ok();
+            let parse_first = codec::parse(xml, &codec::Limits::default()).is_ok();
+            let parse_second = codec::parse(xml, &codec::Limits::default()).is_ok();
             assert_eq!(parse_first, parse_second, "XML fuzz case {case}");
-            let formula_first = Formula::create(xml).is_ok();
-            let formula_second = Formula::create(xml).is_ok();
+            let formula_first = create(xml).is_ok();
+            let formula_second = create(xml).is_ok();
             assert_eq!(formula_first, formula_second, "formula fuzz case {case}");
         }
     }
@@ -164,7 +164,7 @@ fn arbitrary_byte_stream_fuzz_corpus_is_panic_free_and_repeatable() {
 #[test]
 fn second_changed_libreoffice_package_reopens_with_auxiliary_payloads_exact() {
     let bytes = include_bytes!("../../../test-data/odf/native-resave/source/font-styles.odf");
-    let source = Formula::from_bytes(bytes.to_vec()).expect("LibreOffice source");
+    let source = open(bytes).expect("LibreOffice source");
     let original = OwnedPackage::from_bytes(bytes.to_vec()).expect("raw source package");
 
     let mut presentation_edit = source.edit();
@@ -185,24 +185,31 @@ fn second_changed_libreoffice_package_reopens_with_auxiliary_payloads_exact() {
     assert!(commit.diagnostics().candidate_reopened());
     let durable = Patch::from_bytes(&commit.patch().to_bytes().expect("patch bytes"))
         .expect("durable patch reopen");
-    let changed = commit.into_formula();
-    let reopened = Formula::from_bytes(changed.to_bytes()).expect("changed Formula reopen");
-    assert_eq!(reopened.starmath().expect("StarMath").opaque(), &opaque);
+    let changed = commit.into_package();
+    let reopened = open(changed.as_bytes()).expect("changed Formula reopen");
     assert_eq!(
-        durable.apply(&source).expect("durable replay").as_bytes(),
+        reopened.formula().starmath().expect("StarMath").opaque(),
+        &opaque
+    );
+    assert_eq!(
+        source
+            .apply(&durable)
+            .expect("durable replay")
+            .into_package()
+            .as_bytes(),
         reopened.as_bytes()
     );
     assert_eq!(
-        durable
-            .inverse()
-            .apply(&reopened)
+        reopened
+            .apply(&durable.inverse())
             .expect("inverse")
+            .into_package()
             .as_bytes(),
         source.as_bytes()
     );
 
     let changed_package =
-        OwnedPackage::from_bytes(reopened.to_bytes()).expect("raw changed package");
+        OwnedPackage::from_bytes(reopened.to_bytes().expect("bytes")).expect("raw changed package");
     let mut original_names = original.files().expect("source members");
     let mut changed_names = changed_package.files().expect("changed members");
     original_names.retain(|name| !name.ends_with('/'));
@@ -344,4 +351,12 @@ const fn xorshift(mut state: u64) -> u64 {
     state ^= state << 13;
     state ^= state >> 7;
     state ^ (state << 17)
+}
+
+fn create(mathml: impl Into<String>) -> Result<Package, litchi_odf_formula::Error> {
+    litchi_odf_formula::Builder::from_mathml(mathml).build()
+}
+
+fn open(bytes: impl AsRef<[u8]>) -> Result<Package, litchi_odf_formula::Error> {
+    Package::from_bytes(bytes.as_ref())
 }

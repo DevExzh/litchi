@@ -1,11 +1,11 @@
 use super::super::named_range;
-use super::super::{DefinedName, DefinedNameRecordOptions, Writer};
+use super::super::{Builder, DefinedName, DefinedNameRecordOptions};
 use crate::error::{Error, Result};
 use crate::writer::string_limits::{
     DEFINED_NAME_UNITS, NAME_COMMENT_UNITS, ensure_utf16_len_within,
 };
 
-impl Writer {
+impl Builder {
     /// Validate a defined name according to basic Excel constraints.
     ///
     /// This helper enforces only well-defined structural rules from the

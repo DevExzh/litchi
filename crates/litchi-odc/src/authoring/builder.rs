@@ -49,10 +49,11 @@ impl Builder {
         &mut self.definition
     }
 
-    /// Retain caller-selected limits for validation and package publication.
+    /// Retain caller-selected [`crate::OpenOptions`] for validation and
+    /// package publication; the built package keeps them.
     #[must_use]
-    pub fn with_limits(mut self, limits: crate::Limits) -> Self {
-        self.limits = limits;
+    pub fn with_options(mut self, options: crate::OpenOptions) -> Self {
+        self.limits = crate::Limits::from_options(options);
         self
     }
 
@@ -86,13 +87,13 @@ impl Builder {
         self
     }
 
-    /// Serialize the definition into a validated chart package.
+    /// Serialize the definition into a validated, immutable chart package.
     ///
     /// # Errors
     ///
     /// Returns an error if the definition fails serialization or validation,
     /// or if the package cannot be written.
-    pub fn build(self) -> Result<Vec<u8>> {
+    pub fn build(self) -> Result<crate::Package> {
         if self.resources.len() > self.limits.max_resources() {
             return Err(Error::InvalidFormat(
                 "ODC resource count exceeds the caller-selected limit".into(),
@@ -106,6 +107,7 @@ impl Builder {
             self.limits,
             self.package_kind,
         )
+        .and_then(crate::Package::from_snapshot)
     }
 }
 
@@ -121,16 +123,19 @@ fn package_content(
     resources: &[Resource],
     limits: crate::Limits,
     package_kind: crate::ChartPackageKind,
-) -> Result<Vec<u8>> {
+) -> Result<crate::package::Snapshot> {
     let compact_limits = compact_xml::Limits::new(limits.max_content_bytes(), limits.max_depth())
         .map_err(Error::from)?;
-    compact_xml::validate_with_limits(content_xml.as_bytes(), compact_limits)?;
+    compact_xml::validate(content_xml.as_bytes(), compact_limits)?;
     crate::codec::validate(content_xml)?;
     if let Some(styles) = styles_xml {
-        compact_xml::validate_with_limits(styles.as_bytes(), compact_limits)?;
+        compact_xml::validate(styles.as_bytes(), compact_limits)?;
         crate::codec::validate_styles(styles, limits)?;
     }
-    let mut writer = PackageWriter::new_bounded(limits.max_package_bytes());
+    let mut writer = PackageWriter::new_bounded(
+        limits.max_package_bytes(),
+        litchi_odf_common::core::StreamingArchiveLimits::default(),
+    );
     writer.set_mimetype(package_kind.mime_type())?;
     writer.add_file("content.xml", content_xml.as_bytes())?;
     if let Some(styles) = styles_xml {
@@ -148,7 +153,6 @@ fn package_content(
     }
     let bytes = writer.finish_to_bounded_bytes()?;
     crate::package::Snapshot::from_bytes_with_limits(bytes, limits)
-        .map(crate::package::Snapshot::into_bytes)
 }
 
 fn validate_media_type(media_type: &str) -> Result<()> {
@@ -188,7 +192,8 @@ mod tests {
                 crate::Limits::default(),
                 crate::ChartPackageKind::Chart,
             )
-            .unwrap_err(),
+            .err()
+            .unwrap(),
             Error::XmlCompactness {
                 kind: CompactnessKind::FormattingWhitespace,
                 ..

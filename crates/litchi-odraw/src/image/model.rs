@@ -11,20 +11,78 @@ use crate::{Error, Record, Result};
 pub(super) const FBSE_FIXED_LEN: usize = 36;
 pub(super) const MAX_STORE_ENTRIES: u16 = 0x0FFF;
 
+/// A bounded resource used while parsing `OfficeArt` image records.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LimitKind {
+    /// Maximum body bytes accepted by one raw OfficeArt record.
+    RecordBytes,
+    /// Maximum size of one BLIP record body.
+    BlipBytes,
+    /// Maximum number of file blocks in one BLIP store.
+    StoreEntries,
+    /// Maximum number of discovered image files.
+    Files,
+    /// Maximum nested-container depth visited by a file scanner.
+    Depth,
+    /// Maximum records visited by a file scanner.
+    Records,
+}
+
 /// Resource ceilings for `OfficeArt` image parsing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Limits {
-    /// Largest accepted BLIP body.
+    /// Raw record framing and recursive traversal policy shared with the
+    /// drawing parser.
+    pub records: crate::Limits,
+    /// Largest accepted BLIP body.  This is separate from the raw record
+    /// ceiling because a BLIP body also carries image-specific metadata.
     pub max_blip_bytes: u32,
-    /// Largest accepted BLIP-store entry count.
+    /// Largest accepted BLIP-store entry count, and the maximum number of
+    /// blocks visited by [`Delay::iter`]. Direct offset lookup through
+    /// [`Delay::at`] parses one block without enumerating preceding blocks;
+    /// it uses `max_blip_bytes`, rather than this traversal count.
     pub max_store_entries: u16,
+    /// Largest number of image files returned by a scanner.
+    pub max_files: u32,
 }
 
 impl Default for Limits {
     fn default() -> Self {
         Self {
+            records: crate::Limits::default(),
             max_blip_bytes: 256 * 1024 * 1024,
             max_store_entries: MAX_STORE_ENTRIES,
+            max_files: u32::from(MAX_STORE_ENTRIES),
+        }
+    }
+}
+
+impl Limits {
+    /// Returns the raw framing and traversal policy for OfficeArt records.
+    #[must_use]
+    pub const fn record_limits(self) -> crate::Limits {
+        self.records
+    }
+
+    /// Intersects two image policies before resolving a shared resource.
+    ///
+    /// A delayed BLIP can be reached through both an FBSE and a host-owned
+    /// delay store.  The effective policy must honor the stricter bound from
+    /// both sides, including the raw framing and traversal dimensions.
+    #[must_use]
+    pub fn constrained_by(self, other: Self) -> Self {
+        Self {
+            records: crate::Limits {
+                max_record_bytes: self
+                    .records
+                    .max_record_bytes
+                    .min(other.records.max_record_bytes),
+                max_depth: self.records.max_depth.min(other.records.max_depth),
+                max_records: self.records.max_records.min(other.records.max_records),
+            },
+            max_blip_bytes: self.max_blip_bytes.min(other.max_blip_bytes),
+            max_store_entries: self.max_store_entries.min(other.max_store_entries),
+            max_files: self.max_files.min(other.max_files),
         }
     }
 }
@@ -463,6 +521,47 @@ impl<'data> Blip<'data> {
             Self::Emf(_) | Self::Wmf(_) | Self::Pict(_) | Self::Opaque(_) => None,
         }
     }
+
+    /// Rebinds this validated BLIP to the narrower raw policy of a caller
+    /// that is taking ownership of the view.  The payload and decoded fields
+    /// remain borrowed; only the policy carried by their shared record view
+    /// changes.
+    pub(super) fn with_record_limits(self, limits: crate::Limits) -> Self {
+        match self {
+            Self::Emf(mut meta) => {
+                meta.record = meta.record.with_limits(limits);
+                Self::Emf(meta)
+            },
+            Self::Wmf(mut meta) => {
+                meta.record = meta.record.with_limits(limits);
+                Self::Wmf(meta)
+            },
+            Self::Pict(mut meta) => {
+                meta.record = meta.record.with_limits(limits);
+                Self::Pict(meta)
+            },
+            Self::Jpeg(mut bitmap) => {
+                bitmap.record = bitmap.record.with_limits(limits);
+                Self::Jpeg(bitmap)
+            },
+            Self::Png(mut bitmap) => {
+                bitmap.record = bitmap.record.with_limits(limits);
+                Self::Png(bitmap)
+            },
+            Self::Dib(mut bitmap) => {
+                bitmap.record = bitmap.record.with_limits(limits);
+                Self::Dib(bitmap)
+            },
+            Self::Tiff(mut bitmap) => {
+                bitmap.record = bitmap.record.with_limits(limits);
+                Self::Tiff(bitmap)
+            },
+            Self::Opaque(mut opaque) => {
+                opaque.record = opaque.record.with_limits(limits);
+                Self::Opaque(opaque)
+            },
+        }
+    }
 }
 
 /// A checked one-based index into a `BStore` container.
@@ -687,7 +786,9 @@ pub enum Block<'data> {
 pub struct Store<'data> {
     pub(super) record: Record<'data>,
     pub(super) count: u16,
-    pub(super) limits: Limits,
+    pub(super) max_blip_bytes: u32,
+    pub(super) max_store_entries: u16,
+    pub(super) max_files: u32,
 }
 
 /// Lazy, count-validating `BStore` iterator.

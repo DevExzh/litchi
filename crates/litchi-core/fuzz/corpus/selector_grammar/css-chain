@@ -1,0 +1,1 @@
+paragraph[style=Normal] > run[font!=Arial], cell:not(:has(formula))

@@ -3,7 +3,7 @@
 /// The `CurrentUser` stream contains information about the current editing session,
 /// including the offset to the current user edit record. This follows Apache POI's
 /// `CurrentUserAtom` implementation.
-use super::package::{Error, RecordLimits, Result};
+use super::package::{Error, Result, SourceLimits};
 
 /// Minimum size of `CurrentUser` stream in bytes
 const CURRENT_USER_MIN_SIZE: usize = 28;
@@ -87,8 +87,8 @@ impl CurrentUser {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(data: &[u8]) -> Result<Self> {
-        Self::parse_with_limits(data, RecordLimits::default())
+    pub fn parse(data: &[u8], limits: &SourceLimits) -> Result<Self> {
+        Self::parse_with_limits(data, *limits)
     }
 
     /// Parse a Current User stream with the same input bound as the document.
@@ -96,13 +96,13 @@ impl CurrentUser {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_with_limits(data: &[u8], limits: RecordLimits) -> Result<Self> {
+    pub(crate) fn parse_with_limits(data: &[u8], limits: SourceLimits) -> Result<Self> {
         if data.len() > limits.max_input_bytes {
-            return Err(Error::ResourceLimit(format!(
-                "CurrentUser stream size {} exceeds limit {}",
-                data.len(),
-                limits.max_input_bytes
-            )));
+            return Err(Error::Limit {
+                kind: super::package::SourceLimitKind::EntryBytes,
+                observed: data.len(),
+                maximum: limits.max_input_bytes,
+            });
         }
         if data.len() < CURRENT_USER_MIN_SIZE {
             return Err(Error::Corrupted("CurrentUser stream too short".to_string()));
@@ -303,7 +303,7 @@ mod tests {
     #[test]
     fn test_current_user_min_size() {
         let short_data = vec![0u8; 16];
-        let result = CurrentUser::parse(&short_data);
+        let result = CurrentUser::parse(&short_data, &SourceLimits::default());
         assert!(result.is_err());
     }
 
@@ -311,14 +311,14 @@ mod tests {
     fn test_current_user_header_validation() {
         let data = current_user_stream(b"A", Some("A"), 0xFFFF_FFFF);
 
-        let result = CurrentUser::parse(&data);
+        let result = CurrentUser::parse(&data, &SourceLimits::default());
         assert!(result.is_err());
     }
 
     #[test]
     fn test_current_user_valid() {
         let data = current_user_stream(b"??", Some("😀"), UNENCRYPTED_HEADER_TOKEN);
-        let current_user = CurrentUser::parse(&data).unwrap();
+        let current_user = CurrentUser::parse(&data, &SourceLimits::default()).unwrap();
 
         assert_eq!(current_user.current_edit_offset(), 0x1000);
         assert_eq!(current_user.username(), "😀");
@@ -343,7 +343,7 @@ mod tests {
     #[test]
     fn falls_back_to_low_byte_username_when_unicode_is_omitted() {
         let data = current_user_stream(&[0x80, 0xE9], None, ENCRYPTED_HEADER_TOKEN);
-        let current_user = CurrentUser::parse(&data).unwrap();
+        let current_user = CurrentUser::parse(&data, &SourceLimits::default()).unwrap();
 
         assert_eq!(current_user.username(), "\u{80}é");
         assert!(current_user.is_encrypted());
@@ -358,7 +358,7 @@ mod tests {
         let mut truncated = current_user_stream(b"AB", None, UNENCRYPTED_HEADER_TOKEN);
         truncated[20..22].copy_from_slice(&200u16.to_le_bytes());
         for (data, raw) in [(long, 300), (truncated, 200)] {
-            let current_user = CurrentUser::parse(&data).unwrap();
+            let current_user = CurrentUser::parse(&data, &SourceLimits::default()).unwrap();
             assert_eq!(current_user.current_edit_offset(), 0x1000);
             assert_eq!(current_user.username(), "");
             assert_eq!(current_user.release_version(), 0);
@@ -370,7 +370,7 @@ mod tests {
         }
         let conformant = current_user_stream(b"AB", Some("AB"), UNENCRYPTED_HEADER_TOKEN);
         assert_eq!(
-            CurrentUser::parse(&conformant)
+            CurrentUser::parse(&conformant, &SourceLimits::default())
                 .unwrap()
                 .unusable_username_length(),
             None
@@ -385,20 +385,20 @@ mod tests {
         let mut data = current_user_stream(b"AB", Some("AB"), UNENCRYPTED_HEADER_TOKEN);
         data[0..2].copy_from_slice(&0x0012u16.to_le_bytes());
         data[8..12].copy_from_slice(&24u32.to_le_bytes());
-        let current_user = CurrentUser::parse(&data).unwrap();
+        let current_user = CurrentUser::parse(&data, &SourceLimits::default()).unwrap();
         assert_eq!(current_user.current_edit_offset(), 0x1000);
         assert_eq!(current_user.username(), "AB");
         assert_eq!(current_user.nonconforming_header(), Some(0x0012));
         assert_eq!(current_user.nonconforming_size(), Some(24));
 
         let conformant = current_user_stream(b"AB", Some("AB"), UNENCRYPTED_HEADER_TOKEN);
-        let current_user = CurrentUser::parse(&conformant).unwrap();
+        let current_user = CurrentUser::parse(&conformant, &SourceLimits::default()).unwrap();
         assert_eq!(current_user.nonconforming_header(), None);
         assert_eq!(current_user.nonconforming_size(), None);
 
         let mut wrong_type = conformant;
         wrong_type[2..4].copy_from_slice(&0x0FF5u16.to_le_bytes());
-        assert!(CurrentUser::parse(&wrong_type).is_err());
+        assert!(CurrentUser::parse(&wrong_type, &SourceLimits::default()).is_err());
     }
 
     #[test]
@@ -406,20 +406,26 @@ mod tests {
         let data = current_user_stream(b"A", Some("A"), UNENCRYPTED_HEADER_TOKEN);
         CurrentUser::parse_with_limits(
             &data,
-            RecordLimits {
+            SourceLimits {
                 max_input_bytes: data.len(),
-                ..RecordLimits::default()
+                ..SourceLimits::default()
             },
         )
         .unwrap();
         let error = CurrentUser::parse_with_limits(
             &data,
-            RecordLimits {
+            SourceLimits {
                 max_input_bytes: data.len() - 1,
-                ..RecordLimits::default()
+                ..SourceLimits::default()
             },
         )
         .unwrap_err();
-        assert!(matches!(error, Error::ResourceLimit(message) if message.contains("CurrentUser")));
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: crate::SourceLimitKind::EntryBytes,
+                ..
+            }
+        ));
     }
 }

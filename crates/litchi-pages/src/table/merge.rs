@@ -10,3 +10,10 @@ pub use litchi_iwa_common::table::merge::{
     AnchorRelocation, Axis, Deletion, Error, Region, Result, after_deletion, after_insertion,
     anchor_relocation_after_deletion,
 };
+
+/// Exact-source transactions for one rooted Pages body table's merged cells.
+pub mod transaction {
+    pub use crate::package::body_table_merges::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+}

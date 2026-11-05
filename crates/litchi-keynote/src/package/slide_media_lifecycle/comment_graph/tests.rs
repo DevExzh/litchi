@@ -92,8 +92,13 @@ fn native_copied_comment_can_share_source_uuid() {
 #[test]
 fn unknown_root_payload_fields_reject_selected_comment_clone() {
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, COMMENT_TEXT_FIELD, b"comment")
-        .expect("text field");
+    append_length_delimited_field(
+        &mut payload,
+        COMMENT_TEXT_FIELD,
+        b"comment",
+        WireLimits::DEFAULT,
+    )
+    .expect("text field");
     append_varint_field(&mut payload, 10_000, 1).expect("future scalar field");
     let package = native_package();
     let limits = native_limits(&package);
@@ -109,8 +114,13 @@ fn unknown_reference_fields_fail_closed() {
         .expect("reference identifier");
     append_varint_field(&mut reference, 99, 1).expect("unknown reference field");
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, COMMENT_AUTHOR_FIELD, &reference)
-        .expect("author field");
+    append_length_delimited_field(
+        &mut payload,
+        COMMENT_AUTHOR_FIELD,
+        &reference,
+        WireLimits::DEFAULT,
+    )
+    .expect("author field");
     let package = native_package();
     let limits = native_limits(&package);
     let mut budget = native_budget();
@@ -128,16 +138,26 @@ fn unknown_date_and_uuid_fields_reject_selected_comment_clone() {
     date.push(((99_u32 << 3) | 1) as u8);
     date.extend_from_slice(&1_u64.to_le_bytes());
     let mut date_payload = Vec::new();
-    append_length_delimited_field(&mut date_payload, COMMENT_DATE_FIELD, &date)
-        .expect("date field");
+    append_length_delimited_field(
+        &mut date_payload,
+        COMMENT_DATE_FIELD,
+        &date,
+        WireLimits::DEFAULT,
+    )
+    .expect("date field");
     let mut budget = native_budget();
     assert!(validate_comment_payload_wire(&date_payload, limits, &mut budget, true).is_err());
 
     let mut uuid = Vec::new();
     append_varint_field(&mut uuid, 99, 1).expect("unknown UUID field");
     let mut uuid_payload = Vec::new();
-    append_length_delimited_field(&mut uuid_payload, COMMENT_UUID_FIELD, &uuid)
-        .expect("UUID field");
+    append_length_delimited_field(
+        &mut uuid_payload,
+        COMMENT_UUID_FIELD,
+        &uuid,
+        WireLimits::DEFAULT,
+    )
+    .expect("UUID field");
     let mut budget = native_budget();
     assert!(validate_comment_payload_wire(&uuid_payload, limits, &mut budget, true).is_err());
 }
@@ -183,7 +203,12 @@ fn metadata_requires_exact_decoded_reference_aggregate() {
         reply_identifiers: vec![7, 9],
         uuid: None,
     };
-    let mut info = MessageInfo::new(COMMENT_STORAGE_MESSAGE_TYPE, 1);
+    let mut info = MessageInfo::new(
+        COMMENT_STORAGE_MESSAGE_TYPE,
+        1,
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     info.object_references = vec![NATIVE_AUTHOR, 7, 9];
     validate_storage_metadata(1, &info, &facts, &mut budget).expect("complete aggregate");
 
@@ -200,9 +225,18 @@ fn field_metadata_must_be_a_multiset_subset_of_the_aggregate() {
         reply_identifiers: vec![7],
         uuid: None,
     };
-    let mut info = MessageInfo::new(COMMENT_STORAGE_MESSAGE_TYPE, 1);
+    let mut info = MessageInfo::new(
+        COMMENT_STORAGE_MESSAGE_TYPE,
+        1,
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     info.object_references = vec![NATIVE_AUTHOR, 7];
-    let mut field = FieldInfo::new(vec![1]);
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     field.object_references = vec![7];
     info.field_infos.push(field);
     validate_storage_metadata(1, &info, &facts, &mut budget).expect("field subset");

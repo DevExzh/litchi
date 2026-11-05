@@ -16,25 +16,25 @@ use std::io::Cursor;
 use litchi_core::sheet::{Cell as _, CellValue};
 use litchi_xls::autofilter::FilterValue;
 use litchi_xls::writer::{
-    AutoFilterConditionWrite, CellStyle, ConditionalFormat, ConditionalFormatType, ExtendedFormat,
-    ExternalCacheRowOptions, ExternalSheetOptions, ExternalWorkbookOptions, Font, PivotCacheValue,
-    PivotDataItemConfig, PivotFieldConfig, PivotItemConfig, PivotTableConfig, Writer,
+    AutoFilterConditionWrite, Builder, CellStyle, ConditionalFormat, ConditionalFormatType,
+    ExtendedFormat, ExternalCacheRowOptions, ExternalSheetOptions, ExternalWorkbookOptions, Font,
+    PivotCacheValue, PivotDataItemConfig, PivotFieldConfig, PivotItemConfig, PivotTableConfig,
 };
 use litchi_xls::{
     CachedValue, Error, ExtProp, PivotCacheItem, StyleCategory, StyleExt, XfExt, XfProperties,
     XfProperty,
 };
 
-type Workbook = litchi_xls::Workbook<Cursor<Vec<u8>>>;
+type Reader = litchi_xls::raw::Reader<Cursor<Vec<u8>>>;
 
-fn written(writer: &mut Writer) -> Vec<u8> {
+fn written(writer: &mut Builder) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 
-fn read(bytes: Vec<u8>) -> Workbook {
-    Workbook::new(Cursor::new(bytes)).unwrap()
+fn read(bytes: Vec<u8>) -> Reader {
+    Reader::new(Cursor::new(bytes)).unwrap()
 }
 
 /// The field, length and limit of a [`Error::StringTooLong`] refusal.
@@ -91,14 +91,14 @@ fn straddling(limit: usize) -> String {
     format!("{}😀", "a".repeat(limit - 1))
 }
 
-fn one_sheet_writer(name: &str) -> (Writer, usize) {
-    let mut writer = Writer::new();
+fn one_sheet_writer(name: &str) -> (Builder, usize) {
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet(name).unwrap();
     writer.write_string(sheet, 0, 0, "kept").unwrap();
     (writer, sheet)
 }
 
-fn cell_value(workbook: &Workbook, sheet: usize, row: u32, column: u32) -> Option<CellValue> {
+fn cell_value(workbook: &Reader, sheet: usize, row: u32, column: u32) -> Option<CellValue> {
     workbook
         .xls_worksheet(sheet)
         .unwrap()
@@ -308,7 +308,11 @@ fn autofilter_string_operands_carry_cch_and_fcompare_where_excel_reads_them() {
 }
 
 fn autofilter_doper(bytes: &[u8]) -> Vec<u8> {
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes.to_vec())).unwrap();
+    let mut ole = litchi_cfb::OleFile::open(
+        Cursor::new(bytes.to_vec()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let stream = ole.open_stream(&["Workbook"]).unwrap();
     let mut offset = 0;
     while offset + 4 <= stream.len() {
@@ -877,7 +881,7 @@ fn external_workbook_with_sheets(start: usize, count: usize) -> ExternalWorkbook
 
 #[test]
 fn external_sheet_reference_count_is_checked_at_registration() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_worksheet("Links").unwrap();
 
     // Five full SupBooks and one partial one produce N - 1 references.
@@ -1043,7 +1047,7 @@ fn worksheet_names_biff8_forbids_are_refused() {
     for name in [
         "a/b", "a\\b", "a?b", "a*b", "a[b", "a]b", "a:b", "a\0b", "a\u{3}b", "'lead", "trail'",
     ] {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         writer.add_worksheet("Kept").unwrap();
         let before = written(&mut writer);
         invalid_data(writer.add_worksheet(name));
@@ -1055,14 +1059,14 @@ fn worksheet_names_biff8_forbids_are_refused() {
         .chain(strings_of(30))
         .chain(strings_of(31))
     {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         let sheet = writer.add_worksheet(&name).unwrap();
         writer.write_number(sheet, 0, 0, 1.0).unwrap();
         let workbook = read(written(&mut writer));
         assert_eq!(workbook.sheets()[0].name(), name);
     }
     for name in strings_of(32).into_iter().chain([straddling(31)]) {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         assert_eq!(
             too_long(writer.add_worksheet(&name)),
             ("worksheet name", 32, 31)
@@ -1167,8 +1171,8 @@ fn pivot_config(name: &str, data_field_name: &str) -> PivotTableConfig {
     }
 }
 
-fn pivot_writer() -> (Writer, usize) {
-    let mut writer = Writer::new();
+fn pivot_writer() -> (Builder, usize) {
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Source").unwrap();
     (writer, sheet)
 }
@@ -1313,7 +1317,10 @@ fn the_pivot_view_editor_writes_astral_names_that_read_back() {
     writer
         .add_pivot_table(sheet, pivot_config("Sales", "Values"))
         .unwrap();
-    let mut editor = litchi_xls::PivotViewEditor::new(written(&mut writer)).unwrap();
+    let mut editor = litchi_xls::Package::from_bytes(&written(&mut writer))
+        .unwrap()
+        .edit_pivot_views()
+        .unwrap();
     editor
         .update_by_name(0, "Sales", |table| {
             table.view.name = "S😀".to_string();
@@ -1326,7 +1333,7 @@ fn the_pivot_view_editor_writes_astral_names_that_read_back() {
             table.query_tag.as_mut().unwrap().table_name = "S😀".to_string();
         })
         .unwrap();
-    let workbook = read(editor.finish().unwrap());
+    let workbook = read(editor.commit().unwrap().patch().after().to_vec());
     let table = &workbook.worksheet_pivot_tables(0).unwrap()[0];
     assert_eq!(table.view.name, "S😀");
     assert_eq!(table.view.data_field_name, "V😀");
@@ -1350,13 +1357,23 @@ fn the_pivot_view_editor_writes_astral_names_that_read_back() {
     writer
         .add_pivot_table(sheet, pivot_config("Sales", "Values"))
         .unwrap();
-    let mut editor = litchi_xls::PivotViewEditor::new(written(&mut writer)).unwrap();
+    let mut editor = litchi_xls::Package::from_bytes(&written(&mut writer))
+        .unwrap()
+        .edit_pivot_views()
+        .unwrap();
     editor
         .update_by_name(0, "Sales", |table| {
             table.view.name = straddling(255);
         })
         .unwrap();
-    assert_eq!(too_long(editor.finish()), ("PivotTable name", 256, 255));
+    assert_eq!(
+        too_long(
+            editor
+                .commit()
+                .map(|commit| commit.patch().after().to_vec())
+        ),
+        ("PivotTable name", 256, 255)
+    );
 }
 
 /// A formula's tokens are encoded once, when it is set, and the write reuses

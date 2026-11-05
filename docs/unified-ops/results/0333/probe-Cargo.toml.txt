@@ -1,0 +1,10 @@
+[package]
+name = "probe0333"
+version = "0.0.0"
+edition = "2024"
+[workspace]
+[dependencies]
+litchi-ops = { path = "/home/zhuhe/code/litchi-worktrees/uo2-pptx-p0/crates/litchi-ops", features = ["pptx"] }
+sha2 = "0.10"
+litchi-core = { path = "/home/zhuhe/code/litchi-worktrees/uo2-pptx-p0/crates/litchi-core" }
+litchi-pptx = { path = "/home/zhuhe/code/litchi-worktrees/uo2-pptx-p0/crates/litchi-pptx" }

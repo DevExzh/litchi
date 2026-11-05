@@ -13,10 +13,10 @@ use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use std::fmt::Write as FmtWrite;
 
-use super::model::{MutableDocument, Protection};
+use super::model::{Document, Protection};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
-impl MutableDocument {
+impl Document {
     pub(super) fn write_document_prefix(&self, xml: &mut String) {
         if let Some(prefix) = &self.preserved_prefix {
             xml.push_str(prefix);
@@ -226,11 +226,33 @@ fn write_compact_start(
         let value = attribute
             .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
             .map_err(Error::from)?;
-        output.push_str(quick_xml::escape::escape(value.as_ref()).as_ref());
+        push_attribute_value(output, &quick_xml::escape::escape(value.as_ref()));
         output.push('"');
     }
     output.push_str(if empty { "/>" } else { ">" });
     Ok(())
+}
+
+/// Append an escaped attribute value, writing a tab, line feed or carriage
+/// return as a character reference.
+///
+/// Attribute-value normalization turns each of those characters, written
+/// literally, into a space, so a value that holds one (only a character
+/// reference can put it there, as VML `o:gfxdata` base64 line breaks do)
+/// keeps it only when it is written as a reference again.
+fn push_attribute_value(output: &mut String, escaped: &str) {
+    if !escaped.contains(['\t', '\n', '\r']) {
+        output.push_str(escaped);
+        return;
+    }
+    for character in escaped.chars() {
+        match character {
+            '\t' => output.push_str("&#x9;"),
+            '\n' => output.push_str("&#xA;"),
+            '\r' => output.push_str("&#xD;"),
+            other => output.push(other),
+        }
+    }
 }
 
 fn push_utf8(output: &mut String, bytes: &[u8]) -> Result<()> {
@@ -524,4 +546,22 @@ fn settings_root_info(
         String::from_utf8_lossy(qualified_name).into_owned(),
         String::from_utf8_lossy(namespace).into_owned(),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::compact_changed_document_xml;
+
+    #[test]
+    fn compaction_keeps_whitespace_character_references_in_attribute_values() {
+        let compact = compact_changed_document_xml(
+            "<w:p xmlns:w=\"urn:w\" w:a=\"x&#xA;y&#x9;z&#xD;\" w:b=\"one\ntwo\">\n  <w:r> <w:t>a</w:t> </w:r>\n</w:p>",
+        )
+        .unwrap();
+        // A literal line feed normalizes to a space; a reference stays one.
+        assert_eq!(
+            compact,
+            "<w:p xmlns:w=\"urn:w\" w:a=\"x&#xA;y&#x9;z&#xD;\" w:b=\"one two\"><w:r><w:t>a</w:t></w:r></w:p>"
+        );
+    }
 }

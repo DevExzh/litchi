@@ -502,9 +502,9 @@ impl Snapshot {
     ///
     /// Returns an error if reading or parsing the stream fails, or its section
     /// does not satisfy the typed invariants.
-    pub fn from_ole<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Self, OleError> {
+    pub fn from_ole<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Self, crate::Error> {
         let stream = ole.property_set(Binding::SummaryInformation)?;
-        Self::from_stream(&stream)
+        Ok(Self::from_stream(&stream)?)
     }
 
     /// Borrows the complete generic section, including opaque properties.
@@ -525,13 +525,13 @@ impl Snapshot {
         self.section.property(identifier)
     }
 
-    /// Starts a source-bound transactional edit.
+    /// Starts a source-bound edit.
     ///
     /// # Errors
     ///
     /// Returns an error if the source section cannot be cloned for isolation.
-    pub fn transaction(&self) -> Result<super::transaction::Transaction<'_>, OleError> {
-        super::transaction::Transaction::from_snapshot(self)
+    pub fn edit(&self) -> Result<super::transaction::Edit<'_>, OleError> {
+        super::transaction::Edit::from_snapshot(self)
     }
 
     /// Consumes the view into its complete generic section.

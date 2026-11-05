@@ -16,14 +16,14 @@ use crate::{Address, Formula};
 
 const MAIN: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 
-fn workbook_with_sheet(xml: &str) -> Workbook {
+fn workbook_with_sheet(xml: &str) -> crate::Package {
     let baseline = styled_workbook();
     let mut package = baseline.inner.package.clone();
     package
         .get_part_mut(&PackURI::new("/xl/worksheets/sheet1.xml").expect("sheet URI"))
         .expect("worksheet part")
         .set_blob(xml.as_bytes().to_vec());
-    Workbook::from_package(package).expect("generated workbook")
+    crate::Package::from_opc(package).expect("generated workbook")
 }
 
 fn column_name(column: u32) -> String {
@@ -122,7 +122,7 @@ fn random_operations(random: &mut Lcg, rows: u32, columns: u32, count: usize) ->
     operations
 }
 
-fn commit_and_save(source: &Workbook, operations: &[Operation]) -> Result<Vec<u8>, String> {
+fn commit_and_save(source: &crate::Package, operations: &[Operation]) -> Result<Vec<u8>, String> {
     let describe = |error: crate::Error| format!("{error:?} / {error}");
     let style = source.styles().map_err(describe)?.get(1).ok_or("style 1")?;
     let mut edit = source.edit().map_err(describe)?;
@@ -145,10 +145,10 @@ fn commit_and_save(source: &Workbook, operations: &[Operation]) -> Result<Vec<u8
         }
     }
     let commit = edit.commit().map_err(describe)?;
-    let bytes = commit.workbook().to_bytes().map_err(describe)?;
+    let bytes = commit.package().to_bytes().map_err(describe)?;
     // The published snapshot must read back the same cells on both routes.
     let sheet = commit
-        .workbook()
+        .package()
         .sheet("Sheet1")
         .map_err(describe)?
         .ok_or("published sheet")?;
@@ -334,7 +334,7 @@ fn a_changed_cell_reemitted_into_an_omitted_run_keeps_the_complete_readback() {
 /// Commit `operations` and return the published worksheet part and the
 /// cells the published snapshot reads back.
 fn committed_worksheet(
-    source: &Workbook,
+    source: &crate::Package,
     operations: &[Operation],
 ) -> Result<(Vec<u8>, String), String> {
     let describe = |error: crate::Error| format!("{error:?} / {error}");
@@ -360,7 +360,7 @@ fn committed_worksheet(
     }
     let commit = edit.commit().map_err(describe)?;
     let part = commit
-        .workbook()
+        .package()
         .inner
         .package
         .get_part(&PackURI::new("/xl/worksheets/sheet1.xml").expect("sheet URI"))
@@ -368,7 +368,7 @@ fn committed_worksheet(
         .blob()
         .to_vec();
     let cells = commit
-        .workbook()
+        .package()
         .sheet("Sheet1")
         .map_err(describe)?
         .ok_or("published sheet")?

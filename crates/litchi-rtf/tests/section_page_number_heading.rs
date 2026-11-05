@@ -7,23 +7,22 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+use litchi_rtf::raw::Tree;
 use litchi_rtf::{
-    MAX_PAGE_NUMBER_HEADING_LEVEL, PageNumberHeadingSeparator, RtfDocument, RtfWriter, Section,
-    SectionPageNumberHeading,
+    MAX_PAGE_NUMBER_HEADING_LEVEL, PageNumberHeadingSeparator, Section, SectionPageNumberHeading,
+    write::Writer,
 };
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
 #[test]
 fn parses_heading_level_and_separator_and_round_trips_in_canonical_order() {
     let source = r"{\rtf1\sectd\pgnhn2{\pgnhnsh}Body}";
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let heading = document.sections()[0].properties.page_number_heading;
     assert_eq!(
         heading,
@@ -35,7 +34,7 @@ fn parses_heading_level_and_separator_and_round_trips_in_canonical_order() {
     let output = write(&document);
     let serialized = String::from_utf8(output.clone()).unwrap();
     assert!(serialized.contains(r"\pgnhn2\pgnhnsh"));
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         reparsed.sections()[0].properties.page_number_heading,
         heading
@@ -52,7 +51,7 @@ fn parses_all_separator_kinds() {
         ("pgnhnsn", PageNumberHeadingSeparator::EnDash),
     ] {
         let source = format!(r"{{\rtf1\pgnhn1\{control} X}}");
-        let document = RtfDocument::parse(&source).unwrap();
+        let document = Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).unwrap();
         assert_eq!(
             document.sections()[0]
                 .properties
@@ -72,19 +71,27 @@ fn parses_all_separator_kinds() {
 
 #[test]
 fn preserves_explicit_disable_missing_parameter_and_sectd_reset() {
-    let disabled = RtfDocument::parse(r"{\rtf1\pgnhn0 X}").unwrap();
+    let disabled = Tree::parse(
+        r"{\rtf1\pgnhn0 X}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(
         disabled.sections()[0].properties.page_number_heading.level,
         Some(0)
     );
 
-    let bare = RtfDocument::parse(r"{\rtf1\pgnhn X}").unwrap();
+    let bare = Tree::parse(r"{\rtf1\pgnhn X}", litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         bare.sections()[0].properties.page_number_heading.level,
         Some(0)
     );
 
-    let separator_only = RtfDocument::parse(r"{\rtf1\pgnhnsm X}").unwrap();
+    let separator_only = Tree::parse(
+        r"{\rtf1\pgnhnsm X}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(
         separator_only.sections()[0].properties.page_number_heading,
         SectionPageNumberHeading {
@@ -93,7 +100,11 @@ fn preserves_explicit_disable_missing_parameter_and_sectd_reset() {
         }
     );
 
-    let reset = RtfDocument::parse(r"{\rtf1\pgnhn9\pgnhnsc X\sectd Y}").unwrap();
+    let reset = Tree::parse(
+        r"{\rtf1\pgnhn9\pgnhnsc X\sectd Y}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert!(
         reset.sections()[0]
             .properties
@@ -112,7 +123,7 @@ fn inert_destinations_do_not_change_page_number_heading() {
         r"{\rtf1 A{\footnote\pgnhn1\pgnhnsn Note}Body}",
         r"{\rtf1{\object\pgnhn5}Body}",
     ] {
-        let document = RtfDocument::parse(source).unwrap();
+        let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
         assert!(
             document
                 .sections()
@@ -129,11 +140,14 @@ fn rejects_out_of_range_levels_and_invalid_public_writer_state() {
         r"{\rtf1\pgnhn-1 X}".to_string(),
         format!(r"{{\rtf1\pgnhn{} X}}", MAX_PAGE_NUMBER_HEADING_LEVEL + 1),
     ] {
-        assert!(RtfDocument::parse(&source).is_err(), "accepted {source}");
+        assert!(
+            Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted {source}"
+        );
     }
 
     let mut section = Section::new();
     section.properties.page_number_heading.level = Some(u8::MAX);
     let mut output = Vec::new();
-    assert!(RtfWriter::new(&mut output).write_section(&section).is_err());
+    assert!(Writer::new(&mut output).write_section(&section).is_err());
 }

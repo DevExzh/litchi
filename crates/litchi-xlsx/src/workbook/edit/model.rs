@@ -5,6 +5,7 @@ use super::{Edit, MergeIntent, SheetActions};
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt;
+use std::mem::{size_of, size_of_val};
 use std::sync::Arc;
 
 use litchi_ooxml_common::web as common_web;
@@ -16,7 +17,7 @@ use litchi_sheet::{Cell as Address, Column as ColumnIndex, Rect, Row as RowIndex
 use quick_xml::events::Event;
 use quick_xml::reader::Reader;
 
-use super::{Visibility, Workbook};
+use super::{Visibility, Workbook, Worksheet};
 use crate::cell::{Cell, SharedStringKey, Stored};
 use crate::column::{Flags as ColumnFlags, Outline, Props as ColumnProps, State as ColumnState};
 use crate::drawing::DrawingAnchor;
@@ -72,12 +73,19 @@ impl State {
             Some(Payload::SharedString { text, .. }) => {
                 Cell::Value(crate::Value::Text(text.clone()))
             },
+            Some(Payload::Rich(rich)) => {
+                Cell::Value(crate::Value::Text(crate::cell::Text::from(rich.text())))
+            },
             Some(Payload::SharedFormula {
                 formula: Some(formula),
                 ..
             }) => Cell::Formula(formula.clone()),
             Some(Payload::SharedFormula { formula: None, .. }) => {
                 before.map_or(Cell::Empty, |stored| stored.cell.clone())
+            },
+            Some(Payload::Cache(value)) => match before.map(|stored| &stored.cell) {
+                Some(Cell::Formula(formula)) => Cell::Formula(formula.with_cache(value.clone())),
+                _ => before.map_or(Cell::Empty, |stored| stored.cell.clone()),
             },
             Some(Payload::Clear | Payload::ClearIfPresent) => Cell::Empty,
             None => before.map_or(Cell::Empty, |stored| stored.cell.clone()),
@@ -105,6 +113,8 @@ impl State {
             Some(
                 Payload::Set(_)
                 | Payload::SharedFormula { .. }
+                | Payload::Rich(_)
+                | Payload::Cache(_)
                 | Payload::Clear
                 | Payload::ClearIfPresent,
             ) => None,
@@ -427,7 +437,13 @@ fn has_content_after(before: Option<&Cell>, action: Option<&Action>) -> bool {
         Some(Action::Remove) => false,
         Some(Action::Update {
             payload:
-                Some(Payload::Set(_) | Payload::SharedString { .. } | Payload::SharedFormula { .. }),
+                Some(
+                    Payload::Set(_)
+                    | Payload::SharedString { .. }
+                    | Payload::SharedFormula { .. }
+                    | Payload::Rich(_)
+                    | Payload::Cache(_),
+                ),
             ..
         }) => true,
         Some(Action::Update {
@@ -473,6 +489,7 @@ fn follower_content(
 
 pub(super) fn project_merges(
     sheet: &str,
+    worksheet: Option<&Worksheet>,
     store: Option<&crate::cell::Store>,
     intents: Vec<MergeIntent>,
     cells: &BTreeMap<Address, Action>,
@@ -483,12 +500,38 @@ pub(super) fn project_merges(
         .try_reserve_exact(base.len())
         .map_err(|source| allocation("merged-range projection", source))?;
     projected.extend_from_slice(base);
+    let mut table_ranges = None;
     for intent in intents {
         match intent {
             MergeIntent::Add(range) => {
                 ensure_merge_area(sheet, range)?;
                 if projected.contains(&range) {
                     continue;
+                }
+                if let Some(worksheet) = worksheet {
+                    if table_ranges.is_none() {
+                        let tables = worksheet.tables()?;
+                        let mut ranges = Vec::new();
+                        ranges
+                            .try_reserve_exact(tables.len())
+                            .map_err(|source| allocation("worksheet table ranges", source))?;
+                        for table in tables {
+                            ranges.push(table.table().range()?);
+                        }
+                        table_ranges = Some(ranges);
+                    }
+                    let ranges = table_ranges.as_deref().unwrap_or_default();
+                    if let Some(table) = ranges
+                        .iter()
+                        .copied()
+                        .find(|table| crate::merge::overlaps(*table, range))
+                    {
+                        return Err(Error::MergeEditBlocked {
+                            sheet: sheet.to_owned(),
+                            range,
+                            reason: MergeEditBlock::TableOverlap { table },
+                        });
+                    }
                 }
                 if let Some(existing) = projected
                     .iter()
@@ -1780,6 +1823,72 @@ pub struct ConflictSet {
     pub(super) conflicts: Box<[Conflict]>,
 }
 
+/// Fixed classification of a source-equivalence planning failure returned when
+/// two deferred edits are joined.  The original [`crate::Error`] is retained
+/// by [`JoinError`] as its error source; this enum is deliberately free of
+/// document text and therefore remains equality-comparable.
+#[derive(Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum JoinNormalization {
+    /// A format-family edit limit rejected the normalization census.
+    Limit {
+        /// The bounded dimension that was exceeded.
+        kind: crate::error::LimitKind,
+        /// The amount required by the normalized effects.
+        observed: u64,
+        /// The configured maximum.
+        maximum: u64,
+    },
+    /// A shared hierarchical resource budget rejected the census.
+    ResourceLimit,
+    /// The package or OPC source could not be inspected.
+    Package,
+    /// Markup-compatibility preprocessing failed.
+    MarkupCompatibility,
+    /// OOXML decoding failed.
+    Xml,
+    /// A shared dependency or drawing decoder failed.
+    Dependency,
+    /// A shared OOXML service failed.
+    Common,
+    /// A domain value or structural invariant was invalid.
+    Invalid,
+    /// A bounded allocation could not be reserved.
+    Allocation,
+    /// A typed edit was refused by workbook structure or policy.
+    Refused,
+    /// The requested operation is unsupported by this facade.
+    Unsupported,
+    /// A stale patch or signed source prevented publication.
+    Publication,
+    /// A failure outside the known source-equivalence classes.
+    Other,
+}
+
+impl fmt::Display for JoinNormalization {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Limit {
+                kind,
+                observed,
+                maximum,
+            } => write!(formatter, "{kind}: {observed} exceeds {maximum}"),
+            Self::ResourceLimit => formatter.write_str("resource limit"),
+            Self::Package => formatter.write_str("package source error"),
+            Self::MarkupCompatibility => formatter.write_str("markup-compatibility error"),
+            Self::Xml => formatter.write_str("OOXML decoding error"),
+            Self::Dependency => formatter.write_str("source dependency error"),
+            Self::Common => formatter.write_str("shared OOXML service error"),
+            Self::Invalid => formatter.write_str("invalid source or edit state"),
+            Self::Allocation => formatter.write_str("allocation error"),
+            Self::Refused => formatter.write_str("edit refused"),
+            Self::Unsupported => formatter.write_str("unsupported operation"),
+            Self::Publication => formatter.write_str("publication error"),
+            Self::Other => formatter.write_str("source-equivalence planning error"),
+        }
+    }
+}
+
 impl ConflictSet {
     /// Conflicts in deterministic workbook-effect and sheet order.
     #[must_use]
@@ -1818,18 +1927,23 @@ pub enum JoinFailure {
     DifferentSnapshot,
     /// Both edits write at least one of the same effect facets.
     Overlap(ConflictSet),
+    /// Joining the edits would exceed a bounded resource budget.
+    ResourceLimit(litchi_core::ResourceLimit),
     /// Both edits replace the workbook's one persisted task-pane graph.
     TaskPanes,
     /// Both edits replace the complete workbook defined-name catalog.
     DefinedNames,
     /// Both edits stage worksheet drawing graph transfers that cannot be joined.
     DrawingTransfer,
+    /// Planning the deferred source-equivalence effect projection failed.
+    Normalization(JoinNormalization),
 }
 
 /// Recoverable join failure that returns ownership of the rejected edit.
 pub struct JoinError {
     pub(super) failure: JoinFailure,
     pub(super) rejected: Box<Edit>,
+    pub(super) normalization_source: Option<Box<Error>>,
 }
 
 impl fmt::Debug for JoinError {
@@ -1838,6 +1952,7 @@ impl fmt::Debug for JoinError {
             .debug_struct("JoinError")
             .field("failure", &self.failure)
             .field("rejected_effects", &self.rejected.len())
+            .field("normalization_source", &self.normalization_source)
             .finish()
     }
 }
@@ -1849,15 +1964,23 @@ impl JoinError {
         &self.failure
     }
 
-    /// Overlapping effects, or `None` for a lineage mismatch.
+    /// The original typed source failure behind a normalization refusal.
+    #[must_use]
+    pub fn normalization_source(&self) -> Option<&Error> {
+        self.normalization_source.as_deref()
+    }
+
+    /// Overlapping effects, or `None` when the failure is not an effect conflict.
     #[must_use]
     pub fn conflicts(&self) -> Option<&ConflictSet> {
         match &self.failure {
             JoinFailure::Overlap(conflicts) => Some(conflicts),
             JoinFailure::DifferentSnapshot
+            | JoinFailure::ResourceLimit(_)
             | JoinFailure::TaskPanes
             | JoinFailure::DefinedNames
-            | JoinFailure::DrawingTransfer => None,
+            | JoinFailure::DrawingTransfer
+            | JoinFailure::Normalization(_) => None,
         }
     }
 
@@ -1878,6 +2001,13 @@ impl JoinError {
     pub fn into_parts(self) -> (JoinFailure, Edit) {
         (self.failure, *self.rejected)
     }
+
+    /// Recover the structured reason, its original normalization source, and
+    /// the rejected edit without flattening the source diagnostic.
+    #[must_use]
+    pub fn into_parts_with_source(self) -> (JoinFailure, Option<Box<Error>>, Edit) {
+        (self.failure, self.normalization_source, *self.rejected)
+    }
 }
 
 impl fmt::Display for JoinError {
@@ -1889,6 +2019,9 @@ impl fmt::Display for JoinError {
             JoinFailure::Overlap(conflicts) => {
                 write!(formatter, "edit effects overlap: {conflicts}")
             },
+            JoinFailure::ResourceLimit(limit) => {
+                write!(formatter, "edit join resource limit: {limit}")
+            },
             JoinFailure::TaskPanes => {
                 formatter.write_str("both edits replace the persisted task-pane graph")
             },
@@ -1898,11 +2031,21 @@ impl fmt::Display for JoinError {
             JoinFailure::DrawingTransfer => {
                 formatter.write_str("worksheet drawing graph transfers overlap")
             },
+            JoinFailure::Normalization(reason) => {
+                write!(formatter, "edit effect normalization failed: {reason}")
+            },
         }
     }
 }
 
-impl std::error::Error for JoinError {}
+impl std::error::Error for JoinError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        self.normalization_source.as_deref().map(|source| {
+            let source: &(dyn std::error::Error + 'static) = source;
+            source
+        })
+    }
+}
 
 /// One package-owned semantic change, including worksheet-owned satellite parts.
 #[derive(Debug, Clone, PartialEq)]
@@ -2074,7 +2217,7 @@ impl SvgReadGuard {
             }
         }
         let current = package
-            .source_relationships_with_limits(&self.owner, package.read_limits())
+            .source_relationships(&self.owner, package.read_limits())
             .map_err(|_| Error::PatchConflict {
                 part: self.owner.to_string(),
             })?;
@@ -2098,8 +2241,7 @@ impl RelationshipChange {
 
     pub(super) fn validate(&self, package: &OpcPackage) -> Result<()> {
         if let Some(expected) = &self.before_source {
-            let current = package
-                .source_relationships_with_limits(expected.owner(), package.read_limits())?;
+            let current = package.source_relationships(expected.owner(), package.read_limits())?;
             if current != *expected {
                 return Err(Error::PatchConflict {
                     part: expected.owner().to_string(),
@@ -2122,11 +2264,7 @@ impl RelationshipChange {
 
     pub(super) fn apply(&self, package: &mut OpcPackage) -> Result<()> {
         if let (Some(expected), Some(replacement)) = (&self.before_source, &self.after_source) {
-            package.try_replace_relationships_with_limits(
-                expected,
-                replacement,
-                package.read_limits(),
-            )?;
+            package.try_replace_relationships(expected, replacement, package.read_limits())?;
             return Ok(());
         }
         let relationship_id = self.relationship_id()?.to_owned();
@@ -2225,6 +2363,10 @@ pub struct Patch {
     // workbook that happens to share changed-part bytes. Durable patches bind
     // complete package bytes through their wire envelope and do not use this.
     pub(super) authority: Option<PatchAuthority>,
+    /// [`Self::retained_bytes`], computed once: a bounded commit checks it
+    /// and the caller then reads it again for its own snapshot budget, and
+    /// each computation walks both endpoint workbooks (record 0377a).
+    pub(super) retained: std::sync::OnceLock<usize>,
 }
 
 /// Exact final semantic state captured for one selected worksheet picture.
@@ -2298,7 +2440,7 @@ impl fmt::Debug for SvgPartChange {
 
 impl ContentTypesChange {
     pub(super) fn validate(&self, package: &OpcPackage) -> Result<()> {
-        if package.source_content_types_with_limits(package.read_limits())? != self.before {
+        if package.source_content_types(package.read_limits())? != self.before {
             return Err(Error::PatchConflict {
                 part: "[Content_Types].xml".to_owned(),
             });
@@ -2307,7 +2449,7 @@ impl ContentTypesChange {
     }
 
     pub(super) fn apply(&self, package: &mut OpcPackage) -> Result<()> {
-        package.try_replace_content_types_with_limits(
+        package.try_replace_content_types(
             self.before.bytes(),
             &self.after,
             package.read_limits(),
@@ -2384,7 +2526,7 @@ pub(super) fn validate_svg_final_removals(
     changes: &[SvgPartChange],
 ) -> Result<()> {
     let limits = package.read_limits();
-    package.source_content_types_with_limits(limits)?;
+    package.source_content_types(limits)?;
 
     let part_count = package.part_count();
     if part_count > limits.max_parts() {
@@ -2437,7 +2579,7 @@ pub(super) fn validate_svg_final_removals(
     let mut graph_nodes = HashSet::new();
     let root = PackURI::new("/").map_err(invalid)?;
     let mut visit = |owner: &PackURI, relationships: &Relationships| -> Result<()> {
-        let source = package.source_relationships_with_limits(owner, limits)?;
+        let source = package.source_relationships(owner, limits)?;
         if source.member_present() {
             relationship_parts = relationship_parts
                 .checked_add(1)
@@ -2448,7 +2590,7 @@ pub(super) fn validate_svg_final_removals(
             relationship_xml_events = relationship_xml_events
                 .checked_add(relationship_xml_event_count(
                     source.bytes(),
-                    limits.max_xml_events(),
+                    limits.max_events(),
                 )?)
                 .ok_or_else(|| invalid("SVG lifecycle relationship XML events overflow"))?;
         }
@@ -2615,15 +2757,16 @@ impl Patch {
         &self.package_changes
     }
 
+    /// Number of semantic changes retained by this patch.
     #[must_use]
-    pub fn len(&self) -> usize {
+    pub fn operation_count(&self) -> usize {
         self.changes
             .len()
             .saturating_add(self.package_changes.len())
     }
 
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
+    /// Whether the patch carries no change category at all.
+    pub(crate) fn is_structurally_empty(&self) -> bool {
         self.changes.is_empty()
             && self.package_changes.is_empty()
             && self.parts.is_empty()
@@ -2636,9 +2779,191 @@ impl Patch {
             && self.svg_final_guards.is_empty()
     }
 
+    /// The immutable source workbook retained by this patch.
+    ///
+    /// A patch built by a successful native commit always has both endpoints.
+    /// The fallible accessor keeps a manually constructed default patch from
+    /// turning a missing proof into a panic.
+    ///
+    /// # Errors
+    ///
+    /// Returns an unsupported-operation error when this patch has no source
+    /// endpoint.
+    pub fn source(&self) -> Result<&Workbook> {
+        self.source.as_ref().ok_or(Error::Unsupported {
+            feature: "patch has no source workbook endpoint",
+        })
+    }
+
+    /// The immutable target workbook retained by this patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an unsupported-operation error when this patch has no target
+    /// endpoint.
+    pub fn target(&self) -> Result<&Workbook> {
+        self.target.as_ref().ok_or(Error::Unsupported {
+            feature: "patch has no target workbook endpoint",
+        })
+    }
+
+    /// Whether applying this patch leaves the package bytes unchanged.
+    ///
+    /// A commit that published nothing returns its source snapshot, and its
+    /// patch is a no-op. A patch whose only package delta is a set of part
+    /// payloads that equal their sources byte for byte is a no-op as well.
+    /// The check is proportional to the changed closure, never to the
+    /// package; use [`crate::Package::same_content`] to compare two complete
+    /// snapshots, for example the endpoints of an `A -> B -> A` sequence of
+    /// separate commits.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        if let (Some(source), Some(target)) = (&self.source, &self.target) {
+            if Arc::ptr_eq(&source.inner, &target.inner) {
+                return true;
+            }
+        }
+        if self.is_structurally_empty() {
+            return true;
+        }
+        self.relationships.is_empty()
+            && self.content_types.is_none()
+            && self.svg_parts.is_empty()
+            && self.graph.is_empty()
+            && self.web.is_none()
+            && self
+                .parts
+                .iter()
+                .all(|part| part.before.as_slice() == part.after.as_slice())
+    }
+
+    /// Content-free facts about the publication this patch describes.
+    #[must_use]
+    pub fn diagnostics(&self) -> super::Diagnostics {
+        super::Diagnostics {
+            changed: !self.is_noop(),
+            changes: self.changes.len(),
+            package_changes: self.package_changes.len(),
+            changed_parts: self.parts.len(),
+        }
+    }
+
+    /// Conservative retained-data charge for this patch.
+    ///
+    /// Both complete native endpoints are charged, even when their payload
+    /// allocations are shared, because an operations history may retain both
+    /// owners independently. Changed part and graph closures are then added
+    /// on top of the endpoint charge for the patch's own delta buffers. Every
+    /// addition saturates so this accounting cannot wrap on hostile input.
+    /// The result is a bounded retained-data charge for the native owners and
+    /// patch buffers; it is not a claim about allocator overhead or every
+    /// lazily derived cache allocation.
+    #[must_use]
+    pub fn retained_bytes(&self) -> usize {
+        *self.retained.get_or_init(|| self.compute_retained_bytes())
+    }
+
+    fn compute_retained_bytes(&self) -> usize {
+        let archive_hint = self
+            .source
+            .as_ref()
+            .and_then(|workbook| workbook.inner.package.exact_source_len())
+            .into_iter()
+            .chain(
+                self.target
+                    .as_ref()
+                    .and_then(|workbook| workbook.inner.package.exact_source_len()),
+            )
+            .max()
+            .unwrap_or(0);
+
+        let mut bytes = 0usize;
+        if let Some(source) = &self.source {
+            bytes = bytes.saturating_add(workbook_retained_bytes(source, archive_hint));
+        }
+        if let Some(target) = &self.target {
+            bytes = bytes.saturating_add(workbook_retained_bytes(target, archive_hint));
+        }
+
+        // The endpoint payloads account for the package's complete graph.
+        // These terms account for patch-owned transition buffers and their
+        // private source guards, including payloads that are also shared by an
+        // endpoint. Counting them twice is intentional and conservative.
+        bytes = bytes.saturating_add(self.changes.len().saturating_mul(size_of::<Change>()));
+        bytes = bytes.saturating_add(
+            self.package_changes
+                .len()
+                .saturating_mul(size_of::<PackageChange>()),
+        );
+        bytes = bytes.saturating_add(self.parts.len().saturating_mul(size_of::<PartChange>()));
+        for change in &self.parts {
+            bytes = bytes
+                .saturating_add(change.uri.as_str().len())
+                .saturating_add(change.before.capacity())
+                .saturating_add(change.after.capacity());
+        }
+        bytes = bytes.saturating_add(
+            self.relationships
+                .len()
+                .saturating_mul(size_of::<RelationshipChange>()),
+        );
+        for change in &self.relationships {
+            bytes = bytes.saturating_add(change.owner.as_str().len());
+            for relationship in [&change.before, &change.after].into_iter().flatten() {
+                bytes = bytes
+                    .saturating_add(size_of::<Relationship>())
+                    .saturating_add(relationship.r_id().len())
+                    .saturating_add(relationship.reltype().len())
+                    .saturating_add(relationship.target_ref().len())
+                    .saturating_add(relationship.base_uri().len())
+                    .saturating_add(relationship.source_uri().map_or(0, str::len));
+            }
+        }
+        if let Some(change) = &self.content_types {
+            bytes = bytes
+                .saturating_add(size_of::<ContentTypesChange>())
+                .saturating_add(change.before.bytes().len())
+                .saturating_add(change.after.bytes().len());
+        }
+        bytes = bytes.saturating_add(
+            self.svg_parts
+                .len()
+                .saturating_mul(size_of::<SvgPartChange>()),
+        );
+        for change in &self.svg_parts {
+            bytes = bytes
+                .saturating_add(change.part.partname().as_str().len())
+                .saturating_add(change.part.content_type().len())
+                .saturating_add(change.part.blob().len());
+        }
+        bytes = bytes.saturating_add(self.graph.len().saturating_mul(size_of::<GraphChange>()));
+        for change in &self.graph {
+            bytes = bytes
+                .saturating_add(change.source.as_str().len())
+                .saturating_add(size_of::<Relationship>())
+                .saturating_add(change.relationship.r_id().len())
+                .saturating_add(change.relationship.reltype().len())
+                .saturating_add(change.relationship.target_ref().len())
+                .saturating_add(change.relationship.base_uri().len())
+                .saturating_add(change.relationship.source_uri().map_or(0, str::len))
+                .saturating_add(change.part.partname().as_str().len())
+                .saturating_add(change.part.content_type().len())
+                .saturating_add(change.part.blob().len());
+        }
+        bytes
+    }
+
     /// Build the inverse without copying part payloads.
     #[must_use]
     pub fn inverse(&self) -> Self {
+        // A stylesheet PartChange already checks the exact source bytes. A
+        // standalone StyleGuard is intentionally retained only for patches
+        // whose stylesheet is unchanged; keeping the old guard on an inverse
+        // stylesheet patch would validate the wrong endpoint.
+        let style_part_changed = self
+            .style_guard
+            .as_ref()
+            .is_some_and(|guard| self.parts.iter().any(|part| part.uri == guard.uri));
         Self {
             changes: self
                 .changes
@@ -2716,10 +3041,13 @@ impl Patch {
                 .collect::<Vec<_>>()
                 .into_boxed_slice(),
             web: self.web.as_ref().map(common_web::Patch::inverse),
-            style_guard: self.style_guard.clone(),
+            style_guard: (!style_part_changed)
+                .then(|| self.style_guard.clone())
+                .flatten(),
             source: self.target.clone(),
             target: self.source.clone(),
             authority: self.authority.as_ref().map(PatchAuthority::inverse),
+            retained: std::sync::OnceLock::new(),
             svg_read_guards: self
                 .svg_read_guards
                 .iter()
@@ -2761,8 +3089,7 @@ impl Patch {
         super::DurablePatch::from_patch(self)
     }
 
-    pub(in crate::workbook) fn apply_to(&self, workbook: &Workbook) -> Result<Commit> {
-        ensure_unsigned(workbook)?;
+    pub(crate) fn apply_to(&self, workbook: &Workbook) -> Result<Commit> {
         if let Some(authority) = &self.authority {
             authority.validate(workbook)?;
         }
@@ -2792,10 +3119,13 @@ impl Patch {
                 });
             }
             return Ok(Commit {
-                workbook: workbook.clone(),
+                package: crate::Package::from_workbook(workbook.clone()),
                 patch,
             });
         }
+        // An empty patch returns the source, a signed one included; a changed
+        // one refuses a signed workbook (ADR 0006).
+        ensure_unsigned(workbook)?;
         if !self.svg_final_guards.is_empty() {
             super::svg_lifecycle::validate_before_guards(workbook, &self.svg_final_guards)?;
         }
@@ -2871,7 +3201,8 @@ impl Patch {
             }
         }
         if let Some(web) = &self.web {
-            let _ = web.apply(&mut package)?;
+            let commit = web.apply(&package)?;
+            package = commit.into_package();
         }
         if !self.svg_final_guards.is_empty() || !self.svg_parts.is_empty() {
             validate_svg_final_removals(&package, &self.svg_parts)?;
@@ -2900,36 +3231,139 @@ impl Patch {
         }
         patch.source = Some(source);
         patch.target = Some(workbook.clone());
-        Ok(Commit { workbook, patch })
+        Ok(Commit::new(workbook, patch))
     }
 }
 
+/// Count one immutable workbook endpoint without forcing lazy projections.
+/// The optional archive hint is charged for every endpoint: source-backed
+/// descendants can share a retained ZIP, but a history budget must account
+/// for each endpoint independently. Derived cell and shared-string read
+/// caches are intentionally excluded: reading must not change the semantic
+/// retained-data admission charge.
+pub(crate) fn workbook_retained_bytes(workbook: &Workbook, archive_hint: usize) -> usize {
+    let package = &workbook.inner.package;
+    let mut bytes = size_of_val(workbook)
+        .saturating_add(size_of_val(workbook.inner.as_ref()))
+        .saturating_add(size_of_val(package))
+        .saturating_add(archive_hint);
+
+    bytes = bytes
+        .saturating_add(workbook.inner.workbook_uri.as_str().len())
+        .saturating_add(
+            workbook
+                .inner
+                .shared_strings_uri
+                .as_ref()
+                .map_or(0, |uri| uri.as_str().len()),
+        )
+        .saturating_add(
+            workbook
+                .inner
+                .styles_uri
+                .as_ref()
+                .map_or(0, |uri| uri.as_str().len()),
+        );
+
+    for sheet in &workbook.inner.sheets {
+        bytes = bytes
+            .saturating_add(size_of_val(sheet.as_ref()))
+            .saturating_add(sheet.name.capacity())
+            .saturating_add(sheet.name_key.len())
+            .saturating_add(sheet.part_uri.as_str().len())
+            .saturating_add(sheet.relationship_id.capacity());
+    }
+    for name in &workbook.inner.external_reference_ids {
+        bytes = bytes.saturating_add(name.capacity());
+    }
+    bytes = bytes.saturating_add(
+        workbook
+            .inner
+            .defined_names
+            .len()
+            .saturating_mul(size_of::<crate::raw::DefinedName>()),
+    );
+    bytes = bytes.saturating_add(
+        workbook
+            .inner
+            .pivot_caches
+            .len()
+            .saturating_mul(size_of::<crate::raw::PivotCache>()),
+    );
+
+    for metadata in package.iter_parts() {
+        // The archive hint covers deferred source payloads.
+        bytes = bytes
+            .saturating_add(size_of_val(&metadata))
+            .saturating_add(metadata.partname().as_str().len())
+            .saturating_add(metadata.content_type().len())
+            .saturating_add(relationship_retained_bytes(metadata.rels()))
+            .saturating_add(metadata.decoded_payload_capacity().unwrap_or(0));
+    }
+    bytes.saturating_add(relationship_retained_bytes(package.rels()))
+}
+
+fn relationship_retained_bytes(relationships: &Relationships) -> usize {
+    let mut bytes = size_of_val(relationships);
+    for relationship in relationships.iter() {
+        bytes = bytes
+            .saturating_add(size_of::<Relationship>())
+            .saturating_add(relationship.r_id().len())
+            .saturating_add(relationship.reltype().len())
+            .saturating_add(relationship.target_ref().len())
+            .saturating_add(relationship.base_uri().len())
+            .saturating_add(relationship.source_uri().map_or(0, str::len));
+    }
+    bytes
+}
+
 /// Successful atomic transaction result.
+///
+/// The commit carries the published immutable [`crate::Package`], the
+/// reversible [`Patch`] from its source, and content-free
+/// [`super::Diagnostics`].
 #[derive(Debug)]
 pub struct Commit {
-    pub(super) workbook: Workbook,
+    pub(super) package: crate::Package,
     pub(super) patch: Patch,
 }
 
 impl Commit {
-    #[must_use]
-    pub fn workbook(&self) -> &Workbook {
-        &self.workbook
+    pub(super) fn new(workbook: Workbook, patch: Patch) -> Self {
+        Self {
+            package: crate::Package::from_workbook(workbook),
+            patch,
+        }
     }
 
+    /// The published immutable package.
     #[must_use]
-    pub fn patch(&self) -> &Patch {
+    pub const fn package(&self) -> &crate::Package {
+        &self.package
+    }
+
+    /// The reversible patch from the source package.
+    #[must_use]
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
+    /// Content-free publication facts.
     #[must_use]
-    pub fn into_workbook(self) -> Workbook {
-        self.workbook
+    pub fn diagnostics(&self) -> super::Diagnostics {
+        self.patch.diagnostics()
     }
 
+    /// Consume the commit into its published package.
     #[must_use]
-    pub fn into_parts(self) -> (Workbook, Patch) {
-        (self.workbook, self.patch)
+    pub fn into_package(self) -> crate::Package {
+        self.package
+    }
+
+    /// Consume the commit into its published package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (crate::Package, Patch) {
+        (self.package, self.patch)
     }
 
     /// Record this committed snapshot in bounded undo/redo history.
@@ -2942,7 +3376,7 @@ impl Commit {
     ///
     /// Returns an error for a stale history head, durable serialization
     /// failure, or a transition heavier than the history budget.
-    pub fn record(&self, history: &mut crate::workbook::History) -> Result<Vec<Workbook>> {
+    pub fn record(&self, history: &mut crate::workbook::History) -> Result<Vec<crate::Package>> {
         let durable = self.patch.durable()?;
         let next = durable.apply(history.current())?;
         let weight = u64::try_from(durable.to_deterministic_json()?.len())

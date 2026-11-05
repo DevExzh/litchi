@@ -96,7 +96,11 @@ pub(crate) fn validate_value(value: &Settings) -> Result<usize> {
 
 fn validate_frameset(value: &Frameset, depth: usize, budget: &mut Budget) -> Result<()> {
     if depth > MAX_FRAMESET_NESTING {
-        return Err(invalid("web frameset nesting exceeds the safety limit"));
+        return Err(Error::WebLimit {
+            kind: crate::web::LimitKind::FramesetDepth,
+            actual: depth,
+            maximum: MAX_FRAMESET_NESTING,
+        });
     }
     budget.node("frameset")?;
     if let Some(size) = &value.size {
@@ -151,7 +155,11 @@ pub(crate) fn validate_divs(divs: &[Div], depth: usize) -> Result<()> {
 
 fn validate_div_slice(divs: &[Div], depth: usize, budget: &mut Budget) -> Result<()> {
     if depth > MAX_FRAMESET_NESTING {
-        return Err(invalid("HTML division nesting exceeds the safety limit"));
+        return Err(Error::WebLimit {
+            kind: crate::web::LimitKind::HtmlDivisionDepth,
+            actual: depth,
+            maximum: MAX_FRAMESET_NESTING,
+        });
     }
     let mut ids = std::collections::HashSet::new();
     ids.try_reserve(divs.len())

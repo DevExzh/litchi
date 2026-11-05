@@ -14,6 +14,7 @@ use super::super::xml::{
     required_attr,
 };
 use super::support::{enforce_count_with, invalid, parse_bool};
+use crate::web::LimitKind;
 use crate::{Error, Result};
 
 /// Parse one MS-OWEXML web extension part after bounded MCE preprocessing.
@@ -40,9 +41,9 @@ pub(in crate::web) fn parse_add_in_with_budget(
             .len()
             .checked_add(document.string_bytes)
             .ok_or(Error::Limit {
-                resource: "retained web extension string bytes",
-                max: limits.total_string_bytes,
-                actual: usize::MAX,
+                kind: crate::LimitKind::Web(LimitKind::RetainedStringBytes),
+                maximum: limits.total_string_bytes,
+                observed: usize::MAX,
             })?,
         limits,
     )?;
@@ -73,7 +74,7 @@ pub(in crate::web) fn parse_add_in_with_budget(
         position += 1;
         reject_unknown_attributes(node, &[])?;
         let refs = element_children(node);
-        enforce_count_with("alternate reference", refs.len(), limits)?;
+        enforce_count_with(LimitKind::AlternateReferenceItems, refs.len(), limits)?;
         refs.into_iter()
             .map(|child| {
                 require_name(child, WEB_EXTENSION_NAMESPACE, "reference")?;
@@ -92,7 +93,7 @@ pub(in crate::web) fn parse_add_in_with_budget(
     )?;
     reject_unknown_attributes(properties_node, &[])?;
     let property_nodes = element_children(properties_node);
-    enforce_count_with("property", property_nodes.len(), limits)?;
+    enforce_count_with(LimitKind::PropertyItems, property_nodes.len(), limits)?;
     let properties = property_nodes
         .into_iter()
         .map(parse_property)
@@ -106,7 +107,7 @@ pub(in crate::web) fn parse_add_in_with_budget(
     )?;
     reject_unknown_attributes(bindings_node, &[])?;
     let binding_nodes = element_children(bindings_node);
-    enforce_count_with("binding", binding_nodes.len(), limits)?;
+    enforce_count_with(LimitKind::BindingItems, binding_nodes.len(), limits)?;
     let bindings = binding_nodes
         .into_iter()
         .map(|node| parse_binding(node, &document, limits))
@@ -131,7 +132,11 @@ pub(in crate::web) fn parse_add_in_with_budget(
             .map(Compression::parse)
             .transpose()?;
         let snapshot_children = element_children(node);
-        enforce_count_with("snapshot effect", snapshot_children.len(), limits)?;
+        enforce_count_with(
+            LimitKind::SnapshotEffectItems,
+            snapshot_children.len(),
+            limits,
+        )?;
         let mut effects = Vec::with_capacity(snapshot_children.len());
         let mut extension_list = None;
         for (index, child) in snapshot_children.iter().enumerate() {
@@ -204,9 +209,9 @@ pub(in crate::web) fn parse_panes_with_budget(
             .len()
             .checked_add(document.string_bytes)
             .ok_or(Error::Limit {
-                resource: "retained web extension string bytes",
-                max: limits.total_string_bytes,
-                actual: usize::MAX,
+                kind: crate::LimitKind::Web(LimitKind::RetainedStringBytes),
+                maximum: limits.total_string_bytes,
+                observed: usize::MAX,
             })?,
         limits,
     )?;
@@ -214,7 +219,7 @@ pub(in crate::web) fn parse_panes_with_budget(
     require_name(root, TASK_PANES_NAMESPACE, "taskpanes")?;
     reject_unknown_attributes(root, &[])?;
     let children = element_children(root);
-    enforce_count_with("task pane", children.len(), limits)?;
+    enforce_count_with(LimitKind::TaskPaneItems, children.len(), limits)?;
     children
         .into_iter()
         .map(|node| parse_task_pane(node, &document, limits))

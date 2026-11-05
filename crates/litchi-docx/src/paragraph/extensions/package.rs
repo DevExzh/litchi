@@ -1,9 +1,10 @@
 //! Paragraph, row, and mutable-writer integration for extension attributes.
 
+use crate::builder::{Paragraph as DraftParagraph, Row as DraftRow};
 use crate::error::Result;
 use crate::paragraph::Paragraph;
+use crate::paragraph::model::XmlData;
 use crate::table::Row;
-use crate::writer::{MutableParagraph, MutableRow};
 
 use super::codec::{parse_paragraph, parse_row};
 use super::model::{Extensions, Id, Ids};
@@ -27,6 +28,62 @@ impl Paragraph {
         let xml = self.self_contained_xml()?;
         parse_paragraph(&xml)
     }
+
+    /// Read the Word 2010 `paraId`/`textId` pair from this `w:p`'s start tag.
+    ///
+    /// Only the start tag is parsed. A paragraph read from a document or
+    /// block index resolves its prefixes with the namespace bindings its scan
+    /// captured, so the cost is the start tag's, not the paragraph's or its
+    /// offset's. A paragraph without captured bindings (a source-backed
+    /// managed view) resolves them from its part first, as
+    /// [`Self::extensions`] does.
+    ///
+    /// The identifiers equal those of [`Self::extensions`]; the attributes on
+    /// the start tag are checked the same way, and the rest of the paragraph
+    /// is not read.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the start tag is not a `WordprocessingML` `p`,
+    /// when an extension attribute is outside the Word 2010 namespace,
+    /// repeated or malformed, or when `textId` appears without `paraId`.
+    pub(crate) fn extension_ids(&self) -> Result<Ids> {
+        let _parser_admission = self.parser_admission()?;
+        let namespaces = match &self.xml_data {
+            // A range cut from a larger buffer without a scan (the public
+            // arena constructors) carries no captured bindings; resolve them
+            // from the buffer, as `extensions` does, instead of assuming none.
+            XmlData::Shared { slice, namespaces }
+                if namespaces.is_empty() && slice.start() != 0 =>
+            {
+                let reference = self.xml_data.xml_ref()?;
+                let lease = reference.namespace_resolver()?;
+                let bindings = crate::namespace::resolver_bindings(&lease)?;
+                lease.check()?;
+                bindings
+            },
+            data => data.inherited_namespaces()?,
+        };
+        super::codec::parse_paragraph_start(self.xml_bytes(), &namespaces)
+    }
+
+    /// The paragraph's `w14:paraId`, read from its start tag.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for malformed paragraph identifier attributes.
+    pub fn para_id(&self) -> Result<Option<Id>> {
+        Ok(self.extension_ids()?.para_id())
+    }
+
+    /// The paragraph's `w14:textId`, read from its start tag.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for malformed paragraph identifier attributes.
+    pub fn text_id(&self) -> Result<Option<Id>> {
+        Ok(self.extension_ids()?.text_id())
+    }
 }
 
 impl Row {
@@ -43,7 +100,7 @@ impl Row {
     }
 }
 
-impl MutableParagraph {
+impl DraftParagraph {
     /// Borrow the paragraph's detached Word 2010 extension state.
     #[must_use]
     pub fn extensions(&self) -> &Extensions {
@@ -100,7 +157,7 @@ impl MutableParagraph {
     }
 }
 
-impl MutableRow {
+impl DraftRow {
     /// Return the row's detached Word 2010 identifier pair.
     #[must_use]
     pub fn extension_ids(&self) -> Ids {

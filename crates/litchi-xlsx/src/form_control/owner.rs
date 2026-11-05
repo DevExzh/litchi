@@ -17,8 +17,8 @@ use litchi_ooxml_common::mce::{Capabilities, Limits as MceLimits, process_markup
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    EffectiveTopology, OpcPackage, OwnedRelationships, PackURI, PartData, ReadLimits, ReadResource,
-    Relationships, SourceBackedPackage, TargetMode,
+    EffectiveTopology, OpcPackage, OwnedRelationships, PackURI, PartData, Relationships,
+    SourceBackedPackage, SourceLimitKind, SourceLimits, TargetMode,
 };
 use quick_xml::events::{BytesEnd, BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -397,7 +397,7 @@ impl OwnerLimits {
 
     /// Derive an owner policy from the caller's OPC read policy.
     #[must_use]
-    pub fn from_read_limits(read_limits: ReadLimits) -> Self {
+    pub fn from_read_limits(read_limits: SourceLimits) -> Self {
         let mut limits = Self::default();
         limits.max_drawing_bytes =
             lower_u64(limits.max_drawing_bytes, read_limits.max_part_bytes());
@@ -603,7 +603,10 @@ impl OwnerProfile {
 enum RetainedPayload {
     Owned(Arc<Vec<u8>>),
     Source(PartData),
-    Relationships(OwnedRelationships),
+    // Relationship tokens carry the complete OPC relationship index. Keep
+    // that uncommon sidecar behind a pointer so every retained payload stays
+    // compact in the form-control owner and read-set hot paths.
+    Relationships(Box<OwnedRelationships>),
 }
 
 impl RetainedPayload {
@@ -616,7 +619,7 @@ impl RetainedPayload {
     }
 
     fn relationships(token: OwnedRelationships) -> Self {
-        Self::Relationships(token)
+        Self::Relationships(Box::new(token))
     }
 
     fn as_bytes(&self) -> &[u8] {
@@ -835,6 +838,32 @@ impl PartialEq for FormControlPartRead {
 impl Eq for FormControlPartRead {}
 
 impl FormControlPartRead {
+    /// [`Self::same_content`], except that the payload of a part named in
+    /// `excluded` (a member a patch replaces) is not compared.
+    fn same_content_except(&self, other: &Self, excluded: &[&PackURI]) -> bool {
+        if self
+            .part_name
+            .as_ref()
+            .is_some_and(|name| excluded.contains(&name))
+        {
+            return self.part_name == other.part_name
+                && self.relationship_payload == other.relationship_payload
+                && self.relationship_range == other.relationship_range
+                && self.relationships == other.relationships;
+        }
+        self.same_content(other)
+    }
+
+    /// The same part read, whatever source version it was read from.
+    fn same_content(&self, other: &Self) -> bool {
+        self.part_name == other.part_name
+            && self.payload == other.payload
+            && self.relationship_payload == other.relationship_payload
+            && self.range == other.range
+            && self.relationship_range == other.relationship_range
+            && self.relationships == other.relationships
+    }
+
     pub(crate) fn part_name(&self) -> Option<&PackURI> {
         self.part_name.as_ref()
     }
@@ -961,22 +990,60 @@ impl FormControlReadSet {
             .and_then(FormControlPartRead::part_name)
     }
 
-    pub(crate) fn same_source(&self, other: &Self) -> bool {
-        self.source_version == other.source_version
-            && self.workbook == other.workbook
+    /// The same read set, whatever source version it was read from, except
+    /// for the payloads of the parts named in `excluded`.
+    pub(crate) fn same_content_except(&self, other: &Self, excluded: &[&PackURI]) -> bool {
+        fn optional(
+            left: Option<&FormControlPartRead>,
+            right: Option<&FormControlPartRead>,
+            excluded: &[&PackURI],
+        ) -> bool {
+            match (left, right) {
+                (Some(left), Some(right)) => left.same_content_except(right, excluded),
+                (None, None) => true,
+                _ => false,
+            }
+        }
+        fn all(
+            left: &[FormControlPartRead],
+            right: &[FormControlPartRead],
+            excluded: &[&PackURI],
+        ) -> bool {
+            left.len() == right.len()
+                && left
+                    .iter()
+                    .zip(right)
+                    .all(|(left, right)| left.same_content_except(right, excluded))
+        }
+        optional(self.workbook.as_ref(), other.workbook.as_ref(), excluded)
             && self.package_relationship_payload == other.package_relationship_payload
             && self.package_relationships == other.package_relationships
             && self.content_types_payload == other.content_types_payload
             && self.signature_present == other.signature_present
             && self.incoming_relationships == other.incoming_relationships
-            && self.worksheet == other.worksheet
-            && self.drawing == other.drawing
-            && self.vml == other.vml
-            && self.properties == other.properties
-            && self.sidecar_targets == other.sidecar_targets
+            && self
+                .worksheet
+                .same_content_except(&other.worksheet, excluded)
+            && optional(self.drawing.as_ref(), other.drawing.as_ref(), excluded)
+            && optional(self.vml.as_ref(), other.vml.as_ref(), excluded)
+            && all(&self.properties, &other.properties, excluded)
+            && all(&self.sidecar_targets, &other.sidecar_targets, excluded)
             && self.worksheet_mce == other.worksheet_mce
             && self.drawing_mce == other.drawing_mce
     }
+
+    /// The bytes of the part named `name` in this read set, if it holds one.
+    pub(crate) fn part_bytes(&self, name: &PackURI) -> Option<&[u8]> {
+        std::iter::once(&self.worksheet)
+            .chain(self.workbook.as_ref())
+            .chain(self.drawing.as_ref())
+            .chain(self.vml.as_ref())
+            .chain(self.properties.iter())
+            .chain(self.sidecar_targets.iter())
+            .find(|part| part.part_name() == Some(name))
+            .map(FormControlPartRead::bytes)
+    }
+
     /// Source version shared by every retained source payload.
     #[must_use]
     pub const fn source_version(&self) -> Option<litchi_core::SourceVersion> {
@@ -1072,109 +1139,6 @@ impl FormControlReadSet {
     }
 }
 
-/// Check every retained physical member and relationship sidecar against an
-/// in-memory OPC package before applying a source-backed patch.  The source
-/// owner intentionally retains the exact relationship XML, including an
-/// explicit empty member versus absence, so a semantically equivalent graph
-/// rewrite is still a stale read-set refusal.
-pub(crate) fn read_set_matches_package_except(
-    package: &OpcPackage,
-    read_set: &FormControlReadSet,
-    excluded: &[&PackURI],
-) -> Result<bool> {
-    fn matches_part(
-        package: &OpcPackage,
-        part: &FormControlPartRead,
-        excluded: &[&PackURI],
-    ) -> Result<bool> {
-        let Some(name) = part.part_name() else {
-            return Ok(false);
-        };
-        let payload_excluded = excluded.contains(&name);
-        // A source-backed patch must turn a disappeared owner member into a
-        // normal stale-read result.  Propagating `PartNotFound` would expose
-        // an OPC lookup failure instead of the patch-conflict contract, and
-        // would make the missing-member path inconsistent with byte or
-        // relationship mismatches below.
-        let current = match package.get_part(name) {
-            Ok(current) => current,
-            Err(litchi_opc::OpcError::PartNotFound(_)) => return Ok(false),
-            Err(error) => return Err(error.into()),
-        };
-        if !payload_excluded && current.blob() != part.bytes() {
-            return Ok(false);
-        }
-        let current_relationships =
-            package.source_relationships_with_limits(name, package.read_limits())?;
-        if current_relationships.member_present() != part.relationship_bytes().is_some() {
-            return Ok(false);
-        }
-        if let Some(expected) = part.relationship_bytes()
-            && current_relationships.bytes() != expected
-        {
-            return Ok(false);
-        }
-        Ok(true)
-    }
-
-    if !read_set
-        .workbook
-        .as_ref()
-        .map_or(Ok(true), |part| matches_part(package, part, excluded))?
-        || !matches_part(package, &read_set.worksheet, excluded)?
-        || !read_set
-            .drawing
-            .as_ref()
-            .map_or(Ok(true), |part| matches_part(package, part, excluded))?
-        || !read_set
-            .vml
-            .as_ref()
-            .map_or(Ok(true), |part| matches_part(package, part, excluded))?
-    {
-        return Ok(false);
-    }
-    let root = PackURI::new("/").map_err(|error| invalid(error.to_string()))?;
-    let root_relationships =
-        package.source_relationships_with_limits(&root, package.read_limits())?;
-    if root_relationships.member_present() != read_set.package_relationship_payload.is_some()
-        || read_set
-            .package_relationship_payload
-            .as_ref()
-            .is_some_and(|expected| root_relationships.bytes() != expected.as_bytes())
-        || root_relationships.member_present() != read_set.package_relationships.present()
-        || root_relationships.bytes().len() != read_set.package_relationships.bytes()
-    {
-        return Ok(false);
-    }
-    if read_set.signature_present
-        != (package.is_signed() || package.requires_signature_edit_policy())
-    {
-        return Ok(false);
-    }
-    if let Some(expected) = read_set.content_types_payload.as_ref() {
-        let current = package.source_content_types_with_limits(package.read_limits())?;
-        if current.bytes() != expected.as_bytes() {
-            return Ok(false);
-        }
-    }
-    if incoming_fingerprint_from_package(package, read_set).map_err(owner_to_xlsx)?
-        != read_set.incoming_relationships
-    {
-        return Ok(false);
-    }
-    for part in read_set.properties.iter() {
-        if !matches_part(package, part, excluded)? {
-            return Ok(false);
-        }
-    }
-    for part in read_set.sidecar_targets.iter() {
-        if !matches_part(package, part, excluded)? {
-            return Ok(false);
-        }
-    }
-    Ok(true)
-}
-
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 struct IncomingEdgeKey {
     owner: String,
@@ -1212,6 +1176,7 @@ impl IncomingFingerprintBuilder {
             .ok_or_else(|| owner_invalid("incoming relationship edge count overflow"))?;
         if observed > self.maximum {
             return Err(owner_limit(
+                litchi_core::Resource::Objects,
                 "incoming relationship edges",
                 observed,
                 self.maximum,
@@ -1315,35 +1280,6 @@ fn incoming_fingerprint_from_source(
             if relationship.target_mode() == TargetMode::Internal {
                 let target = relationship.target_partname()?;
                 if read_set_contains_target(read_set, workbook_name, &target) {
-                    builder.push(owner, &target, relationship)?;
-                }
-            }
-        }
-    }
-    Ok(builder.finish())
-}
-
-fn incoming_fingerprint_from_package(
-    package: &OpcPackage,
-    read_set: &FormControlReadSet,
-) -> OwnerResult<RelationshipFingerprint> {
-    let maximum = package.read_limits().max_relationship_graph_nodes();
-    let mut builder = IncomingFingerprintBuilder::new(maximum)?;
-    let package_uri = PackURI::new("/").map_err(|error| owner_invalid(error.to_string()))?;
-    for relationship in package.rels().iter() {
-        if relationship.target_mode() == TargetMode::Internal {
-            let target = relationship.target_partname()?;
-            if read_set_contains_target(read_set, None, &target) {
-                builder.push(&package_uri, &target, relationship)?;
-            }
-        }
-    }
-    for part in package.iter_parts() {
-        let owner = part.partname();
-        for relationship in part.rels().iter() {
-            if relationship.target_mode() == TargetMode::Internal {
-                let target = relationship.target_partname()?;
-                if read_set_contains_target(read_set, None, &target) {
                     builder.push(owner, &target, relationship)?;
                 }
             }
@@ -1659,6 +1595,7 @@ impl FormControlCollection {
             .ok_or_else(|| owner_invalid("package read-set byte count overflow"))?;
         if retained > limits.max_read_set_bytes {
             return Err(owner_limit(
+                litchi_core::Resource::Memory,
                 "form-control read-set bytes",
                 retained,
                 limits.max_read_set_bytes,
@@ -1718,9 +1655,11 @@ impl FormControlCollection {
         })
     }
 
-    pub(crate) fn same_source(&self, other: &Self) -> bool {
+    /// The same owner graph, whatever source version it was read from,
+    /// except for the payloads of the parts named in `excluded`.
+    pub(crate) fn same_content_except(&self, other: &Self, excluded: &[&PackURI]) -> bool {
         match (self.read_set.as_deref(), other.read_set.as_deref()) {
-            (Some(left), Some(right)) => left.same_source(right),
+            (Some(left), Some(right)) => left.same_content_except(right, excluded),
             (None, None) => self == other,
             _ => false,
         }
@@ -1883,6 +1822,9 @@ pub enum FormControlOwnerError {
     /// A host resource ceiling was exceeded before retaining more data.
     #[error("XLSX form-control owner {resource} exceeds {maximum} (observed {observed})")]
     Limit {
+        /// The budget dimension that was exceeded at this callsite.
+        kind: litchi_core::Resource,
+        /// Stable local scope for diagnostics and audit evidence.
         resource: &'static str,
         observed: usize,
         maximum: usize,
@@ -2074,7 +2016,12 @@ impl OwnerExecution {
             .checked_add(amount)
             .ok_or_else(|| owner_invalid(format!("{resource} byte count overflow")))?;
         if observed > maximum {
-            return Err(owner_limit(resource, observed, maximum));
+            return Err(owner_limit(
+                litchi_core::Resource::Memory,
+                resource,
+                observed,
+                maximum,
+            ));
         }
         self.reserve(litchi_core::Resource::Memory, amount)?;
         match category {
@@ -2111,7 +2058,12 @@ impl OwnerExecution {
             .checked_add(amount)
             .ok_or_else(|| owner_invalid(format!("{resource} byte count overflow")))?;
         if observed > maximum {
-            return Err(owner_limit(resource, observed, maximum));
+            return Err(owner_limit(
+                litchi_core::Resource::Memory,
+                resource,
+                observed,
+                maximum,
+            ));
         }
         match category {
             OwnerMemoryCategory::Semantic => self.semantic_bytes = observed,
@@ -2191,32 +2143,65 @@ impl SourceBackedFormControlOwner {
     /// Open a deferred OPC package from a reader and retain the source-backed
     /// package for subsequent worksheet selections.
     pub fn from_reader<R: Read>(reader: R) -> OwnerResult<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_reader(reader)?)
+        Self::from_reader_with_options(reader, crate::OpenOptions::new())
+    }
+
+    /// Open a deferred OPC package from a reader under explicit XLSX
+    /// ingress and semantic policies.
+    pub fn from_reader_with_options<R: Read>(
+        reader: R,
+        options: crate::OpenOptions,
+    ) -> OwnerResult<Self> {
+        let workbook =
+            crate::SourceBackedWorkbook::from_reader_with_options(reader, options.clone())?;
+        let package = workbook
+            .try_into_source_backed_package()
+            .map_err(|_| owner_invalid("source-backed workbook package is still shared"))?;
+        Self::from_source_backed_package_with_options(package, options)
     }
 
     /// Open a deferred OPC package from a filesystem path.
     #[cfg(any(unix, windows))]
     pub fn from_path(path: impl AsRef<Path>) -> OwnerResult<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_path(path)?)
+        Self::from_path_with_options(path, crate::OpenOptions::new())
+    }
+
+    /// Open a deferred OPC package from a filesystem path under explicit XLSX
+    /// ingress and semantic policies.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_options(
+        path: impl AsRef<Path>,
+        options: crate::OpenOptions,
+    ) -> OwnerResult<Self> {
+        let workbook = crate::SourceBackedWorkbook::open_with_options(path, options.clone())?;
+        let package = workbook
+            .try_into_source_backed_package()
+            .map_err(|_| owner_invalid("source-backed workbook package is still shared"))?;
+        Self::from_source_backed_package_with_options(package, options)
     }
 
     /// Build an owner from an already opened deferred OPC package.
     pub fn from_source_backed_package(package: SourceBackedPackage) -> OwnerResult<Self> {
+        Self::from_source_backed_package_with_options(package, crate::OpenOptions::new())
+    }
+
+    /// Build an owner from an already opened deferred OPC package and apply
+    /// the form-control semantic policy carried by `options`.
+    pub fn from_source_backed_package_with_options(
+        package: SourceBackedPackage,
+        options: crate::OpenOptions,
+    ) -> OwnerResult<Self> {
         package.check_execution()?;
         if package.has_encrypted_entries() {
             return Err(FormControlOwnerError::Invalid(
                 "encrypted XLSX form-control source is not admitted".into(),
             ));
         }
-        let limits = OwnerLimits::from_read_limits(package.read_limits());
+        let limits = options
+            .semantic_limits_value()
+            .form_controls_value()
+            .unwrap_or_else(|| OwnerLimits::from_read_limits(package.read_limits()));
         Ok(Self { package, limits })
-    }
-
-    /// Set a lower host policy before selecting a worksheet.
-    #[must_use]
-    pub fn with_limits(mut self, limits: OwnerLimits) -> Self {
-        self.limits = limits;
-        self
     }
 
     /// Capture one worksheet's effective form-control collection.
@@ -2228,8 +2213,8 @@ impl SourceBackedFormControlOwner {
         let workbook = self.package.main_document_part()?;
         let workbook_data =
             source_part_data_with_limit(&workbook, self.limits.max_mce_bytes, "workbook bytes")?;
-        let catalog =
-            raw::parse_catalog(workbook_data.as_bytes()).map_err(FormControlOwnerError::Xlsx)?;
+        let catalog = raw::parse_catalog(workbook_data.as_bytes(), &self.package.read_limits())
+            .map_err(FormControlOwnerError::Xlsx)?;
         let sheet_parts = validate_sheet_graph(&self.package, &workbook, &catalog.sheets)
             .map_err(FormControlOwnerError::Xlsx)?;
         let position = resolve_sheet_position(&catalog.sheets, selector.into())?;
@@ -2442,15 +2427,6 @@ pub(crate) fn eager_form_controls_with_execution_context(
     )
 }
 
-/// Read-only host hook for an eager worksheet handle.
-pub(crate) fn eager_form_controls_for_sheet(
-    package: &OpcPackage,
-    worksheet_uri: &PackURI,
-) -> Result<FormControlCollection> {
-    eager_form_controls_for_sheet_with_limits(package, worksheet_uri, OwnerLimits::default())
-        .map_err(owner_to_xlsx)
-}
-
 pub(crate) fn eager_form_controls_for_sheet_with_limits(
     package: &OpcPackage,
     worksheet_uri: &PackURI,
@@ -2522,6 +2498,7 @@ fn effective_loaded_part(
     let relationships = part.relationships().clone();
     if relationships.len() > relationship_limit.max(1) {
         return Err(owner_limit(
+            litchi_core::Resource::Objects,
             "sidecar relationship edges",
             relationships.len(),
             relationship_limit.max(1),
@@ -2563,6 +2540,7 @@ fn effective_unreferenced_properties(
         let name = part.partname().as_str();
         if name.len() > limits.max_name_bytes {
             return Err(owner_limit(
+                litchi_core::Resource::InputBytes,
                 "unreferenced control-properties name bytes",
                 name.len(),
                 limits.max_name_bytes,
@@ -2570,6 +2548,7 @@ fn effective_unreferenced_properties(
         }
         if names.len() >= limits.max_mirror_nodes {
             return Err(owner_limit(
+                litchi_core::Resource::Objects,
                 "unreferenced control-properties inventory",
                 names.len() + 1,
                 limits.max_mirror_nodes,
@@ -2616,18 +2595,6 @@ pub(crate) fn eager_form_controls_for_sheet_with_limits_and_execution_context(
         worksheet_uri,
         limits,
         Some(execution_context),
-    )
-}
-
-/// Read-only host hook for a source-backed worksheet handle.
-pub(crate) fn source_form_controls_for_sheet(
-    package: &SourceBackedPackage,
-    worksheet_uri: &PackURI,
-) -> Result<FormControlCollection> {
-    source_form_controls_for_sheet_with_limits(
-        package,
-        worksheet_uri,
-        OwnerLimits::from_read_limits(package.read_limits()),
     )
 }
 
@@ -2757,11 +2724,12 @@ pub(crate) fn owner_to_xlsx(error: FormControlOwnerError) -> Error {
         FormControlOwnerError::Leaf(error) => Error::FormControl(error),
         FormControlOwnerError::Invalid(error) => Error::Invalid(error),
         FormControlOwnerError::Limit {
+            kind,
             resource,
             observed,
             maximum,
         } => Error::ResourceLimit(litchi_core::ResourceLimit {
-            resource: owner_resource(resource),
+            resource: kind,
             observed: u64::try_from(observed).unwrap_or(u64::MAX),
             limit: u64::try_from(maximum).unwrap_or(u64::MAX),
             scope: Arc::from(format!("form-control owner {resource}")),
@@ -2769,44 +2737,6 @@ pub(crate) fn owner_to_xlsx(error: FormControlOwnerError) -> Error {
         FormControlOwnerError::Allocation { resource, source } => {
             Error::Allocation { resource, source }
         },
-    }
-}
-
-fn owner_resource(resource: &str) -> litchi_core::Resource {
-    if resource.contains("projection")
-        || resource.contains("semantic")
-        || resource.contains("read-set")
-        || resource.contains("read set")
-        || resource.contains("sidecar target")
-        || resource.contains("MCE range capacity")
-        || resource.contains("MCE alias")
-    {
-        litchi_core::Resource::Memory
-    } else if resource.contains("output") || resource.contains("selected provenance") {
-        litchi_core::Resource::OutputBytes
-    } else if resource.contains("input")
-        || resource.contains("raw provenance")
-        || resource.contains("ignored provenance")
-        || resource.contains("bytes")
-    {
-        litchi_core::Resource::InputBytes
-    } else if resource.contains("event") {
-        litchi_core::Resource::Work
-    } else if resource.contains("depth") {
-        litchi_core::Resource::Depth
-    } else if resource.contains("edge")
-        || resource.contains("control")
-        || resource.contains("shape")
-        || resource.contains("node")
-        || resource.contains("item")
-        || resource.contains("branch")
-        || resource.contains("wrapper")
-        || resource.contains("inventory")
-        || resource.contains("diagnostic")
-    {
-        litchi_core::Resource::Objects
-    } else {
-        litchi_core::Resource::Memory
     }
 }
 
@@ -2914,7 +2844,12 @@ fn source_loaded_part(
     relationship_payload: Option<RetainedPayload>,
 ) -> OwnerResult<LoadedPart> {
     if data.as_bytes().len() > maximum {
-        return Err(owner_limit(resource, data.as_bytes().len(), maximum));
+        return Err(owner_limit(
+            litchi_core::Resource::InputBytes,
+            resource,
+            data.as_bytes().len(),
+            maximum,
+        ));
     }
     Ok(LoadedPart {
         part_name,
@@ -2943,6 +2878,7 @@ fn source_part_data_with_limit(
     let maximum_u64 = u64::try_from(maximum).unwrap_or(u64::MAX);
     if declared > maximum_u64 {
         return Err(owner_limit(
+            litchi_core::Resource::InputBytes,
             resource,
             usize::try_from(declared).unwrap_or(usize::MAX),
             maximum,
@@ -2950,7 +2886,12 @@ fn source_part_data_with_limit(
     }
     let data = part.data()?;
     if data.as_bytes().len() > maximum {
-        return Err(owner_limit(resource, data.as_bytes().len(), maximum));
+        return Err(owner_limit(
+            litchi_core::Resource::InputBytes,
+            resource,
+            data.as_bytes().len(),
+            maximum,
+        ));
     }
     Ok(data)
 }
@@ -2962,11 +2903,12 @@ fn source_content_types_data_with_limit(
     let caller_maximum = u64::try_from(maximum).unwrap_or(u64::MAX);
     match package.content_types_data_with_limit(maximum) {
         Ok(data) => Ok(data),
-        Err(litchi_opc::OpcError::ReadLimit {
-            resource: ReadResource::ContentTypesBytes,
-            actual,
+        Err(litchi_opc::OpcError::Limit {
+            kind: SourceLimitKind::ContentTypesBytes,
+            observed: actual,
             maximum: observed_maximum,
         }) if observed_maximum == caller_maximum => Err(owner_limit(
+            litchi_core::Resource::InputBytes,
             "MCE input bytes",
             usize::try_from(actual).unwrap_or(usize::MAX),
             maximum,
@@ -2992,7 +2934,12 @@ fn fingerprint_relationships(
     }
     if let Some(raw) = raw {
         if raw.len() > maximum {
-            return Err(owner_limit(resource, raw.len(), maximum));
+            return Err(owner_limit(
+                litchi_core::Resource::InputBytes,
+                resource,
+                raw.len(),
+                maximum,
+            ));
         }
         return Ok(RelationshipFingerprint {
             present: true,
@@ -3021,7 +2968,12 @@ fn fingerprint_relationships(
             .checked_add(edge_bytes)
             .ok_or_else(|| owner_invalid("relationship fingerprint byte count overflow"))?;
         if bytes > maximum {
-            return Err(owner_limit(resource, bytes, maximum));
+            return Err(owner_limit(
+                litchi_core::Resource::InputBytes,
+                resource,
+                bytes,
+                maximum,
+            ));
         }
         digest = fnv_bytes(digest, relationship.r_id().as_bytes());
         digest = fnv_bytes(digest, relationship.reltype().as_bytes());
@@ -3052,17 +3004,23 @@ fn eager_relationship_payload(
 ) -> OwnerResult<(bool, Option<RetainedPayload>)> {
     if relationships.len() > edge_limit {
         return Err(owner_limit(
+            litchi_core::Resource::Objects,
             "relationship edges",
             relationships.len(),
             edge_limit,
         ));
     }
     let package_limits = package.read_limits();
-    let plan = package.plan_source_relationships_with_limits(owner, package_limits)?;
+    let plan = package.plan_source_relationships(owner, package_limits)?;
     if plan.final_len() > maximum {
-        return Err(owner_limit(resource, plan.final_len(), maximum));
+        return Err(owner_limit(
+            litchi_core::Resource::InputBytes,
+            resource,
+            plan.final_len(),
+            maximum,
+        ));
     }
-    let token = package.source_relationships_with_limits(owner, package_limits)?;
+    let token = package.source_relationships(owner, package_limits)?;
     let present = token.member_present();
     let payload = present.then(|| RetainedPayload::relationships(token));
     Ok((present, payload))
@@ -3078,6 +3036,7 @@ fn source_relationship_payload(
 ) -> OwnerResult<(bool, Option<RetainedPayload>)> {
     if relationships.len() > edge_limit {
         return Err(owner_limit(
+            litchi_core::Resource::Objects,
             "relationship edges",
             relationships.len(),
             edge_limit,
@@ -3088,7 +3047,12 @@ fn source_relationship_payload(
         return Ok((false, None));
     };
     if data.as_bytes().len() > maximum {
-        return Err(owner_limit(resource, data.as_bytes().len(), maximum));
+        return Err(owner_limit(
+            litchi_core::Resource::InputBytes,
+            resource,
+            data.as_bytes().len(),
+            maximum,
+        ));
     }
     Ok((true, Some(RetainedPayload::source(data))))
 }
@@ -3174,6 +3138,7 @@ fn preflight_minimum_mirror_nodes(
             .any(|relationship| relationship.reltype() == CONTROL_PROPERTIES_RELATIONSHIP_TYPE)
     {
         return Err(owner_limit(
+            litchi_core::Resource::Objects,
             "form-control mirror nodes",
             3,
             limits.max_mirror_nodes,
@@ -3203,6 +3168,7 @@ where
     }
     if part.relationship_graph.len() > limits.max_relationship_edges {
         return Err(owner_limit(
+            litchi_core::Resource::Objects,
             "sidecar relationship edges",
             part.relationship_graph.len(),
             limits.max_relationship_edges,
@@ -3230,6 +3196,7 @@ where
         .ok_or_else(|| owner_invalid("sidecar target count overflow"))?;
     if projected_targets > limits.max_mirror_nodes {
         return Err(owner_limit(
+            litchi_core::Resource::Objects,
             "sidecar target nodes",
             projected_targets,
             limits.max_mirror_nodes,
@@ -3240,6 +3207,7 @@ where
         .ok_or_else(|| owner_invalid("form-control relationship edge count overflow"))?;
     if *graph_edges > limits.max_relationship_edges {
         return Err(owner_limit(
+            litchi_core::Resource::Objects,
             "relationship edges",
             *graph_edges,
             limits.max_relationship_edges,
@@ -3288,6 +3256,7 @@ where
             .ok_or_else(|| owner_invalid("sidecar target count overflow"))?;
         if projected_with_target > limits.max_mirror_nodes {
             return Err(owner_limit(
+                litchi_core::Resource::Objects,
                 "sidecar target nodes",
                 projected_with_target,
                 limits.max_mirror_nodes,
@@ -3298,6 +3267,7 @@ where
             .ok_or_else(|| owner_invalid("sidecar relationship depth overflow"))?;
         if child_depth > limits.max_mce_depth {
             return Err(owner_limit(
+                litchi_core::Resource::Depth,
                 "sidecar relationship depth",
                 child_depth,
                 limits.max_mce_depth,
@@ -3317,10 +3287,15 @@ where
                     )
                 });
         if sidecar_remaining == 0 {
+            // A target read needs at least one byte of the retained sidecar
+            // budget.  The target has not been opened here, so report that
+            // minimum requirement against the actual zero-byte remainder
+            // rather than fabricating the configured ceiling plus one.
             return Err(owner_limit(
+                litchi_core::Resource::Memory,
                 "sidecar target bytes",
-                limits.max_sidecar_target_bytes.saturating_add(1),
-                limits.max_sidecar_target_bytes,
+                1,
+                sidecar_remaining,
             ));
         }
         let target_limit = limits
@@ -3493,6 +3468,7 @@ where
     validate_canonical_worksheet_root(worksheet_part.bytes(), Some(execution))?;
     if worksheet_rels.len() > limits.max_relationship_edges {
         return Err(owner_limit(
+            litchi_core::Resource::Objects,
             "worksheet relationship edges",
             worksheet_rels.len(),
             limits.max_relationship_edges,
@@ -3532,6 +3508,7 @@ where
         .ok_or_else(|| owner_invalid("form-control mirror-node count overflow"))?;
     if minimum_mirror_nodes > limits.max_mirror_nodes {
         return Err(owner_limit(
+            litchi_core::Resource::Objects,
             "form-control mirror nodes",
             minimum_mirror_nodes,
             limits.max_mirror_nodes,
@@ -3711,6 +3688,7 @@ where
         .ok_or_else(|| owner_invalid("form-control mirror-node count overflow"))?;
     if projected_drawing_nodes > limits.max_mirror_nodes {
         return Err(owner_limit(
+            litchi_core::Resource::Objects,
             "form-control mirror nodes",
             projected_drawing_nodes,
             limits.max_mirror_nodes,
@@ -3774,6 +3752,7 @@ where
         .ok_or_else(|| owner_invalid("form-control mirror-node count overflow"))?;
     if projected_mirror_nodes > limits.max_mirror_nodes {
         return Err(owner_limit(
+            litchi_core::Resource::Objects,
             "form-control mirror nodes",
             projected_mirror_nodes,
             limits.max_mirror_nodes,
@@ -3801,6 +3780,7 @@ where
         .ok_or_else(|| owner_invalid("form-control mirror-node count overflow"))?;
     if mirror_nodes > limits.max_mirror_nodes {
         return Err(owner_limit(
+            litchi_core::Resource::Objects,
             "form-control mirror nodes",
             mirror_nodes,
             limits.max_mirror_nodes,
@@ -3863,6 +3843,7 @@ where
         let position = controls.len();
         if position >= limits.max_controls {
             return Err(owner_limit(
+                litchi_core::Resource::Objects,
                 "effective controls",
                 position + 1,
                 limits.max_controls,
@@ -4124,6 +4105,7 @@ where
         .ok_or_else(|| owner_invalid("form-control mirror-node count overflow"))?;
     if final_mirror_nodes > limits.max_mirror_nodes {
         return Err(owner_limit(
+            litchi_core::Resource::Objects,
             "form-control mirror nodes",
             final_mirror_nodes,
             limits.max_mirror_nodes,
@@ -4310,6 +4292,7 @@ fn collection_diagnostics(
             {
                 if part.partname().as_str().len() > limits.max_name_bytes {
                     return Err(owner_limit(
+                        litchi_core::Resource::InputBytes,
                         "form-control diagnostic name bytes",
                         part.partname().as_str().len(),
                         limits.max_name_bytes,
@@ -4344,6 +4327,7 @@ fn collection_diagnostics(
         if !referenced.contains(partname) {
             if partname.len() > limits.max_name_bytes {
                 return Err(owner_limit(
+                    litchi_core::Resource::InputBytes,
                     "form-control diagnostic name bytes",
                     partname.len(),
                     limits.max_name_bytes,
@@ -4369,6 +4353,7 @@ fn collection_diagnostics(
     }
     if candidate_count > limits.max_mirror_nodes {
         return Err(owner_limit(
+            litchi_core::Resource::Objects,
             "form-control collection diagnostics",
             candidate_count,
             limits.max_mirror_nodes,
@@ -4427,6 +4412,7 @@ fn collection_diagnostics(
             {
                 if names.len() >= limits.max_mirror_nodes {
                     return Err(owner_limit(
+                        litchi_core::Resource::Objects,
                         "form-control collection diagnostics",
                         names.len() + 1,
                         limits.max_mirror_nodes,
@@ -4451,6 +4437,7 @@ fn collection_diagnostics(
         if !referenced.contains(partname) {
             if names.len() >= limits.max_mirror_nodes {
                 return Err(owner_limit(
+                    litchi_core::Resource::Objects,
                     "form-control collection diagnostics",
                     names.len() + 1,
                     limits.max_mirror_nodes,
@@ -4548,6 +4535,7 @@ fn eager_unreferenced_properties(
         if part.content_type() == CONTROL_PROPERTIES_CONTENT_TYPE {
             if part.partname().as_str().len() > limits.max_name_bytes {
                 return Err(owner_limit(
+                    litchi_core::Resource::InputBytes,
                     "unreferenced control-properties name bytes",
                     part.partname().as_str().len(),
                     limits.max_name_bytes,
@@ -4558,6 +4546,7 @@ fn eager_unreferenced_properties(
                 .ok_or_else(|| owner_invalid("unreferenced control-properties count overflow"))?;
             if candidate_count > limits.max_mirror_nodes {
                 return Err(owner_limit(
+                    litchi_core::Resource::Objects,
                     "unreferenced control-properties inventory",
                     candidate_count,
                     limits.max_mirror_nodes,
@@ -4619,6 +4608,7 @@ fn eager_unreferenced_properties(
         if part.content_type() == CONTROL_PROPERTIES_CONTENT_TYPE {
             if part.partname().as_str().len() > limits.max_name_bytes {
                 return Err(owner_limit(
+                    litchi_core::Resource::InputBytes,
                     "unreferenced control-properties name bytes",
                     part.partname().as_str().len(),
                     limits.max_name_bytes,
@@ -4684,6 +4674,7 @@ fn reserve_eager_inventory_memory(
         .ok_or_else(|| owner_invalid("unreferenced control-properties memory overflow"))?;
     if observed > maximum {
         return Err(owner_limit(
+            litchi_core::Resource::Memory,
             "form-control collection projection bytes",
             observed,
             maximum,
@@ -4790,6 +4781,7 @@ fn validate_namespace_bindings_and_count_events<const PRESERVE_DUPLICATE_WORK_CH
             .ok_or_else(|| owner_invalid("namespace binding event count overflow"))?;
         if events > limits.max_mce_events {
             return Err(owner_limit(
+                litchi_core::Resource::Work,
                 "namespace binding events",
                 events,
                 limits.max_mce_events,
@@ -4928,22 +4920,46 @@ fn select_mce(
 fn mce_to_owner_error(
     subject: &str,
     error: litchi_ooxml_common::mce::Error,
-    limits: &OwnerLimits,
+    _limits: &OwnerLimits,
 ) -> FormControlOwnerError {
     match error {
-        litchi_ooxml_common::mce::Error::LimitExceeded(resource) => {
-            let (resource_name, maximum) = if resource.contains("depth") {
-                ("MCE depth", limits.max_mce_depth)
-            } else if resource.contains("choice") {
-                ("MCE branches", limits.max_mce_branches)
-            } else if resource.contains("input") {
-                ("MCE input bytes", limits.max_mce_bytes)
-            } else if resource.contains("output") {
-                ("MCE output bytes", limits.max_mce_bytes)
-            } else {
-                ("MCE branches", limits.max_mce_branches)
+        error @ litchi_ooxml_common::mce::Error::InvalidLimit { .. } => {
+            FormControlOwnerError::Xlsx(Error::MarkupCompatibility(error))
+        },
+        error @ litchi_ooxml_common::mce::Error::LimitExceeded {
+            kind,
+            observed,
+            maximum,
+        } => {
+            let (resource, scope) = match kind {
+                litchi_ooxml_common::mce::LimitKind::InputBytes
+                | litchi_ooxml_common::mce::LimitKind::SourceBytes => {
+                    (litchi_core::Resource::InputBytes, "MCE input bytes")
+                },
+                litchi_ooxml_common::mce::LimitKind::OutputBytes
+                | litchi_ooxml_common::mce::LimitKind::MarkedBytes => {
+                    (litchi_core::Resource::OutputBytes, "MCE output bytes")
+                },
+                litchi_ooxml_common::mce::LimitKind::Depth => {
+                    (litchi_core::Resource::Depth, "MCE depth")
+                },
+                litchi_ooxml_common::mce::LimitKind::Choices
+                | litchi_ooxml_common::mce::LimitKind::Branches => {
+                    // OwnerLimits::max_mce_branches is the configured bound
+                    // for both alternate choices and the retained branch
+                    // ranges.  The host's Objects dimension is the exact
+                    // budget used by the owner for this bounded graph.
+                    (litchi_core::Resource::Objects, "MCE branches")
+                },
+                // The owner resource vocabulary has no exact dimensions for
+                // event/name/attribute/context/branch counters. Preserve the
+                // typed MCE error so the facade can classify it without
+                // silently turning one counter into another resource.
+                _ => {
+                    return FormControlOwnerError::Xlsx(Error::MarkupCompatibility(error));
+                },
             };
-            owner_limit(resource_name, maximum.saturating_add(1), maximum)
+            owner_limit(resource, scope, observed, maximum)
         },
         litchi_ooxml_common::mce::Error::Allocation { resource, source } => {
             owner_alloc(resource, source)
@@ -4996,6 +5012,7 @@ fn mce_selection(
         .ok_or_else(|| owner_invalid("MCE retained provenance byte count overflow"))?;
     if retained_len > limits.max_mce_bytes {
         return Err(owner_limit(
+            litchi_core::Resource::Memory,
             "MCE retained provenance",
             retained_len,
             limits.max_mce_bytes,
@@ -5165,6 +5182,7 @@ fn mce_branch_ranges(
             .ok_or_else(|| owner_invalid("MCE provenance event count overflow"))?;
         if events > limits.max_mce_events {
             return Err(owner_limit(
+                litchi_core::Resource::Work,
                 "MCE provenance events",
                 events,
                 limits.max_mce_events,
@@ -5189,6 +5207,7 @@ fn mce_branch_ranges(
                     if namespace.as_slice() == MCE && local.as_slice() == b"AlternateContent" {
                         if alternates.len() >= limits.max_mce_branches {
                             return Err(owner_limit(
+                                litchi_core::Resource::Objects,
                                 "MCE provenance wrappers",
                                 alternates.len() + 1,
                                 limits.max_mce_branches,
@@ -5255,6 +5274,7 @@ fn mce_branch_ranges(
                             })?;
                         if parent.branches.len() >= limits.max_mce_branches {
                             return Err(owner_limit(
+                                litchi_core::Resource::Objects,
                                 "MCE provenance branches",
                                 parent.branches.len() + 1,
                                 limits.max_mce_branches,
@@ -5279,6 +5299,7 @@ fn mce_branch_ranges(
                 };
                 if elements.len() >= limits.max_mce_depth {
                     return Err(owner_limit(
+                        litchi_core::Resource::Depth,
                         "MCE provenance depth",
                         elements.len() + 1,
                         limits.max_mce_depth,
@@ -5329,6 +5350,7 @@ fn mce_branch_ranges(
                         };
                         if parent.branches.len() >= limits.max_mce_branches {
                             return Err(owner_limit(
+                                litchi_core::Resource::Objects,
                                 "MCE provenance branches",
                                 parent.branches.len() + 1,
                                 limits.max_mce_branches,
@@ -5633,6 +5655,7 @@ fn validate_drawing_anchors(
             .ok_or_else(|| owner_invalid("drawing anchor event count overflow"))?;
         if events > limits.max_mce_events {
             return Err(owner_limit(
+                litchi_core::Resource::Work,
                 "drawing anchor events",
                 events,
                 limits.max_mce_events,
@@ -5668,6 +5691,7 @@ fn validate_drawing_anchors(
                     }
                     if anchors.len() >= limits.max_shapes {
                         return Err(owner_limit(
+                            litchi_core::Resource::Objects,
                             "DrawingML anchor identities",
                             anchors.len() + 1,
                             limits.max_shapes,
@@ -5721,6 +5745,7 @@ fn validate_drawing_anchors(
                 }
                 if stack.len() >= limits.max_mce_depth {
                     return Err(owner_limit(
+                        litchi_core::Resource::Depth,
                         "drawing anchor depth",
                         stack.len() + 1,
                         limits.max_mce_depth,
@@ -5952,6 +5977,7 @@ fn parse_worksheet(
             .ok_or_else(|| owner_invalid("worksheet event count overflow"))?;
         if events > limits.max_mce_events {
             return Err(owner_limit(
+                litchi_core::Resource::Work,
                 "worksheet XML events",
                 events,
                 limits.max_mce_events,
@@ -6095,6 +6121,7 @@ fn parse_worksheet(
                 }
                 if stack.len() >= limits.max_mce_depth {
                     return Err(owner_limit(
+                        litchi_core::Resource::Depth,
                         "worksheet XML depth",
                         stack.len() + 1,
                         limits.max_mce_depth,
@@ -6136,6 +6163,7 @@ fn parse_worksheet(
                             Some("worksheet control has no LoSmlAnchorV1 controlPr anchor".into());
                         if controls.len() >= limits.max_controls {
                             return Err(owner_limit(
+                                litchi_core::Resource::Objects,
                                 "effective controls",
                                 controls.len() + 1,
                                 limits.max_controls,
@@ -6258,6 +6286,7 @@ fn parse_worksheet(
                     }
                     if controls.len() >= limits.max_controls {
                         return Err(owner_limit(
+                            litchi_core::Resource::Objects,
                             "effective controls",
                             controls.len() + 1,
                             limits.max_controls,
@@ -6289,6 +6318,7 @@ fn parse_worksheet(
     }
     if controls.len() > limits.max_controls {
         return Err(owner_limit(
+            litchi_core::Resource::Objects,
             "effective controls",
             controls.len(),
             limits.max_controls,
@@ -6355,6 +6385,7 @@ fn validate_losml_anchor_values(
             .ok_or_else(|| owner_invalid("worksheet anchor event count overflow"))?;
         if events > limits.max_mce_events {
             return Err(owner_limit(
+                litchi_core::Resource::Work,
                 "worksheet anchor events",
                 events,
                 limits.max_mce_events,
@@ -6427,6 +6458,7 @@ fn validate_losml_anchor_values(
                 }
                 if stack.len() >= limits.max_mce_depth {
                     return Err(owner_limit(
+                        litchi_core::Resource::Depth,
                         "worksheet anchor depth",
                         stack.len() + 1,
                         limits.max_mce_depth,
@@ -6447,6 +6479,7 @@ fn validate_losml_anchor_values(
                     }
                     if validations.len() >= limits.max_controls {
                         return Err(owner_limit(
+                            litchi_core::Resource::Objects,
                             "worksheet anchor validations",
                             validations.len() + 1,
                             limits.max_controls,
@@ -6550,6 +6583,7 @@ fn validate_losml_anchor_values(
                         })?;
                         if validations.len() >= limits.max_controls {
                             return Err(owner_limit(
+                                litchi_core::Resource::Objects,
                                 "worksheet anchor validations",
                                 validations.len() + 1,
                                 limits.max_controls,
@@ -6833,6 +6867,7 @@ fn preflight_shape_nodes(
             .ok_or_else(|| owner_invalid("shape preflight event count overflow"))?;
         if events > limits.max_mce_events {
             return Err(owner_limit(
+                litchi_core::Resource::Work,
                 "shape preflight events",
                 events,
                 limits.max_mce_events,
@@ -6850,7 +6885,12 @@ fn preflight_shape_nodes(
                         .checked_add(1)
                         .ok_or_else(|| owner_invalid("shape identity count overflow"))?;
                     if count > maximum {
-                        return Err(owner_limit(resource, count, maximum));
+                        return Err(owner_limit(
+                            litchi_core::Resource::Objects,
+                            resource,
+                            count,
+                            maximum,
+                        ));
                     }
                 }
             },
@@ -6890,6 +6930,7 @@ fn preflight_form_control_nodes(
             .ok_or_else(|| owner_invalid("form-control census event count overflow"))?;
         if events > limits.max_mce_events {
             return Err(owner_limit(
+                litchi_core::Resource::Work,
                 "form-control census events",
                 events,
                 limits.max_mce_events,
@@ -6925,6 +6966,7 @@ fn preflight_form_control_nodes(
                         .ok_or_else(|| owner_invalid("form-control census count overflow"))?;
                     if count > limits.max_controls {
                         return Err(owner_limit(
+                            litchi_core::Resource::Objects,
                             "effective controls",
                             count,
                             limits.max_controls,
@@ -7000,6 +7042,7 @@ fn parse_drawing(
             .ok_or_else(|| owner_invalid("drawing XML event count overflow"))?;
         if events > limits.max_mce_events {
             return Err(owner_limit(
+                litchi_core::Resource::Work,
                 "drawing XML events",
                 events,
                 limits.max_mce_events,
@@ -7044,6 +7087,7 @@ fn parse_drawing(
                     if !has_shape {
                         if stack.len() >= limits.max_mce_depth {
                             return Err(owner_limit(
+                                litchi_core::Resource::Depth,
                                 "drawing XML depth",
                                 stack.len() + 1,
                                 limits.max_mce_depth,
@@ -7070,6 +7114,7 @@ fn parse_drawing(
                     }
                     if shapes.len() >= limits.max_shapes {
                         return Err(owner_limit(
+                            litchi_core::Resource::Objects,
                             "shape identities",
                             shapes.len() + 1,
                             limits.max_shapes,
@@ -7086,6 +7131,7 @@ fn parse_drawing(
                     )?);
                     if shapes.len() > limits.max_shapes {
                         return Err(owner_limit(
+                            litchi_core::Resource::Objects,
                             "shape identities",
                             shapes.len(),
                             limits.max_shapes,
@@ -7118,6 +7164,7 @@ fn parse_drawing(
                 }
                 if stack.len() >= limits.max_mce_depth {
                     return Err(owner_limit(
+                        litchi_core::Resource::Depth,
                         "drawing XML depth",
                         stack.len() + 1,
                         limits.max_mce_depth,
@@ -7165,6 +7212,7 @@ fn parse_drawing(
                     }
                     if shapes.len() >= limits.max_shapes {
                         return Err(owner_limit(
+                            litchi_core::Resource::Objects,
                             "shape identities",
                             shapes.len() + 1,
                             limits.max_shapes,
@@ -7178,6 +7226,7 @@ fn parse_drawing(
                     shape_cnvpr_seen = true;
                     if shapes.len() > limits.max_shapes {
                         return Err(owner_limit(
+                            litchi_core::Resource::Objects,
                             "shape identities",
                             shapes.len(),
                             limits.max_shapes,
@@ -7369,6 +7418,7 @@ fn validate_unique_vml_attributes(
             .ok_or_else(|| owner_invalid("VML attribute count overflow"))?;
         if count > super::MAX_ATTRIBUTES {
             return Err(owner_limit(
+                litchi_core::Resource::Objects,
                 "VML attribute count",
                 count,
                 super::MAX_ATTRIBUTES,
@@ -7383,6 +7433,7 @@ fn validate_unique_vml_attributes(
             .ok_or_else(|| owner_invalid("VML attribute identity length overflow"))?;
         if key_len > limits.max_name_bytes {
             return Err(owner_limit(
+                litchi_core::Resource::InputBytes,
                 "VML attribute identity",
                 key_len,
                 limits.max_name_bytes,
@@ -7427,7 +7478,12 @@ fn parse_vml(
             .checked_add(1)
             .ok_or_else(|| owner_invalid("VML XML event count overflow"))?;
         if events > limits.max_mce_events {
-            return Err(owner_limit("VML XML events", events, limits.max_mce_events));
+            return Err(owner_limit(
+                litchi_core::Resource::Work,
+                "VML XML events",
+                events,
+                limits.max_mce_events,
+            ));
         }
         let event = reader
             .read_event()
@@ -7463,6 +7519,7 @@ fn parse_vml(
                     }
                     if shapes.len() >= limits.max_shapes {
                         return Err(owner_limit(
+                            litchi_core::Resource::Objects,
                             "VML shape identities",
                             shapes.len() + 1,
                             limits.max_shapes,
@@ -7518,6 +7575,7 @@ fn parse_vml(
                 }
                 if stack.len() >= limits.max_mce_depth {
                     return Err(owner_limit(
+                        litchi_core::Resource::Depth,
                         "VML XML depth",
                         stack.len() + 1,
                         limits.max_mce_depth,
@@ -7571,6 +7629,7 @@ fn parse_vml(
                     }
                     if shapes.len() >= limits.max_shapes {
                         return Err(owner_limit(
+                            litchi_core::Resource::Objects,
                             "VML shape identities",
                             shapes.len() + 1,
                             limits.max_shapes,
@@ -7611,6 +7670,7 @@ fn parse_vml(
                         if let Some((shape, _)) = current.take() {
                             if shapes.len() >= limits.max_shapes {
                                 return Err(owner_limit(
+                                    litchi_core::Resource::Objects,
                                     "VML shape identities",
                                     shapes.len() + 1,
                                     limits.max_shapes,
@@ -7654,6 +7714,7 @@ fn parse_vml(
         }
         if shapes.len() > limits.max_shapes {
             return Err(owner_limit(
+                litchi_core::Resource::Objects,
                 "VML shape identities",
                 shapes.len(),
                 limits.max_shapes,
@@ -7707,6 +7768,7 @@ fn parse_vml_client_fields(
             .ok_or_else(|| owner_invalid("VML ClientData event count overflow"))?;
         if events > limits.max_mce_events {
             return Err(owner_limit(
+                litchi_core::Resource::Work,
                 "VML ClientData events",
                 events,
                 limits.max_mce_events,
@@ -7747,6 +7809,7 @@ fn parse_vml_client_fields(
                     }
                     if fields_by_shape.len() >= limits.max_shapes {
                         return Err(owner_limit(
+                            litchi_core::Resource::Objects,
                             "VML ClientData shapes",
                             fields_by_shape.len() + 1,
                             limits.max_shapes,
@@ -7789,6 +7852,7 @@ fn parse_vml_client_fields(
                         .ok_or_else(|| owner_invalid("VML ClientData field count overflow"))?;
                     if field_nodes > limits.max_mirror_nodes {
                         return Err(owner_limit(
+                            litchi_core::Resource::Objects,
                             "VML ClientData fields",
                             field_nodes,
                             limits.max_mirror_nodes,
@@ -7809,6 +7873,7 @@ fn parse_vml_client_fields(
                 }
                 if stack.len() >= limits.max_mce_depth {
                     return Err(owner_limit(
+                        litchi_core::Resource::Depth,
                         "VML ClientData depth",
                         stack.len() + 1,
                         limits.max_mce_depth,
@@ -7842,6 +7907,7 @@ fn parse_vml_client_fields(
                     }
                     if fields_by_shape.len() >= limits.max_shapes {
                         return Err(owner_limit(
+                            litchi_core::Resource::Objects,
                             "VML ClientData shapes",
                             fields_by_shape.len() + 1,
                             limits.max_shapes,
@@ -7875,6 +7941,7 @@ fn parse_vml_client_fields(
                         .ok_or_else(|| owner_invalid("VML ClientData field count overflow"))?;
                     if field_nodes > limits.max_mirror_nodes {
                         return Err(owner_limit(
+                            litchi_core::Resource::Objects,
                             "VML ClientData fields",
                             field_nodes,
                             limits.max_mirror_nodes,
@@ -7993,7 +8060,12 @@ fn append_vml_field_text(
         .checked_add(decoded.len())
         .ok_or_else(|| owner_invalid("VML ClientData field value length overflow"))?;
     if total > maximum {
-        return Err(owner_limit("VML ClientData field value", total, maximum));
+        return Err(owner_limit(
+            litchi_core::Resource::InputBytes,
+            "VML ClientData field value",
+            total,
+            maximum,
+        ));
     }
     target
         .value
@@ -8025,6 +8097,7 @@ impl<'a> DiagnosticBuffer<'a> {
     ) -> OwnerResult<()> {
         if self.diagnostics.len() >= self.limits.max_mirror_nodes {
             return Err(owner_limit(
+                litchi_core::Resource::Objects,
                 "form-control diagnostics",
                 self.diagnostics.len() + 1,
                 self.limits.max_mirror_nodes,
@@ -8987,6 +9060,7 @@ fn numeric_spid(value: &str) -> Option<u64> {
 fn decode_object_name(value: &str, limits: &OwnerLimits) -> OwnerResult<String> {
     if value.len() > limits.max_name_bytes {
         return Err(owner_limit(
+            litchi_core::Resource::InputBytes,
             "VML object identity",
             value.len(),
             limits.max_name_bytes,
@@ -9079,6 +9153,7 @@ fn push_bounded_object_name(
         .ok_or_else(|| owner_invalid("VML object identity length overflow"))?;
     if bytes > limits.max_name_bytes {
         return Err(owner_limit(
+            litchi_core::Resource::InputBytes,
             "VML object identity",
             bytes,
             limits.max_name_bytes,
@@ -9090,6 +9165,7 @@ fn push_bounded_object_name(
         .ok_or_else(|| owner_invalid("VML object identity character count overflow"))?;
     if total > MAX_AUTHORED_NAME_CHARS {
         return Err(owner_limit(
+            litchi_core::Resource::InputBytes,
             "VML object identity characters",
             total,
             MAX_AUTHORED_NAME_CHARS,
@@ -9306,11 +9382,21 @@ fn decode_attribute_bounded(
     resource: &'static str,
 ) -> OwnerResult<String> {
     if value.len() > limits.max_name_bytes {
-        return Err(owner_limit(resource, value.len(), limits.max_name_bytes));
+        return Err(owner_limit(
+            litchi_core::Resource::InputBytes,
+            resource,
+            value.len(),
+            limits.max_name_bytes,
+        ));
     }
     let decoded = decode_attribute(value, decoder)?;
     if decoded.len() > limits.max_name_bytes {
-        return Err(owner_limit(resource, decoded.len(), limits.max_name_bytes));
+        return Err(owner_limit(
+            litchi_core::Resource::InputBytes,
+            resource,
+            decoded.len(),
+            limits.max_name_bytes,
+        ));
     }
     Ok(decoded)
 }
@@ -9321,7 +9407,12 @@ fn bounded_name(
     resource: &'static str,
 ) -> OwnerResult<String> {
     if value.len() > limits.max_name_bytes {
-        return Err(owner_limit(resource, value.len(), limits.max_name_bytes));
+        return Err(owner_limit(
+            litchi_core::Resource::InputBytes,
+            resource,
+            value.len(),
+            limits.max_name_bytes,
+        ));
     }
     Ok(value)
 }
@@ -9332,7 +9423,12 @@ fn bounded_local_name(
     resource: &'static str,
 ) -> OwnerResult<String> {
     if value.len() > limits.max_name_bytes {
-        return Err(owner_limit(resource, value.len(), limits.max_name_bytes));
+        return Err(owner_limit(
+            litchi_core::Resource::InputBytes,
+            resource,
+            value.len(),
+            limits.max_name_bytes,
+        ));
     }
     let mut bytes = Vec::new();
     bytes
@@ -9355,6 +9451,7 @@ fn bounded_display_name(
     let value = bounded_name(value, limits, resource)?;
     if value.chars().count() > MAX_AUTHORED_NAME_CHARS {
         return Err(owner_limit(
+            litchi_core::Resource::InputBytes,
             resource,
             value.chars().count(),
             MAX_AUTHORED_NAME_CHARS,
@@ -9392,7 +9489,12 @@ pub(crate) fn leaf_limits(limits: &OwnerLimits) -> LeafLimits {
 
 fn bounded_owned(source: &[u8], maximum: usize, resource: &'static str) -> OwnerResult<Vec<u8>> {
     if source.len() > maximum {
-        return Err(owner_limit(resource, source.len(), maximum));
+        return Err(owner_limit(
+            litchi_core::Resource::InputBytes,
+            resource,
+            source.len(),
+            maximum,
+        ));
     }
     let mut owned = Vec::new();
     owned
@@ -9405,8 +9507,14 @@ fn bounded_owned(source: &[u8], maximum: usize, resource: &'static str) -> Owner
 fn owner_invalid(message: impl Into<String>) -> FormControlOwnerError {
     FormControlOwnerError::Invalid(message.into())
 }
-fn owner_limit(resource: &'static str, observed: usize, maximum: usize) -> FormControlOwnerError {
+fn owner_limit(
+    kind: litchi_core::Resource,
+    resource: &'static str,
+    observed: usize,
+    maximum: usize,
+) -> FormControlOwnerError {
     FormControlOwnerError::Limit {
+        kind,
         resource,
         observed,
         maximum,
@@ -9586,6 +9694,7 @@ mod tests {
                 resource: "form-control collection projection bytes",
                 observed,
                 maximum,
+                ..
             } if observed > maximum && maximum == limits.max_projection_bytes
         ));
 

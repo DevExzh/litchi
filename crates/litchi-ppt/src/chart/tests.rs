@@ -181,7 +181,7 @@ fn semantic_validation_is_opt_in_without_changing_raw_inventory() {
     writer.write_to(&mut package_bytes).expect("Graph package");
 
     let package = litchi_ograph::Package::open(package_bytes.into_inner()).expect("Graph package");
-    let book = Book::open(workbook).expect("framed Graph Workbook");
+    let book = Book::open(workbook, Limits::default()).expect("framed Graph Workbook");
     let chart = Chart::Graph(Graph::new(
         Info::new(1, 1, Some("MSGraph.Chart.8".into()), None),
         Box::new(package),
@@ -189,7 +189,14 @@ fn semantic_validation_is_opt_in_without_changing_raw_inventory() {
         Compression::Uncompressed,
     ));
 
-    assert!(chart.charts().next().expect("raw chart").is_ok());
+    assert!(
+        chart
+            .charts()
+            .expect("validated chart streams")
+            .next()
+            .expect("raw chart")
+            .is_ok()
+    );
     let semantic = chart
         .semantic_chart(0)
         .expect("semantic chart validation")

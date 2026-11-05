@@ -4,6 +4,7 @@ use litchi_core::binary::{read_i16_le, read_u16_le, read_u32_le};
 
 use super::package::{Error, Result};
 use super::records::Record;
+use crate::SourceLimits;
 
 /// `PowerPoint` 9 paragraph extensions from `TextPFException9`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -596,9 +597,9 @@ impl VersionedTextMasterStyles {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(root: &Record) -> Result<Self> {
+    pub fn parse(root: &Record, limits: &SourceLimits) -> Result<Self> {
         let mut result = Self::default();
-        for record in root.versioned_binary_tag_records(9)? {
+        for record in root.versioned_binary_tag_records(9, limits)? {
             if record.record_type != crate::consts::RecordType::TextMasterStyle9Atom {
                 continue;
             }
@@ -608,7 +609,7 @@ impl VersionedTextMasterStyles {
                 record.instance,
             )?);
         }
-        for record in root.versioned_binary_tag_records(10)? {
+        for record in root.versioned_binary_tag_records(10, limits)? {
             if record.record_type != crate::consts::RecordType::TextMasterStyle10Atom {
                 continue;
             }
@@ -637,9 +638,9 @@ impl VersionedTextDefaults {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(root: &Record) -> Result<Self> {
+    pub fn parse(root: &Record, limits: &SourceLimits) -> Result<Self> {
         let mut result = Self::default();
-        for record in root.versioned_binary_tag_records(9)? {
+        for record in root.versioned_binary_tag_records(9, limits)? {
             if record.record_type != crate::consts::RecordType::TextDefaults9Atom {
                 continue;
             }
@@ -654,7 +655,7 @@ impl VersionedTextDefaults {
                 ));
             }
         }
-        for record in root.versioned_binary_tag_records(10)? {
+        for record in root.versioned_binary_tag_records(10, limits)? {
             if record.record_type != crate::consts::RecordType::TextDefaults10Atom {
                 continue;
             }
@@ -1010,17 +1011,18 @@ mod tests {
             ],
         };
 
-        let styles = VersionedTextMasterStyles::parse(&root).unwrap();
+        let limits = SourceLimits::default();
+        let styles = VersionedTextMasterStyles::parse(&root, &limits).unwrap();
         assert_eq!(styles.powerpoint9.len(), 1);
         assert_eq!(styles.powerpoint9[0].text_type, 1);
         assert_eq!(styles.powerpoint10.len(), 1);
         assert_eq!(styles.powerpoint10[0].text_type, 5);
 
-        let defaults = VersionedTextDefaults::parse(&root).unwrap();
+        let defaults = VersionedTextDefaults::parse(&root, &limits).unwrap();
         assert_eq!(defaults.powerpoint9.unwrap().paragraph.mask, 0);
         assert_eq!(defaults.powerpoint10.unwrap().character.mask, 0);
 
-        assert!(root.versioned_binary_tag_records(8).is_err());
-        assert!(root.versioned_binary_tag_records(13).is_err());
+        assert!(root.versioned_binary_tag_records(8, &limits).is_err());
+        assert!(root.versioned_binary_tag_records(13, &limits).is_err());
     }
 }

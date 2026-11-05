@@ -1,0 +1,84 @@
+{
+  "schema": "litchi.supplemental-glossary-capture-check.v2",
+  "verified_utc": "2026-10-24T18:20:53Z",
+  "source": {
+    "root": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source",
+    "commit": "472b6705475b073e7fe08f6e11ee17fb1e29f838",
+    "clean": true
+  },
+  "scope": "supplemental checks of registered glossary rules against fresh all-feature rustdoc JSON; no Cargo or new rustdoc",
+  "minimal_feature_claim": false,
+  "profile_count": 59,
+  "passed": 58,
+  "failed": 1,
+  "artifacts": [
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-glossary-472b670547-20261024-1819/results.tsv",
+      "bytes": 56118,
+      "sha256": "8f1ede1b07946716ec2a2c1d7f24dbe6fd8f0043d3381853dd0a0df1ca091f60"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-glossary-472b670547-20261024-1819/profiles.tsv",
+      "bytes": 1387,
+      "sha256": "c7b5ff9265ed5bfde1bb0cb4caf7a04b39069df0fb1a643e217db8659a50fb3a"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-glossary-472b670547-20261024-1819/provenance.txt",
+      "bytes": 1007,
+      "sha256": "9266ae2171b8964eb17c1a03347750147c7e2ca6a29793a4c8bcdcec5de07718"
+    }
+  ],
+  "policy": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source/tools/api_glossary.json",
+    "sha256": "ccd0b4abe58d2d6eb46a54269bfaccd5cf24e27128166c3605c9e6016dd79887",
+    "checker": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source/tools/check_api_glossary.py",
+    "checker_sha256": "7f36d39ada53f95ac457237f7d9d77eab4c2f93ea7c714a79ad438c7c7436e48",
+    "return_types": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source/tools/rustdoc_return_types.py",
+    "return_types_sha256": "b80ed488e77e89753b9cc8d0ea54c47304854f3f681c47ab90cffb198a59f3d3"
+  },
+  "execution": {
+    "environment_unset": [
+      "LITCHI_CAPPED",
+      "LITCHI_BLESS"
+    ],
+    "command_template": "env -u LITCHI_CAPPED -u LITCHI_BLESS /usr/bin/python3 $SOURCE/tools/check_api_glossary.py --policy $SOURCE/tools/api_glossary.json --profile PROFILE --json $CAPTURE_OUTPUT/inventory/JSON",
+    "log_files": 177,
+    "empty_stderr_logs": 58,
+    "nonempty_stderr_logs": 1
+  },
+  "failed_profile": {
+    "profile": "keynote-minimal",
+    "package": "litchi-keynote",
+    "json": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/output/inventory/litchi_keynote.json",
+    "json_sha256": "e8ed4051746c8919364113b867e376b7afc943c7511f25a01d66c57c8e0f9aa2",
+    "exit": 1,
+    "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS /usr/bin/python3 /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source/tools/check_api_glossary.py --policy /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source/tools/api_glossary.json --profile keynote-minimal --json /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/output/inventory/litchi_keynote.json",
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_path": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-glossary-472b670547-20261024-1819/logs/keynote-minimal.stderr.log",
+    "stderr_sha256": "705a2c10ab4737f02241d28900a748f509802b748bce2308e6d2fc9b52273713",
+    "finding": "litchi_keynote::__invalidate_slide_preview exposes banned name Limits; use checked SourceLimits, SemanticLimits and OpenOptions (ADR 0034 \u00a75, record 0298)",
+    "classification": "known internal-iwork-source feature/profile mismatch; keynote-full passes; no source or policy waiver"
+  },
+  "superseded_diagnostic_attempt": {
+    "root": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-glossary-472b670547-20261024-181815",
+    "results_tsv": {
+      "bytes": 49746,
+      "sha256": "583052f2267ff994f5942bcc5bfa81f05b512f77e7a428b6241dd49d20559afb"
+    },
+    "provenance_txt": {
+      "bytes": 1007,
+      "sha256": "b16df4af7f10be7b65fb56eac28a4223647eda91c6d372709fbde16128fcef16"
+    },
+    "profiles_tsv_sha256": "c7b5ff9265ed5bfde1bb0cb4caf7a04b39069df0fb1a643e217db8659a50fb3a",
+    "invocations": 59,
+    "exit_counts": {
+      "2": 59
+    },
+    "reason": "The first sweep used a path typo omitting /home/zhuhe/code/litchi-worktrees; commands failed before reading JSON.",
+    "acceptance_evidence": false
+  },
+  "limitations": [
+    "This is not a feature-specific minimal/full glossary gate; no minimal-feature result is inferred from all-feature JSON.",
+    "The keynote-minimal mismatch remains recorded and is not waived by this supplemental sweep."
+  ]
+}

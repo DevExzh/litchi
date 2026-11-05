@@ -38,7 +38,7 @@ pub(super) fn from_xml(xml: &[u8]) -> Result<Styles> {
     );
 
     let mut output = Cursor::new(Vec::new());
-    package.to_stream(&mut output).map_err(|error| {
+    package.write_to(&mut output).map_err(|error| {
         Error::InvalidFormat(format!(
             "notes-master text styles package write failed: {error}"
         ))
@@ -74,11 +74,12 @@ pub(super) fn from_bytes(data: Vec<u8>) -> Result<Styles> {
     // The package parser owns ZIP and OPC framing.  Re-open the bounded
     // package here to apply this owner’s aggregate part-size budget before the
     // bytes enter a snapshot.
-    let package = OpcPackage::from_bytes(&data).map_err(|error| {
-        Error::Corrupted(format!(
-            "{RECORD_NAME} contains an invalid OPC package: {error}"
-        ))
-    })?;
+    let package =
+        OpcPackage::from_bytes(&data, litchi_opc::SourceLimits::default()).map_err(|error| {
+            Error::Corrupted(format!(
+                "{RECORD_NAME} contains an invalid OPC package: {error}"
+            ))
+        })?;
     for part in package.try_iter_parts() {
         let part = part.map_err(|error| {
             Error::Corrupted(format!("{RECORD_NAME} part payload is unreadable: {error}"))

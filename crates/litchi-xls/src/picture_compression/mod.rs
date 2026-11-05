@@ -5,7 +5,7 @@
 //! and a retained opaque tail. A detached
 //! [`crate::picture_compression::Snapshot`] can retain unrelated BIFF records
 //! and apply typed changes through an atomic
-//! [`crate::picture_compression::Transaction`].
+//! [`crate::picture_compression::Edit`].
 
 mod codec;
 mod model;
@@ -20,4 +20,4 @@ pub const RECORD_TYPE: u16 = 0x089B;
 
 pub use codec::{parse, write};
 pub use model::{Record, Settings, Snapshot, Unknown};
-pub use transaction::{Patch, Transaction};
+pub use transaction::{Commit, Diagnostics, Edit, Patch};

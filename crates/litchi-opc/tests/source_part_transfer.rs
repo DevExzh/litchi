@@ -25,9 +25,10 @@ use litchi_core::{
     Resource, SourceVersion,
 };
 use litchi_opc::{
-    AuthorizedPrecompressedPart, OpcError, PackURI, ReadLimits, ReadResource, SourceBackedPackage,
-    SourceTopologyPlan,
+    AuthorizedPrecompressedPart, OpcError, PackURI, SourceBackedPackage, SourceLimitKind,
+    SourceLimits, SourceTopologyPlan,
 };
+use litchi_opc::{SourceCacheLimits, SourceReadPolicy};
 
 const CONTENT_TYPES_NS: &str = "http://schemas.openxmlformats.org/package/2006/content-types";
 const RELATIONSHIPS_NS: &str = "http://schemas.openxmlformats.org/package/2006/relationships";
@@ -365,7 +366,14 @@ fn managed_context_for_token(
 fn authorized_synthetic_transfer() -> (Arc<TestSource>, AuthorizedPrecompressedPart, Vec<u8>) {
     let (source_bytes, expected) = synthetic_source_bytes();
     let source = TestSource::new(source_bytes);
-    let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+    let package = SourceBackedPackage::from_read_at(
+        source.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
     let view = package.part(&pack(SOURCE_PART)).unwrap();
     let token = view
         .authorize_precompressed(Arc::new(expected.clone()))
@@ -380,10 +388,12 @@ fn authorized_managed_synthetic_transfer()
     let source = TestSource::new(source_bytes);
     let (cancel_source, cancel_token) = CancellationSource::pair();
     let (_budget, context) = managed_context_for_token(64 * 1024 * 1024, cancel_token);
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         source,
-        ReadLimits::default(),
-        context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     let view = package.part(&pack(SOURCE_PART)).unwrap();
@@ -395,7 +405,12 @@ fn authorized_managed_synthetic_transfer()
 }
 
 fn write_transfer(destination: Vec<u8>, plan: SourceTopologyPlan) -> litchi_opc::Result<Vec<u8>> {
-    let package = SourceBackedPackage::from_vec(destination)?;
+    let package = SourceBackedPackage::from_vec(
+        destination,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )?;
     let mut output = Vec::new();
     package.write_topology_to_stream(&mut output, plan)?;
     Ok(output)
@@ -434,7 +449,13 @@ fn cross_source_transfer_reuses_exact_verified_store_member() {
     assert_eq!(output_method, source_method);
     assert_eq!(output_compressed, source_compressed);
 
-    let reopened = SourceBackedPackage::from_vec(output).unwrap();
+    let reopened = SourceBackedPackage::from_vec(
+        output,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let data = reopened
         .part(&pack(DESTINATION_PART))
         .unwrap()
@@ -445,7 +466,13 @@ fn cross_source_transfer_reuses_exact_verified_store_member() {
 
 #[test]
 fn native_poi_video_image_transfer_reuses_exact_compressed_member() {
-    let source = SourceBackedPackage::from_vec(NATIVE_POI_VIDEO_PPTX.to_vec()).unwrap();
+    let source = SourceBackedPackage::from_vec(
+        NATIVE_POI_VIDEO_PPTX.to_vec(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let view = source.part(&pack(NATIVE_IMAGE_PART)).unwrap();
     let expected = view.data().unwrap().as_bytes().to_vec();
     let token = view
@@ -469,7 +496,13 @@ fn native_poi_video_image_transfer_reuses_exact_compressed_member() {
     assert_eq!(output_method, source_method);
     assert_eq!(output_compressed, source_compressed);
 
-    let reopened = SourceBackedPackage::from_vec(output).unwrap();
+    let reopened = SourceBackedPackage::from_vec(
+        output,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let data = reopened
         .part(&pack("/custom/native-image.png"))
         .unwrap()
@@ -480,7 +513,13 @@ fn native_poi_video_image_transfer_reuses_exact_compressed_member() {
 
 #[test]
 fn native_poi_slide_trailing_byte_refuses_authorized_transfer() {
-    let source = SourceBackedPackage::from_vec(NATIVE_POI_TRAILING_BYTE_PPTX.to_vec()).unwrap();
+    let source = SourceBackedPackage::from_vec(
+        NATIVE_POI_TRAILING_BYTE_PPTX.to_vec(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let view = source.part(&pack("/ppt/media/image2.jpeg")).unwrap();
     let expected = view.data().unwrap().as_bytes().to_vec();
     let error = view
@@ -501,7 +540,13 @@ fn source_revision_change_after_view_drop_refuses_before_first_sink_write() {
     add_synthetic_token(&mut plan, token).unwrap();
     let destination = synthetic_destination_bytes();
     let mut output = Vec::new();
-    let package = SourceBackedPackage::from_vec(destination).unwrap();
+    let package = SourceBackedPackage::from_vec(
+        destination,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let error = package
         .write_topology_to_stream(&mut output, plan)
         .unwrap_err();
@@ -525,7 +570,13 @@ fn source_revision_change_during_destination_sink_is_typed_and_partial() {
         source: Arc::clone(&source),
         mutated: false,
     };
-    let package = SourceBackedPackage::from_vec(synthetic_destination_bytes()).unwrap();
+    let package = SourceBackedPackage::from_vec(
+        synthetic_destination_bytes(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let error = package.write_topology_to_stream(sink, plan).unwrap_err();
 
     assert!(
@@ -581,7 +632,13 @@ fn source_cancellation_during_destination_sink_preserves_partial_prefix() {
         cancellation,
         cancelled: false,
     };
-    let package = SourceBackedPackage::from_vec(synthetic_destination_bytes()).unwrap();
+    let package = SourceBackedPackage::from_vec(
+        synthetic_destination_bytes(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let error = package.write_topology_to_stream(sink, plan).unwrap_err();
 
     let written = match error {
@@ -653,7 +710,13 @@ fn source_revision_change_after_final_sink_write_is_incomplete_with_exact_prefix
         expected_len: control_output.len(),
         mutated: Arc::clone(&mutated),
     };
-    let package = SourceBackedPackage::from_vec(synthetic_destination_bytes()).unwrap();
+    let package = SourceBackedPackage::from_vec(
+        synthetic_destination_bytes(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let error = package.write_topology_to_stream(sink, plan).unwrap_err();
 
     let written = match error {
@@ -674,7 +737,13 @@ fn source_revision_change_after_final_sink_write_is_incomplete_with_exact_prefix
 #[test]
 fn decoded_mismatch_and_corrupt_crc_are_rejected_before_publication() {
     let (source_bytes, expected) = synthetic_source_bytes();
-    let source = SourceBackedPackage::from_vec(source_bytes.clone()).unwrap();
+    let source = SourceBackedPackage::from_vec(
+        source_bytes.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let view = source.part(&pack(SOURCE_PART)).unwrap();
     let mut wrong = expected.clone();
     wrong[0] ^= 0x40;
@@ -683,7 +752,13 @@ fn decoded_mismatch_and_corrupt_crc_are_rejected_before_publication() {
     drop(source);
 
     let corrupted = corrupt_member_crc(source_bytes, "custom/source.bin");
-    let package = SourceBackedPackage::from_vec(corrupted).unwrap();
+    let package = SourceBackedPackage::from_vec(
+        corrupted,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let view = package.part(&pack(SOURCE_PART)).unwrap();
     let error = view
         .authorize_precompressed(Arc::new(expected))
@@ -697,10 +772,12 @@ fn cancellation_during_compressed_capture_returns_cancelled_without_token() {
     let (cancel_source, cancel_token) = CancellationSource::pair();
     let source = TestSource::with_cancellation(source_bytes, cancel_source.clone());
     let (_budget, context) = managed_context_for_token(64 * 1024 * 1024, cancel_token);
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         source.clone(),
-        ReadLimits::default(),
-        context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     source.cancel_on_next_read();
@@ -723,12 +800,14 @@ fn output_limit_is_checked_before_any_destination_output() {
     let destination_total =
         u64::try_from(content_types.len() + relationships.len() + b"<destination/>\n".len())
             .unwrap();
-    let limits = ReadLimits::builder()
-        .max_archive_total_bytes(destination_total)
+    let limits = SourceLimits::builder()
+        .max_aggregate_bytes(destination_total)
         .unwrap()
         .build()
         .unwrap();
-    let package = SourceBackedPackage::from_vec_with_limits(destination, limits).unwrap();
+    let package =
+        SourceBackedPackage::from_vec(destination, limits, SourceCacheLimits::default(), None)
+            .unwrap();
     let mut plan = SourceTopologyPlan::new();
     add_synthetic_token(&mut plan, token).unwrap();
     let mut output = Vec::new();
@@ -738,8 +817,8 @@ fn output_limit_is_checked_before_any_destination_output() {
 
     assert!(matches!(
         error,
-        OpcError::ReadLimit {
-            resource: ReadResource::ArchiveTotalBytes,
+        OpcError::Limit {
+            kind: SourceLimitKind::AggregateBytes,
             ..
         }
     ));
@@ -777,7 +856,13 @@ fn sequential_sink_failure_reports_incomplete_output_after_partial_prefix() {
         output: Arc::clone(&output),
         limit: 8,
     };
-    let package = SourceBackedPackage::from_vec(synthetic_destination_bytes()).unwrap();
+    let package = SourceBackedPackage::from_vec(
+        synthetic_destination_bytes(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let error = package.write_topology_to_stream(sink, plan).unwrap_err();
 
     let written = match error {
@@ -796,10 +881,12 @@ fn exact_managed_capture_budget_succeeds_and_one_byte_less_refuses() {
     let (source_bytes, expected) = synthetic_source_bytes();
     let source = Arc::new(litchi_core::OwnedSource::new(source_bytes.clone()));
     let (budget, _cancel_source, context) = managed_context(u64::MAX);
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         source,
-        ReadLimits::default(),
-        context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     let view = package.part(&pack(SOURCE_PART)).unwrap();
@@ -817,10 +904,12 @@ fn exact_managed_capture_budget_succeeds_and_one_byte_less_refuses() {
     assert_eq!(budget.used(Resource::Memory), 0);
 
     let (_budget, _cancel_source, exact_context) = managed_context(exact);
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(litchi_core::OwnedSource::new(source_bytes.clone())),
-        ReadLimits::default(),
-        exact_context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(exact_context),
     )
     .unwrap();
     let view = package.part(&pack(SOURCE_PART)).unwrap();
@@ -835,10 +924,12 @@ fn exact_managed_capture_budget_succeeds_and_one_byte_less_refuses() {
     drop(package);
 
     let (_budget, _cancel_source, under_context) = managed_context(exact - 1);
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(litchi_core::OwnedSource::new(source_bytes)),
-        ReadLimits::default(),
-        under_context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(under_context),
     );
     let package = match package {
         Ok(package) => package,
@@ -924,7 +1015,12 @@ fn encrypted_store_with_zero_crc_is_refused_during_admission() {
     let (source_bytes, _expected) = synthetic_source_bytes();
     let source_bytes =
         mark_encrypted_with_compatibility_crc_zero(source_bytes, "custom/source.bin");
-    let error = match SourceBackedPackage::from_vec(source_bytes) {
+    let error = match SourceBackedPackage::from_vec(
+        source_bytes,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    ) {
         Ok(_) => panic!("encrypted source must be refused during admission"),
         Err(error) => error,
     };
@@ -934,7 +1030,13 @@ fn encrypted_store_with_zero_crc_is_refused_during_admission() {
 #[test]
 fn rooted_signature_infrastructure_is_refused_before_token_or_output() {
     let source_bytes = signed_synthetic_source_bytes();
-    let source = SourceBackedPackage::from_vec(source_bytes.clone()).unwrap();
+    let source = SourceBackedPackage::from_vec(
+        source_bytes.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let view = source.part(&pack(SOURCE_PART)).unwrap();
     let expected = view.data().unwrap().as_bytes().to_vec();
     let error = view
@@ -953,7 +1055,13 @@ fn rooted_signature_infrastructure_is_refused_before_token_or_output() {
         b"decoded signed-source addition".to_vec(),
     )
     .unwrap();
-    let package = SourceBackedPackage::from_vec(source_bytes).unwrap();
+    let package = SourceBackedPackage::from_vec(
+        source_bytes,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let mut output = Vec::new();
     let error = package
         .write_topology_to_stream(&mut output, plan)
@@ -1014,7 +1122,9 @@ impl ReadAt for CaptureObservedSource {
 }
 
 fn combined_capture_fixture(payload: &[u8], deflated: bool) -> Vec<u8> {
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     writer
         .write_stored(
             "[Content_Types].xml",
@@ -1054,7 +1164,14 @@ fn combined_capture_cold_io_and_warm_cache_preserve_exact_output() {
             let mut outputs = Vec::new();
             for combined in [false, true] {
                 let source = CaptureObservedSource::new(TestSource::new(archive.clone()), 65536);
-                let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+                let package = SourceBackedPackage::from_read_at(
+                    source.clone(),
+                    SourceLimits::default(),
+                    SourceCacheLimits::default(),
+                    SourceReadPolicy::exact(),
+                    None,
+                )
+                .unwrap();
                 let view = package.part(&pack(SOURCE_PART)).unwrap();
                 let before = source.counts();
                 let (data, token) = if combined {
@@ -1086,7 +1203,13 @@ fn combined_capture_cold_io_and_warm_cache_preserve_exact_output() {
                     compressed_member(&output, "custom/transferred.bin").1,
                     compressed
                 );
-                let reopened = SourceBackedPackage::from_vec(output.clone()).unwrap();
+                let reopened = SourceBackedPackage::from_vec(
+                    output.clone(),
+                    SourceLimits::default(),
+                    SourceCacheLimits::default(),
+                    None,
+                )
+                .unwrap();
                 assert_eq!(
                     reopened
                         .part(&pack(DESTINATION_PART))
@@ -1126,10 +1249,12 @@ fn combined_capture_cold_io_and_warm_cache_preserve_exact_output() {
 fn combined_capture_pins_decoded_budget_after_package_and_data_drop() {
     let (source_bytes, expected) = synthetic_source_bytes();
     let (budget, _cancel, context) = managed_context(65536);
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         TestSource::new(source_bytes),
-        ReadLimits::default(),
-        context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     let work = budget.used(Resource::Work);
@@ -1174,10 +1299,12 @@ fn combined_capture_exact_budget_and_one_under_are_transactional() {
     for under in [false, true] {
         let (budget, _cancel, context) = managed_context(exact - u64::from(under));
         let source = CaptureObservedSource::new(TestSource::new(bytes.clone()), 65536);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source.clone(),
-            ReadLimits::default(),
-            context,
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let before = source.counts();
@@ -1213,14 +1340,14 @@ fn combined_capture_short_reads_bypass_and_mid_read_refusals_release_reservation
         let (budget, cancellation, context) = managed_context(65536);
         let inner = TestSource::with_cancellation(bytes.clone(), cancellation);
         let source = CaptureObservedSource::new(inner.clone(), 3);
-        let package =
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                source.clone(),
-                ReadLimits::default(),
-                litchi_opc::SourceCacheLimits::new(1, 1).unwrap(),
-                context,
-            )
-            .unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::new(1, 1).unwrap(),
+            SourceReadPolicy::exact(),
+            Some(context),
+        )
+        .unwrap();
         if fault == 1 || fault == 3 {
             inner.cancel_on_next_read();
         }
@@ -1259,10 +1386,12 @@ fn combined_capture_retains_signed_encrypted_and_corrupt_refusals() {
     ];
     for (i, bytes) in cases.into_iter().enumerate() {
         let (budget, _cancel, context) = managed_context(65536);
-        let package = match SourceBackedPackage::from_read_at_with_execution_context(
+        let package = match SourceBackedPackage::from_read_at(
             TestSource::new(bytes),
-            ReadLimits::default(),
-            context,
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         ) {
             Ok(package) => package,
             Err(error) if i == 1 => {
@@ -1296,12 +1425,14 @@ fn combined_capture_retains_signed_encrypted_and_corrupt_refusals() {
 #[test]
 fn combined_native_image_capture_preserves_compressed_member_after_source_drop() {
     let (budget, _cancel, context) = managed_context(64 * 1024 * 1024);
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(litchi_core::OwnedSource::new(
             NATIVE_POI_VIDEO_PPTX.to_vec(),
         )),
-        ReadLimits::default(),
-        context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     let (data, token) = package
@@ -1325,7 +1456,13 @@ fn combined_native_image_capture_preserves_compressed_member_after_source_drop()
         compressed_member(&output, "custom/native-image.png"),
         compressed_member(NATIVE_POI_VIDEO_PPTX, "ppt/media/image1.png")
     );
-    let reopened = SourceBackedPackage::from_vec(output).unwrap();
+    let reopened = SourceBackedPackage::from_vec(
+        output,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     assert_eq!(
         reopened
             .part(&pack("/custom/native-image.png"))
@@ -1344,10 +1481,12 @@ fn retained_capture_charges_each_writer_and_publishes_concurrently_without_reads
     let (bytes, expected) = synthetic_source_bytes();
     let source = CaptureObservedSource::new(TestSource::new(bytes), 65536);
     let (budget, _cancel, context) = managed_context(65536);
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         source.clone(),
-        ReadLimits::default(),
-        context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     let (data, token) = package
@@ -1402,10 +1541,12 @@ fn retained_capture_writer_budget_refusal_does_not_consume_capture() {
     let exact = 3 * expected.len() as u64 + 8192;
     let source = CaptureObservedSource::new(TestSource::new(bytes), 65536);
     let (budget, _cancel, context) = managed_context(exact);
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         source.clone(),
-        ReadLimits::default(),
-        context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     let (data, token) = package
@@ -1438,10 +1579,12 @@ fn retained_capture_rechecks_source_and_cancellation_before_writer_admission() {
         let (bytes, _) = synthetic_source_bytes();
         let source = CaptureObservedSource::new(TestSource::new(bytes), 65536);
         let (budget, cancel, context) = managed_context(65536);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source.clone(),
-            ReadLimits::default(),
-            context,
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let (data, token) = package
@@ -1477,10 +1620,12 @@ fn retained_empty_capture_keeps_metadata_charged_across_repeated_promotion() {
     let source =
         CaptureObservedSource::new(TestSource::new(combined_capture_fixture(&[], false)), 65536);
     let (budget, _cancel, context) = managed_context(3 * 4096);
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         source.clone(),
-        ReadLimits::default(),
-        context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     let (data, token) = package
@@ -1536,14 +1681,16 @@ fn retained_empty_capture_charges_long_source_metadata() {
     ]);
     let source = CaptureObservedSource::new(TestSource::new(bytes), 65536);
     let (budget, _cancel, context) = managed_context(256 * 1024);
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         source.clone(),
-        ReadLimits::builder()
+        SourceLimits::builder()
             .max_archive_member_name_bytes(32768)
             .unwrap()
             .build()
             .unwrap(),
-        context,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     let (data, token) = package

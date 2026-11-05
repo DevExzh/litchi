@@ -16,7 +16,7 @@ use litchi_odf_common::{
     package::raw_identical_members,
 };
 use litchi_ods::{
-    Cell, CellValue, CellView, FormulaChange, SourceBackedSpreadsheet, Spreadsheet,
+    Cell, CellValue, CellView, FormulaChange, Package, SourceBackedSpreadsheet, Workbook,
     worksheet::{CellChange, MAX_CELL_CHANGES},
 };
 
@@ -48,7 +48,7 @@ fn formula_content() -> String {
 }
 
 fn package(content_xml: &str, signed: bool) -> litchi_core::Result<Vec<u8>> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(constants::ODF_SPREADSHEET)?;
     writer.add_file("content.xml", content_xml.as_bytes())?;
     writer.add_file_with_media_type(
@@ -70,7 +70,7 @@ fn text(value: &str) -> Cell {
     Cell::new(CellValue::Text(value.to_string()), value)
 }
 
-fn cell_text(spreadsheet: &Spreadsheet, row: usize, column: usize) -> Option<&str> {
+fn cell_text(spreadsheet: &Workbook, row: usize, column: usize) -> Option<&str> {
     spreadsheet
         .cell("Data", row, column)
         .and_then(|cell| match cell {
@@ -84,8 +84,7 @@ fn source_cell_commit_streams_one_and_repeated_run_edits_with_exact_patch() {
     let source = package(&ordinary_content(), false).unwrap();
     let owner =
         SourceBackedSpreadsheet::from_read_at(Arc::new(OwnedSource::new(source.clone()))).unwrap();
-    let before = owner.cell_snapshot().unwrap();
-    let mut edit = before.edit().unwrap();
+    let mut edit = owner.edit_cells().unwrap();
     assert_eq!(
         edit.set_cell("Data", 0, 0, text("omega")).unwrap(),
         Some(true)
@@ -102,20 +101,43 @@ fn source_cell_commit_streams_one_and_repeated_run_edits_with_exact_patch() {
         Some(2)
     );
     let commit = edit.commit().unwrap();
-    assert!(commit.changed());
-    assert_eq!(commit.changed_cells(), 3);
-    let applied = commit.patch().apply(&before).unwrap();
-    assert_eq!(applied.content_xml(), commit.snapshot().content_xml());
-    let restored = commit.patch().inverse().apply(&applied).unwrap();
-    assert_eq!(restored.content_xml(), before.content_xml());
-    assert!(commit.patch().apply(&applied).is_err());
+    assert!(commit.diagnostics().changed());
+    assert_eq!(commit.diagnostics().changed_cells(), 3);
+    let applied = owner.apply_cells(commit.patch()).unwrap();
+    assert_eq!(
+        applied.package().content_xml().unwrap(),
+        commit.package().content_xml().unwrap()
+    );
+    let restored = applied
+        .package()
+        .apply_cells(&commit.patch().inverse())
+        .unwrap();
+    assert_eq!(
+        restored.package().content_xml().unwrap(),
+        owner.content_xml().unwrap()
+    );
+    let mut restored_bytes = Vec::new();
+    restored.package().write_to(&mut restored_bytes).unwrap();
+    assert_eq!(
+        restored_bytes, source,
+        "the inverse restores the exact archive"
+    );
+    assert!(matches!(
+        applied.package().apply_cells(commit.patch()),
+        Err(litchi_odf_common::Error::PatchConflict { .. })
+    ));
+    let foreign =
+        SourceBackedSpreadsheet::from_read_at(Arc::new(OwnedSource::new(source.clone()))).unwrap();
+    assert!(matches!(
+        foreign.apply_cells(commit.patch()),
+        Err(litchi_odf_common::Error::PatchConflict { .. })
+    ));
 
     let mut output = Vec::new();
-    let report = commit.write_to(&mut output).unwrap();
-    assert_eq!(report.changed_cells(), 3);
+    let report = commit.package().write_to(&mut output).unwrap();
     assert!(!report.is_no_op());
     assert_eq!(report.bytes(), output.len() as u64);
-    let reopened = Spreadsheet::from_bytes(output.clone()).unwrap();
+    let reopened = Package::from_bytes(&output).unwrap().workbook().unwrap();
     assert_eq!(cell_text(&reopened, 0, 0), Some("omega"));
     assert_eq!(cell_text(&reopened, 0, 1), Some("left"));
     assert_eq!(cell_text(&reopened, 0, 2), Some("same"));
@@ -145,7 +167,7 @@ fn chained_source_cell_commits_do_not_reuse_offsets_from_the_original_layout() {
     );
     let first_commit = first_edit.commit().unwrap();
 
-    let mut second_edit = first_commit.snapshot().edit().unwrap();
+    let mut second_edit = first_commit.package().edit_cells().unwrap();
     assert_eq!(
         second_edit
             .set_cell("Data", 1, 0, text("second-edit"))
@@ -154,9 +176,9 @@ fn chained_source_cell_commits_do_not_reuse_offsets_from_the_original_layout() {
     );
     let second_commit = second_edit.commit().unwrap();
     let mut output = Vec::new();
-    second_commit.write_to(&mut output).unwrap();
+    second_commit.package().write_to(&mut output).unwrap();
 
-    let reopened = Spreadsheet::from_bytes(output).unwrap();
+    let reopened = Package::from_bytes(&output).unwrap().workbook().unwrap();
     assert_eq!(cell_text(&reopened, 0, 0), Some(first_value.as_str()));
     assert_eq!(cell_text(&reopened, 1, 0), Some("second-edit"));
 }
@@ -173,13 +195,13 @@ fn changed_source_cell_commit_republishes_changed_content() {
         Some(true)
     );
     let commit = edit.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
 
     let mut output = Vec::new();
-    let report = commit.write_to(&mut output).unwrap();
+    let report = commit.package().write_to(&mut output).unwrap();
     assert!(!report.is_no_op());
 
-    let reopened = Spreadsheet::from_bytes(output).unwrap();
+    let reopened = Package::from_bytes(&output).unwrap().workbook().unwrap();
     assert_eq!(cell_text(&reopened, 0, 0), Some("omega"));
 }
 
@@ -197,7 +219,7 @@ fn source_cell_commit_preserves_standard_table_children_and_refuses_paragraph_fl
     );
     let commit = edit.commit().unwrap();
     let mut output = Vec::new();
-    commit.write_to(&mut output).unwrap();
+    commit.package().write_to(&mut output).unwrap();
     let reopened =
         SourceBackedSpreadsheet::from_read_at(Arc::new(OwnedSource::new(output))).unwrap();
     assert!(reopened.content_xml().unwrap().contains(COLUMN));
@@ -287,6 +309,7 @@ fn source_cell_edit_is_failure_atomic_and_refuses_unsafe_owners() {
         no_op
             .commit()
             .unwrap()
+            .package()
             .write_to(&mut exact)
             .unwrap()
             .is_no_op()
@@ -350,21 +373,26 @@ fn source_formula_edit_preserves_cached_cell_state_and_inverse() {
     let source = package(&formula_content(), false).unwrap();
     let owner =
         SourceBackedSpreadsheet::from_read_at(Arc::new(OwnedSource::new(source.clone()))).unwrap();
-    let before = owner.cell_snapshot().unwrap();
-    let mut edit = before.edit().unwrap();
+    let mut edit = owner.edit_cells().unwrap();
     assert_eq!(
         edit.set_formula("Data", 0, 0, "of:=7*6").unwrap(),
         Some(true)
     );
     let commit = edit.commit().unwrap();
-    assert!(commit.changed());
-    assert_eq!(commit.changed_cells(), 1);
-    let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
-    assert_eq!(restored.content_xml(), before.content_xml());
+    assert!(commit.diagnostics().changed());
+    assert_eq!(commit.diagnostics().changed_cells(), 1);
+    let restored = commit
+        .package()
+        .apply_cells(&commit.patch().inverse())
+        .unwrap();
+    assert_eq!(
+        restored.package().content_xml().unwrap(),
+        owner.content_xml().unwrap()
+    );
 
     let mut output = Vec::new();
-    commit.write_to(&mut output).unwrap();
-    let reopened = Spreadsheet::from_bytes(output.clone()).unwrap();
+    commit.package().write_to(&mut output).unwrap();
+    let reopened = Package::from_bytes(&output).unwrap().workbook().unwrap();
     let Some(CellView::Stored(cell)) = reopened.cell("Data", 0, 0) else {
         panic!("formula fixture cell");
     };
@@ -403,8 +431,8 @@ fn source_formula_batch_handles_repeated_columns_and_atomic_conflicts() {
     assert!(edit.set_formula("Data", 0, 0, "of:=3").is_err());
     let commit = edit.commit().unwrap();
     let mut output = Vec::new();
-    commit.write_to(&mut output).unwrap();
-    let reopened = Spreadsheet::from_bytes(output).unwrap();
+    commit.package().write_to(&mut output).unwrap();
+    let reopened = Package::from_bytes(&output).unwrap().workbook().unwrap();
     let Some(CellView::Stored(first)) = reopened.cell("Data", 0, 0) else {
         panic!("first formula fixture cell");
     };
@@ -447,6 +475,7 @@ fn source_formula_edit_requires_existing_formula_and_allows_exact_protected_no_o
         no_op
             .commit()
             .unwrap()
+            .package()
             .write_to(&mut exact)
             .unwrap()
             .is_no_op()
@@ -477,9 +506,12 @@ fn source_formula_batch_rejects_aggregate_payload_atomically() {
             ],
         )
         .unwrap_err();
-    assert!(matches!(error, litchi_core::Error::ResourceLimit(_)));
+    assert!(matches!(
+        error.core(),
+        Some(litchi_core::Error::ResourceLimit(_))
+    ));
     assert_eq!(edit.changed_cells(), 0);
-    assert!(edit.is_no_op());
+    assert!(edit.is_noop());
 }
 
 #[test]
@@ -496,9 +528,12 @@ fn source_formula_batch_validates_later_changes_before_mutation() {
             ],
         )
         .unwrap_err();
-    assert!(matches!(error, litchi_core::Error::InvalidFormat(_)));
+    assert!(matches!(
+        error.core(),
+        Some(litchi_core::Error::InvalidFormat(_))
+    ));
     assert_eq!(edit.changed_cells(), 0);
-    assert!(edit.is_no_op());
+    assert!(edit.is_noop());
 }
 
 #[test]
@@ -546,11 +581,11 @@ fn source_cell_commit_validates_multi_row_windows_in_order() {
         Some(true)
     );
     let commit = edit.commit().unwrap();
-    assert!(commit.changed());
-    assert_eq!(commit.changed_cells(), 2);
+    assert!(commit.diagnostics().changed());
+    assert_eq!(commit.diagnostics().changed_cells(), 2);
     let mut output = Vec::new();
-    commit.write_to(&mut output).unwrap();
-    let reopened = Spreadsheet::from_bytes(output).unwrap();
+    commit.package().write_to(&mut output).unwrap();
+    let reopened = Package::from_bytes(&output).unwrap().workbook().unwrap();
     assert_eq!(cell_text(&reopened, 0, 0), Some("one"));
     assert_eq!(cell_text(&reopened, 2, 0), Some("middle"));
     assert_eq!(cell_text(&reopened, 3, 0), Some("four"));
@@ -632,9 +667,8 @@ fn no_op_is_exact_and_changed_signed_source_is_refused_before_output() {
     );
     let commit = edit.commit().unwrap();
     let mut output = Vec::new();
-    let report = commit.write_to(&mut output).unwrap();
+    let report = commit.package().write_to(&mut output).unwrap();
     assert!(report.is_no_op());
-    assert_eq!(report.changed_cells(), 0);
     assert_eq!(output, unsigned);
 
     let signed = package(&ordinary_content(), true).unwrap();
@@ -650,6 +684,7 @@ fn no_op_is_exact_and_changed_signed_source_is_refused_before_output() {
         no_op
             .commit()
             .unwrap()
+            .package()
             .write_to(&mut exact)
             .unwrap()
             .is_no_op()
@@ -663,7 +698,7 @@ fn no_op_is_exact_and_changed_signed_source_is_refused_before_output() {
     );
     let commit = edit.commit().unwrap();
     let mut output = Vec::new();
-    let error = commit.write_to(&mut output).unwrap_err();
+    let error = commit.package().write_to(&mut output).unwrap_err();
     assert!(matches!(
         error,
         SourceContentPublicationError::Unsupported { .. }
@@ -687,10 +722,10 @@ fn source_cell_edit_accepts_the_exact_transaction_bound() {
         Some(MAX_CELL_CHANGES)
     );
     let commit = edit.commit().unwrap();
-    assert_eq!(commit.changed_cells(), MAX_CELL_CHANGES);
+    assert_eq!(commit.diagnostics().changed_cells(), MAX_CELL_CHANGES);
     let mut output = Vec::new();
-    commit.write_to(&mut output).unwrap();
-    let reopened = Spreadsheet::from_bytes(output).unwrap();
+    commit.package().write_to(&mut output).unwrap();
+    let reopened = Package::from_bytes(&output).unwrap().workbook().unwrap();
     assert_eq!(cell_text(&reopened, 0, 0), Some("new"));
     assert_eq!(cell_text(&reopened, 0, MAX_CELL_CHANGES - 1), Some("new"));
 }
@@ -705,9 +740,10 @@ fn publication_propagates_stale_limit_cancellation_and_partial_sink_state() {
     edit.set_cell("Data", 0, 0, text("omega")).unwrap();
     let commit = edit.commit().unwrap();
 
-    let replacement_limit = commit.snapshot().content_xml().len() as u64 - 1;
+    let replacement_limit = commit.package().content_xml().unwrap().len() as u64 - 1;
     let mut output = Vec::new();
     let error = commit
+        .package()
         .write_to_with_options(
             &mut output,
             SourceContentPublicationOptions::new().with_max_replacement_bytes(replacement_limit),
@@ -725,6 +761,7 @@ fn publication_propagates_stale_limit_cancellation_and_partial_sink_state() {
     let (cancellation, token) = CancellationSource::pair();
     cancellation.cancel();
     let error = commit
+        .package()
         .write_to_with_options(
             Vec::new(),
             SourceContentPublicationOptions::new().with_cancellation(token),
@@ -738,7 +775,7 @@ fn publication_propagates_stale_limit_cancellation_and_partial_sink_state() {
     ));
 
     let mut partial = PartialErrorSink::default();
-    let error = commit.write_to(&mut partial).unwrap_err();
+    let error = commit.package().write_to(&mut partial).unwrap_err();
     assert!(matches!(
         error,
         SourceContentPublicationError::Sink {
@@ -750,7 +787,7 @@ fn publication_propagates_stale_limit_cancellation_and_partial_sink_state() {
 
     source.bump();
     let mut output = Vec::new();
-    let error = commit.write_to(&mut output).unwrap_err();
+    let error = commit.package().write_to(&mut output).unwrap_err();
     assert!(matches!(
         error,
         SourceContentPublicationError::SourceChanged {
@@ -822,4 +859,49 @@ impl Write for PartialErrorSink {
     fn flush(&mut self) -> io::Result<()> {
         Ok(())
     }
+}
+
+#[test]
+fn committed_spreadsheet_reads_its_content_and_saves_it() {
+    let source = package(&ordinary_content(), false).unwrap();
+    let owner =
+        SourceBackedSpreadsheet::from_read_at(Arc::new(OwnedSource::new(source.clone()))).unwrap();
+    let mut edit = owner.edit_cells().unwrap();
+    edit.set_cell("Data", 0, 0, text("omega")).unwrap();
+    let commit = edit.commit().unwrap();
+    let committed = commit.package();
+
+    // Reads parse the committed content.xml; the source is unchanged.
+    let Some(CellView::Stored(cell)) = committed.cell("Data", 0, 0).unwrap() else {
+        panic!("edited cell")
+    };
+    assert_eq!(cell.text, "omega");
+    let Some(CellView::Stored(cell)) = owner.cell("Data", 0, 0).unwrap() else {
+        panic!("source cell")
+    };
+    assert_eq!(cell.text, "alpha");
+    assert_eq!(
+        committed.member_data("content.xml").unwrap().unwrap(),
+        committed.content_xml().unwrap().as_bytes()
+    );
+    let materialized = committed.materialize().unwrap().workbook().unwrap();
+    assert_eq!(cell_text(&materialized, 0, 0), Some("omega"));
+
+    let directory = std::env::temp_dir().join(format!(
+        "litchi-ods-source-save-{}-{}",
+        std::process::id(),
+        line!()
+    ));
+    std::fs::create_dir_all(&directory).unwrap();
+    let path = directory.join("saved.ods");
+    committed.save(&path).unwrap();
+    let mut written = Vec::new();
+    committed.write_to(&mut written).unwrap();
+    assert_eq!(std::fs::read(&path).unwrap(), written);
+    std::fs::remove_dir_all(&directory).unwrap();
+
+    // An unedited spreadsheet writes its source.
+    let mut unedited = Vec::new();
+    owner.write_to(&mut unedited).unwrap();
+    assert_eq!(unedited, source);
 }

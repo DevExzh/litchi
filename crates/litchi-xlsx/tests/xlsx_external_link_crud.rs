@@ -1,4 +1,4 @@
-use litchi_opc::{PackURI, Part};
+use litchi_opc::{PackURI, Part, SourceLimits};
 use litchi_xlsx::external_links::{
     Conformance, Dde, Link, build_external_link_part, build_external_link_part_with_conformance,
 };
@@ -17,6 +17,7 @@ fn external_link_parts_are_built_without_fetching_targets() {
     let part = build_external_link_part(
         PackURI::new("/xl/externalLinks/externalLink1.xml").unwrap(),
         &kind,
+        &SourceLimits::default(),
     )
     .unwrap();
     assert!(
@@ -33,6 +34,7 @@ fn strict_external_link_parts_keep_the_strict_namespace() {
         PackURI::new("/xl/externalLinks/externalLink1.xml").unwrap(),
         &dde("strict"),
         Conformance::Strict,
+        &SourceLimits::default(),
     )
     .unwrap();
     assert!(

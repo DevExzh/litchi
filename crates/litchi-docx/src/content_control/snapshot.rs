@@ -248,21 +248,12 @@ struct Inner {
 pub struct Snapshot(Arc<Inner>);
 
 impl Snapshot {
-    /// Parse owned XML with production resource limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation cannot be completed.
-    pub fn from_xml(source: impl Into<Vec<u8>>) -> Result<Self> {
-        Self::from_xml_with_limits(source, Limits::default())
-    }
-
     /// Parse owned XML with explicit resource limits.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn from_xml_with_limits(source: impl Into<Vec<u8>>, limits: Limits) -> Result<Self> {
+    pub fn from_xml(source: impl Into<Vec<u8>>, limits: Limits) -> Result<Self> {
         limits.validate()?;
         let source = source.into();
         if source.len() > limits.max_input_bytes {
@@ -278,7 +269,7 @@ impl Snapshot {
     }
 
     pub(crate) fn from_source(source: Source, limits: Limits) -> Result<Self> {
-        let inventory = Inventory::parse_with_limits(source.as_slice(), &limits)?;
+        let inventory = Inventory::parse(source.as_slice(), &limits)?;
         // Reads degrade a malformed sdtPr per control and record it
         // (`ContentControlDefect`). An editable snapshot must address exact
         // source properties, so it keeps refusing properties a read repaired.
@@ -369,8 +360,8 @@ impl Snapshot {
 
     /// Begin a failure-atomic exact-source edit.
     #[must_use]
-    pub fn edit(&self) -> super::Transaction {
-        super::Transaction::new(self.clone())
+    pub(crate) fn edit(&self) -> super::Draft {
+        super::Draft::new(self.clone())
     }
 }
 
@@ -435,13 +426,21 @@ fn scan(source: &[u8], limits: &Limits) -> Result<Vec<SourceOccurrence>> {
         let end = pos(&reader, origin)?;
         events = checked_add(events, 1, "content-control source event count")?;
         if events > limits.max_events {
-            return Err(invalid("content-control source event limit exceeded"));
+            return Err(Error::ContentControlLimit {
+                kind: crate::content_control::LimitKind::SourceEvent,
+                actual: events,
+                maximum: limits.max_events,
+            });
         }
         match event {
             Event::Start(element) => {
                 depth = checked_add(depth, 1, "content-control XML depth")?;
                 if depth > limits.max_depth {
-                    return Err(invalid("content-control XML depth limit exceeded"));
+                    return Err(Error::ContentControlLimit {
+                        kind: crate::content_control::LimitKind::XmlDepth,
+                        actual: depth,
+                        maximum: limits.max_depth,
+                    });
                 }
                 if is_word(&namespace) && element.local_name().as_ref() == b"sdtPr" {
                     // `active_offsets` deliberately drops comments in the XML
@@ -493,7 +492,11 @@ fn scan(source: &[u8], limits: &Limits) -> Result<Vec<SourceOccurrence>> {
             Event::Empty(element) => {
                 let child_depth = checked_add(depth, 1, "content-control XML depth")?;
                 if child_depth > limits.max_depth {
-                    return Err(invalid("content-control XML depth limit exceeded"));
+                    return Err(Error::ContentControlLimit {
+                        kind: crate::content_control::LimitKind::XmlDepth,
+                        actual: child_depth,
+                        maximum: limits.max_depth,
+                    });
                 }
                 if is_word(&namespace) && element.local_name().as_ref() == b"sdtPr" {
                     if child_depth == 1 || active.contains(&begin) {
@@ -892,7 +895,11 @@ fn push_occurrence(
     limits: &Limits,
 ) -> Result<()> {
     if occurrences.len() >= limits.max_content_controls {
-        return Err(invalid("content-control source count limit exceeded"));
+        return Err(Error::ContentControlLimit {
+            kind: crate::content_control::LimitKind::SourceCount,
+            actual: (occurrences.len()).saturating_add(1),
+            maximum: limits.max_content_controls,
+        });
     }
     occurrences
         .try_reserve(1)
@@ -926,7 +933,11 @@ fn exact_attribute(
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         attributes = checked_add(attributes, 1, "content-control attribute count")?;
         if attributes > MAX_ATTRIBUTES {
-            return Err(invalid("content-control attribute count limit exceeded"));
+            return Err(Error::ContentControlLimit {
+                kind: crate::content_control::LimitKind::AttributeCount,
+                actual: attributes,
+                maximum: MAX_ATTRIBUTES,
+            });
         }
         let (resolved, _) = resolver.resolve_attribute(attribute.key);
         if attribute.key.local_name().as_ref() == local && is_namespace(&resolved, namespace) {
@@ -964,13 +975,21 @@ fn active_offsets(source: &[u8], limits: &Limits) -> Result<HashSet<usize>> {
         let (namespace, event) = resolver.resolve_event(event);
         events = checked_add(events, 1, "content-control MCE event count")?;
         if events > limits.max_events {
-            return Err(invalid("content-control MCE event limit exceeded"));
+            return Err(Error::ContentControlLimit {
+                kind: crate::content_control::LimitKind::MceEvent,
+                actual: events,
+                maximum: limits.max_events,
+            });
         }
         match event {
             Event::Start(element) => {
                 depth = checked_add(depth, 1, "content-control MCE depth")?;
                 if depth > limits.max_depth {
-                    return Err(invalid("content-control MCE depth limit exceeded"));
+                    return Err(Error::ContentControlLimit {
+                        kind: crate::content_control::LimitKind::MceDepth,
+                        actual: depth,
+                        maximum: limits.max_depth,
+                    });
                 }
                 if is_relevant(&namespace, &element) {
                     push_offset(&mut offsets, begin, limits.max_events)?;
@@ -1047,7 +1066,11 @@ fn is_namespace(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
 
 fn push_offset(offsets: &mut Vec<u32>, offset: usize, limit: usize) -> Result<()> {
     if offsets.len() >= limit {
-        return Err(invalid("content-control MCE offset limit exceeded"));
+        return Err(Error::ContentControlLimit {
+            kind: crate::content_control::LimitKind::MceOffset,
+            actual: (offsets.len()).saturating_add(1),
+            maximum: limit,
+        });
     }
     offsets
         .try_reserve(1)

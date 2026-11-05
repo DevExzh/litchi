@@ -12,9 +12,9 @@ mod validation;
 #[cfg(test)]
 mod tests;
 
-pub use edit::{Commit, Patch, Snapshot, Transaction};
+pub use crate::error::Error;
+pub use edit::{Commit, Diagnostics, Edit, EditOptions, LimitKind, Patch, Snapshot};
 pub use litchi_ole_common::object::Limits;
-pub use package::Editor;
 pub use semantic::*;
 
 const OBJ: u16 = 0x005D;
@@ -61,8 +61,8 @@ const XL_STRING_RICH: u8 = 0x08;
 /// Size in bytes of one formatting run in a rich `XLUnicodeString`.
 const FORMATTING_RUN_SIZE: usize = 4;
 
-fn invalid(record_type: u16, message: impl Into<String>) -> crate::error::Error {
-    crate::error::Error::InvalidRecord {
+fn invalid(record_type: u16, message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type,
         message: message.into(),
     }

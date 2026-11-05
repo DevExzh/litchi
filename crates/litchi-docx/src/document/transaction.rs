@@ -2,11 +2,20 @@
 
 #[cfg(test)]
 mod attribute_tests;
+mod debug;
 mod durable;
+#[cfg(test)]
+mod element_tests;
+mod formatting;
+pub(crate) use formatting::{ChartMarkup, PictureMarkup, PictureRewrite, SmartArtMarkup};
+pub(crate) mod fields;
+#[cfg(test)]
+mod formatting_tests;
 #[cfg(test)]
 mod publication_proof_tests;
 #[cfg(test)]
 mod scan_differential_tests;
+pub(crate) mod substitute;
 
 use std::mem::size_of;
 use std::sync::Arc;
@@ -32,20 +41,42 @@ use crate::paragraph::Paragraph;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 pub(crate) use durable::durable_transfer_operations;
-pub use durable::{Composition, History, JoinError, PreparedEdit, ThreeWayError, ThreeWayPlan};
-pub use litchi_core::patch::{
-    CompositionLimits, HistoryLimits, MergeChoice, SubEditConflict, SubEditJoinFailure,
-    ThreeWayMergeFailure,
+pub use durable::{Composition, History, JoinError, Prepared, ThreeWayError, ThreeWayPlan};
+pub use formatting::{
+    BodyAnchor, BodyBlock, ElementAnchor, ElementPath, ElementStep, MAX_NEW_TABLE_DIMENSION,
+    NewCell, NewParagraph, NewRun, NewTable, RunAnchor,
 };
+use litchi_core::patch::{CompositionLimits, HistoryLimits};
+#[cfg(test)]
+use litchi_core::patch::{MergeChoice, SubEditJoinFailure};
 
 pub(crate) const MAX_DOCUMENT_XML_BYTES: usize = 32 * 1024 * 1024;
 #[cfg(test)]
 const UTF8_BYTE_ORDER_MARK: &[u8] = b"\xEF\xBB\xBF";
 const UTF8_BYTE_ORDER_MARK_TEXT: &str = "\u{feff}";
-const MAX_DOCUMENT_DEPTH: usize = 256;
-const MAX_DOCUMENT_NODES: usize = 1_000_000;
-const MAX_OPERATIONS: usize = 4_096;
-const MAX_REPLACEMENT_TEXT_BYTES: usize = 16 * 1024 * 1024;
+pub(crate) const MAX_DOCUMENT_DEPTH: usize = 256;
+pub(crate) const MAX_DOCUMENT_NODES: usize = 1_000_000;
+pub(crate) const MAX_DOCUMENT_ATTRIBUTES: usize = 256;
+pub(crate) const MAX_DOCUMENT_ATTRIBUTE_BYTES: usize = 8 * 1024 * 1024;
+/// Semantic operations one edit may stage (record 0251f raised it from
+/// 4,096 so a 10,000-paragraph fanout is one transaction; it matches the
+/// unified layer's expanded-target bound).
+pub(crate) const MAX_OPERATIONS: usize = 65_536;
+/// Runs a field-result scan visits in one paragraph.
+const MAX_FIELD_RUNS: usize = 4_096;
+/// Steps of one nested element path (content controls, tables).
+const MAX_PATH_STEPS: usize = 4_096;
+pub(crate) const MAX_REPLACEMENT_TEXT_BYTES: usize = 16 * 1024 * 1024;
+
+#[cfg(test)]
+pub(crate) fn commit_composition_for_test(composition: Composition) -> Commit {
+    let (source, operations, _artifact_fingerprint) = composition.into_parts();
+    let mut edit = source.edit();
+    for operation in operations {
+        edit.apply_operation(&operation).unwrap();
+    }
+    edit.commit().unwrap()
+}
 // The managed layout scanner owns each quick-xml event and grows bounded
 // layout indexes. `scan_text_owner` additionally retains one `TextSlot` for
 // every editable text element and copies each element's prefix/local-name
@@ -78,13 +109,15 @@ const WORD_2023_DATE_UTC_NAMESPACE: &[u8] =
     b"http://schemas.microsoft.com/office/word/2023/wordml/word16du";
 
 /// Result returned by main-document transaction operations.
-pub type TransactionResult<T> = Result<T, TransactionError>;
+pub type Result<T> = std::result::Result<T, Error>;
 
-pub(crate) fn validate_paragraph_text(position: Position, text: &str) -> TransactionResult<()> {
-    validate_authored_text(text).map_err(|reason| TransactionError::Refused {
-        position: position.get(),
-        reason,
-    })
+pub(crate) fn validate_paragraph_text(position: Position, text: &str) -> Result<()> {
+    if text.chars().any(|character| {
+        !matches!(character, '\t' | '\n' | '\u{20}'..='\u{D7FF}' | '\u{E000}'..='\u{FFFD}' | '\u{10000}'..='\u{10FFFF}')
+    }) {
+        return Err(Error::Refused { position: position.get(), reason: Refusal::StructuralText });
+    }
+    Ok(())
 }
 
 /// A typed reason why a paragraph operation cannot be represented safely.
@@ -118,6 +151,84 @@ pub enum Refusal {
     /// The requested text needs structural run elements such as `w:tab` or
     /// `w:br`, which this focused text operation does not synthesize.
     StructuralText,
+    /// A requested property value is outside the schema domain the property
+    /// readers accept (a negative size, a text scale above 600 percent, an
+    /// outline level above 9, a character XML cannot carry).
+    InvalidPropertyValue,
+    /// A requested property value has only a Transitional spelling (`left`
+    /// or `right` alignment, indentation, or tab stops, or a Transitional
+    /// text direction) and the document is Strict.
+    TransitionalValue,
+    /// The property element that has to change is written more than once,
+    /// so which occurrence a consumer honours is not proven.
+    DuplicateProperty,
+    /// The change would drop change-tracking markup (`w:ins`, `w:del`,
+    /// `w:moveFrom`, `w:moveTo`, a property-change snapshot, or a paragraph
+    /// mark revision).
+    TrackedChange,
+    /// No prefix bound to the WordprocessingML namespace is available for
+    /// the attributes the change has to write.
+    NamespaceBinding,
+    /// The paragraph carries section properties, so removing or moving it
+    /// would change the document's sections.
+    SectionBreak,
+    /// The content holds one end of a bookmark, comment, permission, move,
+    /// custom-XML or complex-field range whose other end lies outside it.
+    OpenRange,
+    /// Removing the content would orphan the comment, footnote or endnote
+    /// its reference anchors, or one side of a tracked move.
+    StoryReference,
+    /// The insertion point lies inside a complex field.
+    FieldInterior,
+    /// The body block an insertion or move is anchored to does not exist;
+    /// the error's position is the block's own position.
+    BlockNotFound,
+    /// The content holds `mc:AlternateContent` (a text box or drawing with a
+    /// fallback) with text of its own. The wrapper is one opaque object to
+    /// an edit, and readers show one branch's text as part of the content's,
+    /// so replacing the content's text would either keep that text or drop
+    /// the object (record 0307).
+    AlternateContentText,
+    /// The change names a property the operation does not write (record
+    /// 0342: a table edit writes its style and borders, a row edit its
+    /// height and flags).
+    UnmodelledProperty,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by (record
+    /// 0351 §2.4, one taxonomy across formats; record 0355a).
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::HyperlinkNotFound
+            | Self::RunNotFound
+            | Self::FieldNotFound
+            | Self::ComplexFieldNotFound
+            | Self::RevisionNotFound
+            | Self::ContentControlNotFound
+            | Self::CellNotFound
+            | Self::BlockNotFound => RefusalKind::NotFound,
+            Self::AmbiguousCompositeSelector
+            | Self::InvalidPropertyValue
+            | Self::TransitionalValue => RefusalKind::InvalidValue,
+            // The selected element is not an editable target of this route.
+            Self::SectionBreak | Self::FieldInterior => RefusalKind::UnsupportedTarget,
+            Self::UnmodelledProperty => RefusalKind::UnsupportedProperty,
+            // Content the route cannot rewrite without losing it.
+            Self::ComplexRun
+            | Self::ComplexContent
+            | Self::RevisionDependency
+            | Self::StructuralText
+            | Self::DuplicateProperty
+            | Self::TrackedChange
+            | Self::NamespaceBinding
+            | Self::OpenRange
+            | Self::StoryReference
+            | Self::AlternateContentText => RefusalKind::UnsupportedContent,
+        }
+    }
 }
 
 impl std::fmt::Display for Refusal {
@@ -139,6 +250,28 @@ impl std::fmt::Display for Refusal {
             Self::ContentControlNotFound => "direct inline content control was not found",
             Self::CellNotFound => "table cell was not found",
             Self::StructuralText => "text requires structural WordprocessingML elements",
+            Self::InvalidPropertyValue => "property value is outside its schema domain",
+            Self::TransitionalValue => {
+                "property value has only a Transitional spelling and the document is Strict"
+            },
+            Self::DuplicateProperty => "property element is written more than once",
+            Self::TrackedChange => "change would drop change-tracking markup",
+            Self::NamespaceBinding => {
+                "no prefix is bound to the WordprocessingML namespace for the new attributes"
+            },
+            Self::SectionBreak => "paragraph carries section properties",
+            Self::OpenRange => {
+                "content holds one end of a range whose other end lies outside it"
+            },
+            Self::StoryReference => {
+                "removal would orphan a comment, note, or tracked move the content anchors"
+            },
+            Self::FieldInterior => "insertion point lies inside a complex field",
+            Self::BlockNotFound => "anchor block was not found",
+            Self::AlternateContentText => {
+                "content holds markup-compatibility alternate content (a text box) with its own text"
+            },
+            Self::UnmodelledProperty => "the operation does not write the requested property",
         })
     }
 }
@@ -254,14 +387,14 @@ impl ParagraphHyperlinkAddress {
 }
 
 /// Authored text paired with one owner-scoped direct hyperlink address.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct HyperlinkTextReplacement {
     address: ParagraphHyperlinkAddress,
     text: String,
 }
 
 /// Authored text paired with one direct-body paragraph position.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct ParagraphTextReplacement {
     position: Position,
     text: String,
@@ -316,7 +449,7 @@ impl HyperlinkTextReplacement {
 /// Dependency-checked paragraph payload prepared for one exact receiving
 /// document. Package planning rewrites relationship references to dependencies
 /// already proven present in the receiver before constructing this value.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct ParagraphTransfer {
     target: Arc<Vec<u8>>,
     fragment: Arc<Vec<u8>>,
@@ -353,7 +486,7 @@ impl ParagraphTransfer {
 ///
 /// Package planning and publication own its bounded contents; callers retain
 /// it only when inspecting or replaying a native operation.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct TransferGraph {
     pub(crate) main_relationships: Arc<[TransferRelationship]>,
     pub(crate) parts: Arc<[TransferPart]>,
@@ -388,6 +521,34 @@ pub(crate) struct TransferRelationship {
     pub(crate) external: bool,
 }
 
+/// A package-graph change staged with a main-document edit (record 0251b):
+/// relationships added to the main part, new parts related from it, and
+/// exact replacements of existing parts. Applied forward, it requires every
+/// relationship and new part to be absent and every replaced part to hold its
+/// `before` bytes; applied backward, the reverse.
+#[derive(Clone, PartialEq, Eq)]
+pub struct GraphChange {
+    pub(crate) relationships: Arc<[TransferRelationship]>,
+    pub(crate) parts: Arc<[TransferPart]>,
+    pub(crate) replaced: Arc<[ReplacedPart]>,
+}
+
+impl GraphChange {
+    /// Whether the change holds nothing.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.relationships.is_empty() && self.parts.is_empty() && self.replaced.is_empty()
+    }
+}
+
+/// One exact replacement of an existing part's payload.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ReplacedPart {
+    pub(crate) name: String,
+    pub(crate) before: Arc<Vec<u8>>,
+    pub(crate) after: Arc<Vec<u8>>,
+}
+
 impl RevisionKind {
     const fn local_name(self) -> &'static [u8] {
         match self {
@@ -399,7 +560,7 @@ impl RevisionKind {
 
 /// Typed reason why a cross-package paragraph dependency closure cannot be
 /// represented without copying or guessing package resources.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum TransferRefusal {
     /// A relationship reference in the donor paragraph is dangling.
@@ -420,6 +581,21 @@ pub enum TransferRefusal {
     },
     /// The selected donor paragraph could not be represented as compact XML.
     InvalidParagraphXml,
+    /// The donor's markup-compatibility directive drops markup that its
+    /// paragraphs may carry; that markup is ignorable only under the donor's
+    /// own `mc:Ignorable`, so moving it to another document would change
+    /// whether readers see it.
+    MarkupCompatibilityScope,
+}
+
+impl TransferRefusal {
+    /// The shared refusal kind litchi-ops classifies this reason by (record
+    /// 0351): every transfer refusal is source content the closure cannot
+    /// carry.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        litchi_core::edit::RefusalKind::UnsupportedContent
+    }
 }
 
 impl std::fmt::Display for TransferRefusal {
@@ -445,14 +621,17 @@ impl std::fmt::Display for TransferRefusal {
             Self::InvalidParagraphXml => {
                 formatter.write_str("donor paragraph XML is not transferable")
             },
+            Self::MarkupCompatibilityScope => formatter.write_str(
+                "donor markup-compatibility directive drops markup a transferred paragraph may carry",
+            ),
         }
     }
 }
 
 /// A main-document transaction failure.
-#[derive(Debug, Error)]
+#[derive(Error)]
 #[non_exhaustive]
-pub enum TransactionError {
+pub enum Error {
     /// The underlying DOCX document or package is invalid.
     #[error(transparent)]
     Document(#[from] crate::Error),
@@ -473,20 +652,21 @@ pub enum TransactionError {
         /// Stable refusal category.
         reason: Refusal,
     },
-    /// A configured transaction resource ceiling was exceeded.
-    #[error("document transaction {resource} limit exceeded: {actual} > {max}")]
+    /// A transaction resource ceiling or representable size was exceeded.
+    #[error("document transaction {kind} limit exceeded: {observed} > {maximum}")]
     Limit {
         /// Bounded resource.
-        resource: &'static str,
+        kind: super::LimitKind,
+        /// Observed or requested value. Arithmetic overflow saturates to
+        /// `usize::MAX`; equality with `maximum` then means unrepresentable size.
+        observed: usize,
         /// Maximum accepted value.
-        max: usize,
-        /// Observed or requested value.
-        actual: usize,
+        maximum: usize,
     },
     /// The patch target no longer has the exact source bytes captured by the
     /// edit.
     #[error("document patch source is stale")]
-    StaleSource,
+    PatchConflict,
     /// A semantic durable operation's expected value did not match source.
     #[error("document patch semantic precondition does not match")]
     SemanticPrecondition,
@@ -523,18 +703,14 @@ pub(crate) struct ManagedAdmission {
 }
 
 impl ManagedAdmission {
-    fn new(
-        context: ExecutionContext,
-        xml_len: usize,
-        partname_len: usize,
-    ) -> TransactionResult<Arc<Self>> {
+    fn new(context: ExecutionContext, xml_len: usize, partname_len: usize) -> Result<Arc<Self>> {
         let index_bytes = xml_len
             .checked_mul(3)
             .and_then(|count| count.checked_mul(size_of::<Range>()))
-            .ok_or(TransactionError::Limit {
-                resource: "managed snapshot index bytes",
-                max: usize::MAX,
-                actual: usize::MAX,
+            .ok_or(Error::Limit {
+                kind: crate::document::LimitKind::ManagedSnapshotIndexBytes,
+                maximum: usize::MAX,
+                observed: usize::MAX,
             })?;
         let metadata_bytes = size_of::<Snapshot>()
             .checked_add(size_of::<ManagedXml>())
@@ -550,27 +726,26 @@ impl ManagedAdmission {
             .and_then(|bytes| bytes.checked_add(size_of::<Arc<ManagedAdmission>>()))
             .and_then(|bytes| bytes.checked_add(partname_len.saturating_mul(2)))
             .and_then(|bytes| bytes.checked_add(4 * size_of::<Arc<[Range]>>()))
-            .ok_or(TransactionError::Limit {
-                resource: "managed snapshot metadata bytes",
-                max: usize::MAX,
-                actual: usize::MAX,
+            .ok_or(Error::Limit {
+                kind: crate::document::LimitKind::ManagedSnapshotMetadataBytes,
+                maximum: usize::MAX,
+                observed: usize::MAX,
             })?;
         let memory = metadata_bytes
             .checked_add(index_bytes)
-            .ok_or(TransactionError::Limit {
-                resource: "managed snapshot memory",
-                max: usize::MAX,
-                actual: usize::MAX,
+            .ok_or(Error::Limit {
+                kind: crate::document::LimitKind::ManagedSnapshotMemory,
+                maximum: usize::MAX,
+                observed: usize::MAX,
             })?;
-        let objects =
-            xml_len
-                .min(MAX_DOCUMENT_NODES)
-                .checked_add(4)
-                .ok_or(TransactionError::Limit {
-                    resource: "managed snapshot objects",
-                    max: usize::MAX,
-                    actual: usize::MAX,
-                })?;
+        let objects = xml_len
+            .min(MAX_DOCUMENT_NODES)
+            .checked_add(4)
+            .ok_or(Error::Limit {
+                kind: crate::document::LimitKind::ManagedSnapshotObjects,
+                maximum: usize::MAX,
+                observed: usize::MAX,
+            })?;
         let memory = reserve_managed(&context, Resource::Memory, memory)?;
         let objects = reserve_managed(&context, Resource::Objects, objects)?;
         Ok(Arc::new(Self {
@@ -580,7 +755,7 @@ impl ManagedAdmission {
         }))
     }
 
-    fn scan(&self, xml_len: usize) -> TransactionResult<ScanAdmission> {
+    fn scan(&self, xml_len: usize) -> Result<ScanAdmission> {
         let scan_memory = reserve_managed(
             &self.context,
             Resource::Memory,
@@ -592,10 +767,10 @@ impl ManagedAdmission {
             managed_scan_slot_count(xml_len)?
                 .checked_mul(MANAGED_SCAN_OBJECT_MULTIPLIER)
                 .and_then(|objects| objects.checked_add(8))
-                .ok_or(TransactionError::Limit {
-                    resource: "managed scan objects",
-                    max: usize::MAX,
-                    actual: usize::MAX,
+                .ok_or(Error::Limit {
+                    kind: crate::document::LimitKind::ManagedScanObjects,
+                    maximum: usize::MAX,
+                    observed: usize::MAX,
                 })?,
         )?;
         let depth = reserve_managed(&self.context, Resource::Depth, MAX_DOCUMENT_DEPTH)?;
@@ -604,10 +779,10 @@ impl ManagedAdmission {
             Resource::Work,
             xml_len
                 .checked_mul(MANAGED_SCAN_WORK_MULTIPLIER)
-                .ok_or(TransactionError::Limit {
-                    resource: "managed scan work",
-                    max: usize::MAX,
-                    actual: usize::MAX,
+                .ok_or(Error::Limit {
+                    kind: crate::document::LimitKind::ManagedScanWork,
+                    maximum: usize::MAX,
+                    observed: usize::MAX,
                 })?,
         )?;
         Ok(ScanAdmission {
@@ -624,17 +799,17 @@ impl ManagedAdmission {
     /// number of events and the active namespace bindings are input-sized.
     /// Charge this before the parser grows any owner state; layout scans keep
     /// their observed per-event charge instead of paying this quadratic bound.
-    fn owner_scan(&self, xml_len: usize) -> TransactionResult<ScanAdmission> {
+    fn owner_scan(&self, xml_len: usize) -> Result<ScanAdmission> {
         let scan = self.scan(xml_len)?;
-        let units = xml_len.checked_add(1).ok_or(TransactionError::Limit {
-            resource: "managed namespace lookup work",
-            max: usize::MAX,
-            actual: usize::MAX,
+        let units = xml_len.checked_add(1).ok_or(Error::Limit {
+            kind: crate::document::LimitKind::ManagedNamespaceLookupWork,
+            maximum: usize::MAX,
+            observed: usize::MAX,
         })?;
-        let namespace_work = units.checked_mul(units).ok_or(TransactionError::Limit {
-            resource: "managed namespace lookup work",
-            max: usize::MAX,
-            actual: usize::MAX,
+        let namespace_work = units.checked_mul(units).ok_or(Error::Limit {
+            kind: crate::document::LimitKind::ManagedNamespaceLookupWork,
+            maximum: usize::MAX,
+            observed: usize::MAX,
         })?;
         consume_managed(&self.context, Resource::Work, namespace_work)?;
         Ok(scan)
@@ -779,24 +954,20 @@ fn reserve_managed(
     context: &ExecutionContext,
     resource: Resource,
     amount: usize,
-) -> TransactionResult<Reservation> {
-    let amount = u64::try_from(amount).map_err(|_error| TransactionError::Limit {
-        resource: "managed reservation amount",
-        max: usize::MAX,
-        actual: usize::MAX,
+) -> Result<Reservation> {
+    let amount = u64::try_from(amount).map_err(|_error| Error::Limit {
+        kind: crate::document::LimitKind::ManagedReservationAmount,
+        maximum: usize::MAX,
+        observed: usize::MAX,
     })?;
     context.reserve(resource, amount).map_err(managed_execution)
 }
 
-fn consume_managed(
-    context: &ExecutionContext,
-    resource: Resource,
-    amount: usize,
-) -> TransactionResult<()> {
-    let amount = u64::try_from(amount).map_err(|_error| TransactionError::Limit {
-        resource: "managed work amount",
-        max: usize::MAX,
-        actual: usize::MAX,
+fn consume_managed(context: &ExecutionContext, resource: Resource, amount: usize) -> Result<()> {
+    let amount = u64::try_from(amount).map_err(|_error| Error::Limit {
+        kind: crate::document::LimitKind::ManagedWorkAmount,
+        maximum: usize::MAX,
+        observed: usize::MAX,
     })?;
     context.consume(resource, amount).map_err(managed_execution)
 }
@@ -809,56 +980,56 @@ fn managed_error(error: litchi_core::ExecutionError) -> crate::Error {
     crate::Error::Opc(error)
 }
 
-fn managed_execution(error: litchi_core::ExecutionError) -> TransactionError {
-    TransactionError::Document(managed_error(error))
+fn managed_execution(error: litchi_core::ExecutionError) -> Error {
+    Error::Document(managed_error(error))
 }
 
-fn managed_parser_error(error: TransactionError) -> crate::Error {
+fn managed_parser_error(error: Error) -> crate::Error {
     match error {
-        TransactionError::Document(error) => error,
+        Error::Document(error) => error,
         error => crate::Error::Other(format!(
             "managed paragraph parser admission failed: {error}"
         )),
     }
 }
 
-fn managed_scan_memory(xml_len: usize) -> TransactionResult<usize> {
+fn managed_scan_memory(xml_len: usize) -> Result<usize> {
     let slot_count = managed_scan_slot_count(xml_len)?;
     let slot_bytes = size_of::<TextSlot>()
         .checked_mul(2)
         .and_then(|bytes| bytes.checked_add(MANAGED_SCAN_SLOT_ALLOCATOR_OVERHEAD))
         .and_then(|bytes| bytes.checked_mul(slot_count))
-        .ok_or(TransactionError::Limit {
-            resource: "managed text-slot memory",
-            max: usize::MAX,
-            actual: usize::MAX,
+        .ok_or(Error::Limit {
+            kind: crate::document::LimitKind::ManagedTextSlotMemory,
+            maximum: usize::MAX,
+            observed: usize::MAX,
         })?;
     MANAGED_SCAN_FIXED_MEMORY
         .checked_add(
             xml_len
                 .checked_mul(MANAGED_SCAN_INPUT_MEMORY_MULTIPLIER)
-                .ok_or(TransactionError::Limit {
-                    resource: "managed scan parser memory",
-                    max: usize::MAX,
-                    actual: usize::MAX,
+                .ok_or(Error::Limit {
+                    kind: crate::document::LimitKind::ManagedScanParserMemory,
+                    maximum: usize::MAX,
+                    observed: usize::MAX,
                 })?,
         )
         .and_then(|bytes| bytes.checked_add(slot_bytes))
-        .ok_or(TransactionError::Limit {
-            resource: "managed scan memory",
-            max: usize::MAX,
-            actual: usize::MAX,
+        .ok_or(Error::Limit {
+            kind: crate::document::LimitKind::ManagedScanMemory,
+            maximum: usize::MAX,
+            observed: usize::MAX,
         })
 }
 
-fn managed_scan_slot_count(xml_len: usize) -> TransactionResult<usize> {
+fn managed_scan_slot_count(xml_len: usize) -> Result<usize> {
     xml_len
         .checked_add(MANAGED_SCAN_MIN_TEXT_SLOT_BYTES - 1)
         .and_then(|bytes| bytes.checked_div(MANAGED_SCAN_MIN_TEXT_SLOT_BYTES))
-        .ok_or(TransactionError::Limit {
-            resource: "managed text-slot count",
-            max: usize::MAX,
-            actual: usize::MAX,
+        .ok_or(Error::Limit {
+            kind: crate::document::LimitKind::ManagedTextSlotCount,
+            maximum: usize::MAX,
+            observed: usize::MAX,
         })
 }
 
@@ -906,6 +1077,14 @@ enum XmlStorage {
 }
 
 impl XmlStorage {
+    /// The shared owned bytes, when the storage holds them.
+    fn shared(&self) -> Option<&Arc<Vec<u8>>> {
+        match self {
+            Self::Owned(xml) | Self::OwnedWithIdentity { xml, .. } => Some(xml),
+            Self::Managed(_) | Self::Source { .. } => None,
+        }
+    }
+
     fn bytes(&self) -> &[u8] {
         match self {
             Self::Owned(xml) => xml.as_slice(),
@@ -933,7 +1112,7 @@ impl XmlStorage {
 }
 
 /// An immutable, cheaply clonable snapshot of the main document XML.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Snapshot {
     xml: XmlStorage,
     paragraphs: Arc<[Range]>,
@@ -957,13 +1136,13 @@ impl Snapshot {
     ///
     /// Returns a typed document or resource-limit error when the XML is
     /// malformed, unsupported, or exceeds the transaction bounds.
-    pub fn from_xml(source_xml: impl Into<Vec<u8>>) -> TransactionResult<Self> {
+    pub(crate) fn from_xml(source_xml: impl Into<Vec<u8>>) -> Result<Self> {
         let xml = source_xml.into();
         if xml.len() > MAX_DOCUMENT_XML_BYTES {
-            return Err(TransactionError::Limit {
-                resource: "XML bytes",
-                max: MAX_DOCUMENT_XML_BYTES,
-                actual: xml.len(),
+            return Err(Error::Limit {
+                kind: crate::document::LimitKind::XmlBytes,
+                maximum: MAX_DOCUMENT_XML_BYTES,
+                observed: xml.len(),
             });
         }
         let layout = scan_document(&xml)?;
@@ -980,12 +1159,12 @@ impl Snapshot {
         })
     }
 
-    pub(crate) fn from_shared_xml(xml: Arc<Vec<u8>>) -> TransactionResult<Self> {
+    pub(crate) fn from_shared_xml(xml: Arc<Vec<u8>>) -> Result<Self> {
         if xml.len() > MAX_DOCUMENT_XML_BYTES {
-            return Err(TransactionError::Limit {
-                resource: "XML bytes",
-                max: MAX_DOCUMENT_XML_BYTES,
-                actual: xml.len(),
+            return Err(Error::Limit {
+                kind: crate::document::LimitKind::XmlBytes,
+                maximum: MAX_DOCUMENT_XML_BYTES,
+                observed: xml.len(),
             });
         }
         let layout = scan_document(&xml)?;
@@ -1011,7 +1190,7 @@ impl Snapshot {
         lineage: SourceLineage,
         version: SourceVersion,
         partname: &PackURI,
-    ) -> TransactionResult<Self> {
+    ) -> Result<Self> {
         Self::from_owned_xml_with_identity(
             xml,
             Arc::new(SourceIdentity {
@@ -1025,13 +1204,13 @@ impl Snapshot {
     fn from_owned_xml_with_identity(
         xml: Arc<Vec<u8>>,
         identity: Arc<SourceIdentity>,
-    ) -> TransactionResult<Self> {
+    ) -> Result<Self> {
         let mut snapshot = Self::from_shared_xml(Arc::clone(&xml))?;
         snapshot.xml = XmlStorage::OwnedWithIdentity { xml, identity };
         Ok(snapshot)
     }
 
-    fn with_rewritten_xml(&self, xml: Vec<u8>) -> TransactionResult<Self> {
+    fn with_rewritten_xml(&self, xml: Vec<u8>) -> Result<Self> {
         if let Some(identity) = self.source_identity() {
             Self::from_owned_xml_with_identity(Arc::new(xml), identity)
         } else {
@@ -1056,8 +1235,18 @@ impl Snapshot {
         &self,
         xml: Vec<u8>,
         splices: &[ParagraphSplice<'_>],
-    ) -> TransactionResult<Self> {
-        match self.spliced_layout(xml.len(), splices)? {
+    ) -> Result<Self> {
+        self.with_spliced_paragraphs_under(xml, splices, SplicePolicy::SameShape)
+    }
+
+    /// [`Self::with_spliced_paragraphs`] under an explicit [`SplicePolicy`].
+    fn with_spliced_paragraphs_under(
+        &self,
+        xml: Vec<u8>,
+        splices: &[ParagraphSplice<'_>],
+        policy: SplicePolicy,
+    ) -> Result<Self> {
+        match self.spliced_layout_under(xml.len(), splices, policy)? {
             Some(layout) => Ok(self.with_spliced_layout(xml, layout)),
             None => self.with_rewritten_xml(xml),
         }
@@ -1068,11 +1257,22 @@ impl Snapshot {
     ///
     /// `None` is never a refusal: it routes the caller back to the full rescan,
     /// which keeps every typed error, limit and refusal exactly where it was.
+    #[cfg(test)]
     fn spliced_layout(
         &self,
         xml_len: usize,
         splices: &[ParagraphSplice<'_>],
-    ) -> TransactionResult<Option<SplicedLayout>> {
+    ) -> Result<Option<SplicedLayout>> {
+        self.spliced_layout_under(xml_len, splices, SplicePolicy::SameShape)
+    }
+
+    /// [`Self::spliced_layout`] under an explicit [`SplicePolicy`].
+    fn spliced_layout_under(
+        &self,
+        xml_len: usize,
+        splices: &[ParagraphSplice<'_>],
+        policy: SplicePolicy,
+    ) -> Result<Option<SplicedLayout>> {
         if splices.is_empty() || xml_len > MAX_DOCUMENT_XML_BYTES {
             return Ok(None);
         }
@@ -1092,7 +1292,7 @@ impl Snapshot {
             let Some(before) = source.get(splice.start..splice.end) else {
                 return Ok(None);
             };
-            if !preserves_body_child_shape(before, splice.replacement) {
+            if !policy.admits(before, splice.replacement, xml_len) {
                 return Ok(None);
             }
             // Each paragraph's inherited-namespace snapshot is carried over
@@ -1183,6 +1383,328 @@ impl Snapshot {
         }))
     }
 
+    /// Insert `fragment` at `offset`, a boundary between direct body children
+    /// at or before the body-final section properties, as direct-body
+    /// paragraph `position`, deriving the new layout instead of rescanning
+    /// the part when [`Self::inserted_layout`] proves it.
+    ///
+    /// The caller guarantees the boundary: an offset inside another body
+    /// child would make the derived layout wrong, so only the structure
+    /// operations, which take it from the body's own child list, call this.
+    fn with_inserted_paragraph(
+        &self,
+        xml: Vec<u8>,
+        offset: usize,
+        position: usize,
+        fragment: &[u8],
+        element: usize,
+    ) -> Result<Self> {
+        match self.inserted_layout(xml.len(), offset, position, fragment, element)? {
+            Some(layout) => Ok(self.with_spliced_layout(xml, layout)),
+            None => self.with_rewritten_xml(xml),
+        }
+    }
+
+    /// The layout [`scan_document`] would produce after inserting `fragment`
+    /// at body boundary `offset`, its first `element` bytes becoming
+    /// paragraph `position` and the rest whitespace the paragraph owns, or
+    /// `None` when it is not proven, which routes the caller to the rescan.
+    ///
+    /// The scanner's verdicts about the new child are those of
+    /// [`grows_body_child_within_limits`]: the fragment must be one balanced
+    /// element without declarations, processing instructions or a `body`
+    /// name, within the depth limit, in a part small enough that the element
+    /// limit cannot be reached. Its classification must be a
+    /// WordprocessingML `p`: its root's prefix must resolve to a
+    /// WordprocessingML namespace in the body's scope, which a neighbouring
+    /// direct-body paragraph without declarations of its own records, and the
+    /// new paragraph inherits exactly that scope. The body-final section
+    /// properties stay last because the offset is at or before them, and no
+    /// other child's classification or scope changes.
+    fn inserted_layout(
+        &self,
+        xml_len: usize,
+        offset: usize,
+        position: usize,
+        fragment: &[u8],
+        element: usize,
+    ) -> Result<Option<SplicedLayout>> {
+        let (Some(paragraph), Some(owned)) = (fragment.get(..element), fragment.get(element..))
+        else {
+            return Ok(None);
+        };
+        if xml_len > MAX_DOCUMENT_XML_BYTES
+            || xml_len / 4 > MAX_DOCUMENT_NODES
+            || contains_namespace_declaration_marker(fragment)
+            || !owned.iter().all(u8::is_ascii_whitespace)
+        {
+            return Ok(None);
+        }
+        let Some(shape) = body_child_shape(paragraph) else {
+            return Ok(None);
+        };
+        if shape.names_body
+            || shape
+                .max_depth
+                .checked_add(2)
+                .is_none_or(|depth| depth > MAX_DOCUMENT_DEPTH)
+        {
+            return Ok(None);
+        }
+        let (Ok(at), Ok(length), Ok(paragraph_length)) = (
+            u32::try_from(offset),
+            u32::try_from(fragment.len()),
+            u32::try_from(paragraph.len()),
+        ) else {
+            return Ok(None);
+        };
+        let end_of = |range: &Range| range.start.checked_add(range.length);
+        let before = position
+            .checked_sub(1)
+            .and_then(|index| self.paragraphs.get(index));
+        let after = self.paragraphs.get(position);
+        if position > self.paragraphs.len()
+            || before.is_some_and(|range| end_of(range).is_none_or(|end| end > at))
+            || after.is_some_and(|range| range.start < at)
+            || at > self.content_end
+        {
+            return Ok(None);
+        }
+        // The scope of a direct-body paragraph that declares nothing is the
+        // body's own.
+        let source = self.xml.bytes();
+        let declares_nothing = |index: usize| {
+            self.paragraphs.get(index).is_some_and(|range| {
+                let start = usize::try_from(range.start).unwrap_or(usize::MAX);
+                let end = usize::try_from(range.length)
+                    .ok()
+                    .and_then(|length| start.checked_add(length))
+                    .unwrap_or(usize::MAX);
+                source.get(start..end).is_some_and(|paragraph| {
+                    paragraph
+                        .iter()
+                        .position(|byte| *byte == b'>')
+                        .is_some_and(|tag_end| {
+                            !contains_namespace_declaration_marker(&paragraph[..tag_end])
+                        })
+                })
+            })
+        };
+        let neighbour = position
+            .checked_sub(1)
+            .filter(|index| declares_nothing(*index))
+            .or_else(|| declares_nothing(position).then_some(position));
+        let Some(scope) = neighbour.and_then(|index| self.paragraph_namespaces.get(index)) else {
+            return Ok(None);
+        };
+        let name_end = shape.root_tag_len.min(paragraph.len());
+        let name = paragraph
+            .get(1..name_end)
+            .and_then(|tag| {
+                tag.iter()
+                    .position(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n' | b'/' | b'>'))
+                    .map(|length| &tag[..length])
+            })
+            .unwrap_or_default();
+        let (prefix, local) = split_qualified_name(name);
+        let bound = scope
+            .iter()
+            .find(|(declared, _)| declared.as_deref() == prefix)
+            .map(|(_, namespace)| namespace.as_slice());
+        if local != b"p"
+            || !bound.is_some_and(|namespace| {
+                namespace == WORDPROCESSINGML_NAMESPACE
+                    || namespace == STRICT_WORDPROCESSINGML_NAMESPACE
+            })
+        {
+            return Ok(None);
+        }
+        let shift = |ranges: &Arc<[Range]>| -> Option<Arc<[Range]>> {
+            let mut shifted = Vec::with_capacity(ranges.len());
+            for range in ranges.iter() {
+                let end = end_of(range)?;
+                if range.start < at && at < end {
+                    return None;
+                }
+                let start = if range.start >= at {
+                    range.start.checked_add(length)?
+                } else {
+                    range.start
+                };
+                shifted.push(Range {
+                    start,
+                    length: range.length,
+                });
+            }
+            Some(shifted.into())
+        };
+        let (Some(tables), Some(block_controls), Some(content_end)) = (
+            shift(&self.tables),
+            shift(&self.block_controls),
+            self.content_end.checked_add(length),
+        ) else {
+            return Ok(None);
+        };
+        let mut paragraphs = Vec::new();
+        let mut namespaces = Vec::new();
+        paragraphs
+            .try_reserve_exact(self.paragraphs.len() + 1)
+            .and_then(|()| namespaces.try_reserve_exact(self.paragraphs.len() + 1))
+            .map_err(|source| crate::Error::Allocation {
+                resource: "inserted document paragraph ranges",
+                source,
+            })?;
+        for (index, (range, scope_of)) in self
+            .paragraphs
+            .iter()
+            .zip(self.paragraph_namespaces.iter())
+            .enumerate()
+        {
+            if index == position {
+                paragraphs.push(Range {
+                    start: at,
+                    length: paragraph_length,
+                });
+                namespaces.push(Arc::clone(scope));
+            }
+            let Some(start) = (if index >= position {
+                range.start.checked_add(length)
+            } else {
+                Some(range.start)
+            }) else {
+                return Ok(None);
+            };
+            paragraphs.push(Range {
+                start,
+                length: range.length,
+            });
+            namespaces.push(Arc::clone(scope_of));
+        }
+        if position == self.paragraphs.len() {
+            paragraphs.push(Range {
+                start: at,
+                length: paragraph_length,
+            });
+            namespaces.push(Arc::clone(scope));
+        }
+        Ok(Some(SplicedLayout {
+            paragraphs: paragraphs.into(),
+            paragraph_namespaces: namespaces.into(),
+            tables,
+            block_controls,
+            content_end,
+        }))
+    }
+
+    /// Remove direct-body paragraph `position` whole, deriving the new
+    /// layout: removing a direct body child changes no other child's
+    /// classification or scope, adds nothing the scanner limits, and keeps
+    /// the body-final section properties last.
+    fn with_removed_paragraph(
+        &self,
+        xml: Vec<u8>,
+        position: usize,
+        removed: usize,
+    ) -> Result<Self> {
+        match self.removed_layout(xml.len(), position, removed)? {
+            Some(layout) => Ok(self.with_spliced_layout(xml, layout)),
+            None => self.with_rewritten_xml(xml),
+        }
+    }
+
+    /// The layout after removing direct-body paragraph `position` with the
+    /// whitespace it owns, `removed` bytes from its start, or `None` when the
+    /// bookkeeping does not add up.
+    fn removed_layout(
+        &self,
+        xml_len: usize,
+        position: usize,
+        removed: usize,
+    ) -> Result<Option<SplicedLayout>> {
+        let Some(paragraph) = self.paragraphs.get(position).copied() else {
+            return Ok(None);
+        };
+        let Ok(length) = u32::try_from(removed) else {
+            return Ok(None);
+        };
+        let removed = Range {
+            start: paragraph.start,
+            length,
+        };
+        let Some(end) = removed.start.checked_add(removed.length) else {
+            return Ok(None);
+        };
+        if length < paragraph.length
+            || self.content_end < end
+            || usize::try_from(self.content_end - removed.length)
+                .is_ok_and(|offset| offset > xml_len)
+            || self
+                .paragraphs
+                .get(position + 1)
+                .is_some_and(|next| next.start < end)
+        {
+            return Ok(None);
+        }
+        let shift = |ranges: &Arc<[Range]>| -> Option<Arc<[Range]>> {
+            let mut shifted = Vec::with_capacity(ranges.len());
+            for range in ranges.iter() {
+                let start = if range.start >= end {
+                    range.start - removed.length
+                } else if range.start.checked_add(range.length)? <= removed.start {
+                    range.start
+                } else {
+                    return None;
+                };
+                shifted.push(Range {
+                    start,
+                    length: range.length,
+                });
+            }
+            Some(shifted.into())
+        };
+        let (Some(tables), Some(block_controls)) =
+            (shift(&self.tables), shift(&self.block_controls))
+        else {
+            return Ok(None);
+        };
+        let mut paragraphs = Vec::new();
+        let mut namespaces = Vec::new();
+        paragraphs
+            .try_reserve_exact(self.paragraphs.len().saturating_sub(1))
+            .and_then(|()| namespaces.try_reserve_exact(self.paragraphs.len().saturating_sub(1)))
+            .map_err(|source| crate::Error::Allocation {
+                resource: "removed document paragraph ranges",
+                source,
+            })?;
+        for (index, (range, scope)) in self
+            .paragraphs
+            .iter()
+            .zip(self.paragraph_namespaces.iter())
+            .enumerate()
+        {
+            if index == position {
+                continue;
+            }
+            paragraphs.push(Range {
+                start: if index > position {
+                    range.start - removed.length
+                } else {
+                    range.start
+                },
+                length: range.length,
+            });
+            namespaces.push(Arc::clone(scope));
+        }
+        let content_end = self.content_end - removed.length;
+        Ok(Some(SplicedLayout {
+            paragraphs: paragraphs.into(),
+            paragraph_namespaces: namespaces.into(),
+            tables,
+            block_controls,
+            content_end,
+        }))
+    }
+
     /// Retain spliced XML under a layout that was derived rather than scanned.
     ///
     /// The storage variant, the conformance and the absent managed admission
@@ -1215,12 +1737,12 @@ impl Snapshot {
         version: SourceVersion,
         partname: &PackURI,
         context: ExecutionContext,
-    ) -> TransactionResult<Self> {
+    ) -> Result<Self> {
         if data.as_bytes().len() > MAX_DOCUMENT_XML_BYTES {
-            return Err(TransactionError::Limit {
-                resource: "XML bytes",
-                max: MAX_DOCUMENT_XML_BYTES,
-                actual: data.as_bytes().len(),
+            return Err(Error::Limit {
+                kind: crate::document::LimitKind::XmlBytes,
+                maximum: MAX_DOCUMENT_XML_BYTES,
+                observed: data.as_bytes().len(),
             });
         }
         let admission =
@@ -1256,12 +1778,12 @@ impl Snapshot {
         version: SourceVersion,
         partname: &PackURI,
         context: ExecutionContext,
-    ) -> TransactionResult<Self> {
+    ) -> Result<Self> {
         if source_xml.bytes().len() > MAX_DOCUMENT_XML_BYTES {
-            return Err(TransactionError::Limit {
-                resource: "XML bytes",
-                max: MAX_DOCUMENT_XML_BYTES,
-                actual: source_xml.bytes().len(),
+            return Err(Error::Limit {
+                kind: crate::document::LimitKind::XmlBytes,
+                maximum: MAX_DOCUMENT_XML_BYTES,
+                observed: source_xml.bytes().len(),
             });
         }
         let admission =
@@ -1295,12 +1817,12 @@ impl Snapshot {
         source_xml: SourceXmlPart,
         identity: Arc<SourceIdentity>,
         context: ExecutionContext,
-    ) -> TransactionResult<Self> {
+    ) -> Result<Self> {
         if source_xml.bytes().len() > MAX_DOCUMENT_XML_BYTES {
-            return Err(TransactionError::Limit {
-                resource: "XML bytes",
-                max: MAX_DOCUMENT_XML_BYTES,
-                actual: source_xml.bytes().len(),
+            return Err(Error::Limit {
+                kind: crate::document::LimitKind::XmlBytes,
+                maximum: MAX_DOCUMENT_XML_BYTES,
+                observed: source_xml.bytes().len(),
             });
         }
         let admission = ManagedAdmission::new(
@@ -1341,23 +1863,30 @@ impl Snapshot {
     /// Attach a publication audit proof. A proof that does not cover exactly
     /// these bytes is dropped, so a snapshot never carries a proof for other
     /// bytes.
-    fn with_publication_proof(mut self, proof: xml_minifier::audit::VerifiedSource) -> Self {
+    ///
+    /// Besides [`Edit::commit`], the source-backed owner attaches the proof
+    /// its OPC package retained for a transaction's base bytes (record 0317),
+    /// which [`commit_preserving_unmodified`] then proves the candidate from.
+    pub(crate) fn with_publication_proof(
+        mut self,
+        proof: xml_minifier::audit::VerifiedSource,
+    ) -> Self {
         if proof.covers(self.xml_bytes(), xml_minifier::audit::Limits::default()) {
             self.publication = Some(proof);
         }
         self
     }
 
-    pub(crate) fn shared_xml(&self) -> TransactionResult<Arc<Vec<u8>>> {
+    pub(crate) fn shared_xml(&self) -> Result<Arc<Vec<u8>>> {
         match &self.xml {
             XmlStorage::Owned(xml) => Ok(Arc::clone(xml)),
             XmlStorage::OwnedWithIdentity { xml, .. } => Ok(Arc::clone(xml)),
             XmlStorage::Managed(_) | XmlStorage::Source { .. } => {
-                Err(TransactionError::Document(crate::Error::UnsafeEdit {
-                    format: "DOCX",
-                    operation: "snapshot.shared_xml",
-                    reason: "managed document XML cannot escape its retained source owner",
-                }))
+                Err(Error::Document(crate::Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "snapshot.shared_xml",
+                    "managed document XML cannot escape its retained source owner",
+                )))
             },
         }
     }
@@ -1374,11 +1903,11 @@ impl Snapshot {
         self.paragraphs.len()
     }
 
-    fn range(&self, position: Position) -> TransactionResult<Range> {
+    fn range(&self, position: Position) -> Result<Range> {
         self.paragraphs
             .get(position.get())
             .copied()
-            .ok_or(TransactionError::OutOfBounds {
+            .ok_or(Error::OutOfBounds {
                 position: position.get(),
                 len: self.paragraph_count(),
             })
@@ -1473,7 +2002,7 @@ impl Snapshot {
     /// Start an isolated edit whose selectors resolve against its projected
     /// state.
     #[must_use]
-    pub fn edit(&self) -> Edit {
+    pub(crate) fn edit(&self) -> Edit {
         Edit {
             base: self.clone(),
             projected: self.clone(),
@@ -1482,6 +2011,8 @@ impl Snapshot {
             operation_admission: None,
             operation_string_admission: None,
             compaction: CompactionPolicy::default(),
+            raw_limits: None,
+            snapshot_budget: None,
         }
     }
 
@@ -1491,7 +2022,7 @@ impl Snapshot {
             .map(|admission| admission.context.clone())
     }
 
-    fn same_source(&self, other: &Self) -> bool {
+    pub(crate) fn same_source(&self, other: &Self) -> bool {
         // The retained bytes are immutable, so the same address and length
         // is an exact equality proof; distinct allocations still receive the
         // full byte comparison. An edit's projection shares its base's
@@ -1586,7 +2117,7 @@ impl Snapshot {
 }
 
 /// A semantic main-document operation recorded in a reversible patch.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Operation {
     /// Replace the complete text of one direct-body paragraph.
@@ -1619,6 +2150,34 @@ pub enum Operation {
         before: String,
         /// Text produced by the operation.
         after: String,
+    },
+    /// Replace only the first direct `w:t` element in one run, retaining its
+    /// exact element attributes and every other run child.
+    ///
+    /// The operation retains the exact before/after text-node fragments so
+    /// replay and inversion preserve authored XML spelling (including
+    /// numeric carriage-return references).
+    ReplaceRunTextNode {
+        /// Direct-body paragraph position.
+        paragraph: Position,
+        /// Direct run position within the paragraph.
+        run: Position,
+        /// Exact first direct text-node bytes required before the operation.
+        before: Arc<Vec<u8>>,
+        /// Exact first direct text-node bytes produced by the operation.
+        after: Arc<Vec<u8>>,
+    },
+    /// Mark the owning complex field of one cached-result run dirty while
+    /// retaining the exact field-marker fragment.
+    MarkCachedRunFieldDirty {
+        /// Direct-body paragraph position.
+        paragraph: Position,
+        /// Direct run position within the paragraph.
+        run: Position,
+        /// Exact owning `w:fldChar` fragment required before the operation.
+        before: Arc<Vec<u8>>,
+        /// Exact owning `w:fldChar` fragment produced by the operation.
+        after: Arc<Vec<u8>>,
     },
     /// Replace the displayed result of one direct `w:fldSimple` field.
     ReplaceSimpleFieldText {
@@ -1822,6 +2381,145 @@ pub enum Operation {
         /// Complete receiver-local dependency closure removed by publication.
         graph: Arc<TransferGraph>,
     },
+    /// Replace the head of one direct run: its start tag through its direct
+    /// property container (`w:rPr`).
+    ///
+    /// Recorded by [`Edit::format_run`]. The head is the run's start tag
+    /// through its first direct `w:rPr` child, only the start tag when the
+    /// run has no container, and the whole element for an empty run
+    /// (`<w:r/>`); the run's content is not part of the operation, so the
+    /// operation composes with text edits of the same run.
+    ReplaceRunProperties {
+        /// Direct-body paragraph position.
+        paragraph: Position,
+        /// Direct run position within the paragraph.
+        run: Position,
+        /// Exact head bytes required before the operation.
+        before: Arc<Vec<u8>>,
+        /// Exact head bytes the operation writes.
+        after: Arc<Vec<u8>>,
+    },
+    /// Replace the head of one direct-body paragraph: its start tag through
+    /// its direct property container (`w:pPr`).
+    ///
+    /// Recorded by [`Edit::format_paragraph`]; see
+    /// [`Self::ReplaceRunProperties`].
+    ReplaceParagraphProperties {
+        /// Direct-body paragraph position.
+        paragraph: Position,
+        /// Exact head bytes required before the operation.
+        before: Arc<Vec<u8>>,
+        /// Exact head bytes the operation writes.
+        after: Arc<Vec<u8>>,
+    },
+    /// Insert one exact paragraph as a direct child of `w:body`.
+    ///
+    /// Recorded by [`Edit::insert_formatted_paragraph`] and
+    /// [`Edit::move_paragraph`], and by the inverse of
+    /// [`Self::RemoveParagraphFragment`].
+    InsertParagraphFragment {
+        /// Index among the direct element children of `w:body` (every
+        /// element, not only blocks) that the paragraph has after the
+        /// insertion; it is inserted before the child that held the index.
+        child: Position,
+        /// Direct-body paragraph position the paragraph has after the
+        /// insertion.
+        position: Position,
+        /// Exact paragraph XML.
+        xml: Arc<Vec<u8>>,
+    },
+    /// Remove one exact direct-body paragraph.
+    ///
+    /// Recorded by [`Edit::remove_paragraph`] and [`Edit::move_paragraph`];
+    /// see [`Self::InsertParagraphFragment`].
+    RemoveParagraphFragment {
+        /// Index of the paragraph among the direct element children of
+        /// `w:body`.
+        child: Position,
+        /// Direct-body paragraph position of the paragraph.
+        position: Position,
+        /// Exact paragraph XML required at the position.
+        xml: Arc<Vec<u8>>,
+    },
+    /// Insert one exact run as a direct child of a direct-body paragraph.
+    ///
+    /// Recorded by [`Edit::insert_run`] and [`Edit::append_run`], and by the
+    /// inverse of [`Self::RemoveRun`].
+    InsertRun {
+        /// Direct-body paragraph position.
+        paragraph: Position,
+        /// Index among the paragraph's direct element children (`w:pPr`
+        /// included) that the run has after the insertion.
+        child: Position,
+        /// Direct run position the run has after the insertion.
+        run: Position,
+        /// Exact run XML.
+        xml: Arc<Vec<u8>>,
+    },
+    /// Remove one exact direct run of a direct-body paragraph.
+    ///
+    /// Recorded by [`Edit::remove_run`]; see [`Self::InsertRun`].
+    RemoveRun {
+        /// Direct-body paragraph position.
+        paragraph: Position,
+        /// Index of the run among the paragraph's direct element children.
+        child: Position,
+        /// Direct run position of the run.
+        run: Position,
+        /// Exact run XML required at the position.
+        xml: Arc<Vec<u8>>,
+    },
+    /// Replace the exact bytes of one element reached through a path.
+    ///
+    /// Recorded by the path-addressed edits ([`Edit::format_paragraph_at`],
+    /// [`Edit::format_run_at`], [`Edit::replace_text_at`],
+    /// [`Edit::replace_cell_text_at`], [`Edit::insert_run_at`]).
+    ReplaceElement {
+        /// Path of the element from `w:body`.
+        path: ElementPath,
+        /// Exact element bytes required before the operation.
+        before: Arc<Vec<u8>>,
+        /// Exact element bytes the operation writes.
+        after: Arc<Vec<u8>>,
+    },
+    /// Insert one exact element as a direct child of a container.
+    ///
+    /// Recorded by [`Edit::insert_paragraph_at`], [`Edit::insert_table_at`],
+    /// [`Edit::insert_row_at`] and [`Edit::move_element_at`], and by the
+    /// inverse of [`Self::RemoveElement`].
+    InsertElement {
+        /// Path of the container (the body for the empty path; a content
+        /// control's children are those of its `w:sdtContent`).
+        container: ElementPath,
+        /// Index among the container's direct element children that the
+        /// element has after the insertion.
+        child: Position,
+        /// Exact element XML.
+        xml: Arc<Vec<u8>>,
+    },
+    /// Remove one exact direct child element of a container.
+    ///
+    /// Recorded by [`Edit::remove_element_at`] and
+    /// [`Edit::move_element_at`]; see [`Self::InsertElement`].
+    RemoveElement {
+        /// Path of the container.
+        container: ElementPath,
+        /// Index of the element among the container's direct element
+        /// children.
+        child: Position,
+        /// Exact element XML required at the index.
+        xml: Arc<Vec<u8>>,
+    },
+    /// Apply (`forward`) or undo a package-graph change published with the
+    /// main document. It changes no main-document XML; package publication
+    /// applies it. Recorded by the relationship and part verbs of the
+    /// package-bound edit.
+    ChangeGraph {
+        /// The change.
+        change: Arc<GraphChange>,
+        /// Whether the change is applied (`true`) or undone.
+        forward: bool,
+    },
 }
 
 impl Operation {
@@ -1830,6 +2528,8 @@ impl Operation {
             Self::ReplaceParagraphText { .. }
             | Self::ReplaceHyperlinkText { .. }
             | Self::ReplaceRunText { .. }
+            | Self::ReplaceRunTextNode { .. }
+            | Self::MarkCachedRunFieldDirty { .. }
             | Self::ReplaceSimpleFieldText { .. }
             | Self::ReplaceComplexFieldText { .. }
             | Self::ReplaceRevisionText { .. }
@@ -1844,11 +2544,41 @@ impl Operation {
             | Self::ReplaceNestedCellParagraphText { .. }
             | Self::ReplaceNestedCellParagraphHyperlinkText { .. }
             | Self::InsertParagraph { .. }
-            | Self::RemoveParagraph { .. } => true,
-            Self::InsertTransferredParagraph { .. } | Self::RemoveTransferredParagraph { .. } => {
-                false
-            },
+            | Self::RemoveParagraph { .. }
+            | Self::ReplaceRunProperties { .. }
+            | Self::ReplaceParagraphProperties { .. }
+            | Self::InsertParagraphFragment { .. }
+            | Self::RemoveParagraphFragment { .. }
+            | Self::InsertRun { .. }
+            | Self::RemoveRun { .. }
+            | Self::ReplaceElement { .. }
+            | Self::InsertElement { .. }
+            | Self::RemoveElement { .. } => true,
+            Self::InsertTransferredParagraph { .. }
+            | Self::RemoveTransferredParagraph { .. }
+            | Self::ChangeGraph { .. } => false,
         }
+    }
+
+    /// Whether the operation records exact markup that a commit must publish
+    /// as staged: compacting it would make the operation's own bytes, and so
+    /// its inverse and replay, disagree with the published document.
+    const fn retains_exact_markup(&self) -> bool {
+        matches!(
+            self,
+            Self::ApplyRevision { .. }
+                | Self::ReplaceRunTextNode { .. }
+                | Self::MarkCachedRunFieldDirty { .. }
+                | Self::ReplaceRunProperties { .. }
+                | Self::ReplaceParagraphProperties { .. }
+                | Self::InsertParagraphFragment { .. }
+                | Self::RemoveParagraphFragment { .. }
+                | Self::InsertRun { .. }
+                | Self::RemoveRun { .. }
+                | Self::ReplaceElement { .. }
+                | Self::InsertElement { .. }
+                | Self::RemoveElement { .. }
+        )
     }
 
     fn inverse(&self) -> Self {
@@ -1883,6 +2613,28 @@ impl Operation {
                 run: *run,
                 before: after.clone(),
                 after: before.clone(),
+            },
+            Self::ReplaceRunTextNode {
+                paragraph,
+                run,
+                before,
+                after,
+            } => Self::ReplaceRunTextNode {
+                paragraph: *paragraph,
+                run: *run,
+                before: Arc::clone(after),
+                after: Arc::clone(before),
+            },
+            Self::MarkCachedRunFieldDirty {
+                paragraph,
+                run,
+                before,
+                after,
+            } => Self::MarkCachedRunFieldDirty {
+                paragraph: *paragraph,
+                run: *run,
+                before: Arc::clone(after),
+                after: Arc::clone(before),
             },
             Self::ReplaceSimpleFieldText {
                 paragraph,
@@ -2075,6 +2827,97 @@ impl Operation {
                 inverse_dependency_digest: Arc::clone(dependency_digest),
                 graph: Arc::clone(graph),
             },
+            Self::ReplaceRunProperties {
+                paragraph,
+                run,
+                before,
+                after,
+            } => Self::ReplaceRunProperties {
+                paragraph: *paragraph,
+                run: *run,
+                before: Arc::clone(after),
+                after: Arc::clone(before),
+            },
+            Self::ReplaceParagraphProperties {
+                paragraph,
+                before,
+                after,
+            } => Self::ReplaceParagraphProperties {
+                paragraph: *paragraph,
+                before: Arc::clone(after),
+                after: Arc::clone(before),
+            },
+            Self::InsertParagraphFragment {
+                child,
+                position,
+                xml,
+            } => Self::RemoveParagraphFragment {
+                child: *child,
+                position: *position,
+                xml: Arc::clone(xml),
+            },
+            Self::RemoveParagraphFragment {
+                child,
+                position,
+                xml,
+            } => Self::InsertParagraphFragment {
+                child: *child,
+                position: *position,
+                xml: Arc::clone(xml),
+            },
+            Self::InsertRun {
+                paragraph,
+                child,
+                run,
+                xml,
+            } => Self::RemoveRun {
+                paragraph: *paragraph,
+                child: *child,
+                run: *run,
+                xml: Arc::clone(xml),
+            },
+            Self::RemoveRun {
+                paragraph,
+                child,
+                run,
+                xml,
+            } => Self::InsertRun {
+                paragraph: *paragraph,
+                child: *child,
+                run: *run,
+                xml: Arc::clone(xml),
+            },
+            Self::ReplaceElement {
+                path,
+                before,
+                after,
+            } => Self::ReplaceElement {
+                path: path.clone(),
+                before: Arc::clone(after),
+                after: Arc::clone(before),
+            },
+            Self::InsertElement {
+                container,
+                child,
+                xml,
+            } => Self::RemoveElement {
+                container: container.clone(),
+                child: *child,
+                xml: Arc::clone(xml),
+            },
+            Self::RemoveElement {
+                container,
+                child,
+                xml,
+            } => Self::InsertElement {
+                container: container.clone(),
+                child: *child,
+                xml: Arc::clone(xml),
+            },
+            Self::ChangeGraph { change, forward } => Self::ChangeGraph {
+                change: Arc::clone(change),
+                forward: !forward,
+            },
         }
     }
 }
@@ -2099,10 +2942,10 @@ impl Operation {
 ///
 /// let mut package = Package::open("input.docx")?;
 /// let mut edit = package
-///     .edit_document()?
+///     .edit()?
 ///     .with_compaction_policy(CompactionPolicy::WholeDocument);
 /// edit.replace_paragraph_text(Position::new(0), "hello")?;
-/// package.publish_document_edit(edit)?;
+/// package = edit.commit()?.into_package();
 /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -2140,7 +2983,6 @@ pub enum CompactionPolicy {
 }
 
 /// A staged main-document edit.
-#[derive(Debug)]
 pub struct Edit {
     base: Snapshot,
     projected: Snapshot,
@@ -2149,9 +2991,140 @@ pub struct Edit {
     operation_admission: Option<Arc<OperationAdmission>>,
     operation_string_admission: Option<Arc<StringAdmission>>,
     compaction: CompactionPolicy,
+    raw_limits: Option<crate::document::raw::Limits>,
+    /// Optional unified-transaction ceiling for the retained main-document
+    /// before/after XML pair.  The facade supplies the transaction's
+    /// remaining snapshot budget here; the native edit rejects a prospective
+    /// projection before it becomes a retained `Snapshot`.
+    snapshot_budget: Option<usize>,
 }
 
 impl Edit {
+    /// Parse one raw document and start a mutable codec tree.
+    pub fn from_xml(source_xml: Vec<u8>, limits: crate::document::raw::Limits) -> Result<Self> {
+        crate::document::raw::validate_xml(&source_xml, limits)?;
+        let snapshot = Snapshot::from_xml(source_xml)?;
+        snapshot.edit().with_raw_limits(limits)
+    }
+
+    /// Return the raw policy retained by this codec tree.
+    #[must_use]
+    pub fn limits(&self) -> crate::document::raw::Limits {
+        self.raw_limits.unwrap_or_default()
+    }
+
+    /// Serialize the current projected document under a caller-selected
+    /// policy. The policy may tighten, but never widen, the admission policy
+    /// retained by this tree.
+    pub fn to_bytes(&self, limits: crate::document::raw::Limits) -> Result<Vec<u8>> {
+        let retained = self.raw_limits.ok_or_else(|| {
+            Error::Document(crate::Error::internal(
+                "document.raw.to_bytes",
+                "raw output requested from an owner transaction",
+            ))
+        })?;
+        limits.validate()?;
+        if let Some((kind, observed, maximum)) = retained.first_widened(limits) {
+            return Err(Error::Limit {
+                kind,
+                observed,
+                maximum,
+            });
+        }
+        crate::document::raw::validate_xml(self.projected.xml_bytes(), limits)?;
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(self.projected.xml_bytes().len())
+            .map_err(|source| crate::Error::Allocation {
+                resource: "raw document XML",
+                source,
+            })?;
+        bytes.extend_from_slice(self.projected.xml_bytes());
+        Ok(bytes)
+    }
+
+    /// Discard staged operations and restore the admitted source tree.
+    pub fn reset(&mut self) {
+        let limits = self.raw_limits;
+        let snapshot_budget = self.snapshot_budget;
+        let source = self.base.clone();
+        *self = source.edit();
+        self.raw_limits = limits;
+        self.snapshot_budget = snapshot_budget;
+    }
+
+    /// Return a reversible patch for the currently staged tree.
+    pub fn patch(&self) -> Result<Patch> {
+        if let Some(limits) = self.raw_limits {
+            crate::document::raw::validate_xml(self.projected.xml_bytes(), limits)?;
+        }
+        Ok(self.try_clone()?.commit()?.patch().clone())
+    }
+
+    /// Replay a patch onto this tree under a policy no wider than the
+    /// retained admission policy.
+    pub fn apply_patch(&self, patch: &Patch, limits: crate::document::raw::Limits) -> Result<Self> {
+        let retained = self.raw_limits.ok_or_else(|| {
+            Error::Document(crate::Error::internal(
+                "document.raw.apply_patch",
+                "raw replay requested from an owner transaction",
+            ))
+        })?;
+        limits.validate()?;
+        if let Some((kind, observed, maximum)) = retained.first_widened(limits) {
+            return Err(Error::Limit {
+                kind,
+                observed,
+                maximum,
+            });
+        }
+        if !self.projected.same_source(patch.source()) {
+            return Err(Error::PatchConflict);
+        }
+        let projected_bytes = if patch.is_noop() {
+            self.projected.xml_bytes().len()
+        } else {
+            patch.target().xml_bytes().len()
+        };
+        self.admit_snapshot_xml(projected_bytes)?;
+        // The source comparison above authenticates the patch once.  Reuse
+        // that proof while retaining the budget check before the target
+        // snapshot is cloned; calling the public replay entry point here
+        // would scan distinct-but-equal source allocations a second time.
+        let snapshot = patch.apply_verified(self.projected());
+        crate::document::raw::validate_xml(snapshot.xml_bytes(), limits)?;
+        let mut edit = snapshot.edit().with_raw_limits(limits)?;
+        if let Some(maximum) = self.snapshot_budget {
+            edit = edit.with_snapshot_budget(maximum);
+        }
+        Ok(edit)
+    }
+
+    pub(crate) fn with_raw_limits(mut self, limits: crate::document::raw::Limits) -> Result<Self> {
+        limits.validate()?;
+        self.raw_limits = Some(limits);
+        Ok(self)
+    }
+
+    /// Bound the semantic before/after XML pair retained by this edit.
+    ///
+    /// This is an internal bridge for the unified facade. It does not alter
+    /// the raw document policy or the leaf's parser/resource ceilings.
+    pub(crate) fn with_snapshot_budget(mut self, maximum: usize) -> Self {
+        self.snapshot_budget = Some(maximum);
+        self
+    }
+
+    pub(crate) fn with_options(mut self, options: super::EditOptions) -> Self {
+        self.snapshot_budget = options.max_snapshot_bytes_value();
+        self
+    }
+
+    /// The unified facade budget currently attached to this edit.
+    pub(crate) const fn snapshot_budget(&self) -> Option<usize> {
+        self.snapshot_budget
+    }
+
     /// Borrow the immutable source snapshot.
     #[must_use]
     pub const fn source(&self) -> &Snapshot {
@@ -2162,6 +3135,17 @@ impl Edit {
     #[must_use]
     pub const fn projected(&self) -> &Snapshot {
         &self.projected
+    }
+
+    /// Remaining semantic-operation slots in this edit's bounded ledger.
+    ///
+    /// Coordinators can close a run before staging a group of operations that
+    /// would exceed the native cap. A no-op may use fewer slots than requested.
+    #[must_use]
+    pub fn remaining_operations(&self) -> usize {
+        self.raw_limits
+            .map_or(MAX_OPERATIONS, crate::document::raw::Limits::max_operations)
+            .saturating_sub(self.operations.len())
     }
 
     /// Choose how this edit compacts the main document it publishes.
@@ -2187,7 +3171,7 @@ impl Edit {
     /// allocation against the retained execution context before growing the
     /// vector. Managed clones also admit the copied operation string payloads
     /// before `String::clone` grows them.
-    pub fn try_clone(&self) -> TransactionResult<Self> {
+    pub fn try_clone(&self) -> Result<Self> {
         let mut operations = Vec::new();
         let operation_admission = if let Some(admission) = self.projected.admission.as_ref() {
             if self.operations.is_empty() {
@@ -2212,13 +3196,13 @@ impl Edit {
                 .operations
                 .iter()
                 .try_fold(0usize, |total, operation| {
-                    total.checked_add(operation_string_bytes(operation)).ok_or(
-                        TransactionError::Limit {
-                            resource: "managed cloned operation string bytes",
-                            max: usize::MAX,
-                            actual: usize::MAX,
-                        },
-                    )
+                    total
+                        .checked_add(operation_string_bytes(operation))
+                        .ok_or(Error::Limit {
+                            kind: crate::document::LimitKind::ManagedClonedOperationStringBytes,
+                            maximum: usize::MAX,
+                            observed: usize::MAX,
+                        })
                 })?;
             if string_bytes == 0 {
                 None
@@ -2226,10 +3210,10 @@ impl Edit {
                 let memory = string_bytes
                     .checked_add(size_of::<StringAdmission>())
                     .and_then(|bytes| bytes.checked_add(size_of::<Arc<StringAdmission>>()))
-                    .ok_or(TransactionError::Limit {
-                        resource: "managed cloned operation string metadata bytes",
-                        max: usize::MAX,
-                        actual: usize::MAX,
+                    .ok_or(Error::Limit {
+                        kind: crate::document::LimitKind::ManagedClonedOperationStringMetadataBytes,
+                        maximum: usize::MAX,
+                        observed: usize::MAX,
                     })?;
                 Some(Arc::new(StringAdmission {
                     _memory: reserve_managed(&admission.context, Resource::Memory, memory)?,
@@ -2253,6 +3237,8 @@ impl Edit {
             operation_admission,
             operation_string_admission,
             compaction: self.compaction,
+            raw_limits: self.raw_limits,
+            snapshot_budget: self.snapshot_budget,
         })
     }
 
@@ -2261,7 +3247,9 @@ impl Edit {
     ///
     /// Replacement characters are assigned to the existing text slots in
     /// order: each slot keeps up to its original character count and the final
-    /// slot receives any remainder. Direct hyperlinks and other paragraph
+    /// slot receives any remainder. Tabs and LF become inline Word tab and
+    /// wrapping-break elements; paragraph count does not change. CR and XML-illegal
+    /// controls remain refused. Direct hyperlinks and other paragraph
     /// wrappers use their focused operations and are refused here.
     /// The input must expose its borrowed `str` view as well as a `String`
     /// conversion so managed callers can be admitted before conversion.
@@ -2274,7 +3262,7 @@ impl Edit {
         &mut self,
         position: Position,
         authored_text: impl Into<String> + AsRef<str>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         if self.projected.is_managed() {
             let input_bytes = authored_text.as_ref().len();
             let input_admission = self.reserve_input_text(input_bytes)?;
@@ -2293,10 +3281,7 @@ impl Edit {
         }
         self.reserve_operation()?;
         let text = authored_text.into();
-        validate_authored_text(&text).map_err(|reason| TransactionError::Refused {
-            position: position.get(),
-            reason,
-        })?;
+        validate_paragraph_text(position, &text)?;
         let range = self.range(position)?;
         let paragraph_start = usize::try_from(range.start).map_err(|_conversion_error| {
             crate::Error::InvalidFormat("paragraph offset does not fit usize".into())
@@ -2311,11 +3296,10 @@ impl Edit {
             .xml_bytes()
             .get(paragraph_start..paragraph_end)
             .ok_or_else(|| crate::Error::InvalidFormat("paragraph range is outside XML".into()))?;
-        let owner =
-            scan_text_owner(paragraph, b"p").map_err(|reason| TransactionError::Refused {
-                position: position.get(),
-                reason,
-            })?;
+        let owner = scan_paragraph_text_owner(paragraph).map_err(|reason| Error::Refused {
+            position: position.get(),
+            reason,
+        })?;
         if owner.text == text {
             return Ok(self);
         }
@@ -2327,7 +3311,7 @@ impl Edit {
             paragraph_end,
             &replacement,
         )?;
-        let candidate = self.projected.with_spliced_paragraphs(
+        let candidate = self.projected_with_splices(
             xml,
             &[ParagraphSplice {
                 start: paragraph_start,
@@ -2337,7 +3321,7 @@ impl Edit {
         )?;
         let readback = candidate
             .paragraph(position)
-            .ok_or(TransactionError::OutOfBounds {
+            .ok_or(Error::OutOfBounds {
                 position: position.get(),
                 len: candidate.paragraph_count(),
             })?
@@ -2364,19 +3348,15 @@ impl Edit {
         authored_text: String,
         input_admission: Option<Arc<StringAdmission>>,
         input_capacity_admission: Option<Arc<StringAdmission>>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         let context = self.base.managed_context().ok_or({
-            TransactionError::Document(crate::Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "replace_paragraph_text",
-                reason: "managed candidate is missing its execution admission",
-            })
+            Error::Document(crate::Error::internal(
+                "replace_paragraph_text",
+                "managed candidate is missing its execution admission",
+            ))
         })?;
         context.check().map_err(managed_execution)?;
-        validate_authored_text(&authored_text).map_err(|reason| TransactionError::Refused {
-            position: position.get(),
-            reason,
-        })?;
+        validate_paragraph_text(position, &authored_text)?;
         let range = self.range(position)?;
         let paragraph_start = usize::try_from(range.start).map_err(|_conversion_error| {
             crate::Error::InvalidFormat("paragraph offset does not fit usize".into())
@@ -2397,11 +3377,10 @@ impl Edit {
             .as_ref()
             .map(|admission| admission.owner_scan(paragraph.len()))
             .transpose()?;
-        let owner =
-            scan_text_owner(paragraph, b"p").map_err(|reason| TransactionError::Refused {
-                position: position.get(),
-                reason,
-            })?;
+        let owner = scan_paragraph_text_owner(paragraph).map_err(|reason| Error::Refused {
+            position: position.get(),
+            reason,
+        })?;
         if let Some(admission) = text_scan_admission.as_mut() {
             admission.release_depth();
         }
@@ -2445,7 +3424,7 @@ impl Edit {
             .map(|admission| admission.owner_scan(base_paragraph.len()))
             .transpose()?;
         let base_owner =
-            scan_text_owner(base_paragraph, b"p").map_err(|reason| TransactionError::Refused {
+            scan_paragraph_text_owner(base_paragraph).map_err(|reason| Error::Refused {
                 position: position.get(),
                 reason,
             })?;
@@ -2464,11 +3443,11 @@ impl Edit {
                 ..
             } = operation
             else {
-                return Err(TransactionError::Document(crate::Error::UnsafeEdit {
-                    format: "DOCX",
-                    operation: "replace_paragraph_text",
-                    reason: "managed transactions only support direct paragraph text operations",
-                }));
+                return Err(Error::Document(crate::Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "replace_paragraph_text",
+                    "managed transactions only support direct paragraph text operations",
+                )));
             };
             if *operation_position == position {
                 if existing_index.replace(index).is_some() {
@@ -2478,7 +3457,7 @@ impl Edit {
                     .into());
                 }
                 if before != &base_text {
-                    return Err(TransactionError::StaleSource);
+                    return Err(Error::PatchConflict);
                 }
             }
         }
@@ -2496,16 +3475,16 @@ impl Edit {
             .len()
             .checked_sub(usize::from(remove_existing))
             .and_then(|count| count.checked_add(usize::from(add_new)))
-            .ok_or(TransactionError::Limit {
-                resource: "managed paragraph operation count",
-                max: MAX_OPERATIONS,
-                actual: usize::MAX,
+            .ok_or(Error::Limit {
+                kind: crate::document::LimitKind::ManagedParagraphOperationCount,
+                maximum: MAX_OPERATIONS,
+                observed: usize::MAX,
             })?;
         if final_count > MAX_OPERATIONS {
-            return Err(TransactionError::Limit {
-                resource: "managed paragraph operation count",
-                max: MAX_OPERATIONS,
-                actual: final_count,
+            return Err(Error::Limit {
+                kind: crate::document::LimitKind::ManagedParagraphOperationCount,
+                maximum: MAX_OPERATIONS,
+                observed: final_count,
             });
         }
 
@@ -2518,18 +3497,18 @@ impl Edit {
                 planned_string_bytes = planned_string_bytes
                     .checked_add(base_text.capacity())
                     .and_then(|bytes| bytes.checked_add(authored_text.capacity()))
-                    .ok_or(TransactionError::Limit {
-                        resource: "managed operation string bytes",
-                        max: MAX_REPLACEMENT_TEXT_BYTES,
-                        actual: usize::MAX,
+                    .ok_or(Error::Limit {
+                        kind: crate::document::LimitKind::ManagedOperationStringBytes,
+                        maximum: MAX_REPLACEMENT_TEXT_BYTES,
+                        observed: usize::MAX,
                     })?;
             } else {
                 planned_string_bytes = planned_string_bytes
                     .checked_add(operation_string_bytes(operation))
-                    .ok_or(TransactionError::Limit {
-                        resource: "managed operation string bytes",
-                        max: MAX_REPLACEMENT_TEXT_BYTES,
-                        actual: usize::MAX,
+                    .ok_or(Error::Limit {
+                        kind: crate::document::LimitKind::ManagedOperationStringBytes,
+                        maximum: MAX_REPLACEMENT_TEXT_BYTES,
+                        observed: usize::MAX,
                     })?;
             }
         }
@@ -2537,10 +3516,10 @@ impl Edit {
             planned_string_bytes = planned_string_bytes
                 .checked_add(base_text.capacity())
                 .and_then(|bytes| bytes.checked_add(authored_text.capacity()))
-                .ok_or(TransactionError::Limit {
-                    resource: "managed operation string bytes",
-                    max: MAX_REPLACEMENT_TEXT_BYTES,
-                    actual: usize::MAX,
+                .ok_or(Error::Limit {
+                    kind: crate::document::LimitKind::ManagedOperationStringBytes,
+                    maximum: MAX_REPLACEMENT_TEXT_BYTES,
+                    observed: usize::MAX,
                 })?;
         }
 
@@ -2563,19 +3542,16 @@ impl Edit {
             return Ok(self);
         }
 
-        let source = self.base.source_xml().ok_or(crate::Error::UnsafeEdit {
-            format: "DOCX",
-            operation: "replace_paragraph_text",
-            reason: "managed paragraph source authorization is unavailable",
-        })?;
-        let identity = self
-            .base
-            .source_identity()
-            .ok_or(crate::Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "replace_paragraph_text",
-                reason: "managed paragraph source identity is unavailable",
-            })?;
+        let source = self.base.source_xml().ok_or(crate::Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "replace_paragraph_text",
+            "managed paragraph source authorization is unavailable",
+        ))?;
+        let identity = self.base.source_identity().ok_or(crate::Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "replace_paragraph_text",
+            "managed paragraph source identity is unavailable",
+        ))?;
 
         // Admit the replacement ledger and all retained operation strings
         // before cloning or growing the prospective operation vector. The
@@ -2602,11 +3578,11 @@ impl Edit {
                 after,
             } = operation
             else {
-                return Err(TransactionError::Document(crate::Error::UnsafeEdit {
-                    format: "DOCX",
-                    operation: "replace_paragraph_text",
-                    reason: "managed transactions only support direct paragraph text operations",
-                }));
+                return Err(Error::Document(crate::Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "replace_paragraph_text",
+                    "managed transactions only support direct paragraph text operations",
+                )));
             };
             if Some(index) == existing_index {
                 if remove_existing {
@@ -2666,13 +3642,12 @@ impl Edit {
         operation: &'static str,
         (source, identity): (SourceXmlPart, Arc<SourceIdentity>),
         _temporary_admissions: impl Sized,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         let context = self.base.managed_context().ok_or({
-            TransactionError::Document(crate::Error::UnsafeEdit {
-                format: "DOCX",
+            Error::Document(crate::Error::internal(
                 operation,
-                reason: "managed candidate is missing its execution admission",
-            })
+                "managed candidate is missing its execution admission",
+            ))
         })?;
         context.check().map_err(managed_execution)?;
         debug_assert!(!planned_operations.is_empty());
@@ -2682,10 +3657,10 @@ impl Edit {
             .len()
             .checked_mul(size_of::<ManagedParagraphPlan>())
             .and_then(|bytes| bytes.checked_add(size_of::<Vec<ManagedParagraphPlan>>()));
-        let plan_memory = plan_memory.ok_or(TransactionError::Limit {
-            resource: "managed paragraph reconstruction plan memory",
-            max: usize::MAX,
-            actual: usize::MAX,
+        let plan_memory = plan_memory.ok_or(Error::Limit {
+            kind: crate::document::LimitKind::ManagedParagraphReconstructionPlanMemory,
+            maximum: usize::MAX,
+            observed: usize::MAX,
         })?;
         let _plan_memory = reserve_managed(&context, Resource::Memory, plan_memory)?;
         let _plan_objects = reserve_managed(&context, Resource::Objects, planned_operations.len())?;
@@ -2705,11 +3680,11 @@ impl Edit {
                 after,
             } = planned_operation
             else {
-                return Err(TransactionError::Document(crate::Error::UnsafeEdit {
-                    format: "DOCX",
+                return Err(Error::Document(crate::Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
                     operation,
-                    reason: "managed transactions only support direct paragraph text operations",
-                }));
+                    "managed transactions only support direct paragraph text operations",
+                )));
             };
             let range = self.base.range(*operation_position)?;
             let paragraph_start = checked_start(range, "base paragraph")?;
@@ -2721,38 +3696,36 @@ impl Edit {
                 "base paragraph",
             )?;
             let base_admission = self.base.admission.as_ref().ok_or({
-                TransactionError::Document(crate::Error::UnsafeEdit {
-                    format: "DOCX",
+                Error::Document(crate::Error::internal(
                     operation,
-                    reason: "managed base snapshot is missing its execution admission",
-                })
+                    "managed base snapshot is missing its execution admission",
+                ))
             })?;
             let mut scan_admission = base_admission.owner_scan(paragraph.len())?;
-            let owner =
-                scan_text_owner(paragraph, b"p").map_err(|reason| TransactionError::Refused {
-                    position: operation_position.get(),
-                    reason,
-                })?;
+            let owner = scan_paragraph_text_owner(paragraph).map_err(|reason| Error::Refused {
+                position: operation_position.get(),
+                reason,
+            })?;
             scan_admission.release_depth();
             if owner.text != *before {
-                return Err(TransactionError::StaleSource);
+                return Err(Error::PatchConflict);
             }
             let (_, owner_fragment_bytes) = preflight_text_owner_rewrite(paragraph, &owner, after)?;
-            fragment_bytes = fragment_bytes.checked_add(owner_fragment_bytes).ok_or(
-                TransactionError::Limit {
-                    resource: "managed paragraph fragment bytes",
-                    max: MAX_DOCUMENT_XML_BYTES,
-                    actual: usize::MAX,
-                },
-            )?;
-            fragment_count =
-                fragment_count
-                    .checked_add(owner.slots.len())
-                    .ok_or(TransactionError::Limit {
-                        resource: "managed paragraph fragment count",
-                        max: MAX_OPERATIONS,
-                        actual: usize::MAX,
+            fragment_bytes =
+                fragment_bytes
+                    .checked_add(owner_fragment_bytes)
+                    .ok_or(Error::Limit {
+                        kind: crate::document::LimitKind::ManagedParagraphFragmentBytes,
+                        maximum: MAX_DOCUMENT_XML_BYTES,
+                        observed: usize::MAX,
                     })?;
+            fragment_count = fragment_count
+                .checked_add(owner.slots.len())
+                .ok_or(Error::Limit {
+                    kind: crate::document::LimitKind::ManagedParagraphFragmentCount,
+                    maximum: MAX_OPERATIONS,
+                    observed: usize::MAX,
+                })?;
             plans.push(ManagedParagraphPlan {
                 range,
                 operation_index,
@@ -2792,16 +3765,16 @@ impl Edit {
                     .checked_mul(
                         size_of::<Vec<u8>>() + size_of::<litchi_opc::AuthoredXmlFragment>(),
                     )
-                    .ok_or(TransactionError::Limit {
-                        resource: "managed paragraph fragment metadata",
-                        max: usize::MAX,
-                        actual: usize::MAX,
+                    .ok_or(Error::Limit {
+                        kind: crate::document::LimitKind::ManagedParagraphFragmentMetadata,
+                        maximum: usize::MAX,
+                        observed: usize::MAX,
                     })?,
             )
-            .ok_or(TransactionError::Limit {
-                resource: "managed paragraph fragment memory",
-                max: usize::MAX,
-                actual: usize::MAX,
+            .ok_or(Error::Limit {
+                kind: crate::document::LimitKind::ManagedParagraphFragmentMemory,
+                maximum: usize::MAX,
+                observed: usize::MAX,
             })?;
         let _fragment_memory = reserve_managed(&context, Resource::Memory, fragment_memory)?;
         let reconstruction_work = self
@@ -2815,10 +3788,10 @@ impl Edit {
                     .checked_mul(size_of::<Operation>())
                     .and_then(|operation_bytes| bytes.checked_add(operation_bytes))
             })
-            .ok_or(TransactionError::Limit {
-                resource: "managed paragraph reconstruction work",
-                max: usize::MAX,
-                actual: usize::MAX,
+            .ok_or(Error::Limit {
+                kind: crate::document::LimitKind::ManagedParagraphReconstructionWork,
+                maximum: usize::MAX,
+                observed: usize::MAX,
             })?;
         consume_managed(&context, Resource::Work, reconstruction_work)?;
 
@@ -2860,22 +3833,20 @@ impl Edit {
                             "paragraph text slot is outside authored text".into(),
                         )
                     })?;
-                    byte_cursor = byte_cursor.checked_add(character.len_utf8()).ok_or(
-                        TransactionError::Limit {
-                            resource: "replacement text bytes",
-                            max: MAX_REPLACEMENT_TEXT_BYTES,
-                            actual: usize::MAX,
-                        },
-                    )?;
+                    byte_cursor =
+                        byte_cursor
+                            .checked_add(character.len_utf8())
+                            .ok_or(Error::Limit {
+                                kind: crate::document::LimitKind::ReplacementTextBytes,
+                                maximum: MAX_REPLACEMENT_TEXT_BYTES,
+                                observed: usize::MAX,
+                            })?;
                 }
-                character_cursor =
-                    character_cursor
-                        .checked_add(count)
-                        .ok_or(TransactionError::Limit {
-                            resource: "replacement text characters",
-                            max: MAX_REPLACEMENT_TEXT_BYTES,
-                            actual: usize::MAX,
-                        })?;
+                character_cursor = character_cursor.checked_add(count).ok_or(Error::Limit {
+                    kind: crate::document::LimitKind::ReplacementTextCharacters,
+                    maximum: MAX_REPLACEMENT_TEXT_BYTES,
+                    observed: usize::MAX,
+                })?;
                 let value = &after[value_start..byte_cursor];
                 let fragment = try_run_content_fragment(&slot.prefix, &slot.local_name, value)?;
                 let start = paragraph_start.checked_add(slot.start).ok_or_else(|| {
@@ -2900,6 +3871,7 @@ impl Edit {
             }
         }
         let candidate_source = publication.finish().map_err(crate::Error::from)?;
+        self.admit_snapshot_xml(candidate_source.bytes().len())?;
         let candidate =
             Snapshot::from_source_xml_with_identity(candidate_source, identity, context)?;
         for plan in &plans {
@@ -2916,7 +3888,7 @@ impl Edit {
             };
             let readback = candidate
                 .paragraph(*operation_position)
-                .ok_or(TransactionError::OutOfBounds {
+                .ok_or(Error::OutOfBounds {
                     position: operation_position.get(),
                     len: candidate.paragraph_count(),
                 })?
@@ -2941,6 +3913,7 @@ impl Edit {
     /// Positions must be non-empty, unique, and strictly increasing. Every
     /// paragraph retains its run boundaries, formatting, drawings, and unknown
     /// run XML under the same refusal rules as [`Self::replace_paragraph_text`].
+    /// Tabs and LF become inline controls; this does not split paragraphs.
     ///
     /// # Errors
     ///
@@ -2950,7 +3923,7 @@ impl Edit {
     pub fn replace_body_paragraph_texts(
         &mut self,
         replacements: &[ParagraphTextReplacement],
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         if self.projected.is_managed() {
             validate_paragraph_replacements(replacements)?;
             return self.replace_managed_body_paragraph_texts(replacements);
@@ -2968,12 +3941,7 @@ impl Edit {
             })?;
         for replacement in replacements {
             candidate.reserve_operation()?;
-            validate_authored_text(replacement.text.as_str()).map_err(|reason| {
-                TransactionError::Refused {
-                    position: replacement.position.get(),
-                    reason,
-                }
-            })?;
+            validate_paragraph_text(replacement.position, replacement.text.as_str())?;
             let replacement_text_bytes = candidate.checked_text_total(replacement.text.len())?;
             let range = candidate.range(replacement.position)?;
             let paragraph_start = checked_start(range, "paragraph")?;
@@ -2984,11 +3952,10 @@ impl Edit {
                 paragraph_end,
                 "paragraph",
             )?;
-            let owner =
-                scan_text_owner(paragraph, b"p").map_err(|reason| TransactionError::Refused {
-                    position: replacement.position.get(),
-                    reason,
-                })?;
+            let owner = scan_paragraph_text_owner(paragraph).map_err(|reason| Error::Refused {
+                position: replacement.position.get(),
+                reason,
+            })?;
             if owner.text == replacement.text {
                 continue;
             }
@@ -3025,7 +3992,7 @@ impl Edit {
                 }),
         );
         let xml = replace_ranges(candidate.projected.xml_bytes(), &ranges)?;
-        let projected = candidate.projected.with_spliced_paragraphs(xml, &splices)?;
+        let projected = candidate.projected_with_splices(xml, &splices)?;
         for operation in &candidate.operations[first_operation..] {
             let Operation::ReplaceParagraphText {
                 position, after, ..
@@ -3038,7 +4005,7 @@ impl Edit {
             };
             let readback = projected
                 .paragraph(*position)
-                .ok_or(TransactionError::OutOfBounds {
+                .ok_or(Error::OutOfBounds {
                     position: position.get(),
                     len: projected.paragraph_count(),
                 })?
@@ -3058,13 +4025,12 @@ impl Edit {
     fn replace_managed_body_paragraph_texts(
         &mut self,
         replacements: &[ParagraphTextReplacement],
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         let context = self.base.managed_context().ok_or({
-            TransactionError::Document(crate::Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "replace_body_paragraph_texts",
-                reason: "managed candidate is missing its execution admission",
-            })
+            Error::Document(crate::Error::internal(
+                "replace_body_paragraph_texts",
+                "managed candidate is missing its execution admission",
+            ))
         })?;
         context.check().map_err(managed_execution)?;
 
@@ -3072,22 +4038,18 @@ impl Edit {
         // must still admit every borrowed length and excess capacity before
         // any decision or operation vector can grow. Keep each token live
         // until the shared reconstruction either publishes or fails.
-        let input_token_capacity =
-            replacements
-                .len()
-                .checked_mul(2)
-                .ok_or(TransactionError::Limit {
-                    resource: "managed batch input admission capacity",
-                    max: usize::MAX,
-                    actual: usize::MAX,
-                })?;
+        let input_token_capacity = replacements.len().checked_mul(2).ok_or(Error::Limit {
+            kind: crate::document::LimitKind::ManagedBatchInputAdmissionCapacity,
+            maximum: usize::MAX,
+            observed: usize::MAX,
+        })?;
         let input_vector_memory = input_token_capacity
             .checked_mul(size_of::<Arc<StringAdmission>>())
             .and_then(|bytes| bytes.checked_add(size_of::<Vec<Arc<StringAdmission>>>()))
-            .ok_or(TransactionError::Limit {
-                resource: "managed batch input admission metadata",
-                max: usize::MAX,
-                actual: usize::MAX,
+            .ok_or(Error::Limit {
+                kind: crate::document::LimitKind::ManagedBatchInputAdmissionMetadata,
+                maximum: usize::MAX,
+                observed: usize::MAX,
             })?;
         let _input_vector_memory =
             reserve_managed(&context, Resource::Memory, input_vector_memory)?;
@@ -3107,12 +4069,7 @@ impl Edit {
             }
         }
         for replacement in replacements {
-            validate_authored_text(replacement.text.as_str()).map_err(|reason| {
-                TransactionError::Refused {
-                    position: replacement.position.get(),
-                    reason,
-                }
-            })?;
+            validate_paragraph_text(replacement.position, replacement.text.as_str())?;
         }
 
         // Decisions retain the immutable-base text and its scan admission
@@ -3122,10 +4079,10 @@ impl Edit {
             .len()
             .checked_mul(size_of::<ManagedBatchDecision<'_>>())
             .and_then(|bytes| bytes.checked_add(size_of::<Vec<ManagedBatchDecision<'_>>>()))
-            .ok_or(TransactionError::Limit {
-                resource: "managed paragraph batch decision metadata",
-                max: usize::MAX,
-                actual: usize::MAX,
+            .ok_or(Error::Limit {
+                kind: crate::document::LimitKind::ManagedParagraphBatchDecisionMetadata,
+                maximum: usize::MAX,
+                observed: usize::MAX,
             })?;
         let _decision_memory = reserve_managed(&context, Resource::Memory, decision_memory)?;
         let _decision_objects = reserve_managed(&context, Resource::Objects, replacements.len())?;
@@ -3150,19 +4107,17 @@ impl Edit {
             )?;
             let (owner, _projected_scan) = {
                 let admission = self.projected.admission.as_ref().ok_or({
-                    TransactionError::Document(crate::Error::UnsafeEdit {
-                        format: "DOCX",
-                        operation: "replace_body_paragraph_texts",
-                        reason: "managed projected snapshot is missing its execution admission",
-                    })
+                    Error::Document(crate::Error::internal(
+                        "replace_body_paragraph_texts",
+                        "managed projected snapshot is missing its execution admission",
+                    ))
                 })?;
                 let mut scan = admission.owner_scan(paragraph.len())?;
-                let owner = scan_text_owner(paragraph, b"p").map_err(|reason| {
-                    TransactionError::Refused {
+                let owner =
+                    scan_paragraph_text_owner(paragraph).map_err(|reason| Error::Refused {
                         position: replacement.position.get(),
                         reason,
-                    }
-                })?;
+                    })?;
                 scan.release_depth();
                 (owner, scan)
             };
@@ -3180,19 +4135,17 @@ impl Edit {
                 "base paragraph",
             )?;
             let base_admission = self.base.admission.as_ref().ok_or({
-                TransactionError::Document(crate::Error::UnsafeEdit {
-                    format: "DOCX",
-                    operation: "replace_body_paragraph_texts",
-                    reason: "managed base snapshot is missing its execution admission",
-                })
+                Error::Document(crate::Error::internal(
+                    "replace_body_paragraph_texts",
+                    "managed base snapshot is missing its execution admission",
+                ))
             })?;
             let mut base_scan = base_admission.owner_scan(base_paragraph.len())?;
-            let base_owner = scan_text_owner(base_paragraph, b"p").map_err(|reason| {
-                TransactionError::Refused {
+            let base_owner =
+                scan_paragraph_text_owner(base_paragraph).map_err(|reason| Error::Refused {
                     position: replacement.position.get(),
                     reason,
-                }
-            })?;
+                })?;
             base_scan.release_depth();
             let base_text = base_owner.text;
 
@@ -3204,11 +4157,11 @@ impl Edit {
                     ..
                 } = operation
                 else {
-                    return Err(TransactionError::Document(crate::Error::UnsafeEdit {
-                        format: "DOCX",
-                        operation: "replace_body_paragraph_texts",
-                        reason: "managed transactions only support direct paragraph text operations",
-                    }));
+                    return Err(Error::Document(crate::Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedOperation,
+                        "replace_body_paragraph_texts",
+                        "managed transactions only support direct paragraph text operations",
+                    )));
                 };
                 if *operation_position == replacement.position {
                     if existing_index.replace(index).is_some() {
@@ -3219,7 +4172,7 @@ impl Edit {
                         .into());
                     }
                     if before != &base_text {
-                        return Err(TransactionError::StaleSource);
+                        return Err(Error::PatchConflict);
                     }
                 }
             }
@@ -3257,16 +4210,16 @@ impl Edit {
             .len()
             .checked_sub(remove_count)
             .and_then(|count| count.checked_add(add_count))
-            .ok_or(TransactionError::Limit {
-                resource: "managed paragraph operation count",
-                max: MAX_OPERATIONS,
-                actual: usize::MAX,
+            .ok_or(Error::Limit {
+                kind: crate::document::LimitKind::ManagedParagraphOperationCount,
+                maximum: MAX_OPERATIONS,
+                observed: usize::MAX,
             })?;
         if final_count > MAX_OPERATIONS {
-            return Err(TransactionError::Limit {
-                resource: "managed paragraph operation count",
-                max: MAX_OPERATIONS,
-                actual: final_count,
+            return Err(Error::Limit {
+                kind: crate::document::LimitKind::ManagedParagraphOperationCount,
+                maximum: MAX_OPERATIONS,
+                observed: final_count,
             });
         }
 
@@ -3280,19 +4233,16 @@ impl Edit {
             return Ok(self);
         }
 
-        let source = self.base.source_xml().ok_or(crate::Error::UnsafeEdit {
-            format: "DOCX",
-            operation: "replace_body_paragraph_texts",
-            reason: "managed paragraph source authorization is unavailable",
-        })?;
-        let identity = self
-            .base
-            .source_identity()
-            .ok_or(crate::Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "replace_body_paragraph_texts",
-                reason: "managed paragraph source identity is unavailable",
-            })?;
+        let source = self.base.source_xml().ok_or(crate::Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "replace_body_paragraph_texts",
+            "managed paragraph source authorization is unavailable",
+        ))?;
+        let identity = self.base.source_identity().ok_or(crate::Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "replace_body_paragraph_texts",
+            "managed paragraph source identity is unavailable",
+        ))?;
 
         // Existing edits may have been staged in arbitrary scalar order. Map
         // each retained operation to its batch decision once so final-ledger
@@ -3302,10 +4252,10 @@ impl Edit {
             .len()
             .checked_mul(size_of::<Option<usize>>())
             .and_then(|bytes| bytes.checked_add(size_of::<Vec<Option<usize>>>()))
-            .ok_or(TransactionError::Limit {
-                resource: "managed paragraph batch decision map metadata",
-                max: usize::MAX,
-                actual: usize::MAX,
+            .ok_or(Error::Limit {
+                kind: crate::document::LimitKind::ManagedParagraphBatchDecisionMapMetadata,
+                maximum: usize::MAX,
+                observed: usize::MAX,
             })?;
         let _decision_map_memory =
             reserve_managed(&context, Resource::Memory, decision_map_memory)?;
@@ -3340,27 +4290,27 @@ impl Edit {
                     continue;
                 }
                 let Operation::ReplaceParagraphText { before, .. } = operation else {
-                    return Err(TransactionError::Document(crate::Error::UnsafeEdit {
-                        format: "DOCX",
-                        operation: "replace_body_paragraph_texts",
-                        reason: "managed transactions only support direct paragraph text operations",
-                    }));
+                    return Err(Error::Document(crate::Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedOperation,
+                        "replace_body_paragraph_texts",
+                        "managed transactions only support direct paragraph text operations",
+                    )));
                 };
                 planned_string_bytes = planned_string_bytes
                     .checked_add(before.capacity())
                     .and_then(|bytes| bytes.checked_add(decision.replacement.text.capacity()))
-                    .ok_or(TransactionError::Limit {
-                        resource: "managed operation string bytes",
-                        max: MAX_REPLACEMENT_TEXT_BYTES,
-                        actual: usize::MAX,
+                    .ok_or(Error::Limit {
+                        kind: crate::document::LimitKind::ManagedOperationStringBytes,
+                        maximum: MAX_REPLACEMENT_TEXT_BYTES,
+                        observed: usize::MAX,
                     })?;
             } else {
                 planned_string_bytes = planned_string_bytes
                     .checked_add(operation_string_bytes(operation))
-                    .ok_or(TransactionError::Limit {
-                        resource: "managed operation string bytes",
-                        max: MAX_REPLACEMENT_TEXT_BYTES,
-                        actual: usize::MAX,
+                    .ok_or(Error::Limit {
+                        kind: crate::document::LimitKind::ManagedOperationStringBytes,
+                        maximum: MAX_REPLACEMENT_TEXT_BYTES,
+                        observed: usize::MAX,
                     })?;
             }
         }
@@ -3368,10 +4318,10 @@ impl Edit {
             planned_string_bytes = planned_string_bytes
                 .checked_add(decision.base_text.capacity())
                 .and_then(|bytes| bytes.checked_add(decision.replacement.text.capacity()))
-                .ok_or(TransactionError::Limit {
-                    resource: "managed operation string bytes",
-                    max: MAX_REPLACEMENT_TEXT_BYTES,
-                    actual: usize::MAX,
+                .ok_or(Error::Limit {
+                    kind: crate::document::LimitKind::ManagedOperationStringBytes,
+                    maximum: MAX_REPLACEMENT_TEXT_BYTES,
+                    observed: usize::MAX,
                 })?;
         }
 
@@ -3399,11 +4349,11 @@ impl Edit {
                     position, before, ..
                 } = operation
                 else {
-                    return Err(TransactionError::Document(crate::Error::UnsafeEdit {
-                        format: "DOCX",
-                        operation: "replace_body_paragraph_texts",
-                        reason: "managed transactions only support direct paragraph text operations",
-                    }));
+                    return Err(Error::Document(crate::Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedOperation,
+                        "replace_body_paragraph_texts",
+                        "managed transactions only support direct paragraph text operations",
+                    )));
                 };
                 planned_operations.push(Operation::ReplaceParagraphText {
                     position: *position,
@@ -3448,11 +4398,11 @@ impl Edit {
         paragraph: Position,
         hyperlink: Position,
         authored_text: impl Into<String>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("replace_hyperlink_text")?;
         self.reserve_operation()?;
         let text = authored_text.into();
-        validate_authored_text(&text).map_err(|reason| TransactionError::Refused {
+        validate_authored_text(&text).map_err(|reason| Error::Refused {
             position: paragraph.get(),
             reason,
         })?;
@@ -3473,7 +4423,7 @@ impl Edit {
             hyperlink,
             Refusal::HyperlinkNotFound,
         )
-        .map_err(|reason| TransactionError::Refused {
+        .map_err(|reason| Error::Refused {
             position: paragraph.get(),
             reason,
         })?;
@@ -3485,12 +4435,11 @@ impl Edit {
             hyperlink_end,
             "hyperlink",
         )?;
-        let owner = scan_text_owner(hyperlink_xml, b"hyperlink").map_err(|reason| {
-            TransactionError::Refused {
+        let owner =
+            scan_text_owner(hyperlink_xml, b"hyperlink").map_err(|reason| Error::Refused {
                 position: paragraph.get(),
                 reason,
-            }
-        })?;
+            })?;
         if owner.text == text {
             return Ok(self);
         }
@@ -3501,7 +4450,7 @@ impl Edit {
             hyperlink_end,
             &replacement,
         )?;
-        let candidate = self.projected.with_rewritten_xml(xml)?;
+        let candidate = self.projected_with_xml(xml)?;
         let actual = selected_hyperlink_text(&candidate, paragraph, hyperlink)?;
         if actual != text {
             return Err(crate::Error::InvalidFormat(
@@ -3536,7 +4485,7 @@ impl Edit {
     pub fn replace_body_hyperlink_texts(
         &mut self,
         replacements: &[HyperlinkTextReplacement],
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("replace_body_hyperlink_texts")?;
         validate_hyperlink_replacements(replacements)?;
         let mut candidate = self.try_clone()?;
@@ -3565,7 +4514,7 @@ impl Edit {
         paragraph: Position,
         run: Position,
         authored_text: impl Into<String>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("replace_run_text")?;
         self.replace_direct_paragraph_owner_text(
             paragraph,
@@ -3582,6 +4531,301 @@ impl Edit {
         )
     }
 
+    /// Replace only the first direct `w:t` child of one run while preserving
+    /// its attributes and every other run child byte-for-byte. Unlike
+    /// [`Self::replace_run_text`], authored tabs, line feeds, and carriage
+    /// returns remain literal text-node characters; carriage returns are
+    /// written as numeric XML references so XML line-ending normalization
+    /// cannot change them on a later parse.
+    ///
+    /// # Errors
+    ///
+    /// Returns a checked selector/refusal, resource-limit, or malformed XML
+    /// error without changing the projected snapshot. Budget-managed edits
+    /// retain the same explicit refusal as the other source-preserving native
+    /// run operations.
+    pub fn replace_run_text_node(
+        &mut self,
+        paragraph: Position,
+        run: Position,
+        authored_text: impl Into<String>,
+    ) -> Result<&mut Self> {
+        self.ensure_unmanaged("replace_run_text_node")?;
+        self.reserve_operation()?;
+        let text = authored_text.into();
+        validate_authored_run_content(&text).map_err(|reason| Error::Refused {
+            position: paragraph.get(),
+            reason,
+        })?;
+        let replacement_text_bytes = self.checked_text_total(text.len())?;
+        let paragraph_range = self.range(paragraph)?;
+        let paragraph_start = checked_start(paragraph_range, "paragraph")?;
+        let paragraph_end = checked_end(paragraph_range, "paragraph")?;
+        let paragraph_xml = checked_slice(
+            self.projected.xml_bytes(),
+            paragraph_start,
+            paragraph_end,
+            "paragraph",
+        )?;
+        let inherited_namespaces = self
+            .projected
+            .paragraph_namespaces
+            .get(paragraph.get())
+            .ok_or(Error::OutOfBounds {
+                position: paragraph.get(),
+                len: self.projected.paragraph_count(),
+            })?;
+        let run_range = select_direct_child_with_transaction_namespace_context(
+            paragraph_xml,
+            b"p",
+            b"r",
+            run,
+            Refusal::RunNotFound,
+            inherited_namespaces,
+        )
+        .map_err(|reason| Error::Refused {
+            position: paragraph.get(),
+            reason,
+        })?;
+        let run_start = checked_relative_start(paragraph_start, run_range)?;
+        let run_end = checked_relative_end(paragraph_start, run_range)?;
+        let run_xml = checked_slice(self.projected.xml_bytes(), run_start, run_end, "run")?;
+        let Some(text_range) =
+            first_direct_text_node(run_xml, inherited_namespaces).map_err(|reason| {
+                Error::Refused {
+                    position: paragraph.get(),
+                    reason,
+                }
+            })?
+        else {
+            if run_has_only_properties(run_xml, inherited_namespaces).map_err(|reason| {
+                Error::Refused {
+                    position: paragraph.get(),
+                    reason,
+                }
+            })? {
+                return Ok(self);
+            }
+            return Err(Error::Refused {
+                position: paragraph.get(),
+                reason: Refusal::ComplexRun,
+            });
+        };
+        let text_start = checked_relative_start(run_start, text_range)?;
+        let text_end = checked_relative_end(run_start, text_range)?;
+        let before = checked_slice(
+            self.projected.xml_bytes(),
+            text_start,
+            text_end,
+            "run text node",
+        )?;
+        let existing = decode_text_fragment(before).map_err(|reason| Error::Refused {
+            position: paragraph.get(),
+            reason,
+        })?;
+        if existing == text {
+            return Ok(self);
+        }
+        let after = rewrite_literal_text_node(before, &text)?;
+        let xml = replace_range(self.projected.xml_bytes(), text_start, text_end, &after)?;
+        let candidate = self.projected_with_xml(xml)?;
+        let candidate_paragraph_range = candidate.range(paragraph)?;
+        let candidate_paragraph_start = checked_start(candidate_paragraph_range, "paragraph")?;
+        let candidate_paragraph_end = checked_end(candidate_paragraph_range, "paragraph")?;
+        let candidate_paragraph = checked_slice(
+            candidate.xml_bytes(),
+            candidate_paragraph_start,
+            candidate_paragraph_end,
+            "paragraph",
+        )?;
+        let candidate_run = select_direct_child_with_transaction_namespace_context(
+            candidate_paragraph,
+            b"p",
+            b"r",
+            run,
+            Refusal::RunNotFound,
+            inherited_namespaces,
+        )
+        .map_err(|reason| Error::Refused {
+            position: paragraph.get(),
+            reason,
+        })?;
+        let candidate_run_start = checked_relative_start(candidate_paragraph_start, candidate_run)?;
+        let candidate_run_end = checked_relative_end(candidate_paragraph_start, candidate_run)?;
+        let candidate_run_xml = checked_slice(
+            candidate.xml_bytes(),
+            candidate_run_start,
+            candidate_run_end,
+            "run",
+        )?;
+        let candidate_text = first_direct_text_node(candidate_run_xml, inherited_namespaces)
+            .map_err(|reason| Error::Refused {
+                position: paragraph.get(),
+                reason,
+            })?
+            .ok_or(Error::Refused {
+                position: paragraph.get(),
+                reason: Refusal::ComplexRun,
+            })?;
+        let candidate_text_start = checked_relative_start(candidate_run_start, candidate_text)?;
+        let candidate_text_end = checked_relative_end(candidate_run_start, candidate_text)?;
+        if checked_slice(
+            candidate.xml_bytes(),
+            candidate_text_start,
+            candidate_text_end,
+            "run text node",
+        )? != after.as_slice()
+        {
+            return Err(crate::Error::InvalidFormat(
+                "document run text-node edit failed exact readback".into(),
+            )
+            .into());
+        }
+        self.operations.push(Operation::ReplaceRunTextNode {
+            paragraph,
+            run,
+            before: Arc::new(before.to_vec()),
+            after: Arc::new(after),
+        });
+        self.replacement_text_bytes = replacement_text_bytes;
+        self.projected = candidate;
+        Ok(self)
+    }
+
+    /// Mark the owning complex field dirty when a direct run is a cached
+    /// result. The operation follows direct run siblings backwards, ignores
+    /// closed nested fields, and changes only the owning `w:fldChar` marker.
+    /// Runs outside a cached result, empty runs, and already-dirty fields are
+    /// no-ops.
+    pub fn mark_cached_run_field_dirty(
+        &mut self,
+        paragraph: Position,
+        run: Position,
+    ) -> Result<&mut Self> {
+        self.ensure_unmanaged("mark_cached_run_field_dirty")?;
+        self.reserve_operation()?;
+        let paragraph_range = self.range(paragraph)?;
+        let paragraph_start = checked_start(paragraph_range, "paragraph")?;
+        let paragraph_end = checked_end(paragraph_range, "paragraph")?;
+        let paragraph_xml = checked_slice(
+            self.projected.xml_bytes(),
+            paragraph_start,
+            paragraph_end,
+            "paragraph",
+        )?;
+        let inherited_namespaces = self
+            .projected
+            .paragraph_namespaces
+            .get(paragraph.get())
+            .ok_or(Error::OutOfBounds {
+                position: paragraph.get(),
+                len: self.projected.paragraph_count(),
+            })?;
+        let runs =
+            scan_cached_field_runs(paragraph_xml, inherited_namespaces).map_err(|reason| {
+                Error::Refused {
+                    position: paragraph.get(),
+                    reason,
+                }
+            })?;
+        let Some(selected) = runs.get(run.get()) else {
+            return Err(Error::Refused {
+                position: paragraph.get(),
+                reason: Refusal::RunNotFound,
+            });
+        };
+        if !selected.has_direct_text {
+            return Ok(self);
+        }
+        let Some((owner_run, marker)) = owning_cached_field_marker(&runs, run.get()) else {
+            return Ok(self);
+        };
+        if marker.dirty {
+            return Ok(self);
+        }
+        let owner_start = checked_relative_start(paragraph_start, runs[owner_run].range)?;
+        let marker_start = checked_relative_start(owner_start, marker.range)?;
+        let marker_end = checked_relative_end(owner_start, marker.range)?;
+        let before = checked_slice(
+            self.projected.xml_bytes(),
+            marker_start,
+            marker_end,
+            "cached field marker",
+        )?;
+        let owner_end = checked_relative_end(paragraph_start, runs[owner_run].range)?;
+        let owner_xml = checked_slice(
+            self.projected.xml_bytes(),
+            owner_start,
+            owner_end,
+            "cached field run",
+        )?;
+        let marker_namespaces =
+            run_namespace_context(owner_xml, inherited_namespaces).map_err(|reason| {
+                Error::Refused {
+                    position: paragraph.get(),
+                    reason,
+                }
+            })?;
+        let after = rewrite_cached_field_marker(before, &marker_namespaces)?;
+        if after == before {
+            return Ok(self);
+        }
+        let replacement_text_bytes = self.checked_text_total(after.len())?;
+        let xml = replace_range(self.projected.xml_bytes(), marker_start, marker_end, &after)?;
+        let candidate = self.projected_with_xml(xml)?;
+        let candidate_paragraph_range = candidate.range(paragraph)?;
+        let candidate_paragraph_start = checked_start(candidate_paragraph_range, "paragraph")?;
+        let candidate_paragraph_end = checked_end(candidate_paragraph_range, "paragraph")?;
+        let candidate_paragraph = checked_slice(
+            candidate.xml_bytes(),
+            candidate_paragraph_start,
+            candidate_paragraph_end,
+            "paragraph",
+        )?;
+        let candidate_runs = scan_cached_field_runs(candidate_paragraph, inherited_namespaces)
+            .map_err(|reason| Error::Refused {
+                position: paragraph.get(),
+                reason,
+            })?;
+        let Some((candidate_owner_run, candidate_marker)) =
+            owning_cached_field_marker(&candidate_runs, run.get())
+        else {
+            return Err(crate::Error::InvalidFormat(
+                "document cached field marker edit lost its owning field".into(),
+            )
+            .into());
+        };
+        let candidate_owner_start = checked_relative_start(
+            candidate_paragraph_start,
+            candidate_runs[candidate_owner_run].range,
+        )?;
+        let candidate_marker_start =
+            checked_relative_start(candidate_owner_start, candidate_marker.range)?;
+        let candidate_marker_end =
+            checked_relative_end(candidate_owner_start, candidate_marker.range)?;
+        if checked_slice(
+            candidate.xml_bytes(),
+            candidate_marker_start,
+            candidate_marker_end,
+            "cached field marker",
+        )? != after.as_slice()
+        {
+            return Err(crate::Error::InvalidFormat(
+                "document cached field marker edit failed exact readback".into(),
+            )
+            .into());
+        }
+        self.operations.push(Operation::MarkCachedRunFieldDirty {
+            paragraph,
+            run,
+            before: Arc::new(before.to_vec()),
+            after: Arc::new(after),
+        });
+        self.replacement_text_bytes = replacement_text_bytes;
+        self.projected = candidate;
+        Ok(self)
+    }
+
     /// Replace the displayed text of one direct simple field while preserving
     /// its instruction, dirty/lock state, formatting, and opaque XML.
     ///
@@ -3596,7 +4840,7 @@ impl Edit {
         paragraph: Position,
         field: Position,
         authored_text: impl Into<String>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("replace_simple_field_text")?;
         self.replace_direct_paragraph_owner_text(
             paragraph,
@@ -3626,11 +4870,11 @@ impl Edit {
         paragraph: Position,
         field: Position,
         authored_text: impl Into<String>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("replace_complex_field_result_text")?;
         self.reserve_operation()?;
         let text = authored_text.into();
-        validate_authored_text(&text).map_err(|reason| TransactionError::Refused {
+        validate_authored_text(&text).map_err(|reason| Error::Refused {
             position: paragraph.get(),
             reason,
         })?;
@@ -3644,12 +4888,11 @@ impl Edit {
             paragraph_end,
             "paragraph",
         )?;
-        let result_range = select_complex_field_result(paragraph_xml, field).map_err(|reason| {
-            TransactionError::Refused {
+        let result_range =
+            select_complex_field_result(paragraph_xml, field).map_err(|reason| Error::Refused {
                 position: paragraph.get(),
                 reason,
-            }
-        })?;
+            })?;
         let start = checked_relative_start(paragraph_start, result_range)?;
         let end = checked_relative_end(paragraph_start, result_range)?;
         let result_xml = checked_slice(
@@ -3659,14 +4902,14 @@ impl Edit {
             "complex field result",
         )?;
         let (before, replacement) =
-            rewrite_run_region(result_xml, &text).map_err(|reason| TransactionError::Refused {
+            rewrite_run_region(result_xml, &text).map_err(|reason| Error::Refused {
                 position: paragraph.get(),
                 reason,
             })?;
         if before == text {
             return Ok(self);
         }
-        let candidate = self.projected.with_rewritten_xml(replace_range(
+        let candidate = self.projected_with_xml(replace_range(
             self.projected.xml_bytes(),
             start,
             end,
@@ -3703,7 +4946,7 @@ impl Edit {
         kind: RevisionKind,
         revision: Position,
         authored_text: impl Into<String>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("replace_revision_text")?;
         self.replace_direct_paragraph_owner_text(
             paragraph,
@@ -3747,7 +4990,7 @@ impl Edit {
         &mut self,
         selector: RevisionSelector,
         action: RevisionAction,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.apply_revision_as("apply_revision", selector, action)
     }
 
@@ -3761,7 +5004,7 @@ impl Edit {
         paragraph: Position,
         kind: RevisionKind,
         revision: Position,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.apply_revision_as(
             "accept_revision",
             RevisionSelector::new(paragraph, kind, revision),
@@ -3779,7 +5022,7 @@ impl Edit {
         paragraph: Position,
         kind: RevisionKind,
         revision: Position,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.apply_revision_as(
             "reject_revision",
             RevisionSelector::new(paragraph, kind, revision),
@@ -3790,14 +5033,14 @@ impl Edit {
     /// Apply one revision disposition for the named public operation.
     ///
     /// The managed refusal comes first. A disposition rebuilds the projection
-    /// with [`Snapshot::from_xml`], which would drop a managed snapshot's
-    /// source identity and budget admission and publish uncharged bytes.
+    /// into owned bytes. The rewrite preserves unmanaged source identity, but
+    /// cannot retain a managed snapshot's budget admission.
     fn apply_revision_as(
         &mut self,
         operation: &'static str,
         selector: RevisionSelector,
         action: RevisionAction,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged(operation)?;
         self.reserve_operation()?;
         let paragraph_range = self.range(selector.paragraph)?;
@@ -3813,7 +5056,7 @@ impl Edit {
             .projected
             .paragraph_namespaces
             .get(selector.paragraph.get())
-            .ok_or(TransactionError::OutOfBounds {
+            .ok_or(Error::OutOfBounds {
                 position: selector.paragraph.get(),
                 len: self.projected.paragraph_count(),
             })?;
@@ -3822,7 +5065,7 @@ impl Edit {
         if paragraph_after == paragraph_xml {
             return Ok(self);
         }
-        let candidate = Snapshot::from_xml(replace_range(
+        let candidate = self.projected_with_xml(replace_range(
             self.projected.xml_bytes(),
             paragraph_start,
             paragraph_end,
@@ -3861,11 +5104,11 @@ impl Edit {
         paragraph: Position,
         control: Position,
         authored_text: impl Into<String>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("replace_content_control_text")?;
         self.reserve_operation()?;
         let text = authored_text.into();
-        validate_authored_text(&text).map_err(|reason| TransactionError::Refused {
+        validate_authored_text(&text).map_err(|reason| Error::Refused {
             position: paragraph.get(),
             reason,
         })?;
@@ -3877,17 +5120,16 @@ impl Edit {
             content.1,
             "content control content",
         )?;
-        let owner = scan_text_owner(content_xml, b"sdtContent").map_err(|reason| {
-            TransactionError::Refused {
+        let owner =
+            scan_text_owner(content_xml, b"sdtContent").map_err(|reason| Error::Refused {
                 position: paragraph.get(),
                 reason,
-            }
-        })?;
+            })?;
         if owner.text == text {
             return Ok(self);
         }
         let replacement = rewrite_text_owner(content_xml, &owner, &text)?;
-        let candidate = self.projected.with_rewritten_xml(replace_range(
+        let candidate = self.projected_with_xml(replace_range(
             self.projected.xml_bytes(),
             content.0,
             content.1,
@@ -3925,7 +5167,7 @@ impl Edit {
         paragraph: Position,
         controls: &[Position],
         authored_text: impl Into<String>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("replace_nested_content_control_text")?;
         let path: Arc<[Position]> = controls.into();
         let (start, end) = select_nested_inline_control_content(&self.projected, paragraph, &path)?;
@@ -3961,7 +5203,7 @@ impl Edit {
         controls: &[Position],
         hyperlink: Position,
         authored_text: impl Into<String>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("replace_nested_content_control_hyperlink_text")?;
         let path: Arc<[Position]> = controls.into();
         let content = select_nested_inline_control_content(&self.projected, paragraph, &path)?;
@@ -4009,7 +5251,7 @@ impl Edit {
         controls: &[Position],
         paragraph: Position,
         authored_text: impl Into<String>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("replace_block_content_control_paragraph_text")?;
         let path: Arc<[Position]> = controls.into();
         let (start, end) = select_block_control_paragraph(&self.projected, &path, paragraph)?;
@@ -4044,7 +5286,7 @@ impl Edit {
         paragraph: Position,
         hyperlink: Position,
         authored_text: impl Into<String>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("replace_block_content_control_paragraph_hyperlink_text")?;
         let path: Arc<[Position]> = controls.into();
         let owner = select_block_control_paragraph(&self.projected, &path, paragraph)?;
@@ -4092,7 +5334,7 @@ impl Edit {
         &mut self,
         controls: &[Position],
         replacements: &[HyperlinkTextReplacement],
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("replace_block_content_control_paragraph_hyperlink_texts")?;
         validate_hyperlink_replacements(replacements)?;
         let mut candidate = self.try_clone()?;
@@ -4125,11 +5367,11 @@ impl Edit {
         row: Position,
         cell: Position,
         authored_text: impl Into<String>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("replace_table_cell_text")?;
         self.reserve_operation()?;
         let text = authored_text.into();
-        validate_authored_text(&text).map_err(|reason| TransactionError::Refused {
+        validate_authored_text(&text).map_err(|reason| Error::Refused {
             position: table.get(),
             reason,
         })?;
@@ -4144,11 +5386,10 @@ impl Edit {
             paragraph_end,
             "table cell paragraph",
         )?;
-        let owner =
-            scan_text_owner(paragraph_xml, b"p").map_err(|reason| TransactionError::Refused {
-                position: table.get(),
-                reason,
-            })?;
+        let owner = scan_text_owner(paragraph_xml, b"p").map_err(|reason| Error::Refused {
+            position: table.get(),
+            reason,
+        })?;
         if owner.text == text {
             return Ok(self);
         }
@@ -4159,7 +5400,7 @@ impl Edit {
             paragraph_end,
             &replacement,
         )?;
-        let candidate = self.projected.with_rewritten_xml(xml)?;
+        let candidate = self.projected_with_xml(xml)?;
         let actual = selected_cell_text(&candidate, table, row, cell)?;
         if actual != text {
             return Err(crate::Error::InvalidFormat(
@@ -4194,11 +5435,11 @@ impl Edit {
         cell: Position,
         paragraph: Position,
         authored_text: impl Into<String>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("replace_table_cell_paragraph_text")?;
         self.reserve_operation()?;
         let text = authored_text.into();
-        validate_authored_text(&text).map_err(|reason| TransactionError::Refused {
+        validate_authored_text(&text).map_err(|reason| Error::Refused {
             position: table.get(),
             reason,
         })?;
@@ -4211,7 +5452,7 @@ impl Edit {
             paragraph,
             Refusal::CellNotFound,
         )
-        .map_err(|reason| TransactionError::Refused {
+        .map_err(|reason| Error::Refused {
             position: table.get(),
             reason,
         })?;
@@ -4223,11 +5464,10 @@ impl Edit {
             paragraph_end,
             "table cell paragraph",
         )?;
-        let owner =
-            scan_text_owner(paragraph_xml, b"p").map_err(|reason| TransactionError::Refused {
-                position: table.get(),
-                reason,
-            })?;
+        let owner = scan_paragraph_text_owner(paragraph_xml).map_err(|reason| Error::Refused {
+            position: table.get(),
+            reason,
+        })?;
         if owner.text == text {
             return Ok(self);
         }
@@ -4238,7 +5478,7 @@ impl Edit {
             paragraph_end,
             &replacement,
         )?;
-        let candidate = self.projected.with_rewritten_xml(xml)?;
+        let candidate = self.projected_with_xml(xml)?;
         let actual = selected_cell_paragraph_text(&candidate, table, row, cell, paragraph)?;
         if actual != text {
             return Err(crate::Error::InvalidFormat(
@@ -4272,7 +5512,7 @@ impl Edit {
         path: &[TableCellAddress],
         paragraph: Position,
         authored_text: impl Into<String>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("replace_nested_table_cell_paragraph_text")?;
         let path_arc: Arc<[TableCellAddress]> = path.into();
         let (start, end) = select_nested_cell_paragraph(&self.projected, &path_arc, paragraph)?;
@@ -4307,7 +5547,7 @@ impl Edit {
         paragraph: Position,
         hyperlink: Position,
         authored_text: impl Into<String>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("replace_nested_table_cell_paragraph_hyperlink_text")?;
         let path_arc: Arc<[TableCellAddress]> = path.into();
         let owner = select_nested_cell_paragraph(&self.projected, &path_arc, paragraph)?;
@@ -4355,7 +5595,7 @@ impl Edit {
         &mut self,
         path: &[TableCellAddress],
         replacements: &[HyperlinkTextReplacement],
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("replace_nested_table_cell_paragraph_hyperlink_texts")?;
         validate_hyperlink_replacements(replacements)?;
         let mut candidate = self.try_clone()?;
@@ -4383,18 +5623,18 @@ impl Edit {
         &mut self,
         position: Position,
         authored_text: impl Into<String>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("insert_paragraph")?;
         self.reserve_operation()?;
         let text = authored_text.into();
-        validate_authored_text(&text).map_err(|reason| TransactionError::Refused {
+        validate_authored_text(&text).map_err(|reason| Error::Refused {
             position: position.get(),
             reason,
         })?;
         let replacement_text_bytes = self.checked_text_total(text.len())?;
         let count = self.projected.paragraph_count();
         if position.get() > count {
-            return Err(TransactionError::OutOfBounds {
+            return Err(Error::OutOfBounds {
                 position: position.get(),
                 len: count,
             });
@@ -4410,18 +5650,18 @@ impl Edit {
         };
         let paragraph = try_plain_paragraph(self.projected.conformance, &text)?;
         let xml = replace_range(self.projected.xml_bytes(), offset, offset, &paragraph)?;
-        let candidate = self.projected.with_rewritten_xml(xml)?;
+        let candidate = self.projected_with_xml(xml)?;
         let readback = candidate
             .paragraph(position)
-            .ok_or(TransactionError::OutOfBounds {
+            .ok_or(Error::OutOfBounds {
                 position: position.get(),
                 len: candidate.paragraph_count(),
             })?
             .text()?;
-        let expected_count = count.checked_add(1).ok_or(TransactionError::Limit {
-            resource: "paragraphs",
-            max: usize::MAX,
-            actual: usize::MAX,
+        let expected_count = count.checked_add(1).ok_or(Error::Limit {
+            kind: crate::document::LimitKind::Paragraphs,
+            maximum: usize::MAX,
+            observed: usize::MAX,
         })?;
         if readback != text || candidate.paragraph_count() != expected_count {
             return Err(crate::Error::InvalidFormat(
@@ -4450,10 +5690,10 @@ impl Edit {
         &mut self,
         position: Position,
         plan: &ParagraphTransfer,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("insert_paragraph_transfer")?;
         if plan.target.as_slice() != self.base.xml_bytes() {
-            return Err(TransactionError::StaleSource);
+            return Err(Error::PatchConflict);
         }
         self.insert_transferred_paragraph(
             position,
@@ -4464,7 +5704,7 @@ impl Edit {
         )
     }
 
-    fn apply_operation(&mut self, operation: &Operation) -> TransactionResult<&mut Self> {
+    pub(crate) fn apply_operation(&mut self, operation: &Operation) -> Result<&mut Self> {
         match operation {
             Operation::ReplaceParagraphText {
                 position,
@@ -4474,13 +5714,13 @@ impl Edit {
                 let actual = self
                     .projected
                     .paragraph(*position)
-                    .ok_or(TransactionError::OutOfBounds {
+                    .ok_or(Error::OutOfBounds {
                         position: position.get(),
                         len: self.projected.paragraph_count(),
                     })?
                     .text()?;
                 if &actual != before {
-                    return Err(TransactionError::SemanticPrecondition);
+                    return Err(Error::SemanticPrecondition);
                 }
                 self.replace_paragraph_text(*position, after.clone())
             },
@@ -4491,7 +5731,7 @@ impl Edit {
                 after,
             } => {
                 if selected_hyperlink_text(&self.projected, *paragraph, *hyperlink)? != *before {
-                    return Err(TransactionError::SemanticPrecondition);
+                    return Err(Error::SemanticPrecondition);
                 }
                 self.replace_hyperlink_text(*paragraph, *hyperlink, after.clone())
             },
@@ -4509,10 +5749,22 @@ impl Edit {
                     Refusal::RunNotFound,
                 )? != *before
                 {
-                    return Err(TransactionError::SemanticPrecondition);
+                    return Err(Error::SemanticPrecondition);
                 }
                 self.replace_run_text(*paragraph, *run, after.clone())
             },
+            Operation::ReplaceRunTextNode {
+                paragraph,
+                run,
+                before,
+                after,
+            } => self.replace_run_text_node_exact(*paragraph, *run, before, after),
+            Operation::MarkCachedRunFieldDirty {
+                paragraph,
+                run,
+                before,
+                after,
+            } => self.mark_cached_run_field_dirty_exact(*paragraph, *run, before, after),
             Operation::ReplaceSimpleFieldText {
                 paragraph,
                 field,
@@ -4527,7 +5779,7 @@ impl Edit {
                     Refusal::FieldNotFound,
                 )? != *before
                 {
-                    return Err(TransactionError::SemanticPrecondition);
+                    return Err(Error::SemanticPrecondition);
                 }
                 self.replace_simple_field_text(*paragraph, *field, after.clone())
             },
@@ -4540,7 +5792,7 @@ impl Edit {
                 if selected_complex_field_result_text(&self.projected, *paragraph, *field)?
                     != *before
                 {
-                    return Err(TransactionError::SemanticPrecondition);
+                    return Err(Error::SemanticPrecondition);
                 }
                 self.replace_complex_field_result_text(*paragraph, *field, after.clone())
             },
@@ -4559,7 +5811,7 @@ impl Edit {
                     Refusal::RevisionNotFound,
                 )? != *before
                 {
-                    return Err(TransactionError::SemanticPrecondition);
+                    return Err(Error::SemanticPrecondition);
                 }
                 self.replace_revision_text(*paragraph, *kind, *revision, after.clone())
             },
@@ -4577,7 +5829,7 @@ impl Edit {
             } => {
                 if selected_content_control_text(&self.projected, *paragraph, *control)? != *before
                 {
-                    return Err(TransactionError::SemanticPrecondition);
+                    return Err(Error::SemanticPrecondition);
                 }
                 self.replace_content_control_text(*paragraph, *control, after.clone())
             },
@@ -4590,7 +5842,7 @@ impl Edit {
                 if selected_nested_inline_control_text(&self.projected, *paragraph, controls)?
                     != *before
                 {
-                    return Err(TransactionError::SemanticPrecondition);
+                    return Err(Error::SemanticPrecondition);
                 }
                 self.replace_nested_content_control_text(*paragraph, controls, after.clone())
             },
@@ -4608,7 +5860,7 @@ impl Edit {
                     *hyperlink,
                 )? != *before
                 {
-                    return Err(TransactionError::SemanticPrecondition);
+                    return Err(Error::SemanticPrecondition);
                 }
                 self.replace_nested_content_control_hyperlink_text(
                     *paragraph,
@@ -4626,7 +5878,7 @@ impl Edit {
                 if selected_block_control_paragraph_text(&self.projected, controls, *paragraph)?
                     != *before
                 {
-                    return Err(TransactionError::SemanticPrecondition);
+                    return Err(Error::SemanticPrecondition);
                 }
                 self.replace_block_content_control_paragraph_text(
                     controls,
@@ -4648,7 +5900,7 @@ impl Edit {
                     *hyperlink,
                 )? != *before
                 {
-                    return Err(TransactionError::SemanticPrecondition);
+                    return Err(Error::SemanticPrecondition);
                 }
                 self.replace_block_content_control_paragraph_hyperlink_text(
                     controls,
@@ -4665,7 +5917,7 @@ impl Edit {
                 after,
             } => {
                 if selected_cell_text(&self.projected, *table, *row, *cell)? != *before {
-                    return Err(TransactionError::SemanticPrecondition);
+                    return Err(Error::SemanticPrecondition);
                 }
                 self.replace_table_cell_text(*table, *row, *cell, after.clone())
             },
@@ -4680,7 +5932,7 @@ impl Edit {
                 if selected_cell_paragraph_text(&self.projected, *table, *row, *cell, *paragraph)?
                     != *before
                 {
-                    return Err(TransactionError::SemanticPrecondition);
+                    return Err(Error::SemanticPrecondition);
                 }
                 self.replace_table_cell_paragraph_text(
                     *table,
@@ -4699,7 +5951,7 @@ impl Edit {
                 if selected_nested_cell_paragraph_text(&self.projected, path, *paragraph)?
                     != *before
                 {
-                    return Err(TransactionError::SemanticPrecondition);
+                    return Err(Error::SemanticPrecondition);
                 }
                 self.replace_nested_table_cell_paragraph_text(path, *paragraph, after.clone())
             },
@@ -4717,7 +5969,7 @@ impl Edit {
                     *hyperlink,
                 )? != *before
                 {
-                    return Err(TransactionError::SemanticPrecondition);
+                    return Err(Error::SemanticPrecondition);
                 }
                 self.replace_nested_table_cell_paragraph_hyperlink_text(
                     path,
@@ -4758,6 +6010,57 @@ impl Edit {
                 inverse_dependency_digest,
                 graph,
             ),
+            Operation::ReplaceRunProperties {
+                paragraph,
+                run,
+                before,
+                after,
+            } => self.replace_run_properties(*paragraph, *run, before, after),
+            Operation::ReplaceParagraphProperties {
+                paragraph,
+                before,
+                after,
+            } => self.replace_paragraph_properties(*paragraph, before, after),
+            Operation::InsertParagraphFragment {
+                child,
+                position,
+                xml,
+            } => self.insert_paragraph_fragment(*child, *position, xml),
+            Operation::RemoveParagraphFragment {
+                child,
+                position,
+                xml,
+            } => self.remove_paragraph_fragment(*child, *position, xml),
+            Operation::InsertRun {
+                paragraph,
+                child,
+                run,
+                xml,
+            } => self.insert_run_fragment(*paragraph, *child, *run, xml),
+            Operation::RemoveRun {
+                paragraph,
+                child,
+                run,
+                xml,
+            } => self.remove_run_fragment(*paragraph, *child, *run, xml),
+            Operation::ReplaceElement {
+                path,
+                before,
+                after,
+            } => self.replace_element(path, before, after),
+            Operation::InsertElement {
+                container,
+                child,
+                xml,
+            } => self.insert_element(container, *child, xml),
+            Operation::RemoveElement {
+                container,
+                child,
+                xml,
+            } => self.remove_element(container, *child, xml),
+            Operation::ChangeGraph { change, forward } => {
+                self.stage_graph_change(Arc::clone(change), *forward)
+            },
         }
     }
 
@@ -4767,7 +6070,7 @@ impl Edit {
         action: RevisionAction,
         before: &Arc<Vec<u8>>,
         after: &Arc<Vec<u8>>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         // Replay rebuilds the projection the same way as `apply_revision_as`,
         // so it carries the same managed refusal.
         self.ensure_unmanaged("apply_revision")?;
@@ -4777,13 +6080,13 @@ impl Edit {
         let end = checked_end(range, "paragraph")?;
         let source = checked_slice(self.projected.xml_bytes(), start, end, "paragraph")?;
         if source != before.as_slice() {
-            return Err(TransactionError::SemanticPrecondition);
+            return Err(Error::SemanticPrecondition);
         }
         let inherited_namespaces = self
             .projected
             .paragraph_namespaces
             .get(selector.paragraph.get())
-            .ok_or(TransactionError::OutOfBounds {
+            .ok_or(Error::OutOfBounds {
                 position: selector.paragraph.get(),
                 len: self.projected.paragraph_count(),
             })?;
@@ -4794,9 +6097,9 @@ impl Edit {
             && rewrite_revision_paragraph(after, selector, action, inherited_namespaces)
                 .is_ok_and(|candidate| candidate.as_slice() == source);
         if !forward_match && !reverse_match {
-            return Err(TransactionError::SemanticPrecondition);
+            return Err(Error::SemanticPrecondition);
         }
-        let candidate = Snapshot::from_xml(replace_range(
+        let candidate = self.projected_with_xml(replace_range(
             self.projected.xml_bytes(),
             start,
             end,
@@ -4822,7 +6125,7 @@ impl Edit {
         &mut self,
         position: Position,
         expected_text: &str,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.reserve_operation()?;
         let range = self.range(position)?;
         let start = checked_start(range, "paragraph")?;
@@ -4830,10 +6133,10 @@ impl Edit {
         let source = checked_slice(self.projected.xml_bytes(), start, end, "paragraph")?;
         let expected = try_plain_paragraph(self.projected.conformance, expected_text)?;
         if source != expected.as_slice() {
-            return Err(TransactionError::SemanticPrecondition);
+            return Err(Error::SemanticPrecondition);
         }
         let xml = replace_range(self.projected.xml_bytes(), start, end, &[])?;
-        let candidate = self.projected.with_rewritten_xml(xml)?;
+        let candidate = self.projected_with_xml(xml)?;
         if candidate.paragraph_count().checked_add(1) != Some(self.projected.paragraph_count()) {
             return Err(crate::Error::InvalidFormat(
                 "document paragraph removal failed semantic readback".into(),
@@ -4855,11 +6158,11 @@ impl Edit {
         dependency_digest: Arc<str>,
         inverse_dependency_digest: Arc<str>,
         graph: Arc<TransferGraph>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.reserve_operation()?;
         let count = self.projected.paragraph_count();
         if position.get() > count {
-            return Err(TransactionError::OutOfBounds {
+            return Err(Error::OutOfBounds {
                 position: position.get(),
                 len: count,
             });
@@ -4871,18 +6174,16 @@ impl Edit {
         } else {
             checked_start(self.range(position)?, "paragraph")?
         };
-        let candidate = self.projected.with_rewritten_xml(replace_range(
+        let candidate = self.projected_with_xml(replace_range(
             self.projected.xml_bytes(),
             offset,
             offset,
             xml.as_slice(),
         )?)?;
-        let inserted = candidate
-            .paragraph(position)
-            .ok_or(TransactionError::OutOfBounds {
-                position: position.get(),
-                len: candidate.paragraph_count(),
-            })?;
+        let inserted = candidate.paragraph(position).ok_or(Error::OutOfBounds {
+            position: position.get(),
+            len: candidate.paragraph_count(),
+        })?;
         if inserted.xml_bytes() != xml.as_slice() {
             return Err(crate::Error::InvalidFormat(
                 "transferred paragraph failed exact readback".into(),
@@ -4907,21 +6208,17 @@ impl Edit {
         dependency_digest: &Arc<str>,
         inverse_dependency_digest: &Arc<str>,
         graph: &Arc<TransferGraph>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.reserve_operation()?;
         let range = self.range(position)?;
         let start = checked_start(range, "paragraph")?;
         let end = checked_end(range, "paragraph")?;
         let source = checked_slice(self.projected.xml_bytes(), start, end, "paragraph")?;
         if source != xml.as_slice() {
-            return Err(TransactionError::SemanticPrecondition);
+            return Err(Error::SemanticPrecondition);
         }
-        let candidate = self.projected.with_rewritten_xml(replace_range(
-            self.projected.xml_bytes(),
-            start,
-            end,
-            &[],
-        )?)?;
+        let candidate =
+            self.projected_with_xml(replace_range(self.projected.xml_bytes(), start, end, &[])?)?;
         self.operations.push(Operation::RemoveTransferredParagraph {
             position,
             xml: Arc::clone(xml),
@@ -4941,14 +6238,14 @@ impl Edit {
         missing: Refusal,
         text: String,
         operation: impl FnOnce(String, String) -> Operation,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.reserve_operation()?;
         let validation = if child_name == b"r" {
             validate_authored_run_content(&text)
         } else {
             validate_authored_text(&text)
         };
-        validation.map_err(|reason| TransactionError::Refused {
+        validation.map_err(|reason| Error::Refused {
             position: paragraph.get(),
             reason,
         })?;
@@ -4963,7 +6260,7 @@ impl Edit {
             "paragraph",
         )?;
         let owner_range = select_direct_child(paragraph_xml, b"p", child_name, owner, missing)
-            .map_err(|reason| TransactionError::Refused {
+            .map_err(|reason| Error::Refused {
                 position: paragraph.get(),
                 reason,
             })?;
@@ -4975,11 +6272,10 @@ impl Edit {
             owner_end,
             "paragraph text owner",
         )?;
-        let scanned =
-            scan_text_owner(owner_xml, child_name).map_err(|reason| TransactionError::Refused {
-                position: paragraph.get(),
-                reason,
-            })?;
+        let scanned = scan_text_owner(owner_xml, child_name).map_err(|reason| Error::Refused {
+            position: paragraph.get(),
+            reason,
+        })?;
         if scanned.text == text {
             return Ok(self);
         }
@@ -4990,7 +6286,7 @@ impl Edit {
             owner_end,
             &replacement,
         )?;
-        let candidate = self.projected.with_rewritten_xml(xml)?;
+        let candidate = self.projected_with_xml(xml)?;
         let actual = selected_direct_paragraph_owner_text(
             &candidate, paragraph, owner, child_name, missing,
         )?;
@@ -5006,6 +6302,225 @@ impl Edit {
         Ok(self)
     }
 
+    fn replace_run_text_node_exact(
+        &mut self,
+        paragraph: Position,
+        run: Position,
+        before: &Arc<Vec<u8>>,
+        after: &Arc<Vec<u8>>,
+    ) -> Result<&mut Self> {
+        self.ensure_unmanaged("replace_run_text_node")?;
+        self.reserve_operation()?;
+        let paragraph_range = self.range(paragraph)?;
+        let paragraph_start = checked_start(paragraph_range, "paragraph")?;
+        let paragraph_end = checked_end(paragraph_range, "paragraph")?;
+        let paragraph_xml = checked_slice(
+            self.projected.xml_bytes(),
+            paragraph_start,
+            paragraph_end,
+            "paragraph",
+        )?;
+        let inherited_namespaces = self
+            .projected
+            .paragraph_namespaces
+            .get(paragraph.get())
+            .ok_or(Error::OutOfBounds {
+                position: paragraph.get(),
+                len: self.projected.paragraph_count(),
+            })?;
+        let run_range = select_direct_child_with_transaction_namespace_context(
+            paragraph_xml,
+            b"p",
+            b"r",
+            run,
+            Refusal::RunNotFound,
+            inherited_namespaces,
+        )
+        .map_err(|reason| Error::Refused {
+            position: paragraph.get(),
+            reason,
+        })?;
+        let run_start = checked_relative_start(paragraph_start, run_range)?;
+        let run_end = checked_relative_end(paragraph_start, run_range)?;
+        let run_xml = checked_slice(self.projected.xml_bytes(), run_start, run_end, "run")?;
+        let text_range = first_direct_text_node(run_xml, inherited_namespaces)
+            .map_err(|reason| Error::Refused {
+                position: paragraph.get(),
+                reason,
+            })?
+            .ok_or(Error::SemanticPrecondition)?;
+        let text_start = checked_relative_start(run_start, text_range)?;
+        let text_end = checked_relative_end(run_start, text_range)?;
+        let current = checked_slice(
+            self.projected.xml_bytes(),
+            text_start,
+            text_end,
+            "run text node",
+        )?;
+        if current != before.as_slice() {
+            return Err(Error::SemanticPrecondition);
+        }
+        validate_literal_text_node_fragment(after, inherited_namespaces).map_err(|reason| {
+            Error::Refused {
+                position: paragraph.get(),
+                reason,
+            }
+        })?;
+        let after_text = decode_text_fragment(after).map_err(|reason| Error::Refused {
+            position: paragraph.get(),
+            reason,
+        })?;
+        validate_authored_run_content(&after_text).map_err(|reason| Error::Refused {
+            position: paragraph.get(),
+            reason,
+        })?;
+        let replacement_text_bytes = self.checked_text_total(after_text.len())?;
+        let xml = replace_range(self.projected.xml_bytes(), text_start, text_end, after)?;
+        let candidate = self.projected_with_xml(xml)?;
+        self.operations.push(Operation::ReplaceRunTextNode {
+            paragraph,
+            run,
+            before: Arc::clone(before),
+            after: Arc::clone(after),
+        });
+        self.replacement_text_bytes = replacement_text_bytes;
+        self.projected = candidate;
+        Ok(self)
+    }
+
+    fn mark_cached_run_field_dirty_exact(
+        &mut self,
+        paragraph: Position,
+        run: Position,
+        before: &Arc<Vec<u8>>,
+        after: &Arc<Vec<u8>>,
+    ) -> Result<&mut Self> {
+        self.ensure_unmanaged("mark_cached_run_field_dirty")?;
+        self.reserve_operation()?;
+        let paragraph_range = self.range(paragraph)?;
+        let paragraph_start = checked_start(paragraph_range, "paragraph")?;
+        let paragraph_end = checked_end(paragraph_range, "paragraph")?;
+        let paragraph_xml = checked_slice(
+            self.projected.xml_bytes(),
+            paragraph_start,
+            paragraph_end,
+            "paragraph",
+        )?;
+        let inherited_namespaces = self
+            .projected
+            .paragraph_namespaces
+            .get(paragraph.get())
+            .ok_or(Error::OutOfBounds {
+                position: paragraph.get(),
+                len: self.projected.paragraph_count(),
+            })?;
+        let runs =
+            scan_cached_field_runs(paragraph_xml, inherited_namespaces).map_err(|reason| {
+                Error::Refused {
+                    position: paragraph.get(),
+                    reason,
+                }
+            })?;
+        let Some(selected) = runs.get(run.get()) else {
+            return Err(Error::Refused {
+                position: paragraph.get(),
+                reason: Refusal::RunNotFound,
+            });
+        };
+        if !selected.has_direct_text {
+            return Err(Error::SemanticPrecondition);
+        }
+        let Some((owner_run, marker)) = owning_cached_field_marker(&runs, run.get()) else {
+            return Err(Error::SemanticPrecondition);
+        };
+        let owner_start = checked_relative_start(paragraph_start, runs[owner_run].range)?;
+        let marker_start = checked_relative_start(owner_start, marker.range)?;
+        let marker_end = checked_relative_end(owner_start, marker.range)?;
+        let current = checked_slice(
+            self.projected.xml_bytes(),
+            marker_start,
+            marker_end,
+            "cached field marker",
+        )?;
+        if current != before.as_slice() {
+            return Err(Error::SemanticPrecondition);
+        }
+        let owner_end = checked_relative_end(paragraph_start, runs[owner_run].range)?;
+        let owner_xml = checked_slice(
+            self.projected.xml_bytes(),
+            owner_start,
+            owner_end,
+            "cached field run",
+        )?;
+        let marker_namespaces =
+            run_namespace_context(owner_xml, inherited_namespaces).map_err(|reason| {
+                Error::Refused {
+                    position: paragraph.get(),
+                    reason,
+                }
+            })?;
+        validate_cached_field_marker_transition(before, after, &marker_namespaces).map_err(
+            |reason| Error::Refused {
+                position: paragraph.get(),
+                reason,
+            },
+        )?;
+        let replacement_text_bytes = self.checked_text_total(after.len())?;
+        let xml = replace_range(self.projected.xml_bytes(), marker_start, marker_end, after)?;
+        let candidate = self.projected_with_xml(xml)?;
+        let candidate_paragraph_range = candidate.range(paragraph)?;
+        let candidate_paragraph_start = checked_start(candidate_paragraph_range, "paragraph")?;
+        let candidate_paragraph_end = checked_end(candidate_paragraph_range, "paragraph")?;
+        let candidate_paragraph = checked_slice(
+            candidate.xml_bytes(),
+            candidate_paragraph_start,
+            candidate_paragraph_end,
+            "paragraph",
+        )?;
+        let candidate_runs = scan_cached_field_runs(candidate_paragraph, inherited_namespaces)
+            .map_err(|reason| Error::Refused {
+                position: paragraph.get(),
+                reason,
+            })?;
+        let Some((candidate_owner_run, candidate_marker)) =
+            owning_cached_field_marker(&candidate_runs, run.get())
+        else {
+            return Err(crate::Error::InvalidFormat(
+                "exact cached field marker replay lost its owning field".into(),
+            )
+            .into());
+        };
+        let candidate_owner_start = checked_relative_start(
+            candidate_paragraph_start,
+            candidate_runs[candidate_owner_run].range,
+        )?;
+        let candidate_marker_start =
+            checked_relative_start(candidate_owner_start, candidate_marker.range)?;
+        let candidate_marker_end =
+            checked_relative_end(candidate_owner_start, candidate_marker.range)?;
+        if checked_slice(
+            candidate.xml_bytes(),
+            candidate_marker_start,
+            candidate_marker_end,
+            "cached field marker",
+        )? != after.as_slice()
+        {
+            return Err(crate::Error::InvalidFormat(
+                "exact cached field marker replay failed exact readback".into(),
+            )
+            .into());
+        }
+        self.operations.push(Operation::MarkCachedRunFieldDirty {
+            paragraph,
+            run,
+            before: Arc::clone(before),
+            after: Arc::clone(after),
+        });
+        self.replacement_text_bytes = replacement_text_bytes;
+        self.projected = candidate;
+        Ok(self)
+    }
+
     fn replace_selected_owner_text(
         &mut self,
         range: (usize, usize),
@@ -5013,26 +6528,30 @@ impl Edit {
         error_position: usize,
         text: String,
         operation: impl FnOnce(String, String) -> Operation,
-        readback: impl FnOnce(&Snapshot) -> TransactionResult<String>,
-    ) -> TransactionResult<&mut Self> {
+        readback: impl FnOnce(&Snapshot) -> Result<String>,
+    ) -> Result<&mut Self> {
         self.reserve_operation()?;
         let (start, end) = range;
-        validate_authored_text(&text).map_err(|reason| TransactionError::Refused {
+        validate_authored_text(&text).map_err(|reason| Error::Refused {
             position: error_position,
             reason,
         })?;
         let replacement_text_bytes = self.checked_text_total(text.len())?;
         let owner_xml = checked_slice(self.projected.xml_bytes(), start, end, "selected owner")?;
-        let owner =
-            scan_text_owner(owner_xml, root_name).map_err(|reason| TransactionError::Refused {
-                position: error_position,
-                reason,
-            })?;
+        let owner = if root_name == b"p" {
+            scan_paragraph_text_owner(owner_xml)
+        } else {
+            scan_text_owner(owner_xml, root_name)
+        }
+        .map_err(|reason| Error::Refused {
+            position: error_position,
+            reason,
+        })?;
         if owner.text == text {
             return Ok(self);
         }
         let replacement = rewrite_text_owner(owner_xml, &owner, &text)?;
-        let candidate = self.projected.with_rewritten_xml(replace_range(
+        let candidate = self.projected_with_xml(replace_range(
             self.projected.xml_bytes(),
             start,
             end,
@@ -5056,17 +6575,28 @@ impl Edit {
     /// # Errors
     ///
     /// Reserved for commit-time document validation failures.
-    pub fn commit(self) -> TransactionResult<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
+        // Admit the retained pair before any commit-only validation or
+        // publication work.  Mutation paths perform the same check before
+        // constructing a candidate snapshot; this closes the no-op path and
+        // protects callers that stage through a native helper which only
+        // discovers its final projection at commit time.
+        self.admit_snapshot_xml(self.projected.xml_bytes().len())?;
+        if let Some(limits) = self.raw_limits {
+            crate::document::raw::validate_xml(self.projected.xml_bytes(), limits)?;
+        }
         let managed_context = self.projected.managed_context();
+        let snapshot_budget = self.snapshot_budget;
+        let base_bytes = self.base.xml_bytes().len();
         if let Some(context) = managed_context.as_ref() {
             context.check().map_err(managed_execution)?;
         }
-        // Revision dispositions preserve retained opaque payload bytes, including
-        // whitespace and attribute spelling. Global compaction would rewrite them.
-        let preserve_revision_source = self
-            .operations
-            .iter()
-            .any(|operation| matches!(operation, Operation::ApplyRevision { .. }));
+        // Revision dispositions, and the formatting and structure operations
+        // of `formatting`, record exact markup, including whitespace and
+        // attribute spelling. Compaction would rewrite it, so their own bytes
+        // (and with them replay and the inverse) would disagree with the
+        // published document.
+        let preserve_revision_source = self.operations.iter().any(Operation::retains_exact_markup);
         let projected = if self.base.same_source(&self.projected) {
             self.projected
         } else if self.base.is_source_backed() && self.projected.is_source_backed() {
@@ -5077,21 +6607,37 @@ impl Edit {
             self.projected
         } else if preserve_revision_source {
             // The preserved bytes skip compaction but not its UTF-8 check: a
-            // changed document that is not UTF-8 is refused either way.
-            std::str::from_utf8(self.projected.xml_bytes()).map_err(|error| {
-                crate::Error::InvalidFormat(format!(
-                    "changed main-document XML is not UTF-8: {error}"
-                ))
-            })?;
+            // changed document that is not UTF-8 is refused either way. The
+            // formatting and structure operations check every paragraph and
+            // fragment they write when they stage it, as the preserving
+            // compaction checks only the paragraphs an edit changed, so the
+            // whole part is checked here only for a revision disposition.
+            if self
+                .operations
+                .iter()
+                .any(|operation| matches!(operation, Operation::ApplyRevision { .. }))
+            {
+                std::str::from_utf8(self.projected.xml_bytes()).map_err(|error| {
+                    crate::Error::InvalidFormat(format!(
+                        "changed main-document XML is not UTF-8: {error}"
+                    ))
+                })?;
+            }
             self.projected
         } else {
             match self.compaction {
                 CompactionPolicy::PreserveUnmodified => {
-                    commit_preserving_unmodified(&self.base, &self.projected)?
+                    commit_preserving_unmodified(&self.base, &self.projected, snapshot_budget)?
                 },
-                CompactionPolicy::WholeDocument => compact_whole_document(&self.projected)?,
+                CompactionPolicy::WholeDocument => {
+                    compact_whole_document(&self.base, &self.projected, snapshot_budget)?
+                },
             }
         };
+        // PreserveUnmodified and WholeDocument can compact a projection at
+        // publication time.  Charge the bytes that the commit actually
+        // retains, not only the pre-compaction candidate.
+        admit_snapshot_pair(snapshot_budget, base_bytes, projected.xml_bytes().len())?;
         if let Some(context) = managed_context.as_ref() {
             context.check().map_err(managed_execution)?;
         }
@@ -5110,6 +6656,7 @@ impl Edit {
             inverse_operations,
             inverse_admission,
             inverse_string_admission,
+            restore: None,
         };
         Ok(Commit {
             snapshot: projected,
@@ -5118,16 +6665,58 @@ impl Edit {
         })
     }
 
-    fn range(&self, position: Position) -> TransactionResult<Range> {
+    fn range(&self, position: Position) -> Result<Range> {
         self.projected.range(position)
     }
 
-    fn reserve_operation(&mut self) -> TransactionResult<()> {
-        if self.operations.len() >= MAX_OPERATIONS {
-            return Err(TransactionError::Limit {
-                resource: "operations",
-                max: MAX_OPERATIONS,
-                actual: self.operations.len().saturating_add(1),
+    fn admit_snapshot_xml(&self, projected_bytes: usize) -> Result<()> {
+        let Some(maximum) = self.snapshot_budget else {
+            return Ok(());
+        };
+        let observed = self.base.xml_bytes().len().saturating_add(projected_bytes);
+        if observed > maximum {
+            return Err(Error::Limit {
+                kind: crate::document::LimitKind::ProjectedXmlBytes,
+                observed,
+                maximum,
+            });
+        }
+        Ok(())
+    }
+
+    fn projected_with_xml(&self, xml: Vec<u8>) -> Result<Snapshot> {
+        self.admit_snapshot_xml(xml.len())?;
+        self.projected.with_rewritten_xml(xml)
+    }
+
+    fn projected_with_splices(
+        &self,
+        xml: Vec<u8>,
+        splices: &[ParagraphSplice<'_>],
+    ) -> Result<Snapshot> {
+        self.projected_with_splices_under(xml, splices, SplicePolicy::SameShape)
+    }
+
+    fn projected_with_splices_under(
+        &self,
+        xml: Vec<u8>,
+        splices: &[ParagraphSplice<'_>],
+        policy: SplicePolicy,
+    ) -> Result<Snapshot> {
+        self.admit_snapshot_xml(xml.len())?;
+        self.projected
+            .with_spliced_paragraphs_under(xml, splices, policy)
+    }
+
+    fn reserve_operation(&mut self) -> Result<()> {
+        let maximum = self
+            .raw_limits
+            .map_or(MAX_OPERATIONS, crate::document::raw::Limits::max_operations);
+        if self.operations.len() >= maximum {
+            return Err(Error::Limit {
+                kind: crate::document::LimitKind::Operations,
+                maximum,
+                observed: self.operations.len().saturating_add(1),
             });
         }
         if self.operation_admission.is_none() {
@@ -5152,11 +6741,10 @@ impl Edit {
             // A managed operation ledger must always cover every retained
             // operation. Multi-paragraph source reconstruction installs a
             // freshly sized ledger atomically before replacing this vector.
-            return Err(TransactionError::Document(crate::Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "document.edit",
-                reason: "managed operation metadata admission is inconsistent",
-            }));
+            return Err(Error::Document(crate::Error::internal(
+                "document.edit",
+                "managed operation metadata admission is inconsistent",
+            )));
         }
         Ok(())
     }
@@ -5164,13 +6752,12 @@ impl Edit {
     fn reserve_managed_operation_admission(
         &self,
         operation_count: usize,
-    ) -> TransactionResult<Arc<OperationAdmission>> {
+    ) -> Result<Arc<OperationAdmission>> {
         let admission = self.projected.admission.as_ref().ok_or({
-            TransactionError::Document(crate::Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "document.edit",
-                reason: "managed operation admission is unavailable",
-            })
+            Error::Document(crate::Error::internal(
+                "document.edit",
+                "managed operation admission is unavailable",
+            ))
         })?;
         let operation_bytes = managed_operation_memory_bytes(operation_count)?;
         let memory = reserve_managed(&admission.context, Resource::Memory, operation_bytes)?;
@@ -5181,59 +6768,85 @@ impl Edit {
         }))
     }
 
-    fn reserve_input_text(&self, bytes: usize) -> TransactionResult<Option<Arc<StringAdmission>>> {
+    fn reserve_input_text(&self, bytes: usize) -> Result<Option<Arc<StringAdmission>>> {
         if !self.projected.is_managed() {
             return Ok(None);
         }
         Ok(Some(self.reserve_string_admission(bytes)?))
     }
 
-    fn reserve_string_admission(&self, bytes: usize) -> TransactionResult<Arc<StringAdmission>> {
+    fn reserve_string_admission(&self, bytes: usize) -> Result<Arc<StringAdmission>> {
         let admission = self.projected.admission.as_ref().ok_or({
-            TransactionError::Document(crate::Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "document.edit",
-                reason: "managed string admission is unavailable",
-            })
+            Error::Document(crate::Error::internal(
+                "document.edit",
+                "managed string admission is unavailable",
+            ))
         })?;
         let memory = bytes
             .checked_add(size_of::<StringAdmission>())
             .and_then(|bytes| bytes.checked_add(size_of::<Arc<StringAdmission>>()))
-            .ok_or(TransactionError::Limit {
-                resource: "operation string metadata bytes",
-                max: usize::MAX,
-                actual: usize::MAX,
+            .ok_or(Error::Limit {
+                kind: crate::document::LimitKind::OperationStringMetadataBytes,
+                maximum: usize::MAX,
+                observed: usize::MAX,
             })?;
         Ok(Arc::new(StringAdmission {
             _memory: reserve_managed(&admission.context, Resource::Memory, memory)?,
         }))
     }
 
-    fn ensure_unmanaged(&self, operation: &'static str) -> TransactionResult<()> {
+    /// Record a package-graph change; the main-document XML is unchanged.
+    pub(crate) fn stage_graph_change(
+        &mut self,
+        change: Arc<GraphChange>,
+        forward: bool,
+    ) -> Result<&mut Self> {
+        self.ensure_unmanaged("change_graph")?;
+        self.reserve_operation()?;
+        self.operations
+            .push(Operation::ChangeGraph { change, forward });
+        Ok(self)
+    }
+
+    /// The package-graph changes staged so far, in order.
+    pub(crate) fn staged_graph_changes(&self) -> impl Iterator<Item = (&GraphChange, bool)> + '_ {
+        self.operations
+            .iter()
+            .filter_map(|operation| match operation {
+                Operation::ChangeGraph { change, forward } => Some((change.as_ref(), *forward)),
+                _ => None,
+            })
+    }
+
+    fn ensure_unmanaged(&self, operation: &'static str) -> Result<()> {
         if self.projected.is_managed() {
-            return Err(TransactionError::Document(crate::Error::UnsafeEdit {
-                format: "DOCX",
+            return Err(Error::Document(crate::Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
                 operation,
-                reason: "this managed transaction operation has no retained source-preserving implementation",
-            }));
+                "this managed transaction operation has no retained source-preserving implementation",
+            )));
         }
         Ok(())
     }
 
-    fn checked_text_total(&self, bytes: usize) -> TransactionResult<usize> {
-        let actual =
-            self.replacement_text_bytes
-                .checked_add(bytes)
-                .ok_or(TransactionError::Limit {
-                    resource: "replacement text bytes",
-                    max: MAX_REPLACEMENT_TEXT_BYTES,
-                    actual: usize::MAX,
-                })?;
-        if actual > MAX_REPLACEMENT_TEXT_BYTES {
-            return Err(TransactionError::Limit {
-                resource: "replacement text bytes",
-                max: MAX_REPLACEMENT_TEXT_BYTES,
-                actual,
+    fn checked_text_total(&self, bytes: usize) -> Result<usize> {
+        let maximum = self.raw_limits.map_or(
+            MAX_REPLACEMENT_TEXT_BYTES,
+            crate::document::raw::Limits::max_replacement_text_bytes,
+        );
+        let actual = self
+            .replacement_text_bytes
+            .checked_add(bytes)
+            .ok_or(Error::Limit {
+                kind: crate::document::LimitKind::ReplacementTextBytes,
+                maximum,
+                observed: usize::MAX,
+            })?;
+        if actual > maximum {
+            return Err(Error::Limit {
+                kind: crate::document::LimitKind::ReplacementTextBytes,
+                maximum,
+                observed: actual,
             });
         }
         Ok(actual)
@@ -5248,6 +6861,13 @@ pub struct Diagnostics {
 }
 
 impl Diagnostics {
+    pub(crate) const fn new(operations: usize, changed: bool) -> Self {
+        Self {
+            operations,
+            changed,
+        }
+    }
+
     /// Number of semantic operations in the commit.
     #[must_use]
     pub const fn operations(self) -> usize {
@@ -5263,7 +6883,7 @@ impl Diagnostics {
 
 /// A successful main-document publication.
 #[derive(Debug, Clone)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     patch: Patch,
     diagnostics: Diagnostics,
@@ -5272,31 +6892,31 @@ pub struct Commit {
 impl Commit {
     /// Borrow the published snapshot.
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Borrow the reversible patch.
     #[must_use]
-    pub const fn patch(&self) -> &Patch {
+    pub(crate) const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Return content-free commit diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> Diagnostics {
+    pub(crate) const fn diagnostics(&self) -> Diagnostics {
         self.diagnostics
     }
 
     /// Move the snapshot and patch out of the commit.
     #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
+    pub(crate) fn into_parts(self) -> (Snapshot, Patch) {
         (self.snapshot, self.patch)
     }
 }
 
 /// A reversible, exact-source-checked main-document patch.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Patch {
     before: Snapshot,
     after: Snapshot,
@@ -5306,9 +6926,47 @@ pub struct Patch {
     inverse_operations: OperationList,
     inverse_admission: Option<Arc<OperationAdmission>>,
     inverse_string_admission: Option<Arc<StringAdmission>>,
+    /// The exact package pair of a source-backed commit (record 0355a):
+    /// applied to a package writing the first artifact, the patch returns
+    /// the second, so an inverse restores the original archive bytes.
+    restore: Option<Arc<(crate::source_backed::Package, crate::source_backed::Package)>>,
 }
 
 impl Patch {
+    /// This patch carrying the exact source-backed `before` and `after`
+    /// packages of a commit.
+    pub(crate) fn with_restore(
+        mut self,
+        before: crate::source_backed::Package,
+        after: crate::source_backed::Package,
+    ) -> Self {
+        self.restore = Some(Arc::new((before, after)));
+        self
+    }
+
+    /// The exact source-backed package pair of a commit, if any.
+    pub(crate) fn restore(
+        &self,
+    ) -> Option<&(crate::source_backed::Package, crate::source_backed::Package)> {
+        self.restore.as_deref()
+    }
+
+    /// The operation-free patch that moves `before` to `after`: a recorded
+    /// history transition replayed as one main-document replacement.
+    pub(crate) fn transition(before: Snapshot, after: Snapshot) -> Self {
+        Self {
+            before,
+            after,
+            operations: OperationList::Empty,
+            operation_admission: None,
+            operation_string_admission: None,
+            inverse_operations: OperationList::Empty,
+            inverse_admission: None,
+            inverse_string_admission: None,
+            restore: None,
+        }
+    }
+
     /// Exact immutable source required by this patch.
     #[must_use]
     pub const fn source(&self) -> &Snapshot {
@@ -5327,10 +6985,17 @@ impl Patch {
         self.operations.as_slice()
     }
 
-    /// Whether this patch changes the exact main-document bytes.
+    /// Whether this patch preserves the exact main-document source.
+    ///
+    /// Staged operations can cancel each other; the final source/target identity
+    /// determines no-op status, independently of the operation count.
     #[must_use]
-    pub fn changed(&self) -> bool {
-        !self.before.same_source(&self.after)
+    pub fn is_noop(&self) -> bool {
+        self.before.same_source(&self.after)
+            && !self
+                .operations()
+                .iter()
+                .any(|operation| matches!(operation, Operation::ChangeGraph { .. }))
     }
 
     /// Return the exact inverse patch.
@@ -5345,6 +7010,10 @@ impl Patch {
             inverse_operations: self.operations.clone(),
             inverse_admission: self.operation_admission.clone(),
             inverse_string_admission: self.operation_string_admission.clone(),
+            restore: self
+                .restore
+                .as_ref()
+                .map(|pair| Arc::new((pair.1.clone(), pair.0.clone()))),
         }
     }
 
@@ -5352,17 +7021,24 @@ impl Patch {
     ///
     /// # Errors
     ///
-    /// Returns [`TransactionError::StaleSource`] when `source` does not match
+    /// Returns [`Error::PatchConflict`] when `source` does not match
     /// the exact bytes against which this patch was produced.
-    pub fn apply(&self, source: &Snapshot) -> TransactionResult<Snapshot> {
+    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if !source.same_source(&self.before) {
-            return Err(TransactionError::StaleSource);
+            return Err(Error::PatchConflict);
         }
-        Ok(if self.changed() {
+        Ok(self.apply_verified(source))
+    }
+
+    /// Apply after the caller has authenticated `source` against `before`.
+    /// Keeping this path private makes the single-comparison precondition
+    /// explicit for budgeted native replay without weakening the public API.
+    fn apply_verified(&self, source: &Snapshot) -> Snapshot {
+        if !self.is_noop() {
             self.after.clone()
         } else {
             source.clone()
-        })
+        }
     }
 
     /// Reuse the retained target when `bytes` are already the exact,
@@ -5384,7 +7060,7 @@ impl Patch {
         if !self.before.retains_exact_unmanaged_xml(bytes) {
             return None;
         }
-        Some(if self.changed() {
+        Some(if !self.is_noop() {
             self.after.clone()
         } else {
             self.before.clone()
@@ -5395,7 +7071,7 @@ impl Patch {
 fn build_inverse_operations(
     operations: &[Operation],
     context: Option<&ExecutionContext>,
-) -> TransactionResult<(
+) -> Result<(
     OperationList,
     Option<Arc<OperationAdmission>>,
     Option<Arc<StringAdmission>>,
@@ -5407,10 +7083,10 @@ fn build_inverse_operations(
         let string_bytes = operations.iter().try_fold(0usize, |total, operation| {
             total
                 .checked_add(operation_string_bytes(operation))
-                .ok_or(TransactionError::Limit {
-                    resource: "inverse operation string bytes",
-                    max: usize::MAX,
-                    actual: usize::MAX,
+                .ok_or(Error::Limit {
+                    kind: crate::document::LimitKind::InverseOperationStringBytes,
+                    maximum: usize::MAX,
+                    observed: usize::MAX,
                 })
         })?;
         let memory = managed_operation_memory_bytes(operations.len())?;
@@ -5426,10 +7102,10 @@ fn build_inverse_operations(
             let memory = string_bytes
                 .checked_add(size_of::<StringAdmission>())
                 .and_then(|bytes| bytes.checked_add(size_of::<Arc<StringAdmission>>()))
-                .ok_or(TransactionError::Limit {
-                    resource: "inverse operation string metadata bytes",
-                    max: usize::MAX,
-                    actual: usize::MAX,
+                .ok_or(Error::Limit {
+                    kind: crate::document::LimitKind::InverseOperationStringMetadataBytes,
+                    maximum: usize::MAX,
+                    observed: usize::MAX,
                 })?;
             Some(Arc::new(StringAdmission {
                 _memory: reserve_managed(context, Resource::Memory, memory)?,
@@ -5471,6 +7147,12 @@ fn operation_string_bytes(operation: &Operation) -> usize {
         | Operation::ReplaceNestedCellParagraphHyperlinkText { before, after, .. } => {
             before.capacity().saturating_add(after.capacity())
         },
+        Operation::ReplaceRunTextNode { before, after, .. } => {
+            before.capacity().saturating_add(after.capacity())
+        },
+        Operation::MarkCachedRunFieldDirty { before, after, .. } => {
+            before.capacity().saturating_add(after.capacity())
+        },
         Operation::InsertParagraph { text, .. } | Operation::RemoveParagraph { text, .. } => {
             text.capacity()
         },
@@ -5480,31 +7162,42 @@ fn operation_string_bytes(operation: &Operation) -> usize {
             before.capacity().saturating_add(after.capacity())
         },
         Operation::InsertTransferredParagraph { .. }
-        | Operation::RemoveTransferredParagraph { .. } => 0,
+        | Operation::RemoveTransferredParagraph { .. }
+        | Operation::ChangeGraph { .. } => 0,
+        Operation::ReplaceRunProperties { before, after, .. }
+        | Operation::ReplaceParagraphProperties { before, after, .. } => {
+            before.capacity().saturating_add(after.capacity())
+        },
+        Operation::InsertParagraphFragment { xml, .. }
+        | Operation::RemoveParagraphFragment { xml, .. }
+        | Operation::InsertRun { xml, .. }
+        | Operation::RemoveRun { xml, .. }
+        | Operation::InsertElement { xml, .. }
+        | Operation::RemoveElement { xml, .. } => xml.capacity(),
+        Operation::ReplaceElement { before, after, .. } => {
+            before.capacity().saturating_add(after.capacity())
+        },
     }
 }
 
-fn managed_replacement_text_bytes(operations: &[Operation]) -> TransactionResult<usize> {
+fn managed_replacement_text_bytes(operations: &[Operation]) -> Result<usize> {
     operations.iter().try_fold(0usize, |total, operation| {
         let Operation::ReplaceParagraphText { after, .. } = operation else {
-            return Err(TransactionError::Document(crate::Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "document.edit",
-                reason: "managed operation ledger contains an unsupported operation",
-            }));
+            return Err(Error::Document(crate::Error::internal(
+                "document.edit",
+                "managed operation ledger contains an unsupported operation",
+            )));
         };
-        let total = total
-            .checked_add(after.len())
-            .ok_or(TransactionError::Limit {
-                resource: "replacement text bytes",
-                max: MAX_REPLACEMENT_TEXT_BYTES,
-                actual: usize::MAX,
-            })?;
+        let total = total.checked_add(after.len()).ok_or(Error::Limit {
+            kind: crate::document::LimitKind::ReplacementTextBytes,
+            maximum: MAX_REPLACEMENT_TEXT_BYTES,
+            observed: usize::MAX,
+        })?;
         if total > MAX_REPLACEMENT_TEXT_BYTES {
-            return Err(TransactionError::Limit {
-                resource: "replacement text bytes",
-                max: MAX_REPLACEMENT_TEXT_BYTES,
-                actual: total,
+            return Err(Error::Limit {
+                kind: crate::document::LimitKind::ReplacementTextBytes,
+                maximum: MAX_REPLACEMENT_TEXT_BYTES,
+                observed: total,
             });
         }
         Ok(total)
@@ -5542,7 +7235,7 @@ impl OperationList {
     }
 }
 
-fn managed_operation_memory_bytes(operation_count: usize) -> TransactionResult<usize> {
+fn managed_operation_memory_bytes(operation_count: usize) -> Result<usize> {
     // A managed edit retains its operation Vec until commit converts it into
     // the patch's Arc slice. The inverse builder has the same Vec-to-Arc
     // overlap, so admit both live representations before either allocation.
@@ -5553,10 +7246,10 @@ fn managed_operation_memory_bytes(operation_count: usize) -> TransactionResult<u
         .and_then(|bytes| bytes.checked_add(size_of::<Arc<[Operation]>>()))
         .and_then(|bytes| bytes.checked_add(size_of::<OperationAdmission>()))
         .and_then(|bytes| bytes.checked_add(size_of::<Arc<OperationAdmission>>()))
-        .ok_or(TransactionError::Limit {
-            resource: "managed operation metadata bytes",
-            max: usize::MAX,
-            actual: usize::MAX,
+        .ok_or(Error::Limit {
+            kind: crate::document::LimitKind::ManagedOperationMetadataBytes,
+            maximum: usize::MAX,
+            observed: usize::MAX,
         })
 }
 
@@ -5613,6 +7306,66 @@ struct BodyChildShape {
     nodes: usize,
     max_depth: usize,
     root_tag_len: usize,
+    /// Whether any element of the fragment has the local name `body`, which
+    /// the document scanner checks wherever it appears.
+    names_body: bool,
+}
+
+/// Which rewrites of a direct-body paragraph may keep a derived layout
+/// instead of a rescan.
+#[derive(Clone, Copy)]
+enum SplicePolicy {
+    /// Only replacements that add no element and no nesting
+    /// ([`preserves_body_child_shape`]): the text operations.
+    SameShape,
+    /// Also replacements that grow within proven document bounds
+    /// ([`grows_body_child_within_limits`]): the formatting and run
+    /// operations, which add property elements and runs.
+    BoundedGrowth,
+}
+
+impl SplicePolicy {
+    fn admits(self, before: &[u8], after: &[u8], xml_len: usize) -> bool {
+        preserves_body_child_shape(before, after)
+            || (matches!(self, Self::BoundedGrowth)
+                && grows_body_child_within_limits(before, after, xml_len))
+    }
+}
+
+/// Whether splicing `after` in place of `before` into a document of
+/// `xml_len` bytes leaves every verdict of [`scan_document`] unchanged even
+/// though `after` may hold more elements or deeper nesting.
+///
+/// [`preserves_body_child_shape`] lists the four kinds of conclusion the
+/// scanner reaches about the inside of a direct body child. With identical
+/// root start tags and no namespace declaration on either side (the caller
+/// checks that), the child is classified identically. Two of the others are
+/// proven here instead of by "no growth":
+///
+/// - **Depth.** A direct body child starts at depth 3 (`w:document` is 1 and
+///   `w:body`, which the scanner requires there, is 2), so its deepest element
+///   is at most `2 + max_depth`; at most `MAX_DOCUMENT_DEPTH` cannot fail.
+/// - **Elements.** Every counted element takes at least four bytes (`<a/>`,
+///   or `<a>` with `</a>`), so a document of `xml_len` bytes holds at most
+///   `xml_len / 4` of them; when that is at most `MAX_DOCUMENT_NODES`, the
+///   count cannot exceed the limit.
+///
+/// The remaining verdicts — declarations, processing instructions and
+/// unbalanced nesting — are refused by [`body_child_shape`] itself. The
+/// scanner also refuses a WordprocessingML `body` element anywhere but under
+/// the root, so a fragment naming `body` takes the rescan.
+fn grows_body_child_within_limits(before: &[u8], after: &[u8], xml_len: usize) -> bool {
+    let (Some(previous), Some(next)) = (body_child_shape(before), body_child_shape(after)) else {
+        return false;
+    };
+    next.root_tag_len == previous.root_tag_len
+        && before.get(..previous.root_tag_len) == after.get(..next.root_tag_len)
+        && !next.names_body
+        && next
+            .max_depth
+            .checked_add(2)
+            .is_some_and(|depth| depth <= MAX_DOCUMENT_DEPTH)
+        && xml_len / 4 <= MAX_DOCUMENT_NODES
 }
 
 /// Shift direct-body sibling ranges across the accepted paragraph splices.
@@ -5623,7 +7376,7 @@ struct BodyChildShape {
 fn shift_sibling_ranges(
     ranges: &Arc<[Range]>,
     bounds: &[SpliceBound],
-) -> TransactionResult<Option<Arc<[Range]>>> {
+) -> Result<Option<Arc<[Range]>>> {
     let (Some(first), Some(last)) = (bounds.first(), ranges.last()) else {
         return Ok(Some(Arc::clone(ranges)));
     };
@@ -5733,34 +7486,43 @@ fn publication_accepts_preserved_xml(xml: &[u8]) -> bool {
 /// returned exactly where it was. A candidate whose bytes cannot be shared
 /// (a managed projection) takes the historical gate and carries no proof.
 ///
-/// Only [`crate::Package::apply_document_patch`] consumes the proof, and it
-/// publishes only patches whose source snapshot carries no source identity
-/// (`Package::document_snapshot`'s). A snapshot with a source identity is
-/// published by the source-backed writer, which audits its own pair, so for
-/// such a source the historical gate runs alone and no proof is built.
+/// When the source snapshot itself carries a proof (record 0317: the
+/// source-backed owner attaches the one its OPC package retained for these
+/// bytes, with the content boundaries that audit recorded), the gate's
+/// verdict on the source is that proof's, and the candidate is audited with
+/// [`xml_minifier::audit::VerifiedSource::verify_successor`]: its verdict and
+/// error are the candidate's complete source audit, but it scans only the
+/// paragraphs that changed, and the original is not scanned at all. The
+/// resulting proof keeps boundaries of its own, so the next commit on the
+/// published revision is proved the same way.
+///
+/// Two writers consume the proof: [`crate::Package::apply`], for patches
+/// whose source snapshot carries no source identity
+/// (`Package::document_snapshot`'s), and the source-backed writer
+/// ([`crate::source_backed::Package::apply`]), for the snapshots bound to a
+/// source identity, which hands it to the OPC overlay in place of that
+/// overlay's own audit of the replacement (record 0311).
 fn commit_preserving_unmodified(
     base: &Snapshot,
     projected: &Snapshot,
-) -> TransactionResult<Snapshot> {
-    if base.xml.identity().is_some() {
-        return if publication_accepts_preserved_xml(base.xml_bytes()) {
-            compact_changed_paragraphs(base, projected)
-        } else {
-            compact_whole_document(projected)
-        };
-    }
-    let compacted = compact_changed_paragraphs(base, projected);
+    snapshot_budget: Option<usize>,
+) -> Result<Snapshot> {
+    let compacted = compact_changed_paragraphs(base, projected, snapshot_budget);
     let replacement = compacted
         .as_ref()
         .ok()
         .and_then(|candidate| candidate.shared_xml().ok());
-    let (source_publishes, proof) = match replacement {
-        Some(replacement) => match xml_minifier::audit::VerifiedSource::verify_replacement(
-            base.xml_bytes(),
-            replacement,
-            xml_minifier::audit::Limits::default(),
-        ) {
+    let limits = xml_minifier::audit::Limits::default();
+    let (source_publishes, proof) = match (replacement, base.publication_proof()) {
+        // The source passed the writer's audit under these limits.
+        (Some(replacement), Some(source)) => match source.verify_successor(replacement, limits) {
             Ok((proof, _how)) => (true, Some(proof)),
+            // As below: the writer's own audit refuses it where it always has.
+            Err(_) => (true, None),
+        },
+        (None, Some(_)) => (true, None),
+        (Some(replacement), None) => match base_pair_audit(base, replacement, limits) {
+            Ok(proof) => (true, Some(proof)),
             // The source's own `verify_source` error: the gate refuses.
             Err(xml_minifier::audit::ReplacementError::Original(_)) => (false, None),
             // The source passes and the candidate does not. Publish it
@@ -5768,10 +7530,10 @@ fn commit_preserving_unmodified(
             // has.
             Err(_) => (true, None),
         },
-        None => (publication_accepts_preserved_xml(base.xml_bytes()), None),
+        (None, None) => (publication_accepts_preserved_xml(base.xml_bytes()), None),
     };
     if !source_publishes {
-        return compact_whole_document(projected);
+        return compact_whole_document(base, projected, snapshot_budget);
     }
     let candidate = compacted?;
     Ok(match proof {
@@ -5780,15 +7542,55 @@ fn commit_preserving_unmodified(
     })
 }
 
+/// The pair audit of the preserving commit's gate, with the candidate's
+/// proof: [`xml_minifier::audit::VerifiedSource::verify_indexed_replacement`]
+/// for a source snapshot bound to a source identity (the source-backed
+/// owner's) whose bytes can be shared, so the candidate's proof keeps the
+/// content boundaries derived from the source's single scan (record 0317) and
+/// a commit on the revision the owner publishes is proved from them; the plain
+/// [`xml_minifier::audit::VerifiedSource::verify_replacement`] otherwise,
+/// which records nothing, since no other writer keeps the proof for a next
+/// commit. Both have the verdict and error of `verify_source_replacement`.
+fn base_pair_audit(
+    base: &Snapshot,
+    replacement: Arc<Vec<u8>>,
+    limits: xml_minifier::audit::Limits,
+) -> core::result::Result<xml_minifier::audit::VerifiedSource, xml_minifier::audit::ReplacementError>
+{
+    let shared = base
+        .source_identity()
+        .and_then(|_identity| base.shared_xml().ok());
+    match shared {
+        Some(source) => xml_minifier::audit::VerifiedSource::verify_indexed_replacement(
+            source,
+            replacement,
+            limits,
+            xml_minifier::audit::IndexDepth::CHILDREN,
+        )
+        .map(|(_source, proof, _how)| proof),
+        None => xml_minifier::audit::VerifiedSource::verify_replacement(
+            base.xml_bytes(),
+            replacement,
+            limits,
+        )
+        .map(|(proof, _how)| proof),
+    }
+}
+
 /// Compact the whole projected main document: the
 /// [`CompactionPolicy::WholeDocument`] opt-in, and the preserving policy's
 /// fallback when the source cannot publish preserved — byte for byte what
 /// every committed edit published before the policy existed.
-fn compact_whole_document(projected: &Snapshot) -> TransactionResult<Snapshot> {
+fn compact_whole_document(
+    base: &Snapshot,
+    projected: &Snapshot,
+    snapshot_budget: Option<usize>,
+) -> Result<Snapshot> {
     let source = std::str::from_utf8(projected.xml_bytes()).map_err(|error| {
         crate::Error::InvalidFormat(format!("changed main-document XML is not UTF-8: {error}"))
     })?;
     let compact = compact_changed_document_preserving_bom(source)?;
+    admit_snapshot_pair(snapshot_budget, base.xml_bytes().len(), compact.len())?;
     projected.with_rewritten_xml(compact.into_bytes())
 }
 
@@ -5799,7 +7601,7 @@ fn compact_whole_document(projected: &Snapshot) -> TransactionResult<Snapshot> {
 /// the original XML bytes as its source of truth, so the fallback publication
 /// route must add the mark back after compaction just as the mutable writer
 /// does. Paragraph-fragment compaction does not call this helper.
-fn compact_changed_document_preserving_bom(source: &str) -> TransactionResult<String> {
+fn compact_changed_document_preserving_bom(source: &str) -> Result<String> {
     let Some(rest) = source.strip_prefix(UTF8_BYTE_ORDER_MARK_TEXT) else {
         return Ok(crate::writer::doc::compact_changed_document_xml(source)?);
     };
@@ -5840,7 +7642,8 @@ const XML_SPACE_ATTRIBUTE: &[u8] = b"xml:space";
 fn compact_changed_paragraphs(
     base: &Snapshot,
     projected: &Snapshot,
-) -> TransactionResult<Snapshot> {
+    snapshot_budget: Option<usize>,
+) -> Result<Snapshot> {
     if base.paragraphs.len() != projected.paragraphs.len() || inherits_xml_space(projected) {
         return Ok(projected.clone());
     }
@@ -5883,6 +7686,7 @@ fn compact_changed_paragraphs(
         return Ok(projected.clone());
     }
     let xml = replace_ranges(source, &replacements)?;
+    admit_snapshot_pair(snapshot_budget, base.xml_bytes().len(), xml.len())?;
     let mut splices = Vec::new();
     splices
         .try_reserve_exact(replacements.len())
@@ -5900,6 +7704,25 @@ fn compact_changed_paragraphs(
             }),
     );
     projected.with_spliced_paragraphs(xml, &splices)
+}
+
+fn admit_snapshot_pair(
+    snapshot_budget: Option<usize>,
+    base_bytes: usize,
+    projected_bytes: usize,
+) -> Result<()> {
+    let Some(maximum) = snapshot_budget else {
+        return Ok(());
+    };
+    let observed = base_bytes.saturating_add(projected_bytes);
+    if observed > maximum {
+        return Err(Error::Limit {
+            kind: crate::document::LimitKind::ProjectedXmlBytes,
+            observed,
+            maximum,
+        });
+    }
+    Ok(())
 }
 
 /// Borrow one body-child range out of the bytes that carry it.
@@ -5966,6 +7789,7 @@ fn preserves_body_child_shape(before: &[u8], after: &[u8]) -> bool {
         && next.max_depth <= previous.max_depth
         && next.root_tag_len == previous.root_tag_len
         && before.get(..previous.root_tag_len) == after.get(..next.root_tag_len)
+        && !next.names_body
 }
 
 /// Measure one direct-body child fragment, or decline to measure it.
@@ -5982,6 +7806,7 @@ fn body_child_shape(fragment: &[u8]) -> Option<BodyChildShape> {
         nodes: 0,
         max_depth: 0,
         root_tag_len: 0,
+        names_body: false,
     };
     let mut depth = 0usize;
     let mut root_seen = false;
@@ -5991,10 +7816,11 @@ fn body_child_shape(fragment: &[u8]) -> Option<BodyChildShape> {
         let event = reader.read_event().ok()?;
         let event_end = origin.offset(reader.buffer_position())?;
         match event {
-            Event::Start(_) => {
+            Event::Start(element) => {
                 if root_closed {
                     return None;
                 }
+                shape.names_body |= split_qualified_name(element.name().into_inner()).1 == b"body";
                 depth = depth.checked_add(1)?;
                 shape.nodes = shape.nodes.checked_add(1)?;
                 shape.max_depth = shape.max_depth.max(depth);
@@ -6006,10 +7832,11 @@ fn body_child_shape(fragment: &[u8]) -> Option<BodyChildShape> {
                     root_seen = true;
                 }
             },
-            Event::Empty(_) => {
+            Event::Empty(element) => {
                 if root_closed {
                     return None;
                 }
+                shape.names_body |= split_qualified_name(element.name().into_inner()).1 == b"body";
                 shape.nodes = shape.nodes.checked_add(1)?;
                 shape.max_depth = shape.max_depth.max(depth.checked_add(1)?);
                 if !root_seen {
@@ -6097,13 +7924,471 @@ struct TextSlot {
     characters: usize,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum ComplexFieldMarker {
     Begin,
     Separate,
     End,
 }
 
+#[derive(Clone, Copy)]
+struct CachedFieldMarker {
+    range: Range,
+    kind: ComplexFieldMarker,
+    dirty: bool,
+}
+
+struct CachedFieldRun {
+    range: Range,
+    has_direct_text: bool,
+    marker: Option<CachedFieldMarker>,
+}
+
+fn scan_cached_field_runs(
+    xml: &[u8],
+    inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
+) -> std::result::Result<Vec<CachedFieldRun>, Refusal> {
+    let mut reader = NsReader::from_reader(xml);
+    seed_transaction_namespaces(&mut reader, inherited_namespaces)?;
+    let mut namespace_state = TransactionNamespaceState::new(inherited_namespaces);
+    let origin = ReaderOrigin::of(xml);
+    let mut fragment_prefix = FragmentPrefix::Unseen;
+    let mut root_depth = None;
+    let mut run_capture = None::<(usize, usize)>;
+    let mut depth = 0usize;
+    let mut saw_root = false;
+    let mut runs = Vec::new();
+    runs.try_reserve(1)
+        .map_err(|_error| Refusal::ComplexContent)?;
+    loop {
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or(Refusal::ComplexContent)?;
+        let raw = reader
+            .read_event()
+            .map_err(|_error| Refusal::ComplexContent)?;
+        let (namespace, event) = reader.resolver().resolve_event(raw);
+        let default_namespace_fallback_allowed = namespace_state.fallback_for_event(&event);
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or(Refusal::ComplexContent)?;
+        match event {
+            Event::Start(element) => {
+                depth = depth.checked_add(1).ok_or(Refusal::ComplexContent)?;
+                if root_depth.is_none() {
+                    fragment_prefix = FragmentPrefix::from_name(element.name());
+                    if saw_root
+                        || !transaction_fragment_word_name_matches(
+                            &namespace,
+                            element.name(),
+                            b"p",
+                            &fragment_prefix,
+                            true,
+                            default_namespace_fallback_allowed,
+                        )
+                    {
+                        return Err(Refusal::ComplexContent);
+                    }
+                    saw_root = true;
+                    root_depth = Some(depth);
+                } else if run_capture.is_none()
+                    && root_depth.is_some_and(|root| depth == root + 1)
+                    && transaction_fragment_word_name_matches(
+                        &namespace,
+                        element.name(),
+                        b"r",
+                        &fragment_prefix,
+                        true,
+                        default_namespace_fallback_allowed,
+                    )
+                {
+                    run_capture = Some((start, depth));
+                }
+            },
+            Event::Empty(element) => {
+                let child_depth = depth.checked_add(1).ok_or(Refusal::ComplexContent)?;
+                if root_depth.is_none() {
+                    fragment_prefix = FragmentPrefix::from_name(element.name());
+                    if saw_root
+                        || !transaction_fragment_word_name_matches(
+                            &namespace,
+                            element.name(),
+                            b"p",
+                            &fragment_prefix,
+                            true,
+                            default_namespace_fallback_allowed,
+                        )
+                    {
+                        return Err(Refusal::ComplexContent);
+                    }
+                    return Ok(runs);
+                }
+                if run_capture.is_none()
+                    && root_depth.is_some_and(|root| child_depth == root + 1)
+                    && transaction_fragment_word_name_matches(
+                        &namespace,
+                        element.name(),
+                        b"r",
+                        &fragment_prefix,
+                        true,
+                        default_namespace_fallback_allowed,
+                    )
+                {
+                    let range =
+                        checked_range(start, end).map_err(|_error| Refusal::ComplexContent)?;
+                    let run_xml = xml.get(start..end).ok_or(Refusal::ComplexContent)?;
+                    let (has_direct_text, marker) =
+                        inspect_cached_field_run(run_xml, inherited_namespaces)?;
+                    runs.try_reserve(1)
+                        .map_err(|_error| Refusal::ComplexContent)?;
+                    runs.push(CachedFieldRun {
+                        range,
+                        has_direct_text,
+                        marker,
+                    });
+                    if runs.len() > MAX_FIELD_RUNS {
+                        return Err(Refusal::ComplexContent);
+                    }
+                }
+            },
+            Event::End(element) => {
+                if let Some((capture_start, capture_depth)) = run_capture
+                    && depth == capture_depth
+                    && transaction_fragment_word_name_matches(
+                        &namespace,
+                        element.name(),
+                        b"r",
+                        &fragment_prefix,
+                        true,
+                        default_namespace_fallback_allowed,
+                    )
+                {
+                    let range = checked_range(capture_start, end)
+                        .map_err(|_error| Refusal::ComplexContent)?;
+                    let run_xml = xml.get(capture_start..end).ok_or(Refusal::ComplexContent)?;
+                    let (has_direct_text, marker) =
+                        inspect_cached_field_run(run_xml, inherited_namespaces)?;
+                    runs.try_reserve(1)
+                        .map_err(|_error| Refusal::ComplexContent)?;
+                    runs.push(CachedFieldRun {
+                        range,
+                        has_direct_text,
+                        marker,
+                    });
+                    if runs.len() > MAX_FIELD_RUNS {
+                        return Err(Refusal::ComplexContent);
+                    }
+                    run_capture = None;
+                }
+                depth = depth.checked_sub(1).ok_or(Refusal::ComplexContent)?;
+                if depth == 0 {
+                    return if saw_root && run_capture.is_none() {
+                        Ok(runs)
+                    } else {
+                        Err(Refusal::ComplexContent)
+                    };
+                }
+            },
+            Event::Eof => {
+                return if saw_root && depth == 0 && run_capture.is_none() {
+                    Ok(runs)
+                } else {
+                    Err(Refusal::ComplexContent)
+                };
+            },
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::DocType(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
+        }
+    }
+}
+
+fn inspect_cached_field_run(
+    xml: &[u8],
+    inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
+) -> std::result::Result<(bool, Option<CachedFieldMarker>), Refusal> {
+    let mut reader = NsReader::from_reader(xml);
+    seed_transaction_namespaces(&mut reader, inherited_namespaces)?;
+    let mut namespace_state = TransactionNamespaceState::new(inherited_namespaces);
+    let origin = ReaderOrigin::of(xml);
+    let mut fragment_prefix = FragmentPrefix::Unseen;
+    let mut root_depth = None;
+    let mut pending_marker = None::<(usize, usize, ComplexFieldMarker, bool)>;
+    let mut marker = None;
+    let mut has_direct_text = false;
+    let mut depth = 0usize;
+    let mut saw_root = false;
+    loop {
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or(Refusal::ComplexContent)?;
+        let raw = reader
+            .read_event()
+            .map_err(|_error| Refusal::ComplexContent)?;
+        let (namespace, event) = reader.resolver().resolve_event(raw);
+        let default_namespace_fallback_allowed = namespace_state.fallback_for_event(&event);
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or(Refusal::ComplexContent)?;
+        match event {
+            Event::Start(element) => {
+                depth = depth.checked_add(1).ok_or(Refusal::ComplexContent)?;
+                if root_depth.is_none() {
+                    fragment_prefix = FragmentPrefix::from_name(element.name());
+                    if saw_root
+                        || !transaction_fragment_word_name_matches(
+                            &namespace,
+                            element.name(),
+                            b"r",
+                            &fragment_prefix,
+                            true,
+                            default_namespace_fallback_allowed,
+                        )
+                    {
+                        return Err(Refusal::ComplexContent);
+                    }
+                    saw_root = true;
+                    root_depth = Some(depth);
+                } else if root_depth.is_some_and(|root| depth == root + 1) {
+                    if is_transaction_fragment_word_name_with_default_fallback(
+                        &namespace,
+                        element.name(),
+                        b"t",
+                        &fragment_prefix,
+                        default_namespace_fallback_allowed,
+                    ) {
+                        has_direct_text = true;
+                    } else if is_transaction_fragment_word_name_with_default_fallback(
+                        &namespace,
+                        element.name(),
+                        b"fldChar",
+                        &fragment_prefix,
+                        default_namespace_fallback_allowed,
+                    ) {
+                        let (kind, dirty) = parse_cached_field_marker(
+                            &element,
+                            reader.resolver(),
+                            reader.decoder(),
+                            &fragment_prefix,
+                        )?;
+                        if pending_marker.is_some() {
+                            return Err(Refusal::ComplexContent);
+                        }
+                        pending_marker = Some((start, depth, kind, dirty));
+                    }
+                }
+            },
+            Event::Empty(element) => {
+                let child_depth = depth.checked_add(1).ok_or(Refusal::ComplexContent)?;
+                if root_depth.is_none() {
+                    fragment_prefix = FragmentPrefix::from_name(element.name());
+                    if saw_root
+                        || !transaction_fragment_word_name_matches(
+                            &namespace,
+                            element.name(),
+                            b"r",
+                            &fragment_prefix,
+                            true,
+                            default_namespace_fallback_allowed,
+                        )
+                    {
+                        return Err(Refusal::ComplexContent);
+                    }
+                    return Ok((false, None));
+                }
+                if root_depth.is_some_and(|root| child_depth == root + 1) {
+                    if is_transaction_fragment_word_name_with_default_fallback(
+                        &namespace,
+                        element.name(),
+                        b"t",
+                        &fragment_prefix,
+                        default_namespace_fallback_allowed,
+                    ) {
+                        has_direct_text = true;
+                    } else if is_transaction_fragment_word_name_with_default_fallback(
+                        &namespace,
+                        element.name(),
+                        b"fldChar",
+                        &fragment_prefix,
+                        default_namespace_fallback_allowed,
+                    ) {
+                        let (kind, dirty) = parse_cached_field_marker(
+                            &element,
+                            reader.resolver(),
+                            reader.decoder(),
+                            &fragment_prefix,
+                        )?;
+                        let range =
+                            checked_range(start, end).map_err(|_error| Refusal::ComplexContent)?;
+                        if marker.is_some() {
+                            return Err(Refusal::ComplexContent);
+                        }
+                        marker = Some(CachedFieldMarker { range, kind, dirty });
+                    }
+                }
+            },
+            Event::End(element) => {
+                if let Some((marker_start, marker_depth, kind, dirty)) = pending_marker
+                    && depth == marker_depth
+                    && is_transaction_fragment_word_name_with_default_fallback(
+                        &namespace,
+                        element.name(),
+                        b"fldChar",
+                        &fragment_prefix,
+                        default_namespace_fallback_allowed,
+                    )
+                {
+                    let range = checked_range(marker_start, end)
+                        .map_err(|_error| Refusal::ComplexContent)?;
+                    if marker.is_some() {
+                        return Err(Refusal::ComplexContent);
+                    }
+                    marker = Some(CachedFieldMarker { range, kind, dirty });
+                    pending_marker = None;
+                }
+                depth = depth.checked_sub(1).ok_or(Refusal::ComplexContent)?;
+                if depth == 0 {
+                    return if saw_root && pending_marker.is_none() {
+                        Ok((has_direct_text, marker))
+                    } else {
+                        Err(Refusal::ComplexContent)
+                    };
+                }
+            },
+            Event::Eof => {
+                return if saw_root && depth == 0 && pending_marker.is_none() {
+                    Ok((has_direct_text, marker))
+                } else {
+                    Err(Refusal::ComplexContent)
+                };
+            },
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::DocType(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
+        }
+    }
+}
+
+fn parse_cached_field_marker(
+    element: &quick_xml::events::BytesStart<'_>,
+    resolver: &quick_xml::name::NamespaceResolver,
+    decoder: quick_xml::encoding::Decoder,
+    fragment_prefix: &FragmentPrefix,
+) -> std::result::Result<(ComplexFieldMarker, bool), Refusal> {
+    let mut kind = None;
+    let mut dirty = false;
+    let mut dirty_seen = false;
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(|_error| Refusal::ComplexContent)?;
+        let (namespace, local_name) = resolver.resolve_attribute(attribute.key);
+        if !is_cached_field_word_attribute(&namespace, fragment_prefix) {
+            continue;
+        }
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+            .map_err(|_error| Refusal::ComplexContent)?;
+        match local_name.as_ref() {
+            b"fldCharType" => {
+                if kind.is_some() {
+                    return Err(Refusal::ComplexContent);
+                }
+                kind = Some(match value.as_ref() {
+                    "begin" => ComplexFieldMarker::Begin,
+                    "separate" => ComplexFieldMarker::Separate,
+                    "end" => ComplexFieldMarker::End,
+                    _ => return Err(Refusal::ComplexContent),
+                });
+            },
+            b"dirty" => {
+                if dirty_seen {
+                    return Err(Refusal::ComplexContent);
+                }
+                dirty_seen = true;
+                dirty = match value.as_ref() {
+                    "true" | "1" | "on" => true,
+                    "false" | "0" | "off" => false,
+                    _ => return Err(Refusal::ComplexContent),
+                };
+            },
+            _ => {},
+        }
+    }
+    kind.map(|kind| (kind, dirty))
+        .ok_or(Refusal::ComplexContent)
+}
+
+fn is_cached_field_word_attribute(
+    namespace: &ResolveResult<'_>,
+    fragment_prefix: &FragmentPrefix,
+) -> bool {
+    if is_wordprocessing_namespace(namespace) {
+        return true;
+    }
+    match namespace {
+        ResolveResult::Unknown(prefix) => matches!(
+            fragment_prefix,
+            FragmentPrefix::Prefixed(candidate) if candidate.as_slice() == prefix.as_slice()
+        ),
+        ResolveResult::Bound(_) | ResolveResult::Unbound => false,
+    }
+}
+
+fn owning_cached_field_marker(
+    runs: &[CachedFieldRun],
+    selected: usize,
+) -> Option<(usize, CachedFieldMarker)> {
+    let selected_run = runs.get(selected)?;
+    if !selected_run.has_direct_text {
+        return None;
+    }
+    let mut closed_depth = 0usize;
+    let mut separate = false;
+    for run in runs[..selected].iter().rev() {
+        let Some(marker) = run.marker else { continue };
+        match marker.kind {
+            ComplexFieldMarker::End => closed_depth = closed_depth.saturating_add(1),
+            ComplexFieldMarker::Begin => {
+                if closed_depth == 0 {
+                    return None;
+                }
+                closed_depth -= 1;
+            },
+            ComplexFieldMarker::Separate if closed_depth == 0 => {
+                separate = true;
+                break;
+            },
+            ComplexFieldMarker::Separate => {},
+        }
+    }
+    if !separate {
+        return None;
+    }
+    closed_depth = 0;
+    for (index, run) in runs[..selected].iter().enumerate().rev() {
+        let Some(marker) = run.marker else { continue };
+        match marker.kind {
+            ComplexFieldMarker::End => closed_depth = closed_depth.saturating_add(1),
+            ComplexFieldMarker::Begin => {
+                if closed_depth == 0 {
+                    return Some((index, marker));
+                }
+                closed_depth -= 1;
+            },
+            ComplexFieldMarker::Separate => {},
+        }
+    }
+    None
+}
+
+#[derive(Clone)]
 enum FragmentPrefix {
     Unseen,
     Unprefixed,
@@ -6118,19 +8403,75 @@ impl FragmentPrefix {
     }
 }
 
+struct TransactionNamespaceState {
+    inherited_default_binding: bool,
+    default_scopes: Vec<bool>,
+    pending_pop: bool,
+}
+
+impl TransactionNamespaceState {
+    fn new(inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)]) -> Self {
+        Self {
+            inherited_default_binding: inherited_namespaces
+                .iter()
+                .any(|(prefix, _namespace)| prefix.is_none()),
+            default_scopes: Vec::new(),
+            pending_pop: false,
+        }
+    }
+
+    fn fallback_for_event(&mut self, event: &Event<'_>) -> bool {
+        if self.pending_pop {
+            self.default_scopes.pop();
+            self.pending_pop = false;
+        }
+        match event {
+            Event::Start(element) => {
+                self.default_scopes
+                    .push(element_declares_default_namespace(element));
+            },
+            Event::Empty(element) => {
+                self.default_scopes
+                    .push(element_declares_default_namespace(element));
+                self.pending_pop = true;
+            },
+            Event::End(_) => self.pending_pop = true,
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::DocType(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_)
+            | Event::Eof => {},
+        }
+        !self.inherited_default_binding && !self.default_scopes.iter().any(|scope| *scope)
+    }
+}
+
+fn element_declares_default_namespace(element: &quick_xml::events::BytesStart<'_>) -> bool {
+    element
+        .unchecked_attributes()
+        .filter_map(std::result::Result::ok)
+        .any(|attribute| {
+            attribute
+                .key
+                .as_namespace_binding()
+                .is_some_and(|prefix| matches!(prefix, PrefixDeclaration::Default))
+        })
+}
+
 struct CellSelection<'a> {
     xml: &'a [u8],
     start: usize,
 }
 
-fn validate_hyperlink_replacements(
-    replacements: &[HyperlinkTextReplacement],
-) -> TransactionResult<()> {
+fn validate_hyperlink_replacements(replacements: &[HyperlinkTextReplacement]) -> Result<()> {
     if replacements.len() > MAX_OPERATIONS {
-        return Err(TransactionError::Limit {
-            resource: "composite hyperlink replacements",
-            max: MAX_OPERATIONS,
-            actual: replacements.len(),
+        return Err(Error::Limit {
+            kind: crate::document::LimitKind::CompositeHyperlinkReplacements,
+            maximum: MAX_OPERATIONS,
+            observed: replacements.len(),
         });
     }
     let ambiguous_position = replacements
@@ -6141,7 +8482,7 @@ fn validate_hyperlink_replacements(
             .windows(2)
             .any(|pair| pair[0].address >= pair[1].address)
     {
-        return Err(TransactionError::Refused {
+        return Err(Error::Refused {
             position: ambiguous_position,
             reason: Refusal::AmbiguousCompositeSelector,
         });
@@ -6149,14 +8490,12 @@ fn validate_hyperlink_replacements(
     Ok(())
 }
 
-fn validate_paragraph_replacements(
-    replacements: &[ParagraphTextReplacement],
-) -> TransactionResult<()> {
+fn validate_paragraph_replacements(replacements: &[ParagraphTextReplacement]) -> Result<()> {
     if replacements.len() > MAX_OPERATIONS {
-        return Err(TransactionError::Limit {
-            resource: "composite paragraph replacements",
-            max: MAX_OPERATIONS,
-            actual: replacements.len(),
+        return Err(Error::Limit {
+            kind: crate::document::LimitKind::CompositeParagraphReplacements,
+            maximum: MAX_OPERATIONS,
+            observed: replacements.len(),
         });
     }
     let ambiguous_position = replacements
@@ -6167,7 +8506,7 @@ fn validate_paragraph_replacements(
             .windows(2)
             .any(|pair| pair[0].position >= pair[1].position)
     {
-        return Err(TransactionError::Refused {
+        return Err(Error::Refused {
             position: ambiguous_position,
             reason: Refusal::AmbiguousCompositeSelector,
         });
@@ -6175,7 +8514,7 @@ fn validate_paragraph_replacements(
     Ok(())
 }
 
-fn scan_document(xml: &[u8]) -> TransactionResult<Layout> {
+fn scan_document(xml: &[u8]) -> Result<Layout> {
     scan_document_with_context(xml, None)
 }
 
@@ -6195,7 +8534,7 @@ fn event_namespace_binding_count(event: &Event<'_>) -> usize {
             }
             element
                 .unchecked_attributes()
-                .filter_map(Result::ok)
+                .filter_map(std::result::Result::ok)
                 .filter(|attribute| attribute.key.as_namespace_binding().is_some())
                 .count()
         },
@@ -6218,10 +8557,7 @@ fn is_classified_body_child(local: &[u8]) -> bool {
     matches!(local, b"p" | b"tbl" | b"sdt" | b"sectPr")
 }
 
-fn scan_document_with_context(
-    xml: &[u8],
-    context: Option<&ExecutionContext>,
-) -> TransactionResult<Layout> {
+fn scan_document_with_context(xml: &[u8], context: Option<&ExecutionContext>) -> Result<Layout> {
     // A plain `Reader` and the shared binding tracker replace `NsReader`
     // (change 0229's pattern for the paragraph text scanner, applied here by
     // change 0754). `NsReader::from_reader` is `Reader::from_reader` with the
@@ -6309,10 +8645,10 @@ fn scan_document_with_context(
             })?;
             let active_namespace_bindings = current_bindings
                 .checked_add(event_namespace_bindings)
-                .ok_or(TransactionError::Limit {
-                    resource: "document namespace binding count",
-                    max: usize::MAX,
-                    actual: usize::MAX,
+                .ok_or(Error::Limit {
+                    kind: crate::document::LimitKind::DocumentNamespaceBindingCount,
+                    maximum: usize::MAX,
+                    observed: usize::MAX,
                 })?;
             (event_namespace_bindings, active_namespace_bindings)
         } else {
@@ -6326,10 +8662,10 @@ fn scan_document_with_context(
             // prepayment for ordinary documents.
             let lookup_work = event_bytes
                 .checked_mul(active_namespace_bindings.saturating_add(1))
-                .ok_or(TransactionError::Limit {
-                    resource: "document namespace lookup work",
-                    max: usize::MAX,
-                    actual: usize::MAX,
+                .ok_or(Error::Limit {
+                    kind: crate::document::LimitKind::DocumentNamespaceLookupWork,
+                    maximum: usize::MAX,
+                    observed: usize::MAX,
                 })?;
             consume_managed(context, Resource::Work, lookup_work)?;
         }
@@ -6346,10 +8682,10 @@ fn scan_document_with_context(
                 crate::Error::InvalidFormat("document element counter overflow".into())
             })?;
             if nodes > MAX_DOCUMENT_NODES {
-                return Err(TransactionError::Limit {
-                    resource: "XML elements",
-                    max: MAX_DOCUMENT_NODES,
-                    actual: nodes,
+                return Err(Error::Limit {
+                    kind: crate::document::LimitKind::XmlElements,
+                    maximum: MAX_DOCUMENT_NODES,
+                    observed: nodes,
                 });
             }
         }
@@ -6360,10 +8696,10 @@ fn scan_document_with_context(
                     crate::Error::InvalidFormat("document XML nesting is too deep".into())
                 })?;
                 if depth > MAX_DOCUMENT_DEPTH {
-                    return Err(TransactionError::Limit {
-                        resource: "XML depth",
-                        max: MAX_DOCUMENT_DEPTH,
-                        actual: depth,
+                    return Err(Error::Limit {
+                        kind: crate::document::LimitKind::XmlDepth,
+                        maximum: MAX_DOCUMENT_DEPTH,
+                        observed: depth,
                     });
                 }
                 // `QName::local_name` and `QName::prefix` split at the same
@@ -6402,7 +8738,13 @@ fn scan_document_with_context(
                     let is_table = is_word && local == b"tbl";
                     let is_control = is_word && local == b"sdt";
                     let is_section = is_word && local == b"sectPr";
-                    if final_section_start.is_some() {
+                    // A child after the body-final section properties is
+                    // refused only when it is body content; producers write
+                    // `w:altChunk` imports there (record 0293), which stay an
+                    // untouched tail outside the editable content region.
+                    if final_section_start.is_some()
+                        && (is_paragraph || is_table || is_control || is_section)
+                    {
                         return Err(crate::Error::InvalidFormat(
                             "body-final section properties are not the final body child".into(),
                         )
@@ -6431,7 +8773,7 @@ fn scan_document_with_context(
                     let (prefix, local) = split_qualified_name(element.name().into_inner());
                     let is_word = is_classified_body_child(local)
                         && is_wordprocessing_namespace(&tracker.resolve_prefix_bytes(prefix));
-                    if final_section_start.is_some() {
+                    if final_section_start.is_some() && is_word {
                         return Err(crate::Error::InvalidFormat(
                             "body-final section properties are not the final body child".into(),
                         )
@@ -6557,7 +8899,7 @@ fn oracle_event_namespace_binding_count(event: &Event<'_>) -> usize {
         Event::Start(element) | Event::Empty(element) => element
             .attributes()
             .with_checks(false)
-            .filter_map(Result::ok)
+            .filter_map(std::result::Result::ok)
             .filter(|attribute| attribute.key.as_namespace_binding().is_some())
             .count(),
         _ => 0,
@@ -6572,7 +8914,7 @@ fn oracle_event_namespace_binding_count(event: &Event<'_>) -> usize {
 fn scan_document_with_context_nsreader_oracle(
     xml: &[u8],
     context: Option<&ExecutionContext>,
-) -> TransactionResult<Layout> {
+) -> Result<Layout> {
     let mut reader = NsReader::from_reader(xml);
     let mut paragraphs = Vec::new();
     let mut paragraph_namespaces = Vec::new();
@@ -6621,10 +8963,10 @@ fn scan_document_with_context_nsreader_oracle(
             })?;
             let active_namespace_bindings = current_bindings
                 .checked_add(event_namespace_bindings)
-                .ok_or(TransactionError::Limit {
-                    resource: "document namespace binding count",
-                    max: usize::MAX,
-                    actual: usize::MAX,
+                .ok_or(Error::Limit {
+                    kind: crate::document::LimitKind::DocumentNamespaceBindingCount,
+                    maximum: usize::MAX,
+                    observed: usize::MAX,
                 })?;
             (event_namespace_bindings, active_namespace_bindings)
         } else {
@@ -6638,10 +8980,10 @@ fn scan_document_with_context_nsreader_oracle(
             // prepayment for ordinary documents.
             let lookup_work = event_bytes
                 .checked_mul(active_namespace_bindings.saturating_add(1))
-                .ok_or(TransactionError::Limit {
-                    resource: "document namespace lookup work",
-                    max: usize::MAX,
-                    actual: usize::MAX,
+                .ok_or(Error::Limit {
+                    kind: crate::document::LimitKind::DocumentNamespaceLookupWork,
+                    maximum: usize::MAX,
+                    observed: usize::MAX,
                 })?;
             consume_managed(context, Resource::Work, lookup_work)?;
         }
@@ -6665,10 +9007,10 @@ fn scan_document_with_context_nsreader_oracle(
                 crate::Error::InvalidFormat("document element counter overflow".into())
             })?;
             if nodes > MAX_DOCUMENT_NODES {
-                return Err(TransactionError::Limit {
-                    resource: "XML elements",
-                    max: MAX_DOCUMENT_NODES,
-                    actual: nodes,
+                return Err(Error::Limit {
+                    kind: crate::document::LimitKind::XmlElements,
+                    maximum: MAX_DOCUMENT_NODES,
+                    observed: nodes,
                 });
             }
         }
@@ -6679,10 +9021,10 @@ fn scan_document_with_context_nsreader_oracle(
                     crate::Error::InvalidFormat("document XML nesting is too deep".into())
                 })?;
                 if depth > MAX_DOCUMENT_DEPTH {
-                    return Err(TransactionError::Limit {
-                        resource: "XML depth",
-                        max: MAX_DOCUMENT_DEPTH,
-                        actual: depth,
+                    return Err(Error::Limit {
+                        kind: crate::document::LimitKind::XmlDepth,
+                        maximum: MAX_DOCUMENT_DEPTH,
+                        observed: depth,
                     });
                 }
                 let is_word = is_wordprocessing_namespace(&namespace);
@@ -6711,7 +9053,9 @@ fn scan_document_with_context_nsreader_oracle(
                     let is_table = is_word && local.as_ref() == b"tbl";
                     let is_control = is_word && local.as_ref() == b"sdt";
                     let is_section = is_word && local.as_ref() == b"sectPr";
-                    if final_section_start.is_some() {
+                    if final_section_start.is_some()
+                        && (is_paragraph || is_table || is_control || is_section)
+                    {
                         return Err(crate::Error::InvalidFormat(
                             "body-final section properties are not the final body child".into(),
                         )
@@ -6734,7 +9078,10 @@ fn scan_document_with_context_nsreader_oracle(
                 if body_depth.is_some_and(|body| child_depth == body + 1) {
                     let is_word = is_wordprocessing_namespace(&namespace);
                     let local = element.local_name();
-                    if final_section_start.is_some() {
+                    if final_section_start.is_some()
+                        && is_word
+                        && is_classified_body_child(local.as_ref())
+                    {
                         return Err(crate::Error::InvalidFormat(
                             "body-final section properties are not the final body child".into(),
                         )
@@ -6861,7 +9208,7 @@ fn conformance_from_namespace(namespace: &ResolveResult<'_>) -> Option<Conforman
     }
 }
 
-fn checked_range(start: usize, end: usize) -> TransactionResult<Range> {
+fn checked_range(start: usize, end: usize) -> Result<Range> {
     Ok(Range {
         start: u32::try_from(start).map_err(|_conversion_error| {
             crate::Error::InvalidFormat("paragraph offset exceeds u32".into())
@@ -6890,14 +9237,14 @@ fn rewrite_revision_paragraph(
     selector: RevisionSelector,
     action: RevisionAction,
     inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
-) -> TransactionResult<Vec<u8>> {
+) -> Result<Vec<u8>> {
     if paragraph_has_revision_range_marker(paragraph_xml, inherited_namespaces).map_err(
-        |reason| TransactionError::Refused {
+        |reason| Error::Refused {
             position: selector.paragraph.get(),
             reason,
         },
     )? {
-        return Err(TransactionError::Refused {
+        return Err(Error::Refused {
             position: selector.paragraph.get(),
             reason: Refusal::RevisionDependency,
         });
@@ -6910,23 +9257,23 @@ fn rewrite_revision_paragraph(
         Refusal::RevisionNotFound,
         inherited_namespaces,
     )
-    .map_err(|reason| TransactionError::Refused {
+    .map_err(|reason| Error::Refused {
         position: selector.paragraph.get(),
         reason,
     })?;
     let revision_start = usize::try_from(revision_range.start).map_err(|_error| {
-        TransactionError::Document(crate::Error::InvalidFormat(
+        Error::Document(crate::Error::InvalidFormat(
             "revision offset does not fit usize".into(),
         ))
     })?;
     let revision_end = revision_start
         .checked_add(usize::try_from(revision_range.length).map_err(|_error| {
-            TransactionError::Document(crate::Error::InvalidFormat(
+            Error::Document(crate::Error::InvalidFormat(
                 "revision length does not fit usize".into(),
             ))
         })?)
         .ok_or_else(|| {
-            TransactionError::Document(crate::Error::InvalidFormat(
+            Error::Document(crate::Error::InvalidFormat(
                 "revision range overflows usize".into(),
             ))
         })?;
@@ -6938,7 +9285,7 @@ fn rewrite_revision_paragraph(
     )?;
     let replacement =
         rewrite_revision_fragment(revision_xml, selector.kind, action, inherited_namespaces)
-            .map_err(|reason| TransactionError::Refused {
+            .map_err(|reason| Error::Refused {
                 position: selector.paragraph.get(),
                 reason,
             })?;
@@ -6948,7 +9295,7 @@ fn rewrite_revision_paragraph(
 fn paragraph_has_revision_range_marker(
     paragraph_xml: &[u8],
     inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
-) -> Result<bool, Refusal> {
+) -> std::result::Result<bool, Refusal> {
     if paragraph_xml.len() > MAX_DOCUMENT_XML_BYTES {
         return Err(Refusal::RevisionDependency);
     }
@@ -7044,7 +9391,7 @@ fn rewrite_revision_fragment(
     kind: RevisionKind,
     action: RevisionAction,
     inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
-) -> Result<Vec<u8>, Refusal> {
+) -> std::result::Result<Vec<u8>, Refusal> {
     let info = scan_revision_fragment(xml, kind, inherited_namespaces)?;
     if action.removes_content(kind) {
         return Ok(Vec::new());
@@ -7198,7 +9545,7 @@ fn scan_revision_fragment(
     xml: &[u8],
     kind: RevisionKind,
     inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
-) -> Result<RevisionFragmentInfo, Refusal> {
+) -> std::result::Result<RevisionFragmentInfo, Refusal> {
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
     for (prefix, namespace) in inherited_namespaces {
@@ -7463,7 +9810,7 @@ fn inspect_revision_run_child(
     text_depth: &mut Option<usize>,
     depth: usize,
     deleted_name: Option<(&mut Option<(usize, usize, Vec<u8>)>, usize)>,
-) -> Result<(), Refusal> {
+) -> std::result::Result<(), Refusal> {
     if matches!(namespace, ResolveResult::Unknown(_)) {
         return Err(Refusal::RevisionDependency);
     }
@@ -7515,7 +9862,7 @@ fn inspect_revision_run_child(
     Err(Refusal::RevisionDependency)
 }
 
-fn validate_revision_text_event(event: Event<'_>) -> Result<(), Refusal> {
+fn validate_revision_text_event(event: Event<'_>) -> std::result::Result<(), Refusal> {
     let text = match event {
         Event::Text(text) => {
             let encoded = text
@@ -7544,7 +9891,7 @@ fn validate_revision_element_attributes(
     element: &quick_xml::events::BytesStart<'_>,
     resolver: &quick_xml::name::NamespaceResolver,
     decoder: quick_xml::encoding::Decoder,
-) -> Result<(), Refusal> {
+) -> std::result::Result<(), Refusal> {
     let mut attributes = 0usize;
     for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|_error| Refusal::RevisionDependency)?;
@@ -7589,7 +9936,7 @@ fn inspect_revision_descendant(
     namespace: &ResolveResult<'_>,
     name: quick_xml::name::QName<'_>,
     depth: usize,
-) -> Result<(), Refusal> {
+) -> std::result::Result<(), Refusal> {
     if matches!(namespace, ResolveResult::Unknown(_)) {
         return Err(Refusal::RevisionDependency);
     }
@@ -7671,7 +10018,7 @@ fn is_word_local(
     is_wordprocessing_namespace(namespace) && name.local_name().as_ref() == local
 }
 
-fn raw_namespace_declarations(open_tag: &[u8]) -> Result<Vec<Vec<u8>>, Refusal> {
+fn raw_namespace_declarations(open_tag: &[u8]) -> std::result::Result<Vec<Vec<u8>>, Refusal> {
     let attributes = raw_tag_attributes(open_tag)?;
     let mut declarations = Vec::new();
     for attribute in attributes.into_iter().filter(|attribute| {
@@ -7690,7 +10037,7 @@ fn raw_revision_scope_attributes(
     element: &quick_xml::events::BytesStart<'_>,
     resolver: &quick_xml::name::NamespaceResolver,
     decoder: quick_xml::encoding::Decoder,
-) -> Result<Vec<Vec<u8>>, Refusal> {
+) -> std::result::Result<Vec<Vec<u8>>, Refusal> {
     let raw_attributes = raw_tag_attributes(open_tag)?;
     let mut raw_attributes = raw_attributes.into_iter();
     let mut scope = Vec::new();
@@ -7831,7 +10178,7 @@ enum RevisionAttributeClass {
 fn validate_revision_metadata(
     attribute: RevisionMetadataAttribute,
     value: &str,
-) -> Result<(), Refusal> {
+) -> std::result::Result<(), Refusal> {
     if value.len() > MAX_REVISION_METADATA_VALUE_BYTES
         || !value.chars().all(is_legal_revision_xml_character)
     {
@@ -7902,10 +10249,14 @@ fn is_xml_scope_attribute(local_name: &[u8]) -> bool {
     matches!(local_name, b"space" | b"lang")
 }
 
+#[derive(Clone)]
 struct RawTagAttribute {
     name: Vec<u8>,
     value: Vec<u8>,
     raw: Vec<u8>,
+    /// Byte range of the quoted value within the opening tag.
+    value_start: usize,
+    value_end: usize,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -7917,7 +10268,9 @@ enum RevisionNamespaceKind {
     Other,
 }
 
-fn raw_attribute_fragments(fragments: &[Vec<u8>]) -> Result<Vec<RawTagAttribute>, Refusal> {
+fn raw_attribute_fragments(
+    fragments: &[Vec<u8>],
+) -> std::result::Result<Vec<RawTagAttribute>, Refusal> {
     let mut attributes = Vec::new();
     attributes
         .try_reserve_exact(fragments.len())
@@ -7945,7 +10298,7 @@ fn raw_attribute_fragments(fragments: &[Vec<u8>]) -> Result<Vec<RawTagAttribute>
 
 fn raw_namespace_bindings(
     declarations: &[RawTagAttribute],
-) -> Result<Vec<(Option<Vec<u8>>, Vec<u8>)>, Refusal> {
+) -> std::result::Result<Vec<(Option<Vec<u8>>, Vec<u8>)>, Refusal> {
     let mut bindings: Vec<(Option<Vec<u8>>, Vec<u8>)> = Vec::new();
     bindings
         .try_reserve_exact(declarations.len())
@@ -7967,7 +10320,7 @@ fn is_namespace_declaration_name(name: &[u8]) -> bool {
     name == b"xmlns" || name.starts_with(b"xmlns:")
 }
 
-fn raw_namespace_declaration_prefix(name: &[u8]) -> Result<Option<&[u8]>, Refusal> {
+fn raw_namespace_declaration_prefix(name: &[u8]) -> std::result::Result<Option<&[u8]>, Refusal> {
     if name == b"xmlns" {
         return Ok(None);
     }
@@ -7978,7 +10331,7 @@ fn raw_namespace_declaration_prefix(name: &[u8]) -> Result<Option<&[u8]>, Refusa
     Ok(Some(prefix))
 }
 
-fn raw_attribute_local_name(name: &[u8]) -> Result<&[u8], Refusal> {
+fn raw_attribute_local_name(name: &[u8]) -> std::result::Result<&[u8], Refusal> {
     let Some(index) = name.iter().position(|byte| *byte == b':') else {
         if name.is_empty() {
             return Err(Refusal::RevisionDependency);
@@ -7992,7 +10345,7 @@ fn raw_attribute_local_name(name: &[u8]) -> Result<&[u8], Refusal> {
     Ok(local)
 }
 
-fn raw_attribute_prefix(name: &[u8]) -> Result<Option<&[u8]>, Refusal> {
+fn raw_attribute_prefix(name: &[u8]) -> std::result::Result<Option<&[u8]>, Refusal> {
     let Some(index) = name.iter().position(|byte| *byte == b':') else {
         return Ok(None);
     };
@@ -8008,7 +10361,7 @@ fn raw_attribute_namespace_kind(
     child_declarations: &[&RawTagAttribute],
     root_bindings: &[(Option<Vec<u8>>, Vec<u8>)],
     inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
-) -> Result<RevisionNamespaceKind, Refusal> {
+) -> std::result::Result<RevisionNamespaceKind, Refusal> {
     let Some(prefix) = raw_attribute_prefix(name)? else {
         raw_attribute_local_name(name)?;
         return Ok(RevisionNamespaceKind::Other);
@@ -8066,7 +10419,7 @@ fn raw_attribute_namespace_kind(
     })
 }
 
-fn raw_tag_name_end(tag: &[u8]) -> Result<usize, Refusal> {
+fn raw_tag_name_end(tag: &[u8]) -> std::result::Result<usize, Refusal> {
     if tag.first() != Some(&b'<') {
         return Err(Refusal::RevisionDependency);
     }
@@ -8084,7 +10437,7 @@ fn raw_tag_name_end(tag: &[u8]) -> Result<usize, Refusal> {
     Ok(end)
 }
 
-fn raw_tag_attributes(tag: &[u8]) -> Result<Vec<RawTagAttribute>, Refusal> {
+fn raw_tag_attributes(tag: &[u8]) -> std::result::Result<Vec<RawTagAttribute>, Refusal> {
     if tag.len() > MAX_REVISION_TAG_ATTRIBUTE_BYTES {
         return Err(Refusal::RevisionDependency);
     }
@@ -8160,6 +10513,7 @@ fn raw_tag_attributes(tag: &[u8]) -> Result<Vec<RawTagAttribute>, Refusal> {
         if cursor >= tag.len() {
             return Err(Refusal::RevisionDependency);
         }
+        let value_end = cursor;
         cursor += 1;
         attribute_count = attribute_count
             .checked_add(1)
@@ -8198,6 +10552,8 @@ fn raw_tag_attributes(tag: &[u8]) -> Result<Vec<RawTagAttribute>, Refusal> {
             name: name_owned,
             value: value_owned,
             raw: raw_owned,
+            value_start,
+            value_end,
         });
     }
     Ok(attributes)
@@ -8207,7 +10563,7 @@ fn revision_tag_name_replacement(
     xml: &[u8],
     event_start: usize,
     end_tag: bool,
-) -> Result<(usize, usize, Vec<u8>), Refusal> {
+) -> std::result::Result<(usize, usize, Vec<u8>), Refusal> {
     let name_start = event_start
         .checked_add(if end_tag { 2 } else { 1 })
         .ok_or(Refusal::RevisionDependency)?;
@@ -8217,7 +10573,7 @@ fn revision_tag_name_replacement(
 fn revision_tag_name_replacement_at(
     xml: &[u8],
     name_start: usize,
-) -> Result<(usize, usize, Vec<u8>), Refusal> {
+) -> std::result::Result<(usize, usize, Vec<u8>), Refusal> {
     let name_end = xml
         .get(name_start..)
         .and_then(|suffix| {
@@ -8234,7 +10590,23 @@ fn revision_tag_name_replacement_at(
     Ok((local_start, name_end, b"t".to_vec()))
 }
 
-fn scan_text_owner(xml: &[u8], root_name: &[u8]) -> Result<TextOwner, Refusal> {
+fn scan_text_owner(xml: &[u8], root_name: &[u8]) -> std::result::Result<TextOwner, Refusal> {
+    scan_text_owner_with_policy(xml, root_name, false)
+}
+
+/// Scan a paragraph for a text edit that retains its paragraph-level range
+/// markers. Cell replacement and other owner-removal operations deliberately
+/// use the strict scanner above because they may discard the surrounding
+/// owner and cannot silently broaden their preservation policy.
+fn scan_paragraph_text_owner(xml: &[u8]) -> std::result::Result<TextOwner, Refusal> {
+    scan_text_owner_with_policy(xml, b"p", true)
+}
+
+fn scan_text_owner_with_policy(
+    xml: &[u8],
+    root_name: &[u8],
+    preserve_paragraph_markers: bool,
+) -> std::result::Result<TextOwner, Refusal> {
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
     let mut fragment_prefix = FragmentPrefix::Unseen;
@@ -8245,6 +10617,9 @@ fn scan_text_owner(xml: &[u8], root_name: &[u8]) -> Result<TextOwner, Refusal> {
     let mut text = String::new();
     let mut depth = 0usize;
     let mut saw_root = false;
+    // The depth of the open `mc:AlternateContent`: an opaque object whose
+    // own text refuses the edit (record 0307).
+    let mut opaque = None::<usize>;
 
     loop {
         let event_start = origin
@@ -8262,9 +10637,36 @@ fn scan_text_owner(xml: &[u8], root_name: &[u8]) -> Result<TextOwner, Refusal> {
             .offset(reader.buffer_position())
             .ok_or(Refusal::ComplexContent)?;
 
+        if let Some(wrapper) = opaque {
+            match &event {
+                Event::Start(element) | Event::Empty(element) => {
+                    if alternate_content_text(&namespace, element.name(), &fragment_prefix) {
+                        return Err(Refusal::AlternateContentText);
+                    }
+                    if matches!(event, Event::Start(_)) {
+                        depth = depth.checked_add(1).ok_or(Refusal::ComplexContent)?;
+                    }
+                    continue;
+                },
+                Event::End(_) => {
+                    if depth == wrapper {
+                        opaque = None;
+                    }
+                    depth = depth.checked_sub(1).ok_or(Refusal::ComplexContent)?;
+                    continue;
+                },
+                Event::Eof => {},
+                _ => continue,
+            }
+        }
+
         match event {
             Event::Start(element) => {
                 depth = depth.checked_add(1).ok_or(Refusal::ComplexContent)?;
+                if root_depth.is_some() && is_alternate_content_name(&namespace, element.name()) {
+                    opaque = Some(depth);
+                    continue;
+                }
                 if root_depth.is_none() {
                     fragment_prefix = FragmentPrefix::from_name(element.name());
                     if saw_root
@@ -8369,6 +10771,13 @@ fn scan_text_owner(xml: &[u8], root_name: &[u8]) -> Result<TextOwner, Refusal> {
                         continue;
                     }
                     if is_fragment_word_element(&namespace, &fragment_prefix)
+                        && !(preserve_paragraph_markers
+                            && is_preserved_paragraph_marker(
+                                root_name,
+                                &namespace,
+                                element.name(),
+                                &fragment_prefix,
+                            ))
                         && !(root_name == b"p"
                             && is_transaction_fragment_word_name(
                                 &namespace,
@@ -8452,6 +10861,58 @@ fn scan_text_owner(xml: &[u8], root_name: &[u8]) -> Result<TextOwner, Refusal> {
     Ok(TextOwner { slots, text })
 }
 
+/// Paragraph-level range markers carry identity but no visible text. They can
+/// remain byte-for-byte in place while run text slots are rewritten, so
+/// accepting them here preserves bookmarks without admitting arbitrary
+/// structural children into the text writer.
+fn is_preserved_paragraph_marker(
+    root_name: &[u8],
+    namespace: &ResolveResult<'_>,
+    name: quick_xml::name::QName<'_>,
+    fragment_prefix: &FragmentPrefix,
+) -> bool {
+    root_name == b"p"
+        && is_fragment_word_element(namespace, fragment_prefix)
+        && matches!(
+            name.local_name().as_ref(),
+            b"bookmarkStart" | b"bookmarkEnd"
+        )
+}
+
+/// Whether an element is an `mc:AlternateContent` wrapper. A transaction
+/// fragment is parsed without the declarations it inherits, so an unbound
+/// prefix counts; a prefix bound to another namespace does not.
+fn is_alternate_content_name(
+    namespace: &ResolveResult<'_>,
+    name: quick_xml::name::QName<'_>,
+) -> bool {
+    name.local_name().as_ref() == b"AlternateContent"
+        && match namespace {
+            ResolveResult::Bound(Namespace(uri)) => *uri == MARKUP_COMPATIBILITY_NAMESPACE,
+            ResolveResult::Unknown(_) | ResolveResult::Unbound => true,
+        }
+}
+
+/// Whether an element inside alternate content carries text a reader shows
+/// (or might show) as part of its owner's.
+fn alternate_content_text(
+    namespace: &ResolveResult<'_>,
+    name: quick_xml::name::QName<'_>,
+    fragment_prefix: &FragmentPrefix,
+) -> bool {
+    matches!(
+        name.local_name().as_ref(),
+        b"t" | b"delText"
+            | b"tab"
+            | b"ptab"
+            | b"br"
+            | b"cr"
+            | b"noBreakHyphen"
+            | b"softHyphen"
+            | b"sym"
+    ) && is_fragment_word_element(namespace, fragment_prefix)
+}
+
 fn is_owner_text_element(
     root_name: &[u8],
     namespace: &ResolveResult<'_>,
@@ -8470,17 +10931,28 @@ fn is_owner_text_element(
     )
 }
 
-fn decode_text_fragment(xml: &[u8]) -> Result<String, Refusal> {
+fn decode_text_fragment(xml: &[u8]) -> std::result::Result<String, Refusal> {
     let mut reader = Reader::from_reader(xml);
     let mut value = String::new();
     let mut depth = 0usize;
+    let mut root_seen = false;
     loop {
         match reader.read_event().map_err(|_error| Refusal::ComplexRun)? {
             Event::Start(_) => {
+                if depth == 0 && root_seen {
+                    return Err(Refusal::ComplexRun);
+                }
                 depth = depth.checked_add(1).ok_or(Refusal::ComplexRun)?;
                 if depth > 1 {
                     return Err(Refusal::ComplexRun);
                 }
+                root_seen = true;
+            },
+            Event::Empty(_) if depth == 0 => {
+                if root_seen {
+                    return Err(Refusal::ComplexRun);
+                }
+                root_seen = true;
             },
             Event::Empty(_) => return Err(Refusal::ComplexRun),
             Event::Text(text) if depth == 1 => {
@@ -8507,7 +10979,7 @@ fn decode_text_fragment(xml: &[u8]) -> Result<String, Refusal> {
                 depth = depth.checked_sub(1).ok_or(Refusal::ComplexRun)?;
             },
             Event::Eof => {
-                if depth == 0 {
+                if depth == 0 && root_seen {
                     break;
                 }
                 return Err(Refusal::ComplexRun);
@@ -8524,7 +10996,7 @@ fn decode_text_fragment(xml: &[u8]) -> Result<String, Refusal> {
     Ok(value)
 }
 
-fn rewrite_text_owner(xml: &[u8], owner: &TextOwner, text: &str) -> TransactionResult<Vec<u8>> {
+fn rewrite_text_owner(xml: &[u8], owner: &TextOwner, text: &str) -> Result<Vec<u8>> {
     let _ = preflight_text_owner_rewrite(xml, owner, text)?;
     let total_characters = text.chars().count();
     let mut characters = text.char_indices();
@@ -8534,7 +11006,7 @@ fn rewrite_text_owner(xml: &[u8], owner: &TextOwner, text: &str) -> TransactionR
     replacements
         .try_reserve_exact(owner.slots.len())
         .map_err(|source| {
-            TransactionError::Document(crate::Error::Allocation {
+            Error::Document(crate::Error::Allocation {
                 resource: "paragraph replacements",
                 source,
             })
@@ -8543,7 +11015,7 @@ fn rewrite_text_owner(xml: &[u8], owner: &TextOwner, text: &str) -> TransactionR
         let remaining = total_characters
             .checked_sub(character_cursor)
             .ok_or_else(|| {
-                TransactionError::Document(crate::Error::InvalidFormat(
+                Error::Document(crate::Error::InvalidFormat(
                     "paragraph text slot cursor exceeded authored text".into(),
                 ))
             })?;
@@ -8555,26 +11027,23 @@ fn rewrite_text_owner(xml: &[u8], owner: &TextOwner, text: &str) -> TransactionR
         let value_start = byte_cursor;
         for _ in 0..count {
             let (_, character) = characters.next().ok_or_else(|| {
-                TransactionError::Document(crate::Error::InvalidFormat(
+                Error::Document(crate::Error::InvalidFormat(
                     "paragraph text slot is outside authored text".into(),
                 ))
             })?;
-            byte_cursor =
-                byte_cursor
-                    .checked_add(character.len_utf8())
-                    .ok_or(TransactionError::Limit {
-                        resource: "replacement text bytes",
-                        max: MAX_REPLACEMENT_TEXT_BYTES,
-                        actual: usize::MAX,
-                    })?;
+            byte_cursor = byte_cursor
+                .checked_add(character.len_utf8())
+                .ok_or(Error::Limit {
+                    kind: crate::document::LimitKind::ReplacementTextBytes,
+                    maximum: MAX_REPLACEMENT_TEXT_BYTES,
+                    observed: usize::MAX,
+                })?;
         }
-        character_cursor = character_cursor
-            .checked_add(count)
-            .ok_or(TransactionError::Limit {
-                resource: "replacement text characters",
-                max: MAX_REPLACEMENT_TEXT_BYTES,
-                actual: usize::MAX,
-            })?;
+        character_cursor = character_cursor.checked_add(count).ok_or(Error::Limit {
+            kind: crate::document::LimitKind::ReplacementTextCharacters,
+            maximum: MAX_REPLACEMENT_TEXT_BYTES,
+            observed: usize::MAX,
+        })?;
         let value = &text[value_start..byte_cursor];
         let fragment = try_run_content_fragment(&slot.prefix, &slot.local_name, value)?;
         replacements.push((slot.start, slot.end, fragment));
@@ -8586,7 +11055,7 @@ fn preflight_text_owner_rewrite(
     xml: &[u8],
     owner: &TextOwner,
     text: &str,
-) -> TransactionResult<(usize, usize)> {
+) -> Result<(usize, usize)> {
     let total_characters = text.chars().count();
     let mut characters = text.char_indices();
     let mut character_cursor = 0usize;
@@ -8597,7 +11066,7 @@ fn preflight_text_owner_rewrite(
         let remaining = total_characters
             .checked_sub(character_cursor)
             .ok_or_else(|| {
-                TransactionError::Document(crate::Error::InvalidFormat(
+                Error::Document(crate::Error::InvalidFormat(
                     "paragraph text slot cursor exceeded authored text".into(),
                 ))
             })?;
@@ -8609,59 +11078,55 @@ fn preflight_text_owner_rewrite(
         let value_start = byte_cursor;
         for _ in 0..count {
             let (_, character) = characters.next().ok_or_else(|| {
-                TransactionError::Document(crate::Error::InvalidFormat(
+                Error::Document(crate::Error::InvalidFormat(
                     "paragraph text slot is outside authored text".into(),
                 ))
             })?;
-            byte_cursor =
-                byte_cursor
-                    .checked_add(character.len_utf8())
-                    .ok_or(TransactionError::Limit {
-                        resource: "replacement text bytes",
-                        max: MAX_REPLACEMENT_TEXT_BYTES,
-                        actual: usize::MAX,
-                    })?;
+            byte_cursor = byte_cursor
+                .checked_add(character.len_utf8())
+                .ok_or(Error::Limit {
+                    kind: crate::document::LimitKind::ReplacementTextBytes,
+                    maximum: MAX_REPLACEMENT_TEXT_BYTES,
+                    observed: usize::MAX,
+                })?;
         }
-        character_cursor = character_cursor
-            .checked_add(count)
-            .ok_or(TransactionError::Limit {
-                resource: "replacement text characters",
-                max: MAX_REPLACEMENT_TEXT_BYTES,
-                actual: usize::MAX,
-            })?;
+        character_cursor = character_cursor.checked_add(count).ok_or(Error::Limit {
+            kind: crate::document::LimitKind::ReplacementTextCharacters,
+            maximum: MAX_REPLACEMENT_TEXT_BYTES,
+            observed: usize::MAX,
+        })?;
         let value = &text[value_start..byte_cursor];
         let replacement_len = run_content_fragment_len(&slot.prefix, &slot.local_name, value)?;
-        fragment_bytes =
-            fragment_bytes
-                .checked_add(replacement_len)
-                .ok_or(TransactionError::Limit {
-                    resource: "paragraph replacement XML bytes",
-                    max: MAX_DOCUMENT_XML_BYTES,
-                    actual: usize::MAX,
-                })?;
+        fragment_bytes = fragment_bytes
+            .checked_add(replacement_len)
+            .ok_or(Error::Limit {
+                kind: crate::document::LimitKind::ParagraphReplacementXmlBytes,
+                maximum: MAX_DOCUMENT_XML_BYTES,
+                observed: usize::MAX,
+            })?;
         let removed_len = slot.end.checked_sub(slot.start).ok_or_else(|| {
-            TransactionError::Document(crate::Error::InvalidFormat(
+            Error::Document(crate::Error::InvalidFormat(
                 "paragraph text slot range is inverted".into(),
             ))
         })?;
         output_len = output_len.checked_sub(removed_len).ok_or_else(|| {
-            TransactionError::Document(crate::Error::InvalidFormat(
+            Error::Document(crate::Error::InvalidFormat(
                 "paragraph text slot range exceeds document XML".into(),
             ))
         })?;
         output_len = output_len
             .checked_add(replacement_len)
-            .ok_or(TransactionError::Limit {
-                resource: "XML bytes",
-                max: MAX_DOCUMENT_XML_BYTES,
-                actual: usize::MAX,
+            .ok_or(Error::Limit {
+                kind: crate::document::LimitKind::XmlBytes,
+                maximum: MAX_DOCUMENT_XML_BYTES,
+                observed: usize::MAX,
             })?;
     }
     if output_len > MAX_DOCUMENT_XML_BYTES {
-        return Err(TransactionError::Limit {
-            resource: "XML bytes",
-            max: MAX_DOCUMENT_XML_BYTES,
-            actual: output_len,
+        return Err(Error::Limit {
+            kind: crate::document::LimitKind::XmlBytes,
+            maximum: MAX_DOCUMENT_XML_BYTES,
+            observed: output_len,
         });
     }
     Ok((output_len, fragment_bytes))
@@ -8674,6 +11139,42 @@ fn is_transaction_fragment_word_name(
     fragment_prefix: &FragmentPrefix,
 ) -> bool {
     name.local_name().as_ref() == local_name && is_fragment_word_element(namespace, fragment_prefix)
+}
+
+fn is_transaction_fragment_word_name_with_default_fallback(
+    namespace: &ResolveResult<'_>,
+    name: quick_xml::name::QName<'_>,
+    local_name: &[u8],
+    fragment_prefix: &FragmentPrefix,
+    default_namespace_fallback_allowed: bool,
+) -> bool {
+    name.local_name().as_ref() == local_name
+        && is_fragment_word_element_with_default_fallback(
+            namespace,
+            fragment_prefix,
+            default_namespace_fallback_allowed,
+        )
+}
+
+fn transaction_fragment_word_name_matches(
+    namespace: &ResolveResult<'_>,
+    name: quick_xml::name::QName<'_>,
+    local_name: &[u8],
+    fragment_prefix: &FragmentPrefix,
+    reject_default_namespace_fallback: bool,
+    default_namespace_fallback_allowed: bool,
+) -> bool {
+    if reject_default_namespace_fallback {
+        is_transaction_fragment_word_name_with_default_fallback(
+            namespace,
+            name,
+            local_name,
+            fragment_prefix,
+            default_namespace_fallback_allowed,
+        )
+    } else {
+        is_transaction_fragment_word_name(namespace, name, local_name, fragment_prefix)
+    }
 }
 
 fn is_fragment_word_element(
@@ -8689,6 +11190,27 @@ fn is_fragment_word_element(
             FragmentPrefix::Prefixed(candidate) if candidate.as_slice() == prefix.as_slice()
         ),
         ResolveResult::Unbound => matches!(fragment_prefix, FragmentPrefix::Unprefixed),
+        ResolveResult::Bound(_) => false,
+    }
+}
+
+fn is_fragment_word_element_with_default_fallback(
+    namespace: &ResolveResult<'_>,
+    fragment_prefix: &FragmentPrefix,
+    default_namespace_fallback_allowed: bool,
+) -> bool {
+    if is_wordprocessing_namespace(namespace) {
+        return true;
+    }
+    match namespace {
+        ResolveResult::Unknown(prefix) => matches!(
+            fragment_prefix,
+            FragmentPrefix::Prefixed(candidate) if candidate.as_slice() == prefix.as_slice()
+        ),
+        ResolveResult::Unbound => {
+            default_namespace_fallback_allowed
+                && matches!(fragment_prefix, FragmentPrefix::Unprefixed)
+        },
         ResolveResult::Bound(_) => false,
     }
 }
@@ -8731,10 +11253,13 @@ fn structural_run_character(
     })
 }
 
-fn select_complex_field_result(xml: &[u8], position: Position) -> Result<Range, Refusal> {
+fn select_complex_field_result(
+    xml: &[u8],
+    position: Position,
+) -> std::result::Result<Range, Refusal> {
     let mut active = Vec::<(usize, Option<usize>)>::new();
     let mut field_index = 0usize;
-    for run_index in 0..MAX_OPERATIONS {
+    for run_index in 0..MAX_FIELD_RUNS {
         let Ok(run) = select_direct_child(
             xml,
             b"p",
@@ -8778,7 +11303,7 @@ fn select_complex_field_result(xml: &[u8], position: Position) -> Result<Range, 
     Err(Refusal::ComplexFieldNotFound)
 }
 
-fn complex_field_marker(xml: &[u8]) -> Result<Option<ComplexFieldMarker>, Refusal> {
+fn complex_field_marker(xml: &[u8]) -> std::result::Result<Option<ComplexFieldMarker>, Refusal> {
     let mut reader = NsReader::from_reader(xml);
     let mut fragment_prefix = FragmentPrefix::Unseen;
     loop {
@@ -8842,7 +11367,7 @@ fn complex_field_marker(xml: &[u8]) -> Result<Option<ComplexFieldMarker>, Refusa
     }
 }
 
-fn rewrite_run_region(xml: &[u8], text: &str) -> Result<(String, Vec<u8>), Refusal> {
+fn rewrite_run_region(xml: &[u8], text: &str) -> std::result::Result<(String, Vec<u8>), Refusal> {
     let (wrapper, prefix_length, suffix_length, owner) = scan_run_region(xml)?;
     let replacement =
         rewrite_text_owner(&wrapper, &owner, text).map_err(|_error| Refusal::ComplexContent)?;
@@ -8859,7 +11384,7 @@ fn rewrite_run_region(xml: &[u8], text: &str) -> Result<(String, Vec<u8>), Refus
     ))
 }
 
-fn scan_run_region(xml: &[u8]) -> Result<(Vec<u8>, usize, usize, TextOwner), Refusal> {
+fn scan_run_region(xml: &[u8]) -> std::result::Result<(Vec<u8>, usize, usize, TextOwner), Refusal> {
     let first = xml
         .iter()
         .position(|byte| *byte == b'<')
@@ -8894,13 +11419,821 @@ fn scan_run_region(xml: &[u8]) -> Result<(Vec<u8>, usize, usize, TextOwner), Ref
     Ok((wrapper, open.len(), close.len(), owner))
 }
 
+fn literal_run_direct_child_refused(
+    namespace: &ResolveResult<'_>,
+    name: quick_xml::name::QName<'_>,
+    fragment_prefix: &FragmentPrefix,
+    default_namespace_fallback_allowed: bool,
+) -> bool {
+    if matches!(
+        namespace,
+        ResolveResult::Bound(Namespace(uri)) if *uri == MARKUP_COMPATIBILITY_NAMESPACE
+    ) && matches!(
+        name.local_name().as_ref(),
+        b"AlternateContent" | b"Choice" | b"Fallback"
+    ) {
+        return true;
+    }
+    if !is_fragment_word_element_with_default_fallback(
+        namespace,
+        fragment_prefix,
+        default_namespace_fallback_allowed,
+    ) {
+        return false;
+    }
+    matches!(
+        name.local_name().as_ref(),
+        b"ptab" | b"fldChar" | b"instrText" | b"drawing" | b"pict" | b"object"
+    )
+}
+
+fn validate_literal_text_node_fragment(
+    xml: &[u8],
+    inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
+) -> std::result::Result<(), Refusal> {
+    let mut reader = NsReader::from_reader(xml);
+    seed_transaction_namespaces(&mut reader, inherited_namespaces)?;
+    let mut namespace_state = TransactionNamespaceState::new(inherited_namespaces);
+    let mut depth = 0usize;
+    let mut saw_root = false;
+    loop {
+        let raw = reader.read_event().map_err(|_error| Refusal::ComplexRun)?;
+        let (namespace, event) = reader.resolver().resolve_event(raw);
+        let default_namespace_fallback_allowed = namespace_state.fallback_for_event(&event);
+        match event {
+            Event::Start(element) => {
+                depth = depth.checked_add(1).ok_or(Refusal::ComplexRun)?;
+                if depth == 1 {
+                    if saw_root {
+                        return Err(Refusal::ComplexRun);
+                    }
+                    let fragment_prefix = FragmentPrefix::from_name(element.name());
+                    if !is_transaction_fragment_word_name_with_default_fallback(
+                        &namespace,
+                        element.name(),
+                        b"t",
+                        &fragment_prefix,
+                        default_namespace_fallback_allowed,
+                    ) {
+                        return Err(Refusal::ComplexRun);
+                    }
+                    saw_root = true;
+                } else {
+                    return Err(Refusal::ComplexRun);
+                }
+            },
+            Event::Empty(element) if depth == 0 => {
+                if saw_root {
+                    return Err(Refusal::ComplexRun);
+                }
+                let fragment_prefix = FragmentPrefix::from_name(element.name());
+                if !is_transaction_fragment_word_name_with_default_fallback(
+                    &namespace,
+                    element.name(),
+                    b"t",
+                    &fragment_prefix,
+                    default_namespace_fallback_allowed,
+                ) {
+                    return Err(Refusal::ComplexRun);
+                }
+                saw_root = true;
+            },
+            Event::End(_) => {
+                if depth != 1 {
+                    return Err(Refusal::ComplexRun);
+                }
+                depth = 0;
+            },
+            Event::Text(_) | Event::CData(_) | Event::Comment(_) | Event::GeneralRef(_)
+                if depth == 1 => {},
+            Event::Eof => {
+                return (saw_root && depth == 0)
+                    .then_some(())
+                    .ok_or(Refusal::ComplexRun);
+            },
+            Event::Decl(_) | Event::DocType(_) | Event::PI(_) => {
+                return Err(Refusal::ComplexRun);
+            },
+            Event::Text(_) | Event::CData(_) | Event::Comment(_) | Event::GeneralRef(_) => {
+                return Err(Refusal::ComplexRun);
+            },
+            Event::Empty(_) => return Err(Refusal::ComplexRun),
+        }
+    }
+}
+
+/// Return the byte range of the first direct WordprocessingML text element in
+/// a run. The range is retained from the original source so callers can
+/// replace only that node and leave all neighbouring run markup untouched.
+fn first_direct_text_node(
+    xml: &[u8],
+    inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
+) -> std::result::Result<Option<Range>, Refusal> {
+    let mut reader = NsReader::from_reader(xml);
+    seed_transaction_namespaces(&mut reader, inherited_namespaces)?;
+    let mut namespace_state = TransactionNamespaceState::new(inherited_namespaces);
+    let origin = ReaderOrigin::of(xml);
+    let mut fragment_prefix = FragmentPrefix::Unseen;
+    let mut root_depth = None;
+    let mut text_depth = None;
+    let mut text_start = None;
+    let mut first_text = None;
+    let mut depth = 0usize;
+    let mut saw_root = false;
+    loop {
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or(Refusal::ComplexRun)?;
+        let raw = reader.read_event().map_err(|_error| Refusal::ComplexRun)?;
+        let (namespace, event) = reader.resolver().resolve_event(raw);
+        let default_namespace_fallback_allowed = namespace_state.fallback_for_event(&event);
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or(Refusal::ComplexRun)?;
+        match event {
+            Event::Start(element) => {
+                depth = depth.checked_add(1).ok_or(Refusal::ComplexRun)?;
+                if root_depth.is_none() {
+                    fragment_prefix = FragmentPrefix::from_name(element.name());
+                    if saw_root
+                        || !is_transaction_fragment_word_name_with_default_fallback(
+                            &namespace,
+                            element.name(),
+                            b"r",
+                            &fragment_prefix,
+                            default_namespace_fallback_allowed,
+                        )
+                    {
+                        return Err(Refusal::ComplexRun);
+                    }
+                    root_depth = Some(depth);
+                    saw_root = true;
+                } else if root_depth.is_some_and(|root| depth == root + 1) {
+                    if literal_run_direct_child_refused(
+                        &namespace,
+                        element.name(),
+                        &fragment_prefix,
+                        default_namespace_fallback_allowed,
+                    ) {
+                        return Err(Refusal::ComplexRun);
+                    }
+                    if is_transaction_fragment_word_name_with_default_fallback(
+                        &namespace,
+                        element.name(),
+                        b"t",
+                        &fragment_prefix,
+                        default_namespace_fallback_allowed,
+                    ) && text_start.is_none()
+                    {
+                        text_start = Some(start);
+                        text_depth = Some(depth);
+                    }
+                }
+            },
+            Event::Empty(element) => {
+                let child_depth = depth.checked_add(1).ok_or(Refusal::ComplexRun)?;
+                if root_depth.is_some_and(|root| child_depth == root + 1) {
+                    if literal_run_direct_child_refused(
+                        &namespace,
+                        element.name(),
+                        &fragment_prefix,
+                        default_namespace_fallback_allowed,
+                    ) {
+                        return Err(Refusal::ComplexRun);
+                    }
+                    if is_transaction_fragment_word_name_with_default_fallback(
+                        &namespace,
+                        element.name(),
+                        b"t",
+                        &fragment_prefix,
+                        default_namespace_fallback_allowed,
+                    ) && first_text.is_none()
+                    {
+                        first_text =
+                            Some(checked_range(start, end).map_err(|_| Refusal::ComplexRun)?);
+                    }
+                }
+            },
+            Event::End(element) => {
+                if let (Some(capture_start), Some(capture_depth)) = (text_start, text_depth)
+                    && depth == capture_depth
+                    && is_transaction_fragment_word_name_with_default_fallback(
+                        &namespace,
+                        element.name(),
+                        b"t",
+                        &fragment_prefix,
+                        default_namespace_fallback_allowed,
+                    )
+                {
+                    if first_text.is_none() {
+                        first_text = Some(
+                            checked_range(capture_start, end).map_err(|_| Refusal::ComplexRun)?,
+                        );
+                    }
+                    text_start = None;
+                    text_depth = None;
+                }
+                depth = depth.checked_sub(1).ok_or(Refusal::ComplexRun)?;
+                if depth == 0 {
+                    return Ok(first_text);
+                }
+            },
+            Event::Eof => {
+                if depth != 0 || text_start.is_some() {
+                    return Err(Refusal::ComplexRun);
+                }
+                return Ok(first_text);
+            },
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::DocType(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
+        }
+    }
+}
+
+/// Decide whether a run with no direct `w:t` is an ordinary empty run. Word's
+/// setter treats `<w:r/>` and runs containing only `w:rPr` as a no-op, while
+/// a run containing a structural or opaque child must remain an explicit
+/// refusal for the focused text-node operation.
+fn run_has_only_properties(
+    xml: &[u8],
+    inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
+) -> std::result::Result<bool, Refusal> {
+    let mut reader = NsReader::from_reader(xml);
+    seed_transaction_namespaces(&mut reader, inherited_namespaces)?;
+    let mut namespace_state = TransactionNamespaceState::new(inherited_namespaces);
+    let mut fragment_prefix = FragmentPrefix::Unseen;
+    let mut depth = 0usize;
+    let mut saw_root = false;
+    let mut property_depth = None;
+    loop {
+        let raw = reader.read_event().map_err(|_error| Refusal::ComplexRun)?;
+        let (namespace, event) = reader.resolver().resolve_event(raw);
+        let default_namespace_fallback_allowed = namespace_state.fallback_for_event(&event);
+        match event {
+            Event::Start(element) => {
+                depth = depth.checked_add(1).ok_or(Refusal::ComplexRun)?;
+                if depth == 1 {
+                    fragment_prefix = FragmentPrefix::from_name(element.name());
+                    if !is_transaction_fragment_word_name_with_default_fallback(
+                        &namespace,
+                        element.name(),
+                        b"r",
+                        &fragment_prefix,
+                        default_namespace_fallback_allowed,
+                    ) {
+                        return Err(Refusal::ComplexRun);
+                    }
+                    saw_root = true;
+                } else if depth == 2 {
+                    if !is_transaction_fragment_word_name_with_default_fallback(
+                        &namespace,
+                        element.name(),
+                        b"rPr",
+                        &fragment_prefix,
+                        default_namespace_fallback_allowed,
+                    ) {
+                        return Ok(false);
+                    }
+                    property_depth = Some(depth);
+                }
+            },
+            Event::Empty(element) => {
+                if depth == 0 {
+                    fragment_prefix = FragmentPrefix::from_name(element.name());
+                    return Ok(is_transaction_fragment_word_name_with_default_fallback(
+                        &namespace,
+                        element.name(),
+                        b"r",
+                        &fragment_prefix,
+                        default_namespace_fallback_allowed,
+                    ));
+                }
+                let child_depth = depth.checked_add(1).ok_or(Refusal::ComplexRun)?;
+                if child_depth == 2
+                    && !is_transaction_fragment_word_name_with_default_fallback(
+                        &namespace,
+                        element.name(),
+                        b"rPr",
+                        &fragment_prefix,
+                        default_namespace_fallback_allowed,
+                    )
+                {
+                    return Ok(false);
+                }
+            },
+            Event::End(_) => {
+                if property_depth == Some(depth) {
+                    property_depth = None;
+                }
+                depth = depth.checked_sub(1).ok_or(Refusal::ComplexRun)?;
+            },
+            Event::Text(text) if depth == 1 => {
+                let value = text
+                    .xml_content(XmlVersion::Explicit1_0)
+                    .map_err(|_error| Refusal::ComplexRun)?;
+                if !value.trim().is_empty() {
+                    return Ok(false);
+                }
+            },
+            Event::CData(_) | Event::GeneralRef(_) if depth == 1 => return Ok(false),
+            Event::Comment(_) | Event::Decl(_) | Event::DocType(_) | Event::PI(_) => {},
+            Event::Text(_) | Event::CData(_) | Event::GeneralRef(_) => {},
+            Event::Eof => return Ok(saw_root && depth == 0 && property_depth.is_none()),
+        }
+    }
+}
+
+fn seed_transaction_namespaces(
+    reader: &mut NsReader<&[u8]>,
+    inherited: &[(Option<Vec<u8>>, Vec<u8>)],
+) -> std::result::Result<(), Refusal> {
+    for (prefix, namespace) in inherited {
+        let prefix = prefix
+            .as_deref()
+            .map_or(PrefixDeclaration::Default, PrefixDeclaration::Named);
+        reader
+            .resolver_mut()
+            .add(prefix, Namespace(namespace))
+            .map_err(|_| Refusal::ComplexRun)?;
+    }
+    Ok(())
+}
+
+/// Rebuild one text element while retaining its original opening tag,
+/// attributes, prefix, and closing tag. A self-closing node becomes paired
+/// only when non-empty content is written.
+#[derive(Clone)]
+struct CachedFieldMarkerFragment {
+    kind: ComplexFieldMarker,
+    dirty: bool,
+    tag_end: usize,
+    dirty_attribute: Option<RawTagAttribute>,
+    marker_prefix: FragmentPrefix,
+    marker_namespace: Vec<u8>,
+}
+
+fn run_namespace_context(
+    run_xml: &[u8],
+    inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
+) -> std::result::Result<Vec<(Option<Vec<u8>>, Vec<u8>)>, Refusal> {
+    let tag_end = find_tag_end(run_xml).ok_or(Refusal::ComplexContent)?;
+    let declarations = raw_tag_attributes(run_xml.get(..tag_end).ok_or(Refusal::ComplexContent)?)?;
+    let mut bindings = Vec::new();
+    bindings
+        .try_reserve_exact(
+            inherited_namespaces
+                .len()
+                .saturating_add(declarations.len()),
+        )
+        .map_err(|_error| Refusal::ComplexContent)?;
+    for (prefix, namespace) in inherited_namespaces {
+        bindings.push((prefix.clone(), namespace.clone()));
+    }
+    for declaration in declarations
+        .iter()
+        .filter(|attribute| is_namespace_declaration_name(&attribute.name))
+    {
+        let prefix = raw_namespace_declaration_prefix(&declaration.name)
+            .map_err(|_error| Refusal::ComplexContent)?
+            .map(ToOwned::to_owned);
+        bindings.retain(|(current, _)| current.as_deref() != prefix.as_deref());
+        bindings.push((prefix, declaration.value.clone()));
+    }
+    Ok(bindings)
+}
+
+fn cached_field_marker_fragment(
+    xml: &[u8],
+    inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
+) -> std::result::Result<CachedFieldMarkerFragment, Refusal> {
+    let mut reader = NsReader::from_reader(xml);
+    seed_transaction_namespaces(&mut reader, inherited_namespaces)?;
+    let mut namespace_state = TransactionNamespaceState::new(inherited_namespaces);
+    let mut depth = 0usize;
+    let mut nodes = 0usize;
+    {
+        let raw = reader
+            .read_event()
+            .map_err(|_error| Refusal::ComplexContent)?;
+        let (namespace, event) = reader.resolver().resolve_event(raw);
+        let default_namespace_fallback_allowed = namespace_state.fallback_for_event(&event);
+        nodes = nodes.checked_add(1).ok_or(Refusal::ComplexContent)?;
+        if nodes > MAX_DOCUMENT_NODES {
+            return Err(Refusal::ComplexContent);
+        }
+        let is_empty = matches!(&event, Event::Empty(_));
+        match event {
+            Event::Start(element) | Event::Empty(element) if depth == 0 => {
+                let marker_prefix = FragmentPrefix::from_name(element.name());
+                if !is_transaction_fragment_word_name_with_default_fallback(
+                    &namespace,
+                    element.name(),
+                    b"fldChar",
+                    &marker_prefix,
+                    default_namespace_fallback_allowed,
+                ) {
+                    return Err(Refusal::ComplexContent);
+                }
+                let (kind, dirty) = parse_cached_field_marker(
+                    &element,
+                    reader.resolver(),
+                    reader.decoder(),
+                    &marker_prefix,
+                )?;
+                let tag_end = find_tag_end(xml).ok_or(Refusal::ComplexContent)?;
+                let raw_attributes =
+                    raw_tag_attributes(xml.get(..tag_end).ok_or(Refusal::ComplexContent)?)?;
+                let dirty_index =
+                    raw_attributes
+                        .iter()
+                        .enumerate()
+                        .find_map(|(index, attribute)| {
+                            let (attribute_namespace, local_name) = reader
+                                .resolver()
+                                .resolve_attribute(quick_xml::name::QName(&attribute.name));
+                            (local_name.as_ref() == b"dirty"
+                                && is_cached_field_word_attribute(
+                                    &attribute_namespace,
+                                    &marker_prefix,
+                                ))
+                            .then_some(index)
+                        });
+                let dirty_attribute = dirty_index.map(|index| raw_attributes[index].clone());
+                let marker_namespace = match namespace {
+                    ResolveResult::Bound(Namespace(uri))
+                        if is_wordprocessing_namespace(&namespace) =>
+                    {
+                        uri.to_vec()
+                    },
+                    _ => WORDPROCESSINGML_NAMESPACE.to_vec(),
+                };
+                if is_empty {
+                    // The resolver has already consumed the complete element.
+                    // Its next event must be EOF; the loop below enforces that.
+                    depth = 0;
+                } else {
+                    depth = 1;
+                }
+                return if is_empty {
+                    match reader
+                        .read_event()
+                        .map_err(|_error| Refusal::ComplexContent)?
+                    {
+                        Event::Eof => Ok(CachedFieldMarkerFragment {
+                            kind,
+                            dirty,
+                            tag_end,
+                            dirty_attribute,
+                            marker_prefix,
+                            marker_namespace,
+                        }),
+                        _ => Err(Refusal::ComplexContent),
+                    }
+                } else {
+                    // A paired marker may carry opaque children. Read them to
+                    // prove the fragment is one well-formed root, while the
+                    // exact transition check below retains those bytes.
+                    loop {
+                        let nested = reader
+                            .read_event()
+                            .map_err(|_error| Refusal::ComplexContent)?;
+                        nodes = nodes.checked_add(1).ok_or(Refusal::ComplexContent)?;
+                        if nodes > MAX_DOCUMENT_NODES {
+                            return Err(Refusal::ComplexContent);
+                        }
+                        match nested {
+                            Event::Start(_) => {
+                                depth = depth.checked_add(1).ok_or(Refusal::ComplexContent)?;
+                                if depth > MAX_DOCUMENT_DEPTH {
+                                    return Err(Refusal::ComplexContent);
+                                }
+                            },
+                            Event::Empty(_) => {
+                                if depth.checked_add(1).ok_or(Refusal::ComplexContent)?
+                                    > MAX_DOCUMENT_DEPTH
+                                {
+                                    return Err(Refusal::ComplexContent);
+                                }
+                            },
+                            Event::End(_) => {
+                                depth = depth.checked_sub(1).ok_or(Refusal::ComplexContent)?;
+                                if depth == 0 {
+                                    return match reader
+                                        .read_event()
+                                        .map_err(|_error| Refusal::ComplexContent)?
+                                    {
+                                        Event::Eof => Ok(CachedFieldMarkerFragment {
+                                            kind,
+                                            dirty,
+                                            tag_end,
+                                            dirty_attribute,
+                                            marker_prefix,
+                                            marker_namespace,
+                                        }),
+                                        _ => Err(Refusal::ComplexContent),
+                                    };
+                                }
+                            },
+                            Event::Eof => return Err(Refusal::ComplexContent),
+                            Event::Text(_)
+                            | Event::CData(_)
+                            | Event::Comment(_)
+                            | Event::Decl(_)
+                            | Event::DocType(_)
+                            | Event::PI(_)
+                            | Event::GeneralRef(_) => {},
+                        }
+                    }
+                };
+            },
+            Event::Eof => return Err(Refusal::ComplexContent),
+            Event::Start(_)
+            | Event::Empty(_)
+            | Event::End(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::DocType(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => return Err(Refusal::ComplexContent),
+        }
+    }
+}
+
+fn rewrite_cached_field_marker(
+    xml: &[u8],
+    inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
+) -> Result<Vec<u8>> {
+    let fragment = cached_field_marker_fragment(xml, inherited_namespaces).map_err(|reason| {
+        Error::Refused {
+            position: 0,
+            reason,
+        }
+    })?;
+    if fragment.dirty {
+        return Ok(xml.to_vec());
+    }
+    let tag_end = fragment.tag_end;
+    if let Some(attribute) = fragment.dirty_attribute {
+        let value_start = attribute.value_start;
+        let value_end = attribute.value_end;
+        return replace_range(xml, value_start, value_end, b"true");
+    }
+    let start_tag = xml.get(..tag_end).ok_or(Error::Refused {
+        position: 0,
+        reason: Refusal::ComplexContent,
+    })?;
+    let mut prefix = match &fragment.marker_prefix {
+        FragmentPrefix::Prefixed(prefix) => prefix.clone(),
+        FragmentPrefix::Unseen | FragmentPrefix::Unprefixed => Vec::new(),
+    };
+    let mut add_binding = false;
+    if prefix.is_empty() {
+        let mut reader = NsReader::from_reader(start_tag);
+        seed_transaction_namespaces(&mut reader, inherited_namespaces).map_err(|reason| {
+            Error::Refused {
+                position: 0,
+                reason,
+            }
+        })?;
+        let _ = reader.read_event().map_err(|_error| Error::Refused {
+            position: 0,
+            reason: Refusal::ComplexContent,
+        })?;
+        if let Some(candidate) = reader
+            .resolver()
+            .bindings()
+            .find_map(|(candidate, namespace)| {
+                let PrefixDeclaration::Named(candidate) = candidate else {
+                    return None;
+                };
+                (namespace.as_ref() == fragment.marker_namespace.as_slice())
+                    .then(|| candidate.to_vec())
+            })
+        {
+            prefix = candidate;
+        } else {
+            prefix.extend_from_slice(b"w");
+            add_binding = true;
+        }
+    }
+    let mut inserted = Vec::new();
+    if add_binding {
+        inserted.extend_from_slice(b" xmlns:");
+        inserted.extend_from_slice(&prefix);
+        inserted.extend_from_slice(b"=\"");
+        inserted.extend_from_slice(&fragment.marker_namespace);
+        inserted.push(b'"');
+    }
+    inserted.push(b' ');
+    inserted.extend_from_slice(&prefix);
+    inserted.extend_from_slice(b":dirty=\"true\"");
+    let insertion = if start_tag
+        .get(..start_tag.len().saturating_sub(1))
+        .is_some_and(|tag| tag.trim_ascii_end().ends_with(b"/"))
+    {
+        start_tag
+            .len()
+            .checked_sub(1)
+            .and_then(|position| start_tag[..position].iter().rposition(|byte| *byte == b'/'))
+            .ok_or(Error::Refused {
+                position: 0,
+                reason: Refusal::ComplexContent,
+            })?
+    } else {
+        tag_end.checked_sub(1).ok_or(Error::Refused {
+            position: 0,
+            reason: Refusal::ComplexContent,
+        })?
+    };
+    replace_range(xml, insertion, insertion, &inserted)
+}
+
+fn validate_cached_field_marker_transition(
+    before: &[u8],
+    after: &[u8],
+    inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
+) -> std::result::Result<(), Refusal> {
+    let before_fragment = cached_field_marker_fragment(before, inherited_namespaces)?;
+    let after_fragment = cached_field_marker_fragment(after, inherited_namespaces)?;
+    if before_fragment.kind == after_fragment.kind && before_fragment.dirty != after_fragment.dirty
+    {
+        let expected = if before_fragment.dirty {
+            rewrite_cached_field_marker(after, inherited_namespaces)
+        } else {
+            rewrite_cached_field_marker(before, inherited_namespaces)
+        }
+        .map_err(|_error| Refusal::ComplexContent)?;
+        if (before_fragment.dirty && expected == before)
+            || (!before_fragment.dirty && expected == after)
+        {
+            return Ok(());
+        }
+    }
+    Err(Refusal::ComplexContent)
+}
+
+fn rewrite_literal_text_node(xml: &[u8], text: &str) -> Result<Vec<u8>> {
+    if xml.first() != Some(&b'<') {
+        return Err(Error::Refused {
+            position: 0,
+            reason: Refusal::ComplexRun,
+        });
+    }
+    let start_end = find_tag_end(xml).ok_or(Error::Refused {
+        position: 0,
+        reason: Refusal::ComplexRun,
+    })?;
+    let start_tag = &xml[..start_end];
+    let empty = start_tag
+        .get(..start_tag.len().saturating_sub(1))
+        .is_some_and(|tag| tag.trim_ascii_end().ends_with(b"/"));
+    let (open, close) = if empty {
+        let slash = start_tag[..start_tag.len() - 1]
+            .iter()
+            .rposition(|byte| *byte == b'/')
+            .ok_or(Error::Refused {
+                position: 0,
+                reason: Refusal::ComplexRun,
+            })?;
+        let mut open = start_tag[..slash].to_vec();
+        open.push(b'>');
+        let name = tag_name_from_start(start_tag)?;
+        let mut close = Vec::with_capacity(name.len() + 3);
+        close.extend_from_slice(b"</");
+        close.extend_from_slice(name);
+        close.push(b'>');
+        (open, close)
+    } else {
+        let close_start = xml
+            .iter()
+            .rposition(|byte| *byte == b'<')
+            .ok_or(Error::Refused {
+                position: 0,
+                reason: Refusal::ComplexRun,
+            })?;
+        let close = xml
+            .get(close_start..)
+            .ok_or(Error::Refused {
+                position: 0,
+                reason: Refusal::ComplexRun,
+            })?
+            .to_vec();
+        (start_tag.to_vec(), close)
+    };
+    let encoded_len = literal_escaped_xml_len(text)?;
+    let capacity = open
+        .len()
+        .checked_add(encoded_len)
+        .and_then(|length| length.checked_add(close.len()))
+        .ok_or(Error::Limit {
+            kind: crate::document::LimitKind::ReplacementXmlBytes,
+            maximum: MAX_DOCUMENT_XML_BYTES,
+            observed: usize::MAX,
+        })?;
+    if capacity > MAX_DOCUMENT_XML_BYTES {
+        return Err(Error::Limit {
+            kind: crate::document::LimitKind::ReplacementXmlBytes,
+            maximum: MAX_DOCUMENT_XML_BYTES,
+            observed: capacity,
+        });
+    }
+    let mut output = Vec::new();
+    output.try_reserve_exact(capacity).map_err(|source| {
+        Error::Document(crate::Error::Allocation {
+            resource: "run text-node replacement XML",
+            source,
+        })
+    })?;
+    output.extend_from_slice(&open);
+    append_literal_escaped_xml(&mut output, text);
+    output.extend_from_slice(&close);
+    Ok(output)
+}
+
+fn find_tag_end(xml: &[u8]) -> Option<usize> {
+    let mut quote = None;
+    for (index, byte) in xml.iter().copied().enumerate() {
+        match (quote, byte) {
+            (None, b'\'' | b'"') => quote = Some(byte),
+            (Some(current), byte) if current == byte => quote = None,
+            (None, b'>') => return Some(index + 1),
+            _ => {},
+        }
+    }
+    None
+}
+
+fn tag_name_from_start(start_tag: &[u8]) -> Result<&[u8]> {
+    let end = start_tag
+        .get(1..)
+        .and_then(|bytes| {
+            bytes
+                .iter()
+                .position(|byte| matches!(*byte, b'>' | b'/' | b' ' | b'\t' | b'\r' | b'\n'))
+        })
+        .and_then(|offset| offset.checked_add(1))
+        .ok_or(Error::Refused {
+            position: 0,
+            reason: Refusal::ComplexRun,
+        })?;
+    start_tag.get(1..end).ok_or(Error::Refused {
+        position: 0,
+        reason: Refusal::ComplexRun,
+    })
+}
+
+fn literal_escaped_xml_len(text: &str) -> Result<usize> {
+    text.bytes().try_fold(0usize, |length, byte| {
+        let encoded = match byte {
+            b'&' => 5,
+            b'<' | b'>' => 4,
+            b'"' | b'\'' => 6,
+            b'\r' => 5,
+            _ => 1,
+        };
+        length.checked_add(encoded).ok_or(Error::Limit {
+            kind: crate::document::LimitKind::ReplacementXmlBytes,
+            maximum: MAX_DOCUMENT_XML_BYTES,
+            observed: usize::MAX,
+        })
+    })
+}
+
+fn append_literal_escaped_xml(output: &mut Vec<u8>, text: &str) {
+    let mut cursor = 0usize;
+    for (index, byte) in text.bytes().enumerate() {
+        let replacement = match byte {
+            b'&' => Some(b"&amp;".as_slice()),
+            b'<' => Some(b"&lt;".as_slice()),
+            b'>' => Some(b"&gt;".as_slice()),
+            b'"' => Some(b"&quot;".as_slice()),
+            b'\'' => Some(b"&apos;".as_slice()),
+            b'\r' => Some(b"&#xD;".as_slice()),
+            _ => None,
+        };
+        if let Some(replacement) = replacement {
+            output.extend_from_slice(&text.as_bytes()[cursor..index]);
+            output.extend_from_slice(replacement);
+            cursor = index + 1;
+        }
+    }
+    output.extend_from_slice(&text.as_bytes()[cursor..]);
+}
+
 fn select_direct_child(
     xml: &[u8],
     root_name: &[u8],
     child_name: &[u8],
     position: Position,
     missing: Refusal,
-) -> Result<Range, Refusal> {
+) -> std::result::Result<Range, Refusal> {
     select_direct_child_with_context(xml, root_name, child_name, position, missing, &[])
 }
 
@@ -8911,7 +12244,46 @@ fn select_direct_child_with_context(
     position: Position,
     missing: Refusal,
     inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
-) -> Result<Range, Refusal> {
+) -> std::result::Result<Range, Refusal> {
+    select_direct_child_with_context_mode(
+        xml,
+        root_name,
+        child_name,
+        position,
+        missing,
+        inherited_namespaces,
+        false,
+    )
+}
+
+fn select_direct_child_with_transaction_namespace_context(
+    xml: &[u8],
+    root_name: &[u8],
+    child_name: &[u8],
+    position: Position,
+    missing: Refusal,
+    inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
+) -> std::result::Result<Range, Refusal> {
+    select_direct_child_with_context_mode(
+        xml,
+        root_name,
+        child_name,
+        position,
+        missing,
+        inherited_namespaces,
+        true,
+    )
+}
+
+fn select_direct_child_with_context_mode(
+    xml: &[u8],
+    root_name: &[u8],
+    child_name: &[u8],
+    position: Position,
+    missing: Refusal,
+    inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
+    reject_default_namespace_fallback: bool,
+) -> std::result::Result<Range, Refusal> {
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
     for (prefix, namespace) in inherited_namespaces {
@@ -8924,6 +12296,7 @@ fn select_direct_child_with_context(
             .map_err(|_error| missing)?;
     }
     let mut fragment_prefix = FragmentPrefix::Unseen;
+    let mut namespace_state = TransactionNamespaceState::new(inherited_namespaces);
     let mut root_depth = None;
     let mut capture = None::<(usize, usize)>;
     let mut depth = 0usize;
@@ -8933,6 +12306,7 @@ fn select_direct_child_with_context(
         let start = origin.offset(reader.buffer_position()).ok_or(missing)?;
         let raw_event = reader.read_event().map_err(|_error| missing)?;
         let (namespace, event) = reader.resolver().resolve_event(raw_event);
+        let default_namespace_fallback_allowed = namespace_state.fallback_for_event(&event);
         let end = origin.offset(reader.buffer_position()).ok_or(missing)?;
         match event {
             Event::Start(element) => {
@@ -8940,11 +12314,13 @@ fn select_direct_child_with_context(
                 if root_depth.is_none() {
                     fragment_prefix = FragmentPrefix::from_name(element.name());
                     if saw_root
-                        || !is_transaction_fragment_word_name(
+                        || !transaction_fragment_word_name_matches(
                             &namespace,
                             element.name(),
                             root_name,
                             &fragment_prefix,
+                            reject_default_namespace_fallback,
+                            default_namespace_fallback_allowed,
                         )
                     {
                         return Err(missing);
@@ -8952,11 +12328,13 @@ fn select_direct_child_with_context(
                     saw_root = true;
                     root_depth = Some(depth);
                 } else if root_depth.is_some_and(|root| depth == root + 1)
-                    && is_transaction_fragment_word_name(
+                    && transaction_fragment_word_name_matches(
                         &namespace,
                         element.name(),
                         child_name,
                         &fragment_prefix,
+                        reject_default_namespace_fallback,
+                        default_namespace_fallback_allowed,
                     )
                 {
                     if index == position.get() {
@@ -8968,11 +12346,13 @@ fn select_direct_child_with_context(
             Event::Empty(element) => {
                 let child_depth = depth.checked_add(1).ok_or(missing)?;
                 if root_depth.is_some_and(|root| child_depth == root + 1)
-                    && is_transaction_fragment_word_name(
+                    && transaction_fragment_word_name_matches(
                         &namespace,
                         element.name(),
                         child_name,
                         &fragment_prefix,
+                        reject_default_namespace_fallback,
+                        default_namespace_fallback_allowed,
                     )
                 {
                     if index == position.get() {
@@ -9003,18 +12383,18 @@ fn select_direct_child_with_context(
     Err(missing)
 }
 
-fn single_cell_paragraph(xml: &[u8]) -> TransactionResult<Range> {
-    validate_basic_cell_children(xml).map_err(|reason| TransactionError::Refused {
+fn single_cell_paragraph(xml: &[u8]) -> Result<Range> {
+    validate_basic_cell_children(xml).map_err(|reason| Error::Refused {
         position: 0,
         reason,
     })?;
     let first = select_direct_child(xml, b"tc", b"p", Position::new(0), Refusal::ComplexContent)
-        .map_err(|reason| TransactionError::Refused {
+        .map_err(|reason| Error::Refused {
             position: 0,
             reason,
         })?;
     if select_direct_child(xml, b"tc", b"p", Position::new(1), Refusal::CellNotFound).is_ok() {
-        return Err(TransactionError::Refused {
+        return Err(Error::Refused {
             position: 0,
             reason: Refusal::ComplexContent,
         });
@@ -9022,7 +12402,7 @@ fn single_cell_paragraph(xml: &[u8]) -> TransactionResult<Range> {
     Ok(first)
 }
 
-fn validate_basic_cell_children(xml: &[u8]) -> Result<(), Refusal> {
+fn validate_basic_cell_children(xml: &[u8]) -> std::result::Result<(), Refusal> {
     let mut reader = NsReader::from_reader(xml);
     let mut fragment_prefix = FragmentPrefix::Unseen;
     let mut root_depth = None;
@@ -9126,16 +12506,15 @@ fn select_cell(
     table: Position,
     row: Position,
     cell: Position,
-) -> TransactionResult<CellSelection<'_>> {
-    let table_range =
-        snapshot
-            .tables
-            .get(table.get())
-            .copied()
-            .ok_or(TransactionError::Refused {
-                position: table.get(),
-                reason: Refusal::CellNotFound,
-            })?;
+) -> Result<CellSelection<'_>> {
+    let table_range = snapshot
+        .tables
+        .get(table.get())
+        .copied()
+        .ok_or(Error::Refused {
+            position: table.get(),
+            reason: Refusal::CellNotFound,
+        })?;
     let table_start = checked_start(table_range, "table")?;
     let table_end = checked_end(table_range, "table")?;
     let table_xml = checked_slice(snapshot.xml_bytes(), table_start, table_end, "table")?;
@@ -9149,9 +12528,9 @@ fn select_cell_in_table<'a>(
     row: Position,
     cell: Position,
     error_position: usize,
-) -> TransactionResult<CellSelection<'a>> {
+) -> Result<CellSelection<'a>> {
     let row_range = select_direct_child(table_xml, b"tbl", b"tr", row, Refusal::CellNotFound)
-        .map_err(|reason| TransactionError::Refused {
+        .map_err(|reason| Error::Refused {
             position: error_position,
             reason,
         })?;
@@ -9159,7 +12538,7 @@ fn select_cell_in_table<'a>(
     let row_end = checked_relative_end(table_start, row_range)?;
     let row_xml = checked_slice(snapshot.xml_bytes(), row_start, row_end, "table row")?;
     let cell_range = select_direct_child(row_xml, b"tr", b"tc", cell, Refusal::CellNotFound)
-        .map_err(|reason| TransactionError::Refused {
+        .map_err(|reason| Error::Refused {
             position: error_position,
             reason,
         })?;
@@ -9171,18 +12550,18 @@ fn select_cell_in_table<'a>(
     })
 }
 
-fn validate_path_length(length: usize, resource: &'static str) -> TransactionResult<()> {
+fn validate_path_length(length: usize, kind: super::LimitKind) -> Result<()> {
     if length == 0 {
-        return Err(TransactionError::Refused {
+        return Err(Error::Refused {
             position: 0,
             reason: Refusal::ComplexContent,
         });
     }
-    if length > MAX_OPERATIONS {
-        return Err(TransactionError::Limit {
-            resource,
-            max: MAX_OPERATIONS,
-            actual: length,
+    if length > MAX_PATH_STEPS {
+        return Err(Error::Limit {
+            kind,
+            maximum: MAX_PATH_STEPS,
+            observed: length,
         });
     }
     Ok(())
@@ -9193,7 +12572,7 @@ fn select_single_control_content(
     control_start: usize,
     control_end: usize,
     error_position: usize,
-) -> TransactionResult<(usize, usize)> {
+) -> Result<(usize, usize)> {
     let control_xml = checked_slice(
         snapshot.xml_bytes(),
         control_start,
@@ -9207,7 +12586,7 @@ fn select_single_control_content(
         Position::new(0),
         Refusal::ComplexContent,
     )
-    .map_err(|reason| TransactionError::Refused {
+    .map_err(|reason| Error::Refused {
         position: error_position,
         reason,
     })?;
@@ -9220,7 +12599,7 @@ fn select_single_control_content(
     )
     .is_ok()
     {
-        return Err(TransactionError::Refused {
+        return Err(Error::Refused {
             position: error_position,
             reason: Refusal::ComplexContent,
         });
@@ -9238,7 +12617,7 @@ fn select_direct_control_content(
     root_name: &[u8],
     control: Position,
     error_position: usize,
-) -> TransactionResult<(usize, usize)> {
+) -> Result<(usize, usize)> {
     let root_xml = checked_slice(snapshot.xml_bytes(), root_start, root_end, "control owner")?;
     let control_range = select_direct_child(
         root_xml,
@@ -9247,7 +12626,7 @@ fn select_direct_control_content(
         control,
         Refusal::ContentControlNotFound,
     )
-    .map_err(|reason| TransactionError::Refused {
+    .map_err(|reason| Error::Refused {
         position: error_position,
         reason,
     })?;
@@ -9262,7 +12641,7 @@ fn select_hyperlink_owner(
     root_name: &[u8],
     hyperlink: Position,
     error_position: usize,
-) -> TransactionResult<(usize, usize)> {
+) -> Result<(usize, usize)> {
     let owner_xml = checked_slice(snapshot.xml_bytes(), owner.0, owner.1, "composite owner")?;
     let hyperlink_range = select_direct_child(
         owner_xml,
@@ -9271,7 +12650,7 @@ fn select_hyperlink_owner(
         hyperlink,
         Refusal::HyperlinkNotFound,
     )
-    .map_err(|reason| TransactionError::Refused {
+    .map_err(|reason| Error::Refused {
         position: error_position,
         reason,
     })?;
@@ -9287,7 +12666,7 @@ fn selected_composite_hyperlink_text(
     root_name: &[u8],
     hyperlink: Position,
     error_position: usize,
-) -> TransactionResult<String> {
+) -> Result<String> {
     let (start, end) =
         select_hyperlink_owner(snapshot, owner, root_name, hyperlink, error_position)?;
     scan_text_owner(
@@ -9295,7 +12674,7 @@ fn selected_composite_hyperlink_text(
         b"hyperlink",
     )
     .map(|scanned| scanned.text)
-    .map_err(|reason| TransactionError::Refused {
+    .map_err(|reason| Error::Refused {
         position: error_position,
         reason,
     })
@@ -9305,14 +12684,14 @@ fn select_nested_inline_control_content(
     snapshot: &Snapshot,
     paragraph: Position,
     controls: &[Position],
-) -> TransactionResult<(usize, usize)> {
-    validate_path_length(controls.len(), "content control path")?;
+) -> Result<(usize, usize)> {
+    validate_path_length(controls.len(), super::LimitKind::ContentControlPath)?;
     let paragraph_range =
         snapshot
             .paragraphs
             .get(paragraph.get())
             .copied()
-            .ok_or(TransactionError::OutOfBounds {
+            .ok_or(Error::OutOfBounds {
                 position: paragraph.get(),
                 len: snapshot.paragraph_count(),
             })?;
@@ -9337,14 +12716,14 @@ fn selected_nested_inline_control_text(
     snapshot: &Snapshot,
     paragraph: Position,
     controls: &[Position],
-) -> TransactionResult<String> {
+) -> Result<String> {
     let (start, end) = select_nested_inline_control_content(snapshot, paragraph, controls)?;
     scan_text_owner(
         checked_slice(snapshot.xml_bytes(), start, end, "content control content")?,
         b"sdtContent",
     )
     .map(|owner| owner.text)
-    .map_err(|reason| TransactionError::Refused {
+    .map_err(|reason| Error::Refused {
         position: paragraph.get(),
         reason,
     })
@@ -9355,7 +12734,7 @@ fn selected_nested_inline_control_hyperlink_text(
     paragraph: Position,
     controls: &[Position],
     hyperlink: Position,
-) -> TransactionResult<String> {
+) -> Result<String> {
     let owner = select_nested_inline_control_content(snapshot, paragraph, controls)?;
     selected_composite_hyperlink_text(snapshot, owner, b"sdtContent", hyperlink, paragraph.get())
 }
@@ -9363,18 +12742,17 @@ fn selected_nested_inline_control_hyperlink_text(
 fn select_block_control_content(
     snapshot: &Snapshot,
     controls: &[Position],
-) -> TransactionResult<(usize, usize)> {
-    validate_path_length(controls.len(), "block content control path")?;
+) -> Result<(usize, usize)> {
+    validate_path_length(controls.len(), super::LimitKind::BlockContentControlPath)?;
     let first = controls[0];
-    let range =
-        snapshot
-            .block_controls
-            .get(first.get())
-            .copied()
-            .ok_or(TransactionError::Refused {
-                position: first.get(),
-                reason: Refusal::ContentControlNotFound,
-            })?;
+    let range = snapshot
+        .block_controls
+        .get(first.get())
+        .copied()
+        .ok_or(Error::Refused {
+            position: first.get(),
+            reason: Refusal::ContentControlNotFound,
+        })?;
     let mut start = checked_start(range, "block content control")?;
     let mut end = checked_end(range, "block content control")?;
     (start, end) = select_single_control_content(snapshot, start, end, first.get())?;
@@ -9395,7 +12773,7 @@ fn select_block_control_paragraph(
     snapshot: &Snapshot,
     controls: &[Position],
     paragraph: Position,
-) -> TransactionResult<(usize, usize)> {
+) -> Result<(usize, usize)> {
     let (content_start, content_end) = select_block_control_content(snapshot, controls)?;
     let content_xml = checked_slice(
         snapshot.xml_bytes(),
@@ -9410,7 +12788,7 @@ fn select_block_control_paragraph(
         paragraph,
         Refusal::ContentControlNotFound,
     )
-    .map_err(|reason| TransactionError::Refused {
+    .map_err(|reason| Error::Refused {
         position: controls.first().map_or(0, |position| position.get()),
         reason,
     })?;
@@ -9424,14 +12802,16 @@ fn selected_block_control_paragraph_text(
     snapshot: &Snapshot,
     controls: &[Position],
     paragraph: Position,
-) -> TransactionResult<String> {
+) -> Result<String> {
     let (start, end) = select_block_control_paragraph(snapshot, controls, paragraph)?;
-    scan_text_owner(
-        checked_slice(snapshot.xml_bytes(), start, end, "block control paragraph")?,
-        b"p",
-    )
+    scan_paragraph_text_owner(checked_slice(
+        snapshot.xml_bytes(),
+        start,
+        end,
+        "block control paragraph",
+    )?)
     .map(|owner| owner.text)
-    .map_err(|reason| TransactionError::Refused {
+    .map_err(|reason| Error::Refused {
         position: controls.first().map_or(0, |position| position.get()),
         reason,
     })
@@ -9442,7 +12822,7 @@ fn selected_block_control_paragraph_hyperlink_text(
     controls: &[Position],
     paragraph: Position,
     hyperlink: Position,
-) -> TransactionResult<String> {
+) -> Result<String> {
     let owner = select_block_control_paragraph(snapshot, controls, paragraph)?;
     selected_composite_hyperlink_text(
         snapshot,
@@ -9456,18 +12836,17 @@ fn selected_block_control_paragraph_hyperlink_text(
 fn select_nested_cell<'a>(
     snapshot: &'a Snapshot,
     path: &[TableCellAddress],
-) -> TransactionResult<CellSelection<'a>> {
-    validate_path_length(path.len(), "nested table path")?;
+) -> Result<CellSelection<'a>> {
+    validate_path_length(path.len(), super::LimitKind::NestedTablePath)?;
     let first = path[0];
-    let table_range =
-        snapshot
-            .tables
-            .get(first.table.get())
-            .copied()
-            .ok_or(TransactionError::Refused {
-                position: first.table.get(),
-                reason: Refusal::CellNotFound,
-            })?;
+    let table_range = snapshot
+        .tables
+        .get(first.table.get())
+        .copied()
+        .ok_or(Error::Refused {
+            position: first.table.get(),
+            reason: Refusal::CellNotFound,
+        })?;
     let mut table_start = checked_start(table_range, "table")?;
     let table_end = checked_end(table_range, "table")?;
     let mut table_xml = checked_slice(snapshot.xml_bytes(), table_start, table_end, "table")?;
@@ -9487,7 +12866,7 @@ fn select_nested_cell<'a>(
             address.table,
             Refusal::CellNotFound,
         )
-        .map_err(|reason| TransactionError::Refused {
+        .map_err(|reason| Error::Refused {
             position: first.table.get(),
             reason,
         })?;
@@ -9515,11 +12894,11 @@ fn select_nested_cell_paragraph(
     snapshot: &Snapshot,
     path: &[TableCellAddress],
     paragraph: Position,
-) -> TransactionResult<(usize, usize)> {
+) -> Result<(usize, usize)> {
     let selection = select_nested_cell(snapshot, path)?;
     let paragraph_range =
         select_direct_child(selection.xml, b"tc", b"p", paragraph, Refusal::CellNotFound).map_err(
-            |reason| TransactionError::Refused {
+            |reason| Error::Refused {
                 position: path.first().map_or(0, |address| address.table.get()),
                 reason,
             },
@@ -9534,14 +12913,16 @@ fn selected_nested_cell_paragraph_text(
     snapshot: &Snapshot,
     path: &[TableCellAddress],
     paragraph: Position,
-) -> TransactionResult<String> {
+) -> Result<String> {
     let (start, end) = select_nested_cell_paragraph(snapshot, path, paragraph)?;
-    scan_text_owner(
-        checked_slice(snapshot.xml_bytes(), start, end, "nested table paragraph")?,
-        b"p",
-    )
+    scan_paragraph_text_owner(checked_slice(
+        snapshot.xml_bytes(),
+        start,
+        end,
+        "nested table paragraph",
+    )?)
     .map(|owner| owner.text)
-    .map_err(|reason| TransactionError::Refused {
+    .map_err(|reason| Error::Refused {
         position: path.first().map_or(0, |address| address.table.get()),
         reason,
     })
@@ -9552,7 +12933,7 @@ fn selected_nested_cell_paragraph_hyperlink_text(
     path: &[TableCellAddress],
     paragraph: Position,
     hyperlink: Position,
-) -> TransactionResult<String> {
+) -> Result<String> {
     let owner = select_nested_cell_paragraph(snapshot, path, paragraph)?;
     selected_composite_hyperlink_text(
         snapshot,
@@ -9567,13 +12948,13 @@ fn selected_hyperlink_text(
     snapshot: &Snapshot,
     paragraph: Position,
     hyperlink: Position,
-) -> TransactionResult<String> {
+) -> Result<String> {
     let paragraph_range =
         snapshot
             .paragraphs
             .get(paragraph.get())
             .copied()
-            .ok_or(TransactionError::OutOfBounds {
+            .ok_or(Error::OutOfBounds {
                 position: paragraph.get(),
                 len: snapshot.paragraph_count(),
             })?;
@@ -9587,7 +12968,7 @@ fn selected_hyperlink_text(
         hyperlink,
         Refusal::HyperlinkNotFound,
     )
-    .map_err(|reason| TransactionError::Refused {
+    .map_err(|reason| Error::Refused {
         position: paragraph.get(),
         reason,
     })?;
@@ -9598,7 +12979,7 @@ fn selected_hyperlink_text(
         b"hyperlink",
     )
     .map(|scanned| scanned.text)
-    .map_err(|reason| TransactionError::Refused {
+    .map_err(|reason| Error::Refused {
         position: paragraph.get(),
         reason,
     })
@@ -9610,13 +12991,13 @@ fn selected_direct_paragraph_owner_text(
     owner: Position,
     child_name: &[u8],
     missing: Refusal,
-) -> TransactionResult<String> {
+) -> Result<String> {
     let paragraph_range =
         snapshot
             .paragraphs
             .get(paragraph.get())
             .copied()
-            .ok_or(TransactionError::OutOfBounds {
+            .ok_or(Error::OutOfBounds {
                 position: paragraph.get(),
                 len: snapshot.paragraph_count(),
             })?;
@@ -9629,7 +13010,7 @@ fn selected_direct_paragraph_owner_text(
         "paragraph",
     )?;
     let owner_range = select_direct_child(paragraph_xml, b"p", child_name, owner, missing)
-        .map_err(|reason| TransactionError::Refused {
+        .map_err(|reason| Error::Refused {
             position: paragraph.get(),
             reason,
         })?;
@@ -9640,7 +13021,7 @@ fn selected_direct_paragraph_owner_text(
         child_name,
     )
     .map(|scanned| scanned.text)
-    .map_err(|reason| TransactionError::Refused {
+    .map_err(|reason| Error::Refused {
         position: paragraph.get(),
         reason,
     })
@@ -9650,13 +13031,13 @@ fn selected_complex_field_result_text(
     snapshot: &Snapshot,
     paragraph: Position,
     field: Position,
-) -> TransactionResult<String> {
+) -> Result<String> {
     let paragraph_range =
         snapshot
             .paragraphs
             .get(paragraph.get())
             .copied()
-            .ok_or(TransactionError::OutOfBounds {
+            .ok_or(Error::OutOfBounds {
                 position: paragraph.get(),
                 len: snapshot.paragraph_count(),
             })?;
@@ -9668,12 +13049,11 @@ fn selected_complex_field_result_text(
         paragraph_end,
         "paragraph",
     )?;
-    let result_range = select_complex_field_result(paragraph_xml, field).map_err(|reason| {
-        TransactionError::Refused {
+    let result_range =
+        select_complex_field_result(paragraph_xml, field).map_err(|reason| Error::Refused {
             position: paragraph.get(),
             reason,
-        }
-    })?;
+        })?;
     let start = checked_relative_start(paragraph_start, result_range)?;
     let end = checked_relative_end(paragraph_start, result_range)?;
     scan_run_region(checked_slice(
@@ -9683,7 +13063,7 @@ fn selected_complex_field_result_text(
         "complex field result",
     )?)
     .map(|(_wrapper, _prefix_length, _suffix_length, owner)| owner.text)
-    .map_err(|reason| TransactionError::Refused {
+    .map_err(|reason| Error::Refused {
         position: paragraph.get(),
         reason,
     })
@@ -9693,13 +13073,13 @@ fn select_content_control_content(
     snapshot: &Snapshot,
     paragraph: Position,
     control: Position,
-) -> TransactionResult<(usize, usize)> {
+) -> Result<(usize, usize)> {
     let paragraph_range =
         snapshot
             .paragraphs
             .get(paragraph.get())
             .copied()
-            .ok_or(TransactionError::OutOfBounds {
+            .ok_or(Error::OutOfBounds {
                 position: paragraph.get(),
                 len: snapshot.paragraph_count(),
             })?;
@@ -9718,7 +13098,7 @@ fn select_content_control_content(
         control,
         Refusal::ContentControlNotFound,
     )
-    .map_err(|reason| TransactionError::Refused {
+    .map_err(|reason| Error::Refused {
         position: paragraph.get(),
         reason,
     })?;
@@ -9737,7 +13117,7 @@ fn select_content_control_content(
         Position::new(0),
         Refusal::ComplexContent,
     )
-    .map_err(|reason| TransactionError::Refused {
+    .map_err(|reason| Error::Refused {
         position: paragraph.get(),
         reason,
     })?;
@@ -9750,7 +13130,7 @@ fn select_content_control_content(
     )
     .is_ok()
     {
-        return Err(TransactionError::Refused {
+        return Err(Error::Refused {
             position: paragraph.get(),
             reason: Refusal::ComplexContent,
         });
@@ -9765,14 +13145,14 @@ fn selected_content_control_text(
     snapshot: &Snapshot,
     paragraph: Position,
     control: Position,
-) -> TransactionResult<String> {
+) -> Result<String> {
     let (start, end) = select_content_control_content(snapshot, paragraph, control)?;
     scan_text_owner(
         checked_slice(snapshot.xml_bytes(), start, end, "content control content")?,
         b"sdtContent",
     )
     .map(|owner| owner.text)
-    .map_err(|reason| TransactionError::Refused {
+    .map_err(|reason| Error::Refused {
         position: paragraph.get(),
         reason,
     })
@@ -9783,7 +13163,7 @@ fn selected_cell_text(
     table: Position,
     row: Position,
     cell: Position,
-) -> TransactionResult<String> {
+) -> Result<String> {
     let selection = select_cell(snapshot, table, row, cell)?;
     let paragraph = single_cell_paragraph(selection.xml)?;
     let start = checked_relative_start(selection.start, paragraph)?;
@@ -9793,7 +13173,7 @@ fn selected_cell_text(
         b"p",
     )
     .map(|owner| owner.text)
-    .map_err(|reason| TransactionError::Refused {
+    .map_err(|reason| Error::Refused {
         position: table.get(),
         reason,
     })
@@ -9805,35 +13185,37 @@ fn selected_cell_paragraph_text(
     row: Position,
     cell: Position,
     paragraph: Position,
-) -> TransactionResult<String> {
+) -> Result<String> {
     let selection = select_cell(snapshot, table, row, cell)?;
     let paragraph_range =
         select_direct_child(selection.xml, b"tc", b"p", paragraph, Refusal::CellNotFound).map_err(
-            |reason| TransactionError::Refused {
+            |reason| Error::Refused {
                 position: table.get(),
                 reason,
             },
         )?;
     let start = checked_relative_start(selection.start, paragraph_range)?;
     let end = checked_relative_end(selection.start, paragraph_range)?;
-    scan_text_owner(
-        checked_slice(snapshot.xml_bytes(), start, end, "table cell paragraph")?,
-        b"p",
-    )
+    scan_paragraph_text_owner(checked_slice(
+        snapshot.xml_bytes(),
+        start,
+        end,
+        "table cell paragraph",
+    )?)
     .map(|owner| owner.text)
-    .map_err(|reason| TransactionError::Refused {
+    .map_err(|reason| Error::Refused {
         position: table.get(),
         reason,
     })
 }
 
-fn checked_start(range: Range, resource: &'static str) -> TransactionResult<usize> {
+fn checked_start(range: Range, resource: &'static str) -> Result<usize> {
     usize::try_from(range.start).map_err(|_error| {
         crate::Error::InvalidFormat(format!("{resource} offset does not fit usize")).into()
     })
 }
 
-fn checked_end(range: Range, resource: &'static str) -> TransactionResult<usize> {
+fn checked_end(range: Range, resource: &'static str) -> Result<usize> {
     checked_start(range, resource)?
         .checked_add(usize::try_from(range.length).map_err(|_error| {
             crate::Error::InvalidFormat(format!("{resource} length does not fit usize"))
@@ -9843,14 +13225,14 @@ fn checked_end(range: Range, resource: &'static str) -> TransactionResult<usize>
         })
 }
 
-fn checked_relative_start(base: usize, range: Range) -> TransactionResult<usize> {
+fn checked_relative_start(base: usize, range: Range) -> Result<usize> {
     base.checked_add(usize::try_from(range.start).map_err(|_error| {
         crate::Error::InvalidFormat("relative XML offset does not fit usize".into())
     })?)
     .ok_or_else(|| crate::Error::InvalidFormat("relative XML offset overflows".into()).into())
 }
 
-fn checked_relative_end(base: usize, range: Range) -> TransactionResult<usize> {
+fn checked_relative_end(base: usize, range: Range) -> Result<usize> {
     checked_relative_start(base, range)?
         .checked_add(usize::try_from(range.length).map_err(|_error| {
             crate::Error::InvalidFormat("relative XML length does not fit usize".into())
@@ -9863,16 +13245,13 @@ fn checked_slice<'a>(
     start: usize,
     end: usize,
     resource: &'static str,
-) -> TransactionResult<&'a [u8]> {
+) -> Result<&'a [u8]> {
     source.get(start..end).ok_or_else(|| {
         crate::Error::InvalidFormat(format!("{resource} range is outside document XML")).into()
     })
 }
 
-fn replace_ranges(
-    source: &[u8],
-    replacements: &[(usize, usize, Vec<u8>)],
-) -> TransactionResult<Vec<u8>> {
+fn replace_ranges(source: &[u8], replacements: &[(usize, usize, Vec<u8>)]) -> Result<Vec<u8>> {
     let mut capacity = source.len();
     let mut previous_end = 0usize;
     for (start, end, replacement) in replacements {
@@ -9885,18 +13264,18 @@ fn replace_ranges(
         capacity = capacity
             .checked_sub(end - start)
             .and_then(|size| size.checked_add(replacement.len()))
-            .ok_or(TransactionError::Limit {
-                resource: "projected XML bytes",
-                max: MAX_DOCUMENT_XML_BYTES,
-                actual: usize::MAX,
+            .ok_or(Error::Limit {
+                kind: crate::document::LimitKind::ProjectedXmlBytes,
+                maximum: MAX_DOCUMENT_XML_BYTES,
+                observed: usize::MAX,
             })?;
         previous_end = *end;
     }
     if capacity > MAX_DOCUMENT_XML_BYTES {
-        return Err(TransactionError::Limit {
-            resource: "projected XML bytes",
-            max: MAX_DOCUMENT_XML_BYTES,
-            actual: capacity,
+        return Err(Error::Limit {
+            kind: crate::document::LimitKind::ProjectedXmlBytes,
+            maximum: MAX_DOCUMENT_XML_BYTES,
+            observed: capacity,
         });
     }
     let mut output = Vec::new();
@@ -9916,7 +13295,7 @@ fn replace_ranges(
     Ok(output)
 }
 
-fn validate_authored_text(text: &str) -> Result<(), Refusal> {
+fn validate_authored_text(text: &str) -> std::result::Result<(), Refusal> {
     if text.contains(['\t', '\n', '\r'])
         || text.chars().any(|character| {
             !matches!(character, '\u{20}'..='\u{D7FF}' | '\u{E000}'..='\u{FFFD}' | '\u{10000}'..='\u{10FFFF}')
@@ -9927,7 +13306,7 @@ fn validate_authored_text(text: &str) -> Result<(), Refusal> {
     Ok(())
 }
 
-fn validate_authored_run_content(text: &str) -> Result<(), Refusal> {
+fn validate_authored_run_content(text: &str) -> std::result::Result<(), Refusal> {
     if text.chars().any(|character| {
         !matches!(character, '\u{9}' | '\u{A}' | '\u{D}' | '\u{20}'..='\u{D7FF}' | '\u{E000}'..='\u{FFFD}' | '\u{10000}'..='\u{10FFFF}')
     }) {
@@ -9940,7 +13319,7 @@ fn run_content_fragment_len(
     prefix: &[u8],
     original_local_name: &[u8],
     text: &str,
-) -> TransactionResult<usize> {
+) -> Result<usize> {
     let text_local_name = if original_local_name == b"delText" {
         b"delText".as_slice()
     } else {
@@ -9970,14 +13349,13 @@ fn run_content_fragment_len(
             }
             let name_len = qualified_name_len(prefix, local_name)?;
             output_len = replacement_len_add(output_len, replacement_len_add(3, name_len)?)?;
-            plain_start =
-                index
-                    .checked_add(character.len_utf8())
-                    .ok_or(TransactionError::Limit {
-                        resource: "replacement text bytes",
-                        max: MAX_REPLACEMENT_TEXT_BYTES,
-                        actual: usize::MAX,
-                    })?;
+            plain_start = index
+                .checked_add(character.len_utf8())
+                .ok_or(Error::Limit {
+                    kind: crate::document::LimitKind::ReplacementTextBytes,
+                    maximum: MAX_REPLACEMENT_TEXT_BYTES,
+                    observed: usize::MAX,
+                })?;
         }
     }
     let plain = &text[plain_start..];
@@ -9994,7 +13372,7 @@ fn try_run_content_fragment(
     prefix: &[u8],
     original_local_name: &[u8],
     text: &str,
-) -> TransactionResult<Vec<u8>> {
+) -> Result<Vec<u8>> {
     let capacity = run_content_fragment_len(prefix, original_local_name, text)?;
     let text_local_name = if original_local_name == b"delText" {
         b"delText".as_slice()
@@ -10003,7 +13381,7 @@ fn try_run_content_fragment(
     };
     let mut output = Vec::new();
     output.try_reserve_exact(capacity).map_err(|source| {
-        TransactionError::Document(crate::Error::Allocation {
+        Error::Document(crate::Error::Allocation {
             resource: "paragraph replacement XML",
             source,
         })
@@ -10030,14 +13408,13 @@ fn try_run_content_fragment(
             output.push(b'<');
             append_qualified_name(&mut output, prefix, local_name);
             output.extend_from_slice(b"/>");
-            plain_start =
-                index
-                    .checked_add(character.len_utf8())
-                    .ok_or(TransactionError::Limit {
-                        resource: "replacement text bytes",
-                        max: MAX_REPLACEMENT_TEXT_BYTES,
-                        actual: usize::MAX,
-                    })?;
+            plain_start = index
+                .checked_add(character.len_utf8())
+                .ok_or(Error::Limit {
+                    kind: crate::document::LimitKind::ReplacementTextBytes,
+                    maximum: MAX_REPLACEMENT_TEXT_BYTES,
+                    observed: usize::MAX,
+                })?;
         }
     }
     let plain = &text[plain_start..];
@@ -10048,26 +13425,22 @@ fn try_run_content_fragment(
     Ok(output)
 }
 
-fn replacement_len_add(left: usize, right: usize) -> TransactionResult<usize> {
-    left.checked_add(right).ok_or(TransactionError::Limit {
-        resource: "replacement XML bytes",
-        max: MAX_DOCUMENT_XML_BYTES,
-        actual: usize::MAX,
+fn replacement_len_add(left: usize, right: usize) -> Result<usize> {
+    left.checked_add(right).ok_or(Error::Limit {
+        kind: crate::document::LimitKind::ReplacementXmlBytes,
+        maximum: MAX_DOCUMENT_XML_BYTES,
+        observed: usize::MAX,
     })
 }
 
-fn qualified_name_len(prefix: &[u8], local_name: &[u8]) -> TransactionResult<usize> {
+fn qualified_name_len(prefix: &[u8], local_name: &[u8]) -> Result<usize> {
     replacement_len_add(
         replacement_len_add(prefix.len(), if prefix.is_empty() { 0 } else { 1 })?,
         local_name.len(),
     )
 }
 
-fn text_element_named_len(
-    prefix: &[u8],
-    local_name: &[u8],
-    text: &str,
-) -> TransactionResult<usize> {
+fn text_element_named_len(prefix: &[u8], local_name: &[u8], text: &str) -> Result<usize> {
     let name_len = qualified_name_len(prefix, local_name)?;
     if text.is_empty() {
         return replacement_len_add(3, name_len);
@@ -10085,7 +13458,7 @@ fn text_element_named_len(
     replacement_len_add(length, escaped_xml_len(text)?)
 }
 
-fn escaped_xml_len(text: &str) -> TransactionResult<usize> {
+fn escaped_xml_len(text: &str) -> Result<usize> {
     let mut length = 0usize;
     for byte in text.bytes() {
         let encoded_len = match byte {
@@ -10146,7 +13519,7 @@ fn append_escaped_xml(output: &mut Vec<u8>, text: &str) {
     output.extend_from_slice(&text.as_bytes()[cursor..]);
 }
 
-fn try_plain_paragraph(conformance: Conformance, text: &str) -> TransactionResult<Vec<u8>> {
+fn try_plain_paragraph(conformance: Conformance, text: &str) -> Result<Vec<u8>> {
     let namespace = conformance.namespace().as_bytes();
     let prefix = b"<w:p xmlns:w=\"";
     if text.is_empty() {
@@ -10155,15 +13528,15 @@ fn try_plain_paragraph(conformance: Conformance, text: &str) -> TransactionResul
             b"\"/>".len(),
         )?;
         if capacity > MAX_DOCUMENT_XML_BYTES {
-            return Err(TransactionError::Limit {
-                resource: "XML bytes",
-                max: MAX_DOCUMENT_XML_BYTES,
-                actual: capacity,
+            return Err(Error::Limit {
+                kind: crate::document::LimitKind::XmlBytes,
+                maximum: MAX_DOCUMENT_XML_BYTES,
+                observed: capacity,
             });
         }
         let mut paragraph = Vec::new();
         paragraph.try_reserve_exact(capacity).map_err(|source| {
-            TransactionError::Document(crate::Error::Allocation {
+            Error::Document(crate::Error::Allocation {
                 resource: "plain paragraph XML",
                 source,
             })
@@ -10182,15 +13555,15 @@ fn try_plain_paragraph(conformance: Conformance, text: &str) -> TransactionResul
         replacement_len_add(text_len, b"</w:r></w:p>".len())?,
     )?;
     if capacity > MAX_DOCUMENT_XML_BYTES {
-        return Err(TransactionError::Limit {
-            resource: "XML bytes",
-            max: MAX_DOCUMENT_XML_BYTES,
-            actual: capacity,
+        return Err(Error::Limit {
+            kind: crate::document::LimitKind::XmlBytes,
+            maximum: MAX_DOCUMENT_XML_BYTES,
+            observed: capacity,
         });
     }
     let mut paragraph = Vec::new();
     paragraph.try_reserve_exact(capacity).map_err(|source| {
-        TransactionError::Document(crate::Error::Allocation {
+        Error::Document(crate::Error::Allocation {
             resource: "plain paragraph XML",
             source,
         })
@@ -10204,12 +13577,7 @@ fn try_plain_paragraph(conformance: Conformance, text: &str) -> TransactionResul
     Ok(paragraph)
 }
 
-fn replace_range(
-    source: &[u8],
-    start: usize,
-    end: usize,
-    replacement: &[u8],
-) -> TransactionResult<Vec<u8>> {
+fn replace_range(source: &[u8], start: usize, end: usize, replacement: &[u8]) -> Result<Vec<u8>> {
     if start > end || end > source.len() {
         return Err(crate::Error::InvalidFormat("invalid document rewrite range".into()).into());
     }
@@ -10217,16 +13585,16 @@ fn replace_range(
         .len()
         .checked_sub(end - start)
         .and_then(|size| size.checked_add(replacement.len()))
-        .ok_or(TransactionError::Limit {
-            resource: "projected XML bytes",
-            max: MAX_DOCUMENT_XML_BYTES,
-            actual: usize::MAX,
+        .ok_or(Error::Limit {
+            kind: crate::document::LimitKind::ProjectedXmlBytes,
+            maximum: MAX_DOCUMENT_XML_BYTES,
+            observed: usize::MAX,
         })?;
     if capacity > MAX_DOCUMENT_XML_BYTES {
-        return Err(TransactionError::Limit {
-            resource: "projected XML bytes",
-            max: MAX_DOCUMENT_XML_BYTES,
-            actual: capacity,
+        return Err(Error::Limit {
+            kind: crate::document::LimitKind::ProjectedXmlBytes,
+            maximum: MAX_DOCUMENT_XML_BYTES,
+            observed: capacity,
         });
     }
     let mut output = Vec::new();
@@ -10247,6 +13615,15 @@ mod tests {
     use super::*;
 
     const WORD: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+
+    fn commit_composition(composition: Composition) -> Commit {
+        let (source, operations, _artifact_fingerprint) = composition.into_parts();
+        let mut edit = source.edit();
+        for operation in operations {
+            edit.apply_operation(&operation).unwrap();
+        }
+        edit.commit().unwrap()
+    }
 
     /// Compare a snapshot's retained layout with a full rescan of its own
     /// bytes.
@@ -10344,9 +13721,9 @@ mod tests {
     }
 
     fn generated_corpus_snapshot(paragraphs: usize) -> Snapshot {
-        let mut package = crate::Package::new().unwrap();
+        let mut builder = crate::Builder::new().unwrap();
         {
-            let document = package.document_mut().unwrap();
+            let document = builder.document().unwrap();
             for index in 0..paragraphs {
                 document.add_paragraph_with_text(&format!(
                     "litchi-perf-baseline-docx-semantic-v1-source-{index:05}"
@@ -10354,7 +13731,8 @@ mod tests {
             }
         }
         let mut output = std::io::Cursor::new(Vec::new());
-        package.to_stream(&mut output).unwrap();
+        let package = builder.build().unwrap();
+        package.write_to(&mut output).unwrap();
         crate::Package::from_reader(std::io::Cursor::new(output.into_inner()))
             .unwrap()
             .document_snapshot()
@@ -10480,7 +13858,7 @@ mod tests {
             CompactionPolicy::WholeDocument,
         ] {
             let commit = base.edit().with_compaction_policy(policy).commit().unwrap();
-            assert!(!commit.patch().changed());
+            assert!(commit.patch().is_noop());
             assert_eq!(commit.snapshot().xml_bytes(), base.xml_bytes());
         }
     }
@@ -11056,6 +14434,587 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_budget_admits_exact_xml_pair_and_rejects_before_capture() {
+        let source =
+            Snapshot::from_xml(document("<w:p><w:r><w:t>before</w:t></w:r></w:p>")).unwrap();
+
+        // Derive the exact charge once without a budget, then exercise both
+        // sides of the boundary with fresh native edits.  The rejected edit
+        // must still hold the original projection: no candidate snapshot is
+        // retained before the typed limit is reported.
+        let mut probe = source.edit();
+        probe
+            .replace_paragraph_text(Position::new(0), "a substantially longer replacement")
+            .unwrap();
+        let exact = source
+            .xml_bytes()
+            .len()
+            .checked_add(probe.projected().xml_bytes().len())
+            .unwrap();
+
+        let mut admitted = source.edit().with_snapshot_budget(exact);
+        admitted
+            .replace_paragraph_text(Position::new(0), "a substantially longer replacement")
+            .unwrap();
+        assert!(admitted.commit().is_ok());
+
+        let mut refused = source.edit().with_snapshot_budget(exact - 1);
+        let error = match refused
+            .replace_paragraph_text(Position::new(0), "a substantially longer replacement")
+        {
+            Ok(_) => panic!("the over-budget projection was admitted"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: crate::document::LimitKind::ProjectedXmlBytes,
+                observed,
+                maximum,
+            } if observed == exact && maximum == exact - 1
+        ));
+        assert_eq!(refused.projected().xml_bytes(), source.xml_bytes());
+    }
+
+    #[test]
+    fn snapshot_budget_checks_an_exact_noop_pair_at_commit() {
+        let source =
+            Snapshot::from_xml(document("<w:p><w:r><w:t>before</w:t></w:r></w:p>")).unwrap();
+        let pair = source.xml_bytes().len().checked_mul(2).unwrap();
+
+        let mut exact = source.edit().with_snapshot_budget(pair);
+        exact
+            .replace_paragraph_text(Position::new(0), "before")
+            .unwrap();
+        assert!(exact.commit().is_ok());
+
+        let mut short = source.edit().with_snapshot_budget(pair - 1);
+        short
+            .replace_paragraph_text(Position::new(0), "before")
+            .unwrap();
+        assert!(matches!(
+            short.commit(),
+            Err(Error::Limit {
+                kind: crate::document::LimitKind::ProjectedXmlBytes,
+                observed,
+                maximum,
+            }) if observed == pair && maximum == pair - 1
+        ));
+    }
+
+    #[test]
+    fn literal_run_text_node_preserves_siblings_controls_and_durable_exactness() {
+        let source = Snapshot::from_xml(document(
+            "<w:p><w:r><w:rPr><w:b/></w:rPr><w:tab/><w:t xml:space=\"preserve\">old &amp; text</w:t><w:br/><w:t>second</w:t><x:opaque xmlns:x=\"urn:test\"/></w:r></w:p>",
+        ))
+        .unwrap();
+        let mut edit = source.edit();
+        edit.replace_run_text_node(Position::new(0), Position::new(0), "new\r\n\t<&")
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        let xml = std::str::from_utf8(commit.snapshot().xml_bytes()).unwrap();
+        assert!(xml.contains(
+            "<w:rPr><w:b/></w:rPr><w:tab/><w:t xml:space=\"preserve\">new&#xD;\n\t&lt;&amp;</w:t><w:br/><w:t>second</w:t><x:opaque xmlns:x=\"urn:test\"/>"
+        ));
+        assert_eq!(commit.diagnostics().operations(), 1);
+        assert!(matches!(
+            commit.patch().operations(),
+            [Operation::ReplaceRunTextNode { .. }]
+        ));
+        assert_eq!(
+            commit
+                .snapshot()
+                .paragraph(Position::new(0))
+                .unwrap()
+                .text()
+                .unwrap(),
+            "\tnew\r\n\t<&\nsecond"
+        );
+        assert_eq!(
+            commit
+                .patch()
+                .inverse()
+                .apply(commit.snapshot())
+                .unwrap()
+                .xml_bytes(),
+            source.xml_bytes()
+        );
+
+        let durable = commit.patch().to_durable(durable_limits()).unwrap();
+        let wire = durable.to_deterministic_json().unwrap();
+        let decoded =
+            litchi_core::patch::Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
+                &wire,
+                durable_limits(),
+            )
+            .unwrap();
+        assert_eq!(
+            source.apply_durable(&decoded).unwrap().xml_bytes(),
+            commit.snapshot().xml_bytes()
+        );
+        assert_eq!(
+            source
+                .apply_durable(&decoded)
+                .unwrap()
+                .apply_durable(&decoded.inverse())
+                .unwrap()
+                .xml_bytes(),
+            source.xml_bytes()
+        );
+    }
+
+    #[test]
+    fn literal_run_text_node_empty_runs_are_noops_and_structural_runs_refuse() {
+        for body in ["<w:r/>", "<w:r><w:rPr><w:i/></w:rPr></w:r>"] {
+            let source = Snapshot::from_xml(document(&format!("<w:p>{body}</w:p>"))).unwrap();
+            let mut edit = source.edit();
+            edit.replace_run_text_node(Position::new(0), Position::new(0), "ignored")
+                .unwrap();
+            let commit = edit.commit().unwrap();
+            assert_eq!(commit.snapshot().xml_bytes(), source.xml_bytes());
+            assert_eq!(commit.diagnostics().operations(), 0);
+        }
+
+        let source = Snapshot::from_xml(document("<w:p><w:r><w:t/></w:r></w:p>")).unwrap();
+        let mut edit = source.edit();
+        edit.replace_run_text_node(Position::new(0), Position::new(0), "filled")
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        assert!(
+            std::str::from_utf8(commit.snapshot().xml_bytes())
+                .unwrap()
+                .contains("<w:t>filled</w:t>")
+        );
+        assert_eq!(
+            commit
+                .patch()
+                .inverse()
+                .apply(commit.snapshot())
+                .unwrap()
+                .xml_bytes(),
+            source.xml_bytes()
+        );
+
+        for child in [
+            "<w:tab/>",
+            "<w:br/>",
+            "<w:fldChar w:fldCharType=\"begin\"/>",
+            "<w:instrText>DATE</w:instrText>",
+            "<w:drawing/>",
+        ] {
+            let source =
+                Snapshot::from_xml(document(&format!("<w:p><w:r>{child}</w:r></w:p>"))).unwrap();
+            let mut edit = source.edit();
+            assert!(matches!(
+                edit.replace_run_text_node(Position::new(0), Position::new(0), "refused"),
+                Err(Error::Refused {
+                    reason: Refusal::ComplexRun,
+                    ..
+                })
+            ));
+            assert_eq!(edit.projected().xml_bytes(), source.xml_bytes());
+            assert!(edit.operations.is_empty());
+        }
+
+        let source =
+            Snapshot::from_xml(document("<w:p><w:r><w:t>before</w:t></w:r></w:p>")).unwrap();
+        let mut edit = source.edit();
+        assert!(matches!(
+            edit.replace_run_text_node(Position::new(0), Position::new(0), "bad\u{000b}"),
+            Err(Error::Refused {
+                reason: Refusal::StructuralText,
+                ..
+            })
+        ));
+        assert_eq!(edit.projected().xml_bytes(), source.xml_bytes());
+        assert!(edit.operations.is_empty());
+    }
+
+    #[test]
+    fn literal_run_text_node_uses_inherited_word_namespace_bindings() {
+        let source = Snapshot::from_xml(
+            format!(
+                "<w:document xmlns:w=\"{WORD}\" xmlns:q=\"{WORD}\"><w:body><q:p><q:r><q:t>before</q:t><q:t>tail</q:t></q:r></q:p><w:sectPr/></w:body></w:document>"
+            )
+            .into_bytes(),
+        )
+        .unwrap();
+        let mut edit = source.edit();
+        edit.replace_run_text_node(Position::new(0), Position::new(0), "after")
+            .unwrap();
+        let committed = edit.commit().unwrap();
+        let xml = std::str::from_utf8(committed.snapshot().xml_bytes()).unwrap();
+        assert!(xml.contains("<q:p><q:r><q:t>after</q:t><q:t>tail</q:t></q:r></q:p>"));
+        assert!(
+            committed
+                .patch()
+                .inverse()
+                .apply(committed.snapshot())
+                .unwrap()
+                .xml_bytes()
+                == source.xml_bytes()
+        );
+    }
+
+    #[test]
+    fn literal_run_text_node_respects_default_namespace_resets() {
+        let source = Snapshot::from_xml(
+            format!(
+                "<w:document xmlns:w=\"{WORD}\"><w:body><p xmlns=\"{WORD}\"><r><t xmlns=\"\">foreign</t></r><r><t>word</t></r></p><w:sectPr/></w:body></w:document>"
+            )
+            .into_bytes(),
+        )
+        .unwrap();
+        let mut edit = source.edit();
+        let result = edit.replace_run_text_node(Position::new(0), Position::new(0), "refused");
+        assert!(matches!(
+            result,
+            Err(Error::Refused {
+                reason: Refusal::ComplexRun,
+                ..
+            })
+        ));
+        assert_eq!(edit.projected().xml_bytes(), source.xml_bytes());
+
+        let source = Snapshot::from_xml(
+            format!(
+                "<w:document xmlns:w=\"{WORD}\"><w:body><p xmlns=\"{WORD}\"><r xmlns=\"\"><t>foreign</t></r></p><w:sectPr/></w:body></w:document>"
+            )
+            .into_bytes(),
+        )
+        .unwrap();
+        let mut edit = source.edit();
+        assert!(matches!(
+            edit.replace_run_text_node(Position::new(0), Position::new(0), "refused"),
+            Err(Error::Refused {
+                reason: Refusal::RunNotFound,
+                ..
+            })
+        ));
+        assert_eq!(edit.projected().xml_bytes(), source.xml_bytes());
+    }
+
+    #[test]
+    fn literal_run_text_node_replay_validates_controls_and_charges_text() {
+        let source = Snapshot::from_xml(document(
+            "<w:p><w:r><w:t>one</w:t></w:r><w:r><w:t>two</w:t></w:r></w:p>",
+        ))
+        .unwrap();
+        let mut edit = source.edit();
+        edit.replacement_text_bytes = MAX_REPLACEMENT_TEXT_BYTES - 3;
+        edit.apply_operation(&Operation::ReplaceRunTextNode {
+            paragraph: Position::new(0),
+            run: Position::new(0),
+            before: Arc::new(b"<w:t>one</w:t>".to_vec()),
+            after: Arc::new(b"<w:t>uno</w:t>".to_vec()),
+        })
+        .unwrap();
+        assert_eq!(edit.replacement_text_bytes, MAX_REPLACEMENT_TEXT_BYTES);
+        let projected_after_first = edit.projected().xml_bytes().to_vec();
+        assert!(matches!(
+            edit.apply_operation(&Operation::ReplaceRunTextNode {
+                paragraph: Position::new(0),
+                run: Position::new(1),
+                before: Arc::new(b"<w:t>two</w:t>".to_vec()),
+                after: Arc::new(b"<w:t>dos</w:t>".to_vec()),
+            }),
+            Err(Error::Limit {
+                kind: crate::document::LimitKind::ReplacementTextBytes,
+                maximum: MAX_REPLACEMENT_TEXT_BYTES,
+                ..
+            })
+        ));
+        assert_eq!(edit.replacement_text_bytes, MAX_REPLACEMENT_TEXT_BYTES);
+        assert_eq!(
+            edit.projected().xml_bytes(),
+            projected_after_first.as_slice()
+        );
+        assert_eq!(edit.operations.len(), 1);
+
+        let source = Snapshot::from_xml(document("<w:p><w:r><w:t>one</w:t></w:r></w:p>")).unwrap();
+        let mut edit = source.edit();
+        assert!(matches!(
+            edit.apply_operation(&Operation::ReplaceRunTextNode {
+                paragraph: Position::new(0),
+                run: Position::new(0),
+                before: Arc::new(b"<w:t>one</w:t>".to_vec()),
+                after: Arc::new(b"<w:t>&#xB;</w:t>".to_vec()),
+            }),
+            Err(Error::Refused {
+                reason: Refusal::StructuralText,
+                ..
+            })
+        ));
+        assert_eq!(edit.projected().xml_bytes(), source.xml_bytes());
+        assert!(edit.operations.is_empty());
+    }
+
+    #[test]
+    fn cached_run_field_dirty_marks_owner_and_round_trips_exactly() {
+        let source = Snapshot::from_xml(document(
+            "<w:p><w:r><w:fldChar w:fldCharType=\"begin\"/></w:r><w:r><w:instrText> PAGE </w:instrText></w:r><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r><w:r><w:t>1</w:t></w:r><w:r><w:fldChar w:fldCharType=\"end\"/></w:r></w:p>",
+        ))
+        .unwrap();
+        let mut edit = source.edit();
+        edit.mark_cached_run_field_dirty(Position::new(0), Position::new(3))
+            .unwrap();
+        let committed = edit.commit().unwrap();
+        let xml = std::str::from_utf8(committed.snapshot().xml_bytes()).unwrap();
+        assert!(xml.contains("<w:fldChar w:fldCharType=\"begin\" w:dirty=\"true\"/>"));
+        assert!(matches!(
+            committed.patch().operations(),
+            [Operation::MarkCachedRunFieldDirty { .. }]
+        ));
+        assert_eq!(
+            committed
+                .patch()
+                .inverse()
+                .apply(committed.snapshot())
+                .unwrap()
+                .xml_bytes(),
+            source.xml_bytes()
+        );
+
+        let durable = committed.patch().to_durable(durable_limits()).unwrap();
+        let wire = durable.to_deterministic_json().unwrap();
+        let decoded =
+            litchi_core::patch::Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
+                &wire,
+                durable_limits(),
+            )
+            .unwrap();
+        assert_eq!(
+            source.apply_durable(&decoded).unwrap().xml_bytes(),
+            committed.snapshot().xml_bytes()
+        );
+        assert_eq!(
+            committed
+                .snapshot()
+                .apply_durable(&decoded.inverse())
+                .unwrap()
+                .xml_bytes(),
+            source.xml_bytes()
+        );
+    }
+
+    #[test]
+    fn cached_run_field_dirty_obeys_nested_and_noop_rules() {
+        let source = Snapshot::from_xml(document(
+            "<w:p><w:r><w:fldChar w:fldCharType=\"begin\"/></w:r><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r><w:r><w:fldChar w:fldCharType=\"begin\"/></w:r><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r><w:r><w:t>inner</w:t></w:r><w:r><w:fldChar w:fldCharType=\"end\"/></w:r><w:r><w:t>outer</w:t></w:r><w:r><w:fldChar w:fldCharType=\"end\"/></w:r></w:p>",
+        ))
+        .unwrap();
+        let mut inner = source.edit();
+        inner
+            .mark_cached_run_field_dirty(Position::new(0), Position::new(4))
+            .unwrap();
+        let inner = inner.commit().unwrap();
+        let inner_xml = std::str::from_utf8(inner.snapshot().xml_bytes()).unwrap();
+        assert!(inner_xml.contains(
+            "<w:fldChar w:fldCharType=\"begin\"/></w:r><w:r><w:fldChar w:fldCharType=\"separate\"/>",
+        ));
+        assert!(inner_xml.contains("<w:fldChar w:fldCharType=\"begin\" w:dirty=\"true\"/>"));
+
+        let mut outer = source.edit();
+        outer
+            .mark_cached_run_field_dirty(Position::new(0), Position::new(6))
+            .unwrap();
+        let outer = outer.commit().unwrap();
+        let outer_xml = std::str::from_utf8(outer.snapshot().xml_bytes()).unwrap();
+        assert!(outer_xml.contains("<w:fldChar w:fldCharType=\"begin\" w:dirty=\"true\"/>"));
+        assert_eq!(outer.patch().operations().len(), 1);
+
+        let mut noops = source.edit();
+        noops
+            .mark_cached_run_field_dirty(Position::new(0), Position::new(0))
+            .unwrap()
+            .mark_cached_run_field_dirty(Position::new(0), Position::new(0))
+            .unwrap();
+        assert!(noops.operations.is_empty());
+        let mut no_cache = Snapshot::from_xml(document(
+            "<w:p><w:r><w:fldChar w:fldCharType=\"begin\"/></w:r><w:r><w:t>plain</w:t></w:r></w:p>",
+        ))
+        .unwrap()
+        .edit();
+        no_cache
+            .mark_cached_run_field_dirty(Position::new(0), Position::new(1))
+            .unwrap();
+        assert!(no_cache.operations.is_empty());
+    }
+
+    #[test]
+    fn cached_run_field_dirty_preserves_default_elements_and_foreign_dirty_attributes() {
+        let source = Snapshot::from_xml(
+            format!(
+                "<w:document xmlns:w=\"{WORD}\" xmlns:x=\"urn:foreign\"><w:body><p xmlns=\"{WORD}\"><r><fldChar w:fldCharType=\"begin\" x:dirty=\"false\"/></r><r><fldChar w:fldCharType=\"separate\"/></r><r><t>cached</t></r></p><w:sectPr/></w:body></w:document>"
+            )
+            .into_bytes(),
+        )
+        .unwrap();
+        let mut edit = source.edit();
+        edit.mark_cached_run_field_dirty(Position::new(0), Position::new(2))
+            .unwrap();
+        let committed = edit.commit().unwrap();
+        let xml = std::str::from_utf8(committed.snapshot().xml_bytes()).unwrap();
+        assert!(
+            xml.contains("<fldChar w:fldCharType=\"begin\" x:dirty=\"false\" w:dirty=\"true\"/>")
+        );
+        assert_eq!(
+            committed
+                .patch()
+                .inverse()
+                .apply(committed.snapshot())
+                .unwrap()
+                .xml_bytes(),
+            source.xml_bytes()
+        );
+    }
+
+    #[test]
+    fn cached_run_field_dirty_refuses_malformed_markers_and_noops_without_owner() {
+        for marker in [
+            "<w:fldChar/>",
+            "<w:fldChar w:fldCharType=\"unknown\"/>",
+            "<w:fldChar w:fldCharType=\"begin\" w:fldCharType=\"end\"/>",
+        ] {
+            let source = Snapshot::from_xml(document(&format!(
+                "<w:p><w:r>{marker}</w:r><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r><w:r><w:t>cached</w:t></w:r></w:p>"
+            )))
+            .unwrap();
+            let mut edit = source.edit();
+            assert!(matches!(
+                edit.mark_cached_run_field_dirty(Position::new(0), Position::new(2)),
+                Err(Error::Refused {
+                    reason: Refusal::ComplexContent,
+                    ..
+                })
+            ));
+            assert_eq!(edit.projected().xml_bytes(), source.xml_bytes());
+            assert!(edit.operations.is_empty());
+        }
+
+        let source = Snapshot::from_xml(document(
+            "<w:p><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r><w:r><w:t>outside</w:t></w:r></w:p>",
+        ))
+        .unwrap();
+        let mut edit = source.edit();
+        edit.mark_cached_run_field_dirty(Position::new(0), Position::new(1))
+            .unwrap();
+        assert!(edit.operations.is_empty());
+        assert_eq!(edit.projected().xml_bytes(), source.xml_bytes());
+    }
+
+    #[test]
+    fn cached_run_field_dirty_preserves_marker_local_binding_and_self_closing_spacing() {
+        let source = Snapshot::from_xml(
+            format!(
+                "<w:document xmlns:w=\"{WORD}\"><w:body><w:p><w:r><w:fldChar xmlns:q=\"{WORD}\" q:fldCharType=\"begin\" /></w:r><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r><w:r><w:t>cached</w:t></w:r><w:r><w:fldChar w:fldCharType=\"end\"/></w:r></w:p><w:sectPr/></w:body></w:document>"
+            )
+            .into_bytes(),
+        )
+        .unwrap();
+        let mut edit = source.edit();
+        edit.mark_cached_run_field_dirty(Position::new(0), Position::new(2))
+            .unwrap();
+        let committed = edit.commit().unwrap();
+        let xml = std::str::from_utf8(committed.snapshot().xml_bytes()).unwrap();
+        assert!(xml.contains(
+            "<w:fldChar xmlns:q=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\" q:fldCharType=\"begin\"  w:dirty=\"true\"/>"
+        ));
+        assert_eq!(
+            committed
+                .patch()
+                .inverse()
+                .apply(committed.snapshot())
+                .unwrap()
+                .xml_bytes(),
+            source.xml_bytes()
+        );
+
+        let Operation::MarkCachedRunFieldDirty {
+            paragraph,
+            run,
+            before,
+            after,
+        } = committed.patch().operations()[0].clone()
+        else {
+            panic!("cached field edit must retain its marker operation");
+        };
+        let forged = Arc::new(
+            format!("<w:fldChar xmlns:q=\"{WORD}\" q:fldCharType=\"begin\" q:dirty=\"true\"/>")
+                .into_bytes(),
+        );
+        assert_ne!(after.as_slice(), forged.as_slice());
+        let mut replay = source.edit();
+        assert!(matches!(
+            replay.apply_operation(&Operation::MarkCachedRunFieldDirty {
+                paragraph,
+                run,
+                before,
+                after: forged,
+            }),
+            Err(Error::Refused {
+                reason: Refusal::ComplexContent,
+                ..
+            })
+        ));
+        assert_eq!(replay.projected().xml_bytes(), source.xml_bytes());
+        assert!(replay.operations.is_empty());
+    }
+
+    #[test]
+    fn cached_run_field_dirty_rejects_forged_marker_transition_and_charges_bytes() {
+        let source = Snapshot::from_xml(document(
+            "<w:p><w:r><w:fldChar w:fldCharType=\"begin\"/></w:r><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r><w:r><w:t>cached</w:t></w:r></w:p>",
+        ))
+        .unwrap();
+        let mut edit = source.edit();
+        edit.replacement_text_bytes = MAX_REPLACEMENT_TEXT_BYTES - 1;
+        let before = Arc::new(b"<w:fldChar w:fldCharType=\"begin\"/>".to_vec());
+        let after = Arc::new(b"<w:fldChar w:fldCharType=\"end\" w:dirty=\"true\"/>".to_vec());
+        assert!(matches!(
+            edit.apply_operation(&Operation::MarkCachedRunFieldDirty {
+                paragraph: Position::new(0),
+                run: Position::new(2),
+                before: Arc::clone(&before),
+                after: Arc::clone(&after),
+            }),
+            Err(Error::Refused {
+                reason: Refusal::ComplexContent,
+                ..
+            })
+        ));
+        assert_eq!(edit.projected().xml_bytes(), source.xml_bytes());
+        assert!(edit.operations.is_empty());
+
+        let valid_after =
+            Arc::new(b"<w:fldChar w:fldCharType=\"begin\" w:dirty=\"true\"/>".to_vec());
+        edit.replacement_text_bytes = MAX_REPLACEMENT_TEXT_BYTES - valid_after.len();
+        edit.apply_operation(&Operation::MarkCachedRunFieldDirty {
+            paragraph: Position::new(0),
+            run: Position::new(2),
+            before: Arc::new(b"<w:fldChar w:fldCharType=\"begin\"/>".to_vec()),
+            after: Arc::clone(&valid_after),
+        })
+        .unwrap();
+        assert_eq!(edit.replacement_text_bytes, MAX_REPLACEMENT_TEXT_BYTES);
+        let projected_after = edit.projected().xml_bytes().to_vec();
+        assert!(matches!(
+            edit.apply_operation(&Operation::MarkCachedRunFieldDirty {
+                paragraph: Position::new(0),
+                run: Position::new(2),
+                before: valid_after,
+                after: before,
+            }),
+            Err(Error::Limit {
+                kind: crate::document::LimitKind::ReplacementTextBytes,
+                ..
+            })
+        ));
+        assert_eq!(edit.projected().xml_bytes(), projected_after.as_slice());
+        assert_eq!(edit.operations.len(), 1);
+    }
+
+    #[test]
     fn paragraph_text_batch_is_canonical_atomic_and_reversible() {
         let source = Snapshot::from_xml(document(
             "<w:p w:rsidR=\"1\"><w:r><w:rPr><w:b/></w:rPr><w:t>first</w:t></w:r></w:p><w:p><w:r><w:t>retained</w:t></w:r></w:p><w:p><w:r><w:rPr><w:i/></w:rPr><w:t>third</w:t></w:r></w:p>",
@@ -11151,26 +15110,26 @@ mod tests {
         ];
         let late_failure = [
             ParagraphTextReplacement::new(Position::new(0), "would change"),
-            ParagraphTextReplacement::new(Position::new(2), "line\nbreak"),
+            ParagraphTextReplacement::new(Position::new(2), "line\u{b}break"),
         ];
         let mut refused = source.edit();
         assert!(matches!(
             refused.replace_body_paragraph_texts(&duplicate),
-            Err(TransactionError::Refused {
+            Err(Error::Refused {
                 reason: Refusal::AmbiguousCompositeSelector,
                 ..
             })
         ));
         assert!(matches!(
             refused.replace_body_paragraph_texts(&[]),
-            Err(TransactionError::Refused {
+            Err(Error::Refused {
                 reason: Refusal::AmbiguousCompositeSelector,
                 ..
             })
         ));
         assert!(matches!(
             refused.replace_body_paragraph_texts(&out_of_order),
-            Err(TransactionError::Refused {
+            Err(Error::Refused {
                 reason: Refusal::AmbiguousCompositeSelector,
                 ..
             })
@@ -11216,7 +15175,7 @@ mod tests {
         let mut refused = source.edit();
         assert!(matches!(
             refused.replace_paragraph_text(Position::new(0), "no"),
-            Err(TransactionError::Refused {
+            Err(Error::Refused {
                 reason: Refusal::ComplexContent,
                 ..
             })
@@ -11229,7 +15188,7 @@ mod tests {
         let stale = Snapshot::from_xml(document("<w:p><w:r><w:t>other</w:t></w:r></w:p>")).unwrap();
         assert!(matches!(
             commit.patch().apply(&stale),
-            Err(TransactionError::StaleSource)
+            Err(Error::PatchConflict)
         ));
     }
 
@@ -11241,7 +15200,7 @@ mod tests {
             .unwrap();
         let commit = edit.commit().unwrap();
 
-        assert!(!commit.patch().changed());
+        assert!(commit.patch().is_noop());
         assert!(commit.patch().operations().is_empty());
         assert!(matches!(
             (&source.xml, &commit.snapshot().xml),
@@ -11399,7 +15358,7 @@ mod tests {
         let mut refused = unsupported.edit();
         assert!(matches!(
             refused.accept_revision(Position::new(0), RevisionKind::Insertion, Position::new(0),),
-            Err(TransactionError::Refused {
+            Err(Error::Refused {
                 reason: Refusal::RevisionDependency,
                 ..
             })
@@ -11418,7 +15377,7 @@ mod tests {
                 RevisionKind::Insertion,
                 Position::new(0),
             ),
-            Err(TransactionError::Refused {
+            Err(Error::Refused {
                 reason: Refusal::RevisionDependency,
                 ..
             })
@@ -11440,7 +15399,7 @@ mod tests {
                 RevisionKind::Insertion,
                 Position::new(0),
             ),
-            Err(TransactionError::Refused {
+            Err(Error::Refused {
                 reason: Refusal::RevisionDependency,
                 ..
             })
@@ -11453,7 +15412,7 @@ mod tests {
         let mut noop = empty.edit();
         assert!(matches!(
             noop.accept_revision(Position::new(0), RevisionKind::Insertion, Position::new(1),),
-            Err(TransactionError::Refused {
+            Err(Error::Refused {
                 reason: Refusal::RevisionNotFound,
                 ..
             })
@@ -11465,7 +15424,7 @@ mod tests {
             Snapshot::from_xml(document("<w:p><w:r><w:t>different</w:t></w:r></w:p>")).unwrap();
         assert!(matches!(
             noop.commit().unwrap().patch().apply(&stale),
-            Err(TransactionError::StaleSource)
+            Err(Error::PatchConflict)
         ));
     }
 
@@ -11497,7 +15456,7 @@ mod tests {
         let mut replay = source.edit();
         assert!(matches!(
             replay.apply_operation(&tampered),
-            Err(TransactionError::SemanticPrecondition)
+            Err(Error::SemanticPrecondition)
         ));
         assert_eq!(replay.projected().xml_bytes(), source.xml_bytes());
         assert!(replay.operations.is_empty());
@@ -11542,24 +15501,39 @@ mod tests {
             0,
         )
         .unwrap();
-        let package = crate::source_backed::Package::from_read_at_with_execution_context(
+        let package = crate::source_backed::Package::from_read_at_with_options(
             Arc::new(OwnedSource::new(PackageWriter::to_bytes(&opc).unwrap())),
-            crate::ReadLimits::default(),
-            ExecutionContext::new(budget.clone(), cancellation, limits),
+            crate::OpenOptions::default()
+                .source_limits(crate::SourceLimits::default())
+                .execution_context(ExecutionContext::new(budget.clone(), cancellation, limits)),
         )
         .unwrap();
-        let mut managed = package.edit_document().unwrap();
+        let mut managed = package.document_snapshot().unwrap().edit();
         assert!(managed.projected.is_managed());
         let projected = managed.projected().xml_bytes().to_vec();
         let reserved = budget.used(Resource::Memory);
 
         assert!(matches!(
-            managed.apply_operation(&recorded),
-            Err(TransactionError::Document(crate::Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "apply_revision",
-                ..
-            }))
+                    managed.replace_run_text_node(Position::new(0), Position::new(0), "managed"),
+                    Err(Error::Document(crate::Error::Refused(refusal))) if refusal.operation() == "replace_run_text_node"
+        ));
+        assert!(managed.projected.is_managed());
+        assert_eq!(managed.projected().xml_bytes(), projected.as_slice());
+        assert!(managed.operations.is_empty());
+        assert_eq!(budget.used(Resource::Memory), reserved);
+
+        assert!(matches!(
+                    managed.mark_cached_run_field_dirty(Position::new(0), Position::new(0)),
+                    Err(Error::Document(crate::Error::Refused(refusal))) if refusal.operation() == "mark_cached_run_field_dirty"
+        ));
+        assert!(managed.projected.is_managed());
+        assert_eq!(managed.projected().xml_bytes(), projected.as_slice());
+        assert!(managed.operations.is_empty());
+        assert_eq!(budget.used(Resource::Memory), reserved);
+
+        assert!(matches!(
+                    managed.apply_operation(&recorded),
+                    Err(Error::Document(crate::Error::Refused(refusal))) if refusal.operation() == "apply_revision"
         ));
         assert!(managed.projected.is_managed());
         assert_eq!(managed.projected().xml_bytes(), projected.as_slice());
@@ -11580,7 +15554,7 @@ mod tests {
                 RevisionKind::Insertion,
                 Position::new(0),
             ),
-            Err(TransactionError::Refused {
+            Err(Error::Refused {
                 reason: Refusal::RevisionDependency,
                 ..
             })
@@ -11701,7 +15675,7 @@ mod tests {
                 .unwrap();
             assert!(matches!(
                 edit.commit(),
-                Err(TransactionError::Document(crate::Error::InvalidFormat(_)))
+                Err(Error::Document(crate::Error::InvalidFormat(_)))
             ));
         }
     }
@@ -11786,7 +15760,7 @@ mod tests {
         let mut replay = source.edit();
         assert!(matches!(
             replay.apply_operation(&malformed),
-            Err(TransactionError::SemanticPrecondition)
+            Err(Error::SemanticPrecondition)
         ));
         assert_eq!(replay.projected().xml_bytes(), source.xml_bytes());
         assert!(replay.operations.is_empty());
@@ -11906,10 +15880,7 @@ mod tests {
         let plan = source.plan_three_way(left, right).unwrap();
         assert!(plan.is_clean());
         assert_eq!(
-            plan.finish()
-                .unwrap()
-                .commit()
-                .unwrap()
+            commit_composition(plan.finish().unwrap())
                 .patch()
                 .operations()
                 .len(),
@@ -11932,7 +15903,7 @@ mod tests {
         assert!(!conflict.is_clean());
         assert!(!conflict.conflicts().is_empty());
         conflict.resolve(MergeChoice::Left);
-        let merged = conflict.finish().unwrap().commit().unwrap();
+        let merged = commit_composition(conflict.finish().unwrap());
         assert!(
             std::str::from_utf8(merged.snapshot().xml_bytes())
                 .unwrap()
@@ -11975,7 +15946,7 @@ mod tests {
         let stale = Snapshot::from_xml(document("<w:p><w:r><w:t>other</w:t></w:r></w:p>")).unwrap();
         assert!(matches!(
             stale.apply_durable(&decoded),
-            Err(TransactionError::StaleSource)
+            Err(Error::PatchConflict)
         ));
     }
 
@@ -12002,7 +15973,7 @@ mod tests {
         let cell = cell.prepare(limits, "a-cell").unwrap();
         let mut composition = source.compose(limits);
         composition.join(paragraph).unwrap().join(cell).unwrap();
-        let commit = composition.commit().unwrap();
+        let commit = commit_composition(composition);
         assert_eq!(commit.patch().operations().len(), 2);
         assert!(matches!(
             commit.patch().operations()[0],
@@ -12041,7 +16012,7 @@ mod tests {
             .unwrap()
             .join(appended)
             .unwrap();
-        append_composition.commit().unwrap();
+        commit_composition(append_composition);
 
         let mut indexed = source.edit();
         indexed
@@ -12062,7 +16033,7 @@ mod tests {
 
         let budget = u64::try_from(commit.snapshot().xml_bytes().len()).unwrap();
         let mut history = source.history(HistoryLimits::new(1, budget));
-        history.record(commit).unwrap();
+        history.record_transaction(commit).unwrap();
         assert!(history.can_undo());
         assert!(history.undo());
         assert_eq!(history.current().xml_bytes(), source.xml_bytes());
@@ -12293,13 +16264,13 @@ mod tests {
             .join(table.prepare(composition_limits, "table").unwrap())
             .unwrap();
         assert_eq!(
-            composition.commit().unwrap().snapshot().xml_bytes(),
+            commit_composition(composition).snapshot().xml_bytes(),
             commit.snapshot().xml_bytes()
         );
 
         let history_budget = u64::try_from(commit.snapshot().xml_bytes().len()).unwrap();
         let mut history = source.history(HistoryLimits::new(2, history_budget));
-        history.record(commit).unwrap();
+        history.record_transaction(commit).unwrap();
         assert!(history.undo());
         assert_eq!(history.current().xml_bytes(), source.xml_bytes());
         assert!(history.redo());
@@ -12405,7 +16376,10 @@ mod tests {
             .unwrap()
             .join(right_edit.prepare(limits, "right").unwrap())
             .unwrap();
-        assert_eq!(composition.commit().unwrap().patch().operations().len(), 2);
+        assert_eq!(
+            commit_composition(composition).patch().operations().len(),
+            2
+        );
     }
 
     #[test]
@@ -12518,13 +16492,13 @@ mod tests {
             .join(body.prepare(limits, "a-body").unwrap())
             .unwrap();
         assert_eq!(
-            composition.commit().unwrap().snapshot().xml_bytes(),
+            commit_composition(composition).snapshot().xml_bytes(),
             commit.snapshot().xml_bytes()
         );
 
         let history_budget = u64::try_from(commit.snapshot().xml_bytes().len()).unwrap();
         let mut history = source.history(HistoryLimits::new(2, history_budget));
-        history.record(commit).unwrap();
+        history.record_transaction(commit).unwrap();
         assert!(history.undo());
         assert_eq!(history.current().xml_bytes(), source.xml_bytes());
         assert!(history.redo());
@@ -12542,14 +16516,14 @@ mod tests {
         let mut refused = source.edit();
         assert!(matches!(
             refused.replace_body_hyperlink_texts(&[]),
-            Err(TransactionError::Refused {
+            Err(Error::Refused {
                 reason: Refusal::AmbiguousCompositeSelector,
                 ..
             })
         ));
         assert!(matches!(
             refused.replace_body_hyperlink_texts(&duplicate),
-            Err(TransactionError::Refused {
+            Err(Error::Refused {
                 reason: Refusal::AmbiguousCompositeSelector,
                 ..
             })
@@ -12568,11 +16542,53 @@ mod tests {
         ];
         assert!(matches!(
             refused.replace_body_hyperlink_texts(&late_failure),
-            Err(TransactionError::Refused {
+            Err(Error::Refused {
                 reason: Refusal::HyperlinkNotFound,
                 ..
             })
         ));
         assert_eq!(refused.projected().xml_bytes(), source.xml_bytes());
+    }
+
+    #[test]
+    fn text_sets_treat_run_alternate_content_as_one_opaque_object() {
+        // Record 0307: a wrapper without text survives a paragraph text set;
+        // one whose branches hold text refuses it, typed, with the edit
+        // untouched.
+        let document = |run: &str| {
+            format!(
+                "<w:document xmlns:w=\"{WORD}\" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" xmlns:x=\"urn:x\"><w:body>\
+                 <w:p><w:r><w:t>before</w:t></w:r><w:r>{run}</w:r></w:p><w:sectPr/></w:body></w:document>"
+            )
+            .into_bytes()
+        };
+        let shape = r#"<mc:AlternateContent><mc:Choice Requires="x"><w:drawing><x:pos>1905</x:pos></w:drawing></mc:Choice><mc:Fallback><w:pict/></mc:Fallback></mc:AlternateContent>"#;
+        let base = Snapshot::from_xml(document(shape)).unwrap();
+        let mut edit = base.edit();
+        edit.replace_paragraph_text(Position::new(0), "after")
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        let published = std::str::from_utf8(commit.snapshot().xml_bytes()).unwrap();
+        assert!(published.contains(shape), "{published}");
+        assert!(published.contains("<w:t>after</w:t>"), "{published}");
+
+        for text in [
+            r#"<w:t>BOX</w:t>"#,
+            r#"<w:txbxContent><w:p><w:r><w:tab/></w:r></w:p></w:txbxContent>"#,
+        ] {
+            let boxed = format!(
+                r#"<mc:AlternateContent><mc:Choice Requires="x"><w:drawing>{text}</w:drawing></mc:Choice><mc:Fallback/></mc:AlternateContent>"#
+            );
+            let base = Snapshot::from_xml(document(&boxed)).unwrap();
+            let mut edit = base.edit();
+            assert!(matches!(
+                edit.replace_paragraph_text(Position::new(0), "after"),
+                Err(Error::Refused {
+                    position: 0,
+                    reason: Refusal::AlternateContentText,
+                })
+            ));
+            assert_eq!(edit.projected().xml_bytes(), base.xml_bytes());
+        }
     }
 }

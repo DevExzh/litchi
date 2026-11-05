@@ -6,11 +6,8 @@
 use super::cell::value::Value;
 use std::fmt;
 
-/// Compact coordinate aliases retained for the shared model API.
-pub use super::coordinate::{
-    AddressError, CellPosition, CellPosition as Position, CellRange, CellRange as Range,
-    Error as CoordinateError,
-};
+/// Compact grid coordinates used by the shared model API.
+pub use super::coordinate::{AddressError, Area, At, Error as CoordinateError};
 
 /// The declared addressable extent of a table.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -70,7 +67,7 @@ impl Dimensions {
     /// compact coordinate representation or [`Error::OutOfBounds`] when the
     /// row lies outside this table's declared extent.
     pub fn check_row(self, row: usize) -> Result<()> {
-        let position = CellPosition::try_from_usize(row, 0)?;
+        let position = At::try_from_usize(row, 0)?;
         if position.row >= self.rows {
             return Err(Error::OutOfBounds {
                 position,
@@ -88,7 +85,7 @@ impl Dimensions {
     /// compact coordinate representation or [`Error::OutOfBounds`] when the
     /// column lies outside this table's declared extent.
     pub fn check_column(self, column: usize) -> Result<()> {
-        let position = CellPosition::try_from_usize(0, column)?;
+        let position = At::try_from_usize(0, column)?;
         if position.column >= self.columns {
             return Err(Error::OutOfBounds {
                 position,
@@ -110,8 +107,8 @@ impl Dimensions {
     ///
     /// Returns an error when the range is inverted or extends beyond this
     /// table's declared extent.
-    pub fn range(self, start: CellPosition, end: CellPosition) -> Result<CellRange> {
-        let range = Range::new(start, end)?;
+    pub fn range(self, start: At, end: At) -> Result<Area> {
+        let range = Area::new(start, end)?;
         if end.row > self.rows || end.column > self.columns {
             return Err(Error::OutOfBounds {
                 position: end,
@@ -131,8 +128,8 @@ impl Dimensions {
     ///
     /// Returns a typed address error for malformed syntax or
     /// [`Error::OutOfBounds`] when the parsed range exceeds this extent.
-    pub fn range_a1(self, address: &str) -> Result<CellRange> {
-        let range = CellRange::from_a1(address)?;
+    pub fn range_a1(self, address: &str) -> Result<Area> {
+        let range = Area::from_a1(address)?;
         if range.end.row > self.rows || range.end.column > self.columns {
             return Err(Error::OutOfBounds {
                 position: range.end,
@@ -142,7 +139,7 @@ impl Dimensions {
         Ok(range)
     }
 
-    fn contains(self, position: CellPosition) -> bool {
+    fn contains(self, position: At) -> bool {
         position.row < self.rows && position.column < self.columns
     }
 }
@@ -150,20 +147,20 @@ impl Dimensions {
 /// One materialized sparse cell.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Cell {
-    position: Position,
+    position: At,
     value: Value,
 }
 
 impl Cell {
     /// Creates a cell record.
     #[must_use]
-    pub const fn new(position: Position, value: Value) -> Self {
+    pub const fn new(position: At, value: Value) -> Self {
         Self { position, value }
     }
 
     /// Returns the cell coordinate.
     #[must_use]
-    pub const fn position(&self) -> Position {
+    pub const fn position(&self) -> At {
         self.position
     }
 
@@ -197,6 +194,7 @@ pub enum View<'a> {
 
 /// Errors returned by checked sparse table operations.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     /// An A1 selector is malformed.
     InvalidAddress {
@@ -208,16 +206,16 @@ pub enum Error {
     /// A coordinate is outside the table's declared extent.
     OutOfBounds {
         /// Requested coordinate.
-        position: Position,
+        position: At,
         /// Declared table extent.
         dimensions: Dimensions,
     },
     /// A range has descending bounds.
     InvalidRange {
         /// Inclusive range start.
-        start: Position,
+        start: At,
         /// Exclusive range end.
-        end: Position,
+        end: At,
     },
     /// A coordinate or dimension cannot fit in the compact representation.
     CoordinateOverflow {
@@ -236,7 +234,7 @@ pub enum Error {
     /// A builder received two cells at the same coordinate.
     DuplicatePosition {
         /// Repeated coordinate.
-        position: Position,
+        position: At,
     },
     /// A sheet received two tables with the same semantic name.
     DuplicateTableName {
@@ -373,19 +371,19 @@ impl GridBudget {
 #[derive(Debug, Clone, Copy)]
 pub struct Grid<'a> {
     table: &'a Table,
-    range: Range,
+    range: Area,
 }
 
 impl<'a> Grid<'a> {
     /// Returns the view's bounded range.
     #[must_use]
-    pub const fn range(self) -> Range {
+    pub const fn range(self) -> Area {
         self.range
     }
 
     /// Looks up one coordinate inside this view.
     #[must_use]
-    pub fn view(self, position: Position) -> Option<View<'a>> {
+    pub fn view(self, position: At) -> Option<View<'a>> {
         self.range
             .contains(position)
             .then(|| self.table.view(position))
@@ -406,8 +404,8 @@ impl<'a> Grid<'a> {
 #[derive(Debug, Clone)]
 pub struct GridIter<'a> {
     table: &'a Table,
-    range: Range,
-    next: Option<Position>,
+    range: Area,
+    next: Option<At>,
 }
 
 impl<'a> Iterator for GridIter<'a> {
@@ -417,11 +415,10 @@ impl<'a> Iterator for GridIter<'a> {
         let position = self.next?;
         let column = position.column + 1;
         if column < self.range.end.column {
-            self.next = Some(Position::new(position.row, column));
+            self.next = Some(At::new(position.row, column));
         } else {
             let row = position.row + 1;
-            self.next =
-                (row < self.range.end.row).then_some(Position::new(row, self.range.start.column));
+            self.next = (row < self.range.end.row).then_some(At::new(row, self.range.start.column));
         }
         Some(self.table.view(position))
     }
@@ -482,7 +479,7 @@ impl Table {
 
     /// Borrows a materialized value at a coordinate.
     #[must_use]
-    pub fn get(&self, position: Position) -> Option<&Value> {
+    pub fn get(&self, position: At) -> Option<&Value> {
         match self.view(position) {
             View::Stored(value) => Some(value),
             View::Missing | View::Covered => None,
@@ -498,7 +495,7 @@ impl Table {
     ///
     /// Returns a typed address error or [`Error::OutOfBounds`].
     pub fn get_a1(&self, address: &str) -> Result<Option<&Value>> {
-        let position = CellPosition::from_a1(address)?;
+        let position = At::from_a1(address)?;
         if !self.dimensions.contains(position) {
             return Err(Error::OutOfBounds {
                 position,
@@ -518,7 +515,7 @@ impl Table {
     ///
     /// Returns a typed address error or [`Error::OutOfBounds`].
     pub fn view_a1(&self, address: &str) -> Result<View<'_>> {
-        let position = CellPosition::from_a1(address)?;
+        let position = At::from_a1(address)?;
         if !self.dimensions.contains(position) {
             return Err(Error::OutOfBounds {
                 position,
@@ -530,7 +527,7 @@ impl Table {
 
     /// Returns the compact stored/missing view for a coordinate.
     #[must_use]
-    pub fn view(&self, position: Position) -> View<'_> {
+    pub fn view(&self, position: At) -> View<'_> {
         self.cells
             .binary_search_by_key(&position, Cell::position)
             .map_or(View::Missing, |index| {
@@ -544,7 +541,7 @@ impl Table {
     ///
     /// Returns [`Error::InvalidRange`] or [`Error::OutOfBounds`] when the
     /// range is not contained by the table's declared extent.
-    pub fn cells(&self, range: Range) -> Result<impl Iterator<Item = &Cell> + '_> {
+    pub fn cells(&self, range: Area) -> Result<impl Iterator<Item = &Cell> + '_> {
         let checked_range = self.dimensions.range(range.start, range.end)?;
         let first = self
             .cells
@@ -623,7 +620,7 @@ impl Table {
                 if column > 0 {
                     csv.push(',');
                 }
-                let position = Position::new(row, column);
+                let position = At::new(row, column);
                 if let Some(cell) = self.cells.get(next_cell)
                     && cell.position() == position
                 {
@@ -654,7 +651,7 @@ impl Table {
     ///
     /// Returns [`Error::BudgetExceeded`] when the range area is larger than
     /// the supplied budget.
-    pub fn grid(&self, range: Range, budget: GridBudget) -> Result<Grid<'_>> {
+    pub fn grid(&self, range: Area, budget: GridBudget) -> Result<Grid<'_>> {
         let checked_range = self.dimensions.range(range.start, range.end)?;
         let requested = checked_range.area().ok_or(Error::BudgetExceeded {
             requested: usize::MAX,
@@ -739,7 +736,7 @@ impl Builder {
 
     /// Borrows a materialized value at a coordinate.
     #[must_use]
-    pub fn get(&self, position: Position) -> Option<&Value> {
+    pub fn get(&self, position: At) -> Option<&Value> {
         if self.sorted {
             match self.cells.binary_search_by_key(&position, Cell::position) {
                 Ok(index) => Some(self.cells[index].value()),
@@ -782,7 +779,7 @@ impl Builder {
     /// reservation fails.
     pub fn set(
         &mut self,
-        position: Position,
+        position: At,
         value: Value,
     ) -> std::result::Result<(), InsertError<Value>> {
         if !self.dimensions.contains(position) {
@@ -851,7 +848,7 @@ impl Builder {
         address: &str,
         value: Value,
     ) -> std::result::Result<(), InsertError<Value>> {
-        let position = match CellPosition::from_a1(address) {
+        let position = match At::from_a1(address) {
             Ok(position) => position,
             Err(error) => return Err(InsertError::new(error.into(), value)),
         };
@@ -1038,36 +1035,36 @@ mod tests {
         assert!(dimensions.check_row(2).is_ok());
         assert!(matches!(
             dimensions.check_row(3),
-            Err(Error::OutOfBounds { position, .. }) if position == Position::new(3, 0)
+            Err(Error::OutOfBounds { position, .. }) if position == At::new(3, 0)
         ));
 
         let dimensions = Dimensions::new(0, 3);
         assert!(dimensions.check_column(2).is_ok());
         assert!(matches!(
             dimensions.check_column(3),
-            Err(Error::OutOfBounds { position, .. }) if position == Position::new(0, 3)
+            Err(Error::OutOfBounds { position, .. }) if position == At::new(0, 3)
         ));
     }
 
     #[test]
     fn compact_sparse_cells_are_sorted_and_replaced_without_duplicates() {
         let mut table = Builder::new("Test", Dimensions::new(4, 4));
-        assert!(table.set(Position::new(2, 1), number(2.0)).is_ok());
-        assert!(table.set(Position::new(0, 3), number(1.0)).is_ok());
-        assert!(table.set(Position::new(2, 1), number(3.0)).is_ok());
+        assert!(table.set(At::new(2, 1), number(2.0)).is_ok());
+        assert!(table.set(At::new(0, 3), number(1.0)).is_ok());
+        assert!(table.set(At::new(2, 1), number(3.0)).is_ok());
 
         let table = table.finish();
         assert!(table.is_ok());
         let table = table.unwrap_or_else(|error| panic!("unexpected table error: {error}"));
-        let range = Range::new(Position::new(0, 0), Position::new(4, 4))
+        let range = Area::new(At::new(0, 0), At::new(4, 4))
             .unwrap_or_else(|error| panic!("unexpected range error: {error}"));
         let positions: Vec<_> = table
             .cells(range)
             .unwrap_or_else(|error| panic!("unexpected cells error: {error}"))
             .map(Cell::position)
             .collect();
-        assert_eq!(positions, [Position::new(0, 3), Position::new(2, 1)]);
-        assert_eq!(table.get(Position::new(2, 1)), Some(&number(3.0)));
+        assert_eq!(positions, [At::new(0, 3), At::new(2, 1)]);
+        assert_eq!(table.get(At::new(2, 1)), Some(&number(3.0)));
         assert_eq!(table.cell_count(), 2);
         assert_eq!(
             table.iter_cells().map(Cell::position).collect::<Vec<_>>(),
@@ -1078,14 +1075,14 @@ mod tests {
     #[test]
     fn rectangular_sparse_cells_skip_off_column_values_without_stopping() {
         let mut builder = Builder::new("Test", Dimensions::new(4, 5));
-        assert!(builder.set(Position::new(0, 1), number(1.0)).is_ok());
-        assert!(builder.set(Position::new(0, 4), number(2.0)).is_ok());
-        assert!(builder.set(Position::new(1, 1), number(3.0)).is_ok());
-        assert!(builder.set(Position::new(2, 2), number(4.0)).is_ok());
+        assert!(builder.set(At::new(0, 1), number(1.0)).is_ok());
+        assert!(builder.set(At::new(0, 4), number(2.0)).is_ok());
+        assert!(builder.set(At::new(1, 1), number(3.0)).is_ok());
+        assert!(builder.set(At::new(2, 2), number(4.0)).is_ok());
         let table = builder
             .finish()
             .unwrap_or_else(|error| panic!("unexpected table error: {error}"));
-        let range = Range::new(Position::new(0, 1), Position::new(3, 3))
+        let range = Area::new(At::new(0, 1), At::new(3, 3))
             .unwrap_or_else(|error| panic!("unexpected range error: {error}"));
 
         let positions = table
@@ -1094,16 +1091,9 @@ mod tests {
             .map(Cell::position)
             .collect::<Vec<_>>();
 
-        assert_eq!(
-            positions,
-            [
-                Position::new(0, 1),
-                Position::new(1, 1),
-                Position::new(2, 2)
-            ]
-        );
+        assert_eq!(positions, [At::new(0, 1), At::new(1, 1), At::new(2, 2)]);
 
-        let empty = Range::new(Position::new(0, 2), Position::new(3, 2))
+        let empty = Area::new(At::new(0, 2), At::new(3, 2))
             .unwrap_or_else(|error| panic!("unexpected empty range error: {error}"));
         assert_eq!(
             table
@@ -1117,28 +1107,20 @@ mod tests {
     #[test]
     fn push_sorts_once_and_rejects_duplicate_coordinates() {
         let mut builder = Builder::new("Test", Dimensions::new(2, 2));
-        assert!(
-            builder
-                .push(Cell::new(Position::new(1, 1), number(2.0)))
-                .is_ok()
-        );
-        assert!(
-            builder
-                .push(Cell::new(Position::new(0, 0), number(1.0)))
-                .is_ok()
-        );
+        assert!(builder.push(Cell::new(At::new(1, 1), number(2.0))).is_ok());
+        assert!(builder.push(Cell::new(At::new(0, 0), number(1.0))).is_ok());
         let table = builder.finish();
         assert!(table.is_ok());
 
         let mut duplicate = Builder::new("Test", Dimensions::new(2, 2));
         assert!(
             duplicate
-                .push(Cell::new(Position::new(0, 0), Value::Empty))
+                .push(Cell::new(At::new(0, 0), Value::Empty))
                 .is_ok()
         );
         assert!(
             duplicate
-                .push(Cell::new(Position::new(0, 0), number(1.0)))
+                .push(Cell::new(At::new(0, 0), number(1.0)))
                 .is_ok()
         );
         assert!(matches!(
@@ -1150,21 +1132,21 @@ mod tests {
     #[test]
     fn views_distinguish_missing_and_explicit_empty() {
         let mut builder = Builder::new("Test", Dimensions::new(1, 2));
-        assert!(builder.set(Position::new(0, 0), Value::Empty).is_ok());
+        assert!(builder.set(At::new(0, 0), Value::Empty).is_ok());
         let table = builder
             .finish()
             .unwrap_or_else(|error| panic!("unexpected table error: {error}"));
         assert!(matches!(
-            table.view(Position::new(0, 0)),
+            table.view(At::new(0, 0)),
             View::Stored(&Value::Empty)
         ));
-        assert!(matches!(table.view(Position::new(0, 1)), View::Missing));
+        assert!(matches!(table.view(At::new(0, 1)), View::Missing));
     }
 
     #[test]
     fn bounded_grid_is_lazy_and_budgeted() {
         let table = Table::new("Test", Dimensions::new(2, 3));
-        let range = Range::new(Position::new(0, 0), Position::new(2, 2))
+        let range = Area::new(At::new(0, 0), At::new(2, 2))
             .unwrap_or_else(|error| panic!("unexpected range error: {error}"));
         assert!(table.grid(range, GridBudget::new(3)).is_err());
         let grid = table
@@ -1176,7 +1158,7 @@ mod tests {
     #[test]
     fn bounded_grid_rejects_ranges_outside_the_declared_extent() {
         let table = Table::new("Test", Dimensions::new(2, 3));
-        let range = Range::new(Position::new(0, 0), Position::new(3, 3))
+        let range = Area::new(At::new(0, 0), At::new(3, 3))
             .unwrap_or_else(|error| panic!("unexpected range error: {error}"));
         assert!(matches!(
             table.grid(range, GridBudget::new(usize::MAX)),
@@ -1195,10 +1177,10 @@ mod tests {
         assert!(builder.set_row_headers(["first\nrow"]).is_ok());
         assert!(
             builder
-                .set(Position::new(0, 0), Value::Text("A, B".to_owned()))
+                .set(At::new(0, 0), Value::Text("A, B".to_owned()))
                 .is_ok()
         );
-        assert!(builder.set(Position::new(1, 1), number(2.0)).is_ok());
+        assert!(builder.set(At::new(1, 1), number(2.0)).is_ok());
         let table = builder
             .finish()
             .unwrap_or_else(|error| panic!("unexpected table error: {error}"));
@@ -1250,7 +1232,7 @@ mod tests {
                 if column > 0 {
                     csv.push(',');
                 }
-                if let Some(value) = table.get(Position::new(row, column)) {
+                if let Some(value) = table.get(At::new(row, column)) {
                     csv.push_str(&value.to_string());
                 }
             }
@@ -1269,11 +1251,11 @@ mod tests {
         );
         assert!(builder.set_row_headers(["row0", "", "r,2"]).is_ok());
         for cell in [
-            Cell::new(Position::new(2, 3), Value::Text("tail".to_owned())),
-            Cell::new(Position::new(0, 2), Value::Text("first, value".to_owned())),
-            Cell::new(Position::new(1, 1), Value::Empty),
-            Cell::new(Position::new(0, 0), Value::Text("first".to_owned())),
-            Cell::new(Position::new(2, 0), Value::Text("last\nline".to_owned())),
+            Cell::new(At::new(2, 3), Value::Text("tail".to_owned())),
+            Cell::new(At::new(0, 2), Value::Text("first, value".to_owned())),
+            Cell::new(At::new(1, 1), Value::Empty),
+            Cell::new(At::new(0, 0), Value::Text("first".to_owned())),
+            Cell::new(At::new(2, 0), Value::Text("last\nline".to_owned())),
         ] {
             assert!(builder.push(cell).is_ok());
         }
@@ -1294,12 +1276,12 @@ mod tests {
         assert!(builder.set_column_headers(["A", "B", "C"]).is_ok());
         assert!(builder.set_row_headers(["R1", "R2"]).is_ok());
         for (position, value) in [
-            (Position::new(0, 0), number(1.0)),
-            (Position::new(0, 1), Value::Text("two".to_owned())),
-            (Position::new(0, 2), Value::Text("three,".to_owned())),
-            (Position::new(1, 0), Value::Text("line\nbreak".to_owned())),
-            (Position::new(1, 1), Value::Boolean(true)),
-            (Position::new(1, 2), number(4.0)),
+            (At::new(0, 0), number(1.0)),
+            (At::new(0, 1), Value::Text("two".to_owned())),
+            (At::new(0, 2), Value::Text("three,".to_owned())),
+            (At::new(1, 0), Value::Text("line\nbreak".to_owned())),
+            (At::new(1, 1), Value::Boolean(true)),
+            (At::new(1, 2), number(4.0)),
         ] {
             assert!(builder.set(position, value).is_ok());
         }
@@ -1318,15 +1300,15 @@ mod tests {
     fn coordinates_and_ranges_are_checked() {
         let dimensions = Dimensions::new(2, 2);
         assert!(matches!(
-            dimensions.range(Position::new(0, 0), Position::new(3, 2)),
+            dimensions.range(At::new(0, 0), At::new(3, 2)),
             Err(Error::OutOfBounds { .. })
         ));
         assert!(matches!(
-            Range::new(Position::new(1, 0), Position::new(0, 1)),
+            Area::new(At::new(1, 0), At::new(0, 1)),
             Err(CoordinateError::InvalidRange { .. })
         ));
         assert!(matches!(
-            Position::try_from_usize(usize::MAX, 0),
+            At::try_from_usize(usize::MAX, 0),
             Err(CoordinateError::CoordinateOverflow { .. })
         ));
     }

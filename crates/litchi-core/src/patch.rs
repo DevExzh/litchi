@@ -10,6 +10,7 @@ use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     fmt,
     marker::PhantomData,
+    mem::size_of,
     sync::Arc,
 };
 
@@ -687,6 +688,90 @@ impl<Mode> Patch<Mode> {
     pub const fn blobs(&self) -> &BlobBundle {
         &self.forward_blobs
     }
+
+    /// Returns the saturating byte charge for the patch-owned semantic data.
+    ///
+    /// This accounts for both operation directions and both blob bundles. It
+    /// walks the already retained strings and JSON values directly; it does
+    /// not serialize the patch or construct an inverse clone. The result is
+    /// an owned-data accounting value, so allocator metadata and sharing
+    /// outside the patch are intentionally not inferred.
+    #[must_use]
+    pub fn retained_bytes(&self) -> usize {
+        let mut bytes = self.format.capacity();
+        bytes = bytes.saturating_add(retained_operations_bytes(
+            &self.forward,
+            self.forward.capacity(),
+        ));
+        bytes = bytes.saturating_add(retained_operations_bytes(
+            &self.reverse,
+            self.reverse.capacity(),
+        ));
+        bytes = bytes.saturating_add(retained_blob_bundle_bytes(&self.forward_blobs));
+        bytes = bytes.saturating_add(retained_blob_bundle_bytes(&self.reverse_blobs));
+        bytes
+    }
+}
+
+fn retained_operations_bytes(operations: &[PatchOperation], capacity: usize) -> usize {
+    let mut bytes = capacity.saturating_mul(size_of::<PatchOperation>());
+    for operation in operations {
+        bytes = bytes.saturating_add(operation.op.capacity());
+        bytes = bytes.saturating_add(operation.target.capacity());
+        bytes = bytes.saturating_add(retained_precondition_bytes(&operation.preconditions));
+        bytes = bytes.saturating_add(retained_json_value_bytes(&operation.value));
+    }
+    bytes
+}
+
+fn retained_json_object_bytes(object: &serde_json::Map<String, Value>) -> usize {
+    retained_string_value_pairs(object.len(), object.iter())
+}
+
+fn retained_precondition_bytes(object: &BTreeMap<String, Value>) -> usize {
+    retained_string_value_pairs(object.len(), object.iter())
+}
+
+fn retained_string_value_pairs<'a, I>(length: usize, pairs: I) -> usize
+where
+    I: IntoIterator<Item = (&'a String, &'a Value)>,
+{
+    let mut bytes = length.saturating_mul(size_of::<(String, Value)>());
+    for (key, value) in pairs {
+        bytes = bytes.saturating_add(key.capacity());
+        bytes = bytes.saturating_add(retained_json_value_bytes(value));
+    }
+    bytes
+}
+
+fn retained_json_value_bytes(value: &Value) -> usize {
+    match value {
+        Value::Array(values) => {
+            let mut bytes = values.capacity().saturating_mul(size_of::<Value>());
+            for value in values {
+                bytes = bytes.saturating_add(retained_json_value_bytes(value));
+            }
+            bytes
+        },
+        Value::Object(object) => retained_json_object_bytes(object),
+        Value::String(value) => value.capacity(),
+        Value::Null | Value::Bool(_) | Value::Number(_) => 0,
+    }
+}
+
+fn retained_blob_bundle_bytes(bundle: &BlobBundle) -> usize {
+    let mut bytes = bundle
+        .entries
+        .len()
+        .saturating_mul(size_of::<(BlobId, Arc<[u8]>)>());
+    for payload in bundle.entries.values() {
+        // An Arc slice owns two counters alongside its payload. This is a
+        // stable conservative charge for the patch-owned blob allocation.
+        bytes = bytes
+            .saturating_add(2usize.saturating_mul(size_of::<usize>()))
+            .saturating_add(payload.len());
+    }
+    bytes
 }
 
 impl<Mode> fmt::Debug for Patch<Mode> {
@@ -1578,6 +1663,8 @@ impl<L, T> fmt::Debug for ThreeWayMergeError<L, T> {
 struct BoundedJsonOutput {
     bytes: Vec<u8>,
     maximum: usize,
+    /// The bound or allocation failure behind the last `io::Write` error.
+    error: Option<PatchError>,
 }
 
 impl BoundedJsonOutput {
@@ -1585,6 +1672,7 @@ impl BoundedJsonOutput {
         Self {
             bytes: Vec::new(),
             maximum,
+            error: None,
         }
     }
 
@@ -1592,7 +1680,7 @@ impl BoundedJsonOutput {
         self.bytes
     }
 
-    fn write(&mut self, bytes: &[u8]) -> Result<(), PatchError> {
+    fn push(&mut self, bytes: &[u8]) -> Result<(), PatchError> {
         let observed = self
             .bytes
             .len()
@@ -1613,6 +1701,22 @@ impl BoundedJsonOutput {
             .try_reserve_exact(bytes.len())
             .map_err(|_allocation_error| PatchError::Allocation)?;
         self.bytes.extend_from_slice(bytes);
+        Ok(())
+    }
+}
+
+impl std::io::Write for BoundedJsonOutput {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        match self.push(bytes) {
+            Ok(()) => Ok(bytes.len()),
+            Err(error) => {
+                self.error = Some(error);
+                Err(std::io::Error::other("bounded JSON output refused bytes"))
+            },
+        }
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
         Ok(())
     }
 }
@@ -2473,50 +2577,16 @@ fn validate_json_limits(value: &Value, limits: PatchLimits) -> Result<(), PatchE
 fn canonical_json<T: Serialize>(source: &T, maximum: usize) -> Result<Vec<u8>, PatchError> {
     let json_value = serde_json::to_value(source).map_err(PatchError::Json)?;
     let mut output = BoundedJsonOutput::new(maximum);
-    write_json(&json_value, &mut output)?;
-    Ok(output.into_inner())
-}
-
-fn write_json(value: &Value, output: &mut BoundedJsonOutput) -> Result<(), PatchError> {
-    match value {
-        Value::Null => output.write(b"null")?,
-        Value::Bool(boolean) => {
-            if *boolean {
-                output.write(b"true")?;
-            } else {
-                output.write(b"false")?;
-            }
-        },
-        Value::Number(number) => output.write(number.to_string().as_bytes())?,
-        Value::String(text) => {
-            let encoded = serde_json::to_string(text).map_err(PatchError::Json)?;
-            output.write(encoded.as_bytes())?;
-        },
-        Value::Array(values) => {
-            output.write(b"[")?;
-            for (index, child) in values.iter().enumerate() {
-                if index != 0 {
-                    output.write(b",")?;
-                }
-                write_json(child, output)?;
-            }
-            output.write(b"]")?;
-        },
-        Value::Object(values) => {
-            output.write(b"{")?;
-            for (index, (key, child)) in values.iter().enumerate() {
-                if index != 0 {
-                    output.write(b",")?;
-                }
-                let encoded = serde_json::to_string(key).map_err(PatchError::Json)?;
-                output.write(encoded.as_bytes())?;
-                output.write(b":")?;
-                write_json(child, output)?;
-            }
-            output.write(b"}")?;
-        },
+    // The canonical writer sorts object members itself, so these bytes do not
+    // depend on whether a linked crate enables `serde_json/preserve_order`.
+    if crate::canonical_json::to_writer(&mut output, &json_value).is_err() {
+        return Err(output.error.take().unwrap_or(PatchError::JsonLimit {
+            kind: JsonLimitKind::OutputBytes,
+            observed: usize::MAX,
+            limit: maximum,
+        }));
     }
-    Ok(())
+    Ok(output.into_inner())
 }
 
 fn validate_version(version: u16) -> Result<(), PatchError> {
@@ -2576,6 +2646,51 @@ mod tests {
             .expect("valid operation")
     }
 
+    /// Record 0349: durable bytes must not depend on whether a linked crate
+    /// enables `serde_json/preserve_order`. This crate's tests enable it, so
+    /// the map below iterates in insertion order; the bytes must still list
+    /// members sorted, exactly as a build without the feature produces them.
+    #[test]
+    fn durable_json_ignores_serde_json_map_order() {
+        let mut value = serde_json::Map::new();
+        value.insert("z".to_owned(), json!(2));
+        value.insert("a".to_owned(), json!({"y": 1, "b": 0.5}));
+        assert_eq!(
+            value.keys().map(String::as_str).collect::<Vec<_>>(),
+            ["z", "a"],
+            "litchi-core tests must run with serde_json/preserve_order"
+        );
+        let patch = Patch::<ForwardOnly>::new(
+            patch_limits(),
+            "org.litchi.test",
+            [operation("cell.set", "A1", Value::Object(value))],
+            BlobBundle::new(limits()),
+        )
+        .expect("valid patch");
+        let wire = patch.to_deterministic_json().expect("serialize patch");
+        let text = String::from_utf8(wire.clone()).expect("UTF-8 JSON");
+        assert!(
+            text.contains(r#""value":{"a":{"b":0.5,"y":1},"z":2}"#),
+            "{text}"
+        );
+        // Insertion-ordered input is not canonical and is refused.
+        let reordered = text.replace(
+            r#""value":{"a":{"b":0.5,"y":1},"z":2}"#,
+            r#""value":{"z":2,"a":{"b":0.5,"y":1}}"#,
+        );
+        assert!(matches!(
+            Patch::<ForwardOnly>::from_deterministic_json(reordered.as_bytes(), patch_limits()),
+            Err(PatchError::NonCanonicalJson)
+        ));
+        assert_eq!(
+            Patch::<ForwardOnly>::from_deterministic_json(&wire, patch_limits())
+                .expect("canonical patch parses")
+                .to_deterministic_json()
+                .expect("serialize decoded patch"),
+            wire
+        );
+    }
+
     #[test]
     fn reversible_wire_is_canonical_and_round_trips() {
         let mut forward = BlobBundle::new(limits());
@@ -2613,6 +2728,38 @@ mod tests {
             decoded.operations()[0].value,
             json!({"a": 1, "blob": forward_id.as_hex(), "z": 2})
         );
+    }
+
+    #[test]
+    fn retained_bytes_counts_reverse_semantic_payloads() {
+        let small = Patch::<Reversible>::new(
+            patch_limits(),
+            "org.litchi.xlsx",
+            [ReversibleOperation::new(
+                operation("cell.set", "sheet:Summary!A1", json!("x")),
+                operation("cell.set", "sheet:Summary!A1", json!("y")),
+            )],
+            BlobBundle::new(limits()),
+            BlobBundle::new(limits()),
+        )
+        .expect("small patch");
+        let large = Patch::<Reversible>::new(
+            patch_limits(),
+            "org.litchi.xlsx",
+            [ReversibleOperation::new(
+                operation("cell.set", "sheet:Summary!A1", json!("x")),
+                operation(
+                    "cell.set",
+                    "sheet:Summary!A1",
+                    json!("reverse payload ".to_owned() + &"x".repeat(80)),
+                ),
+            )],
+            BlobBundle::new(limits()),
+            BlobBundle::new(limits()),
+        )
+        .expect("large patch");
+
+        assert!(large.retained_bytes() > small.retained_bytes());
     }
 
     #[test]

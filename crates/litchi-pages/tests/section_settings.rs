@@ -63,19 +63,23 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
 fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn component_with_unknown_header(
     objects: Vec<ArchiveObject>,
     target_identifier: u64,
 ) -> TestResult<Vec<u8>> {
-    let bytes = Archive { objects }.to_bytes()?;
-    let parsed = Archive::parse(&bytes)?;
+    let bytes = Archive { objects }.to_bytes(Default::default())?;
+    let parsed = Archive::parse(&bytes, Default::default())?;
     let object = parsed
         .object(target_identifier)
         .ok_or_else(|| io::Error::other("synthetic target object is missing"))?;
@@ -109,9 +113,9 @@ fn component_with_unknown_header(
     with_unknown.extend_from_slice(&header);
     with_unknown.extend_from_slice(&bytes[data_offset..]);
 
-    let reparsed = Archive::parse(&with_unknown)?;
-    assert_eq!(reparsed.to_bytes()?, with_unknown);
-    Ok(SnappyStream::compress(&with_unknown)?)
+    let reparsed = Archive::parse(&with_unknown, Default::default())?;
+    assert_eq!(reparsed.to_bytes(Default::default())?, with_unknown);
+    Ok(SnappyStream::compress(&with_unknown, Default::default())?)
 }
 
 fn settings(
@@ -235,10 +239,16 @@ fn synthetic_package_with_first_message(
                 data: b"after-section-payload".to_vec(),
             },
         ],
+        Default::default(),
     )?;
     first_section.archive_info.message_infos[1].object_references = FIRST_TEMPLATES.to_vec();
     for (field_number, identifier) in [23_u32, 24, 25].into_iter().zip(FIRST_TEMPLATES) {
-        let mut field = FieldInfo::new(vec![field_number]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![field_number], litchi_iwa_core::Limits::default())
+                .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references = vec![identifier];
         first_section.archive_info.message_infos[1]
             .field_infos
@@ -247,10 +257,16 @@ fn synthetic_package_with_first_message(
     let mut second_section = ArchiveObject::new(
         SECOND_SECTION_IDENTIFIER,
         vec![section_message(second, SECOND_TEMPLATES, 8_888)?],
+        Default::default(),
     )?;
     second_section.archive_info.message_infos[0].object_references = SECOND_TEMPLATES.to_vec();
     for (field_number, identifier) in [23_u32, 24, 25].into_iter().zip(SECOND_TEMPLATES) {
-        let mut field = FieldInfo::new(vec![field_number]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![field_number], litchi_iwa_core::Limits::default())
+                .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references = vec![identifier];
         second_section.archive_info.message_infos[0]
             .field_infos
@@ -259,9 +275,17 @@ fn synthetic_package_with_first_message(
     let mut document_root = object(DOCUMENT_IDENTIFIER, 10_000, root.encode_to_vec())?;
     document_root.archive_info.message_infos[0].object_references =
         vec![BODY_IDENTIFIER, VIEW_STATE_IDENTIFIER];
-    let mut body_field = FieldInfo::new(vec![4]);
+    let mut body_field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![4], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     body_field.object_references = vec![BODY_IDENTIFIER];
-    let mut view_state_field = FieldInfo::new(vec![15, 5]);
+    let mut view_state_field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![15, 5], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     view_state_field.object_references = vec![VIEW_STATE_IDENTIFIER];
     document_root.archive_info.message_infos[0]
         .field_infos
@@ -318,7 +342,11 @@ fn synthetic_package_with_first_message(
         .encode_to_vec(),
     )?;
     view_bridge.archive_info.message_infos[0].object_references = vec![VIEW_STATE_ROOT_IDENTIFIER];
-    let mut bridge_field = FieldInfo::new(vec![1]);
+    let mut bridge_field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     bridge_field.object_references = vec![VIEW_STATE_ROOT_IDENTIFIER];
     view_bridge.archive_info.message_infos[0]
         .field_infos
@@ -335,7 +363,11 @@ fn synthetic_package_with_first_message(
         view_root_payload,
     )?;
     view_root.archive_info.message_infos[0].object_references = vec![LAYOUT_STATE_IDENTIFIER];
-    let mut layout_field = FieldInfo::new(vec![1]);
+    let mut layout_field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     layout_field.object_references = vec![LAYOUT_STATE_IDENTIFIER];
     view_root.archive_info.message_infos[0]
         .field_infos
@@ -361,12 +393,12 @@ fn synthetic_package_with_first_message(
             (PREVIEWS[1], b"micro preview".as_slice()),
             (PREVIEWS[2], b"web preview".as_slice()),
         ],
-        litchi_pages::Limits::default(),
+        litchi_iwa_archive::Limits::default(),
     )?)
 }
 
 fn legacy_package_bytes(flat: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(flat)?;
+    let catalog = Catalog::from_bytes(flat, Default::default())?;
     let inner_entries = catalog
         .iter()
         .filter(|entry| {
@@ -376,8 +408,10 @@ fn legacy_package_bytes(flat: &[u8]) -> TestResult<Vec<u8>> {
         })
         .map(|entry| (entry.name(), entry.data()))
         .collect::<Vec<_>>();
-    let inner =
-        litchi_iwa_archive::package::to_bytes(inner_entries, litchi_pages::Limits::default())?;
+    let inner = litchi_iwa_archive::package::to_bytes(
+        inner_entries,
+        litchi_iwa_archive::Limits::default(),
+    )?;
     Ok(litchi_iwa_archive::package::to_bytes(
         [
             ("legacy.pages/Index.zip", inner.as_slice()),
@@ -386,17 +420,17 @@ fn legacy_package_bytes(flat: &[u8]) -> TestResult<Vec<u8>> {
                 b"legacy outer sentinel".as_slice(),
             ),
         ],
-        litchi_pages::Limits::default(),
+        litchi_iwa_archive::Limits::default(),
     )?)
 }
 
 fn member_stream(package: &[u8], member: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| io::Error::other("missing synthetic Pages component member"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn document_stream(package: &[u8]) -> TestResult<Vec<u8>> {
@@ -414,7 +448,7 @@ fn message_payload_in(
     type_: u32,
 ) -> TestResult<Vec<u8>> {
     let stream = member_stream(package, member)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic Pages object"))?;
@@ -428,7 +462,7 @@ fn message_payload_in(
 
 fn object_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
     let stream = document_stream(package)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic Pages object"))?;
@@ -453,7 +487,7 @@ fn object_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
 }
 
 fn normalize_message_length(header: &[u8], target_index: usize) -> TestResult<Vec<u8>> {
-    let view = WireView::parse(header)?;
+    let view = WireView::parse(header, WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(header.len());
     let mut message_index = 0usize;
     for field in view.fields() {
@@ -468,7 +502,7 @@ fn normalize_message_length(header: &[u8], target_index: usize) -> TestResult<Ve
         }
         output.extend_from_slice(field.key());
         output.extend_from_slice(b"<message-info>");
-        let message = WireView::parse(field.payload())?;
+        let message = WireView::parse(field.payload(), WireLimits::DEFAULT)?;
         let effective_length = message
             .fields()
             .enumerate()
@@ -492,7 +526,7 @@ fn normalize_message_length(header: &[u8], target_index: usize) -> TestResult<Ve
 }
 
 fn fields_except_settings(payload: &[u8]) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse_with_limits(payload, WireLimits::default())?
+    Ok(WireView::parse(payload, WireLimits::default())?
         .fields()
         .filter(|field| !SETTINGS_FIELDS.contains(&field.number()))
         .map(|field| field.raw().to_vec())
@@ -500,7 +534,7 @@ fn fields_except_settings(payload: &[u8]) -> TestResult<Vec<Vec<u8>>> {
 }
 
 fn entry_map(package: &[u8]) -> TestResult<BTreeMap<String, Vec<u8>>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(catalog
         .iter()
         .map(|entry| (entry.name().to_owned(), entry.data().to_vec()))
@@ -516,8 +550,8 @@ fn assert_previews(package: &[u8], expected: bool) -> TestResult {
 }
 
 fn assert_one_iwa_member_changed(source: &[u8], target: &[u8]) -> TestResult {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     assert_eq!(
         before.iter().map(|entry| entry.name()).collect::<Vec<_>>(),
         after.iter().map(|entry| entry.name()).collect::<Vec<_>>(),
@@ -555,8 +589,8 @@ fn assert_one_iwa_member_changed(source: &[u8], target: &[u8]) -> TestResult {
 
 fn assert_changed_locality(source: &[u8], target: &[u8]) -> TestResult {
     assert_one_iwa_member_changed(source, target)?;
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     let before_document = before
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
@@ -787,10 +821,12 @@ fn first_section_inheritance_changes_fail_before_template_traversal() -> TestRes
                 .set(after)?
                 .commit()
                 .unwrap_err(),
-            Error::UnsupportedDependency {
-                path: Path::section(Position::new(0)),
-                kind: DependencyKind::PreviousSectionTemplates,
-            }
+            Error::Refused(
+                litchi_pages::section::settings::Refusal::UnsupportedDependency {
+                    path: Path::section(Position::new(0)),
+                    kind: DependencyKind::PreviousSectionTemplates,
+                }
+            )
         );
         assert_eq!(exact_bytes(&package)?, bytes);
     }
@@ -861,15 +897,17 @@ fn selectors_and_legacy_sources_are_typed_and_failure_atomic() -> TestResult {
 
     assert!(matches!(
         package.edit_section_settings(SectionSelector::name("missing-private-selector")),
-        Err(Error::NameNotFound)
+        Err(Error::Refused(
+            litchi_pages::section::settings::Refusal::NameNotFound
+        ))
     ));
     assert!(matches!(
         package.edit_section_settings(SectionSelector::index(2)),
-        Err(Error::PositionNotFound { position }) if position == Position::new(2)
+        Err(Error::Refused(litchi_pages::section::settings::Refusal::PositionNotFound { position })) if position == Position::new(2)
     ));
     assert!(matches!(
         package.edit_section_settings(SectionSelector::name("Same")),
-        Err(Error::AmbiguousSelector { first, duplicate })
+        Err(Error::Refused(litchi_pages::section::settings::Refusal::AmbiguousSelector { first, duplicate }))
             if first == Position::new(0) && duplicate == Position::new(1)
     ));
     assert_eq!(exact_bytes(&package)?, bytes);
@@ -902,7 +940,9 @@ fn selectors_and_legacy_sources_are_typed_and_failure_atomic() -> TestResult {
             .edit_section_settings(SectionSelector::index(0))?
             .set(changed)?
             .commit(),
-        Err(Error::UnsupportedSource { .. })
+        Err(Error::Refused(
+            litchi_pages::section::settings::Refusal::UnsupportedSource { .. }
+        ))
     ));
     assert_eq!(exact_bytes(&legacy_package)?, legacy);
     Ok(())
@@ -949,11 +989,11 @@ fn malformed_selected_fields_fail_closed_before_publication() -> TestResult {
         assert_malformed_fails_closed(duplicate, &second)?;
 
         let mut wrong_wire = canonical_payload.clone();
-        append_length_delimited_field(&mut wrong_wire, field, &[])?;
+        append_length_delimited_field(&mut wrong_wire, field, &[], WireLimits::DEFAULT)?;
         assert_malformed_fails_closed(wrong_wire, &second)?;
     }
     let mut duplicate_name = canonical_payload.clone();
-    append_length_delimited_field(&mut duplicate_name, 26, b"duplicate")?;
+    append_length_delimited_field(&mut duplicate_name, 26, b"duplicate", WireLimits::DEFAULT)?;
     assert_malformed_fails_closed(duplicate_name, &second)?;
     let mut wrong_name_wire = canonical_payload.clone();
     append_varint_field(&mut wrong_name_wire, 26, 1)?;

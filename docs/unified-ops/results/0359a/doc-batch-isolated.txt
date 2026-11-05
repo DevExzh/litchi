@@ -1,0 +1,9 @@
+# LITCHI_PROBE_ONLY=<scenario> LITCHI_PROBE_BATCH_ROUNDS=15 taskset -c 29 legacy_w5_source_probe 15 (median µs; each scenario alone in its process)
+before doc/batch1k_leaf    1683854.1 µs
+after doc/batch1k_leaf    1668891.2 µs
+after doc/batch1k_leaf    1690291.3 µs
+before doc/batch1k_leaf    1688256.5 µs
+after doc/batch1k_ops    1231704.9 µs
+after doc/batch1k_leaf    1701971.1 µs
+after doc/batch1k_ops    1233738.4 µs
+after doc/batch1k_leaf    1705269.9 µs

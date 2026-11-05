@@ -7,7 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
-use litchi_rtf::{ImageType, Picture, PictureIdentity, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{ImageType, Picture, PictureIdentity, write::Writer};
 use std::borrow::Cow;
 
 const UID: &[u8] = &[
@@ -21,7 +22,7 @@ fn parses_and_canonically_round_trips_picture_identity() {
         r#"{\*\blipuid 00112233445566778899aabbccddeeff}"#,
         r#" 89504e470d0a1a0a}}"#,
     );
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let picture = &document.pictures()[0];
     assert_eq!(picture.image_type, ImageType::Png);
     assert_eq!(picture.identity.as_ref().unwrap().tag, Some(-7));
@@ -29,13 +30,13 @@ fn parses_and_canonically_round_trips_picture_identity() {
     assert_eq!(picture.identity.as_ref().unwrap().uid.as_deref(), Some(UID));
 
     let mut first = br"{\rtf1".to_vec();
-    RtfWriter::new(&mut first).write_picture(picture).unwrap();
+    Writer::new(&mut first).write_picture(picture).unwrap();
     first.push(b'}');
-    let reparsed = RtfDocument::parse_bytes(&first).unwrap();
+    let reparsed = Tree::parse_bytes(&first, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.pictures(), document.pictures());
 
     let mut second = br"{\rtf1".to_vec();
-    RtfWriter::new(&mut second)
+    Writer::new(&mut second)
         .write_picture(&reparsed.pictures()[0])
         .unwrap();
     second.push(b'}');
@@ -55,8 +56,11 @@ fn parses_and_canonically_round_trips_picture_identity() {
 
 #[test]
 fn accepts_real_empty_uid_but_rejects_malformed_identity_content() {
-    let empty =
-        RtfDocument::parse(r"{\rtf1{\pict\pngblip{\*\blipuid } 89504e470d0a1a0a}}").unwrap();
+    let empty = Tree::parse(
+        r"{\rtf1{\pict\pngblip{\*\blipuid } 89504e470d0a1a0a}}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(
         empty.pictures()[0]
             .identity
@@ -92,7 +96,7 @@ fn accepts_real_empty_uid_but_rejects_malformed_identity_content() {
     ];
     for source in malformed {
         assert!(
-            RtfDocument::parse(source).is_err(),
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
             "accepted malformed RTF: {source}"
         );
     }
@@ -103,7 +107,7 @@ fn accepts_real_empty_uid_but_rejects_malformed_identity_content() {
         units_per_inch: Some(96),
         uid: Some(Cow::Borrowed(&[1])),
     });
-    assert!(RtfWriter::new(Vec::new()).write_picture(&picture).is_err());
+    assert!(Writer::new(Vec::new()).write_picture(&picture).is_err());
 }
 
 fn isolated_picture(fixture: &[u8], required: &[u8]) -> Vec<u8> {
@@ -150,7 +154,7 @@ fn parses_multiple_bundled_libreoffice_identity_fixtures() {
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf127806.rtf"
     );
     let source = isolated_picture(uid_only, br"\blipuid");
-    let document = RtfDocument::parse_bytes(&source).unwrap();
+    let document = Tree::parse_bytes(&source, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         document.pictures()[0]
             .identity
@@ -170,7 +174,7 @@ fn parses_multiple_bundled_libreoffice_identity_fixtures() {
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf153613_inlineAfterPgBreak.rtf"
     );
     let source = isolated_picture(with_upi, br"\blipupi2");
-    let document = RtfDocument::parse_bytes(&source).unwrap();
+    let document = Tree::parse_bytes(&source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let identity = document.pictures()[0].identity.as_ref().unwrap();
     assert_eq!(identity.tag, Some(1_890_591_635));
     assert_eq!(identity.units_per_inch, Some(2));

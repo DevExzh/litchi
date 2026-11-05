@@ -10,12 +10,14 @@ rust-version.workspace = true
 
 [dependencies]
 bitflags           = { workspace = true }
+caseless           = { workspace = true }
 chrono             = { workspace = true }
 litchi-cfb         = { workspace = true }
 litchi-biff         = { workspace = true }
 litchi-codepage    = { workspace = true }
 litchi-core        = { workspace = true }
 serde_json         = { workspace = true }
+unicode-normalization = { workspace = true }
 litchi-crypto      = { workspace = true }
 litchi-odraw       = { workspace = true }
 litchi-ograph      = { workspace = true }

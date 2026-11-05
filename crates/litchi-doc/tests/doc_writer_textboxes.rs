@@ -38,10 +38,11 @@
 //! boxes, then re-opens it with the crate's own reader: the textbox story
 //! (ccpTxbx + PlcftxbxTxt) and the OfficeArtClientTextbox links must resolve
 //! to the right shapes and text.
+use litchi_doc::builder::Builder;
 use litchi_doc::shape::{extract_drawing_shapes, extract_shape_text};
-use litchi_doc::writer::{FloatingPosition, Picture, Writer};
+use litchi_doc::writer::{FloatingPosition, Picture};
 use litchi_doc::writer::{Kind as DrawingKind, Shape as DrawingShape};
-use litchi_doc::{Package, ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin};
+use litchi_doc::{ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin, raw::Reader};
 use litchi_odraw::{Record, shape::Kind};
 use std::io::{Cursor, Write};
 use std::path::PathBuf;
@@ -100,7 +101,7 @@ const FIRST_BOX_SPID: u32 = 1028;
 const SECOND_BOX_SPID: u32 = 1029;
 
 fn write_doc_with_text_boxes(jpeg_bytes: &[u8]) -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("before boxes").unwrap();
     writer
         .insert_picture(Picture::new(make_png(32, 16)).unwrap())
@@ -141,7 +142,7 @@ fn write_doc_with_text_boxes(jpeg_bytes: &[u8]) -> Vec<u8> {
     writer.add_paragraph("after boxes").unwrap();
 
     let mut cursor = Cursor::new(Vec::new());
-    writer.write_to(&mut cursor).unwrap();
+    writer.build().unwrap().write_to(&mut cursor).unwrap();
     cursor.into_inner()
 }
 
@@ -149,7 +150,7 @@ fn write_doc_with_text_boxes(jpeg_bytes: &[u8]) -> Vec<u8> {
 fn text_boxes_round_trip_text_and_shapes() {
     let doc_bytes = write_doc_with_text_boxes(&jpeg_fixture());
 
-    let mut package = Package::from_reader(Cursor::new(&doc_bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(&doc_bytes)).unwrap();
     let document = package.document().unwrap();
 
     // Main story text is intact; the textbox story text is reachable through
@@ -185,7 +186,11 @@ fn text_boxes_round_trip_text_and_shapes() {
     assert_eq!(box_spa.wrap, ShapeTextWrap::Square);
 
     // The drawing layer reports the boxes as text boxes with their colors.
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(&doc_bytes)).unwrap();
+    let mut ole = litchi_cfb::OleFile::open(
+        Cursor::new(&doc_bytes),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let shapes = extract_drawing_shapes(&mut ole).unwrap();
     assert_eq!(shapes.len(), 4);
     let first = shapes
@@ -209,7 +214,11 @@ fn text_boxes_round_trip_text_and_shapes() {
         .unwrap();
     assert_eq!(rectangle.shape_type, Kind::Rectangle);
 
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(&doc_bytes)).unwrap();
+    let mut ole = litchi_cfb::OleFile::open(
+        Cursor::new(&doc_bytes),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     assert_eq!(
         extract_shape_text(&mut ole).unwrap(),
         "First box\r\nHello\rWorld\r"
@@ -224,7 +233,11 @@ fn text_boxes_write_valid_client_textbox_links() {
     const RECORD_CLIENT_TEXTBOX: u16 = 0xF00D;
 
     let doc_bytes = write_doc_with_text_boxes(&jpeg_fixture());
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(&doc_bytes)).unwrap();
+    let mut ole = litchi_cfb::OleFile::open(
+        Cursor::new(&doc_bytes),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let word_document = ole.open_stream(&["WordDocument"]).unwrap();
     let table_stream = ole.open_stream(&["1Table"]).unwrap();
     let fib = FileInformationBlock::parse(&word_document).unwrap();
@@ -250,7 +263,8 @@ fn text_boxes_write_valid_client_textbox_links() {
     fn collect_txids(data: &[u8], txids: &mut Vec<u32>) {
         let mut offset = 0;
         while offset + 8 <= data.len() {
-            let Ok((record, size)) = Record::parse(data, offset) else {
+            let Ok((record, size)) = Record::parse(data, offset, litchi_odraw::Limits::default())
+            else {
                 break;
             };
             if record.raw_kind() == RECORD_CLIENT_TEXTBOX {
@@ -264,7 +278,7 @@ fn text_boxes_write_valid_client_textbox_links() {
     }
     let mut txids = Vec::new();
     // Top level: DggContainer, then a dgglbl byte before the DgContainer.
-    let (first, first_size) = Record::parse(dgg, 0).unwrap();
+    let (first, first_size) = Record::parse(dgg, 0, litchi_odraw::Limits::default()).unwrap();
     collect_txids(first.data(), &mut txids);
     collect_txids(&dgg[first_size + 1..], &mut txids);
     assert_eq!(txids, vec![0x0001_0000, 0x0002_0000]);
@@ -276,7 +290,7 @@ fn genuine_word_text_boxes_parse_via_crate_reader() {
     // story lives in compressed pieces.
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/poi/test-data/document/saved-by-table.doc");
-    let mut package = Package::open(path).unwrap();
+    let mut package = Reader::open(path).unwrap();
     let document = package.document().unwrap();
 
     let boxes = document.text_boxes();
@@ -296,7 +310,7 @@ fn genuine_word_text_boxes_parse_via_crate_reader() {
 
 #[test]
 fn document_without_text_boxes_has_empty_story() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("no boxes").unwrap();
     writer
         .insert_floating_shape(
@@ -306,10 +320,10 @@ fn document_without_text_boxes_has_empty_story() {
         .unwrap();
 
     let mut cursor = Cursor::new(Vec::new());
-    writer.write_to(&mut cursor).unwrap();
+    writer.build().unwrap().write_to(&mut cursor).unwrap();
     let doc_bytes = cursor.into_inner();
 
-    let mut package = Package::from_reader(Cursor::new(&doc_bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(&doc_bytes)).unwrap();
     let document = package.document().unwrap();
     assert!(document.text_boxes().is_empty());
     assert_eq!(document.shape_positions().len(), 1);

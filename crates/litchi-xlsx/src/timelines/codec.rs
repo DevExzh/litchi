@@ -9,8 +9,8 @@ use super::{
     MAX_DEPTH, MAX_NODES, MAX_OPAQUE_BYTES, MAX_PIVOT_TABLES, MAX_STRING_BYTES, MAX_TIMELINES,
     MAX_XML_BYTES, REL, SML, STRICT_REL, STRICT_SML, X15, XR10, bounded, invalid, limit, xml_error,
 };
-use crate::auto_filter::{parse_auto_filter_fragment, write_auto_filter_fragment};
-use crate::error::Result;
+use crate::auto_filter::{parse_auto_filter_fragment, write_auto_filter_fragment_limited};
+use crate::error::{Error, Result};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::attributes::SeenNames;
 use quick_xml::XmlVersion;
@@ -120,30 +120,76 @@ fn parse_timeline_pivot_filter(n: &Node) -> Result<PivotFilter> {
     validate_timeline_filter(&v)?;
     Ok(v)
 }
-fn write_range(x: &mut Vec<u8>, name: &str, v: &Range) -> Result<()> {
+
+struct BoundedXml {
+    bytes: Vec<u8>,
+    limit: usize,
+}
+
+impl BoundedXml {
+    fn new(limit: usize) -> Self {
+        Self {
+            bytes: Vec::new(),
+            limit: limit.min(MAX_XML_BYTES),
+        }
+    }
+
+    fn append(&mut self, bytes: &[u8]) -> Result<()> {
+        let length = self
+            .bytes
+            .len()
+            .checked_add(bytes.len())
+            .ok_or_else(|| limit("serialized XML bytes"))?;
+        if length > self.limit {
+            return Err(limit("serialized XML bytes"));
+        }
+        self.bytes
+            .try_reserve_exact(bytes.len())
+            .map_err(|source| Error::Allocation {
+                resource: "Timeline XML output",
+                source,
+            })?;
+        self.bytes.extend_from_slice(bytes);
+        Ok(())
+    }
+
+    fn push(&mut self, byte: u8) -> Result<()> {
+        self.append(&[byte])
+    }
+
+    fn finish(self) -> Vec<u8> {
+        self.bytes
+    }
+
+    fn remaining(&self) -> usize {
+        self.limit.saturating_sub(self.bytes.len())
+    }
+}
+
+fn write_range(x: &mut BoundedXml, name: &str, v: &Range) -> Result<()> {
     validate_range(v)?;
-    x.extend_from_slice(b"<x15:");
-    x.extend_from_slice(name.as_bytes());
-    attr(x, "startDate", &v.start_date);
-    attr(x, "endDate", &v.end_date);
-    x.extend_from_slice(b"/>");
+    x.append(b"<x15:")?;
+    x.append(name.as_bytes())?;
+    attr_limited(x, "startDate", &v.start_date)?;
+    attr_limited(x, "endDate", &v.end_date)?;
+    x.append(b"/>")?;
     Ok(())
 }
-fn write_state(x: &mut Vec<u8>, v: &State) -> Result<()> {
+fn write_state(x: &mut BoundedXml, v: &State) -> Result<()> {
     validate_state(v)?;
-    x.extend_from_slice(b"<x15:state");
+    x.append(b"<x15:state")?;
     if let Some(q) = v.single_range_filter_state {
-        bool_attr(x, "singleRangeFilterState", q);
+        bool_attr(x, "singleRangeFilterState", q)?;
     }
-    attr(
+    attr_limited(
         x,
         "minimalRefreshVersion",
         &v.minimal_refresh_version.to_string(),
-    );
-    attr(x, "lastRefreshVersion", &v.last_refresh_version.to_string());
-    attr(x, "pivotCacheId", &v.pivot_cache_id.to_string());
-    attr(x, "filterType", v.filter_type.as_str());
-    x.push(b'>');
+    )?;
+    attr_limited(x, "lastRefreshVersion", &v.last_refresh_version.to_string())?;
+    attr_limited(x, "pivotCacheId", &v.pivot_cache_id.to_string())?;
+    attr_limited(x, "filterType", v.filter_type.as_str())?;
+    x.push(b'>')?;
     if let Some(q) = &v.selection {
         write_range(x, "selection", q)?;
     }
@@ -151,29 +197,30 @@ fn write_state(x: &mut Vec<u8>, v: &State) -> Result<()> {
     if let Some(q) = &v.extension_list {
         append_opaque_any_namespace(x, q, "extLst")?;
     }
-    x.extend_from_slice(b"</x15:state>");
+    x.append(b"</x15:state>")?;
     Ok(())
 }
-fn write_timeline_pivot_filter(x: &mut Vec<u8>, v: &PivotFilter) -> Result<()> {
+fn write_timeline_pivot_filter(x: &mut BoundedXml, v: &PivotFilter) -> Result<()> {
     validate_timeline_filter(v)?;
-    x.extend_from_slice(b"<x15:timelinePivotFilter");
+    x.append(b"<x15:timelinePivotFilter")?;
     if let Some(q) = v.use_whole_day {
-        bool_attr(x, "useWholeDay", q);
+        bool_attr(x, "useWholeDay", q)?;
     }
-    attr(x, "fld", &v.field.to_string());
-    attr(x, "id", &v.id.to_string());
+    attr_limited(x, "fld", &v.field.to_string())?;
+    attr_limited(x, "id", &v.id.to_string())?;
     if let Some(q) = &v.name {
-        attr(x, "name", q);
+        attr_limited(x, "name", q)?;
     }
     if let Some(q) = &v.description {
-        attr(x, "description", q);
+        attr_limited(x, "description", q)?;
     }
     if let Some(q) = &v.auto_filter {
-        x.push(b'>');
-        x.extend_from_slice(&write_auto_filter_fragment(q)?);
-        x.extend_from_slice(b"</x15:timelinePivotFilter>");
+        x.push(b'>')?;
+        let fragment = write_auto_filter_fragment_limited(q, x.remaining())?;
+        x.append(&fragment)?;
+        x.append(b"</x15:timelinePivotFilter>")?;
     } else {
-        x.extend_from_slice(b"/>");
+        x.append(b"/>")?;
     }
     Ok(())
 }
@@ -254,6 +301,14 @@ pub fn parse_timeline_cache_definition(xml: &[u8]) -> Result<CacheDefinition> {
     Ok(value)
 }
 
+pub(crate) fn parse_timeline_cache_definition_limited(
+    xml: &[u8],
+    limits: &litchi_opc::SourceLimits,
+) -> Result<CacheDefinition> {
+    crate::raw::check_xml_limits(xml, limits)?;
+    parse_timeline_cache_definition(xml)
+}
+
 fn parse_pivot_tables(node: &Node, output: &mut Vec<CachePivotTable>) -> Result<()> {
     no_attributes(node, &[])?;
     whitespace(node)?;
@@ -283,28 +338,42 @@ fn parse_pivot_tables(node: &Node, output: &mut Vec<CachePivotTable>) -> Result<
 
 /// Deterministically serialize one View Cache part.
 pub fn write_timeline_cache_definition(value: &CacheDefinition) -> Result<Vec<u8>> {
-    validate_cache_definition(value)?;
-    let mut output = Vec::new();
-    output.extend_from_slice(b"<x15:timelineCacheDefinition xmlns:x15=\"");
-    escape(&mut output, X15);
-    output.extend_from_slice(b"\" xmlns:xr10=\"");
-    escape(&mut output, XR10);
-    output.push(b'\"');
-    attr(&mut output, "name", &value.name);
-    attr(&mut output, "sourceName", &value.source_name);
-    if let Some(uid) = &value.uid {
-        attr(&mut output, "xr10:uid", uid);
+    write_timeline_cache_definition_limited(value, MAX_XML_BYTES)
+}
+
+pub(crate) fn write_timeline_cache_definition_limited(
+    value: &CacheDefinition,
+    maximum: usize,
+) -> Result<Vec<u8>> {
+    if let Some(filter) = value
+        .timeline_pivot_filter
+        .as_ref()
+        .and_then(|filter| filter.auto_filter.as_ref())
+    {
+        write_auto_filter_fragment_limited(filter, maximum)?;
     }
-    output.push(b'>');
+    validate_cache_definition(value)?;
+    let mut output = BoundedXml::new(maximum);
+    output.append(b"<x15:timelineCacheDefinition xmlns:x15=\"")?;
+    escape_limited(&mut output, X15)?;
+    output.append(b"\" xmlns:xr10=\"")?;
+    escape_limited(&mut output, XR10)?;
+    output.push(b'\"')?;
+    attr_limited(&mut output, "name", &value.name)?;
+    attr_limited(&mut output, "sourceName", &value.source_name)?;
+    if let Some(uid) = &value.uid {
+        attr_limited(&mut output, "xr10:uid", uid)?;
+    }
+    output.push(b'>')?;
     if !value.pivot_tables.is_empty() {
-        output.extend_from_slice(b"<x15:pivotTables>");
+        output.append(b"<x15:pivotTables>")?;
         for pivot in &value.pivot_tables {
-            output.extend_from_slice(b"<x15:pivotTable");
-            attr(&mut output, "tabId", &pivot.tab_id.to_string());
-            attr(&mut output, "name", &pivot.name);
-            output.extend_from_slice(b"/>");
+            output.append(b"<x15:pivotTable")?;
+            attr_limited(&mut output, "tabId", &pivot.tab_id.to_string())?;
+            attr_limited(&mut output, "name", &pivot.name)?;
+            output.append(b"/>")?;
         }
-        output.extend_from_slice(b"</x15:pivotTables>");
+        output.append(b"</x15:pivotTables>")?;
     }
     write_state(&mut output, &value.state)?;
     if let Some(payload) = &value.timeline_pivot_filter {
@@ -313,11 +382,22 @@ pub fn write_timeline_cache_definition(value: &CacheDefinition) -> Result<Vec<u8
     if let Some(payload) = &value.extension_list {
         append_opaque_any_namespace(&mut output, payload, "extLst")?;
     }
-    output.extend_from_slice(b"</x15:timelineCacheDefinition>");
-    if output.len() > MAX_XML_BYTES {
-        return Err(limit("serialized cache XML bytes"));
+    output.append(b"</x15:timelineCacheDefinition>")?;
+    Ok(output.finish())
+}
+
+pub(super) fn preflight_cache_definition_limited(
+    value: &CacheDefinition,
+    maximum: usize,
+) -> Result<()> {
+    if let Some(filter) = value
+        .timeline_pivot_filter
+        .as_ref()
+        .and_then(|filter| filter.auto_filter.as_ref())
+    {
+        write_auto_filter_fragment_limited(filter, maximum)?;
     }
-    Ok(output)
+    Ok(())
 }
 
 /// Parse one worksheet-scoped Views part.
@@ -339,6 +419,14 @@ pub fn parse_timelines(xml: &[u8]) -> Result<Views> {
     let value = Views { timelines };
     validate_views_local(&value)?;
     Ok(value)
+}
+
+pub(crate) fn parse_timelines_limited(
+    xml: &[u8],
+    limits: &litchi_opc::SourceLimits,
+) -> Result<Views> {
+    crate::raw::check_xml_limits(xml, limits)?;
+    parse_timelines(xml)
 }
 
 fn parse_timeline(node: &Node) -> Result<View> {
@@ -397,22 +485,26 @@ fn parse_timeline(node: &Node) -> Result<View> {
 
 /// Deterministically serialize one worksheet-scoped Views part.
 pub fn write_timelines(value: &Views) -> Result<Vec<u8>> {
+    write_timelines_limited(value, MAX_XML_BYTES)
+}
+
+pub(crate) fn write_timelines_limited(value: &Views, maximum: usize) -> Result<Vec<u8>> {
     validate_views_local(value)?;
-    let mut output = Vec::new();
-    output.extend_from_slice(b"<x15:timelines xmlns:x15=\"");
-    escape(&mut output, X15);
-    output.extend_from_slice(b"\" xmlns:xr10=\"");
-    escape(&mut output, XR10);
-    output.extend_from_slice(b"\">");
+    let mut output = BoundedXml::new(maximum);
+    output.append(b"<x15:timelines xmlns:x15=\"")?;
+    escape_limited(&mut output, X15)?;
+    output.append(b"\" xmlns:xr10=\"")?;
+    escape_limited(&mut output, XR10)?;
+    output.append(b"\">")?;
     for timeline in &value.timelines {
-        output.extend_from_slice(b"<x15:timeline");
-        attr(&mut output, "name", &timeline.name);
+        output.append(b"<x15:timeline")?;
+        attr_limited(&mut output, "name", &timeline.name)?;
         if let Some(uid) = &timeline.uid {
-            attr(&mut output, "xr10:uid", uid);
+            attr_limited(&mut output, "xr10:uid", uid)?;
         }
-        attr(&mut output, "cache", &timeline.cache);
+        attr_limited(&mut output, "cache", &timeline.cache)?;
         if let Some(value) = &timeline.caption {
-            attr(&mut output, "caption", value);
+            attr_limited(&mut output, "caption", value)?;
         }
         for (name, value) in [
             ("showHeader", timeline.show_header),
@@ -424,34 +516,31 @@ pub fn write_timelines(value: &Views) -> Result<Vec<u8>> {
             ),
         ] {
             if let Some(value) = value {
-                bool_attr(&mut output, name, value);
+                bool_attr(&mut output, name, value)?;
             }
         }
-        attr(&mut output, "level", timeline.level.number());
-        attr(
+        attr_limited(&mut output, "level", timeline.level.number())?;
+        attr_limited(
             &mut output,
             "selectionLevel",
             timeline.selection_level.number(),
-        );
+        )?;
         if let Some(value) = &timeline.scroll_position {
-            attr(&mut output, "scrollPosition", value);
+            attr_limited(&mut output, "scrollPosition", value)?;
         }
         if let Some(value) = &timeline.style {
-            attr(&mut output, "style", value);
+            attr_limited(&mut output, "style", value)?;
         }
         if let Some(payload) = &timeline.extension_list {
-            output.push(b'>');
+            output.push(b'>')?;
             append_opaque_any_namespace(&mut output, payload, "extLst")?;
-            output.extend_from_slice(b"</x15:timeline>");
+            output.append(b"</x15:timeline>")?;
         } else {
-            output.extend_from_slice(b"/>");
+            output.append(b"/>")?;
         }
     }
-    output.extend_from_slice(b"</x15:timelines>");
-    if output.len() > MAX_XML_BYTES {
-        return Err(limit("serialized timelines XML bytes"));
-    }
-    Ok(output)
+    output.append(b"</x15:timelines>")?;
+    Ok(output.finish())
 }
 
 /// Load and validate all workbook View Cache parts.
@@ -531,6 +620,14 @@ pub(super) fn parse_document(xml: &[u8]) -> Result<Node> {
         return Err(invalid("unterminated XML"));
     }
     root.ok_or_else(|| invalid("missing XML root"))
+}
+
+pub(super) fn parse_document_limited(
+    xml: &[u8],
+    limits: &litchi_opc::SourceLimits,
+) -> Result<Node> {
+    crate::raw::check_xml_limits(xml, limits)?;
+    parse_document(xml)
 }
 
 fn make_node(
@@ -680,13 +777,12 @@ fn qname(output: &mut Vec<u8>, namespace: &str, name: &str, prefixes: &HashMap<S
 }
 
 fn append_opaque_any_namespace(
-    output: &mut Vec<u8>,
+    output: &mut BoundedXml,
     payload: &OpaqueXml,
     name: &str,
 ) -> Result<()> {
     validate_opaque_kind(payload, &[X15, SML, STRICT_SML], name)?;
-    output.extend_from_slice(&payload.xml);
-    Ok(())
+    output.append(&payload.xml)
 }
 pub(super) fn validate_opaque_kind(
     payload: &OpaqueXml,
@@ -795,9 +891,18 @@ fn resolved_bytes<'a>(value: &ResolveResult<'a>) -> &'a [u8] {
         ResolveResult::Unbound | ResolveResult::Unknown(_) => &[],
     }
 }
-fn bool_attr(output: &mut Vec<u8>, name: &str, value: bool) {
-    attr(output, name, if value { "1" } else { "0" });
+fn bool_attr(output: &mut BoundedXml, name: &str, value: bool) -> Result<()> {
+    attr_limited(output, name, if value { "1" } else { "0" })
 }
+fn attr_limited(output: &mut BoundedXml, name: &str, value: &str) -> Result<()> {
+    output.push(b' ')?;
+    output.append(name.as_bytes())?;
+    output.append(b"=\"")?;
+    escape_limited(output, value)?;
+    output.push(b'\"')?;
+    Ok(())
+}
+
 pub(super) fn attr(output: &mut Vec<u8>, name: &str, value: &str) {
     output.push(b' ');
     output.extend_from_slice(name.as_bytes());
@@ -820,6 +925,24 @@ pub(super) fn escape(output: &mut Vec<u8>, value: &str) {
             },
         }
     }
+}
+
+fn escape_limited(output: &mut BoundedXml, value: &str) -> Result<()> {
+    for character in value.chars() {
+        match character {
+            '&' => output.append(b"&amp;")?,
+            '<' => output.append(b"&lt;")?,
+            '"' => output.append(b"&quot;")?,
+            '\t' => output.append(b"&#x9;")?,
+            '\n' => output.append(b"&#xA;")?,
+            '\r' => output.append(b"&#xD;")?,
+            _ => {
+                let mut bytes = [0; 4];
+                output.append(character.encode_utf8(&mut bytes).as_bytes())?;
+            },
+        }
+    }
+    Ok(())
 }
 pub(super) fn escape_text(output: &mut Vec<u8>, value: &str) {
     for character in value.chars() {

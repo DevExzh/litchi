@@ -1,0 +1,38 @@
+{
+  "record": "0419",
+  "slice": "1",
+  "binary_sha256": "09a93187261869eb6c6a0549a9d3feea261f7e57ddb823c515b5be98577d8173",
+  "build": "source .coord/iwa-w4f/env.sh; cargo test --release -p litchi-iwa --all-features --test parity --no-run",
+  "run": "W4C_ROUTE=<route> taskset -c 3 valgrind --tool=callgrind <binary> --ignored --exact chart_property_cost::chart_property_route_cost_abba --test-threads=1",
+  "metric": "inclusive Ir of w4c_host_route / w4c_leaf_route, two calls each (ABBA)",
+  "captures_dir": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w4f/cg1 (outside the repository)",
+  "routes": [
+    {
+      "route": "keynote_radar_set",
+      "host_ir": 853472234,
+      "leaf_ir": 78570948,
+      "leaf_over_host": 0.09206,
+      "capture": "keynote_radar_set.cg",
+      "capture_bytes": 438716,
+      "capture_sha256": "f9bdc1c0da3130aa97df7faa8027c0ddf5a4cc70cdfdec42815aafc34fe86006"
+    },
+    {
+      "route": "pages_radar_set",
+      "host_ir": 1260865125,
+      "leaf_ir": 48173482,
+      "leaf_over_host": 0.038207,
+      "capture": "pages_radar_set.cg",
+      "capture_bytes": 426348,
+      "capture_sha256": "fccd12fe574cb2e391e804b87387298e92c3cffad28ce373941c48ea675f1ad7"
+    },
+    {
+      "route": "numbers_radar_set",
+      "host_ir": 221155218,
+      "leaf_ir": 45323880,
+      "leaf_over_host": 0.204941,
+      "capture": "numbers_radar_set.cg",
+      "capture_bytes": 405518,
+      "capture_sha256": "a82b6dd06f19c1ba67674291802e14a0a40070ee1483c3c60495616383a5d369"
+    }
+  ]
+}

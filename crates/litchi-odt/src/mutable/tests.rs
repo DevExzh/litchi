@@ -13,8 +13,10 @@ use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 const MINIMAL_CONTENT: &str = r#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:text><text:p>Original</text:p></office:text></office:body></office:document-content>"#;
 
 fn replace_zip_member_raw(package: &[u8], path: &str, replacement: &[u8]) -> Vec<u8> {
-    let archive = ArchiveReader::new(package).unwrap();
-    let mut writer = StreamingArchiveWriter::new();
+    let archive =
+        ArchiveReader::new(package, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     let mut replaced = false;
     for name in archive.file_names() {
         let data = if name == path {
@@ -48,7 +50,7 @@ fn source_document() -> Document {
         .unwrap();
     builder.add_paragraph("Document end").unwrap();
 
-    Document::from_bytes(builder.build().unwrap()).unwrap()
+    builder.build().unwrap().document().unwrap()
 }
 
 #[test]
@@ -60,10 +62,14 @@ fn mutable_metadata_is_deterministic_and_preserves_source_timestamps() {
     let fresh_meta = String::from_utf8(fresh_package.get_file("meta.xml").unwrap()).unwrap();
     assert!(fresh_meta.contains("<meta:creation-date>2026-08-10T01:02:03Z</meta:creation-date>"));
     assert!(fresh_meta.contains("<dc:date>2026-08-10T04:05:06Z</dc:date>"));
-    litchi_odf_common::compact_xml::validate(fresh_meta.as_bytes()).unwrap();
+    litchi_odf_common::compact_xml::validate(
+        fresh_meta.as_bytes(),
+        litchi_odf_common::compact_xml::Limits::default(),
+    )
+    .unwrap();
 
     const SOURCE_META: &str = r#"<?xml version="1.0"?><office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0"><office:meta><meta:generator>Producer/1</meta:generator><dc:date>2024-01-02T03:04:05Z</dc:date></office:meta></office:document-meta>"#;
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.text")
         .unwrap();
@@ -85,7 +91,11 @@ fn mutable_default_metadata_has_no_ambient_timestamp() {
     let meta = String::from_utf8(package.get_file("meta.xml").unwrap()).unwrap();
     assert!(!meta.contains("<meta:creation-date>"));
     assert!(!meta.contains("<dc:date>"));
-    litchi_odf_common::compact_xml::validate(meta.as_bytes()).unwrap();
+    litchi_odf_common::compact_xml::validate(
+        meta.as_bytes(),
+        litchi_odf_common::compact_xml::Limits::default(),
+    )
+    .unwrap();
 }
 
 fn rich_note_body() -> crate::NoteBodyContent {
@@ -356,7 +366,7 @@ fn mutable_document_can_add_headings_and_lists() {
 
 #[test]
 fn read_modify_write_preserves_auxiliary_package_parts_and_media_types() {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.text")
         .unwrap();
@@ -400,7 +410,7 @@ fn read_modify_write_preserves_auxiliary_package_parts_and_media_types() {
         b"stale signature",
     );
     let source = Document::from_bytes(source_bytes.clone()).unwrap();
-    assert_eq!(source.to_bytes().unwrap(), source_bytes);
+    assert_eq!(source.original_bytes(), source_bytes.as_slice());
     let mut mutable = MutableDocument::from_document(source).unwrap();
     mutable.add_paragraph("Modified").unwrap();
     let output = OwnedPackage::from_bytes(mutable.to_bytes().unwrap()).unwrap();
@@ -471,7 +481,7 @@ fn mutable_document_round_trips_structured_note_authoring() {
 fn edits_master_page_regions_through_the_public_mutable_document_api() {
     const STYLES: &str = r#"<?xml version="1.0"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"><office:styles><style:style style:name="preserved"/></office:styles><office:automatic-styles><style:page-layout style:name="pm1" style:page-usage="left"><style:page-layout-properties fo:page-width="21cm" fo:page-height="29.7cm"/></style:page-layout></office:automatic-styles><office:master-styles><style:master-page style:name="Standard" style:page-layout-name="pm1"><style:header><text:p>Old header</text:p></style:header><style:footer><text:p>Old footer</text:p></style:footer></style:master-page></office:master-styles></office:document-styles>"#;
 
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.text")
         .unwrap();

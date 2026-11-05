@@ -59,6 +59,8 @@ pub fn extract(xml_bytes: &[u8], paragraph_separator: Option<char>) -> Result<St
     let mut depth = 0usize;
     let mut nodes = 0usize;
     let mut text_depth = None;
+    // Depth of an open `a:tabLst`: its `a:tab` children are tab stops.
+    let mut tab_list_depth = None;
     let mut seen_paragraph = false;
 
     loop {
@@ -134,7 +136,13 @@ pub fn extract(xml_bytes: &[u8], paragraph_separator: Option<char>) -> Result<St
                     text_depth = Some(depth);
                 } else if is_drawingml_name(&namespace, element.name(), b"br", &fragment_prefix) {
                     result.push('\n');
-                } else if is_drawingml_name(&namespace, element.name(), b"tab", &fragment_prefix) {
+                } else if tab_list_depth.is_none()
+                    && is_drawingml_name(&namespace, element.name(), b"tabLst", &fragment_prefix)
+                {
+                    tab_list_depth = Some(depth);
+                } else if tab_list_depth.is_none()
+                    && is_drawingml_name(&namespace, element.name(), b"tab", &fragment_prefix)
+                {
                     result.push('\t');
                 }
             },
@@ -158,7 +166,11 @@ pub fn extract(xml_bytes: &[u8], paragraph_separator: Option<char>) -> Result<St
                     seen_paragraph = true;
                 } else if is_drawingml_name(&namespace, element.name(), b"br", &fragment_prefix) {
                     result.push('\n');
-                } else if is_drawingml_name(&namespace, element.name(), b"tab", &fragment_prefix) {
+                } else if tab_list_depth.is_none()
+                    && is_drawingml_name(&namespace, element.name(), b"tab", &fragment_prefix)
+                {
+                    // An `a:tab` of an `a:tabLst` defines a tab stop; only
+                    // run content is a tab character.
                     result.push('\t');
                 }
             },
@@ -186,6 +198,9 @@ pub fn extract(xml_bytes: &[u8], paragraph_separator: Option<char>) -> Result<St
                     && is_drawingml_name(&namespace, element.name(), b"t", &fragment_prefix)
                 {
                     text_depth = None;
+                }
+                if tab_list_depth == Some(depth) {
+                    tab_list_depth = None;
                 }
                 depth = depth
                     .checked_sub(1)
@@ -416,6 +431,7 @@ mod tests {
         let mut depth = 0usize;
         let mut nodes = 0usize;
         let mut text_depth = None;
+        let mut tab_list_depth = None;
         let mut seen_paragraph = false;
 
         loop {
@@ -468,12 +484,18 @@ mod tests {
                     } else if is_drawingml_name(&namespace, element.name(), b"br", &fragment_prefix)
                     {
                         result.push('\n');
-                    } else if is_drawingml_name(
-                        &namespace,
-                        element.name(),
-                        b"tab",
-                        &fragment_prefix,
-                    ) {
+                    } else if tab_list_depth.is_none()
+                        && is_drawingml_name(
+                            &namespace,
+                            element.name(),
+                            b"tabLst",
+                            &fragment_prefix,
+                        )
+                    {
+                        tab_list_depth = Some(depth);
+                    } else if tab_list_depth.is_none()
+                        && is_drawingml_name(&namespace, element.name(), b"tab", &fragment_prefix)
+                    {
                         result.push('\t');
                     }
                 },
@@ -498,12 +520,9 @@ mod tests {
                     } else if is_drawingml_name(&namespace, element.name(), b"br", &fragment_prefix)
                     {
                         result.push('\n');
-                    } else if is_drawingml_name(
-                        &namespace,
-                        element.name(),
-                        b"tab",
-                        &fragment_prefix,
-                    ) {
+                    } else if tab_list_depth.is_none()
+                        && is_drawingml_name(&namespace, element.name(), b"tab", &fragment_prefix)
+                    {
                         result.push('\t');
                     }
                 },
@@ -531,6 +550,9 @@ mod tests {
                         && is_drawingml_name(&namespace, element.name(), b"t", &fragment_prefix)
                     {
                         text_depth = None;
+                    }
+                    if tab_list_depth == Some(depth) {
+                        tab_list_depth = None;
                     }
                     depth = depth
                         .checked_sub(1)
@@ -752,6 +774,18 @@ mod tests {
         assert_eq!(paragraphs.len(), 2);
         assert_eq!(paragraphs[0], " A & B < C\t\n");
         assert_eq!(paragraphs[1], "Second");
+    }
+
+    #[test]
+    fn drawingml_tab_stops_are_not_text() {
+        let drawingml = "http://schemas.openxmlformats.org/drawingml/2006/main";
+        let xml = format!(
+            r#"<a:txBody xmlns:a="{drawingml}"><a:bodyPr/><a:lstStyle><a:lvl1pPr><a:tabLst><a:tab pos="457200" algn="l"/></a:tabLst></a:lvl1pPr></a:lstStyle><a:p><a:pPr><a:tabLst><a:tab pos="914400" algn="ctr"/><a:tab pos="1828800"></a:tab></a:tabLst></a:pPr><a:r><a:t>x</a:t></a:r><a:r><a:tab/><a:t>y</a:t></a:r></a:p></a:txBody>"#
+        );
+        // Only the run's `a:tab` is a tab character; the tab-stop lists of
+        // the list style and the paragraph are not text.
+        assert_eq!(extract(xml.as_bytes(), Some('\n')).unwrap(), "x\ty");
+        assert_extract_parity(xml.as_bytes(), Some('\n'));
     }
 
     #[test]

@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import re
+import shutil
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -63,6 +66,39 @@ def _env_assignments(text: str, key: str) -> list[tuple[int, str]]:
             assignments.append((following_indent, value))
     return assignments
 
+
+def _harness_path_dependency_dirs() -> set[str]:
+    """Repository-relative directories of the harness's resolved local crates.
+
+    Cargo resolves features and optional dependencies, so the closure is the
+    one the harness actually compiles. Directories inside
+    ``tools/perf-baseline`` are omitted: its own trigger covers them.
+    """
+    harness = (ROOT / "tools" / "perf-baseline").resolve()
+    command = [
+        "cargo",
+        "metadata",
+        "--format-version",
+        "1",
+        "--locked",
+        "--manifest-path",
+        str(harness / "Cargo.toml"),
+    ]
+    completed = subprocess.run(
+        [*command, "--offline"], capture_output=True, text=True, check=False
+    )
+    if completed.returncode != 0:
+        completed = subprocess.run(command, capture_output=True, text=True, check=True)
+    metadata = json.loads(completed.stdout)
+    resolved = {node["id"] for node in metadata["resolve"]["nodes"]}
+    directories = set()
+    for package in metadata["packages"]:
+        if package["source"] is not None or package["id"] not in resolved:
+            continue
+        directory = Path(package["manifest_path"]).resolve().parent
+        if not directory.is_relative_to(harness):
+            directories.add(directory.relative_to(ROOT.resolve()).as_posix())
+    return directories
 
 def _job_blocks(text: str) -> dict[str, str]:
     lines = text.splitlines()
@@ -739,6 +775,46 @@ class PerformanceWorkflowPolicyTests(unittest.TestCase):
             "smoke must execute the workflow policy test",
         )
 
+
+    @unittest.skipUnless(shutil.which("cargo"), "needs cargo to resolve the harness")
+    def test_harness_path_dependency_closure_is_in_push_and_pull_request_path_triggers(
+        self,
+    ) -> None:
+        # Record 0272: the smoke job runs the harness's `cargo test`, so a
+        # change to any crate the harness compiles must trigger it. The
+        # closure is Cargo's resolved graph, so a new local dependency fails
+        # here until its directory is added to both filters.
+        directories = _harness_path_dependency_dirs()
+        self.assertIn("crates/litchi-ops", directories)
+        self.assertIn("crates/litchi-xlsx", directories)
+        for event in ("push", "pull_request"):
+            section = _top_level_section(self.workflow, event)
+            for directory in sorted(directories):
+                self.assertRegex(
+                    section,
+                    rf"(?m)^\s*-\s*['\"]?{re.escape(directory)}/\*\*['\"]?\s*(?:#.*)?$",
+                    msg=f"{event} path filter must include {directory}/**",
+                )
+
+    def test_smoke_lints_formats_and_tests_the_standalone_harness(self) -> None:
+        # Record 0272: the harness's tests and lints had drifted on a branch
+        # whose gate only compiled it; smoke runs all three under --locked.
+        smoke_steps = _steps(self.jobs["smoke"])
+        harness = next(
+            (step for step in smoke_steps if "name: Check standalone harness" in step),
+            None,
+        )
+        self.assertIsNotNone(harness, "smoke must check the standalone harness")
+        for pattern in (
+            r'cargo fmt --manifest-path "\$PERF_MANIFEST" -- --check',
+            r'cargo clippy --locked --manifest-path "\$PERF_MANIFEST" --all-targets -- -D warnings',
+            r'cargo test --locked --manifest-path "\$PERF_MANIFEST"',
+        ):
+            self.assertRegex(harness, pattern)
+        toolchain = next(
+            step for step in smoke_steps if "dtolnay/rust-toolchain" in step
+        )
+        self.assertRegex(toolchain, r"components:.*clippy")
 
 if __name__ == "__main__":
     unittest.main()

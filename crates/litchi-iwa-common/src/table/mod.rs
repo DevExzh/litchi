@@ -20,3 +20,6 @@ pub mod read;
 pub mod sort;
 /// Lossless, archive-free table title settings.
 pub mod title;
+/// Section-relative row and column insertion and deletion coordinates
+/// (record 0368).
+pub mod topology;

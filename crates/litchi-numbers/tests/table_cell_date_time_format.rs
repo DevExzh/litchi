@@ -17,7 +17,7 @@ use litchi_numbers::cell::data_format::{
     DateTime,
     date_time::transaction::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path},
 };
-use litchi_numbers::{CellPosition, Package, SheetSelector, TableSelector};
+use litchi_numbers::{At, Package, SheetSelector, TableSelector};
 use litchi_numbers_wire::{BncCell, CellDataFormatKind, StoredValue};
 use prost::Message as _;
 
@@ -39,8 +39,8 @@ impl ExactBytes for Package {
     }
 }
 
-fn selected_position() -> CellPosition {
-    CellPosition::new(fixture::FIRST_CELL.0 as u32, fixture::FIRST_CELL.1 as u32)
+fn selected_position() -> At {
+    At::new(fixture::FIRST_CELL.0 as u32, fixture::FIRST_CELL.1 as u32)
 }
 
 fn source() -> TestResult<Vec<u8>> {
@@ -55,8 +55,8 @@ fn date_time(pattern: &str) -> TestResult<DateTime> {
 }
 
 fn assert_exact_locality(source: &[u8], target: &[u8]) -> TestResult {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     let mut changed = Vec::new();
     for entry in before.iter() {
         let candidate = after
@@ -89,15 +89,22 @@ fn assert_non_format_cell_state(source: &[u8], target: &[u8]) -> TestResult {
     let after = fixture::tile_cells(target)?;
     assert_eq!(before.len(), after.len());
     for (before, after) in before.iter().zip(after.iter()) {
-        let before_cell = BncCell::parse(before)?;
-        let after_cell = BncCell::parse(after)?;
+        let before_cell = BncCell::parse(before, &litchi_numbers_wire::Limits::DEFAULT)?;
+        let after_cell = BncCell::parse(after, &litchi_numbers_wire::Limits::DEFAULT)?;
         assert_eq!(before_cell.stored_value(), after_cell.stored_value());
         assert_eq!(before_cell.cached_scalar()?, after_cell.cached_scalar()?);
         let mut before_metadata_free = before_cell;
         let mut after_metadata_free = after_cell;
         before_metadata_free.clear_explicit_format();
         after_metadata_free.clear_explicit_format();
-        assert_eq!(before_metadata_free.encode(), after_metadata_free.encode());
+        assert_eq!(
+            before_metadata_free
+                .encode(&litchi_numbers_wire::Limits::DEFAULT)
+                .unwrap(),
+            after_metadata_free
+                .encode(&litchi_numbers_wire::Limits::DEFAULT)
+                .unwrap()
+        );
     }
     Ok(())
 }
@@ -107,7 +114,10 @@ fn first_cell(source: &[u8]) -> TestResult<BncCell> {
     let bytes = cells
         .first()
         .ok_or_else(|| io::Error::other("Date & Time fixture first cell is missing"))?;
-    Ok(BncCell::parse(bytes)?)
+    Ok(BncCell::parse(
+        bytes,
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?)
 }
 
 fn assert_owner_rejects(source: &[u8]) -> TestResult {
@@ -131,7 +141,7 @@ fn assert_owner_rejects(source: &[u8]) -> TestResult {
 }
 
 fn raw_field_record(source: &[u8], number: u32) -> TestResult<Vec<u8>> {
-    let mut fields = RawWireFields::new(source);
+    let mut fields = RawWireFields::new(source, litchi_iwa_common::wire::RawWireLimits::default());
     while let Some(field) = fields.next()? {
         if field.number() == number {
             return Ok(field.raw().to_vec());
@@ -142,12 +152,18 @@ fn raw_field_record(source: &[u8], number: u32) -> TestResult<Vec<u8>> {
 
 fn raw_format_payload_by_key(source: &[u8], key: u32) -> TestResult<Vec<u8>> {
     let list_payload = fixture::format_list_payload(source)?;
-    let mut list_fields = RawWireFields::new(&list_payload);
+    let mut list_fields = RawWireFields::new(
+        &list_payload,
+        litchi_iwa_common::wire::RawWireLimits::default(),
+    );
     while let Some(entry_field) = list_fields.next()? {
         if entry_field.number() != 3 {
             continue;
         }
-        let mut entry_fields = RawWireFields::new(entry_field.payload());
+        let mut entry_fields = RawWireFields::new(
+            entry_field.payload(),
+            litchi_iwa_common::wire::RawWireLimits::default(),
+        );
         let mut matching_key = false;
         while let Some(field) = entry_fields.next()? {
             if field.number() == 1 {
@@ -336,14 +352,18 @@ fn date_time_wrong_family_and_automatic_marker_fail_closed() -> TestResult {
     )?)?;
     assert!(matches!(
         number.table_cell_date_time_format(0usize, 0usize, selected_position()),
-        Err(Error::WrongFormatFamily { .. })
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::date_time::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
 
     let secondary = fixture::rewrite_tile_cells(&source()?, |cells| {
         let first = cells
             .first_mut()
             .ok_or_else(|| io::Error::other("Date & Time fixture first cell is missing"))?;
-        let mut encoded = BncCell::parse(first)?.encode();
+        let mut encoded = BncCell::parse(first, &litchi_numbers_wire::Limits::DEFAULT)?
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         let flags = u32::from_le_bytes(
             encoded[8..12]
                 .try_into()
@@ -390,7 +410,9 @@ fn date_time_accepts_empty_and_evidenced_type_nine_but_rejects_plain_number() ->
         let first = cells
             .first_mut()
             .ok_or_else(|| io::Error::other("Date & Time fixture first cell is missing"))?;
-        *first = BncCell::minimal().encode();
+        *first = BncCell::minimal()
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         Ok(())
     })?;
     // The selected cell no longer references key 1, so keep the fixture's
@@ -435,11 +457,16 @@ fn date_time_accepts_empty_and_evidenced_type_nine_but_rejects_plain_number() ->
             CellDataFormatKind::DateTime,
             None,
         )?;
-        *first = cell.encode();
+        *first = cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
         Ok(())
     })?;
     let type_nine_cell = first_cell(&type_nine)?;
-    assert_eq!(type_nine_cell.encode()[1], 9);
+    assert_eq!(
+        type_nine_cell
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap()[1],
+        9
+    );
     assert_eq!(
         type_nine_cell.explicit_format_flags(),
         litchi_numbers_wire::EXPLICIT_DATE_TIME_FORMAT
@@ -476,7 +503,9 @@ fn date_time_accepts_empty_and_evidenced_type_nine_but_rejects_plain_number() ->
             CellDataFormatKind::DateTime,
             None,
         )?;
-        let mut encoded = type_nine.encode();
+        let mut encoded = type_nine
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         assert_eq!(encoded.get(1), Some(&9));
         encoded[1] = 2;
         *first = encoded;
@@ -491,7 +520,9 @@ fn date_time_accepts_empty_and_evidenced_type_nine_but_rejects_plain_number() ->
     let plain_before = plain_package.exact_bytes();
     assert!(matches!(
         plain_package.table_cell_date_time_format(0usize, 0usize, selected_position()),
-        Err(Error::WrongFormatFamily { .. })
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::date_time::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     assert_eq!(plain_package.exact_bytes(), plain_before);
 
@@ -501,7 +532,7 @@ fn date_time_accepts_empty_and_evidenced_type_nine_but_rejects_plain_number() ->
             .ok_or_else(|| io::Error::other("Date & Time fixture first cell is missing"))?;
         let mut cell = BncCell::minimal();
         cell.set_plain_number(42.5)?;
-        *first = cell.encode();
+        *first = cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
         Ok(())
     })?;
     let unformatted_number =
@@ -567,7 +598,7 @@ fn date_time_shared_format_key_uses_cow_and_keeps_refcounts_consistent() -> Test
 
     let both = first
         .package()
-        .edit_table_cell_date_time_format(0usize, 0usize, CellPosition::new(0, 1))?
+        .edit_table_cell_date_time_format(0usize, 0usize, At::new(0, 1))?
         .set(replacement)
         .commit()?;
     let both_bytes = both.package().exact_bytes();
@@ -597,7 +628,7 @@ fn date_time_shared_format_key_uses_cow_and_keeps_refcounts_consistent() -> Test
 
     let all_cleared = one_cleared
         .package()
-        .edit_table_cell_date_time_format(0usize, 0usize, CellPosition::new(0, 1))?
+        .edit_table_cell_date_time_format(0usize, 0usize, At::new(0, 1))?
         .clear()
         .commit()?;
     let all_cleared_bytes = all_cleared.package().exact_bytes();
@@ -695,9 +726,9 @@ fn date_time_malformed_format_entries_fail_closed_atomically() -> TestResult {
         let first = cells
             .first_mut()
             .ok_or_else(|| io::Error::other("Date & Time fixture first cell is missing"))?;
-        let mut cell = BncCell::parse(first)?;
+        let mut cell = BncCell::parse(first, &litchi_numbers_wire::Limits::DEFAULT)?;
         cell.set_data_format_identifier(0, CellDataFormatKind::DateTime, None)?;
-        *first = cell.encode();
+        *first = cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
         Ok(())
     })?;
     assert_owner_rejects(&zero_key)?;
@@ -719,7 +750,7 @@ fn date_time_changed_edit_reads_locked_but_refuses_publication() -> TestResult {
         .commit()
         .expect_err("a changed Date & Time edit must refuse a locked table");
     assert!(
-        matches!(error, Error::TableLocked { path: Path::Cell { sheet: 0, table: 0, position } } if position == selected_position())
+        matches!(error, Error::Refused(litchi_numbers::cell::data_format::date_time::transaction::Refusal::TableLocked { path: Path::Cell { sheet: 0, table: 0, position } }) if position == selected_position())
     );
     assert_eq!(package.exact_bytes(), before);
     Ok(())

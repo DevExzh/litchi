@@ -5,11 +5,11 @@ use std::ffi::OsString;
 use std::fs::File;
 
 use litchi::opc::OpcPackage;
-use litchi_xlsb::raw::Records;
+use litchi_xlsb::raw::{Limits, Records};
 
-fn dump_records(label: &str, bytes: &[u8]) -> Result<(), litchi_xlsb::Error> {
+fn dump_records(label: &str, bytes: &[u8], limits: Limits) -> Result<(), litchi_xlsb::Error> {
     println!("=== {label} records ===");
-    for (index, record) in Records::new(bytes).enumerate() {
+    for (index, record) in Records::new(bytes, limits).enumerate() {
         let record = record?;
         println!(
             "{index:08} offset={:#010x} kind={} len={}",
@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .next()
             .unwrap_or_else(|| OsString::from("dump_xlsb_structure")),
     })?;
-    let package = OpcPackage::from_reader(File::open(&path)?)?;
+    let package = OpcPackage::from_reader(File::open(&path)?, litchi_opc::SourceLimits::default())?;
 
     println!("=== Parts ===");
     for part in package.iter_parts() {
@@ -38,8 +38,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
     }
 
+    let limits = Limits::default();
     let main_part = package.main_document_part()?;
-    dump_records("workbook", main_part.blob())?;
+    dump_records("workbook", main_part.blob(), limits)?;
 
     for part in package.iter_parts() {
         let part_name = part.partname().as_str();
@@ -51,7 +52,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             content_type == "application/vnd.ms-excel.styles" || part_name.ends_with("/styles.bin");
 
         if is_worksheet || is_styles {
-            dump_records(part_name, package.get_part(part.partname())?.blob())?;
+            dump_records(part_name, package.get_part(part.partname())?.blob(), limits)?;
         }
     }
 

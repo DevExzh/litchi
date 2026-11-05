@@ -26,7 +26,7 @@ use crate::package::story::{self, StoryKind, StoryLimits, StoryTopology};
 use crate::{Error, Package, Result};
 
 use super::patch::Gate;
-use super::{BindingFlavor, Checksum, ChecksumStatus, Commit, Limits, Snapshot, Transaction};
+use super::{BindingFlavor, Checksum, ChecksumStatus, Draft, DraftCommit, Limits, Snapshot};
 
 const SIGNATURE_TOKEN_MAGIC: &[u8] = b"litchi.docx.sdt.signatures.v1\0";
 
@@ -79,7 +79,7 @@ impl Default for PackageLimits {
 }
 
 impl PackageLimits {
-    fn validate(&self) -> Result<()> {
+    pub(crate) fn validate(&self) -> Result<()> {
         self.controls.validate()?;
         if [
             self.max_content_controls,
@@ -227,7 +227,7 @@ impl PackageSnapshot {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn edit(&self) -> Result<PackageTransaction> {
+    pub(crate) fn edit(&self) -> Result<PackageDraft> {
         let mut transactions = Vec::new();
         transactions
             .try_reserve_exact(self.stories.len())
@@ -235,7 +235,7 @@ impl PackageSnapshot {
         for story in self.stories.iter() {
             transactions.push(story.snapshot.edit());
         }
-        Ok(PackageTransaction {
+        Ok(PackageDraft {
             base: self.clone(),
             transactions,
             mutations: HashSet::new(),
@@ -368,9 +368,9 @@ impl ChecksumEntry {
 
 /// Package-wide edit queue keyed by story part and source ordinal.
 #[derive(Debug, Clone)]
-pub struct PackageTransaction {
+pub(crate) struct PackageDraft {
     base: PackageSnapshot,
-    transactions: Vec<Transaction>,
+    transactions: Vec<Draft>,
     mutations: HashSet<(usize, usize, MutationKind)>,
     crc_memo: HashMap<PackURI, Checksum>,
     crc_bytes: usize,
@@ -382,7 +382,7 @@ enum MutationKind {
     Formatting,
 }
 
-impl PackageTransaction {
+impl PackageDraft {
     /// Exact package snapshot captured for stale checks.
     #[must_use]
     pub const fn source(&self) -> &PackageSnapshot {
@@ -606,14 +606,22 @@ impl PackageTransaction {
             return Ok(value.clone());
         }
         if self.crc_memo.len() >= self.base.limits.max_crc_parts {
-            return Err(invalid("unique CRC part limit exceeded"));
+            return Err(Error::ContentControlLimit {
+                kind: crate::content_control::LimitKind::UniqueCrcPart,
+                actual: (self.crc_memo.len()).saturating_add(1),
+                maximum: self.base.limits.max_crc_parts,
+            });
         }
         let crc_bytes = self
             .crc_bytes
             .checked_add(data.len())
             .ok_or_else(|| invalid("aggregate CRC byte count overflow"))?;
         if crc_bytes > self.base.limits.max_crc_bytes {
-            return Err(invalid("aggregate CRC byte limit exceeded"));
+            return Err(Error::ContentControlLimit {
+                kind: crate::content_control::LimitKind::AggregateCrcByte,
+                actual: crc_bytes,
+                maximum: self.base.limits.max_crc_bytes,
+            });
         }
         self.crc_memo
             .try_reserve(1)
@@ -654,7 +662,7 @@ impl PackageTransaction {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn commit(&self) -> Result<PackageCommit> {
+    pub fn commit(&self) -> Result<PackageDraftCommit> {
         let mut commits = Vec::new();
         commits
             .try_reserve_exact(self.transactions.len())
@@ -667,7 +675,11 @@ impl PackageTransaction {
                     .checked_add(commit.snapshot().source().len())
                     .ok_or_else(|| invalid("aggregate content-control output overflow"))?;
                 if output > self.base.limits.max_output_bytes {
-                    return Err(invalid("aggregate content-control output limit exceeded"));
+                    return Err(Error::ContentControlLimit {
+                        kind: crate::content_control::LimitKind::Output,
+                        actual: output,
+                        maximum: self.base.limits.max_output_bytes,
+                    });
                 }
             }
             commits.push(commit);
@@ -677,19 +689,19 @@ impl PackageTransaction {
             .try_reserve_exact(commits.len())
             .map_err(alloc("content-control package targets"))?;
         after.extend(commits.iter().map(|commit| commit.snapshot().clone()));
-        let changed = commits.iter().any(Commit::changed);
+        let changed = commits.iter().any(DraftCommit::changed);
         let after_signatures = if changed {
             unsigned_signature_token(self.base.limits.max_signature_bytes)?
         } else {
             self.base.signatures.clone()
         };
-        let patch = PackagePatch {
+        let patch = PackageDraftPatch {
             before: self.base.clone(),
             after: Arc::from(after.into_boxed_slice()),
             after_signatures,
             gate: Gate::new(),
         };
-        Ok(PackageCommit {
+        Ok(PackageDraftCommit {
             commits: Arc::from(commits.into_boxed_slice()),
             patch,
         })
@@ -705,7 +717,11 @@ impl PackageTransaction {
             return Ok(false);
         }
         if self.mutations.len() >= self.base.limits.max_mutations {
-            return Err(invalid("content-control mutation limit exceeded"));
+            return Err(Error::ContentControlLimit {
+                kind: crate::content_control::LimitKind::Mutation,
+                actual: (self.mutations.len()).saturating_add(1),
+                maximum: self.base.limits.max_mutations,
+            });
         }
         self.mutations
             .try_reserve(1)
@@ -730,15 +746,11 @@ impl PackageTransaction {
     }
 }
 
-fn transaction_has_mutation(
-    transaction: &Transaction,
-    occurrence: usize,
-    kind: MutationKind,
-) -> bool {
+fn transaction_has_mutation(transaction: &Draft, occurrence: usize, kind: MutationKind) -> bool {
     transaction.edits().any(|edit| match (kind, edit) {
         (
             MutationKind::Checksum(binding),
-            super::Edit::SetBindingChecksum {
+            super::Operation::SetBindingChecksum {
                 occurrence: candidate,
                 binding: candidate_binding,
                 ..
@@ -746,7 +758,7 @@ fn transaction_has_mutation(
         ) => *candidate == occurrence && *candidate_binding == binding,
         (
             MutationKind::Formatting,
-            super::Edit::SetFormattingAllowed {
+            super::Operation::SetFormattingAllowed {
                 occurrence: candidate,
                 ..
             },
@@ -757,41 +769,41 @@ fn transaction_has_mutation(
 
 /// Prepared package publication.
 #[derive(Debug, Clone)]
-pub struct PackageCommit {
-    commits: Arc<[Commit]>,
-    patch: PackagePatch,
+pub(crate) struct PackageDraftCommit {
+    commits: Arc<[DraftCommit]>,
+    patch: PackageDraftPatch,
 }
 
-impl PackageCommit {
+impl PackageDraftCommit {
     /// Whether one or more story sources change.
     #[must_use]
     pub fn changed(&self) -> bool {
-        self.commits.iter().any(Commit::changed)
+        self.commits.iter().any(DraftCommit::changed)
     }
 
     /// Fully reparsed per-story commits in package story order.
     #[must_use]
-    pub fn stories(&self) -> &[Commit] {
+    pub fn stories(&self) -> &[DraftCommit] {
         &self.commits
     }
 
     /// Package-bound retry-safe patch.
     #[must_use]
-    pub const fn patch(&self) -> &PackagePatch {
+    pub const fn patch(&self) -> &PackageDraftPatch {
         &self.patch
     }
 }
 
 /// Retry-safe, topology- and source-checked package publication.
 #[derive(Debug, Clone)]
-pub struct PackagePatch {
+pub(crate) struct PackageDraftPatch {
     before: PackageSnapshot,
     after: Arc<[Snapshot]>,
     after_signatures: Arc<[u8]>,
     gate: Gate,
 }
 
-impl PackagePatch {
+impl PackageDraftPatch {
     /// Whether every story byte remains identical.
     #[must_use]
     pub fn is_noop(&self) -> bool {
@@ -875,8 +887,9 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn content_control_snapshot(&self) -> Result<PackageSnapshot> {
-        self.ensure_story_opc_current("content_control_snapshot")?;
-        PackageSnapshot::capture(self.opc_package(), PackageLimits::default())
+        self.content_control_snapshot_bounded(
+            self.semantic_limits().content_controls_value().clone(),
+        )
     }
 
     /// Capture with explicit aggregate resource limits.
@@ -884,11 +897,11 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn content_control_snapshot_with_limits(
+    pub(crate) fn content_control_snapshot_bounded(
         &self,
         limits: PackageLimits,
     ) -> Result<PackageSnapshot> {
-        self.ensure_story_opc_current("content_control_snapshot_with_limits")?;
+        self.ensure_story_opc_current("content_control_snapshot_bounded")?;
         PackageSnapshot::capture(self.opc_package(), limits)
     }
 
@@ -899,7 +912,11 @@ impl Package {
     /// Returns an error if the operation cannot be completed.
     pub fn verify_content_control_checksums(&self) -> Result<Vec<ChecksumEntry>> {
         self.ensure_story_opc_current("verify_content_control_checksums")?;
-        PackageSnapshot::capture(self.opc_package(), PackageLimits::default())?.verify_checksums()
+        PackageSnapshot::capture(
+            self.opc_package(),
+            self.semantic_limits().content_controls_value().clone(),
+        )?
+        .verify_checksums()
     }
 
     /// Publish a prepared package transaction.
@@ -907,9 +924,12 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn apply_content_controls(&mut self, commit: &PackageCommit) -> Result<()> {
-        self.ensure_story_opc_current("apply_content_controls")?;
-        self.apply_content_control_patch(commit.patch())
+    pub(crate) fn publish_content_control_draft(
+        &mut self,
+        commit: &PackageDraftCommit,
+    ) -> Result<()> {
+        self.ensure_story_opc_current("publish_content_control_draft")?;
+        self.publish_content_control_draft_patch(commit.patch())
     }
 
     /// Publish one exact package patch atomically.
@@ -917,10 +937,13 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn apply_content_control_patch(&mut self, patch: &PackagePatch) -> Result<()> {
+    pub(crate) fn publish_content_control_draft_patch(
+        &mut self,
+        patch: &PackageDraftPatch,
+    ) -> Result<()> {
         // Guard before claiming the shared retry-safe gate. A pending facade
         // edit must not consume even an exact no-op patch.
-        self.ensure_story_opc_current("apply_content_control_patch")?;
+        self.ensure_story_opc_current("publish_content_control_draft_patch")?;
         let current = PackageSnapshot::capture(self.opc_package(), patch.before.limits.clone())?;
         if patch.is_noop() {
             require_current(&patch.before, &current, true)?;
@@ -930,11 +953,7 @@ impl Package {
         }
         require_current(&patch.before, &current, false)?;
         if !is_unsigned_signature_token(&current.signatures) {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "apply_content_control_patch",
-                reason: "changed content controls cannot preserve package signatures; call Package::unsign explicitly first",
-            });
+            return Err(Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy));
         }
         let claim = patch.gate.claim("content-control package patch")?;
 
@@ -954,7 +973,7 @@ impl Package {
         }
         let after = patch.after.clone();
         let limits = patch.before.limits.clone();
-        self.edit_semantic_opc("apply_content_control_patch", move |candidate| {
+        self.edit_semantic_opc("publish_content_control_draft_patch", move |candidate| {
             let staged = PackageSnapshot::capture(candidate, limits.clone())?;
             if staged.topology != topology {
                 return Err(invalid("content-control story topology is stale"));
@@ -1039,13 +1058,21 @@ fn verify(snapshot: &PackageSnapshot, require_matches: Option<bool>) -> Result<V
                                 value.clone()
                             } else {
                                 if memo.len() >= snapshot.limits.max_crc_parts {
-                                    return Err(invalid("unique CRC part limit exceeded"));
+                                    return Err(Error::ContentControlLimit {
+                                        kind: crate::content_control::LimitKind::UniqueCrcPart,
+                                        actual: (memo.len()).saturating_add(1),
+                                        maximum: snapshot.limits.max_crc_parts,
+                                    });
                                 }
                                 total = total
                                     .checked_add(store.data.len())
                                     .ok_or_else(|| invalid("aggregate CRC byte count overflow"))?;
                                 if total > snapshot.limits.max_crc_bytes {
-                                    return Err(invalid("aggregate CRC byte limit exceeded"));
+                                    return Err(Error::ContentControlLimit {
+                                        kind: crate::content_control::LimitKind::AggregateCrcByte,
+                                        actual: total,
+                                        maximum: snapshot.limits.max_crc_bytes,
+                                    });
                                 }
                                 let value =
                                     Checksum::compute(&store.data, &snapshot.limits.controls)?;
@@ -1309,7 +1336,11 @@ fn preflight_custom_xml_graph(package: &OpcPackage, limits: &PackageLimits) -> R
             }
             if !parts.contains(&part) {
                 if parts.len() >= limits.max_crc_parts {
-                    return Err(invalid("unique Custom XML payload limit exceeded"));
+                    return Err(Error::ContentControlLimit {
+                        kind: crate::content_control::LimitKind::UniqueCustomXmlPayload,
+                        actual: (parts.len()).saturating_add(1),
+                        maximum: limits.max_crc_parts,
+                    });
                 }
                 payload_bytes = payload_bytes
                     .checked_add(data.blob().len())
@@ -1770,7 +1801,7 @@ mod tests {
             .partname()
             .clone();
         package
-            .edit_opc(|opc| {
+            .edit_opc_in_place(|opc| {
                 opc.get_part_mut(&main)?.set_blob(xml);
                 Ok::<_, Error>(())
             })
@@ -1780,7 +1811,7 @@ mod tests {
 
     fn mark_signed(package: &mut Package) {
         package
-            .edit_opc(|opc| {
+            .edit_opc_in_place(|opc| {
                 opc.try_add_part(Box::new(BlobPart::new(
                     PackURI::new("/_xmlsignatures/origin.sigs").unwrap(),
                     ct::OPC_DIGITAL_SIGNATURE_ORIGIN.to_owned(),
@@ -1798,32 +1829,6 @@ mod tests {
     }
 
     #[test]
-    fn package_entry_points_refuse_pending_facade_state_before_claiming_patch() {
-        let mut package = Package::new().unwrap();
-        let snapshot = package.content_control_snapshot().unwrap();
-        let commit = snapshot.edit().unwrap().commit().unwrap();
-        assert!(!commit.changed());
-        assert!(!commit.patch().is_applied());
-
-        package
-            .document_mut()
-            .unwrap()
-            .add_paragraph_with_text("pending facade state");
-
-        assert!(package.content_control_snapshot().is_err());
-        assert!(
-            package
-                .content_control_snapshot_with_limits(PackageLimits::default())
-                .is_err()
-        );
-        assert!(package.verify_content_control_checksums().is_err());
-        assert!(package.apply_content_controls(&commit).is_err());
-        assert!(!commit.patch().is_applied());
-        assert!(package.apply_content_control_patch(commit.patch()).is_err());
-        assert!(!commit.patch().is_applied());
-    }
-
-    #[test]
     fn clean_exact_noop_still_bypasses_opc_publication() {
         let mut package = Package::new().unwrap();
         let main = package.opc_package().main_document_part().unwrap();
@@ -1831,7 +1836,7 @@ mod tests {
         let snapshot = package.content_control_snapshot().unwrap();
         let commit = snapshot.edit().unwrap().commit().unwrap();
 
-        package.apply_content_controls(&commit).unwrap();
+        package.publish_content_control_draft(&commit).unwrap();
 
         let after = package
             .opc_package()
@@ -1857,7 +1862,7 @@ mod tests {
         let signed = PackURI::new("/_xmlsignatures/origin.sigs").unwrap();
         let snapshot = package.content_control_snapshot().unwrap();
         let noop = snapshot.edit().unwrap().commit().unwrap();
-        package.apply_content_controls(&noop).unwrap();
+        package.publish_content_control_draft(&noop).unwrap();
         assert!(package.opc_package().contains_part(&signed));
 
         let snapshot = package.content_control_snapshot().unwrap();
@@ -1867,17 +1872,19 @@ mod tests {
             .unwrap();
         let commit = transaction.commit().unwrap();
         let inverse = commit.patch().inverse().unwrap();
-        assert!(package.apply_content_controls(&commit).is_err());
+        assert!(package.publish_content_control_draft(&commit).is_err());
         assert!(!commit.patch().is_applied());
         assert!(package.opc_package().contains_part(&signed));
 
-        package.unsign();
+        package = package.unsign();
         assert!(!package.opc_package().contains_part(&signed));
-        package.apply_content_controls(&commit).unwrap();
+        package.publish_content_control_draft(&commit).unwrap();
         assert!(commit.patch().is_applied());
         let redo = inverse.inverse().unwrap();
-        package.apply_content_control_patch(&inverse).unwrap();
-        package.apply_content_control_patch(&redo).unwrap();
+        package
+            .publish_content_control_draft_patch(&inverse)
+            .unwrap();
+        package.publish_content_control_draft_patch(&redo).unwrap();
         assert!(
             std::str::from_utf8(package.opc_package().get_part(&main).unwrap().blob())
                 .unwrap()
@@ -1889,7 +1896,7 @@ mod tests {
     fn signature_inventory_follows_relationships_and_content_types_not_part_names() {
         let mut relationship_owned = Package::new().unwrap();
         relationship_owned
-            .edit_opc(|opc| {
+            .edit_opc_in_place(|opc| {
                 opc.try_add_part(Box::new(BlobPart::new(
                     PackURI::new("/security/arbitrary-origin.bin").unwrap(),
                     "application/octet-stream".to_owned(),
@@ -1909,7 +1916,7 @@ mod tests {
 
         let mut content_typed = Package::new().unwrap();
         content_typed
-            .edit_opc(|opc| {
+            .edit_opc_in_place(|opc| {
                 opc.try_add_part(Box::new(BlobPart::new(
                     PackURI::new("/security/content-typed.bin").unwrap(),
                     ct::OPC_DIGITAL_SIGNATURE_ORIGIN.to_owned(),
@@ -1927,7 +1934,7 @@ mod tests {
         };
         assert!(
             content_typed
-                .content_control_snapshot_with_limits(bounded)
+                .content_control_snapshot_bounded(bounded)
                 .is_err()
         );
     }
@@ -1962,8 +1969,10 @@ mod tests {
                 .unwrap()
                 .as_ref()
         );
-        package.apply_content_controls(&commit).unwrap();
-        package.apply_content_control_patch(&inverse).unwrap();
+        package.publish_content_control_draft(&commit).unwrap();
+        package
+            .publish_content_control_draft_patch(&inverse)
+            .unwrap();
         assert_eq!(
             package.opc_package().get_part(&main).unwrap().blob(),
             original
@@ -1976,10 +1985,14 @@ mod tests {
             .unwrap();
         let commit = transaction.commit().unwrap();
         let inverse = commit.patch().inverse().unwrap();
-        package.apply_content_controls(&commit).unwrap();
+        package.publish_content_control_draft(&commit).unwrap();
         mark_signed(&mut package);
 
-        assert!(package.apply_content_control_patch(&inverse).is_err());
+        assert!(
+            package
+                .publish_content_control_draft_patch(&inverse)
+                .is_err()
+        );
         assert!(!inverse.is_applied());
     }
 
@@ -1994,7 +2007,7 @@ mod tests {
             .into_bytes(),
         );
         let snapshot = package
-            .content_control_snapshot_with_limits(PackageLimits {
+            .content_control_snapshot_bounded(PackageLimits {
                 max_mutations: 1,
                 ..PackageLimits::default()
             })
@@ -2064,9 +2077,7 @@ mod tests {
             max_mutations: 1,
             ..PackageLimits::default()
         };
-        let snapshot = package
-            .content_control_snapshot_with_limits(limits)
-            .unwrap();
+        let snapshot = package.content_control_snapshot_bounded(limits).unwrap();
         let mut transaction = snapshot.edit().unwrap();
 
         assert!(transaction.refresh_checksums().is_err());
@@ -2126,7 +2137,7 @@ mod tests {
         let first = PackURI::new("/customXml/itemProps1.xml").unwrap();
         let second = PackURI::new("/customXml/itemProps2.xml").unwrap();
         package
-            .edit_opc(|opc| {
+            .edit_opc_in_place(|opc| {
                 let duplicate = opc.get_part(&first)?.blob().to_vec();
                 opc.get_part_mut(&second)?.set_blob(duplicate);
                 Ok::<_, Error>(())
@@ -2154,7 +2165,7 @@ mod tests {
         };
         assert!(
             package
-                .content_control_snapshot_with_limits(binding_limited)
+                .content_control_snapshot_bounded(binding_limited)
                 .is_err()
         );
 
@@ -2163,7 +2174,7 @@ mod tests {
             ..PackageLimits::default()
         };
         let snapshot = package
-            .content_control_snapshot_with_limits(report_limited)
+            .content_control_snapshot_bounded(report_limited)
             .unwrap();
         assert!(snapshot.verify_checksums().is_err());
     }
@@ -2187,7 +2198,7 @@ mod tests {
         };
         assert!(
             package
-                .content_control_snapshot_with_limits(relationship_limited)
+                .content_control_snapshot_bounded(relationship_limited)
                 .is_err()
         );
 
@@ -2197,7 +2208,7 @@ mod tests {
         };
         assert!(
             package
-                .content_control_snapshot_with_limits(props_limited)
+                .content_control_snapshot_bounded(props_limited)
                 .is_err()
         );
     }
@@ -2233,7 +2244,7 @@ mod tests {
         let mut transaction = snapshot.edit().unwrap();
         transaction.refresh_checksums().unwrap();
         let commit = transaction.commit().unwrap();
-        package.apply_content_controls(&commit).unwrap();
+        package.publish_content_control_draft(&commit).unwrap();
         let output =
             std::str::from_utf8(package.opc_package().get_part(&main).unwrap().blob()).unwrap();
         assert_eq!(output.matches(&expected).count(), 1);

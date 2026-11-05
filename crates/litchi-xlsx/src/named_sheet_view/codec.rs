@@ -1861,13 +1861,16 @@ mod tests {
     };
     use super::*;
     use crate::auto_filter::{Calendar, DateGroup, Grouping, Icon, Item, Payload, Top10, Values};
-    use litchi_opc::{OpcPackage, PackURI};
+    use litchi_opc::{OpcPackage, PackURI, SourceLimits};
     use quick_xml::name::ResolveResult as Resolved;
 
     fn libreoffice_fixture() -> OpcPackage {
-        OpcPackage::from_bytes(include_bytes!(
-            "../../../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/NamedSheetViews.xlsx"
-        ))
+        OpcPackage::from_bytes(
+            include_bytes!(
+                "../../../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/NamedSheetViews.xlsx"
+            ),
+            SourceLimits::default(),
+        )
         .unwrap()
     }
 
@@ -2114,7 +2117,7 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("named-sheet-views.xlsx");
         package.save(&path).unwrap();
-        let reopened = OpcPackage::open(&path).unwrap();
+        let reopened = OpcPackage::open(&path, SourceLimits::default()).unwrap();
         assert_eq!(
             load_worksheet_named_sheet_views(&reopened, &worksheet).unwrap(),
             Some(value)
@@ -2147,9 +2150,10 @@ mod tests {
     }
     #[test]
     fn poi_fixture_has_no_named_sheet_views_relationship() {
-        let package = OpcPackage::from_bytes(include_bytes!(
-            "../../../../test-data/poi/test-data/spreadsheet/right-to-left.xlsx"
-        ))
+        let package = OpcPackage::from_bytes(
+            include_bytes!("../../../../test-data/poi/test-data/spreadsheet/right-to-left.xlsx"),
+            SourceLimits::default(),
+        )
         .unwrap();
         let sheet = package
             .get_part(&PackURI::new("/xl/worksheets/sheet1.xml").unwrap())

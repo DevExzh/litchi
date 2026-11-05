@@ -82,7 +82,7 @@ impl Summary {
     /// Returns an error if the operation fails.
     pub fn to_record(&self) -> Result<Record> {
         let bytes = self.to_record_bytes()?;
-        let (record, end) = Record::parse(&bytes, 0)?;
+        let (record, end) = Record::parse(&bytes, 0, &crate::SourceLimits::default())?;
         if end != bytes.len() {
             return corrupted("canonical SummaryContainer did not consume its bytes");
         }

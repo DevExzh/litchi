@@ -1,0 +1,5 @@
+# Record 0337 harness binaries (kept outside the checkout; build.sh rebuilds them).
+# before: trunk d165759e4a + the harness source of this record (before `cargo fmt` of the harness, layout only)
+ea5fd56b6ac6c27894e98db2aee17dc68fecbad97ca32f552ff0c60a676bc84f  unified-batch-closure (before; runs tagged "before" = trunk)
+# after: the same plus this record's XLS change (format/xls/write.rs)
+fdd2f8b78c05ff7fe694d793ec4bc5ae97ea2e133557ed73293c001afbcf2c5b  unified-batch-closure (after; runs tagged "after", XLS only)

@@ -1,0 +1,237 @@
+{
+  "record": "0362o",
+  "integration_base": "51c7fbb1b528e0ccfb51d58125b498f2f97e8cdb",
+  "shared_dependency_commits": [
+    "528e04e6d57fc7bf1d8e1bc2408735e76668018a",
+    "9d68463b1c5be215cd0ee0b1f868dcc13b5fff91",
+    "00e6add236390fa83176747c9f003b7cb2a24142",
+    "2dfd47a64fc65cf22dce9df9863902969ed6b328",
+    "eade92f7188d463089958699faf37c728b8a13e0",
+    "9f9fa3930adc4c52e287680d92a6aff5773ef3fe"
+  ],
+  "parity": {
+    "worker_reference": "9f9fa3930adc4c52e287680d92a6aff5773ef3fe",
+    "common_matches_after_preserving_xlsb_snapshot_helpers": true,
+    "retained_helper_lines": 91,
+    "helper_sha256": "6bb535ae01da669328e77ba1a8f83fc9538da5798f356a7fabf4ec5e3a286e46"
+  },
+  "sources": [
+    {
+      "path": "crates/litchi-ooxml-common/src/properties/transaction.rs",
+      "bytes": 68347,
+      "sha256": "00f43e8c019d09909c06a025bcd89c69b364bfd3e63885bb0997c0be579fb7f8"
+    },
+    {
+      "path": "crates/litchi-ooxml-common/src/properties/transaction_tests.rs",
+      "bytes": 28087,
+      "sha256": "d489de97014638b12848df4b2d78d4c652567c8ebaff038d931b6cab2aca7904"
+    },
+    {
+      "path": "crates/litchi-xlsx/src/metadata.rs",
+      "bytes": 9956,
+      "sha256": "4ba63e8d6de6ec5315c1101439875990be8a83c52cbcbee4dec50fbe777fa91b"
+    },
+    {
+      "path": "crates/litchi-docx/src/metadata.rs",
+      "bytes": 17346,
+      "sha256": "83a50b63914bfc63bf87838ee7a4aa084ca49b7acdda31c8b1da455ad25c6e8c"
+    },
+    {
+      "path": "crates/litchi-docx/src/package/package/metadata.rs",
+      "bytes": 5884,
+      "sha256": "6665d3fc0b9c9c126b1c1c8e587af42db048ff38346c4ff3ca08732911d34b72"
+    },
+    {
+      "path": "crates/litchi-docx/tests/core_properties.rs",
+      "bytes": 2401,
+      "sha256": "4767fc54af8dcc02404f7f2034af336e74cf266ad079e96ac5bcda72aab16de7"
+    },
+    {
+      "path": "crates/litchi-pptx/src/metadata.rs",
+      "bytes": 9096,
+      "sha256": "198a38e60e729515b4f6b8afbe04a88f9380976fa931a52cfec3f6ba2bc31583"
+    }
+  ],
+  "cargo_lock": {
+    "path": "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration/Cargo.lock",
+    "bytes": 139537,
+    "sha256": "f99eff3b7917c448f820d7184f4108bc8382303c7bcc55ce60a298e5860861d6"
+  },
+  "environment": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/env.sh",
+    "bytes": 370,
+    "sha256": "2f8ce1812c7053d216bded1083ac12df234a5eb383dcb852c73c5bebcf19f0e6"
+  },
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-ooxml-common",
+        "--lib"
+      ],
+      "exit": 0,
+      "seconds": 30.856673670001328,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/metadata-integration/validation-v1/check-0.log",
+      "bytes": 45695,
+      "sha256": "b7abe92760d03f5925ad8c3dee62abb0097d68580de0f9c58137991f0cf08acf"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-xlsx",
+        "--lib",
+        "metadata"
+      ],
+      "exit": 0,
+      "seconds": 51.300103046931326,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/metadata-integration/validation-v1/check-1.log",
+      "bytes": 6530,
+      "sha256": "82f88d06b9d8c89668a7c794807e7b62e8beacda489055c4292804875d04e4b5"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-docx",
+        "--lib",
+        "metadata"
+      ],
+      "exit": 0,
+      "seconds": 26.376566499937326,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/metadata-integration/validation-v1/check-2.log",
+      "bytes": 4246,
+      "sha256": "036b9af456c1eb59ae4c12a0d21600f4efc3201ee08736c81ef8ca7f281b3b01"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-docx",
+        "--test",
+        "core_properties",
+        "--test",
+        "package_signature_policy"
+      ],
+      "exit": 0,
+      "seconds": 20.948655164102092,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/metadata-integration/validation-v1/check-3.log",
+      "bytes": 1612,
+      "sha256": "21e6da6309debf36542bf2ed1599e698d970f49b1480db89b2c70d8237d19fc8"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-pptx",
+        "--lib",
+        "metadata"
+      ],
+      "exit": 0,
+      "seconds": 44.48693053005263,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/metadata-integration/validation-v1/check-4.log",
+      "bytes": 14918,
+      "sha256": "1d3cac4d8458caedf063ce1b3a5b3f83ef64ab777f70dbccdcb3556c9e9ba840"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-pptx",
+        "--test",
+        "pptx_metadata_families",
+        "--test",
+        "package_signature_policy"
+      ],
+      "exit": 0,
+      "seconds": 21.74163529300131,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/metadata-integration/validation-v1/check-5.log",
+      "bytes": 1751,
+      "sha256": "a6353a41a398b9ab984a24168ef1af1654c156f1ba72122c78c0dc1972e17122"
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-ooxml-common",
+        "-p",
+        "litchi-xlsx",
+        "-p",
+        "litchi-docx",
+        "-p",
+        "litchi-pptx",
+        "-p",
+        "litchi-ops",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 416.3542476920411,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/metadata-integration/validation-v1/check-6.log",
+      "bytes": 9429,
+      "sha256": "4f4fa404bb628cc6b06988ac5b584558ee6a5e5775697cb619f4ac4a02725e66"
+    },
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 28.610043201013468,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/metadata-integration/validation-v1/check-7.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "passed_tests": {
+    "check-0.log": [
+      472
+    ],
+    "check-1.log": [
+      51
+    ],
+    "check-2.log": [
+      42
+    ],
+    "check-3.log": [
+      2,
+      9
+    ],
+    "check-4.log": [
+      120
+    ],
+    "check-5.log": [
+      10,
+      6
+    ]
+  },
+  "disposition": "Correctness/consumer integration candidate. Native performance, final source integration and workspace gate remain required; not merged into trunk."
+}

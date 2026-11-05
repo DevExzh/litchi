@@ -1,4 +1,6 @@
+use super::package::Editor;
 use super::*;
+use crate::SourceLimits;
 use crate::parts::fib::FileInformationBlock;
 use crate::writer::fib::FibBuilder;
 use litchi_cfb::{OleFile, OleWriter};
@@ -70,12 +72,15 @@ fn sample() -> CommandBars<'static> {
     let custom_delta = Customization::deltas(7, vec![delta]).expect("delta customization");
     let wrapper = ToolbarWrapper::new(vec![custom_toolbar, custom_delta])
         .expect("wrapper")
-        .with_delta_controls(vec![control(
-            ControlType::Label,
-            0x1234,
-            Some(0x0000_1231),
-            Vec::new(),
-        )])
+        .with_delta_controls(
+            vec![control(
+                ControlType::Label,
+                0x1234,
+                Some(0x0000_1231),
+                Vec::new(),
+            )],
+            &SourceLimits::default(),
+        )
         .expect("wrapper controls");
 
     CommandBars::new(vec![
@@ -133,10 +138,13 @@ fn sample() -> CommandBars<'static> {
 #[test]
 fn round_trip_preserves_typed_records_and_opaque_bytes() {
     let value = sample();
-    let bytes = to_bytes(&value).expect("serialize");
-    let parsed = parse_bytes(&bytes).expect("parse");
+    let bytes = to_bytes(&value, &SourceLimits::default()).expect("serialize");
+    let parsed = parse_bytes(&bytes, &SourceLimits::default()).expect("parse");
     assert_eq!(parsed, value);
-    assert_eq!(to_bytes(&parsed).expect("serialize parsed"), bytes);
+    assert_eq!(
+        to_bytes(&parsed, &SourceLimits::default()).expect("serialize parsed"),
+        bytes
+    );
     assert_eq!(parsed.entries().len(), 6);
     assert_eq!(parsed.version(), 0xFF);
     assert_eq!(parsed.terminator(), 0x40);
@@ -176,13 +184,14 @@ fn command_bar_snapshots_are_owned_and_failure_atomic() {
     transaction.clear();
     let commit = transaction.commit().expect("semantic commit");
 
-    assert!(!commit.is_noop());
-    assert!(!commit.snapshot().is_present());
-    assert!(commit.apply(&snapshot).is_ok());
+    let patch = commit.patch();
+    assert!(!patch.is_noop());
+    assert!(!commit.package().is_present());
+    assert!(patch.apply(&snapshot).is_ok());
     let mut changed_stale = stale;
     changed_stale.clear();
-    assert!(commit.apply(changed_stale.snapshot()).is_err());
-    assert_eq!(commit.inverse().apply(commit.snapshot()).unwrap(), snapshot);
+    assert!(patch.apply(changed_stale.staged()).is_err());
+    assert_eq!(patch.inverse().apply(commit.package()).unwrap(), snapshot);
     assert_eq!(snapshot.command_bars().unwrap(), &source.into_owned());
 }
 
@@ -201,7 +210,11 @@ fn package_editor_publishes_command_bars_and_preserves_unrelated_bytes() {
     let reopened = Editor::open(bytes.clone()).expect("published package reopens");
     assert_eq!(reopened.command_bars().command_bars(), Some(&value));
 
-    let mut ole = OleFile::open(std::io::Cursor::new(bytes.clone())).expect("CFB opens");
+    let mut ole = OleFile::open(
+        std::io::Cursor::new(bytes.clone()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .expect("CFB opens");
     let table = ole.open_stream(&["0Table"]).expect("table stream exists");
     assert!(table.starts_with(original_table));
     assert!(committed.package_patch().inverse().apply(&bytes).is_ok());
@@ -209,7 +222,11 @@ fn package_editor_publishes_command_bars_and_preserves_unrelated_bytes() {
     let mut cleared = Editor::open(bytes).expect("published package opens for clear");
     let cleared = cleared.clear().expect("command bars clear");
     let cleared_bytes = cleared.snapshot().finish().expect("clear renders");
-    let mut ole = OleFile::open(std::io::Cursor::new(cleared_bytes)).expect("cleared CFB opens");
+    let mut ole = OleFile::open(
+        std::io::Cursor::new(cleared_bytes),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .expect("cleared CFB opens");
     let word = ole
         .open_stream(&["WordDocument"])
         .expect("WordDocument stream exists");
@@ -273,9 +290,12 @@ fn round_trip_parses_ctb_controls_and_shared_general_metadata() {
     )])
     .expect("command bars");
 
-    let bytes = to_bytes(&value).expect("serialize");
-    let parsed = parse_bytes(&bytes).expect("parse");
-    assert_eq!(to_bytes(&parsed).expect("serialize parsed"), bytes);
+    let bytes = to_bytes(&value, &SourceLimits::default()).expect("serialize");
+    let parsed = parse_bytes(&bytes, &SourceLimits::default()).expect("parse");
+    assert_eq!(
+        to_bytes(&parsed, &SourceLimits::default()).expect("serialize parsed"),
+        bytes
+    );
     let toolbar = match &parsed.entries()[0] {
         Entry::Toolbar(wrapper) => match &wrapper.customizations()[0].data() {
             CustomizationData::Toolbar(toolbar) => toolbar,
@@ -308,9 +328,12 @@ fn round_trip_preserves_menu_and_combo_specific_boundaries() {
         control(ControlType::Popup, 1, None, menu_specific.clone()),
         control(ControlType::DropDown, 1, None, combo_specific.clone()),
     ]);
-    let bytes = to_bytes(&value).expect("serialize");
-    let parsed = parse_bytes(&bytes).expect("parse");
-    assert_eq!(to_bytes(&parsed).expect("serialize parsed"), bytes);
+    let bytes = to_bytes(&value, &SourceLimits::default()).expect("serialize");
+    let parsed = parse_bytes(&bytes, &SourceLimits::default()).expect("parse");
+    assert_eq!(
+        to_bytes(&parsed, &SourceLimits::default()).expect("serialize parsed"),
+        bytes
+    );
     let toolbar = match &parsed.entries()[0] {
         Entry::Toolbar(wrapper) => match wrapper.customizations()[0].data() {
             CustomizationData::Toolbar(toolbar) => toolbar,
@@ -336,26 +359,32 @@ fn rejects_zero_length_combo_item_array_at_the_control_boundary() {
         None,
         0i16.to_le_bytes().to_vec(),
     )]);
-    let bytes = to_bytes(&value).expect("serialize");
-    assert!(parse_bytes(&bytes).is_err());
+    let bytes = to_bytes(&value, &SourceLimits::default()).expect("serialize");
+    assert!(parse_bytes(&bytes, &SourceLimits::default()).is_err());
 }
 
 #[test]
 fn parses_optional_fib_pointer_and_writes_a_new_table_range() {
     let value = sample();
-    let payload = to_bytes(&value).expect("serialize");
+    let payload = to_bytes(&value, &SourceLimits::default()).expect("serialize");
     let offset = 9usize;
     let mut table_stream = vec![0xAA; offset];
     table_stream.extend_from_slice(&payload);
     let fib = fib_with_pointer(offset, payload.len());
     assert_eq!(
-        parse(&fib, &table_stream).expect("parse pointer"),
+        parse(&fib, &table_stream, &SourceLimits::default()).expect("parse pointer"),
         Some(value)
     );
 
     let mut builder = FibBuilder::new();
     let mut generated_table = vec![0xCC; 4];
-    write(&mut builder, &mut generated_table, &sample()).expect("append command bars");
+    write(
+        &mut builder,
+        &mut generated_table,
+        &sample(),
+        &SourceLimits::default(),
+    )
+    .expect("append command bars");
     let generated_fib = FileInformationBlock::parse(&builder.generate().expect("generate FIB"))
         .expect("parse generated FIB");
     assert_eq!(
@@ -368,24 +397,27 @@ fn parses_optional_fib_pointer_and_writes_a_new_table_range() {
 #[test]
 fn absent_or_empty_fib_pointer_is_optional() {
     let fib = fib_with_pointer(0, 0);
-    assert_eq!(parse(&fib, &[]).expect("empty pointer"), None);
+    assert_eq!(
+        parse(&fib, &[], &SourceLimits::default()).expect("empty pointer"),
+        None
+    );
 }
 
 #[test]
 fn rejects_bad_counts_reserved_words_and_relationships() {
-    let valid = to_bytes(&sample()).expect("serialize");
+    let valid = to_bytes(&sample(), &SourceLimits::default()).expect("serialize");
 
     let mut missing_terminator = valid.clone();
     missing_terminator.pop();
-    assert!(parse_bytes(&missing_terminator).is_err());
+    assert!(parse_bytes(&missing_terminator, &SourceLimits::default()).is_err());
 
     let mut invalid_macro_count = valid.clone();
     invalid_macro_count[2..6].copy_from_slice(&(-1i32).to_le_bytes());
-    assert!(parse_bytes(&invalid_macro_count).is_err());
+    assert!(parse_bytes(&invalid_macro_count, &SourceLimits::default()).is_err());
 
     let mut invalid_macro_reserved = valid.clone();
     invalid_macro_reserved[6] = 0;
-    assert!(parse_bytes(&invalid_macro_reserved).is_err());
+    assert!(parse_bytes(&invalid_macro_reserved, &SourceLimits::default()).is_err());
 
     let mut invalid_toolbar_index = valid;
     let marker = [0x12, 0x12, 0, 0, 0x07, 0x06, 0, 0x0C, 0, 0x12];
@@ -395,65 +427,138 @@ fn rejects_bad_counts_reserved_words_and_relationships() {
         .expect("wrapper marker");
     let ctb_index = wrapper_offset + 14 + 2 + 4 + 8 + 4 + 2 + 2;
     invalid_toolbar_index[ctb_index..ctb_index + 4].copy_from_slice(&99i32.to_le_bytes());
-    assert!(parse_bytes(&invalid_toolbar_index).is_err());
+    assert!(parse_bytes(&invalid_toolbar_index, &SourceLimits::default()).is_err());
 }
 
 #[test]
 fn rejects_unknown_records_without_guessing_boundaries() {
-    assert!(parse_bytes(&[0xFF, 0x10, 0x40]).is_err());
-    assert!(parse_bytes(&[0xFF, 0x7F, 0x40]).is_err());
+    assert!(parse_bytes(&[0xFF, 0x10, 0x40], &SourceLimits::default()).is_err());
+    assert!(parse_bytes(&[0xFF, 0x7F, 0x40], &SourceLimits::default()).is_err());
 }
 
 #[test]
 fn rejects_invalid_command_string_and_macro_name_boundaries() {
     let value = sample();
-    let mut bytes = to_bytes(&value).expect("serialize");
+    let mut bytes = to_bytes(&value, &SourceLimits::default()).expect("serialize");
     let strings_tag = bytes
         .windows(5)
         .position(|window| window == [0x10, 0xFF, 0xFF, 6, 0])
         .expect("TcgSttbf tag");
     bytes[strings_tag + 3..strings_tag + 5].copy_from_slice(&3u16.to_le_bytes());
-    assert!(parse_bytes(&bytes).is_err());
+    assert!(parse_bytes(&bytes, &SourceLimits::default()).is_err());
 
-    let mut bytes = to_bytes(&value).expect("serialize");
+    let mut bytes = to_bytes(&value, &SourceLimits::default()).expect("serialize");
     let names_tag = bytes
         .windows(5)
         .position(|window| window == [0x11, 1, 0, 4, 0])
         .expect("MacroNames tag");
     let name_terminator = names_tag + 1 + 2 + 2 + 2 + "AutoMacro".encode_utf16().count() * 2;
     bytes[name_terminator..name_terminator + 2].copy_from_slice(&[1, 0]);
-    assert!(parse_bytes(&bytes).is_err());
+    assert!(parse_bytes(&bytes, &SourceLimits::default()).is_err());
 }
 
 #[test]
 fn rejects_truncated_variable_strings_and_table_ranges() {
-    assert!(XString::parse(&[1, 0, 0x41]).is_err());
-    let payload = to_bytes(&sample()).expect("serialize");
+    assert!(XString::parse(&[1, 0, 0x41], &SourceLimits::default()).is_err());
+    let payload = to_bytes(&sample(), &SourceLimits::default()).expect("serialize");
     let fib = fib_with_pointer(4, payload.len() + 1);
-    assert!(parse(&fib, &[0; 4]).is_err());
+    assert!(parse(&fib, &[0; 4], &SourceLimits::default()).is_err());
+}
+
+#[test]
+fn xstring_public_helpers_honor_exact_and_one_under_limits() {
+    let value = XString::new("bounded").expect("Xst value");
+    let bytes = value.to_bytes(&SourceLimits::default()).unwrap();
+    let exact = SourceLimits::builder()
+        .max_entry_bytes(bytes.len())
+        .unwrap()
+        .build()
+        .unwrap();
+    assert_eq!(value.to_bytes(&exact).unwrap(), bytes);
+    let one_under = SourceLimits::builder()
+        .max_entry_bytes(bytes.len() - 1)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        value.to_bytes(&one_under),
+        Err(crate::package::Error::Limit {
+            kind: crate::package::SourceLimitKind::EntryBytes,
+            ..
+        })
+    ));
+
+    let terminated = value.to_terminated_bytes(&SourceLimits::default()).unwrap();
+    assert_eq!(
+        XString::parse_terminated_prefix(&terminated, &SourceLimits::default())
+            .unwrap()
+            .0,
+        value
+    );
 }
 
 #[test]
 fn rejects_truncated_tbc_specific_data_without_guessing_a_boundary() {
     let value = sample_with_button();
-    let mut bytes = to_bytes(&value).expect("serialize");
+    let mut bytes = to_bytes(&value, &SourceLimits::default()).expect("serialize");
     bytes.pop();
-    assert!(parse_bytes(&bytes).is_err());
+    assert!(parse_bytes(&bytes, &SourceLimits::default()).is_err());
 }
 
 #[test]
 fn rejects_invalid_tbc_command_type() {
     let value = sample();
-    let mut bytes = to_bytes(&value).expect("serialize");
+    let mut bytes = to_bytes(&value, &SourceLimits::default()).expect("serialize");
     let control = control(ControlType::Label, 0x1234, Some(0x0000_1231), Vec::new());
-    let encoded = to_control_bytes(&control).expect("control bytes");
+    let encoded = to_control_bytes(&control, &SourceLimits::default()).expect("control bytes");
     let offset = bytes
         .windows(encoded.len())
         .position(|window| window == encoded.as_slice())
         .expect("encoded control");
     let command_offset = offset + 11;
     bytes[command_offset..command_offset + 4].copy_from_slice(&0x0000_1232u32.to_le_bytes());
-    assert!(parse_bytes(&bytes).is_err());
+    assert!(parse_bytes(&bytes, &SourceLimits::default()).is_err());
+}
+
+#[test]
+fn raw_codec_reports_entry_limit_before_decoding() {
+    let bytes = to_bytes(&sample(), &SourceLimits::default()).expect("serialize");
+    let limits = SourceLimits::builder()
+        .max_entry_bytes(bytes.len() - 1)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        parse_bytes(&bytes, &limits),
+        Err(crate::package::Error::Limit {
+            kind: crate::package::SourceLimitKind::EntryBytes,
+            ..
+        })
+    ));
+}
+
+#[test]
+fn raw_writer_honors_exact_and_one_under_entry_limits() {
+    let value = sample();
+    let bytes = to_bytes(&value, &SourceLimits::default()).expect("serialize");
+    let exact = SourceLimits::builder()
+        .max_entry_bytes(bytes.len())
+        .unwrap()
+        .build()
+        .unwrap();
+    assert_eq!(to_bytes(&value, &exact).unwrap(), bytes);
+    let one_under = SourceLimits::builder()
+        .max_entry_bytes(bytes.len() - 1)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        to_bytes(&value, &one_under),
+        Err(crate::package::Error::Limit {
+            kind: crate::package::SourceLimitKind::EntryBytes,
+            ..
+        })
+    ));
 }
 
 fn sample_with_button() -> CommandBars<'static> {

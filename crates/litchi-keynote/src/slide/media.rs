@@ -4,6 +4,11 @@ use std::time::Duration;
 
 pub mod properties;
 
+/// Embedded media reachable from the document or a slide (record 0372).
+pub mod assets {
+    pub use crate::package::media_assets::{Error, Kind, MediaAsset};
+}
+
 use geometry::MovieTransform;
 
 pub use properties::MediaProperties;
@@ -203,18 +208,6 @@ pub mod geometry {
         /// Toggle reflection and add a half turn to rotation.
         Vertical,
     }
-
-    /// Package transaction types for an existing movie's geometry.
-    ///
-    /// The package adapter owns selection, native graph traversal, and exact
-    /// publication. This namespace exposes only the transaction vocabulary;
-    /// native records and identifiers do not cross the semantic boundary.
-    pub mod transaction {
-        pub use crate::{
-            SlideMovieGeometryCommit, SlideMovieGeometryDiagnostics, SlideMovieGeometryEdit,
-            SlideMovieGeometryError, SlideMovieGeometryLimitKind, SlideMovieGeometryPatch,
-        };
-    }
 }
 
 /// Archive-free playback values used by Keynote slide media summaries.
@@ -238,6 +231,7 @@ pub mod playback {
 
     /// Validation failures for Keynote media playback values.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, thiserror::Error)]
+    #[non_exhaustive]
     pub enum Error {
         /// The supplied volume was NaN or infinite.
         #[error("media volume must be finite")]
@@ -484,17 +478,6 @@ pub mod playback {
         Duration::try_from_secs_f32(seconds as f32)
             .map_err(|_error| Error::TimeOutOfRange { field })
     }
-
-    /// Package transaction types for an existing file-backed movie's scalar
-    /// playback settings.  The transaction itself remains implemented by the
-    /// package adapter; this nested namespace keeps the semantic media value
-    /// and its operation vocabulary together without exposing native records.
-    pub mod transaction {
-        pub use crate::{
-            SlideMoviePlaybackCommit, SlideMoviePlaybackDiagnostics, SlideMoviePlaybackEdit,
-            SlideMoviePlaybackError, SlideMoviePlaybackLimitKind, SlideMoviePlaybackPatch,
-        };
-    }
 }
 
 pub use playback::{MediaLoopMode, MediaPlaybackSettings, MediaVolume};
@@ -651,14 +634,34 @@ impl MovieInfo {
     }
 }
 
-/// Compatibility alias emphasizing that a movie entry is a media drawable.
-pub type MediaInfo = MovieInfo;
+/// Exact-source transactions replacing one existing media payload.
+pub mod data {
+    pub use crate::package::slide_media_replacement::{
+        Commit, Data, Diagnostics, Edit, Error, LimitKind, MediaPart, Patch, Refusal,
+    };
+}
+
+/// Exact-source replacement of one embedded media asset by its
+/// [`assets::MediaAsset`] handle, keeping its identifier (record 0417).
+pub mod asset_data {
+    pub use crate::package::slide_media_replacement::asset::{
+        Commit, Diagnostics, Edit, EditOptions, Patch,
+    };
+    pub use crate::package::slide_media_replacement::{Error, LimitKind, Refusal};
+}
+
+/// Exact-source duplicate/remove transactions for slide media.
+pub mod lifecycle {
+    pub use crate::package::slide_media_lifecycle::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+}
 
 #[cfg(test)]
 mod tests {
     use super::{
-        MediaInfo, MediaLoopMode, MediaPlaybackSettings, MediaVolume, MovieInfo, MovieKind, Point,
-        Size, geometry::MovieTransform,
+        MediaLoopMode, MediaPlaybackSettings, MediaVolume, MovieInfo, MovieKind, Point, Size,
+        geometry::MovieTransform,
     };
     use std::mem::size_of;
     use std::time::Duration;
@@ -700,8 +703,6 @@ mod tests {
         assert_eq!(movie.transform(), None);
         assert_eq!(movie.playback(), Some(playback));
         assert_eq!(movie.duration(), Some(Duration::from_secs(3)));
-        let _: MediaInfo = movie;
-        assert_eq!(size_of::<MovieInfo>(), size_of::<MediaInfo>());
     }
 
     #[test]

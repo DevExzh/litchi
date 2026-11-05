@@ -71,20 +71,30 @@ fn expected(layout: MimetypeLayout) -> Vec<(Defect, u16)> {
 fn assert_opens_everywhere_recording(bytes: &[u8], defects: &[(Defect, u16)], label: &str) {
     // Detection classifies the package from every input shape.
     assert_eq!(
-        detect::packaged_mime(bytes),
+        detect::packaged_mime(bytes, detect::Limits::default())
+            .ok()
+            .flatten(),
         Some(FileFormat::Odt),
         "{label}"
     );
-    assert_eq!(detect::bytes(bytes), Some(FileFormat::Odt), "{label}");
+    assert_eq!(
+        detect::bytes(bytes, detect::Limits::default())
+            .ok()
+            .flatten(),
+        Some(FileFormat::Odt),
+        "{label}"
+    );
     let source = OwnedSource::new(bytes.to_vec());
     assert_eq!(
-        detect::packaged_mime_read_at(&source).unwrap(),
+        detect::packaged_mime_read_at(&source, detect::Limits::default()).unwrap(),
         Some(FileFormat::Odt),
         "{label}"
     );
     let mut cursor = std::io::Cursor::new(bytes.to_vec());
     assert_eq!(
-        detect::reader(&mut cursor),
+        detect::reader(&mut cursor, detect::Limits::default())
+            .ok()
+            .flatten(),
         Some(FileFormat::Odt),
         "{label}"
     );
@@ -112,8 +122,9 @@ fn assert_opens_everywhere_recording(bytes: &[u8], defects: &[(Defect, u16)], la
     );
 
     // The prepared detection handoff retains the report.
-    let prepared = detect::prepared_or_original(bytes.to_vec())
-        .unwrap_or_else(|_| panic!("{label}: tolerated package must prepare"));
+    let prepared =
+        detect::prepared_or_original(bytes.to_vec(), litchi_odf_common::SourceLimits::default())
+            .unwrap_or_else(|_| panic!("{label}: tolerated package must prepare"));
     assert_eq!(prepared.format(), FileFormat::Odt, "{label}");
     assert_eq!(recorded(prepared.tolerance_report()), defects, "{label}");
 }
@@ -173,15 +184,32 @@ fn garbage_mimetype_content_still_fails_under_every_layout() {
             "office:text",
             layout,
         );
-        assert_eq!(detect::packaged_mime(&bytes), None, "{layout:?}");
-        assert_eq!(detect::bytes(&bytes), None, "{layout:?}");
         assert_eq!(
-            detect::packaged_mime_read_at(&OwnedSource::new(bytes.clone())).unwrap(),
+            detect::packaged_mime(&bytes, detect::Limits::default())
+                .ok()
+                .flatten(),
+            None,
+            "{layout:?}"
+        );
+        assert_eq!(
+            detect::bytes(&bytes, detect::Limits::default())
+                .ok()
+                .flatten(),
+            None,
+            "{layout:?}"
+        );
+        assert_eq!(
+            detect::packaged_mime_read_at(
+                &OwnedSource::new(bytes.clone()),
+                detect::Limits::default()
+            )
+            .unwrap(),
             None,
             "{layout:?}"
         );
         assert!(
-            detect::prepared_or_original(bytes.clone()).is_err(),
+            detect::prepared_or_original(bytes.clone(), litchi_odf_common::SourceLimits::default())
+                .is_err(),
             "{layout:?}"
         );
         // The family contract still names the expected MIME type exactly.
@@ -196,13 +224,23 @@ fn garbage_mimetype_content_still_fails_under_every_layout() {
 #[test]
 fn structural_defects_stay_hard_errors() {
     // Non-ZIP input.
-    assert_eq!(detect::packaged_mime(b"not a zip archive at all"), None);
+    assert_eq!(
+        detect::packaged_mime(b"not a zip archive at all", detect::Limits::default())
+            .ok()
+            .flatten(),
+        None
+    );
     assert!(OwnedPackage::from_bytes(b"not a zip archive at all".to_vec()).is_err());
 
     // A truncated archive whose central directory is gone.
     let bytes = minimal_package(ODT, "office:text", NOT_FIRST);
     let truncated = bytes[..bytes.len() - 30].to_vec();
-    assert_eq!(detect::packaged_mime(&truncated), None);
+    assert_eq!(
+        detect::packaged_mime(&truncated, detect::Limits::default())
+            .ok()
+            .flatten(),
+        None
+    );
     assert!(
         SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(truncated.clone()))).is_err()
     );
@@ -212,8 +250,15 @@ fn structural_defects_stay_hard_errors() {
     let mut corrupt = minimal_package(ODT, "office:text", DEFLATED);
     let payload = 30 + "mimetype".len() + 5;
     corrupt[payload] ^= 0x20;
-    assert_eq!(detect::packaged_mime(&corrupt), None);
-    assert!(detect::prepared_or_original(corrupt).is_err());
+    assert_eq!(
+        detect::packaged_mime(&corrupt, detect::Limits::default())
+            .ok()
+            .flatten(),
+        None
+    );
+    assert!(
+        detect::prepared_or_original(corrupt, litchi_odf_common::SourceLimits::default()).is_err()
+    );
 
     // A missing manifest is still rejected by the positional owner.
     let no_manifest = odf_rezip::package(
@@ -236,7 +281,12 @@ fn structural_defects_stay_hard_errors() {
     assert!(
         SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(prefixed.clone()))).is_err()
     );
-    assert_eq!(detect::packaged_mime(&prefixed), None);
+    assert_eq!(
+        detect::packaged_mime(&prefixed, detect::Limits::default())
+            .ok()
+            .flatten(),
+        None
+    );
 }
 
 #[test]
@@ -248,9 +298,14 @@ fn an_ooxml_first_entry_skips_the_tolerant_lookup() {
         &[("[Content_Types].xml", b"<Types/>")],
         NOT_FIRST,
     );
-    assert_eq!(detect::packaged_mime(&bytes), None);
     assert_eq!(
-        detect::packaged_mime_read_at(&OwnedSource::new(bytes)).unwrap(),
+        detect::packaged_mime(&bytes, detect::Limits::default())
+            .ok()
+            .flatten(),
+        None
+    );
+    assert_eq!(
+        detect::packaged_mime_read_at(&OwnedSource::new(bytes), detect::Limits::default()).unwrap(),
         None
     );
 }

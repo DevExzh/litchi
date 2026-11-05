@@ -7,7 +7,7 @@ use crate::data_model::model::{
     Definition, Relationship, Table, TimeGrouping, TimeGroupingColumn, TimeGroupingContentType,
 };
 use crate::package::error::{Error, Result};
-use crate::raw::{Cursor, Limits as RawLimits, Records, Writer, kind};
+use crate::raw::{Cursor, Encoder, Limits as RawLimits, Records, kind};
 
 const FRT_HEADER_LEN: usize = 4;
 const MIN_MODEL_VERSION: u8 = 5;
@@ -35,7 +35,7 @@ pub const HARD_MAX_CONNECTIONS: usize = 4_096;
 
 /// Finite limits for Data Model record inspection and rewrite.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ReadLimits {
+pub struct SemanticLimits {
     /// Raw BIFF12 record and string limits.
     pub raw: RawLimits,
     /// Maximum number of workbook table records.
@@ -72,7 +72,7 @@ pub struct ReadLimits {
     pub max_connections: usize,
 }
 
-impl ReadLimits {
+impl SemanticLimits {
     /// Conservative finite limits for ordinary XLSB processing.
     pub const DEFAULT: Self = Self {
         raw: RawLimits::DEFAULT,
@@ -113,7 +113,7 @@ impl ReadLimits {
     }
 }
 
-impl Default for ReadLimits {
+impl Default for SemanticLimits {
     fn default() -> Self {
         Self::DEFAULT
     }
@@ -164,9 +164,9 @@ pub(crate) struct Parsed {
 }
 
 /// Parse the workbook's optional `BrtBeginDataModel` block.
-pub(crate) fn parse_workbook(data: &[u8], limits: ReadLimits) -> Result<Parsed> {
+pub(crate) fn parse_workbook(data: &[u8], limits: SemanticLimits) -> Result<Parsed> {
     let limits = limits.validate()?;
-    let mut iterator = Records::try_with_limits(data, limits.raw)?;
+    let mut iterator = Records::bounded(data, limits.raw)?;
     let mut record_count = 0_usize;
     let mut begin: Option<usize> = None;
     let mut end: Option<usize> = None;
@@ -444,7 +444,7 @@ pub(crate) fn parse_workbook(data: &[u8], limits: ReadLimits) -> Result<Parsed> 
 
 #[cfg(test)]
 fn collect_records(data: &[u8], limits: RawLimits, max_records: usize) -> Result<Vec<WireRecord>> {
-    let mut iterator = Records::try_with_limits(data, limits)?;
+    let mut iterator = Records::bounded(data, limits)?;
     let mut records = Vec::new();
     while let Some(record) = iterator.next() {
         let record = record?;
@@ -478,19 +478,14 @@ fn parse_begin_data_model(payload: &[u8]) -> Result<([u8; FRT_HEADER_LEN], u8)> 
     validate_frt_blank(header, "BrtBeginDataModel")?;
     let version = payload[FRT_HEADER_LEN];
     if version < MIN_MODEL_VERSION {
-        return Err(invalid(format!(
-            "bVerLoadModelMin {version} is below the required minimum {MIN_MODEL_VERSION}"
-        )));
+        return Err(invalid("bVerLoadModelMin is below the required minimum"));
     }
     Ok((header, version))
 }
 
-fn require_empty(payload: &[u8], name: &'static str) -> Result<()> {
+fn require_empty(payload: &[u8], _name: &'static str) -> Result<()> {
     if !payload.is_empty() {
-        return Err(invalid(format!(
-            "{name} payload must be empty, found {} bytes",
-            payload.len()
-        )));
+        return Err(invalid("payload must be empty, found bytes"));
     }
     Ok(())
 }
@@ -576,21 +571,19 @@ fn start_cursor<'a>(
     validate_frt_blank(header, context)?;
     Ok((
         header,
-        Cursor::try_with_limits(&payload[FRT_HEADER_LEN..], context, limits)?,
+        Cursor::bounded(&payload[FRT_HEADER_LEN..], context, limits)?,
     ))
 }
 
-fn validate_frt_blank(header: [u8; FRT_HEADER_LEN], context: &'static str) -> Result<()> {
+fn validate_frt_blank(header: [u8; FRT_HEADER_LEN], _context: &'static str) -> Result<()> {
     if header != [0; FRT_HEADER_LEN] {
-        return Err(invalid(format!(
-            "{context} FRTHeader reserved bytes must be zero"
-        )));
+        return Err(invalid("FRTHeader reserved bytes must be zero"));
     }
     Ok(())
 }
 
 /// Validate typed workbook Data Model metadata before publication.
-pub(crate) fn validate_definition(value: &Definition, limits: ReadLimits) -> Result<()> {
+pub(crate) fn validate_definition(value: &Definition, limits: SemanticLimits) -> Result<()> {
     if value.min_version_load < MIN_MODEL_VERSION {
         return Err(invalid("min_version_load must be at least 5"));
     }
@@ -621,16 +614,10 @@ pub(crate) fn validate_definition(value: &Definition, limits: ReadLimits) -> Res
         bounded(&table.name, "table name")?;
         bounded(&table.connection, "connection name")?;
         if !ids.insert(table.id.to_lowercase()) {
-            return Err(invalid(format!(
-                "duplicate Data Model table id {:?}",
-                table.id
-            )));
+            return Err(invalid("duplicate Data Model table id"));
         }
         if !names.insert(table.name.to_lowercase()) {
-            return Err(invalid(format!(
-                "duplicate Data Model table name {:?}",
-                table.name
-            )));
+            return Err(invalid("duplicate Data Model table name"));
         }
     }
     let mut relationship_keys = HashSet::new();
@@ -646,16 +633,10 @@ pub(crate) fn validate_definition(value: &Definition, limits: ReadLimits) -> Res
         bounded(&relationship.to_table, "to table")?;
         bounded(&relationship.to_column, "to column")?;
         if !names.contains(&relationship.from_table.to_lowercase()) {
-            return Err(invalid(format!(
-                "relationship references unknown from_table {:?}",
-                relationship.from_table
-            )));
+            return Err(invalid("relationship references unknown from_table"));
         }
         if !names.contains(&relationship.to_table.to_lowercase()) {
-            return Err(invalid(format!(
-                "relationship references unknown to_table {:?}",
-                relationship.to_table
-            )));
+            return Err(invalid("relationship references unknown to_table"));
         }
         let key = (
             relationship.from_table.to_lowercase(),
@@ -679,10 +660,7 @@ pub(crate) fn validate_definition(value: &Definition, limits: ReadLimits) -> Res
         bounded(&grouping.column_name, "time grouping column")?;
         bounded(&grouping.column_id, "time grouping column id")?;
         if !names.contains(&grouping.table_name.to_lowercase()) {
-            return Err(invalid(format!(
-                "time grouping references unknown table {:?}",
-                grouping.table_name
-            )));
+            return Err(invalid("time grouping references unknown table"));
         }
         if grouping.columns.len() > limits.max_time_grouping_columns {
             return Err(limit("time grouping calculated-column count"));
@@ -721,7 +699,7 @@ fn bounded(value: &str, label: &'static str) -> Result<()> {
     let bytes = value.len();
     let units = value.encode_utf16().count();
     if value.is_empty() {
-        return Err(invalid(format!("{label} must not be empty")));
+        return Err(invalid("must not be empty"));
     }
     if bytes > MAX_STRING_BYTES || units > MAX_STRING_UNITS {
         return Err(limit(label));
@@ -732,13 +710,15 @@ fn bounded(value: &str, label: &'static str) -> Result<()> {
 fn serialize_definition(
     value: &Definition,
     layout: Option<&Layout>,
-    limits: ReadLimits,
+    limits: SemanticLimits,
 ) -> Result<Vec<u8>> {
     let limits = limits.validate()?;
     validate_definition(value, limits)?;
     if layout.is_some_and(|layout| layout.opaque) {
-        return Err(Error::UnsupportedFeature(
-            "Data Model workbook block contains opaque future records".to_string(),
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit_data_model",
+            "the Data Model workbook block contains opaque future records",
         ));
     }
     let write_tables = layout.map_or(!value.tables.is_empty(), |value_layout| {
@@ -765,7 +745,7 @@ fn serialize_definition(
             source,
         })?;
     {
-        let mut writer = Writer::try_with_limits(&mut output, limits.raw)?;
+        let mut writer = Encoder::bounded(&mut output, limits.raw)?;
         let begin_header = layout.map_or([0; FRT_HEADER_LEN], |layout| layout.begin_header);
         let mut begin_payload = begin_header.to_vec();
         begin_payload.push(value.min_version_load);
@@ -858,7 +838,7 @@ fn serialized_size(
     write_tables: bool,
     write_relationships: bool,
     write_time_groupings: bool,
-    limits: ReadLimits,
+    limits: SemanticLimits,
 ) -> Result<usize> {
     let mut total = 0_usize;
     add_record_size(
@@ -929,13 +909,10 @@ fn add_record_size(
     total: &mut usize,
     kind: crate::raw::Kind,
     payload: usize,
-    limits: ReadLimits,
+    limits: SemanticLimits,
 ) -> Result<()> {
     if payload > limits.raw.payload() {
-        return Err(invalid(format!(
-            "Data Model record payload {payload} exceeds raw limit {}",
-            limits.raw.payload()
-        )));
+        return Err(invalid("Data Model record payload exceeds raw limit"));
     }
     let record_size = kind_len(kind)
         .checked_add(varint_len(payload))
@@ -989,7 +966,7 @@ fn varint_len(mut value: usize) -> usize {
 }
 
 pub(crate) fn serialize_new_workbook(definition: &Definition) -> Result<Vec<u8>> {
-    serialize_definition(definition, None, ReadLimits::DEFAULT)
+    serialize_definition(definition, None, SemanticLimits::DEFAULT)
 }
 
 fn write_payload(
@@ -998,14 +975,14 @@ fn write_payload(
 ) -> Result<Vec<u8>> {
     let mut payload = Vec::new();
     let mut writer = PayloadWriter {
-        inner: Writer::try_with_limits(&mut payload, limits)?,
+        inner: Encoder::bounded(&mut payload, limits)?,
     };
     write(&mut writer)?;
     Ok(payload)
 }
 
 struct PayloadWriter<'a> {
-    inner: Writer<&'a mut Vec<u8>>,
+    inner: Encoder<&'a mut Vec<u8>>,
 }
 
 impl PayloadWriter<'_> {
@@ -1027,20 +1004,22 @@ pub(crate) fn patch_workbook(
     source: &[u8],
     before: Option<&Definition>,
     after: Option<&Definition>,
-    limits: ReadLimits,
+    limits: SemanticLimits,
 ) -> Result<Vec<u8>> {
     let parsed = parse_workbook(source, limits)?;
     if parsed.definition.as_ref() != before {
-        return Err(Error::InvalidFormat(
-            "Data Model workbook source does not match the transaction snapshot".to_string(),
-        ));
+        return Err(Error::PatchConflict {
+            part: "data model workbook",
+        });
     }
     if before == after {
         return Ok(source.to_vec());
     }
     if parsed.layout.opaque {
-        return Err(Error::UnsupportedFeature(
-            "cannot edit a Data Model workbook block containing opaque future records".to_string(),
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit_data_model",
+            "the Data Model workbook block contains opaque future records",
         ));
     }
     let replacement = match after {
@@ -1097,8 +1076,8 @@ pub(crate) fn patch_workbook(
     Ok(output)
 }
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn invalid(message: &'static str) -> Error {
+    Error::InvalidFormat(message)
 }
 
 fn reserve_one<T>(values: &mut Vec<T>, resource: &'static str) -> Result<()> {
@@ -1123,8 +1102,8 @@ fn is_model_record(value: u16) -> bool {
         || value == kind::MODEL_TIME_GROUPING_CALC_COL.get()
 }
 
-fn limit(name: &'static str) -> Error {
-    Error::InvalidFormat(format!("Data Model {name} limit exceeded"))
+fn limit(_name: &'static str) -> Error {
+    Error::InvalidFormat("Data Model limit exceeded")
 }
 
 #[cfg(test)]
@@ -1157,13 +1136,13 @@ mod tests {
     }
 
     fn fixture() -> Vec<u8> {
-        serialize_definition(&definition(), None, ReadLimits::DEFAULT).expect("fixture")
+        serialize_definition(&definition(), None, SemanticLimits::DEFAULT).expect("fixture")
     }
 
     #[test]
     fn round_trip_model_records() {
         let bytes = fixture();
-        let parsed = parse_workbook(&bytes, ReadLimits::DEFAULT).expect("parse");
+        let parsed = parse_workbook(&bytes, SemanticLimits::DEFAULT).expect("parse");
         assert_eq!(parsed.definition, Some(definition()));
         assert!(!parsed.layout.opaque);
         assert_eq!(
@@ -1171,7 +1150,7 @@ mod tests {
                 &bytes,
                 Some(&definition()),
                 Some(&definition()),
-                ReadLimits::DEFAULT
+                SemanticLimits::DEFAULT
             )
             .expect("noop"),
             bytes
@@ -1188,7 +1167,7 @@ mod tests {
             .expect("column");
         let payload_offset = column.range.start + 2 + 1 + FRT_HEADER_LEN;
         bytes[payload_offset] |= 0x80;
-        assert!(parse_workbook(&bytes, ReadLimits::DEFAULT).is_err());
+        assert!(parse_workbook(&bytes, SemanticLimits::DEFAULT).is_err());
     }
 
     #[test]
@@ -1202,7 +1181,7 @@ mod tests {
             .expect("begin");
         let mut bytes = fixture.clone();
         bytes[begin.range.start + 3] = 1;
-        assert!(parse_workbook(&bytes, ReadLimits::DEFAULT).is_err());
+        assert!(parse_workbook(&bytes, SemanticLimits::DEFAULT).is_err());
 
         let table = records
             .iter()
@@ -1210,7 +1189,7 @@ mod tests {
             .expect("table");
         let mut bytes = fixture;
         bytes[table.range.start + 3] = 1;
-        assert!(parse_workbook(&bytes, ReadLimits::DEFAULT).is_err());
+        assert!(parse_workbook(&bytes, SemanticLimits::DEFAULT).is_err());
     }
 
     #[test]
@@ -1222,19 +1201,19 @@ mod tests {
             .find(|record| record.kind == kind::END_DATA_MODEL.get())
             .expect("end");
         let mut inserted = Vec::new();
-        let mut writer = Writer::new(&mut inserted);
+        let mut writer = Encoder::new(&mut inserted, crate::raw::Limits::DEFAULT);
         writer
             .write_record(Kind::new(4095).expect("kind"), &[1, 2])
             .expect("record");
         bytes.splice(end.range.start..end.range.start, inserted);
-        let parsed = parse_workbook(&bytes, ReadLimits::DEFAULT).expect("read");
+        let parsed = parse_workbook(&bytes, SemanticLimits::DEFAULT).expect("read");
         assert!(parsed.layout.opaque);
         assert_eq!(
             patch_workbook(
                 &bytes,
                 parsed.definition.as_ref(),
                 parsed.definition.as_ref(),
-                ReadLimits::DEFAULT,
+                SemanticLimits::DEFAULT,
             )
             .expect("opaque no-op"),
             bytes
@@ -1246,7 +1225,7 @@ mod tests {
                 &bytes,
                 parsed.definition.as_ref(),
                 Some(&changed),
-                ReadLimits::DEFAULT
+                SemanticLimits::DEFAULT
             )
             .is_err()
         );
@@ -1255,7 +1234,7 @@ mod tests {
     #[test]
     fn workbook_record_index_has_a_finite_limit() {
         let bytes = fixture();
-        let mut limits = ReadLimits::DEFAULT;
+        let mut limits = SemanticLimits::DEFAULT;
         limits.max_records = 0;
         assert!(parse_workbook(&bytes, limits).is_err());
     }
@@ -1263,11 +1242,11 @@ mod tests {
     #[test]
     fn rewrite_byte_limit_is_checked_at_the_exact_boundary() {
         let bytes = fixture();
-        let parsed = parse_workbook(&bytes, ReadLimits::DEFAULT).expect("parse");
+        let parsed = parse_workbook(&bytes, SemanticLimits::DEFAULT).expect("parse");
         let mut changed = definition();
         changed.min_version_load = 6;
 
-        let mut exact = ReadLimits::DEFAULT;
+        let mut exact = SemanticLimits::DEFAULT;
         exact.max_rewrite_bytes = bytes.len();
         let rewritten = patch_workbook(&bytes, parsed.definition.as_ref(), Some(&changed), exact)
             .expect("exact rewrite budget");
@@ -1283,10 +1262,10 @@ mod tests {
     fn model_records_after_end_book_are_rejected() {
         let fixture = fixture();
         let mut bytes = Vec::new();
-        let mut writer = Writer::new(&mut bytes);
+        let mut writer = Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT);
         writer.write_record(kind::END_BOOK, &[]).expect("end book");
         bytes.extend_from_slice(&fixture);
-        assert!(parse_workbook(&bytes, ReadLimits::DEFAULT).is_err());
+        assert!(parse_workbook(&bytes, SemanticLimits::DEFAULT).is_err());
     }
 
     #[test]
@@ -1298,16 +1277,16 @@ mod tests {
             .find(|record| record.kind == kind::END_DATA_MODEL.get())
             .expect("end");
         let mut end_book = Vec::new();
-        Writer::new(&mut end_book)
+        Encoder::new(&mut end_book, crate::raw::Limits::DEFAULT)
             .write_record(kind::END_BOOK, &[])
             .expect("end book");
         let mut bytes = fixture;
         bytes.splice(end.range.start..end.range.start, end_book);
-        assert!(parse_workbook(&bytes, ReadLimits::DEFAULT).is_err());
+        assert!(parse_workbook(&bytes, SemanticLimits::DEFAULT).is_err());
     }
 
     #[test]
     fn model_insertion_requires_an_end_book_anchor() {
-        assert!(patch_workbook(&[], None, Some(&definition()), ReadLimits::DEFAULT,).is_err());
+        assert!(patch_workbook(&[], None, Some(&definition()), SemanticLimits::DEFAULT,).is_err());
     }
 }

@@ -7,14 +7,14 @@ use litchi_core::Position;
 use litchi_iwa_archive::package::{EntryEdit, ExactArtifacts};
 use litchi_iwa_common::{
     WireLimits,
-    wire::{WireView, append_length_delimited_field_with_limits},
+    wire::{WireView, append_length_delimited_field},
 };
 use litchi_iwa_core::{Archive, ArchiveObject, FieldType, RawMessage, SnappyStream};
 use litchi_iwa_protos::package_metadata_codec::{
-    ComponentDescriptor, ComponentSelector, DataReferenceOwnerRemoval, ExternalReferenceDescriptor,
-    ExternalReferenceRemoval, ObjectUuidDescriptor, ObjectUuidRemoval, PackageMetadataVisitor,
-    RemovalBatch, RewriteError, RewriteOptions, UuidBits, inspect_package_metadata_with_visitor,
-    remove_package_metadata,
+    ComponentDescriptor, ComponentSelector, DataReferenceOwnerDescriptor,
+    DataReferenceOwnerRemoval, ExternalReferenceDescriptor, ExternalReferenceRemoval,
+    ObjectUuidDescriptor, ObjectUuidRemoval, PackageMetadataVisitor, RemovalBatch, RewriteError,
+    RewriteOptions, UuidBits, inspect_package_metadata_with_visitor, remove_package_metadata,
 };
 use thiserror::Error as ThisError;
 
@@ -94,6 +94,34 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    #[error("the Keynote source cannot be deleted from safely")]
+    InvalidSource,
+    #[error(
+        "Keynote slide-deletion {kind} limit exceeded at {path}: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        kind: LimitKind,
+        observed: u64,
+        maximum: u64,
+        path: Path,
+    },
+    #[error("could not allocate {amount} units for the Keynote slide-deletion transaction")]
+    Allocation { amount: usize },
+    #[error("the deleted Keynote candidate failed semantic verification")]
+    Verification,
+    #[error("the Keynote slide-deletion patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     #[error("this Keynote source does not support physical edits")]
     UnsupportedSource,
     #[error("this Keynote slide topology is not supported for deletion")]
@@ -112,25 +140,38 @@ pub enum Error {
     OperationAlreadyStaged,
     #[error("the Keynote slide-deletion transaction has no staged operation")]
     NoStagedOperation,
-    #[error("the Keynote source cannot be deleted from safely")]
-    InvalidSource,
     #[error("the selected Keynote slide graph has another surviving owner")]
     AmbiguousOwnership,
-    #[error(
-        "Keynote slide-deletion {kind} limit exceeded at {path}: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        kind: LimitKind,
-        observed: u64,
-        maximum: u64,
-        path: Path,
-    },
-    #[error("could not allocate {amount} units for the Keynote slide-deletion transaction")]
-    Allocation { amount: usize },
-    #[error("the deleted Keynote candidate failed semantic verification")]
-    Verification,
-    #[error("the Keynote slide-deletion patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::AmbiguousOwnership { .. } => RefusalKind::UnsupportedContent,
+            Self::UnsupportedSource { .. } | Self::UnsupportedTopology { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+            Self::AmbiguousSelector { .. } | Self::EmptySlideName { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::SlideNameNotFound { .. } | Self::SlidePositionNotFound { .. } => {
+                RefusalKind::NotFound
+            },
+            Self::CannotDeleteFinalSlide { .. } => RefusalKind::UnsupportedTarget,
+            Self::OperationAlreadyStaged { .. } | Self::NoStagedOperation { .. } => {
+                RefusalKind::UnsupportedOperation
+            },
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -169,6 +210,15 @@ struct MetadataFacts<'a> {
     component_external_record: Option<(u64, Option<bool>)>,
     invalid: bool,
     ambiguous: bool,
+    /// Weak, unversioned references to the node from other components (a
+    /// view state's slide selection): `(source component, source locator,
+    /// target component)`. They do not own the node and are dropped with it.
+    weak_node_references: Vec<(u64, String, u64)>,
+    /// The registry's data-reference owner records of the node and the
+    /// slide: `(owner, data identifier, count)`. They are removed with
+    /// their owners even when the owner's archive no longer lists the data
+    /// (a slide whose preview was invalidated keeps its registry record).
+    data_owner_records: Vec<(u64, u64, u32)>,
     node_identifier: u64,
     slide_identifier: u64,
     node_locator: &'a str,
@@ -216,6 +266,31 @@ impl PackageMetadataVisitor for MetadataFacts<'_> {
         }
         Ok(())
     }
+    fn visit_data_reference_owner(
+        &mut self,
+        owner: DataReferenceOwnerDescriptor<'_>,
+    ) -> Result<(), RewriteError> {
+        let object = owner.object_identifier();
+        if object != self.node_identifier && object != self.slide_identifier {
+            return Ok(());
+        }
+        let locator = if object == self.node_identifier {
+            self.node_locator
+        } else {
+            self.slide_locator
+        };
+        if !owner.component().is_current()
+            || owner.component().effective_locator() != locator
+            || owner.has_unknown_fields()
+        {
+            self.invalid = true;
+        } else {
+            self.data_owner_records
+                .push((object, owner.data_identifier(), owner.count()));
+        }
+        Ok(())
+    }
+
     fn visit_external_reference(
         &mut self,
         reference: ExternalReferenceDescriptor<'_>,
@@ -223,6 +298,15 @@ impl PackageMetadataVisitor for MetadataFacts<'_> {
         if reference.object_identifier() == Some(self.node_identifier) {
             if reference.is_versioned() {
                 self.invalid = true;
+            } else if reference.is_weak() == Some(true)
+                && reference.source().is_current()
+                && reference.source().effective_locator() != self.node_locator
+            {
+                self.weak_node_references.push((
+                    reference.source().identifier(),
+                    reference.source().effective_locator().to_owned(),
+                    reference.target_component_identifier(),
+                ));
             } else {
                 self.ambiguous = true;
             }
@@ -321,6 +405,8 @@ fn select_metadata<'a>(
         component_external_record: None,
         invalid: false,
         ambiguous: false,
+        weak_node_references: Vec::new(),
+        data_owner_records: Vec::new(),
         node_identifier,
         slide_identifier,
         node_locator: normalized_locator(node_component),
@@ -351,7 +437,7 @@ fn select_metadata<'a>(
         return Err(Error::InvalidSource);
     }
     if facts.ambiguous {
-        return Err(Error::AmbiguousOwnership);
+        return Err(Error::Refused(Refusal::AmbiguousOwnership));
     }
     let node_selector = ComponentSelector::new(node_component_id, facts.node_locator);
     let slide_selector = ComponentSelector::new(slide_component_id, facts.slide_locator);
@@ -369,27 +455,43 @@ fn select_metadata<'a>(
         .message_infos
         .first()
         .ok_or(Error::InvalidSource)?;
-    let data_count = node_info
-        .data_references
-        .len()
-        .checked_add(slide_info.data_references.len())
-        .ok_or(Error::InvalidSource)?;
+    // The data each object's archive lists must have a registry owner
+    // record; the registry may also hold records the archive no longer
+    // lists (an invalidated slide preview), which go with their owner.
+    // A record of data the archive lists counts exactly its listings.
+    for (identifier, info) in [(node_identifier, node_info), (slide_identifier, slide_info)] {
+        if info.data_references.iter().any(|data| {
+            !facts
+                .data_owner_records
+                .iter()
+                .any(|(owner, record, _)| *owner == identifier && record == data)
+        }) {
+            return Err(Error::InvalidSource);
+        }
+        for (owner, data, count) in &facts.data_owner_records {
+            let listed = info
+                .data_references
+                .iter()
+                .filter(|listed| *listed == data)
+                .count();
+            if *owner == identifier && listed != 0 && listed != *count as usize {
+                return Err(Error::InvalidSource);
+            }
+        }
+    }
+    let data_count = facts.data_owner_records.len();
     let mut data_owners = Vec::new();
     data_owners
         .try_reserve_exact(data_count)
         .map_err(|_| Error::Allocation { amount: data_count })?;
-    data_owners.extend(
-        node_info
-            .data_references
-            .iter()
-            .map(|id| DataReferenceOwnerRemoval::new(node_selector, *id, node_identifier, 1)),
-    );
-    data_owners.extend(
-        slide_info
-            .data_references
-            .iter()
-            .map(|id| DataReferenceOwnerRemoval::new(slide_selector, *id, slide_identifier, 1)),
-    );
+    data_owners.extend(facts.data_owner_records.iter().map(|(owner, data, count)| {
+        let selector = if *owner == node_identifier {
+            node_selector
+        } else {
+            slide_selector
+        };
+        DataReferenceOwnerRemoval::new(selector, *data, *owner, *count)
+    }));
     let node_uuid = facts.node_uuid.ok_or(Error::InvalidSource)?;
     let slide_uuid = facts.slide_uuid.ok_or(Error::InvalidSource)?;
     let uuid_removals = [
@@ -400,10 +502,41 @@ fn select_metadata<'a>(
     // with no object-specific external reference for its slide object. Remove
     // an exact object-specific record when present; a component-level record
     // (`object_identifier == None`) is not object ownership and is preserved.
-    let external_removal = facts.external_record.map(|(_, weakness)| {
+    if facts
+        .weak_node_references
+        .iter()
+        .any(|(_, _, target)| *target != node_component_id)
+    {
+        return Err(Error::InvalidSource);
+    }
+    let mut external_removals = Vec::new();
+    external_removals
+        .try_reserve_exact(facts.weak_node_references.len() + 1)
+        .map_err(|_| Error::Allocation {
+            amount: facts.weak_node_references.len() + 1,
+        })?;
+    external_removals.extend(facts.external_record.map(|(_, weakness)| {
         ExternalReferenceRemoval::new(node_selector, slide_selector, slide_identifier, weakness)
-    });
-    let external_removals = external_removal.as_slice();
+    }));
+    // A view state's slide selection references the selected node weakly
+    // from its own component. Weak references do not own their target, so
+    // the registry record is removed with the node; the selection payload is
+    // left as a dangling weak reference (not verified against Keynote; see
+    // record 0298).
+    external_removals.extend(
+        facts
+            .weak_node_references
+            .iter()
+            .map(|(source, locator, _)| {
+                ExternalReferenceRemoval::new(
+                    ComponentSelector::new(*source, locator),
+                    node_selector,
+                    node_identifier,
+                    Some(true),
+                )
+            }),
+    );
+    let external_removals = external_removals.as_slice();
     let removal = remove_package_metadata(
         payload,
         RemovalBatch::new(
@@ -457,7 +590,7 @@ pub(super) fn production_test_attempt(
     let observed = budget.report.work;
     if let Some(maximum) = max_work {
         if observed > maximum {
-            let error = Error::LimitExceeded {
+            let error = Error::Limit {
                 kind: LimitKind::Work,
                 observed,
                 maximum,
@@ -528,7 +661,7 @@ impl Budget {
             .checked_add(amount as u64)
             .ok_or(Error::InvalidSource)?;
         if self.report.work > self.maximum {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::Work,
                 observed: self.report.work,
                 maximum: self.maximum,
@@ -544,7 +677,7 @@ impl Budget {
             .checked_add(1)
             .ok_or(Error::InvalidSource)?;
         if self.report.references_scanned > self.max_references {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::References,
                 observed: self.report.references_scanned,
                 maximum: self.max_references,
@@ -560,7 +693,7 @@ impl Budget {
             .checked_add(1)
             .ok_or(Error::InvalidSource)?;
         if self.report.objects_scanned > self.max_objects {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::Objects,
                 observed: self.report.objects_scanned,
                 maximum: self.max_objects,
@@ -589,7 +722,7 @@ impl Budget {
             .checked_add(report.references_scanned() as u64)
             .ok_or(Error::InvalidSource)?;
         if self.report.references_scanned > self.max_references {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::References,
                 observed: self.report.references_scanned,
                 maximum: self.max_references,
@@ -637,19 +770,21 @@ impl<'a> Edit<'a> {
         selector: impl Into<SlideSelector<'s>>,
     ) -> Result<&mut Self, Error> {
         if self.intent.is_some() {
-            return Err(Error::OperationAlreadyStaged);
+            return Err(Error::Refused(Refusal::OperationAlreadyStaged));
         }
         let selector = selector.into();
         let show = self.source.show().map_err(map_read_error)?;
         if show.slides().len() <= 1 {
-            return Err(Error::CannotDeleteFinalSlide);
+            return Err(Error::Refused(Refusal::CannotDeleteFinalSlide));
         }
         let selected = show
             .select_slide(selector)
             .map_err(map_selector_error)?
             .ok_or(match selector {
-                SlideSelector::Name(_) => Error::SlideNameNotFound,
-                SlideSelector::Position(position) => Error::SlidePositionNotFound { position },
+                SlideSelector::Name(_) => Error::Refused(Refusal::SlideNameNotFound),
+                SlideSelector::Position(position) => {
+                    Error::Refused(Refusal::SlidePositionNotFound { position })
+                },
             })?;
         self.intent = Some(Intent {
             position: Position::new(selected.index()),
@@ -659,7 +794,9 @@ impl<'a> Edit<'a> {
 
     /// Validate, rewrite, reopen, and publish the staged immutable candidate.
     pub fn commit(self) -> Result<Commit, Error> {
-        let intent = self.intent.ok_or(Error::NoStagedOperation)?;
+        let intent = self
+            .intent
+            .ok_or(Error::Refused(Refusal::NoStagedOperation))?;
         commit_deletion(self.source, intent)
     }
 }
@@ -697,6 +834,13 @@ impl Patch {
     #[must_use]
     pub const fn target_fingerprint(&self) -> u64 {
         self.artifacts.target_fingerprint()
+    }
+    /// Return whether this patch leaves the deck unchanged. A deletion (or its
+    /// inverse, a restoration) always changes the slide count, so a patch of
+    /// this family is never a no-op.
+    #[must_use]
+    pub const fn is_noop(&self) -> bool {
+        self.source_slide_count == self.target_slide_count
     }
     #[must_use]
     pub fn inverse(&self) -> Self {
@@ -762,6 +906,12 @@ impl Commit {
     #[must_use]
     pub fn into_package(self) -> Package {
         self.package
+    }
+
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
     }
     #[must_use]
     pub const fn patch(&self) -> &Patch {
@@ -890,13 +1040,13 @@ fn prepare_selection<'a>(
             .map_err(map_read_error)?;
     let nodes = snapshot.slide_node_identifiers();
     if nodes.len() <= 1 {
-        return Err(Error::CannotDeleteFinalSlide);
+        return Err(Error::Refused(Refusal::CannotDeleteFinalSlide));
     }
     if intent.position.get() >= nodes.len() {
         return Err(Error::InvalidSource);
     }
     if snapshot.has_deprecated_root_slide_node() || snapshot.has_slide_list() {
-        return Err(Error::UnsupportedTopology);
+        return Err(Error::Refused(Refusal::UnsupportedTopology));
     }
     budget.allocation(
         nodes
@@ -907,7 +1057,7 @@ fn prepare_selection<'a>(
     let mut sorted = nodes.to_vec();
     sorted.sort_unstable();
     if sorted.first() == Some(&0) || sorted.windows(2).any(|pair| pair[0] == pair[1]) {
-        return Err(Error::UnsupportedTopology);
+        return Err(Error::Refused(Refusal::UnsupportedTopology));
     }
     let node_identifier = nodes[intent.position.get()];
     validate_selected_reference_metadata(show, show_message_index, node_identifier, &[3, 2])?;
@@ -967,13 +1117,13 @@ fn prepare_selection<'a>(
                     if *id == node_identifier {
                         node_owner += 1;
                         if owner != show_identifier || message_index != show_message_index {
-                            return Err(Error::AmbiguousOwnership);
+                            return Err(Error::Refused(Refusal::AmbiguousOwnership));
                         }
                     }
                     if *id == slide_identifier {
                         slide_owner += 1;
                         if owner != node_identifier || message_index != node_message_index {
-                            return Err(Error::AmbiguousOwnership);
+                            return Err(Error::Refused(Refusal::AmbiguousOwnership));
                         }
                     }
                 }
@@ -992,14 +1142,14 @@ fn prepare_selection<'a>(
                                 || message_index != show_message_index
                                 || field.path.as_slice() != [3, 2])
                         {
-                            return Err(Error::AmbiguousOwnership);
+                            return Err(Error::Refused(Refusal::AmbiguousOwnership));
                         }
                         if *id == slide_identifier
                             && (owner != node_identifier
                                 || message_index != node_message_index
                                 || field.path.as_slice() != [2])
                         {
-                            return Err(Error::AmbiguousOwnership);
+                            return Err(Error::Refused(Refusal::AmbiguousOwnership));
                         }
                     }
                     for id in &field.data_references {
@@ -1116,15 +1266,15 @@ fn one_message(object: &ArchiveObject, type_: u32) -> Result<(usize, &[u8]), Err
 }
 
 fn strict_flat_slide(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut selected = None;
     for field in view.fields() {
         field.validate_canonical_framing().map_err(map_wire_error)?;
         match field.number() {
-            1 => return Err(Error::UnsupportedTopology),
+            1 => return Err(Error::Refused(Refusal::UnsupportedTopology)),
             2 => {
                 if selected.is_some() || field.wire_type() != 2 {
-                    return Err(Error::UnsupportedTopology);
+                    return Err(Error::Refused(Refusal::UnsupportedTopology));
                 }
                 selected = Some(
                     super::validate_reference_payload(
@@ -1137,7 +1287,7 @@ fn strict_flat_slide(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
             },
             21 => {
                 if field.wire_type() != 0 || strict_canonical_varint(field.payload())? != 1 {
-                    return Err(Error::UnsupportedTopology);
+                    return Err(Error::Refused(Refusal::UnsupportedTopology));
                 }
             },
             _ => {},
@@ -1145,7 +1295,7 @@ fn strict_flat_slide(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
     }
     selected
         .filter(|id| *id != 0)
-        .ok_or(Error::UnsupportedTopology)
+        .ok_or(Error::Refused(Refusal::UnsupportedTopology))
 }
 
 fn strict_canonical_varint(payload: &[u8]) -> Result<u64, Error> {
@@ -1218,7 +1368,7 @@ fn validate_selected_reference_metadata(
 }
 
 fn remove_show_node(payload: &[u8], identifier: u64, limits: WireLimits) -> Result<Vec<u8>, Error> {
-    let show = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let show = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut found_tree = false;
     let mut output = Vec::new();
     output
@@ -1235,7 +1385,7 @@ fn remove_show_node(payload: &[u8], identifier: u64, limits: WireLimits) -> Resu
             return Err(Error::InvalidSource);
         }
         found_tree = true;
-        let tree = WireView::parse_with_limits(field.payload(), limits).map_err(map_wire_error)?;
+        let tree = WireView::parse(field.payload(), limits).map_err(map_wire_error)?;
         let mut retained = Vec::new();
         let mut removed = 0usize;
         for child in tree.fields() {
@@ -1264,8 +1414,7 @@ fn remove_show_node(payload: &[u8], identifier: u64, limits: WireLimits) -> Resu
         if removed != 1 {
             return Err(Error::InvalidSource);
         }
-        append_length_delimited_field_with_limits(&mut output, 3, &retained, limits)
-            .map_err(map_wire_error)?;
+        append_length_delimited_field(&mut output, 3, &retained, limits).map_err(map_wire_error)?;
     }
     if !found_tree {
         return Err(Error::InvalidSource);
@@ -1280,12 +1429,16 @@ fn publish_selection(
 ) -> Result<Package, Error> {
     let catalog = match &source.state.source {
         PhysicalSource::Package(catalog) if catalog.source_is_exact() => catalog,
-        PhysicalSource::Package(_) => return Err(Error::UnsupportedSource),
-        PhysicalSource::Semantic(_) => return Err(Error::UnsupportedSource),
+        PhysicalSource::Package(_) => return Err(Error::Refused(Refusal::UnsupportedSource)),
+        PhysicalSource::Semantic(_) => return Err(Error::Refused(Refusal::UnsupportedSource)),
     };
     let limits = catalog
         .limits()
         .effective_archive_limits()
+        .map_err(map_archive_error)?;
+    let snappy_limits = catalog
+        .limits()
+        .snappy_limits()
         .map_err(map_archive_error)?;
     let wire_limits = source.wire_limits().map_err(map_wire_error)?;
     let names = [
@@ -1308,7 +1461,7 @@ fn publish_selection(
         if entry.is_opaque() {
             return Err(Error::InvalidSource);
         }
-        let stream = SnappyStream::decompress_with_limits(
+        let stream = SnappyStream::decompress(
             entry.data(),
             catalog
                 .limits()
@@ -1316,8 +1469,7 @@ fn publish_selection(
                 .map_err(map_archive_error)?,
         )
         .map_err(map_core_error)?;
-        let mut archive =
-            Archive::parse_with_limits(stream.as_bytes(), limits).map_err(map_core_error)?;
+        let mut archive = Archive::parse(stream.as_bytes(), limits).map_err(map_core_error)?;
         if *name == selection.show_component {
             let show = archive
                 .object(selection.show_identifier)
@@ -1330,7 +1482,7 @@ fn publish_selection(
             archive
                 .object_mut(selection.show_identifier)
                 .ok_or(Error::InvalidSource)?
-                .replace_message_pruning_object_references_preserving_header_with_limits(
+                .replace_message_pruning_object_references_preserving_header(
                     selection.show_message_index,
                     RawMessage {
                         type_: SHOW_MESSAGE_TYPE,
@@ -1355,7 +1507,7 @@ fn publish_selection(
             archive
                 .object_mut(selection.metadata.object_identifier)
                 .ok_or(Error::InvalidSource)?
-                .replace_message_preserving_header_with_limits(
+                .replace_message_preserving_header(
                     selection.metadata.message_index,
                     RawMessage {
                         type_: PACKAGE_METADATA_MESSAGE_TYPE,
@@ -1373,10 +1525,8 @@ fn publish_selection(
             limits,
             wire_limits,
         )?;
-        let bytes = archive
-            .to_bytes_with_limits(limits)
-            .map_err(map_core_error)?;
-        let compressed = SnappyStream::compress(&bytes).map_err(map_core_error)?;
+        let bytes = archive.to_bytes(limits).map_err(map_core_error)?;
+        let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
         budget.allocation(compressed.len())?;
         rewritten.push((name, compressed));
     }
@@ -1464,7 +1614,7 @@ fn verify_expected_archive_delta(
                 .ok_or(Error::InvalidSource)?;
             let payload = remove_show_node(&message.data, selection.node_identifier, wire_limits)?;
             authorized
-                .replace_message_pruning_object_references_preserving_header_with_limits(
+                .replace_message_pruning_object_references_preserving_header(
                     selection.show_message_index,
                     RawMessage {
                         type_: SHOW_MESSAGE_TYPE,
@@ -1484,7 +1634,7 @@ fn verify_expected_archive_delta(
         {
             let mut authorized = source_object.clone();
             authorized
-                .replace_message_preserving_header_with_limits(
+                .replace_message_preserving_header(
                     selection.metadata.message_index,
                     RawMessage {
                         type_: PACKAGE_METADATA_MESSAGE_TYPE,
@@ -1617,14 +1767,16 @@ fn count_changed_components(before: &Package, after: &Package) -> usize {
 fn physical_source(package: &Package) -> Result<Arc<[u8]>, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) if source.source_is_exact() => Ok(source.shared_source()),
-        PhysicalSource::Package(_) | PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
+        PhysicalSource::Package(_) | PhysicalSource::Semantic(_) => {
+            Err(Error::Refused(Refusal::UnsupportedSource))
+        },
     }
 }
 
 fn map_selector_error(error: SlideSelectorError) -> Error {
     match error {
-        SlideSelectorError::EmptySlideName => Error::EmptySlideName,
-        SlideSelectorError::DuplicateSlideName { .. } => Error::AmbiguousSelector,
+        SlideSelectorError::EmptySlideName => Error::Refused(Refusal::EmptySlideName),
+        SlideSelectorError::DuplicateSlideName { .. } => Error::Refused(Refusal::AmbiguousSelector),
     }
 }
 
@@ -1635,7 +1787,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             path: _,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 super::SemanticLimitKind::Objects => LimitKind::Objects,
                 super::SemanticLimitKind::Slides => LimitKind::Slides,
@@ -1653,7 +1805,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             path: _,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 super::PayloadLimitKind::Bytes => LimitKind::WireBytes,
                 super::PayloadLimitKind::Fields => LimitKind::WireFields,
@@ -1673,7 +1825,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     match error {
         litchi_iwa_archive::Error::Limit {
             observed, maximum, ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: LimitKind::EntryBytes,
             observed,
             maximum,
@@ -1689,7 +1841,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
             observed, maximum, ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: LimitKind::EntryBytes,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -1708,7 +1860,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
                 litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -1757,7 +1909,7 @@ fn map_metadata_error(error: RewriteError) -> Error {
             },
             _ => return Error::InvalidSource,
         };
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind,
             observed,
             maximum,

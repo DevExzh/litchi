@@ -2,7 +2,7 @@
 
 use super::codec::parse;
 use super::model::Styles;
-use crate::{FlatDocument, Package};
+use crate::{FlatDocument, GenericPackage as Package};
 use litchi_core::Result;
 
 impl Package {

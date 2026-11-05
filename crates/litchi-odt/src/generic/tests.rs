@@ -12,8 +12,10 @@ use std::io::{Cursor, Read};
 use std::num::{NonZeroU64, NonZeroUsize};
 
 fn replace_zip_member_raw(package: &[u8], path: &str, replacement: &[u8]) -> Vec<u8> {
-    let archive = ArchiveReader::new(package).unwrap();
-    let mut writer = StreamingArchiveWriter::new();
+    let archive =
+        ArchiveReader::new(package, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     let mut replaced = false;
     for name in archive.file_names() {
         let data = if name == path {
@@ -29,7 +31,7 @@ fn replace_zip_member_raw(package: &[u8], path: &str, replacement: &[u8]) -> Vec
 }
 
 fn package(mimetype: &str) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(mimetype).unwrap();
     writer
         .add_file(
@@ -74,7 +76,7 @@ fn opens_every_document_family_and_template_losslessly() {
         (constants::ODF_DATABASE, Family::Database, false),
     ] {
         let bytes = package(mimetype);
-        let document = Package::from_bytes(bytes.clone()).unwrap();
+        let document = Package::from_bytes(&bytes).unwrap();
         assert_eq!(document.family(), family);
         assert_eq!(document.is_template(), template);
         assert_eq!(document.mimetype(), mimetype);
@@ -88,21 +90,21 @@ fn opens_every_document_family_and_template_losslessly() {
 
 #[test]
 fn rejects_non_odf_missing_content_and_invalid_xml_bytes() {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype("application/zip").unwrap();
     writer.add_file(constants::ODF_CONTENT, b"<x/>").unwrap();
-    assert!(Package::from_bytes(writer.finish_to_bytes().unwrap()).is_err());
+    assert!(Package::from_bytes(&writer.finish_to_bytes().unwrap()).is_err());
 
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(constants::ODF_DRAWING).unwrap();
-    assert!(Package::from_bytes(writer.finish_to_bytes().unwrap()).is_err());
+    assert!(Package::from_bytes(&writer.finish_to_bytes().unwrap()).is_err());
 
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(constants::ODF_CHART).unwrap();
     writer.add_file(constants::ODF_CONTENT, b"<x/>").unwrap();
     let package = writer.finish_to_bytes().unwrap();
     let invalid_xml = replace_zip_member_raw(&package, constants::ODF_CONTENT, &[0xff]);
-    assert!(Package::from_bytes(invalid_xml).is_err());
+    assert!(Package::from_bytes(&invalid_xml).is_err());
 }
 
 #[test]
@@ -274,7 +276,7 @@ fn flat_reader_admits_input_incrementally_before_full_stream_consumption() {
         bytes: vec![b'x'; 64 * 1024],
         reads: 0,
     };
-    let result = FlatDocument::from_reader_with_execution_context(&mut reader, 1 << 20, context);
+    let result = FlatDocument::from_reader_with_limit_and_context(&mut reader, 1 << 20, context);
     assert!(matches!(
         result,
         Err(Error::ResourceLimit(limit)) if limit.resource == Resource::InputBytes
@@ -339,7 +341,7 @@ fn flat_snapshot_requires_and_retains_exact_source_memory() {
     let maximum = source_len + 256;
     let (_zero_budget, zero_context) = flat_test_context(0);
     assert!(matches!(
-        FlatDocument::from_bytes_with_execution_context(
+        FlatDocument::from_bytes_with_limit_and_context(
             bytes.clone(),
             maximum,
             zero_context,
@@ -348,7 +350,7 @@ fn flat_snapshot_requires_and_retains_exact_source_memory() {
     ));
     let (budget, context) = flat_test_context(source_capacity);
     let document =
-        FlatDocument::from_bytes_with_execution_context(bytes, maximum, context).unwrap();
+        FlatDocument::from_bytes_with_limit_and_context(bytes, maximum, context).unwrap();
     assert_eq!(budget.used(Resource::Memory), source_capacity);
     drop(document);
     assert_eq!(budget.used(Resource::Memory), 0);
@@ -366,7 +368,7 @@ fn flat_mutation_refusal_keeps_source_reservation_and_bytes() {
     let maximum = source_len + 256;
     let (budget, context) = flat_test_context(source_capacity);
     let mut document =
-        FlatDocument::from_bytes_with_execution_context(bytes, maximum, context).unwrap();
+        FlatDocument::from_bytes_with_limit_and_context(bytes, maximum, context).unwrap();
     let before = document.to_bytes();
     let error = document
         .set_paragraph_rdfa(
@@ -392,7 +394,7 @@ fn flat_mutations_retain_only_the_new_candidate_and_ignore_large_output_cap() {
     let maximum = super::flat::HARD_MAX_FLAT_DOCUMENT_BYTES;
     let (budget, context) = flat_test_context(1 << 20);
     let mut document =
-        FlatDocument::from_bytes_with_execution_context(xml.into_bytes(), maximum, context)
+        FlatDocument::from_bytes_with_limit_and_context(xml.into_bytes(), maximum, context)
             .unwrap();
     document
         .set_paragraph_rdfa(
@@ -422,7 +424,7 @@ fn flat_mutation_noop_keeps_source_usage_unchanged() {
     let source_capacity = u64::try_from(bytes.capacity()).unwrap();
     let (budget, context) = flat_test_context(1 << 20);
     let mut document =
-        FlatDocument::from_bytes_with_execution_context(bytes, source_len + 1, context).unwrap();
+        FlatDocument::from_bytes_with_limit_and_context(bytes, source_len + 1, context).unwrap();
     let before = document.to_bytes();
     document
         .set_paragraph_rdfa(Position::new(0), &crate::RdfaAttributes::default())

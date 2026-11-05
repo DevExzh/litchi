@@ -348,3 +348,10 @@ mod tests {
         );
     }
 }
+
+/// Exact-source transactions for one body footnote's text and custom mark.
+pub mod text {
+    pub use crate::package::footnote_text::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+}

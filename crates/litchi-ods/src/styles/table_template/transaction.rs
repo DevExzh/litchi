@@ -58,7 +58,7 @@ impl Snapshot {
 
     /// Start a failure-atomic edit.
     #[must_use]
-    pub fn edit(&self) -> Edit {
+    pub(crate) fn edit(&self) -> Edit {
         Edit {
             before: self.clone(),
             draft: self.templates.clone(),
@@ -147,15 +147,11 @@ impl Edit {
     }
 
     /// Produce a source-checked semantic commit.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
         validate_templates(&self.draft)?;
         if self.draft == self.before.templates {
             return Ok(Commit {
                 snapshot: self.before.clone(),
-                patch: Patch {
-                    source: self.before.source.clone(),
-                    target: self.before.source.clone(),
-                },
                 changed: false,
             });
         }
@@ -171,80 +167,30 @@ impl Edit {
             ));
         }
         Ok(Commit {
-            patch: Patch {
-                source: self.before.source.clone(),
-                target: target.source.clone(),
-            },
             snapshot: target,
             changed: true,
         })
     }
 }
 
-/// An exact-source reversible styles-part patch.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Patch {
-    source: Option<String>,
-    target: Option<String>,
-}
-
-impl Patch {
-    /// Whether this patch is physically empty.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.source == self.target
-    }
-
-    /// Return the inverse exact-source patch.
-    #[must_use]
-    pub fn inverse(&self) -> Self {
-        Self {
-            source: self.target.clone(),
-            target: self.source.clone(),
-        }
-    }
-
-    /// Apply this patch only to the exact source snapshot.
-    pub fn apply(&self, snapshot: &Snapshot) -> Result<Commit> {
-        if snapshot.source != self.source {
-            return Err(Error::InvalidFormat(
-                "ODS table-template patch source snapshot does not match".to_string(),
-            ));
-        }
-        let target = Snapshot::from_source(self.target.as_deref())?;
-        Ok(Commit {
-            changed: !self.is_empty(),
-            patch: self.clone(),
-            snapshot: target,
-        })
-    }
-}
-
 /// A fully rehydrated table-template commit.
 #[derive(Clone, Debug)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
-    patch: Patch,
     changed: bool,
 }
 
 impl Commit {
     /// Whether the styles part changed.
     #[must_use]
-    pub const fn changed(&self) -> bool {
+    pub(crate) const fn changed(&self) -> bool {
         self.changed
     }
 
     /// Borrow the resulting semantic snapshot.
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
-    }
-
-    /// Borrow the reversible source patch.
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
     }
 }
 
@@ -900,26 +846,6 @@ mod tests {
         assert!(target.contains("x:extension"));
         assert_eq!(commit.snapshot().templates().len(), 2);
         assert_eq!(TABLE_NS, "urn:oasis:names:tc:opendocument:xmlns:table:1.0");
-    }
-
-    #[test]
-    fn inverse_and_stale_source_are_checked() {
-        let snapshot = Snapshot::from_source(Some(SOURCE)).expect("valid styles source");
-        let mut edit = snapshot.edit();
-        edit.replace_named("A", template("A2"))
-            .expect("replace template");
-        let commit = edit.commit().expect("changed commit");
-        let restored = commit
-            .patch()
-            .inverse()
-            .apply(commit.snapshot())
-            .expect("inverse applies");
-        assert_eq!(restored.snapshot().source_xml(), Some(SOURCE));
-        let other = Snapshot::from_source(Some(
-            r#"<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"/>"#,
-        ))
-            .expect("valid other source");
-        assert!(commit.patch().apply(&other).is_err());
     }
 
     #[test]

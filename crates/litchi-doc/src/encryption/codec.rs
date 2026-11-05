@@ -485,6 +485,7 @@ fn map_crypto_error(error: Error) -> PackageError {
         Error::UnsupportedAlgorithm => {
             PackageError::UnsupportedEncryption(EncryptionKind::CryptoApi)
         },
+        _ => PackageError::Corrupted("CryptoAPI RC4 error".to_string()),
     }
 }
 
@@ -503,6 +504,7 @@ fn map_legacy_error(error: legacy_rc4::Error) -> PackageError {
         legacy_rc4::Error::StreamRangeOverflow => {
             PackageError::Corrupted("legacy RC4 stream range overflow".to_string())
         },
+        _ => PackageError::Corrupted("legacy RC4 error".to_string()),
     }
 }
 

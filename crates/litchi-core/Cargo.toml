@@ -21,6 +21,9 @@ smallvec        = { workspace = true }
 thiserror       = { workspace = true }
 zerocopy        = { workspace = true }
 
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61.2", features = [
     "Win32_Foundation",
@@ -31,7 +34,11 @@ windows-sys = { version = "0.61.2", features = [
 ] }
 
 [dev-dependencies]
-tempfile = { workspace = true }
+# Tests run with insertion-ordered maps, the order a workspace build gets once
+# any linked crate enables the feature; the durable-JSON tests then pin that
+# canonical bytes ignore it (record 0349).
+serde_json = { workspace = true, features = ["preserve_order"] }
+tempfile   = { workspace = true }
 
 [lints]
 workspace = true

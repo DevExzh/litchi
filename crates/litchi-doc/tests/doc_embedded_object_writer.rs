@@ -33,19 +33,19 @@
 )]
 
 use litchi_cfb::{OleFile, OleWriter};
-use litchi_doc::embedded_object::Limits;
+use litchi_doc::builder::Builder;
+use litchi_doc::embedded_object::Edit;
 use litchi_doc::parts::protection::{ProtectionAuthorization, ProtectionPolicy};
-use litchi_doc::writer::Writer;
-use litchi_doc::{Editor, Package, WriteOptions};
+use litchi_doc::{EditOptions, Leniency, OpenOptions, Package, WriteOptions, raw::Reader};
 use std::fs;
 use std::io::Cursor;
 use std::path::PathBuf;
 
 fn base_doc() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("before embedded objects").unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 
@@ -78,10 +78,31 @@ fn fixture_policy() -> ProtectionPolicy {
     )
 }
 
+/// An embedded-object edit of the package `bytes` under `policy`.
+fn open_objects(
+    bytes: Vec<u8>,
+    policy: ProtectionPolicy,
+) -> litchi_doc::embedded_object::Result<Edit> {
+    let options = OpenOptions::default().leniency(Leniency::TolerateStylesheetDefects);
+    Package::from_bytes_with_options(&bytes, options)?
+        .edit_embedded_objects_with_options(EditOptions::default().protection_policy(policy))
+}
+
+/// Publishing a staged edit, as the exact package bytes it produces.
+trait Finish {
+    fn finish(self) -> litchi_doc::embedded_object::Result<Vec<u8>>;
+}
+
+impl Finish for Edit {
+    fn finish(self) -> litchi_doc::embedded_object::Result<Vec<u8>> {
+        Ok(self.commit()?.patch().after_bytes().to_vec())
+    }
+}
+
 #[test]
 fn managed_objects_add_reorder_remove_and_reopen_transactionally() {
     let original = base_doc();
-    let mut editor = Editor::open(original, Limits::default()).unwrap();
+    let mut editor = open_objects(original, ProtectionPolicy::default()).unwrap();
     editor.add(options(11)).unwrap();
     editor.add(options(22)).unwrap();
     assert_eq!(
@@ -105,7 +126,7 @@ fn managed_objects_add_reorder_remove_and_reopen_transactionally() {
     );
     let bytes = editor.finish().unwrap();
 
-    let mut reopened = Editor::open(bytes, Limits::default()).unwrap();
+    let mut reopened = open_objects(bytes, ProtectionPolicy::default()).unwrap();
     assert_eq!(
         reopened
             .objects()
@@ -117,17 +138,21 @@ fn managed_objects_add_reorder_remove_and_reopen_transactionally() {
     );
     reopened.remove(22).unwrap();
     let bytes = reopened.finish().unwrap();
-    let ole = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+    let ole = OleFile::open(
+        Cursor::new(bytes.clone()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     assert!(!ole.exists(&["ObjectPool", "_22"]));
     assert!(ole.exists(&["ObjectPool", "_11"]));
-    let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
     let document = package.document().unwrap();
     assert!(document.text().unwrap().contains("before embedded objects"));
 }
 
 #[test]
 fn malformed_add_and_reorder_leave_editor_state_unchanged() {
-    let mut editor = Editor::open(base_doc(), Limits::default()).unwrap();
+    let mut editor = open_objects(base_doc(), ProtectionPolicy::default()).unwrap();
     editor.add(options(1)).unwrap();
     editor.add(options(2)).unwrap();
     let before = editor.objects().unwrap();
@@ -149,14 +174,13 @@ fn producer_fixtures_append_only_when_their_layout_is_supported() {
     let mut rejected = 0usize;
     for (ordinal, path) in fixtures.into_iter().enumerate() {
         let original = fs::read(&path).unwrap();
-        if let Ok(mut editor) =
-            Editor::open_with_policy(original.clone(), Limits::default(), fixture_policy())
-        {
+        if let Ok(mut editor) = open_objects(original.clone(), fixture_policy()) {
             let id = 2_000_000 + ordinal as u32;
             editor.add(options(id)).unwrap();
             match editor.finish() {
                 Ok(output) => {
-                    let reopened = Editor::open(output.clone(), Limits::default()).unwrap();
+                    let mut reopened =
+                        open_objects(output.clone(), ProtectionPolicy::default()).unwrap();
                     assert!(
                         reopened
                             .objects()
@@ -164,7 +188,7 @@ fn producer_fixtures_append_only_when_their_layout_is_supported() {
                             .iter()
                             .any(|value| value.storage_id == id)
                     );
-                    let mut package = Package::from_reader(Cursor::new(output)).unwrap();
+                    let mut package = Reader::from_reader(Cursor::new(output)).unwrap();
                     assert!(!package.document().unwrap().text().unwrap().is_empty());
                     supported += 1;
                 },

@@ -1040,14 +1040,11 @@ impl<'source> Snapshot<'source> {
             return Ok(None);
         };
         let Some(typed) = owner.typed() else {
-            let reason = owner
+            let _reason = owner
                 .opaque_reason()
                 .map(ToString::to_string)
                 .unwrap_or_else(|| "unknown owner state".to_string());
-            return Err(unsupported(format!(
-                "ODS detective owner {} is opaque: {reason}",
-                owner.id.index(),
-            )));
+            return Err(unsupported("ODS detective owner is opaque"));
         };
         Ok(Some(typed.value()))
     }
@@ -1063,12 +1060,9 @@ impl<'source> Snapshot<'source> {
             .owners
             .get(owner.0)
             .ok_or_else(|| invalid("ODS detective owner selector is out of range"))?;
-        let typed = owner.typed().ok_or_else(|| {
-            unsupported(format!(
-                "ODS detective owner {} is opaque and cannot be replaced",
-                owner.id.index()
-            ))
-        })?;
+        let typed = owner
+            .typed()
+            .ok_or_else(|| unsupported("ODS detective owner is opaque and cannot be replaced"))?;
         let cell = self
             .cells
             .get(owner.cell.0)
@@ -1137,22 +1131,18 @@ impl<'source> Snapshot<'source> {
             .get(owner.0)
             .ok_or_else(|| invalid("ODS detective owner selector is out of range"))?;
         if owner.typed().is_none() {
-            return Err(unsupported(format!(
-                "ODS detective owner {} is opaque and cannot be removed",
-                owner.id.index()
-            )));
+            return Err(unsupported(
+                "ODS detective owner is opaque and cannot be removed",
+            ));
         }
         let cell = self
             .cells
             .get(owner.cell.0)
             .ok_or_else(|| invalid("ODS detective owner cell disappeared"))?;
         cell.is_editable_owner()?;
-        let typed = owner.typed().ok_or_else(|| {
-            unsupported(format!(
-                "ODS detective owner {} is opaque and cannot be removed",
-                owner.id.index()
-            ))
-        })?;
+        let typed = owner
+            .typed()
+            .ok_or_else(|| unsupported("ODS detective owner is opaque and cannot be removed"))?;
         if typed.lexical_fidelity() != LexicalFidelity::Canonical {
             return Err(unsupported(
                 "ODS detective owner has source lexical data that focused removal cannot retain",
@@ -3208,12 +3198,12 @@ fn legal_cell_ancestry(spans: &[Span], mut current: Option<usize>) -> Result<boo
             | (CellAncestryState::RowContainer, Some(TABLE_NAMESPACE), "table-rows")
             | (CellAncestryState::RowContainer, Some(TABLE_NAMESPACE), "table-header-rows") => {
                 if span.local == "table" {
-                    CellAncestryState::Spreadsheet
+                    CellAncestryState::Workbook
                 } else {
                     CellAncestryState::RowContainer
                 }
             },
-            (CellAncestryState::Spreadsheet, Some(OFFICE_NAMESPACE), "spreadsheet") => {
+            (CellAncestryState::Workbook, Some(OFFICE_NAMESPACE), "spreadsheet") => {
                 CellAncestryState::Body
             },
             (CellAncestryState::Body, Some(OFFICE_NAMESPACE), "body") => {
@@ -3234,7 +3224,7 @@ enum CellAncestryState {
     Cell,
     Row,
     RowContainer,
-    Spreadsheet,
+    Workbook,
     Body,
     Document,
     Root,
@@ -4001,8 +3991,12 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::InvalidFormat(message.into())
 }
 
-fn unsupported(message: impl Into<String>) -> Error {
-    Error::Unsupported(message.into())
+fn unsupported(reason: &'static str) -> Error {
+    Error::Refused(litchi_core::edit::Refusal::new(
+        litchi_core::edit::RefusalKind::UnsupportedOperation,
+        "ods.sheet_metadata.detective",
+        reason,
+    ))
 }
 
 fn limit(resource: Resource, scope: &'static str, observed: usize, maximum: usize) -> Error {
@@ -4017,10 +4011,8 @@ fn limit(resource: Resource, scope: &'static str, observed: usize, maximum: usiz
 fn map_execution(error: ExecutionError) -> Error {
     match error {
         ExecutionError::ResourceLimit(limit) => Error::ResourceLimit(limit),
-        ExecutionError::Cancelled => unsupported("ODS detective operation cancelled"),
-        other => unsupported(format!(
-            "ODS detective execution policy rejected operation: {other}"
-        )),
+        ExecutionError::Cancelled => Error::Other("ODS detective operation cancelled".to_string()),
+        _other => Error::Other("ODS detective execution policy rejected operation".to_string()),
     }
 }
 

@@ -5,7 +5,7 @@
 )]
 
 use litchi_odp::{
-    Builder, Presentation, edit, page,
+    Builder, Package, page,
     show::{self, CustomShow, Settings},
 };
 
@@ -84,17 +84,17 @@ fn source_checked_insert_remove_preserves_page_identity_and_references() {
     builder
         .set_settings(Some(settings("page2", &["page3", "page2", "page3"])))
         .unwrap();
-    let source = edit::Snapshot::from_bytes(builder.build().unwrap()).unwrap();
-    let source_bytes = source.bytes().to_vec();
-    let mut transaction = source.transaction().unwrap();
+    let source = Package::from_bytes(&builder.build().unwrap().to_bytes().unwrap()).unwrap();
+    let source_bytes = source.as_bytes().to_vec();
+    let mut transaction = source.edit().unwrap();
     transaction
         .add_before(1, "inserted", "new")
         .unwrap()
         .unwrap();
     let inserted = transaction.commit().unwrap();
-    assert_eq!(source.bytes(), source_bytes);
+    assert_eq!(source.as_bytes(), source_bytes);
 
-    let presentation = inserted.snapshot().to_presentation().unwrap();
+    let presentation = inserted.package().presentation().unwrap();
     let pages = presentation.pages().unwrap();
     let names = pages
         .pages()
@@ -104,19 +104,19 @@ fn source_checked_insert_remove_preserves_page_identity_and_references() {
     assert_eq!(names, ["page1", "page4", "page2", "page3"]);
     assert!(presentation.slides().unwrap()[2].all_text().contains("two"));
 
-    let mut refused = inserted.snapshot().transaction().unwrap();
+    let mut refused = inserted.package().edit().unwrap();
     assert!(refused.remove(2).is_err());
     let noop = refused.commit().unwrap();
-    assert!(!noop.changed());
-    assert_eq!(noop.snapshot().bytes(), inserted.snapshot().bytes());
+    assert!(!noop.diagnostics().changed());
+    assert_eq!(noop.package().as_bytes(), inserted.package().as_bytes());
 
-    let mut remove = inserted.snapshot().transaction().unwrap();
+    let mut remove = inserted.package().edit().unwrap();
     assert_eq!(
         remove.remove(1).unwrap().unwrap().title.as_deref(),
         Some("inserted")
     );
     let removed = remove.commit().unwrap();
-    let presentation = removed.snapshot().to_presentation().unwrap();
+    let presentation = removed.package().presentation().unwrap();
     let pages = presentation.pages().unwrap();
     let names = pages
         .pages()
@@ -129,11 +129,10 @@ fn source_checked_insert_remove_preserves_page_identity_and_references() {
         Some(settings("page2", &["page3", "page2", "page3"]))
     );
     let restored = inserted
-        .patch()
-        .inverse()
-        .apply(inserted.snapshot())
+        .package()
+        .apply(&inserted.patch().inverse())
         .unwrap();
-    assert_eq!(restored.bytes(), source.bytes());
+    assert_eq!(restored.into_package().as_bytes(), source.as_bytes());
 }
 
 #[test]
@@ -153,20 +152,20 @@ fn explicit_metadata_reindexes_without_losing_identity() {
     builder
         .set_settings(Some(settings("Beta", &["Alpha", "Beta"])))
         .unwrap();
-    let source = edit::Snapshot::from_bytes(builder.build().unwrap()).unwrap();
-    let mut transaction = source.transaction().unwrap();
+    let source = Package::from_bytes(&builder.build().unwrap().to_bytes().unwrap()).unwrap();
+    let mut transaction = source.edit().unwrap();
     transaction.add_before(0, "new", "new").unwrap().unwrap();
     let inserted = transaction.commit().unwrap();
-    let presentation = inserted.snapshot().to_presentation().unwrap();
+    let presentation = inserted.package().presentation().unwrap();
     let pages = presentation.pages().unwrap();
     assert_eq!(pages.pages()[1].name.as_deref(), Some("Alpha"));
     assert_eq!(pages.pages()[2].name.as_deref(), Some("Beta"));
     assert_eq!(pages.pages()[2].xml_id.as_deref(), Some("beta-id"));
 
-    let mut transaction = inserted.snapshot().transaction().unwrap();
+    let mut transaction = inserted.package().edit().unwrap();
     transaction.remove(0).unwrap().unwrap();
     let removed = transaction.commit().unwrap();
-    let presentation = removed.snapshot().to_presentation().unwrap();
+    let presentation = removed.package().presentation().unwrap();
     let pages = presentation.pages().unwrap();
     assert_eq!(pages.pages()[0].name.as_deref(), Some("Alpha"));
     assert_eq!(pages.pages()[1].name.as_deref(), Some("Beta"));
@@ -196,7 +195,10 @@ fn libreoffice_and_odfpy_settings_fixtures_parse_save_and_reopen() {
         }
         builder.set_pages(Some(metadata(&page_names))).unwrap();
         builder.set_settings(Some(parsed.clone())).unwrap();
-        let reopened = Presentation::from_bytes(builder.build().unwrap()).unwrap();
+        let reopened = Package::from_bytes(&builder.build().unwrap().to_bytes().unwrap())
+            .unwrap()
+            .presentation()
+            .unwrap();
         assert_eq!(reopened.settings().unwrap(), Some(parsed));
     }
 }

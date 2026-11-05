@@ -5,7 +5,7 @@
 //! requiring callers to navigate FIB indexes or table-stream offsets.
 
 pub use crate::parts::route_slip::{
-    Commit, DeliveryOption, EditKind, Editor, FIB_INDEX_ROUTE_SLIP, Metadata, NarrowString,
-    PackageCommit, PackageSnapshot, Patch, Protection, Recipient, RecipientSelectionError,
-    RecipientSelector, Snapshot, Transaction, TransactionError, parse, parse_bytes, to_bytes,
+    Commit, DeliveryOption, Diagnostics, Edit, EditKind, Error, FIB_INDEX_ROUTE_SLIP, LimitKind,
+    Metadata, NarrowString, Patch, Protection, Recipient, RecipientSelectionError,
+    RecipientSelector, Result, parse, parse_bytes, record, to_bytes,
 };

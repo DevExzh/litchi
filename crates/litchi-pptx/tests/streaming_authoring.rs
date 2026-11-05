@@ -56,7 +56,7 @@ fn streaming_deck_is_deterministic_and_reopens() {
     assert_eq!(shape.bounds().unwrap().x(), 914_400);
     assert_eq!(shape.bounds().unwrap().width(), 7_315_200);
 
-    let reader = PhysPkgReader::new(&first).unwrap();
+    let reader = PhysPkgReader::new(&first, litchi_opc::SourceLimits::default()).unwrap();
     assert_eq!(reader.len(), 41);
     let names = reader.member_names().unwrap();
     assert!(names.iter().any(|name| name == "ppt/slides/slide1.xml"));
@@ -89,7 +89,7 @@ fn title_multiple_boxes_have_deterministic_order_and_ids() {
     writer = slide.finish().unwrap();
     let bytes = writer.finish().unwrap();
 
-    let reader = PhysPkgReader::new(&bytes).unwrap();
+    let reader = PhysPkgReader::new(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     let xml = String::from_utf8(reader.read_member("ppt/slides/slide1.xml").unwrap()).unwrap();
     let title = xml.find("id=\"2\"").unwrap();
     let first = xml.find("id=\"3\"").unwrap();
@@ -148,13 +148,18 @@ fn empty_widescreen_slide_reopens_with_fixed_topology() {
             .unwrap(),
         0
     );
-    assert_eq!(PhysPkgReader::new(&bytes).unwrap().len(), 39);
+    assert_eq!(
+        PhysPkgReader::new(&bytes, litchi_opc::SourceLimits::default())
+            .unwrap()
+            .len(),
+        39
+    );
 }
 
 #[test]
 fn static_content_types_and_relationships_close_the_one_slide_graph() {
     let bytes = empty_deck();
-    let reader = PhysPkgReader::new(&bytes).unwrap();
+    let reader = PhysPkgReader::new(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     let names = reader.member_names().unwrap();
     assert_eq!(names.len(), 39);
     for name in [
@@ -381,7 +386,14 @@ fn invalid_global_configuration_does_not_touch_sink() {
         Ok(_) => panic!("the public output budget must not exceed the physical ZIP budget"),
         Err(error) => error,
     };
-    assert!(matches!(error, Error::Limit { .. }));
+    assert!(matches!(
+        error,
+        Error::InvalidLimit {
+            kind: litchi_pptx::LimitKind::Codec(litchi_pptx::CodecLimitKind::OutputBytes),
+            value,
+            maximum,
+        } if value == 512 * 1024 * 1024 + 1 && maximum == 512 * 1024 * 1024
+    ));
     assert!(sink.is_empty());
 }
 
@@ -434,7 +446,7 @@ fn slide_xml_limit_reserves_the_final_suffix_before_box_bytes() {
         .unwrap();
     reference = slide.finish().unwrap();
     let full_bytes = reference.finish().unwrap();
-    let full_xml_len = PhysPkgReader::new(&full_bytes)
+    let full_xml_len = PhysPkgReader::new(&full_bytes, litchi_opc::SourceLimits::default())
         .unwrap()
         .read_member("ppt/slides/slide1.xml")
         .unwrap()
@@ -521,7 +533,7 @@ fn unicode_text_budget_is_utf8_exact_and_whitespace_is_preserved() {
         .unwrap();
     writer = slide.finish().unwrap();
     let bytes = writer.finish().unwrap();
-    let reader = PhysPkgReader::new(&bytes).unwrap();
+    let reader = PhysPkgReader::new(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     let xml = String::from_utf8(reader.read_member("ppt/slides/slide1.xml").unwrap()).unwrap();
     assert!(xml.contains("xml:space=\"preserve\">  é &amp; &lt;  </a:t>"));
 

@@ -1,6 +1,7 @@
 //! Reversible source-checked Custom XML package patches.
 
 use crate::Result;
+use crate::signature::refuse_signed_change;
 use litchi_opc::OpcPackage;
 
 use super::package;
@@ -32,14 +33,8 @@ impl Patch {
 
     /// Whether this patch is an exact semantic and physical no-op.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.before.same_source(&self.after)
-    }
-
-    /// Alias for [`Self::is_empty`].
-    #[must_use]
     pub fn is_noop(&self) -> bool {
-        self.is_empty()
+        self.before.same_source(&self.after)
     }
 
     /// Return the exact inverse patch without reinterpreting XML.
@@ -51,69 +46,51 @@ impl Patch {
         }
     }
 
-    /// Apply atomically after checking the complete captured source graph.
+    /// Replay the patch onto `package`, which must hold the captured source
+    /// graph, and publish the result as a new package; `package` itself is
+    /// unchanged.
+    ///
+    /// An exact no-op publishes `package` itself, so a signed package keeps
+    /// its signature; a changed patch is refused for a signed package (ADR
+    /// 0006): remove the signature explicitly first, with
+    /// [`OpcPackage::unsign`] or the format facade's `unsign`.
     /// # Errors
     ///
-    /// Returns an error when input violates OOXML constraints, exceeds a configured
-    /// bound, or an underlying XML or package operation fails.
-    pub fn apply(&self, target: &mut OpcPackage) -> Result<bool> {
-        let current = Snapshot::load_scoped(target, &self.before.scope_names())?;
+    /// Returns [`crate::Error::Signed`] for a change to a signed package,
+    /// [`crate::Error::PatchConflict`] when the recorded base differs, and
+    /// an error when input
+    /// violates OOXML constraints, exceeds a configured bound, or an
+    /// underlying XML or package operation fails.
+    pub fn apply(&self, package: &OpcPackage) -> Result<Commit> {
+        let current = Snapshot::load_scoped(package, &self.before.scope_names())?;
         if !self.before.same_source(&current) {
             return Err(super::snapshot::source_mismatch());
         }
-        if self.is_empty() {
-            return Ok(false);
+        if self.is_noop() {
+            return Ok(Commit::new(
+                package.clone(),
+                self.clone(),
+                Diagnostics::UNCHANGED,
+            ));
         }
+        refuse_signed_change(package)?;
 
-        let mut candidate = target.clone();
+        let mut candidate = package.clone();
         package::apply_items(&mut candidate, &self.before, self.after.items())?;
         let resulting = Snapshot::load_scoped(&candidate, &self.after.scope_names())?;
         if !self.after.same_source(&resulting) {
-            return Err(super::snapshot::source_mismatch());
+            return Err(crate::Error::Internal(
+                "custom XML candidate does not match the prepared target",
+            ));
         }
-        *target = candidate;
-        Ok(true)
+        Ok(Commit::new(candidate, self.clone(), Diagnostics::CHANGED))
     }
 }
 
-/// Successful publication of one Custom XML transaction.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-    changed: bool,
-}
+/// A published Custom XML change: the new package, its patch and
+/// diagnostics. Read the resulting graph with
+/// [`Snapshot::load`]`(commit.package())`.
+pub type Commit = litchi_core::edit::Commit<OpcPackage, Patch>;
 
-impl Commit {
-    pub(crate) fn new(snapshot: Snapshot, patch: Patch, changed: bool) -> Self {
-        Self {
-            snapshot,
-            patch,
-            changed,
-        }
-    }
-
-    /// Whether the package graph changed.
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-
-    /// Resulting immutable snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Reversible source-checked patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consume the commit into its snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
-    }
-}
+/// What a Custom XML commit changed.
+pub use litchi_core::edit::Diagnostics;

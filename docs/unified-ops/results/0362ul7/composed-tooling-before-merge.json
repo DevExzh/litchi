@@ -1,0 +1,18 @@
+{
+  "source": "76c21c49cfc7fedb995fb1b2c11351098eddef7b",
+  "started_utc": "2026-10-24T10:13:55.999582+00:00",
+  "command": [
+    "python3",
+    "-m",
+    "unittest",
+    "tools.test_check_api_glossary",
+    "tools.test_api_debt_inventory",
+    "tools.test_validate_api_disposition",
+    "tools.test_final_api_inventory"
+  ],
+  "exit_code": 0,
+  "wall_seconds": 1.3632665049954085,
+  "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/composed-inventory-tooling-76c21c49cf.log",
+  "log_bytes": 186,
+  "log_sha256": "4f41c03b743ac6444e5a6b6e453c0a8964d68a3ad35a2cfcc186fcb535e1fdc3"
+}

@@ -226,8 +226,11 @@ fn compare_function(function: &str) {
     for row in rows.iter().filter(|row| row["function"] == function) {
         let fixture_name = row["fixture"].as_str().expect("fixture");
         let fixture = fixtures.get(fixture_name).expect("fixture payload");
-        let expression = Expression::parse(row["formula"].as_str().expect("formula"))
-            .expect("descriptive-statistics reference parses");
+        let expression = Expression::parse(
+            row["formula"].as_str().expect("formula"),
+            &Default::default(),
+        )
+        .expect("descriptive-statistics reference parses");
         for mode in [Mode::Scalar, Mode::Matrix] {
             let cells = Cells::from_fixture(fixture);
             let execution = execution(&format!("descriptive-oracle-{function}-{fixture_name}"));

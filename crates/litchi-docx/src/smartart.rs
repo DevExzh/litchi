@@ -2,10 +2,6 @@
     clippy::shadow_reuse,
     reason = "parser bindings are intentionally refined after validation"
 )]
-#![expect(
-    clippy::struct_field_names,
-    reason = "the public model retains established field names"
-)]
 //! Bounded, inert `SmartArt` (`DrawingML` diagram) inventory owned by a DOCX main document.
 //!
 //! A Word `SmartArt` graphic is anchored in the document body as a
@@ -24,7 +20,7 @@
 use crate::error::{Error, Result};
 use litchi_drawingml::diagram::{
     DGM_NAMESPACE, DGM_NAMESPACE_STRICT, DIAGRAM_COLORS_REL, DIAGRAM_DATA_REL, DIAGRAM_LAYOUT_REL,
-    DIAGRAM_QUICK_STYLE_REL, DiagramDataModel, DiagramDefinition, DiagramNode, DiagramType,
+    DIAGRAM_QUICK_STYLE_REL, DiagramDataModel, DiagramDefinition, DiagramNode, DiagramType, Limits,
     MS_DIAGRAM_DRAWING_REL, STRICT_DIAGRAM_COLORS_REL, STRICT_DIAGRAM_DATA_REL,
     STRICT_DIAGRAM_LAYOUT_REL, STRICT_DIAGRAM_QUICK_STYLE_REL,
 };
@@ -140,6 +136,9 @@ pub struct Diagram {
     pub quick_style: Option<DiagramDefinition>,
     /// Colors part header metadata, when referenced.
     pub colors: Option<DiagramDefinition>,
+    /// The drawing's extent in EMUs (`wp:extent` `cx`, `cy`), when the
+    /// drawing holding the graphic gives one (record 0335).
+    pub extent: Option<(i64, i64)>,
 }
 
 impl Diagram {
@@ -184,6 +183,8 @@ struct DiagramAnchor {
     layout_id: Option<String>,
     quick_style_id: Option<String>,
     colors_id: Option<String>,
+    /// The extent of the drawing the anchor's graphic sits in.
+    extent: Option<(i64, i64)>,
 }
 
 /// Load the typed `SmartArt` inventory anchored in the given main document part.
@@ -196,6 +197,7 @@ struct DiagramAnchor {
 ///
 /// Returns an error if the operation cannot be completed.
 pub fn load_smart_arts(package: &OpcPackage, document_name: &PackURI) -> Result<Vec<Diagram>> {
+    let limits = Limits::default();
     let document = package.get_part(document_name)?;
     if document.content_type() != DOCUMENT_CT {
         return Err(invalid(
@@ -237,7 +239,7 @@ pub fn load_smart_arts(package: &OpcPackage, document_name: &PackURI) -> Result<
             "diagram data",
         )?;
         add_total(&mut total, data_xml.len(), "aggregate bytes")?;
-        let data = DiagramDataModel::parse(&data_xml)?;
+        let data = DiagramDataModel::parse(&data_xml, &limits)?;
 
         let (layout_relationship_id, layout_part_name, layout) = resolve_definition(
             package,
@@ -247,6 +249,7 @@ pub fn load_smart_arts(package: &OpcPackage, document_name: &PackURI) -> Result<
             ct::DML_DIAGRAM_LAYOUT,
             "diagram layout",
             DiagramDefinition::parse_layout,
+            &limits,
             &mut total,
         )?;
         let (quick_style_relationship_id, quick_style_part_name, quick_style) = resolve_definition(
@@ -257,6 +260,7 @@ pub fn load_smart_arts(package: &OpcPackage, document_name: &PackURI) -> Result<
             ct::DML_DIAGRAM_STYLE,
             "diagram quick style",
             DiagramDefinition::parse_quick_style,
+            &limits,
             &mut total,
         )?;
         let (colors_relationship_id, colors_part_name, colors) = resolve_definition(
@@ -267,6 +271,7 @@ pub fn load_smart_arts(package: &OpcPackage, document_name: &PackURI) -> Result<
             ct::DML_DIAGRAM_COLORS,
             "diagram colors",
             DiagramDefinition::parse_colors,
+            &limits,
             &mut total,
         )?;
 
@@ -322,6 +327,7 @@ pub fn load_smart_arts(package: &OpcPackage, document_name: &PackURI) -> Result<
             layout,
             quick_style,
             colors,
+            extent: anchor.extent,
         });
     }
     Ok(smart_arts)
@@ -339,7 +345,8 @@ fn resolve_definition(
     relationship_type: &str,
     content_type: &str,
     label: &str,
-    parse: fn(&str) -> litchi_drawingml::Result<DiagramDefinition>,
+    parse: fn(&str, &Limits) -> litchi_drawingml::Result<DiagramDefinition>,
+    limits: &Limits,
     total: &mut usize,
 ) -> Result<(Option<String>, Option<String>, Option<DiagramDefinition>)> {
     let Some(relationship_id) = relationship_id else {
@@ -355,7 +362,7 @@ fn resolve_definition(
         label,
     )?;
     add_total(total, xml.len(), "aggregate bytes")?;
-    let definition = parse(&xml)?;
+    let definition = parse(&xml, limits)?;
     Ok((
         Some(relationship_id.to_owned()),
         Some(name.as_str().to_owned()),
@@ -423,6 +430,9 @@ fn scan_document_xml(xml: &[u8], conformance: DiagramConformance) -> Result<Vec<
     // Stack of (graphicData depth, parsed anchor) frames for diagram anchors.
     let mut frames: Vec<(usize, Option<DiagramAnchor>)> = Vec::new();
     let mut anchors = Vec::new();
+    // The last drawing extent (`wp:extent`) seen, which a diagram anchor
+    // that follows it in the same drawing takes.
+    let mut extent: Option<(i64, i64)> = None;
 
     loop {
         match reader.read_event().map_err(xml_error)? {
@@ -452,7 +462,9 @@ fn scan_document_xml(xml: &[u8], conformance: DiagramConformance) -> Result<Vec<
                     if frame.1.is_some() {
                         return Err(invalid("SmartArt graphicData has multiple relIds children"));
                     }
-                    frame.1 = Some(rel_ids(&reader, &element, conformance)?);
+                    let mut anchor = rel_ids(&reader, &element, conformance)?;
+                    anchor.extent = extent;
+                    frame.1 = Some(anchor);
                 }
             },
             Event::Empty(element) => {
@@ -481,7 +493,11 @@ fn scan_document_xml(xml: &[u8], conformance: DiagramConformance) -> Result<Vec<
                     if frame.1.is_some() {
                         return Err(invalid("SmartArt graphicData has multiple relIds children"));
                     }
-                    frame.1 = Some(rel_ids(&reader, &element, conformance)?);
+                    let mut anchor = rel_ids(&reader, &element, conformance)?;
+                    anchor.extent = extent;
+                    frame.1 = Some(anchor);
+                } else if local == "extent" && namespace.ends_with("wordprocessingDrawing") {
+                    extent = drawing_extent(&element)?;
                 }
             },
             Event::End(_) => {
@@ -507,6 +523,14 @@ fn scan_document_xml(xml: &[u8], conformance: DiagramConformance) -> Result<Vec<
         return Err(invalid("missing or unterminated document root"));
     }
     Ok(anchors)
+}
+
+/// The `cx` and `cy` of a `wp:extent` element, when both are integers.
+fn drawing_extent(element: &BytesStart<'_>) -> Result<Option<(i64, i64)>> {
+    let read = |name: &str| -> Result<Option<i64>> {
+        Ok(attribute(element, name)?.and_then(|value| value.trim().parse().ok()))
+    };
+    Ok(read("cx")?.zip(read("cy")?))
 }
 
 /// Parse the relationship IDs of a `dgm:relIds` element.
@@ -778,7 +802,8 @@ mod tests {
 
     #[test]
     fn reads_libreoffice_strict_fixture() {
-        let package = OpcPackage::from_bytes(STRICT_DOCX).unwrap();
+        let package =
+            OpcPackage::from_bytes(STRICT_DOCX, litchi_opc::SourceLimits::default()).unwrap();
         let name = document_name();
         let smart_arts = load_smart_arts(&package, &name).unwrap();
         assert_eq!(smart_arts.len(), 1);

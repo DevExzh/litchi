@@ -2,10 +2,10 @@
 
 use litchi::numbers::semantic::cell::{FiniteF64, Type, Value};
 use litchi::numbers::semantic::formula::{
-    AxisReference, BinaryOperator, CachedValue, CellReference, FormulaError,
+    AxisReference, BinaryOperator, CachedValue, CellReference, Error as FormulaError,
 };
 use litchi::numbers::semantic::table::cells::{State, Storage};
-use litchi::numbers::semantic::table::{CellPosition, CellRange, Dimensions};
+use litchi::numbers::semantic::table::{Area, At, Dimensions};
 use litchi::numbers::{Package, SheetSelector, TableSelector};
 
 const FIXTURE: &str = concat!(
@@ -25,8 +25,8 @@ fn semantic_numbers_namespace_exposes_typed_values_without_package_types() {
     assert_send_sync_static::<CachedValue>();
     assert_send_sync_static::<CellReference>();
     assert_send_sync_static::<FormulaError>();
-    assert_send_sync_static::<CellPosition>();
-    assert_send_sync_static::<CellRange>();
+    assert_send_sync_static::<At>();
+    assert_send_sync_static::<Area>();
     assert_send_sync_static::<Dimensions>();
     assert_send_sync_static::<State>();
     assert_send_sync_static::<Storage>();
@@ -34,8 +34,8 @@ fn semantic_numbers_namespace_exposes_typed_values_without_package_types() {
     let number = Value::number(42.0).expect("finite semantic values are accepted");
     assert_eq!(number.cell_type(), Type::Number);
     assert_eq!(number.as_number(), Some(42.0));
-    assert_eq!(CellPosition::from_a1("B2").unwrap().to_string(), "B2");
-    assert_eq!(CellRange::from_a1("B2:C3").unwrap().area(), Some(4));
+    assert_eq!(At::from_a1("B2").unwrap().to_string(), "B2");
+    assert_eq!(Area::from_a1("B2:C3").unwrap().area(), Some(4));
     assert_eq!(Dimensions::new(4, 5).area(), Some(20));
     assert_eq!(CachedValue::boolean(true), CachedValue::boolean(true));
 }
@@ -44,7 +44,7 @@ fn semantic_numbers_namespace_exposes_typed_values_without_package_types() {
 fn semantic_numbers_cell_state_preserves_typed_presence() -> Result<(), Box<dyn std::error::Error>>
 {
     let package = Package::open(FIXTURE)?;
-    let position = CellPosition::from_a1("B2")?;
+    let position = At::from_a1("B2")?;
     let state = package.table_cell(
         SheetSelector::name("Sheet 1"),
         TableSelector::name("Table 1"),

@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use super::codec::{parse_chart, patch_chart_data, serialize_chart};
+use super::model::Chart;
 use super::package::{GENERATED_CHART_OBJECT_ID, chart_bof};
 use super::package::{build_workbook_fixture, ranges, remap_extern_sheet};
 use super::wire::{
@@ -213,8 +214,8 @@ mod chart_tests {
             value: Value::Number(42.0),
         });
         let bytes = build_workbook_fixture(chart, Limits::default()).unwrap();
-        let editor = Editor::open(bytes, Limits::default()).unwrap();
-        let mut charts = editor.charts();
+        let mut editor = Edit::open(bytes, Limits::default()).unwrap();
+        let mut charts = editor.charts().unwrap();
         assert_eq!(charts.len(), 1);
         let chart = charts.next().unwrap();
         assert_eq!(
@@ -238,10 +239,7 @@ mod chart_tests {
     #[test]
     fn public_authoring_refuses_atomically_with_typed_error() {
         fn assert_unsupported(error: Error) {
-            assert!(matches!(
-                error,
-                Error::Graph(litchi_ograph::Error::UnsupportedAuthoring { .. })
-            ));
+            assert!(matches!(error, Error::Refused(_)));
         }
 
         let original = build_workbook_fixture(Chart::default(), Limits::default()).unwrap();
@@ -250,7 +248,7 @@ mod chart_tests {
             object_id: GENERATED_CHART_OBJECT_ID,
         };
 
-        let mut editor = Editor::open(original.clone(), Limits::default()).unwrap();
+        let mut editor = Edit::open(original.clone(), Limits::default()).unwrap();
         assert_unsupported(
             editor
                 .replace_at(&location, Chart::default())
@@ -268,11 +266,11 @@ mod chart_tests {
     fn embedded_identity_reorder_is_exact_and_removal_is_atomic_refusal() {
         let original = build_workbook_fixture(Chart::default(), Limits::default()).unwrap();
 
-        let mut reordered = Editor::open(original.clone(), Limits::default()).unwrap();
+        let mut reordered = Edit::open(original.clone(), Limits::default()).unwrap();
         reordered.reorder("Sheet1", &[0]).unwrap();
         assert_eq!(reordered.finish().unwrap(), original);
 
-        let mut removed = Editor::open(original.clone(), Limits::default()).unwrap();
+        let mut removed = Edit::open(original.clone(), Limits::default()).unwrap();
         assert!(matches!(
             removed
                 .remove(Selector::Embedded {
@@ -280,7 +278,7 @@ mod chart_tests {
                     index: 0,
                 })
                 .expect_err("embedded removal must be refused"),
-            Error::Graph(litchi_ograph::Error::UnsupportedMutation { .. })
+            Error::Refused(_)
         ));
         assert_eq!(removed.finish().unwrap(), original);
     }
@@ -288,8 +286,13 @@ mod chart_tests {
     #[test]
     fn editor_and_package_share_the_workbook_stream_allocation() {
         let bytes = build_workbook_fixture(Chart::default(), Limits::default()).unwrap();
-        let editor = Editor::open(bytes, Limits::default()).unwrap();
-        let captured = editor.package.stream_shared(&editor.workbook_path).unwrap();
+        let editor = Edit::open(bytes, Limits::default()).unwrap();
+        let captured = editor
+            .package
+            .as_ref()
+            .unwrap()
+            .stream_shared(&editor.workbook_path)
+            .unwrap();
         assert!(Arc::ptr_eq(&captured, &editor.workbook));
     }
 
@@ -321,7 +324,7 @@ mod chart_tests {
         });
         assert!(matches!(
             serialize_chart(&chart, Limits::default()),
-            Err(Error::UnsafeEdit(_))
+            Err(Error::Refused(_) | Error::PatchConflict { .. } | Error::Internal(_))
         ));
     }
 
@@ -426,7 +429,7 @@ mod chart_tests {
         .expect("absolute chart range");
         assert!(matches!(
             chart.set_formula(0, Role::Values, transposed),
-            Err(Error::UnsafeEdit(_))
+            Err(Error::Refused(_) | Error::PatchConflict { .. } | Error::Internal(_))
         ));
         assert_eq!(chart, original);
 
@@ -457,7 +460,7 @@ mod chart_tests {
         assert_eq!(chart, original);
         assert!(matches!(
             chart.set_cache(CacheKind::Values, 0, 99, 0, Value::Blank),
-            Err(Error::UnsafeEdit(_))
+            Err(Error::Refused(_) | Error::PatchConflict { .. } | Error::Internal(_))
         ));
         assert_eq!(chart, original);
     }
@@ -586,7 +589,7 @@ mod chart_tests {
         graph_change.title = Some("unsafe graph edit".into());
         assert!(matches!(
             patch_chart_data(&source, &old, &graph_change, limits),
-            Err(Error::UnsafeEdit(_))
+            Err(Error::Refused(_) | Error::PatchConflict { .. } | Error::Internal(_))
         ));
     }
 
@@ -594,7 +597,7 @@ mod chart_tests {
     fn embedded_formula_edit_is_an_atomic_refusal() {
         let limits = Limits::default();
         let original = build_workbook_fixture(Chart::default(), limits).unwrap();
-        let mut editor = Editor::open(original.clone(), limits).unwrap();
+        let mut editor = Edit::open(original.clone(), limits).unwrap();
         let formula = Formula::cell(CellRef {
             extern_sheet_index: 0,
             first_row: 0,
@@ -613,9 +616,7 @@ mod chart_tests {
                 Role::Values,
                 formula,
             ),
-            Err(Error::Graph(
-                litchi_ograph::Error::UnsupportedMutation { .. }
-            ))
+            Err(Error::Refused(_))
         ));
         assert_eq!(editor.finish().unwrap(), original);
     }

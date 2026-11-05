@@ -10,8 +10,8 @@ use litchi::keynote::slide::placeholder::{
     Commit as VisibilityCommit, Error as VisibilityError, Kind, State,
 };
 use litchi::keynote::{
-    Limits, Package, ReadOptions, SemanticLimits, SlideSelector, SlideTextCommit, SlideTextError,
-    TextPosition, TextSpan,
+    OpenOptions, Package, SemanticLimits, SlideSelector, SourceLimits, TextPosition, TextSpan,
+    slide::text::Commit as SlideTextCommit, slide::text::Error as SlideTextError,
 };
 
 const MAX_INPUT_BYTES: u64 = 1024 * 1024;
@@ -47,27 +47,29 @@ fuzz_target!(|data: &[u8]| {
     exercise_package(native_package(), data);
 });
 
-fn fuzz_options() -> ReadOptions {
-    static OPTIONS: OnceLock<ReadOptions> = OnceLock::new();
+fn fuzz_options() -> OpenOptions {
+    static OPTIONS: OnceLock<OpenOptions> = OnceLock::new();
     *OPTIONS.get_or_init(|| {
-        let archive = Limits::new(
-            MAX_INPUT_BYTES,
-            MAX_ENTRIES,
-            MAX_ENTRY_BYTES,
-            MAX_EXPANDED_BYTES,
-            MAX_IWA_STREAM_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid fuzz archive limits: {error}"));
-        let semantic = SemanticLimits::new(
-            MAX_OBJECTS,
-            MAX_SLIDES,
-            MAX_REFERENCES,
-            MAX_TEXT_STORAGES,
-            MAX_TEXT_FRAGMENTS,
-            MAX_TEXT_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid fuzz semantic limits: {error}"));
-        ReadOptions::new(archive, semantic)
+        let archive = SourceLimits::builder()
+            .max_input_bytes(MAX_INPUT_BYTES)
+            .and_then(|limits| limits.max_entries(MAX_ENTRIES))
+            .and_then(|limits| limits.max_entry_bytes(MAX_ENTRY_BYTES))
+            .and_then(|limits| limits.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+            .and_then(|limits| limits.max_component_bytes(MAX_IWA_STREAM_BYTES))
+            .and_then(|limits| limits.build())
+            .unwrap_or_else(|error| unreachable!("valid fuzz archive limits: {error}"));
+        let semantic = SemanticLimits::builder()
+            .max_objects(MAX_OBJECTS)
+            .and_then(|limits| limits.max_slides(MAX_SLIDES))
+            .and_then(|limits| limits.max_references(MAX_REFERENCES))
+            .and_then(|limits| limits.max_text_storages(MAX_TEXT_STORAGES))
+            .and_then(|limits| limits.max_text_fragments(MAX_TEXT_FRAGMENTS))
+            .and_then(|limits| limits.max_text_bytes(MAX_TEXT_BYTES))
+            .and_then(|limits| limits.build())
+            .unwrap_or_else(|error| unreachable!("valid fuzz semantic limits: {error}"));
+        OpenOptions::new()
+            .source_limits(archive)
+            .semantic_limits(semantic)
     })
 }
 
@@ -127,9 +129,11 @@ fn exercise_slide_text_unsupported_kind(package: &Package) {
     ] {
         assert!(matches!(
             result,
-            Err(SlideTextError::UnsupportedKind {
-                kind: Kind::SlideNumber
-            })
+            Err(SlideTextError::Refused(
+                litchi::keynote::slide::text::Refusal::UnsupportedKind {
+                    kind: Kind::SlideNumber
+                }
+            ))
         ));
     }
 }
@@ -168,12 +172,22 @@ fn exercise_operation(package: &Package, role: Kind, data: &[u8]) {
     let Ok(mut edit) = package.edit_slide_text(SlideSelector::index(0), role) else {
         return;
     };
-    black_box((edit.position(), edit.role(), edit.text(), edit.span()));
+    let Ok(text) = edit.text().map(str::to_owned) else {
+        return;
+    };
+    let position = match edit.position() {
+        Ok(position) => position,
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    };
+    black_box((position, edit.role(), &text, edit.span()));
 
     let replacement = replacement(data);
-    let length = edit.text().encode_utf16().count();
-    let first = scalar_boundary(edit.text(), usize::try_from(read_u32(data, 2)).unwrap_or(0));
-    let second = scalar_boundary(edit.text(), usize::try_from(read_u32(data, 6)).unwrap_or(0));
+    let length = text.encode_utf16().count();
+    let first = scalar_boundary(&text, usize::try_from(read_u32(data, 2)).unwrap_or(0));
+    let second = scalar_boundary(&text, usize::try_from(read_u32(data, 6)).unwrap_or(0));
     let (start, end) = if first <= second {
         (first, second)
     } else {
@@ -350,6 +364,9 @@ fn exercise_staging_error(package: &Package, role: Kind, data: &[u8]) {
     let Ok(mut edit) = package.edit_slide_text(SlideSelector::index(0), role) else {
         return;
     };
+    let Ok(text) = edit.text().map(str::to_owned) else {
+        return;
+    };
 
     match control(data, 10) % 4 {
         0 => {
@@ -358,7 +375,7 @@ fn exercise_staging_error(package: &Package, role: Kind, data: &[u8]) {
             }
         },
         1 => {
-            let beyond = edit.text().encode_utf16().count().saturating_add(1);
+            let beyond = text.encode_utf16().count().saturating_add(1);
             if let Ok(span) = TextSpan::from_utf16_indexes(beyond, beyond)
                 && let Err(error) = edit.delete(span)
             {
@@ -366,7 +383,7 @@ fn exercise_staging_error(package: &Package, role: Kind, data: &[u8]) {
             }
         },
         2 => {
-            if let Some(position) = split_surrogate_position(edit.text()) {
+            if let Some(position) = split_surrogate_position(&text) {
                 if let Err(error) = edit.insert(position, "x") {
                     observe_error(error);
                 }

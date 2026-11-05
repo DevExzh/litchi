@@ -1,4 +1,4 @@
-use super::{GeneratedXmlEnvelope, GeneratedXmlLimits, PackageWriter, PackageWriterLimits};
+use super::{GeneratedXmlEnvelope, GeneratedXmlLimits, PackageWriter, StreamingArchiveLimits};
 use litchi_core::Error;
 use soapberry_zip::office::ArchiveReader;
 use std::cell::Cell;
@@ -23,7 +23,7 @@ fn error_chain_contains(error: &dyn StdError, needle: &str) -> bool {
 
 #[test]
 fn generated_xml_is_read_back_and_has_one_manifest_record() {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
     writer
         .set_mimetype_streaming("application/vnd.oasis.opendocument.text")
         .unwrap();
@@ -50,7 +50,8 @@ fn generated_xml_is_read_back_and_has_one_manifest_record() {
     assert_eq!(report.fragments(), 1);
 
     let bytes = writer.finish_to_bytes().unwrap();
-    let archive = ArchiveReader::new(&bytes).unwrap();
+    let archive =
+        ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     assert_eq!(
         archive.read("content.xml").unwrap(),
         b"<root><row id=\"1\">x</row></root>"
@@ -71,7 +72,7 @@ fn generated_xml_is_read_back_and_has_one_manifest_record() {
 
 #[test]
 fn first_producer_failure_preserves_source_and_finish_is_refused() {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
     writer
         .set_mimetype_streaming("application/vnd.oasis.opendocument.text")
         .unwrap();
@@ -92,7 +93,7 @@ fn first_producer_failure_preserves_source_and_finish_is_refused() {
 
 #[test]
 fn later_producer_failure_preserves_source_and_finish_is_refused() {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
     writer
         .set_mimetype_streaming("application/vnd.oasis.opendocument.text")
         .unwrap();
@@ -123,11 +124,11 @@ fn later_producer_failure_preserves_source_and_finish_is_refused() {
 
 #[test]
 fn rejected_archive_budget_does_not_pull_the_first_fragment() {
-    let limits = PackageWriterLimits {
+    let limits = StreamingArchiveLimits {
         max_entries: 1,
-        ..PackageWriterLimits::default()
+        ..StreamingArchiveLimits::default()
     };
-    let mut writer = PackageWriter::new_with_limits(limits);
+    let mut writer = PackageWriter::with_writer(io::Cursor::new(Vec::new()), limits);
     writer
         .set_mimetype_streaming("application/vnd.oasis.opendocument.text")
         .unwrap();
@@ -163,7 +164,7 @@ impl Read for CountingReader {
 
 #[test]
 fn opaque_reader_xml_refusal_still_precedes_source_read() {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
     writer
         .set_mimetype_streaming("application/vnd.oasis.opendocument.text")
         .unwrap();
@@ -226,9 +227,12 @@ fn short_sink_failure_reports_accepted_progress() {
         accepted: Rc::new(Cell::new(0)),
         fail_after: Rc::new(Cell::new(None)),
     };
-    let mut writer = PackageWriter::with_writer(ShortSink {
-        control: control.clone(),
-    });
+    let mut writer = PackageWriter::with_writer(
+        ShortSink {
+            control: control.clone(),
+        },
+        StreamingArchiveLimits::default(),
+    );
     writer
         .set_mimetype_streaming("application/vnd.oasis.opendocument.text")
         .unwrap();

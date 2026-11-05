@@ -4,6 +4,8 @@ use std::{borrow::Cow, fmt, ops::Range, sync::Arc};
 
 use thiserror::Error;
 
+use crate::LimitKind;
+
 use super::{
     MAX_BRUSH_PROPERTIES, MAX_CONTEXTS, MAX_GUID_BYTES, MAX_SOURCE_BYTES, MAX_TOKEN_BYTES,
     MAX_TRACES,
@@ -60,9 +62,10 @@ impl Guid {
     pub fn new(value: impl AsRef<str>) -> Result<Self, ValueError> {
         let value = value.as_ref();
         if value.len() > MAX_GUID_BYTES {
-            return Err(ValueError::TooLong {
-                field: "GUID",
-                limit: MAX_GUID_BYTES,
+            return Err(ValueError::Limit {
+                kind: LimitKind::InkMlIdentifierBytes,
+                observed: value.len(),
+                maximum: MAX_GUID_BYTES,
             });
         }
         if !is_guid(value) {
@@ -131,9 +134,10 @@ pub enum ContextKind {
 impl ContextKind {
     pub(crate) fn parse(value: &str) -> Result<Self, ValueError> {
         if value.len() > MAX_TOKEN_BYTES {
-            return Err(ValueError::TooLong {
-                field: "semantic type",
-                limit: MAX_TOKEN_BYTES,
+            return Err(ValueError::Limit {
+                kind: LimitKind::ScalarBytes,
+                observed: value.len(),
+                maximum: MAX_TOKEN_BYTES,
             });
         }
         Ok(match value {
@@ -216,9 +220,10 @@ pub enum SemanticType {
 impl SemanticType {
     pub(crate) fn parse(value: &str) -> Result<Self, ValueError> {
         if value.len() > MAX_TOKEN_BYTES {
-            return Err(ValueError::TooLong {
-                field: "semantic type",
-                limit: MAX_TOKEN_BYTES,
+            return Err(ValueError::Limit {
+                kind: LimitKind::ScalarBytes,
+                observed: value.len(),
+                maximum: MAX_TOKEN_BYTES,
             });
         }
         Ok(match value {
@@ -840,20 +845,23 @@ impl Metadata {
     pub(crate) fn validate(&self, source_len: Option<usize>) -> Result<(), ValueError> {
         if self.contexts.len() > MAX_CONTEXTS {
             return Err(ValueError::Limit {
-                resource: "InkML context nodes",
-                limit: MAX_CONTEXTS,
+                kind: LimitKind::InkMlContextNodes,
+                observed: self.contexts.len(),
+                maximum: MAX_CONTEXTS,
             });
         }
         if self.traces.len() > MAX_TRACES {
             return Err(ValueError::Limit {
-                resource: "InkML traces",
-                limit: MAX_TRACES,
+                kind: LimitKind::InkMlTraces,
+                observed: self.traces.len(),
+                maximum: MAX_TRACES,
             });
         }
         if self.brush_properties.len() > MAX_BRUSH_PROPERTIES {
             return Err(ValueError::Limit {
-                resource: "InkML brush properties",
-                limit: MAX_BRUSH_PROPERTIES,
+                kind: LimitKind::InkMlBrushProperties,
+                observed: self.brush_properties.len(),
+                maximum: MAX_BRUSH_PROPERTIES,
             });
         }
         if let Some(source_len) = source_len {
@@ -942,8 +950,9 @@ impl Document {
     pub(crate) fn validate(&self) -> Result<(), ValueError> {
         if self.source.len() > MAX_SOURCE_BYTES {
             return Err(ValueError::Limit {
-                resource: "InkML source bytes",
-                limit: MAX_SOURCE_BYTES,
+                kind: LimitKind::InkMlSourceBytes,
+                observed: self.source.len(),
+                maximum: MAX_SOURCE_BYTES,
             });
         }
         self.metadata.validate(Some(self.source.len()))
@@ -954,13 +963,12 @@ impl Document {
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[non_exhaustive]
 pub enum ValueError {
-    #[error("InkML {resource} exceeds the limit of {limit}")]
+    #[error("InkML {kind} limit exceeded: observed {observed}, maximum {maximum}")]
     Limit {
-        resource: &'static str,
-        limit: usize,
+        kind: LimitKind,
+        observed: usize,
+        maximum: usize,
     },
-    #[error("InkML {field} exceeds the limit of {limit} bytes")]
-    TooLong { field: &'static str, limit: usize },
     #[error("invalid InkML GUID '{value}'")]
     Guid { value: String },
     #[error("invalid InkML semantic type '{value}'")]

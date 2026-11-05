@@ -6,14 +6,15 @@ fn saves_and_reopens_inline_and_display_office_math() {
     let inline = crate::OfficeMath::text("x + y");
     let display =
         crate::OfficeMath::from_xml("<m:oMath><m:r><m:t>z</m:t></m:r></m:oMath>").unwrap();
-    let mut package = Package::new().unwrap();
+    let mut builder = crate::Builder::new().unwrap();
     {
-        let document = package.document_mut().unwrap();
+        let document = builder.document().unwrap();
         document
             .add_paragraph()
             .add_inline_office_math(inline.clone());
         document.add_display_office_math(display.clone());
     }
+    let package = builder.build().unwrap();
     package.save(file.path()).unwrap();
 
     let reopened = Package::open(file.path()).unwrap();
@@ -33,17 +34,18 @@ fn saves_and_reopens_inline_and_display_office_math() {
 #[test]
 fn authored_revision_utc_survives_save_and_reopen_with_mce_declaration() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();
-    let mut package = Package::new().unwrap();
+    let mut builder = crate::Builder::new().unwrap();
     let mut metadata = crate::writer::RevisionMetadata::new("1", "Alice").unwrap();
     metadata
         .set_date_utc(Some("2026-07-17T00:00:00.123456+00:00"))
         .unwrap();
-    package
-        .document_mut()
+    builder
+        .document()
         .unwrap()
         .add_paragraph()
         .add_revision(crate::writer::RevisionKind::Insert, metadata)
         .add_run_with_text("  A&<🙂  ");
+    let package = builder.build().unwrap();
     package.save(file.path()).unwrap();
     let reopened = Package::open(file.path()).unwrap();
     let document_uri = PackURI::new("/word/document.xml").unwrap();
@@ -106,10 +108,9 @@ fn opened_package_round_trips_inert_owexml_custom_function_metadata() {
     let mut panes = web::Panes::new();
     panes.push(web::Pane::new(add_in)).unwrap();
 
-    let mut package = Package::new().unwrap();
-    package
-        .put_task_panes(panes, web::Conformance::Transitional)
-        .unwrap();
+    let mut edit = Package::new().unwrap().edit_task_panes();
+    edit.put(panes, web::Conformance::Transitional).unwrap();
+    let package = edit.commit().unwrap().into_package();
     package.save(file.path()).unwrap();
 
     let reopened = Package::open(file.path()).unwrap();
@@ -123,11 +124,12 @@ fn opened_package_round_trips_inert_owexml_custom_function_metadata() {
 #[test]
 fn writes_and_rediscovers_distinct_watermarks() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();
-    let mut package = Package::new().unwrap();
+    let mut builder = crate::Builder::new().unwrap();
     let mut watermark = crate::Watermark::text("INTERNAL");
     watermark.set_font("Aptos");
     watermark.set_color("808080");
-    package.document_mut().unwrap().set_watermark(watermark);
+    builder.document().unwrap().set_watermark(watermark);
+    let package = builder.build().unwrap();
     package.save(file.path()).unwrap();
 
     let reopened = Package::open(file.path()).unwrap();
@@ -142,9 +144,9 @@ fn writes_and_rediscovers_distinct_watermarks() {
 #[test]
 fn writes_and_discovers_typed_table_of_contents_fields() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();
-    let mut package = Package::new().unwrap();
+    let mut builder = crate::Builder::new().unwrap();
     {
-        let document = package.document_mut().unwrap();
+        let document = builder.document().unwrap();
         document.add_heading("Overview", 1).unwrap();
         document
             .add_toc(
@@ -154,6 +156,7 @@ fn writes_and_discovers_typed_table_of_contents_fields() {
             )
             .unwrap();
     }
+    let package = builder.build().unwrap();
     package.save(file.path()).unwrap();
 
     let reopened = Package::open(file.path()).unwrap();
@@ -172,15 +175,16 @@ fn writes_and_discovers_typed_table_of_contents_fields() {
 #[test]
 fn all_supported_headings_resolve_in_the_saved_style_catalog() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();
-    let mut package = Package::new().unwrap();
+    let mut builder = crate::Builder::new().unwrap();
     {
-        let document = package.document_mut().unwrap();
+        let document = builder.document().unwrap();
         for level in 0..=9 {
             document
                 .add_heading(&format!("Heading {level}"), level)
                 .unwrap();
         }
     }
+    let package = builder.build().unwrap();
     package.save(file.path()).unwrap();
 
     let reopened = Package::open(file.path()).unwrap();
@@ -221,15 +225,16 @@ fn all_supported_headings_resolve_in_the_saved_style_catalog() {
 #[test]
 fn writes_and_discovers_typed_table_of_contents_entry_fields() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();
-    let mut package = Package::new().unwrap();
+    let mut builder = crate::Builder::new().unwrap();
     {
-        let document = package.document_mut().unwrap();
+        let document = builder.document().unwrap();
         let entry = document.add_paragraph();
-        entry.add_field(crate::writer::MutableField::with_result(
+        entry.add_field(crate::builder::Field::with_result(
             r#"TC "Illustration 1" \f i \l 4 \n"#.to_string(),
             "cached entry".to_string(),
         ));
     }
+    let package = builder.build().unwrap();
     package.save(file.path()).unwrap();
 
     let reopened = Package::open(file.path()).unwrap();
@@ -247,20 +252,21 @@ fn writes_and_discovers_typed_table_of_contents_entry_fields() {
 #[test]
 fn writes_and_discovers_typed_table_of_authorities_fields() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();
-    let mut package = Package::new().unwrap();
+    let mut builder = crate::Builder::new().unwrap();
     {
-        let document = package.document_mut().unwrap();
+        let document = builder.document().unwrap();
         let authority_table = document.add_paragraph();
-        authority_table.add_field(crate::writer::MutableField::with_result(
+        authority_table.add_field(crate::builder::Field::with_result(
             r#"TOA \c 2 \b "Authorities" \p \h"#.to_string(),
             "Statutes\t3".to_string(),
         ));
         let entry = document.add_paragraph();
-        entry.add_field(crate::writer::MutableField::with_result(
+        entry.add_field(crate::builder::Field::with_result(
             r#"TA \l "Example Statute" \s "Example" \c 2 \b"#.to_string(),
             "hidden marker".to_string(),
         ));
     }
+    let package = builder.build().unwrap();
     package.save(file.path()).unwrap();
 
     let reopened = Package::open(file.path()).unwrap();
@@ -285,9 +291,9 @@ fn writes_and_discovers_typed_table_of_authorities_fields() {
 #[test]
 fn writes_and_discovers_typed_citation_and_bibliography_fields() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();
-    let mut package = Package::new().unwrap();
+    let mut builder = crate::Builder::new().unwrap();
     {
-        let document = package.document_mut().unwrap();
+        let document = builder.document().unwrap();
         let citation = document.add_paragraph();
         let mut primary = crate::CitationSource::new("Doe2024").unwrap();
         primary.set_prefix(Some("qtd. in".to_string())).unwrap();
@@ -300,7 +306,7 @@ fn writes_and_discovers_typed_citation_and_bibliography_fields() {
             .set_cached_result(Some("(Doe, 2024; Smith, 2025)".to_string()))
             .unwrap();
         citation_spec.set_dirty(false);
-        citation.add_field(crate::writer::MutableField::citation(&citation_spec).unwrap());
+        citation.add_field(crate::builder::Field::citation(&citation_spec).unwrap());
         let bibliography = document.add_paragraph();
         let mut bibliography_spec = crate::BibliographyFieldSpec::new();
         bibliography_spec.set_locale(Some(1033));
@@ -311,9 +317,9 @@ fn writes_and_discovers_typed_citation_and_bibliography_fields() {
             .set_cached_result(Some("Doe. Example work.".to_string()))
             .unwrap();
         bibliography_spec.set_dirty(false);
-        bibliography
-            .add_field(crate::writer::MutableField::bibliography(&bibliography_spec).unwrap());
+        bibliography.add_field(crate::builder::Field::bibliography(&bibliography_spec).unwrap());
     }
+    let package = builder.build().unwrap();
     package.save(file.path()).unwrap();
 
     let reopened = Package::open(file.path()).unwrap();
@@ -349,15 +355,16 @@ fn writes_and_discovers_typed_citation_and_bibliography_fields() {
 #[test]
 fn writes_and_discovers_inert_document_variable_fields_without_resolution() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();
-    let mut package = Package::new().unwrap();
+    let mut builder = crate::Builder::new().unwrap();
     {
-        let document = package.document_mut().unwrap();
+        let document = builder.document().unwrap();
         let paragraph = document.add_paragraph();
-        paragraph.add_field(crate::writer::MutableField::with_result(
+        paragraph.add_field(crate::builder::Field::with_result(
             r#"DOCVARIABLE CustomerName \* MERGEFORMAT"#.to_string(),
             "cached customer".to_string(),
         ));
     }
+    let package = builder.build().unwrap();
     package.save(file.path()).unwrap();
 
     let reopened = Package::open(file.path()).unwrap();
@@ -380,15 +387,16 @@ fn writes_and_discovers_inert_document_variable_fields_without_resolution() {
 #[test]
 fn writes_and_discovers_inert_document_property_fields_without_resolution() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();
-    let mut package = Package::new().unwrap();
+    let mut builder = crate::Builder::new().unwrap();
     {
-        let document = package.document_mut().unwrap();
+        let document = builder.document().unwrap();
         let paragraph = document.add_paragraph();
-        paragraph.add_field(crate::writer::MutableField::with_result(
+        paragraph.add_field(crate::builder::Field::with_result(
             r#"DOCPROPERTY "Project Name" \* MERGEFORMAT \@ "MMMM d, yyyy""#.to_string(),
             "cached project".to_string(),
         ));
     }
+    let package = builder.build().unwrap();
     package.save(file.path()).unwrap();
 
     let reopened = Package::open(file.path()).unwrap();
@@ -407,20 +415,21 @@ fn writes_and_discovers_inert_document_property_fields_without_resolution() {
 #[test]
 fn writes_and_discovers_inert_document_information_fields_without_resolution() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();
-    let mut package = Package::new().unwrap();
+    let mut builder = crate::Builder::new().unwrap();
     {
-        let document = package.document_mut().unwrap();
+        let document = builder.document().unwrap();
         let title = document.add_paragraph();
-        title.add_field(crate::writer::MutableField::with_result(
+        title.add_field(crate::builder::Field::with_result(
             r#"TITLE \* MERGEFORMAT"#.to_string(),
             "cached title".to_string(),
         ));
         let author = document.add_paragraph();
-        author.add_field(crate::writer::MutableField::with_result(
+        author.add_field(crate::builder::Field::with_result(
             r#"AUTHOR \@ "opaque format""#.to_string(),
             "cached author".to_string(),
         ));
     }
+    let package = builder.build().unwrap();
     package.save(file.path()).unwrap();
 
     let reopened = Package::open(file.path()).unwrap();
@@ -441,20 +450,21 @@ fn writes_and_discovers_inert_document_information_fields_without_resolution() {
 #[test]
 fn writes_and_discovers_inert_document_context_fields_without_resolution() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();
-    let mut package = Package::new().unwrap();
+    let mut builder = crate::Builder::new().unwrap();
     {
-        let document = package.document_mut().unwrap();
+        let document = builder.document().unwrap();
         let file_name = document.add_paragraph();
-        file_name.add_field(crate::writer::MutableField::with_result(
+        file_name.add_field(crate::builder::Field::with_result(
             r#"FILENAME \p"#.to_string(),
             "cached file name".to_string(),
         ));
         let page = document.add_paragraph();
-        page.add_field(crate::writer::MutableField::with_result(
+        page.add_field(crate::builder::Field::with_result(
             r#"PAGE \* MERGEFORMAT"#.to_string(),
             "cached page".to_string(),
         ));
     }
+    let package = builder.build().unwrap();
     package.save(file.path()).unwrap();
 
     let reopened = Package::open(file.path()).unwrap();
@@ -474,15 +484,16 @@ fn writes_and_discovers_inert_document_context_fields_without_resolution() {
 #[test]
 fn writes_and_discovers_typed_inert_merge_fields_without_merging() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();
-    let mut package = Package::new().unwrap();
+    let mut builder = crate::Builder::new().unwrap();
     {
-        let document = package.document_mut().unwrap();
+        let document = builder.document().unwrap();
         let paragraph = document.add_paragraph();
-        paragraph.add_field(crate::writer::MutableField::with_result(
+        paragraph.add_field(crate::builder::Field::with_result(
             r#"MERGEFIELD "Customer Region" \b "Dear " \f "!" \m \v \* MERGEFORMAT"#.to_string(),
             "cached customer".to_string(),
         ));
     }
+    let package = builder.build().unwrap();
     package.save(file.path()).unwrap();
 
     let reopened = Package::open(file.path()).unwrap();
@@ -504,22 +515,23 @@ fn writes_and_discovers_typed_inert_merge_fields_without_merging() {
 #[test]
 fn writes_and_discovers_typed_inert_mail_merge_counters_without_merging() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();
-    let mut package = Package::new().unwrap();
+    let mut builder = crate::Builder::new().unwrap();
     {
-        let document = package.document_mut().unwrap();
+        let document = builder.document().unwrap();
         document
             .add_paragraph()
-            .add_field(crate::writer::MutableField::with_result(
+            .add_field(crate::builder::Field::with_result(
                 "MERGEREC".to_string(),
                 "12".to_string(),
             ));
         document
             .add_paragraph()
-            .add_field(crate::writer::MutableField::with_result(
+            .add_field(crate::builder::Field::with_result(
                 "MERGESEQ".to_string(),
                 "3".to_string(),
             ));
     }
+    let package = builder.build().unwrap();
     package.save(file.path()).unwrap();
 
     let reopened = Package::open(file.path()).unwrap();
@@ -537,10 +549,16 @@ fn writes_and_discovers_typed_inert_mail_merge_counters_without_merging() {
 #[test]
 fn writes_and_discovers_inert_mail_merge_next_fields_without_advancing_records() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();
-    let mut package = Package::new().unwrap();
-    package.document_mut().unwrap().add_paragraph().add_field(
-        crate::writer::MutableField::with_result("NEXT".to_string(), "cached next".to_string()),
-    );
+    let mut builder = crate::Builder::new().unwrap();
+    builder
+        .document()
+        .unwrap()
+        .add_paragraph()
+        .add_field(crate::builder::Field::with_result(
+            "NEXT".to_string(),
+            "cached next".to_string(),
+        ));
+    let package = builder.build().unwrap();
     package.save(file.path()).unwrap();
 
     let reopened = Package::open(file.path()).unwrap();
@@ -555,13 +573,16 @@ fn writes_and_discovers_inert_mail_merge_next_fields_without_advancing_records()
 #[test]
 fn writes_and_discovers_inert_conditional_mail_merge_controls_without_merging() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();
-    let mut package = Package::new().unwrap();
-    package.document_mut().unwrap().add_paragraph().add_field(
-        crate::writer::MutableField::with_result(
+    let mut builder = crate::Builder::new().unwrap();
+    builder
+        .document()
+        .unwrap()
+        .add_paragraph()
+        .add_field(crate::builder::Field::with_result(
             r#"SKIPIF MERGEFIELD Order < 100"#.to_string(),
             "cached skipif".to_string(),
-        ),
-    );
+        ));
+    let package = builder.build().unwrap();
     package.save(file.path()).unwrap();
 
     let reopened = Package::open(file.path()).unwrap();
@@ -578,13 +599,16 @@ fn writes_and_discovers_inert_conditional_mail_merge_controls_without_merging() 
 #[test]
 fn writes_and_discovers_inert_if_fields_without_evaluation() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();
-    let mut package = Package::new().unwrap();
-    package.document_mut().unwrap().add_paragraph().add_field(
-        crate::writer::MutableField::with_result(
+    let mut builder = crate::Builder::new().unwrap();
+    builder
+        .document()
+        .unwrap()
+        .add_paragraph()
+        .add_field(crate::builder::Field::with_result(
             r#"IF 1 = 1 "yes" "no""#.to_string(),
             "yes".to_string(),
-        ),
-    );
+        ));
+    let package = builder.build().unwrap();
     package.save(file.path()).unwrap();
 
     let reopened = Package::open(file.path()).unwrap();
@@ -599,9 +623,9 @@ fn writes_and_discovers_inert_if_fields_without_evaluation() {
 #[test]
 fn writes_and_discovers_inert_document_state_fields() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();
-    let mut package = Package::new().unwrap();
+    let mut builder = crate::Builder::new().unwrap();
     {
-        let document = package.document_mut().unwrap();
+        let document = builder.document().unwrap();
         for (instruction, cached_result) in [
             (
                 r#"SET RecipientName "North America" \* MERGEFORMAT"#,
@@ -613,12 +637,13 @@ fn writes_and_discovers_inert_document_state_fields() {
         ] {
             document
                 .add_paragraph()
-                .add_field(crate::writer::MutableField::with_result(
+                .add_field(crate::builder::Field::with_result(
                     instruction.to_string(),
                     cached_result.to_string(),
                 ));
         }
     }
+    let package = builder.build().unwrap();
     package.save(file.path()).unwrap();
 
     let reopened = Package::open(file.path()).unwrap();
@@ -662,9 +687,9 @@ fn writes_and_discovers_inert_document_state_fields() {
 #[test]
 fn writes_and_discovers_inert_bookmark_reference_fields() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();
-    let mut package = Package::new().unwrap();
+    let mut builder = crate::Builder::new().unwrap();
     {
-        let document = package.document_mut().unwrap();
+        let document = builder.document().unwrap();
         for (instruction, cached_result) in [
             (
                 r#"REF "Target Bookmark" \d "-" \f \h \n \p \r \t \w"#,
@@ -676,12 +701,13 @@ fn writes_and_discovers_inert_bookmark_reference_fields() {
         ] {
             document
                 .add_paragraph()
-                .add_field(crate::writer::MutableField::with_result(
+                .add_field(crate::builder::Field::with_result(
                     instruction.to_string(),
                     cached_result.to_string(),
                 ));
         }
     }
+    let package = builder.build().unwrap();
     package.save(file.path()).unwrap();
 
     let reopened = Package::open(file.path()).unwrap();
@@ -747,9 +773,9 @@ fn writes_and_discovers_inert_bookmark_reference_fields() {
 #[test]
 fn writes_and_discovers_inert_equation_fields_without_calculation_or_rendering() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();
-    let mut package = Package::new().unwrap();
+    let mut builder = crate::Builder::new().unwrap();
     {
-        let document = package.document_mut().unwrap();
+        let document = builder.document().unwrap();
         for (instruction, cached_result) in [
             (r#"EQ \o\ac(\fs24 Q,\fs16 R)"#, "cached equation"),
             (r#"EQ \f(1,2)"#, "1/2"),
@@ -757,12 +783,13 @@ fn writes_and_discovers_inert_equation_fields_without_calculation_or_rendering()
         ] {
             document
                 .add_paragraph()
-                .add_field(crate::writer::MutableField::with_result(
+                .add_field(crate::builder::Field::with_result(
                     instruction.to_string(),
                     cached_result.to_string(),
                 ));
         }
     }
+    let package = builder.build().unwrap();
     package.save(file.path()).unwrap();
 
     let reopened = Package::open(file.path()).unwrap();
@@ -780,9 +807,9 @@ fn writes_and_discovers_inert_equation_fields_without_calculation_or_rendering()
 #[test]
 fn writes_and_discovers_inert_hyperlink_fields_without_opening_them() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();
-    let mut package = Package::new().unwrap();
+    let mut builder = crate::Builder::new().unwrap();
     {
-        let document = package.document_mut().unwrap();
+        let document = builder.document().unwrap();
         for (instruction, cached_result) in [
             (
                 r#"HYPERLINK "https://example.test/a b" \l "_Toc1" \o "Stored tip" \t "_blank" \m \n"#,
@@ -792,12 +819,13 @@ fn writes_and_discovers_inert_hyperlink_fields_without_opening_them() {
         ] {
             document
                 .add_paragraph()
-                .add_field(crate::writer::MutableField::with_result(
+                .add_field(crate::builder::Field::with_result(
                     instruction.to_string(),
                     cached_result.to_string(),
                 ));
         }
     }
+    let package = builder.build().unwrap();
     package.save(file.path()).unwrap();
 
     let reopened = Package::open(file.path()).unwrap();
@@ -824,20 +852,21 @@ fn writes_and_discovers_inert_hyperlink_fields_without_opening_them() {
 #[test]
 fn writes_and_discovers_inert_prompt_fields_without_displaying_prompts() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();
-    let mut package = Package::new().unwrap();
+    let mut builder = crate::Builder::new().unwrap();
     {
-        let document = package.document_mut().unwrap();
+        let document = builder.document().unwrap();
         let ask = document.add_paragraph();
-        ask.add_field(crate::writer::MutableField::with_result(
+        ask.add_field(crate::builder::Field::with_result(
             r#"ASK AskResponse "What is your first name?" \d "" \o"#.to_string(),
             "cached ask response".to_string(),
         ));
         let fill_in = document.add_paragraph();
-        fill_in.add_field(crate::writer::MutableField::with_result(
+        fill_in.add_field(crate::builder::Field::with_result(
             r#"FILLIN "Enter appointment time" \d "09:00""#.to_string(),
             "10:30".to_string(),
         ));
     }
+    let package = builder.build().unwrap();
     package.save(file.path()).unwrap();
 
     let reopened = Package::open(file.path()).unwrap();
@@ -860,15 +889,16 @@ fn writes_and_discovers_inert_prompt_fields_without_displaying_prompts() {
 #[test]
 fn writes_and_discovers_inert_macro_button_fields_without_execution() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();
-    let mut package = Package::new().unwrap();
+    let mut builder = crate::Builder::new().unwrap();
     {
-        let document = package.document_mut().unwrap();
+        let document = builder.document().unwrap();
         let paragraph = document.add_paragraph();
-        paragraph.add_field(crate::writer::MutableField::with_result(
+        paragraph.add_field(crate::builder::Field::with_result(
             r#"MACROBUTTON NeverRun "Click here""#.to_string(),
             "cached button".to_string(),
         ));
     }
+    let package = builder.build().unwrap();
     package.save(file.path()).unwrap();
 
     let reopened = Package::open(file.path()).unwrap();
@@ -884,9 +914,9 @@ fn writes_and_discovers_inert_macro_button_fields_without_execution() {
 #[test]
 fn writes_and_discovers_inert_active_and_building_block_fields() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();
-    let mut package = Package::new().unwrap();
+    let mut builder = crate::Builder::new().unwrap();
     {
-        let document = package.document_mut().unwrap();
+        let document = builder.document().unwrap();
         for (instruction, cached_result) in [
             ("ADDIN opaque-add-in-data", "cached add-in"),
             ("CONTROL opaque-control-data", "cached control"),
@@ -906,12 +936,13 @@ fn writes_and_discovers_inert_active_and_building_block_fields() {
         ] {
             document
                 .add_paragraph()
-                .add_field(crate::writer::MutableField::with_result(
+                .add_field(crate::builder::Field::with_result(
                     instruction.to_string(),
                     cached_result.to_string(),
                 ));
         }
     }
+    let package = builder.build().unwrap();
     package.save(file.path()).unwrap();
 
     let reopened = Package::open(file.path()).unwrap();
@@ -955,20 +986,21 @@ fn writes_and_discovers_inert_active_and_building_block_fields() {
 #[test]
 fn writes_and_discovers_typed_inert_dde_fields() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();
-    let mut package = Package::new().unwrap();
+    let mut builder = crate::Builder::new().unwrap();
     {
-        let document = package.document_mut().unwrap();
+        let document = builder.document().unwrap();
         let manual = document.add_paragraph();
-        manual.add_field(crate::writer::MutableField::with_result(
+        manual.add_field(crate::builder::Field::with_result(
             r#"DDE Excel "missing.xlsx" "Sheet1!A1" \a \p"#.to_string(),
             "cached DDE link".to_string(),
         ));
         let automatic = document.add_paragraph();
-        automatic.add_field(crate::writer::MutableField::with_result(
+        automatic.add_field(crate::builder::Field::with_result(
             r#"DDEAUTO Excel "missing.xlsx" "Sheet1!A2" \t"#.to_string(),
             "cached DDE auto link".to_string(),
         ));
     }
+    let package = builder.build().unwrap();
     package.save(file.path()).unwrap();
 
     let reopened = Package::open(file.path()).unwrap();
@@ -993,31 +1025,32 @@ fn writes_and_discovers_typed_inert_dde_fields() {
 #[test]
 fn writes_and_discovers_typed_inert_external_include_fields() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();
-    let mut package = Package::new().unwrap();
+    let mut builder = crate::Builder::new().unwrap();
     {
-        let document = package.document_mut().unwrap();
+        let document = builder.document().unwrap();
         let text = document.add_paragraph();
-        text.add_field(crate::writer::MutableField::with_result(
+        text.add_field(crate::builder::Field::with_result(
             r#"INCLUDETEXT "file:///no-contact/source.docx" Summary \! \c Word8 \x /resume/name"#
                 .to_string(),
             "cached included text".to_string(),
         ));
         let picture = document.add_paragraph();
-        picture.add_field(crate::writer::MutableField::with_result(
+        picture.add_field(crate::builder::Field::with_result(
             r#"INCLUDEPICTURE "file:///no-contact/picture.gif" \c Pictim32 \d"#.to_string(),
             "cached picture".to_string(),
         ));
         let legacy_text = document.add_paragraph();
-        legacy_text.add_field(crate::writer::MutableField::with_result(
+        legacy_text.add_field(crate::builder::Field::with_result(
             r#"INCLUDE "file:///no-contact/legacy.docx" LegacySection \!"#.to_string(),
             "cached legacy text".to_string(),
         ));
         let legacy_picture = document.add_paragraph();
-        legacy_picture.add_field(crate::writer::MutableField::with_result(
+        legacy_picture.add_field(crate::builder::Field::with_result(
             r#"IMPORT "file:///no-contact/legacy.wmf" \c GraphicsFilter \d"#.to_string(),
             "cached legacy picture".to_string(),
         ));
     }
+    let package = builder.build().unwrap();
     package.save(file.path()).unwrap();
 
     let reopened = Package::open(file.path()).unwrap();
@@ -1065,20 +1098,21 @@ fn writes_and_discovers_typed_inert_external_include_fields() {
 #[test]
 fn writes_and_discovers_typed_inert_referenced_document_fields() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();
-    let mut package = Package::new().unwrap();
+    let mut builder = crate::Builder::new().unwrap();
     {
-        let document = package.document_mut().unwrap();
+        let document = builder.document().unwrap();
         let relative = document.add_paragraph();
-        relative.add_field(crate::writer::MutableField::with_result(
+        relative.add_field(crate::builder::Field::with_result(
             r#"RD "C:\\Manual\\Chapters\\Chapter 1.docx" \f"#.to_string(),
             "cached relative reference".to_string(),
         ));
         let absolute = document.add_paragraph();
-        absolute.add_field(crate::writer::MutableField::with_result(
+        absolute.add_field(crate::builder::Field::with_result(
             r#"RD "file:///no-contact/appendix.docx""#.to_string(),
             "cached absolute reference".to_string(),
         ));
     }
+    let package = builder.build().unwrap();
     package.save(file.path()).unwrap();
 
     let reopened = Package::open(file.path()).unwrap();
@@ -1103,20 +1137,21 @@ fn writes_and_discovers_typed_inert_referenced_document_fields() {
 #[test]
 fn writes_and_discovers_typed_inert_link_fields() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();
-    let mut package = Package::new().unwrap();
+    let mut builder = crate::Builder::new().unwrap();
     {
-        let document = package.document_mut().unwrap();
+        let document = builder.document().unwrap();
         let spreadsheet = document.add_paragraph();
-        spreadsheet.add_field(crate::writer::MutableField::with_result(
+        spreadsheet.add_field(crate::builder::Field::with_result(
             r#"LINK Excel.Sheet.8 "missing.xlsx" "Sheet1!A1" \a \f 4 \p"#.to_string(),
             "cached spreadsheet link".to_string(),
         ));
         let text = document.add_paragraph();
-        text.add_field(crate::writer::MutableField::with_result(
+        text.add_field(crate::builder::Field::with_result(
             r#"LINK Word.Document.8 "missing.docx" Bookmark \t"#.to_string(),
             "cached text link".to_string(),
         ));
     }
+    let package = builder.build().unwrap();
     package.save(file.path()).unwrap();
 
     let reopened = Package::open(file.path()).unwrap();
@@ -1186,20 +1221,21 @@ fn saves_and_discovers_typed_inert_bibliography_source_stores() {
 #[test]
 fn writes_and_discovers_typed_index_fields() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();
-    let mut package = Package::new().unwrap();
+    let mut builder = crate::Builder::new().unwrap();
     {
-        let document = package.document_mut().unwrap();
+        let document = builder.document().unwrap();
         let index = document.add_paragraph();
-        index.add_field(crate::writer::MutableField::with_result(
+        index.add_field(crate::builder::Field::with_result(
             r#"INDEX \c 2 \f "topics" \r"#.to_string(),
             "Topic\t3".to_string(),
         ));
         let entry = document.add_paragraph();
-        entry.add_field(crate::writer::MutableField::with_result(
+        entry.add_field(crate::builder::Field::with_result(
             r#"XE "Topic" \f "topics" \r TopicRange \b"#.to_string(),
             "hidden marker".to_string(),
         ));
     }
+    let package = builder.build().unwrap();
     package.save(file.path()).unwrap();
 
     let reopened = Package::open(file.path()).unwrap();
@@ -1240,7 +1276,7 @@ fn document_revision_queries_cover_final_sections_grids_and_numbering_after_reop
         .unwrap()
         .set_blob(xml.as_bytes().to_vec());
     package.save(source_file.path()).unwrap();
-    let mut reopened = Package::open(source_file.path()).unwrap();
+    let reopened = Package::open(source_file.path()).unwrap();
     let document = reopened.document().unwrap();
     let records = document.revisions().unwrap();
     assert_eq!(
@@ -1263,9 +1299,13 @@ fn document_revision_queries_cover_final_sections_grids_and_numbering_after_reop
         ..Limits::default()
     };
     assert!(matches!(
-        document.revisions_with_limits(limits),
+        reopened
+            .with_semantic_limits(crate::SemanticLimits::default().revisions(limits))
+            .document()
+            .unwrap()
+            .revisions(),
         Err(Error::RevisionLimit {
-            resource: "records",
+            kind: crate::revision::LimitKind::Records,
             ..
         })
     ));
@@ -1303,9 +1343,13 @@ fn document_revision_queries_cover_final_sections_grids_and_numbering_after_reop
             .collect::<Vec<_>>()
     );
     assert!(matches!(
-        pinned_document.revisions_with_limits(limits),
+        pinned
+            .with_semantic_limits(crate::SemanticLimits::default().revisions(limits))
+            .document()
+            .unwrap()
+            .revisions(),
         Err(Error::RevisionLimit {
-            resource: "records",
+            kind: crate::revision::LimitKind::Records,
             ..
         })
     ));

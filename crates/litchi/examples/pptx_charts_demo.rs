@@ -9,7 +9,7 @@
 //! Run with: cargo run --example pptx_charts_demo --features ooxml
 
 use litchi_pptx::Package;
-use litchi_pptx::chart::{self, Chart, Series, Type as ChartType, encode as encode_chart};
+use litchi_pptx::chart::{Chart, Series, Type as ChartType, encode as encode_chart};
 
 const X: i64 = 914_400;
 const Y: i64 = 1_600_000;
@@ -139,9 +139,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== PPTX Charts Demo ===\n");
     println!("Building typed chart models and a summary presentation...\n");
 
-    let mut package = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
     {
-        let presentation = package.presentation_mut()?;
+        let presentation = builder.presentation()?;
 
         let title = presentation.add_slide()?;
         title.set_title("Chart Types Demo");
@@ -199,16 +199,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Publish the authored slides first, then add chart parts through the
     // transactional OPC facade. Chart-frame mutation is not part of the
     // current writer, so the package graph remains the source of truth.
-    let authored = package.to_bytes()?;
-    let mut package = Package::from_bytes(&authored)?;
-    let relationship_ids = package.edit_opc(|opc| {
+    let mut package = builder.build()?;
+    let relationship_ids = {
+        let mut edit = package.edit_charts()?;
         let mut ids = Vec::with_capacity(charts.len());
         for (index, value) in charts.iter().enumerate() {
-            let slide_name = format!("/ppt/slides/slide{}.xml", index + 2);
-            ids.push(chart::add(opc, &slide_name, value)?);
+            // Slide `index + 2` of the deck, zero-based.
+            ids.push(edit.add(index + 1, value)?);
         }
-        Ok(ids)
-    })?;
+        package = edit.commit()?.into_package();
+        ids
+    };
 
     let bytes = package.to_bytes()?;
     let reopened = Package::from_bytes(&bytes)?;

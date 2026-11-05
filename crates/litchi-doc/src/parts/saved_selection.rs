@@ -344,8 +344,8 @@ impl SavedSelection {
 
     /// Start a source-bound edit of this record.
     #[must_use]
-    pub fn transaction(&self) -> SavedSelectionTransaction {
-        SavedSelectionTransaction {
+    pub fn edit(&self) -> Edit {
+        Edit {
             source: self.clone(),
             draft: self.source,
             owner: self.owner.clone(),
@@ -646,21 +646,21 @@ impl SavedSelection {
 /// candidate. This keeps CP, insertion, table, and block invariants together,
 /// while bytes outside the field being edited remain untouched.
 #[derive(Debug, Clone)]
-pub struct SavedSelectionTransaction {
+pub struct Edit {
     source: SavedSelection,
     draft: [u8; SELSF_SIZE],
     owner: Option<Arc<[u8]>>,
 }
 
-impl SavedSelectionTransaction {
-    /// The source snapshot against which this transaction was opened.
+impl Edit {
+    /// The source snapshot against which this edit was opened.
     #[must_use]
     pub fn source(&self) -> &SavedSelection {
         &self.source
     }
 
-    /// Return the currently staged snapshot after validating all fields.
-    pub fn snapshot(&self) -> Result<SavedSelection> {
+    /// The staged record, validated, without committing it.
+    pub fn staged(&self) -> Result<SavedSelection> {
         SavedSelection::parse_bytes(&self.draft)
             .map(|snapshot| snapshot.with_optional_owner(self.owner.clone()))
     }
@@ -840,15 +840,16 @@ impl SavedSelectionTransaction {
     }
 
     /// Commit the staged record and return its reversible source patch.
-    pub fn commit(self) -> Result<SavedSelectionCommit> {
+    pub fn commit(self) -> Result<Commit> {
         let owner = self.owner;
         let snapshot = SavedSelection::parse_bytes(&self.draft)?.with_optional_owner(owner.clone());
-        let patch = SavedSelectionPatch {
+        let patch = Patch {
             source: self.source.source,
             replacement: snapshot.source,
             owner,
         };
-        Ok(SavedSelectionCommit { snapshot, patch })
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(snapshot, patch, diagnostics))
     }
 
     fn stage(&mut self, edit: impl FnOnce(&mut [u8; SELSF_SIZE])) -> Result<&mut Self> {
@@ -860,48 +861,21 @@ impl SavedSelectionTransaction {
     }
 }
 
-/// The result of committing a [`SavedSelectionTransaction`].
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SavedSelectionCommit {
-    snapshot: SavedSelection,
-    patch: SavedSelectionPatch,
-}
+/// The result of committing a [`Edit`]: the validated
+/// post-edit record, its source-checked byte patch and diagnostics.
+pub type Commit = litchi_core::edit::Commit<SavedSelection, Patch>;
 
-impl SavedSelectionCommit {
-    /// The validated post-edit record.
-    #[must_use]
-    pub fn snapshot(&self) -> &SavedSelection {
-        &self.snapshot
-    }
-
-    /// The source-checked byte patch from the original record to `snapshot`.
-    #[must_use]
-    pub fn patch(&self) -> &SavedSelectionPatch {
-        &self.patch
-    }
-
-    /// Whether any serialized byte changed.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        self.patch.source != self.patch.replacement
-    }
-
-    /// Consume the commit and return the post-edit record.
-    #[must_use]
-    pub fn into_snapshot(self) -> SavedSelection {
-        self.snapshot
-    }
-}
-
+/// Content-free diagnostics of one saved-selection commit.
+pub use litchi_core::edit::Diagnostics;
 /// A reversible, source-checked byte patch for one `Selsf` record.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SavedSelectionPatch {
+pub struct Patch {
     source: [u8; SELSF_SIZE],
     replacement: [u8; SELSF_SIZE],
     owner: Option<Arc<[u8]>>,
 }
 
-impl SavedSelectionPatch {
+impl Patch {
     /// Exact source bytes required before applying this patch.
     #[must_use]
     pub fn source_bytes(&self) -> &[u8] {
@@ -914,10 +888,10 @@ impl SavedSelectionPatch {
         &self.replacement
     }
 
-    /// Whether applying this patch changes any serialized Selsf byte.
+    /// Whether applying this patch changes no serialized Selsf byte.
     #[must_use]
-    pub fn changed(&self) -> bool {
-        self.source != self.replacement
+    pub fn is_noop(&self) -> bool {
+        self.source == self.replacement
     }
 
     /// Whether this changed patch was produced from the supplied immutable
@@ -932,7 +906,7 @@ impl SavedSelectionPatch {
     /// Apply this patch to a matching parsed record.
     pub fn apply(&self, source: &SavedSelection) -> Result<SavedSelection> {
         if source.source != self.source {
-            return Err(corrupted("Selsf patch source does not match the record"));
+            return Err(PackageError::PatchConflict);
         }
         SavedSelection::parse_bytes(&self.replacement)
             .map(|selection| selection.with_optional_owner(source.owner.clone()))
@@ -941,9 +915,7 @@ impl SavedSelectionPatch {
     /// Revert this patch from a matching post-edit record.
     pub fn revert(&self, replacement: &SavedSelection) -> Result<SavedSelection> {
         if replacement.source != self.replacement {
-            return Err(corrupted(
-                "Selsf patch replacement does not match the record",
-            ));
+            return Err(PackageError::PatchConflict);
         }
         SavedSelection::parse_bytes(&self.source)
             .map(|selection| selection.with_optional_owner(replacement.owner.clone()))
@@ -958,9 +930,7 @@ impl SavedSelectionPatch {
     ) -> Result<(usize, usize)> {
         let (start, end) = table_range(fib, table_stream.len())?;
         if table_stream[start..end] != self.source {
-            return Err(corrupted(
-                "Selsf patch source does not match the table stream",
-            ));
+            return Err(PackageError::PatchConflict);
         }
         Ok((start, end))
     }
@@ -991,9 +961,7 @@ impl SavedSelectionPatch {
     ) -> Result<()> {
         let (start, end) = table_range(fib, table_stream.len())?;
         if table_stream[start..end] != self.replacement {
-            return Err(corrupted(
-                "Selsf patch replacement does not match the table stream",
-            ));
+            return Err(PackageError::PatchConflict);
         }
         table_stream[start..end].copy_from_slice(&self.source);
         Ok(())
@@ -1207,7 +1175,7 @@ mod tests {
         data[26..28].copy_from_slice(&[0xD7, 0x7D]);
         let source = SavedSelection::parse_bytes(&data).unwrap();
 
-        let mut transaction = source.transaction();
+        let mut transaction = source.edit();
         assert!(transaction.set_range(10, 9).is_err());
         assert!(
             transaction
@@ -1217,16 +1185,14 @@ mod tests {
         let mut table_source = record((1 << 10) | (1 << 11) | (1 << 13));
         table_source[16..20].copy_from_slice(&0x0002_0001u32.to_le_bytes());
         let table_source = SavedSelection::parse_bytes(&table_source).unwrap();
-        let mut ordinary = table_source.transaction();
+        let mut ordinary = table_source.edit();
         ordinary.set_geometry(SelectionGeometry::None).unwrap();
         assert_eq!(
-            ordinary.snapshot().unwrap().geometry(),
+            ordinary.staged().unwrap().geometry(),
             SelectionGeometry::None
         );
         let mut within_cell = record(1 << 2);
-        let mut table_transaction = SavedSelection::parse_bytes(&within_cell)
-            .unwrap()
-            .transaction();
+        let mut table_transaction = SavedSelection::parse_bytes(&within_cell).unwrap().edit();
         table_transaction
             .set_geometry(SelectionGeometry::Table {
                 first: 0,
@@ -1234,15 +1200,15 @@ mod tests {
             })
             .unwrap();
         assert_eq!(
-            table_transaction.snapshot().unwrap().geometry(),
+            table_transaction.staged().unwrap().geometry(),
             SelectionGeometry::Table {
                 first: 0,
                 limit: 64
             }
         );
         within_cell.fill(0);
-        assert_ne!(within_cell, table_transaction.snapshot().unwrap().bytes());
-        assert_eq!(transaction.snapshot().unwrap(), source);
+        assert_ne!(within_cell, table_transaction.staged().unwrap().bytes());
+        assert_eq!(transaction.staged().unwrap(), source);
         transaction
             .set_range(2, 6)
             .unwrap()
@@ -1251,14 +1217,11 @@ mod tests {
             .set_prefix_w2007(true)
             .unwrap();
         let commit = transaction.commit().unwrap();
-        assert!(commit.changed());
-        assert_eq!(
-            &commit.snapshot().bytes()[12..16],
-            &[0xA5, 0x5A, 0xC3, 0x3C]
-        );
-        assert_eq!(&commit.snapshot().bytes()[26..28], &[0xD7, 0x7D]);
-        assert_eq!(commit.patch().apply(&source).unwrap(), *commit.snapshot());
-        assert_eq!(commit.patch().revert(commit.snapshot()).unwrap(), source);
+        assert!(commit.diagnostics().changed());
+        assert_eq!(&commit.package().bytes()[12..16], &[0xA5, 0x5A, 0xC3, 0x3C]);
+        assert_eq!(&commit.package().bytes()[26..28], &[0xD7, 0x7D]);
+        assert_eq!(commit.patch().apply(&source).unwrap(), *commit.package());
+        assert_eq!(commit.patch().revert(commit.package()).unwrap(), source);
     }
 
     #[test]
@@ -1268,21 +1231,21 @@ mod tests {
         ordinary[32..34].copy_from_slice(&i16::MIN.to_le_bytes());
         ordinary[34..36].copy_from_slice(&i16::MAX.to_le_bytes());
         let ordinary = SavedSelection::parse_bytes(&ordinary).unwrap();
-        let mut ordinary_transaction = ordinary.transaction();
+        let mut ordinary_transaction = ordinary.edit();
         ordinary_transaction
             .set_geometry(SelectionGeometry::None)
             .unwrap();
         assert_eq!(
-            ordinary_transaction.snapshot().unwrap().bytes(),
+            ordinary_transaction.staged().unwrap().bytes(),
             ordinary.bytes()
         );
 
         let mut shape = record(1 << 8);
         shape[3] = 0xA5;
         let shape = SavedSelection::parse_bytes(&shape).unwrap();
-        let mut shape_transaction = shape.transaction();
+        let mut shape_transaction = shape.edit();
         shape_transaction.set_insertion_point(false).unwrap();
-        assert_eq!(shape_transaction.snapshot().unwrap().bytes(), shape.bytes());
+        assert_eq!(shape_transaction.staged().unwrap().bytes(), shape.bytes());
     }
 
     #[test]
@@ -1291,31 +1254,28 @@ mod tests {
         ordinary[32..34].copy_from_slice(&i16::MIN.to_le_bytes());
         ordinary[34..36].copy_from_slice(&i16::MAX.to_le_bytes());
         let ordinary = SavedSelection::parse_bytes(&ordinary).unwrap();
-        let mut transaction = ordinary.transaction();
+        let mut transaction = ordinary.edit();
         transaction
             .set_geometry(SelectionGeometry::Table { first: 2, limit: 4 })
             .unwrap();
         assert_eq!(
-            transaction.snapshot().unwrap().geometry(),
+            transaction.staged().unwrap().geometry(),
             SelectionGeometry::Table { first: 2, limit: 4 }
         );
-        assert_eq!(transaction.snapshot().unwrap().table_left(), MIN_TABLE_EDGE);
-        assert_eq!(
-            transaction.snapshot().unwrap().table_right(),
-            MAX_TABLE_EDGE
-        );
+        assert_eq!(transaction.staged().unwrap().table_left(), MIN_TABLE_EDGE);
+        assert_eq!(transaction.staged().unwrap().table_right(), MAX_TABLE_EDGE);
         transaction.set_table_edges(-100, 100).unwrap();
-        assert_eq!(transaction.snapshot().unwrap().table_left(), -100);
-        assert_eq!(transaction.snapshot().unwrap().table_right(), 100);
+        assert_eq!(transaction.staged().unwrap().table_left(), -100);
+        assert_eq!(transaction.staged().unwrap().table_right(), 100);
 
-        let mut ordinary_transaction = ordinary.transaction();
+        let mut ordinary_transaction = ordinary.edit();
         assert!(ordinary_transaction.set_table_edges(-100, 100).is_err());
         assert!(ordinary_transaction.set_cp_anchor_shrink(4).is_err());
 
         let block = SavedSelection::parse_bytes(&record(1 << 13)).unwrap();
-        let mut block_transaction = block.transaction();
+        let mut block_transaction = block.edit();
         block_transaction.set_cp_anchor_shrink(3).unwrap();
-        assert_eq!(block_transaction.snapshot().unwrap().cp_anchor_shrink(), 3);
+        assert_eq!(block_transaction.staged().unwrap().cp_anchor_shrink(), 3);
     }
 
     #[test]
@@ -1550,7 +1510,7 @@ mod tests {
     #[test]
     fn patch_updates_only_the_declared_table_range() {
         let source = SavedSelection::parse_bytes(&record(0)).unwrap();
-        let mut transaction = source.transaction();
+        let mut transaction = source.edit();
         transaction.set_range(2, 9).unwrap();
         let commit = transaction.commit().unwrap();
 
@@ -1573,7 +1533,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             &table_stream[offset as usize..offset as usize + SELSF_SIZE],
-            commit.snapshot().bytes()
+            commit.package().bytes()
         );
         assert_eq!(&table_stream[..offset as usize], outside_before.as_slice());
         commit

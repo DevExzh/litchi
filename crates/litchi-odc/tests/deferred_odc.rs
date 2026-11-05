@@ -3,7 +3,8 @@
     reason = "tests are expected to panic on unexpected errors"
 )]
 
-use litchi_odc::{AxisUpdate, ChartClassKind, FlatChart};
+use litchi_odc::flat::Chart as FlatChart;
+use litchi_odc::{AxisUpdate, ChartClassKind};
 
 const ODC: &str = concat!(
     r#"<?xml version="1.0" encoding="UTF-8"?>"#,
@@ -17,7 +18,7 @@ const ODC: &str = concat!(
 );
 
 fn exercise(bytes: Vec<u8>) -> Option<litchi_core::Error> {
-    match FlatChart::from_bytes(bytes) {
+    match FlatChart::from_bytes(&bytes) {
         Ok(flat) => {
             if let Some(plot) = flat.plot_area() {
                 for axis in plot.axes() {
@@ -32,7 +33,7 @@ fn exercise(bytes: Vec<u8>) -> Option<litchi_core::Error> {
             }
             None
         },
-        Err(error) => Some(error),
+        Err(error) => Some(error.into()),
     }
 }
 
@@ -45,7 +46,7 @@ fn assert_invalid(case: &str, bytes: Vec<u8>) {
 
 #[test]
 fn flat_chart_reads_tree_preserves_bytes_and_rejects_wrong_family() {
-    let flat = FlatChart::from_bytes(ODC.as_bytes().to_vec()).unwrap();
+    let flat = FlatChart::from_bytes(ODC.as_bytes()).unwrap();
     assert_eq!(flat.as_bytes(), ODC.as_bytes());
     assert!(flat.chart().all_text().contains("Revenue"));
     assert!(flat.find_axis("primary-x").is_some());
@@ -70,44 +71,48 @@ fn flat_chart_preserves_a_chart_class_alias_losslessly() {
             "xmlns:chart=",
             "xmlns:c=\"urn:oasis:names:tc:opendocument:xmlns:chart:1.0\" xmlns:chart=",
         );
-    let flat = FlatChart::from_bytes(input.clone().into_bytes()).unwrap();
+    let flat = FlatChart::from_bytes(&input.clone().into_bytes()).unwrap();
     let class = flat.chart().chart_class().unwrap();
     assert_eq!(class.kind(), ChartClassKind::Bar);
     assert_eq!(class.lexical(), "c:bar");
     assert_eq!(
-        flat.edit().commit().unwrap().snapshot().as_bytes(),
+        flat.edit().commit().unwrap().package().as_bytes(),
         input.as_bytes()
     );
 }
 
 #[test]
 fn flat_axis_transaction_is_lossless_source_checked_and_reversible() {
-    let source = FlatChart::from_bytes(ODC.as_bytes().to_vec()).unwrap();
+    let source = FlatChart::from_bytes(ODC.as_bytes()).unwrap();
     let no_op = source.edit().commit().unwrap();
-    assert_eq!(no_op.snapshot().as_bytes(), source.as_bytes());
+    assert_eq!(no_op.package().as_bytes(), source.as_bytes());
     assert!(no_op.patch().changes().is_empty());
 
     let mut edit = source.edit();
     edit.update_axis(0, AxisUpdate::named("renamed-x")).unwrap();
     let commit = edit.commit().unwrap();
-    let output = std::str::from_utf8(commit.snapshot().as_bytes()).unwrap();
+    let output = std::str::from_utf8(commit.package().as_bytes()).unwrap();
     assert!(output.contains("style:name=\"keep-me\""));
     assert!(output.contains("<text:p>Revenue</text:p>"));
     assert!(!output.contains(">\n<"));
     assert!(!output.contains(">\r\n<"));
-    assert!(commit.snapshot().find_axis("renamed-x").is_some());
+    assert!(commit.package().find_axis("renamed-x").is_some());
     assert!(source.find_axis("primary-x").is_some());
     assert!(commit.patch().is_applicable_to(&source));
 
     let unrelated =
-        FlatChart::from_bytes(ODC.replace("keep-me", "also-kept").into_bytes()).unwrap();
+        FlatChart::from_bytes(&ODC.replace("keep-me", "also-kept").into_bytes()).unwrap();
     assert!(!commit.patch().is_applicable_to(&unrelated));
-    assert!(commit.patch().apply(&unrelated).is_err());
+    assert!(matches!(
+        unrelated.apply(commit.patch()),
+        Err(litchi_odc::flat::Error::PatchConflict { .. })
+    ));
 
     let inverse = commit.patch().inverse();
-    let restored = inverse.apply(commit.snapshot()).unwrap();
-    assert_eq!(restored.snapshot().as_bytes(), source.as_bytes());
-    assert!(commit.patch().apply(commit.snapshot()).is_err());
+    let restored = commit.package().apply(&inverse).unwrap();
+    assert!(restored.diagnostics().changed());
+    assert_eq!(restored.package().as_bytes(), source.as_bytes());
+    assert!(commit.package().apply(commit.patch()).is_err());
 }
 
 #[test]
@@ -145,7 +150,7 @@ fn malformed_and_misplaced_chart_inputs_return_typed_errors() {
     let foreign = content(
         r#"<office:chart><chart:chart chart:class="chart:bar"><chart:plot-area/><ext:thing xmlns:ext="urn:example" ext:attr="1"/></chart:chart></office:chart>"#,
     );
-    assert!(FlatChart::from_bytes(foreign).is_ok());
+    assert!(FlatChart::from_bytes(&foreign).is_ok());
     let mut invalid_utf8 = ODC.as_bytes().to_vec();
     invalid_utf8.insert(invalid_utf8.len() / 2, 0x80);
     assert_invalid("invalid UTF-8", invalid_utf8);
@@ -163,4 +168,53 @@ fn every_truncation_and_single_byte_mutation_is_panic_free() {
         let _ = exercise(mutated);
     }
     assert!(exercise(bytes.to_vec()).is_none());
+}
+
+#[test]
+fn flat_chart_takes_caller_limits_through_open_options() {
+    use litchi_odc::{LimitKind, OpenOptions, SemanticLimitKind, SemanticLimits};
+
+    let one_axis = OpenOptions::new().semantic_limits(
+        SemanticLimits::builder()
+            .max_axes(1)
+            .unwrap()
+            .build()
+            .unwrap(),
+    );
+    assert!(FlatChart::from_bytes_with_options(ODC.as_bytes(), one_axis).is_err());
+    let shallow = OpenOptions::new().semantic_limits(
+        SemanticLimits::builder()
+            .max_depth(2)
+            .unwrap()
+            .build()
+            .unwrap(),
+    );
+    assert!(FlatChart::from_bytes_with_options(ODC.as_bytes(), shallow).is_err());
+
+    let source = FlatChart::from_bytes(ODC.as_bytes()).unwrap();
+    assert_eq!(source.options(), OpenOptions::new());
+    let mut edit = source.edit();
+    edit.update_axis(0, AxisUpdate::named("renamed-x")).unwrap();
+    edit.reset();
+    let noop = edit.commit().unwrap();
+    assert!(!noop.diagnostics().changed());
+    assert!(noop.patch().is_noop());
+    assert_eq!(noop.package().as_bytes(), source.as_bytes());
+    let reread = FlatChart::from_reader(std::io::Cursor::new(ODC.as_bytes())).unwrap();
+    assert_eq!(reread.as_bytes(), source.as_bytes());
+    let tiny = OpenOptions::new().source_limits(
+        litchi_odc::SourceLimits::builder()
+            .max_input_bytes(8)
+            .unwrap()
+            .build()
+            .unwrap(),
+    );
+    assert!(matches!(
+        FlatChart::from_bytes_with_options(ODC.as_bytes(), tiny),
+        Err(litchi_odc::Error::Limit {
+            kind: LimitKind::Source(_),
+            ..
+        })
+    ));
+    let _ = SemanticLimitKind::Axes;
 }

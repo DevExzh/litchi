@@ -267,7 +267,7 @@ impl Hasher for CachedHash {
 mod tests {
     use super::super::super::{CellPos, WritableCell};
     use super::*;
-    use crate::writer::Writer;
+    use crate::writer::Builder;
 
     /// The table this module promises, computed without it: every string
     /// cell in worksheet, row and column order, each distinct string indexed
@@ -298,8 +298,8 @@ mod tests {
         (strings, map, total, cell_indices)
     }
 
-    fn mixed_workbook() -> Writer {
-        let mut writer = Writer::new();
+    fn mixed_workbook() -> Builder {
+        let mut writer = Builder::new();
         let first = writer.add_worksheet("First").unwrap();
         let second = writer.add_worksheet("Second").unwrap();
         let long_ascii = "long ascii payload ".repeat(2_000);
@@ -340,7 +340,7 @@ mod tests {
 
     #[test]
     fn strings_are_listed_at_their_first_occurrence_in_row_and_column_order() {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         let first = writer.add_worksheet("First").unwrap();
         let second = writer.add_worksheet("Second").unwrap();
         // Inserted in neither row-major nor reverse order.
@@ -466,7 +466,7 @@ mod tests {
     fn a_string_longer_than_an_sst_entry_is_refused_while_staging() {
         // Placed behind the writer's own check, as a pivot label or table
         // header could be: the table must refuse it rather than stage it.
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         let sheet = writer.add_worksheet("Long").unwrap();
         writer.write_string(sheet, 0, 0, "short").unwrap();
         for (units, fits) in [(0xFFFE, true), (0xFFFF, true), (0x1_0000, false)] {
@@ -498,7 +498,7 @@ mod tests {
 
     #[test]
     fn repeated_strings_in_distinct_allocations_share_one_entry() {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         let sheet = writer.add_worksheet("Sheet1").unwrap();
         writer.write_string(sheet, 0, 0, "Hello").unwrap();
         writer.write_string(sheet, 0, 1, "Hello").unwrap();
@@ -514,7 +514,7 @@ mod tests {
 
     #[test]
     fn a_workbook_without_string_cells_stages_an_empty_table() {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         let sheet = writer.add_worksheet("Numbers").unwrap();
         writer.write_number(sheet, 0, 0, 1.0).unwrap();
         let table = SharedStringTable::build(&writer.worksheets).unwrap();

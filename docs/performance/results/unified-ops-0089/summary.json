@@ -1,0 +1,162 @@
+{
+  "schema": 1,
+  "invocations": [
+    "paired-1.json",
+    "paired-2.json"
+  ],
+  "statistic": "upper median per invocation; no pooled acceptance claim",
+  "results": [
+    {
+      "targets": 1,
+      "mode": "eager",
+      "status": "ok",
+      "leaf_medians_ns": [
+        9400,
+        9380
+      ],
+      "unified_medians_ns": [
+        13420,
+        13420
+      ],
+      "unified_over_leaf": [
+        1.4276595744680851,
+        1.4307036247334755
+      ]
+    },
+    {
+      "targets": 1,
+      "mode": "source",
+      "status": "ok",
+      "leaf_medians_ns": [
+        16840,
+        16820
+      ],
+      "unified_medians_ns": [
+        21150,
+        21470
+      ],
+      "unified_over_leaf": [
+        1.255938242280285,
+        1.2764565992865635
+      ]
+    },
+    {
+      "targets": 10,
+      "mode": "eager",
+      "status": "ok",
+      "leaf_medians_ns": [
+        39820,
+        40340
+      ],
+      "unified_medians_ns": [
+        52830,
+        53591
+      ],
+      "unified_over_leaf": [
+        1.326720241084882,
+        1.3284828953891918
+      ]
+    },
+    {
+      "targets": 10,
+      "mode": "source",
+      "status": "ok",
+      "leaf_medians_ns": [
+        55531,
+        56450
+      ],
+      "unified_medians_ns": [
+        69310,
+        70130
+      ],
+      "unified_over_leaf": [
+        1.2481316741999964,
+        1.2423383525243579
+      ]
+    },
+    {
+      "targets": 100,
+      "mode": "eager",
+      "status": "ok",
+      "leaf_medians_ns": [
+        330282,
+        337452
+      ],
+      "unified_medians_ns": [
+        427932,
+        433522
+      ],
+      "unified_over_leaf": [
+        1.2956564390429997,
+        1.2846923414292997
+      ]
+    },
+    {
+      "targets": 100,
+      "mode": "source",
+      "status": "ok",
+      "leaf_medians_ns": [
+        419452,
+        425832
+      ],
+      "unified_medians_ns": [
+        521872,
+        524062
+      ],
+      "unified_over_leaf": [
+        1.2441757340530024,
+        1.2306778259971067
+      ]
+    },
+    {
+      "targets": 1000,
+      "mode": "eager",
+      "status": "ok",
+      "leaf_medians_ns": [
+        3186395,
+        3245496
+      ],
+      "unified_medians_ns": [
+        4090970,
+        4131479
+      ],
+      "unified_over_leaf": [
+        1.283886649332553,
+        1.2729884738727146
+      ]
+    },
+    {
+      "targets": 1000,
+      "mode": "source",
+      "status": "ok",
+      "leaf_medians_ns": [
+        4029639,
+        4038109
+      ],
+      "unified_medians_ns": [
+        4988874,
+        4988893
+      ],
+      "unified_over_leaf": [
+        1.2380448968257454,
+        1.2354527824781352
+      ]
+    },
+    {
+      "targets": 10000,
+      "mode": "eager",
+      "status": "refused_native_composite_replacement_limit",
+      "leaf_medians_ns": [],
+      "unified_medians_ns": [],
+      "unified_over_leaf": []
+    },
+    {
+      "targets": 10000,
+      "mode": "source",
+      "status": "refused_native_composite_replacement_limit",
+      "leaf_medians_ns": [],
+      "unified_medians_ns": [],
+      "unified_over_leaf": []
+    }
+  ]
+}

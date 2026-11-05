@@ -5,6 +5,4 @@
 //! This module preserves the existing Numbers paths while the migration
 //! completes.
 
-pub use litchi_iwa_common::table::coordinate::{
-    AddressError, CellPosition, CellRange, Error, Result,
-};
+pub use litchi_iwa_common::table::coordinate::{AddressError, Area, At, Error, Result};

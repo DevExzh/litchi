@@ -1,7 +1,8 @@
 #![allow(clippy::unwrap_used, reason = "test assertions use unwrap for clarity")]
 
+use litchi_odi::flat::Image as FlatImage;
 use litchi_odi::{
-    Builder, FlatImage, FrameEditor, History, Image,
+    Builder, FrameEditor, History,
     frame::Frame,
     map::{Area, AreaKind, ImageMap},
     source::Source,
@@ -32,7 +33,7 @@ fn edit_frame(editor: &mut impl FrameEditor) {
 
 #[test]
 fn image_maps_and_broader_frame_semantics_are_inert_and_bounded() {
-    let image = FlatImage::from_bytes(FLAT.as_bytes().to_vec()).unwrap();
+    let image = FlatImage::from_bytes(FLAT.as_bytes()).unwrap();
     let frame = image.frame().unwrap();
     assert_eq!(frame.style_name(), Some("gr1"));
     assert_eq!(frame.text_style_name(), Some("P1"));
@@ -60,10 +61,10 @@ fn image_maps_and_broader_frame_semantics_are_inert_and_bounded() {
 #[test]
 fn malformed_image_maps_are_rejected() {
     let missing_geometry = FLAT.replace(r#" svg:width="1cm""#, "");
-    assert!(FlatImage::from_bytes(missing_geometry.into_bytes()).is_err());
+    assert!(FlatImage::from_bytes(missing_geometry.as_bytes()).is_err());
 
     let duplicate = FLAT.replace("</draw:image-map>", "</draw:image-map><draw:image-map/>");
-    assert!(FlatImage::from_bytes(duplicate.into_bytes()).is_err());
+    assert!(FlatImage::from_bytes(duplicate.as_bytes()).is_err());
 
     let spoofed = FLAT
         .replace("draw:area-circle", "fake:area-circle")
@@ -71,7 +72,7 @@ fn malformed_image_maps_are_rejected() {
             "xmlns:xlink=",
             r#"xmlns:fake="urn:not-drawing" xmlns:xlink="#,
         );
-    assert!(FlatImage::from_bytes(spoofed.into_bytes()).is_err());
+    assert!(FlatImage::from_bytes(spoofed.as_bytes()).is_err());
 }
 
 #[test]
@@ -98,38 +99,52 @@ fn authored_maps_styles_metadata_and_graph_round_trip() {
         .with_image_map(map);
     let styles = r#"<?xml version="1.0"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><office:styles><style:style style:name="gr1" style:family="graphic"/></office:styles></office:document-styles>"#;
     let meta = r#"<?xml version="1.0"?><office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0"><office:meta><dc:title>Before</dc:title><meta:user-defined meta:name="opaque">keep</meta:user-defined></office:meta></office:document-meta>"#;
-    let source = Image::from_bytes(
-        Builder::new()
-            .frame(&frame)
-            .styles_xml(styles)
-            .meta_xml(meta)
-            .resource("Pictures/photo.png", "image/png", b"png".to_vec())
-            .resource("Thumbnails/thumbnail.png", "image/png", b"thumb".to_vec())
-            .build()
-            .unwrap(),
-    )
-    .unwrap();
+    let source = Builder::new()
+        .frame(&frame)
+        .styles_xml(styles)
+        .meta_xml(meta)
+        .resource("Pictures/photo.png", "image/png", b"png".to_vec())
+        .resource("Thumbnails/thumbnail.png", "image/png", b"thumb".to_vec())
+        .build()
+        .unwrap();
+    let source_image = source.image();
     assert_eq!(
-        source.frame().unwrap().image_map().unwrap().areas().len(),
+        source_image
+            .frame()
+            .unwrap()
+            .image_map()
+            .unwrap()
+            .areas()
+            .len(),
         2
     );
-    assert_eq!(source.styles_xml(), Some(styles));
-    assert!(source.resource_graph().nodes().iter().any(|node| {
+    assert_eq!(source_image.styles_xml(), Some(styles));
+    assert!(source_image.resource_graph().nodes().iter().any(|node| {
         node.path() == "Thumbnails/thumbnail.png" && node.is_present() && !node.is_referenced()
     }));
-    assert_eq!(source.resource_graph().edges().len(), 1);
+    assert_eq!(source_image.resource_graph().edges().len(), 1);
 
     let mut edit = source.edit();
     edit_frame(&mut edit);
     edit.set_title(Some("After".into())).unwrap();
     let commit = edit.commit().unwrap();
-    assert_eq!(commit.image().frame().unwrap().style_name(), Some("gr2"));
     assert_eq!(
-        commit.image().metadata().unwrap().title.as_deref(),
+        commit.package().image().frame().unwrap().style_name(),
+        Some("gr2")
+    );
+    assert_eq!(
+        commit
+            .package()
+            .image()
+            .metadata()
+            .unwrap()
+            .title
+            .as_deref(),
         Some("After")
     );
     assert!(
         commit
+            .package()
             .image()
             .meta_xml()
             .unwrap()
@@ -139,10 +154,10 @@ fn authored_maps_styles_metadata_and_graph_round_trip() {
     assert!(commit.patch().metadata_change().is_some());
     assert_eq!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.image())
+            .package()
+            .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         source.as_bytes()
     );
@@ -150,10 +165,10 @@ fn authored_maps_styles_metadata_and_graph_round_trip() {
 
 #[test]
 fn shared_edit_contract_and_history_work_for_flat_and_package_snapshots() {
-    let source = FlatImage::from_bytes(FLAT.as_bytes().to_vec()).unwrap();
-    let mut edit = source.transaction();
+    let source = FlatImage::from_bytes(FLAT.as_bytes()).unwrap();
+    let mut edit = source.edit();
     edit_frame(&mut edit);
-    let target = edit.commit().unwrap().into_snapshot();
+    let target = edit.commit().unwrap().into_package();
     let mut history = History::new(source.clone(), 3).unwrap();
     assert!(history.record(&source, target.clone()).unwrap());
     assert_eq!(history.undo().unwrap().as_bytes(), source.as_bytes());

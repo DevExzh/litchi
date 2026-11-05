@@ -21,4 +21,6 @@ pub(super) const MAX_VALUE_BYTES: usize = 65_536;
 pub(super) const MAX_AGGREGATE_BYTES: usize = 16 * 1_048_576;
 
 pub use model::{Declaration, Use};
+#[cfg(test)]
 pub(crate) use package::parse_dde_connection_parts_with_budget;
+pub(crate) use package::parse_dde_connection_parts_with_budget_and_xml_limits;

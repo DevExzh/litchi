@@ -1,12 +1,13 @@
 use std::io;
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_common::decode_varint_from_bytes;
 use litchi_iwa_core::{
-    Archive, ArchiveInfo, ArchiveObject, FieldInfo, FieldPath, FieldType, RawMessage, SnappyStream,
+    Archive, ArchiveInfo, ArchiveObject, FieldInfo, FieldType, RawMessage, SnappyStream,
 };
 use litchi_iwa_protos::{kn, tsa, tsk, tsp};
-use litchi_keynote::{Limits, Package, Position, SlideSelector, slide::delete};
+use litchi_keynote::{Package, Position, SlideSelector, slide::delete};
 use prost::Message as _;
 
 const DOCUMENT_MEMBER: &str = "Index/Document.iwa";
@@ -88,6 +89,7 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
@@ -102,7 +104,8 @@ fn referenced_object(
     let info = &mut object.archive_info.message_infos[0];
     info.object_references.extend_from_slice(references);
     info.field_infos.push(FieldInfo {
-        path: FieldPath::new(path.to_vec()),
+        path: litchi_iwa_core::FieldPath::new(path.to_vec(), litchi_iwa_core::Limits::default())
+            .unwrap(),
         r#type: Some(FieldType::ObjectReference),
         object_references: references.to_vec(),
         ..FieldInfo::default()
@@ -111,7 +114,10 @@ fn referenced_object(
 }
 
 fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn encode_varint_into(output: &mut Vec<u8>, mut value: u64) {
@@ -126,8 +132,8 @@ fn component_with_unknown_header(
     objects: Vec<ArchiveObject>,
     target_identifier: u64,
 ) -> TestResult<Vec<u8>> {
-    let bytes = Archive { objects }.to_bytes()?;
-    let parsed = Archive::parse(&bytes)?;
+    let bytes = Archive { objects }.to_bytes(Default::default())?;
+    let parsed = Archive::parse(&bytes, Default::default())?;
     let object = parsed
         .object(target_identifier)
         .ok_or_else(|| io::Error::other("synthetic header target is missing"))?;
@@ -146,8 +152,11 @@ fn component_with_unknown_header(
     encode_varint_into(&mut modified, u64::try_from(header.len())?);
     modified.extend_from_slice(&header);
     modified.extend_from_slice(&bytes[data_offset..]);
-    assert_eq!(Archive::parse(&modified)?.to_bytes()?, modified);
-    Ok(SnappyStream::compress(&modified)?)
+    assert_eq!(
+        Archive::parse(&modified, Default::default())?.to_bytes(Default::default())?,
+        modified
+    );
+    Ok(SnappyStream::compress(&modified, Default::default())?)
 }
 
 fn node(slide_identifier: u64, thumbnail: bool) -> Vec<u8> {
@@ -553,13 +562,15 @@ fn package_bytes(names: &[&str], mode: MetadataMode) -> TestResult<Vec<u8>> {
                 data: b"after-show-sentinel".to_vec(),
             },
         ],
+        Default::default(),
     )?;
     let show_info = &mut show_object.archive_info.message_infos[1];
     show_info
         .object_references
         .extend_from_slice(&NODE_IDS[..names.len()]);
     show_info.field_infos.push(FieldInfo {
-        path: FieldPath::new(vec![3, 2]),
+        path: litchi_iwa_core::FieldPath::new(vec![3, 2], litchi_iwa_core::Limits::default())
+            .unwrap(),
         r#type: Some(FieldType::ObjectReference),
         object_references: NODE_IDS[..names.len()].to_vec(),
         ..FieldInfo::default()
@@ -589,7 +600,8 @@ fn package_bytes(names: &[&str], mode: MetadataMode) -> TestResult<Vec<u8>> {
             let info = &mut node_object.archive_info.message_infos[0];
             info.data_references.push(500);
             info.field_infos.push(FieldInfo {
-                path: FieldPath::new(vec![16]),
+                path: litchi_iwa_core::FieldPath::new(vec![16], litchi_iwa_core::Limits::default())
+                    .unwrap(),
                 r#type: Some(FieldType::DataReference),
                 data_references: vec![500],
                 ..FieldInfo::default()
@@ -599,7 +611,11 @@ fn package_bytes(names: &[&str], mode: MetadataMode) -> TestResult<Vec<u8>> {
                     info.object_references.push(SLIDE_IDS[0]);
                 },
                 MetadataMode::DuplicateFieldInfo => info.field_infos.push(FieldInfo {
-                    path: FieldPath::new(vec![2]),
+                    path: litchi_iwa_core::FieldPath::new(
+                        vec![2],
+                        litchi_iwa_core::Limits::default(),
+                    )
+                    .unwrap(),
                     r#type: Some(FieldType::ObjectReference),
                     object_references: vec![SLIDE_IDS[0]],
                     ..FieldInfo::default()
@@ -611,7 +627,11 @@ fn package_bytes(names: &[&str], mode: MetadataMode) -> TestResult<Vec<u8>> {
                     info.field_infos[0].r#type = Some(FieldType::Value);
                 },
                 MetadataMode::WrongFieldInfoPath => {
-                    info.field_infos[0].path = FieldPath::new(vec![99]);
+                    info.field_infos[0].path = litchi_iwa_core::FieldPath::new(
+                        vec![99],
+                        litchi_iwa_core::Limits::default(),
+                    )
+                    .unwrap();
                 },
                 MetadataMode::NodeAggregateOnlyObject => {
                     info.field_infos
@@ -636,10 +656,19 @@ fn package_bytes(names: &[&str], mode: MetadataMode) -> TestResult<Vec<u8>> {
             }
             if matches!(mode, MetadataMode::NodeSecondMessageData) {
                 let payload = b"second node data metadata".to_vec();
-                let mut metadata = litchi_iwa_core::MessageInfo::new(991, payload.len() as u32);
+                let mut metadata = litchi_iwa_core::MessageInfo::new(
+                    991,
+                    payload.len(),
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap();
                 metadata.data_references.push(500);
                 metadata.field_infos.push(FieldInfo {
-                    path: FieldPath::new(vec![1]),
+                    path: litchi_iwa_core::FieldPath::new(
+                        vec![1],
+                        litchi_iwa_core::Limits::default(),
+                    )
+                    .unwrap(),
                     r#type: Some(FieldType::DataReference),
                     data_references: vec![500],
                     ..FieldInfo::default()
@@ -678,7 +707,8 @@ fn package_bytes(names: &[&str], mode: MetadataMode) -> TestResult<Vec<u8>> {
             let info = &mut slide_object.archive_info.message_infos[0];
             info.data_references.push(501);
             info.field_infos.push(FieldInfo {
-                path: FieldPath::new(vec![99]),
+                path: litchi_iwa_core::FieldPath::new(vec![99], litchi_iwa_core::Limits::default())
+                    .unwrap(),
                 r#type: Some(FieldType::DataReference),
                 data_references: vec![501],
                 ..FieldInfo::default()
@@ -700,10 +730,19 @@ fn package_bytes(names: &[&str], mode: MetadataMode) -> TestResult<Vec<u8>> {
             }
             if matches!(mode, MetadataMode::SlideSecondMessageData) {
                 let payload = b"second slide data metadata".to_vec();
-                let mut metadata = litchi_iwa_core::MessageInfo::new(992, payload.len() as u32);
+                let mut metadata = litchi_iwa_core::MessageInfo::new(
+                    992,
+                    payload.len(),
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap();
                 metadata.data_references.push(501);
                 metadata.field_infos.push(FieldInfo {
-                    path: FieldPath::new(vec![1]),
+                    path: litchi_iwa_core::FieldPath::new(
+                        vec![1],
+                        litchi_iwa_core::Limits::default(),
+                    )
+                    .unwrap(),
                     r#type: Some(FieldType::DataReference),
                     data_references: vec![501],
                     ..FieldInfo::default()
@@ -771,7 +810,8 @@ fn package_bytes(names: &[&str], mode: MetadataMode) -> TestResult<Vec<u8>> {
             info.data_references.push(identifier);
         } else {
             info.field_infos.push(FieldInfo {
-                path: FieldPath::new(vec![1]),
+                path: litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default())
+                    .unwrap(),
                 r#type: Some(FieldType::DataReference),
                 data_references: vec![identifier],
                 ..FieldInfo::default()
@@ -830,18 +870,19 @@ fn names(package: &Package) -> TestResult<Vec<String>> {
 }
 
 fn component_archive(package: &[u8], member: &str) -> TestResult<Archive> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| io::Error::other(format!("missing synthetic member {member}")))?;
     Ok(Archive::parse(
-        &SnappyStream::decompress(entry.data())?.into_bytes(),
+        &SnappyStream::decompress(entry.data(), Default::default())?.into_bytes(),
+        Default::default(),
     )?)
 }
 
 fn member_bytes(package: &[u8], member: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(catalog
         .iter()
         .find(|entry| entry.name() == member)
@@ -863,13 +904,13 @@ fn object_contents(
 }
 
 fn raw_object_record(package: &[u8], member: &str, identifier: u64) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| io::Error::other(format!("missing synthetic member {member}")))?;
-    let stream = SnappyStream::decompress(entry.data())?.into_bytes();
-    let archive = Archive::parse(&stream)?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other(format!("missing synthetic object {identifier}")))?;
@@ -946,6 +987,8 @@ fn selector_first_deletion_is_exact_applicable_and_reversible() -> TestResult<()
     let commit = edit.commit()?;
     assert_eq!(names(commit.package())?, ["Plan", "Evidence"]);
     assert_eq!(commit.patch().position(), Position::new(0));
+    assert!(!commit.patch().is_noop());
+    assert!(!commit.patch().inverse().is_noop());
     assert_ne!(
         commit.patch().source_fingerprint(),
         commit.patch().target_fingerprint()
@@ -991,7 +1034,7 @@ fn selector_first_deletion_is_exact_applicable_and_reversible() -> TestResult<()
     );
     for root_preview in ["preview.jpg", "preview-micro.jpg", "preview-web.jpg"] {
         assert!(
-            Catalog::from_bytes(&changed)?
+            Catalog::from_bytes(&changed, Default::default())?
                 .iter()
                 .all(|entry| entry.name() != root_preview)
         );
@@ -1018,18 +1061,18 @@ fn selectors_final_slide_and_transaction_state_fail_closed() -> TestResult<()> {
     let mut missing_position = package.edit_slide_deletion();
     assert!(matches!(
         missing_position.remove_slide(Position::new(99)),
-        Err(delete::Error::SlidePositionNotFound { position })
+        Err(delete::Error::Refused(delete::Refusal::SlidePositionNotFound { position }))
             if position == Position::new(99)
     ));
     let mut missing_name = package.edit_slide_deletion();
     assert!(matches!(
         missing_name.remove_slide("Missing"),
-        Err(delete::Error::SlideNameNotFound)
+        Err(delete::Error::Refused(delete::Refusal::SlideNameNotFound))
     ));
     let mut empty_name = package.edit_slide_deletion();
     assert!(matches!(
         empty_name.remove_slide(""),
-        Err(delete::Error::EmptySlideName)
+        Err(delete::Error::Refused(delete::Refusal::EmptySlideName))
     ));
 
     let ambiguous_bytes = package_bytes(&["Same", "Same", "Other"], MetadataMode::Exact)?;
@@ -1037,7 +1080,7 @@ fn selectors_final_slide_and_transaction_state_fail_closed() -> TestResult<()> {
     let mut ambiguous_edit = ambiguous.edit_slide_deletion();
     assert!(matches!(
         ambiguous_edit.remove_slide("Same"),
-        Err(delete::Error::AmbiguousSelector)
+        Err(delete::Error::Refused(delete::Refusal::AmbiguousSelector))
     ));
 
     let one_bytes = package_bytes(&["Only"], MetadataMode::Exact)?;
@@ -1045,18 +1088,22 @@ fn selectors_final_slide_and_transaction_state_fail_closed() -> TestResult<()> {
     let mut final_edit = one.edit_slide_deletion();
     assert!(matches!(
         final_edit.remove_slide(0usize),
-        Err(delete::Error::CannotDeleteFinalSlide)
+        Err(delete::Error::Refused(
+            delete::Refusal::CannotDeleteFinalSlide
+        ))
     ));
 
     let mut staged = package.edit_slide_deletion();
     staged.remove_slide(0usize)?;
     assert!(matches!(
         staged.remove_slide(1usize),
-        Err(delete::Error::OperationAlreadyStaged)
+        Err(delete::Error::Refused(
+            delete::Refusal::OperationAlreadyStaged
+        ))
     ));
     assert!(matches!(
         package.edit_slide_deletion().commit(),
-        Err(delete::Error::NoStagedOperation)
+        Err(delete::Error::Refused(delete::Refusal::NoStagedOperation))
     ));
     assert_eq!(exact_bytes(&package)?, source);
     Ok(())
@@ -1074,7 +1121,7 @@ fn surviving_inbound_reference_refuses_before_publication() -> TestResult<()> {
         let mut edit = package.edit_slide_deletion();
         edit.remove_slide("Intro")?;
         match edit.commit() {
-            Err(delete::Error::AmbiguousOwnership) => {},
+            Err(delete::Error::Refused(delete::Refusal::AmbiguousOwnership)) => {},
             Err(error) => panic!("{mode:?} returned {error:?}"),
             Ok(_) => panic!("{mode:?} unexpectedly committed"),
         }
@@ -1287,4 +1334,29 @@ fn public_deletion_values_are_send_sync() {
     assert_send_sync::<delete::Error>();
     assert_send_sync::<delete::LimitKind>();
     assert_send_sync::<delete::Path>();
+}
+
+/// A slide whose preview an earlier text edit invalidated keeps the
+/// registry's data-owner record of its dropped thumbnail; deleting the
+/// slide removes that record with it (record 0298, Phase G F8).
+#[test]
+fn deleting_a_slide_with_a_stale_thumbnail_owner_record() -> TestResult<()> {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/iwork/keynote/multi-slide.key");
+    let package = Package::open(path)?;
+    let titles = |package: &Package| -> TestResult<Vec<Option<String>>> {
+        Ok(package
+            .slides()?
+            .iter()
+            .map(|slide| slide.title().map(str::to_owned))
+            .collect())
+    };
+    let before = titles(&package)?;
+    let mut edit = package.edit_slide_deletion();
+    edit.remove_slide(SlideSelector::index(0))?;
+    let commit = edit.commit()?;
+    let reopened = Package::from_bytes(&exact_bytes(commit.package())?)?;
+    reopened.validate()?;
+    assert_eq!(titles(&reopened)?, before[1..]);
+    Ok(())
 }

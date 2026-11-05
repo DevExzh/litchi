@@ -842,7 +842,7 @@ impl<'source> RawFields<'source> {
         )
         .map_err(map_common_wire_error)?;
         Ok(Self {
-            inner: CommonRawWireFields::with_limits(source, raw_limits),
+            inner: CommonRawWireFields::new(source, raw_limits),
         })
     }
 
@@ -919,6 +919,7 @@ fn map_common_wire_error(error: CommonWireError) -> RewriteError {
             value,
             maximum,
         },
+        _ => RewriteError::InvalidFormat("shared wire decoder rejected source".into()),
     }
 }
 
@@ -2532,13 +2533,13 @@ fn rewritten_nested_location_len(
 /// UTF-8/UTF-16 boundaries, checked arithmetic failure, Buffa disagreement,
 /// an exceeded retained bound, or allocation failure. Unknown fields remain
 /// opaque and byte-authoritative.
-pub fn rewrite_storage_text_with_limits(
+pub fn rewrite_storage_text(
     source: &[u8],
     range: Range<usize>,
     replacement: &str,
     limits: RewriteLimits,
 ) -> RewriteResult<StorageRewrite> {
-    rewrite_storage_text_with_behavior_and_limits(
+    rewrite_storage_text_with_behavior(
         source,
         range,
         replacement,
@@ -2558,21 +2559,16 @@ pub fn rewrite_storage_text_with_limits(
 /// # Errors
 ///
 /// Returns the same bounded, typed failures as
-/// [`rewrite_storage_text_with_limits`].
-pub fn rewrite_storage_text_with_behavior_and_limits(
+/// [`rewrite_storage_text`].
+pub fn rewrite_storage_text_with_behavior(
     source: &[u8],
     range: Range<usize>,
     replacement: &str,
     behavior: RewriteBehavior,
     limits: RewriteLimits,
 ) -> RewriteResult<StorageRewrite> {
-    let prepared = prepare_storage_text_rewrite_with_behavior_and_limits(
-        source,
-        range,
-        replacement,
-        behavior,
-        limits,
-    )?;
+    let prepared =
+        prepare_storage_text_rewrite_with_behavior(source, range, replacement, behavior, limits)?;
     let requirements = prepared.execution_requirements();
     prepared.execute(StorageRewriteExecutionLimits {
         max_output_bytes: requirements.output_bytes,
@@ -2589,8 +2585,8 @@ pub fn rewrite_storage_text_with_behavior_and_limits(
 /// # Errors
 ///
 /// Returns the same source, semantic, and planning-limit failures as
-/// [`rewrite_storage_text_with_behavior_and_limits`].
-pub fn prepare_storage_text_rewrite_with_behavior_and_limits<'source, 'replacement>(
+/// [`rewrite_storage_text_with_behavior`].
+pub fn prepare_storage_text_rewrite_with_behavior<'source, 'replacement>(
     source: &'source [u8],
     range: Range<usize>,
     replacement: &'replacement str,
@@ -2720,10 +2716,7 @@ fn execute_prepared_storage_rewrite(
 ///
 /// Returns a typed bounded validation error. Unknown fields remain opaque and
 /// are reported in [`StorageValidation`] rather than decoded.
-pub fn validate_storage_with_limits(
-    source: &[u8],
-    limits: RewriteLimits,
-) -> RewriteResult<StorageValidation> {
+pub fn validate_storage(source: &[u8], limits: RewriteLimits) -> RewriteResult<StorageValidation> {
     let text_preflight = preflight_root_text(source, limits)?;
     let counters = validate_full_storage_tree(source, text_preflight.utf16_len, limits)?;
     let validation_work =
@@ -2757,10 +2750,7 @@ pub fn validate_storage_with_limits(
 /// Returns a typed bounded validation, projection, allocation, or semantic
 /// storage error. Unknown fields remain opaque and are reported in the
 /// returned [`StorageValidation`].
-pub fn decode_storage_with_limits(
-    source: &[u8],
-    limits: RewriteLimits,
-) -> RewriteResult<ValidatedStorage> {
+pub fn decode_storage(source: &[u8], limits: RewriteLimits) -> RewriteResult<ValidatedStorage> {
     let text_preflight = preflight_root_text(source, limits)?;
     let counters = validate_full_storage_tree(source, text_preflight.utf16_len, limits)?;
     let validation_work =
@@ -3755,7 +3745,7 @@ mod tests {
     }
 
     fn rewrite(source: &[u8], range: Range<usize>, replacement: &str) -> StorageRewrite {
-        rewrite_storage_text_with_limits(source, range, replacement, RewriteLimits::default())
+        rewrite_storage_text(source, range, replacement, RewriteLimits::default())
             .unwrap_or_else(|error| panic!("test storage should rewrite: {error}"))
     }
 
@@ -3852,6 +3842,64 @@ mod tests {
             .unwrap_or_default()
     }
 
+    /// A storage "ab\ncd\nef" whose paragraph-style table (field 5) holds
+    /// entries at `starts`, and a language table (field 19) at zero.
+    fn paragraphs_storage(starts: &[u32]) -> Vec<u8> {
+        let mut source = raw_length_delimited(3, b"ab\ncd\nef");
+        let entries: Vec<(u32, Option<u64>)> = starts
+            .iter()
+            .map(|&start| (start, Some(40 + u64::from(start))))
+            .collect();
+        source.extend_from_slice(&raw_length_delimited(
+            5,
+            &object_table(&entries).encode_to_vec(),
+        ));
+        source.extend_from_slice(&raw_length_delimited(
+            19,
+            &string_table(&[0]).encode_to_vec(),
+        ));
+        source
+    }
+
+    /// Record 0314: the boundaries admit a combined splice exactly where
+    /// one splice publishes what the splices publish one at a time.
+    #[test]
+    fn boundaries_admit_combined_splices_that_equal_their_sequence() {
+        let limits = RewriteLimits::default();
+        // Two paragraph sets: "ab" -> "AB" (0..2), then "cd" -> "CD" (3..5).
+        let sequence = |source: &[u8]| {
+            let first = rewrite(source, 0..2, "AB");
+            rewrite(first.bytes(), 3..5, "CD").into_bytes()
+        };
+        let combined = |source: &[u8]| rewrite(source, 0..5, "AB\nCD").into_bytes();
+
+        let shared = paragraphs_storage(&[0]);
+        let boundaries = storage_boundaries(&shared, limits).expect("boundaries");
+        assert!(boundaries.admits_combined_splice(0..5));
+        assert_eq!(combined(&shared), sequence(&shared));
+
+        let per_paragraph = paragraphs_storage(&[0, 3, 6]);
+        let boundaries = storage_boundaries(&per_paragraph, limits).expect("boundaries");
+        assert!(!boundaries.admits_combined_splice(0..5));
+        assert_ne!(combined(&per_paragraph), sequence(&per_paragraph));
+        // One paragraph's own region: its start entry is kept either way.
+        assert!(boundaries.admits_combined_splice(3..5));
+        assert!(boundaries.admits_combined_splice(0..2));
+
+        // Several fragments and overlapping ranges are refused.
+        let mut fragments = raw_length_delimited(3, b"ab");
+        fragments.extend_from_slice(&raw_length_delimited(3, b"\ncd"));
+        let boundaries = storage_boundaries(&fragments, limits).expect("boundaries");
+        assert!(!boundaries.admits_combined_splice(0..1));
+        let mut ranged = raw_length_delimited(3, b"abcd");
+        ranged.extend_from_slice(&raw_length_delimited(
+            25,
+            &overlapping_table(70).encode_to_vec(),
+        ));
+        let boundaries = storage_boundaries(&ranged, limits).expect("boundaries");
+        assert!(!boundaries.admits_combined_splice(0..2));
+    }
+
     #[test]
     fn exact_semantic_no_op_keeps_fragments_tables_and_unknowns() {
         let mut source = raw_length_delimited(3, b"A");
@@ -3925,7 +3973,7 @@ mod tests {
         .encode_to_vec();
 
         assert_eq!(
-            rewrite_storage_text_with_limits(&source, 2..3, "x", RewriteLimits::default()),
+            rewrite_storage_text(&source, 2..3, "x", RewriteLimits::default()),
             Err(RewriteError::SurrogateSplit { index: 2 })
         );
         let result = rewrite(&source, 1..3, "🚀");
@@ -4076,7 +4124,7 @@ mod tests {
         .encode_to_vec();
 
         assert!(matches!(
-            rewrite_storage_text_with_limits(&source, 5..5, "!", RewriteLimits::default()),
+            rewrite_storage_text(&source, 5..5, "!", RewriteLimits::default()),
             Err(RewriteError::InvalidFormat(message))
                 if message.contains("refusing global normalization")
         ));
@@ -4110,7 +4158,7 @@ mod tests {
         }
         .encode_to_vec();
 
-        let result = rewrite_storage_text_with_behavior_and_limits(
+        let result = rewrite_storage_text_with_behavior(
             &source,
             0..1,
             "A",
@@ -4245,10 +4293,10 @@ mod tests {
             root_field(result.bytes(), 3),
             raw_length_delimited(3, b"aZc")
         );
-        let validation = validate_storage_with_limits(&source, RewriteLimits::default())
+        let validation = validate_storage(&source, RewriteLimits::default())
             .unwrap_or_else(|error| panic!("grouped storage should validate: {error}"));
         assert!(validation.has_unknown_wire_fields());
-        let decoded = decode_storage_with_limits(&source, RewriteLimits::default())
+        let decoded = decode_storage(&source, RewriteLimits::default())
             .unwrap_or_else(|error| panic!("grouped storage should decode: {error}"));
         assert_eq!(decoded.storage().text(), "abc");
     }
@@ -4276,7 +4324,7 @@ mod tests {
             unbalanced,
         ] {
             assert!(matches!(
-                rewrite_storage_text_with_limits(&malformed, 0..0, "", RewriteLimits::default()),
+                rewrite_storage_text(&malformed, 0..0, "", RewriteLimits::default()),
                 Err(RewriteError::InvalidFormat(_))
             ));
         }
@@ -4290,7 +4338,7 @@ mod tests {
 
         for malformed in [overlong_key.as_slice(), &overlong_length, &overlong_value] {
             assert!(matches!(
-                rewrite_storage_text_with_limits(
+                rewrite_storage_text(
                     malformed,
                     0..0,
                     "",
@@ -4309,7 +4357,7 @@ mod tests {
         let fields_limited = RewriteLimits::new(1_024, 3, 4, 16, 1_024, 16, 16, 1_024, 16_384)
             .unwrap_or_else(|error| panic!("test limits should be valid: {error}"));
         assert!(matches!(
-            rewrite_storage_text_with_limits(&source, 0..0, "", fields_limited),
+            rewrite_storage_text(&source, 0..0, "", fields_limited),
             Err(RewriteError::LimitExceeded {
                 resource: "fields",
                 ..
@@ -4324,7 +4372,7 @@ mod tests {
         let nesting_limited = RewriteLimits::new(1_024, 128, 4, 16, 1_024, 16, 16, 1_024, 16_384)
             .unwrap_or_else(|error| panic!("test limits should be valid: {error}"));
         assert!(matches!(
-            rewrite_storage_text_with_limits(&nested_source, 0..0, "", nesting_limited),
+            rewrite_storage_text(&nested_source, 0..0, "", nesting_limited),
             Err(RewriteError::LimitExceeded {
                 resource: "nesting",
                 ..
@@ -4344,7 +4392,7 @@ mod tests {
         )
         .unwrap_or_else(|error| panic!("test limits should be valid: {error}"));
         assert!(matches!(
-            rewrite_storage_text_with_limits(&nested_source, 0..0, "", work_limited),
+            rewrite_storage_text(&nested_source, 0..0, "", work_limited),
             Err(RewriteError::LimitExceeded {
                 resource: "raw wire work",
                 ..
@@ -4363,7 +4411,7 @@ mod tests {
             .unwrap_or_else(|error| panic!("test limits should be valid: {error}"));
 
         assert!(matches!(
-            rewrite_storage_text_with_limits(&source, 0..0, "", limits),
+            rewrite_storage_text(&source, 0..0, "", limits),
             Err(RewriteError::LimitExceeded {
                 resource: "fields",
                 observed: 3,
@@ -4474,7 +4522,7 @@ mod tests {
             wrong_index_wire,
         ] {
             assert!(matches!(
-                rewrite_storage_text_with_limits(&malformed, 0..0, "", RewriteLimits::default()),
+                rewrite_storage_text(&malformed, 0..0, "", RewriteLimits::default()),
                 Err(RewriteError::InvalidFormat(_))
             ));
         }
@@ -4503,7 +4551,7 @@ mod tests {
             ]
             .concat();
             assert!(matches!(
-                rewrite_storage_text_with_limits(&source, 0..0, "", RewriteLimits::default()),
+                rewrite_storage_text(&source, 0..0, "", RewriteLimits::default()),
                 Err(RewriteError::InvalidFormat(_))
             ));
         }
@@ -4520,7 +4568,7 @@ mod tests {
             RewriteLimits::new(source.len() - 1, 64, 4, 4, 64, 16, 16, 1_024, 16_384)
                 .unwrap_or_else(|error| panic!("test limits should be valid: {error}"));
         assert!(matches!(
-            rewrite_storage_text_with_limits(&source, 0..0, "", message_limited),
+            rewrite_storage_text(&source, 0..0, "", message_limited),
             Err(RewriteError::LimitExceeded {
                 resource: "message bytes",
                 ..
@@ -4529,7 +4577,7 @@ mod tests {
         let field_limited = RewriteLimits::new(1_024, 1, 4, 4, 64, 16, 16, 1_024, 16_384)
             .unwrap_or_else(|error| panic!("test limits should be valid: {error}"));
         assert!(matches!(
-            rewrite_storage_text_with_limits(&source, 0..0, "", field_limited),
+            rewrite_storage_text(&source, 0..0, "", field_limited),
             Err(RewriteError::LimitExceeded {
                 resource: "fields",
                 ..
@@ -4541,7 +4589,7 @@ mod tests {
         ]
         .concat();
         assert!(matches!(
-            rewrite_storage_text_with_limits(&invalid_second_fragment, 0..0, "", field_limited),
+            rewrite_storage_text(&invalid_second_fragment, 0..0, "", field_limited),
             Err(RewriteError::LimitExceeded {
                 resource: "fields",
                 ..
@@ -4550,7 +4598,7 @@ mod tests {
         let fragment_limited = RewriteLimits::new(1_024, 64, 4, 1, 64, 16, 16, 1_024, 16_384)
             .unwrap_or_else(|error| panic!("test limits should be valid: {error}"));
         assert!(matches!(
-            rewrite_storage_text_with_limits(&source, 0..0, "", fragment_limited),
+            rewrite_storage_text(&source, 0..0, "", fragment_limited),
             Err(RewriteError::LimitExceeded {
                 resource: "text fragments",
                 ..
@@ -4560,7 +4608,7 @@ mod tests {
         let text_limited = RewriteLimits::new(1_024, 64, 4, 4, 3, 16, 16, 1_024, 16_384)
             .unwrap_or_else(|error| panic!("test limits should be valid: {error}"));
         assert!(matches!(
-            rewrite_storage_text_with_limits(&source, 0..0, "", text_limited),
+            rewrite_storage_text(&source, 0..0, "", text_limited),
             Err(RewriteError::LimitExceeded {
                 resource: "text bytes",
                 ..
@@ -4576,7 +4624,7 @@ mod tests {
         let table_limited = RewriteLimits::new(1_024, 64, 4, 4, 64, 1, 16, 1_024, 16_384)
             .unwrap_or_else(|error| panic!("test limits should be valid: {error}"));
         assert!(matches!(
-            rewrite_storage_text_with_limits(&table_source, 0..0, "", table_limited),
+            rewrite_storage_text(&table_source, 0..0, "", table_limited),
             Err(RewriteError::LimitExceeded {
                 resource: "table entries",
                 ..
@@ -4586,7 +4634,7 @@ mod tests {
         let reference_limited = RewriteLimits::new(1_024, 64, 4, 4, 64, 16, 1, 1_024, 16_384)
             .unwrap_or_else(|error| panic!("test limits should be valid: {error}"));
         assert!(matches!(
-            rewrite_storage_text_with_limits(&table_source, 0..0, "", reference_limited),
+            rewrite_storage_text(&table_source, 0..0, "", reference_limited),
             Err(RewriteError::LimitExceeded {
                 resource: "object references",
                 ..
@@ -4596,7 +4644,7 @@ mod tests {
         let output_limited = RewriteLimits::new(1_024, 64, 4, 4, 64, 16, 16, 8, 16_384)
             .unwrap_or_else(|error| panic!("test limits should be valid: {error}"));
         assert!(matches!(
-            rewrite_storage_text_with_limits(&source, 0..0, "much-longer", output_limited),
+            rewrite_storage_text(&source, 0..0, "much-longer", output_limited),
             Err(RewriteError::LimitExceeded {
                 resource: "output bytes",
                 ..
@@ -4606,7 +4654,7 @@ mod tests {
         let work_limited = RewriteLimits::new(1_024, 64, 4, 4, 64, 16, 16, 1_024, 8)
             .unwrap_or_else(|error| panic!("test limits should be valid: {error}"));
         assert!(matches!(
-            rewrite_storage_text_with_limits(&source, 0..0, "", work_limited),
+            rewrite_storage_text(&source, 0..0, "", work_limited),
             Err(RewriteError::LimitExceeded { .. })
         ));
         assert!(matches!(
@@ -4627,7 +4675,7 @@ mod tests {
         }
         .encode_to_vec();
         let prepare = || {
-            prepare_storage_text_rewrite_with_behavior_and_limits(
+            prepare_storage_text_rewrite_with_behavior(
                 &source,
                 1..2,
                 "longer",
@@ -4708,7 +4756,7 @@ mod tests {
         let limits = RewriteLimits::new(1_024, 64, 4, 4, 64, 8, 8, 1, 16_384)
             .unwrap_or_else(|error| panic!("test limits should be valid: {error}"));
 
-        let validation = validate_storage_with_limits(&source, limits)
+        let validation = validate_storage(&source, limits)
             .unwrap_or_else(|error| panic!("full storage should validate: {error}"));
 
         assert_eq!(validation.utf8_len(), 5);
@@ -4726,7 +4774,7 @@ mod tests {
         ]
         .concat();
         assert!(matches!(
-            validate_storage_with_limits(&malformed, RewriteLimits::default()),
+            validate_storage(&malformed, RewriteLimits::default()),
             Err(RewriteError::InvalidFormat(_))
         ));
     }
@@ -4743,7 +4791,7 @@ mod tests {
                 .unwrap_or_else(|error| panic!("Prost should decode test storage: {error}")),
         )
         .unwrap_or_else(|error| panic!("Prost semantic oracle should convert: {error}"));
-        let decoded = decode_storage_with_limits(&source, RewriteLimits::default())
+        let decoded = decode_storage(&source, RewriteLimits::default())
             .unwrap_or_else(|error| panic!("strict storage decode should succeed: {error}"));
 
         assert_eq!(decoded.storage(), &oracle);
@@ -4763,7 +4811,7 @@ mod tests {
             raw_length_delimited(3, "😀".as_bytes()),
         ]
         .concat();
-        let decoded = decode_storage_with_limits(&source, RewriteLimits::default())
+        let decoded = decode_storage(&source, RewriteLimits::default())
             .unwrap_or_else(|error| panic!("strict storage decode should succeed: {error}"));
         let validation = decoded.validation();
         let storage = decoded.storage();
@@ -4786,7 +4834,7 @@ mod tests {
         assert_eq!(validation.fragments(), storage.runs().len());
         assert_eq!(
             validation,
-            validate_storage_with_limits(&source, RewriteLimits::default())
+            validate_storage(&source, RewriteLimits::default())
                 .unwrap_or_else(|error| panic!("validation should succeed: {error}"))
         );
     }
@@ -4801,7 +4849,7 @@ mod tests {
         .concat();
 
         assert!(matches!(
-            decode_storage_with_limits(&source, RewriteLimits::default()),
+            decode_storage(&source, RewriteLimits::default()),
             Err(RewriteError::InvalidFormat(_))
         ));
     }
@@ -4815,7 +4863,7 @@ mod tests {
         .concat();
         let baseline_limits = RewriteLimits::new(1_024, 64, 4, 2, 6, 8, 8, 1_024, 16_384)
             .unwrap_or_else(|error| panic!("baseline limits should be valid: {error}"));
-        let baseline = decode_storage_with_limits(&source, baseline_limits)
+        let baseline = decode_storage(&source, baseline_limits)
             .unwrap_or_else(|error| panic!("baseline strict decode should succeed: {error}"));
         let validation = baseline.validation();
 
@@ -4831,7 +4879,7 @@ mod tests {
             validation.validation_work(),
         )
         .unwrap_or_else(|error| panic!("exact work limits should be valid: {error}"));
-        assert!(decode_storage_with_limits(&source, exact_work_limits).is_ok());
+        assert!(decode_storage(&source, exact_work_limits).is_ok());
         let almost_work_limits = RewriteLimits::new(
             1_024,
             64,
@@ -4845,7 +4893,7 @@ mod tests {
         )
         .unwrap_or_else(|error| panic!("minus-one work limits should be valid: {error}"));
         assert!(matches!(
-            decode_storage_with_limits(&source, almost_work_limits),
+            decode_storage(&source, almost_work_limits),
             Err(RewriteError::LimitExceeded {
                 resource: "rewrite work",
                 ..
@@ -4864,7 +4912,7 @@ mod tests {
             16_384,
         )
         .unwrap_or_else(|error| panic!("exact text limits should be valid: {error}"));
-        assert!(decode_storage_with_limits(&source, exact_text_limits).is_ok());
+        assert!(decode_storage(&source, exact_text_limits).is_ok());
         let almost_text_limits = RewriteLimits::new(
             1_024,
             64,
@@ -4878,7 +4926,7 @@ mod tests {
         )
         .unwrap_or_else(|error| panic!("minus-one text limits should be valid: {error}"));
         assert!(matches!(
-            decode_storage_with_limits(&source, almost_text_limits),
+            decode_storage(&source, almost_text_limits),
             Err(RewriteError::LimitExceeded {
                 resource: "text bytes",
                 ..
@@ -4897,7 +4945,7 @@ mod tests {
             16_384,
         )
         .unwrap_or_else(|error| panic!("exact fragment limits should be valid: {error}"));
-        assert!(decode_storage_with_limits(&source, exact_fragment_limits).is_ok());
+        assert!(decode_storage(&source, exact_fragment_limits).is_ok());
         let almost_fragment_limits = RewriteLimits::new(
             1_024,
             64,
@@ -4911,7 +4959,7 @@ mod tests {
         )
         .unwrap_or_else(|error| panic!("minus-one fragment limits should be valid: {error}"));
         assert!(matches!(
-            decode_storage_with_limits(&source, almost_fragment_limits),
+            decode_storage(&source, almost_fragment_limits),
             Err(RewriteError::LimitExceeded {
                 resource: "text fragments",
                 ..
@@ -4923,7 +4971,7 @@ mod tests {
     fn reversed_oob_and_fragment_wire_errors_are_typed() {
         let source = raw_length_delimited(3, b"abc");
         assert!(matches!(
-            rewrite_storage_text_with_limits(
+            rewrite_storage_text(
                 &source,
                 Range { start: 2, end: 1 },
                 "",
@@ -4932,14 +4980,14 @@ mod tests {
             Err(RewriteError::ReversedRange { start: 2, end: 1 })
         ));
         assert!(matches!(
-            rewrite_storage_text_with_limits(&source, 0..4, "", RewriteLimits::default()),
+            rewrite_storage_text(&source, 0..4, "", RewriteLimits::default()),
             Err(RewriteError::RangeOutOfBounds {
                 index: 4,
                 length: 3
             })
         ));
         assert!(matches!(
-            rewrite_storage_text_with_limits(
+            rewrite_storage_text(
                 &[0x18, 0x01],
                 0..0,
                 "",
@@ -4948,4 +4996,122 @@ mod tests {
             Err(RewriteError::InvalidFormat(message)) if message.contains("wire type")
         ));
     }
+}
+
+/// Where a validated storage's attribute tables place their entries, in
+/// UTF-16 code units of its text: what decides whether several splices of
+/// the text can be published as one (record 0314).
+///
+/// One storage rewrite takes one splice. A caller that wants to publish a
+/// sequence of edits of one text (each paragraph of a batch, say) as one
+/// splice from the first text to the last must publish exactly what the
+/// edits publish one at a time. That holds when no attribute entry lies
+/// where the two differ: every table entry the splices could drop, merge or
+/// move differently. [`Self::admits_combined_splice`] answers it for the
+/// hull of the edits.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StorageBoundaries {
+    /// Entries of index tables a splice starting at their index keeps.
+    retained: Vec<u32>,
+    /// Entries of index tables a splice starting at their index drops, or
+    /// that a splice may normalize or remove with their table.
+    dropped: Vec<u32>,
+    /// Overlapping ranges, as `start..end`.
+    ranges: Vec<(u32, u32)>,
+    fragments: usize,
+}
+
+impl StorageBoundaries {
+    /// Whether every sequence of splices whose spans lie within `hull` (UTF-16
+    /// code units of the text, both ends inclusive) publishes exactly what one
+    /// splice from the sequence's first text to its last publishes.
+    ///
+    /// The answer is conservative: `false` means the caller publishes the
+    /// splices one at a time. It is `true` when the text is held in at most
+    /// one fragment, no index-table entry lies in `(hull.start, hull.end]`,
+    /// no entry a splice drops lies at `hull.start`, and no overlapping range
+    /// meets the hull. Whether an intermediate text is empty is the caller's
+    /// to check (an emptied text loses its field, which a later splice adds
+    /// back last).
+    #[must_use]
+    pub fn admits_combined_splice(&self, hull: Range<usize>) -> bool {
+        if self.fragments > 1 || hull.start > hull.end {
+            return false;
+        }
+        let inside = |index: u32| {
+            usize::try_from(index).is_ok_and(|index| index > hull.start && index <= hull.end)
+        };
+        let at_or_inside = |index: u32| {
+            usize::try_from(index).is_ok_and(|index| index >= hull.start && index <= hull.end)
+        };
+        !self.retained.iter().copied().any(inside)
+            && !self.dropped.iter().copied().any(at_or_inside)
+            && !self.ranges.iter().any(|&(start, end)| {
+                usize::try_from(start).is_ok_and(|start| start <= hull.end)
+                    && usize::try_from(end).is_ok_and(|end| end >= hull.start)
+            })
+    }
+}
+
+/// Read the attribute boundaries of one `TSWP.StorageArchive` payload: one
+/// bounded scan of its root fields and table entries.
+///
+/// The scan only reads; it does not validate the storage the way a rewrite
+/// does (a caller publishes through a rewrite, which validates the complete
+/// tree). A malformed entry is an error.
+///
+/// # Errors
+///
+/// A typed bounded wire error for a malformed field, entry or range, or an
+/// exceeded limit.
+pub fn storage_boundaries(
+    source: &[u8],
+    limits: RewriteLimits,
+) -> RewriteResult<StorageBoundaries> {
+    let mut boundaries = StorageBoundaries {
+        retained: Vec::new(),
+        dropped: Vec::new(),
+        ranges: Vec::new(),
+        fragments: 0,
+    };
+    let mut fields = RawFields::new(source, limits)?;
+    while let Some(field) = fields.next()? {
+        let number = field.number();
+        if number == ROOT_TEXT_FIELD {
+            boundaries.fragments = checked_add(boundaries.fragments, 1, "text fragments")?;
+            continue;
+        }
+        if !is_table_field(number) {
+            continue;
+        }
+        let policy = TablePolicy::for_field(number)
+            .ok_or_else(|| invalid("recognized table has no rewrite policy"))?;
+        let table = field.canonical_payload(2, "TSWP storage table")?;
+        let mut entries = RawFields::new(table, limits)?;
+        while let Some(entry) = entries.next()? {
+            if entry.number() != TABLE_ENTRY_FIELD {
+                continue;
+            }
+            let payload = entry.canonical_payload(2, "TSWP table entry")?;
+            match policy.entry_kind() {
+                None => {
+                    let inspected = inspect_overlapping_entry(payload, limits)?;
+                    let end = inspected
+                        .start
+                        .checked_add(inspected.length)
+                        .ok_or_else(|| arithmetic("overlapping range end"))?;
+                    boundaries.ranges.push((inspected.start, end));
+                },
+                Some(kind) => {
+                    let index = inspect_index_entry(payload, kind, limits)?.index;
+                    if policy.retain_start() {
+                        boundaries.retained.push(index);
+                    } else {
+                        boundaries.dropped.push(index);
+                    }
+                },
+            }
+        }
+    }
+    Ok(boundaries)
 }

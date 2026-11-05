@@ -5,7 +5,8 @@
 //! Run with:
 //!   cargo run --example doc_rich_text --features doc --no-default-features -- <output.doc>
 
-use litchi_doc::{CharacterFormatting, ParagraphFormatting, Writer};
+use litchi_doc::builder::Builder;
+use litchi_doc::{CharacterFormatting, ParagraphFormatting};
 use std::env;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -13,7 +14,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nth(1)
         .unwrap_or_else(|| "doc_rich_text.doc".to_string());
 
-    let mut doc = Writer::new();
+    let mut doc = Builder::new();
 
     // Paragraph 1: rich runs
     let runs = vec![
@@ -68,7 +69,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Paragraph 2: plain text
     doc.add_paragraph("This is a second paragraph.")?;
 
-    doc.save(&out)?;
+    doc.build()?.save(&out)?;
     println!("Rich text DOC written to: {}", out);
     Ok(())
 }

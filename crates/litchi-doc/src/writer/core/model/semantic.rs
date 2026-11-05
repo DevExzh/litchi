@@ -1,11 +1,11 @@
 use super::{
-    AssociatedStringSlot, BookmarkEntry, CharacterFormatting, CommentEntry,
+    AssociatedStringSlot, BookmarkEntry, Builder, CharacterFormatting, CommentEntry,
     DocumentAssociatedStrings, EncryptionProfile, FloatingAnchorKind, FootnoteEntry,
-    FormattingRevision, GlossaryMetadata, HashMap, HeaderAnchor, HeaderFooterParagraph, HeaderKind,
+    FormattingRevision, GlossaryMetadata, HeaderAnchor, HeaderFooterParagraph, HeaderKind,
     ListFormatOverride, ListNamesTable, ListStructure, ListTemplateTable, NumberingWriter,
     ParagraphFormatting, ProofingFeature, ProofingStateTable, ProofingTables, SavedByTable,
     SmartTagEntry, SmartTagRecognizerRange, TableCell, TableRow, TextRun, WritableParagraph,
-    WritableTable, WriteError, Writer, WriterEncryption, WriterPicture, WriterShape, Zeroizing,
+    WritableTable, WriteError, WriterEncryption, WriterPicture, WriterShape, Zeroizing,
     validate_header_footer_paragraphs, validate_writer_password, writable_paragraph_from_runs,
 };
 
@@ -16,14 +16,13 @@ use super::{
 /// in the returned story character count. Returns the story-relative start
 /// CP of each text box and the total story length (a ccp value).
 
-impl Writer {
+impl Builder {
     /// Create a new DOC writer
     #[must_use]
     pub fn new() -> Self {
         Self {
             paragraphs: Vec::new(),
             tables: Vec::new(),
-            properties: HashMap::new(),
             header_even: None,
             header_odd: None,
             header_first: None,
@@ -56,6 +55,7 @@ impl Writer {
             next_shape_id: crate::writer::images::FIRST_PICTURE_SHAPE_ID,
             encryption: None,
             vba_project: None,
+            properties: litchi_ole_common::property_set::SummaryProperties::new(),
         }
     }
 
@@ -215,7 +215,7 @@ impl Writer {
 
     /// Attach a distinct glossary-only document to this template.
     ///
-    /// The attached writer must have [`Writer::set_glossary_metadata`]
+    /// The attached writer must have [`Builder::set_glossary_metadata`]
     /// configured. Its main story becomes the template's `AutoText` story.
     ///
     /// # Errors
@@ -225,8 +225,8 @@ impl Writer {
     /// represented by the shared DOC stream topology.
     pub fn set_attached_glossary(
         &mut self,
-        glossary: Writer,
-    ) -> Result<Option<Writer>, WriteError> {
+        glossary: Builder,
+    ) -> Result<Option<Builder>, WriteError> {
         glossary.validate_as_attached_glossary()?;
         Ok(self
             .attached_glossary
@@ -236,22 +236,22 @@ impl Writer {
 
     /// Access the attached glossary writer.
     #[must_use]
-    pub fn attached_glossary(&self) -> Option<&Writer> {
+    pub fn attached_glossary(&self) -> Option<&Builder> {
         self.attached_glossary.as_deref()
     }
 
     /// Mutably access the attached glossary writer.
-    pub fn attached_glossary_mut(&mut self) -> Option<&mut Writer> {
+    pub fn attached_glossary_mut(&mut self) -> Option<&mut Builder> {
         self.attached_glossary.as_deref_mut()
     }
 
     /// Remove and return the attached glossary writer.
-    pub fn clear_attached_glossary(&mut self) -> Option<Writer> {
+    pub fn clear_attached_glossary(&mut self) -> Option<Builder> {
         self.attached_glossary.take().map(|glossary| *glossary)
     }
 }
 
-impl Writer {
+impl Builder {
     /// Add a custom paragraph, character, table, or numbering style.
     ///
     /// Custom styles occupy consecutive indices beginning at 15. The returned
@@ -804,7 +804,7 @@ impl Writer {
     }
 }
 
-impl Writer {
+impl Builder {
     pub fn add_table(&mut self, rows: usize, cols: usize) -> Result<usize, WriteError> {
         if rows == 0 || cols == 0 {
             return Err(WriteError::InvalidData(
@@ -1037,18 +1037,60 @@ impl Writer {
         Ok(())
     }
 
-    /// Set a document property
+    /// Replaces the document's metadata with `metadata`.
     ///
-    /// # Arguments
+    /// The fields are written to the `\x05SummaryInformation` and
+    /// `\x05DocumentSummaryInformation` streams by the shared
+    /// [`SummaryProperties`](litchi_ole_common::property_set::SummaryProperties)
+    /// conversion
+    /// ([`SummaryProperties::merge_metadata`](litchi_ole_common::property_set::SummaryProperties::merge_metadata)
+    /// lists the mapping). It replaces every property set earlier, including
+    /// custom ones, so set custom properties through
+    /// [`Self::summary_properties_mut`] afterwards. Empty metadata writes no
+    /// property stream, exactly as a builder that never set one. Nothing
+    /// reads the clock: a creation or save time is written only when given.
     ///
-    /// * `name` - Property name (e.g., "Title", "Author", "Subject")
-    /// * `value` - Property value
-    pub fn set_property(&mut self, name: &str, value: &str) {
-        self.properties.insert(name.to_string(), value.to_string());
+    /// ```
+    /// let mut builder = litchi_doc::Builder::new();
+    /// builder.add_paragraph("Body")?;
+    /// builder.set_metadata(litchi_core::Metadata {
+    ///     title: Some("Quarterly report".to_owned()),
+    ///     author: Some("Ada".to_owned()),
+    ///     ..litchi_core::Metadata::default()
+    /// })?;
+    /// let package = builder.build()?;
+    /// assert_eq!(package.metadata().title.as_deref(), Some("Quarterly report"));
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WriteError::Metadata`], leaving the properties unchanged, for
+    /// a field the property sets cannot store (`identifier`,
+    /// `hyperlink_base`, unzoned timestamps) or a refused value.
+    pub fn set_metadata(&mut self, metadata: litchi_core::Metadata) -> Result<(), WriteError> {
+        self.properties =
+            litchi_ole_common::property_set::SummaryProperties::from_metadata(&metadata)?;
+        Ok(())
+    }
+
+    /// The document properties the builder writes, including typed counts and
+    /// custom properties that [`litchi_core::Metadata`] does not carry.
+    #[must_use]
+    pub const fn summary_properties(&self) -> &litchi_ole_common::property_set::SummaryProperties {
+        &self.properties
+    }
+
+    /// Mutable access to the document properties, for custom properties and
+    /// typed section edits.
+    pub fn summary_properties_mut(
+        &mut self,
+    ) -> &mut litchi_ole_common::property_set::SummaryProperties {
+        &mut self.properties
     }
 }
 
-impl Default for Writer {
+impl Default for Builder {
     fn default() -> Self {
         Self::new()
     }

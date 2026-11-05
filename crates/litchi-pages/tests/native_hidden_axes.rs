@@ -16,7 +16,8 @@ use litchi_iwa_archive::{
 };
 use litchi_iwa_core::ArchiveObject;
 use litchi_pages::{
-    BodyTableHiddenAxesError, BodyTableSelector, Package,
+    BodyTableSelector, Package,
+    table::hidden_axes::transaction::Error as BodyTableHiddenAxesError,
     table::hidden_axes::{AxisIndex, HiddenAxes},
 };
 
@@ -89,14 +90,14 @@ struct SelectedComponent {
 }
 
 fn selected_component(source: &[u8]) -> TestResult<SelectedComponent> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut candidates = Vec::new();
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let decompressed = SnappyStream::decompress(entry.data())?;
-        let archive = Archive::parse(decompressed.as_bytes())?;
+        let decompressed = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(decompressed.as_bytes(), Default::default())?;
         let info_ids = archive
             .objects
             .iter()
@@ -140,7 +141,7 @@ fn selected_component(source: &[u8]) -> TestResult<SelectedComponent> {
 }
 
 fn unselected_entries(source: &[u8], selected_component: &str) -> TestResult<Vec<EntrySnapshot>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut entries = catalog
         .iter()
         .filter(|entry| entry.name() != selected_component && !PREVIEWS.contains(&entry.name()))
@@ -156,13 +157,13 @@ fn unselected_entries(source: &[u8], selected_component: &str) -> TestResult<Vec
 }
 
 fn archive_for_member(source: &[u8], member: &str) -> TestResult<Archive> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| io::Error::other(format!("missing selected member {member}")))?;
-    let decompressed = SnappyStream::decompress(entry.data())?;
-    Ok(Archive::parse(decompressed.as_bytes())?)
+    let decompressed = SnappyStream::decompress(entry.data(), Default::default())?;
+    Ok(Archive::parse(decompressed.as_bytes(), Default::default())?)
 }
 
 fn assert_selected_member_locality(
@@ -204,14 +205,14 @@ struct DependencySnapshot {
 }
 
 fn dependency_objects(source: &[u8]) -> TestResult<Vec<DependencySnapshot>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut dependencies = Vec::new();
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let decompressed = SnappyStream::decompress(entry.data())?;
-        let archive = Archive::parse(decompressed.as_bytes())?;
+        let decompressed = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(decompressed.as_bytes(), Default::default())?;
         for object in archive.objects {
             let Some(message_type) = object.primary_message_type() else {
                 continue;
@@ -270,7 +271,7 @@ fn assert_dependencies_preserved(before: &[DependencySnapshot], after: &[Depende
 
 fn without_previews(source: &[u8]) -> TestResult<Vec<u8>> {
     Ok(
-        Catalog::from_bytes(source)?.reassemble_with_deletions_to_bytes(
+        Catalog::from_bytes(source, Default::default())?.reassemble_with_deletions_to_bytes(
             &[],
             &PREVIEWS,
             Limits::default(),
@@ -445,12 +446,12 @@ fn native_hidden_axes_preserve_dependencies_locality_and_conflict_fences() -> Te
     assert_dependencies_preserved(&before_dependencies, &after_dependencies);
     assert_eq!(commit.diagnostics().touched_components(), 1);
     assert_eq!(commit.diagnostics().deleted_previews(), PREVIEWS.len());
-    let catalog = Catalog::from_bytes(&target)?;
+    let catalog = Catalog::from_bytes(&target, Default::default())?;
     for preview in PREVIEWS {
         assert!(catalog.iter().all(|entry| entry.name() != preview));
     }
 
-    let tampered_source = Catalog::from_bytes(&source)?.reassemble_to_bytes(
+    let tampered_source = Catalog::from_bytes(&source, Default::default())?.reassemble_to_bytes(
         &[EntryEdit::new("preview.jpg", b"tampered-preview")],
         Limits::default(),
     )?;
@@ -489,14 +490,17 @@ fn native_hidden_axes_resource_limits_are_atomic() -> TestResult {
         Limits::MAX_TOTAL_BYTES,
         Limits::MAX_IWA_STREAM_BYTES,
     )?;
-    let package = Package::from_bytes_with_limits(&source_without_previews, bounded)?;
+    let package = Package::from_bytes_with_options(
+        &source_without_previews,
+        litchi_pages::OpenOptions::new().__archive_limits(bounded),
+    )?;
     let before = exact_bytes(&package)?;
     let result = package
         .edit_body_table_hidden_axes(0usize)?
         .set(requested)
         .commit();
     assert!(
-        matches!(result, Err(BodyTableHiddenAxesError::LimitExceeded { .. })),
+        matches!(result, Err(BodyTableHiddenAxesError::Limit { .. })),
         "native output overrun was accepted: {result:?}"
     );
     assert_eq!(exact_bytes(&package)?, before);
@@ -508,7 +512,13 @@ fn native_hidden_axes_resource_limits_are_atomic() -> TestResult {
         Limits::MAX_TOTAL_BYTES,
         Limits::MAX_IWA_STREAM_BYTES,
     )?;
-    assert!(Package::from_bytes_with_limits(&source, input_limited).is_err());
+    assert!(
+        Package::from_bytes_with_options(
+            &source,
+            litchi_pages::OpenOptions::new().__archive_limits(input_limited)
+        )
+        .is_err()
+    );
     Ok(())
 }
 
@@ -551,5 +561,32 @@ fn export_native_hidden_axes_focus_candidates_when_requested() -> TestResult {
         HiddenAxes::empty()
     );
     export_candidate("body-table-hidden-axes-native-reset.pages", &reset_bytes)?;
+    Ok(())
+}
+
+/// Callgrind probe (record 0379): set, then clear, the native document's
+/// hidden axes, serializing each output. Measured before and after the
+/// engine moved to `litchi-iwa-table` with
+/// `--toggle-collect=*native_hidden_axes::hidden_axes_probe_routes*`.
+#[inline(never)]
+fn hidden_axes_probe_routes(source: &[u8]) -> TestResult<usize> {
+    let package = Package::from_bytes(source)?;
+    let set = package
+        .edit_body_table_hidden_axes(0usize)?
+        .set(changed_axes()?)
+        .commit()?;
+    let cleared = set
+        .package()
+        .edit_body_table_hidden_axes(0usize)?
+        .clear()
+        .commit()?;
+    Ok(exact_bytes(set.package())?.len() + exact_bytes(cleared.package())?.len())
+}
+
+#[test]
+#[ignore = "callgrind probe; run explicitly"]
+fn hidden_axes_cost_probe() -> TestResult {
+    let source = source_bytes(NATIVE_HIDDEN_SOURCE)?;
+    assert!(hidden_axes_probe_routes(&source)? > 0);
     Ok(())
 }

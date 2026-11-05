@@ -189,9 +189,10 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn add_custom_xml(&mut self, store: NewStore) -> Result<CustomXmlItem> {
+    pub(crate) fn add_custom_xml(&mut self, store: NewStore) -> Result<CustomXmlItem> {
+        let source_limits = self.opc.read_limits();
         custom_xml::validate_content_type(&store.content_type)?;
-        custom_xml::validate_payload(&store.xml)?;
+        custom_xml::validate_payload(&store.xml, &source_limits)?;
         let props = CustomXmlProps {
             id: store.id,
             schemas: store.schemas,
@@ -202,7 +203,8 @@ impl Package {
         ensure_store_absent(&self.opc, &item_id)?;
         self.refuse_signed_custom_xml_change("add_custom_xml")?;
         let payload = store.xml;
-        let limits = PackageLimits::default();
+        let limits = self.semantic_limits().content_controls_value().clone();
+        limits.validate()?;
         self.edit_semantic_opc("add_custom_xml", move |candidate| {
             ensure_store_absent(candidate, &item_id)?;
             let source_part = candidate.main_document_part()?.partname().clone();
@@ -235,22 +237,21 @@ impl Package {
                 Error::InvalidFormat("Custom XML part-name space is exhausted".into())
             })?;
             let plan = checksum_plan(candidate, &item_id, &payload, true, &limits)?;
-            custom_xml::add(
-                candidate,
-                NewCustomXmlItem {
-                    source: source_part,
-                    rel_id,
-                    part: data_part.clone(),
-                    content_type: store.content_type,
-                    xml: payload,
-                    props: Some(NewCustomXmlProps {
-                        part: props_part,
-                        rel_id: "rIdProps1".to_string(),
-                        value: props,
-                    }),
-                    conformance: store.conformance,
-                },
-            )?;
+            let mut custom_edit = custom_xml::Edit::new(candidate)?;
+            custom_edit.insert(NewCustomXmlItem {
+                source: source_part,
+                rel_id,
+                part: data_part.clone(),
+                content_type: store.content_type,
+                xml: payload,
+                props: Some(NewCustomXmlProps {
+                    part: props_part,
+                    rel_id: "rIdProps1".to_string(),
+                    value: props,
+                }),
+                conformance: store.conformance,
+            })?;
+            *candidate = custom_edit.commit()?.into_package();
             publish_checksum_plan(candidate, &plan)?;
             let published = unique_store(candidate, &item_id)?;
             if published.part() != &data_part {
@@ -271,8 +272,9 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn set_custom_xml(&mut self, id: &str, xml: Vec<u8>) -> Result<()> {
-        custom_xml::validate_payload(&xml)?;
+    pub(crate) fn set_custom_xml(&mut self, id: &str, xml: Vec<u8>) -> Result<()> {
+        let source_limits = self.opc.read_limits();
+        custom_xml::validate_payload(&xml, &source_limits)?;
         self.mutate_custom_xml(
             id,
             "set_custom_xml",
@@ -288,9 +290,10 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn replace_custom_xml(&mut self, id: &str, replacement: NewStore) -> Result<()> {
+    pub(crate) fn replace_custom_xml(&mut self, id: &str, replacement: NewStore) -> Result<()> {
+        let source_limits = self.opc.read_limits();
         custom_xml::validate_content_type(&replacement.content_type)?;
-        custom_xml::validate_payload(&replacement.xml)?;
+        custom_xml::validate_payload(&replacement.xml, &source_limits)?;
         if !replacement.id.eq_ignore_ascii_case(id) {
             return Err(Error::InvalidFormat(
                 "replacement itemID must identify the existing data store".into(),
@@ -300,7 +303,7 @@ impl Package {
             id: replacement.id,
             schemas: replacement.schemas,
         };
-        let props_xml = custom_xml::write_props(&props, replacement.conformance)?;
+        let props_xml = custom_xml::write_props(&props, replacement.conformance, &source_limits)?;
         self.mutate_custom_xml(
             id,
             "replace_custom_xml",
@@ -319,6 +322,8 @@ impl Package {
         mutation: StoreMutation,
     ) -> Result<()> {
         self.ensure_story_opc_current(operation)?;
+        let limits = self.semantic_limits().content_controls_value().clone();
+        limits.validate()?;
         let item = unique_store(&self.opc, id)?;
         if mutation.is_noop(&self.opc, &item)? {
             return Ok(());
@@ -326,7 +331,6 @@ impl Package {
         self.refuse_signed_custom_xml_change(operation)?;
         let expected_part = item.part().clone();
         let item_id = id.to_owned();
-        let limits = PackageLimits::default();
         self.edit_semantic_opc(operation, move |candidate| {
             let item = unique_store(candidate, &item_id)?;
             if item.part() != &expected_part {
@@ -363,8 +367,10 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn remove_custom_xml(&mut self, id: &str) -> Result<bool> {
+    pub(crate) fn remove_custom_xml(&mut self, id: &str) -> Result<bool> {
         self.ensure_story_opc_current("remove_custom_xml")?;
+        let limits = self.semantic_limits().content_controls_value().clone();
+        limits.validate()?;
         let present = custom_xml::discover(&self.opc)?.iter().any(|item| {
             item.props()
                 .is_some_and(|props| props.id.eq_ignore_ascii_case(id))
@@ -374,7 +380,6 @@ impl Package {
         }
         self.refuse_signed_custom_xml_change("remove_custom_xml")?;
         let id = id.to_owned();
-        let limits = PackageLimits::default();
         self.edit_semantic_opc("remove_custom_xml", move |candidate| {
             let items = custom_xml::discover(candidate)?;
             let matching = items
@@ -408,10 +413,10 @@ impl Package {
                     .rels_mut()
                     .remove(item.rel_id());
             }
-            if !part_is_referenced_in(candidate, &data_part) {
+            if !part_is_referenced_in(candidate, &data_part)? {
                 candidate.remove_part(&data_part);
                 if let Some(props_part) = props_part
-                    && !part_is_referenced_in(candidate, &props_part)
+                    && !part_is_referenced_in(candidate, &props_part)?
                 {
                     candidate.remove_part(&props_part);
                 }
@@ -445,7 +450,11 @@ impl Package {
             })?
             .to_owned();
         let item = self.custom_xml_by_id(&item_id)?.ok_or_else(|| {
-            Error::PartNotFound(format!("bibliography source store item '{item_id}'"))
+            Error::refused(
+                litchi_core::edit::RefusalKind::NotFound,
+                "bibliography.lookup",
+                "the requested bibliography source store was not found",
+            )
         })?;
         Ok(Some((item_id, item.xml().to_vec())))
     }
@@ -461,7 +470,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn add_bibliography_source(
+    pub(crate) fn add_bibliography_source(
         &mut self,
         source: crate::bibliography::BibliographySourceBuilder,
     ) -> Result<String> {
@@ -492,7 +501,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn remove_bibliography_source(&mut self, tag: &str) -> Result<bool> {
+    pub(crate) fn remove_bibliography_source(&mut self, tag: &str) -> Result<bool> {
         let Some((item_id, xml)) = self.bibliography_store_item()? else {
             return Ok(false);
         };
@@ -511,16 +520,30 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn replace_bibliography_source(
+    pub(crate) fn replace_bibliography_source(
         &mut self,
         tag: &str,
         source: crate::bibliography::BibliographySourceBuilder,
     ) -> Result<()> {
         let Some((item_id, xml)) = self.bibliography_store_item()? else {
-            return Err(Error::PartNotFound(
-                "no bibliography source store exists".to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::NotFound,
+                "bibliography.replace",
+                "the requested bibliography source store was not found",
             ));
         };
+        let store = crate::bibliography::parse_bibliography_source_store(&xml)?;
+        if !store
+            .sources()
+            .iter()
+            .any(|stored| stored.tag() == Some(tag))
+        {
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::NotFound,
+                "bibliography.replace",
+                "the requested bibliography source was not found",
+            ));
+        }
         let updated = crate::bibliography::replace_source_xml(&xml, tag, &source)?;
         self.set_custom_xml(&item_id, updated.into_bytes())?;
         // Re-validate the mutated store through the read side.
@@ -536,7 +559,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn order_custom_xml(&mut self, ordered_ids: &[String]) -> Result<()> {
+    pub(crate) fn order_custom_xml(&mut self, ordered_ids: &[String]) -> Result<()> {
         self.ensure_story_opc_current("order_custom_xml")?;
         let current = main_store_order(&self.opc)?;
         validate_requested_order(&current, ordered_ids)?;
@@ -560,8 +583,9 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn custom_xml_bindings(&self) -> Result<Vec<Binding>> {
-        let limits = PackageLimits::default();
-        let stories = self.story_inventory_with_limits(limits.stories)?;
+        let limits = self.semantic_limits().content_controls_value().clone();
+        limits.validate()?;
+        let stories = self.story_inventory_bounded(limits.stories)?;
         let mut bindings = Vec::new();
         visit_bindings(
             &stories,
@@ -588,13 +612,11 @@ impl Package {
         Ok(bindings)
     }
 
-    fn refuse_signed_custom_xml_change(&self, operation: &'static str) -> Result<()> {
+    fn refuse_signed_custom_xml_change(&self, _operation: &'static str) -> Result<()> {
         if self.is_signed() {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation,
-                reason: "signed Custom XML changes require explicit Package::unsign before mutation",
-            });
+            return Err(Error::Opc(
+                litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy,
+            ));
         }
         Ok(())
     }
@@ -697,25 +719,31 @@ impl Package {
         Ok(())
     }
 
-    pub(super) fn part_is_referenced(&self, target: &PackURI) -> bool {
+    pub(super) fn part_is_referenced(&self, target: &PackURI) -> Result<bool> {
         part_is_referenced_in(&self.opc, target)
     }
 }
 
-fn part_is_referenced_in(package: &OpcPackage, target: &PackURI) -> bool {
-    package.rels().iter().any(|relationship| {
-        !relationship.is_external()
-            && relationship
-                .target_partname()
-                .is_ok_and(|part| &part == target)
-    }) || package.iter_parts().any(|part| {
-        part.rels().iter().any(|relationship| {
-            !relationship.is_external()
-                && relationship
-                    .target_partname()
-                    .is_ok_and(|part| &part == target)
-        })
-    })
+fn part_is_referenced_in(package: &OpcPackage, target: &PackURI) -> Result<bool> {
+    for relationship in package.rels().iter() {
+        if !relationship.is_external() {
+            let part = relationship.target_partname()?;
+            if &part == target {
+                return Ok(true);
+            }
+        }
+    }
+    for part in package.iter_parts() {
+        for relationship in part.rels().iter() {
+            if !relationship.is_external() {
+                let target_part = relationship.target_partname()?;
+                if &target_part == target {
+                    return Ok(true);
+                }
+            }
+        }
+    }
+    Ok(false)
 }
 
 fn visit_bindings(
@@ -730,7 +758,7 @@ fn visit_bindings(
 ) -> Result<()> {
     let mut controls = 0usize;
     for story in stories.stories() {
-        let inventory = Inventory::parse_with_limits(story.source(), &limits.controls)?;
+        let inventory = Inventory::parse(story.source(), &limits.controls)?;
         controls = controls
             .checked_add(inventory.occurrences().len())
             .ok_or_else(|| Error::InvalidFormat("content-control count overflow".into()))?;
@@ -761,15 +789,23 @@ fn unique_store(package: &OpcPackage, id: &str) -> Result<CustomXmlItem> {
         }
         if let Some(current) = &found {
             if current.part() != item.part() {
-                return Err(Error::InvalidFormat(format!(
-                    "Custom XML itemID '{id}' is ambiguous"
-                )));
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedTarget,
+                    "custom_xml.lookup",
+                    "the Custom XML item ID is ambiguous",
+                ));
             }
         } else {
             found = Some(item);
         }
     }
-    found.ok_or_else(|| Error::PartNotFound(format!("Custom XML itemID '{id}'")))
+    found.ok_or_else(|| {
+        Error::refused(
+            litchi_core::edit::RefusalKind::NotFound,
+            "custom_xml.lookup",
+            "the requested Custom XML data store was not found",
+        )
+    })
 }
 
 fn ensure_store_absent(package: &OpcPackage, id: &str) -> Result<()> {
@@ -777,9 +813,11 @@ fn ensure_store_absent(package: &OpcPackage, id: &str) -> Result<()> {
         item.props()
             .is_some_and(|props| props.id.eq_ignore_ascii_case(id))
     }) {
-        return Err(Error::InvalidFormat(format!(
-            "Custom XML itemID '{id}' already exists"
-        )));
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedTarget,
+            "custom_xml.insert",
+            "the Custom XML item ID is already occupied",
+        ));
     }
     Ok(())
 }

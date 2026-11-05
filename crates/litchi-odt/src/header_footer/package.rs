@@ -2,7 +2,7 @@
 
 use super::codec::parse_page_layout_header_footer_properties;
 use super::model::Properties;
-use crate::{FlatDocument, Package};
+use crate::{FlatDocument, GenericPackage as Package};
 use litchi_core::Result;
 
 impl Package {
@@ -13,7 +13,9 @@ impl Package {
     /// publication remains an explicit caller step so a layout patch cannot
     /// silently invalidate a signed or encrypted container.
     pub fn layout_snapshot(&self) -> Result<Option<super::Snapshot>> {
-        self.styles_xml()?.map(super::Snapshot::parse).transpose()
+        self.styles_xml()?
+            .map(|xml| super::Snapshot::parse(xml, self.xml_limits_value()))
+            .transpose()
     }
 
     pub fn page_layout_header_footer_properties(&self) -> Result<Vec<Properties>> {
@@ -27,7 +29,7 @@ impl Package {
 impl FlatDocument {
     /// Capture this flat document's advanced-layout owner for isolated edits.
     pub fn layout_snapshot(&self) -> Result<super::Snapshot> {
-        super::Snapshot::parse(self.xml().to_string())
+        super::Snapshot::parse(self.xml().to_string(), self.xml_limits_value())
     }
 
     pub fn page_layout_header_footer_properties(&self) -> Result<Vec<Properties>> {

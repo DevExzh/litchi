@@ -3,15 +3,15 @@ use crate::writer::comments::CommentEntry;
 use crate::writer::core::{
     codec,
     model::{
-        CharacterFormatting, CommentStoryData, ParagraphFormatting, TextStream, WriteError, Writer,
-        pack_dttm, utf16_code_unit_len,
+        Builder, CharacterFormatting, CommentStoryData, ParagraphFormatting, TextStream,
+        WriteError, pack_dttm, utf16_code_unit_len,
     },
 };
 use crate::writer::fib::FibBuilder;
 use crate::writer::font_table::FontTableBuilder;
 use crate::writer::piece_table::Piece;
 use std::collections::HashMap;
-impl Writer {
+impl Builder {
     /// Append the comment subdocument and build its owner, reference, and text tables.
     #[allow(
         clippy::too_many_arguments,

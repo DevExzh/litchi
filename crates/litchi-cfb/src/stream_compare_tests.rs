@@ -24,7 +24,7 @@ use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
 use crate::file::CandidateBytes;
-use crate::{OleError, OleFile, writer::OleWriter};
+use crate::{OleError, OleFile, OleFileLimits, writer::OleWriter};
 
 const MAGIC: &[u8; 8] = b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1";
 const MAX_FIXTURE_BYTES: u64 = 48 * 1024 * 1024;
@@ -76,7 +76,7 @@ fn expectations(actual: &[u8]) -> Vec<Vec<u8>> {
 /// Holds every stream of `file` to the readback verdict; returns how many
 /// expectations were compared.
 fn agree_on_every_stream(label: &str, file: &[u8]) -> usize {
-    let Ok(mut first) = OleFile::open(Cursor::new(file)) else {
+    let Ok(mut first) = OleFile::open(Cursor::new(file), OleFileLimits::default()) else {
         return 0;
     };
     let mut cases = Vec::new();
@@ -89,7 +89,7 @@ fn agree_on_every_stream(label: &str, file: &[u8]) -> usize {
     }
     // A fresh reader, whose mini-stream cache starts empty as a comparer's
     // root load does, answers the readback in order.
-    let mut reader = OleFile::open(Cursor::new(file)).unwrap();
+    let mut reader = OleFile::open(Cursor::new(file), OleFileLimits::default()).unwrap();
     let readback: Vec<Verdict> = cases
         .iter()
         .map(|(path, expected)| {
@@ -295,7 +295,7 @@ fn many_mini_streams(sector_size: usize, count: usize, size: usize) -> (Vec<u8>,
 fn the_root_mini_stream_is_loaded_once_and_each_contiguous_stream_compared_once() {
     for sector_size in [512, 4096] {
         let (file, payloads) = many_mini_streams(sector_size, 300, 2_000);
-        let reader = OleFile::open(Cursor::new(file.as_slice())).unwrap();
+        let reader = OleFile::open(Cursor::new(file.as_slice()), OleFileLimits::default()).unwrap();
         let candidate = Counting::new(&file, 0);
         let mut comparer = reader.stream_comparer(&candidate);
         let mut root_checks = None;
@@ -321,7 +321,7 @@ fn the_root_mini_stream_is_loaded_once_and_each_contiguous_stream_compared_once(
 #[test]
 fn a_failed_root_load_is_not_kept_and_is_repeated_like_open_stream() {
     let (file, payloads) = many_mini_streams(512, 3, 700);
-    let reader = OleFile::open(Cursor::new(file.as_slice())).unwrap();
+    let reader = OleFile::open(Cursor::new(file.as_slice()), OleFileLimits::default()).unwrap();
     // The first readability check fails once: the first mini stream reports
     // the error, and the next mini stream loads the root again, successfully.
     let candidate = Counting::new(&file, 1);

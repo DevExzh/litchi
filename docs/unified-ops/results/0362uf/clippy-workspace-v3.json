@@ -1,0 +1,37 @@
+{
+  "source": "355cfe414118f0a76dc907a33893e938bfb0bebe",
+  "pid": 2095118,
+  "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration",
+  "command": [
+    "python3",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/run-semantic-checks-disk-guarded.py",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/clippy-workspace-v2-commands.json",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/clippy-workspace-v3"
+  ],
+  "started_unix_seconds": 1792768686.4571822,
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--keep-going",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 101,
+      "seconds": 275.4196580170028,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/clippy-workspace-v3/check-0.log",
+      "bytes": 35425,
+      "sha256": "cfdaf7c207148f82599774af1a3409b34bba4506f5e50af704683a1d5cd6be4f",
+      "target_bytes_before": 18981820606,
+      "completed_test_executables_pruned": []
+    }
+  ],
+  "note": "Broad workspace all-target/all-feature Clippy stopped on XLSX, DOCX and XLSB production/test lints. Whole diagnosed batch assigned; no full gate pass."
+}

@@ -12,6 +12,7 @@ const MAXIMUM_LABEL_AFFIX_BYTES: usize = 4 * 1_024;
 
 /// Validation failures for fixed chart decimal places.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     /// The requested number exceeds the native inspector range.
     #[error("chart decimal places {value} must not exceed {maximum}")]

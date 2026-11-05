@@ -1,48 +1,20 @@
-use litchi_cfb::OleWriter;
 use litchi_xls::Error;
-use litchi_xls::chart::{Chart, Editor, Limits, Location, Selector, build_workbook};
-use std::io::Cursor;
+use litchi_xls::builder::Chart;
+use litchi_xls::chart::{Limits, Location, Selector, build_workbook};
 
-fn record(kind: u16, data: &[u8]) -> Vec<u8> {
-    let mut out = kind.to_le_bytes().to_vec();
-    out.extend((data.len() as u16).to_le_bytes());
-    out.extend(data);
-    out
-}
-fn bof(kind: u16) -> Vec<u8> {
-    let mut d = Vec::new();
-    d.extend(0x0600u16.to_le_bytes());
-    d.extend(kind.to_le_bytes());
-    d.extend([0; 12]);
-    record(0x0809, &d)
-}
-fn workbook_with(records: &[u8]) -> Vec<u8> {
-    let mut globals = bof(5);
-    let bound_at = globals.len();
-    let mut bound = vec![0; 8];
-    bound[6] = 1;
-    bound.extend(b"S");
-    globals.extend(record(0x0085, &bound));
-    globals.extend(record(0x000a, &[]));
-    let offset = globals.len() as u32;
-    globals[bound_at + 4..bound_at + 8].copy_from_slice(&offset.to_le_bytes());
-    globals.extend(bof(0x0010));
-    globals.extend(records);
-    globals.extend(record(0x000a, &[]));
-    let mut writer = OleWriter::new();
-    writer.create_stream(&["Workbook"], &globals).unwrap();
-    let mut out = Cursor::new(Vec::new());
-    writer.write_to(&mut out).unwrap();
-    out.into_inner()
-}
 fn workbook() -> Vec<u8> {
-    workbook_with(&[])
+    // A complete workbook with the one worksheet `S`, which the package-level
+    // chart family opens.
+    let mut builder = litchi_xls::Builder::new();
+    builder.add_worksheet("S").unwrap();
+    builder.build().unwrap().to_bytes().unwrap()
 }
 
 fn assert_unsupported<T>(result: Result<T, Error>) {
     match result {
-        Err(Error::Graph(litchi_ograph::Error::UnsupportedAuthoring { reason })) => {
-            assert!(!reason.is_empty());
+        Err(Error::Refused(refusal)) => {
+            assert_eq!(refusal.operation(), "author");
+            assert!(!refusal.reason().is_empty());
         },
         Err(error) => panic!("expected typed unsupported-authoring error, found {error}"),
         Ok(_) => panic!("incomplete chart authoring unexpectedly succeeded"),
@@ -51,9 +23,9 @@ fn assert_unsupported<T>(result: Result<T, Error>) {
 
 fn assert_unsupported_mutation<T>(result: Result<T, Error>) {
     match result {
-        Err(Error::Graph(litchi_ograph::Error::UnsupportedMutation { operation, reason })) => {
-            assert!(!operation.is_empty());
-            assert!(!reason.is_empty());
+        Err(Error::Refused(refusal)) => {
+            assert!(!refusal.operation().is_empty());
+            assert!(!refusal.reason().is_empty());
         },
         Err(error) => panic!("expected typed unsupported-mutation error, found {error}"),
         Ok(_) => panic!("unsafe embedded chart mutation unexpectedly succeeded"),
@@ -64,23 +36,38 @@ fn assert_unsupported_mutation<T>(result: Result<T, Error>) {
 fn public_fresh_and_replacement_authoring_is_typed_and_atomic() {
     let original = workbook();
 
-    let mut editor = Editor::open(original.clone(), Limits::default()).unwrap();
+    let mut editor = litchi_xls::Package::from_bytes(&original.clone())
+        .unwrap()
+        .edit_charts()
+        .unwrap();
     assert_unsupported(editor.add("S", Chart::default()));
-    assert_eq!(editor.finish().unwrap(), original);
+    assert_eq!(editor.commit().unwrap().patch().after().to_vec(), original);
 
-    let mut editor = Editor::open(original.clone(), Limits::default()).unwrap();
+    let mut editor = litchi_xls::Package::from_bytes(&original.clone())
+        .unwrap()
+        .edit_charts()
+        .unwrap();
     assert_unsupported(editor.insert_at(0, 1, 0, Chart::default()));
-    assert_eq!(editor.finish().unwrap(), original);
+    assert_eq!(editor.commit().unwrap().patch().after().to_vec(), original);
 
-    let mut editor = Editor::open(original.clone(), Limits::default()).unwrap();
+    let mut editor = litchi_xls::Package::from_bytes(&original.clone())
+        .unwrap()
+        .edit_charts()
+        .unwrap();
     assert_unsupported(editor.add_sheet("Chart", Chart::default()));
-    assert_eq!(editor.finish().unwrap(), original);
+    assert_eq!(editor.commit().unwrap().patch().after().to_vec(), original);
 
-    let mut editor = Editor::open(original.clone(), Limits::default()).unwrap();
+    let mut editor = litchi_xls::Package::from_bytes(&original.clone())
+        .unwrap()
+        .edit_charts()
+        .unwrap();
     assert_unsupported(editor.insert_sheet_at(1, "Chart", Chart::default()));
-    assert_eq!(editor.finish().unwrap(), original);
+    assert_eq!(editor.commit().unwrap().patch().after().to_vec(), original);
 
-    let mut editor = Editor::open(original.clone(), Limits::default()).unwrap();
+    let mut editor = litchi_xls::Package::from_bytes(&original.clone())
+        .unwrap()
+        .edit_charts()
+        .unwrap();
     assert_unsupported(editor.replace(
         Selector::Embedded {
             sheet: "S",
@@ -88,9 +75,12 @@ fn public_fresh_and_replacement_authoring_is_typed_and_atomic() {
         },
         Chart::default(),
     ));
-    assert_eq!(editor.finish().unwrap(), original);
+    assert_eq!(editor.commit().unwrap().patch().after().to_vec(), original);
 
-    let mut editor = Editor::open(original.clone(), Limits::default()).unwrap();
+    let mut editor = litchi_xls::Package::from_bytes(&original.clone())
+        .unwrap()
+        .edit_charts()
+        .unwrap();
     assert_unsupported(editor.replace_at(
         &Location::Embedded {
             sheet_index: 0,
@@ -98,7 +88,7 @@ fn public_fresh_and_replacement_authoring_is_typed_and_atomic() {
         },
         Chart::default(),
     ));
-    assert_eq!(editor.finish().unwrap(), original);
+    assert_eq!(editor.commit().unwrap().patch().after().to_vec(), original);
 
     assert_unsupported(build_workbook(Chart::default(), Limits::default()));
 }
@@ -106,12 +96,18 @@ fn public_fresh_and_replacement_authoring_is_typed_and_atomic() {
 #[test]
 fn clean_inventory_replay_and_existing_sheet_reorder_remain_available() {
     let original = workbook();
-    let mut editor = Editor::open(original.clone(), Limits::default()).unwrap();
-    assert_eq!(editor.charts().len(), 0);
+    let mut editor = litchi_xls::Package::from_bytes(&original.clone())
+        .unwrap()
+        .edit_charts()
+        .unwrap();
+    assert_eq!(editor.charts().unwrap().len(), 0);
     editor.reorder_sheets(&["S"]).unwrap();
-    let finished = editor.finish().unwrap();
-    let reopened = Editor::open(finished, Limits::default()).unwrap();
-    assert_eq!(reopened.charts().len(), 0);
+    let finished = editor.commit().unwrap().patch().after().to_vec();
+    let mut reopened = litchi_xls::Package::from_bytes(&finished)
+        .unwrap()
+        .edit_charts()
+        .unwrap();
+    assert_eq!(reopened.charts().unwrap().len(), 0);
 }
 
 #[test]
@@ -119,9 +115,12 @@ fn real_embedded_chart_mutations_are_typed_atomic_refusals() {
     let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/ole/xls/WithThreeCharts.xls");
     let original = std::fs::read(path).unwrap();
-    let inventory = Editor::open(original.clone(), Limits::default())
+    let inventory = litchi_xls::Package::from_bytes(&original.clone())
+        .unwrap()
+        .edit_charts()
         .expect("bundled POI three-chart fixture must remain readable")
         .charts()
+        .unwrap()
         .map(|entry| entry.location.clone())
         .collect::<Vec<_>>();
     let (sheet_index, object_ids) = inventory
@@ -148,7 +147,10 @@ fn real_embedded_chart_mutations_are_typed_atomic_refusals() {
         })
         .expect("fixture must contain two embedded charts on one worksheet");
 
-    let mut editor = Editor::open(original.clone(), Limits::default()).unwrap();
+    let mut editor = litchi_xls::Package::from_bytes(&original.clone())
+        .unwrap()
+        .edit_charts()
+        .unwrap();
     let first_object_id = object_ids
         .first()
         .copied()
@@ -157,17 +159,23 @@ fn real_embedded_chart_mutations_are_typed_atomic_refusals() {
         sheet_index,
         object_id: first_object_id,
     }));
-    assert_eq!(editor.finish().unwrap(), original);
+    assert_eq!(editor.commit().unwrap().patch().after().to_vec(), original);
 
     let mut reversed = object_ids.clone();
     reversed.reverse();
-    let mut editor = Editor::open(original.clone(), Limits::default()).unwrap();
+    let mut editor = litchi_xls::Package::from_bytes(&original.clone())
+        .unwrap()
+        .edit_charts()
+        .unwrap();
     assert_unsupported_mutation(editor.reorder_at(sheet_index, &reversed));
-    assert_eq!(editor.finish().unwrap(), original);
+    assert_eq!(editor.commit().unwrap().patch().after().to_vec(), original);
 
-    let mut editor = Editor::open(original.clone(), Limits::default()).unwrap();
+    let mut editor = litchi_xls::Package::from_bytes(&original.clone())
+        .unwrap()
+        .edit_charts()
+        .unwrap();
     editor.reorder_at(sheet_index, &object_ids).unwrap();
-    assert_eq!(editor.finish().unwrap(), original);
+    assert_eq!(editor.commit().unwrap().patch().after().to_vec(), original);
 }
 
 #[test]
@@ -180,14 +188,24 @@ fn bundled_poi_and_libreoffice_chart_fixtures_are_strictly_gated() {
         root.join("test-data/libreoffice-core/chart2/qa/extras/data/xls/chart.xls"),
     ] {
         let original = std::fs::read(&path).unwrap();
-        match Editor::open(original.clone(), Limits::default()) {
-            Ok(editor) => {
-                let count = editor.charts().len();
-                let finished = editor.finish().expect("finish clean fixture editor");
+        match litchi_xls::Package::from_bytes(&original.clone())
+            .unwrap()
+            .edit_charts()
+        {
+            Ok(mut editor) => {
+                let count = editor.charts().unwrap().len();
+                let finished = editor
+                    .commit()
+                    .expect("finish clean fixture editor")
+                    .patch()
+                    .after()
+                    .to_vec();
                 assert_eq!(finished, original, "clean finish must preserve exact bytes");
-                let reopened =
-                    Editor::open(finished, Limits::default()).expect("reopen clean fixture editor");
-                assert_eq!(reopened.charts().len(), count);
+                let mut reopened = litchi_xls::Package::from_bytes(&finished)
+                    .unwrap()
+                    .edit_charts()
+                    .expect("reopen clean fixture editor");
+                assert_eq!(reopened.charts().unwrap().len(), count);
             },
             Err(_) => assert_eq!(std::fs::read(&path).unwrap(), original),
         }

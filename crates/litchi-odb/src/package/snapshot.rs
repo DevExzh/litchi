@@ -34,28 +34,98 @@ pub(crate) struct PackageDelta {
 }
 
 impl Snapshot {
-    pub(crate) fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Package::open(path, MIMETYPE, BODY_MARKER, "ODB").and_then(Self::validated)
+    /// The retained physical package (metadata transactions, record 0288).
+    pub(crate) fn owned_package(&self) -> &OwnedPackage {
+        self.0.package.package()
     }
 
-    pub(crate) fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Package::from_bytes(bytes, MIMETYPE, BODY_MARKER, "ODB").and_then(Self::validated)
+    pub(crate) fn open_with_options(
+        path: impl AsRef<Path>,
+        options: litchi_odf_common::OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        Ok(Self::validated(Package::open_with_options(
+            path,
+            options,
+            MIMETYPE,
+            BODY_MARKER,
+            "ODB",
+        )?)?)
     }
 
-    pub(crate) fn from_bytes_with_password(
-        bytes: Vec<u8>,
-        password: impl Into<String>,
-    ) -> Result<Self> {
-        Package::from_bytes_with_password(bytes, password, MIMETYPE, BODY_MARKER, "ODB")
-            .and_then(Self::validated)
-    }
-
-    pub(crate) fn open_with_password(
+    pub(crate) fn open_with_password_and_options(
         path: impl AsRef<Path>,
         password: impl Into<String>,
-    ) -> Result<Self> {
-        Package::open_with_password(path, password, MIMETYPE, BODY_MARKER, "ODB")
-            .and_then(Self::validated)
+        options: litchi_odf_common::OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        Ok(Self::validated(Package::open_with_password_and_options(
+            path,
+            password,
+            options,
+            MIMETYPE,
+            BODY_MARKER,
+            "ODB",
+        )?)?)
+    }
+
+    pub(crate) fn from_bytes_with_options(
+        bytes: Vec<u8>,
+        options: litchi_odf_common::OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        Ok(Self::validated(Package::from_bytes_with_options(
+            bytes,
+            options,
+            MIMETYPE,
+            BODY_MARKER,
+            "ODB",
+        )?)?)
+    }
+
+    pub(crate) fn from_bytes_with_password_and_options(
+        bytes: Vec<u8>,
+        password: impl Into<String>,
+        options: litchi_odf_common::OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        Ok(Self::validated(
+            Package::from_bytes_with_password_and_options(
+                bytes,
+                password,
+                options,
+                MIMETYPE,
+                BODY_MARKER,
+                "ODB",
+            )?,
+        )?)
+    }
+
+    pub(crate) fn from_reader_with_options(
+        reader: impl std::io::Read,
+        options: litchi_odf_common::OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        Ok(Self::validated(Package::from_reader_with_options(
+            reader,
+            options,
+            MIMETYPE,
+            BODY_MARKER,
+            "ODB",
+        )?)?)
+    }
+
+    pub(crate) fn from_owned_package_with_options(
+        archive: OwnedPackage,
+        options: litchi_odf_common::OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        Ok(Self::validated(Package::from_owned_package_with_options(
+            archive,
+            options,
+            MIMETYPE,
+            BODY_MARKER,
+            "ODB",
+        )?)?)
+    }
+
+    /// Reopen bytes this crate published (default limits).
+    pub(crate) fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
+        Package::from_bytes(bytes, MIMETYPE, BODY_MARKER, "ODB").and_then(Self::validated)
     }
 
     fn validated(package: Package) -> Result<Self> {
@@ -77,6 +147,10 @@ impl Snapshot {
 
     pub(crate) fn as_bytes(&self) -> &[u8] {
         self.0.package.as_bytes()
+    }
+
+    pub(crate) fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
+        self.0.package.tolerance_report()
     }
 
     pub(crate) fn files(&self) -> Result<Vec<String>> {
@@ -213,7 +287,11 @@ impl Snapshot {
     ) -> crate::ComponentTransferSupport {
         let requires_provenance = additions.iter().any(|addition| {
             is_xml_member(&addition.path, &addition.media_type)
-                && litchi_odf_common::compact_xml::validate(&addition.bytes).is_err()
+                && litchi_odf_common::compact_xml::validate(
+                    &addition.bytes,
+                    litchi_odf_common::compact_xml::Limits::default(),
+                )
+                .is_err()
         });
         if requires_provenance {
             crate::ComponentTransferSupport::Refused(
@@ -382,13 +460,6 @@ impl Snapshot {
         &self,
     ) -> Result<Vec<litchi_odf_common::signature::SignatureVerification>> {
         self.0.package.package().verify_document_signatures()
-    }
-
-    pub(crate) fn into_bytes(self) -> Vec<u8> {
-        match Arc::try_unwrap(self.0) {
-            Ok(state) => state.package.into_bytes(),
-            Err(state) => state.package.as_bytes().to_vec(),
-        }
     }
 
     pub(crate) fn rebuild_with_content(&self, content: &str) -> Result<Self> {

@@ -1,0 +1,7 @@
+  odg   cross_page_move  leaf     1509.3 µs  unified     1511.9 µs  ratio 1.002
+  odb        query_move  leaf      239.7 µs  unified      240.6 µs  ratio 1.004
+  odc       series_swap  leaf      164.3 µs  unified      166.5 µs  ratio 1.013
+  odf      element_move  leaf      163.9 µs  unified      164.9 µs  ratio 1.006
+ fodt              open  leaf      526.5 µs  unified      531.0 µs  ratio 1.008
+ fodt     paragraph_set  leaf      963.0 µs  unified      965.1 µs  ratio 1.002
+{"rows":[{"format":"odg","leaf_us":1509.27745,"ratio_unified_leaf":1.001733644135477,"scenario":"cross_page_move","unified_us":1511.894},{"format":"odb","leaf_us":239.6637,"ratio_unified_leaf":1.004028353063063,"scenario":"query_move","unified_us":240.62914999999998},{"format":"odc","leaf_us":164.3398,"ratio_unified_leaf":1.01305252896742,"scenario":"series_swap","unified_us":166.48485},{"format":"odf","leaf_us":163.8958,"ratio_unified_leaf":1.005890938022817,"scenario":"element_move","unified_us":164.8613},{"format":"fodt","leaf_us":526.5350999999999,"ratio_unified_leaf":1.0084837649000038,"scenario":"open","unified_us":531.0020999999999},{"format":"fodt","leaf_us":962.9962499999999,"ratio_unified_leaf":1.0021651174654107,"scenario":"paragraph_set","unified_us":965.08125}]}

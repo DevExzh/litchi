@@ -20,7 +20,7 @@
 //! };
 //! use litchi_core::Position;
 //!
-//! # fn insert(package: &mut litchi_docx::Package) -> Result<(), Box<dyn std::error::Error>> {
+//! # fn insert(package: &litchi_docx::Package) -> Result<(), Box<dyn std::error::Error>> {
 //! let payload = Draft::default()
 //!     .context(ContextDraft::new(ContextKind::InkDrawing).with_xml_id("ctx")?)?
 //!     .brush(BrushDraft::new("brush")?)?
@@ -30,7 +30,8 @@
 //! let mut edit = package.edit_ink()?;
 //! edit.insert(Destination::main(Position::new(0)), payload,
 //!     Style::Base(BaseProfile::InkContent))?;
-//! package.publish_ink_edit(edit)?;
+//! let commit = edit.commit()?;
+//! assert!(commit.diagnostics().changed());
 //! # Ok(())
 //! # }
 //! ```
@@ -39,6 +40,7 @@ mod authoring;
 mod codec;
 mod graph;
 mod host;
+mod limit;
 mod model;
 pub(crate) mod package;
 mod placement;
@@ -51,11 +53,19 @@ pub use authoring::{
     HorizontalRelativeFrom, ImageDimensions, ImageType, Placement, Point, Style, VerticalAlignment,
     VerticalPosition, VerticalRelativeFrom, WrapMode,
 };
+pub use litchi_drawingml::ink::builder::{
+    AuthoringLimits, BrushDraft, BrushPropertyDraft, ContextDraft, Draft, TraceDraft,
+};
 pub use litchi_drawingml::ink::{
-    AuthoringLimits, BrushDraft, BrushPropertyDraft, BrushPropertyName, ContextDraft, ContextKind,
-    Draft, EffectiveBrushProperty, Guid, InkEffect, Prepared, SemanticType, TraceDraft,
+    BrushPropertyName, ContextKind, EffectiveBrushProperty, Guid, InkEffect, Prepared, SemanticType,
 };
 pub use model::{Annotation, BrushProperty, Context, Limits, Location, Snapshot};
-pub use transaction::{Commit, Destination, Edit, EditLimits, Patch};
+pub use transaction::{Commit, Destination, Diagnostics, Edit, EditOptions, Patch};
+
+/// Error of the ink family: the crate error. Ink budget refusals are
+/// [`crate::Error::InkLimit`], which carries the exceeded [`LimitKind`].
+pub type Error = crate::Error;
+
+pub use limit::LimitKind;
 
 pub(crate) const CONTENT_TYPE: &str = "application/inkml+xml";

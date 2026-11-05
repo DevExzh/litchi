@@ -7,12 +7,13 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
-use litchi_rtf::{RtfDocument, RtfWriter, StyleType};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{StyleType, write::Writer};
 use std::fs;
 
-fn write_stylesheet(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write_stylesheet(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    let mut writer = RtfWriter::new(&mut output);
+    let mut writer = Writer::new(&mut output);
     writer.write_document_header().unwrap();
     writer.write_stylesheet(document.stylesheet()).unwrap();
     writer.write_str("}").unwrap();
@@ -21,16 +22,19 @@ fn write_stylesheet(document: &RtfDocument<'_>) -> Vec<u8> {
 
 #[test]
 fn parses_implicit_normal_all_types_list_metadata_and_round_trips() {
-    let document = RtfDocument::parse(concat!(
-        r#"{\rtf1\ansi\ansicpg1250\uc2{\stylesheet"#,
-        r#"{\b\fs22\snext0 Normal;}"#,
-        r#"{\s1\i\sbasedon0\snext1\slink2\spriority9\styrsid42 Heading \u268?x;}"#,
-        r#"{\*\cs2\additive\sbasedon0\slink1 Emphasis;}"#,
-        r#"{\*\ds3 Section;}"#,
-        r#"{\*\ts4 Table;}"#,
-        r#"{\s5\ls4\ilvl2 List;}"#,
-        r#"}Body}"#,
-    ))
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1\ansi\ansicpg1250\uc2{\stylesheet"#,
+            r#"{\b\fs22\snext0 Normal;}"#,
+            r#"{\s1\i\sbasedon0\snext1\slink2\spriority9\styrsid42 Heading \u268?x;}"#,
+            r#"{\*\cs2\additive\sbasedon0\slink1 Emphasis;}"#,
+            r#"{\*\ds3 Section;}"#,
+            r#"{\*\ts4 Table;}"#,
+            r#"{\s5\ls4\ilvl2 List;}"#,
+            r#"}Body}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     let sheet = document.stylesheet();
     assert_eq!(sheet.styles().len(), 6);
@@ -76,7 +80,11 @@ fn parses_implicit_normal_all_types_list_metadata_and_round_trips() {
         vec![0, 1]
     );
 
-    let reparsed = RtfDocument::parse_bytes(&write_stylesheet(&document)).unwrap();
+    let reparsed = Tree::parse_bytes(
+        &write_stylesheet(&document),
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(reparsed.stylesheet(), sheet);
 }
 
@@ -98,7 +106,10 @@ fn rejects_malformed_scope_order_duplicates_cycles_and_bounds() {
         r"{\rtf1{\stylesheet{\s1\spriority100 A;}}}",
         r"{\rtf1{\stylesheet{\s1\styrsid-1 A;}}}",
     ] {
-        assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
+        assert!(
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted {source}"
+        );
     }
 }
 
@@ -115,7 +126,7 @@ fn parses_real_libreoffice_stylesheet_types_and_implicit_normal() {
     );
     for fixture in FIXTURES {
         let bytes = fs::read(format!("{root}/{fixture}")).unwrap();
-        let document = RtfDocument::parse_bytes(&bytes)
+        let document = Tree::parse_bytes(&bytes, litchi_rtf::read::OpenOptions::default())
             .unwrap_or_else(|error| panic!("failed to parse {fixture}: {error}"));
         let sheet = document.stylesheet();
         assert_eq!(
@@ -134,7 +145,11 @@ fn parses_real_libreoffice_stylesheet_types_and_implicit_normal() {
                 .iter()
                 .any(|style| style.style_type == StyleType::Table)
         );
-        let reparsed = RtfDocument::parse_bytes(&write_stylesheet(&document)).unwrap();
+        let reparsed = Tree::parse_bytes(
+            &write_stylesheet(&document),
+            litchi_rtf::read::OpenOptions::default(),
+        )
+        .unwrap();
         assert_eq!(reparsed.stylesheet(), sheet);
     }
 }

@@ -1,13 +1,14 @@
 //! Regression coverage for ordinal semantic paragraph queries.
 
 use litchi_core::Position;
-use litchi_doc::Package;
-use litchi_doc::writer::{CharacterFormatting, Writer};
+use litchi_doc::builder::Builder;
+use litchi_doc::raw::Reader;
+use litchi_doc::writer::CharacterFormatting;
 use std::io::Cursor;
 
 #[test]
 fn paragraph_at_matches_materialized_paragraphs_and_preserves_runs() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("first").unwrap();
     writer
         .add_paragraph_runs(
@@ -33,8 +34,8 @@ fn paragraph_at_matches_materialized_paragraphs_and_preserves_runs() {
     writer.add_paragraph("third").unwrap();
 
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
-    let mut package = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(output.into_inner())).unwrap();
     let document = package.document().unwrap();
     let materialized = document.paragraphs().unwrap();
 

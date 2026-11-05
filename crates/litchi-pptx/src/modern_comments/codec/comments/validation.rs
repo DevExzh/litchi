@@ -9,7 +9,11 @@ pub(super) fn validate_model(value: &List) -> Result<()> {
     validate_prefix(&value.root_prefix)?;
     validate_namespaces(&value.namespace_declarations, Some(&value.root_prefix))?;
     if value.comments.len() > MAX_COMMENTS {
-        return Err(limit("modern comments"));
+        return Err(limit(
+            crate::error::CodecLimitKind::CommentEntries,
+            value.comments.len(),
+            MAX_COMMENTS,
+        ));
     }
     let mut replies = 0usize;
     for comment in &value.comments {
@@ -33,15 +37,27 @@ pub(super) fn validate_model(value: &List) -> Result<()> {
         if !comment.reply_list_present && !comment.replies.is_empty() {
             return Err(invalid("modern comment replies require replyLst presence"));
         }
-        replies = replies
-            .checked_add(comment.replies.len())
-            .ok_or_else(|| limit("modern comment replies"))?;
+        replies = replies.checked_add(comment.replies.len()).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::CommentReplies,
+                usize::MAX,
+                MAX_REPLIES,
+            )
+        })?;
         if replies > MAX_REPLIES {
-            return Err(limit("modern comment replies"));
+            return Err(limit(
+                crate::error::CodecLimitKind::CommentReplies,
+                replies,
+                MAX_REPLIES,
+            ));
         }
         for anchor in &comment.anchors {
             if anchor.xml.len() > MAX_BYTES {
-                return Err(limit("modern comment anchor bytes"));
+                return Err(limit(
+                    crate::error::CodecLimitKind::XmlBytes,
+                    anchor.xml.len(),
+                    MAX_BYTES,
+                ));
             }
         }
         validate_fragment(comment.text_body_xml.as_deref())?;
@@ -124,7 +140,11 @@ fn validate_optional_string(value: Option<&str>) -> Result<()> {
 
 fn validate_fragment(value: Option<&[u8]>) -> Result<()> {
     if value.is_some_and(|value| value.len() > MAX_BYTES) {
-        Err(limit("modern Comment opaque fragment bytes"))
+        Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            value.map_or(0, <[u8]>::len),
+            MAX_BYTES,
+        ))
     } else {
         Ok(())
     }
@@ -134,7 +154,11 @@ pub(super) fn bounded(value: &str) -> Result<()> {
     if value.len() <= MAX_STRING_BYTES {
         Ok(())
     } else {
-        Err(limit("modern Comment string bytes"))
+        Err(limit(
+            crate::error::CodecLimitKind::StringBytes,
+            value.len(),
+            MAX_STRING_BYTES,
+        ))
     }
 }
 
@@ -142,6 +166,10 @@ pub(super) fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-pub(super) fn limit(label: &str) -> Error {
-    invalid(format!("{label} exceeds implementation limit"))
+pub(super) fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }

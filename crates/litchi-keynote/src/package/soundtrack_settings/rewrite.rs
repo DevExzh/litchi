@@ -5,7 +5,7 @@ use litchi_iwa_archive::{
     package::{EntryEdit, ExactArtifacts},
 };
 use litchi_iwa_common::wire::{
-    NestedFieldEdit, NestedFieldReplacement, WireView, patch_nested_fields_batched_with_limits,
+    NestedFieldEdit, NestedFieldReplacement, WireView, patch_nested_fields_batched,
 };
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 
@@ -37,7 +37,7 @@ pub(super) fn validate_component_framing(
         return Err(Error::InvalidSource);
     }
     let snappy_limits = transaction_snappy_limits(package, budget, entry.data().len(), 2)?;
-    let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
+    let stream = SnappyStream::decompress(entry.data(), snappy_limits)
         .map_err(|error| map_transaction_snappy_error(error, budget))?;
     budget.charge_work(
         entry
@@ -48,7 +48,15 @@ pub(super) fn validate_component_framing(
     )?;
     component
         .archive()
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(
+            stream.as_bytes(),
+            package
+                .state
+                .options
+                .archive()
+                .effective_archive_limits()
+                .map_err(map_archive_error)?,
+        )
         .map_err(map_core_error)
 }
 
@@ -69,7 +77,7 @@ fn transaction_snappy_limits(
         .checked_sub(compressed_bytes)
         .map_or(0, |available| available / decoded_passes);
     if decoded_allowance == 0 {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireWork,
             observed: budget
                 .work
@@ -103,18 +111,12 @@ fn map_transaction_snappy_error(
                 | litchi_iwa_core::LimitKind::SnappyStreamBytes,
             observed,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: LimitKind::WireWork,
             observed: budget.work.saturating_add(observed) as u64,
             maximum: budget.max_work as u64,
         },
-        other @ (litchi_iwa_core::Error::InvalidArchive { .. }
-        | litchi_iwa_core::Error::InvalidLimits { .. }
-        | litchi_iwa_core::Error::Limit { .. }
-        | litchi_iwa_core::Error::HeaderCodec { .. }
-        | litchi_iwa_core::Error::Io(_)
-        | litchi_iwa_core::Error::Snappy { .. }
-        | litchi_iwa_core::Error::Allocation { .. }) => map_core_error(other),
+        other => map_core_error(other),
     }
 }
 
@@ -140,7 +142,7 @@ pub(super) fn rewrite_and_verify(
         .effective_archive_limits()
         .map_err(map_archive_error)?;
     let snappy_limits = transaction_snappy_limits(source, budget, entry.data().len(), 3)?;
-    let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
+    let stream = SnappyStream::decompress(entry.data(), snappy_limits)
         .map_err(|error| map_transaction_snappy_error(error, budget))?;
     let source_stream_len = stream.as_bytes().len();
     budget.charge_work(
@@ -150,10 +152,9 @@ pub(super) fn rewrite_and_verify(
             .checked_add(source_stream_len.saturating_mul(3))
             .ok_or(Error::InvalidSource)?,
     )?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     archive
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
         .map_err(map_core_error)?;
     drop(stream);
     let object = archive
@@ -171,7 +172,7 @@ pub(super) fn rewrite_and_verify(
     archive
         .object_mut(selection.soundtrack_identifier)
         .ok_or(Error::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             message_index,
             RawMessage {
                 type_: SOUNDTRACK_MESSAGE_TYPE,
@@ -189,15 +190,13 @@ pub(super) fn rewrite_and_verify(
             .checked_mul(3)
             .ok_or(Error::InvalidSource)?,
     )?;
-    let serialized = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
+    let serialized = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     drop(archive);
     if serialized.len() > serialized_bound {
         return Err(Error::Verification);
     }
     let serialized_len = serialized.len();
-    let compressed = SnappyStream::compress(&serialized).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&serialized, snappy_limits).map_err(map_core_error)?;
     let compressed_len = compressed.len();
     drop(serialized);
     let package_bound = source_bytes
@@ -399,7 +398,7 @@ fn rewrite_payload(
     let limits = package.wire_limits().map_err(map_wire_error)?;
     budget.charge_work(source.len())?;
     let bounded_limits = remaining_wire_limits(limits, budget)?;
-    let view = WireView::parse_with_limits(source, bounded_limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, bounded_limits).map_err(map_wire_error)?;
     budget.charge_fields(view.len())?;
     drop(view);
     let edit_fields = [
@@ -422,8 +421,8 @@ fn rewrite_payload(
         .with_fields(budget.remaining_fields())
         .and_then(|field_bounded| field_bounded.with_rewrite_work(budget.remaining_work()))
         .map_err(map_wire_error)?;
-    let output = patch_nested_fields_batched_with_limits(source, &edit_fields, bounded)
-        .map_err(map_wire_error)?;
+    let output =
+        patch_nested_fields_batched(source, &edit_fields, bounded).map_err(map_wire_error)?;
     budget.charge_work(
         source
             .len()

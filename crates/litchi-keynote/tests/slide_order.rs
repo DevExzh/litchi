@@ -1,13 +1,14 @@
 use std::io;
 use std::sync::Arc;
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_common::wire::{WireView, append_varint_field};
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsk, tsp};
 use litchi_keynote::{
-    Limits, Package, Position, ReadError, ReadOptions, SemanticLimits, SlideOrderError,
-    SlideOrderLimitKind, SlideSelector,
+    OpenOptions, Package, Position, ReadError, SemanticLimits, SlideSelector,
+    slide::order::Error as SlideOrderError, slide::order::LimitKind as SlideOrderLimitKind,
 };
 use prost::Message as _;
 
@@ -57,11 +58,15 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
 fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 #[allow(
@@ -100,7 +105,7 @@ fn fixed64_field(number: u32, value: u64) -> Vec<u8> {
 
 fn adversarial_reference(identifier_value: u64, sentinel: u64) -> TestResult<Vec<u8>> {
     let canonical = reference(identifier_value).encode_to_vec();
-    let view = WireView::parse(&canonical)?;
+    let view = WireView::parse(&canonical, litchi_iwa_common::WireLimits::DEFAULT)?;
     let identifier_field = view
         .fields()
         .find(|field| field.number() == 1)
@@ -177,7 +182,7 @@ fn raw_show(topology: Topology, noncanonical_mode: bool) -> TestResult<Vec<u8>> 
         ..Default::default()
     }
     .encode_to_vec();
-    let view = WireView::parse(&canonical)?;
+    let view = WireView::parse(&canonical, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut show = Vec::with_capacity(canonical.len().saturating_add(tree.len()));
     for field in view.fields() {
         match field.number() {
@@ -276,6 +281,7 @@ fn package_bytes_with_iwa_framing(
                 data: b"after-show-sentinel".to_vec(),
             },
         ],
+        Default::default(),
     )?;
     let mut document_objects = vec![object(1, 1, document.encode_to_vec())?, show_object];
     for (index, identifier) in NODE_IDS.into_iter().enumerate() {
@@ -317,7 +323,7 @@ fn package_bytes_with_iwa_framing(
 }
 
 fn component_with_noncanonical_object_prefix(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    let canonical = Archive { objects }.to_bytes()?;
+    let canonical = Archive { objects }.to_bytes(Default::default())?;
     let (header_length, prefix_length) = litchi_iwa_common::decode_varint_from_bytes(&canonical)?;
     if prefix_length != 1 || header_length >= 0x80 {
         return Err(io::Error::other("fixture expected a one-byte object prefix").into());
@@ -326,12 +332,12 @@ fn component_with_noncanonical_object_prefix(objects: Vec<ArchiveObject>) -> Tes
     noncanonical.push(u8::try_from(header_length)? | 0x80);
     noncanonical.push(0);
     noncanonical.extend_from_slice(&canonical[prefix_length..]);
-    Archive::parse(&noncanonical)?;
-    Ok(SnappyStream::compress(&noncanonical)?)
+    Archive::parse(&noncanonical, Default::default())?;
+    Ok(SnappyStream::compress(&noncanonical, Default::default())?)
 }
 
 fn legacy_package_bytes(flat: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(flat)?;
+    let catalog = Catalog::from_bytes(flat, Default::default())?;
     let inner_entries = catalog
         .iter()
         .filter(|entry| {
@@ -365,12 +371,12 @@ fn names(package: &Package) -> TestResult<Vec<String>> {
 }
 
 fn document_stream(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("missing synthetic document member"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn slide_reference_records(package: &[u8]) -> TestResult<Vec<Vec<u8>>> {
@@ -382,37 +388,41 @@ fn slide_reference_records(package: &[u8]) -> TestResult<Vec<Vec<u8>>> {
 
 fn slide_tree_records(package: &[u8]) -> TestResult<Vec<(u32, Vec<u8>)>> {
     let stream = document_stream(package)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let show = archive
         .object(2)
         .and_then(|object| object.messages.iter().find(|message| message.type_ == 2))
         .ok_or_else(|| io::Error::other("missing synthetic show"))?;
-    let show_view = WireView::parse(&show.data)?;
+    let show_view = WireView::parse(&show.data, litchi_iwa_common::WireLimits::DEFAULT)?;
     let tree = show_view
         .fields()
         .find(|field| field.number() == 3)
         .ok_or_else(|| io::Error::other("missing synthetic slide tree"))?;
-    Ok(WireView::parse(tree.payload())?
-        .fields()
-        .map(|field| (field.number(), field.raw().to_vec()))
-        .collect())
+    Ok(
+        WireView::parse(tree.payload(), litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .map(|field| (field.number(), field.raw().to_vec()))
+            .collect(),
+    )
 }
 
 fn show_records(package: &[u8]) -> TestResult<Vec<(u32, Vec<u8>)>> {
     let stream = document_stream(package)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let show = archive
         .object(2)
         .and_then(|object| object.messages.iter().find(|message| message.type_ == 2))
         .ok_or_else(|| io::Error::other("missing synthetic show"))?;
-    Ok(WireView::parse(&show.data)?
-        .fields()
-        .map(|field| (field.number(), field.raw().to_vec()))
-        .collect())
+    Ok(
+        WireView::parse(&show.data, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .map(|field| (field.number(), field.raw().to_vec()))
+            .collect(),
+    )
 }
 
 fn show_message_range(stream: &[u8]) -> TestResult<std::ops::Range<usize>> {
-    let archive = Archive::parse(stream)?;
+    let archive = Archive::parse(stream, Default::default())?;
     let object = archive
         .object(2)
         .ok_or_else(|| io::Error::other("missing synthetic show object"))?;
@@ -481,28 +491,34 @@ fn selectors_validate_source_before_final_destination_and_bound_one_operation() 
     let mut missing_position = package.edit_slide_order();
     assert!(matches!(
         missing_position.move_slide(Position::new(99), Position::new(99)),
-        Err(SlideOrderError::SlidePositionNotFound { position }) if position == Position::new(99)
+        Err(SlideOrderError::Refused(litchi_keynote::slide::order::Refusal::SlidePositionNotFound { position })) if position == Position::new(99)
     ));
     let mut missing_name = package.edit_slide_order();
     assert!(matches!(
         missing_name.move_slide("Missing", Position::new(99)),
-        Err(SlideOrderError::SlideNameNotFound)
+        Err(SlideOrderError::Refused(
+            litchi_keynote::slide::order::Refusal::SlideNameNotFound
+        ))
     ));
     let mut bad_destination = package.edit_slide_order();
     assert!(matches!(
         bad_destination.move_slide(0usize, Position::new(4)),
-        Err(SlideOrderError::DestinationOutOfRange { position, slide_count: 4 })
+        Err(SlideOrderError::Refused(litchi_keynote::slide::order::Refusal::DestinationOutOfRange { position, slide_count: 4 }))
             if position == Position::new(4)
     ));
     let mut one = package.edit_slide_order();
     one.move_slide(0usize, Position::new(1))?;
     assert!(matches!(
         one.move_slide(1usize, Position::new(0)),
-        Err(SlideOrderError::OperationAlreadyStaged)
+        Err(SlideOrderError::Refused(
+            litchi_keynote::slide::order::Refusal::OperationAlreadyStaged
+        ))
     ));
     assert!(matches!(
         package.edit_slide_order().commit(),
-        Err(SlideOrderError::NoStagedOperation)
+        Err(SlideOrderError::Refused(
+            litchi_keynote::slide::order::Refusal::NoStagedOperation
+        ))
     ));
 
     let ambiguous_bytes = package_bytes(Topology::Flat, ["Same", "Same", "C", "D"], false)?;
@@ -510,7 +526,9 @@ fn selectors_validate_source_before_final_destination_and_bound_one_operation() 
     let mut edit = ambiguous.edit_slide_order();
     assert!(matches!(
         edit.move_slide(SlideSelector::name("Same"), Position::new(0)),
-        Err(SlideOrderError::AmbiguousSelector)
+        Err(SlideOrderError::Refused(
+            litchi_keynote::slide::order::Refusal::AmbiguousSelector
+        ))
     ));
     Ok(())
 }
@@ -629,8 +647,8 @@ fn rewrite_permutates_complete_reference_records_and_only_one_component() -> Tes
     }
     assert_eq!(document_stream(after_bytes)?.len(), before_stream.len());
 
-    let before_catalog = Catalog::from_bytes(&bytes)?;
-    let after_catalog = Catalog::from_bytes(after_bytes)?;
+    let before_catalog = Catalog::from_bytes(&bytes, Default::default())?;
+    let after_catalog = Catalog::from_bytes(after_bytes, Default::default())?;
     let mut changed_entries = 0usize;
     for (before_entry, after_entry) in before_catalog.iter().zip(after_catalog.iter()) {
         assert_eq!(before_entry.name(), after_entry.name());
@@ -679,7 +697,12 @@ fn mutation_rejects_nonflat_or_aliased_identity_but_reader_remains_compatible() 
         let mut changed = package.edit_slide_order();
         changed.move_slide(0usize, Position::new(1))?;
         assert!(
-            matches!(changed.commit(), Err(SlideOrderError::UnsupportedTopology)),
+            matches!(
+                changed.commit(),
+                Err(SlideOrderError::Refused(
+                    litchi_keynote::slide::order::Refusal::UnsupportedTopology
+                ))
+            ),
             "{topology:?}"
         );
 
@@ -728,7 +751,9 @@ fn legacy_physical_source_allows_exact_noop_but_refuses_changed_reassembly() -> 
     changed.move_slide(0usize, Position::new(1))?;
     assert!(matches!(
         changed.commit(),
-        Err(SlideOrderError::UnsupportedSource)
+        Err(SlideOrderError::Refused(
+            litchi_keynote::slide::order::Refusal::UnsupportedSource
+        ))
     ));
     Ok(())
 }
@@ -736,14 +761,14 @@ fn legacy_physical_source_allows_exact_noop_but_refuses_changed_reassembly() -> 
 #[test]
 fn signed_int32_is_strict_and_commit_retains_read_options() -> TestResult<()> {
     let bytes = package_bytes(Topology::Flat, NAMES, false)?;
-    let options = ReadOptions::default();
+    let options = OpenOptions::default();
     let package = Package::from_bytes_with_options(&bytes, options)?;
-    assert_eq!(package.read_options(), options);
+    assert_eq!(package.options(), options);
     package.validate()?;
     let mut edit = package.edit_slide_order();
     edit.move_slide(0usize, Position::new(3))?;
     let commit = edit.commit()?;
-    assert_eq!(commit.package().read_options(), options);
+    assert_eq!(commit.package().options(), options);
 
     let bad_bytes = package_bytes(Topology::Flat, NAMES, true)?;
     let bad_package = Package::from_bytes(&bad_bytes)?;
@@ -758,19 +783,14 @@ fn signed_int32_is_strict_and_commit_retains_read_options() -> TestResult<()> {
 fn slide_limit_is_inclusive_and_typed_for_transaction_staging() -> TestResult<()> {
     let bytes = package_bytes(Topology::Flat, NAMES, false)?;
     let semantic_limits = |slides| {
-        SemanticLimits::new(
-            SemanticLimits::MAX_OBJECTS,
-            slides,
-            SemanticLimits::MAX_REFERENCES,
-            SemanticLimits::MAX_TEXT_STORAGES,
-            SemanticLimits::MAX_TEXT_FRAGMENTS,
-            SemanticLimits::MAX_TEXT_BYTES,
-        )
+        SemanticLimits::builder()
+            .max_slides(slides)
+            .and_then(|limits| limits.build())
     };
 
     let exact = Package::from_bytes_with_options(
         &bytes,
-        ReadOptions::new(Limits::default(), semantic_limits(NAMES.len())?),
+        OpenOptions::new().semantic_limits(semantic_limits(NAMES.len())?),
     )?;
     let mut exact_edit = exact.edit_slide_order();
     exact_edit.move_slide(0usize, Position::new(NAMES.len() - 1))?;
@@ -781,12 +801,12 @@ fn slide_limit_is_inclusive_and_typed_for_transaction_staging() -> TestResult<()
 
     let one_under = Package::from_bytes_with_options(
         &bytes,
-        ReadOptions::new(Limits::default(), semantic_limits(NAMES.len() - 1)?),
+        OpenOptions::new().semantic_limits(semantic_limits(NAMES.len() - 1)?),
     )?;
     let mut limited_edit = one_under.edit_slide_order();
     assert!(matches!(
         limited_edit.move_slide(0usize, Position::new(1)),
-        Err(SlideOrderError::LimitExceeded {
+        Err(SlideOrderError::Limit {
             kind: SlideOrderLimitKind::Slides,
             observed,
             maximum,
@@ -838,9 +858,9 @@ fn concurrent_edits_publish_independent_immutable_snapshots() -> TestResult<()> 
 #[test]
 fn public_slide_order_values_are_send_sync() {
     fn assert_send_sync<T: Send + Sync>() {}
-    assert_send_sync::<litchi_keynote::SlideOrderCommit>();
-    assert_send_sync::<litchi_keynote::SlideOrderPatch>();
-    assert_send_sync::<litchi_keynote::SlideOrderDiagnostics>();
+    assert_send_sync::<litchi_keynote::slide::order::Commit>();
+    assert_send_sync::<litchi_keynote::slide::order::Patch>();
+    assert_send_sync::<litchi_keynote::slide::order::Diagnostics>();
     assert_send_sync::<SlideOrderError>();
     assert_send_sync::<Arc<[u8]>>();
 }

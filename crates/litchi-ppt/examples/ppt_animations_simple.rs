@@ -3,7 +3,7 @@
     reason = "this command-line example intentionally prints its results"
 )]
 
-use litchi_ppt::Writer;
+use litchi_ppt::Builder;
 use litchi_ppt::animation::{
     AfterEffect, AnimationEffect, AnimationInfo, AnimationTrigger, BuildInfo, BuildLevel,
     BuildType, EffectDirection, EffectSpeed, IterationType,
@@ -13,8 +13,11 @@ use std::error::Error;
 fn main() -> Result<(), Box<dyn Error>> {
     println!("Creating simple PPT animation demo...");
 
-    let mut writer = Writer::new_widescreen();
-    writer.set_property("Title", "Simple Animation Demo");
+    let mut writer = Builder::new_widescreen();
+    writer.set_metadata(litchi_core::Metadata {
+        title: Some("Simple Animation Demo".to_owned()),
+        ..litchi_core::Metadata::default()
+    })?;
 
     // Slide with 4 animated shapes
     let slide = writer.add_slide()?;
@@ -104,7 +107,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     anim4.build_list = Some(build4);
     writer.set_shape_animation(slide, 4, anim4)?;
 
-    writer.save("ppt_animations_simple.ppt")?;
+    writer.build()?.save("ppt_animations_simple.ppt")?;
     println!("✅ Created ppt_animations_simple.ppt");
     println!("   Open in PowerPoint and check Animation Pane!");
 

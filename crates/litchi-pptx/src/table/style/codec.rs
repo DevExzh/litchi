@@ -186,7 +186,11 @@ fn semantic_element(
             continue;
         }
         if attributes.len() >= MAX_ATTRIBUTES {
-            return Err(limit("table-style attribute count", MAX_ATTRIBUTES));
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlAttributes,
+                attributes.len().checked_add(1).unwrap_or(usize::MAX),
+                MAX_ATTRIBUTES,
+            ));
         }
         let (namespace, local) = resolver.resolve_attribute(attribute.key);
         let namespace = resolved_namespace(&namespace)?;
@@ -201,9 +205,19 @@ fn semantic_element(
             .checked_add(namespace.len())
             .and_then(|total| total.checked_add(local.len()))
             .and_then(|total| total.checked_add(value.len()))
-            .ok_or_else(|| limit("table-style attribute bytes", MAX_ATTRIBUTE_BYTES))?;
+            .ok_or_else(|| {
+                limit(
+                    crate::error::CodecLimitKind::XmlAttributeBytes,
+                    usize::MAX,
+                    MAX_ATTRIBUTE_BYTES,
+                )
+            })?;
         if bytes > MAX_ATTRIBUTE_BYTES {
-            return Err(limit("table-style attribute bytes", MAX_ATTRIBUTE_BYTES));
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlAttributeBytes,
+                bytes,
+                MAX_ATTRIBUTE_BYTES,
+            ));
         }
         attributes
             .try_reserve(1)
@@ -285,7 +299,11 @@ pub(super) fn parse_owned(source: Vec<u8>) -> Result<List> {
 
 pub(super) fn scan(xml: &[u8]) -> Result<Parsed> {
     if xml.len() > MAX_XML_BYTES {
-        return Err(limit("table-style XML bytes", MAX_XML_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            xml.len(),
+            MAX_XML_BYTES,
+        ));
     }
     std::str::from_utf8(xml).map_err(xml_error)?;
     let mut reader = NsReader::from_reader(xml);
@@ -330,7 +348,11 @@ pub(super) fn scan(xml: &[u8]) -> Result<Parsed> {
                         .ok_or_else(|| invalid("table-style root profile is missing"))?;
                     require_drawing(&namespace, profile, element.name(), b"tblStyle")?;
                     if defs.len() >= MAX_STYLES {
-                        return Err(limit("table-style count", MAX_STYLES));
+                        return Err(limit(
+                            crate::error::CodecLimitKind::TableStyles,
+                            defs.len().checked_add(1).unwrap_or(usize::MAX),
+                            MAX_STYLES,
+                        ));
                     }
                     let (id, name, attrs) = parse_def_attrs(&element, decoder)?;
                     open = Some(OpenDef {
@@ -349,11 +371,19 @@ pub(super) fn scan(xml: &[u8]) -> Result<Parsed> {
             },
             Event::Empty(element) => {
                 bump_node(&mut nodes)?;
-                let child_depth = depth
-                    .checked_add(1)
-                    .ok_or_else(|| limit("table-style XML depth", MAX_DEPTH))?;
+                let child_depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        MAX_DEPTH,
+                    )
+                })?;
                 if child_depth > MAX_DEPTH {
-                    return Err(limit("table-style XML depth", MAX_DEPTH));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        child_depth,
+                        MAX_DEPTH,
+                    ));
                 }
                 if child_depth == 1 {
                     if saw_root || element.local_name().as_ref() != b"tblStyleLst" {
@@ -374,7 +404,11 @@ pub(super) fn scan(xml: &[u8]) -> Result<Parsed> {
                         .ok_or_else(|| invalid("table-style root profile is missing"))?;
                     require_drawing(&namespace, profile, element.name(), b"tblStyle")?;
                     if defs.len() >= MAX_STYLES {
-                        return Err(limit("table-style count", MAX_STYLES));
+                        return Err(limit(
+                            crate::error::CodecLimitKind::TableStyles,
+                            defs.len().checked_add(1).unwrap_or(usize::MAX),
+                            MAX_STYLES,
+                        ));
                     }
                     let (id, name, attrs) = parse_def_attrs(&element, decoder)?;
                     defs.try_reserve(1)
@@ -527,7 +561,11 @@ fn attributes(element: &BytesStart<'_>, decoder: Decoder) -> Result<Vec<(String,
     for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if output.len() >= MAX_ATTRIBUTES {
-            return Err(limit("table-style attribute count", MAX_ATTRIBUTES));
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlAttributes,
+                output.len().checked_add(1).unwrap_or(usize::MAX),
+                MAX_ATTRIBUTES,
+            ));
         }
         let name = std::str::from_utf8(attribute.key.as_ref())
             .map_err(xml_error)?
@@ -539,9 +577,19 @@ fn attributes(element: &BytesStart<'_>, decoder: Decoder) -> Result<Vec<(String,
         bytes = bytes
             .checked_add(name.len())
             .and_then(|value_len| value_len.checked_add(value.len()))
-            .ok_or_else(|| limit("table-style attribute bytes", MAX_ATTRIBUTE_BYTES))?;
+            .ok_or_else(|| {
+                limit(
+                    crate::error::CodecLimitKind::XmlAttributeBytes,
+                    usize::MAX,
+                    MAX_ATTRIBUTE_BYTES,
+                )
+            })?;
         if bytes > MAX_ATTRIBUTE_BYTES {
-            return Err(limit("table-style attribute bytes", MAX_ATTRIBUTE_BYTES));
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlAttributeBytes,
+                bytes,
+                MAX_ATTRIBUTE_BYTES,
+            ));
         }
         output
             .try_reserve(1)
@@ -727,12 +775,19 @@ fn append_bytes(output: &mut String, value: &[u8]) -> Result<()> {
 }
 
 fn append(output: &mut String, value: &str) -> Result<()> {
-    let length = output
-        .len()
-        .checked_add(value.len())
-        .ok_or_else(|| limit("encoded table-style XML bytes", MAX_XML_BYTES))?;
+    let length = output.len().checked_add(value.len()).ok_or_else(|| {
+        limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            usize::MAX,
+            MAX_XML_BYTES,
+        )
+    })?;
     if length > MAX_XML_BYTES {
-        return Err(limit("encoded table-style XML bytes", MAX_XML_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            length,
+            MAX_XML_BYTES,
+        ));
     }
     output
         .try_reserve(value.len())
@@ -747,22 +802,38 @@ pub(super) fn xml_char(value: char) -> bool {
 }
 
 fn checked_depth(depth: usize) -> Result<usize> {
-    let depth = depth
-        .checked_add(1)
-        .ok_or_else(|| limit("table-style XML depth", MAX_DEPTH))?;
+    let depth = depth.checked_add(1).ok_or_else(|| {
+        limit(
+            crate::error::CodecLimitKind::XmlDepth,
+            usize::MAX,
+            MAX_DEPTH,
+        )
+    })?;
     if depth > MAX_DEPTH {
-        Err(limit("table-style XML depth", MAX_DEPTH))
+        Err(limit(
+            crate::error::CodecLimitKind::XmlDepth,
+            depth,
+            MAX_DEPTH,
+        ))
     } else {
         Ok(depth)
     }
 }
 
 fn bump_node(nodes: &mut usize) -> Result<()> {
-    *nodes = nodes
-        .checked_add(1)
-        .ok_or_else(|| limit("table-style XML nodes", MAX_NODES))?;
+    *nodes = nodes.checked_add(1).ok_or_else(|| {
+        limit(
+            crate::error::CodecLimitKind::XmlNodes,
+            usize::MAX,
+            MAX_NODES,
+        )
+    })?;
     if *nodes > MAX_NODES {
-        Err(limit("table-style XML nodes", MAX_NODES))
+        Err(limit(
+            crate::error::CodecLimitKind::XmlNodes,
+            *nodes,
+            MAX_NODES,
+        ))
     } else {
         Ok(())
     }

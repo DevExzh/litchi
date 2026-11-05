@@ -57,7 +57,7 @@ fn main() -> ExampleResult<()> {
 
     // 2. Open the CFB container.
     let file = File::open(&path)?;
-    let mut ole = OleFile::open(file)?;
+    let mut ole = OleFile::open(file, litchi_cfb::OleFileLimits::default())?;
     println!("File size:   {} bytes", ole.file_size());
     if let Some(name) = ole.get_root_name() {
         println!("Root entry:  {name}");

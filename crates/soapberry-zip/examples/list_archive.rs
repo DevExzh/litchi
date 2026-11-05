@@ -33,7 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("File size: {} bytes", data.len());
 
     // High-level API: indexed by name, files-only (directories filtered).
-    let archive = ArchiveReader::new(&data)?;
+    let archive = ArchiveReader::new(&data, soapberry_zip::office::ArchiveLimits::default())?;
     println!("Entries (high-level, files only): {}", archive.len());
 
     // Lower-level slice archive lets us print compressed and uncompressed

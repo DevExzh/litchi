@@ -11,7 +11,7 @@ fn inactive_choice_does_not_enforce_extension_ignorable_ownership() {
         r#"<w:document xmlns:w="{W}" xmlns:mc="{MC}" xmlns:w15="{W15}" xmlns:u="urn:unsupported"><mc:AlternateContent><mc:Choice Requires="u"><w:sdtPr><w15:repeatingSection/></w:sdtPr></mc:Choice><mc:Fallback><w:sdtPr><w:id w:val="22"/></w:sdtPr></mc:Fallback></mc:AlternateContent></w:document>"#
     );
 
-    let inventory = Inventory::parse(xml.as_bytes()).unwrap();
+    let inventory = Inventory::parse(xml.as_bytes(), &Default::default()).unwrap();
     assert_eq!(inventory.occurrences().len(), 1);
     assert_eq!(inventory.occurrences()[0].id(), Some(22));
     assert_eq!(inventory.occurrences()[0].control().kind(), Kind::RichText);
@@ -23,7 +23,7 @@ fn inactive_fallback_does_not_enforce_extension_attribute_ignorable_ownership() 
         r#"<w:document xmlns:w="{W}" xmlns:mc="{MC}" xmlns:w15="{W15}" xmlns:h="{HASH}"><mc:AlternateContent><mc:Choice Requires="w15"><w:sdtPr><w:id w:val="15"/></w:sdtPr></mc:Choice><mc:Fallback><w:sdtPr><w:dataBinding w:xpath="/inactive" w:storeItemID="{{11111111-1111-4111-8111-111111111111}}" h:storeItemChecksum="AAAAAA=="/></w:sdtPr></mc:Fallback></mc:AlternateContent></w:document>"#
     );
 
-    let inventory = Inventory::parse(xml.as_bytes()).unwrap();
+    let inventory = Inventory::parse(xml.as_bytes(), &Default::default()).unwrap();
     assert_eq!(inventory.occurrences().len(), 1);
     assert_eq!(inventory.occurrences()[0].id(), Some(15));
     assert!(
@@ -40,7 +40,7 @@ fn selected_branch_still_requires_effective_ignorable_ownership() {
         r#"<w:document xmlns:w="{W}" xmlns:mc="{MC}" xmlns:w15="{W15}"><mc:AlternateContent><mc:Choice Requires="w15"><w:sdtPr><w15:repeatingSection/></w:sdtPr></mc:Choice><mc:Fallback><w:sdtPr><w:id w:val="2"/></w:sdtPr></mc:Fallback></mc:AlternateContent></w:document>"#
     );
 
-    assert!(Inventory::parse(xml.as_bytes()).is_err());
+    assert!(Inventory::parse(xml.as_bytes(), &Default::default()).is_err());
 }
 
 #[test]
@@ -53,7 +53,7 @@ fn inactive_branch_still_counts_toward_raw_mce_security_limits() {
         ..Limits::default()
     };
 
-    assert!(Inventory::parse_with_limits(xml.as_bytes(), &limits).is_err());
+    assert!(Inventory::parse(xml.as_bytes(), &limits).is_err());
 }
 
 #[test]
@@ -62,11 +62,11 @@ fn process_content_wrapped_properties_keep_their_exact_active_source_span() {
         r#"<w:document xmlns:w="{W}" xmlns:mc="{MC}" xmlns:x="urn:unsupported" mc:Ignorable="x" mc:ProcessContent="x:wrap"><w:body><x:wrap><w:sdtPr><w:id w:val="2147483647"/></w:sdtPr></x:wrap></w:body></w:document>"#
     );
 
-    let inventory = Inventory::parse(xml.as_bytes()).unwrap();
+    let inventory = Inventory::parse(xml.as_bytes(), &Default::default()).unwrap();
     assert_eq!(inventory.occurrences().len(), 1);
     assert_eq!(inventory.occurrences()[0].id(), Some(i32::MAX as u32));
 
-    let snapshot = Snapshot::from_xml(xml.into_bytes()).unwrap();
+    let snapshot = Snapshot::from_xml(xml.into_bytes(), Default::default()).unwrap();
     assert_eq!(snapshot.occurrences().len(), 1);
     let span = snapshot.occurrences()[0].properties();
     assert_eq!(
@@ -83,8 +83,8 @@ fn parsed_content_control_ids_reject_values_above_int32() {
 
     // The read-only inventory drops the out-of-range ID and records it
     // (leniency F2.8); the editable snapshot keeps refusing it.
-    let inventory = Inventory::parse(xml.as_bytes()).unwrap();
+    let inventory = Inventory::parse(xml.as_bytes(), &Default::default()).unwrap();
     assert_eq!(inventory.occurrences()[0].id(), None);
     assert_eq!(inventory.tolerance_report().total(), 1);
-    assert!(Snapshot::from_xml(xml.into_bytes()).is_err());
+    assert!(Snapshot::from_xml(xml.into_bytes(), Default::default()).is_err());
 }

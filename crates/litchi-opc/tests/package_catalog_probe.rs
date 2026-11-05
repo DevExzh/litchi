@@ -9,9 +9,10 @@
 use std::io::{self, Cursor, Read, Seek, SeekFrom};
 use std::ops::Range;
 
+use litchi_opc::SourceCacheLimits;
 use litchi_opc::{
-    OpcError, OpcPackage, ReadLimits, ReadResource, SourceBackedPackage,
-    probe_package_catalog_from_reader, probe_package_catalog_from_reader_with_limits,
+    OpcError, OpcPackage, SourceBackedPackage, SourceLimitKind, SourceLimits,
+    probe_package_catalog_from_reader,
 };
 use soapberry_zip::office::StreamingArchiveWriter;
 use soapberry_zip::{ZipArchive, ZipArchiveWriter};
@@ -48,7 +49,8 @@ fn fixture() -> Fixture {
         r#"<Relationships xmlns="{RELATIONSHIPS_NS}"><Relationship Id="rData" Type="{DATA_REL}" Target="../custom/data.bin"/></Relationships>"#
     );
 
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .unwrap();
@@ -274,9 +276,9 @@ fn directory_entry_fixture() -> Vec<u8> {
     bytes
 }
 
-fn directory_entry_limits(maximum: usize) -> ReadLimits {
-    ReadLimits::builder()
-        .max_archive_members(5)
+fn directory_entry_limits(maximum: usize) -> SourceLimits {
+    SourceLimits::builder()
+        .max_members(5)
         .unwrap()
         .max_parts(5)
         .unwrap()
@@ -292,40 +294,44 @@ fn directory_entry_limits(maximum: usize) -> ReadLimits {
 fn archive_total_entry_limit_is_consistent_across_ingress_paths() {
     let bytes = directory_entry_fixture();
     let exact = directory_entry_limits(6);
-    assert!(SourceBackedPackage::from_vec_with_limits(bytes.clone(), exact).is_ok());
-    assert!(OpcPackage::from_bytes_with_limits(&bytes, exact).is_ok());
+    assert!(
+        SourceBackedPackage::from_vec(bytes.clone(), exact, SourceCacheLimits::default(), None)
+            .is_ok()
+    );
+    assert!(OpcPackage::from_bytes(&bytes, exact).is_ok());
     let mut exact_reader = Cursor::new(bytes.clone());
     assert!(
-        probe_package_catalog_from_reader_with_limits(&mut exact_reader, exact).is_ok(),
+        probe_package_catalog_from_reader(&mut exact_reader, exact).is_ok(),
         "metadata probe must admit the exact physical entry ceiling"
     );
 
     let under = directory_entry_limits(5);
-    let source = SourceBackedPackage::from_vec_with_limits(bytes.clone(), under);
+    let source =
+        SourceBackedPackage::from_vec(bytes.clone(), under, SourceCacheLimits::default(), None);
     assert!(matches!(
         source,
-        Err(OpcError::ReadLimit {
-            resource: ReadResource::ArchiveTotalEntries,
-            actual: 6,
+        Err(OpcError::Limit {
+            kind: SourceLimitKind::ArchiveTotalEntries,
+            observed: 6,
             maximum: 5,
         })
     ));
-    let eager = OpcPackage::from_bytes_with_limits(&bytes, under);
+    let eager = OpcPackage::from_bytes(&bytes, under);
     assert!(matches!(
         eager,
-        Err(OpcError::ReadLimit {
-            resource: ReadResource::ArchiveTotalEntries,
-            actual: 6,
+        Err(OpcError::Limit {
+            kind: SourceLimitKind::ArchiveTotalEntries,
+            observed: 6,
             maximum: 5,
         })
     ));
     let mut reader = Cursor::new(bytes);
-    let probe = probe_package_catalog_from_reader_with_limits(&mut reader, under);
+    let probe = probe_package_catalog_from_reader(&mut reader, under);
     assert!(matches!(
         probe,
-        Err(OpcError::ReadLimit {
-            resource: ReadResource::ArchiveTotalEntries,
-            actual: 6,
+        Err(OpcError::Limit {
+            kind: SourceLimitKind::ArchiveTotalEntries,
+            observed: 6,
             maximum: 5,
         })
     ));
@@ -338,7 +344,7 @@ fn default_probe_reads_zip_metadata_and_structural_members_only() {
     let original_position = 17;
     reader.seek(SeekFrom::Start(original_position)).unwrap();
 
-    let catalog = probe_package_catalog_from_reader(&mut reader).unwrap();
+    let catalog = probe_package_catalog_from_reader(&mut reader, SourceLimits::default()).unwrap();
 
     assert_eq!(catalog.part_count(), 2);
     assert_eq!(catalog_types(&catalog), expected_types());
@@ -360,7 +366,7 @@ fn default_probe_reads_zip_metadata_and_structural_members_only() {
 #[test]
 fn limited_probe_matches_eager_and_source_catalog_semantics() {
     let fixture = fixture();
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_input_bytes(fixture.bytes.len() as u64)
         .unwrap()
         .build()
@@ -369,9 +375,15 @@ fn limited_probe_matches_eager_and_source_catalog_semantics() {
     let original_position = 23;
     reader.seek(SeekFrom::Start(original_position)).unwrap();
 
-    let catalog = probe_package_catalog_from_reader_with_limits(&mut reader, limits).unwrap();
-    let eager = OpcPackage::from_bytes(&fixture.bytes).unwrap();
-    let source = SourceBackedPackage::from_vec(fixture.bytes.clone()).unwrap();
+    let catalog = probe_package_catalog_from_reader(&mut reader, limits).unwrap();
+    let eager = OpcPackage::from_bytes(&fixture.bytes, SourceLimits::default()).unwrap();
+    let source = SourceBackedPackage::from_vec(
+        fixture.bytes.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
 
     assert_eq!(catalog.part_count(), eager.part_count());
     assert_eq!(catalog.part_count(), source.iter_parts().count());
@@ -401,36 +413,36 @@ fn probe_limit_errors_are_typed_and_restore_the_cursor() {
     let fixture = fixture();
     let cases = [
         (
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_input_bytes((fixture.bytes.len() - 1) as u64)
                 .unwrap()
                 .build()
                 .unwrap(),
-            ReadResource::InputBytes,
+            SourceLimitKind::InputBytes,
         ),
         (
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_content_types_bytes(fixture.content_types_bytes - 1)
                 .unwrap()
                 .build()
                 .unwrap(),
-            ReadResource::ContentTypesBytes,
+            SourceLimitKind::ContentTypesBytes,
         ),
         (
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_relationship_parts(1)
                 .unwrap()
                 .build()
                 .unwrap(),
-            ReadResource::RelationshipParts,
+            SourceLimitKind::RelationshipParts,
         ),
         (
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_relationship_xml_bytes(1)
                 .unwrap()
                 .build()
                 .unwrap(),
-            ReadResource::RelationshipXmlBytes,
+            SourceLimitKind::RelationshipXmlBytes,
         ),
     ];
 
@@ -438,12 +450,12 @@ fn probe_limit_errors_are_typed_and_restore_the_cursor() {
         let mut reader = ProbeReader::new(fixture.bytes.clone());
         let original_position = 29;
         reader.seek(SeekFrom::Start(original_position)).unwrap();
-        let error = probe_package_catalog_from_reader_with_limits(&mut reader, limits)
+        let error = probe_package_catalog_from_reader(&mut reader, limits)
             .expect_err("fixture must exceed the selected limit");
 
         assert!(matches!(
             error,
-            OpcError::ReadLimit { resource, .. } if resource == expected_resource
+            OpcError::Limit { kind: resource, .. } if resource == expected_resource
         ));
         assert_eq!(reader.position(), original_position);
     }
@@ -460,7 +472,7 @@ fn malformed_probe_is_an_unknown_catalog_error_and_restores_the_cursor() {
     let original_position = 31;
     reader.seek(SeekFrom::Start(original_position)).unwrap();
 
-    let error = probe_package_catalog_from_reader(&mut reader)
+    let error = probe_package_catalog_from_reader(&mut reader, SourceLimits::default())
         .expect_err("truncated ZIP must not produce a catalog");
 
     assert!(matches!(error, OpcError::ZipError(_)));
@@ -468,7 +480,7 @@ fn malformed_probe_is_an_unknown_catalog_error_and_restores_the_cursor() {
 
     let mut non_zip = ProbeReader::new(b"not an OPC ZIP".to_vec());
     non_zip.seek(SeekFrom::Start(4)).unwrap();
-    let error = probe_package_catalog_from_reader(&mut non_zip)
+    let error = probe_package_catalog_from_reader(&mut non_zip, SourceLimits::default())
         .expect_err("non-ZIP input must remain unknown");
     assert!(matches!(error, OpcError::ZipError(_)));
     assert_eq!(non_zip.position(), 4);
@@ -481,7 +493,7 @@ fn reader_failure_restores_the_cursor_without_fabricating_a_catalog() {
     let mut reader = ProbeReader::failing(fixture.bytes);
     reader.seek(SeekFrom::Start(original_position)).unwrap();
 
-    let error = probe_package_catalog_from_reader(&mut reader)
+    let error = probe_package_catalog_from_reader(&mut reader, SourceLimits::default())
         .expect_err("injected reader failure must reject the catalog");
 
     assert!(matches!(

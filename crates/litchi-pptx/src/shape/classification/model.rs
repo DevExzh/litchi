@@ -72,8 +72,11 @@ impl Opaque {
         }
         if xml.len() > MAX_UNKNOWN_EXTENSION_BYTES {
             return Err(Error::Limit {
-                resource: "classification opaque extension bytes",
-                limit: MAX_UNKNOWN_EXTENSION_BYTES,
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::ExtensionBytes,
+                ),
+                observed: xml.len(),
+                maximum: MAX_UNKNOWN_EXTENSION_BYTES,
             });
         }
         Ok(Self { xml })
@@ -116,13 +119,6 @@ impl Snapshot {
         &self.unknown_extensions
     }
 
-    /// Start a detached atomic edit of this snapshot.
-    #[inline]
-    #[must_use]
-    pub fn edit(&self) -> crate::shape::classification::transaction::Editor {
-        crate::shape::classification::transaction::Editor::new(self.clone())
-    }
-
     pub(crate) fn from_wire(
         outcome: Option<Outcome>,
         unknown_extensions: Vec<Opaque>,
@@ -138,26 +134,36 @@ impl Snapshot {
     pub(crate) fn validate(&self) -> Result<()> {
         if self.unknown_extensions.len() > MAX_UNKNOWN_EXTENSIONS {
             return Err(Error::Limit {
-                resource: "classification opaque extensions",
-                limit: MAX_UNKNOWN_EXTENSIONS,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Extensions),
+                observed: self.unknown_extensions.len(),
+                maximum: MAX_UNKNOWN_EXTENSIONS,
             });
         }
         let mut total = 0usize;
         for extension in &self.unknown_extensions {
             if extension.xml.is_empty() || extension.xml.len() > MAX_UNKNOWN_EXTENSION_BYTES {
                 return Err(Error::Limit {
-                    resource: "classification opaque extension bytes",
-                    limit: MAX_UNKNOWN_EXTENSION_BYTES,
+                    kind: crate::opened::LimitKind::Codec(
+                        crate::opened::CodecLimitKind::ExtensionBytes,
+                    ),
+                    observed: extension.xml.len(),
+                    maximum: MAX_UNKNOWN_EXTENSION_BYTES,
                 });
             }
             total = total.checked_add(extension.xml.len()).ok_or(Error::Limit {
-                resource: "classification opaque extension bytes",
-                limit: MAX_UNKNOWN_BYTES,
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::ExtensionBytes,
+                ),
+                observed: usize::MAX,
+                maximum: MAX_UNKNOWN_BYTES,
             })?;
             if total > MAX_UNKNOWN_BYTES {
                 return Err(Error::Limit {
-                    resource: "classification opaque extension bytes",
-                    limit: MAX_UNKNOWN_BYTES,
+                    kind: crate::opened::LimitKind::Codec(
+                        crate::opened::CodecLimitKind::ExtensionBytes,
+                    ),
+                    observed: total,
+                    maximum: MAX_UNKNOWN_BYTES,
                 });
             }
         }

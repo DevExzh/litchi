@@ -12,16 +12,16 @@
 //!
 //! # References
 //!
-//! - `odfpy`: `3rdparty/odfpy/odf/namespaces.py` (lines 24–111)
+//! - `odfpy`: `odf/namespaces.py` (lines 24–111)
 
-use litchi_core::{Error, Result};
+use litchi_core::{Error, Resource, ResourceLimit, Result};
 use phf::{Map, phf_map};
 use quick_xml::XmlVersion;
 use quick_xml::events::BytesStart;
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 // ============================================================================
 // NAMESPACE CONSTANTS
@@ -708,7 +708,8 @@ pub fn resolved_namespace_uri<'uri>(
             "the namespace prefix is not bound",
         )),
         ResolveResult::Bound(Namespace(raw)) => {
-            let uri = decode_namespace_uri(raw, decoder, context)?;
+            let uri = decode_namespace_uri(raw, decoder, context, MAX_NAMESPACE_URI_BYTES)
+                .map_err(NamespaceUriError::into_core)?;
             if uri.as_ref() == XMLNS_DECLARATION_NAMESPACE {
                 return Err(invalid_namespace(
                     context,
@@ -843,8 +844,9 @@ pub fn normalize_namespace_uri<'uri>(
     raw: &'uri [u8],
     decoder: quick_xml::Decoder,
     context: &str,
-) -> Result<Cow<'uri, str>> {
-    decode_namespace_uri(raw, decoder, context)
+    max_uri_bytes: usize,
+) -> std::result::Result<Cow<'uri, str>, crate::Error> {
+    decode_namespace_uri(raw, decoder, context, max_uri_bytes).map_err(NamespaceUriError::into_odf)
 }
 
 fn invalid_namespace(context: &str, reason: &str) -> Error {
@@ -855,19 +857,23 @@ fn decode_namespace_uri<'uri>(
     raw: &'uri [u8],
     decoder: quick_xml::Decoder,
     context: &str,
-) -> Result<Cow<'uri, str>> {
+    max_uri_bytes: usize,
+) -> NamespaceUriResult<Cow<'uri, str>> {
+    if max_uri_bytes == 0 || max_uri_bytes > MAX_NAMESPACE_URI_BYTES {
+        return Err(NamespaceUriError::InvalidLimit {
+            value: max_uri_bytes as u64,
+            maximum: MAX_NAMESPACE_URI_BYTES as u64,
+        });
+    }
     ensure_utf8_decoder(decoder, context)?;
-    if raw.len() > MAX_NAMESPACE_URI_BYTES {
-        return Err(invalid_namespace(
-            context,
-            "the lexical value exceeds the namespace URI limit",
-        ));
+    if raw.len() > max_uri_bytes {
+        return Err(namespace_limit(raw.len(), max_uri_bytes));
     }
     if raw.contains(&b'<') {
-        return Err(invalid_namespace(
+        return Err(NamespaceUriError::from(invalid_namespace(
             context,
             "the lexical value contains an unescaped '<'",
-        ));
+        )));
     }
 
     let decoded = decoder.decode(raw).map_err(|error| {
@@ -876,19 +882,13 @@ fn decode_namespace_uri<'uri>(
             &format!("the value is not valid in the XML encoding: {error}"),
         )
     })?;
-    if decoded.len() > MAX_NAMESPACE_URI_BYTES {
-        return Err(invalid_namespace(
-            context,
-            "the decoded value exceeds the namespace URI limit",
-        ));
+    if decoded.len() > max_uri_bytes {
+        return Err(namespace_limit(decoded.len(), max_uri_bytes));
     }
 
     let (normalized_len, changed) = namespace_normalized_len(&decoded, context)?;
-    if normalized_len > MAX_NAMESPACE_URI_BYTES {
-        return Err(invalid_namespace(
-            context,
-            "entity expansion exceeds the namespace URI limit",
-        ));
+    if normalized_len > max_uri_bytes {
+        return Err(namespace_limit(normalized_len, max_uri_bytes));
     }
     if !changed {
         return Ok(decoded);
@@ -904,6 +904,64 @@ fn decode_namespace_uri<'uri>(
     append_normalized_namespace(&mut output, &decoded, context)?;
     debug_assert_eq!(output.len(), normalized_len);
     Ok(Cow::Owned(output))
+}
+
+#[derive(Debug)]
+enum NamespaceUriError {
+    InvalidLimit { value: u64, maximum: u64 },
+    Limit { observed: u64, maximum: u64 },
+    Core(Error),
+}
+
+type NamespaceUriResult<T> = std::result::Result<T, NamespaceUriError>;
+
+impl From<Error> for NamespaceUriError {
+    fn from(error: Error) -> Self {
+        Self::Core(error)
+    }
+}
+
+impl NamespaceUriError {
+    fn into_core(self) -> Error {
+        match self {
+            Self::InvalidLimit { value, maximum } => Error::InvalidLimit {
+                kind: Resource::Memory,
+                value,
+                maximum,
+                scope: "ODF raw XML namespace URI bytes",
+            },
+            Self::Limit { observed, maximum } => Error::ResourceLimit(ResourceLimit {
+                resource: Resource::Memory,
+                observed,
+                limit: maximum,
+                scope: Arc::from("ODF raw XML namespace URI bytes"),
+            }),
+            Self::Core(error) => error,
+        }
+    }
+
+    fn into_odf(self) -> crate::Error {
+        match self {
+            Self::InvalidLimit { value, maximum } => crate::Error::InvalidLimit {
+                kind: crate::LimitKind::RawXml(crate::RawXmlLimitKind::NamespaceUriBytes),
+                value,
+                maximum,
+            },
+            Self::Limit { observed, maximum } => crate::Error::Limit {
+                kind: crate::LimitKind::RawXml(crate::RawXmlLimitKind::NamespaceUriBytes),
+                observed,
+                maximum,
+            },
+            Self::Core(error) => crate::Error::Core(error),
+        }
+    }
+}
+
+fn namespace_limit(observed: usize, maximum: usize) -> NamespaceUriError {
+    NamespaceUriError::Limit {
+        observed: observed as u64,
+        maximum: maximum as u64,
+    }
 }
 
 fn ensure_utf8_decoder(decoder: quick_xml::Decoder, context: &str) -> Result<()> {
@@ -924,6 +982,16 @@ fn ensure_utf8_decoder(decoder: quick_xml::Decoder, context: &str) -> Result<()>
 
 fn namespace_normalized_len(value: &str, context: &str) -> Result<(usize, bool)> {
     let bytes = value.as_bytes();
+    // Every printable ASCII byte other than '&' is an XML 1.0 character that
+    // attribute-value normalization keeps unchanged, so such a value (every
+    // namespace URI in practice) normalizes to itself; one vectorizable scan
+    // replaces the per-character walk below (record 0377).
+    // No early exit, so the scan vectorizes.
+    if bytes.iter().fold(true, |plain, &byte| {
+        plain & (0x20..0x7f).contains(&byte) & (byte != b'&')
+    }) {
+        return Ok((bytes.len(), false));
+    }
     let mut index = 0;
     let mut length = 0usize;
     let mut changed = false;

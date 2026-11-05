@@ -14,11 +14,12 @@ use litchi_core::Position;
 use litchi_iwa_archive::package::{OwnedExactArtifacts, SharedBytes};
 use litchi_iwa_common::chart::data::{ChartData, DataError};
 use litchi_iwa_protos::chart_data_codec::{self, DecodeLimit, DecodeOptions};
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::Package;
 use super::body_chart_arrangement::{
-    self, ArrangementBudget, BodyChartArrangementError, BodyChartArrangementLimitKind, ChartTarget,
+    self, ArrangementBudget, ChartTarget, Error as BodyChartArrangementError,
+    LimitKind as BodyChartArrangementLimitKind,
 };
 use crate::selector::BodyChartSelector;
 
@@ -29,7 +30,7 @@ const MAX_DATA_TEXT_BYTES: usize = 64 * 1024 * 1024;
 /// Finite resources governed by one Pages body-chart data read.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum BodyChartDataLimitKind {
+pub enum LimitKind {
     /// Complete package input bytes inspected by rooted selection.
     InputBytes,
     /// Native payload bytes inspected.
@@ -56,7 +57,7 @@ pub enum BodyChartDataLimitKind {
     TextBytes,
 }
 
-impl fmt::Display for BodyChartDataLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -76,26 +77,16 @@ impl fmt::Display for BodyChartDataLimitKind {
 }
 
 /// Failure while reading one rooted Pages body chart's semantic data grid.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum BodyChartDataError {
-    /// No rooted body chart matched the source-order selector.
-    #[error("the Pages body has no chart at position {position:?}")]
-    ChartNotFound { position: Position },
-    /// The source does not retain a supported exact native artifact.
-    #[error("this Pages source does not support body-chart data reads")]
-    UnsupportedSource,
+pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     /// The rooted graph or selected chart-data payload was malformed.
     #[error("the selected Pages body-chart data source is invalid")]
     InvalidSource,
-    /// The requested edit changes row or column labels, which this first
-    /// source-preserving numeric transaction does not own.
-    #[error("Pages body-chart data edits must preserve row and column labels")]
-    LabelsChanged,
-    /// The requested edit changes the grid dimensions, which this first
-    /// source-preserving numeric transaction does not own.
-    #[error("Pages body-chart data edits must preserve chart dimensions")]
-    ShapeChanged,
     /// Reopening the candidate did not reproduce the requested numeric grid.
     #[error("the edited Pages body-chart data failed semantic verification")]
     Verification,
@@ -105,9 +96,9 @@ pub enum BodyChartDataError {
     PatchConflict,
     /// A finite read resource ceiling was exceeded.
     #[error("Pages body-chart data {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
+    Limit {
         /// Resource category.
-        kind: BodyChartDataLimitKind,
+        kind: LimitKind,
         /// Observed or requested amount.
         observed: u64,
         /// Configured maximum.
@@ -118,43 +109,118 @@ pub enum BodyChartDataError {
     Allocation { amount: usize },
 }
 
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
+    /// No rooted body chart matched the source-order selector.
+    #[error("the Pages body has no chart at position {position:?}")]
+    ChartNotFound { position: Position },
+    /// The source does not retain a supported exact native artifact.
+    #[error("this Pages source does not support body-chart data reads")]
+    UnsupportedSource,
+    /// The requested edit changes row or column labels, which this first
+    /// source-preserving numeric transaction does not own.
+    #[error("Pages body-chart data edits must preserve row and column labels")]
+    LabelsChanged,
+    /// The requested edit changes the grid dimensions, which this first
+    /// source-preserving numeric transaction does not own.
+    #[error("Pages body-chart data edits must preserve chart dimensions")]
+    ShapeChanged,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::ChartNotFound { .. } => RefusalKind::NotFound,
+            Self::UnsupportedSource { .. }
+            | Self::LabelsChanged { .. }
+            | Self::ShapeChanged { .. } => RefusalKind::UnsupportedContent,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
+}
+
 /// One mutable semantic body-chart data value staged against an immutable
 /// Pages package snapshot.
-pub struct BodyChartDataEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
-    target: ChartTarget,
-    before: Arc<ChartData>,
+    selector: BodyChartSelector,
+    target: Option<ChartTarget>,
+    before: Option<Arc<ChartData>>,
     after: Option<ChartData>,
 }
 
-impl fmt::Debug for BodyChartDataEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("BodyChartDataEdit")
-            .field("position", &self.target.position)
-            .field("before", self.before.as_ref())
+            .debug_struct("Edit")
+            .field("resolved", &self.target.is_some())
+            .field("before", &self.before)
             .field("after", &self.after)
             .finish_non_exhaustive()
     }
 }
 
-impl BodyChartDataEdit<'_> {
+impl Edit<'_> {
+    fn resolve(&mut self) -> Result<(), Error> {
+        if self.target.is_none() {
+            let mut budget = ArrangementBudget::new(self.source).map_err(map_arrangement_error)?;
+            let target =
+                body_chart_arrangement::resolve_target(self.source, self.selector, &mut budget)
+                    .map_err(map_arrangement_error)?;
+            let before = read_target_data(self.source, &target, &mut budget)?;
+            budget
+                .preflight_allocations(1)
+                .map_err(map_arrangement_error)?;
+            budget
+                .preflight_retained(size_of::<ChartData>())
+                .map_err(map_arrangement_error)?;
+            let before = Arc::new(before);
+            budget.allocations(1).map_err(map_arrangement_error)?;
+            budget
+                .retained(size_of::<ChartData>())
+                .map_err(map_arrangement_error)?;
+            if self.after.is_none() {
+                self.before = Some(before.clone());
+            }
+            self.target = Some(target);
+            self.before = Some(before);
+        }
+        Ok(())
+    }
+
     /// Return the selected body-chart source position.
-    #[must_use]
-    pub const fn position(&self) -> Position {
-        self.target.position
+    pub fn position(&mut self) -> Result<Position, Error> {
+        self.resolve()?;
+        self.target
+            .as_ref()
+            .map(|target| target.position)
+            .ok_or(Error::InvalidSource)
     }
 
     /// Return the chart data read before this edit.
-    #[must_use]
-    pub fn before(&self) -> &ChartData {
-        self.before.as_ref()
+    pub fn before(&mut self) -> Result<&ChartData, Error> {
+        self.resolve()?;
+        self.before.as_deref().ok_or(Error::InvalidSource)
     }
 
     /// Return the chart data currently staged for publication.
-    #[must_use]
-    pub fn after(&self) -> &ChartData {
-        self.after.as_ref().unwrap_or(self.before.as_ref())
+    pub fn after(&mut self) -> Result<&ChartData, Error> {
+        self.resolve()?;
+        self.after
+            .as_ref()
+            .or(self.before.as_deref())
+            .ok_or(Error::InvalidSource)
     }
 
     /// Replace the staged chart data.
@@ -165,14 +231,15 @@ impl BodyChartDataEdit<'_> {
     }
 
     /// Validate and publish the staged exact-source edit.
-    pub fn commit(self) -> Result<BodyChartDataCommit, BodyChartDataError> {
+    pub fn commit(mut self) -> Result<Commit, Error> {
+        self.resolve()?;
         commit_data_edit(self)
     }
 }
 
 /// Exact-source checked reversible body-chart data patch.
 #[derive(Clone, PartialEq)]
-pub struct BodyChartDataPatch {
+pub struct Patch {
     artifacts: OwnedExactArtifacts,
     target: ChartTarget,
     before: Arc<ChartData>,
@@ -184,10 +251,10 @@ pub struct BodyChartDataPatch {
     target_previews: usize,
 }
 
-impl fmt::Debug for BodyChartDataPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("BodyChartDataPatch")
+            .debug_struct("Patch")
             .field("position", &self.target.position)
             .field("before", self.before.as_ref())
             .field("after", self.after.as_ref())
@@ -195,7 +262,7 @@ impl fmt::Debug for BodyChartDataPatch {
     }
 }
 
-impl BodyChartDataPatch {
+impl Patch {
     /// Return the selected body-chart source position.
     #[must_use]
     pub const fn position(&self) -> Position {
@@ -257,14 +324,14 @@ impl BodyChartDataPatch {
 
 /// Compact evidence describing one committed body-chart data transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct BodyChartDataDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     deleted_previews: usize,
     full_reparse_performed: bool,
 }
 
-impl BodyChartDataDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -312,13 +379,13 @@ impl BodyChartDataDiagnostics {
 /// Fully reopened immutable result of one body-chart data transaction.
 #[must_use = "a Pages body-chart data commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct BodyChartDataCommit {
+pub struct Commit {
     package: Package,
-    patch: BodyChartDataPatch,
-    diagnostics: BodyChartDataDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl BodyChartDataCommit {
+impl Commit {
     /// Borrow the fully reopened package snapshot.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -331,15 +398,21 @@ impl BodyChartDataCommit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the exact-source reversible patch.
     #[must_use]
-    pub const fn patch(&self) -> &BodyChartDataPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Borrow compact publication diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> &BodyChartDataDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
@@ -355,7 +428,7 @@ impl Package {
     pub fn body_chart_data(
         &self,
         selector: impl Into<BodyChartSelector>,
-    ) -> Result<ChartData, BodyChartDataError> {
+    ) -> Result<ChartData, Error> {
         let mut budget = ArrangementBudget::new(self).map_err(map_arrangement_error)?;
         let target = body_chart_arrangement::resolve_target(self, selector.into(), &mut budget)
             .map_err(map_arrangement_error)?;
@@ -366,35 +439,18 @@ impl Package {
     pub fn edit_body_chart_data(
         &self,
         selector: impl Into<BodyChartSelector>,
-    ) -> Result<BodyChartDataEdit<'_>, BodyChartDataError> {
-        let mut budget = ArrangementBudget::new(self).map_err(map_arrangement_error)?;
-        let target = body_chart_arrangement::resolve_target(self, selector.into(), &mut budget)
-            .map_err(map_arrangement_error)?;
-        let before = read_target_data(self, &target, &mut budget)?;
-        budget
-            .preflight_allocations(1)
-            .map_err(map_arrangement_error)?;
-        budget
-            .preflight_retained(size_of::<ChartData>())
-            .map_err(map_arrangement_error)?;
-        let before = Arc::new(before);
-        budget.allocations(1).map_err(map_arrangement_error)?;
-        budget
-            .retained(size_of::<ChartData>())
-            .map_err(map_arrangement_error)?;
-        Ok(BodyChartDataEdit {
+    ) -> Result<Edit<'_>, Error> {
+        Ok(Edit {
             source: self,
-            target,
-            before,
+            selector: selector.into(),
+            target: None,
+            before: None,
             after: None,
         })
     }
 
     /// Apply an exact-source checked reversible body-chart data patch.
-    pub fn apply_body_chart_data(
-        &self,
-        patch: &BodyChartDataPatch,
-    ) -> Result<BodyChartDataCommit, BodyChartDataError> {
+    pub fn apply_body_chart_data(&self, patch: &Patch) -> Result<Commit, Error> {
         let mut budget = ArrangementBudget::new(self).map_err(map_arrangement_error)?;
         let source = self.state.source.shared_source();
         let source_owner = SharedBytes::from_shared_slice(Arc::clone(&source));
@@ -403,11 +459,11 @@ impl Package {
                 source
                     .len()
                     .checked_add(patch.artifacts.source_owner().as_ref().len())
-                    .ok_or(BodyChartDataError::InvalidSource)?,
+                    .ok_or(Error::InvalidSource)?,
             )
             .map_err(map_arrangement_error)?;
         if !patch.artifacts.authorizes_owner(&source_owner) {
-            return Err(BodyChartDataError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let current = body_chart_arrangement::resolve_target(
             self,
@@ -416,7 +472,7 @@ impl Package {
         )
         .map_err(map_arrangement_error)?;
         if !current.same_identity(&patch.target) {
-            return Err(BodyChartDataError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let current_data = read_target_data(self, &current, &mut budget)?;
         budget
@@ -426,21 +482,21 @@ impl Package {
             )?)
             .map_err(map_arrangement_error)?;
         if !current_data.bitwise_eq(&patch.before) {
-            return Err(BodyChartDataError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if let Some(expected) = patch.source_payload.as_deref() {
             let actual = body_chart_arrangement::selected_chart_payload(self, &patch.target)
-                .map_err(|_| BodyChartDataError::PatchConflict)?;
+                .map_err(|_| Error::PatchConflict)?;
             budget
                 .work(
                     actual
                         .len()
                         .checked_add(expected.len())
-                        .ok_or(BodyChartDataError::InvalidSource)?,
+                        .ok_or(Error::InvalidSource)?,
                 )
                 .map_err(map_arrangement_error)?;
             if actual != expected {
-                return Err(BodyChartDataError::PatchConflict);
+                return Err(Error::PatchConflict);
             }
         }
         let patch_semantic_work =
@@ -454,19 +510,19 @@ impl Package {
             .as_ref()
             .len()
             .checked_add(patch.artifacts.target_owner().as_ref().len())
-            .ok_or(BodyChartDataError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         budget
             .work(patch_bytes_work)
             .map_err(map_arrangement_error)?;
         if patch.before.bitwise_eq(&patch.after) && patch.artifacts.is_byte_noop() {
-            return Ok(BodyChartDataCommit {
-                package: self.snapshot(),
+            return Ok(Commit {
+                package: self.clone(),
                 patch: patch.clone(),
-                diagnostics: BodyChartDataDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         if !self.state.source.source_is_exact() {
-            return Err(BodyChartDataError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         budget
             .work(chart_data_axis_validation_work(
@@ -481,13 +537,12 @@ impl Package {
             .candidate_reopen(target_len)
             .map_err(map_arrangement_error)?;
         let target_bytes = Arc::<[u8]>::from(target_owner.as_ref());
-        let catalog = litchi_iwa_archive::SourceCatalog::from_shared_bytes_with_limits(
-            target_bytes,
-            self.state.source.limits(),
-        )
-        .map_err(|_| BodyChartDataError::Verification)?;
-        let candidate =
-            Package::from_source_catalog(catalog).map_err(|_| BodyChartDataError::Verification)?;
+        let catalog = self
+            .state
+            .source
+            .reopen(target_bytes)
+            .map_err(|_| Error::Verification)?;
+        let candidate = Package::from_source_catalog(catalog).map_err(|_| Error::Verification)?;
         let verified = body_chart_arrangement::resolve_target(
             &candidate,
             BodyChartSelector::position(patch.target.position),
@@ -495,7 +550,7 @@ impl Package {
         )
         .map_err(map_arrangement_error)?;
         if !verified.same_identity(&patch.target) {
-            return Err(BodyChartDataError::Verification);
+            return Err(Error::Verification);
         }
         let verified_data = read_target_data(&candidate, &verified, &mut budget)?;
         budget
@@ -505,7 +560,7 @@ impl Package {
             )?)
             .map_err(map_arrangement_error)?;
         if !verified_data.bitwise_eq(&patch.after) {
-            return Err(BodyChartDataError::Verification);
+            return Err(Error::Verification);
         }
         body_chart_arrangement::verify_locality(
             self,
@@ -517,23 +572,21 @@ impl Package {
             &mut budget,
         )
         .map_err(map_arrangement_error)?;
-        Ok(BodyChartDataCommit {
+        Ok(Commit {
             package: candidate,
             patch: patch.clone(),
-            diagnostics: BodyChartDataDiagnostics::published(
+            diagnostics: Diagnostics::published(
                 patch.source_previews.saturating_sub(patch.target_previews),
             ),
         })
     }
 }
 
-fn commit_data_edit(
-    mut edit: BodyChartDataEdit<'_>,
-) -> Result<BodyChartDataCommit, BodyChartDataError> {
+fn commit_data_edit(mut edit: Edit<'_>) -> Result<Commit, Error> {
     let source = edit.source;
     let source_bytes = source.state.source.shared_source();
-    let target = edit.target;
-    let before = edit.before;
+    let target = edit.target.ok_or(Error::InvalidSource)?;
+    let before = edit.before.ok_or(Error::InvalidSource)?;
     let mut budget = ArrangementBudget::new(source).map_err(map_arrangement_error)?;
 
     // The edit owns the immutable `before` grid through an Arc. Its child
@@ -547,9 +600,9 @@ fn commit_data_edit(
             .work(source_bytes.len())
             .map_err(map_arrangement_error)?;
         let source_owner = SharedBytes::from_shared_slice(Arc::clone(&source_bytes));
-        return Ok(BodyChartDataCommit {
-            package: source.snapshot(),
-            patch: BodyChartDataPatch {
+        return Ok(Commit {
+            package: source.clone(),
+            patch: Patch {
                 artifacts: OwnedExactArtifacts::new(source_owner.clone(), source_owner),
                 target,
                 before: Arc::clone(&before),
@@ -560,7 +613,7 @@ fn commit_data_edit(
                 source_previews: 0,
                 target_previews: 0,
             },
-            diagnostics: BodyChartDataDiagnostics::unchanged(),
+            diagnostics: Diagnostics::unchanged(),
         });
     };
 
@@ -581,9 +634,9 @@ fn commit_data_edit(
             .work(source_bytes.len())
             .map_err(map_arrangement_error)?;
         let source_owner = SharedBytes::from_shared_slice(Arc::clone(&source_bytes));
-        return Ok(BodyChartDataCommit {
-            package: source.snapshot(),
-            patch: BodyChartDataPatch {
+        return Ok(Commit {
+            package: source.clone(),
+            patch: Patch {
                 artifacts: OwnedExactArtifacts::new(source_owner.clone(), source_owner),
                 target,
                 before: Arc::clone(&before),
@@ -594,7 +647,7 @@ fn commit_data_edit(
                 source_previews: 0,
                 target_previews: 0,
             },
-            diagnostics: BodyChartDataDiagnostics::unchanged(),
+            diagnostics: Diagnostics::unchanged(),
         });
     }
 
@@ -609,7 +662,7 @@ fn commit_data_edit(
         .map_err(map_arrangement_error)?;
     validate_data_change(before.as_ref(), &after_data)?;
     if !source.state.source.source_is_exact() {
-        return Err(BodyChartDataError::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     // `after_data` was supplied by the caller. Its children are already
     // admitted above; only the Arc control block is allocated by this API.
@@ -625,14 +678,14 @@ fn commit_data_edit(
     )
     .map_err(map_arrangement_error)?;
     if !current.same_identity(&target) {
-        return Err(BodyChartDataError::PatchConflict);
+        return Err(Error::PatchConflict);
     }
     let current_data = read_target_data(source, &current, &mut budget)?;
     budget
         .work(chart_data_compare_work(&current_data, before.as_ref())?)
         .map_err(map_arrangement_error)?;
     if !current_data.bitwise_eq(&before) {
-        return Err(BodyChartDataError::PatchConflict);
+        return Err(Error::PatchConflict);
     }
     let source_payload = body_chart_arrangement::selected_chart_payload(source, &target)
         .map_err(map_arrangement_error)?;
@@ -675,14 +728,14 @@ fn commit_data_edit(
     )
     .map_err(map_arrangement_error)?;
     if !verified.same_identity(&target) {
-        return Err(BodyChartDataError::Verification);
+        return Err(Error::Verification);
     }
     let verified_data = read_target_data(&candidate, &verified, &mut budget)?;
     budget
         .work(chart_data_compare_work(&verified_data, after.as_ref())?)
         .map_err(map_arrangement_error)?;
     if !verified_data.bitwise_eq(&after) {
-        return Err(BodyChartDataError::Verification);
+        return Err(Error::Verification);
     }
     let target_payload = body_chart_arrangement::selected_chart_payload(&candidate, &verified)
         .map_err(map_arrangement_error)?;
@@ -705,14 +758,14 @@ fn commit_data_edit(
             source_bytes
                 .len()
                 .checked_add(target_bytes.len())
-                .ok_or(BodyChartDataError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )
         .map_err(map_arrangement_error)?;
     let source_owner = SharedBytes::from_shared_slice(source_bytes);
     let target_owner = SharedBytes::from_shared_slice(Arc::clone(&target_bytes));
-    Ok(BodyChartDataCommit {
+    Ok(Commit {
         package: candidate,
-        patch: BodyChartDataPatch {
+        patch: Patch {
             artifacts: OwnedExactArtifacts::new(source_owner, target_owner),
             target,
             before,
@@ -723,13 +776,11 @@ fn commit_data_edit(
             source_previews,
             target_previews,
         },
-        diagnostics: BodyChartDataDiagnostics::published(
-            source_previews.saturating_sub(target_previews),
-        ),
+        diagnostics: Diagnostics::published(source_previews.saturating_sub(target_previews)),
     })
 }
 
-fn validate_data_change(before: &ChartData, after: &ChartData) -> Result<(), BodyChartDataError> {
+fn validate_data_change(before: &ChartData, after: &ChartData) -> Result<(), Error> {
     if before.row_names().len() != after.row_names().len()
         || before.column_names().len() != after.column_names().len()
         || before.values().len() != after.values().len()
@@ -739,10 +790,10 @@ fn validate_data_change(before: &ChartData, after: &ChartData) -> Result<(), Bod
             .zip(after.values())
             .any(|(before, after)| before.len() != after.len())
     {
-        return Err(BodyChartDataError::ShapeChanged);
+        return Err(Error::Refused(Refusal::ShapeChanged));
     }
     if before.row_names() != after.row_names() || before.column_names() != after.column_names() {
-        return Err(BodyChartDataError::LabelsChanged);
+        return Err(Error::Refused(Refusal::LabelsChanged));
     }
     Ok(())
 }
@@ -755,43 +806,39 @@ fn validate_data_change(before: &ChartData, after: &ChartData) -> Result<(), Bod
 /// text, and row-major cells. This is the same shape admitted by the focused
 /// reader and is sufficient to reject oversized caller-owned replacements
 /// before they enter a patch or an Arc.
-fn chart_data_retained_bytes(data: &ChartData) -> Result<usize, BodyChartDataError> {
+fn chart_data_retained_bytes(data: &ChartData) -> Result<usize, Error> {
     let label_count = data
         .row_names()
         .len()
         .checked_add(data.column_names().len())
-        .ok_or(BodyChartDataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let label_headers = label_count
         .checked_mul(size_of::<String>())
-        .ok_or(BodyChartDataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let label_text = data
         .row_names()
         .iter()
         .chain(data.column_names())
         .try_fold(0usize, |bytes, label| {
-            bytes
-                .checked_add(label.len())
-                .ok_or(BodyChartDataError::InvalidSource)
+            bytes.checked_add(label.len()).ok_or(Error::InvalidSource)
         })?;
     let row_headers = data
         .values()
         .len()
         .checked_mul(size_of::<Vec<Option<f64>>>())
-        .ok_or(BodyChartDataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let cells = data.values().iter().try_fold(0usize, |cells, row| {
-        cells
-            .checked_add(row.len())
-            .ok_or(BodyChartDataError::InvalidSource)
+        cells.checked_add(row.len()).ok_or(Error::InvalidSource)
     })?;
     let cell_bytes = cells
         .checked_mul(size_of::<Option<f64>>())
-        .ok_or(BodyChartDataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     size_of::<ChartData>()
         .checked_add(label_headers)
         .and_then(|bytes| bytes.checked_add(label_text))
         .and_then(|bytes| bytes.checked_add(row_headers))
         .and_then(|bytes| bytes.checked_add(cell_bytes))
-        .ok_or(BodyChartDataError::InvalidSource)
+        .ok_or(Error::InvalidSource)
 }
 
 /// Charge the retained model and, when requested, one owning Arc allocation.
@@ -799,7 +846,7 @@ fn admit_chart_data(
     budget: &mut ArrangementBudget,
     data: &ChartData,
     arc_allocation: bool,
-) -> Result<usize, BodyChartDataError> {
+) -> Result<usize, Error> {
     let retained = chart_data_retained_bytes(data)?;
     if arc_allocation {
         budget
@@ -817,62 +864,54 @@ fn admit_chart_data(
 }
 
 /// Bound one exact semantic comparison before its labels and cells are read.
-fn chart_data_compare_work(
-    left: &ChartData,
-    right: &ChartData,
-) -> Result<usize, BodyChartDataError> {
+fn chart_data_compare_work(left: &ChartData, right: &ChartData) -> Result<usize, Error> {
     chart_data_retained_bytes(left)?
         .checked_add(chart_data_retained_bytes(right)?)
-        .ok_or(BodyChartDataError::InvalidSource)
+        .ok_or(Error::InvalidSource)
 }
 
 /// Bound the labels, row headers, and shape probes used by edit validation.
 /// Numeric cells are deliberately excluded because `bitwise_eq` already
 /// charged the full value walk immediately before this narrower validation.
-fn chart_data_axis_validation_work(
-    left: &ChartData,
-    right: &ChartData,
-) -> Result<usize, BodyChartDataError> {
-    fn one(data: &ChartData) -> Result<usize, BodyChartDataError> {
+fn chart_data_axis_validation_work(left: &ChartData, right: &ChartData) -> Result<usize, Error> {
+    fn one(data: &ChartData) -> Result<usize, Error> {
         let label_count = data
             .row_names()
             .len()
             .checked_add(data.column_names().len())
-            .ok_or(BodyChartDataError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let label_text = data
             .row_names()
             .iter()
             .chain(data.column_names())
             .try_fold(0usize, |bytes, label| {
-                bytes
-                    .checked_add(label.len())
-                    .ok_or(BodyChartDataError::InvalidSource)
+                bytes.checked_add(label.len()).ok_or(Error::InvalidSource)
             })?;
         let label_headers = label_count
             .checked_mul(size_of::<String>())
-            .ok_or(BodyChartDataError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let row_headers = data
             .values()
             .len()
             .checked_mul(size_of::<Vec<Option<f64>>>())
-            .ok_or(BodyChartDataError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         size_of::<ChartData>()
             .checked_add(label_headers)
             .and_then(|bytes| bytes.checked_add(label_text))
             .and_then(|bytes| bytes.checked_add(row_headers))
-            .ok_or(BodyChartDataError::InvalidSource)
+            .ok_or(Error::InvalidSource)
     }
 
     one(left)?
         .checked_add(one(right)?)
-        .ok_or(BodyChartDataError::InvalidSource)
+        .ok_or(Error::InvalidSource)
 }
 
 fn read_target_data(
     package: &Package,
     target: &ChartTarget,
     budget: &mut ArrangementBudget,
-) -> Result<ChartData, BodyChartDataError> {
+) -> Result<ChartData, Error> {
     let source = body_chart_arrangement::selected_chart_payload(package, target)
         .map_err(map_arrangement_error)?;
     let options = data_options(budget, source)?;
@@ -894,22 +933,18 @@ fn read_target_data(
     ChartData::new(row_names, column_names, values).map_err(map_data_error)
 }
 
-fn data_options(
-    budget: &ArrangementBudget,
-    source: &[u8],
-) -> Result<DecodeOptions, BodyChartDataError> {
+fn data_options(budget: &ArrangementBudget, source: &[u8]) -> Result<DecodeOptions, Error> {
     let limits = budget
         .residual_wire_limits()
         .map_err(map_arrangement_error)?;
     let source_bytes = source.len().max(1).min(limits.max_input_bytes());
     let fields = limits.max_fields().max(1);
     let work = limits.max_rewrite_work().max(1);
-    let max_depth =
-        u32::try_from(limits.max_nesting()).map_err(|_| BodyChartDataError::LimitExceeded {
-            kind: BodyChartDataLimitKind::WireNesting,
-            observed: limits.max_nesting() as u64,
-            maximum: u32::MAX as u64,
-        })?;
+    let max_depth = u32::try_from(limits.max_nesting()).map_err(|_| Error::Limit {
+        kind: LimitKind::WireNesting,
+        observed: limits.max_nesting() as u64,
+        maximum: u32::MAX as u64,
+    })?;
     let max_cells = limits.max_fields().clamp(1, MAX_DATA_CELLS);
     let max_labels = limits.max_fields().clamp(1, MAX_DATA_LABEL_COUNT);
     let max_text = limits.max_input_bytes().clamp(1, MAX_DATA_TEXT_BYTES);
@@ -944,7 +979,7 @@ fn data_options(
 fn charge_data_report(
     budget: &mut ArrangementBudget,
     report: chart_data_codec::DecodeReport,
-) -> Result<(), BodyChartDataError> {
+) -> Result<(), Error> {
     budget
         .input(report.source_bytes())
         .map_err(map_arrangement_error)?;
@@ -965,29 +1000,29 @@ fn charge_data_report(
         .residual_wire_limits()
         .map_err(map_arrangement_error)?;
     if usize::try_from(report.max_depth()).unwrap_or(usize::MAX) > limits.max_nesting() {
-        return Err(BodyChartDataError::LimitExceeded {
-            kind: BodyChartDataLimitKind::WireNesting,
+        return Err(Error::Limit {
+            kind: LimitKind::WireNesting,
             observed: u64::from(report.max_depth()),
             maximum: limits.max_nesting() as u64,
         });
     }
     if report.cell_count() > MAX_DATA_CELLS {
-        return Err(BodyChartDataError::LimitExceeded {
-            kind: BodyChartDataLimitKind::CellCount,
+        return Err(Error::Limit {
+            kind: LimitKind::CellCount,
             observed: report.cell_count() as u64,
             maximum: MAX_DATA_CELLS as u64,
         });
     }
     if report.label_count() > MAX_DATA_LABEL_COUNT {
-        return Err(BodyChartDataError::LimitExceeded {
-            kind: BodyChartDataLimitKind::LabelCount,
+        return Err(Error::Limit {
+            kind: LimitKind::LabelCount,
             observed: report.label_count() as u64,
             maximum: MAX_DATA_LABEL_COUNT as u64,
         });
     }
     if report.text_bytes() > MAX_DATA_TEXT_BYTES {
-        return Err(BodyChartDataError::LimitExceeded {
-            kind: BodyChartDataLimitKind::TextBytes,
+        return Err(Error::Limit {
+            kind: LimitKind::TextBytes,
             observed: report.text_bytes() as u64,
             maximum: MAX_DATA_TEXT_BYTES as u64,
         });
@@ -999,7 +1034,7 @@ fn charge_materialization_work(
     budget: &mut ArrangementBudget,
     snapshot: chart_data_codec::ChartDataSnapshot<'_>,
     report: chart_data_codec::DecodeReport,
-) -> Result<(), BodyChartDataError> {
+) -> Result<(), Error> {
     // The borrowed iterators intentionally re-scan source spans after strict
     // decode: labels are walked once to preflight text/allocation shape and
     // once to copy, while rows and values are walked once to materialize the
@@ -1011,54 +1046,52 @@ fn charge_materialization_work(
         .checked_mul(10)
         .and_then(|amount| amount.checked_add(report.text_bytes()))
         .and_then(|amount| amount.checked_add(report.cell_count()))
-        .ok_or(BodyChartDataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.work(work).map_err(map_arrangement_error)
 }
 
 fn own_labels(
     labels: chart_data_codec::LabelList<'_>,
     budget: &mut ArrangementBudget,
-) -> Result<Vec<String>, BodyChartDataError> {
+) -> Result<Vec<String>, Error> {
     let count = labels.len();
     if count > MAX_DATA_LABEL_COUNT {
-        return Err(BodyChartDataError::LimitExceeded {
-            kind: BodyChartDataLimitKind::LabelCount,
+        return Err(Error::Limit {
+            kind: LimitKind::LabelCount,
             observed: count as u64,
             maximum: MAX_DATA_LABEL_COUNT as u64,
         });
     }
     let (text_bytes, string_allocations, seen) = labels.iter().try_fold(
         (0usize, 0usize, 0usize),
-        |(text_bytes, string_allocations, seen), label| {
+        |(text_bytes, string_allocations, seen), label| -> Result<_, Error> {
             let text_bytes = text_bytes
                 .checked_add(label.len())
-                .ok_or(BodyChartDataError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             let string_allocations = string_allocations
                 .checked_add(usize::from(!label.is_empty()))
-                .ok_or(BodyChartDataError::InvalidSource)?;
-            let seen = seen
-                .checked_add(1)
-                .ok_or(BodyChartDataError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
+            let seen = seen.checked_add(1).ok_or(Error::InvalidSource)?;
             Ok((text_bytes, string_allocations, seen))
         },
     )?;
     if seen != count {
-        return Err(BodyChartDataError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if text_bytes > MAX_DATA_TEXT_BYTES {
-        return Err(BodyChartDataError::LimitExceeded {
-            kind: BodyChartDataLimitKind::TextBytes,
+        return Err(Error::Limit {
+            kind: LimitKind::TextBytes,
             observed: text_bytes as u64,
             maximum: MAX_DATA_TEXT_BYTES as u64,
         });
     }
     let allocations = usize::from(count != 0)
         .checked_add(string_allocations)
-        .ok_or(BodyChartDataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let retained = count
         .checked_mul(size_of::<String>())
         .and_then(|amount| amount.checked_add(text_bytes))
-        .ok_or(BodyChartDataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget
         .preflight_allocations(allocations)
         .map_err(map_arrangement_error)?;
@@ -1069,19 +1102,19 @@ fn own_labels(
     let mut owned = Vec::new();
     owned
         .try_reserve_exact(count)
-        .map_err(|_| BodyChartDataError::Allocation { amount: count })?;
+        .map_err(|_| Error::Allocation { amount: count })?;
     for label in labels.iter() {
         let mut value = String::new();
         value
             .try_reserve_exact(label.len())
-            .map_err(|_| BodyChartDataError::Allocation {
+            .map_err(|_| Error::Allocation {
                 amount: label.len(),
             })?;
         value.push_str(label);
         owned.push(value);
     }
     if owned.len() != count {
-        return Err(BodyChartDataError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     budget
         .allocations(allocations)
@@ -1094,25 +1127,23 @@ fn own_values(
     rows: chart_data_codec::GridRows<'_>,
     columns: usize,
     budget: &mut ArrangementBudget,
-) -> Result<Vec<Vec<Option<f64>>>, BodyChartDataError> {
+) -> Result<Vec<Vec<Option<f64>>>, Error> {
     let row_count = rows.len();
-    let cells = row_count
-        .checked_mul(columns)
-        .ok_or(BodyChartDataError::InvalidSource)?;
+    let cells = row_count.checked_mul(columns).ok_or(Error::InvalidSource)?;
     if cells > MAX_DATA_CELLS {
-        return Err(BodyChartDataError::LimitExceeded {
-            kind: BodyChartDataLimitKind::CellCount,
+        return Err(Error::Limit {
+            kind: LimitKind::CellCount,
             observed: cells as u64,
             maximum: MAX_DATA_CELLS as u64,
         });
     }
     let allocations = usize::from(row_count != 0)
         .checked_add(row_count)
-        .ok_or(BodyChartDataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let retained = row_count
         .checked_mul(size_of::<Vec<Option<f64>>>())
         .and_then(|amount| amount.checked_add(cells.checked_mul(size_of::<Option<f64>>())?))
-        .ok_or(BodyChartDataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget
         .preflight_allocations(allocations)
         .map_err(map_arrangement_error)?;
@@ -1123,25 +1154,25 @@ fn own_values(
     let mut owned = Vec::new();
     owned
         .try_reserve_exact(row_count)
-        .map_err(|_| BodyChartDataError::Allocation { amount: row_count })?;
+        .map_err(|_| Error::Allocation { amount: row_count })?;
     for row in rows.iter() {
         if row.len() != columns {
-            return Err(BodyChartDataError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let mut values = Vec::new();
         values
             .try_reserve_exact(columns)
-            .map_err(|_| BodyChartDataError::Allocation { amount: columns })?;
+            .map_err(|_| Error::Allocation { amount: columns })?;
         for value in row.values() {
             values.push(value);
         }
         if values.len() != columns {
-            return Err(BodyChartDataError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         owned.push(values);
     }
     if owned.len() != row_count {
-        return Err(BodyChartDataError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     budget
         .allocations(allocations)
@@ -1150,168 +1181,152 @@ fn own_values(
     Ok(owned)
 }
 
-fn map_arrangement_error(error: BodyChartArrangementError) -> BodyChartDataError {
+fn map_arrangement_error(error: BodyChartArrangementError) -> Error {
     match error {
-        BodyChartArrangementError::ChartNotFound { position }
-        | BodyChartArrangementError::ChartPositionNotFound { position } => {
-            BodyChartDataError::ChartNotFound { position }
-        },
-        BodyChartArrangementError::UnsupportedSource => BodyChartDataError::UnsupportedSource,
-        BodyChartArrangementError::InvalidSource => BodyChartDataError::InvalidSource,
-        BodyChartArrangementError::Verification => BodyChartDataError::Verification,
-        BodyChartArrangementError::PatchConflict => BodyChartDataError::PatchConflict,
-        BodyChartArrangementError::LimitExceeded {
+        BodyChartArrangementError::Refused(crate::chart::arrangement::Refusal::ChartNotFound {
+            position,
+        })
+        | BodyChartArrangementError::Refused(
+            crate::chart::arrangement::Refusal::ChartPositionNotFound { position },
+        ) => Error::Refused(Refusal::ChartNotFound { position }),
+        BodyChartArrangementError::Refused(
+            crate::chart::arrangement::Refusal::UnsupportedSource,
+        ) => Error::Refused(Refusal::UnsupportedSource),
+        BodyChartArrangementError::InvalidSource => Error::InvalidSource,
+        BodyChartArrangementError::Verification => Error::Verification,
+        BodyChartArrangementError::PatchConflict => Error::PatchConflict,
+        BodyChartArrangementError::Limit {
             kind,
             observed,
             maximum,
-        } => BodyChartDataError::LimitExceeded {
+        } => Error::Limit {
             kind: map_arrangement_limit(kind),
             observed,
             maximum,
         },
-        BodyChartArrangementError::Allocation { amount } => {
-            BodyChartDataError::Allocation { amount }
-        },
+        BodyChartArrangementError::Allocation { amount } => Error::Allocation { amount },
     }
 }
 
-fn map_arrangement_limit(kind: BodyChartArrangementLimitKind) -> BodyChartDataLimitKind {
+fn map_arrangement_limit(kind: BodyChartArrangementLimitKind) -> LimitKind {
     match kind {
         BodyChartArrangementLimitKind::InputBytes
         | BodyChartArrangementLimitKind::PayloadBytes
-        | BodyChartArrangementLimitKind::TotalPayloadBytes => BodyChartDataLimitKind::InputBytes,
-        BodyChartArrangementLimitKind::PayloadReferences => {
-            BodyChartDataLimitKind::PayloadReferences
-        },
+        | BodyChartArrangementLimitKind::TotalPayloadBytes => LimitKind::InputBytes,
+        BodyChartArrangementLimitKind::PayloadReferences => LimitKind::PayloadReferences,
         BodyChartArrangementLimitKind::WireBytes
-        | BodyChartArrangementLimitKind::WireOutputBytes => BodyChartDataLimitKind::WireBytes,
+        | BodyChartArrangementLimitKind::WireOutputBytes => LimitKind::WireBytes,
         BodyChartArrangementLimitKind::WireFields
         | BodyChartArrangementLimitKind::PayloadItems
         | BodyChartArrangementLimitKind::PayloadMessages
-        | BodyChartArrangementLimitKind::PayloadObjects => BodyChartDataLimitKind::WireFields,
-        BodyChartArrangementLimitKind::WireNesting => BodyChartDataLimitKind::WireNesting,
-        BodyChartArrangementLimitKind::WireWork => BodyChartDataLimitKind::WireWork,
-        BodyChartArrangementLimitKind::WireAllocations => BodyChartDataLimitKind::WireAllocations,
+        | BodyChartArrangementLimitKind::PayloadObjects => LimitKind::WireFields,
+        BodyChartArrangementLimitKind::WireNesting => LimitKind::WireNesting,
+        BodyChartArrangementLimitKind::WireWork => LimitKind::WireWork,
+        BodyChartArrangementLimitKind::WireAllocations => LimitKind::WireAllocations,
         BodyChartArrangementLimitKind::WireRetainedBytes
-        | BodyChartArrangementLimitKind::WireScratchBytes => {
-            BodyChartDataLimitKind::WireRetainedBytes
-        },
+        | BodyChartArrangementLimitKind::WireScratchBytes => LimitKind::WireRetainedBytes,
         BodyChartArrangementLimitKind::OutputBytes
         | BodyChartArrangementLimitKind::Entries
         | BodyChartArrangementLimitKind::EntryBytes
         | BodyChartArrangementLimitKind::TotalEntryBytes
-        | BodyChartArrangementLimitKind::PackageBytes => BodyChartDataLimitKind::InputBytes,
+        | BodyChartArrangementLimitKind::PackageBytes => LimitKind::InputBytes,
     }
 }
 
-fn map_data_codec_error(error: chart_data_codec::DecodeError) -> BodyChartDataError {
+fn map_data_codec_error(error: chart_data_codec::DecodeError) -> Error {
     let Some(limit) = error.resource_limit() else {
-        return BodyChartDataError::InvalidSource;
+        return Error::InvalidSource;
     };
     match limit {
-        DecodeLimit::Bytes { observed, maximum } => BodyChartDataError::LimitExceeded {
-            kind: BodyChartDataLimitKind::WireBytes,
+        DecodeLimit::Bytes { observed, maximum } => Error::Limit {
+            kind: LimitKind::WireBytes,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        DecodeLimit::Fields { observed, maximum } => BodyChartDataError::LimitExceeded {
-            kind: BodyChartDataLimitKind::WireFields,
+        DecodeLimit::Fields { observed, maximum } => Error::Limit {
+            kind: LimitKind::WireFields,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        DecodeLimit::Work { observed, maximum } => BodyChartDataError::LimitExceeded {
-            kind: BodyChartDataLimitKind::WireWork,
+        DecodeLimit::Work { observed, maximum } => Error::Limit {
+            kind: LimitKind::WireWork,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        DecodeLimit::Nesting { observed, maximum } => BodyChartDataError::LimitExceeded {
-            kind: BodyChartDataLimitKind::WireNesting,
+        DecodeLimit::Nesting { observed, maximum } => Error::Limit {
+            kind: LimitKind::WireNesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),
         },
-        DecodeLimit::Cells { observed, maximum } => BodyChartDataError::LimitExceeded {
-            kind: BodyChartDataLimitKind::CellCount,
+        DecodeLimit::Cells { observed, maximum } => Error::Limit {
+            kind: LimitKind::CellCount,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        DecodeLimit::Labels { observed, maximum } => BodyChartDataError::LimitExceeded {
-            kind: BodyChartDataLimitKind::LabelCount,
+        DecodeLimit::Labels { observed, maximum } => Error::Limit {
+            kind: LimitKind::LabelCount,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        DecodeLimit::Text { observed, maximum } => BodyChartDataError::LimitExceeded {
-            kind: BodyChartDataLimitKind::TextBytes,
+        DecodeLimit::Text { observed, maximum } => Error::Limit {
+            kind: LimitKind::TextBytes,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        _ => BodyChartDataError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_data_rewrite_error(error: chart_data_codec::RewriteError) -> BodyChartDataError {
+fn map_data_rewrite_error(error: chart_data_codec::RewriteError) -> Error {
     if let Some(amount) = error.allocation_amount() {
-        return BodyChartDataError::Allocation { amount };
+        return Error::Allocation { amount };
     }
     let Some(limit) = error.resource_limit() else {
-        return BodyChartDataError::InvalidSource;
+        return Error::InvalidSource;
     };
     match limit {
-        chart_data_codec::RewriteLimit::Bytes { observed, maximum } => {
-            BodyChartDataError::LimitExceeded {
-                kind: BodyChartDataLimitKind::WireBytes,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        chart_data_codec::RewriteLimit::Bytes { observed, maximum } => Error::Limit {
+            kind: LimitKind::WireBytes,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        chart_data_codec::RewriteLimit::Fields { observed, maximum } => {
-            BodyChartDataError::LimitExceeded {
-                kind: BodyChartDataLimitKind::WireFields,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        chart_data_codec::RewriteLimit::Fields { observed, maximum } => Error::Limit {
+            kind: LimitKind::WireFields,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        chart_data_codec::RewriteLimit::Work { observed, maximum } => {
-            BodyChartDataError::LimitExceeded {
-                kind: BodyChartDataLimitKind::WireWork,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        chart_data_codec::RewriteLimit::Work { observed, maximum } => Error::Limit {
+            kind: LimitKind::WireWork,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        chart_data_codec::RewriteLimit::Output { observed, maximum } => {
-            BodyChartDataError::LimitExceeded {
-                kind: BodyChartDataLimitKind::WireBytes,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        chart_data_codec::RewriteLimit::Output { observed, maximum } => Error::Limit {
+            kind: LimitKind::WireBytes,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        chart_data_codec::RewriteLimit::Nesting { observed, maximum } => {
-            BodyChartDataError::LimitExceeded {
-                kind: BodyChartDataLimitKind::WireNesting,
-                observed: u64::from(observed),
-                maximum: u64::from(maximum),
-            }
+        chart_data_codec::RewriteLimit::Nesting { observed, maximum } => Error::Limit {
+            kind: LimitKind::WireNesting,
+            observed: u64::from(observed),
+            maximum: u64::from(maximum),
         },
-        chart_data_codec::RewriteLimit::Allocations { observed, maximum } => {
-            BodyChartDataError::LimitExceeded {
-                kind: BodyChartDataLimitKind::WireAllocations,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        chart_data_codec::RewriteLimit::Allocations { observed, maximum } => Error::Limit {
+            kind: LimitKind::WireAllocations,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
         chart_data_codec::RewriteLimit::Retained { observed, maximum }
-        | chart_data_codec::RewriteLimit::Scratch { observed, maximum } => {
-            BodyChartDataError::LimitExceeded {
-                kind: BodyChartDataLimitKind::WireRetainedBytes,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        | chart_data_codec::RewriteLimit::Scratch { observed, maximum } => Error::Limit {
+            kind: LimitKind::WireRetainedBytes,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        _ => BodyChartDataError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_data_error(_error: DataError) -> BodyChartDataError {
-    BodyChartDataError::InvalidSource
+fn map_data_error(_error: DataError) -> Error {
+    Error::InvalidSource
 }
 
 #[cfg(test)]
@@ -1366,7 +1381,7 @@ mod tests {
             chart_data_codec::decode_modern_with_report(source, &options).expect("chart data");
 
         let mut exhausted = ArrangementBudget::new(&package).expect("fresh arrangement budget");
-        let BodyChartArrangementError::LimitExceeded { maximum, .. } =
+        let BodyChartArrangementError::Limit { maximum, .. } =
             exhausted.work(usize::MAX).expect_err("finite work ceiling")
         else {
             panic!("expected a work limit");
@@ -1377,8 +1392,8 @@ mod tests {
         let result = charge_materialization_work(&mut exhausted, snapshot, report);
         assert!(matches!(
             result,
-            Err(BodyChartDataError::LimitExceeded {
-                kind: BodyChartDataLimitKind::WireWork,
+            Err(Error::Limit {
+                kind: LimitKind::WireWork,
                 ..
             })
         ));
@@ -1409,8 +1424,8 @@ mod tests {
         let result = own_values(snapshot.rows(), snapshot.column_count(), &mut budget);
         assert!(matches!(
             result,
-            Err(BodyChartDataError::LimitExceeded {
-                kind: BodyChartDataLimitKind::WireRetainedBytes,
+            Err(Error::Limit {
+                kind: LimitKind::WireRetainedBytes,
                 ..
             })
         ));
@@ -1557,7 +1572,7 @@ mod tests {
                 .expect("body chart edit")
                 .set(labels_changed)
                 .commit(),
-            Err(BodyChartDataError::LabelsChanged)
+            Err(Error::Refused(Refusal::LabelsChanged))
         ));
 
         let dimensions_changed = ChartData::new(
@@ -1576,7 +1591,7 @@ mod tests {
                 .expect("body chart edit")
                 .set(dimensions_changed)
                 .commit(),
-            Err(BodyChartDataError::ShapeChanged)
+            Err(Error::Refused(Refusal::ShapeChanged))
         ));
     }
 
@@ -1617,7 +1632,7 @@ mod tests {
             .expect("body chart data commit");
         assert!(matches!(
             commit.package().apply_body_chart_data(commit.patch()),
-            Err(BodyChartDataError::PatchConflict)
+            Err(Error::PatchConflict)
         ));
     }
 }

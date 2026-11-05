@@ -1,8 +1,9 @@
 //! Focused regression tests for the inert annotation-bookmark owner.
 
-use super::{
-    Editor, MAX_ENTRIES, Snapshot, Tag, TagId, Tags, TransactionError, parse, parse_bytes, to_bytes,
-};
+use super::package::Editor;
+use super::record::{Error as TransactionError, Snapshot};
+use super::{MAX_ENTRIES, Tag, TagId, Tags, parse, parse_bytes, to_bytes};
+use crate::SourceLimits;
 use crate::package::Error as PackageError;
 use crate::parts::fib::FileInformationBlock;
 use crate::parts::protection::{ProtectionAuthorization, ProtectionPolicy};
@@ -22,9 +23,18 @@ fn sample() -> Tags {
 #[test]
 fn round_trip_preserves_opaque_tag_ids() {
     let value = sample();
-    let bytes = to_bytes(&value).expect("sample serializes");
-    assert_eq!(parse_bytes(&bytes).expect("sample parses"), value);
-    assert_eq!(parse_bytes(&bytes).unwrap().to_bytes().unwrap(), bytes);
+    let bytes = to_bytes(&value, &SourceLimits::default()).expect("sample serializes");
+    assert_eq!(
+        parse_bytes(&bytes, &SourceLimits::default()).expect("sample parses"),
+        value
+    );
+    assert_eq!(
+        parse_bytes(&bytes, &SourceLimits::default())
+            .unwrap()
+            .to_bytes(&SourceLimits::default())
+            .unwrap(),
+        bytes
+    );
     assert_eq!(value.entries()[0].id().raw(), 0x8000_0001);
 }
 
@@ -45,56 +55,110 @@ fn table_with_count(count: usize) -> Vec<u8> {
 #[test]
 fn accepts_maximum_count_and_rejects_correctly_sized_next_count() {
     let maximum = table_with_count(MAX_ENTRIES);
-    let tags = parse_bytes(&maximum).expect("maximum annotation-bookmark table parses");
+    let tags = parse_bytes(&maximum, &SourceLimits::default())
+        .expect("maximum annotation-bookmark table parses");
     assert_eq!(tags.len(), MAX_ENTRIES);
 
     let too_many = table_with_count(MAX_ENTRIES + 1);
     assert_eq!(too_many.len(), maximum.len() + 12);
-    assert!(parse_bytes(&too_many).is_err());
+    assert!(parse_bytes(&too_many, &SourceLimits::default()).is_err());
 }
 
 #[test]
 fn parses_fib_range_and_rejects_invalid_atnbe_shapes() {
-    let payload = to_bytes(&sample()).unwrap();
+    let payload = to_bytes(&sample(), &SourceLimits::default()).unwrap();
     let offset = 4usize;
     let mut table = vec![0xa5; offset];
     table.extend_from_slice(&payload);
     let fib = fib_with_pointer(offset, payload.len());
-    assert_eq!(parse(&fib, &table).unwrap(), Some(sample()));
+    assert_eq!(
+        parse(&fib, &table, &SourceLimits::default()).unwrap(),
+        Some(sample())
+    );
 
     let mut wrong_extend = payload.clone();
     wrong_extend[0..2].copy_from_slice(&0u16.to_le_bytes());
-    assert!(parse_bytes(&wrong_extend).is_err());
+    assert!(parse_bytes(&wrong_extend, &SourceLimits::default()).is_err());
 
     let mut wrong_extra = payload.clone();
     wrong_extra[4..6].copy_from_slice(&0u16.to_le_bytes());
-    assert!(parse_bytes(&wrong_extra).is_err());
+    assert!(parse_bytes(&wrong_extra, &SourceLimits::default()).is_err());
 
     let mut wrong_count = payload.clone();
     wrong_count[2..4].copy_from_slice(&0x3ffcu16.to_le_bytes());
-    let error = parse_bytes(&wrong_count).unwrap_err();
+    let error = parse_bytes(&wrong_count, &SourceLimits::default()).unwrap_err();
     assert!(error.to_string().contains("0x3FFB"));
 
     let mut wrong_string = payload.clone();
     wrong_string[6..8].copy_from_slice(&1u16.to_le_bytes());
-    assert!(parse_bytes(&wrong_string).is_err());
+    assert!(parse_bytes(&wrong_string, &SourceLimits::default()).is_err());
 
     let mut wrong_class = payload.clone();
     wrong_class[8..10].copy_from_slice(&0u16.to_le_bytes());
-    assert!(parse_bytes(&wrong_class).is_err());
+    assert!(parse_bytes(&wrong_class, &SourceLimits::default()).is_err());
 
     let mut wrong_old_tag = payload.clone();
     wrong_old_tag[16..20].copy_from_slice(&0i32.to_le_bytes());
-    assert!(parse_bytes(&wrong_old_tag).is_err());
+    assert!(parse_bytes(&wrong_old_tag, &SourceLimits::default()).is_err());
 
     let mut duplicate = payload.clone();
     duplicate[22..26].copy_from_slice(&0x8000_0001u32.to_le_bytes());
-    assert!(parse_bytes(&duplicate).is_err());
+    assert!(parse_bytes(&duplicate, &SourceLimits::default()).is_err());
 
-    assert!(parse_bytes(&payload[..payload.len() - 1]).is_err());
+    assert!(parse_bytes(&payload[..payload.len() - 1], &SourceLimits::default()).is_err());
     let mut trailing = payload;
     trailing.push(0);
-    assert!(parse_bytes(&trailing).is_err());
+    assert!(parse_bytes(&trailing, &SourceLimits::default()).is_err());
+}
+
+#[test]
+fn annotation_count_is_checked_against_minimum_wire_size_before_reservation() {
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(&0xFFFFu16.to_le_bytes());
+    bytes.extend_from_slice(&100u16.to_le_bytes());
+    bytes.extend_from_slice(&10u16.to_le_bytes());
+    assert!(parse_bytes(&bytes, &SourceLimits::default()).is_err());
+}
+
+#[test]
+fn raw_codec_reports_entry_limit_before_decoding() {
+    let bytes = to_bytes(&sample(), &SourceLimits::default()).unwrap();
+    let limits = SourceLimits::builder()
+        .max_entry_bytes(bytes.len() - 1)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        parse_bytes(&bytes, &limits),
+        Err(PackageError::Limit {
+            kind: crate::package::SourceLimitKind::EntryBytes,
+            ..
+        })
+    ));
+}
+
+#[test]
+fn raw_writer_honors_exact_and_one_under_entry_limits() {
+    let value = sample();
+    let bytes = to_bytes(&value, &SourceLimits::default()).unwrap();
+    let exact = SourceLimits::builder()
+        .max_entry_bytes(bytes.len())
+        .unwrap()
+        .build()
+        .unwrap();
+    assert_eq!(to_bytes(&value, &exact).unwrap(), bytes);
+    let one_under = SourceLimits::builder()
+        .max_entry_bytes(bytes.len() - 1)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        to_bytes(&value, &one_under),
+        Err(PackageError::Limit {
+            kind: crate::package::SourceLimitKind::EntryBytes,
+            ..
+        })
+    ));
 }
 
 #[test]
@@ -105,7 +169,7 @@ fn transaction_is_atomic_and_reversible() {
         transaction.replace_entry(99, Tag::new(TagId::new(9))),
         Err(TransactionError::Invalid(_))
     ));
-    assert_eq!(transaction.snapshot(), &source);
+    assert_eq!(transaction.staged(), &source);
 
     transaction
         .replace_entry(0, Tag::new(TagId::new(0x1234)))
@@ -113,18 +177,21 @@ fn transaction_is_atomic_and_reversible() {
     let commit = transaction.commit().unwrap();
     assert!(!commit.patch().is_noop());
     assert_eq!(
-        commit.patch().inverse().apply(commit.snapshot()).unwrap(),
+        commit.patch().inverse().apply(commit.package()).unwrap(),
         source
     );
     assert!(matches!(
         commit.patch().apply(&Snapshot::empty()),
-        Err(TransactionError::Conflict)
+        Err(TransactionError::PatchConflict)
     ));
 }
 
 #[test]
 fn package_noop_returns_exact_original_cfb_bytes() {
-    let original = write_doc(b"opaque prefix", Some(&to_bytes(&sample()).unwrap()));
+    let original = write_doc(
+        b"opaque prefix",
+        Some(&to_bytes(&sample(), &SourceLimits::default()).unwrap()),
+    );
     let committed = Editor::open(original.clone()).unwrap().commit().unwrap();
     assert_eq!(committed.snapshot().finish().unwrap(), original);
     assert_eq!(committed.package_patch().after(), original.as_slice());
@@ -139,7 +206,9 @@ fn package_edit_appends_and_clear_only_removes_the_fib_range() {
     let reopened = Editor::open(written.clone()).unwrap();
     assert_eq!(reopened.value(), Some(&sample()));
 
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(written)).unwrap();
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(written), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     let table = ole.open_stream(&["0Table"]).unwrap();
     assert!(table.starts_with(b"opaque prefix"));
     drop(table);
@@ -151,7 +220,9 @@ fn package_edit_appends_and_clear_only_removes_the_fib_range() {
     let reopened = Editor::open(finished.clone()).unwrap();
     assert!(reopened.value().is_none());
 
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(finished)).unwrap();
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(finished), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     let word = ole.open_stream(&["WordDocument"]).unwrap();
     assert_eq!(&word[POINTER..POINTER + 8], &[0; 8]);
     let table = ole.open_stream(&["0Table"]).unwrap();
@@ -176,13 +247,21 @@ fn protected_package_allows_noop_but_requires_explicit_authorization_for_metadat
     let committed = editor.set(sample()).unwrap();
     assert!(!committed.patch().is_noop());
     assert!(committed.snapshot().value().is_some());
-    assert!(committed.package_patch().apply(&original).is_err());
+    assert!(matches!(
+        committed.package_patch().apply(&original),
+        Err(PackageError::ProtectionDenied(_))
+    ));
+    let changed = committed.snapshot().finish().unwrap();
+    assert!(matches!(
+        committed.package_patch().apply(&changed),
+        Err(PackageError::PatchConflict)
+    ));
     assert_eq!(
         committed
             .package_patch()
             .apply_with_policy(&original, policy)
             .unwrap(),
-        committed.snapshot().finish().unwrap()
+        changed
     );
 }
 

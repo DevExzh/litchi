@@ -1,10 +1,8 @@
 //! Parser for data-pilot fields and field-level references.
 
 use litchi_core::Result;
-use quick_xml::{
-    events::{BytesStart, Event},
-    reader::NsReader,
-};
+use litchi_odf_common::{ResolvedReader, XmlStreamLimits};
+use quick_xml::events::{BytesStart, Event};
 
 use crate::model::data_pilot::model::{
     Field, FieldReference, Orientation, ReferenceMemberType, ReferenceType,
@@ -20,7 +18,10 @@ use super::{
 };
 use crate::model::data_pilot::invalid_message;
 
-pub(super) fn field_from_start(reader: &NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Field> {
+pub(super) fn field_from_start(
+    reader: &ResolvedReader<'_>,
+    start: &BytesStart<'_>,
+) -> Result<Field> {
     let orientation = Orientation::parse(&required_attr(reader, start, b"orientation")?)?;
     Ok(Field {
         source_field_name: required_attr(reader, start, b"source-field-name")?,
@@ -35,18 +36,19 @@ pub(super) fn field_from_start(reader: &NsReader<&[u8]>, start: &BytesStart<'_>)
     })
 }
 
-pub(super) fn parse_field(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Field> {
+pub(super) fn parse_field(
+    reader: &mut ResolvedReader<'_>,
+    start: &BytesStart<'_>,
+    limits: &XmlStreamLimits,
+) -> Result<Field> {
     let mut field = field_from_start(reader, start)?;
-    let mut buf = Vec::new();
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buf)
-            .map_err(xml_error)?;
+        let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         match event {
             Event::Start(ref element) if is_table(&namespace, element, b"data-pilot-level") => {
                 set_once(
                     &mut field.level,
-                    parse_level(reader, element)?,
+                    parse_level(reader, element, limits)?,
                     "data-pilot level",
                 )?;
             },
@@ -69,7 +71,7 @@ pub(super) fn parse_field(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) 
             Event::Start(ref element) if is_table(&namespace, element, b"data-pilot-groups") => {
                 set_once(
                     &mut field.groups,
-                    parse_groups(reader, element)?,
+                    parse_groups(reader, element, limits)?,
                     "field groups",
                 )?;
             },
@@ -93,13 +95,15 @@ pub(super) fn parse_field(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) 
                 return Err(invalid_message("invalid child in table:data-pilot-field"));
             },
         }
-        buf.clear();
     }
     field.validate()?;
     Ok(field)
 }
 
-fn parse_reference(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<FieldReference> {
+fn parse_reference(
+    reader: &ResolvedReader<'_>,
+    element: &BytesStart<'_>,
+) -> Result<FieldReference> {
     Ok(FieldReference {
         field_name: required_attr(reader, element, b"field-name")?,
         member_type: ReferenceMemberType::parse(&required_attr(reader, element, b"member-type")?)?,

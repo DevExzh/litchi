@@ -1,5 +1,6 @@
 //! Workbook/container hosting and transactional chart edits.
 
+use litchi_core::edit::RefusalKind;
 #[cfg(test)]
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -7,7 +8,9 @@ use std::sync::Arc;
 
 use litchi_biff::{Limits as BiffLimits, Records};
 use litchi_ograph::chart::{Kind as GraphChartKind, Ref as GraphChartRef, Refs as GraphCharts};
-use litchi_ole_common::object::{Editor as ObjectEditor, Limits as ObjectLimits, Targets};
+use litchi_ole_common::object::{
+    Edit as ObjectEditor, Limits as ObjectLimits, OpenOptions, Package as ObjectPackage, Targets,
+};
 
 use super::chart_area;
 #[cfg(test)]
@@ -45,37 +48,59 @@ const UNSUPPORTED_AUTHORING_REASON: &str = "fresh and replacement XLS chart auth
 const UNSUPPORTED_EMBEDDED_MUTATION_REASON: &str = "embedded XLS chart mutation requires complete MsoDrawing/Continue, Obj/Continue, chart-substream, and OfficeArt drawing-group ownership";
 
 pub(crate) fn unsupported_authoring<T>() -> Result<T> {
-    Err(litchi_ograph::Error::UnsupportedAuthoring {
-        reason: UNSUPPORTED_AUTHORING_REASON,
-    }
-    .into())
+    Err(
+        litchi_ograph::Error::Refused(litchi_core::edit::Refusal::new(
+            RefusalKind::UnsupportedContent,
+            "author",
+            UNSUPPORTED_AUTHORING_REASON,
+        ))
+        .into(),
+    )
 }
 
 pub(crate) fn unsupported_embedded_mutation<T>() -> Result<T> {
-    Err(litchi_ograph::Error::UnsupportedMutation {
-        operation: "embedded XLS chart drawing",
-        reason: UNSUPPORTED_EMBEDDED_MUTATION_REASON,
-    }
-    .into())
+    Err(
+        litchi_ograph::Error::Refused(litchi_core::edit::Refusal::new(
+            RefusalKind::UnsupportedOperation,
+            "embedded XLS chart drawing",
+            UNSUPPORTED_EMBEDDED_MUTATION_REASON,
+        ))
+        .into(),
+    )
 }
 
-/// Transactional editor for existing BIFF8 chart substreams.
-pub struct Editor {
-    pub(super) package: ObjectEditor,
+/// A staged edit of the BIFF8 chart substreams of one package (the `chart`
+/// family, record 0351 §2.3): `Package::edit_charts` starts it,
+/// [`Edit::commit`] publishes a new package. Dropping it discards it.
+pub struct Edit {
+    base: crate::scoped::Base,
+    pub(super) package: Option<ObjectEditor>,
     pub(super) workbook_path: Vec<String>,
     pub(super) workbook: Arc<[u8]>,
     limits: Limits,
     charts: Vec<StoredChart>,
+    lazy: Option<(crate::scoped::Base, crate::Package, Limits)>,
 }
 
-impl Editor {
+impl Edit {
     /// Takes ownership of an XLS compound file and validates its chart inventory.
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn open(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
+    #[cfg(test)]
+    pub(crate) fn open(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
+        Self::open_based(None, bytes, limits)
+    }
+
+    fn open_based(base: crate::scoped::Base, bytes: Vec<u8>, limits: Limits) -> Result<Self> {
         validate_limits(limits)?;
-        let package = ObjectEditor::open(bytes, Targets::default(), ObjectLimits::default())?;
+        let package = ObjectPackage::open_with_options(
+            bytes,
+            OpenOptions::new()
+                .targets(Targets::default())
+                .limits(ObjectLimits::default()),
+        )?
+        .edit()?;
         let workbook_path = [vec!["Workbook".into()], vec!["Book".into()]]
             .into_iter()
             .find(|path| package.stream(path).is_some())
@@ -88,32 +113,83 @@ impl Editor {
         }
         let charts = parse_workbook_charts(&workbook, limits)?;
         Ok(Self {
-            package,
+            base,
+            package: Some(package),
             workbook_path,
             workbook,
             limits,
             charts,
+            lazy: None,
         })
+    }
+
+    fn lazy(base: crate::scoped::Base, package: crate::Package, limits: Limits) -> Result<Self> {
+        validate_limits(limits)?;
+        if package.is_encrypted() {
+            return Err(Error::refused(
+                RefusalKind::Protected,
+                "edit chart",
+                "an encrypted workbook cannot be republished by a scoped edit",
+            ));
+        }
+        Ok(Self {
+            base,
+            package: None,
+            workbook_path: Vec::new(),
+            workbook: Arc::new([]),
+            limits,
+            charts: Vec::new(),
+            lazy: Some((None, package, limits)),
+        })
+    }
+
+    fn ensure_open(&mut self) -> Result<()> {
+        let Some((base, package, limits)) = self.lazy.take() else {
+            return Ok(());
+        };
+        let (captured_base, bytes) = match crate::scoped::capture(&package) {
+            Ok(captured) => captured,
+            Err(error) => {
+                self.lazy = Some((base, package, limits));
+                return Err(error);
+            },
+        };
+        let eager = match Self::open_based(captured_base, bytes, limits) {
+            Ok(eager) => eager,
+            Err(error) => {
+                self.lazy = Some((base, package, limits));
+                return Err(error);
+            },
+        };
+        self.base = eager.base;
+        self.package = eager.package;
+        self.workbook_path = eager.workbook_path;
+        self.workbook = eager.workbook;
+        self.limits = eager.limits;
+        self.charts = eager.charts;
+        Ok(())
     }
 
     /// Iterates borrowed chart entries in workbook drawing order.
     #[must_use]
-    pub fn charts(&self) -> impl ExactSizeIterator<Item = &Entry> {
-        self.charts.iter().map(|value| &value.entry)
+    pub fn charts(&mut self) -> Result<impl ExactSizeIterator<Item = &Entry>> {
+        self.ensure_open()?;
+        Ok(self.charts.iter().map(|value| &value.entry))
     }
 
     /// Validates the known MS-XLS chart semantics in every discovered chart.
     ///
     /// This read-only pass does not evaluate formulas, inspect a renderer, or
     /// rewrite the `OfficeArt` drawing graph that hosts embedded charts. The
-    /// ordinary [`Self::open`] path remains compatible with partial chart
+    /// ordinary [`crate::Package::edit_charts`] path remains compatible with partial chart
     /// projections; callers opt into this stricter data-relationship check.
     ///
     /// # Errors
     ///
     /// Returns the first semantic validation error found in the discovered
     /// chart entries.
-    pub fn validate_semantics(&self) -> Result<()> {
+    pub fn validate_semantics(&mut self) -> Result<()> {
+        self.ensure_open()?;
         for value in &self.charts {
             value.entry.chart.validate_semantics(self.limits)?;
         }
@@ -262,34 +338,40 @@ impl Editor {
 
     /// Consume the editor and return the parsed chart inventory without persisting.
     #[must_use]
-    pub fn into_charts(self) -> Vec<Entry> {
-        self.charts.into_iter().map(|value| value.entry).collect()
+    pub fn into_charts(mut self) -> Result<Vec<Entry>> {
+        self.ensure_open()?;
+        Ok(self.charts.into_iter().map(|value| value.entry).collect())
     }
 
     /// Looks up a chart by worksheet name and semantic position.
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn get(&self, selector: Selector<'_>) -> Result<Option<&Chart>> {
+    pub fn get(&mut self, selector: Selector<'_>) -> Result<Option<&Chart>> {
         let Some(location) = self.resolve(selector)? else {
             return Ok(None);
         };
-        Ok(self.at(&location))
+        self.at(&location)
     }
 
     /// Looks up a chart using a checked low-level host location.
-    #[must_use]
-    pub fn at(&self, location: &Location) -> Option<&Chart> {
-        self.charts
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the deferred chart inventory cannot be opened.
+    pub fn at(&mut self, location: &Location) -> Result<Option<&Chart>> {
+        self.ensure_open()?;
+        Ok(self
+            .charts
             .iter()
             .find(|value| &value.entry.location == location)
-            .map(|value| &value.entry.chart)
+            .map(|value| &value.entry.chart))
     }
 
     /// Refuses fresh embedded-chart authoring until its complete BIFF grammar is available.
     ///
     /// The editor is unchanged when this returns
-    /// [`litchi_ograph::Error::UnsupportedAuthoring`] through [`Error::Graph`].
+    /// [`litchi_ograph::Error::Refused`] through [`Error::Graph`].
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
@@ -300,7 +382,7 @@ impl Editor {
     /// Refuses fresh embedded-chart authoring at a checked raw host location.
     ///
     /// The editor is unchanged when this returns
-    /// [`litchi_ograph::Error::UnsupportedAuthoring`] through [`Error::Graph`].
+    /// [`litchi_ograph::Error::Refused`] through [`Error::Graph`].
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
@@ -322,6 +404,7 @@ impl Editor {
         index: usize,
         chart: Chart,
     ) -> Result<()> {
+        self.ensure_open()?;
         let (_, sheets) = bindings(&self.workbook)?;
         let sheet = sheets
             .iter()
@@ -364,7 +447,7 @@ impl Editor {
     /// Refuses fresh chart-sheet authoring until its complete BIFF grammar is available.
     ///
     /// The editor is unchanged when this returns
-    /// [`litchi_ograph::Error::UnsupportedAuthoring`] through [`Error::Graph`].
+    /// [`litchi_ograph::Error::Refused`] through [`Error::Graph`].
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
@@ -375,7 +458,7 @@ impl Editor {
     /// Refuses fresh chart-sheet authoring at a checked raw tab index.
     ///
     /// The editor is unchanged when this returns
-    /// [`litchi_ograph::Error::UnsupportedAuthoring`] through [`Error::Graph`].
+    /// [`litchi_ograph::Error::Refused`] through [`Error::Graph`].
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
@@ -393,6 +476,7 @@ impl Editor {
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn remove_sheet_at(&mut self, sheet_index: usize) -> Result<Chart> {
+        self.ensure_open()?;
         let (_, sheets) = bindings(&self.workbook)?;
         let sheet = sheets
             .iter()
@@ -423,6 +507,7 @@ impl Editor {
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn reorder_sheets(&mut self, order: &[&str]) -> Result<()> {
+        self.ensure_open()?;
         let (_, sheets) = bindings(&self.workbook)?;
         if order.len() != sheets.len() {
             return invalid(BOUNDSHEET, "sheet reorder must contain every tab");
@@ -450,6 +535,7 @@ impl Editor {
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn reorder_sheets_at(&mut self, order: &[usize]) -> Result<()> {
+        self.ensure_open()?;
         let count = bindings(&self.workbook)?.1.len();
         if order.len() != count {
             return invalid(BOUNDSHEET, "sheet reorder must contain every tab");
@@ -475,7 +561,7 @@ impl Editor {
     /// Refuses replacement authoring until its complete BIFF grammar is available.
     ///
     /// The editor is unchanged when this returns
-    /// [`litchi_ograph::Error::UnsupportedAuthoring`] through [`Error::Graph`].
+    /// [`litchi_ograph::Error::Refused`] through [`Error::Graph`].
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
@@ -486,7 +572,7 @@ impl Editor {
     /// Refuses replacement authoring at a checked low-level host location.
     ///
     /// The editor is unchanged when this returns
-    /// [`litchi_ograph::Error::UnsupportedAuthoring`] through [`Error::Graph`].
+    /// [`litchi_ograph::Error::Refused`] through [`Error::Graph`].
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
@@ -498,7 +584,7 @@ impl Editor {
     ///
     /// Embedded charts participate in the worksheet `OfficeArt` drawing graph;
     /// until that complete ownership is modeled, the editor returns
-    /// [`litchi_ograph::Error::UnsupportedMutation`] without mutation.
+    /// [`litchi_ograph::Error::Refused`] without mutation.
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
@@ -517,6 +603,7 @@ impl Editor {
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn remove_at(&mut self, location: &Location) -> Result<Chart> {
+        self.ensure_open()?;
         if let Location::ChartSheet { sheet_index } = location {
             return self.remove_sheet_at(*sheet_index);
         }
@@ -538,6 +625,7 @@ impl Editor {
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn reorder(&mut self, sheet: &str, order: &[usize]) -> Result<()> {
+        self.ensure_open()?;
         let (_, sheets) = bindings(&self.workbook)?;
         let sheet = sheets
             .iter()
@@ -583,6 +671,7 @@ impl Editor {
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn reorder_at(&mut self, sheet_index: usize, object_ids: &[u16]) -> Result<()> {
+        self.ensure_open()?;
         let (_, sheets) = bindings(&self.workbook)?;
         let sheet = sheets
             .iter()
@@ -646,12 +735,38 @@ impl Editor {
         unsupported_embedded_mutation()
     }
 
-    /// Consumes the editor and returns the rewritten compound-file allocation.
+    /// The rewritten compound-file allocation (the codec-level output).
+    pub(crate) fn finish(mut self) -> Result<Vec<u8>> {
+        self.ensure_open()?;
+        let package = self
+            .package
+            .as_ref()
+            .ok_or_else(|| Error::InvalidData("chart edit lost its object package".into()))?;
+        crate::scoped::object_editor_bytes(package)
+    }
+
+    /// Validate the staged chart edits and publish them as a new package.
+    ///
     /// # Errors
     ///
-    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn finish(self) -> Result<Vec<u8>> {
-        self.package.finish().map_err(Into::into)
+    /// Returns an error when the edited compound file cannot be rendered or
+    /// republished, or [`Error::Signed`] for a changed signed workbook.
+    pub fn commit(mut self) -> Result<Commit> {
+        self.ensure_open()?;
+        let base = self.base.clone();
+        let before = self
+            .package
+            .as_ref()
+            .ok_or_else(|| Error::InvalidData("chart edit lost its object package".into()))?
+            .source_shared();
+        let after = self.finish()?;
+        let package = crate::scoped::publish(base, &before, &after)?;
+        let patch = Patch {
+            before: Arc::from(before.as_slice()),
+            after: Arc::from(after),
+        };
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(package, patch, diagnostics))
     }
 
     #[cfg(test)]
@@ -670,6 +785,8 @@ impl Editor {
         }
         let workbook: Arc<[u8]> = workbook.into();
         self.package
+            .as_mut()
+            .ok_or_else(|| Error::InvalidData("chart edit lost its object package".into()))?
             .put_stream_shared(&self.workbook_path, Arc::clone(&workbook))?;
         self.workbook = workbook;
         self.charts = reparsed;
@@ -683,12 +800,15 @@ impl Editor {
         let charts = parse_workbook_charts(&workbook, self.limits)?;
         let workbook: Arc<[u8]> = workbook.into();
         self.package
+            .as_mut()
+            .ok_or_else(|| Error::InvalidData("chart edit lost its object package".into()))?
             .put_stream_shared(&self.workbook_path, Arc::clone(&workbook))?;
         self.workbook = workbook;
         Ok(std::mem::replace(&mut self.charts, charts))
     }
 
-    pub(crate) fn resolve(&self, selector: Selector<'_>) -> Result<Option<Location>> {
+    pub(crate) fn resolve(&mut self, selector: Selector<'_>) -> Result<Option<Location>> {
+        self.ensure_open()?;
         let (_, sheets) = bindings(&self.workbook)?;
         match selector {
             Selector::Sheet(name) => Ok(sheets
@@ -718,6 +838,134 @@ impl Editor {
     }
 }
 
+/// A published chart edit: the new package, its exact whole-package patch and
+/// diagnostics.
+pub type Commit = litchi_core::edit::Commit<crate::Package, Patch>;
+
+/// Content-free diagnostics of one chart commit.
+pub use litchi_core::edit::Diagnostics;
+
+/// A chart edit limit dimension: the bounds of [`Limits`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// The Workbook stream bytes the chart edit reads and writes.
+    WorkbookBytes,
+    /// The chart substreams of one workbook.
+    Charts,
+}
+
+/// Per-edit configuration of a chart edit.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct EditOptions {
+    limits: Limits,
+}
+
+impl EditOptions {
+    /// Default options: the default chart bounds.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Select the chart bounds.
+    #[must_use]
+    pub const fn limits(mut self, limits: Limits) -> Self {
+        self.limits = limits;
+        self
+    }
+
+    /// The selected chart bounds.
+    #[must_use]
+    pub const fn limits_value(&self) -> Limits {
+        self.limits
+    }
+}
+
+/// An exact, reversible whole-package chart patch.
+#[derive(Clone, PartialEq, Eq)]
+pub struct Patch {
+    before: Arc<[u8]>,
+    after: Arc<[u8]>,
+}
+
+impl std::fmt::Debug for Patch {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Patch")
+            .field("before_bytes", &self.before.len())
+            .field("after_bytes", &self.after.len())
+            .finish()
+    }
+}
+
+impl Patch {
+    /// Whether applying the patch changes nothing.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.before == self.after
+    }
+
+    /// The patch that undoes this one.
+    #[must_use]
+    pub fn inverse(&self) -> Self {
+        Self {
+            before: Arc::clone(&self.after),
+            after: Arc::clone(&self.before),
+        }
+    }
+
+    /// The exact package bytes the patch applies to.
+    #[must_use]
+    pub fn before(&self) -> &[u8] {
+        &self.before
+    }
+
+    /// The exact package bytes the patch produces.
+    #[must_use]
+    pub fn after(&self) -> &[u8] {
+        &self.after
+    }
+}
+
+impl crate::Package {
+    /// Start a chart edit of this package with the default chart bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an encrypted workbook or a malformed chart
+    /// inventory.
+    pub fn edit_charts(&self) -> Result<Edit> {
+        self.edit_charts_with_options(EditOptions::default())
+    }
+
+    /// Start a chart edit of this package under explicit chart bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::edit_charts`], or a limit error
+    /// when the package exceeds `options`.
+    pub fn edit_charts_with_options(&self, options: EditOptions) -> Result<Edit> {
+        Edit::lazy(Some(self.clone()), self.clone(), options.limits_value())
+    }
+
+    /// Replay a chart patch onto the exact package it was made from.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when this package is not the patch's
+    /// source, or [`Error::Signed`] for a changed signed workbook.
+    pub fn apply_charts(&self, patch: &Patch) -> Result<Commit> {
+        crate::scoped::replay_source(self, patch.before(), "edit chart")?;
+        let package = crate::scoped::publish(Some(self.clone()), patch.before(), patch.after())?;
+        Ok(Commit::new(
+            package,
+            patch.clone(),
+            Diagnostics::new(!patch.is_noop()),
+        ))
+    }
+}
+
 /// The Obj identifier assigned to the chart embedded in a test-only workbook.
 #[cfg(test)]
 pub(super) const GENERATED_CHART_OBJECT_ID: u16 = 1;
@@ -733,7 +981,7 @@ const GENERATED_SHEET_NAME: &str = "Sheet1";
 
 /// Refuses fresh standalone BIFF8 chart-workbook authoring.
 ///
-/// This public entry point returns [`litchi_ograph::Error::UnsupportedAuthoring`]
+/// This public entry point returns [`litchi_ograph::Error::Refused`]
 /// through [`Error::Graph`] until the complete Office-compatible chart
 /// grammar is implemented.
 /// # Errors
@@ -751,7 +999,7 @@ pub(super) fn build_workbook_fixture(chart: Chart, limits: Limits) -> Result<Vec
     package.create_stream(&["Workbook"], &minimal_workbook_stream()?)?;
     let mut bytes = std::io::Cursor::new(Vec::new());
     package.write_to(&mut bytes)?;
-    let mut editor = Editor::open(bytes.into_inner(), limits)?;
+    let mut editor = Edit::open(bytes.into_inner(), limits)?;
     editor.insert_fixture_at(0, GENERATED_CHART_OBJECT_ID, 0, chart)?;
     editor.finish()
 }
@@ -1081,9 +1329,7 @@ pub(crate) fn write_rr_tab_ids(
     Ok(output)
 }
 pub(crate) fn names_equal(left: &str, right: &str) -> bool {
-    left.chars()
-        .flat_map(char::to_lowercase)
-        .eq(right.chars().flat_map(char::to_lowercase))
+    crate::sheet_name::equivalent(left, right)
 }
 #[cfg(test)]
 pub(crate) fn validate_sheet_name(name: &str) -> Result<()> {
@@ -1136,7 +1382,7 @@ fn parse_workbook_charts(input: &[u8], limits: Limits) -> Result<Vec<StoredChart
     for sheet in &sheets {
         if sheet.kind == 2 {
             let bytes = &input[sheet.start..sheet.end];
-            let chart_ref = GraphChartRef::with_limits(bytes, chart_scan_limits(limits))
+            let chart_ref = GraphChartRef::open(bytes, chart_scan_limits(limits))
                 .map_err(|error| graph_error(BOF, error))?;
             if chart_ref.kind() != GraphChartKind::Excel {
                 return invalid(BOF, "chart sheet uses a non-Excel chart grammar");
@@ -1178,7 +1424,7 @@ fn parse_workbook_charts(input: &[u8], limits: Limits) -> Result<Vec<StoredChart
                 chart_objects.push((id, start, end));
             }
         }
-        let charts = GraphCharts::with_limits(bytes, chart_scan_limits(limits))
+        let charts = GraphCharts::open_workbook(bytes, chart_scan_limits(limits))
             .map_err(|error| graph_error(BOF, error))?;
         for chart_ref in charts {
             let chart_ref = chart_ref.map_err(|error| graph_error(BOF, error))?;
@@ -1291,8 +1537,10 @@ fn patch_chart_stream(
     limits: Limits,
 ) -> Result<Vec<u8>> {
     if start > end || end > input.len() || replacement.len() != end.saturating_sub(start) {
-        return Err(Error::UnsafeEdit(
-            "chart-area replacement changed the source stream allocation".into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit chart",
+            "chart-area replacement changed the source stream allocation",
         ));
     }
     let mut output = input.to_vec();
@@ -1477,8 +1725,8 @@ pub(super) fn ranges_with(input: &[u8], max_records: usize) -> Result<Vec<Range>
         max_input_bytes: input.len().max(1),
         ..BiffLimits::default()
     };
-    let records = Records::with_limits(input, biff_limits)
-        .map_err(|error| Error::InvalidData(error.to_string()))?;
+    let records =
+        Records::new(input, biff_limits).map_err(|error| Error::InvalidData(error.to_string()))?;
     for record in records {
         let record = record.map_err(|error| Error::InvalidData(error.to_string()))?;
         let start = record.offset();

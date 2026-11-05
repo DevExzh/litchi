@@ -1,6 +1,7 @@
-//! Transactional persisted-record rewrite for `PowerPoint` OLE objects.
+//! Append-only persisted-record rewrite for `PowerPoint` packages.
 //!
-//! [`Editor`] is intentionally kept as the small ergonomic facade.  Its
+//! [`Editor`] is the crate-private record publisher behind
+//! [`super::Edit`] and the other scoped families.  Its
 //! implementation is divided by responsibility so that opening an OLE
 //! package, reading and mapping persisted records, staging mutations, and
 //! emitting an incremental edit remain independently auditable.
@@ -16,9 +17,11 @@ mod tests;
 
 use super::{Collection, ExternalObject};
 use crate::embedded::storage::Storage;
-use crate::package::Error;
+use crate::package::{Error, SourceLimits};
+#[cfg(test)]
 use litchi_cfb::OleFile;
 use std::collections::{BTreeMap, HashSet};
+#[cfg(test)]
 use std::io::{Read, Seek};
 use std::sync::Arc;
 
@@ -26,9 +29,16 @@ type Result<T> = std::result::Result<T, Error>;
 
 /// Appends a new PPT incremental edit; existing persisted bytes never move.
 #[derive(Clone)]
-pub struct Editor {
+pub(crate) struct Editor {
     pub(super) original: Arc<[u8]>,
     pub(super) max_output_bytes: usize,
+    /// Source-level record limits selected when the owning package was opened.
+    /// Object-list serialization must use this same profile; it may not fall
+    /// back to a fresh parser default during publication.
+    pub(super) source_limits: SourceLimits,
+    /// Physical CFB bounds retained from the source admission. Every
+    /// source-backed rewrite and candidate reopen must use this same profile.
+    pub(super) cfb_limits: litchi_cfb::OleFileLimits,
     /// Every stream in source order. Entries whose path is `document_path` or
     /// `current_user_path` carry no payload: `document` and `current_user`
     /// own those bytes, and `finish` emits them from there.
@@ -46,6 +56,10 @@ pub struct Editor {
     pub(super) rewrite_object_list: bool,
     pub(super) changed: bool,
     pub(super) layout: litchi_cfb::SectorLayoutPolicy,
+    /// Whether the source carries a digital-signature component. Such an
+    /// editor was opened for staging only: [`Self::finish`] refuses any
+    /// changed publication, which would invalidate the signature.
+    pub(super) signed: bool,
 }
 
 impl Editor {
@@ -59,6 +73,7 @@ impl Editor {
         lifecycle::inspect_live_document(bytes)
     }
 
+    #[cfg(test)]
     pub(crate) fn inspect_live_document_from_ole<R: Read + Seek>(
         ole: &mut OleFile<R>,
     ) -> Result<(u32, Vec<u8>)> {
@@ -87,30 +102,63 @@ impl Editor {
         lifecycle::inspect_live_mapping_at(document, head_offset, leniency, report)
     }
 
-    /// Opens a transactional editor over an OLE-backed `PowerPoint` package.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn open(bytes: Vec<u8>, collection: Collection) -> Result<Self> {
-        lifecycle::open(Arc::from(bytes), collection)
-    }
-
     /// Opens the shared incremental persisted-record editor without requiring
     /// an external-object collection. Used by non-OLE record editors.
     ///
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn open_records(bytes: Vec<u8>) -> Result<Self> {
-        lifecycle::open_records(Arc::from(bytes))
+    pub(crate) fn open_records(bytes: Vec<u8>, source_limits: SourceLimits) -> Result<Self> {
+        lifecycle::open_records(Arc::from(bytes), source_limits)
+    }
+
+    /// Opens a transactional editor over an OLE-backed `PowerPoint` package
+    /// that may carry a digital-signature component, so a scoped family can
+    /// stage and read over a signed deck.
+    /// [`Self::finish`] still refuses a changed publication of a signed
+    /// source; encryption and rights-management components stay refused.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
+    pub(crate) fn open_admitting_signature(
+        bytes: Vec<u8>,
+        collection: Collection,
+        cfb_limits: litchi_cfb::OleFileLimits,
+        source_limits: SourceLimits,
+    ) -> Result<Self> {
+        lifecycle::open::open_admitting_signature(
+            Arc::from(bytes),
+            collection,
+            cfb_limits,
+            source_limits,
+        )
+    }
+
+    /// [`Self::open_records`] over a package that may carry a
+    /// digital-signature component (see [`Self::open_admitting_signature`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
+    pub(crate) fn open_records_admitting_signature(
+        bytes: Vec<u8>,
+        source_limits: SourceLimits,
+    ) -> Result<Self> {
+        lifecycle::open::open_admitting_signature(
+            Arc::from(bytes),
+            lifecycle::open::no_objects(),
+            litchi_cfb::OleFileLimits::default(),
+            source_limits,
+        )
     }
 
     pub(crate) fn open_records_arc_with_limit(
         bytes: Arc<[u8]>,
         max_output_bytes: usize,
+        source_limits: SourceLimits,
     ) -> Result<Self> {
-        lifecycle::open::open_records_arc_with_limit(bytes, max_output_bytes)
+        lifecycle::open::open_records_arc_with_limit(bytes, max_output_bytes, source_limits)
     }
 
     /// Selects where a finished package places its sectors.
@@ -122,19 +170,17 @@ impl Editor {
     /// re-lays out the whole container.
     ///
     /// Both policies publish the same logical package.
-    pub const fn set_sector_layout_policy(&mut self, policy: litchi_cfb::SectorLayoutPolicy) {
+    #[cfg(test)]
+    pub(crate) const fn set_sector_layout_policy(
+        &mut self,
+        policy: litchi_cfb::SectorLayoutPolicy,
+    ) {
         self.layout = policy;
-    }
-
-    /// The sector-layout policy a finished package will apply.
-    #[must_use]
-    pub const fn sector_layout_policy(&self) -> litchi_cfb::SectorLayoutPolicy {
-        self.layout
     }
 
     /// Live persisted identifiers in ascending order.
     #[must_use]
-    pub fn persist_ids(&self) -> Vec<u32> {
+    pub(crate) fn persist_ids(&self) -> Vec<u32> {
         lifecycle::persist_ids(self)
     }
 
@@ -143,7 +189,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if serialization fails or the underlying writer reports an error.
-    pub fn persisted_record(&self, persist_id: u32) -> Result<Vec<u8>> {
+    pub(crate) fn persisted_record(&self, persist_id: u32) -> Result<Vec<u8>> {
         lifecycle::persisted_record(self, persist_id)
     }
 
@@ -152,8 +198,44 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn replace_persisted_record(&mut self, persist_id: u32, record: Vec<u8>) -> Result<()> {
+    pub(crate) fn replace_persisted_record(
+        &mut self,
+        persist_id: u32,
+        record: Vec<u8>,
+    ) -> Result<()> {
         mutation::replace_persisted_record(self, persist_id, record)
+    }
+
+    /// Whether a replacement of `persist_id` is staged.
+    pub(crate) fn is_record_staged(&self, persist_id: u32) -> bool {
+        self.staged_storage.contains_key(&persist_id)
+    }
+
+    /// Whether any record replacement or insertion is staged.
+    pub(crate) fn has_staged_records(&self) -> bool {
+        !self.staged_storage.is_empty()
+    }
+
+    /// The source bytes of the live record `persist_id`, ignoring any staged
+    /// replacement.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `persist_id` has no live source record.
+    pub(crate) fn source_record(&self, persist_id: u32) -> Result<&[u8]> {
+        let offset = *self
+            .mappings
+            .get(&persist_id)
+            .ok_or_else(|| Error::Corrupted(format!("unknown persist ID {persist_id}")))?;
+        let offset = usize::try_from(offset)
+            .map_err(|_err| Error::Corrupted("persist offset exceeds usize".into()))?;
+        rewrite::slice(&self.document, offset)
+    }
+
+    /// Drops the staged replacement of `persist_id`, so the source record
+    /// stays live.
+    pub(crate) fn unstage_record(&mut self, persist_id: u32) {
+        self.staged_storage.remove(&persist_id);
     }
 
     /// Stages a complete record under a caller-allocated unused persist ID.
@@ -193,7 +275,7 @@ impl Editor {
 
     /// Returns the typed embedded-object collection represented by this edit.
     #[must_use]
-    pub fn objects(&self) -> &Collection {
+    pub(crate) fn objects(&self) -> &Collection {
         &self.collection
     }
 
@@ -202,7 +284,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn add(&mut self, object: ExternalObject, storage: Storage) -> Result<u32> {
+    pub(crate) fn add(&mut self, object: ExternalObject, storage: Storage) -> Result<u32> {
         mutation::add(self, object, storage)
     }
 
@@ -211,7 +293,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn replace_storage(&mut self, persist_id: u32, storage: Storage) -> Result<()> {
+    pub(crate) fn replace_storage(&mut self, persist_id: u32, storage: Storage) -> Result<()> {
         mutation::replace_storage(self, persist_id, storage)
     }
 
@@ -221,7 +303,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn remove(&mut self, id: u32) -> Result<ExternalObject> {
+    pub(crate) fn remove(&mut self, id: u32) -> Result<ExternalObject> {
         mutation::remove(self, id)
     }
 
@@ -230,8 +312,31 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn reorder(&mut self, ids: &[u32]) -> Result<()> {
+    pub(crate) fn reorder(&mut self, ids: &[u32]) -> Result<()> {
         mutation::reorder(self, ids)
+    }
+
+    /// Whether the staged state differs from `source` and the live records:
+    /// a reorder back to the source order or a storage replacement with the
+    /// exact live record is no net change.
+    pub(crate) fn has_net_change(&self, source: &Collection) -> Result<bool> {
+        if !self.changed {
+            return Ok(false);
+        }
+        if self.collection != *source || !self.removed_persist_ids.is_empty() {
+            return Ok(true);
+        }
+        for (persist_id, record) in &self.staged_storage {
+            let Some(offset) = self.mappings.get(persist_id) else {
+                return Ok(true);
+            };
+            let offset = usize::try_from(*offset)
+                .map_err(|_err| Error::Corrupted("persist offset exceeds usize".into()))?;
+            if rewrite::slice(&self.document, offset)? != record.as_slice() {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     /// Emits the staged changes as one PPT incremental edit.
@@ -239,7 +344,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn finish(self) -> Result<Vec<u8>> {
+    pub(crate) fn finish(self) -> Result<Vec<u8>> {
         transaction::finish(self)
     }
 }

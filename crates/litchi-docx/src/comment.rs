@@ -161,6 +161,46 @@ impl Comment {
         self.xml_data.as_bytes()
     }
 
+    /// The `w14:paraId` of the comment's last paragraph (the last
+    /// `w:p` child of `w:comment`), by which Word's modern-comment parts
+    /// (`commentsExtended`, `commentsIds`) key the comment ([MS-DOCX]
+    /// `CT_CommentEx`; record 0345). For a one-paragraph comment, the
+    /// common case and every comment OfficeCLI writes, it is the first
+    /// paragraph's. `None` when that paragraph has none.
+    #[must_use]
+    pub fn paragraph_id(&self) -> Option<u32> {
+        let mut reader = Reader::from_reader(self.xml_bytes());
+        let mut depth = 0usize;
+        let mut last = None;
+        loop {
+            let (element, empty) = match reader.read_event() {
+                Ok(Event::Start(element)) => (element, false),
+                Ok(Event::Empty(element)) => (element, true),
+                Ok(Event::End(_)) => {
+                    depth = depth.saturating_sub(1);
+                    continue;
+                },
+                Ok(Event::Eof) | Err(_) => return last.flatten(),
+                _ => continue,
+            };
+            if depth == 1 && element.local_name().as_ref() == b"p" {
+                last = Some(
+                    element
+                        .unchecked_attributes()
+                        .filter_map(std::result::Result::ok)
+                        .find(|attribute| attribute.key.local_name().as_ref() == b"paraId")
+                        .and_then(|attribute| {
+                            u32::from_str_radix(std::str::from_utf8(&attribute.value).ok()?, 16)
+                                .ok()
+                        }),
+                );
+            }
+            if !empty {
+                depth += 1;
+            }
+        }
+    }
+
     /// This comment's XML with every namespace declaration it inherits from
     /// `word/comments.xml` re-declared on its own `w:comment`, so that it
     /// parses standalone.
@@ -171,6 +211,31 @@ impl Comment {
     /// read, or when a bound on the namespace scan is reached.
     pub fn self_contained_xml(&self) -> Result<Vec<u8>> {
         self.xml_data.self_contained_xml()
+    }
+
+    /// The comment's direct block children, indexed with the scanner the
+    /// document body uses (see [`crate::Blocks`]).
+    ///
+    /// The comment's XML is first made self-contained, so the blocks parse
+    /// without `word/comments.xml`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the comment's XML is malformed or a bound on the
+    /// index is reached.
+    pub fn blocks(&self) -> Result<crate::Blocks> {
+        let xml = self.self_contained_xml()?;
+        let length = u32::try_from(xml.len()).map_err(|_source_error| {
+            Error::InvalidFormat("Word comment exceeds u32".to_string())
+        })?;
+        crate::Blocks::index(
+            Arc::new(xml),
+            0,
+            length,
+            &[],
+            crate::document::ContainerRoot::COMMENT,
+            crate::parts::memo::RawPositions::Unproven,
+        )
     }
 
     /// Extract all text content from this comment.
@@ -206,6 +271,11 @@ impl Comment {
     ///
     /// A vector of comments
     pub(crate) fn extract_from_part(part: &dyn Part) -> Result<Vec<Comment>> {
+        Self::extract_from_payload(&part.blob_arc())
+    }
+
+    /// Extract the comments of a comments-part payload.
+    pub(crate) fn extract_from_payload(payload: &Arc<Vec<u8>>) -> Result<Vec<Comment>> {
         // Preserve the Word 2023 tracked-change timestamp while selecting
         // active MCE content in comments.xml.  The generic baseline has no
         // knowledge of this DOCX extension and would drop an ignorable
@@ -213,13 +283,13 @@ impl Comment {
         let mut capabilities = litchi_ooxml_common::mce::Capabilities::default();
         capabilities.understand_namespace(crate::revision::WORD_2023_DATE_UTC_NAMESPACE);
         let source = match litchi_ooxml_common::mce::process_markup_compatibility(
-            part.blob(),
+            payload.as_slice(),
             &capabilities,
             &litchi_ooxml_common::mce::Limits::default(),
         )?
         .xml
         {
-            std::borrow::Cow::Borrowed(_) => part.blob_arc(),
+            std::borrow::Cow::Borrowed(_) => Arc::clone(payload),
             std::borrow::Cow::Owned(value) => Arc::new(value),
         };
         let mut comments = Vec::new();

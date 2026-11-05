@@ -25,7 +25,8 @@ use std::sync::OnceLock;
 
 use libfuzzer_sys::fuzz_target;
 use litchi::keynote::{
-    Limits, Package, ReadOptions, SemanticLimits, SlideSelector, SlideTablePhysicalSortCommit,
+    OpenOptions, Package, SemanticLimits, SlideSelector, SourceLimits,
+    slide::table::physical_sort::transaction::Commit as SlideTablePhysicalSortCommit,
     slide::table::{
         TableSelector,
         sort::{ColumnIndex, Direction, Order, RowRange, Rule, Scope},
@@ -37,7 +38,7 @@ use litchi_iwa_archive::{
 };
 use litchi_iwa_common::wire::{WireView, append_length_delimited_field, append_varint_field};
 use litchi_iwa_core::{
-    Archive, ArchiveObject, FieldInfo, FieldPath, FieldType, RawMessage, SnappyStream,
+    Archive, ArchiveObject, FieldInfo, FieldType, RawMessage, SnappyStream,
 };
 use litchi_iwa_protos::{kn, tsa, tsce, tsd, tsk, tsp, tst, tswp};
 use prost::Message as _;
@@ -187,27 +188,29 @@ fuzz_target!(|data: &[u8]| {
     exercise_semantic_limit(&command);
 });
 
-fn fuzz_options() -> ReadOptions {
-    static OPTIONS: OnceLock<ReadOptions> = OnceLock::new();
+fn fuzz_options() -> OpenOptions {
+    static OPTIONS: OnceLock<OpenOptions> = OnceLock::new();
     *OPTIONS.get_or_init(|| {
-        let archive = Limits::new(
-            MAX_INPUT_BYTES,
-            MAX_ENTRIES,
-            MAX_ENTRY_BYTES,
-            MAX_EXPANDED_BYTES,
-            MAX_IWA_STREAM_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid physical-sort archive limits: {error}"));
-        let semantic = SemanticLimits::new(
-            MAX_OBJECTS,
-            MAX_SLIDES,
-            MAX_REFERENCES,
-            MAX_TEXT_STORAGES,
-            MAX_TEXT_FRAGMENTS,
-            MAX_TEXT_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid physical-sort semantic limits: {error}"));
-        ReadOptions::new(archive, semantic)
+        let archive = SourceLimits::builder()
+            .max_input_bytes(MAX_INPUT_BYTES)
+            .and_then(|limits| limits.max_entries(MAX_ENTRIES))
+            .and_then(|limits| limits.max_entry_bytes(MAX_ENTRY_BYTES))
+            .and_then(|limits| limits.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+            .and_then(|limits| limits.max_component_bytes(MAX_IWA_STREAM_BYTES))
+            .and_then(|limits| limits.build())
+            .unwrap_or_else(|error| unreachable!("valid physical-sort archive limits: {error}"));
+        let semantic = SemanticLimits::builder()
+            .max_objects(MAX_OBJECTS)
+            .and_then(|limits| limits.max_slides(MAX_SLIDES))
+            .and_then(|limits| limits.max_references(MAX_REFERENCES))
+            .and_then(|limits| limits.max_text_storages(MAX_TEXT_STORAGES))
+            .and_then(|limits| limits.max_text_fragments(MAX_TEXT_FRAGMENTS))
+            .and_then(|limits| limits.max_text_bytes(MAX_TEXT_BYTES))
+            .and_then(|limits| limits.build())
+            .unwrap_or_else(|error| unreachable!("valid physical-sort semantic limits: {error}"));
+        OpenOptions::new()
+            .source_limits(archive)
+            .semantic_limits(semantic)
     })
 }
 
@@ -393,8 +396,8 @@ fn synthetic_reference(identifier: u64) -> tsp::Reference {
     }
 }
 
-fn synthetic_field_reference(path: impl Into<FieldPath>, references: &[u64]) -> FieldInfo {
-    let mut field = FieldInfo::new(path);
+fn synthetic_field_reference(path: Vec<u32>, references: &[u64]) -> FieldInfo {
+    let mut field = FieldInfo::new(litchi_iwa_core::FieldPath::new(path, litchi_iwa_core::Limits::default()).unwrap(), litchi_iwa_core::Limits::default()).unwrap();
     field.r#type = Some(FieldType::ObjectReference);
     field.object_references.extend_from_slice(references);
     field
@@ -406,7 +409,7 @@ fn synthetic_object(
     data: Vec<u8>,
     references: &[u64],
 ) -> Result<ArchiveObject, Box<dyn StdError>> {
-    let mut object = ArchiveObject::new(identifier, vec![RawMessage { type_, data }])?;
+    let mut object = ArchiveObject::new(identifier, vec![RawMessage { type_, data }], Default::default())?;
     object.archive_info.message_infos[0]
         .object_references
         .extend_from_slice(references);
@@ -610,7 +613,12 @@ fn synthetic_tile_payload_for(
     .encode_to_vec();
     if matches!(variant, Some(SyntheticVariant::UnknownMutableRoot)) {
         append_varint_field(&mut payload, 99, 0x0bad_cafe)?;
-        append_length_delimited_field(&mut payload, 100, SYNTHETIC_TILE_UNKNOWN_MARKER)?;
+        append_length_delimited_field(
+            &mut payload,
+            100,
+            SYNTHETIC_TILE_UNKNOWN_MARKER,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     Ok(payload)
 }
@@ -642,7 +650,12 @@ fn synthetic_row_header_payload(
     .encode_to_vec();
     if matches!(variant, Some(SyntheticVariant::UnknownMutableHeaderRoot)) {
         append_varint_field(&mut payload, 99, 0x0bad_fade)?;
-        append_length_delimited_field(&mut payload, 100, SYNTHETIC_HEADER_UNKNOWN_MARKER)?;
+        append_length_delimited_field(
+            &mut payload,
+            100,
+            SYNTHETIC_HEADER_UNKNOWN_MARKER,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     Ok(payload)
 }
@@ -755,10 +768,20 @@ fn synthetic_table_model(
     .encode_to_vec();
     if with_unknowns {
         append_varint_field(&mut payload, 99, 0xfeed_beef)?;
-        append_length_delimited_field(&mut payload, 100, b"physical-sort-unknown")?;
+        append_length_delimited_field(
+            &mut payload,
+            100,
+            b"physical-sort-unknown",
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     if let Some(field) = variant.and_then(SyntheticVariant::model_field) {
-        append_length_delimited_field(&mut payload, field, SYNTHETIC_MODEL_FIELD_INVALID_PAYLOAD)?;
+        append_length_delimited_field(
+            &mut payload,
+            field,
+            SYNTHETIC_MODEL_FIELD_INVALID_PAYLOAD,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     Ok(payload)
 }
@@ -1111,7 +1134,7 @@ fn synthetic_source_package_with_variant(
     .into_iter()
     .collect::<Vec<_>>();
 
-    let document_bytes = SnappyStream::compress(&Archive { objects }.to_bytes()?)?;
+    let document_bytes = SnappyStream::compress(&Archive { objects }.to_bytes(Default::default())?, Default::default())?;
     let metadata_bytes = SnappyStream::compress(
         &Archive {
             objects: vec![synthetic_object(
@@ -1121,8 +1144,8 @@ fn synthetic_source_package_with_variant(
                 &[],
             )?],
         }
-        .to_bytes()?,
-    )?;
+        .to_bytes(Default::default())?,
+     Default::default(),)?;
     Ok(package_to_bytes(
         [
             (
@@ -1146,18 +1169,18 @@ fn synthetic_source_package_with_variant(
 }
 
 fn synthetic_document_archive(package: &[u8]) -> Archive {
-    let catalog = Catalog::from_bytes(package)
+    let catalog = Catalog::from_bytes(package, Default::default())
         .unwrap_or_else(|error| panic!("synthetic physical-sort package catalog failed: {error}"));
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == SYNTHETIC_DOCUMENT_MEMBER)
         .unwrap_or_else(|| panic!("synthetic physical-sort document component is missing"));
-    let stream = SnappyStream::decompress(entry.data())
+    let stream = SnappyStream::decompress(entry.data(), Default::default())
         .unwrap_or_else(|error| {
             panic!("synthetic physical-sort document decompress failed: {error}")
         })
         .into_bytes();
-    Archive::parse(&stream)
+    Archive::parse(&stream, Default::default())
         .unwrap_or_else(|error| panic!("synthetic physical-sort document archive failed: {error}"))
 }
 
@@ -1323,8 +1346,11 @@ fn assert_synthetic_variant_shape(package: &[u8], variant: SyntheticVariant) {
                 .iter()
                 .find(|message| message.type_ == SYNTHETIC_TABLE_MODEL_MESSAGE_TYPE)
                 .unwrap_or_else(|| panic!("synthetic {variant:?} model message is missing"));
-            let fields = WireView::parse(model_message.data.as_slice())
-                .unwrap_or_else(|error| panic!("synthetic {variant:?} model wire failed: {error}"));
+            let fields = WireView::parse(
+                model_message.data.as_slice(),
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )
+            .unwrap_or_else(|error| panic!("synthetic {variant:?} model wire failed: {error}"));
             assert!(
                 fields.fields().any(|field| {
                     field.number() == model_field
@@ -1894,15 +1920,17 @@ fn exercise_input_limit() {
 }
 
 fn exercise_archive_limit() {
-    let archive = Limits::new(
-        MAX_INPUT_BYTES,
-        1,
-        MAX_ENTRY_BYTES,
-        MAX_EXPANDED_BYTES,
-        MAX_IWA_STREAM_BYTES,
-    )
-    .unwrap_or_else(|error| unreachable!("valid physical-sort entry limits: {error}"));
-    let options = ReadOptions::new(archive, fuzz_options().semantic());
+    let archive = SourceLimits::builder()
+        .max_input_bytes(MAX_INPUT_BYTES)
+        .and_then(|limits| limits.max_entries(1))
+        .and_then(|limits| limits.max_entry_bytes(MAX_ENTRY_BYTES))
+        .and_then(|limits| limits.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+        .and_then(|limits| limits.max_component_bytes(MAX_IWA_STREAM_BYTES))
+        .and_then(|limits| limits.build())
+        .unwrap_or_else(|error| unreachable!("valid physical-sort entry limits: {error}"));
+    let options = OpenOptions::new()
+        .source_limits(archive)
+        .semantic_limits(fuzz_options().semantic_limits_value());
     match Package::from_bytes_with_options(source_built_bytes(), options) {
         Err(error) => observe_error(error),
         Ok(_) => panic!("one-entry physical-sort archive limit accepted the package"),
@@ -1915,21 +1943,24 @@ fn exercise_semantic_limit(command: &[u8]) {
     } else {
         MAX_OBJECTS
     };
-    let semantic = match SemanticLimits::new(
-        max_objects,
-        1,
-        MAX_REFERENCES,
-        MAX_TEXT_STORAGES,
-        MAX_TEXT_FRAGMENTS,
-        MAX_TEXT_BYTES,
-    ) {
+    let semantic = match SemanticLimits::builder()
+        .max_objects(max_objects)
+        .and_then(|limits| limits.max_slides(1))
+        .and_then(|limits| limits.max_references(MAX_REFERENCES))
+        .and_then(|limits| limits.max_text_storages(MAX_TEXT_STORAGES))
+        .and_then(|limits| limits.max_text_fragments(MAX_TEXT_FRAGMENTS))
+        .and_then(|limits| limits.max_text_bytes(MAX_TEXT_BYTES))
+        .and_then(|limits| limits.build())
+    {
         Ok(semantic) => semantic,
         Err(error) => {
             observe_error(error);
             return;
         },
     };
-    let options = ReadOptions::new(fuzz_options().archive(), semantic);
+    let options = OpenOptions::new()
+        .source_limits(fuzz_options().source_limits_value())
+        .semantic_limits(semantic);
     match Package::from_bytes_with_options(source_built_bytes(), options) {
         Ok(package) => {
             let source = package_bytes(&package);

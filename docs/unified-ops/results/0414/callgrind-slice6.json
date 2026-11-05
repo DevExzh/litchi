@@ -1,0 +1,38 @@
+{
+  "record": "0414",
+  "slice": 6,
+  "binary_sha256": "c2d9d55ee7a45fc1328ce90f3f7c50c488566d59078fe4222d7bc0aa10abdefb",
+  "build": "source .coord/iwa-w4c/env.sh; cargo test --release -p litchi-iwa --all-features --test parity --no-run",
+  "run": "W4C_ROUTE=<route> taskset -c 3 valgrind --tool=callgrind <binary> --ignored --exact chart_property_cost::chart_property_route_cost_abba --test-threads=1",
+  "metric": "inclusive Ir of w4c_host_route / w4c_leaf_route, two calls each (ABBA)",
+  "captures_dir": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w4c/cg6 (outside the repository)",
+  "routes": [
+    {
+      "route": "keynote_legend_font_set",
+      "host_ir": 1594961772,
+      "leaf_ir": 261880163,
+      "leaf_over_host": 0.164192,
+      "capture": "keynote_legend_font_set.cg",
+      "capture_bytes": 486467,
+      "capture_sha256": "7e9c5d832273412f16c7018ddd1d8fd2381271ba9a87824098961566f570b282"
+    },
+    {
+      "route": "pages_legend_font_set",
+      "host_ir": 2113559691,
+      "leaf_ir": 192898468,
+      "leaf_over_host": 0.091267,
+      "capture": "pages_legend_font_set.cg",
+      "capture_bytes": 470157,
+      "capture_sha256": "77b9cb7a90d1615e23a8f135c16afbde09d4c229e79aa501d92fbf9fe8055b2e"
+    },
+    {
+      "route": "numbers_legend_font_set",
+      "host_ir": 570407936,
+      "leaf_ir": 185136912,
+      "leaf_over_host": 0.324569,
+      "capture": "numbers_legend_font_set.cg",
+      "capture_bytes": 462206,
+      "capture_sha256": "fb7cd45a7adce14eb95290f10b6a5e134ba74839a45e1462445bd6b53bdee76a"
+    }
+  ]
+}

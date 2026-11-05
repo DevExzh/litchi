@@ -3,4 +3,5 @@
 mod codec;
 mod model;
 
+pub use super::Limits;
 pub use model::{List, Section};

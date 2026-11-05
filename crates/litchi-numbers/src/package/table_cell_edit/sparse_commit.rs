@@ -93,10 +93,12 @@ pub(super) fn commit_sparse_scalar_tiles(
         .iter()
         .any(|change| matches!(change.input_ref(), Some(Input::Text(_))))
     {
-        return Err(Error::UnsupportedDependency {
-            path,
-            kind: DependencyKind::SharedString,
-        });
+        return Err(Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedDependency {
+                path,
+                kind: DependencyKind::SharedString,
+            },
+        ));
     }
     let remaining = authorize_remaining(&mut budget)?;
     let limits = sparse_limits(source, changes.len(), remaining, path)?;
@@ -163,10 +165,12 @@ pub(super) fn commit_sparse_scalar_tiles(
         .storage
         .tiles
         .first()
-        .ok_or(Error::UnsupportedDependency {
-            path,
-            kind: DependencyKind::CellStorage,
-        })?
+        .ok_or(Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedDependency {
+                path,
+                kind: DependencyKind::CellStorage,
+            },
+        ))?
         .message;
     let tile_component = template_route.component_index;
     let header_component = target
@@ -243,14 +247,16 @@ pub(super) fn commit_sparse_scalar_tiles(
         .state
         .components
         .physical()
-        .ok_or(Error::UnsupportedSource { path })?
+        .ok_or(Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedSource { path },
+        ))?
         .limits()
         .effective_archive_limits()
         .map_err(|_error| Error::InvalidSource { path })?;
     let tile_template = message_payload(source, template_route, path)?;
     let component_capacity = changes
         .len()
-        .checked_add(4)
+        .checked_add(5)
         .ok_or(Error::InvalidSource { path })?;
     let mut edits = Vec::new();
     edits
@@ -267,6 +273,20 @@ pub(super) fn commit_sparse_scalar_tiles(
             amount: changes.len(),
         })?;
     let mut observed = metadata_usage(&inspected, &metadata_output, &cells, &header_sources)?;
+    let column_capacity = changes.len().min(
+        usize::try_from(target.native.columns).map_err(|_error| Error::InvalidSource { path })?,
+    );
+    merge_usage(
+        &mut observed,
+        budget::Usage {
+            retained_elements: usize_u64(column_capacity),
+            retained_bytes: usize_u64(column_capacity * size_of::<(u32, i64)>()),
+            allocation_events: u64::from(column_capacity != 0),
+            ..budget::Usage::default()
+        },
+        path,
+    )?;
+    let mut column_deltas = super::column_counts::Deltas::with_capacity(column_capacity)?;
 
     let mut start = 0usize;
     while start < changes.len() {
@@ -319,11 +339,16 @@ pub(super) fn commit_sparse_scalar_tiles(
                 || transition.before_references.formula_error.is_some()
             {
                 budget.cancel_authorization();
-                return Err(Error::UnsupportedDependency {
-                    path,
-                    kind: DependencyKind::CellStorage,
-                });
+                return Err(Error::Refused(
+                    crate::package::table_cells::Refusal::UnsupportedDependency {
+                        path,
+                        kind: DependencyKind::CellStorage,
+                    },
+                ));
             }
+        }
+        for transition in &outcome.transitions {
+            column_deltas.record(transition, path)?;
         }
         for row in &outcome.final_rows {
             let global_row = tile_id
@@ -409,6 +434,31 @@ pub(super) fn commit_sparse_scalar_tiles(
             push_message(&mut edits, route, payload, None, component_capacity, path)?;
         }
     }
+    if column_deltas.changes() {
+        let bucket = message_payload(source, target.storage.column_headers, path)?;
+        merge_usage(
+            &mut observed,
+            column_deltas.envelope(bucket.len(), path)?,
+            path,
+        )?;
+        let payload = match column_deltas.apply(bucket, &target.storage, path) {
+            Ok(payload) => payload,
+            Err(error) => {
+                budget.cancel_authorization();
+                return Err(error);
+            },
+        };
+        if let Some(payload) = payload {
+            push_message(
+                &mut edits,
+                target.storage.column_headers,
+                payload,
+                None,
+                component_capacity,
+                path,
+            )?;
+        }
+    }
     let (data_rewrite, data_report) =
         sparse::rewrite_data_store_with_report(data_store, &plan, &assignments, limits)
             .map_err(|error| map_sparse_error(error, path))?;
@@ -472,7 +522,7 @@ pub(super) fn commit_sparse_scalar_tiles(
     let shape_work_remaining = remaining
         .transaction_work
         .checked_sub(observed.transaction_work)
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: LimitKind::TransactionWork,
             observed: observed.transaction_work,
             maximum: remaining.transaction_work,
@@ -681,7 +731,9 @@ pub(super) fn publish_formula_dependency_objects(
         .state
         .components
         .physical()
-        .ok_or(Error::UnsupportedSource { path })?
+        .ok_or(Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedSource { path },
+        ))?
         .limits()
         .effective_archive_limits()
         .map_err(|_| Error::InvalidSource { path })?;
@@ -1348,7 +1400,9 @@ pub(super) fn formula_dependency_prepublication_usage(
         .state
         .components
         .physical()
-        .ok_or(Error::UnsupportedSource { path })?
+        .ok_or(Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedSource { path },
+        ))?
         .package()
         .len();
     let mut usage = budget::Usage {
@@ -1595,7 +1649,7 @@ fn preflight_usage(
     macro_rules! require {
         ($field:ident, $kind:expr) => {
             if usage.$field > remaining.$field {
-                return Err(Error::LimitExceeded {
+                return Err(Error::Limit {
                     kind: $kind,
                     observed: usage.$field,
                     maximum: remaining.$field,
@@ -1655,7 +1709,7 @@ fn checked_add(left: u64, right: u64) -> Result<u64, Error> {
 
 pub(super) fn map_sparse_error(error: sparse::SparseError, path: Path) -> Error {
     match error {
-        sparse::SparseError::LimitExceeded { observed, maximum } => Error::LimitExceeded {
+        sparse::SparseError::LimitExceeded { observed, maximum } => Error::Limit {
             kind: LimitKind::TransactionWork,
             observed: usize_u64(observed),
             maximum: usize_u64(maximum),
@@ -1685,7 +1739,7 @@ pub(super) fn map_metadata_error(
             amount,
         }
     } else if error.resource_limit().is_some() {
-        Error::LimitExceeded {
+        Error::Limit {
             kind: LimitKind::WireWork,
             observed: u64::MAX,
             maximum: u64::MAX - 1,
@@ -1787,8 +1841,7 @@ pub(super) fn one_message_object(
         type_: message_type,
         data: payload,
     });
-    ArchiveObject::new_with_limits(identifier, messages, limits)
-        .map_err(|_error| Error::InvalidSource { path })
+    ArchiveObject::new(identifier, messages, limits).map_err(|_error| Error::InvalidSource { path })
 }
 
 fn assignment_for_tile(
@@ -1990,14 +2043,14 @@ fn evidence_reference_shape(
                 return Ok(());
             }
             let amount = usize_u64(amount);
-            let observed = self.used.checked_add(amount).ok_or(Error::LimitExceeded {
+            let observed = self.used.checked_add(amount).ok_or(Error::Limit {
                 kind: LimitKind::TransactionWork,
                 observed: u64::MAX,
                 maximum: self.maximum,
                 path: self.path,
             })?;
             if observed > self.maximum {
-                return Err(Error::LimitExceeded {
+                return Err(Error::Limit {
                     kind: LimitKind::TransactionWork,
                     observed,
                     maximum: self.maximum,

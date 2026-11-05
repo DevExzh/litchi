@@ -263,7 +263,7 @@ fn attributes(count: usize) -> Vec<u8> {
         xml.push_str(&index.to_string());
         xml.push_str("=\"");
         xml.push_str(&index.to_string());
-        xml.push_str("\"");
+        xml.push('"');
     }
     xml.push_str("/>");
     xml.into_bytes()

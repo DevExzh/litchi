@@ -99,8 +99,8 @@ impl Snapshot {
 
     /// Start a detached, failure-atomic transaction.
     #[must_use]
-    pub fn edit(&self) -> super::Transaction {
-        super::Transaction::new(self.clone())
+    pub fn edit(&self) -> super::Edit {
+        super::Edit::new(self.clone())
     }
 
     /// Publish the exact validated source stream.
@@ -188,21 +188,16 @@ impl Patch {
         self.before == self.after
     }
 
-    /// Alias for [`Self::is_noop`].
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.is_noop()
-    }
-
     /// Apply this patch only to its exact source snapshot.
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.fingerprint() != self.source_fingerprint || source.bytes() != self.before() {
-            return Err(Error::UnsafeEdit(
-                "RealTimeData patch source does not match its base snapshot".to_string(),
-            ));
+            return Err(Error::PatchConflict {
+                operation: "edit real-time data",
+                reason: "RealTimeData patch source does not match its base snapshot",
+            });
         }
         if self.is_noop() {
             Ok(source.clone())
@@ -217,9 +212,10 @@ impl Patch {
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn revert(&self, target: &Snapshot) -> Result<Snapshot> {
         if target.fingerprint() != self.target_fingerprint || target.bytes() != self.after() {
-            return Err(Error::UnsafeEdit(
-                "RealTimeData patch target does not match its committed snapshot".to_string(),
-            ));
+            return Err(Error::PatchConflict {
+                operation: "edit real-time data",
+                reason: "RealTimeData patch target does not match its committed snapshot",
+            });
         }
         if self.is_noop() {
             Ok(target.clone())
@@ -240,61 +236,12 @@ impl Patch {
     }
 }
 
-/// A successful transaction publication containing its resulting snapshot and
-/// reversible source-checked patch.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
+/// A published edit: the new snapshot, its reversible patch and
+/// diagnostics.
+pub type Commit = litchi_core::edit::Commit<Snapshot, Patch>;
 
-impl Commit {
-    pub(crate) fn new(snapshot: Snapshot, patch: Patch) -> Self {
-        Self { snapshot, patch }
-    }
-
-    /// Whether publication changed any stream byte.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        !self.patch.is_noop()
-    }
-
-    /// Borrow the post-edit snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Borrow the reversible source-checked patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consume the publication into its snapshot.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
-    }
-
-    /// Consume the publication into its patch.
-    #[must_use]
-    pub fn into_patch(self) -> Patch {
-        self.patch
-    }
-
-    /// Consume the publication into exact BIFF stream bytes.
-    #[must_use]
-    pub fn into_bytes(self) -> Vec<u8> {
-        self.snapshot.finish()
-    }
-
-    /// Consume the publication into both resulting artifacts.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
-    }
-}
+/// Content-free diagnostics of one commit.
+pub use litchi_core::edit::Diagnostics;
 
 fn fingerprint(bytes: &[u8]) -> u64 {
     let mut value = 0xcbf2_9ce4_8422_2325u64;

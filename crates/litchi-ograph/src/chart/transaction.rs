@@ -1,6 +1,6 @@
 //! Snapshot-scoped, lossless chart transactions.
 //!
-//! The transaction deliberately owns a parsed [`Chart`] snapshot. It can
+//! The transaction deliberately owns a parsed [`Model`] snapshot. It can
 //! replace an existing cache value or the fixed-size chart-area rectangle only
 //! when the physical BIFF record grammar remains unchanged. It can also patch
 //! the existing fixed-size `ShtProps` metadata record without changing the
@@ -12,21 +12,21 @@ mod model;
 pub mod sheet_props;
 mod validation;
 
-use super::{Chart, Error, Rect, Result, codec};
+use super::{Error, Model, Rect, Result, codec};
 pub(crate) use model::Request;
-pub use model::{CacheValue, Change, Commit, Identity, Patch};
+pub use model::{CacheValue, Change, Commit, Diagnostics, Identity, Patch};
 
 /// A bounded semantic editor for one parsed chart snapshot.
 #[derive(Debug)]
-pub struct Editor {
-    chart: Chart,
+pub struct Edit {
+    chart: Model,
     requests: Vec<Request>,
     chart_area: Option<chart_area::Request>,
     sheet_props: Option<sheet_props::Request>,
 }
 
-impl Editor {
-    pub(crate) fn new(chart: Chart) -> Result<Self> {
+impl Edit {
+    pub(crate) fn new(chart: Model) -> Result<Self> {
         validation::ensure_editable(&chart)?;
         Ok(Self {
             chart,
@@ -80,8 +80,8 @@ impl Editor {
         }
 
         if self.requests.len() >= self.chart.limits.max_cached_values {
-            return Err(Error::LimitExceeded {
-                resource: "cache edit count",
+            return Err(Error::Limit {
+                kind: crate::LimitKind::CacheEdits,
                 observed: u64::try_from(self.requests.len().saturating_add(1)).unwrap_or(u64::MAX),
                 maximum: u64::try_from(self.chart.limits.max_cached_values).unwrap_or(u64::MAX),
             });
@@ -132,7 +132,7 @@ impl Editor {
     /// Validate and publish the staged chart edits.
     ///
     /// The returned [`Commit`] owns the post-edit chart snapshot and a
-    /// reversible semantic patch. The source chart passed to [`Chart::edit`]
+    /// reversible semantic patch. The source chart passed to [`Model::edit`]
     /// was consumed and is never mutated by reference.
     pub fn commit(self) -> Result<Commit> {
         let Self {
@@ -184,7 +184,7 @@ impl Editor {
                 let before = chart.props;
                 let offset = sheet_props::codec::locate(&chart, before)?;
                 if request.expected_offset.is_some_and(|value| value != offset) {
-                    return Err(Error::UnsupportedMutation {
+                    return Err(Error::PatchConflict {
                         operation: "sheet-props-patch",
                         reason: "source ShtProps record identity does not match the patch",
                     });
@@ -233,10 +233,9 @@ impl Editor {
             chart.props = change.after();
         }
 
-        Ok(Commit::new(
-            chart,
-            Patch::new(changes, chart_area, sheet_props),
-        ))
+        let patch = Patch::new(changes, chart_area, sheet_props);
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(chart, patch, diagnostics))
     }
 
     fn set_expected(&mut self, change: &Change) -> Result<&mut Self> {
@@ -250,7 +249,7 @@ impl Editor {
             })?;
         validation::ensure_identity(cache, *change.identity())?;
         if CacheValue::from_cache(cache) != *change.before() {
-            return Err(Error::UnsupportedMutation {
+            return Err(Error::PatchConflict {
                 operation: "cache-value-patch",
                 reason: "patch source value does not match the target snapshot",
             });
@@ -260,7 +259,7 @@ impl Editor {
 
     fn set_expected_chart_area(&mut self, change: &chart_area::Change) -> Result<&mut Self> {
         if self.chart.rect != change.before() {
-            return Err(Error::UnsupportedMutation {
+            return Err(Error::PatchConflict {
                 operation: "chart-area-patch",
                 reason: "patch source rectangle does not match the target snapshot",
             });
@@ -270,7 +269,7 @@ impl Editor {
 
     fn set_expected_sheet_props(&mut self, change: &sheet_props::Change) -> Result<&mut Self> {
         if self.chart.props() != change.before() {
-            return Err(Error::UnsupportedMutation {
+            return Err(Error::PatchConflict {
                 operation: "sheet-props-patch",
                 reason: "patch source ShtProps value does not match the target snapshot",
             });
@@ -286,7 +285,7 @@ impl Editor {
 
 impl Patch {
     /// Applies this patch only to a matching parsed chart snapshot.
-    pub fn apply(&self, chart: Chart) -> Result<Commit> {
+    pub fn apply(&self, chart: Model) -> Result<Commit> {
         let mut editor = chart.edit()?;
         for change in self.changes() {
             editor.set_expected(change)?;

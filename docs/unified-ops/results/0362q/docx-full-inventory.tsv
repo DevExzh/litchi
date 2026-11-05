@@ -1,0 +1,36 @@
+crate	category	path	detail	target
+litchi-docx	replay_return	litchi_docx::Package::apply_durable_ink	returns owner	register and satisfy Result<family::Commit> in result_methods
+litchi-docx	replay_return	litchi_docx::Package::apply_durable_ink_with_options	returns owner	register and satisfy Result<family::Commit> in result_methods
+litchi-docx	replay_return	litchi_docx::Package::apply_metadata	returns owner	register and satisfy Result<family::Commit> in result_methods
+litchi-docx	edit_type	litchi_docx::document::PreparedEdit		rename to the focused module's Edit
+litchi-docx	commit_type	litchi_docx::document::snapshot::Commit	diagnostics,into_parts,patch,snapshot	add package,into_package; delete snapshot
+litchi-docx	commit_snapshot	litchi_docx::document::snapshot::Commit::snapshot	&self	delete: Commit::package/into_package
+litchi-docx	commit_return	litchi_docx::document::snapshot::Edit::commit	self	Result<litchi_docx::document::snapshot::Commit>
+litchi-docx	commit_type	litchi_docx::redact::Commit	patch	add package,into_package,diagnostics,into_parts
+litchi-docx	commit_type	litchi_docx::sanitize::Commit	patch,snapshot	add package,into_package,diagnostics,into_parts; delete snapshot
+litchi-docx	commit_snapshot	litchi_docx::sanitize::Commit::snapshot	&self	delete: Commit::package/into_package
+litchi-docx	commit_type	litchi_docx::section::LayoutCommit	patch,snapshot	add package,into_package,diagnostics,into_parts; delete snapshot
+litchi-docx	commit_snapshot	litchi_docx::section::LayoutCommit::snapshot	&self	delete: Commit::package/into_package
+litchi-docx	edit_type	litchi_docx::section::LayoutEdit		rename to the focused module's Edit
+litchi-docx	commit_type	litchi_docx::source_backed::GlossaryBatchCommit	patch,snapshot	add package,into_package,diagnostics,into_parts; delete snapshot
+litchi-docx	commit_snapshot	litchi_docx::source_backed::GlossaryBatchCommit::snapshot	&self	delete: Commit::package/into_package
+litchi-docx	edit_type	litchi_docx::source_backed::GlossaryBatchEdit		rename to the focused module's Edit
+litchi-docx	replay_return	litchi_docx::source_backed::Package::apply	returns owner	register and satisfy Result<family::Commit> in result_methods
+litchi-docx	commit_type	litchi_docx::source_backed::SourceBackedSvgAttachmentBatchCommit	diagnostics,patch,snapshot	add package,into_package,into_parts; delete snapshot
+litchi-docx	commit_snapshot	litchi_docx::source_backed::SourceBackedSvgAttachmentBatchCommit::snapshot	&self	delete: Commit::package/into_package
+litchi-docx	edit_type	litchi_docx::source_backed::SourceBackedSvgAttachmentBatchEdit		rename to the focused module's Edit
+litchi-docx	commit_type	litchi_docx::source_backed::StoryTextCommit	patch,snapshot	add package,into_package,diagnostics,into_parts; delete snapshot
+litchi-docx	commit_snapshot	litchi_docx::source_backed::StoryTextCommit::snapshot	&self	delete: Commit::package/into_package
+litchi-docx	edit_type	litchi_docx::source_backed::StoryTextEdit		rename to the focused module's Edit
+litchi-docx	edit_type	litchi_docx::source_backed::TailAppendEdit		rename to the focused module's Edit
+litchi-docx	with_limits	litchi_docx::source_backed::TailAppendEdit::with_limits	self	OpenOptions / EditOptions, or required limits (raw)
+litchi-docx	edit_type	litchi_docx::source_backed::TailAppendStreamEdit		rename to the focused module's Edit
+litchi-docx	with_limits	litchi_docx::source_backed::TailAppendStreamEdit::with_limits	self	OpenOptions / EditOptions, or required limits (raw)
+litchi-docx	commit_type	litchi_docx::source_backed::paragraph_copy::Commit	patch	add package,into_package,diagnostics,into_parts
+litchi-docx	commit_return	litchi_docx::source_backed::paragraph_copy::Edit::commit	self	Result<litchi_docx::source_backed::paragraph_copy::Commit>
+litchi-docx	commit_type	litchi_docx::source_backed::paragraph_copy::RemovalCommit	patch	add package,into_package,diagnostics,into_parts
+litchi-docx	edit_type	litchi_docx::source_backed::paragraph_copy::RemovalEdit		rename to the focused module's Edit
+litchi-docx	commit_type	litchi_docx::story_hyperlinks::Commit		add package,into_package,patch,diagnostics,into_parts
+litchi-docx	commit_type	litchi_docx::variables::Commit	into_parts,patch,snapshot	add package,into_package,diagnostics; delete snapshot
+litchi-docx	commit_snapshot	litchi_docx::variables::Commit::snapshot	&self	delete: Commit::package/into_package
+litchi-docx	commit_return	litchi_docx::variables::Edit::commit	self	Result<litchi_docx::variables::Commit>

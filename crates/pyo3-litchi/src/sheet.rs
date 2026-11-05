@@ -1,11 +1,13 @@
 //! Sheet/Workbook API bindings
 
+use std::path::PathBuf;
+
+use litchi::FileFormat as CoreFormat;
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
-use std::path::PathBuf;
-use std::sync::Arc;
 
-use crate::common::boxed_err_to_py_err;
+use crate::errors::{Failure, Opener};
+use crate::iwork;
 
 /// Registers sheet types with the Python module
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -14,10 +16,21 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     Ok(())
 }
 
+/// What a `Workbook` reads: a unified file of the workbook family, or a
+/// Numbers document, which `litchi::File` opens without a family view.
+enum Source {
+    File(litchi::File),
+    Numbers(litchi::File),
+}
+
 /// Excel workbook interface
 ///
-/// Provides support for Excel workbooks in various formats (.xls, .xlsx, .xlsb).
-/// The format is automatically detected when opening a file.
+/// Provides support for workbooks in various formats (.xls, .xlsx, .xlsb,
+/// .ods, .numbers). The format is detected from the file's content when it
+/// is opened.
+///
+/// A Workbook is immutable and can be shared between threads. Opening and
+/// the reads release the GIL while they run.
 ///
 /// # Examples
 ///
@@ -34,16 +47,43 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
 /// for name in wb.worksheet_names():
 ///     print(f"Sheet: {name}")
 /// ```
-#[pyclass(unsendable)]
+#[pyclass(frozen, module = "litchi_py")]
 pub struct Workbook {
-    inner: Arc<litchi::sheet::Workbook>,
+    source: Source,
+}
+
+impl Workbook {
+    fn read(path: &std::path::Path) -> Result<Source, Failure> {
+        match litchi::open(path) {
+            // `litchi::File` opens Numbers packages and package directories
+            // (records 0296 and 0306), but its family views do not cover
+            // them; this reader projects the package the file retains.
+            Ok(file) if file.format() == Some(CoreFormat::Numbers) => Ok(Source::Numbers(file)),
+            Ok(file) => match file.workbook() {
+                Ok(_) => Ok(Source::File(file)),
+                Err(error) => Err(Failure::open(&error, Opener::Workbook)),
+            },
+            Err(error) => Err(Failure::open(&error, Opener::Workbook)),
+        }
+    }
+
+    fn count(&self) -> Result<usize, Failure> {
+        match &self.source {
+            Source::File(file) => file
+                .workbook()
+                .and_then(|workbook| workbook.worksheet_count())
+                .map_err(|error| Failure::read(&error)),
+            Source::Numbers(file) => Ok(iwork::numbers(file)?.sheets().len()),
+        }
+    }
 }
 
 #[pymethods]
 impl Workbook {
     /// Open an Excel workbook from a file path
     ///
-    /// The file format (.xls, .xlsx, .xlsb, .ods, .numbers) is automatically detected.
+    /// The format (.xls, .xlsx, .xlsb, .ods, .numbers) is detected from the
+    /// file's content, not from its name.
     ///
     /// Args:
     ///     path: Path to the workbook file
@@ -52,52 +92,72 @@ impl Workbook {
     ///     Workbook instance
     ///
     /// Raises:
-    ///     IOError: If the file cannot be read
-    ///     ValueError: If the file format is invalid or unsupported
+    ///     IoError: (an OSError) If the file cannot be read
+    ///     UnsupportedError: (a ValueError) If the file is not a workbook,
+    ///         is not a recognized format, or uses a variant that cannot be
+    ///         read (flat OpenDocument)
+    ///     CorruptFileError: (a ValueError) If the file is malformed
+    ///     ProtectedError: (a ValueError) If the workbook is encrypted
     #[staticmethod]
-    #[allow(clippy::arc_with_non_send_sync)] // reason: PyO3 manages thread access via the GIL; Arc here is intra-thread refcounting only
-    fn open(path: PathBuf) -> PyResult<Self> {
-        let wb = litchi::sheet::Workbook::open(path).map_err(boxed_err_to_py_err)?;
-        Ok(Workbook {
-            inner: Arc::new(wb),
-        })
+    fn open(py: Python<'_>, path: PathBuf) -> PyResult<Self> {
+        let source = py.detach(|| Self::read(&path))?;
+        Ok(Workbook { source })
     }
 
     /// Get the number of worksheets in the workbook
     ///
     /// Returns:
     ///     Number of worksheets
-    fn worksheet_count(&self) -> PyResult<usize> {
-        self.inner.worksheet_count().map_err(boxed_err_to_py_err)
+    fn worksheet_count(&self, py: Python<'_>) -> PyResult<usize> {
+        py.detach(|| self.count()).map_err(PyErr::from)
     }
 
     /// Get all worksheet names
     ///
     /// Returns:
     ///     List of worksheet names
-    fn worksheet_names(&self) -> PyResult<Vec<String>> {
-        self.inner.worksheet_names().map_err(boxed_err_to_py_err)
+    fn worksheet_names(&self, py: Python<'_>) -> PyResult<Vec<String>> {
+        py.detach(|| match &self.source {
+            Source::File(file) => file
+                .workbook()
+                .and_then(|workbook| workbook.worksheet_names())
+                .map_err(|error| Failure::read(&error)),
+            Source::Numbers(file) => Ok(iwork::numbers(file)?
+                .sheets()
+                .iter()
+                .map(|sheet| sheet.name().to_owned())
+                .collect()),
+        })
+        .map_err(PyErr::from)
     }
 
     /// Extract all text from all worksheets
     ///
     /// Returns:
     ///     All text content as a single string
-    fn text(&self) -> PyResult<String> {
-        self.inner.text().map_err(boxed_err_to_py_err)
+    ///
+    /// Raises:
+    ///     IoError: (an OSError) If the file changed after it was opened
+    fn text(&self, py: Python<'_>) -> PyResult<String> {
+        py.detach(|| match &self.source {
+            Source::File(file) => file.text().map_err(|error| Failure::read(&error)),
+            Source::Numbers(file) => file.text().map_err(|error| Failure::read(&error)),
+        })
+        .map_err(PyErr::from)
     }
 
-    fn __repr__(&self) -> PyResult<String> {
-        let count = self.worksheet_count().unwrap_or(0);
+    fn __repr__(&self, py: Python<'_>) -> PyResult<String> {
+        let count = py.detach(|| self.count()).unwrap_or(0);
         Ok(format!("<Workbook: {} worksheets>", count))
     }
 }
 
 /// A worksheet in a workbook
 ///
-/// Note: This is a placeholder for future worksheet-level API.
-/// Currently, use Workbook.worksheet_names() and Workbook.text() for data access.
-#[pyclass]
+/// Note: This is a placeholder for future worksheet-level API. No method
+/// returns one yet; use Workbook.worksheet_names() and Workbook.text() for
+/// data access.
+#[pyclass(frozen, module = "litchi_py")]
 pub struct Worksheet {
     _private: (),
 }

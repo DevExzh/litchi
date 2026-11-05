@@ -2,6 +2,7 @@
 
 #[cfg(test)]
 use litchi_biff::Encoder as GraphEncoder;
+use litchi_core::edit::RefusalKind;
 use litchi_ograph::chart::{format, group};
 use litchi_ograph::record::{chart3d, frame, line, marker, pie, series};
 
@@ -649,9 +650,10 @@ pub(crate) fn patch_chart_data(
     ensure_data_edit_shape(old, new)?;
     let source_chart = parse_chart(input, limits)?;
     if !source_chart.eq(old) {
-        return Err(Error::UnsafeEdit(
-            "chart source differs from its typed snapshot".into(),
-        ));
+        return Err(Error::PatchConflict {
+            operation: "edit chart",
+            reason: "chart source differs from its typed snapshot",
+        });
     }
 
     let mut link_changes = old
@@ -669,8 +671,10 @@ pub(crate) fn patch_chart_data(
                 continue;
             }
             if new_link.source != Source::Cells {
-                return Err(Error::UnsafeEdit(
-                    "only worksheet-cell chart formulas can be patched".into(),
+                return Err(Error::refused(
+                    RefusalKind::UnsupportedOperation,
+                    "edit chart",
+                    "only worksheet-cell chart formulas can be patched",
                 ));
             }
             Formula::parse(new_link.formula_tokens.clone(), limits)?;
@@ -731,8 +735,10 @@ pub(crate) fn patch_chart_data(
             },
             SERIES => {
                 if seen_series >= old.series.len() {
-                    return Err(Error::UnsafeEdit(
-                        "chart source contains an unmodeled series record".into(),
+                    return Err(Error::refused(
+                        RefusalKind::UnsupportedContent,
+                        "edit chart",
+                        "chart source contains an unmodeled series record",
                     ));
                 }
                 current_series = Some(seen_series);
@@ -759,18 +765,31 @@ pub(crate) fn patch_chart_data(
                     .series
                     .get(series_index)
                     .and_then(|series| series.links.get(link_index))
-                    .ok_or_else(|| Error::UnsafeEdit("chart source link is not modeled".into()))?;
+                    .ok_or_else(|| {
+                        Error::refused(
+                            RefusalKind::UnsupportedContent,
+                            "edit chart",
+                            "chart source link is not modeled",
+                        )
+                    })?;
                 let parsed = parse_link(data, limits)?;
                 if parsed != *old_link {
-                    return Err(Error::UnsafeEdit(
-                        "chart source link differs from its typed snapshot".into(),
-                    ));
+                    return Err(Error::PatchConflict {
+                        operation: "edit chart",
+                        reason: "chart source link differs from its typed snapshot",
+                    });
                 }
                 let changed = link_changes
                     .get(series_index)
                     .and_then(|links| links.get(link_index))
                     .copied()
-                    .ok_or_else(|| Error::UnsafeEdit("chart source link is not modeled".into()))?;
+                    .ok_or_else(|| {
+                        Error::refused(
+                            RefusalKind::UnsupportedContent,
+                            "edit chart",
+                            "chart source link is not modeled",
+                        )
+                    })?;
                 if changed {
                     let link = &new.series[series_index].links[link_index];
                     output.extend(record(BRAI, &write_link(link, limits)?)?);
@@ -791,22 +810,29 @@ pub(crate) fn patch_chart_data(
                     .ok_or_else(|| invalid_error(SI_INDEX, "cache data precedes SIIndex"))?;
                 let parsed = parse_cache(kind, value.kind, data)?;
                 let cache_index = seen_caches;
-                let old_cache = old
-                    .cached_values
-                    .get(cache_index)
-                    .ok_or_else(|| Error::UnsafeEdit("chart source cache is not modeled".into()))?;
+                let old_cache = old.cached_values.get(cache_index).ok_or_else(|| {
+                    Error::refused(
+                        RefusalKind::UnsupportedContent,
+                        "edit chart",
+                        "chart source cache is not modeled",
+                    )
+                })?;
                 if parsed != *old_cache {
-                    return Err(Error::UnsafeEdit(
-                        "chart source cache differs from its typed snapshot".into(),
-                    ));
+                    return Err(Error::PatchConflict {
+                        operation: "edit chart",
+                        reason: "chart source cache differs from its typed snapshot",
+                    });
                 }
                 seen_caches = seen_caches
                     .checked_add(1)
                     .ok_or_else(|| Error::InvalidData("chart cache count overflow".into()))?;
-                let changed = cache_changes
-                    .get(cache_index)
-                    .copied()
-                    .ok_or_else(|| Error::UnsafeEdit("chart source cache is not modeled".into()))?;
+                let changed = cache_changes.get(cache_index).copied().ok_or_else(|| {
+                    Error::refused(
+                        RefusalKind::UnsupportedContent,
+                        "edit chart",
+                        "chart source cache is not modeled",
+                    )
+                })?;
                 if changed {
                     let (record_type, data) = write_cache(&new.cached_values[cache_index])?;
                     output.extend(record(record_type, &data)?);
@@ -830,8 +856,8 @@ pub(crate) fn patch_chart_data(
         || link_changes.iter().flatten().any(|value| *value)
         || cache_changes.iter().any(|value| *value)
     {
-        return Err(Error::UnsafeEdit(
-            "chart data edit did not find every typed target record".into(),
+        return Err(Error::Internal(
+            "chart data edit did not find every typed target record",
         ));
     }
     Ok(output)
@@ -854,8 +880,10 @@ fn ensure_data_edit_shape(old: &Chart, new: &Chart) -> Result<()> {
         || old.series.len() != new.series.len()
         || old.cached_values.len() != new.cached_values.len()
     {
-        return Err(Error::UnsafeEdit(
-            "chart data edit would change an unsupported graph structure".into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit chart",
+            "chart data edit would change an unsupported graph structure",
         ));
     }
     for (old_series, new_series) in old.series.iter().zip(&new.series) {
@@ -867,8 +895,10 @@ fn ensure_data_edit_shape(old: &Chart, new: &Chart) -> Result<()> {
             || old_series.name != new_series.name
             || old_series.links.len() != new_series.links.len()
         {
-            return Err(Error::UnsafeEdit(
-                "chart data edit would change series topology".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit chart",
+                "chart data edit would change series topology",
             ));
         }
         for (old_link, new_link) in old_series.links.iter().zip(&new_series.links) {
@@ -877,8 +907,10 @@ fn ensure_data_edit_shape(old: &Chart, new: &Chart) -> Result<()> {
                 || old_link.unlinked_number_format != new_link.unlinked_number_format
                 || old_link.number_format != new_link.number_format
             {
-                return Err(Error::UnsafeEdit(
-                    "chart data edit would change a link's semantic metadata".into(),
+                return Err(Error::refused(
+                    RefusalKind::UnsupportedOperation,
+                    "edit chart",
+                    "chart data edit would change a link's semantic metadata",
                 ));
             }
         }
@@ -888,8 +920,10 @@ fn ensure_data_edit_shape(old: &Chart, new: &Chart) -> Result<()> {
             || old_cache.point != new_cache.point
             || old_cache.series != new_cache.series
         {
-            return Err(Error::UnsafeEdit(
-                "chart data edit would change cache placement".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit chart",
+                "chart data edit would change cache placement",
             ));
         }
     }
@@ -1046,8 +1080,10 @@ pub(crate) fn parse_group(kind: u16, data: &[u8]) -> Result<GroupKind> {
 pub(super) fn serialize_chart(chart: &Chart, limits: Limits) -> Result<Vec<u8>> {
     chart.validate(limits)?;
     if !chart.unknown_records.is_empty() {
-        return Err(Error::UnsafeEdit(
-            "opaque chart records have no proven canonical placement".to_string(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedContent,
+            "edit chart",
+            "opaque chart records have no proven canonical placement",
         ));
     }
     let mut out = chart_encoder(limits)?;

@@ -4,7 +4,7 @@ use super::codec::{
     active_marker_with_hash, active_offsets, find_bytes, process_markup_compatibility,
     reserve_exact,
 };
-use super::model::{Capabilities, Error, Limits, Name, OffsetLimits, Report};
+use super::model::{Capabilities, Error, LimitKind, Limits, Name, OffsetLimits, Report};
 use std::{borrow::Cow, str};
 
 #[cfg(test)]
@@ -250,7 +250,7 @@ mod preservation_tests {
         };
         assert!(matches!(
             run_with(&source, &Capabilities::new(), &limits),
-            Err(Error::LimitExceeded(_))
+            Err(Error::LimitExceeded { .. })
         ));
     }
 
@@ -300,7 +300,7 @@ mod preservation_tests {
         };
         assert!(matches!(
             run_with(&source, &Capabilities::new(), &under),
-            Err(Error::LimitExceeded(message)) if message == "namespace bindings"
+            Err(Error::LimitExceeded { kind, .. }) if kind == LimitKind::NamespaceBindings
         ));
     }
 
@@ -430,7 +430,7 @@ mod preservation_tests {
 #[cfg(test)]
 mod streaming_0410_name_ownership_tests {
     use super::super::{
-        Capabilities, Error, ExpandedName,
+        Capabilities, Error, ExpandedName, LimitKind,
         stream::{
             SemanticEvent, StreamError, StreamLimits,
             process_markup_compatibility_stream_with_observers,
@@ -560,9 +560,9 @@ mod streaming_0410_name_ownership_tests {
                 |_| Ok::<(), &'static str>(()),
             ),
             Err(StreamError::Mce {
-                error: Error::LimitExceeded(message),
+                error: Error::LimitExceeded { kind, .. },
                 ..
-            }) if message == "stream name bytes"
+            }) if kind == LimitKind::NameBytes
         ));
     }
 }
@@ -643,7 +643,7 @@ mod codec_tests {
         };
         assert!(matches!(
             active_offsets(xml, &[offset], &Capabilities::new(), &count_limited),
-            Err(Error::LimitExceeded(_))
+            Err(Error::LimitExceeded { .. })
         ));
 
         let marked_limited = OffsetLimits {
@@ -652,7 +652,7 @@ mod codec_tests {
         };
         assert!(matches!(
             active_offsets(xml, &[offset], &Capabilities::new(), &marked_limited),
-            Err(Error::LimitExceeded(_))
+            Err(Error::LimitExceeded { .. })
         ));
     }
 
@@ -792,7 +792,7 @@ mod codec_tests {
         };
         assert!(matches!(
             process_markup_compatibility(source, &Capabilities::new(), &input_limited),
-            Err(Error::LimitExceeded(message)) if message == "input bytes"
+            Err(Error::LimitExceeded { kind, .. }) if kind == LimitKind::InputBytes
         ));
 
         let output_limited = Limits {
@@ -802,7 +802,7 @@ mod codec_tests {
         };
         assert!(matches!(
             process_markup_compatibility(source, &Capabilities::new(), &output_limited),
-            Err(Error::LimitExceeded(message)) if message == "output bytes"
+            Err(Error::LimitExceeded { kind, .. }) if kind == LimitKind::OutputBytes
         ));
     }
 
@@ -976,7 +976,7 @@ mod codec_tests {
         ] {
             assert!(matches!(
                 process_markup_compatibility(xml, &Capabilities::new(), &limits),
-                Err(Error::LimitExceeded(_))
+                Err(Error::LimitExceeded { .. })
             ));
         }
     }
@@ -1010,7 +1010,7 @@ mod codec_tests {
         };
         assert!(matches!(
             process_markup_compatibility(xml, &Capabilities::new(), &over),
-            Err(Error::LimitExceeded(_))
+            Err(Error::LimitExceeded { .. })
         ));
     }
 
@@ -1046,7 +1046,7 @@ mod codec_tests {
         };
         assert!(matches!(
             process_markup_compatibility(xml.as_bytes(), &Capabilities::new(), &namespace_over,),
-            Err(Error::LimitExceeded(_))
+            Err(Error::LimitExceeded { .. })
         ));
     }
 
@@ -1067,7 +1067,7 @@ mod codec_tests {
         };
         assert!(matches!(
             process_markup_compatibility(xml.as_bytes(), &Capabilities::new(), &over),
-            Err(Error::LimitExceeded(_))
+            Err(Error::LimitExceeded { .. })
         ));
     }
 
@@ -1108,9 +1108,12 @@ mod fixture_tests {
 
     #[test]
     fn poi_styles_select_unsupported_vendor_fallbacks() {
-        let package = OpcPackage::from_bytes(include_bytes!(
-            "../../../../test-data/poi/test-data/spreadsheet/style-alternate-content.xlsx"
-        ))
+        let package = OpcPackage::from_bytes(
+            include_bytes!(
+                "../../../../test-data/poi/test-data/spreadsheet/style-alternate-content.xlsx"
+            ),
+            litchi_opc::SourceLimits::default(),
+        )
         .unwrap();
         let part = package
             .get_part(&PackURI::new("/xl/styles.xml").unwrap())
@@ -1126,9 +1129,12 @@ mod fixture_tests {
 
     #[test]
     fn libreoffice_pptx_emits_only_fallback_shape() {
-        let package = OpcPackage::from_bytes(include_bytes!(
-            "../../../../test-data/libreoffice-core/oox/qa/unit/data/import-mce.pptx"
-        ))
+        let package = OpcPackage::from_bytes(
+            include_bytes!(
+                "../../../../test-data/libreoffice-core/oox/qa/unit/data/import-mce.pptx"
+            ),
+            litchi_opc::SourceLimits::default(),
+        )
         .unwrap();
         let part = package
             .get_part(&PackURI::new("/ppt/slides/slide1.xml").unwrap())
@@ -1147,7 +1153,7 @@ mod fixture_tests {
 #[cfg(test)]
 mod streaming_0360_tests {
     use super::super::{
-        Capabilities, Error, ExpandedName, Name,
+        Capabilities, Error, ExpandedName, LimitKind, Name,
         stream::{
             RawElement, RawElementKind, SemanticEvent, StreamError, StreamLimits, StreamReport,
             process_markup_compatibility_stream,
@@ -1160,6 +1166,85 @@ mod streaming_0360_tests {
     };
 
     const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+
+    #[test]
+    fn invalid_stream_bounds_are_typed_configuration_errors() {
+        let limits = StreamLimits {
+            max_events: 0,
+            ..StreamLimits::default()
+        };
+        let error = streaming_0360_active(b"<root/>", &Capabilities::default(), &limits)
+            .expect_err("zero event bounds must be rejected before reading");
+        assert!(matches!(
+            error,
+            StreamError::Mce {
+                error: Error::InvalidLimit {
+                    kind: LimitKind::Events,
+                    value: 0,
+                    minimum: 1,
+                    ..
+                },
+                ..
+            }
+        ));
+
+        let mut limits = StreamLimits::default();
+        limits.processing.max_input_bytes = 0;
+        let error = streaming_0360_active(b"<root/>", &Capabilities::default(), &limits)
+            .expect_err("zero input bounds must be rejected before reading");
+        assert!(matches!(
+            error,
+            StreamError::Mce {
+                error: Error::InvalidLimit {
+                    kind: LimitKind::InputBytes,
+                    value: 0,
+                    minimum: 1,
+                    ..
+                },
+                ..
+            }
+        ));
+    }
+
+    struct AlwaysInterrupted;
+
+    impl Read for AlwaysInterrupted {
+        fn read(&mut self, _output: &mut [u8]) -> io::Result<usize> {
+            Err(io::Error::new(io::ErrorKind::Interrupted, "retry"))
+        }
+    }
+
+    impl BufRead for AlwaysInterrupted {
+        fn fill_buf(&mut self) -> io::Result<&[u8]> {
+            Err(io::Error::new(io::ErrorKind::Interrupted, "retry"))
+        }
+
+        fn consume(&mut self, _amount: usize) {}
+    }
+
+    #[test]
+    fn interrupted_retry_limit_reports_the_ninth_observation() {
+        let mut input = AlwaysInterrupted;
+        let error = process_markup_compatibility_stream_with_observers(
+            &mut input,
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            |_| Ok::<(), Infallible>(()),
+            |_| Ok::<(), Infallible>(()),
+        )
+        .expect_err("the ninth interrupted read must be reported");
+        assert!(matches!(
+            error,
+            StreamError::Mce {
+                error: Error::LimitExceeded {
+                    kind: LimitKind::RetryCount,
+                    observed: 9,
+                    maximum: 8,
+                },
+                ..
+            }
+        ));
+    }
 
     fn streaming_0360_expanded(name: &ExpandedName) -> String {
         format!("{}:{}", name.namespace, name.local_name)
@@ -1497,9 +1582,9 @@ mod streaming_0360_tests {
         assert!(matches!(
             streaming_0360_active(nested, &Capabilities::new(), &over_events),
             Err(StreamError::Mce {
-                error: Error::LimitExceeded(message),
+                error: Error::LimitExceeded { kind, .. },
                 ..
-            }) if message.contains("stream event count")
+            }) if kind == LimitKind::Events
         ));
 
         let attr_xml = format!(r#"<r value="{}"/>"#, "x".repeat(64));
@@ -1515,9 +1600,9 @@ mod streaming_0360_tests {
         assert!(matches!(
             streaming_0360_active(attr_xml.as_bytes(), &Capabilities::new(), &over_attribute),
             Err(StreamError::Mce {
-                error: Error::LimitExceeded(message),
+                error: Error::LimitExceeded { kind, .. },
                 ..
-            }) if message.contains("stream event bytes")
+            }) if kind == LimitKind::EventBytes
         ));
 
         let text_xml = format!("<r>{}</r>", "t".repeat(128));
@@ -1533,9 +1618,9 @@ mod streaming_0360_tests {
         assert!(matches!(
             streaming_0360_active(text_xml.as_bytes(), &Capabilities::new(), &over_text),
             Err(StreamError::Mce {
-                error: Error::LimitExceeded(message),
+                error: Error::LimitExceeded { kind, .. },
                 ..
-            }) if message.contains("stream event bytes")
+            }) if kind == LimitKind::EventBytes
         ));
     }
 
@@ -1908,7 +1993,7 @@ mod streaming_0361_raw_attribute_tests {
 #[cfg(test)]
 mod streaming_0361_raw_recovery_tests {
     use super::super::{
-        Capabilities, Error, Name,
+        Capabilities, Error, LimitKind, Name,
         stream::{
             RawElement, SemanticEvent, StreamError, StreamLimits,
             process_markup_compatibility_stream_with_observers,
@@ -2390,9 +2475,9 @@ mod streaming_0361_raw_recovery_tests {
                 |_| Ok::<(), &'static str>(()),
             ),
             Err(StreamError::Mce {
-                error: Error::LimitExceeded(message),
+                error: Error::LimitExceeded { kind, .. },
                 ..
-            }) if message.contains("stream context bytes")
+            }) if kind == LimitKind::ContextBytes
         ));
     }
 }
@@ -2415,7 +2500,7 @@ mod namespace_emission_contract_tests {
     //! `mce::self_contained_fragment`; `self_contained_fragment_tests` below
     //! pins that.
 
-    use super::super::model::{Capabilities, Error, Limits, NAMESPACE};
+    use super::super::model::{Capabilities, Error, LimitKind, Limits, NAMESPACE};
     use super::process_markup_compatibility;
     use quick_xml::events::Event;
     use quick_xml::name::ResolveResult;
@@ -2906,7 +2991,7 @@ mod namespace_emission_contract_tests {
         };
         assert!(matches!(
             run_with(&xml, &Capabilities::new(), &under_bound),
-            Err(Error::LimitExceeded(message)) if message == "output bytes"
+            Err(Error::LimitExceeded { kind, .. }) if kind == LimitKind::OutputBytes
         ));
     }
 }
@@ -3109,7 +3194,7 @@ mod self_contained_fragment_tests {
     //! Change 0653 restores, at the slice boundary, the property the writer's
     //! namespace redundancy used to provide for free.
 
-    use super::super::model::{Error, Limits};
+    use super::super::model::{Error, LimitKind, Limits};
     use super::super::{InScopeNamespaces, self_contained_fragment};
     use quick_xml::events::Event;
     use quick_xml::name::ResolveResult;
@@ -3288,7 +3373,7 @@ mod self_contained_fragment_tests {
         };
         assert!(matches!(
             InScopeNamespaces::at_offset(document.as_bytes(), document.len() - 12, &limits),
-            Err(Error::LimitExceeded(message)) if message == "namespace bindings"
+            Err(Error::LimitExceeded { kind, .. }) if kind == LimitKind::NamespaceBindings
         ));
     }
 

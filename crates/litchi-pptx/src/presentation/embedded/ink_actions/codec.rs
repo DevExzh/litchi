@@ -91,7 +91,8 @@ fn namespace_matches(actual: &[u8], expected: &[u8]) -> bool {
 fn normalize_namespace(actual: &[u8]) -> Result<Vec<u8>> {
     if actual.len() > crate::presentation::embedded::MAX_ATTRIBUTE_BYTES {
         return Err(limit(
-            "ink-action namespace URI bytes",
+            crate::error::CodecLimitKind::NamespaceBytes,
+            actual.len(),
             crate::presentation::embedded::MAX_ATTRIBUTE_BYTES,
         ));
     }
@@ -174,7 +175,8 @@ impl BranchState {
 pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Candidate>> {
     if xml.len() > crate::presentation::embedded::MAX_XML_BYTES {
         return Err(limit(
-            "ink-action owner XML bytes",
+            crate::error::CodecLimitKind::XmlBytes,
+            xml.len(),
             crate::presentation::embedded::MAX_XML_BYTES,
         ));
     }
@@ -215,12 +217,19 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Candidate>> {
                 increment_nodes(&mut nodes)?;
                 validate_element_name(element.name())?;
                 validate_attributes(&element, &resolver, reader.decoder())?;
-                let depth = stack
-                    .len()
-                    .checked_add(1)
-                    .ok_or_else(|| limit("ink-action owner XML depth", MAX_XML_DEPTH))?;
+                let depth = stack.len().checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        MAX_XML_DEPTH,
+                    )
+                })?;
                 if depth > MAX_XML_DEPTH {
-                    return Err(limit("ink-action owner XML depth", MAX_XML_DEPTH));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        MAX_XML_DEPTH,
+                    ));
                 }
                 let namespace = ElementNamespace::from_resolved(&resolved);
                 if namespace == ElementNamespace::Unknown {
@@ -303,10 +312,10 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Candidate>> {
                     }
 
                     if let Some(branch) = direct_branch_mut(alt, depth) {
-                        branch.element_children = branch
-                            .element_children
-                            .checked_add(1)
-                            .ok_or_else(|| limit("ink-action MCE branch elements", maximum))?;
+                        branch.element_children =
+                            branch.element_children.checked_add(1).ok_or_else(|| {
+                                limit(crate::error::CodecLimitKind::XmlNodes, usize::MAX, maximum)
+                            })?;
                         let is_content = namespace.is_pml() && local.as_slice() == b"contentPart";
                         let is_picture = namespace.is_pml() && local.as_slice() == b"pic";
                         match branch.branch {
@@ -326,7 +335,11 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Candidate>> {
                             Branch::Fallback if is_picture => {
                                 branch.picture_children =
                                     branch.picture_children.checked_add(1).ok_or_else(|| {
-                                        limit("ink-action fallback picture children", maximum)
+                                        limit(
+                                            crate::error::CodecLimitKind::PictureChildren,
+                                            usize::MAX,
+                                            maximum,
+                                        )
                                     })?;
                                 // The complete fallback source is retained.  Its exact
                                 // p:pic shape is checked when the branch closes.
@@ -352,12 +365,19 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Candidate>> {
                 increment_nodes(&mut nodes)?;
                 validate_element_name(element.name())?;
                 validate_attributes(&element, &resolver, reader.decoder())?;
-                let depth = stack
-                    .len()
-                    .checked_add(1)
-                    .ok_or_else(|| limit("ink-action owner XML depth", MAX_XML_DEPTH))?;
+                let depth = stack.len().checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        MAX_XML_DEPTH,
+                    )
+                })?;
                 if depth > MAX_XML_DEPTH {
-                    return Err(limit("ink-action owner XML depth", MAX_XML_DEPTH));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        MAX_XML_DEPTH,
+                    ));
                 }
                 let namespace = ElementNamespace::from_resolved(&resolved);
                 if namespace == ElementNamespace::Unknown {
@@ -386,10 +406,10 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Candidate>> {
                         .and_then(|frame| frame.alternate.as_mut())
                         .ok_or_else(|| invalid("ink-action AlternateContent state is missing"))?;
                     if let Some(branch) = direct_branch_mut(alt, depth) {
-                        branch.element_children = branch
-                            .element_children
-                            .checked_add(1)
-                            .ok_or_else(|| limit("ink-action MCE branch elements", maximum))?;
+                        branch.element_children =
+                            branch.element_children.checked_add(1).ok_or_else(|| {
+                                limit(crate::error::CodecLimitKind::XmlNodes, usize::MAX, maximum)
+                            })?;
                         if branch.branch == Branch::Choice
                             && namespace.is_pml()
                             && local.as_ref() == b"contentPart"
@@ -412,7 +432,11 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Candidate>> {
                         {
                             branch.picture_children =
                                 branch.picture_children.checked_add(1).ok_or_else(|| {
-                                    limit("ink-action fallback picture children", maximum)
+                                    limit(
+                                        crate::error::CodecLimitKind::PictureChildren,
+                                        usize::MAX,
+                                        maximum,
+                                    )
                                 })?;
                         }
                     }
@@ -464,7 +488,11 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Candidate>> {
                         reader.decoder(),
                     )? {
                         if candidates.len() >= maximum {
-                            return Err(limit("ink-action anchor count", maximum));
+                            return Err(limit(
+                                crate::error::CodecLimitKind::InkAnchors,
+                                candidates.len().checked_add(1).unwrap_or(usize::MAX),
+                                maximum,
+                            ));
                         }
                         candidates
                             .try_reserve(1)
@@ -571,7 +599,7 @@ fn finalize_alternate(
     let source_ordinal = *raw_ordinal;
     *raw_ordinal = raw_ordinal
         .checked_add(1)
-        .ok_or_else(|| limit("ink-action source ordinal", usize::MAX))?;
+        .ok_or_else(|| limit(crate::error::CodecLimitKind::Index, usize::MAX, usize::MAX))?;
     if alternate.choices.len() != 1 {
         return Err(invalid(
             "ink-action AlternateContent has duplicate or ambiguous Choice branches",
@@ -700,7 +728,8 @@ fn requires_value(
             }
             if token.len() > crate::presentation::embedded::MAX_ATTRIBUTE_BYTES {
                 return Err(limit(
-                    "ink-action Requires token",
+                    crate::error::CodecLimitKind::NameBytes,
+                    token.len(),
                     crate::presentation::embedded::MAX_ATTRIBUTE_BYTES,
                 ));
             }
@@ -826,22 +855,32 @@ fn validate_attributes(
     let mut seen_namespace_prefixes = Vec::<Vec<u8>>::new();
     for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
-        attributes = attributes
-            .checked_add(1)
-            .ok_or_else(|| limit("ink-action owner XML attributes", MAX_ATTRIBUTES))?;
+        attributes = attributes.checked_add(1).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::XmlAttributes,
+                usize::MAX,
+                MAX_ATTRIBUTES,
+            )
+        })?;
         if attributes > MAX_ATTRIBUTES {
-            return Err(limit("ink-action owner XML attributes", MAX_ATTRIBUTES));
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlAttributes,
+                attributes,
+                MAX_ATTRIBUTES,
+            ));
         }
         if attribute.key.as_ref().len() > crate::presentation::embedded::MAX_ATTRIBUTE_BYTES {
             return Err(limit(
-                "ink-action owner XML attribute name bytes",
+                crate::error::CodecLimitKind::NameBytes,
+                attribute.key.as_ref().len(),
                 crate::presentation::embedded::MAX_ATTRIBUTE_BYTES,
             ));
         }
         validate_qname(attribute.key, "ink-action owner XML attribute name")?;
         if attribute.value.len() > crate::presentation::embedded::MAX_ATTRIBUTE_BYTES {
             return Err(limit(
-                "ink-action owner XML attribute bytes",
+                crate::error::CodecLimitKind::XmlAttributeBytes,
+                attribute.value.len(),
                 crate::presentation::embedded::MAX_ATTRIBUTE_BYTES,
             ));
         }
@@ -855,13 +894,15 @@ fn validate_attributes(
         if is_namespace {
             namespaces = namespaces.checked_add(1).ok_or_else(|| {
                 limit(
-                    "ink-action namespace declarations",
+                    crate::error::CodecLimitKind::NamespaceBindings,
+                    usize::MAX,
                     MAX_NAMESPACE_DECLARATIONS,
                 )
             })?;
             if namespaces > MAX_NAMESPACE_DECLARATIONS {
                 return Err(limit(
-                    "ink-action namespace declarations",
+                    crate::error::CodecLimitKind::NamespaceBindings,
+                    namespaces,
                     MAX_NAMESPACE_DECLARATIONS,
                 ));
             }
@@ -926,7 +967,8 @@ fn validate_attributes(
         seen.push((namespace, local.to_vec()));
         if value.len() > crate::presentation::embedded::MAX_ATTRIBUTE_BYTES {
             return Err(limit(
-                "ink-action owner XML decoded attribute bytes",
+                crate::error::CodecLimitKind::XmlAttributeBytes,
+                value.len(),
                 crate::presentation::embedded::MAX_ATTRIBUTE_BYTES,
             ));
         }
@@ -956,7 +998,8 @@ fn validate_end_name(name: QName<'_>) -> Result<()> {
 fn validate_qname(name: QName<'_>, field: &'static str) -> Result<()> {
     if name.as_ref().len() > crate::presentation::embedded::MAX_ATTRIBUTE_BYTES {
         return Err(limit(
-            "ink-action owner XML qualified name bytes",
+            crate::error::CodecLimitKind::NameBytes,
+            name.as_ref().len(),
             crate::presentation::embedded::MAX_ATTRIBUTE_BYTES,
         ));
     }
@@ -1048,7 +1091,8 @@ fn validate_comment(value: &[u8]) -> Result<()> {
 fn validate_general_ref(reference: &BytesRef<'_>) -> Result<Option<char>> {
     if reference.as_ref().len() > crate::presentation::embedded::MAX_ATTRIBUTE_BYTES {
         return Err(limit(
-            "ink-action XML general reference bytes",
+            crate::error::CodecLimitKind::StringBytes,
+            reference.as_ref().len(),
             crate::presentation::embedded::MAX_ATTRIBUTE_BYTES,
         ));
     }

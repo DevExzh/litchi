@@ -116,10 +116,10 @@ fn snapshot_retains_exact_source_and_all_bags_for_a_noop() {
     assert_eq!(snapshot.store().strings[0].value, "city");
 
     let commit = snapshot.edit().commit().unwrap();
-    assert!(!commit.changed());
+    assert!(!commit.diagnostics().changed());
     assert!(commit.patch().is_noop());
     assert!(commit.patch().change().is_none());
-    assert_eq!(commit.snapshot().bytes(), data.as_slice());
+    assert_eq!(commit.package().bytes(), data.as_slice());
     assert_eq!(commit.patch().apply(&snapshot).unwrap(), snapshot);
 }
 
@@ -145,19 +145,19 @@ fn typed_property_edits_preserve_unknown_strings_and_other_bags() {
         )
         .unwrap();
     let commit = transaction.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert_eq!(
-        commit.snapshot().resolved_property(0, 0),
+        commit.package().resolved_property(0, 0),
         Some(("city", "Rome"))
     );
     assert_eq!(
-        commit.snapshot().resolved_property(1, 0),
+        commit.package().resolved_property(1, 0),
         Some(("city", "Rome"))
     );
-    assert_eq!(commit.snapshot().store().strings[0].value, "city");
-    assert_eq!(commit.snapshot().bags().len(), 2);
+    assert_eq!(commit.package().store().strings[0].value, "city");
+    assert_eq!(commit.package().bags().len(), 2);
     assert_eq!(
-        commit.patch().inverse().apply(commit.snapshot()).unwrap(),
+        commit.patch().inverse().apply(commit.package()).unwrap(),
         snapshot
     );
 }
@@ -180,7 +180,7 @@ fn stale_sources_and_invalid_or_oversized_edits_are_rejected_atomically() {
         .unwrap();
     let changed = changed.commit().unwrap();
     assert!(changed.patch().apply(&snapshot).is_ok());
-    assert!(changed.patch().apply(changed.snapshot()).is_err());
+    assert!(changed.patch().apply(changed.package()).is_err());
 
     let before_store = snapshot.store().clone();
     let before_bags = snapshot.bags().to_vec();

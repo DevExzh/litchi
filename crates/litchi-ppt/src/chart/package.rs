@@ -16,10 +16,11 @@ pub(crate) const MAX_CHART_OBJECTS: usize = 512;
 pub(crate) fn enumerate(presentation: &Presentation, limits: Limits) -> Result<Inventory> {
     let validated_limits = limits.validate()?;
     let document = presentation.live_document_record()?;
-    let Some(objects) = Collection::parse(&document)? else {
+    let source_limits = presentation.source_limits();
+    let Some(objects) = Collection::parse(&document, &source_limits)? else {
         return Ok(Inventory::default());
     };
-    objects.validate_persist_mapping(&presentation.persist_mapping)?;
+    objects.validate_persist_mapping(&presentation.inner.persist_mapping)?;
 
     let mut wanted = Vec::new();
     wanted

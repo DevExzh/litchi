@@ -8,7 +8,7 @@ use litchi_odf_common::package::raw_identical_members;
 use litchi_odp::content::{
     MAX_TEXT_BOX_MODEL_REPLACEMENTS, Paragraph, TextBoxModel, TextBoxModelReplacement,
 };
-use litchi_odp::{Presentation, edit};
+use litchi_odp::{Package, edit};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const MIME: &str = "application/vnd.oasis.opendocument.presentation";
@@ -48,7 +48,7 @@ fn fixture(slides: usize, boxes_per_slide: usize, options: FixtureOptions) -> Ve
     }
     content.push_str("</office:presentation></office:body></office:document-content>");
 
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", content.as_bytes()).unwrap();
     writer
@@ -77,13 +77,13 @@ fn fixture(slides: usize, boxes_per_slide: usize, options: FixtureOptions) -> Ve
 }
 
 fn content_fixture(content: &str) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", content.as_bytes()).unwrap();
     writer.finish_to_bytes().unwrap()
 }
 
-fn model(source: &edit::Snapshot, page: usize, name: &str, text: &str) -> TextBoxModel {
+fn model(source: &Package, page: usize, name: &str, text: &str) -> TextBoxModel {
     let mut value = source
         .rich_content()
         .unwrap()
@@ -99,7 +99,7 @@ fn model(source: &edit::Snapshot, page: usize, name: &str, text: &str) -> TextBo
 }
 
 fn renamed_model(
-    source: &edit::Snapshot,
+    source: &Package,
     page: usize,
     name: &str,
     new_name: &str,
@@ -124,7 +124,7 @@ fn atomic_batch_updates_first_middle_last_and_cross_slide_owners_deterministical
             ..FixtureOptions::default()
         },
     );
-    let source = edit::Snapshot::from_bytes(source_bytes.clone()).unwrap();
+    let source = Package::from_bytes(&source_bytes).unwrap();
     let changed = [
         model(&source, 0, "Box 0-0", "after first"),
         model(&source, 0, "Box 0-1", "after middle"),
@@ -141,23 +141,29 @@ fn atomic_batch_updates_first_middle_last_and_cross_slide_owners_deterministical
     ];
     let reverse = [forward[4], forward[3], forward[2], forward[1], forward[0]];
 
-    let mut edit = source.transaction().unwrap();
+    let mut edit = source.edit().unwrap();
     assert_eq!(edit.replace_text_box_models(&reverse).unwrap(), 5);
     let commit = edit.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert_eq!(commit.patch().domains(), &[edit::Domain::Content]);
 
-    let mut deterministic = source.transaction().unwrap();
+    let mut deterministic = source.edit().unwrap();
     assert_eq!(deterministic.replace_text_box_models(&forward).unwrap(), 5);
     let deterministic = deterministic.commit().unwrap();
-    assert_eq!(deterministic.snapshot().bytes(), commit.snapshot().bytes());
+    assert_eq!(
+        deterministic.package().as_bytes(),
+        commit.package().as_bytes()
+    );
 
-    let reopened = edit::Snapshot::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+    let reopened = Package::from_bytes(commit.package().as_bytes()).unwrap();
     let inventory = reopened.rich_content().unwrap();
     for expected in &changed {
         assert!(inventory.text_boxes().contains(expected));
     }
-    let presentation = Presentation::from_bytes(reopened.bytes().to_vec()).unwrap();
+    let presentation = Package::from_bytes(reopened.as_bytes())
+        .unwrap()
+        .presentation()
+        .unwrap();
     assert_eq!(presentation.slides().unwrap().len(), 3);
     assert!(
         presentation
@@ -165,7 +171,7 @@ fn atomic_batch_updates_first_middle_last_and_cross_slide_owners_deterministical
             .contains(r#"<future:unselected future:value="byte-exact"/>"#)
     );
 
-    let identical = raw_identical_members(&source_bytes, commit.snapshot().bytes()).unwrap();
+    let identical = raw_identical_members(&source_bytes, commit.package().as_bytes()).unwrap();
     for member in [
         "mimetype",
         "styles.xml",
@@ -175,7 +181,7 @@ fn atomic_batch_updates_first_middle_last_and_cross_slide_owners_deterministical
     ] {
         assert!(identical.contains(member), "{member}");
     }
-    let package = OwnedPackage::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+    let package = OwnedPackage::from_bytes(commit.package().as_bytes().to_vec()).unwrap();
     assert_eq!(
         package.get_file("Pictures/opaque.bin").unwrap(),
         vec![0x5a; 1024 * 1024]
@@ -183,19 +189,23 @@ fn atomic_batch_updates_first_middle_last_and_cross_slide_owners_deterministical
 
     let durable =
         edit::Patch::from_durable_bytes(&commit.patch().to_durable_bytes().unwrap()).unwrap();
-    let applied = durable.apply(&source).unwrap();
-    assert_eq!(applied.bytes(), commit.snapshot().bytes());
+    let applied = source.apply(&durable).unwrap().into_package();
+    assert_eq!(applied.as_bytes(), commit.package().as_bytes());
     assert_eq!(
-        durable.inverse().apply(&applied).unwrap().bytes(),
-        source.bytes()
+        applied
+            .apply(&durable.inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        source.as_bytes()
     );
-    let foreign = edit::Snapshot::from_bytes(fixture(1, 1, FixtureOptions::default())).unwrap();
-    assert!(durable.apply(&foreign).is_err());
+    let foreign = Package::from_bytes(&fixture(1, 1, FixtureOptions::default())).unwrap();
+    assert!(foreign.apply(&durable).is_err());
 }
 
 #[test]
 fn duplicate_missing_collision_and_late_invalid_selectors_are_atomic() {
-    let source = edit::Snapshot::from_bytes(fixture(2, 2, FixtureOptions::default())).unwrap();
+    let source = Package::from_bytes(&fixture(2, 2, FixtureOptions::default())).unwrap();
     let first = model(&source, 0, "Box 0-0", "valid first");
     let second = model(&source, 0, "Box 0-1", "valid second");
     let wrong_page = model(&source, 1, "Box 1-0", "wrong owner page");
@@ -214,12 +224,12 @@ fn duplicate_missing_collision_and_late_invalid_selectors_are_atomic() {
             TextBoxModelReplacement::at(0, "Box 0-1", &wrong_page),
         ],
     ] {
-        let mut transaction = source.transaction().unwrap();
+        let mut transaction = source.edit().unwrap();
         assert!(transaction.replace_text_box_models(&replacements).is_err());
         let commit = transaction.commit().unwrap();
-        assert!(!commit.changed());
+        assert!(!commit.diagnostics().changed());
         assert!(commit.patch().is_noop());
-        assert_eq!(commit.snapshot().bytes(), source.bytes());
+        assert_eq!(commit.package().as_bytes(), source.as_bytes());
     }
 
     let mut renamed = first.clone();
@@ -230,16 +240,16 @@ fn duplicate_missing_collision_and_late_invalid_selectors_are_atomic() {
                 .replace("draw:name=\"Box 0-0\"", "draw:name=\"Box 0-1\""),
         )
         .unwrap();
-    let mut collision = source.transaction().unwrap();
+    let mut collision = source.edit().unwrap();
     assert!(
         collision
             .replace_text_box_models(&[TextBoxModelReplacement::at(0, "Box 0-0", &renamed,)])
             .is_err()
     );
-    assert!(!collision.commit().unwrap().changed());
+    assert!(!collision.commit().unwrap().diagnostics().changed());
 
     let retained_incumbent = model(&source, 0, "Box 0-1", "incumbent keeps its name");
-    let mut selected_collision = source.transaction().unwrap();
+    let mut selected_collision = source.edit().unwrap();
     let error = selected_collision
         .replace_text_box_models(&[
             TextBoxModelReplacement::at(0, "Box 0-0", &renamed),
@@ -248,10 +258,10 @@ fn duplicate_missing_collision_and_late_invalid_selectors_are_atomic() {
         .unwrap_err();
     assert!(error.to_string().contains("duplicate destination names"));
     let commit = selected_collision.commit().unwrap();
-    assert!(!commit.changed());
-    assert_eq!(commit.snapshot().bytes(), source.bytes());
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().as_bytes(), source.as_bytes());
 
-    let protected = edit::Snapshot::from_bytes(fixture(
+    let protected = Package::from_bytes(&fixture(
         1,
         2,
         FixtureOptions {
@@ -262,7 +272,7 @@ fn duplicate_missing_collision_and_late_invalid_selectors_are_atomic() {
     .unwrap();
     let valid_first = model(&protected, 0, "Box 0-0", "valid changed owner");
     let refused_late = model(&protected, 0, "Box 0-1", "protected changed owner");
-    let mut transaction = protected.transaction().unwrap();
+    let mut transaction = protected.edit().unwrap();
     assert!(
         transaction
             .replace_text_box_models(&[
@@ -272,16 +282,15 @@ fn duplicate_missing_collision_and_late_invalid_selectors_are_atomic() {
             .is_err()
     );
     let commit = transaction.commit().unwrap();
-    assert!(!commit.changed());
-    assert_eq!(commit.snapshot().bytes(), protected.bytes());
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().as_bytes(), protected.as_bytes());
 
     let protected_ancestor_xml = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:presentation><draw:page draw:name="Slide 0"><draw:frame draw:name="Outside"><draw:text-box><text:p>outside</text:p></draw:text-box></draw:frame><draw:g draw:name="Protected Group" draw:protect="content"><draw:frame draw:name="Inside"><draw:text-box><text:p>inside</text:p></draw:text-box></draw:frame></draw:g></draw:page></office:presentation></office:body></office:document-content>"#;
-    let protected_ancestor =
-        edit::Snapshot::from_bytes(content_fixture(protected_ancestor_xml)).unwrap();
-    let canonical = edit::Snapshot::from_bytes(fixture(1, 1, FixtureOptions::default())).unwrap();
+    let protected_ancestor = Package::from_bytes(&content_fixture(protected_ancestor_xml)).unwrap();
+    let canonical = Package::from_bytes(&fixture(1, 1, FixtureOptions::default())).unwrap();
     let valid_first = renamed_model(&canonical, 0, "Box 0-0", "Outside", "outside changed first");
     let refused_late = renamed_model(&canonical, 0, "Box 0-0", "Inside", "inside refused late");
-    let mut transaction = protected_ancestor.transaction().unwrap();
+    let mut transaction = protected_ancestor.edit().unwrap();
     let error = transaction
         .replace_text_box_models(&[
             TextBoxModelReplacement::at(0, "Outside", &valid_first),
@@ -290,14 +299,14 @@ fn duplicate_missing_collision_and_late_invalid_selectors_are_atomic() {
         .unwrap_err();
     assert!(error.to_string().contains("protected drawing owner"));
     let commit = transaction.commit().unwrap();
-    assert!(!commit.changed());
+    assert!(!commit.diagnostics().changed());
     assert!(commit.patch().is_noop());
-    assert_eq!(commit.snapshot().bytes(), protected_ancestor.bytes());
+    assert_eq!(commit.package().as_bytes(), protected_ancestor.as_bytes());
 }
 
 #[test]
 fn rename_cycles_are_published_simultaneously_and_read_back_by_destination() {
-    let source = edit::Snapshot::from_bytes(fixture(1, 3, FixtureOptions::default())).unwrap();
+    let source = Package::from_bytes(&fixture(1, 3, FixtureOptions::default())).unwrap();
     let cycle = [
         renamed_model(&source, 0, "Box 0-0", "Box 0-1", "zero moved to one"),
         renamed_model(&source, 0, "Box 0-1", "Box 0-2", "one moved to two"),
@@ -309,14 +318,14 @@ fn rename_cycles_are_published_simultaneously_and_read_back_by_destination() {
         TextBoxModelReplacement::at(0, "Box 0-2", &cycle[2]),
     ];
 
-    let mut transaction = source.transaction().unwrap();
+    let mut transaction = source.edit().unwrap();
     assert_eq!(
         transaction.replace_text_box_models(&replacements).unwrap(),
         3
     );
     let commit = transaction.commit().unwrap();
-    assert!(commit.changed());
-    let reopened = edit::Snapshot::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+    assert!(commit.diagnostics().changed());
+    let reopened = Package::from_bytes(commit.package().as_bytes()).unwrap();
     let actual = reopened.rich_content().unwrap();
     for expected in &cycle {
         assert!(actual.text_boxes().contains(expected));
@@ -326,23 +335,23 @@ fn rename_cycles_are_published_simultaneously_and_read_back_by_destination() {
 #[test]
 fn ambiguous_page_names_and_overlapping_named_owners_fail_atomically() {
     let ambiguous_xml = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:presentation><draw:page draw:name="Duplicate"><draw:frame draw:name="First"><draw:text-box><text:p>first</text:p></draw:text-box></draw:frame></draw:page><draw:page draw:name="Duplicate"><draw:frame draw:name="Second"><draw:text-box><text:p>second</text:p></draw:text-box></draw:frame></draw:page></office:presentation></office:body></office:document-content>"#;
-    let ambiguous = edit::Snapshot::from_bytes(content_fixture(ambiguous_xml)).unwrap();
+    let ambiguous = Package::from_bytes(&content_fixture(ambiguous_xml)).unwrap();
     let changed = model(&ambiguous, 0, "First", "changed");
-    let mut transaction = ambiguous.transaction().unwrap();
+    let mut transaction = ambiguous.edit().unwrap();
     let error = transaction
         .replace_text_box_models(&[TextBoxModelReplacement::on("Duplicate", "First", &changed)])
         .unwrap_err();
     assert!(error.to_string().contains("page name is ambiguous"));
     let commit = transaction.commit().unwrap();
-    assert!(!commit.changed());
-    assert_eq!(commit.snapshot().bytes(), ambiguous.bytes());
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().as_bytes(), ambiguous.as_bytes());
 
-    let canonical = edit::Snapshot::from_bytes(fixture(1, 2, FixtureOptions::default())).unwrap();
+    let canonical = Package::from_bytes(&fixture(1, 2, FixtureOptions::default())).unwrap();
     let outer = renamed_model(&canonical, 0, "Box 0-0", "Outer", "outer replacement");
     let inner = renamed_model(&canonical, 0, "Box 0-1", "Inner", "inner replacement");
     let overlapping_xml = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:presentation><draw:page draw:name="Slide 0"><draw:g draw:name="Outer"><draw:frame draw:name="Inner"><draw:text-box><text:p>inner</text:p></draw:text-box></draw:frame></draw:g></draw:page></office:presentation></office:body></office:document-content>"#;
-    let overlapping = edit::Snapshot::from_bytes(content_fixture(overlapping_xml)).unwrap();
-    let mut transaction = overlapping.transaction().unwrap();
+    let overlapping = Package::from_bytes(&content_fixture(overlapping_xml)).unwrap();
+    let mut transaction = overlapping.edit().unwrap();
     let error = transaction
         .replace_text_box_models(&[
             TextBoxModelReplacement::at(0, "Inner", &inner),
@@ -351,13 +360,13 @@ fn ambiguous_page_names_and_overlapping_named_owners_fail_atomically() {
         .unwrap_err();
     assert!(error.to_string().contains("selections overlap"));
     let commit = transaction.commit().unwrap();
-    assert!(!commit.changed());
-    assert_eq!(commit.snapshot().bytes(), overlapping.bytes());
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().as_bytes(), overlapping.as_bytes());
 }
 
 #[test]
 fn exact_batch_limit_mixed_noops_and_all_noop_sharing_are_checked() {
-    let source = edit::Snapshot::from_bytes(fixture(
+    let source = Package::from_bytes(&fixture(
         1,
         MAX_TEXT_BOX_MODEL_REPLACEMENTS,
         FixtureOptions::default(),
@@ -374,28 +383,31 @@ fn exact_batch_limit_mixed_noops_and_all_noop_sharing_are_checked() {
         .iter()
         .map(|model| TextBoxModelReplacement::at(0, model.name(), model))
         .collect::<Vec<_>>();
-    let mut transaction = source.transaction().unwrap();
+    let mut transaction = source.edit().unwrap();
     assert_eq!(
         transaction.replace_text_box_models(&replacements).unwrap(),
         1
     );
-    assert!(transaction.commit().unwrap().changed());
+    assert!(transaction.commit().unwrap().diagnostics().changed());
 
     let noop_models = inventory.text_boxes().to_vec();
     let noop = noop_models
         .iter()
         .map(|model| TextBoxModelReplacement::at(0, model.name(), model))
         .collect::<Vec<_>>();
-    let mut transaction = source.transaction().unwrap();
+    let mut transaction = source.edit().unwrap();
     assert_eq!(transaction.replace_text_box_models(&noop).unwrap(), 0);
     let commit = transaction.commit().unwrap();
-    assert!(!commit.changed());
-    assert_eq!(commit.snapshot().bytes().as_ptr(), source.bytes().as_ptr());
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(
+        commit.package().as_bytes().as_ptr(),
+        source.as_bytes().as_ptr()
+    );
 
     let above = vec![noop[0]; MAX_TEXT_BOX_MODEL_REPLACEMENTS + 1];
-    let mut transaction = source.transaction().unwrap();
+    let mut transaction = source.edit().unwrap();
     assert!(transaction.replace_text_box_models(&above).is_err());
-    assert!(!transaction.commit().unwrap().changed());
+    assert!(!transaction.commit().unwrap().diagnostics().changed());
 }
 
 #[test]
@@ -410,25 +422,25 @@ fn protected_and_opaque_selected_owners_allow_noops_but_refuse_changes() {
             ..FixtureOptions::default()
         },
     ] {
-        let source = edit::Snapshot::from_bytes(fixture(1, 1, options)).unwrap();
+        let source = Package::from_bytes(&fixture(1, 1, options)).unwrap();
         let original = source.rich_content().unwrap().text_boxes()[0].clone();
-        let mut transaction = source.transaction().unwrap();
+        let mut transaction = source.edit().unwrap();
         assert_eq!(
             transaction
                 .replace_text_box_models(&[TextBoxModelReplacement::at(0, "Box 0-0", &original,)])
                 .unwrap(),
             0
         );
-        assert!(!transaction.commit().unwrap().changed());
+        assert!(!transaction.commit().unwrap().diagnostics().changed());
 
         let changed = model(&source, 0, "Box 0-0", "forbidden change");
-        let mut transaction = source.transaction().unwrap();
+        let mut transaction = source.edit().unwrap();
         assert!(
             transaction
                 .replace_text_box_models(&[TextBoxModelReplacement::at(0, "Box 0-0", &changed,)])
                 .is_err()
         );
-        assert!(!transaction.commit().unwrap().changed());
+        assert!(!transaction.commit().unwrap().diagnostics().changed());
     }
 
     let active_xml = fixture(
@@ -439,13 +451,18 @@ fn protected_and_opaque_selected_owners_allow_noops_but_refuse_changes() {
             ..FixtureOptions::default()
         },
     );
-    let active = edit::Snapshot::from_bytes(active_xml).unwrap();
-    assert!(active.transaction().is_err());
+    let active = Package::from_bytes(&active_xml).unwrap();
+    // Processing-instruction refusal is deferred out of the O(1) edit entry.
+    let mut transaction = active.edit().unwrap();
+    assert!(transaction.splice_scene(&[]).is_err());
+    assert!(transaction.slides().is_err());
+    assert!(transaction.layers().is_err());
+    assert!(transaction.commit().is_err());
 }
 
 #[test]
 fn signed_encrypted_and_malformed_sources_fail_closed() {
-    let mut signed = PackageWriter::new();
+    let mut signed = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     signed.set_mimetype(MIME).unwrap();
     signed
         .add_file(
@@ -459,15 +476,17 @@ fn signed_encrypted_and_malformed_sources_fail_closed() {
             br#"<dsig:document-signatures xmlns:dsig="urn:oasis:names:tc:opendocument:xmlns:digitalsignature:1.0"/>"#,
         )
         .unwrap();
-    let signed = edit::Snapshot::from_bytes(signed.finish_to_bytes().unwrap()).unwrap();
+    let signed = Package::from_bytes(&signed.finish_to_bytes().unwrap()).unwrap();
     assert_eq!(
         signed.security_policy().unwrap(),
         edit::SecurityPolicy::SignedReadOnly
     );
-    assert!(signed.transaction().is_err());
+    let signed_edit = signed.edit().unwrap();
+    assert!(signed_edit.commit().is_err());
 
     const ENCRYPTED_MANIFEST: &[u8] = br#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="/" m:media-type="application/vnd.oasis.opendocument.presentation"/><m:file-entry m:full-path="content.xml" m:media-type="text/xml"/><m:file-entry m:full-path="secret.bin" m:media-type="application/octet-stream" m:size="1"><m:encryption-data><m:algorithm m:algorithm-name="http://www.w3.org/2009/xmlenc11#aes256-gcm" m:initialisation-vector="AAAAAAAAAAAAAAAA"/><m:start-key-generation m:start-key-generation-name="SHA1" m:key-size="20"/><m:key-derivation m:key-derivation-name="PBKDF2" m:salt="AQ==" m:iteration-count="1000" m:key-size="32"/></m:encryption-data></m:file-entry></m:manifest>"#;
-    let mut encrypted = StreamingArchiveWriter::new();
+    let mut encrypted =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     encrypted.write_stored("mimetype", MIME.as_bytes()).unwrap();
     encrypted
         .write_deflated(
@@ -479,18 +498,19 @@ fn signed_encrypted_and_malformed_sources_fail_closed() {
     encrypted
         .write_deflated("META-INF/manifest.xml", ENCRYPTED_MANIFEST)
         .unwrap();
-    let encrypted = edit::Snapshot::from_bytes(encrypted.finish_to_bytes().unwrap()).unwrap();
+    let encrypted = Package::from_bytes(&encrypted.finish_to_bytes().unwrap()).unwrap();
     assert_eq!(
         encrypted.security_policy().unwrap(),
         edit::SecurityPolicy::EncryptedReadOnly
     );
-    assert!(encrypted.transaction().is_err());
+    let encrypted_edit = encrypted.edit().unwrap();
+    assert!(encrypted_edit.commit().is_err());
 
     let malformed = fixture(1, 1, FixtureOptions::default());
     let package = OwnedPackage::from_bytes(malformed).unwrap();
     let content = String::from_utf8(package.get_file("content.xml").unwrap()).unwrap();
     let malformed_content = format!("<!DOCTYPE office:document-content>{content}");
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     assert!(
         writer

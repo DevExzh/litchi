@@ -34,8 +34,3 @@ pub(crate) fn unknown_records(records: &[UnknownRecord]) -> Result<()> {
     }
     Ok(())
 }
-
-/// Validate the complete workbook-level connections graph.
-pub fn graph(package: &litchi_opc::OpcPackage) -> Result<Option<Connections>> {
-    super::package::validate_graph(package)
-}

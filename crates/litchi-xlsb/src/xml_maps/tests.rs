@@ -1,7 +1,7 @@
 use super::*;
+use crate::builder::{self, Builder};
 use crate::package::table::{Column, Range, Table};
-use crate::raw::{Records, Writer, kind};
-use crate::writer::{MutableWorksheet, WorkbookWriter};
+use crate::raw::{Encoder, Records, kind};
 use std::io::Cursor;
 
 fn binding(column_id: u32) -> ColumnBinding {
@@ -38,7 +38,7 @@ fn single_cell_canonical_round_trip_and_envelope() {
     )
     .unwrap();
     let bytes = serialize_single_cells(&[value.clone()], Limits::DEFAULT).unwrap();
-    let kinds = Records::new(&bytes)
+    let kinds = Records::new(&bytes, crate::raw::Limits::DEFAULT)
         .map(|record| record.unwrap().kind())
         .collect::<Vec<_>>();
     assert_eq!(kinds.first(), Some(&kind::BEGIN_SINGLE_CELLS));
@@ -72,8 +72,8 @@ fn rewrite_record(
     mut edit: impl FnMut(&mut Vec<u8>),
 ) -> Vec<u8> {
     let mut output = Vec::new();
-    let mut writer = Writer::new(&mut output);
-    for record in Records::new(source) {
+    let mut writer = Encoder::new(&mut output, crate::raw::Limits::DEFAULT);
+    for record in Records::new(source, crate::raw::Limits::DEFAULT) {
         let record = record.unwrap();
         let mut payload = record.payload().to_vec();
         if record.kind() == target {
@@ -87,7 +87,7 @@ fn rewrite_record(
 
 fn minimal_table(binding: &ColumnBinding, ignored_flags: u32) -> Vec<u8> {
     let mut output = Vec::new();
-    let mut writer = Writer::new(&mut output);
+    let mut writer = Encoder::new(&mut output, crate::raw::Limits::DEFAULT);
     let mut list = vec![0; 24];
     list[16..20].copy_from_slice(&2u32.to_le_bytes());
     list[20..24].copy_from_slice(&2u32.to_le_bytes());
@@ -99,7 +99,7 @@ fn minimal_table(binding: &ColumnBinding, ignored_flags: u32) -> Vec<u8> {
         .write_record(kind::BEGIN_LIST_COL, &binding.column_id().to_le_bytes())
         .unwrap();
     let encoded = serialize_column_binding(binding, Limits::DEFAULT).unwrap();
-    for record in Records::new(&encoded) {
+    for record in Records::new(&encoded, crate::raw::Limits::DEFAULT) {
         let record = record.unwrap();
         let mut payload = record.payload().to_vec();
         if record.kind() == kind::BEGIN_LIST_XML_CPR {
@@ -134,7 +134,7 @@ fn ordinary_table_patch_preserves_ignored_xml_property_flags() {
     )
     .unwrap();
     let patched = patch_table_bindings(&source, &changed, Limits::DEFAULT).unwrap();
-    let xml = Records::new(&patched)
+    let xml = Records::new(&patched, crate::raw::Limits::DEFAULT)
         .map(|record| record.unwrap())
         .find(|record| record.kind() == kind::BEGIN_LIST_XML_CPR)
         .unwrap();
@@ -164,7 +164,9 @@ fn single_cell_accepts_but_will_not_normalize_unmodeled_metadata() {
         rewrite_record(&with_list_metadata, kind::BEGIN_LIST_COL, |payload| {
             payload[4..8].copy_from_slice(&6u32.to_le_bytes());
             let mut total = Vec::new();
-            Writer::new(&mut total).write_wide_string("Total").unwrap();
+            Encoder::new(&mut total, crate::raw::Limits::DEFAULT)
+                .write_wide_string("Total")
+                .unwrap();
             payload.splice(32..36, total);
         });
     let source_bytes = rewrite_record(&with_column_metadata, kind::BEGIN_LIST_XML_CPR, |payload| {
@@ -249,8 +251,8 @@ fn opaque_record_limits_accept_exact_boundaries_and_reject_excess() {
     .unwrap();
     let canonical = serialize_single_cells(&[value], Limits::DEFAULT).unwrap();
     let mut source = Vec::new();
-    let mut writer = Writer::new(&mut source);
-    for record in Records::new(&canonical) {
+    let mut writer = Encoder::new(&mut source, crate::raw::Limits::DEFAULT);
+    for record in Records::new(&canonical, crate::raw::Limits::DEFAULT) {
         let record = record.unwrap();
         writer
             .write_record(record.kind(), record.payload())
@@ -291,8 +293,8 @@ fn opaque_record_limits_accept_exact_boundaries_and_reject_excess() {
 
     let table = minimal_table(&binding(3), 0);
     let mut table_source = Vec::new();
-    let mut writer = Writer::new(&mut table_source);
-    for record in Records::new(&table) {
+    let mut writer = Encoder::new(&mut table_source, crate::raw::Limits::DEFAULT);
+    for record in Records::new(&table, crate::raw::Limits::DEFAULT) {
         let record = record.unwrap();
         writer
             .write_record(record.kind(), record.payload())
@@ -319,7 +321,7 @@ fn opaque_record_limits_accept_exact_boundaries_and_reject_excess() {
 
 #[test]
 fn ordinary_unmapped_table_does_not_require_map_info() {
-    let mut worksheet = MutableWorksheet::new("Plain");
+    let mut worksheet = builder::Worksheet::new("Plain");
     worksheet.set_cell(0, 0, "Value");
     worksheet.set_cell(1, 0, "data");
     worksheet
@@ -341,10 +343,10 @@ fn ordinary_unmapped_table_does_not_require_map_info() {
             ..Table::default()
         })
         .unwrap();
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(worksheet);
     let mut bytes = Cursor::new(Vec::new());
-    writer.save(&mut bytes).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
 
     let workbook = crate::Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
     let snapshot = workbook.xml_maps().unwrap();

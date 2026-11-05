@@ -55,13 +55,26 @@ pub(super) fn validate_collections(value: &FontCollections, limits: Limits) -> R
         .and_then(|count| count.checked_add(usize::from(value.international.is_some())))
         .and_then(|count| count.checked_add(usize::from(value.embedding_flags.is_some())))
         .ok_or_else(|| Error::Corrupted("font record count overflow".into()))?;
-    if copied > limits.records.max_copied_payload_bytes
-        || record_count > limits.records.max_records
-        || (record_count != 0 && limits.records.max_depth == 0)
-    {
-        return Err(Error::ResourceLimit(
-            "font owners exceed the composed record budget".into(),
-        ));
+    if copied > limits.records.max_copied_payload_bytes {
+        return Err(Error::Limit {
+            kind: crate::SourceLimitKind::AggregatePayloadBytes,
+            observed: copied,
+            maximum: limits.records.max_copied_payload_bytes,
+        });
+    }
+    if record_count > limits.records.max_records {
+        return Err(Error::Limit {
+            kind: crate::SourceLimitKind::Events,
+            observed: record_count,
+            maximum: limits.records.max_records,
+        });
+    }
+    if record_count != 0 && limits.records.max_depth == 0 {
+        return Err(Error::Limit {
+            kind: crate::SourceLimitKind::Depth,
+            observed: 1,
+            maximum: limits.records.max_depth,
+        });
     }
     if value.base.as_ref().is_some_and(|v| v.international)
         || value

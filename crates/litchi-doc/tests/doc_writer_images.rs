@@ -34,12 +34,13 @@
 
 //! Round-trip tests for the DOC inline picture writer.
 //!
-//! Writes a new .doc with PNG and JPEG pictures via `Writer::insert_picture`
+//! Writes a new .doc with PNG and JPEG pictures via `Builder::insert_picture`
 //! and re-opens it with the crate's own DOC reader, asserting image count,
 //! format, dimensions, and byte-identity of the embedded payloads.
+use litchi_doc::builder::Builder;
 use litchi_doc::image::PictureFields;
-use litchi_doc::writer::{FloatingPosition, Picture, PictureKind, Writer};
-use litchi_doc::{Package, Run, ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin};
+use litchi_doc::writer::{FloatingPosition, Picture, PictureKind};
+use litchi_doc::{Run, ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin, raw::Reader};
 use litchi_odraw::image::Kind as BlipKind;
 use std::io::{Cursor, Write};
 use std::path::PathBuf;
@@ -153,16 +154,16 @@ fn png_and_jpeg_pictures_round_trip_through_doc_reader() {
         (jpeg_picture.width_twips(), jpeg_picture.height_twips()),
     ];
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("before pictures").unwrap();
     writer.insert_picture(png_picture).unwrap();
     writer.insert_picture(jpeg_picture).unwrap();
     writer.add_paragraph("after pictures").unwrap();
 
     let mut cursor = Cursor::new(Vec::new());
-    writer.write_to(&mut cursor).unwrap();
+    writer.build().unwrap().write_to(&mut cursor).unwrap();
 
-    let mut package = Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(cursor.into_inner())).unwrap();
     let document = package.document().unwrap();
 
     // Surrounding text survives and the picture characters stay invisible to text().
@@ -221,7 +222,7 @@ fn native_officeart_picture_family_round_trips_without_reencoding() {
             (1440, 720),
         ),
     ];
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let mut expected = Vec::new();
     for (name, format, blip_type, dimensions) in fixtures {
         let bytes = hex_fixture(name);
@@ -234,8 +235,8 @@ fn native_officeart_picture_family_round_trips_without_reencoding() {
     }
 
     let mut cursor = Cursor::new(Vec::new());
-    writer.write_to(&mut cursor).unwrap();
-    let mut package = Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut cursor).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(cursor.into_inner())).unwrap();
     let document = package.document().unwrap();
     let runs = picture_runs(&document);
     assert_eq!(runs.len(), expected.len());
@@ -268,13 +269,13 @@ fn bmp_is_normalized_to_dib_and_explicit_formats_are_validated() {
 
 #[test]
 fn document_without_pictures_keeps_empty_data_stream() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("plain text").unwrap();
 
     let mut cursor = Cursor::new(Vec::new());
-    writer.write_to(&mut cursor).unwrap();
+    writer.build().unwrap().write_to(&mut cursor).unwrap();
 
-    let mut package = Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(cursor.into_inner())).unwrap();
     let document = package.document().unwrap();
     assert_eq!(document.text().unwrap(), "plain text\r");
     assert!(picture_runs(&document).is_empty());
@@ -290,7 +291,7 @@ fn write_doc_with_inline_and_floating(jpeg_bytes: &[u8]) -> (Vec<u8>, u32, u32) 
     let jpeg_picture = Picture::new(jpeg_bytes.to_vec()).unwrap();
     let floating_dims = (jpeg_picture.width_twips(), jpeg_picture.height_twips());
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("before pictures").unwrap();
     writer.insert_picture(png_picture).unwrap();
     writer
@@ -305,7 +306,7 @@ fn write_doc_with_inline_and_floating(jpeg_bytes: &[u8]) -> (Vec<u8>, u32, u32) 
     writer.add_paragraph("after pictures").unwrap();
 
     let mut cursor = Cursor::new(Vec::new());
-    writer.write_to(&mut cursor).unwrap();
+    writer.build().unwrap().write_to(&mut cursor).unwrap();
     (cursor.into_inner(), floating_dims.0, floating_dims.1)
 }
 
@@ -315,7 +316,7 @@ fn inline_and_floating_pictures_round_trip_through_doc_reader() {
     let (doc_bytes, floating_width, floating_height) =
         write_doc_with_inline_and_floating(&jpeg_bytes);
 
-    let mut package = Package::from_reader(Cursor::new(&doc_bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(&doc_bytes)).unwrap();
     let document = package.document().unwrap();
 
     let text = document.text().unwrap();
@@ -369,7 +370,11 @@ fn floating_picture_writes_valid_dgg_info() {
     let jpeg_bytes = jpeg_fixture();
     let (doc_bytes, _, _) = write_doc_with_inline_and_floating(&jpeg_bytes);
 
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(&doc_bytes)).unwrap();
+    let mut ole = litchi_cfb::OleFile::open(
+        Cursor::new(&doc_bytes),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let word_document = ole.open_stream(&["WordDocument"]).unwrap();
     let table_stream = ole.open_stream(&["1Table"]).unwrap();
     let fib = FileInformationBlock::parse(&word_document).unwrap();
@@ -380,22 +385,31 @@ fn floating_picture_writes_valid_dgg_info() {
     let dgg = &table_stream[dgg_offset as usize..(dgg_offset + dgg_len) as usize];
 
     // Top level: DggContainer, dgglbl byte, DgContainer.
-    let (dgg_container, dgg_container_size) = Record::parse(dgg, 0).unwrap();
+    let (dgg_container, dgg_container_size) =
+        Record::parse(dgg, 0, litchi_odraw::Limits::default()).unwrap();
     assert_eq!(dgg_container.raw_kind(), RECORD_DGG_CONTAINER);
     let dgglbl = dgg[dgg_container_size];
     assert_eq!(dgglbl, 0, "dgglbl 0 = Main Document drawing");
-    let (dg_container, _) = Record::parse(dgg, dgg_container_size + 1).unwrap();
+    let (dg_container, _) =
+        Record::parse(dgg, dgg_container_size + 1, litchi_odraw::Limits::default()).unwrap();
     assert_eq!(dg_container.raw_kind(), RECORD_DG_CONTAINER);
 
     // The BStoreContainer holds one BSE whose embedded BLIP is the JPEG.
     let mut offset = 0;
     let mut bse_count = 0;
     while offset < dgg_container.data().len() {
-        let (record, size) = Record::parse(dgg_container.data(), offset).unwrap();
+        let (record, size) = Record::parse(
+            dgg_container.data(),
+            offset,
+            litchi_odraw::Limits::default(),
+        )
+        .unwrap();
         if record.raw_kind() == RECORD_BSTORE_CONTAINER {
             let mut bse_offset = 0;
             while bse_offset < record.data().len() {
-                let (bse, bse_size) = Record::parse(record.data(), bse_offset).unwrap();
+                let (bse, bse_size) =
+                    Record::parse(record.data(), bse_offset, litchi_odraw::Limits::default())
+                        .unwrap();
                 assert_eq!(bse.raw_kind(), RECORD_BSE);
                 assert!(
                     bse.data()
@@ -421,7 +435,8 @@ fn floating_picture_writes_valid_dgg_info() {
     ) {
         let mut offset = 0;
         while offset + 8 <= data.len() {
-            let Ok((record, size)) = Record::parse(data, offset) else {
+            let Ok((record, size)) = Record::parse(data, offset, litchi_odraw::Limits::default())
+            else {
                 break;
             };
             match record.raw_kind() {

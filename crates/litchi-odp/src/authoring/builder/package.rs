@@ -7,7 +7,7 @@ use litchi_core::Result;
 pub(super) fn build(builder: &Builder) -> Result<Vec<u8>> {
     validation::validate(builder.snapshot())?;
 
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype("application/vnd.oasis.opendocument.presentation")?;
 
     let content_xml = builder.generate_content_xml()?;

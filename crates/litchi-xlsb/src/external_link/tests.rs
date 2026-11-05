@@ -1,5 +1,33 @@
 use super::*;
-use crate::raw::{Header, Kind as RecordKind, Limits, Records, Writer};
+
+/// The planned snapshot and patch of a finished draft, kept under one name so
+/// the codec regressions read as before.
+struct Commit {
+    snapshot: Snapshot,
+    patch: Patch,
+}
+
+impl Commit {
+    fn snapshot(&self) -> &Snapshot {
+        &self.snapshot
+    }
+
+    fn patch(&self) -> &Patch {
+        &self.patch
+    }
+}
+
+trait FinishCommit {
+    fn commit(self) -> Result<Commit>;
+}
+
+impl FinishCommit for Draft {
+    fn commit(self) -> Result<Commit> {
+        let (snapshot, patch) = self.finish()?;
+        Ok(Commit { snapshot, patch })
+    }
+}
+use crate::raw::{Encoder, Header, Kind as RecordKind, Limits, Records};
 
 fn workbook_link() -> Link {
     let sheets = SheetRange::sheets(0, 1).unwrap();
@@ -47,7 +75,7 @@ fn insert_unknown_records_after_known_record(
     let limits = Limits::new(MAX_LINK_PART_BYTES, MAX_WIDE_STRING_UNITS);
     let mut known = 0;
     let mut split = source.len();
-    for record in Records::with_limits(source, limits) {
+    for record in Records::new(source, limits) {
         let record = record.unwrap();
         if !codec::is_modeled_record(record.kind()) {
             continue;
@@ -59,7 +87,7 @@ fn insert_unknown_records_after_known_record(
         known += 1;
     }
     let mut opaque = Vec::new();
-    let mut writer = Writer::new(&mut opaque);
+    let mut writer = Encoder::new(&mut opaque, Limits::DEFAULT);
     for &(kind, payload) in records_to_insert {
         writer.write_record(kind, payload).unwrap();
     }
@@ -77,12 +105,12 @@ fn insert_repeated_unknown_after_first_record(
     payload: &[u8],
 ) -> Vec<u8> {
     let limits = Limits::new(MAX_LINK_PART_BYTES, MAX_WIDE_STRING_UNITS);
-    let mut records = Records::with_limits(source, limits);
+    let mut records = Records::new(source, limits);
     let first = records.next().unwrap().unwrap();
     let (_, header_len) = Header::parse(&source[first.offset()..], limits).unwrap();
     let split = first.offset() + header_len + first.len();
     let mut opaque = Vec::new();
-    let mut writer = Writer::new(&mut opaque);
+    let mut writer = Encoder::new(&mut opaque, Limits::DEFAULT);
     let kind = RecordKind::new(0x3FFE).unwrap();
     for _ in 0..count {
         writer.write_record(kind, payload).unwrap();
@@ -102,7 +130,7 @@ fn replace_record_payload(
     payload: &[u8],
 ) -> Vec<u8> {
     let limits = Limits::new(MAX_LINK_PART_BYTES, MAX_WIDE_STRING_UNITS);
-    let mut records = Records::with_limits(source, limits);
+    let mut records = Records::new(source, limits);
     let mut seen = 0;
     let mut range = None;
     while let Some(record) = records.next() {
@@ -119,7 +147,7 @@ fn replace_record_payload(
     }
     let (start, end) = range.unwrap();
     let mut replacement = Vec::new();
-    Writer::new(&mut replacement)
+    Encoder::new(&mut replacement, Limits::DEFAULT)
         .write_record(target_kind, payload)
         .unwrap();
 
@@ -132,7 +160,7 @@ fn replace_record_payload(
 
 fn first_sup_name_bits(source: &[u8]) -> [u8; 7] {
     let limits = Limits::new(MAX_LINK_PART_BYTES, MAX_WIDE_STRING_UNITS);
-    for record in Records::with_limits(source, limits) {
+    for record in Records::new(source, limits) {
         let record = record.unwrap();
         if record.kind() == crate::raw::kind::SUP_NAME_BITS {
             return record.payload().try_into().unwrap();
@@ -143,7 +171,7 @@ fn first_sup_name_bits(source: &[u8]) -> [u8; 7] {
 
 fn record_kinds(source: &[u8]) -> Vec<u16> {
     let limits = Limits::new(MAX_LINK_PART_BYTES, MAX_WIDE_STRING_UNITS);
-    Records::with_limits(source, limits)
+    Records::new(source, limits)
         .map(|record| u16::from(record.unwrap().kind()))
         .collect()
 }
@@ -187,7 +215,7 @@ fn assert_opaque_cache_run_is_between_tabs_and_name(
 }
 
 fn assert_external_formula_length_error(source: &[u8], found: usize) {
-    match parse_external_link(source).unwrap_err() {
+    match parse_external_link(source, ExternalLinkLimits::DEFAULT).unwrap_err() {
         Error::InvalidLength {
             expected: 13,
             found: actual,
@@ -196,7 +224,8 @@ fn assert_external_formula_length_error(source: &[u8], found: usize) {
         | Error::InvalidFormula(_)
         | Error::InvalidLength { .. }
         | Error::Allocation { .. }
-        | Error::LimitExceeded { .. }) => {
+        | Error::LimitExceeded { .. }
+        | Error::PatchConflict) => {
             panic!("unexpected external formula error: {other:?}")
         },
     }
@@ -217,10 +246,11 @@ fn assert_opaque_sequence_in_order(source: &[u8], records: &[UnknownRecord]) {
 #[test]
 fn workbook_edits_are_source_checked_and_reversible() {
     let link = workbook_link();
-    let source = write_external_link_stream(&link, Some("rIdOld")).unwrap();
-    let snapshot = Snapshot::read(&source).unwrap();
+    let source =
+        write_external_link_stream(&link, Some("rIdOld"), ExternalLinkLimits::DEFAULT).unwrap();
+    let snapshot = Snapshot::read(&source, ExternalLinkLimits::DEFAULT).unwrap();
 
-    let mut edit = snapshot.edit();
+    let mut edit = snapshot.draft();
     edit.set_relationship_id("rIdNew").unwrap();
     edit.set_sheet_names(vec![
         "Data".to_string(),
@@ -232,27 +262,42 @@ fn workbook_edits_are_source_checked_and_reversible() {
         .unwrap();
     let commit = edit.commit().unwrap();
 
-    assert!(!commit.patch().is_empty());
+    assert!(!commit.patch().is_noop());
     assert_eq!(commit.snapshot().relationship_id(), Some("rIdNew"));
     assert_eq!(commit.snapshot().link().defined_names().len(), 2);
 
-    let changed = commit.patch().apply(&source).unwrap();
+    let changed = commit
+        .patch()
+        .apply(&source, ExternalLinkLimits::DEFAULT)
+        .unwrap();
     assert_eq!(changed, commit.patch().after());
-    let restored = commit.patch().inverse().apply(&changed).unwrap();
+    let restored = commit
+        .patch()
+        .inverse()
+        .apply(&changed, ExternalLinkLimits::DEFAULT)
+        .unwrap();
     assert_eq!(restored, source);
-    assert!(commit.patch().apply(b"stale").is_err());
+    assert!(matches!(
+        commit.patch().apply(b"stale", ExternalLinkLimits::DEFAULT),
+        Err(Error::PatchConflict)
+    ));
 }
 
 #[test]
 fn unknown_records_survive_typed_edits_byte_for_byte() {
-    let source = write_external_link_stream(&workbook_link(), Some("rIdPath")).unwrap();
+    let source = write_external_link_stream(
+        &workbook_link(),
+        Some("rIdPath"),
+        ExternalLinkLimits::DEFAULT,
+    )
+    .unwrap();
     let source = insert_unknown_after_first_record(&source);
-    let snapshot = Snapshot::read(&source).unwrap();
+    let snapshot = Snapshot::read(&source, ExternalLinkLimits::DEFAULT).unwrap();
     assert_eq!(snapshot.unknown_records().len(), 1);
     assert_eq!(snapshot.unknown_records()[0].kind(), 0x3FFE);
     assert_eq!(snapshot.unknown_records()[0].payload(), [0xF1, 0x00, 0x7E]);
 
-    let mut edit = snapshot.edit();
+    let mut edit = snapshot.draft();
     edit.set_source("rIdChanged").unwrap();
     let commit = edit.commit().unwrap();
     assert!(
@@ -272,13 +317,23 @@ fn dde_and_ole_metadata_and_caches_edit_without_activation() {
         vec![DdeItem::new("Status").unwrap().with_cached_values(cache())],
     )
     .unwrap();
-    let source = write_external_link_stream(&dde, None).unwrap();
-    let mut edit = Snapshot::read(&source).unwrap().edit();
+    let source = write_external_link_stream(&dde, None, ExternalLinkLimits::DEFAULT).unwrap();
+    let mut edit = Snapshot::read(&source, ExternalLinkLimits::DEFAULT)
+        .unwrap()
+        .draft();
     edit.set_dde_flags("status", true, true, false).unwrap();
     edit.set_dde_cache("Status", None).unwrap();
     edit.set_dde_topic("Sheet1").unwrap();
     let commit = edit.commit().unwrap();
-    let changed = Snapshot::read(commit.patch().apply(&source).unwrap().as_slice()).unwrap();
+    let changed = Snapshot::read(
+        commit
+            .patch()
+            .apply(&source, ExternalLinkLimits::DEFAULT)
+            .unwrap()
+            .as_slice(),
+        ExternalLinkLimits::DEFAULT,
+    )
+    .unwrap();
     assert_eq!(changed.link().dde_topic(), Some("Sheet1"));
     assert!(changed.link().dde_items()[0].wants_advise());
     assert!(changed.link().dde_items()[0].cached_values().is_none());
@@ -289,14 +344,20 @@ fn dde_and_ole_metadata_and_caches_edit_without_activation() {
         vec![OleItem::new("Report").unwrap().with_cached_values(cache())],
     )
     .unwrap();
-    let source = write_external_link_stream(&ole, Some("rIdOle")).unwrap();
-    let mut edit = Snapshot::read(&source).unwrap().edit();
+    let source =
+        write_external_link_stream(&ole, Some("rIdOle"), ExternalLinkLimits::DEFAULT).unwrap();
+    let mut edit = Snapshot::read(&source, ExternalLinkLimits::DEFAULT)
+        .unwrap()
+        .draft();
     edit.set_ole_program_id("Acme.NewServer").unwrap();
     edit.set_ole_flags("Report", true, true, true).unwrap();
     edit.set_ole_cache("Report", Some(cache())).unwrap();
     let commit = edit.commit().unwrap();
-    let changed_bytes = commit.patch().apply(&source).unwrap();
-    let changed = Snapshot::read(&changed_bytes).unwrap();
+    let changed_bytes = commit
+        .patch()
+        .apply(&source, ExternalLinkLimits::DEFAULT)
+        .unwrap();
+    let changed = Snapshot::read(&changed_bytes, ExternalLinkLimits::DEFAULT).unwrap();
     assert_eq!(changed.link().ole_program_id(), Some("Acme.NewServer"));
     assert!(changed.link().ole_items()[0].displays_as_icon());
     assert!(changed.link().ole_items()[0].cached_values().is_some());
@@ -304,25 +365,36 @@ fn dde_and_ole_metadata_and_caches_edit_without_activation() {
 
 #[test]
 fn failed_typed_operations_are_atomic_and_no_op_is_exact() {
-    let source = write_external_link_stream(&workbook_link(), Some("rIdPath")).unwrap();
-    let snapshot = Snapshot::read(&source).unwrap();
+    let source = write_external_link_stream(
+        &workbook_link(),
+        Some("rIdPath"),
+        ExternalLinkLimits::DEFAULT,
+    )
+    .unwrap();
+    let snapshot = Snapshot::read(&source, ExternalLinkLimits::DEFAULT).unwrap();
 
-    let mut edit = snapshot.edit();
+    let mut edit = snapshot.draft();
     let before = edit.link().clone();
     assert!(edit.set_dde_topic("System").is_err());
     assert_eq!(edit.link(), &before);
 
-    let commit = snapshot.edit().commit().unwrap();
-    assert!(commit.patch().is_empty());
+    let commit = snapshot.draft().commit().unwrap();
+    assert!(commit.patch().is_noop());
     assert_eq!(commit.patch().before(), source);
     assert_eq!(commit.patch().after(), source);
-    assert_eq!(commit.patch().apply(&source).unwrap(), source);
+    assert_eq!(
+        commit
+            .patch()
+            .apply(&source, ExternalLinkLimits::DEFAULT)
+            .unwrap(),
+        source
+    );
 }
 
 #[test]
 fn ownership_and_cache_bounds_are_rejected() {
     let dde = Link::dde("Excel", "System", vec!["Status".to_string()]).unwrap();
-    assert!(write_external_link_stream(&dde, Some("rIdDde")).is_err());
+    assert!(write_external_link_stream(&dde, Some("rIdDde"), ExternalLinkLimits::DEFAULT).is_err());
     assert!(ValueMatrix::new(MAX_XLSB_EXTERNAL_CACHE_ROWS + 1, 1, vec![]).is_err());
     assert!(ValueMatrix::new(1, MAX_XLSB_EXTERNAL_CACHE_COLUMNS + 1, vec![]).is_err());
     assert!(
@@ -337,7 +409,12 @@ fn ownership_and_cache_bounds_are_rejected() {
 
 #[test]
 fn workbook_sup_name_bits_preserve_ignored_bytes_and_change_only_modeled_fields() {
-    let source = write_external_link_stream(&workbook_link(), Some("rIdPath")).unwrap();
+    let source = write_external_link_stream(
+        &workbook_link(),
+        Some("rIdPath"),
+        ExternalLinkLimits::DEFAULT,
+    )
+    .unwrap();
     let source = replace_record_payload(
         &source,
         crate::raw::kind::SUP_NAME_BITS,
@@ -349,12 +426,12 @@ fn workbook_sup_name_bits_preserve_ignored_bytes_and_change_only_modeled_fields(
         [0x00, 0xA5, 0x00, 0x00, 0x00, 0x00, 0xFE]
     );
 
-    let snapshot = Snapshot::read(&source).unwrap();
-    let no_op = snapshot.edit().commit().unwrap();
+    let snapshot = Snapshot::read(&source, ExternalLinkLimits::DEFAULT).unwrap();
+    let no_op = snapshot.draft().commit().unwrap();
     assert_eq!(no_op.patch().before(), source);
     assert_eq!(no_op.patch().after(), source);
 
-    let mut unrelated = snapshot.edit();
+    let mut unrelated = snapshot.draft();
     unrelated.set_source("rIdChanged").unwrap();
     let unrelated = unrelated.commit().unwrap();
     let unrelated_bytes = unrelated.patch().after();
@@ -363,7 +440,9 @@ fn workbook_sup_name_bits_preserve_ignored_bytes_and_change_only_modeled_fields(
         [0x00, 0xA5, 0x00, 0x00, 0x00, 0x00, 0xFE]
     );
 
-    let mut modeled = Snapshot::read(unrelated_bytes).unwrap().edit();
+    let mut modeled = Snapshot::read(unrelated_bytes, ExternalLinkLimits::DEFAULT)
+        .unwrap()
+        .draft();
     let mut name = modeled.link().defined_names()[0].clone();
     name = name.with_built_in(true).with_sheet_scope(1);
     modeled.set_defined_names(vec![name]).unwrap();
@@ -382,19 +461,19 @@ fn dde_sup_name_bits_preserve_ignored_bytes_and_change_only_modeled_fields() {
         vec![DdeItem::new("StdDocumentName").unwrap()],
     )
     .unwrap();
-    let source = write_external_link_stream(&dde, None).unwrap();
+    let source = write_external_link_stream(&dde, None, ExternalLinkLimits::DEFAULT).unwrap();
     let source = replace_record_payload(
         &source,
         crate::raw::kind::SUP_NAME_BITS,
         0,
         &[0x00, 0xA5, 0x00, 0x00, 0x00, 0x00, 0xA1],
     );
-    let snapshot = Snapshot::read(&source).unwrap();
-    let no_op = snapshot.edit().commit().unwrap();
+    let snapshot = Snapshot::read(&source, ExternalLinkLimits::DEFAULT).unwrap();
+    let no_op = snapshot.draft().commit().unwrap();
     assert_eq!(no_op.patch().before(), source);
     assert_eq!(no_op.patch().after(), source);
 
-    let mut unrelated = snapshot.edit();
+    let mut unrelated = snapshot.draft();
     unrelated.set_dde_topic("Sheet2").unwrap();
     let unrelated = unrelated.commit().unwrap();
     assert_eq!(
@@ -402,7 +481,9 @@ fn dde_sup_name_bits_preserve_ignored_bytes_and_change_only_modeled_fields() {
         [0x00, 0xA5, 0x00, 0x00, 0x00, 0x00, 0xA1]
     );
 
-    let mut modeled = Snapshot::read(unrelated.patch().after()).unwrap().edit();
+    let mut modeled = Snapshot::read(unrelated.patch().after(), ExternalLinkLimits::DEFAULT)
+        .unwrap()
+        .draft();
     modeled
         .set_dde_flags("StdDocumentName", true, true, true)
         .unwrap();
@@ -421,19 +502,20 @@ fn ole_sup_name_bits_preserve_ignored_bytes_and_change_only_modeled_fields() {
         vec![OleItem::new("Report").unwrap()],
     )
     .unwrap();
-    let source = write_external_link_stream(&ole, Some("rIdOle")).unwrap();
+    let source =
+        write_external_link_stream(&ole, Some("rIdOle"), ExternalLinkLimits::DEFAULT).unwrap();
     let source = replace_record_payload(
         &source,
         crate::raw::kind::SUP_NAME_BITS,
         0,
         &[0x10, 0xA5, 0x00, 0x00, 0x00, 0x00, 0xA1],
     );
-    let snapshot = Snapshot::read(&source).unwrap();
-    let no_op = snapshot.edit().commit().unwrap();
+    let snapshot = Snapshot::read(&source, ExternalLinkLimits::DEFAULT).unwrap();
+    let no_op = snapshot.draft().commit().unwrap();
     assert_eq!(no_op.patch().before(), source);
     assert_eq!(no_op.patch().after(), source);
 
-    let mut unrelated = snapshot.edit();
+    let mut unrelated = snapshot.draft();
     unrelated.set_ole_program_id("Acme.NewServer").unwrap();
     let unrelated = unrelated.commit().unwrap();
     assert_eq!(
@@ -441,7 +523,9 @@ fn ole_sup_name_bits_preserve_ignored_bytes_and_change_only_modeled_fields() {
         [0x10, 0xA5, 0x00, 0x00, 0x00, 0x00, 0xA1]
     );
 
-    let mut modeled = Snapshot::read(unrelated.patch().after()).unwrap().edit();
+    let mut modeled = Snapshot::read(unrelated.patch().after(), ExternalLinkLimits::DEFAULT)
+        .unwrap()
+        .draft();
     modeled.set_ole_flags("Report", true, true, true).unwrap();
     let modeled = modeled.commit().unwrap();
     assert_eq!(
@@ -452,7 +536,12 @@ fn ole_sup_name_bits_preserve_ignored_bytes_and_change_only_modeled_fields() {
 
 #[test]
 fn oversized_external_name_formulas_are_rejected_before_copy() {
-    let source = write_external_link_stream(&workbook_link(), Some("rIdPath")).unwrap();
+    let source = write_external_link_stream(
+        &workbook_link(),
+        Some("rIdPath"),
+        ExternalLinkLimits::DEFAULT,
+    )
+    .unwrap();
     let mut oversized = 14_u32.to_le_bytes().to_vec();
     oversized.extend_from_slice(&[0x00; 14]);
     let oversized =
@@ -470,7 +559,12 @@ fn oversized_external_name_formulas_are_rejected_before_copy() {
 
 #[test]
 fn opaque_external_table_records_and_future_frames_survive_in_order() {
-    let source = write_external_link_stream(&workbook_link(), Some("rIdPath")).unwrap();
+    let source = write_external_link_stream(
+        &workbook_link(),
+        Some("rIdPath"),
+        ExternalLinkLimits::DEFAULT,
+    )
+    .unwrap();
     let opaque_specs = [
         (crate::raw::kind::EXTERN_TABLE_START, &[0x00; 5][..]),
         (crate::raw::kind::EXTERN_ROW_HDR, &[0x00; 4][..]),
@@ -497,7 +591,7 @@ fn opaque_external_table_records_and_future_frames_survive_in_order() {
         (RecordKind::new(0x3FFD).unwrap(), &[0xD0, 0xD1][..]),
     ];
     let source = insert_unknown_records_after_known_record(&source, 2, &opaque_specs);
-    let snapshot = Snapshot::read(&source).unwrap();
+    let snapshot = Snapshot::read(&source, ExternalLinkLimits::DEFAULT).unwrap();
     assert_eq!(snapshot.unknown_records().len(), opaque_specs.len());
     for (record, (kind, payload)) in snapshot.unknown_records().iter().zip(opaque_specs) {
         assert_eq!(record.kind(), u16::from(kind));
@@ -505,11 +599,11 @@ fn opaque_external_table_records_and_future_frames_survive_in_order() {
     }
     assert_opaque_cache_run_is_between_tabs_and_name(&source, &opaque_specs);
 
-    let no_op = snapshot.edit().commit().unwrap();
+    let no_op = snapshot.draft().commit().unwrap();
     assert_eq!(no_op.patch().before(), source);
     assert_eq!(no_op.patch().after(), source);
 
-    let mut edit = snapshot.edit();
+    let mut edit = snapshot.draft();
     edit.set_source("rIdOpaqueChanged").unwrap();
     let commit = edit.commit().unwrap();
     assert_opaque_sequence_in_order(commit.patch().after(), snapshot.unknown_records());
@@ -518,10 +612,15 @@ fn opaque_external_table_records_and_future_frames_survive_in_order() {
 
 #[test]
 fn opaque_external_record_count_and_byte_limits_are_typed() {
-    let source = write_external_link_stream(&workbook_link(), Some("rIdPath")).unwrap();
+    let source = write_external_link_stream(
+        &workbook_link(),
+        Some("rIdPath"),
+        ExternalLinkLimits::DEFAULT,
+    )
+    .unwrap();
     let too_many =
         insert_repeated_unknown_after_first_record(&source, MAX_UNKNOWN_RECORDS + 1, &[0xB0]);
-    match Snapshot::read(&too_many).unwrap_err() {
+    match Snapshot::read(&too_many, ExternalLinkLimits::DEFAULT).unwrap_err() {
         Error::InvalidLength { expected, found } => {
             assert_eq!(expected, MAX_UNKNOWN_RECORDS);
             assert_eq!(found, MAX_UNKNOWN_RECORDS + 1);
@@ -529,19 +628,20 @@ fn opaque_external_record_count_and_byte_limits_are_typed() {
         other @ (Error::Wire(_)
         | Error::InvalidFormula(_)
         | Error::Allocation { .. }
-        | Error::LimitExceeded { .. }) => {
+        | Error::LimitExceeded { .. }
+        | Error::PatchConflict) => {
             panic!("unexpected unknown-record count error: {other:?}")
         },
     }
 
     let mut one_record = Vec::new();
-    Writer::new(&mut one_record)
+    Encoder::new(&mut one_record, Limits::DEFAULT)
         .write_record(RecordKind::new(0x3FFE).unwrap(), &[0xC0; 128])
         .unwrap();
     let count = MAX_UNKNOWN_BYTES / one_record.len() + 1;
     assert!(count <= MAX_UNKNOWN_RECORDS);
     let too_many_bytes = insert_repeated_unknown_after_first_record(&source, count, &[0xC0; 128]);
-    match Snapshot::read(&too_many_bytes).unwrap_err() {
+    match Snapshot::read(&too_many_bytes, ExternalLinkLimits::DEFAULT).unwrap_err() {
         Error::InvalidLength { expected, found } => {
             assert_eq!(expected, MAX_UNKNOWN_BYTES);
             assert_eq!(found, count * one_record.len());
@@ -549,7 +649,8 @@ fn opaque_external_record_count_and_byte_limits_are_typed() {
         other @ (Error::Wire(_)
         | Error::InvalidFormula(_)
         | Error::Allocation { .. }
-        | Error::LimitExceeded { .. }) => {
+        | Error::LimitExceeded { .. }
+        | Error::PatchConflict) => {
             panic!("unexpected unknown-record byte error: {other:?}")
         },
     }
@@ -645,13 +746,18 @@ fn external_link_limits_builder_and_default_are_publicly_parity_checked() {
 
 #[test]
 fn external_link_part_limit_accepts_exact_bytes_and_reports_one_below() {
-    let source = write_external_link_stream(&workbook_link(), Some("rIdPath")).unwrap();
+    let source = write_external_link_stream(
+        &workbook_link(),
+        Some("rIdPath"),
+        ExternalLinkLimits::DEFAULT,
+    )
+    .unwrap();
     let exact = ExternalLinkLimits::builder()
         .max_part_bytes(source.len())
         .max_total_part_bytes(source.len())
         .build()
         .unwrap();
-    assert!(parse_external_link_with_limits(&source, exact).is_ok());
+    assert!(parse_external_link(&source, exact).is_ok());
 
     let below = ExternalLinkLimits::builder()
         .max_part_bytes(source.len() - 1)
@@ -659,7 +765,7 @@ fn external_link_part_limit_accepts_exact_bytes_and_reports_one_below() {
         .build()
         .unwrap();
     assert_limit_exceeded(
-        parse_external_link_with_limits(&source, below),
+        parse_external_link(&source, below),
         ExternalLinkResource::PartBytes,
         source.len(),
         source.len() - 1,
@@ -668,20 +774,25 @@ fn external_link_part_limit_accepts_exact_bytes_and_reports_one_below() {
 
 #[test]
 fn external_link_record_limit_accepts_exact_records_and_reports_one_below() {
-    let source = write_external_link_stream(&workbook_link(), Some("rIdPath")).unwrap();
+    let source = write_external_link_stream(
+        &workbook_link(),
+        Some("rIdPath"),
+        ExternalLinkLimits::DEFAULT,
+    )
+    .unwrap();
     let record_count = record_kinds(&source).len();
     let exact = ExternalLinkLimits::builder()
         .max_records(record_count)
         .build()
         .unwrap();
-    assert!(parse_external_link_with_limits(&source, exact).is_ok());
+    assert!(parse_external_link(&source, exact).is_ok());
 
     let below = ExternalLinkLimits::builder()
         .max_records(record_count - 1)
         .build()
         .unwrap();
     assert_limit_exceeded(
-        parse_external_link_with_limits(&source, below),
+        parse_external_link(&source, below),
         ExternalLinkResource::Records,
         record_count,
         record_count - 1,
@@ -691,7 +802,7 @@ fn external_link_record_limit_accepts_exact_records_and_reports_one_below() {
 #[test]
 fn external_link_utf16_limits_count_non_bmp_units_per_string_and_in_total() {
     let link = Link::dde("X", "😀", vec!["A".to_string()]).unwrap();
-    let source = write_external_link_stream(&link, None).unwrap();
+    let source = write_external_link_stream(&link, None, ExternalLinkLimits::DEFAULT).unwrap();
     let non_bmp_units = "😀".encode_utf16().count();
     let total_units =
         "X".encode_utf16().count() + "😀".encode_utf16().count() + "A".encode_utf16().count();
@@ -702,7 +813,7 @@ fn external_link_utf16_limits_count_non_bmp_units_per_string_and_in_total() {
         .max_total_utf16_units(total_units)
         .build()
         .unwrap();
-    assert!(parse_external_link_with_limits(&source, exact).is_ok());
+    assert!(parse_external_link(&source, exact).is_ok());
 
     let one_below = ExternalLinkLimits::builder()
         .max_utf16_units(non_bmp_units - 1)
@@ -710,7 +821,7 @@ fn external_link_utf16_limits_count_non_bmp_units_per_string_and_in_total() {
         .build()
         .unwrap();
     assert_limit_exceeded(
-        parse_external_link_with_limits(&source, one_below),
+        parse_external_link(&source, one_below),
         ExternalLinkResource::Utf16Units,
         non_bmp_units,
         non_bmp_units - 1,
@@ -722,7 +833,7 @@ fn external_link_utf16_limits_count_non_bmp_units_per_string_and_in_total() {
         .build()
         .unwrap();
     assert_limit_exceeded(
-        parse_external_link_with_limits(&source, total_below),
+        parse_external_link(&source, total_below),
         ExternalLinkResource::TotalUtf16Units,
         total_units,
         total_units - 1,
@@ -732,20 +843,20 @@ fn external_link_utf16_limits_count_non_bmp_units_per_string_and_in_total() {
 #[test]
 fn external_link_decoded_semantic_bytes_accept_exact_and_report_one_below() {
     let link = Link::dde("X", "Y", vec!["A".to_string()]).unwrap();
-    let source = write_external_link_stream(&link, None).unwrap();
+    let source = write_external_link_stream(&link, None, ExternalLinkLimits::DEFAULT).unwrap();
     let semantic_bytes = "X".len() + "Y".len() + "A".len();
     let exact = ExternalLinkLimits::builder()
         .max_decoded_semantic_bytes(semantic_bytes)
         .build()
         .unwrap();
-    assert!(parse_external_link_with_limits(&source, exact).is_ok());
+    assert!(parse_external_link(&source, exact).is_ok());
 
     let one_below = ExternalLinkLimits::builder()
         .max_decoded_semantic_bytes(semantic_bytes - 1)
         .build()
         .unwrap();
     assert_limit_exceeded(
-        parse_external_link_with_limits(&source, one_below),
+        parse_external_link(&source, one_below),
         ExternalLinkResource::DecodedSemanticBytes,
         semantic_bytes,
         semantic_bytes - 1,
@@ -781,13 +892,14 @@ fn external_link_item_limits_aggregate_workbook_names_and_dde_ole_items() {
         (&dde, None),
         (&ole, Some("rIdOle")),
     ] {
-        let source = write_external_link_stream(link, relationship_id).unwrap();
+        let source =
+            write_external_link_stream(link, relationship_id, ExternalLinkLimits::DEFAULT).unwrap();
         let exact = ExternalLinkLimits::builder().max_items(2).build().unwrap();
-        assert!(parse_external_link_with_limits(&source, exact).is_ok());
+        assert!(parse_external_link(&source, exact).is_ok());
 
         let one_below = ExternalLinkLimits::builder().max_items(1).build().unwrap();
         assert_limit_exceeded(
-            parse_external_link_with_limits(&source, one_below),
+            parse_external_link(&source, one_below),
             ExternalLinkResource::Items,
             2,
             1,
@@ -809,14 +921,14 @@ fn external_link_cache_limits_aggregate_matrices_and_cells_across_items() {
         ],
     )
     .unwrap();
-    let source = write_external_link_stream(&link, None).unwrap();
+    let source = write_external_link_stream(&link, None, ExternalLinkLimits::DEFAULT).unwrap();
 
     let exact = ExternalLinkLimits::builder()
         .max_matrices(2)
         .max_cells(2)
         .build()
         .unwrap();
-    assert!(parse_external_link_with_limits(&source, exact).is_ok());
+    assert!(parse_external_link(&source, exact).is_ok());
 
     let matrix_below = ExternalLinkLimits::builder()
         .max_matrices(1)
@@ -824,7 +936,7 @@ fn external_link_cache_limits_aggregate_matrices_and_cells_across_items() {
         .build()
         .unwrap();
     assert_limit_exceeded(
-        parse_external_link_with_limits(&source, matrix_below),
+        parse_external_link(&source, matrix_below),
         ExternalLinkResource::Matrices,
         2,
         1,
@@ -836,7 +948,7 @@ fn external_link_cache_limits_aggregate_matrices_and_cells_across_items() {
         .build()
         .unwrap();
     assert_limit_exceeded(
-        parse_external_link_with_limits(&source, cells_below),
+        parse_external_link(&source, cells_below),
         ExternalLinkResource::Cells,
         2,
         1,
@@ -846,9 +958,14 @@ fn external_link_cache_limits_aggregate_matrices_and_cells_across_items() {
 #[test]
 fn external_link_snapshot_limits_bound_opaque_records_and_bytes() {
     let source = insert_unknown_after_first_record(
-        &write_external_link_stream(&workbook_link(), Some("rIdPath")).unwrap(),
+        &write_external_link_stream(
+            &workbook_link(),
+            Some("rIdPath"),
+            ExternalLinkLimits::DEFAULT,
+        )
+        .unwrap(),
     );
-    let default_snapshot = Snapshot::read(&source).unwrap();
+    let default_snapshot = Snapshot::read(&source, ExternalLinkLimits::DEFAULT).unwrap();
     let opaque_bytes = default_snapshot.unknown_records()[0].bytes().len();
 
     let exact = ExternalLinkLimits::builder()
@@ -857,7 +974,7 @@ fn external_link_snapshot_limits_bound_opaque_records_and_bytes() {
         .max_opaque_records(1)
         .build()
         .unwrap();
-    let snapshot = Snapshot::read_with_limits(&source, exact).unwrap();
+    let snapshot = Snapshot::read(&source, exact).unwrap();
     assert_eq!(snapshot.limits(), exact);
     assert_eq!(snapshot.unknown_records().len(), 1);
 
@@ -866,7 +983,7 @@ fn external_link_snapshot_limits_bound_opaque_records_and_bytes() {
         .build()
         .unwrap();
     assert_limit_exceeded(
-        Snapshot::read_with_limits(&source, record_below),
+        Snapshot::read(&source, record_below),
         ExternalLinkResource::OpaqueRecords,
         1,
         0,
@@ -878,7 +995,7 @@ fn external_link_snapshot_limits_bound_opaque_records_and_bytes() {
         .build()
         .unwrap();
     assert_limit_exceeded(
-        Snapshot::read_with_limits(&source, bytes_below),
+        Snapshot::read(&source, bytes_below),
         ExternalLinkResource::OpaqueBytes,
         opaque_bytes,
         opaque_bytes - 1,
@@ -887,21 +1004,28 @@ fn external_link_snapshot_limits_bound_opaque_records_and_bytes() {
 
 #[test]
 fn external_link_snapshot_limits_are_reused_and_enforced_by_changed_commit() {
-    let source = write_external_link_stream(&workbook_link(), Some("rIdPath")).unwrap();
+    let source = write_external_link_stream(
+        &workbook_link(),
+        Some("rIdPath"),
+        ExternalLinkLimits::DEFAULT,
+    )
+    .unwrap();
     let maximum = source.len();
     let limits = ExternalLinkLimits::builder()
         .max_part_bytes(maximum)
         .max_total_part_bytes(maximum)
         .build()
         .unwrap();
-    let snapshot = Snapshot::read_with_limits(&source, limits).unwrap();
+    let snapshot = Snapshot::read(&source, limits).unwrap();
     assert_eq!(snapshot.limits(), limits);
 
-    let mut edit = snapshot.edit();
+    let mut edit = snapshot.draft();
     let long_source = format!("rId{}", "x".repeat(256));
     edit.set_source(long_source).unwrap();
     let staged = edit.link();
-    let expected_after = write_external_link_stream(staged, Some(staged.source())).unwrap();
+    let expected_after =
+        write_external_link_stream(staged, Some(staged.source()), ExternalLinkLimits::DEFAULT)
+            .unwrap();
     assert!(expected_after.len() > maximum);
     assert_limit_exceeded(
         edit.commit(),
@@ -913,8 +1037,15 @@ fn external_link_snapshot_limits_are_reused_and_enforced_by_changed_commit() {
 
 #[test]
 fn external_link_apply_with_limits_is_fallible_and_accepts_exact_patch_bytes() {
-    let source = write_external_link_stream(&workbook_link(), Some("rIdPath")).unwrap();
-    let mut edit = Snapshot::read(&source).unwrap().edit();
+    let source = write_external_link_stream(
+        &workbook_link(),
+        Some("rIdPath"),
+        ExternalLinkLimits::DEFAULT,
+    )
+    .unwrap();
+    let mut edit = Snapshot::read(&source, ExternalLinkLimits::DEFAULT)
+        .unwrap()
+        .draft();
     edit.set_source("rIdChangedToLonger").unwrap();
     let commit = edit.commit().unwrap();
     let patch = commit.patch();
@@ -924,11 +1055,11 @@ fn external_link_apply_with_limits_is_fallible_and_accepts_exact_patch_bytes() {
         .max_total_part_bytes(maximum)
         .build()
         .unwrap();
-    assert_eq!(
-        apply_with_limits(patch.before(), patch, exact).unwrap(),
-        patch.after()
-    );
-    assert!(apply_with_limits(b"stale", patch, exact).is_err());
+    assert_eq!(apply(patch.before(), patch, exact).unwrap(), patch.after());
+    assert!(matches!(
+        apply(b"stale", patch, exact),
+        Err(Error::PatchConflict)
+    ));
 
     let one_below = ExternalLinkLimits::builder()
         .max_part_bytes(maximum - 1)
@@ -936,7 +1067,7 @@ fn external_link_apply_with_limits_is_fallible_and_accepts_exact_patch_bytes() {
         .build()
         .unwrap();
     assert_limit_exceeded(
-        apply_with_limits(patch.before(), patch, one_below),
+        apply(patch.before(), patch, one_below),
         ExternalLinkResource::PartBytes,
         maximum,
         maximum - 1,
@@ -945,37 +1076,41 @@ fn external_link_apply_with_limits_is_fallible_and_accepts_exact_patch_bytes() {
 
 #[test]
 fn external_link_malformed_wire_keeps_wire_and_structural_errors_typed() {
-    let source = write_external_link_stream(&workbook_link(), Some("rIdPath")).unwrap();
+    let source = write_external_link_stream(
+        &workbook_link(),
+        Some("rIdPath"),
+        ExternalLinkLimits::DEFAULT,
+    )
+    .unwrap();
     let truncated = replace_record_payload(
         &source,
         crate::raw::kind::SUP_NAME_START,
         0,
         &[2, 0, 0, 0, b'A', 0],
     );
-    let wire_error =
-        parse_external_link_with_limits(&truncated, ExternalLinkLimits::DEFAULT).unwrap_err();
+    let wire_error = parse_external_link(&truncated, ExternalLinkLimits::DEFAULT).unwrap_err();
     assert!(matches!(wire_error, Error::Wire(_)));
 
     let mut structurally_invalid = source;
-    Writer::new(&mut structurally_invalid)
+    Encoder::new(&mut structurally_invalid, Limits::DEFAULT)
         .write_record(crate::raw::kind::SUP_NAME_END, &[])
         .unwrap();
     let structural_error =
-        parse_external_link_with_limits(&structurally_invalid, ExternalLinkLimits::DEFAULT)
-            .unwrap_err();
+        parse_external_link(&structurally_invalid, ExternalLinkLimits::DEFAULT).unwrap_err();
     assert!(matches!(structural_error, Error::InvalidFormula(_)));
 }
 
 #[test]
 fn external_link_writer_part_limits_accept_exact_output_and_reject_one_below() {
     let link = workbook_link();
-    let canonical = write_external_link_stream(&link, Some("rIdPath")).unwrap();
+    let canonical =
+        write_external_link_stream(&link, Some("rIdPath"), ExternalLinkLimits::DEFAULT).unwrap();
     let exact = ExternalLinkLimits::builder()
         .max_part_bytes(canonical.len())
         .max_total_part_bytes(canonical.len())
         .build()
         .unwrap();
-    let bounded = write_external_link_stream_with_limits(&link, Some("rIdPath"), exact).unwrap();
+    let bounded = write_external_link_stream(&link, Some("rIdPath"), exact).unwrap();
     assert_eq!(bounded, canonical);
 
     let one_below = ExternalLinkLimits::builder()
@@ -984,7 +1119,7 @@ fn external_link_writer_part_limits_accept_exact_output_and_reject_one_below() {
         .build()
         .unwrap();
     assert_limit_exceeded(
-        write_external_link_stream_with_limits(&link, Some("rIdPath"), one_below),
+        write_external_link_stream(&link, Some("rIdPath"), one_below),
         ExternalLinkResource::PartBytes,
         canonical.len(),
         canonical.len() - 1,
@@ -996,7 +1131,7 @@ fn external_link_writer_rejects_authored_semantic_limits_with_typed_resources() 
     let workbook = workbook_link();
     let items = ExternalLinkLimits::builder().max_items(0).build().unwrap();
     assert_limit_exceeded(
-        write_external_link_stream_with_limits(&workbook, Some("rIdPath"), items),
+        write_external_link_stream(&workbook, Some("rIdPath"), items),
         ExternalLinkResource::Items,
         1,
         0,
@@ -1011,7 +1146,7 @@ fn external_link_writer_rejects_authored_semantic_limits_with_typed_resources() 
     .unwrap();
     let cells = ExternalLinkLimits::builder().max_cells(0).build().unwrap();
     assert_limit_exceeded(
-        write_external_link_stream_with_limits(&cached, None, cells),
+        write_external_link_stream(&cached, None, cells),
         ExternalLinkResource::Cells,
         1,
         0,
@@ -1023,7 +1158,7 @@ fn external_link_writer_rejects_authored_semantic_limits_with_typed_resources() 
         .build()
         .unwrap();
     assert_limit_exceeded(
-        write_external_link_stream_with_limits(&short, None, utf16),
+        write_external_link_stream(&short, None, utf16),
         ExternalLinkResource::Utf16Units,
         1,
         0,
@@ -1034,7 +1169,7 @@ fn external_link_writer_rejects_authored_semantic_limits_with_typed_resources() 
         .build()
         .unwrap();
     assert_limit_exceeded(
-        write_external_link_stream_with_limits(&short, None, semantic_bytes),
+        write_external_link_stream(&short, None, semantic_bytes),
         ExternalLinkResource::DecodedSemanticBytes,
         1,
         0,
@@ -1044,11 +1179,11 @@ fn external_link_writer_rejects_authored_semantic_limits_with_typed_resources() 
 #[test]
 fn external_link_strict_snapshot_commit_rejects_larger_model_and_remains_retryable() {
     let link = Link::dde_with_items("X", "Y", vec![DdeItem::new("A").unwrap()]).unwrap();
-    let source = write_external_link_stream(&link, None).unwrap();
+    let source = write_external_link_stream(&link, None, ExternalLinkLimits::DEFAULT).unwrap();
     let limits = ExternalLinkLimits::builder().max_items(1).build().unwrap();
-    let snapshot = Snapshot::read_with_limits(&source, limits).unwrap();
+    let snapshot = Snapshot::read(&source, limits).unwrap();
 
-    let mut rejected = snapshot.edit();
+    let mut rejected = snapshot.draft();
     rejected
         .upsert_dde_item(DdeItem::new("B").unwrap())
         .unwrap();
@@ -1057,7 +1192,7 @@ fn external_link_strict_snapshot_commit_rejects_larger_model_and_remains_retryab
     assert_eq!(snapshot.link(), &link);
     assert_eq!(snapshot.limits(), limits);
 
-    let mut retry = snapshot.edit();
+    let mut retry = snapshot.draft();
     retry.set_dde_topic("Z").unwrap();
     let committed = retry.commit().unwrap();
     assert_eq!(committed.snapshot().limits(), limits);
@@ -1067,8 +1202,10 @@ fn external_link_strict_snapshot_commit_rejects_larger_model_and_remains_retryab
 #[test]
 fn external_link_patch_apply_with_limits_rejects_semantic_after_image() {
     let link = Link::dde_with_items("X", "Y", vec![DdeItem::new("A").unwrap()]).unwrap();
-    let source = write_external_link_stream(&link, None).unwrap();
-    let mut edit = Snapshot::read(&source).unwrap().edit();
+    let source = write_external_link_stream(&link, None, ExternalLinkLimits::DEFAULT).unwrap();
+    let mut edit = Snapshot::read(&source, ExternalLinkLimits::DEFAULT)
+        .unwrap()
+        .draft();
     edit.upsert_dde_item(DdeItem::new("B").unwrap()).unwrap();
     let commit = edit.commit().unwrap();
     let patch = commit.patch();
@@ -1079,7 +1216,7 @@ fn external_link_patch_apply_with_limits_rejects_semantic_after_image() {
         .build()
         .unwrap();
     assert_limit_exceeded(
-        apply_with_limits(patch.before(), patch, limits),
+        apply(patch.before(), patch, limits),
         ExternalLinkResource::Items,
         2,
         1,
@@ -1089,9 +1226,9 @@ fn external_link_patch_apply_with_limits_rejects_semantic_after_image() {
 #[test]
 fn dde_relationship_id_refusal_is_atomic_and_valid_edits_remain_retryable() {
     let link = Link::dde_with_items("X", "Y", vec![DdeItem::new("A").unwrap()]).unwrap();
-    let source = write_external_link_stream(&link, None).unwrap();
-    let snapshot = Snapshot::read(&source).unwrap();
-    let mut edit = snapshot.edit();
+    let source = write_external_link_stream(&link, None, ExternalLinkLimits::DEFAULT).unwrap();
+    let snapshot = Snapshot::read(&source, ExternalLinkLimits::DEFAULT).unwrap();
+    let mut edit = snapshot.draft();
     let before = edit.link().clone();
 
     assert!(matches!(
@@ -1116,7 +1253,7 @@ fn external_link_writer_cache_matrix_record_and_object_limits_have_exact_edges()
         vec![DdeItem::new("A").unwrap().with_cached_values(matrix)],
     )
     .unwrap();
-    let canonical = write_external_link_stream(&link, None).unwrap();
+    let canonical = write_external_link_stream(&link, None, ExternalLinkLimits::DEFAULT).unwrap();
     let kinds = record_kinds(&canonical);
     let record_count = kinds.len();
 
@@ -1127,7 +1264,7 @@ fn external_link_writer_cache_matrix_record_and_object_limits_have_exact_edges()
         .build()
         .unwrap();
     assert_eq!(
-        write_external_link_stream_with_limits(&link, None, exact).unwrap(),
+        write_external_link_stream(&link, None, exact).unwrap(),
         canonical
     );
 
@@ -1136,7 +1273,7 @@ fn external_link_writer_cache_matrix_record_and_object_limits_have_exact_edges()
         .build()
         .unwrap();
     assert_limit_exceeded(
-        write_external_link_stream_with_limits(&link, None, matrix_below),
+        write_external_link_stream(&link, None, matrix_below),
         ExternalLinkResource::Matrices,
         1,
         0,
@@ -1144,7 +1281,7 @@ fn external_link_writer_cache_matrix_record_and_object_limits_have_exact_edges()
 
     let cells_below = ExternalLinkLimits::builder().max_cells(0).build().unwrap();
     assert_limit_exceeded(
-        write_external_link_stream_with_limits(&link, None, cells_below),
+        write_external_link_stream(&link, None, cells_below),
         ExternalLinkResource::Cells,
         1,
         0,
@@ -1155,7 +1292,7 @@ fn external_link_writer_cache_matrix_record_and_object_limits_have_exact_edges()
         .build()
         .unwrap();
     assert_limit_exceeded(
-        write_external_link_stream_with_limits(&link, None, records_below),
+        write_external_link_stream(&link, None, records_below),
         ExternalLinkResource::Records,
         record_count,
         record_count - 1,
@@ -1165,7 +1302,8 @@ fn external_link_writer_cache_matrix_record_and_object_limits_have_exact_edges()
 #[test]
 fn external_link_writer_extern_cache_record_limit_uses_opaque_table_records() {
     let link = workbook_link();
-    let base = write_external_link_stream(&link, Some("rIdPath")).unwrap();
+    let base =
+        write_external_link_stream(&link, Some("rIdPath"), ExternalLinkLimits::DEFAULT).unwrap();
     let opaque_specs = [
         (crate::raw::kind::EXTERN_TABLE_START, &[0x00; 5][..]),
         (crate::raw::kind::EXTERN_ROW_HDR, &[0x00; 4][..]),
@@ -1192,7 +1330,7 @@ fn external_link_writer_extern_cache_record_limit_uses_opaque_table_records() {
         (RecordKind::new(0x3FFD).unwrap(), &[0xD0, 0xD1][..]),
     ];
     let source = insert_unknown_records_after_known_record(&base, 2, &opaque_specs);
-    let snapshot = Snapshot::read(&source).unwrap();
+    let snapshot = Snapshot::read(&source, ExternalLinkLimits::DEFAULT).unwrap();
     assert_eq!(snapshot.unknown_records().len(), opaque_specs.len());
     let cache_records = snapshot
         .unknown_records()
@@ -1244,14 +1382,14 @@ fn external_link_writer_retained_object_limit_has_exact_edge() {
         .max_retained_objects(1)
         .build()
         .unwrap();
-    assert!(write_external_link_stream_with_limits(&link, Some("rIdPath"), exact).is_ok());
+    assert!(write_external_link_stream(&link, Some("rIdPath"), exact).is_ok());
 
     let one_below = ExternalLinkLimits::builder()
         .max_retained_objects(0)
         .build()
         .unwrap();
     assert_limit_exceeded(
-        write_external_link_stream_with_limits(&link, Some("rIdPath"), one_below),
+        write_external_link_stream(&link, Some("rIdPath"), one_below),
         ExternalLinkResource::RetainedObjects,
         1,
         0,

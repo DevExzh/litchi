@@ -70,7 +70,7 @@ mod tests {
     #[test]
     fn test_parse_operators() {
         let data = vec![0x03]; // PTG_ADD
-        let mut parser = Parser::new(&data);
+        let mut parser = Parser::new(&data, crate::raw::Limits::DEFAULT);
         let tokens = parser.parse().unwrap();
         assert_eq!(tokens.len(), 1);
         match &tokens[0] {
@@ -83,7 +83,7 @@ mod tests {
     fn test_parse_number() {
         let mut data = vec![0x1F]; // PTG_NUM
         data.extend_from_slice(&42.5f64.to_le_bytes());
-        let mut parser = Parser::new(&data);
+        let mut parser = Parser::new(&data, crate::raw::Limits::DEFAULT);
         let tokens = parser.parse().unwrap();
         assert_eq!(tokens.len(), 1);
         match &tokens[0] {
@@ -113,12 +113,15 @@ mod tests {
             rgce: rgce.clone(),
             rgcb: Vec::new(),
         };
-        let bytes = parsed.to_bytes().unwrap();
-        let (roundtrip, consumed) = ParsedFormula::parse(&bytes).unwrap();
+        let bytes = parsed.to_bytes(crate::raw::Limits::DEFAULT).unwrap();
+        let (roundtrip, consumed) =
+            ParsedFormula::parse(&bytes, crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(consumed, bytes.len());
         assert_eq!(roundtrip, parsed);
 
-        let tokens = Parser::new(&rgce).parse().unwrap();
+        let tokens = Parser::new(&rgce, crate::raw::Limits::DEFAULT)
+            .parse()
+            .unwrap();
         assert_eq!(Compiler::try_tokens_to_string(&tokens).unwrap(), "(C13*2)");
     }
 
@@ -160,20 +163,22 @@ mod tests {
 
         for source in ["IF(TRUE,1,2)", "IFERROR(1,2)", "CHOOSE(2,10,20)"] {
             let compiled = text::Compiler::compile(source).unwrap();
-            let tokens = Parser::new(&compiled.rgce).parse().unwrap();
+            let tokens = Parser::new(&compiled.rgce, crate::raw::Limits::DEFAULT)
+                .parse()
+                .unwrap();
             assert_eq!(Compiler::try_tokens_to_string(&tokens).unwrap(), source);
         }
 
         let mut malformed_if = text::Compiler::compile("IF(TRUE,1,2)").unwrap().rgce;
         malformed_if[4] = 6;
         assert!(matches!(
-            Parser::new(&malformed_if).parse(),
+            Parser::new(&malformed_if, crate::raw::Limits::DEFAULT).parse(),
             Err(crate::formula::Error::InvalidFormula(_))
         ));
         let mut malformed_choose = text::Compiler::compile("CHOOSE(2,10,20)").unwrap().rgce;
         malformed_choose[7] = 5;
         assert!(matches!(
-            Parser::new(&malformed_choose).parse(),
+            Parser::new(&malformed_choose, crate::raw::Limits::DEFAULT).parse(),
             Err(crate::formula::Error::InvalidFormula(_))
         ));
     }
@@ -181,7 +186,9 @@ mod tests {
     #[test]
     fn compiler_supports_ranges_functions_unicode_and_absolute_refs() {
         let formula = text::Compiler::compile("SUM($A$1:B3)+\"荔枝\"").unwrap();
-        let tokens = Parser::new(&formula.rgce).parse().unwrap();
+        let tokens = Parser::new(&formula.rgce, crate::raw::Limits::DEFAULT)
+            .parse()
+            .unwrap();
         let text = Compiler::try_tokens_to_string(&tokens).unwrap();
         assert_eq!(text, "(SUM($A$1:B3)+\"荔枝\")");
     }
@@ -523,7 +530,9 @@ mod tests {
         for &(source, expected, token_suffix) in cases {
             let formula = text::Compiler::compile(source).unwrap();
             assert!(formula.rgce.ends_with(token_suffix));
-            let tokens = Parser::new(&formula.rgce).parse().unwrap();
+            let tokens = Parser::new(&formula.rgce, crate::raw::Limits::DEFAULT)
+                .parse()
+                .unwrap();
             assert_eq!(Compiler::try_tokens_to_string(&tokens).unwrap(), expected);
         }
 
@@ -543,15 +552,15 @@ mod tests {
         assert!(text::Compiler::compile("GETPIVOTDATA(1,2,3,4,5)").is_err());
 
         assert!(matches!(
-            Parser::new(&[0x41, 0xE3, 0x00]).parse(),
+            Parser::new(&[0x41, 0xE3, 0x00], crate::raw::Limits::DEFAULT).parse(),
             Err(crate::formula::Error::InvalidFormula(_))
         ));
         assert!(matches!(
-            Parser::new(&[0x42, 0x02, 0xD4, 0x00]).parse(),
+            Parser::new(&[0x42, 0x02, 0xD4, 0x00], crate::raw::Limits::DEFAULT).parse(),
             Err(crate::formula::Error::InvalidFormula(_))
         ));
         assert!(matches!(
-            Parser::new(&[0x42, 0x03, 0xE1, 0x01]).parse(),
+            Parser::new(&[0x42, 0x03, 0xE1, 0x01], crate::raw::Limits::DEFAULT).parse(),
             Err(crate::formula::Error::InvalidFormula(_))
         ));
 
@@ -570,7 +579,9 @@ mod tests {
         let formula_255 = format!("SUM({})", vec!["1"; 255].join(","));
         let compiled = text::Compiler::compile(&formula_255).unwrap();
         assert!(compiled.rgce.ends_with(&[0x42, 0xFF, 0x04, 0x00]));
-        let tokens = Parser::new(&compiled.rgce).parse().unwrap();
+        let tokens = Parser::new(&compiled.rgce, crate::raw::Limits::DEFAULT)
+            .parse()
+            .unwrap();
         assert_eq!(
             Compiler::try_tokens_to_string(&tokens).unwrap(),
             formula_255
@@ -587,7 +598,9 @@ mod tests {
     fn compiler_and_converter_preserve_missing_arguments_and_parentheses() {
         let missing = text::Compiler::compile("IF(TRUE,,0)").unwrap();
         assert!(missing.rgce.contains(&ptg_types::PTG_MISSING_ARG));
-        let tokens = Parser::new(&missing.rgce).parse().unwrap();
+        let tokens = Parser::new(&missing.rgce, crate::raw::Limits::DEFAULT)
+            .parse()
+            .unwrap();
         assert_eq!(
             Compiler::try_tokens_to_string(&tokens).unwrap(),
             "IF(TRUE,,0)"
@@ -595,7 +608,9 @@ mod tests {
 
         let parenthesized = text::Compiler::compile("(1+2)*3").unwrap();
         assert!(parenthesized.rgce.contains(&ptg_types::PTG_PAREN));
-        let tokens = Parser::new(&parenthesized.rgce).parse().unwrap();
+        let tokens = Parser::new(&parenthesized.rgce, crate::raw::Limits::DEFAULT)
+            .parse()
+            .unwrap();
         assert_eq!(
             Compiler::try_tokens_to_string(&tokens).unwrap(),
             "(((1+2))*3)"
@@ -607,7 +622,9 @@ mod tests {
         let mut rgce = text::Compiler::compile("A1").unwrap().rgce;
         rgce.extend_from_slice(&text::Compiler::compile("B2").unwrap().rgce);
         rgce.push(ptg_types::PTG_UNION);
-        let tokens = Parser::new(&rgce).parse().unwrap();
+        let tokens = Parser::new(&rgce, crate::raw::Limits::DEFAULT)
+            .parse()
+            .unwrap();
         assert_eq!(Compiler::try_tokens_to_string(&tokens).unwrap(), "(A1,B2)");
     }
 
@@ -645,17 +662,19 @@ mod tests {
         ];
 
         for (bytes, expected) in cases {
-            let tokens = Parser::new(&bytes).parse().unwrap();
+            let tokens = Parser::new(&bytes, crate::raw::Limits::DEFAULT)
+                .parse()
+                .unwrap();
             assert_eq!(tokens, vec![expected]);
             assert_eq!(Compiler::try_tokens_to_string(&tokens).unwrap(), "#REF!");
         }
 
         assert!(matches!(
-            Parser::new(&[0x4B; 12]).parse(),
+            Parser::new(&[0x4B; 12], crate::raw::Limits::DEFAULT).parse(),
             Err(crate::formula::Error::InvalidFormula(_))
         ));
         assert!(matches!(
-            Parser::new(&[0xAA, 0, 0, 0, 0, 0, 0]).parse(),
+            Parser::new(&[0xAA, 0, 0, 0, 0, 0, 0], crate::raw::Limits::DEFAULT).parse(),
             Err(crate::formula::Error::InvalidFormula(_))
         ));
     }
@@ -688,7 +707,9 @@ mod tests {
         };
 
         let ref_3d = [0x5A, 0, 0, 1, 0, 0, 0, 0, 0xC0];
-        let tokens = Parser::new(&ref_3d).parse().unwrap();
+        let tokens = Parser::new(&ref_3d, crate::raw::Limits::DEFAULT)
+            .parse()
+            .unwrap();
         assert_eq!(
             Compiler::try_tokens_to_string_with_resolution(&tokens, &context).unwrap(),
             "'Data 1'!A2"
@@ -696,14 +717,18 @@ mod tests {
         assert!(Compiler::try_tokens_to_string(&tokens).is_err());
 
         let area_3d = [0x7B, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0];
-        let tokens = Parser::new(&area_3d).parse().unwrap();
+        let tokens = Parser::new(&area_3d, crate::raw::Limits::DEFAULT)
+            .parse()
+            .unwrap();
         assert_eq!(
             Compiler::try_tokens_to_string_with_resolution(&tokens, &context).unwrap(),
             "'Data 1:Last'!$A$1:$B$2"
         );
 
         let name = [0x43, 1, 0, 0, 0];
-        let tokens = Parser::new(&name).parse().unwrap();
+        let tokens = Parser::new(&name, crate::raw::Limits::DEFAULT)
+            .parse()
+            .unwrap();
         assert_eq!(
             Compiler::try_tokens_to_string_with_resolution(&tokens, &context).unwrap(),
             "Rate"
@@ -725,21 +750,23 @@ mod tests {
             current_sheet: None,
         };
         let invalid_xti = [0x5A, 0, 0, 0, 0, 0, 0, 0, 0];
-        let tokens = Parser::new(&invalid_xti).parse().unwrap();
+        let tokens = Parser::new(&invalid_xti, crate::raw::Limits::DEFAULT)
+            .parse()
+            .unwrap();
         assert!(matches!(
             Compiler::try_tokens_to_string_with_resolution(&tokens, &context),
             Err(crate::formula::Error::UnresolvedDependency(_))
         ));
         assert!(matches!(
-            Parser::new(&[0x43, 0, 0, 0, 0]).parse(),
+            Parser::new(&[0x43, 0, 0, 0, 0], crate::raw::Limits::DEFAULT).parse(),
             Err(crate::formula::Error::InvalidFormula(_))
         ));
         assert!(matches!(
-            Parser::new(&[0xDA, 0, 0, 0, 0, 0, 0, 0, 0]).parse(),
+            Parser::new(&[0xDA, 0, 0, 0, 0, 0, 0, 0, 0], crate::raw::Limits::DEFAULT).parse(),
             Err(crate::formula::Error::InvalidFormula(_))
         ));
         assert!(matches!(
-            Parser::new(&[0x5B; 14]).parse(),
+            Parser::new(&[0x5B; 14], crate::raw::Limits::DEFAULT).parse(),
             Err(crate::formula::Error::InvalidFormula(_))
         ));
     }
@@ -753,20 +780,20 @@ mod tests {
             vec![0xB9, 0, 0, 1, 0, 0, 0],
         ] {
             assert!(matches!(
-                Parser::new(&bytes).parse(),
+                Parser::new(&bytes, crate::raw::Limits::DEFAULT).parse(),
                 Err(crate::formula::Error::InvalidFormula(_))
             ));
         }
 
         let row_past_end = [0x44, 0x00, 0x00, 0x10, 0x00, 0, 0];
         assert!(matches!(
-            Parser::new(&row_past_end).parse(),
+            Parser::new(&row_past_end, crate::raw::Limits::DEFAULT).parse(),
             Err(crate::formula::Error::InvalidFormula(_))
         ));
 
         let reversed_area = [0x45, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
         assert!(matches!(
-            Parser::new(&reversed_area).parse(),
+            Parser::new(&reversed_area, crate::raw::Limits::DEFAULT).parse(),
             Err(crate::formula::Error::InvalidCellReference(_))
         ));
     }
@@ -791,7 +818,7 @@ mod tests {
             current_sheet: None,
         }
         .for_sheet(1);
-        let tokens = Parser::new(&[0x5A, 0, 0, 0, 0, 0, 0, 0, 0])
+        let tokens = Parser::new(&[0x5A, 0, 0, 0, 0, 0, 0, 0, 0], crate::raw::Limits::DEFAULT)
             .parse()
             .unwrap();
         assert_eq!(
@@ -829,33 +856,41 @@ mod tests {
         };
 
         let reference = [0x5A, 0, 0, 0, 0, 0, 0, 0, 0];
-        let tokens = Parser::new(&reference).parse().unwrap();
+        let tokens = Parser::new(&reference, crate::raw::Limits::DEFAULT)
+            .parse()
+            .unwrap();
         assert_eq!(
             Compiler::try_tokens_to_string_with_resolution(&tokens, &context).unwrap(),
             "'[Book.xlsx]Data Sheet'!$A$1"
         );
 
         let name = [0x59, 0, 0, 1, 0, 0, 0];
-        let tokens = Parser::new(&name).parse().unwrap();
+        let tokens = Parser::new(&name, crate::raw::Limits::DEFAULT)
+            .parse()
+            .unwrap();
         assert_eq!(
             Compiler::try_tokens_to_string_with_resolution(&tokens, &context).unwrap(),
             "'[Book.xlsx]'!Rate"
         );
 
         let invalid_name = [0x59, 0, 0, 2, 0, 0, 0];
-        let tokens = Parser::new(&invalid_name).parse().unwrap();
+        let tokens = Parser::new(&invalid_name, crate::raw::Limits::DEFAULT)
+            .parse()
+            .unwrap();
         assert!(matches!(
             Compiler::try_tokens_to_string_with_resolution(&tokens, &context),
             Err(crate::formula::Error::UnresolvedDependency(_))
         ));
         assert!(matches!(
-            Parser::new(&[0x59, 0, 0, 0, 0, 0, 0]).parse(),
+            Parser::new(&[0x59, 0, 0, 0, 0, 0, 0], crate::raw::Limits::DEFAULT).parse(),
             Err(crate::formula::Error::InvalidFormula(_))
         ));
 
         let mut add_in = context.clone();
         add_in.supporting_links = vec![SupportingLink::AddIn].into();
-        let tokens = Parser::new(&name).parse().unwrap();
+        let tokens = Parser::new(&name, crate::raw::Limits::DEFAULT)
+            .parse()
+            .unwrap();
         assert!(matches!(
             Compiler::try_tokens_to_string_with_resolution(&tokens, &add_in),
             Err(crate::formula::Error::UnsupportedFeature(_))
@@ -867,12 +902,16 @@ mod tests {
         for &(literal, code) in text::FORMULA_ERRORS {
             let compiled = text::Compiler::compile(&literal.to_ascii_lowercase()).unwrap();
             assert_eq!(compiled.rgce, vec![ptg_types::PTG_ERR, code]);
-            let tokens = Parser::new(&compiled.rgce).parse().unwrap();
+            let tokens = Parser::new(&compiled.rgce, crate::raw::Limits::DEFAULT)
+                .parse()
+                .unwrap();
             assert_eq!(Compiler::try_tokens_to_string(&tokens).unwrap(), literal);
         }
 
         let compiled = text::Compiler::compile("#DIV/0!+1").unwrap();
-        let tokens = Parser::new(&compiled.rgce).parse().unwrap();
+        let tokens = Parser::new(&compiled.rgce, crate::raw::Limits::DEFAULT)
+            .parse()
+            .unwrap();
         assert_eq!(
             Compiler::try_tokens_to_string(&tokens).unwrap(),
             "(#DIV/0!+1)"
@@ -883,11 +922,11 @@ mod tests {
     #[test]
     fn parser_rejects_invalid_scalar_boolean_and_error_values() {
         assert!(matches!(
-            Parser::new(&[ptg_types::PTG_BOOL, 2]).parse(),
+            Parser::new(&[ptg_types::PTG_BOOL, 2], crate::raw::Limits::DEFAULT).parse(),
             Err(crate::formula::Error::InvalidFormula(_))
         ));
         assert!(matches!(
-            Parser::new(&[ptg_types::PTG_ERR, 1]).parse(),
+            Parser::new(&[ptg_types::PTG_ERR, 1], crate::raw::Limits::DEFAULT).parse(),
             Err(crate::formula::Error::InvalidFormula(_))
         ));
     }
@@ -895,17 +934,21 @@ mod tests {
     #[test]
     fn parser_consumes_attribute_payloads_and_converts_attr_sum() {
         let attr_sum = [ptg_types::PTG_INT, 1, 0, ptg_types::PTG_ATTR, 0x10, 0, 0];
-        let tokens = Parser::new(&attr_sum).parse().unwrap();
+        let tokens = Parser::new(&attr_sum, crate::raw::Limits::DEFAULT)
+            .parse()
+            .unwrap();
         assert_eq!(Compiler::try_tokens_to_string(&tokens).unwrap(), "SUM(1)");
 
         let attr_choose = [ptg_types::PTG_ATTR, 0x04, 0x00, 0x00, 0x02, 0x00];
         assert_eq!(
-            Parser::new(&attr_choose).parse().unwrap(),
+            Parser::new(&attr_choose, crate::raw::Limits::DEFAULT)
+                .parse()
+                .unwrap(),
             vec![Token::Attribute(0x04)]
         );
 
         assert!(matches!(
-            Parser::new(&attr_choose[..5]).parse(),
+            Parser::new(&attr_choose[..5], crate::raw::Limits::DEFAULT).parse(),
             Err(crate::formula::Error::InvalidFormula(_))
         ));
     }
@@ -923,7 +966,9 @@ mod tests {
         rgcb.extend_from_slice(&[0x02, 0x01]);
         rgcb.extend_from_slice(&[0x04, 0x07, 0x00, 0x00, 0x00]);
 
-        let tokens = Parser::with_extra(&rgce, &rgcb).parse().unwrap();
+        let tokens = Parser::with_extra(&rgce, &rgcb, crate::raw::Limits::DEFAULT)
+            .parse()
+            .unwrap();
         assert_eq!(
             tokens,
             vec![Token::Array {
@@ -951,7 +996,7 @@ mod tests {
         impossible.extend_from_slice(&1_048_576_u32.to_le_bytes());
         impossible.extend_from_slice(&16_384_u32.to_le_bytes());
         assert!(matches!(
-            Parser::with_extra(&rgce, &impossible).parse(),
+            Parser::with_extra(&rgce, &impossible, crate::raw::Limits::DEFAULT).parse(),
             Err(crate::formula::Error::InvalidFormula(_))
         ));
 
@@ -960,7 +1005,7 @@ mod tests {
         invalid_bool.extend_from_slice(&1_u32.to_le_bytes());
         invalid_bool.extend_from_slice(&[0x02, 0x02]);
         assert!(matches!(
-            Parser::with_extra(&rgce, &invalid_bool).parse(),
+            Parser::with_extra(&rgce, &invalid_bool, crate::raw::Limits::DEFAULT).parse(),
             Err(crate::formula::Error::InvalidFormula(_))
         ));
 
@@ -970,7 +1015,7 @@ mod tests {
         invalid_number.push(0x00);
         invalid_number.extend_from_slice(&f64::NEG_INFINITY.to_le_bytes());
         assert!(matches!(
-            Parser::with_extra(&rgce, &invalid_number).parse(),
+            Parser::with_extra(&rgce, &invalid_number, crate::raw::Limits::DEFAULT).parse(),
             Err(crate::formula::Error::InvalidFormula(_))
         ));
     }
@@ -983,7 +1028,7 @@ mod tests {
             &[0x40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         );
         assert_eq!(&formula.rgcb[..8], &[2, 0, 0, 0, 2, 0, 0, 0]);
-        let tokens = Parser::with_extra(&formula.rgce, &formula.rgcb)
+        let tokens = Parser::with_extra(&formula.rgce, &formula.rgcb, crate::raw::Limits::DEFAULT)
             .parse()
             .unwrap();
         assert_eq!(
@@ -1014,7 +1059,9 @@ mod tests {
         rgcb.extend_from_slice(&1_u32.to_le_bytes());
         rgcb.extend_from_slice(&0_u32.to_le_bytes());
         rgcb.extend_from_slice(&1_u32.to_le_bytes());
-        let tokens = Parser::with_extra(&rgce, &rgcb).parse().unwrap();
+        let tokens = Parser::with_extra(&rgce, &rgcb, crate::raw::Limits::DEFAULT)
+            .parse()
+            .unwrap();
         assert!(matches!(
             &tokens[0],
             Token::Memory {
@@ -1032,13 +1079,13 @@ mod tests {
         let mut rgcb = Vec::new();
         rgcb.extend_from_slice(&u32::MAX.to_le_bytes());
         assert!(matches!(
-            Parser::with_extra(&rgce, &rgcb).parse(),
+            Parser::with_extra(&rgce, &rgcb, crate::raw::Limits::DEFAULT).parse(),
             Err(crate::formula::Error::InvalidFormula(_))
         ));
 
         let oversized_expression = [0x49, 0x01, 0x00];
         assert!(matches!(
-            Parser::new(&oversized_expression).parse(),
+            Parser::new(&oversized_expression, crate::raw::Limits::DEFAULT).parse(),
             Err(crate::formula::Error::InvalidFormula(_))
         ));
     }
@@ -1050,12 +1097,18 @@ mod tests {
         let formula = text::Compiler::compile_shared("B3", 2, 2).unwrap();
         assert_eq!(formula.rgce, vec![0x4C, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF]);
 
-        let anchor_tokens = Parser::with_base_cell(&formula.rgce, 2, 2).parse().unwrap();
+        let anchor_tokens =
+            Parser::with_base_cell(&formula.rgce, 2, 2, crate::raw::Limits::DEFAULT)
+                .parse()
+                .unwrap();
         assert_eq!(
             Compiler::try_tokens_to_string(&anchor_tokens).unwrap(),
             "B3"
         );
-        let follower_tokens = Parser::with_base_cell(&formula.rgce, 3, 2).parse().unwrap();
+        let follower_tokens =
+            Parser::with_base_cell(&formula.rgce, 3, 2, crate::raw::Limits::DEFAULT)
+                .parse()
+                .unwrap();
         assert_eq!(
             Compiler::try_tokens_to_string(&follower_tokens).unwrap(),
             "B4"
@@ -1070,12 +1123,15 @@ mod tests {
             0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x4C, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0x00,
             0x00, 0x00, 0x00,
         ];
-        let group = Group::parse_shared(&bytes).unwrap();
+        let group = Group::parse_shared(&bytes, crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(group.kind, GroupKind::Shared);
         assert_eq!(group.range.to_a1(), "C3:C10");
-        assert_eq!(group.to_record_data().unwrap(), bytes);
+        assert_eq!(
+            group.to_record_data(crate::raw::Limits::DEFAULT).unwrap(),
+            bytes
+        );
 
-        let tokens = Parser::with_base_cell(&group.formula.rgce, 9, 2)
+        let tokens = Parser::with_base_cell(&group.formula.rgce, 9, 2, crate::raw::Limits::DEFAULT)
             .parse()
             .unwrap();
         assert_eq!(Compiler::try_tokens_to_string(&tokens).unwrap(), "B10");
@@ -1090,11 +1146,14 @@ mod tests {
             0x00, 0x00, 0x01, 0x09, 0x00, 0x00, 0x00, 0x23, 0x02, 0x00, 0x00, 0x00, 0x42, 0x01,
             0xFF, 0x00, 0x00, 0x00, 0x00, 0x00,
         ];
-        let group = Group::parse_array(&bytes).unwrap();
+        let group = Group::parse_array(&bytes, crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(group.kind, GroupKind::Array);
         assert_eq!(group.range.to_a1(), "C9:C9");
         assert!(group.always_calculate);
-        assert_eq!(group.to_record_data().unwrap(), bytes);
+        assert_eq!(
+            group.to_record_data(crate::raw::Limits::DEFAULT).unwrap(),
+            bytes
+        );
     }
 
     #[test]
@@ -1114,11 +1173,11 @@ mod tests {
             formula: text::Compiler::compile("1+1").unwrap(),
             always_calculate: false,
         }
-        .to_record_data()
+        .to_record_data(crate::raw::Limits::DEFAULT)
         .unwrap();
         array[16] = 0x80;
         assert!(matches!(
-            Group::parse_array(&array),
+            Group::parse_array(&array, crate::raw::Limits::DEFAULT),
             Err(crate::formula::Error::InvalidFormula(_))
         ));
     }
@@ -1126,7 +1185,9 @@ mod tests {
     #[test]
     fn shared_formula_preserves_mixed_absolute_references() {
         let formula = text::Compiler::compile_shared("$A1+B$2", 4, 3).unwrap();
-        let tokens = Parser::with_base_cell(&formula.rgce, 7, 5).parse().unwrap();
+        let tokens = Parser::with_base_cell(&formula.rgce, 7, 5, crate::raw::Limits::DEFAULT)
+            .parse()
+            .unwrap();
         assert_eq!(
             Compiler::try_tokens_to_string(&tokens).unwrap(),
             "($A4+D$2)"
@@ -1137,12 +1198,16 @@ mod tests {
     fn cell_parsed_formula_accepts_the_empty_token_streams_excel_writes() {
         // `cce == 0`, `cb == 0`: no tokens and no ancillary data.
         let empty = [0_u8; 8];
-        let (formula, consumed) = ParsedFormula::parse(&empty).unwrap();
+        let (formula, consumed) =
+            ParsedFormula::parse(&empty, crate::raw::Limits::DEFAULT).unwrap();
         assert!(formula.rgce.is_empty());
         assert!(formula.rgcb.is_empty());
         assert_eq!(consumed, empty.len());
         // The empty stream must survive a write so reading cannot lose it.
-        assert_eq!(formula.to_bytes().unwrap(), empty);
+        assert_eq!(
+            formula.to_bytes(crate::raw::Limits::DEFAULT).unwrap(),
+            empty
+        );
     }
 
     #[test]
@@ -1151,14 +1216,16 @@ mod tests {
         oversized.extend_from_slice(&((MAX_CELL_FORMULA_BYTES as u32) + 1).to_le_bytes());
         oversized.extend_from_slice(&[0; 4]);
         assert!(matches!(
-            ParsedFormula::parse(&oversized),
+            ParsedFormula::parse(&oversized, crate::raw::Limits::DEFAULT),
             Err(crate::formula::Error::InvalidFormula(_))
         ));
     }
 
     #[test]
     fn truncated_token_is_an_error_instead_of_becoming_unknown_bytes() {
-        let error = Parser::new(&[0x44, 0x01]).parse().unwrap_err();
+        let error = Parser::new(&[0x44, 0x01], crate::raw::Limits::DEFAULT)
+            .parse()
+            .unwrap_err();
         assert!(matches!(error, crate::formula::Error::InvalidFormula(_)));
     }
 
@@ -1494,9 +1561,10 @@ mod structured_reference_compiler_tests {
             "'[Book.xlsx]Data Sheet'!Remote[[#Totals],[Amount]]",
         ] {
             let compiled = text::Compiler::compile_with_context(source, &compile_context).unwrap();
-            let tokens = Parser::with_extra(&compiled.rgce, &compiled.rgcb)
-                .parse()
-                .unwrap();
+            let tokens =
+                Parser::with_extra(&compiled.rgce, &compiled.rgcb, crate::raw::Limits::DEFAULT)
+                    .parse()
+                    .unwrap();
             assert_eq!(
                 Compiler::try_tokens_to_string_with_resolution(&tokens, &resolution_context,)
                     .unwrap(),

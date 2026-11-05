@@ -54,13 +54,13 @@ fn reads_model_cached_unique_names_without_an_item_bound() {
     let package = package();
     let snapshot = Snapshot::load(
         &package,
-        CacheSelector::Id(PivotCacheId(7)),
-        FieldSelector::Ordinal(0),
+        PivotCacheSelector::Id(PivotCacheId(7)),
+        PivotCacheFieldSelector::Ordinal(0),
     )
     .unwrap();
-    assert_eq!(snapshot.entries()[0].index, 0);
-    assert_eq!(snapshot.entries()[0].name, "[A]&B");
-    assert_eq!(snapshot.diagnostic_status(), DiagnosticStatus::Unresolved);
+    assert_eq!(snapshot.cached_unique_names().names()[0].index, 0);
+    assert_eq!(snapshot.cached_unique_names().names()[0].name, "[A]&B");
+    assert_eq!(snapshot.index_bound_status(), IndexBoundStatus::Unresolved);
 }
 
 #[test]
@@ -70,8 +70,8 @@ fn scalar_edit_preserves_unchanged_lexical_neighbor_and_inverse() {
     let before = package.get_part(&uri).unwrap().blob().to_vec();
     let mut transaction = Transaction::new(
         &mut package,
-        CacheSelector::Id(PivotCacheId(7)),
-        FieldSelector::Ordinal(0),
+        PivotCacheSelector::Id(PivotCacheId(7)),
+        PivotCacheFieldSelector::Ordinal(0),
     )
     .unwrap();
     transaction
@@ -122,7 +122,7 @@ fn mce_payload_requires_choice_or_fallback_ancestry() {
     ];
     let scan = XmlScan {
         elements,
-        limits: XmlScanLimits::from_read_limits(ReadLimits::default()),
+        limits: XmlScanLimits::from_read_limits(SourceLimits::default()),
         ignorable_scopes: Vec::new(),
     };
     assert!(
@@ -140,7 +140,7 @@ fn mce_payload_requires_choice_or_fallback_ancestry() {
     ];
     let scan = XmlScan {
         elements,
-        limits: XmlScanLimits::from_read_limits(ReadLimits::default()),
+        limits: XmlScanLimits::from_read_limits(SourceLimits::default()),
         ignorable_scopes: Vec::new(),
     };
     assert!(

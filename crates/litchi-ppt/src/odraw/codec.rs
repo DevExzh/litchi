@@ -2,9 +2,9 @@ use litchi_odraw::shape::Shape;
 use litchi_odraw::{Container, Record, RecordKind};
 
 use crate::embedded::reference::Reference;
-use crate::package::Result;
+use crate::package::{Error, Result, SourceLimitKind, SourceLimits};
 
-use super::model::{Anchor, Drawing, Frame, FrameKind, Placeholder, ShapeExt};
+use super::model::{Anchor, Drawing, Frame, FrameKind, Placeholder, ShapeExt, ShapeLimitsExt};
 use super::package::{
     CLIENT_DATA_RAW_KIND, CLIENT_TEXTBOX_RAW_KIND, RawRecords, advance, corrupted, host_record,
     validate_host_record, visit_host_record,
@@ -35,6 +35,51 @@ impl ShapeExt for Shape<'_> {
         self.interactions_with_limits(crate::InteractionLimits::default())
     }
 
+    fn text_interactions(&self) -> Result<Vec<crate::TextInteraction>> {
+        self.text_interactions_with_limits(crate::TextInteractionLimits::default())
+    }
+
+    fn placeholder_atom(
+        &self,
+        context: crate::PlaceholderContext,
+    ) -> Result<Option<crate::PlaceholderAtom>> {
+        self.placeholder_atom_with_limits(context, crate::PlaceholderLimits::default())
+    }
+
+    fn powerpoint12_shape_metadata(&self) -> Result<Option<crate::ShapeMetadata>> {
+        powerpoint12_shape_metadata(self, None)
+    }
+
+    fn programmable_tags(&self) -> Result<Option<crate::ShapeProgrammableTags>> {
+        self.programmable_tags_with_limits(crate::ShapeProgrammableTagLimits::default())
+    }
+
+    fn ppt_flags(&self) -> Result<Option<crate::ShapeFlagProjection>> {
+        self.ppt_flags_with(crate::ShapeFlagLimits::default())
+    }
+
+    fn animation(&self) -> Result<Option<crate::animation::AnimationInfo>> {
+        let Some(client_data) = host_record(self, RecordKind::ClientData)? else {
+            return Ok(None);
+        };
+        validate_host_record(&client_data, CLIENT_DATA_RAW_KIND, "ClientData")?;
+        let mut offset = 0usize;
+        let mut records = 0u32;
+        let max_records = self.container().record().limits().max_records;
+        while offset < client_data.data().len() {
+            visit_host_record(&mut records, max_records)?;
+            let (record, consumed) =
+                crate::records::Record::parse_strict(client_data.data(), offset)?;
+            if record.record_type == crate::consts::RecordType::AnimationInfo {
+                return crate::animation::parse_animation_info(&record).map(Some);
+            }
+            offset = advance(offset, consumed, "OfficeArt client-data")?;
+        }
+        Ok(None)
+    }
+}
+
+impl ShapeLimitsExt for Shape<'_> {
     fn interactions_with_limits(
         &self,
         limits: crate::InteractionLimits,
@@ -46,10 +91,6 @@ impl ShapeExt for Shape<'_> {
         crate::Interaction::parse_client_data_payload(client_data.data(), limits)
     }
 
-    fn text_interactions(&self) -> Result<Vec<crate::TextInteraction>> {
-        self.text_interactions_with_limits(crate::TextInteractionLimits::default())
-    }
-
     fn text_interactions_with_limits(
         &self,
         limits: crate::TextInteractionLimits,
@@ -59,13 +100,6 @@ impl ShapeExt for Shape<'_> {
         };
         validate_host_record(&textbox, CLIENT_TEXTBOX_RAW_KIND, "ClientTextbox")?;
         crate::EscherTextboxWrapper::parse_text_interactions_with_limits(textbox.data(), limits)
-    }
-
-    fn placeholder_atom(
-        &self,
-        context: crate::PlaceholderContext,
-    ) -> Result<Option<crate::PlaceholderAtom>> {
-        self.placeholder_atom_with_limits(context, crate::PlaceholderLimits::default())
     }
 
     fn placeholder_atom_with_limits(
@@ -85,10 +119,6 @@ impl ShapeExt for Shape<'_> {
         .placeholder)
     }
 
-    fn powerpoint12_shape_metadata(&self) -> Result<Option<crate::ShapeMetadata>> {
-        powerpoint12_shape_metadata(self, None)
-    }
-
     fn programmable_tags_with_limits(
         &self,
         limits: crate::ShapeProgrammableTagLimits,
@@ -101,8 +131,9 @@ impl ShapeExt for Shape<'_> {
         let mut result = None;
         let mut offset = 0usize;
         let mut records = 0u32;
+        let max_records = self.container().record().limits().max_records;
         while offset < client_data.data().len() {
-            visit_host_record(&mut records)?;
+            visit_host_record(&mut records, max_records)?;
             let (record, consumed) =
                 crate::records::Record::parse_strict(client_data.data(), offset)?;
             if record.record_type == crate::consts::RecordType::ProgTags {
@@ -118,14 +149,6 @@ impl ShapeExt for Shape<'_> {
         Ok(result)
     }
 
-    fn programmable_tags(&self) -> Result<Option<crate::ShapeProgrammableTags>> {
-        self.programmable_tags_with_limits(crate::ShapeProgrammableTagLimits::default())
-    }
-
-    fn ppt_flags(&self) -> Result<Option<crate::ShapeFlagProjection>> {
-        self.ppt_flags_with(crate::ShapeFlagLimits::default())
-    }
-
     fn ppt_flags_with(
         &self,
         limits: crate::ShapeFlagLimits,
@@ -138,25 +161,6 @@ impl ShapeExt for Shape<'_> {
             crate::ShapeFlagProjection::parse_client_data_payload(client_data.data(), limits)?;
         Ok(projection.has_flags().then_some(projection))
     }
-
-    fn animation(&self) -> Result<Option<crate::animation::AnimationInfo>> {
-        let Some(client_data) = host_record(self, RecordKind::ClientData)? else {
-            return Ok(None);
-        };
-        validate_host_record(&client_data, CLIENT_DATA_RAW_KIND, "ClientData")?;
-        let mut offset = 0usize;
-        let mut records = 0u32;
-        while offset < client_data.data().len() {
-            visit_host_record(&mut records)?;
-            let (record, consumed) =
-                crate::records::Record::parse_strict(client_data.data(), offset)?;
-            if record.record_type == crate::consts::RecordType::AnimationInfo {
-                return crate::animation::parse_animation_info(&record).map(Some);
-            }
-            offset = advance(offset, consumed, "OfficeArt client-data")?;
-        }
-        Ok(None)
-    }
 }
 
 /// Parse every complete `OfficeArt` drawing in a `PowerPoint` host stream.
@@ -168,8 +172,36 @@ impl ShapeExt for Shape<'_> {
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn parse(data: &[u8]) -> Result<Vec<Shape<'_>>> {
-    parse_drawing(data).map(Drawing::into_shapes)
+pub fn parse<'data>(data: &'data [u8], limits: &litchi_odraw::Limits) -> Result<Vec<Shape<'data>>> {
+    parse_drawing(data, limits).map(Drawing::into_shapes)
+}
+
+/// Derive the neutral OfficeArt traversal policy from the selected PPT
+/// source profile. A source-backed slide projection must not reopen its
+/// drawing with the neutral crate's defaults.
+pub(crate) fn limits_for_source(source: SourceLimits) -> litchi_odraw::Limits {
+    // `SourceLimits` governs the outer PPT record tree and deliberately allows
+    // deeper nesting than the shape decoder can safely traverse.  Intersect
+    // the host profile with OfficeArt's own hard safety ceiling before handing
+    // it to the format-neutral parser; otherwise the default PPT profile (256)
+    // is rejected by `litchi-odraw` (64) even for ordinary source-backed
+    // projections.
+    let defaults = litchi_odraw::Limits::default();
+    // PPT's record ceiling includes its eight-byte header, while OfficeArt's
+    // raw limit is the declared body length. Keep both PPT ceilings active
+    // when crossing that wire-format boundary.
+    litchi_odraw::Limits {
+        max_record_bytes: source
+            .max_record_bytes()
+            .saturating_sub(8)
+            .min(source.max_record_payload_bytes())
+            .min(u32::MAX as usize) as u32,
+        max_depth: source
+            .max_depth()
+            .min(usize::from(defaults.max_depth))
+            .min(u16::MAX as usize) as u16,
+        max_records: source.max_events().min(u32::MAX as usize) as u32,
+    }
 }
 
 /// Parse a `PowerPoint` `OfficeArt` stream while retaining its validated root
@@ -183,16 +215,19 @@ pub fn parse(data: &[u8]) -> Result<Vec<Shape<'_>>> {
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn parse_drawing(data: &[u8]) -> Result<Drawing<'_>> {
+pub fn parse_drawing<'data>(
+    data: &'data [u8],
+    limits: &litchi_odraw::Limits,
+) -> Result<Drawing<'data>> {
     let mut roots = Vec::new();
     let mut shapes = Vec::new();
     let mut offset = 0usize;
     let mut visited = 0u32;
     while offset < data.len() {
-        visit_host_record(&mut visited)?;
-        let (record, consumed) = Record::parse(data, offset)?;
+        visit_host_record(&mut visited, limits.max_records)?;
+        let (record, consumed) = Record::parse(data, offset, *limits)?;
         let end = advance(offset, consumed, "PowerPoint OfficeArt drawing stream")?;
-        shapes.extend(litchi_odraw::shape::parse(&data[offset..end])?);
+        shapes.extend(litchi_odraw::shape::parse(&data[offset..end], *limits)?);
         roots.push(record);
         offset = end;
     }
@@ -219,24 +254,55 @@ pub fn anchor(shape: &Shape<'_>) -> Result<Option<Anchor>> {
     {
         return Err(corrupted("Invalid PowerPoint OfficeArtClientAnchor header"));
     }
-    let parsed = crate::client_anchor::Data::parse(anchor.data())?;
+    let parsed =
+        crate::client_anchor::Data::parse(anchor.data(), &crate::client_anchor::Limits::default())?;
     Anchor::new(parsed.left(), parsed.top(), parsed.right(), parsed.bottom()).map(Some)
 }
 
 /// Extract all PPT textbox text from an `OfficeArt` drawing.
 ///
+/// Each `ClientTextbox` contributes the text records it holds inline. A
+/// text box that only references slide-list text (an `OutlineTextRefAtom`,
+/// MS-PPT 2.9.78) contributes nothing here, because this function has no
+/// slide to resolve the reference against; [`crate::Slide::text`] resolves
+/// it.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn text_from_drawing(data: &[u8]) -> Result<String> {
+pub fn text_from_drawing(data: &[u8], source: SourceLimits) -> Result<String> {
+    drawing_text(data, None, limits_for_source(source))
+}
+
+/// Extract a presentation slide drawing's text, reading each text box that
+/// references slide-list text (an `OutlineTextRefAtom`, MS-PPT 2.9.78) from
+/// the body of `outline` it selects (L-PPT-R1).
+///
+/// Text boxes appear in drawing order. A reference that selects no readable
+/// body contributes no text, as POI and LibreOffice show none.
+pub(crate) fn text_from_slide_drawing(
+    data: &[u8],
+    outline: &[crate::OutlineTextBody],
+    source: SourceLimits,
+) -> Result<String> {
+    drawing_text(data, Some(outline), limits_for_source(source))
+}
+
+/// `outline` is `None` when no slide context exists: every text box is then
+/// read from its inline records, as before outline resolution existed.
+fn drawing_text(
+    data: &[u8],
+    outline: Option<&[crate::OutlineTextBody]>,
+    limits: litchi_odraw::Limits,
+) -> Result<String> {
     let mut offset = 0usize;
     let mut records = 0u32;
     let mut text = String::with_capacity(1024);
     while offset < data.len() {
-        visit_host_record(&mut records)?;
-        let (record, consumed) = Record::parse(data, offset)?;
+        visit_host_record(&mut records, limits.max_records)?;
+        let (record, consumed) = Record::parse(data, offset, limits)?;
         let container = Container::try_new(record)?;
-        text_from_container(&container, &mut text)?;
+        text_from_container(&container, outline, &mut text)?;
         offset = advance(offset, consumed, "PowerPoint OfficeArt drawing stream")?;
     }
     Ok(text)
@@ -249,14 +315,143 @@ pub fn text_from_drawing(data: &[u8]) -> Result<String> {
 /// Returns an error if the operation fails.
 pub fn text_from_textbox(textbox: &Record<'_>) -> Result<Option<String>> {
     validate_host_record(textbox, CLIENT_TEXTBOX_RAW_KIND, "ClientTextbox")?;
-    if textbox.data().is_empty() {
+    text_from_textbox_payload_bounded(
+        textbox.data(),
+        textbox.limits().max_records,
+        usize::from(textbox.limits().max_depth),
+    )
+}
+
+/// Decode the text of a `ClientTextbox` payload, or of a slide-list text
+/// body framed as one: every character atom's text, trimmed and joined with
+/// `\n`, then trimmed at the end; `None` when nothing remains.
+pub(crate) fn text_from_textbox_payload_bounded(
+    payload: &[u8],
+    max_records: u32,
+    max_depth: usize,
+) -> Result<Option<String>> {
+    if payload.is_empty() {
         return Ok(None);
     }
     let mut text = String::with_capacity(256);
-    text_from_ppt_records(textbox.data(), &mut text)?;
+    text_from_ppt_records(payload, &mut text, max_records, max_depth)?;
     let trimmed = text.trim_end().len();
     text.truncate(trimmed);
     Ok((!text.is_empty()).then_some(text))
+}
+
+/// Where a shape's text records live (MS-PPT 2.9.76
+/// `OfficeArtClientTextBoxAtoms`).
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum TextRecords<'a> {
+    /// The `ClientTextbox` holds the text records itself.
+    Inline(&'a [u8]),
+    /// The `ClientTextbox` holds an `OutlineTextRefAtom` that selects this
+    /// slide-list text body.
+    Outline {
+        /// The reference's zero-based body index.
+        index: u32,
+        /// The selected body.
+        body: &'a crate::OutlineTextBody,
+    },
+    /// The `ClientTextbox` holds an `OutlineTextRefAtom` that selects no
+    /// body: its index is negative or past the slide's last body, or the
+    /// atom is not four bytes. The value is the index field reinterpreted as
+    /// unsigned, or `u32::MAX` for a malformed atom; it is the context of
+    /// [`crate::ShapeDefect::UnresolvedOutlineTextRef`].
+    Unresolved(u32),
+}
+
+/// Classifies a `ClientTextbox` payload against a slide's slide-list text
+/// bodies.
+///
+/// The first `OutlineTextRefAtom` decides, and inline text records beside it
+/// are ignored, as POI (`HSLFTextParagraph.findTextParagraphs`) and
+/// LibreOffice (`PPTTextObj`) ignore them; MS-PPT allows either an outline
+/// reference or inline text, never both. Without a reference the payload is
+/// read inline.
+///
+/// # Errors
+///
+/// Returns an error when the payload's record framing is broken, exactly as
+/// decoding its inline text would.
+pub(crate) fn textbox_text_records<'a>(
+    payload: &'a [u8],
+    outline: &'a [crate::OutlineTextBody],
+    max_records: u32,
+) -> Result<TextRecords<'a>> {
+    const OUTLINE_TEXT_REF_ATOM: u16 = 0x0f9e;
+
+    for raw in RawRecords::new(payload, max_records) {
+        let record = raw?;
+        if record.kind != OUTLINE_TEXT_REF_ATOM {
+            continue;
+        }
+        let Ok(bytes) = <[u8; 4]>::try_from(record.data) else {
+            return Ok(TextRecords::Unresolved(u32::MAX));
+        };
+        if record.version != 0 {
+            return Ok(TextRecords::Unresolved(u32::MAX));
+        }
+        let raw_index = u32::from_le_bytes(bytes);
+        // A negative signed index selects nothing.
+        if i32::from_le_bytes(bytes) < 0 {
+            return Ok(TextRecords::Unresolved(raw_index));
+        }
+        return Ok(usize::try_from(raw_index)
+            .ok()
+            .and_then(|index| outline.get(index))
+            .map_or(TextRecords::Unresolved(raw_index), |body| {
+                TextRecords::Outline {
+                    index: raw_index,
+                    body,
+                }
+            }));
+    }
+    Ok(TextRecords::Inline(payload))
+}
+
+/// The shape's name and alternative text (L-PPT-R3): the `wzName` (0x0380,
+/// MS-ODRAW 2.3.4.1) and `wzDescription` (0x0381, MS-ODRAW 2.3.4.3)
+/// properties of its primary property table, where POI
+/// (`HSLFShape.getShapeName`) and LibreOffice (`SvxMSDffManager::ImportObj`)
+/// read them.
+///
+/// Each is `None` when the property is absent, not complex, or empty. The
+/// table is walked once; the property parser already refuses a repeated
+/// property identifier.
+pub(crate) fn shape_labels(shape: &Shape<'_>) -> (Option<String>, Option<String>) {
+    use litchi_odraw::prop::{Id, Value};
+
+    let mut name = None;
+    let mut description = None;
+    for prop in shape.props().iter() {
+        let slot = match prop.id() {
+            Id::GroupName => &mut name,
+            Id::GroupDescription => &mut description,
+            _ => continue,
+        };
+        if let Value::Complex(data) = prop.value() {
+            *slot = utf16z_string(data);
+        }
+    }
+    (name, description)
+}
+
+/// Decodes a null-terminated UTF-16LE complex property, as POI's
+/// `StringUtil.getFromUnicodeLE0Terminated` does: characters stop at the
+/// first NUL, a trailing odd byte is ignored, and unpaired surrogates read as
+/// U+FFFD. `None` when no character remains.
+fn utf16z_string(data: &[u8]) -> Option<String> {
+    let units = data
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|pair| u16::from_le_bytes(*pair))
+        .take_while(|&unit| unit != 0);
+    let mut text = String::with_capacity(data.len() / 2);
+    text.extend(char::decode_utf16(units).map(|unit| unit.unwrap_or(char::REPLACEMENT_CHARACTER)));
+    (!text.is_empty()).then_some(text)
 }
 
 /// Checks the record framing of a shape's `PowerPoint` host records: the
@@ -267,6 +462,8 @@ pub fn text_from_textbox(textbox: &Record<'_>) -> Result<Option<String>> {
 /// cannot be read; a shape failing this check is structural corruption and
 /// stays fatal for the whole drawing.
 pub(crate) fn validate_host_framing(shape: &Shape<'_>) -> Result<()> {
+    let max_records = shape.container().record().limits().max_records;
+    let mut visited = 0u32;
     for (kind, raw_kind, name) in [
         (
             RecordKind::ClientTextbox,
@@ -279,8 +476,9 @@ pub(crate) fn validate_host_framing(shape: &Shape<'_>) -> Result<()> {
             continue;
         };
         validate_host_record(&record, raw_kind, name)?;
-        for child in RawRecords::new(record.data()) {
+        for child in RawRecords::new(record.data(), max_records) {
             child?;
+            visit_host_record(&mut visited, max_records)?;
         }
     }
     Ok(())
@@ -302,7 +500,10 @@ fn placeholder(shape: &Shape<'_>) -> Result<Option<Placeholder>> {
         return Ok(None);
     };
     validate_host_record(&client_data, CLIENT_DATA_RAW_KIND, "ClientData")?;
-    let mut records = RawRecords::new(client_data.data());
+    let mut records = RawRecords::new(
+        client_data.data(),
+        shape.container().record().limits().max_records,
+    );
     let mut found = None;
     for raw in &mut records {
         let record = raw?;
@@ -351,10 +552,14 @@ fn frame(shape: &Shape<'_>) -> Result<Frame> {
     let mut frame = Frame::default();
     let mut action_kind = None;
     let mut host_records = 0;
-    let mut records = RawRecords::new(client_data.data());
+    let max_records = shape.container().record().limits().max_records;
+    let mut records = RawRecords::new(client_data.data(), max_records);
     for raw in &mut records {
         let record = raw?;
-        visit_host_record(&mut host_records)?;
+        visit_host_record(
+            &mut host_records,
+            shape.container().record().limits().max_records,
+        )?;
         match record.kind {
             EX_OBJ_REF_ATOM => {
                 if frame.object_id.is_some() {
@@ -368,10 +573,14 @@ fn frame(shape: &Shape<'_>) -> Result<Frame> {
                 }
             },
             INTERACTIVE_INFO => {
-                let mut children = RawRecords::new(record.data);
+                let mut children =
+                    RawRecords::new(record.data, shape.container().record().limits().max_records);
                 for raw_child in &mut children {
                     let child = raw_child?;
-                    visit_host_record(&mut host_records)?;
+                    visit_host_record(
+                        &mut host_records,
+                        shape.container().record().limits().max_records,
+                    )?;
                     if child.kind != INTERACTIVE_INFO_ATOM {
                         continue;
                     }
@@ -401,25 +610,62 @@ fn frame(shape: &Shape<'_>) -> Result<Frame> {
     Ok(frame)
 }
 
-fn text_from_container(container: &Container<'_>, text: &mut String) -> Result<()> {
-    const MAX_RECORDS: usize = 1_000_000;
-    const MAX_DEPTH: usize = 256;
+fn text_from_container(
+    container: &Container<'_>,
+    outline: Option<&[crate::OutlineTextBody]>,
+    text: &mut String,
+) -> Result<()> {
+    let limits = container.record().limits();
+    let max_records = usize::try_from(limits.max_records).unwrap_or(usize::MAX);
+    let max_depth = usize::from(limits.max_depth);
 
     let mut pending = Vec::new();
-    push_children(container, 1, &mut pending, MAX_RECORDS)?;
+    push_children(container, 0, &mut pending, max_records)?;
     let mut visited = 0usize;
 
     while let Some((record, depth)) = pending.pop() {
-        visited = visited
-            .checked_add(1)
-            .ok_or_else(|| corrupted("OfficeArt traversal count overflow"))?;
-        if visited > MAX_RECORDS {
-            return Err(corrupted("OfficeArt drawing exceeds the PPT record limit"));
+        visited = visited.checked_add(1).ok_or(Error::Limit {
+            kind: SourceLimitKind::Events,
+            observed: usize::MAX,
+            maximum: max_records,
+        })?;
+        if visited > max_records {
+            return Err(Error::Limit {
+                kind: SourceLimitKind::Events,
+                observed: visited,
+                maximum: max_records,
+            });
         }
 
         if record.kind() == RecordKind::ClientTextbox {
             let before = text.len();
-            text_from_ppt_records(record.data(), text)?;
+            match outline {
+                None => text_from_ppt_records(
+                    record.data(),
+                    text,
+                    limits.max_records,
+                    usize::from(limits.max_depth),
+                )?,
+                Some(bodies) => {
+                    match textbox_text_records(record.data(), bodies, limits.max_records)? {
+                        TextRecords::Inline(payload) => text_from_ppt_records(
+                            payload,
+                            text,
+                            limits.max_records,
+                            usize::from(limits.max_depth),
+                        )?,
+                        TextRecords::Outline { body, .. } => {
+                            outline_text_into(
+                                body,
+                                text,
+                                limits.max_records,
+                                usize::from(limits.max_depth),
+                            )?;
+                        },
+                        TextRecords::Unresolved(_) => {},
+                    }
+                },
+            }
             let trimmed = text.trim_end().len();
             text.truncate(trimmed);
             if text.len() > before && !text.ends_with('\n') {
@@ -429,14 +675,42 @@ fn text_from_container(container: &Container<'_>, text: &mut String) -> Result<(
         }
 
         if record.is_container() {
-            if depth >= MAX_DEPTH {
-                return Err(corrupted("OfficeArt drawing exceeds the PPT nesting limit"));
+            if depth >= max_depth {
+                return Err(Error::Limit {
+                    kind: SourceLimitKind::Depth,
+                    observed: depth.saturating_add(1),
+                    maximum: max_depth,
+                });
             }
             let nested = Container::try_new(record)?;
-            push_children(&nested, depth + 1, &mut pending, MAX_RECORDS)?;
+            push_children(&nested, depth + 1, &mut pending, max_records)?;
         }
     }
     Ok(())
+}
+
+/// Appends the text of a slide-list body that a text box references, joined
+/// as the text box's own records would be.
+///
+/// A body whose records cannot be traversed contributes no text, as a shape
+/// that references it shows none (the shape reader records it as
+/// [`crate::ShapeDefect::UnresolvedOutlineTextRef`]); resource limits stay
+/// fatal.
+fn outline_text_into(
+    body: &crate::OutlineTextBody,
+    text: &mut String,
+    max_records: u32,
+    max_depth: usize,
+) -> Result<()> {
+    let mark = text.len();
+    match text_from_ppt_records(body.records(), text, max_records, max_depth) {
+        Ok(()) => Ok(()),
+        Err(error) if crate::slide::types::is_isolatable_shape_error(&error) => {
+            text.truncate(mark);
+            Ok(())
+        },
+        Err(error) => Err(error),
+    }
 }
 
 fn push_children<'data>(
@@ -448,7 +722,14 @@ fn push_children<'data>(
     let mut children = Vec::new();
     for child in container.children() {
         if pending.len().saturating_add(children.len()) >= max_records {
-            return Err(corrupted("OfficeArt drawing exceeds the PPT record limit"));
+            return Err(Error::Limit {
+                kind: SourceLimitKind::Events,
+                observed: pending
+                    .len()
+                    .saturating_add(children.len())
+                    .saturating_add(1),
+                maximum: max_records,
+            });
         }
         children.push(child?);
     }
@@ -456,11 +737,16 @@ fn push_children<'data>(
     Ok(())
 }
 
-pub(super) fn text_from_ppt_records(data: &[u8], text: &mut String) -> Result<()> {
-    const MAX_RECORDS: usize = 1_000_000;
-    const MAX_DEPTH: usize = 256;
+pub(super) fn text_from_ppt_records(
+    data: &[u8],
+    text: &mut String,
+    max_records: u32,
+    max_depth: usize,
+) -> Result<()> {
+    let max_records_u32 = max_records;
+    let max_records = usize::try_from(max_records_u32).unwrap_or(usize::MAX);
 
-    let mut pending = vec![RawRecords::new(data)];
+    let mut pending = vec![RawRecords::new(data, max_records_u32)];
     let mut visited = 0usize;
     while let Some(records) = pending.last_mut() {
         let Some(raw) = records.next() else {
@@ -468,21 +754,32 @@ pub(super) fn text_from_ppt_records(data: &[u8], text: &mut String) -> Result<()
             continue;
         };
         let record = raw?;
-        visited = visited
-            .checked_add(1)
-            .ok_or_else(|| corrupted("ClientTextbox traversal count overflow"))?;
-        if visited > MAX_RECORDS {
-            return Err(corrupted("ClientTextbox exceeds the PPT record limit"));
+        visited = visited.checked_add(1).ok_or(Error::Limit {
+            kind: SourceLimitKind::Events,
+            observed: usize::MAX,
+            maximum: max_records,
+        })?;
+        if visited > max_records {
+            return Err(Error::Limit {
+                kind: SourceLimitKind::Events,
+                observed: visited,
+                maximum: max_records,
+            });
         }
 
         let decoded = match record.kind {
             4000 | 4026 => Some(crate::text::extractor::from_utf16le_lossy(record.data)),
             4008 => Some(crate::text::extractor::decode_text_bytes(record.data)),
             kind if is_text_container(kind) => {
-                if pending.len() >= MAX_DEPTH {
-                    return Err(corrupted("ClientTextbox exceeds the PPT nesting limit"));
+                let depth = pending.len().saturating_sub(1);
+                if depth >= max_depth {
+                    return Err(Error::Limit {
+                        kind: SourceLimitKind::Depth,
+                        observed: depth.saturating_add(1),
+                        maximum: max_depth,
+                    });
                 }
-                pending.push(RawRecords::new(record.data));
+                pending.push(RawRecords::new(record.data, max_records_u32));
                 None
             },
             _ => None,
@@ -543,8 +840,9 @@ pub(crate) fn powerpoint12_shape_metadata(
     let mut found = false;
     let mut offset = 0usize;
     let mut records = 0u32;
+    let max_records = shape.container().record().limits().max_records;
     while offset < client_data.data().len() {
-        visit_host_record(&mut records)?;
+        visit_host_record(&mut records, max_records)?;
         let (record, consumed) = crate::records::Record::parse_strict(client_data.data(), offset)?;
         offset = advance(offset, consumed, "OfficeArt client-data")?;
         let record_type = u32::from(record.record_type.as_u16());

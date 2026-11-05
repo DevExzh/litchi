@@ -14,6 +14,7 @@
     reason = "quick-xml events are refined after each validation step"
 )]
 
+use crate::ink::LimitKind;
 use std::ops::Range;
 
 use litchi_core::xml::ReaderOrigin;
@@ -92,6 +93,14 @@ pub(crate) fn paragraph_records(
     limits: Limits,
 ) -> Result<Vec<Paragraph>> {
     let limits = limits.validate()?;
+    // Candidates are classified on namespace values as written, while active
+    // paragraphs come from the markup-compatibility processor: a binding
+    // spelled with references would make the two disagree.
+    if litchi_ooxml_common::mce::binds_namespace_by_reference(source) {
+        return Err(invalid(
+            "DOCX story XML spells the markup-compatibility namespace with references",
+        ));
+    }
     let candidates = scan_paragraph_candidates(source, dialect, limits)?;
     if candidates.is_empty() {
         return Ok(Vec::new());
@@ -191,13 +200,13 @@ pub(crate) fn retarget_many(
     }
     if targets.len() > MAX_RETARGET_TARGETS {
         return Err(limit(
-            "Ink retarget targets",
+            LimitKind::RetargetTargets,
             targets.len(),
             MAX_RETARGET_TARGETS,
         ));
     }
     if max_output == 0 {
-        return Err(limit("Ink retarget output bytes", 0, 1));
+        return Err(limit(LimitKind::RetargetOutputBytes, 0, 1));
     }
     let bytes = source.bytes();
     let mut previous_end = 0usize;
@@ -259,7 +268,7 @@ pub(crate) fn retarget_many(
                 }
                 stack_depth = stack_depth
                     .checked_add(1)
-                    .ok_or_else(|| limit("Ink retarget XML depth", usize::MAX, usize::MAX))?;
+                    .ok_or_else(|| limit(LimitKind::RetargetXmlDepth, usize::MAX, usize::MAX))?;
             },
             Event::Empty(element) => {
                 let (start, end) = opening_span(event_end, &element, true, bytes)?;
@@ -365,7 +374,11 @@ pub(crate) fn retarget_many(
         changed |= bytes.get(range.clone()) != Some(value.as_slice());
     }
     if output_size > max_output {
-        return Err(limit("Ink retarget output bytes", output_size, max_output));
+        return Err(limit(
+            LimitKind::RetargetOutputBytes,
+            output_size,
+            max_output,
+        ));
     }
     if !changed {
         return Ok(source.clone());
@@ -392,18 +405,18 @@ pub(crate) fn retarget_fallbacks(
     }
     if targets.len() > MAX_RETARGET_TARGETS {
         return Err(limit(
-            "Ink fallback retarget targets",
+            LimitKind::FallbackRetargetTargets,
             targets.len(),
             MAX_RETARGET_TARGETS,
         ));
     }
     let bytes = source.bytes();
     if bytes.len() > MAX_XML_BYTES {
-        return Err(limit("story XML bytes", bytes.len(), MAX_XML_BYTES));
+        return Err(limit(LimitKind::StoryXmlBytes, bytes.len(), MAX_XML_BYTES));
     }
     if bytes.len() > limits.stories.max_story_bytes {
         return Err(limit(
-            "story XML bytes",
+            LimitKind::StoryXmlBytes,
             bytes.len(),
             limits.stories.max_story_bytes,
         ));
@@ -772,7 +785,7 @@ pub(crate) fn retarget_fallbacks(
     }
     let maximum = limits.stories.max_story_bytes.min(MAX_XML_BYTES);
     if output_size > maximum {
-        return Err(limit("story XML bytes", output_size, maximum));
+        return Err(limit(LimitKind::StoryXmlBytes, output_size, maximum));
     }
     if !changed {
         return Ok(source.clone());
@@ -807,7 +820,7 @@ pub(crate) fn fallback_start(
 ) -> Result<Range<usize>> {
     let limits = limits.validate()?;
     if source.len() > MAX_XML_BYTES {
-        return Err(limit("story XML bytes", source.len(), MAX_XML_BYTES));
+        return Err(limit(LimitKind::StoryXmlBytes, source.len(), MAX_XML_BYTES));
     }
     if host_range.start >= host_range.end || host_range.end > source.len() {
         return Err(invalid("DOCX Ink AlternateContent host range is invalid"));
@@ -1023,7 +1036,7 @@ fn scan_paragraph_candidates(
     limits: Limits,
 ) -> Result<Vec<ParagraphCandidate>> {
     if source.len() > MAX_XML_BYTES {
-        return Err(limit("story XML bytes", source.len(), MAX_XML_BYTES));
+        return Err(limit(LimitKind::StoryXmlBytes, source.len(), MAX_XML_BYTES));
     }
     let mut reader = reader(source);
     let origin = ReaderOrigin::of(source);
@@ -1181,7 +1194,7 @@ fn push_paragraph(
 ) -> Result<()> {
     if candidates.len() >= maximum {
         return Err(limit(
-            "DOCX Ink paragraph candidates",
+            LimitKind::ParagraphCandidates,
             candidates.len().saturating_add(1),
             maximum,
         ));
@@ -1513,14 +1526,14 @@ fn add_retarget_edit(
         .checked_add(value.len())
         .ok_or_else(|| {
             limit(
-                "Ink retarget replacement bytes",
+                LimitKind::RetargetReplacementBytes,
                 usize::MAX,
                 MAX_RETARGET_VALUE_BYTES,
             )
         })?;
     if *replacement_bytes > MAX_RETARGET_VALUE_BYTES {
         return Err(limit(
-            "Ink retarget replacement bytes",
+            LimitKind::RetargetReplacementBytes,
             *replacement_bytes,
             MAX_RETARGET_VALUE_BYTES,
         ));
@@ -1596,9 +1609,9 @@ fn observe_envelope_start<T>(
     let depth = stack
         .len()
         .checked_add(1)
-        .ok_or_else(|| limit("XML depth", usize::MAX, limits.max_xml_depth))?;
+        .ok_or_else(|| limit(LimitKind::XmlDepth, usize::MAX, limits.max_xml_depth))?;
     if depth > limits.max_xml_depth {
-        return Err(limit("XML depth", depth, limits.max_xml_depth));
+        return Err(limit(LimitKind::XmlDepth, depth, limits.max_xml_depth));
     }
     if *root_seen && root_closed {
         return Err(invalid("DOCX source has more than one XML root"));
@@ -1634,9 +1647,9 @@ fn observe_envelope_empty<T>(
     let depth = stack
         .len()
         .checked_add(1)
-        .ok_or_else(|| limit("XML depth", usize::MAX, limits.max_xml_depth))?;
+        .ok_or_else(|| limit(LimitKind::XmlDepth, usize::MAX, limits.max_xml_depth))?;
     if depth > limits.max_xml_depth {
-        return Err(limit("XML depth", depth, limits.max_xml_depth));
+        return Err(limit(LimitKind::XmlDepth, depth, limits.max_xml_depth));
     }
     if stack.is_empty() {
         if *root_seen {
@@ -1684,9 +1697,9 @@ fn reader(source: &[u8]) -> NsReader<&[u8]> {
 fn observe_node(nodes: &mut usize, maximum: usize) -> Result<()> {
     *nodes = nodes
         .checked_add(1)
-        .ok_or_else(|| limit("XML nodes", usize::MAX, maximum))?;
+        .ok_or_else(|| limit(LimitKind::XmlNodes, usize::MAX, maximum))?;
     if *nodes > maximum {
-        return Err(limit("XML nodes", *nodes, maximum));
+        return Err(limit(LimitKind::XmlNodes, *nodes, maximum));
     }
     Ok(())
 }
@@ -1751,9 +1764,9 @@ fn invalid(message: &'static str) -> Error {
     Error::Invalid(message.into())
 }
 
-fn limit(resource: &'static str, actual: usize, maximum: usize) -> Error {
+fn limit(resource: LimitKind, actual: usize, maximum: usize) -> Error {
     Error::InkLimit {
-        resource,
+        kind: resource,
         actual,
         maximum,
     }
@@ -1781,7 +1794,8 @@ mod tests {
     }
 
     fn source_part(xml: &str) -> OwnedXmlPart {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer
             .write_stored(
                 "[Content_Types].xml",
@@ -1789,7 +1803,11 @@ mod tests {
             )
             .unwrap();
         writer.write_stored("part.xml", xml.as_bytes()).unwrap();
-        let package = OpcPackage::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap();
+        let package = OpcPackage::from_bytes(
+            &writer.finish_to_bytes().unwrap(),
+            litchi_opc::SourceLimits::default(),
+        )
+        .unwrap();
         let name = PackURI::new("/part.xml").unwrap();
         package.source_xml_part(&name).unwrap()
     }

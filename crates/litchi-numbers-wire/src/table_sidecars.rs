@@ -5,8 +5,9 @@
 //! Numbers, Pages, and Keynote: strict root/segment list selection, entry
 //! shape validation, bounded retention of sidecar values, and conversion of a
 //! classified cell into the archive-free table vocabulary.  Native object
-//! identifiers are kept behind [`SidecarReference`] and never appear in the
-//! common table read returned by an adapter.
+//! identifiers are kept behind
+//! [`SidecarReference`](crate::table_sidecars::SidecarReference) and never
+//! appear in the common table read returned by an adapter.
 
 use std::collections::HashSet;
 use std::fmt;
@@ -1462,7 +1463,7 @@ where
 
 /// Construct one common cell-comment record for a selected position.
 pub fn positioned_comment(
-    position: litchi_iwa_common::table::coordinate::CellPosition,
+    position: litchi_iwa_common::table::coordinate::At,
     comment: Comment,
 ) -> CellComment {
     CellComment::new(position, comment)

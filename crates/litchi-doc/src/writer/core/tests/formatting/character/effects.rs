@@ -31,7 +31,7 @@ mod chpx_position_hresi_effect_writer_tests {
         assert_eq!(properties.hyphenation, hyphenation);
         assert_eq!(properties.text_effect, TextEffect::Shimmer);
 
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         writer
             .add_paragraph_runs(
                 vec![("effects".to_string(), formatting)],
@@ -39,8 +39,9 @@ mod chpx_position_hresi_effect_writer_tests {
             )
             .unwrap();
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).unwrap();
-        let mut package = crate::Package::from_reader(Cursor::new(output.into_inner())).unwrap();
+        writer.build().unwrap().write_to(&mut output).unwrap();
+        let mut package =
+            crate::raw::Reader::from_reader(Cursor::new(output.into_inner())).unwrap();
         let document = package.document().unwrap();
         let paragraphs = document.paragraphs().unwrap();
         let runs = paragraphs[0].runs().unwrap();

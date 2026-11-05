@@ -7,11 +7,14 @@
 
 use std::error::Error as StdError;
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::{Catalog, EntryEdit};
 use litchi_iwa_common::table::merge::Region;
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tsce, tst};
-use litchi_pages::{BodyTableMergesError, BodyTableSelector, Limits, Package};
+use litchi_pages::{
+    BodyTableSelector, Package, table::merge::transaction::Error as BodyTableMergesError,
+};
 use prost::Message as _;
 
 const NATIVE: &[u8] = include_bytes!(concat!(
@@ -31,14 +34,17 @@ fn rewrite_first_table_model(
     source: &[u8],
     mutate: impl FnOnce(&mut tst::TableModelArchive),
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut replacement = None;
     let mut mutate = Some(mutate);
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+        let mut archive = Archive::parse(
+            SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+            Default::default(),
+        )?;
         let mut changed = false;
         for object in &mut archive.objects {
             for message_index in 0..object.messages.len() {
@@ -62,6 +68,7 @@ fn rewrite_first_table_model(
                         type_: message_type,
                         data: model.encode_to_vec(),
                     },
+                    Default::default(),
                 )?;
                 changed = true;
                 break;
@@ -73,7 +80,8 @@ fn rewrite_first_table_model(
         if changed {
             replacement = Some((
                 entry.name().to_owned(),
-                SnappyStream::compress(&archive.to_bytes()?)?.to_vec(),
+                SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?
+                    .to_vec(),
             ));
             break;
         }
@@ -123,7 +131,9 @@ fn native_merge_reads_by_name_and_position_without_rewriting_source() -> TestRes
     );
     assert_eq!(
         package.body_table_merges(BodyTableSelector::name("missing")),
-        Err(BodyTableMergesError::TableNotFound)
+        Err(BodyTableMergesError::Refused(
+            litchi_pages::table::merge::transaction::Refusal::TableNotFound
+        ))
     );
     assert_eq!(exact_bytes(&package)?, NATIVE);
     Ok(())
@@ -217,8 +227,8 @@ fn merge_transaction_rewrites_one_component_and_inverse_restores_exact_source() 
     let replacement = Region::new(0, 0, 1, 2)?;
 
     let mut edit = package.edit_body_table_merges(BodyTableSelector::name("Table 1"))?;
-    assert_eq!(edit.unmerge(existing)?, true);
-    assert_eq!(edit.merge(replacement)?.regions(), &[replacement]);
+    assert!(edit.unmerge(existing)?);
+    assert_eq!(edit.merge(replacement)?.regions()?, &[replacement]);
     let commit = edit.commit()?;
 
     assert_eq!(
@@ -300,7 +310,10 @@ fn merge_transaction_limit_failure_is_atomic() -> TestResult {
     for fields in 1..=4_096 {
         let archive_limits = litchi_iwa_core::Limits::default().with_header_fields(fields)?;
         let limits = Limits::default().with_archive_limits(archive_limits)?;
-        let Ok(package) = Package::from_bytes_with_limits(NATIVE, limits) else {
+        let Ok(package) = Package::from_bytes_with_options(
+            NATIVE,
+            litchi_pages::OpenOptions::new().__archive_limits(limits),
+        ) else {
             continue;
         };
         let before = exact_bytes(&package)?;
@@ -311,7 +324,7 @@ fn merge_transaction_limit_failure_is_atomic() -> TestResult {
                 edit.merge(replacement)?;
                 edit.commit()
             });
-        if matches!(result, Err(BodyTableMergesError::LimitExceeded { .. })) {
+        if matches!(result, Err(BodyTableMergesError::Limit { .. })) {
             assert_eq!(exact_bytes(&package)?, before);
             found_boundary = true;
             break;
@@ -329,7 +342,7 @@ fn merge_transaction_noop_and_missing_unmerge_are_byte_exact() -> TestResult {
     let missing = Region::new(0, 0, 1, 2)?;
 
     let mut edit = package.edit_body_table_merges(BodyTableSelector::index(0))?;
-    assert_eq!(edit.unmerge(missing)?, false);
+    assert!(!edit.unmerge(missing)?);
     let commit = edit.commit()?;
     assert!(commit.patch().is_noop());
     assert!(!commit.diagnostics().changed());
@@ -338,7 +351,9 @@ fn merge_transaction_noop_and_missing_unmerge_are_byte_exact() -> TestResult {
     let mut edit = package.edit_body_table_merges(BodyTableSelector::index(0))?;
     assert!(matches!(
         edit.merge(existing),
-        Err(BodyTableMergesError::OverlappingRegion)
+        Err(BodyTableMergesError::Refused(
+            litchi_pages::table::merge::transaction::Refusal::OverlappingRegion
+        ))
     ));
     Ok(())
 }
@@ -350,10 +365,35 @@ fn merge_transaction_rejects_out_of_bounds_regions_before_mutation() -> TestResu
     let mut edit = package.edit_body_table_merges(BodyTableSelector::index(0))?;
     assert!(matches!(
         edit.merge(region),
-        Err(BodyTableMergesError::InvalidRegion)
+        Err(BodyTableMergesError::Refused(
+            litchi_pages::table::merge::transaction::Refusal::InvalidRegion
+        ))
     ));
     assert!(!edit.unmerge(region)?);
     let commit = edit.commit()?;
     assert!(commit.patch().is_noop());
+    Ok(())
+}
+
+#[test]
+fn merge_creating_an_owner_is_byte_deterministic() -> TestResult {
+    // Record 0300: a new merge owner used to take a random UUID, so two
+    // identical merges on identical sources differed byte for byte.
+    let source = rewrite_first_table_model(NATIVE, |model| model.merge_owner = None)?;
+    let region = Region::new(0, 0, 1, 2)?;
+    let merge = || -> TestResult<Vec<u8>> {
+        let package = Package::from_bytes(&source)?;
+        let mut edit = package.edit_body_table_merges(BodyTableSelector::index(0))?;
+        edit.merge(region)?;
+        let commit = edit.commit()?;
+        assert_eq!(
+            commit
+                .package()
+                .body_table_merges(BodyTableSelector::index(0))?,
+            vec![region]
+        );
+        exact_bytes(commit.package())
+    };
+    assert_eq!(merge()?, merge()?);
     Ok(())
 }

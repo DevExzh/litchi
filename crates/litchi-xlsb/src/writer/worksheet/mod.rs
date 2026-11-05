@@ -7,4 +7,4 @@ mod package;
 #[cfg(test)]
 mod tests;
 
-pub use model::{CellData, MutableWorksheet, SheetProtection};
+pub use model::{CellData, SheetProtection, Worksheet};

@@ -39,7 +39,7 @@ use soapberry_zip::office::{
 
 use super::{OpcPackage, SourcePart};
 use crate::error::{OpcError, Result, map_io_error};
-use crate::limits::{ReadLimits, ReadResource};
+use crate::limits::{SourceLimitKind, SourceLimits};
 use crate::packuri::PackURI;
 use crate::part::Part;
 use crate::payload::{PartPayload, TransferredPayload};
@@ -126,7 +126,7 @@ impl std::fmt::Debug for CompressedPartTransfer {
 struct TransferMember<'package> {
     index: &'package IndexedArchive<Arc<Vec<u8>>>,
     entry_id: EntryId,
-    limits: ReadLimits,
+    limits: SourceLimits,
 }
 
 /// The lazily built ZIP index over an owned package's retained archive.
@@ -148,7 +148,7 @@ impl OpcPackage {
     ///
     /// - the package retains the owned source archive it was opened from —
     ///   [`Self::from_vec`], [`Self::open`], [`Self::from_reader`], their
-    ///   `*_with_limits` forms, [`Self::from_vec_reusing_payloads`] and
+    ///   [`Self::from_vec_reusing_payloads`] and
     ///   [`Self::from_vec_with_execution`] — with a source member for this
     ///   part;
     /// - the part still holds the payload allocation it was opened with,
@@ -210,7 +210,7 @@ impl OpcPackage {
     ///   eligible (see [`Self::compressed_transfer_size`]);
     /// - the part's own decode refusal when its deferred payload cannot be
     ///   decoded;
-    /// - [`OpcError::ReadLimit`] when the member's declared sizes exceed the
+    /// - [`OpcError::Limit`] when the member's declared sizes exceed the
     ///   archive's read limits;
     /// - [`OpcError::Allocation`] when the capture cannot be reserved, and an
     ///   I/O error from the retained source.
@@ -367,7 +367,7 @@ impl OpcPackage {
         if let Some(state) = cell.get() {
             return Ok(state.as_deref());
         }
-        match IndexedArchive::from_reader_with_limits(
+        match IndexedArchive::from_reader(
             Arc::clone(source_archive),
             source_archive.len() as u64,
             self.source_limits.zip_limits(),
@@ -428,17 +428,17 @@ fn verified_capture(
         return Ok(None);
     }
     limits.check(
-        ReadResource::ArchiveCompressedBytes,
+        SourceLimitKind::ArchiveCompressedBytes,
         metadata.compressed_size(),
         limits.max_archive_compressed_bytes(),
     )?;
     limits.check(
-        ReadResource::ArchiveEntryBytes,
+        SourceLimitKind::EntryBytes,
         metadata.uncompressed_size(),
-        limits.max_archive_entry_bytes(),
+        limits.max_entry_bytes(),
     )?;
     limits.check(
-        ReadResource::PartBytes,
+        SourceLimitKind::PartBytes,
         logical_size,
         limits.max_part_bytes(),
     )?;

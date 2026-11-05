@@ -2,14 +2,14 @@ use crate::sprm_operations::SPRM_C_PIC_LOCATION;
 use crate::writer::core::{
     codec,
     model::{
-        FloatingAnchorKind, HeaderFieldState, HeaderFooterParagraph, HeaderStoryData,
-        ParagraphFormatting, TextStream, WriteError, Writer, checked_text_fc,
-        contains_field_character, utf16_code_unit_len,
+        Builder, FloatingAnchorKind, HeaderFieldState, HeaderFooterParagraph, HeaderStoryData,
+        ParagraphFormatting, TextStream, WriteError, checked_text_fc, contains_field_character,
+        utf16_code_unit_len,
     },
 };
 use crate::writer::font_table::FontTableBuilder;
 use crate::writer::piece_table::Piece;
-impl Writer {
+impl Builder {
     /// Build header/footer story text and `PlcfHdd`
     ///
     /// Appends header/footer text to `text_stream`, extends CHPX/PAPX entries and pieces.

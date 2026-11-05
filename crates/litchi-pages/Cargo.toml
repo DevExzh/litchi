@@ -42,6 +42,10 @@ name = "edit_section_background"
 path = "examples/edit_section_background.rs"
 
 [[example]]
+name = "edit_section_lifecycle"
+path = "examples/edit_section_lifecycle.rs"
+
+[[example]]
 name = "edit_section_name"
 path = "examples/edit_section_name.rs"
 
@@ -61,6 +65,10 @@ path = "examples/edit_section_text.rs"
 name = "pages_save_package"
 path = "examples/save_package.rs"
 
+[[example]]
+name = "generate_footnote_fixture"
+path = "examples/generate_footnote_fixture.rs"
+
 [features]
 default = []
 internal-iwork-source = ["litchi-iwa-archive/internal-iwork-source"]
@@ -72,10 +80,13 @@ litchi-iwa-common = { workspace = true }
 litchi-iwa-core   = { workspace = true }
 litchi-iwa-detect = { workspace = true }
 litchi-iwa-protos = { workspace = true }
+litchi-iwa-style = { workspace = true }
+litchi-iwa-table = { workspace = true }
 litchi-iwa-text = { workspace = true }
 litchi-iwa-text-wire = { workspace = true }
 litchi-numbers-wire = { workspace = true }
 plist           = { workspace = true }
+sha1            = { workspace = true }
 thiserror       = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]

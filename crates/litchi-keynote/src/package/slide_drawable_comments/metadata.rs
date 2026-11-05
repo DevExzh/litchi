@@ -385,7 +385,7 @@ fn parse_wire<'a>(
     }
     budget.charge_wire_work(payload.len().max(1))?;
     budget.charge_nesting(nesting.max(1))?;
-    let view = WireView::parse_with_limits(payload, limits).map_err(|_| Error::InvalidSource)?;
+    let view = WireView::parse(payload, limits).map_err(|_| Error::InvalidSource)?;
     budget.charge_wire_fields(view.len())?;
     Ok(view)
 }
@@ -584,10 +584,10 @@ pub(super) fn ensure_generated_author(
         .ok_or(Error::InvalidSource)?;
     // `encode_annotation_author_with_report` already charges the payload
     // buffer. Transfer that buffer into RawMessage without copying it, then
-    // precharge the three heap vectors built by ArchiveObject::new_with_limits
+    // precharge the three heap vectors built by ArchiveObject::new
     // (messages, MessageInfo records, and their conventional version list).
     budget.charge_allocation_plan(nested_allocation_bytes, 3)?;
-    let object = ArchiveObject::new_with_limits(
+    let object = ArchiveObject::new(
         identifier,
         vec![litchi_iwa_core::RawMessage {
             type_: ANNOTATION_AUTHOR_MESSAGE_TYPE,
@@ -612,7 +612,7 @@ pub(super) fn ensure_generated_author(
         budget,
     )?;
     storage_archive
-        .insert_object_with_limits(object, archive_limits)
+        .insert_object(object, archive_limits)
         .map_err(|_| Error::InvalidSource)?;
 
     Ok(AuthorBinding {
@@ -772,9 +772,17 @@ pub(super) fn allocate_identifier(
 }
 
 /// UUID allocation variant that includes already staged archives.
+///
+/// The host draws a random GUID. Leaf output must be a pure function of its
+/// input (record 0428), so the UUID is derived from `identifier`, the comment
+/// storage object it names, with the SplitMix64 scheme of record 0375a §2.1
+/// and a counter advanced until no comment storage in the working set uses
+/// it. The halves keep the RFC 4122 version 4, variant 1 bits of the GUIDs
+/// the host writes.
 pub(super) fn fresh_storage_uuid_in_working_set(
     source: &Package,
     working: &WorkingSet<'_>,
+    identifier: u64,
     budget: &mut Budget,
 ) -> Result<StorageUuid, Error> {
     let limits = source
@@ -843,13 +851,17 @@ pub(super) fn fresh_storage_uuid_in_working_set(
         }
         Ok(())
     })?;
+    let mut counter = 0u64;
     loop {
-        let bytes = litchi_core::id::generate_guid_bytes();
-        let mut lower = [0_u8; 8];
-        let mut upper = [0_u8; 8];
-        lower.copy_from_slice(&bytes[..8]);
-        upper.copy_from_slice(&bytes[8..]);
-        let uuid = StorageUuid::from_parts(u64::from_le_bytes(lower), u64::from_le_bytes(upper));
+        counter = counter.wrapping_add(1);
+        let lower = litchi_numbers_wire::table_create::mix(
+            identifier ^ 0x636f_6d6d_656e_7473 ^ counter.wrapping_mul(0x9e37_79b9_7f4a_7c15),
+        );
+        let upper =
+            litchi_numbers_wire::table_create::mix(lower ^ identifier.rotate_left(17) ^ counter);
+        let lower = (lower & !(0xf << 52)) | (0x4 << 52);
+        let upper = (upper & !0xc0) | 0x80;
+        let uuid = StorageUuid::from_parts(lower, upper);
         if uuid.lower() != 0 && uuid.upper() != 0 && existing.insert((uuid.lower(), uuid.upper())) {
             return Ok(uuid);
         }
@@ -1449,7 +1461,7 @@ fn effective_object_reference_census(
         for object in &archive.objects {
             let mut counts = ArchiveObjectReferenceCounts::default();
             let references = object
-                .inspect_references_with_policy_and_limits(
+                .inspect_references_with_policy(
                     &mut counts,
                     ArchiveReferencePolicy::RejectUnknownMetadata,
                     archive_limits,
@@ -1486,7 +1498,7 @@ fn effective_object_reference_census(
                 witnesses: &mut witnesses,
             };
             let references = object
-                .inspect_references_with_policy_and_limits(
+                .inspect_references_with_policy(
                     &mut collector,
                     ArchiveReferencePolicy::RejectUnknownMetadata,
                     archive_limits,
@@ -2325,7 +2337,7 @@ fn replace_metadata_payload(
     archive
         .object_mut(identifier)
         .ok_or(Error::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             message_index,
             litchi_iwa_core::RawMessage {
                 type_: PACKAGE_METADATA_MESSAGE_TYPE,
@@ -2509,7 +2521,7 @@ fn replace_author_storage_message(
         });
     }
     object
-        .replace_message_transitioning_object_references_preserving_header_with_limits(
+        .replace_message_transitioning_object_references_preserving_header(
             message_index,
             litchi_iwa_core::RawMessage {
                 type_: ANNOTATION_AUTHOR_STORAGE_MESSAGE_TYPE,
@@ -2835,7 +2847,7 @@ pub(super) fn cleanup_generated_author_for_identifier(
                 found: false,
             };
             let reference_count = object
-                .inspect_references_with_policy_and_limits(
+                .inspect_references_with_policy(
                     &mut references,
                     ArchiveReferencePolicy::RejectUnknownMetadata,
                     archive_limits,
@@ -2932,7 +2944,7 @@ pub(super) fn cleanup_generated_author_for_identifier(
         )?;
     } else {
         storage_object
-            .replace_message_preserving_header_with_limits(
+            .replace_message_preserving_header(
                 location.message_index,
                 litchi_iwa_core::RawMessage {
                     type_: ANNOTATION_AUTHOR_STORAGE_MESSAGE_TYPE,

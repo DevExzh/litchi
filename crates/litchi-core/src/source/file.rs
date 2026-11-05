@@ -2,7 +2,10 @@ use std::{
     fs::{File, Metadata},
     io,
     path::Path,
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicU64, Ordering, fence},
+    },
 };
 
 use super::{ReadAt, SourceVersion};
@@ -41,6 +44,68 @@ struct FileState {
     source_id: u64,
     version_policy: FileVersionPolicy,
     version: Mutex<FileVersionState>,
+    /// A lock-free copy of `version` for the common case of an unchanged
+    /// file (record 0280): readers compare the fingerprint they observe with
+    /// it and return its revision without taking the mutex.
+    published: Published,
+}
+
+/// A sequence-locked copy of the last [`FileVersionState`].
+///
+/// Only the slow path writes it, while it holds the `version` mutex: it
+/// makes `sequence` odd, stores the words, then makes it even again. A
+/// reader that sees the same even sequence before and after loading the
+/// words has a consistent copy; any other reader takes the slow path. Every
+/// word is an atomic, so a torn read is detected, never undefined.
+#[derive(Debug)]
+struct Published {
+    sequence: AtomicU64,
+    words: [AtomicU64; FINGERPRINT_WORDS + 1],
+}
+
+impl Published {
+    fn new(state: &FileVersionState) -> Self {
+        let published = Self {
+            sequence: AtomicU64::new(0),
+            words: std::array::from_fn(|_| AtomicU64::new(0)),
+        };
+        published.store(state);
+        published
+    }
+
+    /// Publishes `state`; the caller holds the `version` mutex, so writers
+    /// never race each other.
+    fn store(&self, state: &FileVersionState) {
+        let sequence = self.sequence.load(Ordering::Relaxed);
+        self.sequence
+            .store(sequence.wrapping_add(1), Ordering::Relaxed);
+        fence(Ordering::Release);
+        let words = state.fingerprint.words();
+        for (slot, word) in self.words.iter().zip(words) {
+            slot.store(word, Ordering::Relaxed);
+        }
+        self.words[FINGERPRINT_WORDS].store(state.revision, Ordering::Relaxed);
+        self.sequence
+            .store(sequence.wrapping_add(2), Ordering::Release);
+    }
+
+    /// The published revision when the published fingerprint is
+    /// `fingerprint`; `None` when it differs or a writer is active.
+    fn revision_if(&self, fingerprint: &MetadataFingerprint) -> Option<u64> {
+        let before = self.sequence.load(Ordering::Acquire);
+        if before % 2 == 1 {
+            return None;
+        }
+        let expected = fingerprint.words();
+        let mut same = true;
+        for (slot, word) in self.words.iter().zip(expected) {
+            same &= slot.load(Ordering::Relaxed) == word;
+        }
+        let revision = self.words[FINGERPRINT_WORDS].load(Ordering::Relaxed);
+        fence(Ordering::Acquire);
+        let after = self.sequence.load(Ordering::Relaxed);
+        (same && before == after).then_some(revision)
+    }
 }
 
 #[derive(Debug)]
@@ -103,15 +168,17 @@ impl FileSource {
         let version_policy = version_policy(&metadata);
         let fingerprint = metadata_fingerprint(&metadata);
         let source_id = SourceVersion::fresh().id();
+        let state = FileVersionState {
+            fingerprint,
+            revision: 0,
+        };
         Ok(Self {
             state: Arc::new(FileState {
                 file,
                 source_id,
                 version_policy,
-                version: Mutex::new(FileVersionState {
-                    fingerprint,
-                    revision: 0,
-                }),
+                published: Published::new(&state),
+                version: Mutex::new(state),
             }),
         })
     }
@@ -144,6 +211,23 @@ impl ReadAt for FileSource {
     }
 
     fn version(&self) -> io::Result<SourceVersion> {
+        // Fast path (record 0280): one metadata read and a lock-free compare
+        // with the last published fingerprint. Any difference, including a
+        // concurrent update, falls through to the locked path, which reads
+        // the metadata again under the mutex exactly as before.
+        if let Some(fingerprint) = probe_fingerprint(&self.state.file)
+            && let Some(revision) = self.state.published.revision_if(&fingerprint)
+        {
+            return Ok(SourceVersion::new(self.state.source_id, revision));
+        }
+        self.version_locked()
+    }
+}
+
+impl FileSource {
+    /// The locked revision check: reads the metadata under the mutex,
+    /// advances the revision on a fingerprint change and publishes it.
+    fn version_locked(&self) -> io::Result<SourceVersion> {
         let mut version = self
             .state
             .version
@@ -162,6 +246,7 @@ impl ReadAt for FileSource {
                 io::Error::other("filesystem source revision counter is exhausted")
             })?;
             version.fingerprint = fingerprint;
+            self.state.published.store(&version);
         }
         Ok(SourceVersion::new(self.state.source_id, version.revision))
     }
@@ -341,6 +426,75 @@ struct MetadataFingerprint {
     modified_nanoseconds: i64,
 }
 
+/// The fingerprint of a regular file from one `fstat`, or `None` when the
+/// call fails or the file is no longer regular (the locked path then reports
+/// the error). It reads the same fields as [`metadata_fingerprint`] without
+/// the `statx` field set and the `Metadata` conversion of
+/// [`File::metadata`], about a fifth of the check's cost (record 0280). A
+/// value that ever differed from [`metadata_fingerprint`] would only send
+/// every check to the locked path.
+#[cfg(unix)]
+#[allow(
+    unsafe_code,
+    trivial_numeric_casts,
+    clippy::cast_sign_loss,
+    clippy::cast_possible_wrap,
+    clippy::useless_conversion,
+    clippy::unnecessary_cast,
+    reason = "one FFI call; the casts copy platform-sized stat fields bit for bit"
+)]
+fn probe_fingerprint(file: &File) -> Option<MetadataFingerprint> {
+    use std::os::fd::AsRawFd;
+
+    let mut stat = std::mem::MaybeUninit::<libc::stat>::uninit();
+    // SAFETY: the descriptor is owned by `file`, which outlives the call, and
+    // `stat` points to writable storage of the type `fstat` fills.
+    let status = unsafe { libc::fstat(file.as_raw_fd(), stat.as_mut_ptr()) };
+    if status != 0 {
+        return None;
+    }
+    // SAFETY: `fstat` returned 0, so it initialized the whole structure.
+    let stat = unsafe { stat.assume_init() };
+    if stat.st_mode & libc::S_IFMT != libc::S_IFREG {
+        return None;
+    }
+    Some(MetadataFingerprint {
+        device: stat.st_dev as u64,
+        inode: stat.st_ino as u64,
+        length: stat.st_size as u64,
+        modified_seconds: stat.st_mtime as i64,
+        modified_nanoseconds: stat.st_mtime_nsec as i64,
+    })
+}
+
+/// The fingerprint of `file` through [`File::metadata`], or `None`.
+#[cfg(windows)]
+fn probe_fingerprint(file: &File) -> Option<MetadataFingerprint> {
+    let metadata = file.metadata().ok()?;
+    metadata.is_file().then(|| metadata_fingerprint(&metadata))
+}
+
+/// The number of `u64` words a [`MetadataFingerprint`] publishes as.
+#[cfg(unix)]
+const FINGERPRINT_WORDS: usize = 5;
+
+#[cfg(unix)]
+impl MetadataFingerprint {
+    #[allow(
+        clippy::cast_sign_loss,
+        reason = "bit-preserving: the words are only compared for equality"
+    )]
+    const fn words(&self) -> [u64; FINGERPRINT_WORDS] {
+        [
+            self.device,
+            self.inode,
+            self.length,
+            self.modified_seconds as u64,
+            self.modified_nanoseconds as u64,
+        ]
+    }
+}
+
 #[cfg(unix)]
 fn metadata_fingerprint(metadata: &Metadata) -> MetadataFingerprint {
     use std::os::unix::fs::MetadataExt;
@@ -365,6 +519,17 @@ struct MetadataFingerprint {
     last_write_time: u64,
 }
 
+/// The number of `u64` words a [`MetadataFingerprint`] publishes as.
+#[cfg(windows)]
+const FINGERPRINT_WORDS: usize = 3;
+
+#[cfg(windows)]
+impl MetadataFingerprint {
+    const fn words(&self) -> [u64; FINGERPRINT_WORDS] {
+        [self.length, self.creation_time, self.last_write_time]
+    }
+}
+
 #[cfg(windows)]
 fn metadata_fingerprint(metadata: &Metadata) -> MetadataFingerprint {
     use std::os::windows::fs::MetadataExt;
@@ -373,5 +538,29 @@ fn metadata_fingerprint(metadata: &Metadata) -> MetadataFingerprint {
         length: metadata.file_size(),
         creation_time: metadata.creation_time(),
         last_write_time: metadata.last_write_time(),
+    }
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    #![allow(clippy::expect_used, reason = "test assertions panic by design")]
+
+    use super::{metadata_fingerprint, probe_fingerprint};
+
+    /// The fast probe reads the fingerprint the locked path compares, so an
+    /// unchanged file takes the fast path (record 0280).
+    #[test]
+    fn the_fast_probe_matches_the_metadata_fingerprint() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let path = directory.path().join("probe.bin");
+        std::fs::write(&path, b"probe").expect("write");
+        let file = std::fs::File::open(&path).expect("open");
+        let metadata = file.metadata().expect("metadata");
+        assert_eq!(
+            probe_fingerprint(&file),
+            Some(metadata_fingerprint(&metadata))
+        );
+        let directory_handle = std::fs::File::open(directory.path()).expect("open directory");
+        assert_eq!(probe_fingerprint(&directory_handle), None);
     }
 }

@@ -3,7 +3,7 @@ mod support;
 use litchi_core::Metadata;
 use litchi_odf_common::calculation::{Iteration, IterationStatus, Settings};
 use litchi_odf_common::core::OwnedPackage;
-use litchi_ods::{Builder, MutableSpreadsheet, Spreadsheet};
+use litchi_ods::{Builder, Package, builder::Workbook as Draft};
 use std::num::NonZeroUsize;
 
 const CONTENT: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -44,8 +44,10 @@ const SETTINGS: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 #[test]
 fn facade_round_trips_typed_metadata_and_calculation_settings() {
     let bytes = package(CONTENT, Some(META), Some(SETTINGS));
-    let spreadsheet =
-        Spreadsheet::from_bytes(bytes.clone()).expect("test fixture or operation should succeed");
+    let spreadsheet = Package::from_bytes(&bytes)
+        .expect("test fixture or operation should succeed")
+        .workbook()
+        .expect("test fixture or operation should succeed");
     assert_eq!(spreadsheet.metadata().title.as_deref(), Some("Before"));
     assert_eq!(spreadsheet.metadata().author.as_deref(), Some("Author"));
     assert_eq!(spreadsheet.odf_metadata().title.as_deref(), Some("Before"));
@@ -64,8 +66,12 @@ fn facade_round_trips_typed_metadata_and_calculation_settings() {
             .contains("vendor:opaque")
     );
 
-    let mut mutable =
-        MutableSpreadsheet::from_bytes(bytes).expect("test fixture or operation should succeed");
+    let mut mutable = Draft::from_workbook(
+        Package::from_bytes(&bytes)
+            .expect("test fixture or operation should succeed")
+            .workbook()
+            .expect("test fixture or operation should succeed"),
+    );
     mutable
         .update_metadata(|metadata| {
             metadata.title = Some("After".to_string());
@@ -85,9 +91,15 @@ fn facade_round_trips_typed_metadata_and_calculation_settings() {
         })
         .expect("test fixture or operation should succeed");
 
-    let output = mutable.to_bytes();
-    let reopened =
-        Spreadsheet::from_bytes(output.clone()).expect("test fixture or operation should succeed");
+    let output = mutable
+        .build()
+        .expect("the draft builds")
+        .as_bytes()
+        .to_vec();
+    let reopened = Package::from_bytes(&output)
+        .expect("test fixture or operation should succeed")
+        .workbook()
+        .expect("test fixture or operation should succeed");
     assert_eq!(reopened.metadata().title.as_deref(), Some("After"));
     assert_eq!(
         reopened.metadata().description.as_deref(),
@@ -128,20 +140,30 @@ fn facade_round_trips_typed_metadata_and_calculation_settings() {
         support::compact_xml_fixture(SETTINGS).as_bytes()
     );
 
-    let mut clear = MutableSpreadsheet::from_bytes(package(CONTENT, Some(META), None))
-        .expect("test fixture or operation should succeed");
+    let mut clear = Draft::from_workbook(
+        Package::from_bytes(&package(CONTENT, Some(META), None))
+            .expect("test fixture or operation should succeed")
+            .workbook()
+            .expect("test fixture or operation should succeed"),
+    );
     clear
         .clear_metadata()
         .expect("test fixture or operation should succeed");
-    let cleared = Spreadsheet::from_bytes(clear.to_bytes())
+    let cleared = Package::from_bytes(clear.build().expect("the draft builds").as_bytes())
+        .expect("test fixture or operation should succeed")
+        .workbook()
         .expect("test fixture or operation should succeed");
     assert!(!cleared.metadata_snapshot().is_present());
 }
 
 #[test]
 fn facade_edits_are_atomic_and_builder_writes_new_parts() {
-    let mut mutable = MutableSpreadsheet::from_bytes(package(CONTENT, Some(META), None))
-        .expect("test fixture or operation should succeed");
+    let mut mutable = Draft::from_workbook(
+        Package::from_bytes(&package(CONTENT, Some(META), None))
+            .expect("test fixture or operation should succeed")
+            .workbook()
+            .expect("test fixture or operation should succeed"),
+    );
     let before = mutable.metadata().title.clone();
     let result = mutable.update_metadata(|metadata| {
         metadata.identifier = Some("unsupported".to_string());
@@ -165,11 +187,15 @@ fn facade_edits_are_atomic_and_builder_writes_new_parts() {
             ..Settings::default()
         }))
         .expect("test fixture or operation should succeed");
-    let spreadsheet = Spreadsheet::from_bytes(
-        builder
+    let spreadsheet = Package::from_bytes(
+        &builder
             .build()
+            .expect("test fixture or operation should succeed")
+            .to_bytes()
             .expect("test fixture or operation should succeed"),
     )
+    .expect("test fixture or operation should succeed")
+    .workbook()
     .expect("test fixture or operation should succeed");
     assert_eq!(spreadsheet.metadata().title.as_deref(), Some("Built"));
     assert_eq!(spreadsheet.metadata().author.as_deref(), Some("Builder"));
@@ -185,25 +211,41 @@ fn facade_edits_are_atomic_and_builder_writes_new_parts() {
 #[test]
 fn malformed_metadata_and_settings_are_rejected_at_package_boundary() {
     let malformed_meta = r#"<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0"><office:meta><meta:user-defined>missing name</meta:user-defined></office:meta></office:document-meta>"#;
-    assert!(Spreadsheet::from_bytes(package(CONTENT, Some(malformed_meta), None)).is_err());
+    assert!(
+        Package::from_bytes(&package(CONTENT, Some(malformed_meta), None))
+            .and_then(|package| package.workbook())
+            .is_err()
+    );
 
     let malformed_content = CONTENT.replace(
         "<table:calculation-settings table:case-sensitive=\"false\"/>",
         "<table:calculation-settings/><table:calculation-settings/>",
     );
-    assert!(Spreadsheet::from_bytes(package(&malformed_content, Some(META), None)).is_err());
+    assert!(
+        Package::from_bytes(&package(&malformed_content, Some(META), None))
+            .and_then(|package| package.workbook())
+            .is_err()
+    );
 
     let invalid_iteration = CONTENT.replace(
         "<table:calculation-settings table:case-sensitive=\"false\"/>",
         "<table:calculation-settings><table:iteration table:steps=\"0\"/></table:calculation-settings>",
     );
-    assert!(Spreadsheet::from_bytes(package(&invalid_iteration, Some(META), None)).is_err());
+    assert!(
+        Package::from_bytes(&package(&invalid_iteration, Some(META), None))
+            .and_then(|package| package.workbook())
+            .is_err()
+    );
 
     let unknown_owned_attribute = CONTENT.replace(
         "<table:calculation-settings table:case-sensitive=\"false\"/>",
         "<table:calculation-settings table:case-sensitive=\"false\" table:future=\"x\"/>",
     );
-    assert!(Spreadsheet::from_bytes(package(&unknown_owned_attribute, Some(META), None)).is_err());
+    assert!(
+        Package::from_bytes(&package(&unknown_owned_attribute, Some(META), None))
+            .and_then(|package| package.workbook())
+            .is_err()
+    );
 }
 
 fn package(content: &str, metadata: Option<&str>, settings: Option<&str>) -> Vec<u8> {

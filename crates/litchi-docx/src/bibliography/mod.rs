@@ -38,9 +38,12 @@
 //! stored source XML.  `LCID`, source tags, and every other scalar are kept as
 //! stored data so callers can make their own compatibility decisions.
 
+mod edit;
+mod limit;
 mod package;
 mod writer;
 
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 pub use package::SourceStore;
 pub(crate) use package::discover_bibliography_source_stores;
 pub use writer::{BibliographyPerson, BibliographySourceBuilder, BibliographySourceKind};
@@ -48,7 +51,7 @@ pub(crate) use writer::{
     DEFAULT_STORE_ITEM_ID, add_source_xml, new_store_xml, remove_source_xml, replace_source_xml,
 };
 
-use crate::{Error, Result};
+use crate::Result;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::decode_xml_reference;
 use quick_xml::XmlVersion;

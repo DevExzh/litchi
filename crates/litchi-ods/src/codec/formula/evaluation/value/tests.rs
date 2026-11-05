@@ -75,9 +75,11 @@ fn execution() -> ExecutionContext {
 
 #[test]
 fn shape_planner_retains_mask_capacity_reservation_across_reuse() {
-    let expression =
-        Expression::parse("=IF({TRUE();FALSE()};IF({TRUE();FALSE()};{1;2};{3;4});{5;6})")
-            .expect("nested lazy inline-array fixture should parse");
+    let expression = Expression::parse(
+        "=IF({TRUE();FALSE()};IF({TRUE();FALSE()};{1;2};{3;4});{5;6})",
+        &Default::default(),
+    )
+    .expect("nested lazy inline-array fixture should parse");
     let resolver = NoReadResolver;
     let execution = execution();
     let value_context = Context::new(&execution, Position::new("Sheet", 0, 0));

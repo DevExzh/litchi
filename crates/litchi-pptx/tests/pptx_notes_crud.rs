@@ -4,6 +4,9 @@
     reason = "test assertions panic on failure by design"
 )]
 
+mod in_place;
+use in_place::InPlace as _;
+
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcPackage, PackURI};
 use litchi_pptx::notes;
@@ -70,7 +73,7 @@ fn reopened_deck_clears_all_notes_idempotently() {
     assert_eq!(slide_text(&package), before_text);
 
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
-    let mut package = package;
+    let package = package;
     package.save(output.path()).unwrap();
     let reopened = Package::open(output.path()).unwrap();
     assert_no_speaker_notes(&reopened);
@@ -107,59 +110,33 @@ fn selector_failures_do_not_mutate_the_notes_graph() {
 }
 
 #[test]
-fn dirty_writer_is_rejected_before_direct_notes_owner_access() {
-    let source = authored_two_slide_deck();
-    let clean = Package::open(source.path()).unwrap();
-    assert!(notes_graph(&clean).is_some());
-
-    let mut package = Package::new().unwrap();
-    package
-        .presentation_mut()
+fn built_notes_are_available_without_an_archive_round_trip() {
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    builder
+        .presentation()
         .unwrap()
         .add_slide()
         .unwrap()
         .set_notes("Keep me");
-
-    // The standalone notes owner consumes a canonical OPC snapshot. The
-    // package facade therefore rejects access while its mutable writer is
-    // dirty, without adding a compatibility-specific notes API.
-    let error = match package.opc() {
-        Ok(_) => panic!("dirty writer unexpectedly exposed an OPC snapshot"),
-        Err(error) => error,
-    };
-    assert!(matches!(
-        error,
-        Error::UnsafeEdit { operation: "opc", reason } if reason.contains("unflushed")
-    ));
-    let error = match package.presentation() {
-        Ok(_) => panic!("dirty writer unexpectedly exposed a presentation graph"),
-        Err(error) => error,
-    };
-    assert!(matches!(
-        error,
-        Error::UnsafeEdit { operation: "presentation", reason } if reason.contains("unflushed")
-    ));
-    assert_eq!(
-        package
-            .presentation_mut()
-            .unwrap()
-            .slide_mut(0)
-            .unwrap()
-            .notes(),
-        Some("Keep me")
-    );
+    let package = builder.build().unwrap();
+    assert!(notes_graph(&package).is_some());
+    assert_eq!(slide_notes(&package), vec!["Keep me"]);
+    let (package, removed) = remove_notes(package, "Slide 256");
+    assert!(removed.unwrap());
+    assert_no_speaker_notes(&package);
 }
 
 fn authored_two_slide_deck() -> NamedTempFile {
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
-    let mut package = Package::new().unwrap();
-    let presentation = package.presentation_mut().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    let presentation = builder.presentation().unwrap();
     let overview = presentation.add_slide().unwrap();
     overview.set_title("Overview body");
     overview.set_notes("Overview secret");
     let appendix = presentation.add_slide().unwrap();
     appendix.set_title("Appendix body");
     appendix.set_notes("Appendix secret");
+    let package = builder.build().unwrap();
     package.save(output.path()).unwrap();
     output
 }
@@ -223,7 +200,7 @@ fn slide_notes(package: &Package) -> Vec<String> {
                 .slides()
                 .iter()
                 .find(|notes| notes.owner() == slide.part().part().partname().as_str())
-                .and_then(|slide| slide.text().unwrap())
+                .and_then(|slide| slide.text(notes::Limits::DEFAULT).unwrap())
                 .unwrap_or_default()
         })
         .collect()
@@ -258,22 +235,22 @@ fn assert_no_speaker_notes(package: &Package) {
 
 fn remove_notes(package: Package, slide_name: &str) -> (Package, litchi_pptx::Result<bool>) {
     let mut package = package;
-    let result = package.remove_notes(slide_name);
+    let result = package.remove_notes_in_place(slide_name);
     (package, result)
 }
 
 fn clear_notes(package: Package) -> (Package, litchi_pptx::Result<usize>) {
     let mut package = package;
-    let result = package.clear_notes();
+    let result = package.clear_notes_in_place();
     (package, result)
 }
 
 fn edit_package<T>(
-    mut package: Package,
+    package: Package,
     edit: impl FnOnce(&mut OpcPackage) -> litchi_pptx::Result<T>,
 ) -> (Package, litchi_pptx::Result<T>) {
     let bytes = package.to_bytes().unwrap();
-    let mut opc = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut opc = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     let result = edit(&mut opc);
     let package = Package::from_opc_package(opc).unwrap();
     (package, result)

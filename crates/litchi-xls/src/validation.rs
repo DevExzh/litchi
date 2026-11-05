@@ -77,7 +77,7 @@ const MAX_RETAINED_ISSUES: usize = 12;
 /// Finite input, BIFF, directory, semantic, and report bounds for one XLS
 /// validation pass.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsValidationLimits {
+pub struct Limits {
     max_input_bytes: u64,
     max_workbook_stream_bytes: u64,
     max_biff_records: usize,
@@ -88,7 +88,7 @@ pub struct XlsValidationLimits {
     report: ValidationLimits,
 }
 
-impl XlsValidationLimits {
+impl Limits {
     /// Creates explicit finite XLS validation limits.
     #[must_use]
     #[allow(
@@ -163,15 +163,12 @@ impl XlsValidationLimits {
     ///
     /// # Errors
     ///
-    /// Returns [`XlsValidationError::Ingress`] if the value is outside the CFB
+    /// Returns [`Error::Ingress`] if the value is outside the CFB
     /// directory limit bounds.
-    pub fn with_max_directory_bytes(
-        mut self,
-        max_directory_bytes: u64,
-    ) -> Result<Self, XlsValidationError> {
+    pub fn with_max_directory_bytes(mut self, max_directory_bytes: u64) -> Result<Self, Error> {
         let limits = SharedOleFileLimits::default()
             .with_max_directory_bytes(max_directory_bytes)
-            .map_err(XlsValidationError::Ingress)?;
+            .map_err(Error::Ingress)?;
         self.max_directory_bytes = limits.max_directory_bytes();
         Ok(self)
     }
@@ -183,7 +180,7 @@ impl XlsValidationLimits {
     }
 }
 
-impl Default for XlsValidationLimits {
+impl Default for Limits {
     fn default() -> Self {
         Self {
             max_input_bytes: SharedOleFileLimits::MAX_INPUT_BYTES,
@@ -201,7 +198,7 @@ impl Default for XlsValidationLimits {
 /// Failure to perform or retain an XLS validation report.
 #[derive(Debug)]
 #[non_exhaustive]
-pub enum XlsValidationError {
+pub enum Error {
     /// CFB positional ingress or source stability failed.
     Ingress(OleError),
     /// A bounded validator-owned allocation failed.
@@ -210,7 +207,7 @@ pub enum XlsValidationError {
     Report(ValidationReportError),
 }
 
-impl fmt::Display for XlsValidationError {
+impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Ingress(error) => write!(formatter, "XLS validation ingress failed: {error}"),
@@ -225,7 +222,7 @@ impl fmt::Display for XlsValidationError {
     }
 }
 
-impl StdError for XlsValidationError {
+impl StdError for Error {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
         match self {
             Self::Ingress(error) => Some(error),
@@ -235,32 +232,16 @@ impl StdError for XlsValidationError {
     }
 }
 
-impl From<ValidationReportError> for XlsValidationError {
+impl From<ValidationReportError> for Error {
     fn from(error: ValidationReportError) -> Self {
         Self::Report(error)
     }
 }
 
-impl From<OleError> for XlsValidationError {
+impl From<OleError> for Error {
     fn from(error: OleError) -> Self {
         Self::Ingress(error)
     }
-}
-
-/// Validate a positional XLS source under default finite bounds.
-///
-/// The source is opened through the canonical CFB ingress validator.  Only
-/// bounded CFB metadata and the Workbook/Book stream are inspected; no bytes
-/// are written back and no external target or signature trust decision is
-/// attempted.
-///
-/// # Errors
-///
-/// Returns an error only for source I/O/version changes, bounded allocation
-/// failure, or failure to retain the report. Definite format rejection and a
-/// configured resource ceiling are represented in the returned report.
-pub fn validate_source(source: Arc<dyn ReadAt>) -> Result<ValidateReport, XlsValidationError> {
-    validate_source_with_limits(source, XlsValidationLimits::default())
 }
 
 /// Validate a positional XLS source under explicit finite bounds.
@@ -276,16 +257,13 @@ pub fn validate_source(source: Arc<dyn ReadAt>) -> Result<ValidateReport, XlsVal
 ///
 /// Returns an error for source I/O/version changes, bounded allocation
 /// failure, or bounded report-construction failure.
-pub fn validate_source_with_limits(
-    source: Arc<dyn ReadAt>,
-    limits: XlsValidationLimits,
-) -> Result<ValidateReport, XlsValidationError> {
+pub fn validate_source(source: Arc<dyn ReadAt>, limits: Limits) -> Result<ValidateReport, Error> {
     let expected_version = source
         .version()
-        .map_err(|error| XlsValidationError::Ingress(OleError::Io(error)))?;
+        .map_err(|error| Error::Ingress(OleError::Io(error)))?;
     let source_size = source
         .len()
-        .map_err(|error| XlsValidationError::Ingress(OleError::Io(error)))?;
+        .map_err(|error| Error::Ingress(OleError::Io(error)))?;
     require_version(source.as_ref(), expected_version)?;
 
     let input_ceiling = limits
@@ -304,8 +282,8 @@ pub fn validate_source_with_limits(
     let directory_ceiling = limits.max_directory_bytes;
     let cfb_limits = SharedOleFileLimits::new(input_ceiling)
         .and_then(|cfb_limits| cfb_limits.with_max_directory_bytes(directory_ceiling))
-        .map_err(XlsValidationError::Ingress)?;
-    let shared = match SharedOleFile::open_with_limits(source.clone(), cfb_limits) {
+        .map_err(Error::Ingress)?;
+    let shared = match SharedOleFile::open(source.clone(), cfb_limits) {
         Ok(shared) => shared,
         Err(error) if is_directory_limit_error(&error) => {
             let statuses = blocked_ingress_statuses(
@@ -329,7 +307,7 @@ pub fn validate_source_with_limits(
             require_version(source.as_ref(), expected_version)?;
             return report;
         },
-        Err(error) => return Err(XlsValidationError::Ingress(error)),
+        Err(error) => return Err(Error::Ingress(error)),
     };
 
     let (markers, directory_limited) = inspect_directory(&shared, limits)?;
@@ -412,9 +390,7 @@ pub fn validate_source_with_limits(
         statuses[4] = CheckStatus::stopped_by(check_id(BIFF, limits.report)?);
         statuses[8] = CheckStatus::stopped_by(check_id(BIFF, limits.report)?);
         let report = finish_report(statuses, issues, limits.report);
-        shared
-            .source_version()
-            .map_err(XlsValidationError::Ingress)?;
+        shared.source_version().map_err(Error::Ingress)?;
         return report;
     };
 
@@ -431,9 +407,7 @@ pub fn validate_source_with_limits(
             statuses[5] = CheckStatus::stopped_by(check_id(WORKBOOK_STREAM, limits.report)?);
         }
         let report = finish_report(statuses, issues, limits.report);
-        shared
-            .source_version()
-            .map_err(XlsValidationError::Ingress)?;
+        shared.source_version().map_err(Error::Ingress)?;
         return report;
     }
 
@@ -447,7 +421,7 @@ pub fn validate_source_with_limits(
     let encryption_count = markers
         .encryption_count
         .checked_add(analysis.filepass_count)
-        .ok_or(XlsValidationError::Allocation("encryption presence count"))?;
+        .ok_or(Error::Allocation("encryption presence count"))?;
     statuses[5] = presence_status(encryption_count, directory_limited, limits.report)?;
     if encryption_count == 0 && !analysis.scan_terminal && !directory_limited {
         statuses[5] = CheckStatus::stopped_by(check_id(BIFF, limits.report)?);
@@ -714,9 +688,7 @@ pub fn validate_source_with_limits(
     }
 
     let report = finish_report(statuses, issues, limits.report);
-    shared
-        .source_version()
-        .map_err(XlsValidationError::Ingress)?;
+    shared.source_version().map_err(Error::Ingress)?;
     report
 }
 
@@ -872,14 +844,11 @@ fn read_u16(data: &[u8], offset: usize) -> Option<u16> {
     Some(u16::from_le_bytes([bytes[0], bytes[1]]))
 }
 
-fn inspect_filepass_record(
-    output: &mut Analysis,
-    payload: &[u8],
-) -> Result<(), XlsValidationError> {
+fn inspect_filepass_record(output: &mut Analysis, payload: &[u8]) -> Result<(), Error> {
     output.filepass_count = output
         .filepass_count
         .checked_add(1)
-        .ok_or(XlsValidationError::Allocation("FILEPASS count"))?;
+        .ok_or(Error::Allocation("FILEPASS count"))?;
     if output.filepass_count > 1 {
         output.filepass_invalid = true;
         output.biff_invalid = true;
@@ -899,11 +868,11 @@ fn inspect_filepass_record(
 fn inspect_incomplete_filepass_record(
     output: &mut Analysis,
     valid_position: bool,
-) -> Result<(), XlsValidationError> {
+) -> Result<(), Error> {
     output.filepass_count = output
         .filepass_count
         .checked_add(1)
-        .ok_or(XlsValidationError::Allocation("FILEPASS count"))?;
+        .ok_or(Error::Allocation("FILEPASS count"))?;
     output.filepass_invalid = true;
     output.encrypted = true;
     if !valid_position {
@@ -1203,7 +1172,7 @@ impl Default for ExternalPresenceState {
 }
 
 impl ExternalPresenceState {
-    fn feed(&mut self, record_type: u16, data: &[u8]) -> Result<bool, XlsValidationError> {
+    fn feed(&mut self, record_type: u16, data: &[u8]) -> Result<bool, Error> {
         if self.pending_crn != 0 && record_type != CRN_RECORD_TYPE {
             return Ok(false);
         }
@@ -1285,7 +1254,7 @@ impl ExternalPresenceState {
         true
     }
 
-    fn feed_xct(&mut self, data: &[u8]) -> Result<bool, XlsValidationError> {
+    fn feed_xct(&mut self, data: &[u8]) -> Result<bool, Error> {
         let Some(book_index) = self.current_book else {
             return Ok(false);
         };
@@ -1315,7 +1284,7 @@ impl ExternalPresenceState {
         Ok(true)
     }
 
-    fn feed_crn(&mut self, data: &[u8]) -> Result<bool, XlsValidationError> {
+    fn feed_crn(&mut self, data: &[u8]) -> Result<bool, Error> {
         if self.pending_crn == 0 || data.len() < 4 {
             return Ok(false);
         }
@@ -1735,8 +1704,8 @@ fn count_ser_ar_values(data: &[u8], maximum: usize) -> Option<(usize, usize)> {
 
 fn inspect_directory(
     shared: &SharedOleFile,
-    limits: XlsValidationLimits,
-) -> Result<(MarkerCounts, bool), XlsValidationError> {
+    limits: Limits,
+) -> Result<(MarkerCounts, bool), Error> {
     let mut counts = MarkerCounts::default();
     let mut entries = 0_usize;
     for entry in shared.directory_entries() {
@@ -1745,24 +1714,24 @@ fn inspect_directory(
         }
         entries = entries
             .checked_add(1)
-            .ok_or(XlsValidationError::Allocation("CFB directory count"))?;
+            .ok_or(Error::Allocation("CFB directory count"))?;
         if is_signature_component(&entry.name) {
             counts.signature_count = counts
                 .signature_count
                 .checked_add(1)
-                .ok_or(XlsValidationError::Allocation("signature presence count"))?;
+                .ok_or(Error::Allocation("signature presence count"))?;
         }
         if is_encryption_component(&entry.name) {
             counts.encryption_count = counts
                 .encryption_count
                 .checked_add(1)
-                .ok_or(XlsValidationError::Allocation("encryption presence count"))?;
+                .ok_or(Error::Allocation("encryption presence count"))?;
         }
         if is_drm_component(&entry.name) {
             counts.drm_count = counts
                 .drm_count
                 .checked_add(1)
-                .ok_or(XlsValidationError::Allocation("DRM presence count"))?;
+                .ok_or(Error::Allocation("DRM presence count"))?;
         }
     }
     Ok((counts, false))
@@ -1775,7 +1744,7 @@ enum WorkbookLocation {
     Stream { name: &'static str, size: u64 },
 }
 
-fn locate_workbook_stream(shared: &SharedOleFile) -> Result<WorkbookLocation, XlsValidationError> {
+fn locate_workbook_stream(shared: &SharedOleFile) -> Result<WorkbookLocation, Error> {
     // `directory_entries` is a flattened SID index and does not carry the
     // parent storage path. Resolve only the two root-level logical paths so a
     // nested `Workbook`/`Book` member cannot shadow the workbook stream.
@@ -1807,15 +1776,12 @@ enum LogicalEntry {
     Stream(u64),
 }
 
-fn logical_stream_len(
-    shared: &SharedOleFile,
-    name: &str,
-) -> Result<LogicalEntry, XlsValidationError> {
+fn logical_stream_len(shared: &SharedOleFile, name: &str) -> Result<LogicalEntry, Error> {
     match shared.stream_len(&[name]) {
         Ok(size) => Ok(LogicalEntry::Stream(size)),
         Err(OleError::StreamNotFound) => Ok(LogicalEntry::Missing),
         Err(OleError::InvalidFormat(_)) => Ok(LogicalEntry::NonStream),
-        Err(error) => Err(XlsValidationError::Ingress(error)),
+        Err(error) => Err(Error::Ingress(error)),
     }
 }
 
@@ -1859,7 +1825,7 @@ impl<'a> StreamingRecordReader<'a> {
         shared: &'a SharedOleFile,
         workbook_name: &str,
         max_records: usize,
-    ) -> Result<Self, XlsValidationError> {
+    ) -> Result<Self, Error> {
         // The reader starts without read-ahead. MS-XLS admits FILEPASS only
         // immediately after the workbook-global BOF, optionally behind
         // WRITEPROTECT records, and the walk stops there without reading the
@@ -1870,7 +1836,7 @@ impl<'a> StreamingRecordReader<'a> {
         let cursor = BufferedOleStreamCursor::new(
             shared
                 .stream_cursor_at(&[workbook_name], 0)
-                .map_err(XlsValidationError::Ingress)?,
+                .map_err(Error::Ingress)?,
             0,
         );
         Ok(Self {
@@ -1889,7 +1855,7 @@ impl<'a> StreamingRecordReader<'a> {
     /// source observations per record. With one, those two reads are memory
     /// copies and the walk pays one request per contiguous run of the
     /// allocation chain. The closing `SharedOleFile::source_version` that
-    /// every exit of `validate_source_with_limits` already takes still
+    /// every exit of `validate_source` already takes still
     /// brackets the whole analysis, so a mutation during it is refused as
     /// before; what moves is which read reports it.
     fn open_window(&mut self) {
@@ -1897,7 +1863,7 @@ impl<'a> StreamingRecordReader<'a> {
             .set_read_ahead(BufferedOleStreamCursor::MAX_READ_AHEAD_BYTES);
     }
 
-    fn read_next(&mut self) -> Result<StreamingRecordStep<'_>, XlsValidationError> {
+    fn read_next(&mut self) -> Result<StreamingRecordStep<'_>, Error> {
         let offset = self.cursor.position();
         let length = self.cursor.len();
         if offset == length {
@@ -1921,7 +1887,7 @@ impl<'a> StreamingRecordReader<'a> {
         }
         self.cursor
             .read_exact(&mut self.header)
-            .map_err(XlsValidationError::Ingress)?;
+            .map_err(Error::Ingress)?;
 
         let kind = u16::from_le_bytes([self.header[0], self.header[1]]);
         let payload_len = usize::from(u16::from_le_bytes([self.header[2], self.header[3]]));
@@ -1941,7 +1907,7 @@ impl<'a> StreamingRecordReader<'a> {
         }
         self.cursor
             .read_exact(&mut self.payload[..payload_len])
-            .map_err(XlsValidationError::Ingress)?;
+            .map_err(Error::Ingress)?;
         self.record_count = next_count;
         Ok(StreamingRecordStep::Record(StreamingRecord {
             kind,
@@ -1955,8 +1921,8 @@ fn analyze_workbook(
     shared: &SharedOleFile,
     workbook_name: &str,
     container_encrypted: bool,
-    limits: XlsValidationLimits,
-) -> Result<Analysis, XlsValidationError> {
+    limits: Limits,
+) -> Result<Analysis, Error> {
     let mut output = Analysis {
         encrypted: container_encrypted,
         ..Analysis::default()
@@ -2138,7 +2104,7 @@ fn analyze_workbook(
                 if is_external_record(kind) {
                     external_record_count = external_record_count
                         .checked_add(1)
-                        .ok_or(XlsValidationError::Allocation("external-link record count"))?;
+                        .ok_or(Error::Allocation("external-link record count"))?;
                     if external_record_count > limits.max_external_records {
                         output.external_limit = true;
                     }
@@ -2336,7 +2302,7 @@ fn presence_status(
     count: u64,
     directory_limited: bool,
     limits: ValidationLimits,
-) -> Result<CheckStatus, XlsValidationError> {
+) -> Result<CheckStatus, Error> {
     if directory_limited {
         CheckStatus::blocked(
             "CFB directory inspection reached the configured entry ceiling",
@@ -2359,7 +2325,7 @@ fn push_presence_issue(
     count: u64,
     part: &str,
     limits: ValidationLimits,
-) -> Result<(), XlsValidationError> {
+) -> Result<(), Error> {
     if count == 0 {
         return Ok(());
     }
@@ -2406,7 +2372,7 @@ fn simple_issue(
     path: Option<&str>,
     offset: Option<u64>,
     limits: ValidationLimits,
-) -> Result<ValidationIssue, XlsValidationError> {
+) -> Result<ValidationIssue, Error> {
     Ok(ValidationIssue::try_new(
         check_id(check, limits)?,
         code,
@@ -2431,7 +2397,7 @@ fn cfb_issue(
     error: &OleError,
     source_size: u64,
     limits: ValidationLimits,
-) -> Result<ValidationIssue, XlsValidationError> {
+) -> Result<ValidationIssue, Error> {
     let (code, message) = match error {
         OleError::NotOleFile => (
             "xls.cfb.not_ole",
@@ -2494,7 +2460,7 @@ fn finish_report(
     statuses: [CheckStatus; CHECK_IDS.len()],
     issues: Vec<ValidationIssue>,
     limits: ValidationLimits,
-) -> Result<ValidateReport, XlsValidationError> {
+) -> Result<ValidateReport, Error> {
     let mut checks = Vec::new();
     try_reserve(&mut checks, CHECK_IDS.len(), "XLS validation checks")?;
     for (id, status) in CHECK_IDS.into_iter().zip(statuses) {
@@ -2507,14 +2473,14 @@ fn finish_report(
     ValidateReport::try_new(checks, issues, limits).map_err(Into::into)
 }
 
-fn check_id(id: &str, limits: ValidationLimits) -> Result<CheckCapabilityId, XlsValidationError> {
+fn check_id(id: &str, limits: ValidationLimits) -> Result<CheckCapabilityId, Error> {
     CheckCapabilityId::try_new(id, limits).map_err(Into::into)
 }
 
 fn blocked_ingress_statuses(
     limits: ValidationLimits,
     reason: &str,
-) -> Result<[CheckStatus; CHECK_IDS.len()], XlsValidationError> {
+) -> Result<[CheckStatus; CHECK_IDS.len()], Error> {
     let ingress = check_id(CFB, limits)?;
     let blocked = CheckStatus::blocked(reason, limits)?;
     Ok([
@@ -2532,7 +2498,7 @@ fn blocked_ingress_statuses(
 
 fn cfb_rejection_statuses(
     limits: ValidationLimits,
-) -> Result<[CheckStatus; CHECK_IDS.len()], XlsValidationError> {
+) -> Result<[CheckStatus; CHECK_IDS.len()], Error> {
     let blocked = CheckStatus::blocked("CFB ingress was structurally rejected", limits)?;
     Ok([
         CheckStatus::Complete,
@@ -2568,17 +2534,14 @@ fn is_directory_limit_error(error: &OleError) -> bool {
     )
 }
 
-fn require_version(
-    source: &dyn ReadAt,
-    expected: litchi_core::SourceVersion,
-) -> Result<(), XlsValidationError> {
+fn require_version(source: &dyn ReadAt, expected: litchi_core::SourceVersion) -> Result<(), Error> {
     let observed = source
         .version()
-        .map_err(|error| XlsValidationError::Ingress(OleError::Io(error)))?;
+        .map_err(|error| Error::Ingress(OleError::Io(error)))?;
     if observed == expected {
         Ok(())
     } else {
-        Err(XlsValidationError::Ingress(OleError::SourceChanged {
+        Err(Error::Ingress(OleError::SourceChanged {
             expected,
             observed,
         }))
@@ -2589,17 +2552,13 @@ fn try_reserve<T>(
     values: &mut Vec<T>,
     additional: usize,
     resource: &'static str,
-) -> Result<(), XlsValidationError> {
+) -> Result<(), Error> {
     values
         .try_reserve(additional)
-        .map_err(|_| XlsValidationError::Allocation(resource))
+        .map_err(|_| Error::Allocation(resource))
 }
 
-fn try_push<T>(
-    values: &mut Vec<T>,
-    value: T,
-    resource: &'static str,
-) -> Result<(), XlsValidationError> {
+fn try_push<T>(values: &mut Vec<T>, value: T, resource: &'static str) -> Result<(), Error> {
     if values.len() == values.capacity() {
         try_reserve(values, 1, resource)?;
     }
@@ -2612,11 +2571,11 @@ fn try_hash_insert(
     key: u64,
     value: usize,
     resource: &'static str,
-) -> Result<(), XlsValidationError> {
+) -> Result<(), Error> {
     if values.len() == values.capacity() {
         values
             .try_reserve(1)
-            .map_err(|_| XlsValidationError::Allocation(resource))?;
+            .map_err(|_| Error::Allocation(resource))?;
     }
     values.insert(key, value);
     Ok(())
@@ -2626,11 +2585,11 @@ fn try_hash_set_reserve<T: Eq + Hash>(
     values: &mut HashSet<T>,
     additional: usize,
     resource: &'static str,
-) -> Result<(), XlsValidationError> {
+) -> Result<(), Error> {
     if additional > values.capacity().saturating_sub(values.len()) {
         values
             .try_reserve(additional)
-            .map_err(|_| XlsValidationError::Allocation(resource))?;
+            .map_err(|_| Error::Allocation(resource))?;
     }
     Ok(())
 }

@@ -21,7 +21,7 @@
 //! activated while an inventory is built.
 
 use super::Package;
-use crate::{Error, Result};
+use crate::Result;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcPackage, PackURI};
 use quick_xml::events::Event;
@@ -32,7 +32,11 @@ use std::sync::Arc;
 
 use crate::document::ParagraphHyperlinkAddress;
 
+mod edit;
+mod limit;
 mod source;
+
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 #[allow(
     unused_imports,
     reason = "source-backed consumers use the inventory and part types as they land"
@@ -414,7 +418,7 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn story_inventory(&self) -> Result<StoryInventory> {
-        self.story_inventory_with_limits(StoryLimits::default())
+        self.story_inventory_bounded(self.semantic_limits().stories_value())
     }
 
     /// Inventory Word stories under an explicit semantic resource policy.
@@ -422,8 +426,8 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn story_inventory_with_limits(&self, limits: StoryLimits) -> Result<StoryInventory> {
-        self.ensure_story_opc_current("story_inventory_with_limits")?;
+    pub(crate) fn story_inventory_bounded(&self, limits: StoryLimits) -> Result<StoryInventory> {
+        self.ensure_story_opc_current("story_inventory_bounded")?;
         capture(self.opc_package(), limits)
     }
 }
@@ -443,10 +447,11 @@ pub(crate) fn capture_with_policy(
 ) -> Result<StoryInventory> {
     let limits = limits.validate()?;
     if package.part_count() > limits.max_package_parts {
-        return Err(invalid(format!(
-            "DOCX package part count exceeds {}",
-            limits.max_package_parts
-        )));
+        return Err(crate::Error::StoryLimit {
+            kind: LimitKind::PackageParts,
+            actual: package.part_count(),
+            maximum: limits.max_package_parts,
+        });
     }
 
     let root = root_owner(package)?;
@@ -597,10 +602,11 @@ fn discover_owned(
             })?;
         relationships.push((kind, relationship));
         if relationships.len() > limits.max_relationships_per_owner {
-            return Err(invalid(format!(
-                "story '{}' relationship count exceeds {}",
-                owner, limits.max_relationships_per_owner
-            )));
+            return Err(crate::Error::StoryLimit {
+                kind: LimitKind::RelationshipsPerOwner,
+                actual: relationships.len(),
+                maximum: limits.max_relationships_per_owner,
+            });
         }
     }
     relationships.sort_unstable_by(|left, right| {
@@ -625,10 +631,11 @@ fn discover_owned(
             .checked_add(1)
             .ok_or_else(|| invalid("DOCX story relationship count overflow"))?;
         if *relationship_count > limits.max_total_relationships {
-            return Err(invalid(format!(
-                "DOCX story relationship count exceeds {}",
-                limits.max_total_relationships
-            )));
+            return Err(crate::Error::StoryLimit {
+                kind: LimitKind::Relationships,
+                actual: *relationship_count,
+                maximum: limits.max_total_relationships,
+            });
         }
         if relationship.is_external() {
             return Err(invalid(format!(
@@ -698,27 +705,29 @@ fn push_story(
     total_story_bytes: &mut usize,
 ) -> Result<()> {
     if stories.len() == limits.max_stories {
-        return Err(invalid(format!(
-            "DOCX story count exceeds {}",
-            limits.max_stories
-        )));
+        return Err(crate::Error::StoryLimit {
+            kind: LimitKind::Stories,
+            actual: (stories.len()).saturating_add(1),
+            maximum: limits.max_stories,
+        });
     }
     let length = part.blob().len();
     if enforce_story_bytes && length > limits.max_story_bytes {
-        return Err(invalid(format!(
-            "DOCX story '{}' has {length} bytes, exceeding {}",
-            part.partname(),
-            limits.max_story_bytes
-        )));
+        return Err(crate::Error::StoryLimit {
+            kind: LimitKind::StoryBytes,
+            actual: length,
+            maximum: limits.max_story_bytes,
+        });
     }
     *total_story_bytes = total_story_bytes
         .checked_add(length)
         .ok_or_else(|| invalid("DOCX aggregate story byte count overflow"))?;
     if enforce_story_bytes && *total_story_bytes > limits.max_total_story_bytes {
-        return Err(invalid(format!(
-            "DOCX aggregate story bytes exceed {}",
-            limits.max_total_story_bytes
-        )));
+        return Err(crate::Error::StoryLimit {
+            kind: LimitKind::TotalStoryBytes,
+            actual: *total_story_bytes,
+            maximum: limits.max_total_story_bytes,
+        });
     }
     // Main-only semantic readers still need the complete ownership topology
     // for stale-package detection, but must not parse unrelated story XML.
@@ -842,9 +851,11 @@ fn validate_root(
             .checked_add(1)
             .ok_or_else(|| invalid("Word story XML prolog event count overflow"))?;
         if events > max_events {
-            return Err(invalid(format!(
-                "Word story XML prolog exceeds {max_events} events"
-            )));
+            return Err(crate::Error::StoryLimit {
+                kind: LimitKind::PrologEvents,
+                actual: events,
+                maximum: max_events,
+            });
         }
         let event = reader
             .read_event()
@@ -916,9 +927,11 @@ fn encode_topology(stories: &[StoryPart], limit: usize) -> Result<Arc<[u8]>> {
         size = add_size(size, 1)?;
     }
     if size > limit {
-        return Err(invalid(format!(
-            "DOCX story topology exceeds {limit} bytes"
-        )));
+        return Err(crate::Error::StoryLimit {
+            kind: LimitKind::TopologyBytes,
+            actual: size,
+            maximum: limit,
+        });
     }
     let mut bytes = Vec::new();
     bytes

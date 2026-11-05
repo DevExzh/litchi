@@ -1,0 +1,15 @@
+{
+  "source": "full-gate-9781cf6d87/ops-tests/checks.json",
+  "source_bytes": 98519,
+  "source_sha256": "bc8efb85911c0d4089a5f8687d4ca846fdb663c92209895d6db8ba63ba8a2c2d",
+  "test_selectors": 167,
+  "example_selectors": 72,
+  "library_commands": 1,
+  "chunk_size": 2,
+  "test_chunks": 84,
+  "example_chunks": 36,
+  "selector_chunks_including_library": 121,
+  "doctest_commands": 1,
+  "planned_helper_commands": 122,
+  "basis": "Counts are derived from the preserved checks.json; the historical 132-command statement is not an acceptance receipt."
+}

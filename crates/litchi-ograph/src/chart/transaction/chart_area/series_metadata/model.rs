@@ -1,6 +1,6 @@
 //! Typed semantic values and transaction state for `Series` metadata.
 
-use super::super::super::super::{Chart, Count, DataKind, Series};
+use super::super::super::super::{Count, DataKind, Model, Series};
 use super::validation;
 use crate::{Error, Result};
 
@@ -19,7 +19,7 @@ pub struct Metadata {
 
 impl Metadata {
     /// Creates typed series metadata.  Wire-range validation is performed by
-    /// [`Transaction::set`] before the value can be published.
+    /// [`Edit::set`] before the value can be published.
     #[must_use]
     pub const fn new(
         category_kind: DataKind,
@@ -154,13 +154,13 @@ impl Patch {
 
     /// Number of effective metadata changes.
     #[must_use]
-    pub const fn len(&self) -> usize {
+    pub const fn change_count(&self) -> usize {
         self.changes.len()
     }
 
     /// Whether this patch is a semantic no-op.
     #[must_use]
-    pub const fn is_empty(&self) -> bool {
+    pub const fn is_noop(&self) -> bool {
         self.changes.is_empty()
     }
 
@@ -194,10 +194,10 @@ impl Patch {
     }
 
     /// Applies the patch to an exact matching parsed chart source.
-    pub fn apply(&self, chart: Chart) -> Result<Commit> {
+    pub fn apply(&self, chart: Model) -> Result<Commit> {
         let snapshot = Snapshot::from_chart(chart)?;
         if snapshot.source != self.source_before {
-            return Err(Error::UnsupportedMutation {
+            return Err(Error::PatchConflict {
                 operation: "series-metadata-patch",
                 reason: "patch source fingerprint does not match the target snapshot",
             });
@@ -213,19 +213,20 @@ impl Patch {
 /// Parsed chart snapshot with a validated `Series` record inventory.
 #[derive(Debug)]
 pub struct Snapshot {
-    pub(super) chart: Chart,
+    pub(super) chart: Model,
     pub(super) entries: Box<[Entry]>,
     pub(super) source: u64,
 }
 
 impl Snapshot {
     /// Captures a pristine parsed chart without copying its retained source.
-    pub fn from_chart(chart: Chart) -> Result<Self> {
+    pub fn from_chart(chart: Model) -> Result<Self> {
         if !chart.is_pristine() {
-            return Err(Error::UnsupportedMutation {
-                operation: "series-metadata-patch",
-                reason: "only a pristine parsed chart has a replayable source stream",
-            });
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "series-metadata-patch",
+                "only a pristine parsed chart has a replayable source stream",
+            )));
         }
         let scan = super::codec::scan(&chart)?;
         Ok(Self {
@@ -237,7 +238,7 @@ impl Snapshot {
 
     /// Borrow the unchanged chart snapshot.
     #[must_use]
-    pub const fn chart(&self) -> &Chart {
+    pub const fn chart(&self) -> &Model {
         &self.chart
     }
 
@@ -267,8 +268,8 @@ impl Snapshot {
 
     /// Starts a transaction consuming this snapshot.
     #[must_use]
-    pub fn edit(self) -> Transaction {
-        Transaction {
+    pub fn edit(self) -> Edit {
+        Edit {
             chart: self.chart,
             entries: self.entries,
             source: self.source,
@@ -278,58 +279,28 @@ impl Snapshot {
 
     /// Consumes the snapshot without editing it.
     #[must_use]
-    pub fn into_chart(self) -> Chart {
+    pub fn into_chart(self) -> Model {
         self.chart
     }
 }
 
-/// Published result of a successful series-metadata transaction.
-#[derive(Debug)]
-pub struct Commit {
-    chart: Chart,
-    patch: Patch,
-}
+/// A published series-metadata edit: the edited chart model, its patch and
+/// diagnostics.
+pub type Commit = litchi_core::edit::Commit<Model, Patch>;
 
-impl Commit {
-    pub(super) const fn new(chart: Chart, patch: Patch) -> Self {
-        Self { chart, patch }
-    }
-
-    /// Borrow the post-edit chart snapshot.
-    #[must_use]
-    pub const fn chart(&self) -> &Chart {
-        &self.chart
-    }
-
-    /// Borrow the reversible source-checked patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consume the commit and return the post-edit chart.
-    #[must_use]
-    pub fn into_chart(self) -> Chart {
-        self.chart
-    }
-
-    /// Split the commit into chart and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Chart, Patch) {
-        (self.chart, self.patch)
-    }
-}
+/// Content-free diagnostics of one series-metadata commit.
+pub use litchi_core::edit::Diagnostics;
 
 /// A bounded transaction over one parsed chart snapshot.
 #[derive(Debug)]
-pub struct Transaction {
-    pub(super) chart: Chart,
+pub struct Edit {
+    pub(super) chart: Model,
     pub(super) entries: Box<[Entry]>,
     pub(super) source: u64,
     pub(super) requests: Vec<Request>,
 }
 
-impl Transaction {
+impl Edit {
     /// Number of distinct staged metadata replacements.
     #[must_use]
     pub fn len(&self) -> usize {
@@ -358,8 +329,8 @@ impl Transaction {
             return Ok(self);
         }
         if self.requests.len() >= self.chart.limits.max_series {
-            return Err(Error::LimitExceeded {
-                resource: "series metadata edit count",
+            return Err(Error::Limit {
+                kind: crate::LimitKind::SeriesMetadataEdits,
                 observed: u64::try_from(self.requests.len().saturating_add(1)).unwrap_or(u64::MAX),
                 maximum: u64::try_from(self.chart.limits.max_series).unwrap_or(u64::MAX),
             });
@@ -382,7 +353,7 @@ impl Transaction {
         } = self;
         let current = super::codec::scan(&chart)?;
         if current.source != source {
-            return Err(Error::UnsupportedMutation {
+            return Err(Error::PatchConflict {
                 operation: "series-metadata-patch",
                 reason: "transaction source changed before publication",
             });
@@ -417,7 +388,8 @@ impl Transaction {
             super::codec::patch(&mut chart, source, &changes)?
         };
         let patch = Patch::new(source, source_after, changes);
-        Ok(Commit::new(chart, patch))
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(chart, patch, diagnostics))
     }
 
     fn set_expected(&mut self, change: Change) -> Result<&mut Self> {
@@ -426,13 +398,13 @@ impl Transaction {
             reason: "patch series index is outside the target chart",
         })?;
         if entry.offset != change.offset {
-            return Err(Error::UnsupportedMutation {
+            return Err(Error::PatchConflict {
                 operation: "series-metadata-patch",
                 reason: "patch Series record offset does not match the target snapshot",
             });
         }
         if entry.metadata != change.before {
-            return Err(Error::UnsupportedMutation {
+            return Err(Error::PatchConflict {
                 operation: "series-metadata-patch",
                 reason: "patch source metadata does not match the target snapshot",
             });

@@ -5,37 +5,44 @@ use litchi_xlsx::chain::{self, Cell, Chain, Conformance, Sheet};
 const CHAIN_CONTENT_TYPE: &str =
     "application/vnd.openxmlformats-officedocument.spreadsheetml.calcChain+xml";
 
-fn package() -> OpcPackage {
-    Package::create()
-        .expect("create workbook package")
-        .into_plain_opc()
+fn package() -> Package {
+    Package::new().expect("create workbook package")
 }
 
 #[test]
 fn calculation_chain_package_operations_preserve_the_canonical_owner() {
-    let mut package = package();
     let chain = Chain::new(Cell::new(Sheet::new(1).unwrap(), "D4").unwrap());
 
-    assert!(chain::put(&mut package, &chain, Conformance::Strict).unwrap());
+    let mut edit = package().edit_calculation_chain().unwrap();
+    assert!(edit.set(&chain, Conformance::Strict).unwrap());
     assert_eq!(
-        chain::load(&package).unwrap(),
+        edit.chain().unwrap(),
         Some((chain.clone(), Conformance::Strict))
     );
-    assert!(chain::remove(&mut package).unwrap());
-    assert_eq!(chain::load(&package).unwrap(), None);
-    assert!(!chain::remove(&mut package).unwrap());
+    let package = edit.commit().unwrap().into_package();
+    assert_eq!(
+        chain::load(&package.clone().into_plain_opc()).unwrap(),
+        Some((chain.clone(), Conformance::Strict))
+    );
+    let mut edit = package.edit_calculation_chain().unwrap();
+    assert!(edit.remove().unwrap());
+    assert_eq!(edit.chain().unwrap(), None);
+    assert!(!edit.remove().unwrap());
+    let package = edit.commit().unwrap().into_package();
+    assert_eq!(chain::load(&package.into_plain_opc()).unwrap(), None);
 }
 
 #[test]
 fn calculation_chain_survives_package_publication_and_reopen() {
-    let mut package = package();
     let chain = Chain::new(Cell::new(Sheet::new(1).unwrap(), "A1").unwrap());
-    chain::put(&mut package, &chain, Conformance::Transitional).unwrap();
+    let mut edit = package().edit_calculation_chain().unwrap();
+    edit.set(&chain, Conformance::Transitional).unwrap();
+    let package = edit.commit().unwrap().into_package().into_plain_opc();
 
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("chain-owner.xlsx");
     package.save(&path).unwrap();
-    let reopened = OpcPackage::open(&path).unwrap();
+    let reopened = OpcPackage::open(&path, litchi_opc::SourceLimits::default()).unwrap();
 
     assert_eq!(
         chain::load(&reopened).unwrap(),

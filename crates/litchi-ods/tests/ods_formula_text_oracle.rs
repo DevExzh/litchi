@@ -254,8 +254,11 @@ fn compare_function(function: &str) {
     );
 
     for row in rows.iter().filter(|row| row["function"] == function) {
-        let expression = Expression::parse(row["formula"].as_str().expect("formula"))
-            .unwrap_or_else(|error| panic!("{}: formula parse failed: {error}", row["id"]));
+        let expression = Expression::parse(
+            row["formula"].as_str().expect("formula"),
+            &Default::default(),
+        )
+        .unwrap_or_else(|error| panic!("{}: formula parse failed: {error}", row["id"]));
         for mode in [Mode::Scalar, Mode::Matrix] {
             let cells = Cells::from_row(row);
             let execution = execution(&format!("text-oracle-{function}-{}", row["id"]));

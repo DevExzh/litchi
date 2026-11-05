@@ -10,8 +10,8 @@ use std::sync::{
 };
 
 use litchi_core::{Error, ReadAt, SourceVersion};
-use litchi_odf_common::core::{OwnedPackage, PackageWriter, Profile, SourcePackageLimits};
-use litchi_odt::{Document, ReadLimits, SourceBackedDocument};
+use litchi_odf_common::core::{OwnedPackage, PackageWriter, Profile};
+use litchi_odt::{Package, SourceBackedDocument};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const MIME: &str = "application/vnd.oasis.opendocument.text";
@@ -49,7 +49,7 @@ fn package_with(
     meta: Option<&[u8]>,
     media: Option<&[u8]>,
 ) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", content).unwrap();
     if let Some(styles) = styles {
@@ -94,7 +94,8 @@ fn oversized_text_package() -> Vec<u8> {
     let manifest = format!(
         r#"<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="{MIME}"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/></manifest:manifest>"#
     );
-    let mut archive = StreamingArchiveWriter::new();
+    let mut archive =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     archive.write_stored("mimetype", MIME.as_bytes()).unwrap();
     archive
         .write_deflated("content.xml", content.as_bytes())
@@ -106,7 +107,7 @@ fn oversized_text_package() -> Vec<u8> {
 }
 
 fn password_package(password: &str) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer
         .set_encryption(password, Profile::compatible())
@@ -233,7 +234,7 @@ impl ReadAt for CountingSource {
 #[test]
 fn source_facade_matches_owned_semantics_and_can_materialize() {
     let bytes = package();
-    let eager = Document::from_bytes(bytes.clone()).unwrap();
+    let eager = Package::from_bytes(&bytes).unwrap().document().unwrap();
     let source = SourceBackedDocument::from_read_at(Arc::new(CountingSource::new(bytes))).unwrap();
 
     assert_eq!(source.text().unwrap(), eager.text().unwrap());
@@ -307,13 +308,16 @@ fn source_facade_matches_owned_semantics_and_can_materialize() {
     );
 
     let materialized = source.materialize().unwrap();
-    assert_eq!(materialized.text().unwrap(), eager.text().unwrap());
+    assert_eq!(
+        materialized.document().unwrap().text().unwrap(),
+        eager.text().unwrap()
+    );
 }
 
 #[test]
 fn source_facade_text_cache_has_thresholded_freshness_vector_and_fresh_hits() {
     let bytes = package();
-    let eager = Document::from_bytes(bytes.clone()).unwrap();
+    let eager = Package::from_bytes(&bytes).unwrap().document().unwrap();
     let source = Arc::new(CountingSource::new(bytes));
     let document = SourceBackedDocument::from_read_at(source.clone()).unwrap();
     let expected = eager.text().unwrap();
@@ -345,7 +349,12 @@ fn source_facade_text_cache_is_safe_for_concurrent_first_construction() {
     assert_send_sync::<SourceBackedDocument>();
 
     let bytes = package();
-    let expected = Document::from_bytes(bytes.clone()).unwrap().text().unwrap();
+    let expected = Package::from_bytes(&bytes)
+        .unwrap()
+        .document()
+        .unwrap()
+        .text()
+        .unwrap();
     let source = Arc::new(CountingSource::new(bytes));
     let document = Arc::new(SourceBackedDocument::from_read_at(source.clone()).unwrap());
 
@@ -502,17 +511,25 @@ fn source_facade_reports_stale_source_before_queries_and_materialization() {
 #[test]
 fn source_facade_enforces_source_limits_and_family_validation() {
     let bytes = package();
-    let limits = ReadLimits::default().with_max_source_bytes((bytes.len() - 1) as u64);
+    let limits = litchi_odf_common::SourceLimits::builder()
+        .max_input_bytes((bytes.len() - 1) as u64)
+        .unwrap()
+        .build()
+        .unwrap();
     assert!(matches!(
-        SourceBackedDocument::from_read_at_with_limits(
+        SourceBackedDocument::from_read_at_with_options(
             Arc::new(CountingSource::new(bytes.clone())),
-            limits,
+            litchi_odf_common::OpenOptions::new().source_limits(limits)
         ),
-        Err(Error::ResourceLimit(_))
+        Err(litchi_odt::Error::Limit {
+            kind: litchi_odt::LimitKind::Source(litchi_odt::SourceLimitKind::InputBytes),
+            ..
+        })
     ));
 
     let wrong_mime = {
-        let mut writer = PackageWriter::new();
+        let mut writer =
+            PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.spreadsheet")
             .unwrap();
@@ -588,7 +605,7 @@ fn source_facade_retains_lazy_semantic_meta_errors() {
         Some(malformed_but_utf8.as_bytes()),
         None,
     );
-    let eager = Document::from_bytes(bytes.clone()).unwrap();
+    let eager = Package::from_bytes(&bytes).unwrap().document().unwrap();
     let source = SourceBackedDocument::from_read_at(Arc::new(CountingSource::new(bytes))).unwrap();
     assert!(eager.metadata().is_err());
     assert!(source.metadata().is_err());
@@ -602,7 +619,10 @@ fn source_facade_supports_passwords_and_exported_send_sync() {
 
     let password = "source-password";
     let bytes = password_package(password);
-    let eager = Document::from_bytes_with_password(bytes.clone(), password).unwrap();
+    let eager = Package::from_bytes_with_password(&bytes, password)
+        .unwrap()
+        .document()
+        .unwrap();
     let source = SourceBackedDocument::from_read_at_with_password(
         Arc::new(CountingSource::new(bytes.clone())),
         password,
@@ -616,8 +636,6 @@ fn source_facade_supports_passwords_and_exported_send_sync() {
         )
         .is_err()
     );
-
-    let _: Option<ReadLimits> = None;
 }
 
 #[cfg(any(unix, windows))]
@@ -626,9 +644,9 @@ fn source_facade_opens_filesystem_paths_without_changing_semantics() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("source.odt");
     let bytes = package();
-    let eager = Document::from_bytes(bytes.clone()).unwrap();
+    let eager = Package::from_bytes(&bytes).unwrap().document().unwrap();
     std::fs::write(&path, bytes).unwrap();
-    let source = SourceBackedDocument::from_path(&path).unwrap();
+    let source = SourceBackedDocument::open(&path).unwrap();
     assert_eq!(source.text().unwrap(), eager.text().unwrap());
 }
 
@@ -640,15 +658,11 @@ fn source_facade_rejects_unsafe_member_paths() {
     assert!(source.media_data("../outside.bin").is_err());
 }
 
-#[allow(dead_code)]
-fn _limits_type_is_shared() {
-    let _: SourcePackageLimits = ReadLimits::default();
-}
-
 fn replace_member(bytes: &[u8], target: &str, replacement: &[u8]) -> Vec<u8> {
     let package = OwnedPackage::from_bytes(bytes.to_vec()).unwrap();
     let names = package.files().unwrap();
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in names {
         let data = if name == target {
             replacement.to_vec()

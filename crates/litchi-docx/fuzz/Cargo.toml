@@ -12,6 +12,7 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 litchi-docx = { path = ".." }
+litchi-core = { path = "../../litchi-core" }
 
 [[bin]]
 name = "parse_docx"
@@ -30,6 +31,48 @@ bench = false
 [[bin]]
 name = "source_backed_tail_append_stream"
 path = "fuzz_targets/source_backed_tail_append_stream.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "sequential_ingress"
+path = "fuzz_targets/sequential_ingress.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "smoke_sequential_ingress"
+path = "fuzz_targets/smoke_sequential_ingress.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "direct_properties"
+path = "fuzz_targets/direct_properties.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "smoke_direct_properties"
+path = "fuzz_targets/smoke_direct_properties.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "formatting"
+path = "fuzz_targets/formatting.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "smoke_formatting"
+path = "fuzz_targets/smoke_formatting.rs"
 test = false
 doc = false
 bench = false

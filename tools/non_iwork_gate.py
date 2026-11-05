@@ -5,8 +5,11 @@ The workspace deliberately keeps the Apple iWork packages in the same Cargo
 workspace as the Office and ODF packages.  This gate is the cheap, explicit
 non-iWork slice: it derives the package and facade-feature sets from Cargo
 metadata, checks every selected dependency tree, and then runs the requested
-Cargo operation with the 46 ordinary packages plus the safe facade feature
-closure.  Library tests and the other high-memory modes serialize package
+Cargo operation with the 47 ordinary packages plus the safe facade feature
+closure.  The unified layer (``litchi-ops`` and the ``litchi-cli`` binary on
+top of it) reads and writes iWork since record 0296 (owner decision D1), so
+it is excluded from the bulk slice like the iWork packages themselves; the
+facade's safe feature closures still reach it, without its iWork features.  Library tests and the other high-memory modes serialize package
 roots; library tests clean each successful root's artifacts to keep its test
 target from retaining every package's test binaries at once.
 
@@ -65,17 +68,23 @@ IWORK_LEAF_PACKAGES = frozenset(
         "litchi-pages",
     }
 )
-IWORK_PACKAGE_PREFIX = "litchi-iwa"
-EXPECTED_IWORK_PACKAGES = 17
-EXPECTED_EXCLUDED_PACKAGES = 18
-EXPECTED_BULK_PACKAGES = 46
+IWORK_PACKAGE_PREFIX = "litchi-iwa-"
+EXPECTED_IWORK_PACKAGES = 18
+EXPECTED_EXCLUDED_PACKAGES = 21
+EXPECTED_BULK_PACKAGES = 47
+
+# The unified operations layer depends on the iWork leaves under its
+# `pages`, `keynote` and `numbers` features (owner decision D1, record 0296),
+# and the command line depends on it. Both leave the bulk slice; the facade's
+# safe feature closures may still contain them, because those closures turn
+# on none of their iWork features (the tree checks below prove it).
+EXPECTED_UNIFIED_PACKAGE_NAMES = frozenset({"litchi-cli", "litchi-ops"})
 
 # The release gate is intentionally audited against the current workspace
 # topology, not merely package counts.  A rename, swap, or newly added member
 # must update this inventory and its review before it can enter the gate.
 EXPECTED_IWORK_PACKAGE_NAMES = frozenset(
     {
-        "litchi-iwa",
         "litchi-iwa-archive",
         "litchi-iwa-cache",
         "litchi-iwa-common",
@@ -86,6 +95,8 @@ EXPECTED_IWORK_PACKAGE_NAMES = frozenset(
         "litchi-iwa-package",
         "litchi-iwa-protos",
         "litchi-iwa-structured",
+        "litchi-iwa-style",
+        "litchi-iwa-table",
         "litchi-iwa-text",
         "litchi-iwa-text-wire",
         "litchi-keynote",
@@ -96,7 +107,6 @@ EXPECTED_IWORK_PACKAGE_NAMES = frozenset(
 )
 EXPECTED_EXCLUDED_PACKAGE_NAMES = frozenset(
     {
-        "litchi-iwa",
         "litchi-iwa-archive",
         "litchi-iwa-cache",
         "litchi-iwa-common",
@@ -107,6 +117,8 @@ EXPECTED_EXCLUDED_PACKAGE_NAMES = frozenset(
         "litchi-iwa-package",
         "litchi-iwa-protos",
         "litchi-iwa-structured",
+        "litchi-iwa-style",
+        "litchi-iwa-table",
         "litchi-iwa-text",
         "litchi-iwa-text-wire",
         "litchi-keynote",
@@ -114,6 +126,8 @@ EXPECTED_EXCLUDED_PACKAGE_NAMES = frozenset(
         "litchi-numbers-wire",
         "litchi-pages",
         "litchi-py",
+        "litchi-cli",
+        "litchi-ops",
     }
 )
 EXPECTED_BULK_PACKAGE_NAMES = frozenset(
@@ -152,6 +166,7 @@ EXPECTED_BULK_PACKAGE_NAMES = frozenset(
         "litchi-pptx",
         "litchi-rtf",
         "litchi-sheet",
+        "litchi-sheet-text",
         "litchi-sign",
         "litchi-slide",
         "litchi-spreadsheet-drawing",
@@ -171,6 +186,7 @@ EXPECTED_WORKSPACE_PACKAGE_NAMES = frozenset(
         "litchi",
         "litchi-biff",
         "litchi-cfb",
+        "litchi-cli",
         "litchi-codepage",
         "litchi-core",
         "litchi-crypto",
@@ -181,7 +197,6 @@ EXPECTED_WORKSPACE_PACKAGE_NAMES = frozenset(
         "litchi-fonts",
         "litchi-formula",
         "litchi-imgconv",
-        "litchi-iwa",
         "litchi-iwa-archive",
         "litchi-iwa-cache",
         "litchi-iwa-common",
@@ -192,6 +207,8 @@ EXPECTED_WORKSPACE_PACKAGE_NAMES = frozenset(
         "litchi-iwa-package",
         "litchi-iwa-protos",
         "litchi-iwa-structured",
+        "litchi-iwa-style",
+        "litchi-iwa-table",
         "litchi-iwa-text",
         "litchi-iwa-text-wire",
         "litchi-keynote",
@@ -214,6 +231,7 @@ EXPECTED_WORKSPACE_PACKAGE_NAMES = frozenset(
         "litchi-ole-common",
         "litchi-ooxml-common",
         "litchi-opc",
+        "litchi-ops",
         "litchi-oth",
         "litchi-pages",
         "litchi-ppt",
@@ -221,6 +239,7 @@ EXPECTED_WORKSPACE_PACKAGE_NAMES = frozenset(
         "litchi-py",
         "litchi-rtf",
         "litchi-sheet",
+        "litchi-sheet-text",
         "litchi-sign",
         "litchi-slide",
         "litchi-spreadsheet-drawing",
@@ -405,6 +424,15 @@ class WorkspacePlan:
     bulk_packages: frozenset[str]
     safe_facade_features: frozenset[str]
     unsafe_facade_features: frozenset[str]
+    # Excluded from the bulk slice but allowed in the safe facade trees:
+    # the iWork-capable unified layer (record 0296).
+    unified_packages: frozenset[str] = frozenset()
+
+    @property
+    def facade_forbidden_packages(self) -> frozenset[str]:
+        """Packages no safe facade feature tree may contain."""
+
+        return frozenset(self.excluded_packages - self.unified_packages)
 
 
 @dataclass(frozen=True)
@@ -954,6 +982,11 @@ def _metadata_packages(metadata: Mapping[str, Any]) -> dict[str, Package]:
             if dependency.path is None:
                 continue
             dependency_dir = dependency.path.resolve()
+            if (dependency_dir.parent == ROOT / "vendor"
+                    and dependency.original_name not in packages):
+                # A vendored third-party crate (`vendor/<name>`, excluded
+                # from the workspace) is an external dependency, never iWork.
+                continue
             if dependency_dir not in package_dirs:
                 raise GateError(
                     f"package {package.name!r} dependency {dependency.name!r} path "
@@ -974,9 +1007,7 @@ def _iwork_packages(package_names: Iterable[str]) -> frozenset[str]:
     return frozenset(
         name
         for name in package_names
-        if name == IWORK_PACKAGE_PREFIX
-        or name.startswith(f"{IWORK_PACKAGE_PREFIX}-")
-        or name in IWORK_LEAF_PACKAGES
+        if name.startswith(IWORK_PACKAGE_PREFIX) or name in IWORK_LEAF_PACKAGES
     )
 
 
@@ -1159,6 +1190,37 @@ def _require_bulk_dependency_boundary(
                 + f"{dependency.original_name!r} (" + ", ".join(details) + ")"
             )
 
+def _unified_packages(
+    packages: Mapping[str, Package],
+    iwork_packages: frozenset[str],
+    unsafe_dependents: Iterable[str],
+) -> frozenset[str]:
+    """Return the non-iWork packages that reach an iWork package.
+
+    A package that declares any dependency (optional ones included) on an
+    iWork package, or on such a package, is iWork-capable: its
+    ``--all-features`` tree contains iWork. The facade and its unsafe
+    dependents are gated separately and are not part of this set.
+    """
+
+    skip = set(iwork_packages) | set(unsafe_dependents) | {FACADE_PACKAGE}
+    reaching: set[str] = set()
+    changed = True
+    while changed:
+        changed = False
+        for name, package in packages.items():
+            if name in skip or name in reaching:
+                continue
+            if any(
+                dependency.original_name in iwork_packages
+                or dependency.original_name in reaching
+                for dependency in package.dependencies
+            ):
+                reaching.add(name)
+                changed = True
+    return frozenset(reaching)
+
+
 def derive_plan(metadata: Mapping[str, Any]) -> WorkspacePlan:
     """Derive and validate the exact non-iWork package/feature plan."""
 
@@ -1221,7 +1283,17 @@ def derive_plan(metadata: Mapping[str, Any]) -> WorkspacePlan:
         frozenset({PY_FACADE_PACKAGE}),
         "unsafe facade dependent inventory",
     )
-    excluded_packages = frozenset(iwork_packages | unsafe_dependents)
+    # Only the reviewed unified packages leave the bulk slice; any other
+    # package that reaches iWork stays a bulk root and fails the bulk
+    # dependency boundary below with the edge that pulls it in.
+    reaching = _unified_packages(packages, iwork_packages, unsafe_dependents)
+    unified_packages = frozenset(reaching & EXPECTED_UNIFIED_PACKAGE_NAMES)
+    _require_exact_package_set(
+        unified_packages,
+        EXPECTED_UNIFIED_PACKAGE_NAMES,
+        "iWork-capable unified package inventory",
+    )
+    excluded_packages = frozenset(iwork_packages | unsafe_dependents | unified_packages)
     _require_exact_package_set(
         excluded_packages,
         EXPECTED_EXCLUDED_PACKAGE_NAMES,
@@ -1261,6 +1333,7 @@ def derive_plan(metadata: Mapping[str, Any]) -> WorkspacePlan:
         bulk_packages=bulk_packages,
         safe_facade_features=safe_features,
         unsafe_facade_features=unsafe_features,
+        unified_packages=unified_packages,
     )
 
 
@@ -1630,7 +1703,7 @@ def command_specs(cargo: str, plan: WorkspacePlan, mode: str) -> tuple[CommandSp
         #
         # Unlike the workspace modes this main command does not serialize its
         # test threads.  The bulk modes serialize because a single invocation
-        # over 46 roots keeps every test binary alive until the final link; one
+        # over 47 roots keeps every test binary alive until the final link; one
         # standalone project has no such fan-out, and serializing its 531-test
         # default suite measured 1,870 s against 581 s at Cargo's default
         # parallelism.  The allocator binary is a separate command below: its
@@ -1727,7 +1800,7 @@ def command_specs(cargo: str, plan: WorkspacePlan, mode: str) -> tuple[CommandSp
             )
         )
         return tuple(specs)
-    # All features are intentional for bulk roots: each of the 46 packages
+    # All features are intentional for bulk roots: each of the 47 packages
     # must prove that its non-default feature surface remains non-iWork.  Each
     # root is isolated so Cargo does not retain every high-memory target in a
     # single workspace invocation.  The facade is selected separately with
@@ -1963,7 +2036,8 @@ def verify_dependency_trees(cargo: str, plan: WorkspacePlan) -> tuple[int, int]:
             "safe facade default feature tree",
         )
         default_forbidden = (
-            set(plan.excluded_packages) | set(_protobuf_packages(default_entries))
+            set(plan.facade_forbidden_packages)
+            | set(_protobuf_packages(default_entries))
         ) & default_entries.keys()
         if default_forbidden:
             raise GateError(
@@ -1981,7 +2055,7 @@ def verify_dependency_trees(cargo: str, plan: WorkspacePlan) -> tuple[int, int]:
             entries, plan, {FACADE_PACKAGE}, f"safe facade feature {feature!r} tree"
         )
         forbidden = (
-            set(plan.excluded_packages) | set(_protobuf_packages(entries))
+            set(plan.facade_forbidden_packages) | set(_protobuf_packages(entries))
         ) & entries.keys()
         if forbidden:
             raise GateError(
@@ -2000,7 +2074,8 @@ def verify_dependency_trees(cargo: str, plan: WorkspacePlan) -> tuple[int, int]:
         "combined safe facade feature tree",
     )
     combined_forbidden = (
-        set(plan.excluded_packages) | set(_protobuf_packages(combined_entries))
+        set(plan.facade_forbidden_packages)
+        | set(_protobuf_packages(combined_entries))
     ) & combined_entries.keys()
     if combined_forbidden:
         raise GateError(
@@ -2679,6 +2754,7 @@ def print_plan(plan: WorkspacePlan) -> None:
     print(f"facade_safe_features={len(plan.safe_facade_features)}")
     print(f"facade_unsafe_features={len(plan.unsafe_facade_features)}")
     print("excluded=" + ",".join(sorted(plan.excluded_packages)))
+    print("unified=" + ",".join(sorted(plan.unified_packages)))
     print("bulk=" + ",".join(sorted(plan.bulk_packages)))
     print("facade-safe=" + ",".join(sorted(plan.safe_facade_features)))
     print("facade-unsafe=" + ",".join(sorted(plan.unsafe_facade_features)))

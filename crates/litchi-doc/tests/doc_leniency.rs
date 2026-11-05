@@ -34,16 +34,37 @@
 
 //! Opt-in tolerance for non-structural DOC stylesheet defects.
 
-use litchi_doc::tracked_revision::Limits;
 use litchi_doc::writer::{BookmarkEntry, CommentEntry};
 use litchi_doc::{
-    AuxiliaryTableDefect, BookmarkDefect, CommentDefect, Defect, Leniency, OpenOptions, Package,
+    AuxiliaryTableDefect, BookmarkDefect, Builder, CommentDefect, Defect, Leniency, OpenOptions,
     PapxDefect, PieceDefect, SectionDefect, SprmDefect, StshifDefect, StyleDefect,
-    StylesheetDefect, TableDefinitionDefect, Writer,
+    StylesheetDefect, TableDefinitionDefect, raw::Reader,
 };
-use litchi_ole_common::object::{Editor as PackageEditor, Targets};
+use litchi_ole_common::object::{
+    Edit as PackageEditor, Limits, OpenOptions as ObjectOpenOptions, Package as ObjectPackage,
+    Targets,
+};
 use std::io::Cursor;
 use std::path::PathBuf;
+
+fn open_object(
+    bytes: Vec<u8>,
+    targets: Targets,
+    limits: Limits,
+) -> Result<PackageEditor, litchi_ole_common::Error> {
+    ObjectPackage::open_with_options(
+        bytes,
+        ObjectOpenOptions::new().targets(targets).limits(limits),
+    )?
+    .edit()
+}
+
+fn object_bytes(editor: &PackageEditor) -> Vec<u8> {
+    let package = editor.clone().commit().unwrap().into_package();
+    let mut bytes = Vec::new();
+    package.write_to(&mut bytes).unwrap();
+    bytes
+}
 
 fn fixture(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -55,7 +76,7 @@ fn fixture(name: &str) -> PathBuf {
 /// enforces that. The fixture is a real Word document that violates it.
 #[test]
 fn duplicate_style_names_are_rejected_by_default() {
-    let mut package = Package::open(fixture("duplicate-style-names.doc")).expect("container opens");
+    let mut package = Reader::open(fixture("duplicate-style-names.doc")).expect("container opens");
 
     match package.document() {
         Err(error) => assert!(
@@ -70,12 +91,10 @@ fn duplicate_style_names_are_rejected_by_default() {
 /// reference resolves a style by index — so the text and structure are intact.
 #[test]
 fn opting_in_recovers_the_document_and_records_the_repair() {
-    let mut package = Package::open(fixture("duplicate-style-names.doc")).expect("container opens");
+    let mut package = Reader::open(fixture("duplicate-style-names.doc")).expect("container opens");
 
     let document = package
-        .document_with_options(
-            OpenOptions::default().with_leniency(Leniency::TolerateStylesheetDefects),
-        )
+        .document_with_options(OpenOptions::default().leniency(Leniency::TolerateStylesheetDefects))
         .expect("a duplicated style name is repairable");
 
     let text = document.text().expect("text is extractable");
@@ -123,12 +142,12 @@ fn opting_in_recovers_the_document_and_records_the_repair() {
 fn structural_defects_stay_fatal_when_tolerating_stylesheet_defects() {
     // Word 6.0 predates the table stream entirely; no stylesheet tolerance can
     // make it readable.
-    let mut package = Package::open(fixture("word6-no-table-stream.doc")).expect("container opens");
+    let mut package = Reader::open(fixture("word6-no-table-stream.doc")).expect("container opens");
 
     assert!(
         package
             .document_with_options(
-                OpenOptions::default().with_leniency(Leniency::TolerateStylesheetDefects),
+                OpenOptions::default().leniency(Leniency::TolerateStylesheetDefects),
             )
             .is_err(),
         "leniency must not extend past the stylesheet"
@@ -139,9 +158,9 @@ fn structural_defects_stay_fatal_when_tolerating_stylesheet_defects() {
 #[test]
 fn a_conforming_document_records_no_repairs() {
     for leniency in [Leniency::Strict, Leniency::TolerateStylesheetDefects] {
-        let mut package = Package::open(fixture("Lists.doc")).expect("container opens");
+        let mut package = Reader::open(fixture("Lists.doc")).expect("container opens");
         let document = package
-            .document_with_options(OpenOptions::default().with_leniency(leniency))
+            .document_with_options(OpenOptions::default().leniency(leniency))
             .expect("a conforming document parses under either contract");
 
         if let Some(stylesheet) = document.stylesheet() {
@@ -161,20 +180,24 @@ fn a_conforming_document_records_no_repairs() {
 // Optional auxiliary tables and Stshif reserved bytes (default repairs)
 // ──────────────────────────────────────────────────────────────────────────
 
-fn writer_document(build: impl FnOnce(&mut Writer)) -> Vec<u8> {
-    let mut writer = Writer::new();
+fn writer_document(build: impl FnOnce(&mut Builder)) -> Vec<u8> {
+    let mut writer = Builder::new();
     writer
         .add_paragraph("Body text for the leniency fixtures.")
         .expect("fixture paragraph");
     build(&mut writer);
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).expect("fixture DOC");
+    writer
+        .build()
+        .unwrap()
+        .write_to(&mut output)
+        .expect("fixture DOC");
     output.into_inner()
 }
 
 /// Rewrite the `WordDocument` stream inside a DOC package.
 fn edit_word_stream(bytes: &[u8], edit: impl FnOnce(&mut Vec<u8>)) -> Vec<u8> {
-    let mut package = PackageEditor::open(bytes.to_vec(), Targets::default(), Limits::default())
+    let mut package = open_object(bytes.to_vec(), Targets::default(), Limits::default())
         .expect("fixture package");
     let word_path = ["WordDocument".to_string()];
     let mut word = package
@@ -185,12 +208,12 @@ fn edit_word_stream(bytes: &[u8], edit: impl FnOnce(&mut Vec<u8>)) -> Vec<u8> {
     package
         .put_stream(&word_path, word)
         .expect("edited WordDocument stream");
-    package.finish().expect("edited package")
+    object_bytes(&package)
 }
 
 /// Point one FIB table entry at a one-byte range, which every auxiliary
 /// table parser rejects. The declared pointer count is raised when the index
-/// lies past the Writer's Word 2002 layout; the added entries land in the
+/// lies past the Builder's Word 2002 layout; the added entries land in the
 /// zeroed slack between the FIB and the text, never in document content.
 fn break_table_pointer(word: &mut [u8], index: usize) {
     let declared = usize::from(u16::from_le_bytes([word[152], word[153]]));
@@ -203,7 +226,7 @@ fn break_table_pointer(word: &mut [u8], index: usize) {
 }
 
 fn open_degraded(bytes: Vec<u8>) -> litchi_doc::Document {
-    let mut package = Package::from_reader(Cursor::new(bytes)).expect("package opens");
+    let mut package = Reader::from_reader(Cursor::new(bytes)).expect("package opens");
     package
         .document()
         .expect("degraded optional tables must not fail the open")
@@ -336,7 +359,7 @@ fn a_malformed_revision_author_table_does_not_cascade() {
 fn stshif_reserved_bytes_are_ignored_and_recorded() {
     let bytes = writer_document(|_| {});
     let mut package =
-        PackageEditor::open(bytes, Targets::default(), Limits::default()).expect("fixture package");
+        open_object(bytes, Targets::default(), Limits::default()).expect("fixture package");
     let word_path = ["WordDocument".to_string()];
     let word = package
         .stream(&word_path)
@@ -359,7 +382,7 @@ fn stshif_reserved_bytes_are_ignored_and_recorded() {
     package
         .put_stream(&table_path, table)
         .expect("edited table stream");
-    let bytes = package.finish().expect("edited package");
+    let bytes = object_bytes(&package);
 
     let document = open_degraded(bytes);
     let stylesheet = document.stylesheet().expect("stylesheet parses");
@@ -403,7 +426,7 @@ fn stylesheet_framing_stays_fatal() {
         word[pair + 4..pair + 8].copy_from_slice(&4u32.to_le_bytes());
     });
 
-    let mut package = Package::from_reader(Cursor::new(bytes)).expect("package opens");
+    let mut package = Reader::from_reader(Cursor::new(bytes)).expect("package opens");
     assert!(
         package.document().is_err(),
         "stylesheet framing must stay fatal under the default contract"
@@ -414,7 +437,7 @@ fn stylesheet_framing_stays_fatal() {
 /// the table stream and the stylesheet's offset within it.
 fn edit_stylesheet(bytes: Vec<u8>, edit: impl FnOnce(&mut [u8], usize)) -> Vec<u8> {
     let mut package =
-        PackageEditor::open(bytes, Targets::default(), Limits::default()).expect("fixture package");
+        open_object(bytes, Targets::default(), Limits::default()).expect("fixture package");
     let word = package
         .stream(&["WordDocument".to_string()])
         .expect("WordDocument stream")
@@ -432,7 +455,7 @@ fn edit_stylesheet(bytes: Vec<u8>, edit: impl FnOnce(&mut [u8], usize)) -> Vec<u
     package
         .put_stream(&table_path, table)
         .expect("edited table stream");
-    package.finish().expect("edited package")
+    object_bytes(&package)
 }
 
 /// Offset of the first style record (`STD`, istd 0) within the table stream.
@@ -445,7 +468,7 @@ fn first_std_offset(table: &[u8], stsh_offset: usize) -> usize {
     assert_ne!(
         u16::from_le_bytes([table[lpstd], table[lpstd + 1]]),
         0,
-        "the Writer always emits the Normal style"
+        "the Builder always emits the Normal style"
     );
     lpstd + 2
 }
@@ -484,7 +507,7 @@ fn reserved_grfstd_bits_are_ignored_and_recorded() {
 /// `WordDocument` stream (for FIB pointers) and the table stream.
 fn edit_table_stream(bytes: Vec<u8>, edit: impl FnOnce(&[u8], &mut [u8])) -> Vec<u8> {
     let mut package =
-        PackageEditor::open(bytes, Targets::default(), Limits::default()).expect("fixture package");
+        open_object(bytes, Targets::default(), Limits::default()).expect("fixture package");
     let word = package
         .stream(&["WordDocument".to_string()])
         .expect("WordDocument stream")
@@ -500,7 +523,7 @@ fn edit_table_stream(bytes: Vec<u8>, edit: impl FnOnce(&[u8], &mut [u8])) -> Vec
     package
         .put_stream(&table_path, table)
         .expect("edited table stream");
-    package.finish().expect("edited package")
+    object_bytes(&package)
 }
 
 /// The table-stream offset stored for one FIB `rgFcLcb` pointer.
@@ -605,7 +628,7 @@ fn first_tc80_offset(word: &[u8]) -> usize {
     let sprm = word
         .windows(2)
         .position(|pair| pair == [0x08, 0xD6])
-        .expect("the Writer emits sprmTDefTable for a table row");
+        .expect("the Builder emits sprmTDefTable for a table row");
     let itc_mac = usize::from(word[sprm + 4]);
     sprm + 5 + (itc_mac + 1) * 2
 }
@@ -700,7 +723,7 @@ fn unused_tc80_encodings_are_repaired_per_cell() {
 /// FIB pointer `index` (12 = `PlcfBteChpx`, 13 = `PlcfBtePapx`), plus that
 /// pointer's table-stream offset.
 fn first_bin_table_page(bytes: &[u8], index: usize) -> (usize, usize) {
-    let package = PackageEditor::open(bytes.to_vec(), Targets::default(), Limits::default())
+    let package = open_object(bytes.to_vec(), Targets::default(), Limits::default())
         .expect("fixture package");
     let word = package
         .stream(&["WordDocument".to_string()])
@@ -776,7 +799,7 @@ fn an_unreachable_papx_page_is_skipped_and_recorded() {
 fn papx_alignment_padding_is_trimmed_by_default_and_recorded() {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/poi/test-data/document/test.doc");
-    let mut package = Package::open(path).expect("container opens");
+    let mut package = Reader::open(path).expect("container opens");
     let document = package
         .document()
         .expect("the producer pad no longer needs an opt-in");
@@ -833,7 +856,7 @@ fn section_page_border_defects_are_repaired_and_recorded() {
         let sprm = word
             .windows(4)
             .position(|bytes| bytes == [0x2B, 0x70, 8, 0x01])
-            .expect("the Writer emits sprmSBrcTop80");
+            .expect("the Builder emits sprmSBrcTop80");
         word[sprm + 4] = 0x11; // ico 17
         word[sprm + 5] |= 0x80; // reserved effect bit
     });
@@ -873,7 +896,7 @@ fn an_unresolvable_piece_modifier_is_ignored_and_recorded() {
 
     let bytes = edit_table_stream(clean, |word, table| {
         let clx = table_pointer(word, 33);
-        assert_eq!(table[clx], 0x02, "the Writer emits no RgPrc");
+        assert_eq!(table[clx], 0x02, "the Builder emits no RgPrc");
         let lcb = usize::try_from(u32::from_le_bytes(
             table[clx + 1..clx + 5].try_into().unwrap(),
         ))
@@ -906,11 +929,11 @@ fn an_unresolvable_piece_modifier_is_ignored_and_recorded() {
 fn container_repairs_join_the_document_report() {
     let clean = writer_document(|_| {});
     let mut package =
-        PackageEditor::open(clean, Targets::default(), Limits::default()).expect("fixture package");
+        open_object(clean, Targets::default(), Limits::default()).expect("fixture package");
     package
         .add_stream(vec!["LeniencyProbe".to_string()], vec![0xAB; 5000])
         .expect("probe stream");
-    let with_probe = package.finish().expect("package with probe");
+    let with_probe = object_bytes(&package);
 
     let conformant = open_degraded(with_probe.clone());
     assert!(
@@ -1079,7 +1102,7 @@ fn property_set_repairs_join_the_document_report() {
     assert!(open_degraded(clean.clone()).tolerance_report().is_clean());
 
     let mut package =
-        PackageEditor::open(clean, Targets::default(), Limits::default()).expect("fixture package");
+        open_object(clean, Targets::default(), Limits::default()).expect("fixture package");
     let path = vec!["\u{5}SummaryInformation".to_string()];
     let stream = summary_information_with_unpaired_surrogate();
     if package.stream(&path).is_some() {
@@ -1087,7 +1110,7 @@ fn property_set_repairs_join_the_document_report() {
     } else {
         package.add_stream(path, stream).expect("summary stream");
     }
-    let bytes = package.finish().expect("package with lossy metadata");
+    let bytes = object_bytes(&package);
 
     let document = open_degraded(bytes.clone());
     assert!(document.text().unwrap().contains("Body text"));
@@ -1102,7 +1125,7 @@ fn property_set_repairs_join_the_document_report() {
     );
     // The metadata accessor still hands the lossy title back with its own
     // report.
-    let summary = Package::from_reader(Cursor::new(bytes))
+    let summary = Reader::from_reader(Cursor::new(bytes))
         .unwrap()
         .summary_information()
         .unwrap()

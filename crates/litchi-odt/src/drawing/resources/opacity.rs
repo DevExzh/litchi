@@ -279,7 +279,7 @@ impl Collection {
     }
 }
 
-impl crate::Package {
+impl crate::GenericPackage {
     pub fn drawing_opacities(&self) -> Result<Collection> {
         let styles = self.styles_xml()?;
         parse_drawing_opacities(styles.as_deref().unwrap_or_default())

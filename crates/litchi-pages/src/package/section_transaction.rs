@@ -3,7 +3,7 @@
 use std::num::NonZeroU64;
 
 use litchi_core::Position;
-use litchi_iwa_archive::{SourceCatalog, package::EntryEdit};
+use litchi_iwa_archive::package::EntryEdit;
 use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes, varint::encoded_len, wire::WireView,
 };
@@ -277,7 +277,7 @@ impl TransactionBudget {
             .ok_or_else(|| derived_limit_overflow(kind))?;
         let maximum = self.maximum_limit(kind);
         if amount > maximum {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 path,
                 kind,
                 observed: usize_to_u64(amount),
@@ -419,7 +419,7 @@ impl TransactionBudget {
         let residual = |kind: LimitKind, required: usize| {
             let maximum = self.remaining_limit(kind);
             if maximum < required {
-                return Err(Error::LimitExceeded {
+                return Err(Error::Limit {
                     path,
                     kind,
                     observed: usize_to_u64(required),
@@ -444,7 +444,7 @@ impl TransactionBudget {
                 field,
                 value,
                 maximum,
-            } => Error::LimitExceeded {
+            } => Error::Limit {
                 path,
                 kind: match field {
                     "message bytes" => LimitKind::WireInputBytes,
@@ -483,10 +483,19 @@ impl TransactionBudget {
             .limits()
             .effective_archive_limits()
             .map_err(map_archive_error)?;
-        let source_archive_bytes = component
-            .archive()
-            .encoded_len_with_limits(archive_limits)
-            .map_err(map_core_error)?;
+        let snappy_limits = source
+            .state
+            .source
+            .limits()
+            .snappy_limits()
+            .map_err(map_archive_error)?;
+        let source_archive_bytes = match parsed_archive_len(component.archive()) {
+            Some(length) => length,
+            None => component
+                .archive()
+                .encoded_len(archive_limits)
+                .map_err(map_core_error)?,
+        };
         let message_count = component
             .archive()
             .objects
@@ -508,8 +517,8 @@ impl TransactionBudget {
             .and_then(|value| value.checked_add(rewritten_message_bytes))
             .and_then(|value| value.checked_add(framing_slack))
             .ok_or(Error::InvalidSource { path })?;
-        let compressed_bound =
-            SnappyStream::maximum_compressed_len(archive_bound).map_err(map_core_error)?;
+        let compressed_bound = SnappyStream::maximum_compressed_len(archive_bound, snappy_limits)
+            .map_err(map_core_error)?;
         self.charge_limit(LimitKind::WireOutputBytes, rewritten_message_bytes, path)?;
         self.observe_limit(LimitKind::PayloadBytes, archive_bound, path)?;
         self.charge_limit(LimitKind::EntryBytes, compressed_bound, path)?;
@@ -664,7 +673,7 @@ impl TransactionBudget {
             .checked_add(amount)
             .ok_or_else(|| derived_limit_overflow(LimitKind::TransactionWork))?;
         if observed > self.maximum_transaction_work {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 path,
                 kind: LimitKind::TransactionWork,
                 observed: usize_to_u64(observed),
@@ -688,7 +697,7 @@ impl TransactionBudget {
             .and_then(|value| value.checked_add(amount))
             .ok_or_else(|| derived_limit_overflow(LimitKind::TransactionWork))?;
         if observed > self.maximum_transaction_work {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 path,
                 kind: LimitKind::TransactionWork,
                 observed: usize_to_u64(observed),
@@ -762,7 +771,7 @@ fn charge(
         .checked_add(amount)
         .ok_or_else(|| derived_limit_overflow(kind))?;
     if observed > maximum {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             path,
             kind,
             observed: usize_to_u64(observed),
@@ -780,7 +789,7 @@ fn checked_derived_mul(value: usize, multiplier: usize, kind: LimitKind) -> Resu
 }
 
 const fn derived_limit_overflow(kind: LimitKind) -> Error {
-    Error::LimitExceeded {
+    Error::Limit {
         path: Path::Package,
         kind,
         observed: u64::MAX,
@@ -794,20 +803,26 @@ pub(super) fn resolve_position<'selector>(
 ) -> Result<Position, Error> {
     let selector = selector.into();
     let selected = package
-        .semantic_document()
+        .document_ref()
         .select_section(selector)
         .map_err(|selection_error| match selection_error {
-            crate::SelectorError::EmptySectionName => Error::NameNotFound,
+            crate::SelectorError::EmptySectionName => {
+                Error::Refused(crate::section::settings::Refusal::NameNotFound)
+            },
             crate::SelectorError::AmbiguousSectionName {
                 first, duplicate, ..
-            } => Error::AmbiguousSelector {
+            } => Error::Refused(crate::section::settings::Refusal::AmbiguousSelector {
                 first: Position::new(first),
                 duplicate: Position::new(duplicate),
-            },
+            }),
         })?
         .ok_or(match selector {
-            SectionSelector::Name(_) => Error::NameNotFound,
-            SectionSelector::Position(position) => Error::PositionNotFound { position },
+            SectionSelector::Name(_) => {
+                Error::Refused(crate::section::settings::Refusal::NameNotFound)
+            },
+            SectionSelector::Position(position) => {
+                Error::Refused(crate::section::settings::Refusal::PositionNotFound { position })
+            },
         })?;
     Ok(Position::new(selected.index()))
 }
@@ -822,9 +837,11 @@ pub(super) fn resolve_target(
     let limits = package.state.source.limits();
     budget.charge_transaction_work(components.len(), Path::Package)?;
     let root = root_references_with_limits(components, limits).map_err(map_package_error)?;
-    let body_identifier = root.body.ok_or(Error::UnsupportedSource {
-        path: Path::Package,
-    })?;
+    let body_identifier = root.body.ok_or(Error::Refused(
+        crate::section::settings::Refusal::UnsupportedSource {
+            path: Path::Package,
+        },
+    ))?;
     let body = find_object(components, body_identifier.get()).ok_or(Error::InvalidSource {
         path: Path::Package,
     })?;
@@ -849,7 +866,9 @@ pub(super) fn resolve_target(
         .get(position.get())
         .copied()
         .map(|NativeSectionReference { identifier, .. }| identifier)
-        .ok_or(Error::PositionNotFound { position })?;
+        .ok_or(Error::Refused(
+            crate::section::settings::Refusal::PositionNotFound { position },
+        ))?;
 
     let mut found = None;
     for (component_index, component) in components.iter().enumerate() {
@@ -886,7 +905,7 @@ pub(super) fn resolve_target(
 }
 
 fn message_field_count(payload: &[u8], limits: WireLimits) -> Result<usize, Error> {
-    WireView::parse_with_limits(payload, limits)
+    WireView::parse(payload, limits)
         .map(|view| view.len())
         .map_err(map_wire_error)
 }
@@ -912,9 +931,11 @@ pub(super) fn resolve_body_target(
     let limits = package.state.source.limits();
     budget.charge_transaction_work(components.len(), Path::Package)?;
     let root = root_references_with_limits(components, limits).map_err(map_package_error)?;
-    let identifier = root.body.ok_or(Error::UnsupportedSource {
-        path: Path::Package,
-    })?;
+    let identifier = root.body.ok_or(Error::Refused(
+        crate::section::settings::Refusal::UnsupportedSource {
+            path: Path::Package,
+        },
+    ))?;
 
     let mut found = None;
     for (component_index, component) in components.iter().enumerate() {
@@ -1055,7 +1076,7 @@ pub(super) fn rewrite_package(
             return Err(Error::Verification { path });
         }
         object
-            .replace_message_preserving_header_with_limits(
+            .replace_message_preserving_header(
                 target.message_index,
                 RawMessage {
                     type_: target.message_type,
@@ -1074,7 +1095,7 @@ pub(super) fn rewrite_package(
         )
         .map_err(map_page_layout_error)?;
     }
-    let section_compressed = compress_archive(archive, archive_limits)?;
+    let section_compressed = compress_archive(source, archive, archive_limits)?;
 
     let mut compressed = Vec::new();
     compressed
@@ -1092,7 +1113,7 @@ pub(super) fn rewrite_package(
         .map_err(map_page_layout_error)?;
         compressed.push((
             location.component_name.clone(),
-            compress_archive(view_archive, view_limits)?,
+            compress_archive(source, view_archive, view_limits)?,
         ));
     }
 
@@ -1140,9 +1161,7 @@ pub(super) fn rewrite_package(
             path: Path::Package,
         });
     }
-    let candidate_source =
-        SourceCatalog::from_shared_bytes_with_limits(output.into(), catalog.limits())
-            .map_err(map_archive_error)?;
+    let candidate_source = catalog.reopen(output.into()).map_err(map_archive_error)?;
     let candidate = Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
     budget.charge_candidate_scan(&candidate, Path::Package)?;
     let target_layout_state = if invalidate_layout {
@@ -1206,26 +1225,40 @@ pub(super) fn editable_archive(
         .limits()
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         source.limits().snappy_limits().map_err(map_archive_error)?,
     )
     .map_err(map_core_error)?;
-    let archive = Archive::parse_with_limits(stream.as_bytes(), limits).map_err(map_core_error)?;
-    archive
-        .validate_canonical_object_framing(stream.as_bytes())
+    // The catalog already holds this component parsed from the same bytes:
+    // check the stream's framing and clone that archive rather than parsing
+    // it again (record 0371).
+    let parsed = source
+        .components()
+        .get(component_name)
+        .ok_or(Error::InvalidSource {
+            path: Path::Package,
+        })?
+        .archive();
+    parsed
+        .validate_canonical_object_framing(stream.as_bytes(), limits)
         .map_err(map_core_error)?;
-    Ok((archive, limits))
+    Ok((parsed.clone(), limits))
 }
 
 pub(super) fn compress_archive(
+    source: &Package,
     archive: Archive,
     limits: litchi_iwa_core::Limits,
 ) -> Result<Vec<u8>, Error> {
-    let bytes = archive
-        .to_bytes_with_limits(limits)
-        .map_err(map_core_error)?;
-    SnappyStream::compress(&bytes).map_err(map_core_error)
+    let bytes = archive.to_bytes(limits).map_err(map_core_error)?;
+    let snappy_limits = source
+        .state
+        .source
+        .limits()
+        .snappy_limits()
+        .map_err(map_archive_error)?;
+    SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)
 }
 
 pub(super) fn unique_message(
@@ -1272,7 +1305,7 @@ pub(super) fn strict_reference(
     limits: WireLimits,
     path: Path,
 ) -> Result<u64, Error> {
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut identifier = None;
     let mut type_seen = false;
     let mut external_seen = false;
@@ -1353,22 +1386,31 @@ pub(super) fn fingerprint(bytes: &[u8]) -> u64 {
 pub(super) fn map_package_error(error: PackageError) -> Error {
     match error {
         PackageError::Archive(error) => map_archive_error(error),
-        PackageError::SectionNamesTooLarge { observed, limit } => Error::LimitExceeded {
+        PackageError::SectionNamesTooLarge { observed, limit } => Error::Limit {
             path: Path::Package,
             kind: LimitKind::RetainedBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
-        PackageError::NotPages => Error::UnsupportedSource {
-            path: Path::Package,
+        PackageError::UnexpectedFormat { .. }
+        | PackageError::NotOfficeFile
+        | PackageError::MissingIdentity
+        | PackageError::InvalidLanguage(_)
+        | PackageError::InvalidLocale
+        | PackageError::InvalidTable { .. }
+        | PackageError::InvalidLimit { .. }
+        | PackageError::Limit { .. } => {
+            Error::Refused(crate::section::settings::Refusal::UnsupportedSource {
+                path: Path::Package,
+            })
         },
-        PackageError::PayloadLimit { observed, limit } => Error::LimitExceeded {
+        PackageError::PayloadLimit { observed, limit } => Error::Limit {
             path: Path::Package,
             kind: LimitKind::PayloadBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
-        PackageError::ObjectLimit { observed, limit } => Error::LimitExceeded {
+        PackageError::ObjectLimit { observed, limit } => Error::Limit {
             path: Path::Package,
             kind: LimitKind::PayloadObjects,
             observed: usize_to_u64(observed),
@@ -1390,7 +1432,7 @@ pub(super) fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             path: Path::Package,
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
@@ -1409,8 +1451,10 @@ pub(super) fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
         },
         litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
         litchi_iwa_archive::Error::Iwa(error) => map_core_error(error),
-        litchi_iwa_archive::Error::Reassembly(_) => Error::UnsupportedSource {
-            path: Path::Package,
+        litchi_iwa_archive::Error::Reassembly(_) => {
+            Error::Refused(crate::section::settings::Refusal::UnsupportedSource {
+                path: Path::Package,
+            })
         },
         _ => Error::InvalidSource {
             path: Path::Package,
@@ -1424,7 +1468,7 @@ pub(super) fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             path: Path::Package,
             kind: match kind {
                 litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
@@ -1454,7 +1498,7 @@ pub(super) fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             path: Path::Package,
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireInputBytes,
@@ -1473,22 +1517,24 @@ pub(super) fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
     }
 }
 
-fn map_page_layout_error(error: page_layout::PageLayoutError) -> Error {
+fn map_page_layout_error(error: page_layout::Error) -> Error {
     match error {
-        page_layout::PageLayoutError::UnsupportedSource => Error::UnsupportedDependency {
+        page_layout::Error::Refused(
+            crate::page_layout::transaction::Refusal::UnsupportedSource,
+        ) => Error::Refused(crate::section::settings::Refusal::UnsupportedDependency {
             path: Path::Package,
             kind: DependencyKind::LayoutCache,
-        },
-        page_layout::PageLayoutError::Allocation { amount } => Error::Allocation { amount },
-        page_layout::PageLayoutError::LimitExceeded {
+        }),
+        page_layout::Error::Allocation { amount } => Error::Allocation { amount },
+        page_layout::Error::Limit {
             observed, maximum, ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             path: Path::Package,
             kind: LimitKind::TransactionWork,
             observed,
             maximum,
         },
-        page_layout::PageLayoutError::Verification => Error::Verification {
+        page_layout::Error::Verification => Error::Verification {
             path: Path::Package,
         },
         _ => Error::InvalidSource {
@@ -1536,6 +1582,7 @@ mod tests {
                 type_: message_type,
                 data,
             }],
+            Default::default(),
         )?)
     }
 
@@ -1602,7 +1649,10 @@ mod tests {
                 vec![0x08, 0x00],
             )?);
         }
-        let compressed = SnappyStream::compress(&Archive { objects }.to_bytes()?)?;
+        let compressed = SnappyStream::compress(
+            &Archive { objects }.to_bytes(Default::default())?,
+            Default::default(),
+        )?;
         Ok(package::to_bytes(
             [("Index/Document.iwa", compressed.as_slice())],
             Limits::default(),
@@ -1720,7 +1770,7 @@ mod tests {
         );
         assert!(matches!(
             attempt,
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: LimitKind::TransactionWork,
                 ..
             })
@@ -1728,5 +1778,55 @@ mod tests {
         assert_eq!(attempted_usage.output_allocations, 0);
         assert_eq!(attempted_usage.candidate_reopens, 0);
         Ok(())
+    }
+}
+
+/// The stream length of an archive parsed from source and not yet mutated:
+/// every object's retained header length (its varint frame included) plus
+/// its message payloads. `None` when an object carries no source header (it was
+/// constructed in memory), where the encoder must measure it.
+///
+/// This replaces a full header re-encode (`Archive::encoded_len`) in the
+/// physical preflight of every section and body text edit (record 0371).
+fn parsed_archive_len(archive: &Archive) -> Option<usize> {
+    let mut length = 0usize;
+    for object in &archive.objects {
+        if object.header_length == 0 {
+            return None;
+        }
+        let header = usize::try_from(object.header_length).ok()?;
+        length = length.checked_add(header)?;
+        for message in &object.messages {
+            length = length.checked_add(message.data.len())?;
+        }
+    }
+    Some(length)
+}
+
+#[cfg(test)]
+mod parsed_archive_len_tests {
+    #[test]
+    fn parsed_length_equals_the_encoder_on_native_fixtures() {
+        for fixture in [
+            &include_bytes!("../../../../test-data/iwork/pages/basic.pages")[..],
+            &include_bytes!("../../../../test-data/iwork/pages/body-sections-unicode.pages")[..],
+            &include_bytes!("../../../../test-data/iwork/pages/body-table-cells-native.pages")[..],
+        ] {
+            let package = crate::Package::from_bytes(fixture).unwrap();
+            let limits = package
+                .state
+                .source
+                .limits()
+                .effective_archive_limits()
+                .unwrap();
+            for component in package.state.source.components().iter() {
+                assert_eq!(
+                    super::parsed_archive_len(component.archive()),
+                    Some(component.archive().encoded_len(limits).unwrap()),
+                    "{}",
+                    component.name()
+                );
+            }
+        }
     }
 }

@@ -1,8 +1,9 @@
 //! Owned `DataPilot` snapshots, edits, commits, and reversible patches.
 
 use super::{Catalog, Selector, validation};
-use crate::{model::data_pilot::Table, package::Package};
+use crate::{model::data_pilot::Table, package::Archive};
 use litchi_core::{Error, Result};
+use litchi_odf_common::XmlStreamLimits;
 
 /// Immutable `DataPilot` owner bound to one complete ODS package source.
 #[derive(Clone, Debug)]
@@ -10,6 +11,7 @@ pub struct Snapshot {
     source: Vec<u8>,
     tables: Vec<Table>,
     has_owner: bool,
+    xml_limits: XmlStreamLimits,
 }
 
 impl Snapshot {
@@ -17,13 +19,21 @@ impl Snapshot {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn from_bytes(source: Vec<u8>) -> Result<Self> {
-        let package = Package::from_bytes(source.clone())?;
+    pub fn from_bytes(source: Vec<u8>, limits: &XmlStreamLimits) -> Result<Self> {
+        Self::from_bytes_with_xml_limits(source, *limits)
+    }
+
+    pub(crate) fn from_bytes_with_xml_limits(
+        source: Vec<u8>,
+        xml_limits: XmlStreamLimits,
+    ) -> Result<Self> {
+        let package = Archive::from_bytes_with_xml_limits(source.clone(), xml_limits)?;
         let catalog = Catalog::load(&package)?;
         Ok(Self {
             source,
             tables: catalog.tables.clone(),
             has_owner: catalog.present,
+            xml_limits,
         })
     }
 
@@ -59,7 +69,7 @@ impl Snapshot {
 
     /// Start a source-checked, failure-atomic edit.
     #[must_use]
-    pub fn edit(&self) -> Edit {
+    pub(crate) fn edit(&self) -> Edit {
         Edit {
             before: self.clone(),
             draft: self.has_owner.then(|| self.tables.clone()),
@@ -108,8 +118,8 @@ impl Edit {
         OwnedEditor { edit: self }
     }
 
-    /// Restore the exact source candidate.
-    pub fn rollback(&mut self) {
+    /// Discard every staged change in place.
+    pub fn reset(&mut self) {
         self.draft = self.before.has_owner.then(|| self.before.tables.clone());
     }
 
@@ -117,7 +127,7 @@ impl Edit {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
         validation::validate_candidate(
             &self.before_location()?,
             &self.before_owner(),
@@ -127,15 +137,19 @@ impl Edit {
         let target = if unchanged {
             self.before.clone()
         } else {
-            let package = Package::from_bytes(self.before.source.clone())?;
+            let package = Archive::from_bytes_with_xml_limits(
+                self.before.source.clone(),
+                self.before.xml_limits,
+            )?;
             let catalog = Catalog::load(&package)?;
             let bytes = super::package::replace(
                 &package,
                 catalog.source_xml,
                 &catalog.location,
                 self.draft.as_deref(),
+                &self.before.xml_limits,
             )?;
-            let target = Snapshot::from_bytes(bytes)?;
+            let target = Snapshot::from_bytes_with_xml_limits(bytes, self.before.xml_limits)?;
             if target.has_owner != self.draft.is_some()
                 || target.tables != self.draft.unwrap_or_default()
             {
@@ -145,14 +159,7 @@ impl Edit {
             }
             target
         };
-        Ok(Commit {
-            changed: !unchanged,
-            patch: Patch {
-                source: self.before.source,
-                target: target.source.clone(),
-            },
-            snapshot: target,
-        })
+        Ok(Commit { snapshot: target })
     }
 
     fn before_owner(&self) -> Option<Vec<Table>> {
@@ -160,7 +167,10 @@ impl Edit {
     }
 
     fn before_location(&self) -> Result<super::codec::Location> {
-        let package = Package::from_bytes(self.before.source.clone())?;
+        let package = Archive::from_bytes_with_xml_limits(
+            self.before.source.clone(),
+            self.before.xml_limits,
+        )?;
         Ok(Catalog::load(&package)?.location)
     }
 
@@ -242,72 +252,16 @@ impl OwnedEditor<'_> {
     }
 }
 
-/// A source-checked, reversible package patch.
-#[derive(Clone, Debug)]
-pub struct Patch {
-    source: Vec<u8>,
-    target: Vec<u8>,
-}
-
-impl Patch {
-    /// Whether this patch is physically empty.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.source == self.target
-    }
-
-    /// Return the exact-source patch that restores the accepted package.
-    #[must_use]
-    pub fn inverse(&self) -> Self {
-        Self {
-            source: self.target.clone(),
-            target: self.source.clone(),
-        }
-    }
-
-    /// Apply only to the exact source package snapshot.
-    ///
-    /// # Errors
-    /// Returns an error when the operation cannot be completed.
-    pub fn apply(&self, snapshot: &Snapshot) -> Result<Commit> {
-        if snapshot.source != self.source {
-            return Err(Error::InvalidFormat(
-                "ODS DataPilot patch source snapshot does not match".to_string(),
-            ));
-        }
-        let target = Snapshot::from_bytes(self.target.clone())?;
-        Ok(Commit {
-            changed: !self.is_empty(),
-            patch: self.clone(),
-            snapshot: target,
-        })
-    }
-}
-
 /// A fully rehydrated `DataPilot` publication.
 #[derive(Clone, Debug)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
-    patch: Patch,
-    changed: bool,
 }
 
 impl Commit {
-    /// Whether package bytes changed.
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-
     /// Resulting immutable snapshot.
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
-    }
-
-    /// Reversible exact-source patch.
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
     }
 }

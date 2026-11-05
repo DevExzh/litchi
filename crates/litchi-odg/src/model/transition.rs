@@ -471,8 +471,8 @@ fn is_ncname_char(character: char) -> bool {
 
 fn is_xsd_duration(value: &str) -> bool {
     // ODF 1.4 Part 3 §20.237 assigns presentation:duration the `duration`
-    // datatype from §18.2.  The local OpenDocument-v1.4 specification bundle
-    // is `3rdparty/specs/OpenDocument-v1.4-os.zip`, member
+    // datatype from §18.2.  The OASIS OpenDocument-v1.4 specification bundle
+    // `OpenDocument-v1.4-os.zip`, member
     // `part3-schema/OpenDocument-v1.4-os-part3-schema.html`, which points to
     // XML Schema 1.0 Second Edition §3.2.6.1: seconds are
     // `[0-9]+(\.[0-9]+)?`, and this datatype has no timezone suffix.

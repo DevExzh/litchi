@@ -15,6 +15,7 @@
     reason = "zerocopy's RawDirectoryEntry derive expansion emits internal identifiers outside this crate's source"
 )]
 
+pub mod atomic;
 pub mod consts;
 mod directory_name;
 mod file;
@@ -45,7 +46,7 @@ pub use shared::{
 pub use shared_bulk::{SharedOleBulkError, SharedOleBulkRead};
 pub use splice::{SameLengthStreamSplice, StreamSpliceLimits};
 pub use stream_move::{ExistingStreamMove, StreamMoveLimits, ValidatedStreamMovePlan};
-pub use validation::{CfbValidationError, validate_source, validate_source_with_limits};
+pub use validation::{CfbValidationError, validate_source};
 pub use writer::{
     OleWriter, SectorLayoutFallback, SectorLayoutPolicy, SectorLayoutReport, SequentialOleWriter,
     SequentialWriteError, SequentialWriteProgress, SequentialWriteReport, SequentialWriterLimits,

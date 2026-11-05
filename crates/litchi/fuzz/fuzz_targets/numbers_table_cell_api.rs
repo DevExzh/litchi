@@ -4,11 +4,10 @@ use std::{fmt::Debug, fmt::Display, hint::black_box, sync::OnceLock};
 
 use libfuzzer_sys::fuzz_target;
 use litchi::numbers::{
-    Package, PackageLimits, PackageReadOptions, PackageSemanticLimits, SheetSelector,
-    TableSelector,
+    Package, SheetSelector, TableSelector,
     cell::Value,
     table::cells::{Error as CellError, Input, Storage},
-    table::{CellPosition, CellRange, Dimensions},
+    table::{Area, At, Dimensions},
 };
 
 const MAX_INPUT_BYTES: u64 = 512 * 1024;
@@ -44,25 +43,32 @@ fuzz_target!(|data: &[u8]| {
     exercise_input_limit();
 });
 
-fn fuzz_options() -> PackageReadOptions {
-    static OPTIONS: OnceLock<PackageReadOptions> = OnceLock::new();
+fn fuzz_options() -> litchi::numbers::OpenOptions {
+    static OPTIONS: OnceLock<litchi::numbers::OpenOptions> = OnceLock::new();
     *OPTIONS.get_or_init(|| {
-        let archive = PackageLimits::new(
-            MAX_INPUT_BYTES,
-            MAX_ENTRIES,
-            MAX_ENTRY_BYTES,
-            MAX_EXPANDED_BYTES,
-            MAX_IWA_STREAM_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid Numbers fuzz archive limits: {error}"));
-        let semantic =
-            PackageSemanticLimits::new(MAX_OBJECTS, MAX_SHEETS, MAX_TABLES, MAX_REFERENCES)
-                .unwrap_or_else(|error| unreachable!("valid Numbers fuzz semantic limits: {error}"))
-                .with_projection_limits(MAX_MATERIALIZED_CELLS, MAX_TEXT_BYTES)
-                .unwrap_or_else(|error| {
-                    unreachable!("valid Numbers fuzz projection limits: {error}")
-                });
-        PackageReadOptions::new(archive, semantic)
+        let archive = litchi::numbers::SourceLimits::builder()
+            .max_input_bytes(MAX_INPUT_BYTES)
+            .and_then(|b| b.max_members(MAX_ENTRIES))
+            .and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES))
+            .and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+            .and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid Numbers fuzz archive limits: {error}"));
+        let semantic = litchi::numbers::SemanticLimits::builder()
+            .max_objects(MAX_OBJECTS)
+            .and_then(|b| b.max_sheets(MAX_SHEETS))
+            .and_then(|b| b.max_tables(MAX_TABLES))
+            .and_then(|b| b.max_references(MAX_REFERENCES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid Numbers fuzz semantic limits: {error}"))
+            .to_builder()
+            .max_materialized_cells(MAX_MATERIALIZED_CELLS)
+            .and_then(|b| b.max_output_text_bytes(MAX_TEXT_BYTES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid Numbers fuzz projection limits: {error}"));
+        litchi::numbers::OpenOptions::new()
+            .source_limits(archive)
+            .semantic_limits(semantic)
     })
 }
 
@@ -72,7 +78,7 @@ fn native_package() -> &'static Package {
         let package = Package::from_bytes_with_options(NATIVE_NUMBERS, fuzz_options())
             .unwrap_or_else(|error| panic!("native Numbers table-cell seed must open: {error}"));
         let table = package
-            .document()
+            .workbook_ref()
             .sheets()
             .first()
             .and_then(|sheet| sheet.tables().next())
@@ -84,7 +90,7 @@ fn native_package() -> &'static Package {
 }
 
 fn exercise_package(package: &Package, data: &[u8]) {
-    let Some(sheet) = package.document().sheets().first() else {
+    let Some(sheet) = package.workbook_ref().sheets().first() else {
         return;
     };
     let Some(table) = sheet.tables().next() else {
@@ -108,7 +114,7 @@ fn exercise_package(package: &Package, data: &[u8]) {
         position,
     ));
 
-    let range = CellRange::single(position)
+    let range = Area::single(position)
         .unwrap_or_else(|error| panic!("checked position must form a range: {error}"));
     observe_result(package.table_cells(0usize, 0usize, range));
     observe_result(package.table_cells_a1(0usize, 0usize, address));
@@ -120,7 +126,7 @@ fn exercise_package(package: &Package, data: &[u8]) {
 }
 
 fn exercise_presence(package: &Package, dimensions: Dimensions) {
-    let first = CellPosition::new(0, 0);
+    let first = At::new(0, 0);
     if let Ok(state) = package.table_cell(0usize, 0usize, first) {
         match state.storage() {
             Storage::Missing => {
@@ -141,17 +147,17 @@ fn exercise_presence(package: &Package, dimensions: Dimensions) {
     // The one-over dimensions are guaranteed to trigger a typed bounds error
     // whenever the selected table has a positive extent.  This probes the
     // dense API's pre-allocation check without retaining a partial Vec.
-    let out_of_bounds = CellPosition::new(dimensions.rows(), dimensions.columns());
+    let out_of_bounds = At::new(dimensions.rows(), dimensions.columns());
     observe_result(package.table_cell(0usize, 0usize, out_of_bounds));
-    let malformed = CellRange::new(CellPosition::new(0, 0), out_of_bounds);
+    let malformed = Area::new(At::new(0, 0), out_of_bounds);
     if let Ok(range) = malformed {
         observe_result(package.table_cells(0usize, 0usize, range));
     }
 }
 
-fn exercise_bounded_batch(package: &Package, data: &[u8], position: CellPosition, address: &str) {
+fn exercise_bounded_batch(package: &Package, data: &[u8], position: At, address: &str) {
     let source_bytes = package_bytes(package);
-    let before_state = CellPosition::from_a1(address)
+    let before_state = At::from_a1(address)
         .ok()
         .and_then(|position| package.table_cell(0usize, 0usize, position).ok());
     let input = match control(data, 1) % 4 {
@@ -188,9 +194,7 @@ fn exercise_bounded_batch(package: &Package, data: &[u8], position: CellPosition
                 source_bytes,
                 "table-cell inverse did not restore exact source bytes"
             );
-            if let (Some(before), Ok(position)) =
-                (before_state.as_ref(), CellPosition::from_a1(address))
-            {
+            if let (Some(before), Ok(position)) = (before_state.as_ref(), At::from_a1(address)) {
                 let after = restored
                     .package()
                     .table_cell(0usize, 0usize, position)
@@ -247,7 +251,7 @@ fn exercise_bounded_batch(package: &Package, data: &[u8], position: CellPosition
 /// writable scalar target; the command selects every finite scalar variant,
 /// including the date path that the A1 batch intentionally does not use.
 fn exercise_checked_scalar(package: &Package, data: &[u8]) {
-    let position = CellPosition::new(2, 1);
+    let position = At::new(2, 1);
     let source_bytes = package_bytes(package);
     let input = match control(data, 7) % 5 {
         0 => Input::boolean(control(data, 8) & 1 != 0),
@@ -314,7 +318,7 @@ fn exercise_checked_scalar(package: &Package, data: &[u8]) {
 /// A1 ranges so empty and inverted coordinates reach their own checks.
 fn exercise_table_range_edges(package: &Package, data: &[u8]) {
     let Some(table) = package
-        .document()
+        .workbook_ref()
         .sheets()
         .first()
         .and_then(|sheet| sheet.tables().next())
@@ -327,18 +331,15 @@ fn exercise_table_range_edges(package: &Package, data: &[u8]) {
     }
 
     let sheet_name = package
-        .document()
+        .workbook_ref()
         .sheets()
         .first()
         .map(|sheet| sheet.name())
         .unwrap_or_default();
     let table_name = table.name();
 
-    let empty = CellRange::new(
-        CellPosition::new(dimensions.rows(), 0),
-        CellPosition::new(dimensions.rows(), 0),
-    )
-    .unwrap_or_else(|error| panic!("empty table-cell range must construct: {error}"));
+    let empty = Area::new(At::new(dimensions.rows(), 0), At::new(dimensions.rows(), 0))
+        .unwrap_or_else(|error| panic!("empty table-cell range must construct: {error}"));
     let empty_states = package.table_cells(
         SheetSelector::name(sheet_name),
         TableSelector::name(table_name),
@@ -349,17 +350,17 @@ fn exercise_table_range_edges(package: &Package, data: &[u8]) {
         Err(error) => observe_error(error),
     }
 
-    let inverted = CellRange::new(CellPosition::new(1, 1), CellPosition::new(0, 0));
+    let inverted = Area::new(At::new(1, 1), At::new(0, 0));
     observe_result(inverted);
 
-    let overflow = CellRange::single(CellPosition::new(u32::MAX, u32::MAX));
+    let overflow = Area::single(At::new(u32::MAX, u32::MAX));
     observe_result(overflow);
 
     // Keep one name-selected dense request in this route as well. Its shape
     // is bounded by the source table and the command bytes, so it cannot
     // bypass the package's materialized-cell guard.
-    let end = CellPosition::new(dimensions.rows().min(2), dimensions.columns().min(2));
-    let bounded = CellRange::new(CellPosition::new(0, 0), end)
+    let end = At::new(dimensions.rows().min(2), dimensions.columns().min(2));
+    let bounded = Area::new(At::new(0, 0), end)
         .unwrap_or_else(|error| panic!("bounded table-cell range must construct: {error}"));
     if bounded.area().is_some_and(|area| area > 0) && control(data, 12) & 1 != 0 {
         observe_result(package.table_cells(
@@ -375,7 +376,7 @@ fn exercise_table_range_edges(package: &Package, data: &[u8]) {
 /// is applied as a directional patch.
 fn exercise_exact_noop(package: &Package) {
     let source_bytes = package_bytes(package);
-    let position = CellPosition::new(1, 1);
+    let position = At::new(1, 1);
     let before = package
         .table_cell(0usize, 0usize, position)
         .unwrap_or_else(|error| panic!("native no-op source cell must read: {error}"));
@@ -432,33 +433,77 @@ fn exercise_constructor_limits() {
     static ONCE: OnceLock<()> = OnceLock::new();
     ONCE.get_or_init(|| {
         assert!(
-            PackageLimits::new(
-                0,
-                MAX_ENTRIES,
-                MAX_ENTRY_BYTES,
-                MAX_EXPANDED_BYTES,
-                MAX_IWA_STREAM_BYTES
-            )
-            .is_err()
+            litchi::numbers::SourceLimits::builder()
+                .max_input_bytes(0)
+                .and_then(|b| b.max_members(MAX_ENTRIES))
+                .and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES))
+                .and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+                .and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES))
+                .and_then(|b| b.build())
+                .is_err()
         );
         assert!(
-            PackageLimits::new(
-                MAX_INPUT_BYTES,
-                0,
-                MAX_ENTRY_BYTES,
-                MAX_EXPANDED_BYTES,
-                MAX_IWA_STREAM_BYTES
-            )
-            .is_err()
+            litchi::numbers::SourceLimits::builder()
+                .max_input_bytes(MAX_INPUT_BYTES)
+                .and_then(|b| b.max_members(0))
+                .and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES))
+                .and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+                .and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES))
+                .and_then(|b| b.build())
+                .is_err()
         );
 
-        let semantic = PackageSemanticLimits::default();
-        assert!(PackageSemanticLimits::new(0, MAX_SHEETS, MAX_TABLES, MAX_REFERENCES).is_err());
-        assert!(PackageSemanticLimits::new(MAX_OBJECTS, 0, MAX_TABLES, MAX_REFERENCES).is_err());
-        assert!(semantic.with_projection_limits(0, 1).is_err());
-        assert!(semantic.with_projection_limits(1, 0).is_err());
-        assert!(semantic.with_projection_limits(usize::MAX, 1).is_err());
-        assert!(semantic.with_projection_limits(1, usize::MAX).is_err());
+        let semantic = litchi::numbers::SemanticLimits::DEFAULT;
+        assert!(
+            litchi::numbers::SemanticLimits::builder()
+                .max_objects(0)
+                .and_then(|b| b.max_sheets(MAX_SHEETS))
+                .and_then(|b| b.max_tables(MAX_TABLES))
+                .and_then(|b| b.max_references(MAX_REFERENCES))
+                .and_then(|b| b.build())
+                .is_err()
+        );
+        assert!(
+            litchi::numbers::SemanticLimits::builder()
+                .max_objects(MAX_OBJECTS)
+                .and_then(|b| b.max_sheets(0))
+                .and_then(|b| b.max_tables(MAX_TABLES))
+                .and_then(|b| b.max_references(MAX_REFERENCES))
+                .and_then(|b| b.build())
+                .is_err()
+        );
+        assert!(
+            semantic
+                .to_builder()
+                .max_materialized_cells(0)
+                .and_then(|b| b.max_output_text_bytes(1))
+                .and_then(|b| b.build())
+                .is_err()
+        );
+        assert!(
+            semantic
+                .to_builder()
+                .max_materialized_cells(1)
+                .and_then(|b| b.max_output_text_bytes(0))
+                .and_then(|b| b.build())
+                .is_err()
+        );
+        assert!(
+            semantic
+                .to_builder()
+                .max_materialized_cells(usize::MAX)
+                .and_then(|b| b.max_output_text_bytes(1))
+                .and_then(|b| b.build())
+                .is_err()
+        );
+        assert!(
+            semantic
+                .to_builder()
+                .max_materialized_cells(1)
+                .and_then(|b| b.max_output_text_bytes(usize::MAX))
+                .and_then(|b| b.build())
+                .is_err()
+        );
 
         for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
             assert!(Input::number(value).is_err());
@@ -466,7 +511,7 @@ fn exercise_constructor_limits() {
             assert!(Input::duration(value).is_err());
         }
 
-        assert!(matches!(CellPosition::from_a1(""), Err(_)));
+        assert!(matches!(At::from_a1(""), Err(_)));
     });
 }
 
@@ -483,8 +528,8 @@ fn exercise_input_limit() {
     });
 }
 
-fn position(data: &[u8], dimensions: Dimensions) -> CellPosition {
-    CellPosition::new(
+fn position(data: &[u8], dimensions: Dimensions) -> At {
+    At::new(
         u32::from(control(data, 5)) % dimensions.rows().max(1),
         u32::from(control(data, 6)) % dimensions.columns().max(1),
     )
@@ -507,9 +552,9 @@ fn control(data: &[u8], index: usize) -> u8 {
 
 fn package_bytes(package: &Package) -> Vec<u8> {
     let mut bytes = Vec::new();
-    package
-        .write_to(&mut bytes)
-        .unwrap_or_else(|error| panic!("writing a Numbers package to memory must succeed: {error}"));
+    package.write_to(&mut bytes).unwrap_or_else(|error| {
+        panic!("writing a Numbers package to memory must succeed: {error}")
+    });
     bytes
 }
 

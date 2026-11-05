@@ -1,35 +1,48 @@
 //! ODT package assembly for the builder.
 
 use super::model::Builder;
+use crate::Package;
 use crate::core::PackageWriter;
 use litchi_core::Result;
-use std::path::Path;
 
 impl Builder {
-    /// Build the document and return as bytes
+    /// Build the document into an immutable [`Package`].
+    ///
+    /// Output (`save`, `save_with_durability`, `to_bytes`, `write_to`) lives
+    /// on the returned package. Building never consults the clock or any
+    /// other ambient state: two builders with equal inputs produce
+    /// byte-identical packages.
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```
     /// use litchi_odt::Builder;
     ///
-    /// # fn main() -> litchi_core::Result<()> {
+    /// # fn main() -> Result<(), litchi_odt::Error> {
     /// let mut builder = Builder::new();
     /// builder.add_paragraph("Hello, World!")?;
-    /// let bytes = builder.build()?;
+    /// let package = builder.build()?;
+    /// assert_eq!(package.document()?.text()?, "Hello, World!");
     /// # Ok(())
     /// # }
     /// ```
-    pub fn build(self) -> Result<Vec<u8>> {
-        self.build_package(crate::constants::ODF_TEXT)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an authored part cannot be serialized.
+    pub fn build(self) -> std::result::Result<Package, crate::Error> {
+        Ok(Package::from_authored(
+            self.build_package(crate::constants::ODF_TEXT)?,
+        )?)
     }
 
-    /// Build the document package with an explicit root MIME type.
+    /// Build the document package bytes with an explicit root MIME type.
     ///
     /// Used by the web-template authoring model to emit the legacy
     /// `application/vnd.oasis.opendocument.text-web` MIME type.
     pub(crate) fn build_package(self, mimetype: &str) -> Result<Vec<u8>> {
-        let mut writer = PackageWriter::new();
+        let mut writer =
+            PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
 
         // Set MIME type
         writer.set_mimetype(mimetype)?;
@@ -48,29 +61,5 @@ impl Builder {
 
         // Finish and return bytes
         writer.finish_to_bytes()
-    }
-
-    /// Build and save the document to a file
-    ///
-    /// # Arguments
-    ///
-    /// * `path` - Path where the ODT file should be saved
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use litchi_odt::Builder;
-    ///
-    /// # fn main() -> litchi_core::Result<()> {
-    /// let mut builder = Builder::new();
-    /// builder.add_paragraph("Hello, World!")?;
-    /// builder.save("output.odt")?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn save<P: AsRef<Path>>(self, path: P) -> Result<()> {
-        let bytes = self.build()?;
-        std::fs::write(path, bytes)?;
-        Ok(())
     }
 }

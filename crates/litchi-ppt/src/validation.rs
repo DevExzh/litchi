@@ -6,7 +6,7 @@
 //! executes a VBA project, resolves an external target, verifies a signature,
 //! or repairs a malformed source.
 
-use crate::{Error, RecordLimits, records::Record};
+use crate::{Error as PackageError, SourceLimits, records::Record};
 use litchi_cfb::{OleError, SharedOleFile, SharedOleFileLimits};
 use litchi_core::{
     CheckCapabilityId, CheckStatus, CompatibilityImpact, EvidenceDigest, EvidenceValue,
@@ -69,7 +69,7 @@ struct CurrentUserBootstrap {
 }
 
 impl CurrentUserBootstrap {
-    fn parse(data: &[u8], limits: RecordLimits) -> Result<Self, CurrentUserBootstrapError> {
+    fn parse(data: &[u8], limits: SourceLimits) -> Result<Self, CurrentUserBootstrapError> {
         const HEADER_SIZE: usize = 8;
         const FIXED_PAYLOAD_SIZE: usize = 20;
         const MIN_SIZE: usize = HEADER_SIZE + FIXED_PAYLOAD_SIZE;
@@ -208,7 +208,7 @@ fn is_printable_utf16(bytes: &[u8]) -> bool {
 /// Finite source, CFB directory, record, and report bounds for one PPT
 /// validation pass.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PptValidationLimits {
+pub struct Limits {
     max_input_bytes: u64,
     max_document_stream_bytes: u64,
     max_current_user_stream_bytes: u64,
@@ -216,11 +216,11 @@ pub struct PptValidationLimits {
     max_aggregate_stream_bytes: u64,
     max_directory_entries: usize,
     max_directory_depth: usize,
-    record: RecordLimits,
+    record: SourceLimits,
     report: ValidationLimits,
 }
 
-impl PptValidationLimits {
+impl Limits {
     /// Creates explicit finite PPT validation bounds.
     #[must_use]
     #[allow(
@@ -235,7 +235,7 @@ impl PptValidationLimits {
         max_aggregate_stream_bytes: u64,
         max_directory_entries: usize,
         max_directory_depth: usize,
-        record: RecordLimits,
+        record: SourceLimits,
         report: ValidationLimits,
     ) -> Self {
         Self {
@@ -296,7 +296,7 @@ impl PptValidationLimits {
     /// Bounded record-parser policy used for `PowerPoint Document` and
     /// `Current User`.
     #[must_use]
-    pub const fn record(self) -> RecordLimits {
+    pub const fn record(self) -> SourceLimits {
         self.record
     }
 
@@ -307,9 +307,9 @@ impl PptValidationLimits {
     }
 }
 
-impl Default for PptValidationLimits {
+impl Default for Limits {
     fn default() -> Self {
-        let record = RecordLimits::default();
+        let record = SourceLimits::default();
         Self {
             max_input_bytes: record.max_package_bytes as u64,
             max_document_stream_bytes: record.max_input_bytes as u64,
@@ -327,7 +327,7 @@ impl Default for PptValidationLimits {
 /// Failure to perform or retain a PPT validation report.
 #[derive(Debug)]
 #[non_exhaustive]
-pub enum PptValidationError {
+pub enum Error {
     /// CFB positional ingress or source stability failed.
     Ingress(OleError),
     /// A bounded validator-owned allocation failed.
@@ -336,7 +336,7 @@ pub enum PptValidationError {
     Report(ValidationReportError),
 }
 
-impl fmt::Display for PptValidationError {
+impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Ingress(error) => write!(formatter, "PPT validation ingress failed: {error}"),
@@ -351,7 +351,7 @@ impl fmt::Display for PptValidationError {
     }
 }
 
-impl StdError for PptValidationError {
+impl StdError for Error {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
         match self {
             Self::Ingress(error) => Some(error),
@@ -361,54 +361,41 @@ impl StdError for PptValidationError {
     }
 }
 
-impl From<ValidationReportError> for PptValidationError {
+impl From<ValidationReportError> for Error {
     fn from(error: ValidationReportError) -> Self {
         Self::Report(error)
     }
 }
 
-impl From<OleError> for PptValidationError {
+impl From<OleError> for Error {
     fn from(error: OleError) -> Self {
         Self::Ingress(error)
     }
 }
 
-/// Validates a positional PPT source under default finite bounds.
+/// Validates a positional PPT source under explicit finite bounds
+/// ([`Limits::default`] is the standard profile).
 ///
-/// The source remains untouched. The report is presence-only at security
-/// boundaries: it records encryption, signatures, macros, protection, and
-/// external references without decrypting, verifying, executing, fetching, or
-/// repairing any of them.
+/// The validator checks CFB topology, the canonical root or
+/// `PP97_DUALSTORAGE` stream layout, `Current User`, strict bounded record
+/// framing, and inert security/presence markers. It never mutates the source.
+/// The report is presence-only at security boundaries: it records
+/// encryption, signatures, macros, protection, and external references
+/// without decrypting, verifying, executing, fetching, or repairing any of
+/// them.
 ///
 /// # Errors
 ///
 /// Returns an error for source I/O/version instability, bounded validator
 /// allocation failure, or failure to retain the bounded report. Definite
 /// format rejection and configured limits are represented in the report.
-pub fn validate_source(source: Arc<dyn ReadAt>) -> Result<ValidateReport, PptValidationError> {
-    validate_source_with_limits(source, PptValidationLimits::default())
-}
-
-/// Validates a positional PPT source under explicit finite bounds.
-///
-/// The validator checks CFB topology, the canonical root or
-/// `PP97_DUALSTORAGE` stream layout, `Current User`, strict bounded record
-/// framing, and inert security/presence markers. It never mutates the source.
-///
-/// # Errors
-///
-/// Returns an error for source I/O/version instability, bounded validator
-/// allocation failure, or failure to retain the bounded report.
-pub fn validate_source_with_limits(
-    source: Arc<dyn ReadAt>,
-    limits: PptValidationLimits,
-) -> Result<ValidateReport, PptValidationError> {
+pub fn validate_source(source: Arc<dyn ReadAt>, limits: Limits) -> Result<ValidateReport, Error> {
     let expected_version = source
         .version()
-        .map_err(|error| PptValidationError::Ingress(OleError::Io(error)))?;
+        .map_err(|error| Error::Ingress(OleError::Io(error)))?;
     let source_size = source
         .len()
-        .map_err(|error| PptValidationError::Ingress(OleError::Io(error)))?;
+        .map_err(|error| Error::Ingress(OleError::Io(error)))?;
     require_version(source.as_ref(), expected_version)?;
 
     let input_limit = limits
@@ -423,21 +410,21 @@ pub fn validate_source_with_limits(
         return Ok(report);
     }
 
-    let cfb_limits = SharedOleFileLimits::new(input_limit).map_err(PptValidationError::Ingress)?;
-    let shared = match SharedOleFile::open_with_limits(source.clone(), cfb_limits) {
+    let cfb_limits = SharedOleFileLimits::new(input_limit).map_err(Error::Ingress)?;
+    let shared = match SharedOleFile::open(source.clone(), cfb_limits) {
         Ok(shared) => shared,
         Err(error) if is_structural_cfb_error(&error) => {
             let report = cfb_rejection_report(&error, source_size, limits.report)?;
             require_version(source.as_ref(), expected_version)?;
             return Ok(report);
         },
-        Err(error) => return Err(PptValidationError::Ingress(error)),
+        Err(error) => return Err(Error::Ingress(error)),
     };
 
     let mut issues = Vec::new();
     issues
         .try_reserve(16)
-        .map_err(|_error| PptValidationError::Allocation("PPT validation issues"))?;
+        .map_err(|_error| Error::Allocation("PPT validation issues"))?;
     let inventory = inspect_directory(&shared, limits)?;
     let mut statuses = initial_statuses(limits.report)?;
 
@@ -492,9 +479,7 @@ pub fn validate_source_with_limits(
         statuses[10] = CheckStatus::stopped_by(check_id(HIERARCHY, limits.report)?);
         statuses[11] = CheckStatus::stopped_by(check_id(HIERARCHY, limits.report)?);
         let report = finish_report(statuses, issues, limits.report)?;
-        shared
-            .source_version()
-            .map_err(PptValidationError::Ingress)?;
+        shared.source_version().map_err(Error::Ingress)?;
         return Ok(report);
     }
 
@@ -751,11 +736,7 @@ pub fn validate_source_with_limits(
     let mut current_data = None;
     if stream_budget_ok && statuses[3].is_complete() {
         if let Some(path) = inventory.current_user_path {
-            current_data = Some(
-                shared
-                    .open_stream(path)
-                    .map_err(PptValidationError::Ingress)?,
-            );
+            current_data = Some(shared.open_stream(path).map_err(Error::Ingress)?);
         }
     }
 
@@ -849,11 +830,7 @@ pub fn validate_source_with_limits(
         && statuses[2].is_complete()
         && let Some(path) = inventory.document_path
     {
-        document_data = Some(
-            shared
-                .open_stream(path)
-                .map_err(PptValidationError::Ingress)?,
-        );
+        document_data = Some(shared.open_stream(path).map_err(Error::Ingress)?);
     }
 
     if current.is_none() {
@@ -879,7 +856,11 @@ pub fn validate_source_with_limits(
                 limits.record,
             ) {
                 Ok(records) => Some(records),
-                Err(error @ Error::ResourceLimit(_)) => {
+                Err(
+                    error @ (PackageError::Limit { .. }
+                    | PackageError::InvalidLimit { .. }
+                    | PackageError::ResourceLimit(_)),
+                ) => {
                     statuses[4] = CheckStatus::blocked(
                         "PPT record traversal reached a configured byte, record, or depth ceiling",
                         limits.report,
@@ -895,12 +876,12 @@ pub fn validate_source_with_limits(
                     )?;
                     None
                 },
-                Err(Error::AllocationFailed(_)) => {
-                    return Err(PptValidationError::Allocation("PPT record parser"));
+                Err(PackageError::AllocationFailed(_)) => {
+                    return Err(Error::Allocation("PPT record parser"));
                 },
-                Err(error @ Error::Io(_)) => {
-                    return Err(PptValidationError::Ingress(match error {
-                        Error::Io(error) => OleError::Io(error),
+                Err(error @ PackageError::Io(_)) => {
+                    return Err(Error::Ingress(match error {
+                        PackageError::Io(error) => OleError::Io(error),
                         _ => unreachable!("matched PPT I/O error"),
                     }));
                 },
@@ -1047,7 +1028,7 @@ pub fn validate_source_with_limits(
         if !current.is_encrypted() && statuses[4].is_complete() {
             let current_offset = current.current_edit_offset();
             let offset = usize::try_from(current_offset)
-                .map_err(|_error| PptValidationError::Allocation("Current User edit offset"))?;
+                .map_err(|_error| Error::Allocation("Current User edit offset"))?;
             if offset >= data.len() {
                 push_issue(
                     &mut issues,
@@ -1093,9 +1074,7 @@ pub fn validate_source_with_limits(
         }
     }
 
-    shared
-        .source_version()
-        .map_err(PptValidationError::Ingress)?;
+    shared.source_version().map_err(Error::Ingress)?;
     require_version(source.as_ref(), expected_version)?;
     finish_report(statuses, issues, limits.report)
 }
@@ -1164,8 +1143,8 @@ const DUAL_CURRENT_USER_PATH: &[&str] = &[DUAL_STORAGE, CURRENT_USER_NAME];
 
 fn inspect_directory(
     shared: &SharedOleFile,
-    limits: PptValidationLimits,
-) -> Result<DirectoryObservation, PptValidationError> {
+    limits: Limits,
+) -> Result<DirectoryObservation, Error> {
     let mut observation = DirectoryObservation::default();
     for entry in shared.directory_entries() {
         if entry.entry_type == litchi_cfb::consts::STGTY_ROOT {
@@ -1174,7 +1153,7 @@ fn inspect_directory(
         observation.entry_count = observation
             .entry_count
             .checked_add(1)
-            .ok_or(PptValidationError::Allocation("PPT directory entry count"))?;
+            .ok_or(Error::Allocation("PPT directory entry count"))?;
         if observation.entry_count > limits.max_directory_entries {
             observation.entry_limit = true;
             break;
@@ -1270,14 +1249,14 @@ fn inspect_directory(
 
 fn inspect_directory_depth(
     shared: &SharedOleFile,
-    limits: PptValidationLimits,
+    limits: Limits,
     observation: &mut DirectoryObservation,
-) -> Result<(), PptValidationError> {
+) -> Result<(), Error> {
     let entry_count = shared.directory_entries().count();
     let mut by_sid = HashMap::new();
     by_sid
         .try_reserve(entry_count)
-        .map_err(|_error| PptValidationError::Allocation("PPT directory depth index"))?;
+        .map_err(|_error| Error::Allocation("PPT directory depth index"))?;
     for entry in shared.directory_entries() {
         by_sid.insert(entry.sid, entry);
     }
@@ -1289,7 +1268,7 @@ fn inspect_directory_depth(
     let mut pending = Vec::new();
     pending
         .try_reserve(1)
-        .map_err(|_error| PptValidationError::Allocation("PPT directory depth stack"))?;
+        .map_err(|_error| Error::Allocation("PPT directory depth stack"))?;
     if root.sid_child != litchi_cfb::consts::NOSTREAM {
         pending.push((root.sid_child, 1_usize));
     }
@@ -1308,9 +1287,9 @@ fn inspect_directory_depth(
         };
         for sibling in [entry.sid_left, entry.sid_right] {
             if sibling != litchi_cfb::consts::NOSTREAM {
-                pending.try_reserve(1).map_err(|_error| {
-                    PptValidationError::Allocation("PPT directory depth stack")
-                })?;
+                pending
+                    .try_reserve(1)
+                    .map_err(|_error| Error::Allocation("PPT directory depth stack"))?;
                 pending.push((sibling, depth));
             }
         }
@@ -1321,7 +1300,7 @@ fn inspect_directory_depth(
             };
             pending
                 .try_reserve(1)
-                .map_err(|_error| PptValidationError::Allocation("PPT directory depth stack"))?;
+                .map_err(|_error| Error::Allocation("PPT directory depth stack"))?;
             pending.push((entry.sid_child, child_depth));
         }
     }
@@ -1335,7 +1314,7 @@ struct StreamProbe {
     size: Option<u64>,
 }
 
-fn probe_stream(shared: &SharedOleFile, path: &[&str]) -> Result<StreamProbe, PptValidationError> {
+fn probe_stream(shared: &SharedOleFile, path: &[&str]) -> Result<StreamProbe, Error> {
     if !shared.exists(path) {
         return Ok(StreamProbe::default());
     }
@@ -1350,7 +1329,7 @@ fn probe_stream(shared: &SharedOleFile, path: &[&str]) -> Result<StreamProbe, Pp
             non_stream: true,
             size: None,
         }),
-        Err(error) => Err(PptValidationError::Ingress(error)),
+        Err(error) => Err(Error::Ingress(error)),
     }
 }
 
@@ -1373,12 +1352,12 @@ struct RecordObservation {
     external_records: u64,
 }
 
-fn inspect_records(records: &[Record]) -> Result<RecordObservation, PptValidationError> {
+fn inspect_records(records: &[Record]) -> Result<RecordObservation, Error> {
     let mut observation = RecordObservation::default();
     let mut pending = Vec::new();
     pending
         .try_reserve(records.len())
-        .map_err(|_error| PptValidationError::Allocation("PPT record traversal stack"))?;
+        .map_err(|_error| Error::Allocation("PPT record traversal stack"))?;
     pending.extend(records.iter().map(|record| (record, true)));
     while let Some((record, top_level)) = pending.pop() {
         if top_level && record.record_type_raw == DOCUMENT_RECORD {
@@ -1413,7 +1392,7 @@ fn inspect_records(records: &[Record]) -> Result<RecordObservation, PptValidatio
         }
         pending
             .try_reserve(record.children.len())
-            .map_err(|_error| PptValidationError::Allocation("PPT record traversal stack"))?;
+            .map_err(|_error| Error::Allocation("PPT record traversal stack"))?;
         pending.extend(record.children.iter().map(|child| (child, false)));
     }
     Ok(observation)
@@ -1473,17 +1452,12 @@ fn equal_name(left: &str, right: &str) -> bool {
     left.eq_ignore_ascii_case(right)
 }
 
-fn initial_statuses(
-    limits: ValidationLimits,
-) -> Result<[CheckStatus; CHECK_IDS.len()], PptValidationError> {
+fn initial_statuses(limits: ValidationLimits) -> Result<[CheckStatus; CHECK_IDS.len()], Error> {
     let _ = limits;
     Ok(std::array::from_fn(|_| CheckStatus::Complete))
 }
 
-fn blocked_before_cfb(
-    limits: ValidationLimits,
-    reason: &str,
-) -> Result<ValidateReport, PptValidationError> {
+fn blocked_before_cfb(limits: ValidationLimits, reason: &str) -> Result<ValidateReport, Error> {
     let cfb = check_id(CFB, limits)?;
     let statuses = [
         CheckStatus::blocked(reason, limits)?,
@@ -1506,7 +1480,7 @@ fn cfb_rejection_report(
     error: &OleError,
     source_size: u64,
     limits: ValidationLimits,
-) -> Result<ValidateReport, PptValidationError> {
+) -> Result<ValidateReport, Error> {
     let blocked = CheckStatus::blocked("CFB ingress was structurally rejected", limits)?;
     let statuses = [
         CheckStatus::Complete,
@@ -1551,7 +1525,7 @@ fn cfb_rejection_report(
     let mut issues = Vec::new();
     issues
         .try_reserve_exact(1)
-        .map_err(|_error| PptValidationError::Allocation("PPT CFB validation issues"))?;
+        .map_err(|_error| Error::Allocation("PPT CFB validation issues"))?;
     issues.push(issue);
     finish_report(statuses, issues, limits)
 }
@@ -1591,7 +1565,7 @@ fn simple_issue(
     message: &str,
     part: Option<&str>,
     limits: ValidationLimits,
-) -> Result<ValidationIssue, PptValidationError> {
+) -> Result<ValidationIssue, Error> {
     Ok(ValidationIssue::try_new(
         check_id(check, limits)?,
         code,
@@ -1616,7 +1590,7 @@ fn push_presence_issue(
     message: &str,
     count: u64,
     limits: ValidationLimits,
-) -> Result<(), PptValidationError> {
+) -> Result<(), Error> {
     let issue = ValidationIssue::try_new(
         check_id(check, limits)?,
         code,
@@ -1649,9 +1623,9 @@ fn push_record_error(
     part: &str,
     code: &str,
     message: &str,
-    _error: &Error,
+    _error: &PackageError,
     limits: ValidationLimits,
-) -> Result<(), PptValidationError> {
+) -> Result<(), Error> {
     let issue = ValidationIssue::try_new(
         check_id(check, limits)?,
         code,
@@ -1683,7 +1657,7 @@ fn push_current_user_error(
     code: &str,
     message: &str,
     limits: ValidationLimits,
-) -> Result<(), PptValidationError> {
+) -> Result<(), Error> {
     push_issue(
         issues,
         simple_issue(
@@ -1697,13 +1671,10 @@ fn push_current_user_error(
     )
 }
 
-fn push_issue(
-    issues: &mut Vec<ValidationIssue>,
-    issue: ValidationIssue,
-) -> Result<(), PptValidationError> {
+fn push_issue(issues: &mut Vec<ValidationIssue>, issue: ValidationIssue) -> Result<(), Error> {
     issues
         .try_reserve(1)
-        .map_err(|_error| PptValidationError::Allocation("PPT validation issues"))?;
+        .map_err(|_error| Error::Allocation("PPT validation issues"))?;
     issues.push(issue);
     Ok(())
 }
@@ -1712,30 +1683,27 @@ fn finish_report(
     statuses: [CheckStatus; CHECK_IDS.len()],
     issues: Vec<ValidationIssue>,
     limits: ValidationLimits,
-) -> Result<ValidateReport, PptValidationError> {
+) -> Result<ValidateReport, Error> {
     let mut checks = Vec::new();
     checks
         .try_reserve_exact(CHECK_IDS.len())
-        .map_err(|_error| PptValidationError::Allocation("PPT validation checks"))?;
+        .map_err(|_error| Error::Allocation("PPT validation checks"))?;
     for (id, status) in CHECK_IDS.iter().zip(statuses) {
         checks.push(ValidationCheck::new(check_id(id, limits)?, status));
     }
     ValidateReport::try_new(checks, issues, limits).map_err(Into::into)
 }
 
-fn check_id(id: &str, limits: ValidationLimits) -> Result<CheckCapabilityId, PptValidationError> {
+fn check_id(id: &str, limits: ValidationLimits) -> Result<CheckCapabilityId, Error> {
     CheckCapabilityId::try_new(id, limits).map_err(Into::into)
 }
 
-fn require_version(
-    source: &dyn ReadAt,
-    expected: litchi_core::SourceVersion,
-) -> Result<(), PptValidationError> {
+fn require_version(source: &dyn ReadAt, expected: litchi_core::SourceVersion) -> Result<(), Error> {
     let observed = source
         .version()
-        .map_err(|error| PptValidationError::Ingress(OleError::Io(error)))?;
+        .map_err(|error| Error::Ingress(OleError::Io(error)))?;
     if observed != expected {
-        return Err(PptValidationError::Ingress(OleError::SourceChanged {
+        return Err(Error::Ingress(OleError::SourceChanged {
             expected,
             observed,
         }));

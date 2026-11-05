@@ -12,7 +12,7 @@
 
 //! Transactional XLSB slicer/timeline package-owner regressions.
 
-use litchi_opc::{BlobPart, PackURI, PackageWriter, Part, TargetMode};
+use litchi_opc::{BlobPart, PackURI, Part, TargetMode};
 use litchi_xlsb::Package;
 use litchi_xlsb::slicer::{
     Cache as SlicerCache, CrossFilter, Item, Native, View as SlicerView, Views as SlicerViews,
@@ -50,36 +50,14 @@ fn timeline_cache() -> TimelineCache {
     )
 }
 
-fn package_snapshot(package: &litchi_opc::OpcPackage) -> Package {
-    Package::from_opc(package.clone()).unwrap()
-}
-
 fn authored_package() -> litchi_opc::OpcPackage {
-    let source = Package::create().unwrap().into_opc();
+    let source = Package::new().unwrap().into_opc();
     let mut package = litchi_opc::OpcPackage::new();
     for part in source.try_iter_parts() {
         package.add_part(part.unwrap().clone_part());
     }
     *package.rels_mut() = source.rels().clone();
     package
-}
-
-fn apply_slicer(package: &mut litchi_opc::OpcPackage, patch: &litchi_xlsb::slicer::Patch) {
-    *package = package_snapshot(package)
-        .apply_slicer_patch(patch)
-        .unwrap()
-        .into_opc();
-}
-
-fn apply_timeline(package: &mut litchi_opc::OpcPackage, patch: &litchi_xlsb::timeline::Patch) {
-    *package = package_snapshot(package)
-        .apply_timeline_patch(patch)
-        .unwrap()
-        .into_opc();
-}
-
-fn package_bytes(package: &litchi_opc::OpcPackage) -> Vec<u8> {
-    PackageWriter::to_bytes(package).unwrap()
 }
 
 fn add_inbound(package: &mut litchi_opc::OpcPackage, source: &PackURI, target: &PackURI, id: &str) {
@@ -191,9 +169,37 @@ fn relocate_workbook(package: &mut litchi_opc::OpcPackage, destination: &PackURI
         .unwrap();
 }
 
+fn slicer_views() -> SlicerViews {
+    SlicerViews {
+        items: vec![SlicerView::new("StateView", "Slicer_State")],
+    }
+}
+
+fn timeline_views() -> TimelineViews {
+    TimelineViews {
+        items: vec![TimelineView::new(
+            "Timeline1",
+            "TimelineCache1",
+            Level::Month,
+        )],
+    }
+}
+
+/// `package` with the slicer and timeline caches and views of sheet 0.
+fn with_owners(package: &Package) -> Package {
+    let mut slicers = package.edit_slicers().unwrap();
+    slicers.set_caches(vec![slicer_cache()]).unwrap();
+    slicers.set_views(0, slicer_views()).unwrap();
+    let package = slicers.commit().unwrap().into_package();
+    let mut timelines = package.edit_timelines().unwrap();
+    timelines.set_caches(vec![timeline_cache()]).unwrap();
+    timelines.set_views(0, timeline_views()).unwrap();
+    timelines.commit().unwrap().into_package()
+}
+
 #[test]
 fn semantic_facades_resolve_one_actual_root_workbook_relationship() {
-    let mut missing = Package::create().unwrap().into_opc();
+    let mut missing = Package::new().unwrap().into_opc();
     let root_id = missing
         .rels()
         .iter()
@@ -205,10 +211,12 @@ fn semantic_facades_resolve_one_actual_root_workbook_relationship() {
         .to_string();
     missing.rels_mut().remove(&root_id);
     let missing = Package::from(missing);
-    assert!(missing.slicer_caches().is_err());
-    assert!(missing.timeline_caches().is_err());
+    let slicers = missing.edit_slicers().expect("cold slicer entry");
+    assert!(slicers.caches().is_err());
+    let timelines = missing.edit_timelines().expect("cold timeline entry");
+    assert!(timelines.caches().is_err());
 
-    let mut ambiguous = Package::create().unwrap().into_opc();
+    let mut ambiguous = Package::new().unwrap().into_opc();
     ambiguous
         .rels_mut()
         .try_add_relationship(
@@ -219,108 +227,73 @@ fn semantic_facades_resolve_one_actual_root_workbook_relationship() {
         )
         .unwrap();
     let ambiguous = Package::from(ambiguous);
-    assert!(ambiguous.slicer_caches().is_err());
-    assert!(ambiguous.timeline_caches().is_err());
+    let slicers = ambiguous.edit_slicers().expect("cold slicer entry");
+    assert!(slicers.caches().is_err());
+    let timelines = ambiguous.edit_timelines().expect("cold timeline entry");
+    assert!(timelines.caches().is_err());
 
-    let mut alternate = Package::create().unwrap().into_opc();
-    let workbook = PackURI::new("/xl/workbook.bin").unwrap();
-    let worksheet = PackURI::new("/xl/worksheets/sheet1.bin").unwrap();
-    litchi_xlsb::slicer::package::store_caches(&mut alternate, &workbook, &[slicer_cache()])
-        .unwrap();
-    litchi_xlsb::timeline::package::store_caches(&mut alternate, &workbook, &[timeline_cache()])
-        .unwrap();
-    litchi_xlsb::slicer::package::store_views(
-        &mut alternate,
-        &worksheet,
-        &SlicerViews {
-            items: vec![SlicerView::new("StateView", "Slicer_State")],
-        },
-    )
-    .unwrap();
-    litchi_xlsb::timeline::package::store_views(
-        &mut alternate,
-        &worksheet,
-        &TimelineViews {
-            items: vec![TimelineView::new(
-                "Timeline1",
-                "TimelineCache1",
-                Level::Month,
-            )],
-        },
-    )
-    .unwrap();
+    let mut alternate = with_owners(&Package::new().unwrap()).into_opc();
     relocate_workbook(
         &mut alternate,
         &PackURI::new("/xl/alternate-workbook.bin").unwrap(),
     );
 
     let alternate = Package::from_opc(alternate).unwrap();
-    assert_eq!(
-        alternate.slicer_caches().unwrap().caches().unwrap().len(),
-        1
-    );
-    assert_eq!(
-        alternate.timeline_caches().unwrap().caches().unwrap().len(),
-        1
-    );
-    assert!(alternate.slicer_views(0).unwrap().is_some());
-    assert!(alternate.timeline_views(0).unwrap().is_some());
+    let slicers = alternate.edit_slicers().unwrap();
+    assert_eq!(slicers.caches().unwrap().len(), 1);
+    assert!(!slicers.views(0).unwrap().items.is_empty());
+    let timelines = alternate.edit_timelines().unwrap();
+    assert_eq!(timelines.caches().unwrap().len(), 1);
+    assert!(!timelines.views(0).unwrap().items.is_empty());
 }
 
 #[test]
 fn workbook_facade_round_trips_and_removes_both_inert_owners() {
-    let mut workbook = Package::create().unwrap().into_workbook().unwrap();
     let cache = slicer_cache();
-    workbook.set_slicer_caches(vec![cache.clone()]).unwrap();
-
     let mut slicer_view = SlicerView::new("StateView", "Slicer_State");
     slicer_view.caption = Some("State".to_string());
-    workbook
-        .set_slicers(
+    let mut slicers = Package::new().unwrap().edit_slicers().unwrap();
+    slicers.set_caches(vec![cache.clone()]).unwrap();
+    slicers
+        .set_views(
             0,
             SlicerViews {
                 items: vec![slicer_view],
             },
         )
         .unwrap();
+    let package = slicers.commit().unwrap().into_package();
 
     let timeline = timeline_cache();
-    workbook
-        .set_timeline_caches(vec![timeline.clone()])
-        .unwrap();
-    workbook
-        .set_timelines(
-            0,
-            TimelineViews {
-                items: vec![TimelineView::new(
-                    "Timeline1",
-                    "TimelineCache1",
-                    Level::Month,
-                )],
-            },
-        )
-        .unwrap();
+    let mut timelines = package.edit_timelines().unwrap();
+    timelines.set_caches(vec![timeline.clone()]).unwrap();
+    timelines.set_views(0, timeline_views()).unwrap();
+    let package = timelines.commit().unwrap().into_package();
 
+    let workbook = package.workbook().unwrap();
     assert_eq!(workbook.slicer_caches().unwrap(), vec![cache.clone()]);
     assert_eq!(workbook.timeline_caches().unwrap(), vec![timeline.clone()]);
     assert!(workbook.slicers(0).unwrap().is_some());
     assert!(workbook.timelines(0).unwrap().is_some());
 
     let mut bytes = Cursor::new(Vec::new());
-    workbook.save(&mut bytes).unwrap();
-    let reopened = Package::from_bytes(bytes.into_inner())
-        .unwrap()
-        .into_workbook()
-        .unwrap();
-    assert_eq!(reopened.slicer_caches().unwrap(), vec![cache]);
-    assert_eq!(reopened.timeline_caches().unwrap(), vec![timeline]);
-    assert!(reopened.slicers(0).unwrap().is_some());
-    assert!(reopened.timelines(0).unwrap().is_some());
+    package.write_to(&mut bytes).unwrap();
+    let reopened = Package::from_bytes(&bytes.into_inner()).unwrap();
+    let reopened_workbook = reopened.workbook().unwrap();
+    assert_eq!(reopened_workbook.slicer_caches().unwrap(), vec![cache]);
+    assert_eq!(reopened_workbook.timeline_caches().unwrap(), vec![timeline]);
+    assert!(reopened_workbook.slicers(0).unwrap().is_some());
+    assert!(reopened_workbook.timelines(0).unwrap().is_some());
 
-    assert!(workbook.remove_slicers(0).unwrap());
-    assert!(workbook.remove_slicer_caches().unwrap());
-    assert!(workbook.remove_timelines(0).unwrap());
-    assert!(workbook.remove_timeline_caches().unwrap());
+    let mut slicers = package.edit_slicers().unwrap();
+    assert!(slicers.remove_views(0).unwrap());
+    assert!(slicers.remove_caches().unwrap());
+    let package = slicers.commit().unwrap().into_package();
+    let mut timelines = package.edit_timelines().unwrap();
+    assert!(timelines.remove_views(0).unwrap());
+    assert!(timelines.remove_caches().unwrap());
+    let package = timelines.commit().unwrap().into_package();
+    let workbook = package.workbook().unwrap();
     assert!(workbook.slicer_caches().unwrap().is_empty());
     assert!(workbook.timeline_caches().unwrap().is_empty());
     assert!(workbook.slicers(0).unwrap().is_none());
@@ -329,46 +302,33 @@ fn workbook_facade_round_trips_and_removes_both_inert_owners() {
 
 #[test]
 fn slicer_patch_is_source_checked_reversible_and_dependency_safe() {
-    let mut package = Package::create().unwrap().into_opc();
-    let snapshot = package_snapshot(&package).slicer_caches().unwrap();
-    let mut edit = snapshot.edit().unwrap();
-    edit.replace_caches(vec![slicer_cache()]).unwrap();
+    let source = Package::new().unwrap();
+    let mut edit = source.edit_slicers().unwrap();
+    edit.set_caches(vec![slicer_cache()]).unwrap();
     let commit = edit.commit().unwrap();
-    assert!(!commit.patch().is_empty());
-    apply_slicer(&mut package, commit.patch());
-    assert!(
-        package_snapshot(&package)
-            .apply_slicer_patch(commit.patch())
-            .is_err()
-    );
+    assert!(!commit.patch().is_noop());
+    let package = source.apply_slicers(commit.patch()).unwrap().into_package();
+    assert!(package.apply_slicers(commit.patch()).is_err());
 
-    let views = package_snapshot(&package).slicer_views(0).unwrap().unwrap();
-    let mut edit = views.edit().unwrap();
-    edit.replace_views(SlicerViews {
-        items: vec![SlicerView::new("StateView", "Slicer_State")],
-    })
-    .unwrap();
-    apply_slicer(&mut package, edit.commit().unwrap().patch());
+    let mut edit = package.edit_slicers().unwrap();
+    edit.set_views(0, slicer_views()).unwrap();
+    let package = edit.commit().unwrap().into_package();
 
-    let caches = package_snapshot(&package).slicer_caches().unwrap();
-    let mut dangling = caches.edit().unwrap();
-    dangling.remove_cache("Slicer_State").unwrap();
-    assert!(dangling.commit().is_err());
+    let mut dangling = package.edit_slicers().unwrap();
+    assert!(dangling.remove_cache("Slicer_State").is_err());
 
-    let mut views = package_snapshot(&package)
-        .slicer_views(0)
+    let mut views = package.edit_slicers().unwrap();
+    views.set_views(0, SlicerViews::new()).unwrap();
+    let package = views.commit().unwrap().into_package();
+    let package = package
+        .apply_slicers(&commit.patch().inverse())
         .unwrap()
-        .unwrap()
-        .edit()
-        .unwrap();
-    views.replace_views(SlicerViews::new()).unwrap();
-    apply_slicer(&mut package, views.commit().unwrap().patch());
-    apply_slicer(&mut package, &commit.patch().inverse());
+        .into_package();
     assert!(
-        package_snapshot(&package)
-            .slicer_caches()
+        package
+            .workbook()
             .unwrap()
-            .caches()
+            .slicer_caches()
             .unwrap()
             .is_empty()
     );
@@ -376,32 +336,18 @@ fn slicer_patch_is_source_checked_reversible_and_dependency_safe() {
 
 #[test]
 fn timeline_patch_preserves_noop_and_emits_compact_xml() {
-    let mut package = Package::create().unwrap().into_opc();
-    let before = Package::from_opc(package.clone())
-        .unwrap()
-        .to_bytes()
-        .unwrap();
-    let snapshot = package_snapshot(&package).timeline_caches().unwrap();
-    let noop = snapshot.edit().unwrap().commit().unwrap();
-    assert!(noop.patch().is_empty());
-    apply_timeline(&mut package, noop.patch());
-    assert_eq!(
-        Package::from_opc(package.clone())
-            .unwrap()
-            .to_bytes()
-            .unwrap(),
-        before
-    );
+    let source = Package::new().unwrap();
+    let before = source.to_bytes().unwrap();
+    let noop = source.edit_timelines().unwrap().commit().unwrap();
+    assert!(noop.patch().is_noop());
+    let package = source.apply_timelines(noop.patch()).unwrap().into_package();
+    assert_eq!(package.to_bytes().unwrap(), before);
 
-    let mut caches = package_snapshot(&package)
-        .timeline_caches()
-        .unwrap()
-        .edit()
-        .unwrap();
-    caches.replace_caches(vec![timeline_cache()]).unwrap();
-    apply_timeline(&mut package, caches.commit().unwrap().patch());
+    let mut caches = package.edit_timelines().unwrap();
+    caches.set_caches(vec![timeline_cache()]).unwrap();
+    let package = caches.commit().unwrap().into_package();
 
-    let mut decorated = package.clone();
+    let mut decorated = package.opc_package().clone();
     let cache_part = decorated
         .iter_parts()
         .find(|part| part.partname().as_str().contains("/timelineCaches/"))
@@ -411,34 +357,18 @@ fn timeline_patch_preserves_noop_and_emits_compact_xml() {
     let mut xml = b"<?xml version=\"1.0\"?>".to_vec();
     xml.extend_from_slice(decorated.get_part(&cache_part).unwrap().blob());
     decorated.get_part_mut(&cache_part).unwrap().set_blob(xml);
-    let mut lexical = package_snapshot(&decorated)
-        .timeline_caches()
-        .unwrap()
-        .edit()
-        .unwrap();
+    let decorated = Package::from_opc(decorated).unwrap();
+    let mut lexical = decorated.edit_timelines().unwrap();
     let mut renamed = timeline_cache();
     renamed.name = "TimelineCache2".to_string();
-    lexical.replace_caches(vec![renamed]).unwrap();
-    assert!(lexical.commit().is_err());
+    assert!(lexical.set_caches(vec![renamed]).is_err());
 
-    let mut views = package_snapshot(&package)
-        .timeline_views(0)
-        .unwrap()
-        .unwrap()
-        .edit()
-        .unwrap();
-    views
-        .replace_views(TimelineViews {
-            items: vec![TimelineView::new(
-                "Timeline1",
-                "TimelineCache1",
-                Level::Month,
-            )],
-        })
-        .unwrap();
-    apply_timeline(&mut package, views.commit().unwrap().patch());
+    let mut views = package.edit_timelines().unwrap();
+    views.set_views(0, timeline_views()).unwrap();
+    let package = views.commit().unwrap().into_package();
 
-    let timeline_names = package
+    let opc = package.opc_package();
+    let timeline_names = opc
         .iter_parts()
         .filter(|part| {
             part.partname().as_str().contains("/timelineCaches/")
@@ -447,7 +377,7 @@ fn timeline_patch_preserves_noop_and_emits_compact_xml() {
         .map(|part| part.partname().clone())
         .collect::<Vec<_>>();
     for name in &timeline_names {
-        let part = package.get_part(name).unwrap();
+        let part = opc.get_part(name).unwrap();
         let xml = part.blob();
         assert!(!xml.contains(&b'\n'));
         assert!(!xml.contains(&b'\r'));
@@ -457,10 +387,11 @@ fn timeline_patch_preserves_noop_and_emits_compact_xml() {
 
 #[test]
 fn shared_slicer_targets_are_refused_before_package_mutation() {
-    let mut package = Package::create().unwrap().into_opc();
     let workbook = PackURI::new("/xl/workbook.bin").unwrap();
     let worksheet = PackURI::new("/xl/worksheets/sheet1.bin").unwrap();
-    litchi_xlsb::slicer::package::store_caches(&mut package, &workbook, &[slicer_cache()]).unwrap();
+    let mut edit = Package::new().unwrap().edit_slicers().unwrap();
+    edit.set_caches(vec![slicer_cache()]).unwrap();
+    let mut package = edit.commit().unwrap().into_package().into_opc();
 
     let cache_target = package
         .iter_parts()
@@ -474,29 +405,23 @@ fn shared_slicer_targets_are_refused_before_package_mutation() {
         &cache_target,
         "rIdSharedSlicerCache",
     );
-    let before = package_bytes(&package);
+    let shared = Package::from_opc(package.clone()).unwrap();
+    let before = shared.to_bytes().unwrap();
     let mut extra = slicer_cache();
     extra.name = "Slicer_Province".to_string();
-    assert!(
-        litchi_xlsb::slicer::package::store_caches(
-            &mut package,
-            &workbook,
-            &[slicer_cache(), extra]
-        )
-        .is_err()
-    );
-    assert!(litchi_xlsb::slicer::package::store_caches(&mut package, &workbook, &[]).is_err());
-    assert_eq!(package_bytes(&package), before);
+    let mut edit = shared.edit_slicers().unwrap();
+    assert!(edit.set_caches(vec![slicer_cache(), extra]).is_err());
+    assert!(edit.set_caches(Vec::new()).is_err());
+    assert_eq!(edit.commit().unwrap().package().to_bytes().unwrap(), before);
     package
         .get_part_mut(&worksheet)
         .unwrap()
         .rels_mut()
         .remove("rIdSharedSlicerCache");
 
-    let views = SlicerViews {
-        items: vec![SlicerView::new("StateView", "Slicer_State")],
-    };
-    litchi_xlsb::slicer::package::store_views(&mut package, &worksheet, &views).unwrap();
+    let mut edit = Package::from_opc(package).unwrap().edit_slicers().unwrap();
+    edit.set_views(0, slicer_views()).unwrap();
+    let mut package = edit.commit().unwrap().into_package().into_opc();
     let view_target = package
         .iter_parts()
         .find(|part| part.partname().as_str().contains("/slicers/"))
@@ -504,26 +429,23 @@ fn shared_slicer_targets_are_refused_before_package_mutation() {
         .partname()
         .clone();
     add_inbound(&mut package, &workbook, &view_target, "rIdSharedSlicerView");
-    let before = package_bytes(&package);
-    let mut replacement = views.clone();
+    let shared = Package::from_opc(package).unwrap();
+    let before = shared.to_bytes().unwrap();
+    let mut replacement = slicer_views();
     replacement.items[0].caption = Some("Shared".to_string());
-    assert!(
-        litchi_xlsb::slicer::package::store_views(&mut package, &worksheet, &replacement).is_err()
-    );
-    assert!(
-        litchi_xlsb::slicer::package::store_views(&mut package, &worksheet, &SlicerViews::new())
-            .is_err()
-    );
-    assert_eq!(package_bytes(&package), before);
+    let mut edit = shared.edit_slicers().unwrap();
+    assert!(edit.set_views(0, replacement).is_err());
+    assert!(edit.set_views(0, SlicerViews::new()).is_err());
+    assert_eq!(edit.commit().unwrap().package().to_bytes().unwrap(), before);
 }
 
 #[test]
 fn shared_timeline_targets_are_refused_before_package_mutation() {
-    let mut package = Package::create().unwrap().into_opc();
     let workbook = PackURI::new("/xl/workbook.bin").unwrap();
     let worksheet = PackURI::new("/xl/worksheets/sheet1.bin").unwrap();
-    litchi_xlsb::timeline::package::store_caches(&mut package, &workbook, &[timeline_cache()])
-        .unwrap();
+    let mut edit = Package::new().unwrap().edit_timelines().unwrap();
+    edit.set_caches(vec![timeline_cache()]).unwrap();
+    let mut package = edit.commit().unwrap().into_package().into_opc();
 
     let cache_target = package
         .iter_parts()
@@ -537,33 +459,26 @@ fn shared_timeline_targets_are_refused_before_package_mutation() {
         &cache_target,
         "rIdSharedTimelineCache",
     );
-    let before = package_bytes(&package);
+    let shared = Package::from_opc(package.clone()).unwrap();
+    let before = shared.to_bytes().unwrap();
     let mut extra = timeline_cache();
     extra.name = "TimelineCache2".to_string();
-    assert!(
-        litchi_xlsb::timeline::package::store_caches(
-            &mut package,
-            &workbook,
-            &[timeline_cache(), extra]
-        )
-        .is_err()
-    );
-    assert!(litchi_xlsb::timeline::package::store_caches(&mut package, &workbook, &[]).is_err());
-    assert_eq!(package_bytes(&package), before);
+    let mut edit = shared.edit_timelines().unwrap();
+    assert!(edit.set_caches(vec![timeline_cache(), extra]).is_err());
+    assert!(edit.set_caches(Vec::new()).is_err());
+    assert_eq!(edit.commit().unwrap().package().to_bytes().unwrap(), before);
     package
         .get_part_mut(&worksheet)
         .unwrap()
         .rels_mut()
         .remove("rIdSharedTimelineCache");
 
-    let views = TimelineViews {
-        items: vec![TimelineView::new(
-            "Timeline1",
-            "TimelineCache1",
-            Level::Month,
-        )],
-    };
-    litchi_xlsb::timeline::package::store_views(&mut package, &worksheet, &views).unwrap();
+    let mut edit = Package::from_opc(package)
+        .unwrap()
+        .edit_timelines()
+        .unwrap();
+    edit.set_views(0, timeline_views()).unwrap();
+    let mut package = edit.commit().unwrap().into_package().into_opc();
     let view_target = package
         .iter_parts()
         .find(|part| part.partname().as_str().contains("/timelines/"))
@@ -576,53 +491,41 @@ fn shared_timeline_targets_are_refused_before_package_mutation() {
         &view_target,
         "rIdSharedTimelineView",
     );
-    let before = package_bytes(&package);
-    let mut replacement = views.clone();
+    let shared = Package::from_opc(package).unwrap();
+    let before = shared.to_bytes().unwrap();
+    let mut replacement = timeline_views();
     replacement.items[0].caption = Some("Shared".to_string());
-    assert!(
-        litchi_xlsb::timeline::package::store_views(&mut package, &worksheet, &replacement)
-            .is_err()
-    );
-    assert!(
-        litchi_xlsb::timeline::package::store_views(
-            &mut package,
-            &worksheet,
-            &TimelineViews::new()
-        )
-        .is_err()
-    );
-    assert_eq!(package_bytes(&package), before);
+    let mut edit = shared.edit_timelines().unwrap();
+    assert!(edit.set_views(0, replacement).is_err());
+    assert!(edit.set_views(0, TimelineViews::new()).is_err());
+    assert_eq!(edit.commit().unwrap().package().to_bytes().unwrap(), before);
 }
 
+/// A changed slicer commit over a signed package is refused until the
+/// signature is removed explicitly (ADR 0006); the patch's inverse restores
+/// the explicitly unsigned source byte for byte.
 #[test]
-fn patch_binds_root_relationships_and_inverse_restores_signature_state() {
+fn patch_needs_an_explicit_unsign_and_inverse_is_exact() {
     let mut package = authored_package();
     add_signature_marker(&mut package);
-    let signed = package_bytes(&package);
-    let snapshot = package_snapshot(&package).slicer_caches().unwrap();
-    let mut edit = snapshot.edit().unwrap();
-    edit.replace_caches(vec![slicer_cache()]).unwrap();
+    let signed = Package::from_opc(package).unwrap();
+    let mut edit = signed.edit_slicers().unwrap();
+    let staged = edit.set_caches(vec![slicer_cache()]);
+    assert!(matches!(
+        staged.and_then(|_| edit.commit().map(|_| ())),
+        Err(litchi_xlsb::package::PackageError::Signed)
+    ));
+
+    let unsigned_package = signed.unsign();
+    let unsigned = unsigned_package.to_bytes().unwrap();
+    let mut edit = unsigned_package.edit_slicers().unwrap();
+    edit.set_caches(vec![slicer_cache()]).unwrap();
     let commit = edit.commit().unwrap();
 
-    let mut stale = package.clone();
-    stale
-        .rels_mut()
-        .try_add_relationship(
-            "urn:litchi:test:root-change".to_string(),
-            "/xl/workbook.bin".to_string(),
-            "rIdRootChange".to_string(),
-            TargetMode::Internal,
-        )
-        .unwrap();
-    assert!(
-        package_snapshot(&stale)
-            .apply_slicer_patch(commit.patch())
-            .is_err()
-    );
-
-    let changed = package_snapshot(&package)
-        .apply_slicer_patch(commit.patch())
-        .unwrap();
+    let changed = unsigned_package
+        .apply_slicers(commit.patch())
+        .unwrap()
+        .into_package();
     assert!(
         !changed
             .opc_package()
@@ -630,9 +533,10 @@ fn patch_binds_root_relationships_and_inverse_restores_signature_state() {
             .any(|part| part.partname().as_str().starts_with("/_xmlsignatures/"))
     );
     let restored = changed
-        .apply_slicer_patch(&commit.patch().inverse())
-        .unwrap();
-    assert_eq!(restored.to_bytes().unwrap(), signed);
+        .apply_slicers(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
+    assert_eq!(restored.to_bytes().unwrap(), unsigned);
 }
 
 #[test]

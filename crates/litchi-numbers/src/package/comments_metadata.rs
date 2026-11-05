@@ -466,6 +466,21 @@ impl<'source> MetadataRegistry<'source> {
         Ok(())
     }
 
+    /// Whether a current reference from the edge's source component already
+    /// covers it (the object's own edge, or a component-wide one).
+    pub(super) fn external_edge_present(&self, edge: ExternalEdge) -> Result<bool> {
+        let source = self.selector(edge.source_component_index)?;
+        let target = self.selector(edge.target_component_index)?;
+        Ok(self.external_references.iter().any(|reference| {
+            reference.source_identifier == source.identifier()
+                && reference.target_component_identifier == target.identifier()
+                && reference.current
+                && !reference.versioned
+                && (reference.object_identifier.is_none()
+                    || reference.object_identifier == Some(edge.object_identifier))
+        }))
+    }
+
     pub(super) fn external_addition(
         &self,
         edge: ExternalEdge,
@@ -1112,7 +1127,7 @@ pub(super) fn reject_unknown_archive_metadata(
     for component in source.state.components.catalog().iter() {
         for object in &component.archive().objects {
             object
-                .inspect_references_with_policy_and_limits(
+                .inspect_references_with_policy(
                     &mut Noop,
                     ArchiveReferencePolicy::RejectUnknownMetadata,
                     limits,
@@ -1131,17 +1146,11 @@ fn find_physical_descriptor(
     if preferred_locator == effective_locator {
         return locator_index.find(preferred_locator);
     }
-    let preferred = locator_index.find(preferred_locator);
-    let effective = locator_index.find(effective_locator);
-    match (preferred, effective) {
-        // Preserve the strict descriptor rule: an explicit locator cannot
-        // silently redirect a descriptor while a different preferred physical
-        // member is also present. Both lookups are logarithmic in the single
-        // sorted index, so this retains the old fail-closed result without a
-        // per-descriptor catalog scan.
-        (Some(preferred), Some(effective)) if preferred != effective => None,
-        (_, effective) => effective,
-    }
+    // The effective locator names the member. Native packages give many
+    // components one preferred locator (`Tables/DataList`) and distinct
+    // effective ones (`Tables/DataList-905013`), the first of which is
+    // also a member: the effective member is the component's (record 0318).
+    locator_index.find(effective_locator)
 }
 
 pub(super) fn prepare_additions<'source, 'batch>(
@@ -1323,9 +1332,12 @@ mod tests {
             find_physical_descriptor(&index, "generic.iwa", "member-123.iwa"),
             Some(123)
         );
+        // Native packages name many components `Tables/DataList` by
+        // preference and `Tables/DataList-<id>` effectively, both present:
+        // the effective member is the component's (record 0318).
         assert_eq!(
             find_physical_descriptor(&index, "member-124.iwa", "member-123.iwa"),
-            None
+            Some(123)
         );
         assert_eq!(
             find_physical_descriptor(&index, "member-123.iwa", "missing.iwa"),

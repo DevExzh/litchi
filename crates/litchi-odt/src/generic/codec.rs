@@ -3,7 +3,7 @@
 use super::Family;
 use super::flat::FlatMutationBudget;
 use crate::constants;
-use crate::core::ResolvedReader;
+use crate::core::{ResolvedReader, XmlStreamLimits};
 use litchi_core::{Error, ExecutionContext, ExecutionError, Resource, Result};
 use quick_xml::events::Event;
 
@@ -11,16 +11,18 @@ pub(super) fn validate_flat_document_with_context(
     xml: &str,
     family: Family,
     context: &ExecutionContext,
+    xml_limits: XmlStreamLimits,
 ) -> Result<()> {
-    validate_flat_document_inner(xml, family, EventBudget::Context(context))
+    validate_flat_document_inner(xml, family, EventBudget::Context(context), xml_limits)
 }
 
 pub(super) fn validate_flat_document_with_budget(
     xml: &str,
     family: Family,
     budget: &FlatMutationBudget,
+    xml_limits: XmlStreamLimits,
 ) -> Result<()> {
-    validate_flat_document_inner(xml, family, EventBudget::Mutation(budget))
+    validate_flat_document_inner(xml, family, EventBudget::Mutation(budget), xml_limits)
 }
 
 enum EventBudget<'a> {
@@ -80,10 +82,31 @@ fn validate_flat_document_inner(
     xml: &str,
     family: Family,
     event_budget: EventBudget<'_>,
+    mut xml_limits: XmlStreamLimits,
 ) -> Result<()> {
     const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 
-    let mut reader = ResolvedReader::from_xml(xml);
+    // The format checker has fixed structural ceilings in addition to the
+    // caller's retained policy.  Intersect only those invariants; a caller's
+    // stricter profile remains authoritative for every raw event dimension.
+    xml_limits = XmlStreamLimits::new(
+        xml_limits
+            .max_bytes()
+            .min(super::flat::HARD_MAX_FLAT_DOCUMENT_BYTES),
+        xml_limits.max_depth().min(4_096),
+        xml_limits.max_events().min(4_000_000),
+        xml_limits.max_attributes().min(1_000_000),
+        xml_limits.max_token_bytes().min(64 * 1024 * 1024),
+    )?
+    .namespace_limits(
+        xml_limits.max_namespace_scope_depth().min(4_096),
+        xml_limits.max_namespace_declarations().min(256),
+        xml_limits.max_namespace_bindings().min(256 * 1_024),
+        xml_limits.max_namespace_bytes().min(16 * 1024 * 1024),
+        xml_limits.max_namespace_prefix_bytes().min(64 * 1024),
+        xml_limits.max_namespace_uri_bytes().min(64 * 1024),
+    )?;
+    let mut reader = ResolvedReader::from_xml(xml, xml_limits)?;
     let mut depth = 0usize;
     let mut root_seen = false;
     let mut root_closed = false;
@@ -105,7 +128,7 @@ fn validate_flat_document_inner(
     loop {
         event_budget.event(depth, &mut maximum_depth)?;
         let (namespace, event) = reader.read_resolved_event().map_err(|error| {
-            Error::InvalidFormat(format!("invalid flat OpenDocument XML: {error}"))
+            crate::core::map_resolved_reader_error(error, "invalid flat OpenDocument XML")
         })?;
         match event {
             Event::Start(element) => {

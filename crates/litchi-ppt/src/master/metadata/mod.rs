@@ -3,6 +3,10 @@
 //! The same atom names a main master, title master, notes master, and handout
 //! master. The notes-master text-style package is a separate nested owner.
 //! Every other child remains in the parent snapshot as an opaque record.
+//!
+//! [`Snapshot`] reads one master record; an [`Edit`] (from
+//! [`crate::Package::edit_master_metadata`]) stages the name, design name and
+//! notes styles of one master of a package and publishes a new package.
 
 mod codec;
 mod model;
@@ -13,14 +17,16 @@ pub mod notes_styles;
 /// Main-master design-name metadata.
 pub mod template;
 
+mod edit;
 #[cfg(test)]
 mod tests;
 
-pub use crate::master_layout::{Change, ChangeSet, Context, Limits, Revision};
+pub use crate::master_layout::{Change, Context, Limits, Revision};
+pub use edit::Edit;
 pub use model::{MAX_NAME_BYTES, Name};
 
 use crate::master_layout;
-use crate::package::Result;
+use crate::package::Result as RecordResult;
 use crate::records::Record;
 
 /// An immutable, validated master snapshot with a contextual name view.
@@ -35,19 +41,8 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn from_record(context: Context, root: Record) -> Result<Self> {
-        Self::from_inner(master_layout::Snapshot::from_record(context, root)?)
-    }
-
-    /// Validate and capture one contextual master under explicit tree limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn from_record_with_limits(context: Context, root: Record, limits: Limits) -> Result<Self> {
-        Self::from_inner(master_layout::Snapshot::from_record_with_limits(
-            context, root, limits,
-        )?)
+    pub fn from_record(context: Context, root: Record, limits: &Limits) -> RecordResult<Self> {
+        Self::from_inner(master_layout::Snapshot::from_record(context, root, limits)?)
     }
 
     /// Parse one complete contextual master record.
@@ -55,22 +50,11 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(context: Context, bytes: &[u8]) -> Result<Self> {
-        Self::from_inner(master_layout::Snapshot::parse(context, bytes)?)
+    pub fn parse(context: Context, bytes: &[u8], limits: &Limits) -> RecordResult<Self> {
+        Self::from_inner(master_layout::Snapshot::parse(context, bytes, limits)?)
     }
 
-    /// Parse one complete contextual master under explicit tree limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_with_limits(context: Context, bytes: &[u8], limits: Limits) -> Result<Self> {
-        Self::from_inner(master_layout::Snapshot::parse_with_limits(
-            context, bytes, limits,
-        )?)
-    }
-
-    fn from_inner(inner: master_layout::Snapshot) -> Result<Self> {
+    fn from_inner(inner: master_layout::Snapshot) -> RecordResult<Self> {
         validation::validate(inner.context(), inner.record())?;
         Ok(Self { inner })
     }
@@ -104,7 +88,7 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn name(&self) -> Result<Option<Name>> {
+    pub fn name(&self) -> RecordResult<Option<Name>> {
         codec::read(self.context(), self.record())
     }
 
@@ -113,7 +97,7 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn template_name(&self) -> Result<Option<template::Name>> {
+    pub fn template_name(&self) -> RecordResult<Option<template::Name>> {
         template::codec::read(self.context(), self.record())
     }
 
@@ -122,14 +106,14 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn notes_styles(&self) -> Result<Option<notes_styles::Styles>> {
+    pub fn notes_styles(&self) -> RecordResult<Option<notes_styles::Styles>> {
         notes_styles::codec::read(self.context(), self.record())
     }
 
     /// Open an isolated semantic edit.
     #[must_use]
-    pub fn edit(&self) -> Editor {
-        Editor {
+    pub(crate) fn edit(&self) -> RecordEdit {
+        RecordEdit {
             inner: self.inner.edit(),
         }
     }
@@ -137,14 +121,22 @@ impl Snapshot {
 
 /// A transactional semantic edit of one master’s bounded metadata.
 #[derive(Debug, Clone)]
-pub struct Editor {
-    inner: master_layout::Transaction,
+#[allow(
+    dead_code,
+    reason = "the record-level owner behind the package-level Edit; its full surface stays exercised by the unit tests (record 0357)"
+)]
+pub(crate) struct RecordEdit {
+    inner: master_layout::RecordEdit,
 }
 
-impl Editor {
+#[allow(
+    dead_code,
+    reason = "the record-level owner behind the package-level Edit; its full surface stays exercised by the unit tests (record 0357)"
+)]
+impl RecordEdit {
     /// The contextual master kind being edited.
     #[must_use]
-    pub const fn context(&self) -> Context {
+    pub(crate) const fn context(&self) -> Context {
         self.inner.context()
     }
 
@@ -153,7 +145,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn name(&self) -> Result<Option<Name>> {
+    pub(crate) fn name(&self) -> RecordResult<Option<Name>> {
         codec::read(self.context(), self.inner.record())
     }
 
@@ -162,7 +154,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn template_name(&self) -> Result<Option<template::Name>> {
+    pub(crate) fn template_name(&self) -> RecordResult<Option<template::Name>> {
         template::codec::read(self.context(), self.inner.record())
     }
 
@@ -171,25 +163,19 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn notes_styles(&self) -> Result<Option<notes_styles::Styles>> {
+    pub(crate) fn notes_styles(&self) -> RecordResult<Option<notes_styles::Styles>> {
         notes_styles::codec::read(self.context(), self.inner.record())
     }
 
     /// Borrow the transaction-local master record.
     #[must_use]
-    pub fn record(&self) -> &Record {
+    pub(crate) fn record(&self) -> &Record {
         self.inner.record()
-    }
-
-    /// Whether this editor contains an uncommitted change.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.inner.is_changed()
     }
 
     /// The current semantic change set.
     #[must_use]
-    pub fn changes(&self) -> &[Change] {
+    pub(crate) fn changes(&self) -> &[Change] {
         self.inner.changes()
     }
 
@@ -198,7 +184,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_name(&mut self, value: impl Into<String>) -> Result<()> {
+    pub(crate) fn set_name(&mut self, value: impl Into<String>) -> RecordResult<()> {
         let name = Name::new(value)?;
         let replacement = codec::encode(&name)?;
         let existing = validation::name_index(self.context(), self.inner.record())?;
@@ -218,7 +204,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_template_name(&mut self, value: impl Into<String>) -> Result<()> {
+    pub(crate) fn set_template_name(&mut self, value: impl Into<String>) -> RecordResult<()> {
         let name = template::Name::new(value)?;
         let replacement = template::codec::encode(&name)?;
         let existing = template::validation::template_index(self.context(), self.inner.record())?;
@@ -246,7 +232,7 @@ impl Editor {
         reason = "callers hand over the authored `Styles` package; taking it by reference would \
                   churn the established public API and its callers"
     )]
-    pub fn set_notes_styles(&mut self, styles: notes_styles::Styles) -> Result<()> {
+    pub(crate) fn set_notes_styles(&mut self, styles: notes_styles::Styles) -> RecordResult<()> {
         let replacement = notes_styles::codec::encode(&styles)?;
         let existing = notes_styles::validation::styles_index(self.context(), self.inner.record())?;
         if let Some(index) = existing {
@@ -268,7 +254,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_notes_styles_xml(&mut self, xml: impl AsRef<[u8]>) -> Result<()> {
+    pub(crate) fn set_notes_styles_xml(&mut self, xml: impl AsRef<[u8]>) -> RecordResult<()> {
         self.set_notes_styles(notes_styles::Styles::from_xml(xml)?)
     }
 
@@ -277,7 +263,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn clear_name(&mut self) -> Result<bool> {
+    pub(crate) fn clear_name(&mut self) -> RecordResult<bool> {
         let Some(index) = validation::name_index(self.context(), self.inner.record())? else {
             return Ok(false);
         };
@@ -291,7 +277,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn clear_template_name(&mut self) -> Result<bool> {
+    pub(crate) fn clear_template_name(&mut self) -> RecordResult<bool> {
         let Some(index) =
             template::validation::template_index(self.context(), self.inner.record())?
         else {
@@ -307,7 +293,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn clear_notes_styles(&mut self) -> Result<bool> {
+    pub(crate) fn clear_notes_styles(&mut self) -> RecordResult<bool> {
         let Some(index) =
             notes_styles::validation::styles_index(self.context(), self.inner.record())?
         else {
@@ -318,54 +304,45 @@ impl Editor {
         Ok(true)
     }
 
-    /// Capture the current candidate without publishing it.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn snapshot(&self) -> Result<Snapshot> {
-        Snapshot::from_inner(self.inner.snapshot()?)
-    }
-
     /// Validate and publish the candidate as an immutable snapshot and patch.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> RecordResult<RecordCommit> {
         let (snapshot, changes) = self.inner.commit()?.into_parts();
-        Ok(Commit {
+        Ok(RecordCommit {
             snapshot: Snapshot::from_inner(snapshot)?,
             changes,
         })
-    }
-
-    /// Discard the candidate and recover the original snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        Snapshot {
-            inner: self.inner.rollback(),
-        }
     }
 }
 
 /// A successful semantic commit.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
+#[allow(
+    dead_code,
+    reason = "the record-level owner behind the package-level Edit; its full surface stays exercised by the unit tests (record 0357)"
+)]
+pub(crate) struct RecordCommit {
     snapshot: Snapshot,
-    changes: ChangeSet,
+    changes: master_layout::RecordPatch,
 }
 
-impl Commit {
+#[allow(
+    dead_code,
+    reason = "the record-level owner behind the package-level Edit; its full surface stays exercised by the unit tests (record 0357)"
+)]
+impl RecordCommit {
     /// The immutable target snapshot.
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// The structural patch produced by the semantic edit.
     #[must_use]
-    pub const fn changes(&self) -> &ChangeSet {
+    pub(crate) const fn changes(&self) -> &master_layout::RecordPatch {
         &self.changes
     }
 
@@ -374,7 +351,7 @@ impl Commit {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn notes_styles(&self) -> Result<Option<notes_styles::Styles>> {
+    pub(crate) fn notes_styles(&self) -> RecordResult<Option<notes_styles::Styles>> {
         self.snapshot.notes_styles()
     }
 
@@ -383,7 +360,7 @@ impl Commit {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn undo(&self, current: &Snapshot) -> RecordResult<Snapshot> {
         Snapshot::from_inner(self.changes.undo(&current.inner)?)
     }
 
@@ -392,13 +369,15 @@ impl Commit {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn redo(&self, current: &Snapshot) -> RecordResult<Snapshot> {
         Snapshot::from_inner(self.changes.redo(&current.inner)?)
     }
 
     /// Split the commit into its target and reusable patch.
     #[must_use]
-    pub fn into_parts(self) -> (Snapshot, ChangeSet) {
+    pub(crate) fn into_parts(self) -> (Snapshot, master_layout::RecordPatch) {
         (self.snapshot, self.changes)
     }
 }
+
+crate::scoped::family!("master-metadata");

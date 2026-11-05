@@ -1,0 +1,7 @@
+Xlsx set /title (eager open): native 8730 ns, unified 9180 ns, ratio 1.052
+Xlsx set /title (source open): native 8680 ns, unified 9240 ns, ratio 1.065
+Pptx set /title (eager open): native 71310 ns, unified 72071 ns, ratio 1.011
+Pptx set /title (source open): native 78070 ns, unified 189131 ns, ratio 2.423
+Xlsb set /title (eager open): native 32370 ns, unified 35270 ns, ratio 1.090
+Xlsb set /title (source open): native 32230 ns, unified 44560 ns, ratio 1.383
+xlsx open: 68920 ns; app.xml read 8550 ns (0.124 of open)

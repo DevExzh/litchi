@@ -5,7 +5,7 @@
 
 //! Typed worksheet image payloads used by XLSB Drawings parts.
 
-use crate::chart::Anchor;
+use crate::builder::chart::Anchor;
 use crate::package::error::{Error, Result};
 use litchi_opc::constants::content_type as ct;
 use std::sync::Arc;
@@ -131,7 +131,7 @@ impl ImageFormat {
     pub(crate) fn validate_payload(self, data: &[u8]) -> Result<()> {
         if data.is_empty() {
             return Err(Error::InvalidFormula(
-                "worksheet image payload cannot be empty".to_string(),
+                "worksheet image payload cannot be empty",
             ));
         }
         if data.len() > MAX_XLSB_WORKSHEET_IMAGE_BYTES {
@@ -142,12 +142,109 @@ impl ImageFormat {
         }
         if !self.has_matching_signature(data) {
             return Err(Error::Unrecognized {
-                typ: "worksheet image payload".to_string(),
-                val: format!("bytes do not match declared {} format", self.extension()),
+                typ: "worksheet image payload",
+                val: "bytes do not match declared format",
             });
         }
         Ok(())
     }
+}
+
+/// A bounded dimension of worksheet-image authoring.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Encoded bytes of one image ([`MAX_XLSB_WORKSHEET_IMAGE_BYTES`]).
+    ImageBytes,
+    /// UTF-8 bytes of one image description
+    /// ([`MAX_XLSB_IMAGE_DESCRIPTION_BYTES`]).
+    DescriptionBytes,
+}
+
+impl std::fmt::Display for LimitKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::ImageBytes => "worksheet image bytes",
+            Self::DescriptionBytes => "worksheet image description bytes",
+        })
+    }
+}
+
+impl From<LimitKind> for crate::package::error::LimitKind {
+    fn from(kind: LimitKind) -> Self {
+        Self::Image(kind)
+    }
+}
+
+/// Caller limits for worksheet-image authoring.
+///
+/// The defaults are the format ceilings; a setter accepts any smaller value
+/// and refuses a larger one with [`Error::InvalidLimit`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Limits {
+    image_bytes: usize,
+    description_bytes: usize,
+}
+
+impl Limits {
+    /// The format ceilings.
+    pub const DEFAULT: Self = Self {
+        image_bytes: MAX_XLSB_WORKSHEET_IMAGE_BYTES,
+        description_bytes: MAX_XLSB_IMAGE_DESCRIPTION_BYTES,
+    };
+
+    /// Bound the encoded bytes of one image.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidLimit`] above [`MAX_XLSB_WORKSHEET_IMAGE_BYTES`].
+    pub fn max_image_bytes(mut self, value: usize) -> Result<Self> {
+        self.image_bytes = checked(LimitKind::ImageBytes, value, MAX_XLSB_WORKSHEET_IMAGE_BYTES)?;
+        Ok(self)
+    }
+
+    /// Bound the UTF-8 bytes of one image description.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidLimit`] above [`MAX_XLSB_IMAGE_DESCRIPTION_BYTES`].
+    pub fn max_description_bytes(mut self, value: usize) -> Result<Self> {
+        self.description_bytes = checked(
+            LimitKind::DescriptionBytes,
+            value,
+            MAX_XLSB_IMAGE_DESCRIPTION_BYTES,
+        )?;
+        Ok(self)
+    }
+
+    /// The configured bound of one image's encoded bytes.
+    #[must_use]
+    pub const fn image_bytes(&self) -> usize {
+        self.image_bytes
+    }
+
+    /// The configured bound of one image description's UTF-8 bytes.
+    #[must_use]
+    pub const fn description_bytes(&self) -> usize {
+        self.description_bytes
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
+fn checked(kind: LimitKind, value: usize, maximum: usize) -> Result<usize> {
+    if value > maximum {
+        return Err(Error::InvalidLimit {
+            kind: kind.into(),
+            value,
+            maximum,
+        });
+    }
+    Ok(value)
 }
 
 /// One image and its two-cell worksheet anchor.
@@ -157,26 +254,67 @@ pub struct Image {
     format: ImageFormat,
     anchor: Anchor,
     description: Option<String>,
+    limits: Limits,
 }
 
 impl Image {
-    /// Create and validate an embedded worksheet image.
-    pub fn new(data: impl Into<Arc<[u8]>>, format: ImageFormat, anchor: Anchor) -> Result<Self> {
+    /// Create and validate an embedded worksheet image under `limits`.
+    ///
+    /// The encoded length is admitted against `limits` before the bytes are
+    /// taken into shared ownership; `limits` is retained for later
+    /// [`Self::with_description`] checks.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Limit`] for bytes above the image ceiling, and the
+    /// anchor, signature and format errors of the payload.
+    pub fn new<D>(data: D, format: ImageFormat, anchor: Anchor, limits: &Limits) -> Result<Self>
+    where
+        D: AsRef<[u8]> + Into<Arc<[u8]>>,
+    {
+        let length = data.as_ref().len();
+        if length > limits.image_bytes {
+            return Err(Error::limit(
+                LimitKind::ImageBytes,
+                length,
+                limits.image_bytes,
+            ));
+        }
         let image = Self {
             data: data.into(),
             format,
             anchor,
             description: None,
+            limits: *limits,
         };
         image.validate()?;
         Ok(image)
     }
 
     /// Attach alternative text used by assistive technology.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Limit`] above the retained description ceiling and an
+    /// encoding error for characters XML cannot carry.
     pub fn with_description(mut self, description: impl Into<String>) -> Result<Self> {
-        self.description = Some(description.into());
+        let description = description.into();
+        if description.len() > self.limits.description_bytes {
+            return Err(Error::limit(
+                LimitKind::DescriptionBytes,
+                description.len(),
+                self.limits.description_bytes,
+            ));
+        }
+        self.description = Some(description);
         self.validate()?;
         Ok(self)
+    }
+
+    /// The limits this image was admitted under.
+    #[must_use]
+    pub const fn limits(&self) -> &Limits {
+        &self.limits
     }
 
     /// Encoded image bytes.
@@ -216,7 +354,7 @@ impl Image {
                 )
             }) {
                 return Err(Error::Encoding(
-                    "worksheet image description contains an invalid XML character".to_string(),
+                    "worksheet image description contains an invalid XML character",
                 ));
             }
         }
@@ -318,13 +456,13 @@ mod tests {
                 ImageFormat::from_content_type(format.content_type()),
                 Some(format)
             );
-            Image::new(data.to_vec(), format, anchor()).unwrap();
+            Image::new(data.to_vec(), format, anchor(), &Limits::DEFAULT).unwrap();
         }
         assert_eq!(
             ImageFormat::from_content_type(ImageFormat::Emf.content_type()),
             Some(ImageFormat::Emf)
         );
-        Image::new(emf, ImageFormat::Emf, anchor()).unwrap();
+        Image::new(emf, ImageFormat::Emf, anchor(), &Limits::DEFAULT).unwrap();
     }
 
     #[test]
@@ -335,7 +473,44 @@ mod tests {
             br#"<svg xmlns="http://www.w3.org/2000/svg">"#,
             br#"<html xmlns="http://www.w3.org/2000/svg"/>"#,
         ] {
-            assert!(Image::new(invalid.to_vec(), ImageFormat::Svg, anchor(),).is_err());
+            assert!(
+                Image::new(
+                    invalid.to_vec(),
+                    ImageFormat::Svg,
+                    anchor(),
+                    &Limits::DEFAULT,
+                )
+                .is_err()
+            );
         }
+    }
+
+    #[test]
+    fn image_limits_admit_bytes_before_ownership_and_bound_descriptions() {
+        let png = PNG_SIGNATURE.to_vec();
+        let exact = Limits::DEFAULT.max_image_bytes(png.len()).unwrap();
+        assert!(Image::new(png.clone(), ImageFormat::Png, anchor(), &exact).is_ok());
+        let tight = Limits::DEFAULT.max_image_bytes(png.len() - 1).unwrap();
+        assert!(matches!(
+            Image::new(png.clone(), ImageFormat::Png, anchor(), &tight),
+            Err(Error::Limit {
+                kind: crate::package::LimitKind::Image(LimitKind::ImageBytes),
+                ..
+            })
+        ));
+        assert!(matches!(
+            Limits::DEFAULT.max_image_bytes(MAX_XLSB_WORKSHEET_IMAGE_BYTES + 1),
+            Err(Error::InvalidLimit { .. })
+        ));
+        let short = Limits::DEFAULT.max_description_bytes(3).unwrap();
+        let image = Image::new(png, ImageFormat::Png, anchor(), &short).unwrap();
+        assert!(image.clone().with_description("abc").is_ok());
+        assert!(matches!(
+            image.with_description("abcd"),
+            Err(Error::Limit {
+                kind: crate::package::LimitKind::Image(LimitKind::DescriptionBytes),
+                ..
+            })
+        ));
     }
 }

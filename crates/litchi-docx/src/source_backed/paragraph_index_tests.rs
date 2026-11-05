@@ -4,7 +4,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, OwnedSource, Resource,
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, ReadLimits};
+use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, SourceLimits};
 use std::num::{NonZeroU64, NonZeroUsize};
 use std::sync::{Arc, Barrier};
 use std::thread;
@@ -57,10 +57,15 @@ fn managed_package_with_memory(memory: u64) -> (Budget, CancellationSource, Pack
         0,
     )
     .unwrap();
-    let package = Package::from_read_at_with_execution_context(
+    let package = Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(fixture_bytes())),
-        ReadLimits::default(),
-        ExecutionContext::new(budget.clone(), cancellation, execution_limits),
+        crate::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(ExecutionContext::new(
+                budget.clone(),
+                cancellation,
+                execution_limits,
+            )),
     )
     .unwrap();
     (budget, cancellation_source, package)
@@ -171,7 +176,7 @@ fn delayed_managed_tail_append_publishes_after_clean_index_warm() {
     let (budget, _cancellation_source, package) = managed_package_with_memory(8 << 20);
     let plan = package
         .tail_append_plain_paragraph("tail")
-        .with_limits(tail_append::Limits::new(
+        .with_options(tail_append::EditOptions::new(tail_append::Limits::new(
             4096,
             1024,
             4096,
@@ -183,7 +188,7 @@ fn delayed_managed_tail_append_publishes_after_clean_index_warm() {
             1 << 20,
             1 << 20,
             1024,
-        ))
+        )))
         .prepare()
         .unwrap();
 
@@ -195,7 +200,11 @@ fn delayed_managed_tail_append_publishes_after_clean_index_warm() {
     assert_eq!(before_publish.pinned_entries, 0);
 
     let mut output = Vec::new();
-    plan.write_to_stream(&mut output).unwrap();
+    plan.commit()
+        .unwrap()
+        .package()
+        .write_to(&mut output)
+        .unwrap();
     assert!(!output.is_empty());
 
     let reopened = Package::from_read_at(Arc::new(OwnedSource::new(output))).unwrap();

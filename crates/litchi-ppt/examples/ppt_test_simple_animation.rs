@@ -5,7 +5,7 @@
 
 //! Minimal animation test - single shape with Appear effect
 
-use litchi_ppt::Writer;
+use litchi_ppt::Builder;
 use litchi_ppt::animation::{
     AfterEffect, AnimationEffect, AnimationInfo, AnimationTrigger, BuildInfo, BuildLevel,
     BuildType, EffectDirection, EffectSpeed, IterationType,
@@ -13,7 +13,7 @@ use litchi_ppt::animation::{
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
 
     let slide = writer.add_slide()?;
     writer.add_textbox(slide, 100, 100, 300, 100, "Click to Animate")?;
@@ -38,7 +38,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     anim.build_list = Some(build);
 
     writer.set_shape_animation(slide, 0, anim)?;
-    writer.save("output/test_simple_animation.ppt")?;
+    writer.build()?.save("output/test_simple_animation.ppt")?;
 
     println!("✅ Created: output/test_simple_animation.ppt");
     println!("Shape 0 should have Appear animation on click");

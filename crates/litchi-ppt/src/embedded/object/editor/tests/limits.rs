@@ -5,9 +5,13 @@ use std::sync::Arc;
 
 #[test]
 fn rejects_a_source_above_the_publication_limit_before_parsing() {
-    let error = Editor::open_records_arc_with_limit(Arc::from(vec![0u8; 2]), 1)
-        .err()
-        .expect("source above limit must be rejected");
+    let error = Editor::open_records_arc_with_limit(
+        Arc::from(vec![0u8; 2]),
+        1,
+        crate::SourceLimits::default(),
+    )
+    .err()
+    .expect("source above limit must be rejected");
     assert!(matches!(
         error,
         Error::ResourceLimit(message) if message.contains("editor source")
@@ -21,6 +25,8 @@ fn rejects_a_projected_incremental_stream_above_the_publication_limit() {
     let editor = Editor {
         original: Arc::from(vec![0u8; 8]),
         max_output_bytes: 15,
+        source_limits: crate::SourceLimits::default(),
+        cfb_limits: litchi_cfb::OleFileLimits::default(),
         streams: Vec::new(),
         document_path: vec!["PowerPoint Document".into()],
         current_user_path: vec!["Current User".into()],
@@ -39,6 +45,7 @@ fn rejects_a_projected_incremental_stream_above_the_publication_limit() {
         rewrite_object_list: false,
         changed: true,
         layout: litchi_cfb::SectorLayoutPolicy::default(),
+        signed: false,
     };
 
     let error = editor.finish().unwrap_err();

@@ -1,6 +1,7 @@
 //! Source-backed models for non-simple OLE Property Set storage.
 
 use super::codec;
+use crate::Error;
 use crate::object::directory::Metadata;
 use litchi_cfb::{OleError, SharedOleFile, directory_names_equal};
 use std::sync::Arc;
@@ -216,7 +217,7 @@ impl Eq for Snapshot {}
 
 impl Snapshot {
     /// Opens an owned compound-file payload with explicit finite limits.
-    pub fn open(source: Vec<u8>, limits: Limits) -> Result<Self, OleError> {
+    pub fn open(source: Vec<u8>, limits: Limits) -> Result<Self, Error> {
         limits.validate()?;
         let source_len = source.len() as u64;
         if source_len > limits.max_input_bytes {
@@ -224,13 +225,14 @@ impl Snapshot {
                 resource: "non-simple Property Set input bytes",
                 observed: source_len,
                 maximum: limits.max_input_bytes,
-            });
+            }
+            .into());
         }
         Self::open_shared(source.into(), limits)
     }
 
     /// Opens an immutable shared compound-file payload without copying it.
-    pub fn open_shared(source: Arc<[u8]>, limits: Limits) -> Result<Self, OleError> {
+    pub fn open_shared(source: Arc<[u8]>, limits: Limits) -> Result<Self, Error> {
         limits.validate()?;
         Ok(Self {
             state: codec::capture(source, limits)?,
@@ -256,7 +258,7 @@ impl Snapshot {
     }
 
     /// Returns every source directory element, including empty storages.
-    pub fn elements(&self) -> Result<Vec<Element>, OleError> {
+    pub fn elements(&self) -> Result<Vec<Element>, Error> {
         let mut output = Vec::new();
         output
             .try_reserve_exact(self.state.records.len())
@@ -271,26 +273,24 @@ impl Snapshot {
     }
 
     /// Reads and validates the required `CONTENTS` PropertySetStream lazily.
-    pub fn contents(&self) -> Result<crate::property_set::Stream, OleError> {
-        codec::read_contents(&self.state)
+    pub fn contents(&self) -> Result<crate::property_set::Stream, Error> {
+        Ok(codec::read_contents(&self.state)?)
     }
 
     /// Reads one source stream lazily and shares the resulting allocation.
-    pub fn stream(&self, path: &[&str]) -> Result<Option<Arc<[u8]>>, OleError> {
+    pub fn stream(&self, path: &[&str]) -> Result<Option<Arc<[u8]>>, Error> {
         let Some(record) = codec::find_record(&self.state.records, path) else {
             return Ok(None);
         };
         if record.kind != Some(ElementKind::Stream) {
-            return Err(OleError::InvalidFormat(format!(
-                "non-simple element {path:?} is not a stream"
-            )));
+            return Err(Error::invalid_property_set_selector());
         }
         let bytes = codec::read_stream(&self.state, record)?;
         Ok(Some(bytes))
     }
 
     /// Returns the bounded source descriptor for one physical element.
-    pub fn element(&self, path: &[&str]) -> Result<Option<Element>, OleError> {
+    pub fn element(&self, path: &[&str]) -> Result<Option<Element>, Error> {
         match codec::find_record(&self.state.records, path) {
             Some(record) => Ok(Some(record.try_element()?)),
             None => Ok(None),
@@ -299,8 +299,8 @@ impl Snapshot {
 
     /// Starts an isolated source-bound edit.
     #[must_use]
-    pub fn edit(&self) -> crate::property_set::non_simple::Editor {
-        crate::property_set::non_simple::Editor::new(self.clone())
+    pub fn edit(&self) -> crate::property_set::non_simple::Edit {
+        crate::property_set::non_simple::Edit::new(self.clone())
     }
 }
 

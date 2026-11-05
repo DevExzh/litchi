@@ -1,7 +1,7 @@
-use litchi_xls::Writer;
+use litchi_xls::Builder;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Hyperlinks")?;
 
     // Header row
@@ -23,6 +23,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     writer.write_string(sheet, 3, 1, "Go to A1")?;
     writer.set_hyperlink(sheet, 3, 1, "internal:Hyperlinks!A1")?;
 
-    writer.save("xls_hyperlinks.xls")?;
+    writer.build()?.save("xls_hyperlinks.xls")?;
     Ok(())
 }

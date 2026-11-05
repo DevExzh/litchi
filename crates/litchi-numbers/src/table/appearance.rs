@@ -19,7 +19,7 @@
 /// Exact-source transactions for one rooted Numbers table's appearance.
 pub mod transaction {
     pub use crate::package::table_appearance::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path, Refusal,
     };
 }
 

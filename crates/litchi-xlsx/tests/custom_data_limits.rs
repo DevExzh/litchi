@@ -17,8 +17,19 @@ use std::collections::BTreeMap;
 
 use litchi_core::Resource;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{BlobPart, OpcPackage, PackURI};
-use litchi_xlsx::{CustomData, CustomDataLimits, Error, Package, custom_data::RemovalDisposition};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, SourceLimits};
+use litchi_xlsx::custom_data::{EditOptions, RemovalDisposition};
+use litchi_xlsx::{CustomData, CustomDataLimits, Error, OpenOptions, Package, SemanticLimits};
+
+/// The package's semantic limits with `limits` for Custom Data.
+fn custom_limits(limits: &CustomDataLimits) -> SemanticLimits {
+    SemanticLimits::default().custom_data(*limits)
+}
+
+/// Edit options bounding a Custom Data edit by `limits`.
+fn options(limits: &CustomDataLimits) -> EditOptions {
+    EditOptions::default().limits(*limits)
+}
 use quick_xml::{events::Event, reader::NsReader};
 use soapberry_zip::office::ArchiveReader;
 
@@ -242,7 +253,9 @@ fn physical_source_with_content_types(
     relationship_overrides: &BTreeMap<String, Vec<u8>>,
     content_types_override: Option<Vec<u8>>,
 ) -> Vec<u8> {
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     let mut parts = package
         .try_iter_parts()
         .map(|part| part.expect("part payload decodes"))
@@ -343,7 +356,7 @@ fn synthetic_fixture(
     extension: bool,
 ) -> Fixture {
     assert_eq!(storage_ids.len(), payloads.len());
-    let mut package = Package::create()
+    let mut package = Package::new()
         .expect("minimal XLSX package creates")
         .into_plain_opc();
     let mut properties = BTreeMap::new();
@@ -399,7 +412,7 @@ fn synthetic_fixture(
         );
     }
     let bytes = physical_source(&package, &relationship_overrides);
-    let package = Package::from_bytes(bytes).expect("physical XLSX fixture reopens");
+    let package = Package::from_bytes(&bytes).expect("physical XLSX fixture reopens");
     Fixture {
         package,
         properties,
@@ -421,7 +434,7 @@ fn heavy_workbook_relationships(storage_count: usize) -> Vec<u8> {
 }
 
 fn relationship_heavy_fixture() -> Fixture {
-    let mut package = Package::create()
+    let mut package = Package::new()
         .expect("minimal XLSX package creates")
         .into_plain_opc();
     let property_uri = "/xl/customData/props1.xml";
@@ -450,7 +463,7 @@ fn relationship_heavy_fixture() -> Fixture {
     relationship_overrides.insert(WORKBOOK_URI.to_owned(), heavy_workbook_relationships(1));
     let bytes = physical_source(&package, &relationship_overrides);
     Fixture {
-        package: Package::from_bytes(bytes).expect("relationship fixture reopens"),
+        package: Package::from_bytes(&bytes).expect("relationship fixture reopens"),
         properties: BTreeMap::from([(property_uri.to_owned(), property_bytes)]),
         connections: None,
     }
@@ -465,7 +478,7 @@ fn content_types_self_closed_heavy_fixture() -> Fixture {
 }
 
 fn content_types_heavy_fixture_with_overrides(expanded_overrides: bool) -> Fixture {
-    let mut package = Package::create()
+    let mut package = Package::new()
         .expect("minimal XLSX package creates")
         .into_plain_opc();
     let property_uri = "/xl/customData/props1.xml";
@@ -492,7 +505,7 @@ fn content_types_heavy_fixture_with_overrides(expanded_overrides: bool) -> Fixtu
     let content_types = generated_content_types(&package, expanded_overrides, 8);
     let bytes = physical_source_with_content_types(&package, &BTreeMap::new(), Some(content_types));
     Fixture {
-        package: Package::from_bytes(bytes).expect("content-types fixture reopens"),
+        package: Package::from_bytes(&bytes).expect("content-types fixture reopens"),
         properties: BTreeMap::from([(property_uri.to_owned(), property_bytes)]),
         connections: None,
     }
@@ -545,7 +558,7 @@ fn query_table_fixture_with_connections(
     query_table: Vec<u8>,
     connection_bytes: Vec<u8>,
 ) -> Fixture {
-    let mut package = Package::create()
+    let mut package = Package::new()
         .expect("minimal XLSX package creates")
         .into_plain_opc();
     let property_uri = "/xl/customData/props1.xml";
@@ -588,7 +601,7 @@ fn query_table_fixture_with_connections(
     );
     let bytes = physical_source(&package, &BTreeMap::new());
     Fixture {
-        package: Package::from_bytes(bytes).expect("query-table fixture reopens"),
+        package: Package::from_bytes(&bytes).expect("query-table fixture reopens"),
         properties: BTreeMap::from([(property_uri.to_owned(), property_bytes)]),
         connections: Some(connection_bytes),
     }
@@ -610,7 +623,7 @@ fn signed_fixture() -> Fixture {
         false,
     );
     Fixture {
-        package: Package::from_bytes(physical_source(&package, &BTreeMap::new()))
+        package: Package::from_bytes(&physical_source(&package, &BTreeMap::new()))
             .expect("signed fixture reopens"),
         properties: base.properties,
         connections: base.connections,
@@ -634,7 +647,7 @@ fn foreign_inbound_fixture() -> Fixture {
         "rIdForeign",
     );
     Fixture {
-        package: Package::from_bytes(physical_source(&package, &BTreeMap::new()))
+        package: Package::from_bytes(&physical_source(&package, &BTreeMap::new()))
             .expect("foreign inbound fixture reopens"),
         properties: base.properties,
         connections: base.connections,
@@ -684,7 +697,7 @@ fn single_fixture_with_connection_relationship_member(explicit: bool) -> Fixture
         overrides.insert(CONNECTIONS_URI.to_owned(), empty_relationships());
     }
     Fixture {
-        package: Package::from_bytes(physical_source(&package, &overrides))
+        package: Package::from_bytes(&physical_source(&package, &overrides))
             .expect("connection relationship fixture reopens"),
         properties: base.properties,
         connections: base.connections,
@@ -710,7 +723,7 @@ fn fixture_with_connections_xml(xml: Vec<u8>) -> Fixture {
         .expect("connections part exists")
         .set_blob(xml.clone());
     Fixture {
-        package: Package::from_bytes(physical_source(&package, &BTreeMap::new()))
+        package: Package::from_bytes(&physical_source(&package, &BTreeMap::new()))
             .expect("custom namespace fixture reopens"),
         properties: base.properties,
         connections: Some(xml),
@@ -761,7 +774,8 @@ fn package_bytes(package: &Package) -> Vec<u8> {
 }
 
 fn archive_members(bytes: &[u8]) -> BTreeMap<String, Vec<u8>> {
-    let archive = ArchiveReader::new(bytes).expect("package bytes are a valid ZIP");
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
+        .expect("package bytes are a valid ZIP");
     let names = archive.file_names().map(str::to_owned).collect::<Vec<_>>();
     names
         .into_iter()
@@ -776,12 +790,12 @@ fn logical_package_size(package: &Package) -> usize {
     let opc = package.clone().into_plain_opc();
     let root = uri("/");
     let mut total = opc
-        .source_content_types()
+        .source_content_types(SourceLimits::default())
         .expect("source content types exist")
         .bytes()
         .len();
     total += opc
-        .source_relationships(&root)
+        .source_relationships(&root, SourceLimits::default())
         .expect("source package relationships exist")
         .bytes()
         .len();
@@ -791,7 +805,7 @@ fn logical_package_size(package: &Package) -> usize {
     {
         total += part.blob().len();
         total += opc
-            .source_relationships(part.partname())
+            .source_relationships(part.partname(), SourceLimits::default())
             .expect("source relationship member exists")
             .bytes()
             .len();
@@ -803,7 +817,7 @@ fn relationship_xml_size(package: &Package, owner: &str) -> usize {
     package
         .clone()
         .into_plain_opc()
-        .source_relationships(&uri(owner))
+        .source_relationships(&uri(owner), SourceLimits::default())
         .expect("source relationship member exists")
         .bytes()
         .len()
@@ -813,13 +827,13 @@ fn max_relationship_xml_size(package: &Package) -> usize {
     let opc = package.clone().into_plain_opc();
     let root = uri("/");
     let mut maximum = opc
-        .source_relationships(&root)
+        .source_relationships(&root, SourceLimits::default())
         .expect("source package relationships exist")
         .bytes()
         .len();
     for part in opc.iter_parts() {
         maximum = maximum.max(
-            opc.source_relationships(part.partname())
+            opc.source_relationships(part.partname(), SourceLimits::default())
                 .expect("source relationship member exists")
                 .bytes()
                 .len(),
@@ -884,7 +898,7 @@ fn owned_xml_metrics(package: &Package) -> BTreeMap<String, XmlMetrics> {
     metrics.insert(
         "[Content_Types].xml".to_owned(),
         xml_metrics(
-            opc.source_content_types()
+            opc.source_content_types(SourceLimits::default())
                 .expect("source content types exist")
                 .bytes(),
         ),
@@ -893,7 +907,7 @@ fn owned_xml_metrics(package: &Package) -> BTreeMap<String, XmlMetrics> {
     metrics.insert(
         "relationships:/".to_owned(),
         xml_metrics(
-            opc.source_relationships(&root)
+            opc.source_relationships(&root, SourceLimits::default())
                 .expect("source package relationships exist")
                 .bytes(),
         ),
@@ -906,7 +920,7 @@ fn owned_xml_metrics(package: &Package) -> BTreeMap<String, XmlMetrics> {
         metrics.insert(
             format!("relationships:{owner}"),
             xml_metrics(
-                opc.source_relationships(part.partname())
+                opc.source_relationships(part.partname(), SourceLimits::default())
                     .expect("source relationship member exists")
                     .bytes(),
             ),
@@ -955,14 +969,16 @@ fn host_xml_limits_accept_exact_boundaries_and_reject_one_under() {
     assert!(
         minimal
             .package
-            .custom_data_with_limits(&exact_events)
+            .with_semantic_limits(custom_limits(&exact_events))
+            .custom_data()
             .is_ok()
     );
     let one_under_events = exact_events.with_max_xml_events(1);
     assert!(
         minimal
             .package
-            .custom_data_with_limits(&one_under_events)
+            .with_semantic_limits(custom_limits(&one_under_events))
+            .custom_data()
             .is_err()
     );
     assert_eq!(package_bytes(&minimal.package), minimal_before);
@@ -972,7 +988,8 @@ fn host_xml_limits_accept_exact_boundaries_and_reject_one_under() {
     assert!(
         minimal
             .package
-            .custom_data_with_limits(&exact_properties)
+            .with_semantic_limits(custom_limits(&exact_properties))
+            .custom_data()
             .is_ok()
     );
     let one_under_properties =
@@ -980,7 +997,8 @@ fn host_xml_limits_accept_exact_boundaries_and_reject_one_under() {
     assert!(
         minimal
             .package
-            .custom_data_with_limits(&one_under_properties)
+            .with_semantic_limits(custom_limits(&one_under_properties))
+            .custom_data()
             .is_err()
     );
     assert_eq!(package_bytes(&minimal.package), minimal_before);
@@ -1005,17 +1023,98 @@ fn host_xml_limits_accept_exact_boundaries_and_reject_one_under() {
     assert!(
         extended
             .package
-            .custom_data_with_limits(&exact_extension)
+            .with_semantic_limits(custom_limits(&exact_extension))
+            .custom_data()
             .is_ok()
     );
     let one_under_extension = exact_extension.with_max_extension_xml_bytes(extension_bytes - 1);
     assert!(
         extended
             .package
-            .custom_data_with_limits(&one_under_extension)
+            .with_semantic_limits(custom_limits(&one_under_extension))
+            .custom_data()
             .is_err()
     );
     assert_eq!(package_bytes(&extended.package), extended_before);
+}
+
+#[test]
+fn unrelated_eager_edit_retains_physical_limit_for_connections_read() {
+    let fixture = single_fixture();
+    let source = package_bytes(&fixture.package);
+    let mut admitted = None;
+
+    // Package ingress validates the workbook and relationship catalog under
+    // this physical XML ceiling. The connections family reads its deferred
+    // XML member later and must enforce the same retained ceiling.
+    for maximum in 1..=64 {
+        let limits = SourceLimits::builder()
+            .max_depth(maximum)
+            .expect("positive XML depth limit")
+            .build()
+            .expect("valid XML depth limit");
+        let Ok(package) =
+            Package::from_bytes_with_options(&source, OpenOptions::new().source_limits(limits))
+        else {
+            continue;
+        };
+        let Ok(mut connections_edit) = package.edit_connections() else {
+            continue;
+        };
+        if matches!(
+            connections_edit.before(),
+            Err(Error::Limit {
+                kind: litchi_xlsx::LimitKind::Connections(
+                    litchi_xlsx::connections::LimitKind::Depth,
+                ),
+                ..
+            })
+        ) {
+            admitted = Some((package, limits));
+            break;
+        }
+    }
+    let (package, limits) = admitted.expect(
+        "the workbook must admit one depth profile whose deferred connections read is refused",
+    );
+
+    let mut edit = package.edit().expect("unrelated workbook edit starts");
+    edit.sheet(0_usize)
+        .expect("first worksheet lookup succeeds")
+        .expect("minimal fixture has one worksheet")
+        .set("A1", "unrelated")
+        .expect("unrelated cell edit succeeds");
+    let committed = edit.commit().expect("unrelated edit commits");
+
+    let mut connections_edit = committed
+        .package()
+        .edit_connections()
+        .expect("connections edit construction is deferred");
+    assert!(matches!(
+        connections_edit.before(),
+        Err(Error::Limit {
+            kind: litchi_xlsx::LimitKind::Connections(litchi_xlsx::connections::LimitKind::Depth),
+            ..
+        })
+    ));
+    let reopened = Package::from_bytes_with_options(
+        &committed
+            .package()
+            .to_plain_bytes()
+            .expect("committed package serializes"),
+        OpenOptions::new().source_limits(limits),
+    )
+    .expect("the owning package still admits the deferred member");
+    let mut connections_edit = reopened
+        .edit_connections()
+        .expect("reopened connections edit construction is deferred");
+    assert!(matches!(
+        connections_edit.before(),
+        Err(Error::Limit {
+            kind: litchi_xlsx::LimitKind::Connections(litchi_xlsx::connections::LimitKind::Depth),
+            ..
+        })
+    ));
 }
 
 #[test]
@@ -1033,14 +1132,21 @@ fn relationship_xml_event_and_depth_caps_cover_the_source_member() {
     let exact = CustomDataLimits::new()
         .with_max_xml_events(maximum_xml_events(&metrics))
         .with_max_xml_depth(target.depth);
-    assert!(fixture.package.custom_data_with_limits(&exact).is_ok());
+    assert!(
+        fixture
+            .package
+            .with_semantic_limits(custom_limits(&exact))
+            .custom_data()
+            .is_ok()
+    );
 
     let before = package_bytes(&fixture.package);
     let one_under_events = exact.with_max_xml_events(target.events - 1);
     assert!(
         fixture
             .package
-            .custom_data_with_limits(&one_under_events)
+            .with_semantic_limits(custom_limits(&one_under_events))
+            .custom_data()
             .is_err()
     );
     assert_eq!(package_bytes(&fixture.package), before);
@@ -1048,7 +1154,8 @@ fn relationship_xml_event_and_depth_caps_cover_the_source_member() {
     assert!(
         fixture
             .package
-            .custom_data_with_limits(&one_under_depth)
+            .with_semantic_limits(custom_limits(&one_under_depth))
+            .custom_data()
             .is_err()
     );
     assert_eq!(package_bytes(&fixture.package), before);
@@ -1069,14 +1176,21 @@ fn content_types_xml_event_and_depth_caps_cover_the_source_member() {
     let exact = CustomDataLimits::new()
         .with_max_xml_events(maximum_xml_events(&metrics))
         .with_max_xml_depth(target.depth);
-    assert!(fixture.package.custom_data_with_limits(&exact).is_ok());
+    assert!(
+        fixture
+            .package
+            .with_semantic_limits(custom_limits(&exact))
+            .custom_data()
+            .is_ok()
+    );
 
     let before = package_bytes(&fixture.package);
     let one_under_events = exact.with_max_xml_events(target.events - 1);
     assert!(
         fixture
             .package
-            .custom_data_with_limits(&one_under_events)
+            .with_semantic_limits(custom_limits(&one_under_events))
+            .custom_data()
             .is_err()
     );
     assert_eq!(package_bytes(&fixture.package), before);
@@ -1084,7 +1198,8 @@ fn content_types_xml_event_and_depth_caps_cover_the_source_member() {
     assert!(
         fixture
             .package
-            .custom_data_with_limits(&one_under_depth)
+            .with_semantic_limits(custom_limits(&one_under_depth))
+            .custom_data()
             .is_err()
     );
     assert_eq!(package_bytes(&fixture.package), before);
@@ -1110,14 +1225,21 @@ fn query_table_mce_event_and_depth_caps_cover_raw_and_processed_xml() {
     let exact = CustomDataLimits::new()
         .with_max_xml_events(exact_events)
         .with_max_xml_depth(exact_depth);
-    assert!(fixture.package.custom_data_with_limits(&exact).is_ok());
+    assert!(
+        fixture
+            .package
+            .with_semantic_limits(custom_limits(&exact))
+            .custom_data()
+            .is_ok()
+    );
 
     let before = package_bytes(&fixture.package);
     let one_under_events = exact.with_max_xml_events(exact_events - 1);
     assert!(
         fixture
             .package
-            .custom_data_with_limits(&one_under_events)
+            .with_semantic_limits(custom_limits(&one_under_events))
+            .custom_data()
             .is_err()
     );
     assert_eq!(package_bytes(&fixture.package), before);
@@ -1125,7 +1247,8 @@ fn query_table_mce_event_and_depth_caps_cover_raw_and_processed_xml() {
     assert!(
         fixture
             .package
-            .custom_data_with_limits(&one_under_depth)
+            .with_semantic_limits(custom_limits(&one_under_depth))
+            .custom_data()
             .is_err()
     );
     assert_eq!(package_bytes(&fixture.package), before);
@@ -1138,17 +1261,27 @@ fn query_table_empty_elements_honor_the_xml_depth_cap() {
         shallow_connections_xml("uid-A"),
     );
     let exact = CustomDataLimits::new().with_max_xml_depth(6);
-    assert!(fixture.package.custom_data_with_limits(&exact).is_ok());
+    assert!(
+        fixture
+            .package
+            .with_semantic_limits(custom_limits(&exact))
+            .custom_data()
+            .is_ok()
+    );
 
     let before = package_bytes(&fixture.package);
     let one_under = exact.with_max_xml_depth(5);
     let error = fixture
         .package
-        .custom_data_with_limits(&one_under)
+        .with_semantic_limits(custom_limits(&one_under))
+        .custom_data()
         .expect_err("empty query-table child must count toward XML depth");
     assert!(matches!(
         error,
-        Error::ResourceLimit(limit) if limit.resource == Resource::Depth
+        Error::Limit {
+            kind: litchi_xlsx::LimitKind::Connections(litchi_xlsx::connections::LimitKind::Depth),
+            ..
+        }
     ));
     assert_eq!(package_bytes(&fixture.package), before);
 }
@@ -1159,7 +1292,10 @@ fn zero_xml_event_budget_is_refused_without_widening() {
     let before = package_bytes(&fixture.package);
     let error = fixture
         .package
-        .custom_data_with_limits(&CustomDataLimits::new().with_max_xml_events(0))
+        .with_semantic_limits(custom_limits(
+            &CustomDataLimits::new().with_max_xml_events(0),
+        ))
+        .custom_data()
         .expect_err("zero XML events cannot admit the first source event");
     // The bounded OPC reader may reject zero before the owner reaches its XML
     // codec; either path must preserve refusal rather than widen to one event.
@@ -1171,11 +1307,23 @@ fn zero_xml_event_budget_is_refused_without_widening() {
 fn host_uid_limit_counts_utf16_units_exactly() {
     let fixture = minimal_fixture("😀");
     let exact = CustomDataLimits::new().with_max_uid_units(2);
-    assert!(fixture.package.custom_data_with_limits(&exact).is_ok());
+    assert!(
+        fixture
+            .package
+            .with_semantic_limits(custom_limits(&exact))
+            .custom_data()
+            .is_ok()
+    );
 
     let one_under = exact.with_max_uid_units(1);
     let before = package_bytes(&fixture.package);
-    assert!(fixture.package.custom_data_with_limits(&one_under).is_err());
+    assert!(
+        fixture
+            .package
+            .with_semantic_limits(custom_limits(&one_under))
+            .custom_data()
+            .is_err()
+    );
     assert_eq!(package_bytes(&fixture.package), before);
 }
 
@@ -1190,6 +1338,7 @@ fn relationship_xml_cap_includes_inserted_edges_and_removal_inverse_restores_sou
         .insert(CustomData::new("uid-B", b"inserted".to_vec()))
         .expect("relationship insertion stages");
     let insertion_commit = insertion.commit().expect("relationship insertion commits");
+    candidate = insertion_commit.package().clone();
     let exact = max_relationship_xml_size(&candidate);
     assert!(
         relationship_xml_size(&candidate, WORKBOOK_URI)
@@ -1197,35 +1346,35 @@ fn relationship_xml_cap_includes_inserted_edges_and_removal_inverse_restores_sou
     );
     assert!(exact > 0);
 
-    let mut exact_package = fixture.package.clone();
+    let exact_package = fixture.package.clone();
     let mut exact_transaction = exact_package
-        .edit_custom_data_with_limits(
+        .edit_custom_data_with_options(options(
             &CustomDataLimits::new().with_max_relationship_xml_bytes(exact),
-        )
+        ))
         .expect("exact relationship cap admits source");
     exact_transaction
         .insert(CustomData::new("uid-B", b"inserted".to_vec()))
         .expect("exact relationship insertion stages");
-    assert!(
-        exact_transaction
+    {
+        let commit = exact_transaction
             .commit()
-            .expect("exact relationship cap is inclusive")
-            .changed()
-    );
+            .expect("exact relationship cap is inclusive");
+        assert!(commit.diagnostics().changed());
+    }
 
-    let mut under_package = fixture.package.clone();
+    let under_package = fixture.package.clone();
     let before = package_bytes(&under_package);
     let mut under_transaction = under_package
-        .edit_custom_data_with_limits(
+        .edit_custom_data_with_options(options(
             &CustomDataLimits::new().with_max_relationship_xml_bytes(exact - 1),
-        )
+        ))
         .expect("one-under relationship cap admits source");
     under_transaction
         .insert(CustomData::new("uid-B", b"inserted".to_vec()))
         .expect("one-under relationship insertion stages");
     assert!(under_transaction.commit().is_err());
     assert_eq!(package_bytes(&under_package), before);
-    assert!(insertion_commit.changed());
+    assert!(insertion_commit.diagnostics().changed());
 
     let two = two_storage_fixture();
     let mut removal_candidate = two.package.clone();
@@ -1234,15 +1383,17 @@ fn relationship_xml_cap_includes_inserted_edges_and_removal_inverse_restores_sou
         .expect("removal candidate transaction starts");
     let removal_index = removal_candidate_transaction
         .entries()
+        .unwrap()
         .iter()
         .position(|entry| entry.id() == "uid-B")
         .expect("removal candidate storage exists");
     removal_candidate_transaction
         .remove_with(removal_index, RemovalDisposition::RejectReferenced)
         .expect("removal candidate stages");
-    removal_candidate_transaction
+    removal_candidate = removal_candidate_transaction
         .commit()
-        .expect("removal candidate commits");
+        .expect("removal candidate commits")
+        .into_package();
     let removal_exact = max_relationship_xml_size(&removal_candidate);
     let removal_source = max_relationship_xml_size(&two.package);
     // Relationship XML is bounded while opening the source as well as while
@@ -1252,38 +1403,38 @@ fn relationship_xml_cap_includes_inserted_edges_and_removal_inverse_restores_sou
     assert!(removal_exact > 0);
     assert!(removal_source >= removal_exact);
 
-    let mut exact_removal_package = two.package.clone();
+    let exact_removal_package = two.package.clone();
     let mut exact_removal = exact_removal_package
-        .edit_custom_data_with_limits(
+        .edit_custom_data_with_options(options(
             &CustomDataLimits::new().with_max_relationship_xml_bytes(removal_limit),
-        )
+        ))
         .expect("source-admitted removal relationship cap admits source");
     let exact_removal_index = exact_removal
         .entries()
+        .unwrap()
         .iter()
         .position(|entry| entry.id() == "uid-B")
         .expect("exact removal storage exists");
     exact_removal
         .remove_with(exact_removal_index, RemovalDisposition::RejectReferenced)
         .expect("exact removal stages");
-    assert!(
-        exact_removal
+    {
+        let commit = exact_removal
             .commit()
-            .expect("source-admitted removal relationship cap commits")
-            .changed()
-    );
+            .expect("source-admitted removal relationship cap commits");
+        assert!(commit.diagnostics().changed());
+    }
 
     let before_under_removal = package_bytes(&two.package);
-    let mut under_removal_package = two.package.clone();
-    assert!(
-        under_removal_package
-            .edit_custom_data_with_limits(
-                &CustomDataLimits::new().with_max_relationship_xml_bytes(removal_limit - 1),
-            )
-            .is_err()
-    );
+    let under_removal_package = two.package.clone();
+    let mut under_removal = under_removal_package
+        .edit_custom_data_with_options(options(
+            &CustomDataLimits::new().with_max_relationship_xml_bytes(removal_limit - 1),
+        ))
+        .expect("one-under removal edit construction is deferred");
+    assert!(under_removal.entries().is_err());
     assert_eq!(package_bytes(&under_removal_package), before_under_removal);
-    Package::from_bytes(before_under_removal.clone())
+    Package::from_bytes(&before_under_removal)
         .expect("one-under removal rejection leaves a reopenable source");
 
     let before_remove = package_bytes(&two.package);
@@ -1293,6 +1444,7 @@ fn relationship_xml_cap_includes_inserted_edges_and_removal_inverse_restores_sou
         .expect("removal transaction starts");
     let index = remove_transaction
         .entries()
+        .unwrap()
         .iter()
         .position(|entry| entry.id() == "uid-B")
         .expect("unreferenced storage exists");
@@ -1300,9 +1452,11 @@ fn relationship_xml_cap_includes_inserted_edges_and_removal_inverse_restores_sou
         .remove_with(index, RemovalDisposition::RejectReferenced)
         .expect("unreferenced storage removes");
     let remove_commit = remove_transaction.commit().expect("removal commits");
-    removed
-        .apply_custom_data_patch(&remove_commit.patch().inverse())
-        .expect("removal inverse applies");
+    removed = remove_commit.package().clone();
+    removed = removed
+        .apply_custom_data(&remove_commit.patch().inverse())
+        .expect("removal inverse applies")
+        .into_package();
     assert_eq!(
         archive_members(&package_bytes(&removed)),
         archive_members(&before_remove)
@@ -1340,13 +1494,14 @@ fn connection_and_temporary_caps_cover_rename_growth_without_mutating_source() {
         .with_max_temporary_bytes(expected_connections.len());
     let mut exact_package = fixture.package.clone();
     let mut exact = exact_package
-        .edit_custom_data_with_limits(&exact_limits)
+        .edit_custom_data_with_options(options(&exact_limits))
         .expect("exact rename profile admits source");
     exact.rename(0, long_id).expect("exact rename stages");
     let exact_commit = exact
         .commit()
         .expect("exact connection/property caps are inclusive");
-    assert!(exact_commit.changed());
+    exact_package = exact_commit.package().clone();
+    assert!(exact_commit.diagnostics().changed());
     assert_eq!(
         part_bytes(&exact_package, CONNECTIONS_URI),
         expected_connections
@@ -1357,13 +1512,13 @@ fn connection_and_temporary_caps_cover_rename_growth_without_mutating_source() {
     );
 
     let before = package_bytes(&fixture.package);
-    let mut under_connections_package = fixture.package.clone();
+    let under_connections_package = fixture.package.clone();
     let under_connections = CustomDataLimits::new()
         .with_max_connections_bytes(expected_connections.len() - 1)
         .with_max_properties_xml_bytes(expected_properties.len())
         .with_max_temporary_bytes(expected_connections.len());
     let mut under_connections_transaction = under_connections_package
-        .edit_custom_data_with_limits(&under_connections)
+        .edit_custom_data_with_options(options(&under_connections))
         .expect("one-under connection profile admits source");
     under_connections_transaction
         .rename(0, long_id)
@@ -1371,13 +1526,13 @@ fn connection_and_temporary_caps_cover_rename_growth_without_mutating_source() {
     assert!(under_connections_transaction.commit().is_err());
     assert_eq!(package_bytes(&under_connections_package), before);
 
-    let mut under_properties_package = fixture.package.clone();
+    let under_properties_package = fixture.package.clone();
     let under_properties = CustomDataLimits::new()
         .with_max_connections_bytes(expected_connections.len())
         .with_max_properties_xml_bytes(expected_properties.len() - 1)
         .with_max_temporary_bytes(expected_connections.len());
     let mut under_properties_transaction = under_properties_package
-        .edit_custom_data_with_limits(&under_properties)
+        .edit_custom_data_with_options(options(&under_properties))
         .expect("one-under property profile admits source");
     under_properties_transaction
         .rename(0, long_id)
@@ -1385,13 +1540,13 @@ fn connection_and_temporary_caps_cover_rename_growth_without_mutating_source() {
     assert!(under_properties_transaction.commit().is_err());
     assert_eq!(package_bytes(&under_properties_package), before);
 
-    let mut under_temporary_package = fixture.package.clone();
+    let under_temporary_package = fixture.package.clone();
     let under_temporary = CustomDataLimits::new()
         .with_max_connections_bytes(expected_connections.len())
         .with_max_properties_xml_bytes(expected_properties.len())
         .with_max_temporary_bytes(source_connections.len());
     let mut under_temporary_transaction = under_temporary_package
-        .edit_custom_data_with_limits(&under_temporary)
+        .edit_custom_data_with_options(options(&under_temporary))
         .expect("source-sized temporary profile admits source");
     under_temporary_transaction
         .rename(0, long_id)
@@ -1425,7 +1580,7 @@ fn retained_xml_can_shrink_below_temporary_cap_and_inverse_restores_source() {
     let before = archive_members(&package_bytes(&fixture.package));
     let mut changed = fixture.package.clone();
     let mut transaction = changed
-        .edit_custom_data_with_limits(&profile)
+        .edit_custom_data_with_options(options(&profile))
         .expect("source-backed shrinking transaction starts");
     transaction
         .rename(0, "u")
@@ -1433,16 +1588,18 @@ fn retained_xml_can_shrink_below_temporary_cap_and_inverse_restores_source() {
     let commit = transaction
         .commit()
         .expect("retained source may exceed temporary replacement bytes");
+    changed = commit.package().clone();
     assert_eq!(part_bytes(&changed, CONNECTIONS_URI), expected_connections);
     assert_eq!(
         part_bytes(&changed, "/xl/customData/props1.xml"),
         expected_properties
     );
 
-    let mut reopened = Package::from_bytes(package_bytes(&changed)).expect("changed reopens");
-    reopened
-        .apply_custom_data_patch(&commit.patch().inverse())
-        .expect("inverse restores retained source above temporary cap");
+    let mut reopened = Package::from_bytes(&package_bytes(&changed)).expect("changed reopens");
+    reopened = reopened
+        .apply_custom_data(&commit.patch().inverse())
+        .expect("inverse restores retained source above temporary cap")
+        .into_package();
     assert_eq!(archive_members(&package_bytes(&reopened)), before);
 }
 
@@ -1462,7 +1619,7 @@ fn retained_properties_xml_can_shrink_below_temporary_cap_and_inverse_restores_s
     let before = archive_members(&package_bytes(&fixture.package));
     let mut changed = fixture.package.clone();
     let mut transaction = changed
-        .edit_custom_data_with_limits(&profile)
+        .edit_custom_data_with_options(options(&profile))
         .expect("source-backed Properties shrink transaction starts");
     transaction
         .rename(0, "u")
@@ -1470,15 +1627,17 @@ fn retained_properties_xml_can_shrink_below_temporary_cap_and_inverse_restores_s
     let commit = transaction
         .commit()
         .expect("retained Properties source may exceed temporary bytes");
+    changed = commit.package().clone();
     assert_eq!(
         part_bytes(&changed, "/xl/customData/props1.xml"),
         expected_properties
     );
 
-    let mut reopened = Package::from_bytes(package_bytes(&changed)).expect("changed reopens");
-    reopened
-        .apply_custom_data_patch(&commit.patch().inverse())
-        .expect("inverse restores retained Properties source above temporary cap");
+    let mut reopened = Package::from_bytes(&package_bytes(&changed)).expect("changed reopens");
+    reopened = reopened
+        .apply_custom_data(&commit.patch().inverse())
+        .expect("inverse restores retained Properties source above temporary cap")
+        .into_package();
     assert_eq!(archive_members(&package_bytes(&reopened)), before);
 }
 
@@ -1489,7 +1648,7 @@ fn retained_content_types_manifest_can_shrink_below_temporary_cap_and_inverse_re
         .package
         .clone()
         .into_plain_opc()
-        .source_content_types()
+        .source_content_types(SourceLimits::default())
         .expect("source content-types manifest exists")
         .bytes()
         .len();
@@ -1500,7 +1659,7 @@ fn retained_content_types_manifest_can_shrink_below_temporary_cap_and_inverse_re
     let before = archive_members(&package_bytes(&fixture.package));
     let mut changed = fixture.package.clone();
     let mut transaction = changed
-        .edit_custom_data_with_limits(&profile)
+        .edit_custom_data_with_options(options(&profile))
         .expect("source-backed manifest removal transaction starts");
     transaction
         .remove_with(0, RemovalDisposition::RejectReferenced)
@@ -1508,19 +1667,21 @@ fn retained_content_types_manifest_can_shrink_below_temporary_cap_and_inverse_re
     let commit = transaction
         .commit()
         .expect("retained content-types source may exceed temporary bytes");
+    changed = commit.package().clone();
     let candidate_content_types = changed
         .clone()
         .into_plain_opc()
-        .source_content_types()
+        .source_content_types(SourceLimits::default())
         .expect("candidate content-types manifest exists")
         .bytes()
         .len();
     assert!(candidate_content_types < temporary);
 
-    let mut reopened = Package::from_bytes(package_bytes(&changed)).expect("changed reopens");
-    reopened
-        .apply_custom_data_patch(&commit.patch().inverse())
-        .expect("inverse restores retained content-types source above temporary cap");
+    let mut reopened = Package::from_bytes(&package_bytes(&changed)).expect("changed reopens");
+    reopened = reopened
+        .apply_custom_data(&commit.patch().inverse())
+        .expect("inverse restores retained content-types source above temporary cap")
+        .into_package();
     assert_eq!(archive_members(&package_bytes(&reopened)), before);
 }
 
@@ -1531,42 +1692,48 @@ fn moved_payload_can_exceed_temporary_cap_without_copy() {
         .with_max_payload_bytes(64 * 1024)
         .with_max_temporary_bytes(8 * 1024);
 
-    let mut noop_package = fixture.package.clone();
+    let noop_package = fixture.package.clone();
     let mut noop_transaction = noop_package
-        .edit_custom_data_with_limits(&limits)
+        .edit_custom_data_with_options(options(&limits))
         .expect("bounded no-op transaction starts");
-    let source_pointer = noop_transaction.entries()[0].value().data().as_ptr();
+    let source_pointer = noop_transaction.entries().unwrap()[0]
+        .value()
+        .data()
+        .as_ptr();
     assert!(
         !noop_transaction
             .set_data(0, b"source".to_vec())
             .expect("equal payload is a no-op")
     );
     assert_eq!(
-        noop_transaction.entries()[0].value().data().as_ptr(),
+        noop_transaction.entries().unwrap()[0]
+            .value()
+            .data()
+            .as_ptr(),
         source_pointer
     );
     let noop_commit = noop_transaction
         .commit()
         .expect("bounded no-op commit succeeds");
-    assert!(!noop_commit.changed());
+    assert!(!noop_commit.diagnostics().changed());
 
-    let mut package = fixture.package.clone();
+    let package = fixture.package.clone();
     let payload = vec![0x5a; 16 * 1024];
     let payload_pointer = payload.as_ptr();
     let mut transaction = package
-        .edit_custom_data_with_limits(&limits)
+        .edit_custom_data_with_options(options(&limits))
         .expect("bounded move transaction starts");
     transaction
         .set_data(0, payload)
         .expect("bounded move stages without a temporary copy");
     assert_eq!(
-        transaction.entries()[0].value().data().as_ptr(),
+        transaction.entries().unwrap()[0].value().data().as_ptr(),
         payload_pointer
     );
     let commit = transaction
         .commit()
         .expect("existing payload allocation is not charged as temporary bytes");
-    let published = commit.snapshot().find("uid-A").expect("uid-A exists");
+    let published = commit.patch().after().find("uid-A").expect("uid-A exists");
     assert_eq!(published.value().data().as_ptr(), payload_pointer);
     assert_eq!(published.value().data(), vec![0x5a; 16 * 1024].as_slice());
 }
@@ -1584,7 +1751,10 @@ fn final_output_cap_accepts_candidate_shrink_and_rejects_one_under() {
     baseline
         .set_data(1, b"0123456789abcdefghijklmnopqrstuv0123456789".to_vec())
         .expect("second payload grows");
-    baseline.commit().expect("shrinking baseline edit commits");
+    candidate = baseline
+        .commit()
+        .expect("shrinking baseline edit commits")
+        .into_package();
     let source_size = logical_package_size(&fixture.package);
     let candidate_size = logical_package_size(&candidate);
     // The first payload shrinks by 63 bytes and the second grows by 37; the
@@ -1594,7 +1764,7 @@ fn final_output_cap_accepts_candidate_shrink_and_rejects_one_under() {
     let exact_limits = CustomDataLimits::new().with_max_output_bytes(candidate_size);
     let mut exact_package = fixture.package.clone();
     let mut exact = exact_package
-        .edit_custom_data_with_limits(&exact_limits)
+        .edit_custom_data_with_options(options(&exact_limits))
         .expect("exact shrinking output profile admits source");
     exact
         .set_data(0, b"a".to_vec())
@@ -1605,15 +1775,16 @@ fn final_output_cap_accepts_candidate_shrink_and_rejects_one_under() {
     let exact_commit = exact
         .commit()
         .expect("exact shrinking aggregate cap is inclusive");
-    assert!(exact_commit.changed());
+    exact_package = exact_commit.package().clone();
+    assert!(exact_commit.diagnostics().changed());
     assert_eq!(logical_package_size(&exact_package), candidate_size);
 
-    let mut under_package = fixture.package.clone();
+    let under_package = fixture.package.clone();
     let before = package_bytes(&under_package);
     let mut under = under_package
-        .edit_custom_data_with_limits(
+        .edit_custom_data_with_options(options(
             &CustomDataLimits::new().with_max_output_bytes(candidate_size - 1),
-        )
+        ))
         .expect("one-under shrinking output profile admits source");
     under
         .set_data(0, b"a".to_vec())
@@ -1638,7 +1809,10 @@ fn final_output_cap_uses_candidate_aggregate_for_mixed_shrink_and_growth() {
     baseline
         .set_data(1, b"0123456789abcdefghijklmnopqrstuv0123456789".to_vec())
         .expect("second payload grows");
-    baseline.commit().expect("baseline mixed edit commits");
+    candidate = baseline
+        .commit()
+        .expect("baseline mixed edit commits")
+        .into_package();
     let source_size = logical_package_size(&fixture.package);
     let candidate_size = logical_package_size(&candidate);
     // The first payload shrinks by 31 bytes and the second grows by 37; the
@@ -1648,7 +1822,7 @@ fn final_output_cap_uses_candidate_aggregate_for_mixed_shrink_and_growth() {
     let exact_limits = CustomDataLimits::new().with_max_output_bytes(candidate_size);
     let mut exact_package = fixture.package.clone();
     let mut exact = exact_package
-        .edit_custom_data_with_limits(&exact_limits)
+        .edit_custom_data_with_options(options(&exact_limits))
         .expect("exact final output profile admits source");
     exact
         .set_data(0, b"a".to_vec())
@@ -1659,15 +1833,16 @@ fn final_output_cap_uses_candidate_aggregate_for_mixed_shrink_and_growth() {
     let exact_commit = exact
         .commit()
         .expect("exact final aggregate cap is inclusive");
-    assert!(exact_commit.changed());
+    exact_package = exact_commit.package().clone();
+    assert!(exact_commit.diagnostics().changed());
     assert_eq!(logical_package_size(&exact_package), candidate_size);
 
-    let mut under_package = fixture.package.clone();
+    let under_package = fixture.package.clone();
     let before = package_bytes(&under_package);
     let mut under = under_package
-        .edit_custom_data_with_limits(
+        .edit_custom_data_with_options(options(
             &CustomDataLimits::new().with_max_output_bytes(candidate_size - 1),
-        )
+        ))
         .expect("one-under final output profile admits source");
     under
         .set_data(0, b"a".to_vec())
@@ -1694,19 +1869,21 @@ fn retained_limits_survive_public_patch_inverse_after_reopen() {
 
     let mut changed = fixture.package.clone();
     let mut transaction = changed
-        .edit_custom_data_with_limits(&profile)
+        .edit_custom_data_with_options(options(&profile))
         .expect("profiled transaction starts");
     transaction
         .rename(0, "profiled-rename")
         .expect("profiled rename stages");
     let commit = transaction.commit().expect("profiled rename commits");
-    assert_eq!(commit.snapshot().limits(), profile);
+    changed = commit.package().clone();
+    assert_eq!(commit.patch().after().limits(), profile);
 
     let mut reopened =
-        Package::from_bytes(package_bytes(&changed)).expect("changed package reopens");
-    reopened
-        .apply_custom_data_patch(&commit.patch().inverse())
-        .expect("inverse patch applies with retained profile");
+        Package::from_bytes(&package_bytes(&changed)).expect("changed package reopens");
+    reopened = reopened
+        .apply_custom_data(&commit.patch().inverse())
+        .expect("inverse patch applies with retained profile")
+        .into_package();
     assert_eq!(
         archive_members(&package_bytes(&reopened)),
         archive_members(&before)
@@ -1724,8 +1901,9 @@ fn source_bound_noop_and_inverse_preserve_lexical_zip_members() {
         .expect("no-op transaction starts");
     assert!(!noop.rename(0, "uid-A").expect("same UID is a no-op"));
     let noop_commit = noop.commit().expect("no-op transaction commits");
-    assert!(!noop_commit.changed());
-    assert!(noop_commit.patch().is_empty());
+    noop_package = noop_commit.package().clone();
+    assert!(!noop_commit.diagnostics().changed());
+    assert!(noop_commit.patch().is_noop());
     assert_eq!(archive_members(&package_bytes(&noop_package)), before);
 
     let mut changed_package = fixture.package.clone();
@@ -1734,6 +1912,7 @@ fn source_bound_noop_and_inverse_preserve_lexical_zip_members() {
         .expect("source-preserving transaction starts");
     transaction.rename(0, "uid-B").expect("UID rename stages");
     let commit = transaction.commit().expect("UID rename commits");
+    changed_package = commit.package().clone();
     let changed_bytes = package_bytes(&changed_package);
     let changed_archive = archive_members(&changed_bytes);
     assert_ne!(changed_archive, before);
@@ -1752,10 +1931,11 @@ fn source_bound_noop_and_inverse_preserve_lexical_zip_members() {
             .any(|window| window == b"urn:synthetic-opaque")
     );
 
-    let mut reopened = Package::from_bytes(changed_bytes).expect("changed package reopens");
-    reopened
-        .apply_custom_data_patch(&commit.patch().inverse())
-        .expect("inverse applies after reopen");
+    let mut reopened = Package::from_bytes(&changed_bytes).expect("changed package reopens");
+    reopened = reopened
+        .apply_custom_data(&commit.patch().inverse())
+        .expect("inverse applies after reopen")
+        .into_package();
     assert_eq!(archive_members(&package_bytes(&reopened)), before);
 }
 
@@ -1771,12 +1951,13 @@ fn connection_owner_relationship_presence_is_source_bound_and_inverse_exact() {
         .rename(0, "uid-B")
         .expect("absent-owner rename stages");
     let commit = transaction.commit().expect("absent-owner rename commits");
+    changed = commit.package().clone();
 
     let explicit = single_fixture_with_connection_relationship_member(true);
     let explicit_before = archive_members(&package_bytes(&explicit.package));
-    let mut stale = explicit.package.clone();
+    let stale = explicit.package.clone();
     assert!(matches!(
-        stale.apply_custom_data_patch(commit.patch()),
+        stale.apply_custom_data(commit.patch()),
         Err(Error::PatchConflict { .. })
     ));
     assert_eq!(archive_members(&package_bytes(&stale)), explicit_before);
@@ -1791,9 +1972,10 @@ fn connection_owner_relationship_presence_is_source_bound_and_inverse_exact() {
     let explicit_commit = explicit_transaction
         .commit()
         .expect("explicit-owner rename commits");
-    let mut stale_absent = absent.package.clone();
+    explicit_changed = explicit_commit.package().clone();
+    let stale_absent = absent.package.clone();
     assert!(matches!(
-        stale_absent.apply_custom_data_patch(explicit_commit.patch()),
+        stale_absent.apply_custom_data(explicit_commit.patch()),
         Err(Error::PatchConflict { .. })
     ));
     assert_eq!(
@@ -1801,17 +1983,19 @@ fn connection_owner_relationship_presence_is_source_bound_and_inverse_exact() {
         absent_before
     );
 
-    let mut reopened = Package::from_bytes(package_bytes(&changed)).expect("changed reopens");
-    reopened
-        .apply_custom_data_patch(&commit.patch().inverse())
-        .expect("inverse applies to the changed source");
+    let mut reopened = Package::from_bytes(&package_bytes(&changed)).expect("changed reopens");
+    reopened = reopened
+        .apply_custom_data(&commit.patch().inverse())
+        .expect("inverse applies to the changed source")
+        .into_package();
     assert_eq!(archive_members(&package_bytes(&reopened)), absent_before);
 
     let mut explicit_reopened =
-        Package::from_bytes(package_bytes(&explicit_changed)).expect("explicit change reopens");
-    explicit_reopened
-        .apply_custom_data_patch(&explicit_commit.patch().inverse())
-        .expect("explicit-owner inverse restores the empty relationship member");
+        Package::from_bytes(&package_bytes(&explicit_changed)).expect("explicit change reopens");
+    explicit_reopened = explicit_reopened
+        .apply_custom_data(&explicit_commit.patch().inverse())
+        .expect("explicit-owner inverse restores the empty relationship member")
+        .into_package();
     assert_eq!(
         archive_members(&package_bytes(&explicit_reopened)),
         explicit_before
@@ -1821,7 +2005,7 @@ fn connection_owner_relationship_presence_is_source_bound_and_inverse_exact() {
 #[test]
 fn stale_custom_data_patch_is_refused_without_mutating_the_target() {
     let fixture = single_fixture();
-    let mut source = fixture.package.clone();
+    let source = fixture.package.clone();
     let mut source_transaction = source
         .edit_custom_data()
         .expect("source transaction starts");
@@ -1839,13 +2023,14 @@ fn stale_custom_data_patch_is_refused_without_mutating_the_target() {
     stale_transaction
         .set_data(0, b"independent target change".to_vec())
         .expect("independent target change stages");
-    stale_transaction
+    stale = stale_transaction
         .commit()
-        .expect("independent target change commits");
+        .expect("independent target change commits")
+        .into_package();
     let before = archive_members(&package_bytes(&stale));
 
     assert!(matches!(
-        stale.apply_custom_data_patch(&patch),
+        stale.apply_custom_data(&patch),
         Err(Error::PatchConflict { .. })
     ));
     assert_eq!(archive_members(&package_bytes(&stale)), before);
@@ -1855,7 +2040,7 @@ fn stale_custom_data_patch_is_refused_without_mutating_the_target() {
 fn removal_refuses_unexpected_inbound_relationships_atomically() {
     let fixture = foreign_inbound_fixture();
     let before = archive_members(&package_bytes(&fixture.package));
-    let mut package = fixture.package.clone();
+    let package = fixture.package.clone();
     let mut transaction = package
         .edit_custom_data()
         .expect("foreign-edge transaction starts");
@@ -1871,16 +2056,16 @@ fn signed_custom_data_noop_is_exact_but_changed_commit_is_refused() {
     let fixture = signed_fixture();
     let before = archive_members(&package_bytes(&fixture.package));
 
-    let mut noop_package = fixture.package.clone();
+    let noop_package = fixture.package.clone();
     let noop_commit = noop_package
         .edit_custom_data()
         .expect("signed no-op transaction starts")
         .commit()
         .expect("signed no-op commits");
-    assert!(!noop_commit.changed());
+    assert!(!noop_commit.diagnostics().changed());
     assert_eq!(archive_members(&package_bytes(&noop_package)), before);
 
-    let mut changed_package = fixture.package.clone();
+    let changed_package = fixture.package.clone();
     let mut transaction = changed_package
         .edit_custom_data()
         .expect("signed changed transaction starts");
@@ -1902,14 +2087,16 @@ fn caller_limits_propagate_to_storage_payload_and_relationship_graph_admission()
     assert!(
         fixture
             .package
-            .custom_data_with_limits(&exact_relationships)
+            .with_semantic_limits(custom_limits(&exact_relationships))
+            .custom_data()
             .is_ok()
     );
     let under_relationships = exact_relationships.with_max_relationships(relationships - 1);
     assert!(
         fixture
             .package
-            .custom_data_with_limits(&under_relationships)
+            .with_semantic_limits(custom_limits(&under_relationships))
+            .custom_data()
             .is_err()
     );
 
@@ -1917,7 +2104,8 @@ fn caller_limits_propagate_to_storage_payload_and_relationship_graph_admission()
     assert!(
         fixture
             .package
-            .custom_data_with_limits(&storage_under)
+            .with_semantic_limits(custom_limits(&storage_under))
+            .custom_data()
             .is_err()
     );
 
@@ -1927,7 +2115,8 @@ fn caller_limits_propagate_to_storage_payload_and_relationship_graph_admission()
     assert!(
         payload_fixture
             .package
-            .custom_data_with_limits(&payload_under)
+            .with_semantic_limits(custom_limits(&payload_under))
+            .custom_data()
             .is_err()
     );
     assert_eq!(
@@ -1943,7 +2132,8 @@ fn namespace_byte_limit_reports_input_bytes_dimension() {
     let limits = CustomDataLimits::new().with_max_xml_namespace_bytes(1);
     let error = fixture
         .package
-        .custom_data_with_limits(&limits)
+        .with_semantic_limits(custom_limits(&limits))
+        .custom_data()
         .expect_err("tight namespace byte cap rejects the source");
     assert!(matches!(
         error,
@@ -1969,11 +2159,17 @@ fn connection_namespace_declarations_consume_attribute_budget() {
     let limits = CustomDataLimits::new().with_max_xml_attributes(7);
     let error = fixture
         .package
-        .custom_data_with_limits(&limits)
+        .with_semantic_limits(custom_limits(&limits))
+        .custom_data()
         .expect_err("unused namespace declarations must count as attributes");
     assert!(matches!(
         error,
-        Error::ResourceLimit(limit) if limit.resource == Resource::Objects
+        Error::Limit {
+            kind: litchi_xlsx::LimitKind::Connections(
+                litchi_xlsx::connections::LimitKind::Attributes
+            ),
+            ..
+        }
     ));
 }
 
@@ -1990,11 +2186,17 @@ fn connection_namespace_budget_includes_prefix_bytes() {
         .with_max_xml_namespace_bytes(existing_namespace_bytes + LONG_PREFIX.len());
     let error = fixture
         .package
-        .custom_data_with_limits(&limits)
+        .with_semantic_limits(custom_limits(&limits))
+        .custom_data()
         .expect_err("namespace prefixes must consume the byte budget");
     assert!(matches!(
         error,
-        Error::ResourceLimit(limit) if limit.resource == Resource::InputBytes
+        Error::Limit {
+            kind: litchi_xlsx::LimitKind::Connections(
+                litchi_xlsx::connections::LimitKind::NamespaceBytes
+            ),
+            ..
+        }
     ));
 }
 
@@ -2005,11 +2207,17 @@ fn connection_in_root_cdata_counts_against_xml_string_bytes() {
     let limits = CustomDataLimits::new().with_max_xml_string_bytes(cdata.len() - 1);
     let error = fixture
         .package
-        .custom_data_with_limits(&limits)
+        .with_semantic_limits(custom_limits(&limits))
+        .custom_data()
         .expect_err("in-root CDATA must consume the XML string budget");
     assert!(matches!(
         error,
-        Error::ResourceLimit(limit) if limit.resource == Resource::InputBytes
+        Error::Limit {
+            kind: litchi_xlsx::LimitKind::Connections(
+                litchi_xlsx::connections::LimitKind::StringBytes
+            ),
+            ..
+        }
     ));
 }
 
@@ -2035,7 +2243,8 @@ fn entity_escaped_connection_namespace_preserves_binding_or_refuses() {
     let commit = transaction
         .commit()
         .expect("escaped namespace rename commits");
-    assert!(commit.changed());
+    package = commit.package().clone();
+    assert!(commit.diagnostics().changed());
     let xml = part_bytes(&package, CONNECTIONS_URI);
     assert!(
         xml.windows(b"embeddedDataId=\"uid-B\"".len())
@@ -2067,7 +2276,10 @@ fn default_public_custom_data_api_remains_usable() {
     transaction
         .set_data(0, b"default-api-edit".to_vec())
         .expect("default transaction stages");
-    transaction.commit().expect("default transaction commits");
+    package = transaction
+        .commit()
+        .expect("default transaction commits")
+        .into_package();
     assert_eq!(
         package
             .custom_data()

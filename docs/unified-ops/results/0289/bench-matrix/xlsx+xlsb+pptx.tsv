@@ -1,0 +1,2 @@
+format	operation	scenario	size	comparison	stage	leaf	unified	unit	ratio	ratio_range	budget	status	record	source	explanation
+xlsx+xlsb+pptx	query (full)	file-backed full queries, unified after vs base		after/base (unified leg)				µs	16–23% faster	0.770–0.840	none	no-budget	0280	curated:0280-shared-query-transaction-performance.md §4.1: 'every file-backed full query gains 16–23% (the check is now about 125 ns, the fstat floor)'	

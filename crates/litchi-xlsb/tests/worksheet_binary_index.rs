@@ -13,6 +13,7 @@
 //! record inspection is limited to checking the offsets that the public API
 //! promises to validate and maintain.
 
+use litchi_core::sheet::WorkbookTrait as _;
 use std::io::{self, Cursor};
 use std::path::Path;
 use std::sync::Arc;
@@ -25,11 +26,15 @@ use litchi_core::{
 };
 use litchi_opc::{OpcError, OpcPackage, PackURI};
 use litchi_xlsb::binary_index::Limits as BinaryIndexLimits;
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::cell_values::{Reference, StyleIndex, Value};
 use litchi_xlsb::package::PackageError;
-use litchi_xlsb::raw::{Header, Kind, Limits as RawLimits, Records, Writer, kind};
-use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
-use litchi_xlsb::{ReadLimits, SourceBackedWorkbook, Workbook};
+use litchi_xlsb::raw::{Encoder, Header, Kind, Limits as RawLimits, Records, kind};
+use litchi_xlsb::{Package, SourceBackedWorkbook, SourceLimits, Workbook};
+
+#[path = "support/projection.rs"]
+mod projection;
+use projection::OwnedWorkbook as _;
 
 const SHEET1: &str = "/xl/worksheets/sheet1.bin";
 const INDEX1: &str = "/xl/worksheets/binaryIndex1.bin";
@@ -50,8 +55,22 @@ fn source_workbook(relative: &str) -> SourceBackedWorkbook {
     SourceBackedWorkbook::from_reader(Cursor::new(fixture(relative))).expect("source workbook")
 }
 
+/// The first worksheet of a source owner opened under binary-index limits.
+fn limited_sheet(relative: &str, limits: BinaryIndexLimits) -> litchi_xlsb::SourceBackedWorksheet {
+    SourceBackedWorkbook::from_reader_with_options(
+        Cursor::new(fixture(relative)),
+        litchi_xlsb::OpenOptions::new()
+            .semantic_limits(litchi_xlsb::SemanticLimits::new().binary_index(limits)),
+    )
+    .expect("source workbook")
+    .worksheet_by_index(0)
+    .expect("worksheet selector")
+    .expect("first worksheet")
+}
+
 fn package_part(package_bytes: &[u8], path: &str) -> Vec<u8> {
-    let package = OpcPackage::from_reader(Cursor::new(package_bytes)).expect("OPC package");
+    let package = OpcPackage::from_reader(Cursor::new(package_bytes), SourceLimits::default())
+        .expect("OPC package");
     package
         .get_part(&PackURI::new(path).expect("part URI"))
         .expect("part")
@@ -61,8 +80,30 @@ fn package_part(package_bytes: &[u8], path: &str) -> Vec<u8> {
 
 fn save_workbook(workbook: &Workbook) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).expect("save workbook");
+    workbook
+        .to_package()
+        .write_to(&mut output)
+        .expect("save workbook");
     output.into_inner()
+}
+
+fn package_edit(workbook: &Workbook, sheet: usize) -> (Package, litchi_xlsb::cell_values::Edit) {
+    let package = workbook.to_package();
+    let name = workbook.worksheet_names()[sheet].clone();
+    let edit = package
+        .edit_cell_values(name)
+        .expect("cell-value selector")
+        .resolve()
+        .expect("worksheet resolution")
+        .expect("worksheet selector");
+    (package, edit)
+}
+
+fn publish(commit: litchi_xlsb::cell_values::Commit) -> Workbook {
+    commit
+        .into_package()
+        .owned_workbook()
+        .expect("published workbook")
 }
 
 #[derive(Debug, Clone)]
@@ -74,7 +115,7 @@ struct RawRecord {
 
 fn records(data: &[u8]) -> Vec<RawRecord> {
     let mut output = Vec::new();
-    for record in Records::new(data) {
+    for record in Records::new(data, litchi_xlsb::raw::Limits::DEFAULT) {
         let record = record.expect("record framing");
         output.push(RawRecord {
             kind: record.kind(),
@@ -86,7 +127,8 @@ fn records(data: &[u8]) -> Vec<RawRecord> {
 }
 
 fn rewrite_index(package_bytes: &[u8], transform: impl FnOnce(&[u8]) -> Vec<u8>) -> Vec<u8> {
-    let mut package = OpcPackage::from_reader(Cursor::new(package_bytes)).expect("OPC package");
+    let mut package = OpcPackage::from_reader(Cursor::new(package_bytes), SourceLimits::default())
+        .expect("OPC package");
     let uri = PackURI::new(INDEX1).expect("index URI");
     let changed = transform(package.get_part(&uri).expect("index part").blob());
     package
@@ -94,12 +136,13 @@ fn rewrite_index(package_bytes: &[u8], transform: impl FnOnce(&[u8]) -> Vec<u8>)
         .expect("index part")
         .set_blob(changed);
     let mut output = Vec::new();
-    package.to_stream(&mut output).expect("rewrite package");
+    package.write_to(&mut output).expect("rewrite package");
     output
 }
 
 fn remove_index_relationship(package_bytes: &[u8]) -> Vec<u8> {
-    let mut package = OpcPackage::from_reader(Cursor::new(package_bytes)).expect("OPC package");
+    let mut package = OpcPackage::from_reader(Cursor::new(package_bytes), SourceLimits::default())
+        .expect("OPC package");
     let worksheet = PackURI::new(SHEET1).expect("worksheet URI");
     let relationship_id = package
         .get_part(&worksheet)
@@ -120,14 +163,14 @@ fn remove_index_relationship(package_bytes: &[u8]) -> Vec<u8> {
         .remove(&relationship_id)
         .expect("remove binary-index relationship");
     let mut output = Vec::new();
-    package.to_stream(&mut output).expect("rewrite package");
+    package.write_to(&mut output).expect("rewrite package");
     output
 }
 
 fn insert_opaque_index_record(index: &[u8]) -> Vec<u8> {
     let insertion = {
         let mut bytes = Vec::new();
-        Writer::new(&mut bytes)
+        Encoder::new(&mut bytes, litchi_xlsb::raw::Limits::DEFAULT)
             .write_record(
                 Kind::new(OPAQUE_KIND).expect("opaque kind"),
                 b"extension bytes",
@@ -158,7 +201,7 @@ fn truncate_first_row_block(index: &[u8]) -> Vec<u8> {
     let new_payload_len = first_row_block.payload.len() - 4;
     let mut rebuilt = Vec::with_capacity(index.len() - 4);
     rebuilt.extend_from_slice(&index[..first_row_block.start]);
-    let mut writer = Writer::new(&mut rebuilt);
+    let mut writer = Encoder::new(&mut rebuilt, litchi_xlsb::raw::Limits::DEFAULT);
     writer
         .write_record(
             kind::INDEX_ROW_BLOCK,
@@ -171,7 +214,7 @@ fn truncate_first_row_block(index: &[u8]) -> Vec<u8> {
 
 fn append_index_part_end(index: &[u8]) -> Vec<u8> {
     let mut output = index.to_vec();
-    Writer::new(&mut output)
+    Encoder::new(&mut output, litchi_xlsb::raw::Limits::DEFAULT)
         .write_record(kind::INDEX_PART_END, &[])
         .expect("second end marker");
     output
@@ -189,7 +232,7 @@ fn append_empty_index_block(index: &[u8]) -> Vec<u8> {
     block.extend_from_slice(&[0; 8]);
     block.extend_from_slice(&[0; 8]);
     let mut encoded = Vec::new();
-    Writer::new(&mut encoded)
+    Encoder::new(&mut encoded, litchi_xlsb::raw::Limits::DEFAULT)
         .write_record(kind::INDEX_BLOCK, &block)
         .expect("empty index block");
     let mut output = Vec::with_capacity(index.len() + encoded.len());
@@ -199,7 +242,7 @@ fn append_empty_index_block(index: &[u8]) -> Vec<u8> {
     output
 }
 
-fn write_empty_index_block(writer: &mut Writer<&mut Vec<u8>>, row_start: u32) {
+fn write_empty_index_block(writer: &mut Encoder<&mut Vec<u8>>, row_start: u32) {
     let mut block = Vec::new();
     block.extend_from_slice(&row_start.to_le_bytes());
     block.extend_from_slice(&(row_start + 32).to_le_bytes());
@@ -212,7 +255,7 @@ fn write_empty_index_block(writer: &mut Writer<&mut Vec<u8>>, row_start: u32) {
 
 fn two_empty_index_blocks(_index: &[u8]) -> Vec<u8> {
     let mut output = Vec::new();
-    let mut writer = Writer::new(&mut output);
+    let mut writer = Encoder::new(&mut output, litchi_xlsb::raw::Limits::DEFAULT);
     write_empty_index_block(&mut writer, 0);
     write_empty_index_block(&mut writer, 32);
     writer
@@ -223,7 +266,7 @@ fn two_empty_index_blocks(_index: &[u8]) -> Vec<u8> {
 
 fn empty_index_with_end(_index: &[u8]) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
+    Encoder::new(&mut output, litchi_xlsb::raw::Limits::DEFAULT)
         .write_record(kind::INDEX_PART_END, &[])
         .expect("empty index end marker");
     output
@@ -407,19 +450,14 @@ fn indexed_values_lookup_present_absent_and_formula_cache() {
 
 #[test]
 fn selected_shared_string_obeys_index_raw_string_limit() {
-    let workbook = source_workbook("test-data/ooxml/xlsb/sample.xlsb");
-    let sheet = workbook
-        .worksheet_by_index(0)
-        .expect("worksheet selector")
-        .expect("first worksheet");
     let high_limits = BinaryIndexLimits::new(
         RawLimits::new(RawLimits::DEFAULT.payload(), 5),
         1_000_000,
         32_768,
         1_000_000,
     );
-    let high = sheet
-        .indexed_values_with_limits(high_limits)
+    let high = limited_sheet("test-data/ooxml/xlsb/sample.xlsb", high_limits)
+        .indexed_values()
         .expect("high-limit indexed values")
         .expect("binary index relationship");
     assert_eq!(
@@ -433,8 +471,8 @@ fn selected_shared_string_obeys_index_raw_string_limit() {
         32_768,
         1_000_000,
     );
-    let low = sheet
-        .indexed_values_with_limits(low_limits)
+    let low = limited_sheet("test-data/ooxml/xlsb/sample.xlsb", low_limits)
+        .indexed_values()
         .expect("low-limit index binding")
         .expect("binary index relationship");
     assert!(low.cached_value(0, 0).is_err());
@@ -488,7 +526,7 @@ fn topology_change_preserves_formatting_only_index_rows() {
     let reference = Reference::new(22, 0).expect("reference");
     let snapshot = workbook.cell_values(0).expect("cell snapshot");
     assert!(snapshot.cell(reference).expect("lookup").is_none());
-    let mut edit = snapshot.edit();
+    let (_, mut edit) = package_edit(&workbook, 0);
     edit.insert(
         reference,
         StyleIndex::new(0).expect("style"),
@@ -496,9 +534,8 @@ fn topology_change_preserves_formatting_only_index_rows() {
     )
     .expect("insert cell into formatting-only row");
     let commit = edit.commit().expect("commit");
-    let published = workbook
-        .apply_cell_values(0, &commit)
-        .expect("publish topology-changing edit");
+    workbook = publish(commit);
+    let published = workbook.cell_values(0).expect("published snapshot");
     assert_eq!(
         published
             .cell(reference)
@@ -553,15 +590,19 @@ fn missing_index_relationship_returns_no_index_handle() {
 
 #[test]
 fn writer_emits_lookupable_offsets_for_sparse_cells() {
-    let mut sheet = MutableWorksheet::new("Indexed");
+    let mut sheet = builder::Worksheet::new("Indexed");
     sheet.set_cell(0, 0, 1.25_f64);
     sheet.set_cell(0, 1_024, 2.5_f64);
     sheet.set_cell(33, 2, 3.75_f64);
     sheet.set_cell(MAX_ROW, MAX_COLUMN, 4.0_f64);
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(sheet);
     let mut bytes = Cursor::new(Vec::new());
-    writer.save(&mut bytes).expect("writer save");
+    writer
+        .build()
+        .expect("build package")
+        .write_to(&mut bytes)
+        .expect("writer save");
     let package_bytes = bytes.into_inner();
 
     let index = package_part(&package_bytes, INDEX1);
@@ -610,10 +651,14 @@ fn writer_emits_lookupable_offsets_for_sparse_cells() {
 
 #[test]
 fn writer_emits_an_empty_index_block_for_an_empty_sheet() {
-    let mut writer = WorkbookWriter::new();
-    writer.add_worksheet(MutableWorksheet::new("Empty"));
+    let mut writer = Builder::new();
+    writer.add_worksheet(builder::Worksheet::new("Empty"));
     let mut bytes = Cursor::new(Vec::new());
-    writer.save(&mut bytes).expect("writer save");
+    writer
+        .build()
+        .expect("build package")
+        .write_to(&mut bytes)
+        .expect("writer save");
     let package_bytes = bytes.into_inner();
     let index = package_part(&package_bytes, INDEX1);
     let index_records = records(&index);
@@ -670,10 +715,14 @@ fn index_accepts_optional_empty_blocks_and_two_end_markers() {
 
 #[test]
 fn index_accepts_an_empty_block_before_a_later_empty_block() {
-    let mut writer = WorkbookWriter::new();
-    writer.add_worksheet(MutableWorksheet::new("Empty"));
+    let mut writer = Builder::new();
+    writer.add_worksheet(builder::Worksheet::new("Empty"));
     let mut bytes = Cursor::new(Vec::new());
-    writer.save(&mut bytes).expect("writer save");
+    writer
+        .build()
+        .expect("build package")
+        .write_to(&mut bytes)
+        .expect("writer save");
     let source = rewrite_index(&bytes.into_inner(), two_empty_index_blocks);
     let workbook = SourceBackedWorkbook::from_reader(Cursor::new(source)).expect("catalog");
     let indexed = workbook
@@ -691,14 +740,11 @@ fn removing_an_earlier_cell_updates_later_anchor_offsets() {
     let source = fixture("test-data/ooxml/xlsb/sample.xlsb");
     let before_index = package_part(&source, INDEX1);
     let mut workbook = Workbook::new(Cursor::new(source)).expect("workbook");
-    let snapshot = workbook.cell_values(0).expect("cell snapshot");
-    let mut edit = snapshot.edit();
+    let (_, mut edit) = package_edit(&workbook, 0);
     edit.remove(Reference::new(0, 1).expect("reference"))
         .expect("remove second cell");
     let commit = edit.commit().expect("commit");
-    workbook
-        .apply_cell_values(0, &commit)
-        .expect("publish edit");
+    workbook = publish(commit);
     let saved = save_workbook(&workbook);
     let after_index = package_part(&saved, INDEX1);
     let after_sheet = package_part(&saved, SHEET1);
@@ -730,11 +776,10 @@ fn no_op_save_keeps_the_source_index_byte_exact() {
     );
     let before_index = package_part(&source, INDEX1);
     let mut workbook = Workbook::new(Cursor::new(source)).expect("workbook");
-    let snapshot = workbook.cell_values(0).expect("snapshot");
-    let commit = snapshot.edit().commit().expect("empty commit");
-    workbook
-        .apply_cell_values(0, &commit)
-        .expect("publish no-op");
+    let (_, edit) = package_edit(&workbook, 0);
+    let commit = edit.commit().expect("empty commit");
+    assert!(commit.patch().is_noop());
+    workbook = publish(commit);
     let after_index = package_part(&save_workbook(&workbook), INDEX1);
     assert_eq!(before_index, after_index);
 }
@@ -748,13 +793,11 @@ fn opaque_index_record_refuses_offset_patch_atomically() {
     assert!(records(&before_index).iter().any(|record| {
         record.kind.get() == OPAQUE_KIND && record.payload == b"extension bytes"
     }));
-    let mut workbook = Workbook::new(Cursor::new(decorated)).expect("workbook");
-    let snapshot = workbook.cell_values(0).expect("snapshot");
-    let mut edit = snapshot.edit();
+    let workbook = Workbook::new(Cursor::new(decorated)).expect("workbook");
+    let (_, mut edit) = package_edit(&workbook, 0);
     edit.remove(Reference::new(0, 1).expect("reference"))
         .expect("remove second cell");
-    let commit = edit.commit().expect("commit");
-    assert!(workbook.apply_cell_values(0, &commit).is_err());
+    assert!(edit.commit().is_err());
     let after_package = save_workbook(&workbook);
     assert_eq!(before_index, package_part(&after_package, INDEX1));
     assert_eq!(before_sheet, package_part(&after_package, SHEET1));
@@ -909,12 +952,13 @@ fn indexed_handle_refuses_stale_source_and_cancellation() {
     ));
 
     let (cancellation_source, context) = managed_context();
-    let managed = SourceBackedWorkbook::from_read_at_with_execution_context(
+    let managed = SourceBackedWorkbook::from_read_at_with_options(
         Arc::new(OwnedSource::new(fixture(
             "test-data/ooxml/xlsb/sample.xlsb",
         ))),
-        ReadLimits::default(),
-        context,
+        litchi_xlsb::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .expect("managed source workbook");
     let managed_index = managed
@@ -978,10 +1022,11 @@ fn managed_index_handle_keeps_worksheet_part_data_alive() {
         "test-data/ooxml/xlsb/62815.xlsb",
     )));
     let (_cancellation_source, context) = managed_context();
-    let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
         source.clone(),
-        ReadLimits::default(),
-        context,
+        litchi_xlsb::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .expect("managed source workbook");
     let indexed = workbook
@@ -1006,12 +1051,6 @@ fn source_bytes_limit_rejects_index_before_payload_reads() {
     let source = Arc::new(CountingSource::new(fixture(
         "test-data/ooxml/xlsb/sample.xlsb",
     )));
-    let workbook = SourceBackedWorkbook::from_read_at(source.clone()).expect("source workbook");
-    let sheet = workbook
-        .worksheet_by_index(0)
-        .expect("worksheet selector")
-        .expect("worksheet");
-    let reads_before = source.reads();
     let limits = BinaryIndexLimits::new_with_source_bytes(
         RawLimits::DEFAULT,
         1,
@@ -1019,6 +1058,17 @@ fn source_bytes_limit_rejects_index_before_payload_reads() {
         32_768,
         1_000_000,
     );
-    assert!(sheet.indexed_values_with_limits(limits).is_err());
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
+        source.clone(),
+        litchi_xlsb::OpenOptions::new()
+            .semantic_limits(litchi_xlsb::SemanticLimits::new().binary_index(limits)),
+    )
+    .expect("source workbook");
+    let sheet = workbook
+        .worksheet_by_index(0)
+        .expect("worksheet selector")
+        .expect("worksheet");
+    let reads_before = source.reads();
+    assert!(sheet.indexed_values().is_err());
     assert_eq!(source.reads(), reads_before);
 }

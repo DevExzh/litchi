@@ -4,9 +4,10 @@
 use std::error::Error as StdError;
 
 use litchi_iwa_archive::Limits as PhysicalLimits;
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::{Catalog, EntryEdit};
 use litchi_iwa_core::Limits as ArchiveLimits;
-use litchi_pages::{BodyTableDeletionError, BodyTableSelector, Limits, Package};
+use litchi_pages::{BodyTableSelector, Package, table::deletion::Error as BodyTableDeletionError};
 
 type TestResult<T = ()> = Result<T, Box<dyn StdError>>;
 
@@ -25,7 +26,7 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn entry_data(bytes: &[u8], name: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(bytes)?;
+    let catalog = Catalog::from_bytes(bytes, Default::default())?;
     catalog
         .iter()
         .find(|entry| entry.name() == name)
@@ -34,7 +35,7 @@ fn entry_data(bytes: &[u8], name: &str) -> TestResult<Vec<u8>> {
 }
 
 fn remove_metadata_member(bytes: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(bytes)?;
+    let catalog = Catalog::from_bytes(bytes, Default::default())?;
     if !catalog.iter().any(|entry| entry.name() == METADATA_MEMBER) {
         return Err("fixture has no PackageMetadata member to remove".into());
     }
@@ -46,7 +47,7 @@ fn remove_metadata_member(bytes: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn member_names(bytes: &[u8]) -> TestResult<Vec<String>> {
-    Ok(Catalog::from_bytes(bytes)?
+    Ok(Catalog::from_bytes(bytes, Default::default())?
         .iter()
         .map(|entry| entry.name().to_owned())
         .collect())
@@ -54,8 +55,8 @@ fn member_names(bytes: &[u8]) -> TestResult<Vec<String>> {
 
 fn iwa_object_count(bytes: &[u8], name: &str) -> TestResult<usize> {
     let data = entry_data(bytes, name)?;
-    let stream = litchi_iwa_core::SnappyStream::decompress(&data)?;
-    let archive = litchi_iwa_core::Archive::parse(stream.as_bytes())?;
+    let stream = litchi_iwa_core::SnappyStream::decompress(&data, Default::default())?;
+    let archive = litchi_iwa_core::Archive::parse(stream.as_bytes(), Default::default())?;
     Ok(archive.objects.len())
 }
 
@@ -72,7 +73,10 @@ fn lowered_transaction_budget_fails_atomically() -> TestResult {
         let fields = lower + (upper - lower) / 2;
         let archive_limits = ArchiveLimits::default().with_header_fields(fields)?;
         let limits = Limits::default().with_archive_limits(archive_limits)?;
-        match Package::from_bytes_with_limits(SOURCE, limits) {
+        match Package::from_bytes_with_options(
+            SOURCE,
+            litchi_pages::OpenOptions::new().__archive_limits(limits),
+        ) {
             Ok(package) => {
                 smallest_success = Some(package);
                 upper = fields.saturating_sub(1);
@@ -85,8 +89,11 @@ fn lowered_transaction_budget_fails_atomically() -> TestResult {
     let package = smallest_success.ok_or("no successful ingress limit boundary found")?;
     let before = exact_bytes(&package)?;
     assert!(matches!(
-        package.remove_body_table(BodyTableSelector::index(0)),
-        Err(BodyTableDeletionError::LimitExceeded { .. })
+        package
+            .edit_body_table_deletion()
+            .remove(BodyTableSelector::index(0))
+            .and_then(|edit| edit.commit()),
+        Err(BodyTableDeletionError::Limit { .. })
     ));
     assert_eq!(exact_bytes(&package)?, before);
     Ok(())
@@ -95,10 +102,13 @@ fn lowered_transaction_budget_fails_atomically() -> TestResult {
 #[test]
 fn deletion_preserves_unrelated_zip_members_byte_for_byte() -> TestResult {
     let source = Package::from_bytes(SOURCE)?;
-    let commit = source.remove_body_table(BodyTableSelector::index(0))?;
-    let before = Catalog::from_bytes(SOURCE)?;
+    let commit = source
+        .edit_body_table_deletion()
+        .remove(BodyTableSelector::index(0))
+        .and_then(|edit| edit.commit())?;
+    let before = Catalog::from_bytes(SOURCE, Default::default())?;
     let after_bytes = exact_bytes(commit.package())?;
-    let after = Catalog::from_bytes(&after_bytes)?;
+    let after = Catalog::from_bytes(&after_bytes, Default::default())?;
 
     for entry in before
         .iter()
@@ -137,7 +147,10 @@ fn deletion_removes_empty_iwa_members_without_package_metadata_registration() ->
         );
 
         let package = Package::from_bytes(source)?;
-        let commit = package.remove_body_table(BodyTableSelector::index(0))?;
+        let commit = package
+            .edit_body_table_deletion()
+            .remove(BodyTableSelector::index(0))
+            .and_then(|edit| edit.commit())?;
         let target = exact_bytes(commit.package())?;
         let after_names = member_names(&target)?;
         assert_eq!(
@@ -178,7 +191,7 @@ fn deletion_removes_empty_iwa_members_without_package_metadata_registration() ->
             entry_data(source, SHARED_IWA_MEMBER)?,
             "{label}: unrelated shared IWA member changed"
         );
-        for entry in Catalog::from_bytes(source)?
+        for entry in Catalog::from_bytes(source, Default::default())?
             .iter()
             .filter(|entry| !entry.name().ends_with(".iwa") && !PREVIEWS.contains(&entry.name()))
         {
@@ -196,10 +209,13 @@ fn deletion_removes_empty_iwa_members_without_package_metadata_registration() ->
 #[test]
 fn deleted_previews_are_restored_by_the_inverse_patch() -> TestResult {
     let source = Package::from_bytes(SOURCE)?;
-    let commit = source.remove_body_table(BodyTableSelector::index(0))?;
+    let commit = source
+        .edit_body_table_deletion()
+        .remove(BodyTableSelector::index(0))
+        .and_then(|edit| edit.commit())?;
     assert_eq!(commit.diagnostics().deleted_previews(), PREVIEWS.len());
     let changed = exact_bytes(commit.package())?;
-    let changed_catalog = Catalog::from_bytes(&changed)?;
+    let changed_catalog = Catalog::from_bytes(&changed, Default::default())?;
     assert!(
         PREVIEWS
             .iter()
@@ -223,9 +239,12 @@ fn deleted_previews_are_restored_by_the_inverse_patch() -> TestResult {
 #[test]
 fn patch_rejects_an_independently_reallocated_source_with_different_bytes() -> TestResult {
     let source = Package::from_bytes(SOURCE)?;
-    let commit = source.remove_body_table(BodyTableSelector::index(0))?;
+    let commit = source
+        .edit_body_table_deletion()
+        .remove(BodyTableSelector::index(0))
+        .and_then(|edit| edit.commit())?;
 
-    let source_catalog = Catalog::from_bytes(SOURCE)?;
+    let source_catalog = Catalog::from_bytes(SOURCE, Default::default())?;
     let altered_bytes = source_catalog.reassemble_to_bytes(
         &[EntryEdit::new("preview.jpg", b"independent source bytes")],
         PhysicalLimits::default(),

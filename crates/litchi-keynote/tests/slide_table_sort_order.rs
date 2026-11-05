@@ -3,7 +3,7 @@
 //! This suite exercises only the configuration marker in
 //! `TST.TableModelArchive.sort_order` (field 44).  It deliberately does not
 //! invoke Keynote's physical “Sort Now” executor: row movement, formulas,
-//! tiles, and view state remain compatibility-host behavior in `litchi-iwa`.
+//! tiles, and view state are not part of this owner.
 
 use std::error::Error as StdError;
 
@@ -15,15 +15,18 @@ use litchi_iwa_common::wire::{
     append_length_delimited_field, append_varint_field, repeated_length_delimited_payloads,
     rewrite_repeated_length_delimited_fields,
 };
-use litchi_iwa_core::{
-    Archive, ArchiveObject, FieldInfo, FieldPath, FieldType, RawMessage, SnappyStream,
-};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldType, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsd, tsk, tsp, tst, tswp};
 use litchi_keynote::slide::table::sort::{ColumnIndex, Direction, Order, Rule, Scope};
 use litchi_keynote::{
-    Package, ReadOptions, SemanticLimits, SlideSelector, SlideTableSortCommit,
-    SlideTableSortDiagnostics, SlideTableSortEdit, SlideTableSortError, SlideTableSortLimitKind,
-    SlideTableSortPatch, SlideTableSortPath, TableSelector,
+    OpenOptions, Package, SlideSelector, SourceLimits, TableSelector,
+    slide::table::sort::transaction::Commit as SlideTableSortCommit,
+    slide::table::sort::transaction::Diagnostics as SlideTableSortDiagnostics,
+    slide::table::sort::transaction::Edit as SlideTableSortEdit,
+    slide::table::sort::transaction::Error as SlideTableSortError,
+    slide::table::sort::transaction::LimitKind as SlideTableSortLimitKind,
+    slide::table::sort::transaction::Patch as SlideTableSortPatch,
+    slide::table::sort::transaction::Path as SlideTableSortPath,
 };
 use prost::Message as _;
 
@@ -76,8 +79,12 @@ fn reference(identifier: u64) -> tsp::Reference {
     }
 }
 
-fn field_reference(path: impl Into<FieldPath>, references: &[u64]) -> FieldInfo {
-    let mut field = FieldInfo::new(path);
+fn field_reference(path: Vec<u32>, references: &[u64]) -> FieldInfo {
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(path, litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     field.r#type = Some(FieldType::ObjectReference);
     field.object_references.extend_from_slice(references);
     field
@@ -89,7 +96,11 @@ fn object(
     data: Vec<u8>,
     references: &[u64],
 ) -> TestResult<ArchiveObject> {
-    let mut object = ArchiveObject::new(identifier, vec![RawMessage { type_, data }])?;
+    let mut object = ArchiveObject::new(
+        identifier,
+        vec![RawMessage { type_, data }],
+        Default::default(),
+    )?;
     object.archive_info.message_infos[0]
         .object_references
         .extend_from_slice(references);
@@ -167,6 +178,7 @@ fn sort_payload(scope: Scope, rules: &[Rule], with_unknowns: bool) -> TestResult
                     &mut rewritten,
                     SORT_RULES_FIELD,
                     if index == 0 { first.as_slice() } else { rule },
+                    litchi_iwa_common::WireLimits::DEFAULT,
                 )?;
             }
             payload = rewritten;
@@ -207,7 +219,12 @@ fn table_model(
         append_varint_field(&mut payload, UNKNOWN_MODEL_FIELD, UNKNOWN_MODEL_VALUE)?;
     }
     if let Some(sort) = sort {
-        append_length_delimited_field(&mut payload, SORT_ORDER_FIELD, sort)?;
+        append_length_delimited_field(
+            &mut payload,
+            SORT_ORDER_FIELD,
+            sort,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     Ok(payload)
 }
@@ -351,12 +368,16 @@ fn synthetic_package(
     }
     objects.push(object(TITLE_STYLE, 2_022, paragraph_style_payload(), &[])?);
     objects.push(object(SHAPE_STYLE, 2_025, shape_style_payload(), &[])?);
-    let compressed = SnappyStream::compress(&Archive { objects }.to_bytes()?)?;
+    let compressed = SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?;
     let metadata = SnappyStream::compress(
         &Archive {
             objects: vec![object(METADATA_OBJECT, 11_006, metadata_payload()?, &[])?],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     Ok(litchi_iwa_archive::package::to_bytes(
         [
@@ -454,24 +475,35 @@ fn metadata_payload() -> TestResult<Vec<u8>> {
     .encode_to_vec();
     let mut payload = Vec::new();
     append_varint_field(&mut payload, 1, 900)?;
-    append_length_delimited_field(&mut payload, 3, &component)?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &component,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
 fn append_field_bytes(source: &[u8], field: u32, payload: &[u8]) -> TestResult<Vec<u8>> {
     let mut output = source.to_vec();
-    append_length_delimited_field(&mut output, field, payload)?;
+    append_length_delimited_field(
+        &mut output,
+        field,
+        payload,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(output)
 }
 
 fn document_archive(package: &[u8]) -> TestResult<Archive> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document member")?;
     Ok(Archive::parse(
-        SnappyStream::decompress(entry.data())?.as_bytes(),
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
     )?)
 }
 
@@ -491,14 +523,18 @@ fn rewrite_document_archive(
     package: &[u8],
     mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document member")?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     mutate(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(DOCUMENT_MEMBER, &compressed)],
         Limits::default(),
@@ -509,12 +545,15 @@ fn rewrite_metadata(
     package: &[u8],
     mutate: impl FnOnce(&mut tsp::PackageMetadata) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or("missing metadata member")?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     let object = archive
         .object_mut(METADATA_OBJECT)
         .ok_or("missing metadata object")?;
@@ -532,8 +571,10 @@ fn rewrite_metadata(
             type_: 11_006,
             data: metadata.encode_to_vec(),
         },
+        Default::default(),
     )?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(METADATA_MEMBER, &compressed)],
         Limits::default(),
@@ -559,6 +600,7 @@ fn rewrite_model(
                 type_: TABLE_MODEL_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -573,7 +615,11 @@ fn rewrite_slide(
         let message = slide.messages.first().ok_or("missing slide message")?;
         let mut data = message.data.clone();
         mutate(&mut data)?;
-        slide.replace_message_preserving_header(0, RawMessage { type_: 5, data })?;
+        slide.replace_message_preserving_header(
+            0,
+            RawMessage { type_: 5, data },
+            Default::default(),
+        )?;
         Ok(())
     })
 }
@@ -604,12 +650,12 @@ fn rewrite_field_type(
 }
 
 fn rewrite_member(package: &[u8], name: &str, data: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(catalog.reassemble_to_bytes(&[EntryEdit::new(name, data)], Limits::default())?)
 }
 
 fn legacy_package_bytes(flat: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(flat)?;
+    let catalog = Catalog::from_bytes(flat, Default::default())?;
     let inner_entries = catalog
         .iter()
         .filter(|entry| {
@@ -635,7 +681,7 @@ fn legacy_package_bytes(flat: &[u8]) -> TestResult<Vec<u8>> {
 
 fn package_with_noncanonical_document_prefix(source: &[u8]) -> TestResult<Vec<u8>> {
     let archive = document_archive(source)?;
-    let canonical = archive.to_bytes()?;
+    let canonical = archive.to_bytes(Default::default())?;
     let (header_length, prefix_length) = litchi_iwa_common::decode_varint_from_bytes(&canonical)?;
     if prefix_length != 1 || header_length >= 0x80 {
         return Err("fixture expected a one-byte object prefix".into());
@@ -645,11 +691,11 @@ fn package_with_noncanonical_document_prefix(source: &[u8]) -> TestResult<Vec<u8
     noncanonical.push(u8::try_from(header_length)? | 0x80);
     noncanonical.push(0);
     noncanonical.extend_from_slice(&canonical[prefix_length..]);
-    Archive::parse(&noncanonical)?;
+    Archive::parse(&noncanonical, Default::default())?;
     rewrite_member(
         source,
         DOCUMENT_MEMBER,
-        &SnappyStream::compress(&noncanonical)?,
+        &SnappyStream::compress(&noncanonical, Default::default())?,
     )
 }
 
@@ -670,10 +716,20 @@ fn duplicate_slide_name_package() -> TestResult<Vec<u8>> {
 fn model_with_sort(source: &[u8], sort: &[u8], tracker: Option<&[u8]>) -> TestResult<Vec<u8>> {
     rewrite_model(source, |model| {
         let mut data = rewrite_repeated_length_delimited_fields(model, SORT_ORDER_FIELD, &[])?;
-        append_length_delimited_field(&mut data, SORT_ORDER_FIELD, sort)?;
+        append_length_delimited_field(
+            &mut data,
+            SORT_ORDER_FIELD,
+            sort,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         if let Some(tracker) = tracker {
             data = rewrite_repeated_length_delimited_fields(&data, SORT_TRACKER_FIELD, &[])?;
-            append_length_delimited_field(&mut data, SORT_TRACKER_FIELD, tracker)?;
+            append_length_delimited_field(
+                &mut data,
+                SORT_TRACKER_FIELD,
+                tracker,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         }
         *model = data;
         Ok(())
@@ -734,7 +790,7 @@ fn field_payloads(package: &[u8], field: u32) -> TestResult<Vec<Vec<u8>>> {
 }
 
 fn member_bytes(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
-    Ok(Catalog::from_bytes(package)?
+    Ok(Catalog::from_bytes(package, Default::default())?
         .iter()
         .find(|entry| entry.name() == name)
         .ok_or("missing package member")?
@@ -743,8 +799,8 @@ fn member_bytes(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
 }
 
 fn assert_locality(source: &[u8], target: &[u8]) -> TestResult {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     let changed = before
         .iter()
         .filter(|entry| {
@@ -997,7 +1053,9 @@ fn legacy_source_allows_exact_noop_but_refuses_changed_sort() -> TestResult {
         .commit();
     assert!(matches!(
         changed,
-        Err(SlideTableSortError::UnsupportedSource)
+        Err(SlideTableSortError::Refused(
+            litchi_keynote::slide::table::sort::transaction::Refusal::UnsupportedSource
+        ))
     ));
     assert_eq!(exact_bytes(&package)?, before);
     Ok(())
@@ -1202,8 +1260,18 @@ fn malformed_duplicate_wrong_wire_and_noncanonical_fields_fail_closed() -> TestR
         false,
     )?;
     let duplicate = rewrite_model(&fixture, |model| {
-        append_length_delimited_field(model, SORT_ORDER_FIELD, &valid)?;
-        append_length_delimited_field(model, SORT_ORDER_FIELD, &valid)?;
+        append_length_delimited_field(
+            model,
+            SORT_ORDER_FIELD,
+            &valid,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
+        append_length_delimited_field(
+            model,
+            SORT_ORDER_FIELD,
+            &valid,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         Ok(())
     })?;
     let wrong_wire = rewrite_model(&fixture, |model| {
@@ -1213,7 +1281,12 @@ fn malformed_duplicate_wrong_wire_and_noncanonical_fields_fail_closed() -> TestR
     let mut noncanonical_payload = valid.clone();
     append_overlong_varint_field(&mut noncanonical_payload, SORT_TYPE_FIELD, 0);
     let noncanonical = rewrite_model(&fixture, |model| {
-        append_length_delimited_field(model, SORT_ORDER_FIELD, &noncanonical_payload)?;
+        append_length_delimited_field(
+            model,
+            SORT_ORDER_FIELD,
+            &noncanonical_payload,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         Ok(())
     })?;
     for malformed in [duplicate, wrong_wire, noncanonical] {
@@ -1233,7 +1306,12 @@ fn malformed_nested_duplicate_fields_and_unknown_enum_fail_closed() -> TestResul
     let duplicate_type = rewrite_model(&fixture, |model| {
         let mut malformed = valid.clone();
         append_varint_field(&mut malformed, SORT_TYPE_FIELD, 0)?;
-        append_length_delimited_field(model, SORT_ORDER_FIELD, &malformed)?;
+        append_length_delimited_field(
+            model,
+            SORT_ORDER_FIELD,
+            &malformed,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         Ok(())
     })?;
     let duplicate_column = rewrite_model(&fixture, |model| {
@@ -1242,8 +1320,18 @@ fn malformed_nested_duplicate_fields_and_unknown_enum_fail_closed() -> TestResul
         append_varint_field(&mut rule, RULE_COLUMN_FIELD, 1)?;
         let mut malformed =
             rewrite_repeated_length_delimited_fields(&valid, SORT_RULES_FIELD, &[])?;
-        append_length_delimited_field(&mut malformed, SORT_RULES_FIELD, &rule)?;
-        append_length_delimited_field(model, SORT_ORDER_FIELD, &malformed)?;
+        append_length_delimited_field(
+            &mut malformed,
+            SORT_RULES_FIELD,
+            &rule,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
+        append_length_delimited_field(
+            model,
+            SORT_ORDER_FIELD,
+            &malformed,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         Ok(())
     })?;
     let duplicate_direction = rewrite_model(&fixture, |model| {
@@ -1252,14 +1340,29 @@ fn malformed_nested_duplicate_fields_and_unknown_enum_fail_closed() -> TestResul
         append_varint_field(&mut rule, RULE_DIRECTION_FIELD, 0)?;
         let mut malformed =
             rewrite_repeated_length_delimited_fields(&valid, SORT_RULES_FIELD, &[])?;
-        append_length_delimited_field(&mut malformed, SORT_RULES_FIELD, &rule)?;
-        append_length_delimited_field(model, SORT_ORDER_FIELD, &malformed)?;
+        append_length_delimited_field(
+            &mut malformed,
+            SORT_RULES_FIELD,
+            &rule,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
+        append_length_delimited_field(
+            model,
+            SORT_ORDER_FIELD,
+            &malformed,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         Ok(())
     })?;
     let unknown_scope = rewrite_model(&fixture, |model| {
         let malformed =
             litchi_iwa_common::wire::patch_varint_field(&valid, SORT_TYPE_FIELD, true, Some(99))?;
-        append_length_delimited_field(model, SORT_ORDER_FIELD, &malformed)?;
+        append_length_delimited_field(
+            model,
+            SORT_ORDER_FIELD,
+            &malformed,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         Ok(())
     })?;
     for malformed in [
@@ -1306,7 +1409,12 @@ fn model_graph_alias_and_missing_routes_are_atomic() -> TestResult {
     let duplicate_z_order = rewrite_slide(&fixture, |slide| {
         let mut duplicate = slide.clone();
         let reference_bytes = reference(TABLE_INFOS[0]).encode_to_vec();
-        append_length_delimited_field(&mut duplicate, 42, &reference_bytes)?;
+        append_length_delimited_field(
+            &mut duplicate,
+            42,
+            &reference_bytes,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         *slide = duplicate;
         Ok(())
     })?;
@@ -1326,13 +1434,14 @@ fn model_graph_alias_and_missing_routes_are_atomic() -> TestResult {
 #[test]
 fn cross_component_model_inbound_is_rejected_without_source_mutation() -> TestResult {
     let source = source_without_sort()?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let inbound = object(700, 7_000, vec![0x08, 0x01], &[MODELS[0]])?;
     let component = SnappyStream::compress(
         &Archive {
             objects: vec![inbound],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     let mut members = catalog
         .iter()
@@ -1350,13 +1459,14 @@ fn cross_component_model_inbound_is_rejected_without_source_mutation() -> TestRe
 #[test]
 fn cross_component_data_inbound_is_rejected_without_source_mutation() -> TestResult {
     let source = source_without_sort()?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let inbound = data_reference_object(700, 7_000, vec![0x08, 0x01], MODELS[0])?;
     let component = SnappyStream::compress(
         &Archive {
             objects: vec![inbound],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     let mut members = catalog
         .iter()
@@ -1439,10 +1549,13 @@ fn all_known_table_role_aliases_are_rejected_atomically() -> TestResult {
     for role_type in TABLE_ROLE_MESSAGE_TYPES {
         let malformed_model = rewrite_document_archive(&fixture, |archive| {
             let model = archive.object_mut(MODELS[0]).ok_or("missing model")?;
-            model.push_message(RawMessage {
-                type_: role_type,
-                data: vec![0x08, 0x01],
-            })?;
+            model.push_message(
+                RawMessage {
+                    type_: role_type,
+                    data: vec![0x08, 0x01],
+                },
+                Default::default(),
+            )?;
             Ok(())
         })?;
         assert_rejected_atomically(&malformed_model)?;
@@ -1451,10 +1564,13 @@ fn all_known_table_role_aliases_are_rejected_atomically() -> TestResult {
             let table = archive
                 .object_mut(TABLE_INFOS[0])
                 .ok_or("missing table info")?;
-            table.push_message(RawMessage {
-                type_: role_type,
-                data: vec![0x08, 0x01],
-            })?;
+            table.push_message(
+                RawMessage {
+                    type_: role_type,
+                    data: vec![0x08, 0x01],
+                },
+                Default::default(),
+            )?;
             Ok(())
         })?;
         assert_rejected_atomically(&malformed_info)?;
@@ -1469,10 +1585,13 @@ fn role_alias_on_non_table_drawable_is_rejected_atomically() -> TestResult {
         let drawable = archive
             .object_mut(NON_TABLE_DRAWABLE)
             .ok_or("missing non-table drawable")?;
-        drawable.push_message(RawMessage {
-            type_: TABLE_STYLE_MESSAGE_TYPE,
-            data: vec![0x08, 0x01],
-        })?;
+        drawable.push_message(
+            RawMessage {
+                type_: TABLE_STYLE_MESSAGE_TYPE,
+                data: vec![0x08, 0x01],
+            },
+            Default::default(),
+        )?;
         Ok(())
     })?;
     assert_rejected_atomically(&malformed)
@@ -1573,7 +1692,12 @@ fn extra_foreign_and_malformed_reference_routes_fail_atomically() -> TestResult 
         push_varint(&mut rewritten, first.len() as u64);
         rewritten.extend_from_slice(first);
         for reference in references.into_iter().skip(1) {
-            append_length_delimited_field(&mut rewritten, 42, reference)?;
+            append_length_delimited_field(
+                &mut rewritten,
+                42,
+                reference,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         }
         *slide = rewritten;
         Ok(())
@@ -1586,9 +1710,19 @@ fn extra_foreign_and_malformed_reference_routes_fail_atomically() -> TestResult 
         }
         // The identifier 100 is encoded overlong inside an otherwise valid
         // Reference message (e4 00 instead of the canonical 64).
-        append_length_delimited_field(&mut rewritten, 42, &[0x08, 0xe4, 0x00])?;
+        append_length_delimited_field(
+            &mut rewritten,
+            42,
+            &[0x08, 0xe4, 0x00],
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         for reference in references.into_iter().skip(1) {
-            append_length_delimited_field(&mut rewritten, 42, reference)?;
+            append_length_delimited_field(
+                &mut rewritten,
+                42,
+                reference,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         }
         *slide = rewritten;
         Ok(())
@@ -1618,11 +1752,15 @@ fn duplicate_slide_name_is_ambiguous_and_atomic() -> TestResult {
     let before = exact_bytes(&package)?;
     assert!(matches!(
         package.slide_table_sort_order("Tables", TableSelector::index(0)),
-        Err(SlideTableSortError::AmbiguousSelector)
+        Err(SlideTableSortError::Refused(
+            litchi_keynote::slide::table::sort::transaction::Refusal::AmbiguousSelector
+        ))
     ));
     assert!(matches!(
         package.edit_slide_table_sort_order("Tables", TableSelector::index(0)),
-        Err(SlideTableSortError::AmbiguousSelector)
+        Err(SlideTableSortError::Refused(
+            litchi_keynote::slide::table::sort::transaction::Refusal::AmbiguousSelector
+        ))
     ));
     assert_eq!(exact_bytes(&package)?, before);
     Ok(())
@@ -1635,19 +1773,23 @@ fn missing_empty_and_out_of_range_selectors_are_typed_and_atomic() -> TestResult
     let before = exact_bytes(&package)?;
     assert!(matches!(
         package.slide_table_sort_order(SlideSelector::name(""), TableSelector::index(0)),
-        Err(SlideTableSortError::EmptySlideName)
+        Err(SlideTableSortError::Refused(
+            litchi_keynote::slide::table::sort::transaction::Refusal::EmptySlideName
+        ))
     ));
     assert!(matches!(
         package.slide_table_sort_order(SlideSelector::name("missing"), TableSelector::index(0)),
-        Err(SlideTableSortError::SlideNameNotFound)
+        Err(SlideTableSortError::Refused(
+            litchi_keynote::slide::table::sort::transaction::Refusal::SlideNameNotFound
+        ))
     ));
     assert!(matches!(
         package.slide_table_sort_order(SlideSelector::index(9), TableSelector::index(0)),
-        Err(SlideTableSortError::SlidePositionNotFound { position }) if position.get() == 9
+        Err(SlideTableSortError::Refused(litchi_keynote::slide::table::sort::transaction::Refusal::SlidePositionNotFound { position })) if position.get() == 9
     ));
     assert!(matches!(
         package.slide_table_sort_order(SlideSelector::index(0), TableSelector::index(9)),
-        Err(SlideTableSortError::TablePositionNotFound { position }) if position.get() == 9
+        Err(SlideTableSortError::Refused(litchi_keynote::slide::table::sort::transaction::Refusal::TablePositionNotFound { position })) if position.get() == 9
     ));
     assert_eq!(exact_bytes(&package)?, before);
     Ok(())
@@ -1760,23 +1902,21 @@ fn tight_publication_limit_rejects_changed_sort_atomically() -> TestResult {
     let target = exact_bytes(baseline.package())?;
     assert!(target.len() > source.len());
     let defaults = Limits::default();
-    let limits = Limits::new(
-        u64::try_from(target.len() - 1)?,
-        defaults.max_entries(),
-        defaults.max_entry_bytes(),
-        defaults.max_total_bytes(),
-        defaults.max_iwa_stream_bytes(),
-    )?;
-    let package = Package::from_bytes_with_options(
-        &source,
-        ReadOptions::new(limits, SemanticLimits::default()),
-    )?;
+    let limits = SourceLimits::builder()
+        .max_input_bytes(u64::try_from(target.len() - 1)?)?
+        .max_entries(defaults.max_entries())?
+        .max_entry_bytes(defaults.max_entry_bytes())?
+        .max_aggregate_bytes(defaults.max_total_bytes())?
+        .max_component_bytes(defaults.max_iwa_stream_bytes())?
+        .build()?;
+    let package =
+        Package::from_bytes_with_options(&source, OpenOptions::new().source_limits(limits))?;
     let before = exact_bytes(&package)?;
     let result = package
         .edit_slide_table_sort_order(0usize, 0usize)
         .and_then(|edit| edit.set(order).commit());
     assert!(
-        matches!(result, Err(SlideTableSortError::LimitExceeded { .. })),
+        matches!(result, Err(SlideTableSortError::Limit { .. })),
         "unexpected tight-publication result: {result:?}"
     );
     assert_eq!(exact_bytes(&package)?, before);

@@ -3,17 +3,14 @@ use super::super::support::*;
 #[test]
 fn rejects_invalid_writer_revision_metadata() {
     let error_for = |formatting: CharacterFormatting| {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         writer
             .add_paragraph_runs(
                 vec![("text".to_string(), formatting)],
                 ParagraphFormatting::default(),
             )
             .unwrap();
-        writer
-            .write_to(&mut Cursor::new(Vec::new()))
-            .unwrap_err()
-            .to_string()
+        writer.build().unwrap_err().to_string()
     };
     let both = CharacterFormatting {
         insertion_revision: Some(TextRevision::new("Alice")),
@@ -71,7 +68,7 @@ fn rejects_invalid_writer_revision_metadata() {
     };
     assert!(error_for(invalid_time).contains("timestamp"));
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.set_section_formatting_revision(FormattingRevision::new("Editor").with_timestamp(
         DateTime {
             year: 2026,
@@ -85,13 +82,13 @@ fn rejects_invalid_writer_revision_metadata() {
     writer.add_paragraph("text").unwrap();
     assert!(
         writer
-            .write_to(&mut Cursor::new(Vec::new()))
+            .build()
             .unwrap_err()
             .to_string()
             .contains("timestamp")
     );
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer
         .add_paragraph_runs(
             vec![("text".to_string(), CharacterFormatting::default())],
@@ -101,13 +98,7 @@ fn rejects_invalid_writer_revision_metadata() {
             },
         )
         .unwrap();
-    assert!(
-        writer
-            .write_to(&mut Cursor::new(Vec::new()))
-            .unwrap_err()
-            .to_string()
-            .contains("NumRM")
-    );
+    assert!(writer.build().unwrap_err().to_string().contains("NumRM"));
 
     let invalid_display = CharacterFormatting {
         display_field_revision: Some(DisplayFieldRevision::new("Alice", "x".repeat(16))),

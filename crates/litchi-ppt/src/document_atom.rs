@@ -223,7 +223,7 @@ impl DocumentAtom {
     /// Returns an error if the operation fails.
     pub fn to_record(&self) -> Result<Record> {
         let bytes = self.to_record_bytes()?;
-        let (record, end) = Record::parse(&bytes, 0)?;
+        let (record, end) = Record::parse(&bytes, 0, &crate::SourceLimits::default())?;
         if end != bytes.len() {
             return corrupted("canonical DocumentAtom did not consume its bytes");
         }
@@ -371,17 +371,24 @@ mod tests {
     fn rejects_malformed_records() {
         let mut bad_flag = sample_atom().to_record_bytes().unwrap();
         bad_flag[8 + 36] = 2; // fSaveWithFonts is not a bool1
-        let bad_flag_record = Record::parse(&bad_flag, 0).unwrap().0;
+        let bad_flag_record = Record::parse(&bad_flag, 0, &crate::SourceLimits::default())
+            .unwrap()
+            .0;
         assert!(DocumentAtom::parse(&bad_flag_record).is_err());
 
         let mut bad_size_type = sample_atom().to_record_bytes().unwrap();
         bad_size_type[8 + 34] = 7; // not a SlideSizeEnum value
-        let bad_size_type_record = Record::parse(&bad_size_type, 0).unwrap().0;
+        let bad_size_type_record =
+            Record::parse(&bad_size_type, 0, &crate::SourceLimits::default())
+                .unwrap()
+                .0;
         assert!(DocumentAtom::parse(&bad_size_type_record).is_err());
 
         let mut bad_version = sample_atom().to_record_bytes().unwrap();
         bad_version[0] = 0;
-        let bad_version_record = Record::parse(&bad_version, 0).unwrap().0;
+        let bad_version_record = Record::parse(&bad_version, 0, &crate::SourceLimits::default())
+            .unwrap()
+            .0;
         assert!(DocumentAtom::parse(&bad_version_record).is_err());
     }
 
@@ -389,7 +396,7 @@ mod tests {
     fn presentation_exposes_real_document_atom() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../test-data/ole/ppt/SampleShow.ppt");
-        let mut package = crate::Package::open(path).unwrap();
+        let mut package = crate::raw::Reader::open(path).unwrap();
         let presentation = package.presentation().unwrap();
         let atom = presentation.document_atom().unwrap().unwrap();
 

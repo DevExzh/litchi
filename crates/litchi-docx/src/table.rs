@@ -14,14 +14,14 @@ use crate::error::{Error, Result};
 /// Table, Row, and Cell structures for Word documents.
 use crate::namespace::{
     NamespaceBindings, direct_word_property_value, normalize_xml_integer, scan_word_element_ranges,
-    scan_word_element_ranges_with_context,
+    scan_word_element_ranges_with_context, scan_word_element_ranges_with_context_until,
 };
-use crate::paragraph::{Paragraph, extract_word_text};
+use crate::paragraph::{Paragraph, extract_word_text, is_fragment_word_name};
 use crate::revision::Revision;
 use litchi_core::XmlSlice;
-use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
-use quick_xml::Reader;
 use quick_xml::events::Event;
+use quick_xml::name::ResolveResult;
+use quick_xml::reader::NsReader;
 use smallvec::SmallVec;
 use std::sync::{Arc, LazyLock, OnceLock};
 
@@ -90,61 +90,118 @@ fn absolute_start(base_offset: u32, relative_start: u32) -> Result<u32> {
         .ok_or_else(|| Error::InvalidFormat("Word table element offset exceeds u32".to_string()))
 }
 
+/// The first WordprocessingML `property_name` that is a direct child of the
+/// cell's own `w:tcPr` (a direct child of the fragment's root), with its
+/// `val` attribute: `None` when the cell does not state the property, and
+/// `Some(None)` when it states it without a value.
+///
+/// Only the cell's own properties are read: the `w:tcPr` of a cell in a
+/// table nested inside this cell, and properties below a direct child of
+/// `w:tcPr` (such as a `w:tcPrChange` snapshot), are skipped by depth
+/// (finding F-7 of record 0010). Names are resolved as the shared element
+/// scanner resolves them, and the scan keeps that scanner's depth and
+/// element limits and reads to the end of the fragment, so malformed XML is
+/// refused as before.
 fn word_cell_property_value(
     xml_bytes: &[u8],
     property_name: &[u8],
+    inherited: &[(Option<Vec<u8>>, Vec<u8>)],
 ) -> Result<Option<Option<String>>> {
+    const MAX_DEPTH: usize = 128;
+    const MAX_ELEMENTS: usize = 1_000_000;
+
+    let mut reader = NsReader::from_reader(xml_bytes);
+    for (prefix, namespace) in inherited {
+        let prefix = prefix.as_deref().map_or(
+            quick_xml::name::PrefixDeclaration::Default,
+            quick_xml::name::PrefixDeclaration::Named,
+        );
+        reader
+            .resolver_mut()
+            .add(prefix, quick_xml::name::Namespace(namespace))
+            .map_err(|_| Error::Xml("invalid inherited cell namespace".into()))?;
+    }
+    let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
+    let mut depth = 0usize;
+    let mut elements = 0usize;
+    let mut properties_open = false;
     let mut result = None;
-    scan_word_element_ranges(xml_bytes, &[b"tcPr".as_slice()], |_, start, length| {
-        let start = start as usize;
-        let end = start
-            .checked_add(length as usize)
-            .ok_or_else(|| Error::InvalidFormat("Word cell property range overflow".to_string()))?;
-        scan_word_element_ranges(
-            &xml_bytes[start..end],
-            &[property_name],
-            |_, property_start, property_length| {
-                if result.is_some() {
-                    return Ok(());
+    loop {
+        let event = reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        let (element, empty) = match event {
+            Event::Start(element) => (element, false),
+            Event::Empty(element) => (element, true),
+            Event::End(_) => {
+                if depth == 2 {
+                    properties_open = false;
                 }
-                let property_start = property_start as usize;
-                let property_end = property_start
-                    .checked_add(property_length as usize)
-                    .ok_or_else(|| {
-                        Error::InvalidFormat("Word property range overflow".to_string())
-                    })?;
-                let property_xml = &xml_bytes[start..end][property_start..property_end];
-                let mut reader = Reader::from_reader(property_xml);
-                let element = loop {
-                    match reader.read_event() {
-                        Ok(Event::Start(element) | Event::Empty(element)) => break element,
-                        Ok(Event::Eof) => {
-                            return Err(Error::InvalidFormat(
-                                "missing Word cell property".to_string(),
-                            ));
-                        },
-                        Err(error) => return Err(Error::Xml(error.to_string())),
-                        _ => {},
-                    }
-                };
-                let mut value = None;
-                for attribute in element.checked_attributes() {
-                    let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
-                    if attribute.key.local_name().as_ref() == b"val" {
-                        let raw = std::str::from_utf8(attribute.value.as_ref())
-                            .map_err(|error| Error::Xml(error.to_string()))?;
-                        value = Some(
-                            quick_xml::escape::unescape(raw)
-                                .map_err(|error| Error::Xml(error.to_string()))?
-                                .into_owned(),
-                        );
-                    }
-                }
-                result = Some(value);
-                Ok(())
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| Error::InvalidFormat("invalid Word XML nesting".to_string()))?;
+                continue;
             },
-        )
-    })?;
+            Event::Eof => break,
+            _ => continue,
+        };
+        elements += 1;
+        if elements > MAX_ELEMENTS {
+            return Err(Error::InvalidFormat(format!(
+                "Word XML exceeds {MAX_ELEMENTS} elements"
+            )));
+        }
+        let level = depth + 1;
+        if !empty {
+            if level > MAX_DEPTH {
+                return Err(Error::InvalidFormat(format!(
+                    "Word XML nesting exceeds the {MAX_DEPTH} depth limit"
+                )));
+            }
+            depth = level;
+        }
+        match level {
+            1 if fragment_prefix.is_none() => {
+                let (namespace, _) = reader.resolver().resolve_element(element.name());
+                if !matches!(namespace, ResolveResult::Bound(_)) {
+                    fragment_prefix = Some(
+                        element
+                            .name()
+                            .prefix()
+                            .map(|prefix| prefix.into_inner().to_vec()),
+                    );
+                }
+            },
+            2 if !empty && element.local_name().as_ref() == b"tcPr" => {
+                let (namespace, _) = reader.resolver().resolve_element(element.name());
+                properties_open =
+                    is_fragment_word_name(&namespace, element.name(), b"tcPr", &fragment_prefix);
+            },
+            3 if properties_open
+                && result.is_none()
+                && element.local_name().as_ref() == property_name =>
+            {
+                let (namespace, _) = reader.resolver().resolve_element(element.name());
+                if !is_fragment_word_name(
+                    &namespace,
+                    element.name(),
+                    property_name,
+                    &fragment_prefix,
+                ) {
+                    continue;
+                }
+                crate::properties::audit_attributes(&element, reader.resolver(), reader.decoder())?;
+                let value = crate::namespace::word_attribute_value(
+                    &element,
+                    b"val",
+                    reader.decoder(),
+                    reader.resolver(),
+                )?;
+                result = Some(value);
+            },
+            _ => {},
+        }
+    }
     Ok(result)
 }
 
@@ -220,7 +277,10 @@ impl Table {
     ///
     /// # Errors
     /// Returns an error for malformed revision XML or an exceeded resource limit.
-    pub fn revisions_with_limits(&self, limits: crate::revision::Limits) -> Result<Vec<Revision>> {
+    pub(crate) fn revisions_bounded(
+        &self,
+        limits: crate::revision::Limits,
+    ) -> Result<Vec<Revision>> {
         let revisions = crate::revision::parse_revisions_with_limits(
             self.xml_bytes(),
             self.xml_data.namespace_bindings(),
@@ -338,6 +398,44 @@ impl Table {
         Ok(rows)
     }
 
+    /// The row at `index` (zero-based), or `None` past the last row.
+    ///
+    /// Unlike [`Self::rows`], it reads the table only up to that row when the
+    /// rows are not cached yet, so addressing an early row of a long table
+    /// does not split the whole table.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
+    pub fn row(&self, index: usize) -> Result<Option<Row>> {
+        if let Some(rows) = self.cached_rows.get() {
+            return Ok(rows.get(index).cloned());
+        }
+        let (source, base_offset) = self.xml_data.get_or_create_arc();
+        let mut seen = 0_usize;
+        let mut found = None;
+        scan_word_element_ranges_with_context_until(
+            self.xml_bytes(),
+            self.xml_data.namespace_bindings(),
+            &[b"tr".as_slice()],
+            |_| {
+                let skip = seen < index;
+                seen += 1;
+                skip
+            },
+            |_, start, length, namespaces| {
+                found = Some(Row::from_arc_range(
+                    Arc::clone(&source),
+                    absolute_start(base_offset, start)?,
+                    length,
+                    namespaces,
+                ));
+                Ok(std::ops::ControlFlow::Break(()))
+            },
+        )?;
+        Ok(found)
+    }
+
     /// Get a specific cell by row and column index.
     ///
     /// Returns `None` if the indices are out of bounds.
@@ -346,13 +444,24 @@ impl Table {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn cell(&self, row_idx: usize, col_idx: usize) -> Result<Option<Cell>> {
-        let rows = self.rows()?;
-        if let Some(row) = rows.get(row_idx) {
-            let cells = row.cells()?;
-            Ok(cells.get(col_idx).cloned())
-        } else {
-            Ok(None)
+        match self.row(row_idx)? {
+            Some(row) => row.cell(col_idx),
+            None => Ok(None),
         }
+    }
+
+    /// Read this table's direct (local) properties, the children of its own
+    /// `w:tblPr` and `w:tblGrid`, as typed values.
+    ///
+    /// Tables nested in its cells are never read; see the
+    /// [`crate::properties`] module for the rules.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for XML that is not well-formed, a root that is not
+    /// a WordprocessingML `w:tbl`, or a second `w:tblPr` or `w:tblGrid`.
+    pub fn properties(&self) -> Result<crate::properties::Table> {
+        crate::properties::parse_table(self.xml_bytes(), self.xml_data.namespace_bindings())
     }
 }
 
@@ -400,7 +509,10 @@ impl Row {
     ///
     /// # Errors
     /// Returns an error for malformed revision XML or an exceeded resource limit.
-    pub fn revisions_with_limits(&self, limits: crate::revision::Limits) -> Result<Vec<Revision>> {
+    pub(crate) fn revisions_bounded(
+        &self,
+        limits: crate::revision::Limits,
+    ) -> Result<Vec<Revision>> {
         let revisions = crate::revision::parse_revisions_with_limits(
             self.xml_bytes(),
             self.xml_data.namespace_bindings(),
@@ -457,6 +569,20 @@ impl Row {
             .transpose()
     }
 
+    /// Read this row's direct (local) properties, the children of its own
+    /// `w:trPr`, as typed values.
+    ///
+    /// Rows of tables nested in its cells are never read; see the
+    /// [`crate::properties`] module for the rules.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for XML that is not well-formed, a root that is not
+    /// a WordprocessingML `w:tr`, or a second `w:trPr`.
+    pub fn properties(&self) -> Result<crate::properties::Row> {
+        crate::properties::parse_row(self.xml_bytes(), self.xml_data.namespace_bindings())
+    }
+
     /// Get the number of cells in this row.
     ///
     /// # Errors
@@ -489,6 +615,41 @@ impl Row {
         // Slow path: parse and cache
         let cells = self.parse_cells()?;
         Ok(self.cached_cells.get_or_init(|| cells).clone())
+    }
+
+    /// The cell at `index` (zero-based), or `None` past the last cell. Reads
+    /// the row only up to that cell when the cells are not cached yet.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
+    pub fn cell(&self, index: usize) -> Result<Option<Cell>> {
+        if let Some(cells) = self.cached_cells.get() {
+            return Ok(cells.get(index).cloned());
+        }
+        let (source, base_offset) = self.xml_data.get_or_create_arc();
+        let mut seen = 0_usize;
+        let mut found = None;
+        scan_word_element_ranges_with_context_until(
+            self.xml_bytes(),
+            self.xml_data.namespace_bindings(),
+            &[b"tc".as_slice()],
+            |_| {
+                let skip = seen < index;
+                seen += 1;
+                skip
+            },
+            |_, start, length, namespaces| {
+                found = Some(Cell::from_arc_range_with_context(
+                    Arc::clone(&source),
+                    absolute_start(base_offset, start)?,
+                    length,
+                    namespaces,
+                ));
+                Ok(std::ops::ControlFlow::Break(()))
+            },
+        )?;
+        Ok(found)
     }
 
     /// Parse cells from XML (internal method).
@@ -557,7 +718,10 @@ impl Cell {
     ///
     /// # Errors
     /// Returns an error for malformed revision XML or an exceeded resource limit.
-    pub fn revisions_with_limits(&self, limits: crate::revision::Limits) -> Result<Vec<Revision>> {
+    pub(crate) fn revisions_bounded(
+        &self,
+        limits: crate::revision::Limits,
+    ) -> Result<Vec<Revision>> {
         let revisions = crate::revision::parse_revisions_with_limits(
             self.xml_bytes(),
             self.xml_data.namespace_bindings(),
@@ -597,10 +761,25 @@ impl Cell {
         self.xml_data.as_bytes()
     }
 
+    /// Read this cell's direct (local) properties, the children of its own
+    /// `w:tcPr`, as typed values.
+    ///
+    /// The properties of cells in tables nested inside this cell are never
+    /// read; see the [`crate::properties`] module for the rules.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for XML that is not well-formed, a root that is not
+    /// a WordprocessingML `w:tc`, or a second `w:tcPr`.
+    pub fn properties(&self) -> Result<crate::properties::Cell> {
+        crate::properties::parse_cell(self.xml_bytes(), self.xml_data.namespace_bindings())
+    }
+
     /// Get the grid span (horizontal merge/colspan) of this cell.
     ///
     /// Returns the number of columns this cell spans. A value of 1 (default) means no merge.
-    /// This corresponds to the `<w:gridSpan>` element in OOXML.
+    /// This corresponds to the `<w:gridSpan>` element in OOXML. Only the
+    /// cell's own `w:tcPr` is read, never that of a cell in a nested table.
     ///
     /// # Example
     ///
@@ -617,14 +796,19 @@ impl Cell {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn grid_span(&self) -> Result<usize> {
-        let Some(value) = word_cell_property_value(self.xml_bytes(), b"gridSpan")? else {
+        let Some(value) = word_cell_property_value(
+            self.xml_bytes(),
+            b"gridSpan",
+            self.xml_data.namespace_bindings(),
+        )?
+        else {
             return Ok(1);
         };
         let Some(value) = value else {
             return Ok(1);
         };
         let span = value.parse::<usize>().map_err(|_source_error| {
-            Error::InvalidFormat(format!("invalid Word gridSpan value: {value}"))
+            Error::InvalidFormat("invalid Word gridSpan value".to_string())
         })?;
         if span == 0 {
             return Err(Error::InvalidFormat(
@@ -639,7 +823,8 @@ impl Cell {
     /// Returns `Some(VMergeState)` if this cell participates in vertical merging,
     /// or `None` if no vertical merge is present.
     ///
-    /// This corresponds to the `<w:vMerge>` element in OOXML.
+    /// This corresponds to the `<w:vMerge>` element in OOXML. Only the cell's
+    /// own `w:tcPr` is read, never that of a cell in a nested table.
     ///
     /// # Example
     ///
@@ -665,15 +850,20 @@ impl Cell {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn v_merge(&self) -> Result<Option<VMergeState>> {
-        let Some(value) = word_cell_property_value(self.xml_bytes(), b"vMerge")? else {
+        let Some(value) = word_cell_property_value(
+            self.xml_bytes(),
+            b"vMerge",
+            self.xml_data.namespace_bindings(),
+        )?
+        else {
             return Ok(None);
         };
         match value.as_deref() {
             None | Some("continue") => Ok(Some(VMergeState::Continue)),
             Some("restart") => Ok(Some(VMergeState::Restart)),
-            Some(value) => Err(Error::InvalidFormat(format!(
-                "invalid Word vMerge value: {value}"
-            ))),
+            Some(_) => Err(Error::InvalidFormat(
+                "invalid Word vMerge value".to_string(),
+            )),
         }
     }
 
@@ -704,6 +894,37 @@ impl Cell {
     /// Uses proper XML event parsing to correctly extract text nodes.
     fn extract_text(&self) -> Result<String> {
         extract_word_text(self.xml_bytes())
+    }
+
+    /// The cell's direct block children — paragraphs, nested tables, content
+    /// controls and other children, `w:customXml` wrappers flattened and the
+    /// cell's `w:tcPr` excluded — indexed with the scanner the document body
+    /// uses (see [`crate::Blocks`]).
+    ///
+    /// Unlike [`Self::paragraphs`], the paragraphs of a nested table are not
+    /// the cell's own: `blocks().paragraph(i)` is the cell's `i`-th direct
+    /// paragraph, `tc[K]/p[i + 1]`. A cell does not carry its document's
+    /// markup-compatibility verdict, so
+    /// [`IndexedBlock::transaction_position`](crate::IndexedBlock::transaction_position)
+    /// refuses on these blocks; check the body index of the same document and
+    /// use [`IndexedBlock::direct_position`](crate::IndexedBlock::direct_position).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the cell's XML is malformed or a bound on the
+    /// index is reached.
+    pub fn blocks(&self) -> Result<crate::Blocks> {
+        let (source, start) = self.xml_data.get_or_create_arc();
+        let length = u32::try_from(self.xml_bytes().len())
+            .map_err(|_source_error| Error::InvalidFormat("Word cell exceeds u32".to_string()))?;
+        crate::Blocks::index(
+            source,
+            start,
+            length,
+            self.xml_data.namespace_bindings(),
+            crate::document::ContainerRoot::CELL,
+            crate::parts::memo::RawPositions::Unproven,
+        )
     }
 
     /// Get all paragraphs in this cell.
@@ -782,6 +1003,49 @@ mod tests {
         assert_eq!(paragraphs.len(), 1);
         assert_eq!(paragraphs[0].text().unwrap(), "A < B");
         assert_eq!(paragraphs[0].runs().unwrap()[0].text().unwrap(), "A < B");
+    }
+
+    #[test]
+    fn positional_row_and_cell_match_the_complete_lists() {
+        // Rows inside a content control and a custom-XML wrapper count; rows
+        // of a nested table and foreign look-alikes do not; a self-closing
+        // row counts. Skipped rows may redeclare prefixes.
+        let xml = br#"<w:tbl xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:x="urn:not-wordprocessingml">
+            <w:tr><w:tc><w:p><w:r><w:t>r0c0</w:t></w:r></w:p></w:tc><w:tc><w:tbl><w:tr><w:tc><w:p/></w:tc></w:tr></w:tbl><w:p/></w:tc></w:tr>
+            <x:tr/>
+            <w:sdt><w:sdtContent><w:tr xmlns:q="urn:q"><w:tc><w:p><w:r><w:t>r1c0</w:t></w:r></w:p></w:tc></w:tr></w:sdtContent></w:sdt>
+            <w:customXml><w:tr/></w:customXml>
+            <w:tr><w:tc><w:p><w:r><w:t>r3c0</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>r3c1</w:t></w:r></w:p></w:tc></w:tr>
+        </w:tbl>"#;
+        let rows = Table::new(xml.to_vec()).rows().unwrap();
+        assert_eq!(rows.len(), 4);
+        for index in 0..=rows.len() {
+            // A fresh table each time: nothing cached.
+            let row = Table::new(xml.to_vec()).row(index).unwrap();
+            assert_eq!(
+                row.as_ref().map(|row| row.xml_bytes().to_vec()),
+                rows.get(index).map(|row| row.xml_bytes().to_vec()),
+                "row {index}"
+            );
+            let Some(row) = row else { continue };
+            let cells = rows[index].cells().unwrap();
+            for column in 0..=cells.len() {
+                let cell = row.cell(column).unwrap();
+                assert_eq!(
+                    cell.as_ref().map(|cell| cell.text().unwrap()),
+                    cells.get(column).map(|cell| cell.text().unwrap()),
+                    "row {index} cell {column}"
+                );
+            }
+        }
+        // Cached lists answer too.
+        let table = Table::new(xml.to_vec());
+        table.rows().unwrap();
+        assert_eq!(
+            table.cell(3, 1).unwrap().map(|cell| cell.text().unwrap()),
+            Some("r3c1".to_owned())
+        );
+        assert!(table.cell(4, 0).unwrap().is_none());
     }
 
     #[test]

@@ -1,5 +1,6 @@
 //! Borrowed, bounded XML token validation for the DOCX Ink story scanner.
 
+use crate::ink::LimitKind;
 use std::str;
 
 use litchi_ooxml_common::xml_name::is_qualified_name;
@@ -22,7 +23,7 @@ const MAX_TEXT_BYTES: usize = 1024 * 1024;
 /// Validate borrowed XML text or CDATA content.
 pub(super) fn text(bytes: &[u8]) -> Result<&str> {
     if bytes.len() > MAX_TEXT_BYTES {
-        return Err(limit("XML text", bytes.len(), MAX_TEXT_BYTES));
+        return Err(limit(LimitKind::XmlText, bytes.len(), MAX_TEXT_BYTES));
     }
     let value = str::from_utf8(bytes).map_err(|error| xml_error("XML text", error))?;
     validate_xml_characters(value, "XML text")?;
@@ -32,7 +33,11 @@ pub(super) fn text(bytes: &[u8]) -> Result<&str> {
 /// Validate one borrowed general reference name from a quick-xml event.
 pub(super) fn reference(bytes: &[u8]) -> Result<()> {
     if bytes.len() > MAX_REFERENCE_BYTES {
-        return Err(limit("XML reference", bytes.len(), MAX_REFERENCE_BYTES));
+        return Err(limit(
+            LimitKind::XmlReference,
+            bytes.len(),
+            MAX_REFERENCE_BYTES,
+        ));
     }
     let value = str::from_utf8(bytes).map_err(|error| xml_error("XML reference", error))?;
     match value {
@@ -62,7 +67,11 @@ pub(super) fn reference(bytes: &[u8]) -> Result<()> {
 pub(super) fn declaration(declaration: &BytesDecl<'_>) -> Result<()> {
     let raw = declaration.as_ref();
     if raw.len() > MAX_DECLARATION_BYTES {
-        return Err(limit("XML declaration", raw.len(), MAX_DECLARATION_BYTES));
+        return Err(limit(
+            LimitKind::XmlDeclaration,
+            raw.len(),
+            MAX_DECLARATION_BYTES,
+        ));
     }
     str::from_utf8(raw).map_err(|error| xml_error("XML declaration", error))?;
 
@@ -106,7 +115,7 @@ pub(super) fn declaration(declaration: &BytesDecl<'_>) -> Result<()> {
 
 /// Validate one borrowed XML start tag and its in-scope namespace bindings.
 pub(super) fn element(element: &BytesStart<'_>, resolver: &NamespaceResolver) -> Result<()> {
-    validate_qname(element.name().as_ref(), "XML element QName")?;
+    validate_qname(element.name().as_ref(), LimitKind::XmlElementQName)?;
     if matches!(
         resolver.resolve_element(element.name()).0,
         ResolveResult::Unknown(_)
@@ -120,14 +129,14 @@ pub(super) fn element(element: &BytesStart<'_>, resolver: &NamespaceResolver) ->
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         count = count
             .checked_add(1)
-            .ok_or_else(|| limit("XML attributes", usize::MAX, MAX_ATTRIBUTES))?;
+            .ok_or_else(|| limit(LimitKind::XmlAttributes, usize::MAX, MAX_ATTRIBUTES))?;
         if count > MAX_ATTRIBUTES {
-            return Err(limit("XML attributes", count, MAX_ATTRIBUTES));
+            return Err(limit(LimitKind::XmlAttributes, count, MAX_ATTRIBUTES));
         }
-        validate_qname(attribute.key.as_ref(), "XML attribute QName")?;
+        validate_qname(attribute.key.as_ref(), LimitKind::XmlAttributeQName)?;
         if attribute.value.len() > MAX_ATTRIBUTE_BYTES {
             return Err(limit(
-                "XML attribute",
+                LimitKind::XmlAttribute,
                 attribute.value.len(),
                 MAX_ATTRIBUTE_BYTES,
             ));
@@ -136,7 +145,11 @@ pub(super) fn element(element: &BytesStart<'_>, resolver: &NamespaceResolver) ->
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, element.decoder())
             .map_err(|error| Error::Xml(error.to_string()))?;
         if value.len() > MAX_ATTRIBUTE_BYTES {
-            return Err(limit("XML attribute", value.len(), MAX_ATTRIBUTE_BYTES));
+            return Err(limit(
+                LimitKind::XmlAttribute,
+                value.len(),
+                MAX_ATTRIBUTE_BYTES,
+            ));
         }
         validate_xml_characters(&value, "XML attribute")?;
 
@@ -187,11 +200,11 @@ fn same_expanded_name(
     left.local == right.local && left.namespace == right.namespace
 }
 
-fn validate_qname(name: &[u8], resource: &'static str) -> Result<()> {
+fn validate_qname(name: &[u8], resource: LimitKind) -> Result<()> {
     if name.is_empty() || name.len() > MAX_QNAME_BYTES {
         return Err(limit(resource, name.len(), MAX_QNAME_BYTES));
     }
-    let value = str::from_utf8(name).map_err(|error| xml_error(resource, error))?;
+    let value = str::from_utf8(name).map_err(|error| xml_error(resource.as_str(), error))?;
     if is_qualified_name(value) {
         Ok(())
     } else {
@@ -314,9 +327,9 @@ fn invalid_with_resource(resource: &'static str, message: &'static str) -> Error
     Error::Invalid(format!("{resource} {message}"))
 }
 
-fn limit(resource: &'static str, actual: usize, maximum: usize) -> Error {
+fn limit(resource: LimitKind, actual: usize, maximum: usize) -> Error {
     Error::InkLimit {
-        resource,
+        kind: resource,
         actual,
         maximum,
     }

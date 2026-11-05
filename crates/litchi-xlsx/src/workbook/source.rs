@@ -4,6 +4,10 @@
 //! snapshot owns a mutable OPC graph, while this type must keep ordinary part
 //! payloads deferred. It exposes only semantic catalog and worksheet reads.
 //!
+//! Parsed worksheet values (a sheet's grid and the XML outside its
+//! `sheetData`) are built once per worksheet and kept in a bounded, weighted
+//! clean-value cache; see [`SourceBackedWorkbook::semantic_cache_diagnostics`].
+//!
 //! Managed [`ExecutionContext`] opens are supported for this read-only
 //! facade. Focused source-backed editors retain managed
 //! [`litchi_opc::PartData`] handles in their immutable snapshots and expose
@@ -11,11 +15,15 @@
 //! separate, explicitly fallible boundary when it would require detaching an
 //! allocation from that reservation.
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::io::Read;
+use std::mem::size_of;
+use std::ops::ControlFlow;
 #[cfg(any(unix, windows))]
 use std::path::Path;
-use std::sync::{Arc, OnceLock};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock, PoisonError};
 
 #[cfg(any(unix, windows))]
 use litchi_core::FileSource;
@@ -25,17 +33,33 @@ use litchi_core::{
 use litchi_ooxml_common::mce::{Capabilities, Error as MceError, StreamError, StreamLimits};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    PackURI, PartData, PartView, ReadLimits, SourceBackedPackage, SourceCacheDiagnostics,
-    SourceCacheLimits, VerifiedDecodedReaderError,
+    PackURI, PartData, PartView, SourceBackedPackage, SourceCacheDiagnostics, SourceCacheLimits,
+    SourceLimits, SourceReadPolicy, VerifiedDecodedReaderError,
 };
 use litchi_sheet::{Area, At, Cell as Address, Rect};
 
 use super::{DateSystem, Flavor, Selector, Visibility, WorksheetKind, codec};
 use crate::cell::{Cell, Store, Text, Value, View};
 use crate::error::{Error, Result, allocation, invalid};
-use crate::leniency::{Leniency, ToleranceReport};
+use crate::leniency::ToleranceReport;
 use crate::raw;
 use crate::raw::selected_worksheet::SelectedPayload;
+
+mod styles;
+mod tables;
+
+mod blocks;
+mod cursor;
+pub(crate) mod deferred;
+mod grid;
+#[cfg(test)]
+mod m1_tests;
+mod values;
+
+pub use cursor::CellCursor;
+pub use grid::Grid;
+pub use styles::Record;
+pub use values::CacheDiagnostics;
 
 const CHARTSHEET_REL: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet";
@@ -64,19 +88,302 @@ fn check_execution(context: Option<&ExecutionContext>) -> Result<()> {
     })
 }
 
-struct SourceSheetData {
+pub(crate) struct SourceSheetData {
     position: usize,
-    name: String,
-    name_key: Box<str>,
-    kind: WorksheetKind,
-    visibility: Visibility,
-    part_uri: PackURI,
-    cells: OnceLock<Store>,
+    /// The sheet name, its canonical case-insensitive key and the workbook
+    /// relationship ID, in one allocation; `name_len` and `name_key_len`
+    /// split them.
+    keys: Box<str>,
+    pub(crate) kind: WorksheetKind,
+    pub(crate) visibility: Visibility,
+    pub(crate) part_uri: PackURI,
+    /// The validated workbook catalog coordinates retained for the tab-state
+    /// source closure. Keeping these values avoids reparsing the same
+    /// workbook XML when an already admitted read-only owner starts an edit.
+    pub(crate) sheet_id: u32,
+    name_key_len: u16,
+    /// Sheet names are at most 31 characters, so at most 124 UTF-8 bytes.
+    name_len: u8,
+    /// Repairs made by the first successful parse of this worksheet's grid.
+    ///
+    /// The parsed grid itself lives in the workbook's evictable semantic
+    /// cache; its repair report is kept here so the workbook's report stays
+    /// independent of what the cache currently retains. A report holds at
+    /// most a bounded number of entries.
+    tolerance: OnceLock<ToleranceReport>,
+    /// Serializes the builds of this worksheet's parsed values, so readers
+    /// racing for the same cold value share one build instead of parsing the
+    /// part once each. Reads of other worksheets are never blocked.
+    build: Mutex<()>,
 }
 
-struct SourceInner {
+impl SourceSheetData {
+    /// Build the combined name, name-key and relationship-ID storage.
+    fn keys(name: &str, relationship_id: &str) -> Result<(Box<str>, u8, u16)> {
+        let bound = || Error::Invalid("worksheet name exceeds its storage bound".into());
+        let name_len = u8::try_from(name.len()).map_err(|_overflow| bound())?;
+        let mut keys = if name.is_ascii() {
+            let mut keys = String::with_capacity(2 * name.len() + relationship_id.len());
+            keys.push_str(name);
+            keys.extend(name.chars().map(|character| character.to_ascii_lowercase()));
+            keys
+        } else {
+            let key = crate::sheet::key(name);
+            let mut keys = String::with_capacity(name.len() + key.len() + relationship_id.len());
+            keys.push_str(name);
+            keys.push_str(&key);
+            keys
+        };
+        let name_key_len = u16::try_from(keys.len() - name.len()).map_err(|_overflow| bound())?;
+        keys.push_str(relationship_id);
+        Ok((keys.into_boxed_str(), name_len, name_key_len))
+    }
+
+    /// The sheet name.
+    pub(crate) fn name(&self) -> &str {
+        &self.keys[..usize::from(self.name_len)]
+    }
+
+    /// The canonical case-insensitive key of the sheet name.
+    pub(crate) fn name_key(&self) -> &str {
+        let start = usize::from(self.name_len);
+        &self.keys[start..start + usize::from(self.name_key_len)]
+    }
+
+    /// The workbook relationship ID of this sheet.
+    pub(crate) fn relationship_id(&self) -> &str {
+        &self.keys[usize::from(self.name_len) + usize::from(self.name_key_len)..]
+    }
+
+    fn lock_build(&self) -> MutexGuard<'_, ()> {
+        // The guarded value is empty, so a poisoned lock carries no state.
+        self.build.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct SourceCatalogProof {
+    pub(crate) defined_names: Arc<[raw::DefinedName]>,
+    pub(crate) limits: Arc<SourceLimits>,
+}
+
+/// The source and the resolved state of a source-backed edit.
+///
+/// Source-backed edit entry points must not turn a cheap immutable owner into
+/// a selected-part snapshot merely because a caller is about to stage an edit.
+/// This context therefore retains only the owner until the first operation
+/// that needs the selected source.  `OnceLock` also makes repeated accessors
+/// share the one authenticated snapshot without retaining a decoded payload
+/// in every discarded edit.
+pub(crate) struct LazySource<S> {
+    workbook: SourceBackedWorkbook,
+    resolved: OnceLock<S>,
+}
+
+impl<S> LazySource<S> {
+    pub(crate) fn new(workbook: SourceBackedWorkbook) -> Self {
+        Self {
+            workbook,
+            resolved: OnceLock::new(),
+        }
+    }
+
+    pub(crate) fn workbook(&self) -> &SourceBackedWorkbook {
+        &self.workbook
+    }
+
+    pub(crate) fn resolve(
+        &self,
+        load: impl FnOnce(&SourceBackedPackage) -> Result<S>,
+    ) -> Result<&S> {
+        if let Some(resolved) = self.resolved.get() {
+            return Ok(resolved);
+        }
+        let package = self.workbook.edit_package()?;
+        let resolved = load(package)?;
+        // A concurrently resolving clone may win the one-time publication.
+        // Its snapshot is equivalent under the same immutable source policy;
+        // discard this duplicate and borrow the winner without panicking.
+        let _ = self.resolved.set(resolved);
+        self.resolved
+            .get()
+            .ok_or_else(|| invalid("lazy source snapshot was not retained"))
+    }
+}
+
+/// Make a selector owned so a deferred edit can outlive the caller's input.
+///
+/// XLSX currently has no stable-identity selector variant (`Id` is
+/// `Infallible`), but matching it explicitly keeps this helper correct if the
+/// alias gains one in a future API revision.
+pub(crate) fn own_selector(selector: Selector<'_>) -> Result<Selector<'static>> {
+    match selector {
+        CoreSelector::Name(name) => Ok(CoreSelector::Name(Cow::Owned(name.into_owned()))),
+        CoreSelector::Position(position) => Ok(CoreSelector::Position(position)),
+        CoreSelector::Id(never) => match never {},
+        _ => Err(Error::UnsupportedSelector),
+    }
+}
+
+/// Caches used only by shared-string and conditional-format readers.
+///
+/// Keeping these less common caches separate means the ordinary cell/style
+/// path does not retain their state in its first lazy allocation.
+struct DependencyState {
+    shared_strings: OnceLock<Box<[Text]>>,
+    shared_strings_tolerance: OnceLock<ToleranceReport>,
+    differential_format_count: OnceLock<usize>,
+}
+
+impl DependencyState {
+    fn new() -> Self {
+        Self {
+            shared_strings: OnceLock::new(),
+            shared_strings_tolerance: OnceLock::new(),
+            differential_format_count: OnceLock::new(),
+        }
+    }
+}
+
+/// The source-backed policy that is meaningful after the OPC package has
+/// already admitted its physical source limits.
+///
+/// `OpenOptions` also carries the 192-byte `SourceLimits` value. The package
+/// owns that value, so retaining a complete `OpenOptions` in every immutable
+/// source owner duplicates the physical ingress policy in each owner and in
+/// every reopened history step. Keep the facade policies here and rebuild the
+/// public options value only at a deferred materialization boundary. Package
+/// cache and execution policy are retained separately from an optional facade
+/// context: an external package remains authoritative for its own cache and
+/// budget, while a facade context adds a second cancellation/budget fence.
+#[derive(Clone)]
+struct SourceOwnerOptions {
+    leniency: crate::Leniency,
+    /// Default semantic budgets need no per-owner storage. Customized
+    /// budgets are shared only when a deferred owner actually needs them.
+    semantic_limits: Option<Arc<crate::SemanticLimits>>,
+    #[cfg(feature = "encryption")]
+    encryption_limits: crate::encryption::Limits,
+    cache_limits: Option<SourceCacheLimits>,
+    /// The execution context that owns the OPC package cache and publication
+    /// budget. This is the package's policy, not a facade override.
+    package_execution_context: Option<Arc<ExecutionContext>>,
+    /// An optional facade-level context supplied alongside an already-opened
+    /// package. It remains an additional fence when the package has its own
+    /// managed context.
+    facade_execution_context: Option<Arc<ExecutionContext>>,
+}
+
+impl SourceOwnerOptions {
+    fn from_open_options(options: &crate::OpenOptions) -> Self {
+        let execution_context = options
+            .execution_context
+            .as_ref()
+            .map(|context| Arc::new(context.clone()));
+        Self {
+            leniency: options.leniency,
+            semantic_limits: (options.semantic_limits != crate::SemanticLimits::default())
+                .then(|| Arc::new(options.semantic_limits)),
+            #[cfg(feature = "encryption")]
+            encryption_limits: options.encryption_limits,
+            cache_limits: options.cache_limits,
+            package_execution_context: execution_context.clone(),
+            facade_execution_context: execution_context,
+        }
+    }
+
+    fn from_source_backed_package(
+        package: &SourceBackedPackage,
+        options: &crate::OpenOptions,
+    ) -> Self {
+        let mut owner_options = Self::from_open_options(options);
+        let cache_limits = package.cache_limits();
+        owner_options.cache_limits =
+            (cache_limits != SourceCacheLimits::default()).then_some(cache_limits);
+        owner_options.package_execution_context = package.execution_context().map(Arc::new);
+        owner_options
+    }
+
+    fn to_open_options(&self, source_limits: SourceLimits) -> crate::OpenOptions {
+        // `package_execution_context` is supplied separately through
+        // `shared_owner_options` when the reopened package is constructed.
+        // The public options value carries only the facade context so it
+        // cannot replace the package's own cache/budget policy.
+        let mut options = crate::OpenOptions::new()
+            .source_limits(source_limits)
+            .leniency(self.leniency)
+            .semantic_limits(*self.semantic_limits());
+        #[cfg(feature = "encryption")]
+        {
+            options = options.encryption_limits(self.encryption_limits);
+        }
+        if let Some(cache_limits) = self.cache_limits {
+            options = options.cache_limits(cache_limits);
+        }
+        if let Some(execution_context) = self.facade_execution_context.as_deref() {
+            options = options.execution_context(execution_context.clone());
+        }
+        options
+    }
+
+    fn semantic_limits(&self) -> &crate::SemanticLimits {
+        static DEFAULT: OnceLock<crate::SemanticLimits> = OnceLock::new();
+        self.semantic_limits
+            .as_deref()
+            .unwrap_or_else(|| DEFAULT.get_or_init(crate::SemanticLimits::default))
+    }
+
+    fn is_default(&self) -> bool {
+        self.leniency == crate::Leniency::default()
+            && self.semantic_limits.is_none()
+            && self.cache_limits.is_none()
+            && self.package_execution_context.is_none()
+            && self.facade_execution_context.is_none()
+            && {
+                #[cfg(feature = "encryption")]
+                {
+                    self.encryption_limits == crate::encryption::Limits::default()
+                }
+                #[cfg(not(feature = "encryption"))]
+                {
+                    true
+                }
+            }
+    }
+}
+
+pub(crate) struct SourceInner {
     package: SourceBackedPackage,
-    execution: Option<ExecutionContext>,
+    /// One exact replay endpoint shared by every patch that observes this
+    /// opened source owner. Adjacent deferred patches otherwise retain the
+    /// same endpoint state twice: the earlier patch's `after` and the next
+    /// patch's `before` are the same pending owner.
+    pub(crate) restore_endpoint: OnceLock<Arc<deferred::RestoreEndpoint>>,
+    /// The immutable tab-state source closure captured for this owner. A
+    /// source-backed edit does not mutate that closure, so repeated edits can
+    /// share its parsed graph, relationships and source payload metadata.
+    pub(crate) tab_state_snapshot: OnceLock<Arc<crate::tab_state::Snapshot>>,
+    /// The first edit on an owner is commonly a one-shot admission probe. Do
+    /// not retain its snapshot solely because the edit was dropped; arm the
+    /// immutable cache after the first successful snapshot load so repeated
+    /// edits still share the closure without adding one to every new owner.
+    pub(crate) tab_state_snapshot_seen: AtomicBool,
+    /// The source-backed tab graph is already admitted by the workbook open.
+    /// Keep its exact validation lazy for the edit path, while sharing the
+    /// resulting graph across snapshots once a commit needs it.
+    pub(crate) tab_state_graph: OnceLock<Arc<crate::tab_state::GraphBinding>>,
+    /// One shared package handle for exact replay endpoints. Keeping this
+    /// lazy leaves ordinary read-only opens allocation-free while letting a
+    /// retained patch refer to one package owner per source lineage instead
+    /// of embedding a full `SourceBackedPackage` value in every endpoint.
+    package_handle: OnceLock<Arc<SourceBackedPackage>>,
+    /// Immutable merge-family source closures keyed by worksheet URI. Source
+    /// backed edits repeatedly reopen one worksheet from the same immutable
+    /// owner; sharing its workbook and relationship metadata keeps retained
+    /// patch history compact without sharing rewritten worksheet bytes.
+    merge_source_states:
+        OnceLock<Box<Mutex<HashMap<PackURI, Arc<crate::merge::source::SourceStateShared>>>>>,
+    execution: Option<Arc<ExecutionContext>>,
     // Keep the mandatory workbook payload pinned for managed facades. Besides
     // avoiding a second root extraction, this makes an exact managed budget
     // boundary meaningful: the selected worksheet cannot evict the root while
@@ -84,16 +391,21 @@ struct SourceInner {
     // the historical finite-cache behavior and do not pin this payload.
     _catalog_data: Option<PartData>,
     shared_strings_uri: Option<PackURI>,
-    shared_strings: OnceLock<Box<[Text]>>,
-    /// Repairs made while the shared-string table was parsed; published
-    /// before the table itself (see `crate::leniency`).
-    shared_strings_tolerance: OnceLock<ToleranceReport>,
     styles_uri: Option<PackURI>,
+    /// Style identity remains part of the owner lineage. The common worksheet
+    /// and style caches stay inline so their first reads do not allocate a
+    /// separate reader-state box; less common dependency caches remain lazy.
+    style_lineage: Arc<crate::style::StyleLineage>,
+    values: values::ValueCache,
     styles: OnceLock<raw::styles::Catalog>,
+    formats: crate::style::cell_format::FormatCache,
+    /// Shared-string and conditional-format caches are less common than the
+    /// worksheet/style path, so keep their state in a second lazy allocation.
+    dependencies: OnceLock<Box<DependencyState>>,
     flavor: Flavor,
     date_system: DateSystem,
-    active_sheet: Option<usize>,
-    sheets: Box<[Arc<SourceSheetData>]>,
+    pub(crate) active_sheet: Option<usize>,
+    pub(crate) sheets: Box<[Arc<SourceSheetData>]>,
     /// Sheet positions sorted by their canonical, case-insensitive names.
     ///
     /// The mandatory workbook catalog rejects duplicate canonical names, so a
@@ -102,6 +414,26 @@ struct SourceInner {
     sheet_name_order: Box<[usize]>,
     /// Repairs made while the workbook catalog was parsed at open time.
     tolerance: ToleranceReport,
+    /// Defined names parsed with the mandatory workbook catalog at open.
+    ///
+    /// An ordinary owner keeps the parsed catalogue as a boxed slice (no
+    /// shared-ownership header on the cold open path). An owner reopened
+    /// with a shared catalog proof stores `None` and borrows the proof's
+    /// slice, so every proof-backed owner of a lineage reads one shared copy;
+    /// [`Self::catalog_proof`] copies an ordinary owner's names at most once,
+    /// when that owner first starts a deferred lineage.
+    defined_names: Option<Box<[raw::DefinedName]>>,
+    /// Lazily shared ingress policy for source-backed snapshots. Keeping this
+    /// on the immutable lineage avoids copying all policy fields into every
+    /// retained before/after snapshot while leaving ordinary opens lazy.
+    source_limits: OnceLock<Arc<SourceLimits>>,
+    /// The immutable catalog proof shared by tab-state snapshots in this
+    /// source lineage. It groups the unchanged defined-name catalog and its
+    /// ingress policy behind one retained handle.
+    catalog_proof: OnceLock<Arc<SourceCatalogProof>>,
+    /// The ingress policies this workbook was opened with; a committed
+    /// workbook reopens its output under them.
+    owner_options: Option<Arc<SourceOwnerOptions>>,
 }
 
 /// Read-only XLSX catalog and worksheet access over a positional source.
@@ -116,14 +448,43 @@ struct SourceInner {
 #[derive(Clone)]
 pub struct SourceBackedWorkbook {
     inner: Arc<SourceInner>,
+    /// The pending output of a committed workbook (record 0360): `inner` is
+    /// then the base the commit was made on.
+    pending: Option<Arc<deferred::Deferred>>,
 }
 
 /// A lifetime-free read-only worksheet handle from [`SourceBackedWorkbook`].
+///
+/// The first read that needs the worksheet's parsed grid builds it in one
+/// pass over the part and offers it to the workbook's bounded semantic cache
+/// (see [`SourceBackedWorkbook::semantic_cache_diagnostics`]). The handle then
+/// pins that grid: its later reads, and those of its clones, are lookups in
+/// the pinned grid, and the grid stays resident until the handle and its
+/// clones are dropped, whatever the cache evicts meanwhile.
 #[derive(Clone)]
 pub struct SourceWorksheet {
     owner: Arc<SourceInner>,
     data: Arc<SourceSheetData>,
+    grid: OnceLock<Grid>,
 }
+
+impl std::fmt::Debug for SourceBackedWorkbook {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("SourceBackedWorkbook")
+            .field("sheets", &self.current().sheets.len())
+            .field("committed", &self.pending.is_some())
+            .finish_non_exhaustive()
+    }
+}
+
+// Shared handles: the unified operations layer keeps these in `Arc`-backed,
+// `Send + Sync` file handles (record 0003 risk R3).
+const _: () = {
+    const fn assert_send_sync<T: Send + Sync>() {}
+    assert_send_sync::<SourceBackedWorkbook>();
+    assert_send_sync::<SourceWorksheet>();
+};
 
 /// Owned semantic state at one coordinate in a source-backed worksheet.
 ///
@@ -178,150 +539,79 @@ impl SourceBackedWorkbook {
     /// open source, while a detected metadata change returns a typed source
     /// version error on the next operation.
     #[cfg(any(unix, windows))]
-    pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_path_with_limits(path, ReadLimits::default())
-    }
-
-    /// Open a filesystem-backed XLSX package with explicit OPC limits.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
-        Self::from_read_at_with_limits(file_source(path)?, limits)
-    }
-
-    /// Open a filesystem-backed XLSX package with an explicit deferred-Part
-    /// cache policy.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_cache_limits(
-        path: impl AsRef<Path>,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_read_at_with_cache_limits(file_source(path)?, cache_limits)
-    }
-
-    /// Open a filesystem-backed XLSX package with explicit read and cache
-    /// policies.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits_and_cache_limits(
-        path: impl AsRef<Path>,
-        limits: ReadLimits,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_read_at_with_limits_and_cache_limits(file_source(path)?, limits, cache_limits)
-    }
-
-    /// Open a filesystem-backed XLSX package with explicit read and execution
-    /// policies.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_execution_context(
-        path: impl AsRef<Path>,
-        limits: ReadLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_execution_context(file_source(path)?, limits, context)
-    }
-
-    /// Open a filesystem-backed XLSX package with explicit read and execution
-    /// policies while retaining the default finite cache.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits_and_execution_context(
-        path: impl AsRef<Path>,
-        limits: ReadLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_limits_and_execution_context(file_source(path)?, limits, context)
-    }
-
-    /// Open a filesystem-backed XLSX package with explicit read, cache, and
-    /// execution policies.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits_and_cache_limits_and_execution_context(
-        path: impl AsRef<Path>,
-        limits: ReadLimits,
-        cache_limits: SourceCacheLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            file_source(path)?,
-            limits,
-            cache_limits,
-            context,
-        )
-    }
-
-    /// Open a filesystem-backed XLSX package from a regular path.
-    #[cfg(any(unix, windows))]
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_path(path)
+        Self::open_with_options(path, crate::OpenOptions::default())
     }
 
-    /// Open a filesystem-backed XLSX package with explicit OPC limits.
+    /// Open a filesystem-backed XLSX package under explicit ingress
+    /// policies: source limits, deferred-payload cache limits, execution
+    /// context, leniency and semantic limits ([`crate::OpenOptions`]).
     #[cfg(any(unix, windows))]
-    pub fn open_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
-        Self::from_path_with_limits(path, limits)
-    }
-
-    /// Open a filesystem-backed XLSX package with an explicit finite cache.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_cache_limits(
-        path: impl AsRef<Path>,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_path_with_cache_limits(path, cache_limits)
-    }
-
-    /// Open a filesystem-backed XLSX package with explicit read and cache
-    /// policies.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_limits_and_cache_limits(
-        path: impl AsRef<Path>,
-        limits: ReadLimits,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_path_with_limits_and_cache_limits(path, limits, cache_limits)
-    }
-
-    /// Open a filesystem-backed XLSX package with explicit read and execution
-    /// policies.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_execution_context(
-        path: impl AsRef<Path>,
-        limits: ReadLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_path_with_execution_context(path, limits, context)
-    }
-
-    /// Open a filesystem-backed XLSX package with explicit read and execution
-    /// policies while retaining the default finite cache.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_limits_and_execution_context(
-        path: impl AsRef<Path>,
-        limits: ReadLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_path_with_limits_and_execution_context(path, limits, context)
-    }
-
-    /// Open a filesystem-backed XLSX package with explicit read, cache, and
-    /// execution policies.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_limits_and_cache_limits_and_execution_context(
-        path: impl AsRef<Path>,
-        limits: ReadLimits,
-        cache_limits: SourceCacheLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_path_with_limits_and_cache_limits_and_execution_context(
-            path,
-            limits,
-            cache_limits,
-            context,
-        )
+    pub fn open_with_options(path: impl AsRef<Path>, options: crate::OpenOptions) -> Result<Self> {
+        Self::from_read_at_with_options(file_source(path)?, options)
     }
 
     /// Open an ordinary XLSX package from a caller-provided positional source.
     pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
-        Self::from_read_at_with_limits(source, ReadLimits::default())
+        Self::from_read_at_with_options(source, crate::OpenOptions::default())
+    }
+
+    /// Open from a positional source under explicit ingress policies.
+    ///
+    /// With an execution context, the context checks cancellation before
+    /// mandatory open reads and before every deferred semantic
+    /// materialization, and retained and in-flight payloads are charged to
+    /// its hierarchical memory budget; managed [`litchi_opc::PartData`]
+    /// handles never escape as unbudgeted `Arc` allocations through this
+    /// facade. Without one, the deferred-payload cache is bounded by the
+    /// selected [`SourceCacheLimits`] (or the OPC default) but unmanaged.
+    pub fn from_read_at_with_options(
+        source: Arc<dyn ReadAt>,
+        options: crate::OpenOptions,
+    ) -> Result<Self> {
+        Self::from_read_at_with_options_and_shared_catalog(source, options, None, None)
+    }
+
+    fn from_read_at_with_options_and_shared_catalog(
+        source: Arc<dyn ReadAt>,
+        options: crate::OpenOptions,
+        shared_catalog: Option<Arc<SourceCatalogProof>>,
+        shared_owner_options: Option<Arc<SourceOwnerOptions>>,
+    ) -> Result<Self> {
+        let limits = options.source_limits;
+        let cache_limits = match shared_owner_options.as_ref() {
+            Some(owner_options) => owner_options.cache_limits.unwrap_or_default(),
+            None => options.cache_limits.unwrap_or_default(),
+        };
+        let owner_options = shared_owner_options.or_else(|| {
+            let owner_options = SourceOwnerOptions::from_open_options(&options);
+            (!owner_options.is_default()).then(|| Arc::new(owner_options))
+        });
+        let execution = owner_options
+            .as_ref()
+            .and_then(|owner_options| owner_options.package_execution_context.as_deref().cloned());
+        let package = match execution {
+            Some(context) => SourceBackedPackage::from_read_at(
+                source,
+                limits,
+                cache_limits,
+                SourceReadPolicy::exact(),
+                Some(context),
+            )?,
+            None => SourceBackedPackage::from_read_at(
+                source,
+                limits,
+                cache_limits,
+                SourceReadPolicy::exact(),
+                None,
+            )?,
+        };
+        Self::open_source_backed_package_with_shared_catalog(
+            package,
+            options,
+            shared_catalog,
+            owner_options,
+        )
     }
 
     /// Open an XLSX package from a sequential reader with the default
@@ -333,156 +623,71 @@ impl SourceBackedWorkbook {
     /// them. The resulting owned source has stable freshness identity for the
     /// lifetime of this immutable snapshot.
     pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
-        Self::from_reader_with_limits(reader, ReadLimits::default())
+        Self::from_reader_with_options(reader, crate::OpenOptions::default())
     }
 
-    /// Open an XLSX package from a sequential reader with explicit OPC limits.
-    ///
-    /// Input ingestion and all later deferred payload reads use the same
-    /// bounded source-backed package policy; unselected worksheets remain
-    /// cold until explicitly selected.
-    pub fn from_reader_with_limits<R: Read>(reader: R, limits: ReadLimits) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_reader_with_limits(
-            reader, limits,
-        )?)
-    }
-
-    /// Open from a positional source with explicit OPC resource limits.
-    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: ReadLimits) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_limits(
-            source, limits,
-        )?)
-    }
-
-    /// Open an XLSX source with an explicit finite deferred-Part cache policy.
-    ///
-    /// This compatibility constructor remains unmanaged: the cache is
-    /// bounded by [`SourceCacheLimits`] but is not charged to a hierarchical
-    /// execution budget. Use
-    /// [`Self::from_read_at_with_limits_and_cache_limits_and_execution_context`]
-    /// when the caller owns a managed budget.
-    pub fn from_read_at_with_cache_limits(
-        source: Arc<dyn ReadAt>,
-        cache_limits: SourceCacheLimits,
+    /// Open an XLSX package from a sequential reader under explicit ingress
+    /// policies. Input ingestion and later deferred payload reads use the
+    /// same source limits.
+    pub fn from_reader_with_options<R: Read>(
+        reader: R,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
-        Self::from_read_at_with_limits_and_cache_limits(source, ReadLimits::default(), cache_limits)
-    }
-
-    /// Open an XLSX source with explicit read and finite cache policies.
-    pub fn from_read_at_with_limits_and_cache_limits(
-        source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
-                source,
-                limits,
-                cache_limits,
-            )?,
-        )
-    }
-
-    /// Open an XLSX source with an explicit caller-owned execution context.
-    ///
-    /// The context checks cancellation before mandatory open reads and before
-    /// every deferred semantic materialization. Retained and in-flight
-    /// payloads are charged to its hierarchical memory budget. Managed
-    /// [`litchi_opc::PartData`] handles never escape as unbudgeted `Arc`
-    /// allocations through this read-only facade.
-    pub fn from_read_at_with_execution_context(
-        source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
-            source,
-            limits,
-            context.clone(),
+        let owner_options = SourceOwnerOptions::from_open_options(&options);
+        let owner_options = (!owner_options.is_default()).then(|| Arc::new(owner_options));
+        let package = SourceBackedPackage::from_reader(
+            reader,
+            options.source_limits,
+            options.cache_limits.unwrap_or_default(),
+            options.execution_context.clone(),
         )?;
-        Self::from_source_backed_package_with_execution_context(package, Some(context))
-    }
-
-    /// Open from a positional source with explicit read and execution
-    /// policies while retaining the default finite cache.
-    pub fn from_read_at_with_limits_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_execution_context(source, limits, context)
-    }
-
-    /// Open an XLSX source with explicit read, cache, and execution policies.
-    ///
-    /// This is the fully explicit managed constructor. The read-only
-    /// workbook/sheet facade retains only owned semantic values and bounded
-    /// OPC cache handles; it does not detach managed payloads.
-    pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
-        cache_limits: SourceCacheLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        let package =
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                source,
-                limits,
-                cache_limits,
-                context.clone(),
-            )?;
-        Self::from_source_backed_package_with_execution_context(package, Some(context))
+        Self::open_source_backed_package_with_shared_catalog(package, options, None, owner_options)
     }
 
     /// Build the read-only XLSX facade from a validated deferred OPC package.
     pub fn from_source_backed_package(package: SourceBackedPackage) -> Result<Self> {
-        Self::from_source_backed_package_with_execution_context(package, None)
+        Self::from_source_backed_package_with_options(package, crate::OpenOptions::default())
     }
 
-    /// [`Self::from_source_backed_package`] with the opt-in repairs
-    /// `leniency` allows; see [`crate::leniency`]. The Excel-compatible
-    /// repairs apply under every policy.
-    pub fn from_source_backed_package_with_leniency(
+    /// [`Self::from_source_backed_package`] under explicit policies. The
+    /// package keeps its source, cache limits and package execution context;
+    /// `options` contributes the leniency, semantic limits and an optional
+    /// facade execution context. When both contexts are present, both are
+    /// checked and the package context continues to govern OPC cache and
+    /// publication admission.
+    pub fn from_source_backed_package_with_options(
         package: SourceBackedPackage,
-        leniency: Leniency,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
-        Self::open_source_backed_package(package, None, leniency)
-    }
-
-    /// [`Self::from_reader`] with the opt-in repairs `leniency` allows.
-    pub fn from_reader_with_leniency<R: Read>(reader: R, leniency: Leniency) -> Result<Self> {
-        Self::from_source_backed_package_with_leniency(
-            SourceBackedPackage::from_reader_with_limits(reader, ReadLimits::default())?,
-            leniency,
-        )
-    }
-
-    /// [`Self::from_path`] with the opt-in repairs `leniency` allows.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_leniency(path: impl AsRef<Path>, leniency: Leniency) -> Result<Self> {
-        Self::from_source_backed_package_with_leniency(
-            SourceBackedPackage::from_read_at_with_limits(
-                file_source(path)?,
-                ReadLimits::default(),
-            )?,
-            leniency,
-        )
-    }
-
-    fn from_source_backed_package_with_execution_context(
-        package: SourceBackedPackage,
-        execution: Option<ExecutionContext>,
-    ) -> Result<Self> {
-        Self::open_source_backed_package(package, execution, Leniency::Strict)
+        Self::open_source_backed_package(package, options)
     }
 
     fn open_source_backed_package(
         package: SourceBackedPackage,
-        execution: Option<ExecutionContext>,
-        leniency: Leniency,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
-        check_execution(execution.as_ref())?;
-        let retain_catalog = execution.is_some() || package.cache_diagnostics().budget_managed;
+        Self::open_source_backed_package_with_shared_catalog(package, options, None, None)
+    }
+
+    fn open_source_backed_package_with_shared_catalog(
+        package: SourceBackedPackage,
+        options: crate::OpenOptions,
+        shared_catalog: Option<Arc<SourceCatalogProof>>,
+        shared_owner_options: Option<Arc<SourceOwnerOptions>>,
+    ) -> Result<Self> {
+        let facade_execution = options.execution_context.clone();
+        let leniency = options.leniency;
+        package.check_execution()?;
+        check_execution(facade_execution.as_ref())?;
+        if let Some(shared) = shared_catalog.as_ref()
+            && package.read_limits() != *shared.limits
+        {
+            return Err(invalid(
+                "reopened workbook changed its source-backed policy",
+            ));
+        }
+        let retain_catalog =
+            facade_execution.is_some() || package.cache_diagnostics().budget_managed;
         let workbook = package.main_document_part()?;
         let flavor = codec::flavor(workbook.content_type()).ok_or_else(|| {
             invalid(format!(
@@ -497,29 +702,52 @@ impl SourceBackedWorkbook {
         let mut tolerance = ToleranceReport::default();
         tolerance.append_package(package.tolerance_report());
         let catalog_bytes = workbook.data()?;
-        let catalog =
-            raw::parse_catalog_repairing(catalog_bytes.as_bytes(), leniency, &mut tolerance)?;
-        check_execution(execution.as_ref())?;
+        let catalog = raw::parse_catalog_repairing(
+            catalog_bytes.as_bytes(),
+            &package.read_limits(),
+            leniency,
+            &mut tolerance,
+        )?;
+        package.check_execution()?;
+        check_execution(facade_execution.as_ref())?;
         let sheet_parts = validate_sheet_graph(&package, &workbook, &catalog.sheets)?;
-        check_execution(execution.as_ref())?;
+        package.check_execution()?;
+        check_execution(facade_execution.as_ref())?;
         let shared_strings_uri = validate_shared_strings(&package, &workbook)?;
         let styles_uri = validate_styles(&package, &workbook)?;
-        check_execution(execution.as_ref())?;
+        package.check_execution()?;
+        check_execution(facade_execution.as_ref())?;
 
         let active_sheet = (!catalog.sheets.is_empty()).then_some(catalog.active_sheet_index);
+        let defined_names = match shared_catalog.as_ref() {
+            Some(shared) => {
+                if catalog.defined_names.as_slice() != shared.defined_names.as_ref() {
+                    return Err(invalid(
+                        "reopened workbook changed its defined-name catalog",
+                    ));
+                }
+                None
+            },
+            None => Some(catalog.defined_names.into_boxed_slice()),
+        };
         let mut sheets = Vec::new();
         sheets
             .try_reserve_exact(catalog.sheets.len())
             .map_err(|source| allocation("source-backed workbook sheets", source))?;
         for (position, (sheet, part)) in catalog.sheets.into_iter().zip(sheet_parts).enumerate() {
+            let (keys, name_len, name_key_len) =
+                SourceSheetData::keys(&sheet.name, &sheet.relationship_id)?;
             sheets.push(Arc::new(SourceSheetData {
                 position,
-                name_key: crate::sheet::key(&sheet.name),
-                name: sheet.name,
+                keys,
+                name_len,
+                name_key_len,
                 kind: part.kind,
                 visibility: codec::visibility(sheet.visibility),
                 part_uri: part.uri,
-                cells: OnceLock::new(),
+                sheet_id: sheet.sheet_id,
+                tolerance: OnceLock::new(),
+                build: Mutex::new(()),
             }));
         }
         let sheets = sheets.into_boxed_slice();
@@ -532,9 +760,8 @@ impl SourceBackedWorkbook {
         }
         sheet_name_order.sort_unstable_by(|left, right| {
             sheets[*left]
-                .name_key
-                .as_ref()
-                .cmp(sheets[*right].name_key.as_ref())
+                .name_key()
+                .cmp(sheets[*right].name_key())
                 .then_with(|| left.cmp(right))
         });
         let sheet_name_order = sheet_name_order.into_boxed_slice();
@@ -543,18 +770,40 @@ impl SourceBackedWorkbook {
         // allocated. Do not publish a facade whose catalog was assembled from
         // a stale positional snapshot. This also covers an empty sheet list.
         package.source_version()?;
-        check_execution(execution.as_ref())?;
+        package.check_execution()?;
+        check_execution(facade_execution.as_ref())?;
+
+        let source_limits = OnceLock::new();
+        let catalog_proof = OnceLock::new();
+        if let Some(shared) = shared_catalog {
+            let _ = source_limits.set(Arc::clone(&shared.limits));
+            let _ = catalog_proof.set(shared);
+        }
+        let owner_options = shared_owner_options.or_else(|| {
+            let owner_options = SourceOwnerOptions::from_source_backed_package(&package, &options);
+            (!owner_options.is_default()).then(|| Arc::new(owner_options))
+        });
 
         Ok(Self {
             inner: Arc::new(SourceInner {
                 package,
-                execution,
+                restore_endpoint: OnceLock::new(),
+                tab_state_snapshot: OnceLock::new(),
+                tab_state_snapshot_seen: AtomicBool::new(false),
+                tab_state_graph: OnceLock::new(),
+                package_handle: OnceLock::new(),
+                merge_source_states: OnceLock::new(),
+                execution: owner_options
+                    .as_ref()
+                    .and_then(|owner_options| owner_options.facade_execution_context.clone()),
                 _catalog_data: retain_catalog.then_some(catalog_bytes),
                 shared_strings_uri,
-                shared_strings: OnceLock::new(),
-                shared_strings_tolerance: OnceLock::new(),
                 styles_uri,
+                style_lineage: Arc::new(crate::style::StyleLineage),
+                values: values::ValueCache::new(),
                 styles: OnceLock::new(),
+                formats: crate::style::cell_format::FormatCache::new(),
+                dependencies: OnceLock::new(),
                 flavor,
                 date_system: if catalog.uses_1904_date_system {
                     DateSystem::Excel1904
@@ -565,7 +814,12 @@ impl SourceBackedWorkbook {
                 sheets,
                 sheet_name_order,
                 tolerance,
+                defined_names,
+                source_limits,
+                catalog_proof,
+                owner_options,
             }),
+            pending: None,
         })
     }
 
@@ -573,76 +827,302 @@ impl SourceBackedWorkbook {
     ///
     /// The report merges the repairs made when the workbook was opened with
     /// those of every worksheet whose cells have been materialized, each
-    /// stamped with its sheet position. Worksheets parse lazily; a cold
-    /// selected read that meets an irregular dependency falls back to the
-    /// materializing parse, which records. An empty report means everything
-    /// parsed so far conformed. See [`crate::leniency`] for the contract.
+    /// stamped with its sheet position. Worksheets parse lazily: a worksheet
+    /// joins the report once a read has parsed its grid, and stays in it even
+    /// after the semantic cache releases the grid. A read of a part too large
+    /// to retain goes through the streaming scan, which never repairs, and
+    /// falls back to the materializing parse, which records, when the
+    /// worksheet needs a repair. An empty report means everything parsed so
+    /// far conformed. See [`crate::leniency`] for the contract.
     #[must_use]
     pub fn tolerance_report(&self) -> ToleranceReport {
-        let mut report = self.inner.tolerance.clone();
-        if let Some(strings) = self.inner.shared_strings_tolerance.get() {
+        let inner = self.current();
+        let mut report = inner.tolerance.clone();
+        if let Some(dependencies) = inner.dependencies.get()
+            && let Some(strings) = dependencies.shared_strings_tolerance.get()
+        {
             report.append(strings);
         }
-        for sheet in self.inner.sheets.iter() {
-            if let Some(store) = sheet.cells.get() {
-                report.append_sheet(store.tolerance_report(), sheet.position);
+        for sheet in inner.sheets.iter() {
+            if let Some(tolerance) = sheet.tolerance.get() {
+                report.append_sheet(tolerance, sheet.position);
             }
         }
         report
     }
 
+    /// Low-level inert defined-name records retained from the workbook
+    /// catalog parsed at open.
+    ///
+    /// These are the records [`crate::Workbook::defined_names`] returns for
+    /// the same workbook part; reading them performs no I/O.
+    #[must_use]
+    pub fn defined_names(&self) -> &[raw::DefinedName] {
+        match self.pending_catalog() {
+            Some(catalog) => &catalog.defined_names,
+            None => self.current().defined_names_slice(),
+        }
+    }
+
+    pub(crate) fn shared_catalog_proof(&self) -> Arc<SourceCatalogProof> {
+        self.current().catalog_proof()
+    }
+
+    pub(crate) fn tab_state_snapshot(&self) -> &OnceLock<Arc<crate::tab_state::Snapshot>> {
+        &self.current().tab_state_snapshot
+    }
+
+    pub(crate) fn tab_state_source_owner(&self) -> Arc<SourceInner> {
+        Arc::clone(self.current())
+    }
+
+    pub(crate) fn tab_state_snapshot_should_cache(&self) -> bool {
+        self.current()
+            .tab_state_snapshot_seen
+            .swap(true, Ordering::AcqRel)
+    }
+
+    /// Content-free diagnostics of the workbook's semantic cache.
+    ///
+    /// The cache retains parsed worksheet grids and the projections of their
+    /// blocks outside `sheetData` under a bounded logical weight, releasing
+    /// the least-recently-used values no worksheet handle pins. It is
+    /// separate from the deferred-part payload cache reported by
+    /// [`Self::cache_diagnostics`].
+    #[must_use]
+    pub fn semantic_cache_diagnostics(&self) -> CacheDiagnostics {
+        self.current().values.diagnostics()
+    }
+
+    /// Release every parsed worksheet value the semantic cache retains that
+    /// no worksheet handle pins, returning the logical weight released.
+    ///
+    /// Reads are unaffected apart from cost: a released value is parsed
+    /// again from the same source snapshot when a read next needs it.
+    pub fn trim_semantic_cache(&self) -> usize {
+        self.current().values.trim_clean()
+    }
+
     /// Workbook flavor derived from the mandatory workbook catalog.
     #[must_use]
     pub fn flavor(&self) -> Flavor {
-        self.inner.flavor
+        self.current().flavor
     }
 
     /// Date serial system derived from the mandatory workbook catalog.
     #[must_use]
     pub fn date_system(&self) -> DateSystem {
-        self.inner.date_system
+        self.current().date_system
     }
 
     /// Content-free deferred-Part cache diagnostics.
     #[must_use]
     pub fn cache_diagnostics(&self) -> SourceCacheDiagnostics {
-        self.inner.package.cache_diagnostics()
+        self.current().package.cache_diagnostics()
     }
 
     /// Exact source identity and revision captured by this facade.
     pub fn source_version(&self) -> Result<SourceVersion> {
-        self.inner.package.source_version().map_err(Into::into)
+        self.current().package.source_version().map_err(Into::into)
+    }
+
+    /// Borrow the validated deferred OPC package this catalog reads from.
+    ///
+    /// This is the package indexed when the workbook was opened: no ZIP
+    /// directory, content-type catalog, or relationship graph is rebuilt.
+    /// Borrowed package services, such as
+    /// [`SourceBackedPackage::to_opc_package`], read through the same
+    /// positional source and observe the same source-version fence.
+    ///
+    /// A committed workbook (record 0360) has no indexed package of its own
+    /// until a read writes its output into memory; this does so once.
+    ///
+    /// # Errors
+    ///
+    /// Returns the publication error of a committed workbook's output.
+    pub fn source_backed_package(&self) -> Result<&SourceBackedPackage> {
+        Ok(&self.view()?.inner.package)
+    }
+
+    /// Conservative retained-data census for promotion to the owning
+    /// workbook used by the edit kernel.
+    ///
+    /// Promotion keeps the source archive and eagerly materializes the
+    /// workbook catalog plus every worksheet part used by the page-break
+    /// projection.  The census accounts for those declared payloads and the
+    /// native endpoint/catalog owners without decoding any deferred part.
+    /// Callers can therefore reject a native edit before promotion allocates;
+    /// the owning package's exact retained census remains authoritative after
+    /// promotion and commit.
+    pub fn retained_bytes_for_edit(&self) -> Result<usize> {
+        let inner = self.current();
+        let package = &inner.package;
+        let mut endpoint = usize::try_from(package.source_artifact().len()).unwrap_or(usize::MAX);
+        endpoint = endpoint
+            .saturating_add(size_of::<super::Workbook>())
+            .saturating_add(size_of::<super::Inner>())
+            .saturating_add(size_of::<litchi_opc::OpcPackage>());
+
+        let main = package.main_document_part()?;
+        let main_payload =
+            usize::try_from(main.declared_uncompressed_size()?).unwrap_or(usize::MAX);
+        endpoint = endpoint
+            // The owning catalog parses the workbook XML into independent
+            // names, relationship targets and sheet records in addition to
+            // retaining its source payload.  Reserve one more payload-sized
+            // envelope for those derived strings and records.
+            .saturating_add(main_payload)
+            .saturating_add(main_payload);
+        endpoint = endpoint
+            .saturating_add(main.partname().as_str().len())
+            .saturating_add(main.content_type().len());
+
+        // Workbook::from_package builds a page-break projection for every
+        // catalog sheet, which materializes each corresponding part.  Count
+        // only those payloads here; unrelated media and extension parts stay
+        // deferred and are charged by their family editor if touched.
+        for sheet in inner.sheets.iter() {
+            let part = package.part(&sheet.part_uri)?;
+            endpoint = endpoint.saturating_add(
+                usize::try_from(part.declared_uncompressed_size()?).unwrap_or(usize::MAX),
+            );
+            endpoint = endpoint
+                .saturating_add(size_of::<super::model::SheetData>())
+                .saturating_add(sheet.name().len())
+                .saturating_add(sheet.name_key().len())
+                .saturating_add(sheet.part_uri.as_str().len())
+                .saturating_add(sheet.relationship_id().len());
+        }
+
+        endpoint = endpoint
+            .saturating_add(
+                inner
+                    .shared_strings_uri
+                    .as_ref()
+                    .map_or(0, |uri| uri.as_str().len()),
+            )
+            .saturating_add(
+                inner
+                    .styles_uri
+                    .as_ref()
+                    .map_or(0, |uri| uri.as_str().len()),
+            )
+            .saturating_add(
+                inner
+                    .defined_names
+                    .as_ref()
+                    .map_or(0, |names| names.len())
+                    .saturating_mul(size_of::<raw::DefinedName>()),
+            );
+
+        // The native retained census includes package metadata and
+        // relationship strings even when their payloads remain deferred.
+        for part in package.iter_parts() {
+            endpoint = endpoint
+                .saturating_add(size_of::<litchi_opc::PartMetadata<'_>>())
+                .saturating_add(part.partname().as_str().len())
+                .saturating_add(part.content_type().len())
+                .saturating_add(relationship_bytes(part.rels()));
+        }
+        endpoint = endpoint.saturating_add(relationship_bytes(package.rels()));
+        Ok(endpoint)
+    }
+
+    /// Recover the validated deferred OPC package without re-indexing it.
+    ///
+    /// The returned package is the one this catalog was opened from, so
+    /// [`Self::from_source_backed_package`] can adopt it again without a
+    /// second container index. The lazily parsed
+    /// catalog, shared strings and styles, and every parsed worksheet value
+    /// the semantic cache retains, are released.
+    ///
+    /// # Errors
+    ///
+    /// Returns `self` unchanged while another clone of this workbook, or a
+    /// [`SourceWorksheet`] handle selected from it, still shares the catalog.
+    /// A committed workbook (record 0360), which has no indexed package of
+    /// its own, is returned unchanged too.
+    pub fn try_into_source_backed_package(self) -> std::result::Result<SourceBackedPackage, Self> {
+        if self.pending.is_some() {
+            return Err(self);
+        }
+        match Arc::try_unwrap(self.inner) {
+            Ok(inner) => Ok(inner.package),
+            Err(inner) => Err(Self {
+                inner,
+                pending: None,
+            }),
+        }
     }
 
     /// Number of logical workbook sheets.
     #[must_use]
     pub fn len(&self) -> usize {
-        self.inner.sheets.len()
+        self.current().sheets.len()
     }
 
     /// Whether the workbook catalog contains no sheets.
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.inner.sheets.is_empty()
+        self.current().sheets.is_empty()
     }
 
     /// Iterate lightweight sheet handles without reading worksheet payloads.
-    #[must_use]
+    ///
+    /// # Errors
+    ///
+    /// Returns the publication error of a committed workbook's output, which
+    /// the first read writes into memory once (record 0360).
     pub fn sheets(
         &self,
-    ) -> impl ExactSizeIterator<Item = SourceWorksheet> + DoubleEndedIterator + '_ {
-        self.inner
+    ) -> Result<impl ExactSizeIterator<Item = SourceWorksheet> + DoubleEndedIterator + '_> {
+        let inner = &self.view()?.inner;
+        Ok(inner
             .sheets
             .iter()
             .cloned()
-            .map(|data| SourceWorksheet {
-                owner: Arc::clone(&self.inner),
-                data,
-            })
+            .map(|data| SourceWorksheet::new(Arc::clone(inner), data)))
+    }
+
+    /// The developer-facing sheet names in catalog order, without reading
+    /// any worksheet payload.
+    ///
+    /// A worksheet-level commit leaves the catalog unchanged, so a committed
+    /// workbook answers from its base catalog without materializing its
+    /// output. Workbook-level families retain catalog-only state in their
+    /// deferred projection; a read that needs the reopened owner materializes
+    /// and validates that output before replacing the base projection.
+    #[must_use]
+    pub fn sheet_names(&self) -> impl ExactSizeIterator<Item = &str> + DoubleEndedIterator + '_ {
+        self.current().sheets.iter().map(|sheet| sheet.name())
+    }
+
+    /// The catalog position of the active sheet, if the catalog contains one;
+    /// see [`Self::sheet_names`] for committed workbooks.
+    #[must_use]
+    pub fn active_sheet_position(&self) -> Option<usize> {
+        match self.pending_catalog() {
+            Some(catalog) => catalog.active_sheet,
+            None => self.current().active_sheet,
+        }
+    }
+
+    fn pending_catalog(&self) -> Option<&deferred::Catalog> {
+        self.pending
+            .as_ref()
+            .filter(|pending| pending.materialized().is_none())
+            .and_then(|pending| pending.catalog())
     }
 
     /// Look up a sheet by developer-facing name or checked zero-based position.
     pub fn sheet<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Option<SourceWorksheet>> {
+        self.view()?.sheet_in_view(selector)
+    }
+
+    fn sheet_in_view<'a>(
+        &self,
+        selector: impl Into<Selector<'a>>,
+    ) -> Result<Option<SourceWorksheet>> {
         self.inner.execution_check()?;
         let data = match selector.into() {
             CoreSelector::Position(position) => self.inner.sheets.get(position.get()).cloned(),
@@ -651,10 +1131,7 @@ impl SourceBackedWorkbook {
                 self.inner
                     .sheet_name_order
                     .binary_search_by(|&position| {
-                        self.inner.sheets[position]
-                            .name_key
-                            .as_ref()
-                            .cmp(key.as_ref())
+                        self.inner.sheets[position].name_key().cmp(key.as_ref())
                     })
                     .ok()
                     .and_then(|order| self.inner.sheets.get(self.inner.sheet_name_order[order]))
@@ -663,25 +1140,55 @@ impl SourceBackedWorkbook {
             CoreSelector::Id(never) => match never {},
             _ => return Err(Error::UnsupportedSelector),
         };
-        Ok(data.map(|data| SourceWorksheet {
-            owner: Arc::clone(&self.inner),
-            data,
-        }))
+        Ok(data.map(|data| SourceWorksheet::new(Arc::clone(&self.inner), data)))
     }
 
     /// Return the active sheet, if the workbook catalog contains one.
-    #[must_use]
-    pub fn active_sheet(&self) -> Option<SourceWorksheet> {
-        let data = self
-            .inner
+    ///
+    /// # Errors
+    ///
+    /// Returns the publication error of a committed workbook's output, which
+    /// the first read writes into memory once (record 0360).
+    pub fn active_sheet(&self) -> Result<Option<SourceWorksheet>> {
+        let inner = &self.view()?.inner;
+        let Some(data) = inner
             .active_sheet
-            .and_then(|position| self.inner.sheets.get(position))
-            .cloned()?;
-        Some(SourceWorksheet {
-            owner: Arc::clone(&self.inner),
-            data,
-        })
+            .and_then(|position| inner.sheets.get(position))
+            .cloned()
+        else {
+            return Ok(None);
+        };
+        Ok(Some(SourceWorksheet::new(Arc::clone(inner), data)))
     }
+
+    /// The catalog state infallible accessors read: the reopened output of a
+    /// committed workbook once a read has materialized it, otherwise the
+    /// opened (or base) catalog, which a worksheet-level commit leaves
+    /// unchanged. Catalog-only workbook-level projections remain deferred;
+    /// accessors that need their reopened owner go through [`Self::view`].
+    fn current(&self) -> &Arc<SourceInner> {
+        match &self.pending {
+            Some(pending) => pending
+                .materialized()
+                .map_or(&self.inner, |view| &view.inner),
+            None => &self.inner,
+        }
+    }
+}
+
+fn relationship_bytes(relationships: &litchi_opc::Relationships) -> usize {
+    relationships.iter().fold(
+        size_of::<litchi_opc::Relationships>(),
+        |bytes, relationship| {
+            bytes
+                .saturating_add(size_of::<litchi_opc::Relationship>())
+                .saturating_add(relationship.r_id().len())
+                .saturating_add(relationship.reltype().len())
+                .saturating_add(relationship.target_ref().len())
+                .saturating_add(relationship.base_uri().len())
+                .saturating_add(relationship.source_uri().map_or(0, str::len))
+        },
+    )
 }
 
 #[cfg(any(unix, windows))]
@@ -692,10 +1199,18 @@ fn file_source(path: impl AsRef<Path>) -> Result<Arc<dyn ReadAt>> {
 }
 
 impl SourceWorksheet {
+    const fn new(owner: Arc<SourceInner>, data: Arc<SourceSheetData>) -> Self {
+        Self {
+            owner,
+            data,
+            grid: OnceLock::new(),
+        }
+    }
+
     /// Developer-facing sheet name.
     #[must_use]
     pub fn name(&self) -> &str {
-        &self.data.name
+        self.data.name()
     }
 
     /// Checked zero-based workbook position.
@@ -710,32 +1225,71 @@ impl SourceWorksheet {
         self.data.kind
     }
 
+    /// The number of ordinary charts on this worksheet, in drawing order
+    /// (see [`crate::chart::edit`]). Only the worksheet's relationships and
+    /// its drawing part are read.
+    pub fn chart_count(&self) -> Result<usize> {
+        if self.data.kind != WorksheetKind::Worksheet {
+            return Err(Error::NotWorksheet {
+                sheet: self.data.name().to_owned(),
+            });
+        }
+        crate::chart::edit::source_chart_count(&self.owner.package, &self.data.part_uri)
+    }
+
+    /// The chart-space XML of the ordinary chart at `index` (drawing order)
+    /// on this worksheet, or `None` past the last chart.
+    pub fn chart_xml(&self, index: usize) -> Result<Option<Vec<u8>>> {
+        if self.data.kind != WorksheetKind::Worksheet {
+            return Err(Error::NotWorksheet {
+                sheet: self.data.name().to_owned(),
+            });
+        }
+        crate::chart::edit::source_chart_xml(&self.owner.package, &self.data.part_uri, index)
+    }
+
+    /// The two-cell anchor of the chart at `index` (drawing order) on this
+    /// worksheet; `None` past the last chart or for a one-cell or absolute
+    /// anchor. Only the worksheet's relationships and its drawing are read.
+    pub fn chart_anchor(&self, index: usize) -> Result<Option<crate::builder::chart::Anchor>> {
+        if self.data.kind != WorksheetKind::Worksheet {
+            return Err(Error::NotWorksheet {
+                sheet: self.data.name().to_owned(),
+            });
+        }
+        crate::chart::edit::source_chart_anchor(&self.owner.package, &self.data.part_uri, index)
+    }
+
+    /// The top-level objects of this worksheet's drawing, in drawing order
+    /// (see [`crate::drawing::edit`]). Only the worksheet's relationships, its
+    /// drawing part and the image entries are read.
+    pub fn drawing_elements(&self) -> Result<Vec<crate::drawing::edit::Element>> {
+        if self.data.kind != WorksheetKind::Worksheet {
+            return Err(Error::NotWorksheet {
+                sheet: self.data.name().to_owned(),
+            });
+        }
+        crate::drawing::edit::source_elements(&self.owner.package, &self.data.part_uri)
+    }
+
     /// Read the worksheet's admitted SpreadsheetML form controls.
     pub fn form_controls(&self) -> Result<crate::form_control::FormControlCollection> {
         if self.data.kind != WorksheetKind::Worksheet {
             return Err(Error::NotWorksheet {
-                sheet: self.data.name.clone(),
+                sheet: self.data.name().to_owned(),
             });
         }
-        crate::form_control::source_form_controls_for_sheet(
-            &self.owner.package,
-            &self.data.part_uri,
-        )
-    }
-
-    /// Read this worksheet's form controls under a caller-owned bounded
-    /// owner policy.
-    pub fn form_controls_with_limits(
-        &self,
-        limits: crate::form_control::OwnerLimits,
-    ) -> Result<crate::form_control::FormControlCollection> {
-        if self.data.kind != WorksheetKind::Worksheet {
-            return Err(Error::NotWorksheet {
-                sheet: self.data.name.clone(),
+        let package = &self.owner.package;
+        let limits = self
+            .owner
+            .owner_options_ref()
+            .semantic_limits()
+            .form_controls_value()
+            .unwrap_or_else(|| {
+                crate::form_control::OwnerLimits::from_read_limits(package.read_limits())
             });
-        }
         crate::form_control::source_form_controls_for_sheet_with_limits(
-            &self.owner.package,
+            package,
             &self.data.part_uri,
             limits,
         )
@@ -747,18 +1301,6 @@ impl SourceWorksheet {
         selector: impl Into<crate::form_control::ControlSelector<'a>>,
     ) -> Result<Option<crate::form_control::FormControlView>> {
         Ok(self.form_controls()?.get(selector)?.cloned())
-    }
-
-    /// Resolve one form control under a caller-owned bounded owner policy.
-    pub fn form_control_with_limits<'a>(
-        &self,
-        selector: impl Into<crate::form_control::ControlSelector<'a>>,
-        limits: crate::form_control::OwnerLimits,
-    ) -> Result<Option<crate::form_control::FormControlView>> {
-        Ok(self
-            .form_controls_with_limits(limits)?
-            .get(selector)?
-            .cloned())
     }
 
     /// Retained visibility state.
@@ -787,15 +1329,71 @@ impl SourceWorksheet {
     }
 
     /// Look up an exact logical cell state, returning an owning semantic value.
+    ///
+    /// A retained parsed grid answers by lookup. Otherwise the bounded
+    /// selected scan retains only requested records, falling back to a parsed
+    /// grid when the worksheet needs the full parser. [`Self::grid`] explicitly
+    /// materializes and pins a grid for repeated or structural reads.
     pub fn cell<'a>(&self, at: impl Into<At<'a>>) -> Result<SourceCellView> {
         let address = at.into().resolve()?;
-        let value = if self.data.cells.get().is_some() || self.data.kind != WorksheetKind::Worksheet
-        {
-            self.eager_cell(address)
-        } else {
-            self.stream_cell(address)
+        let value = match self.streams_cells() {
+            Ok(true) => self.stream_cell(address),
+            Ok(false) => self.eager_cell(address),
+            Err(error) => Err(error),
         };
         self.finish_result(value)
+    }
+
+    /// The rich-text runs of the cell at `at`, as
+    /// [`Worksheet::rich_text`](crate::Worksheet::rich_text) reads them
+    /// (record 0338): an inline rich string, or a shared-string item with
+    /// runs; `None` for any other cell. The worksheet's grid is parsed, and
+    /// the worksheet or shared-string part is scanned once.
+    ///
+    /// # Errors
+    ///
+    /// The errors of reading the worksheet's cells or the part holding the
+    /// runs, and a changed source.
+    pub fn rich_text<'a>(&self, at: impl Into<At<'a>>) -> Result<Option<crate::RichText>> {
+        let address = at.into().resolve()?;
+        let result = (|| {
+            let (inline, shared) = match self.store()?.entry(address) {
+                Some(entry) => (entry.inline_rich, entry.shared_string),
+                None => return Ok(None),
+            };
+            if inline {
+                let data = self.owner.package.part(&self.data.part_uri)?.data()?;
+                return crate::workbook::model::inline_rich(data.as_bytes(), &address.a1());
+            }
+            let (Some(index), Some(uri)) = (shared, self.owner.shared_strings_uri.as_ref()) else {
+                return Ok(None);
+            };
+            let data = self.owner.package.part(uri)?.data()?;
+            crate::workbook::model::rich_item(data.as_bytes(), index)
+        })();
+        self.finish_result(result)
+    }
+
+    /// Whether a cell read of this worksheet streams its part instead of
+    /// reading the parsed grid.
+    ///
+    /// A resident grid (pinned by this handle or retained by the workbook)
+    /// always answers. A cold eligible worksheet keeps the selected streaming
+    /// route; materialization is explicit or a parser fallback.
+    fn streams_cells(&self) -> Result<bool> {
+        if self.data.kind != WorksheetKind::Worksheet || self.grid.get().is_some() {
+            return Ok(false);
+        }
+        // A retained grid is pinned here, in the one lookup this read makes;
+        // the store read that follows runs the resident fences. A miss is
+        // counted by that store read, not by this probe.
+        if let Some(store) = self.cached_grid(false) {
+            let _publish_result = self.grid.set(Grid::new(store));
+            return Ok(false);
+        }
+        self.owner.execution_check()?;
+        self.owner.package.source_version()?;
+        Ok(true)
     }
 
     fn eager_cell(&self, address: Address) -> Result<SourceCellView> {
@@ -889,10 +1487,10 @@ impl SourceWorksheet {
 
     /// Read every stored cell selected by a checked range into owning values.
     ///
-    /// A cold worksheet uses the bounded sparse selection route when its
-    /// structure is eligible; unsupported worksheet semantics fall back to
-    /// the materialized store. The returned cells are independent of the
-    /// source and may outlive this worksheet handle.
+    /// The range takes the route [`Self::cell`] describes: the worksheet's
+    /// resident parsed grid, or the bounded sparse selection route when a
+    /// cold worksheet's structure is eligible. The returned cells are independent of
+    /// the source and may outlive this worksheet handle.
     pub fn cells<'a>(&self, area: impl Into<Area<'a>>) -> Result<Vec<SourceCell>> {
         let range = area.into().resolve()?;
         let values = self
@@ -919,11 +1517,13 @@ impl SourceWorksheet {
     /// values as [`Self::cells`], but each selected cell is produced as it is
     /// visited instead of after a whole-range vector of owning cells has been
     /// built. Callbacks still receive references into local values, so no
-    /// callback runs while a source reader is active: the bounded selected
-    /// scan reaches worksheet EOF, resolves its shared-string and style
-    /// dependencies and validates every retained record before the first
-    /// callback, so every refusal [`Self::cells`] raises for this range is
-    /// still raised before any cell is visited.
+    /// callback runs while a source reader is active: the parsed grid is
+    /// complete, or the bounded selected scan has reached worksheet EOF,
+    /// resolved its shared-string and style dependencies and validated every
+    /// retained record, before the first callback, so every refusal
+    /// [`Self::cells`] raises for this range is still raised before any cell
+    /// is visited. [`Self::visit_cells_until`] is the variant whose callback
+    /// can stop the walk without an error.
     ///
     /// Cancellation is checked before each callback. Final source and
     /// execution fences run even when a callback fails, so a source mutation
@@ -932,84 +1532,13 @@ impl SourceWorksheet {
     where
         F: FnMut(Address, &Cell) -> Result<()>,
     {
-        let range = match area.into().resolve() {
-            Ok(range) => range,
-            Err(error) => return self.finish_result(Err(error.into())),
-        };
-        // `cells` publishes its values through `finish_result` before any
-        // caller can observe them; keep that fence ahead of the first visit.
-        let selection = match self.finish_result(self.select_cells(range)) {
-            Ok(selection) => selection,
-            Err(error) => return self.finish_result(Err(error)),
-        };
-        let mut visited = 0usize;
-        let mut result = Ok(());
-        match selection {
-            Selection::Stored(store) => {
-                for (address, cell) in store.cells(range) {
-                    if !self.visit_one(&mut visit, address, cell, &mut visited, &mut result) {
-                        break;
-                    }
-                }
-            },
-            Selection::Selected { cells, shared_text } => {
-                for record in cells {
-                    let source_cell = match resolve_selected_record(record, shared_text.as_deref())
-                    {
-                        Ok(source_cell) => source_cell,
-                        Err(error) => {
-                            result = Err(error);
-                            break;
-                        },
-                    };
-                    if !self.visit_one(
-                        &mut visit,
-                        source_cell.address,
-                        &source_cell.cell,
-                        &mut visited,
-                        &mut result,
-                    ) {
-                        break;
-                    }
-                }
-            },
-        }
-        self.finish_result(result.map(|()| visited))
-    }
-
-    /// Hand one produced cell to a range visitor.
-    ///
-    /// Cancellation is checked before the callback and the visited count is
-    /// bounded. `false` stops the walk, with `result` carrying the primary
-    /// error.
-    fn visit_one<F>(
-        &self,
-        visit: &mut F,
-        address: Address,
-        cell: &Cell,
-        visited: &mut usize,
-        result: &mut Result<()>,
-    ) -> bool
-    where
-        F: FnMut(Address, &Cell) -> Result<()>,
-    {
-        if let Err(error) = self.owner.execution_check() {
-            *result = Err(error);
-            return false;
-        }
-        if let Err(error) = visit(address, cell) {
-            *result = Err(error);
-            return false;
-        }
-        match visited.checked_add(1) {
-            Some(count) => {
-                *visited = count;
-                true
-            },
-            None => {
-                *result = Err(invalid("source-backed cell visit count overflow"));
-                false
-            },
+        let flow = self.visit_cells_until(area, |address, cell| match visit(address, cell) {
+            Ok(()) => ControlFlow::Continue(()),
+            Err(error) => ControlFlow::Break(error),
+        })?;
+        match flow {
+            ControlFlow::Continue(visited) => Ok(visited),
+            ControlFlow::Break(error) => Err(error),
         }
     }
 
@@ -1021,10 +1550,10 @@ impl SourceWorksheet {
     /// whole-range read of this rectangle can raise has already been raised
     /// when this returns.
     fn select_cells(&self, range: Rect) -> Result<Selection<'_>> {
-        if self.data.cells.get().is_some() || self.data.kind != WorksheetKind::Worksheet {
-            return Ok(Selection::Stored(self.store()?));
+        if self.streams_cells()? {
+            return self.stream_selection(range);
         }
-        self.stream_selection(range)
+        Ok(Selection::Stored(self.store()?))
     }
 
     #[expect(
@@ -1177,40 +1706,108 @@ impl SourceWorksheet {
         Ok(extent)
     }
 
+    /// The parsed grid of this worksheet, pinned by this handle.
+    ///
+    /// A grid this handle already pins is returned after the source and
+    /// execution fences. Otherwise the workbook's semantic cache is asked,
+    /// and on a miss the part is parsed once, under this worksheet's build
+    /// lock so racing readers share one build, and the result is offered to
+    /// the cache. Only a complete, successfully parsed grid is published.
     fn store(&self) -> Result<&Store> {
         self.owner.execution_check()?;
         if self.data.kind != WorksheetKind::Worksheet {
             return Err(Error::NotWorksheet {
-                sheet: self.data.name.clone(),
+                sheet: self.data.name().to_owned(),
             });
         }
         // `SourceBackedPackage::part` checks the captured source version even
-        // when this worksheet's parsed semantic store is already retained.
+        // when this worksheet's parsed semantic store is already resident.
         // Never return cached semantic data after a caller-visible source
         // change has invalidated the snapshot.
         let part = self.owner.package.part(&self.data.part_uri)?;
-        if let Some(store) = self.data.cells.get() {
-            // A cached semantic Store must still honor the managed package's
-            // cancellation and source-version checks. `PartView::data()` is
-            // deliberately not requested here: the semantic Store is already
-            // the validated worksheet snapshot, and its retained value must
-            // remain usable even when the bounded payload cache evicted or
-            // bypassed the original worksheet bytes.
-            self.owner.package.check_execution()?;
-            self.owner.execution_check()?;
-            self.owner.package.source_version()?;
-            return Ok(store);
+        if let Some(grid) = self.grid.get() {
+            return self.resident_store(grid);
+        }
+        if let Some(store) = self.cached_grid(true) {
+            return self.pin(store);
+        }
+        let _build = self.data.lock_build();
+        if let Some(store) = self.cached_grid(false) {
+            return self.pin(store);
         }
 
         let data = part.data()?;
         let mut parsed = raw::worksheet::parse(data.as_bytes(), || self.owner.shared_strings())?;
+        drop(data);
         self.owner.repair_styles(&mut parsed)?;
         self.owner.execution_check()?;
         self.owner.package.source_version()?;
-        let _publish_result = self.data.cells.set(parsed);
-        self.data.cells.get().ok_or_else(|| {
+        let _publish_result = self.data.tolerance.set(parsed.tolerance_report().clone());
+        let weight = parsed.weight_bytes();
+        let store = match self.owner.values().publish(
+            self.data.position,
+            values::Cached::Grid(Arc::new(parsed)),
+            weight,
+        ) {
+            values::Cached::Grid(store) => store,
+            values::Cached::Blocks(_) | values::Cached::Prefix(_) => {
+                return Err(invalid(
+                    "source-backed worksheet grid cache returned another value kind",
+                ));
+            },
+        };
+        let _publish_result = self.grid.set(Grid::new(store));
+        self.grid.get().map(Grid::store).ok_or_else(|| {
             invalid("source-backed worksheet cache initialization did not publish a value")
         })
+    }
+
+    /// Return a resident store after the fences every cached read runs.
+    fn resident_store<'a>(&self, grid: &'a Grid) -> Result<&'a Store> {
+        // A cached semantic Store must still honor the managed package's
+        // cancellation and source-version checks. `PartView::data()` is
+        // deliberately not requested here: the semantic Store is already
+        // the validated worksheet snapshot, and its retained value must
+        // remain usable even when the bounded payload cache evicted or
+        // bypassed the original worksheet bytes.
+        self.owner.package.check_execution()?;
+        self.owner.execution_check()?;
+        self.owner.package.source_version()?;
+        Ok(grid.store())
+    }
+
+    /// Pin a store the workbook's cache retains and return it.
+    fn pin(&self, store: Arc<Store>) -> Result<&Store> {
+        // A concurrent reader of this same handle may have pinned the same
+        // cached store first; either value is the one the cache holds.
+        let _publish_result = self.grid.set(Grid::new(store));
+        let grid = self
+            .grid
+            .get()
+            .ok_or_else(|| invalid("source-backed worksheet grid was not pinned"))?;
+        self.resident_store(grid)
+    }
+
+    fn cached_grid(&self, record_miss: bool) -> Option<Arc<Store>> {
+        match self
+            .owner
+            .values()
+            .get(self.data.position, values::Axis::Grid, record_miss)?
+        {
+            values::Cached::Grid(store) => Some(store),
+            values::Cached::Blocks(_) | values::Cached::Prefix(_) => None,
+        }
+    }
+
+    /// Whether this handle pins, or the workbook's cache retains, the parsed
+    /// grid of this worksheet.
+    #[cfg(test)]
+    fn store_resident(&self) -> bool {
+        self.grid.get().is_some()
+            || self
+                .owner
+                .values()
+                .holds(self.data.position, values::Axis::Grid)
     }
 }
 
@@ -1357,6 +1954,133 @@ fn map_selected_mce_error(error: MceError) -> Error {
 }
 
 impl SourceInner {
+    fn default_owner_options() -> &'static Arc<SourceOwnerOptions> {
+        static DEFAULT: OnceLock<Arc<SourceOwnerOptions>> = OnceLock::new();
+        DEFAULT.get_or_init(|| {
+            Arc::new(SourceOwnerOptions::from_open_options(
+                &crate::OpenOptions::default(),
+            ))
+        })
+    }
+
+    fn owner_options_ref(&self) -> &SourceOwnerOptions {
+        self.owner_options
+            .as_deref()
+            .unwrap_or_else(|| Self::default_owner_options().as_ref())
+    }
+
+    fn owner_options(&self) -> Arc<SourceOwnerOptions> {
+        self.owner_options
+            .clone()
+            .unwrap_or_else(|| Arc::clone(Self::default_owner_options()))
+    }
+
+    fn defined_names_slice(&self) -> &[raw::DefinedName] {
+        match &self.defined_names {
+            Some(names) => names,
+            // A proof-backed owner is constructed with its catalog proof set.
+            None => self
+                .catalog_proof
+                .get()
+                .expect("proof-backed source owner must retain its catalog proof")
+                .defined_names
+                .as_ref(),
+        }
+    }
+
+    pub(crate) fn tab_state_graph(
+        &self,
+        owner: std::sync::Weak<SourceInner>,
+    ) -> Arc<crate::tab_state::GraphBinding> {
+        Arc::clone(self.tab_state_graph.get_or_init(|| {
+            Arc::new(crate::tab_state::GraphBinding::source(
+                owner,
+                Arc::from(self.sheets.clone()),
+            ))
+        }))
+    }
+
+    pub(crate) fn tab_state_package(&self) -> &SourceBackedPackage {
+        &self.package
+    }
+
+    pub(crate) fn tab_state_catalog_is_clean(&self) -> bool {
+        self.tolerance.is_clean()
+    }
+
+    pub(crate) fn source_limits(&self) -> Arc<SourceLimits> {
+        Arc::clone(
+            self.source_limits
+                .get_or_init(|| Arc::new(self.package.read_limits())),
+        )
+    }
+
+    /// The catalog proof, when this owner already holds one (a proof-backed
+    /// reopen, or an owner whose proof an earlier edit captured).
+    pub(crate) fn catalog_proof_if_ready(&self) -> Option<Arc<SourceCatalogProof>> {
+        self.catalog_proof.get().cloned()
+    }
+
+    /// Whether this owner's package was admitted under `limits`.
+    pub(crate) fn admitted_under(&self, limits: &SourceLimits) -> bool {
+        match self.source_limits.get() {
+            Some(admitted) => **admitted == *limits,
+            None => self.package.read_limits() == *limits,
+        }
+    }
+
+    pub(crate) fn catalog_proof(&self) -> Arc<SourceCatalogProof> {
+        Arc::clone(self.catalog_proof.get_or_init(|| {
+            Arc::new(SourceCatalogProof {
+                defined_names: Arc::from(self.defined_names_slice()),
+                limits: self.source_limits(),
+            })
+        }))
+    }
+
+    fn values(&self) -> &values::ValueCache {
+        &self.values
+    }
+
+    fn dependencies(&self) -> &DependencyState {
+        self.dependencies
+            .get_or_init(|| Box::new(DependencyState::new()))
+            .as_ref()
+    }
+
+    pub(crate) fn package_handle(&self) -> Arc<SourceBackedPackage> {
+        Arc::clone(
+            self.package_handle
+                .get_or_init(|| Arc::new(self.package.clone())),
+        )
+    }
+
+    pub(crate) fn merge_source_state(
+        &self,
+        worksheet_uri: &PackURI,
+    ) -> Option<Arc<crate::merge::source::SourceStateShared>> {
+        self.merge_source_states.get().and_then(|states| {
+            states
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .get(worksheet_uri)
+                .cloned()
+        })
+    }
+
+    pub(crate) fn cache_merge_source_state(
+        &self,
+        worksheet_uri: PackURI,
+        state: Arc<crate::merge::source::SourceStateShared>,
+    ) -> Arc<crate::merge::source::SourceStateShared> {
+        let mut states = self
+            .merge_source_states
+            .get_or_init(|| Box::new(Mutex::new(HashMap::new())))
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        Arc::clone(states.entry(worksheet_uri).or_insert(state))
+    }
+
     fn execution_check(&self) -> Result<()> {
         // The package owns the execution context used by managed source
         // caches. Always check it first so compatibility facades built around
@@ -1366,7 +2090,7 @@ impl SourceInner {
         // Constructors that create both layers retain the same logical
         // context in each handle; checking the optional facade handle as well
         // also covers callers that supply a distinct policy at this boundary.
-        check_execution(self.execution.as_ref())
+        check_execution(self.execution.as_deref())
     }
 
     fn stream_shared_strings_dependency(
@@ -1476,7 +2200,8 @@ impl SourceInner {
         let Some(uri) = self.shared_strings_uri.as_ref() else {
             return Ok(None);
         };
-        if let Some(strings) = self.shared_strings.get() {
+        let dependencies = self.dependencies();
+        if let Some(strings) = dependencies.shared_strings.get() {
             let _part = self.package.part(uri)?;
             self.execution_check()?;
             self.package.source_version()?;
@@ -1490,9 +2215,10 @@ impl SourceInner {
         self.package.source_version()?;
         // The report is published first, so a published table always has
         // its report; a racing parse of the same bytes reports the same.
-        let _publish_result = self.shared_strings_tolerance.set(tolerance);
-        let _publish_result = self.shared_strings.set(parsed);
-        self.shared_strings
+        let _publish_result = dependencies.shared_strings_tolerance.set(tolerance);
+        let _publish_result = dependencies.shared_strings.set(parsed);
+        dependencies
+            .shared_strings
             .get()
             .map(|strings| Some(strings.as_ref()))
             .ok_or_else(|| {
@@ -1668,7 +2394,7 @@ fn require_content_type(sheet: &raw::Sheet, actual: &str, expected: &str) -> Res
 
 #[cfg(test)]
 mod tests {
-    use std::io;
+    use std::io::{self, Cursor, Read};
     use std::num::{NonZeroU64, NonZeroUsize};
     use std::sync::Arc;
     use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
@@ -1678,11 +2404,15 @@ mod tests {
         ReadAt, Resource, SourceVersion,
     };
     use litchi_opc::constants::content_type as ct;
-    use litchi_opc::{OpcError, OpcPackage, PackURI, SourceBackedPackage, SourceCacheLimits};
+    use litchi_opc::{
+        OpcError, OpcPackage, PackURI, SourceBackedPackage, SourceCacheLimits, SourceLimitKind,
+        SourceReadPolicy,
+    };
     use soapberry_zip::office::StreamingArchiveWriter;
 
-    use super::{ReadLimits, SourceBackedWorkbook, SourceCellView};
+    use super::{SourceBackedWorkbook, SourceCellView};
     use crate::{Cell, Error, Value};
+    use litchi_opc::SourceLimits;
 
     const FIRST_MARKER: &[u8] = b"source-backed-requested-first-sheet";
     const SECOND_MARKER: &[u8] = b"source-backed-unrequested-second-sheet";
@@ -1694,6 +2424,43 @@ mod tests {
         first_body_marker_reads: AtomicUsize,
         second_body_marker_reads: AtomicUsize,
         revision: AtomicU64,
+    }
+
+    struct CountingReader {
+        inner: Cursor<Vec<u8>>,
+        reads: Arc<AtomicUsize>,
+        bytes_read: Arc<AtomicUsize>,
+    }
+
+    impl CountingReader {
+        fn new(bytes: Vec<u8>, reads: Arc<AtomicUsize>) -> Self {
+            Self {
+                inner: Cursor::new(bytes),
+                reads,
+                bytes_read: Arc::new(AtomicUsize::new(0)),
+            }
+        }
+
+        fn with_byte_counter(
+            bytes: Vec<u8>,
+            reads: Arc<AtomicUsize>,
+            bytes_read: Arc<AtomicUsize>,
+        ) -> Self {
+            Self {
+                inner: Cursor::new(bytes),
+                reads,
+                bytes_read,
+            }
+        }
+    }
+
+    impl Read for CountingReader {
+        fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+            self.reads.fetch_add(1, Ordering::SeqCst);
+            let read = self.inner.read(output)?;
+            self.bytes_read.fetch_add(read, Ordering::SeqCst);
+            Ok(read)
+        }
     }
 
     impl CountingSource {
@@ -1798,7 +2565,8 @@ mod tests {
     }
 
     fn source_backed_xlsx() -> Vec<u8> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer
             .write_stored(
                 "[Content_Types].xml",
@@ -1847,7 +2615,8 @@ mod tests {
     }
 
     fn empty_source_backed_xlsx() -> Vec<u8> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer
             .write_stored(
                 "[Content_Types].xml",
@@ -1880,7 +2649,7 @@ mod tests {
     }
 
     fn part_len(bytes: &[u8], member: &str) -> u64 {
-        let package = OpcPackage::from_bytes(bytes).unwrap();
+        let package = OpcPackage::from_bytes(bytes, SourceLimits::default()).unwrap();
         package
             .get_part(&PackURI::new(member).unwrap())
             .unwrap()
@@ -1914,6 +2683,7 @@ mod tests {
         assert_eq!(
             workbook
                 .sheets()
+                .unwrap()
                 .map(|sheet| sheet.name().to_owned())
                 .collect::<Vec<_>>(),
             ["First", "Second"]
@@ -1948,10 +2718,11 @@ mod tests {
     fn cached_worksheet_queries_do_not_reload_an_evicted_payload() {
         let source = Arc::new(CountingSource::new(source_backed_xlsx()));
         let cache_limits = SourceCacheLimits::new(256 * 1024, 1).unwrap();
-        let workbook = SourceBackedWorkbook::from_read_at_with_limits_and_cache_limits(
+        let workbook = SourceBackedWorkbook::from_read_at_with_options(
             source.clone(),
-            ReadLimits::default(),
-            cache_limits,
+            crate::OpenOptions::new()
+                .source_limits(SourceLimits::default())
+                .cache_limits(cache_limits),
         )
         .unwrap();
 
@@ -1987,6 +2758,139 @@ mod tests {
             first_reads_before_cached_query,
             "a retained semantic worksheet must not reload evicted PartData"
         );
+    }
+
+    #[test]
+    fn sequential_reader_preserves_deferred_cache_options() {
+        let cache_limits = SourceCacheLimits::new(256 * 1024, 1).unwrap();
+        let workbook = SourceBackedWorkbook::from_reader_with_options(
+            Cursor::new(source_backed_xlsx()),
+            crate::OpenOptions::new().cache_limits(cache_limits),
+        )
+        .unwrap();
+
+        let first = workbook.sheet("First").unwrap().unwrap();
+        assert!(first.stored_extent().unwrap().is_some());
+        assert!(first.cell("A1").is_ok());
+        let second = workbook.sheet("Second").unwrap().unwrap();
+        assert!(second.stored_extent().unwrap().is_some());
+        assert!(second.cell("A1").is_ok());
+        assert!(
+            workbook.cache_diagnostics().evictions > 0,
+            "the sequential-reader path must retain the caller's one-entry cache policy"
+        );
+    }
+
+    #[test]
+    fn sequential_reader_retains_cancellation_after_open() {
+        let archive = source_backed_xlsx();
+        let reads = Arc::new(AtomicUsize::new(0));
+        let bytes_read = Arc::new(AtomicUsize::new(0));
+        let reader = CountingReader::with_byte_counter(
+            archive.clone(),
+            Arc::clone(&reads),
+            Arc::clone(&bytes_read),
+        );
+        let (budget, cancellation_source, context) = managed_context(u64::MAX);
+        let workbook = SourceBackedWorkbook::from_reader_with_options(
+            reader,
+            crate::OpenOptions::new()
+                .cache_limits(SourceCacheLimits::new(256 * 1024, 1).unwrap())
+                .execution_context(context),
+        )
+        .unwrap();
+
+        // Catalog access succeeds after the sequential reader has completed,
+        // while the worksheet body remains deferred. Cancellation must still
+        // be observed by that later read through the retained OPC context.
+        assert_eq!(workbook.len(), 2);
+        assert_eq!(bytes_read.load(Ordering::SeqCst), archive.len());
+        let first = workbook.sheet("First").unwrap().unwrap();
+        let reads_before_cancel = reads.load(Ordering::SeqCst);
+        cancellation_source.cancel();
+        assert!(matches!(
+            first.stored_extent(),
+            Err(Error::Package(OpcError::Cancelled))
+        ));
+        assert_eq!(reads.load(Ordering::SeqCst), reads_before_cancel);
+        drop(first);
+        drop(workbook);
+        assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn sequential_reader_enforces_exact_and_over_source_input_limits() {
+        let archive = source_backed_xlsx();
+        let exact = SourceLimits::builder()
+            .max_input_bytes(archive.len() as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        let workbook = SourceBackedWorkbook::from_reader_with_options(
+            Cursor::new(archive.clone()),
+            crate::OpenOptions::new().source_limits(exact),
+        )
+        .unwrap();
+        assert_eq!(workbook.len(), 2);
+
+        let maximum = archive.len() - 1;
+        let under = SourceLimits::builder()
+            .max_input_bytes(maximum as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            SourceBackedWorkbook::from_reader_with_options(
+                Cursor::new(archive),
+                crate::OpenOptions::new().source_limits(under),
+            ),
+            Err(Error::Package(OpcError::Limit {
+                kind: SourceLimitKind::InputBytes,
+                observed,
+                maximum: configured,
+            })) if observed == maximum as u64 + 1 && configured == maximum as u64
+        ));
+    }
+
+    #[test]
+    fn sequential_reader_cache_options_survive_committed_owner_reopen() {
+        let cache_limits = SourceCacheLimits::new(256 * 1024, 1).unwrap();
+        let workbook = SourceBackedWorkbook::from_reader_with_options(
+            Cursor::new(source_backed_xlsx()),
+            crate::OpenOptions::new().cache_limits(cache_limits),
+        )
+        .unwrap();
+        let mut edit = workbook.edit_tab_state().unwrap();
+        assert!(edit.hide("First").unwrap());
+        let commit = edit.commit().unwrap();
+
+        let committed = commit.package();
+        let first = committed.sheet("First").unwrap().unwrap();
+        assert!(first.stored_extent().unwrap().is_some());
+        let second = committed.sheet("Second").unwrap().unwrap();
+        assert!(second.stored_extent().unwrap().is_some());
+        assert!(
+            committed.cache_diagnostics().evictions > 0,
+            "a committed sequential owner must retain its custom one-entry cache policy"
+        );
+    }
+
+    #[test]
+    fn sequential_reader_checks_cancellation_before_ingestion() {
+        let reads = Arc::new(AtomicUsize::new(0));
+        let reader = CountingReader::new(source_backed_xlsx(), Arc::clone(&reads));
+        let (budget, cancellation_source, context) = managed_context(u64::MAX);
+        cancellation_source.cancel();
+
+        assert!(matches!(
+            SourceBackedWorkbook::from_reader_with_options(
+                reader,
+                crate::OpenOptions::new().execution_context(context),
+            ),
+            Err(Error::Package(OpcError::Cancelled))
+        ));
+        assert_eq!(reads.load(Ordering::SeqCst), 0);
+        assert_eq!(budget.used(Resource::Memory), 0);
     }
 
     #[test]
@@ -2069,14 +2973,14 @@ mod tests {
         let source = Arc::new(CountingSource::new(archive));
         let (budget, _cancellation_source, context) = managed_context(exact);
         let cache_limits = SourceCacheLimits::new(usize::try_from(exact).unwrap(), 4).unwrap();
-        let workbook =
-            SourceBackedWorkbook::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                source.clone(),
-                ReadLimits::default(),
-                cache_limits,
-                context,
-            )
-            .unwrap();
+        let workbook = SourceBackedWorkbook::from_read_at_with_options(
+            source.clone(),
+            crate::OpenOptions::new()
+                .source_limits(SourceLimits::default())
+                .cache_limits(cache_limits)
+                .execution_context(context),
+        )
+        .unwrap();
 
         assert_eq!(workbook.source_version().unwrap().revision(), 0);
         assert_eq!(workbook.cache_diagnostics().successful_loads, 1);
@@ -2113,14 +3017,14 @@ mod tests {
         let source = Arc::new(CountingSource::new(archive));
         let (budget, _cancellation_source, context) = managed_context(exact - 1);
         let cache_limits = SourceCacheLimits::new(usize::try_from(exact).unwrap(), 4).unwrap();
-        let workbook =
-            SourceBackedWorkbook::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                source.clone(),
-                ReadLimits::default(),
-                cache_limits,
-                context,
-            )
-            .unwrap();
+        let workbook = SourceBackedWorkbook::from_read_at_with_options(
+            source.clone(),
+            crate::OpenOptions::new()
+                .source_limits(SourceLimits::default())
+                .cache_limits(cache_limits)
+                .execution_context(context),
+        )
+        .unwrap();
 
         assert_eq!(workbook.cache_diagnostics().successful_loads, 1);
         assert_eq!(budget.used(Resource::Memory), workbook_bytes);
@@ -2148,10 +3052,11 @@ mod tests {
         let (budget, cancellation_source, context) = managed_context(u64::MAX);
         cancellation_source.cancel();
         assert!(matches!(
-            SourceBackedWorkbook::from_read_at_with_execution_context(
+            SourceBackedWorkbook::from_read_at_with_options(
                 source.clone(),
-                ReadLimits::default(),
-                context,
+                crate::OpenOptions::new()
+                    .source_limits(SourceLimits::default())
+                    .execution_context(context)
             ),
             Err(Error::Package(OpcError::Cancelled))
         ));
@@ -2161,10 +3066,11 @@ mod tests {
 
         let source = Arc::new(CountingSource::new(archive));
         let (budget, cancellation_source, context) = managed_context(u64::MAX);
-        let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+        let workbook = SourceBackedWorkbook::from_read_at_with_options(
             source.clone(),
-            ReadLimits::default(),
-            context,
+            crate::OpenOptions::new()
+                .source_limits(SourceLimits::default())
+                .execution_context(context),
         )
         .unwrap();
         let first = workbook.sheet("First").unwrap().unwrap();
@@ -2190,14 +3096,14 @@ mod tests {
         let source = Arc::new(CountingSource::new(archive));
         let (budget, cancellation_source, context) = managed_context(u64::MAX);
         let cache_limits = SourceCacheLimits::new(256 * 1024, 4).unwrap();
-        let package =
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                source.clone(),
-                ReadLimits::default(),
-                cache_limits,
-                context,
-            )
-            .unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            SourceLimits::default(),
+            cache_limits,
+            SourceReadPolicy::exact(),
+            Some(context),
+        )
+        .unwrap();
         let workbook = SourceBackedWorkbook::from_source_backed_package(package).unwrap();
         let first = workbook.sheet("First").unwrap().unwrap();
         assert!(first.cell("A1").is_ok());
@@ -2218,6 +3124,193 @@ mod tests {
         assert_eq!(budget.used(Resource::Memory), 0);
     }
 
+    #[test]
+    fn externally_opened_package_preserves_custom_cache_after_commit() {
+        let source = Arc::new(CountingSource::new(source_backed_xlsx()));
+        let cache_limits = SourceCacheLimits::new(256 * 1024, 1).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            SourceLimits::default(),
+            cache_limits,
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
+        // A facade option cannot replace the cache policy already admitted by
+        // an externally supplied package. Use the OPC default here so a
+        // regression would visibly widen the one-entry cache.
+        let workbook = SourceBackedWorkbook::from_source_backed_package_with_options(
+            package,
+            crate::OpenOptions::new().cache_limits(SourceCacheLimits::default()),
+        )
+        .unwrap();
+        let mut edit = workbook.edit_tab_state().unwrap();
+        assert!(edit.hide("First").unwrap());
+        let commit = edit.commit().unwrap();
+        let committed = commit.package();
+
+        assert_eq!(
+            committed.source_backed_package().unwrap().cache_limits(),
+            cache_limits,
+            "materialization must retain the externally admitted cache policy"
+        );
+        assert!(
+            committed
+                .sheet("First")
+                .unwrap()
+                .unwrap()
+                .stored_extent()
+                .unwrap()
+                .is_some()
+        );
+        assert!(
+            committed
+                .sheet("Second")
+                .unwrap()
+                .unwrap()
+                .stored_extent()
+                .unwrap()
+                .is_some()
+        );
+        assert!(
+            committed.cache_diagnostics().evictions > 0,
+            "a committed external package must retain its one-entry cache"
+        );
+    }
+
+    #[test]
+    fn externally_opened_managed_package_context_survives_commit() {
+        let source = Arc::new(CountingSource::new(source_backed_xlsx()));
+        let (budget, cancellation_source, context) = managed_context(u64::MAX);
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            SourceLimits::default(),
+            SourceCacheLimits::new(256 * 1024, 4).unwrap(),
+            SourceReadPolicy::exact(),
+            Some(context),
+        )
+        .unwrap();
+        let workbook = SourceBackedWorkbook::from_source_backed_package(package).unwrap();
+        let mut edit = workbook.edit_tab_state().unwrap();
+        assert!(edit.hide("First").unwrap());
+        let commit = edit.commit().unwrap();
+        let committed = commit.package();
+
+        assert!(
+            committed
+                .source_backed_package()
+                .unwrap()
+                .execution_context()
+                .is_some()
+        );
+        let first = committed.sheet("First").unwrap().unwrap();
+        assert!(first.stored_extent().unwrap().is_some());
+        cancellation_source.cancel();
+        assert!(matches!(
+            first.stored_extent(),
+            Err(Error::Package(OpcError::Cancelled))
+        ));
+
+        drop(first);
+        drop(workbook);
+        drop(commit);
+        assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn external_package_and_facade_contexts_both_survive_commit() {
+        let source = Arc::new(CountingSource::new(source_backed_xlsx()));
+        let (package_budget, _package_cancellation, package_context) = managed_context(u64::MAX);
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            SourceLimits::default(),
+            SourceCacheLimits::new(256 * 1024, 4).unwrap(),
+            SourceReadPolicy::exact(),
+            Some(package_context),
+        )
+        .unwrap();
+        let (facade_budget, facade_cancellation, facade_context) = managed_context(u64::MAX);
+        let workbook = SourceBackedWorkbook::from_source_backed_package_with_options(
+            package,
+            crate::OpenOptions::new().execution_context(facade_context),
+        )
+        .unwrap();
+        let mut edit = workbook.edit_tab_state().unwrap();
+        assert!(edit.hide("First").unwrap());
+        let commit = edit.commit().unwrap();
+        let committed = commit.package();
+        let first = committed.sheet("First").unwrap().unwrap();
+        assert!(first.stored_extent().unwrap().is_some());
+
+        facade_cancellation.cancel();
+        assert!(matches!(
+            first.stored_extent(),
+            Err(Error::Package(OpcError::Cancelled))
+        ));
+        drop(first);
+        drop(workbook);
+        drop(commit);
+        assert_eq!(package_budget.used(Resource::Memory), 0);
+        assert_eq!(facade_budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn cancelled_facade_fences_uncached_deferred_view_and_write() {
+        let source = Arc::new(CountingSource::new(source_backed_xlsx()));
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            SourceLimits::default(),
+            SourceCacheLimits::new(256 * 1024, 4).unwrap(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
+        let (budget, cancellation_source, context) = managed_context(u64::MAX);
+        let workbook = SourceBackedWorkbook::from_source_backed_package_with_options(
+            package,
+            crate::OpenOptions::new().execution_context(context),
+        )
+        .unwrap();
+        let mut edit = workbook.edit_tab_state().unwrap();
+        assert!(edit.hide("First").unwrap());
+        let commit = edit.commit().unwrap();
+        let committed = commit.package();
+        assert!(
+            committed
+                .pending
+                .as_ref()
+                .is_some_and(|pending| pending.materialized().is_none()),
+            "the regression must exercise the uncached deferred publication path"
+        );
+
+        cancellation_source.cancel();
+        assert!(matches!(
+            committed.sheet("First"),
+            Err(Error::Package(OpcError::Cancelled))
+        ));
+        assert!(
+            committed
+                .pending
+                .as_ref()
+                .is_some_and(|pending| pending.materialized().is_none()),
+            "a cancelled view must not publish or cache an output"
+        );
+
+        let mut output = Vec::new();
+        assert!(matches!(
+            committed.write_to(&mut output),
+            Err(Error::Package(OpcError::Cancelled))
+        ));
+        assert!(
+            output.is_empty(),
+            "cancelled publication must not touch the sink"
+        );
+
+        drop(workbook);
+        drop(commit);
+        assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
     mod streaming_0363_tests {
         use std::io::Cursor;
         use std::sync::Arc;
@@ -2228,7 +3321,7 @@ mod tests {
         use soapberry_zip::office::StreamingArchiveWriter;
 
         use super::{
-            CountingSource, ReadLimits, SourceBackedWorkbook, SourceCellView, managed_context,
+            CountingSource, SourceBackedWorkbook, SourceCellView, SourceLimits, managed_context,
             source_backed_xlsx,
         };
         use crate::{Cell, Error, Value};
@@ -2237,7 +3330,9 @@ mod tests {
             "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 
         fn one_sheet_xlsx(worksheet: &str) -> Vec<u8> {
-            let mut writer = StreamingArchiveWriter::new();
+            let mut writer = StreamingArchiveWriter::new(
+                soapberry_zip::office::StreamingArchiveLimits::default(),
+            );
             writer
                 .write_stored(
                     "[Content_Types].xml",
@@ -2282,20 +3377,20 @@ mod tests {
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             let cold = workbook.cache_diagnostics();
 
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert!(matches!(
                 sheet.cell("A1").unwrap(),
                 SourceCellView::Stored(Cell::Value(Value::Number(ref value)))
                     if value.as_str() == "7"
             ));
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert!(matches!(sheet.cell("C1").unwrap(), SourceCellView::Missing));
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert!(matches!(
                 sheet.cell("B1").unwrap(),
                 SourceCellView::Stored(Cell::Empty)
             ));
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
 
             let after = workbook.cache_diagnostics();
             assert_eq!(after.successful_loads, cold.successful_loads);
@@ -2309,7 +3404,7 @@ mod tests {
             let sheet = workbook.sheet("First").unwrap().unwrap();
             let cold = workbook.cache_diagnostics();
 
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert!(matches!(
                 sheet.cell("A1").unwrap(),
                 SourceCellView::Stored(Cell::Value(Value::Number(ref value)))
@@ -2317,7 +3412,7 @@ mod tests {
             ));
             let first_reads = source.first_body_marker_reads.load(Ordering::SeqCst);
             assert!(first_reads > 0);
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
                 cold.successful_loads
@@ -2329,7 +3424,7 @@ mod tests {
                     if value.as_str() == "7"
             ));
             assert!(source.first_body_marker_reads.load(Ordering::SeqCst) > first_reads);
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
                 cold.successful_loads
@@ -2344,23 +3439,23 @@ mod tests {
             let workbook = SourceBackedWorkbook::from_reader(Cursor::new(bytes)).unwrap();
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
 
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert!(matches!(
                 sheet.cell("B2").unwrap(),
                 SourceCellView::Stored(Cell::Value(Value::Number(ref value)))
                     if value.as_str() == "-0.000"
             ));
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
 
             let selected = sheet.cells("A1:F9").unwrap();
             assert_eq!(selected.len(), 2);
             assert_eq!(selected[0].address.a1(), "B2");
             assert_eq!(selected[1].address.a1(), "F2");
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
 
             let extent = sheet.stored_extent().unwrap().expect("declared extent");
             assert_eq!(extent.a1(), "B2:F2");
-            assert!(sheet.data.cells.get().is_some());
+            assert!(sheet.store_resident());
         }
 
         #[test]
@@ -2376,7 +3471,7 @@ mod tests {
                 SourceCellView::Stored(Cell::Value(Value::Number(ref value)))
                     if value.as_str() == "7"
             ));
-            assert!(sheet.data.cells.get().is_some());
+            assert!(sheet.store_resident());
         }
 
         #[test]
@@ -2387,13 +3482,13 @@ mod tests {
             let workbook = SourceBackedWorkbook::from_reader(Cursor::new(bytes)).unwrap();
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             let cold = workbook.cache_diagnostics();
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
 
             assert!(matches!(
                 sheet.cell("B1").unwrap(),
                 SourceCellView::Covered(range) if range.a1() == "A1:B1"
             ));
-            assert!(sheet.data.cells.get().is_some());
+            assert!(sheet.store_resident());
             assert!(matches!(
                 sheet.cell("A1").unwrap(),
                 SourceCellView::Stored(Cell::Value(Value::Number(ref value)))
@@ -2412,7 +3507,7 @@ mod tests {
             let cold = workbook.cache_diagnostics();
 
             assert!(sheet.cell("A1").is_err());
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
                 cold.successful_loads
@@ -2433,7 +3528,7 @@ mod tests {
             let cold = workbook.cache_diagnostics();
 
             assert!(sheet.cell("A1").is_err());
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
                 cold.successful_loads
@@ -2452,7 +3547,7 @@ mod tests {
                 sheet.cell("A1"),
                 Err(Error::Package(OpcError::SourceChanged { .. }))
             ));
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
                 cold.successful_loads
@@ -2463,10 +3558,11 @@ mod tests {
         fn cancellation_0363_does_not_publish_store() {
             let source = Arc::new(CountingSource::new(source_backed_xlsx()));
             let (_budget, cancellation_source, context) = managed_context(u64::MAX);
-            let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+            let workbook = SourceBackedWorkbook::from_read_at_with_options(
                 source,
-                ReadLimits::default(),
-                context,
+                crate::OpenOptions::new()
+                    .source_limits(SourceLimits::default())
+                    .execution_context(context),
             )
             .unwrap();
             let sheet = workbook.sheet("First").unwrap().unwrap();
@@ -2477,7 +3573,7 @@ mod tests {
                 sheet.cell("A1"),
                 Err(Error::Package(OpcError::Cancelled))
             ));
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
                 cold.successful_loads
@@ -2496,7 +3592,7 @@ mod tests {
         use soapberry_zip::office::StreamingArchiveWriter;
 
         use super::{
-            CountingSource, ReadLimits, SourceBackedWorkbook, SourceCellView, VersionFlipSource,
+            CountingSource, SourceBackedWorkbook, SourceCellView, SourceLimits, VersionFlipSource,
             managed_context,
         };
         use crate::{Cell, Error, Value};
@@ -2536,7 +3632,9 @@ mod tests {
                 )
             });
 
-            let mut writer = StreamingArchiveWriter::new();
+            let mut writer = StreamingArchiveWriter::new(
+                soapberry_zip::office::StreamingArchiveLimits::default(),
+            );
             writer
                 .write_stored(
                     "[Content_Types].xml",
@@ -2625,6 +3723,18 @@ mod tests {
             ));
         }
 
+        fn styles_cached(workbook: &SourceBackedWorkbook) -> bool {
+            workbook.inner.styles.get().is_some()
+        }
+
+        fn shared_strings_cached(workbook: &SourceBackedWorkbook) -> bool {
+            workbook
+                .inner
+                .dependencies
+                .get()
+                .is_some_and(|dependencies| dependencies.shared_strings.get().is_some())
+        }
+
         #[test]
         fn plain_shared_string_and_style_stream_0364_avoids_materialization() {
             let bytes = dependency_xlsx(
@@ -2638,9 +3748,15 @@ mod tests {
             let cold = workbook.cache_diagnostics();
 
             assert_text(sheet.cell("A1").unwrap(), "plain");
-            assert!(sheet.data.cells.get().is_none());
-            assert!(workbook.inner.shared_strings.get().is_none());
-            assert!(workbook.inner.styles.get().is_none());
+            assert!(!sheet.store_resident());
+            assert!(
+                workbook
+                    .inner
+                    .dependencies
+                    .get()
+                    .is_none_or(|dependencies| dependencies.shared_strings.get().is_none())
+            );
+            assert!(!styles_cached(&workbook));
             let after = workbook.cache_diagnostics();
             assert_eq!(after.cold_loads, cold.cold_loads);
             assert_eq!(after.successful_loads, cold.successful_loads);
@@ -2657,7 +3773,7 @@ mod tests {
             let workbook = SourceBackedWorkbook::from_reader(Cursor::new(valid)).unwrap();
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             assert_text(sheet.cell("A1").unwrap(), "selected");
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
 
             let invalid = dependency_xlsx(
                 &worksheet(r#"<c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c>"#),
@@ -2669,7 +3785,7 @@ mod tests {
             let workbook = SourceBackedWorkbook::from_reader(Cursor::new(invalid)).unwrap();
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             assert_text(sheet.cell("A1").unwrap(), "selected");
-            assert!(sheet.data.cells.get().is_some());
+            assert!(sheet.store_resident());
             assert_eq!(sheet.tolerance_report().unwrap().total(), 1);
         }
 
@@ -2683,8 +3799,14 @@ mod tests {
             let workbook = SourceBackedWorkbook::from_reader(Cursor::new(plain)).unwrap();
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             assert_text(sheet.cell("A1").unwrap(), "rich text");
-            assert!(sheet.data.cells.get().is_none());
-            assert!(workbook.inner.shared_strings.get().is_none());
+            assert!(!sheet.store_resident());
+            assert!(
+                workbook
+                    .inner
+                    .dependencies
+                    .get()
+                    .is_none_or(|dependencies| dependencies.shared_strings.get().is_none())
+            );
 
             let rich = dependency_xlsx(
                 &worksheet(r#"<c r="A1" t="s"><v>0</v></c>"#),
@@ -2694,8 +3816,8 @@ mod tests {
             let workbook = SourceBackedWorkbook::from_reader(Cursor::new(rich)).unwrap();
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             assert_text(sheet.cell("A1").unwrap(), "rich text");
-            assert!(sheet.data.cells.get().is_some());
-            assert!(workbook.inner.shared_strings.get().is_some());
+            assert!(sheet.store_resident());
+            assert!(shared_strings_cached(&workbook));
         }
 
         #[test]
@@ -2746,7 +3868,7 @@ mod tests {
                 } else {
                     assert_text(view, "");
                 }
-                let store = sheet.data.cells.get().expect("fallback published a store");
+                let store = sheet.grid.get().expect("fallback pinned a store").store();
                 assert_eq!(store.entries()[0].style, style);
                 let report = sheet.tolerance_report().unwrap();
                 assert_eq!(report.total(), 1);
@@ -2771,8 +3893,14 @@ mod tests {
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             let cold = workbook.cache_diagnostics();
             assert!(sheet.cell("A1").is_err());
-            assert!(sheet.data.cells.get().is_none());
-            assert!(workbook.inner.shared_strings.get().is_none());
+            assert!(!sheet.store_resident());
+            assert!(
+                workbook
+                    .inner
+                    .dependencies
+                    .get()
+                    .is_none_or(|dependencies| dependencies.shared_strings.get().is_none())
+            );
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
                 cold.successful_loads
@@ -2790,8 +3918,8 @@ mod tests {
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             let cold = workbook.cache_diagnostics();
             assert!(sheet.cell("A1").is_err());
-            assert!(sheet.data.cells.get().is_none());
-            assert!(workbook.inner.styles.get().is_none());
+            assert!(!sheet.store_resident());
+            assert!(!styles_cached(&workbook));
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
                 cold.successful_loads
@@ -2815,8 +3943,14 @@ mod tests {
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             let cold = workbook.cache_diagnostics();
             assert!(sheet.cell("A1").is_err());
-            assert!(sheet.data.cells.get().is_none());
-            assert!(workbook.inner.shared_strings.get().is_none());
+            assert!(!sheet.store_resident());
+            assert!(
+                workbook
+                    .inner
+                    .dependencies
+                    .get()
+                    .is_none_or(|dependencies| dependencies.shared_strings.get().is_none())
+            );
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
                 cold.successful_loads
@@ -2837,8 +3971,8 @@ mod tests {
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             let cold = workbook.cache_diagnostics();
             assert!(sheet.cell("A1").is_err());
-            assert!(sheet.data.cells.get().is_none());
-            assert!(workbook.inner.styles.get().is_none());
+            assert!(!sheet.store_resident());
+            assert!(!styles_cached(&workbook));
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
                 cold.successful_loads
@@ -2861,7 +3995,7 @@ mod tests {
                 sheet.cell("A1"),
                 Err(Error::Package(OpcError::SourceChanged { .. }))
             ));
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
                 cold.successful_loads
@@ -2869,10 +4003,11 @@ mod tests {
 
             let source = Arc::new(CountingSource::new(bytes));
             let (_budget, cancellation_source, context) = managed_context(u64::MAX);
-            let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+            let workbook = SourceBackedWorkbook::from_read_at_with_options(
                 source,
-                ReadLimits::default(),
-                context,
+                crate::OpenOptions::new()
+                    .source_limits(SourceLimits::default())
+                    .execution_context(context),
             )
             .unwrap();
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
@@ -2882,7 +4017,7 @@ mod tests {
                 sheet.cell("A1"),
                 Err(Error::Package(OpcError::Cancelled))
             ));
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
                 cold.successful_loads
@@ -2905,9 +4040,15 @@ mod tests {
             assert!(first_reads > 0);
             assert_text(sheet.cell("A1").unwrap(), "repeat");
             assert!(source.first_body_marker_reads.load(Ordering::SeqCst) > first_reads);
-            assert!(sheet.data.cells.get().is_none());
-            assert!(workbook.inner.shared_strings.get().is_none());
-            assert!(workbook.inner.styles.get().is_none());
+            assert!(!sheet.store_resident());
+            assert!(
+                workbook
+                    .inner
+                    .dependencies
+                    .get()
+                    .is_none_or(|dependencies| dependencies.shared_strings.get().is_none())
+            );
+            assert!(!styles_cached(&workbook));
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
                 cold.successful_loads
@@ -2923,13 +4064,16 @@ mod tests {
             );
             let source = Arc::new(CountingSource::new(bytes));
             let cache_limits = SourceCacheLimits::new(4096, 1).unwrap();
-            let workbook =
-                SourceBackedWorkbook::from_read_at_with_cache_limits(source, cache_limits).unwrap();
+            let workbook = SourceBackedWorkbook::from_read_at_with_options(
+                source,
+                crate::OpenOptions::new().cache_limits(cache_limits),
+            )
+            .unwrap();
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             assert_text(sheet.cell("A1").unwrap(), "rich text");
-            assert!(sheet.data.cells.get().is_some());
-            assert!(workbook.inner.shared_strings.get().is_some());
-            assert!(workbook.inner.styles.get().is_some());
+            assert!(sheet.store_resident());
+            assert!(shared_strings_cached(&workbook));
+            assert!(styles_cached(&workbook));
 
             let shared_uri = workbook.inner.shared_strings_uri.as_ref().unwrap().clone();
             let styles_uri = workbook.inner.styles_uri.as_ref().unwrap().clone();
@@ -2986,7 +4130,7 @@ mod tests {
                 sheet.cell("A1"),
                 Err(Error::Package(OpcError::SourceChanged { .. }))
             ));
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
         }
     }
 
@@ -2994,12 +4138,12 @@ mod tests {
         use std::sync::Arc;
         use std::sync::atomic::Ordering;
 
-        use litchi_opc::{OpcError, SourceBackedPackage, SourceCacheLimits};
+        use litchi_opc::{OpcError, SourceBackedPackage, SourceCacheLimits, SourceReadPolicy};
 
         use super::super::SourceCell;
         use super::streaming_0364_tests::{dependency_xlsx, plain_shared_strings, styles};
         use super::{
-            CountingSource, ReadLimits, SourceBackedWorkbook, SourceCellView, managed_context,
+            CountingSource, SourceBackedWorkbook, SourceCellView, SourceLimits, managed_context,
         };
         use crate::{Cell, Error, Value};
 
@@ -3069,7 +4213,7 @@ mod tests {
 
             assert!(result.is_err());
             assert!(callbacks.is_empty());
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             let after = workbook.cache_diagnostics();
             assert_eq!(after.cold_loads, before.cold_loads);
             assert_eq!(after.successful_loads, before.successful_loads);
@@ -3096,7 +4240,7 @@ mod tests {
                 &all[0].cell,
                 Cell::Value(Value::Number(value)) if value.as_str() == "7"
             ));
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
 
             let subset = sheet.cells("B1:C2").unwrap();
             assert_eq!(addresses(&subset), vec!["C1".to_owned(), "B2".to_owned()]);
@@ -3107,7 +4251,7 @@ mod tests {
             ));
 
             assert!(sheet.cells("Z10:AA11").unwrap().is_empty());
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
         }
 
         #[test]
@@ -3130,7 +4274,7 @@ mod tests {
                 .collect::<Vec<_>>();
             assert_eq!(count, expected.len());
             assert_eq!(visited, expected);
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
         }
 
         #[test]
@@ -3179,8 +4323,14 @@ mod tests {
                 &cells[3].cell,
                 Cell::Value(Value::Text(value)) if value.as_str() == "one"
             ));
-            assert!(sheet.data.cells.get().is_none());
-            assert!(workbook.inner.shared_strings.get().is_none());
+            assert!(!sheet.store_resident());
+            assert!(
+                workbook
+                    .inner
+                    .dependencies
+                    .get()
+                    .is_none_or(|dependencies| dependencies.shared_strings.get().is_none())
+            );
             assert!(workbook.inner.styles.get().is_none());
             let after = workbook.cache_diagnostics();
             assert_eq!(after.cold_loads, before.cold_loads);
@@ -3202,7 +4352,7 @@ mod tests {
             assert_eq!(first, second);
             assert!(first_reads > 0);
             assert!(second_reads > first_reads);
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
                 before.successful_loads
@@ -3215,9 +4365,9 @@ mod tests {
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
 
             let cold = sheet.cells("A1:D4").unwrap();
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert!(sheet.stored_extent().unwrap().is_some());
-            assert!(sheet.data.cells.get().is_some());
+            assert!(sheet.store_resident());
             let warm = sheet.cells("A1:D4").unwrap();
 
             assert_eq!(warm, cold);
@@ -3232,7 +4382,7 @@ mod tests {
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             let cells = sheet.cells("A1:B1").unwrap();
             assert_eq!(addresses(&cells), vec!["A1".to_owned()]);
-            assert!(sheet.data.cells.get().is_some());
+            assert!(sheet.store_resident());
             assert!(matches!(
                 sheet.cell("B1").unwrap(),
                 SourceCellView::Covered(range) if range.a1() == "A1:B1"
@@ -3250,7 +4400,7 @@ mod tests {
             assert_eq!(addresses(&cells), vec!["A1".to_owned(), "A2".to_owned()]);
             assert!(matches!(&cells[0].cell, Cell::Formula(_)));
             assert!(matches!(&cells[1].cell, Cell::Formula(_)));
-            assert!(sheet.data.cells.get().is_some());
+            assert!(sheet.store_resident());
         }
 
         #[test]
@@ -3301,8 +4451,14 @@ mod tests {
 
             assert!(result.is_err());
             assert_eq!(callbacks, 0);
-            assert!(sheet.data.cells.get().is_none());
-            assert!(workbook.inner.shared_strings.get().is_none());
+            assert!(!sheet.store_resident());
+            assert!(
+                workbook
+                    .inner
+                    .dependencies
+                    .get()
+                    .is_none_or(|dependencies| dependencies.shared_strings.get().is_none())
+            );
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
                 before.successful_loads
@@ -3328,7 +4484,7 @@ mod tests {
                 Error::Package(OpcError::SourceChanged { .. })
             ));
             assert_eq!(callbacks, 0);
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
                 before.successful_loads
@@ -3340,10 +4496,11 @@ mod tests {
                 None,
             )));
             let (_budget, cancellation_source, context) = managed_context(u64::MAX);
-            let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+            let workbook = SourceBackedWorkbook::from_read_at_with_options(
                 source,
-                ReadLimits::default(),
-                context,
+                crate::OpenOptions::new()
+                    .source_limits(SourceLimits::default())
+                    .execution_context(context),
             )
             .unwrap();
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
@@ -3359,7 +4516,7 @@ mod tests {
 
             assert!(matches!(error, Error::Package(OpcError::Cancelled)));
             assert_eq!(callbacks, 0);
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
                 before.successful_loads
@@ -3383,7 +4540,7 @@ mod tests {
                 other => panic!("callback error changed type: {other:?}"),
             }
             assert_eq!(callbacks, 1);
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
         }
 
         #[test]
@@ -3394,14 +4551,14 @@ mod tests {
                 None,
             )));
             let (_budget, cancellation_source, context) = managed_context(u64::MAX);
-            let package =
-                SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                    source,
-                    ReadLimits::default(),
-                    SourceCacheLimits::new(256 * 1024, 4).unwrap(),
-                    context,
-                )
-                .unwrap();
+            let package = SourceBackedPackage::from_read_at(
+                source,
+                SourceLimits::default(),
+                SourceCacheLimits::new(256 * 1024, 4).unwrap(),
+                SourceReadPolicy::exact(),
+                Some(context),
+            )
+            .unwrap();
             let workbook = SourceBackedWorkbook::from_source_backed_package(package).unwrap();
             assert!(workbook.inner.package.execution_context().is_some());
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
@@ -3417,7 +4574,7 @@ mod tests {
 
             assert!(matches!(error, Error::Package(OpcError::Cancelled)));
             assert_eq!(callbacks, vec!["A1".to_owned()]);
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
         }
 
         #[test]
@@ -3428,10 +4585,12 @@ mod tests {
                 None,
             )));
             let (_budget, _cancellation_source, context) = managed_context(u64::MAX);
-            let package = SourceBackedPackage::from_read_at_with_execution_context(
+            let package = SourceBackedPackage::from_read_at(
                 source.clone(),
-                ReadLimits::default(),
-                context,
+                SourceLimits::default(),
+                SourceCacheLimits::default(),
+                SourceReadPolicy::exact(),
+                Some(context),
             )
             .unwrap();
             let workbook = SourceBackedWorkbook::from_source_backed_package(package).unwrap();
@@ -3451,7 +4610,7 @@ mod tests {
                 Error::Package(OpcError::SourceChanged { .. })
             ));
             assert_eq!(callbacks, 1);
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
         }
     }
 
@@ -3549,8 +4708,14 @@ mod tests {
                 SourceCellView::Stored(Cell::Value(Value::Number(value)))
                     if value.as_str() == "42.25"
             ));
-            assert!(sheet.data.cells.get().is_none());
-            assert!(workbook.inner.shared_strings.get().is_none());
+            assert!(!sheet.store_resident());
+            assert!(
+                workbook
+                    .inner
+                    .dependencies
+                    .get()
+                    .is_none_or(|dependencies| dependencies.shared_strings.get().is_none())
+            );
             assert!(workbook.inner.styles.get().is_none());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
 
@@ -3579,8 +4744,14 @@ mod tests {
                     "D3".to_owned(),
                 ]
             );
-            assert!(sheet.data.cells.get().is_none());
-            assert!(workbook.inner.shared_strings.get().is_none());
+            assert!(!sheet.store_resident());
+            assert!(
+                workbook
+                    .inner
+                    .dependencies
+                    .get()
+                    .is_none_or(|dependencies| dependencies.shared_strings.get().is_none())
+            );
             assert!(workbook.inner.styles.get().is_none());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
 
@@ -3617,8 +4788,14 @@ mod tests {
                     "D3".to_owned(),
                 ]
             );
-            assert!(sheet.data.cells.get().is_none());
-            assert!(workbook.inner.shared_strings.get().is_none());
+            assert!(!sheet.store_resident());
+            assert!(
+                workbook
+                    .inner
+                    .dependencies
+                    .get()
+                    .is_none_or(|dependencies| dependencies.shared_strings.get().is_none())
+            );
             assert!(workbook.inner.styles.get().is_none());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
 
@@ -3644,7 +4821,7 @@ mod tests {
 
             let actual = fallback_sheet.cell("A1").unwrap();
             assert_eq!(actual, expected);
-            assert!(fallback_sheet.data.cells.get().is_some());
+            assert!(fallback_sheet.store_resident());
             let after = fallback_workbook.cache_diagnostics();
             assert!(after.successful_loads > before.successful_loads);
             assert!(after.retained_entries > before.retained_entries);
@@ -3684,8 +4861,14 @@ mod tests {
 
             assert!(result.is_err());
             assert_eq!(callbacks, 0);
-            assert!(sheet.data.cells.get().is_none());
-            assert!(workbook.inner.shared_strings.get().is_none());
+            assert!(!sheet.store_resident());
+            assert!(
+                workbook
+                    .inner
+                    .dependencies
+                    .get()
+                    .is_none_or(|dependencies| dependencies.shared_strings.get().is_none())
+            );
             assert!(workbook.inner.styles.get().is_none());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
         }
@@ -3729,7 +4912,7 @@ mod tests {
         use super::super::SourceCell;
         use super::streaming_0364_tests::dependency_xlsx;
         use super::{
-            CountingSource, ReadLimits, SourceBackedWorkbook, SourceCellView, managed_context,
+            CountingSource, SourceBackedWorkbook, SourceCellView, SourceLimits, managed_context,
         };
         use crate::{Cell, Error, Value};
 
@@ -3791,8 +4974,14 @@ mod tests {
 
             assert!(result.is_err());
             assert!(callbacks.is_empty());
-            assert!(sheet.data.cells.get().is_none());
-            assert!(workbook.inner.shared_strings.get().is_none());
+            assert!(!sheet.store_resident());
+            assert!(
+                workbook
+                    .inner
+                    .dependencies
+                    .get()
+                    .is_none_or(|dependencies| dependencies.shared_strings.get().is_none())
+            );
             assert!(workbook.inner.styles.get().is_none());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
         }
@@ -3827,8 +5016,14 @@ mod tests {
             ));
             assert!(matches!(&cold[3], SourceCellView::Missing));
             assert!(matches!(&cold[4], SourceCellView::Stored(Cell::Empty)));
-            assert!(sheet.data.cells.get().is_none());
-            assert!(workbook.inner.shared_strings.get().is_none());
+            assert!(!sheet.store_resident());
+            assert!(
+                workbook
+                    .inner
+                    .dependencies
+                    .get()
+                    .is_none_or(|dependencies| dependencies.shared_strings.get().is_none())
+            );
             assert!(workbook.inner.styles.get().is_none());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
 
@@ -3864,7 +5059,7 @@ mod tests {
                 Cell::Value(Value::Number(value)) if value.as_str() == "8"
             ));
             assert!(matches!(&cold[2].cell, Cell::Empty));
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
 
             let mut visited = Vec::new();
             let count = sheet
@@ -3879,8 +5074,14 @@ mod tests {
                 .collect::<Vec<_>>();
             assert_eq!(count, expected.len());
             assert_eq!(visited, expected);
-            assert!(sheet.data.cells.get().is_none());
-            assert!(workbook.inner.shared_strings.get().is_none());
+            assert!(!sheet.store_resident());
+            assert!(
+                workbook
+                    .inner
+                    .dependencies
+                    .get()
+                    .is_none_or(|dependencies| dependencies.shared_strings.get().is_none())
+            );
             assert!(workbook.inner.styles.get().is_none());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
 
@@ -3941,15 +5142,16 @@ mod tests {
                 Error::Package(OpcError::SourceChanged { .. })
             ));
             assert_eq!(callbacks, 0);
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
 
             let source = Arc::new(CountingSource::new(dependency_xlsx(&valid, None, None)));
             let (_budget, cancellation_source, context) = managed_context(u64::MAX);
-            let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+            let workbook = SourceBackedWorkbook::from_read_at_with_options(
                 source,
-                ReadLimits::default(),
-                context,
+                crate::OpenOptions::new()
+                    .source_limits(SourceLimits::default())
+                    .execution_context(context),
             )
             .unwrap();
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
@@ -3964,7 +5166,7 @@ mod tests {
                 .unwrap_err();
             assert!(matches!(error, Error::Package(OpcError::Cancelled)));
             assert_eq!(callbacks, 0);
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
         }
 
@@ -3981,7 +5183,7 @@ mod tests {
                 .iter()
                 .map(|reference| fallback_sheet.cell(*reference).unwrap())
                 .collect::<Vec<_>>();
-            assert!(fallback_sheet.data.cells.get().is_some());
+            assert!(fallback_sheet.store_resident());
             let after = fallback_workbook.cache_diagnostics();
             assert!(after.successful_loads > before.successful_loads);
 
@@ -4086,7 +5288,7 @@ mod tests {
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             if warm {
                 sheet.stored_extent().unwrap();
-                assert!(sheet.data.cells.get().is_some());
+                assert!(sheet.store_resident());
             }
             let mut cells = Vec::new();
             let count = sheet
@@ -4167,7 +5369,7 @@ mod tests {
             let (_source, workbook) = source_workbook(&stored_fixture(), Some(&strings));
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             sheet.stored_extent().unwrap();
-            assert!(sheet.data.cells.get().is_some());
+            assert!(sheet.store_resident());
 
             let mut callbacks = 0usize;
             let error = sheet
@@ -4205,5 +5407,60 @@ mod tests {
             assert_eq!(cells.len(), 5);
             assert_eq!(cells.capacity(), cells.len());
         }
+    }
+}
+
+#[cfg(test)]
+mod package_handoff_tests {
+    use std::io::Cursor;
+
+    use super::SourceBackedWorkbook;
+
+    fn fixture() -> Vec<u8> {
+        std::fs::read(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test-data/ooxml/xlsx/DateFormatTests.xlsx"
+        ))
+        .expect("read XLSX fixture")
+    }
+
+    #[test]
+    fn package_handoff_returns_the_package_indexed_at_open() {
+        let workbook = SourceBackedWorkbook::from_reader(Cursor::new(fixture())).unwrap();
+        let lineage = workbook.source_backed_package().unwrap().source_lineage();
+        assert_eq!(
+            workbook
+                .source_backed_package()
+                .unwrap()
+                .source_version()
+                .unwrap(),
+            workbook.source_version().unwrap()
+        );
+        let selected = workbook.sheet(0_usize).unwrap().expect("first sheet");
+
+        // A selected worksheet handle and a workbook clone both share the
+        // catalog, so the handoff refuses and returns the workbook intact.
+        let workbook = workbook
+            .try_into_source_backed_package()
+            .err()
+            .expect("a selected worksheet shares the catalog");
+        drop(selected);
+        let clone = workbook.clone();
+        let workbook = workbook
+            .try_into_source_backed_package()
+            .err()
+            .expect("a workbook clone shares the catalog");
+        assert_eq!(clone.len(), workbook.len());
+        drop(clone);
+
+        let package = workbook
+            .try_into_source_backed_package()
+            .expect("the sole owner recovers its package");
+        // Same lineage token: the very package opened above, not a re-index.
+        assert!(package.source_lineage() == lineage);
+        let workbook = SourceBackedWorkbook::from_source_backed_package(package).unwrap();
+        workbook
+            .edit_tab_state()
+            .expect("a source-backed family edit adopts the recovered package");
     }
 }

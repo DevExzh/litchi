@@ -1,3 +1,4 @@
+use super::package::apply_patch;
 use super::*;
 use crate::color::Theme;
 use litchi_opc::packuri::PackURI;
@@ -5,11 +6,11 @@ use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, Part};
 
 fn parse_settings(xml: &[u8]) -> Result<Settings> {
-    parse(xml).map(|(settings, _)| settings)
+    raw::parse(xml, &Limits::DEFAULT).map(|(settings, _)| settings)
 }
 
 fn read_settings_part(part: &dyn Part) -> Result<Settings> {
-    read(part).map(|(settings, _)| settings)
+    raw::read(part, &Limits::DEFAULT).map(|(settings, _)| settings)
 }
 
 fn contains_xml(xml: &[u8], needle: &str) -> bool {
@@ -121,23 +122,47 @@ fn numeric_div_selectors_reject_missing_positions_without_mutation() {
 #[test]
 fn package_graph_crud_round_trips_and_is_idempotent() {
     let mut package = package(Conformance::Transitional);
-    assert!(load(&package).unwrap().is_none());
-    assert!(!remove(&mut package).unwrap());
+    assert!(load(&package, &Limits::DEFAULT).unwrap().is_none());
+    assert!(!raw::remove(&mut package, &Limits::DEFAULT).unwrap());
 
     let mut settings = Settings::default();
     settings.set_encoding("utf-8").unwrap().set_allow_png(true);
-    assert!(put(&mut package, settings.clone(), Conformance::Transitional).unwrap());
+    assert!(
+        raw::put(
+            &mut package,
+            settings.clone(),
+            Conformance::Transitional,
+            &Limits::DEFAULT,
+        )
+        .unwrap()
+    );
     assert_eq!(
-        load(&package).unwrap(),
+        load(&package, &Limits::DEFAULT).unwrap(),
         Some((settings.clone(), Conformance::Transitional))
     );
-    assert!(!put(&mut package, settings.clone(), Conformance::Transitional).unwrap());
+    assert!(
+        !raw::put(
+            &mut package,
+            settings.clone(),
+            Conformance::Transitional,
+            &Limits::DEFAULT,
+        )
+        .unwrap()
+    );
 
     settings.set_allow_png(false);
-    assert!(put(&mut package, settings, Conformance::Transitional).unwrap());
-    assert!(remove(&mut package).unwrap());
-    assert!(load(&package).unwrap().is_none());
-    assert!(!remove(&mut package).unwrap());
+    assert!(
+        raw::put(
+            &mut package,
+            settings,
+            Conformance::Transitional,
+            &Limits::DEFAULT,
+        )
+        .unwrap()
+    );
+    assert!(raw::remove(&mut package, &Limits::DEFAULT).unwrap());
+    assert!(load(&package, &Limits::DEFAULT).unwrap().is_none());
+    assert!(!raw::remove(&mut package, &Limits::DEFAULT).unwrap());
 }
 
 #[test]
@@ -157,13 +182,21 @@ fn semantic_noop_preserves_noncanonical_bytes_and_signatures() {
         "rSignature".to_owned(),
         false,
     );
-    let (settings, conformance) = load(&package).unwrap().unwrap();
+    let (settings, conformance) = load(&package, &Limits::DEFAULT).unwrap().unwrap();
     assert!(package.is_signed());
 
-    assert!(put(&mut package, settings.clone(), Conformance::Strict).is_err());
+    assert!(
+        raw::put(
+            &mut package,
+            settings.clone(),
+            Conformance::Strict,
+            &Limits::DEFAULT,
+        )
+        .is_err()
+    );
     assert_eq!(package.get_part(&name).unwrap().blob(), source);
     assert!(package.is_signed());
-    assert!(!put(&mut package, settings, conformance).unwrap());
+    assert!(!raw::put(&mut package, settings, conformance, &Limits::DEFAULT,).unwrap());
     assert_eq!(package.get_part(&name).unwrap().blob(), source);
     assert!(package.is_signed());
 }
@@ -173,9 +206,17 @@ fn strict_graph_and_mce_round_trip() {
     let mut package = package(Conformance::Strict);
     let mut settings = Settings::default();
     settings.set_target_screen_size(Screen::Pixels1920x1200);
-    assert!(put(&mut package, settings.clone(), Conformance::Strict).unwrap());
+    assert!(
+        raw::put(
+            &mut package,
+            settings.clone(),
+            Conformance::Strict,
+            &Limits::DEFAULT,
+        )
+        .unwrap()
+    );
     assert_eq!(
-        load(&package).unwrap(),
+        load(&package, &Limits::DEFAULT).unwrap(),
         Some((settings, Conformance::Strict))
     );
 
@@ -184,7 +225,7 @@ fn strict_graph_and_mce_round_trip() {
             xmlns:x="urn:unsupported" mc:Ignorable="x">
             <x:ignored/><w:allowPNG/>
         </w:webSettings>"#;
-    let (parsed, conformance) = parse(xml).unwrap();
+    let (parsed, conformance) = raw::parse(xml, &Limits::DEFAULT).unwrap();
     assert_eq!(conformance, Conformance::Strict);
     assert_eq!(parsed.allow_png(), Some(true));
 }
@@ -211,10 +252,11 @@ fn graph_failures_are_atomic_and_shared_parts_are_rejected() {
     let parts = duplicate.part_count();
     let relationships = duplicate.get_part(&document).unwrap().rels().iter().count();
     assert!(
-        put(
+        raw::put(
             &mut duplicate,
             Settings::default(),
-            Conformance::Transitional
+            Conformance::Transitional,
+            &Limits::DEFAULT,
         )
         .is_err()
     );
@@ -225,7 +267,15 @@ fn graph_failures_are_atomic_and_shared_parts_are_rejected() {
     );
 
     let mut shared = package(Conformance::Transitional);
-    assert!(put(&mut shared, Settings::default(), Conformance::Transitional).unwrap());
+    assert!(
+        raw::put(
+            &mut shared,
+            Settings::default(),
+            Conformance::Transitional,
+            &Limits::DEFAULT,
+        )
+        .unwrap()
+    );
     let name = PackURI::new("/word/webSettings.xml").unwrap();
     let bytes = shared.get_part(&name).unwrap().blob().to_vec();
     let mut other = BlobPart::new(
@@ -240,9 +290,9 @@ fn graph_failures_are_atomic_and_shared_parts_are_rejected() {
         false,
     );
     shared.add_part(Box::new(other));
-    assert!(remove(&mut shared).is_err());
+    assert!(raw::remove(&mut shared, &Limits::DEFAULT).is_err());
     assert_eq!(shared.get_part(&name).unwrap().blob(), bytes);
-    assert!(load(&shared).unwrap().is_some());
+    assert!(load(&shared, &Limits::DEFAULT).unwrap().is_some());
 }
 
 #[test]
@@ -254,12 +304,12 @@ fn adversarial_xml_never_unwinds() {
             b"\xFF\xFE".as_slice(),
             br#"<w:webSettings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:divs><w:div w:id="same"/><w:div w:id="same"/></w:divs></w:webSettings>"#.as_slice(),
         ] {
-            let result = std::panic::catch_unwind(|| parse(xml));
+            let result = std::panic::catch_unwind(|| raw::parse(xml, &Limits::DEFAULT));
             assert!(result.is_ok());
             assert!(result.unwrap().is_err());
         }
     let oversized = vec![b' '; MAX_XML_BYTES + 1];
-    assert!(parse(&oversized).is_err());
+    assert!(raw::parse(&oversized, &Limits::DEFAULT).is_err());
 }
 
 #[test]
@@ -280,7 +330,7 @@ fn source_checked_web_edits_preserve_opaque_markup_and_round_trip_inverse() {
   <w:targetScreenSz w:val="800x600"/>
   <x:trailing>keep me</x:trailing>
 </w:webSettings>"#;
-    let snapshot = Snapshot::from_xml(source.to_vec()).unwrap();
+    let snapshot = Snapshot::from_xml(source.to_vec(), &Limits::DEFAULT).unwrap();
     assert_eq!(
         snapshot.settings().target_screen_size(),
         Some(Screen::Pixels800x600)
@@ -329,7 +379,7 @@ fn source_checked_web_edits_preserve_opaque_markup_and_round_trip_inverse() {
     assert_eq!(cancelled.snapshot().xml_bytes(), source);
 
     let stale_source = br#"<w:webSettings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:targetScreenSz w:val="1024x768"/></w:webSettings>"#;
-    let stale = Snapshot::from_xml(stale_source.to_vec()).unwrap();
+    let stale = Snapshot::from_xml(stale_source.to_vec(), &Limits::DEFAULT).unwrap();
     assert!(commit.patch().apply(&stale).is_err());
 }
 
@@ -338,7 +388,7 @@ fn package_web_patch_is_graph_checked_and_failure_atomic() {
     let source = br#"<w:webSettings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:targetScreenSz w:val="800x600"/></w:webSettings>"#;
     let mut package = package(Conformance::Transitional);
     let target = add_raw_web(&mut package, source, Conformance::Transitional);
-    let snapshot = load_snapshot(&package).unwrap().unwrap();
+    let snapshot = load_snapshot(&package, &Limits::DEFAULT).unwrap().unwrap();
     let mut edit = snapshot.edit();
     edit.set_target_screen_size(Some(Screen::Pixels1024x768));
     let commit = edit.commit().unwrap();
@@ -393,10 +443,11 @@ fn mce_preprocessing_respects_web_settings_xml_bound() {
     xml.extend_from_slice(suffix);
 
     assert!(matches!(
-        parse(&xml),
-        Err(Error::Mce(litchi_ooxml_common::mce::Error::LimitExceeded(
-            _
-        )))
+        raw::parse(&xml, &Limits::DEFAULT),
+        Err(Error::WebLimit {
+            kind: LimitKind::XmlBytes,
+            ..
+        })
     ));
 }
 
@@ -734,7 +785,9 @@ fn serializes_every_modeled_web_setting_for_round_trip() {
         </w:webSettings>"#;
 
     let settings = parse_settings(xml).unwrap();
-    let serialized = settings.xml(Conformance::Transitional).unwrap();
+    let serialized = settings
+        .xml(Conformance::Transitional, &Limits::DEFAULT)
+        .unwrap();
     let reparsed = parse_settings(&serialized).unwrap();
 
     assert_eq!(reparsed, settings);
@@ -747,7 +800,9 @@ fn serializes_every_modeled_web_setting_for_round_trip() {
 
     let mut strict_settings = settings.clone();
     strict_settings.clear_rely_on_vml();
-    let strict = strict_settings.xml(Conformance::Strict).unwrap();
+    let strict = strict_settings
+        .xml(Conformance::Strict, &Limits::DEFAULT)
+        .unwrap();
     assert!(contains_xml(&strict, "<w:blockQuote w:val=\"1\"/>"));
     assert!(contains_xml(&strict, "<w:bodyDiv w:val=\"0\"/>"));
     assert!(contains_xml(&strict, "<w:bodyDiv w:val=\"1\"/>"));
@@ -772,7 +827,9 @@ fn edits_and_clears_every_scalar_web_setting() {
         .set_target_screen_size(Screen::Pixels1800x1440)
         .set_save_smart_tags_as_xml(false);
 
-    let serialized = settings.xml(Conformance::Transitional).unwrap();
+    let serialized = settings
+        .xml(Conformance::Transitional, &Limits::DEFAULT)
+        .unwrap();
     let reparsed = parse_settings(&serialized).unwrap();
     assert_eq!(reparsed, settings);
     assert_eq!(reparsed.encoding(), Some("utf-8"));
@@ -783,7 +840,7 @@ fn edits_and_clears_every_scalar_web_setting() {
     assert!(settings.set_pixels_per_inch(1024).is_err());
     assert_eq!(settings.pixels_per_inch(), Some(previous_pixels));
 
-    assert!(settings.xml(Conformance::Strict).is_err());
+    assert!(settings.xml(Conformance::Strict, &Limits::DEFAULT).is_err());
 
     settings
         .clear_encoding()
@@ -799,7 +856,12 @@ fn edits_and_clears_every_scalar_web_setting() {
         .clear_save_smart_tags_as_xml();
     assert_eq!(settings, Settings::default());
     assert_eq!(
-        parse_settings(&settings.xml(Conformance::Transitional).unwrap()).unwrap(),
+        parse_settings(
+            &settings
+                .xml(Conformance::Transitional, &Limits::DEFAULT)
+                .unwrap(),
+        )
+        .unwrap(),
         Settings::default()
     );
 }
@@ -842,7 +904,9 @@ fn builds_and_edits_recursive_framesets_for_round_trip() {
 
     let mut settings = Settings::default();
     settings.set_frameset(frameset);
-    let serialized = settings.xml(Conformance::Transitional).unwrap();
+    let serialized = settings
+        .xml(Conformance::Transitional, &Limits::DEFAULT)
+        .unwrap();
     let reparsed = parse_settings(&serialized).unwrap();
     assert_eq!(reparsed, settings);
     assert!(contains_xml(&serialized, "main &amp; detail"));
@@ -917,7 +981,9 @@ fn builds_and_edits_recursive_html_divisions_for_round_trip() {
 
     let mut settings = Settings::default();
     settings.set_divs(vec![div]).unwrap();
-    let serialized = settings.xml(Conformance::Transitional).unwrap();
+    let serialized = settings
+        .xml(Conformance::Transitional, &Limits::DEFAULT)
+        .unwrap();
     let reparsed = parse_settings(&serialized).unwrap();
     assert_eq!(reparsed, settings);
     assert!(contains_xml(&serialized, "w:id=\"1\""));
@@ -1030,7 +1096,11 @@ fn serialization_rejects_excessive_recursive_nesting() {
         frameset: Some(frameset),
         ..Settings::default()
     };
-    assert!(settings.xml(Conformance::Transitional).is_err());
+    assert!(
+        settings
+            .xml(Conformance::Transitional, &Limits::DEFAULT)
+            .is_err()
+    );
 
     let mut div = make_div(1);
     for value in 2..=(MAX_FRAMESET_NESTING as i64 + 3) {
@@ -1042,5 +1112,9 @@ fn serialization_rejects_excessive_recursive_nesting() {
         divs: Some(vec![div]),
         ..Settings::default()
     };
-    assert!(settings.xml(Conformance::Transitional).is_err());
+    assert!(
+        settings
+            .xml(Conformance::Transitional, &Limits::DEFAULT)
+            .is_err()
+    );
 }

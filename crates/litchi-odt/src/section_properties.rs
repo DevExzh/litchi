@@ -5,6 +5,7 @@
 //! duplicating their data models.
 
 use litchi_core::{Error, Result};
+use litchi_odf_common::XmlStreamLimits;
 use quick_xml::{
     NsReader, XmlVersion,
     events::{BytesStart, Event},
@@ -561,7 +562,10 @@ fn style_name(
 }
 
 /// Parse section styles from `styles.xml` or a flat ODF document.
-pub fn parse_section_style_properties(xml: &[u8]) -> Result<SectionStylePropertiesSet> {
+pub fn parse_section_style_properties(
+    xml: &[u8],
+    limits: &XmlStreamLimits,
+) -> Result<SectionStylePropertiesSet> {
     if xml.len() > MAX_XML {
         return Err(invalid("section-properties XML exceeds size cap"));
     }
@@ -722,7 +726,7 @@ pub fn parse_section_style_properties(xml: &[u8]) -> Result<SectionStyleProperti
         }
         buffer.clear();
     }
-    crate::notes_configuration::parse(xml_text)?;
+    crate::notes_configuration::parse(xml_text, limits)?;
     Ok(result)
 }
 
@@ -750,16 +754,16 @@ fn check_child(rank: u8, last: &mut u8, seen: &mut [bool; 3]) -> Result<()> {
     Ok(())
 }
 
-impl crate::Package {
+impl crate::GenericPackage {
     pub fn section_style_properties(&self) -> Result<SectionStylePropertiesSet> {
         self.styles_xml()?.map_or_else(
             || Ok(Default::default()),
-            |xml| parse_section_style_properties(xml.as_bytes()),
+            |xml| parse_section_style_properties(xml.as_bytes(), &self.xml_limits_value()),
         )
     }
 }
 impl crate::FlatDocument {
     pub fn section_style_properties(&self) -> Result<SectionStylePropertiesSet> {
-        parse_section_style_properties(self.xml().as_bytes())
+        parse_section_style_properties(self.xml().as_bytes(), &self.xml_limits_value())
     }
 }

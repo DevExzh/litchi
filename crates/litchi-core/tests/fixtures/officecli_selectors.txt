@@ -1,0 +1,138 @@
+# Query selectors harvested from OfficeCLI (upstream checkout, not in git):
+# the selector argument of `officecli query` in examples/**, README.md,
+# SKILL.md, skills/**, and schemas/help/**/*.json. Strings only; no OfficeCLI
+# code. One selector per line; `#` lines and blank lines are ignored.
+/Assumptions/cell[type=Number]
+/body/p[11]
+/body/tbl[4]
+/numbering
+/revision[@author=Alice]
+/slide[10]
+/slide[1]
+/slide[1]/shape[2]
+/slide[2]
+/slide[3]
+/slide[3]/shape[1]/p[1]
+/slide[4]
+/slide[4]/shape[1]/p[1]
+Dashboard!:has(formula)
+Sheet1!B[value!=0]
+animation
+cell:contains("#DIV/0!")
+cell:contains("#N/A")
+cell:contains("#NAME?")
+cell:contains("#REF!")
+cell:contains("#VALUE!")
+cell:contains("CF !=")
+cell:contains("IMBALANCED")
+cell:contains("S&U IMBALANCE")
+cell:contains("TBD")
+cell:contains("\\\\!")
+cell:contains("xxxx")
+cell:has(formula)
+cell[formula~=SUM]
+cell[type=Number]
+chart
+comment
+conditionalformatting
+connector
+drawing
+equation
+field
+field[fieldType!=page]
+field[fieldType=page]
+field[fieldType=seq]
+footnote
+formfield
+header
+image:no-alt
+merge
+namedrange
+namedrange[name="_xlnm.Print_Area"]
+ole
+p:contains("quarterly")
+p:empty
+paragraph
+paragraph[hangingIndent]
+paragraph[numId>0]
+paragraph[size>=24pt]
+paragraph[style=Heading1]
+paragraph[style=Normal]
+paragraph[style=Normal] > run[font!=Arial]
+picture
+picture:no-alt
+pivottable
+revision
+row[Region=West and Sales>1000]
+row[Salary>5000]
+row[Status=open or Priority=high]
+run:contains(TODO)
+sdt
+section
+shape
+shape:contains("2024")
+shape:contains("CAC")
+shape:contains("LTV")
+shape:contains("NCT")
+shape:contains("Revenue")
+shape:contains("Source")
+shape:contains("TAM")
+shape:contains("Use of Funds")
+shape:contains("assumption")
+shape:contains("ex-")
+shape[fill=1E2761]
+shape[fill=FF0000]
+shape[width>=10cm]
+shape[x>=34cm]
+sheet
+slicer
+slide
+sparkline
+table
+tc
+toc
+validation
+# Selector forms quoted in OfficeCLI's `query --help` text, error suggestions,
+# and handler comments.
+*
+p[2]
+row[2]
+table[2]
+shape[2]
+slide[1] > shape[2]
+slide[1]>ole
+slide > shape
+slide chart
+slide > table > tr
+paragraph, table
+shape[fill=#FF0000][size>=24pt][text~=报告]
+cell[value>5000 and value<8000]
+row[金额>5 or 金额<1]
+row["Full Name"~=doe]
+row["Amount, USD">0]
+paragraph[text~="salt and pepper"]
+cell[a and b]
+row[name="A,B"]
+row[url~=a/b]
+row[not(Region=West)]
+row[col.Salary>5000]
+cell[value\!=0]
+cell:not(:has(formula))
+cell:not(:empty)
+cell:empty
+cell:TBD
+'My Data (2024)'!row[Amount>5000]
+Sheet1!A1
+Sheet1!A1:B5
+Sheet1!row[Amount>5000]
+/Sheet1/cell[value>5000 or value<300]
+/body/p[1]/r[bold=true]
+revision[@type=ins]
+cell[bold=true]
+run[bold=true]
+ole[progId~=Excel]
+shape[text~=r"^Q[1-4]"]
+paragraph[style=Heading 1]
+shape[fill!=#FF0000]
+cell[formula]
+/slide[1]/shape[@id=10000]

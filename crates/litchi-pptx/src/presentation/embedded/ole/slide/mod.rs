@@ -5,14 +5,16 @@
 //! instantiates them.
 
 mod codec;
+mod edit;
 mod model;
 mod package;
 mod transaction;
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 mod validation;
 
 pub use model::Definition;
-pub use package::{apply_commit, apply_patch, load};
-pub use transaction::{Commit, Patch, Revision, Snapshot, Transaction};
+pub use package::load;
+pub use transaction::{Draft, Revision, Snapshot};
 
 #[cfg(test)]
 mod tests;

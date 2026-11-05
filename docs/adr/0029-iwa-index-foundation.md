@@ -113,10 +113,17 @@ object identifier, a serialized token, or a handle that can be reused with a
 different semantic view. Package names, payloads, native identifiers, and
 graph snapshots remain outside this projection.
 
-The original low-level graph surface remains source-compatible through the
-`ObjectIdIter` and `ReferenceGraphSnapshot` re-exports and the
-`ObjectIndex::reference_graph` method. That method is explicitly deprecated
-and documented as a graph-identity compatibility bridge; new semantic code
-must use the bounded `SemanticIndex` operations or the typed `ObjectIndex`
-queries instead. This preserves existing adapter compilation without making
-the graph snapshot part of the supported semantic hand-off.
+At that point the original low-level graph surface remained source-compatible
+through the `ObjectIdIter` and `ReferenceGraphSnapshot` re-exports and the
+`ObjectIndex::reference_graph` method. The method was documented as a
+graph-identity compatibility bridge; new semantic code used the bounded
+`SemanticIndex` operations or the typed `ObjectIndex` queries instead. This
+preserved existing adapter compilation without making the graph snapshot part
+of the supported semantic hand-off.
+
+The compatibility period is closed by record 0362ul157. The public method is
+now `ObjectIndex::reference_snapshot`, a borrowed immutable typed projection;
+the deprecated `reference_graph` spelling is deleted. Likewise, the graph
+crate's raw-`u64` wrappers are deleted in favor of `ObjectId` methods, so a
+protobuf null identity is rejected by `ObjectId::try_from(0)` before graph
+operations rather than silently discarded.

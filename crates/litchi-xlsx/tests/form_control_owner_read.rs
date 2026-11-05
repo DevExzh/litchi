@@ -23,12 +23,12 @@ use litchi_core::{
     Budget, CancellationSource, EvidenceDigest, ExecutionContext, ExecutionLimits,
     Limits as BudgetLimits, OwnedSource, ReadAt, Resource, SourceVersion,
 };
-use litchi_opc::{OpcError, ReadLimits};
+use litchi_opc::{OpcError, SourceLimits};
 use litchi_xlsx::form_control::{
     ControlSelector, FormControlDiagnosticCode, KnownOrUnknown, OwnerLimits, OwnerProfile,
     Properties,
 };
-use litchi_xlsx::{Error, SourceBackedWorkbook, Workbook};
+use litchi_xlsx::{Error, SourceBackedWorkbook};
 use serde_json::Value;
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
@@ -168,6 +168,37 @@ const FIXTURES: &[Fixture] = &[
     },
 ];
 
+/// The first worksheet's form controls of a package opened under the
+/// form-control read budget `limits` (record 0360).
+fn eager_limited_controls(
+    source: &[u8],
+    limits: OwnerLimits,
+) -> litchi_xlsx::Result<litchi_xlsx::form_control::FormControlCollection> {
+    let package = litchi_xlsx::Package::from_bytes_with_options(source, limited(limits))?;
+    package
+        .workbook_ref()
+        .sheet(0)?
+        .expect("sheet")
+        .form_controls()
+}
+
+/// The first worksheet's form controls of a source-backed workbook opened
+/// under the form-control read budget `limits`.
+fn source_limited_controls(
+    source: &[u8],
+    limits: OwnerLimits,
+) -> litchi_xlsx::Result<litchi_xlsx::form_control::FormControlCollection> {
+    SourceBackedWorkbook::from_reader_with_options(Cursor::new(source.to_vec()), limited(limits))?
+        .sheet(0)?
+        .expect("sheet")
+        .form_controls()
+}
+
+fn limited(limits: OwnerLimits) -> litchi_xlsx::OpenOptions {
+    litchi_xlsx::OpenOptions::new()
+        .semantic_limits(litchi_xlsx::SemanticLimits::default().form_controls(limits))
+}
+
 fn fixture_path(file: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/form_control_properties")
@@ -190,9 +221,11 @@ fn known_token<T: std::fmt::Display>(value: Option<&KnownOrUnknown<T>>) -> Optio
 }
 
 fn rewrite_member(source: &[u8], member: &str, edit: impl FnOnce(String) -> String) -> Vec<u8> {
-    let archive = ArchiveReader::new(source).unwrap();
+    let archive =
+        ArchiveReader::new(source, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     let updated = edit(String::from_utf8(archive.read(member).unwrap()).unwrap()).into_bytes();
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in archive.file_names() {
         let bytes = if name == member {
             updated.clone()
@@ -205,8 +238,10 @@ fn rewrite_member(source: &[u8], member: &str, edit: impl FnOnce(String) -> Stri
 }
 
 fn add_member(source: &[u8], member: &str, bytes: &[u8]) -> Vec<u8> {
-    let archive = ArchiveReader::new(source).unwrap();
-    let mut writer = StreamingArchiveWriter::new();
+    let archive =
+        ArchiveReader::new(source, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in archive.file_names() {
         writer
             .write_deflated(name, &archive.read(name).unwrap())
@@ -276,8 +311,10 @@ fn with_ctrlprop_edge_targeting_activex_descriptor(source: &[u8]) -> Vec<u8> {
 }
 
 fn rewrite_members(source: &[u8], edits: &[(&str, &dyn Fn(String) -> String)]) -> Vec<u8> {
-    let archive = ArchiveReader::new(source).unwrap();
-    let mut writer = StreamingArchiveWriter::new();
+    let archive =
+        ArchiveReader::new(source, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in archive.file_names() {
         let mut value = String::from_utf8(archive.read(name).unwrap())
             .unwrap_or_else(|_| panic!("member {name} is not text; omit it from rewrite_members"));
@@ -394,8 +431,9 @@ fn assert_execution_depth_limit<T>(result: litchi_xlsx::Result<T>, label: &str) 
 
 fn assert_owner_refuses(source: Vec<u8>, label: &str) {
     assert!(
-        Workbook::from_bytes(source.clone())
+        litchi_xlsx::Package::from_bytes(&source)
             .unwrap()
+            .workbook_ref()
             .sheet(0)
             .unwrap()
             .unwrap()
@@ -424,12 +462,7 @@ fn assert_resource_limit<T>(result: litchi_xlsx::Result<T>, label: &str) {
 }
 
 fn projection_cap_admits_eager(source: &[u8], cap: usize, label: &str) -> bool {
-    let result = Workbook::from_bytes(source.to_vec())
-        .unwrap()
-        .sheet(0)
-        .unwrap()
-        .unwrap()
-        .form_controls_with_limits(OwnerLimits::new().with_max_projection_bytes(cap));
+    let result = eager_limited_controls(source, OwnerLimits::new().with_max_projection_bytes(cap));
     match result {
         Ok(_) => true,
         Err(Error::ResourceLimit(limit)) => {
@@ -447,12 +480,7 @@ fn projection_cap_admits_eager(source: &[u8], cap: usize, label: &str) -> bool {
 }
 
 fn projection_cap_admits_source(source: &[u8], cap: usize, label: &str) -> bool {
-    let result = SourceBackedWorkbook::from_reader(Cursor::new(source.to_vec()))
-        .unwrap()
-        .sheet(0)
-        .unwrap()
-        .unwrap()
-        .form_controls_with_limits(OwnerLimits::new().with_max_projection_bytes(cap));
+    let result = source_limited_controls(source, OwnerLimits::new().with_max_projection_bytes(cap));
     match result {
         Ok(_) => true,
         Err(Error::ResourceLimit(limit)) => {
@@ -536,9 +564,11 @@ fn native_corpus_inventory_shape_closure_and_source_bytes() {
             json_string(manifest, "sha256"),
             "retained fixture SHA-256 drifted for {file}"
         );
-        let archive = ArchiveReader::new(&source).unwrap();
-        let eager = Workbook::from_bytes(source.clone())
+        let archive =
+            ArchiveReader::new(&source, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+        let eager = litchi_xlsx::Package::from_bytes(&source)
             .unwrap()
+            .workbook_ref()
             .sheet(0)
             .unwrap()
             .unwrap()
@@ -618,8 +648,8 @@ fn native_corpus_inventory_shape_closure_and_source_bytes() {
 #[test]
 fn duplicate_name_selector_is_ambiguous_but_positions_remain_checked() {
     let source = fixture_bytes("tdf161365.xlsx");
-    let workbook = Workbook::from_bytes(source.clone()).unwrap();
-    let sheet = workbook.sheet(0).unwrap().unwrap();
+    let workbook = litchi_xlsx::Package::from_bytes(&source).unwrap();
+    let sheet = workbook.workbook_ref().sheet(0).unwrap().unwrap();
     let controls = sheet.form_controls().unwrap();
     assert_eq!(controls.len(), 2);
     assert!(controls.get(ControlSelector::name("Check Box 4")).is_err());
@@ -687,8 +717,9 @@ fn aliases_and_xml_entities_preserve_semantic_owner_reads() {
             }),
         ],
     );
-    let workbook = Workbook::from_bytes(aliased.clone()).unwrap();
+    let workbook = litchi_xlsx::Package::from_bytes(&aliased).unwrap();
     let view = workbook
+        .workbook_ref()
         .sheet(0)
         .unwrap()
         .unwrap()
@@ -715,8 +746,9 @@ fn aliases_and_xml_entities_preserve_semantic_owner_reads() {
         )
         .replace("</formControlPr>", "</fc:formControlPr>")
     });
-    let properties_view = Workbook::from_bytes(properties_alias)
+    let properties_view = litchi_xlsx::Package::from_bytes(&properties_alias)
         .unwrap()
+        .workbook_ref()
         .sheet(0)
         .unwrap()
         .unwrap()
@@ -795,8 +827,10 @@ fn entity_escaped_namespace_uris_preserve_semantics_and_source_bytes() {
         ],
     );
 
-    let source_archive = ArchiveReader::new(&source).unwrap();
-    let escaped_archive = ArchiveReader::new(&escaped).unwrap();
+    let source_archive =
+        ArchiveReader::new(&source, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let escaped_archive =
+        ArchiveReader::new(&escaped, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     for member in [
         "xl/worksheets/sheet1.xml",
         "xl/worksheets/_rels/sheet1.xml.rels",
@@ -811,16 +845,18 @@ fn entity_escaped_namespace_uris_preserve_semantics_and_source_bytes() {
         );
     }
 
-    let baseline = Workbook::from_bytes(source)
+    let baseline = litchi_xlsx::Package::from_bytes(&source)
         .unwrap()
+        .workbook_ref()
         .sheet(0)
         .unwrap()
         .unwrap()
         .form_control(ControlSelector::position(0))
         .unwrap()
         .unwrap();
-    let eager_controls = Workbook::from_bytes(escaped.clone())
+    let eager_controls = litchi_xlsx::Package::from_bytes(&escaped)
         .unwrap()
+        .workbook_ref()
         .sheet(0)
         .unwrap()
         .unwrap()
@@ -888,8 +924,9 @@ fn strict_and_activex_relationship_dialects_are_refused() {
     let strict = rewrite_member(&source, "xl/worksheets/sheet1.xml", |xml| {
         xml.replacen(SML_NAMESPACE, STRICT_SML_NAMESPACE, 1)
     });
-    let strict_result = Workbook::from_bytes(strict)
+    let strict_result = litchi_xlsx::Package::from_bytes(&strict)
         .unwrap()
+        .workbook_ref()
         .sheet(0)
         .unwrap()
         .unwrap()
@@ -900,8 +937,9 @@ fn strict_and_activex_relationship_dialects_are_refused() {
         let mutated = rewrite_member(&source, "xl/worksheets/_rels/sheet1.xml.rels", |xml| {
             xml.replacen(CONTROL_PROPERTIES_RELATIONSHIP, relationship, 1)
         });
-        let result = Workbook::from_bytes(mutated)
+        let result = litchi_xlsx::Package::from_bytes(&mutated)
             .unwrap()
+            .workbook_ref()
             .sheet(0)
             .unwrap()
             .unwrap()
@@ -916,8 +954,9 @@ fn strict_and_activex_relationship_dialects_are_refused() {
         xml.replace(CONTROL_PROPERTIES_CONTENT_TYPE, ACTIVEX_CONTENT_TYPE)
     });
     assert!(
-        Workbook::from_bytes(wrong_content_type)
+        litchi_xlsx::Package::from_bytes(&wrong_content_type)
             .unwrap()
+            .workbook_ref()
             .sheet(0)
             .unwrap()
             .unwrap()
@@ -931,8 +970,8 @@ fn unrelated_activex_owner_does_not_block_form_control_dispatch() {
     let source = fixture_bytes("checkbox-form-control.xlsx");
     for relationship_type in [ACTIVEX_RELATIONSHIP, STRICT_ACTIVEX_RELATIONSHIP] {
         let source = with_extra_activex_control(&source, relationship_type, 2048, "ActiveX 1");
-        let workbook = Workbook::from_bytes(source).unwrap();
-        let sheet = workbook.sheet(0).unwrap().unwrap();
+        let workbook = litchi_xlsx::Package::from_bytes(&source).unwrap();
+        let sheet = workbook.workbook_ref().sheet(0).unwrap().unwrap();
         let controls = sheet.form_controls().unwrap();
         assert_eq!(
             controls.len(),
@@ -956,8 +995,9 @@ fn active_x_selection_and_shared_persistence_edges_refuse_as_distinct_owners() {
     let source = fixture_bytes("checkbox-form-control.xlsx");
     for relationship_type in [ACTIVEX_RELATIONSHIP, STRICT_ACTIVEX_RELATIONSHIP] {
         let active_x_only = with_activex_control_replacing_form_control(&source, relationship_type);
-        let eager = Workbook::from_bytes(active_x_only.clone())
+        let eager = litchi_xlsx::Package::from_bytes(&active_x_only)
             .unwrap()
+            .workbook_ref()
             .sheet(0)
             .unwrap()
             .unwrap();
@@ -1029,8 +1069,9 @@ fn identity_geometry_and_object_profile_mismatches_are_refused() {
         xml.replace("cNvPr id=\"1025\"", "cNvPr id=\"1026\"")
     });
     assert!(
-        Workbook::from_bytes(missing_drawing_identity)
+        litchi_xlsx::Package::from_bytes(&missing_drawing_identity)
             .unwrap()
+            .workbook_ref()
             .sheet(0)
             .unwrap()
             .unwrap()
@@ -1041,8 +1082,9 @@ fn identity_geometry_and_object_profile_mismatches_are_refused() {
     let bad_object_type = rewrite_member(&source, "xl/drawings/vmlDrawing1.vml", |xml| {
         xml.replace("ObjectType=\"Checkbox\"", "ObjectType=\"Button\"")
     });
-    let bad_object_type_view = Workbook::from_bytes(bad_object_type)
+    let bad_object_type_view = litchi_xlsx::Package::from_bytes(&bad_object_type)
         .unwrap()
+        .workbook_ref()
         .sheet(0)
         .unwrap()
         .unwrap()
@@ -1063,8 +1105,9 @@ fn identity_geometry_and_object_profile_mismatches_are_refused() {
         format!("{}{}", &xml[..start], &xml[end..])
     });
     assert!(
-        Workbook::from_bytes(missing_anchor_endpoint)
+        litchi_xlsx::Package::from_bytes(&missing_anchor_endpoint)
             .unwrap()
+            .workbook_ref()
             .sheet(0)
             .unwrap()
             .unwrap()
@@ -1076,8 +1119,9 @@ fn identity_geometry_and_object_profile_mismatches_are_refused() {
         xml.replace("spid=\"_x0000_s1025\"", "spid=\"_x0000_sbad\"")
     });
     assert!(
-        Workbook::from_bytes(malformed_spid)
+        litchi_xlsx::Package::from_bytes(&malformed_spid)
             .unwrap()
+            .workbook_ref()
             .sheet(0)
             .unwrap()
             .unwrap()
@@ -1096,8 +1140,9 @@ fn identity_geometry_and_object_profile_mismatches_are_refused() {
         },
     );
     assert!(
-        Workbook::from_bytes(disagreement)
+        litchi_xlsx::Package::from_bytes(&disagreement)
             .unwrap()
+            .workbook_ref()
             .sheet(0)
             .unwrap()
             .unwrap()
@@ -1180,8 +1225,9 @@ fn assert_mirror_warning_in_eager_and_source(
     field: &str,
     label: &str,
 ) {
-    let eager = Workbook::from_bytes(source.to_vec())
+    let eager = litchi_xlsx::Package::from_bytes(source)
         .unwrap()
+        .workbook_ref()
         .sheet(0)
         .unwrap()
         .unwrap()
@@ -1202,8 +1248,9 @@ fn assert_mirror_warning_in_eager_and_source(
 #[test]
 fn native_mirror_pairs_are_clean_and_changed_vml_values_are_diagnosed() {
     let checked = fixture_bytes("tdf161365.xlsx");
-    let checked_baseline = Workbook::from_bytes(checked.clone())
+    let checked_baseline = litchi_xlsx::Package::from_bytes(&checked)
         .unwrap()
+        .workbook_ref()
         .sheet(0)
         .unwrap()
         .unwrap()
@@ -1221,8 +1268,9 @@ fn native_mirror_pairs_are_clean_and_changed_vml_values_are_diagnosed() {
     let checked_changed = rewrite_member(&checked, "xl/drawings/vmlDrawing1.vml", |xml| {
         xml.replace("<x:Checked>1</x:Checked>", "<x:Checked>0</x:Checked>")
     });
-    let checked_changed_view = Workbook::from_bytes(checked_changed.clone())
+    let checked_changed_view = litchi_xlsx::Package::from_bytes(&checked_changed)
         .unwrap()
+        .workbook_ref()
         .sheet(0)
         .unwrap()
         .unwrap()
@@ -1238,8 +1286,9 @@ fn native_mirror_pairs_are_clean_and_changed_vml_values_are_diagnosed() {
     assert_mirror_warning_in_eager_and_source(&checked_changed, 1, "checked", "Checked 1 -> 0");
 
     let formula = fixture_bytes("tdf134769.xlsx");
-    let formula_baseline = Workbook::from_bytes(formula.clone())
+    let formula_baseline = litchi_xlsx::Package::from_bytes(&formula)
         .unwrap()
+        .workbook_ref()
         .sheet(0)
         .unwrap()
         .unwrap()
@@ -1263,8 +1312,9 @@ fn native_mirror_pairs_are_clean_and_changed_vml_values_are_diagnosed() {
             "<x:FmlaLink>#A1</x:FmlaLink>",
         )
     });
-    let formula_changed_view = Workbook::from_bytes(formula_changed.clone())
+    let formula_changed_view = litchi_xlsx::Package::from_bytes(&formula_changed)
         .unwrap()
+        .workbook_ref()
         .sheet(0)
         .unwrap()
         .unwrap()
@@ -1299,8 +1349,9 @@ fn native_mirror_pairs_are_clean_and_changed_vml_values_are_diagnosed() {
             ("xl/drawings/vmlDrawing1.vml", &|xml: String| xml),
         ],
     );
-    let aligned_baseline = Workbook::from_bytes(aligned.clone())
+    let aligned_baseline = litchi_xlsx::Package::from_bytes(&aligned)
         .unwrap()
+        .workbook_ref()
         .sheet(0)
         .unwrap()
         .unwrap()
@@ -1327,8 +1378,9 @@ fn native_mirror_pairs_are_clean_and_changed_vml_values_are_diagnosed() {
             "<x:TextVAlign>Top</x:TextVAlign>",
         )
     });
-    let aligned_changed_eager = Workbook::from_bytes(aligned_changed.clone())
+    let aligned_changed_eager = litchi_xlsx::Package::from_bytes(&aligned_changed)
         .unwrap()
+        .workbook_ref()
         .sheet(0)
         .unwrap()
         .unwrap()
@@ -1367,8 +1419,9 @@ fn native_mirror_pairs_are_clean_and_changed_vml_values_are_diagnosed() {
             }),
         ],
     );
-    let list_baseline_eager = Workbook::from_bytes(list_baseline.clone())
+    let list_baseline_eager = litchi_xlsx::Package::from_bytes(&list_baseline)
         .unwrap()
+        .workbook_ref()
         .sheet(0)
         .unwrap()
         .unwrap()
@@ -1385,8 +1438,9 @@ fn native_mirror_pairs_are_clean_and_changed_vml_values_are_diagnosed() {
             "<x:ListItem>Gamma</x:ListItem>",
         )
     });
-    let list_changed_eager = Workbook::from_bytes(list_changed.clone())
+    let list_changed_eager = litchi_xlsx::Package::from_bytes(&list_changed)
         .unwrap()
+        .workbook_ref()
         .sheet(0)
         .unwrap()
         .unwrap()
@@ -1413,8 +1467,9 @@ fn native_mirror_defaults_and_explicit_boolean_forms_keep_presence_distinct() {
     ];
     for (file, position, field, expected) in cases {
         let source = fixture_bytes(file);
-        let eager = Workbook::from_bytes(source.clone())
+        let eager = litchi_xlsx::Package::from_bytes(&source)
             .unwrap()
+            .workbook_ref()
             .sheet(0)
             .unwrap()
             .unwrap()
@@ -1453,8 +1508,9 @@ fn invalid_boolean_and_vml_token_lexicals_are_refused_or_diagnosed() {
         "xl/ctrlProps/ctrlProp1.xml",
         |xml| xml.replace("lockText=\"1\"", "lockText=\"maybe\""),
     );
-    let eager = Workbook::from_bytes(invalid_x14_boolean.clone())
+    let eager = litchi_xlsx::Package::from_bytes(&invalid_x14_boolean)
         .unwrap()
+        .workbook_ref()
         .sheet(0)
         .unwrap()
         .unwrap();
@@ -1474,8 +1530,9 @@ fn invalid_boolean_and_vml_token_lexicals_are_refused_or_diagnosed() {
         "xl/drawings/vmlDrawing1.vml",
         |xml| xml.replace("<x:NoThreeD/>", "<x:NoThreeD>maybe</x:NoThreeD>"),
     );
-    let eager = Workbook::from_bytes(invalid_vml_boolean.clone())
+    let eager = litchi_xlsx::Package::from_bytes(&invalid_vml_boolean)
         .unwrap()
+        .workbook_ref()
         .sheet(0)
         .unwrap()
         .unwrap()
@@ -1503,8 +1560,9 @@ fn invalid_boolean_and_vml_token_lexicals_are_refused_or_diagnosed() {
             "<x:TextVAlign>sideways</x:TextVAlign>",
         )
     });
-    let eager = Workbook::from_bytes(invalid_vml_token.clone())
+    let eager = litchi_xlsx::Package::from_bytes(&invalid_vml_token)
         .unwrap()
+        .workbook_ref()
         .sheet(0)
         .unwrap()
         .unwrap()
@@ -1542,8 +1600,9 @@ fn unanchored_drawing_shape_with_unrelated_valid_anchor_is_refused() {
         )
     });
 
-    let eager = Workbook::from_bytes(unanchored.clone())
+    let eager = litchi_xlsx::Package::from_bytes(&unanchored)
         .unwrap()
+        .workbook_ref()
         .sheet(0)
         .unwrap()
         .unwrap()
@@ -1645,8 +1704,9 @@ fn optional_control_pr_anchor_is_read_with_a_diagnostic() {
     });
 
     for candidate in [absent, malformed] {
-        let eager = Workbook::from_bytes(candidate.clone())
+        let eager = litchi_xlsx::Package::from_bytes(&candidate)
             .unwrap()
+            .workbook_ref()
             .sheet(0)
             .unwrap()
             .unwrap()
@@ -1704,8 +1764,9 @@ fn losml_anchor_coordinate_grammar_is_diagnosed_without_discarding_owner() {
     ];
 
     for (label, candidate) in candidates {
-        let eager = Workbook::from_bytes(candidate.clone())
+        let eager = litchi_xlsx::Package::from_bytes(&candidate)
             .unwrap()
+            .workbook_ref()
             .sheet(0)
             .unwrap()
             .unwrap()
@@ -1753,8 +1814,9 @@ fn malformed_vml_root_and_incomplete_eof_are_refused() {
         ("malformed VML root", malformed_root),
         ("incomplete VML EOF", incomplete_eof),
     ] {
-        let eager = Workbook::from_bytes(candidate.clone())
+        let eager = litchi_xlsx::Package::from_bytes(&candidate)
             .unwrap()
+            .workbook_ref()
             .sheet(0)
             .unwrap()
             .unwrap()
@@ -1786,8 +1848,9 @@ fn control_name_over_32_characters_is_refused_by_the_native_profile() {
     });
 
     assert!(
-        Workbook::from_bytes(candidate.clone())
+        litchi_xlsx::Package::from_bytes(&candidate)
             .unwrap()
+            .workbook_ref()
             .sheet(0)
             .unwrap()
             .unwrap()
@@ -1848,8 +1911,9 @@ fn unsupported_mce_choice_uses_fallback_and_missing_fallback_refuses() {
     let worksheet_fallback = rewrite_member(&source, "xl/worksheets/sheet1.xml", |xml| {
         unsupported_choice_with_fallback(xml, "x14")
     });
-    let worksheet = Workbook::from_bytes(worksheet_fallback)
+    let worksheet = litchi_xlsx::Package::from_bytes(&worksheet_fallback)
         .unwrap()
+        .workbook_ref()
         .sheet(0)
         .unwrap()
         .unwrap();
@@ -1858,8 +1922,9 @@ fn unsupported_mce_choice_uses_fallback_and_missing_fallback_refuses() {
     let drawing_fallback = rewrite_member(&source, "xl/drawings/drawing1.xml", |xml| {
         unsupported_choice_with_fallback(xml, "a14")
     });
-    let drawing = Workbook::from_bytes(drawing_fallback)
+    let drawing = litchi_xlsx::Package::from_bytes(&drawing_fallback)
         .unwrap()
+        .workbook_ref()
         .sheet(0)
         .unwrap()
         .unwrap();
@@ -1873,8 +1938,9 @@ fn unsupported_mce_choice_uses_fallback_and_missing_fallback_refuses() {
         )
     });
     assert!(
-        Workbook::from_bytes(missing_fallback)
+        litchi_xlsx::Package::from_bytes(&missing_fallback)
             .unwrap()
+            .workbook_ref()
             .sheet(0)
             .unwrap()
             .unwrap()
@@ -1890,19 +1956,19 @@ fn properties_relationship_member_presence_is_read_and_malformed_member_refused(
     let drawing_relationship_member = "xl/drawings/_rels/drawing1.xml.rels";
     let vml_relationship_member = "xl/drawings/_rels/vmlDrawing1.vml.rels";
     assert!(
-        !ArchiveReader::new(&source)
+        !ArchiveReader::new(&source, soapberry_zip::office::ArchiveLimits::default())
             .unwrap()
             .file_names()
             .any(|name| name == relationship_member)
     );
     assert!(
-        !ArchiveReader::new(&source)
+        !ArchiveReader::new(&source, soapberry_zip::office::ArchiveLimits::default())
             .unwrap()
             .file_names()
             .any(|name| name == drawing_relationship_member)
     );
     assert!(
-        !ArchiveReader::new(&source)
+        !ArchiveReader::new(&source, soapberry_zip::office::ArchiveLimits::default())
             .unwrap()
             .file_names()
             .any(|name| name == vml_relationship_member)
@@ -1948,26 +2014,24 @@ fn properties_relationship_member_presence_is_read_and_malformed_member_refused(
         Some(empty_relationships.as_slice())
     );
     assert!(vml_read.relationship_is_source_backed());
-    let limited_source = SourceBackedWorkbook::from_reader(Cursor::new(valid.clone()))
-        .unwrap()
-        .sheet(0)
-        .unwrap()
-        .unwrap();
     assert!(
-        limited_source
-            .form_controls_with_limits(
-                OwnerLimits::new().with_max_control_properties_relationship_bytes(1)
-            )
-            .is_err()
+        source_limited_controls(
+            &valid,
+            OwnerLimits::new().with_max_control_properties_relationship_bytes(1)
+        )
+        .is_err()
     );
     assert!(
-        limited_source
-            .form_controls_with_limits(OwnerLimits::new().with_max_sidecar_relationship_bytes(1))
-            .is_err()
+        source_limited_controls(
+            &valid,
+            OwnerLimits::new().with_max_sidecar_relationship_bytes(1)
+        )
+        .is_err()
     );
     assert_eq!(
-        Workbook::from_bytes(valid)
+        litchi_xlsx::Package::from_bytes(&valid)
             .unwrap()
+            .workbook_ref()
             .sheet(0)
             .unwrap()
             .unwrap()
@@ -1978,8 +2042,16 @@ fn properties_relationship_member_presence_is_read_and_malformed_member_refused(
     );
 
     let malformed = add_member(&source, relationship_member, b"<Relationships>");
-    if let Ok(workbook) = Workbook::from_bytes(malformed) {
-        assert!(workbook.sheet(0).unwrap().unwrap().form_controls().is_err());
+    if let Ok(workbook) = litchi_xlsx::Package::from_bytes(&malformed) {
+        assert!(
+            workbook
+                .workbook_ref()
+                .sheet(0)
+                .unwrap()
+                .unwrap()
+                .form_controls()
+                .is_err()
+        );
     }
     let malformed = add_member(&source, drawing_relationship_member, b"<Relationships>");
     if let Ok(workbook) = SourceBackedWorkbook::from_reader(Cursor::new(malformed)) {
@@ -1999,10 +2071,11 @@ fn sidecar_relationships_retain_exact_target_data_and_fingerprint() {
     let source = add_member(&source, property_member, property_relationships);
     let source = add_member(&source, drawing_member, drawing_relationships);
     let source = add_member(&source, vml_member, vml_relationships);
-    let properties_xml = ArchiveReader::new(&source)
-        .unwrap()
-        .read("xl/ctrlProps/ctrlProp1.xml")
-        .unwrap();
+    let properties_xml =
+        ArchiveReader::new(&source, soapberry_zip::office::ArchiveLimits::default())
+            .unwrap()
+            .read("xl/ctrlProps/ctrlProp1.xml")
+            .unwrap();
 
     let source_controls = source_collection(&source);
     let source_read_set = source_controls.read_set().unwrap();
@@ -2065,8 +2138,9 @@ fn sidecar_relationships_retain_exact_target_data_and_fingerprint() {
         vml_read.relationships()
     );
 
-    let eager_view = Workbook::from_bytes(source)
+    let eager_view = litchi_xlsx::Package::from_bytes(&source)
         .unwrap()
+        .workbook_ref()
         .sheet(0)
         .unwrap()
         .unwrap()
@@ -2136,15 +2210,17 @@ fn unreferenced_properties_are_deterministic_and_bounded_by_mirror_cap() {
     let archive_a = build(&["ctrlProp-z.xml", "ctrlProp-a.xml"]);
     let archive_b = build(&["ctrlProp-a.xml", "ctrlProp-z.xml"]);
 
-    let eager_a = Workbook::from_bytes(archive_a.clone())
+    let eager_a = litchi_xlsx::Package::from_bytes(&archive_a)
         .unwrap()
+        .workbook_ref()
         .sheet(0)
         .unwrap()
         .unwrap()
         .form_controls()
         .unwrap();
-    let eager_b = Workbook::from_bytes(archive_b.clone())
+    let eager_b = litchi_xlsx::Package::from_bytes(&archive_b)
         .unwrap()
+        .workbook_ref()
         .sheet(0)
         .unwrap()
         .unwrap()
@@ -2173,22 +2249,12 @@ fn unreferenced_properties_are_deterministic_and_bounded_by_mirror_cap() {
     assert_eq!(source_a.diagnostics(), source_b.diagnostics());
 
     let capped = OwnerLimits::new().with_max_mirror_nodes(1);
-    let eager_sheet = Workbook::from_bytes(archive_a.clone())
-        .unwrap()
-        .sheet(0)
-        .unwrap()
-        .unwrap();
     assert_resource_limit(
-        eager_sheet.form_controls_with_limits(capped),
+        eager_limited_controls(&archive_a, capped),
         "eager diagnostic mirror-node cap",
     );
-    let source_sheet = SourceBackedWorkbook::from_reader(Cursor::new(archive_a))
-        .unwrap()
-        .sheet(0)
-        .unwrap()
-        .unwrap();
     assert_resource_limit(
-        source_sheet.form_controls_with_limits(capped),
+        source_limited_controls(&archive_a, capped),
         "source diagnostic mirror-node cap",
     );
 }
@@ -2304,23 +2370,16 @@ fn mirror_diagnostic_projection_budget_counts_every_detail() {
             xml.replacen("</x:ClientData>", &format!("{extra}</x:ClientData>"), 1)
         },
     );
-    let eager_workbook = Workbook::from_bytes(source.clone())
-        .unwrap()
-        .sheet(0)
-        .unwrap()
-        .unwrap();
-    let source_workbook = SourceBackedWorkbook::from_reader(Cursor::new(source.clone())).unwrap();
-    let source_sheet = source_workbook.sheet(0).unwrap().unwrap();
 
     // The worksheet relationship namespace URI is 67 bytes in this retained
     // fixture, so leave one byte for that canonical identity while keeping
     // the projection ceiling at its normal generous default for the exact
     // diagnostic inventory below.
     let accepted = OwnerLimits::new().with_max_name_bytes(68);
-    let eager = eager_workbook.form_controls_with_limits(accepted).unwrap();
-    let source_controls = source_sheet.form_controls_with_limits(accepted).unwrap();
+    let eager = eager_limited_controls(&source, accepted).unwrap();
+    let source_set = source_limited_controls(&source, accepted).unwrap();
     let eager_view = eager.get(ControlSelector::position(0)).unwrap().unwrap();
-    let source_view = source_controls
+    let source_view = source_set
         .get(ControlSelector::position(0))
         .unwrap()
         .unwrap();
@@ -2333,26 +2392,24 @@ fn mirror_diagnostic_projection_budget_counts_every_detail() {
     assert_eq!(detail_bytes, 1567);
     assert_eq!(eager_view, source_view);
     assert_eq!(eager_view.diagnostics(), source_view.diagnostics());
-    assert!(source_controls.read_set().is_some());
+    assert!(source_set.read_set().is_some());
 
     // 3643 was the old undercounting boundary: it admitted this 30-diagnostic
     // fixture even though the retained detail bytes alone total 1567.  The
     // owner must charge each detail and refuse the same bound for both
     // worksheet facades.
-    let eager_workbook = Workbook::from_bytes(source.clone()).unwrap();
-    let eager_sheet = eager_workbook.sheet(0).unwrap().unwrap();
     assert_resource_limit(
-        eager_sheet.form_controls_with_limits(
+        eager_limited_controls(
+            &source,
             OwnerLimits::new()
                 .with_max_name_bytes(68)
                 .with_max_projection_bytes(3643),
         ),
         "eager mirror diagnostic projection at historical boundary",
     );
-    let source_workbook = SourceBackedWorkbook::from_reader(Cursor::new(source)).unwrap();
-    let source_sheet = source_workbook.sheet(0).unwrap().unwrap();
     assert_resource_limit(
-        source_sheet.form_controls_with_limits(
+        source_limited_controls(
+            &source,
             OwnerLimits::new()
                 .with_max_name_bytes(68)
                 .with_max_projection_bytes(3643),
@@ -2364,7 +2421,8 @@ fn mirror_diagnostic_projection_budget_counts_every_detail() {
 #[test]
 fn source_read_set_retains_exact_owner_relationship_and_mce_provenance() {
     let source = fixture_bytes("checkbox-form-control.xlsx");
-    let archive = ArchiveReader::new(&source).unwrap();
+    let archive =
+        ArchiveReader::new(&source, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     let worksheet_xml = archive.read("xl/worksheets/sheet1.xml").unwrap();
     let worksheet_rels = archive.read("xl/worksheets/_rels/sheet1.xml.rels").unwrap();
     let drawing_xml = archive.read("xl/drawings/drawing1.xml").unwrap();
@@ -2464,8 +2522,9 @@ fn shared_target_and_external_edges_are_refused_before_projection() {
         )
     });
     assert!(
-        Workbook::from_bytes(shared)
+        litchi_xlsx::Package::from_bytes(&shared)
             .unwrap()
+            .workbook_ref()
             .sheet(0)
             .unwrap()
             .unwrap()
@@ -2480,8 +2539,9 @@ fn shared_target_and_external_edges_are_refused_before_projection() {
         )
     });
     assert!(
-        Workbook::from_bytes(external)
+        litchi_xlsx::Package::from_bytes(&external)
             .unwrap()
+            .workbook_ref()
             .sheet(0)
             .unwrap()
             .unwrap()
@@ -2493,21 +2553,23 @@ fn shared_target_and_external_edges_are_refused_before_projection() {
 #[test]
 fn caller_part_limit_refuses_before_form_control_source_projection() {
     let source = fixture_bytes("tdf134769.xlsx");
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_part_bytes(1)
         .unwrap()
         .build()
         .unwrap();
-    assert!(SourceBackedWorkbook::from_reader_with_limits(Cursor::new(source), limits).is_err());
+    assert!(
+        SourceBackedWorkbook::from_reader_with_options(
+            Cursor::new(source),
+            litchi_xlsx::OpenOptions::new().source_limits(limits)
+        )
+        .is_err()
+    );
 }
 
 #[test]
 fn caller_owner_limits_are_applied_through_eager_and_source_facades() {
     let source = fixture_bytes("checkbox-form-control.xlsx");
-    let eager_workbook = Workbook::from_bytes(source.clone()).unwrap();
-    let eager_sheet = eager_workbook.sheet(0).unwrap().unwrap();
-    let source_workbook = SourceBackedWorkbook::from_reader(Cursor::new(source)).unwrap();
-    let source_sheet = source_workbook.sheet(0).unwrap().unwrap();
     let cases = [
         ("controls", OwnerLimits::new().with_max_controls(0)),
         ("MCE branches", OwnerLimits::new().with_max_mce_branches(0)),
@@ -2531,11 +2593,11 @@ fn caller_owner_limits_are_applied_through_eager_and_source_facades() {
     ];
     for (label, limits) in cases {
         assert_resource_limit(
-            eager_sheet.form_controls_with_limits(limits),
+            eager_limited_controls(&source, limits),
             &format!("eager {label} limit"),
         );
         assert_resource_limit(
-            source_sheet.form_controls_with_limits(limits),
+            source_limited_controls(&source, limits),
             &format!("source {label} limit"),
         );
     }
@@ -2545,28 +2607,18 @@ fn caller_owner_limits_are_applied_through_eager_and_source_facades() {
 fn caller_name_limit_is_typed_before_control_projection() {
     let source = fixture_bytes("checkbox-form-control.xlsx");
     let limits = OwnerLimits::new().with_max_name_bytes(1);
-    let eager_sheet = Workbook::from_bytes(source.clone())
-        .unwrap()
-        .sheet(0)
-        .unwrap()
-        .unwrap();
     assert_resource_limit(
-        eager_sheet.form_controls_with_limits(limits),
+        eager_limited_controls(&source, limits),
         "eager authored-name limit",
     );
-    let source_sheet = SourceBackedWorkbook::from_reader(Cursor::new(source))
-        .unwrap()
-        .sheet(0)
-        .unwrap()
-        .unwrap();
     assert_resource_limit(
-        source_sheet.form_controls_with_limits(limits),
+        source_limited_controls(&source, limits),
         "source authored-name limit",
     );
 }
 
 #[test]
-fn worksheet_control_identity_name_limit_reports_object_resource() {
+fn worksheet_control_identity_name_limit_reports_input_resource() {
     let source = fixture_bytes("checkbox-form-control.xlsx");
     // The canonical worksheet carries an XDR namespace QName whose bounded
     // attribute identity is 69 bytes.  Keep this independent name-limit
@@ -2577,29 +2629,19 @@ fn worksheet_control_identity_name_limit_reports_object_resource() {
         xml.replacen("name=\"Check Box 1\"", &format!("name=\"{long_name}\""), 1)
     });
     let limits = OwnerLimits::new().with_max_name_bytes(70);
-    let eager_sheet = Workbook::from_bytes(source.clone())
-        .unwrap()
-        .sheet(0)
-        .unwrap()
-        .unwrap();
-    let source_sheet = SourceBackedWorkbook::from_reader(Cursor::new(source))
-        .unwrap()
-        .sheet(0)
-        .unwrap()
-        .unwrap();
     for (label, result) in [
         (
             "eager worksheet control identity name",
-            eager_sheet.form_controls_with_limits(limits),
+            eager_limited_controls(&source, limits),
         ),
         (
             "source worksheet control identity name",
-            source_sheet.form_controls_with_limits(limits),
+            source_limited_controls(&source, limits),
         ),
     ] {
         match result {
             Err(Error::ResourceLimit(limit)) => {
-                assert_eq!(limit.resource, Resource::Objects, "{label}: {limit:?}");
+                assert_eq!(limit.resource, Resource::InputBytes, "{label}: {limit:?}");
                 assert_eq!(limit.observed, 71, "{label}: {limit:?}");
                 assert_eq!(limit.limit, 70, "{label}: {limit:?}");
                 assert!(
@@ -2616,16 +2658,6 @@ fn worksheet_control_identity_name_limit_reports_object_resource() {
 #[test]
 fn caller_leaf_depth_event_and_opaque_caps_are_forwarded() {
     let source = fixture_bytes("checkbox-form-control.xlsx");
-    let eager_sheet = Workbook::from_bytes(source.clone())
-        .unwrap()
-        .sheet(0)
-        .unwrap()
-        .unwrap();
-    let source_sheet = SourceBackedWorkbook::from_reader(Cursor::new(source))
-        .unwrap()
-        .sheet(0)
-        .unwrap()
-        .unwrap();
     let cases = [
         ("leaf depth", OwnerLimits::new().with_max_mce_depth(1)),
         ("leaf events", OwnerLimits::new().with_max_mce_events(1)),
@@ -2636,11 +2668,11 @@ fn caller_leaf_depth_event_and_opaque_caps_are_forwarded() {
     ];
     for (label, limits) in cases {
         assert_typed_limit(
-            eager_sheet.form_controls_with_limits(limits),
+            eager_limited_controls(&source, limits),
             &format!("eager lowered {label} cap"),
         );
         assert_typed_limit(
-            source_sheet.form_controls_with_limits(limits),
+            source_limited_controls(&source, limits),
             &format!("source lowered {label} cap"),
         );
     }
@@ -2650,10 +2682,11 @@ fn caller_leaf_depth_event_and_opaque_caps_are_forwarded() {
 fn managed_owner_clones_and_read_set_keep_budget_charges_alive() {
     let source = fixture_bytes("checkbox-form-control.xlsx");
     let (budget, _cancellation_source, context) = managed_owner_context(u64::MAX, u64::MAX);
-    let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
         Arc::new(OwnedSource::new(source)),
-        ReadLimits::default(),
-        context,
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let sheet = workbook.sheet(0).unwrap().unwrap();
@@ -2719,10 +2752,11 @@ fn managed_owner_clones_and_read_set_keep_budget_charges_alive() {
 fn managed_owner_tiny_execution_depth_is_a_typed_resource_refusal() {
     let source = fixture_bytes("checkbox-form-control.xlsx");
     let (budget, _cancellation_source, context) = managed_owner_context(u64::MAX, 0);
-    let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
         Arc::new(OwnedSource::new(source)),
-        ReadLimits::default(),
-        context,
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let sheet = workbook.sheet(0).unwrap().unwrap();
@@ -2737,16 +2771,16 @@ fn mirror_node_caps_refuse_without_retaining_control_shape_charges() {
     let source = fixture_bytes("checkbox-form-control.xlsx");
     for maximum in [0, 1] {
         let (budget, _cancellation_source, context) = managed_owner_context(u64::MAX, u64::MAX);
-        let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+        let workbook = SourceBackedWorkbook::from_read_at_with_options(
             Arc::new(OwnedSource::new(source.clone())),
-            ReadLimits::default(),
-            context,
+            limited(OwnerLimits::new().with_max_mirror_nodes(maximum))
+                .source_limits(SourceLimits::default())
+                .execution_context(context),
         )
         .unwrap();
         let sheet = workbook.sheet(0).unwrap().unwrap();
         let before_owner = managed_owner_usage(&budget);
-        let result =
-            sheet.form_controls_with_limits(OwnerLimits::new().with_max_mirror_nodes(maximum));
+        let result = sheet.form_controls();
         match result {
             Err(Error::ResourceLimit(limit)) => {
                 assert_eq!(limit.resource, Resource::Objects);
@@ -2792,7 +2826,8 @@ fn source_reads_are_read_only_and_repeated_semantic_selection_is_stable() {
         .unwrap();
     assert_eq!(first, second);
     assert_eq!(first.properties().fmla_link().unwrap().as_str(), "#REF!");
-    let archive = ArchiveReader::new(&source).unwrap();
+    let archive =
+        ArchiveReader::new(&source, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     let raw = archive.read("xl/ctrlProps/ctrlProp1.xml").unwrap();
     assert_eq!(first.properties().source_bytes(), Some(raw.as_slice()));
 }

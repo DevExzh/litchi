@@ -84,7 +84,7 @@
 //! Compound-file and `OfficeArt` primitives live in `litchi-cfb`,
 //! `litchi-ole-common`, and `litchi-odraw`. The public API is re-exported at
 //! this crate's root so callers can use concise paths such as
-//! [`Package`] and [`writer::Writer`].
+//! [`Package`] and [`Builder`].
 //!
 //! A Word binary document is an OLE2 structured storage containing a
 //! `WordDocument` stream, a `0Table` or `1Table` stream, and optional data,
@@ -97,8 +97,8 @@
 //! ```rust,no_run
 //! use litchi_doc::Package;
 //!
-//! let mut package = Package::open("document.doc")?;
-//! let document = package.document()?;
+//! let package = Package::open("document.doc")?;
+//! let document = package.document();
 //!
 //! for paragraph in document.paragraphs()? {
 //!     println!("{}", paragraph.text()?);
@@ -135,14 +135,15 @@ pub mod bookmark;
 /// Contextual Word caption and `AutoCaption` metadata.
 pub mod captions {
     pub use crate::parts::captions::{
-        AutoEntry, AutoTable, Commit, Definition, Editor, Format, Heading, Info, LabelTable,
-        Location, Numbering, PackageCommit, PackageSnapshot, Separator, Snapshot, Tables,
-        Transaction, TransactionError,
+        AutoEntry, AutoTable, Commit, Definition, Diagnostics, Edit, Error, Format, Heading, Info,
+        LabelTable, LimitKind, Location, Numbering, Patch, Result, Separator, Tables, record,
     };
 }
 pub mod comment;
+mod cp_range;
 // The parsed document owner is intentionally private; `Document` is exposed
 // directly at the crate facade instead of behind an outer `document` module.
+pub mod builder;
 mod document;
 mod encryption;
 pub mod footnote;
@@ -151,12 +152,24 @@ pub mod hyperlink;
 pub mod image;
 pub mod leniency;
 pub mod package;
+pub mod source_backed;
+/// Low-level cursor-backed CFB access for format-specific callers.
+pub mod raw {
+    pub use crate::package::raw::Reader;
+    pub use crate::package::raw::{OpenOutcome, open_package};
+}
 pub mod paragraph;
 pub mod parts;
 mod plcf;
 pub mod revision;
 /// Layered route-slip lifecycle and protection metadata.
 pub mod route_slip;
+mod scoped;
+
+#[cfg(test)]
+extern crate self as litchi_doc;
+#[cfg(test)]
+mod internal_tests;
 pub mod section;
 pub mod shape;
 pub mod table;
@@ -167,14 +180,14 @@ pub mod vba;
 
 /// Typed, inert MS-OFFCRYPTO `DataSpaces` and legacy-binary IRM metadata.
 ///
-/// The package facade exposes [`Package::data_spaces`] for structural
+/// The package facade exposes [`raw::Reader::data_spaces`] for structural
 /// inspection. Rights evaluation, decryption, and external policy services
 /// remain outside this crate.
 pub use litchi_crypto::spaces;
 
 /// Inert `[MS-OSHARED]` VBA digital-signature blob storage.
 ///
-/// The package facade exposes this owner through [`Package::vba_signature`].
+/// The package facade exposes this owner through [`raw::Reader::vba_signature`].
 /// PKCS#7 `SignedData`, `contentInfo` form (`SpcIndirectDataContent` versus
 /// `SpcIndirectDataContentV2`), and certificate-store trust remain opaque:
 /// parsing and editing never establish trust or execute a VBA project.
@@ -187,9 +200,14 @@ pub use parts::annotation_bookmarks;
 pub mod writer;
 
 pub use bookmark::Bookmark;
+pub use builder::Builder;
 pub use comment::{Comment, DateTime, ExtendedMetadata};
-pub use document::Document;
-pub use embedded_object::{Editor, WriteOptions};
+pub use cp_range::CpRange;
+pub use document::{
+    BodyParagraphs, Document, HeaderFooterSlot, StoryBlock, StoryBlockKind, StoryBlocks,
+    StoryIndexDiagnostics,
+};
+pub use embedded_object::WriteOptions;
 pub use encryption::EncryptionProfile;
 pub use equation::{EQUATION_3_CLSID, MtefEquation, MtefEquationWriteOptions};
 pub use footnote::{Endnote, Footnote};
@@ -202,8 +220,8 @@ pub use leniency::{
     StylesheetDefect, TableDefinitionDefect, ToleranceReport, ToleratedDefect,
 };
 pub use package::{
-    EncryptionKind, Error, Limits, LimitsError, OpenOptions, Package, PackageOpenOptions, Password,
-    ResourceKind, ResourceLimit, Result,
+    Commit, Diagnostics, Edit, EditOptions, EncryptionKind, Error, LimitKind, OpenOptions, Package,
+    Password, Patch, Result, SourceLimitKind, SourceLimits, SourceLimitsBuilder,
 };
 pub use paragraph::{Paragraph, Run};
 pub use parts::associated_strings::{AssociatedStringSlot, DocumentAssociatedStrings};
@@ -211,11 +229,9 @@ pub use parts::auto_summary::{AutoSummaryRange, DocumentAutoSummary};
 pub use parts::chp::CharacterConditionalFormatting;
 pub use parts::command_bars::{
     Action, AllocatedCommand, AllocatedCommands, CommandBars, CommandId, CommandString,
-    CommandStrings, Control, Customization, CustomizationData, Editor as CommandBarsEditor, Entry,
-    KeyMap, KeyMapKind, KeyMaps, MacroCommand, MacroCommands, MacroName, MacroNames, Operation,
-    PackageCommit as CommandBarsPackageCommit, PackageSnapshot as CommandBarsPackageSnapshot,
-    Snapshot as CommandBarsSnapshot, Toolbar, ToolbarDelta, ToolbarWrapper, Transaction,
-    TransactionError, XString,
+    CommandStrings, Control, Customization, CustomizationData, Entry, KeyMap, KeyMapKind, KeyMaps,
+    MacroCommand, MacroCommands, MacroName, MacroNames, Operation, Toolbar, ToolbarDelta,
+    ToolbarWrapper, XString,
 };
 pub use parts::document_properties::{
     CompatibilityOptions60, DocumentProperties, DocumentPropertiesBase, DocumentPropertyVersion,
@@ -245,18 +261,15 @@ pub use parts::document_properties_2007::{
 pub use parts::document_properties_2010::{DocumentId, Dop2010};
 pub use parts::document_properties_2013::Dop2013;
 pub use parts::dofr::{
-    DofrArray, DofrChildMarker, DofrCommit, DofrDivider, DofrDividerUnits, DofrFrame,
-    DofrFrameKind, DofrListStyle, DofrListStyles, DofrPatch, DofrPayload, DofrRecord,
-    DofrScrollType, DofrSplitter, DofrTransaction, DofrType, DofrXstz,
+    DofrArray, DofrChildMarker, DofrDivider, DofrDividerUnits, DofrFrame, DofrFrameKind,
+    DofrListStyle, DofrListStyles, DofrPayload, DofrRecord, DofrScrollType, DofrSplitter, DofrType,
+    DofrXstz,
 };
 pub use parts::embedded_fonts::{DocumentEmbeddedFonts, EmbeddedFont};
 pub use parts::envelope::{
-    Attachment, Commit as EnvelopeCommit, Editor as EnvelopeEditor, Envelope,
-    FIB_INDEX as MSO_ENVELOPE_FIB_INDEX, FollowUpStatus, Importance, MSO_ENVELOPE_CLSID, Message,
-    PackageCommit as EnvelopePackageCommit, PackageSnapshot as EnvelopePackageSnapshot,
-    Patch as EnvelopePatch, Payload, PropertyValue, RecipientCollection, RecipientProperties,
-    RecipientProperty, SecurityFlags, Sensitivity, Snapshot as EnvelopeSnapshot, Text,
-    Transaction as EnvelopeTransaction, TransactionError as EnvelopeTransactionError, Version,
+    Attachment, Envelope, FIB_INDEX as MSO_ENVELOPE_FIB_INDEX, FollowUpStatus, Importance,
+    MSO_ENVELOPE_CLSID, Message, Payload, PropertyValue, RecipientCollection, RecipientProperties,
+    RecipientProperty, SecurityFlags, Sensitivity, Text, Version,
 };
 pub use parts::fields::BarcodeField;
 pub use parts::fields::BidiOutlineField;
@@ -305,6 +318,7 @@ pub use parts::fields::{
     ReferenceField, ReferenceFieldKind, ReferenceFieldOption, ReferencedDocumentField,
 };
 pub use parts::fields::{StyleReferenceField, StyleReferenceFieldOption};
+pub use parts::fonts::{Font, FontFamily, FontPitch, FontTable};
 pub use parts::form_fields::{
     CheckBoxState, FormFieldData, FormFieldDataKind, FormFieldTextKind, NilPicfAndBinData,
 };
@@ -348,10 +362,7 @@ pub use parts::repair_bookmarks::{DocumentRepairBookmarks, RepairBookmark};
 pub use parts::rmd_threading::{DocumentRmdThreading, MessageDisplayProperties, ThreadingMessage};
 pub use parts::rsids::DocumentRsids;
 pub use parts::saved_by::{SavedByEntry, SavedByTable};
-pub use parts::saved_selection::{
-    SavedSelection, SavedSelectionCommit, SavedSelectionPatch, SavedSelectionTransaction,
-    SelectionGeometry, SelectionStyle,
-};
+pub use parts::saved_selection::{SavedSelection, SelectionGeometry, SelectionStyle};
 pub use parts::smart_tags::{
     DocumentSmartTag, DocumentSmartTags, SmartTagBookmarkInfo, SmartTagOrigin,
     SmartTagRecognizerRange, SmartTagRecognizerState,
@@ -368,14 +379,12 @@ pub use parts::styles::{
     StyleSheetHeader,
 };
 pub use parts::subdocuments::{
-    Collection, Commit as SubdocumentCommit, FileNameKey, FileNameKeyError, FileNameMetadata,
-    FileNameSelector as SubdocumentFileNameSelector, Kind, Name, Patch as SubdocumentPatch,
+    Collection, FileNameKey, FileNameKeyError, FileNameMetadata,
+    FileNameSelector as SubdocumentFileNameSelector, Kind, Name,
     PatchError as SubdocumentPatchError, Reference,
     ReferenceSelector as SubdocumentReferenceSelector, SelectionError as SubdocumentSelectionError,
-    Snapshot as SubdocumentSnapshot, SourceContext as SubdocumentSourceContext,
-    SourceRanges as SubdocumentSourceRanges, TablePatch as SubdocumentTablePatch,
-    TableRange as SubdocumentTableRange, Transaction as SubdocumentTransaction,
-    TransactionError as SubdocumentTransactionError,
+    SourceContext as SubdocumentSourceContext, SourceRanges as SubdocumentSourceRanges,
+    TablePatch as SubdocumentTablePatch, TableRange as SubdocumentTableRange,
 };
 pub use parts::table_char_cache::{TableCharEntry, TableCharInfo, TableCharacterCache};
 pub use parts::tap::TableStyleCondition;
@@ -401,7 +410,7 @@ pub use section::{
 pub use shape::{Bounds, Kind as ShapeKind, Shape, UnknownRecord};
 pub use shape::{count_shapes, extract_drawing_shapes, extract_shape_text, extract_shapes};
 pub use table::{Cell, Row, Table};
-pub use tracked_revision::{Revision, RevisionEditor, RevisionMetadata};
+pub use tracked_revision::{Revision, RevisionMetadata};
 pub use user_defined_hyperlinks::{
     FieldCandidate, HyperlinkAssociation, MutationError, ResolutionError, UserDefinedHyperlink,
     UserDefinedHyperlinks,
@@ -416,7 +425,7 @@ pub use writer::{
     NumberingRevision, ParagraphBorder, ParagraphBorderStyle, ParagraphBorders,
     ParagraphFormatting, ParagraphShading, PhysicalJustification, Picture, Shape as DrawingShape,
     SmartTagEntry, StyleRevision, StyleWriteError, TabAlignment, TabLeader, TabStop,
-    TextBoxTightWrap, TextRevision, WriteError, Writer,
+    TextBoxTightWrap, TextRevision, WriteError,
 };
 
 /// Crate-native ordered document element returned by [`Document::elements`].

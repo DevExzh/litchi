@@ -482,3 +482,16 @@ fn source_bom_preserves_structural_refusals_and_byte_accounting() {
         );
     }
 }
+
+#[test]
+fn audit_failure_predicates_preserve_resource_and_document_distinctions() {
+    let input = b"<root>text</root>";
+    let limit = audit::verify(input, Limits::new(1, 16, 128, 32, 128, 128).unwrap()).unwrap_err();
+    assert!(limit.is_limit());
+    assert!(!limit.is_allocation());
+    let malformed = audit::verify(b"<root>", limits_for(b"<root>")).unwrap_err();
+    assert!(!malformed.is_limit());
+    assert!(!malformed.is_allocation());
+    assert!(audit::Error::Allocation.is_allocation());
+    assert!(!audit::Error::Allocation.is_limit());
+}

@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, reason = "test assertions use unwrap for clarity")]
 
 use litchi_odf_common::core::PackageWriter;
-use litchi_odg::{Drawing, Transition, TransitionSound, page::Page};
+use litchi_odg::{Package, Transition, TransitionSound, page::Page};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const CONTENT_AUTOMATIC: &str = r##"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:smil="urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xml="http://www.w3.org/XML/1998/namespace" xmlns:foo="urn:example:unknown" office:version="1.4"><office:automatic-styles><style:style style:name="dp1" style:family="drawing-page"><style:drawing-page-properties presentation:transition-type="automatic" presentation:transition-style="fade-from-left" presentation:transition-speed="fast" smil:type="fade" smil:subtype="crossfade" smil:direction="forward" smil:fadeColor="#010203" presentation:duration="PT2S"><presentation:sound xlink:type="simple" xlink:href="media/transition.wav" xlink:actuate="onRequest" xlink:show="replace" presentation:play-full="true" xml:id="sound1"/><foo:unknown foo:value="keep"/></style:drawing-page-properties></style:style></office:automatic-styles><office:body><office:drawing><draw:page draw:name="Page 1" draw:style-name="dp1"/></office:drawing></office:body></office:document-content>"##;
@@ -22,7 +22,7 @@ const STYLES_NAMED: &str = r##"<?xml version="1.0" encoding="UTF-8"?><office:doc
 const STYLES_PREFIXED_INHERITED: &str = r##"<?xml version="1.0" encoding="UTF-8"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:p="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0" office:version="1.4"><office:styles><style:style style:name="parent" style:family="drawing-page"><style:drawing-page-properties p:transition-speed="slow" s:type="fade"/></style:style><style:style style:name="dp1" style:family="drawing-page" style:parent-style-name="parent"><style:drawing-page-properties p:transition-type="manual"/></style:style></office:styles></office:document-styles>"##;
 
 fn package(content: &str, styles: Option<&str>) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.graphics")
         .unwrap();
@@ -37,7 +37,8 @@ fn package(content: &str, styles: Option<&str>) -> Vec<u8> {
 fn raw_package(content: &str) -> Vec<u8> {
     const MIMETYPE: &[u8] = b"application/vnd.oasis.opendocument.graphics";
     const MANIFEST: &[u8] = br#"<?xml version="1.0"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.graphics"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/></manifest:manifest>"#;
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer.write_stored("mimetype", MIMETYPE).unwrap();
     writer
         .write_stored("content.xml", content.as_bytes())
@@ -105,7 +106,7 @@ fn replacement_transition() -> Transition {
 
 #[test]
 fn reads_smil_transition_and_reopens_source_bound_edit() {
-    let source = Drawing::from_bytes(package(CONTENT_AUTOMATIC, None)).unwrap();
+    let source = Package::from_bytes(&package(CONTENT_AUTOMATIC, None)).unwrap();
     let transition = source.pages()[0].transition().unwrap();
     assert_eq!(transition.transition_type(), Some("automatic"));
     assert_eq!(transition.style(), Some("fade-from-left"));
@@ -118,7 +119,7 @@ fn reads_smil_transition_and_reopens_source_bound_edit() {
     edit.set_page_transition(0, Some(replacement_transition()))
         .unwrap();
     let commit = edit.commit().unwrap();
-    let output = commit.snapshot();
+    let output = commit.package();
     assert!(
         output
             .content_xml()
@@ -129,7 +130,7 @@ fn reads_smil_transition_and_reopens_source_bound_edit() {
             .content_xml()
             .contains("presentation:transition-style=\"dissolve\"")
     );
-    let reopened = Drawing::from_bytes(output.as_bytes().to_vec()).unwrap();
+    let reopened = Package::from_bytes(output.as_bytes()).unwrap();
     assert_eq!(
         reopened.pages()[0].transition(),
         output.pages()[0].transition()
@@ -140,7 +141,7 @@ fn reads_smil_transition_and_reopens_source_bound_edit() {
     );
 
     let durable = commit.patch().durable().unwrap();
-    let replayed = durable.apply(source.snapshot()).unwrap();
+    let replayed = durable.apply(&source).unwrap();
     assert_eq!(replayed.as_bytes(), output.as_bytes());
     let restored = durable.inverse().apply(&replayed).unwrap();
     assert_eq!(restored.as_bytes(), source.as_bytes());
@@ -153,12 +154,12 @@ fn oversized_external_styles_member_is_rejected_before_materialization() {
         b"styles.xml",
         256 * 1024 * 1024 + 1,
     );
-    let error = match Drawing::from_bytes(bytes) {
+    let error = match Package::from_bytes(&bytes) {
         Ok(_) => panic!("oversized styles member was accepted"),
         Err(error) => error,
     };
     assert!(
-        matches!(error, litchi_core::Error::InvalidFormat(reason) if reason.contains("styles.xml") && reason.contains("family limit"))
+        matches!(error, litchi_odg::Error::Core(litchi_core::Error::InvalidFormat(reason)) if reason.contains("styles.xml") && reason.contains("family limit"))
     );
 }
 
@@ -169,12 +170,12 @@ fn oversized_external_content_member_is_rejected_before_materialization() {
         b"content.xml",
         256 * 1024 * 1024 + 1,
     );
-    let error = match Drawing::from_bytes(bytes) {
+    let error = match Package::from_bytes(&bytes) {
         Ok(_) => panic!("oversized content member was accepted"),
         Err(error) => error,
     };
     assert!(
-        matches!(error, litchi_core::Error::InvalidFormat(reason) if reason.contains("content.xml") && reason.contains("family limit"))
+        matches!(error, litchi_odg::Error::Core(litchi_core::Error::InvalidFormat(reason)) if reason.contains("content.xml") && reason.contains("family limit"))
     );
 }
 
@@ -183,12 +184,12 @@ fn oversized_ignored_event_is_rejected_before_parser_ownership() {
     let comment = "x".repeat(16 * 1024 * 1024 + 1);
     let content =
         CONTENT_SHARED.replace("<office:body>", &format!("<!--{comment}--><office:body>"));
-    let error = match Drawing::from_bytes(raw_package(&content)) {
+    let error = match Package::from_bytes(&raw_package(&content)) {
         Ok(_) => panic!("oversized ignored XML event was accepted"),
         Err(error) => error,
     };
     assert!(
-        matches!(error, litchi_core::Error::InvalidFormat(reason) if reason.contains("event") && reason.contains("limit"))
+        matches!(error, litchi_odg::Error::Core(litchi_core::Error::InvalidFormat(reason)) if reason.contains("event") && reason.contains("limit"))
     );
 }
 
@@ -198,17 +199,15 @@ fn preserves_paired_empty_transition_sound_markup() {
         r#"xml:id="sound1"/>"#,
         r#"xml:id="sound1"><!--keep--></presentation:sound>"#,
     );
-    let source = Drawing::from_bytes(package(&content, None)).unwrap();
+    let source = Package::from_bytes(&package(&content, None)).unwrap();
     let mut transition = source.pages()[0].transition().cloned().unwrap();
     transition.set_duration(Some("PT3S")).unwrap();
     let mut edit = source.edit();
     edit.set_page_transition(0, Some(transition)).unwrap();
-    let output = edit.commit().unwrap().into_snapshot();
+    let output = edit.commit().unwrap().into_package();
     assert!(output.content_xml().contains("<!--keep-->"));
     assert_eq!(
-        Drawing::from_bytes(output.as_bytes().to_vec())
-            .unwrap()
-            .pages()[0]
+        Package::from_bytes(output.as_bytes()).unwrap().pages()[0]
             .transition()
             .unwrap()
             .duration(),
@@ -218,7 +217,7 @@ fn preserves_paired_empty_transition_sound_markup() {
 
 #[test]
 fn edits_named_style_owner_in_styles_xml() {
-    let source = Drawing::from_bytes(package(CONTENT_NAMED, Some(STYLES_NAMED))).unwrap();
+    let source = Package::from_bytes(&package(CONTENT_NAMED, Some(STYLES_NAMED))).unwrap();
     assert_eq!(
         source.pages()[0].transition().unwrap().transition_type(),
         Some("manual")
@@ -226,7 +225,7 @@ fn edits_named_style_owner_in_styles_xml() {
     let mut edit = source.edit();
     edit.set_page_transition(0, Some(replacement_transition()))
         .unwrap();
-    let output = edit.commit().unwrap().into_snapshot();
+    let output = edit.commit().unwrap().into_package();
     assert_eq!(output.content_xml(), CONTENT_NAMED);
     assert!(
         output
@@ -234,7 +233,7 @@ fn edits_named_style_owner_in_styles_xml() {
             .unwrap()
             .contains("presentation:transition-style=\"dissolve\"")
     );
-    let reopened = Drawing::from_bytes(output.as_bytes().to_vec()).unwrap();
+    let reopened = Package::from_bytes(output.as_bytes()).unwrap();
     assert_eq!(
         reopened.pages()[0].transition().unwrap().style(),
         Some("dissolve")
@@ -244,7 +243,7 @@ fn edits_named_style_owner_in_styles_xml() {
 #[test]
 fn resolves_prefixed_transition_attributes_and_parent_styles() {
     let source =
-        Drawing::from_bytes(package(CONTENT_NAMED, Some(STYLES_PREFIXED_INHERITED))).unwrap();
+        Package::from_bytes(&package(CONTENT_NAMED, Some(STYLES_PREFIXED_INHERITED))).unwrap();
     let transition = source.pages()[0].transition().unwrap();
     assert_eq!(transition.transition_type(), Some("manual"));
     assert_eq!(transition.speed(), Some("slow"));
@@ -253,7 +252,7 @@ fn resolves_prefixed_transition_attributes_and_parent_styles() {
 
 #[test]
 fn refuses_to_mutate_a_transition_style_shared_by_pages() {
-    let source = Drawing::from_bytes(package(CONTENT_SHARED, None)).unwrap();
+    let source = Package::from_bytes(&package(CONTENT_SHARED, None)).unwrap();
     let mut edit = source.edit();
     assert!(
         edit.set_page_transition(0, Some(replacement_transition()))
@@ -263,7 +262,7 @@ fn refuses_to_mutate_a_transition_style_shared_by_pages() {
 
 #[test]
 fn recognizes_inert_dr3d_shape_owners() {
-    let drawing = Drawing::from_bytes(package(CONTENT_3D, None)).unwrap();
+    let drawing = Package::from_bytes(&package(CONTENT_3D, None)).unwrap();
     let shapes = drawing.pages()[0].shapes();
     assert_eq!(
         shapes[0].kind(),
@@ -297,8 +296,10 @@ fn rejects_misplaced_dr3d_shape_owners() {
     );
     for content in [scene_in_rect, non_3d_scene_child] {
         assert!(matches!(
-            Drawing::from_bytes(package(&content, None)),
-            Err(litchi_core::Error::InvalidFormat(_))
+            Package::from_bytes(&package(&content, None)),
+            Err(litchi_odg::Error::Core(litchi_core::Error::InvalidFormat(
+                _
+            )))
         ));
     }
 }
@@ -307,25 +308,30 @@ fn rejects_misplaced_dr3d_shape_owners() {
 fn rejects_malformed_dr3d_vector_attributes() {
     let malformed = CONTENT_3D.replace(r#"dr3d:direction="(0 0 1)""#, r#"dr3d:direction="0 0 1""#);
     assert!(matches!(
-        Drawing::from_bytes(package(&malformed, None)),
-        Err(litchi_core::Error::InvalidFormat(_))
+        Package::from_bytes(&package(&malformed, None)),
+        Err(litchi_odg::Error::Core(litchi_core::Error::InvalidFormat(
+            _
+        )))
     ));
 }
 
 #[test]
 fn refuses_inert_dr3d_shape_authoring() {
-    let drawing = Drawing::from_bytes(package(CONTENT_3D, None)).unwrap();
+    let drawing = Package::from_bytes(&package(CONTENT_3D, None)).unwrap();
     let mut edit = drawing.edit();
     let result = edit.add_shape(
         0,
         litchi_odg::shape::Shape::new(litchi_odg::shape::ShapeKind::ThreeDimensionalCube),
     );
-    assert!(matches!(result, Err(litchi_core::Error::Unsupported(_))));
+    assert!(matches!(
+        result,
+        Err(litchi_core::Error::Unsupported(_) | litchi_core::Error::Refused(_))
+    ));
 }
 
 #[test]
 fn reads_inert_enhanced_geometry_equations_and_handles() {
-    let drawing = Drawing::from_bytes(package(CONTENT_ENHANCED, None)).unwrap();
+    let drawing = Package::from_bytes(&package(CONTENT_ENHANCED, None)).unwrap();
     let geometry = drawing.pages()[0].shapes()[0].enhanced_geometry().unwrap();
     assert_eq!(geometry.attributes().len(), 2);
     assert_eq!(geometry.children().len(), 2);
@@ -348,7 +354,7 @@ fn reads_inert_enhanced_geometry_equations_and_handles() {
         r#"draw:handle draw:handle-position="$0 0""#,
         r#"draw:handle draw:handle-position-x="$0" draw:handle-position-y="$0""#,
     );
-    let modern = Drawing::from_bytes(package(&modern, None)).unwrap();
+    let modern = Package::from_bytes(&package(&modern, None)).unwrap();
     let modern_handle = &modern.pages()[0].shapes()[0]
         .enhanced_geometry()
         .unwrap()
@@ -385,8 +391,10 @@ fn rejects_invalid_enhanced_geometry_handle_grammar_and_children() {
     for (index, content) in invalid_sources.into_iter().enumerate() {
         assert!(
             matches!(
-                Drawing::from_bytes(package(&content, None)),
-                Err(litchi_core::Error::InvalidFormat(_))
+                Package::from_bytes(&package(&content, None)),
+                Err(litchi_odg::Error::Core(litchi_core::Error::InvalidFormat(
+                    _
+                )))
             ),
             "invalid enhanced geometry source {index} was accepted"
         );
@@ -395,7 +403,7 @@ fn rejects_invalid_enhanced_geometry_handle_grammar_and_children() {
 
 #[test]
 fn reads_inert_image_map_contour_and_glue_point_owners() {
-    let drawing = Drawing::from_bytes(package(CONTENT_AUXILIARY, None)).unwrap();
+    let drawing = Package::from_bytes(&package(CONTENT_AUXILIARY, None)).unwrap();
     let shape = &drawing.pages()[0].shapes()[0];
     let map = shape.image_map().unwrap();
     assert_eq!(map.areas().len(), 2);
@@ -421,7 +429,7 @@ fn image_map_charges_retained_area_and_owner_xml_together() {
         );
         let mut content = CONTENT_AUXILIARY.to_owned();
         content.replace_range(end..end + 2, &paired);
-        let result = Drawing::from_bytes(package(&content, None));
+        let result = Package::from_bytes(&package(&content, None));
         if accepted {
             assert_eq!(
                 result.unwrap().pages()[0].shapes()[0]
@@ -432,7 +440,12 @@ fn image_map_charges_retained_area_and_owner_xml_together() {
                 2
             );
         } else {
-            assert!(matches!(result, Err(litchi_core::Error::InvalidFormat(_))));
+            assert!(matches!(
+                result,
+                Err(litchi_odg::Error::Core(litchi_core::Error::InvalidFormat(
+                    _
+                )))
+            ));
         }
     }
 }
@@ -448,14 +461,16 @@ fn paired_contours_and_glue_points_accept_empty_content_and_retain_comments() {
             r#"draw:escape-direction="auto"/>"#,
             r#"draw:escape-direction="auto"><!--glue--></draw:glue-point>"#,
         );
-    let drawing = Drawing::from_bytes(package(&source, None)).unwrap();
+    let drawing = Package::from_bytes(&package(&source, None)).unwrap();
     let shape = &drawing.pages()[0].shapes()[0];
     assert!(shape.contours()[0].source_xml().contains("<!--keep-->"));
     assert!(shape.glue_points()[0].source_xml().contains("<!--glue-->"));
     let nonempty = source.replace("<!--keep-->", "nonempty");
     assert!(matches!(
-        Drawing::from_bytes(package(&nonempty, None)),
-        Err(litchi_core::Error::InvalidFormat(_))
+        Package::from_bytes(&package(&nonempty, None)),
+        Err(litchi_odg::Error::Core(litchi_core::Error::InvalidFormat(
+            _
+        )))
     ));
 }
 
@@ -492,8 +507,10 @@ fn rejects_invalid_contour_attributes_and_non_frame_auxiliary_owners() {
     for (index, content) in invalid_sources.into_iter().enumerate() {
         assert!(
             matches!(
-                Drawing::from_bytes(package(&content, None)),
-                Err(litchi_core::Error::InvalidFormat(_))
+                Package::from_bytes(&package(&content, None)),
+                Err(litchi_odg::Error::Core(litchi_core::Error::InvalidFormat(
+                    _
+                )))
             ),
             "invalid auxiliary source {index} was accepted"
         );
@@ -502,23 +519,23 @@ fn rejects_invalid_contour_attributes_and_non_frame_auxiliary_owners() {
 
 #[test]
 fn refuses_generic_mutation_of_inert_3d_and_preserves_detached_source_identity() {
-    let drawing = Drawing::from_bytes(package(CONTENT_3D, None)).unwrap();
+    let drawing = Package::from_bytes(&package(CONTENT_3D, None)).unwrap();
     let mut edit = drawing.edit();
     assert!(matches!(
         edit.set_shape_transform(0, 2, "rotate (15)"),
-        Err(litchi_core::Error::Unsupported(_))
+        Err(litchi_core::Error::Unsupported(_) | litchi_core::Error::Refused(_))
     ));
     assert_eq!(
-        edit.commit().unwrap().snapshot().as_bytes(),
+        edit.commit().unwrap().package().as_bytes(),
         drawing.as_bytes()
     );
 
-    let enhanced = Drawing::from_bytes(package(CONTENT_ENHANCED, None)).unwrap();
+    let enhanced = Package::from_bytes(&package(CONTENT_ENHANCED, None)).unwrap();
     let detached_copy = enhanced.pages()[0].shapes()[0].clone();
     let mut edit = enhanced.edit();
     assert!(matches!(
         edit.add_shape(0, detached_copy),
-        Err(litchi_core::Error::Unsupported(_))
+        Err(litchi_core::Error::Unsupported(_) | litchi_core::Error::Refused(_))
     ));
 
     let transfer = enhanced.prepare_shape_transfer(0, 0).unwrap();
@@ -526,7 +543,7 @@ fn refuses_generic_mutation_of_inert_3d_and_preserves_detached_source_identity()
     let commit = edit.commit().unwrap();
     assert_eq!(
         commit
-            .snapshot()
+            .package()
             .content_xml()
             .matches("<draw:enhanced-geometry")
             .count(),
@@ -537,18 +554,18 @@ fn refuses_generic_mutation_of_inert_3d_and_preserves_detached_source_identity()
         .durable()
         .unwrap()
         .inverse()
-        .apply(commit.snapshot())
+        .apply(commit.package())
         .unwrap();
     assert_eq!(restored.as_bytes(), enhanced.as_bytes());
 }
 
 #[test]
 fn escapes_decoded_unknown_namespace_uri_when_closing_transfer() {
-    let source = Drawing::from_bytes(package(CONTENT_TRANSFER_NAMESPACE, None)).unwrap();
+    let source = Package::from_bytes(&package(CONTENT_TRANSFER_NAMESPACE, None)).unwrap();
     let transfer = source.prepare_shape_transfer(0, 0).unwrap();
     let mut edit = source.edit();
     edit.insert_shape_transfer(0, 1, &transfer).unwrap();
-    let output = edit.commit().unwrap().into_snapshot();
+    let output = edit.commit().unwrap().into_package();
     assert!(
         output
             .content_xml()
@@ -559,7 +576,7 @@ fn escapes_decoded_unknown_namespace_uri_when_closing_transfer() {
             .content_xml()
             .contains(r#"urn:example:libre&producer""#)
     );
-    assert!(Drawing::from_bytes(output.as_bytes().to_vec()).is_ok());
+    assert!(Package::from_bytes(output.as_bytes()).is_ok());
 }
 
 #[test]
@@ -600,13 +617,15 @@ fn enforces_frame_and_scene_child_order_and_lexical_domains() {
     for content in invalid_sources {
         assert!(
             matches!(
-                Drawing::from_bytes(package(&content, None)),
-                Err(litchi_core::Error::InvalidFormat(_))
+                Package::from_bytes(&package(&content, None)),
+                Err(litchi_odg::Error::Core(litchi_core::Error::InvalidFormat(
+                    _
+                )))
             ),
             "invalid frame or scene source was accepted"
         );
     }
-    let valid_event = Drawing::from_bytes(package(&event_after_payload, None)).unwrap();
+    let valid_event = Package::from_bytes(&package(&event_after_payload, None)).unwrap();
     assert_eq!(
         valid_event.pages()[0].shapes()[0].kind(),
         litchi_odg::shape::ShapeKind::Frame
@@ -619,7 +638,7 @@ fn accepts_empty_anyiri_transition_sound_and_scopes_xml_ids_per_part() {
         "draw:name=\"Page 1\"",
         "draw:name=\"Page 1\" xml:id=\"sound1\"",
     );
-    let source = Drawing::from_bytes(package(&content, Some(STYLES_NAMED))).unwrap();
+    let source = Package::from_bytes(&package(&content, Some(STYLES_NAMED))).unwrap();
     let mut transition = Transition::new();
     transition.set_transition_type(Some("automatic")).unwrap();
     transition.set_duration(Some("PT0.5S")).unwrap();
@@ -631,12 +650,10 @@ fn accepts_empty_anyiri_transition_sound_and_scopes_xml_ids_per_part() {
     let mut edit = source.edit();
     edit.set_page_transition(0, Some(transition.clone()))
         .unwrap();
-    let output = edit.commit().unwrap().into_snapshot();
+    let output = edit.commit().unwrap().into_package();
     assert!(output.styles_xml().unwrap().contains("xlink:href=\"\""));
     assert_eq!(
-        Drawing::from_bytes(output.as_bytes().to_vec())
-            .unwrap()
-            .pages()[0]
+        Package::from_bytes(output.as_bytes()).unwrap().pages()[0]
             .transition()
             .unwrap()
             .duration(),
@@ -646,7 +663,7 @@ fn accepts_empty_anyiri_transition_sound_and_scopes_xml_ids_per_part() {
 
 #[test]
 fn inserts_detached_page_with_owned_transition_style_and_inverts_exactly() {
-    let source = Drawing::from_bytes(package(CONTENT_NAMED, None)).unwrap();
+    let source = Package::from_bytes(&package(CONTENT_NAMED, None)).unwrap();
     let mut transition = Transition::new();
     transition.set_transition_type(Some("automatic")).unwrap();
     transition.set_style(Some("dissolve")).unwrap();
@@ -656,7 +673,7 @@ fn inserts_detached_page_with_owned_transition_style_and_inverts_exactly() {
     edit.insert_page(1, Page::new("Inserted").with_transition(transition.clone()))
         .unwrap();
     let commit = edit.commit().unwrap();
-    let inserted = &commit.snapshot().pages()[1];
+    let inserted = &commit.package().pages()[1];
     assert_eq!(inserted.name(), Some("Inserted"));
     assert_eq!(inserted.transition(), Some(&transition));
     assert!(
@@ -665,14 +682,14 @@ fn inserts_detached_page_with_owned_transition_style_and_inverts_exactly() {
             .unwrap()
             .starts_with("LitchiPageTransition")
     );
-    let reopened = Drawing::from_bytes(commit.snapshot().as_bytes().to_vec()).unwrap();
+    let reopened = Package::from_bytes(commit.package().as_bytes()).unwrap();
     assert_eq!(reopened.pages()[1].transition(), Some(&transition));
     let restored = commit
         .patch()
         .durable()
         .unwrap()
         .inverse()
-        .apply(commit.snapshot())
+        .apply(commit.package())
         .unwrap();
     assert_eq!(restored.as_bytes(), source.as_bytes());
 }

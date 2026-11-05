@@ -22,7 +22,8 @@ pub use model::{
     ExtensionRelationship, ExtensionRelationshipTarget, ImageContentType, ImageResource, Package,
     PrinterSettings, VmlDrawingResource,
 };
-pub use operations::{load_chartsheet, store_chartsheet, validate_package};
+pub(crate) use operations::store_chartsheet;
+pub use operations::{load_chartsheet, validate_package};
 
 use crate::error::Error;
 

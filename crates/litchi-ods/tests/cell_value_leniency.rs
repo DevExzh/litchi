@@ -18,10 +18,9 @@ use std::sync::Arc;
 
 use litchi_core::OwnedSource;
 use litchi_odf_common::{ContentDefect, Defect, DefectLocation, ToleranceReport};
+use litchi_ods::flat::Workbook as FlatSnapshot;
 use litchi_ods::worksheet::{CellValue, Sheet};
-use litchi_ods::{
-    FlatSnapshot, SourceBackedSpreadsheet, SourceBackedSpreadsheetCatalog, Spreadsheet,
-};
+use litchi_ods::{Package, SourceBackedSpreadsheet, SourceBackedSpreadsheetCatalog};
 
 type Recorded = (Defect, u16, Option<DefectLocation>);
 
@@ -145,7 +144,7 @@ fn assert_degraded_cells(sheets: &[Sheet], label: &str) {
 }
 
 fn assert_every_open_path(bytes: &[u8], defects: &[Recorded], label: &str) {
-    let owned = Spreadsheet::from_bytes(bytes.to_vec()).unwrap();
+    let owned = Package::from_bytes(bytes).unwrap().workbook().unwrap();
     assert_eq!(
         recorded(owned.tolerance_report()),
         defects,
@@ -156,9 +155,15 @@ fn assert_every_open_path(bytes: &[u8], defects: &[Recorded], label: &str) {
         assert_degraded_cells(owned.sheets(), &format!("{label}: from_bytes"));
     }
 
-    let prepared = litchi_odf_common::detect::prepared(bytes.to_vec())
-        .unwrap_or_else(|| panic!("{label}: package must prepare"));
-    let adopted = Spreadsheet::from_prepared_package(prepared).unwrap();
+    let prepared = litchi_odf_common::detect::prepared(
+        bytes.to_vec(),
+        litchi_odf_common::SourceLimits::default(),
+    )
+    .unwrap_or_else(|| panic!("{label}: package must prepare"));
+    let adopted = Package::from_prepared_package(prepared)
+        .unwrap()
+        .workbook()
+        .unwrap();
     assert_eq!(
         recorded(adopted.tolerance_report()),
         defects,
@@ -219,7 +224,7 @@ fn package_and_content_repairs_are_reported_together() {
             ..odf_rezip::MimetypeLayout::CONFORMING
         },
     );
-    let owned = Spreadsheet::from_bytes(bytes).unwrap();
+    let owned = Package::from_bytes(&bytes).unwrap().workbook().unwrap();
     let mut defects = vec![(
         Defect::Package(litchi_odf_common::PackageDefect::MimetypeDeflated),
         8,
@@ -232,7 +237,7 @@ fn package_and_content_repairs_are_reported_together() {
 #[test]
 fn flat_spreadsheets_degrade_and_record_the_same_way() {
     let conforming = include_str!("fixtures/odfdo-test-flat-lo-compact.fods").to_string();
-    let clean = FlatSnapshot::from_bytes(conforming.clone().into_bytes()).unwrap();
+    let clean = FlatSnapshot::from_bytes(&conforming.clone().into_bytes()).unwrap();
     assert!(clean.tolerance_report().is_clean());
 
     let malformed = replace_nth(
@@ -241,7 +246,7 @@ fn flat_spreadsheets_degrade_and_record_the_same_way() {
         r#"office:value-type="float" office:value="one-two-three""#,
         0,
     );
-    let flat = FlatSnapshot::from_bytes(malformed.into_bytes()).unwrap();
+    let flat = FlatSnapshot::from_bytes(malformed.as_bytes()).unwrap();
     let defects = recorded(flat.tolerance_report());
     assert_eq!(defects.len(), 1);
     assert_eq!(
@@ -270,6 +275,10 @@ fn malformed_xml_stays_a_hard_error() {
         "content.xml",
         |xml| xml.replacen("</table:table-cell>", "", 1),
     );
-    assert!(Spreadsheet::from_bytes(broken.clone()).is_err());
+    assert!(
+        Package::from_bytes(&broken)
+            .and_then(|package| package.workbook())
+            .is_err()
+    );
     assert!(SourceBackedSpreadsheet::from_read_at(Arc::new(OwnedSource::new(broken))).is_err());
 }

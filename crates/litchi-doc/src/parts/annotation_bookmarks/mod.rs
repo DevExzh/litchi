@@ -7,6 +7,7 @@
 //! CFB bytes unchanged.
 
 mod codec;
+mod family;
 mod model;
 mod package;
 mod transaction;
@@ -16,9 +17,15 @@ mod validation;
 mod tests;
 
 pub use codec::{parse, parse_bytes, to_bytes};
+pub use family::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Result};
 pub use model::{Tag, TagId, Tags};
-pub use package::{Commit as PackageCommit, Editor, Snapshot as PackageSnapshot};
-pub use transaction::{Commit, Error as TransactionError, Patch, Snapshot, Transaction};
+
+/// The part-level annotation-bookmark codec: the semantic [`record::Snapshot`] and its
+/// [`record::Edit`] staging, which publishes a new semantic snapshot;
+/// package edits go through [`Edit`].
+pub mod record {
+    pub use super::transaction::{Commit, Diagnostics, Edit, Error, Patch, Snapshot};
+}
 
 /// FIB index of `fcSttbfAtnBkmk`/`lcbSttbfAtnBkmk`.
 pub const FIB_INDEX: usize = validation::FIB_INDEX;

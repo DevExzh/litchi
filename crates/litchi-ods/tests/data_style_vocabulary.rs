@@ -12,11 +12,12 @@ use std::{
 
 use litchi_core::{Error, Result};
 use litchi_ods::{
-    FlatSpreadsheet, Spreadsheet, data_style,
+    Package, data_style,
     document::{
-        DataStyleAttributePatch, DataStyleFamily, DataStyleOwner, DataStyleSelector, Snapshot,
+        DataStyleAttributePatch, DataStyleFamily, DataStyleOwner, DataStyleSelector,
         StyleGraphExtension,
     },
+    flat::Workbook as FlatSpreadsheet,
 };
 use zip::ZipArchive;
 
@@ -414,7 +415,8 @@ fn compressed_late_graph_fixture() -> Vec<u8> {
 }
 
 fn package_content(source: &[u8]) -> Result<String> {
-    Ok(Spreadsheet::from_bytes(source.to_vec())?
+    Ok(Package::from_bytes(source)?
+        .workbook()?
         .content_xml()
         .to_owned())
 }
@@ -483,10 +485,7 @@ fn auto_selector(name: &str, family: DataStyleFamily) -> DataStyleSelector<'_> {
     DataStyleSelector::automatic(name, family)
 }
 
-fn typed_number(
-    snapshot: &Snapshot,
-    selector: DataStyleSelector<'_>,
-) -> Result<data_style::Number> {
+fn typed_number(snapshot: &Package, selector: DataStyleSelector<'_>) -> Result<data_style::Number> {
     match snapshot.data_style(selector)? {
         data_style::Entry::Number(value) => Ok(value.value.clone()),
         other => Err(Error::InvalidFormat(format!(
@@ -497,7 +496,7 @@ fn typed_number(
 
 #[test]
 fn native_packaged_fixture_contains_the_missing_number_particles() -> Result<()> {
-    let spreadsheet = Spreadsheet::from_bytes(FORMATS_ODS.to_vec())?;
+    let spreadsheet = Package::from_bytes(FORMATS_ODS)?.workbook()?;
     let styles = spreadsheet
         .styles_xml()
         .ok_or_else(|| Error::InvalidFormat("native formats.ods has no styles.xml".to_owned()))?;
@@ -513,7 +512,7 @@ fn native_packaged_fixture_contains_the_missing_number_particles() -> Result<()>
 
 #[test]
 fn native_flat_fixture_is_read_as_flat_and_retains_extension_lexemes() -> Result<()> {
-    let flat = FlatSpreadsheet::from_bytes(YIELDDISC_FODS.to_vec())?;
+    let flat = FlatSpreadsheet::from_bytes(YIELDDISC_FODS)?;
     assert_eq!(flat.as_bytes(), YIELDDISC_FODS);
     let source = std::str::from_utf8(flat.as_bytes())
         .map_err(|error| Error::InvalidFormat(format!("yielddisc UTF-8: {error}")))?;
@@ -763,7 +762,7 @@ fn legacy_date_time_currency_percentage_and_boolean_values_remain_typed() -> Res
 
 #[test]
 fn package_catalog_preserves_legacy_data_style_families() -> Result<()> {
-    let snapshot = Snapshot::from_bytes(legacy_owner_fixture())?;
+    let snapshot = Package::from_bytes(&legacy_owner_fixture())?;
     for (name, family) in [
         ("DateRead", DataStyleFamily::Date),
         ("TimeRead", DataStyleFamily::Time),
@@ -804,7 +803,7 @@ fn duplicate_source_names_are_rejected_before_catalog_publication() -> Result<()
 <number:number-style style:name="Duplicate"><number:scientific-number/></number:number-style>"#,
         "",
     );
-    let snapshot = Snapshot::from_bytes(source)?;
+    let snapshot = Package::from_bytes(&source)?;
     assert!(
         snapshot
             .data_styles(DataStyleOwner::ContentAutomatic)
@@ -853,7 +852,7 @@ fn native_fixture_helpers_expose_exact_member_bytes_for_future_owner_tests() -> 
 #[test]
 fn package_catalog_is_source_qualified_and_common_styles_are_read_only() -> Result<()> {
     let source = owner_fixture();
-    let snapshot = Snapshot::from_bytes(source.clone())?;
+    let snapshot = Package::from_bytes(&source)?;
     let automatic = snapshot.data_styles(DataStyleOwner::ContentAutomatic)?;
     assert!(automatic.iter().any(|entry| entry.name() == "AutoFraction"));
     assert!(automatic.iter().any(|entry| entry.name() == "OpaqueText"));
@@ -880,7 +879,7 @@ fn package_catalog_is_source_qualified_and_common_styles_are_read_only() -> Resu
         "SharedName"
     );
 
-    let mut edit = snapshot.edit();
+    let mut edit = snapshot.edit()?;
     let patch = DataStyleAttributePatch::default().set_title("must-refuse")?;
     assert!(
         edit.patch_data_style(
@@ -896,7 +895,7 @@ fn package_catalog_is_source_qualified_and_common_styles_are_read_only() -> Resu
 #[test]
 fn styles_automatic_owner_is_distinct_and_read_only() -> Result<()> {
     let source = three_owner_fixture();
-    let snapshot = Snapshot::from_bytes(source.clone())?;
+    let snapshot = Package::from_bytes(&source)?;
 
     let content = snapshot.data_style(DataStyleSelector::automatic(
         "ThreeOwner",
@@ -925,7 +924,7 @@ fn styles_automatic_owner_is_distinct_and_read_only() -> Result<()> {
     );
 
     let patch = DataStyleAttributePatch::default().set_title("read-only")?;
-    let mut edit = snapshot.edit();
+    let mut edit = snapshot.edit()?;
     assert!(
         edit.patch_data_style(
             DataStyleSelector::styles_automatic("ThreeOwner", DataStyleFamily::Number),
@@ -941,7 +940,7 @@ fn styles_automatic_owner_is_distinct_and_read_only() -> Result<()> {
 fn data_style_patch_distinguishes_empty_set_clear_and_all_keep_noop() -> Result<()> {
     let source = lexical_metadata_fixture();
     let selector = auto_selector("Lexical", DataStyleFamily::Number);
-    let snapshot = Snapshot::from_bytes(source.clone())?;
+    let snapshot = Package::from_bytes(&source)?;
 
     let mut set_attributes = data_style::Attributes::builder().title("old")?.build()?;
     data_style::Patch::default()
@@ -955,29 +954,29 @@ fn data_style_patch_distinguishes_empty_set_clear_and_all_keep_noop() -> Result<
         .apply(&mut clear_attributes)?;
     assert_eq!(clear_attributes.title, None);
 
-    let mut set_edit = snapshot.edit();
+    let mut set_edit = snapshot.edit()?;
     set_edit.patch_data_style(selector, &data_style::Patch::default().set_title("")?)?;
     let set_xml = package_content(set_edit.as_bytes())?;
     assert!(set_xml.contains("number:title=\"\""), "{set_xml}");
 
-    let mut clear_edit = snapshot.edit();
+    let mut clear_edit = snapshot.edit()?;
     clear_edit.patch_data_style(selector, &data_style::Patch::default().clear_title())?;
     let clear_xml = package_content(clear_edit.as_bytes())?;
     assert!(!clear_xml.contains("number:title="));
 
-    let mut noop_edit = snapshot.edit();
+    let mut noop_edit = snapshot.edit()?;
     noop_edit.patch_data_style(selector, &data_style::Patch::default())?;
     assert_eq!(noop_edit.as_bytes(), source.as_slice());
     let noop_commit = noop_edit.commit()?;
-    assert!(!noop_commit.changed());
-    assert_eq!(noop_commit.snapshot().as_bytes(), source.as_slice());
+    assert!(!noop_commit.diagnostics().changed());
+    assert_eq!(noop_commit.package().as_bytes(), source.as_slice());
     Ok(())
 }
 
 #[test]
 fn source_metadata_patch_preserves_decoded_equal_attribute_spelling() -> Result<()> {
     let source = lexical_metadata_fixture();
-    let mut edit = Snapshot::from_bytes(source.clone())?.edit();
+    let mut edit = Package::from_bytes(&source)?.edit()?;
     let patch = data_style::Patch::default().set_volatile(true);
     edit.patch_data_style(auto_selector("Lexical", DataStyleFamily::Number), &patch)?;
     let content = package_content(edit.as_bytes())?;
@@ -991,7 +990,7 @@ fn source_metadata_patch_preserves_decoded_equal_attribute_spelling() -> Result<
 fn inherited_prefix_metadata_patch_preserves_style_alias_without_redundant_bindings() -> Result<()>
 {
     let source = inherited_prefix_fixture();
-    let snapshot = Snapshot::from_bytes(source.clone())?;
+    let snapshot = Package::from_bytes(&source)?;
     let entry = snapshot.data_style(auto_selector("Inherited", DataStyleFamily::Number))?;
     match entry {
         data_style::Entry::Number(value) => {
@@ -1004,7 +1003,7 @@ fn inherited_prefix_metadata_patch_preserves_style_alias_without_redundant_bindi
         other => panic!("unexpected inherited-prefix entry: {other:?}"),
     }
 
-    let mut edit = snapshot.edit();
+    let mut edit = snapshot.edit()?;
     let patch = data_style::Patch::default().set_title("Inherited title")?;
     edit.patch_data_style(auto_selector("Inherited", DataStyleFamily::Number), &patch)?;
     let content = package_content(edit.as_bytes())?;
@@ -1028,7 +1027,7 @@ fn inherited_prefix_metadata_patch_preserves_style_alias_without_redundant_bindi
 fn explicit_xml_namespace_bindings_literal_and_escaped_are_read_and_retained() -> Result<()> {
     for escaped in [false, true] {
         let source = explicit_xml_namespace_fixture(escaped);
-        let snapshot = Snapshot::from_bytes(source.clone())?;
+        let snapshot = Package::from_bytes(&source)?;
         assert_eq!(
             snapshot
                 .data_style(auto_selector("ExplicitXml", DataStyleFamily::Number))?
@@ -1043,7 +1042,7 @@ fn explicit_xml_namespace_bindings_literal_and_escaped_are_read_and_retained() -
         } else {
             assert!(content.contains(r#"xmlns:xml="http://www.w3.org/XML/1998/namespace""#));
         }
-        let mut edit = snapshot.edit();
+        let mut edit = snapshot.edit()?;
         edit.patch_data_style(
             auto_selector("ExplicitXml", DataStyleFamily::Number),
             &data_style::Patch::default(),
@@ -1056,7 +1055,7 @@ fn explicit_xml_namespace_bindings_literal_and_escaped_are_read_and_retained() -
 #[test]
 fn number_style_short_and_long_are_valid_but_bogus_is_rejected() -> Result<()> {
     for style in ["short", "long"] {
-        let snapshot = Snapshot::from_bytes(date_style_with_number_style(style))?;
+        let snapshot = Package::from_bytes(&date_style_with_number_style(style))?;
         assert_eq!(
             snapshot
                 .data_style(auto_selector("DateStyle", DataStyleFamily::Date))?
@@ -1065,7 +1064,7 @@ fn number_style_short_and_long_are_valid_but_bogus_is_rejected() -> Result<()> {
         );
     }
     // Data-style schema projection is lazy; the XML package itself is well formed.
-    let malformed = Snapshot::from_bytes(date_style_with_number_style("bogus"))?;
+    let malformed = Package::from_bytes(&date_style_with_number_style("bogus"))?;
     assert!(
         malformed
             .data_style(auto_selector("DateStyle", DataStyleFamily::Date))
@@ -1076,7 +1075,7 @@ fn number_style_short_and_long_are_valid_but_bogus_is_rejected() -> Result<()> {
 
 #[test]
 fn number_text_accepts_xml_tab_linefeed_and_carriage_return() -> Result<()> {
-    let snapshot = Snapshot::from_bytes(whitespace_number_text_fixture())?;
+    let snapshot = Package::from_bytes(&whitespace_number_text_fixture())?;
     assert!(matches!(
         snapshot.data_style(auto_selector("WhitespaceText", DataStyleFamily::Number))?,
         data_style::Entry::Number(_)
@@ -1087,7 +1086,7 @@ fn number_text_accepts_xml_tab_linefeed_and_carriage_return() -> Result<()> {
 #[test]
 fn token_whitespace_language_collapses_for_semantic_noop() -> Result<()> {
     let source = token_whitespace_language_fixture();
-    let snapshot = Snapshot::from_bytes(source.clone())?;
+    let snapshot = Package::from_bytes(&source)?;
     let entry = snapshot.data_style(auto_selector("TokenLanguage", DataStyleFamily::Number))?;
     match entry {
         data_style::Entry::Number(value) => {
@@ -1095,23 +1094,23 @@ fn token_whitespace_language_collapses_for_semantic_noop() -> Result<()> {
         },
         other => panic!("unexpected token-language entry: {other:?}"),
     }
-    let mut edit = snapshot.edit();
+    let mut edit = snapshot.edit()?;
     let patch = data_style::Patch::default().set_language("en")?;
     edit.patch_data_style(
         auto_selector("TokenLanguage", DataStyleFamily::Number),
         &patch,
     )?;
     assert_eq!(edit.as_bytes(), source.as_slice());
-    assert!(!edit.commit()?.changed());
+    assert!(!edit.commit()?.diagnostics().changed());
     Ok(())
 }
 
 #[test]
 fn data_style_owner_queries_reject_opposite_document_roots() -> Result<()> {
-    assert!(Snapshot::from_bytes(content_document_styles_root_fixture()).is_err());
+    assert!(Package::from_bytes(&content_document_styles_root_fixture()).is_err());
 
     let source = styles_document_content_root_fixture();
-    let snapshot = Snapshot::from_bytes(source)?;
+    let snapshot = Package::from_bytes(&source)?;
     assert!(
         snapshot
             .data_style(DataStyleSelector::common(
@@ -1134,7 +1133,7 @@ fn data_style_owner_queries_reject_opposite_document_roots() -> Result<()> {
 #[test]
 fn literal_attribute_whitespace_projects_to_spaces_and_set_equal_is_exact_noop() -> Result<()> {
     let source = literal_whitespace_metadata_fixture();
-    let snapshot = Snapshot::from_bytes(source.clone())?;
+    let snapshot = Package::from_bytes(&source)?;
     let entry = snapshot.data_style(auto_selector("LiteralWhitespace", DataStyleFamily::Number))?;
     match entry {
         data_style::Entry::Number(value) => {
@@ -1150,13 +1149,13 @@ fn literal_attribute_whitespace_projects_to_spaces_and_set_equal_is_exact_noop()
     let patch = data_style::Patch::default()
         .set_title("A B C D")?
         .set_display_name("E F G H")?;
-    let mut edit = snapshot.edit();
+    let mut edit = snapshot.edit()?;
     edit.patch_data_style(
         auto_selector("LiteralWhitespace", DataStyleFamily::Number),
         &patch,
     )?;
     assert_eq!(edit.as_bytes(), source.as_slice());
-    assert!(!edit.commit()?.changed());
+    assert!(!edit.commit()?.diagnostics().changed());
     Ok(())
 }
 
@@ -1164,7 +1163,7 @@ fn literal_attribute_whitespace_projects_to_spaces_and_set_equal_is_exact_noop()
 fn schema_string_metadata_preserves_repeated_spaces_and_charref_tabs() -> Result<()> {
     let source = schema_string_charref_metadata_fixture();
     let selector = auto_selector("SchemaStrings", DataStyleFamily::Number);
-    let snapshot = Snapshot::from_bytes(source.clone())?;
+    let snapshot = Package::from_bytes(&source)?;
     let entry = snapshot.data_style(selector)?;
     match entry {
         data_style::Entry::Number(value) => {
@@ -1180,20 +1179,20 @@ fn schema_string_metadata_preserves_repeated_spaces_and_charref_tabs() -> Result
     let same_values = data_style::Patch::default()
         .set_title("a  b")?
         .set_display_name("a\tb")?;
-    let mut noop = snapshot.edit();
+    let mut noop = snapshot.edit()?;
     noop.patch_data_style(selector, &same_values)?;
     assert_eq!(noop.as_bytes(), source.as_slice());
-    assert!(!noop.commit()?.changed());
+    assert!(!noop.commit()?.diagnostics().changed());
 
     // Collapsing either value is a real semantic edit.  It must not be
     // treated as an xsd:token-style whitespace-equivalent update.
     let changed_values = data_style::Patch::default()
         .set_title("a b")?
         .set_display_name("a b")?;
-    let mut changed = snapshot.edit();
+    let mut changed = snapshot.edit()?;
     changed.patch_data_style(selector, &changed_values)?;
     assert_ne!(changed.as_bytes(), source.as_slice());
-    let reopened = Snapshot::from_bytes(changed.as_bytes().to_vec())?;
+    let reopened = Package::from_bytes(changed.as_bytes())?;
     match reopened.data_style(selector)? {
         data_style::Entry::Number(value) => {
             assert_eq!(value.value.attributes.title.as_deref(), Some("a b"));
@@ -1208,7 +1207,7 @@ fn schema_string_metadata_preserves_repeated_spaces_and_charref_tabs() -> Result
 fn literal_crlf_metadata_projects_to_one_space_and_equal_set_is_exact_noop() -> Result<()> {
     let source = crlf_string_metadata_fixture();
     let selector = auto_selector("CrlfStrings", DataStyleFamily::Number);
-    let snapshot = Snapshot::from_bytes(source.clone())?;
+    let snapshot = Package::from_bytes(&source)?;
     match snapshot.data_style(selector)? {
         data_style::Entry::Number(value) => {
             assert_eq!(value.value.attributes.title.as_deref(), Some("a b"));
@@ -1220,10 +1219,10 @@ fn literal_crlf_metadata_projects_to_one_space_and_equal_set_is_exact_noop() -> 
     let patch = data_style::Patch::default()
         .set_title("a b")?
         .set_display_name("a b")?;
-    let mut edit = snapshot.edit();
+    let mut edit = snapshot.edit()?;
     edit.patch_data_style(selector, &patch)?;
     assert_eq!(edit.as_bytes(), source.as_slice());
-    assert!(!edit.commit()?.changed());
+    assert!(!edit.commit()?.diagnostics().changed());
     Ok(())
 }
 
@@ -1231,15 +1230,15 @@ fn literal_crlf_metadata_projects_to_one_space_and_equal_set_is_exact_noop() -> 
 fn setting_schema_string_controls_uses_numeric_refs_and_inverse_preserves_values() -> Result<()> {
     let source = plain_string_metadata_fixture();
     let selector = auto_selector("ControlStrings", DataStyleFamily::Number);
-    let snapshot = Snapshot::from_bytes(source.clone())?;
+    let snapshot = Package::from_bytes(&source)?;
     let controls = "A\tB\nC\rD";
     let patch = data_style::Patch::default()
         .set_title(controls)?
         .set_display_name(controls)?;
-    let mut edit = snapshot.edit();
+    let mut edit = snapshot.edit()?;
     edit.patch_data_style(selector, &patch)?;
     let commit = edit.commit()?;
-    let changed = commit.snapshot();
+    let changed = commit.package();
     let content = package_content(changed.as_bytes())?;
     assert!(
         content.contains("number:title=\"A&#x9;B&#xA;C&#xD;D\""),
@@ -1260,8 +1259,8 @@ fn setting_schema_string_controls_uses_numeric_refs_and_inverse_preserves_values
         other => panic!("unexpected control-string entry: {other:?}"),
     }
 
-    let restored = commit.patch().inverse().apply(changed)?;
-    assert_eq!(restored.snapshot().as_bytes(), source.as_slice());
+    let restored = changed.apply(&commit.patch().inverse())?;
+    assert_eq!(restored.into_package().as_bytes(), source.as_slice());
     Ok(())
 }
 
@@ -1275,7 +1274,7 @@ fn malformed_styles_xml_outside_selected_owner_fails_on_style_query() -> Result<
         "<office:body>&#x1;</office:body>",
         "<office:body>&#1;</office:body>",
     ] {
-        let snapshot = Snapshot::from_bytes(malformed_styles_query_fixture(fragment))?;
+        let snapshot = Package::from_bytes(&malformed_styles_query_fixture(fragment))?;
         let common_rejected = snapshot
             .data_style(DataStyleSelector::common("Common", DataStyleFamily::Number))
             .is_err();
@@ -1297,7 +1296,7 @@ fn malformed_styles_xml_outside_selected_owner_fails_on_style_query() -> Result<
 
 #[test]
 fn effective_cell_data_style_resolves_the_content_automatic_owner() -> Result<()> {
-    let snapshot = Snapshot::from_bytes(owner_fixture())?;
+    let snapshot = Package::from_bytes(&owner_fixture())?;
     let selected = snapshot
         .effective_cell_data_style("Cell")?
         .ok_or_else(|| Error::InvalidFormat("Cell has no data-style reference".to_owned()))?;
@@ -1309,7 +1308,7 @@ fn effective_cell_data_style_resolves_the_content_automatic_owner() -> Result<()
 
 #[test]
 fn same_name_owners_and_families_require_explicit_selectors() -> Result<()> {
-    let snapshot = Snapshot::from_bytes(same_name_owner_fixture())?;
+    let snapshot = Package::from_bytes(&same_name_owner_fixture())?;
     let automatic_number = snapshot.data_style(DataStyleSelector::automatic(
         "SharedName",
         DataStyleFamily::Number,
@@ -1329,17 +1328,18 @@ fn same_name_owners_and_families_require_explicit_selectors() -> Result<()> {
 #[test]
 fn namespace_aliases_survive_source_qualified_metadata_patch() -> Result<()> {
     let source = aliased_owner_fixture();
-    let snapshot = Snapshot::from_bytes(source.clone())?;
+    let snapshot = Package::from_bytes(&source)?;
     assert_eq!(
         snapshot
             .data_style(auto_selector("Aliased", DataStyleFamily::Number))?
             .name(),
         "Aliased"
     );
-    let mut edit = snapshot.edit();
+    let mut edit = snapshot.edit()?;
     let patch = DataStyleAttributePatch::default().set_title("alias-title")?;
     edit.patch_data_style(auto_selector("Aliased", DataStyleFamily::Number), &patch)?;
-    let after = Spreadsheet::from_bytes(edit.as_bytes().to_vec())?
+    let after = Package::from_bytes(edit.as_bytes())?
+        .workbook()?
         .content_xml()
         .to_owned();
     assert!(
@@ -1357,7 +1357,7 @@ fn namespace_aliases_survive_source_qualified_metadata_patch() -> Result<()> {
     let commit = edit.commit()?;
     assert_eq!(
         commit
-            .snapshot()
+            .package()
             .data_style(auto_selector("Aliased", DataStyleFamily::Number))?
             .name(),
         "Aliased"
@@ -1367,7 +1367,7 @@ fn namespace_aliases_survive_source_qualified_metadata_patch() -> Result<()> {
 
 #[test]
 fn extended_graph_add_replace_and_patch_reopen_through_the_public_transaction() -> Result<()> {
-    let snapshot = Snapshot::from_bytes(owner_fixture())?;
+    let snapshot = Package::from_bytes(&owner_fixture())?;
     let added = data_style::NumberBuilder::scientific("AddedScientific")?
         .decimal_places(4)?
         .min_exponent_digits(2)?
@@ -1380,7 +1380,7 @@ fn extended_graph_add_replace_and_patch_reopen_through_the_public_transaction() 
         .max_denominator_value(999)?
         .build()?;
 
-    let mut edit = snapshot.edit();
+    let mut edit = snapshot.edit()?;
     edit.put_extended_style_graph(&graph_with_number(added))?;
     edit.replace_extended_style_graph(
         auto_selector("AutoFraction", DataStyleFamily::Number),
@@ -1394,8 +1394,8 @@ fn extended_graph_add_replace_and_patch_reopen_through_the_public_transaction() 
     let pending_text = package_content(edit.as_bytes())?;
     assert!(pending_text.contains("AddedScientific"));
     let commit = edit.commit()?;
-    assert!(commit.changed());
-    let reopened = commit.snapshot();
+    assert!(commit.diagnostics().changed());
+    let reopened = commit.package();
     assert_eq!(
         reopened
             .data_style(auto_selector("AddedScientific", DataStyleFamily::Number))?
@@ -1421,26 +1421,26 @@ fn extended_graph_add_replace_and_patch_reopen_through_the_public_transaction() 
 #[test]
 fn identical_typed_graph_replacement_is_an_exact_source_noop() -> Result<()> {
     let source = lexical_metadata_fixture();
-    let snapshot = Snapshot::from_bytes(source.clone())?;
+    let snapshot = Package::from_bytes(&source)?;
     let selector = auto_selector("Lexical", DataStyleFamily::Number);
     let graph = StyleGraphExtension {
         number_styles: vec![typed_number(&snapshot, selector)?],
         data_styles: Vec::new(),
     };
 
-    let mut edit = snapshot.edit();
+    let mut edit = snapshot.edit()?;
     edit.replace_extended_style_graph(selector, &graph)?;
     assert_eq!(edit.as_bytes(), source.as_slice());
     let commit = edit.commit()?;
-    assert!(!commit.changed());
-    assert_eq!(commit.snapshot().as_bytes(), source.as_slice());
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().as_bytes(), source.as_slice());
     Ok(())
 }
 
 #[test]
 fn mixed_graph_replacement_preserves_unchanged_lexical_member_bytes() -> Result<()> {
     let source = multi_lexical_graph_fixture();
-    let snapshot = Snapshot::from_bytes(source.clone())?;
+    let snapshot = Package::from_bytes(&source)?;
     let first_selector = auto_selector("FirstFraction", DataStyleFamily::Number);
     let second_selector = auto_selector("SecondFraction", DataStyleFamily::Number);
     let first = typed_number(&snapshot, first_selector)?;
@@ -1452,7 +1452,7 @@ fn mixed_graph_replacement_preserves_unchanged_lexical_member_bytes() -> Result<
         data_styles: Vec::new(),
     };
 
-    let mut edit = snapshot.edit();
+    let mut edit = snapshot.edit()?;
     edit.replace_extended_style_graph(second_selector, &graph)?;
     let content = String::from_utf8(zip_member(edit.as_bytes(), "content.xml")?)
         .map_err(|error| Error::InvalidFormat(format!("edited content.xml UTF-8: {error}")))?;
@@ -1465,7 +1465,7 @@ fn mixed_graph_replacement_preserves_unchanged_lexical_member_bytes() -> Result<
     assert!(content.contains(
         "<number:number-style xmlns:number=\"urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0\" xmlns:style=\"urn:oasis:names:tc:opendocument:xmlns:style:1.0\" style:name=\"SecondFraction\"><number:fraction number:min-denominator-digits=\"7\"/></number:number-style>"
     ));
-    let reopened = Snapshot::from_bytes(edit.as_bytes().to_vec())?;
+    let reopened = Package::from_bytes(edit.as_bytes())?;
     assert!(reopened.data_style(second_selector).is_ok());
     Ok(())
 }
@@ -1483,30 +1483,30 @@ fn compressed_late_content_replacement_uses_content_xml_ranges() -> Result<()> {
     assert!(target_offset + marker.len() > source.len());
 
     let selector = auto_selector("CompressedTarget", DataStyleFamily::Number);
-    let snapshot = Snapshot::from_bytes(source.clone())?;
+    let snapshot = Package::from_bytes(&source)?;
     let replacement = data_style::NumberBuilder::fraction("CompressedTarget")?
         .min_numerator_digits(2)?
         .build()?;
-    let mut edit = snapshot.edit();
+    let mut edit = snapshot.edit()?;
     edit.replace_extended_style_graph(selector, &graph_with_number(replacement))?;
     let commit = edit.commit()?;
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
 
-    let changed_content = zip_member(commit.snapshot().as_bytes(), "content.xml")?;
+    let changed_content = zip_member(commit.package().as_bytes(), "content.xml")?;
     assert!(
         changed_content
             .windows(b"min-numerator-digits=\"2\"".len())
             .any(|window| window == b"min-numerator-digits=\"2\"")
     );
-    let restored = commit.patch().inverse().apply(commit.snapshot())?;
-    assert_eq!(restored.snapshot().as_bytes(), source.as_slice());
+    let restored = commit.package().apply(&commit.patch().inverse())?;
+    assert_eq!(restored.into_package().as_bytes(), source.as_slice());
     Ok(())
 }
 
 #[test]
 fn extended_graph_replacement_applies_every_member_atomically() -> Result<()> {
-    let snapshot = Snapshot::from_bytes(multi_number_owner_fixture())?;
-    let mut edit = snapshot.edit();
+    let snapshot = Package::from_bytes(&multi_number_owner_fixture())?;
+    let mut edit = snapshot.edit()?;
     let graph = two_fraction_graph(5, 7)?;
     edit.replace_extended_style_graph(
         auto_selector("FirstFraction", DataStyleFamily::Number),
@@ -1522,7 +1522,7 @@ fn extended_graph_replacement_applies_every_member_atomically() -> Result<()> {
     ));
 
     let commit = edit.commit()?;
-    let reopened = commit.snapshot();
+    let reopened = commit.package();
     let first = reopened.data_style(auto_selector("FirstFraction", DataStyleFamily::Number))?;
     let second = reopened.data_style(auto_selector("SecondFraction", DataStyleFamily::Number))?;
     match first {
@@ -1549,8 +1549,8 @@ fn extended_graph_replacement_applies_every_member_atomically() -> Result<()> {
 #[test]
 fn extended_graph_replacement_refuses_missing_member_without_partial_change() -> Result<()> {
     let source = multi_number_owner_fixture();
-    let snapshot = Snapshot::from_bytes(source.clone())?;
-    let mut edit = snapshot.edit();
+    let snapshot = Package::from_bytes(&source)?;
+    let mut edit = snapshot.edit()?;
     let first = data_style::NumberBuilder::fraction("FirstFraction")?
         .min_numerator_digits(5)?
         .build()?;
@@ -1577,8 +1577,8 @@ fn extended_graph_replacement_refuses_missing_member_without_partial_change() ->
 #[test]
 fn extended_graph_replacement_refuses_body_kind_mismatch_without_partial_change() -> Result<()> {
     let source = multi_number_owner_fixture();
-    let snapshot = Snapshot::from_bytes(source.clone())?;
-    let mut edit = snapshot.edit();
+    let snapshot = Package::from_bytes(&source)?;
+    let mut edit = snapshot.edit()?;
     let mismatch = data_style::NumberBuilder::scientific("FirstFraction")?
         .decimal_places(3)?
         .build()?;
@@ -1605,8 +1605,8 @@ fn extended_graph_replacement_refuses_body_kind_mismatch_without_partial_change(
 #[test]
 fn extended_graph_replacement_requires_selector_to_be_a_graph_member() -> Result<()> {
     let source = multi_number_owner_fixture();
-    let snapshot = Snapshot::from_bytes(source.clone())?;
-    let mut edit = snapshot.edit();
+    let snapshot = Package::from_bytes(&source)?;
+    let mut edit = snapshot.edit()?;
     let graph = two_fraction_graph(5, 7)?;
     let before = edit.as_bytes().to_vec();
     assert!(
@@ -1624,13 +1624,13 @@ fn extended_graph_replacement_requires_selector_to_be_a_graph_member() -> Result
 #[test]
 fn extended_graph_empty_put_is_an_exact_noop() -> Result<()> {
     let source = owner_fixture();
-    let snapshot = Snapshot::from_bytes(source.clone())?;
-    let mut edit = snapshot.edit();
+    let snapshot = Package::from_bytes(&source)?;
+    let mut edit = snapshot.edit()?;
     edit.put_extended_style_graph(&StyleGraphExtension::default())?;
     assert_eq!(edit.as_bytes(), source.as_slice());
     let commit = edit.commit()?;
-    assert!(!commit.changed());
-    assert_eq!(commit.snapshot().as_bytes(), source.as_slice());
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().as_bytes(), source.as_slice());
     Ok(())
 }
 
@@ -1650,7 +1650,7 @@ fn self_closing_automatic_styles_insertion_preserves_wrapper_and_exact_caps() ->
             .build()?,
     );
 
-    let mut expected_edit = Snapshot::from_bytes(source.clone())?.edit();
+    let mut expected_edit = Package::from_bytes(&source)?.edit()?;
     expected_edit.put_extended_style_graph(&graph)?;
     let expected = expected_edit.as_bytes().to_vec();
     assert!(expected.len() > source.len());
@@ -1669,7 +1669,8 @@ fn self_closing_automatic_styles_insertion_preserves_wrapper_and_exact_caps() ->
         defaults.composition(),
         defaults.history(),
     );
-    let mut exact_edit = Snapshot::from_bytes_with(source.clone(), exact_limits)?.edit();
+    let mut exact_edit = Package::from_bytes(&source)?
+        .edit_with_options(litchi_ods::EditOptions::new().limits(exact_limits))?;
     exact_edit.put_extended_style_graph(&graph)?;
     assert_eq!(exact_edit.as_bytes(), expected.as_slice());
 
@@ -1681,7 +1682,8 @@ fn self_closing_automatic_styles_insertion_preserves_wrapper_and_exact_caps() ->
         defaults.composition(),
         defaults.history(),
     );
-    let mut under_edit = Snapshot::from_bytes_with(source.clone(), under_limits)?.edit();
+    let mut under_edit = Package::from_bytes(&source)?
+        .edit_with_options(litchi_ods::EditOptions::new().limits(under_limits))?;
     assert!(under_edit.put_extended_style_graph(&graph).is_err());
     assert_eq!(under_edit.as_bytes(), source.as_slice());
     Ok(())
@@ -1694,8 +1696,8 @@ fn unsupported_source_body_refuses_replacement_without_losing_candidate_state() 
 <number:number-style style:name="Unsupported"><number:scientific-number number:decimal-places="2"/><number:map style:condition="true" style:apply-style-name="x"/></number:number-style>"#,
         "",
     );
-    let snapshot = Snapshot::from_bytes(source.clone())?;
-    let mut edit = snapshot.edit();
+    let snapshot = Package::from_bytes(&source)?;
+    let mut edit = snapshot.edit()?;
     let pending = edit.as_bytes().to_vec();
     let replacement = data_style::NumberBuilder::decimal("Unsupported")?
         .decimal_places(2)?
@@ -1713,19 +1715,19 @@ fn unsupported_source_body_refuses_replacement_without_losing_candidate_state() 
 
 #[test]
 fn public_patch_inverse_and_stale_source_checks_are_exact() -> Result<()> {
-    let snapshot = Snapshot::from_bytes(owner_fixture())?;
-    let mut edit = snapshot.edit();
+    let snapshot = Package::from_bytes(&owner_fixture())?;
+    let mut edit = snapshot.edit()?;
     let patch = DataStyleAttributePatch::default().set_title("round-trip")?;
     edit.patch_data_style(auto_selector("OpaqueText", DataStyleFamily::Text), &patch)?;
     let commit = edit.commit()?;
     let inverse = commit.patch().inverse();
-    let restored = inverse.apply(commit.snapshot())?;
-    assert_eq!(restored.snapshot().as_bytes(), snapshot.as_bytes());
+    let restored = commit.package().apply(&inverse)?;
+    assert_eq!(restored.into_package().as_bytes(), snapshot.as_bytes());
 
-    let mut unrelated = snapshot.edit();
+    let mut unrelated = snapshot.edit()?;
     unrelated.set_cell_style("Sheet1", 0, 0, "Cell")?;
-    let changed = unrelated.commit()?.into_snapshot();
-    assert!(commit.patch().apply(&changed).is_err());
+    let changed = unrelated.commit()?.into_package();
+    assert!(changed.apply(commit.patch()).is_err());
     Ok(())
 }
 
@@ -1741,8 +1743,8 @@ fn exact_package_limit_refuses_graph_growth_before_staging() -> Result<()> {
         defaults.composition(),
         defaults.history(),
     );
-    let snapshot = Snapshot::from_bytes_with(source.clone(), limits)?;
-    let mut edit = snapshot.edit();
+    let snapshot = Package::from_bytes(&source)?;
+    let mut edit = snapshot.edit_with_options(litchi_ods::EditOptions::new().limits(limits))?;
     let mut title = String::new();
     for index in 0..16_384 {
         write!(title, "{index:04x}")
@@ -1758,6 +1760,6 @@ fn exact_package_limit_refuses_graph_growth_before_staging() -> Result<()> {
             .is_err()
     );
     assert_eq!(edit.as_bytes(), source.as_slice());
-    assert!(!edit.commit()?.changed());
+    assert!(!edit.commit()?.diagnostics().changed());
     Ok(())
 }

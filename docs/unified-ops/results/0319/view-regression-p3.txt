@@ -1,0 +1,72 @@
+## ooxml/docx/ComplexNumberedLists.docx before
+source_paragraph_format	4796
+source_query_paragraphs_format	66360
+source_view_text	21246
+source_root_children	59752
+eager_paragraph_format	4344
+eager_query_paragraphs_format	66034
+eager_view_text	20748
+eager_root_children	58697
+## ooxml/docx/ComplexNumberedLists.docx after
+source_paragraph_format	4886
+source_query_paragraphs_format	69032
+source_view_text	22819
+source_root_children	59930
+eager_paragraph_format	4505
+eager_query_paragraphs_format	68683
+eager_view_text	23269
+eager_root_children	59974
+## ooxml/docx/ComplexNumberedLists.docx after
+source_paragraph_format	4931
+source_query_paragraphs_format	70415
+source_view_text	20832
+source_root_children	59244
+eager_paragraph_format	4524
+eager_query_paragraphs_format	69768
+eager_view_text	21053
+eager_root_children	59861
+## ooxml/docx/ComplexNumberedLists.docx before
+source_paragraph_format	4795
+source_query_paragraphs_format	66973
+source_view_text	21317
+source_root_children	59307
+eager_paragraph_format	4372
+eager_query_paragraphs_format	66364
+eager_view_text	21074
+eager_root_children	59538
+## poi/test-data/document/heading123.docx before
+source_paragraph_format	3238
+source_query_paragraphs_format	45596
+source_view_text	21062
+source_root_children	75468
+eager_paragraph_format	2754
+eager_query_paragraphs_format	44687
+eager_view_text	20488
+eager_root_children	75198
+## poi/test-data/document/heading123.docx after
+source_paragraph_format	3406
+source_query_paragraphs_format	45524
+source_view_text	20764
+source_root_children	75618
+eager_paragraph_format	2967
+eager_query_paragraphs_format	44331
+eager_view_text	20606
+eager_root_children	74856
+## poi/test-data/document/heading123.docx after
+source_paragraph_format	3407
+source_query_paragraphs_format	45799
+source_view_text	21062
+source_root_children	75768
+eager_paragraph_format	2865
+eager_query_paragraphs_format	44942
+eager_view_text	20361
+eager_root_children	74932
+## poi/test-data/document/heading123.docx before
+source_paragraph_format	3228
+source_query_paragraphs_format	45439
+source_view_text	20752
+source_root_children	75610
+eager_paragraph_format	2752
+eager_query_paragraphs_format	44760
+eager_view_text	20155
+eager_root_children	74949

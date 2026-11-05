@@ -7,7 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
-use litchi_rtf::{BorderStyle, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{BorderStyle, write::Writer};
 
 const SYNTHETIC: &str = r"{\rtf1\ansi\ansicpg1250
 {\*\pgptbl
@@ -18,7 +19,7 @@ Body}";
 
 #[test]
 fn parses_resolves_and_round_trips_paragraph_group_table() {
-    let doc = RtfDocument::parse(SYNTHETIC).unwrap();
+    let doc = Tree::parse(SYNTHETIC, litchi_rtf::read::OpenOptions::default()).unwrap();
     let table = doc.paragraph_group_table().unwrap();
     assert_eq!(table.entries().len(), 3);
     assert_eq!(table.get(2).unwrap().parent_id, 1);
@@ -34,16 +35,14 @@ fn parses_resolves_and_round_trips_paragraph_group_table() {
     assert_eq!(doc.text().trim(), "Body");
 
     let mut first = Vec::new();
-    RtfWriter::new(&mut first).write_document(&doc).unwrap();
-    let reparsed = RtfDocument::parse_bytes(&first).unwrap();
+    Writer::new(&mut first).write_document(&doc).unwrap();
+    let reparsed = Tree::parse_bytes(&first, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         doc.paragraph_group_table(),
         reparsed.paragraph_group_table()
     );
     let mut second = Vec::new();
-    RtfWriter::new(&mut second)
-        .write_document(&reparsed)
-        .unwrap();
+    Writer::new(&mut second).write_document(&reparsed).unwrap();
     assert_eq!(first, second);
 }
 
@@ -63,7 +62,7 @@ fn rejects_malformed_paragraph_group_tables() {
     ];
     for source in malformed {
         assert!(
-            RtfDocument::parse(source).is_err(),
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
             "accepted malformed RTF: {source}"
         );
     }
@@ -97,7 +96,7 @@ fn parses_real_libreoffice_paragraph_group_fixture() {
     let mut isolated = br"{\rtf1\ansi".to_vec();
     isolated.extend_from_slice(&fixture[start..end.unwrap()]);
     isolated.push(b'}');
-    let doc = RtfDocument::parse_bytes(&isolated).unwrap();
+    let doc = Tree::parse_bytes(&isolated, litchi_rtf::read::OpenOptions::default()).unwrap();
     let table = doc.paragraph_group_table().unwrap();
     assert_eq!(table.entries().len(), 17);
     assert_eq!(table.get(2).unwrap().parent_id, 13);

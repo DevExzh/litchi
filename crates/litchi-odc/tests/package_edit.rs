@@ -3,7 +3,9 @@
     reason = "integration tests panic on unexpected errors to keep assertions concise"
 )]
 
-use litchi_odc::{AxisSpec, AxisUpdate, Chart, ChartClass, Definition, chart::Dimension};
+use litchi_odc::{
+    AxisSpec, AxisUpdate, Builder, ChartClass, Definition, Package, chart::Dimension,
+};
 use litchi_odf_common::core::PackageWriter;
 use soapberry_zip::office::StreamingArchiveWriter;
 
@@ -19,7 +21,7 @@ fn source_definition() -> Definition {
 }
 
 fn package(content: &str, auxiliary: Option<(&str, &[u8])>) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.chart")
         .unwrap();
@@ -33,7 +35,8 @@ fn package(content: &str, auxiliary: Option<(&str, &[u8])>) -> Vec<u8> {
 fn raw_negative_fixture_package(content: &str) -> Vec<u8> {
     const MIMETYPE: &[u8] = b"application/vnd.oasis.opendocument.chart";
     const MANIFEST: &[u8] = br#"<?xml version="1.0"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.chart"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/></manifest:manifest>"#;
-    let mut archive = StreamingArchiveWriter::new();
+    let mut archive =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     archive.write_stored("mimetype", MIMETYPE).unwrap();
     archive
         .write_deflated("content.xml", content.as_bytes())
@@ -46,53 +49,60 @@ fn raw_negative_fixture_package(content: &str) -> Vec<u8> {
 
 #[test]
 fn package_axis_transaction_is_atomic_exact_source_checked_and_reversible() {
-    let source = Chart::from_definition(source_definition()).unwrap();
+    let source = Builder::new()
+        .with_definition(source_definition())
+        .build()
+        .unwrap();
     let no_op = source.edit().commit().unwrap();
-    assert!(!no_op.changed());
-    assert_eq!(no_op.chart().as_bytes(), source.as_bytes());
+    assert!(!no_op.diagnostics().changed());
+    assert_eq!(no_op.package().as_bytes(), source.as_bytes());
 
     let mut edit = source.edit();
     edit.update_axis(0, AxisUpdate::named("revenue&amp<2026>"))
         .unwrap();
     edit.update_axis(1, AxisUpdate::unnamed()).unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert_eq!(commit.patch().changes().len(), 2);
     assert!(commit.patch().is_applicable_to(&source));
     assert!(
         commit
+            .package()
             .chart()
             .content_xml()
             .contains("chart:name=\"revenue&amp;amp&lt;2026&gt;\"")
     );
-    assert!(!commit.chart().content_xml().contains("primary-y"));
-    assert!(!commit.chart().content_xml().contains("><\n<"));
-    assert!(!commit.chart().content_xml().contains("><\r\n<"));
+    assert!(!commit.package().chart().content_xml().contains("primary-y"));
+    assert!(!commit.package().chart().content_xml().contains("><\n<"));
+    assert!(!commit.package().chart().content_xml().contains("><\r\n<"));
 
-    let stale = Chart::from_definition(Definition::new(ChartClass::line())).unwrap();
+    let stale = Builder::new()
+        .with_definition(Definition::new(ChartClass::line()))
+        .build()
+        .unwrap();
     assert!(!commit.patch().is_applicable_to(&stale));
-    assert!(commit.patch().apply(&stale).is_err());
+    assert!(stale.apply(commit.patch()).is_err());
 
-    let restored = commit.patch().inverse().apply(commit.chart()).unwrap();
-    assert_eq!(restored.as_bytes(), source.as_bytes());
+    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
+    assert_eq!(restored.into_package().as_bytes(), source.as_bytes());
 }
 
 #[test]
 fn package_edit_preserves_auxiliary_payloads_refuses_signatures_and_splices_pretty_xml() {
     let content = litchi_odc::serialize_content(&source_definition()).unwrap();
     let bytes = package(&content, Some(("Pictures/keep.bin", b"keep-exact")));
-    let source = Chart::from_bytes(bytes).unwrap();
+    let source = Package::from_bytes(&bytes).unwrap();
     let mut edit = source.edit();
     edit.update_axis(0, AxisUpdate::named("changed")).unwrap();
-    let committed = edit.commit().unwrap().into_chart();
+    let committed = edit.commit().unwrap().into_package();
     let archive =
-        litchi_odf_common::core::OwnedPackage::from_bytes(committed.into_bytes()).unwrap();
+        litchi_odf_common::core::OwnedPackage::from_bytes(committed.to_bytes().unwrap()).unwrap();
     assert_eq!(
         archive.get_file("Pictures/keep.bin").unwrap(),
         b"keep-exact"
     );
 
-    let signed = Chart::from_bytes(package(
+    let signed = Package::from_bytes(&package(
         &content,
         Some(("META-INF/documentsignatures.xml", b"<signatures/>")),
     ))
@@ -104,15 +114,22 @@ fn package_edit_preserves_auxiliary_payloads_refuses_signatures_and_splices_pret
     assert!(signed_edit.commit().is_err());
 
     let pretty = content.replacen("><", ">\n<", 1);
-    let pretty_chart = Chart::from_bytes(raw_negative_fixture_package(&pretty)).unwrap();
+    let pretty_chart = Package::from_bytes(&raw_negative_fixture_package(&pretty)).unwrap();
     let mut pretty_edit = pretty_chart.edit();
     pretty_edit
         .update_axis(0, AxisUpdate::styled("producer-style"))
         .unwrap();
     let pretty_commit = pretty_edit.commit().unwrap();
-    assert!(pretty_commit.chart().content_xml().contains(">\n<"));
+    assert!(
+        pretty_commit
+            .package()
+            .chart()
+            .content_xml()
+            .contains(">\n<")
+    );
     assert_eq!(
         pretty_commit
+            .package()
             .chart()
             .plot_area()
             .unwrap()
@@ -124,10 +141,10 @@ fn package_edit_preserves_auxiliary_payloads_refuses_signatures_and_splices_pret
     );
     assert_eq!(
         pretty_commit
-            .patch()
-            .inverse()
-            .apply(pretty_commit.chart())
+            .package()
+            .apply(&pretty_commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         pretty_chart.as_bytes()
     );
@@ -136,12 +153,15 @@ fn package_edit_preserves_auxiliary_payloads_refuses_signatures_and_splices_pret
 #[test]
 fn explicit_chart_replacement_publishes_full_typed_definition_and_is_reversible() {
     let original = source_definition();
-    let source = Chart::from_definition(original.clone()).unwrap();
+    let source = Builder::new()
+        .with_definition(original.clone())
+        .build()
+        .unwrap();
     let mut no_op_edit = source.edit();
     no_op_edit.replace_chart(&original).unwrap();
     let no_op = no_op_edit.commit().unwrap();
-    assert!(!no_op.changed());
-    assert_eq!(no_op.chart().as_bytes(), source.as_bytes());
+    assert!(!no_op.diagnostics().changed());
+    assert_eq!(no_op.package().as_bytes(), source.as_bytes());
 
     let mut replacement = Definition::new(ChartClass::ring());
     replacement.title = Some(litchi_odc::Text::new("Quarterly totals"));
@@ -152,21 +172,22 @@ fn explicit_chart_replacement_publishes_full_typed_definition_and_is_reversible(
     let mut edit = source.edit();
     edit.replace_chart(&replacement).unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert!(commit.patch().replaces_chart());
     assert!(commit.patch().changes().is_empty());
     assert_eq!(
-        commit.chart().class().unwrap().kind(),
+        commit.package().chart().class().unwrap().kind(),
         replacement.class.kind()
     );
     assert!(
         commit
+            .package()
             .chart()
             .content_xml()
             .contains("<text:p>Quarterly totals</text:p>")
     );
-    assert!(!commit.chart().content_xml().contains('\n'));
+    assert!(!commit.package().chart().content_xml().contains('\n'));
 
-    let restored = commit.patch().inverse().apply(commit.chart()).unwrap();
-    assert_eq!(restored.as_bytes(), source.as_bytes());
+    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
+    assert_eq!(restored.into_package().as_bytes(), source.as_bytes());
 }

@@ -9,21 +9,22 @@
 
 mod repair_support;
 
-use litchi_rtf::{DocumentHyphenation, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{DocumentHyphenation, write::Writer};
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
 #[test]
 fn parses_all_document_hyphenation_controls_and_round_trips() {
-    let document =
-        RtfDocument::parse(r"{\rtf1\ansi\hyphhotz425\hyphconsec3\hyphcaps0\hyphauto Body}")
-            .unwrap();
+    let document = Tree::parse(
+        r"{\rtf1\ansi\hyphhotz425\hyphconsec3\hyphcaps0\hyphauto Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(
         *document.hyphenation(),
         DocumentHyphenation {
@@ -35,14 +36,16 @@ fn parses_all_document_hyphenation_controls_and_round_trips() {
     );
     assert_eq!(document.text(), "Body");
 
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.hyphenation(), document.hyphenation());
     assert_eq!(reparsed.text(), document.text());
 }
 
 #[test]
 fn typed_api_preserves_absence_and_explicit_defaults() {
-    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
+    let mut document =
+        Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     assert!(document.hyphenation().is_empty());
     document
         .set_hyphenation(DocumentHyphenation {
@@ -52,7 +55,8 @@ fn typed_api_preserves_absence_and_explicit_defaults() {
             hot_zone_twips: Some(0),
         })
         .unwrap();
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.hyphenation(), document.hyphenation());
 
     document.clear_hyphenation();
@@ -62,7 +66,8 @@ fn typed_api_preserves_absence_and_explicit_defaults() {
 #[test]
 fn numeric_controls_round_trip_the_complete_rtf_nonnegative_range() {
     for value in [0, 1, 425, i32::MAX as u32] {
-        let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
+        let mut document =
+            Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
         document
             .set_hyphenation(DocumentHyphenation {
                 consecutive_line_limit: Some(value),
@@ -70,7 +75,8 @@ fn numeric_controls_round_trip_the_complete_rtf_nonnegative_range() {
                 ..DocumentHyphenation::default()
             })
             .unwrap();
-        let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+        let reparsed =
+            Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
         assert_eq!(reparsed.hyphenation(), document.hyphenation());
         assert_eq!(reparsed.text(), "Body");
     }
@@ -92,7 +98,10 @@ fn rejects_bad_values_duplicates_and_non_root_or_late_placement() {
         r"{\rtf1 Body\hyphauto1}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted malformed {source}"
         );
     }
@@ -105,7 +114,10 @@ fn rejects_bad_values_duplicates_and_non_root_or_late_placement() {
             format!(r"{{\rtf1 Body\{control}}}"),
         ] {
             assert!(
-                repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(&source)),
+                repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                    &source,
+                    litchi_rtf::read::OpenOptions::default()
+                )),
                 "accepted malformed {source}"
             );
         }
@@ -130,7 +142,7 @@ fn parses_bundled_document_hyphenation_fixture() {
         "/../../test-data/libreoffice-core/sw/qa/extras/rtfimport/data/tdf163003.rtf"
     ))
     .unwrap();
-    let document = RtfDocument::parse_bytes(&bytes).unwrap();
+    let document = Tree::parse_bytes(&bytes, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(document.hyphenation().hot_zone_twips, Some(142));
     assert_eq!(document.hyphenation().capitalized_words, Some(false));
     assert_eq!(document.hyphenation().automatic, Some(true));

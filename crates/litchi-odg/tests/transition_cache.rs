@@ -2,7 +2,7 @@
 
 use litchi_core::Error;
 use litchi_odf_common::core::PackageWriter;
-use litchi_odg::Drawing;
+use litchi_odg::Package;
 use std::fmt::Write as _;
 
 const PRESENTATION: &str = "urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
@@ -38,7 +38,7 @@ fn styles_document(definitions: &str) -> String {
 }
 
 fn package(content: &str, styles: Option<&str>) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.graphics")
         .unwrap();
@@ -63,8 +63,8 @@ fn direct_style(
 
 fn assert_invalid(content: &str, styles: Option<&str>) {
     assert!(matches!(
-        Drawing::from_bytes(package(content, styles)),
-        Err(Error::InvalidFormat(_))
+        Package::from_bytes(&package(content, styles)),
+        Err(litchi_odg::Error::Core(Error::InvalidFormat(_)))
     ));
 }
 
@@ -72,7 +72,7 @@ fn assert_invalid(content: &str, styles: Option<&str>) {
 fn shared_direct_transition_reads_and_exact_noop_stay_consistent() {
     let automatic = direct_style("shared", "automatic", "dissolve", "shared-sound");
     let content = content_with_pages("shared", 64, &automatic);
-    let source = Drawing::from_bytes(package(&content, None)).unwrap();
+    let source = Package::from_bytes(&package(&content, None)).unwrap();
     let expected = source.pages()[0].transition().cloned().unwrap();
 
     assert_eq!(expected.transition_type(), Some("automatic"));
@@ -90,8 +90,8 @@ fn shared_direct_transition_reads_and_exact_noop_stay_consistent() {
     let mut edit = source.edit();
     edit.set_page_transition(0, Some(expected.clone())).unwrap();
     let commit = edit.commit().unwrap();
-    assert!(!commit.changed());
-    assert_eq!(commit.snapshot().as_bytes(), source.as_bytes());
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().as_bytes(), source.as_bytes());
 }
 
 #[test]
@@ -99,7 +99,7 @@ fn inherited_alias_transition_and_sound_reads_for_many_pages() {
     let definitions = r##"<style:style style:name="base" style:family="drawing-page"><style:drawing-page-properties p:transition-style="fade-from-left" p:transition-speed="slow" s:type="fade" s:subtype="crossfade" s:direction="forward" s:fadeColor="#010203" p:duration="PT2S"><p:sound xlink:type="simple" xlink:href="media/transition.wav" xlink:actuate="onRequest" p:play-full="true" xlink:show="replace" xml:id="base-sound"/></style:drawing-page-properties></style:style><style:style style:name="child" style:family="drawing-page" style:parent-style-name="base"><style:drawing-page-properties p:transition-type="automatic"/></style:style>"##;
     let styles = styles_document(definitions);
     let content = content_with_pages("child", 48, "");
-    let source = Drawing::from_bytes(package(&content, Some(&styles))).unwrap();
+    let source = Package::from_bytes(&package(&content, Some(&styles))).unwrap();
 
     for page in source.pages() {
         let transition = page.transition().unwrap();
@@ -127,7 +127,7 @@ fn content_style_shadowing_and_independent_sources_keep_values_local() {
     ));
     let content_style = direct_style("shared", "automatic", "dissolve", "content-sound");
     let content = content_with_pages("shared", 12, &content_style);
-    let shadowed = Drawing::from_bytes(package(&content, Some(&named))).unwrap();
+    let shadowed = Package::from_bytes(&package(&content, Some(&named))).unwrap();
     for page in shadowed.pages() {
         let transition = page.transition().unwrap();
         assert_eq!(transition.transition_type(), Some("automatic"));
@@ -149,8 +149,8 @@ fn content_style_shadowing_and_independent_sources_keep_values_local() {
     ));
     let first_content = content_with_pages("shared", 4, "");
     let second_content = content_with_pages("shared", 4, "");
-    let first = Drawing::from_bytes(package(&first_content, Some(&first_styles))).unwrap();
-    let second = Drawing::from_bytes(package(&second_content, Some(&second_styles))).unwrap();
+    let first = Package::from_bytes(&package(&first_content, Some(&first_styles))).unwrap();
+    let second = Package::from_bytes(&package(&second_content, Some(&second_styles))).unwrap();
     assert_eq!(
         first.pages()[0].transition().unwrap().style(),
         Some("fade-from-left")
@@ -232,7 +232,7 @@ fn cyclic_and_overdeep_transition_inheritance_remain_rejected() {
     }
     let styles = styles_document(&chain);
     let shallow = content_with_pages("style-1", 1, "");
-    Drawing::from_bytes(package(&shallow, Some(&styles))).unwrap();
+    Package::from_bytes(&package(&shallow, Some(&styles))).unwrap();
     // The first page populates direct values along a valid depth-256 chain.
     // Reaching those same owners one level deeper must still fail on page two.
     let content = content_with_pages("style-1", 2, "").replacen(

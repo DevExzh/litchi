@@ -1,0 +1,3 @@
+71cde93a8ff3c9f8f76c4b27e458a72bf7dd133e5725a670f3f5c30ad651737f  branch odf_rtf_parts_bench (cargo build --release -p litchi-ops --features odt,odp,rtf --example odf_rtf_parts_bench; parts-trial-{1,2,3}.json)
+813f56380bf56cf8821f96270b96594e7e95d2cc77539a8294c776e09fd9983c  branch odf_rtf_view_regression (cargo build --release -p litchi-ops --features odt,odp,rtf --example odf_rtf_view_regression)
+2ce5cdfc12108cdf4bbd7a2ad592f0be50141e05d6b54125ee753445bbe3be88  base fc274041da odf_rtf_view_regression (same command in a git archive of fc274041da with the example copied in)

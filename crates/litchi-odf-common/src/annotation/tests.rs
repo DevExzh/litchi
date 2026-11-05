@@ -6,6 +6,7 @@
 )]
 
 use super::*;
+use crate::XmlStreamLimits;
 
 #[test]
 fn builds_rich_annotation_and_escapes_values() {
@@ -28,7 +29,9 @@ fn builds_rich_annotation_and_escapes_values() {
     assert_eq!(annotation.text(), "first & <line>\nbold\nafter");
 
     let mut xml = String::new();
-    annotation.write_xml(&mut xml);
+    annotation
+        .write_xml(&mut xml, &XmlStreamLimits::owner_default_value())
+        .unwrap();
     assert!(xml.contains("office:display=\"true\""));
     assert!(
         xml.contains("svg:width=\"3&amp;quot; &amp; 4cm\"")
@@ -56,7 +59,9 @@ fn validates_custom_extension_namespaces() {
         .unwrap();
     annotation.validate().unwrap();
     let mut xml = String::new();
-    annotation.write_xml(&mut xml);
+    annotation
+        .write_xml(&mut xml, &XmlStreamLimits::owner_default_value())
+        .unwrap();
     assert!(xml.contains("xmlns:vendor=\"urn:example:annotation\""));
     assert!(xml.contains("<vendor:thread/>"));
 }
@@ -84,7 +89,13 @@ fn builder_enforces_annotation_nesting_limit() {
     let root = quick_xml::events::BytesStart::new("office:annotation");
     let reader = quick_xml::reader::NsReader::from_str("");
     let decoder = reader.decoder();
-    let mut builder = Builder::new(&root, decoder, std::collections::BTreeMap::new()).unwrap();
+    let mut builder = Builder::new(
+        &root,
+        decoder,
+        std::collections::BTreeMap::new(),
+        &XmlStreamLimits::owner_default_value(),
+    )
+    .unwrap();
 
     for _ in 0..package::MAX_ANNOTATION_NESTING {
         let start = quick_xml::events::BytesStart::new("text:p");

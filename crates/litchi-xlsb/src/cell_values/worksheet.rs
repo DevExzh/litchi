@@ -5,12 +5,14 @@
 
 //! Source-bound worksheet-cell snapshots and structural edits.
 
+use crate::formula::Range;
 use crate::leniency::{
     CachedNumber, Leniency, ReservedFieldDefect, Tolerance, ToleranceReport, ValueEncodingDefect,
 };
-use crate::package::error::{Error, Result};
+pub use crate::package::error::Error;
+use crate::package::error::Result;
 use crate::package::shared_strings::SharedString;
-use crate::raw::{Cursor, Header, Limits as RawLimits, Records, Writer, kind};
+use crate::raw::{Cursor, Encoder, Header, Limits as RawLimits, Records, kind};
 use litchi_core::binary;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
@@ -18,9 +20,57 @@ use std::sync::Arc;
 const MAX_ROW: u32 = 1_048_575;
 const MAX_COLUMN: u32 = 16_383;
 const MAX_STYLE_INDEX: u32 = 0x00ff_ffff;
-const MAX_CELL_STRING_UNITS: usize = 32_767;
+pub(crate) const MAX_CELL_STRING_UNITS: usize = 32_767;
 const MAX_FORMULA_BYTES: usize = crate::formula::MAX_CELL_FORMULA_BYTES;
 const PATCH_MAGIC: &[u8; 8] = b"LCXBCLP1";
+
+/// A caller-selected dimension of the cell-values families: the fields of
+/// [`Limits`] and [`TransferLimits`].
+///
+/// An exceeded bound is reported as
+/// [`Error::Limit`] with this kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Bytes of one worksheet part ([`Limits::source_bytes`]).
+    SourceBytes,
+    /// Stored cell records of one worksheet snapshot ([`Limits::cells`]).
+    Cells,
+    /// Bytes of one retained or encoded patch ([`TransferLimits::bytes`]).
+    PatchBytes,
+    /// Semantic changes or staged operations of one patch
+    /// ([`TransferLimits::changes`]).
+    Changes,
+    /// Retained undo/redo entries ([`TransferLimits::history_entries`]).
+    HistoryEntries,
+    /// Aggregate bytes retained by history ([`TransferLimits::history_bytes`]).
+    HistoryBytes,
+    /// Entries of the workbook shared-string table.
+    SharedStrings,
+    /// Bytes of the workbook shared-string part.
+    SharedStringBytes,
+    /// Stable sheet identifiers of one workbook.
+    SheetIdentifiers,
+    /// Attempts to allocate a fresh worksheet part name.
+    PartNameAttempts,
+}
+
+impl std::fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::SourceBytes => "worksheet source bytes",
+            Self::Cells => "cell records",
+            Self::PatchBytes => "patch bytes",
+            Self::Changes => "patch changes",
+            Self::HistoryEntries => "history entries",
+            Self::HistoryBytes => "history bytes",
+            Self::SharedStrings => "shared-string entries",
+            Self::SharedStringBytes => "shared-string part bytes",
+            Self::SheetIdentifiers => "stable sheet identifiers",
+            Self::PartNameAttempts => "worksheet part-name attempts",
+        })
+    }
+}
 
 /// Finite resource policy for one worksheet cell-value snapshot.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -78,12 +128,12 @@ impl Limits {
             || self.raw.string_units() == 0
         {
             return Err(Error::InvalidFormat(
-                "cell-value limits must all be nonzero".to_string(),
+                "cell-value limits must all be nonzero",
             ));
         }
         if self.raw.payload() > self.source_bytes {
             return Err(Error::InvalidFormat(
-                "cell-value record-byte limit cannot exceed the worksheet-source limit".to_string(),
+                "cell-value record-byte limit cannot exceed the worksheet-source limit",
             ));
         }
         Ok(())
@@ -161,7 +211,7 @@ impl TransferLimits {
             || self.history_bytes == 0
         {
             return Err(Error::InvalidFormat(
-                "cell patch transfer/history limits must all be nonzero".to_string(),
+                "cell patch transfer/history limits must all be nonzero",
             ));
         }
         Ok(())
@@ -189,9 +239,9 @@ impl Reference {
     /// Returns an error when either coordinate is outside the XLSB grid.
     pub fn new(row: u32, column: u32) -> Result<Self> {
         if row > MAX_ROW || column > MAX_COLUMN {
-            return Err(Error::InvalidCellReference(format!(
-                "cell ({row}, {column}) is outside the XLSB worksheet grid"
-            )));
+            return Err(Error::InvalidCellReference(
+                "cell (, ) is outside the XLSB worksheet grid",
+            ));
         }
         Ok(Self { row, column })
     }
@@ -224,9 +274,11 @@ impl StyleIndex {
     /// Returns an error for a value outside the 24-bit wire range.
     pub fn new(value: u32) -> Result<Self> {
         if value > MAX_STYLE_INDEX {
-            return Err(Error::UnsupportedFeature(format!(
-                "cell style index {value} exceeds the 24-bit BIFF12 range"
-            )));
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_cell_values",
+                "cell style index exceeds the 24-bit BIFF12 range",
+            ));
         }
         Ok(Self(value))
     }
@@ -290,9 +342,7 @@ impl CellError {
             0x24 => Ok(Self::Number),
             0x2a => Ok(Self::NotAvailable),
             0x2b => Ok(Self::GettingData),
-            _ => Err(Error::InvalidFormat(format!(
-                "invalid BIFF12 BErr value 0x{code:02X}"
-            ))),
+            _ => Err(Error::InvalidFormat("invalid BIFF12 BErr value")),
         }
     }
 
@@ -439,9 +489,11 @@ impl CellFormula {
     ///
     /// # Errors
     ///
-    /// Returns an error for reserved flag bits, an oversized token stream, or
-    /// structurally invalid token/ancillary bytes.
-    pub fn new(flags: u16, tokens: Vec<u8>, ancillary: Vec<u8>) -> Result<Self> {
+    /// Returns an error for reserved flag bits, an oversized token stream,
+    /// streams above the caller's raw profile, or structurally invalid
+    /// token/ancillary bytes.
+    pub fn new(flags: u16, tokens: Vec<u8>, ancillary: Vec<u8>, limits: RawLimits) -> Result<Self> {
+        let limits = limits.validate()?;
         let value = Self::from_source(flags, tokens, ancillary)?;
         let encoded_bytes = value
             .tokens
@@ -451,23 +503,19 @@ impl CellFormula {
             .ok_or(Error::CapacityOverflow {
                 resource: "cell formula bytes",
             })?;
-        if encoded_bytes > RawLimits::DEFAULT.payload() {
+        if encoded_bytes > limits.payload() {
             return Err(Error::InvalidLength {
-                expected: RawLimits::DEFAULT.payload(),
+                expected: limits.payload(),
                 found: encoded_bytes,
             });
         }
-        crate::formula::Parser::with_extra(&value.tokens, &value.ancillary)
-            .parse()
-            .map_err(|error| Error::InvalidFormula(error.to_string()))?;
+        crate::formula::Parser::with_extra(&value.tokens, &value.ancillary, limits).parse()?;
         Ok(value)
     }
 
     fn from_source(flags: u16, tokens: Vec<u8>, ancillary: Vec<u8>) -> Result<Self> {
         if flags & !0x0002 != 0 {
-            return Err(Error::InvalidFormula(format!(
-                "invalid GrbitFmla flags 0x{flags:04X}"
-            )));
+            return Err(Error::InvalidFormula("invalid GrbitFmla flags"));
         }
         if tokens.len() > MAX_FORMULA_BYTES {
             return Err(Error::InvalidLength {
@@ -672,14 +720,27 @@ impl Snapshot {
         })
     }
 
-    /// Start a detached edit against this exact source stream.
+    /// Start a detached byte-level draft against this exact source stream.
+    ///
+    /// Package edits go through [`crate::Package::edit_cell_values`]; a
+    /// draft edits the worksheet stream alone, and [`Draft::finish`] returns
+    /// its exact, composable [`Patch`].
     #[must_use]
-    pub fn edit(&self) -> Edit {
-        Edit {
+    pub fn draft(&self) -> Draft {
+        let mut index = BTreeMap::new();
+        for (entry_index, entry) in self.entries.iter().enumerate() {
+            index
+                .entry(entry.cell.reference)
+                .and_modify(|state| *state = CellIndex::Duplicate)
+                .or_insert(CellIndex::Unique(entry_index));
+        }
+        Draft {
             source: Arc::clone(&self.source),
             entries: self.entries.clone(),
+            metadata: None,
             inserted: BTreeMap::new(),
             removed: BTreeSet::new(),
+            index,
             limits: self.limits,
             leniency: self.leniency,
         }
@@ -744,23 +805,200 @@ impl Iterator for Numbers<'_> {
 
 impl ExactSizeIterator for Numbers<'_> {}
 
-/// Detached structural edits of worksheet cell records.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FormulaGroupKind {
+    Array,
+    Shared,
+    Table,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct FormulaGroupRange {
+    kind: FormulaGroupKind,
+    range: Range,
+}
+
+impl FormulaGroupRange {
+    fn contains(self, reference: Reference) -> bool {
+        self.range.contains(reference.row(), reference.column())
+    }
+}
+
 #[derive(Debug, Clone)]
-pub struct Edit {
+struct SourceMetadata {
+    source_cells: BTreeSet<Reference>,
+    formula_groups: Vec<FormulaGroupRange>,
+    formula_group_metadata_invalid: bool,
+}
+
+/// Detached, byte-level structural edits of worksheet cell records.
+#[derive(Debug, Clone)]
+pub struct Draft {
     source: Arc<[u8]>,
     entries: Vec<Entry>,
+    metadata: Option<SourceMetadata>,
     inserted: BTreeMap<Reference, StoredCell>,
     removed: BTreeSet<Reference>,
+    index: BTreeMap<Reference, CellIndex>,
     limits: Limits,
     leniency: Leniency,
 }
 
-impl Edit {
+impl Draft {
+    /// Resource policy retained by this detached edit.
+    pub(crate) const fn limits(&self) -> Limits {
+        self.limits
+    }
+
+    /// Return the current supported cell at `reference`, including staged
+    /// insertions and replacements.
+    pub(crate) fn current_cell(&self, reference: Reference) -> Result<Option<&StoredCell>> {
+        if let Some(cell) = self.inserted.get(&reference) {
+            return Ok(Some(cell));
+        }
+        if self.removed.contains(&reference) {
+            return Ok(None);
+        }
+        Ok(self
+            .indexed_index(reference)?
+            .map(|index| &self.entries[index].cell))
+    }
+
+    /// Whether this coordinate is an insertion staged by this edit.
+    pub(crate) fn is_inserted(&self, reference: Reference) -> bool {
+        self.inserted.contains_key(&reference)
+    }
+
+    /// Whether a source cell has been staged for removal by this edit.
+    pub(crate) fn is_removed(&self, reference: Reference) -> bool {
+        self.removed.contains(&reference)
+    }
+
+    /// Whether the source contains any cell record at `reference`, including
+    /// a record family outside this owner's supported inventory.
+    pub(crate) fn source_has_cell(&mut self, reference: Reference) -> Result<bool> {
+        Ok(self.source_metadata()?.source_cells.contains(&reference))
+    }
+
+    /// Refuse a semantic scalar assignment that would split a formula group.
+    ///
+    /// Formula-group definitions are retained as opaque worksheet records by
+    /// the cell-value owner.  Their ranges are captured once, lazily when the
+    /// edit first needs structural admission, so a target can be rejected even
+    /// when its member cell record is absent or uses a value family this owner
+    /// does not decode.
+    pub(crate) fn scalar_assignment_guard(&mut self, reference: Reference) -> Result<()> {
+        let metadata = self.source_metadata()?;
+        if metadata.formula_group_metadata_invalid {
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedTarget,
+                "edit_cell_values",
+                "scalar edits cannot target a worksheet with malformed formula-group metadata",
+            ));
+        }
+        if metadata
+            .formula_groups
+            .iter()
+            .any(|group| group.contains(reference))
+        {
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedTarget,
+                "edit_cell_values",
+                "scalar edits cannot target a cell in a formula group",
+            ));
+        }
+        Ok(())
+    }
+
+    fn source_metadata(&mut self) -> Result<&SourceMetadata> {
+        if self.metadata.is_none() {
+            self.metadata = Some(scan_source_metadata(&self.source, self.limits)?);
+        }
+        self.metadata.as_ref().ok_or(Error::InvalidFormat(
+            "worksheet source metadata was not initialized",
+        ))
+    }
+
+    /// Replace a direct scalar value while retaining the cell header and
+    /// allowing a deliberate BIFF12 storage-family change.
+    pub(crate) fn replace_scalar_value(
+        &mut self,
+        reference: Reference,
+        value: Value,
+    ) -> Result<()> {
+        validate_value_with_limits(&value, self.limits)?;
+        if let Value::RkNumber(number) = &value {
+            let _ = encode_rk(*number)?;
+        }
+        if let Some(cell) = self.inserted.get_mut(&reference) {
+            cell.value = value;
+            cell.formula = None;
+            return Ok(());
+        }
+        self.removed.remove(&reference);
+        let index = self.indexed_index(reference)?.ok_or_else(|| {
+            Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_cell_values",
+                "cell (, ) is absent or uses an unsupported cell-record family",
+            )
+        })?;
+        self.entries[index].cell.value = value;
+        self.entries[index].cell.formula = None;
+        Ok(())
+    }
+
+    /// Turn an existing value cell into a formula cell with `cache` as its
+    /// cached result, retaining the cell header.
+    pub(crate) fn replace_with_formula(
+        &mut self,
+        reference: Reference,
+        cache: Value,
+        formula: CellFormula,
+    ) -> Result<()> {
+        if !cache.is_formula_cache() {
+            return Err(Error::InvalidFormula(
+                "a formula cell needs a Formula*Cache value",
+            ));
+        }
+        validate_value_with_limits(&cache, self.limits)?;
+        if let Some(cell) = self.inserted.get_mut(&reference) {
+            cell.value = cache;
+            cell.formula = Some(formula);
+            return Ok(());
+        }
+        self.removed.remove(&reference);
+        let index = self.indexed_index(reference)?.ok_or_else(|| {
+            Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_cell_values",
+                "cell (, ) is absent or uses an unsupported cell-record family",
+            )
+        })?;
+        self.entries[index].cell.value = cache;
+        self.entries[index].cell.formula = Some(formula);
+        Ok(())
+    }
+
+    fn indexed_index(&self, reference: Reference) -> Result<Option<usize>> {
+        match self.index.get(&reference) {
+            None => Ok(None),
+            Some(CellIndex::Unique(index)) => Ok(Some(*index)),
+            Some(CellIndex::Duplicate) => Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_cell_values",
+                "cell (, ) has duplicate stored cell records",
+            )),
+        }
+    }
+
     /// Replace a value while retaining its existing BIFF12 storage family.
     ///
     /// Strings may change UTF-16 length. RK replacements must be exactly
-    /// representable. Formula variants alter only cached results; use
-    /// [`Self::set_formula`] to replace the inert formula payload.
+    /// representable. Formula variants alter only cached results, and may
+    /// change the cached result's type (a number cache becoming a string
+    /// cache, record 0295); use [`Self::set_formula`] to replace the inert
+    /// formula payload.
     ///
     /// # Errors
     ///
@@ -971,7 +1209,7 @@ impl Edit {
     pub fn insert(&mut self, reference: Reference, style: StyleIndex, value: Value) -> Result<()> {
         if value.is_formula_cache() {
             return Err(Error::InvalidFormula(
-                "formula-cache insertion requires an inert formula payload".to_string(),
+                "formula-cache insertion requires an inert formula payload",
             ));
         }
         self.insert_cell(reference, style, value, None)
@@ -992,7 +1230,7 @@ impl Edit {
     ) -> Result<()> {
         if !cache.is_formula_cache() {
             return Err(Error::InvalidFormula(
-                "formula insertion requires a formula-cache value family".to_string(),
+                "formula insertion requires a formula-cache value family",
             ));
         }
         self.insert_cell(reference, style, cache, Some(formula))
@@ -1007,7 +1245,13 @@ impl Edit {
         if self.inserted.remove(&reference).is_some() {
             return Ok(());
         }
-        let _ = required_index(&self.entries, reference)?;
+        self.indexed_index(reference)?.ok_or_else(|| {
+            Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_cell_values",
+                "cell (, ) is absent or uses an unsupported cell-record family",
+            )
+        })?;
         self.removed.insert(reference);
         Ok(())
     }
@@ -1026,23 +1270,23 @@ impl Edit {
         let formula_family = value.is_formula_cache();
         if formula_family != formula.is_some() {
             return Err(Error::InvalidFormula(
-                "cell formula presence does not match its cached-result family".to_string(),
+                "cell formula presence does not match its cached-result family",
             ));
         }
         if self.inserted.contains_key(&reference) {
-            return Err(Error::UnsupportedFeature(format!(
-                "cell ({}, {}) already exists",
-                reference.row(),
-                reference.column()
-            )));
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_cell_values",
+                "cell (, ) already exists",
+            ));
         }
-        if let Some(index) = unique_index(&self.entries, reference)? {
+        if let Some(index) = self.indexed_index(reference)? {
             if !self.removed.remove(&reference) {
-                return Err(Error::UnsupportedFeature(format!(
-                    "cell ({}, {}) already exists",
-                    reference.row(),
-                    reference.column()
-                )));
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "edit_cell_values",
+                    "cell (, ) already exists",
+                ));
             }
             self.entries[index].cell = StoredCell {
                 reference,
@@ -1053,17 +1297,18 @@ impl Edit {
             };
             return Ok(());
         }
-        if any_cell_at(&self.source, self.limits, reference)? {
-            return Err(Error::UnsupportedFeature(format!(
-                "cell ({}, {}) already exists in an unsupported record family",
-                reference.row(),
-                reference.column()
-            )));
+        if self.source_has_cell(reference)? {
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_cell_values",
+                "cell (, ) already exists in an unsupported record family",
+            ));
         }
         if self.inserted.len() >= self.limits.cells {
-            return Err(Error::InvalidLength {
-                expected: self.limits.cells,
-                found: self.inserted.len().saturating_add(1),
+            return Err(Error::Limit {
+                kind: LimitKind::Cells.into(),
+                observed: self.inserted.len().saturating_add(1),
+                maximum: self.limits.cells,
             });
         }
         self.inserted.insert(
@@ -1085,7 +1330,22 @@ impl Edit {
     ///
     /// Returns an error if a replacement range cannot be represented or the
     /// generated source stream fails bounded structural readback.
-    pub fn commit(self) -> Result<Commit> {
+    /// Validate the draft and return the planned worksheet snapshot and its
+    /// exact, reversible stream patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns the cell validation and limit errors of the draft.
+    pub fn finish(self) -> Result<(Snapshot, Patch)> {
+        Ok(self.commit()?.into_parts())
+    }
+
+    pub(crate) fn commit(self) -> Result<Commit> {
+        let maximum = self.limits.cells.saturating_mul(2);
+        self.commit_with_change_limit(maximum)
+    }
+
+    pub(crate) fn commit_with_change_limit(self, maximum: usize) -> Result<Commit> {
         let retained = self.entries.len().saturating_sub(self.removed.len());
         let final_cells =
             retained
@@ -1094,9 +1354,10 @@ impl Edit {
                     resource: "structural cell count",
                 })?;
         if final_cells > self.limits.cells {
-            return Err(Error::InvalidLength {
-                expected: self.limits.cells,
-                found: final_cells,
+            return Err(Error::Limit {
+                kind: LimitKind::Cells.into(),
+                observed: final_cells,
+                maximum: self.limits.cells,
             });
         }
         let changed = self.entries.iter().any(Entry::changed)
@@ -1108,7 +1369,13 @@ impl Edit {
             Arc::clone(&self.source)
         };
         let snapshot = read_shared(Arc::clone(&after), self.limits, self.leniency)?;
-        let changes = semantic_changes(&self.entries, &self.inserted, &self.removed, &snapshot)?;
+        let changes = semantic_changes(
+            &self.entries,
+            &self.inserted,
+            &self.removed,
+            &snapshot,
+            maximum,
+        )?;
         Ok(Commit {
             snapshot,
             patch: Patch {
@@ -1121,9 +1388,9 @@ impl Edit {
     }
 }
 
-/// Successful immutable cell-value commit.
+/// Successful immutable cell-value draft commit.
 #[derive(Debug, Clone)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     patch: Patch,
 }
@@ -1131,19 +1398,19 @@ pub struct Commit {
 impl Commit {
     /// Planned immutable worksheet snapshot.
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Reversible exact-source patch.
     #[must_use]
-    pub const fn patch(&self) -> &Patch {
+    pub(crate) const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Split this result into the planned snapshot and patch.
     #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
+    pub(crate) fn into_parts(self) -> (Snapshot, Patch) {
         (self.snapshot, self.patch)
     }
 }
@@ -1160,7 +1427,7 @@ pub struct Patch {
 impl Patch {
     /// Whether this patch leaves the source stream untouched.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before == self.after
     }
 
@@ -1189,9 +1456,9 @@ impl Patch {
     /// Returns an error when `source` does not equal this patch's before image.
     pub fn apply(&self, source: &[u8]) -> Result<Vec<u8>> {
         if source != self.before.as_ref() {
-            return Err(Error::UnsupportedFeature(
-                "cell-value patch source snapshot does not match".to_string(),
-            ));
+            return Err(Error::PatchConflict {
+                part: "cell-value worksheet",
+            });
         }
         Ok(self.after.to_vec())
     }
@@ -1223,9 +1490,9 @@ impl Patch {
     /// exact source or bounded semantic readback fails.
     pub fn compose(&self, next: &Self) -> Result<Self> {
         if self.after != next.before {
-            return Err(Error::UnsupportedFeature(
-                "cell patch composition source is stale".to_string(),
-            ));
+            return Err(Error::PatchConflict {
+                part: "cell-value composition",
+            });
         }
         patch_from_images(
             Arc::clone(&self.before),
@@ -1243,31 +1510,31 @@ impl Patch {
     /// or failed bounded readback.
     pub fn compose_disjoint(&self, other: &Self) -> Result<Self> {
         if self.before != other.before {
-            return Err(Error::UnsupportedFeature(
-                "disjoint cell patches do not share an exact base".to_string(),
-            ));
+            return Err(Error::PatchConflict {
+                part: "cell-value composition",
+            });
         }
         let left = self
             .changes
             .iter()
             .map(Change::reference)
             .collect::<BTreeSet<_>>();
-        if let Some(reference) = other
+        if let Some(_reference) = other
             .changes
             .iter()
             .map(Change::reference)
             .find(|reference| left.contains(reference))
         {
-            return Err(Error::UnsupportedFeature(format!(
-                "disjoint cell patches overlap at ({}, {})",
-                reference.row(),
-                reference.column()
-            )));
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_cell_values",
+                "disjoint cell patches overlap at (, )",
+            ));
         }
         merge_patch_changes(self, other).and_then(|outcome| {
-            outcome.patch.ok_or_else(|| {
-                Error::InvalidFormat("disjoint patch merge unexpectedly conflicted".to_string())
-            })
+            outcome.patch.ok_or(Error::InvalidFormat(
+                "disjoint patch merge unexpectedly conflicted",
+            ))
         })
     }
 
@@ -1281,8 +1548,10 @@ impl Patch {
     /// reconstruction fails.
     pub fn merge_three_way(&self, other: &Self) -> Result<MergeOutcome> {
         if self.before != other.before {
-            return Err(Error::UnsupportedFeature(
-                "three-way cell patches do not share an exact base".to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_cell_values",
+                "three-way cell patches do not share an exact base",
             ));
         }
         merge_patch_changes(self, other)
@@ -1343,14 +1612,20 @@ impl Patch {
         Ok(bytes)
     }
 
-    /// Decode and fully validate a deterministic patch envelope.
+    /// Decode and fully validate a deterministic patch envelope under the
+    /// caller's required raw BIFF12 policy.
+    ///
+    /// The raw policy embedded in the envelope is the producer's profile. It
+    /// is intersected with `raw_limits` before either image is admitted, so a
+    /// wire profile can never authorize a wider read than the caller chose.
     ///
     /// # Errors
     ///
     /// Returns an error for an unknown version, truncation, trailing bytes,
     /// exceeded limits, or invalid before/after worksheet images.
-    pub fn from_bytes(data: &[u8], limits: TransferLimits) -> Result<Self> {
+    pub fn from_bytes(data: &[u8], limits: TransferLimits, raw_limits: RawLimits) -> Result<Self> {
         limits.validate()?;
+        raw_limits.validate()?;
         if data.len() > limits.bytes {
             return Err(Error::InvalidLength {
                 expected: limits.bytes,
@@ -1360,9 +1635,7 @@ impl Patch {
         let header_len = PATCH_MAGIC.len().saturating_add(6 * 8);
         require_at_least(data, header_len)?;
         if data.get(..PATCH_MAGIC.len()) != Some(PATCH_MAGIC.as_slice()) {
-            return Err(Error::InvalidFormat(
-                "unknown durable cell patch version".to_string(),
-            ));
+            return Err(Error::InvalidFormat("unknown durable cell patch version"));
         }
         let mut offset = PATCH_MAGIC.len();
         let mut lengths = [0usize; 6];
@@ -1391,7 +1664,17 @@ impl Patch {
                 found: data.len(),
             });
         }
-        let worksheet_limits = Limits::new(lengths[2], lengths[3], lengths[4], lengths[5]);
+        let wire_limits = Limits::new(lengths[2], lengths[3], lengths[4], lengths[5]);
+        wire_limits.validate()?;
+        let worksheet_limits = Limits::new(
+            wire_limits.source_bytes(),
+            wire_limits.cells(),
+            wire_limits.raw().payload().min(raw_limits.payload()),
+            wire_limits
+                .raw()
+                .string_units()
+                .min(raw_limits.string_units()),
+        );
         worksheet_limits.validate()?;
         let before = Arc::from(data[offset..end_before].to_vec());
         let after = Arc::from(data[end_before..end_after].to_vec());
@@ -1521,9 +1804,9 @@ impl History {
                 .map(|entry| &entry.after)
         };
         if expected_source.is_some_and(|source| source != &patch.before) {
-            return Err(Error::UnsupportedFeature(
-                "cell history patch does not continue its exact source tip".to_string(),
-            ));
+            return Err(Error::PatchConflict {
+                part: "cell-value history",
+            });
         }
         while self.entries.len() > self.cursor {
             if let Some(removed) = self.entries.pop() {
@@ -1559,7 +1842,11 @@ impl History {
     /// Returns an error for an empty undo side or a stale source.
     pub fn undo(&mut self, source: &[u8]) -> Result<Vec<u8>> {
         let index = self.cursor.checked_sub(1).ok_or_else(|| {
-            Error::UnsupportedFeature("cell history has no undo entry".to_string())
+            Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_cell_values",
+                "cell history has no undo entry",
+            )
         })?;
         let result = self.entries[index].inverse().apply(source)?;
         self.cursor = index;
@@ -1573,7 +1860,11 @@ impl History {
     /// Returns an error for an empty redo side or a stale source.
     pub fn redo(&mut self, source: &[u8]) -> Result<Vec<u8>> {
         let patch = self.entries.get(self.cursor).ok_or_else(|| {
-            Error::UnsupportedFeature("cell history has no redo entry".to_string())
+            Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_cell_values",
+                "cell history has no redo entry",
+            )
         })?;
         let result = patch.apply(source)?;
         self.cursor = self.cursor.saturating_add(1);
@@ -1586,6 +1877,12 @@ struct Entry {
     original: StoredCell,
     cell: StoredCell,
     record_offset: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum CellIndex {
+    Unique(usize),
+    Duplicate,
 }
 
 impl Entry {
@@ -1618,9 +1915,10 @@ pub(super) fn read_with_limits_and_leniency(
 fn read_shared(source: Arc<[u8]>, limits: Limits, leniency: Leniency) -> Result<Snapshot> {
     limits.validate()?;
     if source.len() > limits.source_bytes {
-        return Err(Error::InvalidLength {
-            expected: limits.source_bytes,
-            found: source.len(),
+        return Err(Error::Limit {
+            kind: LimitKind::SourceBytes.into(),
+            observed: source.len(),
+            maximum: limits.source_bytes,
         });
     }
 
@@ -1630,14 +1928,12 @@ fn read_shared(source: Arc<[u8]>, limits: Limits, leniency: Leniency) -> Result<
     let mut current_row = None;
     let mut frt_depth = 0usize;
 
-    for item in Records::with_limits(&source, limits.raw) {
+    for item in Records::new(&source, limits.raw) {
         let record = item?;
         match record.kind() {
             kind::BEGIN_SHEET_DATA => {
                 if in_sheet_data {
-                    return Err(Error::InvalidFormat(
-                        "duplicate BrtBeginSheetData record".to_string(),
-                    ));
+                    return Err(Error::InvalidFormat("duplicate BrtBeginSheetData record"));
                 }
                 in_sheet_data = true;
                 current_row = None;
@@ -1646,7 +1942,7 @@ fn read_shared(source: Arc<[u8]>, limits: Limits, leniency: Leniency) -> Result<
             kind::END_SHEET_DATA => {
                 if !in_sheet_data {
                     return Err(Error::InvalidFormat(
-                        "BrtEndSheetData without BrtBeginSheetData".to_string(),
+                        "BrtEndSheetData without BrtBeginSheetData",
                     ));
                 }
                 in_sheet_data = false;
@@ -1669,25 +1965,21 @@ fn read_shared(source: Arc<[u8]>, limits: Limits, leniency: Leniency) -> Result<
                 }
                 let row = binary::read_u32_le_at(record.payload(), 0)?;
                 if row > MAX_ROW {
-                    return Err(Error::InvalidCellReference(format!(
-                        "BrtRowHdr row {row} is outside the XLSB worksheet grid"
-                    )));
+                    return Err(Error::InvalidCellReference(
+                        "BrtRowHdr row is outside the XLSB worksheet grid",
+                    ));
                 }
                 current_row = Some(row);
             },
             cell_kind if in_sheet_data && frt_depth == 0 && is_supported_cell(cell_kind) => {
                 if entries.len() >= limits.cells {
-                    return Err(Error::InvalidLength {
-                        expected: limits.cells,
-                        found: entries.len().saturating_add(1),
+                    return Err(Error::Limit {
+                        kind: LimitKind::Cells.into(),
+                        observed: entries.len().saturating_add(1),
+                        maximum: limits.cells,
                     });
                 }
-                let row = current_row.ok_or_else(|| {
-                    Error::InvalidFormat(format!(
-                        "{} appears before a BrtRowHdr",
-                        cell_kind_name(cell_kind)
-                    ))
-                })?;
+                let row = current_row.ok_or(Error::InvalidFormat("appears before a BrtRowHdr"))?;
                 let entry = parse_entry(
                     &record,
                     row,
@@ -1707,7 +1999,7 @@ fn read_shared(source: Arc<[u8]>, limits: Limits, leniency: Leniency) -> Result<
     }
     if in_sheet_data {
         return Err(Error::InvalidFormat(
-            "worksheet stream ended before BrtEndSheetData".to_string(),
+            "worksheet stream ended before BrtEndSheetData",
         ));
     }
     Ok(Snapshot {
@@ -1716,6 +2008,134 @@ fn read_shared(source: Arc<[u8]>, limits: Limits, leniency: Leniency) -> Result<
         limits,
         tolerance,
         leniency,
+    })
+}
+
+fn scan_source_metadata(source: &[u8], limits: Limits) -> Result<SourceMetadata> {
+    let mut source_cells = BTreeSet::new();
+    let mut formula_groups = Vec::new();
+    let mut formula_group_metadata_invalid = false;
+    let mut in_sheet_data = false;
+    let mut current_row = None;
+    let mut frt_depth = 0usize;
+
+    for item in Records::new(source, limits.raw) {
+        let record = item?;
+        match record.kind() {
+            kind::BEGIN_SHEET_DATA => {
+                in_sheet_data = true;
+                current_row = None;
+                frt_depth = 0;
+            },
+            kind::END_SHEET_DATA => {
+                in_sheet_data = false;
+                frt_depth = 0;
+            },
+            kind::FRT_BEGIN if in_sheet_data => {
+                frt_depth = frt_depth.checked_add(1).ok_or(Error::CapacityOverflow {
+                    resource: "worksheet FRT nesting depth",
+                })?;
+            },
+            kind::FRT_END if in_sheet_data => {
+                frt_depth = frt_depth.saturating_sub(1);
+            },
+            kind::ROW_HDR if in_sheet_data && frt_depth == 0 => {
+                let row = binary::read_u32_le_at(record.payload(), 0)?;
+                if row > MAX_ROW {
+                    return Err(Error::InvalidCellReference(
+                        "BrtRowHdr row is outside the XLSB worksheet grid",
+                    ));
+                }
+                current_row = Some(row);
+            },
+            cell_kind
+                if in_sheet_data
+                    && frt_depth == 0
+                    && (0x000C..=0x0012).contains(&cell_kind.get()) =>
+            {
+                // These reserved cell families have no modeled coordinate
+                // layout. Refuse semantic mutation rather than interpreting
+                // their payload as an ordinary full cell header.
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "edit_cell_values",
+                    "semantic cell edits require modeled worksheet cell-record families",
+                ));
+            },
+            cell_kind if in_sheet_data && frt_depth == 0 && is_any_cell(cell_kind) => {
+                let row = current_row.ok_or(Error::InvalidFormat("appears before a BrtRowHdr"))?;
+                let reference = Reference::new(row, binary::read_u32_le_at(record.payload(), 0)?)?;
+                if source_cells.insert(reference) && source_cells.len() > limits.cells {
+                    return Err(Error::Limit {
+                        kind: LimitKind::Cells.into(),
+                        observed: source_cells.len(),
+                        maximum: limits.cells,
+                    });
+                }
+            },
+            group_kind @ (kind::ARR_FMLA | kind::SHR_FMLA | kind::TABLE)
+                if in_sheet_data && frt_depth == 0 =>
+            {
+                let (kind, minimum_payload) = match group_kind {
+                    kind::ARR_FMLA => (FormulaGroupKind::Array, 17),
+                    kind::SHR_FMLA => (FormulaGroupKind::Shared, 16),
+                    kind::TABLE => (FormulaGroupKind::Table, 33),
+                    _ => unreachable!("formula-group match is exhaustive"),
+                };
+                let range = record
+                    .payload()
+                    .get(..16)
+                    .and_then(|payload| Range::parse_binary(payload, limits.raw).ok());
+                if record.payload().len() < minimum_payload {
+                    formula_group_metadata_invalid = true;
+                }
+                match range {
+                    Some(range) if record.payload().len() >= minimum_payload => {
+                        if kind != FormulaGroupKind::Table {
+                            let parsed = match kind {
+                                FormulaGroupKind::Array => {
+                                    crate::formula::Group::parse_array(record.payload(), limits.raw)
+                                },
+                                FormulaGroupKind::Shared => crate::formula::Group::parse_shared(
+                                    record.payload(),
+                                    limits.raw,
+                                ),
+                                FormulaGroupKind::Table => unreachable!(),
+                            };
+                            if parsed.is_err() {
+                                formula_group_metadata_invalid = true;
+                            }
+                        }
+                        if formula_groups.len() >= limits.cells {
+                            return Err(Error::Limit {
+                                kind: LimitKind::Cells.into(),
+                                observed: formula_groups.len().saturating_add(1),
+                                maximum: limits.cells,
+                            });
+                        }
+                        formula_groups.try_reserve(1).map_err(|allocation_error| {
+                            Error::Allocation {
+                                resource: "formula-group range index",
+                                source: allocation_error,
+                            }
+                        })?;
+                        formula_groups.push(FormulaGroupRange { kind, range });
+                    },
+                    _ => formula_group_metadata_invalid = true,
+                }
+            },
+            _ => {},
+        }
+    }
+    if in_sheet_data {
+        return Err(Error::InvalidFormat(
+            "worksheet stream ended before BrtEndSheetData",
+        ));
+    }
+    Ok(SourceMetadata {
+        source_cells,
+        formula_groups,
+        formula_group_metadata_invalid,
     })
 }
 
@@ -1740,13 +2160,7 @@ fn parse_entry(
             record.kind(),
             row,
             u32::from(payload[7] & 0xfe),
-            || {
-                Error::InvalidFormat(format!(
-                    "{} has nonzero reserved Cell flag bits 0x{:02X}",
-                    cell_kind_name(record.kind()),
-                    payload[7]
-                ))
-            },
+            || Error::InvalidFormat("has nonzero reserved Cell flag bits"),
         )?;
     }
     let reference = Reference::new(row, binary::read_u32_le_at(payload, 0)?)?;
@@ -1782,7 +2196,7 @@ fn parse_value(
         },
         kind::CELL_RK => {
             require_exact(payload, 12)?;
-            let mut cursor = Cursor::new(&payload[8..], "BrtCellRk");
+            let mut cursor = Cursor::new(&payload[8..], "BrtCellRk", limits);
             Ok((Value::RkNumber(cursor.read_rk()?), None))
         },
         kind::CELL_ERROR => {
@@ -1828,6 +2242,7 @@ fn parse_value(
                     tolerance,
                     kind_value,
                     row,
+                    limits,
                 )?),
                 None,
             ))
@@ -1844,14 +2259,18 @@ fn parse_value(
             };
             Ok((
                 value,
-                Some(parse_formula(kind_value, payload, 16, row, tolerance)?),
+                Some(parse_formula(
+                    kind_value, payload, 16, row, tolerance, limits,
+                )?),
             ))
         },
         kind::FMLA_BOOL => {
             require_at_least(payload, 19)?;
             Ok((
                 Value::FormulaBooleanCache(parse_bool(payload[8], tolerance, kind_value, row)?),
-                Some(parse_formula(kind_value, payload, 9, row, tolerance)?),
+                Some(parse_formula(
+                    kind_value, payload, 9, row, tolerance, limits,
+                )?),
             ))
         },
         kind::FMLA_ERROR => {
@@ -1860,7 +2279,9 @@ fn parse_value(
                 Value::FormulaErrorCache(CellError::from_code_with(
                     payload[8], tolerance, kind_value, row,
                 )?),
-                Some(parse_formula(kind_value, payload, 9, row, tolerance)?),
+                Some(parse_formula(
+                    kind_value, payload, 9, row, tolerance, limits,
+                )?),
             ))
         },
         _ => Err(Error::InvalidRecordType(kind_value.get())),
@@ -1876,7 +2297,7 @@ fn parse_string_value(
     tolerance: &mut Tolerance<'_>,
 ) -> Result<(Value, Option<CellFormula>)> {
     require_at_least(payload, if formula { 14 } else { 12 })?;
-    let mut cursor = Cursor::with_limits(&payload[8..], "cell string", limits);
+    let mut cursor = Cursor::new(&payload[8..], "cell string", limits);
     let value = tolerance.read_wide_string(&mut cursor, kind_value, row)?;
     let units = value.encode_utf16().count();
     if units > MAX_CELL_STRING_UNITS {
@@ -1887,12 +2308,12 @@ fn parse_string_value(
     }
     if !formula {
         tolerance.tolerate_trailing(kind_value, row, cursor.remaining(), || {
-            Error::InvalidFormat("BrtCellSt contains trailing bytes".to_string())
+            Error::InvalidFormat("BrtCellSt contains trailing bytes")
         })?;
     }
     if formula && cursor.remaining() < 10 {
         return Err(Error::InvalidFormat(
-            "BrtFmlaString is missing its formula flags and token stream".to_string(),
+            "BrtFmlaString is missing its formula flags and token stream",
         ));
     }
     let parsed_formula = if formula {
@@ -1909,6 +2330,7 @@ fn parse_string_value(
             flags_offset,
             row,
             tolerance,
+            limits,
         )?)
     } else {
         None
@@ -1929,6 +2351,7 @@ fn parse_formula(
     flags_offset: usize,
     row: u32,
     tolerance: &mut Tolerance<'_>,
+    limits: RawLimits,
 ) -> Result<CellFormula> {
     let formula_offset = flags_offset.checked_add(2).ok_or(Error::CapacityOverflow {
         resource: "cell formula offset",
@@ -1943,17 +2366,17 @@ fn parse_formula(
             kind_value,
             row,
             u32::from(flags & !GRBIT_FMLA_DEFINED),
-            || Error::InvalidFormula(format!("invalid GrbitFmla flags 0x{flags:04X}")),
+            || Error::InvalidFormula("invalid GrbitFmla flags"),
         )?;
         flags &= GRBIT_FMLA_DEFINED;
     }
-    let (parsed, consumed) = crate::formula::ParsedFormula::parse(&payload[formula_offset..])
-        .map_err(|error| Error::InvalidFormula(error.to_string()))?;
+    let (parsed, consumed) =
+        crate::formula::ParsedFormula::parse(&payload[formula_offset..], limits)?;
     let trailing = payload
         .len()
         .saturating_sub(formula_offset.saturating_add(consumed));
     tolerance.tolerate_trailing(kind_value, row, trailing, || {
-        Error::InvalidFormula(format!("formula record has {trailing} trailing bytes"))
+        Error::InvalidFormula("formula record has trailing bytes")
     })?;
     CellFormula::from_source(flags, parsed.rgce, parsed.rgcb)
 }
@@ -1979,24 +2402,6 @@ fn is_supported_cell(kind_value: crate::raw::Kind) -> bool {
     )
 }
 
-fn cell_kind_name(kind_value: crate::raw::Kind) -> &'static str {
-    match kind_value {
-        kind::CELL_BLANK => "BrtCellBlank",
-        kind::CELL_RK => "BrtCellRk",
-        kind::CELL_ERROR => "BrtCellError",
-        kind::CELL_BOOL => "BrtCellBool",
-        kind::CELL_REAL => "BrtCellReal",
-        kind::CELL_ST => "BrtCellSt",
-        kind::CELL_ISST => "BrtCellIsst",
-        kind::CELL_R_STRING => "BrtCellRString",
-        kind::FMLA_STRING => "BrtFmlaString",
-        kind::FMLA_NUM => "BrtFmlaNum",
-        kind::FMLA_BOOL => "BrtFmlaBool",
-        kind::FMLA_ERROR => "BrtFmlaError",
-        _ => "cell record",
-    }
-}
-
 fn unique_index(entries: &[Entry], reference: Reference) -> Result<Option<usize>> {
     let mut found = None;
     for (index, entry) in entries.iter().enumerate() {
@@ -2004,11 +2409,11 @@ fn unique_index(entries: &[Entry], reference: Reference) -> Result<Option<usize>
             continue;
         }
         if found.replace(index).is_some() {
-            return Err(Error::UnsupportedFeature(format!(
-                "cell ({}, {}) has duplicate stored cell records",
-                reference.row(),
-                reference.column()
-            )));
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_cell_values",
+                "cell (, ) has duplicate stored cell records",
+            ));
         }
     }
     Ok(found)
@@ -2016,24 +2421,33 @@ fn unique_index(entries: &[Entry], reference: Reference) -> Result<Option<usize>
 
 fn required_index(entries: &[Entry], reference: Reference) -> Result<usize> {
     unique_index(entries, reference)?.ok_or_else(|| {
-        Error::UnsupportedFeature(format!(
-            "cell ({}, {}) is absent or uses an unsupported cell-record family",
-            reference.row(),
-            reference.column()
-        ))
+        Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit_cell_values",
+            "cell (, ) is absent or uses an unsupported cell-record family",
+        )
     })
 }
 
 fn validate_replacement(original: &Value, replacement: &Value) -> Result<()> {
     if !same_storage_family(original, replacement) {
-        return Err(Error::UnsupportedFeature(
-            "cell-value edits cannot change the existing BIFF12 storage family".to_string(),
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit_cell_values",
+            "cell-value edits cannot change the existing BIFF12 storage family",
         ));
     }
     Ok(())
 }
 
 fn same_storage_family(left: &Value, right: &Value) -> bool {
+    // A formula record keeps its formula whatever its cached result is: the
+    // record is re-encoded from the cache and the retained formula, so the
+    // four `BrtFmla*` families are one family for a cache write (record
+    // 0295).
+    if left.is_formula_cache() && right.is_formula_cache() {
+        return true;
+    }
     matches!(
         (left, right),
         (Value::Blank, Value::Blank)
@@ -2066,10 +2480,7 @@ fn validate_value(value: &Value) -> Result<()> {
             }
             Ok(())
         },
-        Value::RichString(string) => {
-            let _ = string.encode()?;
-            Ok(())
-        },
+        Value::RichString(_) => Ok(()),
         Value::Blank
         | Value::Error(_)
         | Value::Boolean(_)
@@ -2081,25 +2492,41 @@ fn validate_value(value: &Value) -> Result<()> {
 
 fn validate_value_with_limits(value: &Value, limits: Limits) -> Result<()> {
     validate_value(value)?;
-    if let Value::InlineString(string) | Value::FormulaStringCache(string) = value {
-        let units = string.encode_utf16().count();
-        if units > limits.raw.string_units() {
-            return Err(Error::InvalidLength {
-                expected: limits.raw.string_units(),
-                found: units,
-            });
-        }
+    match value {
+        Value::InlineString(string) | Value::FormulaStringCache(string) => {
+            let units = string.encode_utf16().count();
+            if units > limits.raw.string_units() {
+                return Err(Error::InvalidLength {
+                    expected: limits.raw.string_units(),
+                    found: units,
+                });
+            }
+        },
+        Value::RichString(string) => {
+            string.encode(limits.raw)?;
+        },
+        Value::Blank
+        | Value::RkNumber(_)
+        | Value::Error(_)
+        | Value::Boolean(_)
+        | Value::Number(_)
+        | Value::SharedStringIndex(_)
+        | Value::FormulaBooleanCache(_)
+        | Value::FormulaErrorCache(_)
+        | _ => {},
     }
     Ok(())
 }
 
-fn validate_finite(value: f64, context: &'static str) -> Result<()> {
+fn validate_finite(value: f64, _context: &'static str) -> Result<()> {
     if value.is_finite() {
         Ok(())
     } else {
-        Err(Error::UnsupportedFeature(format!(
-            "{context} edits require a finite IEEE-754 value"
-        )))
+        Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit_cell_values",
+            "edits require a finite IEEE-754 value",
+        ))
     }
 }
 
@@ -2112,10 +2539,12 @@ fn validate_xnum(value: f64, context: &'static str) -> Result<()> {
     }
 }
 
-fn xnum_error(context: &'static str) -> Error {
-    Error::UnsupportedFeature(format!(
-        "{context} must be a finite normalized IEEE-754 value or positive zero"
-    ))
+fn xnum_error(_context: &'static str) -> Error {
+    Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
+        "edit_cell_values",
+        "must be a finite normalized IEEE-754 value or positive zero",
+    )
 }
 
 #[allow(
@@ -2123,7 +2552,7 @@ fn xnum_error(context: &'static str) -> Error {
     clippy::too_many_lines,
     reason = "one record-order state machine keeps structural BIFF12 rewriting and unknown-record copying auditable"
 )]
-fn rebuild_stream(edit: &Edit) -> Result<Vec<u8>> {
+fn rebuild_stream(edit: &Draft) -> Result<Vec<u8>> {
     let final_columns = final_row_columns(edit)?;
     let existing_rows = source_rows(&edit.source, edit.limits)?;
     let source_has_cells = source_contains_cells(&edit.source, edit.limits)?;
@@ -2146,7 +2575,7 @@ fn rebuild_stream(edit: &Edit) -> Result<Vec<u8>> {
     }
 
     let insertion_growth = edit.inserted.values().try_fold(0usize, |total, cell| {
-        encoded_cell(cell).and_then(|record| {
+        encoded_cell(cell, edit.limits.raw).and_then(|record| {
             total
                 .checked_add(record.len())
                 .ok_or(Error::CapacityOverflow {
@@ -2159,7 +2588,7 @@ fn rebuild_stream(edit: &Edit) -> Result<Vec<u8>> {
         .iter()
         .filter(|entry| entry.changed() && !edit.removed.contains(&entry.cell.reference))
         .try_fold(0usize, |total, entry| {
-            let new_len = encoded_cell(&entry.cell)?.len();
+            let new_len = encoded_cell(&entry.cell, edit.limits.raw)?.len();
             let old_len = record_total_len(&edit.source, entry.record_offset, edit.limits.raw)?;
             total
                 .checked_add(new_len.saturating_sub(old_len))
@@ -2200,7 +2629,7 @@ fn rebuild_stream(edit: &Edit) -> Result<Vec<u8>> {
     let mut emitted_absent_rows = BTreeSet::new();
     let mut pending_insert_index = 0usize;
 
-    for item in Records::with_limits(&edit.source, edit.limits.raw) {
+    for item in Records::new(&edit.source, edit.limits.raw) {
         let record = item?;
         match record.kind() {
             kind::BEGIN_SHEET_DATA => {
@@ -2223,6 +2652,7 @@ fn rebuild_stream(edit: &Edit) -> Result<Vec<u8>> {
                         &mut output,
                         inserted_rows.get(&row),
                         &mut pending_insert_index,
+                        edit.limits.raw,
                     )?;
                 }
                 let row = binary::read_u32_le_at(record.payload(), 0)?;
@@ -2233,10 +2663,11 @@ fn rebuild_stream(edit: &Edit) -> Result<Vec<u8>> {
                     &existing_rows,
                     &mut emitted_absent_rows,
                     &final_columns,
+                    edit.limits.raw,
                 )?;
                 if structural_rows.contains(&row) {
                     let payload = encode_row_header(record.payload(), final_columns.get(&row))?;
-                    Writer::with_limits(&mut output, edit.limits.raw)
+                    Encoder::new(&mut output, edit.limits.raw)
                         .write_record(kind::ROW_HDR, &payload)?;
                 } else {
                     copy_record(&edit.source, &record, edit.limits.raw, &mut output)?;
@@ -2250,6 +2681,7 @@ fn rebuild_stream(edit: &Edit) -> Result<Vec<u8>> {
                         &mut output,
                         inserted_rows.get(&row),
                         &mut pending_insert_index,
+                        edit.limits.raw,
                     )?;
                 }
                 emit_absent_rows_before(
@@ -2259,26 +2691,27 @@ fn rebuild_stream(edit: &Edit) -> Result<Vec<u8>> {
                     &existing_rows,
                     &mut emitted_absent_rows,
                     &final_columns,
+                    edit.limits.raw,
                 )?;
                 copy_record(&edit.source, &record, edit.limits.raw, &mut output)?;
                 in_sheet_data = false;
                 current_row = None;
             },
             cell_kind if in_sheet_data && frt_depth == 0 && is_any_cell(cell_kind) => {
-                let row = current_row.ok_or_else(|| {
-                    Error::InvalidFormat("cell record appears before BrtRowHdr".to_string())
-                })?;
+                let row = current_row
+                    .ok_or(Error::InvalidFormat("cell record appears before BrtRowHdr"))?;
                 let column = binary::read_u32_le_at(record.payload(), 0)?;
                 emit_insertions_before(
                     &mut output,
                     inserted_rows.get(&row),
                     &mut pending_insert_index,
                     column,
+                    edit.limits.raw,
                 )?;
                 if let Some(entry) = replacements.get(&record.offset()) {
                     if !edit.removed.contains(&entry.cell.reference) {
                         if entry.changed() {
-                            output.extend_from_slice(&encoded_cell(&entry.cell)?);
+                            output.extend_from_slice(&encoded_cell(&entry.cell, edit.limits.raw)?);
                         } else {
                             copy_record(&edit.source, &record, edit.limits.raw, &mut output)?;
                         }
@@ -2293,8 +2726,7 @@ fn rebuild_stream(edit: &Edit) -> Result<Vec<u8>> {
                     edit.inserted.values(),
                     source_has_cells,
                 )?;
-                Writer::with_limits(&mut output, edit.limits.raw)
-                    .write_record(kind::WS_DIM, &payload)?;
+                Encoder::new(&mut output, edit.limits.raw).write_record(kind::WS_DIM, &payload)?;
             },
             _ => copy_record(&edit.source, &record, edit.limits.raw, &mut output)?,
         }
@@ -2308,7 +2740,7 @@ fn rebuild_stream(edit: &Edit) -> Result<Vec<u8>> {
     Ok(output)
 }
 
-fn final_row_columns(edit: &Edit) -> Result<BTreeMap<u32, BTreeSet<u32>>> {
+fn final_row_columns(edit: &Draft) -> Result<BTreeMap<u32, BTreeSet<u32>>> {
     let mut rows = BTreeMap::<u32, BTreeSet<u32>>::new();
     let mut current_row = None;
     let mut in_sheet_data = false;
@@ -2319,7 +2751,7 @@ fn final_row_columns(edit: &Edit) -> Result<BTreeMap<u32, BTreeSet<u32>>> {
         .filter(|entry| edit.removed.contains(&entry.cell.reference))
         .map(|entry| entry.record_offset)
         .collect::<BTreeSet<_>>();
-    for item in Records::with_limits(&edit.source, edit.limits.raw) {
+    for item in Records::new(&edit.source, edit.limits.raw) {
         let record = item?;
         match record.kind() {
             kind::BEGIN_SHEET_DATA => in_sheet_data = true,
@@ -2341,9 +2773,8 @@ fn final_row_columns(edit: &Edit) -> Result<BTreeMap<u32, BTreeSet<u32>>> {
                     && is_any_cell(cell_kind)
                     && !removed_offsets.contains(&record.offset()) =>
             {
-                let row = current_row.ok_or_else(|| {
-                    Error::InvalidFormat("cell record appears before BrtRowHdr".to_string())
-                })?;
+                let row = current_row
+                    .ok_or(Error::InvalidFormat("cell record appears before BrtRowHdr"))?;
                 rows.entry(row)
                     .or_default()
                     .insert(binary::read_u32_le_at(record.payload(), 0)?);
@@ -2363,7 +2794,7 @@ fn source_rows(source: &[u8], limits: Limits) -> Result<BTreeSet<u32>> {
     let mut rows = BTreeSet::new();
     let mut in_sheet_data = false;
     let mut frt_depth = 0usize;
-    for item in Records::with_limits(source, limits.raw) {
+    for item in Records::new(source, limits.raw) {
         let record = item?;
         match record.kind() {
             kind::BEGIN_SHEET_DATA => in_sheet_data = true,
@@ -2386,7 +2817,7 @@ fn source_rows(source: &[u8], limits: Limits) -> Result<BTreeSet<u32>> {
 fn source_contains_cells(source: &[u8], limits: Limits) -> Result<bool> {
     let mut in_sheet_data = false;
     let mut frt_depth = 0usize;
-    for item in Records::with_limits(source, limits.raw) {
+    for item in Records::new(source, limits.raw) {
         let record = item?;
         match record.kind() {
             kind::BEGIN_SHEET_DATA => in_sheet_data = true,
@@ -2413,11 +2844,15 @@ fn encode_row_header(source: &[u8], columns: Option<&BTreeSet<u32>>) -> Result<V
     Ok(payload)
 }
 
-fn synthetic_row_header(row: u32, columns: Option<&BTreeSet<u32>>) -> Result<Vec<u8>> {
+fn synthetic_row_header(
+    row: u32,
+    columns: Option<&BTreeSet<u32>>,
+    raw_limits: RawLimits,
+) -> Result<Vec<u8>> {
     let mut payload = Vec::new();
-    Writer::new(&mut payload).write_u32(row)?;
-    Writer::new(&mut payload).write_u32(0)?;
-    Writer::new(&mut payload).write_u16(300)?;
+    Encoder::new(&mut payload, raw_limits).write_u32(row)?;
+    Encoder::new(&mut payload, raw_limits).write_u32(0)?;
+    Encoder::new(&mut payload, raw_limits).write_u16(300)?;
     payload.extend_from_slice(&[0, 0, 0]);
     append_spans(&mut payload, columns)?;
     Ok(payload)
@@ -2455,15 +2890,16 @@ fn emit_absent_rows_before(
     existing_rows: &BTreeSet<u32>,
     emitted: &mut BTreeSet<u32>,
     final_columns: &BTreeMap<u32, BTreeSet<u32>>,
+    raw_limits: RawLimits,
 ) -> Result<()> {
     for (row, cells) in inserted_rows.range(..upper_bound) {
         if existing_rows.contains(row) || !emitted.insert(*row) {
             continue;
         }
-        let payload = synthetic_row_header(*row, final_columns.get(row))?;
-        Writer::new(&mut *output).write_record(kind::ROW_HDR, &payload)?;
+        let payload = synthetic_row_header(*row, final_columns.get(row), raw_limits)?;
+        Encoder::new(&mut *output, raw_limits).write_record(kind::ROW_HDR, &payload)?;
         for cell in cells {
-            output.extend_from_slice(&encoded_cell(cell)?);
+            output.extend_from_slice(&encoded_cell(cell, raw_limits)?);
         }
     }
     Ok(())
@@ -2474,6 +2910,7 @@ fn emit_insertions_before(
     cells: Option<&Vec<&StoredCell>>,
     index: &mut usize,
     upper_column: u32,
+    raw_limits: RawLimits,
 ) -> Result<()> {
     let Some(cells) = cells else {
         return Ok(());
@@ -2482,7 +2919,7 @@ fn emit_insertions_before(
         if cell.reference.column() >= upper_column {
             break;
         }
-        output.extend_from_slice(&encoded_cell(cell)?);
+        output.extend_from_slice(&encoded_cell(cell, raw_limits)?);
         *index = index.saturating_add(1);
     }
     Ok(())
@@ -2492,39 +2929,40 @@ fn emit_remaining_insertions(
     output: &mut Vec<u8>,
     cells: Option<&Vec<&StoredCell>>,
     index: &mut usize,
+    raw_limits: RawLimits,
 ) -> Result<()> {
     let Some(cells) = cells else {
         return Ok(());
     };
     while let Some(cell) = cells.get(*index) {
-        output.extend_from_slice(&encoded_cell(cell)?);
+        output.extend_from_slice(&encoded_cell(cell, raw_limits)?);
         *index = index.saturating_add(1);
     }
     Ok(())
 }
 
-fn encoded_cell(cell: &StoredCell) -> Result<Vec<u8>> {
+fn encoded_cell(cell: &StoredCell, raw_limits: RawLimits) -> Result<Vec<u8>> {
     let mut payload = Vec::new();
-    Writer::new(&mut payload).write_u32(cell.reference.column())?;
+    Encoder::new(&mut payload, raw_limits).write_u32(cell.reference.column())?;
     let style = cell.style.get().to_le_bytes();
     payload.extend_from_slice(&style[..3]);
     payload.push(u8::from(cell.show_phonetic));
-    encode_value_into(&mut payload, &cell.value)?;
+    encode_value_into(&mut payload, &cell.value, raw_limits)?;
     match (&cell.formula, cell.value.is_formula_cache()) {
         (Some(formula), true) => encode_formula_into(&mut payload, formula)?,
         (None, false) => {},
         (Some(_), false) | (None, true) => {
             return Err(Error::InvalidFormula(
-                "cell formula presence does not match its cached-result family".to_string(),
+                "cell formula presence does not match its cached-result family",
             ));
         },
     }
     let mut record = Vec::new();
-    Writer::new(&mut record).write_record(value_kind(&cell.value), &payload)?;
+    Encoder::new(&mut record, raw_limits).write_record(value_kind(&cell.value), &payload)?;
     Ok(record)
 }
 
-fn encode_value_into(output: &mut Vec<u8>, value: &Value) -> Result<()> {
+fn encode_value_into(output: &mut Vec<u8>, value: &Value, raw_limits: RawLimits) -> Result<()> {
     match value {
         Value::Blank => {},
         Value::RkNumber(number) => output.extend_from_slice(&encode_rk(*number)?),
@@ -2537,10 +2975,10 @@ fn encode_value_into(output: &mut Vec<u8>, value: &Value) -> Result<()> {
             output.extend_from_slice(&number.to_le_bytes());
         },
         Value::InlineString(string) | Value::FormulaStringCache(string) => {
-            Writer::new(output).write_wide_string(string)?;
+            Encoder::new(output, raw_limits).write_wide_string(string)?;
         },
         Value::SharedStringIndex(index) => output.extend_from_slice(&index.to_le_bytes()),
-        Value::RichString(string) => output.extend_from_slice(&string.encode()?),
+        Value::RichString(string) => output.extend_from_slice(&string.encode(raw_limits)?),
     }
     Ok(())
 }
@@ -2619,9 +3057,9 @@ fn copy_record(
     limits: RawLimits,
     output: &mut Vec<u8>,
 ) -> Result<()> {
-    let record_source = source.get(record.offset()..).ok_or_else(|| {
-        Error::InvalidFormat("record offset is outside worksheet source".to_string())
-    })?;
+    let record_source = source.get(record.offset()..).ok_or(Error::InvalidFormat(
+        "record offset is outside worksheet source",
+    ))?;
     let (_, header_len) = Header::parse(record_source, limits)?;
     let end = record
         .offset()
@@ -2630,17 +3068,19 @@ fn copy_record(
         .ok_or(Error::CapacityOverflow {
             resource: "worksheet record range",
         })?;
-    let bytes = source.get(record.offset()..end).ok_or_else(|| {
-        Error::InvalidFormat("record range is outside worksheet source".to_string())
-    })?;
+    let bytes = source
+        .get(record.offset()..end)
+        .ok_or(Error::InvalidFormat(
+            "record range is outside worksheet source",
+        ))?;
     output.extend_from_slice(bytes);
     Ok(())
 }
 
 fn record_total_len(source: &[u8], offset: usize, limits: RawLimits) -> Result<usize> {
-    let record_source = source.get(offset..).ok_or_else(|| {
-        Error::InvalidFormat("record offset is outside worksheet source".to_string())
-    })?;
+    let record_source = source.get(offset..).ok_or(Error::InvalidFormat(
+        "record offset is outside worksheet source",
+    ))?;
     let (header, header_len) = Header::parse(record_source, limits)?;
     header_len
         .checked_add(header.len())
@@ -2653,44 +3093,12 @@ fn is_any_cell(kind_value: crate::raw::Kind) -> bool {
     is_supported_cell(kind_value)
 }
 
-fn any_cell_at(source: &[u8], limits: Limits, reference: Reference) -> Result<bool> {
-    let mut row = None;
-    let mut in_sheet_data = false;
-    let mut frt_depth = 0usize;
-    for item in Records::with_limits(source, limits.raw) {
-        let record = item?;
-        match record.kind() {
-            kind::BEGIN_SHEET_DATA => in_sheet_data = true,
-            kind::END_SHEET_DATA => in_sheet_data = false,
-            kind::FRT_BEGIN if in_sheet_data => {
-                frt_depth = frt_depth.checked_add(1).ok_or(Error::CapacityOverflow {
-                    resource: "worksheet FRT nesting depth",
-                })?;
-            },
-            kind::FRT_END if in_sheet_data => frt_depth = frt_depth.saturating_sub(1),
-            kind::ROW_HDR if in_sheet_data && frt_depth == 0 => {
-                row = Some(binary::read_u32_le_at(record.payload(), 0)?);
-            },
-            cell_kind
-                if in_sheet_data
-                    && frt_depth == 0
-                    && is_any_cell(cell_kind)
-                    && row == Some(reference.row())
-                    && binary::read_u32_le_at(record.payload(), 0)? == reference.column() =>
-            {
-                return Ok(true);
-            },
-            _ => {},
-        }
-    }
-    Ok(false)
-}
-
 fn semantic_changes(
     entries: &[Entry],
     _inserted: &BTreeMap<Reference, StoredCell>,
     _removed: &BTreeSet<Reference>,
     after: &Snapshot,
+    maximum: usize,
 ) -> Result<Vec<Change>> {
     let mut before_by_reference = BTreeMap::<Reference, StoredCell>::new();
     for entry in entries {
@@ -2698,11 +3106,11 @@ fn semantic_changes(
             .insert(entry.original.reference, entry.original.clone())
             .is_some()
         {
-            return Err(Error::UnsupportedFeature(format!(
-                "cell ({}, {}) has duplicate stored cell records",
-                entry.original.reference.row(),
-                entry.original.reference.column()
-            )));
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_cell_values",
+                "cell (, ) has duplicate stored cell records",
+            ));
         }
     }
     let mut after_by_reference = BTreeMap::<Reference, StoredCell>::new();
@@ -2711,11 +3119,11 @@ fn semantic_changes(
             .insert(cell.reference, cell.clone())
             .is_some()
         {
-            return Err(Error::UnsupportedFeature(format!(
-                "cell ({}, {}) has duplicate stored cell records",
-                cell.reference.row(),
-                cell.reference.column()
-            )));
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_cell_values",
+                "cell (, ) has duplicate stored cell records",
+            ));
         }
     }
     let references = before_by_reference
@@ -2725,7 +3133,7 @@ fn semantic_changes(
         .collect::<BTreeSet<_>>();
     let mut changes = Vec::new();
     changes
-        .try_reserve(references.len())
+        .try_reserve_exact(references.len().min(maximum))
         .map_err(|source| Error::Allocation {
             resource: "semantic cell patch changes",
             source,
@@ -2734,6 +3142,13 @@ fn semantic_changes(
         let before = before_by_reference.get(&reference);
         let destination = after_by_reference.get(&reference);
         if before != destination {
+            if changes.len() == maximum {
+                return Err(Error::Limit {
+                    kind: LimitKind::Changes.into(),
+                    observed: changes.len().saturating_add(1),
+                    maximum,
+                });
+            }
             changes.push(Change {
                 reference,
                 before: before.cloned(),
@@ -2763,11 +3178,11 @@ fn snapshot_changes(before: &Snapshot, after: &Snapshot) -> Result<Vec<Change>> 
             .insert(cell.reference, cell.clone())
             .is_some()
         {
-            return Err(Error::UnsupportedFeature(format!(
-                "cell ({}, {}) has duplicate stored cell records",
-                cell.reference.row(),
-                cell.reference.column()
-            )));
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_cell_values",
+                "cell (, ) has duplicate stored cell records",
+            ));
         }
     }
     let mut after_by_reference = BTreeMap::<Reference, StoredCell>::new();
@@ -2776,11 +3191,11 @@ fn snapshot_changes(before: &Snapshot, after: &Snapshot) -> Result<Vec<Change>> 
             .insert(cell.reference, cell.clone())
             .is_some()
         {
-            return Err(Error::UnsupportedFeature(format!(
-                "cell ({}, {}) has duplicate stored cell records",
-                cell.reference.row(),
-                cell.reference.column()
-            )));
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_cell_values",
+                "cell (, ) has duplicate stored cell records",
+            ));
         }
     }
     let references = before_by_reference
@@ -2852,7 +3267,7 @@ fn merge_patch_changes(left: &Patch, right: &Patch) -> Result<MergeOutcome> {
         });
     }
     let base = read_shared(Arc::clone(&left.before), left.limits, Leniency::Strict)?;
-    let mut edit = base.edit();
+    let mut edit = base.draft();
     for (reference, destination) in destinations {
         match destination {
             Some(cell) => put_stored_cell(&mut edit, cell)?,
@@ -2866,23 +3281,23 @@ fn merge_patch_changes(left: &Patch, right: &Patch) -> Result<MergeOutcome> {
     })
 }
 
-fn put_stored_cell(edit: &mut Edit, cell: StoredCell) -> Result<()> {
+fn put_stored_cell(edit: &mut Draft, cell: StoredCell) -> Result<()> {
     validate_value_with_limits(&cell.value, edit.limits)?;
     if cell.value.is_formula_cache() != cell.formula.is_some() {
         return Err(Error::InvalidFormula(
-            "merged cell formula presence does not match its value family".to_string(),
+            "merged cell formula presence does not match its value family",
         ));
     }
     if let Some(index) = unique_index(&edit.entries, cell.reference)? {
         edit.removed.remove(&cell.reference);
         edit.entries[index].cell = cell;
     } else {
-        if any_cell_at(&edit.source, edit.limits, cell.reference)? {
-            return Err(Error::UnsupportedFeature(format!(
-                "merged cell ({}, {}) collides with an unsupported record family",
-                cell.reference.row(),
-                cell.reference.column()
-            )));
+        if edit.source_has_cell(cell.reference)? {
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_cell_values",
+                "merged cell (, ) collides with an unsupported record family",
+            ));
         }
         edit.inserted.insert(cell.reference, cell);
     }
@@ -2918,7 +3333,7 @@ impl Patch {
 fn encode_rk(value: f64) -> Result<Vec<u8>> {
     validate_finite(value, "BrtCellRk")?;
     let mut bytes = Vec::new();
-    Writer::new(&mut bytes).write_rk(value)?;
+    Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT).write_rk(value)?;
     Ok(bytes)
 }
 
@@ -2929,7 +3344,7 @@ fn parse_bool(
     row: u32,
 ) -> Result<bool> {
     tolerance.bool_byte(value, record_type, row, || {
-        Error::InvalidFormat(format!("invalid BIFF12 Boolean byte 0x{value:02X}"))
+        Error::InvalidFormat("invalid BIFF12 Boolean byte")
     })
 }
 
@@ -2955,12 +3370,12 @@ fn require_at_least(payload: &[u8], expected: usize) -> Result<()> {
     }
 }
 
-fn storage_error(reference: Reference, expected: &'static str) -> Error {
-    Error::UnsupportedFeature(format!(
-        "cell ({}, {}) is not encoded as {expected}",
-        reference.row(),
-        reference.column()
-    ))
+fn storage_error(_reference: Reference, _expected: &'static str) -> Error {
+    Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
+        "edit_cell_values",
+        "cell (, ) is not encoded as",
+    )
 }
 
 #[cfg(test)]
@@ -2971,7 +3386,7 @@ fn storage_error(reference: Reference, expected: &'static str) -> Error {
 )]
 mod tests {
     use super::*;
-    use crate::raw::{Kind, Writer};
+    use crate::raw::{Encoder, Kind};
 
     fn append_empty_formula(payload: &mut Vec<u8>) {
         payload.extend_from_slice(&0_u16.to_le_bytes());
@@ -2981,7 +3396,7 @@ mod tests {
 
     fn stream() -> Vec<u8> {
         let mut bytes = Vec::new();
-        let mut writer = Writer::new(&mut bytes);
+        let mut writer = Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT);
         writer
             .write_record(kind::BEGIN_SHEET_DATA, &[])
             .expect("begin");
@@ -3013,7 +3428,9 @@ mod tests {
 
         let mut rk = vec![0; 8];
         rk[..4].copy_from_slice(&5_u32.to_le_bytes());
-        Writer::new(&mut rk).write_rk(25.0).expect("rk value");
+        Encoder::new(&mut rk, crate::raw::Limits::DEFAULT)
+            .write_rk(25.0)
+            .expect("rk value");
         writer.write_record(kind::CELL_RK, &rk).expect("rk");
 
         let mut formula = vec![0; 16];
@@ -3071,7 +3488,11 @@ mod tests {
         };
         let mut rich = vec![0; 8];
         rich[..4].copy_from_slice(&12_u32.to_le_bytes());
-        rich.extend_from_slice(&rich_value.encode().expect("rich string"));
+        rich.extend_from_slice(
+            &rich_value
+                .encode(crate::raw::Limits::DEFAULT)
+                .expect("rich string"),
+        );
         writer
             .write_record(kind::CELL_R_STRING, &rich)
             .expect("rich string cell");
@@ -3096,7 +3517,7 @@ mod tests {
         let formula_error_ref = Reference::new(3, 10).expect("formula error reference");
         let formula_string_ref = Reference::new(3, 11).expect("formula string reference");
         let rich_string_ref = Reference::new(3, 12).expect("rich string reference");
-        let mut edit = snapshot.edit();
+        let mut edit = snapshot.draft();
         edit.set_number(real_ref, 9.25).expect("set real");
         edit.set_boolean(bool_ref, true).expect("set bool");
         edit.set_inline_string(string_ref, "CD".to_string())
@@ -3250,12 +3671,63 @@ mod tests {
         );
     }
 
+    /// Record 0295: a formula record's cache may change type; the record is
+    /// re-encoded with its formula, and the patch inverts exactly.
+    #[test]
+    fn formula_caches_change_type_and_keep_their_formula() {
+        let before = stream();
+        let snapshot = read(&before).expect("snapshot");
+        let number = Reference::new(3, 6).expect("formula number");
+        let string = Reference::new(3, 11).expect("formula string");
+        let formula = snapshot
+            .cell(number)
+            .expect("lookup")
+            .expect("formula")
+            .formula
+            .clone();
+        let mut edit = snapshot.draft();
+        edit.set_formula_string_cache(number, "eleven".to_string())
+            .expect("number to string");
+        edit.set_formula_number_cache(string, 2.5)
+            .expect("string to number");
+        assert!(
+            edit.set_number(number, 1.0).is_err(),
+            "a plain value stays refused"
+        );
+        let commit = edit.commit().expect("commit");
+        let after = commit
+            .snapshot()
+            .cell(number)
+            .expect("lookup")
+            .expect("cell");
+        assert_eq!(
+            after.value(),
+            &Value::FormulaStringCache("eleven".to_string())
+        );
+        assert_eq!(after.formula, formula);
+        assert_eq!(
+            commit
+                .snapshot()
+                .cell(string)
+                .expect("lookup")
+                .expect("cell")
+                .value(),
+            &Value::FormulaNumberCache(2.5)
+        );
+        let restored = commit
+            .patch()
+            .inverse()
+            .apply(commit.snapshot().source_bytes())
+            .expect("inverse");
+        assert_eq!(restored, before);
+    }
+
     #[test]
     fn supports_length_changes_and_refuses_family_changes_inexact_rk_and_stale_sources() {
         let snapshot = read(&stream()).expect("snapshot");
         let string_ref = Reference::new(3, 4).expect("string reference");
         let rk_ref = Reference::new(3, 5).expect("rk reference");
-        let mut edit = snapshot.edit();
+        let mut edit = snapshot.draft();
         assert!(edit.set_boolean(string_ref, true).is_err());
         edit.set_inline_string(string_ref, "a much longer string".to_string())
             .expect("length-changing string");
@@ -3284,7 +3756,7 @@ mod tests {
         let inserted_same_row = Reference::new(3, 13).expect("same row");
         let inserted_new_row = Reference::new(8, 1).expect("new row");
         let formula_ref = Reference::new(3, 6).expect("formula");
-        let mut edit = snapshot.edit();
+        let mut edit = snapshot.draft();
         edit.remove(removed).expect("remove");
         edit.insert(
             inserted_same_row,
@@ -3298,8 +3770,13 @@ mod tests {
             Value::Number(42.0),
         )
         .expect("insert new row");
-        let replacement_formula =
-            CellFormula::new(0x0002, vec![0x1E, 0x02, 0x00], vec![]).expect("constant formula");
+        let replacement_formula = CellFormula::new(
+            0x0002,
+            vec![0x1E, 0x02, 0x00],
+            vec![],
+            crate::raw::Limits::DEFAULT,
+        )
+        .expect("constant formula");
         edit.set_formula(formula_ref, replacement_formula.clone())
             .expect("formula tokens");
         let commit = edit.commit().expect("commit");
@@ -3337,14 +3814,19 @@ mod tests {
         let left_ref = Reference::new(3, 2).expect("left");
         let right_ref = Reference::new(3, 3).expect("right");
 
-        let mut left_edit = base.edit();
+        let mut left_edit = base.draft();
         left_edit.set_number(left_ref, 10.0).expect("left edit");
         let left = left_edit.commit().expect("left commit").patch().clone();
         let encoded = left.to_bytes(TransferLimits::DEFAULT).expect("serialize");
-        let decoded = Patch::from_bytes(&encoded, TransferLimits::DEFAULT).expect("decode");
+        let decoded = Patch::from_bytes(
+            &encoded,
+            TransferLimits::DEFAULT,
+            crate::raw::Limits::DEFAULT,
+        )
+        .expect("decode");
         assert_eq!(decoded.apply(&before).expect("apply"), left.after());
 
-        let mut right_edit = base.edit();
+        let mut right_edit = base.draft();
         right_edit.set_boolean(right_ref, true).expect("right edit");
         let right = right_edit.commit().expect("right commit").patch().clone();
         let merged = left.compose_disjoint(&right).expect("disjoint merge");
@@ -3367,7 +3849,7 @@ mod tests {
             &Value::Boolean(true)
         );
 
-        let mut conflict_edit = base.edit();
+        let mut conflict_edit = base.draft();
         conflict_edit.set_number(left_ref, 11.0).expect("conflict");
         let conflict = conflict_edit.commit().expect("commit").patch().clone();
         let outcome = left.merge_three_way(&conflict).expect("merge outcome");
@@ -3389,6 +3871,40 @@ mod tests {
         let undone = history.undo(&after).expect("undo");
         assert_eq!(undone, before);
         assert_eq!(history.redo(&undone).expect("redo"), after);
+    }
+
+    #[test]
+    fn durable_transfer_decode_uses_the_callers_raw_policy() {
+        let before = stream();
+        let base = read(&before).expect("base");
+        let reference = Reference::new(3, 2).expect("reference");
+        let mut edit = base.draft();
+        edit.set_number(reference, 12.0).expect("edit");
+        let patch = edit.commit().expect("commit").patch().clone();
+        let encoded = patch.to_bytes(TransferLimits::DEFAULT).expect("serialize");
+
+        let fitting = Patch::from_bytes(
+            &encoded,
+            TransferLimits::DEFAULT,
+            RawLimits::new(RawLimits::DEFAULT.payload(), 4),
+        )
+        .expect("four-unit strings fit the caller policy");
+        assert_eq!(fitting.apply(&before).expect("apply"), patch.after());
+
+        let error = Patch::from_bytes(
+            &encoded,
+            TransferLimits::DEFAULT,
+            RawLimits::new(RawLimits::DEFAULT.payload(), 3),
+        )
+        .expect_err("the caller policy rejects the four-unit rich string");
+        assert!(matches!(
+            error,
+            Error::Wire(crate::raw::Error::StringLimit {
+                units: 4,
+                limit: 3,
+                ..
+            })
+        ));
     }
 
     #[test]

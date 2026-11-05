@@ -12,6 +12,7 @@ const MAXIMUM_CUSTOM_INTERVAL: u32 = i32::MAX as u32;
 
 /// Validation failures for an explicit category-label interval.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     /// The interval is reserved for a canonical native frequency or exceeds
     /// the signed native field range.

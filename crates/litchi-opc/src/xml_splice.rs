@@ -7,7 +7,7 @@
 
 use crate::content_type::ContentType;
 use crate::error::{OpcError, Result};
-use crate::limits::{ReadLimits, ReadResource};
+use crate::limits::{SourceLimitKind, SourceLimits};
 use crate::packuri::PackURI;
 use crate::pkgreader::is_xml_id;
 use crate::source_backed::{PartData, SourceLineage, SourceSnapshot};
@@ -67,8 +67,28 @@ pub struct SourceXmlPart {
     pub(crate) original: PartData,
     pub(crate) payload: Arc<Vec<u8>>,
     pub(crate) payload_reservation: Option<Arc<Reservation>>,
+    revision: Option<Arc<XmlRevision>>,
     _metadata_reservation: Option<Arc<Reservation>>,
-    pub(crate) limits: ReadLimits,
+    pub(crate) limits: SourceLimits,
+}
+
+// A logical edit base, distinct from the immutable physical archive source.
+// No parent revision is retained. Range proofs pin this base and its admission
+// until the proof is consumed or dropped; the original PartData also covers
+// the case where edit_base shares the original managed payload allocation.
+struct XmlRevision {
+    edit_base: Arc<Vec<u8>>,
+    _original: PartData,
+    _payload_reservation: Option<Arc<Reservation>>,
+    _holder_reservation: Option<Arc<Reservation>>,
+}
+
+fn same_revision(left: &Option<Arc<XmlRevision>>, right: &Option<Arc<XmlRevision>>) -> bool {
+    match (left, right) {
+        (None, None) => true,
+        (Some(left), Some(right)) => Arc::ptr_eq(left, right),
+        _ => false,
+    }
 }
 
 impl fmt::Debug for SourceXmlPart {
@@ -82,6 +102,7 @@ impl fmt::Debug for SourceXmlPart {
             .field("source_bytes", &self.original.as_bytes().len())
             .field("payload_bytes", &self.payload.len())
             .field("derived_payload", &self.payload_reservation.is_some())
+            .field("logical_revision", &self.revision.is_some())
             .finish()
     }
 }
@@ -89,7 +110,7 @@ impl fmt::Debug for SourceXmlPart {
 impl SourceXmlPart {
     pub(crate) fn new(
         source: SourceSnapshot,
-        limits: ReadLimits,
+        limits: SourceLimits,
         source_partname: &PackURI,
         source_content_type: &str,
         original: PartData,
@@ -111,7 +132,7 @@ impl SourceXmlPart {
         let source_content_type = ContentType::from_admitted_source(source_content_type);
         let bytes = original.as_bytes();
         limits.check(
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             bytes.len() as u64,
             limits.max_part_bytes(),
         )?;
@@ -130,6 +151,7 @@ impl SourceXmlPart {
             original,
             payload,
             payload_reservation: None,
+            revision: None,
             _metadata_reservation: metadata_reservation,
             limits,
         })
@@ -153,6 +175,76 @@ impl SourceXmlPart {
         self.source_content_type.as_str()
     }
 
+    /// Start a fresh logical revision over the current validated XML payload.
+    ///
+    /// This shares the payload and its reservations without reopening the ZIP
+    /// or rescanning XML. The original archive bytes remain the authority for
+    /// physical publication. Each call creates a distinct revision: proofs
+    /// issued by another revision are refused even when its bytes are equal.
+    /// A changed splice must explicitly begin another revision before editing
+    /// again. Clones of this returned token share its revision.
+    ///
+    /// ```
+    /// use litchi_opc::{AuthoredXmlFragment, BlobPart, OpcPackage, PackURI,
+    ///     PackageWriter, SourceBackedPackage, SourceCacheLimits, SourceLimits};
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let name = PackURI::new("/example.xml")?;
+    /// let mut package = OpcPackage::new();
+    /// package.try_add_part(Box::new(BlobPart::new(
+    ///     name.clone(), "application/xml".to_owned(), b"<first/>".to_vec(),
+    /// )))?;
+    /// let source = SourceBackedPackage::from_vec(PackageWriter::to_bytes(&package)?, SourceLimits::default(), SourceCacheLimits::default(), None)?;
+    /// let mut current = source.part(&name)?.source_xml()?;
+    /// for next in [b"<second/>".as_slice(), b"<third/>".as_slice()] {
+    ///     let revision = current.begin_revision()?;
+    ///     let proof = revision.checked_range(0..revision.bytes().len(), revision.bytes())?;
+    ///     let mut edit = revision.into_publication()?;
+    ///     edit.replace(proof, AuthoredXmlFragment::markup(next.to_vec())?)?;
+    ///     current = edit.finish()?;
+    /// }
+    /// assert_eq!(current.bytes(), b"<third/>");
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    /// Returns source-change, cancellation or metadata-admission failures.
+    pub fn begin_revision(&self) -> Result<Self> {
+        self.check_source_state()?;
+        let holder = reserve_output_memory(
+            &self.source,
+            size_of::<XmlRevision>() + size_of::<[usize; 2]>(),
+        )?;
+        let revision = Arc::new(XmlRevision {
+            edit_base: Arc::clone(&self.payload),
+            _original: self.original.clone(),
+            _payload_reservation: self.payload_reservation.clone(),
+            _holder_reservation: holder,
+        });
+        self.check_source_state()?;
+        let mut next = self.clone();
+        next.revision = Some(revision);
+        Ok(next)
+    }
+
+    fn edit_base(&self) -> &[u8] {
+        self.revision.as_ref().map_or_else(
+            || self.original.as_bytes(),
+            |revision| revision.edit_base.as_slice(),
+        )
+    }
+
+    fn is_edit_base_payload(&self) -> bool {
+        self.revision.as_ref().map_or_else(
+            || Arc::ptr_eq(&self.payload, &self.original.shared_bytes()),
+            |revision| Arc::ptr_eq(&self.payload, &revision.edit_base),
+        )
+    }
+
+    pub(crate) fn is_physical_source(&self) -> bool {
+        self.revision.is_none() && Arc::ptr_eq(&self.payload, &self.original.shared_bytes())
+    }
+
     /// Issue a proof for an exact source byte range.
     ///
     /// The expected bytes are compared before the proof is issued.  Empty
@@ -164,7 +256,7 @@ impl SourceXmlPart {
         expected_source: &[u8],
     ) -> Result<XmlSourceRange> {
         self.check_source_state()?;
-        if !self.is_original_payload() {
+        if !self.is_edit_base_payload() {
             return Err(invalid_source(
                 "derived source XML cannot issue a second range proof",
             ));
@@ -177,7 +269,7 @@ impl SourceXmlPart {
             .checked_sub(range.start)
             .ok_or_else(|| invalid_source("XML source range length overflows"))?;
         self.limits.check(
-            ReadResource::XmlAttributeBytes,
+            SourceLimitKind::XmlAttributeBytes,
             range_len as u64,
             limits_range_max(self.limits),
         )?;
@@ -187,8 +279,7 @@ impl SourceXmlPart {
             ));
         }
         let actual = self
-            .original
-            .as_bytes()
+            .edit_base()
             .get(range.clone())
             .ok_or_else(|| invalid_source("XML source range is outside the source Part"))?;
         if actual != expected_source {
@@ -213,16 +304,56 @@ impl SourceXmlPart {
             source_lineage: self.source_lineage.clone(),
             source_version: self.source_version,
             source_partname: self.source_partname.as_ref().clone(),
+            source_content_type: Arc::clone(&self.source_content_type),
+            revision: self.revision.clone(),
+            _source_metadata_reservation: self._metadata_reservation.clone(),
             range,
             expected,
             _reservation: expected_reservation,
         })
     }
 
+    /// Validate a complete replacement XML document against source-read rules.
+    ///
+    /// This is the full-document counterpart to checked splices: declarations,
+    /// BOMs and producer whitespace are retained, while malformed XML, DTDs and
+    /// resource-limit violations are refused. Format-specific semantic and
+    /// protection checks remain the caller's responsibility.
+    /// The original physical authority is retained without an intermediate
+    /// payload/revision chain. Managed output and parser work retain admissions.
+    ///
+    /// # Errors
+    /// Refuses invalid replacement XML, source changes, cancellation and limits.
+    pub fn with_replacement_xml(&self, bytes: impl Into<Arc<Vec<u8>>>) -> Result<Self> {
+        self.check_source_state()?;
+        let result = (|| {
+            let bytes = bytes.into();
+            self.limits.check(
+                SourceLimitKind::PartBytes,
+                bytes.len() as u64,
+                self.limits.max_part_bytes(),
+            )?;
+            let reservation = reserve_output_memory(&self.source, bytes.capacity())?;
+            validate_source_xml(
+                self.partname(),
+                &bytes,
+                self.limits,
+                self.source.context_ref(),
+            )?;
+            let mut target = self.clone();
+            target.payload = bytes;
+            target.payload_reservation = reservation;
+            target.revision = None;
+            Ok(target)
+        })();
+        self.check_source_state()?;
+        result
+    }
+
     /// Begin a source-preserving edit transaction.
     pub fn into_publication(self) -> Result<XmlSplicePublication> {
         self.check_source_state()?;
-        if !self.is_original_payload() {
+        if !self.is_edit_base_payload() {
             return Err(invalid_source(
                 "derived source XML cannot be edited a second time",
             ));
@@ -241,14 +372,10 @@ impl SourceXmlPart {
         self.source.clone()
     }
 
-    fn is_original_payload(&self) -> bool {
-        Arc::ptr_eq(&self.payload, &self.original.shared_bytes())
-    }
-
     pub(crate) fn check_for_publication(
         &self,
         destination_content_type: &str,
-        destination_limits: ReadLimits,
+        destination_limits: SourceLimits,
     ) -> Result<()> {
         if self.source_content_type.as_str() != destination_content_type {
             return Err(invalid_source(
@@ -262,7 +389,7 @@ impl SourceXmlPart {
         }
         self.check_source_state()?;
         destination_limits.check(
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             self.payload.len() as u64,
             destination_limits.max_part_bytes(),
         )?;
@@ -290,7 +417,7 @@ impl SourceXmlPart {
         destination_partname: &PackURI,
         destination_content_type: &str,
         destination_original: &[u8],
-        destination_limits: ReadLimits,
+        destination_limits: SourceLimits,
     ) -> Result<()> {
         destination.ensure_current_public()?;
         if self.source_lineage != destination.lineage().clone()
@@ -334,6 +461,9 @@ pub struct XmlSourceRange {
     source_lineage: SourceLineage,
     source_version: SourceVersion,
     source_partname: PackURI,
+    source_content_type: Arc<ContentType>,
+    revision: Option<Arc<XmlRevision>>,
+    _source_metadata_reservation: Option<Arc<Reservation>>,
     range: Range<usize>,
     expected: Vec<u8>,
     _reservation: Option<Arc<Reservation>>,
@@ -348,6 +478,7 @@ impl fmt::Debug for XmlSourceRange {
             .field("source_partname", &self.source_partname)
             .field("range", &self.range)
             .field("expected_bytes", &self.expected.len())
+            .field("logical_revision", &self.revision.is_some())
             .finish()
     }
 }
@@ -458,16 +589,33 @@ struct XmlSpliceEdit {
 }
 
 impl XmlSplicePublication {
+    pub(crate) fn check_edit_base(&self, expected: &SourceXmlPart) -> Result<()> {
+        if self.source.source_lineage != expected.source_lineage
+            || self.source.source_version != expected.source_version
+            || self.source.source_partname != expected.source_partname
+            || self.source.source_content_type != expected.source_content_type
+            || !same_revision(&self.source.revision, &expected.revision)
+            || !Arc::ptr_eq(&self.source.payload, &expected.payload)
+        {
+            return Err(invalid_source(
+                "XML transaction has a different logical edit base",
+            ));
+        }
+        self.source.check_source_state()
+    }
+
     /// Stage one checked replacement or insertion.
     pub fn replace(&mut self, proof: XmlSourceRange, fragment: AuthoredXmlFragment) -> Result<()> {
         self.source.check_source_state()?;
-        if !self.source.is_original_payload() {
+        if !self.source.is_edit_base_payload() {
             return Err(invalid_source(
                 "derived source XML cannot receive another source splice",
             ));
         }
         if proof.source_lineage != self.source.source_lineage
             || proof.source_version != self.source.source_version
+            || proof.source_content_type != self.source.source_content_type
+            || !same_revision(&proof.revision, &self.source.revision)
             || !proof
                 .source_partname
                 .is_equivalent_to(&self.source.source_partname)
@@ -476,8 +624,7 @@ impl XmlSplicePublication {
         }
         let actual = self
             .source
-            .original
-            .as_bytes()
+            .edit_base()
             .get(proof.range.clone())
             .ok_or_else(|| invalid_source("invalid XML source range"))?;
         if actual != proof.expected.as_slice() {
@@ -541,7 +688,7 @@ impl XmlSplicePublication {
             return Ok(self.source);
         }
         self.edits.sort_unstable_by_key(|edit| edit.range.start);
-        let original = self.source.original.as_bytes();
+        let original = self.source.edit_base();
         let mut removed = 0usize;
         let mut added = 0usize;
         for (index, edit) in self.edits.iter().enumerate() {
@@ -571,7 +718,7 @@ impl XmlSplicePublication {
             .and_then(|length| length.checked_add(added))
             .ok_or_else(|| invalid_source("XML source splice size overflows"))?;
         self.source.limits.check(
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             output_len as u64,
             self.source.limits.max_part_bytes(),
         )?;
@@ -607,6 +754,7 @@ impl XmlSplicePublication {
         self.source.check_source_state()?;
         self.source.payload = Arc::new(output);
         self.source.payload_reservation = output_reservation;
+        self.source.revision = None;
         Ok(self.source)
     }
 }
@@ -904,18 +1052,28 @@ fn reserve_edit_memory(
         .map_err(map_execution_error)
 }
 
-fn limits_range_max(limits: ReadLimits) -> u64 {
+fn limits_range_max(limits: SourceLimits) -> u64 {
     limits.max_xml_attribute_bytes() as u64
 }
 
 fn validate_source_xml(
     partname: &PackURI,
     bytes: &[u8],
-    limits: ReadLimits,
+    limits: SourceLimits,
     context: Option<&ExecutionContext>,
 ) -> Result<()> {
+    validate_source_xml_with_policy(partname, bytes, limits, context, true)
+}
+
+fn validate_source_xml_with_policy(
+    partname: &PackURI,
+    bytes: &[u8],
+    limits: SourceLimits,
+    context: Option<&ExecutionContext>,
+    require_literal_namespace_bindings: bool,
+) -> Result<()> {
     limits.check(
-        ReadResource::PartBytes,
+        SourceLimitKind::PartBytes,
         bytes.len() as u64,
         limits.max_part_bytes(),
     )?;
@@ -936,7 +1094,7 @@ fn validate_source_xml(
     // increments it before returning a start event. Clamp one slot below its
     // maximum so the next event can be observed and refused without wrapping
     // the resolver counter before our own depth accounting sees it.
-    let xml_depth_limit = limits.max_xml_depth().min(QUICK_XML_MAX_SAFE_DEPTH);
+    let xml_depth_limit = limits.max_depth().min(QUICK_XML_MAX_SAFE_DEPTH);
     let mut depth = 0usize;
     let mut roots = 0usize;
     let mut events = 0u64;
@@ -948,11 +1106,7 @@ fn validate_source_xml(
         events = events
             .checked_add(1)
             .ok_or_else(|| invalid_source("source XML event count overflows"))?;
-        limits.check(
-            ReadResource::XmlEvents,
-            events,
-            limits.max_xml_events() as u64,
-        )?;
+        limits.check(SourceLimitKind::Events, events, limits.max_events() as u64)?;
         let (namespace, event) = reader.read_resolved_event().map_err(|error| {
             OpcError::XmlError(format!("source XML '{partname}' is malformed: {error}"))
         })?;
@@ -963,7 +1117,13 @@ fn validate_source_xml(
         }
         match event {
             Event::Start(element) => {
-                validate_source_element(&reader, &element, limits, partname)?;
+                validate_source_element(
+                    &reader,
+                    &element,
+                    limits,
+                    partname,
+                    require_literal_namespace_bindings,
+                )?;
                 if depth == 0 {
                     roots = roots
                         .checked_add(1)
@@ -972,18 +1132,24 @@ fn validate_source_xml(
                 depth = depth
                     .checked_add(1)
                     .ok_or_else(|| invalid_source("source XML depth overflows"))?;
-                limits.check(ReadResource::XmlDepth, depth as u64, xml_depth_limit as u64)?;
+                limits.check(SourceLimitKind::Depth, depth as u64, xml_depth_limit as u64)?;
             },
             Event::Empty(element) => {
                 let element_depth = depth
                     .checked_add(1)
                     .ok_or_else(|| invalid_source("source XML depth overflows"))?;
                 limits.check(
-                    ReadResource::XmlDepth,
+                    SourceLimitKind::Depth,
                     element_depth as u64,
                     xml_depth_limit as u64,
                 )?;
-                validate_source_element(&reader, &element, limits, partname)?;
+                validate_source_element(
+                    &reader,
+                    &element,
+                    limits,
+                    partname,
+                    require_literal_namespace_bindings,
+                )?;
                 if depth == 0 {
                     roots = roots
                         .checked_add(1)
@@ -1068,9 +1234,23 @@ fn validate_source_xml(
 pub fn validate_source_xml_bytes(
     partname: &PackURI,
     bytes: &[u8],
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<()> {
     validate_source_xml(partname, bytes, limits, None)
+}
+
+/// Validate one whole authored XML member under the bounded OPC policy.
+///
+/// Whole-member format edits preserve the caller's bytes and do not splice
+/// expanded names. They therefore accept escaped namespace URI spellings that
+/// the source-splice proof intentionally rejects, while retaining the same
+/// XML, event, depth, attribute, and allocation ceilings.
+pub(crate) fn validate_authored_xml_bytes(
+    partname: &PackURI,
+    bytes: &[u8],
+    limits: SourceLimits,
+) -> Result<()> {
+    validate_source_xml_with_policy(partname, bytes, limits, None, false)
 }
 
 fn consume_work_from_context(context: Option<&ExecutionContext>, bytes: usize) -> Result<()> {
@@ -1170,8 +1350,9 @@ pub(crate) fn validate_source_declaration(
 fn validate_source_element(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-    limits: ReadLimits,
+    limits: SourceLimits,
     partname: &PackURI,
+    require_literal_namespace_bindings: bool,
 ) -> Result<()> {
     validate_source_qname(reader, element.name().as_ref(), "element")?;
     let mut attribute_count = 0usize;
@@ -1209,7 +1390,7 @@ fn validate_source_element(
             .checked_add(attribute.value.as_ref().len())
             .ok_or_else(|| invalid_source("source XML attribute size overflows"))?;
         limits.check(
-            ReadResource::XmlAttributeBytes,
+            SourceLimitKind::XmlAttributeBytes,
             raw_attribute_bytes as u64,
             limits.max_xml_attribute_bytes() as u64,
         )?;
@@ -1228,7 +1409,7 @@ fn validate_source_element(
                 invalid_source(format!("source XML attribute value is invalid: {error}"))
             })?;
         limits.check(
-            ReadResource::XmlAttributeBytes,
+            SourceLimitKind::XmlAttributeBytes,
             value.len() as u64,
             limits.max_xml_attribute_bytes() as u64,
         )?;
@@ -1237,7 +1418,7 @@ fn validate_source_element(
             // quick-xml's resolver retains raw namespace URI bytes. Refuse
             // bindings requiring normalization so expanded-name comparisons
             // cannot miss aliases expressed with character references.
-            if attribute.value.as_ref() != value.as_bytes() {
+            if require_literal_namespace_bindings && attribute.value.as_ref() != value.as_bytes() {
                 return Err(invalid_source(
                     "source XML requires literal namespace bindings",
                 ));
@@ -1468,7 +1649,7 @@ fn map_execution_error(error: ExecutionError) -> OpcError {
 impl SourceXmlPart {
     pub(crate) fn from_source_parts(
         source: SourceSnapshot,
-        limits: ReadLimits,
+        limits: SourceLimits,
         source_partname: &PackURI,
         source_content_type: &str,
         original: PartData,
@@ -1518,7 +1699,7 @@ mod tests {
     }
 
     fn source_is_valid(bytes: &[u8]) -> bool {
-        validate_source_xml(&test_partname(), bytes, ReadLimits::default(), None).is_ok()
+        validate_source_xml(&test_partname(), bytes, SourceLimits::default(), None).is_ok()
     }
 
     #[test]
@@ -1585,8 +1766,8 @@ mod tests {
 
     #[test]
     fn empty_elements_obey_depth_and_attributes_are_limited_individually() {
-        let shallow = ReadLimits::builder()
-            .max_xml_depth(1)
+        let shallow = SourceLimits::builder()
+            .max_depth(1)
             .unwrap()
             .build()
             .unwrap();
@@ -1594,7 +1775,7 @@ mod tests {
             validate_source_xml(&test_partname(), b"<root><leaf/></root>", shallow, None).is_err()
         );
         assert!(validate_source_xml(&test_partname(), b"<root/>", shallow, None).is_ok());
-        let attributes = ReadLimits::builder()
+        let attributes = SourceLimits::builder()
             .max_xml_attribute_bytes(5)
             .unwrap()
             .max_relationship_target_bytes(5)

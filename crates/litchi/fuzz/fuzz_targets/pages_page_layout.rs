@@ -6,9 +6,10 @@ use std::sync::OnceLock;
 
 use libfuzzer_sys::fuzz_target;
 use litchi::pages::{
-    Limits, Package,
+    Package,
     page_layout::{Layout, Orientation},
 };
+use litchi_iwa_archive::Limits;
 
 const MAX_INPUT_BYTES: u64 = 256 * 1024;
 const OVERSIZED_INPUT_BYTES: usize = 256 * 1024 + 1;
@@ -20,7 +21,10 @@ const PRIVATE_MALFORMED_INPUT: &[u8] = b"__litchi_private_pages_layout_input_d73
 const NATIVE_PAGES: &[u8] = include_bytes!("../../../../test-data/iwork/pages/basic.pages");
 
 fuzz_target!(|data: &[u8]| {
-    match Package::from_bytes_with_limits(data, fuzz_limits()) {
+    match Package::from_bytes_with_options(
+        data,
+        litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()),
+    ) {
         Ok(package) => exercise_package(&package, data),
         Err(error) => observe_error(error),
     }
@@ -51,8 +55,11 @@ fn fuzz_limits() -> Limits {
 fn native_package() -> &'static Package {
     static PACKAGE: OnceLock<Package> = OnceLock::new();
     PACKAGE.get_or_init(|| {
-        let package = Package::from_bytes_with_limits(NATIVE_PAGES, fuzz_limits())
-            .unwrap_or_else(|error| panic!("native Pages fuzz seed must open: {error}"));
+        let package = Package::from_bytes_with_options(
+            NATIVE_PAGES,
+            litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()),
+        )
+        .unwrap_or_else(|error| panic!("native Pages fuzz seed must open: {error}"));
         package
             .page_layout()
             .unwrap_or_else(|error| panic!("native Pages fuzz seed must expose a layout: {error}"));
@@ -201,7 +208,10 @@ fn exercise_layout_values(data: &[u8]) {
 }
 
 fn exercise_redacted_malformed_ingress() {
-    match Package::from_bytes_with_limits(PRIVATE_MALFORMED_INPUT, fuzz_limits()) {
+    match Package::from_bytes_with_options(
+        PRIVATE_MALFORMED_INPUT,
+        litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()),
+    ) {
         Err(error) => observe_redacted(error, PRIVATE_MALFORMED_INPUT),
         Ok(_) => panic!("a private malformed sentinel must not parse as Pages"),
     }
@@ -210,7 +220,10 @@ fn exercise_redacted_malformed_ingress() {
 fn exercise_input_limit() {
     static OVERSIZED: OnceLock<Box<[u8]>> = OnceLock::new();
     let bytes = OVERSIZED.get_or_init(|| vec![0; OVERSIZED_INPUT_BYTES].into_boxed_slice());
-    match Package::from_bytes_with_limits(bytes, fuzz_limits()) {
+    match Package::from_bytes_with_options(
+        bytes,
+        litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()),
+    ) {
         Err(error) => observe_error(error),
         Ok(_) => panic!("an oversized Pages input must be rejected"),
     }

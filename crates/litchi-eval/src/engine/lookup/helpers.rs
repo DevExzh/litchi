@@ -11,7 +11,7 @@ pub(super) enum ReferenceLookup {
     NotReference,
 }
 
-pub(super) async fn first_cell_from_expr(
+pub(super) fn first_cell_from_expr(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     expr: &Expr,

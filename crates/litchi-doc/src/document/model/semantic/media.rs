@@ -41,7 +41,7 @@ impl Document {
     #[inline]
     #[must_use]
     pub fn word_document(&self) -> &[u8] {
-        &self.word_document
+        &self.0.word_document
     }
 
     /// Get the appropriate stream for picture data based on `pic_offset`.
@@ -53,7 +53,7 @@ impl Document {
     /// This is because pictures are typically stored in the Data stream,
     /// not the `WordDocument` stream.
     pub(super) fn get_data_stream(&self, offset: u32) -> Option<&[u8]> {
-        if let Some(data_stream) = &self.data_stream
+        if let Some(data_stream) = &self.0.data_stream
             && (offset as usize) < data_stream.len()
         {
             return Some(data_stream.as_slice());
@@ -67,7 +67,7 @@ impl Document {
     #[inline]
     #[must_use]
     pub fn data_stream(&self) -> Option<&[u8]> {
-        self.data_stream.as_deref()
+        self.0.data_stream.as_deref()
     }
 
     /// Get the floating-shape anchors of the Main Document.
@@ -81,7 +81,7 @@ impl Document {
     #[inline]
     #[must_use]
     pub fn shape_positions(&self) -> &[crate::parts::spa::ShapeAnchor] {
-        &self.shape_anchors
+        &self.0.shape_anchors
     }
 
     /// Get the floating-shape anchors of the Header Document.
@@ -92,7 +92,7 @@ impl Document {
     #[inline]
     #[must_use]
     pub fn header_shape_positions(&self) -> &[crate::parts::spa::ShapeAnchor] {
-        &self.header_shape_anchors
+        &self.0.header_shape_anchors
     }
 
     /// Map a header-story-relative character position to the header it
@@ -101,9 +101,9 @@ impl Document {
         &self,
         story_relative_cp: u32,
     ) -> Option<crate::parts::headers::HeaderFooterType> {
-        let (story_base, _) = self.fib.get_header_range()?;
+        let (story_base, _) = self.0.fib.get_header_range()?;
         let absolute_cp = story_base.checked_add(story_relative_cp)?;
-        self.headers_table.as_ref().and_then(|table| {
+        self.0.headers_table.as_ref().and_then(|table| {
             table
                 .stories()
                 .iter()
@@ -150,12 +150,14 @@ impl Document {
             .iter()
             .map(|entry| {
                 let raw = self
+                    .0
                     .text_extractor
                     .text_at_range(story_start + entry.start_cp, story_start + entry.end_cp);
                 // The range of each text box ends with a trailing CR.
                 let text = raw.strip_suffix('\r').unwrap_or(raw);
                 let header_kind = if in_header_story {
-                    self.header_shape_anchors
+                    self.0
+                        .header_shape_anchors
                         .iter()
                         .find(|anchor| anchor.spa.shape_id == entry.shape_id)
                         .and_then(|anchor| self.header_kind_at_cp(anchor.cp))
@@ -180,7 +182,11 @@ impl Document {
     /// vector when the document has no textbox story.
     #[must_use]
     pub fn text_boxes(&self) -> Vec<crate::parts::textbox::TextBox> {
-        self.resolve_text_boxes(&self.textbox_entries, self.fib.get_textbox_range(), false)
+        self.resolve_text_boxes(
+            &self.0.textbox_entries,
+            self.0.fib.get_textbox_range(),
+            false,
+        )
     }
 
     /// Get the text boxes anchored in the header/footer story.
@@ -193,8 +199,8 @@ impl Document {
     #[must_use]
     pub fn header_text_boxes(&self) -> Vec<crate::parts::textbox::TextBox> {
         self.resolve_text_boxes(
-            &self.header_textbox_entries,
-            self.fib.get_header_textbox_range(),
+            &self.0.header_textbox_entries,
+            self.0.fib.get_header_textbox_range(),
             true,
         )
     }

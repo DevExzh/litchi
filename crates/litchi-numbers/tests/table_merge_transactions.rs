@@ -1,10 +1,8 @@
 //! Exact-source selector-first Numbers merge transactions.
 
 use litchi_numbers::table::merge::Region;
-use litchi_numbers::{
-    Package, PackageLimits, PackageReadOptions, PackageSemanticLimits, SheetSelector,
-    TableMergesError, TableSelector,
-};
+use litchi_numbers::table::merge::transaction::Error as TableMergesError;
+use litchi_numbers::{Package, SheetSelector, TableSelector};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -21,7 +19,7 @@ fn merge_and_unmerge_preserve_exact_source_and_inverse() -> TestResult {
 
     let mut edit = source.edit_table_merges(SheetSelector::index(0), TableSelector::index(0))?;
     edit.merge(region)?;
-    assert!(edit.regions().contains(&region));
+    assert!(edit.regions()?.contains(&region));
     let committed = edit.commit()?;
     assert!(committed.diagnostics().changed());
     assert_eq!(committed.diagnostics().regions_added(), 1);
@@ -77,12 +75,16 @@ fn staging_rejects_overlap_and_out_of_bounds_without_mutation() -> TestResult {
     let existing = Region::new(10, 1, 2, 2)?;
     assert!(matches!(
         edit.merge(existing),
-        Err(TableMergesError::OverlappingRegion)
+        Err(TableMergesError::Refused(
+            litchi_numbers::table::merge::transaction::Refusal::OverlappingRegion
+        ))
     ));
     let outside = Region::new(11, 2, 2, 2)?;
     assert!(matches!(
         edit.merge(outside),
-        Err(TableMergesError::InvalidRegion)
+        Err(TableMergesError::Refused(
+            litchi_numbers::table::merge::transaction::Refusal::InvalidRegion
+        ))
     ));
     let committed = edit.commit()?;
     assert!(committed.patch().is_noop());
@@ -162,27 +164,55 @@ fn removing_and_readding_an_existing_region_is_an_exact_noop() -> TestResult {
 #[test]
 fn changed_publication_honors_the_package_output_ceiling() -> TestResult {
     let source = Package::from_bytes(NATIVE_SOURCE)?;
-    let limits = PackageLimits::new(
-        NATIVE_SOURCE.len() as u64,
-        PackageLimits::MAX_ENTRIES,
-        PackageLimits::MAX_ENTRY_BYTES,
-        PackageLimits::MAX_TOTAL_BYTES,
-        PackageLimits::MAX_IWA_STREAM_BYTES,
-    )?;
+    let limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(NATIVE_SOURCE.len() as u64)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
     let bounded = Package::from_bytes_with_options(
         NATIVE_SOURCE,
-        PackageReadOptions::new(limits, PackageSemanticLimits::default()),
+        litchi_numbers::OpenOptions::new()
+            .source_limits(limits)
+            .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
     )?;
     let region = Region::new(1, 1, 1, 2)?;
     let mut edit = bounded.edit_table_merges(SheetSelector::index(0), TableSelector::index(0))?;
     edit.merge(region)?;
-    assert!(matches!(
-        edit.commit(),
-        Err(TableMergesError::LimitExceeded { .. })
-    ));
+    assert!(matches!(edit.commit(), Err(TableMergesError::Limit { .. })));
     assert_eq!(
         source.table_merges(SheetSelector::index(0), TableSelector::index(0))?,
         [Region::new(10, 1, 2, 2)?,]
     );
+    Ok(())
+}
+
+#[test]
+fn identical_merges_are_byte_identical() -> TestResult {
+    // Record 0300: creating a merge owner used to draw a random UUID, so two
+    // identical merges on the same workbook differed byte for byte.
+    let region = Region::new(1, 1, 2, 2)?;
+    let merge = || -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        let source = Package::new();
+        let mut edit =
+            source.edit_table_merges(SheetSelector::index(0), TableSelector::index(0))?;
+        edit.merge(region)?;
+        let committed = edit.commit()?;
+        assert_eq!(
+            committed
+                .package()
+                .table_merges(SheetSelector::index(0), TableSelector::index(0))?,
+            vec![region]
+        );
+        let mut bytes = Vec::new();
+        committed.package().write_to(&mut bytes)?;
+        Ok(bytes)
+    };
+    assert_eq!(merge()?, merge()?);
     Ok(())
 }

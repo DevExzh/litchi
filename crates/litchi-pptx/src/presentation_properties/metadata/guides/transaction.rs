@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use litchi_opc::OpcPackage;
 
+use super::Limits;
 use super::codec;
 use super::model::{Guide, Guides, List, ListKind};
 use crate::{Error, Result};
@@ -18,6 +19,7 @@ pub struct Snapshot {
     pub(crate) presentation_content_type: String,
     pub(crate) source_xml: Arc<Vec<u8>>,
     pub(crate) guides: Guides,
+    pub(crate) limits: Limits,
     pub(crate) revision: Revision,
 }
 
@@ -27,17 +29,8 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn load(package: &OpcPackage) -> Result<Self> {
-        super::package::load_snapshot(package)
-    }
-
-    /// Alias for [`Self::load`] emphasizing the source-bound result.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn read(package: &OpcPackage) -> Result<Self> {
-        Self::load(package)
+    pub fn load(package: &OpcPackage, limits: Limits) -> Result<Self> {
+        super::package::load_snapshot(package, limits)
     }
 
     /// Parse an exact presentation XML source into a detached snapshot.
@@ -45,26 +38,59 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_xml(source_xml: &[u8]) -> Result<Self> {
-        Self::from_wire(String::new(), String::new(), Arc::new(source_xml.to_vec()))
+    pub fn from_xml(source_xml: &[u8], limits: Limits) -> Result<Self> {
+        // Admit the borrowed source before retaining it.  In particular, do
+        // not let an oversized caller buffer turn into an owned copy before
+        // the selected input policy has had a chance to reject it.
+        let guides = Guides::from_xml(source_xml, limits)?;
+        let source_xml = Arc::new(source_xml.to_vec());
+        Ok(Self::from_parsed(
+            String::new(),
+            String::new(),
+            source_xml,
+            guides,
+            limits,
+        ))
     }
 
     pub(crate) fn from_wire(
         presentation_part_name: String,
         presentation_content_type: String,
         source_xml: Arc<Vec<u8>>,
+        limits: Limits,
     ) -> Result<Self> {
-        if source_xml.len() > codec::MAX_BYTES {
-            return Err(invalid("presentation-guide source exceeds 8 MiB"));
+        if source_xml.len() > limits.max_input_bytes() {
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::InputBytes),
+                observed: source_xml.len(),
+                maximum: limits.max_input_bytes(),
+            });
         }
-        let guides = Guides::from_xml(source_xml.as_slice())?;
-        Ok(Self {
+        let guides = Guides::from_xml(source_xml.as_slice(), limits)?;
+        Ok(Self::from_parsed(
+            presentation_part_name,
+            presentation_content_type,
+            source_xml,
+            guides,
+            limits,
+        ))
+    }
+
+    fn from_parsed(
+        presentation_part_name: String,
+        presentation_content_type: String,
+        source_xml: Arc<Vec<u8>>,
+        guides: Guides,
+        limits: Limits,
+    ) -> Self {
+        Self {
             presentation_part_name,
             presentation_content_type,
             revision: fingerprint(source_xml.as_slice()),
             source_xml,
             guides,
-        })
+            limits,
+        }
     }
 
     /// Borrow the complete typed extended-guide value.
@@ -72,13 +98,6 @@ impl Snapshot {
     #[must_use]
     pub fn guides(&self) -> &Guides {
         &self.guides
-    }
-
-    /// Alias emphasizing the semantic guide catalog.
-    #[inline]
-    #[must_use]
-    pub fn value(&self) -> &Guides {
-        self.guides()
     }
 
     /// Return the owning presentation part name.
@@ -112,8 +131,8 @@ impl Snapshot {
     /// Start an atomic detached edit over the typed guide value.
     #[inline]
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub(crate) fn edit(&self) -> Draft {
+        Draft {
             original: self.clone(),
             working: self.guides.clone(),
         }
@@ -133,12 +152,12 @@ impl Snapshot {
 
 /// A failure-atomic edit staged against one guide catalog.
 #[derive(Clone, Debug)]
-pub struct Transaction {
+pub struct Draft {
     original: Snapshot,
     working: Guides,
 }
 
-impl Transaction {
+impl Draft {
     /// Borrow the immutable source snapshot used by this edit.
     #[inline]
     #[must_use]
@@ -153,13 +172,6 @@ impl Transaction {
         &self.working
     }
 
-    /// Alias for [`Self::guides`].
-    #[inline]
-    #[must_use]
-    pub fn snapshot(&self) -> &Guides {
-        self.guides()
-    }
-
     /// Borrow one currently staged owner list.
     #[inline]
     #[must_use]
@@ -167,11 +179,14 @@ impl Transaction {
         self.working.list(kind)
     }
 
-    /// Return whether the staged typed value differs from the source.
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn has_changes(&self) -> bool {
         self.original.guides != self.working
+    }
+
+    /// The outcome of this edit or commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.has_changes())
     }
 
     /// Replace both owner lists after validating IDs, bounds, and opaque XML.
@@ -180,7 +195,7 @@ impl Transaction {
     ///
     /// Returns an error if the operation fails.
     pub fn replace(&mut self, value: Guides) -> Result<bool> {
-        codec::validate_value(&value)?;
+        codec::validate_value(&value, self.original.limits)?;
         if self.working == value {
             return Ok(false);
         }
@@ -196,7 +211,7 @@ impl Transaction {
     pub fn edit(&mut self, operation: impl FnOnce(&mut Guides) -> Result<()>) -> Result<()> {
         let mut candidate = self.working.clone();
         operation(&mut candidate)?;
-        codec::validate_value(&candidate)?;
+        codec::validate_value(&candidate, self.original.limits)?;
         self.working = candidate;
         Ok(())
     }
@@ -212,7 +227,7 @@ impl Transaction {
         if candidate == self.working {
             return Ok(false);
         }
-        codec::validate_value(&candidate)?;
+        codec::validate_value(&candidate, self.original.limits)?;
         self.working = candidate;
         Ok(true)
     }
@@ -231,7 +246,7 @@ impl Transaction {
         let list = list_mut(&mut candidate, kind)
             .ok_or_else(|| invalid(format!("{kind:?} guide list is absent")))?;
         operation(list)?;
-        codec::validate_value(&candidate)?;
+        codec::validate_value(&candidate, self.original.limits)?;
         self.working = candidate;
         Ok(())
     }
@@ -261,7 +276,7 @@ impl Transaction {
             return Err(index_error(index, list.guides.len()));
         }
         list.guides.insert(index, guide);
-        codec::validate_value(&candidate)?;
+        codec::validate_value(&candidate, self.original.limits)?;
         self.working = candidate;
         Ok(())
     }
@@ -284,7 +299,7 @@ impl Transaction {
             return Ok(false);
         }
         *current = guide;
-        codec::validate_value(&candidate)?;
+        codec::validate_value(&candidate, self.original.limits)?;
         self.working = candidate;
         Ok(true)
     }
@@ -309,7 +324,7 @@ impl Transaction {
             .get_mut(index)
             .ok_or_else(|| index_error(index, length))?;
         operation(guide)?;
-        codec::validate_value(&candidate)?;
+        codec::validate_value(&candidate, self.original.limits)?;
         self.working = candidate;
         Ok(())
     }
@@ -339,7 +354,7 @@ impl Transaction {
             return Err(index_error(index, list.guides.len()));
         }
         let removed = list.guides.remove(index);
-        codec::validate_value(&candidate)?;
+        codec::validate_value(&candidate, self.original.limits)?;
         self.working = candidate;
         Ok(removed)
     }
@@ -376,7 +391,7 @@ impl Transaction {
         }
         let guide = list.guides.remove(from);
         list.guides.insert(to, guide);
-        codec::validate_value(&candidate)?;
+        codec::validate_value(&candidate, self.original.limits)?;
         self.working = candidate;
         Ok(true)
     }
@@ -395,21 +410,22 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn commit(self) -> Result<Commit> {
-        if !self.is_changed() {
-            let patch = Patch::new(self.original.clone(), self.original.clone());
-            return Ok(Commit {
+    pub(crate) fn commit(self) -> Result<Prepared> {
+        if !self.has_changes() {
+            let patch = Change::new(self.original.clone(), self.original.clone());
+            return Ok(Prepared {
                 snapshot: self.original,
                 patch,
                 changed: false,
             });
         }
-        codec::validate_value(&self.working)?;
+        codec::validate_value(&self.working, self.original.limits)?;
         let updated = Arc::new(codec::rewrite_source(
             self.original.source_xml(),
             &self.working,
+            self.original.limits,
         )?);
-        let guides = Guides::from_xml(updated.as_slice())?;
+        let guides = Guides::from_xml(updated.as_slice(), self.original.limits)?;
         if guides != self.working {
             return Err(invalid(
                 "extended-guide serialization changed the typed value",
@@ -419,9 +435,10 @@ impl Transaction {
             self.original.presentation_part_name.clone(),
             self.original.presentation_content_type.clone(),
             updated,
+            self.original.limits,
         )?;
-        let patch = Patch::new(self.original, snapshot.clone());
-        Ok(Commit {
+        let patch = Change::new(self.original, snapshot.clone());
+        Ok(Prepared {
             snapshot,
             patch,
             changed: true,
@@ -431,56 +448,64 @@ impl Transaction {
 
 /// A successful guide edit and its reversible package patch.
 #[derive(Clone, Debug)]
-pub struct Commit {
+pub(crate) struct Prepared {
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the module's source-level tests")
+    )]
     snapshot: Snapshot,
-    patch: Patch,
+    patch: Change,
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the module's source-level tests")
+    )]
     changed: bool,
 }
 
-impl Commit {
-    /// Whether publication changes the exact presentation bytes.
-    #[inline]
-    #[must_use]
-    pub const fn changed(&self) -> bool {
+impl Prepared {
+    #[cfg(test)]
+    fn has_changes(&self) -> bool {
         self.changed
     }
 
-    /// Alias for [`Self::changed`].
-    #[inline]
+    /// The outcome of this edit or commit.
     #[must_use]
-    pub const fn is_changed(&self) -> bool {
-        self.changed
+    #[cfg(test)]
+    pub(crate) fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.has_changes())
     }
 
     /// Borrow the projected post-edit snapshot.
     #[inline]
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    #[cfg(test)]
+    pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Borrow the reversible source-checked patch.
     #[inline]
     #[must_use]
-    pub fn patch(&self) -> &Patch {
+    pub(crate) fn patch(&self) -> &Change {
         &self.patch
     }
 
     /// Consume the commit into its patch.
     #[must_use]
-    pub fn into_patch(self) -> Patch {
+    #[cfg(test)]
+    pub(crate) fn into_patch(self) -> Change {
         self.patch
     }
 }
 
 /// A reversible source-checked replacement of one presentation XML source.
 #[derive(Clone, Debug)]
-pub struct Patch {
+pub(crate) struct Change {
     before: Snapshot,
     after: Snapshot,
 }
 
-impl Patch {
+impl Change {
     fn new(before: Snapshot, after: Snapshot) -> Self {
         Self { before, after }
     }
@@ -488,53 +513,48 @@ impl Patch {
     /// Source context required before publication.
     #[inline]
     #[must_use]
-    pub fn before(&self) -> &Snapshot {
+    pub(crate) fn before(&self) -> &Snapshot {
         &self.before
     }
 
     /// Source context produced by publication.
     #[inline]
     #[must_use]
-    pub fn after(&self) -> &Snapshot {
+    pub(crate) fn after(&self) -> &Snapshot {
         &self.after
     }
 
     /// Whether this patch is an exact no-op.
     #[inline]
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
-    }
-
-    /// Alias for [`Self::is_empty`] with mutation-oriented naming.
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.is_empty()
     }
 
     /// Return the exact inverse patch.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    #[cfg(test)]
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
         }
     }
 
-    /// Return the source fingerprint required for publication.
-    #[inline]
-    #[must_use]
-    pub const fn expected_revision(&self) -> Revision {
-        self.before.revision
-    }
-
     /// Apply this patch atomically to an OPC package.
+    ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) before anything is mutated: remove the signature explicitly
+    /// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+    /// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+    /// no-op keeps the signature.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn apply(&self, target: &mut OpcPackage) -> Result<Snapshot> {
+    #[cfg(test)]
+    pub(crate) fn apply(&self, target: &mut OpcPackage) -> Result<Snapshot> {
         super::package::apply_patch(target, self)
     }
 
@@ -543,17 +563,21 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn apply_xml(&self, target: &mut Vec<u8>) -> Result<Snapshot> {
+    #[cfg(test)]
+    pub(crate) fn apply_xml(&self, target: &mut Vec<u8>, limits: Limits) -> Result<Snapshot> {
         if target.as_slice() != self.before.source_xml() {
             return Err(invalid("extended-guide source is stale"));
         }
-        if self.is_empty() {
-            return Ok(self.before.clone());
+        if self.is_noop() {
+            let mut snapshot = self.before.clone();
+            snapshot.limits = limits;
+            return Ok(snapshot);
         }
         let parsed = Snapshot::from_wire(
             self.after.presentation_part_name.clone(),
             self.after.presentation_content_type.clone(),
             Arc::clone(self.after.source_arc()),
+            limits,
         )?;
         if !parsed.same_source(&self.after) {
             return Err(invalid(

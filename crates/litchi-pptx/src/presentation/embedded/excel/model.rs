@@ -127,31 +127,30 @@ impl Chart {
         }
         if self.series.len() > MAX_SERIES {
             return Err(Error::Limit {
-                resource: "embedded workbook series",
-                limit: MAX_SERIES,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::ChartSeries),
+                observed: self.series.len(),
+                maximum: MAX_SERIES,
             });
         }
-        if self
-            .title
-            .as_ref()
-            .is_some_and(|value| value.len() > MAX_TEXT_BYTES)
+        if let Some(title) = self.title.as_ref()
+            && title.len() > MAX_TEXT_BYTES
         {
             return Err(Error::Limit {
-                resource: "embedded workbook title bytes",
-                limit: MAX_TEXT_BYTES,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+                observed: title.len(),
+                maximum: MAX_TEXT_BYTES,
             });
         }
         let mut points = 0usize;
         for series in &self.series {
-            if series.name.len() > MAX_TEXT_BYTES
-                || series
-                    .categories
-                    .iter()
-                    .any(|value| value.len() > MAX_TEXT_BYTES)
+            if let Some(observed) = std::iter::once(series.name.len())
+                .chain(series.categories.iter().map(String::len))
+                .find(|length| *length > MAX_TEXT_BYTES)
             {
                 return Err(Error::Limit {
-                    resource: "embedded workbook text bytes",
-                    limit: MAX_TEXT_BYTES,
+                    kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+                    observed,
+                    maximum: MAX_TEXT_BYTES,
                 });
             }
             if series
@@ -171,13 +170,19 @@ impl Chart {
                 .and_then(|value| value.checked_add(series.x_values.len()))
                 .and_then(|value| value.checked_add(series.bubble_sizes.len()))
                 .ok_or(Error::Limit {
-                    resource: "embedded workbook points",
-                    limit: MAX_POINTS,
+                    kind: crate::opened::LimitKind::Codec(
+                        crate::opened::CodecLimitKind::ChartPoints,
+                    ),
+                    observed: usize::MAX,
+                    maximum: MAX_POINTS,
                 })?;
             if points > MAX_POINTS {
                 return Err(Error::Limit {
-                    resource: "embedded workbook points",
-                    limit: MAX_POINTS,
+                    kind: crate::opened::LimitKind::Codec(
+                        crate::opened::CodecLimitKind::ChartPoints,
+                    ),
+                    observed: points,
+                    maximum: MAX_POINTS,
                 });
             }
         }
@@ -229,8 +234,31 @@ impl Workbook {
         let bytes = super::package::generate(chart)?;
         if bytes.len() > MAX_WORKBOOK_BYTES {
             return Err(Error::Limit {
-                resource: "embedded workbook bytes",
-                limit: MAX_WORKBOOK_BYTES,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PayloadBytes),
+                observed: bytes.len(),
+                maximum: MAX_WORKBOOK_BYTES,
+            });
+        }
+        Ok(Self { bytes })
+    }
+
+    /// Generate the workbook an authored chart spec with a
+    /// [`Binding::Sheet`](litchi_drawingml::chart::authoring::Binding::Sheet)
+    /// binding refers to: the spec's
+    /// [`sheet_layout`](litchi_drawingml::chart::authoring::Spec::sheet_layout)
+    /// on `Sheet1`. The same spec always produces the same bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the spec is invalid or the workbook exceeds its
+    /// byte limit.
+    pub fn from_spec(spec: &litchi_drawingml::chart::authoring::Spec) -> Result<Self> {
+        let bytes = super::package::generate_spec(spec)?;
+        if bytes.len() > MAX_WORKBOOK_BYTES {
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PayloadBytes),
+                observed: bytes.len(),
+                maximum: MAX_WORKBOOK_BYTES,
             });
         }
         Ok(Self { bytes })

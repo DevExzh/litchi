@@ -1,7 +1,7 @@
 //! Immutable, source-preserving smart-tag property-bag state.
 
 use super::model::{Error, Limits, Property, PropertyBag, PropertyBagStore};
-use super::transaction::{Revision, Transaction};
+use super::transaction::{Edit, Revision};
 use super::validation;
 use litchi_codepage::Ansi;
 use std::sync::Arc;
@@ -174,14 +174,8 @@ impl Snapshot {
 
     /// Starts an isolated typed edit.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction::new(self.clone())
-    }
-
-    /// Alias for [`Self::edit`] for callers that prefer transactional naming.
-    #[must_use]
-    pub fn transaction(&self) -> Transaction {
-        self.edit()
+    pub fn edit(&self) -> Edit {
+        Edit::new(self.clone())
     }
 
     /// Consumes the snapshot into its complete typed projection.

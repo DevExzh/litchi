@@ -5,7 +5,7 @@
 
 //! Bounded BIFF12 codecs for the shared-workbook owner.
 
-use crate::raw::{Cursor, Kind, Limits, Records, Writer};
+use crate::raw::{Cursor, Encoder, Kind, Limits, Records};
 
 use super::model::{
     Guid, Header, Info, MAX_HEADERS, MAX_NAME_UNITS, MAX_PART_BYTES, MAX_RECORDS, MAX_STRING_UNITS,
@@ -21,8 +21,8 @@ const INFO: u16 = 398;
 const HEADER: u16 = 411;
 
 /// Parse the complete BIFF12 record stream for a user-names part.
-pub fn parse_users(data: &[u8]) -> Result<UserNames> {
-    let records = parse_records(data, "user-names")?;
+pub fn parse_users(data: &[u8], limits: Limits) -> Result<UserNames> {
+    let records = parse_records(data, "user-names", limits)?;
     let mut count_slot = None;
     let mut user_slots = Vec::new();
     let mut users = Vec::new();
@@ -49,7 +49,7 @@ pub fn parse_users(data: &[u8]) -> Result<UserNames> {
             },
             USER => {
                 user_slots.push(index);
-                users.push(parse_user(&record.payload)?);
+                users.push(parse_user(&record.payload, limits)?);
             },
             _ => {},
         }
@@ -87,7 +87,7 @@ pub fn parse_users(data: &[u8]) -> Result<UserNames> {
 }
 
 /// Encode a user-names part while retaining unknown records and their order.
-pub fn write_users(value: &UserNames) -> Result<Vec<u8>> {
+pub fn write_users(value: &UserNames, limits: Limits) -> Result<Vec<u8>> {
     super::validation::validate_users(value)?;
     let records = if value.records.is_empty() {
         let mut records = Vec::with_capacity(value.users.len().saturating_add(2));
@@ -141,12 +141,12 @@ pub fn write_users(value: &UserNames) -> Result<Vec<u8>> {
         }
         output
     };
-    write_records(&records)
+    write_records(&records, limits)
 }
 
 /// Parse a revision-headers part, retaining unknown records in source order.
-pub fn parse_headers(data: &[u8]) -> Result<RevisionHeaders> {
-    let records = parse_records(data, "revision-headers")?;
+pub fn parse_headers(data: &[u8], limits: Limits) -> Result<RevisionHeaders> {
+    let records = parse_records(data, "revision-headers", limits)?;
     let mut info = None;
     let mut info_slot = None;
     let mut headers = Vec::new();
@@ -154,13 +154,13 @@ pub fn parse_headers(data: &[u8]) -> Result<RevisionHeaders> {
     for (index, record) in records.iter().enumerate() {
         match record.kind {
             INFO => {
-                if info.replace(parse_info(&record.payload)?).is_some() {
+                if info.replace(parse_info(&record.payload, limits)?).is_some() {
                     return Err(invalid("duplicate BrtInfo record"));
                 }
                 info_slot = Some(index);
             },
             HEADER => {
-                headers.push(parse_header(&record.payload)?);
+                headers.push(parse_header(&record.payload, limits)?);
                 header_slots.push(index);
             },
             _ => {},
@@ -185,7 +185,7 @@ pub fn parse_headers(data: &[u8]) -> Result<RevisionHeaders> {
 }
 
 /// Encode revision headers while retaining unknown records and their order.
-pub fn write_headers(value: &RevisionHeaders) -> Result<Vec<u8>> {
+pub fn write_headers(value: &RevisionHeaders, limits: Limits) -> Result<Vec<u8>> {
     super::validation::validate_headers(value)?;
     let records = if value.records.is_empty() {
         let mut records = Vec::with_capacity(value.headers.len().saturating_add(1));
@@ -227,23 +227,23 @@ pub fn write_headers(value: &RevisionHeaders) -> Result<Vec<u8>> {
         }
         output
     };
-    write_records(&records)
+    write_records(&records, limits)
 }
 
 /// Parse a revision-log part without interpreting or changing its records.
-pub fn parse_log(data: &[u8]) -> Result<RevisionLog> {
+pub fn parse_log(data: &[u8], limits: Limits) -> Result<RevisionLog> {
     Ok(RevisionLog {
         relationship_id: String::new(),
         relationship_type: String::new(),
         part_name: String::new(),
-        records: parse_records(data, "revision-log")?,
+        records: parse_records(data, "revision-log", limits)?,
     })
 }
 
 /// Encode an opaque revision-log part in source record order.
-pub fn write_log(value: &RevisionLog) -> Result<Vec<u8>> {
+pub fn write_log(value: &RevisionLog, limits: Limits) -> Result<Vec<u8>> {
     super::validation::validate_log(value)?;
-    write_records(&value.records)
+    write_records(&value.records, limits)
 }
 
 /// Return the common revision envelope for record kinds that safely begin with
@@ -272,7 +272,7 @@ fn is_enveloped_kind(kind: u16) -> bool {
     )
 }
 
-fn parse_records(data: &[u8], context: &'static str) -> Result<Vec<RawRecord>> {
+fn parse_records(data: &[u8], context: &'static str, limits: Limits) -> Result<Vec<RawRecord>> {
     if data.len() > MAX_PART_BYTES {
         return Err(invalid(format!(
             "{context} part exceeds the {} byte bound",
@@ -280,7 +280,14 @@ fn parse_records(data: &[u8], context: &'static str) -> Result<Vec<RawRecord>> {
         )));
     }
     let mut records = Vec::new();
-    for record in Records::with_limits(data, Limits::new(MAX_PART_BYTES, MAX_STRING_UNITS)) {
+    let limits = limits.validate().map_err(map_raw)?;
+    for record in Records::new(
+        data,
+        Limits::new(
+            MAX_PART_BYTES.min(limits.payload()),
+            MAX_STRING_UNITS.min(limits.string_units()),
+        ),
+    ) {
         if records.len() >= MAX_RECORDS {
             return Err(invalid(format!("{context} has too many BIFF12 records")));
         }
@@ -293,13 +300,13 @@ fn parse_records(data: &[u8], context: &'static str) -> Result<Vec<RawRecord>> {
     Ok(records)
 }
 
-fn write_records(records: &[RawRecord]) -> Result<Vec<u8>> {
+fn write_records(records: &[RawRecord], limits: Limits) -> Result<Vec<u8>> {
     if records.len() > MAX_RECORDS {
         return Err(invalid("too many BIFF12 records"));
     }
     let mut output = Vec::new();
     {
-        let mut writer = Writer::new(&mut output);
+        let mut writer = Encoder::new(&mut output, limits);
         for record in records {
             let projected = writer
                 .get_ref()
@@ -319,11 +326,14 @@ fn write_records(records: &[RawRecord]) -> Result<Vec<u8>> {
     Ok(output)
 }
 
-fn parse_user(payload: &[u8]) -> Result<User> {
-    let mut cursor = Cursor::with_limits(
+fn parse_user(payload: &[u8], limits: Limits) -> Result<User> {
+    let mut cursor = Cursor::new(
         payload,
         "BrtUsr",
-        Limits::new(MAX_PART_BYTES, MAX_STRING_UNITS),
+        Limits::new(
+            MAX_PART_BYTES.min(limits.payload()),
+            MAX_STRING_UNITS.min(limits.string_units()),
+        ),
     );
     let id = cursor.read_u32().map_err(map_raw)?;
     let guid = Guid::from_bytes(
@@ -353,8 +363,8 @@ fn encode_user(user: &User) -> Result<Vec<u8>> {
     Ok(payload)
 }
 
-fn parse_info(payload: &[u8]) -> Result<Info> {
-    let mut cursor = Cursor::new(payload, "BrtInfo");
+fn parse_info(payload: &[u8], limits: Limits) -> Result<Info> {
+    let mut cursor = Cursor::new(payload, "BrtInfo", limits);
     let flags = cursor.read_u16().map_err(map_raw)?;
     if flags & !0x000f != 0 || flags & 0x000d != 0x000d {
         return Err(invalid("BrtInfo has invalid reserved flags"));
@@ -407,8 +417,8 @@ fn encode_info(info: &Info) -> Result<Vec<u8>> {
     Ok(payload)
 }
 
-fn parse_header(payload: &[u8]) -> Result<Header> {
-    let mut cursor = Cursor::new(payload, "BrtRRHeader");
+fn parse_header(payload: &[u8], limits: Limits) -> Result<Header> {
+    let mut cursor = Cursor::new(payload, "BrtRRHeader", limits);
     let unused = cursor.read_u32().map_err(map_raw)?;
     let revision_id = cursor.read_u32().map_err(map_raw)?;
     let revision_type = cursor.read_u16().map_err(map_raw)?;

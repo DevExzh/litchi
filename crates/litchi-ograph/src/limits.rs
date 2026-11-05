@@ -1,5 +1,30 @@
-use crate::{Error, Result};
+use crate::{Error, LimitKind, Result};
 use litchi_biff::{Limits as BiffLimits, MAX_RECORD_BYTES};
+
+/// Ingress options for a standalone Graph package and its projections.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[must_use]
+pub struct OpenOptions {
+    limits: Limits,
+}
+
+impl OpenOptions {
+    /// Conservative default ingress bounds.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Select the bounds used to validate the package.
+    pub const fn limits(mut self, limits: Limits) -> Self {
+        self.limits = limits;
+        self
+    }
+
+    /// The selected ingress bounds.
+    pub const fn limits_value(&self) -> Limits {
+        self.limits
+    }
+}
 
 /// Resource bounds applied before allocation or traversal.
 ///
@@ -40,26 +65,29 @@ pub struct Limits {
 
 impl Limits {
     /// Checks that all configured limits are usable and mutually consistent.
+    // The record codecs repeatedly validate retained policies. Keep the
+    // successful scalar checks inline even though error conversion is cold.
+    #[inline(always)]
     pub fn validate(self) -> Result<Self> {
-        nonzero("package bytes", self.max_package_bytes)?;
-        nonzero("root entries", self.max_streams)?;
-        nonzero("stream bytes", self.max_stream_bytes)?;
-        nonzero("Workbook bytes", self.max_workbook_bytes)?;
-        nonzero("chart count", self.max_charts)?;
-        nonzero("chart record count", self.max_chart_records)?;
-        nonzero("series count", self.max_series)?;
-        nonzero("group count", self.max_groups)?;
-        nonzero("axis count", self.max_axes)?;
-        nonzero("formula bytes", self.max_formula_bytes)?;
-        nonzero("cached value count", self.max_cached_values)?;
-        nonzero("unknown bytes", self.max_unknown_bytes)?;
-        nonzero("chart nesting", self.max_nesting)?;
+        nonzero(LimitKind::PackageBytes, self.max_package_bytes)?;
+        nonzero(LimitKind::RootEntries, self.max_streams)?;
+        nonzero(LimitKind::StreamBytes, self.max_stream_bytes)?;
+        nonzero(LimitKind::WorkbookBytes, self.max_workbook_bytes)?;
+        nonzero(LimitKind::Charts, self.max_charts)?;
+        nonzero(LimitKind::ChartRecords, self.max_chart_records)?;
+        nonzero(LimitKind::Series, self.max_series)?;
+        nonzero(LimitKind::Groups, self.max_groups)?;
+        nonzero(LimitKind::Axes, self.max_axes)?;
+        nonzero(LimitKind::FormulaBytes, self.max_formula_bytes)?;
+        nonzero(LimitKind::CachedValues, self.max_cached_values)?;
+        nonzero(LimitKind::UnknownBytes, self.max_unknown_bytes)?;
+        nonzero(LimitKind::Nesting, self.max_nesting)?;
         self.biff.validate()?;
         if self.max_groups > 10 {
             return Err(Error::InvalidLimit {
-                resource: "group count",
+                kind: LimitKind::Groups,
                 value: as_u64(self.max_groups),
-                reason: "BIFF charts cannot contain more than ten groups",
+                maximum: 10,
             });
         }
         Ok(self)
@@ -92,12 +120,16 @@ impl Default for Limits {
     }
 }
 
-fn nonzero(resource: &'static str, value: usize) -> Result<()> {
+fn nonzero(kind: LimitKind, value: usize) -> Result<()> {
     if value == 0 {
         return Err(Error::InvalidLimit {
-            resource,
+            kind,
             value: 0,
-            reason: "must be non-zero",
+            maximum: if kind == LimitKind::Groups {
+                10
+            } else {
+                as_u64(usize::MAX)
+            },
         });
     }
     Ok(())
@@ -105,4 +137,142 @@ fn nonzero(resource: &'static str, value: usize) -> Result<()> {
 
 pub(crate) fn as_u64(value: usize) -> u64 {
     u64::try_from(value).unwrap_or(u64::MAX)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn invalid_configuration_reports_the_dimension_and_supported_ceiling() {
+        let cases = [
+            (
+                LimitKind::PackageBytes,
+                Limits {
+                    max_package_bytes: 0,
+                    ..Limits::default()
+                },
+            ),
+            (
+                LimitKind::RootEntries,
+                Limits {
+                    max_streams: 0,
+                    ..Limits::default()
+                },
+            ),
+            (
+                LimitKind::StreamBytes,
+                Limits {
+                    max_stream_bytes: 0,
+                    ..Limits::default()
+                },
+            ),
+            (
+                LimitKind::WorkbookBytes,
+                Limits {
+                    max_workbook_bytes: 0,
+                    ..Limits::default()
+                },
+            ),
+            (
+                LimitKind::Charts,
+                Limits {
+                    max_charts: 0,
+                    ..Limits::default()
+                },
+            ),
+            (
+                LimitKind::ChartRecords,
+                Limits {
+                    max_chart_records: 0,
+                    ..Limits::default()
+                },
+            ),
+            (
+                LimitKind::Series,
+                Limits {
+                    max_series: 0,
+                    ..Limits::default()
+                },
+            ),
+            (
+                LimitKind::Groups,
+                Limits {
+                    max_groups: 0,
+                    ..Limits::default()
+                },
+            ),
+            (
+                LimitKind::Axes,
+                Limits {
+                    max_axes: 0,
+                    ..Limits::default()
+                },
+            ),
+            (
+                LimitKind::FormulaBytes,
+                Limits {
+                    max_formula_bytes: 0,
+                    ..Limits::default()
+                },
+            ),
+            (
+                LimitKind::CachedValues,
+                Limits {
+                    max_cached_values: 0,
+                    ..Limits::default()
+                },
+            ),
+            (
+                LimitKind::UnknownBytes,
+                Limits {
+                    max_unknown_bytes: 0,
+                    ..Limits::default()
+                },
+            ),
+            (
+                LimitKind::Nesting,
+                Limits {
+                    max_nesting: 0,
+                    ..Limits::default()
+                },
+            ),
+        ];
+        for (expected, limits) in cases {
+            let ceiling = if expected == LimitKind::Groups {
+                10
+            } else {
+                usize::MAX as u64
+            };
+            assert!(matches!(limits.validate(), Err(Error::InvalidLimit {
+                kind, value: 0, maximum,
+            }) if kind == expected && maximum == ceiling));
+        }
+        assert!(matches!(
+            Limits {
+                max_groups: 11,
+                ..Limits::default()
+            }
+            .validate(),
+            Err(Error::InvalidLimit {
+                kind: LimitKind::Groups,
+                value: 11,
+                maximum: 10
+            })
+        ));
+    }
+
+    #[test]
+    fn physical_configuration_keeps_its_biff_dimension_and_numeric_evidence() {
+        let limits = Limits {
+            biff: BiffLimits {
+                max_record_bytes: MAX_RECORD_BYTES + 1,
+                ..BiffLimits::default()
+            },
+            ..Limits::default()
+        };
+        assert!(matches!(limits.validate(), Err(Error::InvalidLimit {
+            kind: LimitKind::Biff(litchi_biff::Resource::RecordBytes), value, maximum,
+        }) if value == (MAX_RECORD_BYTES + 1) as u64 && maximum == MAX_RECORD_BYTES as u64));
+    }
 }

@@ -11,7 +11,8 @@
 
 mod repair_support;
 
-use litchi_rtf::{EmphasisMark, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{EmphasisMark, write::Writer};
 
 const MARKS: &[(EmphasisMark, &str)] = &[
     (EmphasisMark::Dot, r"\accdot"),
@@ -20,11 +21,9 @@ const MARKS: &[(EmphasisMark, &str)] = &[
     (EmphasisMark::Circle, r"\acccircle"),
 ];
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
@@ -32,7 +31,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 fn emphasis_marks_round_trip() {
     for (mark, control) in MARKS {
         let source = format!(r"{{\rtf1\ansi{control} Emphasized\par}}");
-        let document = RtfDocument::parse(&source).unwrap();
+        let document = Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).unwrap();
         assert_eq!(
             document.blocks()[0].formatting.emphasis_mark,
             *mark,
@@ -46,7 +45,7 @@ fn emphasis_marks_round_trip() {
             "missing {control} in {serialized}"
         );
 
-        let reparsed = RtfDocument::parse(&serialized).unwrap();
+        let reparsed = Tree::parse(&serialized, litchi_rtf::read::OpenOptions::default()).unwrap();
         assert_eq!(
             reparsed.blocks()[0].formatting.emphasis_mark,
             *mark,
@@ -57,14 +56,22 @@ fn emphasis_marks_round_trip() {
 
 #[test]
 fn explicit_accnone_matches_default_state() {
-    let document = RtfDocument::parse(r"{\rtf1\ansi\accnone Plain\par}").unwrap();
+    let document = Tree::parse(
+        r"{\rtf1\ansi\accnone Plain\par}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(
         document.blocks()[0].formatting.emphasis_mark,
         EmphasisMark::None
     );
 
     let output = write(&document);
-    let reparsed = RtfDocument::parse(&String::from_utf8(output).unwrap()).unwrap();
+    let reparsed = Tree::parse(
+        &String::from_utf8(output).unwrap(),
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(
         reparsed.blocks()[0].formatting.emphasis_mark,
         EmphasisMark::None
@@ -73,7 +80,11 @@ fn explicit_accnone_matches_default_state() {
 
 #[test]
 fn emphasis_marks_are_mutually_exclusive_last_wins() {
-    let document = RtfDocument::parse(r"{\rtf1\ansi\accdot\acccomma Marked\par}").unwrap();
+    let document = Tree::parse(
+        r"{\rtf1\ansi\accdot\acccomma Marked\par}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(
         document.blocks()[0].formatting.emphasis_mark,
         EmphasisMark::Comma
@@ -82,7 +93,11 @@ fn emphasis_marks_are_mutually_exclusive_last_wins() {
 
 #[test]
 fn plain_resets_emphasis_mark() {
-    let document = RtfDocument::parse(r"{\rtf1\ansi\accdot Marked\plain Unmarked\par}").unwrap();
+    let document = Tree::parse(
+        r"{\rtf1\ansi\accdot Marked\plain Unmarked\par}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(
         document.blocks()[0].formatting.emphasis_mark,
         EmphasisMark::Dot
@@ -103,7 +118,10 @@ fn emphasis_mark_controls_reject_parameters() {
         r"{\rtf1\ansi\accnone1 Text\par}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted malformed {source}"
         );
     }

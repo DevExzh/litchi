@@ -16,13 +16,16 @@ fn opaque_comments_and_pis_still_require_xml_characters_and_utf8() {
         b"<?keep \xff?>",
     ] {
         assert!(
-            formatcode2::read(&with_markup(markup)).is_err(),
+            formatcode2::read(&with_markup(markup), &formatcode2::Limits::DEFAULT).is_err(),
             "{markup:?}"
         );
     }
     let source = with_markup(b"<!-- <? --><?keep legitimate?>");
-    let parsed = formatcode2::read(&source).unwrap();
-    assert_eq!(formatcode2::write(&parsed).unwrap(), source);
+    let parsed = formatcode2::read(&source, &formatcode2::Limits::DEFAULT).unwrap();
+    assert_eq!(
+        formatcode2::write(&parsed, &formatcode2::Limits::DEFAULT).unwrap(),
+        source
+    );
 }
 
 #[test]
@@ -33,13 +36,17 @@ fn processing_instruction_targets_must_be_valid_and_not_reserved_xml() {
         b"<?xMl reserved?>",
     ] {
         assert!(
-            formatcode2::read(&with_markup(markup)).is_err(),
+            formatcode2::read(&with_markup(markup), &formatcode2::Limits::DEFAULT).is_err(),
             "{markup:?}"
         );
     }
     let source = with_markup(b"<?xml-stylesheet inert?>");
     assert_eq!(
-        formatcode2::write(&formatcode2::read(&source).unwrap()).unwrap(),
+        formatcode2::write(
+            &formatcode2::read(&source, &formatcode2::Limits::DEFAULT).unwrap(),
+            &formatcode2::Limits::DEFAULT,
+        )
+        .unwrap(),
         source
     );
 }
@@ -53,7 +60,11 @@ fn inherited_namespace_view_has_an_explicit_combined_byte_limit() {
     for extra in [0, 1] {
         let xml = format!("{prefix}{}{suffix}", "p".repeat(padding + extra));
         assert!(xml.len() < formatcode2::MAX_XML_BYTES);
-        let result = formatcode2::read_attribute_with_bindings(xml.as_bytes(), &[("f", NAMESPACE)]);
+        let result = formatcode2::read_attribute_with_bindings(
+            xml.as_bytes(),
+            &[("f", NAMESPACE)],
+            &formatcode2::Limits::DEFAULT,
+        );
         if extra == 0 {
             assert!(result.is_ok(), "{result:?}");
         } else {
@@ -61,7 +72,8 @@ fn inherited_namespace_view_has_an_explicit_combined_byte_limit() {
                 matches!(
                     result,
                     Err(litchi_drawingml::Error::Limit {
-                        limit: formatcode2::MAX_XML_BYTES,
+                        kind: litchi_drawingml::LimitKind::XmlBytes,
+                        maximum: formatcode2::MAX_XML_BYTES,
                         ..
                     })
                 ),
@@ -75,17 +87,25 @@ fn inherited_namespace_view_has_an_explicit_combined_byte_limit() {
 fn empty_named_namespace_prefix_is_not_a_default_declaration() {
     let invalid =
         format!("<f:formatcode2 xmlns:f=\"{NAMESPACE}\" xmlns:=\"urn:bad\">x</f:formatcode2>");
-    assert!(formatcode2::read(invalid.as_bytes()).is_err());
+    assert!(formatcode2::read(invalid.as_bytes(), &formatcode2::Limits::DEFAULT).is_err());
     let attribute =
         format!("<owner xmlns:f=\"{NAMESPACE}\" xmlns:=\"urn:bad\" f:formatcode2='x'/>");
-    assert!(formatcode2::read_attribute(attribute.as_bytes()).is_err());
+    assert!(
+        formatcode2::read_attribute(attribute.as_bytes(), &formatcode2::Limits::DEFAULT).is_err()
+    );
     assert!(
         formatcode2::read_attribute_with_bindings(
             b"<owner xmlns:='urn:bad' f:formatcode2='x'/>",
-            &[("f", NAMESPACE)]
+            &[("f", NAMESPACE)],
+            &formatcode2::Limits::DEFAULT,
         )
         .is_err()
     );
     let valid = format!("<f:formatcode2 xmlns:f=\"{NAMESPACE}\" xmlns=\"\">x</f:formatcode2>");
-    assert_eq!(formatcode2::read(valid.as_bytes()).unwrap().value(), "x");
+    assert_eq!(
+        formatcode2::read(valid.as_bytes(), &formatcode2::Limits::DEFAULT)
+            .unwrap()
+            .value(),
+        "x"
+    );
 }

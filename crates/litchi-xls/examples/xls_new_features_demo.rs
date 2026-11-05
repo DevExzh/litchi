@@ -7,7 +7,7 @@
 //!
 //! The file is saved to `output/xls_new_features_demo.xls`.
 
-use litchi_xls::Writer;
+use litchi_xls::Builder;
 use litchi_xls::writer::Column;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::fs::create_dir_all(output_dir)?;
     let output_path = output_dir.join("xls_new_features_demo.xls");
 
-    let mut w = Writer::new();
+    let mut w = Builder::new();
 
     // ================================================================
     // Sheet 1 — Merged Cells
@@ -233,7 +233,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ================================================================
     // Save
     // ================================================================
-    w.save(&output_path)?;
+    w.build()?.save(&output_path)?;
     println!("\nSaved to: {}", output_path.display());
     println!("Open in Excel to verify merged cells, hyperlinks, and auto-filter dropdowns.");
 
@@ -246,16 +246,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Read the generated XLS file back using `Workbook` and print
+/// Read the generated XLS file back using `raw::Reader` and print
 /// the parsed merged cells, hyperlinks, comments, and auto-filter data.
 fn round_trip_verify(path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
-    use litchi_core::sheet::WorkbookTrait;
-    use litchi_xls::Workbook;
+    use litchi_core::sheet::{WorkbookTrait, Worksheet as _};
+    use litchi_xls::raw::Reader;
     use std::io::Cursor;
 
     let data = std::fs::read(path)?;
     let cursor = Cursor::new(data);
-    let wb = Workbook::new(cursor)?;
+    let wb = Reader::new(cursor)?;
 
     println!("Worksheets: {:?}", wb.worksheet_names());
     println!("Sheet count: {}", wb.worksheet_count());
@@ -263,15 +263,10 @@ fn round_trip_verify(path: &std::path::Path) -> Result<(), Box<dyn std::error::E
     for (idx, name) in wb.worksheet_names().iter().enumerate() {
         println!("\n--- Sheet {idx}: \"{name}\" ---");
 
-        // Access the underlying Worksheet to inspect new features.
-        // The WorkbookTrait gives us a dyn Worksheet, but we stored
-        // typed worksheets inside Workbook. The easiest way to
-        // inspect features is through the typed accessor.
-        //
-        // For now, print basic cell info via the trait.
-        let sheet = wb
-            .worksheet_by_index(idx)
-            .map_err(|e| -> Box<dyn std::error::Error> { e })?;
+        // The WorkbookTrait lends the typed `litchi_xls::Worksheet`, so
+        // the generic reads below and the typed feature accessors work on
+        // the same borrowed worksheet.
+        let sheet = wb.worksheet_by_index(idx)?;
         if let Some(dims) = sheet.dimensions() {
             println!(
                 "  Dimensions: rows {}..{}, cols {}..{}",

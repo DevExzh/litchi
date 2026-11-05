@@ -17,7 +17,12 @@ mod validation;
 #[cfg(test)]
 mod tests;
 
-pub use codec::parse_field_code;
+// Field::parsed_code is the public record-level projection.  The parser
+// itself is crate-private because it consumes an already retained field
+// instruction and uses the fixed, bounded field-code profile below rather
+// than accepting a caller-selected source ingress profile.
+#[cfg(test)]
+pub(crate) use codec::parse_field_code;
 pub(crate) use codec::quoted_field_operand;
 pub use model::*;
 pub(crate) use validation::{push_story_page_break, validate_story_events};

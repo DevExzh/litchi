@@ -1,0 +1,11 @@
+--- a/run_safe_gate.py
++++ b/run_safe_gate.py
+@@ -451,7 +451,7 @@
+         shell("native-resave-check", "cd tools/native-resave && cargo check --locked --all-targets"),
+         direct("api-glossary", ["python3", "tools/check_api_glossary.py", "--target-dir", str(target)], env={"RUSTC_BOOTSTRAP": "1"}),
+         direct("iwork-leaf-api", ["python3", "-m", "unittest", "tools.test_check_iwork_leaf_public_api"]),
+-        direct("tooling-unit", ["python3", "-m", "unittest", "tools.test_check_api_glossary", "tools.test_final_api_inventory", "tools.test_officecli_corpus", "tools.test_officecli_capability_delta", "tools.test_no_3rdparty_references", "tools.test_check_crate_boundaries", "tools.test_non_iwork_gate", "tools.test_unified_bench_matrix", "tools.test_check_iwork_leaf_public_api"]),
++        direct("tooling-unit", ["python3", "-m", "unittest", "tools.test_check_api_glossary", "tools.test_api_debt_inventory", "tools.test_validate_api_disposition", "tools.test_final_api_inventory", "tools.test_w8_file_provenance", "tools.test_w8_original_baseline", "tools.test_w8_projection_policy", "tools.test_officecli_corpus", "tools.test_officecli_capability_delta", "tools.test_no_3rdparty_references", "tools.test_check_crate_boundaries", "tools.test_non_iwork_gate", "tools.test_unified_bench_matrix", "tools.test_check_iwork_leaf_public_api"]),
+         direct("crate-boundaries", ["python3", "tools/check_crate_boundaries.py"]),
+         direct("non-iwork-gate", ["python3", "tools/non_iwork_gate.py", "verify"]),
+         direct("bench-matrix", ["python3", "tools/unified_bench_matrix.py", "--check"]),

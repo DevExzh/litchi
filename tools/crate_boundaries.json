@@ -13,7 +13,6 @@
       "litchi-formula",
       "litchi-imgconv",
       "litchi-iwa-detect",
-      "litchi-iwa-structured",
       "litchi-keynote",
       "litchi-markdown",
       "litchi-numbers",
@@ -25,11 +24,13 @@
       "litchi-ole-common",
       "litchi-ooxml-common",
       "litchi-opc",
+      "litchi-ops",
       "litchi-pages",
       "litchi-ppt",
       "litchi-pptx",
       "litchi-rtf",
       "litchi-sheet",
+      "litchi-sheet-text",
       "litchi-sign",
       "litchi-xls",
       "litchi-xlsb",
@@ -38,6 +39,10 @@
     "litchi-biff": [],
     "litchi-cfb": [
       "litchi-core"
+    ],
+    "litchi-cli": [
+      "litchi-core",
+      "litchi-ops"
     ],
     "litchi-codepage": [],
     "litchi-core": [],
@@ -85,7 +90,6 @@
       "litchi-odraw",
       "xml-minifier"
     ],
-    "litchi-iwa": [],
     "litchi-iwa-archive": [
       "litchi-core",
       "litchi-iwa-cache",
@@ -118,6 +122,25 @@
       "litchi-numbers",
       "litchi-pages"
     ],
+    "litchi-iwa-style": [
+      "litchi-iwa-archive",
+      "litchi-iwa-common",
+      "litchi-iwa-core",
+      "litchi-iwa-protos",
+      "litchi-iwa-text",
+      "litchi-iwa-text-wire"
+    ],
+    "litchi-iwa-table": [
+      "litchi-core",
+      "litchi-iwa-archive",
+      "litchi-iwa-common",
+      "litchi-iwa-core",
+      "litchi-iwa-protos",
+      "litchi-iwa-style",
+      "litchi-iwa-text",
+      "litchi-iwa-text-wire",
+      "litchi-numbers-wire"
+    ],
     "litchi-iwa-text": [
       "litchi-iwa-common"
     ],
@@ -133,6 +156,8 @@
       "litchi-iwa-core",
       "litchi-iwa-detect",
       "litchi-iwa-protos",
+      "litchi-iwa-style",
+      "litchi-iwa-table",
       "litchi-iwa-text",
       "litchi-iwa-text-wire",
       "litchi-numbers-wire"
@@ -147,6 +172,9 @@
       "litchi-iwa-core",
       "litchi-iwa-detect",
       "litchi-iwa-protos",
+      "litchi-iwa-style",
+      "litchi-iwa-table",
+      "litchi-iwa-text",
       "litchi-iwa-text-wire",
       "litchi-numbers-wire"
     ],
@@ -205,7 +233,9 @@
       "soapberry-zip",
       "xml-minifier"
     ],
-    "litchi-odraw": [],
+    "litchi-odraw": [
+      "litchi-core"
+    ],
     "litchi-ods": [
       "litchi-core",
       "litchi-odf-common"
@@ -230,13 +260,56 @@
       "litchi-core",
       "litchi-crypto",
       "litchi-opc",
-      "litchi-vba"
+      "litchi-vba",
+      "soapberry-zip"
     ],
     "litchi-opc": [
       "litchi-core",
       "litchi-sign",
       "soapberry-zip",
       "xml-minifier"
+    ],
+    "litchi-ops": [
+      "litchi-biff",
+      "litchi-cfb",
+      "litchi-core",
+      "litchi-crypto",
+      "litchi-doc",
+      "litchi-docx",
+      "litchi-drawingml",
+      "litchi-eval",
+      "litchi-formula",
+      "litchi-iwa-archive",
+      "litchi-iwa-detect",
+      "litchi-keynote",
+      "litchi-markdown",
+      "litchi-numbers",
+      "litchi-odb",
+      "litchi-odc",
+      "litchi-odf-common",
+      "litchi-odf-formula",
+      "litchi-odg",
+      "litchi-odi",
+      "litchi-odm",
+      "litchi-odp",
+      "litchi-ods",
+      "litchi-odt",
+      "litchi-ograph",
+      "litchi-ole-common",
+      "litchi-ooxml-common",
+      "litchi-opc",
+      "litchi-oth",
+      "litchi-pages",
+      "litchi-ppt",
+      "litchi-pptx",
+      "litchi-rtf",
+      "litchi-sheet-text",
+      "litchi-sign",
+      "litchi-vba",
+      "litchi-xls",
+      "litchi-xlsb",
+      "litchi-xlsx",
+      "soapberry-zip"
     ],
     "litchi-oth": [
       "litchi-core",
@@ -250,6 +323,8 @@
       "litchi-iwa-core",
       "litchi-iwa-detect",
       "litchi-iwa-protos",
+      "litchi-iwa-style",
+      "litchi-iwa-table",
       "litchi-iwa-text",
       "litchi-iwa-text-wire",
       "litchi-numbers-wire"
@@ -287,6 +362,10 @@
     ],
     "litchi-sheet": [
       "litchi-core"
+    ],
+    "litchi-sheet-text": [
+      "litchi-core",
+      "litchi-sheet"
     ],
     "litchi-sign": [
       "litchi-cfb",
@@ -377,6 +456,10 @@
       "dependency": "soapberry-zip"
     },
     {
+      "dependent": "litchi-ooxml-common",
+      "dependency": "soapberry-zip"
+    },
+    {
       "dependent": "litchi-oth",
       "dependency": "soapberry-zip"
     },
@@ -401,90 +484,11 @@
       "dependency": "soapberry-zip"
     }
   ],
-  "migration_hosts": [
-    "litchi-iwa"
-  ],
-  "migration_debt": [
-    {
-      "order": 1,
-      "dependent": "litchi-iwa",
-      "dependency": "litchi-core",
-      "reason": "The legacy umbrella still hosts unified document, media, and metadata adapters over core primitives.",
-      "exit": "Move each adapter into its concrete format owner or the root facade, then delete litchi-iwa."
-    },
-    {
-      "order": 2,
-      "dependent": "litchi-iwa",
-      "dependency": "litchi-iwa-archive",
-      "reason": "Legacy mutation paths still coordinate physical package ingress, preservation, and reassembly.",
-      "exit": "Move all remaining package transactions into Pages, Numbers, or Keynote and delete litchi-iwa."
-    },
-    {
-      "order": 4,
-      "dependent": "litchi-iwa",
-      "dependency": "litchi-iwa-common",
-      "reason": "Unmigrated editors still consume neutral iWork values and wire helpers from the legacy host.",
-      "exit": "Move every editor adapter to its concrete owner and delete litchi-iwa."
-    },
-    {
-      "order": 8,
-      "dependent": "litchi-iwa",
-      "dependency": "litchi-iwa-index",
-      "reason": "The legacy object index still bridges raw archives to application editors.",
-      "exit": "Adopt the focused index inside concrete package owners and delete litchi-iwa."
-    },
-    {
-      "order": 10,
-      "dependent": "litchi-iwa",
-      "dependency": "litchi-iwa-protos",
-      "reason": "Many legacy format editors still decode generated native protobuf payloads directly.",
-      "exit": "Replace those adapters with private bounded format codecs and delete litchi-iwa."
-    },
-    {
-      "order": 12,
-      "dependent": "litchi-iwa",
-      "dependency": "litchi-iwa-text",
-      "reason": "Unmigrated text editors still adapt native storage graphs to focused semantic text values.",
-      "exit": "Move application-specific text adapters into concrete package owners and delete litchi-iwa."
-    },
-    {
-      "order": 13,
-      "dependent": "litchi-iwa",
-      "dependency": "litchi-iwa-text-wire",
-      "reason": "The legacy host still invokes the shared native text-storage wire adapter.",
-      "exit": "Route every call through concrete format packages and delete litchi-iwa."
-    },
-    {
-      "order": 14,
-      "dependent": "litchi-iwa",
-      "dependency": "litchi-keynote",
-      "reason": "Keynote semantic values are focused, but native mutation remains in the legacy host.",
-      "exit": "Complete Keynote package editing and move its examples and tests before deleting litchi-iwa."
-    },
-    {
-      "order": 15,
-      "dependent": "litchi-iwa",
-      "dependency": "litchi-numbers",
-      "reason": "Numbers semantic values are focused, but substantial native editing remains in the legacy host.",
-      "exit": "Complete Numbers package editing and move its examples and tests before deleting litchi-iwa."
-    },
-    {
-      "order": 16,
-      "dependent": "litchi-iwa",
-      "dependency": "litchi-numbers-wire",
-      "reason": "Legacy Numbers, Pages, and Keynote table editors still use the private BNC wire codec.",
-      "exit": "Move all table mutation adapters into concrete format owners and delete litchi-iwa."
-    },
-    {
-      "order": 17,
-      "dependent": "litchi-iwa",
-      "dependency": "litchi-pages",
-      "reason": "Pages semantic values are focused, but native mutation remains in the legacy host.",
-      "exit": "Complete Pages package editing and move its examples and tests before deleting litchi-iwa."
-    }
-  ],
+  "migration_hosts": [],
+  "migration_debt": [],
   "runtime_neutral": [
     "litchi-biff",
+    "litchi-cli",
     "litchi-codepage",
     "litchi-core",
     "litchi-crypto",
@@ -501,6 +505,8 @@
     "litchi-iwa-package",
     "litchi-iwa-protos",
     "litchi-iwa-structured",
+    "litchi-iwa-style",
+    "litchi-iwa-table",
     "litchi-iwa-text",
     "litchi-iwa-text-wire",
     "litchi-keynote",
@@ -520,9 +526,11 @@
     "litchi-ograph",
     "litchi-ole-common",
     "litchi-ooxml-common",
+    "litchi-ops",
     "litchi-pages",
     "litchi-pptx",
     "litchi-sheet",
+    "litchi-sheet-text",
     "litchi-sign",
     "litchi-slide",
     "litchi-spreadsheet-drawing",

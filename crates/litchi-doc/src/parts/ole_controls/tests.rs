@@ -3,6 +3,7 @@ use super::{
     Persist2, RgxOcxInfo, StorageName, Story, parse, parse_bytes, parse_metadata, to_bytes,
     to_metadata_bytes,
 };
+use crate::SourceLimits;
 use crate::parts::fib::FileInformationBlock;
 
 const FIB_POINTER_COUNT: usize = FIB_INDEX_PLC_OCX + 1;
@@ -49,9 +50,9 @@ fn round_trips_fixed_records_and_ignored_values() {
         ),
     ])
     .unwrap();
-    let bytes = to_bytes(&table).unwrap();
+    let bytes = to_bytes(&table, &SourceLimits::default()).unwrap();
     assert_eq!(bytes.len(), 4 + 2 * 20);
-    let parsed = parse_bytes(&bytes).unwrap();
+    let parsed = parse_bytes(&bytes, &SourceLimits::default()).unwrap();
     assert_eq!(parsed, table);
     assert_eq!(parsed.infos()[0].accelerator_handle(), 0x90AB_CDEF);
     assert_eq!(parsed.infos()[0].flags().reserved_bits(), 0xA5);
@@ -65,26 +66,30 @@ fn enforces_cookie_uniqueness_and_record_shape() {
 
     let mut bytes = vec![1, 0, 0, 0];
     bytes.extend_from_slice(&[0; 19]);
-    assert!(parse_bytes(&bytes).is_err());
+    assert!(parse_bytes(&bytes, &SourceLimits::default()).is_err());
     bytes.push(0);
-    assert!(parse_bytes(&bytes).is_err());
+    assert!(parse_bytes(&bytes, &SourceLimits::default()).is_err());
 
-    assert!(parse_bytes(&[0, 0, 0, 0, 0]).is_err());
-    assert!(parse_bytes(&u32::MAX.to_le_bytes()).is_err());
-    assert!(parse_bytes(&[0; 3]).is_err());
+    assert!(parse_bytes(&[0, 0, 0, 0, 0], &SourceLimits::default()).is_err());
+    assert!(parse_bytes(&u32::MAX.to_le_bytes(), &SourceLimits::default()).is_err());
+    assert!(parse_bytes(&[0; 3], &SourceLimits::default()).is_err());
 }
 
 #[test]
 fn rejects_invalid_story_and_fifld() {
-    let table = to_bytes(&RgxOcxInfo::try_new(vec![sample()]).unwrap()).unwrap();
+    let table = to_bytes(
+        &RgxOcxInfo::try_new(vec![sample()]).unwrap(),
+        &SourceLimits::default(),
+    )
+    .unwrap();
 
     let mut bad_story = table.clone();
     bad_story[4 + 16..4 + 18].copy_from_slice(&5u16.to_le_bytes());
-    assert!(parse_bytes(&bad_story).is_err());
+    assert!(parse_bytes(&bad_story, &SourceLimits::default()).is_err());
 
     let mut bad_fifld = table;
     bad_fifld[4 + 14..4 + 16].copy_from_slice(&0xA4u16.to_le_bytes());
-    assert!(parse_bytes(&bad_fifld).is_err());
+    assert!(parse_bytes(&bad_fifld, &SourceLimits::default()).is_err());
 }
 
 #[test]
@@ -92,41 +97,115 @@ fn skips_unwritten_array_slots_left_by_real_producers() {
     // Some Word-produced documents pad the `RgxOcxInfo` array with an
     // unwritten slot (all-ones `dwCookie`/`ifld`, zero elsewhere); readers
     // ignore the marker instead of rejecting the document.
-    let real = to_bytes(&RgxOcxInfo::try_new(vec![sample()]).unwrap()).unwrap();
+    let real = to_bytes(
+        &RgxOcxInfo::try_new(vec![sample()]).unwrap(),
+        &SourceLimits::default(),
+    )
+    .unwrap();
 
     let mut trailing = 2u32.to_le_bytes().to_vec();
     trailing.extend_from_slice(&real[4..]);
     trailing.extend_from_slice(&[0xFF; 8]);
     trailing.extend_from_slice(&[0; 12]);
-    assert_eq!(parse_bytes(&trailing).unwrap().infos(), [sample()]);
+    assert_eq!(
+        parse_bytes(&trailing, &SourceLimits::default())
+            .unwrap()
+            .infos(),
+        [sample()]
+    );
 
     let mut leading = 2u32.to_le_bytes().to_vec();
     leading.extend_from_slice(&[0xFF; 8]);
     leading.extend_from_slice(&[0; 12]);
     leading.extend_from_slice(&real[4..]);
-    assert_eq!(parse_bytes(&leading).unwrap().infos(), [sample()]);
+    assert_eq!(
+        parse_bytes(&leading, &SourceLimits::default())
+            .unwrap()
+            .infos(),
+        [sample()]
+    );
 }
 
 #[test]
 fn reads_the_fc_plcocx_table_pointer() {
-    let payload = to_bytes(&RgxOcxInfo::try_new(vec![sample()]).unwrap()).unwrap();
+    let payload = to_bytes(
+        &RgxOcxInfo::try_new(vec![sample()]).unwrap(),
+        &SourceLimits::default(),
+    )
+    .unwrap();
     let mut table_stream = vec![0xCC; 5];
     let offset = table_stream.len();
     table_stream.extend_from_slice(&payload);
     let fib = fib_with_pointer(offset as u32, payload.len() as u32);
     assert_eq!(
-        parse(&fib, &table_stream).unwrap().unwrap().infos(),
+        parse(&fib, &table_stream, &SourceLimits::default())
+            .unwrap()
+            .unwrap()
+            .infos(),
         [sample()]
     );
 
     let absent = fib_with_pointer(0, 0);
-    assert!(parse(&absent, &[]).unwrap().is_none());
+    assert!(
+        parse(&absent, &[], &SourceLimits::default())
+            .unwrap()
+            .is_none()
+    );
 
     let undefined_empty = fib_with_pointer(1, 0);
-    assert!(parse(&undefined_empty, &[0]).unwrap().is_none());
+    assert!(
+        parse(&undefined_empty, &[0], &SourceLimits::default())
+            .unwrap()
+            .is_none()
+    );
 
     let truncated = fib_with_pointer(4, payload.len() as u32);
-    assert!(parse(&truncated, &table_stream).is_err());
+    assert!(parse(&truncated, &table_stream, &SourceLimits::default()).is_err());
+}
+
+#[test]
+fn raw_codec_reports_entry_limit_before_decoding() {
+    let bytes = to_bytes(
+        &RgxOcxInfo::try_new(vec![sample()]).unwrap(),
+        &SourceLimits::default(),
+    )
+    .unwrap();
+    let limits = SourceLimits::builder()
+        .max_entry_bytes(bytes.len() - 1)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        parse_bytes(&bytes, &limits),
+        Err(crate::package::Error::Limit {
+            kind: crate::package::SourceLimitKind::EntryBytes,
+            ..
+        })
+    ));
+}
+
+#[test]
+fn raw_writer_honors_exact_and_one_under_entry_limits() {
+    let value = RgxOcxInfo::try_new(vec![sample()]).unwrap();
+    let bytes = to_bytes(&value, &SourceLimits::default()).unwrap();
+    let exact = SourceLimits::builder()
+        .max_entry_bytes(bytes.len())
+        .unwrap()
+        .build()
+        .unwrap();
+    assert_eq!(to_bytes(&value, &exact).unwrap(), bytes);
+    let one_under = SourceLimits::builder()
+        .max_entry_bytes(bytes.len() - 1)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        to_bytes(&value, &one_under),
+        Err(crate::package::Error::Limit {
+            kind: crate::package::SourceLimitKind::EntryBytes,
+            ..
+        })
+    ));
 }
 
 fn metadata_sample() -> Metadata {
@@ -270,6 +349,9 @@ fn editor_commit_round_trips_without_mutating_the_source_snapshot() {
     let commit = editor.commit().unwrap();
     assert_eq!(commit.patch().changes().len(), 2);
     assert_eq!(source.infos(), &[sample()]);
-    let bytes = to_bytes(commit.snapshot()).unwrap();
-    assert_eq!(&parse_bytes(&bytes).unwrap(), commit.snapshot());
+    let bytes = to_bytes(commit.package(), &SourceLimits::default()).unwrap();
+    assert_eq!(
+        &parse_bytes(&bytes, &SourceLimits::default()).unwrap(),
+        commit.package()
+    );
 }

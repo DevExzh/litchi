@@ -24,7 +24,7 @@ fn small_rect_round_trips_with_normative_field_order() {
         0x90, 0x01, // bottom = 400
     ];
     let bytes = record(&payload);
-    let anchor = Anchor::parse(&bytes).unwrap();
+    let anchor = Anchor::parse(&bytes, &Limits::default()).unwrap();
 
     assert_eq!(anchor.encoding(), Encoding::Small);
     assert_eq!((anchor.left(), anchor.top()), (-200, -100));
@@ -36,7 +36,7 @@ fn small_rect_round_trips_with_normative_field_order() {
 #[test]
 fn full_rect_round_trips_extreme_coordinates_without_overflow() {
     let anchor = Anchor::full(i32::MIN, -7, i32::MAX, 9).unwrap();
-    let parsed = Anchor::parse(anchor.to_bytes()).unwrap();
+    let parsed = Anchor::parse(anchor.to_bytes(), &Limits::default()).unwrap();
 
     assert_eq!(parsed.encoding(), Encoding::Full);
     assert_eq!(parsed.width(), i64::from(u32::MAX));
@@ -49,12 +49,12 @@ fn strict_codec_rejects_bad_headers_lengths_bounds_and_limits() {
     for index in [0, 1, 2] {
         let mut bad = valid.clone();
         bad[index] ^= 1;
-        assert!(Anchor::parse(&bad).is_err());
+        assert!(Anchor::parse(&bad, &Limits::default()).is_err());
     }
     let mut bad_length = valid.clone();
     bad_length[4..8].copy_from_slice(&12u32.to_le_bytes());
-    assert!(Anchor::parse(&bad_length).is_err());
-    assert!(Anchor::parse(&valid[..valid.len() - 1]).is_err());
+    assert!(Anchor::parse(&bad_length, &Limits::default()).is_err());
+    assert!(Anchor::parse(&valid[..valid.len() - 1], &Limits::default()).is_err());
     assert!(Anchor::small(4, 2, 3, 5).is_err());
     assert!(Anchor::full(1, 8, 3, 4).is_err());
 
@@ -73,7 +73,7 @@ fn strict_codec_rejects_bad_headers_lengths_bounds_and_limits() {
 #[test]
 fn no_op_commit_preserves_the_exact_source_snapshot() {
     let bytes = Anchor::small(-2, -1, 4, 8).unwrap().to_bytes();
-    let source = Snapshot::parse(&bytes).unwrap();
+    let source = Snapshot::parse(&bytes, &Limits::default()).unwrap();
     let commit = source.edit().commit().unwrap();
 
     assert_eq!(commit.snapshot().bytes(), bytes);

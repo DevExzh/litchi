@@ -33,3 +33,10 @@
 *.jpg binary
 *.png binary
 *.wmf binary
+
+# A final tab in this generated report represents an empty last TSV field.
+docs/unified-ops/results/0289/fidelity.tsv whitespace=-blank-at-eol
+
+# Keep vendored upstream artifacts byte-identical to their licensed snapshot.
+vendor/zlib-rs/LICENSE whitespace=-blank-at-eol
+vendor/zlib-rs/src/deflate/test-data/paper-100k.pdf binary

@@ -2,23 +2,23 @@
 //!
 //! Revision values and invariants live in the model module, bounded XML in
 //! the codec module, and workbook/revisionLog OPC graph operations in package.
+//!
+//! [`crate::Package::edit_revisions`] starts an [`Edit`] of the workbook's
+//! revision owner; [`Edit::commit`] returns a [`Commit`] holding the new
+//! package, the exact [`Patch`] and the [`Diagnostics`], and
+//! [`crate::Package::apply_revisions`] replays a patch. The source package
+//! never changes.
 
 mod codec;
+mod edit;
 mod model;
 mod package;
-pub mod patch;
-pub mod snapshot;
-pub mod transaction;
+mod patch;
+mod snapshot;
 pub mod validation;
-
-use crate::error::Error;
 
 pub(super) fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
-}
-
-pub(super) fn limit(name: &str) -> Error {
-    invalid(format!("{name} exceeds configured limit"))
 }
 
 pub(super) fn xml_error(error: impl std::fmt::Display) -> Error {
@@ -29,15 +29,19 @@ pub use codec::{
     parse_revision_headers, parse_revision_log, parse_revision_users, write_revision_headers,
     write_revision_log, write_revision_users,
 };
+#[cfg(test)]
+pub(crate) use edit::Transaction;
+pub use edit::{Edit, EditOptions};
 pub use model::{
     RevisionAttribute, RevisionAttributeNamespace, RevisionConformance, RevisionHeader,
     RevisionHeaderProperties, RevisionHeaders, RevisionLog, RevisionLogPart, RevisionRecord,
     RevisionRecordKind, RevisionUser, RevisionUsers, RevisionXmlElement, Revisions,
 };
-pub use package::{load_workbook_revisions, remove_workbook_revisions, store_workbook_revisions};
-pub use patch::{Commit, Patch};
+pub use package::load_workbook_revisions;
+#[cfg(test)]
+pub(crate) use package::store_workbook_revisions;
+pub use patch::{Commit, Diagnostics, Error, LimitKind, Patch};
 pub use snapshot::Snapshot;
-pub use transaction::Transaction;
 
 #[cfg(test)]
 mod tests;

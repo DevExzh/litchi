@@ -7,8 +7,9 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+use litchi_rtf::raw::Tree;
 use litchi_rtf::{
-    LegacyHorizontalAnchor, LegacyTextDirection, LegacyVerticalAnchor, RtfDocument, RtfWriter,
+    LegacyHorizontalAnchor, LegacyTextDirection, LegacyVerticalAnchor, write::Writer,
 };
 
 const SYNTHETIC: &str = concat!(
@@ -20,7 +21,7 @@ const SYNTHETIC: &str = concat!(
 
 #[test]
 fn parses_typed_legacy_text_box_and_round_trips_canonically() {
-    let document = RtfDocument::parse(SYNTHETIC).unwrap();
+    let document = Tree::parse(SYNTHETIC, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(document.text(), "AB");
     assert_eq!(document.legacy_text_boxes().len(), 1);
     let text_box = &document.legacy_text_boxes()[0];
@@ -44,16 +45,12 @@ fn parses_typed_legacy_text_box_and_round_trips_canonically() {
     );
 
     let mut first = Vec::new();
-    RtfWriter::new(&mut first)
-        .write_document(&document)
-        .unwrap();
-    let reparsed = RtfDocument::parse_bytes(&first).unwrap();
+    Writer::new(&mut first).write_document(&document).unwrap();
+    let reparsed = Tree::parse_bytes(&first, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.legacy_text_boxes(), document.legacy_text_boxes());
     let mut second = Vec::new();
-    RtfWriter::new(&mut second)
-        .write_document(&reparsed)
-        .unwrap();
+    Writer::new(&mut second).write_document(&reparsed).unwrap();
     assert_eq!(first, second);
 }
 
@@ -85,7 +82,7 @@ fn rejects_misplaced_malformed_active_and_binary_legacy_text_boxes() {
     ];
     for source in malformed {
         assert!(
-            RtfDocument::parse(source).is_err(),
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
             "accepted malformed legacy text box: {source}"
         );
     }
@@ -94,12 +91,18 @@ fn rejects_misplaced_malformed_active_and_binary_legacy_text_boxes() {
         r"{{\rtf1{{\*\do\dptxbx{{\dptxbxtext {}}}}}}}",
         "x".repeat(1_048_577)
     );
-    assert!(RtfDocument::parse(&oversized).is_err());
+    assert!(Tree::parse(&oversized, litchi_rtf::read::OpenOptions::default()).is_err());
 }
 
 #[test]
 fn rejects_malformed_non_text_legacy_drawings() {
-    assert!(RtfDocument::parse(r"{\rtf1 A{\*\do\dpline\dpx1}B}").is_err());
+    assert!(
+        Tree::parse(
+            r"{\rtf1 A{\*\do\dpline\dpx1}B}",
+            litchi_rtf::read::OpenOptions::default()
+        )
+        .is_err()
+    );
 }
 
 fn isolated_drawing(fixture: &[u8]) -> Vec<u8> {
@@ -134,7 +137,11 @@ fn parses_named_libreoffice_legacy_text_box_fixtures() {
     let hollow = include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/dplinehollow.rtf"
     );
-    let document = RtfDocument::parse_bytes(&isolated_drawing(hollow)).unwrap();
+    let document = Tree::parse_bytes(
+        &isolated_drawing(hollow),
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(document.text(), "AB");
     let text_box = &document.legacy_text_boxes()[0];
     assert_eq!(text_box.text, "textbox without border\n");
@@ -154,7 +161,11 @@ fn parses_named_libreoffice_legacy_text_box_fixtures() {
     let relation = include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/dptxbx-relation.rtf"
     );
-    let document = RtfDocument::parse_bytes(&isolated_drawing(relation)).unwrap();
+    let document = Tree::parse_bytes(
+        &isolated_drawing(relation),
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let text_box = &document.legacy_text_boxes()[0];
     assert_eq!(text_box.text, "To:\n");
     assert_eq!((text_box.x, text_box.y), (Some(941), Some(2114)));
@@ -162,7 +173,11 @@ fn parses_named_libreoffice_legacy_text_box_fixtures() {
 
     let nested_geometry =
         include_bytes!("../../../test-data/libreoffice-core/sw/qa/core/data/rtf/pass/fdo78900.rtf");
-    let document = RtfDocument::parse_bytes(&isolated_drawing(nested_geometry)).unwrap();
+    let document = Tree::parse_bytes(
+        &isolated_drawing(nested_geometry),
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let text_box = &document.legacy_text_boxes()[0];
     assert!(text_box.text.contains("hello"));
     assert_eq!((text_box.x, text_box.y), (Some(227), Some(227)));

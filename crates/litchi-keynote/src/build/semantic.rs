@@ -1017,6 +1017,54 @@ impl Path {
         })
     }
 
+    /// Construct a path whose natural size is the bounding box of every
+    /// node and control point (the migration host's
+    /// `recalculate_natural_size`).
+    ///
+    /// ```
+    /// use litchi_keynote::build::{Node, Path, Point, Subpath};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let subpath = Subpath::new(
+    ///     vec![Node::sharp(Point::new(-10.0, 5.0)?), Node::sharp(Point::new(30.0, -15.0)?)],
+    ///     false,
+    /// )?;
+    /// let path = Path::fitted(vec![subpath], false, false)?;
+    /// assert_eq!((path.natural_width(), path.natural_height()), (40.0, 20.0));
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of [`Self::new`].
+    pub fn fitted(
+        subpaths: impl Into<Box<[Subpath]>>,
+        horizontal_flip: bool,
+        vertical_flip: bool,
+    ) -> Result<Self> {
+        let subpaths = subpaths.into();
+        let mut points = subpaths
+            .iter()
+            .flat_map(|subpath| subpath.nodes.iter())
+            .flat_map(|node| [node.in_control_point, node.point, node.out_control_point]);
+        let (width, height) = match points.next() {
+            None => (0.0, 0.0),
+            Some(first) => {
+                let (mut min_x, mut max_x) = (first.x.get(), first.x.get());
+                let (mut min_y, mut max_y) = (first.y.get(), first.y.get());
+                for point in points {
+                    min_x = min_x.min(point.x.get());
+                    max_x = max_x.max(point.x.get());
+                    min_y = min_y.min(point.y.get());
+                    max_y = max_y.max(point.y.get());
+                }
+                (max_x - min_x, max_y - min_y)
+            },
+        };
+        Self::new(subpaths, width, height, horizontal_flip, vertical_flip)
+    }
+
     /// Construct a two-node straight motion path.
     pub fn straight(delta_x: f64, delta_y: f64) -> Result<Self> {
         let origin = Point::new(0.0, 0.0)?;

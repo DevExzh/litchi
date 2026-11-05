@@ -608,6 +608,106 @@ fn metadata_is_reparse_point(metadata: &fs::Metadata) -> bool {
     }
 }
 
+/// Monotonic suffix of sibling staging and retirement directories.
+static DIRECTORY_STAGING: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// Synchronize every regular file and directory below `root`, depth first.
+fn sync_tree(root: &Path) -> io::Result<()> {
+    for entry in fs::read_dir(root)? {
+        let entry = entry?;
+        let kind = entry.file_type()?;
+        if kind.is_dir() {
+            sync_tree(&entry.path())?;
+        } else if kind.is_file() {
+            File::open(entry.path())?.sync_all()?;
+        }
+    }
+    sync_parent(root)
+}
+
+/// Publish a package directory at `path`: `write` fills a fresh sibling
+/// staging directory, every file and directory in it is synchronized, an
+/// existing destination directory is renamed aside, the staging directory
+/// takes the destination name, and only then is the old directory deleted
+/// (record 0301, Pages package directories).
+///
+/// A failure before the swap leaves the destination untouched; a failure of
+/// the swap renames the old directory back. Deleting the retired directory
+/// after the swap is reported as a committed failure.
+///
+/// # Errors
+///
+/// A destination that exists and is not a directory, or a symbolic link, is
+/// [`DestinationKind::NonRegular`] / [`DestinationKind::Symlink`];
+/// filesystem failures carry their stage. A callback error is returned
+/// unchanged.
+pub fn replace_directory_with<E>(
+    path: &Path,
+    write: impl FnOnce(&Path) -> Result<(), E>,
+) -> Result<(), E>
+where
+    E: From<Error>,
+{
+    ensure_publication_supported().map_err(E::from)?;
+    let file_name = path.file_name().ok_or_else(|| {
+        E::from(Error::invalid_destination(
+            DestinationKind::MissingFilename,
+            Stage::ResolveParent,
+        ))
+    })?;
+    let parent = match path.parent() {
+        Some(parent) if !parent.as_os_str().is_empty() => parent.to_path_buf(),
+        _ => PathBuf::from("."),
+    };
+    let existing = match fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.file_type().is_symlink() => {
+            return Err(E::from(Error::invalid_destination(
+                DestinationKind::Symlink,
+                Stage::ValidateDestination,
+            )));
+        },
+        Ok(metadata) if metadata.is_dir() => true,
+        Ok(_) => {
+            return Err(E::from(Error::invalid_destination(
+                DestinationKind::NonRegular,
+                Stage::ValidateDestination,
+            )));
+        },
+        Err(error) if error.kind() == io::ErrorKind::NotFound => false,
+        Err(error) => return Err(E::from(Error::io(Stage::ValidateDestination, error))),
+    };
+    let suffix = DIRECTORY_STAGING.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let stem = file_name.to_string_lossy();
+    let process = std::process::id();
+    let staging = parent.join(format!(".{stem}.litchi-iwa-{process}-{suffix}.tmp"));
+    let retired = parent.join(format!(".{stem}.litchi-iwa-{process}-{suffix}.old"));
+    fs::create_dir(&staging).map_err(|error| E::from(Error::io(Stage::CreateTemporary, error)))?;
+    let staged = write(&staging).and_then(|()| {
+        sync_tree(&staging).map_err(|error| E::from(Error::io(Stage::SyncFile, error)))
+    });
+    if let Err(error) = staged {
+        let _ = fs::remove_dir_all(&staging);
+        return Err(error);
+    }
+    if existing && let Err(error) = fs::rename(path, &retired) {
+        let _ = fs::remove_dir_all(&staging);
+        return Err(E::from(Error::io(Stage::Persist, error)));
+    }
+    if let Err(error) = fs::rename(&staging, path) {
+        if existing {
+            let _ = fs::rename(&retired, path);
+        }
+        let _ = fs::remove_dir_all(&staging);
+        return Err(E::from(Error::io(Stage::Persist, error)));
+    }
+    sync_parent(&parent).map_err(|error| E::from(Error::committed(Stage::SyncParent, error)))?;
+    if existing {
+        fs::remove_dir_all(&retired)
+            .map_err(|error| E::from(Error::committed(Stage::Persist, error)))?;
+    }
+    Ok(())
+}
+
 #[cfg(unix)]
 fn sync_parent(parent: &Path) -> io::Result<()> {
     match File::open(parent).and_then(|directory| directory.sync_all()) {

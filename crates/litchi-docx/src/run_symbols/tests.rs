@@ -1,7 +1,7 @@
 use super::*;
 
+use crate::builder::Document as DraftDocument;
 use crate::paragraph::Run;
-use crate::writer::MutableDocument;
 
 const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
@@ -27,34 +27,6 @@ fn reads_repeated_symbols_and_preserves_absent_attributes() {
     assert_eq!(symbols.get(1).unwrap().font(), Some("Segoe UI Symbol"));
     assert_eq!(symbols.get(1).unwrap().char_code(), Some(0x1F600));
     assert_eq!(run.sym_ex().unwrap(), symbols.first().cloned());
-}
-
-#[test]
-fn snapshots_are_failure_atomic_and_patchable_without_losing_unknown_run_xml() {
-    let source_xml = run_xml(
-        r#"<w:rPr><w:i/></w:rPr><x:future x:value="keep"/><sx:symEx sx:font="Old" sx:char="00000041"/><w:t>tail</w:t>"#,
-    );
-    let source = Snapshot::from_xml(source_xml.as_bytes().to_vec()).unwrap();
-    assert_eq!(source.symbol().unwrap().font(), Some("Old"));
-
-    let mut edit = source.edit();
-    let replacement = Symbol::new("New & Font", 0x1F642).unwrap();
-    edit.set_symbol(Some(replacement.clone())).unwrap();
-    let commit = edit.commit().unwrap();
-
-    assert_eq!(source.xml_bytes(), source_xml.as_bytes());
-    assert_eq!(commit.snapshot().symbol(), Some(&replacement));
-    let changed = std::str::from_utf8(commit.snapshot().xml_bytes()).unwrap();
-    assert!(changed.contains(r#"x:future x:value="keep""#));
-    assert!(changed.contains("<w:rPr><w:i/></w:rPr>"));
-    assert!(changed.contains("<w:t>tail</w:t>"));
-    assert!(changed.contains("New &amp; Font"));
-
-    let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
-    assert_eq!(restored.symbol().unwrap().font(), Some("Old"));
-    assert_eq!(commit.patch().before().len(), 1);
-    assert_eq!(commit.patch().after().first(), Some(&replacement));
-    assert!(commit.patch().apply(commit.snapshot()).is_err());
 }
 
 #[test]
@@ -98,7 +70,7 @@ fn invalid_symbol_domains_are_rejected_before_editing() {
 
 #[test]
 fn mutable_writer_authors_and_reopens_sym_ex() {
-    let mut document = MutableDocument::new();
+    let mut document = DraftDocument::new();
     let run = document.add_paragraph().add_run();
     run.set_symbol_character("Segoe UI Symbol", 0x1F600)
         .unwrap();

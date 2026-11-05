@@ -374,27 +374,27 @@ fn verify_corpus_identity(
 #[inline(never)]
 fn phase_snapshot_open(
     input: Vec<u8>,
-) -> litchi_core::Result<litchi_odp::authoring::edit::Snapshot> {
-    let result = litchi_odp::authoring::edit::Snapshot::from_bytes(input);
+) -> Result<litchi_odp::authoring::edit::Package, litchi_odf_common::Error> {
+    let result = litchi_odp::authoring::edit::Package::from_bytes(&input);
     std::hint::black_box(&result);
     result
 }
 
 #[inline(never)]
 fn phase_transaction(
-    source: &litchi_odp::authoring::edit::Snapshot,
-) -> litchi_core::Result<litchi_odp::authoring::edit::Transaction> {
-    let result = source.transaction();
+    source: &litchi_odp::authoring::edit::Package,
+) -> Result<litchi_odp::authoring::edit::Edit, litchi_odf_common::Error> {
+    let result = source.edit();
     std::hint::black_box(&result);
     result
 }
 
 #[inline(never)]
 fn phase_add(
-    transaction: &mut litchi_odp::authoring::edit::Transaction,
+    transaction: &mut litchi_odp::authoring::edit::Edit,
     title: &str,
     body: &str,
-) -> litchi_core::Result<()> {
+) -> Result<(), litchi_odf_common::Error> {
     let result = transaction.add(title, body);
     std::hint::black_box(&result);
     result
@@ -402,8 +402,8 @@ fn phase_add(
 
 #[inline(never)]
 fn phase_commit(
-    transaction: litchi_odp::authoring::edit::Transaction,
-) -> litchi_core::Result<litchi_odp::authoring::edit::Commit> {
+    transaction: litchi_odp::authoring::edit::Edit,
+) -> Result<litchi_odp::authoring::edit::Commit, litchi_odf_common::Error> {
     let result = transaction.commit();
     std::hint::black_box(&result);
     result
@@ -443,7 +443,7 @@ where
 fn runtime_row(
     sample_index: usize,
     corpus: &odp_existing_append::OdpExistingAppendCorpus,
-    source: &litchi_odp::authoring::edit::Snapshot,
+    source: &litchi_odp::authoring::edit::Package,
     commit: &litchi_odp::authoring::edit::Commit,
     sink: HashingDiscardSink,
     measurement: TimingMeasurement,
@@ -453,14 +453,14 @@ fn runtime_row(
         phases,
         lifecycle_allocation_metrics,
     } = measurement;
-    let candidate = commit.snapshot().bytes();
-    let source_bytes = source.bytes();
+    let candidate = commit.package().as_bytes();
+    let source_bytes = source.as_bytes();
     let candidate_sha256 = sha256_hex(candidate);
     let (sink_summary, sink_sha256) = sink.finish();
     let sink = SinkObservation::from(sink_summary);
     let source_bytes_identity_verified = source_bytes == corpus.corpus.archive.as_slice();
     let candidate_bytes_identity_verified = candidate == corpus.expected_output();
-    let commit_changed_verified = commit.changed();
+    let commit_changed_verified = commit.diagnostics().changed();
     let patch_non_noop_verified = !commit.patch().is_noop();
     let sink_digest_verified = sink_sha256 == candidate_sha256;
     let sink_length_verified =
@@ -525,11 +525,11 @@ fn run_lifecycle_iteration(
     )?);
     let allocation_region = allocation_metrics::begin();
     let started = Instant::now();
-    let source = litchi_odp::authoring::edit::Snapshot::from_bytes(input)?;
-    let mut transaction = source.transaction()?;
+    let source = litchi_odp::authoring::edit::Package::from_bytes(&input)?;
+    let mut transaction = source.edit()?;
     transaction.add(&title, &body)?;
     let commit = transaction.commit()?;
-    sink.write_all(commit.snapshot().bytes())?;
+    sink.write_all(commit.package().as_bytes())?;
     let lifecycle_ns = elapsed_ns(started.elapsed())?;
     let lifecycle_allocation_metrics = allocation_region.finish();
     let row = runtime_row(
@@ -568,7 +568,7 @@ fn run_phases_iteration(
     let (_, add_phase) = measure_phase("add", || phase_add(&mut transaction, &title, &body))?;
     let (commit, commit_phase) = measure_phase("commit", || phase_commit(transaction))?;
     let (_, publication_phase) = measure_phase("publication", || {
-        phase_publication(&mut sink, commit.snapshot().bytes())
+        phase_publication(&mut sink, commit.package().as_bytes())
     })?;
     let lifecycle_ns = elapsed_ns(lifecycle_started.elapsed())?;
     let row = runtime_row(

@@ -17,7 +17,8 @@ const BOF_SID: u16 = 0x0809;
 const EOF_SID: u16 = 0x000a;
 const CRYPTOAPI_RC4_PROVIDER: &str = "Microsoft Enhanced Cryptographic Provider v1.0";
 
-/// Password-to-open encryption profiles supported by the BIFF8 writer.
+/// Password-to-open encryption profiles supported by the BIFF8 reader and
+/// writer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EncryptionProfile {
     /// Legacy BIFF8 XOR obfuscation. Passwords are limited to 15 ANSI characters.
@@ -28,6 +29,60 @@ pub enum EncryptionProfile {
     CryptoApiRc4 { key_bits: u16 },
 }
 
+/// Caller-owned entropy for one BIFF8 RC4 authoring attempt.
+///
+/// RC4 headers contain a salt and a verifier.  A [`Builder`](crate::Builder)
+/// never obtains those bytes from ambient randomness: pass one entropy token
+/// with [`Builder::set_encryption_entropy`](crate::Builder::set_encryption_entropy)
+/// before building an Office Binary RC4 or CryptoAPI RC4 workbook.  The token
+/// is move-only and is consumed by that attempt, including when the attempt
+/// later fails.  Supplying a fresh token for every distinct plaintext and
+/// password is required; do not reuse a salt with the same password across
+/// different plaintexts.
+///
+/// [`generate`](Self::generate) is the explicit convenience constructor for a
+/// cryptographically random token.  [`from_bytes`](Self::from_bytes) is useful
+/// for deterministic tests and reproducible pipelines, where the caller owns
+/// the risk of selecting unique secret material.
+///
+/// The token intentionally has no `Clone` or `Debug` implementation:
+///
+/// ```compile_fail
+/// use litchi_xls::EncryptionEntropy;
+/// let entropy = EncryptionEntropy::from_bytes([0; 16], [1; 16]);
+/// let _copy = entropy.clone();
+/// ```
+pub struct EncryptionEntropy {
+    salt: Zeroizing<[u8; 16]>,
+    verifier: Zeroizing<[u8; 16]>,
+}
+
+impl EncryptionEntropy {
+    /// Generate fresh salt and verifier bytes using the operating system RNG.
+    ///
+    /// Randomness is obtained only by this explicit constructor; workbook
+    /// building itself never consults an ambient random source.
+    pub fn generate() -> Result<Self> {
+        Ok(Self {
+            salt: random_16("binary RC4 salt")?,
+            verifier: random_16("binary RC4 verifier")?,
+        })
+    }
+
+    /// Construct deterministic entropy from caller-provided bytes.
+    ///
+    /// The token is still consumed after one RC4 build attempt.  Never reuse
+    /// the same salt and password for distinct plaintexts: doing so reuses an
+    /// RC4 keystream and can disclose information about both workbooks.
+    #[must_use]
+    pub fn from_bytes(salt: [u8; 16], verifier: [u8; 16]) -> Self {
+        Self {
+            salt: Zeroizing::new(salt),
+            verifier: Zeroizing::new(verifier),
+        }
+    }
+}
+
 /// Explicit capability required to author legacy BIFF8 XOR obfuscation.
 ///
 /// XOR obfuscation is retained for interoperability with legacy documents, not
@@ -35,7 +90,7 @@ pub enum EncryptionProfile {
 /// at the call site to make an intentional compatibility downgrade visible in
 /// code and diagnostics.
 #[derive(Debug, PartialEq, Eq)]
-#[must_use = "weak encryption must be explicitly passed to Writer::set_xor_obfuscation_password"]
+#[must_use = "weak encryption must be explicitly passed to Builder::set_xor_obfuscation_password"]
 pub struct WeakEncryptionPolicy {
     _private: (),
 }
@@ -130,7 +185,7 @@ struct XorObfuscation {
 enum FilePassRecord {
     Xor(XorObfuscation),
     BinaryRc4(legacy_rc4::Header),
-    CryptoApi(Header),
+    CryptoApi { header: Header, key_bits: u16 },
     Unsupported(EncryptionKind),
 }
 
@@ -150,7 +205,7 @@ pub(crate) fn inspect_filepass(data: &[u8]) -> Result<FilePassKind> {
     match FilePassRecord::parse(data) {
         Ok(FilePassRecord::Xor(_)) => Ok(FilePassKind::Xor),
         Ok(FilePassRecord::BinaryRc4(_)) => Ok(FilePassKind::BinaryRc4),
-        Ok(FilePassRecord::CryptoApi(_)) => Ok(FilePassKind::CryptoApi),
+        Ok(FilePassRecord::CryptoApi { .. }) => Ok(FilePassKind::CryptoApi),
         Ok(FilePassRecord::Unsupported(kind)) => Ok(FilePassKind::Unsupported(kind)),
         Err(Error::UnsupportedEncryption(kind)) => Ok(FilePassKind::Unsupported(kind)),
         Err(error) => Err(error),
@@ -189,7 +244,9 @@ impl FilePassRecord {
                 if matches!((major, minor), (2..=4, 2)) {
                     let header =
                         office_rc4::parse_header(&data[2..]).map_err(map_cryptoapi_header_error)?;
-                    return Ok(Self::CryptoApi(header));
+                    let key_bits = u16::try_from(header.key_bits())
+                        .map_err(|_| Error::UnsupportedEncryption(EncryptionKind::CryptoApi))?;
+                    return Ok(Self::CryptoApi { header, key_bits });
                 }
                 if (major, minor) != (1, 1) {
                     return Ok(Self::Unsupported(EncryptionKind::CryptoApi));
@@ -228,7 +285,10 @@ fn random_16(field: &str) -> Result<Zeroizing<[u8; 16]>> {
     Ok(value)
 }
 
-fn prepare_writer_material(encryption: &WriterEncryption) -> Result<WriterEncryptionMaterial> {
+fn prepare_writer_material(
+    encryption: &WriterEncryption,
+    entropy: Option<&EncryptionEntropy>,
+) -> Result<WriterEncryptionMaterial> {
     validate_writer_encryption(&encryption.password, encryption.profile)?;
     match encryption.profile {
         EncryptionProfile::XorObfuscation => {
@@ -242,10 +302,9 @@ fn prepare_writer_material(encryption: &WriterEncryption) -> Result<WriterEncryp
             })
         },
         EncryptionProfile::OfficeBinaryRc4 => {
-            let salt = random_16("binary RC4 salt")?;
-            let verifier = random_16("binary RC4 verifier")?;
+            let entropy = entropy.ok_or(Error::EncryptionEntropyRequired)?;
             let (header, context) =
-                legacy_rc4::build_header(&encryption.password, &salt, &verifier)
+                legacy_rc4::build_header(&encryption.password, &entropy.salt, &entropy.verifier)
                     .map_err(map_legacy_runtime_error)?;
 
             let mut filepass = Vec::with_capacity(BINARY_RC4_FILEPASS_LEN);
@@ -257,15 +316,14 @@ fn prepare_writer_material(encryption: &WriterEncryption) -> Result<WriterEncryp
             })
         },
         EncryptionProfile::CryptoApiRc4 { key_bits } => {
-            let salt = random_16("CryptoAPI salt")?;
-            let verifier = random_16("CryptoAPI verifier")?;
+            let entropy = entropy.ok_or(Error::EncryptionEntropyRequired)?;
             let (header, context) = office_rc4::build_header(
                 &encryption.password,
                 usize::from(key_bits),
                 Flags::CRYPTO_API,
                 CRYPTOAPI_RC4_PROVIDER,
-                &salt,
-                &verifier,
+                &entropy.salt,
+                &entropy.verifier,
             )
             .map_err(map_cryptoapi_runtime_error)?;
             let mut filepass = Vec::with_capacity(2 + header.len());
@@ -414,9 +472,10 @@ fn inspect_clear_workbook(workbook: &[u8]) -> Result<ClearWorkbookPlan> {
 pub(crate) fn encrypt_workbook_for_write(
     mut workbook: Vec<u8>,
     encryption: &WriterEncryption,
+    entropy: Option<&EncryptionEntropy>,
 ) -> Result<Vec<u8>> {
     let plan = inspect_clear_workbook(&workbook)?;
-    let mut material = prepare_writer_material(encryption)?;
+    let mut material = prepare_writer_material(encryption, entropy)?;
     let filepass_len = u16::try_from(material.filepass.len()).map_err(|_error| {
         Error::InvalidData("FILEPASS payload exceeds the BIFF8 record limit".to_string())
     })?;
@@ -510,13 +569,26 @@ pub(crate) fn encrypt_workbook_for_write(
 }
 
 /// Validate `FILEPASS` and decrypt eligible BIFF8 record payloads in place.
+#[cfg(test)]
 pub(crate) fn prepare_workbook_stream(
-    mut workbook: Vec<u8>,
+    workbook: Vec<u8>,
     password: Option<&str>,
 ) -> Result<Vec<u8>> {
+    prepare_workbook_stream_with_state(workbook, password).map(|(workbook, _)| workbook)
+}
+
+/// Validate/decrypt a Workbook stream and retain the exact profile selected by
+/// its `FILEPASS` record. The state is returned with the transformed bytes so
+/// an eager owner can carry it into a package publication guard and encryption
+/// projection without rescanning the BIFF payload.
+pub(crate) fn prepare_workbook_stream_with_state(
+    mut workbook: Vec<u8>,
+    password: Option<&str>,
+) -> Result<(Vec<u8>, Option<EncryptionProfile>)> {
     let mut position = 0usize;
     let mut cipher = None;
     let mut saw_filepass = false;
+    let mut encryption = None;
 
     while position < workbook.len() {
         let header_end = position.checked_add(4).ok_or_else(|| {
@@ -543,7 +615,7 @@ pub(crate) fn prepare_workbook_stream(
         // reached without one, worksheet substreams and trailing OLE padding
         // cannot change the workbook's encryption state.
         if sid == 0x000A && !saw_filepass {
-            return Ok(workbook);
+            return Ok((workbook, None));
         }
 
         if sid == FILEPASS_SID {
@@ -562,6 +634,7 @@ pub(crate) fn prepare_workbook_stream(
                         return Err(Error::InvalidPassword);
                     }
                     cipher = Some(WorkbookCipher::Xor(create_xor_array(password)));
+                    encryption = Some(EncryptionProfile::XorObfuscation);
                 },
                 FilePassRecord::BinaryRc4(filepass) => {
                     let password = password.ok_or(Error::PasswordRequired)?;
@@ -569,13 +642,15 @@ pub(crate) fn prepare_workbook_stream(
                         .map_err(map_legacy_runtime_error)?
                         .ok_or(Error::InvalidPassword)?;
                     cipher = Some(WorkbookCipher::BinaryRc4(context));
+                    encryption = Some(EncryptionProfile::OfficeBinaryRc4);
                 },
-                FilePassRecord::CryptoApi(header) => {
+                FilePassRecord::CryptoApi { header, key_bits } => {
                     let password = password.ok_or(Error::PasswordRequired)?;
                     let context = office_rc4::verify(&header, password)
                         .map_err(map_cryptoapi_runtime_error)?
                         .ok_or(Error::InvalidPassword)?;
                     cipher = Some(WorkbookCipher::CryptoApi(context));
+                    encryption = Some(EncryptionProfile::CryptoApiRc4 { key_bits });
                 },
                 FilePassRecord::Unsupported(kind) => {
                     return Err(Error::UnsupportedEncryption(kind));
@@ -621,7 +696,7 @@ pub(crate) fn prepare_workbook_stream(
         position = record_end;
     }
 
-    Ok(workbook)
+    Ok((workbook, encryption))
 }
 
 fn map_cryptoapi_header_error(error: CryptoError) -> Error {
@@ -630,6 +705,7 @@ fn map_cryptoapi_header_error(error: CryptoError) -> Error {
         CryptoError::UnsupportedVersion { .. } | CryptoError::UnsupportedAlgorithm => {
             Error::UnsupportedEncryption(EncryptionKind::CryptoApi)
         },
+        _ => Error::MalformedFilePass("CryptoAPI RC4 error".to_string()),
     }
 }
 
@@ -639,6 +715,7 @@ fn map_cryptoapi_runtime_error(error: CryptoError) -> Error {
         CryptoError::UnsupportedVersion { .. } | CryptoError::UnsupportedAlgorithm => {
             Error::UnsupportedEncryption(EncryptionKind::CryptoApi)
         },
+        _ => Error::InvalidData("CryptoAPI RC4 error".to_string()),
     }
 }
 
@@ -657,6 +734,7 @@ fn map_legacy_header_error(error: legacy_rc4::Error) -> Error {
         legacy_rc4::Error::StreamRangeOverflow => {
             Error::MalformedFilePass("legacy RC4 stream range overflow".to_string())
         },
+        _ => Error::MalformedFilePass("legacy RC4 error".to_string()),
     }
 }
 
@@ -672,6 +750,7 @@ fn map_legacy_runtime_error(error: legacy_rc4::Error) -> Error {
         legacy_rc4::Error::InvalidBlockSize { .. } | legacy_rc4::Error::StreamRangeOverflow => {
             Error::InvalidData(error.to_string())
         },
+        _ => Error::InvalidData("legacy RC4 error".to_string()),
     }
 }
 
@@ -772,7 +851,7 @@ fn create_xor_array(password: &str) -> [u8; 16] {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{OpenOptions, Workbook};
+    use crate::{OpenOptions, raw::Reader};
     use litchi_core::sheet::{Cell, CellValue};
 
     fn poi_fixture(name: &str) -> std::path::PathBuf {
@@ -899,7 +978,7 @@ mod tests {
         for (major, key_bits) in [(2, 40), (3, 56), (4, 120), (4, 128)] {
             assert!(matches!(
                 FilePassRecord::parse(&cryptoapi_filepass(major, key_bits)),
-                Ok(FilePassRecord::CryptoApi(_))
+                Ok(FilePassRecord::CryptoApi { .. })
             ));
         }
 
@@ -951,9 +1030,9 @@ mod tests {
     fn opens_apache_poi_cryptoapi_workbook() {
         let path = poi_fixture("35897-type4.xls");
         let open = |password| {
-            Workbook::new_with_options(
+            Reader::new_with_options(
                 std::fs::File::open(&path).unwrap(),
-                OpenOptions::new().with_password(password),
+                OpenOptions::new().password(password),
             )
         };
         assert!(matches!(open(None), Err(Error::PasswordRequired)));
@@ -1041,8 +1120,7 @@ mod tests {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../test-data/poi/test-data/spreadsheet/xor-encryption-abc.xls");
         let file = std::fs::File::open(path).unwrap();
-        let workbook =
-            Workbook::new_with_options(file, OpenOptions::new().with_password("abc")).unwrap();
+        let workbook = Reader::new_with_options(file, OpenOptions::new().password("abc")).unwrap();
         let cell = workbook.xls_worksheet(0).unwrap().get_cell(0, 0).unwrap();
         assert!(matches!(cell.value(), CellValue::Float(value) if *value == 1.0));
     }
@@ -1053,15 +1131,12 @@ mod tests {
             .join("../../test-data/ole/xls/password.xls");
         let wrong_password_file = std::fs::File::open(&path).unwrap();
         assert!(matches!(
-            Workbook::new_with_options(
-                wrong_password_file,
-                OpenOptions::new().with_password("wrong"),
-            ),
+            Reader::new_with_options(wrong_password_file, OpenOptions::new().password("wrong"),),
             Err(Error::InvalidPassword)
         ));
         let file = std::fs::File::open(path).unwrap();
         let workbook =
-            Workbook::new_with_options(file, OpenOptions::new().with_password("password")).unwrap();
+            Reader::new_with_options(file, OpenOptions::new().password("password")).unwrap();
         let worksheet = workbook.xls_worksheet(0).unwrap();
         let found = (0..128).any(|row| {
             (0..32).any(|column| {

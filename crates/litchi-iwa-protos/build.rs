@@ -34,21 +34,30 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/chart_metadata_codec.rs");
     println!("cargo:rerun-if-changed=src/buffa-projections/TSCHChartMetadataArchive.proto");
     println!("cargo:rerun-if-changed=src/chart_data_codec.rs");
+    println!("cargo:rerun-if-changed=src/chart_style_codec.rs");
+    println!("cargo:rerun-if-changed=src/chart_style_codec/merge.rs");
+    println!("cargo:rerun-if-changed=src/shape_style_codec.rs");
+    println!("cargo:rerun-if-changed=src/shape_style_codec/native.rs");
     println!("cargo:rerun-if-changed=src/chart_data_codec/rewrite.rs");
     println!("cargo:rerun-if-changed=src/chart_grid_creation_codec.rs");
     println!("cargo:rerun-if-changed=src/buffa-projections/TSCHChartDataArchive.proto");
     println!("cargo:rerun-if-changed=src/keynote_chart_axis_title_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_chart_axis_value_settings_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_show_codec.rs");
+    println!("cargo:rerun-if-changed=src/keynote_theme_codec.rs");
+    println!("cargo:rerun-if-changed=src/buffa-projections/KNThemeArchiveProjection.proto");
     println!("cargo:rerun-if-changed=src/keynote_placeholder_text_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_speaker_notes_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_slide_drawables_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_slide_number_codec.rs");
+    println!("cargo:rerun-if-changed=src/number_attachment_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_soundtrack_settings_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_media_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_media_creation_codec.rs");
+    println!("cargo:rerun-if-changed=src/keynote_shape_creation_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_build_creation_codec.rs");
     println!("cargo:rerun-if-changed=src/buffa-projections/TSDKeynoteMediaCreationArchive.proto");
+    println!("cargo:rerun-if-changed=src/buffa-projections/TSDKeynoteShapeCreationArchive.proto");
     println!("cargo:rerun-if-changed=src/buffa-projections/KNKeynoteBuildCreationArchive.proto");
     println!("cargo:rerun-if-changed=src/keynote_media_lifecycle_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_media_lifecycle_codec/node_cache.rs");
@@ -87,17 +96,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     // standalone copies do not contain these sibling sources, so the
     // provenance checks below are intentionally conditional on their presence.
     for path in [
-        "../litchi-iwa/src/protobuf.rs",
         "../litchi-numbers-wire/src/table_data_list.rs",
         "../litchi-numbers/src/package/extractor.rs",
-        "../litchi-iwa/src/pages/editor.rs",
-        "../litchi-iwa/src/pages/editor/movies/graph.rs",
-        "../litchi-iwa/src/pages/editor/movies/caption.rs",
-        "../litchi-iwa/src/pages/editor/audio/graph.rs",
-        "../litchi-iwa/src/pages/editor/body_shapes/caption.rs",
-        "../litchi-iwa/src/image_caption.rs",
-        "../litchi-iwa/src/pages/editor/footnotes.rs",
-        "../litchi-iwa/src/pages/creation.rs",
         "../litchi-pages/src/package.rs",
         "../litchi-pages/src/package/footnote_text.rs",
         "../litchi-pages/src/package/document_settings.rs",
@@ -130,6 +130,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/buffa-projections/TSDImageAdjustmentsArchive.proto");
     println!("cargo:rerun-if-changed=src/keynote_movie_geometry_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_media_properties_codec.rs");
+    println!("cargo:rerun-if-changed=src/shape_properties_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_footnote_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_footnote_marker_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_footnote_graph_codec.rs");
@@ -147,6 +148,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/table_info_codec.rs");
     println!("cargo:rerun-if-changed=src/table_appearance_codec.rs");
     println!("cargo:rerun-if-changed=src/text_storage_codec.rs");
+    println!("cargo:rerun-if-changed=src/theme_codec.rs");
+    println!("cargo:rerun-if-changed=src/buffa-projections/TSSThemeArchiveProjection.proto");
     println!("cargo:rerun-if-changed=src/lib.rs");
 
     let mut proto_files = fs::read_dir(proto_directory)?
@@ -201,6 +204,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         buffa_projection_directory,
     )?;
     enforce_keynote_show_projection_provenance(proto_directory, buffa_projection_directory)?;
+    enforce_keynote_theme_projection_provenance(proto_directory, buffa_projection_directory)?;
+    enforce_theme_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_keynote_placeholder_text_projection_provenance(
         proto_directory,
         buffa_projection_directory,
@@ -217,6 +222,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         proto_directory,
         buffa_projection_directory,
     )?;
+    enforce_number_attachment_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_keynote_soundtrack_settings_projection_provenance(
         proto_directory,
         buffa_projection_directory,
@@ -1193,6 +1199,27 @@ fn main() -> Result<(), Box<dyn Error>> {
         .compile()?;
     enforce_keynote_media_creation_projection_budget(&buffa_keynote_media_creation_out_directory)?;
 
+    // Fresh Keynote rectangle text-box authoring uses a narrow borrowed
+    // Buffa view closure.  The complete ShapeInfo/Storage graphs remain the
+    // compatibility schema and source-owned bytes remain authoritative for
+    // clone/edit operations.
+    let buffa_keynote_shape_creation_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-keynote-shape-creation");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TSDKeynoteShapeCreationArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_keynote_shape_creation_out_directory)
+        .include_file("iwa_keynote_shape_creation_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(false)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_keynote_shape_creation_projection_budget(&buffa_keynote_shape_creation_out_directory)?;
+
     // Fresh Keynote build records use an equally narrow borrowed Buffa view
     // closure.  Existing build graphs remain source-authoritative.
     let buffa_keynote_build_creation_out_directory =
@@ -1228,6 +1255,26 @@ fn main() -> Result<(), Box<dyn Error>> {
         .compile()?;
     enforce_formula_projection_budget(&buffa_formula_out_directory)?;
 
+    // The shared theme owner keeps all repeated preset and extension bytes on
+    // its strict source-preserving path.  Buffa only supplies borrowed views
+    // for the wrapper/base envelope and the optional theme identifier.
+    let buffa_theme_archive_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-theme-archive");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TSSThemeArchiveProjection.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_theme_archive_out_directory)
+        .include_file("iwa_theme_archive_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_theme_archive_projection_budget(&buffa_theme_archive_out_directory)?;
+
     // Keynote's show reader projects only scalar settings, required direct
     // references, and presentation size. The repeated slide tree is routed by
     // a bounded handwritten iterator so generated code never owns an
@@ -1248,6 +1295,27 @@ fn main() -> Result<(), Box<dyn Error>> {
         .idiomatic_field_names(true)
         .compile()?;
     enforce_keynote_show_projection_budget(&buffa_keynote_show_out_directory)?;
+
+    // The outer Keynote theme keeps the required shared TSS payload opaque
+    // and streams template references by hand. Buffa projects only singular
+    // UUID/default/live-video fields, so no generated input-width vectors
+    // cross this boundary.
+    let buffa_keynote_theme_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-keynote-theme");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("KNThemeArchiveProjection.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_keynote_theme_out_directory)
+        .include_file("iwa_keynote_theme_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_keynote_theme_projection_budget(&buffa_keynote_theme_out_directory)?;
 
     // A semantic Keynote title/body edge ends at one placeholder's owned text
     // storage through three required inheritance envelopes. Generate only
@@ -1565,6 +1633,26 @@ fn main() -> Result<(), Box<dyn Error>> {
         .compile()?;
     enforce_pages_footnote_marker_projection_budget(&buffa_pages_footnote_marker_out_directory)?;
 
+    // Number attachments share one neutral TSWP payload across Pages,
+    // Numbers, and Keynote. Keep the textual envelope and selected scalar
+    // values lazy; repeated/unknown source fields remain caller-owned.
+    let buffa_number_attachment_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-number-attachment");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TSWPNumberAttachmentArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_number_attachment_out_directory)
+        .include_file("iwa_number_attachment_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_number_attachment_projection_budget(&buffa_number_attachment_out_directory)?;
+
     Ok(())
 }
 
@@ -1583,6 +1671,11 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
             "TSPDataReferenceProjection.proto",
             275,
             "a19e934a76924af3268fad0ac87e07ad9c3abd5e17c3bc4d0bfec56d2ec8c90a",
+        ),
+        (
+            "TSSThemeArchiveProjection.proto",
+            831,
+            "b6fb2c3664913adf7ffe1befa681a1115235a77e582915432ce4d8e0b49d1b09",
         ),
         (
             "KNDocumentArchive.proto",
@@ -1613,6 +1706,11 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
             "KNShowArchive.proto",
             1682,
             "06641b66f5bc7c137578a29ff16e43167a6e307fe13159b07538a99e49c96d56",
+        ),
+        (
+            "KNThemeArchiveProjection.proto",
+            1105,
+            "f15cba59ce6e040c3ec50d483ecf634fd2d0444360aa294d07f5fd4be663b220",
         ),
         (
             "KNSlideNumberArchive.proto",
@@ -1755,6 +1853,11 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
             "b7123341bc1a5500152d209ea6d505fefa8f7f99ab69e5914f87adf342b8b0fa",
         ),
         (
+            "TSDKeynoteShapeCreationArchive.proto",
+            2710,
+            "043f10b67812c842ead0510ab2df84ec781f531d42c241a05a3753d06f7f035d",
+        ),
+        (
             "KNKeynoteBuildCreationArchive.proto",
             1841,
             "2cb1528e4787e3a5e645796e1aa68d5b648a4f719c4d0d898dd79b0385b7ae23",
@@ -1879,6 +1982,11 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
             470,
             "12cd2d1186d8c0241c6439085c5d0b911fde6ecd5dec759626a2d94dceca3c15",
         ),
+        (
+            "TSWPNumberAttachmentArchive.proto",
+            649,
+            "cea6ca5ab4ad9b47abc59dc64c2bc7e0aa269b6cc4e1b21b441c30fb0c4e4045",
+        ),
     ];
 
     let mut actual_names = fs::read_dir(projection_directory)?
@@ -1959,6 +2067,11 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
             "mod buffa_archive_header_generated {",
         ),
         (
+            "src/theme_codec.rs",
+            "crate::buffa_theme_archive_generated::",
+            "mod buffa_theme_archive_generated {",
+        ),
+        (
             "src/text_storage_codec.rs",
             "crate::buffa_text_storage_generated::",
             "mod buffa_text_storage_generated {",
@@ -2012,6 +2125,11 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
             "src/keynote_media_properties_codec.rs",
             "crate::buffa_keynote_media_properties_generated::",
             "mod buffa_keynote_media_properties_generated {",
+        ),
+        (
+            "src/shape_properties_codec.rs",
+            "crate::buffa_keynote_media_creation_generated::",
+            "mod buffa_keynote_media_creation_generated {",
         ),
         (
             "src/keynote_chart_title_codec.rs",
@@ -2069,6 +2187,11 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
             "mod buffa_keynote_slide_number_generated {",
         ),
         (
+            "src/number_attachment_codec.rs",
+            "crate::buffa_number_attachment_generated::",
+            "mod buffa_number_attachment_generated {",
+        ),
+        (
             "src/keynote_soundtrack_settings_codec.rs",
             "crate::buffa_keynote_soundtrack_settings_generated::",
             "mod buffa_keynote_soundtrack_settings_generated {",
@@ -2097,6 +2220,11 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
             "src/keynote_show_codec.rs",
             "crate::buffa_keynote_show_generated::",
             "mod buffa_keynote_show_generated {",
+        ),
+        (
+            "src/keynote_theme_codec.rs",
+            "crate::buffa_keynote_theme_generated::",
+            "mod buffa_keynote_theme_generated {",
         ),
         (
             "src/numbers_names_codec.rs",
@@ -2289,6 +2417,11 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
             "mod buffa_keynote_media_creation_generated {",
         ),
         (
+            "src/keynote_shape_creation_codec.rs",
+            "crate::buffa_keynote_shape_creation_generated::",
+            "mod buffa_keynote_shape_creation_generated {",
+        ),
+        (
             "src/keynote_build_creation_codec.rs",
             "crate::buffa_keynote_build_creation_generated::",
             "mod buffa_keynote_build_creation_generated {",
@@ -2315,7 +2448,9 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
     // for the same forbidden Prost/owned-view markers and for accidental
     // Buffa usage.
     const RAW_CODECS: &[&str] = &[
+        "src/chart_style_codec.rs",
         "src/hyperlink_codec.rs",
+        "src/shape_style_codec.rs",
         "src/keynote_chart_caption_graph_codec.rs",
         "src/pages_footnote_graph_codec.rs",
         "src/table_appearance_codec.rs",
@@ -2328,6 +2463,7 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
         "src/numbers_table_cell_text_format_codec.rs",
         "src/numbers_table_cell_date_time_format_codec.rs",
         "src/numbers_table_cell_duration_format_codec.rs",
+        "src/theme_presets_codec.rs",
     ];
 
     let mut expected_paths = CODECS
@@ -6579,27 +6715,11 @@ fn enforce_numbers_table_data_list_provenance(
         .all(|field| codec.contains(field))
         && codec.contains(SEGMENT_CODEC_PARITY);
 
-    let registry_path = Path::new("../litchi-iwa/src/protobuf.rs");
     let wire_owner_path = Path::new("../litchi-numbers-wire/src/table_data_list.rs");
     let adapter_paths = [Path::new("../litchi-numbers/src/package/extractor.rs")];
-    let registry_table_data_list_markers = [
-        format!(
-            "{}u32 => decode_table_data_list,",
-            TABLE_DATA_LIST_NATIVE_IDS[0]
-        ),
-        format!(
-            "{}u32 => decode_table_data_list,",
-            TABLE_DATA_LIST_NATIVE_IDS[1]
-        ),
-    ];
-    let registry_table_data_list_segment_marker = format!(
-        "{}u32 => decode_table_data_list_segment,",
-        TABLE_DATA_LIST_SEGMENT_NATIVE_ID
-    );
-    // Message-ID registration remains in the legacy host's type registry,
-    // while candidate routing and root/segment publication now live in the
-    // borrowed Numbers wire coordinator.  Each adapter keeps its decoder,
-    // budget, and converter hooks but delegates the topology walk to
+    // Candidate routing and root/segment publication live in the borrowed
+    // Numbers wire coordinator. Each adapter keeps its decoder, budget, and
+    // converter hooks but delegates the topology walk to
     // `table_data_list::read_list`.
     let wire_table_data_list_markers = [
         "pub const TABLE_DATA_LIST_MESSAGE_KIND: u32 = 6_005;",
@@ -6623,24 +6743,6 @@ fn enforce_numbers_table_data_list_provenance(
         ),
         ".filter(|message| message.type_ == 6_011)".to_owned(),
     ];
-
-    let registry_scope_ok = if registry_path.is_file() {
-        let registry_source = fs::read_to_string(registry_path)?;
-        registry_source
-            .matches(registry_table_data_list_markers[0].as_str())
-            .count()
-            == 1
-            && registry_source
-                .matches(registry_table_data_list_markers[1].as_str())
-                .count()
-                == 1
-            && registry_source
-                .matches(registry_table_data_list_segment_marker.as_str())
-                .count()
-                == 1
-    } else {
-        true
-    };
 
     let adapter_sources = adapter_paths
         .iter()
@@ -6676,7 +6778,7 @@ fn enforce_numbers_table_data_list_provenance(
             && source.contains(adapter_read_list_marker)
             && legacy_filter_absent
     });
-    let route_scope_ok = registry_scope_ok && wire_scope_ok && adapters_scope_ok;
+    let route_scope_ok = wire_scope_ok && adapters_scope_ok;
 
     if !canonical_scope_ok || !projection_scope_ok || !codec_scope_ok || !route_scope_ok {
         return Err(
@@ -7106,6 +7208,180 @@ fn enforce_keynote_show_projection_provenance(
             "derived Keynote show projection/router drifted from canonical fields, exceeded its 2 KiB source budget, introduced generated repeated storage, or added production encoding"
                 .into(),
         );
+    }
+    Ok(())
+}
+
+fn enforce_keynote_theme_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const CANONICAL_FIELDS: [&str; 8] = [
+        "required .TSS.ThemeArchive super = 1;",
+        "repeated .TSP.Reference templates = 2;",
+        "optional string uuid = 3;",
+        "optional .TSP.Reference default_template_slide_node = 5;",
+        "optional .TSP.Reference default_template_slide_node_reference = 6;",
+        "optional bool default_template_slide_node_is_our_best_guess = 7;",
+        "optional .TSP.Reference live_video_source_collection = 9;",
+        "repeated .TSP.Reference motion_background_style_presets = 10;",
+    ];
+    const REFERENCE: &str = "message Reference {\n  required uint64 identifier = 1;\n  optional int32 deprecated_type = 2;\n  optional bool deprecated_is_external = 3;\n}";
+    const PROJECTION: &str = "message KeynoteThemeArchive {\n  required bytes super = 1;\n  optional string uuid = 3;\n  optional Reference default_template_slide_node = 5;\n  optional Reference default_template_slide_node_reference = 6;\n  optional bool default_template_slide_node_is_our_best_guess = 7;\n  optional Reference live_video_source_collection = 9;\n}";
+    const ROUTER_DECLARATIONS: [&str; 11] = [
+        "const THEME_SUPER_FIELD: u32 = 1;",
+        "const THEME_TEMPLATES_FIELD: u32 = 2;",
+        "const THEME_UUID_FIELD: u32 = 3;",
+        "const THEME_DEFAULT_TEMPLATE_FIELD: u32 = 5;",
+        "const THEME_DEFAULT_TEMPLATE_REFERENCE_FIELD: u32 = 6;",
+        "const THEME_DEFAULT_TEMPLATE_GUESS_FIELD: u32 = 7;",
+        "const THEME_LIVE_VIDEO_FIELD: u32 = 9;",
+        "const REFERENCE_IDENTIFIER_FIELD: u32 = 1;",
+        "const REFERENCE_DEPRECATED_TYPE_FIELD: u32 = 2;",
+        "const REFERENCE_DEPRECATED_EXTERNAL_FIELD: u32 = 3;",
+        "const MAX_RECURSION_LIMIT: u32 = 64;",
+    ];
+
+    let keynote = fs::read_to_string(proto_directory.join("KNArchives.proto"))?;
+    let projection =
+        fs::read_to_string(projection_directory.join("KNThemeArchiveProjection.proto"))?;
+    let codec = fs::read_to_string("src/keynote_theme_codec.rs")?;
+    let production_codec = production_codec_source(&codec);
+    let lib = fs::read_to_string("src/lib.rs")?;
+    if !CANONICAL_FIELDS
+        .iter()
+        .all(|declaration| keynote.matches(declaration).count() == 1)
+        || projection.matches(REFERENCE).count() != 1
+        || projection.matches(PROJECTION).count() != 1
+        || !ROUTER_DECLARATIONS
+            .iter()
+            .all(|declaration| codec.matches(declaration).count() == 1)
+        || !lib.contains("mod buffa_keynote_theme_generated {")
+        || !lib.contains("/buffa-keynote-theme/iwa_keynote_theme_buffa_protos.rs")
+        || !lib.contains("pub mod keynote_theme_codec;")
+        || projection.len() > 2 * 1024
+        || projection.contains("repeated ")
+        || production_codec.contains("prost::")
+        || production_codec.contains("to_owned_message")
+        || production_codec.contains("encode_to_vec")
+        || production_codec.contains("try_encode")
+        || production_codec.contains("RepeatedView")
+        || production_codec.contains("LazyRepeatedView")
+    {
+        return Err(
+            "derived Keynote theme projection/codec drifted from KN.ThemeArchive, introduced generated repeated storage, or added generated production encoding"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
+fn enforce_theme_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const CANONICAL_FIELDS: [&str; 7] = [
+        "optional .TSP.Reference legacy_stylesheet = 1;",
+        "optional string theme_identifier = 3;",
+        "optional .TSP.Reference document_stylesheet = 4;",
+        "repeated .TSP.UUID old_uuids_for_preset_replacements = 5;",
+        "repeated .TSP.UUID new_uuids_for_preset_replacements = 6;",
+        "repeated .TSP.Color color_presets = 10;",
+        "extensions 100 to 536870911;",
+    ];
+    const REFERENCE: &str = "message Reference {\n  required uint64 identifier = 1;\n  optional int32 deprecated_type = 2;\n  optional bool deprecated_is_external = 3;\n}";
+    const COLOR: &str = "message Color {";
+    const WRAPPER: &str = "message ThemeWrapper {\n  required bytes super = 1;\n}";
+    const PROJECTION: &str = "message ThemeArchive {\n  optional bytes legacy_stylesheet = 1;\n  optional string theme_identifier = 3;\n  optional bytes document_stylesheet = 4;\n  optional bytes drawing_presets = 100;\n  optional bytes text_presets = 110;\n  optional bytes chart_presets = 120;\n  optional bytes table_presets = 200;\n  optional bytes application_presets = 210;\n}";
+    const ROUTER_DECLARATIONS: [&str; 15] = [
+        "const THEME_SUPER_FIELD: u32 = 1;",
+        "const LEGACY_STYLESHEET_FIELD: u32 = 1;",
+        "const THEME_IDENTIFIER_FIELD: u32 = 3;",
+        "const DOCUMENT_STYLESHEET_FIELD: u32 = 4;",
+        "const OLD_PRESET_UUIDS_FIELD: u32 = 5;",
+        "const NEW_PRESET_UUIDS_FIELD: u32 = 6;",
+        "const COLOR_PRESETS_FIELD: u32 = 10;",
+        "const DRAWING_PRESETS_FIELD: u32 = 100;",
+        "const TEXT_PRESETS_FIELD: u32 = 110;",
+        "const CHART_PRESETS_FIELD: u32 = 120;",
+        "const TABLE_PRESETS_FIELD: u32 = 200;",
+        "const APPLICATION_PRESETS_FIELD: u32 = 210;",
+        "const MAX_AUTOMATIC_LIMIT: usize = 64 * 1024 * 1024;",
+        "const MAX_RECURSION_LIMIT: u32 = 64;",
+        "const EXTENSION_FIELDS: [u32; 5] = [",
+    ];
+
+    let tss = fs::read_to_string(proto_directory.join("TSSArchives.proto"))?;
+    let tsp = fs::read_to_string(proto_directory.join("TSPMessages.proto"))?;
+    let projection =
+        fs::read_to_string(projection_directory.join("TSSThemeArchiveProjection.proto"))?;
+    let codec = fs::read_to_string("src/theme_codec.rs")?;
+    let production_codec = production_codec_source(&codec);
+    let lib = fs::read_to_string("src/lib.rs")?;
+    if !CANONICAL_FIELDS
+        .iter()
+        .all(|declaration| tss.matches(declaration).count() == 1)
+        || tsp.matches(REFERENCE).count() != 1
+        || tsp.matches(COLOR).count() != 1
+        || projection.matches(WRAPPER).count() != 1
+        || projection.matches(PROJECTION).count() != 1
+        || !ROUTER_DECLARATIONS
+            .iter()
+            .all(|declaration| codec.matches(declaration).count() == 1)
+        || !lib.contains("mod buffa_theme_archive_generated {")
+        || !lib.contains("/buffa-theme-archive/iwa_theme_archive_buffa_protos.rs")
+        || !lib.contains("pub mod theme_codec;")
+        || projection.len() > 2 * 1024
+        || projection
+            .lines()
+            .any(|line| line.trim_start().starts_with("repeated "))
+        || production_codec.contains("prost::")
+        || production_codec.contains("to_owned_message")
+        || production_codec.contains("encode_to_vec")
+        || production_codec.contains("try_encode")
+        || production_codec.contains("RepeatedView")
+        || production_codec.contains("LazyRepeatedView")
+    {
+        return Err(
+            "derived shared theme projection/codec drifted from TSS.ThemeArchive/TSP scalar schemas, introduced generated repeated storage, or added generated production encoding"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
+fn enforce_keynote_theme_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: usize = 5;
+    const MAX_GENERATED_BYTES: u64 = 128 * 1024;
+    let mut files = 0usize;
+    let mut bytes = 0u64;
+    let mut repeated = 0usize;
+    let mut lazy_repeated = 0usize;
+    for entry_result in fs::read_dir(directory)? {
+        let entry = entry_result?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files = files
+            .checked_add(1)
+            .ok_or("theme generated file count overflow")?;
+        bytes = bytes
+            .checked_add(entry.metadata()?.len())
+            .ok_or("theme generated byte count overflow")?;
+        let generated = fs::read_to_string(entry.path())?;
+        repeated = repeated
+            .checked_add(generated.matches("RepeatedView").count())
+            .ok_or("theme generated repeated-view count overflow")?;
+        lazy_repeated = lazy_repeated
+            .checked_add(generated.matches("LazyRepeatedView").count())
+            .ok_or("theme generated lazy-repeated-view count overflow")?;
+    }
+    if files != EXPECTED_FILES || bytes > MAX_GENERATED_BYTES || repeated != 0 || lazy_repeated != 0
+    {
+        return Err(format!(
+            "Keynote theme projection generated {files} files/{bytes} bytes/{repeated} RepeatedView mentions/{lazy_repeated} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
+        )
+        .into());
     }
     Ok(())
 }
@@ -8346,79 +8622,7 @@ fn enforce_pages_native_message_provenance(proto_directory: &Path) -> Result<(),
     // Keep their workspace routes private and check them only as a build-time
     // provenance seam. The canonical message blocks below are the authority
     // for what each number means; no ID is added to the public codec API.
-    const ROUTE_DECLARATIONS: [(&str, &str, &str, &str); 21] = [
-        (
-            "../litchi-iwa/src/pages/editor.rs",
-            "const MOVIE_MESSAGE_TYPE: u32 = 3_007;",
-            "../litchi-iwa/src/pages/editor.rs",
-            "MOVIE_MESSAGE_TYPE => remap_pages_movie_wire",
-        ),
-        (
-            "../litchi-iwa/src/pages/editor.rs",
-            "const CAPTION_INFO_MESSAGE_TYPE: u32 = 633;",
-            "../litchi-iwa/src/pages/editor.rs",
-            "CAPTION_INFO_MESSAGE_TYPE => remap_pages_caption_info_wire",
-        ),
-        (
-            "../litchi-iwa/src/pages/editor/movies/graph.rs",
-            "const MOVIE_MESSAGE_TYPE: u32 = 3_007;",
-            "../litchi-iwa/src/pages/editor/movies/graph.rs",
-            "decode_typed_package_object(package, identifier, MOVIE_MESSAGE_TYPE",
-        ),
-        (
-            "../litchi-iwa/src/pages/editor/movies/caption.rs",
-            "const MOVIE_MESSAGE_TYPE: u32 = 3_007;",
-            "../litchi-iwa/src/pages/editor/movies/caption.rs",
-            "MOVIE_MESSAGE_TYPE,\n        \"TSD.MovieArchive\",",
-        ),
-        (
-            "../litchi-iwa/src/pages/editor/audio/graph.rs",
-            "const AUDIO_MESSAGE_TYPE: u32 = 3_007;",
-            "../litchi-iwa/src/pages/editor/audio/graph.rs",
-            "decode_typed_package_object(\n        editor.package(),\n        drawable_object_id,\n        AUDIO_MESSAGE_TYPE,\n",
-        ),
-        (
-            "../litchi-iwa/src/pages/editor/body_shapes/caption.rs",
-            "const THEME_MESSAGE_TYPE: u32 = 10_001;",
-            "../litchi-iwa/src/pages/editor/body_shapes/caption.rs",
-            ".filter(|message| message.type_ == THEME_MESSAGE_TYPE)",
-        ),
-        (
-            "../litchi-iwa/src/image_caption.rs",
-            "pub(crate) const CAPTION_INFO_MESSAGE_TYPE: u32 = 633;",
-            "../litchi-iwa/src/image_caption.rs",
-            ".filter(|message| message.type_ == CAPTION_INFO_MESSAGE_TYPE)",
-        ),
-        (
-            "../litchi-iwa/src/pages/editor/footnotes.rs",
-            "const FOOTNOTE_REFERENCE_MESSAGE_TYPE: u32 = 2_008;",
-            "../litchi-iwa/src/pages/editor/footnotes.rs",
-            "pages_footnote_codec::decode_footnote_reference(",
-        ),
-        (
-            "../litchi-iwa/src/pages/editor/footnotes.rs",
-            "const TEXTUAL_ATTACHMENT_MESSAGE_TYPE: u32 = 2_004;",
-            "../litchi-iwa/src/pages/editor/footnotes.rs",
-            "pages_footnote_marker_codec::decode_textual_attachment(",
-        ),
-        (
-            "../litchi-iwa/src/pages/editor.rs",
-            "const DOCUMENT_MESSAGE_TYPE: u32 = 10000;",
-            "../litchi-iwa/src/pages/editor.rs",
-            ".find(|message| message.type_ == DOCUMENT_MESSAGE_TYPE)\n            .map(|message| message.data.as_slice())\n            .ok_or_else(|| {\n                Error::InvalidFormat(\"Pages root has no TP.DocumentArchive payload\".to_owned())\n            })?;\n        let snapshot = pages_body_codec::decode_document_root(",
-        ),
-        (
-            "../litchi-iwa/src/pages/editor.rs",
-            "const SECTION_MESSAGE_TYPE: u32 = 10011;",
-            "../litchi-iwa/src/pages/editor.rs",
-            "SECTION_MESSAGE_TYPE,\n        \"TP.SectionArchive\",",
-        ),
-        (
-            "../litchi-iwa/src/pages/creation.rs",
-            "enum PagesMessageType {",
-            "../litchi-iwa/src/pages/creation.rs",
-            "PagesMessageType::Document,\n            document,",
-        ),
+    const ROUTE_DECLARATIONS: [(&str, &str, &str, &str); 9] = [
         (
             "../litchi-pages/src/package.rs",
             "const SECTION_MESSAGE_TYPE: u32 = 10_011;",
@@ -8479,112 +8683,7 @@ fn enforce_pages_native_message_provenance(proto_directory: &Path) -> Result<(),
     // private numeric routes exist; these markers prove that each route is
     // still used by the intended code path rather than a comment, string, or
     // test-only compatibility shim.
-    const PRODUCTION_ROUTE_MARKERS: [(&str, &str, usize); 40] = [
-        (
-            "../litchi-iwa/src/pages/editor/movies/graph.rs",
-            "decode_typed_package_object(\n        editor.package(),\n        drawable_object_id,\n        MOVIE_MESSAGE_TYPE,\n",
-            1,
-        ),
-        (
-            "../litchi-iwa/src/pages/editor/movies/graph.rs",
-            ".filter(|message| message.type_ == MOVIE_MESSAGE_TYPE)",
-            1,
-        ),
-        (
-            "../litchi-iwa/src/pages/editor/movies/graph.rs",
-            "pages_movie_object(\n            ids.drawable,\n            MOVIE_MESSAGE_TYPE,\n            movie,",
-            1,
-        ),
-        (
-            "../litchi-iwa/src/pages/editor/movies/graph.rs",
-            ".filter(|(_, message)| message.type_ == MOVIE_MESSAGE_TYPE)",
-            2,
-        ),
-        (
-            "../litchi-iwa/src/pages/editor/movies/graph.rs",
-            "type_: MOVIE_MESSAGE_TYPE,\n                data,",
-            2,
-        ),
-        (
-            "../litchi-iwa/src/pages/editor.rs",
-            "pages_body_codec::decode_document_root(",
-            1,
-        ),
-        (
-            "../litchi-iwa/src/pages/editor.rs",
-            "SECTION_MESSAGE_TYPE => {\n                        if !section_objects.insert(identifier)",
-            1,
-        ),
-        (
-            "../litchi-iwa/src/pages/editor.rs",
-            ".any(|message| message.type_ == SECTION_MESSAGE_TYPE)",
-            1,
-        ),
-        (
-            "../litchi-iwa/src/pages/editor.rs",
-            "SECTION_MESSAGE_TYPE => {\n            const REFERENCE_PATHS:",
-            1,
-        ),
-        (
-            "../litchi-iwa/src/pages/editor.rs",
-            "let mut cloned = clone_pages_object_metadata(\n        source,\n        new_identifier,\n        vec![RawMessage {\n            type_: message.type_,\n            data,\n        }],",
-            1,
-        ),
-        (
-            "../litchi-iwa/src/pages/editor/audio/graph.rs",
-            ".filter(|message| message.type_ == AUDIO_MESSAGE_TYPE)",
-            1,
-        ),
-        (
-            "../litchi-iwa/src/pages/editor/audio/graph.rs",
-            ".filter(|(_, message)| message.type_ == AUDIO_MESSAGE_TYPE)",
-            2,
-        ),
-        (
-            "../litchi-iwa/src/pages/editor/audio/graph.rs",
-            "decode_typed_package_object(package, identifier, AUDIO_MESSAGE_TYPE, \"TSD.MovieArchive\")?",
-            1,
-        ),
-        (
-            "../litchi-iwa/src/pages/editor/audio/graph.rs",
-            "pages_audio_object(\n            ids.drawable,\n            AUDIO_MESSAGE_TYPE,\n            audio,",
-            1,
-        ),
-        (
-            "../litchi-iwa/src/pages/editor/audio/graph.rs",
-            "type_: AUDIO_MESSAGE_TYPE,\n                data,",
-            2,
-        ),
-        (
-            "../litchi-iwa/src/pages/creation.rs",
-            "Document = 10_000,",
-            1,
-        ),
-        (
-            "../litchi-iwa/src/pages/creation.rs",
-            "Section = 10_011,",
-            1,
-        ),
-        (
-            "../litchi-iwa/src/pages/creation.rs",
-            "Settings = 10_012,",
-            1,
-        ),
-        (
-            "../litchi-iwa/src/pages/creation.rs",
-            "PagesMessageType::Section,\n            tp::SectionArchive",
-            1,
-        ),
-        (
-            "../litchi-iwa/src/pages/creation.rs",
-            "PagesMessageType::Settings,\n            tp::SettingsArchive",
-            1,
-        ),
-        (
-            "../litchi-iwa/src/pages/creation.rs",
-            "type_: message_type.value(),\n            data,",
-            1,
-        ),
+    const PRODUCTION_ROUTE_MARKERS: [(&str, &str, usize); 17] = [
         (
             "../litchi-pages/src/package.rs",
             "let payload = unique_message_payload(&object.messages, 10_000, \"Pages root object 1\")?",
@@ -8603,16 +8702,6 @@ fn enforce_pages_native_message_provenance(proto_directory: &Path) -> Result<(),
         (
             "../litchi-pages/src/package/footnote_text.rs",
             "let marker_payload = unique_message_payload(\n            &marker.messages,\n            TEXTUAL_ATTACHMENT_MESSAGE_TYPE,",
-            1,
-        ),
-        (
-            "../litchi-iwa/src/pages/editor/body_shapes/caption.rs",
-            ".filter(|message| message.type_ == CAPTION_INFO_MESSAGE_TYPE)",
-            1,
-        ),
-        (
-            "../litchi-iwa/src/pages/editor/body_shapes/caption.rs",
-            "pages_movie_caption_codec::decode_caption_info(",
             1,
         ),
         (
@@ -8662,7 +8751,7 @@ fn enforce_pages_native_message_provenance(proto_directory: &Path) -> Result<(),
         ),
         (
             "../litchi-pages/src/package/footnote_text.rs",
-            "let body =\n        find_object(components, body_identifier.get())",
+            "let body = find_object(components, body_identifier.get())",
             1,
         ),
         (
@@ -8680,13 +8769,6 @@ fn enforce_pages_native_message_provenance(proto_directory: &Path) -> Result<(),
             "let marker_identifier = footnote_marker_identifier(",
             1,
         ),
-    ];
-    const REGISTRY_DECLARATIONS: [&str; 5] = [
-        "3007u32 => decode_shape_archive,",
-        "2004u32 => decode_storage_archive,",
-        "2008u32 => decode_storage_archive,",
-        "2001u32 => decode_storage_archive,",
-        "2022u32 => decode_storage_archive,",
     ];
     const MOVIE_FIELDS: [&str; 2] = [
         "required .TSD.DrawableArchive super = 1;",
@@ -8807,7 +8889,6 @@ fn enforce_pages_native_message_provenance(proto_directory: &Path) -> Result<(),
     // workspace-only numeric route check is intentionally skipped. A partial
     // sibling checkout is an error so one missing route cannot weaken this
     // seam silently.
-    const REGISTRY_SOURCE: &str = "../litchi-iwa/src/protobuf.rs";
     const ADDITIONAL_ROUTE_SOURCES: [&str; 5] = [
         "../litchi-pages/src/package/footnote_text.rs",
         "../litchi-pages/src/package/section_background.rs",
@@ -8822,8 +8903,7 @@ fn enforce_pages_native_message_provenance(proto_directory: &Path) -> Result<(),
         })
         || ADDITIONAL_ROUTE_SOURCES
             .iter()
-            .any(|path| Path::new(path).is_file())
-        || Path::new(REGISTRY_SOURCE).is_file();
+            .any(|path| Path::new(path).is_file());
     let all_routes_present = ROUTE_DECLARATIONS
         .iter()
         .all(|(declaration_path, _, use_path, _)| {
@@ -8831,8 +8911,7 @@ fn enforce_pages_native_message_provenance(proto_directory: &Path) -> Result<(),
         })
         && ADDITIONAL_ROUTE_SOURCES
             .iter()
-            .all(|path| Path::new(path).is_file())
-        && Path::new(REGISTRY_SOURCE).is_file();
+            .all(|path| Path::new(path).is_file());
     let route_scope_ok = if !any_route_present {
         true
     } else if !all_routes_present {
@@ -8863,18 +8942,9 @@ fn enforce_pages_native_message_provenance(proto_directory: &Path) -> Result<(),
         declarations_ok && production_markers_ok
     };
 
-    let registry_scope_ok = if !any_route_present || !all_routes_present {
-        true
-    } else {
-        let registry = fs::read_to_string(REGISTRY_SOURCE)?;
-        REGISTRY_DECLARATIONS
-            .iter()
-            .all(|declaration| rust_code_marker_count(&registry, declaration) == 1)
-    };
-
-    if !canonical_scope_ok || !route_scope_ok || !registry_scope_ok {
+    if !canonical_scope_ok || !route_scope_ok {
         return Err(
-            "Pages native message provenance drifted: private Movie/audio 3007, body-shape theme 10001, Caption 633, FootnoteReference 2008, TextualAttachment 2004, section template/storage (10143/2001/2022), legacy editor Document/Section (10000/10011), creation Document/Section/Settings (10000/10011/10012), package Document/Section/Settings (10000/10011/10012), or table-lock root (10000) routes no longer match their message-scoped canonical declarations and production decode/remap/write sites"
+            "Pages native message provenance drifted: Movie 3007 and Caption 633 schema fields, FootnoteReference 2008, TextualAttachment 2004, section template/storage (10143/2001/2022), package Document/Section/Settings (10000/10011/10012), or table-lock root (10000) routes no longer match their message-scoped canonical declarations and production decode/remap/write sites"
                 .into(),
         );
     }
@@ -9380,6 +9450,50 @@ fn enforce_keynote_slide_number_projection_provenance(
         || !fs::read_to_string("src/lib.rs")?.contains("mod buffa_keynote_slide_number_generated")
     {
         return Err("derived Keynote slide-number projection drifted from the selected KN/TSWP fields, introduced generated repeated storage or production encoding, or lost its private generated boundary".into());
+    }
+    Ok(())
+}
+
+fn enforce_number_attachment_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const SOURCE_FIELDS: [&str; 4] = [
+        "optional .TSWP.TextualAttachmentArchive super = 1;",
+        "optional uint32 number_format = 2;",
+        "optional string string_value = 3;",
+        "optional string number_format_name = 4;",
+    ];
+    const TEXTUAL_FIELDS: [&str; 2] = [
+        "optional string string_equivalent = 1;",
+        "optional .TSWP.TextualAttachmentArchive.Kind kind = 2;",
+    ];
+    const PROJECTION: &str = "syntax = \"proto2\";\npackage LitchiIwaProjection;\nmessage TextualAttachmentArchive {\noptional string string_equivalent = 1;\noptional int32 kind = 2;\n}\nmessage NumberAttachmentArchive {\noptional .LitchiIwaProjection.TextualAttachmentArchive super = 1;\noptional uint32 number_format = 2;\noptional string string_value = 3;\noptional string number_format_name = 4;\n}";
+    let source = fs::read_to_string(proto_directory.join("TSWPArchives.proto"))?;
+    let projection =
+        fs::read_to_string(projection_directory.join("TSWPNumberAttachmentArchive.proto"))?;
+    let normalized = projection
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with("//"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let number = proto_message_block(&source, "NumberAttachmentArchive").unwrap_or_default();
+    let textual = proto_message_block(&source, "TextualAttachmentArchive").unwrap_or_default();
+    if !SOURCE_FIELDS
+        .iter()
+        .all(|field| proto_field(number, field) == 1)
+        || !TEXTUAL_FIELDS
+            .iter()
+            .all(|field| proto_field(textual, field) == 1)
+        || normalized != PROJECTION
+        || projection.len() > 2 * 1024
+        || !fs::read_to_string("src/lib.rs")?.contains("mod buffa_number_attachment_generated")
+        || !fs::read_to_string("src/number_attachment_codec.rs")
+            .unwrap_or_default()
+            .contains("decode_lazy_view")
+    {
+        return Err("number-attachment Buffa projection drifted from TSWP schema or lost its private lazy boundary".into());
     }
     Ok(())
 }
@@ -11065,6 +11179,46 @@ fn enforce_keynote_media_lifecycle_projection_budget(
     Ok(())
 }
 
+fn enforce_theme_archive_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
+    // The theme sidecar intentionally has no repeated generated view.  The
+    // strict codec owns the input-width preset lists and all extension/raw
+    // spans, so this check prevents an accidental schema widening from
+    // changing the allocation profile of the owner.
+    const EXPECTED_FILES: usize = 5;
+    const MAX_GENERATED_BYTES: u64 = 96 * 1024;
+    let mut files = 0usize;
+    let mut bytes = 0u64;
+    let mut repeated = 0usize;
+    let mut lazy_repeated = 0usize;
+    for entry_result in fs::read_dir(directory)? {
+        let entry = entry_result?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files = files
+            .checked_add(1)
+            .ok_or("theme projection generated file-count overflow")?;
+        bytes = bytes
+            .checked_add(entry.metadata()?.len())
+            .ok_or("theme projection generated-byte count overflow")?;
+        let generated = fs::read_to_string(entry.path())?;
+        repeated = repeated
+            .checked_add(generated.matches("RepeatedView").count())
+            .ok_or("theme projection generated repeated-view count overflow")?;
+        lazy_repeated = lazy_repeated
+            .checked_add(generated.matches("LazyRepeatedView").count())
+            .ok_or("theme projection generated lazy-repeated-view count overflow")?;
+    }
+    if files != EXPECTED_FILES || bytes > MAX_GENERATED_BYTES || repeated != 0 || lazy_repeated != 0
+    {
+        return Err(format!(
+            "theme archive projection generated {files} files/{bytes} bytes/{repeated} RepeatedView mentions/{lazy_repeated} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
+        )
+        .into());
+    }
+    Ok(())
+}
+
 fn enforce_formula_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
     const EXPECTED_FILES: &[&str] = &[
         "LitchiIwaFormulaProjection.mod.rs",
@@ -11344,6 +11498,40 @@ fn enforce_keynote_slide_number_projection_budget(directory: &Path) -> Result<()
     if files != EXPECTED_FILES || bytes > MAX_GENERATED_BYTES || repeated != 0 || lazy_repeated != 0
     {
         return Err(format!("Keynote slide-number projection generated {files} files/{bytes} bytes/{repeated} RepeatedView mentions/{lazy_repeated} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views").into());
+    }
+    Ok(())
+}
+
+fn enforce_number_attachment_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: usize = 5;
+    const MAX_GENERATED_BYTES: u64 = 64 * 1024;
+    let mut files = 0usize;
+    let mut bytes = 0u64;
+    let mut repeated_views = 0usize;
+    for entry_result in fs::read_dir(directory)? {
+        let entry = entry_result?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files = files
+            .checked_add(1)
+            .ok_or("generated file count overflow")?;
+        bytes = bytes
+            .checked_add(entry.metadata()?.len())
+            .ok_or("generated byte count overflow")?;
+        repeated_views = repeated_views
+            .checked_add(
+                fs::read_to_string(entry.path())?
+                    .matches("RepeatedView")
+                    .count(),
+            )
+            .ok_or("generated repeated-view count overflow")?;
+    }
+    if files != EXPECTED_FILES || bytes > MAX_GENERATED_BYTES || repeated_views != 0 {
+        return Err(format!(
+            "number-attachment projection generated {files} files/{bytes} bytes/{repeated_views} repeated-view mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
+        )
+        .into());
     }
     Ok(())
 }
@@ -11942,6 +12130,39 @@ fn enforce_keynote_media_creation_projection_budget(
     {
         return Err(format!(
             "Keynote media creation projection generated {files} files/{bytes} bytes/{repeated_views} RepeatedView mentions/{lazy_repeated_views} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn enforce_keynote_shape_creation_projection_budget(
+    directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: usize = 4;
+    // The rectangle text-box closure contains one bounded repeated point and
+    // one bounded repeated text field. Keep the generated source finite so a
+    // future projection edit cannot pull in the complete native graph.
+    const MAX_GENERATED_BYTES: u64 = 768 * 1024;
+
+    let mut files = 0usize;
+    let mut bytes = 0u64;
+    for entry_result in fs::read_dir(directory)? {
+        let entry = entry_result?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files = files
+            .checked_add(1)
+            .ok_or("Keynote shape creation generated file count overflow")?;
+        bytes = bytes
+            .checked_add(entry.metadata()?.len())
+            .ok_or("Keynote shape creation generated byte count overflow")?;
+    }
+
+    if files != EXPECTED_FILES || bytes > MAX_GENERATED_BYTES {
+        return Err(format!(
+            "Keynote shape creation projection generated {files} files/{bytes} bytes; expected {EXPECTED_FILES} files and at most {MAX_GENERATED_BYTES} bytes"
         )
         .into());
     }

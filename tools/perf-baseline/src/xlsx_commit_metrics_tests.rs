@@ -210,17 +210,17 @@ fn xlsx_commit_save_operation_returns_exact_output_and_semantic_commit()
     for update_count in [1, spec.one_percent_updates.len()] {
         let updates = &spec.one_percent_updates[..update_count];
         let expected = xlsx_expected_output(&corpus, updates)?;
-        let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+        let workbook = XlsxPackage::from_bytes(&corpus.archive)?;
         let edit = prepare_xlsx_updates(&workbook, updates)?;
         let mut sink = CountingSink::bounded(xlsx_output_ceiling(expected.len())?, 64 * 1024);
         sink.reserve_budget()?;
 
         let commit = xlsx_commit_save_operation(edit, &mut sink)?;
         assert_eq!(sink.bytes, expected);
-        assert_eq!(commit.patch().len(), updates.len());
-        verify_xlsx_cells(commit.workbook(), spec, updates)?;
+        assert_eq!(commit.patch().operation_count(), updates.len());
+        verify_xlsx_cells(commit.package(), spec, updates)?;
 
-        let reopened = Workbook::from_bytes(sink.bytes.clone())?;
+        let reopened = XlsxPackage::from_bytes(&sink.bytes)?;
         verify_xlsx_cells(&reopened, spec, updates)?;
         let encoded_sink = serde_json::to_value(sink.summary())?;
         assert_eq!(
@@ -238,7 +238,7 @@ fn xlsx_commit_save_operation_propagates_a_short_counting_sink() -> Result<(), B
     let spec = xlsx_spec(&corpus)?;
     let updates = &spec.one_percent_updates[..1];
     let expected = xlsx_expected_output(&corpus, updates)?;
-    let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+    let workbook = XlsxPackage::from_bytes(&corpus.archive)?;
     let edit = prepare_xlsx_updates(&workbook, updates)?;
     let short_limit = u64::try_from(expected.len().checked_sub(1).ok_or("empty XLSX output")?)?;
     let mut sink = CountingSink::bounded(short_limit, 64 * 1024);

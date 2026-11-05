@@ -100,6 +100,34 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    #[error("the Pages {path} has no unambiguous section background")]
+    InvalidSource { path: Path },
+    #[error(
+        "Pages section-background {kind} limit exceeded at {path}: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        path: Path,
+        kind: LimitKind,
+        observed: u64,
+        maximum: u64,
+    },
+    #[error("could not allocate {amount} units for the Pages section-background transaction")]
+    Allocation { amount: usize },
+    #[error("the edited Pages {path} background failed verification")]
+    Verification { path: Path },
+    #[error("the Pages section-background patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     #[error(
         "the Pages section-background selector is ambiguous at positions {first:?} and {duplicate:?}"
     )]
@@ -113,23 +141,25 @@ pub enum Error {
     PositionNotFound { position: Position },
     #[error("the Pages {path} does not support exact section-background editing")]
     UnsupportedSource { path: Path },
-    #[error("the Pages {path} has no unambiguous section background")]
-    InvalidSource { path: Path },
-    #[error(
-        "Pages section-background {kind} limit exceeded at {path}: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        path: Path,
-        kind: LimitKind,
-        observed: u64,
-        maximum: u64,
-    },
-    #[error("could not allocate {amount} units for the Pages section-background transaction")]
-    Allocation { amount: usize },
-    #[error("the edited Pages {path} background failed verification")]
-    Verification { path: Path },
-    #[error("the Pages section-background patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::AmbiguousSelector { .. } => RefusalKind::InvalidValue,
+            Self::NameNotFound { .. } | Self::PositionNotFound { .. } => RefusalKind::NotFound,
+            Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// One background staged against an immutable package snapshot.
@@ -366,6 +396,12 @@ impl Commit {
     #[must_use]
     pub fn into_package(self) -> Package {
         self.package
+    }
+
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
     }
     #[must_use]
     pub const fn patch(&self) -> &Patch {

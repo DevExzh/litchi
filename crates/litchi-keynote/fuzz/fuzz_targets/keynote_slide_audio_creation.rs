@@ -2,7 +2,7 @@
 
 //! Bounded selector-first fuzzing for fresh Keynote slide audio.
 //!
-//! The target exercises [`Package::add_slide_audio`] against arbitrary
+//! The target exercises [`Package::edit_slide_audio_creation`] against arbitrary
 //! bounded package bytes and a mandatory checked-in native package seed. A
 //! successful transaction must preserve the source, reopen and validate its
 //! candidate, replay exactly, restore through its inverse, and produce the
@@ -14,8 +14,8 @@ use std::{fmt::Debug, fmt::Display, hint::black_box, sync::OnceLock, time::Durat
 use libfuzzer_sys::fuzz_target;
 use litchi_iwa_common::shape::geometry::Point;
 use litchi_keynote::{
-    Limits, MediaPart, MovieSelector, Package, ReadOptions, SemanticLimits, SlideSelector,
-    slide::audio::Options,
+    MovieSelector, OpenOptions, Package, SemanticLimits, SlideSelector, SourceLimits,
+    slide::audio::Options, slide::media::data::MediaPart,
 };
 
 const MAX_INPUT_BYTES: u64 = 1024 * 1024;
@@ -40,27 +40,29 @@ fuzz_target!(|data: &[u8]| {
     exercise_seed(data);
 });
 
-fn fuzz_options() -> ReadOptions {
-    static OPTIONS: OnceLock<ReadOptions> = OnceLock::new();
+fn fuzz_options() -> OpenOptions {
+    static OPTIONS: OnceLock<OpenOptions> = OnceLock::new();
     *OPTIONS.get_or_init(|| {
-        let archive = Limits::new(
-            MAX_PACKAGE_BYTES,
-            MAX_ENTRIES,
-            MAX_ENTRY_BYTES,
-            MAX_EXPANDED_BYTES,
-            MAX_IWA_STREAM_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid audio-creation archive limits: {error}"));
-        let semantic = SemanticLimits::new(
-            MAX_OBJECTS,
-            MAX_SLIDES,
-            MAX_REFERENCES,
-            MAX_TEXT_STORAGES,
-            MAX_TEXT_FRAGMENTS,
-            MAX_TEXT_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid audio-creation semantic limits: {error}"));
-        ReadOptions::new(archive, semantic)
+        let archive = SourceLimits::builder()
+            .max_input_bytes(MAX_PACKAGE_BYTES)
+            .and_then(|limits| limits.max_entries(MAX_ENTRIES))
+            .and_then(|limits| limits.max_entry_bytes(MAX_ENTRY_BYTES))
+            .and_then(|limits| limits.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+            .and_then(|limits| limits.max_component_bytes(MAX_IWA_STREAM_BYTES))
+            .and_then(|limits| limits.build())
+            .unwrap_or_else(|error| unreachable!("valid audio-creation archive limits: {error}"));
+        let semantic = SemanticLimits::builder()
+            .max_objects(MAX_OBJECTS)
+            .and_then(|limits| limits.max_slides(MAX_SLIDES))
+            .and_then(|limits| limits.max_references(MAX_REFERENCES))
+            .and_then(|limits| limits.max_text_storages(MAX_TEXT_STORAGES))
+            .and_then(|limits| limits.max_text_fragments(MAX_TEXT_FRAGMENTS))
+            .and_then(|limits| limits.max_text_bytes(MAX_TEXT_BYTES))
+            .and_then(|limits| limits.build())
+            .unwrap_or_else(|error| unreachable!("valid audio-creation semantic limits: {error}"));
+        OpenOptions::new()
+            .source_limits(archive)
+            .semantic_limits(semantic)
     })
 }
 
@@ -97,7 +99,11 @@ fn exercise_package(package: &Package, data: &[u8]) {
     let filename = requested_filename(data);
     let options = requested_options(data);
     let slide = requested_slide(data);
-    let commit = match package.add_slide_audio(slide, &filename, &audio, options) {
+    let commit = match package
+        .edit_slide_audio_creation()
+        .add(slide, &filename, &audio, options)
+        .and_then(|edit| edit.commit())
+    {
         Ok(commit) => commit,
         Err(error) => {
             observe_error(error);
@@ -176,7 +182,9 @@ fn verify_seed_success_contract(package: &Package) {
     let data = seed_audio();
     let options = seed_options();
     let commit = package
-        .add_slide_audio(SlideSelector::index(0), "fuzz-seed.wav", &data, options)
+        .edit_slide_audio_creation()
+        .add(SlideSelector::index(0), "fuzz-seed.wav", &data, options)
+        .and_then(|edit| edit.commit())
         .unwrap_or_else(|error| panic!("native audio-creation seed must commit: {error}"));
     assert!(!commit.patch().is_noop());
     assert_eq!(commit.patch().options(), options);
@@ -219,29 +227,26 @@ fn verify_seed_success_contract(package: &Package) {
 }
 
 fn exercise_limit_budget() {
-    let semantic = SemanticLimits::new(
-        SemanticLimits::MAX_OBJECTS,
-        SemanticLimits::MAX_SLIDES,
-        1,
-        SemanticLimits::MAX_TEXT_STORAGES,
-        SemanticLimits::MAX_TEXT_FRAGMENTS,
-        SemanticLimits::MAX_TEXT_BYTES,
-    )
-    .unwrap_or_else(|error| panic!("finite audio-creation semantic limit must build: {error}"));
+    let semantic = SemanticLimits::builder()
+        .max_references(1)
+        .and_then(|limits| limits.build())
+        .unwrap_or_else(|error| panic!("finite audio-creation semantic limit must build: {error}"));
     let package = Package::from_bytes_with_options(
         NATIVE_KEYNOTE,
-        ReadOptions::new(Limits::default(), semantic),
+        OpenOptions::new().semantic_limits(semantic),
     )
     .unwrap_or_else(|error| panic!("native audio-creation limit seed must open: {error}"));
     let source_bytes = package_bytes(&package);
     assert!(
         package
-            .add_slide_audio(
+            .edit_slide_audio_creation()
+            .add(
                 SlideSelector::index(0),
                 "limit.wav",
                 &seed_audio(),
                 seed_options(),
             )
+            .and_then(|edit| edit.commit())
             .is_err(),
         "the tight reference budget must reject creation"
     );

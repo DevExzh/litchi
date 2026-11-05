@@ -126,8 +126,9 @@ struct Profile {
 pub(crate) fn read_owner(xml: &[u8]) -> Result<Owner> {
     if xml.len() > MAX_OWNER_BYTES {
         return Err(Error::Limit {
-            resource: "zoom owner XML",
-            limit: MAX_OWNER_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: xml.len(),
+            maximum: MAX_OWNER_BYTES,
         });
     }
 
@@ -174,8 +175,11 @@ pub(crate) fn read_owner(xml: &[u8]) -> Result<Owner> {
                     .ok_or_else(|| Error::Invalid("zoom XML node count overflow".into()))?;
                 if nodes > MAX_OWNER_NODES {
                     return Err(Error::Limit {
-                        resource: "zoom owner XML nodes",
-                        limit: MAX_OWNER_NODES,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlNodes,
+                        ),
+                        observed: nodes,
+                        maximum: MAX_OWNER_NODES,
                     });
                 }
                 let changes = apply_namespace_declarations(&element, decoder, &mut namespaces)?;
@@ -239,8 +243,11 @@ pub(crate) fn read_owner(xml: &[u8]) -> Result<Owner> {
                     .ok_or_else(|| Error::Invalid("zoom XML node count overflow".into()))?;
                 if nodes > MAX_OWNER_NODES {
                     return Err(Error::Limit {
-                        resource: "zoom owner XML nodes",
-                        limit: MAX_OWNER_NODES,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlNodes,
+                        ),
+                        observed: nodes,
+                        maximum: MAX_OWNER_NODES,
                     });
                 }
                 let changes = apply_namespace_declarations(&element, decoder, &mut namespaces)?;
@@ -312,8 +319,11 @@ pub(crate) fn read_owner(xml: &[u8]) -> Result<Owner> {
                     })?;
                     if spans.len() >= MAX_ZOOMS {
                         return Err(Error::Limit {
-                            resource: "zoom entry count",
-                            limit: MAX_ZOOMS,
+                            kind: crate::opened::LimitKind::Codec(
+                                crate::opened::CodecLimitKind::ZoomEntries,
+                            ),
+                            observed: spans.len().checked_add(1).unwrap_or(usize::MAX),
+                            maximum: MAX_ZOOMS,
                         });
                     }
                     let value = parse_alternate(raw, inherited)?;
@@ -460,8 +470,9 @@ fn restore_namespace_declarations(
 fn parse_alternate(raw: &[u8], inherited: &HashMap<String, String>) -> Result<Zoom> {
     if raw.len() > MAX_UNKNOWN_BYTES {
         return Err(Error::Limit {
-            resource: "zoom alternate-content XML",
-            limit: MAX_UNKNOWN_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: raw.len(),
+            maximum: MAX_UNKNOWN_BYTES,
         });
     }
     let dom = parse_dom(raw, inherited)?;
@@ -851,8 +862,11 @@ fn parse_dom(raw: &[u8], inherited: &HashMap<String, String>) -> Result<Dom> {
                 nodes += 1;
                 if nodes > MAX_OWNER_NODES {
                     return Err(Error::Limit {
-                        resource: "zoom alternate-content nodes",
-                        limit: MAX_OWNER_NODES,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlNodes,
+                        ),
+                        observed: nodes,
+                        maximum: MAX_OWNER_NODES,
                     });
                 }
                 let changes = apply_namespace_declarations(&element, decoder, &mut namespaces)?;
@@ -863,8 +877,11 @@ fn parse_dom(raw: &[u8], inherited: &HashMap<String, String>) -> Result<Dom> {
                 nodes += 1;
                 if nodes > MAX_OWNER_NODES {
                     return Err(Error::Limit {
-                        resource: "zoom alternate-content nodes",
-                        limit: MAX_OWNER_NODES,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlNodes,
+                        ),
+                        observed: nodes,
+                        maximum: MAX_OWNER_NODES,
                     });
                 }
                 let changes = apply_namespace_declarations(&element, decoder, &mut namespaces)?;
@@ -1198,8 +1215,9 @@ fn walk(node: &Node, visitor: &mut impl FnMut(&Node) -> Result<()>) -> Result<()
 fn validate_entries(entries: &[Zoom]) -> Result<()> {
     if entries.len() > MAX_ZOOMS {
         return Err(Error::Limit {
-            resource: "zoom entry count",
-            limit: MAX_ZOOMS,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::ZoomEntries),
+            observed: entries.len(),
+            maximum: MAX_ZOOMS,
         });
     }
     let mut ids = HashSet::new();
@@ -1268,8 +1286,9 @@ fn validate_zoom(value: &Zoom) -> Result<()> {
         Zoom::Unknown(value) => {
             if value.xml.len() > MAX_UNKNOWN_BYTES {
                 return Err(Error::Limit {
-                    resource: "unknown zoom XML",
-                    limit: MAX_UNKNOWN_BYTES,
+                    kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                    observed: value.xml.len(),
+                    maximum: MAX_UNKNOWN_BYTES,
                 });
             }
             let mut inherited = HashMap::new();
@@ -1292,8 +1311,12 @@ fn validate_properties(value: &Properties) -> Result<()> {
         || value.shape_properties_xml.len() > MAX_UNKNOWN_BYTES
     {
         return Err(Error::Limit {
-            resource: "zoom DrawingML property XML",
-            limit: MAX_UNKNOWN_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: value
+                .blip_fill_xml
+                .len()
+                .max(value.shape_properties_xml.len()),
+            maximum: MAX_UNKNOWN_BYTES,
         });
     }
     let parsed = parse_blip_relationship(&value.blip_fill_xml)?;
@@ -1322,8 +1345,9 @@ fn validate_properties(value: &Properties) -> Result<()> {
 fn validate_fallback(xml: &[u8], local: &str) -> Result<()> {
     if xml.len() > MAX_UNKNOWN_BYTES {
         return Err(Error::Limit {
-            resource: "zoom fallback XML",
-            limit: MAX_UNKNOWN_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: xml.len(),
+            maximum: MAX_UNKNOWN_BYTES,
         });
     }
     let mut inherited = HashMap::new();
@@ -1346,8 +1370,9 @@ fn validate_optional_extension(xml: Option<&[u8]>) -> Result<()> {
     };
     if xml.len() > MAX_UNKNOWN_BYTES {
         return Err(Error::Limit {
-            resource: "zoom extension XML",
-            limit: MAX_UNKNOWN_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: xml.len(),
+            maximum: MAX_UNKNOWN_BYTES,
         });
     }
     let mut inherited = HashMap::new();
@@ -1365,8 +1390,9 @@ fn validate_unknown<'a>(values: impl Iterator<Item = &'a Vec<u8>>) -> Result<()>
     for value in values {
         if value.len() > MAX_UNKNOWN_BYTES {
             return Err(Error::Limit {
-                resource: "zoom unknown XML",
-                limit: MAX_UNKNOWN_BYTES,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                observed: value.len(),
+                maximum: MAX_UNKNOWN_BYTES,
             });
         }
     }
@@ -1481,8 +1507,9 @@ pub(crate) fn write_zoom(value: &Zoom, owner: &Owner) -> Result<Vec<u8>> {
     xml.push_str("</mc:AlternateContent>");
     if xml.len() > MAX_UNKNOWN_BYTES {
         return Err(Error::Limit {
-            resource: "serialized zoom XML",
-            limit: MAX_UNKNOWN_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: xml.len(),
+            maximum: MAX_UNKNOWN_BYTES,
         });
     }
     Ok(xml.into_bytes())
@@ -1588,7 +1615,12 @@ pub(crate) fn validate_in_package(
     source: &dyn Part,
 ) -> Result<()> {
     validate_entries(&owner.entries)?;
-    let graph = crate::presentation_properties::metadata::structure::load(package)?;
+    let graph = crate::presentation_properties::metadata::structure::load(
+        package,
+        crate::presentation_properties::metadata::structure::Limits::from_source_limits(
+            package.read_limits(),
+        ),
+    )?;
     let slide_ids = graph
         .slides
         .iter()

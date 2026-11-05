@@ -1,0 +1,1785 @@
+use std::collections::BTreeSet;
+
+use super::support;
+use crate::form::TextControl;
+use crate::{
+    Package, ScriptResourceKind, ScriptResourceSpec,
+    core::{OwnedPackage as CoreOwnedPackage, PackageWriter, Profile},
+    elements::field::DynamicTextField,
+    mutable::MutableDocument,
+    note::{Note, NoteClass},
+    odc::{ChartClass, Definition},
+    package::{
+        embedded::{EmbeddedResource, EmbeddedResourceKind, EmbeddedResourceSource},
+        forms::{AuthoredForm, AuthoredFormControl},
+    },
+    protection::Policy,
+    rdf::{Object, Subject, Triple},
+    ruby_family::{
+        Alignment, Annotation as RubyAnnotation, Base as RubyBase, Properties as RubyProperties,
+        Style as RubyStyle,
+    },
+    transaction::{
+        EnvelopeKind, HistoryLimits, MergeChoice, MergePlan, OperationResult, ParagraphSelector,
+        Position, SubEditJoinFailure, TransferDependencyKind,
+    },
+};
+use litchi_odf_common::Error;
+use litchi_odf_common::package::raw_identical_members;
+
+fn source() -> Package {
+    let mut document = MutableDocument::new();
+    document.add_paragraph("Unique paragraph").unwrap();
+    Package::from_bytes(&document.to_bytes().unwrap()).unwrap()
+}
+
+#[test]
+fn content_only_edits_raw_preserve_unchanged_media_and_metadata() {
+    const MEDIA_PATH: &str = "Pictures/opaque.bin";
+    let mut base = MutableDocument::new();
+    base.add_paragraph("Before").unwrap();
+    let base = CoreOwnedPackage::from_bytes(base.to_bytes().unwrap()).unwrap();
+    let package = base.package().unwrap();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
+    writer
+        .set_mimetype("application/vnd.oasis.opendocument.text")
+        .unwrap();
+    for path in package.files().unwrap() {
+        if matches!(path.as_str(), "mimetype" | "META-INF/manifest.xml") || path.ends_with('/') {
+            continue;
+        }
+        writer
+            .add_file_with_media_type(
+                &path,
+                &package.get_file(&path).unwrap(),
+                package.manifest().get_media_type(&path).unwrap_or_default(),
+            )
+            .unwrap();
+    }
+    writer.add_manifest_directory("Pictures/", "").unwrap();
+    writer
+        .add_file_with_media_type(
+            MEDIA_PATH,
+            &vec![0x5a; 1024 * 1024],
+            "application/octet-stream",
+        )
+        .unwrap();
+    let source_bytes = writer.finish_to_bytes().unwrap();
+    let source = Package::from_bytes(&source_bytes).unwrap();
+    let snapshot = source.clone();
+
+    let mut edit = snapshot.edit();
+    edit.replace_paragraph(Position::new(0), "Interim")
+        .unwrap()
+        .replace_paragraph(Position::new(0), "After")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let identical = raw_identical_members(&source_bytes, commit.package().as_bytes()).unwrap();
+
+    assert!(!identical.contains("content.xml"));
+    for path in [
+        "mimetype",
+        "styles.xml",
+        "meta.xml",
+        "META-INF/manifest.xml",
+        MEDIA_PATH,
+    ] {
+        assert!(identical.contains(path), "{path}");
+    }
+    let reopened = commit.package().document().unwrap();
+    assert_eq!(reopened.paragraphs().unwrap()[0].text().unwrap(), "After");
+    assert_eq!(
+        reopened.get_file(MEDIA_PATH).unwrap(),
+        vec![0x5a; 1024 * 1024]
+    );
+    assert_eq!(
+        snapshot
+            .apply(commit.patch())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        commit.package().as_bytes()
+    );
+    assert_eq!(
+        commit
+            .package()
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        source_bytes
+    );
+
+    let mut edit = snapshot.edit();
+    edit.append_line_break(ParagraphSelector::position(Position::new(0)))
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let identical = raw_identical_members(&source_bytes, commit.package().as_bytes()).unwrap();
+    assert!(!identical.contains("content.xml"));
+    for path in [
+        "mimetype",
+        "styles.xml",
+        "meta.xml",
+        "META-INF/manifest.xml",
+        MEDIA_PATH,
+    ] {
+        assert!(identical.contains(path), "{path}");
+    }
+    let reopened = commit.package().document().unwrap();
+    assert_eq!(
+        reopened.paragraphs().unwrap()[0].text().unwrap(),
+        "Before\n"
+    );
+    assert_eq!(
+        snapshot
+            .apply(commit.patch())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        commit.package().as_bytes()
+    );
+    assert_eq!(
+        commit
+            .package()
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        source_bytes
+    );
+
+    for style_name in [None, Some("Emphasis")] {
+        let mut edit = snapshot.edit();
+        edit.append_run(Position::new(0), " appended", style_name)
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        let identical = raw_identical_members(&source_bytes, commit.package().as_bytes()).unwrap();
+        assert!(!identical.contains("content.xml"));
+        for path in [
+            "mimetype",
+            "styles.xml",
+            "meta.xml",
+            "META-INF/manifest.xml",
+            MEDIA_PATH,
+        ] {
+            assert!(identical.contains(path), "{path}");
+        }
+        let reopened = commit.package().document().unwrap();
+        assert_eq!(
+            reopened.paragraphs().unwrap()[0].text().unwrap(),
+            "Before appended"
+        );
+        let content = std::str::from_utf8(&reopened.get_file("content.xml").unwrap())
+            .unwrap()
+            .to_owned();
+        assert_eq!(
+            content.contains("text:style-name=\"Emphasis\""),
+            style_name.is_some()
+        );
+        assert_eq!(
+            snapshot
+                .apply(commit.patch())
+                .unwrap()
+                .into_package()
+                .as_bytes(),
+            commit.package().as_bytes()
+        );
+        assert_eq!(
+            commit
+                .package()
+                .apply(&commit.patch().inverse())
+                .unwrap()
+                .into_package()
+                .as_bytes(),
+            source_bytes
+        );
+        assert!(commit.package().apply(commit.patch()).is_err());
+    }
+
+    let mut edit = snapshot.edit();
+    edit.append_hyperlink(
+        Position::new(0),
+        "https://example.invalid/content-only",
+        " linked",
+    )
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    let identical = raw_identical_members(&source_bytes, commit.package().as_bytes()).unwrap();
+    assert!(!identical.contains("content.xml"));
+    for path in [
+        "mimetype",
+        "styles.xml",
+        "meta.xml",
+        "META-INF/manifest.xml",
+        MEDIA_PATH,
+    ] {
+        assert!(identical.contains(path), "{path}");
+    }
+    let reopened = commit.package().document().unwrap();
+    assert_eq!(
+        reopened.paragraphs().unwrap()[0].text().unwrap(),
+        "Before linked"
+    );
+    assert_eq!(
+        reopened.hyperlinks().unwrap(),
+        [(
+            " linked".to_string(),
+            "https://example.invalid/content-only".to_string(),
+        )]
+    );
+    assert_eq!(
+        snapshot
+            .apply(commit.patch())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        commit.package().as_bytes()
+    );
+    assert_eq!(
+        commit
+            .package()
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        source_bytes
+    );
+    assert!(commit.package().apply(commit.patch()).is_err());
+
+    for inserted in [true, false] {
+        let mut edit = snapshot.edit();
+        if inserted {
+            edit.insert_paragraph(Position::new(0), "Inserted").unwrap();
+        } else {
+            edit.remove_paragraph(Position::new(0)).unwrap();
+        }
+        let commit = edit.commit().unwrap();
+        let identical = raw_identical_members(&source_bytes, commit.package().as_bytes()).unwrap();
+        assert!(!identical.contains("content.xml"));
+        for path in [
+            "mimetype",
+            "styles.xml",
+            "meta.xml",
+            "META-INF/manifest.xml",
+            MEDIA_PATH,
+        ] {
+            assert!(identical.contains(path), "{path}");
+        }
+        let reopened = commit.package().document().unwrap();
+        let text = reopened
+            .paragraphs()
+            .unwrap()
+            .into_iter()
+            .map(|paragraph| paragraph.text().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            text,
+            if inserted {
+                vec!["Inserted".to_string(), "Before".to_string()]
+            } else {
+                Vec::new()
+            }
+        );
+        assert_eq!(
+            snapshot
+                .apply(commit.patch())
+                .unwrap()
+                .into_package()
+                .as_bytes(),
+            commit.package().as_bytes()
+        );
+        assert_eq!(
+            commit
+                .package()
+                .apply(&commit.patch().inverse())
+                .unwrap()
+                .into_package()
+                .as_bytes(),
+            source_bytes
+        );
+        assert!(commit.package().apply(commit.patch()).is_err());
+    }
+}
+
+#[test]
+fn consecutive_paragraph_replacements_match_scalar_semantics_and_durable_replay() {
+    let mut document = MutableDocument::new();
+    for text in ["zero", "one", "two", "three"] {
+        document.add_paragraph(text).unwrap();
+    }
+    let snapshot = Package::from_bytes(&document.to_bytes().unwrap()).unwrap();
+
+    let mut edit = snapshot.edit();
+    edit.replace_paragraph(Position::new(0), "ZERO")
+        .unwrap()
+        .replace_paragraph(Position::new(2), "TWO")
+        .unwrap()
+        .replace_paragraph(Position::new(2), "two-final")
+        .unwrap()
+        .replace_paragraph(Position::new(3), "THREE")
+        .unwrap();
+    let committed = edit.commit().unwrap();
+    assert_eq!(committed.results().len(), 4);
+
+    let mut scalar = snapshot.clone();
+    for (index, text) in [(0, "ZERO"), (2, "TWO"), (2, "two-final"), (3, "THREE")] {
+        let mut edit = scalar.edit();
+        edit.replace_paragraph(Position::new(index), text).unwrap();
+        scalar = edit.commit().unwrap().into_package();
+    }
+    let coalesced_document = committed.package().document().unwrap();
+    let scalar_document = scalar.document().unwrap();
+    let coalesced_paragraphs = coalesced_document
+        .paragraphs()
+        .unwrap()
+        .into_iter()
+        .map(|paragraph| paragraph.text().unwrap())
+        .collect::<Vec<_>>();
+    let scalar_paragraphs = scalar_document
+        .paragraphs()
+        .unwrap()
+        .into_iter()
+        .map(|paragraph| paragraph.text().unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(coalesced_paragraphs, ["ZERO", "one", "two-final", "THREE"]);
+    assert_eq!(coalesced_paragraphs, scalar_paragraphs);
+    assert_eq!(
+        coalesced_document.text().unwrap(),
+        scalar_document.text().unwrap()
+    );
+
+    let coalesced_package =
+        CoreOwnedPackage::from_bytes(committed.package().as_bytes().to_vec()).unwrap();
+    let scalar_package = CoreOwnedPackage::from_bytes(scalar.as_bytes().to_vec()).unwrap();
+    let coalesced_archive = coalesced_package.package().unwrap();
+    let scalar_archive = scalar_package.package().unwrap();
+    let source_package = CoreOwnedPackage::from_bytes(snapshot.as_bytes().to_vec()).unwrap();
+    let source_archive = source_package.package().unwrap();
+    let mut source_paths = source_archive.files().unwrap();
+    let mut coalesced_paths = coalesced_archive.files().unwrap();
+    let mut scalar_paths = scalar_archive.files().unwrap();
+    source_paths.sort();
+    coalesced_paths.sort();
+    scalar_paths.sort();
+    assert_eq!(source_paths, coalesced_paths);
+    assert_eq!(coalesced_paths, scalar_paths);
+    for path in coalesced_paths {
+        assert_eq!(
+            coalesced_archive.get_file(&path).unwrap(),
+            scalar_archive.get_file(&path).unwrap(),
+            "logical package member diverged: {path}"
+        );
+    }
+
+    let expected_untouched = [
+        "mimetype".to_owned(),
+        "styles.xml".to_owned(),
+        "meta.xml".to_owned(),
+        "META-INF/manifest.xml".to_owned(),
+    ]
+    .into_iter()
+    .collect::<BTreeSet<_>>();
+    let coalesced_raw_identical =
+        raw_identical_members(snapshot.as_bytes(), committed.package().as_bytes()).unwrap();
+    let scalar_raw_identical =
+        raw_identical_members(snapshot.as_bytes(), scalar.as_bytes()).unwrap();
+    assert_eq!(coalesced_raw_identical, expected_untouched);
+    assert_eq!(scalar_raw_identical, expected_untouched);
+
+    let durable = committed.patch().durable().unwrap();
+    let wire = durable.to_deterministic_json().unwrap();
+    assert_eq!(
+        wire.windows(b"paragraph.replace".len())
+            .filter(|window| *window == b"paragraph.replace")
+            .count(),
+        4
+    );
+    let decoded = crate::transaction::DurablePatch::from_deterministic_json(&wire).unwrap();
+    let replayed = decoded.apply(&snapshot).unwrap();
+    assert_eq!(replayed.as_bytes(), committed.package().as_bytes());
+    assert_eq!(
+        decoded.inverse().apply(&replayed).unwrap().as_bytes(),
+        snapshot.as_bytes()
+    );
+}
+
+#[test]
+fn consecutive_paragraph_replacements_refuse_late_invalid_position_atomically() {
+    let source = source().clone();
+    let source_bytes = source.as_bytes().to_vec();
+    let mut edit = source.edit();
+    edit.replace_paragraph(Position::new(0), "changed")
+        .unwrap()
+        .replace_paragraph(Position::new(1), "missing")
+        .unwrap();
+
+    assert!(edit.commit().is_err());
+    assert_eq!(source.as_bytes(), source_bytes);
+    assert_eq!(
+        source.document().unwrap().text().unwrap(),
+        "Unique paragraph"
+    );
+}
+
+#[test]
+fn mixed_model_content_run_matches_scalar_semantics_and_patch_replay() {
+    let mut document = MutableDocument::new();
+    for text in ["zero", "one", "two"] {
+        document.add_paragraph(text).unwrap();
+    }
+    let snapshot = Package::from_bytes(&document.to_bytes().unwrap()).unwrap();
+
+    let mut coalesced = snapshot.edit();
+    coalesced
+        .remove_paragraph(Position::new(0))
+        .unwrap()
+        .insert_paragraph(Position::new(1), "inserted")
+        .unwrap()
+        .replace_paragraph(Position::new(2), "TWO")
+        .unwrap()
+        .append_run(Position::new(1), " run", Some("Emphasis"))
+        .unwrap()
+        .append_hyperlink(Position::new(2), "https://example.invalid/mixed", " linked")
+        .unwrap();
+    let coalesced = coalesced.commit().unwrap();
+
+    let mut scalar = snapshot.clone();
+    for operation in [
+        (0usize, "", 4u8),
+        (1, "inserted", 0),
+        (2, "TWO", 1),
+        (1, " run", 2),
+        (2, " linked", 3),
+    ] {
+        let mut edit = scalar.edit();
+        match operation.2 {
+            0 => {
+                edit.insert_paragraph(Position::new(operation.0), operation.1)
+                    .unwrap();
+            },
+            1 => {
+                edit.replace_paragraph(Position::new(operation.0), operation.1)
+                    .unwrap();
+            },
+            2 => {
+                edit.append_run(Position::new(operation.0), operation.1, Some("Emphasis"))
+                    .unwrap();
+            },
+            3 => {
+                edit.append_hyperlink(
+                    Position::new(operation.0),
+                    "https://example.invalid/mixed",
+                    operation.1,
+                )
+                .unwrap();
+            },
+            4 => {
+                edit.remove_paragraph(Position::new(operation.0)).unwrap();
+            },
+            _ => unreachable!(),
+        }
+        scalar = edit.commit().unwrap().into_package();
+    }
+
+    assert_eq!(coalesced.results().len(), 5);
+    assert_eq!(coalesced.results()[0], OperationResult::Unit);
+    assert_eq!(coalesced.results()[1], OperationResult::Index(1));
+    assert!(
+        coalesced.results()[2..]
+            .iter()
+            .all(|result| matches!(result, OperationResult::Unit))
+    );
+
+    // A repeated scalar publication is not a whole-archive byte oracle for
+    // this rich mixed run: each reopen may canonicalize the content model.
+    // Compare the semantic projection and untouched package members instead.
+    let reopened = coalesced.package().document().unwrap();
+    let scalar_reopened = scalar.document().unwrap();
+    assert_eq!(reopened.text().unwrap(), "one\ninserted run\nTWO linked");
+    assert_eq!(reopened.text().unwrap(), scalar_reopened.text().unwrap());
+    assert_eq!(
+        reopened.hyperlinks().unwrap(),
+        [(
+            " linked".to_string(),
+            "https://example.invalid/mixed".to_string(),
+        )]
+    );
+    let content = String::from_utf8(reopened.get_file("content.xml").unwrap()).unwrap();
+    assert!(content.contains("<text:span text:style-name=\"Emphasis\"> run</text:span>"));
+    assert!(content.contains("<text:a xlink:href=\"https://example.invalid/mixed\""));
+
+    let coalesced_package =
+        CoreOwnedPackage::from_bytes(coalesced.package().as_bytes().to_vec()).unwrap();
+    let scalar_package = CoreOwnedPackage::from_bytes(scalar.as_bytes().to_vec()).unwrap();
+    let coalesced_archive = coalesced_package.package().unwrap();
+    let scalar_archive = scalar_package.package().unwrap();
+    let mut coalesced_paths = coalesced_archive.files().unwrap();
+    let mut scalar_paths = scalar_archive.files().unwrap();
+    coalesced_paths.sort();
+    scalar_paths.sort();
+    assert_eq!(coalesced_paths, scalar_paths);
+    for path in coalesced_paths {
+        if path != "content.xml" {
+            assert_eq!(
+                coalesced_archive.get_file(&path).unwrap(),
+                scalar_archive.get_file(&path).unwrap(),
+                "logical package member diverged: {path}"
+            );
+        }
+    }
+    let raw_identical =
+        raw_identical_members(snapshot.as_bytes(), coalesced.package().as_bytes()).unwrap();
+    for path in [
+        "mimetype",
+        "styles.xml",
+        "meta.xml",
+        "META-INF/manifest.xml",
+    ] {
+        assert!(raw_identical.contains(path), "{path}");
+    }
+    assert!(!raw_identical.contains("content.xml"));
+
+    let durable = coalesced.patch().durable().unwrap();
+    let wire = durable.to_deterministic_json().unwrap();
+    let decoded = crate::transaction::DurablePatch::from_deterministic_json(&wire).unwrap();
+    assert_eq!(
+        decoded.apply(&snapshot).unwrap().as_bytes(),
+        coalesced.package().as_bytes()
+    );
+    assert_eq!(
+        decoded
+            .inverse()
+            .apply(coalesced.package())
+            .unwrap()
+            .as_bytes(),
+        snapshot.as_bytes()
+    );
+
+    let mut foreign_document = MutableDocument::new();
+    for text in ["zero", "one", "foreign"] {
+        foreign_document.add_paragraph(text).unwrap();
+    }
+    let foreign = Package::from_bytes(&foreign_document.to_bytes().unwrap()).unwrap();
+    assert!(foreign.apply(coalesced.patch()).is_err());
+    assert!(coalesced.package().apply(coalesced.patch()).is_err());
+}
+
+#[test]
+fn inline_append_then_plain_replace_starts_a_fresh_batch() {
+    let snapshot = source().clone();
+    let mut edit = snapshot.edit();
+    edit.append_run(Position::new(0), " run", Some("Emphasis"))
+        .unwrap()
+        .append_hyperlink(
+            Position::new(0),
+            "https://example.invalid/barrier",
+            " linked",
+        )
+        .unwrap()
+        .replace_paragraph(Position::new(0), "replacement")
+        .unwrap();
+    let committed = edit.commit().unwrap();
+    let reopened = committed.package().document().unwrap();
+
+    assert_eq!(committed.results().len(), 3);
+    assert_eq!(reopened.text().unwrap(), "replacement");
+    assert!(reopened.hyperlinks().unwrap().is_empty());
+    let content = String::from_utf8(reopened.get_file("content.xml").unwrap()).unwrap();
+    assert!(!content.contains("text:span"));
+    assert!(!content.contains("text:a"));
+}
+
+#[test]
+fn plain_replace_then_inline_append_stays_in_one_batch() {
+    let snapshot = source().clone();
+    let mut edit = snapshot.edit();
+    edit.replace_paragraph(Position::new(0), "replacement")
+        .unwrap()
+        .append_run(Position::new(0), " run", Some("Emphasis"))
+        .unwrap()
+        .append_hyperlink(
+            Position::new(0),
+            "https://example.invalid/ordered",
+            " linked",
+        )
+        .unwrap();
+    let committed = edit.commit().unwrap();
+    let reopened = committed.package().document().unwrap();
+
+    assert_eq!(committed.results().len(), 3);
+    assert_eq!(reopened.text().unwrap(), "replacement run linked");
+    assert_eq!(
+        reopened.hyperlinks().unwrap(),
+        [(
+            " linked".to_string(),
+            "https://example.invalid/ordered".to_string(),
+        )]
+    );
+    let content = String::from_utf8(reopened.get_file("content.xml").unwrap()).unwrap();
+    assert!(content.contains("<text:span text:style-name=\"Emphasis\"> run</text:span>"));
+    assert!(content.contains("<text:a xlink:href=\"https://example.invalid/ordered\""));
+}
+
+#[test]
+fn mixed_model_content_run_refuses_late_invalid_operation_atomically() {
+    let source = source().clone();
+    let source_bytes = source.as_bytes().to_vec();
+    let mut edit = source.edit();
+    edit.replace_paragraph(Position::new(0), "changed")
+        .unwrap()
+        .append_hyperlink(Position::new(1), "https://example.invalid/late", "missing")
+        .unwrap();
+
+    assert!(edit.commit().is_err());
+    assert_eq!(source.as_bytes(), source_bytes);
+    assert_eq!(
+        source.document().unwrap().text().unwrap(),
+        "Unique paragraph"
+    );
+}
+
+#[test]
+fn xml_only_line_break_remains_a_model_content_batch_barrier() {
+    let source = source().clone();
+
+    let mut edit = source.edit();
+    edit.replace_paragraph(Position::new(0), "before break")
+        .unwrap()
+        .append_line_break(ParagraphSelector::position(Position::new(0)))
+        .unwrap()
+        .replace_paragraph(Position::new(0), "after break")
+        .unwrap();
+    let committed = edit.commit().unwrap();
+
+    let mut scalar = source.clone();
+    let mut edit = scalar.edit();
+    edit.replace_paragraph(Position::new(0), "before break")
+        .unwrap();
+    scalar = edit.commit().unwrap().into_package();
+    let mut edit = scalar.edit();
+    edit.append_line_break(ParagraphSelector::position(Position::new(0)))
+        .unwrap();
+    scalar = edit.commit().unwrap().into_package();
+    let mut edit = scalar.edit();
+    edit.replace_paragraph(Position::new(0), "after break")
+        .unwrap();
+    scalar = edit.commit().unwrap().into_package();
+
+    assert_eq!(committed.results().len(), 3);
+    assert_eq!(committed.package().as_bytes(), scalar.as_bytes());
+    assert_eq!(
+        committed.package().document().unwrap().text().unwrap(),
+        "after break"
+    );
+}
+
+#[test]
+fn non_replacement_operation_ends_paragraph_replacement_run() {
+    let mut document = MutableDocument::new();
+    document.add_paragraph("zero").unwrap();
+    document.add_paragraph("one").unwrap();
+    document.add_paragraph("two").unwrap();
+    let snapshot = Package::from_bytes(&document.to_bytes().unwrap()).unwrap();
+    let mut edit = snapshot.edit();
+    edit.replace_paragraph(Position::new(0), "ZERO")
+        .unwrap()
+        .replace_paragraph(Position::new(1), "ONE")
+        .unwrap()
+        .append_run(Position::new(1), "!", None)
+        .unwrap();
+
+    let commit = edit.commit().unwrap();
+    assert_eq!(commit.results().len(), 3);
+    assert_eq!(
+        commit.package().document().unwrap().text().unwrap(),
+        "ZERO\nONE!\ntwo"
+    );
+}
+
+#[test]
+fn paragraph_replacement_above_common_raw_limit_uses_existing_rebuild_path() {
+    const PARAGRAPH_COUNT: usize = 16_120;
+    const TARGET: usize = PARAGRAPH_COUNT / 2;
+    let text = "x".repeat(1024);
+    let mut document = MutableDocument::new();
+    for _ in 0..PARAGRAPH_COUNT {
+        document.add_paragraph(&text).unwrap();
+    }
+    let source = Package::from_bytes(&document.to_bytes().unwrap()).unwrap();
+    assert!(
+        source
+            .document()
+            .unwrap()
+            .get_file("content.xml")
+            .unwrap()
+            .len()
+            > litchi_odf_common::package::MAX_CONTENT_REPLACEMENT_BYTES
+    );
+    let snapshot = source.clone();
+
+    let mut edit = snapshot.edit();
+    edit.replace_paragraph(Position::new(TARGET), "fallback replacement")
+        .unwrap()
+        .replace_paragraph(Position::new(TARGET + 1), "second fallback replacement")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let reopened = commit.package().document().unwrap();
+    let paragraphs = reopened.paragraphs().unwrap();
+
+    assert_eq!(paragraphs.len(), PARAGRAPH_COUNT);
+    assert_eq!(paragraphs[TARGET].text().unwrap(), "fallback replacement");
+    assert_eq!(paragraphs[TARGET - 1].text().unwrap(), text);
+    assert_eq!(
+        paragraphs[TARGET + 1].text().unwrap(),
+        "second fallback replacement"
+    );
+    assert_eq!(paragraphs[TARGET + 2].text().unwrap(), text);
+}
+
+fn real_producer_source() -> Package {
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
+    writer
+        .set_mimetype("application/vnd.oasis.opendocument.text")
+        .unwrap();
+    writer
+        .add_file(
+            "content.xml",
+            include_bytes!("../fixtures/libreoffice-master-document-content.xml"),
+        )
+        .unwrap();
+    writer
+        .add_file(
+            "styles.xml",
+            br#"<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" office:version="1.3"><office:styles/></office:document-styles>"#,
+        )
+        .unwrap();
+    writer
+        .add_file(
+            "meta.xml",
+            br#"<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" office:version="1.3"><office:meta/></office:document-meta>"#,
+        )
+        .unwrap();
+    Package::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap()
+}
+
+fn assert_all_package_xml_is_compact(bytes: &[u8]) {
+    let package = crate::core::package::OwnedPackage::from_bytes(bytes.to_vec()).unwrap();
+    let archive = package.package().unwrap();
+    for path in archive.files().unwrap() {
+        if path.ends_with(".xml") || path.ends_with(".rdf") {
+            litchi_odf_common::compact_xml::validate(
+                &archive.get_file(&path).unwrap(),
+                litchi_odf_common::compact_xml::Limits::default(),
+            )
+            .unwrap();
+        }
+    }
+}
+
+#[test]
+fn packaged_transaction_is_source_checked_reversible_and_exact_for_noop() {
+    let source = source();
+    let snapshot = source.clone();
+
+    let no_op = snapshot.edit().commit().unwrap();
+    assert_eq!(no_op.package().as_bytes(), snapshot.as_bytes());
+
+    let mut edit = snapshot.edit();
+    edit.append_line_break(ParagraphSelector::exact_text("Unique paragraph"))
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(
+        commit.package().document().unwrap().paragraphs().unwrap()[0]
+            .text()
+            .unwrap()
+            .contains('\n')
+    );
+    assert_eq!(
+        commit
+            .package()
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        snapshot.as_bytes()
+    );
+    assert!(commit.package().apply(commit.patch()).is_err());
+}
+
+#[test]
+fn packaged_transaction_rejects_ambiguous_text_selectors() {
+    let mut document = MutableDocument::new();
+    document.add_paragraph("duplicate").unwrap();
+    document.add_paragraph("duplicate").unwrap();
+    let source = Package::from_bytes(&document.to_bytes().unwrap()).unwrap();
+    let snapshot = source.clone();
+
+    assert!(
+        snapshot
+            .edit()
+            .append_line_break(ParagraphSelector::exact_text("duplicate"))
+            .is_err()
+    );
+}
+
+#[test]
+fn checked_positions_are_resolved_against_the_source_snapshot() {
+    let source = source();
+    let snapshot = source.clone();
+    let position = Position::new(0);
+
+    let mut edit = snapshot.edit();
+    edit.append_line_break(ParagraphSelector::position(position))
+        .unwrap();
+    assert!(edit.commit().is_ok());
+
+    assert!(
+        snapshot
+            .edit()
+            .append_line_break(ParagraphSelector::position(Position::new(1)))
+            .is_err()
+    );
+}
+
+#[test]
+fn rdf_transaction_preserves_a_real_producer_package_and_is_reversible() {
+    let source = real_producer_source();
+    let before = source.clone();
+    let triple = Triple {
+        subject: Subject::Iri("urn:litchi:document".to_string()),
+        predicate: "urn:litchi:review#reviewed".to_string(),
+        object: Object::Literal {
+            value: "true".to_string(),
+            datatype: None,
+            language: None,
+        },
+    };
+
+    let mut edit = source.edit();
+    edit.add_rdf_graph(Some("metadata/litchi.rdf"), std::slice::from_ref(&triple))
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let after = commit.package().document().unwrap();
+    let graphs = after.rdf_graphs().unwrap();
+    assert_eq!(graphs.len(), 1);
+    assert_eq!(graphs[0].path, "metadata/litchi.rdf");
+    assert_eq!(graphs[0].triples, vec![triple]);
+    assert_eq!(
+        commit
+            .package()
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        before.as_bytes()
+    );
+}
+
+#[test]
+fn changed_transactions_refuse_signed_and_encrypted_envelopes() {
+    let mut signed_writer =
+        PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
+    signed_writer
+        .set_mimetype("application/vnd.oasis.opendocument.text")
+        .unwrap();
+    signed_writer
+        .add_file(
+            "content.xml",
+            br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:text><text:p>signed</text:p></office:text></office:body></office:document-content>"#,
+        )
+        .unwrap();
+    signed_writer
+        .add_file("META-INF/documentsignatures.xml", b"<signatures/>")
+        .unwrap();
+    let signed = Package::from_bytes(&signed_writer.finish_to_bytes().unwrap()).unwrap();
+    let signed_snapshot = signed.clone();
+    assert_eq!(
+        signed_snapshot.envelope_kind().unwrap(),
+        EnvelopeKind::Signed
+    );
+    assert_eq!(
+        signed_snapshot
+            .edit()
+            .commit()
+            .unwrap()
+            .package()
+            .as_bytes(),
+        signed_snapshot.as_bytes()
+    );
+    let mut signed_edit = signed.edit();
+    signed_edit
+        .append_line_break(ParagraphSelector::at(0))
+        .unwrap();
+    assert!(signed_edit.commit().is_err());
+
+    let mut encrypted_writer =
+        PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
+    encrypted_writer
+        .set_mimetype("application/vnd.oasis.opendocument.text")
+        .unwrap();
+    encrypted_writer
+        .set_encryption("secret", Profile::compatible())
+        .unwrap();
+    encrypted_writer
+        .add_file(
+            "content.xml",
+            br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:text><text:p>encrypted</text:p></office:text></office:body></office:document-content>"#,
+        )
+        .unwrap();
+    let encrypted_bytes = encrypted_writer.finish_to_bytes().unwrap();
+    let encrypted = Package::from_bytes_with_password(&encrypted_bytes, "secret").unwrap();
+    let encrypted_snapshot = encrypted.clone();
+    assert_eq!(
+        encrypted_snapshot.envelope_kind().unwrap(),
+        EnvelopeKind::Encrypted
+    );
+    let encrypted_noop = encrypted_snapshot.edit().commit().unwrap();
+    assert_eq!(
+        encrypted_noop.package().as_bytes(),
+        encrypted_snapshot.as_bytes()
+    );
+    assert!(encrypted_noop.patch().durable().is_err());
+    let mut encrypted_edit = encrypted.edit();
+    encrypted_edit
+        .append_line_break(ParagraphSelector::at(0))
+        .unwrap();
+    assert!(encrypted_edit.commit().is_err());
+}
+
+#[test]
+fn form_and_linked_resource_operations_commit_as_one_atomic_package() {
+    let source = source();
+    let before = source.clone();
+    let form = AuthoredForm::new("ReviewForm");
+    let resource = EmbeddedResource {
+        kind: EmbeddedResourceKind::Object,
+        source: EmbeddedResourceSource::Linked {
+            href: "https://example.invalid/inert-object".to_string(),
+        },
+        frame_name: Some("ReviewObject".to_string()),
+        xml_id: Some("review-object".to_string()),
+        class_id: None,
+    };
+
+    let mut edit = source.edit();
+    edit.add_form(0, &form)
+        .unwrap()
+        .add_embedded_resource(&resource)
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let document = commit.package().document().unwrap();
+    assert_eq!(document.forms().unwrap().groups.len(), 1);
+    assert_eq!(document.embedded_objects().unwrap().len(), 1);
+    assert_eq!(
+        commit
+            .package()
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        before.as_bytes()
+    );
+}
+
+#[test]
+fn residual_semantic_families_share_one_reversible_transaction() {
+    let source = source();
+    let triple = Triple {
+        subject: Subject::Iri("urn:litchi:transaction".to_string()),
+        predicate: "urn:litchi:review#status".to_string(),
+        object: Object::Literal {
+            value: "closed".to_string(),
+            datatype: None,
+            language: None,
+        },
+    };
+    let form = AuthoredForm::new("Parent");
+    let child = AuthoredForm::new("Child");
+    let control = AuthoredFormControl::from(TextControl::text("Review", "review-control"));
+    let script = ScriptResourceSpec {
+        kind: ScriptResourceKind::Opaque,
+        preferred_path: Some("Scripts/review.bin".to_string()),
+        media_type: "application/octet-stream".to_string(),
+        bytes: b"inert-not-executed".to_vec(),
+    };
+
+    let mut edit = source.edit();
+    edit.add_rdf_graph(Some("metadata/review.rdf"), std::slice::from_ref(&triple))
+        .unwrap()
+        .add_rdf_triple("metadata/review.rdf", &triple)
+        .unwrap()
+        .set_protection(&Policy::default().with_read_only(Some(true)))
+        .unwrap()
+        .add_form(0, &form)
+        .unwrap()
+        .add_nested_form(0, &child)
+        .unwrap()
+        .add_form_control(0, &control)
+        .unwrap()
+        .add_script_resource(&script)
+        .unwrap();
+    let commit = edit.commit().unwrap();
+
+    assert_eq!(
+        commit.results(),
+        &[
+            OperationResult::Path("metadata/review.rdf".to_string()),
+            OperationResult::Index(1),
+            OperationResult::Unit,
+            OperationResult::Index(0),
+            OperationResult::Index(1),
+            OperationResult::Index(0),
+            OperationResult::Path("Scripts/review.bin".to_string()),
+        ]
+    );
+    let document = commit.package().document().unwrap();
+    assert_eq!(document.rdf_graphs().unwrap()[0].triples.len(), 2);
+    assert_eq!(document.protection().unwrap().read_only, Some(true));
+    assert_eq!(document.forms().unwrap().groups[0].forms.len(), 1);
+    assert_eq!(document.script_resources().unwrap()[0].bytes, script.bytes);
+    let durable = commit.patch().durable().unwrap();
+    let wire = durable.to_deterministic_json().unwrap();
+    let wire_text = std::str::from_utf8(&wire).unwrap();
+    for operation in ["form.add", "form.add_nested", "form.control.add"] {
+        assert!(wire_text.contains(operation), "missing {operation}");
+    }
+    assert_eq!(
+        durable.apply(&source.clone()).unwrap().as_bytes(),
+        commit.package().as_bytes()
+    );
+    assert_all_package_xml_is_compact(commit.package().as_bytes());
+    assert_eq!(
+        commit
+            .package()
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        source.as_bytes()
+    );
+}
+
+#[test]
+fn form_replacement_reorder_and_removal_are_durable_and_transferable() {
+    let source = source().clone();
+    let first = AuthoredForm::new("First");
+    let second = AuthoredForm::new("Second");
+    let first_control = AuthoredFormControl::from(TextControl::text("One", "one"));
+    let second_control = AuthoredFormControl::from(TextControl::text("Two", "two"));
+    let mut setup = source.edit();
+    setup
+        .add_form(0, &first)
+        .unwrap()
+        .add_form(0, &second)
+        .unwrap()
+        .add_form_control(0, &first_control)
+        .unwrap()
+        .add_form_control(0, &second_control)
+        .unwrap();
+    let setup = setup.commit().unwrap().into_package();
+
+    let replacement_form = AuthoredForm::new("Replacement");
+    let replacement_control =
+        AuthoredFormControl::from(TextControl::text("Replacement", "replacement"));
+    let mut edit = setup.edit();
+    edit.replace_form_control(0, &replacement_control)
+        .unwrap()
+        .move_form_control_to(Position::new(0), Position::new(1))
+        .unwrap()
+        .remove_form_control_at(Position::new(1))
+        .unwrap()
+        .replace_form(1, &replacement_form)
+        .unwrap()
+        .move_form_to(Position::new(0), Position::new(1))
+        .unwrap()
+        .remove_form_at(Position::new(1))
+        .unwrap();
+    let committed = edit.commit().unwrap();
+    let durable = committed.patch().durable().unwrap();
+    let wire = durable.to_deterministic_json().unwrap();
+    let wire_text = std::str::from_utf8(&wire).unwrap();
+    for operation in [
+        "form.control.replace",
+        "form.control.move",
+        "form.control.remove",
+        "form.replace",
+        "form.move",
+        "form.remove",
+    ] {
+        assert!(wire_text.contains(operation), "missing {operation}");
+    }
+    assert_eq!(
+        durable.apply(&setup).unwrap().as_bytes(),
+        committed.package().as_bytes()
+    );
+    assert_eq!(
+        committed
+            .patch()
+            .plan_transfer(&setup)
+            .unwrap()
+            .commit()
+            .unwrap()
+            .package()
+            .as_bytes(),
+        committed.package().as_bytes()
+    );
+}
+
+#[test]
+fn durable_patch_round_trips_deterministically_and_remains_exactly_reversible() {
+    let source = source();
+    let snapshot = source.clone();
+    let mut edit = snapshot.edit();
+    edit.append_line_break(ParagraphSelector::position(Position::new(0)))
+        .unwrap();
+    let commit = edit.commit().unwrap();
+
+    let durable = commit.patch().durable().unwrap();
+    let first_json = durable.to_deterministic_json().unwrap();
+    let second_json = durable.to_deterministic_json().unwrap();
+    assert_eq!(first_json, second_json);
+
+    let decoded = crate::transaction::DurablePatch::from_deterministic_json(&first_json).unwrap();
+    let applied = decoded.apply(&snapshot).unwrap();
+    assert_eq!(applied.as_bytes(), commit.package().as_bytes());
+    assert_all_package_xml_is_compact(applied.as_bytes());
+    let restored = decoded.inverse().apply(&applied).unwrap();
+    assert_eq!(restored.as_bytes(), snapshot.as_bytes());
+    assert!(matches!(
+        decoded.apply(&applied),
+        Err(Error::PatchConflict { .. })
+    ));
+}
+
+#[test]
+fn semantic_durable_patch_covers_styles_fields_revisions_rdf_protection_and_script_blobs() {
+    let source = source();
+    let snapshot = source.clone();
+    let ruby = RubyStyle::new(
+        "RubyReview",
+        Some(RubyProperties {
+            position: None,
+            alignment: Some(Alignment::Center),
+        }),
+    )
+    .unwrap();
+    let field = DynamicTextField::DdeConnection {
+        connection_name: "review-cache".to_string(),
+        display_text: " \t ".to_string(),
+    };
+    let triple = Triple {
+        subject: Subject::Iri("urn:litchi:durable".to_string()),
+        predicate: "urn:litchi:review#status".to_string(),
+        object: Object::Literal {
+            value: "ready".to_string(),
+            datatype: None,
+            language: Some("en".to_string()),
+        },
+    };
+    let script = ScriptResourceSpec {
+        kind: ScriptResourceKind::Opaque,
+        preferred_path: Some("Scripts/durable.bin".to_string()),
+        media_type: "application/octet-stream".to_string(),
+        bytes: b"durable inert payload".to_vec(),
+    };
+
+    let mut edit = snapshot.edit();
+    edit.set_ruby_style(&ruby)
+        .unwrap()
+        .insert_dynamic_text_field(Position::new(0), &field)
+        .unwrap()
+        .set_tracked_change_policy(
+            Some(true),
+            Some("c2FsdGVkLWtleQ=="),
+            Some("urn:litchi:digest:test"),
+        )
+        .unwrap()
+        .add_rdf_graph(Some("metadata/durable.rdf"), std::slice::from_ref(&triple))
+        .unwrap()
+        .set_protection(&Policy::default().with_read_only(Some(true)))
+        .unwrap()
+        .add_script_resource(&script)
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let durable = commit.patch().durable().unwrap();
+    let wire = durable.to_deterministic_json().unwrap();
+    let wire_text = std::str::from_utf8(&wire).unwrap();
+    for operation in [
+        "style.ruby.set",
+        "field.dynamic.insert",
+        "revision.policy.set",
+        "rdf.graph.add",
+        "protection.set",
+        "resource.script.add",
+    ] {
+        assert!(wire_text.contains(operation), "missing {operation}");
+    }
+    assert!(!wire_text.contains("durable inert payload"));
+
+    let decoded = crate::transaction::DurablePatch::from_deterministic_json(&wire).unwrap();
+    let applied = decoded.apply(&snapshot).unwrap();
+    assert_eq!(applied.as_bytes(), commit.package().as_bytes());
+    let reopened = applied.document().unwrap();
+    assert_eq!(reopened.ruby_styles().unwrap().styles, vec![ruby]);
+    assert_eq!(reopened.dynamic_text_fields().unwrap(), vec![field]);
+    assert_eq!(
+        reopened.tracked_changes().unwrap().track_changes,
+        Some(true)
+    );
+    assert_eq!(reopened.rdf_graphs().unwrap()[0].triples, vec![triple]);
+    assert_eq!(reopened.protection().unwrap().read_only, Some(true));
+    assert_eq!(reopened.script_resources().unwrap()[0].bytes, script.bytes);
+
+    let package =
+        crate::core::package::OwnedPackage::from_bytes(applied.as_bytes().to_vec()).unwrap();
+    let content = String::from_utf8(package.get_file("content.xml").unwrap()).unwrap();
+    assert!(content.contains("&#32;&#9;&#32;"));
+}
+
+#[test]
+fn rich_note_and_ruby_edits_use_typed_durable_fragments() {
+    let snapshot = source().clone();
+    let note = Note::new(NoteClass::Footnote, "1", "Durable footnote").unwrap();
+    let ruby = RubyAnnotation::new(None, RubyBase::from_text("漢").unwrap(), "kan", None).unwrap();
+    let mut edit = snapshot.edit();
+    edit.insert_note(Position::new(0), &note)
+        .unwrap()
+        .insert_ruby_annotation(Position::new(0), &ruby)
+        .unwrap();
+    let committed = edit.commit().unwrap();
+    let durable = committed.patch().durable().unwrap();
+    let wire = durable.to_deterministic_json().unwrap();
+    let wire_text = std::str::from_utf8(&wire).unwrap();
+    assert!(wire_text.contains("note.insert"));
+    assert!(wire_text.contains("ruby.annotation.insert"));
+    assert!(!wire_text.contains("document.replace"));
+
+    let decoded = crate::transaction::DurablePatch::from_deterministic_json(&wire).unwrap();
+    let inserted = decoded.apply(&snapshot).unwrap();
+    assert_eq!(inserted.as_bytes(), committed.package().as_bytes());
+    let reopened = inserted.document().unwrap();
+    assert_eq!(reopened.notes().unwrap(), vec![note]);
+    assert_eq!(reopened.ruby_annotations().unwrap().annotations, vec![ruby]);
+
+    let replacement_note = Note::new(NoteClass::Endnote, "A", "Replacement").unwrap();
+    let replacement_ruby =
+        RubyAnnotation::new(None, RubyBase::from_text("字").unwrap(), "ji", None).unwrap();
+    let mut replacement = inserted.edit();
+    replacement
+        .replace_note(Position::new(0), &replacement_note)
+        .unwrap()
+        .replace_ruby_annotation(Position::new(0), &replacement_ruby)
+        .unwrap();
+    let replacement = replacement.commit().unwrap();
+    let replayed = replacement
+        .patch()
+        .durable()
+        .unwrap()
+        .apply(&inserted)
+        .unwrap();
+    assert_eq!(replayed.as_bytes(), replacement.package().as_bytes());
+
+    let mut removal = replayed.edit();
+    removal
+        .remove_note(Position::new(0))
+        .unwrap()
+        .remove_ruby_annotation(Position::new(0))
+        .unwrap();
+    let removal = removal.commit().unwrap();
+    let removed = removal
+        .patch()
+        .durable()
+        .unwrap()
+        .apply(&replayed)
+        .unwrap()
+        .document()
+        .unwrap();
+    assert!(removed.notes().unwrap().is_empty());
+    assert!(removed.ruby_annotations().unwrap().annotations.is_empty());
+}
+
+#[test]
+fn chart_and_resource_payloads_replay_and_transfer_with_explicit_dependencies() {
+    let snapshot = source().clone();
+    let chart = Definition::new(ChartClass::line());
+    let resource = EmbeddedResource {
+        kind: EmbeddedResourceKind::Image,
+        source: EmbeddedResourceSource::InlineBinary {
+            bytes: b"durable-resource-payload".to_vec(),
+            media_type: Some("image/png".to_string()),
+        },
+        frame_name: Some("Durable Resource".to_string()),
+        xml_id: Some("durable-resource".to_string()),
+        class_id: None,
+    };
+    let mut edit = snapshot.edit();
+    edit.add_embedded_chart(&chart)
+        .unwrap()
+        .add_embedded_resource(&resource)
+        .unwrap();
+    let committed = edit.commit().unwrap();
+    let durable = committed.patch().durable().unwrap();
+    let wire = durable.to_deterministic_json().unwrap();
+    let wire_text = std::str::from_utf8(&wire).unwrap();
+    assert!(wire_text.contains("chart.add"));
+    assert!(wire_text.contains("resource.embedded.add"));
+    assert!(!wire_text.contains("durable-resource-payload"));
+
+    let decoded = crate::transaction::DurablePatch::from_deterministic_json(&wire).unwrap();
+    let applied = decoded.apply(&snapshot).unwrap();
+    assert_eq!(applied.as_bytes(), committed.package().as_bytes());
+    applied.document().unwrap().embedded_chart(0).unwrap();
+
+    let destination = source().clone();
+    let transfer = committed.patch().plan_transfer(&destination).unwrap();
+    assert!(transfer.dependencies().iter().any(|dependency| {
+        dependency.kind() == TransferDependencyKind::ResourcePayload && dependency.is_satisfied()
+    }));
+    let transferred = transfer.commit().unwrap();
+    transferred
+        .package()
+        .document()
+        .unwrap()
+        .embedded_chart(0)
+        .unwrap();
+
+    let mut styled = Definition::new(ChartClass::line());
+    styled.style_name = Some("MissingChartStyle".to_string());
+    let mut styled_edit = snapshot.edit();
+    styled_edit.add_embedded_chart(&styled).unwrap();
+    let styled_commit = styled_edit.commit().unwrap();
+    let styled_transfer = styled_commit.patch().plan_transfer(&destination).unwrap();
+    assert!(styled_transfer.dependencies().iter().any(|dependency| {
+        dependency.kind() == TransferDependencyKind::ChartStyle
+            && dependency.key() == "MissingChartStyle"
+            && dependency.is_satisfied()
+    }));
+    styled_transfer.commit().unwrap();
+}
+
+#[test]
+fn chart_and_resource_replacement_removal_and_moves_use_semantic_wire() {
+    let source = source().clone();
+    let linked = |name: &str| EmbeddedResource {
+        kind: EmbeddedResourceKind::Object,
+        source: EmbeddedResourceSource::Linked {
+            href: format!("https://example.invalid/{name}"),
+        },
+        frame_name: Some(name.to_string()),
+        xml_id: None,
+        class_id: None,
+    };
+    let image = |name: &str, bytes: &[u8]| EmbeddedResource {
+        kind: EmbeddedResourceKind::Image,
+        source: EmbeddedResourceSource::InlineBinary {
+            bytes: bytes.to_vec(),
+            media_type: Some("image/png".to_string()),
+        },
+        frame_name: Some(name.to_string()),
+        xml_id: None,
+        class_id: None,
+    };
+    let mut setup = source.edit();
+    setup
+        .add_embedded_resource(&linked("object-one"))
+        .unwrap()
+        .add_embedded_resource(&linked("object-two"))
+        .unwrap()
+        .add_embedded_chart(&Definition::new(ChartClass::line()))
+        .unwrap()
+        .add_embedded_chart(&Definition::new(ChartClass::bar()))
+        .unwrap()
+        .add_embedded_resource(&image("image-one", b"one"))
+        .unwrap()
+        .add_embedded_resource(&image("image-two", b"two"))
+        .unwrap();
+    let setup = setup.commit().unwrap().into_package();
+
+    let mut edit = setup.edit();
+    edit.replace_embedded_chart(2, &Definition::new(ChartClass::ring()))
+        .unwrap()
+        .remove_embedded_chart_at(Position::new(3))
+        .unwrap()
+        .replace_embedded_object(0, &linked("object-replacement"))
+        .unwrap()
+        .move_embedded_object_to(Position::new(0), Position::new(1))
+        .unwrap()
+        .remove_embedded_object_at(Position::new(1))
+        .unwrap()
+        .replace_embedded_image(0, &image("image-replacement", b"replacement"))
+        .unwrap()
+        .move_embedded_image_to(Position::new(0), Position::new(1))
+        .unwrap()
+        .remove_embedded_image_at(Position::new(1))
+        .unwrap();
+    let committed = edit.commit().unwrap();
+    let durable = committed.patch().durable().unwrap();
+    let wire = durable.to_deterministic_json().unwrap();
+    let wire_text = std::str::from_utf8(&wire).unwrap();
+    for operation in [
+        "chart.replace",
+        "chart.remove",
+        "resource.embedded.object.replace",
+        "resource.embedded.object.move",
+        "resource.embedded.object.remove",
+        "resource.embedded.image.replace",
+        "resource.embedded.image.move",
+        "resource.embedded.image.remove",
+    ] {
+        assert!(wire_text.contains(operation), "missing {operation}");
+    }
+    assert_eq!(
+        durable.apply(&setup).unwrap().as_bytes(),
+        committed.package().as_bytes()
+    );
+    assert_eq!(
+        committed
+            .patch()
+            .plan_transfer(&setup)
+            .unwrap()
+            .commit()
+            .unwrap()
+            .package()
+            .as_bytes(),
+        committed.package().as_bytes()
+    );
+}
+
+#[test]
+fn cross_document_transfer_is_dependency_checked_and_refuses_source_local_edits() {
+    let source_snapshot = source().clone();
+    let mut portable = source_snapshot.edit();
+    portable
+        .insert_paragraph(Position::new(1), "portable")
+        .unwrap()
+        .append_run(Position::new(1), " addition", None)
+        .unwrap();
+    let portable = portable.commit().unwrap();
+
+    let destination = source().clone();
+    let plan = portable.patch().plan_transfer(&destination).unwrap();
+    assert_eq!(plan.operation_count(), 2);
+    assert_eq!(plan.dependencies().len(), 1);
+    assert_eq!(
+        plan.dependencies()[0].kind(),
+        TransferDependencyKind::Paragraph
+    );
+    assert!(plan.dependencies()[0].is_satisfied());
+    assert_eq!(
+        plan.commit()
+            .unwrap()
+            .package()
+            .document()
+            .unwrap()
+            .text()
+            .unwrap(),
+        "Unique paragraph\nportable addition"
+    );
+
+    let mut local = source_snapshot.edit();
+    local
+        .replace_paragraph(Position::new(0), "source-local")
+        .unwrap();
+    let local = local.commit().unwrap();
+    assert!(local.patch().plan_transfer(&destination).is_err());
+
+    let empty = {
+        let document = MutableDocument::new();
+        Package::from_bytes(&document.to_bytes().unwrap()).unwrap()
+    };
+    let unresolved = portable.patch().plan_transfer(&empty).unwrap();
+    assert!(
+        unresolved
+            .dependencies()
+            .iter()
+            .any(|dependency| !dependency.is_satisfied())
+    );
+    assert!(unresolved.commit().is_err());
+}
+
+#[test]
+fn genuine_libreoffice_package_survives_transaction_reopen_and_full_resave() {
+    let producer = Package::from_bytes(include_bytes!(
+            "../../../../test-data/libreoffice-core/sw/qa/extras/odfexport/data/Formcontrol needs high z-index.odt"
+        ).as_ref()).unwrap();
+    let snapshot = producer.clone();
+    let triple = Triple {
+        subject: Subject::Iri("urn:litchi:libreoffice".to_string()),
+        predicate: "urn:litchi:review#reopened".to_string(),
+        object: Object::Literal {
+            value: "true".to_string(),
+            datatype: None,
+            language: None,
+        },
+    };
+    let chart = Definition::new(ChartClass::line());
+    let resource = EmbeddedResource {
+        kind: EmbeddedResourceKind::Object,
+        source: EmbeddedResourceSource::Linked {
+            href: "https://example.invalid/writer-resource".to_string(),
+        },
+        frame_name: Some("Writer Resource".to_string()),
+        xml_id: Some("writer-resource".to_string()),
+        class_id: None,
+    };
+    let mut edit = snapshot.edit();
+    edit.add_rdf_graph(
+        Some("metadata/litchi-reopen.rdf"),
+        std::slice::from_ref(&triple),
+    )
+    .unwrap()
+    .add_embedded_chart(&chart)
+    .unwrap()
+    .add_embedded_resource(&resource)
+    .unwrap();
+    let committed = edit.commit().unwrap();
+    let chart_index = match committed.results().get(1) {
+        Some(OperationResult::Index(index)) => *index,
+        other => panic!("unexpected embedded chart result: {other:?}"),
+    };
+
+    let first_reopen = Package::from_bytes(committed.package().as_bytes()).unwrap();
+    let resaved = first_reopen.to_bytes().unwrap();
+    let second_reopen = Package::from_bytes(&resaved).unwrap().document().unwrap();
+    let graph = second_reopen
+        .rdf_graphs()
+        .unwrap()
+        .into_iter()
+        .find(|graph| graph.path == "metadata/litchi-reopen.rdf")
+        .unwrap();
+    assert_eq!(graph.triples, vec![triple]);
+    assert!(!second_reopen.forms().unwrap().groups.is_empty());
+    second_reopen.embedded_chart(chart_index).unwrap();
+    assert!(second_reopen.embedded_objects().unwrap().len() >= 2);
+}
+
+#[test]
+fn raw_zip_signature_marker_is_classified_and_never_mutated() {
+    let content = br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:text><text:p>signed raw fixture</text:p></office:text></office:body></office:document-content>"#;
+    let bytes = support::package(
+        "application/vnd.oasis.opendocument.text",
+        &[
+            ("content.xml", content.as_slice()),
+            (
+                "META-INF/documentsignatures.xml",
+                b"not parsed or trusted signature bytes",
+            ),
+        ],
+    );
+    let snapshot = Package::from_bytes(&bytes).unwrap();
+    assert_eq!(snapshot.envelope_kind().unwrap(), EnvelopeKind::Signed);
+    let mut edit = snapshot.edit();
+    edit.append_line_break(ParagraphSelector::position(Position::new(0)))
+        .unwrap();
+    assert!(edit.commit().is_err());
+}
+
+#[test]
+fn sealed_durable_patch_discards_reverse_artifact_and_checks_source_digest() {
+    let source = source();
+    let snapshot = source.clone();
+    let mut edit = snapshot.edit();
+    edit.append_line_break(ParagraphSelector::position(Position::new(0)))
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let reversible_json = commit
+        .patch()
+        .durable()
+        .unwrap()
+        .to_deterministic_json()
+        .unwrap();
+    let sealed_json = commit
+        .patch()
+        .durable()
+        .unwrap()
+        .seal()
+        .to_deterministic_json()
+        .unwrap();
+    assert!(sealed_json.len() < reversible_json.len());
+
+    let sealed = crate::transaction::SealedPatch::from_deterministic_json(&sealed_json).unwrap();
+    assert_eq!(
+        sealed.apply(&snapshot).unwrap().as_bytes(),
+        commit.package().as_bytes()
+    );
+    assert!(matches!(
+        sealed.apply(commit.package()),
+        Err(Error::PatchConflict { .. })
+    ));
+}
+
+#[test]
+fn durable_patch_parser_rejects_noncanonical_json() {
+    let source = source();
+    let snapshot = source.clone();
+    let json = snapshot
+        .edit()
+        .commit()
+        .unwrap()
+        .patch()
+        .durable()
+        .unwrap()
+        .to_deterministic_json()
+        .unwrap();
+    let mut noncanonical = Vec::with_capacity(json.len() + 1);
+    noncanonical.push(b' ');
+    noncanonical.extend_from_slice(&json);
+    assert!(crate::transaction::DurablePatch::from_deterministic_json(&noncanonical).is_err());
+
+    let mut foreign_format = json;
+    let format = foreign_format
+        .windows(b"litchi.odt".len())
+        .position(|window| window == b"litchi.odt")
+        .unwrap();
+    foreign_format[format + b"litchi.odt".len() - 1] = b'x';
+    assert!(crate::transaction::DurablePatch::from_deterministic_json(&foreign_format).is_err());
+}
+
+#[test]
+fn semantic_durable_patch_replays_paragraph_runs_and_hyperlinks() {
+    let source = source();
+    let snapshot = source.clone();
+    let mut edit = snapshot.edit();
+    edit.insert_paragraph(Position::new(1), "second")
+        .unwrap()
+        .replace_paragraph(Position::new(0), "first")
+        .unwrap()
+        .append_run(Position::new(0), " styled", Some("Emphasis"))
+        .unwrap()
+        .append_hyperlink(Position::new(1), "https://example.invalid/review", "review")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let mut repeated = snapshot.edit();
+    repeated
+        .insert_paragraph(Position::new(1), "second")
+        .unwrap()
+        .replace_paragraph(Position::new(0), "first")
+        .unwrap()
+        .append_run(Position::new(0), " styled", Some("Emphasis"))
+        .unwrap()
+        .append_hyperlink(Position::new(1), "https://example.invalid/review", "review")
+        .unwrap();
+    assert_eq!(
+        repeated.commit().unwrap().package().as_bytes(),
+        commit.package().as_bytes()
+    );
+    let durable = commit.patch().durable().unwrap();
+    let wire = durable.to_deterministic_json().unwrap();
+    let wire_text = std::str::from_utf8(&wire).unwrap();
+    assert!(wire_text.contains("paragraph.insert"));
+    assert!(wire_text.contains("paragraph.replace"));
+    assert!(wire_text.contains("run.append"));
+    assert!(wire_text.contains("hyperlink.append"));
+    assert!(!wire_text.contains("document.replace"));
+
+    let reopened = durable.apply(&snapshot).unwrap().document().unwrap();
+    let paragraphs = reopened.paragraphs().unwrap();
+    assert_eq!(paragraphs[0].text().unwrap(), "first styled");
+    assert_eq!(paragraphs[1].text().unwrap(), "secondreview");
+    assert_eq!(
+        reopened.hyperlinks().unwrap()[0].1,
+        "https://example.invalid/review"
+    );
+    assert_eq!(
+        durable
+            .inverse()
+            .apply(commit.package())
+            .unwrap()
+            .as_bytes(),
+        snapshot.as_bytes()
+    );
+}
+
+#[test]
+fn deterministic_join_reports_exact_conflicts_and_commits_in_identifier_order() {
+    let mut document = MutableDocument::new();
+    document.add_paragraph("zero").unwrap();
+    document.add_paragraph("one").unwrap();
+    let snapshot = Package::from_bytes(&document.to_bytes().unwrap()).unwrap();
+
+    let mut joined = snapshot.joined_edits();
+    let mut second = snapshot.edit();
+    second.replace_paragraph(Position::new(1), "ONE").unwrap();
+    joined.join("z-second", second).unwrap();
+    let mut first = snapshot.edit();
+    first.replace_paragraph(Position::new(0), "ZERO").unwrap();
+    joined.join("a-first", first).unwrap();
+
+    let mut overlapping = snapshot.edit();
+    overlapping.append_run(Position::new(0), "!", None).unwrap();
+    // A whole-paragraph replacement and an inline append intentionally share
+    // one paragraph effect key through conservative conflict ownership.
+    let conflict = match joined.join("overlap", overlapping) {
+        Ok(_) => panic!("overlapping ODT edits must conflict"),
+        Err(conflict) => conflict,
+    };
+    assert!(matches!(conflict.failure(), SubEditJoinFailure::Overlap(_)));
+    assert!(!conflict.conflicts().unwrap().is_empty());
+
+    let committed = joined.commit().unwrap();
+    let paragraphs = committed
+        .package()
+        .document()
+        .unwrap()
+        .paragraphs()
+        .unwrap();
+    assert_eq!(paragraphs[0].text().unwrap(), "ZERO");
+    assert_eq!(paragraphs[1].text().unwrap(), "ONE");
+}
+
+#[test]
+fn three_way_plan_is_non_applying_and_requires_explicit_conflict_resolution() {
+    let snapshot = source().clone();
+    let mut left = snapshot.joined_edits();
+    let mut left_edit = snapshot.edit();
+    left_edit
+        .replace_paragraph(Position::new(0), "left")
+        .unwrap();
+    left.join("left", left_edit).unwrap();
+
+    let mut right = snapshot.joined_edits();
+    let mut right_edit = snapshot.edit();
+    right_edit
+        .append_run(Position::new(0), " right", None)
+        .unwrap();
+    right.join("right", right_edit).unwrap();
+
+    let mut plan = MergePlan::new(left, right).unwrap();
+    assert_eq!(plan.conflicts().len(), 1);
+    assert_eq!(
+        snapshot.document().unwrap().text().unwrap(),
+        "Unique paragraph"
+    );
+    plan.resolve(MergeChoice::Left);
+    let joined = match plan.finish() {
+        Ok(joined) => joined,
+        Err(_) => panic!("resolved ODT merge plan must finish"),
+    };
+    let merged = joined.commit().unwrap();
+    assert_eq!(merged.package().document().unwrap().text().unwrap(), "left");
+}
+
+#[test]
+fn bounded_history_rejects_stale_edits_and_fully_reopens_undo_redo() {
+    let snapshot = source().clone();
+    let mut history = snapshot.history(HistoryLimits::new(4, 64 * 1024 * 1024));
+    let stale = history.edit();
+    let mut current = history.edit();
+    current
+        .replace_paragraph(Position::new(0), "committed")
+        .unwrap();
+    history.commit(current).unwrap();
+    assert_eq!(history.document().unwrap().text().unwrap(), "committed");
+    assert!(matches!(
+        history.commit(stale),
+        Err(Error::PatchConflict { .. })
+    ));
+    assert_eq!(history.document().unwrap().text().unwrap(), "committed");
+    assert!(history.undo());
+    assert_eq!(
+        history.document().unwrap().text().unwrap(),
+        "Unique paragraph"
+    );
+    assert!(history.redo());
+    assert_eq!(history.document().unwrap().text().unwrap(), "committed");
+}

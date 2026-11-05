@@ -9,7 +9,7 @@
 use super::model::*;
 use super::parse_pivot_cache_definition;
 use crate::package::error::{Error, Result};
-use crate::raw::{Error as WireError, Kind, Stage, Writer, kind as rt};
+use crate::raw::{Encoder, Error as WireError, Kind, Stage, kind as rt};
 
 fn wide_string(value: &str) -> Vec<u8> {
     let mut data = Vec::new();
@@ -29,7 +29,7 @@ fn nullable_wide_string(value: Option<&str>) -> Vec<u8> {
 
 fn stream(records: &[(Kind, Vec<u8>)]) -> Vec<u8> {
     let mut data = Vec::new();
-    let mut writer = Writer::new(&mut data);
+    let mut writer = Encoder::new(&mut data, crate::raw::Limits::DEFAULT);
     for (record_type, payload) in records {
         writer.write_record(*record_type, payload).unwrap();
     }
@@ -37,7 +37,7 @@ fn stream(records: &[(Kind, Vec<u8>)]) -> Vec<u8> {
 }
 
 fn parse(records: &[(Kind, Vec<u8>)]) -> Result<PivotCacheDefinition> {
-    parse_pivot_cache_definition(&stream(records))
+    parse_pivot_cache_definition(&stream(records), crate::raw::Limits::DEFAULT)
 }
 
 /// `BrtBeginPivotCacheDef` payload with refreshed-by and records rel id.

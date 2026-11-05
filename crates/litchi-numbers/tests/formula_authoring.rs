@@ -20,7 +20,7 @@ use litchi_numbers::{
         Expression, LimitKind as FormulaLimitKind, MAX_DEPTH, MAX_NODES, MAX_OWNED_BYTES,
     },
     table::{
-        CellPosition,
+        At,
         cells::{Change, DependencyKind, Error as CellError, Input, Storage},
     },
 };
@@ -136,7 +136,12 @@ fn append_declared_reference(
     {
         field.object_references.push(identifier);
     } else {
-        let mut field = FieldInfo::new(path.to_vec());
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(path.to_vec(), litchi_iwa_core::Limits::default())
+                .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references.push(identifier);
         info.field_infos.push(field);
     }
@@ -290,16 +295,16 @@ fn two_table_formula_package() -> TestResult<Package> {
     const OWNER_MESSAGE_TYPE: u32 = 4_008;
 
     let source = std::fs::read(fixture_path())?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let mut components = Vec::new();
     for member in catalog
         .iter()
         .filter(|member| member.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(member.data())?;
+        let stream = SnappyStream::decompress(member.data(), Default::default())?;
         components.push(SyntheticComponent {
             name: member.name().to_owned(),
-            archive: Archive::parse(stream.as_bytes())?,
+            archive: Archive::parse(stream.as_bytes(), Default::default())?,
             changed: false,
         });
     }
@@ -479,6 +484,7 @@ fn two_table_formula_package() -> TestResult<Package> {
             type_: TABLE_INFO_MESSAGE_TYPE,
             data: cloned_info_value.encode_to_vec(),
         },
+        Default::default(),
     )?;
 
     let mut cloned_model = components[model_component].archive.objects[model_object].clone();
@@ -516,6 +522,7 @@ fn two_table_formula_package() -> TestResult<Package> {
             type_: TABLE_MODEL_MESSAGE_TYPE,
             data: model_payload,
         },
+        Default::default(),
     )?;
 
     let mut cloned_tile = components[tile_component].archive.objects[tile_object].clone();
@@ -545,6 +552,7 @@ fn two_table_formula_package() -> TestResult<Package> {
             type_: OWNER_MESSAGE_TYPE,
             data: owner.encode_to_vec(),
         },
+        Default::default(),
     )?;
 
     sheet.drawable_infos.push(tsp::Reference {
@@ -560,6 +568,7 @@ fn two_table_formula_package() -> TestResult<Package> {
                 type_: SHEET_MESSAGE_TYPE,
                 data: sheet.encode_to_vec(),
             },
+            Default::default(),
         )?;
         components[sheet_component].changed = true;
     }
@@ -590,6 +599,7 @@ fn two_table_formula_package() -> TestResult<Package> {
                 type_: ENGINE_MESSAGE_TYPE,
                 data: engine.encode_to_vec(),
             },
+            Default::default(),
         )?;
         components[engine_component].changed = true;
     }
@@ -618,7 +628,10 @@ fn two_table_formula_package() -> TestResult<Package> {
     for component in components.iter().filter(|component| component.changed) {
         rewritten.push((
             component.name.as_str(),
-            SnappyStream::compress(&component.archive.to_bytes()?)?,
+            SnappyStream::compress(
+                &component.archive.to_bytes(Default::default())?,
+                Default::default(),
+            )?,
         ));
     }
     let edits = rewritten
@@ -635,14 +648,14 @@ fn data_list_entries(
     package: &[u8],
     kind: tst::table_data_list::ListType,
 ) -> TestResult<Vec<tst::table_data_list::ListEntry>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let mut entries = Vec::new();
     for member in catalog
         .iter()
         .filter(|member| member.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(member.data())?;
-        let archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(member.data(), Default::default())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
         for message in archive
             .objects
             .iter()
@@ -680,15 +693,15 @@ fn decode_offset(bytes: &[u8], width: usize) -> Option<usize> {
     }
 }
 
-fn formula_cell(package: &[u8], position: CellPosition) -> TestResult<BncCell> {
-    let catalog = Catalog::from_bytes(package)?;
+fn formula_cell(package: &[u8], position: At) -> TestResult<BncCell> {
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let mut matches = Vec::new();
     for member in catalog
         .iter()
         .filter(|member| member.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(member.data())?;
-        let archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(member.data(), Default::default())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
         for message in archive
             .objects
             .iter()
@@ -731,7 +744,7 @@ fn formula_cell(package: &[u8], position: CellPosition) -> TestResult<BncCell> {
             let encoded = storage
                 .get(start..end)
                 .ok_or_else(|| std::io::Error::other("formula cell storage range is malformed"))?;
-            let cell = BncCell::parse(encoded)?;
+            let cell = BncCell::parse(encoded, &litchi_numbers_wire::Limits::DEFAULT)?;
             if matches!(
                 cell.stored_value(),
                 litchi_numbers_wire::StoredValue::Formula(_)
@@ -750,7 +763,7 @@ fn formula_cell(package: &[u8], position: CellPosition) -> TestResult<BncCell> {
     Ok(matches.remove(0))
 }
 
-fn assert_formula_source(package: &Package, position: CellPosition) -> TestResult {
+fn assert_formula_source(package: &Package, position: At) -> TestResult {
     assert!(matches!(
         package.table_cell(0usize, 0usize, position)?.storage(),
         Storage::Stored(Value::Formula(source)) if source.starts_with('=') && source.len() > 1
@@ -776,7 +789,7 @@ fn public_formula_values_are_bounded_typed_and_content_free() -> TestResult {
     let expression = Expression::text(secret)?;
     let cached = CachedValue::text(secret)?;
     let input = Input::formula_cached(expression.clone(), cached.clone());
-    let change = Change::set_formula_cached(CellPosition::new(2, 2), expression, cached);
+    let change = Change::set_formula_cached(At::new(2, 2), expression, cached);
     for rendered in [
         format!("{input:?}"),
         format!("{change:?}"),
@@ -807,7 +820,7 @@ fn literals_and_caches_reject_nonfinite_and_oversized_values() -> TestResult {
     ] {
         assert!(matches!(
             error,
-            FormulaError::LimitExceeded {
+            FormulaError::Limit {
                 kind: FormulaLimitKind::OwnedBytes,
                 observed,
                 maximum: actual,
@@ -829,7 +842,7 @@ fn composition_charges_literal_bytes_and_depth_aggregately() -> TestResult {
         .expect_err("function name plus literals must exceed the aggregate byte limit");
     assert!(matches!(
         error,
-        FormulaError::LimitExceeded {
+        FormulaError::Limit {
             kind: FormulaLimitKind::OwnedBytes,
             observed,
             maximum,
@@ -844,7 +857,7 @@ fn composition_charges_literal_bytes_and_depth_aggregately() -> TestResult {
         .expect_err("one node beyond the maximum formula depth must fail");
     assert!(matches!(
         error,
-        FormulaError::LimitExceeded {
+        FormulaError::Limit {
             kind: FormulaLimitKind::Depth,
             observed,
             maximum,
@@ -870,7 +883,7 @@ fn node_limit_accepts_the_exact_maximum_and_refuses_the_next_parent() -> TestRes
         .expect_err("a unary parent above the exact node maximum must fail");
     assert!(matches!(
         error,
-        FormulaError::LimitExceeded {
+        FormulaError::Limit {
             kind: FormulaLimitKind::Nodes,
             observed,
             maximum,
@@ -913,7 +926,7 @@ fn functions_unary_binary_ranges_and_whole_axes_are_checked() -> TestResult {
     );
     assert!(matches!(
         Expression::function("TOO-LONG", [Expression::number(1.0)?]),
-        Err(FormulaError::LimitExceeded {
+        Err(FormulaError::Limit {
             kind: FormulaLimitKind::OwnedBytes,
             observed: 8,
             maximum: 7,
@@ -960,7 +973,7 @@ fn functions_unary_binary_ranges_and_whole_axes_are_checked() -> TestResult {
             (0..=litchi_numbers::formula::MAX_FUNCTION_ARGUMENTS)
                 .map(|_| Expression::boolean(true)),
         ),
-        Err(FormulaError::LimitExceeded {
+        Err(FormulaError::Limit {
             kind: FormulaLimitKind::FunctionArguments,
             observed,
             maximum,
@@ -980,11 +993,15 @@ fn selector_derived_table_handles_are_source_bound() -> TestResult {
     assert!(!format!("{by_name:?}").contains("Table 1"));
     assert!(matches!(
         edit.formula_table("missing sheet", 0usize),
-        Err(CellError::SheetNotFound)
+        Err(CellError::Refused(
+            litchi_numbers::table::cells::Refusal::SheetNotFound
+        ))
     ));
     assert!(matches!(
         edit.formula_table(0usize, "missing table"),
-        Err(CellError::TableNotFound)
+        Err(CellError::Refused(
+            litchi_numbers::table::cells::Refusal::TableNotFound
+        ))
     ));
 
     let local = Expression::function(
@@ -1043,7 +1060,7 @@ fn formula_staging_checks_addresses_bounds_and_all_cache_kinds() -> TestResult {
         (5, CachedValue::date(123_456.0)?),
         (6, CachedValue::duration(90.0)?),
     ] {
-        edit = edit.set_formula_cached(CellPosition::new(2, column), expression(), cached)?;
+        edit = edit.set_formula_cached(At::new(2, column), expression(), cached)?;
     }
     assert_eq!(edit.len(), 5);
 
@@ -1051,19 +1068,25 @@ fn formula_staging_checks_addresses_bounds_and_all_cache_kinds() -> TestResult {
         package
             .edit_table_cells(0usize, 0usize)?
             .set_formula_a1("private invalid address", expression()),
-        Err(CellError::InvalidAddress)
+        Err(CellError::Refused(
+            litchi_numbers::table::cells::Refusal::InvalidAddress
+        ))
     ));
     assert!(matches!(
         package
             .edit_table_cells(0usize, 0usize)?
-            .set_formula(CellPosition::new(22, 0), Expression::number(1.0)?,),
-        Err(CellError::OutOfBounds { .. })
+            .set_formula(At::new(22, 0), Expression::number(1.0)?,),
+        Err(CellError::Refused(
+            litchi_numbers::table::cells::Refusal::OutOfBounds { .. }
+        ))
     ));
     assert!(matches!(
         package
             .edit_table_cells(0usize, 0usize)?
             .set_formula_a1("C3", Expression::cell(CellReference::relative(22, 0)),),
-        Err(CellError::OutOfBounds { .. })
+        Err(CellError::Refused(
+            litchi_numbers::table::cells::Refusal::OutOfBounds { .. }
+        ))
     ));
     assert_eq!(exact_bytes(&package), source);
     Ok(())
@@ -1100,10 +1123,12 @@ fn cache_poison_cycles_and_unsupported_descendants_refuse_atomically() -> TestRe
     assert!(
         matches!(
             poisoned,
-            CellError::UnsupportedDependency {
-                kind: DependencyKind::FormulaCache,
-                ..
-            }
+            CellError::Refused(
+                litchi_numbers::table::cells::Refusal::UnsupportedDependency {
+                    kind: DependencyKind::FormulaCache,
+                    ..
+                }
+            )
         ),
         "unexpected poisoned-cache error: {poisoned:?}"
     );
@@ -1117,10 +1142,12 @@ fn cache_poison_cycles_and_unsupported_descendants_refuse_atomically() -> TestRe
         .expect_err("an authored dependency cycle must refuse atomically");
     assert!(matches!(
         cycle,
-        CellError::UnsupportedDependency {
-            kind: DependencyKind::FormulaCache,
-            ..
-        }
+        CellError::Refused(
+            litchi_numbers::table::cells::Refusal::UnsupportedDependency {
+                kind: DependencyKind::FormulaCache,
+                ..
+            }
+        )
     ));
     assert_eq!(exact_bytes(&package), source);
 
@@ -1150,10 +1177,12 @@ fn cache_poison_cycles_and_unsupported_descendants_refuse_atomically() -> TestRe
         .expect_err("an impacted descendant cannot consume an unevaluated authored leaf");
     assert!(matches!(
         unsupported_descendant,
-        CellError::UnsupportedDependency {
-            kind: DependencyKind::FormulaCache,
-            ..
-        }
+        CellError::Refused(
+            litchi_numbers::table::cells::Refusal::UnsupportedDependency {
+                kind: DependencyKind::FormulaCache,
+                ..
+            }
+        )
     ));
     assert_eq!(exact_bytes(&package), source);
 
@@ -1164,7 +1193,7 @@ fn cache_poison_cycles_and_unsupported_descendants_refuse_atomically() -> TestRe
     assert_eq!(unsupported_leaf.diagnostics().changed_cells(), 1);
     assert_eq!(unsupported_leaf.diagnostics().refreshed_formula_caches(), 0);
     let target = exact_bytes(unsupported_leaf.package());
-    assert_formula_source(unsupported_leaf.package(), CellPosition::from_a1("C3")?)?;
+    assert_formula_source(unsupported_leaf.package(), At::from_a1("C3")?)?;
     assert_eq!(formula_entries(&target)?.len(), 1);
     assert_eq!(
         exact_bytes(
@@ -1269,18 +1298,18 @@ fn all_typed_caches_commit_through_native_tiles_and_reopen() -> TestResult {
     );
     let reopened = Package::from_bytes(&target)?;
     for address in ["C3", "D3", "E3", "F3", "G3", "C4", "D4", "E4"] {
-        assert_formula_source(&reopened, CellPosition::from_a1(address)?)?;
+        assert_formula_source(&reopened, At::from_a1(address)?)?;
     }
     assert!(matches!(
-        formula_cell(&target, CellPosition::from_a1("C3")?)?.cached_scalar()?,
+        formula_cell(&target, At::from_a1("C3")?)?.cached_scalar()?,
         Some(CachedScalar::Number(value)) if value.get() == 1.5
     ));
     assert!(matches!(
-        formula_cell(&target, CellPosition::from_a1("D3")?)?.cached_scalar()?,
+        formula_cell(&target, At::from_a1("D3")?)?.cached_scalar()?,
         Some(CachedScalar::Boolean(true))
     ));
     assert!(matches!(
-        formula_cell(&target, CellPosition::from_a1("E3")?)?.cached_scalar()?,
+        formula_cell(&target, At::from_a1("E3")?)?.cached_scalar()?,
         Some(CachedScalar::Unsupported(_))
     ));
     let text_entries = data_list_entries(&target, tst::table_data_list::ListType::String)?;
@@ -1291,16 +1320,16 @@ fn all_typed_caches_commit_through_native_tiles_and_reopen() -> TestResult {
     assert_eq!(typed_text.len(), 1);
     assert_eq!(typed_text[0].refcount, 1);
     assert!(matches!(
-        formula_cell(&target, CellPosition::from_a1("F3")?)?.cached_scalar()?,
+        formula_cell(&target, At::from_a1("F3")?)?.cached_scalar()?,
         Some(CachedScalar::Date(value)) if value.get() == 123_456.0
     ));
     assert!(matches!(
-        formula_cell(&target, CellPosition::from_a1("G3")?)?.cached_scalar()?,
+        formula_cell(&target, At::from_a1("G3")?)?.cached_scalar()?,
         Some(CachedScalar::Duration(value)) if value.get() == 90.0
     ));
     for (address, expected) in [("C4", -5.0), ("D4", 0.5), ("E4", 3.0)] {
         assert!(matches!(
-            formula_cell(&target, CellPosition::from_a1(address)?)?.cached_scalar()?,
+            formula_cell(&target, At::from_a1(address)?)?.cached_scalar()?,
             Some(CachedScalar::Number(value)) if value.get() == expected
         ));
     }
@@ -1323,15 +1352,15 @@ fn all_typed_caches_commit_through_native_tiles_and_reopen() -> TestResult {
         .commit()?;
     let refreshed_bytes = exact_bytes(refreshed.package());
     assert!(matches!(
-        formula_cell(&refreshed_bytes, CellPosition::from_a1("C3")?)?.cached_scalar()?,
+        formula_cell(&refreshed_bytes, At::from_a1("C3")?)?.cached_scalar()?,
         Some(CachedScalar::Number(value)) if value.get() == 44.0
     ));
     assert!(matches!(
-        formula_cell(&refreshed_bytes, CellPosition::from_a1("D3")?)?.cached_scalar()?,
+        formula_cell(&refreshed_bytes, At::from_a1("D3")?)?.cached_scalar()?,
         Some(CachedScalar::Boolean(true))
     ));
     assert!(matches!(
-        formula_cell(&refreshed_bytes, CellPosition::from_a1("G3")?)?.cached_scalar()?,
+        formula_cell(&refreshed_bytes, At::from_a1("G3")?)?.cached_scalar()?,
         Some(CachedScalar::Duration(value)) if value.get() == 90.0
     ));
     assert_eq!(formula_entries(&refreshed_bytes)?.len(), 8);
@@ -1354,12 +1383,12 @@ fn all_typed_caches_commit_through_native_tiles_and_reopen() -> TestResult {
     assert!(matches!(
         cleared
             .package()
-            .table_cell(0usize, 0usize, CellPosition::from_a1("G3")?)?
+            .table_cell(0usize, 0usize, At::from_a1("G3")?)?
             .storage(),
         Storage::Stored(Value::Empty)
     ));
     for address in ["C3", "D3", "E3", "F3", "C4", "D4", "E4"] {
-        assert_formula_source(cleared.package(), CellPosition::from_a1(address)?)?;
+        assert_formula_source(cleared.package(), At::from_a1(address)?)?;
     }
     assert_eq!(
         exact_bytes(
@@ -1449,7 +1478,10 @@ fn locked_table_allows_formula_noop_and_refuses_formula_change() -> TestResult {
         )?
         .commit()
         .expect_err("a changed authored formula must respect the table lock");
-    assert!(matches!(error, CellError::TableLocked { .. }));
+    assert!(matches!(
+        error,
+        CellError::Refused(litchi_numbers::table::cells::Refusal::TableLocked { .. })
+    ));
     assert_eq!(exact_bytes(&locked), source);
     Ok(())
 }
@@ -1458,7 +1490,7 @@ fn locked_table_allows_formula_noop_and_refuses_formula_change() -> TestResult {
 fn native_basic_formula_is_exact_reversible_noop_replaceable_and_clearable() -> TestResult {
     let package = Package::open(fixture_path())?;
     let source = exact_bytes(&package);
-    let c3 = CellPosition::from_a1("C3")?;
+    let c3 = At::from_a1("C3")?;
     let authored_expression = || {
         Expression::function(
             "SUM",
@@ -1478,10 +1510,12 @@ fn native_basic_formula_is_exact_reversible_noop_replaceable_and_clearable() -> 
     assert!(
         matches!(
             mismatch,
-            CellError::UnsupportedDependency {
-                kind: DependencyKind::FormulaCache,
-                ..
-            }
+            CellError::Refused(
+                litchi_numbers::table::cells::Refusal::UnsupportedDependency {
+                    kind: DependencyKind::FormulaCache,
+                    ..
+                }
+            )
         ),
         "unexpected cache-mismatch error: {mismatch:?}"
     );
@@ -1591,9 +1625,9 @@ fn sequential_formula_overlays_preserve_survivors_and_exact_inverse() -> TestRes
         )
         .expect("supported native formula")
     };
-    let c3 = CellPosition::from_a1("C3")?;
-    let d3 = CellPosition::from_a1("D3")?;
-    let e3 = CellPosition::from_a1("E3")?;
+    let c3 = At::from_a1("C3")?;
+    let d3 = At::from_a1("D3")?;
+    let e3 = At::from_a1("E3")?;
     let base = Package::open(fixture_path())?;
 
     let first = base
@@ -1702,8 +1736,8 @@ fn sequential_formula_overlays_preserve_survivors_and_exact_inverse() -> TestRes
 fn native_formula_evaluates_against_the_same_batch_final_scalar_overlay() -> TestResult {
     let package = Package::open(fixture_path())?;
     let source = exact_bytes(&package);
-    let b3 = CellPosition::from_a1("B3")?;
-    let c3 = CellPosition::from_a1("C3")?;
+    let b3 = At::from_a1("B3")?;
+    let c3 = At::from_a1("C3")?;
     let expression = Expression::function(
         "SUM",
         [
@@ -1742,7 +1776,7 @@ fn native_formula_evaluates_against_the_same_batch_final_scalar_overlay() -> Tes
 fn local_formula_and_clear_in_multi_owner_engine_preserve_unrelated_owner() -> TestResult {
     let package = two_table_formula_package()?;
     let source = exact_bytes(&package);
-    let c3 = CellPosition::from_a1("C3")?;
+    let c3 = At::from_a1("C3")?;
     let authored = package
         .edit_table_cells("Sheet 1", "Table 1")?
         .set_formula(c3, Expression::cell(CellReference::relative(2, 1)))?
@@ -1861,7 +1895,7 @@ fn every_local_and_distinct_owner_reference_form_commits_and_reopens() -> TestRe
     );
     let reopened = Package::from_bytes(&target)?;
     for address in ["C3", "D3", "E3", "F3", "G3", "C4", "D4", "E4"] {
-        assert_formula_source(&reopened, CellPosition::from_a1(address)?)?;
+        assert_formula_source(&reopened, At::from_a1(address)?)?;
     }
     for (address, expected) in [
         ("C3", 43.0),
@@ -1874,7 +1908,7 @@ fn every_local_and_distinct_owner_reference_form_commits_and_reopens() -> TestRe
         ("E4", 0.0),
     ] {
         assert!(matches!(
-            formula_cell(&target, CellPosition::from_a1(address)?)?.cached_scalar()?,
+            formula_cell(&target, At::from_a1(address)?)?.cached_scalar()?,
             Some(CachedScalar::Number(value)) if value.get() == expected
         ));
     }
@@ -1889,12 +1923,12 @@ fn every_local_and_distinct_owner_reference_form_commits_and_reopens() -> TestRe
     let refreshed_bytes = exact_bytes(refreshed.package());
     for address in ["C3", "D3"] {
         assert!(matches!(
-            formula_cell(&refreshed_bytes, CellPosition::from_a1(address)?)?.cached_scalar()?,
+            formula_cell(&refreshed_bytes, At::from_a1(address)?)?.cached_scalar()?,
             Some(CachedScalar::Number(value)) if value.get() == 44.0
         ));
     }
     assert!(matches!(
-        formula_cell(&refreshed_bytes, CellPosition::from_a1("G3")?)?.cached_scalar()?,
+        formula_cell(&refreshed_bytes, At::from_a1("G3")?)?.cached_scalar()?,
         Some(CachedScalar::Number(value)) if value.get() == 42.0
     ));
     assert_eq!(

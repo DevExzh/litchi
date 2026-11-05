@@ -7,5 +7,7 @@
 mod model;
 mod transaction;
 
-pub use model::{Commit, Patch, Snapshot};
-pub use transaction::Transaction;
+pub use model::{Commit, Diagnostics, EditOptions, LimitKind, Patch, Snapshot};
+pub use transaction::Edit;
+#[cfg(test)]
+pub(crate) use transaction::RecordCommit;

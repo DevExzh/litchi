@@ -26,14 +26,9 @@ pub struct WireView<'a> {
 }
 
 impl<'a> WireView<'a> {
-    /// Parse one borrowed wire message under the default resource profile.
-    pub fn parse(source: &'a [u8]) -> Result<Self> {
-        Self::parse_with_limits(source, WireLimits::default())
-    }
-
     /// Parse one borrowed wire message under an explicit finite resource
     /// profile.
-    pub fn parse_with_limits(source: &'a [u8], limits: WireLimits) -> Result<Self> {
+    pub fn parse(source: &'a [u8], limits: WireLimits) -> Result<Self> {
         let spans = parse_wire_items_with_limits(source, limits, "wire view spans", |field| {
             span_from_field(field)
         })?;
@@ -856,13 +851,8 @@ pub struct RawWireFields<'source> {
 }
 
 impl<'source> RawWireFields<'source> {
-    /// Begin a scan under [`RawWireLimits::default`].
-    pub fn new(source: &'source [u8]) -> Self {
-        Self::with_limits(source, RawWireLimits::default())
-    }
-
     /// Begin a scan under an explicit finite resource profile.
-    pub const fn with_limits(source: &'source [u8], limits: RawWireLimits) -> Self {
+    pub const fn new(source: &'source [u8], limits: RawWireLimits) -> Self {
         Self {
             source,
             offset: 0,
@@ -1280,7 +1270,7 @@ impl NestedFieldReplacement<'_> {
     }
 }
 
-/// One schema-selected leaf edit for [`patch_nested_fields_batched_with_limits`].
+/// One schema-selected leaf edit for [`patch_nested_fields_batched`].
 ///
 /// `path` is a nonempty sequence of canonical protobuf field numbers. Every
 /// non-leaf component must identify exactly one canonical length-delimited
@@ -1462,12 +1452,8 @@ fn validate_canonical_length_bytes(
     Ok(())
 }
 
-pub fn parse_wire_fields(data: &[u8]) -> Result<Vec<WireField>> {
-    parse_wire_fields_with_limits(data, WireLimits::default())
-}
-
 /// Parse protobuf wire fields under an explicit finite resource profile.
-pub fn parse_wire_fields_with_limits(data: &[u8], limits: WireLimits) -> Result<Vec<WireField>> {
+pub fn parse_wire_fields(data: &[u8], limits: WireLimits) -> Result<Vec<WireField>> {
     if data.len() > limits.max_input_bytes() {
         return Err(Error::LimitExceeded {
             kind: LimitKind::InputBytes,
@@ -1496,6 +1482,43 @@ pub fn parse_wire_fields_with_limits(data: &[u8], limits: WireLimits) -> Result<
         items.push(field);
     }
     Ok(items)
+}
+
+/// Visit protobuf wire fields in order without retaining a field list.
+///
+/// This applies exactly the framing, input-byte and field-count rules of
+/// [`parse_wire_fields`], in the same order and with the same errors, but
+/// hands each field to `visit` instead of collecting it. Callers that only
+/// look up a few field numbers avoid an input-sized allocation. A field is
+/// visited only after it parsed and passed the field-count ceiling; an error
+/// returned by `visit` stops the scan.
+pub fn visit_wire_fields<F>(data: &[u8], limits: WireLimits, mut visit: F) -> Result<()>
+where
+    F: FnMut(WireField) -> Result<()>,
+{
+    if data.len() > limits.max_input_bytes() {
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::InputBytes,
+            observed: data.len(),
+            limit: limits.max_input_bytes(),
+        });
+    }
+    let mut fields = 0usize;
+    let mut offset = 0usize;
+    while offset < data.len() {
+        let field = parse_wire_field(data, offset)?;
+        offset = field.end;
+        if fields >= limits.max_fields() {
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::Fields,
+                observed: fields + 1,
+                limit: limits.max_fields(),
+            });
+        }
+        fields += 1;
+        visit(field)?;
+    }
+    Ok(())
 }
 
 fn parse_wire_field(data: &[u8], start: usize) -> Result<WireField> {
@@ -1630,32 +1653,9 @@ fn span_from_field(field: WireField) -> Result<WireSpan> {
     })
 }
 
-/// Parse a borrowed source into a source-bound wire view.
-pub fn parse_wire_view(source: &[u8]) -> Result<WireView<'_>> {
-    WireView::parse(source)
-}
-
 /// Parse a borrowed source into a source-bound wire view under finite limits.
-pub fn parse_wire_view_with_limits(source: &[u8], limits: WireLimits) -> Result<WireView<'_>> {
-    WireView::parse_with_limits(source, limits)
-}
-
-/// Preflight a root message and every schema-selected deferred submessage
-/// under the default finite resource profile.
-///
-/// The visitor runs once for each structurally valid field in depth-first wire
-/// order. Return [`WireDescent::Descend`] only for fields that the schema
-/// declares to be messages. The containing-message [`WireVisit::path`] lets a
-/// caller distinguish the same field number in different message types.
-///
-/// All selected messages share one aggregate byte, field, and nesting budget.
-/// This closes the budget reset that would result from independently parsing
-/// each deferred payload after a lazy top-level decode.
-pub fn preflight_wire_tree<'source, F>(source: &'source [u8], visitor: F) -> Result<WirePreflight>
-where
-    F: for<'path> FnMut(WireVisit<'source, 'path>) -> Result<WireDescent>,
-{
-    preflight_wire_tree_with_limits(source, WireLimits::default(), visitor)
+pub fn parse_wire_view(source: &[u8], limits: WireLimits) -> Result<WireView<'_>> {
+    WireView::parse(source, limits)
 }
 
 /// Preflight a root message and every schema-selected deferred submessage
@@ -1670,7 +1670,7 @@ where
 /// ancestor and descendant slices. Field count is likewise aggregate across
 /// the whole selected tree. The path stack is grown with fallible allocation
 /// and never exceeds [`WireLimits::max_nesting`].
-pub fn preflight_wire_tree_with_limits<'source, F>(
+pub fn preflight_wire_tree<'source, F>(
     source: &'source [u8],
     limits: WireLimits,
     mut visitor: F,
@@ -1749,10 +1749,35 @@ where
 /// singular schema fields.
 pub fn overlay_singular_wire_fields(base: &[u8], overlay: &[u8]) -> Result<Vec<u8>> {
     let limits = WireLimits::default();
-    let base_fields = parse_wire_fields_with_limits(base, limits)?;
-    let overlay_fields = parse_wire_fields_with_limits(overlay, limits)?;
-    ensure_rewrite_work(overlay_fields.len(), limits)?;
+    // Parsing both source messages and emitting the merged message are part of
+    // one bounded rewrite. Reject an over-budget source pair before the field
+    // vectors (and their backing allocations) are materialized.
+    if base.len() > limits.max_input_bytes() {
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::InputBytes,
+            observed: base.len(),
+            limit: limits.max_input_bytes(),
+        });
+    }
+    if overlay.len() > limits.max_input_bytes() {
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::InputBytes,
+            observed: overlay.len(),
+            limit: limits.max_input_bytes(),
+        });
+    }
+    let input_work = base
+        .len()
+        .checked_add(overlay.len())
+        .ok_or_else(|| Error::InvalidFormat("protobuf overlay work overflow".to_owned()))?;
+    ensure_rewrite_work(input_work, limits)?;
+    let base_fields = parse_wire_fields(base, limits)?;
+    let overlay_fields = parse_wire_fields(overlay, limits)?;
     if overlay_fields.is_empty() {
+        let work = input_work
+            .checked_add(base.len())
+            .ok_or_else(|| Error::InvalidFormat("protobuf overlay work overflow".to_owned()))?;
+        ensure_rewrite_work(work, limits)?;
         return clone_output(base, limits);
     }
 
@@ -1839,6 +1864,11 @@ pub fn overlay_singular_wire_fields(base: &[u8], overlay: &[u8]) -> Result<Vec<u
         }
     }
 
+    let work = input_work
+        .checked_add(output_size)
+        .ok_or_else(|| Error::InvalidFormat("protobuf overlay work overflow".to_owned()))?;
+    ensure_rewrite_work(work, limits)?;
+
     let mut output = output_with_capacity(output_size, limits)?;
     for field in &base_fields {
         if let Some(&index) = overlay_indexes.get(&field.number) {
@@ -1923,7 +1953,7 @@ pub fn patch_nested_fixed64_field(
 /// once by the planning pass and every output byte is emitted once. The final
 /// output uses one exact, fallible allocation; planning storage is also grown
 /// fallibly.
-pub fn patch_nested_fields_batched_with_limits(
+pub fn patch_nested_fields_batched(
     data: &[u8],
     edits: &[NestedFieldEdit<'_>],
     limits: WireLimits,
@@ -1936,7 +1966,11 @@ pub fn patch_nested_fields_batched_with_limits(
         });
     }
 
-    let trie = build_batch_edit_trie(edits, limits)?;
+    let (trie, trie_work) = build_batch_edit_trie(edits, limits)?;
+    let minimum_work = trie_work
+        .checked_add(data.len())
+        .ok_or_else(|| Error::InvalidFormat("protobuf rewrite-work overflow".to_owned()))?;
+    ensure_rewrite_work(minimum_work, limits)?;
     let mut context = BatchPlanContext::new(limits);
     let root_plan = plan_batch_message(data, 0, data.len(), 0, 0, &trie, edits, &mut context)?;
     let root = context
@@ -1950,9 +1984,9 @@ pub fn patch_nested_fields_batched_with_limits(
         .ok_or_else(|| Error::InvalidFormat("protobuf field-count overflow".to_owned()))?;
     ensure_field_count(output_fields, limits)?;
     let output_size = root.output_len;
-    let work = data
-        .len()
-        .checked_add(output_size)
+    let work = trie_work
+        .checked_add(data.len())
+        .and_then(|work| work.checked_add(output_size))
         .ok_or_else(|| Error::InvalidFormat("protobuf rewrite-work overflow".to_owned()))?;
     ensure_rewrite_work(work, limits)?;
 
@@ -1962,17 +1996,10 @@ pub fn patch_nested_fields_batched_with_limits(
     Ok(output)
 }
 
-/// Rewrite many nested singular leaves under the default finite resource
-/// profile. See [`patch_nested_fields_batched_with_limits`] for invariants and
-/// byte-preservation guarantees.
-pub fn patch_nested_fields_batched(data: &[u8], edits: &[NestedFieldEdit<'_>]) -> Result<Vec<u8>> {
-    patch_nested_fields_batched_with_limits(data, edits, WireLimits::default())
-}
-
 fn build_batch_edit_trie(
     edits: &[NestedFieldEdit<'_>],
     limits: WireLimits,
-) -> Result<Vec<BatchTrieNode>> {
+) -> Result<(Vec<BatchTrieNode>, usize)> {
     ensure_field_count(edits.len(), limits)?;
     let mut trie = Vec::new();
     trie.try_reserve(1)
@@ -1981,6 +2008,7 @@ fn build_batch_edit_trie(
             amount: 1,
         })?;
     trie.push(BatchTrieNode::new());
+    let mut work = 0usize;
 
     for (edit_index, edit) in edits.iter().enumerate() {
         if edit.path.is_empty() {
@@ -1991,6 +2019,10 @@ fn build_batch_edit_trie(
         ensure_nesting(edit.path.len() - 1, limits)?;
         let mut node_index = 0usize;
         for &field_number in edit.path {
+            work = work
+                .checked_add(1)
+                .ok_or_else(|| Error::InvalidFormat("protobuf rewrite-work overflow".to_owned()))?;
+            ensure_rewrite_work(work, limits)?;
             validate_field_number(field_number)?;
             if trie[node_index].edit.is_some() {
                 return Err(Error::InvalidFormat(
@@ -2019,6 +2051,12 @@ fn build_batch_edit_trie(
                     .children
                     .binary_search_by_key(&field_number, |&(number, _)| number)
                     .unwrap_or_else(|position| position);
+                work = work
+                    .checked_add(trie[node_index].children.len() - position)
+                    .ok_or_else(|| {
+                        Error::InvalidFormat("protobuf rewrite-work overflow".to_owned())
+                    })?;
+                ensure_rewrite_work(work, limits)?;
                 trie[node_index]
                     .children
                     .try_reserve(1)
@@ -2044,7 +2082,7 @@ fn build_batch_edit_trie(
         }
         trie[node_index].edit = Some(edit_index);
     }
-    Ok(trie)
+    Ok((trie, work))
 }
 
 #[allow(
@@ -2720,7 +2758,7 @@ pub fn append_repeated_length_delimited_field(
 ) -> Result<Vec<u8>> {
     // Parse first so malformed existing data cannot be normalized accidentally.
     let limits = WireLimits::default();
-    let fields = parse_wire_fields_with_limits(data, limits)?;
+    let fields = parse_wire_fields(data, limits)?;
     ensure_field_count(
         fields
             .len()
@@ -2736,7 +2774,7 @@ pub fn append_repeated_length_delimited_field(
 /// Return raw payloads for every occurrence of one repeated length-delimited
 /// field, rejecting a same-number field with an incompatible wire type.
 pub fn repeated_length_delimited_payloads(data: &[u8], field_number: u32) -> Result<Vec<&[u8]>> {
-    let fields = parse_wire_fields(data)?;
+    let fields = parse_wire_fields(data, WireLimits::DEFAULT)?;
     let matches = fields
         .iter()
         .filter(|field| field.number == field_number)
@@ -2769,7 +2807,7 @@ pub fn rewrite_repeated_length_delimited_fields(
     replacements: &[Vec<u8>],
 ) -> Result<Vec<u8>> {
     let limits = WireLimits::default();
-    let fields = parse_wire_fields_with_limits(data, limits)?;
+    let fields = parse_wire_fields(data, limits)?;
     ensure_rewrite_work(replacements.len(), limits)?;
     let field_count = fields.len();
     let matches = matching_fields(&fields, field_number)?;
@@ -2875,7 +2913,7 @@ pub fn rewrite_repeated_length_delimited_fields(
 /// packed or otherwise mismatched occurrence keeps bounded mutations from
 /// silently normalizing an unexpected representation.
 pub fn repeated_varint_values(data: &[u8], field_number: u32) -> Result<Vec<u64>> {
-    let fields = parse_wire_fields(data)?;
+    let fields = parse_wire_fields(data, WireLimits::DEFAULT)?;
     let matches = fields
         .iter()
         .filter(|field| field.number == field_number)
@@ -2918,7 +2956,7 @@ pub fn rewrite_repeated_varint_fields(
     replacements: &[u64],
 ) -> Result<Vec<u8>> {
     let limits = WireLimits::default();
-    let fields = parse_wire_fields_with_limits(data, limits)?;
+    let fields = parse_wire_fields(data, limits)?;
     ensure_rewrite_work(replacements.len(), limits)?;
     let field_count = fields.len();
     let matches = matching_fields(&fields, field_number)?;
@@ -3000,7 +3038,7 @@ pub fn rewrite_repeated_varint_fields(
 
 /// Return every occurrence of an unpacked repeated fixed64 field.
 pub fn repeated_fixed64_values(data: &[u8], field_number: u32) -> Result<Vec<u64>> {
-    let fields = parse_wire_fields(data)?;
+    let fields = parse_wire_fields(data, WireLimits::DEFAULT)?;
     let matches = fields
         .iter()
         .filter(|field| field.number == field_number)
@@ -3027,7 +3065,7 @@ pub fn repeated_fixed64_values(data: &[u8], field_number: u32) -> Result<Vec<u64
 
 /// Return every occurrence of an unpacked repeated fixed32 field.
 pub fn repeated_fixed32_values(data: &[u8], field_number: u32) -> Result<Vec<u32>> {
-    let fields = parse_wire_fields(data)?;
+    let fields = parse_wire_fields(data, WireLimits::DEFAULT)?;
     let matches = fields
         .iter()
         .filter(|field| field.number == field_number)
@@ -3059,7 +3097,7 @@ pub fn rewrite_repeated_fixed32_fields(
     replacements: &[u32],
 ) -> Result<Vec<u8>> {
     let limits = WireLimits::default();
-    let fields = parse_wire_fields_with_limits(data, limits)?;
+    let fields = parse_wire_fields(data, limits)?;
     ensure_rewrite_work(replacements.len(), limits)?;
     let field_count = fields.len();
     let matches = matching_fields(&fields, field_number)?;
@@ -3154,7 +3192,7 @@ pub fn rewrite_repeated_fixed64_fields(
     replacements: &[u64],
 ) -> Result<Vec<u8>> {
     let limits = WireLimits::default();
-    let fields = parse_wire_fields_with_limits(data, limits)?;
+    let fields = parse_wire_fields(data, limits)?;
     ensure_rewrite_work(replacements.len(), limits)?;
     let field_count = fields.len();
     let matches = matching_fields(&fields, field_number)?;
@@ -3368,7 +3406,7 @@ where
     E: From<Error>,
 {
     let limits = WireLimits::default();
-    let fields = parse_wire_fields_with_limits(data, limits)?;
+    let fields = parse_wire_fields(data, limits)?;
     ensure_rewrite_work(fields.len(), limits)?;
     let mut removed = Vec::new();
     removed
@@ -3421,7 +3459,7 @@ fn singular_field(
     field_number: u32,
     expected_present: bool,
 ) -> Result<Option<WireField>> {
-    let fields = parse_wire_fields(data)?;
+    let fields = parse_wire_fields(data, WireLimits::DEFAULT)?;
     let mut matches = fields
         .into_iter()
         .filter(|field| field.number == field_number);
@@ -3449,22 +3487,14 @@ fn require_wire_type(field: &WireField, expected: u8, name: &str) -> Result<()> 
     Ok(())
 }
 
-pub fn append_length_delimited_field(
-    output: &mut Vec<u8>,
-    field_number: u32,
-    payload: &[u8],
-) -> Result<()> {
-    append_length_delimited_field_with_limits(output, field_number, payload, WireLimits::default())
-}
-
 /// Append one length-delimited field under an explicit output budget.
-pub fn append_length_delimited_field_with_limits(
+pub fn append_length_delimited_field(
     output: &mut Vec<u8>,
     field_number: u32,
     payload: &[u8],
     limits: WireLimits,
 ) -> Result<()> {
-    let field_count = parse_wire_fields_with_limits(output, limits)?.len();
+    let field_count = parse_wire_fields(output, limits)?.len();
     ensure_field_count(
         field_count
             .checked_add(1)
@@ -3498,7 +3528,7 @@ fn append_length_delimited_field_unchecked(
 
 pub fn append_varint_field(output: &mut Vec<u8>, field_number: u32, value: u64) -> Result<()> {
     let limits = WireLimits::default();
-    let field_count = parse_wire_fields_with_limits(output, limits)?.len();
+    let field_count = parse_wire_fields(output, limits)?.len();
     ensure_field_count(
         field_count
             .checked_add(1)
@@ -3635,7 +3665,7 @@ fn ensure_field_count(count: usize, limits: WireLimits) -> Result<()> {
 }
 
 fn ensure_one_more_field(data: &[u8], limits: WireLimits) -> Result<()> {
-    let fields = parse_wire_fields_with_limits(data, limits)?;
+    let fields = parse_wire_fields(data, limits)?;
     let count = fields
         .len()
         .checked_add(1)
@@ -3825,7 +3855,7 @@ mod tests {
 
     fn length_delimited_field(number: u32, payload: &[u8]) -> Vec<u8> {
         let mut field = Vec::new();
-        append_length_delimited_field(&mut field, number, payload).unwrap();
+        append_length_delimited_field(&mut field, number, payload, WireLimits::DEFAULT).unwrap();
         field
     }
 
@@ -3852,7 +3882,7 @@ mod tests {
         ]
         .concat();
 
-        let mut fields = RawWireFields::new(&source);
+        let mut fields = RawWireFields::new(&source, RawWireLimits::default());
         let first = fields.next().unwrap().unwrap();
         let second = fields.next().unwrap().unwrap();
         let third = fields.next().unwrap().unwrap();
@@ -3883,7 +3913,7 @@ mod tests {
 
         // The additive scanner understands groups; the legacy parser keeps
         // its deliberately narrower behavior unchanged.
-        assert!(parse_wire_fields(&source).is_err());
+        assert!(parse_wire_fields(&source, WireLimits::DEFAULT).is_err());
     }
 
     #[test]
@@ -3892,7 +3922,7 @@ mod tests {
         let payload = [varint_field(91, 1), nested].concat();
         let source = group_field(90, &payload);
         let mut visited = Vec::new();
-        let mut fields = RawWireFields::new(&source);
+        let mut fields = RawWireFields::new(&source, RawWireLimits::default());
         let outer = fields
             .next_with(|field| {
                 visited.push((field.number(), field.wire_type(), field.depth()));
@@ -3916,7 +3946,7 @@ mod tests {
     fn raw_wire_fields_enforce_input_field_depth_and_work_limits() {
         let source = [varint_field(1, 1), varint_field(2, 2)].concat();
         let fields_limit = RawWireLimits::default().with_fields(1).unwrap();
-        let mut fields = RawWireFields::with_limits(&source, fields_limit);
+        let mut fields = RawWireFields::new(&source, fields_limit);
         assert!(fields.next().unwrap().is_some());
         assert!(matches!(
             fields.next(),
@@ -3930,7 +3960,7 @@ mod tests {
         let nested = group_field(90, &group_field(91, &[]));
         let depth_limit = RawWireLimits::default().with_depth(1).unwrap();
         assert!(matches!(
-            RawWireFields::with_limits(&nested, depth_limit).next(),
+            RawWireFields::new(&nested, depth_limit).next(),
             Err(Error::LimitExceeded {
                 kind: LimitKind::Nesting,
                 observed: 2,
@@ -3945,7 +3975,7 @@ mod tests {
             .with_work(one_field.len() - 1)
             .unwrap();
         assert!(matches!(
-            RawWireFields::with_limits(&one_field, work_limit).next(),
+            RawWireFields::new(&one_field, work_limit).next(),
             Err(Error::LimitExceeded {
                 kind: LimitKind::RewriteWork,
                 ..
@@ -3954,7 +3984,7 @@ mod tests {
 
         let input_limit = RawWireLimits::default().with_input_bytes(1).unwrap();
         assert!(matches!(
-            RawWireFields::with_limits(&one_field, input_limit).next(),
+            RawWireFields::new(&one_field, input_limit).next(),
             Err(Error::LimitExceeded {
                 kind: LimitKind::InputBytes,
                 observed: 2,
@@ -3967,7 +3997,7 @@ mod tests {
     fn raw_wire_fields_reject_unbalanced_or_mismatched_groups() {
         let start_only = crate::varint::encode_varint((90_u64 << 3) | 3);
         assert!(matches!(
-            RawWireFields::new(&start_only).next(),
+            RawWireFields::new(&start_only, RawWireLimits::default()).next(),
             Err(Error::InvalidFormat(message)) if message.contains("not terminated")
         ));
 
@@ -3977,13 +4007,13 @@ mod tests {
         ]
         .concat();
         assert!(matches!(
-            RawWireFields::new(&mismatched).next(),
+            RawWireFields::new(&mismatched, RawWireLimits::default()).next(),
             Err(Error::InvalidFormat(message)) if message.contains("does not match")
         ));
 
         let end_only = crate::varint::encode_varint((90_u64 << 3) | 4);
         assert!(matches!(
-            RawWireFields::new(&end_only).next(),
+            RawWireFields::new(&end_only, RawWireLimits::default()).next(),
             Err(Error::InvalidFormat(message)) if message.contains("unexpected")
         ));
     }
@@ -3995,7 +4025,7 @@ mod tests {
             crate::varint::encode_varint((91_u64 << 3) | 4),
         ]
         .concat();
-        let mut parser_failed = RawWireFields::new(&malformed_group);
+        let mut parser_failed = RawWireFields::new(&malformed_group, RawWireLimits::default());
         let parser_error = parser_failed.next().unwrap_err();
         let parser_fields = parser_failed.fields();
         let parser_work = parser_failed.work();
@@ -4004,7 +4034,7 @@ mod tests {
         assert_eq!(parser_failed.work(), parser_work);
 
         let source = varint_field(1, 1);
-        let mut visitor_failed = RawWireFields::new(&source);
+        let mut visitor_failed = RawWireFields::new(&source, RawWireLimits::default());
         let mut calls = 0usize;
         let visitor_error = visitor_failed
             .next_with(|_| {
@@ -4024,8 +4054,8 @@ mod tests {
     #[test]
     fn generic_callback_boundary_preserves_caller_errors() {
         let mut repeated = Vec::new();
-        append_length_delimited_field(&mut repeated, 2, b"first").unwrap();
-        append_length_delimited_field(&mut repeated, 2, b"second").unwrap();
+        append_length_delimited_field(&mut repeated, 2, b"first", WireLimits::DEFAULT).unwrap();
+        append_length_delimited_field(&mut repeated, 2, b"second", WireLimits::DEFAULT).unwrap();
         let repeated_error = transform_repeated_length_delimited_fields(&repeated, 2, |_| {
             Err::<Vec<u8>, _>(CallbackError::Sentinel)
         })
@@ -4033,9 +4063,9 @@ mod tests {
         assert_eq!(repeated_error, CallbackError::Sentinel);
 
         let mut nested = Vec::new();
-        append_length_delimited_field(&mut nested, 2, b"leaf").unwrap();
+        append_length_delimited_field(&mut nested, 2, b"leaf", WireLimits::DEFAULT).unwrap();
         let mut outer = Vec::new();
-        append_length_delimited_field(&mut outer, 3, &nested).unwrap();
+        append_length_delimited_field(&mut outer, 3, &nested, WireLimits::DEFAULT).unwrap();
         let path_error = transform_length_delimited_fields_at_path(&outer, &[3, 2], |_| {
             Err::<Vec<u8>, _>(CallbackError::Sentinel)
         })
@@ -4066,6 +4096,80 @@ mod tests {
         let mut duplicate = varint_field(2, 21);
         duplicate.extend(varint_field(2, 22));
         assert!(overlay_singular_wire_fields(&base, &duplicate).is_err());
+    }
+
+    #[test]
+    fn visiting_wire_fields_matches_the_collected_parse() {
+        let mut source = varint_field(1, 7);
+        source.extend(length_delimited_field(2, b"payload"));
+        source.extend(varint_field(1, 9));
+        let collected = parse_wire_fields(&source, WireLimits::DEFAULT).unwrap();
+        let mut visited = Vec::new();
+        visit_wire_fields(&source, WireLimits::DEFAULT, |field| {
+            visited.push(field);
+            Ok(())
+        })
+        .unwrap();
+        let shape = |fields: &[WireField]| {
+            fields
+                .iter()
+                .map(|field| {
+                    (
+                        field.number(),
+                        field.wire_type(),
+                        field.start(),
+                        field.key_end(),
+                        field.payload_start(),
+                        field.end(),
+                    )
+                })
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(shape(&visited), shape(&collected));
+
+        // The same field ceiling and framing errors, in the same order.
+        let tight = WireLimits::default().with_fields(2).unwrap();
+        assert_eq!(
+            visit_wire_fields(&source, tight, |_| Ok(()))
+                .unwrap_err()
+                .to_string(),
+            parse_wire_fields(&source, tight).unwrap_err().to_string()
+        );
+        let mut truncated = source.clone();
+        truncated.extend([0x12, 0x05, b'x']);
+        assert_eq!(
+            visit_wire_fields(&truncated, WireLimits::DEFAULT, |_| Ok(()))
+                .unwrap_err()
+                .to_string(),
+            parse_wire_fields(&truncated, WireLimits::DEFAULT)
+                .unwrap_err()
+                .to_string()
+        );
+        let mut visits = 0;
+        assert!(
+            visit_wire_fields(&source, WireLimits::DEFAULT, |_| {
+                visits += 1;
+                Err(Error::InvalidFormat("stop".to_owned()))
+            })
+            .is_err()
+        );
+        assert_eq!(visits, 1);
+    }
+
+    #[test]
+    fn singular_wire_overlay_charges_source_and_output_bytes() {
+        let payload = vec![b'x'; 8_000_000];
+        let base = length_delimited_field(1, &payload);
+        assert!(base.len() * 2 > WireLimits::MAX_REWRITE_WORK);
+
+        assert!(matches!(
+            overlay_singular_wire_fields(&base, &[]),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::RewriteWork,
+                observed,
+                limit,
+            }) if observed == base.len() * 2 && limit == WireLimits::MAX_REWRITE_WORK
+        ));
     }
 
     #[test]
@@ -4109,7 +4213,7 @@ mod tests {
         let mut leaf = varint_field(1, 7);
         append_scalar_field(&mut leaf, 2, 5, &10_u32.to_le_bytes()).unwrap();
         append_scalar_field(&mut leaf, 3, 1, &20_u64.to_le_bytes()).unwrap();
-        append_length_delimited_field(&mut leaf, 4, b"old").unwrap();
+        append_length_delimited_field(&mut leaf, 4, b"old", WireLimits::DEFAULT).unwrap();
         leaf.extend(varint_field(99, 9001));
         let child = length_delimited_field(2, &leaf);
         let mut source = varint_field(90, 1);
@@ -4127,7 +4231,7 @@ mod tests {
             ),
             NestedFieldEdit::new(&[4, 2, 5], false, NestedFieldReplacement::Varint(Some(55))),
         ];
-        let batch = patch_nested_fields_batched(&source, &edits).unwrap();
+        let batch = patch_nested_fields_batched(&source, &edits, WireLimits::DEFAULT).unwrap();
 
         let mut sequential = patch_nested_varint_field(&source, &[4, 2, 1], true, Some(8)).unwrap();
         sequential = patch_nested_fixed32_field(&sequential, &[4, 2, 2], true, None).unwrap();
@@ -4145,7 +4249,7 @@ mod tests {
         source.extend(varint_field(1, 7));
         append_scalar_field(&mut source, 2, 5, &10_u32.to_le_bytes()).unwrap();
         append_scalar_field(&mut source, 3, 1, &20_u64.to_le_bytes()).unwrap();
-        append_length_delimited_field(&mut source, 4, b"opaque").unwrap();
+        append_length_delimited_field(&mut source, 4, b"opaque", WireLimits::DEFAULT).unwrap();
         let cleared = patch_nested_fields_batched(
             &source,
             &[
@@ -4154,6 +4258,7 @@ mod tests {
                 NestedFieldEdit::new(&[3], true, NestedFieldReplacement::Fixed64(None)),
                 NestedFieldEdit::new(&[4], true, NestedFieldReplacement::LengthDelimited(None)),
             ],
+            WireLimits::DEFAULT,
         )
         .unwrap();
         assert_eq!(cleared, varint_field(99, 9001));
@@ -4170,6 +4275,7 @@ mod tests {
                     NestedFieldReplacement::LengthDelimited(Some(b"opaque")),
                 ),
             ],
+            WireLimits::DEFAULT,
         )
         .unwrap();
         assert_eq!(restored, source);
@@ -4182,13 +4288,16 @@ mod tests {
         inner.extend([0xa5, 0x01, 1, 2, 3, 4]);
         inner.extend([0x92, 0x00, 0x81, 0x00, b'z']);
         let source = length_delimited_field(4, &inner);
-        assert_eq!(patch_nested_fields_batched(&source, &[]).unwrap(), source);
+        assert_eq!(
+            patch_nested_fields_batched(&source, &[], WireLimits::DEFAULT).unwrap(),
+            source
+        );
         let noops = [
             NestedFieldEdit::new(&[4, 1], true, NestedFieldReplacement::Varint(Some(7))),
             NestedFieldEdit::new(&[4, 3], false, NestedFieldReplacement::Fixed32(None)),
         ];
         assert_eq!(
-            patch_nested_fields_batched(&source, &noops).unwrap(),
+            patch_nested_fields_batched(&source, &noops, WireLimits::DEFAULT).unwrap(),
             source
         );
 
@@ -4196,7 +4305,7 @@ mod tests {
             NestedFieldEdit::new(&[4, 7], false, NestedFieldReplacement::Varint(Some(1))),
             NestedFieldEdit::new(&[4, 5], false, NestedFieldReplacement::Fixed32(Some(2))),
         ];
-        let changed = patch_nested_fields_batched(&source, &appends).unwrap();
+        let changed = patch_nested_fields_batched(&source, &appends, WireLimits::DEFAULT).unwrap();
         let mut expected_inner = inner;
         expected_inner.extend(varint_field(7, 1));
         append_scalar_field(&mut expected_inner, 5, 5, &2_u32.to_le_bytes()).unwrap();
@@ -4221,7 +4330,7 @@ mod tests {
             true,
             NestedFieldReplacement::Varint(Some(8)),
         )];
-        let changed = patch_nested_fields_batched(&source, &edit).unwrap();
+        let changed = patch_nested_fields_batched(&source, &edit, WireLimits::DEFAULT).unwrap();
 
         let mut expected = vec![0x91, 0x01, 1, 2, 3, 4, 5, 6, 7, 8];
         expected.extend(&group);
@@ -4243,13 +4352,13 @@ mod tests {
             vec![0x53, 0x08, 0x01, 0x5c],
             vec![0x54, 0x08, 0x01],
         ] {
-            assert!(patch_nested_fields_batched(&malformed, &edit).is_err());
+            assert!(patch_nested_fields_batched(&malformed, &edit, WireLimits::DEFAULT).is_err());
         }
 
         let nested_groups = [0x53, 0x5b, 0x5c, 0x54, 0x08, 0x01];
         let shallow = WireLimits::default().with_nesting(1).unwrap();
         assert!(matches!(
-            patch_nested_fields_batched_with_limits(&nested_groups, &edit, shallow),
+            patch_nested_fields_batched(&nested_groups, &edit, shallow),
             Err(Error::LimitExceeded {
                 kind: LimitKind::Nesting,
                 observed: 2,
@@ -4257,7 +4366,7 @@ mod tests {
             })
         ));
         let exact = WireLimits::default().with_nesting(2).unwrap();
-        assert!(patch_nested_fields_batched_with_limits(&nested_groups, &edit, exact).is_ok());
+        assert!(patch_nested_fields_batched(&nested_groups, &edit, exact).is_ok());
     }
 
     #[test]
@@ -4275,7 +4384,7 @@ mod tests {
                 true,
                 NestedFieldReplacement::LengthDelimited(Some(&new)),
             )];
-            let changed = patch_nested_fields_batched(&source, &edit).unwrap();
+            let changed = patch_nested_fields_batched(&source, &edit, WireLimits::DEFAULT).unwrap();
             let expected_inner = length_delimited_field(1, &new);
             assert_eq!(expected_inner.len(), new_inner);
             assert_eq!(changed, length_delimited_field(4, &expected_inner));
@@ -4287,7 +4396,10 @@ mod tests {
         let source = varint_field(1, 7);
         let duplicate_source = [source.as_slice(), source.as_slice()].concat();
         let replace = NestedFieldEdit::new(&[1], true, NestedFieldReplacement::Varint(Some(8)));
-        assert!(patch_nested_fields_batched(&duplicate_source, &[replace]).is_err());
+        assert!(
+            patch_nested_fields_batched(&duplicate_source, &[replace], WireLimits::DEFAULT)
+                .is_err()
+        );
         assert!(
             patch_nested_fields_batched(
                 &source,
@@ -4296,6 +4408,7 @@ mod tests {
                     false,
                     NestedFieldReplacement::Varint(Some(8)),
                 )],
+                WireLimits::DEFAULT,
             )
             .is_err()
         );
@@ -4307,10 +4420,13 @@ mod tests {
                     true,
                     NestedFieldReplacement::Fixed32(Some(8)),
                 )],
+                WireLimits::DEFAULT,
             )
             .is_err()
         );
-        assert!(patch_nested_fields_batched(&source, &[replace, replace]).is_err());
+        assert!(
+            patch_nested_fields_batched(&source, &[replace, replace], WireLimits::DEFAULT).is_err()
+        );
         assert!(
             patch_nested_fields_batched(
                 &source,
@@ -4318,6 +4434,7 @@ mod tests {
                     replace,
                     NestedFieldEdit::new(&[1, 2], true, NestedFieldReplacement::Varint(Some(3)),),
                 ],
+                WireLimits::DEFAULT,
             )
             .is_err()
         );
@@ -4330,15 +4447,28 @@ mod tests {
             true,
             NestedFieldReplacement::Varint(Some(2)),
         )];
-        assert!(patch_nested_fields_batched(&[0x88, 0x00, 0x01], &varint_edit).is_err());
-        assert!(patch_nested_fields_batched(&[0x08, 0x81, 0x00], &varint_edit).is_err());
+        assert!(
+            patch_nested_fields_batched(&[0x88, 0x00, 0x01], &varint_edit, WireLimits::DEFAULT)
+                .is_err()
+        );
+        assert!(
+            patch_nested_fields_batched(&[0x08, 0x81, 0x00], &varint_edit, WireLimits::DEFAULT)
+                .is_err()
+        );
 
         let length_edit = [NestedFieldEdit::new(
             &[1],
             true,
             NestedFieldReplacement::LengthDelimited(Some(b"y")),
         )];
-        assert!(patch_nested_fields_batched(&[0x0a, 0x81, 0x00, b'x'], &length_edit).is_err());
+        assert!(
+            patch_nested_fields_batched(
+                &[0x0a, 0x81, 0x00, b'x'],
+                &length_edit,
+                WireLimits::DEFAULT
+            )
+            .is_err()
+        );
 
         let nested_edit = [NestedFieldEdit::new(
             &[2, 1],
@@ -4346,10 +4476,20 @@ mod tests {
             NestedFieldReplacement::Varint(Some(2)),
         )];
         assert!(
-            patch_nested_fields_batched(&[0x92, 0x00, 0x02, 0x08, 0x01], &nested_edit).is_err()
+            patch_nested_fields_batched(
+                &[0x92, 0x00, 0x02, 0x08, 0x01],
+                &nested_edit,
+                WireLimits::DEFAULT
+            )
+            .is_err()
         );
         assert!(
-            patch_nested_fields_batched(&[0x12, 0x82, 0x00, 0x08, 0x01], &nested_edit).is_err()
+            patch_nested_fields_batched(
+                &[0x12, 0x82, 0x00, 0x08, 0x01],
+                &nested_edit,
+                WireLimits::DEFAULT
+            )
+            .is_err()
         );
     }
 
@@ -4362,7 +4502,8 @@ mod tests {
             NestedFieldReplacement::Varint(Some(300)),
         )];
         let expected = varint_field(1, 300);
-        let work = source.len() + expected.len();
+        let trie_work = replace.iter().map(|edit| edit.path().len()).sum::<usize>();
+        let work = trie_work + source.len() + expected.len();
         let exact = WireLimits::default()
             .with_input_bytes(source.len())
             .unwrap()
@@ -4373,7 +4514,7 @@ mod tests {
             .with_rewrite_work(work)
             .unwrap();
         assert_eq!(
-            patch_nested_fields_batched_with_limits(&source, &replace, exact).unwrap(),
+            patch_nested_fields_batched(&source, &replace, exact).unwrap(),
             expected
         );
 
@@ -4381,7 +4522,7 @@ mod tests {
             .with_input_bytes(source.len() - 1)
             .unwrap();
         assert!(matches!(
-            patch_nested_fields_batched_with_limits(&source, &replace, input_short),
+            patch_nested_fields_batched(&source, &replace, input_short),
             Err(Error::LimitExceeded {
                 kind: LimitKind::InputBytes,
                 ..
@@ -4391,7 +4532,7 @@ mod tests {
             .with_output_bytes(expected.len() - 1)
             .unwrap();
         assert!(matches!(
-            patch_nested_fields_batched_with_limits(&source, &replace, output_short),
+            patch_nested_fields_batched(&source, &replace, output_short),
             Err(Error::LimitExceeded {
                 kind: LimitKind::OutputBytes,
                 ..
@@ -4399,7 +4540,7 @@ mod tests {
         ));
         let work_short = WireLimits::default().with_rewrite_work(work - 1).unwrap();
         assert!(matches!(
-            patch_nested_fields_batched_with_limits(&source, &replace, work_short),
+            patch_nested_fields_batched(&source, &replace, work_short),
             Err(Error::LimitExceeded {
                 kind: LimitKind::RewriteWork,
                 observed,
@@ -4414,7 +4555,7 @@ mod tests {
         )];
         let one_field = WireLimits::default().with_fields(1).unwrap();
         assert!(matches!(
-            patch_nested_fields_batched_with_limits(&source, &append, one_field),
+            patch_nested_fields_batched(&source, &append, one_field),
             Err(Error::LimitExceeded {
                 kind: LimitKind::Fields,
                 observed: 2,
@@ -4427,12 +4568,34 @@ mod tests {
             NestedFieldEdit::new(&[3], false, NestedFieldReplacement::Fixed32(None)),
         ];
         assert!(matches!(
-            patch_nested_fields_batched_with_limits(&[], &validators, one_field),
+            patch_nested_fields_batched(&[], &validators, one_field),
             Err(Error::LimitExceeded {
                 kind: LimitKind::Fields,
                 observed: 2,
                 limit: 1,
             })
+        ));
+    }
+
+    #[test]
+    fn batched_nested_rejects_quadratic_edit_trie_shifts_before_completion() {
+        const EDIT_COUNT: usize = 6_000;
+        let paths: Vec<[u32; 1]> = (1..=EDIT_COUNT as u32)
+            .rev()
+            .map(|number| [number])
+            .collect();
+        let edits: Vec<_> = paths
+            .iter()
+            .map(|path| NestedFieldEdit::new(path, false, NestedFieldReplacement::Varint(Some(1))))
+            .collect();
+
+        assert!(matches!(
+            patch_nested_fields_batched(&[], &edits, WireLimits::DEFAULT),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::RewriteWork,
+                observed,
+                limit,
+            }) if observed > limit && limit == WireLimits::MAX_REWRITE_WORK
         ));
     }
 
@@ -4448,7 +4611,7 @@ mod tests {
         )];
         let too_shallow = WireLimits::default().with_nesting(1).unwrap();
         assert!(matches!(
-            patch_nested_fields_batched_with_limits(&source, &edit, too_shallow),
+            patch_nested_fields_batched(&source, &edit, too_shallow),
             Err(Error::LimitExceeded {
                 kind: LimitKind::Nesting,
                 observed: 2,
@@ -4456,15 +4619,15 @@ mod tests {
             })
         ));
         let exact = WireLimits::default().with_nesting(2).unwrap();
-        assert!(patch_nested_fields_batched_with_limits(&source, &edit, exact).is_ok());
+        assert!(patch_nested_fields_batched(&source, &edit, exact).is_ok());
     }
 
     #[test]
     fn repeated_rewrite_preserves_slots_and_append_remove_is_exact() {
         let mut original = varint_field(90, 1);
-        append_length_delimited_field(&mut original, 2, b"first").unwrap();
+        append_length_delimited_field(&mut original, 2, b"first", WireLimits::DEFAULT).unwrap();
         original.extend(varint_field(91, 2));
-        append_length_delimited_field(&mut original, 2, b"second").unwrap();
+        append_length_delimited_field(&mut original, 2, b"second", WireLimits::DEFAULT).unwrap();
         original.extend(varint_field(92, 3));
 
         let reordered = rewrite_repeated_length_delimited_fields(
@@ -4540,7 +4703,7 @@ mod tests {
         assert_eq!(restored, original);
 
         let mut packed = original.clone();
-        append_length_delimited_field(&mut packed, 2, &[1, 2]).unwrap();
+        append_length_delimited_field(&mut packed, 2, &[1, 2], WireLimits::DEFAULT).unwrap();
         assert!(rewrite_repeated_varint_fields(&packed, 2, &[10, 20]).is_err());
     }
 
@@ -4587,15 +4750,15 @@ mod tests {
         let mut second_leaf = varint_field(1, 20);
         second_leaf.extend(varint_field(91, 901));
         let mut nested = varint_field(80, 800);
-        append_length_delimited_field(&mut nested, 2, &first_leaf).unwrap();
+        append_length_delimited_field(&mut nested, 2, &first_leaf, WireLimits::DEFAULT).unwrap();
         nested.extend(varint_field(81, 801));
-        append_length_delimited_field(&mut nested, 2, &second_leaf).unwrap();
+        append_length_delimited_field(&mut nested, 2, &second_leaf, WireLimits::DEFAULT).unwrap();
         let mut original = varint_field(70, 700);
-        append_length_delimited_field(&mut original, 3, &nested).unwrap();
+        append_length_delimited_field(&mut original, 3, &nested, WireLimits::DEFAULT).unwrap();
         original.extend(varint_field(71, 701));
 
         let changed = transform_length_delimited_fields_at_path(&original, &[3, 2], |leaf| {
-            let fields = parse_wire_fields(leaf)?;
+            let fields = parse_wire_fields(leaf, WireLimits::DEFAULT)?;
             let identifier = fields
                 .iter()
                 .find(|field| field.number == 1)
@@ -4610,7 +4773,7 @@ mod tests {
         assert_ne!(changed, original);
 
         let restored = transform_length_delimited_fields_at_path(&changed, &[3, 2], |leaf| {
-            let fields = parse_wire_fields(leaf)?;
+            let fields = parse_wire_fields(leaf, WireLimits::DEFAULT)?;
             let identifier = fields
                 .iter()
                 .find(|field| field.number == 1)
@@ -4649,7 +4812,7 @@ mod tests {
         data.extend(varint_field(2, 2));
         let limits = WireLimits::default().with_fields(1).unwrap();
         assert!(matches!(
-            parse_wire_fields_with_limits(&data, limits),
+            parse_wire_fields(&data, limits),
             Err(Error::LimitExceeded {
                 kind: LimitKind::Fields,
                 observed: 2,
@@ -4659,7 +4822,7 @@ mod tests {
 
         let limits = WireLimits::default().with_input_bytes(1).unwrap();
         assert!(matches!(
-            parse_wire_fields_with_limits(&data, limits),
+            parse_wire_fields(&data, limits),
             Err(Error::LimitExceeded {
                 kind: LimitKind::InputBytes,
                 observed: 4,
@@ -4671,12 +4834,15 @@ mod tests {
     #[test]
     fn length_delimited_append_checks_field_numbers_and_output_budget() {
         let mut output = Vec::new();
-        assert!(append_length_delimited_field(&mut output, 0, b"x").is_err());
-        assert!(append_length_delimited_field(&mut output, 0x2000_0000, b"x").is_err());
+        assert!(append_length_delimited_field(&mut output, 0, b"x", WireLimits::DEFAULT).is_err());
+        assert!(
+            append_length_delimited_field(&mut output, 0x2000_0000, b"x", WireLimits::DEFAULT)
+                .is_err()
+        );
 
         let limits = WireLimits::default().with_output_bytes(2).unwrap();
         assert!(matches!(
-            append_length_delimited_field_with_limits(&mut output, 1, b"x", limits),
+            append_length_delimited_field(&mut output, 1, b"x", limits),
             Err(Error::LimitExceeded {
                 kind: LimitKind::OutputBytes,
                 ..
@@ -4687,7 +4853,10 @@ mod tests {
     #[test]
     fn wire_field_offsets_are_exposed_through_checked_slices() {
         let data = varint_field(7, 42);
-        let field = parse_wire_fields(&data).unwrap().pop().unwrap();
+        let field = parse_wire_fields(&data, WireLimits::DEFAULT)
+            .unwrap()
+            .pop()
+            .unwrap();
         assert_eq!(field.number(), 7);
         assert_eq!(field.wire_type(), 0);
         assert_eq!(field.start(), 0);
@@ -4703,7 +4872,10 @@ mod tests {
     #[test]
     fn wire_field_helpers_validate_canonical_framing_without_tightening_parser() {
         let overlong_key = [0x88, 0x00, 0x07];
-        let key_field = parse_wire_fields(&overlong_key).unwrap().pop().unwrap();
+        let key_field = parse_wire_fields(&overlong_key, WireLimits::DEFAULT)
+            .unwrap()
+            .pop()
+            .unwrap();
         assert_eq!(key_field.checked_payload(&overlong_key).unwrap(), [0x07]);
         assert!(key_field.validate_canonical_key(&overlong_key).is_err());
         assert!(
@@ -4713,7 +4885,10 @@ mod tests {
         );
 
         let canonical_key = varint_field(1, 7);
-        let canonical_key_field = parse_wire_fields(&canonical_key).unwrap().pop().unwrap();
+        let canonical_key_field = parse_wire_fields(&canonical_key, WireLimits::DEFAULT)
+            .unwrap()
+            .pop()
+            .unwrap();
         canonical_key_field
             .validate_canonical_key(&canonical_key)
             .unwrap();
@@ -4724,21 +4899,30 @@ mod tests {
         );
 
         let fixed32 = [0x1d, 0x78, 0x56, 0x34, 0x12];
-        let fixed32_field = parse_wire_fields(&fixed32).unwrap().pop().unwrap();
+        let fixed32_field = parse_wire_fields(&fixed32, WireLimits::DEFAULT)
+            .unwrap()
+            .pop()
+            .unwrap();
         assert_eq!(
             fixed32_field.checked_payload(&fixed32).unwrap(),
             &fixed32[1..]
         );
 
         let fixed64 = [0x09, 0xef, 0xcd, 0xab, 0x89, 0x67, 0x45, 0x23, 0x01];
-        let fixed64_field = parse_wire_fields(&fixed64).unwrap().pop().unwrap();
+        let fixed64_field = parse_wire_fields(&fixed64, WireLimits::DEFAULT)
+            .unwrap()
+            .pop()
+            .unwrap();
         assert_eq!(
             fixed64_field.checked_payload(&fixed64).unwrap(),
             &fixed64[1..]
         );
 
         let overlong_length = [0x0a, 0x81, 0x00, b'x'];
-        let length_field = parse_wire_fields(&overlong_length).unwrap().pop().unwrap();
+        let length_field = parse_wire_fields(&overlong_length, WireLimits::DEFAULT)
+            .unwrap()
+            .pop()
+            .unwrap();
         assert_eq!(
             length_field.checked_payload(&overlong_length).unwrap(),
             b"x"
@@ -4753,7 +4937,10 @@ mod tests {
         );
 
         let canonical_length = [0x0a, 0x01, b'x'];
-        let canonical_length_field = parse_wire_fields(&canonical_length).unwrap().pop().unwrap();
+        let canonical_length_field = parse_wire_fields(&canonical_length, WireLimits::DEFAULT)
+            .unwrap()
+            .pop()
+            .unwrap();
         canonical_length_field
             .validate_canonical_key(&canonical_length)
             .unwrap();
@@ -4768,9 +4955,9 @@ mod tests {
     #[test]
     fn source_bound_wire_view_borrows_one_source_and_exposes_field_views() {
         let mut source = varint_field(1, 7);
-        append_length_delimited_field(&mut source, 2, b"payload").unwrap();
+        append_length_delimited_field(&mut source, 2, b"payload", WireLimits::DEFAULT).unwrap();
         let other_source = [0x08, 0x63, 0x12, 0x01, b'x'];
-        let view = parse_wire_view(&source).unwrap();
+        let view = parse_wire_view(&source, WireLimits::DEFAULT).unwrap();
         let fields: Vec<_> = view.fields().collect();
 
         assert_eq!(view.source().as_ptr(), source.as_ptr());
@@ -4806,7 +4993,10 @@ mod tests {
     #[test]
     fn source_bound_wire_view_helpers_reject_noncanonical_framing() {
         let overlong_key = [0x88, 0x00, 0x07];
-        let key_field = parse_wire_view(&overlong_key).unwrap().get(0).unwrap();
+        let key_field = parse_wire_view(&overlong_key, WireLimits::DEFAULT)
+            .unwrap()
+            .get(0)
+            .unwrap();
         assert_eq!(key_field.raw(), overlong_key);
         assert_eq!(key_field.key(), &overlong_key[..2]);
         assert_eq!(key_field.payload(), &overlong_key[2..]);
@@ -4814,18 +5004,24 @@ mod tests {
         assert!(key_field.canonical_key().is_err());
 
         let overlong_length = [0x0a, 0x81, 0x00, b'x'];
-        let length_field = parse_wire_view(&overlong_length).unwrap().get(0).unwrap();
+        let length_field = parse_wire_view(&overlong_length, WireLimits::DEFAULT)
+            .unwrap()
+            .get(0)
+            .unwrap();
         length_field.validate_canonical_key().unwrap();
         assert!(length_field.validate_canonical_length().is_err());
         assert!(length_field.validate_canonical_framing().is_err());
         assert!(length_field.canonical_payload().is_err());
 
         let canonical = [0x0a, 0x01, b'x'];
-        let canonical_field = parse_wire_view(&canonical).unwrap().get(0).unwrap();
+        let canonical_field = parse_wire_view(&canonical, WireLimits::DEFAULT)
+            .unwrap()
+            .get(0)
+            .unwrap();
         assert_eq!(canonical_field.canonical_key().unwrap(), &canonical[..1]);
         assert_eq!(canonical_field.canonical_payload().unwrap(), b"x");
         assert!(
-            parse_wire_view(&[0x08, 0x00])
+            parse_wire_view(&[0x08, 0x00], WireLimits::DEFAULT)
                 .unwrap()
                 .get(0)
                 .unwrap()
@@ -4837,14 +5033,14 @@ mod tests {
     #[test]
     fn source_bound_wire_view_rejects_truncation_and_limits_before_publication() {
         for truncated in [[0x08].as_slice(), &[0x09, 0x01], &[0x0a, 0x02, b'x']] {
-            assert!(parse_wire_view(truncated).is_err());
+            assert!(parse_wire_view(truncated, WireLimits::DEFAULT).is_err());
         }
 
         let mut data = varint_field(1, 1);
         data.extend(varint_field(2, 2));
         let one_field = WireLimits::default().with_fields(1).unwrap();
         assert!(matches!(
-            parse_wire_view_with_limits(&data, one_field),
+            parse_wire_view(&data, one_field),
             Err(Error::LimitExceeded {
                 kind: LimitKind::Fields,
                 observed: 2,
@@ -4854,7 +5050,7 @@ mod tests {
 
         let one_byte = WireLimits::default().with_input_bytes(1).unwrap();
         assert!(matches!(
-            parse_wire_view_with_limits(&data, one_byte),
+            parse_wire_view(&data, one_byte),
             Err(Error::LimitExceeded {
                 kind: LimitKind::InputBytes,
                 observed: 4,
@@ -4869,7 +5065,7 @@ mod tests {
         let data = [0x08, 0x00, 0x10, 0x01];
         let limits = WireLimits::default().with_fields(1).unwrap();
         assert!(matches!(
-            WireView::parse_with_limits(&data, limits),
+            WireView::parse(&data, limits),
             Err(Error::LimitExceeded {
                 kind: LimitKind::Fields,
                 observed: 2,
@@ -4881,13 +5077,19 @@ mod tests {
     #[test]
     fn append_rejects_invalid_fields_without_mutating_output() {
         let mut output = Vec::new();
-        assert!(append_length_delimited_field(&mut output, 0, b"x").is_err());
+        assert!(append_length_delimited_field(&mut output, 0, b"x", WireLimits::DEFAULT).is_err());
         assert!(output.is_empty());
-        assert!(append_length_delimited_field(&mut output, 0x2000_0000, b"x").is_err());
+        assert!(
+            append_length_delimited_field(&mut output, 0x2000_0000, b"x", WireLimits::DEFAULT)
+                .is_err()
+        );
         assert!(output.is_empty());
 
-        append_length_delimited_field(&mut output, 0x1fff_ffff, b"x").unwrap();
-        assert_eq!(parse_wire_fields(&output).unwrap()[0].number(), 0x1fff_ffff);
+        append_length_delimited_field(&mut output, 0x1fff_ffff, b"x", WireLimits::DEFAULT).unwrap();
+        assert_eq!(
+            parse_wire_fields(&output, WireLimits::DEFAULT).unwrap()[0].number(),
+            0x1fff_ffff
+        );
     }
 
     #[test]
@@ -4895,7 +5097,7 @@ mod tests {
         let at_limit = [0x08, 0x00].repeat(WireLimits::default().max_fields());
         let mut appended = at_limit.clone();
         assert!(matches!(
-            append_length_delimited_field(&mut appended, 1, b"x"),
+            append_length_delimited_field(&mut appended, 1, b"x", WireLimits::DEFAULT),
             Err(Error::LimitExceeded {
                 kind: LimitKind::Fields,
                 ..
@@ -4936,13 +5138,13 @@ mod tests {
     fn wire_tree_preflight_visits_selected_messages_with_shared_totals() {
         let leaf = varint_field(7, 70);
         let mut child = varint_field(3, 30);
-        append_length_delimited_field(&mut child, 4, &leaf).unwrap();
+        append_length_delimited_field(&mut child, 4, &leaf, WireLimits::DEFAULT).unwrap();
         let mut source = varint_field(1, 10);
-        append_length_delimited_field(&mut source, 2, &child).unwrap();
-        append_length_delimited_field(&mut source, 9, &[0x80]).unwrap();
+        append_length_delimited_field(&mut source, 2, &child, WireLimits::DEFAULT).unwrap();
+        append_length_delimited_field(&mut source, 9, &[0x80], WireLimits::DEFAULT).unwrap();
 
         let mut visited = Vec::new();
-        let report = preflight_wire_tree(&source, |visit| {
+        let report = preflight_wire_tree(&source, WireLimits::DEFAULT, |visit| {
             let field = visit.field();
             visited.push((visit.path().to_vec(), field.number(), field.wire_type()));
             Ok(if descend_test_schema(visit.path(), field) {
@@ -4977,12 +5179,12 @@ mod tests {
     fn wire_tree_preflight_shares_field_budget_across_siblings() {
         let child = varint_field(1, 1);
         let mut source = Vec::new();
-        append_length_delimited_field(&mut source, 2, &child).unwrap();
-        append_length_delimited_field(&mut source, 2, &child).unwrap();
+        append_length_delimited_field(&mut source, 2, &child, WireLimits::DEFAULT).unwrap();
+        append_length_delimited_field(&mut source, 2, &child, WireLimits::DEFAULT).unwrap();
         let limits = WireLimits::default().with_fields(3).unwrap();
 
         assert!(matches!(
-            preflight_wire_tree_with_limits(&source, limits, |visit| Ok(if visit.depth() == 0 {
+            preflight_wire_tree(&source, limits, |visit| Ok(if visit.depth() == 0 {
                 WireDescent::Descend
             } else {
                 WireDescent::Skip
@@ -4999,14 +5201,14 @@ mod tests {
     fn wire_tree_preflight_shares_aggregate_scan_byte_budget() {
         let child = varint_field(1, 1);
         let mut source = Vec::new();
-        append_length_delimited_field(&mut source, 2, &child).unwrap();
+        append_length_delimited_field(&mut source, 2, &child, WireLimits::DEFAULT).unwrap();
         let aggregate = source.len() + child.len();
         let limits = WireLimits::default()
             .with_input_bytes(aggregate - 1)
             .unwrap();
 
         assert!(matches!(
-            preflight_wire_tree_with_limits(&source, limits, |visit| Ok(
+            preflight_wire_tree(&source, limits, |visit| Ok(
                 if visit.depth() == 0 {
                     WireDescent::Descend
                 } else {
@@ -5026,13 +5228,13 @@ mod tests {
         let mut source = varint_field(9, 1);
         for _ in 0..4 {
             let mut parent = Vec::new();
-            append_length_delimited_field(&mut parent, 1, &source).unwrap();
+            append_length_delimited_field(&mut parent, 1, &source, WireLimits::DEFAULT).unwrap();
             source = parent;
         }
         let limits = WireLimits::default().with_nesting(3).unwrap();
 
         assert!(matches!(
-            preflight_wire_tree_with_limits(&source, limits, |visit| Ok(
+            preflight_wire_tree(&source, limits, |visit| Ok(
                 if visit.field().wire_type() == 2 {
                     WireDescent::Descend
                 } else {
@@ -5050,15 +5252,19 @@ mod tests {
     #[test]
     fn wire_tree_preflight_validates_only_selected_deferred_messages() {
         let mut source = Vec::new();
-        append_length_delimited_field(&mut source, 2, &[0x08]).unwrap();
+        append_length_delimited_field(&mut source, 2, &[0x08], WireLimits::DEFAULT).unwrap();
 
-        let skipped = preflight_wire_tree(&source, |_| Ok(WireDescent::Skip)).unwrap();
+        let skipped =
+            preflight_wire_tree(&source, WireLimits::DEFAULT, |_| Ok(WireDescent::Skip)).unwrap();
         assert_eq!(skipped.fields(), 1);
-        assert!(preflight_wire_tree(&source, |_| Ok(WireDescent::Descend)).is_err());
+        assert!(
+            preflight_wire_tree(&source, WireLimits::DEFAULT, |_| Ok(WireDescent::Descend))
+                .is_err()
+        );
 
         let scalar = varint_field(1, 7);
         assert!(matches!(
-            preflight_wire_tree(&scalar, |_| Ok(WireDescent::Descend)),
+            preflight_wire_tree(&scalar, WireLimits::DEFAULT, |_| Ok(WireDescent::Descend)),
             Err(Error::InvalidFormat(message))
                 if message.contains("not length-delimited")
         ));
@@ -5071,8 +5277,8 @@ mod tests {
             path: &mut Vec<u32>,
             collected: &mut Vec<(Vec<u32>, u32, u8, Vec<u8>)>,
         ) {
-            for field in parse_wire_fields(source).unwrap() {
-                let field_view = WireView::parse(field.raw(source).unwrap())
+            for field in parse_wire_fields(source, WireLimits::DEFAULT).unwrap() {
+                let field_view = WireView::parse(field.raw(source).unwrap(), WireLimits::DEFAULT)
                     .unwrap()
                     .get(0)
                     .unwrap();
@@ -5092,16 +5298,16 @@ mod tests {
 
         let leaf = varint_field(8, 800);
         let mut child = varint_field(3, 300);
-        append_length_delimited_field(&mut child, 4, &leaf).unwrap();
+        append_length_delimited_field(&mut child, 4, &leaf, WireLimits::DEFAULT).unwrap();
         child.extend([0x95, 0x00, 1, 2, 3, 4]);
         let mut source = vec![0x88, 0x00, 0x01];
-        append_length_delimited_field(&mut source, 2, &child).unwrap();
+        append_length_delimited_field(&mut source, 2, &child, WireLimits::DEFAULT).unwrap();
         source.extend([0x29, 1, 2, 3, 4, 5, 6, 7, 8]);
 
         let mut legacy = Vec::new();
         collect_legacy(&source, &mut Vec::new(), &mut legacy);
         let mut preflight = Vec::new();
-        let report = preflight_wire_tree(&source, |visit| {
+        let report = preflight_wire_tree(&source, WireLimits::DEFAULT, |visit| {
             let field = visit.field();
             preflight.push((
                 visit.path().to_vec(),
@@ -5127,8 +5333,9 @@ mod tests {
             vec![0x0e],
         ] {
             assert_eq!(
-                preflight_wire_tree(&malformed, |_| Ok(WireDescent::Skip)).is_ok(),
-                parse_wire_fields(&malformed).is_ok()
+                preflight_wire_tree(&malformed, WireLimits::DEFAULT, |_| Ok(WireDescent::Skip))
+                    .is_ok(),
+                parse_wire_fields(&malformed, WireLimits::DEFAULT).is_ok()
             );
         }
     }

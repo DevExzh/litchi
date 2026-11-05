@@ -13,16 +13,15 @@ use std::{fmt, path::Path, sync::Arc};
 use litchi_iwa_archive::ComponentCatalog;
 use litchi_iwa_archive::{Error as ArchiveError, LimitKind as ArchiveLimitKind, SourceCatalog};
 
-use super::super::{
-    Package, PayloadLimitKind, ReadError, ReadOptions, SemanticLimitKind, read_source,
-};
-use super::SlideTableMergesError;
+use super::super::{Package, PayloadLimitKind, Profile, ReadError, read_source};
+use super::Error;
+use crate::limits::{OpenOptions, SemanticLimitKind};
 
 /// A lazy, metadata-only Keynote merged-cell reader.
 ///
 /// `MergeReader` retains one validated component catalog and the compact object
 /// index required to resolve rooted slide/table ownership. It does not retain
-/// a ZIP reassembly catalog, build a semantic [`crate::Document`], decode slide
+/// a ZIP reassembly catalog, build a semantic [`crate::Presentation`], decode slide
 /// values, or expose native object identifiers. Clones share the immutable
 /// package state and its parsed archive allocations.
 ///
@@ -36,7 +35,8 @@ use super::SlideTableMergesError;
 /// unrelated malformed cell or slide does not force a full semantic decode.
 ///
 /// ```no_run
-/// use litchi_keynote::{MergeReader, SlideSelector, TableSelector};
+/// use litchi_keynote::slide::table::merge::transaction::MergeReader;
+/// use litchi_keynote::{SlideSelector, TableSelector};
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let reader = MergeReader::open("deck.key")?;
@@ -53,7 +53,7 @@ impl fmt::Debug for MergeReader {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("MergeReader")
-            .field("options", &self.package.read_options())
+            .field("options", &self.package.options())
             .finish_non_exhaustive()
     }
 }
@@ -77,8 +77,8 @@ impl MergeReader {
     ///
     /// Returns a typed merge error when the path cannot be read, physical
     /// ingress exceeds a limit, or the source is not a valid Keynote package.
-    pub fn open(path: impl AsRef<Path>) -> Result<Self, SlideTableMergesError> {
-        Self::open_with_options(path, ReadOptions::default())
+    pub fn open(path: impl AsRef<Path>) -> Result<Self, Error> {
+        Self::open_with_options(path, OpenOptions::default())
     }
 
     /// Open a Keynote package for lazy merged-cell queries under explicit
@@ -92,11 +92,9 @@ impl MergeReader {
     ///
     /// Returns a typed merge error when bounded filesystem or package ingress
     /// fails.
-    pub fn open_with_options(
-        path: impl AsRef<Path>,
-        options: ReadOptions,
-    ) -> Result<Self, SlideTableMergesError> {
-        let source = read_source(path.as_ref(), options.archive()).map_err(map_read_error)?;
+    pub fn open_with_options(path: impl AsRef<Path>, options: OpenOptions) -> Result<Self, Error> {
+        let profile = Profile::from_options(options).map_err(map_read_error)?;
+        let source = read_source(path.as_ref(), profile.archive()).map_err(map_read_error)?;
         Self::from_shared_bytes_with_options(source, options)
     }
 
@@ -104,15 +102,15 @@ impl MergeReader {
     ///
     /// The input is parsed into one immutable component catalog; the ZIP
     /// allocation is released after component validation because this reader
-    /// does not provide source-preserving writes. No semantic `Document` or
+    /// does not provide source-preserving writes. No semantic `Presentation` or
     /// slide snapshot is built.
     ///
     /// # Errors
     ///
     /// Returns a typed merge error when physical ingress or Keynote root
     /// validation fails.
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, SlideTableMergesError> {
-        Self::from_bytes_with_options(bytes, ReadOptions::default())
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+        Self::from_bytes_with_options(bytes, OpenOptions::default())
     }
 
     /// Parse Keynote package bytes under explicit physical and semantic limits.
@@ -121,21 +119,18 @@ impl MergeReader {
     ///
     /// Returns a typed merge error when the source is malformed, belongs to a
     /// different iWork format, or exceeds the configured profile.
-    pub fn from_bytes_with_options(
-        bytes: &[u8],
-        options: ReadOptions,
-    ) -> Result<Self, SlideTableMergesError> {
-        let length =
-            u64::try_from(bytes.len()).map_err(|_| SlideTableMergesError::InvalidSource)?;
+    pub fn from_bytes_with_options(bytes: &[u8], options: OpenOptions) -> Result<Self, Error> {
+        let options = Profile::from_options(options).map_err(map_read_error)?;
+        let length = u64::try_from(bytes.len()).map_err(|_| Error::InvalidSource)?;
         if length > options.archive().max_input_bytes() {
-            return Err(SlideTableMergesError::LimitExceeded {
-                kind: super::SlideTableMergesLimitKind::InputBytes,
+            return Err(Error::Limit {
+                kind: super::LimitKind::InputBytes,
                 observed: length,
                 maximum: options.archive().max_input_bytes(),
             });
         }
-        let source = SourceCatalog::from_bytes_with_limits(bytes, options.archive())
-            .map_err(map_archive_error)?;
+        let source =
+            SourceCatalog::from_bytes(bytes, options.archive()).map_err(map_archive_error)?;
         let components = Arc::new(source.into_components());
         let package =
             Package::from_merge_components(components, options).map_err(map_read_error)?;
@@ -152,8 +147,8 @@ impl MergeReader {
     /// # Errors
     ///
     /// Returns the same typed merge failures as [`Self::from_bytes_with_options`].
-    pub fn from_shared_bytes(bytes: Arc<[u8]>) -> Result<Self, SlideTableMergesError> {
-        Self::from_shared_bytes_with_options(bytes, ReadOptions::default())
+    pub fn from_shared_bytes(bytes: Arc<[u8]>) -> Result<Self, Error> {
+        Self::from_shared_bytes_with_options(bytes, OpenOptions::default())
     }
 
     /// Parse an already shared immutable source under explicit limits.
@@ -164,9 +159,10 @@ impl MergeReader {
     /// classification, or bounded object indexing fails.
     pub fn from_shared_bytes_with_options(
         bytes: Arc<[u8]>,
-        options: ReadOptions,
-    ) -> Result<Self, SlideTableMergesError> {
-        let source = SourceCatalog::from_shared_bytes_with_limits(bytes, options.archive())
+        options: OpenOptions,
+    ) -> Result<Self, Error> {
+        let options = Profile::from_options(options).map_err(map_read_error)?;
+        let source = SourceCatalog::from_shared_bytes(bytes, options.archive())
             .map_err(map_archive_error)?;
         let components = Arc::new(source.into_components());
         let package =
@@ -182,8 +178,9 @@ impl MergeReader {
     #[doc(hidden)]
     pub fn __from_shared_catalog(
         catalog: Arc<ComponentCatalog>,
-        options: ReadOptions,
-    ) -> Result<Self, SlideTableMergesError> {
+        options: OpenOptions,
+    ) -> Result<Self, Error> {
+        let options = Profile::from_options(options).map_err(map_read_error)?;
         let package = Package::from_merge_components(catalog, options).map_err(map_read_error)?;
         Ok(Self { package })
     }
@@ -203,28 +200,29 @@ impl MergeReader {
         &self,
         slide: impl Into<crate::SlideSelector<'slide>>,
         table: impl Into<crate::TableSelector>,
-    ) -> Result<Vec<crate::slide::table::merge::Region>, SlideTableMergesError> {
+    ) -> Result<Vec<crate::slide::table::merge::Region>, Error> {
         self.package
             .slide_table_merges_from_components(slide, table)
     }
 
-    /// Return the physical and semantic profiles retained by this reader.
-    #[must_use]
-    pub fn read_options(&self) -> ReadOptions {
-        self.package.read_options()
+    /// Return the ingress envelope retained by this reader.
+    pub fn options(&self) -> OpenOptions {
+        self.package.options()
     }
 }
 
-fn map_read_error(error: ReadError) -> SlideTableMergesError {
+fn map_read_error(error: ReadError) -> Error {
     match error {
-        ReadError::NotKeynote => SlideTableMergesError::UnsupportedSource,
+        ReadError::UnexpectedFormat { .. } => {
+            Error::Refused(crate::slide::table::merge::transaction::Refusal::UnsupportedSource)
+        },
         ReadError::Archive(error) => map_archive_error(error),
         ReadError::SemanticLimit {
             kind,
             observed,
             maximum,
             ..
-        } => SlideTableMergesError::LimitExceeded {
+        } => Error::Limit {
             kind: map_semantic_limit(kind),
             observed: observed as u64,
             maximum: maximum as u64,
@@ -234,89 +232,75 @@ fn map_read_error(error: ReadError) -> SlideTableMergesError {
             observed,
             maximum,
             ..
-        } => SlideTableMergesError::LimitExceeded {
+        } => Error::Limit {
             kind: map_payload_limit(kind),
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        ReadError::Allocation { amount, .. } => SlideTableMergesError::Allocation { amount },
+        ReadError::Allocation { amount, .. } => Error::Allocation { amount },
         ReadError::Io(_)
         | ReadError::Detection(_)
         | ReadError::InvalidFormat(_)
         | ReadError::Decode(_)
         | ReadError::TextStorage { .. }
-        | ReadError::Metadata(_) => SlideTableMergesError::InvalidSource,
+        | ReadError::Metadata(_) => Error::InvalidSource,
     }
 }
 
-fn map_archive_error(error: ArchiveError) -> SlideTableMergesError {
+fn map_archive_error(error: ArchiveError) -> Error {
     match error {
         ArchiveError::Limit {
             kind,
             observed,
             maximum,
-        } => SlideTableMergesError::LimitExceeded {
+        } => Error::Limit {
             kind: map_archive_limit(kind),
             observed,
             maximum,
         },
-        ArchiveError::Allocation { amount, .. } => SlideTableMergesError::Allocation { amount },
-        ArchiveError::Io(_)
-        | ArchiveError::Zip { .. }
-        | ArchiveError::Iwa(_)
-        | ArchiveError::InvalidLimits(_)
-        | ArchiveError::Encrypted
-        | ArchiveError::SourceChanged { .. }
-        | ArchiveError::DirectoryChanged { .. }
-        | ArchiveError::Reassembly(_)
-        | ArchiveError::InvalidBundle(_) => SlideTableMergesError::InvalidSource,
+        ArchiveError::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_archive_limit(
-    kind: ArchiveLimitKind,
-) -> super::super::slide_table_merges::SlideTableMergesLimitKind {
-    use super::super::slide_table_merges::SlideTableMergesLimitKind;
+fn map_archive_limit(kind: ArchiveLimitKind) -> super::super::slide_table_merges::LimitKind {
+    use super::super::slide_table_merges::LimitKind;
 
     match kind {
-        ArchiveLimitKind::InputBytes => SlideTableMergesLimitKind::InputBytes,
-        ArchiveLimitKind::OutputBytes => SlideTableMergesLimitKind::OutputBytes,
-        ArchiveLimitKind::Entries => SlideTableMergesLimitKind::Entries,
-        ArchiveLimitKind::MemberNameBytes => SlideTableMergesLimitKind::EntryBytes,
-        ArchiveLimitKind::MetadataBytes => SlideTableMergesLimitKind::TotalBytes,
-        ArchiveLimitKind::CompressedEntryBytes => SlideTableMergesLimitKind::EntryBytes,
-        ArchiveLimitKind::EntryBytes => SlideTableMergesLimitKind::EntryBytes,
-        ArchiveLimitKind::TotalBytes => SlideTableMergesLimitKind::TotalBytes,
-        ArchiveLimitKind::IwaStreamBytes => SlideTableMergesLimitKind::PayloadObjects,
-        ArchiveLimitKind::IwaTotalBytes => SlideTableMergesLimitKind::TotalBytes,
+        ArchiveLimitKind::InputBytes => LimitKind::InputBytes,
+        ArchiveLimitKind::OutputBytes => LimitKind::OutputBytes,
+        ArchiveLimitKind::Entries => LimitKind::Entries,
+        ArchiveLimitKind::MemberNameBytes => LimitKind::EntryBytes,
+        ArchiveLimitKind::MetadataBytes => LimitKind::TotalBytes,
+        ArchiveLimitKind::CompressedEntryBytes => LimitKind::EntryBytes,
+        ArchiveLimitKind::EntryBytes => LimitKind::EntryBytes,
+        ArchiveLimitKind::TotalBytes => LimitKind::TotalBytes,
+        ArchiveLimitKind::IwaStreamBytes => LimitKind::PayloadObjects,
+        ArchiveLimitKind::IwaTotalBytes => LimitKind::TotalBytes,
     }
 }
 
-fn map_semantic_limit(
-    kind: SemanticLimitKind,
-) -> super::super::slide_table_merges::SlideTableMergesLimitKind {
-    use super::super::slide_table_merges::SlideTableMergesLimitKind;
+fn map_semantic_limit(kind: SemanticLimitKind) -> super::super::slide_table_merges::LimitKind {
+    use super::super::slide_table_merges::LimitKind;
 
     match kind {
-        SemanticLimitKind::Objects => SlideTableMergesLimitKind::PayloadObjects,
-        SemanticLimitKind::Slides => SlideTableMergesLimitKind::Components,
-        SemanticLimitKind::References => SlideTableMergesLimitKind::References,
-        SemanticLimitKind::TextStorages => SlideTableMergesLimitKind::PayloadMessages,
-        SemanticLimitKind::TextFragments => SlideTableMergesLimitKind::PayloadItems,
-        SemanticLimitKind::TextBytes => SlideTableMergesLimitKind::Retained,
+        SemanticLimitKind::Objects => LimitKind::PayloadObjects,
+        SemanticLimitKind::Slides => LimitKind::Components,
+        SemanticLimitKind::References => LimitKind::References,
+        SemanticLimitKind::TextStorages => LimitKind::PayloadMessages,
+        SemanticLimitKind::TextFragments => LimitKind::PayloadItems,
+        SemanticLimitKind::TextBytes => LimitKind::Retained,
     }
 }
 
-fn map_payload_limit(
-    kind: PayloadLimitKind,
-) -> super::super::slide_table_merges::SlideTableMergesLimitKind {
-    use super::super::slide_table_merges::SlideTableMergesLimitKind;
+fn map_payload_limit(kind: PayloadLimitKind) -> super::super::slide_table_merges::LimitKind {
+    use super::super::slide_table_merges::LimitKind;
 
     match kind {
-        PayloadLimitKind::Bytes => SlideTableMergesLimitKind::InputBytes,
-        PayloadLimitKind::Fields => SlideTableMergesLimitKind::WireFields,
-        PayloadLimitKind::Nesting => SlideTableMergesLimitKind::WireNesting,
-        PayloadLimitKind::Work => SlideTableMergesLimitKind::WireWork,
+        PayloadLimitKind::Bytes => LimitKind::InputBytes,
+        PayloadLimitKind::Fields => LimitKind::WireFields,
+        PayloadLimitKind::Nesting => LimitKind::WireNesting,
+        PayloadLimitKind::Work => LimitKind::WireWork,
     }
 }
 
@@ -355,7 +339,7 @@ mod tests {
     fn clones_share_the_reader_state_and_retain_options() {
         let reader = MergeReader::from_bytes(NATIVE_SOURCE).expect("native Keynote source");
         let clone = reader.clone();
-        assert_eq!(clone.read_options(), reader.read_options());
+        assert_eq!(clone.options(), reader.options());
         assert_eq!(
             clone.slide_table_merges(0, 0).expect("clone merge read"),
             [Region::new(3, 1, 2, 2).expect("checked region")]
@@ -375,7 +359,9 @@ mod tests {
         );
         assert!(matches!(
             reader.slide_table_merges(SlideSelector::name("missing"), TableSelector::index(0)),
-            Err(super::super::SlideTableMergesError::SlideNameNotFound)
+            Err(super::super::Error::Refused(
+                crate::slide::table::merge::transaction::Refusal::SlideNameNotFound
+            ))
         ));
         assert_eq!(
             reader
@@ -396,7 +382,7 @@ mod tests {
     fn shared_catalog_keeps_original_archive_allocations() {
         use litchi_iwa_archive::{ComponentCatalog, Limits};
 
-        let records = ComponentCatalog::from_bytes(NATIVE_SOURCE)
+        let records = ComponentCatalog::from_bytes(NATIVE_SOURCE, Default::default())
             .expect("native Keynote source")
             .into_iter()
             .map(|component| {
@@ -419,7 +405,7 @@ mod tests {
         );
         let reader = MergeReader::__from_shared_catalog(
             std::sync::Arc::clone(&catalog),
-            crate::ReadOptions::default(),
+            crate::OpenOptions::default(),
         )
         .expect("shared catalog reader");
         assert_eq!(
@@ -474,10 +460,7 @@ mod tests {
     -> Result<(), Box<dyn std::error::Error>> {
         use std::sync::Arc;
 
-        use crate::{
-            MAX_OBJECTS, MAX_SLIDES, MAX_TEXT_BYTES, MAX_TEXT_FRAGMENTS, MAX_TEXT_STORAGES,
-            ReadOptions, SemanticLimits,
-        };
+        use crate::{OpenOptions, SemanticLimits};
         use litchi_iwa_archive::{ComponentCatalog, Limits};
         use litchi_iwa_core::{ArchiveObject, RawMessage};
         use litchi_iwa_protos::{kn, tsp};
@@ -493,7 +476,7 @@ mod tests {
 
         let package = Package::from_bytes(NATIVE_SOURCE)?;
         let show_identifier = package.root_show_identifier()?;
-        let components = ComponentCatalog::from_bytes(NATIVE_SOURCE)?;
+        let components = ComponentCatalog::from_bytes(NATIVE_SOURCE, Default::default())?;
         let mut parts = components
             .into_iter()
             .map(|component| component.into_parts())
@@ -529,6 +512,7 @@ mod tests {
                             .checked_add(1)
                             .ok_or("synthetic slide identifier overflow")?;
                         show.slide_tree.slides.push(reference(node_identifier));
+                        #[allow(deprecated, reason = "the required native field is deprecated")]
                         let node = kn::SlideNodeArchive {
                             slide: Some(reference(slide_identifier)),
                             is_skipped: false,
@@ -542,6 +526,7 @@ mod tests {
                                 type_: 4,
                                 data: node.encode_to_vec(),
                             }],
+                            Default::default(),
                         )?);
                         extra_objects.push(ArchiveObject::new(
                             slide_identifier,
@@ -549,6 +534,7 @@ mod tests {
                                 type_: 5,
                                 data: Vec::new(),
                             }],
+                            Default::default(),
                         )?);
                     }
                     message.data = show.encode_to_vec();
@@ -569,22 +555,15 @@ mod tests {
                 .map(|(name, archive)| (name.as_str(), Arc::new(archive.clone()))),
             Limits::default(),
         )?);
-        let semantic = SemanticLimits::new(
-            MAX_OBJECTS,
-            MAX_SLIDES,
-            5,
-            MAX_TEXT_STORAGES,
-            MAX_TEXT_FRAGMENTS,
-            MAX_TEXT_BYTES,
-        )?;
+        let semantic = SemanticLimits::builder().max_references(5)?.build()?;
         let reader = MergeReader::__from_shared_catalog(
             catalog,
-            ReadOptions::new(Limits::default(), semantic),
+            OpenOptions::new().semantic_limits(semantic),
         )?;
         assert!(matches!(
             reader.slide_table_merges(SlideSelector::name("missing"), TableSelector::index(0)),
-            Err(super::super::SlideTableMergesError::LimitExceeded {
-                kind: super::super::SlideTableMergesLimitKind::References,
+            Err(super::super::Error::Limit {
+                kind: super::super::LimitKind::References,
                 observed: 6,
                 maximum: 5,
             })
@@ -596,18 +575,20 @@ mod tests {
     #[test]
     fn semantic_only_package_ingress_remains_unsupported_for_package_reads() {
         let components = std::sync::Arc::new(
-            litchi_iwa_archive::ComponentCatalog::from_bytes(NATIVE_SOURCE)
+            litchi_iwa_archive::ComponentCatalog::from_bytes(NATIVE_SOURCE, Default::default())
                 .expect("native Keynote components"),
         );
         let package = Package::from_classified_components(
             components,
-            crate::Limits::default(),
+            litchi_iwa_archive::Limits::default(),
             crate::SemanticLimits::default(),
         )
         .expect("semantic-only Keynote package");
         assert!(matches!(
             package.slide_table_merges(SlideSelector::index(0), TableSelector::index(0)),
-            Err(super::super::SlideTableMergesError::UnsupportedSource)
+            Err(super::super::Error::Refused(
+                crate::slide::table::merge::transaction::Refusal::UnsupportedSource
+            ))
         ));
     }
 }

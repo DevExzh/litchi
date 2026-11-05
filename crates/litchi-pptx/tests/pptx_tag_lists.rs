@@ -4,6 +4,9 @@
     reason = "test assertions panic on failure by design"
 )]
 
+mod in_place;
+use in_place::InPlace as _;
+
 use litchi_opc::PackURI;
 use litchi_opc::part::BlobPart;
 use litchi_pptx::Error;
@@ -90,7 +93,7 @@ fn numeric_slide_lookup_does_not_process_unrelated_slides() {
     let mut package = package_with_direct_tag_lists();
     let unrelated = PackURI::new("/ppt/slides/slide2.xml").unwrap();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             opc.get_part_mut(&unrelated)?
                 .set_blob(b"<not-valid-xml".to_vec());
             Ok(())
@@ -110,7 +113,7 @@ fn direct_anchor_rejects_an_external_tag_relationship() {
         .unwrap();
     let relationship_id = source.rel().to_owned();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             let slide = opc.get_part_mut(&slide_name)?;
             let relationship = slide.rels_mut().remove(&relationship_id).unwrap();
             slide.rels_mut().add_relationship(
@@ -140,7 +143,7 @@ fn direct_anchor_rejects_the_wrong_tag_content_type() {
         .part()
         .clone();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             assert!(opc.remove_part(&part_name));
             opc.add_part(Box::new(BlobPart::new(
                 part_name,
@@ -190,10 +193,15 @@ fn real_shape_tags_are_not_flattened_into_slide_tags() {
 fn package_tag_put_and_remove_are_singleton_and_persistent() {
     let mut package = package_with_named_slides();
     let created = tag_list("Priority", "High");
-    assert_eq!(package.put_tags("Overview", created.clone()).unwrap(), None);
+    assert_eq!(
+        package
+            .put_tags_in_place("Overview", created.clone())
+            .unwrap(),
+        None
+    );
     assert_eq!(package.tags("Overview").unwrap(), Some(created.clone()));
 
-    let previous = package.put_tags("Overview", List::new()).unwrap();
+    let previous = package.put_tags_in_place("Overview", List::new()).unwrap();
     assert_eq!(previous, Some(created));
     assert_eq!(package.tags("Overview").unwrap(), Some(List::new()));
 
@@ -201,8 +209,11 @@ fn package_tag_put_and_remove_are_singleton_and_persistent() {
     package.save(output.path()).unwrap();
     let mut reopened = Package::open(output.path()).unwrap();
     assert_eq!(reopened.tags("Overview").unwrap(), Some(List::new()));
-    assert_eq!(reopened.remove_tags("Overview").unwrap(), Some(List::new()));
-    assert_eq!(reopened.remove_tags("Overview").unwrap(), None);
+    assert_eq!(
+        reopened.remove_tags_in_place("Overview").unwrap(),
+        Some(List::new())
+    );
+    assert_eq!(reopened.remove_tags_in_place("Overview").unwrap(), None);
     reopened.save(output.path()).unwrap();
 
     let reopened = Package::open(output.path()).unwrap();
@@ -216,7 +227,7 @@ fn package_tag_crud_edits_only_the_active_raw_mce_branch() {
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
     let inactive_part = PackURI::new("/ppt/tags/tag900.xml").unwrap();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             opc.add_part(Box::new(BlobPart::new(
                 inactive_part.clone(),
                 TAG_CONTENT_TYPE.to_owned(),
@@ -235,7 +246,7 @@ fn package_tag_crud_edits_only_the_active_raw_mce_branch() {
         r#"<mc:AlternateContent xmlns:mc="{MC}"><mc:Choice xmlns:x="urn:litchi:test:unsupported" Requires="x"><p:custDataLst><!--inactive-branch--><p:tags r:id="rIdInactiveTags"/></p:custDataLst></mc:Choice><mc:Fallback><p:custDataLst><!--active-branch--></p:custDataLst></mc:Fallback></mc:AlternateContent>"#
     );
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             let slide = opc.get_part_mut(&slide_name)?;
             let xml = std::str::from_utf8(slide.blob()).unwrap();
             let updated = xml.replacen("</p:spTree>", &format!("</p:spTree>{alternate}"), 1);
@@ -247,12 +258,19 @@ fn package_tag_crud_edits_only_the_active_raw_mce_branch() {
 
     assert_eq!(package.tags("Overview").unwrap(), None);
     let created = tag_list("Owner", "Alice");
-    assert_eq!(package.put_tags("Overview", created.clone()).unwrap(), None);
+    assert_eq!(
+        package
+            .put_tags_in_place("Overview", created.clone())
+            .unwrap(),
+        None
+    );
     assert_eq!(package.tags("Overview").unwrap(), Some(created.clone()));
 
     let replacement = tag_list("Owner", "Grace");
     assert_eq!(
-        package.put_tags("Overview", replacement.clone()).unwrap(),
+        package
+            .put_tags_in_place("Overview", replacement.clone())
+            .unwrap(),
         Some(created)
     );
     assert_eq!(package.tags("Overview").unwrap(), Some(replacement.clone()));
@@ -271,8 +289,11 @@ fn package_tag_crud_edits_only_the_active_raw_mce_branch() {
         reopened.tags("Overview").unwrap(),
         Some(replacement.clone())
     );
-    assert_eq!(reopened.remove_tags("Overview").unwrap(), Some(replacement));
-    assert_eq!(reopened.remove_tags("Overview").unwrap(), None);
+    assert_eq!(
+        reopened.remove_tags_in_place("Overview").unwrap(),
+        Some(replacement)
+    );
+    assert_eq!(reopened.remove_tags_in_place("Overview").unwrap(), None);
     let after_remove = std::str::from_utf8(
         reopened
             .opc()
@@ -301,30 +322,38 @@ fn package_tag_crud_edits_only_the_active_raw_mce_branch() {
 }
 
 #[test]
-fn package_tag_edits_reject_a_dirty_legacy_writer() {
-    let mut package = Package::new().unwrap();
-    package.presentation_mut().unwrap().add_slide().unwrap();
-
-    assert!(matches!(
-        package.put_tags(0, tag_list("Owner", "Alice")),
-        Err(Error::UnsafeEdit {
-            operation: "put_tags",
-            ..
-        })
-    ));
+fn built_package_accepts_tag_edits_without_an_archive_round_trip() {
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    builder.presentation().unwrap().add_slide().unwrap();
+    let mut package = builder.build().unwrap();
+    assert!(
+        package
+            .put_tags_in_place(0, tag_list("Owner", "Alice"))
+            .unwrap()
+            .is_none()
+    );
+    let bytes = package.to_bytes().unwrap();
+    let reopened = Package::from_bytes(&bytes).unwrap();
+    assert!(package.same_content(&reopened).unwrap());
 }
 
 fn package_with_direct_tag_lists() -> Package {
     let mut package = package_with_named_slides();
     assert_eq!(
         package
-            .put_tags("Overview", tag::parse(LOCAL_PRIMARY_TAGS).unwrap())
+            .put_tags_in_place(
+                "Overview",
+                tag::parse(LOCAL_PRIMARY_TAGS, tag::Limits::DEFAULT).unwrap(),
+            )
             .unwrap(),
         None
     );
     assert_eq!(
         package
-            .put_tags("Appendix", tag::parse(LOCAL_SECONDARY_TAGS).unwrap())
+            .put_tags_in_place(
+                "Appendix",
+                tag::parse(LOCAL_SECONDARY_TAGS, tag::Limits::DEFAULT).unwrap(),
+            )
             .unwrap(),
         None
     );
@@ -333,9 +362,10 @@ fn package_with_direct_tag_lists() -> Package {
 
 fn package_with_named_slides() -> Package {
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
-    let mut package = Package::new().unwrap();
-    package.presentation_mut().unwrap().add_slide().unwrap();
-    package.presentation_mut().unwrap().add_slide().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    builder.presentation().unwrap().add_slide().unwrap();
+    builder.presentation().unwrap().add_slide().unwrap();
+    let package = builder.build().unwrap();
     package.save(output.path()).unwrap();
 
     let mut package = Package::open(output.path()).unwrap();
@@ -347,7 +377,7 @@ fn package_with_named_slides() -> Package {
 fn name_slide(package: &mut Package, slide_name: &str, name: &str) {
     let slide_name = PackURI::new(slide_name).unwrap();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             let slide = opc.get_part_mut(&slide_name)?;
             let xml = std::str::from_utf8(slide.blob()).unwrap();
             let named = if xml.contains("<p:cSld>") {
@@ -383,7 +413,7 @@ fn install_unanchored_tag_relationship(package: &mut Package) {
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
     let part_name = PackURI::new("/ppt/tags/tag99.xml").unwrap();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             opc.add_part(Box::new(BlobPart::new(
                 part_name,
                 TAG_CONTENT_TYPE.to_owned(),

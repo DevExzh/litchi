@@ -25,7 +25,7 @@ fn tab_visibility_is_selector_first_reversible_and_active_safe() {
         .expect("tab")
         .hide();
     let hidden = edit.commit().expect("hide active tab");
-    assert_eq!(hidden.patch().len(), 2);
+    assert_eq!(hidden.patch().operation_count(), 2);
     let (before, after) = hidden.patch().changes()[0]
         .active()
         .expect("implicit active relocation");
@@ -42,7 +42,7 @@ fn tab_visibility_is_selector_first_reversible_and_active_safe() {
     ));
     assert_eq!(
         hidden
-            .workbook()
+            .package()
             .sheet("Sheet1")
             .expect("lookup")
             .expect("sheet")
@@ -51,14 +51,14 @@ fn tab_visibility_is_selector_first_reversible_and_active_safe() {
     );
     assert_eq!(
         hidden
-            .workbook()
+            .package()
             .active_sheet()
             .map(|sheet| sheet.name().to_owned()),
         Some("Sheet2".to_owned())
     );
     assert!(
         hidden
-            .workbook()
+            .package()
             .sheet("Sheet2")
             .expect("lookup")
             .expect("sheet")
@@ -66,12 +66,12 @@ fn tab_visibility_is_selector_first_reversible_and_active_safe() {
     );
 
     let restored = hidden
-        .workbook()
+        .package()
         .apply(&hidden.patch().inverse())
         .expect("inverse");
-    assert_eq!(restored.workbook().to_bytes().expect("bytes"), source_bytes);
+    assert_eq!(restored.package().to_bytes().expect("bytes"), source_bytes);
 
-    let mut last = hidden.workbook().edit().expect("last visible edit");
+    let mut last = hidden.package().edit().expect("last visible edit");
     last.tab(1usize)
         .expect("position lookup")
         .expect("tab")
@@ -85,13 +85,13 @@ fn tab_visibility_is_selector_first_reversible_and_active_safe() {
         }) if sheet == "Sheet2"
     ));
 
-    let mut swap = hidden.workbook().edit().expect("swap visibility");
+    let mut swap = hidden.package().edit().expect("swap visibility");
     swap.tab("Sheet1").expect("lookup").expect("tab").show();
     swap.tab(1usize).expect("lookup").expect("tab").very_hide();
     let swapped = swap.commit().expect("swap commit");
     assert_eq!(
         swapped
-            .workbook()
+            .package()
             .sheet(1usize)
             .expect("lookup")
             .expect("sheet")
@@ -100,7 +100,7 @@ fn tab_visibility_is_selector_first_reversible_and_active_safe() {
     );
     assert_eq!(
         swapped
-            .workbook()
+            .package()
             .active_sheet()
             .map(|sheet| sheet.name().to_owned()),
         Some("Sheet1".to_owned())
@@ -108,7 +108,7 @@ fn tab_visibility_is_selector_first_reversible_and_active_safe() {
 
     let mut no_op = source.edit().expect("no-op edit");
     no_op.tab(0usize).expect("lookup").expect("tab").show();
-    assert!(no_op.commit().expect("no-op commit").patch().is_empty());
+    assert!(no_op.commit().expect("no-op commit").patch().is_noop());
 }
 #[test]
 fn active_tab_is_selector_first_reversible_and_composable() {
@@ -137,34 +137,34 @@ fn active_tab_is_selector_first_reversible_and_composable() {
             .activate();
         assert_eq!(edit.len(), 1);
         let committed = edit.commit().expect("activate");
-        assert_eq!(committed.patch().len(), 1);
+        assert_eq!(committed.patch().operation_count(), 1);
         let (before, after) = committed.patch().changes()[0]
             .active()
             .expect("active change");
         assert_eq!((before.name(), before.position()), ("Sheet1", 0));
         assert_eq!((after.name(), after.position()), ("Sheet2", 1));
-        let active = committed.workbook().active_sheet().expect("active sheet");
+        let active = committed.package().active_sheet().expect("active sheet");
         assert_eq!(active.name(), "Sheet2");
         assert_eq!(active.kind(), kind);
         assert!(active.is_active());
         assert_eq!(
             committed
-                .workbook()
+                .package()
                 .apply(&committed.patch().inverse())
                 .expect("inverse")
-                .workbook()
+                .package()
                 .to_bytes()
                 .expect("restored bytes"),
             source_bytes
         );
 
-        let mut no_op = committed.workbook().edit().expect("no-op edit");
+        let mut no_op = committed.package().edit().expect("no-op edit");
         no_op
             .tab("Sheet2")
             .expect("lookup")
             .expect("tab")
             .activate();
-        assert!(no_op.commit().expect("no-op commit").patch().is_empty());
+        assert!(no_op.commit().expect("no-op commit").patch().is_noop());
     }
 
     let source = two_sheet_workbook(WorksheetKind::Worksheet);
@@ -182,7 +182,7 @@ fn active_tab_is_selector_first_reversible_and_composable() {
         .activate();
     cell.join(active).expect("orthogonal join");
     let committed = cell.commit().expect("joined commit");
-    assert_eq!(committed.patch().len(), 2);
+    assert_eq!(committed.patch().operation_count(), 2);
     assert_eq!(
         committed
             .patch()
@@ -192,7 +192,7 @@ fn active_tab_is_selector_first_reversible_and_composable() {
             .count(),
         1
     );
-    let active = committed.workbook().active_sheet().expect("active sheet");
+    let active = committed.package().active_sheet().expect("active sheet");
     assert_eq!(active.name(), "Sheet2");
     assert!(matches!(
         active.cell("A1").expect("cell").stored(),
@@ -216,7 +216,7 @@ fn active_tab_is_selector_first_reversible_and_composable() {
             .commit()
             .expect("last activation wins")
             .patch()
-            .is_empty()
+            .is_noop()
     );
 }
 
@@ -227,7 +227,7 @@ fn active_tab_requires_final_visibility_and_conflicts_globally() {
     hide.tab("Sheet2").expect("lookup").expect("tab").hide();
     let hidden = hide.commit().expect("hidden source");
 
-    let mut blocked = hidden.workbook().edit().expect("blocked edit");
+    let mut blocked = hidden.package().edit().expect("blocked edit");
     blocked
         .tab("Sheet2")
         .expect("lookup")
@@ -242,7 +242,7 @@ fn active_tab_requires_final_visibility_and_conflicts_globally() {
         }) if sheet == "Sheet2"
     ));
 
-    let mut repaired = hidden.workbook().edit().expect("repair edit");
+    let mut repaired = hidden.package().edit().expect("repair edit");
     repaired
         .tab("Sheet2")
         .expect("lookup")
@@ -250,10 +250,10 @@ fn active_tab_requires_final_visibility_and_conflicts_globally() {
         .show()
         .activate();
     let repaired = repaired.commit().expect("show and activate");
-    let active = repaired.workbook().active_sheet().expect("active sheet");
+    let active = repaired.package().active_sheet().expect("active sheet");
     assert_eq!(active.name(), "Sheet2");
     assert!(active.visibility().is_visible());
-    assert_eq!(repaired.patch().len(), 2);
+    assert_eq!(repaired.patch().operation_count(), 2);
 
     let mut contradictory = source.edit().expect("contradictory edit");
     contradictory
@@ -299,12 +299,12 @@ fn active_tab_requires_final_visibility_and_conflicts_globally() {
     active.join(visibility).expect("orthogonal facets");
     let committed = active.commit().expect("joined commit");
     assert_eq!(
-        committed.workbook().active_sheet().expect("active").name(),
+        committed.package().active_sheet().expect("active").name(),
         "Sheet2"
     );
     assert_eq!(
         committed
-            .workbook()
+            .package()
             .sheet("Sheet1")
             .expect("lookup")
             .expect("sheet")
@@ -333,15 +333,9 @@ fn tab_rename_is_typed_dependency_aware_move_first_and_reversible() {
         .set("D1", "composed")
         .expect("same-part cell edit");
     let committed = edit.commit().expect("rename commit");
-    assert!(
-        committed
-            .workbook()
-            .sheet("Data")
-            .expect("lookup")
-            .is_none()
-    );
+    assert!(committed.package().sheet("Data").expect("lookup").is_none());
     let renamed = committed
-        .workbook()
+        .package()
         .sheet("INPUT 2026")
         .expect("Unicode caseless lookup")
         .expect("renamed sheet");
@@ -349,14 +343,14 @@ fn tab_rename_is_typed_dependency_aware_move_first_and_reversible() {
     assert_eq!(renamed.data.part_uri, source_part);
     assert_eq!(renamed.data.native_id, source_id);
     assert_eq!(renamed.data.relationship_id, source_relationship);
-    assert_eq!(committed.patch().len(), 2);
+    assert_eq!(committed.patch().operation_count(), 2);
     assert_eq!(
         committed.patch().changes()[0].renamed(),
         Some((0, "Data", "Input 2026"))
     );
 
     let calc = committed
-        .workbook()
+        .package()
         .sheet("Calc")
         .expect("lookup")
         .expect("Calc");
@@ -376,22 +370,22 @@ fn tab_rename_is_typed_dependency_aware_move_first_and_reversible() {
         "/xl/pivotCache/pivotCacheDefinition1.xml",
         "/docProps/app.xml",
     ] {
-        let text = part_text(committed.workbook(), uri);
+        let text = part_text(committed.package(), uri);
         assert!(
             text.contains("Input 2026"),
             "expected renamed dependency in {uri}: {text}"
         );
     }
     assert!(
-        part_text(committed.workbook(), "/xl/externalLinks/externalLink1.xml")
+        part_text(committed.package(), "/xl/externalLinks/externalLink1.xml")
             .contains("[1]Data!A1")
     );
 
     let restored = committed
-        .workbook()
+        .package()
         .apply(&committed.patch().inverse())
         .expect("inverse rename");
-    assert_eq!(restored.workbook().to_bytes().expect("bytes"), source_bytes);
+    assert_eq!(restored.package().to_bytes().expect("bytes"), source_bytes);
     assert_eq!(source.to_bytes().expect("source unchanged"), source_bytes);
 }
 
@@ -437,7 +431,7 @@ fn tab_rename_validates_names_collisions_swaps_and_join_facets() {
     let swapped = swap.commit().expect("simultaneous swap");
     assert_eq!(
         swapped
-            .workbook()
+            .package()
             .sheets()
             .map(|sheet| sheet.name().to_owned())
             .collect::<Vec<_>>(),
@@ -468,8 +462,8 @@ fn tab_rename_validates_names_collisions_swaps_and_join_facets() {
         .expect("moved typed name");
     left.join(right).expect("disjoint names join");
     let joined = left.commit().expect("joined renames");
-    assert!(joined.workbook().sheet("first").expect("lookup").is_some());
-    assert!(joined.workbook().sheet("second").expect("lookup").is_some());
+    assert!(joined.package().sheet("first").expect("lookup").is_some());
+    assert!(joined.package().sheet("second").expect("lookup").is_some());
 }
 
 #[test]
@@ -486,7 +480,7 @@ fn tab_reorder_is_selector_first_dependency_aware_and_reversible() {
     let committed = edit.commit().expect("reorder");
     assert_eq!(
         committed
-            .workbook()
+            .package()
             .sheets()
             .map(|sheet| sheet.name().to_owned())
             .collect::<Vec<_>>(),
@@ -494,7 +488,7 @@ fn tab_reorder_is_selector_first_dependency_aware_and_reversible() {
     );
     assert_eq!(
         committed
-            .workbook()
+            .package()
             .active_sheet()
             .expect("active sheet")
             .name(),
@@ -502,7 +496,7 @@ fn tab_reorder_is_selector_first_dependency_aware_and_reversible() {
     );
     assert_eq!(
         committed
-            .workbook()
+            .package()
             .active_sheet()
             .expect("active sheet")
             .position(),
@@ -510,7 +504,7 @@ fn tab_reorder_is_selector_first_dependency_aware_and_reversible() {
     );
     assert!(matches!(
         committed
-            .workbook()
+            .package()
             .sheet("Sheet3")
             .expect("lookup")
             .expect("Sheet3")
@@ -521,7 +515,7 @@ fn tab_reorder_is_selector_first_dependency_aware_and_reversible() {
     ));
     assert_eq!(
         committed
-            .workbook()
+            .package()
             .defined_names()
             .iter()
             .map(|name| (name.name.as_str(), name.local_sheet_id))
@@ -532,7 +526,7 @@ fn tab_reorder_is_selector_first_dependency_aware_and_reversible() {
             ("Global", None),
         ]
     );
-    assert_eq!(committed.patch().len(), 2);
+    assert_eq!(committed.patch().operation_count(), 2);
     assert_eq!(committed.patch().changes()[0].sheet(), "Sheet3");
     assert_eq!(committed.patch().changes()[0].moved(), Some((2, 0)));
     let (before, after) = committed.patch().changes()[1]
@@ -544,10 +538,10 @@ fn tab_reorder_is_selector_first_dependency_aware_and_reversible() {
     let inverse = committed.patch().inverse();
     assert_eq!(inverse.changes()[1].moved(), Some((0, 2)));
     let restored = committed
-        .workbook()
+        .package()
         .apply(&inverse)
         .expect("inverse reorder");
-    assert_eq!(restored.workbook().to_bytes().expect("bytes"), source_bytes);
+    assert_eq!(restored.package().to_bytes().expect("bytes"), source_bytes);
     assert_eq!(source.to_bytes().expect("source unchanged"), source_bytes);
 
     let chart_source = two_sheet_workbook(WorksheetKind::Chart);
@@ -558,21 +552,17 @@ fn tab_reorder_is_selector_first_dependency_aware_and_reversible() {
         .expect("chart lookup")
         .expect("chart tabs");
     let chart = chart_edit.commit().expect("chart reorder");
-    let first = chart
-        .workbook()
-        .sheet(0usize)
-        .expect("lookup")
-        .expect("tab");
+    let first = chart.package().sheet(0usize).expect("lookup").expect("tab");
     assert_eq!(
         (first.name(), first.kind()),
         ("Sheet2", WorksheetKind::Chart)
     );
     assert_eq!(
         chart
-            .workbook()
+            .package()
             .apply(&chart.patch().inverse())
             .expect("chart inverse")
-            .workbook()
+            .package()
             .to_bytes()
             .expect("chart bytes"),
         chart_bytes
@@ -609,11 +599,11 @@ fn tab_reorder_composes_with_other_facets_and_conflicts_globally() {
     order.join(visibility).expect("order and visibility");
     order.join(cell).expect("order and cell");
     let committed = order.commit().expect("composed reorder");
-    let active = committed.workbook().active_sheet().expect("active");
+    let active = committed.package().active_sheet().expect("active");
     assert_eq!((active.name(), active.position()), ("Sheet3", 0));
     assert_eq!(
         committed
-            .workbook()
+            .package()
             .sheet("Sheet1")
             .expect("lookup")
             .expect("sheet")
@@ -671,7 +661,7 @@ fn tab_reorder_composes_with_other_facets_and_conflicts_globally() {
     let committed = same_position
         .commit()
         .expect("active identity changes at the same position");
-    let active = committed.workbook().active_sheet().expect("active");
+    let active = committed.package().active_sheet().expect("active");
     assert_eq!((active.name(), active.position()), ("Sheet2", 0));
     let active_change = committed
         .patch()
@@ -699,17 +689,17 @@ fn numeric_tab_moves_are_checked_and_all_positions_round_trip() {
             let committed = edit.commit().expect("move");
             assert_eq!(
                 committed
-                    .workbook()
+                    .package()
                     .sheets()
                     .map(|sheet| sheet.name().to_owned())
                     .collect::<Vec<_>>(),
                 expected.into_iter().map(str::to_owned).collect::<Vec<_>>()
             );
             let restored = committed
-                .workbook()
+                .package()
                 .apply(&committed.patch().inverse())
                 .expect("inverse");
-            assert_eq!(restored.workbook().to_bytes().expect("bytes"), source_bytes);
+            assert_eq!(restored.package().to_bytes().expect("bytes"), source_bytes);
         }
     }
 
@@ -722,7 +712,7 @@ fn numeric_tab_moves_are_checked_and_all_positions_round_trip() {
             .is_none()
     );
     assert!(missing.move_to("Sheet1", 3).expect("bounds").is_none());
-    assert!(missing.commit().expect("no-op").patch().is_empty());
+    assert!(missing.commit().expect("no-op").patch().is_noop());
 
     let mut cancelled = source.edit().expect("cancelled edit");
     cancelled
@@ -735,7 +725,7 @@ fn numeric_tab_moves_are_checked_and_all_positions_round_trip() {
         .expect("tabs");
     assert!(cancelled.is_empty());
     assert_eq!(cancelled.len(), 0);
-    assert!(cancelled.commit().expect("cancelled").patch().is_empty());
+    assert!(cancelled.commit().expect("cancelled").patch().is_noop());
 
     let mut cancelled = source.edit().expect("cancelled join edit");
     cancelled
@@ -757,7 +747,7 @@ fn numeric_tab_moves_are_checked_and_all_positions_round_trip() {
     let joined = cancelled.commit().expect("joined order");
     assert_eq!(
         joined
-            .workbook()
+            .package()
             .sheets()
             .map(|sheet| sheet.name().to_owned())
             .collect::<Vec<_>>(),
@@ -777,13 +767,13 @@ fn numeric_tab_moves_are_checked_and_all_positions_round_trip() {
     let sequence = sequence.commit().expect("move sequence");
     assert_eq!(
         sequence
-            .workbook()
+            .package()
             .sheets()
             .map(|sheet| sheet.name().to_owned())
             .collect::<Vec<_>>(),
         ["Sheet3", "Sheet2", "Sheet1"]
     );
-    assert_eq!(sequence.patch().len(), 2);
+    assert_eq!(sequence.patch().operation_count(), 2);
     assert_eq!(sequence.patch().changes()[0].moved(), Some((2, 0)));
     assert_eq!(sequence.patch().changes()[1].moved(), Some((1, 2)));
     let inverse = sequence.patch().inverse();
@@ -791,10 +781,10 @@ fn numeric_tab_moves_are_checked_and_all_positions_round_trip() {
     assert_eq!(inverse.changes()[1].moved(), Some((0, 2)));
     assert_eq!(
         sequence
-            .workbook()
+            .package()
             .apply(&inverse)
             .expect("sequence inverse")
-            .workbook()
+            .package()
             .to_bytes()
             .expect("restored bytes"),
         source_bytes
@@ -815,7 +805,7 @@ fn tab_reorder_blocks_protection_and_revision_tracking() {
             "<workbookProtection lockStructure=\"1\"/><bookViews>",
         );
     workbook.set_blob(xml.into_bytes());
-    let protected = Workbook::from_package(package).expect("protected workbook");
+    let protected = crate::Package::from_opc(package).expect("protected workbook");
     let mut edit = protected.edit().expect("edit");
     edit.move_before("Sheet3", "Sheet1")
         .expect("lookup")
@@ -864,7 +854,7 @@ fn tab_reorder_blocks_protection_and_revision_tracking() {
             TargetMode::Internal,
         )
         .expect("revision relationship");
-    let tracked = Workbook::from_package(package).expect("tracked workbook");
+    let tracked = crate::Package::from_opc(package).expect("tracked workbook");
     let mut edit = tracked.edit().expect("edit");
     edit.move_before("Sheet3", "Sheet1")
         .expect("lookup")
@@ -905,7 +895,7 @@ fn tab_visibility_composes_with_cells_and_conflicts_by_facet() {
     tab.tab(1usize).expect("lookup").expect("tab").hide();
     cell.join(tab).expect("orthogonal join");
     let committed = cell.commit().expect("joined commit");
-    assert_eq!(committed.patch().len(), 2);
+    assert_eq!(committed.patch().operation_count(), 2);
     assert_eq!(
         committed
             .patch()
@@ -916,7 +906,7 @@ fn tab_visibility_composes_with_cells_and_conflicts_by_facet() {
         1
     );
     let sheet = committed
-        .workbook()
+        .package()
         .sheet("Sheet2")
         .expect("lookup")
         .expect("sheet");
@@ -956,7 +946,7 @@ fn tab_visibility_applies_to_non_worksheet_sheet_kinds() {
     let committed = edit.commit().expect("chart tab commit");
     assert_eq!(
         committed
-            .workbook()
+            .package()
             .sheet("Sheet2")
             .expect("lookup")
             .expect("chart sheet")
@@ -979,16 +969,16 @@ fn active_relocation_synchronizes_worksheet_and_chart_view_selection() {
         let committed = edit.commit().expect("active hide");
         assert_eq!(
             committed
-                .workbook()
+                .package()
                 .active_sheet()
                 .map(|sheet| sheet.name().to_owned()),
             Some("Sheet1".to_owned())
         );
         let new_active = committed
-            .workbook()
+            .package()
             .inner
             .package
-            .get_part(&committed.workbook().inner.sheets[0].part_uri)
+            .get_part(&committed.package().inner.sheets[0].part_uri)
             .expect("new active part")
             .blob();
         assert!(
@@ -997,10 +987,10 @@ fn active_relocation_synchronizes_worksheet_and_chart_view_selection() {
                 .contains(r#"tabSelected="1""#)
         );
         let old_active = committed
-            .workbook()
+            .package()
             .inner
             .package
-            .get_part(&committed.workbook().inner.sheets[1].part_uri)
+            .get_part(&committed.package().inner.sheets[1].part_uri)
             .expect("old active part")
             .blob();
         assert!(
@@ -1010,10 +1000,10 @@ fn active_relocation_synchronizes_worksheet_and_chart_view_selection() {
         );
         assert_eq!(
             committed
-                .workbook()
+                .package()
                 .apply(&committed.patch().inverse())
                 .expect("inverse")
-                .workbook()
+                .package()
                 .to_bytes()
                 .expect("restored bytes"),
             source_bytes
@@ -1031,7 +1021,7 @@ fn tab_visibility_blocks_protected_workbook_structure() {
             .set_blob(
                 br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><workbookProtection lockStructure="1"/><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/><sheet name="Sheet2" sheetId="2" r:id="rIdTab2"/></sheets></workbook>"#.to_vec(),
             );
-    let protected = Workbook::from_package(package).expect("protected workbook");
+    let protected = crate::Package::from_opc(package).expect("protected workbook");
     let mut edit = protected.edit().expect("edit");
     edit.tab("Sheet2").expect("lookup").expect("tab").hide();
     assert!(matches!(
@@ -1053,7 +1043,7 @@ fn tab_visibility_blocks_protected_workbook_structure() {
         .expect("structure protection permits selection");
     assert_eq!(
         activated
-            .workbook()
+            .package()
             .active_sheet()
             .expect("active sheet")
             .name(),
@@ -1071,7 +1061,7 @@ fn showing_an_unknown_producer_state_repairs_it_explicitly() {
             .set_blob(
                 br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/><sheet name="Sheet2" sheetId="2" state="show" r:id="rIdTab2"/></sheets></workbook>"#.to_vec(),
             );
-    let source = Workbook::from_package(package).expect("producer workbook");
+    let source = crate::Package::from_opc(package).expect("producer workbook");
     assert!(matches!(
         source
             .sheet("Sheet2")
@@ -1086,7 +1076,7 @@ fn showing_an_unknown_producer_state_repairs_it_explicitly() {
     let committed = edit.commit().expect("repair commit");
     assert!(
         committed
-            .workbook()
+            .package()
             .sheet("Sheet2")
             .expect("lookup")
             .expect("sheet")
@@ -1095,10 +1085,10 @@ fn showing_an_unknown_producer_state_repairs_it_explicitly() {
     );
     assert_eq!(
         committed
-            .workbook()
+            .package()
             .apply(&committed.patch().inverse())
             .expect("inverse")
-            .workbook()
+            .package()
             .to_bytes()
             .expect("restored bytes"),
         source_bytes
@@ -1139,8 +1129,8 @@ fn defined_name_catalog_write_is_compact_joinable_replayable_and_reversible() {
     names_edit.join(cell_edit).expect("join disjoint edit");
     let committed = names_edit.commit().expect("commit defined names");
 
-    assert_eq!(committed.workbook().defined_names(), names);
-    assert!(part_text(committed.workbook(), "/xl/workbook.xml").contains(
+    assert_eq!(committed.package().defined_names(), names);
+    assert!(part_text(committed.package(), "/xl/workbook.xml").contains(
         r#"<definedNames><definedName name="GlobalTotal" comment="owned &amp; inert">SUM(Sheet1!$A$1:$A$9)</definedName><definedName name="LocalInput" localSheetId="1" hidden="1">Sheet2!$B$2</definedName></definedNames>"#
     ));
     assert!(committed.patch().package_changes().iter().any(|change| {
@@ -1152,13 +1142,13 @@ fn defined_name_catalog_write_is_compact_joinable_replayable_and_reversible() {
     let replayed = source
         .apply(committed.patch())
         .expect("replay defined names");
-    assert_eq!(replayed.workbook().defined_names(), names);
+    assert_eq!(replayed.package().defined_names(), names);
     let restored = committed
-        .workbook()
+        .package()
         .apply(&committed.patch().inverse())
         .expect("inverse defined names");
     assert_eq!(
-        restored.workbook().to_bytes().expect("restored bytes"),
+        restored.package().to_bytes().expect("restored bytes"),
         source_bytes
     );
 }

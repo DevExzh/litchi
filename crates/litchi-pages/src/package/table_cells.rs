@@ -14,7 +14,7 @@ use std::mem::size_of;
 use std::num::NonZeroU64;
 
 use litchi_iwa_common::formula::render::FormulaRenderBudget;
-use litchi_iwa_common::table::coordinate::CellPosition;
+use litchi_iwa_common::table::coordinate::At;
 use litchi_iwa_common::table::model::{Cell as TableCell, Dimensions};
 use litchi_iwa_common::table::read::{
     CellComment, Comment, CommentAuthor, CommentReply, TableRead,
@@ -30,7 +30,7 @@ use litchi_numbers_wire::table_sidecars::{
     self as sidecars, CellSidecarResolver, SidecarAllocation, SidecarIssue, SidecarKind,
     SidecarReadBudget, SidecarReference, SidecarTables,
 };
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::{Package, table_lock};
 use crate::selector::BodyTableSelector;
@@ -38,7 +38,7 @@ use crate::selector::BodyTableSelector;
 /// Finite resources charged while reading one Pages body-table cell source.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum BodyTableCellsLimitKind {
+pub enum LimitKind {
     /// Complete package input bytes.
     InputBytes,
     /// Complete package output bytes (reserved for shared transaction budgets).
@@ -75,7 +75,7 @@ pub enum BodyTableCellsLimitKind {
     WireWork,
 }
 
-impl fmt::Display for BodyTableCellsLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -100,9 +100,9 @@ impl fmt::Display for BodyTableCellsLimitKind {
 }
 
 /// Failure while resolving or decoding one Pages body-table cell source.
-#[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, ThisError, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum BodyTableCellsError {
+pub enum Error {
     /// No rooted body table matched the selector.
     #[error("the Pages body has no table matching the requested selector")]
     TableNotFound,
@@ -120,9 +120,9 @@ pub enum BodyTableCellsError {
     InvalidSource,
     /// A finite read resource ceiling was exceeded.
     #[error("Pages body-table cells {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
+    Limit {
         /// Resource category.
-        kind: BodyTableCellsLimitKind,
+        kind: LimitKind,
         /// Observed or requested amount.
         observed: u64,
         /// Configured maximum.
@@ -147,6 +147,7 @@ pub(crate) struct SelectedBodyTableStorage<'source> {
     data_store: storage::DataStoreSnapshot<'source>,
     tile_size: u32,
     tiles: Vec<wire_cells::TileReference>,
+    limits: litchi_numbers_wire::Limits,
 }
 
 impl<'source> SelectedBodyTableStorage<'source> {
@@ -172,6 +173,11 @@ impl<'source> SelectedBodyTableStorage<'source> {
         self.data_store
     }
 
+    /// Borrow the validated sparse tile routes for a focused table writer.
+    pub(crate) fn tiles(&self) -> &[wire_cells::TileReference] {
+        &self.tiles
+    }
+
     /// Feed all selected cells to a Pages-owned semantic sink.
     pub(crate) fn read_into<Budget, Sink, Resolve>(
         &self,
@@ -187,6 +193,7 @@ impl<'source> SelectedBodyTableStorage<'source> {
         let tile_references = self.tiles.iter().copied();
         wire_cells::read_table_cells(
             self.dimensions(),
+            &self.limits,
             tile_references,
             resolve_tile,
             budget,
@@ -204,24 +211,21 @@ struct ObjectIndex<'source> {
 }
 
 impl<'source> ObjectIndex<'source> {
-    fn new(
-        package: &'source Package,
-        budget: &mut table_lock::WireBudget,
-    ) -> Result<Self, BodyTableCellsError> {
+    fn new(package: &'source Package, budget: &mut table_lock::WireBudget) -> Result<Self, Error> {
         let components = package.state.source.components();
         let object_count = components
             .iter()
             .try_fold(0usize, |count, component| {
                 count.checked_add(component.archive().objects.len())
             })
-            .ok_or(BodyTableCellsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         budget
             .charge_payload_work(object_count)
             .map_err(map_lock_error)?;
         let mut entries = Vec::new();
         entries
             .try_reserve_exact(object_count)
-            .map_err(|_| BodyTableCellsError::Allocation {
+            .map_err(|_| Error::Allocation {
                 amount: object_count,
             })?;
         for component in components.iter() {
@@ -233,24 +237,21 @@ impl<'source> ObjectIndex<'source> {
                     continue;
                 };
                 let Some(identifier) = NonZeroU64::new(identifier) else {
-                    return Err(BodyTableCellsError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 };
                 entries.push((identifier, object.messages.as_slice()));
             }
         }
         entries.sort_unstable_by_key(|(identifier, _)| *identifier);
         if entries.windows(2).any(|pair| pair[0].0 == pair[1].0) {
-            return Err(BodyTableCellsError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         Ok(Self { entries })
     }
 
-    fn resolve(
-        &self,
-        identifier: u64,
-    ) -> Result<Option<NativeMessages<'source>>, BodyTableCellsError> {
+    fn resolve(&self, identifier: u64) -> Result<Option<NativeMessages<'source>>, Error> {
         let Some(identifier) = NonZeroU64::new(identifier) else {
-            return Err(BodyTableCellsError::InvalidSource);
+            return Err(Error::InvalidSource);
         };
         Ok(self
             .entries
@@ -314,7 +315,7 @@ impl PagesCellReadBudget {
 }
 
 impl TableCellReadBudget for PagesCellReadBudget {
-    type Error = BodyTableCellsError;
+    type Error = Error;
 
     fn storage_options(&mut self, source: &[u8]) -> Result<storage::DecodeOptions, Self::Error> {
         storage_options(&self.wire, source)
@@ -356,10 +357,10 @@ impl TableCellReadBudget for PagesCellReadBudget {
     }
 }
 
-fn check_materialized_cell_limit(observed: usize) -> Result<(), BodyTableCellsError> {
+fn check_materialized_cell_limit(observed: usize) -> Result<(), Error> {
     if observed > MAX_MATERIALIZED_CELLS {
-        return Err(BodyTableCellsError::LimitExceeded {
-            kind: BodyTableCellsLimitKind::PayloadItems,
+        return Err(Error::Limit {
+            kind: LimitKind::PayloadItems,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(MAX_MATERIALIZED_CELLS),
         });
@@ -368,7 +369,7 @@ fn check_materialized_cell_limit(observed: usize) -> Result<(), BodyTableCellsEr
 }
 
 impl SidecarReadBudget for PagesCellReadBudget {
-    type Error = BodyTableCellsError;
+    type Error = Error;
 
     fn list_options(
         &mut self,
@@ -448,8 +449,8 @@ impl SidecarReadBudget for PagesCellReadBudget {
         let limits = self.wire.wire_limits();
         let input = source.len().max(1);
         if input > limits.max_input_bytes() {
-            return Err(BodyTableCellsError::LimitExceeded {
-                kind: BodyTableCellsLimitKind::WireBytes,
+            return Err(Error::Limit {
+                kind: LimitKind::WireBytes,
                 observed: usize_as_u64(input),
                 maximum: usize_as_u64(limits.max_input_bytes()),
             });
@@ -457,15 +458,15 @@ impl SidecarReadBudget for PagesCellReadBudget {
         let fields = self.wire.remaining_wire_fields();
         let work = self.wire.remaining_wire_work();
         if fields == 0 {
-            return Err(BodyTableCellsError::LimitExceeded {
-                kind: BodyTableCellsLimitKind::WireFields,
+            return Err(Error::Limit {
+                kind: LimitKind::WireFields,
                 observed: 1,
                 maximum: 0,
             });
         }
         if work == 0 {
-            return Err(BodyTableCellsError::LimitExceeded {
-                kind: BodyTableCellsLimitKind::WireWork,
+            return Err(Error::Limit {
+                kind: LimitKind::WireWork,
                 observed: 1,
                 maximum: 0,
             });
@@ -515,8 +516,8 @@ impl SidecarReadBudget for PagesCellReadBudget {
         let limits = self.wire.wire_limits();
         let input = source.len().max(1);
         if input > limits.max_input_bytes() {
-            return Err(BodyTableCellsError::LimitExceeded {
-                kind: BodyTableCellsLimitKind::WireBytes,
+            return Err(Error::Limit {
+                kind: LimitKind::WireBytes,
                 observed: usize_as_u64(input),
                 maximum: usize_as_u64(limits.max_input_bytes()),
             });
@@ -524,15 +525,15 @@ impl SidecarReadBudget for PagesCellReadBudget {
         let fields = self.wire.remaining_wire_fields();
         let work = self.wire.remaining_wire_work();
         if fields == 0 {
-            return Err(BodyTableCellsError::LimitExceeded {
-                kind: BodyTableCellsLimitKind::WireFields,
+            return Err(Error::Limit {
+                kind: LimitKind::WireFields,
                 observed: 1,
                 maximum: 0,
             });
         }
         if work == 0 {
-            return Err(BodyTableCellsError::LimitExceeded {
-                kind: BodyTableCellsLimitKind::WireWork,
+            return Err(Error::Limit {
+                kind: LimitKind::WireWork,
                 observed: 1,
                 maximum: 0,
             });
@@ -574,8 +575,8 @@ impl SidecarReadBudget for PagesCellReadBudget {
         let limits = self.wire.wire_limits();
         let input = source.len().max(1);
         if input > limits.max_input_bytes() {
-            return Err(BodyTableCellsError::LimitExceeded {
-                kind: BodyTableCellsLimitKind::WireBytes,
+            return Err(Error::Limit {
+                kind: LimitKind::WireBytes,
                 observed: usize_as_u64(input),
                 maximum: usize_as_u64(limits.max_input_bytes()),
             });
@@ -642,22 +643,22 @@ impl SidecarReadBudget for PagesCellReadBudget {
 }
 
 impl FormulaRenderBudget for PagesCellReadBudget {
-    type Error = BodyTableCellsError;
+    type Error = Error;
 
     fn output_limit(&self, observed: usize) -> Self::Error {
-        BodyTableCellsError::LimitExceeded {
-            kind: BodyTableCellsLimitKind::WireOutputBytes,
+        Error::Limit {
+            kind: LimitKind::WireOutputBytes,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(self.wire.wire_limits().max_output_bytes()),
         }
     }
 
     fn allocation(&self, _resource: &'static str, amount: usize) -> Self::Error {
-        BodyTableCellsError::Allocation { amount }
+        Error::Allocation { amount }
     }
 
     fn invalid(&self, _message: &'static str) -> Self::Error {
-        BodyTableCellsError::InvalidSource
+        Error::InvalidSource
     }
 
     fn check(&self, amount: usize) -> Result<(), Self::Error> {
@@ -673,8 +674,8 @@ impl FormulaRenderBudget for PagesCellReadBudget {
     fn check_structure(&self, nodes: usize, parts: usize) -> Result<(), Self::Error> {
         let maximum = self.wire.remaining_wire_work();
         if nodes > maximum || parts > maximum {
-            return Err(BodyTableCellsError::LimitExceeded {
-                kind: BodyTableCellsLimitKind::WireWork,
+            return Err(Error::Limit {
+                kind: LimitKind::WireWork,
                 observed: nodes.max(parts) as u64,
                 maximum: usize_as_u64(maximum),
             });
@@ -695,8 +696,8 @@ impl FormulaRenderBudget for PagesCellReadBudget {
 impl FormulaEventRenderBudget for PagesCellReadBudget {
     fn check_render_depth(&self, depth: usize) -> Result<(), Self::Error> {
         if depth > self.wire.wire_limits().max_nesting() {
-            return Err(BodyTableCellsError::LimitExceeded {
-                kind: BodyTableCellsLimitKind::WireNesting,
+            return Err(Error::Limit {
+                kind: LimitKind::WireNesting,
                 observed: usize_as_u64(depth),
                 maximum: usize_as_u64(self.wire.wire_limits().max_nesting()),
             });
@@ -705,11 +706,11 @@ impl FormulaEventRenderBudget for PagesCellReadBudget {
     }
 
     fn parse_error(&self, _message: String) -> Self::Error {
-        BodyTableCellsError::InvalidSource
+        Error::InvalidSource
     }
 
     fn invalid_format(&self, _message: String) -> Self::Error {
-        BodyTableCellsError::InvalidSource
+        Error::InvalidSource
     }
 }
 
@@ -789,7 +790,7 @@ impl FormulaNameResolver {
         package: &Package,
         index: &ObjectIndex<'_>,
         budget: &mut PagesCellReadBudget,
-    ) -> Result<Self, BodyTableCellsError> {
+    ) -> Result<Self, Error> {
         // The full rooted catalog is the authority for table display names.
         // A selected table alone is insufficient for a cross-table formula,
         // and no synthetic sheet name is valid for the Pages profile.
@@ -805,11 +806,11 @@ impl FormulaNameResolver {
             .charge_payload_work(target_count)
             .map_err(map_lock_error)?;
         let mut table_names = Vec::new();
-        table_names.try_reserve_exact(target_count).map_err(|_| {
-            BodyTableCellsError::Allocation {
+        table_names
+            .try_reserve_exact(target_count)
+            .map_err(|_| Error::Allocation {
                 amount: target_count,
-            }
-        })?;
+            })?;
         budget
             .wire_mut()
             .charge_payload_work(target_count)
@@ -817,14 +818,14 @@ impl FormulaNameResolver {
         let mut table_indices = HashMap::new();
         table_indices
             .try_reserve(target_count)
-            .map_err(|_| BodyTableCellsError::Allocation {
+            .map_err(|_| Error::Allocation {
                 amount: target_count,
             })?;
         for target in targets {
             let table_info = target.drawable_identifier.get();
             let index = table_names.len();
             if table_indices.insert(table_info, index).is_some() {
-                return Err(BodyTableCellsError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             table_names.push(target.table_name);
         }
@@ -884,16 +885,14 @@ impl FormulaNameResolver {
                     .wire_mut()
                     .charge_payload_items(1)
                     .map_err(map_lock_error)?;
-                owners
-                    .try_reserve(1)
-                    .map_err(|_| BodyTableCellsError::Allocation {
-                        amount: owners.len().saturating_add(1),
-                    })?;
+                owners.try_reserve(1).map_err(|_| Error::Allocation {
+                    amount: owners.len().saturating_add(1),
+                })?;
                 if owners
                     .insert(projection.cfuuid_words(), table_index)
                     .is_some()
                 {
-                    return Err(BodyTableCellsError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
             }
         }
@@ -911,28 +910,28 @@ impl FormulaNameResolver {
 fn formula_name_wire_limits(
     budget: &PagesCellReadBudget,
     source_len: usize,
-) -> Result<litchi_iwa_common::WireLimits, BodyTableCellsError> {
+) -> Result<litchi_iwa_common::WireLimits, Error> {
     let limits = budget.wire().wire_limits();
     let fields = budget.wire().remaining_wire_fields();
     let work = budget.wire().remaining_wire_work();
     if fields == 0 {
-        return Err(BodyTableCellsError::LimitExceeded {
-            kind: BodyTableCellsLimitKind::WireFields,
+        return Err(Error::Limit {
+            kind: LimitKind::WireFields,
             observed: 1,
             maximum: 0,
         });
     }
     if work == 0 {
-        return Err(BodyTableCellsError::LimitExceeded {
-            kind: BodyTableCellsLimitKind::WireWork,
+        return Err(Error::Limit {
+            kind: LimitKind::WireWork,
             observed: 1,
             maximum: 0,
         });
     }
     let input = work.max(source_len);
     if input > litchi_iwa_common::WireLimits::MAX_INPUT_BYTES {
-        return Err(BodyTableCellsError::LimitExceeded {
-            kind: BodyTableCellsLimitKind::WireBytes,
+        return Err(Error::Limit {
+            kind: LimitKind::WireBytes,
             observed: usize_as_u64(input),
             maximum: usize_as_u64(litchi_iwa_common::WireLimits::MAX_INPUT_BYTES),
         });
@@ -960,7 +959,7 @@ fn charge_formula_name_report(
     input_bytes: usize,
     fields: usize,
     work: usize,
-) -> Result<(), BodyTableCellsError> {
+) -> Result<(), Error> {
     budget
         .wire_mut()
         .charge_payload_work(input_bytes)
@@ -975,7 +974,7 @@ fn read_formula_categories(
     source: &[u8],
     categories: &mut HashMap<[u64; 2], Box<str>>,
     budget: &mut PagesCellReadBudget,
-) -> Result<(), BodyTableCellsError> {
+) -> Result<(), Error> {
     let limits = formula_name_wire_limits(budget, source.len())?;
     let category_limits = formula_names::CategoryReadLimits {
         wire: limits,
@@ -1017,7 +1016,7 @@ fn read_formula_categories(
         .map_err(map_lock_error)?;
     categories
         .try_reserve(projection.entries.len())
-        .map_err(|_| BodyTableCellsError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: projection.entries.len(),
         })?;
     for entry in projection.entries {
@@ -1029,11 +1028,11 @@ fn read_formula_categories(
         let mut label = String::new();
         label
             .try_reserve_exact(reserve)
-            .map_err(|_| BodyTableCellsError::Allocation { amount: reserve })?;
-        write!(&mut label, "{}", entry.label()).map_err(|_| BodyTableCellsError::InvalidSource)?;
+            .map_err(|_| Error::Allocation { amount: reserve })?;
+        write!(&mut label, "{}", entry.label()).map_err(|_| Error::InvalidSource)?;
         let key = entry.id();
         if categories.insert(key, label.into_boxed_str()).is_some() {
-            return Err(BodyTableCellsError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(())
@@ -1043,7 +1042,7 @@ fn read_sidecars(
     index: &ObjectIndex<'_>,
     data_store: storage::DataStoreSnapshot<'_>,
     budget: &mut PagesCellReadBudget,
-) -> Result<SidecarTables, BodyTableCellsError> {
+) -> Result<SidecarTables, Error> {
     let mut tables = SidecarTables::new();
     let required = [
         (SidecarKind::Strings, data_store.string_table().identifier()),
@@ -1094,7 +1093,7 @@ fn read_one_sidecar(
     kind: SidecarKind,
     identifier: u64,
     budget: &mut PagesCellReadBudget,
-) -> Result<sidecars::SidecarList, BodyTableCellsError> {
+) -> Result<sidecars::SidecarList, Error> {
     let Some(root) = index.resolve(identifier)? else {
         return Err(SidecarReadBudget::map_issue(
             budget,
@@ -1141,16 +1140,13 @@ impl<'sidecars, 'source, 'names> PagesCellSink<'sidecars, 'source, 'names> {
         }
     }
 
-    fn finish(self) -> Result<TableRead, BodyTableCellsError> {
+    fn finish(self) -> Result<TableRead, Error> {
         let table = self.table.finish().map_err(map_common_table_error)?;
         TableRead::try_from_owned_parts(table, self.comments).map_err(map_common_table_error)
     }
 }
 
-fn retain_table_name(
-    name: &str,
-    budget: &mut PagesCellReadBudget,
-) -> Result<String, BodyTableCellsError> {
+fn retain_table_name(name: &str, budget: &mut PagesCellReadBudget) -> Result<String, Error> {
     budget
         .wire_mut()
         .charge_payload_work(name.len())
@@ -1158,7 +1154,7 @@ fn retain_table_name(
     let mut retained = String::new();
     retained
         .try_reserve_exact(name.len())
-        .map_err(|_| BodyTableCellsError::Allocation { amount: name.len() })?;
+        .map_err(|_| Error::Allocation { amount: name.len() })?;
     retained.push_str(name);
     Ok(retained)
 }
@@ -1168,7 +1164,7 @@ impl CellValueSink<PagesCellReadBudget> for PagesCellSink<'_, '_, '_> {
         &mut self,
         cell: wire_cells::CellSource<'_>,
         budget: &mut PagesCellReadBudget,
-    ) -> Result<(), BodyTableCellsError> {
+    ) -> Result<(), Error> {
         let mut resolver = PagesCellSidecarResolver {
             index: self.index,
             budget,
@@ -1187,10 +1183,7 @@ impl CellValueSink<PagesCellReadBudget> for PagesCellSink<'_, '_, '_> {
             .charge_payload_work(1)
             .map_err(map_lock_error)?;
         self.table
-            .push(TableCell::new(
-                CellPosition::new(cell.row(), cell.column()),
-                value,
-            ))
+            .push(TableCell::new(At::new(cell.row(), cell.column()), value))
             .map_err(|error| map_common_table_error(error.into_parts().0))?;
         if let Some(comment) = comment {
             budget
@@ -1199,11 +1192,11 @@ impl CellValueSink<PagesCellReadBudget> for PagesCellSink<'_, '_, '_> {
                 .map_err(map_lock_error)?;
             self.comments
                 .try_reserve(1)
-                .map_err(|_| BodyTableCellsError::Allocation {
+                .map_err(|_| Error::Allocation {
                     amount: self.comments.len().saturating_add(1),
                 })?;
             self.comments.push(CellComment::new(
-                CellPosition::new(cell.row(), cell.column()),
+                At::new(cell.row(), cell.column()),
                 comment,
             ));
         }
@@ -1220,11 +1213,11 @@ struct PagesCellSidecarResolver<'index, 'budget, 'source, 'names> {
 }
 
 impl CellSidecarResolver for PagesCellSidecarResolver<'_, '_, '_, '_> {
-    type Error = BodyTableCellsError;
+    type Error = Error;
 
     fn rich_text(&mut self, reference: SidecarReference) -> Result<String, Self::Error> {
         let Some(messages) = self.index.resolve(reference.identifier())? else {
-            return Err(BodyTableCellsError::InvalidSource);
+            return Err(Error::InvalidSource);
         };
         let mut payload = None;
         for message in messages {
@@ -1232,11 +1225,11 @@ impl CellSidecarResolver for PagesCellSidecarResolver<'_, '_, '_, '_> {
                 continue;
             }
             if payload.replace(message.data).is_some() {
-                return Err(BodyTableCellsError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
         let Some(payload) = payload else {
-            return Err(BodyTableCellsError::InvalidSource);
+            return Err(Error::InvalidSource);
         };
         let (storage_identifier, report) = preflight_rich_text_payload(payload)?;
         self.budget
@@ -1253,7 +1246,7 @@ impl CellSidecarResolver for PagesCellSidecarResolver<'_, '_, '_, '_> {
             )
             .map_err(map_lock_error)?;
         let Some(messages) = self.index.resolve(storage_identifier)? else {
-            return Err(BodyTableCellsError::InvalidSource);
+            return Err(Error::InvalidSource);
         };
         let mut storage_payload = None;
         for message in messages {
@@ -1261,11 +1254,11 @@ impl CellSidecarResolver for PagesCellSidecarResolver<'_, '_, '_, '_> {
                 continue;
             }
             if storage_payload.replace(message.data).is_some() {
-                return Err(BodyTableCellsError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
         let Some(storage_payload) = storage_payload else {
-            return Err(BodyTableCellsError::InvalidSource);
+            return Err(Error::InvalidSource);
         };
         self.budget
             .wire_mut()
@@ -1277,9 +1270,9 @@ impl CellSidecarResolver for PagesCellSidecarResolver<'_, '_, '_, '_> {
             self.budget.wire().remaining_wire_fields().max(1),
             self.budget.wire().remaining_wire_work().max(1),
         )
-        .map_err(|_| BodyTableCellsError::InvalidSource)?;
-        let storage = litchi_iwa_text_wire::from_bytes_with_limits(storage_payload, limits)
-            .map_err(|_| BodyTableCellsError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?;
+        let storage = litchi_iwa_text_wire::from_bytes(storage_payload, limits)
+            .map_err(|_| Error::InvalidSource)?;
         self.budget.charge(storage.len())?;
         Ok(storage.into_text())
     }
@@ -1292,7 +1285,7 @@ impl CellSidecarResolver for PagesCellSidecarResolver<'_, '_, '_, '_> {
         column: u32,
     ) -> Result<String, Self::Error> {
         let Some(resolver) = self.formula_names else {
-            return Err(BodyTableCellsError::UnsupportedSource);
+            return Err(Error::UnsupportedSource);
         };
         let rendered = sidecars::render_formula(
             source,
@@ -1305,14 +1298,14 @@ impl CellSidecarResolver for PagesCellSidecarResolver<'_, '_, '_, '_> {
             self.budget,
         )?;
         if resolver.has_unresolved_reference() {
-            return Err(BodyTableCellsError::UnsupportedSource);
+            return Err(Error::UnsupportedSource);
         }
         Ok(rendered)
     }
 
     fn comment(&mut self, reference: SidecarReference) -> Result<Comment, Self::Error> {
         let Some(messages) = self.index.resolve(reference.identifier())? else {
-            return Err(BodyTableCellsError::InvalidSource);
+            return Err(Error::InvalidSource);
         };
         let storage = sidecars::read_comment_storage(reference, messages, self.budget)?;
         let (text, timestamp, author_reference, replies, _storage_uuid) = storage.into_parts();
@@ -1323,7 +1316,7 @@ impl CellSidecarResolver for PagesCellSidecarResolver<'_, '_, '_, '_> {
             let reply_bytes = replies
                 .len()
                 .checked_mul(size_of::<CommentReply>())
-                .ok_or(BodyTableCellsError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             self.budget
                 .wire_mut()
                 .charge_payload_work(reply_bytes)
@@ -1336,7 +1329,7 @@ impl CellSidecarResolver for PagesCellSidecarResolver<'_, '_, '_, '_> {
         let mut retained_replies = Vec::new();
         retained_replies
             .try_reserve_exact(replies.len())
-            .map_err(|_| BodyTableCellsError::Allocation {
+            .map_err(|_| Error::Allocation {
                 amount: replies.len(),
             })?;
         for reply in replies {
@@ -1360,7 +1353,7 @@ impl CellSidecarResolver for PagesCellSidecarResolver<'_, '_, '_, '_> {
         let mut value = String::new();
         value
             .try_reserve_exact(source.len())
-            .map_err(|_| BodyTableCellsError::Allocation {
+            .map_err(|_| Error::Allocation {
                 amount: source.len(),
             })?;
         value.push_str(source);
@@ -1368,26 +1361,23 @@ impl CellSidecarResolver for PagesCellSidecarResolver<'_, '_, '_, '_> {
     }
 
     fn missing(&mut self, _kind: SidecarKind, _key: u32) -> Self::Error {
-        BodyTableCellsError::InvalidSource
+        Error::InvalidSource
     }
 
     fn invalid_scalar(&mut self) -> Self::Error {
-        BodyTableCellsError::InvalidSource
+        Error::InvalidSource
     }
 }
 
 impl PagesCellSidecarResolver<'_, '_, '_, '_> {
-    fn read_reply(
-        &mut self,
-        reference: SidecarReference,
-    ) -> Result<CommentReply, BodyTableCellsError> {
+    fn read_reply(&mut self, reference: SidecarReference) -> Result<CommentReply, Error> {
         let Some(messages) = self.index.resolve(reference.identifier())? else {
-            return Err(BodyTableCellsError::InvalidSource);
+            return Err(Error::InvalidSource);
         };
         let storage = sidecars::read_comment_storage(reference, messages, self.budget)?;
         let (text, timestamp, author_reference, replies, _storage_uuid) = storage.into_parts();
         if !replies.is_empty() {
-            return Err(BodyTableCellsError::UnsupportedSource);
+            return Err(Error::UnsupportedSource);
         }
         let author = author_reference
             .map(|reference| self.author(reference))
@@ -1395,12 +1385,9 @@ impl PagesCellSidecarResolver<'_, '_, '_, '_> {
         Ok(CommentReply::from_owned_parts(text, timestamp, author))
     }
 
-    fn author(
-        &mut self,
-        reference: SidecarReference,
-    ) -> Result<CommentAuthor, BodyTableCellsError> {
+    fn author(&mut self, reference: SidecarReference) -> Result<CommentAuthor, Error> {
         let Some(messages) = self.index.resolve(reference.identifier())? else {
-            return Err(BodyTableCellsError::InvalidSource);
+            return Err(Error::InvalidSource);
         };
         let mut payload = None;
         for message in messages {
@@ -1408,17 +1395,17 @@ impl PagesCellSidecarResolver<'_, '_, '_, '_> {
                 continue;
             }
             if payload.replace(message.data).is_some() {
-                return Err(BodyTableCellsError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
         let Some(payload) = payload else {
-            return Err(BodyTableCellsError::InvalidSource);
+            return Err(Error::InvalidSource);
         };
         let limits = self.budget.wire().wire_limits();
         let input = payload.len().max(1);
         if input > limits.max_input_bytes() {
-            return Err(BodyTableCellsError::LimitExceeded {
-                kind: BodyTableCellsLimitKind::WireBytes,
+            return Err(Error::Limit {
+                kind: LimitKind::WireBytes,
                 observed: usize_as_u64(input),
                 maximum: usize_as_u64(limits.max_input_bytes()),
             });
@@ -1426,15 +1413,15 @@ impl PagesCellSidecarResolver<'_, '_, '_, '_> {
         let fields = self.budget.wire().remaining_wire_fields();
         let work = self.budget.wire().remaining_wire_work();
         if fields == 0 {
-            return Err(BodyTableCellsError::LimitExceeded {
-                kind: BodyTableCellsLimitKind::WireFields,
+            return Err(Error::Limit {
+                kind: LimitKind::WireFields,
                 observed: 1,
                 maximum: 0,
             });
         }
         if work == 0 {
-            return Err(BodyTableCellsError::LimitExceeded {
-                kind: BodyTableCellsLimitKind::WireWork,
+            return Err(Error::Limit {
+                kind: LimitKind::WireWork,
                 observed: 1,
                 maximum: 0,
             });
@@ -1489,8 +1476,8 @@ const ANNOTATION_AUTHOR_MESSAGE_KIND: u32 = 212;
 
 fn preflight_rich_text_payload(
     source: &[u8],
-) -> Result<(u64, litchi_iwa_common::wire::WirePreflight), BodyTableCellsError> {
-    use litchi_iwa_common::wire::{WireDescent, preflight_wire_tree_with_limits};
+) -> Result<(u64, litchi_iwa_common::wire::WirePreflight), Error> {
+    use litchi_iwa_common::wire::{WireDescent, preflight_wire_tree};
 
     let limits = litchi_iwa_common::WireLimits::default()
         .with_input_bytes(
@@ -1506,10 +1493,10 @@ fn preflight_rich_text_payload(
             )
         })
         .and_then(|limits| limits.with_nesting(1))
-        .map_err(|_| BodyTableCellsError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?;
     let mut storage = None;
     let mut has_cell_owner = false;
-    let report = preflight_wire_tree_with_limits(source, limits, |visit| {
+    let report = preflight_wire_tree(source, limits, |visit| {
         let field = visit.field();
         match field.number() {
             1 => {
@@ -1534,20 +1521,21 @@ fn preflight_rich_text_payload(
         }
         Ok(WireDescent::Skip)
     })
-    .map_err(|_| BodyTableCellsError::InvalidSource)?;
+    .map_err(|_| Error::InvalidSource)?;
     if !has_cell_owner {
-        return Err(BodyTableCellsError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
-    let storage = storage.ok_or(BodyTableCellsError::InvalidSource)?;
+    let storage = storage.ok_or(Error::InvalidSource)?;
     Ok((storage, report))
 }
 
 fn parse_local_reference(source: &[u8]) -> Result<u64, litchi_iwa_common::Error> {
     use litchi_iwa_common::decode_varint_from_bytes;
     let mut identifier = None;
-    for field in litchi_iwa_common::wire::WireView::parse(source)
-        .map_err(|_| litchi_iwa_common::Error::InvalidFormat("invalid local reference".into()))?
-        .fields()
+    for field in
+        litchi_iwa_common::wire::WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_| litchi_iwa_common::Error::InvalidFormat("invalid local reference".into()))?
+            .fields()
     {
         if field.number() != 1 || field.wire_type() != 0 || identifier.is_some() {
             return Err(litchi_iwa_common::Error::InvalidFormat(
@@ -1571,11 +1559,18 @@ fn parse_local_reference(source: &[u8]) -> Result<u64, litchi_iwa_common::Error>
         .ok_or_else(|| litchi_iwa_common::Error::InvalidFormat("invalid local reference".into()))
 }
 
-fn map_table_cell_issue(issue: wire_cells::TableCellIssue) -> BodyTableCellsError {
+fn map_table_cell_issue(issue: wire_cells::TableCellIssue) -> Error {
     match issue {
         wire_cells::TableCellIssue::StorageDecode(error) => map_storage_error(error),
-        wire_cells::TableCellIssue::Allocation { amount, .. } => {
-            BodyTableCellsError::Allocation { amount }
+        wire_cells::TableCellIssue::Allocation { amount, .. } => Error::Allocation { amount },
+        wire_cells::TableCellIssue::RawLimitExceeded {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: map_raw_limit_kind(kind),
+            observed: usize_as_u64(observed),
+            maximum: usize_as_u64(maximum),
         },
         wire_cells::TableCellIssue::MissingTile { .. }
         | wire_cells::TableCellIssue::MissingTilePayload { .. }
@@ -1587,17 +1582,29 @@ fn map_table_cell_issue(issue: wire_cells::TableCellIssue) -> BodyTableCellsErro
         | wire_cells::TableCellIssue::DuplicateTileRow { .. }
         | wire_cells::TableCellIssue::CounterOverflow
         | wire_cells::TableCellIssue::CellStorageOutOfBounds { .. }
-        | wire_cells::TableCellIssue::CellValueDecode { .. } => BodyTableCellsError::InvalidSource,
+        | wire_cells::TableCellIssue::CellValueDecode { .. } => Error::InvalidSource,
     }
 }
 
-fn map_sidecar_issue(issue: SidecarIssue) -> BodyTableCellsError {
+const fn map_raw_limit_kind(kind: litchi_numbers_wire::LimitKind) -> LimitKind {
+    match kind {
+        litchi_numbers_wire::LimitKind::InputBytes | litchi_numbers_wire::LimitKind::TailBytes => {
+            LimitKind::WireBytes
+        },
+        litchi_numbers_wire::LimitKind::OutputBytes => LimitKind::WireOutputBytes,
+        litchi_numbers_wire::LimitKind::Fields => LimitKind::WireFields,
+        litchi_numbers_wire::LimitKind::Items => LimitKind::PayloadItems,
+        _ => LimitKind::WireBytes,
+    }
+}
+
+fn map_sidecar_issue(issue: SidecarIssue) -> Error {
     match issue {
         SidecarIssue::StorageDecode { error, .. } => map_storage_error(error),
         SidecarIssue::CommentDecode(error) => map_comment_decode_error(error),
         SidecarIssue::FormulaDecode(error) => map_formula_decode_error(error),
         SidecarIssue::Coordinator(issue) => map_coordinator_issue(issue),
-        SidecarIssue::Allocation { amount, .. } => BodyTableCellsError::Allocation { amount },
+        SidecarIssue::Allocation { amount, .. } => Error::Allocation { amount },
         SidecarIssue::InvalidEntry { .. }
         | SidecarIssue::ZeroReference { .. }
         | SidecarIssue::MissingPayload { .. }
@@ -1606,21 +1613,19 @@ fn map_sidecar_issue(issue: SidecarIssue) -> BodyTableCellsError {
         | SidecarIssue::DuplicateSegmentReference { .. }
         | SidecarIssue::DuplicateList { .. }
         | SidecarIssue::ZeroUuid
-        | SidecarIssue::InvalidReplies => BodyTableCellsError::InvalidSource,
+        | SidecarIssue::InvalidReplies => Error::InvalidSource,
     }
 }
 
-fn map_coordinator_issue(
-    issue: litchi_numbers_wire::table_data_list::CoordinatorIssue,
-) -> BodyTableCellsError {
+fn map_coordinator_issue(issue: litchi_numbers_wire::table_data_list::CoordinatorIssue) -> Error {
     use litchi_numbers_wire::table_data_list::CoordinatorIssue;
     match issue {
-        CoordinatorIssue::EntryLimit { observed, maximum } => BodyTableCellsError::LimitExceeded {
-            kind: BodyTableCellsLimitKind::PayloadItems,
+        CoordinatorIssue::EntryLimit { observed, maximum } => Error::Limit {
+            kind: LimitKind::PayloadItems,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        CoordinatorIssue::Allocation { amount, .. } => BodyTableCellsError::Allocation { amount },
+        CoordinatorIssue::Allocation { amount, .. } => Error::Allocation { amount },
         CoordinatorIssue::MissingRoot { .. }
         | CoordinatorIssue::DuplicateRoot { .. }
         | CoordinatorIssue::MissingSegment { .. }
@@ -1630,215 +1635,196 @@ fn map_coordinator_issue(
         | CoordinatorIssue::KeyRangeOverflow { .. }
         | CoordinatorIssue::MissingKeyRange { .. }
         | CoordinatorIssue::EntryOutsideKeyRange { .. }
-        | CoordinatorIssue::DuplicateEntryKey { .. } => BodyTableCellsError::InvalidSource,
+        | CoordinatorIssue::DuplicateEntryKey { .. } => Error::InvalidSource,
     }
 }
 
-fn map_comment_decode_error(
-    error: litchi_iwa_protos::comment_storage_codec::DecodeError,
-) -> BodyTableCellsError {
+fn map_comment_decode_error(error: litchi_iwa_protos::comment_storage_codec::DecodeError) -> Error {
     use litchi_iwa_protos::comment_storage_codec::DecodeLimit;
     match error.resource_limit() {
-        Some(DecodeLimit::Bytes { observed, maximum }) => BodyTableCellsError::LimitExceeded {
-            kind: BodyTableCellsLimitKind::WireBytes,
+        Some(DecodeLimit::Bytes { observed, maximum }) => Error::Limit {
+            kind: LimitKind::WireBytes,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        Some(DecodeLimit::OutputBytes { observed, maximum }) => {
-            BodyTableCellsError::LimitExceeded {
-                kind: BodyTableCellsLimitKind::WireOutputBytes,
-                observed: usize_as_u64(observed),
-                maximum: usize_as_u64(maximum),
-            }
+        Some(DecodeLimit::OutputBytes { observed, maximum }) => Error::Limit {
+            kind: LimitKind::WireOutputBytes,
+            observed: usize_as_u64(observed),
+            maximum: usize_as_u64(maximum),
         },
         Some(DecodeLimit::References { observed, maximum })
         | Some(DecodeLimit::Replies { observed, maximum })
-        | Some(DecodeLimit::ReferenceBytes { observed, maximum }) => {
-            BodyTableCellsError::LimitExceeded {
-                kind: BodyTableCellsLimitKind::PayloadReferences,
-                observed: usize_as_u64(observed),
-                maximum: usize_as_u64(maximum),
-            }
-        },
-        Some(DecodeLimit::Text { observed, maximum }) => BodyTableCellsError::LimitExceeded {
-            kind: BodyTableCellsLimitKind::PayloadItems,
+        | Some(DecodeLimit::ReferenceBytes { observed, maximum }) => Error::Limit {
+            kind: LimitKind::PayloadReferences,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        Some(DecodeLimit::Fields { observed, maximum }) => BodyTableCellsError::LimitExceeded {
-            kind: BodyTableCellsLimitKind::WireFields,
+        Some(DecodeLimit::Text { observed, maximum }) => Error::Limit {
+            kind: LimitKind::PayloadItems,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        Some(DecodeLimit::Work { observed, maximum }) => BodyTableCellsError::LimitExceeded {
-            kind: BodyTableCellsLimitKind::WireWork,
+        Some(DecodeLimit::Fields { observed, maximum }) => Error::Limit {
+            kind: LimitKind::WireFields,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        Some(DecodeLimit::Nesting { observed, maximum }) => BodyTableCellsError::LimitExceeded {
-            kind: BodyTableCellsLimitKind::WireNesting,
+        Some(DecodeLimit::Work { observed, maximum }) => Error::Limit {
+            kind: LimitKind::WireWork,
+            observed: usize_as_u64(observed),
+            maximum: usize_as_u64(maximum),
+        },
+        Some(DecodeLimit::Nesting { observed, maximum }) => Error::Limit {
+            kind: LimitKind::WireNesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),
         },
         Some(DecodeLimit::Allocations { observed, maximum })
-        | Some(DecodeLimit::Scratch { observed, maximum }) => BodyTableCellsError::LimitExceeded {
-            kind: BodyTableCellsLimitKind::WireWork,
+        | Some(DecodeLimit::Scratch { observed, maximum }) => Error::Limit {
+            kind: LimitKind::WireWork,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        Some(DecodeLimit::Retained { observed, maximum }) => BodyTableCellsError::LimitExceeded {
-            kind: BodyTableCellsLimitKind::PayloadBytes,
+        Some(DecodeLimit::Retained { observed, maximum }) => Error::Limit {
+            kind: LimitKind::PayloadBytes,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        Some(_) | None => BodyTableCellsError::InvalidSource,
+        Some(_) | None => Error::InvalidSource,
     }
 }
 
-fn map_formula_decode_error(
-    error: litchi_iwa_protos::numbers_formula_codec::DecodeError,
-) -> BodyTableCellsError {
+fn map_formula_decode_error(error: litchi_iwa_protos::numbers_formula_codec::DecodeError) -> Error {
     use litchi_iwa_protos::numbers_formula_codec::DecodeLimit;
     match error.resource_limit() {
-        Some(DecodeLimit::Bytes { observed, maximum }) => BodyTableCellsError::LimitExceeded {
-            kind: BodyTableCellsLimitKind::WireBytes,
+        Some(DecodeLimit::Bytes { observed, maximum }) => Error::Limit {
+            kind: LimitKind::WireBytes,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        Some(DecodeLimit::Fields { observed, maximum }) => BodyTableCellsError::LimitExceeded {
-            kind: BodyTableCellsLimitKind::WireFields,
+        Some(DecodeLimit::Fields { observed, maximum }) => Error::Limit {
+            kind: LimitKind::WireFields,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
         Some(DecodeLimit::Work { observed, maximum })
-        | Some(DecodeLimit::Nodes { observed, maximum }) => BodyTableCellsError::LimitExceeded {
-            kind: BodyTableCellsLimitKind::WireWork,
+        | Some(DecodeLimit::Nodes { observed, maximum }) => Error::Limit {
+            kind: LimitKind::WireWork,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        Some(DecodeLimit::Nesting { observed, maximum }) => BodyTableCellsError::LimitExceeded {
-            kind: BodyTableCellsLimitKind::WireNesting,
+        Some(DecodeLimit::Owners { observed, maximum }) => Error::Limit {
+            // The Pages compatibility reader exposes resolved owner entries
+            // through its existing payload-reference dimension.
+            kind: LimitKind::PayloadReferences,
+            observed: usize_as_u64(observed),
+            maximum: usize_as_u64(maximum),
+        },
+        Some(DecodeLimit::Nesting { observed, maximum }) => Error::Limit {
+            kind: LimitKind::WireNesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),
         },
-        Some(DecodeLimit::Text { observed, maximum }) => BodyTableCellsError::LimitExceeded {
-            kind: BodyTableCellsLimitKind::WireOutputBytes,
+        Some(DecodeLimit::Text { observed, maximum }) => Error::Limit {
+            kind: LimitKind::WireOutputBytes,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        Some(DecodeLimit::Allocation { requested }) => {
-            BodyTableCellsError::Allocation { amount: requested }
-        },
-        None => BodyTableCellsError::InvalidSource,
+        Some(DecodeLimit::Allocation { requested }) => Error::Allocation { amount: requested },
+        None => Error::InvalidSource,
     }
 }
 
 fn map_author_decode_error(
     error: litchi_iwa_protos::annotation_author_codec::DecodeError,
-) -> BodyTableCellsError {
+) -> Error {
     use litchi_iwa_protos::annotation_author_codec::DecodeLimit;
     match error.resource_limit() {
-        Some(DecodeLimit::Bytes { observed, maximum }) => BodyTableCellsError::LimitExceeded {
-            kind: BodyTableCellsLimitKind::WireBytes,
+        Some(DecodeLimit::Bytes { observed, maximum }) => Error::Limit {
+            kind: LimitKind::WireBytes,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        Some(DecodeLimit::OutputBytes { observed, maximum }) => {
-            BodyTableCellsError::LimitExceeded {
-                kind: BodyTableCellsLimitKind::WireOutputBytes,
-                observed: usize_as_u64(observed),
-                maximum: usize_as_u64(maximum),
-            }
+        Some(DecodeLimit::OutputBytes { observed, maximum }) => Error::Limit {
+            kind: LimitKind::WireOutputBytes,
+            observed: usize_as_u64(observed),
+            maximum: usize_as_u64(maximum),
         },
-        Some(DecodeLimit::Fields { observed, maximum }) => BodyTableCellsError::LimitExceeded {
-            kind: BodyTableCellsLimitKind::WireFields,
+        Some(DecodeLimit::Fields { observed, maximum }) => Error::Limit {
+            kind: LimitKind::WireFields,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
         Some(DecodeLimit::Work { observed, maximum })
         | Some(DecodeLimit::Allocations { observed, maximum })
-        | Some(DecodeLimit::Scratch { observed, maximum }) => BodyTableCellsError::LimitExceeded {
-            kind: BodyTableCellsLimitKind::WireWork,
+        | Some(DecodeLimit::Scratch { observed, maximum }) => Error::Limit {
+            kind: LimitKind::WireWork,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        Some(DecodeLimit::Nesting { observed, maximum }) => BodyTableCellsError::LimitExceeded {
-            kind: BodyTableCellsLimitKind::WireNesting,
+        Some(DecodeLimit::Nesting { observed, maximum }) => Error::Limit {
+            kind: LimitKind::WireNesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),
         },
-        Some(DecodeLimit::References { observed, maximum }) => BodyTableCellsError::LimitExceeded {
-            kind: BodyTableCellsLimitKind::PayloadReferences,
+        Some(DecodeLimit::References { observed, maximum }) => Error::Limit {
+            kind: LimitKind::PayloadReferences,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        Some(DecodeLimit::Text { observed, maximum }) => BodyTableCellsError::LimitExceeded {
-            kind: BodyTableCellsLimitKind::PayloadItems,
+        Some(DecodeLimit::Text { observed, maximum }) => Error::Limit {
+            kind: LimitKind::PayloadItems,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        Some(DecodeLimit::Retained { observed, maximum }) => BodyTableCellsError::LimitExceeded {
-            kind: BodyTableCellsLimitKind::PayloadBytes,
+        Some(DecodeLimit::Retained { observed, maximum }) => Error::Limit {
+            kind: LimitKind::PayloadBytes,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        Some(_) | None => BodyTableCellsError::InvalidSource,
+        Some(_) | None => Error::InvalidSource,
     }
 }
 
-fn map_common_wire_error(error: litchi_iwa_common::Error) -> BodyTableCellsError {
+fn map_common_wire_error(error: litchi_iwa_common::Error) -> Error {
     match error {
         litchi_iwa_common::Error::LimitExceeded {
             kind,
             observed,
             limit,
-        } => BodyTableCellsError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_common::LimitKind::InputBytes => BodyTableCellsLimitKind::WireBytes,
-                litchi_iwa_common::LimitKind::Fields => BodyTableCellsLimitKind::WireFields,
-                litchi_iwa_common::LimitKind::OutputBytes => {
-                    BodyTableCellsLimitKind::WireOutputBytes
-                },
-                litchi_iwa_common::LimitKind::Nesting => BodyTableCellsLimitKind::WireNesting,
-                litchi_iwa_common::LimitKind::RewriteWork => BodyTableCellsLimitKind::WireWork,
+                litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
+                litchi_iwa_common::LimitKind::Fields => LimitKind::WireFields,
+                litchi_iwa_common::LimitKind::OutputBytes => LimitKind::WireOutputBytes,
+                litchi_iwa_common::LimitKind::Nesting => LimitKind::WireNesting,
+                litchi_iwa_common::LimitKind::RewriteWork => LimitKind::WireWork,
                 litchi_iwa_common::LimitKind::TableRows
                 | litchi_iwa_common::LimitKind::TableColumns
                 | litchi_iwa_common::LimitKind::TableCells
-                | litchi_iwa_common::LimitKind::MaterializedCells => {
-                    BodyTableCellsLimitKind::PayloadItems
-                },
+                | litchi_iwa_common::LimitKind::MaterializedCells => LimitKind::PayloadItems,
             },
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(limit),
         },
-        litchi_iwa_common::Error::Allocation { amount, .. } => {
-            BodyTableCellsError::Allocation { amount }
-        },
-        litchi_iwa_common::Error::InvalidFormat(_)
-        | litchi_iwa_common::Error::InvalidLimit { .. } => BodyTableCellsError::InvalidSource,
+        litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_common_table_error(error: litchi_iwa_common::table::model::Error) -> BodyTableCellsError {
+fn map_common_table_error(error: litchi_iwa_common::table::model::Error) -> Error {
     match error {
         litchi_iwa_common::table::model::Error::Allocation { amount, .. } => {
-            BodyTableCellsError::Allocation { amount }
+            Error::Allocation { amount }
         },
         litchi_iwa_common::table::model::Error::BudgetExceeded { requested, maximum } => {
-            BodyTableCellsError::LimitExceeded {
-                kind: BodyTableCellsLimitKind::PayloadItems,
+            Error::Limit {
+                kind: LimitKind::PayloadItems,
                 observed: usize_as_u64(requested),
                 maximum: usize_as_u64(maximum),
             }
         },
-        litchi_iwa_common::table::model::Error::InvalidAddress { .. }
-        | litchi_iwa_common::table::model::Error::OutOfBounds { .. }
-        | litchi_iwa_common::table::model::Error::InvalidRange { .. }
-        | litchi_iwa_common::table::model::Error::CoordinateOverflow { .. }
-        | litchi_iwa_common::table::model::Error::DuplicatePosition { .. }
-        | litchi_iwa_common::table::model::Error::DuplicateTableName { .. } => {
-            BodyTableCellsError::InvalidSource
-        },
+        _ => Error::InvalidSource,
     }
 }
 
@@ -1850,7 +1836,7 @@ impl Package {
     /// traversal, and semantic publication consume one aggregate budget.  The
     /// returned value contains no package objects, generated protobuf values,
     /// or native identifiers.
-    pub fn body_table_cells<'table, S>(&self, selector: S) -> Result<TableRead, BodyTableCellsError>
+    pub fn body_table_cells<'table, S>(&self, selector: S) -> Result<TableRead, Error>
     where
         S: Into<BodyTableSelector<'table>>,
     {
@@ -1913,7 +1899,10 @@ pub(crate) fn selected_body_table_storage<'source>(
     package: &'source Package,
     selector: BodyTableSelector<'_>,
     budget: &mut table_lock::WireBudget,
-) -> Result<SelectedBodyTableStorage<'source>, BodyTableCellsError> {
+) -> Result<SelectedBodyTableStorage<'source>, Error> {
+    let limits = package
+        .numbers_wire_limits()
+        .map_err(|_| Error::InvalidSource)?;
     let target = package
         .resolve_body_table_with_budget(selector, budget)
         .map_err(map_lock_error)?;
@@ -1932,7 +1921,7 @@ pub(crate) fn selected_body_table_storage<'source>(
         || model.number_of_columns() != target.table_columns
         || model.table_name() != target.table_name.as_ref()
     {
-        return Err(BodyTableCellsError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
 
     // The model traversal validates and streams tile references, but its
@@ -1949,18 +1938,19 @@ pub(crate) fn selected_body_table_storage<'source>(
     charge_storage_report_without_references(budget, tile_report)?;
     let tile_size = tile_storage.tile_size().unwrap_or(256);
     if tile_size == 0 {
-        return Err(BodyTableCellsError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
 
     let max_tiles = tile_count(model.number_of_rows(), tile_size)?;
     if routes.values.len() > max_tiles {
-        return Err(BodyTableCellsError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(SelectedBodyTableStorage {
         model,
         data_store,
         tile_size,
         tiles: routes.values,
+        limits,
     })
 }
 
@@ -2001,59 +1991,59 @@ impl storage::StorageVisitor for TileRoutes {
 fn model_message<'source>(
     package: &'source Package,
     target: &table_lock::BodyTableTarget,
-) -> Result<&'source RawMessage, BodyTableCellsError> {
+) -> Result<&'source RawMessage, Error> {
     let component = package
         .state
         .source
         .components()
         .get_index(target.model_component_index)
-        .ok_or(BodyTableCellsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let object = component
         .archive()
         .objects
         .get(target.model_object_index)
-        .ok_or(BodyTableCellsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if object.archive_info.identifier != Some(target.model_identifier.get()) {
-        return Err(BodyTableCellsError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let message = object
         .messages
         .get(target.model_message_index)
         .filter(|message| message.type_ == target.model_message_type)
-        .ok_or(BodyTableCellsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     object
         .archive_info
         .message_infos
         .get(target.model_message_index)
-        .ok_or(BodyTableCellsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     Ok(message)
 }
 
 fn storage_options(
     budget: &table_lock::WireBudget,
     source: &[u8],
-) -> Result<storage::DecodeOptions, BodyTableCellsError> {
+) -> Result<storage::DecodeOptions, Error> {
     let limits = budget.wire_limits();
     let input = source.len().max(1);
     if input > limits.max_input_bytes() {
-        return Err(BodyTableCellsError::LimitExceeded {
-            kind: BodyTableCellsLimitKind::WireBytes,
+        return Err(Error::Limit {
+            kind: LimitKind::WireBytes,
             observed: usize_as_u64(input),
             maximum: usize_as_u64(limits.max_input_bytes()),
         });
     }
     let fields = budget.remaining_wire_fields();
     if fields == 0 {
-        return Err(BodyTableCellsError::LimitExceeded {
-            kind: BodyTableCellsLimitKind::WireFields,
+        return Err(Error::Limit {
+            kind: LimitKind::WireFields,
             observed: 1,
             maximum: 0,
         });
     }
     let work = budget.remaining_wire_work();
     if work == 0 {
-        return Err(BodyTableCellsError::LimitExceeded {
-            kind: BodyTableCellsLimitKind::WireWork,
+        return Err(Error::Limit {
+            kind: LimitKind::WireWork,
             observed: 1,
             maximum: 0,
         });
@@ -2068,7 +2058,7 @@ fn storage_options(
 fn charge_storage_report(
     budget: &mut table_lock::WireBudget,
     report: storage::DecodeReport,
-) -> Result<(), BodyTableCellsError> {
+) -> Result<(), Error> {
     budget
         .charge_payload_work(report.source_bytes())
         .map_err(map_lock_error)?;
@@ -2088,7 +2078,7 @@ fn charge_storage_report(
 fn charge_storage_probe_report(
     budget: &mut table_lock::WireBudget,
     report: storage::DecodeReport,
-) -> Result<(), BodyTableCellsError> {
+) -> Result<(), Error> {
     budget
         .charge_payload_work(report.source_bytes())
         .map_err(map_lock_error)?;
@@ -2100,7 +2090,7 @@ fn charge_storage_probe_report(
 fn charge_storage_report_without_references(
     budget: &mut table_lock::WireBudget,
     report: storage::DecodeReport,
-) -> Result<(), BodyTableCellsError> {
+) -> Result<(), Error> {
     budget
         .charge_payload_work(report.source_bytes())
         .map_err(map_lock_error)?;
@@ -2112,48 +2102,46 @@ fn charge_storage_report_without_references(
         .map_err(map_lock_error)
 }
 
-fn tile_count(rows: u32, tile_size: u32) -> Result<usize, BodyTableCellsError> {
-    let rows = usize::try_from(rows).map_err(|_| BodyTableCellsError::InvalidSource)?;
-    let tile_size = usize::try_from(tile_size).map_err(|_| BodyTableCellsError::InvalidSource)?;
+fn tile_count(rows: u32, tile_size: u32) -> Result<usize, Error> {
+    let rows = usize::try_from(rows).map_err(|_| Error::InvalidSource)?;
+    let tile_size = usize::try_from(tile_size).map_err(|_| Error::InvalidSource)?;
     rows.checked_add(tile_size.saturating_sub(1))
         .and_then(|value| value.checked_div(tile_size))
-        .ok_or(BodyTableCellsError::InvalidSource)
+        .ok_or(Error::InvalidSource)
 }
 
-fn map_storage_error(error: storage::DecodeError) -> BodyTableCellsError {
+fn map_storage_error(error: storage::DecodeError) -> Error {
     let Some(limit) = error.resource_limit() else {
-        return BodyTableCellsError::InvalidSource;
+        return Error::InvalidSource;
     };
     match limit {
-        storage::DecodeLimit::Bytes { observed, maximum } => BodyTableCellsError::LimitExceeded {
-            kind: BodyTableCellsLimitKind::WireBytes,
+        storage::DecodeLimit::Bytes { observed, maximum } => Error::Limit {
+            kind: LimitKind::WireBytes,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        storage::DecodeLimit::References { observed, maximum } => {
-            BodyTableCellsError::LimitExceeded {
-                kind: BodyTableCellsLimitKind::PayloadReferences,
-                observed: usize_as_u64(observed),
-                maximum: usize_as_u64(maximum),
-            }
-        },
-        storage::DecodeLimit::Text { observed, maximum } => BodyTableCellsError::LimitExceeded {
-            kind: BodyTableCellsLimitKind::PayloadItems,
+        storage::DecodeLimit::References { observed, maximum } => Error::Limit {
+            kind: LimitKind::PayloadReferences,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        storage::DecodeLimit::Fields { observed, maximum } => BodyTableCellsError::LimitExceeded {
-            kind: BodyTableCellsLimitKind::WireFields,
+        storage::DecodeLimit::Text { observed, maximum } => Error::Limit {
+            kind: LimitKind::PayloadItems,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        storage::DecodeLimit::Work { observed, maximum } => BodyTableCellsError::LimitExceeded {
-            kind: BodyTableCellsLimitKind::WireWork,
+        storage::DecodeLimit::Fields { observed, maximum } => Error::Limit {
+            kind: LimitKind::WireFields,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        storage::DecodeLimit::Nesting { observed, maximum } => BodyTableCellsError::LimitExceeded {
-            kind: BodyTableCellsLimitKind::WireNesting,
+        storage::DecodeLimit::Work { observed, maximum } => Error::Limit {
+            kind: LimitKind::WireWork,
+            observed: usize_as_u64(observed),
+            maximum: usize_as_u64(maximum),
+        },
+        storage::DecodeLimit::Nesting { observed, maximum } => Error::Limit {
+            kind: LimitKind::WireNesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),
         },
@@ -2161,56 +2149,60 @@ fn map_storage_error(error: storage::DecodeError) -> BodyTableCellsError {
         | storage::DecodeLimit::Retained {
             observed: requested,
             maximum: _,
-        } => BodyTableCellsError::Allocation { amount: requested },
-        _ => BodyTableCellsError::InvalidSource,
+        } => Error::Allocation { amount: requested },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_lock_error(error: table_lock::BodyTableLockError) -> BodyTableCellsError {
+fn map_lock_error(error: table_lock::Error) -> Error {
     match error {
-        table_lock::BodyTableLockError::TableNotFound => BodyTableCellsError::TableNotFound,
-        table_lock::BodyTableLockError::AmbiguousTableName => {
-            BodyTableCellsError::AmbiguousTableName
+        table_lock::Error::Refused(crate::table::lock::Refusal::TableNotFound) => {
+            Error::TableNotFound
         },
-        table_lock::BodyTableLockError::AmbiguousSelector => BodyTableCellsError::AmbiguousSelector,
-        table_lock::BodyTableLockError::UnsupportedSource => BodyTableCellsError::UnsupportedSource,
-        table_lock::BodyTableLockError::LimitExceeded {
+        table_lock::Error::Refused(crate::table::lock::Refusal::AmbiguousTableName) => {
+            Error::AmbiguousTableName
+        },
+        table_lock::Error::Refused(crate::table::lock::Refusal::AmbiguousSelector) => {
+            Error::AmbiguousSelector
+        },
+        table_lock::Error::Refused(crate::table::lock::Refusal::UnsupportedSource) => {
+            Error::UnsupportedSource
+        },
+        table_lock::Error::Limit {
             kind,
             observed,
             maximum,
-        } => BodyTableCellsError::LimitExceeded {
+        } => Error::Limit {
             kind: map_lock_limit(kind),
             observed,
             maximum,
         },
-        table_lock::BodyTableLockError::Allocation { amount } => {
-            BodyTableCellsError::Allocation { amount }
-        },
-        table_lock::BodyTableLockError::InvalidSource
-        | table_lock::BodyTableLockError::Verification
-        | table_lock::BodyTableLockError::PatchConflict => BodyTableCellsError::InvalidSource,
+        table_lock::Error::Allocation { amount } => Error::Allocation { amount },
+        table_lock::Error::InvalidSource
+        | table_lock::Error::Verification
+        | table_lock::Error::PatchConflict => Error::InvalidSource,
     }
 }
 
-const fn map_lock_limit(kind: table_lock::BodyTableLockLimitKind) -> BodyTableCellsLimitKind {
-    use table_lock::BodyTableLockLimitKind as Lock;
+const fn map_lock_limit(kind: table_lock::LimitKind) -> LimitKind {
+    use table_lock::LimitKind as Lock;
     match kind {
-        Lock::InputBytes => BodyTableCellsLimitKind::InputBytes,
-        Lock::OutputBytes => BodyTableCellsLimitKind::OutputBytes,
-        Lock::Entries => BodyTableCellsLimitKind::Entries,
-        Lock::EntryBytes => BodyTableCellsLimitKind::EntryBytes,
-        Lock::TotalEntryBytes => BodyTableCellsLimitKind::TotalEntryBytes,
-        Lock::PackageBytes => BodyTableCellsLimitKind::PackageBytes,
-        Lock::PayloadBytes => BodyTableCellsLimitKind::PayloadBytes,
-        Lock::TotalPayloadBytes => BodyTableCellsLimitKind::TotalPayloadBytes,
-        Lock::PayloadObjects => BodyTableCellsLimitKind::PayloadObjects,
-        Lock::PayloadMessages => BodyTableCellsLimitKind::PayloadMessages,
-        Lock::PayloadItems => BodyTableCellsLimitKind::PayloadItems,
-        Lock::PayloadReferences => BodyTableCellsLimitKind::PayloadReferences,
-        Lock::WireBytes => BodyTableCellsLimitKind::WireBytes,
-        Lock::WireFields => BodyTableCellsLimitKind::WireFields,
-        Lock::WireNesting => BodyTableCellsLimitKind::WireNesting,
-        Lock::WireWork => BodyTableCellsLimitKind::WireWork,
+        Lock::InputBytes => LimitKind::InputBytes,
+        Lock::OutputBytes => LimitKind::OutputBytes,
+        Lock::Entries => LimitKind::Entries,
+        Lock::EntryBytes => LimitKind::EntryBytes,
+        Lock::TotalEntryBytes => LimitKind::TotalEntryBytes,
+        Lock::PackageBytes => LimitKind::PackageBytes,
+        Lock::PayloadBytes => LimitKind::PayloadBytes,
+        Lock::TotalPayloadBytes => LimitKind::TotalPayloadBytes,
+        Lock::PayloadObjects => LimitKind::PayloadObjects,
+        Lock::PayloadMessages => LimitKind::PayloadMessages,
+        Lock::PayloadItems => LimitKind::PayloadItems,
+        Lock::PayloadReferences => LimitKind::PayloadReferences,
+        Lock::WireBytes => LimitKind::WireBytes,
+        Lock::WireFields => LimitKind::WireFields,
+        Lock::WireNesting => LimitKind::WireNesting,
+        Lock::WireWork => LimitKind::WireWork,
     }
 }
 
@@ -2269,11 +2261,11 @@ mod tests {
         .expect("native Pages table fixture");
         assert_eq!(
             package.body_table_cells("missing table"),
-            Err(BodyTableCellsError::TableNotFound)
+            Err(Error::TableNotFound)
         );
         assert_eq!(
             package.body_table_cells(usize::MAX),
-            Err(BodyTableCellsError::TableNotFound)
+            Err(Error::TableNotFound)
         );
     }
 
@@ -2287,15 +2279,15 @@ mod tests {
         let limits = litchi_iwa_archive::Limits::default()
             .with_archive_limits(archive_limits)
             .expect("valid package limits");
-        let package = Package::from_bytes_with_limits(source, limits)
+        let package = Package::from_bytes_with_archive_limits(source, limits)
             .expect("native fixture must open before the focused read budget is spent");
         let error = package
             .body_table_cells(0usize)
             .expect_err("selection and cell traversal must exceed the shared field ceiling");
         assert!(matches!(
             error,
-            BodyTableCellsError::LimitExceeded {
-                kind: BodyTableCellsLimitKind::WireFields,
+            Error::Limit {
+                kind: LimitKind::WireFields,
                 observed,
                 maximum,
             } if observed > maximum && maximum < 256
@@ -2326,8 +2318,8 @@ mod tests {
             .expect_err("the next cumulative cell must be refused");
         assert_eq!(
             error,
-            BodyTableCellsError::LimitExceeded {
-                kind: BodyTableCellsLimitKind::PayloadItems,
+            Error::Limit {
+                kind: LimitKind::PayloadItems,
                 observed: usize_as_u64(MAX_MATERIALIZED_CELLS + 1),
                 maximum: usize_as_u64(MAX_MATERIALIZED_CELLS),
             }

@@ -1,0 +1,94 @@
+{
+  "baseline_commit": "8470ce2629",
+  "changes": {
+    "ograph": "OpenOptions for Package/PackageRef/Workbook/WorkbookRef/Payload; required Limits for chart Ref/Stream/Book/Refs",
+    "ppt": "chart::GraphPackage moves to builder::graph::Draft, with its View; Draft::open_with_options uses Graph OpenOptions",
+    "xls": "EmbeddedPayload::new takes required object Limits",
+    "ods": "History::with_options takes EditOptions; limits_value getter",
+    "ppt_semantic_names": "chart::semantic::{Model,Models}; SemanticChart alias and SemanticCharts name removed"
+  },
+  "validation": {
+    "owners-check": "passed",
+    "owners-clippy": "passed",
+    "owners-harness": "passed",
+    "ppt-clippy-final": "passed after moving the draft and removing semantic aliases",
+    "tests": {
+      "ograph": {
+        "passed": 70,
+        "failed": 0,
+        "ignored": 0
+      },
+      "xls-ole": {
+        "passed": 53,
+        "failed": 0,
+        "ignored": 0
+      },
+      "ppt-chart": {
+        "passed": 10,
+        "failed": 0,
+        "ignored": 0
+      },
+      "ppt-graph-draft": {
+        "passed": 4,
+        "failed": 0,
+        "ignored": 0
+      },
+      "ppt-charts": {
+        "passed": 5,
+        "failed": 0,
+        "ignored": 0
+      },
+      "ods-history": {
+        "passed": 7,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    "glossary_profiles": {
+      "xls-minimal": "API glossary: 1 profiles, 95 banned names, 13 transaction families checked, 3 immutable owners, family methods in 1 profiles",
+      "ppt-minimal": "API glossary: 1 profiles, 164 banned names, 15 transaction families checked, 2 immutable owners, family methods in 1 profiles",
+      "ppt-full": "API glossary: 1 profiles, 164 banned names, 15 transaction families checked, 2 immutable owners, family methods in 1 profiles",
+      "ograph": "API glossary: 1 profiles, 11 banned names, 0 transaction families checked, 0 immutable owners, family methods in 1 profiles",
+      "ods": "API glossary: 1 profiles, 79 banned names, 6 transaction families checked, 4 immutable owners, family methods in 1 profiles"
+    }
+  },
+  "raw_constructor_equivalence": [
+    {
+      "owner": "impl<'a> Ref<'a>",
+      "body_sha256": "ccd000f321f4bf12c49f9298013e62348870589737373d9b3021290812d88184",
+      "comparison": "identical after updating the called canonical constructor names"
+    },
+    {
+      "owner": "impl Stream",
+      "body_sha256": "45b06497918f7df80c14d1beeef4f67c21a35699d146dba6b1880e7e2dea849d",
+      "comparison": "identical after updating the called canonical constructor names"
+    },
+    {
+      "owner": "impl Book",
+      "body_sha256": "bb461dbd678c7948854ac1102693fba0e6bb92626eddc480a348f749492559f6",
+      "comparison": "identical after updating the called canonical constructor names"
+    },
+    {
+      "owner": "impl<'a> Refs<'a>",
+      "body_sha256": "b1025cc1be7e1833e0629a76435123973e81e2088611b37cb13322b32ad716de",
+      "comparison": "identical after updating the called canonical constructor names"
+    },
+    {
+      "owner": "XLS EmbeddedPayload",
+      "body_sha256": "2e2c3304522f67e961763296e36f1dcc4c46838e7d5a8f93c6619f4f853cb7ca",
+      "comparison": "byte-identical constructor body"
+    }
+  ],
+  "commands": [
+    "cargo check -q -p litchi-ograph -p litchi-ppt -p litchi-xls -p litchi-ods --all-features --all-targets",
+    "cargo test -q -p litchi-ograph --all-features",
+    "cargo test -q -p litchi-xls --all-features --lib ole_object",
+    "cargo test -q -p litchi-ppt --all-features --lib chart",
+    "cargo test -q -p litchi-ppt --all-features --lib builder::graph",
+    "cargo test -q -p litchi-ppt --all-features --test ppt_charts",
+    "cargo test -q -p litchi-ods --all-features --test document_transactions",
+    "cargo clippy -q -p litchi-ograph -p litchi-ppt -p litchi-xls -p litchi-ods --all-features --all-targets -- -D warnings",
+    "cargo check -q --locked --manifest-path tools/perf-baseline/Cargo.toml --all-targets",
+    "python3 tools/check_api_glossary.py --profile <each of xls-minimal,ppt-minimal,ppt-full,ograph,ods>"
+  ]
+}

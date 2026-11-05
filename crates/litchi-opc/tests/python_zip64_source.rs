@@ -15,6 +15,7 @@
 use std::collections::HashMap;
 
 use litchi_opc::{OpcPackage, PackURI, PackageWriter, SourceBackedPackage};
+use litchi_opc::{SourceCacheLimits, SourceLimits};
 use soapberry_zip::office::ArchiveLimits;
 use soapberry_zip::{PreservationIndex, RECOMMENDED_BUFFER_SIZE, ZipArchive};
 
@@ -38,9 +39,7 @@ struct RawRecord {
 fn raw_records(data: &[u8]) -> HashMap<Vec<u8>, RawRecord> {
     let archive = ZipArchive::from_slice(data).unwrap().into_zip_archive();
     let mut scratch = vec![0; RECOMMENDED_BUFFER_SIZE];
-    let index =
-        PreservationIndex::new_with_limits(&archive, &mut scratch, ArchiveLimits::UNBOUNDED)
-            .unwrap();
+    let index = PreservationIndex::new(&archive, &mut scratch, ArchiveLimits::UNBOUNDED).unwrap();
     index
         .entries()
         .iter()
@@ -66,17 +65,29 @@ fn python_force_zip64_source_overlay_is_exact_on_noop_and_preserves_untouched_me
     // The eager owning package and the source-backed overlay both retain an
     // exact no-op authorization, including ZIP64 local headers and signed
     // descriptors.
-    let owning = OpcPackage::from_vec(SOURCE.to_vec()).expect("open Python OPC source");
+    let owning = OpcPackage::from_vec(SOURCE.to_vec(), SourceLimits::default())
+        .expect("open Python OPC source");
     assert_eq!(PackageWriter::to_bytes(&owning).unwrap(), SOURCE);
 
     let mut no_op = Vec::new();
-    SourceBackedPackage::from_vec(SOURCE.to_vec())
-        .unwrap()
-        .write_part_overlay_to_stream(&mut no_op, &pack(DOCUMENT_URI), DOCUMENT.to_vec())
-        .expect("source-backed no-op overlay");
+    SourceBackedPackage::from_vec(
+        SOURCE.to_vec(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap()
+    .write_part_overlay_to_stream(&mut no_op, &pack(DOCUMENT_URI), DOCUMENT.to_vec())
+    .expect("source-backed no-op overlay");
     assert_eq!(no_op, SOURCE);
 
-    let package = SourceBackedPackage::from_vec(SOURCE.to_vec()).expect("open source-backed OPC");
+    let package = SourceBackedPackage::from_vec(
+        SOURCE.to_vec(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .expect("open source-backed OPC");
     let physical_names: Vec<_> = package.physical_member_names().collect();
     assert_eq!(
         physical_names,
@@ -99,10 +110,15 @@ fn python_force_zip64_source_overlay_is_exact_on_noop_and_preserves_untouched_me
     );
 
     let mut output = Vec::new();
-    SourceBackedPackage::from_vec(SOURCE.to_vec())
-        .unwrap()
-        .write_part_overlay_to_stream(&mut output, &pack(DOCUMENT_URI), REPLACEMENT.to_vec())
-        .expect("targeted source-backed OPC edit");
+    SourceBackedPackage::from_vec(
+        SOURCE.to_vec(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap()
+    .write_part_overlay_to_stream(&mut output, &pack(DOCUMENT_URI), REPLACEMENT.to_vec())
+    .expect("targeted source-backed OPC edit");
     assert_ne!(output, SOURCE);
 
     let output_raw = raw_records(&output);
@@ -117,8 +133,13 @@ fn python_force_zip64_source_overlay_is_exact_on_noop_and_preserves_untouched_me
         assert_eq!(output_record.central, source_record.central);
     }
 
-    let reopened_source = SourceBackedPackage::from_vec(output.clone())
-        .expect("reopen targeted source-backed output");
+    let reopened_source = SourceBackedPackage::from_vec(
+        output.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .expect("reopen targeted source-backed output");
     assert_eq!(
         reopened_source
             .part(&pack(DOCUMENT_URI))
@@ -128,7 +149,8 @@ fn python_force_zip64_source_overlay_is_exact_on_noop_and_preserves_untouched_me
             .as_bytes(),
         REPLACEMENT
     );
-    let reopened_owning = OpcPackage::from_vec(output).expect("reopen targeted owning output");
+    let reopened_owning = OpcPackage::from_vec(output, SourceLimits::default())
+        .expect("reopen targeted owning output");
     assert_eq!(
         reopened_owning
             .get_part(&pack(DOCUMENT_URI))

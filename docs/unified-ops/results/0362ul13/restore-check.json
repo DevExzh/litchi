@@ -1,0 +1,199 @@
+{
+  "created_utc": "2026-10-24T15:09:46Z",
+  "exercise": {
+    "branch_refs_retained_after_cleanup": {
+      "uo2/drawingml-native-rss-repair": "40091854020a07a233c792cac32eafc308d93120",
+      "uo2/ppt-lazy-native-protocol": "079ad7e3bc277d16ce5cf165e612280fa15b85f0"
+    },
+    "destination_hash_and_mode_checks": true,
+    "ignored_status_exact": true,
+    "nonforced_worktree_remove_after_cleanup": true,
+    "parent_directory_mode_checks": true,
+    "recreated_with": "git worktree add --no-checkout <recorded-source-worktree> <recorded-branch>; git restore --source=HEAD --worktree --staged .",
+    "restore_command": "python3 quarantine/wave46/restore.py",
+    "source_worktrees_absent_after": true,
+    "temporary_restored_copies_removed_after_check": true
+  },
+  "external_roots_touched": false,
+  "final_verification": {
+    "branch_refs": {
+      "uo2/drawingml-native-rss-repair": "40091854020a07a233c792cac32eafc308d93120",
+      "uo2/ppt-lazy-native-protocol": "079ad7e3bc277d16ce5cf165e612280fa15b85f0"
+    },
+    "candidate_holders_after": [],
+    "candidate_worktrees_absent": true,
+    "integration_status_observed": [],
+    "manifest_sha256": "0fde1ea674be9823f0e79f10ee6bd90a88e768b177a20f09cdf755368b7bd2fa",
+    "receipt_sha256": "1a84eebfc96fc24b3abc6d5c72e79005ca38986684e191f34cb3485c45cdcb39",
+    "staging_head_unchanged": true
+  },
+  "foreign_signals_sent": false,
+  "leaves": [
+    {
+      "branch": "uo2/drawingml-native-rss-repair",
+      "branch_ref_after": "40091854020a07a233c792cac32eafc308d93120",
+      "head": "40091854020a07a233c792cac32eafc308d93120",
+      "name": "drawingml-native-rss-repair",
+      "parent_directories": [
+        {
+          "mode": "0o775",
+          "path": "tools"
+        },
+        {
+          "mode": "0o775",
+          "path": "tools/__pycache__"
+        },
+        {
+          "mode": "0o775",
+          "path": "tools/native_qualification"
+        },
+        {
+          "mode": "0o775",
+          "path": "tools/native_qualification/__pycache__"
+        }
+      ],
+      "payloads": [
+        {
+          "mode": "0o664",
+          "path": "tools/__pycache__/native_qualification_runner.cpython-314.pyc",
+          "sha256": "9f20d1aca73525a7276f32c0f75b12108cf33dea194a5533405a02c46b8d7f9b",
+          "size": 131344
+        },
+        {
+          "mode": "0o664",
+          "path": "tools/__pycache__/test_drawingml_raw_qualification.cpython-314.pyc",
+          "sha256": "61a16e378c8321e54e6de7ca9887d1c726f5c872b43c0826500d7f434cc3a1ff",
+          "size": 26338
+        },
+        {
+          "mode": "0o664",
+          "path": "tools/__pycache__/test_native_qualification_runner.cpython-314.pyc",
+          "sha256": "8db5c9379ac16d2f01d52398e90091e38fc692fef10dfe5d79b17c0bfa2e94d4",
+          "size": 47751
+        },
+        {
+          "mode": "0o664",
+          "path": "tools/native_qualification/__pycache__/drawingml_raw_paired_runner.cpython-314.pyc",
+          "sha256": "2a39d0250393aa360ceb8a8d0d602ab16bc1939faac84acdfcb7c40ab01b1007",
+          "size": 55619
+        },
+        {
+          "mode": "0o664",
+          "path": "tools/native_qualification/__pycache__/drawingml_raw_validator.cpython-314.pyc",
+          "sha256": "e24efeb2fb8e551e1d33b803d3f2e5f11073e6a545698395fa46f5d88364fc06",
+          "size": 74190
+        },
+        {
+          "mode": "0o664",
+          "path": "tools/native_qualification/__pycache__/prepare_drawingml_raw_inputs.cpython-314.pyc",
+          "sha256": "c071100b2bedc3749c538c74516470b10a7dd46adfa9bc26f72d952c1ef6f5d3",
+          "size": 23568
+        },
+        {
+          "mode": "0o664",
+          "path": "tools/native_qualification/__pycache__/prepare_w4b_w5_inputs.cpython-314.pyc",
+          "sha256": "8750b766982e2f66e17778bae03854b3c316d6f75b86475b9e5a4479189cf481",
+          "size": 28918
+        },
+        {
+          "mode": "0o664",
+          "path": "tools/native_qualification/__pycache__/prepare_xlsx_raw_inputs.cpython-314.pyc",
+          "sha256": "3e7344da891878503282ffa10347e455e5507ce100ad65551a5b0ee6b42afbbe",
+          "size": 21984
+        },
+        {
+          "mode": "0o664",
+          "path": "tools/native_qualification/__pycache__/w5_analyzer_adapter.cpython-314.pyc",
+          "sha256": "aceacbe6ad813a42718734d926361429ebb37fa19ccc80639b912978b0c86ccc",
+          "size": 8566
+        }
+      ],
+      "restored_records": 9,
+      "restored_regular_bytes": 418278,
+      "source_worktree": "/home/zhuhe/code/litchi-worktrees/uo2-drawingml-native-rss-repair",
+      "status": "verified"
+    },
+    {
+      "branch": "uo2/ppt-lazy-native-protocol",
+      "branch_ref_after": "079ad7e3bc277d16ce5cf165e612280fa15b85f0",
+      "head": "079ad7e3bc277d16ce5cf165e612280fa15b85f0",
+      "name": "ppt-lazy-native-protocol",
+      "parent_directories": [
+        {
+          "mode": "0o775",
+          "path": "tools"
+        },
+        {
+          "mode": "0o775",
+          "path": "tools/__pycache__"
+        },
+        {
+          "mode": "0o775",
+          "path": "tools/native_qualification"
+        },
+        {
+          "mode": "0o775",
+          "path": "tools/native_qualification/__pycache__"
+        }
+      ],
+      "payloads": [
+        {
+          "mode": "0o664",
+          "path": "Cargo.lock",
+          "sha256": "558fafc4fdaf4d517aef588586b8fcde52efa11f683b54e5e96a6fa7a82e2ab0",
+          "size": 139607
+        },
+        {
+          "mode": "0o664",
+          "path": "tools/__pycache__/odg_joined_qualification_bindings.cpython-314.pyc",
+          "sha256": "83acb4e77049ebb0345a05a06c2621ef441d4f6f62a6d0a850ded9ba6eaf859c",
+          "size": 2094
+        },
+        {
+          "mode": "0o664",
+          "path": "tools/__pycache__/odg_joined_qualification_builder.cpython-314.pyc",
+          "sha256": "4631a83acf66a0e03c1033a7a13df097d663e5d117739cf291d7de63eaded603",
+          "size": 111227
+        },
+        {
+          "mode": "0o664",
+          "path": "tools/__pycache__/odp_native_qualification.cpython-314.pyc",
+          "sha256": "584a33332a9d060836d1ffaecea14826928945ee72f4046cede6d013961f4b67",
+          "size": 90176
+        },
+        {
+          "mode": "0o664",
+          "path": "tools/__pycache__/ppt_lazy_native_qualification.cpython-314.pyc",
+          "sha256": "814a9c9f4e8bda0b35afee60b9cb2baf41f541ed12939f3aa065b0bb25037662",
+          "size": 94053
+        },
+        {
+          "mode": "0o664",
+          "path": "tools/__pycache__/test_ppt_lazy_native_qualification.cpython-314.pyc",
+          "sha256": "5689cfd04b84170fc75d0c74e2fd7e5d8509198b5d5f0f7dd4758d883a70e93b",
+          "size": 28468
+        },
+        {
+          "mode": "0o664",
+          "path": "tools/__pycache__/test_prepare_ppt_lazy_native_inputs.cpython-314.pyc",
+          "sha256": "4e478d2c7b2c0ba2cf991e26cb5aec8722228956df31fce17c3e0313a7dc383b",
+          "size": 12627
+        },
+        {
+          "mode": "0o664",
+          "path": "tools/native_qualification/__pycache__/prepare_ppt_lazy_native_inputs.cpython-314.pyc",
+          "sha256": "b99364cf4906cfb2ad5dbc5cb966c8697501ceb16368d617e882ebd2f0bec351",
+          "size": 21888
+        }
+      ],
+      "restored_records": 8,
+      "restored_regular_bytes": 500140,
+      "source_worktree": "/home/zhuhe/code/litchi-worktrees/uo2-ppt-lazy-native-protocol",
+      "status": "verified"
+    }
+  ],
+  "source_or_progress_touched": false,
+  "staging_head": "082fbeafe8f1e68c7118ec8561b5bd6fe1577415",
+  "status": "passed",
+  "wave": "wave46"
+}

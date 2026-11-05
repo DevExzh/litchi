@@ -24,7 +24,7 @@ fn fixture_bytes() -> Vec<u8> {
 }
 
 fn native_package() -> Package {
-    Package::from_bytes(fixture_bytes()).expect("native XLSB package")
+    Package::from_bytes(&fixture_bytes()).expect("native XLSB package")
 }
 
 fn connections() -> Connections {
@@ -52,15 +52,15 @@ fn definition() -> Definition {
 }
 
 fn attach_connections(package: Package) -> Package {
-    let mut workbook = package.into_workbook().expect("native workbook");
-    workbook
-        .set_connections(connections())
+    let mut edit = package.edit_connections().expect("connections edit");
+    edit.replace(Some(connections()))
         .expect("attach synthetic connections");
+    let published = edit.commit().expect("commit connections").into_package();
     let mut output = Cursor::new(Vec::new());
-    workbook
-        .save(&mut output)
+    published
+        .write_to(&mut output)
         .expect("save synthetic connections");
-    Package::from_bytes(output.into_inner()).expect("reopen synthetic connections")
+    Package::from_bytes(&output.into_inner()).expect("reopen synthetic connections")
 }
 
 fn native_part_bytes(package: &Package) -> BTreeMap<String, Vec<u8>> {
@@ -98,10 +98,15 @@ fn native_fixture_is_model_free_before_synthetic_attachment() {
     assert!(snapshot.connection_names().is_none());
 
     let before = package.to_bytes().expect("native package bytes");
-    let noop = snapshot.edit().commit().expect("native Data Model no-op");
-    assert!(!noop.changed());
+    let noop = package
+        .edit_data_model()
+        .expect("native Data Model snapshot")
+        .commit()
+        .expect("native Data Model no-op");
+    assert!(!noop.diagnostics().changed());
     let applied = package
-        .apply_data_model(&noop)
+        .apply_data_model(noop.patch())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("apply native Data Model no-op");
     assert_eq!(applied.to_bytes().expect("native no-op bytes"), before);
 }
@@ -132,21 +137,26 @@ fn native_package_preserves_members_through_synthetic_model_lifecycle() {
             .is_present()
     );
 
-    let before = with_connections.data_model().expect("before snapshot");
-    let mut create = before.edit();
+    let mut create = with_connections.edit_data_model().expect("before snapshot");
     create
         .replace_model(Some(
-            Model::from_bytes(definition(), vec![1, 2, 3, 4]).expect("synthetic model"),
+            Model::from_bytes(
+                definition(),
+                vec![1, 2, 3, 4],
+                litchi_xlsb::data_model::SemanticLimits::DEFAULT,
+            )
+            .expect("synthetic model"),
         ))
         .expect("stage synthetic model");
     let create_commit = create.commit().expect("commit synthetic model");
     let attached = with_connections
-        .apply_data_model(&create_commit)
+        .apply_data_model(create_commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("publish synthetic model");
     assert_eq!(native_part_bytes(&attached), native_members);
 
     let attached_bytes = attached.to_bytes().expect("synthetic model bytes");
-    let attached_reopened = Package::from_bytes(attached_bytes).expect("reopen synthetic model");
+    let attached_reopened = Package::from_bytes(&attached_bytes).expect("reopen synthetic model");
     let attached_snapshot = attached_reopened.data_model().expect("attached snapshot");
     assert_eq!(attached_snapshot.definition(), Some(&definition()));
     assert_eq!(
@@ -155,7 +165,9 @@ fn native_package_preserves_members_through_synthetic_model_lifecycle() {
     );
     assert_eq!(native_part_bytes(&attached_reopened), native_members);
 
-    let mut version_edit = attached_snapshot.edit();
+    let mut version_edit = attached_reopened
+        .edit_data_model()
+        .expect("attached snapshot");
     version_edit
         .edit_definition(|value| {
             value.min_version_load = 6;
@@ -164,7 +176,8 @@ fn native_package_preserves_members_through_synthetic_model_lifecycle() {
         .expect("stage version edit");
     let version_commit = version_edit.commit().expect("commit version edit");
     let changed = attached_reopened
-        .apply_data_model(&version_commit)
+        .apply_data_model(version_commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("publish version edit");
     assert_eq!(
         changed
@@ -175,12 +188,13 @@ fn native_package_preserves_members_through_synthetic_model_lifecycle() {
             .min_version_load,
         6
     );
-    let changed_reopened = Package::from_bytes(changed.to_bytes().expect("changed bytes"))
+    let changed_reopened = Package::from_bytes(&changed.to_bytes().expect("changed bytes"))
         .expect("reopen changed model");
     assert_eq!(native_part_bytes(&changed_reopened), native_members);
 
     let restored = changed_reopened
-        .apply_data_model_patch(&version_commit.patch().inverse())
+        .apply_data_model(&version_commit.patch().inverse())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("inverse version edit");
     assert_eq!(
         restored.data_model().expect("restored snapshot"),
@@ -188,11 +202,12 @@ fn native_package_preserves_members_through_synthetic_model_lifecycle() {
     );
     assert_eq!(native_part_bytes(&restored), native_members);
 
-    let mut remove = restored.data_model().expect("model for removal").edit();
+    let mut remove = restored.edit_data_model().expect("model for removal");
     remove.remove_model().expect("stage model removal");
     let remove_commit = remove.commit().expect("commit model removal");
     let removed = restored
-        .apply_data_model(&remove_commit)
+        .apply_data_model(remove_commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("publish model removal");
     assert!(!removed.data_model().expect("removed snapshot").is_present());
     assert_eq!(native_part_bytes(&removed), native_members);
@@ -201,7 +216,7 @@ fn native_package_preserves_members_through_synthetic_model_lifecycle() {
         with_connections_workbook
     );
 
-    let removed_reopened = Package::from_bytes(removed.to_bytes().expect("removed bytes"))
+    let removed_reopened = Package::from_bytes(&removed.to_bytes().expect("removed bytes"))
         .expect("reopen removed model");
     assert!(
         !removed_reopened

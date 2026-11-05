@@ -7,10 +7,6 @@
     reason = "the value is validated as nonnegative before conversion"
 )]
 #![expect(
-    clippy::module_name_repetitions,
-    reason = "public names retain established OOXML facade terminology"
-)]
-#![expect(
     clippy::shadow_reuse,
     reason = "parser bindings are intentionally refined after validation"
 )]
@@ -33,54 +29,54 @@ use litchi_core::xml::escape_xml;
 use std::fmt::Write as FmtWrite;
 
 // Import shared format types
-pub use super::super::format::{LineSpacing, ParagraphAlignment};
+pub(crate) use super::super::format::{LineSpacing, ParagraphAlignment};
 // Import other writer types
-use super::bookmark::MutableBookmark;
-use super::field::MutableField;
-use super::hyperlink::MutableHyperlink;
-use super::image::MutableInlineImage;
-use super::ole_object::MutableOleObject;
+use super::bookmark::Bookmark;
+use super::field::Field;
+use super::hyperlink::Hyperlink;
+use super::image::InlineImage;
+use super::ole_object::OleObject;
 use super::revision::{
-    ConflictKind, MutableConflict, MutableCustomXmlConflictRange, MutableRevision,
-    ParagraphPropertyChange, RevisionKind, RevisionMetadata, RevisionTextMode,
+    Conflict, ConflictKind, CustomXmlConflictRange, ParagraphPropertyChange, Revision,
+    RevisionKind, RevisionMetadata, RevisionTextMode,
 };
-use super::run::MutableRun;
+use super::run::Run;
 use super::section::SectionProperties;
-use super::smart_tag::MutableSmartTag;
-use super::smartart::MutableSmartArt;
-use super::textbox::MutableTextBox;
-use super::vml_shape::MutableVmlShape;
+use super::smart_tag::SmartTag;
+use super::smartart::SmartArt;
+use super::textbox::TextBox;
+use super::vml_shape::VmlShape;
 
 /// Elements that can appear in a paragraph.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum ParagraphElement {
-    Run(MutableRun),
+    Run(Run),
     /// Display `<m:oMathPara>` content directly inside the paragraph.
     DisplayOfficeMath(OfficeMathParagraph),
-    Hyperlink(MutableHyperlink),
-    InlineImage(MutableInlineImage),
+    Hyperlink(Hyperlink),
+    InlineImage(InlineImage),
     /// Inline `DrawingML` text box (wordprocessing shape).
-    TextBox(MutableTextBox),
+    TextBox(TextBox),
     /// Embedded OLE/package object (`w:object` with `o:OLEObject`).
-    OleObject(MutableOleObject),
+    OleObject(OleObject),
     /// `SmartArt` (`DrawingML` diagram) anchor with `dgm:relIds`.
-    SmartArt(MutableSmartArt),
+    SmartArt(SmartArt),
     /// Legacy VML shape (`w:pict` with `v:rect`/`v:oval`/…).
-    VmlShape(MutableVmlShape),
+    VmlShape(VmlShape),
     /// Bookmark start marker
-    BookmarkStart(MutableBookmark),
+    BookmarkStart(Bookmark),
     /// Bookmark end marker (ID only)
     BookmarkEnd(u32),
     /// Field
-    Field(MutableField),
+    Field(Field),
     /// Run-level smart tag.
-    SmartTag(MutableSmartTag),
+    SmartTag(SmartTag),
     /// Typed tracked-change wrapper.
-    Revision(MutableRevision),
+    Revision(Revision),
     /// Word 2010 co-authoring conflict wrapper.
-    Conflict(MutableConflict),
+    Conflict(Conflict),
     /// Atomic Word 2010 custom-XML conflict range marker pair.
-    CustomXmlConflictRange(MutableCustomXmlConflictRange),
+    CustomXmlConflictRange(CustomXmlConflictRange),
 }
 
 impl ParagraphElement {
@@ -365,8 +361,8 @@ impl ParagraphElement {
 }
 
 /// A mutable paragraph in a document.
-#[derive(Debug)]
-pub struct MutableParagraph {
+#[derive(Debug, Clone)]
+pub struct Paragraph {
     /// Elements (runs and hyperlinks) in this paragraph
     pub(crate) elements: Vec<ParagraphElement>,
     /// Paragraph style ID
@@ -380,7 +376,7 @@ pub struct MutableParagraph {
     pub(crate) property_change: Option<ParagraphPropertyChange>,
 }
 
-impl MutableParagraph {
+impl Paragraph {
     pub(crate) fn new() -> Self {
         Self {
             elements: Vec::new(),
@@ -397,8 +393,8 @@ impl MutableParagraph {
     /// # Panics
     ///
     /// Panics if an internal writer invariant is violated.
-    pub fn add_run(&mut self) -> &mut MutableRun {
-        self.elements.push(ParagraphElement::Run(MutableRun::new()));
+    pub fn add_run(&mut self) -> &mut Run {
+        self.elements.push(ParagraphElement::Run(Run::new()));
         match self.elements.last_mut().unwrap() {
             ParagraphElement::Run(r) => r,
             ParagraphElement::DisplayOfficeMath(_)
@@ -419,7 +415,7 @@ impl MutableParagraph {
     }
 
     /// Add a run with text.
-    pub fn add_run_with_text(&mut self, text: &str) -> &mut MutableRun {
+    pub fn add_run_with_text(&mut self, text: &str) -> &mut Run {
         let run = self.add_run();
         run.set_text(text);
         run
@@ -489,10 +485,10 @@ impl MutableParagraph {
     /// # Panics
     ///
     /// Panics if an internal writer invariant is violated.
-    pub fn add_hyperlink(&mut self, url: &str, text: &str) -> &mut MutableHyperlink {
+    pub fn add_hyperlink(&mut self, url: &str, text: &str) -> &mut Hyperlink {
         self.elements
-            .push(ParagraphElement::Hyperlink(MutableHyperlink::new(
-                url.to_string(),  // URL first (matches MutableHyperlink::new signature)
+            .push(ParagraphElement::Hyperlink(Hyperlink::new(
+                url.to_string(),  // URL first (matches Hyperlink::new signature)
                 text.to_string(), // Text second
             )));
         match self.elements.last_mut().unwrap() {
@@ -528,10 +524,10 @@ impl MutableParagraph {
         image_path: &str,
         width_emu: Option<i64>,
         height_emu: Option<i64>,
-    ) -> Result<&mut MutableInlineImage> {
+    ) -> Result<&mut InlineImage> {
         use std::fs;
         let data = fs::read(image_path).map_err(Error::Io)?;
-        let image = MutableInlineImage::from_bytes(data, width_emu, height_emu)?;
+        let image = InlineImage::from_bytes(data, width_emu, height_emu)?;
         self.elements.push(ParagraphElement::InlineImage(image));
         match self.elements.last_mut().unwrap() {
             ParagraphElement::InlineImage(img) => Ok(img),
@@ -566,8 +562,8 @@ impl MutableParagraph {
         data: Vec<u8>,
         width_emu: Option<i64>,
         height_emu: Option<i64>,
-    ) -> Result<&mut MutableInlineImage> {
-        let image = MutableInlineImage::from_bytes(data, width_emu, height_emu)?;
+    ) -> Result<&mut InlineImage> {
+        let image = InlineImage::from_bytes(data, width_emu, height_emu)?;
         self.elements.push(ParagraphElement::InlineImage(image));
         match self.elements.last_mut().unwrap() {
             ParagraphElement::InlineImage(img) => Ok(img),
@@ -597,7 +593,7 @@ impl MutableParagraph {
     /// # Panics
     ///
     /// Panics if an internal writer invariant is violated.
-    pub fn add_text_box(&mut self, text_box: MutableTextBox) -> &mut MutableTextBox {
+    pub fn add_text_box(&mut self, text_box: TextBox) -> &mut TextBox {
         self.elements.push(ParagraphElement::TextBox(text_box));
         match self.elements.last_mut().unwrap() {
             ParagraphElement::TextBox(text_box) => text_box,
@@ -621,9 +617,9 @@ impl MutableParagraph {
     /// Add an embedded OLE/package object to the paragraph.
     ///
     /// Crate-internal: public embedding goes through
-    /// [`crate::writer::MutableDocument::add_ole_object`], which assigns
+    /// [`crate::builder::Document::add_ole_object`], which assigns
     /// and validates the shape identity first.
-    pub(crate) fn add_ole_object(&mut self, object: MutableOleObject) -> &mut MutableOleObject {
+    pub(crate) fn add_ole_object(&mut self, object: OleObject) -> &mut OleObject {
         self.elements.push(ParagraphElement::OleObject(object));
         match self.elements.last_mut().unwrap() {
             ParagraphElement::OleObject(object) => object,
@@ -647,9 +643,9 @@ impl MutableParagraph {
     /// Add a `SmartArt` (`DrawingML` diagram) anchor to the paragraph.
     ///
     /// Crate-internal: public authoring goes through
-    /// [`crate::writer::MutableDocument::add_smart_art`], which assigns
+    /// [`crate::builder::Document::add_smart_art`], which assigns
     /// the anchor key first.
-    pub(crate) fn add_smart_art(&mut self, smartart: MutableSmartArt) -> &mut MutableSmartArt {
+    pub(crate) fn add_smart_art(&mut self, smartart: SmartArt) -> &mut SmartArt {
         self.elements.push(ParagraphElement::SmartArt(smartart));
         match self.elements.last_mut().unwrap() {
             ParagraphElement::SmartArt(smartart) => smartart,
@@ -673,9 +669,9 @@ impl MutableParagraph {
     /// Add a legacy VML shape to the paragraph.
     ///
     /// Crate-internal: public authoring goes through
-    /// [`crate::writer::MutableDocument::add_vml_shape`], which assigns
+    /// [`crate::builder::Document::add_vml_shape`], which assigns
     /// the shape identity first.
-    pub(crate) fn add_vml_shape(&mut self, shape: MutableVmlShape) -> &mut MutableVmlShape {
+    pub(crate) fn add_vml_shape(&mut self, shape: VmlShape) -> &mut VmlShape {
         self.elements.push(ParagraphElement::VmlShape(shape));
         match self.elements.last_mut().unwrap() {
             ParagraphElement::VmlShape(shape) => shape,
@@ -714,7 +710,7 @@ impl MutableParagraph {
     /// para.add_bookmark_end(1);
     /// ```
     pub fn add_bookmark_start(&mut self, id: u32, name: &str) {
-        let bookmark = MutableBookmark::new(id, name.to_string());
+        let bookmark = Bookmark::new(id, name.to_string());
         self.elements
             .push(ParagraphElement::BookmarkStart(bookmark));
     }
@@ -738,22 +734,22 @@ impl MutableParagraph {
     ///
     /// ```rust,ignore
     /// // Add a page number field
-    /// para.add_field(MutableField::page());
+    /// para.add_field(Field::page());
     ///
     /// // Add a date field
-    /// para.add_field(MutableField::date(Some("MMMM d, yyyy")));
+    /// para.add_field(Field::date(Some("MMMM d, yyyy")));
     ///
     /// // Add a cross-reference field
-    /// para.add_field(MutableField::reference("MyBookmark"));
+    /// para.add_field(Field::reference("MyBookmark"));
     /// ```
-    pub fn add_field(&mut self, field: MutableField) {
+    pub fn add_field(&mut self, field: Field) {
         self.elements.push(ParagraphElement::Field(field));
     }
 
     /// Add a run-level smart tag to this paragraph.
-    pub fn add_smart_tag(&mut self, element: impl Into<String>) -> &mut MutableSmartTag {
+    pub fn add_smart_tag(&mut self, element: impl Into<String>) -> &mut SmartTag {
         self.elements
-            .push(ParagraphElement::SmartTag(MutableSmartTag::new(element)));
+            .push(ParagraphElement::SmartTag(SmartTag::new(element)));
         match self.elements.last_mut() {
             Some(ParagraphElement::SmartTag(tag)) => tag,
             _ => unreachable!(),
@@ -765,11 +761,9 @@ impl MutableParagraph {
         &mut self,
         kind: RevisionKind,
         metadata: RevisionMetadata,
-    ) -> &mut MutableRevision {
+    ) -> &mut Revision {
         self.elements
-            .push(ParagraphElement::Revision(MutableRevision::new(
-                kind, metadata,
-            )));
+            .push(ParagraphElement::Revision(Revision::new(kind, metadata)));
         match self.elements.last_mut() {
             Some(ParagraphElement::Revision(revision)) => revision,
             _ => unreachable!(),
@@ -785,8 +779,8 @@ impl MutableParagraph {
         &mut self,
         kind: ConflictKind,
         metadata: ConflictMetadata,
-    ) -> Result<&mut MutableConflict> {
-        let conflict = MutableConflict::new(kind, metadata)?;
+    ) -> Result<&mut Conflict> {
+        let conflict = Conflict::new(kind, metadata)?;
         self.elements.push(ParagraphElement::Conflict(conflict));
         match self.elements.last_mut() {
             Some(ParagraphElement::Conflict(conflict)) => Ok(conflict),
@@ -806,8 +800,8 @@ impl MutableParagraph {
         &mut self,
         kind: ConflictKind,
         metadata: ConflictMetadata,
-    ) -> Result<&mut MutableCustomXmlConflictRange> {
-        let range = MutableCustomXmlConflictRange::new(kind, metadata)?;
+    ) -> Result<&mut CustomXmlConflictRange> {
+        let range = CustomXmlConflictRange::new(kind, metadata)?;
         self.elements
             .push(ParagraphElement::CustomXmlConflictRange(range));
         match self.elements.last_mut() {
@@ -820,7 +814,7 @@ impl MutableParagraph {
     pub fn set_property_change(
         &mut self,
         metadata: RevisionMetadata,
-        previous: &MutableParagraph,
+        previous: &Paragraph,
     ) -> &mut Self {
         self.property_change = Some(ParagraphPropertyChange::snapshot(metadata, previous));
         self
@@ -1456,13 +1450,13 @@ pub enum ListType {
 
 #[cfg(test)]
 mod tests {
-    use super::MutableParagraph;
+    use super::Paragraph;
     use crate::writer::relmap::RelationshipMapper;
-    use crate::{OfficeMath, Paragraph};
+    use crate::{OfficeMath, Paragraph as ReadParagraph};
 
     #[test]
     fn writes_paragraph_division_id_for_reader_round_trip() {
-        let mut paragraph = MutableParagraph::new();
+        let mut paragraph = Paragraph::new();
         paragraph
             .set_division_id("+123456789012345678901234567890")
             .unwrap();
@@ -1485,7 +1479,7 @@ mod tests {
             .unwrap();
         assert_eq!(relationship_xml, xml);
 
-        let parsed = Paragraph::new(xml.into_bytes());
+        let parsed = ReadParagraph::new(xml.into_bytes());
         assert_eq!(
             parsed.division_id().unwrap().as_deref(),
             Some("+123456789012345678901234567890")
@@ -1499,7 +1493,7 @@ mod tests {
 
     #[test]
     fn rejects_invalid_paragraph_division_id() {
-        let mut paragraph = MutableParagraph::new();
+        let mut paragraph = Paragraph::new();
         assert!(paragraph.set_division_id("12.5").is_err());
         assert_eq!(paragraph.division_id(), None);
     }
@@ -1508,7 +1502,7 @@ mod tests {
     fn writes_and_reopens_inline_and_display_office_math() {
         let inline = OfficeMath::text("x + y");
         let display = OfficeMath::from_xml("<m:oMath><m:r><m:t>z</m:t></m:r></m:oMath>").unwrap();
-        let mut paragraph = MutableParagraph::new();
+        let mut paragraph = Paragraph::new();
         paragraph.add_run_with_text("before ");
         paragraph.add_inline_office_math(inline.clone());
         paragraph.add_run_with_text(" after");
@@ -1519,7 +1513,7 @@ mod tests {
         assert!(xml.contains("<w:r><m:oMath"));
         assert!(xml.contains("<m:oMathPara"));
 
-        let parsed = Paragraph::new(xml.into_bytes());
+        let parsed = ReadParagraph::new(xml.into_bytes());
         assert_eq!(parsed.inline_office_math().unwrap(), vec![inline]);
         assert_eq!(parsed.display_office_math().unwrap(), vec![display]);
 

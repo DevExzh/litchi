@@ -253,13 +253,17 @@ impl<'a> Placeholder<'a> {
         let (placeholder_type, size, index) = if container.raw_data.is_empty() {
             (PlaceholderType::Body, None, None)
         } else {
-            let (record, consumed) = litchi_odraw::Record::parse(&container.raw_data, 0)?;
+            let (record, consumed) = litchi_odraw::Record::parse(
+                &container.raw_data,
+                0,
+                litchi_odraw::Limits::default(),
+            )?;
             if consumed != container.raw_data.len() {
                 return Err(super::super::package::Error::Corrupted(
                     "placeholder container has trailing OfficeArt records".to_owned(),
                 ));
             }
-            let shape = litchi_odraw::shape::Shape::try_from(record)?;
+            let shape = litchi_odraw::shape::Shape::from_record(record, Default::default())?;
             match shape.placeholder()? {
                 Some(info) => (
                     PlaceholderType::from(info.kind),
@@ -410,6 +414,10 @@ impl<'a> Placeholder<'a> {
     pub(crate) fn mark_source_bound(&mut self) {
         self.container.mark_source_bound();
     }
+
+    pub(crate) fn apply_source_identity(&mut self, identity: super::shape::SourceIdentity) {
+        self.container.apply_source_identity(identity);
+    }
 }
 
 impl<'a> Shape for Placeholder<'a>
@@ -433,10 +441,6 @@ where
             .text_content
             .as_ref()
             .is_some_and(|text| !text.is_empty())
-    }
-
-    fn clone_box(&self) -> Box<dyn Shape> {
-        Box::new(self.clone())
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

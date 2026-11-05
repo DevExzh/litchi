@@ -7,7 +7,7 @@ use super::super::shape_style::{
 };
 use super::super::text_format::Paragraph;
 use super::model::{
-    ShapeProperties, ShapeType, TextAlignment, WritableShape, WritableSlide, WriteError, Writer,
+    Builder, ShapeProperties, ShapeType, TextAlignment, WritableShape, WritableSlide, WriteError,
 };
 use std::collections::{BTreeMap, HashMap};
 
@@ -166,6 +166,7 @@ fn shape_type_to_escher(shape_type: ShapeType) -> u16 {
         ShapeType::Rectangle | ShapeType::Placeholder => escher_shape_type::RECTANGLE,
         ShapeType::TextBox => escher_shape_type::TEXT_BOX,
         ShapeType::Line => escher_shape_type::LINE,
+        ShapeType::Connector => 32, // STRAIGHT_CONNECTOR_1
         ShapeType::Ellipse => escher_shape_type::ELLIPSE,
         ShapeType::RoundRectangle => escher_shape_type::ROUND_RECTANGLE,
         ShapeType::Diamond => escher_shape_type::DIAMOND,
@@ -486,7 +487,7 @@ pub(super) fn interaction_for_hyperlink(
 /// - Pictures/images
 /// - Hyperlinks
 /// - Speaker notes
-impl Writer {
+impl Builder {
     pub(super) fn build_docinfo_list(
         &self,
         vba_persist_id: Option<u32>,

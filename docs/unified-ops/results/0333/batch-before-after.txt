@@ -1,0 +1,10 @@
+# One atomic File::batch of N `set /slide[1]/shape[i]/paragraph[1]/run[1]
+# {bold, size 20pt, color 1F4E79}` on a one-slide deck of N text boxes;
+# median of 5, release, taskset -c 7. base = d761892de3 (per-item sets),
+# new = record 0333 (coalesced). batch_time.rs (batch-time.rs.txt).
+base eager n=100 median_ms=195.48 source n=100 median_ms=195.82
+new  eager n=100 median_ms=2.00   source n=100 median_ms=2.77
+base eager n=300 median_ms=1519.39 source n=300 median_ms=1739.62
+new  eager n=300 median_ms=5.32   source n=300 median_ms=8.29
+base n=1000: refused, limit_exceeded (snapshot bytes of 1,000 separate steps)
+new  eager n=1000 median_ms=16.57 source n=1000 median_ms=27.90

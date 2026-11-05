@@ -11,7 +11,7 @@
 //! - After-effects (`DimToColor`)
 //! - Speed and direction variations
 
-use litchi_ppt::Writer;
+use litchi_ppt::Builder;
 use litchi_ppt::animation::{
     AfterEffect, AnimationEffect, AnimationInfo, AnimationSound, AnimationTrigger, BuildInfo,
     BuildLevel, BuildType, BuiltinSound, EffectDirection, EffectSpeed, IterationType,
@@ -21,8 +21,11 @@ use std::error::Error;
 fn main() -> Result<(), Box<dyn Error>> {
     println!("Creating PPT with new animation features...");
 
-    let mut writer = Writer::new();
-    writer.set_property("Title", "New Animation Features Demo");
+    let mut writer = Builder::new();
+    writer.set_metadata(litchi_core::Metadata {
+        title: Some("New Animation Features Demo".to_owned()),
+        ..litchi_core::Metadata::default()
+    })?;
 
     // Slide 1: New Entrance Effects with Sounds
     let slide1 = writer.add_slide()?;
@@ -184,7 +187,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("Slide 2 created with 4 animated shapes");
 
     // Save the presentation
-    writer.save("output/ppt_new_animation_features.ppt")?;
+    writer
+        .build()?
+        .save("output/ppt_new_animation_features.ppt")?;
 
     println!("\n✅ Created: output/ppt_new_animation_features.ppt");
     println!("\nThis file demonstrates new animation features:");

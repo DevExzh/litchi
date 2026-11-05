@@ -13,7 +13,7 @@
 
 use crate::package::error::{Error, Result};
 use crate::package::table::model::{Column, Formula, StyleInfo, Table};
-use crate::raw::Writer;
+use crate::raw::Encoder;
 use crate::raw::kind as rt;
 
 /// `DXFId` value meaning no differential formatting (MS-XLSB 2.5.38).
@@ -40,10 +40,10 @@ const FORMULA_ARRAY: u8 = 1 << 1;
 /// Leading blank field of `BrtList14` (MS-XLSB 2.4.705).
 const FRT_BLANK_LEN: usize = 4;
 
-fn malformed(context: &str, detail: impl Into<String>) -> Error {
+fn malformed(context: &'static str, detail: &'static str) -> Error {
     Error::Unrecognized {
-        typ: context.to_string(),
-        val: detail.into(),
+        typ: context,
+        val: detail,
     }
 }
 
@@ -165,7 +165,7 @@ fn style_client_payload(style: &StyleInfo) -> Vec<u8> {
 /// Serialize one table into its complete table-part stream.
 pub(crate) fn write_table_part(table: &Table) -> Result<Vec<u8>> {
     let mut data = Vec::with_capacity(256);
-    let mut writer = Writer::new(&mut data);
+    let mut writer = Encoder::new(&mut data, crate::raw::Limits::DEFAULT);
     writer.write_record(rt::BEGIN_LIST, &list_payload(table))?;
 
     if !table.columns.is_empty() {
@@ -202,7 +202,7 @@ pub(crate) fn write_table_part(table: &Table) -> Result<Vec<u8>> {
 
 /// Serialize a worksheet's `BrtBeginListParts` collection (MS-XLSB 2.4.103).
 pub(crate) fn write_list_parts<W: std::io::Write>(
-    writer: &mut Writer<W>,
+    writer: &mut Encoder<W>,
     rel_ids: &[String],
 ) -> Result<()> {
     let declared = u32::try_from(rel_ids.len())
@@ -283,7 +283,7 @@ mod tests {
     fn serialized_table_round_trips_through_the_reader() {
         let table = sample_table();
         let bytes = write_table_part(&table).unwrap();
-        let parsed = parse_table_part(&bytes).unwrap();
+        let parsed = parse_table_part(&bytes, crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(parsed, table);
     }
 
@@ -302,7 +302,7 @@ mod tests {
             ..Table::default()
         };
         let bytes = write_table_part(&table).unwrap();
-        let parsed = parse_table_part(&bytes).unwrap();
+        let parsed = parse_table_part(&bytes, crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(parsed, table);
     }
 
@@ -310,7 +310,7 @@ mod tests {
     fn serialized_list_parts_round_trip_through_rel_id_reader() {
         // Wrap in a worksheet-shaped stream: sheet begin, list parts, sheet end.
         let mut stream = Vec::new();
-        let mut writer = Writer::new(&mut stream);
+        let mut writer = Encoder::new(&mut stream, crate::raw::Limits::DEFAULT);
         writer.write_record(rt::BEGIN_SHEET, &[]).unwrap();
         writer
             .write_record(rt::BEGIN_LIST_PARTS, &2u32.to_le_bytes())
@@ -322,7 +322,9 @@ mod tests {
         }
         writer.write_record(rt::END_LIST_PARTS, &[]).unwrap();
         writer.write_record(rt::END_SHEET, &[]).unwrap();
-        let rel_ids = crate::package::table::parse_table_part_rel_ids(&stream).unwrap();
+        let rel_ids =
+            crate::package::table::parse_table_part_rel_ids(&stream, crate::raw::Limits::DEFAULT)
+                .unwrap();
         assert_eq!(rel_ids, ["rId5", "rId9"]);
     }
 }

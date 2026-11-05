@@ -8,9 +8,9 @@ mod validation;
 mod tests;
 
 pub use model::{Conformance, Def, Id, Link, List, Parts};
-pub use validation::{conformance, link, load, present, put, remove};
-
-use crate::Error;
+pub use validation::{conformance, link, load, present};
+mod edit;
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 
 const A: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
 const AS: &str = "http://purl.oclc.org/ooxml/drawingml/main";
@@ -43,8 +43,12 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-fn limit(resource: &'static str, limit: usize) -> Error {
-    Error::Limit { resource, limit }
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }
 
 fn allocation(resource: &'static str, source: std::collections::TryReserveError) -> Error {
@@ -56,3 +60,4 @@ fn allocation(resource: &'static str, source: std::collections::TryReserveError)
 pub fn default_xml() -> &'static str {
     DEFAULT_XML
 }
+pub(crate) use validation::{put, remove};

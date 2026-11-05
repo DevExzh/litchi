@@ -15,7 +15,7 @@ use litchi_numbers::cell::{
     data_format::custom::{Custom, Name, Number as CustomNumber, NumberPattern},
 };
 use litchi_numbers::table::cells::Storage;
-use litchi_numbers::{CellPosition, Package};
+use litchi_numbers::{At, Package};
 
 #[path = "support/table_cell_data_format_fixture.rs"]
 mod fixture;
@@ -52,12 +52,12 @@ fn retirement_cleared_fixture_path() -> PathBuf {
         .join("../../test-data/iwork/numbers/custom-retirement-cleared.numbers")
 }
 
-fn position() -> CellPosition {
-    CellPosition::new(1, 1)
+fn position() -> At {
+    At::new(1, 1)
 }
 
-fn marker_position() -> CellPosition {
-    CellPosition::new(1, 2)
+fn marker_position() -> At {
+    At::new(1, 2)
 }
 
 fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
@@ -104,8 +104,8 @@ fn assert_number(package: &Package, expected: &CustomNumber) -> TestResult {
 }
 
 fn assert_exact_locality(source: &[u8], target: &[u8]) -> TestResult {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     let mut changed = Vec::new();
     for entry in before.iter() {
         let candidate = after
@@ -160,12 +160,15 @@ fn rewrite_document_root(source: &[u8], corruption: RouteCorruption) -> TestResu
 }
 
 fn corrupt_document_route(source: &[u8], corruption: RouteCorruption) -> TestResult<Vec<u8>> {
-    let root = WireView::parse(source)?;
+    let root = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)?;
     let super_field = root
         .fields()
         .find(|field| field.number() == DOCUMENT_SUPER_FIELD)
         .ok_or_else(|| io::Error::other("native TSA super envelope is missing"))?;
-    let tsa = WireView::parse(super_field.payload())?;
+    let tsa = WireView::parse(
+        super_field.payload(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let registry = tsa
         .fields()
         .find(|field| field.number() == TSA_REGISTRY_FIELD)
@@ -178,6 +181,7 @@ fn corrupt_document_route(source: &[u8], corruption: RouteCorruption) -> TestRes
                 &mut tsa_payload,
                 TSA_REGISTRY_FIELD,
                 registry.payload(),
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
             Ok(patch_length_delimited_field(
                 source,
@@ -192,6 +196,7 @@ fn corrupt_document_route(source: &[u8], corruption: RouteCorruption) -> TestRes
                 &mut root_payload,
                 DOCUMENT_SUPER_FIELD,
                 super_field.payload(),
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
             Ok(root_payload)
         },
@@ -201,6 +206,7 @@ fn corrupt_document_route(source: &[u8], corruption: RouteCorruption) -> TestRes
                 &mut root_payload,
                 DOCUMENT_REGISTRY_FIELD,
                 registry.payload(),
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
             Ok(root_payload)
         },

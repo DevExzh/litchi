@@ -6,7 +6,7 @@
 )]
 
 use litchi_cfb::OleFile;
-use litchi_ograph::chart::{Chart, Context, Kind, Refs};
+use litchi_ograph::chart::{Context, Kind, Model, Refs};
 use std::io::Cursor;
 use std::path::PathBuf;
 
@@ -16,12 +16,13 @@ fn workbook_fixture(name: &str) -> Vec<u8> {
         .join(name);
     let source = std::fs::read(&path)
         .unwrap_or_else(|error| panic!("{} must remain readable: {error}", path.display()));
-    let mut ole = OleFile::open(Cursor::new(source)).unwrap_or_else(|error| {
-        panic!(
-            "{} must remain a valid CFB workbook: {error}",
-            path.display()
-        )
-    });
+    let mut ole = OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default())
+        .unwrap_or_else(|error| {
+            panic!(
+                "{} must remain a valid CFB workbook: {error}",
+                path.display()
+            )
+        });
     ole.open_stream(&["Workbook"])
         .unwrap_or_else(|error| panic!("{} must contain Workbook: {error}", path.display()))
 }
@@ -30,7 +31,7 @@ fn workbook_fixture(name: &str) -> Vec<u8> {
 fn discovers_and_replays_chart_substreams_from_real_excel_workbooks() {
     for name in ["SimpleChart.xls", "WithThreeCharts.xls"] {
         let workbook = workbook_fixture(name);
-        let charts = Refs::open_workbook(&workbook)
+        let charts = Refs::open_workbook(&workbook, litchi_ograph::Limits::default())
             .expect("real XLS workbook framing must be valid")
             .collect::<Result<Vec<_>, _>>()
             .unwrap_or_else(|error| panic!("{name} chart discovery failed: {error}"));
@@ -41,7 +42,7 @@ fn discovers_and_replays_chart_substreams_from_real_excel_workbooks() {
 
         for chart in charts {
             assert_eq!(chart.kind(), Kind::Excel, "{name}");
-            let parsed = Chart::parse(chart, Context::excel())
+            let parsed = Model::parse(chart, Context::excel())
                 .unwrap_or_else(|error| panic!("{name} semantic chart parse failed: {error}"));
             let replayed = parsed
                 .encode()

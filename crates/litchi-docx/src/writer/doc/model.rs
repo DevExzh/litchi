@@ -27,16 +27,16 @@ use std::fmt::Write as FmtWrite;
 // Import shared format types
 use super::super::super::format::ImageFormat;
 // Import from other writer modules
-use super::super::comment::{Date as CommentDate, MutableComment};
+use super::super::comment::{Comment, Date as CommentDate};
 use super::super::note::Note;
-use super::super::ole_object::MutableOleObject;
-use super::super::paragraph::{MutableParagraph, ParagraphElement};
+use super::super::ole_object::OleObject;
+use super::super::paragraph::{Paragraph, ParagraphElement};
 use super::super::section::SectionProperties;
-use super::super::smartart::{MAX_SMART_ARTS, MutableSmartArt};
-use super::super::table::MutableTable;
-use super::super::theme::MutableTheme;
+use super::super::smartart::{MAX_SMART_ARTS, SmartArt};
+use super::super::table::Table;
+use super::super::theme::Theme;
 use super::super::toc::TableOfContents;
-use super::super::vml_shape::MutableVmlShape;
+use super::super::vml_shape::VmlShape;
 use super::super::watermark::{ImageWatermark, Watermark};
 use std::collections::HashSet;
 // Import settings types
@@ -53,19 +53,20 @@ use super::package::{
 ///
 /// Provides methods to add and modify document content including paragraphs,
 /// runs, tables, sections, and other elements.
-pub struct MutableDocument {
+#[derive(Clone)]
+pub struct Document {
     /// Document body content (paragraphs, tables, etc.)
     pub(crate) body: DocumentBody,
     /// Header content (optional)
-    header: Option<Vec<MutableParagraph>>,
+    header: Option<Vec<Paragraph>>,
     /// Footer content (optional)
-    footer: Option<Vec<MutableParagraph>>,
+    footer: Option<Vec<Paragraph>>,
     /// Footnotes (ID -> Note)
     footnotes: Vec<Note>,
     /// Endnotes (ID -> Note)
     endnotes: Vec<Note>,
     /// Comments (ID -> Comment)
-    comments: Vec<MutableComment>,
+    comments: Vec<Comment>,
     /// Document protection settings
     protection: Option<Protection>,
     /// Whether document protection was explicitly changed.
@@ -73,7 +74,7 @@ pub struct MutableDocument {
     /// Section properties (page setup, margins, orientation)
     pub(super) section: SectionProperties,
     /// Theme (optional)
-    theme: Option<MutableTheme>,
+    theme: Option<Theme>,
     /// Watermark (optional)
     pub(crate) watermark: Option<Watermark>,
     /// Image watermark (optional)
@@ -118,12 +119,12 @@ pub struct Protection {
 }
 
 #[cfg(feature = "fonts")]
-use super::super::smart_tag::MutableSmartTag;
+use super::super::smart_tag::SmartTag;
 #[cfg(feature = "fonts")]
 use litchi_fonts::{CollectGlyphs, GlyphMap};
 
 #[cfg(feature = "fonts")]
-impl CollectGlyphs for MutableDocument {
+impl CollectGlyphs for Document {
     fn collect_glyphs(&self) -> GlyphMap {
         let mut glyphs = GlyphMap::new();
 
@@ -175,7 +176,7 @@ impl CollectGlyphs for MutableDocument {
 }
 
 #[cfg(feature = "fonts")]
-impl CollectGlyphs for MutableParagraph {
+impl CollectGlyphs for Paragraph {
     fn collect_glyphs(&self) -> GlyphMap {
         let mut glyphs = GlyphMap::new();
         for element in &self.elements {
@@ -205,7 +206,7 @@ impl CollectGlyphs for MutableParagraph {
 }
 
 #[cfg(feature = "fonts")]
-impl CollectGlyphs for MutableSmartTag {
+impl CollectGlyphs for SmartTag {
     fn collect_glyphs(&self) -> GlyphMap {
         let mut glyphs = GlyphMap::new();
         for element in &self.elements {
@@ -235,7 +236,7 @@ impl CollectGlyphs for MutableSmartTag {
 }
 
 #[cfg(feature = "fonts")]
-impl CollectGlyphs for MutableTable {
+impl CollectGlyphs for Table {
     fn collect_glyphs(&self) -> GlyphMap {
         let mut glyphs = GlyphMap::new();
         for row in &self.rows {
@@ -251,7 +252,7 @@ impl CollectGlyphs for MutableTable {
     }
 }
 
-impl MutableDocument {
+impl Document {
     /// Create a new empty mutable document.
     #[must_use]
     pub fn new() -> Self {
@@ -441,20 +442,20 @@ impl MutableDocument {
     }
 
     /// Add a new paragraph to the end of the document.
-    pub fn add_paragraph(&mut self) -> &mut MutableParagraph {
+    pub fn add_paragraph(&mut self) -> &mut Paragraph {
         self.modified = true;
         self.body.add_paragraph()
     }
 
     /// Add a paragraph with text.
-    pub fn add_paragraph_with_text(&mut self, text: &str) -> &mut MutableParagraph {
+    pub fn add_paragraph_with_text(&mut self, text: &str) -> &mut Paragraph {
         let para = self.add_paragraph();
         para.add_run_with_text(text);
         para
     }
 
     /// Add a paragraph containing one display Office Math equation.
-    pub fn add_display_office_math(&mut self, equation: OfficeMath) -> &mut MutableParagraph {
+    pub fn add_display_office_math(&mut self, equation: OfficeMath) -> &mut Paragraph {
         let paragraph = self.add_paragraph();
         paragraph.add_display_office_math(equation);
         paragraph
@@ -468,7 +469,7 @@ impl MutableDocument {
     pub fn add_display_office_math_xml(
         &mut self,
         xml: impl Into<String>,
-    ) -> Result<&mut MutableParagraph> {
+    ) -> Result<&mut Paragraph> {
         let equation = OfficeMath::from_xml(xml)?;
         Ok(self.add_display_office_math(equation))
     }
@@ -478,7 +479,7 @@ impl MutableDocument {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn add_heading(&mut self, text: &str, level: u8) -> Result<&mut MutableParagraph> {
+    pub fn add_heading(&mut self, text: &str, level: u8) -> Result<&mut Paragraph> {
         if level > 9 {
             return Err(Error::InvalidFormat(
                 "Heading level must be 0-9".to_string(),
@@ -496,7 +497,7 @@ impl MutableDocument {
     }
 
     /// Add a table with specified rows and columns.
-    pub fn add_table(&mut self, rows: usize, cols: usize) -> &mut MutableTable {
+    pub fn add_table(&mut self, rows: usize, cols: usize) -> &mut Table {
         self.modified = true;
         self.body.add_table(rows, cols)
     }
@@ -508,8 +509,8 @@ impl MutableDocument {
     /// [`crate::Document::text_boxes`] inventory after save and reopen.
     pub fn add_text_box(
         &mut self,
-        text_box: super::super::textbox::MutableTextBox,
-    ) -> &mut super::super::textbox::MutableTextBox {
+        text_box: super::super::textbox::TextBox,
+    ) -> &mut super::super::textbox::TextBox {
         self.add_paragraph().add_text_box(text_box)
     }
 
@@ -525,10 +526,7 @@ impl MutableDocument {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn add_ole_object(
-        &mut self,
-        mut object: MutableOleObject,
-    ) -> Result<&mut MutableOleObject> {
+    pub fn add_ole_object(&mut self, mut object: OleObject) -> Result<&mut OleObject> {
         if object.shape_id.is_empty() {
             let mut number = self.next_ole_shape_number;
             let shape_id = loop {
@@ -593,7 +591,7 @@ impl MutableDocument {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn add_vml_shape(&mut self, mut shape: MutableVmlShape) -> Result<&mut MutableVmlShape> {
+    pub fn add_vml_shape(&mut self, mut shape: VmlShape) -> Result<&mut VmlShape> {
         if shape.id.is_empty() {
             let mut number = self.next_vml_shape_number;
             let id = loop {
@@ -631,7 +629,7 @@ impl MutableDocument {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn add_smart_art(&mut self, mut smartart: MutableSmartArt) -> Result<&mut MutableSmartArt> {
+    pub fn add_smart_art(&mut self, mut smartart: SmartArt) -> Result<&mut SmartArt> {
         if self.collect_smart_arts().len() >= MAX_SMART_ARTS {
             return Err(Error::InvalidFormat(format!(
                 "SmartArt count exceeds {MAX_SMART_ARTS}"
@@ -645,7 +643,7 @@ impl MutableDocument {
     }
 
     /// Add a page break.
-    pub fn add_page_break(&mut self) -> &mut MutableParagraph {
+    pub fn add_page_break(&mut self) -> &mut Paragraph {
         let para = self.add_paragraph();
         para.add_run().add_page_break();
         para
@@ -662,7 +660,7 @@ impl MutableDocument {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn insert_paragraph(&mut self, index: usize) -> Result<&mut MutableParagraph> {
+    pub fn insert_paragraph(&mut self, index: usize) -> Result<&mut Paragraph> {
         let (position, paragraph) = self.body.insert_paragraph(index)?;
         shift_toc_index_on_insert(&mut self.toc_config, position);
         self.modified = true;
@@ -679,12 +677,7 @@ impl MutableDocument {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn insert_table(
-        &mut self,
-        index: usize,
-        rows: usize,
-        cols: usize,
-    ) -> Result<&mut MutableTable> {
+    pub fn insert_table(&mut self, index: usize, rows: usize, cols: usize) -> Result<&mut Table> {
         let (position, table) = self.body.insert_table(index, rows, cols)?;
         shift_toc_index_on_insert(&mut self.toc_config, position);
         self.modified = true;
@@ -743,7 +736,7 @@ impl MutableDocument {
     /// # Panics
     ///
     /// Panics if an internal writer invariant is violated.
-    pub fn header(&mut self) -> &mut Vec<MutableParagraph> {
+    pub fn header(&mut self) -> &mut Vec<Paragraph> {
         if self.header.is_none() {
             self.header = Some(Vec::new());
             self.modified = true;
@@ -757,7 +750,7 @@ impl MutableDocument {
     /// # Panics
     ///
     /// Panics if an internal writer invariant is violated.
-    pub fn footer(&mut self) -> &mut Vec<MutableParagraph> {
+    pub fn footer(&mut self) -> &mut Vec<Paragraph> {
         if self.footer.is_none() {
             self.footer = Some(Vec::new());
             self.modified = true;
@@ -783,11 +776,11 @@ impl MutableDocument {
     /// # Panics
     ///
     /// Panics if an internal writer invariant is violated.
-    pub fn add_header_paragraph(&mut self) -> &mut MutableParagraph {
+    pub fn add_header_paragraph(&mut self) -> &mut Paragraph {
         if self.header.is_none() {
             self.header = Some(Vec::new());
         }
-        let para = MutableParagraph::new();
+        let para = Paragraph::new();
         self.header.as_mut().unwrap().push(para);
         self.modified = true;
         self.header.as_mut().unwrap().last_mut().unwrap()
@@ -798,11 +791,11 @@ impl MutableDocument {
     /// # Panics
     ///
     /// Panics if an internal writer invariant is violated.
-    pub fn add_footer_paragraph(&mut self) -> &mut MutableParagraph {
+    pub fn add_footer_paragraph(&mut self) -> &mut Paragraph {
         if self.footer.is_none() {
             self.footer = Some(Vec::new());
         }
-        let para = MutableParagraph::new();
+        let para = Paragraph::new();
         self.footer.as_mut().unwrap().push(para);
         self.modified = true;
         self.footer.as_mut().unwrap().last_mut().unwrap()
@@ -951,9 +944,9 @@ impl MutableDocument {
     /// let (comment_id, comment) = doc.add_comment("John Doe", "This needs revision");
     /// comment.set_initials(Some("JD".to_string()));
     /// ```
-    pub fn add_comment(&mut self, author: &str, text: &str) -> (u32, &mut MutableComment) {
-        let id = Self::next_note_id(self.comments.iter().map(MutableComment::id));
-        let comment = MutableComment::new(id, author.to_string(), text.to_string());
+    pub fn add_comment(&mut self, author: &str, text: &str) -> (u32, &mut Comment) {
+        let id = Self::next_note_id(self.comments.iter().map(Comment::id));
+        let comment = Comment::new(id, author.to_string(), text.to_string());
         self.push_comment(comment)
     }
 
@@ -963,13 +956,13 @@ impl MutableDocument {
         author: &str,
         text: &str,
         date: CommentDate,
-    ) -> (u32, &mut MutableComment) {
-        let id = Self::next_note_id(self.comments.iter().map(MutableComment::id));
-        let comment = MutableComment::new_with_date(id, author.to_string(), text.to_string(), date);
+    ) -> (u32, &mut Comment) {
+        let id = Self::next_note_id(self.comments.iter().map(Comment::id));
+        let comment = Comment::new_with_date(id, author.to_string(), text.to_string(), date);
         self.push_comment(comment)
     }
 
-    fn push_comment(&mut self, comment: MutableComment) -> (u32, &mut MutableComment) {
+    fn push_comment(&mut self, comment: Comment) -> (u32, &mut Comment) {
         let id = comment.id();
         let index = self.comments.len();
         self.comments.push(comment);
@@ -987,7 +980,7 @@ impl MutableDocument {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn remove_comment(&mut self, id: u32) -> Result<MutableComment> {
+    pub fn remove_comment(&mut self, id: u32) -> Result<Comment> {
         let index = self
             .comments
             .iter()
@@ -1093,24 +1086,24 @@ impl MutableDocument {
     /// # Examples
     ///
     /// ```rust,ignore
-    /// use litchi_docx::writer::MutableTheme;
+    /// use litchi_docx::writer::Theme;
     ///
-    /// let theme = MutableTheme::office_theme();
+    /// let theme = Theme::office_theme();
     /// doc.set_theme(theme);
     /// ```
-    pub fn set_theme(&mut self, theme: MutableTheme) {
+    pub fn set_theme(&mut self, theme: Theme) {
         self.theme = Some(theme);
         self.modified = true;
     }
 
     /// Get a reference to the document theme.
     #[must_use]
-    pub fn theme(&self) -> Option<&MutableTheme> {
+    pub fn theme(&self) -> Option<&Theme> {
         self.theme.as_ref()
     }
 
     /// Get a mutable reference to the document theme.
-    pub fn theme_mut(&mut self) -> Option<&mut MutableTheme> {
+    pub fn theme_mut(&mut self) -> Option<&mut Theme> {
         self.modified = true;
         self.theme.as_mut()
     }
@@ -1215,7 +1208,7 @@ impl MutableDocument {
     /// Generate and insert TOC entries.
     /// This is called automatically before serialization.
     pub(crate) fn generate_toc_if_needed(&mut self) -> Result<()> {
-        use super::super::field::MutableField;
+        use super::super::field::Field;
         use std::fmt::Write as FmtWrite;
 
         // Check if we have a TOC to generate
@@ -1277,25 +1270,25 @@ impl MutableDocument {
         let mut toc_paragraphs = Vec::new();
 
         // First paragraph: TOC field wrapper
-        let mut toc_field_para = MutableParagraph::new();
+        let mut toc_field_para = Paragraph::new();
         let instruction = toc.build_field_instruction();
         toc_field_para
             .elements
-            .push(ParagraphElement::Field(MutableField::begin()));
+            .push(ParagraphElement::Field(Field::begin()));
         toc_field_para
             .elements
-            .push(ParagraphElement::Field(MutableField::instruction_char(
+            .push(ParagraphElement::Field(Field::instruction_char(
                 instruction,
             )));
         toc_field_para
             .elements
-            .push(ParagraphElement::Field(MutableField::separate()));
+            .push(ParagraphElement::Field(Field::separate()));
 
         toc_paragraphs.push(toc_field_para);
 
         // Generate TOC entry paragraphs
         for (level, heading_text, bookmark_name) in heading_info {
-            let mut toc_entry = MutableParagraph::new();
+            let mut toc_entry = Paragraph::new();
 
             // Set TOC style
             toc_entry.style = Some(format!("TOC{level}"));
@@ -1320,14 +1313,14 @@ impl MutableDocument {
 
             // Add hyperlink with runs and PAGEREF field
             let mut hyperlink =
-                super::super::hyperlink::MutableHyperlink::new_anchor(bookmark_name.clone());
+                super::super::hyperlink::Hyperlink::new_anchor(bookmark_name.clone());
 
-            let mut text_run = super::super::run::MutableRun::new();
+            let mut text_run = super::super::run::Run::new();
             text_run.set_text(&heading_text);
             text_run.properties.no_proof = true;
             hyperlink.add_run(text_run);
 
-            let mut tab_run = super::super::run::MutableRun::new();
+            let mut tab_run = super::super::run::Run::new();
             tab_run.add_tab();
             tab_run.properties.no_proof = true;
             tab_run.properties.web_hidden = true;
@@ -1336,7 +1329,7 @@ impl MutableDocument {
             hyperlink
                 .elements
                 .push(super::super::hyperlink::HyperlinkElement::Field(
-                    MutableField::begin(),
+                    Field::begin(),
                 ));
 
             let mut pageref_instr = String::new();
@@ -1344,16 +1337,16 @@ impl MutableDocument {
             hyperlink
                 .elements
                 .push(super::super::hyperlink::HyperlinkElement::Field(
-                    MutableField::instruction_char(pageref_instr),
+                    Field::instruction_char(pageref_instr),
                 ));
 
             hyperlink
                 .elements
                 .push(super::super::hyperlink::HyperlinkElement::Field(
-                    MutableField::separate(),
+                    Field::separate(),
                 ));
 
-            let mut page_run = super::super::run::MutableRun::new();
+            let mut page_run = super::super::run::Run::new();
             page_run.set_text("1");
             page_run.properties.no_proof = true;
             page_run.properties.web_hidden = true;
@@ -1362,7 +1355,7 @@ impl MutableDocument {
             hyperlink
                 .elements
                 .push(super::super::hyperlink::HyperlinkElement::Field(
-                    MutableField::end(),
+                    Field::end(),
                 ));
 
             toc_entry
@@ -1375,7 +1368,7 @@ impl MutableDocument {
         if let Some(first_para) = toc_paragraphs.first_mut() {
             first_para
                 .elements
-                .push(ParagraphElement::Field(MutableField::end()));
+                .push(ParagraphElement::Field(Field::end()));
         }
 
         // Step 3: Insert TOC paragraphs at the recorded position
@@ -1432,7 +1425,7 @@ impl MutableDocument {
     }
 
     /// Collect all embedded OLE objects from the document in document order.
-    pub(crate) fn collect_ole_objects(&self) -> Vec<&MutableOleObject> {
+    pub(crate) fn collect_ole_objects(&self) -> Vec<&OleObject> {
         let mut objects = Vec::new();
 
         for element in &self.body.elements {
@@ -1449,7 +1442,7 @@ impl MutableDocument {
     }
 
     /// Collect all `SmartArt` diagrams from the document in document order.
-    pub(crate) fn collect_smart_arts(&self) -> Vec<&MutableSmartArt> {
+    pub(crate) fn collect_smart_arts(&self) -> Vec<&SmartArt> {
         let mut smartarts = Vec::new();
 
         for element in &self.body.elements {
@@ -1621,12 +1614,12 @@ impl MutableDocument {
     }
 
     /// Get a reference to a paragraph by index.
-    pub fn paragraph(&mut self, index: usize) -> Option<&mut MutableParagraph> {
+    pub fn paragraph(&mut self, index: usize) -> Option<&mut Paragraph> {
         self.body.paragraph(index)
     }
 
     /// Get a reference to a table by index.
-    pub fn table(&mut self, index: usize) -> Option<&mut MutableTable> {
+    pub fn table(&mut self, index: usize) -> Option<&mut Table> {
         self.body.table(index)
     }
 
@@ -1740,7 +1733,7 @@ impl MutableDocument {
     }
 }
 
-impl Default for MutableDocument {
+impl Default for Document {
     fn default() -> Self {
         Self::new()
     }
@@ -1748,12 +1741,12 @@ impl Default for MutableDocument {
 
 #[cfg(test)]
 mod tests {
-    use super::MutableDocument;
+    use super::Document;
     use crate::writer::comment::Date;
 
     #[test]
     fn comments_part_is_deterministic_and_compact() {
-        let mut document = MutableDocument::new();
+        let mut document = Document::new();
         document.add_comment("A", "first");
         let Ok(date) = Date::parse("2026-08-08T04:34:56Z") else {
             panic!("valid test timestamp must parse");

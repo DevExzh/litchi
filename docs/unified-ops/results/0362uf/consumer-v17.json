@@ -1,0 +1,74 @@
+{
+  "source": "70d64634c9d1d4328447d8724d3b076114a91fd0",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--all-features",
+        "--message-format",
+        "json-render-diagnostics",
+        "-p",
+        "soapberry-zip",
+        "--lib"
+      ],
+      "exit": 0,
+      "seconds": 10.291549458999725,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v17/check-0.log",
+      "bytes": 116492,
+      "sha256": "5f31c5eff8ee45050d4c05b822626515bae7d6cda18a7ba0b6960d98746d738c",
+      "target_bytes_before": 18596969994,
+      "completed_test_executables_pruned": [
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/unified-ops-api/target/debug/deps/soapberry_zip-f876441eaf8a3063",
+          "bytes": 18197240,
+          "sha256": "ead3959f353b5d80323c3f9282466f2f3c99701f489ba09c54dd418bc5483e4c"
+        }
+      ]
+    },
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--all-targets",
+        "--all-features",
+        "--keep-going",
+        "-p",
+        "litchi-opc",
+        "-p",
+        "soapberry-zip"
+      ],
+      "exit": 0,
+      "seconds": 15.230926259000626,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v17/check-1.log",
+      "bytes": 311,
+      "sha256": "62c48779a4631af5a68363284f5ac0abed0c93812992c9374fa1b196c72f2480",
+      "target_bytes_before": 18596969994,
+      "completed_test_executables_pruned": []
+    },
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--keep-going"
+      ],
+      "exit": 101,
+      "seconds": 434.80157887099995,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v17/check-2.log",
+      "bytes": 72933,
+      "sha256": "1a881b22d6821587057116ecfd5fc5058aecebe58db2fa4badd895df55f7d3e3",
+      "target_bytes_before": 18596970004,
+      "completed_test_executables_pruned": []
+    }
+  ],
+  "note": "ZIP library: 506 passed. Focused OPC/ZIP all-target check passed. Workspace stopped on retained-policy call sites, private const Arc getters and test qualification/constructor scopes; 27d9541e46 repairs the complete diagnostic batch. Harness checks not reached."
+}

@@ -22,14 +22,17 @@ mod validation;
 #[cfg(test)]
 mod tests;
 
-pub use codec::{load, put, remove};
+pub use codec::load;
+mod edit;
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 
 // Classification and other shape-owned semantic owners need the same
 // selector-to-byte-span mapping as programmable tags. Keep the scanner
 // implementation private while exposing this crate-internal seam to sibling
 // shape owners.
-pub(crate) use codec::{selected_raw_span, selected_raw_span_for_shape};
+pub(crate) use codec::{selected_raw_span_for_shape, selected_raw_span_with_limits};
 
 // `tag::package` uses this narrow lexical seam while discovering package-level
 // tag anchors. The implementation remains private to the tag subsystem.
 pub(crate) use codec::attribute_value_span;
+pub(crate) use codec::{put_with_limits, remove_with_limits};

@@ -12,6 +12,8 @@ use crate::binding_tracker::{BindingTracker, BindingTrackerError};
 use crate::xml::attributes::BytesStartExt as _;
 
 pub mod attributes;
+/// Namespace-aware, bounded surgery for local sheet-name dependencies.
+pub mod sheet_name;
 
 /// Return whether a value follows the XML 1.0 Fifth Edition `NCName` grammar.
 ///

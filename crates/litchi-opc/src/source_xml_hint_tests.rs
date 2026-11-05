@@ -13,6 +13,7 @@
 )]
 
 use super::*;
+use crate::SourceCacheLimits;
 use crate::content_type::ContentType;
 use litchi_core::{Budget, CancellationSource, ExecutionLimits, Limits, SourceVersion};
 use soapberry_zip::office::StreamingArchiveWriter;
@@ -39,7 +40,8 @@ fn archive_bytes(document: &[u8]) -> Vec<u8> {
     let relationships = format!(
         r#"<Relationships xmlns="{RELATIONSHIPS_NS}"><Relationship Id="rId1" Type="{OFFICE_DOCUMENT_REL}" Target="{DOCUMENT_MEMBER}"/></Relationships>"#
     );
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .expect("content types fixture must be writable");
@@ -55,7 +57,13 @@ fn archive_bytes(document: &[u8]) -> Vec<u8> {
 }
 
 fn open_package(document: &[u8]) -> SourceBackedPackage {
-    SourceBackedPackage::from_vec(archive_bytes(document)).expect("fixture package must open")
+    SourceBackedPackage::from_vec(
+        archive_bytes(document),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .expect("fixture package must open")
 }
 
 fn source_parts(package: &SourceBackedPackage) -> (usize, SourceXmlPart) {
@@ -104,8 +112,8 @@ fn each_identity_and_policy_field_is_required_for_a_hint_hit() {
     cases.push(("content type", content_type));
 
     let mut limits = original.clone();
-    limits.limits = ReadLimits::builder()
-        .max_xml_events(expected_limits.max_xml_events() - 1)
+    limits.limits = SourceLimits::builder()
+        .max_events(expected_limits.max_events() - 1)
         .unwrap()
         .build()
         .unwrap();
@@ -200,10 +208,12 @@ fn eligible_hint_comparison_consumes_its_bounded_work_charge() {
         )
         .unwrap(),
     );
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(archive)),
-        ReadLimits::default(),
-        context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     let part = package.part(&document_uri()).unwrap();

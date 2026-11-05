@@ -9,21 +9,22 @@
 
 mod repair_support;
 
-use litchi_rtf::{DocumentView, DocumentViewKind, DocumentZoomKind, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{DocumentView, DocumentViewKind, DocumentZoomKind, write::Writer};
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
 #[test]
 fn parses_view_and_zoom_metadata_and_round_trips_in_stable_order() {
-    let document =
-        RtfDocument::parse(r"{\rtf1\viewkind4\viewscale135\viewzk3\viewbksp1\viewnobound Body}")
-            .unwrap();
+    let document = Tree::parse(
+        r"{\rtf1\viewkind4\viewscale135\viewzk3\viewbksp1\viewnobound Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(
         *document.document_view(),
         DocumentView {
@@ -40,14 +41,15 @@ fn parses_view_and_zoom_metadata_and_round_trips_in_stable_order() {
     assert!(serialized.find("\\viewscale135").unwrap() < serialized.find("\\viewzk3").unwrap());
     assert!(serialized.find("\\viewzk3").unwrap() < serialized.find("\\viewbksp1").unwrap());
     assert!(serialized.find("\\viewbksp1").unwrap() < serialized.find("\\viewnobound").unwrap());
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.document_view(), document.document_view());
     assert_eq!(reparsed.text(), "Body");
 }
 
 #[test]
 fn typed_api_preserves_absence_and_clear() {
-    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
+    let mut document =
+        Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     assert!(document.document_view().is_empty());
     document
         .set_document_view(DocumentView {
@@ -58,7 +60,8 @@ fn typed_api_preserves_absence_and_clear() {
             hide_page_boundaries: false,
         })
         .unwrap();
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.document_view(), document.document_view());
     document.clear_document_view();
     assert!(document.document_view().is_empty());
@@ -88,7 +91,10 @@ fn rejects_invalid_values_duplicates_and_bad_placement_or_group_shape() {
         r"{\rtf1{{\*\viewkind1}}Body}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted malformed {source}"
         );
     }
@@ -101,7 +107,7 @@ fn parses_bundled_libreoffice_starred_view_fixture() {
         "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf114303.rtf"
     ))
     .unwrap();
-    let document = RtfDocument::parse_bytes(&bytes).unwrap();
+    let document = Tree::parse_bytes(&bytes, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         document.document_view().kind,
         Some(DocumentViewKind::PageLayout)
@@ -118,6 +124,6 @@ fn parses_bundled_libreoffice_background_shapes_fixture() {
         "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/page-background.rtf"
     ))
     .unwrap();
-    let document = RtfDocument::parse_bytes(&bytes).unwrap();
+    let document = Tree::parse_bytes(&bytes, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(document.document_view().background_shapes, Some(true));
 }

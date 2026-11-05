@@ -27,14 +27,18 @@ fn package_loads_local_view_and_presentation_settings() {
     let package = package_with_local_settings();
     let opc = package.opc().unwrap();
 
-    let view_properties = view_properties::load_from_package(opc).unwrap().unwrap();
+    let view_properties =
+        view_properties::load_from_package(opc, view_properties::Limits::default())
+            .unwrap()
+            .unwrap();
     assert_eq!(view_properties.last_view, Some(ViewKind::Slide));
     assert_eq!(view_properties.show_comments, Some(true));
     assert_eq!(view_properties.grid_spacing.as_ref().unwrap().cx, 72_000);
 
-    let presentation_properties = presentation_properties::load_from_package(opc)
-        .unwrap()
-        .unwrap();
+    let presentation_properties =
+        presentation_properties::load_from_package(opc, presentation_properties::Limits::default())
+            .unwrap()
+            .unwrap();
     let web = presentation_properties.web.as_ref().unwrap();
     assert_eq!(web.allow_png, Some(true));
     assert_eq!(
@@ -65,9 +69,16 @@ fn package_readers_report_absent_settings() {
     remove_presentation_relationships(&mut opc, VIEW_PROPERTIES_RELATIONSHIP_TYPE);
     remove_presentation_relationships(&mut opc, PRESENTATION_PROPERTIES_RELATIONSHIP_TYPE);
 
-    assert_eq!(view_properties::load_from_package(&opc).unwrap(), None);
     assert_eq!(
-        presentation_properties::load_from_package(&opc).unwrap(),
+        view_properties::load_from_package(&opc, view_properties::Limits::default()).unwrap(),
+        None
+    );
+    assert_eq!(
+        presentation_properties::load_from_package(
+            &opc,
+            presentation_properties::Limits::default(),
+        )
+        .unwrap(),
         None
     );
 }
@@ -88,7 +99,7 @@ fn package_readers_reject_external_settings_relationships() {
         );
 
     assert!(matches!(
-        view_properties::load_from_package(&opc),
+        view_properties::load_from_package(&opc, view_properties::Limits::default()),
         Err(Error::Invalid(message)) if message.contains("cannot be external")
     ));
 
@@ -104,15 +115,18 @@ fn package_readers_reject_external_settings_relationships() {
         );
 
     assert!(matches!(
-        presentation_properties::load_from_package(&opc),
+        presentation_properties::load_from_package(
+            &opc,
+            presentation_properties::Limits::default(),
+        ),
         Err(Error::Invalid(message)) if message.contains("cannot be external")
     ));
 }
 
 fn base_opc() -> OpcPackage {
-    let mut package = Package::new().unwrap();
+    let package = Package::new().unwrap();
     let package_bytes = package.to_bytes().unwrap();
-    OpcPackage::from_bytes(&package_bytes).unwrap()
+    OpcPackage::from_bytes(&package_bytes, litchi_opc::SourceLimits::default()).unwrap()
 }
 
 fn package_with_local_settings() -> Package {

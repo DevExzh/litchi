@@ -17,17 +17,23 @@ use crate::{Error, Result};
 pub(crate) fn slide_tags<'a>(
     package: &'a OpcPackage,
     part: &SlidePart<'a>,
+    limits: crate::tag::Limits,
 ) -> Result<Option<crate::tag::List>> {
-    Ok(crate::tag::load(package, part.part().partname())?.map(crate::tag::Source::into_list))
+    Ok(
+        crate::tag::load_with_limits(package, part.part().partname(), limits)?
+            .map(crate::tag::Source::into_list),
+    )
 }
 
 pub(crate) fn slide_shape_tags<'a, 'k>(
     package: &'a OpcPackage,
     part: &SlidePart<'a>,
     shape: impl Into<crate::shape::Key<'k>>,
+    limits: crate::tag::Limits,
+    shape_limits: crate::shape::Limits,
 ) -> Result<Option<crate::tag::List>> {
     Ok(
-        crate::tag::shape::load(package, part.part().partname(), shape)?
+        crate::tag::shape::load(package, part.part().partname(), shape, limits, shape_limits)?
             .map(crate::tag::Source::into_list),
     )
 }
@@ -36,16 +42,23 @@ pub(crate) fn slide_shape_classification<'a, 'k>(
     package: &'a OpcPackage,
     part: &SlidePart<'a>,
     shape: impl Into<crate::shape::Key<'k>>,
+    shape_limits: crate::shape::Limits,
 ) -> Result<Option<crate::shape::classification::Snapshot>> {
-    crate::shape::classification::load(package, part.part().partname(), shape)
+    crate::shape::classification::load_with_limits(
+        package,
+        part.part().partname(),
+        shape,
+        shape_limits,
+    )
 }
 
 pub(crate) fn slide_shape_design_element<'a, 'k>(
     package: &'a OpcPackage,
     part: &SlidePart<'a>,
     shape: impl Into<crate::shape::Key<'k>>,
+    shape_limits: crate::shape::Limits,
 ) -> Result<Option<crate::shape::designer::Snapshot>> {
-    crate::shape::designer::load(package, part.part().partname(), shape)
+    crate::shape::designer::load_with_limits(package, part.part().partname(), shape, shape_limits)
 }
 
 pub(crate) fn slide_shape_designer_properties<'a, 'k>(
@@ -53,12 +66,14 @@ pub(crate) fn slide_shape_designer_properties<'a, 'k>(
     part: &SlidePart<'a>,
     shape: impl Into<crate::shape::Key<'k>>,
     limits: crate::shape::designer::Limits,
-) -> Result<crate::shape::designer::PropertiesSnapshot> {
-    crate::shape::designer::load_properties_with_limits(
+    shape_limits: crate::shape::Limits,
+) -> Result<crate::shape::designer::properties::Snapshot> {
+    crate::shape::designer::load_properties_with_limits_and_shape_limits(
         package,
         part.part().partname(),
         shape,
         limits,
+        shape_limits,
     )
 }
 
@@ -108,8 +123,9 @@ pub(crate) fn slide_designer_tags<'a>(
 pub(crate) fn slide_tag_inventory<'a>(
     package: &'a OpcPackage,
     part: &SlidePart<'a>,
+    limits: crate::tag::Limits,
 ) -> Result<Vec<crate::tag::Source>> {
-    crate::tag::discover(part.part(), package)
+    crate::tag::discover_with_limits(part.part(), package, limits)
 }
 
 pub(crate) fn slide_charts<'a>(
@@ -133,6 +149,23 @@ pub(crate) fn slide_comments<'a>(
     part.comments(package)
 }
 
+pub(crate) fn slide_comment_snapshot<'a>(
+    package: &'a OpcPackage,
+    part: &SlidePart<'a>,
+    limits: crate::comments::Limits,
+) -> Result<Option<crate::presentation::related::Comments>> {
+    crate::presentation::related::load_eager_comments(package, part, limits)
+}
+
+pub(crate) fn slide_notes<'a>(
+    package: &'a OpcPackage,
+    part: &SlidePart<'a>,
+    shape_limits: crate::shape::Limits,
+    notes_limits: crate::notes::Limits,
+) -> Result<Option<crate::presentation::related::Notes>> {
+    crate::presentation::related::load_eager_notes(package, part, shape_limits, notes_limits)
+}
+
 pub(crate) fn slide_zooms<'a>(
     package: &'a OpcPackage,
     part: &SlidePart<'a>,
@@ -143,11 +176,15 @@ pub(crate) fn slide_zooms<'a>(
 pub(crate) fn slide_sync<'a>(
     package: &'a OpcPackage,
     part: &SlidePart<'a>,
+    limits: crate::presentation_properties::metadata::slide_sync::Limits,
 ) -> Result<Option<crate::presentation_properties::metadata::slide_sync::Properties>> {
     let part_name = part.part().partname();
-    let mut matches = crate::presentation_properties::metadata::slide_sync::load(package)?
-        .into_iter()
-        .filter(|entry| entry.slide_part_name == *part_name);
+    let mut matches = crate::presentation_properties::metadata::slide_sync::load(
+        package,
+        limits.constrained_by_source(package.read_limits()),
+    )?
+    .into_iter()
+    .filter(|entry| entry.slide_part_name == *part_name);
     Ok(matches.next().map(|entry| entry.properties))
 }
 

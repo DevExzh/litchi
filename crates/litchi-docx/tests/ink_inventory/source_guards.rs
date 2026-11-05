@@ -8,7 +8,8 @@ use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 use super::*;
 
 fn members(bytes: &[u8]) -> BTreeMap<String, Vec<u8>> {
-    let archive = ArchiveReader::new(bytes).unwrap();
+    let archive =
+        ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     archive
         .file_names()
         .map(|name| (name.to_owned(), archive.read(name).unwrap()))
@@ -19,8 +20,10 @@ fn rewrite_member<F>(bytes: &[u8], selected: &str, mut rewrite: F) -> Vec<u8>
 where
     F: FnMut(&[u8]) -> Vec<u8>,
 {
-    let archive = ArchiveReader::new(bytes).unwrap();
-    let mut writer = StreamingArchiveWriter::new();
+    let archive =
+        ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in archive.file_names() {
         let content = archive.read(name).unwrap();
         if name == selected {
@@ -33,8 +36,10 @@ where
 }
 
 fn add_member(bytes: &[u8], name: &str, content: &[u8]) -> Vec<u8> {
-    let archive = ArchiveReader::new(bytes).unwrap();
-    let mut writer = StreamingArchiveWriter::new();
+    let archive =
+        ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for member in archive.file_names() {
         writer
             .write_stored(member, &archive.read(member).unwrap())
@@ -119,10 +124,39 @@ fn base_source_with_unrelated_relationship() -> Vec<u8> {
     PackageWriter::to_bytes(&opc).unwrap()
 }
 
+#[test]
+fn patches_keep_their_source_after_the_owner_and_sibling_edit_are_dropped() {
+    let original = PackageWriter::to_bytes(&source(false, false)).unwrap();
+    let (noop, changed) = {
+        let package = Package::from_reader(Cursor::new(&original)).unwrap();
+        let noop = noop_patch(&package);
+        let changed = removal_patch(&package);
+        assert_eq!(package.ink().unwrap().annotations().len(), 1);
+        (noop, changed)
+    };
+    let copy = Package::from_reader(Cursor::new(&original)).unwrap();
+    let mut unchanged = copy.apply_ink(&noop).unwrap().into_package();
+    assert_eq!(save(&mut unchanged), original);
+    let mut target = copy.apply_ink(&changed).unwrap().into_package();
+    assert!(target.ink().unwrap().annotations().is_empty());
+    assert!(target.apply_ink(&noop).is_err());
+    let mut restored = target.apply_ink(&changed.inverse()).unwrap().into_package();
+    assert_eq!(save(&mut restored), original);
+    assert_eq!(copy.ink().unwrap().annotations().len(), 1);
+    // Publishing an unrelated result cannot mutate the graph retained by either patch.
+    let _ = save(&mut target);
+    assert!(copy.apply_ink(&noop.inverse()).is_ok());
+}
+
 fn assert_source_guard_rejects(variant: Vec<u8>, patch: &litchi_docx::ink::Patch) {
     let mut package = Package::from_reader(Cursor::new(&variant)).unwrap();
     let before = members(&save(&mut package));
-    assert!(package.apply_ink_patch(patch).is_err());
+    assert!(
+        package
+            .apply_ink(patch)
+            .map(|commit| commit.into_package())
+            .is_err()
+    );
     assert_eq!(members(&save(&mut package)), before);
 }
 
@@ -177,12 +211,18 @@ fn adding_an_empty_relationship_member_is_a_stale_source_for_changed_and_noop_pa
     );
     let absent = baseline
         .opc_package()
-        .source_relationships(&PackURI::new("/payload/empty.xml").unwrap())
+        .source_relationships(
+            &PackURI::new("/payload/empty.xml").unwrap(),
+            litchi_opc::SourceLimits::default(),
+        )
         .unwrap();
     let present_package = Package::from_reader(Cursor::new(&variant)).unwrap();
     let present = present_package
         .opc_package()
-        .source_relationships(&PackURI::new("/payload/empty.xml").unwrap())
+        .source_relationships(
+            &PackURI::new("/payload/empty.xml").unwrap(),
+            litchi_opc::SourceLimits::default(),
+        )
         .unwrap();
     assert_eq!(absent.bytes(), present.bytes());
     assert!(!absent.member_present());
@@ -212,17 +252,19 @@ fn relationship_lexical_tokens_count_against_public_ink_topology_limit() {
     assert!(semantic_topology_bytes < limits.stories.max_topology_bytes);
     let before = members(&save(&mut package));
 
-    let error = package
-        .edit_ink_with_limits(litchi_docx::ink::EditLimits {
+    let edit = package
+        .edit_ink_with_options(litchi_docx::ink::EditOptions {
             inventory: limits,
-            ..litchi_docx::ink::EditLimits::default()
+            ..litchi_docx::ink::EditOptions::default()
         })
-        .err()
-        .expect("lexical relationship tokens should exceed the semantic-only budget");
+        .unwrap();
+    let error = edit
+        .inventory()
+        .expect_err("lexical relationship tokens should exceed the semantic-only budget");
     assert!(matches!(
         error,
         Error::InkLimit {
-            resource: "Ink graph publication token bytes",
+            kind: litchi_docx::ink::LimitKind::GraphPublicationTokenBytes,
             ..
         }
     ));

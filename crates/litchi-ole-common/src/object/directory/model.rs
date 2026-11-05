@@ -43,14 +43,40 @@ impl Default for Limits {
 
 impl Limits {
     pub(crate) fn validate(self) -> Result<(), OleError> {
-        if self.max_entries == 0
-            || self.max_name_bytes == 0
-            || self.max_total_bytes == 0
-            || self.max_raw_depth == 0
-        {
-            return Err(OleError::InvalidFormat(
-                "CFB directory catalog limits must be non-zero".into(),
-            ));
+        if self.max_entries == 0 {
+            return Err(OleError::InvalidLimit {
+                resource: "directory entries",
+                value: 0,
+                maximum: u64::MAX,
+            });
+        }
+        if self.max_name_bytes == 0 {
+            return Err(OleError::InvalidLimit {
+                resource: "directory name bytes",
+                value: 0,
+                maximum: u64::MAX,
+            });
+        }
+        if self.max_total_bytes == 0 {
+            return Err(OleError::InvalidLimit {
+                resource: "directory total bytes",
+                value: 0,
+                maximum: u64::MAX,
+            });
+        }
+        if self.max_raw_children == 0 {
+            return Err(OleError::InvalidLimit {
+                resource: "directory entries",
+                value: 0,
+                maximum: u64::MAX,
+            });
+        }
+        if self.max_raw_depth == 0 {
+            return Err(OleError::InvalidLimit {
+                resource: "directory depth",
+                value: 0,
+                maximum: u64::MAX,
+            });
         }
         Ok(())
     }
@@ -69,13 +95,14 @@ impl Sid {
     /// # Errors
     ///
     /// Returns an error when `raw` is outside the regular CFB SID range.
-    pub fn new(raw: u32) -> Result<Self, OleError> {
+    pub fn new(raw: u32) -> Result<Self, crate::Error> {
         if raw <= MAX_REGULAR_SID {
             Ok(Self(raw))
         } else {
             Err(OleError::InvalidFormat(format!(
                 "CFB directory SID {raw:#010X} is outside the regular SID range"
-            )))
+            ))
+            .into())
         }
     }
 

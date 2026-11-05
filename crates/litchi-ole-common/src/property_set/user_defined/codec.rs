@@ -1,4 +1,5 @@
 use super::model::{Hyperlink, Hyperlinks, Limits, LinkBase};
+use crate::{Error, LimitKind};
 use litchi_cfb::OleError;
 
 const VT_I4: u16 = 0x0003;
@@ -18,7 +19,7 @@ impl<'a> Reader<'a> {
         self.data.len() - self.offset
     }
 
-    fn take(&mut self, count: usize, field: &str) -> Result<&'a [u8], OleError> {
+    fn take(&mut self, count: usize, field: &str) -> Result<&'a [u8], Error> {
         let end = self
             .offset
             .checked_add(count)
@@ -31,17 +32,17 @@ impl<'a> Reader<'a> {
         Ok(bytes)
     }
 
-    fn u16(&mut self, field: &str) -> Result<u16, OleError> {
+    fn u16(&mut self, field: &str) -> Result<u16, Error> {
         let bytes = self.take(2, field)?;
         Ok(u16::from_le_bytes([bytes[0], bytes[1]]))
     }
 
-    fn u32(&mut self, field: &str) -> Result<u32, OleError> {
+    fn u32(&mut self, field: &str) -> Result<u32, Error> {
         let bytes = self.take(4, field)?;
         Ok(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
     }
 
-    fn i4(&mut self, field: &str) -> Result<i32, OleError> {
+    fn i4(&mut self, field: &str) -> Result<i32, Error> {
         if self.u16(&format!("{field} type"))? != VT_I4 {
             return Err(invalid(format!("{field} must be VT_I4")));
         }
@@ -58,7 +59,7 @@ impl<'a> Reader<'a> {
         limits: Limits,
         aggregate: &mut usize,
         field: &str,
-    ) -> Result<String, OleError> {
+    ) -> Result<String, Error> {
         if self.u16(&format!("{field} type"))? != VT_LPWSTR {
             return Err(invalid(format!("{field} must be VT_LPWSTR")));
         }
@@ -99,7 +100,7 @@ impl<'a> Reader<'a> {
         Ok(decoded)
     }
 
-    fn finish(self, field: &str) -> Result<(), OleError> {
+    fn finish(self, field: &str) -> Result<(), Error> {
         if self.remaining() == 0 {
             Ok(())
         } else {
@@ -108,15 +109,15 @@ impl<'a> Reader<'a> {
     }
 }
 
-fn invalid(message: impl Into<String>) -> OleError {
-    OleError::InvalidFormat(message.into())
+fn invalid(message: impl Into<String>) -> Error {
+    Error::Cfb(OleError::InvalidFormat(message.into()))
 }
 
-fn allocation(resource: &'static str, source: std::collections::TryReserveError) -> OleError {
-    OleError::Allocation { resource, source }
+fn allocation(resource: &'static str, source: std::collections::TryReserveError) -> Error {
+    Error::Cfb(OleError::Allocation { resource, source })
 }
 
-pub(super) fn decode_link_base(data: &[u8], limits: Limits) -> Result<LinkBase, OleError> {
+pub(super) fn decode_link_base(data: &[u8], limits: Limits) -> Result<LinkBase, Error> {
     check_blob(data, limits, "_PID_LINKBASE")?;
     if data.is_empty() {
         return LinkBase::new("");
@@ -132,7 +133,7 @@ pub(super) fn decode_link_base(data: &[u8], limits: Limits) -> Result<LinkBase, 
     LinkBase::new(value)
 }
 
-pub(super) fn encode_link_base(value: &LinkBase, limits: Limits) -> Result<Vec<u8>, OleError> {
+pub(super) fn encode_link_base(value: &LinkBase, limits: Limits) -> Result<Vec<u8>, Error> {
     let mut units = 0;
     let mut output = Vec::new();
     let count = value
@@ -157,7 +158,7 @@ pub(super) fn encode_link_base(value: &LinkBase, limits: Limits) -> Result<Vec<u
     Ok(output)
 }
 
-pub(super) fn decode_hyperlinks(data: &[u8], limits: Limits) -> Result<Hyperlinks, OleError> {
+pub(super) fn decode_hyperlinks(data: &[u8], limits: Limits) -> Result<Hyperlinks, Error> {
     check_blob(data, limits, "_PID_HLINKS")?;
     let mut reader = Reader::new(data);
     let declared_bytes_raw = reader.u32("_PID_HLINKS cbData")?;
@@ -175,10 +176,11 @@ pub(super) fn decode_hyperlinks(data: &[u8], limits: Limits) -> Result<Hyperlink
     }
     let count = elements / 6;
     if count > limits.max_links() {
-        return Err(invalid(format!(
-            "_PID_HLINKS link count {count} exceeds configured limit {}",
-            limits.max_links()
-        )));
+        return Err(Error::Limit {
+            kind: LimitKind::UserDefinedLinks,
+            observed: count as u64,
+            maximum: limits.max_links() as u64,
+        });
     }
     let mut links = Vec::new();
     links
@@ -200,13 +202,13 @@ pub(super) fn decode_hyperlinks(data: &[u8], limits: Limits) -> Result<Hyperlink
     Ok(Hyperlinks::new(links))
 }
 
-pub(super) fn encode_hyperlinks(value: &Hyperlinks, limits: Limits) -> Result<Vec<u8>, OleError> {
+pub(super) fn encode_hyperlinks(value: &Hyperlinks, limits: Limits) -> Result<Vec<u8>, Error> {
     if value.len() > limits.max_links() {
-        return Err(invalid(format!(
-            "_PID_HLINKS link count {} exceeds configured limit {}",
-            value.len(),
-            limits.max_links()
-        )));
+        return Err(Error::Limit {
+            kind: LimitKind::UserDefinedLinks,
+            observed: value.len() as u64,
+            maximum: limits.max_links() as u64,
+        });
     }
     let element_count_usize = value
         .len()
@@ -261,21 +263,22 @@ pub(super) fn encode_hyperlinks(value: &Hyperlinks, limits: Limits) -> Result<Ve
     Ok(output)
 }
 
-fn check_blob(data: &[u8], limits: Limits, field: &str) -> Result<(), OleError> {
+fn check_blob(data: &[u8], limits: Limits, field: &str) -> Result<(), Error> {
     check_blob_len(data.len(), limits, field)
 }
 
-fn check_blob_len(length: usize, limits: Limits, field: &str) -> Result<(), OleError> {
+fn check_blob_len(length: usize, limits: Limits, _field: &str) -> Result<(), Error> {
     if length > limits.max_blob_bytes() {
-        return Err(invalid(format!(
-            "{field} BLOB size {length} exceeds configured limit {}",
-            limits.max_blob_bytes()
-        )));
+        return Err(Error::Limit {
+            kind: LimitKind::UserDefinedBlobBytes,
+            observed: length as u64,
+            maximum: limits.max_blob_bytes() as u64,
+        });
     }
     Ok(())
 }
 
-fn encoded_hyperlinks_size(value: &Hyperlinks, limits: Limits) -> Result<usize, OleError> {
+fn encoded_hyperlinks_size(value: &Hyperlinks, limits: Limits) -> Result<usize, Error> {
     let mut total = 8usize;
     let mut units = 0usize;
     for link in value.links() {
@@ -309,7 +312,7 @@ fn encoded_string_size(
     limits: Limits,
     aggregate: &mut usize,
     field: &str,
-) -> Result<usize, OleError> {
+) -> Result<usize, Error> {
     if value.contains('\0') {
         return Err(invalid(format!("{field} must not contain NUL")));
     }
@@ -329,7 +332,7 @@ fn encoded_string_size(
         .ok_or_else(|| invalid(format!("{field} encoded size overflow")))
 }
 
-fn append_i4(output: &mut Vec<u8>, value: i32) -> Result<(), OleError> {
+fn append_i4(output: &mut Vec<u8>, value: i32) -> Result<(), Error> {
     output
         .try_reserve(8)
         .map_err(|source| allocation("user-defined hyperlink value", source))?;
@@ -345,7 +348,7 @@ fn append_string(
     limits: Limits,
     aggregate: &mut usize,
     field: &str,
-) -> Result<(), OleError> {
+) -> Result<(), Error> {
     if value.contains('\0') {
         return Err(invalid(format!("{field} must not contain NUL")));
     }
@@ -386,27 +389,33 @@ fn check_units(
     limits: Limits,
     aggregate: &mut usize,
     field: &str,
-) -> Result<(), OleError> {
-    if units == 0 || units > limits.max_string_units() {
+) -> Result<(), Error> {
+    if units == 0 {
         return Err(invalid(format!(
-            "{field} UTF-16 unit count {units} exceeds configured per-string limit {}",
-            limits.max_string_units()
+            "{field} UTF-16 unit count must include a terminating NUL"
         )));
+    }
+    if units > limits.max_string_units() {
+        return Err(Error::Limit {
+            kind: LimitKind::UserDefinedStringUnits,
+            observed: units as u64,
+            maximum: limits.max_string_units() as u64,
+        });
     }
     *aggregate = aggregate
         .checked_add(units)
         .ok_or_else(|| invalid("user-defined hyperlink aggregate UTF-16 unit count overflow"))?;
     if *aggregate > limits.max_total_utf16_units() {
-        return Err(invalid(format!(
-            "user-defined hyperlink aggregate UTF-16 unit count {} exceeds configured limit {}",
-            *aggregate,
-            limits.max_total_utf16_units()
-        )));
+        return Err(Error::Limit {
+            kind: LimitKind::UserDefinedTotalUtf16Units,
+            observed: *aggregate as u64,
+            maximum: limits.max_total_utf16_units() as u64,
+        });
     }
     Ok(())
 }
 
-fn decode_utf16(bytes: &[u8], field: &str) -> Result<String, OleError> {
+fn decode_utf16(bytes: &[u8], field: &str) -> Result<String, Error> {
     if !bytes.len().is_multiple_of(2) {
         return Err(invalid(format!(
             "{field} UTF-16 payload has an odd byte length"

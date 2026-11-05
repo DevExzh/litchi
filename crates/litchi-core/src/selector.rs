@@ -1,6 +1,60 @@
-//! Concise collection selectors that do not overload indexing.
+//! Concise collection selectors and the unified path/selector grammar.
+//!
+//! The module has two layers:
+//!
+//! - The typed vocabulary used by format crates: [`Position`] (a checked
+//!   zero-based collection position) and [`Selector`] (name, position, or
+//!   opaque stable identity).
+//! - The OfficeCLI-aligned string grammar used by the unified operations
+//!   layer: [`Path`] for element addressing (`/body/p[3]/r[1]`,
+//!   `/Sheet1/A1:C5`, `/slide[2]/notes`) and [`Query`] for CSS-like selection
+//!   (`paragraph[style=Heading1] > run[font!=Arial]`,
+//!   `row[Salary>5000 and Region=EMEA]`). Both are typed ASTs; strings are an
+//!   edge layer parsed once through [`Path::parse`] / [`Query::parse`] (which
+//!   borrow from the input) or [`std::str::FromStr`] (which owns). `Display`
+//!   renders a canonical string that parses back to an equal value.
+//!
+//! The grammar is syntax only. Whether a step names an existing element is a
+//! resolution-time question answered by the operations layer, which reports
+//! [`ErrorCode::PathNotFound`]; this module never produces that code.
+//!
+//! # Example
+//!
+//! ```
+//! use litchi_core::selector::{Path, Position, Predicate, Query};
+//!
+//! let path = Path::parse("/body/p[3]/r[1]")?;
+//! assert_eq!(path.steps().len(), 3);
+//! assert_eq!(path.steps()[1].name(), "p");
+//! // String indices are 1-based; the typed value is the zero-based Position.
+//! assert_eq!(path.steps()[1].predicates(), &[Predicate::Index(Position::new(2))]);
+//! assert_eq!(path.to_string(), "/body/p[3]/r[1]");
+//!
+//! let query: Query<'_> = Query::parse("row[Salary>5000 and Region=EMEA]")?;
+//! assert_eq!(query.to_string(), "row[Salary>5000 and Region=EMEA]");
+//! # Ok::<(), litchi_core::selector::ParseError>(())
+//! ```
 
 use std::borrow::Cow;
+
+mod axis;
+mod cursor;
+mod error;
+pub mod limits;
+mod path;
+mod predicate;
+mod query;
+mod store;
+mod text;
+
+#[cfg(test)]
+mod grammar_tests;
+
+pub use axis::{Axis, CellRange, CellRef, column_number};
+pub use error::{ErrorCode, ErrorKind, Expected, Found, Grammar, Limit, ParseError};
+pub use path::{Path, Step};
+pub use predicate::{CompareOp, Condition, Expr, Key, Predicate, Value};
+pub use query::{Combinator, Complex, Compound, Element, Pseudo, Query, Scope};
 
 /// A checked collection position.
 ///
@@ -23,6 +77,39 @@ impl Position {
     #[must_use]
     pub const fn get(self) -> usize {
         self.0
+    }
+
+    /// Converts a 1-based string-grammar index (`p[3]`) to a position.
+    ///
+    /// Returns `None` for `0`, which has no 1-based meaning.
+    ///
+    /// ```
+    /// use litchi_core::Position;
+    ///
+    /// assert_eq!(Position::from_one_based(3), Some(Position::new(2)));
+    /// assert_eq!(Position::from_one_based(0), None);
+    /// ```
+    #[inline]
+    #[must_use]
+    pub const fn from_one_based(index: usize) -> Option<Self> {
+        match index.checked_sub(1) {
+            Some(value) => Some(Self(value)),
+            None => None,
+        }
+    }
+
+    /// Returns the 1-based string-grammar index, or `None` when the position
+    /// is `usize::MAX` and has no representable 1-based form.
+    ///
+    /// ```
+    /// use litchi_core::Position;
+    ///
+    /// assert_eq!(Position::new(2).one_based(), Some(3));
+    /// ```
+    #[inline]
+    #[must_use]
+    pub const fn one_based(self) -> Option<usize> {
+        self.0.checked_add(1)
     }
 }
 

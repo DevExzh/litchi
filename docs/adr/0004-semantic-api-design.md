@@ -3718,3 +3718,13 @@ Patches and candidate checks carry complete metadata-aware snapshots. Public
 values continue to exclude storage UUIDs, native object/list/reply IDs,
 protobuf messages, and archive handles. Graph admission and native-reply
 limitations remain explicit in ADR 0008 and ADR 0028.
+
+## 2026-10-08 amendment: canonical cross-format vocabulary
+
+[ADR 0034](0034-unified-api-glossary-and-default-policies.md), adopted by
+owner instruction in [record 0016](../unified-ops/0016-rebase-and-glossary-adoption.md),
+supersedes conflicting naming, owner/projection, transaction, error-scope,
+selector and default-policy clauses of this record. The migration proceeds
+in verified waves tracked in [the API glossary](../API_GLOSSARY.md); no aliases
+or deprecation window are introduced. Existing preservation, typed-error,
+static-dispatch and resource-budget requirements remain binding.

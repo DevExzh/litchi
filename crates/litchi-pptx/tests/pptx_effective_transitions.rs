@@ -5,7 +5,6 @@
 )]
 
 use litchi_opc::{OpcPackage, PackURI};
-use litchi_pptx::Package;
 use litchi_pptx::transition::{Kind, Ms, Origin, Ripple, Transition, read};
 
 const LOCAL_P14_RIPPLE: &str =
@@ -115,7 +114,7 @@ fn effective_transition(
     };
     for name in candidates.into_iter().flatten() {
         let part = package.get_part(&PackURI::new(name).unwrap())?;
-        if let Some(transition) = read(part.blob())? {
+        if let Some(transition) = read(part.blob(), litchi_pptx::transition::Limits::DEFAULT)? {
             return Ok(Some(transition));
         }
     }
@@ -123,10 +122,11 @@ fn effective_transition(
 }
 
 fn package_with_transition_fragments(fragments: &[(&str, &str, &str)]) -> OpcPackage {
-    let mut package = Package::new().unwrap();
-    package.presentation_mut().unwrap().add_slide().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    builder.presentation().unwrap().add_slide().unwrap();
+    let package = builder.build().unwrap();
     let bytes = package.to_bytes().unwrap();
-    let mut package = OpcPackage::from_vec(bytes).unwrap();
+    let mut package = OpcPackage::from_vec(bytes, litchi_opc::SourceLimits::default()).unwrap();
     for (part_name, end_tag, fragment) in fragments {
         let part_name = PackURI::new(*part_name).unwrap();
         let part = package.get_part_mut(&part_name).unwrap();

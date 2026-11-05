@@ -12,7 +12,7 @@ use std::sync::{
 use litchi_core::{Error, ReadAt, SourceVersion};
 use litchi_odf_common::core::{PackageWriter, Profile};
 use litchi_odt::{
-    ReadLimits, SourceBackedDocumentCatalog,
+    SourceBackedDocumentCatalog,
     elements::text::{Kind, TextElements},
 };
 use soapberry_zip::office::StreamingArchiveWriter;
@@ -36,7 +36,7 @@ fn aliased_content_xml() -> String {
 }
 
 fn package_with(content: &[u8], extras: bool) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", content).unwrap();
     if extras {
@@ -63,7 +63,8 @@ fn raw_package_with(content: &[u8]) -> Vec<u8> {
     let manifest = format!(
         r#"<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="{MIME}"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/></manifest:manifest>"#
     );
-    let mut archive = StreamingArchiveWriter::new();
+    let mut archive =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     archive.write_stored("mimetype", MIME.as_bytes()).unwrap();
     archive.write_deflated("content.xml", content).unwrap();
     archive
@@ -103,7 +104,7 @@ fn oversized_declared_content_package() -> (Vec<u8>, (u64, u64)) {
 }
 
 fn password_package(content: &[u8], password: &str) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer
         .set_encryption(password, Profile::compatible())
@@ -357,7 +358,7 @@ fn catalog_rejects_malformed_document_and_defers_bad_selected_text() {
     .unwrap_err();
     assert!(matches!(
         error,
-        Error::InvalidFormat(message)
+        litchi_odt::Error::Core(Error::InvalidFormat(message))
             if message.contains("ODT content.xml") && message.contains("outside its root")
     ));
 
@@ -388,19 +389,27 @@ fn catalog_rejects_malformed_document_and_defers_bad_selected_text() {
 fn catalog_enforces_package_limits_and_materializes_exactly() {
     let content = content_xml();
     let bytes = package_with(content.as_bytes(), false);
-    let manifest_limited = ReadLimits::default().with_max_manifest_bytes(1);
+    let manifest_limited = litchi_odf_common::SourceLimits::builder()
+        .max_manifest_bytes(1)
+        .unwrap()
+        .build()
+        .unwrap();
     assert!(
-        SourceBackedDocumentCatalog::from_read_at_with_limits(
+        SourceBackedDocumentCatalog::from_read_at_with_options(
             Arc::new(CountingSource::new(bytes.clone())),
-            manifest_limited,
+            litchi_odf_common::OpenOptions::new().source_limits(manifest_limited)
         )
         .is_err()
     );
-    let source_limited = ReadLimits::default().with_max_source_bytes(bytes.len() as u64 - 1);
+    let source_limited = litchi_odf_common::SourceLimits::builder()
+        .max_input_bytes(bytes.len() as u64 - 1)
+        .unwrap()
+        .build()
+        .unwrap();
     assert!(
-        SourceBackedDocumentCatalog::from_read_at_with_limits(
+        SourceBackedDocumentCatalog::from_read_at_with_options(
             Arc::new(CountingSource::new(bytes.clone())),
-            source_limited,
+            litchi_odf_common::OpenOptions::new().source_limits(source_limited)
         )
         .is_err()
     );
@@ -409,7 +418,7 @@ fn catalog_enforces_package_limits_and_materializes_exactly() {
         SourceBackedDocumentCatalog::from_read_at(Arc::new(CountingSource::new(bytes.clone())))
             .unwrap();
     let document = catalog.materialize().unwrap();
-    assert_eq!(document.original_bytes(), bytes.as_slice());
+    assert_eq!(document.as_bytes(), bytes.as_slice());
 }
 
 #[test]
@@ -419,7 +428,7 @@ fn catalog_rejects_oversized_declared_content_before_decompression() {
     let error = SourceBackedDocumentCatalog::from_read_at(source.clone()).unwrap_err();
     assert!(matches!(
         error,
-        Error::InvalidFormat(message)
+        litchi_odt::Error::Core(Error::InvalidFormat(message))
             if message == "ODT content.xml exceeds the family limit"
     ));
     assert!(
@@ -444,5 +453,5 @@ fn catalog_preserves_password_for_selection_and_materialization() {
         Kind::Paragraph
     );
     let document = catalog.materialize().unwrap();
-    assert_eq!(document.original_bytes(), bytes.as_slice());
+    assert_eq!(document.as_bytes(), bytes.as_slice());
 }

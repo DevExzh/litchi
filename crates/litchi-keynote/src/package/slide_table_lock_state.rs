@@ -12,7 +12,7 @@
     reason = "the package boundary redacts lower-layer failure details"
 )]
 
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::{collections::HashSet, fmt};
 
 use litchi_core::Position;
@@ -26,8 +26,9 @@ use litchi_iwa_core::{
     SnappyStream,
 };
 use litchi_iwa_protos::{package_metadata_codec, table_info_codec, table_model_discovery_codec};
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
+use super::edit::{OwnedSlideSelector, SelectorError};
 use super::{Package, PhysicalSource, ReadError, SemanticLimitKind};
 use crate::SlideSelector;
 use crate::slide::table::TableSelector;
@@ -50,7 +51,7 @@ const DRAWABLE_PARENT_FIELD: u32 = 2;
 /// Finite resource categories enforced by one slide-table lock transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum SlideTableLockStateLimitKind {
+pub enum LimitKind {
     InputBytes,
     OutputBytes,
     Entries,
@@ -66,9 +67,10 @@ pub enum SlideTableLockStateLimitKind {
     Retained,
     Scratch,
     Components,
+    SelectorBytes,
 }
 
-impl fmt::Display for SlideTableLockStateLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -86,6 +88,7 @@ impl fmt::Display for SlideTableLockStateLimitKind {
             Self::Retained => "retained bytes",
             Self::Scratch => "scratch bytes",
             Self::Components => "components",
+            Self::SelectorBytes => "selector bytes",
         })
     }
 }
@@ -93,12 +96,12 @@ impl fmt::Display for SlideTableLockStateLimitKind {
 /// Content-free semantic path for a slide-table lock operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum SlideTableLockStatePath {
+pub enum Path {
     Package,
     Table { slide: Position, table: Position },
 }
 
-impl fmt::Display for SlideTableLockStatePath {
+impl fmt::Display for Path {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Package => formatter.write_str("package"),
@@ -110,9 +113,36 @@ impl fmt::Display for SlideTableLockStatePath {
 }
 
 /// Failure from a Keynote slide-table lock read or transaction.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum SlideTableLockStateError {
+pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    #[error("the selected Keynote slide-table lock source is invalid")]
+    InvalidSource,
+    #[error(
+        "Keynote slide-table lock {kind} limit exceeded: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        kind: LimitKind,
+        observed: u64,
+        maximum: u64,
+    },
+    #[error("could not allocate {amount} units for the Keynote slide-table lock transaction")]
+    Allocation { amount: usize },
+    #[error("the edited Keynote slide-table lock failed semantic verification")]
+    Verification,
+    #[error("the Keynote slide-table lock patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     #[error("this Keynote source does not support persisted slide-table lock edits")]
     UnsupportedSource,
     #[error("the requested Keynote slide-table lock graph is outside the supported scope")]
@@ -129,22 +159,32 @@ pub enum SlideTableLockStateError {
     TablePositionNotFound { position: Position },
     #[error("the selected Keynote slide-table is locked")]
     Locked,
-    #[error("the selected Keynote slide-table lock source is invalid")]
-    InvalidSource,
-    #[error(
-        "Keynote slide-table lock {kind} limit exceeded: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        kind: SlideTableLockStateLimitKind,
-        observed: u64,
-        maximum: u64,
-    },
-    #[error("could not allocate {amount} units for the Keynote slide-table lock transaction")]
-    Allocation { amount: usize },
-    #[error("the edited Keynote slide-table lock failed semantic verification")]
-    Verification,
-    #[error("the Keynote slide-table lock patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. } | Self::UnsupportedDependency { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+            Self::AmbiguousSelector { .. } | Self::EmptySlideName { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::TablePositionNotFound { .. } => RefusalKind::NotFound,
+            Self::Locked { .. } => RefusalKind::Protected,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -182,10 +222,10 @@ struct LockBudget {
 }
 
 impl LockBudget {
-    fn new(package: &Package) -> Result<Self, SlideTableLockStateError> {
+    fn new(package: &Package) -> Result<Self, Error> {
         let wire = package.wire_limits().map_err(map_wire_error)?;
         let source = usize::try_from(package.state.options.archive().max_input_bytes())
-            .map_err(|_| SlideTableLockStateError::InvalidSource)?;
+            .map_err(|_| Error::InvalidSource)?;
         let outer_limits = package.state.options.archive();
         let archive_limits = outer_limits
             .effective_archive_limits()
@@ -206,9 +246,7 @@ impl LockBudget {
             .max_messages()
             .checked_mul(max_components)
             .unwrap_or(usize::MAX);
-        let aggregate = source
-            .checked_mul(4)
-            .ok_or(SlideTableLockStateError::InvalidSource)?;
+        let aggregate = source.checked_mul(4).ok_or(Error::InvalidSource)?;
         Ok(Self {
             max_input: aggregate,
             max_output: aggregate,
@@ -224,11 +262,11 @@ impl LockBudget {
                 .checked_mul(operation_passes)
                 .unwrap_or(usize::MAX),
             max_entry_bytes: usize::try_from(outer_limits.max_total_bytes())
-                .map_err(|_| SlideTableLockStateError::InvalidSource)?
+                .map_err(|_| Error::InvalidSource)?
                 .checked_mul(operation_passes)
                 .unwrap_or(usize::MAX),
             max_total_bytes: usize::try_from(outer_limits.max_total_bytes())
-                .map_err(|_| SlideTableLockStateError::InvalidSource)?
+                .map_err(|_| Error::InvalidSource)?
                 .checked_mul(operation_passes)
                 .unwrap_or(usize::MAX),
             max_payload_objects,
@@ -256,13 +294,11 @@ impl LockBudget {
         current: &mut usize,
         amount: usize,
         maximum: usize,
-        kind: SlideTableLockStateLimitKind,
-    ) -> Result<(), SlideTableLockStateError> {
-        let observed = current
-            .checked_add(amount)
-            .ok_or(SlideTableLockStateError::InvalidSource)?;
+        kind: LimitKind,
+    ) -> Result<(), Error> {
+        let observed = current.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > maximum {
-            return Err(SlideTableLockStateError::LimitExceeded {
+            return Err(Error::Limit {
                 kind,
                 observed: observed as u64,
                 maximum: maximum as u64,
@@ -272,129 +308,124 @@ impl LockBudget {
         Ok(())
     }
 
-    fn input(&mut self, amount: usize) -> Result<(), SlideTableLockStateError> {
+    fn input(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.input,
             amount,
             self.max_input,
-            SlideTableLockStateLimitKind::InputBytes,
+            LimitKind::InputBytes,
         )
     }
 
-    fn output(&mut self, amount: usize) -> Result<(), SlideTableLockStateError> {
+    fn output(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.output,
             amount,
             self.max_output,
-            SlideTableLockStateLimitKind::OutputBytes,
+            LimitKind::OutputBytes,
         )
     }
 
-    fn fields(&mut self, amount: usize) -> Result<(), SlideTableLockStateError> {
+    fn fields(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.fields,
             amount,
             self.max_fields,
-            SlideTableLockStateLimitKind::WireFields,
+            LimitKind::WireFields,
         )
     }
 
-    fn work(&mut self, amount: usize) -> Result<(), SlideTableLockStateError> {
-        Self::add(
-            &mut self.work,
-            amount,
-            self.max_work,
-            SlideTableLockStateLimitKind::WireWork,
-        )
+    fn work(&mut self, amount: usize) -> Result<(), Error> {
+        Self::add(&mut self.work, amount, self.max_work, LimitKind::WireWork)
     }
 
-    fn references(&mut self, amount: usize) -> Result<(), SlideTableLockStateError> {
+    fn references(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.references,
             amount,
             self.max_references,
-            SlideTableLockStateLimitKind::References,
+            LimitKind::References,
         )
     }
 
-    fn allocations(&mut self, amount: usize) -> Result<(), SlideTableLockStateError> {
+    fn allocations(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.allocations,
             amount,
             self.max_allocations,
-            SlideTableLockStateLimitKind::Allocations,
+            LimitKind::Allocations,
         )
     }
 
-    fn retained(&mut self, amount: usize) -> Result<(), SlideTableLockStateError> {
+    fn retained(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.retained,
             amount,
             self.max_retained,
-            SlideTableLockStateLimitKind::Retained,
+            LimitKind::Retained,
         )
     }
 
-    fn scratch(&mut self, amount: usize) -> Result<(), SlideTableLockStateError> {
+    fn scratch(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.scratch,
             amount,
             self.max_scratch,
-            SlideTableLockStateLimitKind::Scratch,
+            LimitKind::Scratch,
         )
     }
 
-    fn entries(&mut self, amount: usize) -> Result<(), SlideTableLockStateError> {
+    fn entries(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.entries,
             amount,
             self.max_entries,
-            SlideTableLockStateLimitKind::Entries,
+            LimitKind::Entries,
         )
     }
 
-    fn entry_bytes(&mut self, amount: usize) -> Result<(), SlideTableLockStateError> {
+    fn entry_bytes(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.entry_bytes,
             amount,
             self.max_entry_bytes,
-            SlideTableLockStateLimitKind::EntryBytes,
+            LimitKind::EntryBytes,
         )
     }
 
-    fn total_bytes(&mut self, amount: usize) -> Result<(), SlideTableLockStateError> {
+    fn total_bytes(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.total_bytes,
             amount,
             self.max_total_bytes,
-            SlideTableLockStateLimitKind::TotalBytes,
+            LimitKind::TotalBytes,
         )
     }
 
-    fn payload_objects(&mut self, amount: usize) -> Result<(), SlideTableLockStateError> {
+    fn payload_objects(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.payload_objects,
             amount,
             self.max_payload_objects,
-            SlideTableLockStateLimitKind::PayloadObjects,
+            LimitKind::PayloadObjects,
         )
     }
 
-    fn payload_messages(&mut self, amount: usize) -> Result<(), SlideTableLockStateError> {
+    fn payload_messages(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.payload_messages,
             amount,
             self.max_payload_messages,
-            SlideTableLockStateLimitKind::PayloadMessages,
+            LimitKind::PayloadMessages,
         )
     }
 
-    fn components(&mut self, amount: usize) -> Result<(), SlideTableLockStateError> {
+    fn components(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.components,
             amount,
             self.max_components,
-            SlideTableLockStateLimitKind::Components,
+            LimitKind::Components,
         )
     }
 
@@ -402,7 +433,7 @@ impl LockBudget {
         &mut self,
         package: &Package,
         catalog: &litchi_iwa_archive::SourceCatalog,
-    ) -> Result<(), SlideTableLockStateError> {
+    ) -> Result<(), Error> {
         self.entries(catalog.package().len())?;
         self.components(package.state.source.components().len())?;
         for entry in catalog.package().iter() {
@@ -420,14 +451,14 @@ impl LockBudget {
                     .try_fold(0usize, |count, object| {
                         count
                             .checked_add(object.messages.len())
-                            .ok_or(SlideTableLockStateError::InvalidSource)
+                            .ok_or(Error::InvalidSource)
                     })?;
             self.payload_messages(message_count)?;
         }
         Ok(())
     }
 
-    fn physical(&mut self, amount: usize) -> Result<(), SlideTableLockStateError> {
+    fn physical(&mut self, amount: usize) -> Result<(), Error> {
         self.input(amount)?;
         self.work(amount)
     }
@@ -435,7 +466,7 @@ impl LockBudget {
     fn codec_requirements(
         &mut self,
         requirements: table_info_codec::RewriteExecutionRequirements,
-    ) -> Result<(), SlideTableLockStateError> {
+    ) -> Result<(), Error> {
         self.input(requirements.input_bytes())?;
         self.output(requirements.output_bytes())?;
         self.fields(requirements.fields())?;
@@ -445,8 +476,8 @@ impl LockBudget {
         self.scratch(requirements.scratch_bytes())?;
         self.nesting = self.nesting.max(requirements.max_depth() as usize);
         if self.nesting > self.max_nesting {
-            return Err(SlideTableLockStateError::LimitExceeded {
-                kind: SlideTableLockStateLimitKind::WireNesting,
+            return Err(Error::Limit {
+                kind: LimitKind::WireNesting,
                 observed: self.nesting as u64,
                 maximum: self.max_nesting as u64,
             });
@@ -457,7 +488,7 @@ impl LockBudget {
     fn metadata_report(
         &mut self,
         report: package_metadata_codec::RewriteReport,
-    ) -> Result<(), SlideTableLockStateError> {
+    ) -> Result<(), Error> {
         self.input(report.input_bytes())?;
         self.output(report.output_bytes())?;
         self.fields(report.fields())?;
@@ -467,15 +498,15 @@ impl LockBudget {
             report
                 .references_scanned()
                 .checked_add(report.source_references_scanned())
-                .ok_or(SlideTableLockStateError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )?;
         self.allocations(report.allocations())?;
         self.retained(report.retained_bytes())?;
         self.scratch(report.scratch_bytes())?;
         self.nesting = self.nesting.max(report.max_depth() as usize);
         if self.nesting > self.max_nesting {
-            return Err(SlideTableLockStateError::LimitExceeded {
-                kind: SlideTableLockStateLimitKind::WireNesting,
+            return Err(Error::Limit {
+                kind: LimitKind::WireNesting,
                 observed: self.nesting as u64,
                 maximum: self.max_nesting as u64,
             });
@@ -486,7 +517,7 @@ impl LockBudget {
     fn reassembly(
         &mut self,
         requirements: litchi_iwa_archive::package::ReassemblyExecutionRequirements,
-    ) -> Result<(), SlideTableLockStateError> {
+    ) -> Result<(), Error> {
         self.output(requirements.output_bytes())?;
         self.allocations(requirements.allocations())?;
         self.retained(requirements.retained_bytes())?;
@@ -494,7 +525,7 @@ impl LockBudget {
         self.work(requirements.output_bytes())
     }
 
-    fn residual(&self, package: &Package) -> Result<WireLimits, SlideTableLockStateError> {
+    fn residual(&self, package: &Package) -> Result<WireLimits, Error> {
         let base = package.wire_limits().map_err(map_wire_error)?;
         base.with_input_bytes(
             base.max_input_bytes()
@@ -524,62 +555,67 @@ impl LockBudget {
 }
 
 /// One mutable lock value staged against an immutable package snapshot.
-pub struct SlideTableLockStateEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
-    selection: LockSelection,
-    after: State,
+    slide: OwnedSlideSelector,
+    table: TableSelector,
+    selection: OnceLock<LockSelection>,
+    after: Option<State>,
 }
 
-impl fmt::Debug for SlideTableLockStateEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SlideTableLockStateEdit")
-            .field("path", &self.selection.path())
-            .field("before", &self.selection.before)
-            .field("after", &self.after)
+            .debug_struct("Edit")
+            .field("has_selection", &self.selection.get().is_some())
+            .field("has_staged", &self.after.is_some())
             .finish_non_exhaustive()
     }
 }
 
-impl SlideTableLockStateEdit<'_> {
-    #[must_use]
-    pub const fn slide_position(&self) -> Position {
-        self.selection.slide_position
+impl Edit<'_> {
+    fn resolve(&self) -> Result<&LockSelection, Error> {
+        if let Some(selection) = self.selection.get() {
+            return Ok(selection);
+        }
+        let selection = select_table(self.source, self.slide.as_selector(), self.table)?;
+        let _ = self.selection.set(selection);
+        self.selection.get().ok_or(Error::InvalidSource)
     }
 
-    #[must_use]
-    pub const fn table_position(&self) -> Position {
-        self.selection.table_position
+    pub fn slide_position(&self) -> Result<Position, Error> {
+        Ok(self.resolve()?.slide_position)
     }
 
-    #[must_use]
-    pub const fn path(&self) -> SlideTableLockStatePath {
-        self.selection.path()
+    pub fn table_position(&self) -> Result<Position, Error> {
+        Ok(self.resolve()?.table_position)
     }
 
-    #[must_use]
-    pub const fn before(&self) -> State {
-        self.selection.before
+    pub fn path(&self) -> Result<Path, Error> {
+        Ok(self.resolve()?.path())
     }
 
-    #[must_use]
-    pub const fn state(&self) -> State {
-        self.after
+    #[must_use = "handle the deferred table-lock result"]
+    pub fn state(&self) -> Result<State, Error> {
+        self.after()
     }
 
-    #[must_use]
-    pub const fn after(&self) -> State {
-        self.after
+    #[must_use = "handle the deferred table-lock result"]
+    pub fn after(&self) -> Result<State, Error> {
+        if let Some(after) = self.after {
+            return Ok(after);
+        }
+        Ok(self.resolve()?.before)
     }
 
     #[must_use]
     pub fn set(mut self, state: State) -> Self {
-        self.after = state;
+        self.after = Some(state);
         self
     }
 
     pub fn set_state(&mut self, state: State) -> &mut Self {
-        self.after = state;
+        self.after = Some(state);
         self
     }
 
@@ -591,24 +627,30 @@ impl SlideTableLockStateEdit<'_> {
         self.set_state(State::Unlocked)
     }
 
-    pub fn commit(self) -> Result<SlideTableLockStateCommit, SlideTableLockStateError> {
-        commit_edit(self.source, &self.selection, self.after)
+    pub fn before(&self) -> Result<State, Error> {
+        Ok(self.resolve()?.before)
+    }
+
+    pub fn commit(self) -> Result<Commit, Error> {
+        let selection = self.resolve()?.clone();
+        let after = self.after.unwrap_or(selection.before);
+        commit_edit(self.source, &selection, after)
     }
 }
 
 /// Exact-source checked reversible slide-table lock patch.
 #[derive(Clone, PartialEq, Eq)]
-pub struct SlideTableLockStatePatch {
+pub struct Patch {
     artifacts: ExactArtifacts,
     selection: LockSelection,
     before: State,
     after: State,
 }
 
-impl fmt::Debug for SlideTableLockStatePatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SlideTableLockStatePatch")
+            .debug_struct("Patch")
             .field("path", &self.selection.path())
             .field("before", &self.before)
             .field("after", &self.after)
@@ -616,7 +658,7 @@ impl fmt::Debug for SlideTableLockStatePatch {
     }
 }
 
-impl SlideTableLockStatePatch {
+impl Patch {
     #[must_use]
     pub const fn before(&self) -> State {
         self.before
@@ -628,7 +670,7 @@ impl SlideTableLockStatePatch {
     }
 
     #[must_use]
-    pub const fn path(&self) -> SlideTableLockStatePath {
+    pub const fn path(&self) -> Path {
         self.selection.path()
     }
 
@@ -660,14 +702,14 @@ impl SlideTableLockStatePatch {
 
 /// Compact publication diagnostics for one slide-table lock transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SlideTableLockStateDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     deleted_previews: usize,
     full_reparse_performed: bool,
 }
 
-impl SlideTableLockStateDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -710,13 +752,13 @@ impl SlideTableLockStateDiagnostics {
 /// Fully verified result of one slide-table lock transaction.
 #[must_use = "a Keynote slide-table lock commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct SlideTableLockStateCommit {
+pub struct Commit {
     package: Package,
-    patch: SlideTableLockStatePatch,
-    diagnostics: SlideTableLockStateDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl SlideTableLockStateCommit {
+impl Commit {
     #[must_use]
     pub const fn package(&self) -> &Package {
         &self.package
@@ -727,13 +769,19 @@ impl SlideTableLockStateCommit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
     #[must_use]
-    pub const fn patch(&self) -> &SlideTableLockStatePatch {
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
+    #[must_use]
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     #[must_use]
-    pub const fn diagnostics(&self) -> &SlideTableLockStateDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
@@ -767,8 +815,8 @@ impl fmt::Debug for LockSelection {
 }
 
 impl LockSelection {
-    const fn path(&self) -> SlideTableLockStatePath {
-        SlideTableLockStatePath::Table {
+    const fn path(&self) -> Path {
+        Path::Table {
             slide: self.slide_position,
             table: self.table_position,
         }
@@ -790,32 +838,42 @@ impl Package {
         &self,
         slide: impl Into<SlideSelector<'slide>>,
         table: impl Into<TableSelector>,
-    ) -> Result<State, SlideTableLockStateError> {
+    ) -> Result<State, Error> {
         Ok(select_table(self, slide.into(), table.into())?.before)
     }
 
     /// Start an immutable exact edit of one slide table's persisted lock state.
+    ///
+    /// Entry retains only the source and archive-free selectors. Table graph
+    /// selection is deferred until a value is read or the edit is committed.
+    /// Selector names are admitted against the package's finite selector-byte
+    /// limit at entry.
     pub fn edit_slide_table_lock_state<'slide>(
         &self,
         slide: impl Into<SlideSelector<'slide>>,
         table: impl Into<TableSelector>,
-    ) -> Result<SlideTableLockStateEdit<'_>, SlideTableLockStateError> {
-        let selection = select_table(self, slide.into(), table.into())?;
-        Ok(SlideTableLockStateEdit {
+    ) -> Result<Edit<'_>, Error> {
+        let mut selector_bytes = 0;
+        let slide = OwnedSlideSelector::from_selector(
+            slide.into(),
+            self.semantic_limits().max_text_bytes(),
+            &mut selector_bytes,
+        )
+        .map_err(map_selector_error)?;
+        Ok(Edit {
             source: self,
-            after: selection.before,
-            selection,
+            slide,
+            table: table.into(),
+            after: None,
+            selection: OnceLock::new(),
         })
     }
 
     /// Apply an exact-source checked reversible slide-table lock patch.
-    pub fn apply_slide_table_lock_state(
-        &self,
-        patch: &SlideTableLockStatePatch,
-    ) -> Result<SlideTableLockStateCommit, SlideTableLockStateError> {
+    pub fn apply_slide_table_lock_state(&self, patch: &Patch) -> Result<Commit, Error> {
         let catalog = physical_catalog(self)?;
         if !patch.artifacts.authorizes_source(&catalog.shared_source()) {
-            return Err(SlideTableLockStateError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let current = select_table(
             self,
@@ -823,40 +881,47 @@ impl Package {
             TableSelector::position(patch.selection.table_position),
         )?;
         if !same_selection(&current, &patch.selection) || current.before != patch.before {
-            return Err(SlideTableLockStateError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if patch.is_noop() {
-            return Ok(SlideTableLockStateCommit {
+            return Ok(Commit {
                 package: self.snapshot(),
                 patch: patch.clone(),
-                diagnostics: SlideTableLockStateDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         reopen_patch(self, patch, current.admission_budget)
     }
 }
 
-fn commit_edit(
-    source: &Package,
-    selection: &LockSelection,
-    after: State,
-) -> Result<SlideTableLockStateCommit, SlideTableLockStateError> {
+fn map_selector_error(error: SelectorError) -> Error {
+    match error {
+        SelectorError::Limit { observed, maximum } => Error::Limit {
+            kind: LimitKind::SelectorBytes,
+            observed: u64::try_from(observed).unwrap_or(u64::MAX),
+            maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+        },
+        SelectorError::Allocation { amount } => Error::Allocation { amount },
+    }
+}
+
+fn commit_edit(source: &Package, selection: &LockSelection, after: State) -> Result<Commit, Error> {
     let catalog = physical_catalog(source)?;
     if selection.before == after {
         let bytes = catalog.shared_source();
-        return Ok(SlideTableLockStateCommit {
+        return Ok(Commit {
             package: source.snapshot(),
-            patch: SlideTableLockStatePatch {
+            patch: Patch {
                 artifacts: ExactArtifacts::new(Arc::clone(&bytes), bytes),
                 selection: selection.clone(),
                 before: selection.before,
                 after,
             },
-            diagnostics: SlideTableLockStateDiagnostics::unchanged(),
+            diagnostics: Diagnostics::unchanged(),
         });
     }
     if !catalog.source_is_exact() {
-        return Err(SlideTableLockStateError::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let mut budget = selection.admission_budget;
     let candidate = rewrite_lock(source, selection, after, &mut budget)?;
@@ -870,27 +935,23 @@ fn commit_edit(
         &mut budget,
     )?;
     if !same_selection(&selected, selection) || selected.before != after {
-        return Err(SlideTableLockStateError::Verification);
+        return Err(Error::Verification);
     }
     verify_locality(source, &candidate, selection, &mut budget)?;
     let target = physical_catalog(&candidate)?.shared_source();
-    Ok(SlideTableLockStateCommit {
+    Ok(Commit {
         package: candidate,
-        patch: SlideTableLockStatePatch {
+        patch: Patch {
             artifacts: ExactArtifacts::new(Arc::from(source.source_bytes()), target),
             selection: selection.clone(),
             before: selection.before,
             after,
         },
-        diagnostics: SlideTableLockStateDiagnostics::published(),
+        diagnostics: Diagnostics::published(),
     })
 }
 
-fn reopen_patch(
-    source: &Package,
-    patch: &SlideTableLockStatePatch,
-    mut budget: LockBudget,
-) -> Result<SlideTableLockStateCommit, SlideTableLockStateError> {
+fn reopen_patch(source: &Package, patch: &Patch, mut budget: LockBudget) -> Result<Commit, Error> {
     budget.input(patch.artifacts.target().len())?;
     budget.work(patch.artifacts.target().len())?;
     budget.allocations(physical_catalog(source)?.package().len())?;
@@ -907,13 +968,13 @@ fn reopen_patch(
         &mut budget,
     )?;
     if !same_selection(&selected, &patch.selection) || selected.before != patch.after {
-        return Err(SlideTableLockStateError::Verification);
+        return Err(Error::Verification);
     }
     verify_locality(source, &candidate, &patch.selection, &mut budget)?;
-    Ok(SlideTableLockStateCommit {
+    Ok(Commit {
         package: candidate,
         patch: patch.clone(),
-        diagnostics: SlideTableLockStateDiagnostics::published(),
+        diagnostics: Diagnostics::published(),
     })
 }
 
@@ -921,7 +982,7 @@ fn select_table(
     package: &Package,
     slide_selector: SlideSelector<'_>,
     table_selector: TableSelector,
-) -> Result<LockSelection, SlideTableLockStateError> {
+) -> Result<LockSelection, Error> {
     let mut budget = LockBudget::new(package)?;
     select_table_with_budget(package, slide_selector, table_selector, &mut budget)
 }
@@ -931,7 +992,7 @@ fn select_table_with_budget(
     slide_selector: SlideSelector<'_>,
     table_selector: TableSelector,
     budget: &mut LockBudget,
-) -> Result<LockSelection, SlideTableLockStateError> {
+) -> Result<LockSelection, Error> {
     let catalog = physical_catalog(package)?;
     budget.input(package.source_bytes().len())?;
     budget.inventory(package, catalog)?;
@@ -946,12 +1007,12 @@ fn select_table_with_budget(
     let record = package
         .slide_record_at(slide_position.get())
         .map_err(map_read_error)?
-        .ok_or(SlideTableLockStateError::SlidePositionNotFound {
+        .ok_or(Error::Refused(Refusal::SlidePositionNotFound {
             position: slide_position,
-        })?;
+        }))?;
     let (_slide_component, slide) = package
         .object_with_component(record.slide_identifier)
-        .ok_or(SlideTableLockStateError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let (slide_message_index, slide_payload) = unique_message(slide, SLIDE_MESSAGE_TYPE, budget)?;
 
     let wire_limits = budget.residual(package)?;
@@ -966,7 +1027,7 @@ fn select_table_with_budget(
         owned
             .len()
             .checked_add(z_order.len())
-            .ok_or(SlideTableLockStateError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     reject_duplicates(&owned, budget)?;
     reject_duplicates(&z_order, budget)?;
@@ -974,17 +1035,17 @@ fn select_table_with_budget(
 
     let mut candidates = Vec::new();
     budget.allocations(z_order.len())?;
-    candidates.try_reserve_exact(z_order.len()).map_err(|_| {
-        SlideTableLockStateError::Allocation {
+    candidates
+        .try_reserve_exact(z_order.len())
+        .map_err(|_| Error::Allocation {
             amount: z_order.len(),
-        }
-    })?;
+        })?;
 
     for table_info_identifier in z_order {
         let Some((_owner_component, info_object)) =
             package.object_with_component(table_info_identifier)
         else {
-            return Err(SlideTableLockStateError::InvalidSource);
+            return Err(Error::InvalidSource);
         };
         let info_count = info_object
             .messages
@@ -1003,12 +1064,12 @@ fn select_table_with_budget(
         });
         if info_count == 0 {
             if has_role_alias {
-                return Err(SlideTableLockStateError::UnsupportedDependency);
+                return Err(Error::Refused(Refusal::UnsupportedDependency));
             }
             continue;
         }
         if info_count != 1 || has_role_alias {
-            return Err(SlideTableLockStateError::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         if owned
             .iter()
@@ -1016,14 +1077,14 @@ fn select_table_with_budget(
             .count()
             != 1
         {
-            return Err(SlideTableLockStateError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let (info_message_index, info_payload) =
             unique_message(info_object, TABLE_INFO_MESSAGE_TYPE, budget)?;
         let info = decode_table_info(info_payload, package, budget)?;
         let parent = table_parent(info_payload, wire_limits, budget)?;
         if parent != record.slide_identifier {
-            return Err(SlideTableLockStateError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let model_identifier = info.table_model().identifier().get();
         validate_table_info_metadata(
@@ -1035,7 +1096,7 @@ fn select_table_with_budget(
         )?;
         let (model_component, model) = package
             .object_with_component(model_identifier)
-            .ok_or(SlideTableLockStateError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let model_count = model
             .messages
             .iter()
@@ -1052,7 +1113,7 @@ fn select_table_with_budget(
             )
         });
         if model_count != 1 || has_model_role_alias {
-            return Err(SlideTableLockStateError::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         let (model_message_index, model_payload) =
             unique_message(model, TABLE_MODEL_MESSAGE_TYPE, budget)?;
@@ -1068,14 +1129,15 @@ fn select_table_with_budget(
     }
 
     let table_position = table_selector.as_position();
-    let candidate = candidates.get(table_position.get()).copied().ok_or(
-        SlideTableLockStateError::TablePositionNotFound {
+    let candidate = candidates
+        .get(table_position.get())
+        .copied()
+        .ok_or(Error::Refused(Refusal::TablePositionNotFound {
             position: table_position,
-        },
-    )?;
+        }))?;
     let (component_name, _info_object) = package
         .object_with_component(candidate.table_info_identifier)
-        .ok_or(SlideTableLockStateError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     ensure_unique_identity(package, candidate.table_info_identifier, budget)?;
     ensure_unique_identity(package, candidate.model_identifier, budget)?;
     ensure_unique_table_owner(
@@ -1110,10 +1172,7 @@ fn select_table_with_budget(
     })
 }
 
-fn validate_package_metadata(
-    package: &Package,
-    budget: &mut LockBudget,
-) -> Result<(), SlideTableLockStateError> {
+fn validate_package_metadata(package: &Package, budget: &mut LockBudget) -> Result<(), Error> {
     const PACKAGE_METADATA_MESSAGE_TYPE: u32 = 11_006;
 
     let mut payload = None;
@@ -1125,20 +1184,19 @@ fn validate_package_metadata(
                         .data
                         .len()
                         .checked_add(1)
-                        .ok_or(SlideTableLockStateError::InvalidSource)?,
+                        .ok_or(Error::InvalidSource)?,
                 )?;
                 if message.type_ == PACKAGE_METADATA_MESSAGE_TYPE {
                     if payload.replace(message.data.as_slice()).is_some() {
-                        return Err(SlideTableLockStateError::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                 }
             }
         }
     }
-    let payload = payload.ok_or(SlideTableLockStateError::InvalidSource)?;
+    let payload = payload.ok_or(Error::InvalidSource)?;
     let wire = budget.residual(package)?;
-    let recursion =
-        u32::try_from(wire.max_nesting()).map_err(|_| SlideTableLockStateError::InvalidSource)?;
+    let recursion = u32::try_from(wire.max_nesting()).map_err(|_| Error::InvalidSource)?;
     let remaining_references = budget
         .max_references
         .saturating_sub(budget.references)
@@ -1166,7 +1224,7 @@ fn validate_package_metadata(
     .map_err(map_metadata_error)?;
     budget.metadata_report(inspection.report())?;
     if visitor.unknown {
-        return Err(SlideTableLockStateError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -1188,15 +1246,15 @@ fn rewrite_lock(
     selection: &LockSelection,
     after: State,
     budget: &mut LockBudget,
-) -> Result<Package, SlideTableLockStateError> {
+) -> Result<Package, Error> {
     let catalog = physical_catalog(source)?;
     let entry = catalog
         .package()
         .iter()
         .find(|entry| entry.name() == selection.component_name.as_ref())
-        .ok_or(SlideTableLockStateError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(SlideTableLockStateError::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let physical_limits = source.state.options.archive();
     let archive_limits = physical_limits
@@ -1205,34 +1263,31 @@ fn rewrite_lock(
     let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
 
     budget.physical(entry.data().len())?;
-    let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
-        .map_err(map_core_error)?;
+    let stream = SnappyStream::decompress(entry.data(), snappy_limits).map_err(map_core_error)?;
     budget.physical(stream.as_bytes().len())?;
     budget.allocations(1)?;
     budget.retained(stream.as_bytes().len())?;
     budget.scratch(stream.as_bytes().len())?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     charge_archive_inventory(&archive, budget)?;
     let object = archive
         .object(selection.table_info_identifier)
-        .ok_or(SlideTableLockStateError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let original = object
         .messages
         .get(selection.table_info_message_index)
         .filter(|message| message.type_ == TABLE_INFO_MESSAGE_TYPE)
-        .ok_or(SlideTableLockStateError::InvalidSource)?
+        .ok_or(Error::InvalidSource)?
         .data
         .as_slice();
     let current = decode_table_info(original, source, budget)?;
     if State::from_locked(current.locked().unwrap_or(false)) != selection.before {
-        return Err(SlideTableLockStateError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
 
     let write = table_info_codec::TableInfoLockWrite::from_locked(after.is_locked());
     let residual = budget.residual(source)?;
-    let recursion = u32::try_from(residual.max_nesting())
-        .map_err(|_| SlideTableLockStateError::InvalidSource)?;
+    let recursion = u32::try_from(residual.max_nesting()).map_err(|_| Error::InvalidSource)?;
     let options = table_info_codec::DecodeOptions::new(
         residual.max_input_bytes().min(original.len().max(1)),
         residual.max_fields(),
@@ -1265,19 +1320,19 @@ fn rewrite_lock(
         || report.retained_bytes() != requirements.retained_bytes()
         || report.scratch_bytes() != requirements.scratch_bytes()
     {
-        return Err(SlideTableLockStateError::Verification);
+        return Err(Error::Verification);
     }
     let rewritten = output.into_bytes();
     let verified = decode_table_info(&rewritten, source, budget)?;
     if State::from_locked(verified.locked().unwrap_or(false)) != after {
-        return Err(SlideTableLockStateError::Verification);
+        return Err(Error::Verification);
     }
 
     let object = archive
         .object_mut(selection.table_info_identifier)
-        .ok_or(SlideTableLockStateError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             selection.table_info_message_index,
             RawMessage {
                 type_: TABLE_INFO_MESSAGE_TYPE,
@@ -1288,28 +1343,26 @@ fn rewrite_lock(
         .map_err(map_core_error)?;
 
     let encoded_len = archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_core_error)?;
     budget.output(encoded_len)?;
     budget.allocations(1)?;
     budget.retained(encoded_len)?;
     budget.scratch(encoded_len)?;
-    let bytes = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
+    let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     if bytes.len() != encoded_len {
-        return Err(SlideTableLockStateError::Verification);
+        return Err(Error::Verification);
     }
     budget.work(bytes.len())?;
     let compressed_bound =
-        SnappyStream::maximum_compressed_len(encoded_len).map_err(map_core_error)?;
+        SnappyStream::maximum_compressed_len(encoded_len, snappy_limits).map_err(map_core_error)?;
     budget.output(compressed_bound)?;
     budget.allocations(1)?;
     budget.retained(compressed_bound)?;
     budget.scratch(compressed_bound)?;
-    let compressed = SnappyStream::compress(&bytes).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
     if compressed.len() > compressed_bound {
-        return Err(SlideTableLockStateError::Verification);
+        return Err(Error::Verification);
     }
 
     let entry_edits = [EntryEdit::new(
@@ -1338,16 +1391,10 @@ fn decode_table_info(
     payload: &[u8],
     package: &Package,
     budget: &mut LockBudget,
-) -> Result<table_info_codec::TableInfoSnapshot, SlideTableLockStateError> {
+) -> Result<table_info_codec::TableInfoSnapshot, Error> {
     let limits = budget.residual(package)?;
-    let recursion =
-        u32::try_from(limits.max_nesting()).map_err(|_| SlideTableLockStateError::InvalidSource)?;
-    budget.work(
-        payload
-            .len()
-            .checked_mul(2)
-            .ok_or(SlideTableLockStateError::InvalidSource)?,
-    )?;
+    let recursion = u32::try_from(limits.max_nesting()).map_err(|_| Error::InvalidSource)?;
+    budget.work(payload.len().checked_mul(2).ok_or(Error::InvalidSource)?)?;
     table_info_codec::decode_table_info(
         payload,
         table_info_codec::DecodeOptions::new(
@@ -1364,10 +1411,9 @@ fn validate_model_payload(
     payload: &[u8],
     package: &Package,
     budget: &mut LockBudget,
-) -> Result<(), SlideTableLockStateError> {
+) -> Result<(), Error> {
     let limits = budget.residual(package)?;
-    let recursion =
-        u32::try_from(limits.max_nesting()).map_err(|_| SlideTableLockStateError::InvalidSource)?;
+    let recursion = u32::try_from(limits.max_nesting()).map_err(|_| Error::InvalidSource)?;
     let options = table_model_discovery_codec::DecodeOptions::for_source(payload)
         .with_max_input_bytes(limits.max_input_bytes().min(payload.len().max(1)))
         .with_max_fields(limits.max_fields())
@@ -1387,8 +1433,8 @@ fn validate_model_payload(
         budget.nesting = depth;
     }
     if budget.nesting > budget.max_nesting {
-        return Err(SlideTableLockStateError::LimitExceeded {
-            kind: SlideTableLockStateLimitKind::WireNesting,
+        return Err(Error::Limit {
+            kind: LimitKind::WireNesting,
             observed: budget.nesting as u64,
             maximum: budget.max_nesting as u64,
         });
@@ -1402,25 +1448,25 @@ fn validate_slide_metadata(
     owned: &[u64],
     z_order: &[u64],
     budget: &mut LockBudget,
-) -> Result<(), SlideTableLockStateError> {
+) -> Result<(), Error> {
     validate_message_header(object, message_index)?;
     let info = object
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(SlideTableLockStateError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if info.object_references.is_empty() {
-        return Err(SlideTableLockStateError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if !info.data_references.is_empty() {
-        return Err(SlideTableLockStateError::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     reject_duplicates(&info.object_references, budget)?;
     budget.allocations(info.object_references.len())?;
     let mut declared = HashSet::new();
     declared
         .try_reserve(info.object_references.len())
-        .map_err(|_| SlideTableLockStateError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: info.object_references.len(),
         })?;
     for identifier in &info.object_references {
@@ -1429,7 +1475,7 @@ fn validate_slide_metadata(
     for identifier in owned.iter().chain(z_order) {
         budget.work(1)?;
         if !declared.contains(identifier) {
-            return Err(SlideTableLockStateError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     budget.references(info.object_references.len())?;
@@ -1443,10 +1489,10 @@ fn validate_slide_metadata(
                 .object_references
                 .len()
                 .checked_add(field.data_references.len())
-                .ok_or(SlideTableLockStateError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )?;
         if !field.data_references.is_empty() {
-            return Err(SlideTableLockStateError::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         match field.path.as_slice() {
             [SLIDE_OWNED_DRAWABLES_FIELD] => {
@@ -1454,7 +1500,7 @@ fn validate_slide_metadata(
                     || !is_message_reference_field(field)
                     || field.object_references.as_slice() != owned
                 {
-                    return Err(SlideTableLockStateError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 saw_owned = true;
             },
@@ -1463,12 +1509,12 @@ fn validate_slide_metadata(
                     || !is_message_reference_field(field)
                     || field.object_references.as_slice() != z_order
                 {
-                    return Err(SlideTableLockStateError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 saw_z_order = true;
             },
             _ if !field.object_references.is_empty() => {
-                return Err(SlideTableLockStateError::UnsupportedDependency);
+                return Err(Error::Refused(Refusal::UnsupportedDependency));
             },
             _ => {},
         }
@@ -1482,18 +1528,18 @@ fn validate_table_info_metadata(
     parent: u64,
     model: u64,
     budget: &mut LockBudget,
-) -> Result<(), SlideTableLockStateError> {
+) -> Result<(), Error> {
     validate_message_header(object, message_index)?;
     let info = object
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(SlideTableLockStateError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if info.object_references.is_empty() {
-        return Err(SlideTableLockStateError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if !info.data_references.is_empty() {
-        return Err(SlideTableLockStateError::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     reject_duplicates(&info.object_references, budget)?;
     if info
@@ -1509,7 +1555,7 @@ fn validate_table_info_metadata(
             .count()
             != 1
     {
-        return Err(SlideTableLockStateError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     budget.references(info.object_references.len())?;
     budget.fields(info.field_infos.len())?;
@@ -1522,10 +1568,10 @@ fn validate_table_info_metadata(
                 .object_references
                 .len()
                 .checked_add(field.data_references.len())
-                .ok_or(SlideTableLockStateError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )?;
         if !field.data_references.is_empty() {
-            return Err(SlideTableLockStateError::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         match field.path.as_slice() {
             [TABLE_MODEL_FIELD] => {
@@ -1534,7 +1580,7 @@ fn validate_table_info_metadata(
                     || field.object_references.as_slice() != [model]
                     || !field.data_references.is_empty()
                 {
-                    return Err(SlideTableLockStateError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 saw_model = true;
             },
@@ -1544,12 +1590,12 @@ fn validate_table_info_metadata(
                     || field.object_references.as_slice() != [parent]
                     || !field.data_references.is_empty()
                 {
-                    return Err(SlideTableLockStateError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 saw_parent = true;
             },
             _ if !field.object_references.is_empty() => {
-                return Err(SlideTableLockStateError::UnsupportedDependency);
+                return Err(Error::Refused(Refusal::UnsupportedDependency));
             },
             _ => {},
         }
@@ -1563,22 +1609,19 @@ fn is_message_reference_field(field: &litchi_iwa_core::FieldInfo) -> bool {
         .is_none_or(|field_type| field_type == litchi_iwa_core::FieldType::Message)
 }
 
-fn validate_message_header(
-    object: &ArchiveObject,
-    message_index: usize,
-) -> Result<(), SlideTableLockStateError> {
+fn validate_message_header(object: &ArchiveObject, message_index: usize) -> Result<(), Error> {
     if object.messages.len() != object.archive_info.message_infos.len() {
-        return Err(SlideTableLockStateError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let message = object
         .messages
         .get(message_index)
-        .ok_or(SlideTableLockStateError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let info = object
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(SlideTableLockStateError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if message.type_ != info.type_
         || usize::try_from(info.length).ok() != Some(message.data.len())
         || object.archive_info.should_merge == Some(true)
@@ -1588,7 +1631,7 @@ fn validate_message_header(
         || !info.fields_to_remove.is_empty()
         || !info.diff_read_version.is_empty()
     {
-        return Err(SlideTableLockStateError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -1597,9 +1640,9 @@ fn unique_message<'a>(
     object: &'a ArchiveObject,
     message_type: u32,
     budget: &mut LockBudget,
-) -> Result<(usize, &'a [u8]), SlideTableLockStateError> {
+) -> Result<(usize, &'a [u8]), Error> {
     if object.messages.len() != object.archive_info.message_infos.len() {
-        return Err(SlideTableLockStateError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut selected = None;
     for (index, message) in object.messages.iter().enumerate() {
@@ -1608,17 +1651,17 @@ fn unique_message<'a>(
                 .data
                 .len()
                 .checked_add(1)
-                .ok_or(SlideTableLockStateError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )?;
         validate_message_header(object, index)?;
         if message.type_ == message_type {
             if selected.is_some() {
-                return Err(SlideTableLockStateError::UnsupportedDependency);
+                return Err(Error::Refused(Refusal::UnsupportedDependency));
             }
             selected = Some((index, message.data.as_slice()));
         }
     }
-    selected.ok_or(SlideTableLockStateError::InvalidSource)
+    selected.ok_or(Error::InvalidSource)
 }
 
 fn repeated_references(
@@ -1626,8 +1669,8 @@ fn repeated_references(
     field_number: u32,
     limits: WireLimits,
     budget: &mut LockBudget,
-) -> Result<Vec<u64>, SlideTableLockStateError> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+) -> Result<Vec<u64>, Error> {
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let count = fields
         .fields()
         .filter(|field| field.number() == field_number)
@@ -1636,7 +1679,7 @@ fn repeated_references(
     budget.allocations(count)?;
     result
         .try_reserve_exact(count)
-        .map_err(|_| SlideTableLockStateError::Allocation { amount: count })?;
+        .map_err(|_| Error::Allocation { amount: count })?;
     budget.fields(count)?;
     budget.work(payload.len())?;
     for field in fields
@@ -1645,57 +1688,48 @@ fn repeated_references(
     {
         field.validate_canonical_framing().map_err(map_wire_error)?;
         if field.wire_type() != 2 {
-            return Err(SlideTableLockStateError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         result.push(strict_reference(field.payload(), limits, budget)?);
     }
     Ok(result)
 }
 
-fn table_parent(
-    payload: &[u8],
-    limits: WireLimits,
-    budget: &mut LockBudget,
-) -> Result<u64, SlideTableLockStateError> {
+fn table_parent(payload: &[u8], limits: WireLimits, budget: &mut LockBudget) -> Result<u64, Error> {
     budget.work(payload.len())?;
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut super_payload = None;
     let mut super_count = 0usize;
     for field in fields.fields() {
         budget.fields(1)?;
         field.validate_canonical_framing().map_err(map_wire_error)?;
         if field.number() == TABLE_SUPER_FIELD {
-            super_count = super_count
-                .checked_add(1)
-                .ok_or(SlideTableLockStateError::InvalidSource)?;
+            super_count = super_count.checked_add(1).ok_or(Error::InvalidSource)?;
             super_payload = Some(field);
         }
     }
     let Some(super_field) = super_payload else {
-        return Err(SlideTableLockStateError::InvalidSource);
+        return Err(Error::InvalidSource);
     };
     if super_count != 1 || super_field.wire_type() != 2 {
-        return Err(SlideTableLockStateError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
-    let drawable =
-        WireView::parse_with_limits(super_field.payload(), limits).map_err(map_wire_error)?;
+    let drawable = WireView::parse(super_field.payload(), limits).map_err(map_wire_error)?;
     let mut parent_payload = None;
     let mut parent_count = 0usize;
     for field in drawable.fields() {
         budget.fields(1)?;
         field.validate_canonical_framing().map_err(map_wire_error)?;
         if field.number() == DRAWABLE_PARENT_FIELD {
-            parent_count = parent_count
-                .checked_add(1)
-                .ok_or(SlideTableLockStateError::InvalidSource)?;
+            parent_count = parent_count.checked_add(1).ok_or(Error::InvalidSource)?;
             parent_payload = Some(field);
         }
     }
     let Some(parent_field) = parent_payload else {
-        return Err(SlideTableLockStateError::InvalidSource);
+        return Err(Error::InvalidSource);
     };
     if parent_count != 1 || parent_field.wire_type() != 2 {
-        return Err(SlideTableLockStateError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     strict_reference(parent_field.payload(), limits, budget)
 }
@@ -1704,8 +1738,8 @@ fn strict_reference(
     payload: &[u8],
     limits: WireLimits,
     budget: &mut LockBudget,
-) -> Result<u64, SlideTableLockStateError> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+) -> Result<u64, Error> {
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut identifier = None;
     for field in fields.fields() {
         budget.fields(1)?;
@@ -1713,36 +1747,33 @@ fn strict_reference(
         match field.number() {
             1 => {
                 if field.wire_type() != 0 || identifier.is_some() {
-                    return Err(SlideTableLockStateError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
-                let (value, width) = decode_varint_from_bytes(field.payload())
-                    .map_err(|_| SlideTableLockStateError::InvalidSource)?;
+                let (value, width) =
+                    decode_varint_from_bytes(field.payload()).map_err(|_| Error::InvalidSource)?;
                 if value == 0 || width != encoded_len(value) {
-                    return Err(SlideTableLockStateError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 identifier = Some(value);
             },
-            2 | 3 => return Err(SlideTableLockStateError::UnsupportedDependency),
-            _ => return Err(SlideTableLockStateError::InvalidSource),
+            2 | 3 => return Err(Error::Refused(Refusal::UnsupportedDependency)),
+            _ => return Err(Error::InvalidSource),
         }
     }
-    identifier.ok_or(SlideTableLockStateError::InvalidSource)
+    identifier.ok_or(Error::InvalidSource)
 }
 
-fn reject_duplicates(
-    values: &[u64],
-    budget: &mut LockBudget,
-) -> Result<(), SlideTableLockStateError> {
+fn reject_duplicates(values: &[u64], budget: &mut LockBudget) -> Result<(), Error> {
     budget.allocations(values.len())?;
     let mut seen = HashSet::new();
     seen.try_reserve(values.len())
-        .map_err(|_| SlideTableLockStateError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: values.len(),
         })?;
     for value in values {
         budget.work(1)?;
         if !seen.insert(*value) {
-            return Err(SlideTableLockStateError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(())
@@ -1752,20 +1783,18 @@ fn ensure_unique_identity(
     package: &Package,
     identifier: u64,
     budget: &mut LockBudget,
-) -> Result<(), SlideTableLockStateError> {
+) -> Result<(), Error> {
     let mut count = 0usize;
     for component in package.state.source.components().iter() {
         for object in &component.archive().objects {
             budget.work(1)?;
             if object.archive_info.identifier == Some(identifier) {
-                count = count
-                    .checked_add(1)
-                    .ok_or(SlideTableLockStateError::InvalidSource)?;
+                count = count.checked_add(1).ok_or(Error::InvalidSource)?;
             }
         }
     }
     if count != 1 {
-        return Err(SlideTableLockStateError::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     Ok(())
 }
@@ -1777,7 +1806,7 @@ fn ensure_unique_table_owner(
     model_identifier: u64,
     limits: WireLimits,
     budget: &mut LockBudget,
-) -> Result<(), SlideTableLockStateError> {
+) -> Result<(), Error> {
     let mut owned_count = 0usize;
     let mut z_order_count = 0usize;
     let mut selected_slide = false;
@@ -1825,7 +1854,7 @@ fn ensure_unique_table_owner(
     if owned_count == 1 && z_order_count == 1 && selected_slide && model_owners == 1 {
         Ok(())
     } else {
-        Err(SlideTableLockStateError::UnsupportedDependency)
+        Err(Error::Refused(Refusal::UnsupportedDependency))
     }
 }
 
@@ -1835,7 +1864,7 @@ fn validate_global_inbound_references(
     table_info_identifier: u64,
     model_identifier: u64,
     budget: &mut LockBudget,
-) -> Result<(), SlideTableLockStateError> {
+) -> Result<(), Error> {
     let archive_limits = package
         .state
         .options
@@ -1844,41 +1873,41 @@ fn validate_global_inbound_references(
         .map_err(map_archive_error)?;
     let (_, slide) = package
         .object_with_component(slide_identifier)
-        .ok_or(SlideTableLockStateError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let slide_message_index = slide
         .messages
         .iter()
         .position(|message| message.type_ == SLIDE_MESSAGE_TYPE)
-        .ok_or(SlideTableLockStateError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let slide_info = slide
         .archive_info
         .message_infos
         .get(slide_message_index)
-        .ok_or(SlideTableLockStateError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let (_, table_info) = package
         .object_with_component(table_info_identifier)
-        .ok_or(SlideTableLockStateError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let table_info_message_index = table_info
         .messages
         .iter()
         .position(|message| message.type_ == TABLE_INFO_MESSAGE_TYPE)
-        .ok_or(SlideTableLockStateError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let table_info_info = table_info
         .archive_info
         .message_infos
         .get(table_info_message_index)
-        .ok_or(SlideTableLockStateError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let expected_info_edges = reference_occurrence_count(slide_info, table_info_identifier)?;
     let expected_model_edges = reference_occurrence_count(table_info_info, model_identifier)?;
     if expected_info_edges == 0 || expected_model_edges == 0 {
-        return Err(SlideTableLockStateError::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     budget.work(
         slide_info
             .field_infos
             .len()
             .checked_add(table_info_info.field_infos.len())
-            .ok_or(SlideTableLockStateError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     let mut census = InboundReferenceCensus {
         slide_identifier,
@@ -1910,7 +1939,7 @@ fn validate_global_inbound_references(
             if object.archive_info.identifier.is_none()
                 || object.messages.len() != object.archive_info.message_infos.len()
             {
-                return Err(SlideTableLockStateError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             let field_count = object
                 .archive_info
@@ -1918,9 +1947,7 @@ fn validate_global_inbound_references(
                 .iter()
                 .map(|info| info.field_infos.len())
                 .try_fold(0usize, |count, fields| {
-                    count
-                        .checked_add(fields)
-                        .ok_or(SlideTableLockStateError::InvalidSource)
+                    count.checked_add(fields).ok_or(Error::InvalidSource)
                 })?;
             let reference_count =
                 object
@@ -1935,29 +1962,25 @@ fn validate_global_inbound_references(
                                     .and_then(|count| {
                                         count.checked_add(field.data_references.len())
                                     })
-                                    .ok_or(SlideTableLockStateError::InvalidSource)
+                                    .ok_or(Error::InvalidSource)
                             })?;
                         let references = info
                             .object_references
                             .len()
                             .checked_add(info.data_references.len())
                             .and_then(|count| count.checked_add(field_references))
-                            .ok_or(SlideTableLockStateError::InvalidSource)?;
-                        count
-                            .checked_add(references)
-                            .ok_or(SlideTableLockStateError::InvalidSource)
+                            .ok_or(Error::InvalidSource)?;
+                        count.checked_add(references).ok_or(Error::InvalidSource)
                     })?;
             let message_bytes = object
                 .messages
                 .iter()
                 .map(|message| message.data.len())
                 .try_fold(0usize, |count, bytes| {
-                    count
-                        .checked_add(bytes)
-                        .ok_or(SlideTableLockStateError::InvalidSource)
+                    count.checked_add(bytes).ok_or(Error::InvalidSource)
                 })?;
             let header_bytes = usize::try_from(object.header_length).unwrap_or(usize::MAX);
-            // `inspect_references_with_policy_and_limits` canonicalizes and
+            // `inspect_references_with_policy` canonicalizes and
             // walks the complete ArchiveInfo header. Debit that work before
             // entering the visitor so a hostile header cannot spend the
             // transaction budget after the scan has already run.
@@ -1970,7 +1993,7 @@ fn validate_global_inbound_references(
                     .checked_add(field_count)
                     .and_then(|value| value.checked_add(reference_count))
                     .and_then(|value| value.checked_add(1))
-                    .ok_or(SlideTableLockStateError::InvalidSource)?,
+                    .ok_or(Error::InvalidSource)?,
             )?;
             budget.retained(header_bytes)?;
             budget.scratch(header_bytes)?;
@@ -1981,10 +2004,10 @@ fn validate_global_inbound_references(
                     .checked_add(message_bytes)
                     .and_then(|value| value.checked_add(field_count))
                     .and_then(|value| value.checked_add(header_bytes))
-                    .ok_or(SlideTableLockStateError::InvalidSource)?,
+                    .ok_or(Error::InvalidSource)?,
             )?;
             object
-                .inspect_references_with_policy_and_limits(
+                .inspect_references_with_policy(
                     &mut census,
                     ArchiveReferencePolicy::RejectUnknownMetadata,
                     archive_limits,
@@ -1996,7 +2019,7 @@ fn validate_global_inbound_references(
         || census.info_edges != census.expected_info_edges
         || census.model_edges != census.expected_model_edges
     {
-        return Err(SlideTableLockStateError::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     Ok(())
 }
@@ -2004,7 +2027,7 @@ fn validate_global_inbound_references(
 fn reference_occurrence_count(
     info: &litchi_iwa_core::MessageInfo,
     identifier: u64,
-) -> Result<usize, SlideTableLockStateError> {
+) -> Result<usize, Error> {
     let direct = info
         .object_references
         .iter()
@@ -2016,9 +2039,7 @@ fn reference_occurrence_count(
             .iter()
             .filter(|value| **value == identifier)
             .count();
-        count
-            .checked_add(nested)
-            .ok_or(SlideTableLockStateError::InvalidSource)
+        count.checked_add(nested).ok_or(Error::InvalidSource)
     })
 }
 
@@ -2107,18 +2128,18 @@ fn verify_locality(
     candidate: &Package,
     selection: &LockSelection,
     budget: &mut LockBudget,
-) -> Result<(), SlideTableLockStateError> {
+) -> Result<(), Error> {
     let source_catalog = physical_catalog(source)?;
     let candidate_catalog = physical_catalog(candidate)?;
     if source_catalog.package().len() != candidate_catalog.package().len() {
-        return Err(SlideTableLockStateError::Verification);
+        return Err(Error::Verification);
     }
     budget.entries(
         source_catalog
             .package()
             .len()
             .checked_add(candidate_catalog.package().len())
-            .ok_or(SlideTableLockStateError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     for (entry, other) in source_catalog
         .package()
@@ -2129,7 +2150,7 @@ fn verify_locality(
             .data()
             .len()
             .checked_add(other.data().len())
-            .ok_or(SlideTableLockStateError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         budget.entry_bytes(entry_bytes)?;
         budget.total_bytes(entry_bytes)?;
         budget.work(
@@ -2138,22 +2159,22 @@ fn verify_locality(
                 .len()
                 .checked_add(entry.name().len())
                 .and_then(|value| value.checked_add(other.data().len()))
-                .ok_or(SlideTableLockStateError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )?;
         if other.name() != entry.name() {
-            return Err(SlideTableLockStateError::Verification);
+            return Err(Error::Verification);
         }
         if entry.name() != selection.component_name.as_ref()
             && (entry.data() != other.data() || entry.metadata() != other.metadata())
         {
-            return Err(SlideTableLockStateError::Verification);
+            return Err(Error::Verification);
         }
     }
     let source_archive = component_archive(source, selection.component_name.as_ref(), budget)?;
     let candidate_archive =
         component_archive(candidate, selection.component_name.as_ref(), budget)?;
     if source_archive.objects.len() != candidate_archive.objects.len() {
-        return Err(SlideTableLockStateError::Verification);
+        return Err(Error::Verification);
     }
     let archive_limits = source
         .state
@@ -2165,18 +2186,18 @@ fn verify_locality(
         let identifier = source_object
             .archive_info
             .identifier
-            .ok_or(SlideTableLockStateError::Verification)?;
+            .ok_or(Error::Verification)?;
         let candidate_object = candidate_archive
             .object(identifier)
-            .ok_or(SlideTableLockStateError::Verification)?;
+            .ok_or(Error::Verification)?;
         if identifier == selection.table_info_identifier {
             let candidate_message = candidate_object
                 .messages
                 .get(selection.table_info_message_index)
-                .ok_or(SlideTableLockStateError::Verification)?;
+                .ok_or(Error::Verification)?;
             let mut expected = source_object.clone();
             expected
-                .replace_message_preserving_header_with_limits(
+                .replace_message_preserving_header(
                     selection.table_info_message_index,
                     candidate_message.clone(),
                     archive_limits,
@@ -2185,10 +2206,10 @@ fn verify_locality(
             expected.header_length = candidate_object.header_length;
             expected.data_length = candidate_object.data_length;
             if !expected.same_content_ignoring_offsets(candidate_object) {
-                return Err(SlideTableLockStateError::Verification);
+                return Err(Error::Verification);
             }
         } else if !source_object.same_content_ignoring_offsets(candidate_object) {
-            return Err(SlideTableLockStateError::Verification);
+            return Err(Error::Verification);
         }
     }
     Ok(())
@@ -2198,15 +2219,15 @@ fn component_archive(
     package: &Package,
     name: &str,
     budget: &mut LockBudget,
-) -> Result<Archive, SlideTableLockStateError> {
+) -> Result<Archive, Error> {
     let catalog = physical_catalog(package)?;
     let entry = catalog
         .package()
         .iter()
         .find(|entry| entry.name() == name)
-        .ok_or(SlideTableLockStateError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(SlideTableLockStateError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     budget.physical(entry.data().len())?;
     let snappy = package
@@ -2221,30 +2242,24 @@ fn component_archive(
         .archive()
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    let stream =
-        SnappyStream::decompress_with_limits(entry.data(), snappy).map_err(map_core_error)?;
+    let stream = SnappyStream::decompress(entry.data(), snappy).map_err(map_core_error)?;
     budget.physical(stream.as_bytes().len())?;
     budget.allocations(1)?;
     budget.retained(stream.as_bytes().len())?;
     budget.scratch(stream.as_bytes().len())?;
-    let archive = Archive::parse_with_limits(stream.as_bytes(), limits).map_err(map_core_error)?;
+    let archive = Archive::parse(stream.as_bytes(), limits).map_err(map_core_error)?;
     charge_archive_inventory(&archive, budget)?;
     Ok(archive)
 }
 
-fn charge_archive_inventory(
-    archive: &Archive,
-    budget: &mut LockBudget,
-) -> Result<(), SlideTableLockStateError> {
+fn charge_archive_inventory(archive: &Archive, budget: &mut LockBudget) -> Result<(), Error> {
     let objects = archive.objects.len();
     let messages = archive
         .objects
         .iter()
         .map(|object| object.messages.len())
         .try_fold(0usize, |count, value| {
-            count
-                .checked_add(value)
-                .ok_or(SlideTableLockStateError::InvalidSource)
+            count.checked_add(value).ok_or(Error::InvalidSource)
         })?;
     let fields = archive
         .objects
@@ -2252,9 +2267,7 @@ fn charge_archive_inventory(
         .flat_map(|object| object.archive_info.message_infos.iter())
         .map(|info| info.field_infos.len())
         .try_fold(0usize, |count, value| {
-            count
-                .checked_add(value)
-                .ok_or(SlideTableLockStateError::InvalidSource)
+            count.checked_add(value).ok_or(Error::InvalidSource)
         })?;
     let references = archive
         .objects
@@ -2265,13 +2278,13 @@ fn charge_archive_inventory(
                 count
                     .checked_add(field.object_references.len())
                     .and_then(|value| value.checked_add(field.data_references.len()))
-                    .ok_or(SlideTableLockStateError::InvalidSource)
+                    .ok_or(Error::InvalidSource)
             })?;
             count
                 .checked_add(info.object_references.len())
                 .and_then(|value| value.checked_add(info.data_references.len()))
                 .and_then(|value| value.checked_add(nested))
-                .ok_or(SlideTableLockStateError::InvalidSource)
+                .ok_or(Error::InvalidSource)
         })?;
     let message_bytes = archive
         .objects
@@ -2279,9 +2292,7 @@ fn charge_archive_inventory(
         .flat_map(|object| object.messages.iter())
         .map(|message| message.data.len())
         .try_fold(0usize, |count, value| {
-            count
-                .checked_add(value)
-                .ok_or(SlideTableLockStateError::InvalidSource)
+            count.checked_add(value).ok_or(Error::InvalidSource)
         })?;
     budget.payload_objects(objects)?;
     budget.payload_messages(messages)?;
@@ -2292,7 +2303,7 @@ fn charge_archive_inventory(
             .checked_add(messages)
             .and_then(|value| value.checked_add(fields))
             .and_then(|value| value.checked_add(references))
-            .ok_or(SlideTableLockStateError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     budget.work(
         objects
@@ -2300,27 +2311,27 @@ fn charge_archive_inventory(
             .and_then(|value| value.checked_add(fields))
             .and_then(|value| value.checked_add(references))
             .and_then(|value| value.checked_add(message_bytes))
-            .ok_or(SlideTableLockStateError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )
 }
 
 fn resolve_slide_position(
     package: &Package,
     selector: SlideSelector<'_>,
-) -> Result<Position, SlideTableLockStateError> {
+) -> Result<Position, Error> {
     match selector {
         SlideSelector::Position(position) => Ok(position),
         SlideSelector::Name(name) => {
             if name.is_empty() {
-                return Err(SlideTableLockStateError::EmptySlideName);
+                return Err(Error::Refused(Refusal::EmptySlideName));
             }
             package
                 .show()
                 .map_err(map_read_error)?
                 .select_slide(selector)
-                .map_err(|_| SlideTableLockStateError::AmbiguousSelector)?
+                .map_err(|_| Error::Refused(Refusal::AmbiguousSelector))?
                 .map(|slide| Position::new(slide.index()))
-                .ok_or(SlideTableLockStateError::SlideNameNotFound)
+                .ok_or(Error::Refused(Refusal::SlideNameNotFound))
         },
     }
 }
@@ -2337,262 +2348,228 @@ fn same_selection(left: &LockSelection, right: &LockSelection) -> bool {
         && left.component_name == right.component_name
 }
 
-fn physical_catalog(
-    package: &Package,
-) -> Result<&litchi_iwa_archive::SourceCatalog, SlideTableLockStateError> {
+fn physical_catalog(package: &Package) -> Result<&litchi_iwa_archive::SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
-        PhysicalSource::Semantic(_) => Err(SlideTableLockStateError::UnsupportedSource),
+        PhysicalSource::Semantic(_) => Err(Error::Refused(Refusal::UnsupportedSource)),
     }
 }
 
-fn map_read_error(error: ReadError) -> SlideTableLockStateError {
+fn map_read_error(error: ReadError) -> Error {
     match error {
         ReadError::SemanticLimit {
             kind,
             observed,
             maximum,
             ..
-        } => SlideTableLockStateError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                SemanticLimitKind::References => SlideTableLockStateLimitKind::References,
-                _ => SlideTableLockStateLimitKind::WireWork,
+                SemanticLimitKind::References => LimitKind::References,
+                _ => LimitKind::WireWork,
             },
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        ReadError::Allocation { amount, .. } => SlideTableLockStateError::Allocation { amount },
-        _ => SlideTableLockStateError::InvalidSource,
+        ReadError::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_table_info_error(error: table_info_codec::DecodeError) -> SlideTableLockStateError {
+fn map_table_info_error(error: table_info_codec::DecodeError) -> Error {
     if let Some(amount) = error.allocation_amount() {
-        return SlideTableLockStateError::Allocation { amount };
+        return Error::Allocation { amount };
     }
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return SlideTableLockStateError::LimitExceeded {
-            kind: SlideTableLockStateLimitKind::WireFields,
+        return Error::Limit {
+            kind: LimitKind::WireFields,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return SlideTableLockStateError::LimitExceeded {
-            kind: SlideTableLockStateLimitKind::WireWork,
+        return Error::Limit {
+            kind: LimitKind::WireWork,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some((observed, maximum)) = error.output_limit_values() {
-        return SlideTableLockStateError::LimitExceeded {
-            kind: SlideTableLockStateLimitKind::OutputBytes,
+        return Error::Limit {
+            kind: LimitKind::OutputBytes,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some((observed, maximum)) = error.allocation_limit_values() {
-        return SlideTableLockStateError::LimitExceeded {
-            kind: SlideTableLockStateLimitKind::Allocations,
+        return Error::Limit {
+            kind: LimitKind::Allocations,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some((observed, maximum)) = error.retained_limit_values() {
-        return SlideTableLockStateError::LimitExceeded {
-            kind: SlideTableLockStateLimitKind::Retained,
+        return Error::Limit {
+            kind: LimitKind::Retained,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some((observed, maximum)) = error.scratch_limit_values() {
-        return SlideTableLockStateError::LimitExceeded {
-            kind: SlideTableLockStateLimitKind::Scratch,
+        return Error::Limit {
+            kind: LimitKind::Scratch,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some(limit) = error.wire_resource_limit() {
         return match limit {
-            table_info_codec::WireResourceLimit::Bytes { observed, maximum } => {
-                SlideTableLockStateError::LimitExceeded {
-                    kind: SlideTableLockStateLimitKind::InputBytes,
-                    observed: observed.unwrap_or_default() as u64,
-                    maximum: maximum.unwrap_or_default() as u64,
-                }
+            table_info_codec::WireResourceLimit::Bytes { observed, maximum } => Error::Limit {
+                kind: LimitKind::InputBytes,
+                observed: observed.unwrap_or_default() as u64,
+                maximum: maximum.unwrap_or_default() as u64,
             },
-            table_info_codec::WireResourceLimit::Nesting { observed, maximum } => {
-                SlideTableLockStateError::LimitExceeded {
-                    kind: SlideTableLockStateLimitKind::WireNesting,
-                    observed: observed.unwrap_or_default() as u64,
-                    maximum: maximum.unwrap_or_default() as u64,
-                }
+            table_info_codec::WireResourceLimit::Nesting { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireNesting,
+                observed: observed.unwrap_or_default() as u64,
+                maximum: maximum.unwrap_or_default() as u64,
             },
-            _ => SlideTableLockStateError::InvalidSource,
+            _ => Error::InvalidSource,
         };
     }
-    SlideTableLockStateError::InvalidSource
+    Error::InvalidSource
 }
 
-fn map_metadata_error(error: package_metadata_codec::RewriteError) -> SlideTableLockStateError {
+fn map_metadata_error(error: package_metadata_codec::RewriteError) -> Error {
     if let Some(amount) = error.allocation_request() {
-        return SlideTableLockStateError::Allocation { amount };
+        return Error::Allocation { amount };
     }
     let Some(limit) = error.resource_limit() else {
-        return SlideTableLockStateError::InvalidSource;
+        return Error::InvalidSource;
     };
     let (kind, observed, maximum) = match limit {
         package_metadata_codec::RewriteLimit::InputBytes { observed, maximum } => {
-            (SlideTableLockStateLimitKind::InputBytes, observed, maximum)
+            (LimitKind::InputBytes, observed, maximum)
         },
         package_metadata_codec::RewriteLimit::OutputBytes { observed, maximum } => {
-            (SlideTableLockStateLimitKind::OutputBytes, observed, maximum)
+            (LimitKind::OutputBytes, observed, maximum)
         },
         package_metadata_codec::RewriteLimit::Fields { observed, maximum } => {
-            (SlideTableLockStateLimitKind::WireFields, observed, maximum)
+            (LimitKind::WireFields, observed, maximum)
         },
         package_metadata_codec::RewriteLimit::Work { observed, maximum } => {
-            (SlideTableLockStateLimitKind::WireWork, observed, maximum)
+            (LimitKind::WireWork, observed, maximum)
         },
         package_metadata_codec::RewriteLimit::Nesting { observed, maximum } => {
-            return SlideTableLockStateError::LimitExceeded {
-                kind: SlideTableLockStateLimitKind::WireNesting,
+            return Error::Limit {
+                kind: LimitKind::WireNesting,
                 observed: u64::from(observed),
                 maximum: u64::from(maximum),
             };
         },
         package_metadata_codec::RewriteLimit::Components { observed, maximum } => {
-            (SlideTableLockStateLimitKind::Components, observed, maximum)
+            (LimitKind::Components, observed, maximum)
         },
         package_metadata_codec::RewriteLimit::References { observed, maximum } => {
-            (SlideTableLockStateLimitKind::References, observed, maximum)
+            (LimitKind::References, observed, maximum)
         },
         package_metadata_codec::RewriteLimit::Additions { observed, maximum } => {
-            (SlideTableLockStateLimitKind::Allocations, observed, maximum)
+            (LimitKind::Allocations, observed, maximum)
         },
-        _ => return SlideTableLockStateError::InvalidSource,
+        _ => return Error::InvalidSource,
     };
-    SlideTableLockStateError::LimitExceeded {
+    Error::Limit {
         kind,
         observed: observed as u64,
         maximum: maximum as u64,
     }
 }
 
-fn map_table_model_error(
-    error: table_model_discovery_codec::DecodeError,
-) -> SlideTableLockStateError {
+fn map_table_model_error(error: table_model_discovery_codec::DecodeError) -> Error {
     let Some(limit) = error.resource_limit() else {
-        return SlideTableLockStateError::InvalidSource;
+        return Error::InvalidSource;
     };
     match limit {
-        table_model_discovery_codec::DecodeLimit::Bytes { observed, maximum } => {
-            SlideTableLockStateError::LimitExceeded {
-                kind: SlideTableLockStateLimitKind::InputBytes,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        table_model_discovery_codec::DecodeLimit::Bytes { observed, maximum } => Error::Limit {
+            kind: LimitKind::InputBytes,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        table_model_discovery_codec::DecodeLimit::Fields { observed, maximum } => {
-            SlideTableLockStateError::LimitExceeded {
-                kind: SlideTableLockStateLimitKind::WireFields,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        table_model_discovery_codec::DecodeLimit::Fields { observed, maximum } => Error::Limit {
+            kind: LimitKind::WireFields,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        table_model_discovery_codec::DecodeLimit::Work { observed, maximum } => {
-            SlideTableLockStateError::LimitExceeded {
-                kind: SlideTableLockStateLimitKind::WireWork,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        table_model_discovery_codec::DecodeLimit::Work { observed, maximum } => Error::Limit {
+            kind: LimitKind::WireWork,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        table_model_discovery_codec::DecodeLimit::Text { observed, maximum } => {
-            SlideTableLockStateError::LimitExceeded {
-                kind: SlideTableLockStateLimitKind::WireWork,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        table_model_discovery_codec::DecodeLimit::Text { observed, maximum } => Error::Limit {
+            kind: LimitKind::WireWork,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        table_model_discovery_codec::DecodeLimit::Nesting { observed, maximum } => {
-            SlideTableLockStateError::LimitExceeded {
-                kind: SlideTableLockStateLimitKind::WireNesting,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        table_model_discovery_codec::DecodeLimit::Nesting { observed, maximum } => Error::Limit {
+            kind: LimitKind::WireNesting,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        _ => SlideTableLockStateError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_wire_error(_error: litchi_iwa_common::Error) -> SlideTableLockStateError {
-    SlideTableLockStateError::InvalidSource
+fn map_wire_error(_error: litchi_iwa_common::Error) -> Error {
+    Error::InvalidSource
 }
 
-fn map_archive_error(error: litchi_iwa_archive::Error) -> SlideTableLockStateError {
+fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     match error {
         litchi_iwa_archive::Error::Limit {
             kind,
             observed,
             maximum,
-        } => SlideTableLockStateError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_archive::LimitKind::InputBytes => {
-                    SlideTableLockStateLimitKind::InputBytes
-                },
-                litchi_iwa_archive::LimitKind::OutputBytes => {
-                    SlideTableLockStateLimitKind::OutputBytes
-                },
-                litchi_iwa_archive::LimitKind::Entries => SlideTableLockStateLimitKind::Entries,
+                litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
+                litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_archive::LimitKind::Entries => LimitKind::Entries,
                 litchi_iwa_archive::LimitKind::EntryBytes
-                | litchi_iwa_archive::LimitKind::CompressedEntryBytes => {
-                    SlideTableLockStateLimitKind::EntryBytes
-                },
-                litchi_iwa_archive::LimitKind::TotalBytes => {
-                    SlideTableLockStateLimitKind::TotalBytes
-                },
-                _ => SlideTableLockStateLimitKind::WireWork,
+                | litchi_iwa_archive::LimitKind::CompressedEntryBytes => LimitKind::EntryBytes,
+                litchi_iwa_archive::LimitKind::TotalBytes => LimitKind::TotalBytes,
+                _ => LimitKind::WireWork,
             },
             observed,
             maximum,
         },
-        litchi_iwa_archive::Error::Allocation { amount, .. } => {
-            SlideTableLockStateError::Allocation { amount }
-        },
+        litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
         litchi_iwa_archive::Error::Iwa(error) => map_core_error(error),
-        _ => SlideTableLockStateError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_core_error(error: litchi_iwa_core::Error) -> SlideTableLockStateError {
+fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
             kind,
             observed,
             maximum,
-        } => SlideTableLockStateError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_core::LimitKind::Objects => SlideTableLockStateLimitKind::PayloadObjects,
+                litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
                 litchi_iwa_core::LimitKind::Messages
-                | litchi_iwa_core::LimitKind::MessagesPerObject => {
-                    SlideTableLockStateLimitKind::PayloadMessages
-                },
-                litchi_iwa_core::LimitKind::HeaderNesting => {
-                    SlideTableLockStateLimitKind::WireNesting
-                },
+                | litchi_iwa_core::LimitKind::MessagesPerObject => LimitKind::PayloadMessages,
+                litchi_iwa_core::LimitKind::HeaderNesting => LimitKind::WireNesting,
                 litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
                 | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes
-                | litchi_iwa_core::LimitKind::SnappyFrames => {
-                    SlideTableLockStateLimitKind::EntryBytes
-                },
-                _ => SlideTableLockStateLimitKind::WireWork,
+                | litchi_iwa_core::LimitKind::SnappyFrames => LimitKind::EntryBytes,
+                _ => LimitKind::WireWork,
             },
             observed: observed as u64,
             maximum: maximum as u64,
         },
         litchi_iwa_core::Error::Allocation { requested, .. } => {
-            SlideTableLockStateError::Allocation { amount: requested }
+            Error::Allocation { amount: requested }
         },
-        _ => SlideTableLockStateError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }

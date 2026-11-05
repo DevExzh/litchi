@@ -4,11 +4,14 @@
     reason = "test assertions panic on failure by design"
 )]
 
-use litchi_ppt::RecordType;
-use litchi_ppt::master::{Objects, parse};
-use litchi_ppt::master_layout::{Context, Path, Snapshot};
+use std::path::PathBuf;
+
+use litchi_core::Position;
+use litchi_ppt::master::{Kind, Objects, parse};
+use litchi_ppt::master_layout::{self, Context, Path, Snapshot};
 use litchi_ppt::persist::PersistMapping;
 use litchi_ppt::records::Record;
+use litchi_ppt::{Package, RecordType};
 
 const UNKNOWN_TYPE: u16 = 0x7abc;
 
@@ -130,7 +133,7 @@ fn inventories_all_four_masters_contextually() {
 }
 
 #[test]
-fn masters_retain_unknown_records_and_transactional_edits_are_atomic() {
+fn masters_retain_unknown_records_and_package_edits_are_atomic() {
     let opaque = unknown(&[0xaa, 0xbb, 0xcc]);
     let main = container(
         RecordType::MainMaster,
@@ -144,22 +147,49 @@ fn masters_retain_unknown_records_and_transactional_edits_are_atomic() {
         wire(&opaque)
     );
 
-    let source = Snapshot::from_record(Context::Main, main).unwrap();
-    let before = source.bytes().to_vec();
-    let mut edit = source.edit();
-    edit.replace(Path::root().child(0), slide_atom(3, 0))
-        .unwrap();
-    let committed = edit.commit().unwrap();
+    let snapshot =
+        Snapshot::from_record(Context::Main, main, &master_layout::Limits::default()).unwrap();
     assert!(
-        committed
-            .snapshot()
+        snapshot
             .bytes()
             .windows(wire(&opaque).len())
             .any(|window| window == wire(&opaque))
     );
 
-    let mut invalid = source.edit();
-    invalid.remove(Path::root().child(0)).unwrap();
-    assert!(invalid.commit().is_err());
-    assert_eq!(source.bytes(), before.as_slice());
+    let path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../test-data/ole/ppt/SampleShow.ppt");
+    let source = Package::from_bytes(&std::fs::read(path).unwrap()).unwrap();
+    let before = source.to_bytes().unwrap();
+    let mut edit = source
+        .edit_master_layout(Kind::Main, Position::new(0))
+        .unwrap();
+    assert_eq!(edit.context().unwrap(), Context::Main);
+    let appended = edit.record().unwrap().children.len();
+    edit.append(Path::root(), opaque.clone()).unwrap();
+    let committed = edit.commit().unwrap();
+    assert!(committed.diagnostics().changed());
+    let published = committed
+        .package()
+        .edit_master_layout(Kind::Main, Position::new(0))
+        .unwrap();
+    assert_eq!(published.record().unwrap().children[appended], opaque);
+
+    // A candidate that is no longer a valid master is refused at commit and
+    // leaves the source untouched.
+    let mut invalid = source
+        .edit_master_layout(Kind::Main, Position::new(0))
+        .unwrap();
+    let atom = invalid
+        .record()
+        .unwrap()
+        .children
+        .iter()
+        .position(|child| child.record_type == RecordType::SlideAtom)
+        .unwrap();
+    invalid.remove(Path::root().child(atom)).unwrap();
+    assert!(matches!(
+        invalid.commit(),
+        Err(master_layout::Error::Refused(_))
+    ));
+    assert_eq!(source.to_bytes().unwrap(), before);
 }

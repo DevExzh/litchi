@@ -5,7 +5,7 @@
 //! leaving package identifiers, formula graphs, and wire mutation in the
 //! concrete format crate.
 
-use super::CellPosition;
+use super::At;
 use crate::cell::{Type, Update, Value};
 use std::collections::HashSet;
 use std::fmt;
@@ -34,7 +34,7 @@ impl Budget {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Batch {
     updates: Box<[Update]>,
-    positions: Box<[CellPosition]>,
+    positions: Box<[At]>,
 }
 
 impl Batch {
@@ -56,8 +56,9 @@ impl Batch {
         let updates_iter = updates.into_iter();
         let lower_bound = updates_iter.size_hint().0;
         if lower_bound > budget.max_updates {
-            return Err(Error::LimitExceeded {
-                requested: lower_bound,
+            return Err(Error::Limit {
+                kind: LimitKind::Updates,
+                observed: lower_bound,
                 maximum: budget.max_updates,
             });
         }
@@ -75,19 +76,19 @@ impl Batch {
 
         for update in updates_iter {
             if values.len() >= budget.max_updates {
-                return Err(Error::LimitExceeded {
-                    requested: budget.max_updates.saturating_add(1),
+                return Err(Error::Limit {
+                    kind: LimitKind::Updates,
+                    observed: budget.max_updates.saturating_add(1),
                     maximum: budget.max_updates,
                 });
             }
 
-            let position =
-                CellPosition::try_from_usize(update.row, update.column).map_err(|_error| {
-                    Error::CoordinateOverflow {
-                        row: update.row,
-                        column: update.column,
-                    }
-                })?;
+            let position = At::try_from_usize(update.row, update.column).map_err(|_error| {
+                Error::CoordinateOverflow {
+                    row: update.row,
+                    column: update.column,
+                }
+            })?;
             seen.try_reserve(1).map_err(|_error| Error::Allocation {
                 resource: "table edit coordinate set",
                 amount: 1,
@@ -124,9 +125,17 @@ impl Batch {
     /// Splits the validated updates from their compact cache-refresh
     /// coordinates without cloning either collection.
     #[must_use]
-    pub fn into_parts(self) -> (Box<[Update]>, Box<[CellPosition]>) {
+    pub fn into_parts(self) -> (Box<[Update]>, Box<[At]>) {
         (self.updates, self.positions)
     }
+}
+
+/// A budget of a cell-edit batch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Updates in one batch.
+    Updates,
 }
 
 /// Failure while constructing a bounded cell-edit batch.
@@ -136,9 +145,16 @@ pub enum Error {
     /// A coordinate cannot be represented by the compact table position.
     CoordinateOverflow { row: usize, column: usize },
     /// A coordinate occurs more than once in the batch.
-    DuplicatePosition { position: CellPosition },
+    DuplicatePosition { position: At },
     /// The batch exceeds its caller-supplied bound.
-    LimitExceeded { requested: usize, maximum: usize },
+    Limit {
+        /// The exceeded budget.
+        kind: LimitKind,
+        /// The observed amount.
+        observed: usize,
+        /// The configured maximum.
+        maximum: usize,
+    },
     /// A collection reservation failed before the batch was completed.
     Allocation {
         resource: &'static str,
@@ -163,9 +179,13 @@ impl fmt::Display for Error {
                 position.row(),
                 position.column()
             ),
-            Self::LimitExceeded { requested, maximum } => write!(
+            Self::Limit {
+                kind: LimitKind::Updates,
+                observed,
+                maximum,
+            } => write!(
                 formatter,
-                "table edit batch requests {requested} updates, budget is {maximum}"
+                "table edit batch requests {observed} updates, budget is {maximum}"
             ),
             Self::Allocation { resource, amount } => {
                 write!(
@@ -228,10 +248,7 @@ mod tests {
         assert_eq!(batch.len(), 2);
         let (updates, positions) = batch.into_parts();
         assert_eq!(updates.len(), 2);
-        assert_eq!(
-            positions.as_ref(),
-            &[CellPosition::new(2, 3), CellPosition::new(0, 1)]
-        );
+        assert_eq!(positions.as_ref(), &[At::new(2, 3), At::new(0, 1)]);
     }
 
     #[test]
@@ -246,7 +263,7 @@ mod tests {
         assert!(matches!(duplicate, Err(Error::DuplicatePosition { .. })));
 
         let oversized = Batch::collect([Update::clear(0, 0), Update::clear(0, 1)], Budget::new(1));
-        assert!(matches!(oversized, Err(Error::LimitExceeded { .. })));
+        assert!(matches!(oversized, Err(Error::Limit { .. })));
     }
 
     #[test]

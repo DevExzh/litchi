@@ -12,10 +12,7 @@
 //! `ST_Xstring` `id`, and its only direct child is one `x14:extLst`.
 
 use litchi_ooxml_common::custom_data::codec::{
-    Limits, parse_properties_with_limits, rewrite_extension_list,
-    rewrite_extension_list_with_limits, rewrite_extension_list_with_limits_and_output, rewrite_id,
-    rewrite_id_with_limits, rewrite_id_with_limits_and_output, validate_source_properties,
-    write_properties_with_limits,
+    Limits, rewrite_extension_list, rewrite_id, validate_source_properties,
 };
 use litchi_ooxml_common::custom_data::{
     ExtensionList, Properties, parse_properties, write_properties,
@@ -38,7 +35,8 @@ fn source_part(xml: &[u8]) -> litchi_opc::OwnedXmlPart {
         xml.to_vec(),
     )));
     let bytes = PackageWriter::to_bytes(&package).expect("fixture package writes");
-    let package = OpcPackage::from_bytes(&bytes).expect("fixture package reopens");
+    let package = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default())
+        .expect("fixture package reopens");
     package
         .source_xml_part(&name)
         .expect("reopened part retains exact XML provenance")
@@ -62,7 +60,8 @@ fn source_with_extension() -> (Vec<u8>, litchi_opc::OwnedXmlPart) {
 #[test]
 fn public_surface_accepts_schema_minimum_and_retains_opaque_extension_bytes() {
     let (source, _) = source_with_extension();
-    let properties = parse_properties(&source).expect("valid datastoreItem fixture");
+    let properties =
+        parse_properties(&source, &Limits::standard()).expect("valid datastoreItem fixture");
     assert_eq!(properties.id, "old-id");
     let extension = properties
         .extension_list
@@ -106,8 +105,10 @@ fn public_surface_accepts_schema_minimum_and_retains_opaque_extension_bytes() {
             .into_bytes(),
         }),
     };
-    let serialized = write_properties(&writable).expect("typed properties serialize");
-    let reread = parse_properties(&serialized).expect("serialized properties reread");
+    let serialized =
+        write_properties(&writable, &Limits::standard()).expect("typed properties serialize");
+    let reread =
+        parse_properties(&serialized, &Limits::standard()).expect("serialized properties reread");
     assert_eq!(reread, writable);
     assert!(serialized.starts_with(b"<x14:datastoreItem xmlns:x14=\""));
 }
@@ -117,7 +118,7 @@ fn extension_grammar_accepts_transitional_sml_ext_optional_uri_and_one_wildcard(
     let source = format!(
         r#"<x14:datastoreItem xmlns:x14="{X14}" xmlns:s="{SML}" xmlns:v="urn:vendor" id="core"><x14:extLst><s:ext><v:opaque/></s:ext></x14:extLst></x14:datastoreItem>"#
     );
-    let properties = parse_properties(source.as_bytes())
+    let properties = parse_properties(source.as_bytes(), &Limits::standard())
         .expect("CT_ExtensionList admits a core Transitional SpreadsheetML ext");
     let extension = properties
         .extension_list
@@ -131,8 +132,12 @@ fn extension_grammar_accepts_transitional_sml_ext_optional_uri_and_one_wildcard(
             .windows(b"<v:opaque/>".len())
             .any(|w| w == b"<v:opaque/>")
     );
-    let serialized = write_properties(&properties).expect("parsed extension is standalone-ready");
-    assert_eq!(parse_properties(&serialized).unwrap(), properties);
+    let serialized = write_properties(&properties, &Limits::standard())
+        .expect("parsed extension is standalone-ready");
+    assert_eq!(
+        parse_properties(&serialized, &Limits::standard()).unwrap(),
+        properties
+    );
 }
 
 #[test]
@@ -140,7 +145,7 @@ fn extension_grammar_rejects_strict_sml_direct_ext() {
     let source = format!(
         r#"<x14:datastoreItem xmlns:x14="{X14}" xmlns:strict="{STRICT_SML}" xmlns:v="urn:vendor" id="strict"><x14:extLst><strict:ext><v:opaque/></strict:ext></x14:extLst></x14:datastoreItem>"#
     );
-    assert!(parse_properties(source.as_bytes()).is_err());
+    assert!(parse_properties(source.as_bytes(), &Limits::standard()).is_err());
 }
 
 #[test]
@@ -156,15 +161,20 @@ fn empty_id_and_st_xstring_escape_round_trip_including_supplementary_scalar() {
             id: id.to_owned(),
             extension_list: None,
         };
-        let serialized = write_properties(&properties).expect("ST_Xstring value writes");
-        let reread = parse_properties(&serialized).expect("ST_Xstring value rereads");
+        let serialized =
+            write_properties(&properties, &Limits::standard()).expect("ST_Xstring value writes");
+        let reread =
+            parse_properties(&serialized, &Limits::standard()).expect("ST_Xstring value rereads");
         assert_eq!(reread, properties, "decoded id differs for {id:?}");
     }
 
-    let escaped = write_properties(&Properties {
-        id: "_x0041_\u{1}\u{fffe}\u{ffff}😀".to_owned(),
-        extension_list: None,
-    })
+    let escaped = write_properties(
+        &Properties {
+            id: "_x0041_\u{1}\u{fffe}\u{ffff}😀".to_owned(),
+            extension_list: None,
+        },
+        &Limits::standard(),
+    )
     .expect("escaped value writes");
     assert!(
         escaped
@@ -194,27 +204,33 @@ fn empty_id_and_st_xstring_escape_round_trip_including_supplementary_scalar() {
 
     let source =
         format!(r#"<x14:datastoreItem xmlns:x14="{X14}" id="A &amp; _x0041_ &#x1F600;"/>"#);
-    let parsed = parse_properties(source.as_bytes()).expect("source ST_Xstring parses");
+    let parsed =
+        parse_properties(source.as_bytes(), &Limits::standard()).expect("source ST_Xstring parses");
     assert_eq!(parsed.id, "A & A 😀");
 }
 
 #[test]
 fn raw_less_than_in_attribute_values_is_rejected_but_escaped_less_than_is_valid() {
     let escaped_id = format!(r#"<x14:datastoreItem xmlns:x14="{X14}" id="a &lt; b"/>"#);
-    assert_eq!(parse_properties(escaped_id.as_bytes()).unwrap().id, "a < b");
+    assert_eq!(
+        parse_properties(escaped_id.as_bytes(), &Limits::standard())
+            .unwrap()
+            .id,
+        "a < b"
+    );
 
     let raw_id = format!(r#"<x14:datastoreItem xmlns:x14="{X14}" id="a < b"/>"#);
-    assert!(parse_properties(raw_id.as_bytes()).is_err());
+    assert!(parse_properties(raw_id.as_bytes(), &Limits::standard()).is_err());
 
     let escaped_opaque = format!(
         r#"<x14:datastoreItem xmlns:x14="{X14}" xmlns:s="{SML}" xmlns:v="urn:vendor" id="x"><x14:extLst><s:ext><v:opaque value="a &lt; b"/></s:ext></x14:extLst></x14:datastoreItem>"#
     );
-    assert!(parse_properties(escaped_opaque.as_bytes()).is_ok());
+    assert!(parse_properties(escaped_opaque.as_bytes(), &Limits::standard()).is_ok());
 
     let raw_opaque = format!(
         r#"<x14:datastoreItem xmlns:x14="{X14}" xmlns:s="{SML}" xmlns:v="urn:vendor" id="x"><x14:extLst><s:ext><v:opaque value="a < b"/></s:ext></x14:extLst></x14:datastoreItem>"#
     );
-    assert!(parse_properties(raw_opaque.as_bytes()).is_err());
+    assert!(parse_properties(raw_opaque.as_bytes(), &Limits::standard()).is_err());
 }
 
 #[test]
@@ -223,18 +239,19 @@ fn uid_utf16_units_are_exact_for_one_supplementary_scalar() {
         id: "😀".to_owned(),
         extension_list: None,
     };
-    let serialized = write_properties(&value).expect("supplementary UID writes");
+    let serialized =
+        write_properties(&value, &Limits::standard()).expect("supplementary UID writes");
     let exact = Limits::standard().with_uid_units(2);
-    assert!(write_properties_with_limits(&value, &exact).is_ok());
-    assert!(parse_properties_with_limits(&serialized, &exact).is_ok());
+    assert!(write_properties(&value, &exact).is_ok());
+    assert!(parse_properties(&serialized, &exact).is_ok());
 
     let source = source_part(&serialized);
-    assert!(rewrite_id_with_limits(&source, "😀", &exact).is_ok());
+    assert!(rewrite_id(&source, "😀", &exact, exact.properties_xml_bytes).is_ok());
 
     let one_under = exact.with_uid_units(1);
-    assert!(write_properties_with_limits(&value, &one_under).is_err());
-    assert!(parse_properties_with_limits(&serialized, &one_under).is_err());
-    assert!(rewrite_id_with_limits(&source, "😀", &one_under).is_err());
+    assert!(write_properties(&value, &one_under).is_err());
+    assert!(parse_properties(&serialized, &one_under).is_err());
+    assert!(rewrite_id(&source, "😀", &one_under, one_under.properties_xml_bytes).is_err());
 }
 
 #[test]
@@ -243,11 +260,12 @@ fn parser_event_limit_is_exact_and_one_under_for_minimal_properties() {
         id: "event".to_owned(),
         extension_list: None,
     };
-    let serialized = write_properties(&value).expect("baseline properties write");
+    let serialized =
+        write_properties(&value, &Limits::standard()).expect("baseline properties write");
     let exact = Limits::standard().with_events(2);
-    assert!(parse_properties_with_limits(&serialized, &exact).is_ok());
+    assert!(parse_properties(&serialized, &exact).is_ok());
     let one_under = exact.with_events(1);
-    assert!(parse_properties_with_limits(&serialized, &one_under).is_err());
+    assert!(parse_properties(&serialized, &one_under).is_err());
 }
 
 #[test]
@@ -256,43 +274,44 @@ fn lowered_limits_accept_exact_boundaries_and_reject_one_under() {
         id: "abcd".to_owned(),
         extension_list: None,
     };
-    let serialized = write_properties(&value).expect("baseline properties write");
+    let serialized =
+        write_properties(&value, &Limits::standard()).expect("baseline properties write");
 
     let exact_properties = Limits::standard().with_properties_xml_bytes(serialized.len());
-    assert!(write_properties_with_limits(&value, &exact_properties).is_ok());
-    assert!(parse_properties_with_limits(&serialized, &exact_properties).is_ok());
+    assert!(write_properties(&value, &exact_properties).is_ok());
+    assert!(parse_properties(&serialized, &exact_properties).is_ok());
     let under_properties = exact_properties.with_properties_xml_bytes(serialized.len() - 1);
-    assert!(write_properties_with_limits(&value, &under_properties).is_err());
-    assert!(parse_properties_with_limits(&serialized, &under_properties).is_err());
+    assert!(write_properties(&value, &under_properties).is_err());
+    assert!(parse_properties(&serialized, &under_properties).is_err());
 
     let exact_string = Limits::standard().with_string_bytes(X14.len());
-    assert!(parse_properties_with_limits(&serialized, &exact_string).is_ok());
+    assert!(parse_properties(&serialized, &exact_string).is_ok());
     let under_string = exact_string.with_string_bytes(X14.len() - 1);
-    assert!(parse_properties_with_limits(&serialized, &under_string).is_err());
+    assert!(parse_properties(&serialized, &under_string).is_err());
     let exact_id_write = Limits::standard().with_string_bytes(value.id.len());
-    assert!(write_properties_with_limits(&value, &exact_id_write).is_ok());
+    assert!(write_properties(&value, &exact_id_write).is_ok());
     let under_id_write = exact_id_write.with_string_bytes(value.id.len() - 1);
-    assert!(write_properties_with_limits(&value, &under_id_write).is_err());
+    assert!(write_properties(&value, &under_id_write).is_err());
 
     let exact_nodes = Limits::standard().with_nodes(1);
-    assert!(parse_properties_with_limits(&serialized, &exact_nodes).is_ok());
+    assert!(parse_properties(&serialized, &exact_nodes).is_ok());
     let under_nodes = exact_nodes.with_nodes(0);
-    assert!(parse_properties_with_limits(&serialized, &under_nodes).is_err());
+    assert!(parse_properties(&serialized, &under_nodes).is_err());
 
     let exact_depth = Limits::standard().with_depth(1);
-    assert!(parse_properties_with_limits(&serialized, &exact_depth).is_ok());
+    assert!(parse_properties(&serialized, &exact_depth).is_ok());
     let under_depth = exact_depth.with_depth(0);
-    assert!(parse_properties_with_limits(&serialized, &under_depth).is_err());
+    assert!(parse_properties(&serialized, &under_depth).is_err());
 
     let exact_namespace = Limits::standard().with_namespace_bytes(3 + X14.len());
-    assert!(parse_properties_with_limits(&serialized, &exact_namespace).is_ok());
+    assert!(parse_properties(&serialized, &exact_namespace).is_ok());
     let under_namespace = exact_namespace.with_namespace_bytes(3 + X14.len() - 1);
-    assert!(parse_properties_with_limits(&serialized, &under_namespace).is_err());
+    assert!(parse_properties(&serialized, &under_namespace).is_err());
 
     let exact_attributes = Limits::standard().with_attributes(2);
-    assert!(parse_properties_with_limits(&serialized, &exact_attributes).is_ok());
+    assert!(parse_properties(&serialized, &exact_attributes).is_ok());
     let under_attributes = exact_attributes.with_attributes(1);
-    assert!(parse_properties_with_limits(&serialized, &under_attributes).is_err());
+    assert!(parse_properties(&serialized, &under_attributes).is_err());
 }
 
 #[test]
@@ -307,36 +326,78 @@ fn extension_and_source_rewrite_limits_use_exact_output_boundaries() {
             xml: extension_xml.clone(),
         }),
     };
-    let serialized = write_properties(&value).expect("baseline extension write");
+    let serialized =
+        write_properties(&value, &Limits::standard()).expect("baseline extension write");
     let exact_extension = Limits::standard().with_extension_xml_bytes(extension_xml.len());
-    assert!(write_properties_with_limits(&value, &exact_extension).is_ok());
-    assert!(parse_properties_with_limits(&serialized, &exact_extension).is_ok());
+    assert!(write_properties(&value, &exact_extension).is_ok());
+    assert!(parse_properties(&serialized, &exact_extension).is_ok());
     let under_extension = exact_extension.with_extension_xml_bytes(extension_xml.len() - 1);
-    assert!(write_properties_with_limits(&value, &under_extension).is_err());
-    assert!(parse_properties_with_limits(&serialized, &under_extension).is_err());
+    assert!(write_properties(&value, &under_extension).is_err());
+    assert!(parse_properties(&serialized, &under_extension).is_err());
 
     let source_xml = format!(r#"<x14:datastoreItem xmlns:x14="{X14}" id="a"/>"#);
     let source = source_part(source_xml.as_bytes());
-    let rewritten_id = rewrite_id(&source, "longer-id").expect("baseline id rewrite");
+    let rewritten_id = rewrite_id(
+        &source,
+        "longer-id",
+        &Limits::standard(),
+        Limits::standard().properties_xml_bytes,
+    )
+    .expect("baseline id rewrite");
     let exact_id_output = Limits::standard().with_properties_xml_bytes(rewritten_id.bytes().len());
-    assert!(rewrite_id_with_limits(&source, "longer-id", &exact_id_output).is_ok());
+    assert!(
+        rewrite_id(
+            &source,
+            "longer-id",
+            &exact_id_output,
+            exact_id_output.properties_xml_bytes
+        )
+        .is_ok()
+    );
     let under_id_output = exact_id_output.with_properties_xml_bytes(rewritten_id.bytes().len() - 1);
-    assert!(rewrite_id_with_limits(&source, "longer-id", &under_id_output).is_err());
+    assert!(
+        rewrite_id(
+            &source,
+            "longer-id",
+            &under_id_output,
+            under_id_output.properties_xml_bytes
+        )
+        .is_err()
+    );
 
     let source_xml = format!(
         r#"<x14:datastoreItem xmlns:x14="{X14}" xmlns:s="{SML}" id="a"><x14:extLst><s:ext uri="urn:old"><v:opaque xmlns:v="urn:vendor"/></s:ext></x14:extLst></x14:datastoreItem>"#
     );
     let source = source_part(source_xml.as_bytes());
     let replacement = ExtensionList { xml: extension_xml };
-    let rewritten_extension =
-        rewrite_extension_list(&source, Some(&replacement)).expect("baseline extension rewrite");
+    let rewritten_extension = rewrite_extension_list(
+        &source,
+        Some(&replacement),
+        &Limits::standard(),
+        Limits::standard().properties_xml_bytes,
+    )
+    .expect("baseline extension rewrite");
     let exact_output =
         Limits::standard().with_properties_xml_bytes(rewritten_extension.bytes().len());
-    assert!(rewrite_extension_list_with_limits(&source, Some(&replacement), &exact_output).is_ok());
+    assert!(
+        rewrite_extension_list(
+            &source,
+            Some(&replacement),
+            &exact_output,
+            exact_output.properties_xml_bytes
+        )
+        .is_ok()
+    );
     let under_output =
         exact_output.with_properties_xml_bytes(rewritten_extension.bytes().len() - 1);
     assert!(
-        rewrite_extension_list_with_limits(&source, Some(&replacement), &under_output).is_err()
+        rewrite_extension_list(
+            &source,
+            Some(&replacement),
+            &under_output,
+            under_output.properties_xml_bytes
+        )
+        .is_err()
     );
 }
 
@@ -346,7 +407,8 @@ fn namespace_aliases_and_entity_escaped_uri_resolve_by_expanded_name() {
     let source = format!(
         r#"<alias:datastoreItem xmlns:alias="{escaped_uri}" xmlns:s="{SML}" id="alias-id"><alias:extLst><s:ext uri="urn:alias"><foreign:opaque xmlns:foreign="urn:foreign"><foreign:leaf/></foreign:opaque></s:ext></alias:extLst></alias:datastoreItem>"#
     );
-    let properties = parse_properties(source.as_bytes()).expect("aliased X14 names parse");
+    let properties =
+        parse_properties(source.as_bytes(), &Limits::standard()).expect("aliased X14 names parse");
     assert_eq!(properties.id, "alias-id");
     assert!(properties.extension_list.is_some());
 }
@@ -356,14 +418,20 @@ fn inherited_bindings_cover_opaque_descendants_and_replacement_fragments() {
     let source = format!(
         r#"<datastoreItem xmlns="{X14}" xmlns:s="{SML}" xmlns:v="urn:vendor" id="old"><extLst><s:ext uri="urn:old"><v:opaque><v:leaf><![CDATA[<? legal ]]></v:leaf></v:opaque></s:ext></extLst></datastoreItem>"#
     );
-    let parsed = parse_properties(source.as_bytes()).expect("default X14 binding parses");
+    let parsed = parse_properties(source.as_bytes(), &Limits::standard())
+        .expect("default X14 binding parses");
     let fragment = ExtensionList {
         xml: br#"<extLst xmlns:s="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><s:ext uri="urn:new"><v:opaque xmlns:v="urn:vendor"><v:leaf/></v:opaque></s:ext></extLst>"#
             .to_vec(),
     };
     let source_part = source_part(source.as_bytes());
-    let replaced = rewrite_extension_list(&source_part, Some(&fragment))
-        .expect("fragment may use bindings inherited from its insertion root");
+    let replaced = rewrite_extension_list(
+        &source_part,
+        Some(&fragment),
+        &Limits::standard(),
+        Limits::standard().properties_xml_bytes,
+    )
+    .expect("fragment may use bindings inherited from its insertion root");
     assert!(
         replaced
             .bytes()
@@ -376,8 +444,13 @@ fn inherited_bindings_cover_opaque_descendants_and_replacement_fragments() {
             .windows(b"urn:old".len())
             .any(|window| window == b"urn:old")
     );
-    assert_eq!(parse_properties(replaced.bytes()).unwrap().id, "old");
-    let replaced_properties = parse_properties(replaced.bytes()).unwrap();
+    assert_eq!(
+        parse_properties(replaced.bytes(), &Limits::standard())
+            .unwrap()
+            .id,
+        "old"
+    );
+    let replaced_properties = parse_properties(replaced.bytes(), &Limits::standard()).unwrap();
     let replaced_extension = replaced_properties
         .extension_list
         .as_ref()
@@ -396,9 +469,11 @@ fn inherited_bindings_cover_opaque_descendants_and_replacement_fragments() {
     );
     assert_eq!(parsed.id, "old");
 
-    let serialized = write_properties(&parsed).expect("parsed properties can be serialized");
+    let serialized = write_properties(&parsed, &Limits::standard())
+        .expect("parsed properties can be serialized");
     assert_eq!(
-        parse_properties(&serialized).expect("serialized parsed properties reread"),
+        parse_properties(&serialized, &Limits::standard())
+            .expect("serialized parsed properties reread"),
         parsed
     );
 }
@@ -411,8 +486,10 @@ fn identical_raw_extensions_keep_their_own_inherited_namespace_context() {
     let second = format!(
         r#"<x:datastoreItem xmlns:x="{X14}" xmlns:s="{SML}" xmlns:v="urn:second-context" id="second"><x:extLst><s:ext uri="urn:raw"><v:opaque/></s:ext></x:extLst></x:datastoreItem>"#
     );
-    let first_properties = parse_properties(first.as_bytes()).expect("first source parses");
-    let second_properties = parse_properties(second.as_bytes()).expect("second source parses");
+    let first_properties =
+        parse_properties(first.as_bytes(), &Limits::standard()).expect("first source parses");
+    let second_properties =
+        parse_properties(second.as_bytes(), &Limits::standard()).expect("second source parses");
     let first_extension = first_properties
         .extension_list
         .as_ref()
@@ -446,10 +523,10 @@ fn identical_raw_extensions_keep_their_own_inherited_namespace_context() {
             .any(|window| { window == b"urn:first-context" })
     );
 
-    let serialized_first =
-        write_properties(&first_properties).expect("first parsed fragment is standalone-ready");
-    let reread_first =
-        parse_properties(&serialized_first).expect("serialized first properties reread");
+    let serialized_first = write_properties(&first_properties, &Limits::standard())
+        .expect("first parsed fragment is standalone-ready");
+    let reread_first = parse_properties(&serialized_first, &Limits::standard())
+        .expect("serialized first properties reread");
     assert_eq!(reread_first, first_properties);
     assert!(
         serialized_first
@@ -475,7 +552,7 @@ fn reserved_namespace_bindings_and_empty_prefixed_bindings_are_rejected() {
     ];
     for source in cases {
         assert!(
-            parse_properties(source.as_bytes()).is_err(),
+            parse_properties(source.as_bytes(), &Limits::standard()).is_err(),
             "accepted {source}"
         );
     }
@@ -492,7 +569,7 @@ fn source_validation_rejects_unbound_prefix_without_real_context() {
             .into_bytes(),
         }),
     };
-    assert!(validate_source_properties(&value).is_err());
+    assert!(validate_source_properties(&value, &Limits::standard()).is_err());
 }
 
 #[test]
@@ -500,7 +577,12 @@ fn full_documents_allow_bom_and_declaration_but_embedded_fragments_do_not() {
     let full = format!(
         "\u{feff}<?xml version=\"1.0\" encoding=\"UTF-8\"?><x14:datastoreItem xmlns:x14=\"{X14}\" id=\"bom\"/>"
     );
-    assert_eq!(parse_properties(full.as_bytes()).unwrap().id, "bom");
+    assert_eq!(
+        parse_properties(full.as_bytes(), &Limits::standard())
+            .unwrap()
+            .id,
+        "bom"
+    );
 
     let declaration = ExtensionList {
         xml: format!(
@@ -509,10 +591,13 @@ fn full_documents_allow_bom_and_declaration_but_embedded_fragments_do_not() {
         .into_bytes(),
     };
     assert!(
-        write_properties(&Properties {
-            id: "x".to_owned(),
-            extension_list: Some(declaration),
-        })
+        write_properties(
+            &Properties {
+                id: "x".to_owned(),
+                extension_list: Some(declaration),
+            },
+            &Limits::standard()
+        )
         .is_err()
     );
 
@@ -523,10 +608,13 @@ fn full_documents_allow_bom_and_declaration_but_embedded_fragments_do_not() {
         .into_bytes(),
     };
     assert!(
-        write_properties(&Properties {
-            id: "x".to_owned(),
-            extension_list: Some(bom),
-        })
+        write_properties(
+            &Properties {
+                id: "x".to_owned(),
+                extension_list: Some(bom),
+            },
+            &Limits::standard()
+        )
         .is_err()
     );
 }
@@ -564,7 +652,7 @@ fn malformed_whole_documents_and_direct_container_grammar_fail_closed() {
     ];
     for source in cases {
         assert!(
-            parse_properties(source.as_bytes()).is_err(),
+            parse_properties(source.as_bytes(), &Limits::standard()).is_err(),
             "accepted {source}"
         );
     }
@@ -574,18 +662,21 @@ fn malformed_whole_documents_and_direct_container_grammar_fail_closed() {
 fn non_xml_nbsp_is_not_accepted_as_container_whitespace() {
     let root_text =
         format!("<x14:datastoreItem xmlns:x14=\"{X14}\" id=\"x\">\u{00a0}</x14:datastoreItem>");
-    assert!(parse_properties(root_text.as_bytes()).is_err());
+    assert!(parse_properties(root_text.as_bytes(), &Limits::standard()).is_err());
 
     let ext_list_text = format!(
         r#"<x14:extLst xmlns:x14="{X14}" xmlns:s="{SML}" xmlns:v="urn:vendor"> <s:ext><v:opaque/></s:ext></x14:extLst>"#
     );
     assert!(
-        write_properties(&Properties {
-            id: "x".to_owned(),
-            extension_list: Some(ExtensionList {
-                xml: ext_list_text.into_bytes(),
-            }),
-        })
+        write_properties(
+            &Properties {
+                id: "x".to_owned(),
+                extension_list: Some(ExtensionList {
+                    xml: ext_list_text.into_bytes(),
+                }),
+            },
+            &Limits::standard()
+        )
         .is_err()
     );
 
@@ -593,12 +684,15 @@ fn non_xml_nbsp_is_not_accepted_as_container_whitespace() {
         r#"<x14:extLst xmlns:x14="{X14}" xmlns:s="{SML}" xmlns:v="urn:vendor"><s:ext> <v:opaque/></s:ext></x14:extLst>"#
     );
     assert!(
-        write_properties(&Properties {
-            id: "x".to_owned(),
-            extension_list: Some(ExtensionList {
-                xml: ext_text.into_bytes(),
-            }),
-        })
+        write_properties(
+            &Properties {
+                id: "x".to_owned(),
+                extension_list: Some(ExtensionList {
+                    xml: ext_text.into_bytes(),
+                }),
+            },
+            &Limits::standard()
+        )
         .is_err()
     );
 }
@@ -616,7 +710,7 @@ fn duplicate_required_attributes_and_direct_extension_owners_are_rejected() {
     ];
     for source in cases {
         assert!(
-            parse_properties(source.as_bytes()).is_err(),
+            parse_properties(source.as_bytes(), &Limits::standard()).is_err(),
             "accepted {source}"
         );
     }
@@ -625,9 +719,18 @@ fn duplicate_required_attributes_and_direct_extension_owners_are_rejected() {
 #[test]
 fn source_rewrites_change_only_the_requested_root_id_or_extension_span() {
     let (source, part) = source_with_extension();
-    assert_eq!(parse_properties(&source).unwrap().id, "old-id");
+    assert_eq!(
+        parse_properties(&source, &Limits::standard()).unwrap().id,
+        "old-id"
+    );
 
-    let renamed = rewrite_id(&part, "new-id").expect("source id rewrites");
+    let renamed = rewrite_id(
+        &part,
+        "new-id",
+        &Limits::standard(),
+        Limits::standard().properties_xml_bytes,
+    )
+    .expect("source id rewrites");
     let expected = String::from_utf8_lossy(&source)
         .replace("old&#45;id", "new-id")
         .into_bytes();
@@ -655,8 +758,13 @@ fn source_rewrites_change_only_the_requested_root_id_or_extension_span() {
         xml: br#"<d:extLst xmlns:d="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main" xmlns:s="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><s:ext uri="urn:new"><v:opaque xmlns:v="urn:vendor"><![CDATA[<? replacement ]]></v:opaque></s:ext></d:extLst>"#
             .to_vec(),
     };
-    let replaced =
-        rewrite_extension_list(&part, Some(&replacement)).expect("direct extension span rewrites");
+    let replaced = rewrite_extension_list(
+        &part,
+        Some(&replacement),
+        &Limits::standard(),
+        Limits::standard().properties_xml_bytes,
+    )
+    .expect("direct extension span rewrites");
     assert!(
         replaced
             .bytes()
@@ -687,13 +795,24 @@ fn source_rewrites_change_only_the_requested_root_id_or_extension_span() {
             .windows(b"<?extension-pi?>".len())
             .all(|window| { window != b"<?extension-pi?>" })
     );
-    assert_eq!(parse_properties(replaced.bytes()).unwrap().id, "old-id");
+    assert_eq!(
+        parse_properties(replaced.bytes(), &Limits::standard())
+            .unwrap()
+            .id,
+        "old-id"
+    );
 }
 
 #[test]
 fn extension_removal_removes_the_whole_opening_range_and_keeps_siblings() {
     let (source, part) = source_with_extension();
-    let removed = rewrite_extension_list(&part, None).expect("direct extension removes");
+    let removed = rewrite_extension_list(
+        &part,
+        None,
+        &Limits::standard(),
+        Limits::standard().properties_xml_bytes,
+    )
+    .expect("direct extension removes");
     let source_text = String::from_utf8_lossy(&source);
     let extension = "<d:extLst><?extension-pi?><s:ext uri='urn:old'><v:opaque v:raw='&amp;raw'><v:leaf><![CDATA[<? cdata-looking text ]]></v:leaf><!-- opaque-comment --></v:opaque></s:ext></d:extLst>";
     let expected = source_text.replace(extension, "");
@@ -717,7 +836,9 @@ fn extension_removal_removes_the_whole_opening_range_and_keeps_siblings() {
             .any(|window| { window == b"<!-- after-extension -->" })
     );
     assert_eq!(
-        parse_properties(removed.bytes()).unwrap().extension_list,
+        parse_properties(removed.bytes(), &Limits::standard())
+            .unwrap()
+            .extension_list,
         None
     );
 }
@@ -728,16 +849,28 @@ fn scalar_semantic_noop_preserves_lexical_source_bytes() {
         r#"<x14:datastoreItem xmlns:x14="{X14}" xmlns:s="{SML}" id="same&#45;id"><x14:extLst><s:ext uri="urn:same"><v:opaque xmlns:v="urn:vendor"/></s:ext></x14:extLst></x14:datastoreItem>"#
     );
     let part = source_part(source.as_bytes());
-    let properties = parse_properties(source.as_bytes()).expect("source parses");
-    let renamed = rewrite_id(&part, &properties.id).expect("semantic same id is accepted");
+    let properties =
+        parse_properties(source.as_bytes(), &Limits::standard()).expect("source parses");
+    let renamed = rewrite_id(
+        &part,
+        &properties.id,
+        &Limits::standard(),
+        Limits::standard().properties_xml_bytes,
+    )
+    .expect("semantic same id is accepted");
     assert_eq!(renamed.bytes(), part.bytes());
 
     let extension = properties
         .extension_list
         .as_ref()
         .expect("extension exists");
-    let same_extension = rewrite_extension_list(&part, Some(extension))
-        .expect("semantic same extension is accepted");
+    let same_extension = rewrite_extension_list(
+        &part,
+        Some(extension),
+        &Limits::standard(),
+        Limits::standard().properties_xml_bytes,
+    )
+    .expect("semantic same extension is accepted");
     assert_eq!(same_extension.bytes(), part.bytes());
 }
 
@@ -754,7 +887,13 @@ fn malformed_extension_fragments_are_rejected_before_source_splice() {
     for (label, xml) in cases {
         let extension = ExtensionList { xml };
         assert!(
-            rewrite_extension_list(&part, Some(&extension)).is_err(),
+            rewrite_extension_list(
+                &part,
+                Some(&extension),
+                &Limits::standard(),
+                Limits::standard().properties_xml_bytes
+            )
+            .is_err(),
             "accepted malformed {label} extension"
         );
         assert_eq!(part.bytes(), source.as_bytes());
@@ -767,16 +906,16 @@ fn source_uid_shrink_has_an_independent_output_ceiling() {
     let source = source_part(bytes.as_bytes());
     let expected = bytes.replace("long-source-uid", "x");
     let limits = Limits::standard();
-    let result = rewrite_id_with_limits_and_output(&source, "x", &limits, expected.len()).unwrap();
+    let result = rewrite_id(&source, "x", &limits, expected.len()).unwrap();
     assert_eq!(result.bytes(), expected.as_bytes());
     assert!(matches!(
-        rewrite_id_with_limits_and_output(&source, "x", &limits, expected.len() - 1),
+        rewrite_id(&source, "x", &limits, expected.len() - 1),
         Err(litchi_ooxml_common::Error::Limit {
-            resource: "properties XML output",
+            kind: litchi_ooxml_common::LimitKind::PropertiesXmlOutput,
             ..
         })
     ));
-    let noop = rewrite_id_with_limits_and_output(&source, "long-source-uid", &limits, 0).unwrap();
+    let noop = rewrite_id(&source, "long-source-uid", &limits, 0).unwrap();
     assert!(std::sync::Arc::ptr_eq(
         &source.shared_bytes(),
         &noop.shared_bytes()
@@ -791,14 +930,12 @@ fn extension_output_preflight_covers_shrink_and_empty_root_expansion() {
     let source = source_part(source_bytes.as_bytes());
     let expected = source_bytes.replace("<p:extLst/>", "");
     let limits = Limits::standard();
-    let result =
-        rewrite_extension_list_with_limits_and_output(&source, None, &limits, expected.len())
-            .unwrap();
+    let result = rewrite_extension_list(&source, None, &limits, expected.len()).unwrap();
     assert_eq!(result.bytes(), expected.as_bytes());
     assert!(matches!(
-        rewrite_extension_list_with_limits_and_output(&source, None, &limits, expected.len() - 1),
+        rewrite_extension_list(&source, None, &limits, expected.len() - 1),
         Err(litchi_ooxml_common::Error::Limit {
-            resource: "properties XML output",
+            kind: litchi_ooxml_common::LimitKind::PropertiesXmlOutput,
             ..
         })
     ));
@@ -812,23 +949,13 @@ fn extension_output_preflight_covers_shrink_and_empty_root_expansion() {
         empty.strip_suffix("/>").unwrap(),
         std::str::from_utf8(&extension.xml).unwrap()
     );
-    let result = rewrite_extension_list_with_limits_and_output(
-        &source,
-        Some(&extension),
-        &limits,
-        expected.len(),
-    )
-    .unwrap();
+    let result =
+        rewrite_extension_list(&source, Some(&extension), &limits, expected.len()).unwrap();
     assert_eq!(result.bytes(), expected.as_bytes());
     assert!(matches!(
-        rewrite_extension_list_with_limits_and_output(
-            &source,
-            Some(&extension),
-            &limits,
-            expected.len() - 1
-        ),
+        rewrite_extension_list(&source, Some(&extension), &limits, expected.len() - 1),
         Err(litchi_ooxml_common::Error::Limit {
-            resource: "properties XML output",
+            kind: litchi_ooxml_common::LimitKind::PropertiesXmlOutput,
             ..
         })
     ));

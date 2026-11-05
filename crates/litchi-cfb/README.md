@@ -20,11 +20,11 @@ litchi-cfb = "0.0.1"
 ```
 
 ```rust
-use litchi_cfb::OleFile;
+use litchi_cfb::{OleFile, OleFileLimits};
 use std::fs::File;
 
 let file = File::open("example.doc")?;
-let mut ole = OleFile::open(file)?;
+let mut ole = OleFile::open(file, OleFileLimits::default())?;
 let word_doc = ole.open_stream(&["WordDocument"])?;
 # Ok::<(), litchi_cfb::OleError>(())
 ```

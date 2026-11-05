@@ -37,6 +37,10 @@ use std::collections::HashSet;
 /// `stylesWithEffects` parts.
 pub mod effects;
 
+/// The located styles part: every style with its byte range, read and
+/// edited in place (record 0319).
+pub mod catalog;
+
 /// Semantic kind of a Word style.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u8)]
@@ -567,6 +571,7 @@ impl<'a> Styles<'a> {
                             numbering: builder.numbering,
                             level_override: builder.level_override,
                             outline: builder.outline,
+                            declares_outline: builder.saw_outline,
                             priority: builder.priority,
                             is_quick_style: builder.is_quick_style,
                             is_hidden: builder.is_hidden,
@@ -690,6 +695,8 @@ pub struct Style {
     /// level of the numbering the style inherits.
     level_override: Option<u8>,
     outline: Option<Outline>,
+    /// Whether the style declares `w:outlineLvl`, body text included.
+    declares_outline: bool,
     /// UI priority for display ordering
     priority: Option<i32>,
     /// Whether to show in quick style gallery
@@ -766,6 +773,16 @@ impl Style {
     #[must_use]
     pub const fn outline(&self) -> Option<Outline> {
         self.outline
+    }
+
+    /// Whether the style declares a `w:outlineLvl` of its own, including
+    /// the body-text level that [`Self::outline`] reports as `None`; such
+    /// a declaration overrides the level its based-on style would give
+    /// (record 0279).
+    #[inline]
+    #[must_use]
+    pub const fn declares_outline(&self) -> bool {
+        self.declares_outline
     }
 
     /// Get the UI priority for this style.

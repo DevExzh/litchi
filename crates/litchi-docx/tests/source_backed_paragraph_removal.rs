@@ -3,8 +3,9 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use litchi_core::{OwnedSource, Position, ReadAt};
-use litchi_docx::source_backed::paragraph_copy::Patch as CopyPatch;
-use litchi_docx::source_backed::paragraph_remove::{Error, Limits, Patch, Refusal};
+use litchi_docx::source_backed::paragraph_copy::raw::{
+    Error, LimitKind, Limits, Patch as CopyPatch, Refusal, RemovalPatch as Patch,
+};
 use litchi_docx::{Package, source_backed};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter};
@@ -64,6 +65,23 @@ fn reopened_texts(bytes: Vec<u8>) -> Vec<String> {
         .collect()
 }
 
+fn projected_xml(package: &source_backed::Package) -> Vec<u8> {
+    package
+        .edit_plain_paragraph_removal()
+        .unwrap()
+        .projected()
+        .unwrap()
+        .xml_bytes()
+        .to_vec()
+}
+
+fn admit_removal(source: Vec<u8>) -> Result<(), Error> {
+    open(source)
+        .edit_plain_paragraph_removal()?
+        .projected()
+        .map(|_| ())
+}
+
 fn payload_range(zip: &[u8], name: &str) -> std::ops::Range<usize> {
     let name = name.as_bytes();
     for (offset, _) in zip
@@ -114,13 +132,13 @@ fn removes_first_middle_last_and_the_only_paragraph_exactly() {
         let mut edit = package.edit_plain_paragraph_removal().unwrap();
         edit.remove_plain_paragraph(Position::new(position))
             .unwrap();
-        let commit = edit.commit();
-        assert_eq!(commit.projected().paragraph_count(), 2);
-        assert_eq!(commit.effect_report().removed_paragraphs, 1);
-        assert!(commit.effect_report().removed_bytes > 0);
+        let commit = edit.commit().unwrap();
+        assert_eq!(commit.patch().effect_report().removed_paragraphs, 1);
+        assert!(commit.patch().effect_report().removed_bytes > 0);
         let mut output = Vec::new();
         package
-            .publish_plain_paragraph_removal_to_stream(&mut output, &commit)
+            .apply_plain_paragraph_removal(commit.patch())
+            .and_then(|committed| Ok(committed.package().write_to(&mut output)?))
             .unwrap();
         assert_eq!(reopened_texts(output), expected);
     }
@@ -128,12 +146,10 @@ fn removes_first_middle_last_and_the_only_paragraph_exactly() {
     let package = open(bytes(&fixture(document(&["only"]))));
     let mut edit = package.edit_plain_paragraph_removal().unwrap();
     edit.remove_plain_paragraph(Position::new(0)).unwrap();
-    let commit = edit.commit();
-    assert_eq!(commit.projected().paragraph_count(), 0);
+    let commit = edit.commit().unwrap();
+    let projected = projected_xml(commit.package());
     assert!(
-        commit
-            .projected()
-            .xml_bytes()
+        projected
             .windows(b"<w:body></w:body>".len())
             .any(|value| value == b"<w:body></w:body>")
     );
@@ -146,27 +162,39 @@ fn publication_raw_copies_others_and_both_inverse_paths_restore_exact_artifact()
     let package = open(source.clone());
     let mut edit = package.edit_plain_paragraph_removal().unwrap();
     edit.remove_plain_paragraph(Position::new(1)).unwrap();
-    let commit = edit.commit();
+    let commit = edit.commit().unwrap();
     let mut output = Vec::new();
     let publication = package
-        .publish_plain_paragraph_removal_to_stream(&mut output, &commit)
+        .apply_plain_paragraph_removal(commit.patch())
+        .and_then(|committed| {
+            committed.package().write_to(&mut output)?;
+            Ok(committed)
+        })
         .unwrap();
     assert_eq!(
         &output[payload_range(&output, UNUSED)],
         &source[retained_range]
     );
 
-    let inverse_wire = publication.inverse_patch().to_bytes().unwrap();
-    let inverse = Patch::from_bytes(&inverse_wire).unwrap();
+    let inverse_wire = publication
+        .patch()
+        .inverse()
+        .durable()
+        .unwrap()
+        .to_bytes(Limits::default())
+        .unwrap();
+    let inverse = Patch::from_bytes(&inverse_wire, Limits::default()).unwrap();
     let mut durable_restored = Vec::new();
     open(output.clone())
-        .publish_plain_paragraph_removal_patch_to_stream(&mut durable_restored, &inverse)
+        .apply_plain_paragraph_removal(&inverse.clone().into())
+        .and_then(|committed| Ok(committed.package().write_to(&mut durable_restored)?))
         .unwrap();
     assert_eq!(durable_restored, source);
 
     let mut exact_restored = Vec::new();
     open(output)
-        .publish_plain_paragraph_removal_inverse_to_stream(&mut exact_restored, &publication)
+        .apply_plain_paragraph_removal(&publication.patch().inverse())
+        .and_then(|committed| Ok(committed.package().write_to(&mut exact_restored)?))
         .unwrap();
     assert_eq!(exact_restored, source);
 }
@@ -175,20 +203,36 @@ fn publication_raw_copies_others_and_both_inverse_paths_restore_exact_artifact()
 fn durable_removal_is_canonical_semantically_closed_and_whole_artifact_bound() {
     let source = bytes(&fixture(document(&["a", "b", "c"])));
     let package = open(source.clone());
-    let snapshot = package.plain_paragraph_removal_snapshot().unwrap();
-    let mut edit = snapshot.removal_edit();
+    let mut edit = package.edit_plain_paragraph_removal().unwrap();
     edit.remove_plain_paragraph(Position::new(1)).unwrap();
-    let commit = edit.commit();
-    let wire = commit.patch().to_bytes().unwrap();
+    let commit = edit.commit().unwrap();
+    let wire = commit.patch().to_bytes(Limits::default()).unwrap();
+    let caller_limits = Limits::new(1024, 4, 100, 8, 2048, wire.len() - 1).unwrap();
     assert!(matches!(
-        CopyPatch::from_bytes(&wire),
+        commit.patch().to_bytes(caller_limits),
+        Err(Error::Limit {
+            kind: LimitKind::DurablePatchBytes,
+            ..
+        })
+    ));
+    assert!(matches!(
+        Patch::from_bytes(&wire, caller_limits),
         Err(Error::InvalidDurable)
     ));
-    let durable = Patch::from_bytes(&wire).unwrap();
-    assert_eq!(durable.to_bytes().unwrap(), wire);
+    assert!(matches!(
+        CopyPatch::from_bytes(&wire, Limits::default()),
+        Err(Error::InvalidDurable)
+    ));
+    let durable = Patch::from_bytes(&wire, Limits::default()).unwrap();
+    assert_eq!(durable.to_bytes(Limits::default()).unwrap(), wire);
+    let mut projected = Vec::new();
+    open(source.clone())
+        .apply_plain_paragraph_removal(&durable.clone().into())
+        .and_then(|committed| Ok(committed.package().write_to(&mut projected)?))
+        .unwrap();
     assert_eq!(
-        durable.apply(&snapshot).unwrap().xml_bytes(),
-        commit.projected().xml_bytes()
+        projected_xml(&open(projected)),
+        projected_xml(commit.package())
     );
 
     let mut foreign = fixture(document(&["a", "b", "c"]));
@@ -197,37 +241,35 @@ fn durable_removal_is_canonical_semantically_closed_and_whole_artifact_bound() {
         .unwrap()
         .set_blob(b"different retained member".to_vec());
     let foreign_bytes = bytes(&foreign);
-    let stale = open(foreign_bytes.clone())
-        .plain_paragraph_removal_snapshot()
-        .unwrap();
-    assert!(matches!(durable.apply(&stale), Err(Error::StaleSource)));
     let mut stale_output = Vec::new();
     assert!(matches!(
         open(foreign_bytes)
-            .publish_plain_paragraph_removal_patch_to_stream(&mut stale_output, &durable),
-        Err(Error::StaleSource)
+            .apply_plain_paragraph_removal(&durable.clone().into())
+            .and_then(|committed| {
+                committed.package().write_to(&mut stale_output)?;
+                Ok(committed)
+            }),
+        Err(Error::PatchConflict)
     ));
     assert!(stale_output.is_empty());
 
     let mut noncanonical_reserved = wire.clone();
     noncanonical_reserved[62..66].copy_from_slice(&1u32.to_le_bytes());
     assert!(matches!(
-        Patch::from_bytes(&noncanonical_reserved),
+        Patch::from_bytes(&noncanonical_reserved, Limits::default()),
         Err(Error::InvalidDurable)
     ));
     let mut forged_target = wire;
     let last = forged_target.len() - 1;
     forged_target[last] ^= 1;
-    assert!(Patch::from_bytes(&forged_target).is_err());
+    assert!(Patch::from_bytes(&forged_target, Limits::default()).is_err());
 }
 
 #[test]
 fn invalid_positions_operation_and_resource_limits_leave_projection_unchanged() {
     let source = bytes(&fixture(document(&["a", "b"])));
-    let snapshot = open(source.clone())
-        .plain_paragraph_removal_snapshot()
-        .unwrap();
-    let mut edit = snapshot.removal_edit();
+    let mut edit = open(source.clone()).edit_plain_paragraph_removal().unwrap();
+    let original = edit.projected().unwrap().xml_bytes().to_vec();
     assert!(matches!(
         edit.remove_plain_paragraph(Position::new(2)),
         Err(Error::OutOfBounds {
@@ -235,51 +277,63 @@ fn invalid_positions_operation_and_resource_limits_leave_projection_unchanged() 
             ..
         })
     ));
-    assert_eq!(edit.projected().xml_bytes(), snapshot.xml_bytes());
+    assert_eq!(edit.projected().unwrap().xml_bytes(), original);
     edit.remove_plain_paragraph(Position::new(0)).unwrap();
-    let once = edit.projected().xml_bytes().to_vec();
+    let once = edit.projected().unwrap().xml_bytes().to_vec();
     assert!(matches!(
         edit.remove_plain_paragraph(Position::new(0)),
         Err(Error::Limit {
-            resource: "operations",
+            kind: LimitKind::Operations,
             ..
         })
     ));
-    assert_eq!(edit.projected().xml_bytes(), once);
+    assert_eq!(edit.projected().unwrap().xml_bytes(), once);
 
     let paragraph_limited = Limits::new(1024, 1, 100, 8, 2048, 4096).unwrap();
     assert!(matches!(
-        open(source.clone()).plain_paragraph_removal_snapshot_with_limits(paragraph_limited),
+        open(source.clone())
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().paragraph_copy(paragraph_limited)
+            )
+            .edit_plain_paragraph_removal()
+            .and_then(|edit| edit.projected().map(|_| ())),
         Err(Error::Limit {
-            resource: "paragraphs",
+            kind: LimitKind::Paragraphs,
             ..
         })
     ));
 
     let output_limited = Limits::new(1024, 4, 100, 8, 1, 4096).unwrap();
     let snapshot = open(source)
-        .plain_paragraph_removal_snapshot_with_limits(output_limited)
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().paragraph_copy(output_limited))
+        .edit_plain_paragraph_removal()
         .unwrap();
-    let mut edit = snapshot.removal_edit();
+    let mut edit = snapshot;
     assert!(matches!(
         edit.remove_plain_paragraph(Position::new(0)),
         Err(Error::Limit {
-            resource: "output bytes",
+            kind: LimitKind::OutputBytes,
             ..
         })
     ));
-    assert_eq!(edit.projected().xml_bytes(), snapshot.xml_bytes());
+    assert_eq!(
+        edit.projected().unwrap().xml_bytes(),
+        projected_xml(edit.package())
+    );
 
     let durable_limited = Limits::new(1024, 4, 100, 8, 2048, 128).unwrap();
     let snapshot = open(bytes(&fixture(document(&["a"]))))
-        .plain_paragraph_removal_snapshot_with_limits(durable_limited)
+        .with_semantic_limits(
+            litchi_docx::SemanticLimits::default().paragraph_copy(durable_limited),
+        )
+        .edit_plain_paragraph_removal()
         .unwrap();
-    let mut edit = snapshot.removal_edit();
+    let mut edit = snapshot;
     edit.remove_plain_paragraph(Position::new(0)).unwrap();
     assert!(matches!(
-        edit.commit().patch().to_bytes(),
+        edit.commit().unwrap().patch().to_bytes(Limits::default()),
         Err(Error::Limit {
-            resource: "durable patch bytes",
+            kind: LimitKind::DurablePatchBytes,
             ..
         })
     ));
@@ -289,14 +343,25 @@ fn invalid_positions_operation_and_resource_limits_leave_projection_unchanged() 
 fn empty_edit_is_exact_noop_and_security_or_complexity_refuses_before_editing() {
     let source = bytes(&fixture(document(&["only"])));
     let package = open(source.clone());
-    let commit = package.edit_plain_paragraph_removal().unwrap().commit();
+    let commit = package
+        .edit_plain_paragraph_removal()
+        .unwrap()
+        .commit()
+        .unwrap();
     assert!(commit.patch().is_noop());
-    assert!(commit.effect_report().is_noop());
-    let wire = commit.patch().to_bytes().unwrap();
-    assert_eq!(Patch::from_bytes(&wire).unwrap().to_bytes().unwrap(), wire);
+    assert!(commit.patch().effect_report().is_noop());
+    let wire = commit.patch().to_bytes(Limits::default()).unwrap();
+    assert_eq!(
+        Patch::from_bytes(&wire, Limits::default())
+            .unwrap()
+            .to_bytes(Limits::default())
+            .unwrap(),
+        wire
+    );
     let mut output = Vec::new();
     package
-        .publish_plain_paragraph_removal_to_stream(&mut output, &commit)
+        .apply_plain_paragraph_removal(commit.patch())
+        .and_then(|committed| Ok(committed.package().write_to(&mut output)?))
         .unwrap();
     assert_eq!(output, source);
 
@@ -321,7 +386,7 @@ fn empty_edit_is_exact_noop_and_security_or_complexity_refuses_before_editing() 
             true,
         );
     assert!(matches!(
-        open(bytes(&external)).plain_paragraph_removal_snapshot(),
+        admit_removal(bytes(&external)),
         Err(Error::Refused(Refusal::ExternalRelationship))
     ));
 
@@ -330,7 +395,7 @@ fn empty_edit_is_exact_noop_and_security_or_complexity_refuses_before_editing() 
     )
     .into_bytes();
     assert!(matches!(
-        open(bytes(&fixture(complex))).plain_paragraph_removal_snapshot(),
+        admit_removal(bytes(&fixture(complex))),
         Err(Error::Refused(Refusal::ComplexParagraph))
     ));
 }
@@ -374,12 +439,16 @@ fn changed_live_source_version_is_rejected_before_publication_output() {
     let package = source_backed::Package::from_read_at(read_at).unwrap();
     let mut edit = package.edit_plain_paragraph_removal().unwrap();
     edit.remove_plain_paragraph(Position::new(0)).unwrap();
-    let commit = edit.commit();
+    let commit = edit.commit().unwrap();
     source.revision.fetch_add(1, Ordering::SeqCst);
     let mut output = Vec::new();
     assert!(
         package
-            .publish_plain_paragraph_removal_to_stream(&mut output, &commit)
+            .apply_plain_paragraph_removal(commit.patch())
+            .and_then(|committed| {
+                committed.package().write_to(&mut output)?;
+                Ok(committed)
+            })
             .is_err()
     );
     assert!(output.is_empty());

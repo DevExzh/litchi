@@ -4,12 +4,10 @@ use std::sync::{
     atomic::{AtomicU64, Ordering},
 };
 
-use litchi_core::{Error, OwnedSource, ReadAt, SourceVersion};
+use litchi_core::{Error as CoreError, OwnedSource, ReadAt, SourceVersion};
 use litchi_odf_common::core::{PackageWriter, Profile};
 use litchi_odf_common::signature::{DocumentSigner, SignatureAlgorithm};
-use litchi_ods::{
-    ReadLimits, SourceBackedSpreadsheet, SourceBackedSpreadsheetCatalog, Spreadsheet,
-};
+use litchi_ods::{Package, SourceBackedSpreadsheet, SourceBackedSpreadsheetCatalog};
 use zip::{ZipArchive, ZipWriter, write::SimpleFileOptions};
 
 mod support;
@@ -28,7 +26,7 @@ fn package() -> Vec<u8> {
     let content = format!(
         r#"<office:document-content xmlns:office="{OFFICE}" xmlns:table="{TABLE}" xmlns:text="{TEXT}"><office:body><office:spreadsheet><table:table table:name="First"><table:table-row><table:table-cell office:value-type="string"><text:p>first</text:p></table:table-cell></table:table-row></table:table><table:table table:name="Selected"><table:table-row><table:table-cell office:value-type="string"><text:p>middle</text:p></table:table-cell><table:table-cell office:value-type="float" office:value="42"/></table:table-row></table:table></office:spreadsheet></office:body></office:document-content>"#
     );
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).expect("ODS MIME");
     writer
         .set_document_signer(
@@ -62,7 +60,7 @@ fn aliased_package() -> Vec<u8> {
     let content = format!(
         r#"<o:document-content xmlns:o="{OFFICE}" xmlns:t="{TABLE}" xmlns:x="{TEXT}"><o:body><o:spreadsheet><t:table t:name="Alias"><t:table-row><t:table-cell o:value-type="string"><x:p>alias</x:p></t:table-cell></t:table-row></t:table><t:table t:name="Empty"/></o:spreadsheet></o:body></o:document-content>"#
     );
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).expect("ODS MIME");
     writer
         .add_file("content.xml", content.as_bytes())
@@ -140,7 +138,7 @@ fn oversized_encrypted_content_package() -> (Vec<u8>, (u64, u64)) {
     let content = format!(
         r#"<office:document-content xmlns:office="{OFFICE}" xmlns:table="{TABLE}"><office:body><office:spreadsheet/></office:body></office:document-content>"#
     );
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).expect("ODS MIME");
     writer
         .set_encryption("catalog-password", Profile::compatible())
@@ -321,7 +319,10 @@ fn catalog_open_and_selected_sheet_are_lazy_and_semantically_equal() {
             > 0
     );
 
-    let eager = Spreadsheet::from_bytes(bytes).expect("eager owner");
+    let eager = Package::from_bytes(&bytes)
+        .expect("eager owner")
+        .workbook()
+        .expect("eager owner");
     let expected = eager.sheets().get(1).expect("eager selected sheet").clone();
     assert_eq!(selected, expected);
 }
@@ -352,20 +353,23 @@ fn catalog_keeps_opaque_members_and_signatures_deferred_until_selected() {
     assert_eq!(media.len(), 512 * 1024);
 
     let materialized = catalog.materialize().expect("explicit materialization");
-    let snapshot = materialized.document_snapshot().expect("snapshot");
-    assert_eq!(snapshot.as_bytes(), bytes.as_slice());
+    assert_eq!(materialized.as_bytes(), bytes.as_slice());
 }
 
 #[test]
 fn catalog_preserves_limits_and_source_version_lifecycle() {
     let bytes = package();
-    let limited = ReadLimits::default().with_max_manifest_bytes(1);
-    let error = SourceBackedSpreadsheetCatalog::from_read_at_with_limits(
+    let limited = litchi_odf_common::SourceLimits::builder()
+        .max_manifest_bytes(1)
+        .unwrap()
+        .build()
+        .unwrap();
+    let error = SourceBackedSpreadsheetCatalog::from_read_at_with_options(
         Arc::new(OwnedSource::new(bytes.clone())),
-        limited,
+        litchi_odf_common::OpenOptions::new().source_limits(limited),
     )
     .expect_err("manifest limit must be enforced during catalog open");
-    assert!(matches!(error, Error::ResourceLimit(_)));
+    assert!(matches!(error, litchi_ods::Error::Limit { .. }));
 
     let source = ProbeSource::new(bytes);
     let catalog =
@@ -373,11 +377,11 @@ fn catalog_preserves_limits_and_source_version_lifecycle() {
     source.bump();
     assert!(matches!(
         catalog.sheet_count(),
-        Err(Error::SourceChanged { .. })
+        Err(litchi_ods::Error::Core(CoreError::SourceChanged { .. }))
     ));
     assert!(matches!(
         catalog.sheet_at(0),
-        Err(Error::SourceChanged { .. })
+        Err(litchi_ods::Error::Core(CoreError::SourceChanged { .. }))
     ));
 }
 
@@ -389,7 +393,8 @@ fn source_owners_reject_oversized_content_before_payload_read() {
         .expect_err("full source owner must reject oversized content");
     assert!(matches!(
         error,
-        Error::InvalidFormat(message) if message == "ODS content.xml exceeds the family limit"
+        litchi_ods::Error::Core(CoreError::InvalidFormat(message))
+            if message == "ODS content.xml exceeds the family limit"
     ));
     assert!(
         source
@@ -405,7 +410,8 @@ fn source_owners_reject_oversized_content_before_payload_read() {
         .expect_err("catalog source owner must reject oversized content");
     assert!(matches!(
         error,
-        Error::InvalidFormat(message) if message == "ODS content.xml exceeds the family limit"
+        litchi_ods::Error::Core(CoreError::InvalidFormat(message))
+            if message == "ODS content.xml exceeds the family limit"
     ));
     assert!(
         source
@@ -422,7 +428,8 @@ fn source_owners_reject_oversized_content_before_payload_read() {
             .expect_err("full source owner must reject oversized encrypted content");
     assert!(matches!(
         error,
-        Error::InvalidFormat(message) if message == "ODS content.xml exceeds the family limit"
+        litchi_ods::Error::Core(CoreError::InvalidFormat(message))
+            if message == "ODS content.xml exceeds the family limit"
     ));
     assert!(
         source
@@ -441,7 +448,8 @@ fn source_owners_reject_oversized_content_before_payload_read() {
     .expect_err("catalog source owner must reject oversized encrypted content");
     assert!(matches!(
         error,
-        Error::InvalidFormat(message) if message == "ODS content.xml exceeds the family limit"
+        litchi_ods::Error::Core(CoreError::InvalidFormat(message))
+            if message == "ODS content.xml exceeds the family limit"
     ));
     assert!(
         source
@@ -472,7 +480,10 @@ fn catalog_handles_namespace_aliases_and_empty_selected_worksheets() {
 #[test]
 fn catalog_excludes_inert_dde_cached_tables_and_matches_eager_sheets() {
     let bytes = package_with_content(DDE_CONTENT);
-    let eager = Spreadsheet::from_bytes(bytes.clone()).expect("eager DDE owner");
+    let eager = Package::from_bytes(&bytes)
+        .expect("eager DDE owner")
+        .workbook()
+        .expect("eager DDE owner");
     let eager_sheets = eager.sheets();
     let catalog = SourceBackedSpreadsheetCatalog::from_read_at(Arc::new(OwnedSource::new(bytes)))
         .expect("DDE catalog open");
@@ -506,7 +517,10 @@ fn catalog_excludes_self_closing_dde_cache_before_real_sheet() {
         r#"<office:document-content xmlns:office="{OFFICE}" xmlns:table="{TABLE}"><office:body><office:spreadsheet><table:dde-links><table:dde-link><table:table/></table:dde-link></table:dde-links><table:table table:name="Real"><table:table-row/></table:table></office:spreadsheet></office:body></office:document-content>"#
     );
     let bytes = package_with_content(&content);
-    let eager = Spreadsheet::from_bytes(bytes.clone()).expect("eager self-closing DDE owner");
+    let eager = Package::from_bytes(&bytes)
+        .expect("eager self-closing DDE owner")
+        .workbook()
+        .expect("eager self-closing DDE owner");
     assert_eq!(
         eager
             .sheets()
@@ -542,7 +556,7 @@ fn catalog_preserves_validation_precedence_for_malformed_xml() {
     )))
     .expect_err("malformed content must be refused");
     assert!(
-        matches!(error, Error::InvalidFormat(message) if message.contains("invalid ODS content.xml"))
+        matches!(error, litchi_ods::Error::Core(CoreError::InvalidFormat(message)) if message.contains("invalid ODS content.xml"))
     );
 }
 
@@ -556,7 +570,7 @@ fn catalog_rejects_duplicate_and_nested_worksheet_entries() {
     )))
     .expect_err("duplicate sheet names must be refused");
     assert!(
-        matches!(duplicate_error, Error::InvalidFormat(message) if message.contains("duplicated"))
+        matches!(duplicate_error, litchi_ods::Error::Core(CoreError::InvalidFormat(message)) if message.contains("duplicated"))
     );
 
     let nested = format!(
@@ -567,6 +581,6 @@ fn catalog_rejects_duplicate_and_nested_worksheet_entries() {
     )))
     .expect_err("nested worksheet entries must be refused");
     assert!(
-        matches!(nested_error, Error::InvalidFormat(message) if message.contains("direct child"))
+        matches!(nested_error, litchi_ods::Error::Core(CoreError::InvalidFormat(message)) if message.contains("direct child"))
     );
 }

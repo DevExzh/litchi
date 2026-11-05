@@ -1,6 +1,6 @@
 use super::model::Token;
-use crate::codec::error::{RtfError, RtfResult};
-use crate::codec::limits::ParseLimits;
+
+use crate::codec::limits::SourceLimits;
 use bumpalo::Bump;
 use std::mem::size_of;
 use std::ops::Range;
@@ -24,7 +24,7 @@ pub(crate) struct Lexer<'a> {
     /// Arena allocator for temporary strings
     pub(super) arena: &'a Bump,
     /// Finite token and binary-payload ceilings.
-    pub(super) limits: ParseLimits,
+    pub(super) limits: SourceLimits,
     /// Aggregate bytes claimed by accepted `binN` payloads.
     pub(super) total_binary_bytes: usize,
     /// Destination markers for open groups.  Keeping this small and bounded
@@ -45,12 +45,12 @@ impl<'a> Lexer<'a> {
     #[cfg(test)]
     #[inline]
     pub(crate) fn new(input: &'a str, arena: &'a Bump) -> Self {
-        Self::new_with_limits(input, arena, ParseLimits::default())
+        Self::new_with_limits(input, arena, SourceLimits::default())
     }
 
     /// Create a lexer with an explicit finite resource profile.
     #[inline]
-    pub(crate) fn new_with_limits(input: &'a str, arena: &'a Bump, limits: ParseLimits) -> Self {
+    pub(crate) fn new_with_limits(input: &'a str, arena: &'a Bump, limits: SourceLimits) -> Self {
         Self {
             input,
             pos: 0,
@@ -116,11 +116,11 @@ impl<'a> Lexer<'a> {
         self.limits.max_binary_bytes()
     }
 
-    pub(super) fn observe_group_token(&mut self, token: &Token<'a>) -> RtfResult<()> {
+    pub(super) fn observe_group_token(&mut self, token: &Token<'a>) -> crate::Result<()> {
         match token {
             Token::OpenBrace => {
                 if self.binary_destinations.len() >= crate::codec::parser::MAX_GROUP_NESTING_DEPTH {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF group nesting depth exceeds the safety limit".to_string(),
                     ));
                 }
@@ -130,7 +130,7 @@ impl<'a> Lexer<'a> {
                 // from growing the destination stack and token stream far
                 // beyond the depth the recursive parser can safely consume.
                 self.binary_destinations.try_reserve(1).map_err(|_err| {
-                    RtfError::AllocationFailed {
+                    crate::Error::AllocationFailed {
                         resource: "lexer destination stack",
                         requested: self.binary_destinations.len().saturating_add(1),
                     }
@@ -158,23 +158,25 @@ impl<'a> Lexer<'a> {
 
     /// Tokenize the entire input.
     #[cfg(test)]
-    pub(crate) fn tokenize(&mut self) -> RtfResult<Vec<Token<'a>>> {
+    pub(crate) fn tokenize(&mut self) -> crate::Result<Vec<Token<'a>>> {
         self.tokenize_with_spans().map(|(tokens, _)| tokens)
     }
 
     /// Tokenize while retaining exact source ranges for lossless syntax nodes.
-    pub(crate) fn tokenize_with_spans(&mut self) -> RtfResult<(Vec<Token<'a>>, Vec<Range<usize>>)> {
+    pub(crate) fn tokenize_with_spans(
+        &mut self,
+    ) -> crate::Result<(Vec<Token<'a>>, Vec<Range<usize>>)> {
         let mut tokens = Vec::new();
         let mut spans = Vec::new();
         let mut opened_root = false;
 
         while self.pos < self.input.len() {
             let observed = tokens.len().saturating_add(1);
-            if observed > self.limits.max_tokens() {
-                return Err(RtfError::LimitExceeded {
-                    resource: "lexer tokens",
+            if observed > self.limits.max_events() {
+                return Err(crate::Error::Limit {
+                    kind: crate::SourceLimitKind::Events,
                     observed,
-                    limit: self.limits.max_tokens(),
+                    maximum: self.limits.max_events(),
                 });
             }
             // `Vec::try_reserve` grows geometrically, so calling it for every
@@ -184,7 +186,7 @@ impl<'a> Lexer<'a> {
             if tokens.len() == tokens.capacity() {
                 tokens
                     .try_reserve(1)
-                    .map_err(|_err| RtfError::AllocationFailed {
+                    .map_err(|_err| crate::Error::AllocationFailed {
                         resource: "lexer tokens",
                         requested: observed.saturating_mul(size_of::<Token<'a>>()),
                     })?;
@@ -192,7 +194,7 @@ impl<'a> Lexer<'a> {
             if spans.len() == spans.capacity() {
                 spans
                     .try_reserve(1)
-                    .map_err(|_err| RtfError::AllocationFailed {
+                    .map_err(|_err| crate::Error::AllocationFailed {
                         resource: "lexer token spans",
                         requested: observed.saturating_mul(size_of::<Range<usize>>()),
                     })?;
@@ -244,20 +246,20 @@ impl<'a> Lexer<'a> {
         &mut self,
         tokens: &mut Vec<Token<'a>>,
         spans: &mut Vec<Range<usize>>,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         let open = self.binary_destinations.len();
         if open == 0 {
             return Ok(());
         }
         let observed = tokens.len().saturating_add(open);
-        if observed > self.limits.max_tokens() {
-            return Err(RtfError::LimitExceeded {
-                resource: "lexer tokens",
+        if observed > self.limits.max_events() {
+            return Err(crate::Error::Limit {
+                kind: crate::SourceLimitKind::Events,
                 observed,
-                limit: self.limits.max_tokens(),
+                maximum: self.limits.max_events(),
             });
         }
-        let allocation_failed = |_err| RtfError::AllocationFailed {
+        let allocation_failed = |_err| crate::Error::AllocationFailed {
             resource: "lexer tokens",
             requested: observed.saturating_mul(size_of::<Token<'a>>()),
         };

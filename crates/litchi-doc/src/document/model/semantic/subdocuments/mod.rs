@@ -2,4 +2,5 @@
 
 mod comments;
 mod headers;
+pub use headers::HeaderFooterSlot;
 mod notes;

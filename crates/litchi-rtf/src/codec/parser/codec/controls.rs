@@ -8,16 +8,15 @@ use super::{
     Paragraph, ParagraphFontAlignment, ParagraphFrame, ParagraphFrameHorizontalPosition,
     ParagraphFrameHorizontalReference, ParagraphFrameTextFlow, ParagraphFrameVerticalPosition,
     ParagraphFrameVerticalReference, ParagraphFrameWrap, ParagraphWrapping, Parser,
-    RevisionMetadata, RtfEncoding, RtfError, RtfResult, State, TextDirection, UnderlineStyle,
-    animated_text, apply_associated_character_control, apply_table_distance,
-    apply_table_distance_side, character_grid, character_style_reference, character_type_selector,
-    complex_script_selector, emphasis_mark, fit_text, floating_table_offset,
-    floating_table_wrap_distance, font_size, nonnegative_author_index, paragraph_style_reference,
-    parser_classification_error, pending_cell_revision, require_parameterless,
-    required_list_spacing, required_paragraph_bool, required_paragraph_indent,
-    resolve_preferred_width, resolve_row_geometry, strict_paragraph_selector,
-    strict_paragraph_toggle, table_geometry_twips, table_indent_unit, table_row_height,
-    table_style_reference, table_width_unit,
+    RevisionMetadata, RtfEncoding, State, TextDirection, UnderlineStyle, animated_text,
+    apply_associated_character_control, apply_table_distance, apply_table_distance_side,
+    character_grid, character_style_reference, character_type_selector, complex_script_selector,
+    emphasis_mark, fit_text, floating_table_offset, floating_table_wrap_distance, font_size,
+    nonnegative_author_index, paragraph_style_reference, parser_classification_error,
+    pending_cell_revision, require_parameterless, required_list_spacing, required_paragraph_bool,
+    required_paragraph_indent, resolve_preferred_width, resolve_row_geometry,
+    strict_paragraph_selector, strict_paragraph_toggle, table_geometry_twips, table_indent_unit,
+    table_row_height, table_style_reference, table_width_unit,
 };
 
 fn paragraph_frame(state: &mut State) -> &mut ParagraphFrame {
@@ -27,35 +26,39 @@ fn paragraph_frame(state: &mut State) -> &mut ParagraphFrame {
         .get_or_insert_with(ParagraphFrame::default)
 }
 
-fn frame_nonnegative(value: Option<i32>, name: &str) -> RtfResult<u32> {
+fn frame_nonnegative(value: Option<i32>, name: &str) -> crate::Result<u32> {
     let value = value.ok_or_else(|| {
-        RtfError::MalformedDocument(format!("RTF {name} requires a numeric parameter"))
+        crate::Error::MalformedDocument(format!("RTF {name} requires a numeric parameter"))
     })?;
     let value = u32::try_from(value).map_err(|_err| {
-        RtfError::MalformedDocument(format!("RTF {name} parameter cannot be negative"))
+        crate::Error::MalformedDocument(format!("RTF {name} parameter cannot be negative"))
     })?;
     (value <= crate::MAX_PARAGRAPH_FRAME_TWIPS as u32)
         .then_some(value)
-        .ok_or_else(|| RtfError::MalformedDocument(format!("RTF {name} exceeds the safety limit")))
+        .ok_or_else(|| {
+            crate::Error::MalformedDocument(format!("RTF {name} exceeds the safety limit"))
+        })
 }
 
-fn frame_offset(value: Option<i32>, name: &str) -> RtfResult<i32> {
+fn frame_offset(value: Option<i32>, name: &str) -> crate::Result<i32> {
     let value = value.ok_or_else(|| {
-        RtfError::MalformedDocument(format!("RTF {name} requires a numeric parameter"))
+        crate::Error::MalformedDocument(format!("RTF {name} requires a numeric parameter"))
     })?;
     (value.unsigned_abs() <= crate::MAX_PARAGRAPH_FRAME_TWIPS as u32)
         .then_some(value)
-        .ok_or_else(|| RtfError::MalformedDocument(format!("RTF {name} exceeds the safety limit")))
+        .ok_or_else(|| {
+            crate::Error::MalformedDocument(format!("RTF {name} exceeds the safety limit"))
+        })
 }
 
-fn frame_toggle(value: Option<i32>, name: &str) -> RtfResult<bool> {
+fn frame_toggle(value: Option<i32>, name: &str) -> crate::Result<bool> {
     match value {
         Some(1) => Ok(true),
         Some(0) => Ok(false),
-        None => Err(RtfError::MalformedDocument(format!(
+        None => Err(crate::Error::MalformedDocument(format!(
             "RTF {name} requires a numeric parameter of 0 or 1"
         ))),
-        Some(_) => Err(RtfError::MalformedDocument(format!(
+        Some(_) => Err(crate::Error::MalformedDocument(format!(
             "RTF {name} parameter must be 0 or 1"
         ))),
     }
@@ -78,22 +81,22 @@ impl Parser<'_> {
         clippy::cast_sign_loss,
         reason = "match guards and adjacent range checks bound the remaining raw color and font conversions"
     )]
-    pub(super) fn apply_control_word(&mut self, control: &ControlWord<'_>) -> RtfResult<()> {
+    pub(super) fn apply_control_word(&mut self, control: &ControlWord<'_>) -> crate::Result<()> {
         if let ControlWord::Page(parameter) = control {
             require_parameterless(*parameter, "page")?;
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF page is not permitted in this destination".to_string(),
             ));
         }
         if let ControlWord::EditableRegionStart(parameter) = control {
             require_parameterless(*parameter, "ebcstart")?;
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF editable-region marks are supported only in the main body story".to_string(),
             ));
         }
         if let ControlWord::EditableRegionEnd(parameter) = control {
             require_parameterless(*parameter, "ebcend")?;
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF editable-region marks are supported only in the main body story".to_string(),
             ));
         }
@@ -104,7 +107,7 @@ impl Parser<'_> {
                 | ControlWord::SoftLineBreak(_)
                 | ControlWord::SoftLineHeight(_)
         ) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF soft-break controls are supported only in the main body story".to_string(),
             ));
         }
@@ -118,7 +121,7 @@ impl Parser<'_> {
                 | ControlWord::StylesheetDefaultLowAnsiFont(_)
         ) {
             if self.states.len() != 2 || self.section_note_options_closed {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF default-font selectors must occur in the root document header".to_string(),
                 ));
             }
@@ -132,15 +135,15 @@ impl Parser<'_> {
                 _ => return Err(parser_classification_error()),
             };
             if self.default_font_selectors_seen & bit != 0 {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "duplicate RTF {name} default-font selector"
                 )));
             }
             let value = u16::try_from(parameter.ok_or_else(|| {
-                RtfError::MalformedDocument(format!("RTF {name} requires a numeric parameter"))
+                crate::Error::MalformedDocument(format!("RTF {name} requires a numeric parameter"))
             })?)
             .map_err(|_err| {
-                RtfError::MalformedDocument(format!("RTF {name} value must be in 0..=65535"))
+                crate::Error::MalformedDocument(format!("RTF {name} value must be in 0..=65535"))
             })?;
             self.default_font_selectors_seen |= bit;
             let fonts = &mut self.default_formatting.fonts;
@@ -163,17 +166,17 @@ impl Parser<'_> {
         }
         if let ControlWord::DefaultTabWidth(parameter) = control {
             if self.states.len() != 2 || self.section_note_options_closed {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF deftab must precede visible text at document root".to_string(),
                 ));
             }
             let value = parameter.ok_or_else(|| {
-                RtfError::MalformedDocument(
+                crate::Error::MalformedDocument(
                     "RTF deftab requires a nonnegative numeric parameter".to_string(),
                 )
             })?;
             let value = u32::try_from(value).map_err(|_err| {
-                RtfError::MalformedDocument(
+                crate::Error::MalformedDocument(
                     "RTF deftab requires a nonnegative numeric parameter".to_string(),
                 )
             })?;
@@ -184,7 +187,7 @@ impl Parser<'_> {
             if let Some(existing) = self.default_tab_width_twips
                 && existing != value
             {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "conflicting RTF deftab document property".to_string(),
                 ));
             }
@@ -193,22 +196,22 @@ impl Parser<'_> {
         }
         if let ControlWord::KinsokuLanguage(parameter) = control {
             if self.states.len() != 2 || self.section_note_options_closed {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF ksulang must precede visible text at document root".to_string(),
                 ));
             }
             if self.kinsoku.language.is_some() {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "duplicate RTF ksulang document property".to_string(),
                 ));
             }
             let value = parameter.ok_or_else(|| {
-                RtfError::MalformedDocument(
+                crate::Error::MalformedDocument(
                     "RTF ksulang requires a nonnegative numeric parameter".to_string(),
                 )
             })?;
             self.kinsoku.language = Some(u32::try_from(value).map_err(|_err| {
-                RtfError::MalformedDocument(
+                crate::Error::MalformedDocument(
                     "RTF ksulang requires a nonnegative numeric parameter".to_string(),
                 )
             })?);
@@ -221,7 +224,7 @@ impl Parser<'_> {
                 | ControlWord::BoilerplateDocument(_)
         ) {
             if self.states.len() != 2 || self.section_note_options_closed {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF file-setting flag must precede visible text at document root".to_string(),
                 ));
             }
@@ -232,12 +235,12 @@ impl Parser<'_> {
                 _ => return Err(parser_classification_error()),
             };
             if parameter.is_some() {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "RTF {name} must not have a numeric parameter"
                 )));
             }
             if self.file_settings_seen & bit != 0 {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "duplicate RTF {name} document property"
                 )));
             }
@@ -259,7 +262,7 @@ impl Parser<'_> {
             ControlWord::Word97CompatibilityMode(_) | ControlWord::PostScriptOverText(_)
         ) {
             if self.states.len() != 2 || self.section_note_options_closed {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF output-setting flag must precede visible text at document root"
                         .to_string(),
                 ));
@@ -270,12 +273,12 @@ impl Parser<'_> {
                 _ => return Err(parser_classification_error()),
             };
             if parameter.is_some() {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "RTF {name} must not have a numeric parameter"
                 )));
             }
             if self.output_settings_seen & bit != 0 {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "duplicate RTF {name} document property"
                 )));
             }
@@ -300,7 +303,7 @@ impl Parser<'_> {
                 | ControlWord::LineBasedOnGrid(_)
         ) {
             if self.states.len() != 2 || self.section_note_options_closed {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF rendering flag must precede visible text at document root".to_string(),
                 ));
             }
@@ -313,12 +316,12 @@ impl Parser<'_> {
                 _ => return Err(parser_classification_error()),
             };
             if parameter.is_some() {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "RTF {name} must not have a numeric parameter"
                 )));
             }
             if self.rendering_settings_seen & bit != 0 {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "duplicate or conflicting RTF {name} rendering property"
                 )));
             }
@@ -354,7 +357,7 @@ impl Parser<'_> {
                 | ControlWord::DocumentEventMask(_)
         ) {
             if self.states.len() != 2 || self.section_note_options_closed {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF processing property must precede visible text at document root"
                         .to_string(),
                 ));
@@ -368,7 +371,7 @@ impl Parser<'_> {
                 _ => return Err(parser_classification_error()),
             };
             if self.processing_settings_seen & bit != 0 {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "duplicate RTF {name} document property"
                 )));
             }
@@ -379,7 +382,7 @@ impl Parser<'_> {
                         .fractional_character_widths_for_printing = true;
                 },
                 ControlWord::FractionalCharacterWidths(Some(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF fracwidth must not have a numeric parameter".to_string(),
                     ));
                 },
@@ -392,21 +395,21 @@ impl Parser<'_> {
                         Some(crate::AbstractNumberingCleanupStatus::Incomplete);
                 },
                 ControlWord::AbstractNumberingCleanup(_) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF ilfomacatclnup must have value 0 or 1".to_string(),
                     ));
                 },
                 ControlWord::DocumentEventMask(Some(value @ 0..=0x7fff)) => {
                     self.processing_settings.event_mask = Some(
                         crate::DocumentEventMask::from_bits(*value as u16).ok_or_else(|| {
-                            RtfError::MalformedDocument(
+                            crate::Error::MalformedDocument(
                                 "RTF grfdocevents contains unsupported event bits".to_string(),
                             )
                         })?,
                     );
                 },
                 ControlWord::DocumentEventMask(_) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF grfdocevents must have a value from 0 through 32767".to_string(),
                     ));
                 },
@@ -426,7 +429,7 @@ impl Parser<'_> {
                 | ControlWord::DrawingGridVerticalShow(_)
         ) {
             if self.states.len() != 2 || self.section_note_options_closed {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF drawing-grid property must precede visible text at document root"
                         .to_string(),
                 ));
@@ -443,7 +446,7 @@ impl Parser<'_> {
                 _ => return Err(parser_classification_error()),
             };
             if self.drawing_grid_seen & bit != 0 {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "duplicate RTF {name} drawing-grid property"
                 )));
             }
@@ -457,14 +460,14 @@ impl Parser<'_> {
                 },
                 ControlWord::DrawingGridFollowsMargins(Some(_))
                 | ControlWord::SnapToDrawingGrid(Some(_)) => {
-                    return Err(RtfError::MalformedDocument(format!(
+                    return Err(crate::Error::MalformedDocument(format!(
                         "RTF {name} must not have a numeric parameter"
                     )));
                 },
                 ControlWord::DrawingGridHorizontalSpacing(Some(value @ 0..=32767)) => {
                     self.drawing_grid.horizontal_spacing = Some(
                         crate::DrawingGridSpacing::new(*value as u16).ok_or_else(|| {
-                            RtfError::MalformedDocument(
+                            crate::Error::MalformedDocument(
                                 "RTF dghspace is outside the supported range".to_string(),
                             )
                         })?,
@@ -473,7 +476,7 @@ impl Parser<'_> {
                 ControlWord::DrawingGridVerticalSpacing(Some(value @ 0..=32767)) => {
                     self.drawing_grid.vertical_spacing = Some(
                         crate::DrawingGridSpacing::new(*value as u16).ok_or_else(|| {
-                            RtfError::MalformedDocument(
+                            crate::Error::MalformedDocument(
                                 "RTF dgvspace is outside the supported range".to_string(),
                             )
                         })?,
@@ -488,7 +491,7 @@ impl Parser<'_> {
                 ControlWord::DrawingGridHorizontalShow(Some(value @ 0..=32767)) => {
                     self.drawing_grid.horizontal_line_interval = Some(
                         crate::DrawingGridLineInterval::new(*value as u16).ok_or_else(|| {
-                            RtfError::MalformedDocument(
+                            crate::Error::MalformedDocument(
                                 "RTF dghshow is outside the supported range".to_string(),
                             )
                         })?,
@@ -497,14 +500,14 @@ impl Parser<'_> {
                 ControlWord::DrawingGridVerticalShow(Some(value @ 0..=32767)) => {
                     self.drawing_grid.vertical_line_interval = Some(
                         crate::DrawingGridLineInterval::new(*value as u16).ok_or_else(|| {
-                            RtfError::MalformedDocument(
+                            crate::Error::MalformedDocument(
                                 "RTF dgvshow is outside the supported range".to_string(),
                             )
                         })?,
                     );
                 },
                 _ => {
-                    return Err(RtfError::MalformedDocument(format!(
+                    return Err(crate::Error::MalformedDocument(format!(
                         "RTF {name} has a missing or out-of-range numeric parameter"
                     )));
                 },
@@ -520,7 +523,7 @@ impl Parser<'_> {
                 | ControlWord::PrintTwoOnOne(_)
         ) {
             if self.states.len() != 2 || self.section_note_options_closed {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF print-layout setting must precede visible text at document root"
                         .to_string(),
                 ));
@@ -534,7 +537,7 @@ impl Parser<'_> {
                 _ => return Err(parser_classification_error()),
             };
             if self.print_layout_settings_seen & bit != 0 {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "duplicate RTF {name} document property"
                 )));
             }
@@ -545,7 +548,7 @@ impl Parser<'_> {
                 },
                 ControlWord::MirrorMargins(parameter) => {
                     if parameter.is_some() {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF margmirror must not have a numeric parameter".to_string(),
                         ));
                     }
@@ -566,14 +569,14 @@ impl Parser<'_> {
                     }
                 },
                 ControlWord::DocumentGutter(_) => {
-                    return Err(RtfError::MalformedDocument(format!(
+                    return Err(crate::Error::MalformedDocument(format!(
                         "RTF gutter must have a numeric parameter in 0..={} twips",
                         crate::MAX_DOCUMENT_GUTTER_TWIPS
                     )));
                 },
                 ControlWord::ParallelGutter(_) => {
                     if let ControlWord::ParallelGutter(Some(_)) = control {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF gutterprl must not have a numeric parameter".to_string(),
                         ));
                     }
@@ -581,7 +584,7 @@ impl Parser<'_> {
                 },
                 ControlWord::PrintTwoOnOne(_) => {
                     if let ControlWord::PrintTwoOnOne(Some(_)) = control {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF twoonone must not have a numeric parameter".to_string(),
                         ));
                     }
@@ -599,7 +602,7 @@ impl Parser<'_> {
                 | ControlWord::ThemeLanguageComplexScript(_)
         ) {
             if self.states.len() != 2 || self.section_note_options_closed {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF theme language must precede visible text at document root".to_string(),
                 ));
             }
@@ -610,12 +613,12 @@ impl Parser<'_> {
                 _ => return Err(parser_classification_error()),
             };
             if self.theme_languages_seen & bit != 0 {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "duplicate RTF {name} document property"
                 )));
             }
             let value = parameter.ok_or_else(|| {
-                RtfError::MalformedDocument(format!(
+                crate::Error::MalformedDocument(format!(
                     "RTF {name} control requires a numeric language ID"
                 ))
             })?;
@@ -643,7 +646,7 @@ impl Parser<'_> {
                 | ControlWord::ShowXmlErrors(_)
         ) {
             if self.states.len() != 2 || self.section_note_options_closed {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF XML policy must precede visible text at document root".to_string(),
                 ));
             }
@@ -657,7 +660,7 @@ impl Parser<'_> {
                 _ => return Err(parser_classification_error()),
             };
             if self.xml_policies_seen & bit != 0 {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "duplicate RTF {name} document property"
                 )));
             }
@@ -665,7 +668,7 @@ impl Parser<'_> {
                 Some(0) => false,
                 Some(1) => true,
                 _ => {
-                    return Err(RtfError::MalformedDocument(format!(
+                    return Err(crate::Error::MalformedDocument(format!(
                         "RTF {name} must have numeric value 0 or 1"
                     )));
                 },
@@ -697,7 +700,7 @@ impl Parser<'_> {
             ControlWord::DoNotEmbedSystemFonts(_) | ControlWord::DoNotEmbedLinguisticData(_)
         ) {
             if self.states.len() != 2 || self.section_note_options_closed {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF embedding policy must precede visible text at document root".to_string(),
                 ));
             }
@@ -711,7 +714,7 @@ impl Parser<'_> {
                 _ => return Err(parser_classification_error()),
             };
             if self.embedding_policies_seen & bit != 0 {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "duplicate RTF {name} document property"
                 )));
             }
@@ -719,7 +722,7 @@ impl Parser<'_> {
                 Some(0) => false,
                 Some(1) => true,
                 _ => {
-                    return Err(RtfError::MalformedDocument(format!(
+                    return Err(crate::Error::MalformedDocument(format!(
                         "RTF {name} must have numeric value 0 or 1"
                     )));
                 },
@@ -741,7 +744,7 @@ impl Parser<'_> {
             ControlWord::TrackMoves(_) | ControlWord::TrackFormatting(_)
         ) {
             if self.states.len() != 2 || self.section_note_options_closed {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF revision policy must precede visible text at document root".to_string(),
                 ));
             }
@@ -751,7 +754,7 @@ impl Parser<'_> {
                 _ => return Err(parser_classification_error()),
             };
             if self.revision_policies_seen & bit != 0 {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "duplicate RTF {name} document property"
                 )));
             }
@@ -759,7 +762,7 @@ impl Parser<'_> {
                 Some(0) => false,
                 Some(1) => true,
                 _ => {
-                    return Err(RtfError::MalformedDocument(format!(
+                    return Err(crate::Error::MalformedDocument(format!(
                         "RTF {name} must have numeric value 0 or 1"
                     )));
                 },
@@ -782,7 +785,7 @@ impl Parser<'_> {
                 | ControlWord::UpdateStylesFromTemplate(_)
         ) {
             if self.states.len() != 2 || self.section_note_options_closed {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF style policy must precede visible text at document root".to_string(),
                 ));
             }
@@ -796,12 +799,12 @@ impl Parser<'_> {
                 _ => return Err(parser_classification_error()),
             };
             if parameter.is_some() {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "RTF {name} must not have a numeric parameter"
                 )));
             }
             if self.style_policies_seen & bit != 0 {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "duplicate RTF {name} document property"
                 )));
             }
@@ -829,7 +832,7 @@ impl Parser<'_> {
                 | ControlWord::AllowAutoFormatOverride(_)
         ) {
             if self.states.len() != 2 || self.section_note_options_closed {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF style restriction must precede visible text at document root".to_string(),
                 ));
             }
@@ -847,12 +850,12 @@ impl Parser<'_> {
                 _ => return Err(parser_classification_error()),
             };
             if parameter.is_some() {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "RTF {name} must not have a numeric parameter"
                 )));
             }
             if self.style_restrictions_seen & bit != 0 {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "duplicate RTF {name} document property"
                 )));
             }
@@ -881,7 +884,7 @@ impl Parser<'_> {
                 | ControlWord::BookFoldSheets(_)
         ) {
             if self.states.len() != 2 || self.section_note_options_closed {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF booklet-printing property must precede visible text at document root"
                         .to_string(),
                 ));
@@ -898,18 +901,18 @@ impl Parser<'_> {
                 } else {
                     "must not have a numeric parameter"
                 };
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "RTF {name} {requirement}"
                 )));
             }
             if self.booklet_printing_seen & bit != 0 {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "duplicate RTF {name} document property"
                 )));
             }
             if let Some(value) = parameter {
                 if *value < 0 || *value % 4 != 0 {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF bookfoldsheets must be a nonnegative multiple of four".to_string(),
                     ));
                 }
@@ -931,7 +934,7 @@ impl Parser<'_> {
             ControlWord::RemovePersonalInformation(_) | ControlWord::RemoveDateTimeInformation(_)
         ) {
             if self.states.len() != 2 || self.section_note_options_closed {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF privacy policy must precede visible text at document root".to_string(),
                 ));
             }
@@ -943,12 +946,12 @@ impl Parser<'_> {
                 _ => return Err(parser_classification_error()),
             };
             if parameter.is_some() {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "RTF {name} must not have a numeric parameter"
                 )));
             }
             if self.privacy_policies_seen & bit != 0 {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "duplicate RTF {name} document property"
                 )));
             }
@@ -982,7 +985,7 @@ impl Parser<'_> {
                 | ControlWord::UseAnsiKerningPairs(_)
         ) {
             if self.states.len() != 2 || self.section_note_options_closed {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF Word 2003 compatibility flag must precede visible text at document root"
                         .to_string(),
                 ));
@@ -1023,12 +1026,12 @@ impl Parser<'_> {
                 _ => return Err(parser_classification_error()),
             };
             if parameter.is_some() {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "RTF {name} must not have a numeric parameter"
                 )));
             }
             if self.word_2003_compatibility_seen & bit != 0 {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "duplicate RTF {name} document property"
                 )));
             }
@@ -1096,7 +1099,7 @@ impl Parser<'_> {
                 | ControlWord::ForceCompatibilityUpgrade(_)
         ) {
             if self.states.len() != 2 || self.section_note_options_closed {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF compatibility policy must precede visible text at document root"
                         .to_string(),
                 ));
@@ -1109,27 +1112,27 @@ impl Parser<'_> {
                 _ => return Err(parser_classification_error()),
             };
             if self.compatibility_policy_seen & bit != 0 {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "duplicate RTF {name} document property"
                 )));
             }
             match control {
                 ControlWord::NoFeatureThrottle(_) => {
                     let value = parameter.ok_or_else(|| {
-                        RtfError::MalformedDocument(
+                        crate::Error::MalformedDocument(
                             "RTF nofeaturethrottle requires parameter 0 or 1".to_string(),
                         )
                     })?;
                     self.compatibility_policy.feature_throttle = Some(
                         crate::DocumentFeatureThrottle::from_rtf(value).ok_or_else(|| {
-                            RtfError::MalformedDocument(
+                            crate::Error::MalformedDocument(
                                 "RTF nofeaturethrottle parameter must be 0 or 1".to_string(),
                             )
                         })?,
                     );
                 },
                 _ if parameter.is_some() => {
-                    return Err(RtfError::MalformedDocument(format!(
+                    return Err(crate::Error::MalformedDocument(format!(
                         "RTF {name} must not have a numeric parameter"
                     )));
                 },
@@ -1157,7 +1160,7 @@ impl Parser<'_> {
                 | ControlWord::CompressPunctuationAtLineStart(_)
         ) {
             if self.states.len() != 2 || self.section_note_options_closed {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF Asian grid compatibility flag must precede visible text at document root"
                         .to_string(),
                 ));
@@ -1177,12 +1180,12 @@ impl Parser<'_> {
                 _ => return Err(parser_classification_error()),
             };
             if parameter.is_some() {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "RTF {name} must not have a numeric parameter"
                 )));
             }
             if self.asian_grid_compatibility_seen & bit != 0 {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "duplicate RTF {name} document property"
                 )));
             }
@@ -1217,7 +1220,7 @@ impl Parser<'_> {
                 | ControlWord::UseWord95AutoSpacing(_)
         ) {
             if self.states.len() != 2 || self.section_note_options_closed {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF legacy layout compatibility flag must precede visible text at document root"
                         .to_string(),
                 ));
@@ -1231,12 +1234,12 @@ impl Parser<'_> {
                 _ => return Err(parser_classification_error()),
             };
             if parameter.is_some() {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "RTF {name} must not have a numeric parameter"
                 )));
             }
             if self.legacy_layout_compatibility_seen & bit != 0 {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "duplicate RTF {name} document property"
                 )));
             }
@@ -1275,7 +1278,7 @@ impl Parser<'_> {
                 | ControlWord::UseWord2003TableStyleRules(_)
         ) {
             if self.states.len() != 2 || self.section_note_options_closed {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF table-layout compatibility flag must precede visible text at document root"
                         .to_string(),
                 ));
@@ -1302,12 +1305,12 @@ impl Parser<'_> {
                 _ => return Err(parser_classification_error()),
             };
             if parameter.is_some() {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "RTF {name} must not have a numeric parameter"
                 )));
             }
             if self.table_layout_compatibility_seen & bit != 0 {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "duplicate RTF {name} document property"
                 )));
             }
@@ -1355,7 +1358,7 @@ impl Parser<'_> {
                 | ControlWord::LegacyAsianLineBreakingRules(_)
         ) {
             if self.states.len() != 2 || self.section_note_options_closed {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF East Asian compatibility flag must precede visible text at document root"
                         .to_string(),
                 ));
@@ -1376,12 +1379,12 @@ impl Parser<'_> {
                 _ => return Err(parser_classification_error()),
             };
             if parameter.is_some() {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "RTF {name} must not have a numeric parameter"
                 )));
             }
             if self.east_asian_compatibility_seen & bit != 0 {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "duplicate RTF {name} document property"
                 )));
             }
@@ -1420,7 +1423,7 @@ impl Parser<'_> {
                 | ControlWord::SuppressBottomPageExtraSpacing(_)
         ) {
             if self.states.len() != 2 || self.section_note_options_closed {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF line-spacing compatibility flag must precede visible text at document root"
                         .to_string(),
                 ));
@@ -1442,12 +1445,12 @@ impl Parser<'_> {
                 _ => return Err(parser_classification_error()),
             };
             if parameter.is_some() {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "RTF {name} must not have a numeric parameter"
                 )));
             }
             if self.line_spacing_compatibility_seen & bit != 0 {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "duplicate RTF {name} document property"
                 )));
             }
@@ -1479,20 +1482,20 @@ impl Parser<'_> {
         }
         if matches!(control, ControlWord::FromText(_) | ControlWord::FromHtml(_)) {
             if self.states.len() != 2 || self.section_note_options_closed || self.saw_font_table {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF document origin must occur in the header before font tables and visible text"
                         .to_string(),
                 ));
             }
             if self.origin_metadata.origin.is_some() {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "duplicate or conflicting RTF document-origin property".to_string(),
                 ));
             }
             self.origin_metadata.origin = Some(match control {
                 ControlWord::FromText(None) => crate::DocumentOrigin::PlainTextEmail,
                 ControlWord::FromText(Some(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF fromtext must not have a numeric parameter".to_string(),
                     ));
                 },
@@ -1507,12 +1510,12 @@ impl Parser<'_> {
         }
         if let ControlWord::DocumentType(parameter) = control {
             if self.states.len() != 2 || self.section_note_options_closed {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF document type must precede visible text at document root".to_string(),
                 ));
             }
             if self.origin_metadata.auto_format_type.is_some() {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "duplicate RTF document type property".to_string(),
                 ));
             }
@@ -1526,7 +1529,7 @@ impl Parser<'_> {
             ControlWord::ReadOnlyRecommended(_) | ControlWord::SavePreviousPicture(_)
         ) {
             if self.states.len() != 2 || self.section_note_options_closed {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF save preference must precede visible text at document root".to_string(),
                 ));
             }
@@ -1538,12 +1541,12 @@ impl Parser<'_> {
                 _ => return Err(parser_classification_error()),
             };
             if parameter.is_some() {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "RTF {name} must not have a numeric parameter"
                 )));
             }
             if self.save_preferences_seen & bit != 0 {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "duplicate RTF {name} document property"
                 )));
             }
@@ -1563,12 +1566,12 @@ impl Parser<'_> {
         }
         if let ControlWord::StyleSortMethod(parameter) = control {
             if self.states.len() != 2 || self.section_note_options_closed {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF style-sort method must precede visible text at document root".to_string(),
                 ));
             }
             if self.style_sort_method_seen {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "duplicate RTF style-sort method document property".to_string(),
                 ));
             }
@@ -1580,17 +1583,17 @@ impl Parser<'_> {
         }
         if let ControlWord::UseXslTransform(parameter) = control {
             if self.states.len() != 2 || self.section_note_options_closed {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF usexform must precede visible text at document root".to_string(),
                 ));
             }
             if parameter.is_some() {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF usexform must not have a numeric parameter".to_string(),
                 ));
             }
             if self.use_xsl_transform_seen {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "duplicate RTF usexform document property".to_string(),
                 ));
             }
@@ -1610,7 +1613,7 @@ impl Parser<'_> {
                     .last()
                     .is_some_and(|state| state.destination == Destination::DocumentBody);
             if !at_root || self.section_note_options_closed {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF review-display flags must precede visible text at document root"
                         .to_string(),
                 ));
@@ -1632,7 +1635,7 @@ impl Parser<'_> {
                     .last()
                     .is_some_and(|state| state.destination == Destination::DocumentBody);
             if !at_root || self.section_note_options_closed {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF document-view controls must precede visible text at document root"
                         .to_string(),
                 ));
@@ -1656,7 +1659,7 @@ impl Parser<'_> {
             // not yet been flushed into a StyleBlock) enters the document stream.
             let body_started = self.section_note_options_closed;
             if !at_root || body_started {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF document hyphenation controls must precede visible text at document root"
                         .to_string(),
                 ));
@@ -1666,13 +1669,13 @@ impl Parser<'_> {
         }
         if let ControlWord::TableNestingLevel(parameter) = control {
             let value = parameter.ok_or_else(|| {
-                RtfError::MalformedDocument("RTF itap requires a numeric parameter".to_string())
+                crate::Error::MalformedDocument("RTF itap requires a numeric parameter".to_string())
             })?;
             let level = u8::try_from(value).map_err(|_err| {
-                RtfError::MalformedDocument("RTF itap is outside 0..=32".to_string())
+                crate::Error::MalformedDocument("RTF itap is outside 0..=32".to_string())
             })?;
             if usize::from(level) > crate::MAX_TABLE_NESTING_DEPTH {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF itap is outside 0..=32".to_string(),
                 ));
             }
@@ -1688,17 +1691,17 @@ impl Parser<'_> {
         match control {
             ControlWord::RevisionSaveRoot(value) => {
                 if self.states.len() != 2 || self.saw_revision_save_root {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF rsidroot must occur exactly once at document scope".to_string(),
                     ));
                 }
                 let value = u32::try_from(*value).map_err(|_err| {
-                    RtfError::MalformedDocument(
+                    crate::Error::MalformedDocument(
                         "RTF revision root must be a positive signed integer".to_string(),
                     )
                 })?;
                 if value == 0 {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF revision root must be a positive signed integer".to_string(),
                     ));
                 }
@@ -1707,7 +1710,7 @@ impl Parser<'_> {
                 return Ok(());
             },
             ControlWord::RevisionSaveId(_) => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "orphan RTF rsid control outside rsidtbl".to_string(),
                 ));
             },
@@ -1723,7 +1726,7 @@ impl Parser<'_> {
             | ControlWord::WindowsBitmapBitsPerPixel(_)
             | ControlWord::WindowsBitmapPlanes(_)
             | ControlWord::WindowsBitmapWidthBytes(_) => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "orphan RTF picture metadata control outside pict".to_string(),
                 ));
             },
@@ -1740,7 +1743,7 @@ impl Parser<'_> {
                     || self.note_options_closed
                     || self.blocks.iter().any(|block| !block.text.is_empty())
                 {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF note options must precede body text at document root".to_string(),
                     ));
                 }
@@ -1751,7 +1754,7 @@ impl Parser<'_> {
                             1 => crate::PresentNoteKinds::EndnotesOnly,
                             2 => crate::PresentNoteKinds::FootnotesAndEndnotes,
                             _ => {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF fet value must be between 0 and 2".to_string(),
                                 ));
                             },
@@ -1765,7 +1768,7 @@ impl Parser<'_> {
                     },
                     ControlWord::FootnoteStart(value) => {
                         if *value <= 0 {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF footnote starting number must be positive".to_string(),
                             ));
                         }
@@ -1773,7 +1776,7 @@ impl Parser<'_> {
                     },
                     ControlWord::EndnoteStart(value) => {
                         if *value <= 0 {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF endnote starting number must be positive".to_string(),
                             ));
                         }
@@ -1815,12 +1818,12 @@ impl Parser<'_> {
             | ControlWord::LegacyTextTopBottomRightLeft
             | ControlWord::LegacyTextTopBottomRightLeftVertical
             | ControlWord::LegacyTextBottomTopLeftRight => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "orphan RTF legacy drawing control outside do".to_string(),
                 ));
             },
             ControlWord::GeneratedListText | ControlWord::LegacyGeneratedListText => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF generated list marker must be a grouped body destination".to_string(),
                 ));
             },
@@ -1833,24 +1836,24 @@ impl Parser<'_> {
             | ControlWord::MoveFromEnd
             | ControlWord::MoveToStart
             | ControlWord::MoveToEnd => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "orphan RTF metadata control outside its destination".to_string(),
                 ));
             },
             ControlWord::ListPicture(_)
             | ControlWord::ShapePicture(_)
             | ControlWord::NonShapePicture(_) => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF listpicture and shppict are misplaced".to_string(),
                 ));
             },
             ControlWord::BackgroundDestination(_) => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF background must be a starred root destination".to_string(),
                 ));
             },
             ControlWord::ThemeData | ControlWord::ColorSchemeMapping => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "orphan RTF theme destination control".to_string(),
                 ));
             },
@@ -1867,12 +1870,12 @@ impl Parser<'_> {
             | ControlWord::LatentStyleUnhideUsed(_)
             | ControlWord::LatentStyleQuickFormat(_)
             | ControlWord::LatentStylePriority(_) => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "orphan RTF latent-style control".to_string(),
                 ));
             },
             ControlWord::DataStore => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "orphan RTF datastore destination control".to_string(),
                 ));
             },
@@ -1903,7 +1906,7 @@ impl Parser<'_> {
             | ControlWord::MailMergeUdl
             | ControlWord::MailMergeUdlData
             | ControlWord::MailMergeUniqueTag => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "orphan or misplaced RTF mail-merge control".to_string(),
                 ));
             },
@@ -1924,7 +1927,7 @@ impl Parser<'_> {
             | ControlWord::MathSmallFractions(_)
             | ControlWord::MathWrapIndent(_)
             | ControlWord::MathWrapRight(_) => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "orphan RTF document math-properties control".to_string(),
                 ));
             },
@@ -2001,14 +2004,14 @@ impl Parser<'_> {
                 return Ok(());
             },
             ControlWord::EnforceProtection(None) => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF enforceprot requires a numeric parameter".to_string(),
                 ));
             },
             ControlWord::ProtectionLevel(Some(value)) => {
                 self.ensure_protection_scope()?;
                 if self.info.protection.level.is_some() {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "duplicate RTF protlevel control".to_string(),
                     ));
                 }
@@ -2016,22 +2019,22 @@ impl Parser<'_> {
                 return Ok(());
             },
             ControlWord::ProtectionLevel(None) => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF protlevel requires a numeric parameter".to_string(),
                 ));
             },
             ControlWord::Password => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF password hash is misplaced or not a starred info destination".to_string(),
                 ));
             },
             ControlWord::PasswordHash => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF passwordhash is misplaced or not a starred info destination".to_string(),
                 ));
             },
             control if Self::is_math_scoped_control(control) => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF math controls may occur only inside a math zone destination".to_string(),
                 ));
             },
@@ -2074,7 +2077,7 @@ impl Parser<'_> {
             },
             ControlWord::FontNumber(n) => {
                 state.formatting.font_ref = FontRef::try_from(*n).map_err(|_err| {
-                    RtfError::MalformedDocument("invalid RTF body font reference".to_string())
+                    crate::Error::MalformedDocument("invalid RTF body font reference".to_string())
                 })?;
             },
             ControlWord::Language(value) => {
@@ -2301,7 +2304,7 @@ impl Parser<'_> {
                     .ok()
                     .filter(|level| *level <= 9)
                     .ok_or_else(|| {
-                        RtfError::MalformedDocument(
+                        crate::Error::MalformedDocument(
                             "RTF outline level must be between 0 and 9".to_string(),
                         )
                     })?;
@@ -2489,7 +2492,7 @@ impl Parser<'_> {
                 paragraph_frame(state).horizontal_position =
                     ParagraphFrameHorizontalPosition::Offset(
                         i32::try_from(frame_nonnegative(*value, "posx")?).map_err(|_err| {
-                            RtfError::MalformedDocument(
+                            crate::Error::MalformedDocument(
                                 "RTF posx exceeds the safety limit".to_string(),
                             )
                         })?,
@@ -2541,7 +2544,9 @@ impl Parser<'_> {
             ControlWord::FrameVerticalOffset(value) => {
                 paragraph_frame(state).vertical_position = ParagraphFrameVerticalPosition::Offset(
                     i32::try_from(frame_nonnegative(*value, "posy")?).map_err(|_err| {
-                        RtfError::MalformedDocument("RTF posy exceeds the safety limit".to_string())
+                        crate::Error::MalformedDocument(
+                            "RTF posy exceeds the safety limit".to_string(),
+                        )
                     })?,
                 );
             },
@@ -2640,12 +2645,12 @@ impl Parser<'_> {
             },
             ControlWord::ListLevelIndex(value) => {
                 let level = u8::try_from(*value).map_err(|_err| {
-                    RtfError::MalformedDocument(
+                    crate::Error::MalformedDocument(
                         "RTF paragraph list level is outside the supported range".to_string(),
                     )
                 })?;
                 if level > 8 {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF paragraph list level exceeds the nine-level specification limit"
                             .to_string(),
                     ));
@@ -2657,7 +2662,7 @@ impl Parser<'_> {
             ControlWord::Revised(value) => {
                 if *value {
                     if state.revision_type.is_some() {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "conflicting or duplicate RTF revision marker".to_string(),
                         ));
                     }
@@ -2675,7 +2680,7 @@ impl Parser<'_> {
             ControlWord::Deleted(value) => {
                 if *value {
                     if state.revision_type.is_some() {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "conflicting or duplicate RTF revision marker".to_string(),
                         ));
                     }
@@ -2692,7 +2697,7 @@ impl Parser<'_> {
             },
             ControlWord::RevisionAuthor(value) => {
                 if state.revision_type.is_none() || state.revision_author_id.is_some() {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF revauth requires one active revision marker".to_string(),
                     ));
                 }
@@ -2703,7 +2708,7 @@ impl Parser<'_> {
                     != Some(super::super::super::annotation::RevisionType::Deletion)
                     || state.revision_author_id.is_some()
                 {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF revauthdel requires one active deletion marker".to_string(),
                     ));
                 }
@@ -2711,7 +2716,7 @@ impl Parser<'_> {
             },
             ControlWord::RevisionDate(value) => {
                 if state.revision_type.is_none() || state.revision_date.is_some() {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF revdttm requires one active revision marker".to_string(),
                     ));
                 }
@@ -2722,7 +2727,7 @@ impl Parser<'_> {
                     != Some(super::super::super::annotation::RevisionType::Deletion)
                     || state.revision_date.is_some()
                 {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF revdttmdel requires one active deletion marker".to_string(),
                     ));
                 }
@@ -2747,13 +2752,16 @@ impl Parser<'_> {
                     437 => RtfEncoding::Cp437,
                     850 => RtfEncoding::Cp850,
                     _ => {
-                        let page =
-                            u32::try_from(*cp).ok().and_then(Mbcs::new).ok_or_else(|| {
-                                RtfError::MalformedDocument(format!(
-                                    "unsupported RTF ANSI code page {cp}"
-                                ))
-                            })?;
-                        RtfEncoding::Standard(page)
+                        let page = u32::try_from(*cp).map_err(|_| {
+                            crate::Error::MalformedDocument(format!(
+                                "invalid RTF ANSI code page {cp}"
+                            ))
+                        })?;
+                        // A positive page without an exact codec is refused
+                        // as unsupported, not as malformed (record 0347).
+                        RtfEncoding::Standard(
+                            Mbcs::new(page).ok_or(crate::Error::UnsupportedCodePage(page))?,
+                        )
                     },
                 }
             },
@@ -2856,7 +2864,7 @@ impl Parser<'_> {
                 let _ = state;
                 if destination == Destination::NestedTableProperties {
                     if level < 2 {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF nesttableprops lacks itap level 2 or greater".to_string(),
                         ));
                     }
@@ -2876,26 +2884,28 @@ impl Parser<'_> {
             },
             ControlWord::TableRowIndex(value) => {
                 if state.table_row_index_seen {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "duplicate RTF irow control".to_string(),
                     ));
                 }
                 let value = value.ok_or_else(|| {
-                    RtfError::MalformedDocument("RTF irow requires a numeric parameter".to_string())
+                    crate::Error::MalformedDocument(
+                        "RTF irow requires a numeric parameter".to_string(),
+                    )
                 })?;
                 state.table_row_banding.row_index = Some(u16::try_from(value).map_err(|_err| {
-                    RtfError::MalformedDocument("RTF irow must be in 0..=65535".to_string())
+                    crate::Error::MalformedDocument("RTF irow must be in 0..=65535".to_string())
                 })?);
                 state.table_row_index_seen = true;
             },
             ControlWord::TableRowBandIndex(value) => {
                 if state.table_row_band_index_seen {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "duplicate RTF irowband control".to_string(),
                     ));
                 }
                 let value = value.ok_or_else(|| {
-                    RtfError::MalformedDocument(
+                    crate::Error::MalformedDocument(
                         "RTF irowband requires a numeric parameter".to_string(),
                     )
                 })?;
@@ -2903,7 +2913,7 @@ impl Parser<'_> {
                     crate::TableRowBandIndex::Header
                 } else {
                     crate::TableRowBandIndex::Row(u16::try_from(value).map_err(|_err| {
-                        RtfError::MalformedDocument(
+                        crate::Error::MalformedDocument(
                             "RTF irowband must be -1 or in 0..=65535".to_string(),
                         )
                     })?)
@@ -2913,7 +2923,7 @@ impl Parser<'_> {
             ControlWord::TableLastRow(param) => {
                 require_parameterless(*param, "lastrow")?;
                 if state.table_last_row_seen {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "duplicate RTF lastrow control".to_string(),
                     ));
                 }
@@ -2923,7 +2933,7 @@ impl Parser<'_> {
             ControlWord::TableAutoformatFlag(flag, param) => {
                 require_parameterless(*param, "table autoformat flag")?;
                 if !state.table_autoformat_flags.insert(*flag) {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "duplicate RTF table autoformat flag".to_string(),
                     ));
                 }
@@ -2956,14 +2966,14 @@ impl Parser<'_> {
                     crate::TableDistanceScope::Cell => &mut state.pending_cell_width_unit,
                 };
                 if target.replace(unit).is_some() {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF preferred-width unit is duplicated".to_string(),
                     ));
                 }
             },
             ControlWord::TablePreferredWidthValue(scope, param) => {
                 let value = param.ok_or_else(|| {
-                    RtfError::MalformedDocument(
+                    crate::Error::MalformedDocument(
                         "RTF preferred-width value requires a parameter".to_string(),
                     )
                 })?;
@@ -2972,7 +2982,7 @@ impl Parser<'_> {
                     crate::TableDistanceScope::Cell => &mut state.pending_cell_width_value,
                 };
                 if target.replace(value).is_some() {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF preferred-width value is duplicated".to_string(),
                     ));
                 }
@@ -2985,14 +2995,14 @@ impl Parser<'_> {
                     &mut state.table_leading_width_unit
                 };
                 if target.replace(unit).is_some() {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF invisible-width unit is duplicated".to_string(),
                     ));
                 }
             },
             ControlWord::TableInvisibleWidthValue(trailing, param) => {
                 let value = param.ok_or_else(|| {
-                    RtfError::MalformedDocument(
+                    crate::Error::MalformedDocument(
                         "RTF invisible-width value requires a parameter".to_string(),
                     )
                 })?;
@@ -3002,7 +3012,7 @@ impl Parser<'_> {
                     &mut state.table_leading_width_value
                 };
                 if target.replace(value).is_some() {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF invisible-width value is duplicated".to_string(),
                     ));
                 }
@@ -3012,12 +3022,12 @@ impl Parser<'_> {
                     Some(0) => false,
                     Some(1) => true,
                     None => {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF trautofit requires 0 or 1".to_string(),
                         ));
                     },
                     Some(_) => {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF trautofit accepts only 0 or 1".to_string(),
                         ));
                     },
@@ -3029,7 +3039,7 @@ impl Parser<'_> {
                     Some(_) => table_geometry_twips(*param, "tblind", true)?,
                 };
                 if state.table_indent_value.replace(value).is_some() {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF tblind is duplicated".to_string(),
                     ));
                 }
@@ -3037,7 +3047,7 @@ impl Parser<'_> {
             ControlWord::TableIndentUnit(param) => {
                 let unit = table_indent_unit(*param)?;
                 if state.table_indent_unit.replace(unit).is_some() {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF tblindtype is duplicated".to_string(),
                     ));
                 }
@@ -3087,7 +3097,7 @@ impl Parser<'_> {
                     crate::TableCellMergeAxis::Vertical => &mut state.pending_cell_merge.vertical,
                 };
                 if pending.replace(*role).is_some() {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF cell definition has duplicate or conflicting merge roles on one axis"
                             .to_string(),
                     ));
@@ -3095,7 +3105,7 @@ impl Parser<'_> {
             },
             ControlWord::CellRevisionMark(kind) => match &mut state.pending_cell_revision {
                 Some(revision) if revision.kind != *kind => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF cell definition has conflicting revision markers".to_string(),
                     ));
                 },
@@ -3142,7 +3152,7 @@ impl Parser<'_> {
                 // Cell boundary definition
                 state.cell_boundaries.push(*boundary);
                 if state.cell_distances.len() >= crate::MAX_TABLE_CELLS_PER_ROW {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF row exceeds 4096 cell definitions".to_string(),
                     ));
                 }
@@ -3195,17 +3205,19 @@ impl Parser<'_> {
             ControlWord::TableDefaultCellWidthUnit(param) => {
                 let unit = table_width_unit(*param)?;
                 if state.table_default_width_unit.replace(unit).is_some() {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF tscellwidthfts is duplicated".to_string(),
                     ));
                 }
             },
             ControlWord::TableDefaultCellWidthValue(param) => {
                 let value = param.ok_or_else(|| {
-                    RtfError::MalformedDocument("RTF tscellwidth requires a parameter".to_string())
+                    crate::Error::MalformedDocument(
+                        "RTF tscellwidth requires a parameter".to_string(),
+                    )
                 })?;
                 if state.table_default_width_value.replace(value).is_some() {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF tscellwidth is duplicated".to_string(),
                     ));
                 }
@@ -3290,7 +3302,7 @@ impl Parser<'_> {
                         None | Some(1) => true,
                         Some(0) => false,
                         Some(_) => {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF tabsnoovrlp accepts only 0 or 1".to_string(),
                             ));
                         },
@@ -3303,7 +3315,7 @@ impl Parser<'_> {
                 let level = state.table_nesting_level;
                 let _ = state;
                 if destination != Destination::DocumentBody || level < 2 {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF nestcell requires visible nested-table text and itap 2 or greater"
                             .to_string(),
                     ));
@@ -3316,7 +3328,7 @@ impl Parser<'_> {
                 let level = state.table_nesting_level;
                 let _ = state;
                 if destination != Destination::NestedTableProperties || level < 2 {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF nestrow requires a nesttableprops destination and itap 2 or greater"
                             .to_string(),
                     ));
@@ -3324,7 +3336,7 @@ impl Parser<'_> {
                 self.finalize_nested_row(level)?;
             },
             ControlWord::NestedTableProperties(_) | ControlWord::NoNestedTables(_) => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF nested-table destination control is misplaced".to_string(),
                 ));
             },
@@ -3369,7 +3381,7 @@ impl Parser<'_> {
                 self.finalize_cell(false)?;
                 if let Some(row) = &mut self.current_row {
                     if !boundaries.is_empty() && boundaries.len() != row.cell_count() {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF row cell boundaries do not match cell count".to_string(),
                         ));
                     }
@@ -3420,7 +3432,7 @@ impl Parser<'_> {
             | ControlWord::StyleListFilter(_)
             | ControlWord::WriteReservation(_)
             | ControlWord::WriteReservationHash(_) => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF destination control is misplaced".to_string(),
                 ));
             },

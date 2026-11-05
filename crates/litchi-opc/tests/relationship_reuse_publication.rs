@@ -16,6 +16,7 @@
 //! 2,189 of the 2,216 relationships members in this repository's OOXML corpus
 //! are spelled differently from their canonical form, so if keeping the capture
 //! could move a published byte, it would move one here.
+use litchi_opc::SourceLimits;
 use litchi_opc::phys_pkg::PhysPkgReader;
 use litchi_opc::{OpcPackage, PackURI, PackageWriter};
 
@@ -40,7 +41,7 @@ fn fixture() -> Vec<u8> {
 }
 
 fn member(archive: &[u8], name: &str) -> Vec<u8> {
-    PhysPkgReader::new(archive)
+    PhysPkgReader::new(archive, SourceLimits::default())
         .expect("read archive")
         .read_member(name)
         .unwrap_or_else(|error| panic!("read member {name}: {error}"))
@@ -70,7 +71,8 @@ fn smallest_internal_pair(package: &OpcPackage, owner: Option<&PackURI>) -> (Str
 #[test]
 fn the_fixture_is_not_spelled_the_way_this_crate_serializes_relationships() {
     let bytes = fixture();
-    let package = OpcPackage::from_vec(bytes.clone()).expect("open fixture");
+    let package =
+        OpcPackage::from_vec(bytes.clone(), SourceLimits::default()).expect("open fixture");
     let drawing = PackURI::new(DRAWING).expect("drawing URI");
 
     assert_ne!(
@@ -94,17 +96,19 @@ fn the_fixture_is_not_spelled_the_way_this_crate_serializes_relationships() {
 #[test]
 fn reusing_a_package_relationship_publishes_what_taking_the_seam_publishes() {
     let bytes = fixture();
-    let probe = OpcPackage::from_vec(bytes.clone()).expect("open fixture");
+    let probe = OpcPackage::from_vec(bytes.clone(), SourceLimits::default()).expect("open fixture");
     let (reltype, target) = smallest_internal_pair(&probe, None);
     drop(probe);
 
     // Taking the seam revokes exact-source authorization without changing a
     // value, so all three legs publish through the preservation route.
-    let mut seam = OpcPackage::from_vec(bytes.clone()).expect("open seam leg");
+    let mut seam =
+        OpcPackage::from_vec(bytes.clone(), SourceLimits::default()).expect("open seam leg");
     let _seam = seam.rels_mut();
     let seam_output = PackageWriter::to_bytes(&seam).expect("publish seam leg");
 
-    let mut reuse = OpcPackage::from_vec(bytes.clone()).expect("open reuse leg");
+    let mut reuse =
+        OpcPackage::from_vec(bytes.clone(), SourceLimits::default()).expect("open reuse leg");
     let reused = reuse
         .rels_mut()
         .get_or_add(&reltype, &target)
@@ -115,7 +119,8 @@ fn reusing_a_package_relationship_publishes_what_taking_the_seam_publishes() {
     // Removing an absent identifier keeps every value identical but drops
     // every open-time proof, which is the route the reuse leg took before
     // change 0647. It is the oracle for "the capture is only ever a shortcut".
-    let mut compared = OpcPackage::from_vec(bytes.clone()).expect("open compared leg");
+    let mut compared =
+        OpcPackage::from_vec(bytes.clone(), SourceLimits::default()).expect("open compared leg");
     compared.rels_mut().remove("rIdAbsent0647");
     let compared_output = PackageWriter::to_bytes(&compared).expect("publish compared leg");
 
@@ -138,16 +143,18 @@ fn reusing_a_package_relationship_publishes_what_taking_the_seam_publishes() {
 fn reusing_a_part_relationship_publishes_what_taking_the_seam_publishes() {
     let bytes = fixture();
     let drawing = PackURI::new(DRAWING).expect("drawing URI");
-    let probe = OpcPackage::from_vec(bytes.clone()).expect("open fixture");
+    let probe = OpcPackage::from_vec(bytes.clone(), SourceLimits::default()).expect("open fixture");
     let (reltype, target) = smallest_internal_pair(&probe, Some(&drawing));
     let established = probe.get_part(&drawing).expect("drawing part").rels().len();
     drop(probe);
 
-    let mut seam = OpcPackage::from_vec(bytes.clone()).expect("open seam leg");
+    let mut seam =
+        OpcPackage::from_vec(bytes.clone(), SourceLimits::default()).expect("open seam leg");
     let _seam = seam.get_part_mut(&drawing).expect("drawing part");
     let seam_output = PackageWriter::to_bytes(&seam).expect("publish seam leg");
 
-    let mut reuse = OpcPackage::from_vec(bytes.clone()).expect("open reuse leg");
+    let mut reuse =
+        OpcPackage::from_vec(bytes.clone(), SourceLimits::default()).expect("open reuse leg");
     let reused = reuse
         .get_part_mut(&drawing)
         .expect("drawing part")
@@ -157,7 +164,8 @@ fn reusing_a_part_relationship_publishes_what_taking_the_seam_publishes() {
         .to_string();
     let reuse_output = PackageWriter::to_bytes(&reuse).expect("publish reuse leg");
 
-    let mut compared = OpcPackage::from_vec(bytes.clone()).expect("open compared leg");
+    let mut compared =
+        OpcPackage::from_vec(bytes.clone(), SourceLimits::default()).expect("open compared leg");
     compared
         .get_part_mut(&drawing)
         .expect("drawing part")
@@ -183,11 +191,13 @@ fn establishing_a_new_relationship_still_republishes_the_member() {
     let bytes = fixture();
     let drawing = PackURI::new(DRAWING).expect("drawing URI");
     let (reltype, _target) = {
-        let probe = OpcPackage::from_vec(bytes.clone()).expect("open fixture");
+        let probe =
+            OpcPackage::from_vec(bytes.clone(), SourceLimits::default()).expect("open fixture");
         smallest_internal_pair(&probe, Some(&drawing))
     };
 
-    let mut package = OpcPackage::from_vec(bytes.clone()).expect("open fixture");
+    let mut package =
+        OpcPackage::from_vec(bytes.clone(), SourceLimits::default()).expect("open fixture");
     let established = package
         .get_part_mut(&drawing)
         .expect("drawing part")
@@ -203,7 +213,8 @@ fn establishing_a_new_relationship_still_republishes_the_member() {
         member(&bytes, DRAWING_MEMBER),
         "a relationship that was actually established must move the member"
     );
-    let reopened = OpcPackage::from_bytes(&output).expect("reopen published package");
+    let reopened =
+        OpcPackage::from_bytes(&output, SourceLimits::default()).expect("reopen published package");
     assert!(
         reopened
             .get_part(&drawing)

@@ -56,8 +56,9 @@ fn package_with_local_laser() -> Package {
 
 fn package_with_laser_extension(extension: &str) -> Package {
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
-    let mut package = Package::new().unwrap();
-    package.presentation_mut().unwrap().add_slide().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    builder.presentation().unwrap().add_slide().unwrap();
+    let package = builder.build().unwrap();
     package.save(output.path()).unwrap();
 
     let package = Package::open(output.path()).unwrap();
@@ -79,18 +80,21 @@ fn traces(package: &Package) -> Vec<laser::Trace> {
 
 fn traces_result(package: &Package) -> litchi_pptx::Result<Vec<laser::Trace>> {
     let slides = package.presentation()?.slides()?;
-    let mut limits = laser::Limits::default();
+    let limits = laser::Limits::default();
+    let mut usage = laser::Usage::default();
     slides
         .iter()
         .enumerate()
-        .map(|(index, slide)| laser::load_slide_traces(index, slide.part().part(), &mut limits))
+        .map(|(index, slide)| {
+            laser::load_slide_traces(index, slide.part().part(), &limits, &mut usage)
+        })
         .collect::<litchi_pptx::Result<Vec<_>>>()
         .map(|groups| groups.into_iter().flatten().collect())
 }
 
-fn edit_package(mut package: Package, edit: impl FnOnce(&mut OpcPackage)) -> Package {
+fn edit_package(package: Package, edit: impl FnOnce(&mut OpcPackage)) -> Package {
     let bytes = package.to_bytes().unwrap();
-    let mut opc = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut opc = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     edit(&mut opc);
     Package::from_opc_package(opc).unwrap()
 }

@@ -1,0 +1,19 @@
+[package]
+name = "uo0012-open-bench"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+litchi-opc = { path = "../../../../../crates/litchi-opc" }
+litchi-core = { path = "../../../../../crates/litchi-core" }
+litchi-docx = { path = "../../../../../crates/litchi-docx" }
+litchi-pptx = { path = "../../../../../crates/litchi-pptx" }
+
+[profile.release]
+opt-level = 3
+debug = false
+codegen-units = 1
+lto = "thin"

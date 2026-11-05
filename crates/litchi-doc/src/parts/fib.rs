@@ -375,7 +375,7 @@ impl FileInformationBlock {
     }
 
     /// All eight subdocument character counts, resolving the FIB bytes once.
-    fn character_counts(&self) -> [u32; 8] {
+    pub(crate) fn character_counts(&self) -> [u32; 8] {
         let data = self.data();
         std::array::from_fn(|index| Self::character_count_at(data, index))
     }

@@ -5,4 +5,4 @@ mod model;
 #[cfg(test)]
 mod tests;
 
-pub use model::RtfDocument;
+pub use model::Tree;

@@ -2,7 +2,7 @@ use super::super::support::*;
 
 #[test]
 fn test_add_paragraph() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("Test").unwrap();
     assert_eq!(writer.paragraphs.len(), 1);
     assert_eq!(writer.paragraphs[0].runs[0].text, "Test");
@@ -10,7 +10,7 @@ fn test_add_paragraph() {
 
 #[test]
 fn test_add_multiple_paragraphs() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("First paragraph").unwrap();
     writer.add_paragraph("Second paragraph").unwrap();
     writer.add_paragraph("Third paragraph").unwrap();
@@ -22,7 +22,7 @@ fn test_add_multiple_paragraphs() {
 
 #[test]
 fn test_add_formatted_paragraph() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let para_fmt = ParagraphFormatting {
         alignment: Some(1), // Center
         space_before: Some(240),
@@ -39,7 +39,7 @@ fn test_add_formatted_paragraph() {
 
 #[test]
 fn test_add_paragraph_with_character_formatting() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let char_fmt = CharacterFormatting {
         bold: Some(true),
         italic: Some(true),
@@ -59,7 +59,7 @@ fn test_add_paragraph_with_character_formatting() {
 
 #[test]
 fn test_add_paragraph_runs() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let runs = vec![
         (
             "Bold ".to_string(),

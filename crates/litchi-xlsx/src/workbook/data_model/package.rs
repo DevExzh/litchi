@@ -4,18 +4,25 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use litchi_core::xml::ReaderOrigin;
-use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, SourceLimits, TargetMode};
 use quick_xml::{Reader, events::Event};
 
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::package::xldm::{
-    OlapProofLimits, StorageProfile, Xldm140TimeGroupingContentType, generated,
-    inspect as inspect_xldm, metadata, native, olap, olapproof, prove_xldm140_closure,
+    Limits as XldmLimits, OlapProofLimits, StorageProfile, Xldm140TimeGroupingContentType,
+    generated, inspect as inspect_xldm, metadata, native, olap, olapproof, prove_xldm140_closure,
 };
 
 const NATIVE_MODEL_RELATIONSHIP_TYPE: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/powerPivotData";
 const MODEL_CONNECTION_EXTENSION_URI: &str = "{DE250136-89BD-433C-8126-D09CA5730AF9}";
+
+fn xldm_limits(source: SourceLimits) -> XldmLimits {
+    let maximum = usize::try_from(source.max_part_bytes())
+        .unwrap_or(usize::MAX)
+        .min(MAX_PAYLOAD_BYTES);
+    XldmLimits::new(maximum, maximum)
+}
 
 use super::codec::{
     parse_document_with_base, rewrite_data_model_extension, rewrite_load_version,
@@ -28,19 +35,28 @@ use super::model::{
 };
 use super::{
     CONNECTIONS_CONTENT_TYPE, CONNECTIONS_RELATIONSHIP_TYPE, DATA_MODEL_CONTENT_TYPE,
-    DATA_MODEL_EXTENSION_URI, DATA_MODEL_PART_NAME, MAX_PAYLOAD_BYTES,
-    STRICT_CONNECTIONS_RELATIONSHIP_TYPE, invalid, limit,
+    DATA_MODEL_EXTENSION_URI, DATA_MODEL_PART_NAME, EditOptions, LimitKind, Limits,
+    MAX_PAYLOAD_BYTES, STRICT_CONNECTIONS_RELATIONSHIP_TYPE, invalid, limit,
 };
 
 /// Load an independently owned Data Model, explicitly copying its inert payload.
 /// Use [`Snapshot::load`] for a view that shares the package allocation.
-pub fn load_data_model(package: &OpcPackage, workbook_name: &PackURI) -> Result<Option<Model>> {
-    Ok(load_shared_model(package, workbook_name)?.map(|model| model.to_owned()))
+pub fn load_data_model(
+    package: &OpcPackage,
+    workbook_name: &PackURI,
+    limits: &SourceLimits,
+) -> Result<Option<Model>> {
+    Ok(load_shared_model(package, workbook_name, limits)?.map(|model| model.to_owned()))
 }
 
-fn load_shared_model(package: &OpcPackage, workbook_name: &PackURI) -> Result<Option<ModelView>> {
+fn load_shared_model(
+    package: &OpcPackage,
+    workbook_name: &PackURI,
+    limits: &SourceLimits,
+) -> Result<Option<ModelView>> {
     let workbook = package.get_part(workbook_name)?;
-    let workbook_root = parse_document_with_base(workbook.blob(), Some(workbook_name.as_str()))?;
+    let workbook_root =
+        parse_document_with_base(workbook.blob(), Some(workbook_name.as_str()), limits)?;
     let (_, definition) = workbook_definition(&workbook_root)?;
     let mut parts = package
         .iter_parts()
@@ -75,10 +91,11 @@ fn load_shared_model(package: &OpcPackage, workbook_name: &PackURI) -> Result<Op
     if blob.is_empty() {
         return Err(invalid("Data Model payload cannot be empty"));
     }
-    if blob.len() > MAX_PAYLOAD_BYTES {
-        return Err(limit("payload bytes"));
+    let maximum = limits.max_part_bytes().min(MAX_PAYLOAD_BYTES as u64) as usize;
+    if blob.len() > maximum {
+        return Err(Error::limit(LimitKind::PayloadBytes, blob.len(), maximum));
     }
-    let profile = inspect_xldm(blob)?.profile();
+    let profile = inspect_xldm(blob, &xldm_limits(*limits))?.profile();
     if !part.rels().is_empty() {
         return Err(invalid(
             "Data Model part has forbidden outbound relationships",
@@ -103,7 +120,8 @@ fn load_shared_model(package: &OpcPackage, workbook_name: &PackURI) -> Result<Op
 /// relationship closure are checked. A model-time-grouping write additionally
 /// requires the neutral XLDM owner to prove the source and calculated-column
 /// identity closure before the descriptor is published.
-pub fn store_data_model(
+#[cfg(test)]
+pub(crate) fn store_data_model(
     package: &mut OpcPackage,
     workbook_name: &PackURI,
     value: &Model,
@@ -111,12 +129,13 @@ pub fn store_data_model(
     if package.is_signed() || package.requires_signature_edit_policy() {
         return Err(Error::Signed);
     }
-    if load_shared_model(package, workbook_name)?.is_some() {
+    if load_shared_model(package, workbook_name, &package.read_limits())?.is_some() {
         return Err(invalid("workbook already contains a Data Model"));
     }
     validate_model_time_grouping_identity(
         &value.payload.data,
         value.definition.model_time_groupings()?.as_ref(),
+        &package.read_limits(),
     )?;
     validate_model_contents(
         package,
@@ -127,7 +146,12 @@ pub fn store_data_model(
     )?;
     let model = prepare_import(package, workbook_name, into_shared_model(value.clone())?)?;
     let mut candidate = package.clone();
-    publish_data_model(&mut candidate, workbook_name, Some(&model))?;
+    publish_data_model(
+        &mut candidate,
+        workbook_name,
+        Some(&model),
+        Limits::default(),
+    )?;
     *package = candidate;
     Ok(())
 }
@@ -136,6 +160,7 @@ fn publish_data_model(
     package: &mut OpcPackage,
     workbook_name: &PackURI,
     value: Option<&ModelView>,
+    limits: Limits,
 ) -> Result<()> {
     if let Some(value) = value {
         validate_model(package, workbook_name, value)?;
@@ -159,8 +184,10 @@ fn publish_data_model(
         }
     }
     let removal = if value.is_none() {
-        load_shared_model(package, workbook_name)?
-            .map(|model| super::removal::prepare(package, workbook_name, model.definition()))
+        load_shared_model(package, workbook_name, &package.read_limits())?
+            .map(|model| {
+                super::removal::prepare(package, workbook_name, model.definition(), limits)
+            })
             .transpose()?
     } else {
         None
@@ -173,7 +200,7 @@ fn publish_data_model(
             .find(|rel| rel.reltype() == NATIVE_MODEL_RELATIONSHIP_TYPE)
             .map(|rel| rel.r_id().to_owned());
         id.map(|id| -> Result<_> {
-            let before = package.source_relationships(workbook_name)?;
+            let before = package.source_relationships(workbook_name, package.read_limits())?;
             let after = before.without_relationship(&id, before.bytes().len())?;
             Ok((before, after))
         })
@@ -182,7 +209,12 @@ fn publish_data_model(
         None
     };
     let workbook_source = package.source_xml_part(workbook_name)?;
-    let root = parse_document_with_base(workbook_source.bytes(), Some(workbook_name.as_str()))?;
+    let source_limits = package.read_limits();
+    let root = parse_document_with_base(
+        workbook_source.bytes(),
+        Some(workbook_name.as_str()),
+        &source_limits,
+    )?;
     let (core, existing) = workbook_definition(&root)?;
     let updated = match (existing.as_ref(), value) {
         (Some(before), Some(after)) if same_structure(before, &after.definition) => {
@@ -198,7 +230,7 @@ fn publish_data_model(
         },
         _ => {
             let fragment = value
-                .map(|value| write_data_model_fragment(core, &value.definition))
+                .map(|value| write_data_model_fragment(core, &value.definition, &source_limits))
                 .transpose()?;
             Some(rewrite_data_model_extension(
                 &workbook_source,
@@ -252,7 +284,7 @@ fn publish_data_model(
         package.try_replace_owned_xml_part(workbook_source.bytes(), updated)?;
     }
     if let Some((before, after)) = relationship_update {
-        package.try_replace_relationships(&before, &after)?;
+        package.try_replace_relationships(&before, &after, package.read_limits())?;
     }
     if let Some(removal) = removal {
         removal.publish(package)?;
@@ -260,8 +292,12 @@ fn publish_data_model(
     Ok(())
 }
 
-fn write_data_model_fragment(core: &str, definition: &Definition) -> Result<Vec<u8>> {
-    let descriptor = write_data_model(definition)?;
+fn write_data_model_fragment(
+    core: &str,
+    definition: &Definition,
+    limits: &SourceLimits,
+) -> Result<Vec<u8>> {
+    let descriptor = write_data_model(definition, limits)?;
     let mut fragment = Vec::new();
     fragment.extend_from_slice(b"<x:ext xmlns:x=\"");
     escape(&mut fragment, core);
@@ -283,11 +319,14 @@ fn prepare_import(
     if let Some(extension) = &mut Arc::make_mut(&mut model.definition).extension_list {
         extension.xml = super::codec::close_extension(&extension.xml)?;
         let source = package.source_xml_part(workbook)?;
-        let root = parse_document_with_base(source.bytes(), Some(workbook.as_str()))?;
+        let source_limits = package.read_limits();
+        let root =
+            parse_document_with_base(source.bytes(), Some(workbook.as_str()), &source_limits)?;
         let (core, _) = workbook_definition(&root)?;
-        let fragment = write_data_model_fragment(core, &model.definition)?;
+        let fragment = write_data_model_fragment(core, &model.definition, &source_limits)?;
         let projected = rewrite_data_model_extension(&source, core, Some(&fragment))?;
-        let projected_root = parse_document_with_base(projected.bytes(), Some(workbook.as_str()))?;
+        let projected_root =
+            parse_document_with_base(projected.bytes(), Some(workbook.as_str()), &source_limits)?;
         model.definition = Arc::new(
             workbook_definition(&projected_root)?
                 .1
@@ -333,6 +372,44 @@ fn model_time_grouping_identity_unsupported() -> Error {
     }
 }
 
+fn map_xldm_metadata_identity_error(error: metadata::MetadataError) -> Error {
+    match error {
+        metadata::MetadataError::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::limit(crate::package::map_xldm_limit_kind(kind), observed, maximum),
+        metadata::MetadataError::InvalidLimit {
+            kind,
+            value,
+            maximum,
+        } => Error::InvalidLimit {
+            kind: crate::package::map_xldm_limit_kind(kind),
+            value: u64::try_from(value).unwrap_or(u64::MAX),
+            maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+        },
+        metadata::MetadataError::Invalid(_) | metadata::MetadataError::Allocation { .. } => {
+            model_time_grouping_identity_unsupported()
+        },
+    }
+}
+
+fn map_xldm_olap_identity_error(error: litchi_xldm::OlapProofError) -> Error {
+    match error {
+        litchi_xldm::OlapProofError::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::limit(crate::package::map_xldm_limit_kind(kind), observed, maximum),
+        litchi_xldm::OlapProofError::UnsupportedProfile
+        | litchi_xldm::OlapProofError::Invalid { .. }
+        | litchi_xldm::OlapProofError::Unproven { .. }
+        | litchi_xldm::OlapProofError::Allocation { .. } => {
+            model_time_grouping_identity_unsupported()
+        },
+    }
+}
+
 /// Prove every workbook time grouping against the complete neutral XLDM 140
 /// closure. The proof is source-bound: it resolves the table XML name, the
 /// table-local source column, every calculated column, the Date DBType of the
@@ -343,16 +420,18 @@ fn model_time_grouping_identity_unsupported() -> Error {
 fn validate_model_time_grouping_identity(
     data: &[u8],
     groupings: Option<&ModelTimeGroupings>,
+    source_limits: &SourceLimits,
 ) -> Result<()> {
     let Some(groupings) = groupings else {
         return Ok(());
     };
-    let storage = inspect_xldm(data)?;
+    let limits = xldm_limits(*source_limits);
+    let storage = inspect_xldm(data, &limits)?;
     if storage.profile() != StorageProfile::Xldm140 {
         return Err(model_time_grouping_identity_unsupported());
     }
     let metadata =
-        metadata::inspect(&storage).map_err(|_| model_time_grouping_identity_unsupported())?;
+        metadata::inspect(&storage, &limits).map_err(map_xldm_metadata_identity_error)?;
     let native = native::inspect(&storage, &metadata.native_parse_options())
         .map_err(|_| model_time_grouping_identity_unsupported())?;
     let generated = generated::inspect_system_generated(&storage)
@@ -367,7 +446,7 @@ fn validate_model_time_grouping_identity(
     // descriptor IDs.
     let olap_proof =
         olapproof::prove_xldm140_olap(&storage, &metadata, &olap, OlapProofLimits::default())
-            .map_err(|_| model_time_grouping_identity_unsupported())?;
+            .map_err(map_xldm_olap_identity_error)?;
     if !olap_proof.is_complete() {
         return Err(model_time_grouping_identity_unsupported());
     }
@@ -455,9 +534,13 @@ fn validate_model_contents(
         return Err(invalid("Data Model payload cannot be empty"));
     }
     if data.len() > MAX_PAYLOAD_BYTES {
-        return Err(limit("payload bytes"));
+        return Err(limit(
+            LimitKind::PayloadBytes,
+            data.len(),
+            MAX_PAYLOAD_BYTES,
+        ));
     }
-    let profile = inspect_xldm(data)?.profile();
+    let profile = inspect_xldm(data, &xldm_limits(package.read_limits()))?.profile();
     validate_inbound_relationships(
         package,
         &PackURI::new(part_name).map_err(invalid)?,
@@ -527,7 +610,8 @@ fn validate_connections(
             "Connections part has forbidden outbound relationships",
         ));
     }
-    let connections = crate::connections::Connections::parse(part.blob())
+    let limits = package.read_limits();
+    let connections = crate::connections::Connections::parse(part.blob(), &limits)
         .map_err(|error| invalid(format!("invalid Connections part: {error}")))?;
     validate_model_connection_extensions(part.blob())?;
     let mut names = HashMap::<String, usize>::new();
@@ -791,7 +875,7 @@ impl Snapshot {
     }
 
     fn load_for(package: &OpcPackage, workbook_name: PackURI) -> Result<Self> {
-        let model = load_shared_model(package, &workbook_name)?;
+        let model = load_shared_model(package, &workbook_name, &package.read_limits())?;
         let source = Arc::new(capture_source(package, &workbook_name, model.as_ref())?);
         Ok(Self {
             workbook_name,
@@ -821,34 +905,87 @@ impl Snapshot {
     }
 }
 
-/// A clone-staged source-bound Data Model transaction.
-pub struct Transaction<'a> {
-    target: &'a mut OpcPackage,
+crate::record::record_family!("Data Model");
+
+/// A staged, source-bound Data Model edit of one [`crate::Package`].
+///
+/// Starting one retains only the source package and limits; it does not read
+/// the graph or copy payload. The graph and semantic model are materialized
+/// by the first getter, mutation or commit. Dropping the edit discards it;
+/// [`Self::commit`] publishes a new package.
+pub struct Edit {
+    target: crate::record::Source,
+    limits: Limits,
+    loaded: Option<Loaded>,
+}
+
+struct Loaded {
     before: Snapshot,
     draft: Option<ModelView>,
 }
 
-impl<'a> Transaction<'a> {
-    /// Start a transaction from the package's current Data Model graph.
-    pub fn new(target: &'a mut OpcPackage) -> Result<Self> {
-        let before = Snapshot::load(target)?;
+impl crate::Package {
+    /// Start a Data Model edit retaining the package's current graph source.
+    ///
+    /// # Errors
+    ///
+    /// Returns the encryption-policy error for a package whose mutations are
+    /// refused. Graph, XML and source-limit errors are deferred to the first
+    /// getter, mutation or commit.
+    pub fn edit_data_model(&self) -> Result<Edit> {
+        self.edit_data_model_with_options(EditOptions::default())
+    }
+
+    /// Start a Data Model edit with caller-selected dependency and formula
+    /// audit limits.
+    pub fn edit_data_model_with_options(&self, options: EditOptions) -> Result<Edit> {
+        Edit::start(
+            crate::record::Source::new(self, "edit_data_model")?,
+            options.limits_value().unwrap_or_default(),
+        )
+    }
+
+    /// Apply an exact Data Model patch to a new package; this one is
+    /// unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when this package is not the patch's
+    /// before state and [`Error::Signed`] for a changed patch of a signed
+    /// workbook.
+    pub fn apply_data_model(&self, patch: &Patch) -> Result<Commit> {
+        crate::record::replay(self, patch, "apply_data_model")
+    }
+}
+
+impl Edit {
+    fn start(target: crate::record::Source, limits: Limits) -> Result<Self> {
         Ok(Self {
-            draft: before.model.clone(),
             target,
-            before,
+            limits,
+            loaded: None,
         })
     }
 
-    /// Read the source snapshot captured at transaction start.
-    #[must_use]
-    pub fn before(&self) -> &Snapshot {
-        &self.before
+    fn ensure_loaded(&mut self) -> Result<&mut Loaded> {
+        if self.loaded.is_none() {
+            let before = Snapshot::load(&self.target)?;
+            self.loaded = Some(Loaded {
+                draft: before.model.clone(),
+                before,
+            });
+        }
+        Ok(self.loaded.as_mut().expect("Data Model graph loaded"))
+    }
+
+    /// Materialize and return the source snapshot used by this edit.
+    pub fn before(&mut self) -> Result<&Snapshot> {
+        Ok(&self.ensure_loaded()?.before)
     }
 
     /// Read the currently staged model, if any.
-    #[must_use]
-    pub fn model(&self) -> Option<&ModelView> {
-        self.draft.as_ref()
+    pub fn model(&mut self) -> Result<Option<&ModelView>> {
+        Ok(self.ensure_loaded()?.draft.as_ref())
     }
 
     /// Replace the complete model after validating its descriptor, payload,
@@ -859,23 +996,44 @@ impl<'a> Transaction<'a> {
     /// XLDM storage profile cannot prove that a changed opaque payload keeps
     /// the same inner table, relationship, column, and time-group identity
     /// closure. Creation into an empty workbook remains supported through the
-    /// outer validation performed by [`store_data_model`].
+    /// outer validation of the descriptor, storage profile and relationship
+    /// closure.
     /// Imported opaque extensions acquire explicit namespace context for the
     /// destination workbook; inspect [`Self::model`] for the staged definition.
     pub fn set(&mut self, model: Model) -> Result<bool> {
+        self.ensure_loaded()?;
         let model = into_shared_model(model)?;
-        if self.draft.as_ref() == Some(&model) {
+        if self
+            .loaded
+            .as_ref()
+            .expect("Data Model graph loaded")
+            .draft
+            .as_ref()
+            == Some(&model)
+        {
             return Ok(false);
         }
         self.check_structure(&model)?;
         let model = if model.definition.extension_list.is_some()
             && !self
+                .loaded
+                .as_ref()
+                .expect("Data Model graph loaded")
                 .before
                 .model
                 .as_ref()
                 .is_some_and(|before| same_structure(&before.definition, &model.definition))
         {
-            prepare_import(self.target, &self.before.workbook_name, model)?
+            prepare_import(
+                &self.target,
+                &self
+                    .loaded
+                    .as_ref()
+                    .expect("Data Model graph loaded")
+                    .before
+                    .workbook_name,
+                model,
+            )?
         } else {
             model
         };
@@ -883,11 +1041,27 @@ impl<'a> Transaction<'a> {
     }
 
     fn set_shared(&mut self, model: ModelView) -> Result<bool> {
-        if self.draft.as_ref() == Some(&model) {
+        self.ensure_loaded()?;
+        if self
+            .loaded
+            .as_ref()
+            .expect("Data Model graph loaded")
+            .draft
+            .as_ref()
+            == Some(&model)
+        {
             return Ok(false);
         }
         self.check_structure(&model)?;
-        require_unchanged_model_time_groupings(self.before.model.as_ref(), &model)?;
+        require_unchanged_model_time_groupings(
+            self.loaded
+                .as_ref()
+                .expect("Data Model graph loaded")
+                .before
+                .model
+                .as_ref(),
+            &model,
+        )?;
         // A payload-only replacement can invalidate the identities and
         // derivation closure even when the outer descriptor is byte-for-byte
         // unchanged. Reprove the retained extension against the candidate
@@ -896,9 +1070,17 @@ impl<'a> Transaction<'a> {
         validate_model_time_grouping_identity(
             model.payload(),
             model.definition.model_time_groupings()?.as_ref(),
+            &self.target.read_limits(),
         )?;
-        validate_model(self.target, &self.before.workbook_name, &model)?;
-        self.draft = Some(model);
+        let workbook_name = self
+            .loaded
+            .as_ref()
+            .expect("Data Model graph loaded")
+            .before
+            .workbook_name
+            .clone();
+        validate_model(&self.target, &workbook_name, &model)?;
+        self.loaded.as_mut().expect("Data Model graph loaded").draft = Some(model);
         Ok(true)
     }
 
@@ -906,7 +1088,8 @@ impl<'a> Transaction<'a> {
         // A complete replacement must not disguise an unverified inner XLDM
         // structural change by supplying different opaque payload bytes. Check
         // the original as well, so remove/set cannot bypass this refusal.
-        for previous in [self.before.model.as_ref(), self.draft.as_ref()]
+        let loaded = self.loaded.as_ref().expect("Data Model graph loaded");
+        for previous in [loaded.before.model.as_ref(), loaded.draft.as_ref()]
             .into_iter()
             .flatten()
         {
@@ -927,6 +1110,7 @@ impl<'a> Transaction<'a> {
         edit: impl FnOnce(&mut Definition) -> Result<()>,
     ) -> Result<bool> {
         let current = self
+            .ensure_loaded()?
             .draft
             .as_ref()
             .ok_or_else(|| invalid("workbook has no Data Model to edit"))?;
@@ -945,6 +1129,7 @@ impl<'a> Transaction<'a> {
     /// identity before the edit is staged.
     pub fn edit_model_time_groupings(&mut self, value: Option<ModelTimeGroupings>) -> Result<bool> {
         let current = self
+            .ensure_loaded()?
             .draft
             .as_ref()
             .ok_or_else(|| invalid("workbook has no Data Model to edit"))?;
@@ -960,58 +1145,100 @@ impl<'a> Transaction<'a> {
         validate_model_time_grouping_identity(
             candidate.payload(),
             candidate.definition.model_time_groupings()?.as_ref(),
+            &self.target.read_limits(),
         )?;
-        validate_model(self.target, &self.before.workbook_name, &candidate)?;
-        self.draft = Some(candidate);
+        let workbook_name = self
+            .loaded
+            .as_ref()
+            .expect("Data Model graph loaded")
+            .before
+            .workbook_name
+            .clone();
+        validate_model(&self.target, &workbook_name, &candidate)?;
+        self.loaded.as_mut().expect("Data Model graph loaded").draft = Some(candidate);
         Ok(true)
     }
 
     /// Remove the staged Data Model graph.
     pub fn remove(&mut self) -> Result<bool> {
-        if self.draft.is_none() {
+        if self.ensure_loaded()?.draft.is_none() {
             return Ok(false);
         }
-        self.draft = None;
+        self.loaded.as_mut().expect("Data Model graph loaded").draft = None;
         Ok(true)
     }
 
     /// Whether the typed model or payload differs from the source snapshot.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.before.same_semantics(self.draft.as_ref())
+    fn changed(loaded: &Loaded) -> bool {
+        !loaded.before.same_semantics(loaded.draft.as_ref())
     }
 
-    /// Validate the source closure and atomically publish the staged model.
+    #[cfg(test)]
+    pub(crate) fn is_changed(&mut self) -> Result<bool> {
+        Ok(Self::changed(self.ensure_loaded()?))
+    }
+
+    /// Discard every staged change.
+    pub fn reset(&mut self) -> Result<()> {
+        let loaded = self.ensure_loaded()?;
+        loaded.draft.clone_from(&loaded.before.model);
+        Ok(())
+    }
+
+    /// Validate the source closure and publish the staged model as a new
+    /// package. An unchanged edit returns the source package.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Signed`] for a changed edit of a signed workbook,
+    /// [`Error::PatchConflict`] when the source changed, and the
+    /// publication's validation errors.
     pub fn commit(self) -> Result<Commit> {
-        if !self.is_changed() {
-            return Ok(Commit::new(
-                self.before.clone(),
-                Patch::new(self.before.clone(), self.before.clone()),
-                false,
+        self.publish().map(|(commit, _)| commit)
+    }
+
+    /// [`Self::commit`], keeping the published snapshot.
+    fn publish(mut self) -> Result<(Commit, Snapshot)> {
+        let unchanged = {
+            let loaded = self.ensure_loaded()?;
+            !Self::changed(loaded)
+        };
+        if unchanged {
+            let loaded = self.loaded.take().expect("Data Model graph loaded");
+            let patch = Patch::new(loaded.before.clone(), loaded.before.clone(), self.limits);
+            return Ok((
+                Commit::new(self.target.into_package(), patch, Diagnostics::new(false)),
+                loaded.before,
             ));
         }
+        let loaded = self.loaded.take().expect("Data Model graph loaded");
+        let Loaded { before, draft } = loaded;
         if self.target.is_signed() || self.target.requires_signature_edit_policy() {
             return Err(Error::Signed);
         }
-        let current = Snapshot::load(self.target)?;
-        if !current.same_source(&self.before) {
+        let current = Snapshot::load(&self.target)?;
+        if !current.same_source(&before) {
             return Err(Error::PatchConflict {
                 part: "Data Model source closure".into(),
             });
         }
-        let mut candidate = self.target.clone();
+        let mut candidate = OpcPackage::clone(&self.target);
         publish_data_model(
             &mut candidate,
-            &self.before.workbook_name,
-            self.draft.as_ref(),
+            &before.workbook_name,
+            draft.as_ref(),
+            self.limits,
         )?;
         let snapshot = Snapshot::load(&candidate)?;
-        if !snapshot.same_semantics(self.draft.as_ref()) {
+        if !snapshot.same_semantics(draft.as_ref()) {
             return Err(invalid("Data Model publication changed staged semantics"));
         }
-        let patch = Patch::new(self.before, snapshot.clone());
-        *self.target = candidate;
-        Ok(Commit::new(snapshot, patch, true))
+        let patch = Patch::new(before, snapshot.clone(), self.limits);
+        let package = self.target.publish(candidate)?;
+        Ok((
+            Commit::new(package, patch, Diagnostics::new(true)),
+            snapshot,
+        ))
     }
 }
 
@@ -1020,11 +1247,16 @@ impl<'a> Transaction<'a> {
 pub struct Patch {
     before: Snapshot,
     after: Snapshot,
+    limits: Limits,
 }
 
 impl Patch {
-    fn new(before: Snapshot, after: Snapshot) -> Self {
-        Self { before, after }
+    fn new(before: Snapshot, after: Snapshot, limits: Limits) -> Self {
+        Self {
+            before,
+            after,
+            limits,
+        }
     }
 
     /// Source state required before application.
@@ -1041,7 +1273,7 @@ impl Patch {
 
     /// Whether this patch is a byte-preserving no-op.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
@@ -1051,19 +1283,20 @@ impl Patch {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
+            limits: self.limits,
         }
     }
 
     /// Apply the patch atomically, restoring retained source bytes for the
     /// workbook descriptor and opaque payload.
-    pub fn apply(&self, target: &mut OpcPackage) -> Result<()> {
+    pub(crate) fn apply(&self, target: &mut OpcPackage) -> Result<()> {
         let current = Snapshot::load(target)?;
         if !current.same_source(&self.before) {
             return Err(Error::PatchConflict {
                 part: "Data Model source closure".into(),
             });
         }
-        if self.is_empty() {
+        if self.is_noop() {
             return Ok(());
         }
         if target.is_signed() || target.requires_signature_edit_policy() {
@@ -1071,7 +1304,12 @@ impl Patch {
         }
         if self.after.model.is_none() {
             if let Some(model) = &self.before.model {
-                super::removal::prepare(target, &self.before.workbook_name, model.definition())?;
+                super::removal::prepare(
+                    target,
+                    &self.before.workbook_name,
+                    model.definition(),
+                    self.limits,
+                )?;
             }
         }
         if self.before.source.connections_part.is_none() {
@@ -1105,39 +1343,59 @@ impl Patch {
     }
 }
 
-/// Successful Data Model transaction publication.
-#[derive(Debug)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-    changed: bool,
+impl crate::record::Record for Patch {
+    fn is_noop(&self) -> bool {
+        Self::is_noop(self)
+    }
+
+    fn apply_to(&self, package: &mut OpcPackage) -> Result<()> {
+        self.apply(package)
+    }
 }
 
-impl Commit {
-    fn new(snapshot: Snapshot, patch: Patch, changed: bool) -> Self {
-        Self {
+/// A raw-graph route over [`Edit`] for the unit tests that author bare
+/// graphs.
+#[cfg(test)]
+pub(crate) struct Transaction<'a> {
+    target: crate::record::TestTarget<'a>,
+    edit: Edit,
+}
+
+#[cfg(test)]
+impl<'a> Transaction<'a> {
+    pub(crate) fn new(target: impl Into<crate::record::TestTarget<'a>>) -> Result<Self> {
+        let target = target.into();
+        let package = target.package()?;
+        let edit = package.edit_data_model()?;
+        Ok(Self { target, edit })
+    }
+
+    pub(crate) fn commit(self) -> Result<crate::record::RawCommit<Snapshot, Patch>> {
+        let (commit, snapshot) = self.edit.publish()?;
+        let changed = commit.diagnostics().changed();
+        let (package, patch) = commit.into_parts();
+        self.target.store(package);
+        Ok(crate::record::RawCommit {
             snapshot,
             patch,
             changed,
-        }
+        })
     }
+}
 
-    /// Whether the model graph changed.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        self.changed
+#[cfg(test)]
+impl std::ops::Deref for Transaction<'_> {
+    type Target = Edit;
+
+    fn deref(&self) -> &Edit {
+        &self.edit
     }
+}
 
-    /// Resulting source-bound snapshot.
-    #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Exact reversible patch produced by the transaction.
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
+#[cfg(test)]
+impl std::ops::DerefMut for Transaction<'_> {
+    fn deref_mut(&mut self) -> &mut Edit {
+        &mut self.edit
     }
 }
 
@@ -1176,10 +1434,11 @@ fn capture_source(
         })
         .transpose()?;
     Ok(SourceState {
-        content_types: package.source_content_types()?,
+        content_types: package.source_content_types(package.read_limits())?,
         workbook_blob: workbook.blob_arc(),
         workbook_proof: package.source_xml_part(workbook_name)?,
-        workbook_relationships: package.source_relationships(workbook_name)?,
+        workbook_relationships: package
+            .source_relationships(workbook_name, package.read_limits())?,
         model_part,
         model_incoming_relationships,
         connections_part,
@@ -1191,7 +1450,7 @@ fn source_part(package: &OpcPackage, part: &dyn Part) -> Result<SourcePart> {
         name: part.partname().clone(),
         content_type: part.content_type().into(),
         blob: part.blob_arc(),
-        relationships: package.source_relationships(part.partname())?,
+        relationships: package.source_relationships(part.partname(), package.read_limits())?,
         xml: (part.content_type() == CONNECTIONS_CONTENT_TYPE)
             .then(|| package.source_xml_part(part.partname()))
             .transpose()?,
@@ -1250,10 +1509,12 @@ fn publish_snapshot(
 ) -> Result<()> {
     let current = package.get_part(&snapshot.workbook_name)?.blob_arc();
     package.try_replace_owned_xml_part(&current, snapshot.source.workbook_proof.clone())?;
-    let current_relationships = package.source_relationships(&snapshot.workbook_name)?;
+    let current_relationships =
+        package.source_relationships(&snapshot.workbook_name, package.read_limits())?;
     package.try_replace_relationships(
         &current_relationships,
         &snapshot.source.workbook_relationships,
+        package.read_limits(),
     )?;
     let model_uri = PackURI::new(DATA_MODEL_PART_NAME).map_err(invalid)?;
     match snapshot.source.model_part.as_ref() {
@@ -1280,10 +1541,11 @@ fn publish_snapshot(
         },
         (None, None) => {},
     }
-    let current_content_types = package.source_content_types()?;
+    let current_content_types = package.source_content_types(package.read_limits())?;
     package.try_replace_content_types(
         current_content_types.bytes(),
         &snapshot.source.content_types,
+        package.read_limits(),
     )?;
     Ok(())
 }
@@ -1317,8 +1579,8 @@ fn publish_source_part(package: &mut OpcPackage, part: &SourcePart) -> Result<()
             Arc::clone(&part.blob),
         )))?;
     }
-    let current = package.source_relationships(&part.name)?;
-    package.try_replace_relationships(&current, &part.relationships)?;
+    let current = package.source_relationships(&part.name, package.read_limits())?;
+    package.try_replace_relationships(&current, &part.relationships, package.read_limits())?;
     Ok(())
 }
 
@@ -1334,6 +1596,18 @@ mod tests {
         MAX_XML_BYTES, MODEL_TIME_GROUPINGS_EXTENSION_URI, Payload, SML, X15,
     };
     use litchi_opc::Part;
+
+    fn load_model(package: &OpcPackage, workbook: &PackURI) -> Result<Option<Model>> {
+        load_data_model(package, workbook, &package.read_limits())
+    }
+
+    fn parse_model(xml: &[u8]) -> Result<Definition> {
+        parse_data_model(xml, &SourceLimits::default())
+    }
+
+    fn write_model(value: &Definition) -> Result<Vec<u8>> {
+        write_data_model(value, &SourceLimits::default())
+    }
 
     fn definition() -> Definition {
         Definition {
@@ -1399,7 +1673,9 @@ mod tests {
     // A synthetic producer ZIP, deliberately bypassing the authored compact
     // writer so that tests exercise genuine ingress provenance for spaced XML.
     fn as_source(package: &OpcPackage) -> OpcPackage {
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         let mut parts = package
             .try_iter_parts()
             .map(|part| part.expect("part payload decodes"))
@@ -1440,7 +1716,7 @@ mod tests {
         writer
             .write_stored("_rels/.rels", package.rels().to_xml().as_bytes())
             .unwrap();
-        OpcPackage::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap()
+        OpcPackage::from_bytes(&writer.finish_to_bytes().unwrap(), SourceLimits::default()).unwrap()
     }
 
     fn model() -> Model {
@@ -1458,7 +1734,8 @@ mod tests {
         workbook: &PackURI,
         value: ModelTimeGroupings,
     ) {
-        let mut current = load_data_model(package, workbook).unwrap().unwrap();
+        let limits = package.read_limits();
+        let mut current = load_model(package, workbook).unwrap().unwrap();
         current
             .definition
             .set_model_time_groupings(Some(value))
@@ -1466,9 +1743,10 @@ mod tests {
         let (source, updated) = {
             let source = package.source_xml_part(workbook).unwrap();
             let source_bytes = source.bytes().to_vec();
-            let root = parse_document_with_base(&source_bytes, Some(workbook.as_str())).unwrap();
+            let root =
+                parse_document_with_base(&source_bytes, Some(workbook.as_str()), &limits).unwrap();
             let (core, _) = workbook_definition(&root).unwrap();
-            let fragment = write_data_model_fragment(core, &current.definition).unwrap();
+            let fragment = write_data_model_fragment(core, &current.definition, &limits).unwrap();
             let updated = rewrite_data_model_extension(&source, core, Some(&fragment)).unwrap();
             (source_bytes, updated)
         };
@@ -1511,7 +1789,7 @@ mod tests {
             .expect("test XLDM directory timestamp");
         let value_offset = offset + "<LastWriteTime>".encode_utf16().count() * 2;
         payload[value_offset] = b'1';
-        assert!(litchi_xldm::inspect(&payload).is_ok());
+        assert!(litchi_xldm::inspect(&payload, &litchi_xldm::Limits::DEFAULT).is_ok());
         payload
     }
 
@@ -1565,7 +1843,7 @@ mod tests {
             Err(Error::Unsupported { feature })
                 if feature.contains("inner XLDM table, column, and calculated-column identity closure")
         ));
-        assert!(load_data_model(&package, &workbook).unwrap().is_none());
+        assert!(load_model(&package, &workbook).unwrap().is_none());
     }
 
     #[test]
@@ -1587,7 +1865,7 @@ mod tests {
         let mut transaction = Transaction::new(&mut package).unwrap();
         transaction.set(expected).unwrap();
         assert_eq!(
-            transaction.model().unwrap().payload().as_ptr(),
+            transaction.model().unwrap().unwrap().payload().as_ptr(),
             payload_pointer
         );
         let commit = transaction.commit().unwrap();
@@ -1607,11 +1885,11 @@ mod tests {
         assert!(xml.contains(r#"xmlns:q="urn:source""#));
         assert!(xml.contains(r#"xmlns="""#));
         let bytes = litchi_opc::PackageWriter::to_bytes(&package).unwrap();
-        let mut reopened = OpcPackage::from_bytes(&bytes).unwrap();
+        let mut reopened = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
         assert!(Snapshot::load(&reopened).unwrap().same_source(&after));
         patch.inverse().apply(&mut reopened).unwrap();
         let bytes = litchi_opc::PackageWriter::to_bytes(&reopened).unwrap();
-        let restored = OpcPackage::from_bytes(&bytes).unwrap();
+        let restored = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
         assert!(Snapshot::load(&restored).unwrap().same_source(&before));
     }
 
@@ -1621,7 +1899,7 @@ mod tests {
         let xml = format!(
             r#"<m:dataModel xmlns:m='{X15}' xmlns='urn:default' xmlns:a='urn:a&amp;b' xmlns:q='urn:value'><m:extLst marker='q:Tag'>{content}</m:extLst></m:dataModel>"#
         );
-        let parsed = parse_data_model(xml.as_bytes()).unwrap();
+        let parsed = parse_model(xml.as_bytes()).unwrap();
         let extension = String::from_utf8_lossy(&parsed.extension_list.as_ref().unwrap().xml);
         assert!(extension.contains(content));
         assert!(extension.contains("marker='q:Tag'"));
@@ -1634,17 +1912,17 @@ mod tests {
         }
         let detached = super::super::codec::close_extension(extension.as_bytes()).unwrap();
         assert_eq!(detached, extension.as_bytes());
-        let serialized = write_data_model(&parsed).unwrap();
+        let serialized = write_model(&parsed).unwrap();
         assert!(String::from_utf8_lossy(&serialized).contains(content));
-        assert!(parse_data_model(&serialized).is_ok());
+        assert!(parse_model(&serialized).is_ok());
         assert!(
-            parse_data_model(
+            parse_model(
                 format!(r#"<m:dataModel xmlns:m='{X15}'><![CDATA[bad]]></m:dataModel>"#).as_bytes()
             )
             .is_err()
         );
         assert!(
-            parse_data_model(
+            parse_model(
                 format!(r#"<!DOCTYPE dataModel><m:dataModel xmlns:m='{X15}'/>"#).as_bytes()
             )
             .is_err()
@@ -1665,21 +1943,21 @@ mod tests {
         let mut package = as_source(&package);
         let before = Snapshot::load(&package).unwrap();
         let mut transaction = Transaction::new(&mut package).unwrap();
-        let mut owned = transaction.model().unwrap().to_owned();
+        let mut owned = transaction.model().unwrap().unwrap().to_owned();
         assert!(!transaction.set(owned.clone()).unwrap());
         owned.definition.min_version_load = 8;
         transaction.set(owned).unwrap();
         let commit = transaction.commit().unwrap();
         let patch = commit.patch().clone();
         let bytes = litchi_opc::PackageWriter::to_bytes(&package).unwrap();
-        let mut reopened = OpcPackage::from_bytes(&bytes).unwrap();
+        let mut reopened = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
         assert_eq!(
             reopened.get_part(&workbook).unwrap().blob(),
             xml.replace("= '7'", "= '8'").as_bytes()
         );
         patch.inverse().apply(&mut reopened).unwrap();
         let bytes = litchi_opc::PackageWriter::to_bytes(&reopened).unwrap();
-        let restored = OpcPackage::from_bytes(&bytes).unwrap();
+        let restored = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
         assert!(Snapshot::load(&restored).unwrap().same_source(&before));
         assert_eq!(restored.get_part(&workbook).unwrap().blob(), xml.as_bytes());
     }
@@ -1706,9 +1984,15 @@ mod tests {
             if allowed {
                 assert!(result.is_ok());
             } else {
-                assert!(
-                    matches!(result, Err(Error::Invalid(message)) if message.contains("namespace count"))
-                );
+                assert!(matches!(
+                    result,
+                    Err(Error::Limit {
+                        kind: crate::LimitKind::DataModel(LimitKind::NamespaceBindings,),
+                        observed: 4097,
+                        maximum: 4096,
+                        ..
+                    })
+                ));
             }
         }
     }
@@ -1716,8 +2000,8 @@ mod tests {
     #[test]
     fn typed_descriptor_round_trip() {
         let expected = definition();
-        let xml = write_data_model(&expected).unwrap();
-        let actual = parse_data_model(&xml).unwrap();
+        let xml = write_model(&expected).unwrap();
+        let actual = parse_model(&xml).unwrap();
         assert_eq!(actual.min_version_load, expected.min_version_load);
         assert_eq!(actual.tables, expected.tables);
         assert_eq!(actual.relationships, expected.relationships);
@@ -1729,7 +2013,7 @@ mod tests {
         let (mut package, workbook) = fixture_package();
         let expected = model();
         store_data_model(&mut package, &workbook, &expected).unwrap();
-        let actual = load_data_model(&package, &workbook).unwrap().unwrap();
+        let actual = load_model(&package, &workbook).unwrap().unwrap();
         assert_eq!(
             actual.definition.min_version_load,
             expected.definition.min_version_load
@@ -1754,7 +2038,7 @@ mod tests {
         );
         let mut package = as_source(&package);
         store_data_model(&mut package, &workbook, &model()).unwrap();
-        assert!(load_data_model(&package, &workbook).unwrap().is_some());
+        assert!(load_model(&package, &workbook).unwrap().is_some());
     }
 
     #[test]
@@ -1768,9 +2052,9 @@ mod tests {
                 r#"<x15:dataModel xmlns:x15="{X15}"><x15:modelRelationships><x15:modelRelationship fromTable="Missing" fromColumn="a" toTable="Missing" toColumn="b"/></x15:modelRelationships></x15:dataModel>"#
             ),
         ] {
-            assert!(parse_data_model(xml.as_bytes()).is_err());
+            assert!(parse_model(xml.as_bytes()).is_err());
         }
-        assert!(parse_data_model(&vec![b' '; MAX_XML_BYTES + 1]).is_err());
+        assert!(parse_model(&vec![b' '; MAX_XML_BYTES + 1]).is_err());
     }
 
     #[test]
@@ -1791,7 +2075,7 @@ mod tests {
         );
         let mut value = definition();
         value.relationships[0].to_table = "Absent".into();
-        assert!(write_data_model(&value).is_err());
+        assert!(write_model(&value).is_err());
     }
 
     #[test]
@@ -1826,7 +2110,7 @@ mod tests {
             table.connection = "Model_Connection".into();
         }
         store_data_model(&mut package, &workbook, &expected).unwrap();
-        let actual = load_data_model(&package, &workbook).unwrap().unwrap();
+        let actual = load_model(&package, &workbook).unwrap().unwrap();
         assert_eq!(actual.definition.tables, expected.definition.tables);
     }
 
@@ -1862,7 +2146,7 @@ mod tests {
             DATA_MODEL_CONTENT_TYPE.into(),
             vec![1],
         )));
-        assert!(load_data_model(&package, &workbook).is_err());
+        assert!(load_model(&package, &workbook).is_err());
         let (mut package, workbook) = fixture_package();
         store_data_model(&mut package, &workbook, &model()).unwrap();
         package
@@ -1875,7 +2159,7 @@ mod tests {
                 "rIdModel".into(),
                 false,
             );
-        assert!(load_data_model(&package, &workbook).is_err());
+        assert!(load_model(&package, &workbook).is_err());
         let mut wrong = model();
         wrong.payload.part_name = "/xl/model/other.data".into();
         let (mut package, workbook) = fixture_package();
@@ -1906,7 +2190,7 @@ mod tests {
         let commit = transaction.commit().unwrap();
         assert!(commit.changed());
         assert_eq!(
-            load_data_model(&package, &workbook)
+            load_model(&package, &workbook)
                 .unwrap()
                 .unwrap()
                 .payload
@@ -1953,11 +2237,11 @@ mod tests {
             Err(Error::Unsupported { feature })
                 if feature.contains("inner XLDM table, column, and calculated-column identity closure")
         ));
-        assert!(!transaction.is_changed());
+        assert!(!transaction.is_changed().unwrap());
         drop(transaction);
         assert_eq!(package.get_part(&workbook).unwrap().blob(), before);
         assert_eq!(
-            load_data_model(&package, &workbook)
+            load_model(&package, &workbook)
                 .unwrap()
                 .unwrap()
                 .definition
@@ -1993,15 +2277,15 @@ mod tests {
                 .edit_model_time_groupings(Some(grouping.clone()))
                 .unwrap()
         );
-        assert!(!transaction.is_changed());
+        assert!(!transaction.is_changed().unwrap());
         let commit = transaction.commit().unwrap();
         assert!(!commit.changed());
 
         let after = litchi_opc::PackageWriter::to_bytes(&package).unwrap();
         assert_eq!(after, before);
-        let mut reopened = OpcPackage::from_bytes(&after).unwrap();
+        let mut reopened = OpcPackage::from_bytes(&after, SourceLimits::default()).unwrap();
         assert_eq!(
-            load_data_model(&reopened, &workbook)
+            load_model(&reopened, &workbook)
                 .unwrap()
                 .unwrap()
                 .definition
@@ -2041,7 +2325,7 @@ mod tests {
         let commit = transaction.commit().unwrap();
         assert!(commit.changed());
         assert_eq!(
-            load_data_model(&package, &workbook)
+            load_model(&package, &workbook)
                 .unwrap()
                 .unwrap()
                 .definition
@@ -2051,7 +2335,7 @@ mod tests {
         );
 
         let after = litchi_opc::PackageWriter::to_bytes(&package).unwrap();
-        let mut reopened = OpcPackage::from_bytes(&after).unwrap();
+        let mut reopened = OpcPackage::from_bytes(&after, SourceLimits::default()).unwrap();
         commit.patch().inverse().apply(&mut reopened).unwrap();
         assert_eq!(
             litchi_opc::PackageWriter::to_bytes(&reopened).unwrap(),
@@ -2103,7 +2387,7 @@ mod tests {
                     if feature.contains("inner XLDM table, column, and calculated-column identity closure")
                         || feature.contains("unknown modelTimeGrouping contentType")
             ));
-            assert!(!transaction.is_changed());
+            assert!(!transaction.is_changed().unwrap());
         }
         assert_eq!(package.get_part(&workbook).unwrap().blob(), before);
     }
@@ -2138,7 +2422,7 @@ mod tests {
             Err(Error::Unsupported { feature })
                 if feature.contains("structural Data Model edits require validated inner XLDM identity closure")
         ));
-        assert!(!transaction.is_changed());
+        assert!(!transaction.is_changed().unwrap());
         drop(transaction);
         assert_eq!(package.get_part(&workbook).unwrap().blob(), before);
     }
@@ -2162,7 +2446,7 @@ mod tests {
         };
         install_model_time_groupings(&mut package, &workbook, grouping);
         assert!(matches!(
-            load_data_model(&package, &workbook),
+            load_model(&package, &workbook),
             Err(Error::Invalid(message)) if message.contains("unknown table 'MissingTable'")
         ));
     }
@@ -2198,7 +2482,7 @@ mod tests {
             .unwrap()
             .set_blob(format!("{before_close}{duplicate}{marker}{close}").into_bytes());
         assert!(matches!(
-            load_data_model(&package, &workbook),
+            load_model(&package, &workbook),
             Err(Error::Invalid(message)) if message.contains("duplicate modelTimeGroupings owner")
         ));
     }
@@ -2235,7 +2519,7 @@ mod tests {
             transaction.edit_model_time_groupings(Some(changed)),
             Err(Error::Unsupported { .. })
         ));
-        assert!(!transaction.is_changed());
+        assert!(!transaction.is_changed().unwrap());
         drop(transaction);
         assert_eq!(package.get_part(&workbook).unwrap().blob(), before);
     }
@@ -2248,9 +2532,9 @@ mod tests {
         assert!(transaction.remove().unwrap());
         let commit = transaction.commit().unwrap();
         assert!(commit.changed());
-        assert!(load_data_model(&package, &workbook).unwrap().is_none());
+        assert!(load_model(&package, &workbook).unwrap().is_none());
         commit.patch().inverse().apply(&mut package).unwrap();
-        assert!(load_data_model(&package, &workbook).unwrap().is_some());
+        assert!(load_model(&package, &workbook).unwrap().is_some());
     }
 
     #[test]
@@ -2278,14 +2562,14 @@ mod tests {
         remove_low_level_signature(&mut package);
 
         let mut transaction = Transaction::new(&mut package).unwrap();
-        let mut replacement = transaction.model().unwrap().to_owned();
+        let mut replacement = transaction.model().unwrap().unwrap().to_owned();
         replacement.payload.data = payload_with_equivalent_object_id_case();
         assert!(transaction.set(replacement).unwrap());
         assert!(matches!(transaction.commit(), Err(Error::Signed)));
 
         package.unsign();
         let mut transaction = Transaction::new(&mut package).unwrap();
-        let mut replacement = transaction.model().unwrap().to_owned();
+        let mut replacement = transaction.model().unwrap().unwrap().to_owned();
         replacement.payload.data = payload_with_equivalent_object_id_case();
         assert!(transaction.set(replacement).unwrap());
         assert!(transaction.commit().is_ok());
@@ -2318,14 +2602,14 @@ mod tests {
 
         let before = package.get_part(&workbook).unwrap().blob().to_vec();
         let mut transaction = Transaction::new(&mut package).unwrap();
-        let mut replacement = transaction.model().unwrap().to_owned();
+        let mut replacement = transaction.model().unwrap().unwrap().to_owned();
         replacement.payload.data = payload_with_equivalent_object_id_case();
         assert!(matches!(
             transaction.set(replacement),
             Err(Error::Unsupported { feature })
                 if feature.contains("inner XLDM table, column, and calculated-column identity closure")
         ));
-        assert!(!transaction.is_changed());
+        assert!(!transaction.is_changed().unwrap());
         drop(transaction);
         assert_eq!(package.get_part(&workbook).unwrap().blob(), before);
     }
@@ -2347,13 +2631,19 @@ mod tests {
         assert!(Arc::ptr_eq(&payload, &snapshot.model().unwrap().data));
 
         let mut edit = Transaction::new(&mut package).unwrap();
-        assert_eq!(edit.model().unwrap().payload().as_ptr(), payload.as_ptr());
+        assert_eq!(
+            edit.model().unwrap().unwrap().payload().as_ptr(),
+            payload.as_ptr()
+        );
         edit.edit_definition(|definition| {
             definition.min_version_load += 1;
             Ok(())
         })
         .unwrap();
-        assert_eq!(edit.model().unwrap().payload().as_ptr(), payload.as_ptr());
+        assert_eq!(
+            edit.model().unwrap().unwrap().payload().as_ptr(),
+            payload.as_ptr()
+        );
         let commit = edit.commit().unwrap();
         assert!(Arc::ptr_eq(
             &payload,
@@ -2395,20 +2685,20 @@ mod tests {
                 }),
                 Err(Error::Unsupported { .. })
             ));
-            assert!(!edit.is_changed());
+            assert!(!edit.is_changed().unwrap());
 
-            let mut owned = edit.model().unwrap().to_owned();
+            let mut owned = edit.model().unwrap().unwrap().to_owned();
             change(&mut owned.definition);
             assert!(matches!(
                 edit.set(owned.clone()),
                 Err(Error::Unsupported { .. })
             ));
-            assert!(!edit.is_changed());
+            assert!(!edit.is_changed().unwrap());
 
             // Removing the draft must not hide its original payload identity.
             edit.remove().unwrap();
             assert!(matches!(edit.set(owned), Err(Error::Unsupported { .. })));
-            assert!(edit.model().is_none());
+            assert!(edit.model().unwrap().is_none());
             drop(edit);
             assert!(Arc::ptr_eq(
                 &before,
@@ -2425,7 +2715,7 @@ mod tests {
             table.connection = "MODELCONNECTION".into();
         }
         store_data_model(&mut package, &workbook, &expected).unwrap();
-        let actual = load_data_model(&package, &workbook).unwrap().unwrap();
+        let actual = load_model(&package, &workbook).unwrap().unwrap();
         assert_eq!(actual.definition.tables, expected.definition.tables);
         assert_eq!(actual.payload, expected.payload);
 
@@ -2518,7 +2808,7 @@ mod tests {
         .unwrap();
         let commit = edit.commit().unwrap();
         let saved = litchi_opc::PackageWriter::to_bytes(&package).unwrap();
-        let reopened = OpcPackage::from_bytes(&saved).unwrap();
+        let reopened = OpcPackage::from_bytes(&saved, SourceLimits::default()).unwrap();
         assert!(
             Snapshot::load(&reopened)
                 .unwrap()
@@ -2532,9 +2822,11 @@ mod tests {
                 .as_bytes()
         );
         commit.patch().inverse().apply(&mut package).unwrap();
-        let restored =
-            OpcPackage::from_bytes(&litchi_opc::PackageWriter::to_bytes(&package).unwrap())
-                .unwrap();
+        let restored = OpcPackage::from_bytes(
+            &litchi_opc::PackageWriter::to_bytes(&package).unwrap(),
+            SourceLimits::default(),
+        )
+        .unwrap();
         assert_eq!(
             restored.get_part(&workbook).unwrap().blob(),
             original.as_bytes()
@@ -2569,7 +2861,7 @@ mod tests {
             .unwrap();
             let commit = edit.commit().unwrap();
             let saved = litchi_opc::PackageWriter::to_bytes(&package).unwrap();
-            let reopened = OpcPackage::from_bytes(&saved).unwrap();
+            let reopened = OpcPackage::from_bytes(&saved, SourceLimits::default()).unwrap();
             assert!(
                 Snapshot::load(&reopened)
                     .unwrap()
@@ -2586,9 +2878,11 @@ mod tests {
                 6
             );
             commit.patch().inverse().apply(&mut package).unwrap();
-            let restored =
-                OpcPackage::from_bytes(&litchi_opc::PackageWriter::to_bytes(&package).unwrap())
-                    .unwrap();
+            let restored = OpcPackage::from_bytes(
+                &litchi_opc::PackageWriter::to_bytes(&package).unwrap(),
+                SourceLimits::default(),
+            )
+            .unwrap();
             assert_eq!(
                 restored.get_part(&workbook).unwrap().blob(),
                 original.as_bytes()
@@ -2623,7 +2917,7 @@ mod tests {
             edit.set(value).unwrap();
             let inserted = edit.commit().unwrap();
             let saved = litchi_opc::PackageWriter::to_bytes(&package).unwrap();
-            let reopened = OpcPackage::from_bytes(&saved).unwrap();
+            let reopened = OpcPackage::from_bytes(&saved, SourceLimits::default()).unwrap();
             assert!(
                 Snapshot::load(&reopened)
                     .unwrap()
@@ -2634,22 +2928,28 @@ mod tests {
                     .contains("<!--root-->")
             );
             inserted.patch().inverse().apply(&mut package).unwrap();
-            let restored =
-                OpcPackage::from_bytes(&litchi_opc::PackageWriter::to_bytes(&package).unwrap())
-                    .unwrap();
+            let restored = OpcPackage::from_bytes(
+                &litchi_opc::PackageWriter::to_bytes(&package).unwrap(),
+                SourceLimits::default(),
+            )
+            .unwrap();
             assert!(Snapshot::load(&restored).unwrap().same_source(&before));
             inserted.patch().apply(&mut package).unwrap();
             let mut remove = Transaction::new(&mut package).unwrap();
             remove.remove().unwrap();
             let removed = remove.commit().unwrap();
-            let reopened =
-                OpcPackage::from_bytes(&litchi_opc::PackageWriter::to_bytes(&package).unwrap())
-                    .unwrap();
+            let reopened = OpcPackage::from_bytes(
+                &litchi_opc::PackageWriter::to_bytes(&package).unwrap(),
+                SourceLimits::default(),
+            )
+            .unwrap();
             assert!(Snapshot::load(&reopened).unwrap().is_empty());
             removed.patch().inverse().apply(&mut package).unwrap();
-            let restored =
-                OpcPackage::from_bytes(&litchi_opc::PackageWriter::to_bytes(&package).unwrap())
-                    .unwrap();
+            let restored = OpcPackage::from_bytes(
+                &litchi_opc::PackageWriter::to_bytes(&package).unwrap(),
+                SourceLimits::default(),
+            )
+            .unwrap();
             assert!(
                 Snapshot::load(&restored)
                     .unwrap()
@@ -2663,13 +2963,52 @@ mod tests {
         for lexical in ["  +007  ", "&#x9;005&#xA;"] {
             let xml = format!(r#"<d:dataModel xmlns:d="{X15}" minVersionLoad="{lexical}"/>"#);
             assert!(matches!(
-                parse_data_model(xml.as_bytes()).unwrap().min_version_load,
+                parse_model(xml.as_bytes()).unwrap().min_version_load,
                 5 | 7
             ));
         }
         for lexical in ["4", "256", "5.0", "&#xA0;5", "5 0"] {
             let xml = format!(r#"<d:dataModel xmlns:d="{X15}" minVersionLoad="{lexical}"/>"#);
-            assert!(parse_data_model(xml.as_bytes()).is_err());
+            assert!(parse_model(xml.as_bytes()).is_err());
         }
+    }
+
+    #[test]
+    fn nested_xldm_limits_keep_typed_dimensions_at_the_xlsx_boundary() {
+        let metadata = map_xldm_metadata_identity_error(metadata::MetadataError::InvalidLimit {
+            kind: litchi_xldm::LimitKind::MetadataTextBytes,
+            value: 65,
+            maximum: 64,
+        });
+        assert!(matches!(
+            metadata,
+            Error::InvalidLimit {
+                kind: crate::LimitKind::DataModel(LimitKind::XldmMetadataTextBytes),
+                value: 65,
+                maximum: 64,
+            }
+        ));
+
+        let proof = map_xldm_olap_identity_error(litchi_xldm::OlapProofError::Limit {
+            kind: litchi_xldm::LimitKind::Work,
+            observed: 33,
+            maximum: 32,
+        });
+        assert!(matches!(
+            proof,
+            Error::Limit {
+                kind: crate::LimitKind::DataModel(LimitKind::XldmProofWork),
+                observed: 33,
+                maximum: 32,
+            }
+        ));
+
+        assert!(matches!(
+            map_xldm_olap_identity_error(litchi_xldm::OlapProofError::Invalid {
+                path: "source".into(),
+                detail: "contradiction".into(),
+            }),
+            Error::Unsupported { .. }
+        ));
     }
 }

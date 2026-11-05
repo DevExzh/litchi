@@ -7,22 +7,24 @@
 use std::fmt;
 use std::hash::{BuildHasher, Hash};
 
+use super::limits::SourceLimitKind;
+
 /// Result type for RTF operations.
-pub type RtfResult<T> = Result<T, RtfError>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 /// Reserve additional vector elements before an atomic model mutation.
 pub(crate) fn try_reserve_additional<T>(
     values: &mut Vec<T>,
     additional: usize,
     resource: &'static str,
-) -> RtfResult<()> {
+) -> Result<()> {
     let requested = values
         .len()
         .saturating_add(additional)
         .saturating_mul(size_of::<T>());
     values
         .try_reserve(additional)
-        .map_err(|_err| RtfError::AllocationFailed {
+        .map_err(|_err| Error::AllocationFailed {
             resource,
             requested,
         })
@@ -30,7 +32,7 @@ pub(crate) fn try_reserve_additional<T>(
 
 /// Reserve one additional vector element without exposing an allocation panic
 /// as a recoverable model mutation.
-pub(crate) fn try_reserve_one<T>(values: &mut Vec<T>, resource: &'static str) -> RtfResult<()> {
+pub(crate) fn try_reserve_one<T>(values: &mut Vec<T>, resource: &'static str) -> Result<()> {
     try_reserve_additional(values, 1, resource)
 }
 
@@ -40,7 +42,7 @@ pub(crate) fn try_reserve_set<T, S>(
     values: &mut std::collections::HashSet<T, S>,
     additional: usize,
     resource: &'static str,
-) -> RtfResult<()>
+) -> Result<()>
 where
     T: Eq + Hash,
     S: BuildHasher,
@@ -51,7 +53,7 @@ where
         .saturating_mul(size_of::<T>());
     values
         .try_reserve(additional)
-        .map_err(|_err| RtfError::AllocationFailed {
+        .map_err(|_err| Error::AllocationFailed {
             resource,
             requested,
         })
@@ -60,7 +62,7 @@ where
 /// RTF parsing errors.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
-pub enum RtfError {
+pub enum Error {
     /// Lexer error during tokenization
     LexerError(String),
     /// Parser error during document construction
@@ -75,6 +77,28 @@ pub enum RtfError {
     InvalidControlWord(String),
     /// Malformed document
     MalformedDocument(String),
+    /// The document's `\ansicpg` names a code page with no exact codec,
+    /// such as the Mac Japanese (10001) and Mac Cyrillic (10007) pages.
+    /// The document is well formed; its text cannot be decoded exactly.
+    UnsupportedCodePage(u32),
+    /// A source-limit value was invalid at profile construction.
+    InvalidLimit {
+        /// Stable physical ingress dimension.
+        kind: SourceLimitKind,
+        /// Caller-provided value.
+        value: usize,
+        /// Maximum addressable value for the dimension.
+        maximum: usize,
+    },
+    /// A configured physical ingress budget was exceeded.
+    Limit {
+        /// Stable physical ingress dimension.
+        kind: SourceLimitKind,
+        /// Value observed by the parser or transport decoder.
+        observed: usize,
+        /// Configured maximum value.
+        maximum: usize,
+    },
     /// A finite resource budget was exceeded.
     LimitExceeded {
         /// Stable name of the exhausted resource.
@@ -93,17 +117,36 @@ pub enum RtfError {
     },
 }
 
-impl fmt::Display for RtfError {
+impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            RtfError::LexerError(msg) => write!(f, "RTF Lexer Error: {msg}"),
-            RtfError::ParserError(msg) => write!(f, "RTF Parser Error: {msg}"),
-            RtfError::InvalidStructure(msg) => write!(f, "Invalid RTF structure: {msg}"),
-            RtfError::InvalidUnicode(msg) => write!(f, "Invalid unicode: {msg}"),
-            RtfError::UnexpectedEof => write!(f, "Unexpected end of input"),
-            RtfError::InvalidControlWord(msg) => write!(f, "Invalid control word: {msg}"),
-            RtfError::MalformedDocument(msg) => write!(f, "Malformed RTF document: {msg}"),
-            RtfError::LimitExceeded {
+            Error::LexerError(msg) => write!(f, "RTF Lexer Error: {msg}"),
+            Error::ParserError(msg) => write!(f, "RTF Parser Error: {msg}"),
+            Error::InvalidStructure(msg) => write!(f, "Invalid RTF structure: {msg}"),
+            Error::InvalidUnicode(msg) => write!(f, "Invalid unicode: {msg}"),
+            Error::UnexpectedEof => write!(f, "Unexpected end of input"),
+            Error::InvalidControlWord(msg) => write!(f, "Invalid control word: {msg}"),
+            Error::MalformedDocument(msg) => write!(f, "Malformed RTF document: {msg}"),
+            Error::UnsupportedCodePage(page) => {
+                write!(f, "unsupported RTF ANSI code page {page}")
+            },
+            Error::InvalidLimit {
+                kind,
+                value,
+                maximum,
+            } => write!(
+                f,
+                "invalid RTF source limit for {kind}: value {value}, maximum {maximum}"
+            ),
+            Error::Limit {
+                kind,
+                observed,
+                maximum,
+            } => write!(
+                f,
+                "RTF source limit exceeded for {kind}: observed {observed}, maximum {maximum}"
+            ),
+            Error::LimitExceeded {
                 resource,
                 observed,
                 limit,
@@ -111,7 +154,7 @@ impl fmt::Display for RtfError {
                 f,
                 "RTF resource limit exceeded for {resource}: observed {observed}, limit {limit}"
             ),
-            RtfError::AllocationFailed {
+            Error::AllocationFailed {
                 resource,
                 requested,
             } => write!(
@@ -122,16 +165,16 @@ impl fmt::Display for RtfError {
     }
 }
 
-impl std::error::Error for RtfError {}
+impl std::error::Error for Error {}
 
-impl From<std::str::Utf8Error> for RtfError {
+impl From<std::str::Utf8Error> for Error {
     fn from(err: std::str::Utf8Error) -> Self {
-        RtfError::InvalidUnicode(err.to_string())
+        Error::InvalidUnicode(err.to_string())
     }
 }
 
-impl From<std::num::ParseIntError> for RtfError {
+impl From<std::num::ParseIntError> for Error {
     fn from(err: std::num::ParseIntError) -> Self {
-        RtfError::ParserError(format!("Integer parsing error: {err}"))
+        Error::ParserError(format!("Integer parsing error: {err}"))
     }
 }

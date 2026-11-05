@@ -4,6 +4,9 @@
     reason = "test assertions panic on failure by design"
 )]
 
+mod in_place;
+use in_place::InPlace as _;
+
 use litchi_opc::PackURI;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
@@ -42,7 +45,7 @@ fn presentation_hyperlinks_reject_malformed_inline_xml() {
     let mut package = package_with_hyperlinks();
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             opc.get_part_mut(&slide_name)
                 .unwrap()
                 .set_blob(MALFORMED_SLIDE_XML.to_vec());
@@ -62,7 +65,7 @@ fn package_with_hyperlinks() -> Package {
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
 
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             let presentation = opc.get_part_mut(&presentation_name).unwrap();
             presentation.set_blob(PRESENTATION_XML.to_vec());
             presentation.rels_mut().add_relationship(

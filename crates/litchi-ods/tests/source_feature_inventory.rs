@@ -1,4 +1,4 @@
-use litchi_ods::{Builder, DrawingKind, SourceFeatureLimits, SourceFeatures, Spreadsheet};
+use litchi_ods::{Builder, DrawingKind, Package, SourceFeatureLimits, SourceFeatures};
 
 const XML: &str = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:calcext="urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0"><office:body><office:spreadsheet><table:table table:name="Data"><table:table-row><table:table-cell><text:p><text:a xlink:href="https://example.test/never-contact">external link</text:a></text:p></table:table-cell></table:table-row><calcext:conditional-formats><calcext:conditional-format/></calcext:conditional-formats><calcext:sparkline-groups><calcext:sparkline-group/></calcext:sparkline-groups><table:shapes><draw:frame draw:name="chart"><draw:image xlink:href="http://192.0.2.1/tracking-pixel.png"/></draw:frame></table:shapes></table:table></office:spreadsheet></office:body></office:document-content>"#;
 
@@ -28,9 +28,13 @@ fn package_facade_exposes_the_same_inert_inventory() {
     let bytes = Builder::new()
         .content_xml(XML)
         .build()
+        .expect("test fixture or operation should succeed")
+        .to_bytes()
         .expect("test fixture or operation should succeed");
-    let spreadsheet =
-        Spreadsheet::from_bytes(bytes).expect("test fixture or operation should succeed");
+    let spreadsheet = Package::from_bytes(&bytes)
+        .expect("test fixture or operation should succeed")
+        .workbook()
+        .expect("test fixture or operation should succeed");
     let inventory = spreadsheet
         .source_features()
         .expect("test fixture or operation should succeed");

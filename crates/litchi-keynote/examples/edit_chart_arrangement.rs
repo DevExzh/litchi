@@ -13,9 +13,7 @@ use std::ffi::OsString;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use litchi_keynote::{
-    ChartArrangement, ChartArrangementError, ChartSelector, Package, SlideSelector,
-};
+use litchi_keynote::{ChartArrangement, ChartSelector, Package, SlideSelector, chart::arrangement};
 use tempfile::NamedTempFile;
 
 const USAGE: &str = "usage: edit_chart_arrangement <input.key> <output.key> \
@@ -118,7 +116,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             commit
                 .package()
                 .apply_slide_chart_arrangement(commit.patch()),
-            Err(ChartArrangementError::PatchConflict)
+            Err(arrangement::Error::PatchConflict)
         )
     {
         return Err(invalid_input(

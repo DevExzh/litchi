@@ -5,8 +5,8 @@
 )]
 use super::{
     ControlWord, Cow, Formatting, MAX_STORY_GROUP_DEPTH, MAX_TEXT_INTERMEDIATE_BYTES,
-    ParsedBodyStoryEvent, Parser, RtfEncoding, RtfError, RtfResult, SmallVec, State, Token,
-    control_symbol_text, is_section_control, require_parameterless,
+    ParsedBodyStoryEvent, Parser, RtfEncoding, SmallVec, State, Token, control_symbol_text,
+    is_section_control, require_parameterless,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -35,10 +35,10 @@ fn observe_story_baseline(
     observed: &mut Option<StoryBaseline>,
     formatting: Formatting,
     owner: &'static str,
-) -> RtfResult<()> {
+) -> crate::Result<()> {
     let baseline = effective_story_baseline(formatting);
     if observed.is_some_and(|existing| existing != baseline) {
-        return Err(RtfError::MalformedDocument(format!(
+        return Err(crate::Error::MalformedDocument(format!(
             "RTF {owner} has mixed character baseline formatting that cannot be represented losslessly"
         )));
     }
@@ -61,10 +61,10 @@ fn retain_story_baseline(
 
 impl<'a> Parser<'a> {
     /// Parse header or footer content.
-    pub(super) fn parse_header_footer_content(&mut self) -> RtfResult<()> {
-        let hf_type = self
-            .current_hf_type
-            .ok_or_else(|| RtfError::MalformedDocument("Header/footer type not set".to_string()))?;
+    pub(super) fn parse_header_footer_content(&mut self) -> crate::Result<()> {
+        let hf_type = self.current_hf_type.ok_or_else(|| {
+            crate::Error::MalformedDocument("Header/footer type not set".to_string())
+        })?;
 
         let mut hf = super::super::super::section::HeaderFooter::new(hf_type);
         self.current_hf_shapes.clear();
@@ -79,10 +79,12 @@ impl<'a> Parser<'a> {
         let mut inert_section_format = false;
 
         while let Some(token) = self.tokens.get(self.pos) {
+            let origin = self.pos;
             match token {
                 Token::CloseBrace => {
                     if !text_buffer.is_empty() {
                         if let Ok(text) = std::str::from_utf8(&text_buffer) {
+                            self.close_header_footer_paragraph_source(Some(origin));
                             let state = self.current_state().ok().unwrap_or(&default_state);
                             let text_alloc = self.arena.alloc_str(text);
                             let para = super::super::super::section::HeaderFooterParagraph::new(
@@ -115,10 +117,11 @@ impl<'a> Parser<'a> {
                             self.current_hf_story_offset.saturating_add(1);
                     }
                     let text = std::str::from_utf8(&text_buffer).map_err(|error| {
-                        RtfError::InvalidUnicode(format!(
+                        crate::Error::InvalidUnicode(format!(
                             "invalid UTF-8 in header/footer story: {error}"
                         ))
                     })?;
+                    self.close_header_footer_paragraph_source(Some(origin));
                     let state = self.current_state().ok().unwrap_or(&default_state);
                     let text_alloc = self.arena.alloc_str(text);
                     hf.add_paragraph(super::super::super::section::HeaderFooterParagraph::new(
@@ -163,6 +166,7 @@ impl<'a> Parser<'a> {
                     )?;
                     text_buffer.push(b'\t');
                     self.current_hf_story_offset = self.current_hf_story_offset.saturating_add(1);
+                    self.observe_header_footer_text(origin);
                 },
                 Token::Control(ControlWord::Unicode(code)) => {
                     inert_section_format = false;
@@ -186,6 +190,7 @@ impl<'a> Parser<'a> {
                     text_buffer.extend_from_slice(decoded.as_bytes());
                     self.current_hf_story_offset =
                         self.current_hf_story_offset.saturating_add(decoded.len());
+                    self.observe_header_footer_text(origin);
                 },
                 Token::Control(control) if control_symbol_text(control).is_some() => {
                     inert_section_format = false;
@@ -210,6 +215,7 @@ impl<'a> Parser<'a> {
                     self.current_hf_story_offset = self
                         .current_hf_story_offset
                         .saturating_add(control_symbol_text(control).unwrap_or_default().len());
+                    self.observe_header_footer_text(origin);
                 },
                 Token::Control(ControlWord::SectionDefault) => {
                     self.pos += 1;
@@ -253,6 +259,9 @@ impl<'a> Parser<'a> {
                     text_buffer.extend_from_slice(decoded.as_bytes());
                     self.current_hf_story_offset =
                         self.current_hf_story_offset.saturating_add(decoded.len());
+                    if !decoded.is_empty() {
+                        self.observe_header_footer_text(origin);
+                    }
                 },
                 Token::Binary(_) => {
                     self.pos += 1;
@@ -284,9 +293,15 @@ impl<'a> Parser<'a> {
         if !self.section_properties_active {
             self.begin_section()?;
         }
+        let section_index = self.sections.len().saturating_sub(1);
+        let story_index = self
+            .sections
+            .last()
+            .map_or(0, |section| section.headers_footers.len());
+        self.record_header_footer_sources(section_index, story_index, hf.paragraphs.len());
         self.sections
             .last_mut()
-            .ok_or_else(|| RtfError::MalformedDocument("no active RTF section".to_string()))?
+            .ok_or_else(|| crate::Error::MalformedDocument("no active RTF section".to_string()))?
             .add_header_footer(hf);
 
         self.current_hf_type = None;
@@ -299,7 +314,7 @@ impl<'a> Parser<'a> {
         text_buffer: &mut SmallVec<[u8; 256]>,
         pending_paragraph_break: &mut bool,
         paragraph_baseline: &mut Option<StoryBaseline>,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         self.reject_non_body_custom_xml_markup_group()?;
         if self.is_root_drawing_group() {
             if *pending_paragraph_break {
@@ -341,6 +356,7 @@ impl<'a> Parser<'a> {
         self.states.push(state);
         self.pos += 1;
         loop {
+            let origin = self.pos;
             match self.tokens.get(self.pos) {
                 Some(Token::CloseBrace) => {
                     self.pos += 1;
@@ -369,6 +385,7 @@ impl<'a> Parser<'a> {
                     )?;
                     text_buffer.push(b'\t');
                     self.current_hf_story_offset += 1;
+                    self.observe_header_footer_text(origin);
                 },
                 Some(Token::Control(control @ (ControlWord::Par | ControlWord::Line))) => {
                     let paragraph_break = matches!(control, ControlWord::Par);
@@ -378,10 +395,11 @@ impl<'a> Parser<'a> {
                             self.current_hf_story_offset.saturating_add(1);
                     }
                     let text = std::str::from_utf8(text_buffer).map_err(|error| {
-                        RtfError::InvalidUnicode(format!(
+                        crate::Error::InvalidUnicode(format!(
                             "invalid UTF-8 in header/footer story: {error}"
                         ))
                     })?;
+                    self.close_header_footer_paragraph_source(Some(origin));
                     let state = self.current_state()?.clone();
                     let text_alloc = self.arena.alloc_str(text);
                     hf.add_paragraph(super::super::super::section::HeaderFooterParagraph::new(
@@ -425,6 +443,7 @@ impl<'a> Parser<'a> {
                     }
                     text_buffer.extend_from_slice(decoded.as_bytes());
                     self.current_hf_story_offset += decoded.len();
+                    self.observe_header_footer_text(origin);
                 },
                 Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
                     if *pending_paragraph_break {
@@ -443,6 +462,7 @@ impl<'a> Parser<'a> {
                     text_buffer.extend_from_slice(value.as_bytes());
                     self.current_hf_story_offset += value.len();
                     self.pos += 1;
+                    self.observe_header_footer_text(origin);
                 },
                 Some(Token::Control(ControlWord::Unknown(_, _))) => {
                     let token = self.pos;
@@ -471,16 +491,19 @@ impl<'a> Parser<'a> {
                     }
                     text_buffer.extend_from_slice(decoded.as_bytes());
                     self.current_hf_story_offset += decoded.len();
+                    if !decoded.is_empty() {
+                        self.observe_header_footer_text(origin);
+                    }
                 },
                 Some(Token::Binary(_)) => {
                     self.states.pop();
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF header/footer story cannot contain direct binary data".to_string(),
                     ));
                 },
                 None => {
                     self.states.pop();
-                    return Err(RtfError::UnexpectedEof);
+                    return Err(crate::Error::UnexpectedEof);
                 },
             }
         }
@@ -494,7 +517,7 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_destination_unicode_sequence(
         &mut self,
         first_code: i32,
-    ) -> RtfResult<String> {
+    ) -> crate::Result<String> {
         let encoding = self.current_state()?.encoding;
         self.parse_destination_unicode_sequence_with_encoding(first_code, encoding)
     }
@@ -502,7 +525,7 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_destination_unicode_sequence_for_current_font(
         &mut self,
         first_code: i32,
-    ) -> RtfResult<String> {
+    ) -> crate::Result<String> {
         let encoding = {
             let state = self.current_state()?;
             self.effective_text_encoding(state)?
@@ -514,7 +537,7 @@ impl<'a> Parser<'a> {
         &mut self,
         first_code: i32,
         encoding: RtfEncoding,
-    ) -> RtfResult<String> {
+    ) -> crate::Result<String> {
         let skip_count = self.current_state()?.unicode_skip.max(0).cast_unsigned() as usize;
         let mut utf16 = super::unicode::UnicodeRun::default();
         let awaiting_fallback =
@@ -535,25 +558,25 @@ impl<'a> Parser<'a> {
                             .map(char::len_utf8)
                             .try_fold(0usize, |total, length| total.checked_add(length))
                             .ok_or_else(|| {
-                                RtfError::MalformedDocument(
+                                crate::Error::MalformedDocument(
                                     "RTF Unicode fallback size overflow".to_string(),
                                 )
                             })?;
                         let observed =
                             remainder.len().checked_add(additional).ok_or_else(|| {
-                                RtfError::MalformedDocument(
+                                crate::Error::MalformedDocument(
                                     "RTF Unicode fallback size overflow".to_string(),
                                 )
                             })?;
                         if observed > MAX_TEXT_INTERMEDIATE_BYTES {
-                            return Err(RtfError::LimitExceeded {
+                            return Err(crate::Error::LimitExceeded {
                                 resource: "RTF Unicode fallback text",
                                 observed,
                                 limit: MAX_TEXT_INTERMEDIATE_BYTES,
                             });
                         }
                         remainder.try_reserve_exact(additional).map_err(|_error| {
-                            RtfError::AllocationFailed {
+                            crate::Error::AllocationFailed {
                                 resource: "RTF Unicode fallback text",
                                 requested: observed,
                             }
@@ -582,10 +605,10 @@ impl<'a> Parser<'a> {
         let mut decoded = self.decode_bounded_utf16(&utf16, "RTF destination Unicode")?;
         let fallback = self.decode_transport_text_strict_with_encoding(&remainder, encoding)?;
         let observed = decoded.len().checked_add(fallback.len()).ok_or_else(|| {
-            RtfError::MalformedDocument("RTF Unicode fallback size overflow".to_string())
+            crate::Error::MalformedDocument("RTF Unicode fallback size overflow".to_string())
         })?;
         if observed > MAX_TEXT_INTERMEDIATE_BYTES {
-            return Err(RtfError::LimitExceeded {
+            return Err(crate::Error::LimitExceeded {
                 resource: "RTF Unicode fallback text",
                 observed,
                 limit: MAX_TEXT_INTERMEDIATE_BYTES,
@@ -593,7 +616,7 @@ impl<'a> Parser<'a> {
         }
         decoded
             .try_reserve_exact(fallback.len())
-            .map_err(|_error| RtfError::AllocationFailed {
+            .map_err(|_error| crate::Error::AllocationFailed {
                 resource: "RTF Unicode fallback text",
                 requested: observed,
             })?;
@@ -602,9 +625,10 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse footnote or endnote content.
-    pub(super) fn parse_note(&mut self, is_footnote: bool) -> RtfResult<()> {
+    pub(super) fn parse_note(&mut self, is_footnote: bool) -> crate::Result<()> {
+        let mut is_footnote = is_footnote;
         if self.notes.len() >= super::super::super::section::MAX_NOTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF note count exceeds the safety limit".to_string(),
             ));
         }
@@ -615,10 +639,16 @@ impl<'a> Parser<'a> {
         self.current_note_story_events.clear();
         let mut note_baseline = None;
         let mut reference = String::from(if is_footnote { "1" } else { "i" });
+        let mut explicit_reference = false;
+        self.current_note_text_tokens = None;
+        let mut close_token = None;
 
         while let Some(token) = self.tokens.get(self.pos) {
+            let origin = self.pos;
+            let before = self.current_note_buffer.len();
             match token {
                 Token::CloseBrace => {
+                    close_token = Some(self.pos);
                     self.pos += 1;
                     break;
                 },
@@ -628,6 +658,7 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::FootnoteNumber(n)) => {
                     self.pos += 1;
                     reference = n.to_string();
+                    explicit_reference = true;
                 },
                 Token::Control(ControlWord::Tab) => {
                     self.pos += 1;
@@ -675,6 +706,11 @@ impl<'a> Parser<'a> {
                     }
                     self.current_note_buffer.extend_from_slice(value.as_bytes());
                 },
+                // `\ftnalt` turns a `\footnote` destination into an endnote.
+                Token::Control(ControlWord::Unknown("ftnalt", None)) => {
+                    self.pos += 1;
+                    is_footnote = false;
+                },
                 Token::Control(ControlWord::Unknown(_, _)) => {
                     let token = self.pos;
                     self.pos += 1;
@@ -701,15 +737,22 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
             }
+            if self.current_note_buffer.len() != before {
+                self.observe_note_text(origin);
+            }
             if self.current_note_buffer.len() > super::super::super::section::MAX_NOTE_BODY_BYTES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF note body exceeds the safety limit".to_string(),
                 ));
             }
         }
 
-        let content = std::str::from_utf8(&self.current_note_buffer)
-            .map_err(|error| RtfError::InvalidUnicode(format!("invalid note Unicode: {error}")))?;
+        if !is_footnote && !explicit_reference {
+            reference = String::from("i");
+        }
+        let content = std::str::from_utf8(&self.current_note_buffer).map_err(|error| {
+            crate::Error::InvalidUnicode(format!("invalid note Unicode: {error}"))
+        })?;
         let content_alloc = self.arena.alloc_str(content);
         let mut note = if is_footnote {
             super::super::super::section::Note::footnote(
@@ -740,12 +783,13 @@ impl<'a> Parser<'a> {
         if aggregate
             .is_none_or(|size| size > super::super::super::section::MAX_NOTE_TEXT_TOTAL_BYTES)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF note aggregate text exceeds the safety limit".to_string(),
             ));
         }
         note.validate()?;
         let index = self.notes.len();
+        self.record_note_source(index, close_token);
         self.notes.push(note);
         self.body_story_events
             .push(ParsedBodyStoryEvent::Resolved(crate::BodyStoryEvent::Note(
@@ -758,7 +802,7 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_note_group(
         &mut self,
         note_baseline: &mut Option<StoryBaseline>,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         self.reject_non_body_custom_xml_markup_group()?;
         if self.is_root_drawing_group() {
             return self.parse_group();
@@ -772,7 +816,7 @@ impl<'a> Parser<'a> {
             return self.skip_until_close_brace();
         }
         if !matches!(self.tokens.get(self.pos), Some(Token::OpenBrace)) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF note nested-group parser is not at an opening brace".to_string(),
             ));
         }
@@ -784,7 +828,7 @@ impl<'a> Parser<'a> {
             return self.preserve_unknown_destination();
         }
         if self.states.len() >= MAX_STORY_GROUP_DEPTH {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF note-story group nesting exceeds the safety limit".to_string(),
             ));
         }
@@ -847,7 +891,7 @@ impl<'a> Parser<'a> {
                 },
                 Some(Token::Control(ControlWord::Footnote | ControlWord::Endnote)) => {
                     self.states.pop();
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF note story cannot contain a nested note destination".to_string(),
                     ));
                 },
@@ -876,18 +920,18 @@ impl<'a> Parser<'a> {
                 },
                 Some(Token::Binary(_)) => {
                     self.states.pop();
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF note story cannot contain direct binary data".to_string(),
                     ));
                 },
                 None => {
                     self.states.pop();
-                    return Err(RtfError::UnexpectedEof);
+                    return Err(crate::Error::UnexpectedEof);
                 },
             }
             if self.current_note_buffer.len() > super::super::super::section::MAX_NOTE_BODY_BYTES {
                 self.states.pop();
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF note body exceeds the safety limit".to_string(),
                 ));
             }

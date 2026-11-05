@@ -580,7 +580,10 @@ fn oracle_archive(
 }
 
 fn validate_oracle(corpus: &Corpus, bytes: &[u8]) -> BenchResult<()> {
-    let reader = soapberry_zip::office::ArchiveReader::new(bytes)?;
+    let reader = soapberry_zip::office::ArchiveReader::new(
+        bytes,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
     if reader.len() != corpus.count {
         return Err(format!(
             "oracle has {} files, expected {}",

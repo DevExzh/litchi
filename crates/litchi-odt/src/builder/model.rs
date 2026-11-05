@@ -17,7 +17,7 @@ use std::ops::Range;
 /// let mut builder = Builder::new();
 /// builder.add_paragraph("Hello, World!")?;
 /// builder.add_paragraph("This is a new document.")?;
-/// builder.save("document.odt")?;
+/// builder.build()?.save("document.odt")?;
 /// # Ok(())
 /// # }
 /// ```

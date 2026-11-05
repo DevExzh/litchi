@@ -23,13 +23,8 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-    /// Read a complete worksheet using safe default sparkline limits.
-    pub fn read(source: &[u8]) -> Result<Self> {
-        Self::read_with_limits(source, Limits::DEFAULT)
-    }
-
-    /// Read a complete worksheet using an explicit sparkline policy.
-    pub fn read_with_limits(source: &[u8], limits: Limits) -> Result<Self> {
+    /// Read a complete worksheet stream under an explicit sparkline policy.
+    pub fn read(source: &[u8], limits: Limits) -> Result<Self> {
         limits.validate()?;
         enforce_worksheet_bytes(source.len(), limits)?;
         let mut retained = Vec::new();
@@ -66,9 +61,9 @@ impl Snapshot {
         self.limits
     }
 
-    /// Start a detached edit using this snapshot's policy.
+    /// Start a detached draft using this snapshot's policy.
     #[must_use]
-    pub fn edit(self) -> Edit {
+    pub(crate) fn edit(self) -> Edit {
         Edit {
             source: self.source,
             groups: self.groups,
@@ -77,10 +72,12 @@ impl Snapshot {
             limits: self.limits,
         }
     }
+}
 
-    /// Start a detached edit using a replacement policy.
-    #[must_use]
-    pub fn edit_with_limits(self, limits: Limits) -> Edit {
+impl Snapshot {
+    /// Start a detached draft under a replacement policy (unit tests).
+    #[cfg(test)]
+    pub(crate) fn edit_bounded(self, limits: Limits) -> Edit {
         Edit {
             source: self.source,
             groups: self.groups,
@@ -99,9 +96,9 @@ impl PartialEq for Snapshot {
 
 impl Eq for Snapshot {}
 
-/// A detached optional-block edit.
+/// A detached optional-block draft.
 #[derive(Debug)]
-pub struct Edit {
+pub(crate) struct Edit {
     source: Vec<u8>,
     groups: Option<Groups>,
     block: Option<Range<usize>>,
@@ -110,25 +107,19 @@ pub struct Edit {
 }
 
 impl Edit {
-    /// The currently staged groups.
-    #[must_use]
-    pub const fn groups(&self) -> Option<&Groups> {
-        self.groups.as_ref()
-    }
-
     /// Insert or replace the complete sparkline collection.
-    pub fn set(&mut self, groups: Groups) -> &mut Self {
+    pub(crate) fn set(&mut self, groups: Groups) -> &mut Self {
         self.groups = Some(groups);
         self
     }
 
     /// Remove the complete sparkline collection.
-    pub fn remove(&mut self) -> bool {
+    pub(crate) fn remove(&mut self) -> bool {
         self.groups.take().is_some()
     }
 
     /// Validate and fully encode the staged value before publishing a commit.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
         self.limits.validate()?;
         enforce_worksheet_bytes(self.source.len(), self.limits)?;
         let encoded = self
@@ -163,9 +154,8 @@ impl Edit {
 /// A structurally validated, unpublished worksheet edit.
 ///
 /// The encoded worksheet bytes remain crate-private because formulas still
-/// require workbook-owned name and `Xti` validation. Publish this value only
-/// through [`crate::Workbook::apply_sparklines`].
-pub struct Commit {
+/// require workbook-owned name and `Xti` validation.
+pub(crate) struct Commit {
     groups: Option<Groups>,
     limits: Limits,
     patch: Patch,
@@ -174,13 +164,13 @@ pub struct Commit {
 impl Commit {
     /// The staged semantic groups, if the edit retains a sparkline block.
     #[must_use]
-    pub const fn groups(&self) -> Option<&Groups> {
+    pub(crate) const fn groups(&self) -> Option<&Groups> {
         self.groups.as_ref()
     }
 
     /// Whether publication would leave the worksheet byte-identical.
     #[must_use]
-    pub fn is_noop(&self) -> bool {
+    pub(crate) fn is_noop(&self) -> bool {
         self.patch.is_empty()
     }
 
@@ -277,24 +267,15 @@ impl Patch {
     }
 }
 
-/// Read a complete worksheet with default limits.
-pub fn read(source: &[u8]) -> Result<Snapshot> {
-    Snapshot::read(source)
-}
-
-/// Read a complete worksheet with explicit limits.
-pub fn read_with_limits(source: &[u8], limits: Limits) -> Result<Snapshot> {
-    Snapshot::read_with_limits(source, limits)
-}
-
-pub(crate) fn read_owned(source: Vec<u8>, limits: Limits) -> Result<Snapshot> {
-    scan(source, limits)
+/// Read a complete worksheet stream under an explicit sparkline policy.
+pub fn read(source: &[u8], limits: Limits) -> Result<Snapshot> {
+    Snapshot::read(source, limits)
 }
 
 fn scan(source: Vec<u8>, limits: Limits) -> Result<Snapshot> {
     limits.validate()?;
     enforce_worksheet_bytes(source.len(), limits)?;
-    let mut records = Records::new(&source);
+    let mut records = Records::new(&source, crate::raw::Limits::new(limits.record_bytes(), 1));
     let mut family = Vec::new();
     family.try_reserve_exact(3).map_err(|_| Error::Allocation {
         resource: "worksheet family stack",
@@ -366,10 +347,7 @@ fn scan(source: Vec<u8>, limits: Limits) -> Result<Snapshot> {
                     )
                 })?;
                 if expected != record_kind {
-                    return Err(invalid(
-                        "sparkline record family",
-                        format!("expected {expected}, found {record_kind}"),
-                    ));
+                    return Err(invalid("sparkline record family", "expected, found"));
                 }
                 if record_kind == kind::END_SPARKLINE_GROUPS {
                     let start = outer_start.take().ok_or_else(|| {
@@ -570,9 +548,6 @@ fn fallible_copy(source: &[u8], resource: &'static str) -> Result<Vec<u8>> {
     Ok(output)
 }
 
-fn invalid(record: &'static str, reason: impl Into<String>) -> Error {
-    Error::Value {
-        record,
-        reason: reason.into(),
-    }
+fn invalid(record: &'static str, reason: &'static str) -> Error {
+    Error::Value { record, reason }
 }

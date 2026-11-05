@@ -1,0 +1,748 @@
+{
+  "schema": "litchi-iwa-constructor-admission.v4",
+  "status": "deterministic repair evidence; native qualification pending",
+  "source": {
+    "commit": "d56448c7e10251b217d973e037352675f5874980",
+    "changes": [
+      "The default minimal admission predicate rejects an oversized public length with a widened comparison before accepting the fixed-shape fast path.",
+      "ArchiveInfo::new and MessageInfo::new are inlineable, and fixed message versions are copied with one extend operation.",
+      "Public mutation checks and strict-profile admission remain on their existing paths; no unchecked provenance is introduced.",
+      "Retained-header comparison now uses target-derived lengths only while the current projection still matches; after divergence it emits the current payload and recalculates the length prefix.",
+      "A direct packed-field cardinality mutation regression proves canonical fallback preserves the changed public metadata and exact re-encoding."
+    ],
+    "lock_sha256": "551fd8812350c2b13b5d1791fb8773ba4a50c71801728c3a18f6c1dca3f7f89a",
+    "base_commit": "ddf2ac8ae2117cd78829ef94bcb610d6cbdfa0e2",
+    "candidate_commit": "d56448c7e10251b217d973e037352675f5874980",
+    "prior_constructor_optimization_commit": "f44804d2c24d204719c08fc77f0397ae5a5bd573"
+  },
+  "method": {
+    "callgrind": "valgrind --tool=callgrind --collect-jumps=no --error-exitcode=99; Ir/op=(Ir at 12,000 - Ir at 2,000)/10,000",
+    "message_counts": [
+      1,
+      8,
+      32,
+      128
+    ],
+    "output_check": "Every base and candidate row has matching checksum, encoded byte length and output SHA-256.",
+    "raw_artifacts": "The captures and executables remain outside the repository under /home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator."
+  },
+  "consumer_audit": {
+    "result": "No production raw Vec<MessageInfo> ArchiveInfo::new consumer is equivalent to push_new.",
+    "archive_object": "ArchiveObject::new already constructs conventional MessageInfo records with its internal try_new path and admits the complete header before publication.",
+    "external_sample": "crates/litchi-iwa-archive/tests/core_type_routes.rs deliberately mutates nested MessageInfo fields, so it must retain the generic checked route.",
+    "probe_routes": "The complete authoring probe uses push_new; the fair raw probe retains the public Vec<MessageInfo> capability."
+  },
+  "v20_complete_archive_object_serialization": {
+    "route": "ArchiveObject::new plus Archive::to_bytes inside every measured iteration",
+    "probe_source_sha256": {
+      "base": "ecd0c13426552b5486632258cba75fbca13628969c23c6989ec49fa8b288510e",
+      "candidate": "5c2dc2834fe5184077e28a5441ece97328b814f83c2c447b66a4ff41a9b3c669"
+    },
+    "binary_sha256": {
+      "base": "d3ff541f17c9ae5983adfe5e4e105993b9a15d28011ab790374c8ff6221c6fc8",
+      "candidate": "9a3f63c7346be58d0dad07d7f81d9649aa30349434a19dd22203684071397e8b"
+    },
+    "capture_directory": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v20-archive-serialize",
+    "capture_manifest_sha256": "f8142abd30ae9c0fe173d2d4756afdb5775c14d25f8999fc55bcd5290eb86f27",
+    "capture_files": 16,
+    "capture_bytes": 1773127,
+    "rows": [
+      {
+        "messages": 1,
+        "base_ir": 10587.0053,
+        "candidate_ir": 8017.0057,
+        "candidate_base": 0.757249616,
+        "output_bytes": 1040,
+        "output_sha256": "9023b16c5bbd17a50293cab64fd4aeb3408644e555338eee9ba058469a3220e1"
+      },
+      {
+        "messages": 8,
+        "base_ir": 55524.2542,
+        "candidate_ir": 39915.5046,
+        "candidate_base": 0.71888412,
+        "output_bytes": 8299,
+        "output_sha256": "8b436827ca0ea648569e590e9a37fca13b42c6c63c93a4e45955b62a02b98d15"
+      },
+      {
+        "messages": 32,
+        "base_ir": 259512.0048,
+        "candidate_ir": 173925.0052,
+        "candidate_base": 0.67020023,
+        "output_bytes": 33188,
+        "output_sha256": "fcd0b10420e42a94d43f6174285c5ca423a31baaa01c7bb6ca8e7e486248c698"
+      },
+      {
+        "messages": 128,
+        "base_ir": 1070983.7656,
+        "candidate_ir": 717469.9051,
+        "candidate_base": 0.669916695,
+        "output_bytes": 132740,
+        "output_sha256": "dbc59a16097dc1a379d9342db3dc25603a6a4ab3581ce7bf098a76875479ede2"
+      }
+    ]
+  },
+  "v21_fair_raw_constructor": {
+    "route": "ArchiveInfo::new(identifier, Vec<MessageInfo>, Limits), with raw and metadata-assembly endpoints",
+    "probe_source_sha256": {
+      "base": "ecd0c13426552b5486632258cba75fbca13628969c23c6989ec49fa8b288510e",
+      "candidate": "5c2dc2834fe5184077e28a5441ece97328b814f83c2c447b66a4ff41a9b3c669"
+    },
+    "binary_sha256": {
+      "base": "d3ff541f17c9ae5983adfe5e4e105993b9a15d28011ab790374c8ff6221c6fc8",
+      "candidate": "9a3f63c7346be58d0dad07d7f81d9649aa30349434a19dd22203684071397e8b"
+    },
+    "capture_directory": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v21-raw-inline",
+    "capture_manifest_sha256": "211df51863e86e5d2881b129f86aaa3bcf6968f9cd3babae1285a28ad61a3460",
+    "capture_files": 32,
+    "capture_bytes": 3444377,
+    "direct_raw_rows": [
+      {
+        "messages": 1,
+        "base_ir": 46.0051,
+        "candidate_ir": 101.0051,
+        "candidate_base": 2.195519627
+      },
+      {
+        "messages": 8,
+        "base_ir": 46.0051,
+        "candidate_ir": 248.0041,
+        "candidate_base": 5.390795803
+      },
+      {
+        "messages": 32,
+        "base_ir": 46.0062,
+        "candidate_ir": 752.0056,
+        "candidate_base": 16.345744704
+      },
+      {
+        "messages": 128,
+        "base_ir": 46.0036,
+        "candidate_ir": 2768.0052,
+        "candidate_base": 60.169317184
+      }
+    ],
+    "assembled_raw_rows": [
+      {
+        "messages": 1,
+        "base_ir": 1066.0056,
+        "candidate_ir": 1218.0056,
+        "candidate_base": 1.142588369,
+        "output_bytes": 1040,
+        "output_sha256": "9023b16c5bbd17a50293cab64fd4aeb3408644e555338eee9ba058469a3220e1"
+      },
+      {
+        "messages": 8,
+        "base_ir": 2177.0041,
+        "candidate_ir": 3246.0051,
+        "candidate_base": 1.491042254,
+        "output_bytes": 8299,
+        "output_sha256": "8b436827ca0ea648569e590e9a37fca13b42c6c63c93a4e45955b62a02b98d15"
+      },
+      {
+        "messages": 32,
+        "base_ir": 10333.0062,
+        "candidate_ir": 14761.0051,
+        "candidate_base": 1.428529589,
+        "output_bytes": 33188,
+        "output_sha256": "fcd0b10420e42a94d43f6174285c5ca423a31baaa01c7bb6ca8e7e486248c698"
+      },
+      {
+        "messages": 128,
+        "base_ir": 51543.0041,
+        "candidate_ir": 68362.0052,
+        "candidate_base": 1.326310067,
+        "output_bytes": 132740,
+        "output_sha256": "dbc59a16097dc1a379d9342db3dc25603a6a4ab3581ce7bf098a76875479ede2"
+      }
+    ],
+    "interpretation": "The direct rows expose the required current public-record scan and are not a whole-lifecycle score. The assembled rows include metadata construction and show the comparable raw-constructor lifecycle, but their 1.1426x\u20131.4910x range remains a returned performance regression pending further repair."
+  },
+  "validation": {
+    "format": "cargo fmt --all -- --check passed; git diff --check passed.",
+    "core_tests": "cargo test --offline --locked --manifest-path crates/litchi-iwa-core/Cargo.toml --lib: 82 passed, 0 failed, including the retained-header fallback regression.",
+    "core_type_routes": "cargo test --offline --locked --manifest-path crates/litchi-iwa-archive/Cargo.toml --test core_type_routes: 2 passed.",
+    "failure_attribution": "The three retained-header tests were rerun exactly on the original baseline ddf2ac8ae2117cd78829ef94bcb610d6cbdfa0e2 and each passed. The candidate d56448c7e10251b217d973e037352675f5874980 passes all three and the direct packed-field-length mutation regression; no nested encoded length mismatch remains.",
+    "staged_size_and_binary_checks": "passed with no output; no evidence file or binary was staged.",
+    "retained_header_replay": {
+      "base_commit": "ddf2ac8ae2117cd78829ef94bcb610d6cbdfa0e2",
+      "candidate_commit": "d56448c7e10251b217d973e037352675f5874980",
+      "tests": [
+        "archive::tests::data_pruning_zero_and_noop_policies_preserve_existing_behavior",
+        "archive::tests::empty_reference_removal_delegates_to_preserving_replacement",
+        "archive::tests::exact_reference_transition_retains_duplicate_unselected_field_members"
+      ],
+      "baseline_result": "3 passed, 0 failed",
+      "candidate_result": "3 passed, 0 failed",
+      "additional_regression": "archive::tests::retained_probe_falls_back_after_packed_field_length_changes: passed"
+    }
+  },
+  "v22_matched_allocation_and_attribution": {
+    "source": {
+      "base_commit": "57c2ff520b534a2949fc84904fa89c7a902d55da",
+      "candidate_commit": "f44804d2c24d204719c08fc77f0397ae5a5bd573",
+      "base_archive_source_sha256": "0a436b6a54c5b0b581dc79d86d5545ac2d96922bbfbbb3eadb0e9649dbd37019",
+      "candidate_archive_source_sha256": "fb7fe32c14030a872247183a106d4323e787ceb62de30b2f05217f7178f0e47a",
+      "probe_source_sha256": "5c2dc2834fe5184077e28a5441ece97328b814f83c2c447b66a4ff41a9b3c669",
+      "probe_lock_sha256": "551fd8812350c2b13b5d1791fb8773ba4a50c71801728c3a18f6c1dca3f7f89a"
+    },
+    "binaries": {
+      "callgrind_base_sha256": "d3ff541f17c9ae5983adfe5e4e105993b9a15d28011ab790374c8ff6221c6fc8",
+      "callgrind_candidate_sha256": "9a3f63c7346be58d0dad07d7f81d9649aa30349434a19dd22203684071397e8b",
+      "allocation_base_sha256": "df765b190ab09ff2ffae219107a9c5667691e0b4239ca06e6624710d0e1e2b0a",
+      "allocation_candidate_sha256": "2fc130c3fdaaf006c913635ef4518c24af0dd63609d8a7e9d190d61b11ad49aa"
+    },
+    "callgrind": {
+      "command": "valgrind --tool=callgrind --collect-jumps=no; Ir/op=(Ir at 12,000 - Ir at 2,000)/10,000",
+      "capture_directory": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v22-attribution",
+      "capture_files": 12,
+      "capture_bytes": 429360,
+      "capture_manifest_sha256": "707aff57cfc00ce99e53aed2b2c57a1a84cea2f7809689a667c977cfda5ad17c",
+      "rows": [
+        {
+          "route": "message_info",
+          "messages": 1,
+          "base_ir_per_op": 169.004,
+          "candidate_ir_per_op": 277.0043,
+          "delta_ir": 108.0003
+        },
+        {
+          "route": "archive_info_raw",
+          "messages": 1,
+          "base_ir_per_op": 46.0051,
+          "candidate_ir_per_op": 101.0051,
+          "delta_ir": 55.0
+        },
+        {
+          "route": "archive_info_raw",
+          "messages": 8,
+          "base_ir_per_op": 46.0051,
+          "candidate_ir_per_op": 248.0041,
+          "delta_ir": 201.999
+        },
+        {
+          "route": "archive_info_raw",
+          "messages": 32,
+          "base_ir_per_op": 46.0062,
+          "candidate_ir_per_op": 752.0056,
+          "delta_ir": 705.9994
+        },
+        {
+          "route": "archive_info_raw",
+          "messages": 128,
+          "base_ir_per_op": 46.0036,
+          "candidate_ir_per_op": 2768.0052,
+          "delta_ir": 2722.0016
+        },
+        {
+          "route": "archive_info_raw_e2e",
+          "messages": 1,
+          "base_ir_per_op": 1066.0056,
+          "candidate_ir_per_op": 1218.0056,
+          "delta_ir": 152.0
+        },
+        {
+          "route": "archive_info_raw_e2e",
+          "messages": 8,
+          "base_ir_per_op": 2177.0041,
+          "candidate_ir_per_op": 3246.0051,
+          "delta_ir": 1069.001
+        },
+        {
+          "route": "archive_info_raw_e2e",
+          "messages": 32,
+          "base_ir_per_op": 10333.0062,
+          "candidate_ir_per_op": 14761.0051,
+          "delta_ir": 4427.9989
+        },
+        {
+          "route": "archive_info_raw_e2e",
+          "messages": 128,
+          "base_ir_per_op": 51543.0041,
+          "candidate_ir_per_op": 68362.0052,
+          "delta_ir": 16819.0011
+        }
+      ],
+      "attribution": {
+        "archive_info_raw_delta": "34 + 21*N Ir/op exactly across 1, 8, 32 and 128 messages; this is the required public-field shape/length admission scan.",
+        "message_info_delta": "108.0003 Ir per MessageInfo::new call; this is constructor-side length/profile admission and does not allocate additional buffers.",
+        "raw_e2e_scope": "archive_info_raw_e2e assembles MessageInfo values and calls the raw constructor; it does not encode inside the timed loop.",
+        "no_duplicate_encoded_length": "The default raw constructor fast path checks public shape and length only; it does not compute encoded header length or serialize a header."
+      }
+    },
+    "allocation": {
+      "probe": "count-candidate-v14 with allocations feature; 100 iterations per row; setup outside timed loop.",
+      "capture_directory": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v22-alloc-results",
+      "capture_files": 80,
+      "capture_bytes": 22638,
+      "capture_manifest_sha256": "bd657d49df12f94501a0d7bad2cb68817268ca24a90446018d1a1efc1c448a41",
+      "rows": [
+        {
+          "route": "archive_info_raw",
+          "messages": 1,
+          "iterations": 100,
+          "base": {
+            "peak": 0,
+            "allocated": 0,
+            "allocations": 0
+          },
+          "candidate": {
+            "peak": 0,
+            "allocated": 0,
+            "allocations": 0
+          },
+          "output_bytes": 1040,
+          "output_sha256": "9023b16c5bbd17a50293cab64fd4aeb3408644e555338eee9ba058469a3220e1",
+          "checksum_match": true
+        },
+        {
+          "route": "archive_info_raw",
+          "messages": 8,
+          "iterations": 100,
+          "base": {
+            "peak": 0,
+            "allocated": 0,
+            "allocations": 0
+          },
+          "candidate": {
+            "peak": 0,
+            "allocated": 0,
+            "allocations": 0
+          },
+          "output_bytes": 8299,
+          "output_sha256": "8b436827ca0ea648569e590e9a37fca13b42c6c63c93a4e45955b62a02b98d15",
+          "checksum_match": true
+        },
+        {
+          "route": "archive_info_raw",
+          "messages": 32,
+          "iterations": 100,
+          "base": {
+            "peak": 0,
+            "allocated": 0,
+            "allocations": 0
+          },
+          "candidate": {
+            "peak": 0,
+            "allocated": 0,
+            "allocations": 0
+          },
+          "output_bytes": 33188,
+          "output_sha256": "fcd0b10420e42a94d43f6174285c5ca423a31baaa01c7bb6ca8e7e486248c698",
+          "checksum_match": true
+        },
+        {
+          "route": "archive_info_raw",
+          "messages": 128,
+          "iterations": 100,
+          "base": {
+            "peak": 0,
+            "allocated": 0,
+            "allocations": 0
+          },
+          "candidate": {
+            "peak": 0,
+            "allocated": 0,
+            "allocations": 0
+          },
+          "output_bytes": 132740,
+          "output_sha256": "dbc59a16097dc1a379d9342db3dc25603a6a4ab3581ce7bf098a76875479ede2",
+          "checksum_match": true
+        },
+        {
+          "route": "archive_info_raw_e2e",
+          "messages": 1,
+          "iterations": 100,
+          "base": {
+            "peak": 220,
+            "allocated": 22100,
+            "allocations": 300
+          },
+          "candidate": {
+            "peak": 220,
+            "allocated": 22100,
+            "allocations": 300
+          },
+          "output_bytes": 1040,
+          "output_sha256": "9023b16c5bbd17a50293cab64fd4aeb3408644e555338eee9ba058469a3220e1",
+          "checksum_match": true
+        },
+        {
+          "route": "archive_info_raw_e2e",
+          "messages": 8,
+          "iterations": 100,
+          "base": {
+            "peak": 1760,
+            "allocated": 176100,
+            "allocations": 1000
+          },
+          "candidate": {
+            "peak": 1760,
+            "allocated": 176100,
+            "allocations": 1000
+          },
+          "output_bytes": 8299,
+          "output_sha256": "8b436827ca0ea648569e590e9a37fca13b42c6c63c93a4e45955b62a02b98d15",
+          "checksum_match": true
+        },
+        {
+          "route": "archive_info_raw_e2e",
+          "messages": 32,
+          "iterations": 100,
+          "base": {
+            "peak": 7040,
+            "allocated": 704200,
+            "allocations": 3400
+          },
+          "candidate": {
+            "peak": 7040,
+            "allocated": 704200,
+            "allocations": 3400
+          },
+          "output_bytes": 33188,
+          "output_sha256": "fcd0b10420e42a94d43f6174285c5ca423a31baaa01c7bb6ca8e7e486248c698",
+          "checksum_match": true
+        },
+        {
+          "route": "archive_info_raw_e2e",
+          "messages": 128,
+          "iterations": 100,
+          "base": {
+            "peak": 28160,
+            "allocated": 2816300,
+            "allocations": 13000
+          },
+          "candidate": {
+            "peak": 28160,
+            "allocated": 2816300,
+            "allocations": 13000
+          },
+          "output_bytes": 132740,
+          "output_sha256": "dbc59a16097dc1a379d9342db3dc25603a6a4ab3581ce7bf098a76875479ede2",
+          "checksum_match": true
+        },
+        {
+          "route": "archive_info_generic_e2e",
+          "messages": 1,
+          "iterations": 100,
+          "base": {
+            "peak": 428,
+            "allocated": 42900,
+            "allocations": 400
+          },
+          "candidate": {
+            "peak": 428,
+            "allocated": 42900,
+            "allocations": 400
+          },
+          "output_bytes": 1040,
+          "output_sha256": "9023b16c5bbd17a50293cab64fd4aeb3408644e555338eee9ba058469a3220e1",
+          "checksum_match": true
+        },
+        {
+          "route": "archive_info_generic_e2e",
+          "messages": 8,
+          "iterations": 100,
+          "base": {
+            "peak": 3424,
+            "allocated": 342500,
+            "allocations": 1100
+          },
+          "candidate": {
+            "peak": 3424,
+            "allocated": 342500,
+            "allocations": 1100
+          },
+          "output_bytes": 8299,
+          "output_sha256": "8b436827ca0ea648569e590e9a37fca13b42c6c63c93a4e45955b62a02b98d15",
+          "checksum_match": true
+        },
+        {
+          "route": "archive_info_generic_e2e",
+          "messages": 32,
+          "iterations": 100,
+          "base": {
+            "peak": 13696,
+            "allocated": 1369800,
+            "allocations": 3500
+          },
+          "candidate": {
+            "peak": 13696,
+            "allocated": 1369800,
+            "allocations": 3500
+          },
+          "output_bytes": 33188,
+          "output_sha256": "fcd0b10420e42a94d43f6174285c5ca423a31baaa01c7bb6ca8e7e486248c698",
+          "checksum_match": true
+        },
+        {
+          "route": "archive_info_generic_e2e",
+          "messages": 128,
+          "iterations": 100,
+          "base": {
+            "peak": 54784,
+            "allocated": 5478700,
+            "allocations": 13100
+          },
+          "candidate": {
+            "peak": 54784,
+            "allocated": 5478700,
+            "allocations": 13100
+          },
+          "output_bytes": 132740,
+          "output_sha256": "dbc59a16097dc1a379d9342db3dc25603a6a4ab3581ce7bf098a76875479ede2",
+          "checksum_match": true
+        },
+        {
+          "route": "archive_info_e2e",
+          "messages": 1,
+          "iterations": 100,
+          "base": {
+            "peak": 220,
+            "allocated": 22100,
+            "allocations": 300
+          },
+          "candidate": {
+            "peak": 220,
+            "allocated": 22100,
+            "allocations": 300
+          },
+          "output_bytes": 1040,
+          "output_sha256": "9023b16c5bbd17a50293cab64fd4aeb3408644e555338eee9ba058469a3220e1",
+          "checksum_match": true
+        },
+        {
+          "route": "archive_info_e2e",
+          "messages": 8,
+          "iterations": 100,
+          "base": {
+            "peak": 1760,
+            "allocated": 176100,
+            "allocations": 1000
+          },
+          "candidate": {
+            "peak": 1760,
+            "allocated": 176100,
+            "allocations": 1000
+          },
+          "output_bytes": 8299,
+          "output_sha256": "8b436827ca0ea648569e590e9a37fca13b42c6c63c93a4e45955b62a02b98d15",
+          "checksum_match": true
+        },
+        {
+          "route": "archive_info_e2e",
+          "messages": 32,
+          "iterations": 100,
+          "base": {
+            "peak": 7040,
+            "allocated": 704200,
+            "allocations": 3400
+          },
+          "candidate": {
+            "peak": 7040,
+            "allocated": 704200,
+            "allocations": 3400
+          },
+          "output_bytes": 33188,
+          "output_sha256": "fcd0b10420e42a94d43f6174285c5ca423a31baaa01c7bb6ca8e7e486248c698",
+          "checksum_match": true
+        },
+        {
+          "route": "archive_info_e2e",
+          "messages": 128,
+          "iterations": 100,
+          "base": {
+            "peak": 28160,
+            "allocated": 2816300,
+            "allocations": 13000
+          },
+          "candidate": {
+            "peak": 28160,
+            "allocated": 2816300,
+            "allocations": 13000
+          },
+          "output_bytes": 132740,
+          "output_sha256": "dbc59a16097dc1a379d9342db3dc25603a6a4ab3581ce7bf098a76875479ede2",
+          "checksum_match": true
+        },
+        {
+          "route": "archive_object_serialize_e2e",
+          "messages": 1,
+          "iterations": 100,
+          "base": {
+            "peak": 3151,
+            "allocated": 347200,
+            "allocations": 1700
+          },
+          "candidate": {
+            "peak": 3151,
+            "allocated": 347200,
+            "allocations": 1700
+          },
+          "output_bytes": 1040,
+          "output_sha256": "9023b16c5bbd17a50293cab64fd4aeb3408644e555338eee9ba058469a3220e1",
+          "checksum_match": true
+        },
+        {
+          "route": "archive_object_serialize_e2e",
+          "messages": 8,
+          "iterations": 100,
+          "base": {
+            "peak": 24389,
+            "allocated": 2658600,
+            "allocations": 5900
+          },
+          "candidate": {
+            "peak": 24389,
+            "allocated": 2658600,
+            "allocations": 5900
+          },
+          "output_bytes": 8299,
+          "output_sha256": "8b436827ca0ea648569e590e9a37fca13b42c6c63c93a4e45955b62a02b98d15",
+          "checksum_match": true
+        },
+        {
+          "route": "archive_object_serialize_e2e",
+          "messages": 32,
+          "iterations": 100,
+          "base": {
+            "peak": 97270,
+            "allocated": 10606000,
+            "allocations": 20900
+          },
+          "candidate": {
+            "peak": 97270,
+            "allocated": 10606000,
+            "allocations": 20900
+          },
+          "output_bytes": 33188,
+          "output_sha256": "fcd0b10420e42a94d43f6174285c5ca423a31baaa01c7bb6ca8e7e486248c698",
+          "checksum_match": true
+        },
+        {
+          "route": "archive_object_serialize_e2e",
+          "messages": 128,
+          "iterations": 100,
+          "base": {
+            "peak": 388982,
+            "allocated": 42484500,
+            "allocations": 79100
+          },
+          "candidate": {
+            "peak": 388982,
+            "allocated": 42484500,
+            "allocations": 79100
+          },
+          "output_bytes": 132740,
+          "output_sha256": "dbc59a16097dc1a379d9342db3dc25603a6a4ab3581ce7bf098a76875479ede2",
+          "checksum_match": true
+        }
+      ],
+      "result": "Base and candidate peak bytes, allocated bytes and allocation calls are identical for every matched row; all checksums and serialized output hashes match."
+    },
+    "status": "Instruction-count regression remains returned; matched allocation evidence shows no added heap or allocation-count cost, and the source attribution separates required public-field admission from MessageInfo construction and fixture assembly.",
+    "collection_diagnostic": {
+      "capture_directory": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v22-collection",
+      "capture_files": 96,
+      "capture_bytes": 3503990,
+      "capture_manifest_sha256": "d070b25a50c16c4f2a2ffb6455b2e7b9defb95d365dcc7d9f8b60db798797ca9",
+      "routes": [
+        {
+          "route": "archive_info_e2e",
+          "messages": 1,
+          "base_ir_per_op": 1070.0056,
+          "candidate_ir_per_op": 1567.0041,
+          "delta_ir": 496.9985,
+          "candidate_base": 1.464482
+        },
+        {
+          "route": "archive_info_e2e",
+          "messages": 8,
+          "base_ir_per_op": 2181.0041,
+          "candidate_ir_per_op": 3665.0051,
+          "delta_ir": 1484.001,
+          "candidate_base": 1.680421
+        },
+        {
+          "route": "archive_info_e2e",
+          "messages": 32,
+          "base_ir_per_op": 10337.0062,
+          "candidate_ir_per_op": 15420.0051,
+          "delta_ir": 5082.9989,
+          "candidate_base": 1.491728
+        },
+        {
+          "route": "archive_info_e2e",
+          "messages": 128,
+          "base_ir_per_op": 51547.0041,
+          "candidate_ir_per_op": 69981.0052,
+          "delta_ir": 18434.0011,
+          "candidate_base": 1.357615
+        },
+        {
+          "route": "archive_info_generic_e2e",
+          "messages": 1,
+          "base_ir_per_op": 1065.0056,
+          "candidate_ir_per_op": 1963.8185,
+          "delta_ir": 898.8129,
+          "candidate_base": 1.843951
+        },
+        {
+          "route": "archive_info_generic_e2e",
+          "messages": 8,
+          "base_ir_per_op": 2176.0041,
+          "candidate_ir_per_op": 5462.8195,
+          "delta_ir": 3286.8154,
+          "candidate_base": 2.510482
+        },
+        {
+          "route": "archive_info_generic_e2e",
+          "messages": 32,
+          "base_ir_per_op": 10332.0062,
+          "candidate_ir_per_op": 21292.0041,
+          "delta_ir": 10959.9979,
+          "candidate_base": 2.060781
+        },
+        {
+          "route": "archive_info_generic_e2e",
+          "messages": 128,
+          "base_ir_per_op": 51542.0041,
+          "candidate_ir_per_op": 91715.0052,
+          "delta_ir": 40173.0011,
+          "candidate_base": 1.779423
+        }
+      ],
+      "semantics": {
+        "archive_info_e2e": "Candidate uses MessageInfoCollection::push_new; the historical base adapter uses its pre-limits constructor signature.",
+        "archive_info_generic_e2e": "Candidate assembles MessageInfo::new values and passes them through MessageInfoCollection::push; the historical base adapter again uses its pre-limits constructor signature.",
+        "fairness": "These base/candidate ratios are diagnostic only. The fair raw Vec<MessageInfo> lifecycle remains the v21 route recorded above."
+      },
+      "candidate_push_new_vs_generic": [
+        {
+          "messages": 1,
+          "push_new_ir_per_op": 1567.0041,
+          "generic_push_ir_per_op": 1963.8185,
+          "generic_extra_ir": 396.8144
+        },
+        {
+          "messages": 8,
+          "push_new_ir_per_op": 3665.0051,
+          "generic_push_ir_per_op": 5462.8195,
+          "generic_extra_ir": 1797.8144
+        },
+        {
+          "messages": 32,
+          "push_new_ir_per_op": 15420.0051,
+          "generic_push_ir_per_op": 21292.0041,
+          "generic_extra_ir": 5871.999
+        },
+        {
+          "messages": 128,
+          "push_new_ir_per_op": 69981.0052,
+          "generic_push_ir_per_op": 91715.0052,
+          "generic_extra_ir": 21734.0
+        }
+      ],
+      "attribution": "The candidate-only generic-vs-push_new delta is the cost of rechecking public MessageInfo shape and length in push; the certified collection then publishes aggregate totals without a second ArchiveInfo scan. Conventional callers can use push_new, while the generic push path preserves mutable-field validation."
+    }
+  }
+}

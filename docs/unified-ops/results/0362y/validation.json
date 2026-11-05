@@ -1,0 +1,59 @@
+{
+  "schema": "litchi_odp_lazy_source_projection.v1",
+  "base_commit": "cc76bd50dea6c9d47a38b4a923f29e7867d96f3c",
+  "source": {
+    "path": "crates/litchi-odp/src/package/source.rs",
+    "bytes": 39783,
+    "sha256": "e5b16bee7be793884c71d22a64272eaf6bf4bb825afa74299c5a9f0200292bdc"
+  },
+  "regression": {
+    "test": "package::source::tests::source_owner_drops_large_validation_buffer_before_semantic_read",
+    "content_member_text_bytes": 1048576,
+    "open_content_cache": "empty",
+    "first_content_xml_read_cache": "populated"
+  },
+  "consumer_test": {
+    "path": "crates/litchi-odp/tests/source_backed.rs",
+    "bytes": 19840,
+    "sha256": "8578c324f7ae71b0dafe937c429509dd0b6b738ea721310bf23a6e70e7e0eaec",
+    "first_semantic_read": "deferred member read observed",
+    "subsequent_cached_read": "no member read observed"
+  },
+  "streaming_consumer_test": {
+    "path": "crates/litchi-odp/tests/sequential_text.rs",
+    "bytes": 18746,
+    "sha256": "c778fb7e6553af135f2b763191df96b8ee7b50486667089fb3eaeb699bdd0a80",
+    "result": "16 passed"
+  },
+  "checks": [
+    {
+      "command": "cargo check --offline -p litchi-odp --lib",
+      "result": "passed"
+    },
+    {
+      "command": "cargo test --offline -p litchi-odp --lib source_owner_drops_large_validation_buffer_before_semantic_read",
+      "result": "passed"
+    },
+    {
+      "command": "cargo test --offline -p litchi-odp --test source_backed",
+      "result": "12 passed"
+    },
+    {
+      "command": "cargo test --offline -p litchi-odp --test sequential_text",
+      "result": "16 passed"
+    },
+    {
+      "command": "cargo test --offline -p litchi-odp --lib package::source_append::tests",
+      "result": "12 passed"
+    },
+    {
+      "command": "cargo clippy --offline -p litchi-odp --all-targets --all-features -- -D warnings",
+      "result": "passed"
+    },
+    {
+      "command": "cargo test --offline -p litchi-odp --all-targets --all-features",
+      "result": "passed: 223 unit tests and all integration targets"
+    }
+  ],
+  "native_measurement": "deferred_until_quiet_host_window"
+}

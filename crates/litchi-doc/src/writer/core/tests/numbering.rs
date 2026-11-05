@@ -2,7 +2,7 @@ use super::support::*;
 
 #[test]
 fn list_tables_round_trip_through_fib_indices() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let mut list = ListStructure::new(42);
     let mut level = crate::writer::numbering::ListLevel::new(3, NumberFormat::Decimal);
     level.number_text = "%1.😀".to_string();
@@ -27,8 +27,8 @@ fn list_tables_round_trip_through_fib_indices() {
         .unwrap();
 
     let mut cursor = Cursor::new(Vec::new());
-    writer.write_to(&mut cursor).unwrap();
-    let mut package = crate::Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut cursor).unwrap();
+    let mut package = crate::raw::Reader::from_reader(Cursor::new(cursor.into_inner())).unwrap();
     let document = package.document().unwrap();
     let tables = document.list_tables().unwrap();
     assert_eq!(tables.structures().len(), 1);

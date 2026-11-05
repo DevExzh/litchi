@@ -77,7 +77,7 @@ fn parses_real_odfdo_and_libreoffice_fixtures() {
     let lo = include_bytes!(
         "../../../test-data/libreoffice-core/xmloff/qa/unit/data/tdf162686_3D_metal_type_ODF.fods"
     );
-    let flat = litchi_odt::generic::FlatDocument::from_reader(Cursor::new(lo)).unwrap();
+    let flat = litchi_odt::generic::flat::Document::from_reader(Cursor::new(lo)).unwrap();
     assert!(!flat.row_style_properties().unwrap().styles.is_empty());
 }
 
@@ -101,7 +101,9 @@ fn builder_package_round_trip() {
     let mut builder = Builder::new();
     builder.add_table_row_property_style(style.clone()).unwrap();
     builder.add_paragraph("x").unwrap();
-    let package = litchi_odt::generic::Package::from_bytes(builder.build().unwrap()).unwrap();
+    let package =
+        litchi_odt::generic::Package::from_bytes(&builder.build().unwrap().to_bytes().unwrap())
+            .unwrap();
     assert_eq!(
         package.row_style_properties().unwrap().get("Row"),
         Some(&style)

@@ -24,7 +24,7 @@ fn assert_names(
     table_name: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let sheet = package
-        .document()
+        .workbook_ref()
         .sheet(SheetSelector::name(sheet_name))?
         .ok_or_else(|| io::Error::other("Numbers facade has no expected sheet"))?;
     let table = sheet
@@ -169,7 +169,7 @@ fn table_header_transaction_reaches_numbers_facade() -> Result<(), Box<dyn std::
 #[test]
 fn table_cell_reads_reach_numbers_facade() -> Result<(), Box<dyn std::error::Error>> {
     use litchi::numbers::table::{
-        CellPosition, CellRange,
+        Area, At,
         cells::{Error, LimitKind, Path, State, Storage},
     };
 
@@ -180,7 +180,7 @@ fn table_cell_reads_reach_numbers_facade() -> Result<(), Box<dyn std::error::Err
     assert_send_sync::<Path>();
 
     let package = Package::open(fixture_path())?;
-    let b2 = CellPosition::from_a1("B2")?;
+    let b2 = At::from_a1("B2")?;
     let text_by_index = package.table_cell(SheetSelector::index(0), TableSelector::index(0), b2)?;
     let text_by_name = package.table_cell(
         SheetSelector::name("Sheet 1"),
@@ -195,11 +195,11 @@ fn table_cell_reads_reach_numbers_facade() -> Result<(), Box<dyn std::error::Err
     let range = package.table_cells(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellRange::from_a1("B2:B3")?,
+        Area::from_a1("B2:B3")?,
     )?;
     assert_eq!(range.len(), 2);
     assert_eq!(range[0], text_by_index);
-    assert_eq!(range[1].position(), CellPosition::from_a1("B3")?);
+    assert_eq!(range[1].position(), At::from_a1("B3")?);
     assert!(matches!(range[1].storage(), Storage::Stored(_)));
 
     let state_debug = format!("{text_by_index:?}");
@@ -212,10 +212,13 @@ fn table_cell_reads_reach_numbers_facade() -> Result<(), Box<dyn std::error::Err
         .table_cell(
             "private missing sheet selector",
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )
         .expect_err("a missing selector must fail without exposing its text");
-    assert!(matches!(error, Error::SheetNotFound));
+    assert!(matches!(
+        error,
+        Error::Refused(litchi::numbers::table::cells::Refusal::SheetNotFound)
+    ));
     let error_debug = format!("{error:?}");
     assert!(!error_debug.contains("private missing sheet selector"));
     assert!(!error_debug.contains("identifier"));
@@ -243,9 +246,9 @@ fn table_title_transaction_reaches_numbers_facade() -> Result<(), Box<dyn std::e
     let table = TableSelector::index(0);
     let before = package.table_title_settings(sheet, table)?;
 
-    let edit = package.edit_table_title(sheet, table)?;
-    assert_eq!(edit.path(), Path::Table { sheet: 0, table: 0 });
-    assert_eq!(edit.settings(), before);
+    let mut edit = package.edit_table_title(sheet, table)?;
+    assert_eq!(edit.path()?, Path::Table { sheet: 0, table: 0 });
+    assert_eq!(edit.settings()?, before);
     let edit_debug = format!("{edit:?}");
     assert!(edit_debug.contains("Table { sheet: 0, table: 0 }"));
     assert!(!edit_debug.contains("Sheet 1"));

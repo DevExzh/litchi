@@ -3,10 +3,6 @@
     reason = "items remain grouped by OOXML schema family and package lifecycle"
 )]
 #![expect(
-    clippy::module_name_repetitions,
-    reason = "public names retain established OOXML facade terminology"
-)]
-#![expect(
     clippy::shadow_reuse,
     reason = "parser bindings are intentionally refined after validation"
 )]
@@ -16,11 +12,11 @@
 )]
 //! Typed `WordprocessingML` tracked-change authoring.
 
-use super::content_control::MutableContentControl;
-use super::field::MutableField;
-use super::hyperlink::MutableHyperlink;
-use super::paragraph::{MutableParagraph, ParagraphElement, ParagraphProperties};
-use super::run::{MutableRun, RunProperties};
+use super::content_control::ContentControl;
+use super::field::Field;
+use super::hyperlink::Hyperlink;
+use super::paragraph::{Paragraph, ParagraphElement, ParagraphProperties};
+use super::run::{Run, RunProperties};
 use crate::error::{Error, Result};
 use crate::revision::WORD_2023_DATE_UTC_NAMESPACE;
 use crate::revision::conflict::Metadata as ConflictMetadata;
@@ -313,7 +309,7 @@ fn validate_nonempty_xml(label: &str, value: &str) -> Result<()> {
     Ok(())
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum RevisionChild {
     Element(ParagraphElement),
     CommentRangeStart(u32),
@@ -322,26 +318,26 @@ enum RevisionChild {
     ContentControl(RevisionContentControl),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RevisionContentControl {
-    control: MutableContentControl,
+    control: ContentControl,
     elements: Vec<ParagraphElement>,
 }
 
 impl RevisionContentControl {
-    pub fn add_run(&mut self) -> &mut MutableRun {
-        self.elements.push(ParagraphElement::Run(MutableRun::new()));
+    pub fn add_run(&mut self) -> &mut Run {
+        self.elements.push(ParagraphElement::Run(Run::new()));
         match self.elements.last_mut() {
             Some(ParagraphElement::Run(run)) => run,
             _ => unreachable!(),
         }
     }
-    pub fn add_run_with_text(&mut self, text: &str) -> &mut MutableRun {
+    pub fn add_run_with_text(&mut self, text: &str) -> &mut Run {
         let run = self.add_run();
         run.set_text(text);
         run
     }
-    pub fn add_field(&mut self, field: MutableField) -> &mut Self {
+    pub fn add_field(&mut self, field: Field) -> &mut Self {
         self.elements.push(ParagraphElement::Field(field));
         self
     }
@@ -356,7 +352,7 @@ impl RevisionContentControl {
         for e in &self.elements {
             e.write_placeholder_mode(xml, hi, ii, mode)?;
         }
-        xml.push_str(MutableContentControl::to_xml_end());
+        xml.push_str(ContentControl::to_xml_end());
         Ok(())
     }
     fn write_with_rels(
@@ -371,13 +367,13 @@ impl RevisionContentControl {
         for e in &self.elements {
             e.write_with_rels_mode(xml, mapper, hi, ii, mode)?;
         }
-        xml.push_str(MutableContentControl::to_xml_end());
+        xml.push_str(ContentControl::to_xml_end());
         Ok(())
     }
 }
 
-#[derive(Debug)]
-pub struct MutableRevision {
+#[derive(Debug, Clone)]
+pub struct Revision {
     kind: RevisionKind,
     metadata: RevisionMetadata,
     children: Vec<RevisionChild>,
@@ -385,17 +381,17 @@ pub struct MutableRevision {
 
 /// Mutable Word 2010 inline conflict content.
 ///
-/// The legal child surface intentionally mirrors [`MutableRevision`]. Nested
+/// The legal child surface intentionally mirrors [`Revision`]. Nested
 /// revision or conflict wrappers are not exposed because `WordprocessingML` does
 /// not permit those wrappers in this context.
-#[derive(Debug)]
-pub struct MutableConflict {
+#[derive(Debug, Clone)]
+pub struct Conflict {
     kind: ConflictKind,
     metadata: ConflictMetadata,
     children: Vec<RevisionChild>,
 }
 
-impl MutableConflict {
+impl Conflict {
     ///
     /// # Errors
     ///
@@ -424,18 +420,16 @@ impl MutableConflict {
         self.children.len()
     }
 
-    pub fn add_run(&mut self) -> &mut MutableRun {
+    pub fn add_run(&mut self) -> &mut Run {
         self.children
-            .push(RevisionChild::Element(ParagraphElement::Run(
-                MutableRun::new(),
-            )));
+            .push(RevisionChild::Element(ParagraphElement::Run(Run::new())));
         match self.children.last_mut() {
             Some(RevisionChild::Element(ParagraphElement::Run(run))) => run,
             _ => unreachable!(),
         }
     }
 
-    pub fn add_run_with_text(&mut self, text: &str) -> &mut MutableRun {
+    pub fn add_run_with_text(&mut self, text: &str) -> &mut Run {
         let run = self.add_run();
         run.set_text(text);
         run
@@ -444,7 +438,7 @@ impl MutableConflict {
     pub fn add_bookmark_start(&mut self, id: u32, name: &str) -> &mut Self {
         self.children
             .push(RevisionChild::Element(ParagraphElement::BookmarkStart(
-                super::bookmark::MutableBookmark::new(id, name.to_owned()),
+                super::bookmark::Bookmark::new(id, name.to_owned()),
             )));
         self
     }
@@ -525,14 +519,14 @@ impl MutableConflict {
 ///
 /// The matching end marker is generated from the start metadata, so callers
 /// cannot create an orphan or mismatched marker through this API.
-#[derive(Debug)]
-pub struct MutableCustomXmlConflictRange {
+#[derive(Debug, Clone)]
+pub struct CustomXmlConflictRange {
     kind: ConflictKind,
     metadata: ConflictMetadata,
     children: Vec<RevisionChild>,
 }
 
-impl MutableCustomXmlConflictRange {
+impl CustomXmlConflictRange {
     ///
     /// # Errors
     ///
@@ -561,18 +555,16 @@ impl MutableCustomXmlConflictRange {
         self.children.len()
     }
 
-    pub fn add_run(&mut self) -> &mut MutableRun {
+    pub fn add_run(&mut self) -> &mut Run {
         self.children
-            .push(RevisionChild::Element(ParagraphElement::Run(
-                MutableRun::new(),
-            )));
+            .push(RevisionChild::Element(ParagraphElement::Run(Run::new())));
         match self.children.last_mut() {
             Some(RevisionChild::Element(ParagraphElement::Run(run))) => run,
             _ => unreachable!(),
         }
     }
 
-    pub fn add_run_with_text(&mut self, text: &str) -> &mut MutableRun {
+    pub fn add_run_with_text(&mut self, text: &str) -> &mut Run {
         let run = self.add_run();
         run.set_text(text);
         run
@@ -581,7 +573,7 @@ impl MutableCustomXmlConflictRange {
     pub fn add_bookmark_start(&mut self, id: u32, name: &str) -> &mut Self {
         self.children
             .push(RevisionChild::Element(ParagraphElement::BookmarkStart(
-                super::bookmark::MutableBookmark::new(id, name.to_owned()),
+                super::bookmark::Bookmark::new(id, name.to_owned()),
             )));
         self
     }
@@ -706,7 +698,7 @@ pub(crate) fn write_conflict_attributes(
     Ok(())
 }
 
-impl MutableRevision {
+impl Revision {
     #[must_use]
     pub fn new(kind: RevisionKind, metadata: RevisionMetadata) -> Self {
         Self {
@@ -727,32 +719,30 @@ impl MutableRevision {
     pub fn child_count(&self) -> usize {
         self.children.len()
     }
-    pub fn add_run(&mut self) -> &mut MutableRun {
+    pub fn add_run(&mut self) -> &mut Run {
         self.children
-            .push(RevisionChild::Element(ParagraphElement::Run(
-                MutableRun::new(),
-            )));
+            .push(RevisionChild::Element(ParagraphElement::Run(Run::new())));
         match self.children.last_mut() {
             Some(RevisionChild::Element(ParagraphElement::Run(run))) => run,
             _ => unreachable!(),
         }
     }
-    pub fn add_run_with_text(&mut self, text: &str) -> &mut MutableRun {
+    pub fn add_run_with_text(&mut self, text: &str) -> &mut Run {
         let run = self.add_run();
         run.set_text(text);
         run
     }
-    pub fn add_hyperlink(&mut self, url: &str, text: &str) -> &mut MutableHyperlink {
+    pub fn add_hyperlink(&mut self, url: &str, text: &str) -> &mut Hyperlink {
         self.children
             .push(RevisionChild::Element(ParagraphElement::Hyperlink(
-                MutableHyperlink::new(url, text),
+                Hyperlink::new(url, text),
             )));
         match self.children.last_mut() {
             Some(RevisionChild::Element(ParagraphElement::Hyperlink(link))) => link,
             _ => unreachable!(),
         }
     }
-    pub fn add_field(&mut self, field: MutableField) -> &mut Self {
+    pub fn add_field(&mut self, field: Field) -> &mut Self {
         self.children
             .push(RevisionChild::Element(ParagraphElement::Field(field)));
         self
@@ -760,7 +750,7 @@ impl MutableRevision {
     pub fn add_bookmark_start(&mut self, id: u32, name: &str) -> &mut Self {
         self.children
             .push(RevisionChild::Element(ParagraphElement::BookmarkStart(
-                super::bookmark::MutableBookmark::new(id, name.to_owned()),
+                super::bookmark::Bookmark::new(id, name.to_owned()),
             )));
         self
     }
@@ -781,10 +771,7 @@ impl MutableRevision {
         self.children.push(RevisionChild::CommentReference(id));
         self
     }
-    pub fn add_content_control(
-        &mut self,
-        control: MutableContentControl,
-    ) -> &mut RevisionContentControl {
+    pub fn add_content_control(&mut self, control: ContentControl) -> &mut RevisionContentControl {
         self.children
             .push(RevisionChild::ContentControl(RevisionContentControl {
                 control,
@@ -799,7 +786,7 @@ impl MutableRevision {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn add_revision(&mut self, _nested: MutableRevision) -> Result<&mut Self> {
+    pub fn add_revision(&mut self, _nested: Revision) -> Result<&mut Self> {
         Err(Error::InvalidFormat(
             "nested WordprocessingML revision wrappers are not supported".into(),
         ))
@@ -941,7 +928,7 @@ pub(crate) struct RunPropertyChange {
     previous: RunProperties,
 }
 impl RunPropertyChange {
-    pub(crate) fn snapshot(metadata: RevisionMetadata, previous: &MutableRun) -> Self {
+    pub(crate) fn snapshot(metadata: RevisionMetadata, previous: &Run) -> Self {
         Self {
             metadata,
             previous: previous.properties.clone(),
@@ -964,7 +951,7 @@ pub(crate) struct ParagraphPropertyChange {
     previous: ParagraphProperties,
 }
 impl ParagraphPropertyChange {
-    pub(crate) fn snapshot(metadata: RevisionMetadata, previous: &MutableParagraph) -> Self {
+    pub(crate) fn snapshot(metadata: RevisionMetadata, previous: &Paragraph) -> Self {
         Self {
             metadata,
             style: previous.style.clone(),
@@ -990,7 +977,7 @@ impl ParagraphPropertyChange {
 mod tests {
     use super::*;
     use crate::OfficeMath;
-    use crate::paragraph::Paragraph;
+    use crate::paragraph::Paragraph as ReadParagraph;
     use crate::revision::RevisionType;
     use crate::revision::conflict::Id as ConflictId;
     fn md(id: &str) -> RevisionMetadata {
@@ -1009,7 +996,7 @@ mod tests {
     }
     #[test]
     fn wrappers_escape_delete_and_round_trip() {
-        let mut p = MutableParagraph::new();
+        let mut p = Paragraph::new();
         for (i, k) in [
             RevisionKind::Insert,
             RevisionKind::Delete,
@@ -1027,7 +1014,7 @@ mod tests {
         assert_eq!(x.matches("<w:delText").count(), 2);
         assert!(x.contains("A &amp; B"));
         assert!(x.contains("u&lt;&amp;&quot;1"));
-        let r = Paragraph::new(x.into_bytes()).revisions().unwrap();
+        let r = ReadParagraph::new(x.into_bytes()).revisions().unwrap();
         assert_eq!(r.len(), 4);
         assert_eq!(r[0].revision_type(), RevisionType::Insert);
         assert_eq!(r[1].revision_type(), RevisionType::Delete);
@@ -1056,7 +1043,7 @@ mod tests {
         metadata
             .set_date_utc(Some("2026-07-17T00:00:00.123456+00:00"))
             .unwrap();
-        let mut paragraph = MutableParagraph::new();
+        let mut paragraph = Paragraph::new();
         paragraph
             .add_revision(RevisionKind::Insert, metadata)
             .add_run_with_text("inserted");
@@ -1074,7 +1061,7 @@ mod tests {
             )
         );
 
-        let revisions = Paragraph::new(xml.into_bytes()).revisions().unwrap();
+        let revisions = ReadParagraph::new(xml.into_bytes()).revisions().unwrap();
         assert_eq!(revisions.len(), 1);
         assert_eq!(
             revisions[0].date_utc(),
@@ -1083,9 +1070,9 @@ mod tests {
     }
     #[test]
     fn deleted_fields_use_deleted_elements() {
-        let mut p = MutableParagraph::new();
+        let mut p = Paragraph::new();
         p.add_revision(RevisionKind::Delete, md("1"))
-            .add_field(MutableField::with_result("REF A".into(), "old".into()));
+            .add_field(Field::with_result("REF A".into(), "old".into()));
         let mut x = String::new();
         p.to_xml(&mut x).unwrap();
         assert!(x.contains("<w:delInstrText>REF A</w:delInstrText>"));
@@ -1093,13 +1080,13 @@ mod tests {
     }
     #[test]
     fn property_changes_are_last() {
-        let mut oldr = MutableRun::new();
+        let mut oldr = Run::new();
         oldr.bold(true).font_name("Old");
-        let mut p = MutableParagraph::new();
+        let mut p = Paragraph::new();
         p.add_run_with_text("n")
             .italic(true)
             .set_property_change(md("2"), &oldr);
-        let mut oldp = MutableParagraph::new();
+        let mut oldp = Paragraph::new();
         oldp.set_alignment(crate::ParagraphAlignment::Center);
         p.set_property_change(md("3"), &oldp);
         let mut x = String::new();
@@ -1110,21 +1097,21 @@ mod tests {
     }
     #[test]
     fn rejects_nested_atomically() {
-        let mut a = MutableRevision::new(RevisionKind::Insert, md("1"));
+        let mut a = Revision::new(RevisionKind::Insert, md("1"));
         a.add_run_with_text("x");
         let n = a.child_count();
         assert!(
-            a.add_revision(MutableRevision::new(RevisionKind::Insert, md("2")))
+            a.add_revision(Revision::new(RevisionKind::Insert, md("2")))
                 .is_err()
         );
         assert_eq!(a.child_count(), n);
     }
     #[test]
     fn legal_anchors_controls_and_strict_context() {
-        let mut p = MutableParagraph::new();
+        let mut p = Paragraph::new();
         let r = p.add_revision(RevisionKind::Insert, md("1"));
         r.add_bookmark_start(4, "b").add_comment_range_start(7);
-        r.add_content_control(MutableContentControl::plain_text(9, Some("t")))
+        r.add_content_control(ContentControl::plain_text(9, Some("t")))
             .add_run_with_text("v");
         r.add_comment_range_end(7)
             .add_comment_reference(7)
@@ -1136,12 +1123,18 @@ mod tests {
         );
         assert!(strict.contains("<w:ins"));
         assert!(strict.contains("<w:sdt>"));
-        assert_eq!(Paragraph::new(x.into_bytes()).revisions().unwrap().len(), 1);
+        assert_eq!(
+            ReadParagraph::new(x.into_bytes())
+                .revisions()
+                .unwrap()
+                .len(),
+            1
+        );
     }
 
     #[test]
     fn writes_inline_conflicts_with_mode_and_mc_context() {
-        let mut paragraph = MutableParagraph::new();
+        let mut paragraph = Paragraph::new();
         paragraph.extension_values.set_no_spell_err(Some(true));
         paragraph
             .add_conflict(ConflictKind::Insert, conflict_md(20))
@@ -1180,7 +1173,7 @@ mod tests {
 
     #[test]
     fn writes_custom_xml_conflict_range_as_atomic_pair() {
-        let mut paragraph = MutableParagraph::new();
+        let mut paragraph = Paragraph::new();
         paragraph
             .add_custom_xml_conflict_range(ConflictKind::Delete, conflict_md(42))
             .unwrap()
@@ -1199,7 +1192,7 @@ mod tests {
 
     #[test]
     fn conflict_metadata_uses_full_signed_domain_and_additions_are_atomic() {
-        let mut paragraph = MutableParagraph::new();
+        let mut paragraph = Paragraph::new();
         paragraph.add_run_with_text("keep");
         let count = paragraph.element_count();
         let mut invalid_author = conflict_md(1);
@@ -1234,7 +1227,7 @@ mod tests {
 
     #[test]
     fn rejects_active_or_opaque_conflict_runs_before_emission() {
-        let mut field = MutableParagraph::new();
+        let mut field = Paragraph::new();
         field
             .add_conflict(ConflictKind::Insert, conflict_md(30))
             .unwrap()
@@ -1248,7 +1241,7 @@ mod tests {
             "<m:oMath xmlns:m=\"http://schemas.openxmlformats.org/officeDocument/2006/math\"><foreign:opaque xmlns:foreign=\"urn:litchi:test\"/></m:oMath>",
         )
         .unwrap();
-        let mut range = MutableParagraph::new();
+        let mut range = Paragraph::new();
         range
             .add_custom_xml_conflict_range(ConflictKind::Delete, conflict_md(31))
             .unwrap()
@@ -1258,7 +1251,7 @@ mod tests {
         assert!(range.to_xml(&mut xml).is_err());
         assert_eq!(xml, "unchanged");
 
-        let mut note = MutableParagraph::new();
+        let mut note = Paragraph::new();
         note.add_conflict(ConflictKind::Insert, conflict_md(32))
             .unwrap()
             .add_run()

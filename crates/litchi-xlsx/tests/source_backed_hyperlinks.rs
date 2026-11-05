@@ -16,9 +16,7 @@ use litchi_core::{
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcError, OpcPackage, PackURI};
 use litchi_xlsx::{
-    Error, Hyperlink, HyperlinkReference, Package, ReadLimits, SourceBackedHyperlinkCommit,
-    SourceBackedHyperlinkEdit, SourceBackedHyperlinkEditor, SourceBackedHyperlinkPatch,
-    SourceBackedHyperlinkSnapshot,
+    Error, Hyperlink, HyperlinkReference, Package, SourceBackedWorkbook, SourceLimits,
 };
 use soapberry_zip::{PreservationIndex, ZipArchive};
 
@@ -116,7 +114,12 @@ struct RawMember {
 fn raw_members(bytes: &[u8]) -> BTreeMap<String, RawMember> {
     let archive = ZipArchive::from_slice(bytes).unwrap().into_zip_archive();
     let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+    let index = PreservationIndex::new(
+        &archive,
+        &mut buffer,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
     let mut records = archive.entries(&mut buffer);
     index
         .entries()
@@ -246,7 +249,9 @@ fn fixture_with_sheet(sheet_xml: String, signed: bool) -> Vec<u8> {
         drawing = rt::DRAWING,
     );
 
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .unwrap();
@@ -295,11 +300,9 @@ fn fixture(signed: bool) -> Vec<u8> {
 }
 
 fn eager_links(bytes: &[u8]) -> Vec<Hyperlink> {
-    let workbook = Package::from_bytes(bytes.to_vec())
-        .unwrap()
-        .into_workbook()
-        .unwrap();
+    let workbook = Package::from_bytes(bytes).unwrap();
     workbook
+        .workbook_ref()
         .sheet("Sheet1")
         .unwrap()
         .unwrap()
@@ -308,8 +311,9 @@ fn eager_links(bytes: &[u8]) -> Vec<Hyperlink> {
 }
 
 fn eager_links_from_opc(package: OpcPackage) -> Vec<Hyperlink> {
-    let workbook = Package::from_opc(package).unwrap().into_workbook().unwrap();
+    let workbook = Package::from_opc(package).unwrap();
     workbook
+        .workbook_ref()
         .sheet("Sheet1")
         .unwrap()
         .unwrap()
@@ -317,16 +321,16 @@ fn eager_links_from_opc(package: OpcPackage) -> Vec<Hyperlink> {
         .unwrap()
 }
 
-fn source_links(snapshot: &SourceBackedHyperlinkSnapshot) -> Vec<Hyperlink> {
+fn source_links(snapshot: &litchi_xlsx::hyperlinks::Snapshot) -> Vec<Hyperlink> {
     snapshot.hyperlinks().to_vec()
 }
 
-fn stage_change(edit: &mut SourceBackedHyperlinkEdit) {
-    edit.put_hyperlink(internal("B2", "Sheet1!D4", Some("added"), None))
+fn stage_change(edit: &mut litchi_xlsx::hyperlinks::source::Edit) {
+    edit.put(internal("B2", "Sheet1!D4", Some("added"), None))
         .unwrap();
-    edit.replace_hyperlink(internal("A1", "Sheet1!C3", Some("replaced"), Some("tip")))
+    edit.put(internal("A1", "Sheet1!C3", Some("replaced"), Some("tip")))
         .unwrap();
-    edit.put_hyperlink(external(
+    edit.put(external(
         "C3",
         EXTERNAL_TARGET,
         Some("updated remote"),
@@ -334,25 +338,26 @@ fn stage_change(edit: &mut SourceBackedHyperlinkEdit) {
     ))
     .unwrap();
     assert!(
-        edit.remove_hyperlink(HyperlinkReference::new("B2").unwrap())
+        edit.remove(HyperlinkReference::new("B2").unwrap())
             .unwrap()
             .is_some()
     );
 }
 
-fn changed_commit(editor: &SourceBackedHyperlinkEditor) -> SourceBackedHyperlinkCommit {
-    let mut edit = editor.edit("Sheet1").unwrap();
+fn changed_edit(editor: &SourceBackedWorkbook) -> litchi_xlsx::hyperlinks::source::Edit {
+    let mut edit = editor.edit_hyperlinks("Sheet1").unwrap();
     stage_change(&mut edit);
-    let commit = edit.commit().unwrap();
-    assert!(commit.changed());
+    edit
+}
+
+fn changed_commit(editor: &SourceBackedWorkbook) -> litchi_xlsx::hyperlinks::source::Commit {
+    let commit = changed_edit(editor).commit().unwrap();
+    assert!(commit.diagnostics().changed());
     commit
 }
 
 fn eager_changed_links(bytes: &[u8]) -> Vec<Hyperlink> {
-    let workbook = Package::from_bytes(bytes.to_vec())
-        .unwrap()
-        .into_workbook()
-        .unwrap();
+    let workbook = Package::from_bytes(bytes).unwrap();
     let mut edit = workbook.edit().unwrap();
     {
         let mut sheet = edit.sheet("Sheet1").unwrap().unwrap();
@@ -360,10 +365,10 @@ fn eager_changed_links(bytes: &[u8]) -> Vec<Hyperlink> {
             .put_hyperlink(internal("B2", "Sheet1!D4", Some("added"), None))
             .unwrap();
         sheet
-            .replace_hyperlink(internal("A1", "Sheet1!C3", Some("replaced"), Some("tip")))
+            .put_hyperlink(internal("A1", "Sheet1!C3", Some("replaced"), Some("tip")))
             .unwrap();
         sheet
-            .replace_hyperlink(external(
+            .put_hyperlink(external(
                 "C3",
                 EXTERNAL_TARGET,
                 Some("updated remote"),
@@ -377,8 +382,9 @@ fn eager_changed_links(bytes: &[u8]) -> Vec<Hyperlink> {
                 .is_some()
         );
     }
-    let committed = edit.commit().unwrap().into_workbook();
+    let committed = edit.commit().unwrap().into_package();
     committed
+        .workbook_ref()
         .sheet("Sheet1")
         .unwrap()
         .unwrap()
@@ -387,7 +393,7 @@ fn eager_changed_links(bytes: &[u8]) -> Vec<Hyperlink> {
 }
 
 fn part_len(bytes: &[u8], member: &str) -> u64 {
-    OpcPackage::from_bytes(bytes)
+    OpcPackage::from_bytes(bytes, SourceLimits::default())
         .unwrap()
         .get_part(&PackURI::new(member).unwrap())
         .unwrap()
@@ -417,8 +423,11 @@ fn internal_edits_and_external_metadata_match_eager_semantics_and_stay_local() {
     let source_bytes = fixture(false);
     let eager_before = eager_links(&source_bytes);
     let source = Arc::new(CountingSource::new(source_bytes.clone()));
-    let editor = SourceBackedHyperlinkEditor::from_read_at(source.clone()).unwrap();
-    let before = editor.snapshot("Sheet1").unwrap();
+    let editor = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let before = editor
+        .edit_hyperlinks("Sheet1")
+        .map(|edit| edit.before().clone())
+        .unwrap();
     assert_eq!(source_links(&before), eager_before);
     assert_eq!(
         source.second_body_marker_reads.load(Ordering::SeqCst),
@@ -428,7 +437,7 @@ fn internal_edits_and_external_metadata_match_eager_semantics_and_stay_local() {
 
     let commit = changed_commit(&editor);
     assert_eq!(
-        source_links(commit.snapshot()),
+        source_links(commit.patch().after()),
         eager_changed_links(&source_bytes)
     );
     assert_eq!(
@@ -438,64 +447,61 @@ fn internal_edits_and_external_metadata_match_eager_semantics_and_stay_local() {
     );
 
     let mut output = Vec::new();
-    editor
-        .publish_commit_to_stream(&mut output, &commit)
-        .unwrap();
-    assert_eq!(eager_links(&output), source_links(commit.snapshot()));
+    commit.package().write_to(&mut output).unwrap();
+    assert_eq!(eager_links(&output), source_links(commit.patch().after()));
 }
 
 #[test]
 fn exact_noop_including_signed_source_bytes_and_changed_signed_source_refusal() {
     for signed in [false, true] {
         let source_bytes = fixture(signed);
-        let editor = SourceBackedHyperlinkEditor::from_read_at(Arc::new(CountingSource::new(
-            source_bytes.clone(),
-        )))
-        .unwrap();
-        let noop = editor.edit("Sheet1").unwrap().commit().unwrap();
-        assert!(!noop.changed());
-        assert!(noop.patch().is_empty());
+        let editor =
+            SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(source_bytes.clone())))
+                .unwrap();
+        let noop = editor.edit_hyperlinks("Sheet1").unwrap().commit().unwrap();
+        assert!(!noop.diagnostics().changed());
+        assert!(noop.patch().is_noop());
         let mut output = Vec::new();
-        editor.publish_commit_to_stream(&mut output, &noop).unwrap();
+        noop.package().write_to(&mut output).unwrap();
         assert_eq!(output, source_bytes);
     }
 
     let source_bytes = fixture(true);
     let editor =
-        SourceBackedHyperlinkEditor::from_read_at(Arc::new(CountingSource::new(source_bytes)))
-            .unwrap();
-    let mut edit = editor.edit("Sheet1").unwrap();
-    edit.put_hyperlink(internal("D4", "Sheet1!D4", None, None))
-        .unwrap();
-    let commit = edit.commit().unwrap();
-    let mut output = Vec::new();
+        SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(source_bytes))).unwrap();
+    let mut edit = editor.edit_hyperlinks("Sheet1").unwrap();
+    edit.put(internal("D4", "Sheet1!D4", None, None)).unwrap();
+    // A changed edit of a signed source is refused at commit.
     assert!(matches!(
-        editor.publish_commit_to_stream(&mut output, &commit),
+        edit.commit(),
         Err(Error::Package(OpcError::SignedSourceRequiresExplicitPolicy))
     ));
-    assert!(output.is_empty());
 }
 
 #[test]
 fn patch_forward_inverse_restore_exact_worksheet_and_relationships_and_reject_stale_foreign() {
     let source_bytes = fixture(false);
-    let editor = SourceBackedHyperlinkEditor::from_read_at(Arc::new(CountingSource::new(
-        source_bytes.clone(),
-    )))
-    .unwrap();
+    let editor =
+        SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(source_bytes.clone())))
+            .unwrap();
     let commit = changed_commit(&editor);
-    let patch: &SourceBackedHyperlinkPatch = commit.patch();
+    let patch: &litchi_xlsx::hyperlinks::source::Patch = commit.patch();
 
-    let mut replay = OpcPackage::from_bytes(&source_bytes).unwrap();
+    let original = OpcPackage::from_bytes(&source_bytes, SourceLimits::default()).unwrap();
     let sheet_uri = PackURI::new(SHEET).unwrap();
-    let before_sheet = replay.get_part(&sheet_uri).unwrap().blob().to_vec();
-    let before_relationships = relationship_signatures(replay.get_part(&sheet_uri).unwrap().rels());
-    patch.apply(&mut replay).unwrap();
+    let before_sheet = original.get_part(&sheet_uri).unwrap().blob().to_vec();
+    let before_relationships =
+        relationship_signatures(original.get_part(&sheet_uri).unwrap().rels());
+    // Replay onto a second open of the source bytes, then invert onto a
+    // reopened copy of the output.
+    let forward = replay_bytes(&source_bytes, patch).unwrap();
+    let replay = OpcPackage::from_bytes(&forward, SourceLimits::default()).unwrap();
     assert_eq!(
         eager_links_from_opc(replay.clone()),
-        source_links(commit.snapshot())
+        source_links(commit.patch().after())
     );
-    patch.inverse().apply(&mut replay).unwrap();
+    let restored = replay_bytes(&forward, &patch.inverse()).unwrap();
+    let replay = OpcPackage::from_bytes(&restored, SourceLimits::default()).unwrap();
     assert_eq!(replay.get_part(&sheet_uri).unwrap().blob(), before_sheet);
     assert_eq!(
         relationship_signatures(replay.get_part(&sheet_uri).unwrap().rels()),
@@ -503,19 +509,18 @@ fn patch_forward_inverse_restore_exact_worksheet_and_relationships_and_reject_st
     );
 
     let source = Arc::new(CountingSource::new(source_bytes.clone()));
-    let editor = SourceBackedHyperlinkEditor::from_read_at(source.clone()).unwrap();
+    let editor = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
     let commit = changed_commit(&editor);
     source.changed();
     let mut output = Vec::new();
     assert!(matches!(
-        editor.publish_commit_to_stream(&mut output, &commit),
+        commit.package().write_to(&mut output),
         Err(Error::Package(OpcError::SourceChanged { .. }))
     ));
     assert!(output.is_empty());
 
     let editor =
-        SourceBackedHyperlinkEditor::from_read_at(Arc::new(CountingSource::new(source_bytes)))
-            .unwrap();
+        SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(source_bytes))).unwrap();
     let commit = changed_commit(&editor);
     let foreign = fixture_with_sheet(
         format!(
@@ -524,29 +529,24 @@ fn patch_forward_inverse_restore_exact_worksheet_and_relationships_and_reject_st
         false,
     );
     let foreign_editor =
-        SourceBackedHyperlinkEditor::from_read_at(Arc::new(CountingSource::new(foreign))).unwrap();
-    let mut output = Vec::new();
-    assert!(matches!(
-        foreign_editor.publish_commit_to_stream(&mut output, &commit),
-        Err(Error::PatchConflict { .. })
-    ));
-    assert!(output.is_empty());
+        SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(foreign))).unwrap();
+    // A replay compares content (record 0360): the foreign worksheet does not
+    // hold the patch's before state (it does not even load as one).
+    assert!(foreign_editor.apply_hyperlinks(commit.patch()).is_err());
 }
 
 #[test]
 fn changed_publication_raw_preserves_relationships_and_unselected_members() {
     let source_bytes = fixture(false);
     let source = Arc::new(CountingSource::new(source_bytes.clone()));
-    let editor = SourceBackedHyperlinkEditor::from_read_at(source.clone()).unwrap();
+    let editor = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
     let commit = changed_commit(&editor);
     assert_eq!(source.second_body_marker_reads.load(Ordering::SeqCst), 0);
 
     let mut output = Vec::new();
-    editor
-        .publish_commit_to_stream(&mut output, &commit)
-        .unwrap();
-    let source_package = OpcPackage::from_bytes(&source_bytes).unwrap();
-    let output_package = OpcPackage::from_bytes(&output).unwrap();
+    commit.package().write_to(&mut output).unwrap();
+    let source_package = OpcPackage::from_bytes(&source_bytes, SourceLimits::default()).unwrap();
+    let output_package = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
     assert_eq!(source_package.part_count(), output_package.part_count());
     for source_part in source_package
         .try_iter_parts()
@@ -585,19 +585,16 @@ fn changed_publication_raw_preserves_relationships_and_unselected_members() {
 #[test]
 fn relationship_changes_and_opaque_owners_refuse_before_output() {
     let editor =
-        SourceBackedHyperlinkEditor::from_read_at(Arc::new(CountingSource::new(fixture(false))))
-            .unwrap();
-    let mut edit = editor.edit("Sheet1").unwrap();
+        SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(fixture(false)))).unwrap();
+    let mut edit = editor.edit_hyperlinks("Sheet1").unwrap();
     let baseline = edit.values().unwrap();
-    edit.remove_hyperlink(HyperlinkReference::new("C3").unwrap())
-        .unwrap();
+    edit.remove(HyperlinkReference::new("C3").unwrap()).unwrap();
     assert!(edit.set(baseline).unwrap());
-    assert!(!edit.commit().unwrap().changed());
+    assert!(!edit.commit().unwrap().diagnostics().changed());
 
     let editor =
-        SourceBackedHyperlinkEditor::from_read_at(Arc::new(CountingSource::new(fixture(false))))
-            .unwrap();
-    let mut edit = editor.edit("Sheet1").unwrap();
+        SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(fixture(false)))).unwrap();
+    let mut edit = editor.edit_hyperlinks("Sheet1").unwrap();
     edit.replace_at(
         HyperlinkReference::new("C3").unwrap(),
         external("D4", EXTERNAL_TARGET, Some("moved"), None),
@@ -605,21 +602,19 @@ fn relationship_changes_and_opaque_owners_refuse_before_output() {
     .unwrap();
     let staged = edit.values().unwrap();
     assert!(!edit.set(staged).unwrap());
-    assert!(edit.commit().unwrap().changed());
+    assert!(edit.commit().unwrap().diagnostics().changed());
 
     let editor =
-        SourceBackedHyperlinkEditor::from_read_at(Arc::new(CountingSource::new(fixture(false))))
-            .unwrap();
-    let mut edit = editor.edit("Sheet1").unwrap();
-    edit.put_hyperlink(external("D4", NEW_EXTERNAL_TARGET, None, None))
+        SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(fixture(false)))).unwrap();
+    let mut edit = editor.edit_hyperlinks("Sheet1").unwrap();
+    edit.put(external("D4", NEW_EXTERNAL_TARGET, None, None))
         .unwrap();
     assert!(matches!(edit.commit(), Err(Error::Unsupported { .. })));
 
     let editor =
-        SourceBackedHyperlinkEditor::from_read_at(Arc::new(CountingSource::new(fixture(false))))
-            .unwrap();
-    let mut edit = editor.edit("Sheet1").unwrap();
-    edit.replace_hyperlink(external(
+        SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(fixture(false)))).unwrap();
+    let mut edit = editor.edit_hyperlinks("Sheet1").unwrap();
+    edit.put(external(
         "C3",
         NEW_EXTERNAL_TARGET,
         Some("retargeted"),
@@ -629,11 +624,10 @@ fn relationship_changes_and_opaque_owners_refuse_before_output() {
     assert!(matches!(edit.commit(), Err(Error::Unsupported { .. })));
 
     let editor =
-        SourceBackedHyperlinkEditor::from_read_at(Arc::new(CountingSource::new(fixture(false))))
-            .unwrap();
-    let mut edit = editor.edit("Sheet1").unwrap();
+        SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(fixture(false)))).unwrap();
+    let mut edit = editor.edit_hyperlinks("Sheet1").unwrap();
     assert!(
-        edit.remove_hyperlink(HyperlinkReference::new("C3").unwrap())
+        edit.remove(HyperlinkReference::new("C3").unwrap())
             .unwrap()
             .is_some()
     );
@@ -645,9 +639,11 @@ fn relationship_changes_and_opaque_owners_refuse_before_output() {
         ),
         false,
     );
-    let editor =
-        SourceBackedHyperlinkEditor::from_read_at(Arc::new(CountingSource::new(opaque))).unwrap();
-    assert!(matches!(editor.edit("Sheet1"), Err(Error::Invalid(_))));
+    let editor = SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(opaque))).unwrap();
+    assert!(matches!(
+        editor.edit_hyperlinks("Sheet1"),
+        Err(Error::Invalid(_))
+    ));
 
     let mce = fixture_with_sheet(
         format!(
@@ -655,9 +651,8 @@ fn relationship_changes_and_opaque_owners_refuse_before_output() {
         ),
         false,
     );
-    let editor =
-        SourceBackedHyperlinkEditor::from_read_at(Arc::new(CountingSource::new(mce))).unwrap();
-    assert!(editor.edit("Sheet1").is_err());
+    let editor = SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(mce))).unwrap();
+    assert!(editor.edit_hyperlinks("Sheet1").is_err());
 }
 
 #[test]
@@ -665,14 +660,17 @@ fn managed_limits_cancellation_and_partial_sink_are_typed() {
     let source_bytes = fixture(false);
     let exact = part_len(&source_bytes, MAIN) + part_len(&source_bytes, SHEET);
     let (budget, _cancellation_source, context) = managed_context(exact - 1);
-    let editor = SourceBackedHyperlinkEditor::from_read_at_with_execution_context(
+    let editor = SourceBackedWorkbook::from_read_at_with_options(
         Arc::new(CountingSource::new(source_bytes.clone())),
-        ReadLimits::default(),
-        context,
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     assert!(matches!(
-        editor.snapshot("Sheet1"),
+        editor
+            .edit_hyperlinks("Sheet1")
+            .map(|edit| edit.before().clone()),
         Err(Error::Package(OpcError::Execution(
             ExecutionError::ResourceLimit(_)
         )))
@@ -680,48 +678,62 @@ fn managed_limits_cancellation_and_partial_sink_are_typed() {
     drop(editor);
     assert_eq!(budget.used(Resource::Memory), 0);
 
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_part_bytes(1)
         .unwrap()
         .build()
         .unwrap();
     assert!(matches!(
-        SourceBackedHyperlinkEditor::from_read_at_with_limits(
+        SourceBackedWorkbook::from_read_at_with_options(
             Arc::new(CountingSource::new(source_bytes.clone())),
-            limits,
+            litchi_xlsx::OpenOptions::new().source_limits(limits)
         ),
-        Err(Error::Package(OpcError::ReadLimit { .. }))
+        Err(Error::Package(OpcError::Limit { .. }))
     ));
 
     let (budget, cancellation_source, context) = managed_context(exact);
-    let editor = SourceBackedHyperlinkEditor::from_read_at_with_execution_context(
+    let editor = SourceBackedWorkbook::from_read_at_with_options(
         Arc::new(CountingSource::new(source_bytes.clone())),
-        ReadLimits::default(),
-        context,
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let commit = changed_commit(&editor);
     cancellation_source.cancel();
     let mut output = Vec::new();
     assert!(matches!(
-        editor.publish_commit_to_stream(&mut output, &commit),
+        commit.package().write_to(&mut output),
         Err(Error::Package(OpcError::Cancelled))
     ));
     assert!(output.is_empty());
     drop(commit);
+    assert!(budget.used(Resource::Memory) <= exact);
+    drop(editor);
     assert_eq!(budget.used(Resource::Memory), 0);
 
     let editor =
-        SourceBackedHyperlinkEditor::from_read_at(Arc::new(CountingSource::new(source_bytes)))
-            .unwrap();
+        SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(source_bytes))).unwrap();
     let commit = changed_commit(&editor);
     let mut sink = FailingSink {
         accepted: 0,
         limit: 128,
     };
     assert!(matches!(
-        editor.publish_commit_to_stream(&mut sink, &commit),
+        commit.package().write_to(&mut sink),
         Err(Error::Package(OpcError::IncompleteOutput { .. }))
     ));
     assert_eq!(sink.accepted, 128);
+}
+
+/// Replay a source-backed patch onto a source-backed workbook over `bytes`
+/// and return its output (record 0360).
+fn replay_bytes(
+    bytes: &[u8],
+    patch: &litchi_xlsx::hyperlinks::source::Patch,
+) -> litchi_xlsx::Result<Vec<u8>> {
+    let workbook = SourceBackedWorkbook::from_read_at(Arc::new(litchi_core::OwnedSource::new(
+        bytes.to_vec(),
+    )))?;
+    workbook.apply_hyperlinks(patch)?.into_package().to_bytes()
 }

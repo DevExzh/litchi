@@ -1,0 +1,45 @@
+{
+  "source": "3ae4cb242019625b691d8bbf0b711b131806ba7c",
+  "pid": 2234594,
+  "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation",
+  "command": [
+    "python3",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/run-semantic-checks-disk-guarded.py",
+    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/native-check-v2-commands.json",
+    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/native-check-v2"
+  ],
+  "started_unix_seconds": 1792769713.8240561,
+  "target": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target",
+  "lock_sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--all-targets",
+        "--all-features",
+        "--keep-going",
+        "-p",
+        "litchi-docx",
+        "-p",
+        "litchi-pptx",
+        "-p",
+        "litchi-xlsx",
+        "-p",
+        "litchi-xlsb",
+        "-p",
+        "litchi-ops"
+      ],
+      "exit": 101,
+      "seconds": 125.55505514499964,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/native-check-v2/check-0.log",
+      "bytes": 11078,
+      "sha256": "dd8b66cfc01aba64e79af8d4cc3ebd9f12a84e63e94ca31989a46605309272e7",
+      "target_bytes_before": 215243793,
+      "completed_test_executables_pruned": []
+    }
+  ],
+  "note": "Combined native/facade all-target/all-feature check stopped at OPC metadata-only planner state/required-policy mismatches. Incoming21a37ebfc6 removes that planner and stale state. Native/facade dependent compilation not reached."
+}

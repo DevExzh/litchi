@@ -22,12 +22,11 @@ use std::{
 };
 
 mod lexical;
-mod source_backed;
 mod transaction;
 
-pub use source_backed::{SourceCommit, SourceEdit, SourcePatch, SourceSnapshot};
+pub(crate) use transaction::admit_target;
 pub use transaction::{
-    CachedCell, CachedRow, CachedTable, CachedValue, Commit, Edit, LinkSpec, Patch, SheetSelector,
+    CachedCell, CachedRow, CachedTable, CachedValue, Edit, LinkSpec, SheetSelector,
 };
 
 const OFFICE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -123,7 +122,7 @@ impl From<Error> for CoreError {
                 scope: Arc::from("ods-dde"),
             }),
             Error::ExecutionLimit(limit) => CoreError::ResourceLimit(limit),
-            Error::Cancelled => CoreError::Unsupported("ODS DDE operation cancelled".to_string()),
+            Error::Cancelled => CoreError::Other("ODS DDE operation cancelled".to_string()),
             Error::InvalidXml(message) => CoreError::InvalidFormat(message),
             Error::InvalidStructure(message) => CoreError::InvalidFormat(message),
             Error::PositionOverflow => {
@@ -225,7 +224,7 @@ impl Limits {
         self.depth
     }
 
-    fn validate(self) -> Result<Self> {
+    pub(crate) fn validate(self) -> Result<Self> {
         for (name, value, ceiling) in [
             ("input bytes", self.input_bytes, MAX_INPUT_BYTES),
             ("links", self.links, MAX_LINKS),
@@ -869,7 +868,7 @@ impl Snapshot {
     ///
     /// The context is checked before every parser step and its input, memory,
     /// and work dimensions are charged.  The same budget lineage is required
-    /// again by [`Edit::commit`], so a numerically equivalent unrelated budget
+    /// again when the edit commits, so a numerically equivalent unrelated budget
     /// cannot be substituted for the retained operation context.
     pub fn parse_with_context(
         content_xml: &str,
@@ -1040,6 +1039,11 @@ impl Snapshot {
         &self.content
     }
 
+    /// The retained `content.xml`, shared.
+    pub(crate) fn content_arc(&self) -> &Arc<str> {
+        &self.content
+    }
+
     #[must_use]
     pub fn links(&self) -> &[Link] {
         &self.inventory.links
@@ -1060,7 +1064,7 @@ impl Snapshot {
 
     /// Begin an immutable, source-checked DDE edit.
     #[must_use]
-    pub fn edit(&self) -> Edit {
+    pub(crate) fn edit(&self) -> Edit {
         Edit::new(self.clone())
     }
 

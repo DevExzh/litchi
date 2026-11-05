@@ -96,15 +96,15 @@ fn route_path(message_type: u32) -> Option<&'static [u32]> {
 
 pub(crate) fn component_archives(source: &[u8]) -> TestResult<Vec<(String, Archive)>> {
     let mut archives = Vec::new();
-    for entry in Catalog::from_bytes(source)?.iter() {
+    for entry in Catalog::from_bytes(source, Default::default())?.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = match SnappyStream::decompress(entry.data()) {
+        let stream = match SnappyStream::decompress(entry.data(), Default::default()) {
             Ok(stream) => stream.into_bytes(),
             Err(_) => continue,
         };
-        let archive = match Archive::parse(&stream) {
+        let archive = match Archive::parse(&stream, Default::default()) {
             Ok(archive) => archive,
             Err(_) => continue,
         };
@@ -126,8 +126,8 @@ fn component_containing_object(source: &[u8], identifier: u64) -> TestResult<Loc
 }
 
 fn replace_component(source: &[u8], component_name: &str, archive: Archive) -> TestResult<Vec<u8>> {
-    let bytes = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(source)?;
+    let bytes = SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entries = catalog
         .iter()
         .map(|entry| {
@@ -182,7 +182,7 @@ fn first_slide(source: &[u8]) -> TestResult<(String, u64, Vec<u64>)> {
 fn nested_reference(payload: &[u8], path: &[u32]) -> TestResult<Option<u64>> {
     let mut current = payload;
     for field_number in path {
-        let fields = WireView::parse(current)?
+        let fields = WireView::parse(current, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .filter(|field| field.number() == *field_number)
             .collect::<Vec<_>>();
@@ -197,7 +197,7 @@ fn nested_reference(payload: &[u8], path: &[u32]) -> TestResult<Option<u64>> {
         }
         current = field.payload();
     }
-    let fields = WireView::parse(current)?
+    let fields = WireView::parse(current, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .filter(|field| field.number() == 1)
         .collect::<Vec<_>>();
@@ -290,10 +290,15 @@ fn append_comment_reference(payload: &[u8], path: &[u32], identifier: u64) -> Te
             ..Default::default()
         }
         .encode_to_vec();
-        append_length_delimited_field(&mut output, field_number, &reference)?;
+        append_length_delimited_field(
+            &mut output,
+            field_number,
+            &reference,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         return Ok(output);
     }
-    let fields = WireView::parse(payload)?
+    let fields = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .filter(|field| field.number() == field_number)
         .collect::<Vec<_>>();
@@ -301,11 +306,11 @@ fn append_comment_reference(payload: &[u8], path: &[u32], identifier: u64) -> Te
         return Err(io::Error::other("drawable route has no unique envelope").into());
     }
     let rewritten = append_comment_reference(fields[0].payload(), remainder, identifier)?;
-    Ok(litchi_iwa_common::wire::transform_length_delimited_field(
+    litchi_iwa_common::wire::transform_length_delimited_field(
         payload,
         field_number,
         |_| -> TestResult<Vec<u8>> { Ok(rewritten.clone()) },
-    )?)
+    )
 }
 
 fn attach_comment(source: &[u8], target: &DrawableTarget, comment: u64) -> TestResult<Vec<u8>> {
@@ -339,6 +344,7 @@ fn attach_comment(source: &[u8], target: &DrawableTarget, comment: u64) -> TestR
             type_: target.message_type,
             data: payload,
         },
+        Default::default(),
     )?;
     replace_component(source, &located.component, archive)
 }
@@ -392,13 +398,13 @@ fn add_reply(source: &[u8], target: &DrawableTarget) -> TestResult<(Vec<u8>, u64
 }
 
 fn metadata_payload(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == "Index/Metadata.iwa")
         .ok_or_else(|| io::Error::other("missing metadata component"))?;
-    let stream = SnappyStream::decompress(entry.data())?.into_bytes();
-    let archive = Archive::parse(&stream)?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+    let archive = Archive::parse(&stream, Default::default())?;
     archive
         .objects
         .iter()
@@ -409,13 +415,14 @@ fn metadata_payload(source: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn replace_metadata_payload(source: &[u8], metadata: &tsp::PackageMetadata) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let metadata_entry = catalog
         .iter()
         .find(|entry| entry.name() == "Index/Metadata.iwa")
         .ok_or_else(|| io::Error::other("metadata component disappeared"))?;
-    let metadata_stream = SnappyStream::decompress(metadata_entry.data())?.into_bytes();
-    let mut metadata_archive = Archive::parse(&metadata_stream)?;
+    let metadata_stream =
+        SnappyStream::decompress(metadata_entry.data(), Default::default())?.into_bytes();
+    let mut metadata_archive = Archive::parse(&metadata_stream, Default::default())?;
     let object = metadata_archive
         .objects
         .iter_mut()
@@ -444,7 +451,6 @@ fn register_object_uuid(source: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
     let (_, _, _, comment) = comment_object(source, identifier)?;
     let uuid = comment
         .storage_uuid
-        .clone()
         .ok_or_else(|| io::Error::other("comment object has no storage UUID"))?;
     let mut metadata = tsp::PackageMetadata::decode(metadata_payload(source)?.as_slice())?;
     if metadata
@@ -735,7 +741,7 @@ pub(crate) fn relocate_object(
                 "destination archive {destination_component} missing"
             ))
         })?;
-    destination_archive.insert_object(moved.clone())?;
+    destination_archive.insert_object(moved.clone(), Default::default())?;
     let source_after_insert = replace_component(
         &source_after_remove,
         destination_component,
@@ -910,6 +916,7 @@ fn attach_reply_reference(
             type_: COMMENT_STORAGE_MESSAGE_TYPE,
             data: root.encode_to_vec(),
         },
+        Default::default(),
     )?;
     replace_component(source, &located.component, archive)
 }

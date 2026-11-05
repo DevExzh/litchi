@@ -27,7 +27,7 @@ use litchi_odp::streaming::{
     PlainSlide, PublicationFailureKind, StreamingError, StreamingLimits, XmlAuditLimits,
     stream_plain_slides_to, try_stream_plain_slides_to,
 };
-use litchi_odp::{Builder, Presentation};
+use litchi_odp::{Builder, Package};
 
 const ODP_MIME: &[u8] = b"application/vnd.oasis.opendocument.presentation";
 
@@ -115,7 +115,11 @@ fn control_bytes(specs: &[Spec]) -> Vec<u8> {
             builder.add_slide(body).expect("control body slide");
         }
     }
-    builder.build().expect("control ODP package")
+    builder
+        .build()
+        .expect("control ODP package")
+        .to_bytes()
+        .expect("control ODP package")
 }
 
 fn run(
@@ -197,7 +201,9 @@ fn assert_same_members(actual: &[u8], expected: &[u8]) {
 }
 
 fn reopened_text(bytes: &[u8]) -> Vec<(Option<String>, String)> {
-    Presentation::from_bytes(bytes.to_vec())
+    Package::from_bytes(bytes)
+        .expect("ODP reopens")
+        .presentation()
         .expect("ODP reopens")
         .slides()
         .expect("slides parse")
@@ -325,7 +331,9 @@ fn empty_controls_and_geometry_match_builder_and_reopen() {
         // above preserves that the source CR was emitted as line-break.
         assert_eq!(actual_body, body.replace('\r', "\n"));
     }
-    let pages = Presentation::from_bytes(output.clone())
+    let pages = Package::from_bytes(&output)
+        .expect("reopen")
+        .presentation()
         .expect("reopen")
         .pages()
         .expect("page metadata");
@@ -352,7 +360,9 @@ fn empty_controls_and_geometry_match_builder_and_reopen() {
     assert!(page_fragments(&content_xml(&empty_output)).is_empty());
     assert!(reopened_text(&empty_output).is_empty());
     assert!(
-        Presentation::from_bytes(empty_output)
+        Package::from_bytes(&empty_output)
+            .expect("empty ODP reopens")
+            .presentation()
             .expect("empty ODP reopens")
             .pages()
             .expect("empty page metadata")
@@ -403,7 +413,10 @@ fn adjacent_control_spacing_keeps_existing_authored_xml_refusal() {
     let control = builder
         .build()
         .expect_err("Builder audit rejects ambiguous spacing");
-    assert!(matches!(control, Error::InvalidFormat(_)));
+    assert!(matches!(
+        control,
+        litchi_odp::Error::Core(Error::InvalidFormat(_))
+    ));
     assert!(control.to_string().contains("AmbiguousWhitespace"));
     let (budget, output, result) = run(&[(None, body)], generous_limits());
     let error = result.expect_err("streaming keeps the authored XML refusal");

@@ -1,6 +1,7 @@
 //! Layered modern Word comment metadata owner.
 
 mod codec;
+mod limit;
 mod model;
 mod package;
 
@@ -11,6 +12,7 @@ pub use codec::{
     parse_comments_extended, parse_comments_extensible, parse_comments_ids, parse_people,
     write_comments_extended, write_comments_extensible, write_comments_ids, write_people,
 };
+pub use limit::LimitKind;
 pub use model::{
     COMMENTS_EXTENSIBLE_NAMESPACE, COMMENTS_IDS_NAMESPACE, Comment, Conformance, Extended,
     Extension, ExtensionList, IdMapping, MAX_MODERN_COMMENT_DEPTH, MAX_MODERN_COMMENT_ITEMS,

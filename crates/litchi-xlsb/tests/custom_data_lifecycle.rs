@@ -21,13 +21,13 @@ use litchi_core::{
 use litchi_opc::phys_pkg::{PhysPkgReader, PhysPkgWriter};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, XmlPart};
 use litchi_xlsb::Package;
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::custom_data::{
-    Commit, CustomData, Limits, Patch, Properties, RemovalDisposition, Snapshot, StorageId,
-    StorageSelector, Transaction, write_properties,
+    Commit, CustomData, Edit, EditOptions, Limits, Patch, Properties, RemovalDisposition, Snapshot,
+    StorageId, StorageSelector, write_properties,
 };
 use litchi_xlsb::package::PackageError;
-use litchi_xlsb::raw::{Kind, Writer, kind as rt};
-use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
+use litchi_xlsb::raw::{Encoder, Kind, kind as rt};
 
 const X14: &str = "http://schemas.microsoft.com/office/spreadsheetml/2009/9/main";
 const WORKBOOK_URI: &str = "/xl/workbook.bin";
@@ -78,7 +78,7 @@ fn wide(value: &str) -> Vec<u8> {
 }
 
 fn record(kind: Kind, payload: &[u8], output: &mut Vec<u8>) {
-    Writer::new(output)
+    Encoder::new(output, litchi_xlsb::raw::Limits::DEFAULT)
         .write_record(kind, payload)
         .expect("synthetic BIFF12 record writes");
 }
@@ -188,11 +188,15 @@ fn synthetic_fixture(
     let connections = connections_stream(references, opaque_frt);
     let opaque = b"opaque member source bytes".to_vec();
 
-    let mut writer = WorkbookWriter::new();
-    writer.add_worksheet(MutableWorksheet::new("Sheet1"));
+    let mut writer = Builder::new();
+    writer.add_worksheet(builder::Worksheet::new("Sheet1"));
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output).expect("base XLSB package writes");
-    let base = Package::from_bytes(output.into_inner()).expect("base XLSB package reopens");
+    writer
+        .build()
+        .expect("build package")
+        .write_to(&mut output)
+        .expect("base XLSB package writes");
+    let base = Package::from_bytes(&output.into_inner()).expect("base XLSB package reopens");
     let mut package = base.into_opc();
 
     for (index, uid) in storage_ids.iter().enumerate() {
@@ -246,9 +250,9 @@ fn synthetic_fixture(
 
     let mut package_bytes = Vec::new();
     package
-        .to_stream(&mut package_bytes)
+        .write_to(&mut package_bytes)
         .expect("synthetic source package serializes");
-    let package = Package::from_bytes(package_bytes)
+    let package = Package::from_bytes(&package_bytes)
         .expect("synthetic XLSB custom-data graph reopens with source provenance");
     Fixture {
         package,
@@ -306,12 +310,12 @@ fn logical_package_size(package: &Package) -> usize {
     let opc = package.opc_package();
     let root = uri("/");
     let mut total = opc
-        .source_content_types()
+        .source_content_types(litchi_opc::SourceLimits::default())
         .expect("source content types exist")
         .bytes()
         .len();
     total += opc
-        .source_relationships(&root)
+        .source_relationships(&root, litchi_opc::SourceLimits::default())
         .expect("source package relationships exist")
         .bytes()
         .len();
@@ -321,7 +325,7 @@ fn logical_package_size(package: &Package) -> usize {
     {
         total += part.blob().len();
         total += opc
-            .source_relationships(part.partname())
+            .source_relationships(part.partname(), litchi_opc::SourceLimits::default())
             .expect("source part relationships exist")
             .bytes()
             .len();
@@ -333,19 +337,19 @@ fn max_relationship_xml_size(package: &Package) -> usize {
     let opc = package.opc_package();
     let root = uri("/");
     let mut maximum = opc
-        .source_content_types()
+        .source_content_types(litchi_opc::SourceLimits::default())
         .expect("source content types exist")
         .bytes()
         .len()
         .max(
-            opc.source_relationships(&root)
+            opc.source_relationships(&root, litchi_opc::SourceLimits::default())
                 .expect("source package relationships exist")
                 .bytes()
                 .len(),
         );
     for part in opc.iter_parts() {
         maximum = maximum.max(
-            opc.source_relationships(part.partname())
+            opc.source_relationships(part.partname(), litchi_opc::SourceLimits::default())
                 .expect("source part relationships exist")
                 .bytes()
                 .len(),
@@ -357,7 +361,7 @@ fn max_relationship_xml_size(package: &Package) -> usize {
 fn relationship_xml_size(package: &Package, owner: &str) -> usize {
     package
         .opc_package()
-        .source_relationships(&uri(owner))
+        .source_relationships(&uri(owner), litchi_opc::SourceLimits::default())
         .expect("source relationship member exists")
         .bytes()
         .len()
@@ -372,7 +376,8 @@ fn package_with_part_bytes(package: Package, part_name: &str, bytes: Vec<u8>) ->
 }
 
 fn rewrite_physical_member(bytes: &[u8], wanted: &str, replacement: Vec<u8>) -> Vec<u8> {
-    let reader = PhysPkgReader::new(bytes).expect("synthetic package is a physical ZIP");
+    let reader = PhysPkgReader::new(bytes, litchi_opc::SourceLimits::default())
+        .expect("synthetic package is a physical ZIP");
     let mut writer = PhysPkgWriter::new();
     for member in reader
         .member_names()
@@ -406,7 +411,7 @@ fn source_preserving_fixture_with_properties(
         "xl/customData/props1.xml",
         source_properties,
     );
-    let package = Package::from_bytes(physical)
+    let package = Package::from_bytes(&physical)
         .expect("formatted source XML reopens through the physical package reader");
     Fixture {
         package,
@@ -460,7 +465,7 @@ fn public_custom_data_crud_reads_typed_properties_and_inert_bytes() {
     let fixture = single_fixture();
     let package = &fixture.package;
     let snapshot: Snapshot = package.custom_data().expect("public Custom Data snapshot");
-    let direct_snapshot = Snapshot::load(package.opc_package()).expect("direct snapshot load");
+    let direct_snapshot = package.custom_data().expect("direct snapshot load");
     assert_eq!(direct_snapshot.len(), snapshot.len());
     assert_eq!(snapshot.len(), 1);
     assert!(!snapshot.is_empty());
@@ -473,7 +478,7 @@ fn public_custom_data_crud_reads_typed_properties_and_inert_bytes() {
     assert!(!snapshot.has_opaque_reference_candidates());
 
     let properties: Properties = storage.properties().clone();
-    let mut transaction: Transaction = package.edit_custom_data().expect("public edit transaction");
+    let mut transaction: Edit = package.edit_custom_data().expect("public edit transaction");
     let replacement = CustomData {
         properties,
         data: b"replacement".to_vec(),
@@ -495,7 +500,7 @@ fn public_custom_data_crud_reads_typed_properties_and_inert_bytes() {
         .insert(CustomData::new("uid-B", vec![7, 8]))
         .expect("insert storage");
     assert_eq!(inserted.as_str(), "uid-B");
-    assert_eq!(transaction.storages().len(), 2);
+    assert_eq!(transaction.storages().expect("staged storages").len(), 2);
     let upserted = transaction
         .upsert(CustomData::new("uid-B", vec![9]))
         .expect("upsert storage");
@@ -507,9 +512,10 @@ fn public_custom_data_crud_reads_typed_properties_and_inert_bytes() {
     assert_eq!(removed.id(), "uid-B");
 
     let commit: Commit = transaction.commit().expect("publish CRUD transaction");
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     let changed = package
-        .apply_custom_data(&commit)
+        .apply_custom_data(commit.patch())
+        .map(Commit::into_package)
         .expect("apply public Custom Data commit");
     let changed_snapshot = changed.custom_data().expect("read changed snapshot");
     assert_eq!(changed_snapshot.len(), 1);
@@ -537,7 +543,8 @@ fn rename_updates_all_effective_references_and_preserves_properties_payload() {
     let patch: Patch = commit.patch().clone();
     let changed = fixture
         .package
-        .apply_custom_data_patch(&patch)
+        .apply_custom_data(&patch)
+        .map(Commit::into_package)
         .expect("apply rename patch");
     let snapshot = changed.custom_data().expect("read renamed snapshot");
     assert!(snapshot.find("renamed-A & <tag>").is_some());
@@ -571,15 +578,22 @@ fn rename_to_a_later_uid_commits_across_sorted_catalog_and_inverts_exactly() {
         .package
         .edit_custom_data()
         .expect("UID-order rename transaction");
-    assert_eq!(transaction.storages()[0].id(), "uid-A");
-    assert_eq!(transaction.storages()[1].id(), "uid-B");
+    assert_eq!(
+        transaction.storages().expect("staged storages")[0].id(),
+        "uid-A"
+    );
+    assert_eq!(
+        transaction.storages().expect("staged storages")[1].id(),
+        "uid-B"
+    );
     transaction
         .rename(StorageSelector::Id("uid-A"), "uid-Z")
         .expect("rename to later UID stages");
     let commit = transaction.commit().expect("UID-order rename commits");
     let changed = fixture
         .package
-        .apply_custom_data(&commit)
+        .apply_custom_data(commit.patch())
+        .map(Commit::into_package)
         .expect("UID-order rename applies publicly");
     let snapshot = changed.custom_data().expect("read renamed catalog");
     let ids = snapshot
@@ -593,7 +607,8 @@ fn rename_to_a_later_uid_commits_across_sorted_catalog_and_inverts_exactly() {
     assert_eq!(snapshot.connection_references("uid-A"), 0);
 
     let restored = changed
-        .apply_custom_data_patch(&commit.patch().inverse())
+        .apply_custom_data(&commit.patch().inverse())
+        .map(Commit::into_package)
         .expect("UID-order rename inverse applies");
     assert_eq!(package_bytes(&restored), before);
 }
@@ -612,7 +627,8 @@ fn inserting_an_earlier_uid_after_existing_storage_commits_and_inverts_exactly()
     let commit = transaction.commit().expect("UID-order insertion commits");
     let changed = fixture
         .package
-        .apply_custom_data(&commit)
+        .apply_custom_data(commit.patch())
+        .map(Commit::into_package)
         .expect("UID-order insertion applies publicly");
     let snapshot = changed.custom_data().expect("read inserted catalog");
     let ids = snapshot
@@ -626,7 +642,8 @@ fn inserting_an_earlier_uid_after_existing_storage_commits_and_inverts_exactly()
     assert_eq!(snapshot.connection_references("uid-A"), 0);
 
     let restored = changed
-        .apply_custom_data_patch(&commit.patch().inverse())
+        .apply_custom_data(&commit.patch().inverse())
+        .map(Commit::into_package)
         .expect("UID-order insertion inverse applies");
     assert_eq!(package_bytes(&restored), before);
 }
@@ -679,7 +696,8 @@ fn source_formatted_properties_preserve_raw_opaque_xml_through_public_apply_and_
         .expect("formatted source rename commits");
     let changed = fixture
         .package
-        .apply_custom_data(&commit)
+        .apply_custom_data(commit.patch())
+        .map(Commit::into_package)
         .expect("formatted source public apply");
     assert_eq!(
         part_bytes(&changed, "/xl/customData/props1.xml"),
@@ -703,7 +721,8 @@ fn source_formatted_properties_preserve_raw_opaque_xml_through_public_apply_and_
     }
 
     let restored = changed
-        .apply_custom_data_patch(&commit.patch().inverse())
+        .apply_custom_data(&commit.patch().inverse())
+        .map(Commit::into_package)
         .expect("formatted source inverse applies");
     assert_eq!(
         part_bytes(&restored, "/xl/customData/props1.xml"),
@@ -724,8 +743,11 @@ fn inverse_refuses_oversized_source_template_under_temporary_cap_atomically() {
         .expect("oversized-template storage")
         .properties()
         .clone();
-    let canonical_properties =
-        write_properties(&properties).expect("canonical restoration properties serialize");
+    let canonical_properties = write_properties(
+        &properties,
+        &litchi_ooxml_common::custom_data::Limits::standard(),
+    )
+    .expect("canonical restoration properties serialize");
     assert!(
         source_properties.len() > canonical_properties.len(),
         "formatted source must exceed canonical restoration: source={}, canonical={}",
@@ -736,7 +758,7 @@ fn inverse_refuses_oversized_source_template_under_temporary_cap_atomically() {
         fixture
             .package
             .opc_package()
-            .source_content_types()
+            .source_content_types(litchi_opc::SourceLimits::default())
             .expect("source content types exist")
             .bytes()
             .len(),
@@ -746,7 +768,7 @@ fn inverse_refuses_oversized_source_template_under_temporary_cap_atomically() {
     let before = package_bytes(&fixture.package);
     let mut transaction = fixture
         .package
-        .edit_custom_data_with_limits(limits)
+        .edit_custom_data_with_options(EditOptions::default().limits(limits))
         .expect("temporary cap admits source snapshot");
     transaction
         .remove(StorageSelector::Index(0))
@@ -757,23 +779,29 @@ fn inverse_refuses_oversized_source_template_under_temporary_cap_atomically() {
         .expect("removal does not rewrite oversized source template");
     let removed = fixture
         .package
-        .apply_custom_data(&commit)
+        .apply_custom_data(commit.patch())
+        .map(Commit::into_package)
         .expect("removal applies under temporary cap");
     assert!(removed.custom_data().unwrap().is_empty());
     let removed_before_inverse = package_bytes(&removed);
 
-    let inverse = removed.apply_custom_data_patch(&commit.patch().inverse());
+    let inverse = removed
+        .apply_custom_data(&commit.patch().inverse())
+        .map(Commit::into_package);
     match inverse {
-        Err(PackageError::LimitExceeded {
-            resource,
-            actual,
+        Err(PackageError::Limit {
+            kind,
+            observed,
             maximum,
         }) => {
-            assert!(
-                resource.contains("temporary"),
-                "oversized restoration should name temporary resource: {resource}"
+            assert_eq!(
+                kind,
+                litchi_xlsb::package::LimitKind::CustomData(
+                    litchi_xlsb::custom_data::LimitKind::TemporaryBytes
+                ),
+                "oversized restoration should name the temporary budget"
             );
-            assert!(actual > maximum);
+            assert!(observed > maximum);
         },
         other => panic!("oversized source restoration unexpectedly succeeded: {other:?}"),
     }
@@ -795,7 +823,7 @@ fn referenced_remove_requires_disposition_and_detach_is_reversible() {
         reject.remove(StorageSelector::Id("uid-A")),
         Err(PackageError::CustomDataReferenced { connections: 2, .. })
     ));
-    assert!(!reject.is_changed());
+    assert!(!reject.changed().expect("changed state"));
 
     let mut detach = fixture
         .package
@@ -810,7 +838,8 @@ fn referenced_remove_requires_disposition_and_detach_is_reversible() {
     let detached = detach.commit().expect("publish detach");
     let detached_package = fixture
         .package
-        .apply_custom_data(&detached)
+        .apply_custom_data(detached.patch())
+        .map(Commit::into_package)
         .expect("apply detach");
     assert!(
         detached_package
@@ -827,7 +856,8 @@ fn referenced_remove_requires_disposition_and_detach_is_reversible() {
         0
     );
     let restored = detached_package
-        .apply_custom_data_patch(&detached.patch().inverse())
+        .apply_custom_data(&detached.patch().inverse())
+        .map(Commit::into_package)
         .expect("apply detach inverse");
     assert_eq!(package_bytes(&restored), before_bytes);
     assert_eq!(part_bytes(&restored, CONNECTIONS_URI), before_connections);
@@ -849,7 +879,8 @@ fn retarget_removal_updates_every_reference_to_the_remaining_storage() {
     let retargeted = retarget.commit().expect("publish retarget");
     let retargeted_package = fixture
         .package
-        .apply_custom_data_patch(retargeted.patch())
+        .apply_custom_data(retargeted.patch())
+        .map(Commit::into_package)
         .expect("apply retarget");
     let retargeted_snapshot = retargeted_package.custom_data().unwrap();
     assert!(retargeted_snapshot.find("uid-A").is_none());
@@ -866,11 +897,12 @@ fn noop_commit_is_publicly_empty_and_patch_inverse_round_trips_source() {
         .expect("no-op transaction")
         .commit()
         .expect("no-op commit");
-    assert!(!noop.changed());
-    assert!(noop.patch().is_empty());
+    assert!(!noop.diagnostics().changed());
+    assert!(noop.patch().is_noop());
     let unchanged = fixture
         .package
-        .apply_custom_data(&noop)
+        .apply_custom_data(noop.patch())
+        .map(Commit::into_package)
         .expect("apply no-op commit");
     assert_eq!(package_bytes(&unchanged), before);
 
@@ -887,10 +919,12 @@ fn noop_commit_is_publicly_empty_and_patch_inverse_round_trips_source() {
     let commit = transaction.commit().expect("publish inverse source");
     let changed = fixture
         .package
-        .apply_custom_data_patch(commit.patch())
+        .apply_custom_data(commit.patch())
+        .map(Commit::into_package)
         .expect("apply forward patch");
     let restored = changed
-        .apply_custom_data_patch(&commit.patch().inverse())
+        .apply_custom_data(&commit.patch().inverse())
+        .map(Commit::into_package)
         .expect("apply inverse patch");
     assert_eq!(package_bytes(&restored), before);
 }
@@ -919,7 +953,11 @@ fn stale_member_and_connection_readsets_refuse_without_mutation() {
         .custom_data()
         .expect("stale data source can be read repeatedly");
     let stale_data_bytes = package_bytes(&stale_data);
-    assert_patch_conflict(stale_data.apply_custom_data_patch(commit.patch()));
+    assert_patch_conflict(
+        stale_data
+            .apply_custom_data(commit.patch())
+            .map(Commit::into_package),
+    );
     assert_eq!(package_bytes(&stale_data), stale_data_bytes);
 
     let mut changed_connections = fixture.connections.clone();
@@ -934,7 +972,11 @@ fn stale_member_and_connection_readsets_refuse_without_mutation() {
         changed_connections,
     );
     let stale_connections_bytes = package_bytes(&stale_connections);
-    assert_patch_conflict(stale_connections.apply_custom_data_patch(commit.patch()));
+    assert_patch_conflict(
+        stale_connections
+            .apply_custom_data(commit.patch())
+            .map(Commit::into_package),
+    );
     assert_eq!(package_bytes(&stale_connections), stale_connections_bytes);
 }
 
@@ -957,10 +999,16 @@ fn patch_preserves_unrelated_opaque_member_or_fails_closed() {
         OPAQUE_URI,
         candidate_opaque.clone(),
     );
-    match candidate.apply_custom_data_patch(commit.patch()) {
+    match candidate
+        .apply_custom_data(commit.patch())
+        .map(Commit::into_package)
+    {
         Ok(applied) => {
             assert_eq!(part_bytes(&applied, OPAQUE_URI), candidate_opaque);
-            match applied.apply_custom_data_patch(&commit.patch().inverse()) {
+            match applied
+                .apply_custom_data(&commit.patch().inverse())
+                .map(Commit::into_package)
+            {
                 Ok(restored) => assert_eq!(part_bytes(&restored, OPAQUE_URI), candidate_opaque),
                 Err(_) => assert_eq!(part_bytes(&applied, OPAQUE_URI), candidate_opaque),
             }
@@ -981,7 +1029,10 @@ fn patch_preserves_unrelated_opaque_member_or_fails_closed() {
         connections_stream(&["opaque-safe-rename"], false),
     );
     let inverse_candidate = package_with_part_bytes(renamed, OPAQUE_URI, candidate_opaque.clone());
-    match inverse_candidate.apply_custom_data_patch(&commit.patch().inverse()) {
+    match inverse_candidate
+        .apply_custom_data(&commit.patch().inverse())
+        .map(Commit::into_package)
+    {
         Ok(restored) => assert_eq!(part_bytes(&restored, OPAQUE_URI), candidate_opaque),
         Err(_) => assert_eq!(part_bytes(&inverse_candidate, OPAQUE_URI), candidate_opaque),
     }
@@ -1008,7 +1059,7 @@ fn rename_growth_accepts_exact_wire_and_xml_caps_and_rejects_one_under() {
         .with_max_temporary_bytes(expected_connections.len());
     let mut exact = fixture
         .package
-        .edit_custom_data_with_limits(exact_limits)
+        .edit_custom_data_with_options(EditOptions::default().limits(exact_limits))
         .expect("exact rename limits admit the source");
     exact
         .rename(StorageSelector::Index(0), long_id)
@@ -1017,6 +1068,7 @@ fn rename_growth_accepts_exact_wire_and_xml_caps_and_rejects_one_under() {
         exact
             .commit()
             .expect("exact wire/XML caps are inclusive")
+            .diagnostics()
             .changed()
     );
 
@@ -1027,15 +1079,12 @@ fn rename_growth_accepts_exact_wire_and_xml_caps_and_rejects_one_under() {
         .with_max_temporary_bytes(expected_connections.len());
     let mut under = fixture
         .package
-        .edit_custom_data_with_limits(under_connections)
+        .edit_custom_data_with_options(EditOptions::default().limits(under_connections))
         .expect("one-under connections cap admits the source");
     under
         .rename(StorageSelector::Index(0), long_id)
         .expect("stage one-under connections rename");
-    assert!(matches!(
-        under.commit(),
-        Err(PackageError::LimitExceeded { .. })
-    ));
+    assert!(matches!(under.commit(), Err(PackageError::Limit { .. })));
     assert_eq!(package_bytes(&fixture.package), source_before_failure);
 
     let under_properties = Limits::new()
@@ -1044,15 +1093,12 @@ fn rename_growth_accepts_exact_wire_and_xml_caps_and_rejects_one_under() {
         .with_max_temporary_bytes(expected_connections.len());
     let mut under = fixture
         .package
-        .edit_custom_data_with_limits(under_properties)
+        .edit_custom_data_with_options(EditOptions::default().limits(under_properties))
         .expect("one-under properties cap admits the source");
     under
         .rename(StorageSelector::Index(0), long_id)
         .expect("stage one-under properties rename");
-    assert!(matches!(
-        under.commit(),
-        Err(PackageError::LimitExceeded { .. })
-    ));
+    assert!(matches!(under.commit(), Err(PackageError::Limit { .. })));
     assert_eq!(package_bytes(&fixture.package), source_before_failure);
 
     let temporary_source_cap = Limits::new()
@@ -1061,14 +1107,14 @@ fn rename_growth_accepts_exact_wire_and_xml_caps_and_rejects_one_under() {
         .with_max_temporary_bytes(source_connections.len());
     let mut temporary = fixture
         .package
-        .edit_custom_data_with_limits(temporary_source_cap)
+        .edit_custom_data_with_options(EditOptions::default().limits(temporary_source_cap))
         .expect("source-sized temporary cap admits the source");
     temporary
         .rename(StorageSelector::Index(0), long_id)
         .expect("stage source-sized temporary rename");
     assert!(matches!(
         temporary.commit(),
-        Err(PackageError::LimitExceeded { .. })
+        Err(PackageError::Limit { .. })
     ));
     assert_eq!(package_bytes(&fixture.package), source_before_failure);
 }
@@ -1093,7 +1139,8 @@ fn final_output_cap_counts_mixed_shrink_and_growth_without_overcharging() {
     let baseline_commit = baseline.commit().expect("mixed output baseline commit");
     let candidate = fixture
         .package
-        .apply_custom_data(&baseline_commit)
+        .apply_custom_data(baseline_commit.patch())
+        .map(Commit::into_package)
         .expect("apply mixed output baseline");
     let source_size = logical_package_size(&fixture.package);
     let candidate_size = logical_package_size(&candidate);
@@ -1102,7 +1149,7 @@ fn final_output_cap_counts_mixed_shrink_and_growth_without_overcharging() {
     let exact_limits = Limits::new().with_max_output_bytes(candidate_size);
     let mut exact = fixture
         .package
-        .edit_custom_data_with_limits(exact_limits)
+        .edit_custom_data_with_options(EditOptions::default().limits(exact_limits))
         .expect("exact final-output cap admits the source");
     exact
         .set_data(StorageSelector::Id("uid-A"), b"a".to_vec())
@@ -1117,13 +1164,16 @@ fn final_output_cap_counts_mixed_shrink_and_growth_without_overcharging() {
         exact
             .commit()
             .expect("exact aggregate output cap is inclusive")
+            .diagnostics()
             .changed()
     );
 
     let source_before_failure = package_bytes(&fixture.package);
     let mut under = fixture
         .package
-        .edit_custom_data_with_limits(Limits::new().with_max_output_bytes(candidate_size - 1))
+        .edit_custom_data_with_options(
+            EditOptions::default().limits(Limits::new().with_max_output_bytes(candidate_size - 1)),
+        )
         .expect("one-under final-output cap admits the source");
     under
         .set_data(StorageSelector::Id("uid-A"), b"a".to_vec())
@@ -1134,10 +1184,7 @@ fn final_output_cap_counts_mixed_shrink_and_growth_without_overcharging() {
             b"0123456789abcdefghijklmnopqrstuv0123456789".to_vec(),
         )
         .expect("stage one-under growing payload");
-    assert!(matches!(
-        under.commit(),
-        Err(PackageError::LimitExceeded { .. })
-    ));
+    assert!(matches!(under.commit(), Err(PackageError::Limit { .. })));
     assert_eq!(package_bytes(&fixture.package), source_before_failure);
 }
 
@@ -1154,7 +1201,8 @@ fn relationship_xml_cap_includes_inserted_edges_at_exact_boundary() {
     let baseline_commit = baseline.commit().expect("relationship insertion commit");
     let candidate = fixture
         .package
-        .apply_custom_data(&baseline_commit)
+        .apply_custom_data(baseline_commit.patch())
+        .map(Commit::into_package)
         .expect("apply relationship insertion");
     let source_workbook_relationships = relationship_xml_size(&fixture.package, WORKBOOK_URI);
     let candidate_workbook_relationships = relationship_xml_size(&candidate, WORKBOOK_URI);
@@ -1164,7 +1212,9 @@ fn relationship_xml_cap_includes_inserted_edges_at_exact_boundary() {
 
     let mut exact_transaction = fixture
         .package
-        .edit_custom_data_with_limits(Limits::new().with_max_relationship_xml_bytes(exact))
+        .edit_custom_data_with_options(
+            EditOptions::default().limits(Limits::new().with_max_relationship_xml_bytes(exact)),
+        )
         .expect("exact relationship cap admits the source");
     exact_transaction
         .insert(CustomData::new("uid-B", b"inserted".to_vec()))
@@ -1173,20 +1223,23 @@ fn relationship_xml_cap_includes_inserted_edges_at_exact_boundary() {
         exact_transaction
             .commit()
             .expect("exact relationship cap is inclusive")
+            .diagnostics()
             .changed()
     );
 
     let source_before_failure = package_bytes(&fixture.package);
     let mut under = fixture
         .package
-        .edit_custom_data_with_limits(Limits::new().with_max_relationship_xml_bytes(exact - 1))
+        .edit_custom_data_with_options(
+            EditOptions::default().limits(Limits::new().with_max_relationship_xml_bytes(exact - 1)),
+        )
         .expect("one-under relationship cap admits the source");
     under
         .insert(CustomData::new("uid-B", b"inserted".to_vec()))
         .expect("stage one-under relationship insertion");
     let under_result = under.commit();
     assert!(
-        matches!(under_result, Err(PackageError::LimitExceeded { .. })),
+        matches!(under_result, Err(PackageError::Limit { .. })),
         "one-under relationship cap unexpectedly admitted: exact={exact}, source_workbook={source_workbook_relationships}, candidate_workbook={candidate_workbook_relationships}, result={under_result:?}"
     );
     assert_eq!(package_bytes(&fixture.package), source_before_failure);
@@ -1198,7 +1251,7 @@ fn storage_cardinality_limit_admits_exact_capacity_and_rejects_one_under() {
     let exact_limits = Limits::new().with_max_storages(2);
     let mut exact = fixture
         .package
-        .edit_custom_data_with_limits(exact_limits)
+        .edit_custom_data_with_options(EditOptions::default().limits(exact_limits))
         .expect("exact storage cardinality admits source");
     exact
         .insert(CustomData::new("uid-A", b"exact-capacity".to_vec()))
@@ -1206,19 +1259,25 @@ fn storage_cardinality_limit_admits_exact_capacity_and_rejects_one_under() {
     let commit = exact.commit().expect("exact storage cardinality commits");
     let candidate = fixture
         .package
-        .apply_custom_data(&commit)
+        .apply_custom_data(commit.patch())
+        .map(Commit::into_package)
         .expect("exact storage cardinality applies");
     assert_eq!(
         candidate
-            .custom_data_with_limits(exact_limits)
+            .with_semantic_limits(litchi_xlsb::SemanticLimits::new().custom_data(exact_limits))
+            .custom_data()
             .unwrap()
             .len(),
         2
     );
     assert!(matches!(
-        candidate.custom_data_with_limits(Limits::new().with_max_storages(1)),
-        Err(PackageError::LimitExceeded {
-            actual: 2,
+        candidate
+            .with_semantic_limits(
+                litchi_xlsb::SemanticLimits::new().custom_data(Limits::new().with_max_storages(1))
+            )
+            .custom_data(),
+        Err(PackageError::Limit {
+            observed: 2,
             maximum: 1,
             ..
         })
@@ -1226,18 +1285,25 @@ fn storage_cardinality_limit_admits_exact_capacity_and_rejects_one_under() {
 
     let mut one_under = fixture
         .package
-        .edit_custom_data_with_limits(Limits::new().with_max_storages(1))
+        .edit_custom_data_with_options(
+            EditOptions::default().limits(Limits::new().with_max_storages(1)),
+        )
         .expect("one-under storage cardinality admits source");
     assert!(matches!(
         one_under.insert(CustomData::new("uid-A", b"one-under".to_vec())),
-        Err(PackageError::LimitExceeded {
-            resource: "Custom Data storages",
-            actual: 2,
+        Err(PackageError::Limit {
+            kind: litchi_xlsb::package::LimitKind::CustomData(
+                litchi_xlsb::custom_data::LimitKind::Storages
+            ),
+            observed: 2,
             maximum: 1,
         })
     ));
-    assert_eq!(one_under.storages().len(), 1);
-    assert_eq!(one_under.storages()[0].id(), "uid-Z");
+    assert_eq!(one_under.storages().expect("staged storages").len(), 1);
+    assert_eq!(
+        one_under.storages().expect("staged storages")[0].id(),
+        "uid-Z"
+    );
 }
 
 #[test]
@@ -1263,7 +1329,7 @@ fn signed_source_allows_noop_but_refuses_changed_public_commit() {
         .expect("signed no-op transaction")
         .commit()
         .expect("signed no-op remains readable");
-    assert!(!noop.changed());
+    assert!(!noop.diagnostics().changed());
 
     let mut transaction = signed
         .edit_custom_data()
@@ -1291,7 +1357,7 @@ fn opaque_frt_reference_is_readable_but_identity_mutation_refuses() {
         .expect("identity edit stages before closure proof");
     assert!(matches!(
         transaction.commit(),
-        Err(PackageError::UnsupportedFeature(_))
+        Err(PackageError::Refused(_))
     ));
     assert_eq!(package_bytes(&fixture.package), before);
 }
@@ -1301,12 +1367,18 @@ fn limits_and_cancellation_reject_before_publication_and_keep_staging_atomic() {
     let fixture = single_fixture();
     let connections_limit = Limits::new().with_max_connections_bytes(fixture.connections.len() - 1);
     assert!(matches!(
-        fixture.package.custom_data_with_limits(connections_limit),
-        Err(PackageError::LimitExceeded { .. })
+        fixture
+            .package
+            .with_semantic_limits(litchi_xlsb::SemanticLimits::new().custom_data(connections_limit))
+            .custom_data(),
+        Err(PackageError::Limit { .. })
     ));
 
     let uid_limit = Limits::new().with_max_uid_units(3);
-    let uid_limited = fixture.package.custom_data_with_limits(uid_limit);
+    let uid_limited = fixture
+        .package
+        .with_semantic_limits(litchi_xlsb::SemanticLimits::new().custom_data(uid_limit))
+        .custom_data();
     let uid_diagnostic = format!("{uid_limited:?}");
     assert!(
         uid_limited.is_err(),
@@ -1315,7 +1387,9 @@ fn limits_and_cancellation_reject_before_publication_and_keep_staging_atomic() {
 
     let mut limited = fixture
         .package
-        .edit_custom_data_with_limits(Limits::new().with_max_output_bytes(1))
+        .edit_custom_data_with_options(
+            EditOptions::default().limits(Limits::new().with_max_output_bytes(1)),
+        )
         .expect("bounded transaction starts from source");
     limited
         .set_data(
@@ -1323,33 +1397,43 @@ fn limits_and_cancellation_reject_before_publication_and_keep_staging_atomic() {
             b"staged within transaction".to_vec(),
         )
         .expect("staging does not publish output");
-    let before_staged = limited.storages()[0].data().to_vec();
-    assert!(matches!(
-        limited.commit(),
-        Err(PackageError::LimitExceeded { .. })
-    ));
+    let before_staged = limited.storages().expect("staged storages")[0]
+        .data()
+        .to_vec();
+    assert!(matches!(limited.commit(), Err(PackageError::Limit { .. })));
     assert_eq!(before_staged, b"staged within transaction");
 
     let (cancellation_source, context) = managed_context();
     let mut cancelled = fixture
         .package
-        .edit_custom_data_with_limits_and_context(Limits::new(), context)
+        .edit_custom_data_with_options(
+            EditOptions::default()
+                .limits(Limits::new())
+                .execution_context(context),
+        )
         .expect("cancellable transaction starts");
-    let before_id = cancelled.storages()[0].id().to_owned();
+    let before_id = cancelled.storages().expect("staged storages")[0]
+        .id()
+        .to_owned();
     cancellation_source.cancel();
     assert!(matches!(
         cancelled.rename(StorageSelector::Index(0), "cancelled"),
         Err(PackageError::Execution(_))
     ));
-    assert!(!cancelled.is_changed());
-    assert_eq!(cancelled.storages()[0].id(), before_id);
+    assert!(!cancelled.changed().expect("changed state"));
+    assert_eq!(
+        cancelled.storages().expect("staged storages")[0].id(),
+        before_id
+    );
 
     let (cancelled_before_read, context) = managed_context();
     cancelled_before_read.cancel();
     assert!(matches!(
-        fixture
-            .package
-            .custom_data_with_limits_and_context(Limits::new(), context),
+        fixture.package.edit_custom_data_with_options(
+            EditOptions::default()
+                .limits(Limits::new())
+                .execution_context(context)
+        ),
         Err(PackageError::Execution(_))
     ));
 }

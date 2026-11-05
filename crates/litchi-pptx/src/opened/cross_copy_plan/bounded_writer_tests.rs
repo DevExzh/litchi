@@ -111,6 +111,7 @@ fn bounded_writer_into_bytes_reuses_an_exact_buffer() {
         digest: Sha256::new(),
         limit: length,
         exceeded: false,
+        observed: 0,
         allocation_failure: None,
     };
 
@@ -141,6 +142,7 @@ fn bounded_writer_into_bytes_copies_when_spare_capacity_exists() {
         digest: Sha256::new(),
         limit: length,
         exceeded: false,
+        observed: 0,
         allocation_failure: None,
     };
 

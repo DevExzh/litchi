@@ -292,7 +292,10 @@ fn collect_directory_entry(
 }
 
 fn inventory(bytes: &[u8]) -> Result<Inventory, BoxError> {
-    let mut ole = OleFile::open(Cursor::new(bytes.to_vec()))?;
+    let mut ole = OleFile::open(
+        Cursor::new(bytes.to_vec()),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
     let sector_size = ole.sector_size();
     let raw_directory = raw_directory_image(bytes)?;
     let root = ole.root_entry().cloned().ok_or_else(|| {
@@ -348,9 +351,13 @@ fn inventory(bytes: &[u8]) -> Result<Inventory, BoxError> {
 }
 
 fn structural_valid(bytes: &[u8]) -> bool {
-    validate_source(Arc::new(OwnedSource::new(bytes.to_vec())))
-        .map(|report| report.is_complete() && !report.has_errors())
-        .unwrap_or(false)
+    validate_source(
+        Arc::new(OwnedSource::new(bytes.to_vec())),
+        litchi_cfb::SharedOleFileLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
+    .map(|report| report.is_complete() && !report.has_errors())
+    .unwrap_or(false)
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -931,8 +938,8 @@ fn value_collection_state<T: std::fmt::Debug + Clone>(
 }
 
 fn doc_semantic_witness(
-    source: &litchi_doc::body_text::Snapshot,
-    output: &litchi_doc::body_text::Snapshot,
+    source: &litchi_doc::Package,
+    output: &litchi_doc::Package,
     replacement: &str,
 ) -> (bool, String, DocSemanticWitness) {
     let mut witness = DocSemanticWitness {
@@ -942,7 +949,7 @@ fn doc_semantic_witness(
         comparison_basis: "direct_text_and_collection_values_with_sha256_report_fields".into(),
         ..DocSemanticWitness::default()
     };
-    let source_paragraphs = match source.paragraphs(litchi_doc::body_text::Projection::All) {
+    let source_paragraphs = match source.body_paragraphs(litchi_doc::body_text::Projection::All) {
         Ok(value) => value,
         Err(error) => {
             let message = format!("DOC source paragraph read failed: {error}");
@@ -950,7 +957,7 @@ fn doc_semantic_witness(
             return (false, message, witness);
         },
     };
-    let output_paragraphs = match output.paragraphs(litchi_doc::body_text::Projection::All) {
+    let output_paragraphs = match output.body_paragraphs(litchi_doc::body_text::Projection::All) {
         Ok(value) => value,
         Err(error) => {
             let message = format!("DOC output paragraph read failed: {error}");
@@ -1005,7 +1012,7 @@ fn doc_semantic_witness(
     witness.accepted_projection = paragraph_projection_witness(
         "accepted_projection",
         source
-            .paragraphs(litchi_doc::body_text::Projection::Accepted)
+            .body_paragraphs(litchi_doc::body_text::Projection::Accepted)
             .map(|paragraphs| {
                 paragraphs
                     .iter()
@@ -1014,7 +1021,7 @@ fn doc_semantic_witness(
             })
             .map_err(|error| error.to_string()),
         output
-            .paragraphs(litchi_doc::body_text::Projection::Accepted)
+            .body_paragraphs(litchi_doc::body_text::Projection::Accepted)
             .map(|paragraphs| {
                 paragraphs
                     .iter()
@@ -1027,7 +1034,7 @@ fn doc_semantic_witness(
     witness.rejected_projection = paragraph_projection_witness(
         "rejected_projection",
         source
-            .paragraphs(litchi_doc::body_text::Projection::Rejected)
+            .body_paragraphs(litchi_doc::body_text::Projection::Rejected)
             .map(|paragraphs| {
                 paragraphs
                     .iter()
@@ -1036,7 +1043,7 @@ fn doc_semantic_witness(
             })
             .map_err(|error| error.to_string()),
         output
-            .paragraphs(litchi_doc::body_text::Projection::Rejected)
+            .body_paragraphs(litchi_doc::body_text::Projection::Rejected)
             .map(|paragraphs| {
                 paragraphs
                     .iter()
@@ -1108,10 +1115,16 @@ fn doc_semantic_witness(
     collections_ok &= witness.field_results.direct_match;
     drop((source_items, output_items));
 
-    let (source_state, source_items) =
-        doc_collection_state(source.revisions().map_err(|error| error.to_string()));
-    let (output_state, output_items) =
-        doc_collection_state(output.revisions().map_err(|error| error.to_string()));
+    let (source_state, source_items) = doc_collection_state(
+        source
+            .tracked_revisions()
+            .map_err(|error| error.to_string()),
+    );
+    let (output_state, output_items) = doc_collection_state(
+        output
+            .tracked_revisions()
+            .map_err(|error| error.to_string()),
+    );
     witness.revisions = collection_witness("revisions", source_state, output_state);
     direct_slice_match(
         &mut witness.revisions,
@@ -1141,10 +1154,14 @@ fn doc_semantic_witness(
 
     let source_objects = source
         .embedded_objects()
+        .map_err(|error| error.to_string())
+        .and_then(|objects| objects.inventory().map_err(|error| error.to_string()))
         .map(|value| (value.len(), value))
         .map_err(|error| error.to_string());
     let output_objects = output
         .embedded_objects()
+        .map_err(|error| error.to_string())
+        .and_then(|objects| objects.inventory().map_err(|error| error.to_string()))
         .map(|value| (value.len(), value))
         .map_err(|error| error.to_string());
     let (source_state, source_objects) = value_collection_state(source_objects);
@@ -1241,10 +1258,7 @@ fn semantic_reopen_check(
     output_bytes: &[u8],
     replacement: &str,
 ) -> (bool, String, SemanticWitness) {
-    let source = match litchi_doc::body_text::Snapshot::open(
-        source_bytes.to_vec(),
-        litchi_doc::tracked_revision::Limits::default(),
-    ) {
+    let source = match litchi_doc::Package::from_bytes(source_bytes) {
         Ok(snapshot) => snapshot,
         Err(error) => {
             let message = format!("DOC source public reopen failed: {error}");
@@ -1258,10 +1272,7 @@ fn semantic_reopen_check(
             );
         },
     };
-    let output = match litchi_doc::body_text::Snapshot::open(
-        output_bytes.to_vec(),
-        litchi_doc::tracked_revision::Limits::default(),
-    ) {
+    let output = match litchi_doc::Package::from_bytes(output_bytes) {
         Ok(snapshot) => snapshot,
         Err(error) => {
             let message = format!("DOC output public reopen failed: {error}");

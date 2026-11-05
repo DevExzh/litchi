@@ -49,14 +49,14 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn slide_component(source: &[u8]) -> TestResult<(String, Vec<u8>)> {
-    for entry in Catalog::from_bytes(source)?.iter() {
+    for entry in Catalog::from_bytes(source, Default::default())?.iter() {
         // These fixed native fixtures contain one presentation slide; template
         // slides also use type 5 and must never become the test mutation target.
         if !entry.name().starts_with("Index/Slide-") || !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = SnappyStream::decompress(entry.data())?.into_bytes();
-        let archive = Archive::parse(&stream)?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+        let archive = Archive::parse(&stream, Default::default())?;
         if archive.objects.iter().any(|object| {
             object
                 .messages
@@ -74,10 +74,11 @@ fn rewrite_document(
     mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
     let (member, stream) = slide_component(source)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     mutate(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(source)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     Ok(catalog.reassemble_to_bytes(&[EntryEdit::new(&member, &compressed)], Limits::default())?)
 }
 
@@ -199,7 +200,15 @@ fn with_movie_role_alias(source: &[u8], role: PlaceholderRole) -> TestResult<Vec
                 field.object_references.push(movie_identifier);
             }
         } else {
-            let mut field = FieldInfo::new(vec![role.field()]);
+            let mut field = FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(
+                    vec![role.field()],
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap();
             field.object_references.push(movie_identifier);
             info.field_infos.push(field);
         }

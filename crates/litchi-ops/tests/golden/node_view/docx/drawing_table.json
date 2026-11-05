@@ -1,0 +1,26 @@
+{
+  "path": "/body/tbl[1]",
+  "type": "table",
+  "childCount": 1,
+  "format": {
+    "cols": "1",
+    "rows": "1",
+    "width": "100%",
+    "cellSpacing": 0,
+    "tblLook": "0000",
+    "padding.left": 0,
+    "padding.right": 0,
+    "colWidths": "9355dxa"
+  },
+  "children": [
+    {
+      "path": "/body/tbl[1]/tr[1]",
+      "type": "row",
+      "childCount": 1,
+      "format": {
+        "cellSpacing": 0
+      },
+      "children": []
+    }
+  ]
+}

@@ -4,9 +4,12 @@ use std::{fmt::Debug, hint::black_box, sync::OnceLock};
 
 use libfuzzer_sys::fuzz_target;
 use litchi::pages::{
-    BodyFootnoteCommit, BodyFootnoteError, Limits, Package,
+    Package,
+    footnote::body::transaction::Commit as BodyFootnoteCommit,
+    footnote::body::transaction::Error as BodyFootnoteError,
     footnote::body::{Footnote, Position, Selector},
 };
+use litchi_iwa_archive::Limits;
 
 const MAX_INPUT_BYTES: u64 = 256 * 1024;
 const OVERSIZED_INPUT_BYTES: usize = 256 * 1024 + 1;
@@ -24,7 +27,10 @@ fuzz_target!(|data: &[u8]| {
         return;
     };
 
-    if let Ok(package) = Package::from_bytes_with_limits(&source, fuzz_limits()) {
+    if let Ok(package) = Package::from_bytes_with_options(
+        &source,
+        litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()),
+    ) {
         exercise_package(&package, &source);
     }
 
@@ -98,8 +104,11 @@ fn fuzz_limits() -> Limits {
 fn native_package() -> &'static Package {
     static PACKAGE: OnceLock<Package> = OnceLock::new();
     PACKAGE.get_or_init(|| {
-        let package = Package::from_bytes_with_limits(NATIVE_PAGES, fuzz_limits())
-            .unwrap_or_else(|error| panic!("native Pages lifecycle seed must open: {error}"));
+        let package = Package::from_bytes_with_options(
+            NATIVE_PAGES,
+            litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()),
+        )
+        .unwrap_or_else(|error| panic!("native Pages lifecycle seed must open: {error}"));
         package
             .validate()
             .unwrap_or_else(|error| panic!("native Pages lifecycle seed must validate: {error}"));
@@ -124,14 +133,37 @@ fn exercise_package(package: &Package, data: &[u8]) {
     };
     black_box(&notes);
 
-    let missing = package.edit_body_footnote(Selector::index(notes.len()));
-    if let Err(error) = missing {
-        assert!(matches!(error, BodyFootnoteError::NotFound));
+    let mut missing = match package.edit_body_footnote(Selector::index(notes.len())) {
+        Ok(edit) => edit,
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    };
+    if let Err(error) = missing.before() {
+        assert!(matches!(
+            error,
+            BodyFootnoteError::Refused(
+                litchi::pages::footnote::body::transaction::Refusal::NotFound
+            )
+        ));
         observe_error(error);
     }
-    if let Err(error) = package.edit_body_footnote(Selector::At(Position::ZERO)) {
+    let mut missing_anchor = match package.edit_body_footnote(Selector::Anchor(Position::ZERO)) {
+        Ok(edit) => edit,
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    };
+    if let Err(error) = missing_anchor.before() {
         if !notes.iter().any(|note| note.position == Position::ZERO) {
-            assert!(matches!(error, BodyFootnoteError::NotFound));
+            assert!(matches!(
+                error,
+                BodyFootnoteError::Refused(
+                    litchi::pages::footnote::body::transaction::Refusal::NotFound
+                )
+            ));
         }
         observe_error(error);
     }
@@ -177,9 +209,14 @@ fn exercise_insert(package: &Package, data: &[u8], source_before: &[u8]) {
     let inserted_bytes = package_bytes(commit.package());
     let mut remove = commit
         .package()
-        .edit_body_footnote(Selector::At(position))
+        .edit_body_footnote(Selector::Anchor(position))
         .unwrap_or_else(|error| panic!("inserted footnote must be selectable: {error}"));
-    assert_eq!(remove.before(), &expected);
+    assert_eq!(
+        remove
+            .before()
+            .unwrap_or_else(|error| panic!("inserted footnote read failed: {error}")),
+        &expected
+    );
     remove.clear();
     let removed = remove
         .commit()
@@ -277,7 +314,7 @@ fn exercise_noop_edit(
     source_before: &[u8],
 ) {
     let mut edit = package
-        .edit_body_footnote(Selector::At(position))
+        .edit_body_footnote(Selector::Anchor(position))
         .unwrap_or_else(|error| panic!("inserted footnote must support no-op edit: {error}"));
     edit.set(&expected.text)
         .unwrap_or_else(|error| panic!("same footnote text must stage: {error}"));
@@ -314,7 +351,10 @@ fn exercise_existing_remove(
             return;
         },
     };
-    let before = edit.before().clone();
+    let before = edit
+        .before()
+        .unwrap_or_else(|error| panic!("existing footnote read failed: {error}"))
+        .clone();
     edit.clear();
     let removed = match edit.commit() {
         Ok(commit) => commit,
@@ -342,7 +382,9 @@ fn exercise_authored_rejections(package: &Package, source_before: &[u8]) {
     let structural = package.insert_body_footnote(Position::ZERO, "bad\u{000e}", None);
     assert!(matches!(
         &structural,
-        Err(BodyFootnoteError::StructuralMarker)
+        Err(BodyFootnoteError::Refused(
+            litchi::pages::footnote::body::transaction::Refusal::StructuralMarker
+        ))
     ));
     if let Err(error) = structural {
         observe_error(error);
@@ -350,19 +392,34 @@ fn exercise_authored_rejections(package: &Package, source_before: &[u8]) {
     assert_eq!(package_bytes(package), source_before);
 
     let marker = package.insert_body_footnote(Position::ZERO, "ok", Some("bad\u{fffc}"));
-    assert!(matches!(&marker, Err(BodyFootnoteError::StructuralMarker)));
+    assert!(matches!(
+        &marker,
+        Err(BodyFootnoteError::Refused(
+            litchi::pages::footnote::body::transaction::Refusal::StructuralMarker
+        ))
+    ));
     if let Err(error) = marker {
         observe_error(error);
     }
     assert_eq!(package_bytes(package), source_before);
 
-    if let Err(error) = package.edit_body_footnote(Selector::index(usize::MAX)) {
+    let mut missing = match package.edit_body_footnote(Selector::index(usize::MAX)) {
+        Ok(edit) => edit,
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    };
+    if let Err(error) = missing.before() {
         observe_error(error);
     }
 }
 
 fn exercise_redacted_malformed_ingress() {
-    match Package::from_bytes_with_limits(PRIVATE_MALFORMED_INPUT, fuzz_limits()) {
+    match Package::from_bytes_with_options(
+        PRIVATE_MALFORMED_INPUT,
+        litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()),
+    ) {
         Err(error) => {
             let display = error.to_string();
             let debug = format!("{error:?}");
@@ -379,7 +436,10 @@ fn exercise_redacted_malformed_ingress() {
 fn exercise_input_limit() {
     static OVERSIZED: OnceLock<Box<[u8]>> = OnceLock::new();
     let bytes = OVERSIZED.get_or_init(|| vec![0; OVERSIZED_INPUT_BYTES].into_boxed_slice());
-    match Package::from_bytes_with_limits(bytes, fuzz_limits()) {
+    match Package::from_bytes_with_options(
+        bytes,
+        litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()),
+    ) {
         Err(error) => observe_error(error),
         Ok(_) => panic!("oversized Pages input must be rejected"),
     }

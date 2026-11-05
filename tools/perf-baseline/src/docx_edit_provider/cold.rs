@@ -433,16 +433,16 @@ fn prepare_case(
     }
     crate::verify_docx_source_edit_output(&corpus, &expected_output)?;
     let source_document_xml = commit.patch().source().xml_bytes().to_vec();
-    let candidate_document_xml = commit.snapshot().xml_bytes().to_vec();
-    let replay_forward_verified =
-        commit.patch().apply(commit.patch().source())?.xml_bytes() == commit.snapshot().xml_bytes();
+    let candidate_document_xml = commit.patch().target().xml_bytes().to_vec();
+    let replay_forward_verified = commit.patch().apply(commit.patch().source())?.xml_bytes()
+        == commit.patch().target().xml_bytes();
     let inverse_restores_source_verified = commit
         .patch()
         .inverse()
-        .apply(commit.snapshot())?
+        .apply(commit.patch().target())?
         .xml_bytes()
         == commit.patch().source().xml_bytes();
-    let stale_target_refusal_verified = commit.patch().apply(commit.snapshot()).is_err();
+    let stale_target_refusal_verified = commit.patch().apply(commit.patch().target()).is_err();
     let foreign_package = litchi_docx::source_backed::Package::from_read_at(Arc::new(
         OwnedSource::new(expected_output.clone()),
     ))?;
@@ -821,11 +821,11 @@ fn run_child(args: &[OsString]) -> Result<(), Box<dyn Error>> {
             let source_version_before = source.version()?;
             let (materializations, commit) =
                 crate::publish_docx_source_edit(Arc::clone(&source), &mut sink)?;
-            let changed = commit.patch().changed();
+            let changed = !commit.patch().is_noop();
             let operations = commit.diagnostics().operations();
             let commit_identity_verified = commit.patch().source().xml_bytes()
                 == case.source_document_xml.as_slice()
-                && commit.snapshot().xml_bytes() == case.candidate_document_xml.as_slice();
+                && commit.patch().target().xml_bytes() == case.candidate_document_xml.as_slice();
             let source_version_after = source.version()?;
             // Both the source-backed package and its FileSource are owned by this
             // local Arc.  Drop them before stopping the clock so provider teardown

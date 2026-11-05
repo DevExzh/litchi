@@ -25,26 +25,24 @@ pub(crate) const REFERENCE_ERROR_CODE: u8 = 0x17;
 pub(crate) fn validate_defined_name(name: &str) -> Result<()> {
     let utf16_len = name.encode_utf16().count();
     if utf16_len == 0 || utf16_len > 255 {
-        return Err(Error::InvalidFormula(format!(
-            "defined name length {utf16_len} is outside 1..=255"
-        )));
+        return Err(Error::InvalidFormula("defined name length is outside 1255"));
     }
     let mut chars = name.chars();
     let first = chars.next().expect("checked non-empty defined name");
     if !is_name_start(first) || !chars.all(is_name_character) {
-        return Err(Error::InvalidFormula(format!(
-            "defined name {name:?} does not follow XLNameWideString grammar"
-        )));
+        return Err(Error::InvalidFormula(
+            "defined name does not follow XLNameWideString grammar",
+        ));
     }
     if name.eq_ignore_ascii_case("TRUE") || name.eq_ignore_ascii_case("FALSE") {
-        return Err(Error::InvalidFormula(format!(
-            "defined name {name:?} is a reserved Boolean literal"
-        )));
+        return Err(Error::InvalidFormula(
+            "defined name is a reserved Boolean literal",
+        ));
     }
     if is_a1_reference(name) || starts_with_r1c1_reference(name) {
-        return Err(Error::InvalidFormula(format!(
-            "defined name {name:?} conflicts with a cell reference"
-        )));
+        return Err(Error::InvalidFormula(
+            "defined name conflicts with a cell reference",
+        ));
     }
     Ok(())
 }
@@ -154,9 +152,7 @@ impl SheetRange {
     /// Create a validated inclusive range of external sheets.
     pub fn sheets(first: u16, last: u16) -> Result<Self> {
         if last < first || last > i16::MAX as u16 {
-            return Err(Error::InvalidFormula(format!(
-                "invalid external sheet range {first}..={last}"
-            )));
+            return Err(Error::InvalidFormula("invalid external sheet range"));
         }
         Ok(Self {
             first: first.cast_signed(),
@@ -268,7 +264,7 @@ impl AreaReference {
     pub fn new(sheets: SheetRange, first: CellLocation, last: CellLocation) -> Result<Self> {
         if last.row < first.row || last.column < first.column {
             return Err(Error::InvalidFormula(
-                "external-name area reference is reversed".to_string(),
+                "external-name area reference is reversed",
             ));
         }
         Ok(Self {
@@ -411,7 +407,7 @@ impl NameFormula {
         let kind = validate_external_name_token(&self.tokens, Some(sheet_count))?;
         if kind != self.kind {
             return Err(Error::InvalidFormula(
-                "external-name formula kind does not match its token".to_string(),
+                "external-name formula kind does not match its token",
             ));
         }
         Ok(())
@@ -455,9 +451,7 @@ impl ErrorValue {
             0x24 => Ok(Self::Number),
             0x2A => Ok(Self::NotAvailable),
             0x2B => Ok(Self::GettingData),
-            _ => Err(Error::InvalidFormula(format!(
-                "invalid cached external error code 0x{code:02X}"
-            ))),
+            _ => Err(Error::InvalidFormula("invalid cached external error code")),
         }
     }
 }
@@ -510,7 +504,7 @@ impl ValueMatrix {
             || self.columns > MAX_XLSB_EXTERNAL_CACHE_COLUMNS
         {
             return Err(Error::InvalidFormula(
-                "external cache dimensions exceed worksheet bounds".to_string(),
+                "external cache dimensions exceed worksheet bounds",
             ));
         }
         let expected = usize::try_from(self.rows)
@@ -520,9 +514,7 @@ impl ValueMatrix {
                     .ok()
                     .and_then(|columns| rows.checked_mul(columns))
             })
-            .ok_or_else(|| {
-                Error::InvalidFormula("external cache dimensions overflow".to_string())
-            })?;
+            .ok_or(Error::InvalidFormula("external cache dimensions overflow"))?;
         if expected != self.values.len() || expected > MAX_XLSB_EXTERNAL_CACHED_VALUES {
             return Err(Error::InvalidLength {
                 expected: expected.min(MAX_XLSB_EXTERNAL_CACHED_VALUES),
@@ -536,7 +528,7 @@ impl ValueMatrix {
                     if value.encode_utf16().count() > MAX_WIDE_STRING_UNITS =>
                 {
                     return Err(Error::InvalidFormula(
-                        "external cached string exceeds 32,767 UTF-16 units".to_string(),
+                        "external cached string exceeds 32,767 UTF-16 units",
                     ));
                 },
                 _ => {},
@@ -616,10 +608,9 @@ impl DefinedName {
                 .scope_sheet_index
                 .is_some_and(|index| usize::from(index) >= sheet_count)
         {
-            return Err(Error::InvalidFormula(format!(
-                "external defined name {:?} has an invalid sheet scope",
-                self.name
-            )));
+            return Err(Error::InvalidFormula(
+                "external defined name has an invalid sheet scope",
+            ));
         }
         if let Some(formula) = &self.formula {
             formula.validate_for_sheets(sheet_count)?;
@@ -723,7 +714,7 @@ impl DdeItem {
         validate_defined_name(&self.name)?;
         if self.supports_ole && self.name != "StdDocumentName" {
             return Err(Error::InvalidFormula(
-                "OLE-supporting DDE item must be named \"StdDocumentName\"".to_string(),
+                "OLE-supporting DDE item must be named \"StdDocumentName\"",
             ));
         }
         if let Some(values) = &self.cached_values {
@@ -1067,7 +1058,7 @@ impl Link {
             || self.entry_count() > MAX_COLLECTION_ITEMS
         {
             return Err(Error::InvalidFormula(
-                "external-link collection exceeds 65,535 items".to_string(),
+                "external-link collection exceeds 65,535 items",
             ));
         }
         let mut folded_sheet_names = HashSet::new();
@@ -1083,16 +1074,14 @@ impl Link {
                 sheet_name,
                 "external sheet-name lowercase keys",
             )?) {
-                return Err(Error::InvalidFormula(format!(
-                    "duplicate external sheet name {sheet_name:?}"
-                )));
+                return Err(Error::InvalidFormula("duplicate external sheet name"));
             }
         }
         match (&self.kind, &self.entries) {
             (Kind::Workbook, Entries::Workbook(entries)) => {
                 if self.detail.is_some() {
                     return Err(Error::InvalidFormula(
-                        "external workbook link cannot have DDE/OLE detail".to_string(),
+                        "external workbook link cannot have DDE/OLE detail",
                     ));
                 }
                 validate_unique_entries(entries.iter().map(DefinedName::name), entries.len())?;
@@ -1116,7 +1105,7 @@ impl Link {
             },
             _ => {
                 return Err(Error::InvalidFormula(
-                    "external-link kind does not match its entry collection".to_string(),
+                    "external-link kind does not match its entry collection",
                 ));
             },
         }
@@ -1134,7 +1123,7 @@ impl Link {
     fn validate_data_source_detail(&self, context: &str) -> Result<()> {
         if !self.sheet_names.is_empty() {
             return Err(Error::InvalidFormula(
-                "DDE/OLE links cannot declare workbook sheet names".to_string(),
+                "DDE/OLE links cannot declare workbook sheet names",
             ));
         }
         validate_wide_string(self.detail.as_deref().unwrap_or_default(), context)
@@ -1179,7 +1168,7 @@ impl Parsed {
     pub fn resolve_source(mut self, source: impl Into<String>) -> Result<Link> {
         if self.relationship_id.is_none() {
             return Err(Error::InvalidFormula(
-                "DDE external links do not have a relationship source".to_string(),
+                "DDE external links do not have a relationship source",
             ));
         }
         self.link.source = source.into();
@@ -1200,9 +1189,7 @@ fn validate_unique_entries<'a>(
         })?;
     for name in names {
         if !seen.insert(lowercase_key(name, "external entry-name lowercase keys")?) {
-            return Err(Error::InvalidFormula(format!(
-                "duplicate external entry name {name:?}"
-            )));
+            return Err(Error::InvalidFormula("duplicate external entry name"));
         }
     }
     Ok(())
@@ -1212,9 +1199,11 @@ fn lowercase_key(value: &str, resource: &'static str) -> Result<String> {
     let mut byte_len = 0usize;
     for character in value.chars() {
         for lowercase in character.to_lowercase() {
-            byte_len = byte_len.checked_add(lowercase.len_utf8()).ok_or_else(|| {
-                Error::InvalidFormula("lowercase external-link key length overflow".to_string())
-            })?;
+            byte_len = byte_len
+                .checked_add(lowercase.len_utf8())
+                .ok_or(Error::InvalidFormula(
+                    "lowercase external-link key length overflow",
+                ))?;
         }
     }
 
@@ -1229,12 +1218,10 @@ fn lowercase_key(value: &str, resource: &'static str) -> Result<String> {
     Ok(key)
 }
 
-fn validate_wide_string(value: &str, context: &str) -> Result<()> {
+fn validate_wide_string(value: &str, _context: &str) -> Result<()> {
     let units = value.encode_utf16().count();
     if units == 0 || units > MAX_WIDE_STRING_UNITS || value.contains('\0') {
-        return Err(Error::InvalidFormula(format!(
-            "{context} is empty, too long, or contains NUL"
-        )));
+        return Err(Error::InvalidFormula("is empty, too long, or contains NUL"));
     }
     Ok(())
 }
@@ -1242,7 +1229,7 @@ fn validate_wide_string(value: &str, context: &str) -> Result<()> {
 pub fn validate_number(number: f64) -> Result<()> {
     if !(number.is_normal() || (number == 0.0 && !number.is_sign_negative())) {
         return Err(Error::InvalidFormula(
-            "external cache number is not a normalized finite Xnum".to_string(),
+            "external cache number is not a normalized finite Xnum",
         ));
     }
     Ok(())
@@ -1252,9 +1239,9 @@ fn validate_external_name_token(
     token: &[u8],
     sheet_count: Option<usize>,
 ) -> Result<NameFormulaKind> {
-    let (&opcode, rest) = token
-        .split_first()
-        .ok_or_else(|| Error::InvalidFormula("external-name formula token is empty".to_string()))?;
+    let (&opcode, rest) = token.split_first().ok_or(Error::InvalidFormula(
+        "external-name formula token is empty",
+    ))?;
     let (kind, expected) = match opcode {
         EXT_PTG_REFERENCE => (NameFormulaKind::CellReference, 9),
         EXT_PTG_AREA => (NameFormulaKind::AreaReference, 13),
@@ -1262,9 +1249,9 @@ fn validate_external_name_token(
         EXT_PTG_AREA_ERROR => (NameFormulaKind::AreaReferenceError, 13),
         EXT_PTG_ERROR => (NameFormulaKind::ReferenceError, 2),
         _ => {
-            return Err(Error::InvalidFormula(format!(
-                "unsupported external-name formula token 0x{opcode:02X}"
-            )));
+            return Err(Error::InvalidFormula(
+                "unsupported external-name formula token",
+            ));
         },
     };
     if token.len() != expected {
@@ -1275,9 +1262,7 @@ fn validate_external_name_token(
     }
     if kind == NameFormulaKind::ReferenceError {
         if rest != [REFERENCE_ERROR_CODE] {
-            return Err(Error::InvalidFormula(
-                "ExtPtgErr must contain #REF!".to_string(),
-            ));
+            return Err(Error::InvalidFormula("ExtPtgErr must contain #REF!"));
         }
         return Ok(kind);
     }
@@ -1293,7 +1278,7 @@ fn validate_external_name_token(
             let last_column = validate_small_column(u16::from_le_bytes([token[11], token[12]]))?;
             if last_row < first_row || last_column < first_column {
                 return Err(Error::InvalidFormula(
-                    "external-name area reference is reversed".to_string(),
+                    "external-name area reference is reversed",
                 ));
             }
         },
@@ -1307,16 +1292,14 @@ fn validate_external_sheet_pair(data: &[u8], sheet_count: Option<usize>) -> Resu
     let first = i16::from_le_bytes([data[0], data[1]]);
     let last = i16::from_le_bytes([data[2], data[3]]);
     if first < -1 || last < -1 || (first == -1) != (last == -1) || (first >= 0 && last < first) {
-        return Err(Error::InvalidFormula(format!(
-            "invalid external sheet range {first}..={last}"
-        )));
+        return Err(Error::InvalidFormula("invalid external sheet range"));
     }
     if let Some(sheet_count) = sheet_count
         && last >= 0
         && usize::try_from(last).map_or(true, |index| index >= sheet_count)
     {
         return Err(Error::InvalidFormula(
-            "external-name formula sheet range exceeds BrtSupTabs".to_string(),
+            "external-name formula sheet range exceeds BrtSupTabs",
         ));
     }
     Ok(())
@@ -1346,9 +1329,9 @@ fn decode_cell_location(row: &[u8], column: &[u8]) -> CellLocation {
 fn validate_small_column(encoded: u16) -> Result<u16> {
     let column = encoded & 0x3FFF;
     if column >= 256 {
-        return Err(Error::InvalidFormula(format!(
-            "external-name formula column {column} exceeds 255"
-        )));
+        return Err(Error::InvalidFormula(
+            "external-name formula column exceeds 255",
+        ));
     }
     Ok(column)
 }

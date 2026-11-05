@@ -1,5 +1,7 @@
 //! Bounded XML codec for `DrawingML` color fragments.
 
+use std::fmt;
+
 use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event};
 
@@ -7,12 +9,12 @@ use crate::{Error, Result};
 
 use super::model::{
     Angle, Base, FixedPercentage, Hsl, PositiveAngle, PositiveFixedPercentage, PositivePercentage,
-    Preset, Rgb, ScRgb, Scheme, System, Transform, Transformed, Unknown, Value, write_hex,
+    Preset, Rgb, ScRgb, Scheme, System, Transform, Transformed, Unknown, Value,
 };
 use super::validation;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
-pub use super::validation::{MAX_DEPTH, MAX_NODES, MAX_TRANSFORMS, MAX_XML_BYTES};
+pub use super::validation::{Limits, MAX_DEPTH, MAX_NODES, MAX_TRANSFORMS, MAX_XML_BYTES};
 
 const VAL: &[u8] = b"val";
 const LAST_CLR: &[u8] = b"lastClr";
@@ -61,8 +63,9 @@ impl<'a> From<&'a Base> for BaseRef<'a> {
 ///
 /// Returns an error when input violates DrawingML constraints, exceeds a configured
 /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-pub fn read(xml: &[u8]) -> Result<Value> {
-    let validated = validation::validated_fragment(xml)?;
+pub fn read(xml: &[u8], limits: &Limits) -> Result<Value> {
+    let limits = limits.validate()?;
+    let validated = validation::validated_fragment(xml, limits)?;
     let mut reader = Reader::from_reader(validated);
 
     loop {
@@ -77,12 +80,14 @@ pub fn read(xml: &[u8]) -> Result<Value> {
                     .trim()
                     .is_empty() => {},
             Event::Start(element) => {
-                return Ok(read_choice(&mut reader, &element)?
+                return Ok(read_choice(&mut reader, &element, limits.max_transforms)?
                     .unwrap_or_else(|| Value::Unknown(Unknown::from_validated(validated))));
             },
             Event::Empty(element) => {
-                return Ok(parse_empty_choice(&mut reader, &element)?
-                    .unwrap_or_else(|| Value::Unknown(Unknown::from_validated(validated))));
+                return Ok(
+                    parse_empty_choice(&mut reader, &element, limits.max_transforms)?
+                        .unwrap_or_else(|| Value::Unknown(Unknown::from_validated(validated))),
+                );
             },
             Event::End(_)
             | Event::Text(_)
@@ -104,37 +109,47 @@ pub fn read(xml: &[u8]) -> Result<Value> {
 ///
 /// Returns an error when input violates DrawingML constraints, exceeds a configured
 /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-pub fn write(value: &Value) -> Result<Vec<u8>> {
-    let mut output = String::new();
-    match value {
-        Value::Rgb(rgb) => write_base(&mut output, BaseRef::Rgb(*rgb), false),
-        Value::Scheme(scheme) => write_base(&mut output, BaseRef::Scheme(*scheme), false),
-        Value::ScRgb(color) => write_base(&mut output, BaseRef::ScRgb(*color), false),
-        Value::Hsl(color) => write_base(&mut output, BaseRef::Hsl(*color), false),
-        Value::System(color) => write_base(&mut output, BaseRef::System(color), false),
-        Value::Preset(color) => write_base(&mut output, BaseRef::Preset(color), false),
-        Value::Transformed(value) => {
-            write_base(&mut output, BaseRef::from(value.base()), true);
-            for transform in value.transforms() {
-                write_transform(&mut output, *transform);
-            }
-            output.push_str("</a:");
-            output.push_str(base_name(value.base()));
-            output.push('>');
-        },
-        Value::Unknown(value) => return Ok(value.as_xml().to_vec()),
+pub fn write(value: &Value, limits: &Limits) -> Result<Vec<u8>> {
+    let limits = limits.validate()?;
+    if let Value::Unknown(value) = value {
+        let validated = validation::validated_fragment(value.as_xml(), limits)?;
+        if validated.len() > limits.max_xml_bytes {
+            return Err(Error::limit(
+                crate::LimitKind::XmlBytes,
+                validated.len(),
+                limits.max_xml_bytes,
+            ));
+        }
+        return Ok(validated.to_vec());
     }
+    validate_typed_limits(value, limits)?;
 
-    if output.len() > MAX_XML_BYTES {
-        return Err(Error::Limit {
-            resource: "DrawingML color XML",
-            limit: MAX_XML_BYTES,
-        });
+    let mut length = LengthWriter::default();
+    write_value_xml(&mut length, value).map_err(format_error)?;
+    if length.overflow {
+        return Err(Error::limit(
+            crate::LimitKind::XmlBytes,
+            usize::MAX,
+            limits.max_xml_bytes,
+        ));
     }
+    if length.len > limits.max_xml_bytes {
+        return Err(Error::limit(
+            crate::LimitKind::XmlBytes,
+            length.len,
+            limits.max_xml_bytes,
+        ));
+    }
+    let mut output = String::with_capacity(length.len);
+    write_value_xml(&mut output, value).map_err(format_error)?;
     Ok(output.into_bytes())
 }
 
-fn read_choice(reader: &mut Reader<&[u8]>, element: &BytesStart<'_>) -> Result<Option<Value>> {
+fn read_choice(
+    reader: &mut Reader<&[u8]>,
+    element: &BytesStart<'_>,
+    max_transforms: usize,
+) -> Result<Option<Value>> {
     let Some(base) = parse_base(element, reader.decoder())? else {
         return Ok(None);
     };
@@ -156,13 +171,13 @@ fn read_choice(reader: &mut Reader<&[u8]>, element: &BytesStart<'_>) -> Result<O
                 let Some(transform) = parse_transform(&element, reader.decoder())? else {
                     return Ok(None);
                 };
-                push_transform(&mut transforms, transform)?;
+                push_transform(&mut transforms, transform, max_transforms)?;
             },
             Event::Start(element) => {
                 let Some(transform) = parse_started_transform(reader, &element)? else {
                     return Ok(None);
                 };
-                push_transform(&mut transforms, transform)?;
+                push_transform(&mut transforms, transform, max_transforms)?;
             },
             Event::End(element) if element.name().as_ref() == root_name.as_slice() => break,
             Event::Eof => {
@@ -195,6 +210,7 @@ fn read_choice(reader: &mut Reader<&[u8]>, element: &BytesStart<'_>) -> Result<O
 fn parse_empty_choice(
     reader: &mut Reader<&[u8]>,
     element: &BytesStart<'_>,
+    _max_transforms: usize,
 ) -> Result<Option<Value>> {
     let decoder = reader.decoder();
     let Some(base) = parse_base(element, decoder)? else {
@@ -377,12 +393,17 @@ fn parse_transform(
     }))
 }
 
-fn push_transform(transforms: &mut Vec<Transform>, transform: Transform) -> Result<()> {
-    if transforms.len() >= MAX_TRANSFORMS {
-        return Err(Error::Limit {
-            resource: "DrawingML color transforms",
-            limit: MAX_TRANSFORMS,
-        });
+fn push_transform(
+    transforms: &mut Vec<Transform>,
+    transform: Transform,
+    max_transforms: usize,
+) -> Result<()> {
+    if transforms.len() >= max_transforms {
+        return Err(Error::limit(
+            crate::LimitKind::ColorTransforms,
+            transforms.len() + 1,
+            max_transforms,
+        ));
     }
     transforms.push(transform);
     Ok(())
@@ -438,57 +459,106 @@ fn optional<'a>(attributes: &'a [(Vec<u8>, String)], name: &[u8]) -> Option<&'a 
         .map(|(_, value)| value.as_str())
 }
 
-fn write_base(output: &mut String, base: BaseRef<'_>, transformed: bool) {
+fn validate_typed_limits(value: &Value, limits: Limits) -> Result<()> {
+    let (nodes, depth, transforms) = match value {
+        Value::Transformed(value) => (
+            1usize + value.transforms().len(),
+            2usize,
+            value.transforms().len(),
+        ),
+        Value::Rgb(_)
+        | Value::Scheme(_)
+        | Value::ScRgb(_)
+        | Value::Hsl(_)
+        | Value::System(_)
+        | Value::Preset(_)
+        | Value::Unknown(_) => (1, 1, 0),
+    };
+    if transforms > limits.max_transforms {
+        return Err(Error::limit(
+            crate::LimitKind::ColorTransforms,
+            transforms,
+            limits.max_transforms,
+        ));
+    }
+    if nodes > limits.max_nodes {
+        return Err(Error::limit(
+            crate::LimitKind::XmlNodes,
+            nodes,
+            limits.max_nodes,
+        ));
+    }
+    if depth > limits.max_depth {
+        return Err(Error::limit(
+            crate::LimitKind::XmlDepth,
+            depth,
+            limits.max_depth,
+        ));
+    }
+    Ok(())
+}
+
+fn write_value_xml<W: fmt::Write>(output: &mut W, value: &Value) -> fmt::Result {
+    match value {
+        Value::Rgb(rgb) => write_base(output, BaseRef::Rgb(*rgb), false),
+        Value::Scheme(scheme) => write_base(output, BaseRef::Scheme(*scheme), false),
+        Value::ScRgb(color) => write_base(output, BaseRef::ScRgb(*color), false),
+        Value::Hsl(color) => write_base(output, BaseRef::Hsl(*color), false),
+        Value::System(color) => write_base(output, BaseRef::System(color), false),
+        Value::Preset(color) => write_base(output, BaseRef::Preset(color), false),
+        Value::Transformed(value) => {
+            write_base(output, BaseRef::from(value.base()), true)?;
+            for transform in value.transforms() {
+                write_transform(output, *transform)?;
+            }
+            write!(output, "</a:{}>", base_name(value.base()))
+        },
+        Value::Unknown(_) => unreachable!("opaque values are handled before typed serialization"),
+    }
+}
+
+fn write_base<W: fmt::Write>(output: &mut W, base: BaseRef<'_>, transformed: bool) -> fmt::Result {
     match base {
         BaseRef::Rgb(rgb) => {
-            output.push_str("<a:srgbClr val=\"");
-            write_hex(output, rgb);
-            output.push('"');
+            write!(output, "<a:srgbClr val=\"{rgb}\"")?;
         },
         BaseRef::Scheme(scheme) => {
-            output.push_str("<a:schemeClr val=\"");
-            output.push_str(scheme.token());
-            output.push('"');
+            write!(output, "<a:schemeClr val=\"{}\"", scheme.token())?;
         },
         BaseRef::ScRgb(color) => {
-            output.push_str("<a:scrgbClr r=\"");
-            output.push_str(&color.red().value().to_string());
-            output.push_str("\" g=\"");
-            output.push_str(&color.green().value().to_string());
-            output.push_str("\" b=\"");
-            output.push_str(&color.blue().value().to_string());
-            output.push('"');
+            write!(
+                output,
+                "<a:scrgbClr r=\"{}\" g=\"{}\" b=\"{}\"",
+                color.red().value(),
+                color.green().value(),
+                color.blue().value()
+            )?;
         },
         BaseRef::Hsl(color) => {
-            output.push_str("<a:hslClr hue=\"");
-            output.push_str(&color.hue().value().to_string());
-            output.push_str("\" sat=\"");
-            output.push_str(&color.saturation().value().to_string());
-            output.push_str("\" lum=\"");
-            output.push_str(&color.luminance().value().to_string());
-            output.push('"');
+            write!(
+                output,
+                "<a:hslClr hue=\"{}\" sat=\"{}\" lum=\"{}\"",
+                color.hue().value(),
+                color.saturation().value(),
+                color.luminance().value()
+            )?;
         },
         BaseRef::System(color) => {
-            output.push_str("<a:sysClr val=\"");
-            output.push_str(color.token());
-            output.push('"');
+            write!(output, "<a:sysClr val=\"{}\"", color.token())?;
             if let Some(last) = color.last_rgb() {
-                output.push_str(" lastClr=\"");
-                write_hex(output, last);
-                output.push('"');
+                write!(output, " lastClr=\"{last}\"")?;
             }
         },
         BaseRef::Preset(color) => {
-            output.push_str("<a:prstClr val=\"");
-            output.push_str(color.token());
-            output.push('"');
+            write!(output, "<a:prstClr val=\"{}\"", color.token())?;
         },
     }
     if transformed {
-        output.push('>');
+        output.write_char('>')?;
     } else {
-        output.push_str("/>");
+        output.write_str("/>")?;
     }
+    Ok(())
 }
 
 fn base_name(base: &Base) -> &'static str {
@@ -502,51 +572,72 @@ fn base_name(base: &Base) -> &'static str {
     }
 }
 
-fn write_transform(output: &mut String, transform: Transform) {
+fn write_transform<W: fmt::Write>(output: &mut W, transform: Transform) -> fmt::Result {
     match transform {
-        Transform::Alpha(value) => write_value(output, "alpha", &value.value()),
-        Transform::AlphaMod(value) => write_value(output, "alphaMod", &value.value()),
-        Transform::AlphaOff(value) => write_value(output, "alphaOff", &value.value()),
-        Transform::Blue(value) => write_value(output, "blue", &value.value()),
-        Transform::BlueMod(value) => write_value(output, "blueMod", &value.value()),
-        Transform::BlueOff(value) => write_value(output, "blueOff", &value.value()),
+        Transform::Alpha(value) => write_value(output, "alpha", value.value()),
+        Transform::AlphaMod(value) => write_value(output, "alphaMod", value.value()),
+        Transform::AlphaOff(value) => write_value(output, "alphaOff", value.value()),
+        Transform::Blue(value) => write_value(output, "blue", value.value()),
+        Transform::BlueMod(value) => write_value(output, "blueMod", value.value()),
+        Transform::BlueOff(value) => write_value(output, "blueOff", value.value()),
         Transform::Complement => write_empty(output, "comp"),
         Transform::Gamma => write_empty(output, "gamma"),
         Transform::Gray => write_empty(output, "gray"),
-        Transform::Green(value) => write_value(output, "green", &value.value()),
-        Transform::GreenMod(value) => write_value(output, "greenMod", &value.value()),
-        Transform::GreenOff(value) => write_value(output, "greenOff", &value.value()),
-        Transform::Hue(value) => write_value(output, "hue", &value.value()),
-        Transform::HueMod(value) => write_value(output, "hueMod", &value.value()),
-        Transform::HueOff(value) => write_value(output, "hueOff", &value.value()),
+        Transform::Green(value) => write_value(output, "green", value.value()),
+        Transform::GreenMod(value) => write_value(output, "greenMod", value.value()),
+        Transform::GreenOff(value) => write_value(output, "greenOff", value.value()),
+        Transform::Hue(value) => write_value(output, "hue", value.value()),
+        Transform::HueMod(value) => write_value(output, "hueMod", value.value()),
+        Transform::HueOff(value) => write_value(output, "hueOff", value.value()),
         Transform::Inverse => write_empty(output, "inv"),
         Transform::InverseGamma => write_empty(output, "invGamma"),
-        Transform::Lum(value) => write_value(output, "lum", &value.value()),
-        Transform::LumMod(value) => write_value(output, "lumMod", &value.value()),
-        Transform::LumOff(value) => write_value(output, "lumOff", &value.value()),
-        Transform::Red(value) => write_value(output, "red", &value.value()),
-        Transform::RedMod(value) => write_value(output, "redMod", &value.value()),
-        Transform::RedOff(value) => write_value(output, "redOff", &value.value()),
-        Transform::Sat(value) => write_value(output, "sat", &value.value()),
-        Transform::SatMod(value) => write_value(output, "satMod", &value.value()),
-        Transform::SatOff(value) => write_value(output, "satOff", &value.value()),
-        Transform::Shade(value) => write_value(output, "shade", &value.value()),
-        Transform::Tint(value) => write_value(output, "tint", &value.value()),
+        Transform::Lum(value) => write_value(output, "lum", value.value()),
+        Transform::LumMod(value) => write_value(output, "lumMod", value.value()),
+        Transform::LumOff(value) => write_value(output, "lumOff", value.value()),
+        Transform::Red(value) => write_value(output, "red", value.value()),
+        Transform::RedMod(value) => write_value(output, "redMod", value.value()),
+        Transform::RedOff(value) => write_value(output, "redOff", value.value()),
+        Transform::Sat(value) => write_value(output, "sat", value.value()),
+        Transform::SatMod(value) => write_value(output, "satMod", value.value()),
+        Transform::SatOff(value) => write_value(output, "satOff", value.value()),
+        Transform::Shade(value) => write_value(output, "shade", value.value()),
+        Transform::Tint(value) => write_value(output, "tint", value.value()),
     }
 }
 
-fn write_value(output: &mut String, name: &str, value: &impl ToString) {
-    output.push_str("<a:");
-    output.push_str(name);
-    output.push_str(" val=\"");
-    output.push_str(&value.to_string());
-    output.push_str("\"/>");
+fn write_value<W: fmt::Write, V: fmt::Display>(
+    output: &mut W,
+    name: &str,
+    value: V,
+) -> fmt::Result {
+    write!(output, "<a:{name} val=\"{value}\"/>")
 }
 
-fn write_empty(output: &mut String, name: &str) {
-    output.push_str("<a:");
-    output.push_str(name);
-    output.push_str("/>");
+fn write_empty<W: fmt::Write>(output: &mut W, name: &str) -> fmt::Result {
+    write!(output, "<a:{name}/>")
+}
+
+fn format_error(error: fmt::Error) -> Error {
+    Error::Xml(error.to_string())
+}
+
+#[derive(Default)]
+struct LengthWriter {
+    len: usize,
+    overflow: bool,
+}
+
+impl fmt::Write for LengthWriter {
+    fn write_str(&mut self, value: &str) -> fmt::Result {
+        match self.len.checked_add(value.len()) {
+            Some(length) => self.len = length,
+            None => {
+                self.len = usize::MAX;
+                self.overflow = true;
+            },
+        }
+        Ok(())
+    }
 }
 
 fn tail_is_empty(reader: &mut Reader<&[u8]>) -> Result<bool> {

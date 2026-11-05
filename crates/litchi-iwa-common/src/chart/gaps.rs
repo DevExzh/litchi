@@ -7,6 +7,7 @@
 
 /// Validation failures for chart-gap percentages.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     /// The supplied percentage was NaN or infinite.
     #[error("chart gap percentage must be finite")]

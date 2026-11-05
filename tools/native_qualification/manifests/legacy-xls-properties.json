@@ -1,0 +1,125 @@
+{
+  "schema": "litchi.native-qualification.v1",
+  "lane": "legacy-xls-properties",
+  "output_dir": "$XLS_NATIVE_QUAL_OUTPUT",
+  "path_prepend": ["$LITCHI_COORD_BIN"],
+  "rounds": 31,
+  "abba_order": ["before", "after", "after", "before"],
+  "environment": {
+    "CARGO_PROFILE_RELEASE_DEBUG": "0",
+    "TMPDIR": "$XLS_NATIVE_TMP"
+  },
+  "preparation_receipt": "$XLS_NATIVE_PREPARATION_RECEIPT",
+  "validators": [
+    {
+      "id": "legacy-native-contract",
+      "script": "$LITCHI_NATIVE_QUAL_ROOT/tools/native_qualification/legacy_native_validator.py",
+      "argv": [
+        "python3",
+        "$LITCHI_NATIVE_QUAL_ROOT/tools/native_qualification/legacy_native_validator.py",
+        "{output_dir}",
+        "legacy-xls-properties",
+        "$XLS_BASELINE_REVISION",
+        "$XLS_CANDIDATE_REVISION",
+        "$XLS_TARGET_ROOT/before",
+        "$XLS_TARGET_ROOT/after",
+        "{manifest_path}"
+      ],
+      "cwd": "{output_dir}",
+      "outputs": ["{output_dir}/summary.json"],
+      "require_stdout": true
+    }
+  ],
+  "shared": {
+    "probe_paths": ["crates/litchi-ops/examples/ole_metadata_bench.rs"],
+    "fixture_paths": [
+      "test-data/ole/doc/FancyFoot.doc",
+      "test-data/ole/xls/Simple.xls",
+      "test-data/ole/ppt/SampleShow.ppt"
+    ]
+  },
+  "legs": {
+    "before": {
+      "source_root": "$XLS_BEFORE_SOURCE",
+      "target_dir": "$XLS_TARGET_ROOT/before",
+      "allow_dirty": true,
+      "allowed_dirty_paths": [
+        "Cargo.lock",
+        "crates/litchi-ops/examples/ole_metadata_bench.rs"
+      ],
+      "lock_paths": ["Cargo.lock"],
+      "build": [
+        {
+          "id": "xls_metadata_bench",
+          "argv": [
+            "cargo",
+            "build",
+            "--release",
+            "--manifest-path",
+            "Cargo.toml",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--features",
+            "doc,xls,ppt",
+            "--example",
+            "ole_metadata_bench"
+          ],
+          "artifacts": ["{target_dir}/release/examples/ole_metadata_bench"]
+        }
+      ],
+      "programs": [
+        {
+          "id": "metadata",
+          "binary": "{target_dir}/release/examples/ole_metadata_bench",
+          "argv": [],
+          "outputs": [],
+          "stdout": "{output_dir}/xls-properties-block-{block}-{leg}-{index}.jsonl",
+          "stderr": "{output_dir}/xls-properties-block-{block}-{leg}-{index}.stderr",
+          "require_stdout": true
+        }
+      ]
+    },
+    "after": {
+      "source_root": "$XLS_AFTER_SOURCE",
+      "target_dir": "$XLS_TARGET_ROOT/after",
+      "allow_dirty": true,
+      "allowed_dirty_paths": [
+        "Cargo.lock",
+        "crates/litchi-ops/examples/ole_metadata_bench.rs"
+      ],
+      "lock_paths": ["Cargo.lock"],
+      "build": [
+        {
+          "id": "xls_metadata_bench",
+          "argv": [
+            "cargo",
+            "build",
+            "--release",
+            "--manifest-path",
+            "Cargo.toml",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--features",
+            "doc,xls,ppt",
+            "--example",
+            "ole_metadata_bench"
+          ],
+          "artifacts": ["{target_dir}/release/examples/ole_metadata_bench"]
+        }
+      ],
+      "programs": [
+        {
+          "id": "metadata",
+          "binary": "{target_dir}/release/examples/ole_metadata_bench",
+          "argv": [],
+          "outputs": [],
+          "stdout": "{output_dir}/xls-properties-block-{block}-{leg}-{index}.jsonl",
+          "stderr": "{output_dir}/xls-properties-block-{block}-{leg}-{index}.stderr",
+          "require_stdout": true
+        }
+      ]
+    }
+  }
+}

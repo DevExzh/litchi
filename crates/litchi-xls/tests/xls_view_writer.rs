@@ -1,13 +1,13 @@
 use std::io::Cursor;
 
-use litchi_xls::Workbook;
+use litchi_xls::raw::Reader;
 use litchi_xls::view::{PaneType, Range};
 use litchi_xls::writer::view::{Pane, Scale, Selection, View};
-use litchi_xls::writer::{Column, FrozenPanes, Row, Writer};
+use litchi_xls::writer::{Builder, Column, FrozenPanes, Row};
 
 #[test]
 fn writes_and_reads_typed_view_state() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("View").unwrap();
     let pane = Pane::split(1_200, 800, 7, 4, PaneType::LowerRight).unwrap();
     let selection = Selection::new(
@@ -28,8 +28,8 @@ fn writes_and_reads_typed_view_state() {
     writer.put_view(sheet, view).unwrap();
 
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
-    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let view = workbook.xls_worksheet(0).unwrap().worksheet_view().unwrap();
     assert!(view.shows_formulas());
     assert!(!view.shows_gridlines());
@@ -47,7 +47,7 @@ fn writes_and_reads_typed_view_state() {
 
 #[test]
 fn freeze_and_scale_round_trip() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Compat").unwrap();
     writer
         .freeze_panes(
@@ -59,8 +59,8 @@ fn freeze_and_scale_round_trip() {
         .put_scale(sheet, Some(Scale::new(3, 4).unwrap()))
         .unwrap();
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
-    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let view = workbook.xls_worksheet(0).unwrap().worksheet_view().unwrap();
     assert!(view.has_frozen_panes());
     assert!(view.is_frozen_without_split());

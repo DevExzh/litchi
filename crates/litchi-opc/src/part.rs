@@ -119,7 +119,7 @@ pub trait Part: PartClone + Send + Sync {
     ///
     /// # Errors
     ///
-    /// Returns the refusal the decode produced: [`OpcError::ReadLimit`] for
+    /// Returns the refusal the decode produced: [`OpcError::Limit`] for
     /// `PartBytes` or `TotalPartBytes` when the central directory
     /// under-declared the member, an allocation failure, a cancellation, an
     /// I/O error, or a ZIP error for a corrupt Deflate stream or a CRC
@@ -127,6 +127,18 @@ pub trait Part: PartClone + Send + Sync {
     /// later access.
     fn ensure_payload(&self) -> Result<()> {
         Ok(())
+    }
+
+    /// Return this part's admitted payload length without materializing a
+    /// deferred source member.
+    ///
+    /// Built-in parts opened from an owned source answer from the checked
+    /// central-directory size retained at admission. Their first byte access
+    /// still verifies that size against the retained archive and decoded
+    /// payload. Other implementations use the default fallible byte access.
+    fn payload_len(&self) -> Result<usize> {
+        self.ensure_payload()?;
+        Ok(self.blob().len())
     }
 
     /// The payload if it is already available, without decoding anything.
@@ -352,6 +364,10 @@ impl Part for BlobPart {
 
     fn ensure_payload(&self) -> Result<()> {
         self.blob.force().map(|_| ())
+    }
+
+    fn payload_len(&self) -> Result<usize> {
+        self.blob.payload_len()
     }
 
     fn decoded_blob(&self) -> Option<&[u8]> {
@@ -632,6 +648,10 @@ impl Part for XmlPart {
         self.xml_bytes.force().map(|_| ())
     }
 
+    fn payload_len(&self) -> Result<usize> {
+        self.xml_bytes.payload_len()
+    }
+
     fn decoded_blob(&self) -> Option<&[u8]> {
         self.xml_bytes.decoded().map(|blob| blob.as_slice())
     }
@@ -716,6 +736,18 @@ impl<'part> PartMetadata<'part> {
         self.part.rels()
     }
 
+    /// Return the part's admitted payload length without decoding a deferred
+    /// source member.
+    ///
+    /// A source-backed part reports the central-directory length that was
+    /// checked against its retained [`SourceLimits`](crate::SourceLimits)
+    /// policy when the package was opened. The first byte access still checks
+    /// the retained metadata and decoded length, so this projection does not
+    /// turn attacker-controlled size metadata into published bytes.
+    pub fn payload_len(&self) -> Result<usize> {
+        self.part.payload_len()
+    }
+
     /// Get the target reference for a relationship ID.
     ///
     /// # Errors
@@ -736,6 +768,19 @@ impl<'part> PartMetadata<'part> {
     #[must_use]
     pub fn payload_is_decoded(&self) -> bool {
         self.part.decoded_blob().is_some()
+    }
+
+    /// The capacity of the payload allocation if the payload is already
+    /// available, without decoding it; `None` exactly when
+    /// [`Self::payload_is_decoded`] is `false`.
+    ///
+    /// This serves retained-data accounting and is not part of the supported
+    /// surface.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn decoded_payload_capacity(&self) -> Option<usize> {
+        self.part.decoded_blob()?;
+        Some(self.part.blob_arc().capacity())
     }
 }
 

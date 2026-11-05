@@ -1,0 +1,32 @@
+[package]
+name = "litchi-perf-baseline"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[features]
+default = ["current-xlsx-raw-opc"]
+allocator-metrics = []
+current-xlsx-raw-opc = []
+legacy-xlsx-raw-opc = []
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "xlsx-raw-identity-alloc"
+path = "src/bin/xlsx_raw_identity_alloc.rs"
+required-features = ["allocator-metrics"]
+
+[[bin]]
+name = "xlsx-raw-identity-native"
+path = "src/bin/xlsx_raw_identity_native.rs"
+
+[dependencies]
+litchi-opc = { path = "../../../crates/litchi-opc" }
+litchi-xlsx = { path = "../../../crates/litchi-xlsx" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.11"
+
+[workspace]

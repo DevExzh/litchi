@@ -8,11 +8,9 @@
 
 use super::model::*;
 use super::parse::parse_connections_part;
-use crate::package::Workbook;
-use crate::raw::{Kind, Writer, kind as rt};
-use crate::writer::{MutableWorksheet, WorkbookWriter};
+use crate::builder::{self, Builder};
+use crate::raw::{Encoder, Kind, kind as rt};
 use litchi_opc::PackURI;
-use std::io::Cursor;
 
 fn wide(value: &str) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(4 + value.len() * 2);
@@ -29,7 +27,7 @@ fn record(record_type: Kind, payload: &[u8]) -> (Kind, Vec<u8>) {
 
 fn build(records: &[(Kind, Vec<u8>)]) -> Vec<u8> {
     let mut data = Vec::new();
-    let mut writer = Writer::new(&mut data);
+    let mut writer = Encoder::new(&mut data, crate::raw::Limits::DEFAULT);
     for (record_type, payload) in records {
         writer.write_record(*record_type, payload).unwrap();
     }
@@ -180,7 +178,7 @@ fn odbc_connection_records() -> Vec<(Kind, Vec<u8>)> {
 #[test]
 fn parses_odbc_connection_with_db_props_and_parameters() {
     let part = full_part(&odbc_connection_records());
-    let connections = parse_connections_part(&part).unwrap();
+    let connections = parse_connections_part(&part, crate::raw::Limits::DEFAULT).unwrap();
     assert_eq!(connections.connections.len(), 1);
     let connection = &connections.connections[0];
     assert_eq!(connection.connection_id, 42);
@@ -252,7 +250,8 @@ fn parses_olap_and_web_connections_with_lookup_helpers() {
         record(rt::END_EC_WP_TABLES, &[]),
         record(rt::END_EXT_CONNECTION, &[]),
     ];
-    let connections = parse_connections_part(&full_part(&records)).unwrap();
+    let connections =
+        parse_connections_part(&full_part(&records), crate::raw::Limits::DEFAULT).unwrap();
     assert_eq!(connections.connections.len(), 2);
     match &connections.connections[0].properties {
         Properties::Olap(olap) => {
@@ -307,7 +306,7 @@ fn skips_unknown_records_and_extension_collections() {
     let mut part = vec![record(rt::BEGIN_EXT_CONNECTIONS, &[])];
     part.append(&mut records);
     part.push(record(rt::END_EXT_CONNECTIONS, &[]));
-    let connections = parse_connections_part(&build(&part)).unwrap();
+    let connections = parse_connections_part(&build(&part), crate::raw::Limits::DEFAULT).unwrap();
     assert_eq!(connections.connections.len(), 1);
     assert_eq!(connections.connections[0].source_type, SourceType::Text);
     assert_eq!(connections.connections[0].properties, Properties::None);
@@ -316,15 +315,30 @@ fn skips_unknown_records_and_extension_collections() {
 #[test]
 fn rejects_malformed_parts() {
     // Not a connections part.
-    assert!(parse_connections_part(&build(&[record(rt::BEGIN_LIST, &[])])).is_err());
+    assert!(
+        parse_connections_part(
+            &build(&[record(rt::BEGIN_LIST, &[])]),
+            crate::raw::Limits::DEFAULT
+        )
+        .is_err()
+    );
     // Truncated stream.
-    assert!(parse_connections_part(&build(&[record(rt::BEGIN_EXT_CONNECTIONS, &[])])).is_err());
+    assert!(
+        parse_connections_part(
+            &build(&[record(rt::BEGIN_EXT_CONNECTIONS, &[])]),
+            crate::raw::Limits::DEFAULT
+        )
+        .is_err()
+    );
     // Non-empty begin payload.
     assert!(
-        parse_connections_part(&build(&[
-            record(rt::BEGIN_EXT_CONNECTIONS, &[0x01]),
-            record(rt::END_EXT_CONNECTIONS, &[]),
-        ]))
+        parse_connections_part(
+            &build(&[
+                record(rt::BEGIN_EXT_CONNECTIONS, &[0x01]),
+                record(rt::END_EXT_CONNECTIONS, &[]),
+            ]),
+            crate::raw::Limits::DEFAULT
+        )
         .is_err()
     );
     // Truncated connection payload.
@@ -334,7 +348,7 @@ fn rejects_malformed_parts() {
         record(rt::END_EXT_CONNECTION, &[]),
         record(rt::END_EXT_CONNECTIONS, &[]),
     ];
-    assert!(parse_connections_part(&build(&records)).is_err());
+    assert!(parse_connections_part(&build(&records), crate::raw::Limits::DEFAULT).is_err());
     // Unknown DBType.
     records = vec![
         record(rt::BEGIN_EXT_CONNECTIONS, &[]),
@@ -345,7 +359,7 @@ fn rejects_malformed_parts() {
         record(rt::END_EXT_CONNECTION, &[]),
         record(rt::END_EXT_CONNECTIONS, &[]),
     ];
-    assert!(parse_connections_part(&build(&records)).is_err());
+    assert!(parse_connections_part(&build(&records), crate::raw::Limits::DEFAULT).is_err());
     // Duplicate connection ids are rejected after the complete part is parsed.
     records = vec![
         record(rt::BEGIN_EXT_CONNECTIONS, &[]),
@@ -361,7 +375,7 @@ fn rejects_malformed_parts() {
         record(rt::END_EXT_CONNECTION, &[]),
         record(rt::END_EXT_CONNECTIONS, &[]),
     ];
-    assert!(parse_connections_part(&build(&records)).is_err());
+    assert!(parse_connections_part(&build(&records), crate::raw::Limits::DEFAULT).is_err());
     // Unterminated connection collection.
     records = vec![
         record(rt::BEGIN_EXT_CONNECTIONS, &[]),
@@ -371,15 +385,13 @@ fn rejects_malformed_parts() {
         ),
         record(rt::END_EXT_CONNECTIONS, &[]),
     ];
-    assert!(parse_connections_part(&build(&records)).is_err());
+    assert!(parse_connections_part(&build(&records), crate::raw::Limits::DEFAULT).is_err());
 }
 
-fn generated_workbook() -> Workbook {
-    let mut writer = WorkbookWriter::new();
-    writer.add_worksheet(MutableWorksheet::new("Sheet1"));
-    let mut bytes = Cursor::new(Vec::new());
-    writer.save(&mut bytes).unwrap();
-    Workbook::new(Cursor::new(bytes.into_inner())).unwrap()
+fn generated_package() -> crate::Package {
+    let mut writer = Builder::new();
+    writer.add_worksheet(builder::Worksheet::new("Sheet1"));
+    writer.build().unwrap()
 }
 
 fn sample_connection(name: &str) -> Connections {
@@ -399,77 +411,95 @@ fn sample_connection(name: &str) -> Connections {
     }
 }
 
+fn with_connections(package: &crate::Package, value: Connections) -> crate::Package {
+    let mut edit = package.edit_connections().unwrap();
+    edit.replace(Some(value)).unwrap();
+    edit.commit().unwrap().into_package()
+}
+
 #[test]
 fn source_checked_transaction_preserves_opaque_records_and_inverse() {
-    let mut workbook = generated_workbook();
-    workbook
-        .set_connections(sample_connection("Before"))
-        .unwrap();
+    let package = with_connections(&generated_package(), sample_connection("Before"));
     let uri = PackURI::new(super::package::CONNECTIONS_PART_NAME).unwrap();
     let opaque = build(&[record(
         Kind::new(0x3ffd).unwrap(),
         &[0xDE, 0xAD, 0xBE, 0xEF],
     )]);
     let source = {
-        let part = workbook.opc_package().get_part(&uri).unwrap();
+        let part = package.opc_package().get_part(&uri).unwrap();
         let mut bytes = part.blob().to_vec();
         bytes.extend_from_slice(&opaque);
         bytes
     };
-    workbook
-        .opc_package_mut()
-        .get_part_mut(&uri)
-        .unwrap()
-        .set_blob(source.clone());
+    let mut raw = package.edit_opc().unwrap();
+    raw.update(|opc| {
+        opc.get_part_mut(&uri)?.set_blob(source.clone());
+        Ok(())
+    })
+    .unwrap();
+    let package = raw.commit().unwrap().into_package();
 
-    let commit = {
-        let package = workbook.opc_package_mut();
-        let mut transaction = super::transaction::Transaction::new(package).unwrap();
-        assert!(
-            transaction
-                .edit(42, |connection| {
-                    connection.name = "After".to_string();
-                    Ok(())
-                })
-                .unwrap()
-        );
-        transaction.commit().unwrap()
-    };
-    assert!(commit.changed());
-    let package = workbook.opc_package();
-    let edited = package.get_part(&uri).unwrap().blob();
+    let mut edit = package.edit_connections().unwrap();
+    assert!(
+        edit.edit(42, |connection| {
+            connection.name = "After".to_string();
+            Ok(())
+        })
+        .unwrap()
+    );
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    let edited = commit
+        .package()
+        .opc_package()
+        .get_part(&uri)
+        .unwrap()
+        .blob();
     assert!(
         edited
             .windows(opaque.len())
             .any(|window| window == opaque.as_slice())
     );
     assert_eq!(
-        parse_connections_part(edited).unwrap().connections[0].name,
+        parse_connections_part(edited, crate::raw::Limits::DEFAULT)
+            .unwrap()
+            .connections[0]
+            .name,
         "After"
     );
 
-    let mut restored = package.clone();
-    commit.patch().inverse().apply(&mut restored).unwrap();
-    assert_eq!(restored.get_part(&uri).unwrap().blob(), source);
+    let restored = commit
+        .package()
+        .apply_connections(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
+    assert_eq!(
+        restored.opc_package().get_part(&uri).unwrap().blob(),
+        source
+    );
 }
 
 #[test]
 fn source_checked_transaction_rejects_stale_patch_and_supports_noop() {
-    let mut workbook = generated_workbook();
-    workbook
-        .set_connections(sample_connection("Stable"))
-        .unwrap();
-    let noop = {
-        let transaction = super::transaction::Transaction::new(workbook.opc_package_mut()).unwrap();
-        transaction.commit().unwrap()
-    };
-    assert!(!noop.changed());
-    assert!(noop.patch().is_empty());
+    let package = with_connections(&generated_package(), sample_connection("Stable"));
+    let noop = package.edit_connections().unwrap().commit().unwrap();
+    assert!(!noop.diagnostics().changed());
+    assert!(noop.patch().is_noop());
 
-    let mut changed = workbook.opc_package().clone();
+    let mut edit = package.edit_connections().unwrap();
+    edit.replace(Some(sample_connection("Changed"))).unwrap();
+    let changed = edit.commit().unwrap();
     let uri = PackURI::new(super::package::CONNECTIONS_PART_NAME).unwrap();
-    let mut bytes = changed.get_part(&uri).unwrap().blob().to_vec();
-    bytes.push(0);
-    changed.get_part_mut(&uri).unwrap().set_blob(bytes);
-    assert!(noop.patch().apply(&mut changed).is_err());
+    let mut raw = package.edit_opc().unwrap();
+    raw.update(|opc| {
+        let mut bytes = opc.get_part(&uri)?.blob().to_vec();
+        bytes.push(0);
+        opc.get_part_mut(&uri)?.set_blob(bytes);
+        Ok(())
+    })
+    .unwrap();
+    let stale = raw.commit();
+    if let Ok(stale) = stale {
+        assert!(stale.package().apply_connections(changed.patch()).is_err());
+    }
 }

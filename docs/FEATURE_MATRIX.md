@@ -37,6 +37,7 @@ otherwise.
 | `litchi-xlsx` | SpreadsheetML (`.xlsx`, related OOXML packages) | [MS-XLSX], [MS-OE376], [MS-OI29500], [MS-OWEXML], [MS-ODRAWXML], [MS-OFFCRYPTO], [MS-OVBA] | [SpreadsheetML feature matrix](../crates/litchi-xlsx/docs/FEATURE_MATRIX.md) |
 | `litchi-ppt` | PowerPoint binary (`.ppt`) | [MS-PPT], [MS-CFB], [MS-OLEPS], [MS-ODRAW], [MS-OGRAPH], [MS-OSHARED] | [PowerPoint binary feature matrix](../crates/litchi-ppt/docs/FEATURE_MATRIX.md) |
 | `litchi-pptx` | PresentationML (`.pptx`, related OOXML packages) | [MS-PPTX], [MS-OE376], [MS-OI29500], [MS-ODRAWXML], [MS-OFFCRYPTO], [MS-OVBA] | [PresentationML feature matrix](../crates/litchi-pptx/docs/FEATURE_MATRIX.md) |
+| `litchi-rtf` | Rich Text Format (`.rtf`) | RTF 1.9.1, [MS-OXRTFCP] | [Rich Text Format feature matrix](../crates/litchi-rtf/docs/FEATURE_MATRIX.md) |
 | `litchi-pages` | Apple Pages (`.pages`) | Apple IWA package plus Pages, text, table, and shared schema projections | [Pages feature matrix](../crates/litchi-pages/docs/FEATURE_MATRIX.md) |
 | `litchi-keynote` | Apple Keynote (`.key`) | Apple IWA package plus Keynote, presentation, text, table, chart, and shared schema projections | [Keynote feature matrix](../crates/litchi-keynote/docs/FEATURE_MATRIX.md) |
 | `litchi-numbers` | Apple Numbers (`.numbers`) | Apple IWA package plus Numbers, table, formula, chart, and shared schema projections | [Numbers feature matrix](../crates/litchi-numbers/docs/FEATURE_MATRIX.md) |
@@ -58,15 +59,13 @@ crate. Shared Office package and drawing behavior lives in the crates named by t
 map below.
 
 For iWork, the concrete Pages, Keynote, and Numbers matrices own user-facing semantic and package
-claims. Shared `litchi-iwa-*` crates are substrate, not a fourth format. Capabilities that remain
-only in the legacy `litchi-iwa` migration host do not count as focused-owner support unless the
-relevant detailed matrix labels them explicitly as host-only.
+claims. Shared `litchi-iwa-*` crates are substrate, not a fourth format. The legacy `litchi-iwa`
+migration host was deleted by record [0429](unified-ops/0429-iwa-w3-delete-host.md) (last present
+at commit `4d8a3e161f`); its exit ledger is
+[`iwa-exit-ledger.tsv`](unified-ops/results/0363/iwa-exit-ledger.tsv).
 
-The current iWork migration inventory is 64 workspace packages, 238 internal dependency
-declarations, 227 canonical edges, 11 development-only edges, 11 ordered migration debts
-`[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host. These are topology facts,
-not evidence that the concrete format owners or the monolith deletion gate are complete; the
-focused Keynote physical-sort slice closes no debt or gate.
+After record 0429 the workspace has 69 packages and 303 internal dependency declarations,
+with no migration host and no ordered migration debt (`tools/check_crate_boundaries.py`).
 
 The Pages matrix now records a bounded existing body-table hidden-axis owner. Its public surface
 uses `BodyTableSelector` (checked position or exact visible name) with archive-free
@@ -87,8 +86,8 @@ candidate-reopened, local to the selected component, invalidate the three canoni
 and provide exact source-bound apply/inverse patches. This remains visibility metadata, not
 cell/formula, filter/pivot, sorting, or row/column topology support.
 
-The Pages raw-ID `PagesEditor` hidden-axis route and the shared Numbers/Keynote adapter remain
-migration-host compatibility until creation parity and native mutation gates pass. Focused Pages
+The Pages raw-ID hidden-axis route and the shared Numbers/Keynote adapter of the retired migration
+host were deleted with it (record 0429). Focused Pages
 graph, codec, identity/COW, and concurrency tests cover the E1 source/self-round-trip contract. The
 checked-in [`body-table-visible.pages`](../test-data/iwork/pages/body-table-visible.pages) fixture
 is a native Pages 14.4 baseline: its visible body table is 5 by 4 with a body marker. Disposable
@@ -145,13 +144,13 @@ to the recorded marker shapes and cells and does not claim broad native acceptan
 producer parity, native byte parity, or package-wide performance.
 
 The eight scalar owners and the bounded Custom registry owner do not retire every compatibility path: generic
-source-built or cross-format `DataFormat` mutation remains host-owned. The
-dedicated raw-ID `NumbersEditor` routes for Number, Percentage, Currency,
+source-built or cross-format `DataFormat` mutation remained in the retired migration host until
+its deletion (record 0429). The dedicated raw-ID migration-host routes for Number, Percentage, Currency,
 Scientific, Fraction, Date & Time, Duration, and Custom are retired, and there is no dedicated
 host Text route. Generic source-built/cross-format
 `DataFormat::Custom`, `DataFormat::DateTime`, and `DataFormat::Duration`, the
 broad `TextDateTimeField` smart-field lifecycle, and attached Pages/Keynote
-table compatibility remain host-owned. Numbers persisted-sort compatibility is
+table compatibility also remained there. Numbers persisted-sort compatibility is
 narrower still: exact package snapshots use the semantic persisted-sort owner
 and any refusal is terminal; only historical source-built snapshots may use the
 private physical bridge for field 44. This bridge is not a public owner and has
@@ -180,9 +179,8 @@ not current-owner E3/E4 promotion; the checked-in native fixture
 has no table and the checked-in evidence test records hashes without launching Keynote. Native
 acceptance remains pending; see the [Keynote matrix](../crates/litchi-keynote/docs/FEATURE_MATRIX.md)
 and [ADR 0008](adr/0008-migration-and-verification.md#2026-09-02-amendment-keynote-physical-sort-now-evidence-status).
-For exact packages, focused physical-sort refusals are terminal. The legacy host
-retains only the explicitly source-built compatibility route and broader
-table/cell graph work; it is not a general physical-sort fallback.
+For exact packages, focused physical-sort refusals are terminal; there is no
+host fallback.
 
 The Keynote matrix also records a bounded owner for existing slide-media data.
 `Package::{slide_media_data, edit_slide_media_data, apply_slide_media_data}`
@@ -194,9 +192,8 @@ native IDs, `DataInfo` records, and ZIP paths private. Exact no-op/inverse and
 stale-patch refusal, candidate reread, locality, unrelated-member preservation,
 and preview invalidation are source-level contracts. The narrow host wrappers
 `replace_slide_movie_data`, `replace_slide_movie_poster`, and
-`replace_slide_audio_data` are retired; generic `replace_media` and broad
-asset creation, duplication, removal, properties, and lifecycle remain
-host-owned. The checked-in
+`replace_slide_audio_data` are retired, and the host's generic `replace_media`
+was deleted with it (record 0429). The checked-in
 [`media-replacement-native.key`](../test-data/iwork/keynote/media-replacement-native.key)
 is a 752,060-byte native Audio/Audio/File/File baseline with SHA-256
 `f5763984974612f078486cb2310f408cbcb7cd06ef6adca494aae19eaf62609d`; it was
@@ -290,9 +287,24 @@ iWork parsing is split by concrete application format: `litchi-pages` owns
 Pages (`.pages`), `litchi-keynote` owns Keynote (`.key`), and `litchi-numbers`
 owns Numbers (`.numbers`). Their shared IWA archive, protocol, and package
 layers do not constitute a fourth user-facing format. At the `litchi` facade,
-the `pages`, `keynote`, and `numbers` feature leaves enable those parsers
-independently. `iwork` is both their aggregate dependency gate and a bounded,
-format-neutral read-only facade; it is not a fourth native format or writer.
+the `pages`, `keynote`, and `numbers` feature leaves enable those formats
+independently, and `iwork` is only their aggregate feature. `litchi::open` opens
+all three as `File::Pages`, `File::Keynote`, and `File::Numbers`, which read
+and write through the unified API like every other format; the former
+format-neutral `litchi::iwork::Document` reader was removed (record 0306).
+
+## Unified API
+
+Every format listed above, plus RTF, reads and writes through the unified
+`litchi::File` (`litchi-ops`): paths, queries and views; immutable `set`, `add`,
+`remove`, `move_to` and `swap`; transactions with exact inverse patches;
+batches; `save`, `save_as`, `to_bytes` and `write_to`; and `litchi::create`.
+The detailed matrices describe each format crate's own typed API, which the
+unified operations dispatch to. Element and property coverage through `File`
+is reported per handle by `File::capabilities()`; an unsupported request is a
+typed `unsupported_capability` refusal. The per-format element coverage
+against OfficeCLI is tracked in
+[`officecli-capability-delta.md`](unified-ops/officecli-capability-delta.md).
 
 ## Cross-format capability index
 
@@ -301,8 +313,8 @@ give the authoritative status and limitations for each concrete format.
 
 | Capability family | Overall scope | Primary owners |
 |--------------------|---------------|----------------|
-| Format detection and unified facades | Office, ODF, RTF, iWork, and tabular APIs where exposed; facade authoring is not implied | `litchi`, `litchi-core`, detailed format crates |
-| OOXML OPC package editing | Parts, relationships, content types, strict/transitional XML, and graph validation. Ingestion has configurable `ReadLimits`; default ceilings protect package input, ZIP members/names/metadata/compressed and uncompressed sizes, materialized parts, `[Content_Types].xml`, and relationship XML, attributes, targets, events, depth, and graph traversal. These are safety policy rather than spec maxima, grounded in ECMA-376 Part 2 §7.3.6/§10 and [MS-OI29500] §2.1.1749-1752. | `litchi-opc`, `litchi-ooxml-common`, DOCX/XLSX/XLSB/PPTX matrices |
+| Format detection and the unified API | Content detection and `litchi::File` reads and writes for every Office, ODF, RTF, and iWork format; per-handle coverage is reported by `File::capabilities()` | `litchi`, `litchi-ops`, `litchi-core`, detailed format crates |
+| OOXML OPC package editing | Parts, relationships, content types, strict/transitional XML, and graph validation. Ingestion has configurable `SourceLimits`; default ceilings protect package input, ZIP members/names/metadata/compressed and uncompressed sizes, materialized parts, `[Content_Types].xml`, and relationship XML, attributes, targets, events, depth, and graph traversal. These are safety policy rather than spec maxima, grounded in ECMA-376 Part 2 §7.3.6/§10 and [MS-OI29500] §2.1.1749-1752. | `litchi-opc`, `litchi-ooxml-common`, DOCX/XLSX/XLSB/PPTX matrices |
 | OLE/CFB package editing | Streams, storages, property sets, inert OLEDS links, directory catalogs, custom XML stores, VBA signature metadata, and package-preserving editors | `litchi-cfb`, `litchi-ole-common`, DOC/XLS/PPT matrices; `object::{directory,link}`, `custom_xml`, and `vba_signature` provide bounded source-checked transactions with reversible patches and opaque-tail preservation |
 | ODF package and flat XML editing | ZIP package, manifest, metadata, styles, settings, resources, and bounded flat-document handling | `litchi-odf-common`, concrete ODF family crates, and ODF matrices |
 | Encryption and integrity | Format-specific Office and ODF profiles; bounded password and integrity handling | `litchi-crypto`, `litchi-sign`, format matrices |
@@ -312,7 +324,7 @@ give the authoritative status and limitations for each concrete format.
 | Drawing, media, and embedded objects | Typed support varies by format; opaque preservation is not semantic rendering | `litchi-drawingml`, `litchi-odraw`, `litchi-ograph`, format matrices |
 | Formula and equation conversion/evaluation | Shared formula/equation infrastructure with intentionally incomplete host semantics | `litchi-formula`, `litchi-eval`, ODF/XLS/XLSB/XLSX matrices |
 | VBA and macro-enabled packages | Bounded codepage-aware project/module metadata and preservation; VBA is never compiled, interpreted, or executed | `litchi-vba`, OOXML matrices |
-| Conversion and interchange | Markdown, images, RTF, CSV/TSV, and conversion APIs beyond each native format surface are separate from the detailed matrices unless a matrix explicitly includes them | `litchi-markdown`, `litchi-imgconv`, `litchi-rtf`, `litchi-pages`, `litchi-keynote`, `litchi-numbers`, `litchi-sheet` |
+| Conversion and interchange | Markdown, images, RTF, CSV/TSV, and conversion APIs beyond each native format surface are separate from the detailed matrices unless a matrix explicitly includes them. The text workbooks (CSV/TSV/PRN, SYLK, DIF, fixed width) are the `litchi-sheet-text` leaf, re-exported as `litchi::sheet::text` by the facade's `sheet-text` feature; they are not claimed formats and `litchi::open` does not read them. `File::import` tokenizes CSV/TSV with the same crate (record 0354) | `litchi-markdown`, `litchi-imgconv`, `litchi-rtf`, `litchi-pages`, `litchi-keynote`, `litchi-numbers`, `litchi-sheet`, `litchi-sheet-text` |
 
 ## Shared specification map
 
@@ -376,4 +388,4 @@ verification is integrity-oriented and does not establish certificate trust.
 - VBA project codec: `crates/litchi-vba/`
 - OpenDocument shared models: `crates/litchi-odf/`, `crates/litchi-odf-common/`, and `crates/litchi-odf-formula/`
 - iWork format owners and shared IWA layers: `crates/litchi-pages/`, `crates/litchi-keynote/`, `crates/litchi-numbers/`, and `crates/litchi-iwa-*/`
-- Unified facades and conversion APIs: `crates/litchi/`, `crates/litchi-core/`, `crates/litchi-formula/`, `crates/litchi-eval/`, `crates/litchi-markdown/`, and `crates/litchi-sheet/`
+- Unified facades and conversion APIs: `crates/litchi/`, `crates/litchi-core/`, `crates/litchi-formula/`, `crates/litchi-eval/`, `crates/litchi-markdown/`, `crates/litchi-sheet/`, and `crates/litchi-sheet-text/`

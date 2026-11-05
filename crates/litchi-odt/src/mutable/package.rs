@@ -19,20 +19,7 @@ impl MutableDocument {
     /// # Arguments
     ///
     /// * `doc` - The document to make mutable
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use litchi_odt::Document;
-    /// use litchi_odt::mutable::MutableDocument;
-    ///
-    /// # fn main() -> litchi_core::Result<()> {
-    /// let doc = Document::open("document.odt")?;
-    /// let mut mutable_doc = MutableDocument::from_document(doc)?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn from_document(doc: Document) -> Result<Self> {
+    pub(crate) fn from_document(doc: Document) -> Result<Self> {
         let content_xml = String::from_utf8(doc.get_file("content.xml")?).map_err(|error| {
             litchi_core::Error::InvalidFormat(format!("content.xml is not UTF-8: {error}"))
         })?;
@@ -60,7 +47,7 @@ impl MutableDocument {
                 OrderElement::List(list) => DocumentElement::List(list),
             })
             .collect();
-        let source_package = Some(doc.into_package());
+        let source_package = Some(doc.transaction_package().clone());
 
         Ok(Self {
             elements,
@@ -70,6 +57,7 @@ impl MutableDocument {
             source_package,
             content_xml: Some(content_xml),
             pending_images: Vec::new(),
+            xml_limits: doc.transaction_xml_limits(),
             next_frame_number: 1,
         })
     }
@@ -80,7 +68,7 @@ impl MutableDocument {
     ///
     /// Used by the web-template authoring model to emit the legacy
     /// `application/vnd.oasis.opendocument.text-web` MIME type.
-    pub fn set_mimetype(&mut self, mimetype: impl Into<String>) {
+    pub(crate) fn set_mimetype(&mut self, mimetype: impl Into<String>) {
         self.mimetype = mimetype.into();
     }
 }
@@ -92,28 +80,7 @@ impl MutableDocument {
     /// verbatim under `Pictures/` in the package, and referenced from a
     /// `draw:frame`/`draw:image` element with the given geometry and anchor.
     /// Returns the allocated package path of the picture part.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use litchi_odt::frame::{Anchor, Length};
-    /// use litchi_odt::mutable::MutableDocument;
-    ///
-    /// # fn main() -> litchi_core::Result<()> {
-    /// let mut doc = MutableDocument::new();
-    /// let png = b"\x89PNG\r\n\x1a\n".as_slice();
-    /// let path = doc.insert_image(
-    ///     0,
-    ///     png,
-    ///     &Length::centimeters(10.0),
-    ///     &Length::centimeters(4.0),
-    ///     Anchor::AsChar,
-    /// )?;
-    /// assert!(path.starts_with("Pictures/"));
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn insert_image(
+    pub(crate) fn insert_image(
         &mut self,
         index: usize,
         image: &[u8],
@@ -170,7 +137,7 @@ impl MutableDocument {
     ///
     /// The box is a `draw:frame` wrapping `draw:text-box`; newlines in `text`
     /// become separate paragraphs in the box story. Returns the frame name.
-    pub fn insert_text_box(
+    pub(crate) fn insert_text_box(
         &mut self,
         index: usize,
         text: &str,
@@ -268,10 +235,10 @@ impl MutableDocument {
         let Ok(source) = String::from_utf8(bytes) else {
             return Ok(None);
         };
-        let source_metadata = crate::Metadata::from_xml(&source)?;
+        let source_metadata = crate::Metadata::from_xml(&source, self.xml_limits)?;
         let patch =
             MetaXmlPatch::preserve_all().diff_simple_fields(&source_metadata, &self.metadata);
-        patch_meta_xml(&source, &patch)
+        patch_meta_xml(&source, &patch, self.xml_limits)
     }
 
     /// Generate meta.xml from the mutable metadata model alone.
@@ -281,7 +248,12 @@ impl MutableDocument {
         estimated += self.metadata.author.as_ref().map_or(0, String::len);
         estimated += self.metadata.subject.as_ref().map_or(0, String::len);
         estimated += self.metadata.description.as_ref().map_or(0, String::len);
-        estimated += self.metadata.keywords.as_ref().map_or(0, String::len);
+        estimated += self
+            .metadata
+            .keywords
+            .iter()
+            .map(|keyword| keyword.len() + 27)
+            .sum::<usize>();
         let mut meta_fields = String::with_capacity(estimated);
 
         // Add optional metadata fields
@@ -317,11 +289,11 @@ impl MutableDocument {
             ));
         }
 
-        if let Some(ref keywords) = self.metadata.keywords {
-            let escaped_keywords = escape_xml(keywords);
+        for keyword in &self.metadata.keywords {
+            let escaped_keyword = escape_xml(keyword);
             meta_fields.push_str(&xml_minifier::minified_xml_format!(
                 r#"<meta:keyword>{}</meta:keyword>"#,
-                escaped_keywords
+                escaped_keyword
             ));
         }
 
@@ -342,13 +314,7 @@ impl MutableDocument {
         }
 
         if let Some(created) = &self.metadata.created {
-            let value = created.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true);
-            meta_fields.push_str(&xml_minifier::minified_xml_format!(
-                r#"<meta:creation-date>{}</meta:creation-date>"#,
-                value
-            ));
-        } else if let Some(created) = &self.metadata.created_local {
-            let value = created.format("%Y-%m-%dT%H:%M:%S%.f").to_string();
+            let value = created.to_string();
             meta_fields.push_str(&xml_minifier::minified_xml_format!(
                 r#"<meta:creation-date>{}</meta:creation-date>"#,
                 value
@@ -356,13 +322,7 @@ impl MutableDocument {
         }
 
         if let Some(modified) = &self.metadata.modified {
-            let value = modified.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true);
-            meta_fields.push_str(&xml_minifier::minified_xml_format!(
-                r#"<dc:date>{}</dc:date>"#,
-                value
-            ));
-        } else if let Some(modified) = &self.metadata.modified_local {
-            let value = modified.format("%Y-%m-%dT%H:%M:%S%.f").to_string();
+            let value = modified.to_string();
             meta_fields.push_str(&xml_minifier::minified_xml_format!(
                 r#"<dc:date>{}</dc:date>"#,
                 value
@@ -381,22 +341,29 @@ impl MutableDocument {
     ///
     /// * `path` - Path where the ODT file should be saved
     ///
-    /// # Examples
+    /// The bytes are staged in a sibling temporary file and published with
+    /// one rename, so a failed save leaves an existing destination unchanged.
     ///
-    /// ```no_run
-    /// use litchi_odt::mutable::MutableDocument;
+    /// # Errors
     ///
-    /// # fn main() -> litchi_core::Result<()> {
-    /// let mut doc = MutableDocument::new();
-    /// doc.add_paragraph("Hello!")?;
-    /// doc.save("output.odt")?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+    /// Returns serialization or publication failures.
+    pub(crate) fn save<P: AsRef<Path>>(
+        &self,
+        path: P,
+    ) -> std::result::Result<(), litchi_odf_common::Error> {
         let bytes = self.to_bytes()?;
-        std::fs::write(path, bytes)?;
-        Ok(())
+        litchi_odf_common::publish::save_bytes(path.as_ref(), &bytes, litchi_core::Durability::Full)
+    }
+
+    /// Serialize the current state into an immutable [`crate::Package`].
+    ///
+    /// # Errors
+    ///
+    /// Returns serialization or archive-validation failures.
+    pub(crate) fn to_package(
+        &self,
+    ) -> std::result::Result<crate::Package, litchi_odf_common::Error> {
+        Ok(crate::Package::from_authored(self.to_bytes()?)?)
     }
 
     /// Publish a content-only edit against the retained package.
@@ -430,21 +397,9 @@ impl MutableDocument {
     }
 
     /// Convert the document to bytes.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use litchi_odt::mutable::MutableDocument;
-    ///
-    /// # fn main() -> litchi_core::Result<()> {
-    /// let mut doc = MutableDocument::new();
-    /// doc.add_paragraph("Hello!")?;
-    /// let bytes = doc.to_bytes()?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn to_bytes(&self) -> Result<Vec<u8>> {
-        let mut writer = PackageWriter::new();
+    pub(crate) fn to_bytes(&self) -> Result<Vec<u8>> {
+        let mut writer =
+            PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
 
         // Set MIME type
         writer.set_mimetype(&self.mimetype)?;
@@ -461,7 +416,11 @@ impl MutableDocument {
             .source_package
             .as_ref()
             .map(|source| {
-                crate::font_face::content_font_face_splice_publication(source, content_xml)
+                crate::font_face::content_font_face_splice_publication(
+                    source,
+                    content_xml,
+                    &self.xml_limits,
+                )
             })
             .transpose()?
             .flatten();
@@ -483,7 +442,11 @@ impl MutableDocument {
                 .source_package
                 .as_ref()
                 .map(|source| {
-                    crate::font_face::styles_font_face_splice_publication(source, styles_xml)
+                    crate::font_face::styles_font_face_splice_publication(
+                        source,
+                        styles_xml,
+                        &self.xml_limits,
+                    )
                 })
                 .transpose()?
                 .flatten();

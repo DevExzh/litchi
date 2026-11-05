@@ -2,8 +2,8 @@
 
 use super::catalog::{Catalog, Entry};
 use super::model::{Limits, Links, Metadata};
-use super::transaction::{Revision, Transaction};
-use litchi_cfb::{DirectoryEntry, OleError};
+use super::transaction::{Edit, Revision};
+use litchi_cfb::DirectoryEntry;
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -25,19 +25,9 @@ impl Snapshot {
     ///
     /// Returns an error when an entry violates CFB invariants or the supplied
     /// resource limits, or when copying the entries cannot be allocated.
-    pub fn parse(entries: &[DirectoryEntry], limits: Limits) -> Result<Self, OleError> {
+    pub fn parse(entries: &[DirectoryEntry], limits: Limits) -> Result<Self, crate::Error> {
         let catalog = Catalog::parse(entries, limits)?;
         Ok(Self::from_catalog(catalog))
-    }
-
-    /// Parses a directory catalog with the default bounds.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when an entry violates CFB invariants or the default
-    /// resource limits, or when copying the entries cannot be allocated.
-    pub fn parse_default(entries: &[DirectoryEntry]) -> Result<Self, OleError> {
-        Self::parse(entries, Limits::default())
     }
 
     /// Captures owned directory entries without retaining a CFB container.
@@ -46,7 +36,10 @@ impl Snapshot {
     ///
     /// Returns an error when an entry violates CFB invariants or the supplied
     /// resource limits.
-    pub fn from_entries(entries: Vec<DirectoryEntry>, limits: Limits) -> Result<Self, OleError> {
+    pub fn from_entries(
+        entries: Vec<DirectoryEntry>,
+        limits: Limits,
+    ) -> Result<Self, crate::Error> {
         Ok(Self::from_catalog(Catalog::from_entries(entries, limits)?))
     }
 
@@ -59,7 +52,7 @@ impl Snapshot {
     pub fn from_entries_shared(
         entries: Arc<[DirectoryEntry]>,
         limits: Limits,
-    ) -> Result<Self, OleError> {
+    ) -> Result<Self, crate::Error> {
         Ok(Self::from_catalog(Catalog::from_entries_shared(
             entries, limits,
         )?))
@@ -127,14 +120,8 @@ impl Snapshot {
 
     /// Starts an isolated typed directory edit.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction::new(self.clone())
-    }
-
-    /// Alias for [`Self::edit`] for transactional call sites.
-    #[must_use]
-    pub fn transaction(&self) -> Transaction {
-        self.edit()
+    pub fn edit(&self) -> Edit {
+        Edit::new(self.clone())
     }
 
     pub(crate) fn catalog_clone(&self) -> Catalog {

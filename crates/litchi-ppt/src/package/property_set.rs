@@ -5,16 +5,16 @@
 //! and the whole-artifact source check.
 
 use super::{Error, Result};
-use litchi_cfb::{OleError, OleFile};
+use litchi_cfb::{OleError, OleFile, OleFileLimits};
 use litchi_ole_common::property_set::{
-    self, Binding, PropertySetReader, Section, Stream, USER_DEFINED_PROPERTIES_FMTID,
+    self, Binding, CodePage, PropertySetReader, Section, Stream, USER_DEFINED_PROPERTIES_FMTID,
 };
 use std::io::Cursor;
 use std::sync::Arc;
 
 /// An immutable PPT package source for property-set edits.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Snapshot {
+pub(crate) struct Snapshot {
     bytes: Arc<[u8]>,
 }
 
@@ -24,7 +24,7 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
+    pub(crate) fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         validate_host(&bytes)?;
         Ok(Self {
             bytes: Arc::from(bytes.into_boxed_slice()),
@@ -36,13 +36,13 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(bytes: &[u8]) -> Result<Self> {
+    pub(crate) fn parse(bytes: &[u8]) -> Result<Self> {
         Self::from_bytes(bytes.to_vec())
     }
 
     /// Returns the exact source artifact bytes.
     #[must_use]
-    pub fn bytes(&self) -> &[u8] {
+    pub(crate) fn bytes(&self) -> &[u8] {
         &self.bytes
     }
 
@@ -51,7 +51,7 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn summary_information(
+    pub(crate) fn summary_information(
         &self,
     ) -> Result<Option<property_set::summary_information::Snapshot>> {
         let Some(stream) = read_stream(&self.bytes, Binding::SummaryInformation)? else {
@@ -67,7 +67,7 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn document_summary_information(
+    pub(crate) fn document_summary_information(
         &self,
     ) -> Result<Option<property_set::document_summary::Snapshot>> {
         let Some(stream) = read_stream(&self.bytes, Binding::DocumentSummaryInformation)? else {
@@ -83,7 +83,7 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn user_defined_properties(&self) -> Result<Option<Section>> {
+    pub(crate) fn user_defined_properties(&self) -> Result<Option<Section>> {
         Ok(read_stream(&self.bytes, Binding::UserDefinedProperties)?
             .and_then(|stream| stream.section(USER_DEFINED_PROPERTIES_FMTID).cloned()))
     }
@@ -93,36 +93,48 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn transaction(&self) -> Result<Transaction> {
+    pub(crate) fn transaction(&self) -> Result<Transaction> {
         Transaction::new(self.clone())
     }
 
     /// Consumes the snapshot into owned source bytes.
     #[must_use]
-    pub fn into_bytes(self) -> Vec<u8> {
+    pub(crate) fn into_bytes(self) -> Vec<u8> {
         self.bytes.to_vec()
     }
 }
 
 /// An isolated PPT property-set transaction over owned CFB bytes.
-pub struct Transaction {
+pub(crate) struct Transaction {
     source: Snapshot,
-    editor: property_set::Editor,
+    editor: property_set::Edit,
     changed: bool,
 }
 
 impl Transaction {
     fn new(source: Snapshot) -> Result<Self> {
         Ok(Self {
-            editor: property_set::Editor::new(source.bytes.to_vec())?,
+            editor: property_set::Edit::new(source.bytes.to_vec(), OleFileLimits::default())?,
             source,
             changed: false,
         })
     }
 
+    /// The shared property-set editor, for the package metadata transaction.
+    pub(crate) const fn editor(&self) -> &property_set::Edit {
+        &self.editor
+    }
+
+    /// Mutable access to the shared editor; staging through it marks the
+    /// transaction changed.
+    pub(crate) fn editor_mut(&mut self) -> &mut property_set::Edit {
+        self.changed = true;
+        &mut self.editor
+    }
+
     /// Whether a successful edit has changed the transaction state.
     #[must_use]
-    pub const fn is_changed(&self) -> bool {
+    pub(crate) const fn is_changed(&self) -> bool {
         self.changed
     }
 
@@ -131,7 +143,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn summary_information(
+    pub(crate) fn summary_information(
         &self,
     ) -> Result<Option<property_set::summary_information::Snapshot>> {
         let Some(section) = self.editor.property_set(Binding::SummaryInformation)? else {
@@ -147,7 +159,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn document_summary_information(
+    pub(crate) fn document_summary_information(
         &self,
     ) -> Result<Option<property_set::document_summary::Snapshot>> {
         let Some(section) = self
@@ -166,7 +178,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn user_defined_properties(&self) -> Result<Option<Section>> {
+    pub(crate) fn user_defined_properties(&self) -> Result<Option<Section>> {
         self.editor
             .property_set(Binding::UserDefinedProperties)
             .map_err(Into::into)
@@ -174,62 +186,74 @@ impl Transaction {
 
     /// Applies a typed `SummaryInformation` edit through the common PIDSI owner.
     ///
+    /// A package without a `\u{5}SummaryInformation` stream starts from an
+    /// empty section with the Windows-1252 code page, and the stream is
+    /// created when the edit changes it; an existing blank section (no
+    /// property, not even a code page) is treated the same way.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn edit_summary_information<F>(&mut self, edit: F) -> Result<bool>
+    pub(crate) fn edit_summary_information<F>(&mut self, edit: F) -> Result<bool>
     where
         F: for<'a> FnOnce(
             &mut property_set::summary_information::Edit<'a>,
         ) -> std::result::Result<(), OleError>,
     {
-        let source = self
-            .editor
-            .property_set(Binding::SummaryInformation)?
-            .ok_or(OleError::StreamNotFound)?;
-        let snapshot = property_set::summary_information::Snapshot::from_section(&source)?;
-        let mut transaction = snapshot.transaction()?;
-        {
-            let mut draft = transaction.edit();
-            edit(&mut draft)?;
-        }
-        let commit = transaction.commit()?;
-        if !commit.changed() {
+        let snapshot = match self.editor.property_set(Binding::SummaryInformation)? {
+            Some(source) if !source.is_empty() => {
+                property_set::summary_information::Snapshot::from_section(&source)?
+            },
+            _ => property_set::summary_information::Snapshot::new(CodePage::WINDOWS_1252)?,
+        };
+        let mut draft = snapshot.edit()?;
+        edit(&mut draft)?;
+        let commit = draft.commit()?;
+        if !commit.diagnostics().changed() {
             return Ok(false);
         }
         self.editor
-            .replace(Binding::SummaryInformation, commit.into_section())?;
+            .replace(Binding::SummaryInformation, commit.into_package())?;
         self.changed = true;
         Ok(true)
     }
 
     /// Applies a typed `DocumentSummaryInformation` edit through the common PIDDSI owner.
     ///
+    /// A missing or blank section is handled as in
+    /// [`Self::edit_summary_information`]. The blank case matters for the
+    /// presentations [`crate::Builder`] builds without document
+    /// properties: their fixed `\u{5}DocumentSummaryInformation` stream
+    /// carries an empty section with no code page, which the typed owner
+    /// would otherwise refuse. A user-defined section already in the stream
+    /// is kept.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn edit_document_summary_information<F>(&mut self, edit: F) -> Result<bool>
+    pub(crate) fn edit_document_summary_information<F>(&mut self, edit: F) -> Result<bool>
     where
         F: for<'a> FnOnce(
             &mut property_set::document_summary::Edit<'a>,
         ) -> std::result::Result<(), OleError>,
     {
-        let source = self
+        let snapshot = match self
             .editor
             .property_set(Binding::DocumentSummaryInformation)?
-            .ok_or(OleError::StreamNotFound)?;
-        let snapshot = property_set::document_summary::Snapshot::from_section(&source)?;
-        let mut transaction = snapshot.transaction()?;
         {
-            let mut draft = transaction.edit();
-            edit(&mut draft)?;
-        }
-        let commit = transaction.commit()?;
-        if !commit.changed() {
+            Some(source) if !source.is_empty() => {
+                property_set::document_summary::Snapshot::from_section(&source)?
+            },
+            _ => property_set::document_summary::Snapshot::new(CodePage::WINDOWS_1252)?,
+        };
+        let mut draft = snapshot.edit()?;
+        edit(&mut draft)?;
+        let commit = draft.commit()?;
+        if !commit.diagnostics().changed() {
             return Ok(false);
         }
         self.editor
-            .replace(Binding::DocumentSummaryInformation, commit.into_section())?;
+            .replace(Binding::DocumentSummaryInformation, commit.into_package())?;
         self.changed = true;
         Ok(true)
     }
@@ -239,9 +263,9 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn edit_user_defined_properties<F>(&mut self, edit: F) -> Result<bool>
+    pub(crate) fn edit_user_defined_properties<F>(&mut self, edit: F) -> Result<bool>
     where
-        F: FnOnce(&mut Section) -> std::result::Result<(), OleError>,
+        F: FnOnce(&mut Section) -> std::result::Result<(), litchi_ole_common::Error>,
     {
         let source = self.editor.property_set(Binding::UserDefinedProperties)?;
         let mut candidate = source
@@ -266,7 +290,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn remove_user_defined_properties(&mut self) -> Result<bool> {
+    pub(crate) fn remove_user_defined_properties(&mut self) -> Result<bool> {
         if self
             .editor
             .property_set(Binding::UserDefinedProperties)?
@@ -284,7 +308,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
         let before = self.source.bytes.clone();
         let bytes = self.editor.finish()?;
         let snapshot = Snapshot::from_bytes(bytes)?;
@@ -298,17 +322,11 @@ impl Transaction {
             changed,
         })
     }
-
-    /// Discards the transaction and recovers its exact source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
-    }
 }
 
 /// An owned result of a PPT property-set transaction.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     patch: Patch,
     changed: bool,
@@ -317,38 +335,38 @@ pub struct Commit {
 impl Commit {
     /// Whether the complete output differs from the source artifact.
     #[must_use]
-    pub const fn changed(&self) -> bool {
+    pub(crate) const fn changed(&self) -> bool {
         self.changed
     }
 
     /// Borrows the validated output snapshot.
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Borrows the source-checked reversible whole-package patch.
     #[must_use]
-    pub const fn patch(&self) -> &Patch {
+    pub(crate) const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Consumes the commit into its owned output bytes.
     #[must_use]
-    pub fn into_bytes(self) -> Vec<u8> {
+    pub(crate) fn into_bytes(self) -> Vec<u8> {
         self.snapshot.into_bytes()
     }
 
     /// Consumes the commit into its output snapshot and patch.
     #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
+    pub(crate) fn into_parts(self) -> (Snapshot, Patch) {
         (self.snapshot, self.patch)
     }
 }
 
 /// A source-checked reversible whole-PPT package patch.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Patch {
+pub(crate) struct Patch {
     source: Arc<[u8]>,
     replacement: Arc<[u8]>,
 }
@@ -356,13 +374,13 @@ pub struct Patch {
 impl Patch {
     /// Returns the exact source bytes bound to this patch.
     #[must_use]
-    pub fn source(&self) -> &[u8] {
+    pub(crate) fn source(&self) -> &[u8] {
         &self.source
     }
 
     /// Returns the exact replacement bytes produced by the commit.
     #[must_use]
-    pub fn replacement(&self) -> &[u8] {
+    pub(crate) fn replacement(&self) -> &[u8] {
         &self.replacement
     }
 
@@ -371,7 +389,7 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.bytes.as_ref() != self.source.as_ref() {
             return Err(Error::InvalidFormat(
                 "PPT property-set patch source does not match".to_string(),
@@ -385,7 +403,7 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn revert(&self, replacement: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn revert(&self, replacement: &Snapshot) -> Result<Snapshot> {
         if replacement.bytes.as_ref() != self.replacement.as_ref() {
             return Err(Error::InvalidFormat(
                 "PPT property-set patch replacement does not match".to_string(),
@@ -396,7 +414,7 @@ impl Patch {
 }
 
 fn validate_host(bytes: &[u8]) -> Result<()> {
-    let ole = OleFile::open(Cursor::new(bytes))?;
+    let ole = OleFile::open(Cursor::new(bytes), OleFileLimits::default())?;
     if !ole.exists(&["PowerPoint Document"]) {
         return Err(Error::InvalidFormat(
             "Not a valid PowerPoint document: PowerPoint Document stream not found".to_string(),
@@ -406,10 +424,10 @@ fn validate_host(bytes: &[u8]) -> Result<()> {
 }
 
 fn read_stream(bytes: &[u8], binding: Binding) -> Result<Option<Stream>> {
-    let mut ole = OleFile::open(Cursor::new(bytes))?;
+    let mut ole = OleFile::open(Cursor::new(bytes), OleFileLimits::default())?;
     match ole.property_set(binding) {
         Ok(stream) => Ok(Some(stream)),
-        Err(OleError::StreamNotFound) => Ok(None),
+        Err(litchi_ole_common::Error::Cfb(OleError::StreamNotFound)) => Ok(None),
         Err(error) => Err(error.into()),
     }
 }
@@ -498,7 +516,11 @@ mod tests {
             Some("after company")
         );
 
-        let mut ole = OleFile::open(Cursor::new(commit.snapshot().bytes().to_vec())).unwrap();
+        let mut ole = OleFile::open(
+            Cursor::new(commit.snapshot().bytes().to_vec()),
+            OleFileLimits::default(),
+        )
+        .unwrap();
         assert_eq!(
             ole.open_stream(&["Unrelated", "Nested"]).unwrap(),
             b"untouched"
@@ -506,6 +528,44 @@ mod tests {
         let applied = commit.patch().apply(&snapshot).unwrap();
         assert_eq!(applied.bytes(), commit.snapshot().bytes());
         assert_eq!(commit.patch().revert(&applied).unwrap().bytes(), source);
+    }
+
+    #[test]
+    fn missing_streams_are_created_by_typed_edits() {
+        let mut writer = OleWriter::new();
+        writer
+            .create_stream(&["PowerPoint Document"], b"ppt")
+            .unwrap();
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        let snapshot = Snapshot::from_bytes(output.into_inner()).unwrap();
+        assert!(snapshot.summary_information().unwrap().is_none());
+
+        let mut transaction = snapshot.transaction().unwrap();
+        assert!(!transaction.edit_summary_information(|_| Ok(())).unwrap());
+        assert!(
+            transaction
+                .edit_summary_information(|edit| edit.set_title("title"))
+                .unwrap()
+        );
+        assert!(
+            transaction
+                .edit_document_summary_information(|edit| edit.set_company("company"))
+                .unwrap()
+        );
+        let commit = transaction.commit().unwrap();
+        let edited = commit.snapshot();
+        let summary = edited.summary_information().unwrap().unwrap();
+        assert_eq!(summary.title(), Some("title"));
+        assert_eq!(summary.codepage(), Some(CodePage::WINDOWS_1252));
+        assert_eq!(
+            edited
+                .document_summary_information()
+                .unwrap()
+                .unwrap()
+                .company(),
+            Some("company")
+        );
     }
 
     #[test]

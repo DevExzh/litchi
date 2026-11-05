@@ -5,6 +5,8 @@ use super::super::{
     TASK_PANES_RELATIONSHIP, VecDeque, WEB_EXTENSION_NAMESPACE,
 };
 use super::{PlannedPart, PlannedRelationship, fold_part_name, folded_name_conflicts};
+use crate::signature::refuse_signed_change;
+use crate::web::LimitKind;
 use litchi_core::xml::ReaderOrigin;
 use litchi_opc::{
     BlobPart, OpcError, OwnedContentTypes, OwnedRelationships, OwnedXmlPart, TargetMode,
@@ -47,7 +49,7 @@ impl std::fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
             .debug_struct("Patch")
-            .field("empty", &self.is_empty())
+            .field("empty", &self.is_noop())
             .field(
                 "affected_parts",
                 &self
@@ -73,9 +75,9 @@ impl Patch {
             .len()
             .checked_add(deletions.len())
             .ok_or(Error::Limit {
-                resource: "Web Extensions patch parts",
-                max: usize::MAX,
-                actual: usize::MAX,
+                kind: crate::LimitKind::Web(LimitKind::PatchParts),
+                maximum: usize::MAX,
+                observed: usize::MAX,
             })?;
         let mut parts = Vec::with_capacity(affected_parts);
         let mut planned_names = HashSet::with_capacity(planned.len());
@@ -159,9 +161,9 @@ impl Patch {
         Ok(patch)
     }
 
-    /// Return whether this patch makes no changes.
+    /// Return whether this patch is an exact no-op.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         !self.has_changes()
     }
 
@@ -192,33 +194,35 @@ impl Patch {
 
     /// Apply this patch after checking its exact source graph.
     ///
-    /// Returns `true` when the package changed. Source checks, destination-name
-    /// checks, and relationship staging all finish before the first mutation.
+    /// The source package is unchanged; the returned commit owns the new
+    /// package. Source checks, destination-name checks, and relationship
+    /// staging all finish before publication.
     /// # Errors
     ///
     /// Returns an error when input violates OOXML constraints, exceeds a configured
     /// bound, or an underlying XML or package operation fails.
-    pub fn apply(&self, package: &mut OpcPackage) -> Result<bool> {
-        if self.is_empty() {
+    pub fn apply(&self, package: &OpcPackage) -> Result<Commit> {
+        if self.is_noop() {
             if self.is_source_bound() {
                 self.validate_source(package)?;
                 self.validate_protection(package)?;
             }
-            return Ok(false);
+            return Ok(Commit::new(
+                package.clone(),
+                self.clone(),
+                Diagnostics::UNCHANGED,
+            ));
         }
         self.validate_source(package)?;
         self.validate_protection(package)?;
         self.validate_destination_names(package)?;
-        if package.is_signed() || package.requires_signature_edit_policy() {
-            return Err(Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy));
-        }
+        refuse_signed_change(package)?;
         // The exact token APIs can still fail on a bounded reservation.
         // Publish through an Arc-sharing package clone so every failure,
         // including a late lexical replacement, is atomic.
         let mut candidate = package.clone();
         self.apply_to_candidate(&mut candidate)?;
-        *package = candidate;
-        Ok(true)
+        Ok(Commit::new(candidate, self.clone(), Diagnostics::CHANGED))
     }
 
     pub(in crate::web) fn has_changes(&self) -> bool {
@@ -248,9 +252,7 @@ impl Patch {
                 None => first.is_none(),
             };
             if !root_matches {
-                return Err(Error::Relationship(
-                    "Web Extensions patch source relationship changed".into(),
-                ));
+                return Err(Error::PatchConflict);
             }
             if let Some(after) = &root.after {
                 let reuses_source_id = root
@@ -258,9 +260,7 @@ impl Patch {
                     .as_ref()
                     .is_some_and(|before| before.id == after.id);
                 if !reuses_source_id && package.rels().get(&after.id).is_some() {
-                    return Err(Error::Relationship(
-                        "Web Extensions patch destination relationship is occupied".into(),
-                    ));
+                    return Err(Error::PatchConflict);
                 }
             }
         }
@@ -276,9 +276,7 @@ impl Patch {
                 _ => false,
             };
             if !matches {
-                return Err(Error::Relationship(
-                    "Web Extensions patch source part changed".into(),
-                ));
+                return Err(Error::PatchConflict);
             }
         }
         if let Some(lexical) = &self.lexical {
@@ -330,8 +328,8 @@ impl Patch {
                 };
                 let part = package.get_part(&xml.name)?;
                 if part.blob() != after.bytes() {
-                    return Err(Error::Relationship(
-                        "Web Extensions patch XML destination changed while staging".into(),
+                    return Err(Error::Internal(
+                        "Web Extensions patch XML destination changed while staging",
                     ));
                 }
                 package.try_replace_owned_xml_part(after.bytes(), after.clone())?;
@@ -340,11 +338,15 @@ impl Patch {
                 let Some(after) = &relationships.after else {
                     continue;
                 };
-                let current = package.source_relationships(after.owner())?;
-                package.try_replace_relationships(&current, after)?;
+                let current = package.source_relationships(after.owner(), package.read_limits())?;
+                package.try_replace_relationships(&current, after, package.read_limits())?;
             }
-            let current = package.source_content_types()?;
-            package.try_replace_content_types(current.bytes(), &lexical.content_types.after)?;
+            let current = package.source_content_types(package.read_limits())?;
+            package.try_replace_content_types(
+                current.bytes(),
+                &lexical.content_types.after,
+                package.read_limits(),
+            )?;
 
             lexical.validate_after(package)?;
         }
@@ -364,8 +366,10 @@ impl Patch {
         if !changed_existing.is_empty() {
             let protected = protected_parts(package, &guard.source, &guard.limits)?;
             if changed_existing.iter().any(|name| protected.contains(name)) {
-                return Err(Error::Relationship(
-                    "Web Extensions patch would change a newly shared source part".into(),
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "web_extensions.apply",
+                    "the Web Extensions graph has a shared source part",
                 ));
             }
         }
@@ -382,8 +386,10 @@ impl Patch {
                 .iter()
                 .any(|name| protected.contains(name))
             {
-                return Err(Error::Relationship(
-                    "Web Extensions patch would create a newly shared destination part".into(),
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "web_extensions.apply",
+                    "the Web Extensions graph has a shared destination part",
                 ));
             }
         }
@@ -400,7 +406,9 @@ impl Patch {
         for change in changed {
             let folded = fold_part_name(&change.name);
             if folded_name_conflicts(&destinations, &folded) {
-                return invalid("Web Extensions patch destination parts conflict".into());
+                return Err(Error::Internal(
+                    "Web Extensions patch destination parts conflict",
+                ));
             }
             destinations.insert(folded.clone());
             if change.before.is_some() {
@@ -419,12 +427,18 @@ impl Patch {
                 .get(&folded)
                 .is_some_and(|name| *name == existing.partname());
             if !is_replaced_source {
-                return invalid("Web Extensions patch destination part is occupied".into());
+                return Err(Error::PatchConflict);
             }
         }
         Ok(())
     }
 }
+
+/// A published Web Extensions graph change.
+pub type Commit = litchi_core::edit::Commit<OpcPackage, Patch>;
+
+/// Minimal content-free diagnostics for a Web Extensions commit.
+pub use litchi_core::edit::Diagnostics;
 
 #[derive(Clone)]
 pub(in crate::web::package) struct LexicalChange {
@@ -504,7 +518,7 @@ fn reconstruct_proven_attribute_source(
         return Ok(Some(before.clone()));
     }
     if after.len() > limits.xml_bytes {
-        return limit("Web Extensions XML bytes", limits.xml_bytes, after.len());
+        return limit(LimitKind::PackageXmlBytes, limits.xml_bytes, after.len());
     }
 
     let before_bytes = before.bytes();
@@ -552,7 +566,7 @@ fn reconstruct_proven_attribute_source(
                 };
                 if edits.len() >= limits.nodes {
                     return limit(
-                        "Web Extensions source attribute edits",
+                        LimitKind::SourceAttributeEdits,
                         limits.nodes,
                         edits.len().saturating_add(1),
                     );
@@ -583,7 +597,7 @@ fn reconstruct_proven_attribute_source(
         }
         if result.bytes().len() > limits.xml_bytes {
             return limit(
-                "Web Extensions XML bytes",
+                LimitKind::PackageXmlBytes,
                 limits.xml_bytes,
                 result.bytes().len(),
             );
@@ -732,7 +746,7 @@ fn source_tag_edit(
     }
     if replacements.len() > limits.items {
         return limit(
-            "Web Extensions source attribute edits",
+            LimitKind::SourceAttributeEdits,
             limits.items,
             replacements.len(),
         );
@@ -800,7 +814,7 @@ fn parse_proven_source_tag(raw: &[u8], limits: Limits) -> Result<ProvenSourceTag
         }
         if attributes.len() >= limits.items {
             return limit(
-                "Web Extensions source tag attributes",
+                LimitKind::SourceTagAttributes,
                 limits.items,
                 attributes.len().saturating_add(1),
             );
@@ -877,11 +891,11 @@ impl LexicalChange {
         destination_parts: &[PackURI],
         limits: Limits,
     ) -> Result<Self> {
-        let before_content_types = package.source_content_types()?;
+        let before_content_types = package.source_content_types(package.read_limits())?;
         check_lexical_bytes(
             before_content_types.bytes().len(),
             &limits,
-            "content-types XML",
+            LimitKind::ContentTypesXml,
         )?;
 
         let mut candidate = package.clone();
@@ -910,7 +924,7 @@ impl LexicalChange {
         check_lexical_bytes(
             content_types_after.bytes().len(),
             &limits,
-            "content-types XML",
+            LimitKind::ContentTypesXml,
         )?;
 
         let scope_capacity = source_parts
@@ -918,9 +932,9 @@ impl LexicalChange {
             .checked_add(destination_parts.len())
             .and_then(|count| count.checked_add(parts.len()))
             .ok_or(Error::Limit {
-                resource: "Web Extensions patch lexical scope",
-                max: limits.package_parts,
-                actual: usize::MAX,
+                kind: crate::LimitKind::Web(LimitKind::PatchLexicalScope),
+                maximum: limits.package_parts,
+                observed: usize::MAX,
             })?;
         let mut scope_names = Vec::new();
         scope_names
@@ -953,9 +967,9 @@ impl LexicalChange {
                     .len()
                     .checked_add(if root.is_some() { 1 } else { 0 })
                     .ok_or(Error::Limit {
-                        resource: "Web Extensions patch relationship tokens",
-                        max: limits.package_relationships,
-                        actual: usize::MAX,
+                        kind: crate::LimitKind::Web(LimitKind::PatchRelationshipTokens),
+                        maximum: limits.package_relationships,
+                        observed: usize::MAX,
                     })?,
             )
             .map_err(|source| Error::Allocation {
@@ -973,14 +987,14 @@ impl LexicalChange {
         total_xml_bytes = total_xml_bytes
             .checked_add(content_types_after.bytes().len())
             .ok_or(Error::Limit {
-                resource: "Web Extensions patch lexical XML",
-                max: limits.total_xml_bytes,
-                actual: usize::MAX,
+                kind: crate::LimitKind::Web(LimitKind::PatchLexicalXml),
+                maximum: limits.total_xml_bytes,
+                observed: usize::MAX,
             })?;
 
         if root.is_some() {
             let owner = PackURI::new("/").map_err(|error| Error::Uri(error.to_string()))?;
-            let before = package.source_relationships(&owner)?;
+            let before = package.source_relationships(&owner, package.read_limits())?;
             let after = match root {
                 Some(root) if root.before != root.after => transition_relationships(
                     &before,
@@ -988,7 +1002,7 @@ impl LexicalChange {
                     root.after.as_ref().map(std::slice::from_ref),
                     &limits,
                 )?,
-                _ => candidate.source_relationships(&owner)?,
+                _ => candidate.source_relationships(&owner, candidate.read_limits())?,
             };
             charge_lexical_bytes(&mut total_xml_bytes, before.bytes().len(), &limits)?;
             charge_lexical_bytes(&mut total_xml_bytes, after.bytes().len(), &limits)?;
@@ -1151,28 +1165,22 @@ impl LexicalChange {
         content_types: &OwnedContentTypes,
         after: bool,
     ) -> Result<()> {
-        if package.source_content_types()?.bytes() != content_types.bytes() {
-            return Err(Error::Relationship(
-                if after {
-                    "Web Extensions patch destination content-types source changed"
-                } else {
-                    "Web Extensions patch source content-types changed"
-                }
-                .into(),
-            ));
+        if package.source_content_types(package.read_limits())?.bytes() != content_types.bytes() {
+            return Err(if after {
+                Error::Internal("Web Extensions patch destination content-types changed")
+            } else {
+                Error::PatchConflict
+            });
         }
         for change in &self.relationships {
             let expected = if after { &change.after } else { &change.before };
             let actual = optional_relationships(package, &change.owner)?;
             if actual.as_ref() != expected.as_ref() {
-                return Err(Error::Relationship(
-                    if after {
-                        "Web Extensions patch destination relationship source changed"
-                    } else {
-                        "Web Extensions patch source relationship metadata changed"
-                    }
-                    .into(),
-                ));
+                return Err(if after {
+                    Error::Internal("Web Extensions patch destination relationships changed")
+                } else {
+                    Error::PatchConflict
+                });
             }
         }
         for change in &self.parts {
@@ -1185,14 +1193,13 @@ impl LexicalChange {
             let actual_part = package.get_part(&change.name);
             if !expected_exists {
                 if actual_part.is_ok() {
-                    return Err(Error::Relationship(
-                        if after {
-                            "Web Extensions patch destination XML part unexpectedly exists"
-                        } else {
-                            "Web Extensions patch source XML part unexpectedly exists"
-                        }
-                        .into(),
-                    ));
+                    return Err(if after {
+                        Error::Internal(
+                            "Web Extensions patch destination XML part unexpectedly exists",
+                        )
+                    } else {
+                        Error::PatchConflict
+                    });
                 }
                 continue;
             }
@@ -1204,14 +1211,11 @@ impl LexicalChange {
             };
             let actual = optional_xml_part(package, &change.name)?;
             if actual.as_ref() != Some(expected) {
-                return Err(Error::Relationship(
-                    if after {
-                        "Web Extensions patch destination XML source changed"
-                    } else {
-                        "Web Extensions patch source XML metadata changed"
-                    }
-                    .into(),
-                ));
+                return Err(if after {
+                    Error::Internal("Web Extensions patch destination XML changed")
+                } else {
+                    Error::PatchConflict
+                });
             }
         }
         Ok(())
@@ -1311,13 +1315,13 @@ fn optional_relationships(
 ) -> Result<Option<OwnedRelationships>> {
     if owner.as_str() == "/" {
         return package
-            .source_relationships(owner)
+            .source_relationships(owner, package.read_limits())
             .map(Some)
             .map_err(Into::into);
     }
     match package.get_part(owner) {
         Ok(_) => package
-            .source_relationships(owner)
+            .source_relationships(owner, package.read_limits())
             .map(Some)
             .map_err(Into::into),
         Err(OpcError::PartNotFound(_)) => Ok(None),
@@ -1352,25 +1356,21 @@ fn is_xml_part(content_type: &str, name: &PackURI) -> bool {
         })
 }
 
-fn check_lexical_bytes(bytes: usize, limits: &Limits, resource: &'static str) -> Result<()> {
+fn check_lexical_bytes(bytes: usize, limits: &Limits, kind: LimitKind) -> Result<()> {
     if bytes > limits.xml_bytes {
-        return limit(resource, limits.xml_bytes, bytes);
+        return limit(kind, limits.xml_bytes, bytes);
     }
     Ok(())
 }
 
 fn charge_lexical_bytes(total: &mut usize, bytes: usize, limits: &Limits) -> Result<()> {
     *total = total.checked_add(bytes).ok_or(Error::Limit {
-        resource: "Web Extensions patch lexical XML",
-        max: limits.total_xml_bytes,
-        actual: usize::MAX,
+        kind: crate::LimitKind::Web(LimitKind::PatchLexicalXml),
+        maximum: limits.total_xml_bytes,
+        observed: usize::MAX,
     })?;
     if *total > limits.total_xml_bytes {
-        return limit(
-            "Web Extensions patch lexical XML",
-            limits.total_xml_bytes,
-            *total,
-        );
+        return limit(LimitKind::PatchLexicalXml, limits.total_xml_bytes, *total);
     }
     Ok(())
 }
@@ -1415,7 +1415,7 @@ pub(in crate::web) fn protected_parts(
 ) -> Result<HashSet<String>> {
     let part_count = package.part_count();
     if part_count > limits.package_parts {
-        return limit("package parts", limits.package_parts, part_count);
+        return limit(LimitKind::PackageParts, limits.package_parts, part_count);
     }
     if scope.owned_parts.is_empty() {
         return Ok(HashSet::new());
@@ -1497,13 +1497,13 @@ pub(in crate::web) fn charge_patch_relationship(
     limits: &Limits,
 ) -> Result<()> {
     *relationships = relationships.checked_add(1).ok_or(Error::Limit {
-        resource: "package relationships",
-        max: limits.package_relationships,
-        actual: usize::MAX,
+        kind: crate::LimitKind::Web(LimitKind::PackageRelationships),
+        maximum: limits.package_relationships,
+        observed: usize::MAX,
     })?;
     if *relationships > limits.package_relationships {
         return limit(
-            "package relationships",
+            LimitKind::PackageRelationships,
             limits.package_relationships,
             *relationships,
         );

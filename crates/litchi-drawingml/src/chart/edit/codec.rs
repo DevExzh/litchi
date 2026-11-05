@@ -9,7 +9,7 @@ use super::model::DataLabelFlag;
 use super::validation;
 use crate::chart::data::TitleText;
 use crate::chart::reader;
-use crate::chart::types::{AxisPosition, DisplayBlanks};
+use crate::chart::types::{AxisPosition, DisplayBlanks, LegendPosition};
 use crate::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
 use litchi_core::xml::{escape_xml, unescape_xml};
@@ -64,7 +64,8 @@ impl Document {
     pub(crate) fn parse(xml: &[u8]) -> Result<Self> {
         if xml.len() > validation::MAX_XML_BYTES {
             return Err(validation::limit(
-                "chart editor XML",
+                crate::LimitKind::XmlBytes,
+                xml.len(),
                 validation::MAX_XML_BYTES,
             ));
         }
@@ -89,13 +90,15 @@ impl Document {
                 Event::Start(element) => {
                     if nodes.len() >= validation::MAX_XML_NODES {
                         return Err(validation::limit(
-                            "chart editor XML nodes",
+                            crate::LimitKind::XmlNodes,
+                            nodes.len() + 1,
                             validation::MAX_XML_NODES,
                         ));
                     }
                     if stack.len() >= validation::MAX_XML_DEPTH {
                         return Err(validation::limit(
-                            "chart editor XML nesting",
+                            crate::LimitKind::XmlDepth,
+                            stack.len() + 1,
                             validation::MAX_XML_DEPTH,
                         ));
                     }
@@ -115,7 +118,8 @@ impl Document {
                 Event::Empty(element) => {
                     if nodes.len() >= validation::MAX_XML_NODES {
                         return Err(validation::limit(
-                            "chart editor XML nodes",
+                            crate::LimitKind::XmlNodes,
+                            nodes.len() + 1,
                             validation::MAX_XML_NODES,
                         ));
                     }
@@ -344,10 +348,11 @@ impl Document {
             let Some(id) = self.child(candidate, b"axId", NamespaceKind::Chart)? else {
                 continue;
             };
-            if self
-                .attribute_from(xml, id, b"val")?
-                .and_then(|value| parse_u32(&value).ok())
-                == Some(axis_id)
+            if self.attribute_from(xml, id, b"val")?.and_then(|value| {
+                std::str::from_utf8(&value)
+                    .ok()
+                    .and_then(crate::chart::axis::parse_axis_id)
+            }) == Some(axis_id)
             {
                 matches.push(candidate);
             }
@@ -385,7 +390,7 @@ impl Document {
 
 pub(crate) fn read(xml: &[u8]) -> Result<crate::chart::Chart> {
     Document::parse(xml)?;
-    reader::read(Cursor::new(xml))
+    reader::read(Cursor::new(xml), &crate::chart::Limits::DEFAULT)
 }
 
 pub(crate) fn set_style(xml: &[u8], style: Option<u32>) -> Result<Vec<u8>> {
@@ -636,6 +641,557 @@ pub(crate) fn set_axis_range(
         source = remove_scaling_value(&source, axis_id, b"min")?;
     }
     Ok(source)
+}
+
+pub(crate) fn set_legend(xml: &[u8], position: Option<LegendPosition>) -> Result<Vec<u8>> {
+    let document = Document::parse(xml)?;
+    let chart = document.chart()?;
+    let legend = document.child(chart, b"legend", NamespaceKind::Chart)?;
+    match (legend, position) {
+        (None, None) => Ok(xml.to_vec()),
+        (Some(legend), None) => remove_node(xml, &document, legend),
+        (Some(legend), Some(position)) => {
+            let value = position.xml_value();
+            if let Some(node) = document.child(legend, b"legendPos", NamespaceKind::Chart)? {
+                replace_attribute_if_changed(xml, &document, node, b"val", value)
+            } else {
+                let prefix = document.prefix(legend);
+                let fragment = element(&prefix, "legendPos", &format!(r#" val="{value}""#), "");
+                let node = document.node(legend);
+                match node.close_start {
+                    Some(_) => insert_at(xml, node.open_end, fragment.as_bytes()),
+                    None => append_to_parent(xml, &document, legend, &fragment),
+                }
+            }
+        },
+        (None, Some(position)) => {
+            let prefix = document.prefix(chart);
+            let fragment = format!(
+                "<{legend}><{pos} val=\"{}\"/><{overlay} val=\"0\"/></{legend}>",
+                position.xml_value(),
+                legend = qname(&prefix, "legend"),
+                pos = qname(&prefix, "legendPos"),
+                overlay = qname(&prefix, "overlay"),
+            );
+            insert_after_child(xml, &document, chart, b"plotArea", &fragment)
+        },
+    }
+}
+
+pub(crate) fn set_axis_title(
+    xml: &[u8],
+    axis_id: u32,
+    title: Option<&TitleText>,
+) -> Result<Vec<u8>> {
+    let mut source = xml.to_vec();
+    let mut document = Document::parse(&source)?;
+    let axis = document.axis(&source, axis_id)?;
+    let title_node = document.child(axis, b"title", NamespaceKind::Chart)?;
+    match (title_node, title) {
+        (Some(node), None) => remove_node(&source, &document, node),
+        (Some(node), Some(title)) => set_title_in_node(&source, &document, node, title),
+        (None, None) => Ok(source),
+        (None, Some(title)) => {
+            if matches!(title, TitleText::Literal(_))
+                && document.namespace_prefix(NamespaceKind::Drawing).is_none()
+            {
+                source = ensure_namespace(&source, &document, b"a", DRAWING_TRANSITIONAL)?;
+                document = Document::parse(&source)?;
+            }
+            let axis = document.axis(&source, axis_id)?;
+            let prefix = document.prefix(axis);
+            let drawing = document
+                .namespace_prefix(NamespaceKind::Drawing)
+                .unwrap_or_else(|| b"a".to_vec());
+            let fragment = title_fragment(&prefix, &drawing, title);
+            // CT_*Ax: axId, scaling, delete, axPos, majorGridlines,
+            // minorGridlines, title, ...
+            for anchor in [
+                &b"minorGridlines"[..],
+                b"majorGridlines",
+                b"axPos",
+                b"delete",
+                b"scaling",
+                b"axId",
+            ] {
+                if let Some(node) = document.child(axis, anchor, NamespaceKind::Chart)? {
+                    return insert_at(&source, document.node(node).end, fragment.as_bytes());
+                }
+            }
+            Err(Error::Invalid("chart axis has no identifier".into()))
+        },
+    }
+}
+
+const FILLS: [&[u8]; 6] = [
+    b"noFill",
+    b"solidFill",
+    b"gradFill",
+    b"blipFill",
+    b"pattFill",
+    b"grpFill",
+];
+
+/// The fill child of a shape-properties or line element, if any.
+fn fill_child(document: &Document, parent: usize) -> Result<Option<usize>> {
+    let mut found = None;
+    for fill in FILLS {
+        if let Some(node) = document.child(parent, fill, NamespaceKind::Drawing)? {
+            if found.is_some() {
+                return Err(Error::Invalid("chart shape has more than one fill".into()));
+            }
+            found = Some(node);
+        }
+    }
+    Ok(found)
+}
+
+/// Replace, insert or remove the fill of `parent` (an `spPr` or `a:ln`).
+/// `before` lists the children a new fill precedes, in schema order.
+fn set_fill_in(
+    xml: &[u8],
+    document: &Document,
+    parent: usize,
+    fill: Option<&str>,
+    before: &[&[u8]],
+) -> Result<Vec<u8>> {
+    let current = fill_child(document, parent)?;
+    match (current, fill) {
+        (Some(node), Some(fill)) => {
+            let node = document.node(node);
+            if &xml[node.start..node.end] == fill.as_bytes() {
+                return Ok(xml.to_vec());
+            }
+            replace_range(xml, node.start..node.end, fill.as_bytes())
+        },
+        (Some(node), None) => remove_node(xml, document, node),
+        (None, None) => Ok(xml.to_vec()),
+        (None, Some(fill)) => {
+            for name in before {
+                if let Some(child) = document.child(parent, name, NamespaceKind::Drawing)? {
+                    return insert_at(xml, document.node(child).start, fill.as_bytes());
+                }
+            }
+            append_to_parent(xml, document, parent, fill)
+        },
+    }
+}
+
+/// Set or clear the fill color of a series: its area fill, or for a
+/// line, scatter, radar or stock series its line color.
+pub(crate) fn set_series_color(xml: &[u8], index: u32, color: Option<&str>) -> Result<Vec<u8>> {
+    if let Some(color) = color {
+        let valid =
+            matches!(color.len(), 6 | 8) && color.bytes().all(|byte| byte.is_ascii_hexdigit());
+        if !valid {
+            return Err(Error::Invalid(
+                "a series color is RRGGBB or AARRGGBB".into(),
+            ));
+        }
+    }
+    let mut source = xml.to_vec();
+    let mut document = Document::parse(&source)?;
+    if color.is_some() && document.namespace_prefix(NamespaceKind::Drawing).is_none() {
+        source = ensure_namespace(&source, &document, b"a", DRAWING_TRANSITIONAL)?;
+        document = Document::parse(&source)?;
+    }
+    let drawing = document
+        .namespace_prefix(NamespaceKind::Drawing)
+        .unwrap_or_else(|| b"a".to_vec());
+    let a = |local: &str| qname(&drawing, local);
+    let fill = color.map(|color| {
+        let color = color.to_ascii_uppercase();
+        let inner = if color.len() == 8 {
+            let alpha = u32::from_str_radix(&color[..2], 16).unwrap_or(255);
+            format!(
+                r#"<{clr} val="{}"><{alpha_name} val="{}"/></{clr}>"#,
+                &color[2..],
+                alpha * 100_000 / 255,
+                clr = a("srgbClr"),
+                alpha_name = a("alpha"),
+            )
+        } else {
+            format!(r#"<{} val="{color}"/>"#, a("srgbClr"))
+        };
+        format!("<{fill}>{inner}</{fill}>", fill = a("solidFill"))
+    });
+    let series = document.series(&source, index)?;
+    let lined = document.node(series).parent.is_some_and(|parent| {
+        matches!(
+            document.node(parent).local.as_slice(),
+            b"lineChart" | b"line3DChart" | b"scatterChart" | b"stockChart"
+        ) || (document.node(parent).local == b"radarChart"
+            && document
+                .child(parent, b"radarStyle", NamespaceKind::Chart)
+                .ok()
+                .flatten()
+                .and_then(|style| {
+                    document
+                        .attribute_from(&source, style, b"val")
+                        .ok()
+                        .flatten()
+                })
+                .is_none_or(|style| style != b"filled"))
+    });
+    let shape = document.child(series, b"spPr", NamespaceKind::Chart)?;
+    let after_shape: &[&[u8]] = &[
+        b"ln",
+        b"effectLst",
+        b"effectDag",
+        b"scene3d",
+        b"sp3d",
+        b"extLst",
+    ];
+    match (shape, &fill) {
+        (None, None) => Ok(source),
+        (None, Some(fill)) => {
+            let prefix = document.prefix(series);
+            let body = if lined {
+                format!("<{ln}>{fill}</{ln}>", ln = a("ln"))
+            } else {
+                fill.clone()
+            };
+            let fragment = element(&prefix, "spPr", "", &body);
+            for anchor in [&b"tx"[..], b"order"] {
+                if let Some(node) = document.child(series, anchor, NamespaceKind::Chart)? {
+                    return insert_at(&source, document.node(node).end, fragment.as_bytes());
+                }
+            }
+            Err(Error::Invalid("chart series has no order".into()))
+        },
+        (Some(shape), fill) if lined => {
+            match document.child(shape, b"ln", NamespaceKind::Drawing)? {
+                Some(line) => set_fill_in(
+                    &source,
+                    &document,
+                    line,
+                    fill.as_deref(),
+                    &[
+                        b"prstDash",
+                        b"custDash",
+                        b"round",
+                        b"bevel",
+                        b"miter",
+                        b"headEnd",
+                        b"tailEnd",
+                        b"extLst",
+                    ],
+                ),
+                None => match fill {
+                    Some(fill) => {
+                        let fragment = format!("<{ln}>{fill}</{ln}>", ln = a("ln"));
+                        for name in &after_shape[1..] {
+                            if let Some(node) =
+                                document.child(shape, name, NamespaceKind::Drawing)?
+                            {
+                                return insert_at(
+                                    &source,
+                                    document.node(node).start,
+                                    fragment.as_bytes(),
+                                );
+                            }
+                        }
+                        append_to_parent(&source, &document, shape, &fragment)
+                    },
+                    None => Ok(source.clone()),
+                },
+            }
+        },
+        (Some(shape), fill) => set_fill_in(&source, &document, shape, fill.as_deref(), after_shape),
+    }
+}
+
+/// The value element of a series: `c:val`, or `c:yVal` for X/Y series.
+fn series_values_node(document: &Document, series: usize) -> Result<usize> {
+    if let Some(node) = document.child(series, b"val", NamespaceKind::Chart)? {
+        return Ok(node);
+    }
+    document
+        .child(series, b"yVal", NamespaceKind::Chart)?
+        .ok_or_else(|| Error::Invalid("chart series has no values".into()))
+}
+
+pub(crate) fn set_series_values(xml: &[u8], index: u32, values: &[f64]) -> Result<Vec<u8>> {
+    if values.iter().any(|value| !value.is_finite()) {
+        return Err(Error::Invalid("chart series values must be finite".into()));
+    }
+    if values.is_empty() {
+        return Err(Error::Invalid("chart series values cannot be empty".into()));
+    }
+    let document = Document::parse(xml)?;
+    let series = document.series(xml, index)?;
+    let container = series_values_node(&document, series)?;
+    let points: Vec<String> = values.iter().map(f64::to_string).collect();
+    rewrite_data(xml, &document, container, &points, Kind::Number)
+}
+
+pub(crate) fn set_categories(xml: &[u8], labels: &[String]) -> Result<Vec<u8>> {
+    for label in labels {
+        validation::validate_text(label, "category label")?;
+    }
+    if labels.is_empty() {
+        return Err(Error::Invalid("chart categories cannot be empty".into()));
+    }
+    let mut source = xml.to_vec();
+    loop {
+        let document = Document::parse(&source)?;
+        let plot_area = document.plot_area()?;
+        let mut pending = None;
+        for (candidate, node) in document.nodes.iter().enumerate() {
+            if node.local != b"ser"
+                || !document.matches_namespace(node, NamespaceKind::Chart)
+                || !document.is_descendant(candidate, plot_area)
+            {
+                continue;
+            }
+            let next = match document.child(candidate, b"cat", NamespaceKind::Chart)? {
+                Some(cat) => rewrite_data(&source, &document, cat, labels, Kind::Text)?,
+                None => match document.child(candidate, b"xVal", NamespaceKind::Chart)? {
+                    Some(x) => rewrite_data(&source, &document, x, labels, Kind::Auto)?,
+                    None => {
+                        let prefix = document.prefix(candidate);
+                        let fragment =
+                            element(&prefix, "cat", "", &literal(&prefix, labels, Kind::Text));
+                        let anchor = series_values_node(&document, candidate)?;
+                        insert_at(&source, document.node(anchor).start, fragment.as_bytes())?
+                    },
+                },
+            };
+            if next != source {
+                pending = Some(next);
+                break;
+            }
+        }
+        match pending {
+            Some(next) => source = next,
+            None => return Ok(source),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Kind {
+    Number,
+    Text,
+    /// Numbers when every point parses as one, text otherwise.
+    Auto,
+}
+
+fn literal(prefix: &[u8], points: &[String], kind: Kind) -> String {
+    let numeric = match kind {
+        Kind::Number => true,
+        Kind::Text => false,
+        Kind::Auto => points
+            .iter()
+            .all(|point| point.trim().parse::<f64>().is_ok()),
+    };
+    let local = if numeric { "numLit" } else { "strLit" };
+    format!(
+        "<{name}>{}</{name}>",
+        cache_body(prefix, points, numeric, None),
+        name = qname(prefix, local)
+    )
+}
+
+fn cache_body(prefix: &[u8], points: &[String], numeric: bool, format: Option<&str>) -> String {
+    let mut body = String::new();
+    if numeric {
+        body.push_str(&element(
+            prefix,
+            "formatCode",
+            "",
+            &escape_xml(format.unwrap_or("General")),
+        ));
+    }
+    body.push_str(&element(
+        prefix,
+        "ptCount",
+        &format!(r#" val="{}""#, points.len()),
+        "",
+    ));
+    for (index, point) in points.iter().enumerate() {
+        let value = if numeric {
+            point.trim().to_owned()
+        } else {
+            escape_xml(point)
+        };
+        body.push_str(&format!(
+            "<{pt} idx=\"{index}\"><{v}>{value}</{v}></{pt}>",
+            pt = qname(prefix, "pt"),
+            v = qname(prefix, "v"),
+        ));
+    }
+    body
+}
+
+/// Rewrite the points of a data container (`c:cat`, `c:val`, `c:xVal`,
+/// `c:yVal`): a literal is replaced; a reference keeps its formula, resized
+/// when it is a single-column or single-row range, and gets a new cache.
+fn rewrite_data(
+    xml: &[u8],
+    document: &Document,
+    container: usize,
+    points: &[String],
+    kind: Kind,
+) -> Result<Vec<u8>> {
+    let prefix = document.prefix(container);
+    for (local, numeric) in [(&b"numRef"[..], true), (b"strRef", false)] {
+        let Some(reference) = document.child(container, local, NamespaceKind::Chart)? else {
+            continue;
+        };
+        if numeric
+            && kind != Kind::Number
+            && points
+                .iter()
+                .any(|point| point.trim().parse::<f64>().is_err())
+        {
+            return Err(Error::Invalid(
+                "numeric chart data cannot take text points".into(),
+            ));
+        }
+        if numeric && kind == Kind::Number && points.iter().any(|p| p.parse::<f64>().is_err()) {
+            return Err(Error::Invalid("chart values must be numbers".into()));
+        }
+        let cache_name: &[u8] = if numeric { b"numCache" } else { b"strCache" };
+        let cache = document.child(reference, cache_name, NamespaceKind::Chart)?;
+        let format = match cache {
+            Some(cache) => document
+                .child(cache, b"formatCode", NamespaceKind::Chart)?
+                .map(|node| {
+                    let node = document.node(node);
+                    node.close_start.map_or_else(String::new, |close| {
+                        unescape_xml(&String::from_utf8_lossy(&xml[node.open_end..close]))
+                    })
+                }),
+            None => None,
+        };
+        let cache_local = if numeric { "numCache" } else { "strCache" };
+        let fragment = element(
+            &prefix,
+            cache_local,
+            "",
+            &cache_body(&prefix, points, numeric, format.as_deref()),
+        );
+        let formula = document
+            .child(reference, b"f", NamespaceKind::Chart)?
+            .ok_or_else(|| Error::Invalid("chart data reference has no formula".into()))?;
+        let formula_node = document.node(formula);
+        let formula_text = formula_node
+            .close_start
+            .map(|close| unescape_xml(&String::from_utf8_lossy(&xml[formula_node.open_end..close])))
+            .unwrap_or_default();
+        let current = range_points(&formula_text);
+        // Replace the cache first (it follows the formula), then the formula.
+        let mut output = match cache {
+            Some(cache) => replace_range(
+                xml,
+                document.node(cache).start..document.node(cache).end,
+                fragment.as_bytes(),
+            )?,
+            None => insert_at(xml, formula_node.end, fragment.as_bytes())?,
+        };
+        if current != Some(points.len()) {
+            let resized = resize_range(&formula_text, points.len()).ok_or_else(|| {
+                Error::Invalid(
+                    "the chart data reference is not a single-column or single-row range, so it cannot be resized"
+                        .into(),
+                )
+            })?;
+            let close = formula_node
+                .close_start
+                .ok_or_else(|| Error::Invalid("chart formula is not closed".into()))?;
+            output = replace_range(
+                &output,
+                formula_node.open_end..close,
+                escape_xml(&resized).as_bytes(),
+            )?;
+        }
+        return Ok(output);
+    }
+    for (local, numeric) in [(&b"numLit"[..], true), (b"strLit", false)] {
+        let Some(node) = document.child(container, local, NamespaceKind::Chart)? else {
+            continue;
+        };
+        let numeric = match kind {
+            Kind::Number => true,
+            Kind::Text => false,
+            Kind::Auto => numeric && points.iter().all(|p| p.trim().parse::<f64>().is_ok()),
+        };
+        let replacement = literal(
+            &prefix,
+            points,
+            if numeric { Kind::Number } else { Kind::Text },
+        );
+        return replace_range(
+            xml,
+            document.node(node).start..document.node(node).end,
+            replacement.as_bytes(),
+        );
+    }
+    let replacement = literal(&prefix, points, kind);
+    append_to_parent(xml, document, container, &replacement)
+}
+
+/// Split `Sheet!$A$2:$A$5` into its sheet prefix and the two cells.
+fn split_range(formula: &str) -> Option<(&str, (&str, u32), (&str, u32))> {
+    let (sheet, range) = formula.rsplit_once('!')?;
+    let (first, last) = range.split_once(':').unwrap_or((range, range));
+    Some((sheet, cell(first)?, cell(last)?))
+}
+
+fn cell(text: &str) -> Option<(&str, u32)> {
+    let text = text.strip_prefix('$').unwrap_or(text);
+    let split = text.find(|c: char| !c.is_ascii_alphabetic())?;
+    let (column, row) = text.split_at(split);
+    let row = row.strip_prefix('$').unwrap_or(row);
+    if column.is_empty() || !column.chars().all(|c| c.is_ascii_uppercase()) {
+        return None;
+    }
+    Some((column, row.parse().ok()?))
+}
+
+/// The number of cells of a single-column or single-row range.
+fn range_points(formula: &str) -> Option<usize> {
+    let (_, (first_column, first_row), (last_column, last_row)) = split_range(formula)?;
+    if first_column == last_column {
+        usize::try_from(last_row.checked_sub(first_row)?)
+            .ok()?
+            .checked_add(1)
+    } else if first_row == last_row {
+        let first = column_index(first_column)?;
+        let last = column_index(last_column)?;
+        last.checked_sub(first)?.checked_add(1)
+    } else {
+        None
+    }
+}
+
+fn column_index(name: &str) -> Option<usize> {
+    name.bytes()
+        .try_fold(0_usize, |value, byte| {
+            value
+                .checked_mul(26)?
+                .checked_add(usize::from(byte - b'A') + 1)
+        })
+        .and_then(|value| value.checked_sub(1))
+}
+
+/// Resize a single-column range to `points` rows (a single cell grows
+/// downward); `None` for any other reference.
+fn resize_range(formula: &str, points: usize) -> Option<String> {
+    let (sheet, (first_column, first_row), (last_column, _)) = split_range(formula)?;
+    if first_column != last_column || points == 0 {
+        return None;
+    }
+    let last_row = first_row.checked_add(u32::try_from(points - 1).ok()?)?;
+    if last_row > 1_048_576 {
+        return None;
+    }
+    Some(if points == 1 {
+        format!("{sheet}!${first_column}${first_row}")
+    } else {
+        format!("{sheet}!${first_column}${first_row}:${first_column}${last_row}")
+    })
 }
 
 fn set_scaling_value(xml: &[u8], axis_id: u32, name: &[u8], value: f64) -> Result<Vec<u8>> {
@@ -1066,7 +1622,8 @@ fn insert_at(xml: &[u8], position: usize, bytes: &[u8]) -> Result<Vec<u8>> {
     let output_len = xml.len().saturating_add(bytes.len());
     if output_len > validation::MAX_XML_BYTES {
         return Err(validation::limit(
-            "chart editor XML",
+            crate::LimitKind::XmlBytes,
+            output_len,
             validation::MAX_XML_BYTES,
         ));
     }
@@ -1089,7 +1646,8 @@ fn replace_range(xml: &[u8], range: Range<usize>, replacement: &[u8]) -> Result<
         .saturating_add(replacement.len());
     if output_len > validation::MAX_XML_BYTES {
         return Err(validation::limit(
-            "chart editor XML",
+            crate::LimitKind::XmlBytes,
+            output_len,
             validation::MAX_XML_BYTES,
         ));
     }

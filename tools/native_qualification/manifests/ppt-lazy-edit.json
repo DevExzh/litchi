@@ -1,0 +1,222 @@
+{
+  "schema": "litchi.ppt.lazy-native-qualification.input.v1",
+  "baseline": {
+    "root": "PARAMETERIZED_EXTERNAL_BASELINE_ROOT",
+    "ref": "8779d059add6c90c74552801372c44f770db9f0f",
+    "tree": "27e0b56e2f8e3ab11b00c119604b5636f358dfe2",
+    "lock": {
+      "path": "tools/perf-baseline/Cargo.lock",
+      "bytes": 57158,
+      "sha256": "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184"
+    },
+    "normal_binary": {
+      "path": "PARAMETERIZED_EXTERNAL_BASELINE_TARGET/release/ppt_lazy_native",
+      "bytes": null,
+      "sha256": null
+    },
+    "allocator_binary": {
+      "path": "PARAMETERIZED_EXTERNAL_BASELINE_ALLOCATOR_TARGET/release/ppt_lazy_native_alloc",
+      "bytes": null,
+      "sha256": null
+    },
+    "target_dir": "PARAMETERIZED_EXTERNAL_BASELINE_TARGET",
+    "allocator_target_dir": "PARAMETERIZED_EXTERNAL_BASELINE_ALLOCATOR_TARGET"
+  },
+  "candidate": null,
+  "probe_sources": [
+    {
+      "path": "tools/perf-baseline/src/ppt_lazy_native.rs",
+      "bytes": null,
+      "sha256": null
+    },
+    {
+      "path": "tools/perf-baseline/src/bin/ppt_lazy_native.rs",
+      "bytes": null,
+      "sha256": null
+    },
+    {
+      "path": "tools/perf-baseline/src/bin/ppt_lazy_native_alloc.rs",
+      "bytes": null,
+      "sha256": null
+    },
+    {
+      "path": "tools/perf-baseline/src/lib.rs",
+      "bytes": null,
+      "sha256": null
+    }
+  ],
+  "baseline_adapter": {
+    "status": "M tools/perf-baseline/src/lib.rs\n?? test-data/unified-ops/ppt-lazy-native-fixture.ppt\n?? tools/perf-baseline/src/bin/ppt_lazy_native.rs\n?? tools/perf-baseline/src/bin/ppt_lazy_native_alloc.rs\n?? tools/perf-baseline/src/ppt_lazy_native.rs",
+    "overlay_paths": [
+      "tools/perf-baseline/src/ppt_lazy_native.rs",
+      "tools/perf-baseline/src/bin/ppt_lazy_native.rs",
+      "tools/perf-baseline/src/bin/ppt_lazy_native_alloc.rs"
+    ],
+    "registration": {
+      "path": "tools/perf-baseline/src/lib.rs",
+      "line": "pub mod ppt_lazy_native;"
+    },
+    "fixture": {
+      "path": "test-data/unified-ops/ppt-lazy-native-fixture.ppt",
+      "bytes": 14848,
+      "sha256": "02fa44ca76903943e80a3a2da1f9dbd326c7a4a047540c3aa9cf211e34ef617c"
+    },
+    "compile_fixtures": [
+      {
+        "path": "test-data/poi/test-data/slideshow/ppt_with_embeded.ppt",
+        "bytes": 180736,
+        "sha256": "afa1dd5adc36765e6e40725a133b0330e5ad1febd1506ca93ceae8c5c5400b53"
+      },
+      {
+        "path": "test-data/unified-ops/0294/video.ppt",
+        "bytes": 43520,
+        "sha256": "f32f0614958a177a5195cd7537cdfd2efef52c57de4decc13cf65eadc66cdb8a"
+      },
+      {
+        "path": "test-data/poi/test-data/slideshow/bug61881.ppt",
+        "bytes": 74752,
+        "sha256": "ba2bf551e87f5fd7667dec52ac19005396bdf9af00f0006f9a247a9fede2e8ee"
+      },
+      {
+        "path": "test-data/poi/test-data/spreadsheet/54016.xls",
+        "bytes": 984576,
+        "sha256": "2e050f1fbb31868b097aa6d4d0fe0a16af8e39c252af82d01cd8f93c4f9a911a"
+      },
+      {
+        "path": "test-data/rtf/watermark.rtf",
+        "bytes": 69471,
+        "sha256": "48d62dcd959e737b06ebb8255780bcaaf1e88056ff9c3d5a21d3ff5cd3ddf9cb"
+      }
+    ]
+  },
+  "build": {
+    "preparation": {
+      "path": "PARAMETERIZED_EXTERNAL_PREPARATION_RECEIPT",
+      "bytes": null,
+      "sha256": null
+    },
+    "receipt": {
+      "path": "PARAMETERIZED_EXTERNAL_BUILD_RECEIPT",
+      "bytes": null,
+      "sha256": null
+    },
+    "source_archive": {
+      "path": "PARAMETERIZED_EXTERNAL_SOURCE_ARCHIVE",
+      "bytes": null,
+      "sha256": null
+    },
+    "fixtures": {
+      "default": {
+        "path": "../../../test-data/unified-ops/ppt-lazy-native-fixture.ppt",
+        "bytes": 14848,
+        "sha256": "02fa44ca76903943e80a3a2da1f9dbd326c7a4a047540c3aa9cf211e34ef617c"
+      },
+      "objects": {
+        "path": "../../../test-data/poi/test-data/slideshow/ppt_with_embeded.ppt",
+        "bytes": 180736,
+        "sha256": "afa1dd5adc36765e6e40725a133b0330e5ad1febd1506ca93ceae8c5c5400b53"
+      },
+      "external_media": {
+        "path": "../../../test-data/unified-ops/0294/video.ppt",
+        "bytes": 43520,
+        "sha256": "f32f0614958a177a5195cd7537cdfd2efef52c57de4decc13cf65eadc66cdb8a"
+      },
+      "picture_bullets": {
+        "path": "../../../test-data/poi/test-data/slideshow/bug61881.ppt",
+        "bytes": 74752,
+        "sha256": "ba2bf551e87f5fd7667dec52ac19005396bdf9af00f0006f9a247a9fede2e8ee"
+      }
+    },
+    "fixture_routes": {
+      "primary_entry_drop": "default",
+      "primary_noop_commit": "default",
+      "metadata_entry_drop": "default",
+      "metadata_noop_commit": "default",
+      "animations_entry_drop": "default",
+      "animations_noop_commit": "default",
+      "broadcast_entry_drop": "default",
+      "broadcast_noop_commit": "default",
+      "client_data_entry_drop": "default",
+      "client_data_noop_commit": "default",
+      "diagrams_entry_drop": "default",
+      "diagrams_noop_commit": "default",
+      "document_comparison_entry_drop": "default",
+      "document_comparison_noop_commit": "default",
+      "objects_entry_drop": "objects",
+      "objects_noop_commit": "objects",
+      "external_media_entry_drop": "external_media",
+      "external_media_noop_commit": "external_media",
+      "fonts_entry_drop": "default",
+      "fonts_noop_commit": "default",
+      "master_metadata_entry_drop": "default",
+      "master_metadata_noop_commit": "default",
+      "master_layout_entry_drop": "default",
+      "master_layout_noop_commit": "default",
+      "picture_bullets_entry_drop": "picture_bullets",
+      "picture_bullets_noop_commit": "picture_bullets",
+      "slide_sync_entry_drop": "default",
+      "slide_sync_noop_commit": "default"
+    },
+    "toolchain": {
+      "path": "PARAMETERIZED_EXTERNAL_TOOLCHAIN",
+      "bytes": null,
+      "sha256": null
+    },
+    "cargo_config": {
+      "path": "PARAMETERIZED_EXTERNAL_CARGO_CONFIG",
+      "bytes": null,
+      "sha256": null
+    },
+    "profile": "release",
+    "target_subdir": "target/release",
+    "normal_command": [
+      "cargo",
+      "build",
+      "--release",
+      "--offline",
+      "--locked",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--bin",
+      "ppt_lazy_native"
+    ],
+    "allocator_command": [
+      "cargo",
+      "build",
+      "--release",
+      "--offline",
+      "--locked",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--bin",
+      "ppt_lazy_native_alloc"
+    ],
+    "features": {
+      "normal": [
+        "current-api",
+        "current-xlsx-raw-opc"
+      ],
+      "allocator": [
+        "current-api",
+        "current-xlsx-raw-opc"
+      ]
+    },
+    "environment": {
+      "CARGO_BUILD_JOBS": "1",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_PROFILE_RELEASE_DEBUG": "0"
+    }
+  },
+  "protocol": {
+    "cpu": 3,
+    "blocks": 2,
+    "warmups": 3,
+    "target_ms": 500,
+    "minimum_ms": 150,
+    "max_load": 1.0,
+    "max_iterations": 1000000,
+    "timeout_s": 300.0
+  },
+  "claim_scope": "preparation and reproducible native qualification protocol only; no native timing claim"
+}

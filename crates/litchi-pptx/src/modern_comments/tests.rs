@@ -54,6 +54,95 @@ mod comment_tests {
         format!(r#"<p188:cmLst xmlns:p188="{P188}" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p188:cm id="{COMMENT}" authorId="{AUTHOR}" created="2024-12-30T20:26:06.503"><p188:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>Needs more cowbell</a:t></a:r></a:p></p188:txBody></p188:cm></p188:cmLst>"#).into_bytes()
     }
 
+    #[test]
+    fn processed_comment_and_author_fragments_validate_character_references() {
+        let source = String::from_utf8(sdk_xml()).unwrap();
+        for token in ["&amp;", "&#38;", "&#x26;"] {
+            let xml = source.replace("Needs more cowbell", token);
+            let parsed = List::from_processed(xml.as_bytes()).unwrap();
+            assert!(
+                std::str::from_utf8(parsed.comments[0].text_body_xml.as_ref().unwrap())
+                    .unwrap()
+                    .contains(token)
+            );
+            let authors = format!(
+                r#"<p188:authorLst xmlns:p188="{P188}"><p188:author id="{AUTHOR}" name="Author" userId="user" providerId="provider"><p188:extLst><p188:ext uri="example"><x:v xmlns:x="urn:example">{token}</x:v></p188:ext></p188:extLst></p188:author></p188:authorLst>"#
+            );
+            Authors::from_processed(authors.as_bytes()).unwrap();
+            assert!(
+                Authors::from_processed(authors.replace(token, "&undefined;").as_bytes()).is_err()
+            );
+        }
+        assert!(
+            List::from_processed(
+                source
+                    .replace("Needs more cowbell", "&undefined;")
+                    .as_bytes()
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn processed_modern_parts_report_typed_byte_limits() {
+        let oversized = vec![b' '; MAX_BYTES + 1];
+        assert!(matches!(
+            List::from_processed(&oversized),
+            Err(Error::Limit {
+                kind: LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                observed,
+                maximum: MAX_BYTES,
+                ..
+            }) if observed == oversized.len()
+        ));
+        assert!(matches!(
+            Authors::from_processed(&oversized),
+            Err(Error::Limit {
+                kind: LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                observed,
+                maximum: MAX_BYTES,
+                ..
+            }) if observed == oversized.len()
+        ));
+    }
+
+    #[test]
+    fn comment_relationship_string_limit_preserves_observation() {
+        let expected = MAX_STRING_BYTES + 1;
+        let mut package = package();
+        let mut value = value();
+        value.relationship_id = "r".repeat(expected);
+        assert!(matches!(
+            store_modern_comment(&mut package, &value),
+            Err(Error::Limit {
+                kind: LimitKind::Codec(crate::opened::CodecLimitKind::StringBytes),
+                observed,
+                maximum: MAX_STRING_BYTES,
+                ..
+            }) if observed == expected
+        ));
+    }
+
+    #[test]
+    fn author_relationship_string_limit_preserves_observation() {
+        let expected = MAX_STRING_BYTES + 1;
+        let mut package = package();
+        let value = AuthorPart {
+            relationship_id: "r".repeat(expected),
+            part_name: "/ppt/authors/modernAuthor1.xml".into(),
+            authors: Authors::default(),
+        };
+        assert!(matches!(
+            store_modern_comment_authors(&mut package, &value),
+            Err(Error::Limit {
+                kind: LimitKind::Codec(crate::opened::CodecLimitKind::StringBytes),
+                observed,
+                maximum: MAX_STRING_BYTES,
+                ..
+            }) if observed == expected
+        ));
+    }
+
     fn package() -> OpcPackage {
         let mut package = OpcPackage::new();
         package.rels_mut().add_relationship(

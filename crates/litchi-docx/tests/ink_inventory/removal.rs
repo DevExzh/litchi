@@ -1,12 +1,13 @@
 use std::collections::BTreeMap;
 
-use litchi_docx::ink::EditLimits;
+use litchi_docx::ink::EditOptions;
 use soapberry_zip::office::ArchiveReader;
 
 use super::*;
 
 fn members(bytes: &[u8]) -> BTreeMap<String, Vec<u8>> {
-    let archive = ArchiveReader::new(bytes).unwrap();
+    let archive =
+        ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     archive
         .file_names()
         .map(|name| (name.to_owned(), archive.read(name).unwrap()))
@@ -30,10 +31,10 @@ fn base_removal_across_all_stories_retains_shared_target_until_last_owner_and_un
         assert!(!first.remove(Position::new(0)).unwrap());
         assert!(first.remove(Position::new(8)).is_err());
         let first = first.commit().unwrap();
-        assert!(first.changed());
-        assert_eq!(first.snapshot().annotations().len(), 7);
+        assert!(first.diagnostics().changed());
+        assert_eq!(first.package().ink().unwrap().annotations().len(), 7);
         assert_eq!(package.ink().unwrap().annotations().len(), 8);
-        package.apply_ink_patch(first.patch()).unwrap();
+        package = package.apply_ink(first.patch()).unwrap().into_package();
         assert!(has_part(&package, "/payload/handwriting.xml"));
         let intermediate = save(&mut package);
         let mut package = Package::from_reader(Cursor::new(&intermediate)).unwrap();
@@ -41,13 +42,23 @@ fn base_removal_across_all_stories_retains_shared_target_until_last_owner_and_un
         for position in 0..7 {
             rest.remove(Position::new(position)).unwrap();
         }
-        let rest = package.publish_ink_edit(rest).unwrap();
+        let rest = {
+            let commit = rest.commit().unwrap();
+            package = commit.package().clone();
+            commit
+        };
         assert!(!has_part(&package, "/payload/handwriting.xml"));
         let removed = save(&mut package);
         let mut package = Package::from_reader(Cursor::new(&removed)).unwrap();
-        package.apply_ink_patch(&rest.patch().inverse()).unwrap();
+        package = package
+            .apply_ink(&rest.patch().inverse())
+            .unwrap()
+            .into_package();
         assert_eq!(members(&save(&mut package)), members(&intermediate));
-        package.apply_ink_patch(&first.patch().inverse()).unwrap();
+        package = package
+            .apply_ink(&first.patch().inverse())
+            .unwrap()
+            .into_package();
         assert_eq!(members(&save(&mut package)), members(&original));
         assert_eq!(package.ink().unwrap().annotations().len(), 8);
     }
@@ -70,7 +81,7 @@ fn same_id_and_inactive_or_unknown_attribute_uses_prevent_relationship_cleanup()
         let mut package = open(&opc);
         let mut edit = package.edit_ink().unwrap();
         edit.remove(Position::new(0)).unwrap();
-        package.publish_ink_edit(edit).unwrap();
+        package = edit.commit().unwrap().into_package();
         assert!(has_part(&package, "/payload/handwriting.xml"));
         let main = package
             .opc_package()
@@ -118,10 +129,14 @@ fn selectors_skip_generic_content_and_batch_removal_handles_distinct_ids_sharing
     let original = PackageWriter::to_bytes(&opc).unwrap();
     let mut package = open(&opc);
     let mut edit = package.edit_ink().unwrap();
-    assert_eq!(edit.snapshot().annotations().len(), 2);
+    assert_eq!(edit.inventory().unwrap().annotations().len(), 2);
     edit.remove(Position::new(1)).unwrap();
     edit.remove(Position::new(0)).unwrap();
-    let commit = package.publish_ink_edit(edit).unwrap();
+    let commit = {
+        let commit = edit.commit().unwrap();
+        package = commit.package().clone();
+        commit
+    };
     assert!(!has_part(&package, "/payload/handwriting.xml"));
     assert!(has_part(&package, "/payload/math.xml"));
     let current = package
@@ -135,7 +150,10 @@ fn selectors_skip_generic_content_and_batch_removal_handles_distinct_ids_sharing
             .as_bytes()
     );
     assert_eq!(current.rels().len(), 1);
-    package.apply_ink_patch(&commit.patch().inverse()).unwrap();
+    package = package
+        .apply_ink(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(members(&save(&mut package)), members(&original));
 }
 
@@ -170,7 +188,11 @@ fn drawing_removal_deletes_complete_alternative_and_exclusive_fallback_then_rest
     let mut package = open(&opc);
     let mut edit = package.edit_ink().unwrap();
     edit.remove(Position::new(0)).unwrap();
-    let commit = package.publish_ink_edit(edit).unwrap();
+    let commit = {
+        let commit = edit.commit().unwrap();
+        package = commit.package().clone();
+        commit
+    };
     assert!(!has_part(&package, "/payload/fallback.png"));
     assert!(!has_part(&package, "/payload/handwriting.xml"));
     let main = package
@@ -181,7 +203,10 @@ fn drawing_removal_deletes_complete_alternative_and_exclusive_fallback_then_rest
     assert!(main.contains("<w:t>before</w:t><w:t>after</w:t>"));
     assert!(!main.contains("<mc:AlternateContent>"));
     let mut reopened = Package::from_reader(Cursor::new(save(&mut package))).unwrap();
-    reopened.apply_ink_patch(&commit.patch().inverse()).unwrap();
+    reopened = reopened
+        .apply_ink(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(members(&save(&mut reopened)), members(&original));
 }
 
@@ -189,7 +214,8 @@ fn drawing_removal_deletes_complete_alternative_and_exclusive_fallback_then_rest
 fn removal_and_reopened_inverse_preserve_relationship_and_content_type_lexical_extensions() {
     use soapberry_zip::office::StreamingArchiveWriter;
     let original = PackageWriter::to_bytes(&drawing_source("", "")).unwrap();
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for (name, bytes) in members(&original) {
         let bytes = if name == "[Content_Types].xml" || name.ends_with(".rels") {
             let xml = String::from_utf8(bytes).unwrap();
@@ -212,7 +238,11 @@ fn removal_and_reopened_inverse_preserve_relationship_and_content_type_lexical_e
     let mut package = Package::from_reader(Cursor::new(&original)).unwrap();
     let mut edit = package.edit_ink().unwrap();
     edit.remove(Position::new(0)).unwrap();
-    let commit = package.publish_ink_edit(edit).unwrap();
+    let commit = {
+        let commit = edit.commit().unwrap();
+        package = commit.package().clone();
+        commit
+    };
     let modified = save(&mut package);
     let modified_members = members(&modified);
     for name in ["[Content_Types].xml", "word/_rels/document.xml.rels"] {
@@ -223,7 +253,10 @@ fn removal_and_reopened_inverse_preserve_relationship_and_content_type_lexical_e
         );
     }
     let mut reopened = Package::from_reader(Cursor::new(modified)).unwrap();
-    reopened.apply_ink_patch(&commit.patch().inverse()).unwrap();
+    reopened = reopened
+        .apply_ink(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(members(&save(&mut reopened)), members(&original));
 }
 
@@ -245,13 +278,21 @@ fn drawing_removal_retains_fallback_with_foreign_incoming_and_guards_its_bytes()
     );
     let mut changed = open(&changed);
     let unchanged = save(&mut changed);
-    assert!(changed.apply_ink_patch(commit.patch()).is_err());
+    assert!(
+        changed
+            .apply_ink(commit.patch())
+            .map(|commit| commit.into_package())
+            .is_err()
+    );
     assert_eq!(save(&mut changed), unchanged);
-    package.apply_ink_patch(commit.patch()).unwrap();
+    package = package.apply_ink(commit.patch()).unwrap().into_package();
     assert!(has_part(&package, "/payload/fallback.png"));
     assert!(!has_part(&package, "/payload/handwriting.xml"));
     let mut package = Package::from_reader(Cursor::new(save(&mut package))).unwrap();
-    package.apply_ink_patch(&commit.patch().inverse()).unwrap();
+    package = package
+        .apply_ink(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(members(&save(&mut package)), members(&original));
 }
 
@@ -272,10 +313,17 @@ fn external_fallback_edge_is_removed_and_undone_without_fetching() {
     let mut package = open(&opc);
     let mut edit = package.edit_ink().unwrap();
     edit.remove(Position::new(0)).unwrap();
-    let commit = package.publish_ink_edit(edit).unwrap();
+    let commit = {
+        let commit = edit.commit().unwrap();
+        package = commit.package().clone();
+        commit
+    };
     assert!(has_part(&package, "/payload/fallback.png")); // The unrelated orphan stays untouched.
     let mut package = Package::from_reader(Cursor::new(save(&mut package))).unwrap();
-    package.apply_ink_patch(&commit.patch().inverse()).unwrap();
+    package = package
+        .apply_ink(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(members(&save(&mut package)), members(&original));
 }
 
@@ -299,7 +347,7 @@ fn unknown_fallback_resource_dependencies_refuse_atomically() {
     let mut package = open(&opc);
     let mut edit = package.edit_ink().unwrap();
     edit.remove(Position::new(0)).unwrap();
-    assert!(package.publish_ink_edit(edit).is_err());
+    assert!(edit.commit().is_err());
     assert_eq!(save(&mut package), original);
 }
 
@@ -316,7 +364,7 @@ fn unmodeled_drawing_siblings_refuse_without_publication() {
         let mut package = open(&opc);
         let mut edit = package.edit_ink().unwrap();
         edit.remove(Position::new(0)).unwrap();
-        assert!(package.publish_ink_edit(edit).is_err());
+        assert!(edit.commit().is_err());
         assert_eq!(save(&mut package), original);
     }
 }
@@ -329,9 +377,16 @@ fn generic_text_xml_ink_removes_and_restores_its_exact_xml_member() {
     let mut package = open(&opc);
     let mut edit = package.edit_ink().unwrap();
     edit.remove(Position::new(0)).unwrap();
-    let commit = package.publish_ink_edit(edit).unwrap();
+    let commit = {
+        let commit = edit.commit().unwrap();
+        package = commit.package().clone();
+        commit
+    };
     assert!(!has_part(&package, "/payload/handwriting.xml"));
-    package.apply_ink_patch(&commit.patch().inverse()).unwrap();
+    package = package
+        .apply_ink(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(members(&save(&mut package)), members(&original));
 }
 
@@ -348,17 +403,17 @@ fn signed_noop_is_exact_changed_edit_requires_explicit_unsigned_source() {
     let original = PackageWriter::to_bytes(&opc).unwrap();
     let mut package = open(&opc);
     let noop = package.edit_ink().unwrap().commit().unwrap();
-    assert!(!noop.changed());
-    package.apply_ink_patch(noop.patch()).unwrap();
+    assert!(!noop.diagnostics().changed());
+    package = package.apply_ink(noop.patch()).unwrap().into_package();
     assert_eq!(save(&mut package), original);
     let mut edit = package.edit_ink().unwrap();
     edit.remove(Position::new(0)).unwrap();
-    assert!(package.publish_ink_edit(edit).is_err());
+    assert!(edit.commit().is_err());
     assert_eq!(save(&mut package), original);
-    package.unsign();
+    package = package.unsign();
     let mut edit = package.edit_ink().unwrap();
     edit.remove(Position::new(0)).unwrap();
-    package.publish_ink_edit(edit).unwrap();
+    package = edit.commit().unwrap().into_package();
     assert!(!package.is_signed());
 }
 
@@ -390,8 +445,18 @@ fn stale_graph_and_payload_reject_changed_and_noop_patches_without_touching_targ
         }
         let expected = PackageWriter::to_bytes(&opc).unwrap();
         let mut target = open(&opc);
-        assert!(target.apply_ink_patch(noop.patch()).is_err());
-        assert!(target.apply_ink_patch(changed.patch()).is_err());
+        assert!(
+            target
+                .apply_ink(noop.patch())
+                .map(|commit| commit.into_package())
+                .is_err()
+        );
+        assert!(
+            target
+                .apply_ink(changed.patch())
+                .map(|commit| commit.into_package())
+                .is_err()
+        );
         assert_eq!(save(&mut target), expected);
     }
 }
@@ -401,54 +466,43 @@ fn edit_limits_and_dirty_state_refuse_before_publication() {
     let mut package = open(&source(false, true));
     let original = save(&mut package);
     let mut too_small = package
-        .edit_ink_with_limits(EditLimits {
+        .edit_ink_with_options(EditOptions {
             max_staged_bytes: 1,
-            ..EditLimits::default()
+            ..EditOptions::default()
         })
         .unwrap();
     too_small.remove(Position::new(0)).unwrap();
     assert!(matches!(
-        package.publish_ink_edit(too_small),
+        too_small.commit(),
         Err(Error::InkLimit {
-            resource: "edit staged bytes",
+            kind: litchi_docx::ink::LimitKind::EditStagedBytes,
             ..
         })
     ));
     assert_eq!(save(&mut package), original);
+    let too_small_package = package
+        .edit_ink_with_options(EditOptions {
+            max_package_bytes: 1,
+            ..EditOptions::default()
+        })
+        .unwrap();
+    assert!(too_small_package.inventory().is_err());
     assert!(
         package
-            .edit_ink_with_limits(EditLimits {
-                max_package_bytes: 1,
-                ..EditLimits::default()
-            })
-            .is_err()
-    );
-    assert!(
-        package
-            .edit_ink_with_limits(EditLimits {
+            .edit_ink_with_options(EditOptions {
                 max_operations: 0,
-                ..EditLimits::default()
+                ..EditOptions::default()
             })
             .is_err()
     );
     let mut edit = package
-        .edit_ink_with_limits(EditLimits {
+        .edit_ink_with_options(EditOptions {
             max_operations: 1,
-            ..EditLimits::default()
+            ..EditOptions::default()
         })
         .unwrap();
     edit.remove(Position::new(0)).unwrap();
     assert!(edit.remove(Position::new(1)).is_err());
     let commit = edit.commit().unwrap();
-    assert_eq!(commit.snapshot().annotations().len(), 7);
-    package
-        .document_mut()
-        .unwrap()
-        .add_paragraph()
-        .add_run_with_text("pending");
-    assert!(matches!(package.edit_ink(), Err(Error::UnsafeEdit { .. })));
-    assert!(matches!(
-        package.apply_ink_patch(commit.patch()),
-        Err(Error::UnsafeEdit { .. })
-    ));
+    assert_eq!(commit.package().ink().unwrap().annotations().len(), 7);
 }

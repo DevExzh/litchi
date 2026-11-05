@@ -173,7 +173,7 @@ fn rejects_raw_oversized_attributes_before_entity_decoding() {
     let error = read(xml.as_bytes()).unwrap_err();
     assert!(matches!(
         error,
-        crate::Error::Invalid(message)
+        Error::Invalid(message)
             if message == format!("calculation-chain attribute exceeds {MAX_ATTRIBUTE_BYTES} bytes")
     ));
 }
@@ -296,9 +296,9 @@ fn signed_publication_allows_exact_noops_and_rejects_changes() {
     let changed = Chain::new(Cell::new(Sheet::new(1).unwrap(), "B2").unwrap());
     assert!(matches!(
         put(&mut package, &changed, Conformance::Transitional),
-        Err(crate::Error::Signed)
+        Err(Error::Signed)
     ));
-    assert!(matches!(remove(&mut package), Err(crate::Error::Signed)));
+    assert!(matches!(remove(&mut package), Err(Error::Signed)));
     assert!(package.is_signed());
     assert!(std::sync::Arc::ptr_eq(
         &before,
@@ -339,7 +339,7 @@ fn refuses_to_canonicalize_mce_projected_chain_sources() {
         let error = put(&mut package, &chain, conformance).unwrap_err();
         assert!(matches!(
             error,
-            crate::Error::Invalid(message)
+            Error::Invalid(message)
                 if message == "cannot replace calculation-chain source projected through MCE"
         ));
         assert!(std::sync::Arc::ptr_eq(
@@ -356,7 +356,7 @@ fn rejects_chain_sheet_ids_absent_from_workbook_catalog_exactly() {
     let error = put(&mut package, &chain, Conformance::Transitional).unwrap_err();
     assert!(matches!(
         error,
-        crate::Error::Invalid(message)
+        Error::Invalid(message)
             if message == "calculation-chain sheet ID 2 does not resolve to a workbook sheet"
     ));
     assert!(load(&package).unwrap().is_none());
@@ -379,7 +379,7 @@ fn workbook_sheet_catalog_enforces_its_exact_projected_boundary() {
     let error = put(&mut oversized, &chain, Conformance::Transitional).unwrap_err();
     assert!(matches!(
         error,
-        crate::Error::Invalid(message)
+        Error::Invalid(message)
             if message == format!(
                 "workbook sheet catalog exceeds {MAX_WORKBOOK_SHEETS} entries"
             )
@@ -395,8 +395,10 @@ fn workbook_mce_expansion_is_rejected_during_bounded_processing() {
     let error = process_workbook_mce_with_limit(source.as_bytes(), source.len()).unwrap_err();
     assert!(matches!(
         error,
-        crate::Error::Invalid(message)
-            if message == "workbook MCE error: markup compatibility resource limit exceeded: output bytes"
+        Error::MarkupCompatibility(litchi_ooxml_common::mce::Error::LimitExceeded {
+            kind: litchi_ooxml_common::mce::LimitKind::OutputBytes,
+            ..
+        })
     ));
 }
 
@@ -445,7 +447,7 @@ fn package_calculation_chain_mutators_reject_invalid_existing_graphs() {
 fn loads_real_poi_and_synthetic_packages_and_validates_relationships() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../..//test-data/poi/test-data/spreadsheet/62834.xlsx");
-    let package = OpcPackage::open(path).unwrap();
+    let package = OpcPackage::open(path, litchi_opc::SourceLimits::default()).unwrap();
     let (chain, _) = load(&package).unwrap().unwrap();
     assert_eq!(chain.cells().len(), 3);
     assert_eq!(chain.cells()[0].reference(), "A5");

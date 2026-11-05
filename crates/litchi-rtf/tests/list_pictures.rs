@@ -7,13 +7,12 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
-use litchi_rtf::{ImageType, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{ImageType, write::Writer};
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
@@ -22,7 +21,7 @@ fn parses_real_libreoffice_picture_bullet_without_cloning_payload() {
     let source = include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/i120928.rtf"
     );
-    let document = RtfDocument::parse_bytes(source).unwrap();
+    let document = Tree::parse_bytes(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let indices = document.list_table().picture_bullet_picture_indices();
     assert_eq!(
         indices.len(),
@@ -36,7 +35,7 @@ fn parses_real_libreoffice_picture_bullet_without_cloning_payload() {
     let output = write(&document);
     let serialized = String::from_utf8_lossy(&output);
     assert!(serialized.contains("{\\*\\listpicture{\\*\\shppict{\\pict"));
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         reparsed.list_table().picture_bullet_count,
         document.list_table().picture_bullet_count
@@ -59,11 +58,11 @@ fn canonical_roundtrip_preserves_multiple_records_and_empty_legacy_entry() {
         r#"{\*\shppict{\pict\pngblip 89504e470d0a1a0a}}"#,
         r#"{\*\shppict{\pict\jpegblip ffd8ffe0}}}}}"#,
     );
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(document.list_table().picture_bullet_count, 2);
     assert_eq!(document.list_picture_bullets().count(), 2);
     let first = write(&document);
-    let reparsed = RtfDocument::parse_bytes(&first).unwrap();
+    let reparsed = Tree::parse_bytes(&first, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         reparsed.list_table().picture_bullet_picture_indices().len(),
         2
@@ -71,17 +70,25 @@ fn canonical_roundtrip_preserves_multiple_records_and_empty_legacy_entry() {
     assert_eq!(reparsed.pictures().len(), 2);
     assert_eq!(write(&reparsed), first);
 
-    let empty = RtfDocument::parse(r"{\rtf1{\*\listtable{\*\listpicture}}}").unwrap();
+    let empty = Tree::parse(
+        r"{\rtf1{\*\listtable{\*\listpicture}}}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(empty.list_table().picture_bullet_count, 1);
     assert!(empty.list_picture_bullets().next().unwrap().is_none());
     let rewritten = write(&empty);
-    let reparsed = RtfDocument::parse_bytes(&rewritten).unwrap();
+    let reparsed = Tree::parse_bytes(&rewritten, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.list_table().picture_bullet_count, 1);
 }
 
 #[test]
 fn typed_indices_validate_and_clear_only_references() {
-    let mut document = RtfDocument::parse(r"{\rtf1{\pict\pngblip 89504e470d0a1a0a}Body}").unwrap();
+    let mut document = Tree::parse(
+        r"{\rtf1{\pict\pngblip 89504e470d0a1a0a}Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(document.pictures().len(), 1);
     document
         .set_list_picture_bullet_indices(vec![Some(0), None])
@@ -94,7 +101,10 @@ fn typed_indices_validate_and_clear_only_references() {
     );
     let output = write(&document);
     assert_eq!(
-        RtfDocument::parse_bytes(&output).unwrap().pictures().len(),
+        Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default())
+            .unwrap()
+            .pictures()
+            .len(),
         1
     );
 
@@ -118,7 +128,7 @@ fn rejects_hostile_list_picture_grammar() {
         r"{\rtf1{\*\listpicture{\*\shppict{\pict\pngblip 00}}}}",
     ] {
         assert!(
-            RtfDocument::parse(source).is_err(),
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
             "accepted malformed {source}"
         );
     }

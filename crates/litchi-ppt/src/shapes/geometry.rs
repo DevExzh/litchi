@@ -254,7 +254,7 @@ impl<'data> VertexData<'data> {
 /// use litchi_odraw::prop::Props;
 /// use litchi_ppt::shapes::geometry::extract_geometry_rect;
 ///
-/// let props = Props::parse(&opt_record)?;
+/// let props = Props::parse(&opt_record, litchi_odraw::Limits::default())?;
 /// if let Some(geom) = extract_geometry_rect(&props) {
 ///     println!("Geometry: {}x{}", geom.width(), geom.height());
 /// }

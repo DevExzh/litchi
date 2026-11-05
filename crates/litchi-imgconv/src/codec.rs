@@ -314,7 +314,7 @@ fn raw_metafile_svg(
     match input {
         InputFormat::Emf => {
             preflight_emf_header(data, limits)?;
-            let parser = crate::emf::EmfParser::new_compatible(data)?;
+            let parser = crate::emf::EmfParser::new_compatible(data, limits)?;
             check_record_count(parser.records.len(), limits)?;
             check_emf_playback_limits(&parser, limits)?;
             let width = positive(parser.width());
@@ -358,7 +358,7 @@ fn raw_metafile_svg(
         },
         InputFormat::Wmf => {
             preflight_wmf_records(data, limits)?;
-            let parser = crate::wmf::WmfParser::new(data)?;
+            let parser = crate::wmf::WmfParser::new(data, limits)?;
             check_record_count(parser.records.len(), limits)?;
             check_wmf_playback_limits(&parser, limits)?;
             let width = positive(parser.width());
@@ -896,11 +896,7 @@ fn render_wmf(meta: &Meta<'_>, format: ImageFormat, options: Options) -> Result<
 
 fn render_pict(meta: &Meta<'_>, options: Options) -> Result<DynamicImage> {
     let data = inflate_checked(meta, &options.limits)?;
-    let parser = crate::pict::PictParser::new_bounded(
-        &data,
-        options.limits.max_records,
-        options.limits.max_uncompressed_bytes,
-    )?;
+    let parser = crate::pict::PictParser::new(&data, &options.limits)?;
     let (width, height) = target_dimensions(
         positive(parser.width()),
         positive(parser.height()),
@@ -1348,21 +1344,21 @@ mod tests {
         zlib.write_all(b"metafile").unwrap();
         let encoded = zlib.finish().unwrap();
         let bytes = meta(&encoded, 8);
-        let blip = Blip::parse(&bytes).unwrap();
+        let blip = Blip::parse(&bytes, Default::default()).unwrap();
         assert_eq!(
             decode_data(&blip, &Limits::default()).unwrap(),
             b"metafile".as_slice()
         );
 
         let wrong = meta(&encoded, 9);
-        let wrong = Blip::parse(&wrong).unwrap();
+        let wrong = Blip::parse(&wrong, Default::default()).unwrap();
         assert!(decode_data(&wrong, &Limits::default()).is_err());
 
         let mut raw = DeflateEncoder::new(Vec::new(), Level::default());
         raw.write_all(b"metafile").unwrap();
         let raw = raw.finish().unwrap();
         let raw = meta(&raw, 8);
-        let raw = Blip::parse(&raw).unwrap();
+        let raw = Blip::parse(&raw, Default::default()).unwrap();
         assert!(decode_data(&raw, &Limits::default()).is_err());
     }
 
@@ -1372,7 +1368,7 @@ mod tests {
         zlib.write_all(&[0; 1024]).unwrap();
         let encoded = zlib.finish().unwrap();
         let bytes = meta(&encoded, 1024);
-        let blip = Blip::parse(&bytes).unwrap();
+        let blip = Blip::parse(&bytes, Default::default()).unwrap();
         let limits = Limits {
             max_uncompressed_bytes: 32,
             ..Limits::default()
@@ -1390,7 +1386,7 @@ mod tests {
         body.push(0xFF);
         body.extend_from_slice(&png);
         let bytes = record(0x6E0, 0xF01E, &body);
-        let blip = Blip::parse(&bytes).unwrap();
+        let blip = Blip::parse(&bytes, Default::default()).unwrap();
         let limits = Limits {
             max_pixels: 15,
             ..Limits::default()

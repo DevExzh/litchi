@@ -72,10 +72,26 @@ pub use codec::{
     parse_timeline_cache_definition, parse_timelines, write_timeline_cache_definition,
     write_timelines,
 };
+
+pub(crate) fn write_timeline_cache_definition_limited(
+    value: &CacheDefinition,
+    maximum: usize,
+) -> Result<Vec<u8>> {
+    codec::write_timeline_cache_definition_limited(value, maximum)
+}
+
+pub(crate) fn write_timelines_limited(value: &Views, maximum: usize) -> Result<Vec<u8>> {
+    codec::write_timelines_limited(value, maximum)
+}
 pub use model::{
     Cache, CacheDefinition, CachePivotTable, FilterType, Level, OpaqueXml, Part, PivotFilter,
     Range, State, View, Views,
 };
-pub use package::{
-    load_timeline_caches, load_timelines, store_timeline_caches, store_worksheet_timelines,
+pub use package::{load_timeline_caches, load_timelines};
+pub(crate) use package::{
+    load_timeline_caches_limited, load_timelines_limited, store_timeline_caches,
+    store_timeline_caches_limited, store_timeline_caches_prepared_limited,
+    store_timeline_caches_prepared_limited_with_budget, store_worksheet_timelines,
+    store_worksheet_timelines_limited, store_worksheet_timelines_prepared_limited,
+    store_worksheet_timelines_prepared_limited_with_budget,
 };

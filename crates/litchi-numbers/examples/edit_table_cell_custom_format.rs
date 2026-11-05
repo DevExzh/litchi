@@ -27,7 +27,7 @@ use litchi_numbers::cell::data_format::custom::{
     Condition, ConditionValue, Custom, DateTime as CustomDateTime, DateTimePattern, Name,
     Number as CustomNumber, NumberPattern, NumberRule, Text as CustomText,
 };
-use litchi_numbers::{CellPosition, Package, SheetSelector, TableSelector};
+use litchi_numbers::{At, Package, SheetSelector, TableSelector};
 use tempfile::NamedTempFile;
 
 const USAGE: &str = concat!(
@@ -74,7 +74,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let output = PathBuf::from(required_argument(&mut arguments, "missing output path")?);
     let sheet = parse_selector(required_text(&mut arguments, "missing sheet selector")?)?;
     let table = parse_selector(required_text(&mut arguments, "missing table selector")?)?;
-    let position = CellPosition::from_a1(&required_text(&mut arguments, "missing cell address")?)
+    let position = At::from_a1(&required_text(&mut arguments, "missing cell address")?)
         .map_err(|error| invalid_input(format!("invalid A1 address: {error}")))?;
     let mut operation_arguments = arguments.collect::<Vec<_>>();
     let inverse_output = parse_inverse_output(&mut operation_arguments)?;

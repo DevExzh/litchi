@@ -11,7 +11,11 @@
     reason = "The package boundary maps native failures to content-redacted semantic errors."
 )]
 
-use std::{fmt, mem::size_of, sync::Arc};
+use std::{
+    fmt,
+    mem::size_of,
+    sync::{Arc, OnceLock},
+};
 
 use litchi_core::Position;
 use litchi_iwa_archive::{
@@ -21,13 +25,14 @@ use litchi_iwa_archive::{
 use litchi_iwa_common::chart::data::{ChartData, DataError};
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::chart_data_codec::{self, DecodeOptions, LabelList};
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::Package;
 use super::chart_axis_support::{self, AxisSupportBudget, AxisSupportError};
+use super::edit::{OwnedChartSelector, OwnedSlideSelector, SelectorError};
 use super::slide_chart_title::{
-    self, ChartGraphScanBudget, ChartSelection, ChartTitleError, ChartTitleLimitKind,
-    select_chart_with_budget,
+    self, ChartGraphScanBudget, ChartSelection, Error as ChartTitleError,
+    LimitKind as ChartTitleLimitKind, select_chart_with_budget,
 };
 use crate::{ChartSelector, SlideSelector};
 
@@ -40,7 +45,7 @@ const MAX_DATA_CODEC_BYTES: usize = 64 * 1024 * 1024;
 /// A finite resource governed while one chart-data view is prepared.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum SlideChartDataLimitKind {
+pub enum LimitKind {
     /// Complete package input bytes.
     InputBytes,
     /// Bytes in one protobuf payload.
@@ -81,6 +86,8 @@ pub enum SlideChartDataLimitKind {
     Allocations,
     /// Bytes retained by the data view.
     RetainedBytes,
+    /// Caller bytes retained by the deferred selectors.
+    SelectorBytes,
     /// Number of borrowed row/column labels.
     LabelCount,
     /// Candidate output bytes.
@@ -89,7 +96,7 @@ pub enum SlideChartDataLimitKind {
     ScratchBytes,
 }
 
-impl fmt::Display for SlideChartDataLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -112,6 +119,7 @@ impl fmt::Display for SlideChartDataLimitKind {
             Self::TotalBytes => "total bytes",
             Self::Allocations => "allocations",
             Self::RetainedBytes => "retained bytes",
+            Self::SelectorBytes => "selector bytes",
             Self::LabelCount => "label count",
             Self::OutputBytes => "output bytes",
             Self::ScratchBytes => "scratch bytes",
@@ -120,9 +128,42 @@ impl fmt::Display for SlideChartDataLimitKind {
 }
 
 /// A content-redacted failure raised by a chart-data read.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum SlideChartDataError {
+pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The selected chart graph or data payload was malformed.
+    #[error("the Keynote chart data source is malformed or unsupported")]
+    InvalidSource,
+    /// A finite resource ceiling was exceeded.
+    #[error("Keynote chart data {kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        /// Resource category that exceeded its limit.
+        kind: LimitKind,
+        /// Observed or requested amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A bounded semantic allocation failed before the result was published.
+    #[error("could not allocate {amount} units for Keynote chart data")]
+    Allocation { amount: usize },
+    /// Full candidate reopening did not reproduce the requested state.
+    #[error("the edited Keynote chart data failed semantic verification")]
+    Verification,
+    /// The patch does not belong to this exact immutable package artifact.
+    #[error("the Keynote chart-data patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The source was not retained as an exact physical package.
     #[error("this Keynote source does not support physical chart data reads")]
     UnsupportedSource,
@@ -147,83 +188,111 @@ pub enum SlideChartDataError {
     /// An empty exact chart name was supplied.
     #[error("the Keynote chart selector name cannot be empty")]
     EmptyChartName,
-    /// The selected chart graph or data payload was malformed.
-    #[error("the Keynote chart data source is malformed or unsupported")]
-    InvalidSource,
     /// The requested edit changes one or more row or column labels.
     #[error("Keynote chart data edits must preserve row and column labels")]
     LabelsChanged,
     /// The requested edit changes the rectangular grid dimensions.
     #[error("Keynote chart data edits must preserve chart dimensions")]
     ShapeChanged,
-    /// A finite resource ceiling was exceeded.
-    #[error("Keynote chart data {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
-        /// Resource category that exceeded its limit.
-        kind: SlideChartDataLimitKind,
-        /// Observed or requested amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-    },
-    /// A bounded semantic allocation failed before the result was published.
-    #[error("could not allocate {amount} units for Keynote chart data")]
-    Allocation { amount: usize },
-    /// Full candidate reopening did not reproduce the requested state.
-    #[error("the edited Keynote chart data failed semantic verification")]
-    Verification,
-    /// The patch does not belong to this exact immutable package artifact.
-    #[error("the Keynote chart-data patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. }
+            | Self::LabelsChanged { .. }
+            | Self::ShapeChanged { .. } => RefusalKind::UnsupportedContent,
+            Self::AmbiguousSelector { .. }
+            | Self::EmptySlideName { .. }
+            | Self::EmptyChartName { .. } => RefusalKind::InvalidValue,
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::ChartNameNotFound { .. }
+            | Self::ChartPositionNotFound { .. } => RefusalKind::NotFound,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// One mutable semantic chart-data value staged against an immutable Keynote
 /// package snapshot.
-pub struct SlideChartDataEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
-    slide_position: Position,
-    chart_position: Position,
-    chart_identifier: u64,
-    slide_identifier: u64,
-    before: Arc<ChartData>,
+    slide: OwnedSlideSelector,
+    chart: OwnedChartSelector,
+    selection: OnceLock<(ChartSelection, Arc<ChartData>)>,
     after: Option<ChartData>,
 }
 
-impl fmt::Debug for SlideChartDataEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SlideChartDataEdit")
-            .field("slide_position", &self.slide_position)
-            .field("chart_position", &self.chart_position)
-            .field("before", self.before.as_ref())
-            .field("after", &self.after)
+            .debug_struct("Edit")
+            .field("has_selection", &self.selection.get().is_some())
+            .field("has_staged", &self.after.is_some())
             .finish_non_exhaustive()
     }
 }
 
-impl SlideChartDataEdit<'_> {
+impl Edit<'_> {
+    fn resolve(&self) -> Result<&(ChartSelection, Arc<ChartData>), Error> {
+        if let Some(selection) = self.selection.get() {
+            return Ok(selection);
+        }
+        let mut budget = ChartGraphScanBudget::new(self.source).map_err(map_chart_title_error)?;
+        budget
+            .charge_selection_scans(self.source, true)
+            .map_err(map_axis_support_error)?;
+        let selection = select_chart_with_budget(
+            self.source,
+            self.slide.as_selector(),
+            self.chart.as_selector(),
+            true,
+            &mut budget,
+        )
+        .map_err(map_axis_support_error)?;
+        let before = read_selected_data(self.source, selection.clone(), &mut budget)?;
+        preflight_data_budget(&budget, LimitKind::Allocations, 1)?;
+        budget
+            .charge_work(size_of::<ChartData>())
+            .map_err(map_axis_support_error)?;
+        let _ = self.selection.set((selection, Arc::new(before)));
+        self.selection.get().ok_or(Error::InvalidSource)
+    }
+
     /// Return the selected semantic slide position.
-    #[must_use]
-    pub const fn slide_position(&self) -> Position {
-        self.slide_position
+    #[must_use = "handle the deferred chart-data result"]
+    pub fn slide_position(&self) -> Result<Position, Error> {
+        Ok(self.resolve()?.0.slide_position)
     }
 
     /// Return the selected semantic chart position.
-    #[must_use]
-    pub const fn chart_position(&self) -> Position {
-        self.chart_position
+    #[must_use = "handle the deferred chart-data result"]
+    pub fn chart_position(&self) -> Result<Position, Error> {
+        Ok(self.resolve()?.0.chart_position)
     }
 
-    /// Return the chart data observed when this edit began.
-    #[must_use]
-    pub fn before(&self) -> &ChartData {
-        self.before.as_ref()
+    /// Return the chart data observed when this edit first resolves.
+    #[must_use = "handle the deferred chart-data result"]
+    pub fn before(&self) -> Result<&ChartData, Error> {
+        Ok(self.resolve()?.1.as_ref())
     }
 
     /// Return the chart data currently staged for publication.
-    #[must_use]
-    pub fn after(&self) -> &ChartData {
-        self.after.as_ref().unwrap_or(self.before.as_ref())
+    #[must_use = "handle the deferred chart-data result"]
+    pub fn after(&self) -> Result<&ChartData, Error> {
+        match self.after.as_ref() {
+            Some(after) => Ok(after),
+            None => Ok(self.resolve()?.1.as_ref()),
+        }
     }
 
     /// Replace the staged chart data.
@@ -237,14 +306,14 @@ impl SlideChartDataEdit<'_> {
     }
 
     /// Validate and publish the staged exact-source edit.
-    pub fn commit(self) -> Result<SlideChartDataCommit, SlideChartDataError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         commit_data_edit(self)
     }
 }
 
 /// Exact-source-checked reversible chart-data patch.
 #[derive(Clone, PartialEq)]
-pub struct SlideChartDataPatch {
+pub struct Patch {
     artifacts: ExactArtifacts,
     slide_position: Position,
     chart_position: Position,
@@ -256,10 +325,10 @@ pub struct SlideChartDataPatch {
     target_payload: Option<Arc<[u8]>>,
 }
 
-impl fmt::Debug for SlideChartDataPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SlideChartDataPatch")
+            .debug_struct("Patch")
             .field("slide_position", &self.slide_position)
             .field("chart_position", &self.chart_position)
             .field("before", self.before.as_ref())
@@ -268,7 +337,7 @@ impl fmt::Debug for SlideChartDataPatch {
     }
 }
 
-impl SlideChartDataPatch {
+impl Patch {
     /// Return the selected semantic slide position.
     #[must_use]
     pub const fn slide_position(&self) -> Position {
@@ -333,14 +402,14 @@ impl SlideChartDataPatch {
 
 /// Compact evidence describing one committed chart-data transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct SlideChartDataDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     deleted_previews: usize,
     full_reparse_performed: bool,
 }
 
-impl SlideChartDataDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -387,13 +456,13 @@ impl SlideChartDataDiagnostics {
 /// Fully reopened immutable result of one chart-data transaction.
 #[must_use = "a Keynote chart-data commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct SlideChartDataCommit {
+pub struct Commit {
     package: Package,
-    patch: SlideChartDataPatch,
-    diagnostics: SlideChartDataDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl SlideChartDataCommit {
+impl Commit {
     /// Borrow the fully reopened package snapshot.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -406,15 +475,21 @@ impl SlideChartDataCommit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the exact-source reversible patch.
     #[must_use]
-    pub const fn patch(&self) -> &SlideChartDataPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Borrow compact publication diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> &SlideChartDataDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
@@ -425,12 +500,12 @@ impl Package {
     /// Numeric cells are returned as finite `f64` values and missing,
     /// date-only, or duration-only native cells become `None`. Legacy chart
     /// payloads and graphs that do not prove the modern inline grid are
-    /// rejected as [`SlideChartDataError::InvalidSource`].
+    /// rejected as [`Error::InvalidSource`].
     pub fn slide_chart_data<'slide, 'chart>(
         &self,
         slide_selector: impl Into<SlideSelector<'slide>>,
         chart_selector: impl Into<ChartSelector<'chart>>,
-    ) -> Result<ChartData, SlideChartDataError> {
+    ) -> Result<ChartData, Error> {
         let mut budget = ChartGraphScanBudget::new(self).map_err(map_chart_title_error)?;
         budget
             .charge_selection_scans(self, true)
@@ -447,44 +522,41 @@ impl Package {
     }
 
     /// Begin a selector-first immutable chart-data edit.
+    ///
+    /// Entry retains only the source and the archive-free selectors. Chart
+    /// graph selection and data decoding are deferred until a value is read
+    /// or the edit is committed. Selector names are admitted against the
+    /// package's finite selector-byte limit at entry.
     pub fn edit_slide_chart_data<'slide, 'chart>(
         &self,
         slide_selector: impl Into<SlideSelector<'slide>>,
         chart_selector: impl Into<ChartSelector<'chart>>,
-    ) -> Result<SlideChartDataEdit<'_>, SlideChartDataError> {
-        let mut budget = ChartGraphScanBudget::new(self).map_err(map_chart_title_error)?;
-        budget
-            .charge_selection_scans(self, true)
-            .map_err(map_axis_support_error)?;
-        let selection = select_chart_with_budget(
-            self,
+    ) -> Result<Edit<'_>, Error> {
+        let maximum_selector_bytes = self.semantic_limits().max_text_bytes();
+        let mut selector_bytes = 0;
+        let slide = OwnedSlideSelector::from_selector(
             slide_selector.into(),
-            chart_selector.into(),
-            true,
-            &mut budget,
+            maximum_selector_bytes,
+            &mut selector_bytes,
         )
-        .map_err(map_axis_support_error)?;
-        let before = read_selected_data(self, selection.clone(), &mut budget)?;
-        preflight_data_budget(&budget, SlideChartDataLimitKind::Allocations, 1)?;
-        budget
-            .charge_work(size_of::<ChartData>())
-            .map_err(map_axis_support_error)?;
-        Ok(SlideChartDataEdit {
+        .map_err(map_selector_error)?;
+        let chart = OwnedChartSelector::from_selector(
+            chart_selector.into(),
+            maximum_selector_bytes,
+            &mut selector_bytes,
+        )
+        .map_err(map_selector_error)?;
+        Ok(Edit {
             source: self,
-            slide_position: selection.slide_position,
-            chart_position: selection.chart_position,
-            chart_identifier: selection.chart_identifier,
-            slide_identifier: selection.slide_identifier,
-            before: Arc::new(before),
+            slide,
+            chart,
+            selection: OnceLock::new(),
             after: None,
         })
     }
 
     /// Apply an exact-source-checked reversible chart-data patch.
-    pub fn apply_slide_chart_data(
-        &self,
-        patch: &SlideChartDataPatch,
-    ) -> Result<SlideChartDataCommit, SlideChartDataError> {
+    pub fn apply_slide_chart_data(&self, patch: &Patch) -> Result<Commit, Error> {
         let catalog = physical_catalog(self)?;
         let source = catalog.shared_source();
         let mut budget = ChartGraphScanBudget::new(self).map_err(map_chart_title_error)?;
@@ -495,7 +567,7 @@ impl Package {
             .charge_work(source.len())
             .map_err(map_axis_support_error)?;
         if !patch.artifacts.authorizes_source(&source) {
-            return Err(SlideChartDataError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         budget
             .charge_selection_scans(self, true)
@@ -511,39 +583,39 @@ impl Package {
         if selection.chart_identifier != patch.chart_identifier
             || selection.slide_identifier != patch.slide_identifier
         {
-            return Err(SlideChartDataError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let current = read_selected_data(self, selection.clone(), &mut budget)?;
         if !compare_chart_data_with_budget(&current, patch.before.as_ref(), &mut budget)? {
-            return Err(SlideChartDataError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if let Some(expected) = patch.source_payload.as_deref() {
             let actual = selected_chart_payload(self, &selection, &mut budget)?;
             if !compare_payload_with_budget(actual, expected, &mut budget)? {
-                return Err(SlideChartDataError::PatchConflict);
+                return Err(Error::PatchConflict);
             }
         }
         if patch_is_noop_with_budget(patch, &mut budget)? {
-            return Ok(SlideChartDataCommit {
+            return Ok(Commit {
                 package: self.snapshot(),
                 patch: patch.clone(),
-                diagnostics: SlideChartDataDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         if !catalog.source_is_exact() {
-            return Err(SlideChartDataError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         validate_data_change(patch.before.as_ref(), patch.after.as_ref(), &mut budget)?;
         let target = patch
             .target_payload
             .as_deref()
-            .ok_or(SlideChartDataError::PatchConflict)?;
+            .ok_or(Error::PatchConflict)?;
         let target_bytes = patch.artifacts.target();
         budget
             .charge_work(target_bytes.len())
             .map_err(map_axis_support_error)?;
         let candidate = Package::from_source_with_options(target_bytes, self.state.options)
-            .map_err(|_error| SlideChartDataError::Verification)?;
+            .map_err(|_error| Error::Verification)?;
         let candidate_selection = select_chart_with_budget(
             &candidate,
             SlideSelector::position(patch.slide_position),
@@ -555,16 +627,16 @@ impl Package {
         if candidate_selection.chart_identifier != patch.chart_identifier
             || candidate_selection.slide_identifier != patch.slide_identifier
         {
-            return Err(SlideChartDataError::Verification);
+            return Err(Error::Verification);
         }
         let candidate_data =
             read_selected_data(&candidate, candidate_selection.clone(), &mut budget)?;
         if !compare_chart_data_with_budget(&candidate_data, patch.after.as_ref(), &mut budget)? {
-            return Err(SlideChartDataError::Verification);
+            return Err(Error::Verification);
         }
         let actual_target = selected_chart_payload(&candidate, &candidate_selection, &mut budget)?;
         if !compare_payload_with_budget(actual_target, target, &mut budget)? {
-            return Err(SlideChartDataError::Verification);
+            return Err(Error::Verification);
         }
         verify_chart_candidate(
             self,
@@ -575,26 +647,33 @@ impl Package {
             &mut budget,
         )?;
         let deleted_previews = preview_count_removed(self, &candidate, &mut budget)?;
-        Ok(SlideChartDataCommit {
+        Ok(Commit {
             package: candidate,
             patch: patch.clone(),
-            diagnostics: SlideChartDataDiagnostics::published(deleted_previews),
+            diagnostics: Diagnostics::published(deleted_previews),
         })
     }
 }
 
-fn commit_data_edit(
-    edit: SlideChartDataEdit<'_>,
-) -> Result<SlideChartDataCommit, SlideChartDataError> {
-    let SlideChartDataEdit {
-        source,
-        slide_position,
-        chart_position,
-        chart_identifier,
-        slide_identifier,
-        before,
-        after: after_value,
-    } = edit;
+fn map_selector_error(error: SelectorError) -> Error {
+    match error {
+        SelectorError::Limit { observed, maximum } => Error::Limit {
+            kind: LimitKind::SelectorBytes,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(maximum),
+        },
+        SelectorError::Allocation { amount } => Error::Allocation { amount },
+    }
+}
+
+fn commit_data_edit(edit: Edit<'_>) -> Result<Commit, Error> {
+    let (selection_base, before) = edit.resolve()?.clone();
+    let source = edit.source;
+    let after_value = edit.after;
+    let slide_position = selection_base.slide_position;
+    let chart_position = selection_base.chart_position;
+    let chart_identifier = selection_base.chart_identifier;
+    let slide_identifier = selection_base.slide_identifier;
     let catalog = physical_catalog(source)?;
     let source_bytes = catalog.shared_source();
     let mut budget = ChartGraphScanBudget::new(source).map_err(map_chart_title_error)?;
@@ -620,11 +699,11 @@ fn commit_data_edit(
             || selection.slide_identifier != slide_identifier
             || !compare_chart_data_with_budget(&current, before.as_ref(), &mut budget)?
         {
-            return Err(SlideChartDataError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
-        return Ok(SlideChartDataCommit {
+        return Ok(Commit {
             package: source.snapshot(),
-            patch: SlideChartDataPatch {
+            patch: Patch {
                 artifacts: exact_artifacts_with_budget(
                     Arc::clone(&source_bytes),
                     source_bytes,
@@ -639,14 +718,14 @@ fn commit_data_edit(
                 source_payload: None,
                 target_payload: None,
             },
-            diagnostics: SlideChartDataDiagnostics::unchanged(),
+            diagnostics: Diagnostics::unchanged(),
         });
     }
 
-    let after = after_value.ok_or(SlideChartDataError::InvalidSource)?;
+    let after = after_value.ok_or(Error::InvalidSource)?;
     validate_data_change(before.as_ref(), &after, &mut budget)?;
     if !catalog.source_is_exact() {
-        return Err(SlideChartDataError::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
 
     charge_chart_data_ownership(&after, &mut budget)?;
@@ -664,11 +743,11 @@ fn commit_data_edit(
     if selection.chart_identifier != chart_identifier
         || selection.slide_identifier != slide_identifier
     {
-        return Err(SlideChartDataError::PatchConflict);
+        return Err(Error::PatchConflict);
     }
     let current = read_selected_data(source, selection.clone(), &mut budget)?;
     if !compare_chart_data_with_budget(&current, before.as_ref(), &mut budget)? {
-        return Err(SlideChartDataError::PatchConflict);
+        return Err(Error::PatchConflict);
     }
     let source_payload = selected_chart_payload(source, &selection, &mut budget)?;
     let options = data_options(&budget, source_payload)?;
@@ -696,11 +775,11 @@ fn commit_data_edit(
     if candidate_selection.chart_identifier != chart_identifier
         || candidate_selection.slide_identifier != slide_identifier
     {
-        return Err(SlideChartDataError::Verification);
+        return Err(Error::Verification);
     }
     let candidate_data = read_selected_data(&candidate, candidate_selection.clone(), &mut budget)?;
     if !compare_chart_data_with_budget(&candidate_data, &after, &mut budget)? {
-        return Err(SlideChartDataError::Verification);
+        return Err(Error::Verification);
     }
     let target_payload = selected_chart_payload(&candidate, &candidate_selection, &mut budget)?;
     verify_chart_candidate(
@@ -714,9 +793,9 @@ fn commit_data_edit(
     let (source_payload, target_payload) =
         retain_payload_pair(source_payload, target_payload, &mut budget)?;
     let target_bytes = physical_catalog(&candidate)?.shared_source();
-    Ok(SlideChartDataCommit {
+    Ok(Commit {
         package: candidate,
-        patch: SlideChartDataPatch {
+        patch: Patch {
             artifacts: exact_artifacts_with_budget(source_bytes, target_bytes, &mut budget)?,
             slide_position,
             chart_position,
@@ -727,7 +806,7 @@ fn commit_data_edit(
             source_payload: Some(source_payload),
             target_payload: Some(target_payload),
         },
-        diagnostics: SlideChartDataDiagnostics::published(deleted_previews),
+        diagnostics: Diagnostics::published(deleted_previews),
     })
 }
 
@@ -735,10 +814,10 @@ fn validate_data_change(
     before: &ChartData,
     after: &ChartData,
     budget: &mut ChartGraphScanBudget,
-) -> Result<(), SlideChartDataError> {
+) -> Result<(), Error> {
     charge_chart_data_compare(before, after, budget)?;
     if before.row_names() != after.row_names() || before.column_names() != after.column_names() {
-        return Err(SlideChartDataError::LabelsChanged);
+        return Err(Error::Refused(Refusal::LabelsChanged));
     }
     if before.values().len() != after.values().len()
         || before
@@ -747,7 +826,7 @@ fn validate_data_change(
             .zip(after.values())
             .any(|(left, right)| left.len() != right.len())
     {
-        return Err(SlideChartDataError::ShapeChanged);
+        return Err(Error::Refused(Refusal::ShapeChanged));
     }
     Ok(())
 }
@@ -760,7 +839,7 @@ fn compare_chart_data_with_budget(
     left: &ChartData,
     right: &ChartData,
     budget: &mut ChartGraphScanBudget,
-) -> Result<bool, SlideChartDataError> {
+) -> Result<bool, Error> {
     charge_chart_data_compare(left, right, budget)?;
     Ok(chart_data_bits_equal(left, right))
 }
@@ -769,30 +848,28 @@ fn charge_chart_data_compare(
     left: &ChartData,
     right: &ChartData,
     budget: &mut ChartGraphScanBudget,
-) -> Result<(), SlideChartDataError> {
+) -> Result<(), Error> {
     let amount = chart_data_compare_work(left)?
         .checked_add(chart_data_compare_work(right)?)
-        .ok_or(SlideChartDataError::InvalidSource)?;
-    preflight_data_budget(budget, SlideChartDataLimitKind::WireWork, amount)?;
+        .ok_or(Error::InvalidSource)?;
+    preflight_data_budget(budget, LimitKind::WireWork, amount)?;
     budget.charge_work(amount).map_err(map_axis_support_error)
 }
 
-fn chart_data_compare_work(data: &ChartData) -> Result<usize, SlideChartDataError> {
+fn chart_data_compare_work(data: &ChartData) -> Result<usize, Error> {
     let mut amount = data
         .row_names()
         .len()
         .checked_add(data.column_names().len())
         .and_then(|value| value.checked_add(data.values().len()))
-        .ok_or(SlideChartDataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     for label in data.row_names().iter().chain(data.column_names()) {
         amount = amount
             .checked_add(label.len())
-            .ok_or(SlideChartDataError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     for row in data.values() {
-        amount = amount
-            .checked_add(row.len())
-            .ok_or(SlideChartDataError::InvalidSource)?;
+        amount = amount.checked_add(row.len()).ok_or(Error::InvalidSource)?;
     }
     Ok(amount)
 }
@@ -801,20 +878,20 @@ fn compare_payload_with_budget(
     left: &[u8],
     right: &[u8],
     budget: &mut ChartGraphScanBudget,
-) -> Result<bool, SlideChartDataError> {
+) -> Result<bool, Error> {
     let amount = left
         .len()
         .checked_add(right.len())
-        .ok_or(SlideChartDataError::InvalidSource)?;
-    preflight_data_budget(budget, SlideChartDataLimitKind::WireWork, amount)?;
+        .ok_or(Error::InvalidSource)?;
+    preflight_data_budget(budget, LimitKind::WireWork, amount)?;
     budget.charge_work(amount).map_err(map_axis_support_error)?;
     Ok(left == right)
 }
 
 fn patch_is_noop_with_budget(
-    patch: &SlideChartDataPatch,
+    patch: &Patch,
     budget: &mut ChartGraphScanBudget,
-) -> Result<bool, SlideChartDataError> {
+) -> Result<bool, Error> {
     if !compare_chart_data_with_budget(patch.before.as_ref(), patch.after.as_ref(), budget)? {
         return Ok(false);
     }
@@ -830,16 +907,16 @@ fn exact_artifacts_with_budget(
     source: Arc<[u8]>,
     target: Arc<[u8]>,
     budget: &mut ChartGraphScanBudget,
-) -> Result<ExactArtifacts, SlideChartDataError> {
+) -> Result<ExactArtifacts, Error> {
     let amount = if Arc::ptr_eq(&source, &target) {
         source.len()
     } else {
         source
             .len()
             .checked_add(target.len())
-            .ok_or(SlideChartDataError::InvalidSource)?
+            .ok_or(Error::InvalidSource)?
     };
-    preflight_data_budget(budget, SlideChartDataLimitKind::WireWork, amount)?;
+    preflight_data_budget(budget, LimitKind::WireWork, amount)?;
     budget.charge_work(amount).map_err(map_axis_support_error)?;
     Ok(ExactArtifacts::new(source, target))
 }
@@ -853,14 +930,14 @@ fn exact_artifacts_with_budget(
 fn charge_chart_data_ownership(
     data: &ChartData,
     budget: &mut ChartGraphScanBudget,
-) -> Result<(), SlideChartDataError> {
+) -> Result<(), Error> {
     let mut retained = size_of::<ChartData>()
         .checked_add(
             2usize
                 .checked_mul(size_of::<usize>())
-                .ok_or(SlideChartDataError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )
-        .ok_or(SlideChartDataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let mut allocations = 1usize;
     let mut work = 0usize;
 
@@ -870,25 +947,21 @@ fn charge_chart_data_ownership(
                 labels
                     .len()
                     .checked_mul(size_of::<String>())
-                    .ok_or(SlideChartDataError::InvalidSource)?,
+                    .ok_or(Error::InvalidSource)?,
             )
-            .ok_or(SlideChartDataError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         allocations = allocations
             .checked_add(usize::from(!labels.is_empty()))
-            .ok_or(SlideChartDataError::InvalidSource)?;
-        work = work
-            .checked_add(labels.len())
-            .ok_or(SlideChartDataError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
+        work = work.checked_add(labels.len()).ok_or(Error::InvalidSource)?;
         for label in labels {
             retained = retained
                 .checked_add(label.len())
-                .ok_or(SlideChartDataError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             allocations = allocations
                 .checked_add(usize::from(!label.is_empty()))
-                .ok_or(SlideChartDataError::InvalidSource)?;
-            work = work
-                .checked_add(label.len())
-                .ok_or(SlideChartDataError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
+            work = work.checked_add(label.len()).ok_or(Error::InvalidSource)?;
         }
     }
 
@@ -897,59 +970,50 @@ fn charge_chart_data_ownership(
         .checked_add(
             rows.len()
                 .checked_mul(size_of::<Vec<Option<f64>>>())
-                .ok_or(SlideChartDataError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )
-        .ok_or(SlideChartDataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     allocations = allocations
         .checked_add(usize::from(!rows.is_empty()))
-        .ok_or(SlideChartDataError::InvalidSource)?;
-    work = work
-        .checked_add(rows.len())
-        .ok_or(SlideChartDataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
+    work = work.checked_add(rows.len()).ok_or(Error::InvalidSource)?;
     for row in rows {
         retained = retained
             .checked_add(
                 row.len()
                     .checked_mul(size_of::<Option<f64>>())
-                    .ok_or(SlideChartDataError::InvalidSource)?,
+                    .ok_or(Error::InvalidSource)?,
             )
-            .ok_or(SlideChartDataError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         allocations = allocations
             .checked_add(usize::from(!row.is_empty()))
-            .ok_or(SlideChartDataError::InvalidSource)?;
-        work = work
-            .checked_add(row.len())
-            .ok_or(SlideChartDataError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
+        work = work.checked_add(row.len()).ok_or(Error::InvalidSource)?;
     }
 
     let charge = retained
         .checked_add(allocations)
         .and_then(|value| value.checked_add(work))
-        .ok_or(SlideChartDataError::InvalidSource)?;
-    preflight_data_budget(budget, SlideChartDataLimitKind::Allocations, allocations)?;
-    preflight_data_budget(budget, SlideChartDataLimitKind::RetainedBytes, retained)?;
-    preflight_data_budget(budget, SlideChartDataLimitKind::WireWork, charge)?;
+        .ok_or(Error::InvalidSource)?;
+    preflight_data_budget(budget, LimitKind::Allocations, allocations)?;
+    preflight_data_budget(budget, LimitKind::RetainedBytes, retained)?;
+    preflight_data_budget(budget, LimitKind::WireWork, charge)?;
     budget.charge_work(charge).map_err(map_axis_support_error)
 }
 
-fn data_options(
-    budget: &ChartGraphScanBudget,
-    source: &[u8],
-) -> Result<DecodeOptions, SlideChartDataError> {
+fn data_options(budget: &ChartGraphScanBudget, source: &[u8]) -> Result<DecodeOptions, Error> {
     let (limits, remaining_work) = budget.chart_metadata_residual_limits();
     if remaining_work == 0 {
-        return Err(SlideChartDataError::LimitExceeded {
-            kind: SlideChartDataLimitKind::WireWork,
+        return Err(Error::Limit {
+            kind: LimitKind::WireWork,
             observed: 1,
             maximum: 0,
         });
     }
-    let maximum_depth = u32::try_from(limits.max_nesting()).map_err(|_error| {
-        SlideChartDataError::LimitExceeded {
-            kind: SlideChartDataLimitKind::WireNesting,
-            observed: usize_to_u64(limits.max_nesting()),
-            maximum: u64::from(u32::MAX),
-        }
+    let maximum_depth = u32::try_from(limits.max_nesting()).map_err(|_error| Error::Limit {
+        kind: LimitKind::WireNesting,
+        observed: usize_to_u64(limits.max_nesting()),
+        maximum: u64::from(u32::MAX),
     })?;
     let input = source.len().max(1).min(limits.max_input_bytes());
     let bounded_work = remaining_work.clamp(1, MAX_DATA_CODEC_BYTES);
@@ -979,7 +1043,7 @@ fn data_options(
 fn charge_rewrite_requirements(
     budget: &mut ChartGraphScanBudget,
     requirements: chart_data_codec::RewriteExecutionRequirements,
-) -> Result<(), SlideChartDataError> {
+) -> Result<(), Error> {
     let amount = requirements
         .output_bytes
         .checked_add(requirements.fields)
@@ -988,8 +1052,8 @@ fn charge_rewrite_requirements(
         .and_then(|value| value.checked_add(requirements.allocations))
         .and_then(|value| value.checked_add(requirements.retained_bytes))
         .and_then(|value| value.checked_add(requirements.scratch_bytes))
-        .ok_or(SlideChartDataError::InvalidSource)?;
-    preflight_data_budget(budget, SlideChartDataLimitKind::OutputBytes, amount)?;
+        .ok_or(Error::InvalidSource)?;
+    preflight_data_budget(budget, LimitKind::OutputBytes, amount)?;
     budget.charge_work(amount).map_err(map_axis_support_error)
 }
 
@@ -997,19 +1061,19 @@ fn retain_payload_pair(
     source: &[u8],
     target: &[u8],
     budget: &mut ChartGraphScanBudget,
-) -> Result<(Arc<[u8]>, Arc<[u8]>), SlideChartDataError> {
+) -> Result<(Arc<[u8]>, Arc<[u8]>), Error> {
     let amount = source
         .len()
         .checked_add(target.len())
-        .ok_or(SlideChartDataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let allocations = usize::from(!source.is_empty()) + usize::from(!target.is_empty());
-    preflight_data_budget(budget, SlideChartDataLimitKind::Allocations, allocations)?;
-    preflight_data_budget(budget, SlideChartDataLimitKind::RetainedBytes, amount)?;
+    preflight_data_budget(budget, LimitKind::Allocations, allocations)?;
+    preflight_data_budget(budget, LimitKind::RetainedBytes, amount)?;
     budget.charge_work(amount).map_err(map_axis_support_error)?;
     Ok((Arc::<[u8]>::from(source), Arc::<[u8]>::from(target)))
 }
 
-fn physical_catalog(package: &Package) -> Result<&SourceCatalog, SlideChartDataError> {
+fn physical_catalog(package: &Package) -> Result<&SourceCatalog, Error> {
     chart_axis_support::physical_catalog(package).map_err(map_axis_support_error)
 }
 
@@ -1017,12 +1081,12 @@ fn selected_chart_payload<'source>(
     package: &'source Package,
     selection: &ChartSelection,
     budget: &mut ChartGraphScanBudget,
-) -> Result<&'source [u8], SlideChartDataError> {
+) -> Result<&'source [u8], Error> {
     let (component_name, object) = package
         .object_with_component(selection.chart_identifier)
-        .ok_or(SlideChartDataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if component_name != selection.slide_component_name {
-        return Err(SlideChartDataError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let (_message_index, message) =
         chart_axis_support::unique_message(object, CHART_MESSAGE_TYPE, budget)
@@ -1033,31 +1097,31 @@ fn selected_chart_payload<'source>(
 fn root_preview_deletions_with_budget(
     catalog: &litchi_iwa_archive::package::Catalog,
     budget: &mut ChartGraphScanBudget,
-) -> Result<super::rendering_invalidation::RootPreviewPlan, SlideChartDataError> {
+) -> Result<super::rendering_invalidation::RootPreviewPlan, Error> {
     const ROOT_PREVIEW_NAMES: usize = 3;
     let scan_work = catalog
         .len()
         .checked_mul(ROOT_PREVIEW_NAMES)
         .and_then(|value| value.checked_add(ROOT_PREVIEW_NAMES))
-        .ok_or(SlideChartDataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let retained = ROOT_PREVIEW_NAMES
         .checked_mul(size_of::<&str>())
-        .ok_or(SlideChartDataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     // `root_preview_deletions` builds a bounded boxed slice after scanning the
     // catalog. Charge its complete fixed-name envelope before entering that
     // allocator so an over-budget plan cannot partially materialize.
-    preflight_data_budget(budget, SlideChartDataLimitKind::Allocations, 1)?;
-    preflight_data_budget(budget, SlideChartDataLimitKind::RetainedBytes, retained)?;
-    preflight_data_budget(budget, SlideChartDataLimitKind::WireWork, scan_work)?;
+    preflight_data_budget(budget, LimitKind::Allocations, 1)?;
+    preflight_data_budget(budget, LimitKind::RetainedBytes, retained)?;
+    preflight_data_budget(budget, LimitKind::WireWork, scan_work)?;
     budget
         .charge_work(scan_work)
         .map_err(map_axis_support_error)?;
     super::rendering_invalidation::root_preview_deletions(catalog).map_err(|error| match error {
         super::rendering_invalidation::RenderingInvalidationError::Allocation { amount } => {
-            SlideChartDataError::Allocation { amount }
+            Error::Allocation { amount }
         },
         super::rendering_invalidation::RenderingInvalidationError::InvalidSource => {
-            SlideChartDataError::InvalidSource
+            Error::InvalidSource
         },
     })
 }
@@ -1066,7 +1130,7 @@ fn preview_count_removed(
     source: &Package,
     candidate: &Package,
     budget: &mut ChartGraphScanBudget,
-) -> Result<usize, SlideChartDataError> {
+) -> Result<usize, Error> {
     let source_names =
         root_preview_deletions_with_budget(physical_catalog(source)?.package(), budget)?;
     let candidate_names =
@@ -1077,7 +1141,7 @@ fn preview_count_removed(
                 .len()
                 .checked_add(candidate_names.len())
                 .and_then(|value| value.checked_mul(3))
-                .ok_or(SlideChartDataError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )
         .map_err(map_axis_support_error)?;
     Ok(source_names
@@ -1097,15 +1161,15 @@ fn rewrite_chart_payload(
     selection: &ChartSelection,
     rewritten: Vec<u8>,
     budget: &mut ChartGraphScanBudget,
-) -> Result<(Package, usize), SlideChartDataError> {
+) -> Result<(Package, usize), Error> {
     let catalog = physical_catalog(source)?;
     let entry = catalog
         .package()
         .iter()
         .find(|entry| entry.name() == selection.slide_component_name)
-        .ok_or(SlideChartDataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(SlideChartDataError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let component = source
         .state
@@ -1113,24 +1177,24 @@ fn rewrite_chart_payload(
         .components()
         .iter()
         .find(|component| component.name() == selection.slide_component_name)
-        .ok_or(SlideChartDataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let (message_index, original) = {
         let object = component
             .archive()
             .objects
             .iter()
             .find(|object| object.archive_info.identifier == Some(selection.chart_identifier))
-            .ok_or(SlideChartDataError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let mut selected = None;
         for (index, message) in object.messages.iter().enumerate() {
             if message.type_ != CHART_MESSAGE_TYPE {
                 continue;
             }
             if selected.replace((index, message.data.as_slice())).is_some() {
-                return Err(SlideChartDataError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
-        selected.ok_or(SlideChartDataError::InvalidSource)?
+        selected.ok_or(Error::InvalidSource)?
     };
     let original_len = original.len();
     let physical_limits = source.state.options.archive();
@@ -1143,14 +1207,14 @@ fn rewrite_chart_payload(
         .checked_sub(original_len)
         .and_then(|value| value.checked_add(rewritten.len()))
         .and_then(|value| value.checked_add(64))
-        .ok_or(SlideChartDataError::InvalidSource)?;
-    let compressed_bound =
-        SnappyStream::maximum_compressed_len(replacement_bound).map_err(map_core_error)?;
+        .ok_or(Error::InvalidSource)?;
+    let compressed_bound = SnappyStream::maximum_compressed_len(replacement_bound, snappy_limits)
+        .map_err(map_core_error)?;
     if replacement_bound > usize::try_from(physical_limits.max_entry_bytes()).unwrap_or(usize::MAX)
         || compressed_bound > snappy_limits.max_compressed_stream()
     {
-        return Err(SlideChartDataError::LimitExceeded {
-            kind: SlideChartDataLimitKind::EntryBytes,
+        return Err(Error::Limit {
+            kind: LimitKind::EntryBytes,
             observed: usize_to_u64(replacement_bound.max(compressed_bound)),
             maximum: usize_to_u64(
                 usize::try_from(physical_limits.max_entry_bytes())
@@ -1164,12 +1228,12 @@ fn rewrite_chart_payload(
         .len()
         .checked_sub(entry.data().len())
         .and_then(|value| value.checked_add(compressed_bound))
-        .ok_or(SlideChartDataError::InvalidSource)?;
-    let maximum_package = usize::try_from(physical_limits.max_input_bytes())
-        .map_err(|_| SlideChartDataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
+    let maximum_package =
+        usize::try_from(physical_limits.max_input_bytes()).map_err(|_| Error::InvalidSource)?;
     if package_bound > maximum_package {
-        return Err(SlideChartDataError::LimitExceeded {
-            kind: SlideChartDataLimitKind::OutputBytes,
+        return Err(Error::Limit {
+            kind: LimitKind::OutputBytes,
             observed: usize_to_u64(package_bound),
             maximum: usize_to_u64(maximum_package),
         });
@@ -1184,34 +1248,32 @@ fn rewrite_chart_payload(
         .and_then(|value| value.checked_add(package_bound))
         .and_then(|value| value.checked_add(source.source_bytes().len()))
         .and_then(|value| value.checked_add(64 * previews.len()))
-        .ok_or(SlideChartDataError::InvalidSource)?;
-    preflight_data_budget(budget, SlideChartDataLimitKind::ScratchBytes, precharged)?;
+        .ok_or(Error::InvalidSource)?;
+    preflight_data_budget(budget, LimitKind::ScratchBytes, precharged)?;
     budget
         .charge_work(precharged)
         .map_err(map_axis_support_error)?;
 
-    let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
-        .map_err(map_core_error)?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let stream = SnappyStream::decompress(entry.data(), snappy_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     validate_canonical_object_length_prefixes(stream.as_bytes(), &archive)?;
     let object = archive
         .objects
         .iter()
         .find(|object| object.archive_info.identifier == Some(selection.chart_identifier))
-        .ok_or(SlideChartDataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if object
         .messages
         .get(message_index)
         .map(|message| message.type_)
         != Some(CHART_MESSAGE_TYPE)
     {
-        return Err(SlideChartDataError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     archive
         .object_mut(selection.chart_identifier)
-        .ok_or(SlideChartDataError::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .ok_or(Error::InvalidSource)?
+        .replace_message_preserving_header(
             message_index,
             RawMessage {
                 type_: CHART_MESSAGE_TYPE,
@@ -1221,15 +1283,15 @@ fn rewrite_chart_payload(
         )
         .map_err(map_core_error)?;
     let encoded_bound = archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_core_error)?;
-    let compressed_bound =
-        SnappyStream::maximum_compressed_len(encoded_bound).map_err(map_core_error)?;
+    let compressed_bound = SnappyStream::maximum_compressed_len(encoded_bound, snappy_limits)
+        .map_err(map_core_error)?;
     if encoded_bound > usize::try_from(physical_limits.max_entry_bytes()).unwrap_or(usize::MAX)
         || compressed_bound > snappy_limits.max_compressed_stream()
     {
-        return Err(SlideChartDataError::LimitExceeded {
-            kind: SlideChartDataLimitKind::EntryBytes,
+        return Err(Error::Limit {
+            kind: LimitKind::EntryBytes,
             observed: usize_to_u64(encoded_bound.max(compressed_bound)),
             maximum: usize_to_u64(
                 usize::try_from(physical_limits.max_entry_bytes())
@@ -1238,10 +1300,8 @@ fn rewrite_chart_payload(
             ),
         });
     }
-    let bytes = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
-    let compressed = SnappyStream::compress(&bytes).map_err(map_core_error)?;
+    let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
     let edit = EntryEdit::new(selection.slide_component_name.as_str(), &compressed);
     let prepared = catalog
         .package()
@@ -1257,12 +1317,8 @@ fn rewrite_chart_payload(
         .checked_add(requirements.allocations())
         .and_then(|value| value.checked_add(requirements.retained_bytes()))
         .and_then(|value| value.checked_add(requirements.scratch_bytes()))
-        .ok_or(SlideChartDataError::InvalidSource)?;
-    preflight_data_budget(
-        budget,
-        SlideChartDataLimitKind::OutputBytes,
-        reassembly_work,
-    )?;
+        .ok_or(Error::InvalidSource)?;
+    preflight_data_budget(budget, LimitKind::OutputBytes, reassembly_work)?;
     budget
         .charge_work(reassembly_work)
         .map_err(map_axis_support_error)?;
@@ -1270,19 +1326,16 @@ fn rewrite_chart_payload(
         .execute(requirements.exact_limits())
         .map_err(map_archive_error)?;
     let package = Package::from_source_with_options(output.into(), source.state.options)
-        .map_err(|_error| SlideChartDataError::Verification)?;
+        .map_err(|_error| Error::Verification)?;
     Ok((package, previews.len()))
 }
 
-fn parsed_archive_stream_bound(archive: &Archive) -> Result<usize, SlideChartDataError> {
+fn parsed_archive_stream_bound(archive: &Archive) -> Result<usize, Error> {
     archive.objects.iter().try_fold(0usize, |bound, object| {
         let end = usize::try_from(object.data_offset)
-            .map_err(|_| SlideChartDataError::InvalidSource)?
-            .checked_add(
-                usize::try_from(object.data_length)
-                    .map_err(|_| SlideChartDataError::InvalidSource)?,
-            )
-            .ok_or(SlideChartDataError::InvalidSource)?;
+            .map_err(|_| Error::InvalidSource)?
+            .checked_add(usize::try_from(object.data_length).map_err(|_| Error::InvalidSource)?)
+            .ok_or(Error::InvalidSource)?;
         Ok(bound.max(end))
     })
 }
@@ -1290,31 +1343,26 @@ fn parsed_archive_stream_bound(archive: &Archive) -> Result<usize, SlideChartDat
 fn validate_canonical_object_length_prefixes(
     source: &[u8],
     archive: &Archive,
-) -> Result<(), SlideChartDataError> {
+) -> Result<(), Error> {
     for object in &archive.objects {
-        let offset = usize::try_from(object.header_offset)
-            .map_err(|_| SlideChartDataError::InvalidSource)?;
-        let remaining = source
-            .get(offset..)
-            .ok_or(SlideChartDataError::InvalidSource)?;
+        let offset = usize::try_from(object.header_offset).map_err(|_| Error::InvalidSource)?;
+        let remaining = source.get(offset..).ok_or(Error::InvalidSource)?;
         let (header_bytes, prefix_bytes) = litchi_iwa_common::decode_varint_from_bytes(remaining)
-            .map_err(|_| SlideChartDataError::InvalidSource)?;
+            .map_err(|_| Error::InvalidSource)?;
         if prefix_bytes != litchi_iwa_common::varint::encoded_len(header_bytes) {
-            return Err(SlideChartDataError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let framed_header_bytes = header_bytes
-            .checked_add(
-                u64::try_from(prefix_bytes).map_err(|_| SlideChartDataError::InvalidSource)?,
-            )
-            .ok_or(SlideChartDataError::InvalidSource)?;
+            .checked_add(u64::try_from(prefix_bytes).map_err(|_| Error::InvalidSource)?)
+            .ok_or(Error::InvalidSource)?;
         if framed_header_bytes != object.header_length
             || object
                 .header_offset
                 .checked_add(object.header_length)
-                .ok_or(SlideChartDataError::InvalidSource)?
+                .ok_or(Error::InvalidSource)?
                 != object.data_offset
         {
-            return Err(SlideChartDataError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(())
@@ -1327,13 +1375,13 @@ fn verify_chart_candidate(
     expected_payload: Option<&[u8]>,
     previews_must_be_absent: bool,
     budget: &mut ChartGraphScanBudget,
-) -> Result<(), SlideChartDataError> {
+) -> Result<(), Error> {
     // Reopening already enforces the physical ZIP/IWA profile. The selected
     // graph readback plus the complete locality proof below provide the
     // focused semantic invariant; a package-wide `validate` here would walk
     // unrelated lazy document state without adding publication evidence.
     if source.state.total_objects != candidate.state.total_objects {
-        return Err(SlideChartDataError::Verification);
+        return Err(Error::Verification);
     }
     budget
         .charge_selection_scans(candidate, true)
@@ -1352,11 +1400,11 @@ fn verify_chart_candidate(
         || candidate_selection.title != source_selection.title
         || candidate_selection.slide_component_name != source_selection.slide_component_name
     {
-        return Err(SlideChartDataError::Verification);
+        return Err(Error::Verification);
     }
     let (_, source_object) = source
         .object_with_component(source_selection.chart_identifier)
-        .ok_or(SlideChartDataError::Verification)?;
+        .ok_or(Error::Verification)?;
     let (message_index, _) =
         chart_axis_support::unique_message(source_object, CHART_MESSAGE_TYPE, budget)
             .map_err(map_axis_support_error)?;
@@ -1377,12 +1425,12 @@ fn read_selected_data(
     package: &Package,
     selection: ChartSelection,
     budget: &mut ChartGraphScanBudget,
-) -> Result<ChartData, SlideChartDataError> {
+) -> Result<ChartData, Error> {
     let (component_name, chart_object) = package
         .object_with_component(selection.chart_identifier)
-        .ok_or(SlideChartDataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if component_name != selection.slide_component_name {
-        return Err(SlideChartDataError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let (message_index, message) =
         chart_axis_support::unique_message(chart_object, CHART_MESSAGE_TYPE, budget)
@@ -1392,18 +1440,16 @@ fn read_selected_data(
 
     let (limits, residual_work) = budget.chart_metadata_residual_limits();
     if residual_work == 0 {
-        return Err(SlideChartDataError::LimitExceeded {
-            kind: SlideChartDataLimitKind::WireWork,
+        return Err(Error::Limit {
+            kind: LimitKind::WireWork,
             observed: 1,
             maximum: 0,
         });
     }
-    let maximum_depth = u32::try_from(limits.max_nesting()).map_err(|_error| {
-        SlideChartDataError::LimitExceeded {
-            kind: SlideChartDataLimitKind::WireNesting,
-            observed: usize_to_u64(limits.max_nesting()),
-            maximum: u64::from(u32::MAX),
-        }
+    let maximum_depth = u32::try_from(limits.max_nesting()).map_err(|_error| Error::Limit {
+        kind: LimitKind::WireNesting,
+        observed: usize_to_u64(limits.max_nesting()),
+        maximum: u64::from(u32::MAX),
     })?;
     let options = DecodeOptions::new(
         message.data.len().max(1).min(limits.max_input_bytes()),
@@ -1445,7 +1491,7 @@ fn read_selected_data(
 fn charge_data_report(
     budget: &mut ChartGraphScanBudget,
     report: chart_data_codec::DecodeReport,
-) -> Result<(), SlideChartDataError> {
+) -> Result<(), Error> {
     let amount = report
         .source_bytes()
         .checked_add(report.fields())
@@ -1456,7 +1502,7 @@ fn charge_data_report(
         .and_then(|value| value.checked_add(report.text_bytes()))
         .and_then(|value| value.checked_add(report.allocations()))
         .and_then(|value| value.checked_add(report.retained_bytes()))
-        .ok_or(SlideChartDataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.charge_work(amount).map_err(map_axis_support_error)
 }
 
@@ -1467,76 +1513,74 @@ fn charge_data_report(
 fn charge_snapshot_projection(
     snapshot: chart_data_codec::ChartDataSnapshot<'_>,
     budget: &mut ChartGraphScanBudget,
-) -> Result<(), SlideChartDataError> {
+) -> Result<(), Error> {
     let cells = snapshot
         .row_count()
         .checked_mul(snapshot.column_count())
-        .ok_or(SlideChartDataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let amount = snapshot
         .grid_source()
         .len()
         .max(1)
         .checked_mul(10)
         .and_then(|value| value.checked_add(cells))
-        .ok_or(SlideChartDataError::InvalidSource)?;
-    preflight_data_budget(budget, SlideChartDataLimitKind::WireWork, amount)?;
+        .ok_or(Error::InvalidSource)?;
+    preflight_data_budget(budget, LimitKind::WireWork, amount)?;
     budget.charge_work(amount).map_err(map_axis_support_error)
 }
 
 fn copy_labels<'source>(
     labels: LabelList<'source>,
     budget: &mut ChartGraphScanBudget,
-) -> Result<Vec<String>, SlideChartDataError> {
+) -> Result<Vec<String>, Error> {
     let count = labels.len();
     let mut text_bytes = 0usize;
     let mut string_allocations = 0usize;
     let mut seen = 0usize;
     for label in labels.iter() {
-        seen = seen
-            .checked_add(1)
-            .ok_or(SlideChartDataError::InvalidSource)?;
+        seen = seen.checked_add(1).ok_or(Error::InvalidSource)?;
         text_bytes = text_bytes
             .checked_add(label.len())
-            .ok_or(SlideChartDataError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         string_allocations = string_allocations
             .checked_add(usize::from(!label.is_empty()))
-            .ok_or(SlideChartDataError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     if seen != count {
-        return Err(SlideChartDataError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let allocations = usize::from(count != 0)
         .checked_add(string_allocations)
-        .ok_or(SlideChartDataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let retained = count
         .checked_mul(size_of::<String>())
         .and_then(|value| value.checked_add(text_bytes))
-        .ok_or(SlideChartDataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let charge = count
         .checked_add(text_bytes)
         .and_then(|value| value.checked_add(allocations))
         .and_then(|value| value.checked_add(retained))
-        .ok_or(SlideChartDataError::InvalidSource)?;
-    preflight_data_budget(budget, SlideChartDataLimitKind::Allocations, allocations)?;
-    preflight_data_budget(budget, SlideChartDataLimitKind::RetainedBytes, retained)?;
-    preflight_data_budget(budget, SlideChartDataLimitKind::WireWork, charge)?;
+        .ok_or(Error::InvalidSource)?;
+    preflight_data_budget(budget, LimitKind::Allocations, allocations)?;
+    preflight_data_budget(budget, LimitKind::RetainedBytes, retained)?;
+    preflight_data_budget(budget, LimitKind::WireWork, charge)?;
 
     let mut copied = Vec::new();
     copied
         .try_reserve_exact(count)
-        .map_err(|_error| SlideChartDataError::Allocation { amount: count })?;
+        .map_err(|_error| Error::Allocation { amount: count })?;
     for label in labels.iter() {
         let mut owned = String::new();
         owned
             .try_reserve_exact(label.len())
-            .map_err(|_error| SlideChartDataError::Allocation {
+            .map_err(|_error| Error::Allocation {
                 amount: label.len(),
             })?;
         owned.push_str(label);
         copied.push(owned);
     }
     if copied.len() != count {
-        return Err(SlideChartDataError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     budget.charge_work(charge).map_err(map_axis_support_error)?;
     Ok(copied)
@@ -1545,53 +1589,51 @@ fn copy_labels<'source>(
 fn copy_values(
     snapshot: chart_data_codec::ChartDataSnapshot<'_>,
     budget: &mut ChartGraphScanBudget,
-) -> Result<Vec<Vec<Option<f64>>>, SlideChartDataError> {
+) -> Result<Vec<Vec<Option<f64>>>, Error> {
     let rows = snapshot.row_count();
     let columns = snapshot.column_count();
-    let cells = rows
-        .checked_mul(columns)
-        .ok_or(SlideChartDataError::InvalidSource)?;
+    let cells = rows.checked_mul(columns).ok_or(Error::InvalidSource)?;
     let value_work = rows
         .checked_add(cells)
         .and_then(|value| value.checked_add(rows.checked_mul(size_of::<Vec<Option<f64>>>())?))
         .and_then(|value| value.checked_add(cells.checked_mul(size_of::<Option<f64>>())?))
-        .ok_or(SlideChartDataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let allocations = usize::from(rows != 0)
         .checked_add(rows)
-        .ok_or(SlideChartDataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let retained = rows
         .checked_mul(size_of::<Vec<Option<f64>>>())
         .and_then(|value| value.checked_add(cells.checked_mul(size_of::<Option<f64>>())?))
-        .ok_or(SlideChartDataError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let charge = value_work
         .checked_add(allocations)
-        .ok_or(SlideChartDataError::InvalidSource)?;
-    preflight_data_budget(budget, SlideChartDataLimitKind::Allocations, allocations)?;
-    preflight_data_budget(budget, SlideChartDataLimitKind::RetainedBytes, retained)?;
-    preflight_data_budget(budget, SlideChartDataLimitKind::WireWork, charge)?;
+        .ok_or(Error::InvalidSource)?;
+    preflight_data_budget(budget, LimitKind::Allocations, allocations)?;
+    preflight_data_budget(budget, LimitKind::RetainedBytes, retained)?;
+    preflight_data_budget(budget, LimitKind::WireWork, charge)?;
 
     let mut copied = Vec::new();
     copied
         .try_reserve_exact(rows)
-        .map_err(|_error| SlideChartDataError::Allocation { amount: rows })?;
+        .map_err(|_error| Error::Allocation { amount: rows })?;
     for row in snapshot.rows().iter() {
         if row.len() != columns {
-            return Err(SlideChartDataError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let mut values = Vec::new();
         values
             .try_reserve_exact(columns)
-            .map_err(|_error| SlideChartDataError::Allocation { amount: columns })?;
+            .map_err(|_error| Error::Allocation { amount: columns })?;
         for value in row.values() {
             values.push(value);
         }
         if values.len() != columns {
-            return Err(SlideChartDataError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         copied.push(values);
     }
     if copied.len() != rows {
-        return Err(SlideChartDataError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     budget.charge_work(charge).map_err(map_axis_support_error)?;
     Ok(copied)
@@ -1599,16 +1641,16 @@ fn copy_values(
 
 fn preflight_data_budget(
     budget: &ChartGraphScanBudget,
-    kind: SlideChartDataLimitKind,
+    kind: LimitKind,
     amount: usize,
-) -> Result<(), SlideChartDataError> {
+) -> Result<(), Error> {
     // ChartGraphScanBudget deliberately exposes one aggregate operation
     // ledger shared by selector and metadata readers.  Allocation and
     // retained-byte checks use that same finite remainder, but run before
     // try_reserve so a rejected semantic copy cannot partially materialize.
     let (_, remaining) = budget.chart_metadata_residual_limits();
     if amount > remaining {
-        return Err(SlideChartDataError::LimitExceeded {
+        return Err(Error::Limit {
             kind,
             observed: usize_to_u64(amount),
             maximum: usize_to_u64(remaining),
@@ -1617,233 +1659,222 @@ fn preflight_data_budget(
     Ok(())
 }
 
-fn map_data_error(_error: DataError) -> SlideChartDataError {
-    SlideChartDataError::InvalidSource
+fn map_data_error(_error: DataError) -> Error {
+    Error::InvalidSource
 }
 
-fn map_axis_support_error(error: AxisSupportError) -> SlideChartDataError {
+fn map_axis_support_error(error: AxisSupportError) -> Error {
     map_chart_title_error(slide_chart_title::map_axis_support_error(error))
 }
 
-fn map_chart_title_error(error: ChartTitleError) -> SlideChartDataError {
+fn map_chart_title_error(error: ChartTitleError) -> Error {
     match error {
-        ChartTitleError::UnsupportedSource => SlideChartDataError::UnsupportedSource,
-        ChartTitleError::AmbiguousSelector => SlideChartDataError::AmbiguousSelector,
-        ChartTitleError::EmptySlideName => SlideChartDataError::EmptySlideName,
-        ChartTitleError::SlideNameNotFound => SlideChartDataError::SlideNameNotFound,
-        ChartTitleError::SlidePositionNotFound { position } => {
-            SlideChartDataError::SlidePositionNotFound { position }
+        ChartTitleError::Refused(crate::chart::title::Refusal::UnsupportedSource) => {
+            Error::Refused(Refusal::UnsupportedSource)
         },
-        ChartTitleError::ChartNameNotFound => SlideChartDataError::ChartNameNotFound,
-        ChartTitleError::ChartPositionNotFound { position } => {
-            SlideChartDataError::ChartPositionNotFound { position }
+        ChartTitleError::Refused(crate::chart::title::Refusal::AmbiguousSelector) => {
+            Error::Refused(Refusal::AmbiguousSelector)
         },
-        ChartTitleError::EmptyChartName => SlideChartDataError::EmptyChartName,
+        ChartTitleError::Refused(crate::chart::title::Refusal::EmptySlideName) => {
+            Error::Refused(Refusal::EmptySlideName)
+        },
+        ChartTitleError::Refused(crate::chart::title::Refusal::SlideNameNotFound) => {
+            Error::Refused(Refusal::SlideNameNotFound)
+        },
+        ChartTitleError::Refused(crate::chart::title::Refusal::SlidePositionNotFound {
+            position,
+        }) => Error::Refused(Refusal::SlidePositionNotFound { position }),
+        ChartTitleError::Refused(crate::chart::title::Refusal::ChartNameNotFound) => {
+            Error::Refused(Refusal::ChartNameNotFound)
+        },
+        ChartTitleError::Refused(crate::chart::title::Refusal::ChartPositionNotFound {
+            position,
+        }) => Error::Refused(Refusal::ChartPositionNotFound { position }),
+        ChartTitleError::Refused(crate::chart::title::Refusal::EmptyChartName) => {
+            Error::Refused(Refusal::EmptyChartName)
+        },
         ChartTitleError::InvalidSource
         | ChartTitleError::Verification
-        | ChartTitleError::PatchConflict => SlideChartDataError::InvalidSource,
-        ChartTitleError::LimitExceeded {
+        | ChartTitleError::PatchConflict => Error::InvalidSource,
+        ChartTitleError::Limit {
             kind,
             observed,
             maximum,
-        } => SlideChartDataError::LimitExceeded {
+        } => Error::Limit {
             kind: map_title_limit_kind(kind),
             observed,
             maximum,
         },
-        ChartTitleError::Allocation { amount } => SlideChartDataError::Allocation { amount },
+        ChartTitleError::Allocation { amount } => Error::Allocation { amount },
     }
 }
 
-fn map_title_limit_kind(kind: ChartTitleLimitKind) -> SlideChartDataLimitKind {
+fn map_title_limit_kind(kind: ChartTitleLimitKind) -> LimitKind {
     match kind {
-        ChartTitleLimitKind::InputBytes => SlideChartDataLimitKind::InputBytes,
-        ChartTitleLimitKind::OutputBytes => SlideChartDataLimitKind::WireBytes,
-        ChartTitleLimitKind::WireBytes => SlideChartDataLimitKind::WireBytes,
-        ChartTitleLimitKind::Entries => SlideChartDataLimitKind::Entries,
-        ChartTitleLimitKind::EntryBytes => SlideChartDataLimitKind::EntryBytes,
-        ChartTitleLimitKind::TotalBytes => SlideChartDataLimitKind::TotalBytes,
-        ChartTitleLimitKind::Slides => SlideChartDataLimitKind::Slides,
-        ChartTitleLimitKind::References => SlideChartDataLimitKind::References,
-        ChartTitleLimitKind::TextStorages => SlideChartDataLimitKind::TextStorages,
-        ChartTitleLimitKind::TextFragments => SlideChartDataLimitKind::TextFragments,
-        ChartTitleLimitKind::TextBytes | ChartTitleLimitKind::TitleBytes => {
-            SlideChartDataLimitKind::TextBytes
-        },
-        ChartTitleLimitKind::WireFields => SlideChartDataLimitKind::WireFields,
-        ChartTitleLimitKind::WireNesting => SlideChartDataLimitKind::WireNesting,
-        ChartTitleLimitKind::WireWork => SlideChartDataLimitKind::WireWork,
+        ChartTitleLimitKind::InputBytes => LimitKind::InputBytes,
+        ChartTitleLimitKind::OutputBytes => LimitKind::WireBytes,
+        ChartTitleLimitKind::WireBytes => LimitKind::WireBytes,
+        ChartTitleLimitKind::Entries => LimitKind::Entries,
+        ChartTitleLimitKind::EntryBytes => LimitKind::EntryBytes,
+        ChartTitleLimitKind::TotalBytes => LimitKind::TotalBytes,
+        ChartTitleLimitKind::Slides => LimitKind::Slides,
+        ChartTitleLimitKind::References => LimitKind::References,
+        ChartTitleLimitKind::TextStorages => LimitKind::TextStorages,
+        ChartTitleLimitKind::TextFragments => LimitKind::TextFragments,
+        ChartTitleLimitKind::TextBytes | ChartTitleLimitKind::TitleBytes => LimitKind::TextBytes,
+        ChartTitleLimitKind::SelectorBytes => LimitKind::SelectorBytes,
+        ChartTitleLimitKind::WireFields => LimitKind::WireFields,
+        ChartTitleLimitKind::WireNesting => LimitKind::WireNesting,
+        ChartTitleLimitKind::WireWork => LimitKind::WireWork,
     }
 }
 
-fn map_chart_data_decode_error(error: chart_data_codec::DecodeError) -> SlideChartDataError {
+fn map_chart_data_decode_error(error: chart_data_codec::DecodeError) -> Error {
     if let Some((observed, maximum)) = error.input_limit_values() {
-        return SlideChartDataError::LimitExceeded {
-            kind: SlideChartDataLimitKind::WireBytes,
+        return Error::Limit {
+            kind: LimitKind::WireBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return SlideChartDataError::LimitExceeded {
-            kind: SlideChartDataLimitKind::WireFields,
+        return Error::Limit {
+            kind: LimitKind::WireFields,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return SlideChartDataError::LimitExceeded {
-            kind: SlideChartDataLimitKind::WireWork,
+        return Error::Limit {
+            kind: LimitKind::WireWork,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.cell_limit_values() {
-        return SlideChartDataError::LimitExceeded {
-            kind: SlideChartDataLimitKind::Cells,
+        return Error::Limit {
+            kind: LimitKind::Cells,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.label_limit_values() {
-        return SlideChartDataError::LimitExceeded {
-            kind: SlideChartDataLimitKind::LabelCount,
+        return Error::Limit {
+            kind: LimitKind::LabelCount,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.text_limit_values() {
-        return SlideChartDataError::LimitExceeded {
-            kind: SlideChartDataLimitKind::TextBytes,
+        return Error::Limit {
+            kind: LimitKind::TextBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.depth_limit_values() {
-        return SlideChartDataError::LimitExceeded {
-            kind: SlideChartDataLimitKind::WireNesting,
+        return Error::Limit {
+            kind: LimitKind::WireNesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),
         };
     }
-    SlideChartDataError::InvalidSource
+    Error::InvalidSource
 }
 
-fn map_data_rewrite_error(error: chart_data_codec::RewriteError) -> SlideChartDataError {
+fn map_data_rewrite_error(error: chart_data_codec::RewriteError) -> Error {
     if let Some(amount) = error.allocation_amount() {
-        return SlideChartDataError::Allocation { amount };
+        return Error::Allocation { amount };
     }
     if error.is_shape_mismatch() {
-        return SlideChartDataError::ShapeChanged;
+        return Error::Refused(Refusal::ShapeChanged);
     }
     if error.is_non_finite_numeric() {
-        return SlideChartDataError::InvalidSource;
+        return Error::InvalidSource;
     }
     let Some(limit) = error.resource_limit() else {
-        return SlideChartDataError::InvalidSource;
+        return Error::InvalidSource;
     };
     match limit {
-        chart_data_codec::RewriteLimit::Bytes { observed, maximum } => {
-            SlideChartDataError::LimitExceeded {
-                kind: SlideChartDataLimitKind::WireBytes,
-                observed: usize_to_u64(observed),
-                maximum: usize_to_u64(maximum),
-            }
+        chart_data_codec::RewriteLimit::Bytes { observed, maximum } => Error::Limit {
+            kind: LimitKind::WireBytes,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(maximum),
         },
-        chart_data_codec::RewriteLimit::Fields { observed, maximum } => {
-            SlideChartDataError::LimitExceeded {
-                kind: SlideChartDataLimitKind::WireFields,
-                observed: usize_to_u64(observed),
-                maximum: usize_to_u64(maximum),
-            }
+        chart_data_codec::RewriteLimit::Fields { observed, maximum } => Error::Limit {
+            kind: LimitKind::WireFields,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(maximum),
         },
-        chart_data_codec::RewriteLimit::Work { observed, maximum } => {
-            SlideChartDataError::LimitExceeded {
-                kind: SlideChartDataLimitKind::WireWork,
-                observed: usize_to_u64(observed),
-                maximum: usize_to_u64(maximum),
-            }
+        chart_data_codec::RewriteLimit::Work { observed, maximum } => Error::Limit {
+            kind: LimitKind::WireWork,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(maximum),
         },
-        chart_data_codec::RewriteLimit::Output { observed, maximum } => {
-            SlideChartDataError::LimitExceeded {
-                kind: SlideChartDataLimitKind::OutputBytes,
-                observed: usize_to_u64(observed),
-                maximum: usize_to_u64(maximum),
-            }
+        chart_data_codec::RewriteLimit::Output { observed, maximum } => Error::Limit {
+            kind: LimitKind::OutputBytes,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(maximum),
         },
-        chart_data_codec::RewriteLimit::Nesting { observed, maximum } => {
-            SlideChartDataError::LimitExceeded {
-                kind: SlideChartDataLimitKind::WireNesting,
-                observed: u64::from(observed),
-                maximum: u64::from(maximum),
-            }
+        chart_data_codec::RewriteLimit::Nesting { observed, maximum } => Error::Limit {
+            kind: LimitKind::WireNesting,
+            observed: u64::from(observed),
+            maximum: u64::from(maximum),
         },
-        chart_data_codec::RewriteLimit::Allocations { observed, maximum } => {
-            SlideChartDataError::LimitExceeded {
-                kind: SlideChartDataLimitKind::WireAllocations,
-                observed: usize_to_u64(observed),
-                maximum: usize_to_u64(maximum),
-            }
+        chart_data_codec::RewriteLimit::Allocations { observed, maximum } => Error::Limit {
+            kind: LimitKind::WireAllocations,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(maximum),
         },
-        chart_data_codec::RewriteLimit::Retained { observed, maximum } => {
-            SlideChartDataError::LimitExceeded {
-                kind: SlideChartDataLimitKind::WireRetainedBytes,
-                observed: usize_to_u64(observed),
-                maximum: usize_to_u64(maximum),
-            }
+        chart_data_codec::RewriteLimit::Retained { observed, maximum } => Error::Limit {
+            kind: LimitKind::WireRetainedBytes,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(maximum),
         },
-        chart_data_codec::RewriteLimit::Scratch { observed, maximum } => {
-            SlideChartDataError::LimitExceeded {
-                kind: SlideChartDataLimitKind::ScratchBytes,
-                observed: usize_to_u64(observed),
-                maximum: usize_to_u64(maximum),
-            }
+        chart_data_codec::RewriteLimit::Scratch { observed, maximum } => Error::Limit {
+            kind: LimitKind::ScratchBytes,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(maximum),
         },
-        _ => SlideChartDataError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_archive_error(error: litchi_iwa_archive::Error) -> SlideChartDataError {
+fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     match error {
         litchi_iwa_archive::Error::Limit {
             kind,
             observed,
             maximum,
-        } => SlideChartDataError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_archive::LimitKind::InputBytes => SlideChartDataLimitKind::InputBytes,
-                litchi_iwa_archive::LimitKind::OutputBytes => SlideChartDataLimitKind::OutputBytes,
-                litchi_iwa_archive::LimitKind::Entries => SlideChartDataLimitKind::Entries,
+                litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
+                litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_archive::LimitKind::Entries => LimitKind::Entries,
                 litchi_iwa_archive::LimitKind::EntryBytes
                 | litchi_iwa_archive::LimitKind::CompressedEntryBytes
-                | litchi_iwa_archive::LimitKind::IwaStreamBytes => {
-                    SlideChartDataLimitKind::EntryBytes
-                },
+                | litchi_iwa_archive::LimitKind::IwaStreamBytes => LimitKind::EntryBytes,
                 litchi_iwa_archive::LimitKind::TotalBytes
                 | litchi_iwa_archive::LimitKind::IwaTotalBytes
                 | litchi_iwa_archive::LimitKind::MemberNameBytes
-                | litchi_iwa_archive::LimitKind::MetadataBytes => {
-                    SlideChartDataLimitKind::TotalBytes
-                },
+                | litchi_iwa_archive::LimitKind::MetadataBytes => LimitKind::TotalBytes,
             },
             observed,
             maximum,
         },
-        litchi_iwa_archive::Error::Allocation { amount, .. } => {
-            SlideChartDataError::Allocation { amount }
-        },
+        litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
         litchi_iwa_archive::Error::Iwa(error) => map_core_error(error),
-        _ => SlideChartDataError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_core_error(error: litchi_iwa_core::Error) -> SlideChartDataError {
+fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
             kind,
             observed,
             maximum,
-        } => SlideChartDataError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::ArchiveBytes
                 | litchi_iwa_core::LimitKind::ObjectBytes
@@ -1852,27 +1883,23 @@ fn map_core_error(error: litchi_iwa_core::Error) -> SlideChartDataError {
                 | litchi_iwa_core::LimitKind::SnappyChunkBytes
                 | litchi_iwa_core::LimitKind::SnappyStreamBytes
                 | litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
-                | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes => {
-                    SlideChartDataLimitKind::EntryBytes
-                },
+                | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes => LimitKind::EntryBytes,
                 litchi_iwa_core::LimitKind::HeaderFields
                 | litchi_iwa_core::LimitKind::MetadataItems
                 | litchi_iwa_core::LimitKind::Objects
                 | litchi_iwa_core::LimitKind::Messages
-                | litchi_iwa_core::LimitKind::MessagesPerObject => SlideChartDataLimitKind::Entries,
-                litchi_iwa_core::LimitKind::HeaderNesting => SlideChartDataLimitKind::WireNesting,
-                litchi_iwa_core::LimitKind::HeaderMemoryBytes => {
-                    SlideChartDataLimitKind::RetainedBytes
-                },
-                litchi_iwa_core::LimitKind::SnappyFrames => SlideChartDataLimitKind::WireWork,
+                | litchi_iwa_core::LimitKind::MessagesPerObject => LimitKind::Entries,
+                litchi_iwa_core::LimitKind::HeaderNesting => LimitKind::WireNesting,
+                litchi_iwa_core::LimitKind::HeaderMemoryBytes => LimitKind::RetainedBytes,
+                litchi_iwa_core::LimitKind::SnappyFrames => LimitKind::WireWork,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         },
         litchi_iwa_core::Error::Allocation { requested, .. } => {
-            SlideChartDataError::Allocation { amount: requested }
+            Error::Allocation { amount: requested }
         },
-        _ => SlideChartDataError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
@@ -1900,9 +1927,9 @@ mod tests {
             .expect("reserve all but one work unit");
 
         assert_eq!(
-            preflight_data_budget(&budget, SlideChartDataLimitKind::RetainedBytes, 2),
-            Err(SlideChartDataError::LimitExceeded {
-                kind: SlideChartDataLimitKind::RetainedBytes,
+            preflight_data_budget(&budget, LimitKind::RetainedBytes, 2),
+            Err(Error::Limit {
+                kind: LimitKind::RetainedBytes,
                 observed: 2,
                 maximum: 1,
             })
@@ -1936,8 +1963,8 @@ mod tests {
 
         assert!(matches!(
             charge_snapshot_projection(snapshot, &mut budget),
-            Err(SlideChartDataError::LimitExceeded {
-                kind: SlideChartDataLimitKind::WireWork,
+            Err(Error::Limit {
+                kind: LimitKind::WireWork,
                 observed,
                 maximum,
             }) if observed == projection as u64 && maximum == (projection - 1) as u64

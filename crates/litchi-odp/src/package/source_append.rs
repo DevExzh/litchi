@@ -1,27 +1,49 @@
-//! Bounded, source-backed append of one plain slide to an existing ODP.
+//! Bounded append of one plain slide to a [`SourceBackedPresentation`]
+//! (record 0358a; the shape of DOCX record 0355a §1).
 //!
-//! This module is deliberately separate from [`super::source`] and from the
-//! materialized authoring transaction.  It retains the positional package
-//! index and one bounded authored page, then asks the common ODF insertion
-//! owner to replay `content.xml` into the preserved ZIP layout.  It never
-//! constructs a complete `content.xml`, candidate package, `Snapshot`, or
-//! `Commit`.
+//! [`SourceBackedPresentation::edit_tail_append`] starts an [`Edit`] holding
+//! only the bounded title and body; [`Edit::prepare`] scans the source once
+//! and returns a [`Plan`] with its [`SourceProof`]; [`Plan::commit`] (or
+//! [`Edit::commit`]) returns a [`Commit`] holding the new presentation, the
+//! reversible [`Patch`] and the [`Diagnostics`]. Nothing is written until the
+//! committed presentation's
+//! [`write_to`](SourceBackedPresentation::write_to) or
+//! [`save`](SourceBackedPresentation::save), which replays `content.xml` with
+//! the page inserted into the preserved ZIP layout and copies every other
+//! member raw. The commit never constructs a complete `content.xml` or
+//! candidate package; reading or editing the committed presentation
+//! materializes its output once.
+//!
+//! ```no_run
+//! use litchi_odp::SourceBackedPresentation;
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let presentation = SourceBackedPresentation::open("deck.odp")?;
+//! let commit = presentation.edit_tail_append("Title", "Body")?.commit()?;
+//! commit.package().save("deck-appended.odp")?;
+//! # Ok(())
+//! # }
+//! ```
 
-use std::{fmt, io::Write, sync::Arc};
+use std::{fmt, sync::Arc};
+
+use super::source::SourceBackedPresentation;
+pub use litchi_odf_common::LimitKind;
 
 use litchi_core::{
-    CancellationToken, Error, ExecutionError, ReadAt, Resource, Result, SourceVersion,
+    CancellationToken, Error as CoreError, ExecutionError, Resource, Result, SourceVersion,
 };
 use litchi_odf_common::{
-    constants::{ODF_CONTENT, ODF_PRESENTATION},
+    Error as OdfError,
+    constants::ODF_CONTENT,
     core::source_publication::{
-        SourceContentInsertionError, SourceContentInsertionPlan, SourceContentScanError,
-        scan_source_content,
+        SourceContentInsertionCallbackError, SourceContentInsertionError,
+        SourceContentInsertionPlan, SourceContentScanError, scan_source_content,
     },
     core::{
         AuthoredXmlFragment, SourceBackedPackage, SourceContentPublicationError,
-        SourceContentPublicationOptions, SourceContentPublicationProgress,
-        SourceContentPublicationReport, SourceMemberReaderError, XmlStreamLimits,
+        SourceContentPublicationOptions, SourceContentPublicationProgress, SourceMemberReaderError,
+        XmlStreamLimits,
         private::{BindingTracker, XmlStreamEvent},
     },
 };
@@ -31,9 +53,6 @@ use quick_xml::{
     name::{Namespace, ResolveResult},
 };
 
-use super::ReadLimits;
-
-const FAMILY_NAME: &str = "ODP";
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const DRAW_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
 const GENERATED_DOCUMENT_PREFIX: &[u8] = br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0"><office:body><office:presentation>"#;
@@ -53,7 +72,7 @@ const MAX_CONTENT_XML_BYTES: u64 = 256 * 1024 * 1024;
 
 /// Finite bounds for a source-backed one-slide append.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct TailAppendLimits {
+pub struct Limits {
     /// Maximum combined UTF-8 bytes in the submitted title and body.
     pub max_text_bytes: usize,
     /// Maximum generated page bytes retained by the plan.
@@ -64,7 +83,7 @@ pub struct TailAppendLimits {
     pub max_content_xml_bytes: u64,
 }
 
-impl TailAppendLimits {
+impl Limits {
     /// Create explicit finite append bounds.
     #[must_use]
     pub const fn new(
@@ -82,7 +101,7 @@ impl TailAppendLimits {
     }
 }
 
-impl Default for TailAppendLimits {
+impl Default for Limits {
     fn default() -> Self {
         Self::new(
             MAX_TEXT_BYTES,
@@ -96,74 +115,298 @@ impl Default for TailAppendLimits {
 /// Failure from the format-owned source append proof or publication handoff.
 #[derive(Debug)]
 #[non_exhaustive]
-pub enum TailAppendError {
+pub enum Error {
     /// The source or authored request is not accepted by the ODP proof.
-    Invalid(Error),
+    Invalid(CoreError),
     /// A verified source member reader failed while scanning the source.
-    SourceMember(SourceMemberReaderError<Error>),
+    SourceMember(SourceMemberReaderError<CoreError>),
     /// The common insertion owner rejected the bounded plan before output.
     Plan(SourceContentPublicationError),
     /// The common insertion owner reported a typed sink/source failure after
     /// or during publication.
     Publication(SourceContentInsertionError),
+    /// The positional source changed after the append captured its proof.
+    SourceChanged {
+        /// Source identity and revision captured before the operation.
+        expected: SourceVersion,
+        /// Source identity and revision observed during the operation.
+        observed: SourceVersion,
+        /// Sink progress observed when the source became stale.
+        progress: SourceContentPublicationProgress,
+        /// The typed reader or publication diagnostic retained below the
+        /// freshness classification.
+        source: Option<Box<SourceChangedSource>>,
+    },
+    /// A patch was applied to a presentation it was not made on.
+    PatchConflict {
+        /// The replay operation that detected the conflict.
+        operation: &'static str,
+        /// Why the base does not match.
+        reason: &'static str,
+    },
 }
 
-impl fmt::Display for TailAppendError {
+/// Typed diagnostic retained by [`Error::SourceChanged`].
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum SourceChangedSource {
+    /// The common core freshness error observed before source publication.
+    Core(CoreError),
+    /// The verified source-member reader that observed the stale source.
+    SourceMember(SourceMemberReaderError<CoreError>),
+    /// The common source-content publication failure that observed it.
+    Publication(SourceContentPublicationError),
+    /// The common source-content insertion failure that observed it, keeping
+    /// replay and callback diagnostics on the effective/read path.
+    Insertion(SourceContentInsertionError),
+}
+
+impl fmt::Display for SourceChangedSource {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Core(error) => error.fmt(formatter),
+            Self::SourceMember(error) => error.fmt(formatter),
+            Self::Publication(error) => error.fmt(formatter),
+            Self::Insertion(error) => error.fmt(formatter),
+        }
+    }
+}
+
+impl std::error::Error for SourceChangedSource {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Core(error) => Some(error),
+            Self::SourceMember(error) => Some(error),
+            Self::Publication(error) => Some(error),
+            Self::Insertion(error) => Some(error),
+        }
+    }
+}
+
+impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Invalid(error) => error.fmt(formatter),
             Self::SourceMember(error) => error.fmt(formatter),
             Self::Plan(error) => error.fmt(formatter),
             Self::Publication(error) => error.fmt(formatter),
+            Self::SourceChanged {
+                expected,
+                observed,
+                progress,
+                ..
+            } => write!(
+                formatter,
+                "ODP source changed (expected {expected:?}, observed {observed:?}, {progress:?})"
+            ),
+            Self::PatchConflict { operation, reason } => {
+                write!(formatter, "ODP patch conflict in {operation}: {reason}")
+            },
         }
     }
 }
 
-impl std::error::Error for TailAppendError {
+impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Invalid(error) => Some(error),
             Self::SourceMember(error) => Some(error),
             Self::Plan(error) => Some(error),
             Self::Publication(error) => Some(error),
+            Self::SourceChanged {
+                source: Some(source),
+                ..
+            } => Some(source.as_ref()),
+            Self::SourceChanged { source: None, .. } | Self::PatchConflict { .. } => None,
         }
     }
 }
 
-impl TailAppendError {
+impl Error {
     /// Return sink progress when the common publication layer has observed it.
     #[must_use]
     pub const fn progress(&self) -> Option<SourceContentPublicationProgress> {
         match self {
             Self::Plan(error) => Some(error.progress()),
             Self::Publication(error) => Some(error.progress()),
-            Self::Invalid(_) | Self::SourceMember(_) => None,
+            Self::Invalid(_) | Self::SourceMember(_) | Self::PatchConflict { .. } => None,
+            Self::SourceChanged { progress, .. } => Some(*progress),
         }
     }
 }
 
-fn invalid(message: impl Into<String>) -> TailAppendError {
-    TailAppendError::Invalid(Error::InvalidFormat(message.into()))
+fn invalid(message: impl Into<String>) -> Error {
+    Error::Invalid(CoreError::InvalidFormat(message.into()))
 }
 
-fn check_plan_options(
-    options: &SourceContentPublicationOptions,
-) -> std::result::Result<(), TailAppendError> {
+fn source_error(error: CoreError) -> Error {
+    match error {
+        error @ CoreError::SourceChanged { expected, observed } => Error::SourceChanged {
+            expected,
+            observed,
+            progress: SourceContentPublicationProgress::Untouched,
+            source: Some(Box::new(SourceChangedSource::Core(error))),
+        },
+        other => Error::Invalid(other),
+    }
+}
+
+fn odf_error(error: OdfError) -> Error {
+    match error {
+        OdfError::Core(error) => source_error(error),
+        OdfError::SourceContentPublication(error) => publication_error(*error),
+        OdfError::SourceContentInsertion(error) => insertion_error(*error),
+        other => Error::Invalid(CoreError::from(other)),
+    }
+}
+
+fn publication_error(error: SourceContentPublicationError) -> Error {
+    let progress = error.progress();
+    match error {
+        error @ SourceContentPublicationError::SourceChanged {
+            expected, observed, ..
+        }
+        | error @ SourceContentPublicationError::Core(CoreError::SourceChanged {
+            expected,
+            observed,
+        })
+        | error @ SourceContentPublicationError::Source {
+            source: CoreError::SourceChanged { expected, observed },
+            ..
+        } => Error::SourceChanged {
+            expected,
+            observed,
+            progress,
+            source: Some(Box::new(SourceChangedSource::Publication(error))),
+        },
+        other => Error::Plan(other),
+    }
+}
+
+fn insertion_error(error: SourceContentInsertionError) -> Error {
+    let progress = error.progress();
+    let Some((expected, observed)) = insertion_source_changed(&error) else {
+        return Error::Publication(error);
+    };
+    Error::SourceChanged {
+        expected,
+        observed,
+        progress,
+        source: Some(Box::new(SourceChangedSource::Insertion(error))),
+    }
+}
+
+fn insertion_source_changed(
+    error: &SourceContentInsertionError,
+) -> Option<(SourceVersion, SourceVersion)> {
+    match error {
+        SourceContentInsertionError::Publication { source, .. } => {
+            publication_source_changed(source)
+        },
+        SourceContentInsertionError::Replay { source, .. } => replay_source_changed(source),
+        SourceContentInsertionError::Transport {
+            publication,
+            replay,
+            ..
+        } => publication_source_changed(publication).or_else(|| replay_source_changed(replay)),
+        _ => None,
+    }
+}
+
+fn publication_source_changed(
+    error: &SourceContentPublicationError,
+) -> Option<(SourceVersion, SourceVersion)> {
+    match error {
+        SourceContentPublicationError::SourceChanged {
+            expected, observed, ..
+        }
+        | SourceContentPublicationError::Core(CoreError::SourceChanged { expected, observed })
+        | SourceContentPublicationError::Source {
+            source: CoreError::SourceChanged { expected, observed },
+            ..
+        } => Some((*expected, *observed)),
+        _ => None,
+    }
+}
+
+fn replay_source_changed(
+    error: &soapberry_zip::ReplayPublicationError<SourceContentInsertionCallbackError>,
+) -> Option<(SourceVersion, SourceVersion)> {
+    use soapberry_zip::ReplayPublicationError;
+
+    match error {
+        ReplayPublicationError::Archive { callback_error, .. }
+        | ReplayPublicationError::Limit { callback_error, .. }
+        | ReplayPublicationError::Sink { callback_error, .. } => {
+            callback_error.as_ref().and_then(callback_source_changed)
+        },
+        ReplayPublicationError::Callback { source, .. } => callback_source_changed(source),
+        ReplayPublicationError::NonDeterministic { .. } => None,
+        _ => None,
+    }
+}
+
+fn callback_source_changed(
+    error: &SourceContentInsertionCallbackError,
+) -> Option<(SourceVersion, SourceVersion)> {
+    match error {
+        SourceContentInsertionCallbackError::Member(error) => match error.as_ref() {
+            SourceMemberReaderError::Core {
+                error,
+                callback_error,
+            } => core_source_changed(error)
+                .or_else(|| callback_error.as_ref().and_then(callback_source_changed)),
+            SourceMemberReaderError::Callback(error) => callback_source_changed(error),
+            _ => None,
+        },
+        SourceContentInsertionCallbackError::Io(_)
+        | SourceContentInsertionCallbackError::Cancelled
+        | SourceContentInsertionCallbackError::Execution(_)
+        | SourceContentInsertionCallbackError::Verification { .. } => None,
+        _ => None,
+    }
+}
+
+fn core_source_changed(error: &CoreError) -> Option<(SourceVersion, SourceVersion)> {
+    match error {
+        CoreError::SourceChanged { expected, observed } => Some((*expected, *observed)),
+        _ => None,
+    }
+}
+
+fn source_member_error(error: SourceMemberReaderError<CoreError>) -> Error {
+    match error {
+        error @ SourceMemberReaderError::Core {
+            error: CoreError::SourceChanged { expected, observed },
+            ..
+        }
+        | error @ SourceMemberReaderError::Callback(CoreError::SourceChanged {
+            expected,
+            observed,
+        }) => Error::SourceChanged {
+            expected,
+            observed,
+            progress: SourceContentPublicationProgress::Untouched,
+            source: Some(Box::new(SourceChangedSource::SourceMember(error))),
+        },
+        other => Error::SourceMember(other),
+    }
+}
+
+fn check_plan_options(options: &SourceContentPublicationOptions) -> std::result::Result<(), Error> {
     if options
         .cancellation()
         .is_some_and(CancellationToken::is_cancelled)
     {
-        return Err(TailAppendError::Plan(
-            SourceContentPublicationError::Cancelled {
-                progress: SourceContentPublicationProgress::Untouched,
-            },
-        ));
+        return Err(Error::Plan(SourceContentPublicationError::Cancelled {
+            progress: SourceContentPublicationProgress::Untouched,
+        }));
     }
     if let Some(execution) = options.execution_context() {
         execution
             .check()
             .map_err(map_execution_error)
-            .map_err(TailAppendError::Plan)?;
+            .map_err(Error::Plan)?;
     }
     Ok(())
 }
@@ -183,7 +426,7 @@ fn map_execution_error(error: ExecutionError) -> SourceContentPublicationError {
 fn reserve_fragment_memory(
     options: &SourceContentPublicationOptions,
     maximum: usize,
-) -> std::result::Result<Option<litchi_core::Reservation>, TailAppendError> {
+) -> std::result::Result<Option<litchi_core::Reservation>, Error> {
     let Some(execution) = options.execution_context() else {
         return Ok(None);
     };
@@ -194,7 +437,7 @@ fn reserve_fragment_memory(
         .reserve(Resource::Memory, amount)
         .map(Some)
         .map_err(map_execution_error)
-        .map_err(TailAppendError::Plan)
+        .map_err(Error::Plan)
 }
 
 /// Bound the format-owned page generation and parser readback window.
@@ -221,44 +464,50 @@ fn generated_readback_memory_bound(
     let submitted_text_bytes = title
         .len()
         .checked_add(body.len())
-        .ok_or_else(|| Error::InvalidFormat("ODP submitted text size overflow".to_string()))?;
+        .ok_or_else(|| CoreError::InvalidFormat("ODP submitted text size overflow".to_string()))?;
     let parser_text_bytes = submitted_text_bytes
         .checked_mul(GENERATED_READBACK_TEXT_GEOMETRIC_MULTIPLIER)
         .and_then(|value| value.checked_mul(GENERATED_READBACK_TEXT_PARALLEL_STRINGS))
-        .ok_or_else(|| Error::InvalidFormat("ODP parser text bound overflow".to_string()))?;
+        .ok_or_else(|| CoreError::InvalidFormat("ODP parser text bound overflow".to_string()))?;
     let text_memory = retained_text_capacity
         .checked_add(parser_text_bytes)
-        .ok_or_else(|| Error::InvalidFormat("ODP text memory bound overflow".to_string()))?;
+        .ok_or_else(|| CoreError::InvalidFormat("ODP text memory bound overflow".to_string()))?;
     let wrapper_bytes = GENERATED_DOCUMENT_PREFIX
         .len()
         .checked_add(GENERATED_DOCUMENT_SUFFIX.len())
         .ok_or_else(|| {
-            Error::InvalidFormat("ODP generated document wrapper size overflow".to_string())
+            CoreError::InvalidFormat("ODP generated document wrapper size overflow".to_string())
         })?;
     let fragment_growth = max_fragment_bytes
         .checked_mul(GENERATED_FRAGMENT_GROWTH_MULTIPLIER)
-        .ok_or_else(|| Error::InvalidFormat("ODP fragment growth bound overflow".to_string()))?;
+        .ok_or_else(|| {
+            CoreError::InvalidFormat("ODP fragment growth bound overflow".to_string())
+        })?;
     let readback_document = max_fragment_bytes
         .checked_add(wrapper_bytes)
-        .ok_or_else(|| Error::InvalidFormat("ODP readback document bound overflow".to_string()))?;
+        .ok_or_else(|| {
+            CoreError::InvalidFormat("ODP readback document bound overflow".to_string())
+        })?;
     let parser_buffer = max_fragment_bytes
         .checked_mul(GENERATED_READBACK_PARSER_BUFFER_MULTIPLIER)
-        .ok_or_else(|| Error::InvalidFormat("ODP parser buffer bound overflow".to_string()))?;
+        .ok_or_else(|| CoreError::InvalidFormat("ODP parser buffer bound overflow".to_string()))?;
     let decoded_token = max_fragment_bytes
         .checked_mul(GENERATED_READBACK_DECODED_TOKEN_MULTIPLIER)
-        .ok_or_else(|| Error::InvalidFormat("ODP decoded token bound overflow".to_string()))?;
+        .ok_or_else(|| CoreError::InvalidFormat("ODP decoded token bound overflow".to_string()))?;
     text_memory
         .checked_add(fragment_growth)
         .and_then(|value| value.checked_add(readback_document))
         .and_then(|value| value.checked_add(parser_buffer))
         .and_then(|value| value.checked_add(decoded_token))
         .and_then(|value| value.checked_add(GENERATED_READBACK_FIXED_STATE_BYTES))
-        .ok_or_else(|| Error::InvalidFormat("ODP generated page memory bound overflow".to_string()))
+        .ok_or_else(|| {
+            CoreError::InvalidFormat("ODP generated page memory bound overflow".to_string())
+        })
 }
 
 /// Facts established by the bounded source scan before ZIP preparation.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TailAppendSourceProof {
+pub struct SourceProof {
     source_version: SourceVersion,
     content_bytes: u64,
     insert_at: u64,
@@ -266,7 +515,7 @@ pub struct TailAppendSourceProof {
     page_name: String,
 }
 
-impl TailAppendSourceProof {
+impl SourceProof {
     /// Source revision captured by the proof.
     #[must_use]
     pub const fn source_version(&self) -> SourceVersion {
@@ -299,127 +548,319 @@ impl TailAppendSourceProof {
     }
 }
 
-/// A source-backed ODP append edit containing only bounded caller input.
-pub struct SourceBackedTailAppendEdit {
-    package: Arc<SourceBackedPackage>,
-    title: String,
-    body: String,
-    limits: TailAppendLimits,
+/// The result of a tail-append `commit`: the new source-backed
+/// presentation, the patch and the diagnostics.
+pub type Commit = litchi_core::edit::Commit<SourceBackedPresentation, Patch, Diagnostics>;
+
+/// What a tail-append commit changed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Diagnostics {
+    changed: bool,
+    proof: Option<SourceProof>,
 }
 
-impl fmt::Debug for SourceBackedTailAppendEdit {
+impl Diagnostics {
+    /// Whether the commit changed the presentation; an append always does.
+    #[must_use]
+    pub const fn changed(&self) -> bool {
+        self.changed
+    }
+
+    /// The source proof of the committed append; `None` for a replayed
+    /// patch.
+    #[must_use]
+    pub const fn proof(&self) -> Option<&SourceProof> {
+        self.proof.as_ref()
+    }
+}
+
+/// The exact, reversible change of a tail append: the presentations it was
+/// committed between and the SHA-256 proofs of their `content.xml`.
+///
+/// It replays onto (a share of) the presentation it was committed on, or
+/// onto an independently opened presentation with equal `content.xml`. Its
+/// inverse removes the authored page through the same bounded replacement
+/// proof; an unrelated content source is refused with [`Error::PatchConflict`].
+#[derive(Clone)]
+pub struct Patch {
+    before: Arc<SourceBackedPresentation>,
+    after: Arc<SourceBackedPresentation>,
+    source_content_sha256: [u8; 32],
+    target_content_sha256: [u8; 32],
+    before_proof: SourceProof,
+    after_proof: SourceProof,
+    fragment: Arc<[u8]>,
+    limits: Limits,
+    options: SourceContentPublicationOptions,
+    removes_source_range: bool,
+}
+
+impl Patch {
+    /// Whether the patch changes nothing; an append always changes the
+    /// presentation.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.source_content_sha256 == self.target_content_sha256
+    }
+
+    /// The patch that restores the before presentation.
+    #[must_use]
+    pub fn inverse(&self) -> Self {
+        Self {
+            before: Arc::clone(&self.after),
+            after: Arc::clone(&self.before),
+            source_content_sha256: self.target_content_sha256,
+            target_content_sha256: self.source_content_sha256,
+            before_proof: self.after_proof.clone(),
+            after_proof: self.before_proof.clone(),
+            fragment: Arc::clone(&self.fragment),
+            limits: self.limits,
+            options: self.options.clone(),
+            removes_source_range: !self.removes_source_range,
+        }
+    }
+
+    /// SHA-256 of the `content.xml` the patch applies to.
+    #[must_use]
+    pub const fn source_content_sha256(&self) -> [u8; 32] {
+        self.source_content_sha256
+    }
+
+    /// SHA-256 of the `content.xml` the patch produces.
+    #[must_use]
+    pub const fn target_content_sha256(&self) -> [u8; 32] {
+        self.target_content_sha256
+    }
+}
+
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SourceBackedTailAppendEdit")
-            .field("package", &self.package)
+            .debug_struct("Patch")
+            .field("noop", &self.is_noop())
+            .finish_non_exhaustive()
+    }
+}
+
+/// A staged one-slide append to a [`SourceBackedPresentation`], holding only
+/// the bounded title and body. Dropping it discards it.
+pub struct Edit<'a> {
+    source: &'a SourceBackedPresentation,
+    title: String,
+    body: String,
+    limits: Limits,
+    options: SourceContentPublicationOptions,
+}
+
+impl fmt::Debug for Edit<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Edit")
             .field("title_bytes", &self.title.len())
             .field("body_bytes", &self.body.len())
             .field("limits", &self.limits)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
-impl SourceBackedTailAppendEdit {
-    /// Open an ODP positional source and stage one plain title/body slide.
-    pub fn from_read_at(
-        source: Arc<dyn ReadAt>,
+impl SourceBackedPresentation {
+    /// Start appending one plain title/body slide after the last slide.
+    ///
+    /// # Errors
+    ///
+    /// Refuses text the append cannot represent or that exceeds the default
+    /// [`Limits`].
+    pub fn edit_tail_append(
+        &self,
         title: impl Into<String>,
         body: impl Into<String>,
-    ) -> Result<Self> {
-        Self::from_read_at_with_limits(source, ReadLimits::default(), title, body)
-    }
-
-    /// Open an ODP positional source with explicit package and append bounds.
-    pub fn from_read_at_with_limits(
-        source: Arc<dyn ReadAt>,
-        package_limits: ReadLimits,
-        title: impl Into<String>,
-        body: impl Into<String>,
-    ) -> Result<Self> {
-        let package = SourceBackedPackage::from_read_at_with_limits(source, package_limits)?;
-        let package = Arc::new(package);
-        if package.mimetype()? != ODF_PRESENTATION {
-            return Err(Error::InvalidFormat(format!(
-                "expected {FAMILY_NAME} package MIME type '{ODF_PRESENTATION}'"
-            )));
-        }
+    ) -> std::result::Result<Edit<'_>, Error> {
         let title = title.into();
         let body = body.into();
-        validate_text_core(&title, &body, TailAppendLimits::default().max_text_bytes)?;
-        Ok(Self {
-            package,
-            title,
-            body,
-            limits: TailAppendLimits::default(),
-        })
-    }
-
-    /// Start from an already indexed, MIME-validated positional package.
-    pub fn new(
-        package: Arc<SourceBackedPackage>,
-        title: impl Into<String>,
-        body: impl Into<String>,
-    ) -> std::result::Result<Self, TailAppendError> {
-        Self::with_limits(package, title, body, TailAppendLimits::default())
-    }
-
-    /// Start from an already indexed package with explicit append bounds.
-    pub fn with_limits(
-        package: Arc<SourceBackedPackage>,
-        title: impl Into<String>,
-        body: impl Into<String>,
-        limits: TailAppendLimits,
-    ) -> std::result::Result<Self, TailAppendError> {
-        let mimetype = package.mimetype().map_err(TailAppendError::Invalid)?;
-        if mimetype != ODF_PRESENTATION {
-            return Err(invalid(format!(
-                "expected {FAMILY_NAME} package MIME type '{ODF_PRESENTATION}'"
-            )));
-        }
-        let title = title.into();
-        let body = body.into();
+        let limits = Limits::default();
         validate_text(&title, &body, limits.max_text_bytes)?;
-        Ok(Self {
-            package,
+        Ok(Edit {
+            source: self,
             title,
             body,
             limits,
+            options: SourceContentPublicationOptions::default(),
         })
     }
 
-    /// Return the indexed source package retained by this edit.
-    #[must_use]
-    pub fn package(&self) -> &Arc<SourceBackedPackage> {
-        &self.package
+    /// Apply a tail-append patch to a new presentation; this one is
+    /// unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when the presentation has different
+    /// `content.xml` bytes, or when its structure does not match the bounded
+    /// source proof captured by the patch.
+    pub fn apply_tail_append(&self, patch: &Patch) -> std::result::Result<Commit, Error> {
+        if self.same_share(&patch.before) {
+            self.check_source().map_err(source_error)?;
+            return Ok(Commit::new(
+                patch.after.share(),
+                patch.clone(),
+                Diagnostics {
+                    changed: !patch.is_noop(),
+                    proof: None,
+                },
+            ));
+        }
+        rebase_patch(self, patch)
+    }
+}
+
+fn rebase_patch(
+    recipient: &SourceBackedPresentation,
+    patch: &Patch,
+) -> std::result::Result<Commit, Error> {
+    recipient.check_source().map_err(source_error)?;
+    let base = recipient.effective_with_odf_error().map_err(odf_error)?;
+    let expected = &patch.before_proof;
+    let package = Arc::clone(&base.package);
+    let facts = scan_or_cached_source(base, &package, patch.limits, &patch.options)?;
+    if facts.content_bytes != expected.content_bytes
+        || facts.insert_at != expected.insert_at
+        || facts.slide_count != expected.slide_count
+    {
+        return Err(Error::PatchConflict {
+            operation: "odp.tail_append.apply",
+            reason: "the recipient content structure differs from the recorded base",
+        });
     }
 
-    /// Return the configured append bounds.
+    let removes = patch.removes_source_range;
+    let remove_length = if removes {
+        u64::try_from(patch.fragment.len()).map_err(|_| {
+            invalid("ODP tail-append patch fragment length exceeds the replay range")
+        })?
+    } else {
+        0
+    };
+    let replacement_offset = if removes {
+        expected
+            .insert_at
+            .checked_sub(remove_length)
+            .ok_or(Error::PatchConflict {
+                operation: "odp.tail_append.apply",
+                reason: "the recorded inverse range precedes the recipient content",
+            })?
+    } else {
+        expected.insert_at
+    };
+    let fragment = if removes {
+        AuthoredXmlFragment::empty()
+    } else {
+        AuthoredXmlFragment::markup(patch.fragment.as_ref().to_vec()).map_err(Error::Invalid)?
+    };
+    let candidate_token_bytes = patch
+        .limits
+        .max_fragment_bytes
+        .saturating_add(1024)
+        .clamp(1, 64 * 1024 * 1024);
+    let common = SourceContentInsertionPlan::prepare_replacement_with_validator(
+        package,
+        replacement_offset,
+        remove_length,
+        fragment,
+        XmlStreamLimits::new(
+            patch.limits.max_content_xml_bytes,
+            256,
+            4_000_000,
+            1_000_000,
+            candidate_token_bytes,
+        )
+        .map_err(Error::Invalid)?,
+        &patch.options,
+        |_event, _tracker| Ok(()),
+    )
+    .map_err(publication_error)?;
+    if common.source_content_sha256() != patch.source_content_sha256
+        || common.target_content_sha256() != patch.target_content_sha256
+        || common.source_content_length() != expected.content_bytes
+        || common.target_content_length() != patch.after_proof.content_bytes
+    {
+        return Err(Error::PatchConflict {
+            operation: "odp.tail_append.apply",
+            reason: "the recipient content bytes differ from the recorded base",
+        });
+    }
+
+    base.remember_append_facts(&facts, &patch.options);
+
+    let options = patch.options.clone();
+    let package = base.deferred(common, options);
+    let rebased = Patch {
+        before: Arc::new(base.share()),
+        after: Arc::new(package.share()),
+        ..patch.clone()
+    };
+    recipient.check_source().map_err(source_error)?;
+    Ok(Commit::new(
+        package,
+        rebased,
+        Diagnostics {
+            changed: !patch.is_noop(),
+            proof: None,
+        },
+    ))
+}
+
+impl<'a> Edit<'a> {
+    /// The append bounds.
     #[must_use]
-    pub const fn limits(&self) -> TailAppendLimits {
+    pub const fn limits(&self) -> Limits {
         self.limits
     }
 
-    /// Build a source proof and common ZIP insertion plan.
-    pub fn plan(
-        self,
-        options: &SourceContentPublicationOptions,
-    ) -> std::result::Result<SourceBackedTailAppendPublicationPlan, TailAppendError> {
+    /// Replace the append bounds.
+    ///
+    /// # Errors
+    ///
+    /// Refuses when the staged text exceeds the new bounds; the edit keeps
+    /// its previous bounds.
+    pub fn set_limits(&mut self, limits: Limits) -> std::result::Result<(), Error> {
+        validate_text(&self.title, &self.body, limits.max_text_bytes)?;
+        self.limits = limits;
+        Ok(())
+    }
+
+    /// Set the cancellation, execution and output policy of the source scan,
+    /// the insertion plan and the committed presentation's
+    /// [`write_to`](SourceBackedPresentation::write_to).
+    pub fn set_options(&mut self, options: SourceContentPublicationOptions) {
+        self.options = options;
+    }
+
+    /// Scan the source and prepare the bounded insertion: the source proof
+    /// and the common raw-preserving ZIP plan. Nothing is written.
+    ///
+    /// # Errors
+    ///
+    /// Returns the typed refusal of the source, the authored page or the
+    /// plan's limits and execution policy.
+    pub fn prepare(self) -> std::result::Result<Plan<'a>, Error> {
         let Self {
-            package,
+            source,
             title,
             body,
             limits,
+            options,
         } = self;
-        check_plan_options(options)?;
-        let source_version = package.source_version().map_err(TailAppendError::Invalid)?;
+        let base = source.effective_with_odf_error().map_err(odf_error)?;
+        let package = Arc::clone(&base.package);
+        check_plan_options(&options)?;
+        let source_version = package.source_version().map_err(source_error)?;
         let content_bytes = package
             .member_materialized_size(ODF_CONTENT)
-            .map_err(TailAppendError::Invalid)?
+            .map_err(source_error)?
             .ok_or_else(|| invalid("ODP package has no content.xml"))?;
         if content_bytes > limits.max_content_xml_bytes {
             return Err(invalid("ODP content.xml exceeds the source append limit"));
         }
-        let first = scan_source(&package, limits, options)?;
+        let first = scan_or_cached_source(base, &package, limits, &options)?;
         if first.slide_count >= limits.max_slides {
             return Err(invalid("ODP append would exceed the slide-count limit"));
         }
@@ -439,17 +880,15 @@ impl SourceBackedTailAppendEdit {
                 retained_text_capacity,
                 limits.max_fragment_bytes,
             )
-            .map_err(TailAppendError::Invalid)?;
-            let _memory = reserve_fragment_memory(options, readback_bound)?;
+            .map_err(Error::Invalid)?;
+            let _memory = reserve_fragment_memory(&options, readback_bound)?;
             let fragment = build_plain_page(&page_name, &title, &body, limits.max_fragment_bytes)?;
             // Keep the reservation alive while the exact authored fragment is
             // audited by the established ODP parser.  The parser sees only
             // this bounded page wrapped in a small, locally namespace-bound
             // document; the source content remains cold and opaque.
-            validate_generated_page_semantics(&fragment, &title, &body)
-                .map_err(TailAppendError::Invalid)?;
-            let authored =
-                AuthoredXmlFragment::markup(fragment).map_err(TailAppendError::Invalid)?;
+            validate_generated_page_semantics(&fragment, &title, &body).map_err(Error::Invalid)?;
+            let authored = AuthoredXmlFragment::markup(fragment).map_err(Error::Invalid)?;
             // Release submitted allocations while their reservation is still
             // held; only the authored fragment enters common planning.
             drop(title);
@@ -462,7 +901,7 @@ impl SourceBackedTailAppendEdit {
             .saturating_add(1024)
             .clamp(1, 64 * 1024 * 1024);
         let common = SourceContentInsertionPlan::prepare_with_validator(
-            Arc::clone(&package),
+            package,
             first.insert_at,
             authored,
             XmlStreamLimits::new(
@@ -472,15 +911,20 @@ impl SourceBackedTailAppendEdit {
                 1_000_000,
                 candidate_token_bytes,
             )
-            .map_err(TailAppendError::Invalid)?,
-            options,
+            .map_err(Error::Invalid)?,
+            &options,
             |event, tracker| validator.observe(event, tracker),
         )
-        .map_err(TailAppendError::Plan)?;
+        .map_err(publication_error)?;
 
-        Ok(SourceBackedTailAppendPublicationPlan {
+        base.remember_append_facts(&first, &options);
+
+        Ok(Plan {
+            source,
             common,
-            proof: TailAppendSourceProof {
+            options,
+            limits,
+            proof: SourceProof {
                 source_version,
                 content_bytes,
                 insert_at: first.insert_at,
@@ -489,27 +933,39 @@ impl SourceBackedTailAppendEdit {
             },
         })
     }
+
+    /// [`Self::prepare`] and [`Plan::commit`].
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::prepare`].
+    pub fn commit(self) -> std::result::Result<Commit, Error> {
+        self.prepare()?.commit()
+    }
 }
 
-/// A fully source-proved ODP append publication plan.
-pub struct SourceBackedTailAppendPublicationPlan {
+/// A fully source-proved one-slide append, ready to commit.
+pub struct Plan<'a> {
+    source: &'a SourceBackedPresentation,
     common: SourceContentInsertionPlan,
-    proof: TailAppendSourceProof,
+    options: SourceContentPublicationOptions,
+    limits: Limits,
+    proof: SourceProof,
 }
 
-impl fmt::Debug for SourceBackedTailAppendPublicationPlan {
+impl fmt::Debug for Plan<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SourceBackedTailAppendPublicationPlan")
+            .debug_struct("Plan")
             .field("proof", &self.proof)
             .finish_non_exhaustive()
     }
 }
 
-impl SourceBackedTailAppendPublicationPlan {
+impl Plan<'_> {
     /// Return the ODP source proof.
     #[must_use]
-    pub const fn proof(&self) -> &TailAppendSourceProof {
+    pub const fn proof(&self) -> &SourceProof {
         &self.proof
     }
 
@@ -561,30 +1017,96 @@ impl SourceBackedTailAppendPublicationPlan {
         self.common.target_content_sha256()
     }
 
-    /// Publish to a sequential sink using the common raw-preserving ZIP plan.
-    pub fn write_to<W: Write>(
-        &self,
-        sink: W,
-        options: SourceContentPublicationOptions,
-    ) -> std::result::Result<SourceContentPublicationReport, TailAppendError> {
-        self.common
-            .write_to(sink, options)
-            .map_err(TailAppendError::Publication)
+    /// Commit the append to a new presentation over the same retained
+    /// source. Nothing is written: writing the committed presentation
+    /// streams the source with the page inserted into `content.xml` and
+    /// every other member copied raw.
+    ///
+    /// # Errors
+    ///
+    /// Returns a source change of the presentation the edit was made on.
+    pub fn commit(self) -> std::result::Result<Commit, Error> {
+        let Self {
+            source,
+            common,
+            options,
+            limits,
+            proof,
+        } = self;
+        let base = source.effective_with_odf_error().map_err(odf_error)?;
+        let source_content_sha256 = common.source_content_sha256();
+        let target_content_sha256 = common.target_content_sha256();
+        let fragment: Arc<[u8]> = Arc::from(common.authored_fragment_bytes());
+        let options_for_patch = options.clone();
+        let package = base.deferred(common, options);
+        let after_proof = SourceProof {
+            source_version: proof.source_version,
+            content_bytes: proof
+                .content_bytes
+                .checked_add(u64::try_from(fragment.len()).map_err(|_| {
+                    Error::Invalid(CoreError::InvalidFormat(
+                        "ODP tail-append fragment length exceeds u64".to_string(),
+                    ))
+                })?)
+                .ok_or_else(|| {
+                    Error::Invalid(CoreError::InvalidFormat(
+                        "ODP tail-append target content length overflows u64".to_string(),
+                    ))
+                })?,
+            insert_at: proof
+                .insert_at
+                .checked_add(u64::try_from(fragment.len()).map_err(|_| {
+                    Error::Invalid(CoreError::InvalidFormat(
+                        "ODP tail-append fragment length exceeds u64".to_string(),
+                    ))
+                })?)
+                .ok_or_else(|| {
+                    Error::Invalid(CoreError::InvalidFormat(
+                        "ODP tail-append insertion offset overflows u64".to_string(),
+                    ))
+                })?,
+            slide_count: proof.slide_count.checked_add(1).ok_or_else(|| {
+                Error::Invalid(CoreError::InvalidFormat(
+                    "ODP tail-append slide count overflows usize".to_string(),
+                ))
+            })?,
+            page_name: proof.page_name.clone(),
+        };
+        let patch = Patch {
+            before: Arc::new(source.share()),
+            after: Arc::new(package.share()),
+            source_content_sha256,
+            target_content_sha256,
+            before_proof: proof.clone(),
+            after_proof,
+            fragment,
+            limits,
+            options: options_for_patch,
+            removes_source_range: false,
+        };
+        Ok(Commit::new(
+            package,
+            patch,
+            Diagnostics {
+                changed: true,
+                proof: Some(proof),
+            },
+        ))
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct ScanFacts {
-    content_bytes: u64,
-    insert_at: u64,
-    slide_count: usize,
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub(crate) struct ScanFacts {
+    pub(crate) content_bytes: u64,
+    pub(crate) insert_at: u64,
+    pub(crate) slide_count: usize,
 }
 
 fn scan_source(
     package: &SourceBackedPackage,
-    limits: TailAppendLimits,
+    limits: Limits,
     options: &SourceContentPublicationOptions,
-) -> std::result::Result<ScanFacts, TailAppendError> {
+) -> std::result::Result<ScanFacts, Error> {
     let mut facts = ScanFacts {
         content_bytes: 0,
         insert_at: 0,
@@ -597,7 +1119,7 @@ fn scan_source(
         1_000_000,
         64 * 1024,
     )
-    .map_err(TailAppendError::Invalid)?;
+    .map_err(Error::Invalid)?;
     let mut state = OdpScanState::default();
     let report = scan_source_content(
         package,
@@ -608,16 +1130,31 @@ fn scan_source(
         },
     )
     .map_err(|error| match error {
-        SourceContentScanError::Publication(error) => TailAppendError::Plan(error),
-        SourceContentScanError::SourceMember(error) => TailAppendError::SourceMember(error),
-        _ => TailAppendError::Invalid(Error::InvalidFormat(
+        SourceContentScanError::Publication(error) => publication_error(error),
+        SourceContentScanError::SourceMember(error) => source_member_error(error),
+        _ => Error::Invalid(CoreError::InvalidFormat(
             "unknown source-content scan failure".to_string(),
         )),
     })?;
     facts.content_bytes = report.bytes();
     facts.slide_count = state.pages_seen;
-    state.finish(&facts).map_err(TailAppendError::Invalid)?;
+    state.finish(&facts).map_err(Error::Invalid)?;
     Ok(facts)
+}
+
+fn scan_or_cached_source(
+    base: &SourceBackedPresentation,
+    package: &SourceBackedPackage,
+    limits: Limits,
+    options: &SourceContentPublicationOptions,
+) -> std::result::Result<ScanFacts, Error> {
+    if let Some(facts) = base
+        .cached_append_facts(limits.max_content_xml_bytes, limits.max_slides, options)
+        .map_err(Error::Invalid)?
+    {
+        return Ok(facts);
+    }
+    scan_source(package, limits, options)
 }
 
 #[derive(Debug, Default)]
@@ -649,7 +1186,7 @@ impl OdpScanState {
         event: &XmlStreamEvent<'_>,
         tracker: &BindingTracker,
         facts: &mut ScanFacts,
-        limits: TailAppendLimits,
+        limits: Limits,
     ) -> Result<()> {
         self.content_bytes = self.content_bytes.max(event.end());
         if self.content_bytes > limits.max_content_xml_bytes {
@@ -1135,8 +1672,8 @@ impl CandidateValidator {
     }
 }
 
-fn candidate_invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn candidate_invalid(message: impl Into<String>) -> CoreError {
+    CoreError::InvalidFormat(message.into())
 }
 
 fn page_name_matches_core(
@@ -1147,7 +1684,7 @@ fn page_name_matches_core(
 ) -> Result<bool> {
     for attribute in element.attributes().with_checks(false) {
         let attribute = attribute.map_err(|error| {
-            Error::InvalidFormat(format!("invalid ODP draw:page attribute: {error}"))
+            CoreError::InvalidFormat(format!("invalid ODP draw:page attribute: {error}"))
         })?;
         let (namespace, local) = tracker.resolve_attribute(attribute.key).map_err(|error| {
             error.into_litchi_error_with_context(|| "invalid ODP attribute namespace".to_string())
@@ -1157,7 +1694,9 @@ fn page_name_matches_core(
         {
             let value = attribute
                 .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
-                .map_err(|error| Error::InvalidFormat(format!("invalid ODP draw:name: {error}")))?;
+                .map_err(|error| {
+                    CoreError::InvalidFormat(format!("invalid ODP draw:name: {error}"))
+                })?;
             return Ok(value == expected);
         }
     }
@@ -1174,11 +1713,13 @@ fn validate_generated_page_semantics(fragment: &[u8], title: &str, body: &str) -
         .len()
         .checked_add(fragment.len())
         .and_then(|length| length.checked_add(GENERATED_DOCUMENT_SUFFIX.len()))
-        .ok_or_else(|| Error::InvalidFormat("ODP generated document size overflow".to_string()))?;
+        .ok_or_else(|| {
+            CoreError::InvalidFormat("ODP generated document size overflow".to_string())
+        })?;
     let mut document = Vec::new();
     document
         .try_reserve_exact(length)
-        .map_err(|source| Error::Allocation {
+        .map_err(|source| CoreError::Allocation {
             resource: "ODP generated semantic readback document",
             source,
         })?;
@@ -1186,25 +1727,25 @@ fn validate_generated_page_semantics(fragment: &[u8], title: &str, body: &str) -
     document.extend_from_slice(fragment);
     document.extend_from_slice(GENERATED_DOCUMENT_SUFFIX);
     let document = std::str::from_utf8(&document).map_err(|error| {
-        Error::InvalidFormat(format!("generated ODP page is not UTF-8: {error}"))
+        CoreError::InvalidFormat(format!("generated ODP page is not UTF-8: {error}"))
     })?;
     let slides = crate::codec::Parser::parse_slides_with_styles(document, None)?;
     let slide = slides.first().ok_or_else(|| {
-        Error::InvalidFormat("ODP generated page semantic readback found no slide".to_string())
+        CoreError::InvalidFormat("ODP generated page semantic readback found no slide".to_string())
     })?;
     if slides.len() != 1 {
-        return Err(Error::InvalidFormat(
+        return Err(CoreError::InvalidFormat(
             "ODP generated page semantic readback found more than one slide".to_string(),
         ));
     }
     if slide.title.as_deref().unwrap_or_default() != title {
-        return Err(Error::InvalidFormat(
+        return Err(CoreError::InvalidFormat(
             "ODP generated title does not survive the established parser projection".to_string(),
         ));
     }
     if body.trim().is_empty() {
         if !slide.text.is_empty() {
-            return Err(Error::InvalidFormat(
+            return Err(CoreError::InvalidFormat(
                 "ODP generated whitespace-only body unexpectedly entered the slide text projection"
                     .to_string(),
             ));
@@ -1215,7 +1756,7 @@ fn validate_generated_page_semantics(fragment: &[u8], title: &str, body: &str) -
                 continue;
             }
             if object_shape.replace(shape).is_some() {
-                return Err(Error::InvalidFormat(
+                return Err(CoreError::InvalidFormat(
                     "ODP generated whitespace-only body produced multiple object shapes"
                         .to_string(),
                 ));
@@ -1223,47 +1764,43 @@ fn validate_generated_page_semantics(fragment: &[u8], title: &str, body: &str) -
         }
         if body.is_empty() {
             if object_shape.is_some() {
-                return Err(Error::InvalidFormat(
+                return Err(CoreError::InvalidFormat(
                     "ODP generated empty body produced an object shape".to_string(),
                 ));
             }
         } else {
             let shape = object_shape.ok_or_else(|| {
-                Error::InvalidFormat(
+                CoreError::InvalidFormat(
                     "ODP generated whitespace-only body was not retained as an object shape"
                         .to_string(),
                 )
             })?;
             if shape.text()? != body {
-                return Err(Error::InvalidFormat(
+                return Err(CoreError::InvalidFormat(
                     "ODP generated whitespace-only body does not survive object-shape readback"
                         .to_string(),
                 ));
             }
         }
     } else if slide.text != body {
-        return Err(Error::InvalidFormat(
+        return Err(CoreError::InvalidFormat(
             "ODP generated body does not survive the established parser projection".to_string(),
         ));
     }
     Ok(())
 }
 
-fn validate_text(
-    title: &str,
-    body: &str,
-    maximum: usize,
-) -> std::result::Result<(), TailAppendError> {
-    validate_text_core(title, body, maximum).map_err(TailAppendError::Invalid)
+fn validate_text(title: &str, body: &str, maximum: usize) -> std::result::Result<(), Error> {
+    validate_text_core(title, body, maximum).map_err(Error::Invalid)
 }
 
 fn validate_text_core(title: &str, body: &str, maximum: usize) -> Result<()> {
     let bytes = title
         .len()
         .checked_add(body.len())
-        .ok_or_else(|| Error::InvalidFormat("ODP slide text size overflow".to_string()))?;
+        .ok_or_else(|| CoreError::InvalidFormat("ODP slide text size overflow".to_string()))?;
     if bytes > maximum {
-        return Err(Error::InvalidFormat(
+        return Err(CoreError::InvalidFormat(
             "ODP slide text exceeds the append limit".to_string(),
         ));
     }
@@ -1272,7 +1809,7 @@ fn validate_text_core(title: &str, body: &str, maximum: usize) -> Result<()> {
         .chain(body.chars())
         .any(|character| character == '\r')
     {
-        return Err(Error::InvalidFormat(
+        return Err(CoreError::InvalidFormat(
             "ODP slide text contains a carriage return; use '\\n' for paragraph breaks".to_string(),
         ));
     }
@@ -1283,14 +1820,14 @@ fn validate_text_core(title: &str, body: &str, maximum: usize) -> Result<()> {
                 | '\u{E000}'..='\u{FFFD}' | '\u{10000}'..='\u{10FFFF}'
         )
     }) {
-        return Err(Error::InvalidFormat(
+        return Err(CoreError::InvalidFormat(
             "ODP slide text contains a character forbidden by XML 1.0".to_string(),
         ));
     }
     if title.chars().chain(body.chars()).any(|character| {
         character.is_whitespace() && !matches!(character, ' ' | '\t' | '\n' | '\r')
     }) {
-        return Err(Error::InvalidFormat(
+        return Err(CoreError::InvalidFormat(
             "ODP slide text contains Unicode whitespace that the established parser normalizes; use spaces, tabs, or newlines".to_string(),
         ));
     }
@@ -1302,7 +1839,7 @@ fn build_plain_page(
     title: &str,
     body: &str,
     maximum: usize,
-) -> std::result::Result<Vec<u8>, TailAppendError> {
+) -> std::result::Result<Vec<u8>, Error> {
     let mut output = Vec::new();
     append_limited(
         &mut output,
@@ -1340,7 +1877,7 @@ fn append_limited(
     output: &mut Vec<u8>,
     bytes: &[u8],
     maximum: usize,
-) -> std::result::Result<(), TailAppendError> {
+) -> std::result::Result<(), Error> {
     let required = output
         .len()
         .checked_add(bytes.len())
@@ -1359,7 +1896,7 @@ fn append_escaped_text(
     output: &mut Vec<u8>,
     text: &str,
     maximum: usize,
-) -> std::result::Result<(), TailAppendError> {
+) -> std::result::Result<(), Error> {
     for character in text.chars() {
         append_escaped_char(output, character, maximum)?;
     }
@@ -1370,7 +1907,7 @@ fn append_escaped_char(
     output: &mut Vec<u8>,
     character: char,
     maximum: usize,
-) -> std::result::Result<(), TailAppendError> {
+) -> std::result::Result<(), Error> {
     match character {
         '&' => append_limited(output, b"&amp;", maximum),
         '<' => append_limited(output, b"&lt;", maximum),
@@ -1389,7 +1926,7 @@ fn append_text_paragraphs(
     output: &mut Vec<u8>,
     text: &str,
     maximum: usize,
-) -> std::result::Result<(), TailAppendError> {
+) -> std::result::Result<(), Error> {
     for paragraph in text.split('\n') {
         append_limited(output, b"<text:p>", maximum)?;
         append_encoded_paragraph(output, paragraph, maximum)?;
@@ -1402,7 +1939,7 @@ fn append_encoded_paragraph(
     output: &mut Vec<u8>,
     paragraph: &str,
     maximum: usize,
-) -> std::result::Result<(), TailAppendError> {
+) -> std::result::Result<(), Error> {
     let mut characters = paragraph.chars().peekable();
     let mut encoded_any = false;
     while let Some(character) = characters.next() {
@@ -1453,24 +1990,84 @@ fn append_encoded_paragraph(
 mod tests {
     use super::*;
     use litchi_core::{OwnedSource, ReadAt};
-    use litchi_odf_common::core::{OwnedPackage, PackageWriter};
+    use litchi_odf_common::Error as OdfError;
+    use litchi_odf_common::constants::ODF_PRESENTATION;
+    use litchi_odf_common::core::OwnedPackage;
+    use soapberry_zip::office::StreamingArchiveWriter;
+    use std::io;
+    use std::sync::atomic::{AtomicU64, Ordering};
 
-    use super::super::{Presentation, SourceBackedPresentation};
+    use super::super::Presentation;
 
     const OFFICE_NAMESPACE_UTF8: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
     const DRAW_NAMESPACE_UTF8: &str = "urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
     const PRESENTATION_NAMESPACE_UTF8: &str =
         "urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
 
-    fn source_package(content: &str) -> Arc<dyn ReadAt> {
-        let mut writer = PackageWriter::new();
-        writer.set_mimetype(ODF_PRESENTATION).unwrap();
-        writer.add_file(ODF_CONTENT, content.as_bytes()).unwrap();
-        Arc::new(OwnedSource::new(writer.finish_to_bytes().unwrap()))
+    fn source_package_bytes(content: &str) -> Vec<u8> {
+        let manifest = format!(
+            r#"<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="{ODF_PRESENTATION}"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/></manifest:manifest>"#,
+        );
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
+        writer
+            .write_stored("mimetype", ODF_PRESENTATION.as_bytes())
+            .unwrap();
+        writer
+            .write_stored(ODF_CONTENT, content.as_bytes())
+            .unwrap();
+        writer
+            .write_stored("META-INF/manifest.xml", manifest.as_bytes())
+            .unwrap();
+        writer.finish_to_bytes().unwrap()
     }
 
-    fn plan_options() -> SourceContentPublicationOptions {
-        SourceContentPublicationOptions::new()
+    fn source_package(content: &str) -> Arc<dyn ReadAt> {
+        Arc::new(OwnedSource::new(source_package_bytes(content)))
+    }
+
+    struct VersionedSource {
+        bytes: Arc<Vec<u8>>,
+        revision: AtomicU64,
+    }
+
+    impl VersionedSource {
+        fn new(bytes: Vec<u8>) -> Self {
+            Self {
+                bytes: Arc::new(bytes),
+                revision: AtomicU64::new(0),
+            }
+        }
+
+        fn bump(&self) {
+            self.revision.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    impl ReadAt for VersionedSource {
+        fn len(&self) -> io::Result<u64> {
+            u64::try_from(self.bytes.len())
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "source length overflow"))
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+            let offset = usize::try_from(offset).map_err(|_| {
+                io::Error::new(io::ErrorKind::InvalidInput, "source offset overflow")
+            })?;
+            if offset >= self.bytes.len() {
+                return Ok(0);
+            }
+            let count = output.len().min(self.bytes.len() - offset);
+            output[..count].copy_from_slice(&self.bytes[offset..offset + count]);
+            Ok(count)
+        }
+
+        fn version(&self) -> io::Result<SourceVersion> {
+            Ok(SourceVersion::new(
+                0x4f44_505f_7461_696c,
+                self.revision.load(Ordering::Relaxed),
+            ))
+        }
     }
 
     #[test]
@@ -1478,15 +2075,42 @@ mod tests {
         let content = format!(
             r#"<office:document-content xmlns:office="{OFFICE_NAMESPACE_UTF8}"><office:body><office:presentation></office:presentation></office:body></office:document-content>"#,
         );
-        let edit =
-            SourceBackedTailAppendEdit::from_read_at(source_package(&content), "title", "body")
-                .unwrap();
-        let error = edit.plan(&plan_options()).unwrap_err();
+        let owner = SourceBackedPresentation::from_read_at(source_package(&content)).unwrap();
+        let edit = owner.edit_tail_append("title", "body").unwrap();
+        let error = edit.prepare().unwrap_err();
         assert!(matches!(
             error,
-            TailAppendError::Invalid(Error::InvalidFormat(message))
+            Error::Invalid(CoreError::InvalidFormat(message))
                 if message.contains("non-empty")
         ));
+    }
+
+    #[test]
+    fn strict_open_keeps_the_legacy_body_probe_fallback_for_malformed_xml() {
+        let content = format!(
+            r#"<office:document-content xmlns:office="{OFFICE_NAMESPACE_UTF8}" xmlns:draw="{DRAW_NAMESPACE_UTF8}"><office:body><office:presentation><draw:page></office:presentation></office:body></office:document-content>"#,
+        );
+        let owner = SourceBackedPresentation::from_read_at(source_package(&content))
+            .expect("the historical open probe admits a body before semantic parsing");
+        assert!(
+            owner.slides().is_err(),
+            "semantic parsing still reports malformed XML"
+        );
+    }
+
+    #[test]
+    fn doctype_open_remains_accepted_but_append_keeps_its_refusal() {
+        let content = format!(
+            r#"<!DOCTYPE office:document-content><office:document-content xmlns:office="{OFFICE_NAMESPACE_UTF8}" xmlns:draw="{DRAW_NAMESPACE_UTF8}"><office:body><office:presentation><draw:page/></office:presentation></office:body></office:document-content>"#,
+        );
+        let owner = SourceBackedPresentation::from_read_at(source_package(&content)).unwrap();
+        let error = owner
+            .edit_tail_append("title", "body")
+            .unwrap()
+            .prepare()
+            .unwrap_err();
+        let message = format!("{error}");
+        assert!(message.contains("DTD") || message.contains("DOCTYPE"));
     }
 
     #[test]
@@ -1494,13 +2118,12 @@ mod tests {
         let content = format!(
             r#"<office:document-content xmlns:office="{OFFICE_NAMESPACE_UTF8}"><office:body><office:presentation/></office:body></office:document-content>"#,
         );
-        let edit =
-            SourceBackedTailAppendEdit::from_read_at(source_package(&content), "title", "body")
-                .unwrap();
-        let error = edit.plan(&plan_options()).unwrap_err();
+        let owner = SourceBackedPresentation::from_read_at(source_package(&content)).unwrap();
+        let edit = owner.edit_tail_append("title", "body").unwrap();
+        let error = edit.prepare().unwrap_err();
         assert!(matches!(
             error,
-            TailAppendError::Invalid(Error::InvalidFormat(message))
+            Error::Invalid(CoreError::InvalidFormat(message))
                 if message.contains("non-empty") || message.contains("self-closing")
         ));
     }
@@ -1510,14 +2133,13 @@ mod tests {
         let content = format!(
             r#"<office:document-content xmlns:office="{OFFICE_NAMESPACE_UTF8}" xmlns:draw="{DRAW_NAMESPACE_UTF8}"><office:body><office:presentation><draw:page draw:name="page2"/></office:presentation></office:body></office:document-content>"#,
         );
-        let edit =
-            SourceBackedTailAppendEdit::from_read_at(source_package(&content), "title", "body")
-                .unwrap();
-        let error = edit.plan(&plan_options()).unwrap_err();
+        let owner = SourceBackedPresentation::from_read_at(source_package(&content)).unwrap();
+        let edit = owner.edit_tail_append("title", "body").unwrap();
+        let error = edit.prepare().unwrap_err();
         assert!(matches!(
             error,
-            TailAppendError::Plan(SourceContentPublicationError::Core(
-                Error::InvalidFormat(message)
+            Error::Plan(SourceContentPublicationError::Core(
+                CoreError::InvalidFormat(message)
             )) if message.contains("generated page")
         ));
     }
@@ -1527,13 +2149,11 @@ mod tests {
         let content = format!(
             r#"<office:document-content xmlns:office="{OFFICE_NAMESPACE_UTF8}" xmlns:draw="{DRAW_NAMESPACE_UTF8}" xmlns:presentation="{PRESENTATION_NAMESPACE_UTF8}"><office:body><office:presentation><draw:page draw:name="page1"/><presentation:settings presentation:start-page="page1"/><!--tail-token--></office:presentation></office:body></office:document-content>"#,
         );
-        let edit =
-            SourceBackedTailAppendEdit::from_read_at(source_package(&content), "title", "body")
-                .unwrap();
-        let options = plan_options();
-        let plan = edit.plan(&options).unwrap();
+        let owner = SourceBackedPresentation::from_read_at(source_package(&content)).unwrap();
+        let edit = owner.edit_tail_append("title", "body").unwrap();
+        let commit = edit.commit().unwrap();
         let mut output = Vec::new();
-        plan.write_to(&mut output, options).unwrap();
+        commit.package().write_to(&mut output).unwrap();
 
         let package = OwnedPackage::from_bytes(output).unwrap();
         let published = String::from_utf8(package.get_file(ODF_CONTENT).unwrap()).unwrap();
@@ -1552,12 +2172,11 @@ mod tests {
         );
         let title = "A & < B > \"C\" ' 😀\t\nnext";
         let body = "  body  \n第二行";
-        let edit = SourceBackedTailAppendEdit::from_read_at(source_package(&content), title, body)
-            .unwrap();
-        let options = plan_options();
-        let plan = edit.plan(&options).unwrap();
+        let owner = SourceBackedPresentation::from_read_at(source_package(&content)).unwrap();
+        let edit = owner.edit_tail_append(title, body).unwrap();
+        let commit = edit.commit().unwrap();
         let mut output = Vec::new();
-        plan.write_to(&mut output, options).unwrap();
+        commit.package().write_to(&mut output).unwrap();
 
         let source_backed =
             SourceBackedPresentation::from_read_at(Arc::new(OwnedSource::new(output.clone())))
@@ -1580,13 +2199,11 @@ mod tests {
             r#"<office:document-content xmlns:office="{OFFICE_NAMESPACE_UTF8}" xmlns:draw="{DRAW_NAMESPACE_UTF8}"><office:body><office:presentation><draw:page draw:name="page1"/></office:presentation></office:body></office:document-content>"#,
         );
         let body = " \t\n  ";
-        let edit =
-            SourceBackedTailAppendEdit::from_read_at(source_package(&content), "title", body)
-                .unwrap();
-        let options = plan_options();
-        let plan = edit.plan(&options).unwrap();
+        let owner = SourceBackedPresentation::from_read_at(source_package(&content)).unwrap();
+        let edit = owner.edit_tail_append("title", body).unwrap();
+        let commit = edit.commit().unwrap();
         let mut output = Vec::new();
-        plan.write_to(&mut output, options).unwrap();
+        commit.package().write_to(&mut output).unwrap();
 
         let source_backed =
             SourceBackedPresentation::from_read_at(Arc::new(OwnedSource::new(output.clone())))
@@ -1620,15 +2237,12 @@ mod tests {
         let content = format!(
             r#"<office:document-content xmlns:office="{OFFICE_NAMESPACE_UTF8}" xmlns:draw="{DRAW_NAMESPACE_UTF8}"><office:body><office:presentation><draw:page draw:name="page1"/></office:presentation></office:body></office:document-content>"#,
         );
-        let error = SourceBackedTailAppendEdit::from_read_at(
-            source_package(&content),
-            "title\u{2003}",
-            "body",
-        )
-        .unwrap_err();
+        let owner = SourceBackedPresentation::from_read_at(source_package(&content)).unwrap();
+        let error = owner.edit_tail_append("title\u{2003}", "body").unwrap_err();
         assert!(matches!(
             error,
-            Error::InvalidFormat(message) if message.contains("Unicode whitespace")
+            Error::Invalid(CoreError::InvalidFormat(message))
+                if message.contains("Unicode whitespace")
         ));
     }
 
@@ -1647,15 +2261,14 @@ mod tests {
         let content = format!(
             r#"<office:document-content xmlns:office="{OFFICE_NAMESPACE_UTF8}" xmlns:draw="{DRAW_NAMESPACE_UTF8}"><office:body><office:presentation><draw:page draw:name="page1"/></office:presentation></office:body></office:document-content>"#,
         );
-        let error = SourceBackedTailAppendEdit::from_read_at(
-            source_package(&content),
-            "title\rwith carriage return",
-            "body",
-        )
-        .unwrap_err();
+        let owner = SourceBackedPresentation::from_read_at(source_package(&content)).unwrap();
+        let error = owner
+            .edit_tail_append("title\rwith carriage return", "body")
+            .unwrap_err();
         assert!(matches!(
             error,
-            Error::InvalidFormat(message) if message.contains("carriage return")
+            Error::Invalid(CoreError::InvalidFormat(message))
+                if message.contains("carriage return")
         ));
     }
 
@@ -1664,18 +2277,346 @@ mod tests {
         let content = format!(
             r#"<office:document-content xmlns:office="{OFFICE_NAMESPACE_UTF8}" xmlns:draw="{DRAW_NAMESPACE_UTF8}" xmlns:presentation="{PRESENTATION_NAMESPACE_UTF8}"><office:body><office:presentation><presentation:settings presentation:start-page="page1"/><draw:page draw:name="page1"/></office:presentation></office:body></office:document-content>"#,
         );
-        let edit =
-            SourceBackedTailAppendEdit::from_read_at(source_package(&content), "title", "body")
-                .unwrap();
-        let options = plan_options();
-        let plan = edit.plan(&options).unwrap();
+        let owner = SourceBackedPresentation::from_read_at(source_package(&content)).unwrap();
+        let edit = owner.edit_tail_append("title", "body").unwrap();
+        let commit = edit.commit().unwrap();
         let mut output = Vec::new();
-        plan.write_to(&mut output, options).unwrap();
+        commit.package().write_to(&mut output).unwrap();
 
         let package = OwnedPackage::from_bytes(output).unwrap();
         let published = String::from_utf8(package.get_file(ODF_CONTENT).unwrap()).unwrap();
         let settings = published.find("<presentation:settings").unwrap();
         let generated = published.find(r#"draw:name="page2""#).unwrap();
         assert!(settings < generated);
+    }
+
+    #[test]
+    fn commit_is_deferred_reversible_and_chains() {
+        let content = format!(
+            r#"<office:document-content xmlns:office="{OFFICE_NAMESPACE_UTF8}" xmlns:draw="{DRAW_NAMESPACE_UTF8}"><office:body><office:presentation><draw:page draw:name="page1"/></office:presentation></office:body></office:document-content>"#,
+        );
+        let source = source_package(&content);
+        let mut source_bytes = vec![0; usize::try_from(source.len().unwrap()).unwrap()];
+        source.read_at(0, &mut source_bytes).unwrap();
+        let owner = SourceBackedPresentation::from_read_at(source).unwrap();
+        let plan = owner
+            .edit_tail_append("first", "one")
+            .unwrap()
+            .prepare()
+            .unwrap();
+        assert_eq!(plan.proof().slide_count(), 1);
+        assert_eq!(plan.proof().page_name(), "page2");
+        let commit = plan.commit().unwrap();
+        assert!(commit.diagnostics().changed());
+        assert_eq!(commit.diagnostics().proof().unwrap().slide_count(), 1);
+        assert!(!commit.patch().is_noop());
+
+        // Reads materialize the committed output; the source is unchanged.
+        assert_eq!(commit.package().slide_count().unwrap(), 2);
+        assert_eq!(owner.slide_count().unwrap(), 1);
+
+        // A second append on the committed presentation chains.
+        let chained = commit
+            .package()
+            .edit_tail_append("second", "two")
+            .unwrap()
+            .commit()
+            .unwrap();
+        assert_eq!(chained.package().slide_count().unwrap(), 3);
+        assert_eq!(
+            chained
+                .package()
+                .slide(2)
+                .unwrap()
+                .unwrap()
+                .title()
+                .unwrap(),
+            Some("second")
+        );
+
+        // The patch replays onto its source and its inverse restores it.
+        let replayed = owner.apply_tail_append(commit.patch()).unwrap();
+        let mut replayed_bytes = Vec::new();
+        replayed.package().write_to(&mut replayed_bytes).unwrap();
+        let mut committed_bytes = Vec::new();
+        commit.package().write_to(&mut committed_bytes).unwrap();
+        assert_eq!(replayed_bytes, committed_bytes);
+        let restored = commit
+            .package()
+            .apply_tail_append(&commit.patch().inverse())
+            .unwrap();
+        let mut restored_bytes = Vec::new();
+        restored.package().write_to(&mut restored_bytes).unwrap();
+        assert_eq!(restored_bytes, source_bytes);
+        assert!(matches!(
+            chained.package().apply_tail_append(commit.patch()),
+            Err(Error::PatchConflict { .. })
+        ));
+    }
+
+    #[test]
+    fn stale_source_is_reported_separately_from_patch_conflict() {
+        let content = format!(
+            r#"<office:document-content xmlns:office="{OFFICE_NAMESPACE_UTF8}" xmlns:draw="{DRAW_NAMESPACE_UTF8}"><office:body><office:presentation><draw:page draw:name="page1"/></office:presentation></office:body></office:document-content>"#,
+        );
+        let source = Arc::new(VersionedSource::new(source_package_bytes(&content)));
+        let owner = SourceBackedPresentation::from_read_at(source.clone()).unwrap();
+        let commit = owner
+            .edit_tail_append("title", "body")
+            .unwrap()
+            .commit()
+            .unwrap();
+
+        source.bump();
+        assert!(matches!(
+            owner.apply_tail_append(commit.patch()),
+            Err(Error::SourceChanged { .. })
+        ));
+        assert!(matches!(
+            owner.edit_tail_append("later", "body").unwrap().prepare(),
+            Err(Error::SourceChanged { .. })
+        ));
+    }
+
+    #[cfg(any(unix, windows))]
+    #[test]
+    fn stale_save_retains_insertion_progress_and_source_diagnostic() {
+        let content = format!(
+            r#"<office:document-content xmlns:office="{OFFICE_NAMESPACE_UTF8}" xmlns:draw="{DRAW_NAMESPACE_UTF8}"><office:body><office:presentation><draw:page draw:name="page1"/></office:presentation></office:body></office:document-content>"#,
+        );
+        let source = Arc::new(VersionedSource::new(source_package_bytes(&content)));
+        let owner = SourceBackedPresentation::from_read_at(source.clone()).unwrap();
+        let committed = owner
+            .edit_tail_append("title", "body")
+            .unwrap()
+            .commit()
+            .unwrap();
+        source.bump();
+
+        let directory = tempfile::tempdir().unwrap();
+        let error = committed
+            .package()
+            .save_with_durability(
+                directory.path().join("stale.odp"),
+                litchi_core::Durability::NoSync,
+            )
+            .unwrap_err();
+        let OdfError::SourceContentInsertion(error) = error else {
+            panic!("stale save must retain insertion error, got {error:?}");
+        };
+        assert_eq!(
+            error.progress(),
+            SourceContentPublicationProgress::Untouched
+        );
+        assert!(matches!(
+            error.as_ref(),
+            SourceContentInsertionError::Publication {
+                source: SourceContentPublicationError::SourceChanged { .. },
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn effective_odf_conversion_retains_replay_progress_and_callback_diagnostic() {
+        use soapberry_zip::{ReplayPass, ReplayProgress, ReplayPublicationError};
+
+        let expected = SourceVersion::new(0x301, 1);
+        let observed = SourceVersion::new(0x301, 2);
+        let insertion = SourceContentInsertionError::Replay {
+            progress: SourceContentPublicationProgress::Complete { bytes: 29 },
+            source: ReplayPublicationError::Callback {
+                pass: ReplayPass::Emit,
+                source: SourceContentInsertionCallbackError::Member(Box::new(
+                    SourceMemberReaderError::Core {
+                        error: CoreError::SourceChanged { expected, observed },
+                        callback_error: Some(SourceContentInsertionCallbackError::Verification {
+                            what: "callback verification failed",
+                        }),
+                    },
+                )),
+                progress: ReplayProgress::Complete { bytes: 29 },
+            },
+        };
+        let error = odf_error(OdfError::from(insertion));
+
+        assert_eq!(
+            error.progress(),
+            Some(SourceContentPublicationProgress::Complete { bytes: 29 })
+        );
+        assert!(matches!(
+            &error,
+            Error::SourceChanged {
+                expected: actual_expected,
+                observed: actual_observed,
+                source: Some(source),
+                ..
+            } if *actual_expected == expected
+                && *actual_observed == observed
+                && matches!(
+                    source.as_ref(),
+                    SourceChangedSource::Insertion(SourceContentInsertionError::Replay {
+                        source: ReplayPublicationError::Callback {
+                            source: SourceContentInsertionCallbackError::Member(member),
+                            ..
+                        },
+                        ..
+                    }) if matches!(
+                        member.as_ref(),
+                        SourceMemberReaderError::Core {
+                            callback_error: Some(
+                                SourceContentInsertionCallbackError::Verification { what: message },
+                            ),
+                            ..
+                        } if *message == "callback verification failed"
+                    )
+                )
+        ));
+    }
+
+    #[test]
+    fn stale_publication_preserves_before_and_after_progress() {
+        let expected = SourceVersion::new(0x100, 1);
+        let observed = SourceVersion::new(0x100, 2);
+        let before = publication_error(SourceContentPublicationError::SourceChanged {
+            expected,
+            observed,
+            progress: SourceContentPublicationProgress::Untouched,
+        });
+        assert_eq!(
+            before.progress(),
+            Some(SourceContentPublicationProgress::Untouched)
+        );
+
+        let after = publication_error(SourceContentPublicationError::Source {
+            progress: SourceContentPublicationProgress::Complete { bytes: 17 },
+            source: CoreError::SourceChanged { expected, observed },
+        });
+        assert_eq!(
+            after.progress(),
+            Some(SourceContentPublicationProgress::Complete { bytes: 17 })
+        );
+
+        let callback = source_member_error(SourceMemberReaderError::Callback(
+            CoreError::SourceChanged { expected, observed },
+        ));
+        assert_eq!(
+            callback.progress(),
+            Some(SourceContentPublicationProgress::Untouched)
+        );
+    }
+
+    #[test]
+    fn stale_source_retains_core_diagnostic() {
+        let expected = SourceVersion::new(0x300, 1);
+        let observed = SourceVersion::new(0x300, 2);
+        let error = source_error(CoreError::SourceChanged { expected, observed });
+
+        assert!(matches!(
+            &error,
+            Error::SourceChanged {
+                source: Some(source),
+                ..
+            } if matches!(
+                source.as_ref(),
+                SourceChangedSource::Core(CoreError::SourceChanged {
+                    expected: retained_expected,
+                    observed: retained_observed,
+                }) if *retained_expected == expected && *retained_observed == observed
+            )
+        ));
+        assert!(matches!(
+            std::error::Error::source(&error)
+                .and_then(|source| source.downcast_ref::<SourceChangedSource>()),
+            Some(SourceChangedSource::Core(CoreError::SourceChanged { .. }))
+        ));
+    }
+
+    #[test]
+    fn stale_verification_retains_secondary_callback_failure() {
+        let expected = SourceVersion::new(0x200, 1);
+        let observed = SourceVersion::new(0x200, 2);
+        let error = source_member_error(SourceMemberReaderError::Core {
+            error: CoreError::SourceChanged { expected, observed },
+            callback_error: Some(CoreError::InvalidFormat(
+                "callback verification failed".to_string(),
+            )),
+        });
+
+        assert_eq!(
+            error.progress(),
+            Some(SourceContentPublicationProgress::Untouched)
+        );
+        assert!(matches!(
+            &error,
+            Error::SourceChanged {
+                source: Some(source),
+                ..
+            } if matches!(
+                source.as_ref(),
+                SourceChangedSource::SourceMember(SourceMemberReaderError::Core {
+                    error: CoreError::SourceChanged { .. },
+                    callback_error: Some(CoreError::InvalidFormat(message)),
+                }) if message == "callback verification failed"
+            )
+        ));
+
+        let retained = std::error::Error::source(&error)
+            .and_then(|source| source.downcast_ref::<SourceChangedSource>())
+            .expect("stale source keeps its typed reader diagnostic");
+        assert!(matches!(
+            retained,
+            SourceChangedSource::SourceMember(SourceMemberReaderError::Core {
+                callback_error: Some(CoreError::InvalidFormat(message)),
+                ..
+            }) if message == "callback verification failed"
+        ));
+    }
+
+    #[test]
+    fn equal_content_recipients_rebase_forward_and_inverse_tail_append() {
+        let content = format!(
+            r#"<office:document-content xmlns:office="{OFFICE_NAMESPACE_UTF8}" xmlns:draw="{DRAW_NAMESPACE_UTF8}"><office:body><office:presentation><draw:page draw:name="page1"/></office:presentation></office:body></office:document-content>"#,
+        );
+        let source = source_package(&content);
+        let mut source_bytes = vec![0; usize::try_from(source.len().unwrap()).unwrap()];
+        source.read_at(0, &mut source_bytes).unwrap();
+        let owner = SourceBackedPresentation::from_read_at(Arc::new(OwnedSource::new(
+            source_bytes.clone(),
+        )))
+        .unwrap();
+        let independent = SourceBackedPresentation::from_read_at(Arc::new(OwnedSource::new(
+            source_bytes.clone(),
+        )))
+        .unwrap();
+        let commit = owner
+            .edit_tail_append("title", "body")
+            .unwrap()
+            .commit()
+            .unwrap();
+
+        let rebased = independent.apply_tail_append(commit.patch()).unwrap();
+        let mut rebased_bytes = Vec::new();
+        rebased.package().write_to(&mut rebased_bytes).unwrap();
+        let mut committed_bytes = Vec::new();
+        commit.package().write_to(&mut committed_bytes).unwrap();
+        assert_eq!(rebased_bytes, committed_bytes);
+
+        let target_copy =
+            SourceBackedPresentation::from_read_at(Arc::new(OwnedSource::new(rebased_bytes)))
+                .unwrap();
+        let restored = target_copy
+            .apply_tail_append(&commit.patch().inverse())
+            .unwrap();
+        let mut restored_bytes = Vec::new();
+        restored.package().write_to(&mut restored_bytes).unwrap();
+        assert_eq!(restored_bytes, source_bytes);
+
+        let wrong_content = content.replace("page1", "pageX");
+        let wrong = SourceBackedPresentation::from_read_at(source_package(&wrong_content)).unwrap();
+        assert!(matches!(
+            wrong.apply_tail_append(commit.patch()),
+            Err(Error::PatchConflict { .. })
+        ));
     }
 }

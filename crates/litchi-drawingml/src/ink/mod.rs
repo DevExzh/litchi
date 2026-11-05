@@ -13,14 +13,19 @@ mod validation;
 
 pub mod actions;
 
+/// Detached InkML authoring builders.
+pub mod builder {
+    pub use super::authoring::{
+        AuthoringLimits, BrushDraft, BrushPropertyDraft, ContextDraft, Draft, Prepared, TraceDraft,
+    };
+}
+
 #[cfg(test)]
 mod tests;
 
-pub use authoring::{
-    AuthoringLimits, BrushDraft, BrushPropertyDraft, ContextDraft, Draft, Prepared, TraceDraft,
-};
+pub use authoring::Prepared;
 pub use codec::{
-    read, read_metadata, read_metadata_with_source_spans, read_shared,
+    Limits, read, read_metadata, read_metadata_with_source_spans, read_shared,
     read_shared_with_source_spans, write, write_to,
 };
 pub use model::{

@@ -2,7 +2,7 @@
 
 use litchi_opc::{OpcPackage, PackURI, TargetMode};
 
-use super::model::ReadLimits;
+use super::model::SemanticLimits;
 use crate::package::error::{Error, Result};
 
 /// MS-XLSB 2.1.7.4 content type.
@@ -28,7 +28,7 @@ pub(crate) struct Graph {
 /// pass covers both feature ownership and target topology.
 pub(crate) fn discover_graph_with_probe(
     package: &OpcPackage,
-    limits: ReadLimits,
+    limits: SemanticLimits,
     probe_target: Option<&PackURI>,
 ) -> Result<Option<Graph>> {
     let limits = limits.validate()?;
@@ -66,8 +66,7 @@ pub(crate) fn discover_graph_with_probe(
     let part = package.get_part(&part_name)?;
     if part.content_type() != CONTENT_TYPE {
         return Err(Error::InvalidContentType {
-            expected: CONTENT_TYPE.to_string(),
-            got: part.content_type().to_string(),
+            expected: CONTENT_TYPE,
         });
     }
     if !part.rels().is_empty() {
@@ -106,22 +105,22 @@ pub(crate) fn discover_graph_with_probe(
 /// allocator telemetry: retained source-map keys are covered by the repeated
 /// URI terms, while opaque source members are bounded by OPC ingress and
 /// source-capture limits.
-pub(crate) fn preflight_metadata(package: &OpcPackage, limits: ReadLimits) -> Result<()> {
+pub(crate) fn preflight_metadata(package: &OpcPackage, limits: SemanticLimits) -> Result<()> {
     // Keep this metadata pass independent of the per-stream byte ceiling.
     // `max_part_bytes` is enforced against the Workbook/owner and captured
     // source tokens after graph discovery; using it here would make a small
     // stream limit reject ordinary package metadata before the more useful
-    // stream-specific error is reported.  The OPC metadata profile itself is
-    // still finite and is the same default profile used for in-memory
-    // authored metadata.
-    let opc_limits = litchi_opc::ReadLimits::default();
+    // stream-specific error is reported.  Preserve the package's retained
+    // OPC metadata profile so a package admitted under a tighter policy is
+    // never widened while its metadata is preflighted.
+    let opc_limits = package.read_limits();
     let part_count = package.part_count();
     if part_count > limits.max_graph_parts {
-        return Err(Error::LimitExceeded {
-            resource: "Calculation Chain graph parts",
-            actual: part_count,
-            maximum: limits.max_graph_parts,
-        });
+        return Err(Error::limit(
+            crate::calculation_chain::LimitKind::GraphParts,
+            part_count,
+            limits.max_graph_parts,
+        ));
     }
 
     let mut relationship_count = 0usize;
@@ -160,7 +159,7 @@ pub(crate) fn preflight_metadata(package: &OpcPackage, limits: ReadLimits) -> Re
         )?;
         if content_type_metadata_bytes > opc_limits.max_content_types_bytes() {
             return Err(opc_limit(
-                litchi_opc::ReadResource::ContentTypesBytes,
+                litchi_opc::SourceLimitKind::ContentTypesBytes,
                 content_type_metadata_bytes,
                 opc_limits.max_content_types_bytes(),
             ));
@@ -178,10 +177,10 @@ pub(crate) fn preflight_metadata(package: &OpcPackage, limits: ReadLimits) -> Re
 
 fn preflight_relationship_collection(
     relationships: &litchi_opc::Relationships,
-    opc_limits: &litchi_opc::ReadLimits,
+    opc_limits: &litchi_opc::SourceLimits,
     relationship_count: &mut usize,
     relationship_metadata_bytes: &mut usize,
-    limits: ReadLimits,
+    limits: SemanticLimits,
 ) -> Result<()> {
     // A cloned Relationships owns these collection-level strings even when
     // the collection is empty.  They are distinct from the relationship
@@ -198,7 +197,7 @@ fn preflight_relationship_collection(
     )?;
     if *relationship_metadata_bytes > opc_limits.max_total_relationship_xml_bytes() {
         return Err(opc_limit(
-            litchi_opc::ReadResource::TotalRelationshipXmlBytes,
+            litchi_opc::SourceLimitKind::TotalRelationshipXmlBytes,
             *relationship_metadata_bytes,
             opc_limits.max_total_relationship_xml_bytes(),
         ));
@@ -217,10 +216,10 @@ fn preflight_relationship_collection(
 
 fn preflight_relationship(
     relationship: &litchi_opc::Relationship,
-    opc_limits: &litchi_opc::ReadLimits,
+    opc_limits: &litchi_opc::SourceLimits,
     relationship_count: &mut usize,
     relationship_metadata_bytes: &mut usize,
-    limits: ReadLimits,
+    limits: SemanticLimits,
 ) -> Result<()> {
     *relationship_count = relationship_count
         .checked_add(1)
@@ -228,11 +227,11 @@ fn preflight_relationship(
             resource: "Calculation Chain relationships",
         })?;
     if *relationship_count > limits.max_relationships {
-        return Err(Error::LimitExceeded {
-            resource: "Calculation Chain relationships",
-            actual: *relationship_count,
-            maximum: limits.max_relationships,
-        });
+        return Err(Error::limit(
+            crate::calculation_chain::LimitKind::Relationships,
+            *relationship_count,
+            limits.max_relationships,
+        ));
     }
 
     preflight_xml_attribute(
@@ -251,7 +250,7 @@ fn preflight_relationship(
         opc_limits.max_xml_attribute_bytes(),
     )?;
     preflight_metadata_text(
-        litchi_opc::ReadResource::RelationshipTargetBytes,
+        litchi_opc::SourceLimitKind::RelationshipTargetBytes,
         relationship.target_ref().len(),
         opc_limits.max_relationship_target_bytes(),
     )?;
@@ -268,7 +267,7 @@ fn preflight_relationship(
                 resource: "Calculation Chain relationship target metadata",
             })?;
         preflight_metadata_text(
-            litchi_opc::ReadResource::XmlAttributeBytes,
+            litchi_opc::SourceLimitKind::XmlAttributeBytes,
             resolved_upper_bound,
             opc_limits.max_xml_attribute_bytes(),
         )?;
@@ -291,7 +290,7 @@ fn preflight_relationship(
     )?;
     if *relationship_metadata_bytes > opc_limits.max_total_relationship_xml_bytes() {
         return Err(opc_limit(
-            litchi_opc::ReadResource::TotalRelationshipXmlBytes,
+            litchi_opc::SourceLimitKind::TotalRelationshipXmlBytes,
             *relationship_metadata_bytes,
             opc_limits.max_total_relationship_xml_bytes(),
         ));
@@ -319,7 +318,7 @@ fn checked_metadata_add(current: usize, addition: usize, resource: &'static str)
 }
 
 fn preflight_metadata_text(
-    resource: litchi_opc::ReadResource,
+    resource: litchi_opc::SourceLimitKind,
     actual: usize,
     maximum: usize,
 ) -> Result<()> {
@@ -347,13 +346,17 @@ fn preflight_xml_attribute(key: &str, value: &str, maximum: usize) -> Result<()>
         .ok_or(Error::CapacityOverflow {
             resource: "Calculation Chain XML attribute metadata",
         })?;
-    preflight_metadata_text(litchi_opc::ReadResource::XmlAttributeBytes, actual, maximum)
+    preflight_metadata_text(
+        litchi_opc::SourceLimitKind::XmlAttributeBytes,
+        actual,
+        maximum,
+    )
 }
 
-fn opc_limit(resource: litchi_opc::ReadResource, actual: usize, maximum: usize) -> Error {
-    Error::Opc(litchi_opc::OpcError::ReadLimit {
-        resource,
-        actual: actual as u64,
+fn opc_limit(resource: litchi_opc::SourceLimitKind, actual: usize, maximum: usize) -> Error {
+    Error::Opc(litchi_opc::OpcError::Limit {
+        kind: resource,
+        observed: actual as u64,
         maximum: maximum as u64,
     })
 }
@@ -368,7 +371,7 @@ fn scan_relationship_graph(
     target: Option<&PackURI>,
     expected_source: Option<&PackURI>,
     expected_relationship_id: Option<&str>,
-    limits: ReadLimits,
+    limits: SemanticLimits,
 ) -> Result<()> {
     let mut relationship_count = 0usize;
     let mut part_count = 0usize;
@@ -403,10 +406,9 @@ fn scan_relationship_graph(
             if relationship.reltype() == RELATIONSHIP_TYPE
                 && !source.partname().is_equivalent_to(workbook_name)
             {
-                return Err(invalid(format!(
-                    "Calculation Chain relationship on unexpected source part '{}'",
-                    source.partname().as_str()
-                )));
+                return Err(invalid(
+                    "Calculation Chain relationship on unexpected source part",
+                ));
             }
             if let Some(target) = target {
                 if relationship.target_mode() == TargetMode::Internal
@@ -426,34 +428,34 @@ fn scan_relationship_graph(
     Ok(())
 }
 
-fn checked_relationship_count(current: usize, limits: ReadLimits) -> Result<usize> {
+fn checked_relationship_count(current: usize, limits: SemanticLimits) -> Result<usize> {
     let actual = current.checked_add(1).ok_or(Error::CapacityOverflow {
         resource: "Calculation Chain relationships",
     })?;
     if actual > limits.max_relationships {
-        return Err(Error::LimitExceeded {
-            resource: "Calculation Chain relationships",
+        return Err(Error::limit(
+            crate::calculation_chain::LimitKind::Relationships,
             actual,
-            maximum: limits.max_relationships,
-        });
+            limits.max_relationships,
+        ));
     }
     Ok(actual)
 }
 
-fn checked_graph_part_count(current: usize, limits: ReadLimits) -> Result<usize> {
+fn checked_graph_part_count(current: usize, limits: SemanticLimits) -> Result<usize> {
     let actual = current.checked_add(1).ok_or(Error::CapacityOverflow {
         resource: "Calculation Chain graph parts",
     })?;
     if actual > limits.max_graph_parts {
-        return Err(Error::LimitExceeded {
-            resource: "Calculation Chain graph parts",
+        return Err(Error::limit(
+            crate::calculation_chain::LimitKind::GraphParts,
             actual,
-            maximum: limits.max_graph_parts,
-        });
+            limits.max_graph_parts,
+        ));
     }
     Ok(actual)
 }
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn invalid(message: &'static str) -> Error {
+    Error::InvalidFormat(message)
 }

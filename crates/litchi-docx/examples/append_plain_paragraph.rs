@@ -26,20 +26,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let text = text
         .into_string()
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "paragraph text must be UTF-8"))?;
-    let package = litchi_docx::source_backed::Package::from_path(input)?;
-    let commit = package.tail_append_plain_paragraph(text).commit()?;
-    // Preparation and semantic readback finish before even creating the file.
+    let package = litchi_docx::source_backed::Package::open(input)?;
+    let plan = package.tail_append_plain_paragraph(text).prepare()?;
+    let (before, after) = (
+        plan.source_proof().paragraph_count,
+        plan.candidate_proof().paragraph_count,
+    );
+    let commit = plan.commit()?;
+    // Preparation and semantic readback finish before even creating the file;
+    // writing the committed package streams the append.
     let mut sink = OpenOptions::new()
         .write(true)
         .create_new(true)
         .open(output)?;
-    let publication = commit.write_to_stream(&mut sink)?;
+    commit.package().write_to(&mut sink)?;
     sink.sync_all()?;
-    println!(
-        "Appended one paragraph: {} -> {} paragraphs",
-        publication.source_proof().paragraph_count,
-        publication.candidate_proof().paragraph_count,
-    );
+    println!("Appended one paragraph: {before} -> {after} paragraphs");
     Ok(())
 }
 

@@ -19,6 +19,17 @@
 /// implementation identifiers.
 pub mod order;
 
+/// Sheet-chart transaction families.
+pub mod chart;
+
+/// The drawables a sheet owns, their selector and values, and the
+/// transactions that edit them.
+pub mod drawable;
+
+/// Exact-source transactions that add an empty sheet or remove a sheet and
+/// its private graph. Start with [`crate::Package::edit_sheet_lifecycle`].
+pub mod lifecycle;
+
 use std::collections::HashSet;
 
 use super::selector::{SheetSelector, TableSelector};
@@ -180,7 +191,10 @@ impl Sheet {
                 }
                 Ok(Some(table))
             },
-            TableSelector::Index(index) => Ok(self.tables.get(index)),
+            TableSelector::Position(index) => {
+                let index = index.get();
+                Ok(self.tables.get(index))
+            },
         }
     }
 
@@ -220,7 +234,7 @@ impl Sheet {
     /// This selector currently cannot fail for a valid position; the
     /// `Result` keeps the selector boundary explicit for future validation.
     pub fn at(&self, index: usize) -> Result<Option<&Table>> {
-        self.select(TableSelector::Index(index))
+        self.select(TableSelector::index(index))
     }
 
     /// Returns whether the sheet has no tables.
@@ -341,7 +355,7 @@ fn fallible_name_copy(name: &str) -> std::result::Result<String, Error> {
 mod tests {
     use super::*;
     use crate::cell::Value;
-    use crate::table::{Builder as TableBuilder, Dimensions, Position};
+    use crate::table::{At, Builder as TableBuilder, Dimensions};
 
     #[test]
     fn sheets_store_immutable_tables_without_peer_dependencies() {
@@ -349,7 +363,7 @@ mod tests {
         assert!(
             table_builder
                 .set(
-                    Position::new(1, 1),
+                    At::new(1, 1),
                     Value::number(42.0).expect("finite test number"),
                 )
                 .is_ok()

@@ -122,24 +122,6 @@ impl OpcOperationAccounting {
         self.output_bytes_accepted
     }
 
-    /// Alias for [`Self::compressed_deflate_payload_bytes_read`].
-    #[must_use]
-    pub const fn deflate_payload_bytes_read(&self) -> u64 {
-        self.compressed_deflate_payload_bytes_read()
-    }
-
-    /// Alias for [`Self::deflate_bytes_produced`].
-    #[must_use]
-    pub const fn decompressed_deflate_bytes_produced(&self) -> u64 {
-        self.deflate_bytes_produced()
-    }
-
-    /// Alias for [`Self::deflate_bytes_accepted`].
-    #[must_use]
-    pub const fn decompressed_deflate_bytes_accepted(&self) -> u64 {
-        self.deflate_bytes_accepted()
-    }
-
     pub(crate) fn add_compressed_deflate_payload_bytes_read(
         &mut self,
         bytes: u64,

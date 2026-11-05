@@ -1,8 +1,11 @@
-//! Archive-free shape-gradient values shared by iWork format owners.
+//! Archive-free shape-fill values shared by iWork format owners: gradients,
+//! image fills and the [`Fill`] they form with colors (record 0375 adds the
+//! image fill and [`Fill`]).
 
 use std::f32::consts::TAU;
 
 use crate::color::Rgba;
+use crate::shape::geometry::Size;
 
 #[allow(
     clippy::arbitrary_source_item_ordering,
@@ -46,6 +49,7 @@ const SIMPLE_STOP_COUNT: usize = 2;
 
 /// Validation failures for shape-gradient values.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     /// The gradient angle was not finite.
     #[error("shape gradient angle must be finite")]
@@ -80,6 +84,12 @@ pub enum Error {
     /// A non-advanced gradient did not have the native simple shape.
     #[error("a simple shape gradient must be linear with two centered stops")]
     InvalidSimpleShape,
+    /// An image-fill size was not finite and positive.
+    #[error("shape image-fill dimensions must be finite and positive")]
+    ImageSizeInvalid,
+    /// An embedded image-data identifier was zero.
+    #[error("an embedded shape-fill image identifier must be nonzero")]
+    ImageDataZero,
 }
 
 /// Result type for shape-gradient value construction.
@@ -404,5 +414,289 @@ mod tests {
             ),
             Err(Error::StopsUnordered)
         );
+    }
+}
+
+/// How an image is laid out inside a shape.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum ImageTechnique {
+    /// Keep the image at its natural size.
+    OriginalSize,
+    /// Distort the image to match the shape bounds.
+    #[default]
+    Stretch,
+    /// Repeat the image in both dimensions.
+    Tile,
+    /// Preserve aspect ratio and cover the shape bounds.
+    ScaleToFill,
+    /// Preserve aspect ratio and fit entirely inside the shape bounds.
+    ScaleToFit,
+}
+
+impl ImageTechnique {
+    /// The technique stored under a native `ImageFillTechnique` value.
+    #[must_use]
+    pub const fn from_native(value: i32) -> Option<Self> {
+        match value {
+            0 => Some(Self::OriginalSize),
+            1 => Some(Self::Stretch),
+            2 => Some(Self::Tile),
+            3 => Some(Self::ScaleToFill),
+            4 => Some(Self::ScaleToFit),
+            _ => None,
+        }
+    }
+
+    /// The native `ImageFillTechnique` value.
+    #[must_use]
+    pub const fn native_value(self) -> i32 {
+        match self {
+            Self::OriginalSize => 0,
+            Self::Stretch => 1,
+            Self::Tile => 2,
+            Self::ScaleToFill => 3,
+            Self::ScaleToFit => 4,
+        }
+    }
+}
+
+/// The non-zero identifier of embedded image data (`TSP.DataReference`), the
+/// archive-boundary key of an image fill.
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ImageData(std::num::NonZeroU64);
+
+impl ImageData {
+    /// Construct a non-zero identifier.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::ImageDataZero`] for 0.
+    pub const fn new(identifier: u64) -> Result<Self> {
+        match std::num::NonZeroU64::new(identifier) {
+            Some(value) => Ok(Self(value)),
+            None => Err(Error::ImageDataZero),
+        }
+    }
+
+    /// The native identifier.
+    #[must_use]
+    pub const fn get(self) -> u64 {
+        self.0.get()
+    }
+}
+
+fn validate_image_size(size: Size) -> Result<()> {
+    if !size.width.is_finite()
+        || !size.height.is_finite()
+        || size.width <= 0.0
+        || size.height <= 0.0
+    {
+        return Err(Error::ImageSizeInvalid);
+    }
+    Ok(())
+}
+
+/// A simple or advanced (tinted) image fill.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Image {
+    data: Option<ImageData>,
+    technique: ImageTechnique,
+    fill_size: Size,
+    tint: Option<Rgba>,
+    reference_color: Option<Rgba>,
+    interprets_untagged_image_as_generic: bool,
+}
+
+impl Image {
+    /// A fill backed by embedded image data.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::ImageSizeInvalid`] for a non-positive or non-finite size.
+    pub fn embedded(data: ImageData, technique: ImageTechnique, fill_size: Size) -> Result<Self> {
+        Self::new(Some(data), technique, fill_size)
+    }
+
+    /// The empty placeholder shown before an image is chosen.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::ImageSizeInvalid`] for a non-positive or non-finite size.
+    pub fn placeholder(technique: ImageTechnique, fill_size: Size) -> Result<Self> {
+        Self::new(None, technique, fill_size)
+    }
+
+    fn new(data: Option<ImageData>, technique: ImageTechnique, fill_size: Size) -> Result<Self> {
+        validate_image_size(fill_size)?;
+        Ok(Self {
+            data,
+            technique,
+            fill_size,
+            tint: None,
+            reference_color: None,
+            interprets_untagged_image_as_generic: false,
+        })
+    }
+
+    /// Apply a tint (the inspector's Advanced Image Fill).
+    #[must_use]
+    pub const fn with_tint(mut self, tint: Rgba) -> Self {
+        self.tint = Some(tint);
+        self
+    }
+
+    /// Remove the tint.
+    #[must_use]
+    pub const fn without_tint(mut self) -> Self {
+        self.tint = None;
+        self
+    }
+
+    /// Keep iWork's representative color sampled from the image.
+    #[must_use]
+    pub const fn with_reference_color(mut self, color: Rgba) -> Self {
+        self.reference_color = Some(color);
+        self
+    }
+
+    /// Remove the representative color.
+    #[must_use]
+    pub const fn without_reference_color(mut self) -> Self {
+        self.reference_color = None;
+        self
+    }
+
+    /// Replace the layout technique.
+    #[must_use]
+    pub const fn with_technique(mut self, technique: ImageTechnique) -> Self {
+        self.technique = technique;
+        self
+    }
+
+    /// Replace the natural/tile fill size.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::ImageSizeInvalid`].
+    pub fn with_fill_size(mut self, fill_size: Size) -> Result<Self> {
+        validate_image_size(fill_size)?;
+        self.fill_size = fill_size;
+        Ok(self)
+    }
+
+    /// Whether untagged pixels are interpreted as generic RGB.
+    #[must_use]
+    pub const fn with_generic_untagged_image(mut self, enabled: bool) -> Self {
+        self.interprets_untagged_image_as_generic = enabled;
+        self
+    }
+
+    /// The embedded image data, or `None` for the placeholder.
+    #[must_use]
+    pub const fn data(&self) -> Option<ImageData> {
+        self.data
+    }
+
+    /// The layout technique.
+    #[must_use]
+    pub const fn technique(&self) -> ImageTechnique {
+        self.technique
+    }
+
+    /// The natural/tile fill size.
+    #[must_use]
+    pub const fn fill_size(&self) -> Size {
+        self.fill_size
+    }
+
+    /// The tint.
+    #[must_use]
+    pub const fn tint(&self) -> Option<Rgba> {
+        self.tint
+    }
+
+    /// The representative color.
+    #[must_use]
+    pub const fn reference_color(&self) -> Option<Rgba> {
+        self.reference_color
+    }
+
+    /// Whether untagged pixels are interpreted as generic RGB.
+    #[must_use]
+    pub const fn interprets_untagged_image_as_generic(&self) -> bool {
+        self.interprets_untagged_image_as_generic
+    }
+}
+
+/// A standard shape fill.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub enum Fill {
+    /// An empty native fill ("No Fill").
+    #[default]
+    None,
+    /// One color.
+    Solid(Rgba),
+    /// A gradient.
+    Gradient(Gradient),
+    /// An image fill.
+    Image(Image),
+}
+
+#[cfg(test)]
+mod image_tests {
+    use super::{Error, Fill, Image, ImageData, ImageTechnique, Size};
+
+    const SIZE: Size = Size {
+        width: 320.0,
+        height: 180.0,
+    };
+
+    #[test]
+    fn image_fills_validate_and_build() {
+        assert_eq!(ImageData::new(0), Err(Error::ImageDataZero));
+        assert_eq!(
+            Image::placeholder(
+                ImageTechnique::Stretch,
+                Size {
+                    width: 0.0,
+                    height: 1.0
+                }
+            ),
+            Err(Error::ImageSizeInvalid)
+        );
+        let data = ImageData::new(42).unwrap();
+        let tint = crate::color::Rgba::black();
+        let image = Image::embedded(data, ImageTechnique::ScaleToFit, SIZE)
+            .unwrap()
+            .with_tint(tint)
+            .with_reference_color(tint)
+            .with_generic_untagged_image(true)
+            .with_technique(ImageTechnique::Tile);
+        assert_eq!(image.data(), Some(data));
+        assert_eq!(image.technique(), ImageTechnique::Tile);
+        assert_eq!(image.tint(), Some(tint));
+        assert!(
+            image
+                .clone()
+                .without_tint()
+                .without_reference_color()
+                .tint()
+                .is_none()
+        );
+        assert!(image.interprets_untagged_image_as_generic());
+        for technique in [
+            ImageTechnique::OriginalSize,
+            ImageTechnique::Stretch,
+            ImageTechnique::Tile,
+            ImageTechnique::ScaleToFill,
+            ImageTechnique::ScaleToFit,
+        ] {
+            assert_eq!(
+                ImageTechnique::from_native(technique.native_value()),
+                Some(technique)
+            );
+        }
+        assert_eq!(Fill::default(), Fill::None);
     }
 }

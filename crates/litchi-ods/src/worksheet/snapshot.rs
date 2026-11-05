@@ -1,11 +1,12 @@
-//! Package-bound worksheet snapshots and reversible edits.
+//! Archive-bound worksheet snapshots and reversible edits.
 
 use std::{fmt, sync::Arc};
 
 use litchi_core::{Error, Position, Result};
+use litchi_odf_common::XmlStreamLimits;
 
 use super::{Cell, Sheet, validation};
-use crate::package::Package;
+use crate::package::Archive;
 
 /// Maximum number of logical cell replacements accepted by one batch.
 pub const MAX_CELL_CHANGES: usize = 4_096;
@@ -73,8 +74,9 @@ impl From<usize> for Selector<'_> {
 #[derive(Clone)]
 pub struct Snapshot {
     source: Arc<Vec<u8>>,
-    package: Arc<Package>,
+    package: Arc<Archive>,
     sheets: Arc<[Sheet]>,
+    xml_limits: XmlStreamLimits,
 }
 
 impl fmt::Debug for Snapshot {
@@ -98,25 +100,41 @@ impl Snapshot {
     }
 
     fn from_arc(source: Arc<Vec<u8>>) -> Result<Self> {
-        let package = Package::from_shared_bytes(Arc::clone(&source))?;
-        Self::from_package(package)
+        Self::from_arc_with_xml_limits(source, XmlStreamLimits::owner_default_value())
+    }
+
+    fn from_arc_with_xml_limits(source: Arc<Vec<u8>>, xml_limits: XmlStreamLimits) -> Result<Self> {
+        let package = Archive::from_shared_bytes_with_xml_limits(Arc::clone(&source), xml_limits)?;
+        Self::from_package_with_xml_limits(package, xml_limits)
     }
 
     /// Adopt a package that has already passed the ODS package boundary.
     ///
     /// Worksheet graph parsing and validation remain mandatory; only the
     /// immutable ZIP/archive ownership is reused.
-    pub(crate) fn from_package(package: Package) -> Result<Self> {
-        Self::from_shared_package(Arc::new(package))
+    #[cfg(test)]
+    pub(crate) fn from_package(package: Archive) -> Result<Self> {
+        Self::from_package_with_xml_limits(package, XmlStreamLimits::owner_default_value())
     }
 
-    pub(crate) fn from_shared_package(package: Arc<Package>) -> Result<Self> {
+    pub(crate) fn from_package_with_xml_limits(
+        package: Archive,
+        xml_limits: XmlStreamLimits,
+    ) -> Result<Self> {
+        Self::from_shared_package_with_xml_limits(Arc::new(package), xml_limits)
+    }
+
+    pub(crate) fn from_shared_package_with_xml_limits(
+        package: Arc<Archive>,
+        xml_limits: XmlStreamLimits,
+    ) -> Result<Self> {
         let source = package.shared_bytes_owner();
-        let sheets = Arc::from(package.sheets()?);
+        let sheets = Arc::from(package.sheets_with_xml_limits(xml_limits)?);
         Ok(Self {
             source,
             package,
             sheets,
+            xml_limits,
         })
     }
 
@@ -146,7 +164,7 @@ impl Snapshot {
     }
 
     #[must_use]
-    pub fn edit(&self) -> Edit {
+    pub(crate) fn edit(&self) -> Edit {
         Edit {
             before: self.clone(),
             draft: self.sheets.to_vec(),
@@ -354,7 +372,8 @@ impl Edit {
         self.publish(sheets)
     }
 
-    pub fn rollback(&mut self) {
+    /// Discard every staged change in place.
+    pub fn reset(&mut self) {
         self.draft = self.before.sheets.to_vec();
     }
 
@@ -363,7 +382,7 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error when validation, compactness, rebuilding, or readback fails.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
         super::package::validate_owned_link_delta(self.before.sheets(), &self.draft)?;
         validation::validate_sheets(&self.draft)?;
         if self.draft.as_slice() == self.before.sheets() {
@@ -376,22 +395,28 @@ impl Edit {
             &self.draft,
             validation::MAX_CONTENT_XML_BYTES,
         )?;
-        let (content, target_package, provenance_spliced) = match row_local {
-            Some(changed)
-                if litchi_odf_common::compact_xml::validate(changed.content.as_bytes()).is_ok() =>
-            {
-                let target =
-                    package.replace_spliced_content_xml(&changed.content, changed.publication)?;
-                (changed.content, target, true)
-            },
-            Some(_) | None => {
+        // A row-local splice keeps every source byte outside the changed
+        // rows, so a producer's formatting whitespace (LibreOffice ends the
+        // XML declaration with a newline) stays as it was; its authored row
+        // fragments are audited as compact XML by the splice publication.
+        // Only a rebuilt `content.xml` must be compact as a whole.
+        let (target_package, provenance_spliced) = match row_local {
+            Some(changed) => (
+                package.replace_spliced_content_xml(&changed.content, changed.publication)?,
+                true,
+            ),
+            None => {
                 let content = super::package::replace_tables(package.content_xml(), &self.draft)?;
-                let target = package.replace_content_xml(&content)?;
-                (content, target, false)
+                litchi_odf_common::compact_xml::validate(
+                    content.as_bytes(),
+                    litchi_odf_common::compact_xml::Limits::default(),
+                )
+                .map_err(Error::from)?;
+                (package.replace_content_xml(&content)?, false)
             },
         };
-        litchi_odf_common::compact_xml::validate(content.as_bytes()).map_err(Error::from)?;
-        let target = Snapshot::from_package(target_package)?;
+        let target =
+            Snapshot::from_package_with_xml_limits(target_package, self.before.xml_limits)?;
         if target.sheets() != self.draft {
             return Err(Error::InvalidFormat(
                 "ODS worksheet typed readback does not match the staged edit".to_string(),
@@ -431,7 +456,7 @@ impl Edit {
 
 /// An exact-source, reversible worksheet patch.
 #[derive(Clone)]
-pub struct Patch {
+pub(crate) struct Patch {
     source: Arc<Vec<u8>>,
     target: Arc<Vec<u8>>,
 }
@@ -448,45 +473,14 @@ impl fmt::Debug for Patch {
 
 impl Patch {
     #[must_use]
-    pub fn changed(&self) -> bool {
+    pub(crate) fn changed(&self) -> bool {
         self.source != self.target
-    }
-
-    #[must_use]
-    pub fn is_applicable_to(&self, snapshot: &Snapshot) -> bool {
-        self.source.as_slice() == snapshot.as_bytes()
-    }
-
-    /// Apply this patch to its exact source snapshot.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for a stale source or invalid target.
-    pub fn apply(&self, snapshot: &Snapshot) -> Result<Commit> {
-        if !self.is_applicable_to(snapshot) {
-            return Err(Error::InvalidFormat(
-                "ODS worksheet patch source snapshot does not match".to_string(),
-            ));
-        }
-        Ok(Commit {
-            snapshot: Snapshot::from_arc(self.target.clone())?,
-            patch: self.clone(),
-            provenance_spliced: false,
-        })
-    }
-
-    #[must_use]
-    pub fn inverse(&self) -> Self {
-        Self {
-            source: self.target.clone(),
-            target: self.source.clone(),
-        }
     }
 }
 
 /// A validated worksheet publication.
 #[derive(Debug)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     patch: Patch,
     provenance_spliced: bool,
@@ -506,18 +500,13 @@ impl Commit {
     }
 
     #[must_use]
-    pub fn changed(&self) -> bool {
+    pub(crate) fn changed(&self) -> bool {
         self.patch.changed()
     }
 
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
-    }
-
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
     }
 
     pub(crate) const fn content_provenance_spliced(&self) -> bool {
@@ -525,7 +514,7 @@ impl Commit {
     }
 
     #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
+    pub(crate) fn into_snapshot(self) -> Snapshot {
         self.snapshot
     }
 }
@@ -535,7 +524,7 @@ impl Snapshot {
         self.source
     }
 
-    pub(crate) fn package_owner(&self) -> Arc<Package> {
+    pub(crate) fn package_owner(&self) -> Arc<Archive> {
         Arc::clone(&self.package)
     }
 }
@@ -730,12 +719,12 @@ mod tests {
         )?;
         let mut builder = Builder::new();
         builder.add_sheet(sheet)?;
-        let source = builder.build()?;
+        let source = builder.build()?.to_bytes()?;
         let source_pointer = source.as_ptr();
 
         let snapshot = Snapshot::from_bytes(source)?;
         assert_eq!(snapshot.source.as_slice().as_ptr(), source_pointer);
-        let package = Package::from_shared_bytes(Arc::clone(&snapshot.source))?;
+        let package = Archive::from_shared_bytes(Arc::clone(&snapshot.source))?;
         assert!(Arc::ptr_eq(&snapshot.source, &package.shared_bytes()));
 
         let package_identity = package.prepared_index_identity();

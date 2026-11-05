@@ -1,7 +1,7 @@
 use super::*;
 use litchi_docx::ink::{
     AnchorGeometry, BaseProfile, BrushDraft, ContextDraft, ContextKind, Destination, Draft,
-    EditLimits, FallbackImage, Geometry, Location, Placement, Prepared, Style, TraceDraft,
+    EditOptions, FallbackImage, Geometry, Location, Placement, Prepared, Style, TraceDraft,
 };
 use soapberry_zip::office::ArchiveReader;
 use std::collections::BTreeMap;
@@ -38,7 +38,8 @@ fn image() -> FallbackImage {
     FallbackImage::from_bytes(PNG.to_vec()).unwrap()
 }
 fn members(bytes: &[u8]) -> BTreeMap<String, Vec<u8>> {
-    let archive = ArchiveReader::new(bytes).unwrap();
+    let archive =
+        ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     archive
         .file_names()
         .map(|name| (name.to_owned(), archive.read(name).unwrap()))
@@ -58,7 +59,8 @@ fn creates_base_ink_in_all_story_roles_and_restores_exact_members_after_reopen()
             let mut package = Package::from_reader(Cursor::new(&original)).unwrap();
             let mut edit = package.edit_ink().unwrap();
             let locations: Vec<_> = edit
-                .snapshot()
+                .inventory()
+                .unwrap()
                 .annotations()
                 .iter()
                 .map(|annotation| annotation.location())
@@ -73,8 +75,8 @@ fn creates_base_ink_in_all_story_roles_and_restores_exact_members_after_reopen()
             }
             let commit = edit.commit().unwrap();
             assert_eq!(package.ink().unwrap().annotations().len(), 8);
-            assert_eq!(commit.snapshot().annotations().len(), 16);
-            package.apply_ink_patch(commit.patch()).unwrap();
+            assert_eq!(commit.package().ink().unwrap().annotations().len(), 16);
+            package = package.apply_ink(commit.patch()).unwrap().into_package();
             let published = save(&mut package);
             let mut reopened = Package::from_reader(Cursor::new(&published)).unwrap();
             let inventory = reopened.ink().unwrap();
@@ -84,7 +86,10 @@ fn creates_base_ink_in_all_story_roles_and_restores_exact_members_after_reopen()
                 assert_eq!(pair[1].trace_count(), 0);
                 assert_eq!(pair[0].location(), pair[1].location());
             }
-            reopened.apply_ink_patch(&commit.patch().inverse()).unwrap();
+            reopened = reopened
+                .apply_ink(&commit.patch().inverse())
+                .unwrap()
+                .into_package();
             assert_eq!(members(&save(&mut reopened)), members(&original));
         }
     }
@@ -98,7 +103,11 @@ fn selected_replacement_clones_shared_payload_and_preserves_unselected_annotatio
         let mut edit = package.edit_ink().unwrap();
         assert!(edit.replace(Position::new(0), prepared(), None).unwrap());
         assert!(!edit.replace(Position::new(0), prepared(), None).unwrap());
-        let commit = package.publish_ink_edit(edit).unwrap();
+        let commit = {
+            let commit = edit.commit().unwrap();
+            package = commit.package().clone();
+            commit
+        };
         let annotations = package.ink().unwrap();
         assert_eq!(annotations.annotations()[0].trace_count(), 0);
         assert!(
@@ -117,7 +126,10 @@ fn selected_replacement_clones_shared_payload_and_preserves_unselected_annotatio
         );
         let published = save(&mut package);
         let mut reopened = Package::from_reader(Cursor::new(&published)).unwrap();
-        reopened.apply_ink_patch(&commit.patch().inverse()).unwrap();
+        reopened = reopened
+            .apply_ink(&commit.patch().inverse())
+            .unwrap()
+            .into_package();
         assert_eq!(members(&save(&mut reopened)), members(&original));
     }
 }
@@ -146,7 +158,11 @@ fn insertion_expands_empty_paragraph_and_preserves_call_order() {
         Style::Base(BaseProfile::InkContent),
     )
     .unwrap();
-    let commit = package.publish_ink_edit(edit).unwrap();
+    let commit = {
+        let commit = edit.commit().unwrap();
+        package = commit.package().clone();
+        commit
+    };
     assert_eq!(package.ink().unwrap().annotations().len(), 2);
     let document = package
         .opc_package()
@@ -159,7 +175,10 @@ fn insertion_expands_empty_paragraph_and_preserves_call_order() {
         .map(|edge| edge.target_partname().unwrap())
         .collect();
     assert_eq!(targets.len(), 2);
-    package.apply_ink_patch(&commit.patch().inverse()).unwrap();
+    package = package
+        .apply_ink(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(members(&save(&mut package)), members(&original));
 }
 
@@ -182,7 +201,11 @@ fn drawing_canvas_group_creation_has_fallback_and_reversible_resource_closure() 
             let payload = strokes();
             edit.insert(Destination::main(Position::new(0)), payload.clone(), style)
                 .unwrap();
-            let commit = package.publish_ink_edit(edit).unwrap();
+            let commit = {
+                let commit = edit.commit().unwrap();
+                package = commit.package().clone();
+                commit
+            };
             assert_eq!(package.ink().unwrap().annotations().len(), 2);
             let published = save(&mut package);
             let mut reopened = Package::from_reader(Cursor::new(&published)).unwrap();
@@ -206,8 +229,12 @@ fn drawing_canvas_group_creation_has_fallback_and_reversible_resource_closure() 
                     .unwrap()
             );
             assert!(unchanged.replace(Position::new(1), payload, None).unwrap());
-            let unchanged = reopened.publish_ink_edit(unchanged).unwrap();
-            assert!(unchanged.patch().is_empty());
+            let unchanged = {
+                let commit = unchanged.commit().unwrap();
+                reopened = commit.package().clone();
+                commit
+            };
+            assert!(unchanged.patch().is_noop());
             assert_eq!(members(&save(&mut reopened)), members(&published));
             assert!(reopened.opc_package().try_iter_parts().any(|part| {
                 let part = part.expect("decode part payload");
@@ -217,21 +244,31 @@ fn drawing_canvas_group_creation_has_fallback_and_reversible_resource_closure() 
             replacement
                 .replace(Position::new(1), prepared(), Some(image()))
                 .unwrap();
-            let replacement = reopened
-                .publish_ink_edit(replacement)
+            let replacement = replacement
+                .commit()
                 .unwrap_or_else(|error| panic!("{description}: {error}"));
+            reopened = replacement.package().clone();
             assert_eq!(reopened.ink().unwrap().annotations()[1].trace_count(), 0);
             let mut removal = reopened.edit_ink().unwrap();
             assert!(removal.remove(Position::new(1)).unwrap());
-            let removal = reopened.publish_ink_edit(removal).unwrap();
+            let removal = {
+                let commit = removal.commit().unwrap();
+                reopened = commit.package().clone();
+                commit
+            };
             assert_eq!(reopened.ink().unwrap().annotations().len(), 1);
-            reopened
-                .apply_ink_patch(&removal.patch().inverse())
-                .unwrap();
-            reopened
-                .apply_ink_patch(&replacement.patch().inverse())
-                .unwrap();
-            reopened.apply_ink_patch(&commit.patch().inverse()).unwrap();
+            reopened = reopened
+                .apply_ink(&removal.patch().inverse())
+                .unwrap()
+                .into_package();
+            reopened = reopened
+                .apply_ink(&replacement.patch().inverse())
+                .unwrap()
+                .into_package();
+            reopened = reopened
+                .apply_ink(&commit.patch().inverse())
+                .unwrap()
+                .into_package();
             assert_eq!(members(&save(&mut reopened)), members(&original));
         }
     }
@@ -255,7 +292,7 @@ fn invalid_destinations_strict_drawings_and_conflicting_intents_refuse_atomicall
             Style::Base(BaseProfile::InkContent),
         )
         .unwrap();
-        assert!(package.publish_ink_edit(edit).is_err());
+        assert!(edit.commit().is_err());
         assert_eq!(members(&save(&mut package)), original);
     }
     let mut package = open(&source(true, false));
@@ -267,12 +304,21 @@ fn invalid_destinations_strict_drawings_and_conflicting_intents_refuse_atomicall
         Style::drawing(Placement::Inline(Geometry::new(1, 1).unwrap()), image()),
     )
     .unwrap();
-    assert!(package.publish_ink_edit(edit).is_err());
+    assert!(edit.commit().is_err());
     assert_eq!(members(&save(&mut package)), original);
     let mut edit = package.edit_ink().unwrap();
     edit.replace(Position::new(0), prepared(), None).unwrap();
     assert!(edit.remove(Position::new(0)).is_err());
-    assert_eq!(edit.commit().unwrap().snapshot().annotations().len(), 1);
+    assert_eq!(
+        edit.commit()
+            .unwrap()
+            .package()
+            .ink()
+            .unwrap()
+            .annotations()
+            .len(),
+        1
+    );
 }
 
 #[test]
@@ -281,12 +327,16 @@ fn drawing_replacement_updates_fallback_preserves_geometry_and_undoes_after_reop
     let mut package = Package::from_reader(Cursor::new(&original)).unwrap();
     let mut missing = package.edit_ink().unwrap();
     missing.replace(Position::new(0), prepared(), None).unwrap();
-    assert!(package.publish_ink_edit(missing).is_err());
+    assert!(missing.commit().is_err());
     assert_eq!(members(&save(&mut package)), members(&original));
     let mut edit = package.edit_ink().unwrap();
     edit.replace(Position::new(0), prepared(), Some(image()))
         .unwrap();
-    let commit = package.publish_ink_edit(edit).unwrap();
+    let commit = {
+        let commit = edit.commit().unwrap();
+        package = commit.package().clone();
+        commit
+    };
     assert_eq!(package.ink().unwrap().annotations()[0].trace_count(), 0);
     let published = save(&mut package);
     let published_members = members(&published);
@@ -299,7 +349,10 @@ fn drawing_replacement_updates_fallback_preserves_geometry_and_undoes_after_reop
     assert!(!published_members.contains_key("payload/fallback.png"));
     assert!(published_members.values().any(|bytes| bytes == PNG));
     let mut reopened = Package::from_reader(Cursor::new(&published)).unwrap();
-    reopened.apply_ink_patch(&commit.patch().inverse()).unwrap();
+    reopened = reopened
+        .apply_ink(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(members(&save(&mut reopened)), members(&original));
 }
 
@@ -308,9 +361,9 @@ fn authoring_limits_refuse_without_changing_prior_intents_or_package() {
     let mut package = open(&source(false, false));
     let original = members(&save(&mut package));
     let mut edit = package
-        .edit_ink_with_limits(EditLimits {
+        .edit_ink_with_options(EditOptions {
             max_operations: 1,
-            ..EditLimits::default()
+            ..EditOptions::default()
         })
         .unwrap();
     edit.insert(
@@ -320,16 +373,23 @@ fn authoring_limits_refuse_without_changing_prior_intents_or_package() {
     )
     .unwrap();
     assert!(edit.replace(Position::new(0), prepared(), None).is_err());
-    let commit = package.publish_ink_edit(edit).unwrap();
+    let commit = {
+        let commit = edit.commit().unwrap();
+        package = commit.package().clone();
+        commit
+    };
     assert_eq!(package.ink().unwrap().annotations().len(), 2);
-    package.apply_ink_patch(&commit.patch().inverse()).unwrap();
+    package = package
+        .apply_ink(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(members(&save(&mut package)), original);
 
     let payload = strokes();
     let mut edit = package
-        .edit_ink_with_limits(EditLimits {
+        .edit_ink_with_options(EditOptions {
             max_staged_bytes: payload.as_bytes().len() - 1,
-            ..EditLimits::default()
+            ..EditOptions::default()
         })
         .unwrap();
     assert!(
@@ -340,14 +400,14 @@ fn authoring_limits_refuse_without_changing_prior_intents_or_package() {
         )
         .is_err()
     );
-    assert!(edit.commit().unwrap().patch().is_empty());
+    assert!(edit.commit().unwrap().patch().is_noop());
     assert_eq!(members(&save(&mut package)), original);
 
     let payload = strokes();
     let mut edit = package
-        .edit_ink_with_limits(EditLimits {
+        .edit_ink_with_options(EditOptions {
             max_staged_bytes: payload.as_bytes().len(),
-            ..EditLimits::default()
+            ..EditOptions::default()
         })
         .unwrap();
     edit.insert(
@@ -356,7 +416,7 @@ fn authoring_limits_refuse_without_changing_prior_intents_or_package() {
         Style::Base(BaseProfile::InkContent),
     )
     .unwrap();
-    assert!(package.publish_ink_edit(edit).is_err());
+    assert!(edit.commit().is_err());
     assert_eq!(members(&save(&mut package)), original);
 }
 
@@ -373,7 +433,11 @@ fn mixed_insert_replace_remove_uses_base_selectors_and_one_reversible_commit() {
         Style::Base(BaseProfile::InkContent),
     )
     .unwrap();
-    let commit = package.publish_ink_edit(edit).unwrap();
+    let commit = {
+        let commit = edit.commit().unwrap();
+        package = commit.package().clone();
+        commit
+    };
     let snapshot = package.ink().unwrap();
     assert_eq!(snapshot.annotations().len(), 8);
     assert_eq!(snapshot.annotations()[0].trace_count(), 0);
@@ -385,7 +449,10 @@ fn mixed_insert_replace_remove_uses_base_selectors_and_one_reversible_commit() {
     );
     let published = save(&mut package);
     let mut reopened = Package::from_reader(Cursor::new(&published)).unwrap();
-    reopened.apply_ink_patch(&commit.patch().inverse()).unwrap();
+    reopened = reopened
+        .apply_ink(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(members(&save(&mut reopened)), members(&original));
 }
 
@@ -410,7 +477,12 @@ fn authored_patch_guards_graph_and_payload_and_requires_explicit_unsign() {
     );
     let mut changed = open(&changed);
     let unchanged = members(&save(&mut changed));
-    assert!(changed.apply_ink_patch(commit.patch()).is_err());
+    assert!(
+        changed
+            .apply_ink(commit.patch())
+            .map(|commit| commit.into_package())
+            .is_err()
+    );
     assert_eq!(members(&save(&mut changed)), unchanged);
     let mut signed = source(false, false);
     part(
@@ -429,9 +501,9 @@ fn authored_patch_guards_graph_and_payload_and_requires_explicit_unsign() {
         Style::Base(BaseProfile::InkContent),
     )
     .unwrap();
-    assert!(signed.publish_ink_edit(edit).is_err());
+    assert!(edit.commit().is_err());
     assert_eq!(members(&save(&mut signed)), original);
     // The unrelated package still accepts its source-bound prepared patch.
-    package.apply_ink_patch(commit.patch()).unwrap();
+    package = package.apply_ink(commit.patch()).unwrap().into_package();
     assert_eq!(package.ink().unwrap().annotations().len(), 2);
 }

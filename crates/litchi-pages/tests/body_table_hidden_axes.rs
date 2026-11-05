@@ -13,17 +13,18 @@ use std::error::Error as StdError;
 use std::sync::Arc;
 use std::thread;
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::{Catalog, EntryEdit};
 use litchi_iwa_common::{
     decode_varint_from_bytes,
     wire::{RawWireField, RawWireFields, WireView},
 };
-use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, SnappyStream};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tp, tsa, tsce, tsd, tsp, tst, tswp};
 use litchi_pages::table::hidden_axes::{AxisIndex, HiddenAxes};
 use litchi_pages::{
-    BodyTableHiddenAxesError as Error, BodyTableHiddenAxesLimitKind, BodyTableSelector, Limits,
-    Package,
+    BodyTableSelector, Package, table::hidden_axes::transaction::Error,
+    table::hidden_axes::transaction::LimitKind as BodyTableHiddenAxesLimitKind,
 };
 use prost::Message as _;
 
@@ -189,8 +190,12 @@ fn table_formula_object(index: usize, column: bool) -> u64 {
         + u64::try_from(index * 2 + usize::from(!column)).expect("fixture index fits")
 }
 
-fn field_reference(path: impl Into<FieldPath>, identifier: u64) -> FieldInfo {
-    let mut field = FieldInfo::new(path);
+fn field_reference(path: Vec<u32>, identifier: u64) -> FieldInfo {
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(path, litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     field.object_references.push(identifier);
     field
 }
@@ -199,13 +204,18 @@ fn field_reference(path: impl Into<FieldPath>, identifier: u64) -> FieldInfo {
 // output and rejects groups, while these fixtures intentionally retain them.
 fn append_message_field(output: &mut Vec<u8>, number: u32, payload: &[u8]) -> TestResult {
     let mut field = Vec::new();
-    litchi_iwa_common::wire::append_length_delimited_field(&mut field, number, payload)?;
+    litchi_iwa_common::wire::append_length_delimited_field(
+        &mut field,
+        number,
+        payload,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     output.extend_from_slice(&field);
     Ok(())
 }
 
 fn raw_wire_fields(source: &[u8]) -> TestResult<Vec<RawWireField<'_>>> {
-    let mut scanner = RawWireFields::new(source);
+    let mut scanner = RawWireFields::new(source, litchi_iwa_common::wire::RawWireLimits::default());
     let mut fields = Vec::new();
     while let Some(field) = scanner.next()? {
         fields.push(field);
@@ -320,7 +330,11 @@ fn object(
     data: Vec<u8>,
     references: &[u64],
 ) -> TestResult<ArchiveObject> {
-    let mut object = ArchiveObject::new(identifier, vec![RawMessage { type_, data }])?;
+    let mut object = ArchiveObject::new(
+        identifier,
+        vec![RawMessage { type_, data }],
+        Default::default(),
+    )?;
     object.archive_info.message_infos[0]
         .object_references
         .extend_from_slice(references);
@@ -835,7 +849,8 @@ fn synthetic_package(
     }
 
     let archive = Archive { objects };
-    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    let component =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     let mut members: Vec<(&str, &[u8])> = vec![
         ("Data/sentinel.bin", b"untouched-sentinel"),
         (DOCUMENT_MEMBER, component.as_slice()),
@@ -889,12 +904,15 @@ fn metadata_uuid_entry(identifier: u64) -> tsp::ObjectUuidMapEntry {
 /// shape remains covered separately; these tests opt into a registry-bearing
 /// shape with one unrelated physical component as well.
 fn metadata_package(source: &[u8]) -> TestResult<Vec<u8>> {
-    let source_catalog = Catalog::from_bytes(source)?;
+    let source_catalog = Catalog::from_bytes(source, Default::default())?;
     let document = source_catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document member")?;
-    let archive = Archive::parse(SnappyStream::decompress(document.data())?.as_bytes())?;
+    let archive = Archive::parse(
+        SnappyStream::decompress(document.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     let mut identifiers = archive
         .objects
         .iter()
@@ -942,7 +960,8 @@ fn metadata_package(source: &[u8]) -> TestResult<Vec<u8>> {
                 &[],
             )?],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     let mut members = source_catalog
         .iter()
@@ -958,7 +977,8 @@ fn metadata_package(source: &[u8]) -> TestResult<Vec<u8>> {
                 &[],
             )?],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     members.push((UNRELATED_MEMBER.to_owned(), unrelated_component));
     members.push((METADATA_MEMBER.to_owned(), metadata_component));
@@ -1043,13 +1063,14 @@ fn explicit_zero_count_package() -> TestResult<Vec<u8>> {
 }
 
 fn document_archive(package: &[u8]) -> TestResult<Archive> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document member")?;
     Ok(Archive::parse(
-        SnappyStream::decompress(entry.data())?.as_bytes(),
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
     )?)
 }
 
@@ -1109,7 +1130,7 @@ fn assert_aggregate_rewrite_preserves_unselected_source(
 }
 
 fn member_bytes(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(catalog
         .iter()
         .find(|entry| entry.name() == name)
@@ -1119,12 +1140,15 @@ fn member_bytes(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
 }
 
 fn metadata_payload_from_package(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or("missing metadata member")?;
-    let archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     archive
         .object(METADATA_OBJECT_IDENTIFIER)
         .ok_or("missing metadata object")?
@@ -1145,12 +1169,15 @@ fn rewrite_metadata(
     package: &[u8],
     mutate: impl FnOnce(&mut tsp::PackageMetadata) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or("missing metadata member")?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     let metadata_object = archive
         .object_mut(METADATA_OBJECT_IDENTIFIER)
         .ok_or("missing metadata object")?;
@@ -1168,8 +1195,10 @@ fn rewrite_metadata(
             type_: METADATA_MESSAGE_TYPE,
             data: metadata.encode_to_vec(),
         },
+        Default::default(),
     )?;
-    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    let component =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(METADATA_MEMBER, component.as_slice())],
         Limits::default(),
@@ -1254,18 +1283,21 @@ fn metadata_watermark_near_max(package: &[u8]) -> TestResult<Vec<u8>> {
 
 fn metadata_physical_id_collision(package: &[u8]) -> TestResult<Vec<u8>> {
     rewrite_document_archive(package, |archive| {
-        archive.insert_object(object(
-            METADATA_OBJECT_IDENTIFIER,
-            FILTER_SET_MESSAGE_TYPE,
-            filter_set_payload()?,
-            &[],
-        )?)?;
+        archive.insert_object(
+            object(
+                METADATA_OBJECT_IDENTIFIER,
+                FILTER_SET_MESSAGE_TYPE,
+                filter_set_payload()?,
+                &[],
+            )?,
+            Default::default(),
+        )?;
         Ok(())
     })
 }
 
 fn metadata_misrouted_member(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let metadata = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
@@ -1292,12 +1324,15 @@ fn metadata_misrouted_member(package: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn append_metadata_unknown(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or("missing metadata member")?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     let metadata_object = archive
         .object_mut(METADATA_OBJECT_IDENTIFIER)
         .ok_or("missing metadata object")?;
@@ -1314,8 +1349,10 @@ fn append_metadata_unknown(package: &[u8]) -> TestResult<Vec<u8>> {
             type_: METADATA_MESSAGE_TYPE,
             data: payload,
         },
+        Default::default(),
     )?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(METADATA_MEMBER, compressed.as_slice())],
         Limits::default(),
@@ -1326,14 +1363,18 @@ fn rewrite_document_archive(
     package: &[u8],
     mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document member")?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     mutate(&mut archive)?;
-    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    let component =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(DOCUMENT_MEMBER, &component)],
         Limits::default(),
@@ -1341,13 +1382,13 @@ fn rewrite_document_archive(
 }
 
 fn object_header_bytes(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document member")?;
-    let decompressed = SnappyStream::decompress(entry.data())?.into_bytes();
-    let archive = Archive::parse(&decompressed)?;
+    let decompressed = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+    let archive = Archive::parse(&decompressed, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| format!("missing object {identifier}"))?;
@@ -1371,13 +1412,13 @@ fn rewrite_raw_object_header(
     identifier: u64,
     mutate: impl FnOnce(&[u8]) -> TestResult<Vec<u8>>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document member")?;
-    let decompressed = SnappyStream::decompress(entry.data())?.into_bytes();
-    let archive = Archive::parse(&decompressed)?;
+    let decompressed = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+    let archive = Archive::parse(&decompressed, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| format!("missing object {identifier}"))?;
@@ -1411,7 +1452,7 @@ fn rewrite_raw_object_header(
             .get(header_end..)
             .ok_or("object payload is truncated")?,
     );
-    let component = SnappyStream::compress(&rewritten)?;
+    let component = SnappyStream::compress(&rewritten, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(DOCUMENT_MEMBER, &component)],
         Limits::default(),
@@ -1491,13 +1532,13 @@ fn rewrite_native_archive(
     package: &[u8],
     mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry_name = catalog
         .iter()
         .find(|entry| {
-            SnappyStream::decompress(entry.data())
+            SnappyStream::decompress(entry.data(), Default::default())
                 .ok()
-                .and_then(|bytes| Archive::parse(bytes.as_bytes()).ok())
+                .and_then(|bytes| Archive::parse(bytes.as_bytes(), Default::default()).ok())
                 .is_some_and(|archive| archive.object(NATIVE_TABLE_MODEL_IDENTIFIER).is_some())
         })
         .map(|entry| entry.name().to_owned())
@@ -1506,10 +1547,11 @@ fn rewrite_native_archive(
         .iter()
         .find(|entry| entry.name() == entry_name)
         .ok_or("missing native table-model archive")?;
-    let decompressed = SnappyStream::decompress(entry.data())?.into_bytes();
-    let mut archive = Archive::parse(&decompressed)?;
+    let decompressed = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+    let mut archive = Archive::parse(&decompressed, Default::default())?;
     mutate(&mut archive)?;
-    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    let component =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(&entry_name, &component)],
         Limits::default(),
@@ -1521,7 +1563,7 @@ fn rewrite_native_archive(
 /// in Document.  This is deliberately a physical move, not a metadata-only
 /// alias, so the focused owner must prove the package-wide dependency route.
 fn move_formula_owner_to_calculation_engine(package: &[u8], index: usize) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     if catalog
         .iter()
         .any(|entry| entry.name() == CALCULATION_ENGINE_MEMBER)
@@ -1532,7 +1574,10 @@ fn move_formula_owner_to_calculation_engine(package: &[u8], index: usize) -> Tes
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document member")?;
-    let mut document = Archive::parse(SnappyStream::decompress(document_entry.data())?.as_bytes())?;
+    let mut document = Archive::parse(
+        SnappyStream::decompress(document_entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     let owner_identifier = table_formula_owner(index);
     let owner_position = document
         .objects
@@ -1582,9 +1627,11 @@ fn move_formula_owner_to_calculation_engine(package: &[u8], index: usize) -> Tes
         &Archive {
             objects: vec![engine, owner],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
-    let document = SnappyStream::compress(&document.to_bytes()?)?;
+    let document =
+        SnappyStream::compress(&document.to_bytes(Default::default())?, Default::default())?;
 
     let mut members = catalog
         .iter()
@@ -1611,12 +1658,15 @@ fn clear_calculation_engine_formula_owner_metadata(
     package: &[u8],
     index: usize,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == CALCULATION_ENGINE_MEMBER)
         .ok_or("missing calculation-engine member")?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     let owner = archive
         .object_mut(table_formula_owner(index))
         .ok_or("missing calculation-engine formula-owner object")?;
@@ -1633,7 +1683,8 @@ fn clear_calculation_engine_formula_owner_metadata(
     metadata.object_references.clear();
     metadata.data_references.clear();
     metadata.field_infos.clear();
-    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    let component =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(CALCULATION_ENGINE_MEMBER, &component)],
         Limits::default(),
@@ -1645,12 +1696,15 @@ fn rewrite_calculation_engine_archive(
     index: usize,
     mutate: impl FnOnce(&mut ArchiveObject, &mut tsce::CalculationEngineArchive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == CALCULATION_ENGINE_MEMBER)
         .ok_or("missing calculation-engine member")?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     let engine = archive
         .object_mut(
             CALCULATION_ENGINE_OBJECT_BASE
@@ -1667,7 +1721,8 @@ fn rewrite_calculation_engine_archive(
         tsce::CalculationEngineArchive::decode(engine.messages[message_index].data.as_slice())?;
     mutate(engine, &mut decoded)?;
     engine.messages[message_index].data = decoded.encode_to_vec();
-    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    let component =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(CALCULATION_ENGINE_MEMBER, &component)],
         Limits::default(),
@@ -1822,7 +1877,12 @@ fn source_built_provenance_variants(
                 .message_infos
                 .first_mut()
                 .ok_or("missing calculation-engine message metadata")?;
-            let mut field = FieldInfo::new(FieldPath::new(vec![99]));
+            let mut field = FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(vec![99], litchi_iwa_core::Limits::default())
+                    .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap();
             field.object_references.push(table_formula_owner(index + 1));
             info.field_infos.push(field);
             Ok(())
@@ -1924,10 +1984,13 @@ fn append_duplicate_model_message(package: &[u8], index: usize) -> TestResult<Ve
             .ok_or("missing table-model message")?
             .data
             .clone();
-        model.push_message(RawMessage {
-            type_: TABLE_MODEL_MESSAGE_TYPE,
-            data: payload,
-        })?;
+        model.push_message(
+            RawMessage {
+                type_: TABLE_MODEL_MESSAGE_TYPE,
+                data: payload,
+            },
+            Default::default(),
+        )?;
         Ok(())
     })
 }
@@ -1944,10 +2007,13 @@ fn append_duplicate_info_message(package: &[u8], index: usize) -> TestResult<Vec
             .ok_or("missing table-info message")?
             .data
             .clone();
-        info.push_message(RawMessage {
-            type_: TABLE_INFO_MESSAGE_TYPE,
-            data: payload,
-        })?;
+        info.push_message(
+            RawMessage {
+                type_: TABLE_INFO_MESSAGE_TYPE,
+                data: payload,
+            },
+            Default::default(),
+        )?;
         Ok(())
     })
 }
@@ -2003,7 +2069,7 @@ fn append_duplicate_formula_owner(package: &[u8], index: usize) -> TestResult<Ve
             .clone();
         let mut duplicate = owner;
         duplicate.archive_info.identifier = Some(table_formula_owner(index) + 10_000);
-        archive.insert_object(duplicate)?;
+        archive.insert_object(duplicate, Default::default())?;
         Ok(())
     })
 }
@@ -2369,7 +2435,7 @@ fn qualified_legacy_uid_map(package: &[u8], index: usize) -> TestResult<Vec<u8>>
         map.messages[message_index].type_ = 6_200;
         let info = &mut map.archive_info.message_infos[message_index];
         info.type_ = 6_200;
-        info.versions = vec![1, 0, 5];
+        info.versions = vec![1, 0, 5].into();
         Ok(())
     })
 }
@@ -2381,7 +2447,7 @@ fn unqualified_legacy_uid_map(package: &[u8], index: usize) -> TestResult<Vec<u8
         info.type_ = 6_200;
         // A legacy type without the native archive version tuple is not a
         // qualified Pages UID-map route.
-        info.versions = vec![1, 0, 4];
+        info.versions = vec![1, 0, 4].into();
         Ok(())
     })
 }
@@ -2420,16 +2486,18 @@ fn uid_map_diff_merge_version(package: &[u8], index: usize) -> TestResult<Vec<u8
 
 fn uid_map_diff_field_path(package: &[u8], index: usize) -> TestResult<Vec<u8>> {
     rewrite_uid_map_metadata(package, index, |map, message_index| {
-        map.archive_info.message_infos[message_index].diff_field_path =
-            Some(FieldPath::new(vec![1]));
+        map.archive_info.message_infos[message_index].diff_field_path = Some(
+            litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default()).unwrap(),
+        );
         Ok(())
     })
 }
 
 fn uid_map_fields_to_remove(package: &[u8], index: usize) -> TestResult<Vec<u8>> {
     rewrite_uid_map_metadata(package, index, |map, message_index| {
-        map.archive_info.message_infos[message_index].fields_to_remove =
-            vec![FieldPath::new(vec![1])];
+        map.archive_info.message_infos[message_index].fields_to_remove = vec![
+            litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default()).unwrap(),
+        ];
         Ok(())
     })
 }
@@ -2548,7 +2616,7 @@ fn wrong_active_uuid(package: &[u8], index: usize) -> TestResult<Vec<u8>> {
 
 fn duplicate_hidden_owner_field(package: &[u8], index: usize) -> TestResult<Vec<u8>> {
     let payload = model_payload_from_package(package, index)?;
-    let owner = WireView::parse(&payload)?
+    let owner = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == 70)
         .ok_or("missing hidden-state owner")?
@@ -2766,7 +2834,12 @@ fn active_view_selection_and_multiview_writes_fail_closed() -> TestResult {
         .commit();
     assert!(matches!(
         result,
-        Err(Error::UnsupportedDependency | Error::InvalidSource | Error::UnsupportedSource)
+        Err(Error::Refused(
+            litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedDependency
+        ) | Error::InvalidSource
+            | Error::Refused(
+                litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedSource
+            ))
     ));
     assert_eq!(package.exact_bytes(), before);
 
@@ -2825,7 +2898,12 @@ fn active_view_selection_and_multiview_writes_fail_closed() -> TestResult {
         .commit();
     assert!(matches!(
         second_result,
-        Err(Error::UnsupportedDependency | Error::InvalidSource | Error::UnsupportedSource)
+        Err(Error::Refused(
+            litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedDependency
+        ) | Error::InvalidSource
+            | Error::Refused(
+                litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedSource
+            ))
     ));
     assert_eq!(second_active.exact_bytes(), second_before);
 
@@ -2834,11 +2912,24 @@ fn active_view_selection_and_multiview_writes_fail_closed() -> TestResult {
     let missing_before = missing_uuid.exact_bytes();
     assert!(matches!(
         missing_uuid.body_table_hidden_axes(0usize),
-        Err(Error::InvalidSource | Error::UnsupportedDependency | Error::UnsupportedSource)
+        Err(Error::InvalidSource
+            | Error::Refused(
+                litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedDependency
+            )
+            | Error::Refused(
+                litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedSource
+            ))
     ));
+    let mut missing_uuid_edit = missing_uuid.edit_body_table_hidden_axes(0usize)?;
     assert!(matches!(
-        missing_uuid.edit_body_table_hidden_axes(0usize),
-        Err(Error::InvalidSource | Error::UnsupportedDependency | Error::UnsupportedSource)
+        missing_uuid_edit.before(),
+        Err(Error::InvalidSource
+            | Error::Refused(
+                litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedDependency
+            )
+            | Error::Refused(
+                litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedSource
+            ))
     ));
     assert_eq!(missing_uuid.exact_bytes(), missing_before);
     Ok(())
@@ -2901,10 +2992,13 @@ fn filtered_and_pivot_states_are_preserved_or_refused_fail_closed() -> TestResul
     let source_model_payload = model_payload_from_package(&source, 0)?;
     let source_info_payload = info_payload(&source, 0)?;
     let source_owner_payload = hidden_owner_payload_from_package(&source, 0)?;
-    let filtered_rows = WireView::parse(&source_model_payload)?
-        .fields()
-        .find(|field| field.number() == 40)
-        .ok_or("filtered-row count field 40 is missing")?;
+    let filtered_rows = WireView::parse(
+        &source_model_payload,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?
+    .fields()
+    .find(|field| field.number() == 40)
+    .ok_or("filtered-row count field 40 is missing")?;
     assert_eq!(decode_varint_from_bytes(filtered_rows.payload())?.0, 1);
     assert!(before.contains(AxisIndex::row(1)));
     assert!(before.contains(AxisIndex::column(2)));
@@ -3104,7 +3198,9 @@ fn filtered_and_pivot_states_are_preserved_or_refused_fail_closed() -> TestResul
     assert!(
         matches!(
             &result,
-            Err(Error::UnsupportedDependency | Error::InvalidSource)
+            Err(Error::Refused(
+                litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedDependency
+            ) | Error::InvalidSource)
         ),
         "pivot topology must be refused: {result:?}"
     );
@@ -3218,7 +3314,12 @@ fn pivot_owner_is_distinct_from_merge_owner_and_bool_values_are_strict() -> Test
         .edit_body_table_hidden_axes(0usize)?
         .set(HiddenAxes::new([AxisIndex::row(0)])?)
         .commit();
-    assert!(matches!(pivot_result, Err(Error::UnsupportedDependency)));
+    assert!(matches!(
+        pivot_result,
+        Err(Error::Refused(
+            litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedDependency
+        ))
+    ));
     assert_eq!(pivot.exact_bytes(), pivot_before);
 
     let merge_source = merge_owner_only(&source, 0)?;
@@ -3243,7 +3344,7 @@ fn pivot_owner_is_distinct_from_merge_owner_and_bool_values_are_strict() -> Test
 
 fn model_count_field(package: &[u8], index: usize, number: u32) -> TestResult<Option<u64>> {
     let payload = model_payload_from_package(package, index)?;
-    WireView::parse(&payload)?
+    WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == number)
         .map(|field| decode_varint_from_bytes(field.payload()).map(|(value, _)| value))
@@ -3331,7 +3432,7 @@ fn unknown_model_info_and_nested_owner_wire_fields_survive_rewrite() -> TestResu
     let target = commit.package().exact_bytes();
 
     let model_payload = model_payload_from_package(&target, 0)?;
-    let model = WireView::parse(&model_payload)?;
+    let model = WireView::parse(&model_payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     let model_unknown = model
         .fields()
         .find(|field| field.number() == UNKNOWN_MODEL_FIELD)
@@ -3346,7 +3447,7 @@ fn unknown_model_info_and_nested_owner_wire_fields_survive_rewrite() -> TestResu
             .any(|field| field.number() == UNKNOWN_LENGTH_FIELD)
     );
     let info_payload = info_payload(&target, 0)?;
-    let info = WireView::parse(&info_payload)?;
+    let info = WireView::parse(&info_payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     let info_unknown = info
         .fields()
         .find(|field| field.number() == UNKNOWN_INFO_FIELD)
@@ -3412,7 +3513,7 @@ fn rewrite_is_local_to_selected_table_and_invalidates_only_root_previews() -> Te
             "unselected object {identifier} or its archive metadata changed"
         );
     }
-    let catalog = Catalog::from_bytes(&target)?;
+    let catalog = Catalog::from_bytes(&target, Default::default())?;
     for preview in PREVIEWS {
         assert!(catalog.iter().all(|entry| entry.name() != preview));
     }
@@ -3430,7 +3531,8 @@ fn selected_object_retains_noncanonical_header_while_payload_framing_changes_loc
 {
     let source = with_noncanonical_model_header(&normal_package()?, 0)?;
     let source_header = object_header_bytes(&source, table_model(0))?;
-    let source_header_view = WireView::parse(&source_header)?;
+    let source_header_view =
+        WireView::parse(&source_header, litchi_iwa_common::WireLimits::DEFAULT)?;
     assert!(
         source_header_view
             .fields()
@@ -3457,7 +3559,8 @@ fn selected_object_retains_noncanonical_header_while_payload_framing_changes_loc
         .commit()?;
     let target = commit.package().exact_bytes();
     let target_header = object_header_bytes(&target, table_model(0))?;
-    let target_header_view = WireView::parse(&target_header)?;
+    let target_header_view =
+        WireView::parse(&target_header, litchi_iwa_common::WireLimits::DEFAULT)?;
     let retained = target_header_view
         .fields()
         .find(|field| field.number() == UNKNOWN_LENGTH_FIELD)
@@ -3518,7 +3621,8 @@ fn output_and_wire_limits_reject_before_publication() -> TestResult {
         .set(requested.clone())
         .commit()?;
     assert_eq!(partial_commit.diagnostics().deleted_previews(), 1);
-    let partial_catalog = Catalog::from_bytes(&partial_commit.package().exact_bytes())?;
+    let partial_catalog =
+        Catalog::from_bytes(&partial_commit.package().exact_bytes(), Default::default())?;
     assert!(
         partial_catalog
             .iter()
@@ -3534,13 +3638,16 @@ fn output_and_wire_limits_reject_before_publication() -> TestResult {
         1024 * 1024,
         1024 * 1024,
     )?;
-    let bounded_package = Package::from_bytes_with_limits(&source, bounded)?;
+    let bounded_package = Package::from_bytes_with_options(
+        &source,
+        litchi_pages::OpenOptions::new().__archive_limits(bounded),
+    )?;
     let before = bounded_package.exact_bytes();
     let result = bounded_package
         .edit_body_table_hidden_axes(0usize)?
         .set(requested.clone())
         .commit();
-    assert!(matches!(result, Err(Error::LimitExceeded { .. })));
+    assert!(matches!(result, Err(Error::Limit { .. })));
     assert_eq!(bounded_package.exact_bytes(), before);
 
     let normal_source = normal_package()?;
@@ -3548,7 +3655,10 @@ fn output_and_wire_limits_reject_before_publication() -> TestResult {
     for fields in 1..=4_096 {
         let archive_limits = litchi_iwa_core::Limits::default().with_header_fields(fields)?;
         let limits = Limits::default().with_archive_limits(archive_limits)?;
-        match Package::from_bytes_with_limits(&normal_source, limits) {
+        match Package::from_bytes_with_options(
+            &normal_source,
+            litchi_pages::OpenOptions::new().__archive_limits(limits),
+        ) {
             Ok(package) => {
                 let result = package
                     .edit_body_table_hidden_axes(0usize)
@@ -3572,14 +3682,17 @@ fn output_and_wire_limits_reject_before_publication() -> TestResult {
     assert!(exact_fields > 1);
     let archive_limits = litchi_iwa_core::Limits::default().with_header_fields(exact_fields - 1)?;
     let limits = Limits::default().with_archive_limits(archive_limits)?;
-    match Package::from_bytes_with_limits(&normal_source, limits) {
+    match Package::from_bytes_with_options(
+        &normal_source,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    ) {
         Ok(package) => {
             let before = package.exact_bytes();
             let result = package
                 .edit_body_table_hidden_axes(0usize)
                 .map(|edit| edit.set(requested.clone()))
                 .and_then(|edit| edit.commit());
-            assert!(matches!(result, Err(Error::LimitExceeded { .. })));
+            assert!(matches!(result, Err(Error::Limit { .. })));
             assert_eq!(package.exact_bytes(), before);
         },
         Err(error) => {
@@ -3637,16 +3750,17 @@ fn public_hidden_axis_transactions_are_send_sync_debug_and_redacted() -> TestRes
     assert_send_sync_debug::<Package>();
     assert_send_sync_debug::<AxisIndex>();
     assert_send_sync_debug::<HiddenAxes>();
-    assert_send_sync_debug::<litchi_pages::BodyTableHiddenAxesEdit<'static>>();
-    assert_send_sync_debug::<litchi_pages::BodyTableHiddenAxesPatch>();
-    assert_send_sync_debug::<litchi_pages::BodyTableHiddenAxesCommit>();
-    assert_send_sync_debug::<litchi_pages::BodyTableHiddenAxesDiagnostics>();
+    assert_send_sync_debug::<litchi_pages::table::hidden_axes::transaction::Edit<'static>>();
+    assert_send_sync_debug::<litchi_pages::table::hidden_axes::transaction::Patch>();
+    assert_send_sync_debug::<litchi_pages::table::hidden_axes::transaction::Commit>();
+    assert_send_sync_debug::<litchi_pages::table::hidden_axes::transaction::Diagnostics>();
     assert_send_sync_debug::<Error>();
     assert_send_sync_debug::<BodyTableHiddenAxesLimitKind>();
 
     let package = Package::from_bytes(&normal_package()?)?;
-    let edit = package.edit_body_table_hidden_axes(0usize)?;
-    assert_redacted(&format!("{:?}", edit.path()));
+    let mut edit = package.edit_body_table_hidden_axes(0usize)?;
+    let path = edit.path()?;
+    assert_redacted(&format!("{path:?}"));
     assert_redacted(&format!("{edit:?}"));
     let commit = edit.set(HiddenAxes::new([AxisIndex::row(0)])?).commit()?;
     assert_redacted(&format!("{:?}", commit.patch().path()));
@@ -3655,10 +3769,10 @@ fn public_hidden_axis_transactions_are_send_sync_debug_and_redacted() -> TestRes
     assert_redacted(&format!("{commit:?}"));
     assert_redacted(&format!("{:?}", commit.diagnostics()));
     for error in [
-        Error::TableNotFound,
-        Error::TableLocked,
+        Error::Refused(litchi_pages::table::hidden_axes::transaction::Refusal::TableNotFound),
+        Error::Refused(litchi_pages::table::hidden_axes::transaction::Refusal::TableLocked),
         Error::PatchConflict,
-        Error::LimitExceeded {
+        Error::Limit {
             kind: BodyTableHiddenAxesLimitKind::WireBytes,
             observed: 17,
             maximum: 23,
@@ -3906,7 +4020,8 @@ fn wrong_model_map_field_path(package: &[u8], index: usize) -> TestResult<Vec<u8
             .iter_mut()
             .find(|field| field.path.as_slice() == [46])
             .ok_or("missing model map field declaration")?;
-        field.path = FieldPath::new(vec![47]);
+        field.path =
+            litchi_iwa_core::FieldPath::new(vec![47], litchi_iwa_core::Limits::default()).unwrap();
         Ok(())
     })
 }
@@ -3974,7 +4089,11 @@ fn source_built_aggregate_metadata_conflict(package: &[u8], index: usize) -> Tes
         metadata
             .field_infos
             .retain(|field| matches!(field.path.as_slice(), [34] | [35]));
-        let mut field = FieldInfo::new(FieldPath::new(vec![47]));
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![47], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references.push(table_uid_map(index));
         metadata.field_infos.push(field);
         Ok(())
@@ -3994,7 +4113,8 @@ fn wrong_info_map_field_path(package: &[u8], index: usize) -> TestResult<Vec<u8>
             .iter_mut()
             .find(|field| field.path.as_slice() == [6])
             .ok_or("missing info map field declaration")?;
-        field.path = FieldPath::new(vec![7]);
+        field.path =
+            litchi_iwa_core::FieldPath::new(vec![7], litchi_iwa_core::Limits::default()).unwrap();
         Ok(())
     })
 }
@@ -4187,7 +4307,9 @@ fn native_model_filter_wrong_path(package: &[u8]) -> TestResult<Vec<u8>> {
                 .iter_mut()
                 .find(|field| field.path.as_slice() == [70])
                 .ok_or("missing native hidden-state-owner metadata")?;
-            field.path = FieldPath::new(vec![71]);
+            field.path =
+                litchi_iwa_core::FieldPath::new(vec![71], litchi_iwa_core::Limits::default())
+                    .unwrap();
             Ok(())
         },
     )
@@ -4216,7 +4338,7 @@ fn native_formula_owner_version_mismatch(package: &[u8]) -> TestResult<Vec<u8>> 
         NATIVE_FORMULA_OWNER_IDENTIFIER,
         FORMULA_OWNER_MESSAGE_TYPE,
         |object, message_index| {
-            object.archive_info.message_infos[message_index].versions = vec![1, 0, 5];
+            object.archive_info.message_infos[message_index].versions = vec![1, 0, 5].into();
             Ok(())
         },
     )
@@ -4235,7 +4357,12 @@ fn native_model_filter_data_alias_at_unrelated_path(package: &[u8]) -> TestResul
                 .find(|field| field.path.as_slice() == [70])
                 .and_then(|field| field.object_references.first())
                 .ok_or("missing native filter reference")?;
-            let mut alias = FieldInfo::new(FieldPath::new(vec![71]));
+            let mut alias = FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(vec![71], litchi_iwa_core::Limits::default())
+                    .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap();
             alias.data_references.push(filter);
             info.field_infos.push(alias);
             Ok(())
@@ -4528,7 +4655,7 @@ fn formula_owner_bad_versions(package: &[u8], identifier: u64) -> TestResult<Vec
         identifier,
         FORMULA_OWNER_MESSAGE_TYPE,
         |object, message_index| {
-            object.archive_info.message_infos[message_index].versions = vec![2, 0, 0];
+            object.archive_info.message_infos[message_index].versions = vec![2, 0, 0].into();
             Ok(())
         },
     )
@@ -4564,8 +4691,10 @@ fn formula_owner_bad_diff(package: &[u8], identifier: u64) -> TestResult<Vec<u8>
         identifier,
         FORMULA_OWNER_MESSAGE_TYPE,
         |object, message_index| {
-            object.archive_info.message_infos[message_index].diff_field_path =
-                Some(FieldPath::new(vec![1]));
+            object.archive_info.message_infos[message_index].diff_field_path = Some(
+                litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default())
+                    .unwrap(),
+            );
             Ok(())
         },
     )
@@ -4600,18 +4729,18 @@ fn native_object_message_payload(
     identifier: u64,
     type_: u32,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| {
-            SnappyStream::decompress(entry.data())
+            SnappyStream::decompress(entry.data(), Default::default())
                 .ok()
-                .and_then(|bytes| Archive::parse(bytes.as_bytes()).ok())
+                .and_then(|bytes| Archive::parse(bytes.as_bytes(), Default::default()).ok())
                 .is_some_and(|archive| archive.object(identifier).is_some())
         })
         .ok_or_else(|| format!("missing native object archive for {identifier}"))?;
-    let decompressed = SnappyStream::decompress(entry.data())?.into_bytes();
-    let archive = Archive::parse(&decompressed)?;
+    let decompressed = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+    let archive = Archive::parse(&decompressed, Default::default())?;
     Ok(archive
         .object(identifier)
         .ok_or_else(|| format!("missing native object {identifier}"))?
@@ -4732,12 +4861,14 @@ fn info_payload(package: &[u8], index: usize) -> TestResult<Vec<u8>> {
 
 fn hidden_owner_payload_from_package(package: &[u8], index: usize) -> TestResult<Vec<u8>> {
     let payload = model_payload_from_package(package, index)?;
-    Ok(WireView::parse(&payload)?
-        .fields()
-        .find(|field| field.number() == 70)
-        .ok_or("missing hidden-state owner")?
-        .payload()
-        .to_vec())
+    Ok(
+        WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .find(|field| field.number() == 70)
+            .ok_or("missing hidden-state owner")?
+            .payload()
+            .to_vec(),
+    )
 }
 
 fn without_previews(package: &[u8]) -> TestResult<Vec<u8>> {
@@ -4746,7 +4877,7 @@ fn without_previews(package: &[u8]) -> TestResult<Vec<u8>> {
 
 fn without_preview_subset(package: &[u8], previews: &[&str]) -> TestResult<Vec<u8>> {
     Ok(
-        Catalog::from_bytes(package)?.reassemble_with_deletions_to_bytes(
+        Catalog::from_bytes(package, Default::default())?.reassemble_with_deletions_to_bytes(
             &[],
             previews,
             Limits::default(),
@@ -4771,7 +4902,7 @@ fn assert_rejected_without_mutation(
 fn native_profile_mixes_are_rejected_before_graph_admission() -> TestResult {
     let source = normal_package()?;
     let mixed = rewrite_model_metadata(&source, 0, |model, message_index| {
-        model.archive_info.message_infos[message_index].versions = vec![3, 2, 10];
+        model.archive_info.message_infos[message_index].versions = vec![3, 2, 10].into();
         Ok(())
     })?;
     let package = Package::from_bytes(&mixed)?;
@@ -4780,10 +4911,8 @@ fn native_profile_mixes_are_rejected_before_graph_admission() -> TestResult {
         package.body_table_hidden_axes(0usize),
         Err(Error::InvalidSource)
     ));
-    assert!(matches!(
-        package.edit_body_table_hidden_axes(0usize),
-        Err(Error::InvalidSource)
-    ));
+    let mut edit = package.edit_body_table_hidden_axes(0usize)?;
+    assert!(matches!(edit.before(), Err(Error::InvalidSource)));
     assert_eq!(package.exact_bytes(), before);
     Ok(())
 }
@@ -4807,10 +4936,8 @@ fn native_metadata_contradictions_remain_terminal() -> TestResult {
             package.body_table_hidden_axes(0usize),
             Err(Error::InvalidSource)
         ));
-        assert!(matches!(
-            package.edit_body_table_hidden_axes(0usize),
-            Err(Error::InvalidSource)
-        ));
+        let mut edit = package.edit_body_table_hidden_axes(0usize)?;
+        assert!(matches!(edit.before(), Err(Error::InvalidSource)));
         assert_eq!(package.exact_bytes(), before);
     }
     Ok(())
@@ -4841,10 +4968,8 @@ fn native_nonempty_hidden_state_is_not_admitted() -> TestResult {
         package.body_table_hidden_axes(0usize),
         Err(Error::InvalidSource)
     ));
-    assert!(matches!(
-        package.edit_body_table_hidden_axes(0usize),
-        Err(Error::InvalidSource)
-    ));
+    let mut edit = package.edit_body_table_hidden_axes(0usize)?;
+    assert!(matches!(edit.before(), Err(Error::InvalidSource)));
     assert_eq!(package.exact_bytes(), before);
     Ok(())
 }
@@ -4860,12 +4985,15 @@ fn selectors_read_rows_columns_and_absence_without_collapsing_names() -> TestRes
     // view map (field 6).  Keep this assertion independent of the focused
     // hidden-axis reader so a fixture typo cannot mask an ownership bug.
     assert!(
-        !WireView::parse(&info_payload(&source, 0)?)?
-            .fields()
-            .any(|field| field.number() == 6)
+        !WireView::parse(
+            &info_payload(&source, 0)?,
+            litchi_iwa_common::WireLimits::DEFAULT
+        )?
+        .fields()
+        .any(|field| field.number() == 6)
     );
     let model_payload = model_payload_from_package(&source, 0)?;
-    let model_wire = WireView::parse(&model_payload)?;
+    let model_wire = WireView::parse(&model_payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     assert!(model_wire.fields().any(|field| field.number() == 46));
     let owner_field = model_wire
         .fields()
@@ -4889,11 +5017,18 @@ fn selectors_read_rows_columns_and_absence_without_collapsing_names() -> TestRes
     );
     assert!(matches!(
         package.body_table_hidden_axes(BodyTableSelector::name("Missing")),
-        Err(Error::TableNotFound)
+        Err(Error::Refused(
+            litchi_pages::table::hidden_axes::transaction::Refusal::TableNotFound
+        ))
     ));
     assert!(matches!(
         package.body_table_hidden_axes(usize::MAX),
-        Err(Error::TableNotFound | Error::AmbiguousSelector)
+        Err(
+            Error::Refused(litchi_pages::table::hidden_axes::transaction::Refusal::TableNotFound)
+                | Error::Refused(
+                    litchi_pages::table::hidden_axes::transaction::Refusal::AmbiguousSelector
+                )
+        )
     ));
 
     let ambiguous_source = synthetic_package(
@@ -4909,7 +5044,11 @@ fn selectors_read_rows_columns_and_absence_without_collapsing_names() -> TestRes
     let ambiguous = Package::from_bytes(&ambiguous_source)?;
     assert!(matches!(
         ambiguous.body_table_hidden_axes(BodyTableSelector::name("Revenue")),
-        Err(Error::AmbiguousTableName | Error::AmbiguousSelector)
+        Err(Error::Refused(
+            litchi_pages::table::hidden_axes::transaction::Refusal::AmbiguousTableName
+        ) | Error::Refused(
+            litchi_pages::table::hidden_axes::transaction::Refusal::AmbiguousSelector
+        ))
     ));
     Ok(())
 }
@@ -4988,7 +5127,12 @@ fn ownerless_creation_rejects_active_or_column_extent_uuid_in_unselected_map() -
             .set(requested.clone())
             .commit();
         assert!(
-            matches!(&result, Err(Error::UnsupportedDependency)),
+            matches!(
+                &result,
+                Err(Error::Refused(
+                    litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedDependency
+                ))
+            ),
             "{label} UUID collision in an unselected map was accepted: {result:?}"
         );
         assert_eq!(package.exact_bytes(), before);
@@ -5190,7 +5334,9 @@ fn source_built_aggregate_nonempty_dependency_creation_is_refused() -> TestResul
     assert!(
         matches!(
             &result,
-            Err(Error::UnsupportedDependency | Error::InvalidSource)
+            Err(Error::Refused(
+                litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedDependency
+            ) | Error::InvalidSource)
         ),
         "non-empty source-built dependency was admitted: {result:?}"
     );
@@ -5222,7 +5368,9 @@ fn source_built_aggregate_foreign_engine_edge_is_refused() -> TestResult {
         .and_then(|edit| edit.set(requested).commit());
     assert!(matches!(
         result,
-        Err(Error::UnsupportedDependency | Error::InvalidSource)
+        Err(Error::Refused(
+            litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedDependency
+        ) | Error::InvalidSource)
     ));
     assert_eq!(package.exact_bytes(), before);
     Ok(())
@@ -5365,7 +5513,10 @@ fn metadata_bearing_ownerless_creation_round_trips_rows_columns_and_both() -> Te
             );
         }
         let target_model_payload = model_payload_from_package(&target, 0)?;
-        let model = WireView::parse(&target_model_payload)?;
+        let model = WireView::parse(
+            &target_model_payload,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let owner_payload = model
             .fields()
             .find(|field| field.number() == 70)
@@ -5399,7 +5550,7 @@ fn metadata_bearing_ownerless_creation_round_trips_rows_columns_and_both() -> Te
             member_bytes(&target, UNRELATED_MEMBER)?,
             source_other_archive
         );
-        let target_catalog = Catalog::from_bytes(&target)?;
+        let target_catalog = Catalog::from_bytes(&target, Default::default())?;
         for preview in PREVIEWS {
             assert!(target_catalog.iter().all(|entry| entry.name() != preview));
         }
@@ -5581,9 +5732,9 @@ fn hostile_metadata_identity_routes_and_watermarks_fail_closed_atomically() -> T
             matches!(
                 &result,
                 Err(Error::InvalidSource
-                    | Error::UnsupportedSource
-                    | Error::UnsupportedDependency
-                    | Error::LimitExceeded { .. })
+                    | Error::Refused(litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedSource)
+                    | Error::Refused(litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedDependency)
+                    | Error::Limit { .. })
             ),
             "hostile metadata case {case_index} was accepted: {result:?}"
         );
@@ -5617,7 +5768,13 @@ fn unknown_metadata_is_read_and_noop_preserved_but_changed_creation_refused() ->
     assert!(
         matches!(
             &result,
-            Err(Error::InvalidSource | Error::UnsupportedSource | Error::UnsupportedDependency)
+            Err(Error::InvalidSource
+                | Error::Refused(
+                    litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedSource
+                )
+                | Error::Refused(
+                    litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedDependency
+                ))
         ),
         "changed owner creation accepted unknown PackageMetadata fields: {result:?}"
     );
@@ -5652,14 +5809,17 @@ fn ownerless_creation_output_limit_is_atomic() -> TestResult {
         64 * 1024 * 1024,
         64 * 1024 * 1024,
     )?;
-    let bounded = Package::from_bytes_with_limits(&source, limits)?;
+    let bounded = Package::from_bytes_with_options(
+        &source,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    )?;
     let before = bounded.exact_bytes();
     let result = bounded
         .edit_body_table_hidden_axes(0usize)?
         .set(requested)
         .commit();
     assert!(
-        matches!(&result, Err(Error::LimitExceeded { .. })),
+        matches!(&result, Err(Error::Limit { .. })),
         "ownerless creation crossed the output limit without reporting it: {result:?}"
     );
     assert_eq!(bounded.exact_bytes(), before);
@@ -5726,7 +5886,7 @@ fn set_clear_reset_and_noop_preserve_exact_source_and_presence() -> TestResult {
     assert!(replay_again.patch().is_noop());
     assert_eq!(replay_again.package().exact_bytes(), source);
 
-    let tampered_source = Catalog::from_bytes(&source)?.reassemble_to_bytes(
+    let tampered_source = Catalog::from_bytes(&source, Default::default())?.reassemble_to_bytes(
         &[EntryEdit::new("Data/sentinel.bin", b"tampered-noop")],
         Limits::default(),
     )?;
@@ -5745,18 +5905,21 @@ fn set_clear_reset_and_noop_preserve_exact_source_and_presence() -> TestResult {
         HiddenAxes::empty()
     );
     assert!(
-        WireView::parse(&model_payload_from_package(
-            &clear.package().exact_bytes(),
-            0
-        )?)?
+        WireView::parse(
+            &model_payload_from_package(&clear.package().exact_bytes(), 0)?,
+            litchi_iwa_common::WireLimits::DEFAULT
+        )?
         .fields()
         .any(|field| field.number() == 70),
         "clearing user-hidden axes must retain the native owner presence"
     );
     assert!(
-        WireView::parse(&info_payload(&clear.package().exact_bytes(), 0)?)?
-            .fields()
-            .any(|field| field.number() == 8),
+        WireView::parse(
+            &info_payload(&clear.package().exact_bytes(), 0)?,
+            litchi_iwa_common::WireLimits::DEFAULT
+        )?
+        .fields()
+        .any(|field| field.number() == 8),
         "clearing user-hidden axes must retain the active-state UUID presence"
     );
 
@@ -5809,7 +5972,7 @@ fn changed_axes_have_exact_apply_inverse_and_conflict_fences() -> TestResult {
         commit.patch().before().clone()
     );
 
-    let tampered_source = Catalog::from_bytes(&source)?.reassemble_to_bytes(
+    let tampered_source = Catalog::from_bytes(&source, Default::default())?.reassemble_to_bytes(
         &[EntryEdit::new("Data/sentinel.bin", b"tampered")],
         Limits::default(),
     )?;
@@ -5818,10 +5981,11 @@ fn changed_axes_have_exact_apply_inverse_and_conflict_fences() -> TestResult {
         tampered.apply_body_table_hidden_axes(commit.patch()),
         Err(Error::PatchConflict)
     ));
-    let tampered_target_source = Catalog::from_bytes(&target)?.reassemble_to_bytes(
-        &[EntryEdit::new("Data/sentinel.bin", b"tampered-target")],
-        Limits::default(),
-    )?;
+    let tampered_target_source = Catalog::from_bytes(&target, Default::default())?
+        .reassemble_to_bytes(
+            &[EntryEdit::new("Data/sentinel.bin", b"tampered-target")],
+            Limits::default(),
+        )?;
     let tampered_target = Package::from_bytes(&tampered_target_source)?;
     assert!(matches!(
         tampered_target.apply_body_table_hidden_axes(&commit.patch().inverse()),
@@ -5898,7 +6062,12 @@ fn locked_tables_refuse_changed_axis_publication_but_allow_reads() -> TestResult
         .edit_body_table_hidden_axes(0usize)?
         .set(HiddenAxes::new([AxisIndex::row(0)])?)
         .commit();
-    assert!(matches!(result, Err(Error::TableLocked)));
+    assert!(matches!(
+        result,
+        Err(Error::Refused(
+            litchi_pages::table::hidden_axes::transaction::Refusal::TableLocked
+        ))
+    ));
     assert_eq!(package.exact_bytes(), before);
     Ok(())
 }

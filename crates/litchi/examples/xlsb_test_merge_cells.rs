@@ -6,15 +6,15 @@
 //! ```
 
 use litchi::sheet::CellValue;
+use litchi::xlsb::builder::{self, Builder};
 use litchi::xlsb::merged_cells::MergedCell;
-use litchi::xlsb::writer::{MutableWorksheet, WorkbookWriter};
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Test M: Creating XLSB with one merged title row...");
 
-    let mut workbook = WorkbookWriter::new();
-    let mut sheet = MutableWorksheet::new("Merged");
+    let mut workbook = Builder::new();
+    let mut sheet = builder::Worksheet::new("Merged");
 
     // Title in A1, merge A1:D1
     sheet.set_cell(0, 0, CellValue::String("Sales Report".to_string()));
@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     workbook.add_worksheet(sheet);
 
     let file = File::create("xlsb_test_merge_cells.xlsb")?;
-    workbook.save(file)?;
+    workbook.build()?.write_to(file)?;
 
     println!("✓ Created xlsb_test_merge_cells.xlsb");
     Ok(())

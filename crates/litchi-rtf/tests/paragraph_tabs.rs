@@ -9,10 +9,11 @@
 
 mod repair_support;
 
-use litchi_rtf::{MAX_PARAGRAPH_TAB_STOPS, RtfDocument, RtfWriter, TabAlignment, TabLeader};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{MAX_PARAGRAPH_TAB_STOPS, TabAlignment, TabLeader, write::Writer};
 use std::fmt::Write as _;
 
-fn block<'a>(document: &'a RtfDocument<'a>, needle: &str) -> &'a litchi_rtf::StyleBlock<'a> {
+fn block<'a>(document: &'a Tree<'a>, needle: &str) -> &'a litchi_rtf::StyleBlock<'a> {
     document
         .blocks()
         .iter()
@@ -27,7 +28,7 @@ fn parses_libreoffice_paragraph_and_style_tab_fixture() {
             "../../test-data/libreoffice-core/sw/qa/extras/rtfimport/data/tdf96308-tabpos.rtf",
         ))
         .unwrap();
-    let document = RtfDocument::parse_bytes(&source).unwrap();
+    let document = Tree::parse_bytes(&source, litchi_rtf::read::OpenOptions::default()).unwrap();
 
     let style_tabs = document
         .stylesheet()
@@ -51,7 +52,8 @@ fn parses_libreoffice_paragraph_and_style_tab_fixture() {
         "../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tab-stop-fill-chars.rtf",
     ))
     .unwrap();
-    let leader_document = RtfDocument::parse_bytes(&leader_source).unwrap();
+    let leader_document =
+        Tree::parse_bytes(&leader_source, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert!(leader_document.blocks().iter().any(|block| {
         block
             .paragraph
@@ -77,7 +79,7 @@ fn parses_inherits_resets_and_deterministically_writes_all_tab_forms() {
         r#"{\tqr\tx5760 Inner}Tail{\pard Reset}"#,
         r#"{\*\unknown\tqr1\tx\tlmdot0 ignored}Visible}"#,
     );
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let outer = block(&document, "Outer");
     let tabs = outer.paragraph.tab_stops.as_slice();
     assert_eq!(tabs.len(), 7);
@@ -105,9 +107,7 @@ fn parses_inherits_resets_and_deterministically_writes_all_tab_forms() {
     );
 
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut output).write_document(&document).unwrap();
     let written = String::from_utf8(output).unwrap();
     assert!(written.contains(concat!(
         r#"\tqr\tldot\tx720\tqc\tlmdot\tx1440\tqdec\tlhyph\tx2160"#,
@@ -116,7 +116,7 @@ fn parses_inherits_resets_and_deterministically_writes_all_tab_forms() {
     assert!(!written.contains(r"\tql"));
     assert!(!written.contains(r"\tb\tx"));
 
-    let reparsed = RtfDocument::parse(&written).unwrap();
+    let reparsed = Tree::parse(&written, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         block(&reparsed, "Outer").paragraph.tab_stops,
         outer.paragraph.tab_stops
@@ -125,9 +125,11 @@ fn parses_inherits_resets_and_deterministically_writes_all_tab_forms() {
 
 #[test]
 fn parses_and_writes_tabs_in_paragraph_styles() {
-    let document =
-        RtfDocument::parse(r"{\rtf1{\stylesheet{\s30\tqr\tldot\tx2552 Body Text 3;}}Body}")
-            .unwrap();
+    let document = Tree::parse(
+        r"{\rtf1{\stylesheet{\s30\tqr\tldot\tx2552 Body Text 3;}}Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let tabs = document
         .stylesheet()
         .get(30)
@@ -139,11 +141,11 @@ fn parses_and_writes_tabs_in_paragraph_styles() {
     assert_eq!(tabs.as_slice()[0].alignment, TabAlignment::Right);
 
     let mut output = Vec::new();
-    let mut writer = RtfWriter::new(&mut output);
+    let mut writer = Writer::new(&mut output);
     writer.write_document_header().unwrap();
     writer.write_stylesheet(document.stylesheet()).unwrap();
     writer.write_str("}").unwrap();
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         reparsed
             .stylesheet()
@@ -170,7 +172,10 @@ fn rejects_malformed_and_over_limit_tab_definitions() {
         r"{\rtf1\tx2147483648 X}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted {source}"
         );
     }
@@ -181,8 +186,14 @@ fn rejects_malformed_and_over_limit_tab_definitions() {
     }
     over_limit.push_str(" X}");
     assert!(repair_support::rejected_or_parameter_repaired(
-        &RtfDocument::parse(&over_limit)
+        &Tree::parse(&over_limit, litchi_rtf::read::OpenOptions::default())
     ));
 
-    assert!(RtfDocument::parse(r"{\rtf1{\*\unknown\tqr1\tx\tlmdot0 ignored}Visible}",).is_ok());
+    assert!(
+        Tree::parse(
+            r"{\rtf1{\*\unknown\tqr1\tx\tlmdot0 ignored}Visible}",
+            litchi_rtf::read::OpenOptions::default()
+        )
+        .is_ok()
+    );
 }

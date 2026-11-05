@@ -27,12 +27,12 @@ const DEFAULT_THEME_DIRECTORY: &str = "/xl/theme";
 const DEFAULT_THEME_STEM: &str = "theme";
 const DEFAULT_THEME_EXTENSION: &str = "xml";
 
-fn relationship_output_limit() -> usize {
-    litchi_opc::ReadLimits::default().max_relationship_xml_bytes()
+fn relationship_output_limit(limits: litchi_opc::SourceLimits) -> usize {
+    limits.max_relationship_xml_bytes()
 }
 
-fn content_types_output_limit() -> usize {
-    litchi_opc::ReadLimits::default().max_content_types_bytes()
+fn content_types_output_limit(limits: litchi_opc::SourceLimits) -> usize {
+    limits.max_content_types_bytes()
 }
 
 /// An eager snapshot of the optional Workbook-owned Theme part.
@@ -43,7 +43,7 @@ fn content_types_output_limit() -> usize {
 /// retains the Workbook relationship list so a create/remove patch detects
 /// unrelated graph changes that could alter the selected relationship ID.
 #[derive(Clone, Debug)]
-pub struct OwnerSnapshot {
+pub(crate) struct OwnerSnapshot {
     theme: Option<Snapshot>,
     source: OwnerSource,
     plan: CreationPlan,
@@ -51,53 +51,33 @@ pub struct OwnerSnapshot {
 }
 
 impl OwnerSnapshot {
-    /// Borrow the typed Theme, or `None` when the owner is absent.
-    #[must_use]
-    pub fn theme(&self) -> Option<&Theme> {
-        self.theme.as_ref().map(Snapshot::theme)
+    /// The present Theme, if any.
+    pub(crate) const fn snapshot(&self) -> Option<&Snapshot> {
+        self.theme.as_ref()
+    }
+
+    /// The part name of the present Theme, or the one a new Theme is
+    /// created at.
+    pub(crate) fn part_name(&self) -> &str {
+        &self.plan.theme_name
     }
 
     /// Borrow the optional applied-theme family metadata.
     #[must_use]
-    pub fn family(&self) -> Option<&Family> {
+    pub(crate) fn family(&self) -> Option<&Family> {
         self.theme.as_ref().and_then(Snapshot::family)
-    }
-
-    /// Borrow the present Theme snapshot, or `None` when the owner is absent.
-    #[must_use]
-    pub fn snapshot(&self) -> Option<&Snapshot> {
-        self.theme.as_ref()
-    }
-
-    /// Borrow the exact Theme XML when the owner is present.
-    #[must_use]
-    pub fn source_xml(&self) -> Option<&[u8]> {
-        self.theme.as_ref().map(Snapshot::source_xml)
     }
 
     /// Whether the Workbook owns a Theme part.
     #[must_use]
-    pub fn is_present(&self) -> bool {
+    pub(crate) fn is_present(&self) -> bool {
         self.theme.is_some()
-    }
-
-    /// Return the finite limits used to inspect and stage this owner.
-    #[must_use]
-    pub const fn limits(&self) -> Limits {
-        self.limits
-    }
-
-    /// Return the absolute Theme part name used by the current or planned
-    /// owner.  This is a diagnostic string rather than an OPC URI type.
-    #[must_use]
-    pub fn part_name(&self) -> &str {
-        &self.plan.theme_name
     }
 
     /// Start a detached create, replace, or remove transaction.
     #[must_use]
-    pub fn edit(&self) -> OwnerTransaction {
-        OwnerTransaction {
+    pub(crate) fn edit(&self) -> OwnerDraft {
+        OwnerDraft {
             before: self.clone(),
             staged: self.theme.as_ref().map(|snapshot| snapshot.theme().clone()),
             staged_family: self.family().cloned(),
@@ -172,33 +152,33 @@ impl OwnerSnapshot {
 
 /// Detached optional Theme owner edit.
 #[derive(Clone, Debug)]
-pub struct OwnerTransaction {
+pub(crate) struct OwnerDraft {
     before: OwnerSnapshot,
     staged: Option<Theme>,
     staged_family: Option<Family>,
 }
 
-impl OwnerTransaction {
+impl OwnerDraft {
     /// Immutable owner source used for stale checks.
     #[must_use]
-    pub fn before(&self) -> &OwnerSnapshot {
+    pub(crate) fn before(&self) -> &OwnerSnapshot {
         &self.before
     }
 
     /// Borrow the currently staged Theme, or `None` when removal is staged.
     #[must_use]
-    pub fn theme(&self) -> Option<&Theme> {
+    pub(crate) fn theme(&self) -> Option<&Theme> {
         self.staged.as_ref()
     }
 
     /// Borrow the currently staged applied-theme family metadata.
     #[must_use]
-    pub fn family(&self) -> Option<&Family> {
+    pub(crate) fn family(&self) -> Option<&Family> {
         self.staged_family.as_ref()
     }
 
     /// Replace or remove the complete typed Theme owner.
-    pub fn replace(&mut self, theme: Option<Theme>) -> Result<bool> {
+    pub(crate) fn replace(&mut self, theme: Option<Theme>) -> Result<bool> {
         if let Some(value) = theme.as_ref() {
             validate_model(value, self.before.limits)?;
             if !self.before.is_present() && value.name.is_empty() {
@@ -222,12 +202,12 @@ impl OwnerTransaction {
     }
 
     /// Set or create the complete typed Theme owner.
-    pub fn set_theme(&mut self, theme: Theme) -> Result<bool> {
+    pub(crate) fn set_theme(&mut self, theme: Theme) -> Result<bool> {
         self.replace(Some(theme))
     }
 
     /// Set or replace the applied-theme family metadata.
-    pub fn set_family(&mut self, family: Family) -> Result<bool> {
+    pub(crate) fn set_family(&mut self, family: Family) -> Result<bool> {
         let family = super::preserve_family_source(self.before.family(), family)?;
         if self.staged_family.as_ref() == Some(&family) {
             return Ok(false);
@@ -237,7 +217,7 @@ impl OwnerTransaction {
     }
 
     /// Remove the applied-theme family metadata while retaining the Theme.
-    pub fn remove_family(&mut self) -> Result<bool> {
+    pub(crate) fn remove_family(&mut self) -> Result<bool> {
         if self.staged_family.is_none() {
             return Ok(false);
         }
@@ -246,12 +226,12 @@ impl OwnerTransaction {
     }
 
     /// Remove the optional Theme part and its Workbook owner edge.
-    pub fn remove(&mut self) -> Result<bool> {
+    pub(crate) fn remove(&mut self) -> Result<bool> {
         self.replace(None)
     }
 
     /// Change the Theme display name while retaining its other typed fields.
-    pub fn set_name(&mut self, name: impl Into<String>) -> Result<bool> {
+    pub(crate) fn set_name(&mut self, name: impl Into<String>) -> Result<bool> {
         let mut candidate = self
             .staged
             .clone()
@@ -261,7 +241,7 @@ impl OwnerTransaction {
     }
 
     /// Replace the complete twelve-slot color palette.
-    pub fn set_palette(&mut self, colors: super::Palette) -> Result<bool> {
+    pub(crate) fn set_palette(&mut self, colors: super::Palette) -> Result<bool> {
         let mut candidate = self
             .staged
             .clone()
@@ -271,7 +251,7 @@ impl OwnerTransaction {
     }
 
     /// Replace the complete major/minor font set.
-    pub fn set_fonts(&mut self, fonts: super::FontSet) -> Result<bool> {
+    pub(crate) fn set_fonts(&mut self, fonts: super::FontSet) -> Result<bool> {
         let mut candidate = self
             .staged
             .clone()
@@ -281,7 +261,7 @@ impl OwnerTransaction {
     }
 
     /// Commit the detached create, replace, or remove operation.
-    pub fn commit(self) -> Result<OwnerCommit> {
+    pub(crate) fn commit(self) -> Result<OwnerCommit> {
         let before_theme = self
             .before
             .theme
@@ -356,7 +336,7 @@ impl OwnerTransaction {
 
 /// Result of an optional Theme owner transaction.
 #[derive(Clone, Debug)]
-pub struct OwnerCommit {
+pub(crate) struct OwnerCommit {
     patch: OwnerPatch,
     changed: bool,
 }
@@ -368,25 +348,13 @@ impl OwnerCommit {
 
     /// Whether the Theme payload or owner topology changes.
     #[must_use]
-    pub const fn changed(&self) -> bool {
+    pub(crate) const fn changed(&self) -> bool {
         self.changed
-    }
-
-    /// Planned resulting owner snapshot.
-    #[must_use]
-    pub fn snapshot(&self) -> &OwnerSnapshot {
-        self.patch.after()
-    }
-
-    /// Reversible source-checked publication patch.
-    #[must_use]
-    pub fn patch(&self) -> &OwnerPatch {
-        &self.patch
     }
 
     /// Consume the commit into its planned snapshot and patch.
     #[must_use]
-    pub fn into_parts(self) -> (OwnerSnapshot, OwnerPatch) {
+    pub(crate) fn into_parts(self) -> (OwnerSnapshot, OwnerPatch) {
         let snapshot = self.patch.after().clone();
         (snapshot, self.patch)
     }
@@ -394,7 +362,7 @@ impl OwnerCommit {
 
 /// A source-checked, reversible create/replace/remove Theme owner patch.
 #[derive(Clone, Debug)]
-pub struct OwnerPatch {
+pub(crate) struct OwnerPatch {
     before: OwnerSnapshot,
     after: OwnerSnapshot,
     changed: bool,
@@ -411,26 +379,25 @@ impl OwnerPatch {
     }
 
     /// Source state required before publication.
-    #[must_use]
-    pub fn before(&self) -> &OwnerSnapshot {
+    pub(crate) fn before(&self) -> &OwnerSnapshot {
         &self.before
     }
 
     /// Exact state produced by publication.
     #[must_use]
-    pub fn after(&self) -> &OwnerSnapshot {
+    pub(crate) fn after(&self) -> &OwnerSnapshot {
         &self.after
     }
 
     /// Whether applying this patch changes bytes or owner topology.
     #[must_use]
-    pub const fn is_empty(&self) -> bool {
+    pub(crate) const fn is_empty(&self) -> bool {
         !self.changed
     }
 
     /// Return a patch that restores the source state represented by `before`.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
@@ -442,15 +409,13 @@ impl OwnerPatch {
     pub(crate) fn apply(&self, package: &mut OpcPackage) -> Result<OwnerSnapshot> {
         let current = read_owner(package, self.before.limits)?;
         if !current.same_source(&self.before) {
-            return Err(invalid("Theme owner patch source is stale"));
+            return Err(Error::PatchConflict { part: "theme" });
         }
         if self.is_empty() {
             return Ok(current);
         }
         if package.is_signed() || package.requires_signature_edit_policy() {
-            return Err(Error::Opc(
-                litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy,
-            ));
+            return Err(Error::Signed);
         }
         let mut candidate = package.clone();
         candidate.unsign();
@@ -475,6 +440,7 @@ struct CreationPlan {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct OwnerSource {
+    opc_limits: litchi_opc::SourceLimits,
     workbook_name: String,
     workbook_relationships: Vec<RelationshipState>,
     part_names: Vec<String>,
@@ -497,13 +463,16 @@ struct OwnerSource {
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum ThemeRelationships {
     Absent,
-    Exact(OwnedRelationships),
+    // Most theme owners have no relationship member. Keep the full OPC
+    // relationship index out of the common absent/fresh enum footprint.
+    Exact(Box<OwnedRelationships>),
     FreshAbsent { owner: String },
 }
 
 impl OwnerSource {
     fn same_source(&self, other: &Self) -> bool {
-        if self.workbook_name != other.workbook_name
+        if self.opc_limits != other.opc_limits
+            || self.workbook_name != other.workbook_name
             || self.workbook_relationships != other.workbook_relationships
             || self.part_names != other.part_names
             || self.workbook_relationship_xml != other.workbook_relationship_xml
@@ -527,7 +496,7 @@ impl OwnerSource {
                 &plan.relationship.target_ref,
                 &plan.relationship.id,
                 plan.relationship.target_mode,
-                relationship_output_limit(),
+                relationship_output_limit(self.opc_limits),
             )?;
         }
         workbook_relationships.sort_by(|left, right| left.id.cmp(&right.id));
@@ -535,11 +504,10 @@ impl OwnerSource {
         let mut content_types = self.content_types.clone();
         if !part_names.iter().any(|name| name == &plan.theme_name) {
             part_names.push(plan.theme_name.clone());
-            let theme_name = PackURI::new(&plan.theme_name)
-                .map_err(|error| Error::InvalidUri(error.to_string()))?;
+            let theme_name = PackURI::new(&plan.theme_name)?;
             content_types = content_types.with_part_overrides(
                 &[(&theme_name, CONTENT_TYPE)],
-                content_types_output_limit(),
+                content_types_output_limit(self.opc_limits),
             )?;
         }
         part_names.sort();
@@ -551,6 +519,7 @@ impl OwnerSource {
             }
         };
         Ok(Self {
+            opc_limits: self.opc_limits,
             workbook_name: self.workbook_name.clone(),
             workbook_relationships,
             part_names,
@@ -586,16 +555,17 @@ impl OwnerSource {
                 part_names.push(name.clone());
             }
         }
-        let workbook_relationship_xml = self
-            .workbook_relationship_xml
-            .without_relationship(&plan.relationship.id, relationship_output_limit())?;
-        let theme_name =
-            PackURI::new(&plan.theme_name).map_err(|error| Error::InvalidUri(error.to_string()))?;
+        let workbook_relationship_xml = self.workbook_relationship_xml.without_relationship(
+            &plan.relationship.id,
+            relationship_output_limit(self.opc_limits),
+        )?;
+        let theme_name = PackURI::new(&plan.theme_name)?;
         let content_types = self.content_types.without_parts(
             std::slice::from_ref(&theme_name),
-            content_types_output_limit(),
+            content_types_output_limit(self.opc_limits),
         )?;
         Ok(Self {
+            opc_limits: self.opc_limits,
             workbook_name: self.workbook_name.clone(),
             workbook_relationships,
             part_names,
@@ -615,8 +585,7 @@ pub(crate) fn read_owner(package: &OpcPackage, limits: Limits) -> Result<OwnerSn
     let workbook = package.main_document_part()?;
     if workbook.content_type() != content_type::XLSB_BIN {
         return Err(Error::InvalidContentType {
-            expected: content_type::XLSB_BIN.to_owned(),
-            got: workbook.content_type().to_owned(),
+            expected: content_type::XLSB_BIN,
         });
     }
     let mut workbook_relationships = Vec::new();
@@ -631,18 +600,17 @@ pub(crate) fn read_owner(package: &OpcPackage, limits: Limits) -> Result<OwnerSn
     }
     workbook_relationships.sort_by(|left, right| left.id.cmp(&right.id));
     let part_names = collect_part_names(package)?;
-    let opc_limits = litchi_opc::ReadLimits::default();
+    let opc_limits = package.read_limits();
     let workbook_relationship_xml =
-        package.source_relationships_with_limits(workbook.partname(), opc_limits)?;
-    let content_types = package.source_content_types_with_limits(opc_limits)?;
+        package.source_relationships(workbook.partname(), opc_limits)?;
+    let content_types = package.source_content_types(opc_limits)?;
     let theme_relationship_xml = theme
         .as_ref()
         .map(|snapshot| -> Result<ThemeRelationships> {
-            let name = PackURI::new(&snapshot.graph.theme_name)
-                .map_err(|error| Error::InvalidUri(error.to_string()))?;
-            let relationships = package.source_relationships_with_limits(&name, opc_limits)?;
+            let name = PackURI::new(&snapshot.graph.theme_name)?;
+            let relationships = package.source_relationships(&name, opc_limits)?;
             if relationships.member_present() {
-                Ok(ThemeRelationships::Exact(relationships))
+                Ok(ThemeRelationships::Exact(Box::new(relationships)))
             } else {
                 Ok(ThemeRelationships::FreshAbsent {
                     owner: snapshot.graph.theme_name.clone(),
@@ -654,8 +622,7 @@ pub(crate) fn read_owner(package: &OpcPackage, limits: Limits) -> Result<OwnerSn
     let theme_xml = theme
         .as_ref()
         .map(|snapshot| {
-            let name = PackURI::new(&snapshot.graph.theme_name)
-                .map_err(|error| Error::InvalidUri(error.to_string()))?;
+            let name = PackURI::new(&snapshot.graph.theme_name)?;
             package.source_xml_part(&name).map_err(Error::from)
         })
         .transpose()?;
@@ -668,6 +635,7 @@ pub(crate) fn read_owner(package: &OpcPackage, limits: Limits) -> Result<OwnerSn
         None => plan_absent(package, workbook, &workbook_relationships)?,
     };
     let source = OwnerSource {
+        opc_limits,
         workbook_name: workbook.partname().as_str().to_owned(),
         workbook_relationships,
         part_names,
@@ -748,8 +716,7 @@ fn next_theme_name(package: &OpcPackage) -> Result<PackURI> {
     for index in 1..=maximum {
         let candidate = PackURI::new(format!(
             "{DEFAULT_THEME_DIRECTORY}/{DEFAULT_THEME_STEM}{index}.{DEFAULT_THEME_EXTENSION}"
-        ))
-        .map_err(|error| Error::InvalidUri(error.to_string()))?;
+        ))?;
         if package
             .iter_parts()
             .all(|part| !part.partname().is_equivalent_to(&candidate))
@@ -821,8 +788,7 @@ fn plan_from_absent_source(source: &OwnerSource, relationship_type: &str) -> Res
                 .any(|relationship| relationship.id == *candidate)
         })
         .ok_or_else(|| invalid("no bounded Theme relationship ID is available"))?;
-    let workbook = PackURI::new(&source.workbook_name)
-        .map_err(|error| Error::InvalidUri(error.to_string()))?;
+    let workbook = PackURI::new(&source.workbook_name)?;
     let target_ref = theme_name.relative_ref(workbook.base_uri());
     Ok(CreationPlan {
         workbook_name: source.workbook_name.clone(),
@@ -850,7 +816,12 @@ fn encode_new_theme(
     } else {
         theme.name.as_str()
     };
-    let mut source = codec::encode_part(name, &theme.colors, &theme.fonts)?;
+    let mut source = codec::encode_part(
+        name,
+        &theme.colors,
+        &theme.fonts,
+        codec::Limits::new(limits.max_xml_bytes),
+    )?;
     if plan.relationship.reltype == STRICT_THEME_RELATIONSHIP {
         let range = super::raw_attribute_value_range(&source, b"xmlns:a")?;
         if &source[range.clone()] != codec::NAMESPACE.as_bytes() {
@@ -859,19 +830,19 @@ fn encode_new_theme(
         source.splice(range, codec::STRICT_NAMESPACE.bytes());
     }
     if let Some(family) = family {
-        source = super::family::part::add_family_with_uri_limit(
+        source = super::family::part::add_family_with_uri(
             &source,
             family,
             super::family::part::NATIVE_EXTENSION_URI,
-            limits.max_xml_bytes,
+            super::family::part::Limits::new(limits.max_xml_bytes),
         )?;
     }
     if source.len() > limits.max_xml_bytes {
-        return Err(Error::LimitExceeded {
-            resource: "generated Theme XML bytes",
-            actual: source.len(),
-            maximum: limits.max_xml_bytes,
-        });
+        return Err(Error::limit(
+            crate::theme::LimitKind::XmlBytes,
+            source.len(),
+            limits.max_xml_bytes,
+        ));
     }
     Ok(source)
 }
@@ -882,8 +853,7 @@ fn materialize(
     after: &OwnerSnapshot,
 ) -> Result<()> {
     let workbook_name = package.main_document_part()?.partname().clone();
-    let expected_workbook = PackURI::new(&before.source.workbook_name)
-        .map_err(|error| Error::InvalidUri(error.to_string()))?;
+    let expected_workbook = PackURI::new(&before.source.workbook_name)?;
     if !workbook_name.is_equivalent_to(&expected_workbook) {
         return Err(invalid("Theme owner Workbook changed during publication"));
     }
@@ -894,8 +864,7 @@ fn materialize(
                     "Theme replacement cannot change its validated package graph",
                 ));
             }
-            let part_name = PackURI::new(&before.graph.theme_name)
-                .map_err(|error| Error::InvalidUri(error.to_string()))?;
+            let part_name = PackURI::new(&before.graph.theme_name)?;
             let part = package.get_part(&part_name)?;
             if part.content_type() != CONTENT_TYPE
                 || part.rels().iter().count() != before.graph.theme_relationships.len()
@@ -918,12 +887,11 @@ fn materialize(
 }
 
 fn restore_source_tokens(package: &mut OpcPackage, source: &OwnerSource) -> Result<()> {
-    let limits = litchi_opc::ReadLimits::default();
-    let workbook_name = PackURI::new(&source.workbook_name)
-        .map_err(|error| Error::InvalidUri(error.to_string()))?;
-    let current_workbook = package.source_relationships_with_limits(&workbook_name, limits)?;
+    let limits = package.read_limits();
+    let workbook_name = PackURI::new(&source.workbook_name)?;
+    let current_workbook = package.source_relationships(&workbook_name, limits)?;
     if current_workbook != source.workbook_relationship_xml {
-        package.try_replace_relationships_with_limits(
+        package.try_replace_relationships(
             &current_workbook,
             &source.workbook_relationship_xml,
             limits,
@@ -932,9 +900,8 @@ fn restore_source_tokens(package: &mut OpcPackage, source: &OwnerSource) -> Resu
     match &source.theme_relationship_xml {
         ThemeRelationships::Absent => {},
         ThemeRelationships::FreshAbsent { owner } => {
-            let owner =
-                PackURI::new(owner).map_err(|error| Error::InvalidUri(error.to_string()))?;
-            let current = package.source_relationships_with_limits(&owner, limits)?;
+            let owner = PackURI::new(owner)?;
+            let current = package.source_relationships(&owner, limits)?;
             if current.member_present() {
                 return Err(invalid(
                     "new Theme unexpectedly acquired a physical relationship member",
@@ -943,19 +910,19 @@ fn restore_source_tokens(package: &mut OpcPackage, source: &OwnerSource) -> Resu
         },
         ThemeRelationships::Exact(theme_relationship_xml) => {
             let current_theme =
-                package.source_relationships_with_limits(theme_relationship_xml.owner(), limits)?;
-            if current_theme != *theme_relationship_xml {
-                package.try_replace_relationships_with_limits(
+                package.source_relationships(theme_relationship_xml.as_ref().owner(), limits)?;
+            if current_theme != *theme_relationship_xml.as_ref() {
+                package.try_replace_relationships(
                     &current_theme,
-                    theme_relationship_xml,
+                    theme_relationship_xml.as_ref(),
                     limits,
                 )?;
             }
         },
     }
-    let current_content_types = package.source_content_types_with_limits(limits)?;
+    let current_content_types = package.source_content_types(limits)?;
     if current_content_types.bytes() != source.content_types.bytes() {
-        package.try_replace_content_types_with_limits(
+        package.try_replace_content_types(
             current_content_types.bytes(),
             &source.content_types,
             limits,
@@ -973,8 +940,7 @@ fn add_owner(
         .theme
         .as_ref()
         .ok_or_else(|| invalid("Theme creation is missing its resulting snapshot"))?;
-    let theme_name = PackURI::new(&snapshot.graph.theme_name)
-        .map_err(|error| Error::InvalidUri(error.to_string()))?;
+    let theme_name = PackURI::new(&snapshot.graph.theme_name)?;
     package.validate_new_part_name(&theme_name)?;
     let source_xml = Arc::clone(&snapshot.source_xml);
     let source_token = after.source.theme_xml.clone();
@@ -996,8 +962,7 @@ fn add_owner(
                 .target_name
                 .as_ref()
                 .ok_or_else(|| invalid("Theme inverse is missing an internal Image target"))?;
-            let target =
-                PackURI::new(target_name).map_err(|error| Error::InvalidUri(error.to_string()))?;
+            let target = PackURI::new(target_name)?;
             let image = package.get_part(&target)?;
             validate_image_target(image.content_type(), image.rels().is_empty())?;
         }
@@ -1030,8 +995,7 @@ fn remove_owner(
     workbook_name: &PackURI,
     before: &Snapshot,
 ) -> Result<()> {
-    let theme_name = PackURI::new(&before.graph.theme_name)
-        .map_err(|error| Error::InvalidUri(error.to_string()))?;
+    let theme_name = PackURI::new(&before.graph.theme_name)?;
     let relationship_id = &before.graph.workbook_relationship.id;
     let workbook = package.get_part_mut(workbook_name)?;
     let relationship = workbook

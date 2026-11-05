@@ -11,6 +11,7 @@
 
 use super::super::file::OleFile;
 use super::core::OleWriter;
+use crate::OleFileLimits;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -49,7 +50,7 @@ fn test_write_simple_ole_file() {
 
     // Try to open with reader
     let cursor = Cursor::new(data);
-    let mut ole = OleFile::open(cursor).unwrap();
+    let mut ole = OleFile::open(cursor, OleFileLimits::default()).unwrap();
 
     // Verify we can read the stream back
     let stream_data = ole.open_stream(&["TestStream"]).unwrap();
@@ -87,7 +88,7 @@ fn test_directory_state_and_filetimes_round_trip_without_clock_access() {
 
     let mut buffer = Cursor::new(Vec::new());
     writer.write_to(&mut buffer).unwrap();
-    let ole = OleFile::open(Cursor::new(buffer.into_inner())).unwrap();
+    let ole = OleFile::open(Cursor::new(buffer.into_inner()), OleFileLimits::default()).unwrap();
 
     let root = ole.root_entry().unwrap();
     assert_eq!(root.state_bits, 0x1020_3040);
@@ -130,7 +131,8 @@ fn fresh_root_creation_time_is_checked_and_source_replay_is_explicit() {
 
     let mut output = Cursor::new(Vec::new());
     fresh.write_to(&mut output).unwrap();
-    let fresh_file = OleFile::open(Cursor::new(output.into_inner())).unwrap();
+    let fresh_file =
+        OleFile::open(Cursor::new(output.into_inner()), OleFileLimits::default()).unwrap();
     assert_eq!(fresh_file.root_entry().unwrap().creation_time, 0);
 
     let expected = 0x0102_0304_0506_0708;
@@ -140,7 +142,8 @@ fn fresh_root_creation_time_is_checked_and_source_replay_is_explicit() {
     replay.create_stream(&["Payload"], b"payload").unwrap();
     let mut output = Cursor::new(Vec::new());
     replay.write_to(&mut output).unwrap();
-    let replay_file = OleFile::open(Cursor::new(output.into_inner())).unwrap();
+    let replay_file =
+        OleFile::open(Cursor::new(output.into_inner()), OleFileLimits::default()).unwrap();
     assert_eq!(replay_file.root_entry().unwrap().creation_time, expected);
 }
 
@@ -148,7 +151,7 @@ fn fresh_root_creation_time_is_checked_and_source_replay_is_explicit() {
 fn known_legacy_fixture_directory_metadata_round_trips_exactly() {
     const FIXTURE: &[u8] =
         include_bytes!("../../../../test-data/ole/doc/cfb-v3-uninitialized-size-high-word.doc");
-    let mut source = OleFile::open(Cursor::new(FIXTURE)).unwrap();
+    let mut source = OleFile::open(Cursor::new(FIXTURE), OleFileLimits::default()).unwrap();
     let root = source.root_entry().unwrap().clone();
     assert_ne!(root.creation_time, 0);
     assert_ne!(root.modified_time, 0);
@@ -178,7 +181,7 @@ fn known_legacy_fixture_directory_metadata_round_trips_exactly() {
 
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
-    let output = OleFile::open(Cursor::new(output.into_inner())).unwrap();
+    let output = OleFile::open(Cursor::new(output.into_inner()), OleFileLimits::default()).unwrap();
     let output_root = output.root_entry().unwrap();
     assert_eq!(output_root.state_bits, root.state_bits);
     assert_eq!(output_root.creation_time, root.creation_time);
@@ -223,7 +226,7 @@ fn test_write_multiple_streams() {
     // Read it back
     let data = buffer.into_inner();
     let cursor = Cursor::new(data);
-    let mut ole = OleFile::open(cursor).unwrap();
+    let mut ole = OleFile::open(cursor, OleFileLimits::default()).unwrap();
 
     // Verify all streams
     let small1 = ole.open_stream(&["Small1"]).unwrap();
@@ -254,7 +257,8 @@ fn test_write_owned_streams_round_trip() {
     let mut buffer = Cursor::new(Vec::new());
     writer.write_to(&mut buffer).unwrap();
 
-    let mut ole = OleFile::open(Cursor::new(buffer.into_inner())).unwrap();
+    let mut ole =
+        OleFile::open(Cursor::new(buffer.into_inner()), OleFileLimits::default()).unwrap();
     assert_eq!(ole.open_stream(&["SmallOwned"]).unwrap(), vec![0x2a; 127]);
     assert_eq!(ole.open_stream(&["LargeOwned"]).unwrap(), vec![0x7b; 5_003]);
 }
@@ -289,7 +293,7 @@ fn test_write_empty_stream() {
 
     let data = buffer.into_inner();
     let cursor = Cursor::new(data);
-    let mut ole = OleFile::open(cursor).unwrap();
+    let mut ole = OleFile::open(cursor, OleFileLimits::default()).unwrap();
 
     let empty = ole.open_stream(&["Empty"]).unwrap();
     assert_eq!(empty.len(), 0);
@@ -311,7 +315,7 @@ fn test_write_with_minifat() {
 
     let data = buffer.into_inner();
     let cursor = Cursor::new(data);
-    let mut ole = OleFile::open(cursor).unwrap();
+    let mut ole = OleFile::open(cursor, OleFileLimits::default()).unwrap();
 
     // Verify all streams
     for i in 0..10 {
@@ -334,7 +338,7 @@ fn test_write_large_stream() {
 
     let data = buffer.into_inner();
     let cursor = Cursor::new(data);
-    let mut ole = OleFile::open(cursor).unwrap();
+    let mut ole = OleFile::open(cursor, OleFileLimits::default()).unwrap();
 
     let read_data = ole.open_stream(&["LargeStream"]).unwrap();
     assert_eq!(read_data.len(), 100_000);
@@ -349,7 +353,7 @@ fn test_write_update_delete() {
     writer.create_stream(&["Test"], b"Initial").unwrap();
 
     // Update it
-    writer.update_stream(&["Test"], b"Updated").unwrap();
+    writer.create_stream(&["Test"], b"Updated").unwrap();
 
     // Create another stream
     writer.create_stream(&["Test2"], b"Data").unwrap();
@@ -362,7 +366,7 @@ fn test_write_update_delete() {
 
     let data = buffer.into_inner();
     let cursor = Cursor::new(data);
-    let mut ole = OleFile::open(cursor).unwrap();
+    let mut ole = OleFile::open(cursor, OleFileLimits::default()).unwrap();
 
     // Test should not exist
     assert!(ole.open_stream(&["Test"]).is_err());
@@ -397,7 +401,8 @@ fn test_delete_storage_removes_descendants_when_serialized() {
     let mut buffer = Cursor::new(Vec::new());
     writer.write_to(&mut buffer).unwrap();
 
-    let mut ole = OleFile::open(Cursor::new(buffer.into_inner())).unwrap();
+    let mut ole =
+        OleFile::open(Cursor::new(buffer.into_inner()), OleFileLimits::default()).unwrap();
     assert!(!ole.directory_exists(&["Root"]));
     assert!(ole.directory_exists(&["RootSibling"]));
     assert!(ole.open_stream(&["Root", "Nested", "Removed"]).is_err());
@@ -433,7 +438,7 @@ fn test_write_sector_size_4096() {
     assert_eq!(sector_shift, 12);
 
     let cursor = Cursor::new(data);
-    let mut ole = OleFile::open(cursor).unwrap();
+    let mut ole = OleFile::open(cursor, OleFileLimits::default()).unwrap();
 
     let stream_data = ole.open_stream(&["Test"]).unwrap();
     assert_eq!(stream_data, b"Hello, 4096!");
@@ -451,7 +456,7 @@ fn test_list_streams_after_write() {
 
     let data = buffer.into_inner();
     let cursor = Cursor::new(data);
-    let ole = OleFile::open(cursor).unwrap();
+    let ole = OleFile::open(cursor, OleFileLimits::default()).unwrap();
 
     let streams = ole.list_streams();
     assert_eq!(streams.len(), 3);
@@ -490,7 +495,7 @@ fn test_write_mixed_sizes() {
 
     let data = buffer.into_inner();
     let cursor = Cursor::new(data);
-    let mut ole = OleFile::open(cursor).unwrap();
+    let mut ole = OleFile::open(cursor, OleFileLimits::default()).unwrap();
 
     // Verify all streams
     assert_eq!(ole.open_stream(&["Tiny"]).unwrap(), b"tiny");
@@ -536,7 +541,7 @@ fn test_write_to_file() {
 
     // Read back from file
     let file = fs::File::open(&temp_path).unwrap();
-    let mut ole = OleFile::open(file).unwrap();
+    let mut ole = OleFile::open(file, OleFileLimits::default()).unwrap();
 
     let data = ole.open_stream(&["TestFile"]).unwrap();
     assert_eq!(data, b"File content");
@@ -557,7 +562,11 @@ fn test_save_atomically_overwrites_existing_file() {
         .unwrap();
     writer.save(&destination).unwrap();
 
-    let mut ole = OleFile::open(std::fs::File::open(&destination).unwrap()).unwrap();
+    let mut ole = OleFile::open(
+        std::fs::File::open(&destination).unwrap(),
+        OleFileLimits::default(),
+    )
+    .unwrap();
     assert_eq!(ole.open_stream(&["Document"]).unwrap(), b"new contents");
     assert_eq!(std::fs::read_dir(&directory).unwrap().count(), 1);
 
@@ -602,7 +611,7 @@ fn test_boundary_conditions() {
 
     let data = buffer.into_inner();
     let cursor = Cursor::new(data);
-    let mut ole = OleFile::open(cursor).unwrap();
+    let mut ole = OleFile::open(cursor, OleFileLimits::default()).unwrap();
 
     let under = ole.open_stream(&["JustUnder"]).unwrap();
     assert_eq!(under.len(), 4095);

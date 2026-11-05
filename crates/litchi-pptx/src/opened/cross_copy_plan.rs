@@ -23,7 +23,7 @@ use super::copy_plan::{
     validate_slide_surface,
 };
 use super::model::{Limits, PartDigests, Slide, Snapshot, invalid};
-use super::patch::Patch;
+use super::patch::Patch as OpenedPatch;
 use crate::{Error, Result, SlideCopyRefusal};
 
 /// Payload-digest memos the caller already holds for the two live packages an
@@ -188,13 +188,13 @@ struct CandidateBuild<'a> {
 /// [`Self::release_retained_candidate`], gives back memory without changing
 /// what the plan proves, publishes or compares equal to.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CrossSlideCopyPlan {
+pub struct Plan {
     source: Slide,
     destination: Slide,
     position: usize,
     slide_id: u32,
     presentation_relationship_id: String,
-    parts: Box<[super::SlideCopyPart]>,
+    parts: Box<[crate::slide_copy::Part]>,
     source_layout: PackURI,
     destination_layout: PackURI,
     external_relationships: usize,
@@ -205,7 +205,7 @@ pub struct CrossSlideCopyPlan {
     source_physical_revision: [u8; 32],
     destination_physical_revision: [u8; 32],
     target_physical_revision: [u8; 32],
-    patch: CrossSlideCopyPatch,
+    patch: Patch,
     candidate: RetainedCandidateSlot,
 }
 
@@ -239,7 +239,7 @@ struct RetainedCandidate {
 /// A plan's retained candidate archive, which is not part of the plan's value.
 ///
 /// The archive is derived state: a plan holding it and the same plan after
-/// [`CrossSlideCopyPlan::release_retained_candidate`] prove the same six
+/// [`Plan::release_retained_candidate`] prove the same six
 /// revisions, carry the same durable patch and publish the same bytes.
 /// Equality therefore ignores this slot entirely, which keeps
 /// `plan_a == plan_b` the comparison it has always been and makes releasing
@@ -288,7 +288,7 @@ enum CandidateArchive<'a> {
     Reuse(&'a RetainedCandidate),
 }
 
-impl CrossSlideCopyPlan {
+impl Plan {
     /// Bytes of the serialized candidate archive this plan is holding, if any.
     ///
     /// A plan retains the archive it built at planning when its length fits
@@ -353,7 +353,7 @@ impl CrossSlideCopyPlan {
 
     /// Copied source parts in deterministic source-name order.
     #[must_use]
-    pub fn parts(&self) -> &[super::SlideCopyPart] {
+    pub fn parts(&self) -> &[crate::slide_copy::Part] {
         &self.parts
     }
 
@@ -419,7 +419,7 @@ impl CrossSlideCopyPlan {
 
     /// Exact durable source- and destination-bound patch.
     #[must_use]
-    pub const fn patch(&self) -> &CrossSlideCopyPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
@@ -427,7 +427,7 @@ impl CrossSlideCopyPlan {
     /// member from the source member's verified compressed bytes instead of
     /// deflating it again.
     ///
-    /// See [`CrossSlideCopyPatch::transfers_source_compressed_media`].
+    /// See [`Patch::transfers_source_compressed_media`].
     #[must_use]
     pub fn transfers_source_compressed_media(&self) -> bool {
         self.patch.transfers_source_compressed_media()
@@ -440,7 +440,7 @@ impl CrossSlideCopyPlan {
 /// either direction still requires the same immutable source package and the
 /// corresponding before-revision of the destination package.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CrossSlideCopyPatch {
+pub struct Patch {
     source_revision: [u8; 32],
     destination_revision: [u8; 32],
     target_revision: [u8; 32],
@@ -454,10 +454,15 @@ pub struct CrossSlideCopyPatch {
     slide_id: u32,
     presentation_relationship_id: String,
     copied_media: CopiedMedia,
-    patch: Patch,
+    patch: OpenedPatch,
 }
 
-impl CrossSlideCopyPatch {
+impl Patch {
+    /// The generic exact-write-set patch this durable patch carries.
+    pub(crate) const fn opened_patch(&self) -> &OpenedPatch {
+        &self.patch
+    }
+
     /// Whether the forward candidate frames at least one copied image member
     /// from the source member's verified compressed bytes instead of
     /// deflating it again.
@@ -582,8 +587,9 @@ impl CrossSlideCopyPatch {
             .ok_or_else(|| invalid("cross-slide durable patch limit overflow"))?;
         if reserve > limit {
             return Err(Error::Limit {
-                resource: "cross-slide durable patch bytes",
-                limit,
+                kind: crate::opened::LimitKind::PatchBytes,
+                observed: reserve,
+                maximum: limit,
             });
         }
         output
@@ -629,17 +635,6 @@ impl CrossSlideCopyPatch {
         Ok(output)
     }
 
-    /// Parse a stable durable patch under conservative finite limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::DurablePatchRevisionFormat`] for a patch serialized
-    /// under the superseded `LPCP0002` or `LPCP0003` format, and an error for
-    /// malformed, trailing, or unbounded input.
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, Limits::default())
-    }
-
     /// Parse a stable durable patch under caller-selected finite limits.
     ///
     /// A patch whose header carries a superseded magic is refused here,
@@ -652,30 +647,28 @@ impl CrossSlideCopyPatch {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::DurablePatchRevisionFormat`] for a patch serialized
+    /// Returns [`Error::PatchConflict`] for a patch serialized
     /// under the superseded `LPCP0002` or `LPCP0003` format, and an error for
     /// malformed, trailing, or unbounded input.
-    pub fn from_bytes_with_limits(bytes: &[u8], limits: Limits) -> Result<Self> {
+    pub fn from_bytes(bytes: &[u8], limits: Limits) -> Result<Self> {
         let limit = limits
             .max_patch_bytes()
             .checked_add(PATCH_HEADER_BYTES)
             .ok_or_else(|| invalid("cross-slide durable patch limit overflow"))?;
         if bytes.len() > limit {
             return Err(Error::Limit {
-                resource: "cross-slide durable patch bytes",
-                limit,
+                kind: crate::opened::LimitKind::PatchBytes,
+                observed: bytes.len(),
+                maximum: limit,
             });
         }
-        // See `SlideRemovalPatch::from_bytes_with_limits`: a superseded magic
+        // See `crate::slide_removal::Patch::from_bytes`: a superseded magic
         // is refused by name before any header field is read, so a revision
         // from a superseded proof never reaches a caller.
         for superseded in SUPERSEDED_PATCH_FORMATS {
             let magic = superseded.magic();
             if bytes.get(..magic.len()) == Some(magic.as_slice()) {
-                return Err(Error::DurablePatchRevisionFormat {
-                    found: superseded,
-                    expected: PATCH_FORMAT,
-                });
+                return Err(Error::PatchConflict);
             }
         }
         let mut input = WireInput::new(bytes);
@@ -705,15 +698,16 @@ impl CrossSlideCopyPatch {
         let payload_len = input.usize64("patch payload")?;
         if payload_len > limits.max_patch_bytes() {
             return Err(Error::Limit {
-                resource: "cross-slide durable patch payload",
-                limit: limits.max_patch_bytes(),
+                kind: crate::opened::LimitKind::PatchBytes,
+                observed: payload_len,
+                maximum: limits.max_patch_bytes(),
             });
         }
         let payload = input.take(payload_len)?;
         if !input.is_empty() {
             return Err(invalid("cross-slide durable patch has trailing bytes"));
         }
-        let patch = Patch::from_bytes_with_limits(payload, limits)?;
+        let patch = OpenedPatch::from_bytes(payload, limits)?;
         validate_patch_descriptor(
             &patch,
             &source_slide,
@@ -753,7 +747,7 @@ impl Snapshot {
     /// dependencies are copied through the existing strict owned-role closure;
     /// external allowlisted targets remain inert and are never fetched.
     /// Both snapshots must come from source-preserving ingress such as
-    /// [`crate::Package::from_vec`], [`crate::Package::open`], or
+    /// [`crate::Package::open`] or
     /// [`crate::Package::from_reader`]; borrowed graph-only ingress is refused
     /// because it cannot authorize discarded ZIP ordering and extras.
     ///
@@ -761,15 +755,15 @@ impl Snapshot {
     /// member's bytes prove a bounded Store or Deflate encoding of it is
     /// published from those verified compressed bytes, in fresh known-size
     /// framing, instead of being deflated again (change 0742). See
-    /// [`CrossSlideCopyPatch::transfers_source_compressed_media`] for the rule
+    /// [`Patch::transfers_source_compressed_media`] for the rule
     /// and for what it means for application.
     pub fn plan_cross_slide_copy<'s, 'd>(
         &self,
         source: &Snapshot,
-        source_slide: impl Into<crate::slide::Key<'s>>,
-        destination_slide: impl Into<crate::slide::Key<'d>>,
+        source_slide: impl Into<crate::slide::Selector<'s>>,
+        destination_slide: impl Into<crate::slide::Selector<'d>>,
         position: usize,
-    ) -> Result<CrossSlideCopyPlan> {
+    ) -> Result<Plan> {
         let source_slide = resolve_slide(source, source_slide.into())?;
         let destination_slide = resolve_slide(self, destination_slide.into())?;
         plan_cross_slide_copy_for_slides(
@@ -789,10 +783,10 @@ impl Snapshot {
     pub fn plan_cross_presentation_slide_copy<'s, 'd>(
         &self,
         source: &Snapshot,
-        source_slide: impl Into<crate::slide::Key<'s>>,
-        destination_slide: impl Into<crate::slide::Key<'d>>,
+        source_slide: impl Into<crate::slide::Selector<'s>>,
+        destination_slide: impl Into<crate::slide::Selector<'d>>,
         position: usize,
-    ) -> Result<CrossSlideCopyPlan> {
+    ) -> Result<Plan> {
         self.plan_cross_slide_copy(source, source_slide, destination_slide, position)
     }
 }
@@ -800,10 +794,12 @@ impl Snapshot {
 pub(crate) fn apply_plan(
     source: &OpcPackage,
     destination: &mut OpcPackage,
-    plan: &CrossSlideCopyPlan,
+    plan: &Plan,
     source_physical_source_provenance: bool,
     destination_physical_source_provenance: bool,
     live: LiveDigests<'_>,
+    source_semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
+    destination_semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
 ) -> Result<Snapshot> {
     let limits = plan.patch.patch.limits();
     // Both revisions are recomputed from the live packages; the caller's memos
@@ -812,57 +808,49 @@ pub(crate) fn apply_plan(
     let (source_revision, source_digests) =
         super::model::package_fingerprint_with_memo(source, live.source)?;
     if source_revision != plan.source_revision {
-        return Err(Error::UnsafeEdit {
-            operation: "apply_cross_slide_copy_plan",
-            reason: "the complete source package graph changed after cross-slide planning",
-        });
+        return Err(Error::PatchConflict);
     }
     let (destination_revision, destination_digests) =
         super::model::package_fingerprint_with_memo(destination, live.destination)?;
     if destination_revision != plan.destination_revision {
-        return Err(Error::UnsafeEdit {
-            operation: "apply_cross_slide_copy_plan",
-            reason: "the complete destination package graph changed after cross-slide planning",
-        });
+        return Err(Error::PatchConflict);
     }
     let source_physical_revision = physical_package_fingerprint(source, limits)?;
     if source_physical_revision != plan.source_physical_revision {
-        return Err(Error::UnsafeEdit {
-            operation: "apply_cross_slide_copy_plan",
-            reason: "the serialized source package changed after cross-slide planning",
-        });
+        return Err(Error::PatchConflict);
     }
     let destination_physical_revision = physical_package_fingerprint(destination, limits)?;
     if destination_physical_revision != plan.destination_physical_revision {
-        return Err(Error::UnsafeEdit {
-            operation: "apply_cross_slide_copy_plan",
-            reason: "the serialized destination package changed after cross-slide planning",
-        });
+        return Err(Error::PatchConflict);
     }
     if plan.patch.copied_media == CopiedMedia::SourceCompressed
         && !holds_only_built_in_parts(destination)
     {
         return refusal(SlideCopyRefusal::CallerDefinedPart, CALLER_DEFINED_PART);
     }
-    let source_snapshot = super::model::capture_with_revision_and_digests_and_mce(
-        source,
-        limits,
-        source_physical_source_provenance,
-        source_revision,
-        source_digests,
-        None,
-        None,
-    )?;
+    let source_snapshot =
+        super::model::capture_with_revision_and_digests_and_mce_and_semantic_limits(
+            source,
+            limits,
+            source_physical_source_provenance,
+            source_revision,
+            source_digests,
+            None,
+            None,
+            source_semantic_limits,
+        )?;
     remember_physical_revision(&source_snapshot, limits, source_physical_revision);
-    let destination_snapshot = super::model::capture_with_revision_and_digests_and_mce(
-        destination,
-        limits,
-        destination_physical_source_provenance,
-        destination_revision,
-        destination_digests,
-        None,
-        None,
-    )?;
+    let destination_snapshot =
+        super::model::capture_with_revision_and_digests_and_mce_and_semantic_limits(
+            destination,
+            limits,
+            destination_physical_source_provenance,
+            destination_revision,
+            destination_digests,
+            None,
+            None,
+            destination_semantic_limits.clone(),
+        )?;
     remember_physical_revision(&destination_snapshot, limits, destination_physical_revision);
     let Prepared {
         plan: fresh,
@@ -892,10 +880,7 @@ pub(crate) fn apply_plan(
         || fresh.target_physical_revision != plan.target_physical_revision
         || fresh.patch != plan.patch
     {
-        return Err(Error::UnsafeEdit {
-            operation: "apply_cross_slide_copy_plan",
-            reason: "the durable cross-slide plan does not match a freshly proven candidate",
-        });
+        return Err(Error::PatchConflict);
     }
     let (mut candidate, snapshot, rebuilt) = validate_application_candidate(
         destination,
@@ -905,14 +890,12 @@ pub(crate) fn apply_plan(
         destination_physical_source_provenance,
         !normalized,
         Some(&candidate_digests),
+        destination_semantic_limits.clone(),
     )?;
     if published_archive_revision(&candidate, limits, rebuilt, fresh.target_physical_revision)?
         != plan.target_physical_revision
     {
-        return Err(Error::UnsafeEdit {
-            operation: "apply_cross_slide_copy_plan",
-            reason: "the published candidate has an unexpected serialized package revision",
-        });
+        return Err(Error::PatchConflict);
     }
     if normalized {
         adopt_destination_save_options(&mut candidate, destination);
@@ -924,10 +907,12 @@ pub(crate) fn apply_plan(
 pub(crate) fn apply_patch(
     source: &OpcPackage,
     destination: &mut OpcPackage,
-    patch: &CrossSlideCopyPatch,
+    patch: &Patch,
     source_physical_source_provenance: bool,
     destination_physical_source_provenance: bool,
     live: LiveDigests<'_>,
+    source_semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
+    destination_semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
 ) -> Result<Snapshot> {
     let limits = patch.patch.limits();
     // As in `apply_plan`: recomputed from the live packages, consulting the
@@ -935,52 +920,44 @@ pub(crate) fn apply_patch(
     let (source_revision, source_digests) =
         super::model::package_fingerprint_with_memo(source, live.source)?;
     if source_revision != patch.source_revision {
-        return Err(Error::UnsafeEdit {
-            operation: "apply_cross_slide_copy_patch",
-            reason: "the complete source package graph differs from the cross-slide patch source",
-        });
+        return Err(Error::PatchConflict);
     }
     let (destination_revision, destination_digests) =
         super::model::package_fingerprint_with_memo(destination, live.destination)?;
     if destination_revision != patch.destination_revision {
-        return Err(Error::UnsafeEdit {
-            operation: "apply_cross_slide_copy_patch",
-            reason: "the complete destination package graph differs from the cross-slide patch source",
-        });
+        return Err(Error::PatchConflict);
     }
     let source_physical_revision = physical_package_fingerprint(source, limits)?;
     if source_physical_revision != patch.source_physical_revision {
-        return Err(Error::UnsafeEdit {
-            operation: "apply_cross_slide_copy_patch",
-            reason: "the serialized source package differs from the cross-slide patch source",
-        });
+        return Err(Error::PatchConflict);
     }
     let destination_physical_revision = physical_package_fingerprint(destination, limits)?;
     if destination_physical_revision != patch.destination_physical_revision {
-        return Err(Error::UnsafeEdit {
-            operation: "apply_cross_slide_copy_patch",
-            reason: "the serialized destination package differs from the cross-slide patch source",
-        });
+        return Err(Error::PatchConflict);
     }
-    let source_snapshot = super::model::capture_with_revision_and_digests_and_mce(
-        source,
-        limits,
-        source_physical_source_provenance,
-        source_revision,
-        source_digests,
-        None,
-        None,
-    )?;
+    let source_snapshot =
+        super::model::capture_with_revision_and_digests_and_mce_and_semantic_limits(
+            source,
+            limits,
+            source_physical_source_provenance,
+            source_revision,
+            source_digests,
+            None,
+            None,
+            source_semantic_limits,
+        )?;
     remember_physical_revision(&source_snapshot, limits, source_physical_revision);
-    let destination_snapshot = super::model::capture_with_revision_and_digests_and_mce(
-        destination,
-        limits,
-        destination_physical_source_provenance,
-        destination_revision,
-        destination_digests,
-        None,
-        None,
-    )?;
+    let destination_snapshot =
+        super::model::capture_with_revision_and_digests_and_mce_and_semantic_limits(
+            destination,
+            limits,
+            destination_physical_source_provenance,
+            destination_revision,
+            destination_digests,
+            None,
+            None,
+            destination_semantic_limits.clone(),
+        )?;
     remember_physical_revision(&destination_snapshot, limits, destination_physical_revision);
     let source_slide = find_slide_by_part(&source_snapshot, &patch.source_slide)?;
     let destination_slide = find_slide_by_part(&destination_snapshot, &patch.destination_slide)?;
@@ -1024,11 +1001,12 @@ pub(crate) fn apply_patch(
         // and comparing the exact inverse. The real destination is untouched
         // until this proof succeeds.
         let mut restored = destination.clone();
-        if super::patch::apply_exact_revision(
+        if super::patch::apply_exact_revision_with_semantic_limits(
             &mut restored,
             &patch.patch,
             patch.target_revision,
             destination_physical_source_provenance,
+            destination_semantic_limits.clone(),
         )
         .is_err()
         {
@@ -1041,11 +1019,12 @@ pub(crate) fn apply_patch(
             // The restored clone shares every payload allocation the inverse
             // did not replace with the live destination, whose memo this
             // capture consults (change 0751).
-            let restored_snapshot = super::model::capture_with_parent_digests(
+            let restored_snapshot = super::model::capture_with_parent_digests_and_semantic_limits(
                 &restored,
                 limits,
                 destination_physical_source_provenance,
                 &destination_snapshot.part_digests,
+                destination_semantic_limits.clone(),
             );
             let restored_digests = restored_snapshot
                 .ok()
@@ -1073,10 +1052,7 @@ pub(crate) fn apply_patch(
         }
     };
     let (candidate, reopened, normalized, candidate_digests) =
-        candidate.ok_or(Error::UnsafeEdit {
-            operation: "apply_cross_slide_copy_patch",
-            reason: "the durable cross-slide patch does not match a freshly proven candidate",
-        })?;
+        candidate.ok_or(Error::PatchConflict)?;
     let (mut candidate, snapshot, rebuilt) = validate_application_candidate(
         destination,
         candidate,
@@ -1085,14 +1061,12 @@ pub(crate) fn apply_patch(
         destination_physical_source_provenance,
         reopened && !normalized,
         Some(&candidate_digests),
+        destination_semantic_limits,
     )?;
     if published_archive_revision(&candidate, limits, rebuilt, patch.target_physical_revision)?
         != patch.target_physical_revision
     {
-        return Err(Error::UnsafeEdit {
-            operation: "apply_cross_slide_copy_patch",
-            reason: "the published candidate has an unexpected serialized package revision",
-        });
+        return Err(Error::PatchConflict);
     }
     if normalized {
         adopt_destination_save_options(&mut candidate, destination);
@@ -1123,11 +1097,12 @@ const CALLER_DEFINED_PART: &str = "a cross-slide copy that frames source-compres
 fn validate_application_candidate(
     destination: &OpcPackage,
     candidate: OpcPackage,
-    patch: &Patch,
+    patch: &OpenedPatch,
     target_revision: [u8; 32],
     physical_source_provenance: bool,
     may_rebuild: bool,
     candidate_digests: Option<&PartDigests>,
+    semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
 ) -> Result<(OpcPackage, Snapshot, bool)> {
     // Reopening preserves the observable state of untouched owned ingress.
     // Dirty packages can carry caller-defined parts or save preferences that
@@ -1136,11 +1111,12 @@ fn validate_application_candidate(
     if may_rebuild && !destination.is_unmodified_owned_source() {
         drop(candidate);
         let mut candidate = destination.clone();
-        let snapshot = super::patch::apply_exact_revision(
+        let snapshot = super::patch::apply_exact_revision_with_semantic_limits(
             &mut candidate,
             patch,
             target_revision,
             physical_source_provenance,
+            semantic_limits,
         )?;
         return Ok((candidate, snapshot, true));
     }
@@ -1151,6 +1127,7 @@ fn validate_application_candidate(
         target_revision,
         physical_source_provenance,
         candidate_digests,
+        semantic_limits,
     )?;
     Ok((candidate, snapshot, false))
 }
@@ -1203,7 +1180,7 @@ fn plan_cross_slide_copy_for_slides(
     destination_slide: Slide,
     position: usize,
     build: CandidateBuild<'_>,
-) -> Result<CrossSlideCopyPlan> {
+) -> Result<Plan> {
     prepare_cross_slide_copy_for_slides(
         source,
         destination,
@@ -1221,7 +1198,7 @@ fn plan_cross_slide_copy_for_slides(
 /// their descriptor, durable patch and at most the candidate's archive bytes,
 /// never the candidate package or a capture of it.
 struct Prepared {
-    plan: CrossSlideCopyPlan,
+    plan: Plan,
     /// The candidate reopened from its archive.
     candidate: OpcPackage,
     /// Whether the candidate was built from the destination's reopened
@@ -1249,7 +1226,7 @@ fn prepare_cross_slide_copy_for_slides(
     if !source.physical_source_provenance || !destination.physical_source_provenance {
         return refusal(
             SlideCopyRefusal::UnknownPhysicalMember,
-            "cross-slide physical authorization requires source-preserving package ingress (use Package::from_vec, open, or from_reader)",
+            "cross-slide physical authorization requires source-preserving package ingress (use Package::open, from_reader, or their *_with_options forms)",
         );
     }
     if has_signature_infrastructure(source.package.as_ref())
@@ -1288,8 +1265,20 @@ fn prepare_cross_slide_copy_for_slides(
         destination_presentation.blob(),
         "destination presentation owner",
     )?;
-    reject_protected(source_presentation.blob(), "source presentation")?;
-    reject_protected(destination_presentation.blob(), "destination presentation")?;
+    reject_protected(
+        source_presentation.blob(),
+        "source presentation",
+        crate::presentation_properties::metadata::protection::Limits::from_source_limits(
+            source.package.read_limits(),
+        ),
+    )?;
+    reject_protected(
+        destination_presentation.blob(),
+        "destination presentation",
+        crate::presentation_properties::metadata::protection::Limits::from_source_limits(
+            destination.package.read_limits(),
+        ),
+    )?;
     if source.slides.is_empty() || destination.slides.is_empty() {
         return refusal(
             SlideCopyRefusal::AmbiguousTopology,
@@ -1299,8 +1288,13 @@ fn prepare_cross_slide_copy_for_slides(
     reject_slide_name_collisions(&source.slides, &destination.slides, &source_slide)?;
     if destination.slides.len() == crate::parts::MAX_SLIDES {
         return Err(Error::Limit {
-            resource: "cross-slide copy presentation slides",
-            limit: crate::parts::MAX_SLIDES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Slides),
+            observed: destination
+                .slides
+                .len()
+                .checked_add(1)
+                .unwrap_or(usize::MAX),
+            maximum: crate::parts::MAX_SLIDES,
         });
     }
     validate_slide_ids(&source.slides)?;
@@ -1308,14 +1302,16 @@ fn prepare_cross_slide_copy_for_slides(
     let limits = intersect_limits(source.limits, destination.limits)?;
     if source.package.part_count() > limits.max_parts() {
         return Err(Error::Limit {
-            resource: "cross-slide copy source package parts",
-            limit: limits.max_parts(),
+            kind: crate::opened::LimitKind::Parts,
+            observed: source.package.part_count(),
+            maximum: limits.max_parts(),
         });
     }
     if destination.package.part_count() > limits.max_parts() {
         return Err(Error::Limit {
-            resource: "cross-slide copy destination package parts",
-            limit: limits.max_parts(),
+            kind: crate::opened::LimitKind::Parts,
+            observed: destination.package.part_count(),
+            maximum: limits.max_parts(),
         });
     }
     crate::master_layout::validate_master_layout_graph(source.package.as_ref())?;
@@ -1377,7 +1373,7 @@ fn prepare_cross_slide_copy_for_slides(
             &reserved,
         )?;
         reserved.insert(target.clone());
-        parts.push(super::SlideCopyPart {
+        parts.push(crate::slide_copy::Part {
             source: name,
             target,
             content_type: copy_string(part.content_type(), "cross-slide content types")?,
@@ -1392,14 +1388,16 @@ fn prepare_cross_slide_copy_for_slides(
         .ok_or_else(|| invalid("cross-slide resulting part count overflow"))?;
     if resulting_parts > limits.max_parts() {
         return Err(Error::Limit {
-            resource: "cross-slide resulting package parts",
-            limit: limits.max_parts(),
+            kind: crate::opened::LimitKind::Parts,
+            observed: resulting_parts,
+            maximum: limits.max_parts(),
         });
     }
     if planned_bytes > limits.max_patch_bytes() {
         return Err(Error::Limit {
-            resource: "cross-slide planned closure bytes",
-            limit: limits.max_patch_bytes(),
+            kind: crate::opened::LimitKind::PatchBytes,
+            observed: planned_bytes,
+            maximum: limits.max_patch_bytes(),
         });
     }
     let slide_id = next_slide_id(&destination.slides)?;
@@ -1429,8 +1427,13 @@ fn prepare_cross_slide_copy_for_slides(
             MediaPolicy::Classify => media = MediaTransfers::none(source),
             MediaPolicy::Recorded(_) => {
                 return Err(Error::Limit {
-                    resource: "cross-slide candidate patch bytes",
-                    limit: bound,
+                    kind: crate::opened::LimitKind::Codec(
+                        crate::opened::CodecLimitKind::PatchBytes,
+                    ),
+                    observed: estimate
+                        .checked_add(media.capture_bytes)
+                        .unwrap_or(usize::MAX),
+                    maximum: bound,
                 });
             },
         }
@@ -1488,7 +1491,7 @@ fn prepare_cross_slide_copy_for_slides(
             destination_view: &destination_view,
         },
     )?;
-    let patch = Patch::capture(
+    let patch = OpenedPatch::capture(
         destination.package.as_ref(),
         &candidate,
         destination.presentation_name.clone(),
@@ -1499,7 +1502,7 @@ fn prepare_cross_slide_copy_for_slides(
     let target_revision = candidate_revision;
     let target_physical_revision =
         candidate_physical_revision(&candidate, limits, candidate_archive_revision)?;
-    let cross_patch = CrossSlideCopyPatch {
+    let cross_patch = Patch {
         source_revision: source.revision,
         destination_revision: destination.revision,
         target_revision,
@@ -1525,7 +1528,7 @@ fn prepare_cross_slide_copy_for_slides(
         &cross_patch.presentation_relationship_id,
     )?;
     Ok(Prepared {
-        plan: CrossSlideCopyPlan {
+        plan: Plan {
             source: source_slide,
             destination: destination_slide,
             position,
@@ -1596,7 +1599,7 @@ fn is_transferable_media(part: &dyn Part) -> bool {
 /// member is captured here, so every limit can be checked first.
 fn classify_media<'s>(
     source: &'s Snapshot,
-    parts: &[super::SlideCopyPart],
+    parts: &[crate::slide_copy::Part],
     limits: Limits,
     policy: MediaPolicy,
 ) -> Result<MediaTransfers<'s>> {
@@ -1679,7 +1682,7 @@ impl<'s> MediaTransfers<'s> {
     /// planned, and both packages are proven unchanged since.
     fn capture(
         self,
-        parts: &[super::SlideCopyPart],
+        parts: &[crate::slide_copy::Part],
         reuse: Option<&RetainedCandidate>,
         archive_limit: usize,
     ) -> Result<Self> {
@@ -1740,7 +1743,7 @@ fn holds_only_built_in_parts(package: &OpcPackage) -> bool {
 
 /// Whether `error` is a read-limit refusal of a package's re-read.
 const fn is_read_limit(error: &Error) -> bool {
-    matches!(error, Error::Opc(litchi_opc::OpcError::ReadLimit { .. }))
+    matches!(error, Error::Opc(litchi_opc::OpcError::Limit { .. }))
 }
 
 /// The package that holds, as its owned source archive, exactly the bytes
@@ -1779,8 +1782,7 @@ fn owned_view(snapshot: &Snapshot, limits: Limits) -> Result<Cow<'_, OpcPackage>
             let _first = snapshot.physical_revision.set((bound, revision));
         },
     }
-    let view =
-        OpcPackage::from_vec_with_limits(bytes, package.source_read_limits().unwrap_or_default())?;
+    let view = OpcPackage::from_vec(bytes, package.read_limits())?;
     if !view.is_unmodified_owned_source() {
         return Err(invalid(
             "cross-slide could not reopen a package's serialization as an owned source",
@@ -1799,7 +1801,7 @@ fn build_candidate(
     presentation_relationship_id: &str,
     source_layout: &PackURI,
     destination_layout: &PackURI,
-    parts: &[super::SlideCopyPart],
+    parts: &[crate::slide_copy::Part],
     limits: Limits,
     inputs: CandidateInputs<'_>,
 ) -> Result<BuiltCandidate> {
@@ -1808,6 +1810,13 @@ fn build_candidate(
         transfers,
         destination_view,
     } = inputs;
+    // A recompressing candidate is published by clone-and-apply when its
+    // candidate reopen is refused by the destination's read policy: adding
+    // the copied closure may legitimately exceed a member ceiling that
+    // admitted the destination itself. We still attempt the exact archive
+    // reopen first, and transferring candidates require that reopen because
+    // it authorizes the source-compressed spans they publish.
+    let recompressing = transfers.is_empty();
     let archive_limit = limits.max_patch_bytes();
     let mut transferred = Vec::new();
     transferred
@@ -1880,13 +1889,9 @@ fn build_candidate(
                 {
                     destination_layout
                 } else {
-                    mapping
-                        .get(&source_target)
-                        .ok_or_else(|| Error::SlideCopyPlan {
-                            kind: SlideCopyRefusal::AmbiguousTopology,
-                            detail: "a copied internal relationship escaped the owned closure"
-                                .to_owned(),
-                        })?
+                    mapping.get(&source_target).ok_or_else(|| {
+                        Error::slide_copy_refused(SlideCopyRefusal::AmbiguousTopology)
+                    })?
                 };
                 (
                     target_part.relative_ref(planned.target.base_uri()),
@@ -1926,7 +1931,7 @@ fn build_candidate(
     }
     // A retained candidate archive is the serialization of this exact graph.
     // Both input packages were proved unchanged before this call -- semantic
-    // graph and serialized archive alike -- and `to_stream` is a deterministic
+    // graph and serialized archive alike -- and `write_to` is a deterministic
     // function of the package, so a fresh serialization reproduces the
     // retained bytes. The `debug_assert` re-derives exactly that on every
     // reuse in debug and test builds; a release build rests on the argument
@@ -1952,47 +1957,46 @@ fn build_candidate(
     };
     let serialized_bytes = serialized.len();
     // Clean owned ingress proves the destination has built-in parts. Keep
-    // the existing path for caller-defined parts and revoked authorization.
+    // the exact-archive reopen whenever it succeeds, including ordinary
+    // recompressing plans that retain that archive. Only a recompressing
+    // candidate whose own read policy rejects the newly-added member set may
+    // stay as the already-built graph: that route is published by
+    // clone-and-apply and never reads the candidate back.
+    let candidate_read_limits = candidate.read_limits();
     let reopened = match serialized {
         CandidateBytes::Owned(bytes) if destination_view.is_unmodified_owned_source() => {
-            OpcPackage::from_vec_reusing_payloads(
-                bytes,
-                litchi_opc::ReadLimits::default(),
-                &candidate,
-            )?
+            OpcPackage::from_vec_reusing_payloads(bytes, candidate_read_limits, &candidate)
         },
-        CandidateBytes::Owned(bytes) => OpcPackage::from_vec(bytes)?,
+        CandidateBytes::Owned(bytes) => OpcPackage::from_vec(bytes, candidate_read_limits),
         CandidateBytes::Shared(bytes) if destination_view.is_unmodified_owned_source() => {
-            OpcPackage::from_shared_vec_reusing_payloads(
-                bytes,
-                litchi_opc::ReadLimits::default(),
-                &candidate,
-            )?
+            OpcPackage::from_shared_vec_reusing_payloads(bytes, candidate_read_limits, &candidate)
         },
-        CandidateBytes::Shared(bytes) => {
-            OpcPackage::from_shared_vec_with_limits(bytes, litchi_opc::ReadLimits::default())?
+        CandidateBytes::Shared(bytes) => OpcPackage::from_shared_vec(bytes, candidate_read_limits),
+    };
+    let reopened = reopened.map_err(Error::from);
+    let (reopened, archive_revision) = match reopened {
+        Ok(reopened) => {
+            // Owned ingress retains the archive it was opened from and
+            // republishes it verbatim, so the bytes just hashed are exactly
+            // what a serializing hash sink would read back. A reopen that
+            // revoked that authorization is left to the ordinary
+            // recomputation.
+            let archive_revision = match written_digest {
+                Some(digest) => reopened
+                    .is_unmodified_owned_source()
+                    .then(|| seal_physical_revision(digest, serialized_bytes))
+                    .transpose()?,
+                None => reopened
+                    .exact_source_sha256()
+                    .map(|digest| seal_physical_revision(digest, serialized_bytes))
+                    .transpose()?,
+            };
+            (reopened, archive_revision)
         },
+        Err(error) if recompressing && is_read_limit(&error) => (candidate, None),
+        Err(error) => return Err(error),
     };
-    // Owned ingress retains the archive it was opened from and republishes it
-    // verbatim, so the bytes just hashed are exactly what a serializing hash
-    // sink would read back. A reopen that revoked that authorization is left
-    // to the ordinary recomputation.
-    //
-    // A retained archive's digest is recomputed here, at application, over
-    // the bytes about to be published, never carried beside them (change
-    // 0646's G5): the reopened package hashes the archive it now holds, and
-    // keeps the digest bound to that archive for any later request.
-    let archive_revision = match written_digest {
-        Some(digest) => reopened
-            .is_unmodified_owned_source()
-            .then(|| seal_physical_revision(digest, serialized_bytes))
-            .transpose()?,
-        None => reopened
-            .exact_source_sha256()
-            .map(|digest| seal_physical_revision(digest, serialized_bytes))
-            .transpose()?,
-    };
-    let copied_media = if transferred.is_empty() {
+    let copied_media = if recompressing {
         CopiedMedia::Recompressed
     } else {
         CopiedMedia::SourceCompressed
@@ -2022,16 +2026,18 @@ fn build_candidate(
     // the rewritten presentation part, is hashed (change 0751).
     let parents = PartDigests::union(&[&source.part_digests, &destination.part_digests]);
     let captured = match parents.as_ref() {
-        Some(parents) => super::model::capture_with_parent_digests(
+        Some(parents) => super::model::capture_with_parent_digests_and_semantic_limits(
             &reopened,
             destination.limits,
             destination.physical_source_provenance,
             parents,
+            destination.owner_state.semantic_limits.clone(),
         )?,
-        None => super::model::capture(
+        None => super::model::capture_with_provenance_and_semantic_limits(
             &reopened,
             destination.limits,
             destination.physical_source_provenance,
+            destination.owner_state.semantic_limits.clone(),
         )?,
     };
     drop(parents);
@@ -2084,7 +2090,7 @@ impl CandidateBytes {
 /// compressed bytes the transferred members' captures hold.
 fn candidate_estimate(
     destination: &Snapshot,
-    parts: &[super::SlideCopyPart],
+    parts: &[crate::slide_copy::Part],
     planned_bytes: usize,
     capture_bytes: usize,
 ) -> Result<usize> {
@@ -2111,13 +2117,14 @@ fn candidate_estimate(
 /// destination cannot take.
 fn preflight_parts(
     destination: &Snapshot,
-    parts: &[super::SlideCopyPart],
+    parts: &[crate::slide_copy::Part],
     estimate: usize,
 ) -> Result<()> {
     if estimate > destination.limits.max_patch_bytes() {
         return Err(Error::Limit {
-            resource: "cross-slide candidate patch bytes",
-            limit: destination.limits.max_patch_bytes(),
+            kind: crate::opened::LimitKind::PatchBytes,
+            observed: estimate,
+            maximum: destination.limits.max_patch_bytes(),
         });
     }
     let mut targets = HashSet::new();
@@ -2180,10 +2187,7 @@ fn selected_layout(package: &OpcPackage, slide: &dyn Part) -> Result<PackURI> {
         crate::parts::validate_content_type(package.get_part(&target)?, ct::PML_SLIDE_LAYOUT)?;
         selected = Some(target);
     }
-    selected.ok_or_else(|| Error::SlideCopyPlan {
-        kind: SlideCopyRefusal::AmbiguousTopology,
-        detail: "a slide has no reusable layout relationship".to_owned(),
-    })
+    selected.ok_or_else(|| Error::slide_copy_refused(SlideCopyRefusal::AmbiguousTopology))
 }
 
 #[derive(Clone, Copy)]
@@ -2384,8 +2388,9 @@ fn prove_inherited_part(
             .ok_or_else(|| invalid("cross-slide inheritance relationship count overflow"))?;
         if *traversed_relationships > relationship_limit {
             return Err(Error::Limit {
-                resource: "cross-slide inheritance relationships",
-                limit: relationship_limit,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Relationships),
+                observed: *traversed_relationships,
+                maximum: relationship_limit,
             });
         }
         if left_relationship.r_id() != right_relationship.r_id()
@@ -2534,10 +2539,7 @@ fn single_inheritance_target(
         }
         target = Some(relationship.target_partname()?);
     }
-    let target = target.ok_or_else(|| Error::SlideCopyPlan {
-        kind: SlideCopyRefusal::SharedOwner,
-        detail: format!("the inherited part has no {label} relationship"),
-    })?;
+    let target = target.ok_or_else(|| Error::slide_copy_refused(SlideCopyRefusal::SharedOwner))?;
     let target_part = package.get_part(&target)?;
     if target_part.content_type() != expected_content_type {
         return refusal(
@@ -2554,11 +2556,7 @@ fn find_slide_by_part(snapshot: &Snapshot, part: &PackURI) -> Result<Slide> {
         .iter()
         .find(|slide| slide.part_name == *part)
         .cloned()
-        .ok_or_else(|| Error::SlideCopyPlan {
-            kind: SlideCopyRefusal::SharedOwner,
-            detail: "the durable cross-slide patch source slide is not presentation-owned"
-                .to_owned(),
-        })
+        .ok_or_else(|| Error::slide_copy_refused(SlideCopyRefusal::SharedOwner))
 }
 
 fn reject_slide_name_collisions(
@@ -2715,10 +2713,14 @@ fn next_relationship_id(relationships: &litchi_opc::Relationships) -> Result<Str
     Ok(format!("rId{candidate}"))
 }
 
-fn reject_protected(xml: &[u8], context: &'static str) -> Result<()> {
+fn reject_protected(
+    xml: &[u8],
+    context: &'static str,
+    limits: crate::presentation_properties::metadata::protection::Limits,
+) -> Result<()> {
     let text = std::str::from_utf8(xml)
         .map_err(|error| Error::Xml(format!("{context} XML is not UTF-8: {error}")))?;
-    if crate::presentation_properties::metadata::protection::Settings::parse_xml(text)?
+    if crate::presentation_properties::metadata::protection::Settings::parse_xml(text, limits)?
         .is_protected()
     {
         return refusal(
@@ -2877,7 +2879,7 @@ fn is_xml_part(partname: &PackURI, content_type: &str) -> bool {
 
 /// Hash the exact serialized archive used for physical authorization.
 ///
-/// `OpcPackage::to_stream` is source-aware: an untouched package streams its
+/// `OpcPackage::write_to` is source-aware: an untouched package streams its
 /// retained source archive byte-for-byte (including ZIP ordering, compression,
 /// comments, and extra fields), while an authored or mutated package streams
 /// the complete checked OPC graph. Unknown non-Part members are refused before
@@ -2896,8 +2898,9 @@ fn physical_package_fingerprint(package: &OpcPackage, limits: Limits) -> Result<
     if let Some(length) = package.exact_source_len() {
         if length > limits.max_patch_bytes() {
             return Err(Error::Limit {
-                resource: "cross-slide serialized archive bytes",
-                limit: limits.max_patch_bytes(),
+                kind: crate::opened::LimitKind::PatchBytes,
+                observed: length,
+                maximum: limits.max_patch_bytes(),
             });
         }
         if let Some(digest) = package.exact_source_sha256() {
@@ -2918,11 +2921,12 @@ fn physical_package_fingerprint(package: &OpcPackage, limits: Limits) -> Result<
 /// every memoized value.
 fn streamed_physical_revision(package: &OpcPackage, limits: Limits) -> Result<[u8; 32]> {
     let mut sink = ArchiveHashWriter::new(limits.max_patch_bytes());
-    let result = package.to_stream(&mut sink);
+    let result = package.write_to(&mut sink);
     if sink.exceeded {
         return Err(Error::Limit {
-            resource: "cross-slide serialized archive bytes",
-            limit: limits.max_patch_bytes(),
+            kind: crate::opened::LimitKind::PatchBytes,
+            observed: sink.observed,
+            maximum: limits.max_patch_bytes(),
         });
     }
     result?;
@@ -3021,6 +3025,7 @@ struct ArchiveHashWriter {
     length: usize,
     limit: usize,
     exceeded: bool,
+    observed: usize,
 }
 
 impl ArchiveHashWriter {
@@ -3030,6 +3035,7 @@ impl ArchiveHashWriter {
             length: 0,
             limit,
             exceeded: false,
+            observed: 0,
         }
     }
 }
@@ -3038,6 +3044,7 @@ impl Write for ArchiveHashWriter {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
         let Some(next) = self.length.checked_add(bytes.len()) else {
             self.exceeded = true;
+            self.observed = usize::MAX;
             return Err(io::Error::new(
                 io::ErrorKind::WriteZero,
                 "cross-slide serialized archive length overflow",
@@ -3045,6 +3052,7 @@ impl Write for ArchiveHashWriter {
         };
         if next > self.limit {
             self.exceeded = true;
+            self.observed = next;
             return Err(io::Error::new(
                 io::ErrorKind::WriteZero,
                 "cross-slide serialized archive exceeds its bound",
@@ -3065,6 +3073,7 @@ struct BoundedVecWriter {
     digest: Sha256,
     limit: usize,
     exceeded: bool,
+    observed: usize,
     allocation_failure: Option<TryReserveError>,
 }
 
@@ -3075,6 +3084,7 @@ impl BoundedVecWriter {
             digest: Sha256::new(),
             limit,
             exceeded: false,
+            observed: 0,
             allocation_failure: None,
         }
     }
@@ -3104,6 +3114,7 @@ impl Write for BoundedVecWriter {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
         let Some(next) = self.bytes.len().checked_add(bytes.len()) else {
             self.exceeded = true;
+            self.observed = usize::MAX;
             return Err(io::Error::new(
                 io::ErrorKind::WriteZero,
                 "cross-slide candidate archive length overflow",
@@ -3111,6 +3122,7 @@ impl Write for BoundedVecWriter {
         };
         if next > self.limit {
             self.exceeded = true;
+            self.observed = next;
             return Err(io::Error::new(
                 io::ErrorKind::WriteZero,
                 "cross-slide candidate archive exceeds its bound",
@@ -3151,7 +3163,7 @@ impl Write for BoundedVecWriter {
 /// second time.
 fn bounded_package_bytes(package: &OpcPackage, limit: usize) -> Result<(Vec<u8>, [u8; 32])> {
     let mut writer = BoundedVecWriter::new(limit);
-    let result = package.to_stream(&mut writer);
+    let result = package.write_to(&mut writer);
     if let Some(source) = writer.allocation_failure.take() {
         return Err(Error::Allocation {
             resource: "cross-slide candidate archive",
@@ -3160,8 +3172,9 @@ fn bounded_package_bytes(package: &OpcPackage, limit: usize) -> Result<(Vec<u8>,
     }
     if writer.exceeded {
         return Err(Error::Limit {
-            resource: "cross-slide serialized archive bytes",
-            limit,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::ArchiveBytes),
+            observed: writer.observed,
+            maximum: limit,
         });
     }
     result?;
@@ -3178,7 +3191,7 @@ fn copy_string(value: &str, resource: &'static str) -> Result<String> {
 }
 
 fn validate_patch_descriptor(
-    patch: &Patch,
+    patch: &OpenedPatch,
     source_slide: &PackURI,
     destination_slide: &PackURI,
     destination_layout: &PackURI,
@@ -3199,7 +3212,7 @@ fn validate_patch_descriptor(
             "cross-slide durable patch has invalid destination identity",
         ));
     }
-    if patch.is_empty() {
+    if patch.is_noop() {
         return Err(invalid(
             "cross-slide durable patch has no destination change",
         ));
@@ -3229,11 +3242,8 @@ fn parse_part_name_text(value: String) -> Result<PackURI> {
     PackURI::new(value).map_err(Error::Invalid)
 }
 
-fn refusal<T>(kind: SlideCopyRefusal, detail: impl Into<String>) -> Result<T> {
-    Err(Error::SlideCopyPlan {
-        kind,
-        detail: detail.into(),
-    })
+fn refusal<T>(kind: SlideCopyRefusal, _detail: impl Into<String>) -> Result<T> {
+    Err(Error::slide_copy_refused(kind))
 }
 
 struct WireInput<'a> {

@@ -7,7 +7,7 @@ use crate::error::{Error, Result};
 
 /// An exact source-checked workbook XML replacement.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Patch {
+pub(crate) struct Patch {
     before: Snapshot,
     after: Snapshot,
 }
@@ -19,25 +19,25 @@ impl Patch {
 
     /// Source state required before application.
     #[must_use]
-    pub fn before(&self) -> &Snapshot {
+    pub(crate) fn before(&self) -> &Snapshot {
         &self.before
     }
 
     /// Exact state produced by application.
     #[must_use]
-    pub fn after(&self) -> &Snapshot {
+    pub(crate) fn after(&self) -> &Snapshot {
         &self.after
     }
 
     /// Whether this patch preserves the source byte-for-byte.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
     /// Return the exact source-bound inverse.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
@@ -45,7 +45,7 @@ impl Patch {
     }
 
     /// Apply after validating the complete workbook owner state.
-    pub fn apply(&self, target: &mut OpcPackage) -> Result<()> {
+    pub(crate) fn apply(&self, target: &mut OpcPackage) -> Result<()> {
         self.before.check_execution()?;
         self.after.check_execution()?;
         if !self.before.matches_current_source(target) {
@@ -78,14 +78,16 @@ impl Patch {
     }
 }
 
-/// Successful calculation-metadata transaction publication.
+/// The record commit of the crate's raw-graph test route.
+#[cfg(test)]
 #[derive(Debug)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     patch: Patch,
     changed: bool,
 }
 
+#[cfg(test)]
 impl Commit {
     pub(crate) fn new(snapshot: Snapshot, patch: Patch, changed: bool) -> Self {
         Self {
@@ -97,33 +99,28 @@ impl Commit {
 
     /// Whether exact authored calculation metadata changed.
     #[must_use]
-    pub fn changed(&self) -> bool {
+    pub(crate) fn changed(&self) -> bool {
         self.changed
     }
 
     /// Resulting immutable source-bound state.
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Exact reversible patch produced by the transaction.
     #[must_use]
-    pub fn patch(&self) -> &Patch {
+    pub(crate) fn patch(&self) -> &Patch {
         &self.patch
-    }
-
-    /// Consume this result into its snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::calculation_properties::{Properties, Transaction};
+    use crate::calculation_properties::Properties;
+    use crate::calculation_properties::edit::Transaction;
     use litchi_opc::TargetMode;
     use litchi_opc::constants::relationship_type as rt;
 
@@ -136,7 +133,7 @@ mod tests {
         let mut package = crate::package::build_minimal_package().unwrap();
         let original = Snapshot::load(&package).unwrap();
         let mut transaction = Transaction::new(&mut package).unwrap();
-        transaction.set_properties(authored());
+        transaction.set_properties(authored()).unwrap();
         let commit = transaction.commit().unwrap();
         commit.patch().inverse().apply(&mut package).unwrap();
         assert!(Snapshot::load(&package).unwrap().same_source(&original));
@@ -147,7 +144,7 @@ mod tests {
         let mut package = crate::package::build_minimal_package().unwrap();
         let original = package.clone();
         let mut transaction = Transaction::new(&mut package).unwrap();
-        transaction.set_properties(authored());
+        transaction.set_properties(authored()).unwrap();
         let patch = transaction.commit().unwrap().patch().clone();
 
         let mut stale = original;

@@ -1,0 +1,160 @@
+{
+  "record": "0362qa",
+  "rust_source_base": "4b959bd51436440e76c559a9415860cbbbdd059e",
+  "source_files": [
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/unified-ops-api/tools/rustdoc_return_types.py",
+      "bytes": 9898,
+      "sha256": "f4ab047525392129d5da57a1a9e84e0258f792094521c9b068215b50b7217ead"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/unified-ops-api/tools/check_api_glossary.py",
+      "bytes": 29952,
+      "sha256": "53d34351b1321e1ed4f4da22ed3724ec88cc70a7497ccfeccbbb0b8e973d88e5"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/unified-ops-api/tools/api_debt_inventory.py",
+      "bytes": 12949,
+      "sha256": "a80e606b852b0baa8b2c7e2790a124c28c7171d96d2b5c4a717823210cc80d88"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/unified-ops-api/tools/test_check_api_glossary.py",
+      "bytes": 33759,
+      "sha256": "3faa9b0d6f57d7f8933685257354e5029f9fb502198986856683d6be19ae9241"
+    }
+  ],
+  "regression": {
+    "command": [
+      "python3",
+      "-m",
+      "unittest",
+      "tools.test_check_api_glossary"
+    ],
+    "before_exit": 1,
+    "before": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-generics/before.log",
+      "bytes": 2322,
+      "sha256": "01a458ceda288621d01482fc10bba817d60e8b71228a06cae30d313056d2b67c"
+    },
+    "after_exit": 0,
+    "after": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-generics/after-v1.log",
+      "bytes": 139,
+      "sha256": "a1b494d4a65f0f705416b949a51bd92c9e12a35d267825bd0c6ddf4c6d2bc909"
+    }
+  },
+  "checks": [
+    {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "tools.test_check_api_glossary",
+        "tools.test_officecli_corpus",
+        "tools.test_officecli_capability_delta",
+        "tools.test_no_3rdparty_references",
+        "tools.test_check_crate_boundaries",
+        "tools.test_non_iwork_gate",
+        "tools.test_unified_bench_matrix",
+        "tools.test_check_iwork_leaf_public_api"
+      ],
+      "exit": 0,
+      "seconds": 32.87770501896739,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-generics/validation-v2/check-0.log",
+      "bytes": 633247,
+      "sha256": "f2d0e16ac03e510c5ff9add2a69db8143d0460f98e5412adde8fefff8f7e8e21"
+    },
+    {
+      "command": [
+        "python3",
+        "tools/check_api_glossary.py",
+        "--profile",
+        "docx-minimal",
+        "--json",
+        "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/docx-minimal.json"
+      ],
+      "exit": 0,
+      "seconds": 2.8319926250260323,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-generics/validation-v2/check-1.log",
+      "bytes": 155,
+      "sha256": "da4458936686a45736d6034f4f62afd03f5108134c177cd6c98011ec9f47403a"
+    },
+    {
+      "command": [
+        "python3",
+        "tools/check_api_glossary.py",
+        "--profile",
+        "docx-full",
+        "--json",
+        "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/docx-full.json"
+      ],
+      "exit": 0,
+      "seconds": 2.8413914759876207,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-generics/validation-v2/check-2.log",
+      "bytes": 155,
+      "sha256": "5a9f20c8206911ac29f27b8849a07562fa14c1fb0c936d36c173b952ef0f17e8"
+    },
+    {
+      "command": [
+        "python3",
+        "tools/api_debt_inventory.py",
+        "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/docx-full.json"
+      ],
+      "exit": 0,
+      "seconds": 2.570623383973725,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-generics/validation-v2/check-3.log",
+      "bytes": 4483,
+      "sha256": "c9f20d012fc961656721df0564f5edc5f8969fc3922fd4dfce1dda85d41385f8"
+    }
+  ],
+  "tool_unit_tests": 1334,
+  "glossary_unit_tests": 40,
+  "notes": [
+    "The DOCX captures are the retained 0362q captures from unchanged production Rust, not new rustdoc builds.",
+    "The fixture builds a real dependency and caller rustdoc graph. No compiled binary is committed.",
+    "RTF source migration and its policy registration remain on the integration lane, not trunk."
+  ],
+  "rtf_candidate_validation": {
+    "worker_source_commit": "28d4262acc",
+    "capture": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/w8-rtf-tail-litchi_rtf-rustdoc.json",
+      "bytes": 49776372,
+      "sha256": "20374a4543f8ff82711bd4d595eb4ee391fd8f5adccc56fddbe4730a21f73542"
+    },
+    "policy": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-generics/rtf-five-result-policy.json",
+      "bytes": 22214,
+      "sha256": "ef2daad1a42ef9bb6339b392c8c76c2ba176319d7dfa1d28e277a310ff19a283"
+    },
+    "checks": [
+      {
+        "command": [
+          "python3",
+          "tools/check_api_glossary.py",
+          "--policy",
+          "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-generics/rtf-five-result-policy.json",
+          "--profile",
+          "rtf-minimal",
+          "--json",
+          "/home/zhuhe/code/litchi-worktrees/.coord/w8-rtf-tail-litchi_rtf-rustdoc.json"
+        ],
+        "exit": 0,
+        "seconds": 1.820195989916101,
+        "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-generics/rtf-validation-v1/check-0.log",
+        "bytes": 154,
+        "sha256": "7d6e4d59417fa762be2e667491389974ac9ffaeeea80f2db79e46b1397cafcd4"
+      }
+    ],
+    "result_methods": 5,
+    "feature_note": "litchi-rtf defines no Cargo features; the worker all-features capture and minimal profile have the same feature set. Rustdoc warnings were denied.",
+    "integration_note": "This proves the external candidate capture, not the RTF source currently on trunk. The five rules are not registered on trunk yet.",
+    "inventory": {
+      "path": "docs/unified-ops/results/0362qa/rtf-candidate-inventory.tsv",
+      "bytes": 28,
+      "sha256": "72ad46bedd27da7fe027031dd7de9db11057455fc19ca19f1027ed89b60beb54",
+      "rows": 0,
+      "replay_return_rows": 0,
+      "note": "Only the categories implemented by api_debt_inventory; required raw-policy source audits remain separate."
+    }
+  }
+}

@@ -5,7 +5,7 @@ use std::sync::Arc;
 use litchi_core::{ExecutionContext, ExecutionError, Selector as CoreSelector};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    OpcPackage, PackURI, Part, Relationship, Relationships, SourceBackedPackage, TargetMode,
+    OpcPackage, PackURI, Relationship, Relationships, SourceBackedPackage, TargetMode,
 };
 
 use super::Metadata;
@@ -38,7 +38,7 @@ impl Snapshot {
         }
 
         let workbook_part = package.main_document_part()?;
-        let catalog = raw::parse_catalog(workbook_part.blob())?;
+        let catalog = raw::parse_catalog(workbook_part.blob(), &package.read_limits())?;
         let catalog_sheet = catalog.sheets.get(sheet.position()).ok_or_else(|| {
             invalid("sheet-protection worksheet position is absent from the workbook catalog")
         })?;
@@ -82,7 +82,7 @@ impl Snapshot {
         let workbook = package.main_document_part()?;
         require_workbook_content_type(workbook.content_type())?;
         let workbook_xml = SourcePayload::from_part_data(package, workbook.data()?)?;
-        let catalog = raw::parse_catalog(workbook_xml.as_bytes())?;
+        let catalog = raw::parse_catalog(workbook_xml.as_bytes(), &package.read_limits())?;
         let sheet_parts = validate_sheet_graph(package, &workbook, &catalog.sheets)?;
         let sheet_position = resolve_selector(&catalog.sheets, selector.into())?
             .ok_or_else(|| invalid("sheet-protection worksheet selector did not resolve"))?;
@@ -233,38 +233,6 @@ impl Snapshot {
             && self.sheet_position == other.sheet_position
             && self.source == other.source
     }
-
-    pub(super) fn matches_current_source(&self, package: &OpcPackage) -> bool {
-        let Ok(workbook) = package.main_document_part() else {
-            return false;
-        };
-        if !self.source.workbook.matches_part(workbook)
-            || !current_owner_relationship(package.rels())
-                .is_some_and(|relationship| self.source.owner_relationship.matches(relationship))
-        {
-            return false;
-        }
-        let Some(relationship) = workbook
-            .rels()
-            .get(self.source.sheet_relationship.id.as_ref())
-        else {
-            return false;
-        };
-        let Ok(target) = relationship.target_partname() else {
-            return false;
-        };
-        if !self.source.sheet_relationship.matches(relationship)
-            || target != self.source.worksheet.uri
-        {
-            return false;
-        }
-        package
-            .get_part(&self.source.worksheet.uri)
-            .is_ok_and(|part| {
-                self.source.worksheet.matches_part(part)
-                    && relationships_match(&self.source.worksheet_relationships, part.rels())
-            })
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -296,12 +264,6 @@ impl PartState {
             bytes,
         })
     }
-
-    fn matches_part(&self, part: &dyn Part) -> bool {
-        part.partname() == &self.uri
-            && part.content_type() == self.content_type.as_ref()
-            && part.blob() == self.bytes.as_bytes()
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -327,13 +289,6 @@ impl SourceRelationship {
             mode: relationship.target_mode(),
         })
     }
-
-    fn matches(&self, relationship: &Relationship) -> bool {
-        relationship.r_id() == self.id.as_ref()
-            && relationship.reltype() == self.relationship_type.as_ref()
-            && relationship.target_ref() == self.target.as_ref()
-            && relationship.target_mode() == self.mode
-    }
 }
 
 fn capture_relationships(relationships: &Relationships) -> Result<Vec<SourceRelationship>> {
@@ -349,17 +304,6 @@ fn capture_relationships(relationships: &Relationships) -> Result<Vec<SourceRela
     }
     captured.sort_by(|left, right| left.id.cmp(&right.id));
     Ok(captured)
-}
-
-fn relationships_match(expected: &[SourceRelationship], actual: &Relationships) -> bool {
-    if expected.len() != actual.len() {
-        return false;
-    }
-    expected.iter().all(|relationship| {
-        actual
-            .get(relationship.id.as_ref())
-            .is_some_and(|actual| relationship.matches(actual))
-    })
 }
 
 fn resolve_selector(sheets: &[raw::Sheet], selector: Selector<'_>) -> Result<Option<usize>> {

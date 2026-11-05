@@ -5,19 +5,122 @@ edition = "2024"
 publish = false
 
 [features]
+default = [
+    "current-api",
+    "current-xlsx-raw-opc",
+    "rtf-current-api",
+    "drawingml-probe",
+    "drawingml-raw-current",
+    "drawingml-owner-current",
+    "drawingml-theme-family-current",
+    "drawingml-theme-family-owner-limits-current",
+    "drawingml-ink-limits-current",
+    "drawingml-transform-limits-current",
+]
+current-api = ["current-owner-api", "current-property-api"]
+# The RTF refusal contract is compiled against two native API eras through
+# this consumer-only probe.  These package features select only the adapter;
+# they do not alter litchi-rtf or overlay its implementation.
+rtf-current-api = []
+rtf-legacy-api = []
+# The paired W5 driver can compare the owner and property-set migrations
+# independently.  `current-api` keeps the normal candidate invocation terse;
+# the baseline uses the two legacy flags and the intermediate pair selects
+# `current-owner-api,legacy-property-api`.
+current-owner-api = []
+current-property-api = []
+# The DrawingML native qualification probe is an opt-in package surface.  It
+# is enabled by the ordinary current profile and by the paired DrawingML
+# runner, but remains absent from unrelated --no-default-features lanes.
+drawingml-probe = []
+# The DrawingML owner transition is measured against the common pre-owner
+# source (945eb1d6...).  This gate selects the Package/Edit owner branch; it
+# is independent from the Theme-part caller-limit gate below because the
+# 11728 parent already has Package/Edit while retaining *_with_limit parts.
+drawingml-owner-current = []
+# The complete Theme-part raw route crossed its caller-limit API separately
+# from the detached owner transition.  The historical 11728 parent keeps the
+# explicit *_with_limit methods; current source uses part::Limits.
+drawingml-theme-family-current = []
+drawingml-theme-family-owner-limits-current = []
+drawingml-transform-limits-current = []
+drawingml-raw-current = []
+# The final Ink actions raw/editor boundary added the required typed reader
+# policy after the historical 2f7/996/11728 parents. Keep this independent
+# from the detached Package/Edit owner gate so those parents retain their
+# one-argument `read_profile` API while the candidate passes Limits explicitly.
+drawingml-ink-limits-current = []
 allocator-metrics = []
+current-xlsx-raw-opc = []
+legacy-xlsx-raw-opc = []
 ordinary-save-process-metrics = []
+# Enables the W5 OLE probe's isolated counting allocator.  Native timing
+# binaries leave this feature disabled so their allocator and output paths are
+# unchanged.
+w5-counting-allocator = []
 xls-source-attribution = ["litchi/xls"]
 xlsb-crud = ["litchi/xlsb"]
+# Historical XLSX source-history measurements are built from the exact e63
+# checkout and its recorded overlay; the current manifest intentionally has no
+# legacy compatibility feature. See unified-xlsx-source-history/README.md.
+# The paired OLE probe is built against either migration boundary when these
+# flags are enabled on the recorded baseline checkout with
+# `--no-default-features`.  `--all-features` gives current API branches
+# precedence, so the ordinary performance package profile remains buildable.
+legacy-owner-api = []
+legacy-property-api = []
+# The ODF raw-codec qualification probe is a consumer-only adapter.  These
+# features select all ten ODF facade paths, while the example chooses the old
+# or current raw constructor/writer call shape with cfg.  They do not alter a
+# production crate or copy candidate implementation files into the baseline.
+raw-codec-odf = [
+    "litchi-ops/odt",
+    "litchi-ops/ods",
+    "litchi-ops/odp",
+    "litchi-ops/odg",
+    "litchi-ops/odc",
+    "litchi-ops/odi",
+    "litchi-ops/odb",
+    "litchi-ops/odf-formula",
+    "litchi-ops/oth",
+    "litchi-ops/odm",
+]
+raw-codec-original = ["raw-codec-odf"]
+raw-codec-current = ["raw-codec-odf"]
+raw-codec-allocator = []
 
 [[bin]]
 name = "litchi-perf-baseline-alloc"
 path = "src/bin/litchi-perf-baseline-alloc.rs"
 required-features = ["allocator-metrics"]
 
+[[example]]
+name = "odf_raw_codec_qualification"
+path = "examples/odf_raw_codec_qualification.rs"
+required-features = ["raw-codec-odf"]
+
 [[bin]]
 name = "xlsx_managed_compression_alloc"
 path = "src/bin/xlsx_managed_compression_alloc.rs"
+required-features = ["allocator-metrics"]
+
+[[bin]]
+name = "xlsx_source_family_abba"
+path = "src/bin/xlsx_source_family_abba.rs"
+
+[[bin]]
+name = "xlsx_merge_history_alloc"
+path = "src/bin/xlsx_merge_history_alloc.rs"
+required-features = ["allocator-metrics"]
+
+[[bin]]
+name = "xlsx_tab_state_history_alloc"
+path = "src/bin/xlsx_tab_state_history_alloc.rs"
+required-features = ["allocator-metrics"]
+
+[[bin]]
+name = "xlsx_source_reader_paths_alloc"
+path = "src/bin/xlsx_source_reader_paths_alloc.rs"
 required-features = ["allocator-metrics"]
 
 [[bin]]
@@ -64,12 +167,23 @@ name = "xls_source_attribution"
 path = "src/bin/xls_source_attribution.rs"
 required-features = ["xls-source-attribution"]
 
+[[bin]]
+name = "drawingml-raw-native"
+path = "src/bin/drawingml_raw_native.rs"
+required-features = ["drawingml-probe"]
+
+[[bin]]
+name = "drawingml-raw-allocator"
+path = "src/bin/drawingml_raw_allocator.rs"
+required-features = ["drawingml-probe"]
+
 [dependencies]
 litchi-cfb = { path = "../../crates/litchi-cfb", features = ["write"] }
 litchi-core = { path = "../../crates/litchi-core" }
 litchi-crypto = { path = "../../crates/litchi-crypto", features = ["ooxml"] }
 litchi-doc = { path = "../../crates/litchi-doc", features = ["performance-diagnostics"] }
 litchi-docx = { path = "../../crates/litchi-docx" }
+litchi-drawingml = { path = "../../crates/litchi-drawingml" }
 litchi-odf-common = { path = "../../crates/litchi-odf-common" }
 litchi-odraw = { path = "../../crates/litchi-odraw" }
 litchi-odp = { path = "../../crates/litchi-odp" }
@@ -78,6 +192,7 @@ litchi-odt = { path = "../../crates/litchi-odt" }
 litchi-ole-common = { path = "../../crates/litchi-ole-common" }
 litchi-ooxml-common = { path = "../../crates/litchi-ooxml-common" }
 litchi-opc = { path = "../../crates/litchi-opc", features = ["sign", "performance-diagnostics"] }
+litchi-ops = { path = "../../crates/litchi-ops" }
 litchi = { path = "../../crates/litchi", features = ["doc", "docx", "ods", "odt", "odp", "ppt", "pptx", "rtf", "xlsx"] }
 litchi-ppt = { path = "../../crates/litchi-ppt" }
 litchi-pptx = { path = "../../crates/litchi-pptx" }
@@ -86,6 +201,7 @@ litchi-sign = { path = "../../crates/litchi-sign" }
 litchi-xls = { path = "../../crates/litchi-xls" }
 litchi-xlsb = { path = "../../crates/litchi-xlsb" }
 litchi-xlsx = { path = "../../crates/litchi-xlsx" }
+litchi-vba = { path = "../../crates/litchi-vba" }
 xml-minifier = { path = "../../crates/xml-minifier" }
 quick-xml = "0.41"
 serde = { version = "1", features = ["derive"] }

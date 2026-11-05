@@ -10,7 +10,9 @@
 use std::{cell::RefCell, collections::HashSet, convert::Infallible, io::Cursor};
 
 use super::codec::process_markup_compatibility;
-use super::model::{Capabilities, ExpandedName, Limits, NAMESPACE, NamespaceUri, XMLNS_NAMESPACE};
+use super::model::{
+    Capabilities, ExpandedName, LimitKind, Limits, NAMESPACE, NamespaceUri, XMLNS_NAMESPACE,
+};
 use super::scope::counter::{counted, counted_copies, counted_uri_bytes};
 use super::stream::{
     SemanticEvent, StreamError, StreamLimits, process_markup_compatibility_stream_with_observers,
@@ -523,7 +525,7 @@ fn a_stream_limited_below_the_fixed_namespaces_still_refuses_their_names() {
         )
         .expect_err(xml);
         assert!(
-            matches!(&error, StreamError::Mce { error: super::model::Error::LimitExceeded(message), .. } if message == "stream name bytes"),
+            matches!(&error, StreamError::Mce { error: super::model::Error::LimitExceeded { kind, .. }, .. } if *kind == LimitKind::NameBytes),
             "{xml}: {error:?}"
         );
     }

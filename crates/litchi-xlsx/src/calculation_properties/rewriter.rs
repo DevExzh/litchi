@@ -109,7 +109,11 @@ pub(super) fn inspect_layout(xml: &[u8], limits: &Limits) -> Result<Layout> {
             .checked_add(1)
             .ok_or_else(|| invalid("XML event count overflow"))?;
         if events > limits.max_events() {
-            return Err(invalid("calculation metadata exceeds event count limit"));
+            return Err(Error::limit(
+                super::LimitKind::Events,
+                events,
+                limits.max_events(),
+            ));
         }
         let start = position(&reader, origin)?;
         let decoder = reader.decoder();
@@ -237,15 +241,19 @@ pub(super) fn inspect_layout(xml: &[u8], limits: &Limits) -> Result<Layout> {
     if !root_seen || !root_closed || !stack.is_empty() {
         return Err(invalid("unterminated workbook XML"));
     }
+    // Projection is recognized on namespace values as written; a binding
+    // spelled with references may project either owner all the same
+    // (record 0011).
+    let escaped = litchi_ooxml_common::mce::binds_namespace_by_reference(xml);
     Ok(Layout {
         calc,
         calc_insert: calc_insert.unwrap_or(root_close),
-        calc_projected,
+        calc_projected: calc_projected || escaped,
         ext_list,
         target_ext,
         feature_list,
         feature_qname,
-        features_projected,
+        features_projected: features_projected || escaped,
         mixed_target,
         root_qname,
         root_close,
@@ -467,7 +475,11 @@ fn close_frame(
                             .checked_add(span.end - span.start)
                             .ok_or_else(|| invalid("opaque extension byte count overflow"))?;
                         if *opaque_bytes > limits.max_opaque_bytes() {
-                            return Err(invalid("opaque extension bytes exceed limit"));
+                            return Err(Error::limit(
+                                super::LimitKind::OpaqueBytes,
+                                *opaque_bytes,
+                                limits.max_opaque_bytes(),
+                            ));
                         }
                     },
                     Kind::TargetExt { mixed } => {
@@ -720,7 +732,11 @@ fn apply_edits<'a>(
             .ok_or_else(|| invalid("calculation metadata output size overflow"))?;
     }
     if final_len > limits.max_output_bytes() {
-        return Err(invalid("calculation metadata output exceeds byte limit"));
+        return Err(Error::limit(
+            super::LimitKind::OutputBytes,
+            final_len,
+            limits.max_output_bytes(),
+        ));
     }
     let mut output = Vec::new();
     output
@@ -1003,7 +1019,11 @@ fn write_features(
     for feature in features {
         let len = feature.as_str().len();
         if len > limits.max_feature_name_bytes() {
-            return Err(invalid("calculation feature name exceeds byte limit"));
+            return Err(Error::limit(
+                super::LimitKind::FeatureNameBytes,
+                len,
+                limits.max_feature_name_bytes(),
+            ));
         }
         total = total
             .checked_add(len)
@@ -1211,7 +1231,11 @@ fn check_attributes(element: &BytesStart<'_>, limits: &Limits) -> Result<()> {
             .checked_add(1)
             .ok_or_else(|| invalid("attribute count overflow"))?;
         if count > limits.max_attributes() {
-            return Err(invalid("calculation metadata exceeds attribute limit"));
+            return Err(Error::limit(
+                super::LimitKind::Attributes,
+                count,
+                limits.max_attributes(),
+            ));
         }
     }
     Ok(())

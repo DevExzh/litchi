@@ -1,7 +1,5 @@
 use std::borrow::Cow;
 
-use crate::{RtfError, RtfResult};
-
 /// Maximum encoded UTF-8 size accepted for a document-window caption.
 pub const MAX_WINDOW_CAPTION_BYTES: usize = 65_536;
 
@@ -18,7 +16,7 @@ impl<'a> DocumentWindowCaption<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn new(text: Cow<'a, str>) -> RtfResult<Self> {
+    pub fn new(text: Cow<'a, str>) -> crate::Result<Self> {
         let caption = Self { text };
         caption.validate()?;
         Ok(caption)
@@ -26,14 +24,14 @@ impl<'a> DocumentWindowCaption<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self.text.is_empty() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF window caption must not be empty".to_string(),
             ));
         }
         if self.text.len() > MAX_WINDOW_CAPTION_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF window caption exceeds the resource limit".to_string(),
             ));
         }
@@ -42,7 +40,7 @@ impl<'a> DocumentWindowCaption<'a> {
             .chars()
             .any(|character| matches!(character, '\0' | '\r' | '\n'))
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF window caption contains a forbidden character".to_string(),
             ));
         }

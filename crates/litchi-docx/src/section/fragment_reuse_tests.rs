@@ -60,14 +60,14 @@ fn inventory_reuse_matches_section_footnote_before_semantic_error() {
     let document = format!(
         r#"<w:document xmlns:w="{W}" xmlns:w12="{W12}" xmlns:mc="{MC}" mc:Ignorable="w12" mc:PreserveElements="w12:footnoteColumns"><w:body>{fragment}</w:body></w:document>"#
     );
-    let inventory_error = Inventory::parse(document.as_bytes())
+    let inventory_error = Inventory::parse(document.as_bytes(), &Default::default())
         .expect_err("inventory must reject the retained malformed focused extension");
 
     let footnote_only = fragment.replace(r#"<w:type w:val="not-a-section-break"/>"#, "");
     let footnote_document = format!(
         r#"<w:document xmlns:w="{W}" xmlns:w12="{W12}" xmlns:mc="{MC}" mc:Ignorable="w12" mc:PreserveElements="w12:footnoteColumns"><w:body>{footnote_only}</w:body></w:document>"#
     );
-    let footnote_error = Inventory::parse(footnote_document.as_bytes())
+    let footnote_error = Inventory::parse(footnote_document.as_bytes(), &Default::default())
         .expect_err("the retained focused extension must fail on its own");
     assert_eq!(
         inventory_error.to_string(),
@@ -93,9 +93,9 @@ fn inventory_reuse_keeps_raw_depth_error_before_footnote_error() {
     let malformed_document = format!(
         r#"<w:document xmlns:w="{W}" xmlns:w12="{W12}" xmlns:mc="{MC}" mc:Ignorable="w12" mc:PreserveElements="w12:footnoteColumns"><w:body>{malformed_footnote}</w:body></w:document>"#
     );
-    let raw_error = Inventory::parse(valid_document.as_bytes())
+    let raw_error = Inventory::parse(valid_document.as_bytes(), &Default::default())
         .expect_err("the private raw codec depth bound must reject this fragment");
-    let combined_error = Inventory::parse(malformed_document.as_bytes())
+    let combined_error = Inventory::parse(malformed_document.as_bytes(), &Default::default())
         .expect_err("the malformed footnote is behind the raw depth failure");
     assert_eq!(
         raw_error.to_string(),
@@ -115,13 +115,13 @@ fn inventory_reuse_keeps_reference_preflight_before_section_and_footnote_errors(
         max_reference_bytes: relationship_id.len() - 1,
         ..Limits::default()
     };
-    match Inventory::parse_with_limits(xml.as_bytes(), &limits) {
+    match Inventory::parse(xml.as_bytes(), &limits) {
         Err(Error::SectionInventoryLimit {
-            resource,
+            kind,
             maximum,
             actual,
         }) => {
-            assert_eq!(resource, "header/footer reference bytes");
+            assert_eq!(kind, LimitKind::HeaderFooterReferenceBytes);
             assert_eq!(maximum, relationship_id.len() - 1);
             assert_eq!(actual, relationship_id.len());
         },
@@ -135,7 +135,8 @@ fn inventory_reuse_maps_tolerance_to_original_offsets_after_namespace_injection(
     let xml = format!(
         r#"<q:document xmlns:q="{W}" xmlns:rel="{REL}"><q:body><q:sectPr><q:headerReference q:type="default" rel:id="bad id"/><q:cols q:equalWidth="0" q:num="3"><q:col q:space="720"/><q:col q:w="4000"/></q:cols></q:sectPr></q:body></q:document>"#
     );
-    let inventory = Inventory::parse(xml.as_bytes()).expect("aliased section is valid");
+    let inventory =
+        Inventory::parse(xml.as_bytes(), &Default::default()).expect("aliased section is valid");
     assert_eq!(inventory.sections().len(), 1);
     assert_eq!(
         inventory.sections()[0].headers()[0].relationship_id,
@@ -170,7 +171,7 @@ fn inventory_reuse_maps_tolerance_to_original_offsets_after_namespace_injection(
 #[test]
 fn inventory_reuse_preserves_mce_filtering_and_footnote_controls() {
     let absent = format!(r#"<q:document xmlns:q="{W}"><q:body><q:sectPr/></q:body></q:document>"#);
-    assert!(Inventory::parse(absent.as_bytes()).is_ok());
+    assert!(Inventory::parse(absent.as_bytes(), &Default::default()).is_ok());
 
     let mut zero = Section::from_xml_bytes(
         format!(
@@ -189,14 +190,14 @@ fn inventory_reuse_preserves_mce_filtering_and_footnote_controls() {
     let inherited = format!(
         r#"<q:document xmlns:q="{W}" xmlns:x12="{W12}" xmlns:m="{MC}" m:Ignorable="x12"><q:body><q:sectPr><x12:footnoteColumns q:val="0"/></q:sectPr></q:body></q:document>"#
     );
-    let inventory = Inventory::parse(inherited.as_bytes())
+    let inventory = Inventory::parse(inherited.as_bytes(), &Default::default())
         .expect("MCE removes this unknown ignorable extension before inventory scanning");
     assert_eq!(inventory.sections().len(), 1);
 
     let non_ignorable = format!(
         r#"<q:document xmlns:q="{W}" xmlns:x12="{W12}"><q:body><q:sectPr><x12:footnoteColumns q:val="0"/></q:sectPr></q:body></q:document>"#
     );
-    let error = Inventory::parse(non_ignorable.as_bytes())
+    let error = Inventory::parse(non_ignorable.as_bytes(), &Default::default())
         .expect_err("a non-ignorable extension must reach focused validation");
     assert!(
         error

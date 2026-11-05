@@ -16,7 +16,7 @@ use quick_xml::{
     name::{Namespace, ResolveResult},
     reader::NsReader,
 };
-use std::{collections::BTreeSet, ops::Range};
+use std::{borrow::Cow, collections::BTreeSet, ops::Range};
 
 use crate::{
     ApplicationConnectionSettings, AutoIncrementSettings, CharacterSetSettings, Column, Component,
@@ -100,23 +100,27 @@ impl Change {
 /// driver, follows a component link, or executes a stored command.
 #[derive(Clone)]
 pub struct Edit<'source> {
-    source: &'source Database,
+    source: &'source crate::Package,
     policy: crate::EditPolicy,
-    content: String,
+    content: Cow<'source, str>,
     changes: Vec<Change>,
     legacy_query: Option<QueryChange>,
+    /// Whether scalar setters touched more than one query: the patch then
+    /// reports no single legacy query change (record 0288).
+    several_queries: bool,
     payload_additions: Vec<Addition>,
     payload_directories: Vec<(String, String)>,
 }
 
 impl<'source> Edit<'source> {
-    pub(crate) fn new(source: &'source Database, policy: crate::EditPolicy) -> Self {
+    pub(crate) fn new(source: &'source crate::Package, policy: crate::EditPolicy) -> Self {
         Self {
             source,
             policy,
-            content: source.content_xml().to_owned(),
+            content: Cow::Borrowed(source.database.content_xml()),
             changes: Vec::new(),
             legacy_query: None,
+            several_queries: false,
             payload_additions: Vec::new(),
             payload_directories: Vec::new(),
         }
@@ -209,9 +213,12 @@ impl<'source> Edit<'source> {
         let catalog = source.catalog()?.to_owned();
         let query = owned_query(&catalog, name)?.clone();
         let semantics = query.command_semantics()?;
-        if let crate::QueryDependencySupport::Unsupported(reason) = semantics.dependency_support() {
-            return Err(Error::Unsupported(format!(
-                "ODB query dependency closure is unsupported: {reason:?}"
+        if let crate::QueryDependencySupport::Unsupported(_reason) = semantics.dependency_support()
+        {
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odb.authoring.transaction",
+                "ODB query dependency closure is unsupported",
             )));
         }
         let mut dependencies = semantics
@@ -519,9 +526,11 @@ impl<'source> Edit<'source> {
         active_content: crate::ActiveContentDisposition,
     ) -> Result<()> {
         if source.protection_status()?.is_encrypted() {
-            return Err(Error::Unsupported(
-                "ODB component payload transfer from an encrypted donor is refused".to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odb.authoring.transaction",
+                "ODB component payload transfer from an encrypted donor is refused",
+            )));
         }
         let Some(source_href) = component.href() else {
             if destination_href.is_some() {
@@ -543,6 +552,7 @@ impl<'source> Edit<'source> {
         })?;
         if self
             .source
+            .database
             .package
             .contains_package_prefix(&destination_prefix)?
             || self
@@ -562,18 +572,22 @@ impl<'source> Edit<'source> {
         if additions.is_empty() && directories.is_empty() {
             return invalid("ODB linked component package payload does not exist");
         }
-        if let crate::ComponentTransferSupport::Refused(reason) =
+        if let crate::ComponentTransferSupport::Refused(_reason) =
             crate::package::Snapshot::payload_transfer_support(&additions)
         {
-            return Err(Error::Unsupported(format!(
-                "ODB component payload transfer is refused: {reason:?}"
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odb.authoring.transaction",
+                "ODB component payload transfer is refused",
             )));
         }
         let active_dependencies =
             crate::package::Snapshot::payload_active_content_count(&additions)?;
         if active_dependencies > 0 && active_content == crate::ActiveContentDisposition::Refuse {
-            return Err(Error::Unsupported(format!(
-                "ODB component payload has {active_dependencies} active-content dependencies"
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odb.authoring.transaction",
+                "ODB component payload has active-content dependencies",
             )));
         }
         for addition in additions {
@@ -587,7 +601,7 @@ impl<'source> Edit<'source> {
                 }
                 continue;
             }
-            match self.source.package.file_matches(&addition)? {
+            match self.source.database.package.file_matches(&addition)? {
                 Some(true) => {},
                 Some(false) => {
                     return invalid("ODB component package dependency collides in destination");
@@ -606,7 +620,7 @@ impl<'source> Edit<'source> {
                 }
                 continue;
             }
-            match self.source.package.directory_media_type(&path)? {
+            match self.source.database.package.directory_media_type(&path)? {
                 Some(existing) if existing == media_type => {},
                 Some(_) => {
                     return invalid("ODB component package directory collides in destination");
@@ -741,7 +755,7 @@ impl<'source> Edit<'source> {
         let nodes = scan(&self.content)?;
         match table.kind() {
             TableKind::Representation => insert_into_or_create_collection(
-                &mut self.content,
+                self.content.to_mut(),
                 &nodes,
                 "table-representations",
                 "database",
@@ -750,20 +764,20 @@ impl<'source> Edit<'source> {
             )?,
             TableKind::Definition => {
                 if let Some(collection) = unique_node(&nodes, "table-definitions")? {
-                    insert_child(&mut self.content, collection, &fragment)?;
+                    insert_child(self.content.to_mut(), collection, &fragment)?;
                 } else if let Some(schema) = unique_node(&nodes, "schema-definition")? {
                     let wrapped = format!(
                         "<{0}:table-definitions>{fragment}</{0}:table-definitions>",
                         prefixes.database
                     );
-                    insert_child(&mut self.content, schema, &wrapped)?;
+                    insert_child(self.content.to_mut(), schema, &wrapped)?;
                 } else {
                     let database = unique_required_node(&nodes, "database")?;
                     let wrapped = format!(
                         "<{0}:schema-definition><{0}:table-definitions>{fragment}</{0}:table-definitions></{0}:schema-definition>",
                         prefixes.database
                     );
-                    insert_child(&mut self.content, database, &wrapped)?;
+                    insert_child(self.content.to_mut(), database, &wrapped)?;
                 }
             },
         }
@@ -780,13 +794,15 @@ impl<'source> Edit<'source> {
             return invalid("ODB table replacement cannot change declaration kind");
         }
         if table.name() != name {
-            return Err(Error::Unsupported(
-                "ODB table replacement cannot rename; use rename_table first".to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odb.authoring.transaction",
+                "ODB table replacement cannot rename; use rename_table first",
+            )));
         }
         let prefix = prefixes(&self.content)?.database;
         replace_span(
-            &mut self.content,
+            self.content.to_mut(),
             site.full.clone(),
             &serialize_table(&table, &prefix),
         )?;
@@ -817,9 +833,11 @@ impl<'source> Edit<'source> {
             })
             .collect::<Vec<_>>();
         if !incoming.is_empty() && disposition == crate::DependencyDisposition::Refuse {
-            return Err(Error::Unsupported(
-                "ODB table removal requires an incoming-relation disposition".to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odb.authoring.transaction",
+                "ODB table removal requires an incoming-relation disposition",
+            )));
         }
         if disposition == crate::DependencyDisposition::Cascade {
             let mut edits = incoming
@@ -833,7 +851,7 @@ impl<'source> Edit<'source> {
                 range: site.full.clone(),
                 value: String::new(),
             });
-            apply_edits(&mut self.content, edits)?;
+            apply_edits(self.content.to_mut(), edits)?;
             for key in incoming {
                 let owner = ancestors(&nodes, key)
                     .find(|node| node.local == "table-definition")
@@ -848,7 +866,7 @@ impl<'source> Edit<'source> {
                 }
             }
         } else {
-            replace_span(&mut self.content, site.full.clone(), "")?;
+            replace_span(self.content.to_mut(), site.full.clone(), "")?;
         }
         self.record(ChangeAction::Remove, ChangeKind::Table, name)
     }
@@ -885,7 +903,7 @@ impl<'source> Edit<'source> {
                 )?);
             }
         }
-        apply_edits(&mut self.content, edits)?;
+        apply_edits(self.content.to_mut(), edits)?;
         self.record(ChangeAction::Update, ChangeKind::Table, name)
     }
 
@@ -908,7 +926,7 @@ impl<'source> Edit<'source> {
         let prefix = prefixes(&self.content)?.database;
         let fragment = serialize_column(&column, table_site.local == "table-definition", &prefix);
         insert_table_collection(
-            &mut self.content,
+            self.content.to_mut(),
             &nodes,
             table_site,
             column_collection(table_site),
@@ -931,13 +949,15 @@ impl<'source> Edit<'source> {
         let site = find_named_child(&nodes, table_site, column_element(table_site), name)?
             .ok_or_else(|| Error::InvalidFormat("ODB column does not exist".to_string()))?;
         if column.name() != name {
-            return Err(Error::Unsupported(
-                "ODB column replacement cannot rename; use rename_column first".to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odb.authoring.transaction",
+                "ODB column replacement cannot rename; use rename_column first",
+            )));
         }
         let prefix = prefixes(&self.content)?.database;
         let fragment = serialize_column(&column, table_site.local == "table-definition", &prefix);
-        replace_span(&mut self.content, site.full.clone(), &fragment)?;
+        replace_span(self.content.to_mut(), site.full.clone(), &fragment)?;
         self.record(
             ChangeAction::Update,
             ChangeKind::Column,
@@ -964,9 +984,11 @@ impl<'source> Edit<'source> {
             .ok_or_else(|| Error::InvalidFormat("ODB column does not exist".to_string()))?;
         let dependents = column_dependents(&nodes, table_site, table, name);
         if !dependents.is_empty() && disposition == crate::DependencyDisposition::Refuse {
-            return Err(Error::Unsupported(
-                "ODB column removal requires a key/index dependency disposition".to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odb.authoring.transaction",
+                "ODB column removal requires a key/index dependency disposition",
+            )));
         }
         if disposition == crate::DependencyDisposition::Cascade {
             let mut edits = dependents
@@ -980,7 +1002,7 @@ impl<'source> Edit<'source> {
                 range: site.full.clone(),
                 value: String::new(),
             });
-            apply_edits(&mut self.content, edits)?;
+            apply_edits(self.content.to_mut(), edits)?;
             for dependent in dependents {
                 self.record(
                     ChangeAction::Remove,
@@ -989,7 +1011,7 @@ impl<'source> Edit<'source> {
                 )?;
             }
         } else {
-            replace_span(&mut self.content, site.full.clone(), "")?;
+            replace_span(self.content.to_mut(), site.full.clone(), "")?;
         }
         self.record(
             ChangeAction::Remove,
@@ -1052,7 +1074,7 @@ impl<'source> Edit<'source> {
                 )?);
             }
         }
-        apply_edits(&mut self.content, edits)?;
+        apply_edits(self.content.to_mut(), edits)?;
         self.record(
             ChangeAction::Update,
             ChangeKind::Column,
@@ -1146,7 +1168,7 @@ impl<'source> Edit<'source> {
         let prefix = prefixes(&self.content)?.database;
         let fragment = serialize_query(&query, &prefix);
         insert_into_or_create_collection(
-            &mut self.content,
+            self.content.to_mut(),
             &nodes,
             "queries",
             "database",
@@ -1167,7 +1189,7 @@ impl<'source> Edit<'source> {
         }
         let prefix = prefixes(&self.content)?.database;
         replace_span(
-            &mut self.content,
+            self.content.to_mut(),
             site.full.clone(),
             &serialize_query(&query, &prefix),
         )?;
@@ -1179,8 +1201,69 @@ impl<'source> Edit<'source> {
         let nodes = scan(&self.content)?;
         let site = find_named_node(&nodes, "query", name)?
             .ok_or_else(|| Error::InvalidFormat("ODB query does not exist".to_string()))?;
-        replace_span(&mut self.content, site.full.clone(), "")?;
+        replace_span(self.content.to_mut(), site.full.clone(), "")?;
         self.record(ChangeAction::Remove, ChangeKind::Query, name)
+    }
+
+    /// Moves a stored query so it ends at position `to` among the queries of
+    /// its collection. The query's bytes move unchanged; every other byte of
+    /// the content stays in place. A move to the current position is an
+    /// exact no-op.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the query does not exist, its name is
+    /// ambiguous, or `to` is outside the collection.
+    pub fn move_query(&mut self, name: &str, to: usize) -> Result<()> {
+        let nodes = scan(&self.content)?;
+        let site = find_named_node(&nodes, "query", name)?
+            .ok_or_else(|| Error::InvalidFormat("ODB query does not exist".to_string()))?;
+        if relocate_sibling(self.content.to_mut(), &nodes, site, to)? {
+            self.record(ChangeAction::Update, ChangeKind::Query, name)?;
+        }
+        Ok(())
+    }
+
+    /// Moves a table declaration so it ends at position `to` among the
+    /// declarations of the same kind in its collection (representations
+    /// among representations, definitions among definitions). The
+    /// declaration's bytes move unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the table does not exist, its name is
+    /// ambiguous, or `to` is outside its collection.
+    pub fn move_table(&mut self, name: &str, to: usize) -> Result<()> {
+        let nodes = scan(&self.content)?;
+        let site = find_named_table(&nodes, name)?
+            .ok_or_else(|| Error::InvalidFormat("ODB table does not exist".to_string()))?;
+        if relocate_sibling(self.content.to_mut(), &nodes, site, to)? {
+            self.record(ChangeAction::Update, ChangeKind::Table, name)?;
+        }
+        Ok(())
+    }
+
+    /// Moves a column so it ends at position `to` among the columns of its
+    /// table. The column's bytes move unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the table or column does not exist, a name is
+    /// ambiguous, or `to` is outside the table's columns.
+    pub fn move_column(&mut self, table: &str, name: &str, to: usize) -> Result<()> {
+        let nodes = scan(&self.content)?;
+        let table_site = find_named_table(&nodes, table)?
+            .ok_or_else(|| Error::InvalidFormat("ODB table does not exist".to_string()))?;
+        let site = find_named_child(&nodes, table_site, column_element(table_site), name)?
+            .ok_or_else(|| Error::InvalidFormat("ODB column does not exist".to_string()))?;
+        if relocate_sibling(self.content.to_mut(), &nodes, site, to)? {
+            self.record(
+                ChangeAction::Update,
+                ChangeKind::Column,
+                &child_target(table, name),
+            )?;
+        }
+        Ok(())
     }
 
     /// Replaces the inert command text stored for one exactly named query.
@@ -1270,7 +1353,7 @@ impl<'source> Edit<'source> {
                         site,
                         site,
                     )?;
-                    replace_span(&mut self.content, site.full.clone(), &replacement)?;
+                    replace_span(self.content.to_mut(), site.full.clone(), &replacement)?;
                 } else {
                     let replacement = serialize_connection_owner_for_site(
                         value,
@@ -1280,7 +1363,7 @@ impl<'source> Edit<'source> {
                         site,
                         (owner.id != site.id).then_some(owner),
                     )?;
-                    replace_span(&mut self.content, owner.full.clone(), &replacement)?;
+                    replace_span(self.content.to_mut(), owner.full.clone(), &replacement)?;
                 }
             },
             (Some(site), None) => {
@@ -1298,7 +1381,7 @@ impl<'source> Edit<'source> {
                         "ODB connection removal would discard opaque database-description content",
                     );
                 }
-                replace_span(&mut self.content, owner.full.clone(), "")?;
+                replace_span(self.content.to_mut(), owner.full.clone(), "")?;
             },
             (None, Some(value)) => {
                 if let Some(description) = unique_node(&nodes, "database-description")? {
@@ -1320,14 +1403,14 @@ impl<'source> Edit<'source> {
                             description,
                             description,
                         )?;
-                        replace_span(&mut self.content, description.full.clone(), &fragment)?;
+                        replace_span(self.content.to_mut(), description.full.clone(), &fragment)?;
                     } else {
                         let fragment = serialize_connection(value, &prefixes)?;
-                        insert_child(&mut self.content, description, &fragment)?;
+                        insert_child(self.content.to_mut(), description, &fragment)?;
                     }
                 } else if let Some(data) = unique_node(&nodes, "connection-data")? {
                     insert_child(
-                        &mut self.content,
+                        self.content.to_mut(),
                         data,
                         &serialize_connection_owner(value, &prefixes)?,
                     )?;
@@ -1335,7 +1418,7 @@ impl<'source> Edit<'source> {
                     let source = unique_required_node(&nodes, "data-source")?;
                     let owner = serialize_connection_owner(value, &prefixes)?;
                     let wrapped = wrap_connection_data(&owner, &prefixes)?;
-                    insert_child(&mut self.content, source, &wrapped)?;
+                    insert_child(self.content.to_mut(), source, &wrapped)?;
                 }
             },
             (None, None) => return invalid("ODB connection staging state is inconsistent"),
@@ -1415,7 +1498,7 @@ impl<'source> Edit<'source> {
         let prefixes = prefixes(&self.content)?;
         if current.login() != settings.login() {
             set_login_node(
-                &mut self.content,
+                self.content.to_mut(),
                 &nodes,
                 connection_data,
                 settings.login(),
@@ -1426,7 +1509,7 @@ impl<'source> Edit<'source> {
             let nodes = scan(&self.content)?;
             let source = unique_required_node(&nodes, "data-source")?;
             set_driver_node(
-                &mut self.content,
+                self.content.to_mut(),
                 &nodes,
                 source,
                 settings.driver(),
@@ -1437,7 +1520,7 @@ impl<'source> Edit<'source> {
             let nodes = scan(&self.content)?;
             let source = unique_required_node(&nodes, "data-source")?;
             set_application_node(
-                &mut self.content,
+                self.content.to_mut(),
                 &nodes,
                 source,
                 settings.application_connection(),
@@ -1470,7 +1553,7 @@ impl<'source> Edit<'source> {
         let prefixes = prefixes(&self.content)?;
         let fragment = serialize_component(&component, &prefixes);
         insert_into_or_create_collection(
-            &mut self.content,
+            self.content.to_mut(),
             &nodes,
             collection,
             "database",
@@ -1506,7 +1589,7 @@ impl<'source> Edit<'source> {
         }
         let prefixes = prefixes(&self.content)?;
         replace_span(
-            &mut self.content,
+            self.content.to_mut(),
             site.full.clone(),
             &serialize_component(&component, &prefixes),
         )?;
@@ -1522,7 +1605,7 @@ impl<'source> Edit<'source> {
         let nodes = scan(&self.content)?;
         let site = find_component(&nodes, kind, name)?
             .ok_or_else(|| Error::InvalidFormat("ODB component does not exist".to_string()))?;
-        replace_span(&mut self.content, site.full.clone(), "")?;
+        replace_span(self.content.to_mut(), site.full.clone(), "")?;
         self.record(
             ChangeAction::Remove,
             ChangeKind::Component,
@@ -1561,7 +1644,7 @@ impl<'source> Edit<'source> {
         }) {
             return invalid("ODB producer extension already exists");
         }
-        insert_child(&mut self.content, database, xml)?;
+        insert_child(self.content.to_mut(), database, xml)?;
         self.record(
             ChangeAction::Create,
             ChangeKind::ProducerExtension,
@@ -1608,7 +1691,7 @@ impl<'source> Edit<'source> {
             .ok_or_else(|| {
                 Error::InvalidFormat("ODB producer extension does not exist".to_string())
             })?;
-        replace_span(&mut self.content, site.full.clone(), xml)?;
+        replace_span(self.content.to_mut(), site.full.clone(), xml)?;
         self.record(
             ChangeAction::Update,
             ChangeKind::ProducerExtension,
@@ -1634,7 +1717,7 @@ impl<'source> Edit<'source> {
             .ok_or_else(|| {
                 Error::InvalidFormat("ODB producer extension does not exist".to_string())
             })?;
-        replace_span(&mut self.content, site.full.clone(), "")?;
+        replace_span(self.content.to_mut(), site.full.clone(), "")?;
         self.record(
             ChangeAction::Remove,
             ChangeKind::ProducerExtension,
@@ -1658,7 +1741,7 @@ impl<'source> Edit<'source> {
         }
         let prefix = prefixes(&self.content)?.database;
         insert_table_collection(
-            &mut self.content,
+            self.content.to_mut(),
             &nodes,
             table_site,
             collection,
@@ -1686,7 +1769,7 @@ impl<'source> Edit<'source> {
         {
             return invalid("ODB replacement table child name already exists");
         }
-        replace_span(&mut self.content, site.full.clone(), fragment)?;
+        replace_span(self.content.to_mut(), site.full.clone(), fragment)?;
         self.record(ChangeAction::Update, kind, &child_target(table, name))
     }
 
@@ -1695,7 +1778,7 @@ impl<'source> Edit<'source> {
         let table_site = definition_table(&nodes, table)?;
         let site = find_named_child(&nodes, table_site, local, name)?
             .ok_or_else(|| Error::InvalidFormat("ODB table child does not exist".to_string()))?;
-        replace_span(&mut self.content, site.full.clone(), "")?;
+        replace_span(self.content.to_mut(), site.full.clone(), "")?;
         let kind = if local == "key" {
             ChangeKind::Key
         } else {
@@ -1723,19 +1806,26 @@ impl<'source> Edit<'source> {
             value,
             &prefix,
         )?;
-        apply_edits(&mut self.content, vec![edit])
+        apply_edits(self.content.to_mut(), vec![edit])
     }
 
     fn prepare_legacy_query(&mut self, name: &str) -> Result<()> {
+        if self.several_queries {
+            return Ok(());
+        }
         if self
             .legacy_query
             .as_ref()
             .is_some_and(|change| change.name != name)
         {
-            return invalid("legacy query scalar setters support one query per transaction");
+            // Scalar setters of several queries stage like any other edit;
+            // only the single-query compatibility report is dropped.
+            self.several_queries = true;
+            self.legacy_query = None;
+            return Ok(());
         }
         if self.legacy_query.is_none() {
-            let catalog = self.source.catalog()?;
+            let catalog = self.source.database.catalog()?;
             let query = catalog.query(name)?.ok_or_else(|| {
                 Error::InvalidFormat(format!("ODB query '{name}' does not exist"))
             })?;
@@ -1769,24 +1859,36 @@ impl<'source> Edit<'source> {
     }
 
     /// Atomically rebuilds, fully reopens, and semantically verifies the
-    /// candidate package.
-    pub fn commit(self) -> Result<Commit> {
-        if self.content == self.source.content_xml()
+    /// candidate package. An exact no-op returns the source package
+    /// byte-for-byte.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when protection policy refuses the change or the
+    /// rebuilt package fails validation or semantic readback.
+    pub fn commit(self) -> std::result::Result<Commit, litchi_odf_common::Error> {
+        Ok(self.commit_core()?)
+    }
+
+    fn commit_core(self) -> Result<Commit> {
+        if self.content == self.source.database.content_xml()
             && self.payload_additions.is_empty()
             && self.payload_directories.is_empty()
         {
             return Ok(Commit::unchanged(self.source.clone()));
         }
-        let protection = self.source.protection_status()?;
+        let protection = self.source.database.protection_status()?;
         if protection.is_signed()
             && matches!(
                 self.policy.signature(),
                 crate::SignaturePolicy::PreserveExactOnly
             )
         {
-            return Err(Error::Unsupported(
-                "ODB signature policy permits exact no-ops only".to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::Protected,
+                "odb.authoring.transaction",
+                "ODB signature policy permits exact no-ops only",
+            )));
         }
         if protection.is_encrypted()
             && matches!(
@@ -1794,33 +1896,37 @@ impl<'source> Edit<'source> {
                 crate::EncryptionPolicy::PreserveExactOnly
             )
         {
-            return Err(Error::Unsupported(
-                "ODB encryption policy permits exact no-ops only".to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odb.authoring.transaction",
+                "ODB encryption policy permits exact no-ops only",
+            )));
         }
         let typed_publication = self
             .changes
             .iter()
             .any(|change| matches!(change.kind, ChangeKind::Connection | ChangeKind::Settings));
         crate::codec::validate(&self.content)?;
-        let snapshot = Database {
-            package: self.source.package.rebuild_with_content_and_additions(
-                &self.content,
-                self.payload_additions,
-                self.payload_directories,
-            )?,
-            settings: std::sync::Arc::new(std::sync::OnceLock::new()),
-        };
-        snapshot.catalog()?;
+        let snapshot = crate::Package::from_snapshot(
+            self.source
+                .database
+                .package
+                .rebuild_with_content_and_additions(
+                    &self.content,
+                    self.payload_additions,
+                    self.payload_directories,
+                )?,
+        );
+        snapshot.database.catalog()?;
         if typed_publication {
-            snapshot.settings()?;
+            snapshot.database.settings()?;
         }
         if protection.is_signed()
             && matches!(
                 self.policy.signature(),
                 crate::SignaturePolicy::RemoveInvalidated
             )
-            && snapshot.protection_status()?.is_signed()
+            && snapshot.database.protection_status()?.is_signed()
         {
             return Err(Error::InvalidFormat(
                 "ODB changed publication retained an invalidated signature member".to_string(),
@@ -1882,15 +1988,24 @@ impl QueryChange {
     }
 }
 
-/// A committed immutable database and its source-checked reversible patch.
+/// A committed immutable database package and its source-checked reversible
+/// patch.
 pub struct Commit {
-    snapshot: Database,
+    snapshot: crate::Package,
     patch: Patch,
     changed: bool,
 }
 
 impl Commit {
-    fn unchanged(snapshot: Database) -> Self {
+    pub(crate) fn replayed(snapshot: crate::Package, patch: Patch) -> Self {
+        Self {
+            changed: !patch.is_noop(),
+            snapshot,
+            patch,
+        }
+    }
+
+    fn unchanged(snapshot: crate::Package) -> Self {
         Self {
             patch: Patch {
                 source: snapshot.clone(),
@@ -1903,19 +2018,63 @@ impl Commit {
         }
     }
 
+    /// Borrows the published immutable package.
     #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-
-    #[must_use]
-    pub const fn database(&self) -> &Database {
+    pub const fn package(&self) -> &crate::Package {
         &self.snapshot
     }
 
+    /// Borrows the reversible source-checked patch.
     #[must_use]
     pub const fn patch(&self) -> &Patch {
         &self.patch
+    }
+
+    /// Returns content-free facts about this commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> Diagnostics {
+        Diagnostics {
+            changed: self.changed,
+            source: self.patch.source.clone(),
+            target: self.snapshot.clone(),
+        }
+    }
+
+    /// Consumes the commit into its published package.
+    #[must_use]
+    pub fn into_package(self) -> crate::Package {
+        self.snapshot
+    }
+
+    /// Consumes the commit into its published package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (crate::Package, Patch) {
+        (self.snapshot, self.patch)
+    }
+}
+
+/// Content-free facts about one [`Commit`].
+#[derive(Clone)]
+pub struct Diagnostics {
+    changed: bool,
+    source: crate::Package,
+    target: crate::Package,
+}
+
+impl std::fmt::Debug for Diagnostics {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Diagnostics")
+            .field("changed", &self.changed)
+            .finish_non_exhaustive()
+    }
+}
+
+impl Diagnostics {
+    /// Whether publication rebuilt the package.
+    #[must_use]
+    pub const fn changed(&self) -> bool {
+        self.changed
     }
 
     /// Inventories the protection lifecycle of this exact publication.
@@ -1928,33 +2087,35 @@ impl Commit {
     /// Returns an error if either package inventory cannot be inspected.
     pub fn protection_transition(&self) -> Result<crate::ProtectionTransition> {
         Ok(crate::ProtectionTransition::new(
-            self.patch.source.protection_status()?,
-            self.snapshot.protection_status()?,
+            self.source.database.protection_status()?,
+            self.target.database.protection_status()?,
         ))
-    }
-
-    #[must_use]
-    pub fn into_database(self) -> Database {
-        self.snapshot
     }
 }
 
 /// A byte-exact source-checked reversible ODB patch.
 #[derive(Clone)]
 pub struct Patch {
-    pub(super) source: Database,
-    pub(super) target: Database,
+    pub(super) source: crate::Package,
+    pub(super) target: crate::Package,
     pub(super) changes: Vec<Change>,
     pub(super) legacy_query: Option<QueryChange>,
 }
 
 impl Patch {
+    /// Whether `source` is byte-for-byte this patch's source.
     #[must_use]
-    pub fn is_applicable_to(&self, source: &Database) -> bool {
+    pub fn is_applicable_to(&self, source: &crate::Package) -> bool {
         self.source.as_bytes() == source.as_bytes()
     }
 
-    pub fn apply(&self, source: &Database) -> Result<Database> {
+    /// Whether this patch leaves its source unchanged.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.source.as_bytes() == self.target.as_bytes()
+    }
+
+    pub(crate) fn apply(&self, source: &crate::Package) -> Result<crate::Package> {
         if !self.is_applicable_to(source) {
             return invalid("ODB patch source does not match its expected snapshot");
         }
@@ -1967,12 +2128,14 @@ impl Patch {
         &self.changes
     }
 
-    /// Returns the legacy scalar query change when this transaction used it.
+    /// Returns the legacy scalar query change when this transaction used
+    /// scalar setters on exactly one query.
     #[must_use]
     pub const fn change(&self) -> Option<&QueryChange> {
         self.legacy_query.as_ref()
     }
 
+    /// Returns the patch that restores the exact source package.
     #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
@@ -2190,7 +2353,7 @@ fn decode_attributes(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Resu
                 Error::InvalidFormat(format!("invalid ODB attribute value: {error}"))
             })?;
         let value = quick_xml::escape::unescape(decoded.as_ref())
-            .map(std::borrow::Cow::into_owned)
+            .map(Cow::into_owned)
             .map_err(|error| {
                 Error::InvalidFormat(format!("invalid ODB attribute value: {error}"))
             })?;
@@ -2243,7 +2406,11 @@ fn prefixes(source: &str) -> Result<Prefixes> {
         .find(|node| node.namespace == NamespaceKind::Database)
         .and_then(|node| qname_prefix(source, node));
     let database = database.ok_or_else(|| {
-        Error::Unsupported("ODB editing requires a prefixed database namespace".to_string())
+        Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odb.authoring.transaction",
+            "ODB editing requires a prefixed database namespace",
+        ))
     })?;
     let xlink = nodes
         .iter()
@@ -2266,7 +2433,11 @@ fn prefixes(source: &str) -> Result<Prefixes> {
                 })
         })
         .ok_or_else(|| {
-            Error::Unsupported("ODB editing requires a bound xlink namespace".to_string())
+            Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odb.authoring.transaction",
+                "ODB editing requires a bound xlink namespace",
+            ))
         })?
         .to_owned();
     Ok(Prefixes { database, xlink })
@@ -3039,17 +3210,21 @@ fn ensure_removable_subtree(
                     .get(current.start_tag.end..current.full.end)
                     .is_some_and(|inner| inner.contains("<!--") || inner.contains("<?")))
         {
-            return Err(Error::Unsupported(
-                "ODB settings edit would discard unknown XML".to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "odb.authoring.transaction",
+                "ODB settings edit would discard unknown XML",
+            )));
         }
         for child in nodes.iter().filter(|child| child.parent == Some(id)) {
             if child.namespace != NamespaceKind::Database
                 || !known_children.contains(&child.local.as_str())
             {
-                return Err(Error::Unsupported(
-                    "ODB settings edit would discard unknown XML".to_string(),
-                ));
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "odb.authoring.transaction",
+                    "ODB settings edit would discard unknown XML",
+                )));
             }
             check.push(child.id);
         }
@@ -3782,6 +3957,44 @@ fn apply_edits(source: &mut String, mut edits: Vec<TextEdit>) -> Result<()> {
         replace_span(source, edit.range, &edit.value)?;
     }
     Ok(())
+}
+
+/// Move `site`'s bytes so it ends at position `to` among its same-named
+/// siblings under the same parent. Returns whether anything moved.
+fn relocate_sibling(source: &mut String, nodes: &[Node], site: &Node, to: usize) -> Result<bool> {
+    let siblings = nodes
+        .iter()
+        .filter(|node| {
+            node.parent == site.parent
+                && node.namespace == site.namespace
+                && node.local == site.local
+        })
+        .collect::<Vec<_>>();
+    let from = siblings
+        .iter()
+        .position(|node| node.id == site.id)
+        .ok_or_else(|| Error::InvalidFormat("ODB moved element is missing".to_string()))?;
+    if to >= siblings.len() {
+        return invalid("ODB move position is out of bounds");
+    }
+    if from == to {
+        return Ok(false);
+    }
+    let span = site.full.clone();
+    let bytes = source
+        .get(span.clone())
+        .ok_or_else(|| Error::InvalidFormat("ODB moved span is invalid".to_string()))?
+        .to_owned();
+    if to > from {
+        let at = siblings[to].full.end;
+        replace_span(source, at..at, &bytes)?;
+        replace_span(source, span, "")?;
+    } else {
+        let at = siblings[to].full.start;
+        replace_span(source, span, "")?;
+        replace_span(source, at..at, &bytes)?;
+    }
+    Ok(true)
 }
 
 fn replace_span(source: &mut String, range: Range<usize>, value: &str) -> Result<()> {
@@ -5205,7 +5418,11 @@ fn validate_extension(xml: &str) -> Result<()> {
     if xml.starts_with("<?xml") || xml.contains("<!DOCTYPE") {
         return invalid("ODB producer extension must be one inert element subtree");
     }
-    litchi_odf_common::compact_xml::validate(xml.as_bytes()).map_err(Error::from)?;
+    litchi_odf_common::compact_xml::validate(
+        xml.as_bytes(),
+        litchi_odf_common::compact_xml::Limits::default(),
+    )
+    .map_err(Error::from)?;
     let nodes = scan(xml)?;
     let roots = nodes.iter().filter(|node| node.parent.is_none()).count();
     if roots != 1 {
@@ -5294,8 +5511,12 @@ fn has_column(table: &Table, name: &str) -> bool {
     table.columns().iter().any(|column| column.name() == name)
 }
 
-fn dependency_refusal<T>(message: &str) -> Result<T> {
-    Err(Error::Unsupported(message.to_owned()))
+fn dependency_refusal<T>(reason: &'static str) -> Result<T> {
+    Err(Error::Refused(litchi_core::edit::Refusal::new(
+        litchi_core::edit::RefusalKind::UnsupportedOperation,
+        "odb.authoring.transaction",
+        reason,
+    )))
 }
 
 fn extension_target(namespace: &str, local: &str) -> String {

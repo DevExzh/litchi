@@ -4,7 +4,10 @@
     reason = "test assertions panic on failure by design"
 )]
 
-use super::codec::{add_anchor, load, put, remove, remove_anchor, scan_layout, selected_raw_span};
+use super::codec::{
+    add_anchor, load, put, remove, remove_anchor, scan_layout, selected_raw_span,
+    selected_raw_span_with_limits,
+};
 use super::validation::P14;
 use crate::tag::Tag;
 use crate::tag::{CONTENT_TYPE, Conformance, List};
@@ -102,11 +105,19 @@ fn maps_all_five_families_and_nested_groups_to_raw_source() {
         assert_eq!(by_name, by_index);
         assert!(xml[by_name].starts_with(opening));
 
-        let layout = scan_layout(&xml, by_index).expect("shape layout");
-        let staged = add_anchor(&xml, &layout, "rId9").expect("anchor insertion");
+        let layout =
+            scan_layout(&xml, by_index, crate::shape::Limits::DEFAULT).expect("shape layout");
+        let staged = add_anchor(
+            &xml,
+            &layout,
+            "rId9",
+            crate::shape::Limits::DEFAULT.output_bytes(),
+        )
+        .expect("anchor insertion");
         let staged_span =
             selected_raw_span(&staged, crate::shape::Key::Name(name)).expect("staged shape maps");
-        let staged_layout = scan_layout(&staged, staged_span).expect("staged layout");
+        let staged_layout = scan_layout(&staged, staged_span, crate::shape::Limits::DEFAULT)
+            .expect("staged layout");
         assert_eq!(
             staged_layout
                 .anchor
@@ -114,16 +125,64 @@ fn maps_all_five_families_and_nested_groups_to_raw_source() {
                 .map(|anchor| anchor.id.as_str()),
             Some("rId9")
         );
-        let removed = remove_anchor(&staged, &staged_layout).expect("anchor removal");
+        let removed = remove_anchor(
+            &staged,
+            &staged_layout,
+            crate::shape::Limits::DEFAULT.output_bytes(),
+        )
+        .expect("anchor removal");
         let removed_span =
             selected_raw_span(&removed, crate::shape::Key::Name(name)).expect("removed shape maps");
         assert!(
-            scan_layout(&removed, removed_span)
+            scan_layout(&removed, removed_span, crate::shape::Limits::DEFAULT)
                 .expect("removed layout")
                 .anchor
                 .is_none()
         );
     }
+}
+
+#[test]
+fn scan_layout_uses_the_selected_shape_node_profile() {
+    let xml = format!(
+        r#"<p:sld xmlns:p="{PML}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/>{}</p:spTree></p:cSld></p:sld>"#,
+        shape_xml("Profile", 2),
+    )
+    .into_bytes();
+    let span = selected_raw_span_with_limits(
+        &xml,
+        crate::shape::Key::Name("Profile"),
+        crate::shape::Limits::DEFAULT,
+    )
+    .expect("profile shape");
+    let defaults = crate::shape::Limits::DEFAULT;
+    let tight = crate::shape::Limits::new(
+        defaults.input_bytes(),
+        defaults.output_bytes(),
+        defaults.depth(),
+        1,
+        defaults.shapes(),
+        defaults.retained_text_bytes(),
+    )
+    .expect("tight profile");
+    assert!(matches!(
+        scan_layout(&xml, span.clone(), tight),
+        Err(crate::Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
+            observed: 2,
+            maximum: 1,
+        })
+    ));
+    let larger = crate::shape::Limits::new(
+        defaults.input_bytes(),
+        defaults.output_bytes(),
+        defaults.depth(),
+        defaults.nodes() * 2,
+        defaults.shapes(),
+        defaults.retained_text_bytes(),
+    )
+    .expect("larger profile");
+    scan_layout(&xml, span, larger).expect("larger profile remains valid");
 }
 
 #[test]
@@ -135,8 +194,14 @@ fn preserves_customer_data_and_inserts_before_extensions() {
         )
         .into_bytes();
     let span = selected_raw_span(&xml, crate::shape::Key::Name("Ordered")).expect("shape");
-    let layout = scan_layout(&xml, span).expect("layout");
-    let staged = add_anchor(&xml, &layout, "rIdTags").expect("insert");
+    let layout = scan_layout(&xml, span, crate::shape::Limits::DEFAULT).expect("layout");
+    let staged = add_anchor(
+        &xml,
+        &layout,
+        "rIdTags",
+        crate::shape::Limits::DEFAULT.output_bytes(),
+    )
+    .expect("insert");
     let text = std::str::from_utf8(&staged).expect("UTF-8 fixture");
     assert!(text.find("<p:custData ").unwrap() < text.find("<p:tags ").unwrap());
     assert!(text.find("<p:tags ").unwrap() < text.find("</p:custDataLst>").unwrap());
@@ -145,8 +210,14 @@ fn preserves_customer_data_and_inserts_before_extensions() {
 
     let staged_span =
         selected_raw_span(&staged, crate::shape::Key::Name("Ordered")).expect("shape");
-    let staged_layout = scan_layout(&staged, staged_span).expect("layout");
-    let removed = remove_anchor(&staged, &staged_layout).expect("remove");
+    let staged_layout =
+        scan_layout(&staged, staged_span, crate::shape::Limits::DEFAULT).expect("layout");
+    let removed = remove_anchor(
+        &staged,
+        &staged_layout,
+        crate::shape::Limits::DEFAULT.output_bytes(),
+    )
+    .expect("remove");
     assert_eq!(removed, xml);
 }
 
@@ -174,8 +245,15 @@ fn mce_mapping_edits_only_the_active_raw_branch() {
             .windows(15)
             .any(|bytes| bytes == b"name=\"Inactive\"")
     );
-    let layout = scan_layout(&xml, active_span).expect("active layout");
-    let staged = add_anchor(&xml, &layout, "rIdTags").expect("active insertion");
+    let layout =
+        scan_layout(&xml, active_span, crate::shape::Limits::DEFAULT).expect("active layout");
+    let staged = add_anchor(
+        &xml,
+        &layout,
+        "rIdTags",
+        crate::shape::Limits::DEFAULT.output_bytes(),
+    )
+    .expect("active insertion");
     let text = std::str::from_utf8(&staged).expect("UTF-8 fixture");
     assert_eq!(text.matches("<p:tags ").count(), 2);
     assert!(text.contains(r#"<p:tags r:id="rIdInactive"/>"#));
@@ -192,9 +270,15 @@ fn inactive_mce_anchor_forces_replacement_fork_and_removal_retention() {
         .expect("replace active attachment")
         .expect("old list");
     assert_eq!(old.get("owner").expect("old tag").value(), "Alice");
-    let active = load(&package, &owner, "Active")
-        .expect("load active attachment")
-        .expect("active attachment");
+    let active = load(
+        &package,
+        &owner,
+        "Active",
+        crate::tag::Limits::DEFAULT,
+        crate::shape::Limits::DEFAULT,
+    )
+    .expect("load active attachment")
+    .expect("active attachment");
     assert_ne!(active.rel(), "rId1");
     assert_ne!(active.part(), &original_part);
     assert_eq!(
@@ -221,9 +305,15 @@ fn inactive_mce_anchor_forces_replacement_fork_and_removal_retention() {
         .expect("old list");
     assert_eq!(removed.get("owner").expect("old tag").value(), "Alice");
     assert!(
-        load(&package, &owner, "Active")
-            .expect("load active")
-            .is_none()
+        load(
+            &package,
+            &owner,
+            "Active",
+            crate::tag::Limits::DEFAULT,
+            crate::shape::Limits::DEFAULT
+        )
+        .expect("load active")
+        .is_none()
     );
     let owner_part = package.get_part(&owner).expect("owner");
     assert!(owner_part.rels().get("rId1").is_some());
@@ -249,14 +339,30 @@ fn shape_crud_is_atomic_noop_safe_and_move_based() {
         .into_bytes();
     let (mut package, owner) = owner_package(xml);
 
-    assert!(load(&package, &owner, "Title").expect("load").is_none());
+    assert!(
+        load(
+            &package,
+            &owner,
+            "Title",
+            crate::tag::Limits::DEFAULT,
+            crate::shape::Limits::DEFAULT
+        )
+        .expect("load")
+        .is_none()
+    );
     assert_eq!(
         put(&mut package, &owner, "Title", list("Owner", "Alice")).expect("create"),
         None
     );
-    let source = load(&package, &owner, 0_usize)
-        .expect("load")
-        .expect("attachment");
+    let source = load(
+        &package,
+        &owner,
+        0_usize,
+        crate::tag::Limits::DEFAULT,
+        crate::shape::Limits::DEFAULT,
+    )
+    .expect("load")
+    .expect("attachment");
     assert_eq!(source.list().get("owner").expect("tag").value(), "Alice");
 
     let owner_before = package.get_part(&owner).expect("owner").blob_arc();
@@ -293,12 +399,36 @@ fn shape_crud_is_atomic_noop_safe_and_move_based() {
         &package.get_part(&owner).expect("owner").blob_arc()
     ));
 
+    // Removing the attachment refuses the signed package (ADR 0006) and
+    // leaves it untouched until the signature is removed explicitly.
+    assert!(matches!(
+        remove(&mut package, &owner, "Title"),
+        Err(crate::Error::Opc(
+            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
+        ))
+    ));
+    assert!(package.is_signed());
+    assert!(Arc::ptr_eq(
+        &owner_before,
+        &package.get_part(&owner).expect("owner").blob_arc()
+    ));
+    package.unsign();
     let removed = remove(&mut package, &owner, "Title")
         .expect("remove")
         .expect("old list");
     assert_eq!(removed.get("owner").expect("tag").value(), "Alice");
     assert!(!package.is_signed());
-    assert!(load(&package, &owner, "Title").expect("load").is_none());
+    assert!(
+        load(
+            &package,
+            &owner,
+            "Title",
+            crate::tag::Limits::DEFAULT,
+            crate::shape::Limits::DEFAULT
+        )
+        .expect("load")
+        .is_none()
+    );
     assert!(
         remove(&mut package, &owner, "Title")
             .expect("idempotent remove")
@@ -318,9 +448,15 @@ fn strict_shape_crud_uses_strict_namespaces_and_relationship_type() {
         put(&mut package, &owner, "Strict", List::new()).expect("strict create"),
         None
     );
-    let source = load(&package, &owner, "Strict")
-        .expect("strict load")
-        .expect("strict attachment");
+    let source = load(
+        &package,
+        &owner,
+        "Strict",
+        crate::tag::Limits::DEFAULT,
+        crate::shape::Limits::DEFAULT,
+    )
+    .expect("strict load")
+    .expect("strict attachment");
     assert_eq!(source.conformance(), Conformance::Strict);
     assert_eq!(
         package
@@ -373,12 +509,24 @@ fn shared_shape_anchor_forks_then_collects_each_orphan() {
         .expect("fork")
         .expect("old list");
     assert_eq!(old.get("owner").expect("old tag").value(), "Alice");
-    let first = load(&package, &owner, "First")
-        .expect("first load")
-        .expect("first attachment");
-    let second = load(&package, &owner, "Second")
-        .expect("second load")
-        .expect("second attachment");
+    let first = load(
+        &package,
+        &owner,
+        "First",
+        crate::tag::Limits::DEFAULT,
+        crate::shape::Limits::DEFAULT,
+    )
+    .expect("first load")
+    .expect("first attachment");
+    let second = load(
+        &package,
+        &owner,
+        "Second",
+        crate::tag::Limits::DEFAULT,
+        crate::shape::Limits::DEFAULT,
+    )
+    .expect("second load")
+    .expect("second attachment");
     assert_ne!(first.rel(), second.rel());
     assert_ne!(first.part(), second.part());
     assert_eq!(

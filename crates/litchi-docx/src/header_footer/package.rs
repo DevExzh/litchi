@@ -38,7 +38,7 @@ pub(crate) fn footers(package: &OpcPackage, document: &DocumentPart<'_>) -> Resu
 /// Resolve picture watermark media referenced by header stories.
 pub(crate) fn image_watermarks<'a>(
     package: &'a OpcPackage,
-    document: &DocumentPart<'a>,
+    document: &DocumentPart<'_>,
 ) -> Result<Vec<Image<'a>>> {
     let links = links(document, Role::Header)?;
     let mut images = Vec::new();

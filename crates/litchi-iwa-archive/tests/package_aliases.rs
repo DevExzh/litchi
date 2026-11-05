@@ -1,5 +1,5 @@
 use litchi_iwa_archive::package::{
-    PackageEntry, PackageEntryChangeKind, PackageEntryStoreError, PackagePatch,
+    PackageEntry, PackageEntryChangeKind, PackageEntryStoreError, Patch,
 };
 use litchi_iwa_package::EntryStore;
 
@@ -18,8 +18,8 @@ fn archive_aliases_reach_neutral_package_primitives_directly() {
     )])
     .unwrap_or_else(|error| panic!("valid target entry should be accepted: {error}"));
 
-    let patch: litchi_iwa_package::Patch = PackagePatch::between(&source, &target);
-    assert_eq!(patch.version(), PackagePatch::VERSION);
+    let patch: Patch = Patch::between(&source, &target);
+    assert_eq!(patch.version(), Patch::VERSION);
     assert_eq!(patch.changes().len(), 1);
     assert_eq!(patch.changes()[0].kind(), PackageEntryChangeKind::Replaced);
 

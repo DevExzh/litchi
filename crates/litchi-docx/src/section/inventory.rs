@@ -39,6 +39,25 @@ pub struct Limits {
 }
 
 impl Limits {
+    /// Intersect two policies without allowing a requested raw operation to
+    /// widen the policy under which its source was admitted.
+    pub(crate) fn intersection(&self, requested: &Self) -> Self {
+        Self {
+            max_input_bytes: self.max_input_bytes.min(requested.max_input_bytes),
+            max_events: self.max_events.min(requested.max_events),
+            max_depth: self.max_depth.min(requested.max_depth),
+            max_paragraphs: self.max_paragraphs.min(requested.max_paragraphs),
+            max_sections: self.max_sections.min(requested.max_sections),
+            max_section_bytes: self.max_section_bytes.min(requested.max_section_bytes),
+            max_reference_bytes: self.max_reference_bytes.min(requested.max_reference_bytes),
+            max_mce_output_bytes: self
+                .max_mce_output_bytes
+                .min(requested.max_mce_output_bytes),
+            max_mce_bindings: self.max_mce_bindings.min(requested.max_mce_bindings),
+            max_mce_choices: self.max_mce_choices.min(requested.max_mce_choices),
+        }
+    }
+
     fn validate(&self) -> Result<()> {
         if [
             self.max_input_bytes,
@@ -332,13 +351,8 @@ impl SourceSpan {
 }
 
 impl Inventory {
-    /// Parse a main-document XML payload with production defaults.
-    pub fn parse(xml: &[u8]) -> Result<Self> {
-        Self::parse_with_limits(xml, &Limits::default())
-    }
-
     /// Parse a main-document XML payload with caller-provided limits.
-    pub fn parse_with_limits(xml: &[u8], limits: &Limits) -> Result<Self> {
+    pub fn parse(xml: &[u8], limits: &Limits) -> Result<Self> {
         parse_inventory(xml, limits)
     }
 
@@ -540,15 +554,10 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-    /// Capture an owned XML snapshot without a positional-source lineage.
-    pub fn from_xml(xml: Vec<u8>) -> Result<Self> {
-        Self::from_xml_with_limits(xml, &Limits::default())
-    }
-
     /// Capture owned XML with caller-provided semantic limits.
-    pub fn from_xml_with_limits(xml: Vec<u8>, limits: &Limits) -> Result<Self> {
+    pub fn from_xml(xml: Vec<u8>, limits: &Limits) -> Result<Self> {
         Ok(Self {
-            inventory: Inventory::parse_with_limits(&xml, limits)?,
+            inventory: Inventory::parse(&xml, limits)?,
             source_version: None,
         })
     }
@@ -559,7 +568,7 @@ impl Snapshot {
         limits: &Limits,
     ) -> Result<Self> {
         Ok(Self {
-            inventory: Inventory::parse_with_limits(xml, limits)?,
+            inventory: Inventory::parse(xml, limits)?,
             source_version: Some(source_version),
         })
     }
@@ -708,7 +717,11 @@ struct ScanState {
 
 fn parse_inventory(xml: &[u8], limits: &Limits) -> Result<Inventory> {
     limits.validate()?;
-    enforce_limit("input bytes", xml.len(), limits.max_input_bytes)?;
+    enforce_limit(
+        crate::section::LimitKind::InputBytes,
+        xml.len(),
+        limits.max_input_bytes,
+    )?;
     let mut capabilities = litchi_ooxml_common::mce::Capabilities::default();
     capabilities.understand_namespace(crate::paragraph::extensions::WORD_2010_NAMESPACE);
     let processed = litchi_ooxml_common::mce::process_markup_compatibility(
@@ -764,7 +777,11 @@ fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
         events = events
             .checked_add(1)
             .ok_or_else(|| Error::InvalidFormat("section event counter overflow".into()))?;
-        enforce_limit("XML events", events, limits.max_events)?;
+        enforce_limit(
+            crate::section::LimitKind::XmlEvents,
+            events,
+            limits.max_events,
+        )?;
 
         match event {
             Event::Start(element) => {
@@ -776,7 +793,11 @@ fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
                 let child_depth = depth
                     .checked_add(1)
                     .ok_or_else(|| Error::InvalidFormat("section XML nesting overflow".into()))?;
-                enforce_limit("XML depth", child_depth, limits.max_depth)?;
+                enforce_limit(
+                    crate::section::LimitKind::XmlDepth,
+                    child_depth,
+                    limits.max_depth,
+                )?;
                 let word = is_wordprocessing_namespace(&namespace);
                 let local = element.local_name();
                 validate_namespace_bindings(&element, &namespace, resolver, reader.decoder())?;
@@ -832,7 +853,11 @@ fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
                 let child_depth = depth
                     .checked_add(1)
                     .ok_or_else(|| Error::InvalidFormat("section XML nesting overflow".into()))?;
-                enforce_limit("XML depth", child_depth, limits.max_depth)?;
+                enforce_limit(
+                    crate::section::LimitKind::XmlDepth,
+                    child_depth,
+                    limits.max_depth,
+                )?;
                 let word = is_wordprocessing_namespace(&namespace);
                 let local = element.local_name();
                 validate_namespace_bindings(&element, &namespace, resolver, reader.decoder())?;
@@ -1047,7 +1072,7 @@ fn inspect_element(
             return Ok(());
         }
         enforce_limit(
-            "paragraphs",
+            crate::section::LimitKind::Paragraphs,
             state.paragraphs.saturating_add(1),
             limits.max_paragraphs,
         )?;
@@ -1197,9 +1222,13 @@ fn append_section(
     let length = end
         .checked_sub(capture.start)
         .ok_or_else(|| Error::InvalidFormat("section fragment range underflow".into()))?;
-    enforce_limit("section bytes", length, limits.max_section_bytes)?;
     enforce_limit(
-        "sections",
+        crate::section::LimitKind::Bytes,
+        length,
+        limits.max_section_bytes,
+    )?;
+    enforce_limit(
+        crate::section::LimitKind::Sections,
         state.sections.len().saturating_add(1),
         limits.max_sections,
     )?;
@@ -1238,7 +1267,7 @@ fn append_section(
         .checked_add(added_reference_bytes)
         .ok_or_else(|| Error::InvalidFormat("section reference byte count overflow".into()))?;
     enforce_limit(
-        "header/footer reference bytes",
+        crate::section::LimitKind::HeaderFooterReferenceBytes,
         state.reference_bytes,
         limits.max_reference_bytes,
     )?;
@@ -1382,7 +1411,7 @@ fn inspect_reference(
             .and_then(|value| value.checked_add(attribute.value.len()))
             .ok_or_else(|| Error::InvalidFormat("section reference byte count overflow".into()))?;
         enforce_limit(
-            "header/footer reference bytes",
+            crate::section::LimitKind::HeaderFooterReferenceBytes,
             raw_total,
             limits.max_reference_bytes,
         )?;
@@ -1394,7 +1423,7 @@ fn inspect_reference(
             .checked_add(value.len())
             .ok_or_else(|| Error::InvalidFormat("section reference byte count overflow".into()))?;
         enforce_limit(
-            "header/footer reference bytes",
+            crate::section::LimitKind::HeaderFooterReferenceBytes,
             retained_reference_bytes
                 .checked_add(capture.reference_bytes)
                 .ok_or_else(|| {
@@ -1506,7 +1535,11 @@ fn self_contained_fragment(
         .len()
         .checked_add(added)
         .ok_or_else(|| Error::InvalidFormat("section fragment size overflow".into()))?;
-    enforce_limit("section bytes", capacity, max_section_bytes)?;
+    enforce_limit(
+        crate::section::LimitKind::Bytes,
+        capacity,
+        max_section_bytes,
+    )?;
     let mut fragment = Vec::new();
     fragment
         .try_reserve_exact(capacity)
@@ -1613,7 +1646,7 @@ fn root_declares_prefix(source: &[u8], prefix: &[u8]) -> Result<bool> {
 
 fn append_implicit(state: &mut ScanState, limits: &Limits) -> Result<()> {
     enforce_limit(
-        "sections",
+        crate::section::LimitKind::Sections,
         state.sections.len().saturating_add(1),
         limits.max_sections,
     )?;
@@ -1649,10 +1682,10 @@ fn append_implicit(state: &mut ScanState, limits: &Limits) -> Result<()> {
     Ok(())
 }
 
-fn enforce_limit(resource: &'static str, actual: usize, maximum: usize) -> Result<()> {
+fn enforce_limit(resource: crate::section::LimitKind, actual: usize, maximum: usize) -> Result<()> {
     if actual > maximum {
         return Err(Error::SectionInventoryLimit {
-            resource,
+            kind: resource,
             maximum,
             actual,
         });

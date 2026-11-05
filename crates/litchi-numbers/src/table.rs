@@ -6,6 +6,8 @@
 
 /// Lossless table appearance values and selector-first transactions.
 pub mod appearance;
+/// Cell fill, text layout and borders of table cells (record 0412b).
+pub mod cell_appearance;
 /// Presence-preserving semantic cell reads.
 pub mod cells;
 /// Compact, archive-free cell coordinates and A1 selectors.
@@ -16,36 +18,40 @@ pub mod dimension;
 pub mod edit;
 /// Header, footer, and repeating-row/column semantics.
 pub mod headers;
+/// Hidden rows and columns of a table (record 0379).
+pub mod hidden_axes;
+/// Exact-source transactions that add an empty table to a sheet or remove a
+/// table and its private graph. Start with
+/// [`crate::Package::edit_table_lifecycle`].
+pub mod lifecycle;
 /// Archive-free interactive table-lock semantics.
 pub mod lock;
 /// Compact merged-cell geometry and topology algebra.
 pub mod merge;
+/// Exact-source table order within a sheet.
+pub mod order;
+/// Pivot aggregate categories (record 0421).
+pub mod pivot;
 /// Exact-source transactions for moving a rooted table between sheets.
 pub mod relocation;
+/// Resizing a table at its trailing edges, started by
+/// [`crate::Package::edit_table_resize`].
+pub mod resize;
 /// Checked, archive-free table sort semantics.
 pub mod sort;
 /// Compact, presence-preserving table title semantics.
 pub mod title;
-/// Section-relative table topology edits.
+/// Section-relative table row and column insertion and removal, started by
+/// [`crate::Package::edit_table_topology`].
 pub mod topology;
 
 use crate::cell::Value;
 use crate::selector::TableSelector;
 
-pub use litchi_iwa_common::table::coordinate::{
-    AddressError, CellPosition, CellRange, Error as CoordinateError,
-};
+pub use litchi_iwa_common::table::coordinate::{AddressError, Area, At, Error as CoordinateError};
 pub use litchi_iwa_common::table::model::{
     Cell, Dimensions, Error, Grid, GridBudget, GridIter, InsertError, InsertResult, Result, View,
 };
-
-/// Narrow migration name for [`CellPosition`] used by existing archive
-/// adapters. New semantic code should use the focused name.
-pub type Position = CellPosition;
-
-/// Narrow migration name for [`CellRange`] used by existing archive adapters.
-/// New semantic code should use the focused name.
-pub type Range = CellRange;
 
 /// The format-independent table representation used by Numbers.
 ///
@@ -125,7 +131,7 @@ impl Table {
 
     /// Borrows a materialized value at a coordinate.
     #[must_use]
-    pub fn get(&self, position: Position) -> Option<&Value> {
+    pub fn get(&self, position: At) -> Option<&Value> {
         self.0.get(position)
     }
 
@@ -141,12 +147,12 @@ impl Table {
 
     /// Returns the compact stored/missing view for a coordinate.
     #[must_use]
-    pub fn view(&self, position: Position) -> View<'_> {
+    pub fn view(&self, position: At) -> View<'_> {
         self.0.view(position)
     }
 
     /// Iterates over sparse cells in row-major order within a range.
-    pub fn cells(&self, range: Range) -> Result<impl Iterator<Item = &Cell> + '_> {
+    pub fn cells(&self, range: Area) -> Result<impl Iterator<Item = &Cell> + '_> {
         self.0.cells(range)
     }
 
@@ -192,7 +198,7 @@ impl Table {
     }
 
     /// Creates a dense view only when it fits the caller's budget.
-    pub fn grid(&self, range: Range, budget: GridBudget) -> Result<Grid<'_>> {
+    pub fn grid(&self, range: Area, budget: GridBudget) -> Result<Grid<'_>> {
         self.0.grid(range, budget)
     }
 
@@ -257,7 +263,7 @@ impl Builder {
 
     /// Borrows a materialized value at a coordinate.
     #[must_use]
-    pub fn get(&self, position: Position) -> Option<&Value> {
+    pub fn get(&self, position: At) -> Option<&Value> {
         self.0.get(position)
     }
 
@@ -282,7 +288,7 @@ impl Builder {
     /// Replaces or inserts one checked sparse value.
     pub fn set(
         &mut self,
-        position: Position,
+        position: At,
         value: Value,
     ) -> std::result::Result<(), InsertError<Value>> {
         self.0.set(position, value)

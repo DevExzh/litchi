@@ -13,9 +13,14 @@ pub use model::{
 pub(crate) use package::{add, remove, reorder, replace, update};
 
 use litchi_core::{Error, Result};
+use litchi_odf_common::XmlStreamLimits;
 
-pub(crate) fn annotations(content: &str, host: AnnotationHost) -> Result<Vec<AnnotationInfo>> {
-    let scan = scan::scan(content, host)?;
+pub(crate) fn annotations(
+    content: &str,
+    host: AnnotationHost,
+    limits: &XmlStreamLimits,
+) -> Result<Vec<AnnotationInfo>> {
+    let scan = scan::scan(content, host, limits)?;
     scan.records
         .into_iter()
         .enumerate()
@@ -39,11 +44,12 @@ pub(crate) fn find_annotation(
     content: &str,
     host: AnnotationHost,
     name: &str,
+    limits: &XmlStreamLimits,
 ) -> Result<Option<AnnotationInfo>> {
     if name.is_empty() {
         return invalid("annotation name cannot be empty");
     }
-    Ok(annotations(content, host)?
+    Ok(annotations(content, host, limits)?
         .into_iter()
         .find(|item| item.annotation.name() == Some(name)))
 }
@@ -67,8 +73,9 @@ macro_rules! annotation_facade_methods {
         /// Inspect annotations in document order without following body links.
         pub fn annotations(&self) -> litchi_core::Result<Vec<crate::AnnotationInfo>> {
             crate::package::annotation::annotations(
-                self.content.xml_content(),
+                self.state.content.xml_content(),
                 crate::package::annotation::AnnotationHost::$host,
+                &self.state.xml_limits,
             )
         }
 
@@ -78,91 +85,11 @@ macro_rules! annotation_facade_methods {
             name: &str,
         ) -> litchi_core::Result<Option<crate::AnnotationInfo>> {
             crate::package::annotation::find_annotation(
-                self.content.xml_content(),
+                self.state.content.xml_content(),
                 crate::package::annotation::AnnotationHost::$host,
                 name,
+                &self.state.xml_limits,
             )
-        }
-
-        /// Add a point or named-range annotation atomically.
-        pub fn add_annotation(
-            &mut self,
-            anchor: &crate::AnnotationAnchor,
-            annotation: &crate::Annotation,
-        ) -> litchi_core::Result<usize> {
-            let (bytes, index) = crate::package::annotation::add(
-                &self.package,
-                self.content.xml_content(),
-                crate::package::annotation::AnnotationHost::$host,
-                anchor,
-                annotation,
-            )?;
-            let replacement = Self::from_bytes(bytes)?;
-            *self = replacement;
-            Ok(index)
-        }
-
-        /// Replace an annotation body and metadata while retaining its anchor.
-        pub fn replace_annotation(
-            &mut self,
-            index: usize,
-            annotation: &crate::Annotation,
-        ) -> litchi_core::Result<()> {
-            let bytes = crate::package::annotation::replace(
-                &self.package,
-                self.content.xml_content(),
-                crate::package::annotation::AnnotationHost::$host,
-                index,
-                annotation,
-            )?;
-            let replacement = Self::from_bytes(bytes)?;
-            *self = replacement;
-            Ok(())
-        }
-
-        /// Apply a partial typed annotation metadata update.
-        pub fn update_annotation(
-            &mut self,
-            index: usize,
-            update: &crate::AnnotationUpdate,
-        ) -> litchi_core::Result<()> {
-            let bytes = crate::package::annotation::update(
-                &self.package,
-                self.content.xml_content(),
-                crate::package::annotation::AnnotationHost::$host,
-                index,
-                update,
-            )?;
-            let replacement = Self::from_bytes(bytes)?;
-            *self = replacement;
-            Ok(())
-        }
-
-        /// Remove an annotation and its paired end marker, if any.
-        pub fn remove_annotation(&mut self, index: usize) -> litchi_core::Result<()> {
-            let bytes = crate::package::annotation::remove(
-                &self.package,
-                self.content.xml_content(),
-                crate::package::annotation::AnnotationHost::$host,
-                index,
-            )?;
-            let replacement = Self::from_bytes(bytes)?;
-            *self = replacement;
-            Ok(())
-        }
-
-        /// Reorder point annotations that are direct XML siblings.
-        pub fn reorder_annotation(&mut self, from: usize, to: usize) -> litchi_core::Result<()> {
-            let bytes = crate::package::annotation::reorder(
-                &self.package,
-                self.content.xml_content(),
-                crate::package::annotation::AnnotationHost::$host,
-                from,
-                to,
-            )?;
-            let replacement = Self::from_bytes(bytes)?;
-            *self = replacement;
-            Ok(())
         }
     };
 }

@@ -14,7 +14,9 @@
 use std::sync::Arc;
 
 use litchi_opc::part::PayloadHandle;
-use litchi_opc::{OpcError, OpcPackage, PackURI, PackageWriter, Part, Relationships, XmlPart};
+use litchi_opc::{
+    OpcError, OpcPackage, PackURI, PackageWriter, Part, Relationships, SourceLimits, XmlPart,
+};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 use xml_minifier::audit::{Limits, VerifiedSource, verify_source};
 
@@ -38,7 +40,8 @@ fn archive(document: &[u8]) -> Vec<u8> {
     let relationships = format!(
         r#"<Relationships xmlns="{RELATIONSHIPS_NS}"><Relationship Id="rId1" Type="{OFFICE_DOCUMENT_REL}" Target="word/document.xml"/></Relationships>"#
     );
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .unwrap();
@@ -54,7 +57,7 @@ fn document_uri() -> PackURI {
 }
 
 fn package() -> OpcPackage {
-    OpcPackage::from_bytes(&archive(ORIGINAL)).unwrap()
+    OpcPackage::from_bytes(&archive(ORIGINAL), SourceLimits::default()).unwrap()
 }
 
 fn proof(bytes: &[u8]) -> VerifiedSource {
@@ -63,7 +66,7 @@ fn proof(bytes: &[u8]) -> VerifiedSource {
 
 fn published_document(package: &OpcPackage) -> Vec<u8> {
     let output = PackageWriter::to_bytes(package).unwrap();
-    ArchiveReader::new(&output)
+    ArchiveReader::new(&output, soapberry_zip::office::ArchiveLimits::default())
         .unwrap()
         .read("word/document.xml")
         .unwrap()
@@ -308,9 +311,9 @@ fn every_route_audits_the_bytes_it_publishes() {
         for owned in [true, false] {
             let archive = archive(ORIGINAL);
             let mut package = if owned {
-                OpcPackage::from_vec(archive).unwrap()
+                OpcPackage::from_vec(archive, SourceLimits::default()).unwrap()
             } else {
-                OpcPackage::from_bytes(&archive).unwrap()
+                OpcPackage::from_bytes(&archive, SourceLimits::default()).unwrap()
             };
             package.add_part(Box::new(Split::new(
                 Arc::clone(&shown),
@@ -330,10 +333,13 @@ fn every_route_audits_the_bytes_it_publishes() {
                 Ok(bytes) => panic!(
                     "{label}, owned {owned}: published {:?} unaudited",
                     String::from_utf8_lossy(
-                        &ArchiveReader::new(&bytes)
-                            .unwrap()
-                            .read("word/document.xml")
-                            .unwrap()
+                        &ArchiveReader::new(
+                            &bytes,
+                            soapberry_zip::office::ArchiveLimits::default()
+                        )
+                        .unwrap()
+                        .read("word/document.xml")
+                        .unwrap()
                     )
                 ),
             }
@@ -348,9 +354,9 @@ fn a_consistent_custom_part_publishes_on_the_owned_source_route() {
     for owned in [true, false] {
         let archive = archive(ORIGINAL);
         let mut package = if owned {
-            OpcPackage::from_vec(archive).unwrap()
+            OpcPackage::from_vec(archive, SourceLimits::default()).unwrap()
         } else {
-            OpcPackage::from_bytes(&archive).unwrap()
+            OpcPackage::from_bytes(&archive, SourceLimits::default()).unwrap()
         };
         package.add_part(Box::new(Split::new(
             Arc::new(EDITED.to_vec()),

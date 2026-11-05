@@ -1,0 +1,53 @@
+{
+  "source": "59637bd50c5060b7800710b6738533adf14315e4",
+  "pid": 2453083,
+  "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation",
+  "command": [
+    "python3",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/run-semantic-checks-disk-guarded.py",
+    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/docx-pptx-odf-runtime-v14-commands.json",
+    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/docx-pptx-odf-runtime-v14"
+  ],
+  "started_unix_seconds": 1792784153.9803646,
+  "target": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target",
+  "lock_sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-ops",
+        "--all-features",
+        "--lib",
+        "--message-format=json-render-diagnostics",
+        "--",
+        "--test-threads=1",
+        "format::docx",
+        "error::tests::docx",
+        "malformed_",
+        "signed_pptx_shape_setter_preserves_exact_noops_and_refuses_changes",
+        "signed_docx_paragraph_setter_preserves_exact_noops_and_refuses_changes"
+      ],
+      "exit": 0,
+      "seconds": 91.63910487400426,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/docx-pptx-odf-runtime-v14/check-0.log",
+      "bytes": 342809,
+      "sha256": "3937ab643fbbdba414dda3e8e9eee48159cec964679f24242371eed8d94c6fba",
+      "target_bytes_before": 3393484537,
+      "completed_test_executables_pruned": [
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/litchi_ops-1281d387699cc94f",
+          "bytes": 279773528,
+          "sha256": "83fef55d39b0ccbf298d3c9ffdfeb7ec49b2942e7bf99a839dddd848e2aa695c"
+        }
+      ]
+    }
+  ],
+  "test_summaries": [
+    "test result: ok. 104 passed; 0 failed; 0 ignored; 0 measured; 898 filtered out; finished in 9.27s"
+  ],
+  "note": "Focused all-feature facade validation passes DOCX module and error cases, malformed-input cases, signed DOCX paragraph no-op/cancellation and signed PPTX shape no-op/cancellation. This validates the merged DOCX authoritative scan and physical source-policy fixes, PPTX private unsigned staging and ODF typed cause assertions. Legacy and complete assembled runtime remain required."
+}

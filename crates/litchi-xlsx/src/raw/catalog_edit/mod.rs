@@ -72,7 +72,8 @@ mod tests {
         assert!(text.contains(r#"<x:workbookView z:keep="yes" activeTab="1"/>"#));
         assert!(text.contains(r#"<x:workbookView activeTab="0"/>"#));
         assert!(text.contains(r#"<x:extLst><z:data value="exact"/></x:extLst>"#));
-        let catalog = parse_catalog(&output).expect("catalog");
+        let catalog =
+            parse_catalog(&output, &litchi_opc::SourceLimits::default()).expect("catalog");
         assert_eq!(catalog.active_sheet_index, 1);
         assert_eq!(catalog.sheets[0].visibility, Visibility::Hidden);
         assert_eq!(catalog.sheets[1].visibility, Visibility::Visible);
@@ -136,7 +137,9 @@ mod tests {
             )
         );
         assert_eq!(
-            parse_catalog(&output).expect("catalog").active_sheet_index,
+            parse_catalog(&output, &litchi_opc::SourceLimits::default())
+                .expect("catalog")
+                .active_sheet_index,
             1
         );
     }
@@ -187,7 +190,7 @@ mod tests {
         let activated = rewrite(protected.as_bytes(), plan(Vec::new(), Some(0)))
             .expect("structure protection permits active-tab selection");
         assert_eq!(
-            parse_catalog(&activated)
+            parse_catalog(&activated, &litchi_opc::SourceLimits::default())
                 .expect("protected catalog")
                 .active_sheet_index,
             0
@@ -343,7 +346,8 @@ mod tests {
         assert!(text.contains(r#"name="ThreeLocal" localSheetId="0""#));
         assert!(text.contains(r#"activeSheetId="30""#));
         assert!(text.contains(r#"<x15ac:absPath url="/exact/""#));
-        let catalog = parse_catalog(&output).expect("catalog");
+        let catalog =
+            parse_catalog(&output, &litchi_opc::SourceLimits::default()).expect("catalog");
         assert_eq!(catalog.active_sheet_index, 0);
         assert_eq!(
             catalog
@@ -439,7 +443,8 @@ mod tests {
         ));
         assert!(text.contains(r#"<x:tail>opaque</x:tail>"#));
         assert!(text.contains(r#"<s:workbook xmlns:s="#));
-        let catalog = parse_catalog(&output).expect("catalog");
+        let catalog =
+            parse_catalog(&output, &litchi_opc::SourceLimits::default()).expect("catalog");
         assert_eq!(catalog.sheets.len(), 2);
         assert_eq!(catalog.sheets[1].name, "A&B");
         assert!(matches!(catalog.sheets[1].visibility, Visibility::Hidden));
@@ -466,7 +471,13 @@ mod tests {
                 r#"<s:sheets><s:sheet name="Only" sheetId="9" rel:id="new"/></s:sheets>"#
             )
         );
-        assert_eq!(parse_catalog(&output).expect("catalog").sheets.len(), 1);
+        assert_eq!(
+            parse_catalog(&output, &litchi_opc::SourceLimits::default())
+                .expect("catalog")
+                .sheets
+                .len(),
+            1
+        );
     }
 
     #[test]
@@ -486,7 +497,13 @@ mod tests {
         .expect("append");
         let text = std::str::from_utf8(&output).expect("UTF-8");
         assert!(text.contains(r#"<s:sheet name="Only" sheetId="1" rel:id="rId1"/>"#));
-        assert_eq!(parse_catalog(&output).expect("catalog").sheets.len(), 1);
+        assert_eq!(
+            parse_catalog(&output, &litchi_opc::SourceLimits::default())
+                .expect("catalog")
+                .sheets
+                .len(),
+            1
+        );
     }
 
     #[test]
@@ -516,7 +533,8 @@ mod tests {
         assert!(text.contains(r#"k:v="second" activeTab="1" firstSheet="1""#));
         assert!(text.contains(r#"name="ThreeLocal" localSheetId="1""#));
         assert!(text.contains("<k:tail>opaque</k:tail>"));
-        let catalog = parse_catalog(&output).expect("catalog");
+        let catalog =
+            parse_catalog(&output, &litchi_opc::SourceLimits::default()).expect("catalog");
         assert_eq!(
             catalog
                 .sheets

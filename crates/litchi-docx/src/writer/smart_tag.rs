@@ -3,36 +3,32 @@
     reason = "the invariant is established immediately before extraction"
 )]
 #![expect(
-    clippy::module_name_repetitions,
-    reason = "public names retain established OOXML facade terminology"
-)]
-#![expect(
     clippy::shadow_unrelated,
     reason = "local parser names mirror the OOXML role currently being decoded"
 )]
 //! Mutable Word smart tags.
 
-use super::bookmark::MutableBookmark;
-use super::field::MutableField;
-use super::hyperlink::MutableHyperlink;
-use super::image::MutableInlineImage;
+use super::bookmark::Bookmark;
+use super::field::Field;
+use super::hyperlink::Hyperlink;
+use super::image::InlineImage;
 use super::paragraph::ParagraphElement;
 use super::relmap::RelationshipMapper;
 use super::revision::RevisionTextMode;
-use super::run::MutableRun;
+use super::run::Run;
 use crate::error::{Error, Result};
 use litchi_core::xml::escape_xml;
 use std::fmt::Write as _;
 
 /// A custom property on a mutable smart tag.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MutableSmartTagAttribute {
+pub struct SmartTagAttribute {
     uri: Option<String>,
     name: String,
     value: String,
 }
 
-impl MutableSmartTagAttribute {
+impl SmartTagAttribute {
     /// Set the optional property namespace URI.
     pub fn set_uri(&mut self, uri: impl Into<String>) -> &mut Self {
         self.uri = Some(uri.into());
@@ -59,15 +55,15 @@ impl MutableSmartTagAttribute {
 }
 
 /// A mutable run-level Word smart tag.
-#[derive(Debug)]
-pub struct MutableSmartTag {
+#[derive(Debug, Clone)]
+pub struct SmartTag {
     uri: Option<String>,
     element: String,
-    attributes: Vec<MutableSmartTagAttribute>,
+    attributes: Vec<SmartTagAttribute>,
     pub(crate) elements: Vec<ParagraphElement>,
 }
 
-impl MutableSmartTag {
+impl SmartTag {
     /// Create a smart tag with its required element name.
     pub fn new(element: impl Into<String>) -> Self {
         Self {
@@ -93,8 +89,8 @@ impl MutableSmartTag {
         &mut self,
         name: impl Into<String>,
         value: impl Into<String>,
-    ) -> &mut MutableSmartTagAttribute {
-        self.attributes.push(MutableSmartTagAttribute {
+    ) -> &mut SmartTagAttribute {
+        self.attributes.push(SmartTagAttribute {
             uri: None,
             name: name.into(),
             value: value.into(),
@@ -105,8 +101,8 @@ impl MutableSmartTag {
     }
 
     /// Add an empty run to the tagged content.
-    pub fn add_run(&mut self) -> &mut MutableRun {
-        self.elements.push(ParagraphElement::Run(MutableRun::new()));
+    pub fn add_run(&mut self) -> &mut Run {
+        self.elements.push(ParagraphElement::Run(Run::new()));
         match self.elements.last_mut() {
             Some(ParagraphElement::Run(run)) => run,
             _ => unreachable!(),
@@ -114,16 +110,16 @@ impl MutableSmartTag {
     }
 
     /// Add a text run to the tagged content.
-    pub fn add_run_with_text(&mut self, text: &str) -> &mut MutableRun {
+    pub fn add_run_with_text(&mut self, text: &str) -> &mut Run {
         let run = self.add_run();
         run.set_text(text);
         run
     }
 
     /// Add an external hyperlink to the tagged content.
-    pub fn add_hyperlink(&mut self, url: &str, text: &str) -> &mut MutableHyperlink {
+    pub fn add_hyperlink(&mut self, url: &str, text: &str) -> &mut Hyperlink {
         self.elements
-            .push(ParagraphElement::Hyperlink(MutableHyperlink::new(
+            .push(ParagraphElement::Hyperlink(Hyperlink::new(
                 url.to_owned(),
                 text.to_owned(),
             )));
@@ -143,8 +139,8 @@ impl MutableSmartTag {
         data: Vec<u8>,
         width_emu: Option<i64>,
         height_emu: Option<i64>,
-    ) -> Result<&mut MutableInlineImage> {
-        let image = MutableInlineImage::from_bytes(data, width_emu, height_emu)?;
+    ) -> Result<&mut InlineImage> {
+        let image = InlineImage::from_bytes(data, width_emu, height_emu)?;
         self.elements.push(ParagraphElement::InlineImage(image));
         match self.elements.last_mut() {
             Some(ParagraphElement::InlineImage(image)) => Ok(image),
@@ -153,7 +149,7 @@ impl MutableSmartTag {
     }
 
     /// Add a nested smart tag.
-    pub fn add_smart_tag(&mut self, element: impl Into<String>) -> &mut MutableSmartTag {
+    pub fn add_smart_tag(&mut self, element: impl Into<String>) -> &mut SmartTag {
         self.elements
             .push(ParagraphElement::SmartTag(Self::new(element)));
         match self.elements.last_mut() {
@@ -165,7 +161,7 @@ impl MutableSmartTag {
     /// Add a bookmark start marker to the tagged content.
     pub fn add_bookmark_start(&mut self, id: u32, name: &str) {
         self.elements
-            .push(ParagraphElement::BookmarkStart(MutableBookmark::new(
+            .push(ParagraphElement::BookmarkStart(Bookmark::new(
                 id,
                 name.to_owned(),
             )));
@@ -177,7 +173,7 @@ impl MutableSmartTag {
     }
 
     /// Add a field to the tagged content.
-    pub fn add_field(&mut self, field: MutableField) {
+    pub fn add_field(&mut self, field: Field) {
         self.elements.push(ParagraphElement::Field(field));
     }
 
@@ -195,7 +191,7 @@ impl MutableSmartTag {
 
     /// Return the smart-tag properties.
     #[must_use]
-    pub fn attributes(&self) -> &[MutableSmartTagAttribute] {
+    pub fn attributes(&self) -> &[SmartTagAttribute] {
         &self.attributes
     }
 
@@ -281,13 +277,13 @@ impl MutableSmartTag {
 
 #[cfg(test)]
 mod tests {
-    use crate::Paragraph;
-    use crate::writer::MutableDocument;
-    use crate::writer::paragraph::MutableParagraph;
+    use crate::Paragraph as ReadParagraph;
+    use crate::builder::Document;
+    use crate::writer::paragraph::Paragraph;
 
     #[test]
     fn generated_nested_smart_tags_round_trip_through_reader() {
-        let mut paragraph = MutableParagraph::new();
+        let mut paragraph = Paragraph::new();
         let tag = paragraph.add_smart_tag("person");
         tag.set_uri("urn:contacts");
         tag.add_attribute("kind", "friend & peer")
@@ -297,7 +293,7 @@ mod tests {
 
         let mut xml = String::new();
         paragraph.to_xml(&mut xml).unwrap();
-        let paragraph = Paragraph::new(xml.into_bytes());
+        let paragraph = ReadParagraph::new(xml.into_bytes());
         let tags = paragraph.smart_tags().unwrap();
 
         assert_eq!(tags.len(), 2);
@@ -309,7 +305,7 @@ mod tests {
 
     #[test]
     fn nested_smart_tag_hyperlinks_are_collected_for_relationships() {
-        let mut document = MutableDocument::new();
+        let mut document = Document::new();
         document
             .add_paragraph()
             .add_smart_tag("link")

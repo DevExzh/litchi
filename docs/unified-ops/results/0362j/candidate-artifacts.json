@@ -1,0 +1,199 @@
+{
+  "build_manifest": {
+    "kind": "isolated-source-build",
+    "status": "release-built-protected-validated",
+    "source_root": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-replay-c0-source-20261021",
+    "source_commit": "c0f346607bb28559ae21fa780c835dc70e87fb0b",
+    "source_tree": "a8f88614d0252ce4257bbd2dad0164a54f2c14b7",
+    "candidate_branch": "uo2/ppt-0362f-candidate",
+    "parent_candidate": "e3aa14d255573f5ca51c4cd9f96a698eb8c1b1cb",
+    "cargo_lock": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-replay-c0-source-20261021/Cargo.lock",
+      "sha256": "40dcbcff741065997d9bc583140a22d921ebe2b4f321570af2587d1cf22d3b5c",
+      "origin": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-release-source-20261021/source/Cargo.lock"
+    },
+    "harness": {
+      "probe": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-replay-c0-source-20261021/crates/litchi-ppt/examples/scoped_patch_probe.rs",
+      "probe_sha256": "0bd4d9c1bcad6319968024ff603ae77195810174e496d5394fbae1838021e549",
+      "probe_source_path": "crates/litchi-ppt/examples/scoped_patch_probe.rs",
+      "runner": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-release-source-20261021/harness/ppt-phase-abba.py",
+      "runner_sha256": "42e49141d7b8b8a3940fad8861aa259b763c6468a7684b8906bb29a4955b41a8"
+    },
+    "fixture": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-replay-c0-source-20261021/test-data/unified-ops/0294/video.ppt",
+      "sha256": "f32f0614958a177a5195cd7537cdfd2efef52c57de4decc13cf65eadc66cdb8a",
+      "bytes": 43520
+    },
+    "profile": "workspace release, default litchi-ppt features, normalized locked registry",
+    "build": {
+      "env_file": "/home/zhuhe/code/litchi-worktrees/.coord/w8-file/env.sh",
+      "target_dir": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-replay-c0-target-20261021",
+      "command": "source /home/zhuhe/code/litchi-worktrees/.coord/w8-file/env.sh && CARGO_BUILD_JOBS=1 CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/ppt-replay-c0-target-20261021 cargo build --offline --locked --release -p litchi-ppt --example scoped_patch_probe",
+      "exit_code": 0,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-replay-c0-build.log",
+      "log_sha256": "0cc8b53ad4bca6ac44854a2c22ff05e443b3a7b410eb8df7e26060c1c15a483a",
+      "log_bytes": 4705,
+      "binary_target": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-replay-c0-target-20261021/release/examples/scoped_patch_probe",
+      "binary_protected": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-replay-c0-source-20261021/protected/scoped_patch_probe-c0f346607b",
+      "binary_sha256": "e7c6db29e3dd65bf0178eeaa5e6b52fa57d2e7bd9871aacf70302dd17867b4aa",
+      "binary_bytes": 1763496
+    },
+    "checks": {
+      "target_dir": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-replay-c0-check-target-20261021",
+      "jobs": 1,
+      "test_threads": 2,
+      "all_exit_code": 0,
+      "commands": [
+        "cargo test --offline --locked -p litchi-ppt --all-features --lib scoped::tests -- --test-threads=2",
+        "cargo test --offline --locked -p litchi-ppt --all-features --lib -- --test-threads=2",
+        "cargo test --offline --locked -p litchi-cfb --all-features --lib -- --test-threads=2",
+        "cargo test --offline --locked -p litchi-ppt --all-features --tests -- --test-threads=2",
+        "cargo test --offline --locked -p litchi-cfb --all-features --tests -- --test-threads=2",
+        "cargo clippy --offline --locked -p litchi-ppt --all-features --all-targets -- -D warnings",
+        "cargo clippy --offline --locked -p litchi-cfb --all-features --all-targets -- -D warnings"
+      ],
+      "results": [
+        {
+          "name": "scoped-tests",
+          "exit_code": 0,
+          "test_result": "13 passed",
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-replay-c0-scoped-tests.log",
+          "log_sha256": "eb55b18d577f509b6277c17a2fd476066c81a529feb3ce1b43159eb6868d64bc",
+          "bytes": 9627
+        },
+        {
+          "name": "ppt-all-features-lib",
+          "exit_code": 0,
+          "test_result": "1249 passed; 0 failed; 1 ignored",
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-replay-c0-ppt-lib.log",
+          "log_sha256": "fb9d4f3ca3440cad040785e75c6580ecb580d7bd9f948911201ace3022477b07",
+          "bytes": 101541
+        },
+        {
+          "name": "cfb-all-features-lib",
+          "exit_code": 0,
+          "test_result": "491 passed; 0 failed",
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-replay-c0-cfb-lib.log",
+          "log_sha256": "87de51988c5babb54cfd8d177a1305d0988582973bf2f7020fae278ebf57141c",
+          "bytes": 42512
+        },
+        {
+          "name": "ppt-all-features-tests",
+          "exit_code": 0,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-replay-c0-ppt-tests.log",
+          "log_sha256": "b5e6c77b241741ae2c732f565ae4afb2141a7ac0da618de4a2930d4fd8348e30",
+          "bytes": 137043
+        },
+        {
+          "name": "cfb-all-features-tests",
+          "exit_code": 0,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-replay-c0-cfb-tests.log",
+          "log_sha256": "20e1a662eb9b8f33be2a950b05278ce33567cec7e255b0a7acab30b86f9f8b6b",
+          "bytes": 47946
+        },
+        {
+          "name": "ppt-all-features-clippy",
+          "exit_code": 0,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-replay-c0-ppt-clippy.log",
+          "log_sha256": "82261b8ea48be77274cae931a673ac0b6fbab104e09f602e7adfa04bbdf4d758",
+          "bytes": 7236
+        },
+        {
+          "name": "cfb-all-features-clippy",
+          "exit_code": 0,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-replay-c0-cfb-clippy.log",
+          "log_sha256": "11d94500d0a48018912c5be391922931a2ef00e5d4094bf61e2ffc6c73d44e3a",
+          "bytes": 728
+        }
+      ]
+    },
+    "preflight": {
+      "command": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-replay-c0-source-20261021/protected/scoped_patch_probe-c0f346607b /home/zhuhe/code/litchi-worktrees/.coord/ppt-replay-c0-source-20261021/test-data/unified-ops/0294/video.ppt 1 1 1",
+      "output": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-replay-c0-source-20261021/preflight-c0-1-1-1.json",
+      "stderr": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-replay-c0-source-20261021/preflight-c0-1-1-1.stderr",
+      "exit_code": 0,
+      "output_sha256": "789a7bd3bc305df4ca54fea9b8d9479b9d8c4c2dac3254a48033ea041f899fa8",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_len": 43520,
+      "target_len": 54784,
+      "inverse_verified": true,
+      "retained_patch_bytes": 15384,
+      "retained_payload_bytes": 15360,
+      "retained_block_span_bytes": 24,
+      "retained_block_span_count": 3
+    },
+    "native_measurement": {
+      "status": "pending-coordinator-grant",
+      "note": "No timing or performance qualification is claimed by this validation manifest."
+    }
+  },
+  "manifest": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-replay-c0-source-20261021/manifest.json",
+    "bytes": 6743,
+    "sha256": "b446bdfd7976a65c16c08f0c3044aba8cecb70d7a69f9756c54fc409b8f2be76"
+  },
+  "prior_manifest": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-replay-c0-source-20261021/manifest-before-lock-origin-correction.json",
+    "bytes": 6736,
+    "sha256": "0cde12a9c361f259a0dc9a254c6620a2dc41d53a861ac74e9d2b7ff1934ee957"
+  },
+  "metadata_correction": "Only cargo_lock.origin was corrected to the existing e3aa source/Cargo.lock path; lock hash and source/binary bytes are unchanged. Native measurements use the separately identified 0362g runner, not the historical runner path retained in this build receipt.",
+  "source_parity": {
+    "source_commit": "c0f346607bb28559ae21fa780c835dc70e87fb0b",
+    "source_manifest": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-replay-c0-source-digests.json",
+      "bytes": 1363016,
+      "sha256": "fbd4da237806a2807efd2c4d58fd9bc700313320cc253f726849ab262ec43955"
+    },
+    "reference_manifest": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-final-admission-20261021/source-digests.json",
+    "unchanged_reference_files": 10855,
+    "changed": [
+      "crates/litchi-ppt/src/scoped.rs"
+    ],
+    "changed_files_match_committed_blob": true,
+    "missing_generated_fuzz_locks": [
+      "crates/litchi-core/fuzz/Cargo.lock",
+      "crates/litchi-ops/fuzz/Cargo.lock",
+      "crates/litchi-pages/fuzz/Cargo.lock",
+      "crates/litchi/fuzz/Cargo.lock"
+    ],
+    "additional": []
+  },
+  "integrated_candidate_files": [
+    {
+      "path": "Cargo.toml",
+      "sha256": "f5ec007892023b38f1deaef1ce20714db58b58448a3bea088be3b847b84570de"
+    },
+    {
+      "path": "crates/litchi-cfb/src/shared.rs",
+      "sha256": "c98f041fad4d59674536a54fdda1fde052587bd0c1ff10eb40f76ce4d4b6bdd2"
+    },
+    {
+      "path": "crates/litchi-ppt/Cargo.toml",
+      "sha256": "44555020edaae6db4d46619c24c5f7cf23d2ce418ce5fcf1050ae8c2d3e45919"
+    },
+    {
+      "path": "crates/litchi-ppt/examples/scoped_patch_probe.rs",
+      "sha256": "0bd4d9c1bcad6319968024ff603ae77195810174e496d5394fbae1838021e549"
+    },
+    {
+      "path": "crates/litchi-ppt/src/package/owner.rs",
+      "sha256": "4e9e858c5c38aa86709c535cdf427bae8b7d3abd83abb8eb05cc96184bc19560"
+    },
+    {
+      "path": "crates/litchi-ppt/src/scoped.rs",
+      "sha256": "88af7af8c76325590e16a5777388794a814506ec5f9f737d948d5091d238faf3"
+    },
+    {
+      "path": "crates/litchi-ppt/src/scoped/digest.rs",
+      "sha256": "070a534c47609c12704a85cd0e824323249f93aaba9910920564b7809261fdbd"
+    },
+    {
+      "path": "crates/litchi-ppt/src/slide_order.rs",
+      "sha256": "e81ca2ca441eb95278c5348ee5207191b4c070b0757811f7476b8bd111b3e45a"
+    }
+  ],
+  "unique_tests_passed": 2110,
+  "existing_ignored_tests": 3,
+  "test_count_note": "Focused scoped tests and repeated library invocations are not double-counted."
+}

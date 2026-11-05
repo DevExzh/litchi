@@ -19,8 +19,8 @@
 //!
 //! # References
 //!
-//! - odfpy: `3rdparty/odfpy/odf/namespaces.py`
-//! - odfdo: `3rdparty/odfdo/src/odfdo/const.py`
+//! - odfpy: `odf/namespaces.py`
+//! - odfdo: `src/odfdo/const.py`
 use memchr::memmem;
 use phf::{Map, phf_map};
 

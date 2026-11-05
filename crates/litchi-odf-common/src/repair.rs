@@ -39,7 +39,7 @@ use soapberry_zip::{
     office::{ArchiveLimits, ArchiveReader},
 };
 
-use crate::{OdfValidationError, OdfValidationLimits, validate_package_with_limits};
+use crate::{OdfValidationError, OdfValidationLimits, validate_package};
 
 /// Stable report issue code for the supported repair.
 pub const MIMETYPE_LOCAL_EXTRA_ISSUE: &str = "odf.mimetype.local_header_extra";
@@ -690,7 +690,8 @@ impl<'source, Intent: RepairIntent> RepairPlan<'source, Intent> {
             "member_payloads_preserved": self.effects().member_payloads_preserved(),
             "reversible": self.effects().reversible(),
         });
-        let encoded = serde_json::to_vec(&value).map_err(|_| RepairError::PlanJsonEncoding)?;
+        // Sorted members whatever `serde_json` features are unified (0349).
+        let encoded = litchi_core::canonical_json::to_vec(&value);
         if encoded.len() > self.limits.max_plan_json_bytes {
             return Err(RepairError::Limit {
                 resource: "plan JSON bytes",
@@ -1375,7 +1376,7 @@ fn check_report(
     if source_size != Some(expected_len) || source_sha256 != Some(expected_digest) {
         return Err(RepairError::ReportMismatch);
     }
-    let fresh = validate_package_with_limits(
+    let fresh = validate_package(
         source,
         validation_limits(limits, limits.max_input_bytes),
         litchi_core::ValidationLimits::default(),
@@ -1729,7 +1730,7 @@ fn inspect_layout(source: &[u8], limits: OdfRepairLimits) -> Result<Layout, Repa
             resource: "repair preservation index buffer",
         })?;
     index_buffer.resize(soapberry_zip::RECOMMENDED_BUFFER_SIZE, 0);
-    let index = PreservationIndex::new(&archive, &mut index_buffer)?;
+    let index = PreservationIndex::new(&archive, &mut index_buffer, ArchiveLimits::default())?;
     let entries = index.entries();
     if entries.len() != central_preflight.record_count {
         return Err(RepairError::Unsupported {
@@ -2125,7 +2126,7 @@ fn scan_package_xml(
     limits: OdfRepairLimits,
     metadata_base: u64,
 ) -> Result<(), RepairError> {
-    let archive = ArchiveReader::new_with_limits(source, archive_limits(limits))?;
+    let archive = ArchiveReader::new(source, archive_limits(limits))?;
     for name in archive.file_names() {
         if name != MANIFEST_PATH && is_xml_family_name(name) {
             scan_archive_xml_member(&archive, name, limits)?;
@@ -2927,7 +2928,7 @@ fn verify_candidate(
             None => Err(RepairError::PlanMismatch),
         };
     }
-    let candidate_report = validate_package_with_limits(
+    let candidate_report = validate_package(
         candidate,
         validation_limits(limits, limits.max_output_bytes),
         litchi_core::ValidationLimits::default(),
@@ -2951,7 +2952,7 @@ fn verify_streaming_proof(
     // was checked immediately before this function, so the already-proved
     // report authorization still applies without retaining report data in the
     // borrowed plan.
-    let report = validate_package_with_limits(
+    let report = validate_package(
         source,
         validation_limits(limits, limits.max_input_bytes),
         litchi_core::ValidationLimits::default(),
@@ -2983,7 +2984,7 @@ fn verify_source_member_digests(
     expected_members: usize,
     limits: OdfRepairLimits,
 ) -> Result<(), RepairError> {
-    let archive = ArchiveReader::new_with_limits(source, archive_limits(limits))?;
+    let archive = ArchiveReader::new(source, archive_limits(limits))?;
     let mut member_count = 0_usize;
     for name in archive.file_names() {
         member_count = member_count.saturating_add(1);
@@ -3132,8 +3133,8 @@ fn verify_member_digests(
     limits: OdfRepairLimits,
 ) -> Result<(), RepairError> {
     let archive_limits = archive_limits(limits);
-    let source_archive = ArchiveReader::new_with_limits(source, archive_limits)?;
-    let candidate_archive = ArchiveReader::new_with_limits(candidate, archive_limits)?;
+    let source_archive = ArchiveReader::new(source, archive_limits)?;
+    let candidate_archive = ArchiveReader::new(candidate, archive_limits)?;
     let mut source_names = Vec::new();
     for name in source_archive.file_names() {
         if source_names.len() >= limits.max_members {

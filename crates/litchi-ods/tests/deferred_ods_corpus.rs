@@ -1,4 +1,4 @@
-use litchi_ods::{CellValue, Spreadsheet};
+use litchi_ods::{CellValue, Package};
 use std::path::{Path, PathBuf};
 
 fn corpus() -> PathBuf {
@@ -14,7 +14,8 @@ fn real_calc_packages_parse_and_expose_typed_content() {
         ("calc-two-sheets.ods", 2),
     ];
     for (file, count) in cases {
-        let spreadsheet = Spreadsheet::open(corpus().join(file))
+        let spreadsheet = Package::open(corpus().join(file))
+            .and_then(|package| package.workbook())
             .unwrap_or_else(|error| panic!("{file}: open failed: {error:?}"));
         assert_eq!(spreadsheet.sheets().len(), count, "{file}: sheet count");
         assert!(
@@ -36,7 +37,9 @@ fn real_calc_packages_parse_and_expose_typed_content() {
         let _ = spreadsheet.metadata();
     }
 
-    let spreadsheet = Spreadsheet::open(corpus().join("calc-formulas.ods"))
+    let spreadsheet = Package::open(corpus().join("calc-formulas.ods"))
+        .expect("test fixture or operation should succeed")
+        .workbook()
         .expect("test fixture or operation should succeed");
     assert!(
         spreadsheet

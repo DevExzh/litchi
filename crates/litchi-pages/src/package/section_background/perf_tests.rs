@@ -28,6 +28,7 @@ fn object(identifier: u64, message_type: u32, data: Vec<u8>) -> TestResult<Archi
             type_: message_type,
             data,
         }],
+        Default::default(),
     )?)
 }
 
@@ -78,7 +79,10 @@ fn topology_package(object_count: usize) -> TestResult<Vec<u8>> {
             vec![0x08, 0x00],
         )?);
     }
-    let compressed = SnappyStream::compress(&Archive { objects }.to_bytes()?)?;
+    let compressed = SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?;
     Ok(package::to_bytes(
         [("Index/Document.iwa", compressed.as_slice())],
         Limits::default(),
@@ -142,7 +146,7 @@ fn component_population_work_scales_and_required_minus_one_refuses_before_public
     let (rejected, rejected_usage) = attempt(8_192, Some(maximum))?;
     assert!(matches!(
         rejected,
-        Err(Error::LimitExceeded {
+        Err(Error::Limit {
             kind: LimitKind::TransactionWork,
             maximum: reported_maximum,
             ..

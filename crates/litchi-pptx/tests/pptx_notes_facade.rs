@@ -4,6 +4,9 @@
     reason = "test assertions panic on failure by design"
 )]
 
+mod in_place;
+use in_place::InPlace as _;
+
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, PackURI, Part, TargetMode};
 use litchi_pptx::{Error, Package, notes};
@@ -24,20 +27,21 @@ const PACKAGE_REL: &str =
 fn package_notes_crud_uses_semantic_slide_selectors() {
     let mut package = opened_deck(&[("Overview", "First note"), ("Appendix", "Second note")]);
     let mut graph = package.notes().unwrap().unwrap();
-    graph.slides_mut()[0].replace_xml(notes::write_text("Revised note").unwrap());
-    package.put_notes(graph).unwrap();
+    graph.slides_mut()[0]
+        .replace_xml(notes::write_text("Revised note", notes::Limits::DEFAULT).unwrap());
+    package.put_notes_in_place(graph).unwrap();
     assert_eq!(
         package.notes().unwrap().unwrap().slides()[0]
-            .text()
+            .text(notes::Limits::DEFAULT)
             .unwrap(),
         Some("Revised note".into())
     );
 
-    assert!(package.remove_notes("Overview").unwrap());
-    assert!(!package.remove_notes("Overview").unwrap());
+    assert!(package.remove_notes_in_place("Overview").unwrap());
+    assert!(!package.remove_notes_in_place("Overview").unwrap());
     assert_eq!(package.notes().unwrap().unwrap().slides().len(), 1);
-    assert!(package.remove_notes(1usize).unwrap());
-    assert_eq!(package.clear_notes().unwrap(), 0);
+    assert!(package.remove_notes_in_place(1usize).unwrap());
+    assert_eq!(package.clear_notes_in_place().unwrap(), 0);
     assert!(package.notes().unwrap().unwrap().slides().is_empty());
 }
 
@@ -45,7 +49,7 @@ fn package_notes_crud_uses_semantic_slide_selectors() {
 fn facade_publishes_source_checked_lossless_edits_and_rejects_stale_patches() {
     let mut package = opened_deck(&[("Overview", "Source note")]);
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             let notes_name = PackURI::new(NOTES).unwrap();
             let child_name = PackURI::new(CHILD).unwrap();
             opc.try_add_part(Box::new(BlobPart::new(
@@ -65,15 +69,15 @@ fn facade_publishes_source_checked_lossless_edits_and_rejects_stale_patches() {
         })
         .unwrap();
 
-    let source = package.notes_snapshot().unwrap().unwrap();
-    let mut edit = source.edit();
+    let mut edit = package.edit_notes().unwrap();
     assert!(edit.set_text(0, "Committed note").unwrap());
     let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
     let patch = commit.patch().clone();
-    package.apply_notes_commit(commit).unwrap();
+    package = commit.into_package();
     assert_eq!(
         package.notes().unwrap().unwrap().slides()[0]
-            .text()
+            .text(notes::Limits::DEFAULT)
             .unwrap(),
         Some("Committed note".into())
     );
@@ -87,11 +91,11 @@ fn facade_publishes_source_checked_lossless_edits_and_rejects_stale_patches() {
         b"opaque-child"
     );
 
-    let error = package.apply_notes_patch(&patch).unwrap_err();
-    assert!(matches!(error, Error::Invalid(message) if message.contains("stale")));
+    let error = package.apply_notes(&patch).unwrap_err();
+    assert!(matches!(error, Error::PatchConflict));
     assert_eq!(
         package.notes().unwrap().unwrap().slides()[0]
-            .text()
+            .text(notes::Limits::DEFAULT)
             .unwrap(),
         Some("Committed note".into())
     );
@@ -102,7 +106,7 @@ fn notes_removal_collects_only_exclusive_descendants_and_preserves_slide_comment
     let mut package = opened_deck(&[("Overview", "Source note")]);
     add_comment_and_notes_children(&mut package, false);
 
-    assert!(package.remove_notes("Overview").unwrap());
+    assert!(package.remove_notes_in_place("Overview").unwrap());
     let opc = package.opc().unwrap();
     assert!(!opc.contains_part(&PackURI::new(NOTES).unwrap()));
     assert!(!opc.contains_part(&PackURI::new(CHILD).unwrap()));
@@ -131,7 +135,7 @@ fn shared_notes_descendant_refuses_deletion_without_partial_mutation() {
     add_comment_and_notes_children(&mut package, true);
     let before = package.notes().unwrap().unwrap();
 
-    let error = package.remove_notes("Overview").unwrap_err();
+    let error = package.remove_notes_in_place("Overview").unwrap_err();
     assert!(matches!(error, Error::Invalid(message) if message.contains("shared inbound")));
     assert_eq!(package.notes().unwrap().unwrap(), before);
     assert!(
@@ -146,7 +150,7 @@ fn shared_notes_descendant_refuses_deletion_without_partial_mutation() {
 fn unknown_notes_relationship_refuses_deletion_atomically() {
     let mut package = opened_deck(&[("Overview", "Source note")]);
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             let notes_name = PackURI::new(NOTES).unwrap();
             let child_name = PackURI::new("/ppt/media/unknown.bin").unwrap();
             opc.try_add_part(Box::new(BlobPart::new(
@@ -167,7 +171,7 @@ fn unknown_notes_relationship_refuses_deletion_atomically() {
         .unwrap();
     let before = package.notes().unwrap().unwrap();
 
-    let error = package.remove_notes("Overview").unwrap_err();
+    let error = package.remove_notes_in_place("Overview").unwrap_err();
     assert!(
         matches!(error, Error::Invalid(message) if message.contains("unknown relationship type"))
     );
@@ -178,7 +182,7 @@ fn unknown_notes_relationship_refuses_deletion_atomically() {
 fn notes_descendant_limit_rejects_n_plus_one_before_mutation() {
     let mut package = opened_deck(&[("Overview", "Source note"), ("Appendix", "Other note")]);
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             for index in 0..=MAX_OWNED_PARTS {
                 let notes_name =
                     PackURI::new(format!("/ppt/notesSlides/notesSlide{}.xml", index % 2 + 1))
@@ -202,12 +206,13 @@ fn notes_descendant_limit_rejects_n_plus_one_before_mutation() {
         })
         .unwrap();
 
-    let error = package.clear_notes().unwrap_err();
+    let error = package.clear_notes_in_place().unwrap_err();
     assert!(matches!(
         error,
         Error::Limit {
-            resource: "notes-owned related parts",
-            limit: MAX_OWNED_PARTS
+            kind: litchi_pptx::opened::LimitKind::Codec(litchi_pptx::opened::CodecLimitKind::Parts),
+            maximum: MAX_OWNED_PARTS,
+            ..
         }
     ));
     assert!(
@@ -227,8 +232,11 @@ fn notes_descendant_limit_rejects_n_plus_one_before_mutation() {
 #[test]
 fn authored_notes_xml_and_referenced_master_are_compact() {
     for xml in [
-        notes::write_text("Compact").unwrap(),
-        notes::master_xml().as_bytes().to_vec(),
+        notes::write_text("Compact", notes::Limits::DEFAULT).unwrap(),
+        notes::master_xml(notes::Limits::DEFAULT)
+            .unwrap()
+            .as_bytes()
+            .to_vec(),
     ] {
         assert!(!xml.contains(&b'\n'));
         assert!(!xml.contains(&b'\r'));
@@ -238,18 +246,19 @@ fn authored_notes_xml_and_referenced_master_are_compact() {
 
 fn opened_deck(slides: &[(&str, &str)]) -> Package {
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
-    let mut package = Package::new().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
     for (name, note) in slides {
-        let slide = package.presentation_mut().unwrap().add_slide().unwrap();
+        let slide = builder.presentation().unwrap().add_slide().unwrap();
         slide.set_title(name);
         slide.set_notes(note);
     }
+    let package = builder.build().unwrap();
     package.save(output.path()).unwrap();
     let mut package = Package::open(output.path()).unwrap();
     for (index, (name, _)) in slides.iter().enumerate() {
         let slide_name = PackURI::new(format!("/ppt/slides/slide{}.xml", index + 1)).unwrap();
         package
-            .edit_opc(|opc| {
+            .edit_opc_in_place(|opc| {
                 let slide = opc.get_part_mut(&slide_name)?;
                 let xml = std::str::from_utf8(slide.blob()).unwrap();
                 let named = if xml.contains("<p:cSld>") {
@@ -274,7 +283,7 @@ fn opened_deck(slides: &[(&str, &str)]) -> Package {
 
 fn add_comment_and_notes_children(package: &mut Package, shared: bool) {
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             let slide_name = PackURI::new(SLIDE).unwrap();
             let notes_name = PackURI::new(NOTES).unwrap();
             let classic_name = PackURI::new(CLASSIC_COMMENTS).unwrap();

@@ -16,7 +16,8 @@ use std::ffi::OsString;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use litchi_numbers::{ChartData, ChartDataError, ChartSelector, Package, SheetSelector};
+use litchi_numbers::sheet::chart::data::Error as ChartDataError;
+use litchi_numbers::{ChartData, ChartSelector, Package, SheetSelector};
 use tempfile::NamedTempFile;
 
 const USAGE: &str = "usage: edit_sheet_chart_data <input.numbers> <output.numbers> \

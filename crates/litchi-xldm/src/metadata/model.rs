@@ -9,17 +9,97 @@ const NO_SPLIT_WIDTHS: &[u8] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 16, 21, 32];
 
 /// A structural or cross-file section 2.5 validation error.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct MetadataError(pub(crate) String);
+pub enum MetadataError {
+    Invalid(String),
+    Limit {
+        kind: crate::LimitKind,
+        observed: usize,
+        maximum: usize,
+    },
+    InvalidLimit {
+        kind: crate::LimitKind,
+        value: usize,
+        maximum: usize,
+    },
+    Allocation {
+        resource: &'static str,
+        source: String,
+    },
+}
 
 impl MetadataError {
     pub(super) fn new(message: impl Into<String>) -> Self {
-        Self(message.into())
+        Self::Invalid(message.into())
+    }
+
+    pub(super) fn limit(kind: crate::LimitKind, observed: usize, maximum: usize) -> Self {
+        Self::Limit {
+            kind,
+            observed,
+            maximum,
+        }
+    }
+
+    pub(super) fn allocation(resource: &'static str, source: impl fmt::Display) -> Self {
+        Self::Allocation {
+            resource,
+            source: source.to_string(),
+        }
+    }
+
+    pub(super) fn from_error(error: crate::Error) -> Self {
+        match error {
+            crate::Error::Limit {
+                kind,
+                observed,
+                maximum,
+            } => Self::Limit {
+                kind,
+                observed,
+                maximum,
+            },
+            crate::Error::InvalidLimit {
+                kind,
+                value,
+                maximum,
+            } => Self::InvalidLimit {
+                kind,
+                value,
+                maximum,
+            },
+            crate::Error::Allocation { resource, source } => Self::allocation(resource, source),
+            other => Self::new(other.to_string()),
+        }
     }
 }
 
 impl fmt::Display for MetadataError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(&self.0)
+        match self {
+            Self::Invalid(message) => formatter.write_str(message),
+            Self::Limit {
+                kind,
+                observed,
+                maximum,
+            } => write!(
+                formatter,
+                "MS-XLDM {kind} limit exceeded: observed {observed}, maximum {maximum}"
+            ),
+            Self::InvalidLimit {
+                kind,
+                value,
+                maximum,
+            } => write!(
+                formatter,
+                "invalid MS-XLDM {kind} limit {value} (allowed 1..={maximum})"
+            ),
+            Self::Allocation { resource, source } => {
+                write!(
+                    formatter,
+                    "could not reserve memory for MS-XLDM {resource}: {source}"
+                )
+            },
+        }
     }
 }
 
@@ -127,6 +207,15 @@ pub struct MetadataFile<'a> {
     pub bytes: &'a [u8],
     pub kind: MetadataFileKind,
     pub table: MetadataObject,
+    pub(crate) limits: crate::Limits,
+}
+
+impl MetadataFile<'_> {
+    /// Return the policy retained when this borrowed metadata file was parsed.
+    #[must_use = "use the retained resource policy"]
+    pub fn limits_value(&self) -> crate::Limits {
+        self.limits
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

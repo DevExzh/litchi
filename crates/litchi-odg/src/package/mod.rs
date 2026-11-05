@@ -5,11 +5,11 @@ mod snapshot;
 pub use litchi_core::patch::HistoryLimits;
 pub use snapshot::{
     ActiveContentStatus, ActiveContentWritePolicy, Change, Commit, ControlReferenceChange,
-    DurablePatch, GeometryChange, JoinedEdits, LayerChange, Lineage, MergePlan, NameChange,
-    PageNameChange, PageStyleChange, PageTransitionChange, Patch, PathChange, PreparedEdit,
-    ResourceChange, SecurityCapabilities, SecurityLifecycleDisposition, SecurityLifecycleOperation,
-    SecurityLifecycleRefusal, SecurityStatus, SecurityWritePolicy, ShapeTransfer, Snapshot,
-    SnapshotHistory as History, StructureChange, StyleChange, TextChange, Transaction,
-    TransferControl, TransferResource, TransferStyle, TransferStyleResource,
+    Diagnostics, DurablePatch, Edit, GeometryChange, History, JoinError, JoinedEdits, LayerChange,
+    Lineage, MergePlan, NameChange, Package, PageNameChange, PageStyleChange, PageTransitionChange,
+    Patch, PathChange, ResourceChange, SecurityCapabilities, SecurityLifecycleDisposition,
+    SecurityLifecycleOperation, SecurityLifecycleRefusal, SecurityStatus, SecurityWritePolicy,
+    ShapeTransfer, StructureChange, StyleChange, SubEdit, TextChange, TransferControl,
+    TransferResource, TransferStyle, TransferStyleResource,
 };
 pub(crate) use snapshot::{MIMETYPE, TEMPLATE_MIMETYPE};

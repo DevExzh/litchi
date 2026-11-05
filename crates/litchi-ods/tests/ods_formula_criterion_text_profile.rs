@@ -131,7 +131,7 @@ fn execution() -> (CancellationSource, ExecutionContext) {
 }
 
 fn evaluate_number(source: &str, resolver: &CriteriaResolver, execution: &ExecutionContext) -> f64 {
-    let expression = Expression::parse(source).expect("formula parses");
+    let expression = Expression::parse(source, &Default::default()).expect("formula parses");
     let context = Context::new(execution, Position::new("Main", 0, 0)).with_mode(Mode::Matrix);
     let result = value::evaluate(&expression, resolver, &context, &Limits::default())
         .expect("formula evaluates");

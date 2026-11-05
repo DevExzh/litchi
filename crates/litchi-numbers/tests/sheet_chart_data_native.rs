@@ -2,11 +2,8 @@
 
 use std::path::PathBuf;
 
-use litchi_iwa_archive::Limits;
-use litchi_numbers::{
-    ChartDataError, ChartSelector, MAX_OBJECTS, Package, PackageReadOptions, PackageSemanticLimits,
-    SheetSelector,
-};
+use litchi_numbers::sheet::chart::data::Error as ChartDataError;
+use litchi_numbers::{ChartSelector, MAX_OBJECTS, Package, SheetSelector};
 
 #[path = "support/chart_arrangement_fixture.rs"]
 mod fixture;
@@ -45,14 +42,19 @@ fn native_numbers_chart_data_rejects_unmatched_selectors_without_mutation() -> T
     let error = package
         .sheet_chart_data(SheetSelector::name("missing"), ChartSelector::index(0))
         .expect_err("unknown sheet must be rejected");
-    assert!(matches!(error, ChartDataError::SheetNameNotFound));
+    assert!(matches!(
+        error,
+        ChartDataError::Refused(litchi_numbers::sheet::chart::data::Refusal::SheetNameNotFound)
+    ));
 
     let error = package
         .sheet_chart_data(SheetSelector::index(0), ChartSelector::index(99))
         .expect_err("unknown chart position must be rejected");
     assert!(matches!(
         error,
-        ChartDataError::ChartPositionNotFound { .. }
+        ChartDataError::Refused(
+            litchi_numbers::sheet::chart::data::Refusal::ChartPositionNotFound { .. }
+        )
     ));
 
     let mut round_trip = Vec::new();
@@ -92,20 +94,20 @@ fn native_numbers_chart_data_errors_do_not_expose_native_ids() -> TestResult {
 #[test]
 fn native_numbers_chart_data_refuses_a_tight_reference_budget() -> TestResult {
     let source = fixture::with_single_rooted_sheet(&fixture::fixture()?)?;
-    let semantic = PackageSemanticLimits::new(
-        MAX_OBJECTS,
-        PackageSemanticLimits::MAX_SHEETS,
-        PackageSemanticLimits::MAX_TABLES,
-        2,
-    )?;
+    let semantic = litchi_numbers::SemanticLimits::builder()
+        .max_objects(MAX_OBJECTS)
+        .and_then(|b| b.max_sheets(litchi_numbers::SemanticLimits::MAXIMUM.max_sheets()))
+        .and_then(|b| b.max_tables(litchi_numbers::SemanticLimits::MAXIMUM.max_tables()))
+        .and_then(|b| b.max_references(2))
+        .and_then(|b| b.build())?;
     let package = Package::from_bytes_with_options(
         &source,
-        PackageReadOptions::new(Limits::default(), semantic),
+        litchi_numbers::OpenOptions::new().semantic_limits(semantic),
     )?;
     let error = package
         .sheet_chart_data(SheetSelector::index(0), ChartSelector::index(0))
         .expect_err("the selected graph must honor the finite reference budget");
-    assert!(matches!(error, ChartDataError::LimitExceeded { .. }));
+    assert!(matches!(error, ChartDataError::Limit { .. }));
 
     let mut round_trip = Vec::new();
     package.write_to(&mut round_trip)?;

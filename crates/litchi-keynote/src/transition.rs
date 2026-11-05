@@ -2,7 +2,9 @@
 
 use crate::Result;
 
-pub use crate::package::slide_transition::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
+pub use crate::package::slide_transition::{
+    Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+};
 
 const NONE_EFFECT: &str = "none";
 const DISSOLVE_EFFECT: &str = "apple:dissolve";

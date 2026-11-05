@@ -1,19 +1,30 @@
 //! Guarded tab-state publication over an immutable positional source.
+//!
+//! [`SourceBackedWorkbook::edit_tab_state`] stages tab visibility and the
+//! active tab; [`Edit::commit`] validates the edit and returns a [`Commit`]
+//! holding the new workbook, whose output is the splice the former stream
+//! publisher wrote: visibility-only changes overlay the workbook part, an
+//! active-tab transition additionally overlays the old and new worksheet
+//! parts so `tabSelected` stays synchronized, and every other member is
+//! raw-copied. An exact no-op returns the source workbook; a changed edit of a
+//! signed source is refused at commit. The workbook's catalog accessors read
+//! the committed catalog without materializing the output.
+//! [`SourceBackedWorkbook::apply_tab_state`] replays a [`Patch`] onto a
+//! workbook holding its before state (record 0360).
 
 use std::io::Write;
 use std::sync::Arc;
 
-use litchi_core::{ExecutionContext, ReadAt, Selector as CoreSelector};
-use litchi_opc::{ReadLimits, SourceBackedPackage, SourceCacheLimits};
+use litchi_core::Selector as CoreSelector;
+use litchi_opc::SourceBackedPackage;
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use super::snapshot::Snapshot;
-use super::{Commit, Patch};
-use crate::error::{Error, Result, TabEditBlock, allocation, invalid};
-use crate::{Selector, Visibility, WorksheetKind, raw};
+use crate::error::{Result, TabEditBlock, allocation, invalid};
+use crate::{Selector, SourceBackedWorkbook, Visibility, WorksheetKind, raw};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const MAX_EDIT_XML_BYTES: usize = 32 * 1024 * 1024;
@@ -21,160 +32,202 @@ const MAX_EDIT_XML_DEPTH: usize = 128;
 const MAX_EDIT_XML_EVENTS: usize = 1_000_000;
 const MCE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
 
-/// An owning source-backed editor for existing workbook tabs.
-pub struct SourceBackedEditor {
-    package: SourceBackedPackage,
-    origin: Arc<()>,
+crate::workbook::source::deferred::source_family!(
+    "tab-state",
+    super::Patch,
+    own_limits,
+    own_diagnostics
+);
+
+crate::record::limit_kinds!("source-backed tab-state", TabState {
+    /// XML bytes audited by one tab-state edit.
+    XmlBytes => "tab-state XML bytes",
+    /// Element depth of one audited XML part.
+    Depth => "tab-state XML depth",
+    /// XML events visited by one audited XML part.
+    Events => "tab-state XML events",
+});
+
+/// Resource limits for one source-backed tab-state edit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Limits {
+    max_xml_bytes: usize,
+    max_depth: usize,
+    max_events: usize,
 }
 
-/// An isolated visibility and active-tab edit over one exact source closure.
-pub struct SourceEdit<'a> {
-    package: &'a SourceBackedPackage,
-    before: Snapshot,
-    staged_visibility: Vec<Visibility>,
-    requested_active: Option<usize>,
-}
-
-impl SourceBackedEditor {
-    /// Open with the standard bounded OPC policy.
-    pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
-        Self::from_read_at_with_limits(source, ReadLimits::default())
-    }
-
-    /// Open with an explicit bounded OPC policy.
-    pub fn from_read_at_with_limits(
-        source: Arc<dyn ReadAt>,
-        read_limits: ReadLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_limits(
-            source,
-            read_limits,
-        )?)
-    }
-
-    /// Open with an explicit finite deferred-payload cache policy.
-    pub fn from_read_at_with_cache_limits(
-        source: Arc<dyn ReadAt>,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_cache_limits(
-            source,
-            cache_limits,
-        )?)
-    }
-
-    /// Open with explicit read and finite cache policies.
-    pub fn from_read_at_with_limits_and_cache_limits(
-        source: Arc<dyn ReadAt>,
-        read_limits: ReadLimits,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
-                source,
-                read_limits,
-                cache_limits,
-            )?,
-        )
-    }
-
-    /// Open with an explicit caller-owned execution context and the default cache.
-    pub fn from_read_at_with_execution_context(
-        source: Arc<dyn ReadAt>,
-        read_limits: ReadLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_execution_context(
-            source,
-            read_limits,
-            context,
-        )?)
-    }
-
-    /// Open with explicit read and execution policies.
-    pub fn from_read_at_with_limits_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        read_limits: ReadLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_execution_context(source, read_limits, context)
-    }
-
-    /// Open with explicit read, cache, and caller-owned execution policies.
-    pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        read_limits: ReadLimits,
-        cache_limits: SourceCacheLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                source,
-                read_limits,
-                cache_limits,
-                context,
-            )?,
-        )
-    }
-
-    /// Build an editor from a validated deferred OPC package.
-    pub fn from_source_backed_package(package: SourceBackedPackage) -> Result<Self> {
-        package.check_execution()?;
-        let editor = Self {
-            package,
-            origin: Arc::new(()),
-        };
-        editor.package.check_execution()?;
-        Ok(editor)
-    }
-
-    /// Capture exact source-bound workbook tab state.
-    pub fn snapshot(&self) -> Result<Snapshot> {
-        self.package.check_execution()?;
-        Snapshot::load_source_backed(&self.package, Arc::clone(&self.origin))
-    }
-
-    /// Begin an isolated existing-tab edit.
-    pub fn edit(&self) -> Result<SourceEdit<'_>> {
-        self.package.check_execution()?;
-        SourceEdit::new(&self.package, self.snapshot()?)
-    }
-
-    /// Content-free deferred-Part cache diagnostics.
+impl Limits {
+    /// Construct the default tab-state edit limits.
     #[must_use]
-    pub fn cache_diagnostics(&self) -> litchi_opc::SourceCacheDiagnostics {
-        self.package.cache_diagnostics()
+    pub const fn new() -> Self {
+        Self {
+            max_xml_bytes: MAX_EDIT_XML_BYTES,
+            max_depth: MAX_EDIT_XML_DEPTH,
+            max_events: MAX_EDIT_XML_EVENTS,
+        }
     }
 
-    /// Publish a source-checked commit to a sequential sink.
-    ///
-    /// Visibility-only changes overlay the workbook Part. An active-tab
-    /// transition additionally overlays the old and new worksheet Parts so
-    /// `tabSelected` stays synchronized. Every other member is raw-copied.
-    pub fn publish_commit_to_stream<W: Write>(
-        self,
-        writer: W,
-        commit: &Commit,
-    ) -> Result<Snapshot> {
-        self.package.check_execution()?;
-        let before = commit.patch().before();
-        if !before.belongs_to(&self.origin)
-            || !before.matches_source_backed(&self.package, Some(&self.origin))?
-        {
+    /// Maximum bytes audited in one workbook or worksheet XML part.
+    #[must_use]
+    pub const fn max_xml_bytes(self) -> usize {
+        self.max_xml_bytes
+    }
+
+    /// Maximum element depth audited in one XML part.
+    #[must_use]
+    pub const fn max_depth(self) -> usize {
+        self.max_depth
+    }
+
+    /// Maximum XML events audited in one XML part.
+    #[must_use]
+    pub const fn max_events(self) -> usize {
+        self.max_events
+    }
+
+    /// Set the maximum XML bytes audited in one part.
+    pub fn with_max_xml_bytes(mut self, value: usize) -> Result<Self> {
+        self.max_xml_bytes = checked_limit(LimitKind::XmlBytes, value, MAX_EDIT_XML_BYTES)?;
+        Ok(self)
+    }
+
+    /// Set the maximum element depth audited in one part.
+    pub fn with_max_depth(mut self, value: usize) -> Result<Self> {
+        self.max_depth = checked_limit(LimitKind::Depth, value, MAX_EDIT_XML_DEPTH)?;
+        Ok(self)
+    }
+
+    /// Set the maximum XML events audited in one part.
+    pub fn with_max_events(mut self, value: usize) -> Result<Self> {
+        self.max_events = checked_limit(LimitKind::Events, value, MAX_EDIT_XML_EVENTS)?;
+        Ok(self)
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+fn checked_limit(kind: LimitKind, value: usize, maximum: usize) -> Result<usize> {
+    if value == 0 {
+        return Err(Error::InvalidLimit {
+            kind: kind.into(),
+            value: 0,
+            maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+        });
+    }
+    if value > maximum {
+        return Err(Error::InvalidLimit {
+            kind: kind.into(),
+            value: u64::try_from(value).unwrap_or(u64::MAX),
+            maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+        });
+    }
+    Ok(value)
+}
+
+/// Options for one source-backed tab-state edit.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct EditOptions {
+    limits: Option<Limits>,
+}
+
+impl EditOptions {
+    /// Bound the XML audit by `limits` instead of the default policy.
+    #[must_use]
+    pub const fn limits(mut self, limits: Limits) -> Self {
+        self.limits = Some(limits);
+        self
+    }
+
+    /// Return the configured limits, if an override was supplied.
+    #[must_use]
+    pub const fn limits_value(self) -> Option<Limits> {
+        self.limits
+    }
+}
+
+/// What a committed tab-state change replaced.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Diagnostics {
+    touched_parts: usize,
+}
+
+impl Diagnostics {
+    /// Whether the change replaced any part.
+    #[must_use]
+    pub const fn changed(&self) -> bool {
+        self.touched_parts != 0
+    }
+
+    /// The replaced parts: the workbook, plus the old and new active
+    /// worksheet views for an active-tab transition.
+    #[must_use]
+    pub const fn touched_parts(&self) -> usize {
+        self.touched_parts
+    }
+
+    /// The replaced worksheet view parts.
+    #[must_use]
+    pub const fn touched_worksheets(&self) -> usize {
+        self.touched_parts.saturating_sub(1)
+    }
+}
+
+impl crate::workbook::source::deferred::Report for super::Patch {
+    type Diagnostics = Diagnostics;
+
+    fn diagnostics(&self) -> Diagnostics {
+        Diagnostics {
+            touched_parts: if self.is_empty() {
+                0
+            } else {
+                1 + self.after().touched().len()
+            },
+        }
+    }
+}
+
+impl Patch {
+    /// The exact workbook tab state the patch requires.
+    #[must_use]
+    pub fn before(&self) -> &Snapshot {
+        self.0.before()
+    }
+
+    /// The exact workbook tab state the patch produces.
+    #[must_use]
+    pub fn after(&self) -> &Snapshot {
+        self.0.after()
+    }
+}
+
+impl crate::workbook::source::deferred::Change for super::Patch {
+    fn is_noop(&self) -> bool {
+        self.is_empty()
+    }
+
+    fn inverse(&self) -> Self {
+        super::Patch::inverse(self)
+    }
+
+    fn check(&self, package: &SourceBackedPackage) -> Result<()> {
+        // A replay compares content: the workbook catalog, the sheet graph and
+        // the touched worksheet views must hold the before state.
+        if !self.before().matches_source_backed(package, None)? {
             return Err(Error::PatchConflict {
-                part: before.workbook_part_name().to_string(),
+                part: self.before().workbook_part_name().to_string(),
             });
         }
-        let target = if commit.patch().is_empty() {
-            before.clone()
-        } else {
-            commit.patch().after().clone()
-        };
-        if commit.patch().is_empty() {
-            self.package
-                .write_part_overlays_shared_to_stream(writer, Vec::new())?;
-            return Ok(target);
-        }
+        Ok(())
+    }
+
+    fn write(&self, package: &SourceBackedPackage, writer: &mut dyn Write) -> Result<()> {
+        package.check_execution()?;
+        crate::workbook::source::deferred::Change::check(self, package)?;
+        let target = self.after();
         let mut overlays = Vec::new();
         overlays
             .try_reserve_exact(1 + target.touched().len())
@@ -186,22 +239,125 @@ impl SourceBackedEditor {
         for part in target.touched() {
             overlays.push((part.part.uri.clone(), part.part.bytes.detached_arc()?));
         }
-        self.package
+        package
+            .clone()
             .write_part_overlays_shared_to_stream(writer, overlays)?;
-        Ok(target)
+        Ok(())
+    }
+
+    fn write_authenticated(
+        &self,
+        package: &SourceBackedPackage,
+        writer: &mut dyn Write,
+    ) -> Result<()> {
+        package.check_execution()?;
+        let target = self.after();
+        let mut overlays = Vec::new();
+        overlays
+            .try_reserve_exact(1 + target.touched().len())
+            .map_err(|source| allocation("tab-state source overlay plan", source))?;
+        overlays.push((
+            target.workbook_part_name().clone(),
+            target.workbook_source_arc()?,
+        ));
+        for part in target.touched() {
+            overlays.push((part.part.uri.clone(), part.part.bytes.detached_arc()?));
+        }
+        package
+            .clone()
+            .write_part_overlays_shared_to_stream(writer, overlays)?;
+        Ok(())
+    }
+
+    fn catalog(
+        &self,
+        package: &SourceBackedPackage,
+    ) -> Option<crate::workbook::source::deferred::Catalog> {
+        let catalog = self.after().catalog_proof().ok()?;
+        (package.read_limits() == *catalog.limits)
+            .then(|| self.after().deferred_catalog())
+            .flatten()
+    }
+
+    fn catalog_xml(&self) -> Option<&[u8]> {
+        Some(self.after().workbook_xml())
     }
 }
 
-impl<'a> SourceEdit<'a> {
-    fn new(package: &'a SourceBackedPackage, before: Snapshot) -> Result<Self> {
+impl SourceBackedWorkbook {
+    /// Begin an isolated edit of the visibility and active tab of existing
+    /// workbook tabs.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the workbook catalog is invalid or the source
+    /// cannot be read.
+    pub fn edit_tab_state(&self) -> Result<Edit> {
+        self.edit_tab_state_with_options(EditOptions::default())
+    }
+
+    /// Begin an isolated tab-state edit with explicit XML audit limits.
+    pub fn edit_tab_state_with_options(&self, options: EditOptions) -> Result<Edit> {
+        let view = self.view()?;
+        let package = view.edit_package()?;
+        let source_owner = view.tab_state_source_owner();
+        let snapshot_cache = view.tab_state_snapshot();
+        let before = match snapshot_cache.get() {
+            Some(snapshot) => {
+                // The source-owner loader performs this freshness check while
+                // creating the closure. Keep the same source fence when a
+                // cached immutable closure is reused.
+                package.source_version()?;
+                (**snapshot).clone()
+            },
+            None => {
+                let snapshot =
+                    Snapshot::load_source_backed_from_owner(package, source_owner, Arc::new(()))?;
+                // The first edit of an owner keeps its snapshot to itself; a
+                // repeated edit caches one shared copy.
+                if view.tab_state_snapshot_should_cache() {
+                    (**snapshot_cache.get_or_init(|| Arc::new(snapshot))).clone()
+                } else {
+                    snapshot
+                }
+            },
+        };
+        Edit::new(self.clone(), before, options.limits.unwrap_or_default())
+    }
+
+    /// Replay a tab-state patch onto this workbook.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when the workbook does not hold the
+    /// patch's before state, and the signed-source refusal for a changed
+    /// patch on a signed source.
+    pub fn apply_tab_state(&self, patch: &Patch) -> Result<Commit> {
+        apply_change(self, patch)
+    }
+}
+
+/// An isolated visibility and active-tab edit over one exact source closure
+/// of a [`SourceBackedWorkbook`]. Dropping it discards it.
+pub struct Edit {
+    workbook: SourceBackedWorkbook,
+    before: Snapshot,
+    limits: Limits,
+    staged_visibility: Vec<Visibility>,
+    requested_active: Option<usize>,
+}
+
+impl Edit {
+    fn new(workbook: SourceBackedWorkbook, before: Snapshot, limits: Limits) -> Result<Self> {
         let mut staged_visibility = Vec::new();
         staged_visibility
             .try_reserve_exact(before.tabs().len())
             .map_err(|source| allocation("staged tab visibility", source))?;
         staged_visibility.extend(before.tabs().iter().map(|tab| tab.visibility().clone()));
         Ok(Self {
-            package,
+            workbook,
             before,
+            limits,
             staged_visibility,
             requested_active: None,
         })
@@ -243,21 +399,21 @@ impl<'a> SourceEdit<'a> {
         Ok(changed)
     }
 
-    /// Whether staged visibility or explicit activation differs semantically.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.staged_visibility
-            .iter()
-            .zip(self.before.tabs())
-            .any(|(staged, before)| staged != before.visibility())
-            || self
-                .requested_active
-                .is_some_and(|active| active != self.before.active_position())
+    /// Discard every staged change in place.
+    pub fn reset(&mut self) {
+        for (staged, before) in self.staged_visibility.iter_mut().zip(self.before.tabs()) {
+            *staged = before.visibility().clone();
+        }
+        self.requested_active = None;
     }
 
     /// Validate, bind the exact touched closure, and freeze the edit.
     pub fn commit(self) -> Result<Commit> {
-        self.package.check_execution()?;
+        let package = self.workbook.edit_package()?;
+        package.check_execution()?;
+        // A committed patch may outlive the source owner: capture the
+        // catalog proof the snapshot has so far only linked.
+        self.before.catalog_proof()?;
         let visibility_changed = self
             .staged_visibility
             .iter()
@@ -272,8 +428,13 @@ impl<'a> SourceEdit<'a> {
                 .requested_active
                 .is_none_or(|position| position == self.before.active_position())
         {
-            let patch = Patch::new(self.before.clone(), self.before.clone());
-            return Ok(Commit::new(self.before, patch, 0));
+            // A no-op patch may outlive both the edit and its source owner.
+            // Capture the exact graph proof before the only owner reference
+            // becomes weak, so detached fallback replay remains infallible
+            // for the same admitted source closure.
+            self.before.materialize_source_graph()?;
+            let patch = super::Patch::new(self.before.clone(), self.before.clone());
+            return commit_change(&self.workbook, patch);
         }
 
         if !self.staged_visibility.iter().any(Visibility::is_visible) {
@@ -300,7 +461,7 @@ impl<'a> SourceEdit<'a> {
             return Err(self.block(active, TabEditBlock::ActiveTabLimit));
         }
 
-        let audit = audit_xml(self.before.workbook_xml(), XmlOwner::Workbook)?;
+        let audit = audit_xml(self.before.workbook_xml(), XmlOwner::Workbook, self.limits)?;
         let context = visibility_changed.first().copied().unwrap_or(active);
         if audit.protected_structure {
             return Err(self.block(context, TabEditBlock::ProtectedWorkbook));
@@ -312,12 +473,12 @@ impl<'a> SourceEdit<'a> {
         let active_changed = active != self.before.active_position();
         let before = if active_changed {
             self.before
-                .with_source_touched(self.package, &[self.before.active_position(), active])?
+                .with_source_touched(package, &[self.before.active_position(), active])?
         } else {
             self.before
         };
         for part in before.touched() {
-            let audit = audit_xml(part.part.bytes.as_bytes(), XmlOwner::Sheet)?;
+            let audit = audit_xml(part.part.bytes.as_bytes(), XmlOwner::Sheet, self.limits)?;
             if audit.alternate_content {
                 return Err(Error::TabEditBlocked {
                     sheet: before.tabs()[part.position].name().to_owned(),
@@ -330,7 +491,7 @@ impl<'a> SourceEdit<'a> {
         let mut tabs = Vec::new();
         tabs.try_reserve_exact(visibility_changed.len())
             .map_err(|source| allocation("tab-state workbook edit plan", source))?;
-        let source_catalog = raw::parse_catalog(before.workbook_xml())?;
+        let source_catalog = raw::parse_catalog(before.workbook_xml(), &package.read_limits())?;
         for position in visibility_changed {
             let binding = before.binding(position)?;
             let state = raw_visibility(&self.staged_visibility[position]).ok_or_else(|| {
@@ -378,7 +539,7 @@ impl<'a> SourceEdit<'a> {
             touched.push((part.position, bytes));
         }
         let after = Snapshot::rewritten(&before, workbook, touched)?;
-        self.package.check_execution()?;
+        package.check_execution()?;
         if after.active_position() != active
             || after
                 .tabs()
@@ -388,13 +549,7 @@ impl<'a> SourceEdit<'a> {
         {
             return Err(invalid("tab-state publication changed staged semantics"));
         }
-        let touched_parts = 1_u8
-            .checked_add(u8::try_from(before.touched().len()).map_err(|_source| {
-                invalid("tab-state touched Part count does not fit diagnostics")
-            })?)
-            .ok_or_else(|| invalid("tab-state touched Part count overflow"))?;
-        let patch = Patch::new(before, after.clone());
-        Ok(Commit::new(after, patch, touched_parts))
+        commit_change(&self.workbook, super::Patch::new(before, after))
     }
 
     fn set_visibility(&mut self, selector: Selector<'_>, value: Visibility) -> Result<bool> {
@@ -465,20 +620,30 @@ struct XmlAudit {
     alternate_content: bool,
 }
 
-fn audit_xml(content: &[u8], owner: XmlOwner) -> Result<XmlAudit> {
-    if content.len() > MAX_EDIT_XML_BYTES {
-        return Err(invalid("tab-state XML exceeds the 32 MiB edit bound"));
+fn audit_xml(content: &[u8], owner: XmlOwner, limits: Limits) -> Result<XmlAudit> {
+    if content.len() > limits.max_xml_bytes {
+        return Err(Error::limit(
+            LimitKind::XmlBytes,
+            content.len(),
+            limits.max_xml_bytes,
+        ));
     }
     let mut reader = NsReader::from_reader(content);
-    let mut audit = XmlAudit::default();
+    // Names are recognized on namespace values as written; a declaration that
+    // spells the markup-compatibility namespace with references binds it for
+    // preprocessing all the same (record 0011).
+    let mut audit = XmlAudit {
+        alternate_content: litchi_ooxml_common::mce::binds_namespace_by_reference(content),
+        ..XmlAudit::default()
+    };
     let mut depth = 0usize;
     let mut events = 0usize;
     loop {
         events = events
             .checked_add(1)
-            .ok_or_else(|| invalid("tab-state XML event count overflow"))?;
-        if events > MAX_EDIT_XML_EVENTS {
-            return Err(invalid("tab-state XML exceeds the event bound"));
+            .ok_or_else(|| Error::limit(LimitKind::Events, usize::MAX, limits.max_events))?;
+        if events > limits.max_events {
+            return Err(Error::limit(LimitKind::Events, events, limits.max_events));
         }
         let event = reader
             .read_event()
@@ -490,9 +655,9 @@ fn audit_xml(content: &[u8], owner: XmlOwner) -> Result<XmlAudit> {
             Event::Start(element) => {
                 depth = depth
                     .checked_add(1)
-                    .ok_or_else(|| invalid("tab-state XML depth overflow"))?;
-                if depth > MAX_EDIT_XML_DEPTH {
-                    return Err(invalid("tab-state XML exceeds the depth bound"));
+                    .ok_or_else(|| Error::limit(LimitKind::Depth, usize::MAX, limits.max_depth))?;
+                if depth > limits.max_depth {
+                    return Err(Error::limit(LimitKind::Depth, depth, limits.max_depth));
                 }
                 observe_element(&mut audit, owner, &namespace, &element, reader.decoder())?;
             },

@@ -2,11 +2,15 @@
 
 use super::model::{Tag, TagId, Tags};
 use super::validation;
-use crate::package::{Error as PackageError, Result};
+use crate::package::{Error as PackageError, Result, SourceLimits};
 use crate::parts::fib::FileInformationBlock;
 
 /// Parse the optional FIB-addressed annotation-bookmark table.
-pub fn parse(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<Option<Tags>> {
+pub fn parse(
+    fib: &FileInformationBlock,
+    table_stream: &[u8],
+    limits: &SourceLimits,
+) -> Result<Option<Tags>> {
     let Some((offset, length)) = fib
         .get_table_pointer(validation::FIB_INDEX)
         .filter(|(_, length)| *length != 0)
@@ -14,11 +18,12 @@ pub fn parse(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<Option<T
         return Ok(None);
     };
     let data = validation::table_range(table_stream, offset, length)?;
-    parse_bytes(data).map(Some)
+    parse_bytes(data, limits).map(Some)
 }
 
 /// Parse one complete `SttbfAtnBkmk` payload.
-pub fn parse_bytes(data: &[u8]) -> Result<Tags> {
+pub fn parse_bytes(data: &[u8], limits: &SourceLimits) -> Result<Tags> {
+    crate::parts::enforce_source_entry_limit(data, limits)?;
     if data.len() > validation::MAX_TABLE_BYTES {
         return Err(corrupted(
             "SttbfAtnBkmk exceeds its specification-derived size cap",
@@ -38,6 +43,13 @@ pub fn parse_bytes(data: &[u8]) -> Result<Tags> {
         return Err(corrupted("SttbfAtnBkmk cbExtra must be 0x000A"));
     }
 
+    let minimum = count
+        .checked_mul(2 + validation::ATNBE_SIZE)
+        .and_then(|value| value.checked_add(6))
+        .ok_or_else(|| corrupted("SttbfAtnBkmk minimum size overflows"))?;
+    if data.len() < minimum {
+        return Err(corrupted("SttbfAtnBkmk entries are truncated"));
+    }
     let mut offset = 6usize;
     let mut entries = Vec::with_capacity(count);
     for index in 0..count {
@@ -72,7 +84,7 @@ pub fn parse_bytes(data: &[u8]) -> Result<Tags> {
 }
 
 /// Serialize one complete `SttbfAtnBkmk` payload.
-pub fn to_bytes(value: &Tags) -> Result<Vec<u8>> {
+pub fn to_bytes(value: &Tags, limits: &SourceLimits) -> Result<Vec<u8>> {
     validation::tags(value)?;
     let capacity = 6usize
         .checked_add(
@@ -82,6 +94,7 @@ pub fn to_bytes(value: &Tags) -> Result<Vec<u8>> {
                 .ok_or_else(|| corrupted("SttbfAtnBkmk serialized size overflows"))?,
         )
         .ok_or_else(|| corrupted("SttbfAtnBkmk serialized size overflows"))?;
+    crate::parts::enforce_source_entry_size(capacity, limits)?;
     let mut data = Vec::with_capacity(capacity);
     data.extend_from_slice(&0xFFFFu16.to_le_bytes());
     data.extend_from_slice(
@@ -101,18 +114,22 @@ pub fn to_bytes(value: &Tags) -> Result<Vec<u8>> {
 
 impl Tags {
     /// Parse the optional FIB-addressed table.
-    pub fn parse(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<Option<Self>> {
-        parse(fib, table_stream)
+    pub fn parse(
+        fib: &FileInformationBlock,
+        table_stream: &[u8],
+        limits: &SourceLimits,
+    ) -> Result<Option<Self>> {
+        parse(fib, table_stream, limits)
     }
 
     /// Parse one complete table payload.
-    pub fn parse_bytes(data: &[u8]) -> Result<Self> {
-        parse_bytes(data)
+    pub fn parse_bytes(data: &[u8], limits: &SourceLimits) -> Result<Self> {
+        parse_bytes(data, limits)
     }
 
     /// Serialize one complete table payload.
-    pub fn to_bytes(&self) -> Result<Vec<u8>> {
-        to_bytes(self)
+    pub fn to_bytes(&self, limits: &SourceLimits) -> Result<Vec<u8>> {
+        to_bytes(self, limits)
     }
 }
 

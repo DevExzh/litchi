@@ -1,22 +1,27 @@
-//! Source-bound publication of an XLS package containing `User Names`.
+//! The XLS `User Names` edit family (record 0351 §2.3).
 //!
-//! [`Snapshot`] owns the complete validated CFB artifact, while the common
-//! OLE package editor owns rendering and directory metadata preservation.  A
-//! transaction changes only the typed `User Names` stream; the resulting CFB
-//! is reopened through the normal XLS reader and the Revision Log dependency
-//! check before a commit is returned.
+//! [`crate::Package::user_names`] reads the shared-workbook user list as a
+//! [`Snapshot`] of the complete validated CFB artifact;
+//! [`crate::Package::edit_user_names`] stages typed `User Names` changes and
+//! [`Edit::commit`] publishes a new [`crate::Package`] with an exact
+//! [`Patch`] and [`Diagnostics`]. The common OLE package editor owns
+//! rendering and directory metadata preservation; the resulting CFB is
+//! reopened through the normal XLS reader and the Revision Log dependency
+//! check before the commit is returned.
 
+use litchi_core::edit::RefusalKind;
 use std::fmt;
 use std::io::Cursor;
 use std::sync::Arc;
 
 use litchi_cfb::OleFile;
-use litchi_ole_common::object::{Editor as PackageEditor, Limits as PackageLimits, Targets};
-
-use super::{
-    Limits as UserNamesLimits, Snapshot as UserNamesSnapshot, Transaction as UserNamesTransaction,
+use litchi_ole_common::object::{
+    Limits as PackageLimits, OpenOptions, Package as ObjectPackage, Targets,
 };
-use crate::{Error, Result};
+
+use super::{Edit as UserNamesEdit, Limits as UserNamesLimits, Snapshot as UserNamesSnapshot};
+/// The User Names family error and result: the crate's.
+pub use crate::{Error, Result};
 
 /// An immutable, cheaply cloned source-bound XLS package snapshot.
 #[derive(Clone)]
@@ -32,21 +37,6 @@ struct Inner {
 }
 
 impl Snapshot {
-    /// Open an XLS package that contains one root `User Names` stream.
-    ///
-    /// The common CFB owner rejects signed, encrypted, and DRM containers.
-    /// BIFF `FILEPASS` records are rejected by the complete XLS open as well;
-    /// this owner never attempts to decrypt or re-encrypt a source.  All CFB
-    /// streams and directory metadata are captured before an edit is exposed.
-    ///
-    /// # Errors
-    ///
-    /// Returns a CFB, workbook, User Names grammar, Revision Log closure, or
-    /// protected-source error.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, UserNamesLimits::default())
-    }
-
     /// Open an XLS package with an explicit `User Names` resource bound.
     ///
     /// The byte bound is checked against the User Names and required Revision
@@ -58,18 +48,28 @@ impl Snapshot {
     ///
     /// Returns an error when the bound, package, workbook, User Names stream,
     /// or Revision Log dependency closure is invalid.
-    pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: UserNamesLimits) -> Result<Self> {
+    pub fn from_bytes(bytes: Vec<u8>, limits: UserNamesLimits) -> Result<Self> {
         validate_user_names_limits(limits)?;
         let expected_path = preflight_user_names(&bytes, limits)?;
         let (package, user_names_path) = open_package(bytes)?;
         // The preflight and the common owner inspect the same immutable input;
         // keep the exact spelling selected by the owner for the replacement.
         if user_names_path != expected_path {
-            return Err(Error::UnsafeEdit(
-                "User Names stream path changed between CFB validation passes".to_string(),
-            ));
+            return Err(Error::PatchConflict {
+                operation: "edit user names",
+                reason: "User Names stream path changed between CFB validation passes",
+            });
         }
-        let bytes = Arc::<[u8]>::from(package.finish()?.into_boxed_slice());
+        Self::from_package(package, user_names_path, limits)
+    }
+
+    fn from_package(
+        package: ObjectPackage,
+        user_names_path: Vec<String>,
+        limits: UserNamesLimits,
+    ) -> Result<Self> {
+        let bytes = package.source_shared();
+        let bytes = Arc::<[u8]>::from(bytes.as_slice());
         let user_names = parse_user_names(&bytes, limits)?;
         Ok(Self {
             inner: Arc::new(Inner {
@@ -99,27 +99,6 @@ impl Snapshot {
         &self.inner.user_names
     }
 
-    /// Alias emphasizing the typed stream owner.
-    #[must_use]
-    pub fn user_names_snapshot(&self) -> &UserNamesSnapshot {
-        self.user_names()
-    }
-
-    /// Start a detached source-bound User Names transaction.
-    #[must_use]
-    pub fn edit(&self) -> Transaction {
-        self.edit_user_names()
-    }
-
-    /// Start a detached source-bound User Names transaction.
-    #[must_use]
-    pub fn edit_user_names(&self) -> Transaction {
-        Transaction {
-            source: self.clone(),
-            user_names: self.inner.user_names.edit(),
-        }
-    }
-
     /// Return the exact validated source artifact.
     #[must_use]
     pub fn finish(&self) -> Vec<u8> {
@@ -147,40 +126,73 @@ impl Eq for Snapshot {}
 
 /// A detached source-bound transaction over one complete XLS package.
 #[derive(Clone)]
-pub struct Transaction {
-    source: Snapshot,
-    user_names: UserNamesTransaction,
+pub struct Edit {
+    base: crate::scoped::Base,
+    package: Option<crate::Package>,
+    source: Option<Snapshot>,
+    user_names: Option<UserNamesEdit>,
+    options: EditOptions,
 }
 
-impl Transaction {
-    /// The immutable package snapshot used as the publication source.
-    #[must_use]
-    pub const fn source(&self) -> &Snapshot {
-        &self.source
+impl Edit {
+    fn lazy(package: crate::Package, options: EditOptions) -> Self {
+        Self {
+            base: Some(package.clone()),
+            package: Some(package),
+            source: None,
+            user_names: None,
+            options,
+        }
+    }
+
+    fn ensure_open(&mut self) -> Result<()> {
+        if self.user_names.is_some() {
+            return Ok(());
+        }
+        let package = self
+            .package
+            .clone()
+            .ok_or_else(|| Error::InvalidData("User Names edit lost its source package".into()))?;
+        let (_, bytes) = crate::scoped::capture(&package)?;
+        let source = Snapshot::from_bytes(bytes, self.options.limits_value())?;
+        self.user_names = Some(source.inner.user_names.edit());
+        self.source = Some(source);
+        Ok(())
     }
 
     /// The immutable package snapshot used as the publication source.
     #[must_use]
-    pub const fn before(&self) -> &Snapshot {
+    pub fn source(&mut self) -> Result<&Snapshot> {
+        self.ensure_open()?;
+        self.source
+            .as_ref()
+            .ok_or_else(|| Error::InvalidData("User Names edit source was not retained".into()))
+    }
+
+    /// The immutable package snapshot used as the publication source.
+    #[must_use]
+    pub fn before(&mut self) -> Result<&Snapshot> {
         self.source()
     }
 
     /// Borrow staged User Names entries in source order.
     #[must_use]
-    pub fn users(&self) -> &[super::UserEntry] {
-        self.user_names.users()
+    pub fn users(&mut self) -> Result<&[super::UserEntry]> {
+        self.ensure_open()?;
+        self.user_names
+            .as_ref()
+            .map(UserNamesEdit::users)
+            .ok_or_else(|| Error::InvalidData("User Names edit was not retained".into()))
     }
 
     /// Borrow the staged User Names semantic projection.
     #[must_use]
-    pub fn model(&self) -> &super::UserNames {
-        self.user_names.model()
-    }
-
-    /// Whether the staged User Names stream differs from its source bytes.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.user_names.is_changed()
+    pub fn model(&mut self) -> Result<&super::UserNames> {
+        self.ensure_open()?;
+        self.user_names
+            .as_ref()
+            .map(UserNamesEdit::model)
+            .ok_or_else(|| Error::InvalidData("User Names edit was not retained".into()))
     }
 
     /// Stage a User Names display-name change.
@@ -190,7 +202,11 @@ impl Transaction {
     /// Returns an index, name, or bounded stream error without changing this
     /// transaction.
     pub fn set_user_name(&mut self, index: usize, name: impl Into<String>) -> Result<&mut Self> {
-        self.user_names.set_user_name(index, name)?;
+        self.ensure_open()?;
+        self.user_names
+            .as_mut()
+            .ok_or_else(|| Error::InvalidData("User Names edit was not retained".into()))?
+            .set_user_name(index, name)?;
         Ok(self)
     }
 
@@ -205,7 +221,11 @@ impl Transaction {
         index: usize,
         opened_at: crate::revision_records::ShortDtr,
     ) -> Result<&mut Self> {
-        self.user_names.set_user_opened_at(index, opened_at)?;
+        self.ensure_open()?;
+        self.user_names
+            .as_mut()
+            .ok_or_else(|| Error::InvalidData("User Names edit was not retained".into()))?
+            .set_user_opened_at(index, opened_at)?;
         Ok(self)
     }
 
@@ -230,7 +250,11 @@ impl Transaction {
     /// Returns an index, GUID-closure, duplicate-ID, or bound error without
     /// changing this transaction.
     pub fn insert(&mut self, index: usize, user: super::UserEntry) -> Result<&mut Self> {
-        self.user_names.insert(index, user)?;
+        self.ensure_open()?;
+        self.user_names
+            .as_mut()
+            .ok_or_else(|| Error::InvalidData("User Names edit was not retained".into()))?
+            .insert(index, user)?;
         Ok(self)
     }
 
@@ -241,7 +265,11 @@ impl Transaction {
     /// Returns a GUID-closure, duplicate-ID, or bound error without changing
     /// this transaction.
     pub fn push(&mut self, user: super::UserEntry) -> Result<&mut Self> {
-        self.user_names.push(user)?;
+        self.ensure_open()?;
+        self.user_names
+            .as_mut()
+            .ok_or_else(|| Error::InvalidData("User Names edit was not retained".into()))?
+            .push(user)?;
         Ok(self)
     }
 
@@ -262,25 +290,11 @@ impl Transaction {
     /// Returns an index or bounded stream error without changing the source
     /// package.
     pub fn remove(&mut self, index: usize) -> Result<super::UserEntry> {
-        self.user_names.remove(index)
-    }
-
-    /// Return the source package and discard staged changes.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
-    }
-
-    /// Reparse the staged User Names stream as a complete package snapshot.
-    ///
-    /// This renders and reopens the candidate through the common CFB owner;
-    /// it is useful for callers that need a read view before final commit.
-    ///
-    /// # Errors
-    ///
-    /// Returns a CFB, workbook, stream, or dependency-closure error.
-    pub fn snapshot(&self) -> Result<Snapshot> {
-        self.clone().commit().map(|commit| commit.snapshot)
+        self.ensure_open()?;
+        self.user_names
+            .as_mut()
+            .ok_or_else(|| Error::InvalidData("User Names edit was not retained".into()))?
+            .remove(index)
     }
 
     /// Validate and publish the complete XLS package with a reversible patch.
@@ -295,88 +309,159 @@ impl Transaction {
     /// Returns a CFB, workbook, stream, User Names, or dependency-closure
     /// error without publishing partial bytes.
     pub fn commit(self) -> Result<Commit> {
-        let Self { source, user_names } = self;
+        let base = self.base.clone();
+        let (_, patch) = self.commit_record()?;
+        let package = crate::scoped::publish(base, patch.before(), patch.after())?;
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(package, patch, diagnostics))
+    }
+
+    pub(crate) fn commit_record(mut self) -> Result<(Snapshot, Patch)> {
+        self.ensure_open()?;
+        let Self {
+            source, user_names, ..
+        } = self;
+        let source = source
+            .ok_or_else(|| Error::InvalidData("User Names edit source was not retained".into()))?;
+        let user_names = user_names
+            .ok_or_else(|| Error::InvalidData("User Names edit was not retained".into()))?;
         let user_names_commit = user_names.commit()?;
-        if !user_names_commit.changed() {
-            return Ok(Commit {
-                patch: Patch::new(source.bytes_shared(), source.bytes_shared()),
-                snapshot: source,
-            });
+        if !user_names_commit.diagnostics().changed() {
+            return Ok((
+                source.clone(),
+                Patch::new(source.bytes_shared(), source.bytes_shared()),
+            ));
         }
 
         let replacement =
-            Arc::<[u8]>::from(user_names_commit.snapshot().finish().into_boxed_slice());
-        let mut package = PackageEditor::open(
+            Arc::<[u8]>::from(user_names_commit.package().finish().into_boxed_slice());
+        let package = ObjectPackage::open_with_options(
             source.bytes().to_vec(),
-            Targets::default(),
-            PackageLimits::default(),
+            OpenOptions::new()
+                .targets(Targets::default())
+                .limits(PackageLimits::default()),
         )?;
-        let rendered =
-            package.put_stream_shared_with_rendered(&source.inner.user_names_path, replacement)?;
-        let snapshot = Snapshot::from_bytes_with_limits(rendered, source.inner.user_names_limits)?;
+        let mut editor = package.edit()?;
+        editor.put_stream_shared(&source.inner.user_names_path, replacement)?;
+        let package = editor.commit()?.into_package();
+        let snapshot = Snapshot::from_package(
+            package,
+            source.inner.user_names_path.clone(),
+            source.inner.user_names_limits,
+        )?;
         let patch = Patch::new(source.bytes_shared(), snapshot.bytes_shared());
-        Ok(Commit { snapshot, patch })
+        Ok((snapshot, patch))
     }
 }
 
-impl fmt::Debug for Transaction {
+impl fmt::Debug for Edit {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("UserNamesPackageTransaction")
-            .field("source", &self.source)
-            .field("changed", &self.is_changed())
-            .finish()
+            .debug_struct("UserNamesPackageEdit")
+            .field("materialized", &self.source.is_some())
+            .finish_non_exhaustive()
     }
 }
 
-/// A successful complete-CFB User Names publication.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
+/// A published User Names edit: the new package, its exact complete-CFB
+/// patch and diagnostics.
+pub type Commit = litchi_core::edit::Commit<crate::Package, Patch>;
+
+/// Content-free diagnostics of one User Names commit.
+pub use litchi_core::edit::Diagnostics;
+
+/// A User Names edit limit dimension: the bounds of [`super::Limits`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// The `User Names` and Revision Log stream bytes.
+    StreamBytes,
+    /// The users in the `User Names` stream.
+    Users,
+    /// The Revision Log GUIDs of the dependency closure.
+    RevisionGuids,
 }
 
-impl Commit {
-    /// Reopened target package snapshot.
+/// Per-edit configuration of a User Names edit.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct EditOptions {
+    limits: UserNamesLimits,
+}
+
+impl EditOptions {
+    /// Default options: the default `User Names` bounds.
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    /// Exact-source reversible package patch.
+    /// Select the `User Names` stream bounds.
     #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
+    pub const fn limits(mut self, limits: UserNamesLimits) -> Self {
+        self.limits = limits;
+        self
     }
 
-    /// Whether the complete CFB artifact changed.
+    /// The selected `User Names` stream bounds.
     #[must_use]
-    pub fn changed(&self) -> bool {
-        !self.patch.is_noop()
+    pub const fn limits_value(&self) -> UserNamesLimits {
+        self.limits
+    }
+}
+
+impl crate::Package {
+    /// The `User Names` read view of this shared workbook.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package has no valid `User Names` stream or
+    /// its Revision Log dependency closure is invalid.
+    pub fn user_names(&self) -> Result<Snapshot> {
+        let (_, bytes) = crate::scoped::capture(self)?;
+        Snapshot::from_bytes(bytes, UserNamesLimits::default())
     }
 
-    /// Consume the publication into its target snapshot.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
+    /// Start a `User Names` edit of this package with the default bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::user_names`], or a refusal for an
+    /// encrypted workbook.
+    pub fn edit_user_names(&self) -> Result<Edit> {
+        self.edit_user_names_with_options(EditOptions::default())
     }
 
-    /// Consume the publication into its reversible patch.
-    #[must_use]
-    pub fn into_patch(self) -> Patch {
-        self.patch
+    /// Start a `User Names` edit of this package under explicit bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::edit_user_names`], or a limit error
+    /// when the package exceeds `options`.
+    pub fn edit_user_names_with_options(&self, options: EditOptions) -> Result<Edit> {
+        if self.is_encrypted() {
+            return Err(Error::refused(
+                RefusalKind::Protected,
+                "edit user names",
+                "an encrypted workbook cannot be republished by a scoped edit",
+            ));
+        }
+        Ok(Edit::lazy(self.clone(), options))
     }
 
-    /// Consume the publication into exact complete-CFB bytes.
-    #[must_use]
-    pub fn into_bytes(self) -> Vec<u8> {
-        self.snapshot.finish()
-    }
-
-    /// Consume the publication into its target snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
+    /// Replay a `User Names` patch onto the exact package it was made from.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when this package is not the patch's
+    /// source, or [`Error::Signed`] for a changed signed workbook.
+    pub fn apply_user_names(&self, patch: &Patch) -> Result<Commit> {
+        crate::scoped::replay_source(self, patch.before(), "edit user names")?;
+        let package = crate::scoped::publish(Some(self.clone()), patch.before(), patch.after())?;
+        Ok(Commit::new(
+            package,
+            patch.clone(),
+            Diagnostics::new(!patch.is_noop()),
+        ))
     }
 }
 
@@ -410,12 +495,6 @@ impl Patch {
         self.before == self.after
     }
 
-    /// Alias for [`Self::is_noop`].
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.is_noop()
-    }
-
     /// Apply this patch only to its exact source package snapshot.
     ///
     /// # Errors
@@ -424,14 +503,15 @@ impl Patch {
     /// package reopen.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.bytes() != self.before() {
-            return Err(Error::UnsafeEdit(
-                "User Names package patch source does not match its base snapshot".to_string(),
-            ));
+            return Err(Error::PatchConflict {
+                operation: "edit user names",
+                reason: "User Names package patch source does not match its base snapshot",
+            });
         }
         if self.is_noop() {
             return Ok(source.clone());
         }
-        Snapshot::from_bytes_with_limits(self.after.to_vec(), source.inner.user_names_limits)
+        Snapshot::from_bytes(self.after.to_vec(), source.inner.user_names_limits)
     }
 
     /// Apply the inverse replacement to its exact committed target.
@@ -442,14 +522,15 @@ impl Patch {
     /// package reopen.
     pub fn revert(&self, target: &Snapshot) -> Result<Snapshot> {
         if target.bytes() != self.after() {
-            return Err(Error::UnsafeEdit(
-                "User Names package patch target does not match its committed snapshot".to_string(),
-            ));
+            return Err(Error::PatchConflict {
+                operation: "edit user names",
+                reason: "User Names package patch target does not match its committed snapshot",
+            });
         }
         if self.is_noop() {
             return Ok(target.clone());
         }
-        Snapshot::from_bytes_with_limits(self.before.to_vec(), target.inner.user_names_limits)
+        Snapshot::from_bytes(self.before.to_vec(), target.inner.user_names_limits)
     }
 
     /// Return the exact inverse replacement.
@@ -467,28 +548,36 @@ fn validate_user_names_limits(limits: UserNamesLimits) -> Result<()> {
 }
 
 fn preflight_user_names(bytes: &[u8], limits: UserNamesLimits) -> Result<Vec<String>> {
-    let ole = OleFile::open(Cursor::new(bytes))?;
+    let ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())?;
     let path = find_user_names_path(&ole)?;
     let maximum = u64::try_from(limits.max_stream_bytes).unwrap_or(u64::MAX);
     let revision_path = find_revision_log_path(&ole)?;
     let revision_len = ole.stream_len(&[revision_path[0].as_str()])?;
     if revision_len > maximum {
-        return Err(Error::UnsafeEdit(format!(
-            "Revision Log stream has {revision_len} bytes; maximum is {maximum}"
-        )));
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit user names",
+            "the Revision Log stream exceeds its byte limit",
+        ));
     }
     let stream_len = ole.stream_len(&[path[0].as_str()])?;
     if stream_len > maximum {
-        return Err(Error::UnsafeEdit(format!(
-            "User Names stream has {stream_len} bytes; maximum is {maximum}"
-        )));
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit user names",
+            "the User Names stream exceeds its byte limit",
+        ));
     }
     Ok(path)
 }
 
-fn open_package(bytes: Vec<u8>) -> Result<(PackageEditor, Vec<String>)> {
-    let (package, ole) =
-        PackageEditor::open_with_ole_file(bytes, Targets::default(), PackageLimits::default())?;
+fn open_package(bytes: Vec<u8>) -> Result<(ObjectPackage, Vec<String>)> {
+    let (package, ole) = ObjectPackage::open_with_ole_file(
+        bytes,
+        OpenOptions::new()
+            .targets(Targets::default())
+            .limits(PackageLimits::default()),
+    )?;
     let path = find_user_names_path(&ole)?;
     Ok((package, path))
 }
@@ -532,8 +621,8 @@ fn find_revision_log_path<R: std::io::Read + std::io::Seek>(
 }
 
 fn parse_user_names(bytes: &[u8], limits: UserNamesLimits) -> Result<UserNamesSnapshot> {
-    let mut workbook = crate::Workbook::new(Cursor::new(bytes))?;
+    let mut workbook = crate::raw::Reader::new(Cursor::new(bytes))?;
     workbook
-        .user_names_with_limits(limits)?
+        .user_names(limits)?
         .ok_or_else(|| Error::InvalidData("XLS package has no User Names stream".to_string()))
 }

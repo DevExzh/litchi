@@ -81,11 +81,19 @@ pub(super) fn parse_raw(xml: &[u8]) -> Result<Option<RawFonts>> {
 
 pub(super) fn parse_presentation(xml: &[u8]) -> Result<ParsedPresentation> {
     if xml.len() > MAX_XML_BYTES {
-        return Err(limit("presentation XML bytes"));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            xml.len(),
+            MAX_XML_BYTES,
+        ));
     }
     let processed = process_ooxml(xml)?;
     if processed.len() > MAX_XML_BYTES {
-        return Err(limit("MCE-processed presentation XML bytes"));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            processed.len(),
+            MAX_XML_BYTES,
+        ));
     }
     let mut reader = NsReader::from_reader(processed.as_ref());
     reader.config_mut().trim_text(false);
@@ -104,12 +112,26 @@ pub(super) fn parse_presentation(xml: &[u8]) -> Result<ParsedPresentation> {
         match event {
             Event::Start(ref element) | Event::Empty(ref element) => {
                 let empty = empty_event;
-                nodes = nodes.checked_add(1).ok_or_else(|| limit("XML nodes"))?;
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        MAX_NODES,
+                    )
+                })?;
                 if nodes > MAX_NODES {
-                    return Err(limit("XML nodes"));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        nodes,
+                        MAX_NODES,
+                    ));
                 }
                 if stack.len() >= MAX_DEPTH {
-                    return Err(limit("XML depth"));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        stack.len().checked_add(1).unwrap_or(usize::MAX),
+                        MAX_DEPTH,
+                    ));
                 }
                 let namespace =
                     resolved_namespace(reader.resolver().resolve_element(element.name()).0)?;
@@ -172,7 +194,11 @@ pub(super) fn parse_presentation(xml: &[u8]) -> Result<ParsedPresentation> {
                         &mut string_bytes,
                     )?;
                     if fonts.len() >= MAX_FONTS {
-                        return Err(limit("embedded fonts"));
+                        return Err(limit(
+                            crate::error::CodecLimitKind::Fonts,
+                            fonts.len().checked_add(1).unwrap_or(usize::MAX),
+                            MAX_FONTS,
+                        ));
                     }
                     fonts.push(RawFont {
                         has_descriptor: false,
@@ -471,7 +497,11 @@ pub(super) fn write_raw(value: &RawFonts, conformance: Conformance) -> Result<Ve
     }
     output.extend_from_slice(b"</p:embeddedFontLst>");
     if output.len() > MAX_XML_BYTES {
-        return Err(limit("serialized embedded-font XML bytes"));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            output.len(),
+            MAX_XML_BYTES,
+        ));
     }
     Ok(output)
 }
@@ -511,7 +541,11 @@ pub(super) fn validate_typeface(value: &str) -> Result<()> {
 
 pub(super) fn validate_font_bytes(value: &[u8]) -> Result<()> {
     if value.len() > MAX_FONT_BYTES {
-        Err(limit("individual font bytes"))
+        Err(limit(
+            crate::error::CodecLimitKind::FontBytes,
+            value.len(),
+            MAX_FONT_BYTES,
+        ))
     } else {
         Ok(())
     }
@@ -818,7 +852,11 @@ pub(super) fn is_xml_char(value: char) -> bool {
 
 pub(super) fn validate_value(value: &RawFonts, require_resources: bool) -> Result<()> {
     if value.fonts.len() > MAX_FONTS {
-        return Err(limit("embedded fonts"));
+        return Err(limit(
+            crate::error::CodecLimitKind::Fonts,
+            value.fonts.len(),
+            MAX_FONTS,
+        ));
     }
     let mut resources = HashMap::<&str, (&str, &Arc<Vec<u8>>)>::new();
     let mut total = 0usize;
@@ -856,11 +894,19 @@ pub(super) fn validate_value(value: &RawFonts, require_resources: bool) -> Resul
                         resource.part_name.as_str(),
                         (resource.content_type.as_str(), &resource.data),
                     );
-                    total = total
-                        .checked_add(resource.data.len())
-                        .ok_or_else(|| limit("total font bytes"))?;
+                    total = total.checked_add(resource.data.len()).ok_or_else(|| {
+                        limit(
+                            crate::error::CodecLimitKind::TotalFontBytes,
+                            usize::MAX,
+                            MAX_TOTAL_FONT_BYTES,
+                        )
+                    })?;
                     if total > MAX_TOTAL_FONT_BYTES {
-                        return Err(limit("total font bytes"));
+                        return Err(limit(
+                            crate::error::CodecLimitKind::TotalFontBytes,
+                            total,
+                            MAX_TOTAL_FONT_BYTES,
+                        ));
                     }
                 }
             }
@@ -916,15 +962,27 @@ pub(super) fn bounded_string(value: &str) -> Result<()> {
     if value.len() <= MAX_STRING_BYTES {
         Ok(())
     } else {
-        Err(limit("embedded-font string bytes"))
+        Err(limit(
+            crate::error::CodecLimitKind::StringBytes,
+            value.len(),
+            MAX_STRING_BYTES,
+        ))
     }
 }
 pub(super) fn add_string_bytes(total: &mut usize, count: usize) -> Result<()> {
-    *total = total
-        .checked_add(count)
-        .ok_or_else(|| limit("XML string bytes"))?;
+    *total = total.checked_add(count).ok_or_else(|| {
+        limit(
+            crate::error::CodecLimitKind::StringBytes,
+            usize::MAX,
+            MAX_STRING_BYTES,
+        )
+    })?;
     if *total > MAX_STRING_BYTES {
-        Err(limit("XML string bytes"))
+        Err(limit(
+            crate::error::CodecLimitKind::StringBytes,
+            *total,
+            MAX_STRING_BYTES,
+        ))
     } else {
         Ok(())
     }

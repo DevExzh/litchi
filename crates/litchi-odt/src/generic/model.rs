@@ -1,6 +1,10 @@
 //! Typed snapshots for format-neutral ODF package and flat-document access.
 
 use crate::core::OwnedPackage;
+use litchi_odf_common::XmlStreamLimits;
+
+/// The crate-internal name of the flat owner ([`Document`]).
+pub(crate) use self::Document as FlatDocument;
 
 /// Standard packaged `OpenDocument` document family.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -33,11 +37,13 @@ pub enum Family {
 /// This provides lossless package access for every standard `OpenDocument`
 /// family, including document types that do not yet have a specialized object
 /// model. Saving an unmodified package returns the original bytes exactly.
+#[derive(Clone)]
 pub struct Package {
     pub(super) package: OwnedPackage,
     pub(super) family: Family,
     pub(super) template: bool,
     pub(super) mimetype: String,
+    pub(super) xml_limits: XmlStreamLimits,
 }
 
 /// Validated flat `OpenDocument` XML file.
@@ -48,7 +54,7 @@ pub struct Package {
 /// also accepted for compatibility with odfdo's non-standard
 /// `office:formula` convention; conforming packaged `.odf` formulas use a
 /// direct `MathML` root.
-pub struct FlatDocument {
+pub struct Document {
     pub(super) xml: String,
     pub(super) family: Family,
     pub(super) template: bool,
@@ -56,4 +62,5 @@ pub struct FlatDocument {
     pub(super) max_document_bytes: usize,
     pub(super) execution_context: litchi_core::ExecutionContext,
     pub(super) source_memory: super::flat::MemoryLease,
+    pub(super) xml_limits: XmlStreamLimits,
 }

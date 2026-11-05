@@ -20,14 +20,14 @@ const APPLIED: u8 = 2;
 
 /// Reversible, exact-source content-control XML replacement.
 #[derive(Debug, Clone)]
-pub struct Patch {
+pub(crate) struct DraftPatch {
     before: Source,
     after: Source,
     limits: Limits,
     gate: Gate,
 }
 
-impl Patch {
+impl DraftPatch {
     pub(crate) fn new(before: Source, after: Source, limits: Limits) -> Self {
         Self {
             before,

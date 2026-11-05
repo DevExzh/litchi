@@ -12,10 +12,7 @@ use litchi_iwa_archive::{Limits, package::Catalog};
 use litchi_iwa_common::wire::{WireView, append_length_delimited_field, append_varint_field};
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldType, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tn, tsd, tsp, tss, tst};
-use litchi_numbers::{
-    Appearance, Banding, GridlineVisibility, Gridlines, Package, PackageLimits, PackageReadOptions,
-    PackageSemanticLimits, RowSizing,
-};
+use litchi_numbers::{Appearance, Banding, GridlineVisibility, Gridlines, Package, RowSizing};
 use prost::Message as _;
 
 use litchi_numbers::table::appearance::transaction::{Error, Path};
@@ -72,22 +69,34 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
 fn add_model_archive_metadata(object: &mut ArchiveObject, style_identifier: u64) {
     let info = &mut object.archive_info.message_infos[0];
     info.data_references = vec![700 + style_identifier];
-    let mut style_field = FieldInfo::new(vec![3]);
+    let mut style_field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![3], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     style_field.object_references = vec![style_identifier];
     style_field.data_references = vec![800 + style_identifier];
-    let mut unknown_tail = FieldInfo::new(vec![99, 1]);
+    let mut unknown_tail = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![99, 1], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     unknown_tail.data_references = vec![900 + style_identifier];
     info.field_infos = vec![style_field, unknown_tail];
 }
 
 fn compressed(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn table_model(identifier: u64) -> tst::TableModelArchive {
@@ -217,6 +226,7 @@ fn sidecars() -> TestResult<ArchiveObject> {
             .encode_to_vec(),
         })
         .collect(),
+        Default::default(),
     )?)
 }
 
@@ -287,10 +297,25 @@ fn metadata_payload() -> TestResult<Vec<u8>> {
         ..Default::default()
     }
     .encode_to_vec();
-    append_length_delimited_field(&mut data, 3, &document)?;
-    append_length_delimited_field(&mut data, 3, &stylesheet)?;
-    append_length_delimited_field(&mut data, 3, &view)?;
-    append_length_delimited_field(&mut data, 11, &versioned)?;
+    append_length_delimited_field(
+        &mut data,
+        3,
+        &document,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut data,
+        3,
+        &stylesheet,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(&mut data, 3, &view, litchi_iwa_common::WireLimits::DEFAULT)?;
+    append_length_delimited_field(
+        &mut data,
+        11,
+        &versioned,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut data, 90, 900)?;
     Ok(data)
 }
@@ -304,13 +329,13 @@ fn metadata_entry() -> TestResult<Vec<u8>> {
 }
 
 fn metadata_payload_from_bytes(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or_else(|| io::Error::other("metadata member is missing"))?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let archive = Archive::parse(stream.as_bytes(), Default::default())?;
     archive
         .objects
         .iter()
@@ -330,7 +355,7 @@ fn metadata_components(
     field_number: u32,
 ) -> TestResult<Vec<(tsp::ComponentInfo, Vec<u8>)>> {
     let payload = metadata_payload_from_bytes(source)?;
-    WireView::parse(&payload)?
+    WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .filter(|field| field.number() == field_number)
         .map(|field| {
@@ -367,13 +392,13 @@ fn object_messages(
     member_name: &str,
     identifier: u64,
 ) -> TestResult<Vec<(u32, Vec<u8>)>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member_name)
         .ok_or_else(|| io::Error::other(format!("member {member_name} is missing")))?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let archive = Archive::parse(stream.as_bytes(), Default::default())?;
     let object = archive
         .objects
         .iter()
@@ -391,13 +416,13 @@ fn object_references(
     member_name: &str,
     identifier: u64,
 ) -> TestResult<Vec<Vec<u64>>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member_name)
         .ok_or_else(|| io::Error::other(format!("member {member_name} is missing")))?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let archive = Archive::parse(stream.as_bytes(), Default::default())?;
     let object = archive
         .objects
         .iter()
@@ -416,13 +441,13 @@ fn object_message_metadata(
     member_name: &str,
     identifier: u64,
 ) -> TestResult<litchi_iwa_core::MessageInfo> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member_name)
         .ok_or_else(|| io::Error::other(format!("member {member_name} is missing")))?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let archive = Archive::parse(stream.as_bytes(), Default::default())?;
     let object = archive
         .objects
         .iter()
@@ -445,13 +470,13 @@ fn rewrite_object_message<F>(
 where
     F: FnOnce(&mut RawMessage) -> TestResult,
 {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member_name)
         .ok_or_else(|| io::Error::other(format!("member {member_name} is missing")))?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let mut archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
     let object = archive
         .object_mut(identifier)
         .ok_or_else(|| io::Error::other(format!("object {identifier} is missing")))?;
@@ -464,8 +489,9 @@ where
         data: message.data.clone(),
     };
     rewrite(&mut replacement)?;
-    object.replace_message_preserving_header(0, replacement)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    object.replace_message_preserving_header(0, replacement, Default::default())?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             member_name,
@@ -496,13 +522,13 @@ fn rewrite_object_archive_info<F>(
 where
     F: FnOnce(&mut litchi_iwa_core::MessageInfo) -> TestResult,
 {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member_name)
         .ok_or_else(|| io::Error::other(format!("member {member_name} is missing")))?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let mut archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
     let object = archive
         .object_mut(identifier)
         .ok_or_else(|| io::Error::other(format!("object {identifier} is missing")))?;
@@ -512,7 +538,8 @@ where
         .first_mut()
         .ok_or_else(|| io::Error::other(format!("object {identifier} has no metadata")))?;
     rewrite(info)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             member_name,
@@ -539,8 +566,14 @@ fn assert_appearance_read_rejects(source: &[u8]) -> TestResult {
         Err(_) => Ok(()),
         Ok(package) => match package.table_appearance(0usize, 0usize) {
             Err(Error::InvalidSource { .. })
-            | Err(Error::UnsupportedDependency { .. })
-            | Err(Error::UnsupportedSource) => Ok(()),
+            | Err(Error::Refused(
+                litchi_numbers::table::appearance::transaction::Refusal::UnsupportedDependency {
+                    ..
+                },
+            ))
+            | Err(Error::Refused(
+                litchi_numbers::table::appearance::transaction::Refusal::UnsupportedSource,
+            )) => Ok(()),
             Ok(_) => Err(io::Error::other("malformed appearance graph was accepted").into()),
             Err(error) => Err(io::Error::other(format!("unexpected error: {error}")).into()),
         },
@@ -603,11 +636,14 @@ fn assert_reserved_identifier_is_not_reused(source: &[u8]) -> TestResult {
 }
 
 fn raw_fields(source: &[u8], field_number: u32) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(&metadata_payload_from_bytes(source)?)?
-        .fields()
-        .filter(|field| field.number() == field_number)
-        .map(|field| field.raw().to_owned())
-        .collect())
+    Ok(WireView::parse(
+        &metadata_payload_from_bytes(source)?,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?
+    .fields()
+    .filter(|field| field.number() == field_number)
+    .map(|field| field.raw().to_owned())
+    .collect())
 }
 
 fn without_wire_field(source: &[u8], field_number: u32) -> TestResult<Vec<u8>> {
@@ -615,7 +651,7 @@ fn without_wire_field(source: &[u8], field_number: u32) -> TestResult<Vec<u8>> {
 }
 
 fn without_wire_fields(source: &[u8], field_numbers: &[u32]) -> TestResult<Vec<u8>> {
-    let view = WireView::parse(source)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::new();
     for field in view
         .fields()
@@ -631,7 +667,7 @@ fn append_nested_wire_field(
     outer_field: u32,
     nested_field: &[u8],
 ) -> TestResult<Vec<u8>> {
-    let view = WireView::parse(source)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::new();
     let mut appended = false;
     for field in view.fields() {
@@ -639,13 +675,18 @@ fn append_nested_wire_field(
             output.extend_from_slice(field.raw());
             continue;
         }
-        let nested = WireView::parse(field.payload())?;
+        let nested = WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
         let mut payload = Vec::new();
         for child in nested.fields() {
             payload.extend_from_slice(child.raw());
         }
         payload.extend_from_slice(nested_field);
-        append_length_delimited_field(&mut output, outer_field, &payload)?;
+        append_length_delimited_field(
+            &mut output,
+            outer_field,
+            &payload,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         appended = true;
     }
     if !appended {
@@ -660,7 +701,7 @@ fn replace_nested_wire_field(
     nested_field: u32,
     replacement: &[u8],
 ) -> TestResult<Vec<u8>> {
-    let view = WireView::parse(source)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::new();
     let mut replaced = false;
     for field in view.fields() {
@@ -668,7 +709,7 @@ fn replace_nested_wire_field(
             output.extend_from_slice(field.raw());
             continue;
         }
-        let nested = WireView::parse(field.payload())?;
+        let nested = WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
         let mut payload = Vec::new();
         for child in nested.fields() {
             if child.number() == nested_field && !replaced {
@@ -678,7 +719,12 @@ fn replace_nested_wire_field(
                 payload.extend_from_slice(child.raw());
             }
         }
-        append_length_delimited_field(&mut output, outer_field, &payload)?;
+        append_length_delimited_field(
+            &mut output,
+            outer_field,
+            &payload,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     if !replaced {
         return Err(io::Error::other("nested protobuf field is missing").into());
@@ -687,19 +733,23 @@ fn replace_nested_wire_field(
 }
 
 fn unknown_component_fields(raw: &[u8]) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(raw)?
-        .fields()
-        .filter(|field| field.number() == 90)
-        .map(|field| field.raw().to_owned())
-        .collect())
+    Ok(
+        WireView::parse(raw, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .filter(|field| field.number() == 90)
+            .map(|field| field.raw().to_owned())
+            .collect(),
+    )
 }
 
 fn wire_fields(source: &[u8], field_number: u32) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(source)?
-        .fields()
-        .filter(|field| field.number() == field_number)
-        .map(|field| field.raw().to_owned())
-        .collect())
+    Ok(
+        WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .filter(|field| field.number() == field_number)
+            .map(|field| field.raw().to_owned())
+            .collect(),
+    )
 }
 
 fn metadata_transition_assertions(source: &[u8], target: &[u8]) -> TestResult {
@@ -988,10 +1038,18 @@ fn synthetic_package() -> TestResult<Vec<u8>> {
     ];
     let mut stylesheet_object = stylesheet()?;
     stylesheet_object.archive_info.message_infos[0].data_references = vec![6_000];
-    let mut stylesheet_reference_field = FieldInfo::new(vec![1]);
+    let mut stylesheet_reference_field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     stylesheet_reference_field.object_references = vec![PARENT_STYLE_ID, UNUSED_STYLE_ID];
     stylesheet_reference_field.data_references = vec![6_002];
-    let mut stylesheet_tail = FieldInfo::new(vec![77, 1]);
+    let mut stylesheet_tail = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![77, 1], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     stylesheet_tail.data_references = vec![6_001];
     stylesheet_object.archive_info.message_infos[0]
         .field_infos
@@ -1039,8 +1097,8 @@ fn custom_appearance() -> Appearance {
 }
 
 fn changed_members(source: &[u8], target: &[u8]) -> TestResult<Vec<String>> {
-    let source = Catalog::from_bytes(source)?;
-    let target = Catalog::from_bytes(target)?;
+    let source = Catalog::from_bytes(source, Default::default())?;
+    let target = Catalog::from_bytes(target, Default::default())?;
     let mut changed = Vec::new();
     for before in source.iter() {
         let after = target
@@ -1068,13 +1126,13 @@ fn changed_members(source: &[u8], target: &[u8]) -> TestResult<Vec<String>> {
 }
 
 fn rewrite_document_table_info(source: &[u8], locked: bool) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("Document member is missing"))?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let mut archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
     let info = archive
         .object_mut(FIRST_INFO_ID)
         .ok_or_else(|| io::Error::other("first table info is missing"))?;
@@ -1086,8 +1144,10 @@ fn rewrite_document_table_info(source: &[u8], locked: bool) -> TestResult<Vec<u8
             type_: TABLE_INFO_TYPE,
             data: decoded.encode_to_vec(),
         },
+        Default::default(),
     )?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             DOCUMENT_MEMBER,
@@ -1099,7 +1159,7 @@ fn rewrite_document_table_info(source: &[u8], locked: bool) -> TestResult<Vec<u8
 
 fn remove_metadata(source: &[u8]) -> TestResult<Vec<u8>> {
     Ok(
-        Catalog::from_bytes(source)?.reassemble_with_deletions_to_bytes(
+        Catalog::from_bytes(source, Default::default())?.reassemble_with_deletions_to_bytes(
             &[],
             &[METADATA_MEMBER],
             Limits::default(),
@@ -1219,7 +1279,10 @@ fn missing_metadata_and_locked_table_fail_atomically() -> TestResult {
         .set(custom_appearance())
         .commit()
         .expect_err("locked table must refuse changed appearance");
-    assert!(matches!(error, Error::TableLocked { .. }));
+    assert!(matches!(
+        error,
+        Error::Refused(litchi_numbers::table::appearance::transaction::Refusal::TableLocked { .. })
+    ));
     assert_eq!(locked.exact_bytes(), before);
     Ok(())
 }
@@ -1234,6 +1297,7 @@ fn duplicate_edges_missing_stylesheet_and_inheritance_cycle_fail_closed() -> Tes
                 &mut message.data,
                 3,
                 &reference(PARENT_STYLE_ID).encode_to_vec(),
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
             Ok(())
         })?;
@@ -1260,6 +1324,7 @@ fn duplicate_edges_missing_stylesheet_and_inheritance_cycle_fail_closed() -> Tes
                 &mut duplicate,
                 5,
                 &reference(STYLESHEET_ID).encode_to_vec(),
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
             message.data = append_nested_wire_field(&message.data, 1, &duplicate)?;
             Ok(())
@@ -1663,17 +1728,23 @@ fn old_style_metadata_ownership_and_aliases_fail_closed() -> TestResult {
 #[test]
 fn tight_ingress_limit_rejects_before_package_publication() -> TestResult {
     let source = synthetic_package()?;
-    let archive_limits = PackageLimits::new(
-        u64::try_from(source.len().saturating_sub(1))?,
-        PackageLimits::MAX_ENTRIES,
-        PackageLimits::MAX_ENTRY_BYTES,
-        PackageLimits::MAX_TOTAL_BYTES,
-        PackageLimits::MAX_IWA_STREAM_BYTES,
-    )?;
+    let archive_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(source.len().saturating_sub(1))?)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
     assert!(
         Package::from_bytes_with_options(
             &source,
-            PackageReadOptions::new(archive_limits, PackageSemanticLimits::default()),
+            litchi_numbers::OpenOptions::new()
+                .source_limits(archive_limits)
+                .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
         )
         .is_err()
     );
@@ -1684,16 +1755,20 @@ fn tight_ingress_limit_rejects_before_package_publication() -> TestResult {
 fn tight_candidate_output_limit_rejects_before_publication() -> TestResult {
     let source = synthetic_package()?;
     let source_limit = u64::try_from(source.len())?;
-    let archive_limits = PackageLimits::new(
-        source_limit,
-        PackageLimits::MAX_ENTRIES,
-        PackageLimits::MAX_ENTRY_BYTES,
-        source_limit,
-        PackageLimits::MAX_IWA_STREAM_BYTES,
-    )?;
+    let archive_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(source_limit)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| b.max_aggregate_bytes(source_limit))
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
     let package = Package::from_bytes_with_options(
         &source,
-        PackageReadOptions::new(archive_limits, PackageSemanticLimits::default()),
+        litchi_numbers::OpenOptions::new()
+            .source_limits(archive_limits)
+            .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
     )?;
     let before = package.exact_bytes();
     assert!(

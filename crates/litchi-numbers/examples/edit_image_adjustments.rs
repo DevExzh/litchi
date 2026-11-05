@@ -15,9 +15,9 @@ use std::ffi::OsString;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use litchi_numbers::shape::image::adjustments::Error as SheetImageAdjustmentsError;
 use litchi_numbers::{
-    ImageAdjustment, ImageAdjustments, ImageEnhancement, ImageSelector, Package,
-    SheetImageAdjustmentsError, SheetSelector,
+    ImageAdjustment, ImageAdjustments, ImageEnhancement, ImageSelector, Package, SheetSelector,
 };
 use tempfile::NamedTempFile;
 

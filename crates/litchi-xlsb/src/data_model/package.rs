@@ -21,15 +21,21 @@ const MAX_PAYLOAD_BYTES: usize = 512 * 1024 * 1024;
 /// and relationship fields while borrowing the caller's graph. Source-provenance
 /// maps and other OPC-owned state have separate limits and are not a measured
 /// part of this estimate.
-pub(crate) fn preflight_metadata(package: &OpcPackage, limits: super::ReadLimits) -> Result<()> {
+pub(crate) fn preflight_metadata(
+    package: &OpcPackage,
+    limits: super::SemanticLimits,
+) -> Result<()> {
     if package.part_count() > limits.max_graph_parts {
         return Err(limit(
-            "Data Model graph parts",
+            crate::data_model::LimitKind::GraphParts,
             package.part_count(),
             limits.max_graph_parts,
         ));
     }
-    let opc_limits = litchi_opc::ReadLimits::default();
+    // This package may have been admitted under a caller-supplied policy.
+    // Reuse that policy for the metadata pass instead of widening it to the
+    // OPC defaults while the model snapshot is prepared.
+    let opc_limits = package.read_limits();
     let mut relationship_count = 0_usize;
     let mut metadata_bytes = 0_usize;
     preflight_relationships(
@@ -46,7 +52,7 @@ pub(crate) fn preflight_metadata(package: &OpcPackage, limits: super::ReadLimits
             let actual = package.get_part(part.partname())?.blob().len();
             if actual > limits.max_part_bytes {
                 return Err(limit(
-                    "Data Model payload bytes",
+                    crate::data_model::LimitKind::PayloadBytes,
                     actual,
                     limits.max_part_bytes,
                 ));
@@ -56,7 +62,7 @@ pub(crate) fn preflight_metadata(package: &OpcPackage, limits: super::ReadLimits
             let actual = package.get_part(part.partname())?.blob().len();
             if actual > limits.max_connection_bytes {
                 return Err(limit(
-                    "Data Model External Data Connections bytes",
+                    crate::data_model::LimitKind::ConnectionsBytes,
                     actual,
                     limits.max_connection_bytes,
                 ));
@@ -93,19 +99,25 @@ pub(crate) fn preflight_metadata(package: &OpcPackage, limits: super::ReadLimits
     Ok(())
 }
 
-pub(crate) fn opc_capture_limits(limits: super::ReadLimits) -> Result<litchi_opc::ReadLimits> {
+pub(crate) fn opc_capture_limits(
+    limits: super::SemanticLimits,
+) -> Result<litchi_opc::SourceLimits> {
     if limits.max_part_bytes == 0 || limits.max_metadata_bytes == 0 {
         return Err(limit(
-            "Data Model source capture bytes",
+            crate::data_model::LimitKind::SourceBytes,
             0,
             limits.max_part_bytes.max(limits.max_metadata_bytes),
         ));
     }
     if limits.max_graph_parts == 0 {
-        return Err(limit("Data Model graph parts", 1, 0));
+        return Err(limit(crate::data_model::LimitKind::GraphParts, 1, 0));
     }
     if limits.max_graph_relationships == 0 {
-        return Err(limit("Data Model graph relationships", 1, 0));
+        return Err(limit(
+            crate::data_model::LimitKind::GraphRelationships,
+            1,
+            0,
+        ));
     }
     // OPC defaults are ordinary safety policy, not hard ceilings. The Data
     // Model limits have already been validated against this feature's finite
@@ -125,8 +137,8 @@ pub(crate) fn opc_capture_limits(limits: super::ReadLimits) -> Result<litchi_opc
         })?;
     let content_mappings = parts.max(limits.max_connections);
     let total_relationship_xml = limits.max_metadata_bytes.max(limits.max_part_bytes);
-    litchi_opc::ReadLimits::builder()
-        .max_archive_members(archive_members)?
+    litchi_opc::SourceLimits::builder()
+        .max_members(archive_members)?
         .max_archive_total_entries(archive_members)?
         .max_parts(parts)?
         .max_part_bytes(limits.max_part_bytes as u64)?
@@ -145,10 +157,10 @@ pub(crate) fn opc_capture_limits(limits: super::ReadLimits) -> Result<litchi_opc
 
 fn preflight_relationships(
     relationships: &litchi_opc::Relationships,
-    opc_limits: &litchi_opc::ReadLimits,
+    opc_limits: &litchi_opc::SourceLimits,
     relationship_count: &mut usize,
     metadata_bytes: &mut usize,
-    limits: super::ReadLimits,
+    limits: super::SemanticLimits,
 ) -> Result<()> {
     *metadata_bytes = checked_metadata_add(
         *metadata_bytes,
@@ -167,7 +179,7 @@ fn preflight_relationships(
             })?;
         if *relationship_count > limits.max_graph_relationships {
             return Err(limit(
-                "Data Model graph relationships",
+                crate::data_model::LimitKind::GraphRelationships,
                 *relationship_count,
                 limits.max_graph_relationships,
             ));
@@ -188,9 +200,9 @@ fn preflight_relationships(
                     resource: "Data Model relationship target metadata",
                 })?;
             if resolved > opc_limits.max_xml_attribute_bytes() {
-                return Err(Error::Opc(litchi_opc::OpcError::ReadLimit {
-                    resource: litchi_opc::ReadResource::XmlAttributeBytes,
-                    actual: resolved as u64,
+                return Err(Error::Opc(litchi_opc::OpcError::Limit {
+                    kind: litchi_opc::SourceLimitKind::XmlAttributeBytes,
+                    observed: resolved as u64,
                     maximum: opc_limits.max_xml_attribute_bytes() as u64,
                 }));
             }
@@ -226,14 +238,18 @@ fn metadata_cost(lengths: impl IntoIterator<Item = usize>) -> Result<usize> {
 fn checked_metadata_add(
     current: usize,
     addition: usize,
-    limits: super::ReadLimits,
+    limits: super::SemanticLimits,
     resource: &'static str,
 ) -> Result<usize> {
     let total = current
         .checked_add(addition)
         .ok_or(Error::CapacityOverflow { resource })?;
     if total > limits.max_metadata_bytes {
-        return Err(limit(resource, total, limits.max_metadata_bytes));
+        return Err(limit(
+            super::LimitKind::MetadataBytes,
+            total,
+            limits.max_metadata_bytes,
+        ));
     }
     Ok(total)
 }
@@ -257,19 +273,19 @@ fn preflight_xml_attribute(key: &str, value: &str, maximum: usize) -> Result<()>
             resource: "Data Model XML attribute metadata",
         })?;
     if actual > maximum {
-        return Err(Error::Opc(litchi_opc::OpcError::ReadLimit {
-            resource: litchi_opc::ReadResource::XmlAttributeBytes,
-            actual: actual as u64,
+        return Err(Error::Opc(litchi_opc::OpcError::Limit {
+            kind: litchi_opc::SourceLimitKind::XmlAttributeBytes,
+            observed: actual as u64,
             maximum: maximum as u64,
         }));
     }
     Ok(())
 }
 
-fn limit(resource: &'static str, actual: usize, maximum: usize) -> Error {
-    Error::LimitExceeded {
-        resource,
-        actual,
+const fn limit(kind: super::LimitKind, actual: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::package::LimitKind::DataModel(kind),
+        observed: actual,
         maximum,
     }
 }
@@ -286,11 +302,7 @@ pub(crate) fn inspect_model_part(package: &OpcPackage) -> Result<Option<ModelPar
         if part.partname().is_equivalent_to(&fixed_uri)
             && part.content_type() != DATA_MODEL_CONTENT_TYPE
         {
-            return Err(invalid(format!(
-                "fixed Data Model part '{}' has content type '{}' instead of '{DATA_MODEL_CONTENT_TYPE}'",
-                part.partname(),
-                part.content_type()
-            )));
+            return Err(invalid("fixed Data Model part has content type instead"));
         }
         if part.content_type() != DATA_MODEL_CONTENT_TYPE {
             continue;
@@ -299,10 +311,7 @@ pub(crate) fn inspect_model_part(package: &OpcPackage) -> Result<Option<ModelPar
             return Err(invalid("package contains multiple Data Model parts"));
         }
         if !part.partname().is_equivalent_to(&fixed_uri) {
-            return Err(invalid(format!(
-                "Data Model part '{}' must be '{DATA_MODEL_PART_NAME}'",
-                part.partname()
-            )));
+            return Err(invalid("Data Model part must be"));
         }
         // The model payload is the only one this pass reads, so it is the
         // only part decoded here (ADR 0030).
@@ -331,14 +340,11 @@ pub(crate) fn inspect_model_part(package: &OpcPackage) -> Result<Option<ModelPar
 /// Validate a caller-provided opaque payload before staging it in a draft.
 pub(crate) fn validate_payload(part: &ModelPart) -> Result<()> {
     if !part.part_name.eq_ignore_ascii_case(DATA_MODEL_PART_NAME) {
-        return Err(invalid(format!(
-            "Data Model part must be '{DATA_MODEL_PART_NAME}'"
-        )));
+        return Err(invalid("Data Model part must be"));
     }
     if part.content_type != DATA_MODEL_CONTENT_TYPE {
         return Err(Error::InvalidContentType {
-            expected: DATA_MODEL_CONTENT_TYPE.to_string(),
-            got: part.content_type.clone(),
+            expected: DATA_MODEL_CONTENT_TYPE,
         });
     }
     if part.bytes.is_empty() {
@@ -356,10 +362,14 @@ pub(crate) fn validate_payload(part: &ModelPart) -> Result<()> {
 /// are separate owners; validating only the former lets a caller publish
 /// stale groupings after replacing the opaque bytes.
 pub(crate) fn validate_model_payload_and_groupings(model: &Model) -> Result<()> {
-    super::codec::validate_definition(&model.definition, super::ReadLimits::DEFAULT)?;
+    super::codec::validate_definition(&model.definition, super::SemanticLimits::DEFAULT)?;
     validate_payload(&model.part)?;
     for grouping in &model.definition.time_groupings {
-        super::proof::prove_time_grouping(model.part.bytes(), grouping)?;
+        super::proof::prove_time_grouping(
+            model.part.bytes(),
+            grouping,
+            super::codec::HARD_MAX_PART_BYTES,
+        )?;
     }
     Ok(())
 }
@@ -422,17 +432,15 @@ where
         let wanted = table.connection.to_lowercase();
         match names.get(&wanted).copied().unwrap_or(0) {
             0 => {
-                return Err(invalid(format!(
-                    "Data Model table '{}' references unknown workbook connection '{}'",
-                    table.name, table.connection
-                )));
+                return Err(invalid(
+                    "Data Model table references unknown workbook connection",
+                ));
             },
             1 => {},
             _ => {
-                return Err(invalid(format!(
-                    "Data Model table '{}' references multiple workbook connections named '{}'",
-                    table.name, table.connection
-                )));
+                return Err(invalid(
+                    "Data Model table references multiple workbook connections named",
+                ));
             },
         }
     }
@@ -440,7 +448,8 @@ where
 }
 
 pub(crate) fn model_part_uri() -> Result<PackURI> {
-    PackURI::new(DATA_MODEL_PART_NAME).map_err(|error| Error::InvalidUri(error.to_string()))
+    PackURI::new(DATA_MODEL_PART_NAME)
+        .map_err(|_error| Error::InvalidUri("the part name is not a valid package URI"))
 }
 
 pub(crate) fn reject_inbound_relationships(package: &OpcPackage, target: &PackURI) -> Result<()> {
@@ -454,10 +463,9 @@ pub(crate) fn reject_inbound_relationships(package: &OpcPackage, target: &PackUR
     for source in package.iter_parts() {
         for relationship in source.rels().iter() {
             if relationship_targets(relationship, target)? {
-                return Err(invalid(format!(
-                    "part '{}' has a relationship to the relationship-free Data Model part",
-                    source.partname()
-                )));
+                return Err(invalid(
+                    "part has a relationship to the relationship-free Data Model part",
+                ));
             }
         }
     }
@@ -471,8 +479,8 @@ fn relationship_targets(relationship: &litchi_opc::Relationship, target: &PackUR
     Ok(relationship.target_partname()?.is_equivalent_to(target))
 }
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn invalid(message: &'static str) -> Error {
+    Error::InvalidFormat(message)
 }
 
 #[cfg(test)]

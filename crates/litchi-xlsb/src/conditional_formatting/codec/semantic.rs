@@ -24,22 +24,22 @@ use super::{Error, Result, invalid};
 pub(super) struct EmptyFormulaResolution;
 
 impl Resolution for EmptyFormulaResolution {
-    fn sheet_prefix(&self, index: u16) -> crate::formula::Result<String> {
-        Err(crate::formula::Error::InvalidFormula(format!(
-            "formula references unresolved sheet index {index}"
-        )))
+    fn sheet_prefix(&self, _index: u16) -> crate::formula::Result<String> {
+        Err(crate::formula::Error::InvalidFormula(
+            "formula references unresolved sheet index",
+        ))
     }
 
-    fn defined_name(&self, index: u32) -> crate::formula::Result<String> {
-        Err(crate::formula::Error::InvalidFormula(format!(
-            "formula references unresolved defined name {index}"
-        )))
+    fn defined_name(&self, _index: u32) -> crate::formula::Result<String> {
+        Err(crate::formula::Error::InvalidFormula(
+            "formula references unresolved defined name",
+        ))
     }
 
-    fn external_name(&self, sheet_index: u16, name_index: u32) -> crate::formula::Result<String> {
-        Err(crate::formula::Error::InvalidFormula(format!(
-            "formula references unresolved external name {sheet_index}:{name_index}"
-        )))
+    fn external_name(&self, _sheet_index: u16, _name_index: u32) -> crate::formula::Result<String> {
+        Err(crate::formula::Error::InvalidFormula(
+            "formula references unresolved external name",
+        ))
     }
 
     fn table_reference(
@@ -47,14 +47,14 @@ impl Resolution for EmptyFormulaResolution {
         _reference: &crate::formula::TableReference,
     ) -> crate::formula::Result<String> {
         Err(crate::formula::Error::InvalidFormula(
-            "formula references unresolved table".to_string(),
+            "formula references unresolved table",
         ))
     }
 
-    fn pivot_name(&self, index: u32) -> crate::formula::Result<String> {
-        Err(crate::formula::Error::InvalidFormula(format!(
-            "formula references unresolved pivot name {index}"
-        )))
+    fn pivot_name(&self, _index: u32) -> crate::formula::Result<String> {
+        Err(crate::formula::Error::InvalidFormula(
+            "formula references unresolved pivot name",
+        ))
     }
 }
 
@@ -70,18 +70,15 @@ impl TextCompiler {
     pub(super) fn compile(input: &str) -> Result<ParsedFormula> {
         let input = input.strip_prefix('=').unwrap_or(input).trim();
         if input.is_empty() {
-            return Err(Error::InvalidFormula(
-                "conditional-format formula is empty".to_string(),
-            ));
+            return Err(Error::InvalidFormula("conditional-format formula is empty"));
         }
         let mut rgce = Vec::new();
         let mut rgcb = Vec::new();
         compile_formula_expression(input, &mut rgce, &mut rgcb)?;
         if rgce.is_empty() || rgce.len() > MAX_CELL_FORMULA_BYTES {
-            return Err(Error::InvalidFormula(format!(
-                "compiled conditional-format formula length {} is outside 1..={MAX_CELL_FORMULA_BYTES}",
-                rgce.len()
-            )));
+            return Err(Error::InvalidFormula(
+                "compiled conditional-format formula length is outside its allowed range",
+            ));
         }
         Ok(ParsedFormula { rgce, rgcb })
     }
@@ -91,7 +88,7 @@ fn compile_formula_expression(input: &str, rgce: &mut Vec<u8>, rgcb: &mut Vec<u8
     let input = input.trim();
     if input.is_empty() {
         return Err(Error::InvalidFormula(
-            "conditional-format formula has an empty operand".to_string(),
+            "conditional-format formula has an empty operand",
         ));
     }
     if let Some(inner) = strip_outer_parentheses(input) {
@@ -153,7 +150,7 @@ fn compile_formula_expression(input: &str, rgce: &mut Vec<u8>, rgcb: &mut Vec<u8
     if let Some(value) = parse_formula_string(input)? {
         let units = value.encode_utf16().count();
         let units = u16::try_from(units)
-            .map_err(|_| Error::InvalidFormula("formula string is too long".to_string()))?;
+            .map_err(|_| Error::InvalidFormula("formula string is too long"))?;
         rgce.push(crate::formula::ptg_types::PTG_STR);
         rgce.extend_from_slice(&units.to_le_bytes());
         rgce.extend(value.encode_utf16().flat_map(u16::to_le_bytes));
@@ -172,9 +169,7 @@ fn compile_formula_expression(input: &str, rgce: &mut Vec<u8>, rgcb: &mut Vec<u8
     }
     if let Ok(number) = input.parse::<f64>() {
         if !number.is_finite() {
-            return Err(Error::InvalidFormula(
-                "formula number is not finite".to_string(),
-            ));
+            return Err(Error::InvalidFormula("formula number is not finite"));
         }
         if number.fract() == 0.0 && (0.0..=f64::from(u16::MAX)).contains(&number) {
             rgce.push(crate::formula::ptg_types::PTG_INT);
@@ -194,18 +189,14 @@ fn compile_formula_expression(input: &str, rgce: &mut Vec<u8>, rgcb: &mut Vec<u8
     }
     if let Some((first, last)) = input.split_once(':') {
         let Some((first_row, first_col, first_bits)) = parse_formula_reference(first.trim()) else {
-            return Err(Error::InvalidFormula(format!(
-                "invalid conditional-format range {input:?}"
-            )));
+            return Err(Error::InvalidFormula("invalid conditional-format range"));
         };
         let Some((last_row, last_col, last_bits)) = parse_formula_reference(last.trim()) else {
-            return Err(Error::InvalidFormula(format!(
-                "invalid conditional-format range {input:?}"
-            )));
+            return Err(Error::InvalidFormula("invalid conditional-format range"));
         };
         if first_row > last_row || first_col > last_col {
             return Err(Error::InvalidFormula(
-                "conditional-format range is reversed".to_string(),
+                "conditional-format range is reversed",
             ));
         }
         rgce.push(crate::formula::ptg_types::PTG_AREA | 0x20);
@@ -216,16 +207,16 @@ fn compile_formula_expression(input: &str, rgce: &mut Vec<u8>, rgcb: &mut Vec<u8
         return Ok(());
     }
 
-    Err(Error::UnsupportedFeature(format!(
-        "conditional-format formula construct {input:?} is not supported by the owner-local emitter"
-    )))
+    Err(Error::UnsupportedFeature(
+        "conditional-format formula construct is not supported by the owner-local emitter",
+    ))
 }
 
 fn compile_formula_array(input: &str, rgce: &mut Vec<u8>, rgcb: &mut Vec<u8>) -> Result<()> {
     let rows = split_formula_list(input, ';');
     if rows.is_empty() || rows.iter().any(|row| row.trim().is_empty()) {
         return Err(Error::InvalidFormula(
-            "conditional-format array has an empty row".to_string(),
+            "conditional-format array has an empty row",
         ));
     }
     let columns = rows
@@ -235,16 +226,16 @@ fn compile_formula_array(input: &str, rgce: &mut Vec<u8>, rgcb: &mut Vec<u8>) ->
     let column_count = columns[0].len();
     if column_count == 0 || columns.iter().any(|row| row.len() != column_count) {
         return Err(Error::InvalidFormula(
-            "conditional-format array rows have different widths".to_string(),
+            "conditional-format array rows have different widths",
         ));
     }
     let row_count = u32::try_from(columns.len())
-        .map_err(|_| Error::InvalidFormula("array row count overflow".to_string()))?;
+        .map_err(|_| Error::InvalidFormula("array row count overflow"))?;
     let column_count = u32::try_from(column_count)
-        .map_err(|_| Error::InvalidFormula("array column count overflow".to_string()))?;
+        .map_err(|_| Error::InvalidFormula("array column count overflow"))?;
     if row_count > 1_048_576 || column_count > 16_384 {
         return Err(Error::InvalidFormula(
-            "conditional-format array exceeds worksheet bounds".to_string(),
+            "conditional-format array exceeds worksheet bounds",
         ));
     }
 
@@ -265,7 +256,7 @@ fn compile_formula_array(input: &str, rgce: &mut Vec<u8>, rgcb: &mut Vec<u8>) ->
             ArrayValue::Number(value) => {
                 if !value.is_finite() {
                     return Err(Error::InvalidFormula(
-                        "conditional-format array number is not finite".to_string(),
+                        "conditional-format array number is not finite",
                     ));
                 }
                 rgcb.push(0);
@@ -273,7 +264,7 @@ fn compile_formula_array(input: &str, rgce: &mut Vec<u8>, rgcb: &mut Vec<u8>) ->
             },
             ArrayValue::String(value) => {
                 let units = u16::try_from(value.encode_utf16().count()).map_err(|_| {
-                    Error::InvalidFormula("conditional-format array string is too long".to_string())
+                    Error::InvalidFormula("conditional-format array string is too long")
                 })?;
                 rgcb.push(1);
                 rgcb.extend_from_slice(&units.to_le_bytes());
@@ -296,9 +287,9 @@ fn parse_formula_array_value(input: &str) -> Result<ArrayValue> {
     if let Some(error) = formula_error_code(input) {
         return Ok(ArrayValue::Error(error));
     }
-    let value = input.parse::<f64>().map_err(|_| {
-        Error::InvalidFormula(format!("invalid conditional-format array value {input:?}"))
-    })?;
+    let value = input
+        .parse::<f64>()
+        .map_err(|_| Error::InvalidFormula("invalid conditional-format array value"))?;
     Ok(ArrayValue::Number(value))
 }
 
@@ -308,7 +299,7 @@ fn parse_formula_string(input: &str) -> Result<Option<String>> {
     }
     if !input.ends_with('"') || input.len() < 2 {
         return Err(Error::InvalidFormula(
-            "unterminated conditional-format string".to_string(),
+            "unterminated conditional-format string",
         ));
     }
     let mut value = String::new();
@@ -490,10 +481,7 @@ pub fn validate_template(rule_type: RuleType, template: u32) -> Result<()> {
     if valid {
         Ok(())
     } else {
-        Err(invalid(
-            "BrtBeginCFRule",
-            format!("template {template} is invalid for {rule_type:?}"),
-        ))
+        Err(invalid("BrtBeginCFRule", "template is invalid"))
     }
 }
 
@@ -501,12 +489,8 @@ pub(super) fn validate_extension14_template(rule_type: RuleType, template: u32) 
     if rule_type == RuleType::DataBar && template == 0 {
         Ok(())
     } else {
-        validate_template(rule_type, template).map_err(|_| {
-            invalid(
-                "BrtBeginCFRule14",
-                format!("template {template} is invalid for {rule_type:?}"),
-            )
-        })
+        validate_template(rule_type, template)
+            .map_err(|_| invalid("BrtBeginCFRule14", "template is invalid"))
     }
 }
 
@@ -536,7 +520,7 @@ pub fn validate_formula_count(
     } else {
         Err(invalid(
             "BrtBeginCFRule",
-            format!("formula count {count} does not match required {expected}"),
+            "formula count does not match required",
         ))
     }
 }
@@ -565,7 +549,7 @@ pub(super) fn validate_formula_slots(
     } else {
         Err(invalid(
             "BrtBeginCFRule",
-            format!("formula slots {found:?} do not match required {expected:?}"),
+            "formula slots do not match required",
         ))
     }
 }
@@ -597,15 +581,12 @@ pub(super) fn validate_parameter_and_flags(
         _ => parameter == 0,
     };
     if !valid_parameter {
-        return Err(invalid(
-            "BrtBeginCFRule",
-            format!("invalid parameter {parameter} for template {template}"),
-        ));
+        return Err(invalid("BrtBeginCFRule", "invalid parameter for template"));
     }
     if above_average != matches!(template, 25 | 29) {
         return Err(invalid(
             "BrtBeginCFRule",
-            format!("invalid above-average flag for template {template}"),
+            "invalid above-average flag for template",
         ));
     }
     if rule_type != RuleType::TopN && (bottom || percent) {
@@ -621,9 +602,11 @@ pub(super) fn render_formula(
     formula: &ParsedFormula,
     base: (u32, u32),
     context: &impl Resolution,
+    limits: crate::raw::Limits,
 ) -> Result<String> {
     let tokens =
-        Parser::with_base_cell_and_extra(&formula.rgce, &formula.rgcb, base.0, base.1).parse()?;
+        Parser::with_base_cell_and_extra(&formula.rgce, &formula.rgcb, base.0, base.1, limits)
+            .parse()?;
     Ok(Compiler::try_tokens_to_string_with_resolution(
         &tokens, context,
     )?)
@@ -661,7 +644,7 @@ pub(super) fn effective_rule_formulas(rule: &Rule) -> Result<Vec<ParsedFormula>>
     if !rule.formulas.is_empty() {
         if !rule.formula_extras.is_empty() && rule.formula_extras.len() != rule.formulas.len() {
             return Err(Error::InvalidFormula(
-                "conditional-format ancillary stream count does not match formulas".to_string(),
+                "conditional-format ancillary stream count does not match formulas",
             ));
         }
         return rule
@@ -670,10 +653,9 @@ pub(super) fn effective_rule_formulas(rule: &Rule) -> Result<Vec<ParsedFormula>>
             .enumerate()
             .map(|(index, rgce)| {
                 if rgce.is_empty() || rgce.len() > MAX_CELL_FORMULA_BYTES {
-                    return Err(Error::InvalidFormula(format!(
-                        "conditional-format formula length {} is outside 1..={MAX_CELL_FORMULA_BYTES}",
-                        rgce.len()
-                    )));
+                    return Err(Error::InvalidFormula(
+                        "conditional-format formula length is outside its allowed range",
+                    ));
                 }
                 Ok(ParsedFormula {
                     rgce: rgce.clone(),
@@ -800,10 +782,7 @@ pub(super) fn validate_rule_metadata(rule: &Rule) -> Result<()> {
     }
     validate_template(rule.rule_type, rule.template)?;
     if rule.priority == 0 || rule.priority > i32::MAX as u32 {
-        return Err(invalid(
-            "BrtBeginCFRule",
-            format!("invalid priority {}", rule.priority),
-        ));
+        return Err(invalid("BrtBeginCFRule", "invalid priority"));
     }
     if rule.dxf_id.is_some_and(|id| id > i32::MAX as u32) {
         return Err(invalid(
@@ -917,10 +896,7 @@ pub(super) fn validate_data_bar14(bar: &Bar14, priority: i32) -> Result<()> {
 pub(super) fn validate_icon_set14(set: &IconSet14) -> Result<()> {
     let expected = icon_count14(set.icon_set_type);
     if expected == 0 || set.cfvos.len() != expected {
-        return Err(invalid(
-            "BrtBeginIconSet14",
-            format!("expected {expected} thresholds, found {}", set.cfvos.len()),
-        ));
+        return Err(invalid("BrtBeginIconSet14", "expected thresholds, found"));
     }
     if set
         .cfvos
@@ -971,7 +947,7 @@ pub(super) fn validate_scale_thresholds(scale: &Scale) -> Result<()> {
 pub(super) fn validate_boundary_thresholds(
     minimum: &Value,
     maximum: &Value,
-    record: &str,
+    record: &'static str,
 ) -> Result<()> {
     if minimum.cfvo_type == 3 || maximum.cfvo_type == 2 {
         return Err(invalid(
@@ -987,7 +963,7 @@ pub(super) fn icon_count(icon_set_type: u8) -> Result<usize> {
         0..=7 => Ok(3),
         8..=12 => Ok(4),
         13..=16 => Ok(5),
-        value => Err(invalid("BrtBeginIconSet", format!("invalid set {value}"))),
+        _value => Err(invalid("BrtBeginIconSet", "invalid set")),
     }
 }
 

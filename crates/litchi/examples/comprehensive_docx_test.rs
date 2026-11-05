@@ -12,19 +12,20 @@
 //! 2. Regression test baseline
 //! 3. Visual reference for all capabilities
 
+use litchi::docx::builder::{Document as DraftDocument, Theme};
+use litchi::docx::metadata::Metadata;
 use litchi::docx::{
     Border, Borders, Color, EndnotePos, Endnotes, FootnotePos, Footnotes, ListType,
-    MutableDocument, MutableTheme, Package, PageNumberFormat, PageOrientation, ParagraphAlignment,
-    Style, TableOfContents, UnderlineStyle, Watermark,
+    PageNumberFormat, PageOrientation, ParagraphAlignment, Style, TableOfContents, UnderlineStyle,
+    Watermark,
 };
-use litchi::ooxml_common::Props;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("╔════════════════════════════════════════════════════════════╗");
     println!("║     COMPREHENSIVE DOCX FEATURE TEST & VERIFICATION        ║");
     println!("╚════════════════════════════════════════════════════════════╝\n");
 
-    let mut doc = MutableDocument::new();
+    let mut doc = DraftDocument::new();
 
     // ═══════════════════════════════════════════════════════════════════════════
     // PART 1: NEW ADVANCED FEATURES (Themes, Watermarks, TOC)
@@ -38,7 +39,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 1.1 Theme Configuration
     // ───────────────────────────────────────────────────────────────────────────
     println!("   [1/3] Configuring custom theme...");
-    let mut theme = MutableTheme::new("Comprehensive Test Theme");
+    let mut theme = Theme::new("Comprehensive Test Theme");
     theme.set_major_font("Georgia");
     theme.set_minor_font("Calibri");
 
@@ -645,18 +646,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ═══════════════════════════════════════════════════════════════════════════
     println!("\n💾 Saving document...");
 
-    let mut package = Package::new()?;
-    *package.document_mut()? = doc;
+    let mut builder = litchi::docx::Builder::new()?;
+    *builder.document()? = doc;
 
     // Set document properties
-    let _ = package.put_props(
-        Props::new()
-            .title("Comprehensive DOCX Feature Test")
-            .subject("Feature Verification and Regression Testing")
-            .creator("Litchi OOXML Library")
-            .keywords("docx, test, verification, regression, features, themes, watermarks, toc")
-            .description("Complete test document for all DOCX writer features including new theme, watermark, and TOC support"),
-    );
+    let mut metadata = builder.build()?.edit_metadata();
+    metadata.set(Metadata {
+        title: Some("Comprehensive DOCX Feature Test".to_owned()),
+        subject: Some("Feature Verification and Regression Testing".to_owned()),
+        author: Some("Litchi OOXML Library".to_owned()),
+        keywords: litchi::common::metadata::keywords::split(
+            "docx, test, verification, regression, features, themes, watermarks, toc",
+        ),
+        description: Some(
+            "Complete test document for all DOCX writer features including new theme, watermark, and TOC support"
+                .to_owned(),
+        ),
+        ..Metadata::default()
+    });
+    let package = metadata.commit()?.into_package();
 
     let filename = "comprehensive_test.docx";
     package.save(filename)?;

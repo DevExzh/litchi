@@ -8,9 +8,9 @@ fn package_round_trip_preserves_extension_state_and_hyperlink_relationships() {
     let para_id = Id::new(0x1234).unwrap();
     let text_id = Id::new(0x5678).unwrap();
 
-    let mut package = Package::new().unwrap();
+    let mut builder = litchi_docx::Builder::new().unwrap();
     {
-        let document = package.document_mut().unwrap();
+        let document = builder.document().unwrap();
         let paragraph = document.add_paragraph();
         paragraph.add_hyperlink("https://example.test/typed", "typed link");
         paragraph
@@ -29,6 +29,7 @@ fn package_round_trip_preserves_extension_state_and_hyperlink_relationships() {
             .set_text_id(Some(Id::new(0xdef0).unwrap()))
             .unwrap();
     }
+    let package = builder.build().unwrap();
     package.save(file.path()).unwrap();
 
     let reopened = Package::open(file.path()).unwrap();

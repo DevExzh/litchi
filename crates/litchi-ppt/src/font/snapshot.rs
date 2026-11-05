@@ -1,6 +1,7 @@
 use super::codec::encode_record;
 use super::{FontCollections, PackageLimits, PackageOptions};
-use crate::package::{Error, Package, Result};
+use crate::package::{Error, Result};
+use crate::raw::Reader;
 use crate::records::Record;
 use std::io::Cursor;
 use std::sync::Arc;
@@ -17,14 +18,14 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-    /// Snapshot a borrowed whole-CFB source with default limits.
+    /// Snapshot a borrowed whole-CFB source under the caller's limits.
     ///
     /// # Errors
     ///
     /// Returns an error if the source is malformed, exceeds the default
     /// limits, or its live font owner is not losslessly representable.
-    pub fn parse(bytes: &[u8]) -> Result<Self> {
-        Self::parse_with_limits(bytes, PackageLimits::default())
+    pub fn parse(bytes: &[u8], limits: &PackageLimits) -> Result<Self> {
+        Self::parse_with_limits(bytes, *limits)
     }
 
     /// Copy a borrowed package only after enforcing the caller's source limit.
@@ -32,7 +33,7 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_with_limits(bytes: &[u8], limits: PackageLimits) -> Result<Self> {
+    pub(crate) fn parse_with_limits(bytes: &[u8], limits: PackageLimits) -> Result<Self> {
         validate_source_len(bytes.len(), limits)?;
         let mut owned = Vec::new();
         owned
@@ -42,14 +43,14 @@ impl Snapshot {
         Self::from_arc(Arc::from(owned), limits)
     }
 
-    /// Snapshot an owned whole-CFB source with default limits.
+    /// Snapshot an owned whole-CFB source under the caller's limits.
     ///
     /// # Errors
     ///
     /// Returns an error if the source is malformed, exceeds the default
     /// limits, or its live font owner is not losslessly representable.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, PackageLimits::default())
+    pub fn from_bytes(bytes: Vec<u8>, limits: &PackageLimits) -> Result<Self> {
+        Self::from_bytes_with_limits(bytes, *limits)
     }
 
     /// Snapshot an owned whole-CFB source with explicit limits.
@@ -58,7 +59,7 @@ impl Snapshot {
     ///
     /// Returns an error if the source is malformed, exceeds `limits`, or its
     /// live font owner is not losslessly representable.
-    pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: PackageLimits) -> Result<Self> {
+    pub(crate) fn from_bytes_with_limits(bytes: Vec<u8>, limits: PackageLimits) -> Result<Self> {
         Self::from_bytes_with_options(
             bytes,
             PackageOptions {
@@ -96,16 +97,14 @@ impl Snapshot {
         ingress_limits.max_package_bytes = ingress_limits
             .max_package_bytes
             .min(options.limits.max_source_bytes);
-        let mut package =
-            Package::from_reader_with_limits(Cursor::new(bytes.clone()), ingress_limits)?;
-        #[cfg(feature = "encryption")]
-        let presentation = package.presentation_with_options_and_limits(
-            crate::OpenOptions {
-                password: options.password,
-                ..Default::default()
-            },
-            options.limits.fonts.records,
+        let mut package = Reader::from_reader_with_options(
+            Cursor::new(bytes.clone()),
+            crate::OpenOptions::new().source_limits(ingress_limits),
         )?;
+        let record_limits = crate::OpenOptions::new().source_limits(options.limits.fonts.records);
+        #[cfg(feature = "encryption")]
+        let presentation =
+            package.presentation_with_options(record_limits.password(options.password))?;
         #[cfg(not(feature = "encryption"))]
         let presentation = {
             if options.password.is_some() {
@@ -113,7 +112,7 @@ impl Snapshot {
                     "password opening requires the encryption feature".into(),
                 ));
             }
-            package.presentation_with_limits(options.limits.fonts.records)?
+            package.presentation_with_options(record_limits)?
         };
         let (document_persist_id, source) =
             match crate::embedded::object::Editor::inspect_live_document(&bytes) {
@@ -199,8 +198,9 @@ impl Snapshot {
     ///
     /// Returns an error if the transaction cannot be initialized from this
     /// snapshot.
-    pub fn edit(&self) -> Result<super::Transaction> {
-        Ok(super::Transaction::new(self.clone()))
+    #[cfg(test)]
+    pub(crate) fn edit(&self) -> Result<super::transaction::Transaction> {
+        Ok(super::transaction::Transaction::new(self.clone()))
     }
 }
 

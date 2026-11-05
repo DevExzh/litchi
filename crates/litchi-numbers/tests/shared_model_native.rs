@@ -4,7 +4,7 @@
 use std::{error::Error, fs, path::PathBuf};
 
 use litchi_iwa_common::table::cell::value::Value as SharedValue;
-use litchi_iwa_common::table::coordinate::CellPosition;
+use litchi_iwa_common::table::coordinate::At;
 use litchi_iwa_common::table::model::{Builder, Dimensions};
 use litchi_numbers::cell::Value;
 use litchi_numbers::table::cells::Storage;
@@ -43,7 +43,7 @@ fn shared_table() -> litchi_iwa_common::table::model::Table {
     for (row, values) in rows.into_iter().enumerate() {
         for (column, value) in values.into_iter().enumerate() {
             builder
-                .set(CellPosition::new(row as u32, column as u32), value)
+                .set(At::new(row as u32, column as u32), value)
                 .expect("shared model coordinate is in bounds");
         }
     }
@@ -69,7 +69,7 @@ fn shared_model_csv_matches_numbers_facade_and_source_file() -> Result<(), Box<d
 }
 
 fn assert_text(package: &Package, address: &str, expected: &str) -> Result<(), Box<dyn Error>> {
-    let state = package.table_cell(SHEET_NAME, TABLE_NAME, CellPosition::from_a1(address)?)?;
+    let state = package.table_cell(SHEET_NAME, TABLE_NAME, At::from_a1(address)?)?;
     match state.storage() {
         Storage::Stored(Value::Text(value)) => assert_eq!(value, expected, "cell {address}"),
         storage => panic!("cell {address} expected text {expected:?}, got {storage:?}"),
@@ -78,7 +78,7 @@ fn assert_text(package: &Package, address: &str, expected: &str) -> Result<(), B
 }
 
 fn assert_number(package: &Package, address: &str, expected: f64) -> Result<(), Box<dyn Error>> {
-    let state = package.table_cell(SHEET_NAME, TABLE_NAME, CellPosition::from_a1(address)?)?;
+    let state = package.table_cell(SHEET_NAME, TABLE_NAME, At::from_a1(address)?)?;
     match state.storage() {
         Storage::Stored(Value::Number(value)) => {
             assert_eq!(value.get().to_bits(), expected.to_bits(), "cell {address}");
@@ -89,7 +89,7 @@ fn assert_number(package: &Package, address: &str, expected: f64) -> Result<(), 
 }
 
 fn assert_boolean(package: &Package, address: &str, expected: bool) -> Result<(), Box<dyn Error>> {
-    let state = package.table_cell(SHEET_NAME, TABLE_NAME, CellPosition::from_a1(address)?)?;
+    let state = package.table_cell(SHEET_NAME, TABLE_NAME, At::from_a1(address)?)?;
     match state.storage() {
         Storage::Stored(Value::Boolean(value)) => assert_eq!(*value, expected, "cell {address}"),
         storage => panic!("cell {address} expected Boolean {expected}, got {storage:?}"),
@@ -101,7 +101,7 @@ fn assert_boolean(package: &Package, address: &str, expected: bool) -> Result<()
 fn native_numbers_fixture_reads_all_shared_model_values() -> Result<(), Box<dyn Error>> {
     let package = Package::open(repository_path(NATIVE_FIXTURE))?;
     let table = package
-        .document()
+        .workbook_ref()
         .sheet(0)?
         .ok_or_else(|| std::io::Error::other("native Numbers fixture has no first sheet"))?
         .at(0)?

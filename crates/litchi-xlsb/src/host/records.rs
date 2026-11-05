@@ -7,8 +7,8 @@ use litchi_core::binary;
 use std::io::Read;
 
 /// Decode one strict BIFF12 wide string and report consumed bytes.
-pub(crate) fn decode_string(buf: &[u8]) -> Result<(String, usize)> {
-    let mut cursor = Cursor::new(buf, "XLWideString");
+pub(crate) fn decode_string(buf: &[u8], limits: Limits) -> Result<(String, usize)> {
+    let mut cursor = Cursor::new(buf, "XLWideString", limits);
     let value = cursor.read_wide_string()?;
     Ok((value, cursor.position()))
 }
@@ -20,8 +20,9 @@ pub(crate) fn decode_string_with(
     tolerance: &mut crate::leniency::Tolerance<'_>,
     record_type: Kind,
     location: u32,
+    limits: Limits,
 ) -> Result<(String, usize)> {
-    let mut cursor = Cursor::new(buf, "XLWideString");
+    let mut cursor = Cursor::new(buf, "XLWideString", limits);
     let value = tolerance.read_wide_string(&mut cursor, record_type, location)?;
     Ok((value, cursor.position()))
 }
@@ -38,31 +39,31 @@ pub(crate) struct Stream<R> {
 }
 
 impl<R: Read> Stream<R> {
-    pub(crate) fn new(reader: R) -> Self {
+    pub(crate) fn new(reader: R, limits: Limits) -> Self {
         Self {
             reader,
             pending_len: None,
-            limits: Limits::DEFAULT,
+            limits,
         }
     }
 
     pub(crate) fn read_type(&mut self) -> Result<Kind> {
         if self.pending_len.is_some() {
             return Err(Error::Unrecognized {
-                typ: "BIFF12 stream".to_string(),
-                val: "payload must be read before the next header".to_string(),
+                typ: "BIFF12 stream",
+                val: "payload must be read before the next header",
             });
         }
         let header = Header::read(&mut self.reader, self.limits)?
-            .ok_or_else(|| Error::UnexpectedEndOfStream("BIFF12 record header".to_string()))?;
+            .ok_or(Error::UnexpectedEndOfStream("BIFF12 record header"))?;
         self.pending_len = Some(header.len());
         Ok(header.kind())
     }
 
     pub(crate) fn fill_buffer(&mut self, buf: &mut Vec<u8>) -> Result<usize> {
-        let len = self.pending_len.take().ok_or_else(|| Error::Unrecognized {
-            typ: "BIFF12 stream".to_string(),
-            val: "record header must be read before its payload".to_string(),
+        let len = self.pending_len.take().ok_or(Error::Unrecognized {
+            typ: "BIFF12 stream",
+            val: "record header must be read before its payload",
         })?;
         buf.resize(len, 0);
         self.reader.read_exact(buf)?;
@@ -77,7 +78,8 @@ pub struct WorkbookPropRecord {
 }
 
 impl WorkbookPropRecord {
-    pub fn parse(data: &[u8]) -> Result<Self> {
+    pub fn parse(data: &[u8], limits: Limits) -> Result<Self> {
+        let _limits = limits.admit(data.len())?;
         if data.is_empty() {
             return Ok(WorkbookPropRecord { is_date1904: false });
         }
@@ -104,8 +106,8 @@ pub struct BundleSheetRecord {
 
 impl BundleSheetRecord {
     /// Parse one `BrtBundleSh` payload, refusing every defect.
-    pub fn parse(data: &[u8]) -> Result<Self> {
-        Self::parse_with(data, 0, crate::leniency::Tolerance::refusing())
+    pub fn parse(data: &[u8], limits: Limits) -> Result<Self> {
+        Self::parse_with(data, 0, crate::leniency::Tolerance::refusing(), limits)
     }
 
     /// Parse one `BrtBundleSh` payload, ignoring trailing payload bytes
@@ -115,7 +117,9 @@ impl BundleSheetRecord {
         data: &[u8],
         ordinal: u32,
         mut tolerance: crate::leniency::Tolerance<'_>,
+        limits: Limits,
     ) -> Result<Self> {
+        let _limits = limits.admit(data.len())?;
         if data.len() < 12 {
             return Err(Error::InvalidLength {
                 expected: 12,
@@ -126,8 +130,8 @@ impl BundleSheetRecord {
         let state = binary::read_u32_le_at(data, 0)?;
         if state > 2 {
             return Err(Error::Unrecognized {
-                typ: "BrtBundleSh hsState".to_string(),
-                val: state.to_string(),
+                typ: "BrtBundleSh hsState",
+                val: "unexpected value",
             });
         }
         let current_id = binary::read_u32_le_at(data, 4)?;
@@ -138,15 +142,15 @@ impl BundleSheetRecord {
             // before iTabID. This layout is also recognized by Apache POI.
             if data.len() < 16 {
                 return Err(Error::Unrecognized {
-                    typ: "BrtBundleSh iTabID".to_string(),
-                    val: current_id.to_string(),
+                    typ: "BrtBundleSh iTabID",
+                    val: "unexpected value",
                 });
             }
             let beta_id = binary::read_u32_le_at(data, 8)?;
             if !(1..=0xFFFF).contains(&beta_id) {
                 return Err(Error::Unrecognized {
-                    typ: "BrtBundleSh iTabID".to_string(),
-                    val: format!("current {current_id}, beta {beta_id}"),
+                    typ: "BrtBundleSh iTabID",
+                    val: "current, beta",
                 });
             }
             (beta_id, 12)
@@ -160,35 +164,37 @@ impl BundleSheetRecord {
                 &mut tolerance,
                 kind::BUNDLE_SH,
                 ordinal,
+                limits,
             )?;
             if value.is_empty() {
                 return Err(Error::Unrecognized {
-                    typ: "BrtBundleSh strRelID".to_string(),
-                    val: "empty relationship ID".to_string(),
+                    typ: "BrtBundleSh strRelID",
+                    val: "empty relationship ID",
                 });
             }
             (Some(value), consumed)
         };
         if rel_id.is_none() && state != 2 {
             return Err(Error::Unrecognized {
-                typ: "BrtBundleSh strRelID".to_string(),
-                val: "NULL relationship on a sheet that is not very hidden".to_string(),
+                typ: "BrtBundleSh strRelID",
+                val: "NULL relationship on a sheet that is not very hidden",
             });
         }
         let name_offset = strings_offset
             .checked_add(rel_consumed)
-            .ok_or_else(|| Error::Encoding("BrtBundleSh relationship size overflow".to_string()))?;
+            .ok_or(Error::Encoding("BrtBundleSh relationship size overflow"))?;
         let (name, name_consumed) = decode_string_with(
             &data[name_offset..],
             &mut tolerance,
             kind::BUNDLE_SH,
             ordinal,
+            limits,
         )?;
         let trailing = data.len().saturating_sub(name_offset + name_consumed);
         tolerance.tolerate_trailing(kind::BUNDLE_SH, ordinal, trailing, || {
             Error::Unrecognized {
-                typ: "BrtBundleSh".to_string(),
-                val: format!("{trailing} trailing bytes"),
+                typ: "BrtBundleSh",
+                val: "trailing bytes",
             }
         })?;
         let name_len = name.encode_utf16().count();
@@ -199,8 +205,8 @@ impl BundleSheetRecord {
             || name.ends_with('\'')
         {
             return Err(Error::Unrecognized {
-                typ: "BrtBundleSh strName".to_string(),
-                val: name,
+                typ: "BrtBundleSh strName",
+                val: "unexpected value",
             });
         }
 
@@ -230,7 +236,8 @@ pub struct RowHeaderRecord {
     reason = "retained for BIFF12 codec completeness and staged host integration"
 )]
 impl RowHeaderRecord {
-    pub fn parse(data: &[u8]) -> Result<Self> {
+    pub fn parse(data: &[u8], limits: Limits) -> Result<Self> {
+        let _limits = limits.admit(data.len())?;
         if data.len() < 8 {
             return Err(Error::InvalidLength {
                 expected: 8,
@@ -274,7 +281,8 @@ pub struct CellRecord {
 }
 
 impl CellRecord {
-    pub fn parse(record_type: Kind, data: &[u8]) -> Result<Self> {
+    pub fn parse(record_type: Kind, data: &[u8], limits: Limits) -> Result<Self> {
+        let limits = limits.admit(data.len())?;
         if data.len() < 4 {
             return Err(Error::InvalidLength {
                 expected: 4,
@@ -294,7 +302,7 @@ impl CellRecord {
                         found: data.len(),
                     });
                 }
-                let mut cursor = Cursor::new(&data[6..], "BrtCellBool");
+                let mut cursor = Cursor::new(&data[6..], "BrtCellBool", limits);
                 CellValue::Bool(cursor.read_bool8()?)
             },
             kind::CELL_ERROR => {
@@ -316,7 +324,7 @@ impl CellRecord {
                 CellValue::Real(binary::read_f64_le_at(data, 6)?)
             },
             kind::CELL_ST => {
-                let (string, _) = decode_string(&data[6..])?;
+                let (string, _) = decode_string(&data[6..], limits)?;
                 CellValue::String(string)
             },
             kind::CELL_ISST => {
@@ -335,7 +343,7 @@ impl CellRecord {
                         found: data.len(),
                     });
                 }
-                let mut cursor = Cursor::new(&data[6..], "BrtCellRk");
+                let mut cursor = Cursor::new(&data[6..], "BrtCellRk", limits);
                 CellValue::Real(cursor.read_rk()?)
             },
             // Formula records - parse formula bytes and cached value
@@ -357,7 +365,7 @@ impl CellRecord {
                 let formula_bytes = data[10..10 + formula_len].to_vec();
 
                 // Read cached string value after formula
-                let (string, _) = decode_string(&data[10 + formula_len..])?;
+                let (string, _) = decode_string(&data[10 + formula_len..], limits)?;
                 CellValue::Formula {
                     value: Box::new(CellValue::String(string)),
                     formula: Some(formula_bytes),
@@ -399,7 +407,11 @@ impl CellRecord {
                     });
                 }
                 let formula_bytes = data[10..10 + formula_len].to_vec();
-                let mut cursor = Cursor::new(&data[10 + formula_len..], "BrtFmlaBool cached value");
+                let mut cursor = Cursor::new(
+                    &data[10 + formula_len..],
+                    "BrtFmlaBool cached value",
+                    limits,
+                );
                 let bool_value = cursor.read_bool8()?;
                 CellValue::Formula {
                     value: Box::new(CellValue::Bool(bool_value)),
@@ -455,7 +467,8 @@ impl ColInfoRecord {
         dead_code,
         reason = "retained for BIFF12 codec completeness and staged host integration"
     )]
-    pub fn parse(data: &[u8]) -> Result<Self> {
+    pub fn parse(data: &[u8], limits: Limits) -> Result<Self> {
+        let _limits = limits.admit(data.len())?;
         if data.len() < 12 {
             return Err(Error::InvalidLength {
                 expected: 12,
@@ -515,7 +528,8 @@ impl MergeCellRecord {
         dead_code,
         reason = "retained for BIFF12 codec completeness and staged host integration"
     )]
-    pub fn parse(data: &[u8]) -> Result<Self> {
+    pub fn parse(data: &[u8], limits: Limits) -> Result<Self> {
+        let _limits = limits.admit(data.len())?;
         if data.len() < 16 {
             return Err(Error::InvalidLength {
                 expected: 16,
@@ -554,7 +568,8 @@ impl HyperlinkRecord {
         dead_code,
         reason = "retained for BIFF12 codec completeness and staged host integration"
     )]
-    pub fn parse(data: &[u8]) -> Result<Self> {
+    pub fn parse(data: &[u8], limits: Limits) -> Result<Self> {
+        let limits = limits.admit(data.len())?;
         if data.len() < 16 {
             return Err(Error::InvalidLength {
                 expected: 16,
@@ -570,12 +585,12 @@ impl HyperlinkRecord {
         let mut offset = 16;
 
         // Read relationship ID
-        let (r_id, consumed) = decode_string(&data[offset..])?;
+        let (r_id, consumed) = decode_string(&data[offset..], limits)?;
         offset += consumed;
 
         // Read location (optional)
         let (location, consumed) = if offset < data.len() {
-            let (loc, c) = decode_string(&data[offset..])?;
+            let (loc, c) = decode_string(&data[offset..], limits)?;
             (if loc.is_empty() { None } else { Some(loc) }, c)
         } else {
             (None, 0)
@@ -584,7 +599,7 @@ impl HyperlinkRecord {
 
         // Read tooltip (optional)
         let (tooltip, consumed) = if offset < data.len() {
-            let (tt, c) = decode_string(&data[offset..])?;
+            let (tt, c) = decode_string(&data[offset..], limits)?;
             (if tt.is_empty() { None } else { Some(tt) }, c)
         } else {
             (None, 0)
@@ -593,7 +608,7 @@ impl HyperlinkRecord {
 
         // Read display text (optional)
         let display = if offset < data.len() {
-            let (disp, _) = decode_string(&data[offset..])?;
+            let (disp, _) = decode_string(&data[offset..], limits)?;
             if disp.is_empty() { None } else { Some(disp) }
         } else {
             None
@@ -631,8 +646,8 @@ impl NameRecord {
         dead_code,
         reason = "retained for BIFF12 codec completeness and staged host integration"
     )]
-    pub fn parse(data: &[u8]) -> Result<Self> {
-        let named_range = Definition::parse(data)?;
+    pub fn parse(data: &[u8], limits: Limits) -> Result<Self> {
+        let named_range = Definition::parse(data, limits)?;
 
         Ok(NameRecord {
             name: named_range.name,
@@ -668,7 +683,7 @@ mod tests {
         current.extend_from_slice(&7u32.to_le_bytes());
         current.extend_from_slice(&wide_string("rId7"));
         current.extend_from_slice(&wide_string("Data"));
-        let sheet = BundleSheetRecord::parse(&current).unwrap();
+        let sheet = BundleSheetRecord::parse(&current, Limits::DEFAULT).unwrap();
         assert_eq!(sheet.id, 7);
         assert_eq!(sheet.state, 0);
         assert_eq!(sheet.rel_id.as_deref(), Some("rId7"));
@@ -678,7 +693,7 @@ mod tests {
         beta.extend_from_slice(&8u32.to_le_bytes());
         beta.extend_from_slice(&wide_string("rId8"));
         beta.extend_from_slice(&wide_string("Legacy"));
-        let sheet = BundleSheetRecord::parse(&beta).unwrap();
+        let sheet = BundleSheetRecord::parse(&beta, Limits::DEFAULT).unwrap();
         assert_eq!(sheet.id, 8);
         assert_eq!(sheet.rel_id.as_deref(), Some("rId8"));
         assert_eq!(sheet.name, "Legacy");
@@ -690,7 +705,7 @@ mod tests {
         invalid.extend_from_slice(&0u32.to_le_bytes());
         invalid.extend_from_slice(&0u32.to_le_bytes());
         assert!(matches!(
-            BundleSheetRecord::parse(&invalid),
+            BundleSheetRecord::parse(&invalid, Limits::DEFAULT),
             Err(Error::Unrecognized { .. })
         ));
 
@@ -699,8 +714,28 @@ mod tests {
         null_visible.extend_from_slice(&u32::MAX.to_le_bytes());
         null_visible.extend_from_slice(&wide_string("Module"));
         assert!(matches!(
-            BundleSheetRecord::parse(&null_visible),
+            BundleSheetRecord::parse(&null_visible, Limits::DEFAULT),
             Err(Error::Unrecognized { .. })
+        ));
+    }
+
+    #[test]
+    fn bundle_sheet_uses_the_callers_payload_and_string_limits() {
+        let mut payload = 0u32.to_le_bytes().to_vec();
+        payload.extend_from_slice(&7u32.to_le_bytes());
+        payload.extend_from_slice(&wide_string("rId7"));
+        payload.extend_from_slice(&wide_string("Data"));
+
+        let string_tight = Limits::new(payload.len(), 1);
+        assert!(matches!(
+            BundleSheetRecord::parse(&payload, string_tight),
+            Err(Error::Wire(crate::Error::StringLimit { units: 4, .. }))
+        ));
+
+        let payload_tight = Limits::new(payload.len() - 1, Limits::DEFAULT.string_units());
+        assert!(matches!(
+            BundleSheetRecord::parse(&payload, payload_tight),
+            Err(Error::Wire(crate::Error::PayloadLimit { length, .. })) if length == payload.len()
         ));
     }
 
@@ -710,7 +745,9 @@ mod tests {
         rk.extend_from_slice(&2_u16.to_le_bytes());
         rk.extend_from_slice(&((((-42_i32) as u32) << 2) | 0x02).to_le_bytes());
         assert!(matches!(
-            CellRecord::parse(kind::CELL_RK, &rk).unwrap().value,
+            CellRecord::parse(kind::CELL_RK, &rk, Limits::DEFAULT)
+                .unwrap()
+                .value,
             CellValue::Real(value) if value == -42.0
         ));
 
@@ -718,7 +755,9 @@ mod tests {
         scaled.extend_from_slice(&3_u16.to_le_bytes());
         scaled.extend_from_slice(&((1234_u32 << 2) | 0x03).to_le_bytes());
         assert!(matches!(
-            CellRecord::parse(kind::CELL_RK, &scaled).unwrap().value,
+            CellRecord::parse(kind::CELL_RK, &scaled, Limits::DEFAULT)
+                .unwrap()
+                .value,
             CellValue::Real(value) if value == 12.34
         ));
 
@@ -726,7 +765,7 @@ mod tests {
         invalid_bool.extend_from_slice(&4_u16.to_le_bytes());
         invalid_bool.push(2);
         assert!(matches!(
-            CellRecord::parse(kind::CELL_BOOL, &invalid_bool),
+            CellRecord::parse(kind::CELL_BOOL, &invalid_bool, Limits::DEFAULT),
             Err(Error::Wire(crate::Error::InvalidBool { value: 2, .. }))
         ));
 
@@ -735,7 +774,7 @@ mod tests {
         invalid_formula_bool.extend_from_slice(&0_u32.to_le_bytes());
         invalid_formula_bool.push(2);
         assert!(matches!(
-            CellRecord::parse(kind::FMLA_BOOL, &invalid_formula_bool),
+            CellRecord::parse(kind::FMLA_BOOL, &invalid_formula_bool, Limits::DEFAULT),
             Err(Error::Wire(crate::Error::InvalidBool { value: 2, .. }))
         ));
     }

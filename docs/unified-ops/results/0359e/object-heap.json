@@ -1,0 +1,62 @@
+{
+  "scope": "Direct heaptrack of actual final executables; full process includes fixture, exact-byte preflight, warmup and 20 changed-publication iterations with 2 MiB opaque stream. Profiling wall times excluded from native acceptance. Decimal units from heaptrack_print.",
+  "reproduce": "taskset -c 24 heaptrack -o /external/object-budget-probe/heap-LABEL /external/object-budget-probe/LABEL/target/release/object-budget-probe replace_stream 20 2097152 0",
+  "profiles": {
+    "before": {
+      "binary": {
+        "file": "object-budget-probe",
+        "bytes": 1211568,
+        "sha256": "f173d3b2278c0f155bdb3f1519b94e51a2f6d94d01a606154d876fe765316fa4"
+      },
+      "allocations": 17170,
+      "peak_heap": "21.30M",
+      "peak_rss_including_profiler": "28.95M",
+      "leaked": "544B",
+      "artifacts": [
+        {
+          "file": "heap-before.zst",
+          "bytes": 73727,
+          "sha256": "f6c1567e058a3718bdd809c9ff2908d15553358761be674d903b2dae8555da05"
+        },
+        {
+          "file": "heap-before.log",
+          "bytes": 729,
+          "sha256": "a46d82097f7aa1c647e3a15e6e23b0cccbb21a4aa0d2393077193c6ffe55a44c"
+        },
+        {
+          "file": "heap-before-summary.txt",
+          "bytes": 156931,
+          "sha256": "7ca8e167d017e3e34b77f73d918213b3c0d01314369e0d7393eb919cb76c249e"
+        }
+      ]
+    },
+    "after": {
+      "binary": {
+        "file": "object-budget-probe",
+        "bytes": 1214504,
+        "sha256": "13bddf95479158c74003458378bf8450cd1345c53ad8b1918179dd9bbadbcdb2"
+      },
+      "allocations": 17169,
+      "peak_heap": "21.30M",
+      "peak_rss_including_profiler": "28.95M",
+      "leaked": "544B",
+      "artifacts": [
+        {
+          "file": "heap-after.zst",
+          "bytes": 73898,
+          "sha256": "bc2999abe3aba9738b296975ef8b00cc17cb9dfd211091919f027fb666668bda"
+        },
+        {
+          "file": "heap-after.log",
+          "bytes": 727,
+          "sha256": "4db9e2c58e4c899ba2db4aeffc47aff1babffe2d40353098fd38907b4282abed"
+        },
+        {
+          "file": "heap-after-summary.txt",
+          "bytes": 150416,
+          "sha256": "313fa25944baf7919b86bbe9882a9d8599edabe816ecb438d1e9b62407438640"
+        }
+      ]
+    }
+  }
+}

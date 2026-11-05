@@ -2,6 +2,7 @@
 
 use super::codec::{CommentCollector, parse_note_record, parse_txo_runs};
 use super::model::*;
+use litchi_core::Position;
 
 fn obj(object_id: u16) -> Vec<u8> {
     let mut data = Vec::new();
@@ -239,7 +240,7 @@ fn enforces_record_and_opaque_payload_bounds() {
 
 #[test]
 fn reads_poi_comment_fixtures() {
-    use crate::Workbook;
+    use crate::raw::Reader;
     use std::fs::File;
     use std::path::Path;
 
@@ -249,7 +250,7 @@ fn reads_poi_comment_fixtures() {
             .join(name)
     };
 
-    let simple = Workbook::new(File::open(fixture("SimpleWithComments.xls")).unwrap()).unwrap();
+    let simple = Reader::new(File::open(fixture("SimpleWithComments.xls")).unwrap()).unwrap();
     let comments = simple.xls_worksheet(0).unwrap().comments();
     assert_eq!(comments.len(), 3);
     assert_eq!(comments[0].author(), "Yegor Kozlov");
@@ -260,12 +261,12 @@ fn reads_poi_comment_fixtures() {
     assert_ne!(comments[0].identity().guid(), &[0; 16]);
     assert_eq!(comments[0].text_runs().len(), 2);
 
-    let drawing = Workbook::new(File::open(fixture("DrawingAndComments.xls")).unwrap()).unwrap();
+    let drawing = Reader::new(File::open(fixture("DrawingAndComments.xls")).unwrap()).unwrap();
     let comments = drawing.xls_worksheet(0).unwrap().comments();
     assert_eq!(comments.len(), 3);
     assert!(comments.iter().all(|comment| !comment.text().is_empty()));
 
-    let libreoffice = Workbook::new(File::open(fixture("comments.xls")).unwrap()).unwrap();
+    let libreoffice = Reader::new(File::open(fixture("comments.xls")).unwrap()).unwrap();
     let comments = libreoffice.xls_worksheet(0).unwrap().comments();
     assert_eq!(comments.len(), 3);
     assert!(
@@ -283,12 +284,12 @@ fn reads_poi_comment_fixtures() {
 #[test]
 fn generic_commit_publishes_the_artifact_a_second_render_would_produce() {
     use crate::cell_values::{Reference, Selector};
-    use litchi_ole_common::object::{Editor, Limits, Targets};
+    use litchi_ole_common::object::{Limits, OpenOptions, Package, Targets};
     use std::io::Cursor;
     use std::sync::Arc;
 
     for comments in [1_u32, 3, 12] {
-        let mut writer = crate::Writer::new();
+        let mut writer = crate::Builder::new();
         let sheet = writer.add_worksheet("Notes").unwrap();
         for index in 0..comments {
             writer
@@ -304,22 +305,25 @@ fn generic_commit_publishes_the_artifact_a_second_render_would_produce() {
         let other = writer.add_worksheet("Untouched").unwrap();
         writer.write_number(other, 20, 4, 42.0).unwrap();
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).unwrap();
+        writer.build().unwrap().write_to(&mut output).unwrap();
 
         let source = super::Snapshot::from_bytes(output.into_inner()).unwrap();
         let mut edit = source.edit();
         edit.replace(
-            Selector::Position(0),
+            Selector::Position(Position::new(0)),
             Reference::new(comments - 1, 1).unwrap(),
             super::Value::new("Probe", "a replacement of another length").unwrap(),
         )
         .unwrap();
-        let commit = edit.commit().unwrap();
-        let mut rerendered = Editor::open(
+        let commit = edit.commit_record().unwrap();
+        let mut rerendered = Package::open_with_options(
             source.bytes().to_vec(),
-            Targets::default(),
-            Limits::default(),
+            OpenOptions::new()
+                .targets(Targets::default())
+                .limits(Limits::default()),
         )
+        .unwrap()
+        .edit()
         .unwrap();
         rerendered
             .put_stream_shared(
@@ -329,7 +333,9 @@ fn generic_commit_publishes_the_artifact_a_second_render_would_produce() {
             .unwrap();
         assert_eq!(
             commit.snapshot().bytes(),
-            rerendered.finish().unwrap().as_slice()
+            crate::scoped::object_editor_bytes(&rerendered)
+                .unwrap()
+                .as_slice()
         );
     }
 }

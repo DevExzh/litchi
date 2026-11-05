@@ -3,23 +3,50 @@
 use super::codec::BoundedXml;
 use super::model::{
     CONNECTIONS_CONTENT_TYPE, CONNECTIONS_RELATIONSHIP, CORE_NAMESPACE, Conformance,
-    MAX_STRING_BYTES, MAX_XML_BYTES, STRICT_NAMESPACE,
+    MAX_CONNECTIONS, MAX_STRING_BYTES, MAX_XML_BYTES, STRICT_NAMESPACE,
 };
 use super::*;
 use litchi_opc::phys_pkg::{PhysPkgReader, PhysPkgWriter};
-use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, SourceLimits};
 
 const TEST_QUERY_TABLE_RELATIONSHIP: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/queryTable";
 const TEST_WORKSHEET_CONTENT_TYPE: &str =
     "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml";
 
+fn limits() -> SourceLimits {
+    SourceLimits::default()
+}
+
+fn parse(xml: &[u8]) -> crate::error::Result<Connections> {
+    Connections::parse(xml, &limits())
+}
+
+fn xml(value: &Connections, strict: bool) -> crate::error::Result<Vec<u8>> {
+    value.to_xml(strict, &limits())
+}
+
+fn load(package: &OpcPackage) -> crate::error::Result<Option<Connections>> {
+    let limits = package.read_limits();
+    load_from_package(package, &limits)
+}
+
+fn snapshot(package: &OpcPackage) -> crate::error::Result<Snapshot> {
+    let limits = package.read_limits();
+    Snapshot::load(package, &limits)
+}
+
+fn validate(package: &OpcPackage) -> crate::error::Result<Option<Connections>> {
+    let limits = package.read_limits();
+    validate_graph(package, &limits)
+}
+
 fn f(b: &[u8]) -> Connections {
-    let p = OpcPackage::from_bytes(b).unwrap();
-    load_from_package(&p).unwrap().unwrap()
+    let p = OpcPackage::from_bytes(b, SourceLimits::default()).unwrap();
+    load(&p).unwrap().unwrap()
 }
 fn f_without_broken_thumbnail(b: &[u8]) -> Connections {
-    let reader = PhysPkgReader::new(b).unwrap();
+    let reader = PhysPkgReader::new(b, SourceLimits::default()).unwrap();
     let mut writer = PhysPkgWriter::new();
     for name in reader.member_names().unwrap() {
         if name == "docProps/thumbnail.jpeg" {
@@ -60,9 +87,9 @@ fn poi_database_mce_and_strict_roundtrip() {
     let db = v.connections[0].database.as_ref().unwrap();
     assert!(db.connection.contains("Microsoft.ACE.OLEDB"));
     assert_eq!(db.command.as_deref(), Some("Office Address List"));
-    let x = v.to_xml(true).unwrap();
+    let x = xml(&v, true).unwrap();
     assert_eq!(
-        Connections::parse(&x).unwrap().connections[0]
+        parse(&x).unwrap().connections[0]
             .database
             .as_ref()
             .unwrap()
@@ -116,15 +143,15 @@ fn libreoffice_prefixed_core_namespace() {
 }
 #[test]
 fn standards_parameters_tables_strict_and_mce() {
-    let xml = format!(
+    let xml_source = format!(
         r#"<connections xmlns="{STRICT_NAMESPACE}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:u="urn:u" mc:Ignorable="u"><mc:AlternateContent><mc:Choice Requires="u"><u:x/></mc:Choice><mc:Fallback><connection id="9" refreshedVersion="8" credentials="stored"><webPr htmlFormat="rtf"><tables count="3"><m/><s v="A"/><x v="2"/></tables></webPr><parameters count="1"><parameter name="p" sqlType="4" parameterType="value" double="1.5"/></parameters></connection></mc:Fallback></mc:AlternateContent></connections>"#
     );
-    let v = Connections::parse(xml.as_bytes()).unwrap();
+    let v = parse(xml_source.as_bytes()).unwrap();
     assert_eq!(
         v.connections[0].parameters.as_ref().unwrap()[0].double,
         Some(1.5)
     );
-    assert_eq!(Connections::parse(&v.to_xml(false).unwrap()).unwrap(), v);
+    assert_eq!(parse(&xml(&v, false).unwrap()).unwrap(), v);
 }
 #[test]
 fn rejects_malformed_and_unsafe() {
@@ -140,10 +167,7 @@ fn rejects_malformed_and_unsafe() {
             r#"<!DOCTYPE x><connections xmlns="{CORE_NAMESPACE}"><connection id="1" refreshedVersion="0"/></connections>"#
         ),
     ] {
-        assert!(
-            Connections::parse(xml.as_bytes()).is_err(),
-            "accepted {xml}"
-        );
+        assert!(parse(xml.as_bytes()).is_err(), "accepted {xml}");
     }
 }
 
@@ -152,18 +176,12 @@ fn accepts_processing_instructions_while_still_validating_connections() {
     let xml = format!(
         r#"<?before?><connections xmlns="{CORE_NAMESPACE}"><?inside?><connection id="1" refreshedVersion="0"/><?between?></connections><?after?>"#
     );
-    assert_eq!(
-        Connections::parse(xml.as_bytes())
-            .unwrap()
-            .connections
-            .len(),
-        1
-    );
+    assert_eq!(parse(xml.as_bytes()).unwrap().connections.len(), 1);
 
     let malformed = format!(
         r#"<?keep?><connections xmlns="{CORE_NAMESPACE}"><connection id="1"/></connections>"#
     );
-    assert!(Connections::parse(malformed.as_bytes()).is_err());
+    assert!(parse(malformed.as_bytes()).is_err());
 }
 
 #[test]
@@ -171,7 +189,7 @@ fn failed_add_preserves_the_existing_connection_set() {
     let xml = format!(
         r#"<connections xmlns="{CORE_NAMESPACE}"><connection id="1" refreshedVersion="0"/></connections>"#
     );
-    let mut value = Connections::parse(xml.as_bytes()).unwrap();
+    let mut value = parse(xml.as_bytes()).unwrap();
     let before = value.clone();
 
     let mut invalid = value.connections[0].clone();
@@ -190,7 +208,7 @@ fn failed_reorder_preserves_the_existing_connection_order() {
     let xml = format!(
         r#"<connections xmlns="{CORE_NAMESPACE}"><connection id="1" refreshedVersion="0"/><connection id="2" refreshedVersion="0"/></connections>"#
     );
-    let mut value = Connections::parse(xml.as_bytes()).unwrap();
+    let mut value = parse(xml.as_bytes()).unwrap();
     let before = value.clone();
 
     assert!(value.reorder(&[1, 1]).is_err());
@@ -209,15 +227,126 @@ fn failed_reorder_preserves_the_existing_connection_order() {
 
 #[test]
 fn bounded_serializer_rejects_oversized_output_before_appending() {
-    let mut output = BoundedXml::new();
+    let mut output = BoundedXml::new(MAX_XML_BYTES);
     let error = output
         .push_bytes(&vec![b'x'; MAX_XML_BYTES + 1])
         .unwrap_err();
-    assert_eq!(
-        error.to_string(),
-        "serialized connections part exceeds 16 MiB"
-    );
+    assert!(matches!(
+        error,
+        Error::Limit {
+            kind: crate::LimitKind::Connections(LimitKind::OutputBytes),
+            ..
+        }
+    ));
     assert!(output.bytes.is_empty());
+}
+
+#[test]
+fn source_limits_bound_connection_codec_dimensions() {
+    let source = format!(
+        r#"<connections xmlns="{CORE_NAMESPACE}"><connection id="1" refreshedVersion="0"/></connections>"#
+    );
+    let bytes = SourceLimits::builder()
+        .max_part_bytes(16)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        Connections::parse(source.as_bytes(), &bytes),
+        Err(Error::Limit {
+            kind: crate::LimitKind::Connections(LimitKind::XmlBytes),
+            maximum: 16,
+            ..
+        })
+    ));
+    let value = parse(source.as_bytes()).unwrap();
+    assert!(matches!(
+        value.to_xml(false, &bytes),
+        Err(Error::Limit {
+            kind: crate::LimitKind::Connections(LimitKind::OutputBytes),
+            maximum: 16,
+            ..
+        })
+    ));
+
+    let events = SourceLimits::builder()
+        .max_events(1)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        Connections::parse(
+            format!(r#"<connections xmlns="{CORE_NAMESPACE}"/>"#).as_bytes(),
+            &events,
+        ),
+        Err(Error::Limit {
+            kind: crate::LimitKind::Connections(LimitKind::Events),
+            maximum: 1,
+            ..
+        })
+    ));
+
+    let depth = SourceLimits::builder()
+        .max_depth(1)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        Connections::parse(source.as_bytes(), &depth),
+        Err(Error::Limit {
+            kind: crate::LimitKind::Connections(LimitKind::Depth),
+            maximum: 1,
+            ..
+        })
+    ));
+}
+
+#[test]
+fn namespace_binding_limits_keep_count_separate_from_malformed_input() {
+    let source = format!(
+        r#"<connections xmlns="{CORE_NAMESPACE}" xmlns:f="urn:f" xmlns:g="urn:g"><connection xmlns:h="urn:h" xmlns:i="urn:i" id="1" refreshedVersion="0"/></connections>"#
+    );
+    let limits = SourceLimits::builder()
+        .max_xml_attribute_bytes(4)
+        .and_then(|builder| builder.max_relationship_target_bytes(4))
+        .unwrap()
+        .build()
+        .unwrap();
+    let parsed = Connections::parse(source.as_bytes(), &limits);
+    assert!(matches!(
+        parsed,
+        Err(Error::Limit {
+            kind: crate::LimitKind::Connections(LimitKind::NamespaceBindings),
+            observed: 5,
+            maximum: 4,
+        })
+    ));
+
+    let malformed = format!(r#"<connections xmlns="{CORE_NAMESPACE}"><connection id="1""#);
+    assert!(matches!(
+        Connections::parse(malformed.as_bytes(), &limits),
+        Err(Error::Invalid(_))
+    ));
+}
+
+#[test]
+fn connection_collection_limit_survives_public_parser() {
+    let count = MAX_CONNECTIONS + 1;
+    let mut source = String::with_capacity(count * 60 + 32);
+    source.push_str(&format!(r#"<connections xmlns="{CORE_NAMESPACE}">"#));
+    for id in 0..count {
+        source.push_str(&format!(r#"<connection id="{id}" refreshedVersion="0"/>"#));
+    }
+    source.push_str("</connections>");
+
+    assert!(matches!(
+        Connections::parse(source.as_bytes(), &SourceLimits::default()),
+        Err(Error::Limit {
+            kind: crate::LimitKind::Connections(LimitKind::Connections),
+            observed,
+            maximum,
+        }) if observed == count as u64 && maximum == MAX_CONNECTIONS as u64
+    ));
 }
 
 fn package(content_type: &str, external: bool, outbound: bool) -> OpcPackage {
@@ -252,9 +381,9 @@ fn package(content_type: &str, external: bool, outbound: bool) -> OpcPackage {
 }
 #[test]
 fn rejects_external_wrong_content_and_outbound_package_edges() {
-    assert!(load_from_package(&package(CONNECTIONS_CONTENT_TYPE, true, false)).is_err());
-    assert!(load_from_package(&package("application/xml", false, false)).is_err());
-    assert!(load_from_package(&package(CONNECTIONS_CONTENT_TYPE, false, true)).is_err());
+    assert!(load(&package(CONNECTIONS_CONTENT_TYPE, true, false)).is_err());
+    assert!(load(&package("application/xml", false, false)).is_err());
+    assert!(load(&package(CONNECTIONS_CONTENT_TYPE, false, true)).is_err());
 }
 
 fn transaction_connection(id: u32, name: &str) -> Connection {
@@ -337,7 +466,7 @@ fn many_connections_source(count: u32) -> Vec<u8> {
 #[test]
 fn typed_transaction_preserves_opaque_connection_xml_and_inverse() {
     let mut package = transaction_package(true);
-    let before = Snapshot::load(&package).unwrap();
+    let before = snapshot(&package).unwrap();
     let mut transaction = Transaction::new(&mut package).unwrap();
     assert!(
         transaction
@@ -364,7 +493,7 @@ fn typed_transaction_preserves_opaque_connection_xml_and_inverse() {
             .any(|window| window == b"name=\"after\"")
     );
     commit.patch().inverse().apply(&mut package).unwrap();
-    assert_eq!(Snapshot::load(&package).unwrap(), before);
+    assert_eq!(snapshot(&package).unwrap(), before);
 }
 
 #[test]
@@ -452,7 +581,7 @@ fn extension_owner_transaction_projection_handles_compact_pi_mce_and_foreign_con
             .get_part(&PackURI::new("/xl/connections.xml").unwrap())
             .unwrap()
             .blob();
-        let reopened = Snapshot::load(&package).unwrap();
+        let reopened = snapshot(&package).unwrap();
         let extension = reopened.connections().unwrap().connections[0]
             .extension_xml
             .as_deref()
@@ -575,7 +704,7 @@ fn large_transaction_scalar_commit_reopens_with_stable_ids() {
             .unwrap()
     );
     assert!(transaction.commit().unwrap().changed());
-    let reopened = Snapshot::load(&package).unwrap();
+    let reopened = snapshot(&package).unwrap();
     assert_eq!(
         reopened.connections().unwrap().connections.len(),
         COUNT as usize
@@ -602,11 +731,11 @@ fn large_transaction_reorder_publishes_the_requested_order() {
         .unwrap()
         .set_blob(many_connections_source(COUNT));
     let mut transaction = Transaction::new(&mut package).unwrap();
-    let mut reordered = transaction.connections().unwrap().clone();
+    let mut reordered = transaction.connections().unwrap().unwrap().clone();
     reordered.connections.reverse();
     assert!(transaction.replace(Some(reordered)).unwrap());
     assert!(transaction.commit().unwrap().changed());
-    let reopened = Snapshot::load(&package).unwrap();
+    let reopened = snapshot(&package).unwrap();
     let connections = &reopened.connections().unwrap().connections;
     assert_eq!(connections.first().unwrap().id, COUNT);
     assert_eq!(connections.last().unwrap().id, 1);
@@ -615,13 +744,13 @@ fn large_transaction_reorder_publishes_the_requested_order() {
 #[test]
 fn transaction_noop_and_stale_failure_are_source_checked() {
     let mut package = transaction_package(true);
-    let before = Snapshot::load(&package).unwrap();
+    let before = snapshot(&package).unwrap();
     let mut transaction = Transaction::new(&mut package).unwrap();
     assert!(!transaction.edit(1, |_connection| Ok(())).unwrap());
     let commit = transaction.commit().unwrap();
     assert!(!commit.changed());
-    assert!(commit.patch().is_empty());
-    assert_eq!(Snapshot::load(&package).unwrap(), before);
+    assert!(commit.patch().is_noop());
+    assert_eq!(snapshot(&package).unwrap(), before);
 
     let patch = {
         let mut transaction = Transaction::new(&mut package).unwrap();
@@ -649,7 +778,7 @@ fn transaction_creates_and_removes_the_connections_owner() {
         .unwrap();
     transaction.commit().unwrap();
     assert_eq!(
-        Snapshot::load(&package)
+        snapshot(&package)
             .unwrap()
             .connections()
             .unwrap()
@@ -661,7 +790,7 @@ fn transaction_creates_and_removes_the_connections_owner() {
     let mut transaction = Transaction::new(&mut package).unwrap();
     transaction.remove(9).unwrap();
     transaction.commit().unwrap();
-    assert!(Snapshot::load(&package).unwrap().connections().is_none());
+    assert!(snapshot(&package).unwrap().connections().is_none());
     assert!(
         package
             .get_part(&PackURI::new("/xl/connections.xml").unwrap())
@@ -707,7 +836,7 @@ fn query_table_validation_accepts_processing_instructions() {
         false,
         QUERY_TABLE_CONTENT_TYPE,
     );
-    let snapshot = Snapshot::load(&package).unwrap();
+    let snapshot = snapshot(&package).unwrap();
     assert_eq!(snapshot.query_table_parts().count(), 1);
 }
 
@@ -721,7 +850,7 @@ fn graph_closure_rejects_foreign_connections_and_invalid_query_table_edges() {
     );
     other.relate_to("connections.xml", CONNECTIONS_RELATIONSHIP);
     foreign.add_part(Box::new(other));
-    assert!(validate_graph(&foreign).is_err());
+    assert!(validate(&foreign).is_err());
 
     let wrong_target = query_table_package(
         TEST_WORKSHEET_CONTENT_TYPE,
@@ -729,7 +858,7 @@ fn graph_closure_rejects_foreign_connections_and_invalid_query_table_edges() {
         false,
         QUERY_TABLE_CONTENT_TYPE,
     );
-    assert!(validate_graph(&wrong_target).is_err());
+    assert!(validate(&wrong_target).is_err());
 
     let wrong_source = query_table_package(
         "application/xml",
@@ -737,7 +866,7 @@ fn graph_closure_rejects_foreign_connections_and_invalid_query_table_edges() {
         false,
         QUERY_TABLE_CONTENT_TYPE,
     );
-    assert!(validate_graph(&wrong_source).is_err());
+    assert!(validate(&wrong_source).is_err());
 
     let mut wrong_workbook = transaction_package(true);
     wrong_workbook
@@ -745,7 +874,7 @@ fn graph_closure_rejects_foreign_connections_and_invalid_query_table_edges() {
         .unwrap()
         .set_content_type("application/xml".into())
         .unwrap();
-    assert!(validate_graph(&wrong_workbook).is_err());
+    assert!(validate(&wrong_workbook).is_err());
 }
 
 #[test]
@@ -767,7 +896,7 @@ fn recognized_owner_targets_reject_query_and_fragment_components() {
             "rIdConnections".into(),
             false,
         );
-    assert!(validate_graph(&package).is_err());
+    assert!(validate(&package).is_err());
 }
 
 #[test]
@@ -784,7 +913,7 @@ fn conformance_uses_the_root_namespace_only() {
             .into_bytes(),
         );
     assert_eq!(
-        Snapshot::load(&package).unwrap().conformance(),
+        snapshot(&package).unwrap().conformance(),
         Conformance::Transitional
     );
 
@@ -798,7 +927,7 @@ fn conformance_uses_the_root_namespace_only() {
             .into_bytes(),
         );
     assert_eq!(
-        Snapshot::load(&package).unwrap().conformance(),
+        snapshot(&package).unwrap().conformance(),
         Conformance::Strict
     );
 }

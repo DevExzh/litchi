@@ -38,13 +38,14 @@
 //! floating text box, then re-opens it with the crate's own reader: header
 //! text, header text box text/shape metadata, and both drawing layers must
 //! resolve correctly without disturbing the main stories.
+use litchi_doc::builder::Builder;
 use litchi_doc::parts::headers::HeaderFooterType;
 use litchi_doc::shape::{extract_drawing_shapes, extract_shape_text};
-use litchi_doc::writer::{FloatingPosition, Writer};
+use litchi_doc::writer::FloatingPosition;
 use litchi_doc::writer::{Kind as DrawingKind, Shape as DrawingShape};
 use litchi_doc::{
-    HeaderFooterParagraph, HeaderKind, Package, ShapeHorizontalOrigin, ShapeTextWrap,
-    ShapeVerticalOrigin,
+    HeaderFooterParagraph, HeaderKind, ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin,
+    raw::Reader,
 };
 use litchi_odraw::{Record, shape::Kind};
 use std::io::Cursor;
@@ -56,7 +57,7 @@ const HEADER_BOX_SPID: u32 = 2049;
 const MAIN_BOX_SPID: u32 = 1025;
 
 fn write_doc_with_header_text_box() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("Body text").unwrap();
     writer
         .set_odd_header_paragraphs(vec![HeaderFooterParagraph::plain("LETTERHEAD")])
@@ -87,7 +88,7 @@ fn write_doc_with_header_text_box() -> Vec<u8> {
     writer.add_paragraph("More body").unwrap();
 
     let mut cursor = Cursor::new(Vec::new());
-    writer.write_to(&mut cursor).unwrap();
+    writer.build().unwrap().write_to(&mut cursor).unwrap();
     cursor.into_inner()
 }
 
@@ -95,7 +96,7 @@ fn write_doc_with_header_text_box() -> Vec<u8> {
 fn header_text_box_round_trips_through_doc_reader() {
     let doc_bytes = write_doc_with_header_text_box();
 
-    let mut package = Package::from_reader(Cursor::new(&doc_bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(&doc_bytes)).unwrap();
     let document = package.document().unwrap();
 
     // Main story intact.
@@ -146,7 +147,11 @@ fn header_text_box_round_trips_through_doc_reader() {
     assert_eq!(main_positions[0].spa.shape_id, MAIN_BOX_SPID);
 
     // Both drawing layers extract: the header text box and the main one.
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(&doc_bytes)).unwrap();
+    let mut ole = litchi_cfb::OleFile::open(
+        Cursor::new(&doc_bytes),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let shapes = extract_drawing_shapes(&mut ole).unwrap();
     let header_box = shapes
         .iter()
@@ -163,7 +168,11 @@ fn header_text_box_round_trips_through_doc_reader() {
     assert_eq!(main_box.shape_type, Kind::TextBox);
     assert_eq!(main_box.text.as_deref(), Some("Main box\r"));
 
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(&doc_bytes)).unwrap();
+    let mut ole = litchi_cfb::OleFile::open(
+        Cursor::new(&doc_bytes),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     assert_eq!(
         extract_shape_text(&mut ole).unwrap(),
         "Main box\r\nWatermark\rDraft\r"
@@ -177,7 +186,11 @@ fn header_text_box_writes_two_drawing_layers() {
     const RECORD_DG_CONTAINER: u16 = 0xF002;
 
     let doc_bytes = write_doc_with_header_text_box();
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(&doc_bytes)).unwrap();
+    let mut ole = litchi_cfb::OleFile::open(
+        Cursor::new(&doc_bytes),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let word_document = ole.open_stream(&["WordDocument"]).unwrap();
     let table_stream = ole.open_stream(&["1Table"]).unwrap();
     let fib = FileInformationBlock::parse(&word_document).unwrap();
@@ -190,12 +203,13 @@ fn header_text_box_writes_two_drawing_layers() {
     let (dgg_offset, dgg_len) = fib.get_table_pointer(FIB_INDEX_DGG_INFO).unwrap();
     assert!(dgg_len > 0);
     let dgg = &table_stream[dgg_offset as usize..(dgg_offset + dgg_len) as usize];
-    let (_first, first_size) = Record::parse(dgg, 0).unwrap();
+    let (_first, first_size) = Record::parse(dgg, 0, litchi_odraw::Limits::default()).unwrap();
     let mut dgglbls = Vec::new();
     let mut offset = first_size;
     while offset + 9 <= dgg.len() {
         dgglbls.push(dgg[offset]);
-        let Ok((record, size)) = Record::parse(dgg, offset + 1) else {
+        let Ok((record, size)) = Record::parse(dgg, offset + 1, litchi_odraw::Limits::default())
+        else {
             break;
         };
         if record.raw_kind() != RECORD_DG_CONTAINER {
@@ -208,15 +222,15 @@ fn header_text_box_writes_two_drawing_layers() {
 
 #[test]
 fn document_with_header_but_no_boxes_has_empty_header_story_tables() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("plain").unwrap();
     writer.set_odd_header("just a header");
 
     let mut cursor = Cursor::new(Vec::new());
-    writer.write_to(&mut cursor).unwrap();
+    writer.build().unwrap().write_to(&mut cursor).unwrap();
     let doc_bytes = cursor.into_inner();
 
-    let mut package = Package::from_reader(Cursor::new(&doc_bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(&doc_bytes)).unwrap();
     let document = package.document().unwrap();
     assert!(document.header_text_boxes().is_empty());
     assert!(document.header_shape_positions().is_empty());

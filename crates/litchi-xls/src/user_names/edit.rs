@@ -1,5 +1,6 @@
 //! Immutable snapshots and source-checked edits for `User Names`.
 
+use litchi_core::edit::RefusalKind;
 use std::fmt;
 use std::mem::size_of;
 use std::sync::Arc;
@@ -17,40 +18,23 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-    /// Parse a complete `User Names` stream with default resource bounds.
-    /// # Errors
-    ///
-    /// Returns an error when framing, the stream grammar, or a typed payload
-    /// violates its bounded MS-XLS contract.
-    pub fn parse(bytes: impl AsRef<[u8]>) -> Result<Self> {
-        Self::parse_with_limits(bytes, Limits::default())
-    }
-
     /// Parse a complete stream with explicit resource bounds.
     /// # Errors
     ///
     /// Returns an error when a bound or the stream grammar is violated.
-    pub fn parse_with_limits(bytes: impl AsRef<[u8]>, limits: Limits) -> Result<Self> {
+    pub fn parse(bytes: impl AsRef<[u8]>, limits: Limits) -> Result<Self> {
         let limits = limits.validate()?;
         let source = bytes.as_ref();
         ensure_source_bound(source, limits)?;
         let bytes = copy_bytes(source, "retaining User Names source")?;
-        Self::parse_shared_with_limits(bytes, limits)
-    }
-
-    /// Parse an already shared source allocation without copying it.
-    /// # Errors
-    ///
-    /// Returns an error when a bound or the stream grammar is violated.
-    pub fn parse_shared(bytes: Arc<[u8]>) -> Result<Self> {
-        Self::parse_shared_with_limits(bytes, Limits::default())
+        Self::parse_shared(bytes, limits)
     }
 
     /// Parse an already shared source allocation with explicit bounds.
     /// # Errors
     ///
     /// Returns an error when a bound or the stream grammar is violated.
-    pub fn parse_shared_with_limits(bytes: Arc<[u8]>, limits: Limits) -> Result<Self> {
+    pub fn parse_shared(bytes: Arc<[u8]>, limits: Limits) -> Result<Self> {
         let package = Arc::new(Package::parse(&bytes, limits)?);
         Ok(Self {
             fingerprint: fingerprint(&bytes),
@@ -129,11 +113,11 @@ impl Snapshot {
         ensure_source_bound(&bytes, limits)?;
         ensure_revision_log_bound(&revision_log, limits)?;
         if revision_guids.len() > limits.max_revision_guids {
-            return Err(Error::UnsafeEdit(format!(
-                "Revision Log contains {} GUIDs; maximum is {}",
-                revision_guids.len(),
-                limits.max_revision_guids
-            )));
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit user names",
+                "the Revision Log exceeds its GUID limit",
+            ));
         }
         Self::parse_shared_with_revision_guids_and_limits_and_source(
             bytes,
@@ -212,8 +196,8 @@ impl Snapshot {
 
     /// Start a detached, failure-atomic edit.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction::new(self.clone())
+    pub fn edit(&self) -> Edit {
+        Edit::new(self.clone())
     }
 
     /// Publish the exact validated source stream.
@@ -246,13 +230,13 @@ impl Eq for Snapshot {}
 
 /// A detached, source-checked transaction over user metadata and membership.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub struct Edit {
     source: Snapshot,
     candidate: Arc<[u8]>,
     package: Arc<Package>,
 }
 
-impl Transaction {
+impl Edit {
     fn new(source: Snapshot) -> Self {
         Self {
             candidate: Arc::clone(&source.bytes),
@@ -285,33 +269,17 @@ impl Transaction {
         self.package.model()
     }
 
-    /// Materialize and validate the staged candidate.
-    /// # Errors
-    ///
-    /// Returns an error if the staged bytes no longer satisfy the stream
-    /// grammar or the bound Revision Log closure.
-    pub fn snapshot(&self) -> Result<Snapshot> {
-        if self.candidate.as_ref() == self.source.bytes() {
-            return Ok(self.source.clone());
-        }
-        self.parse_candidate(Arc::clone(&self.candidate))
-    }
-
-    /// Whether staged bytes differ from the exact source stream.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.candidate.as_ref() != self.source.bytes()
-    }
-
     /// Change one user name while retaining its GUID, timestamp, and reserved byte.
     /// # Errors
     ///
     /// Returns an error when the index or new name is invalid.
     pub fn set_user_name(&mut self, index: usize, name: impl Into<String>) -> Result<&mut Self> {
         let current = self.users().get(index).cloned().ok_or_else(|| {
-            Error::UnsafeEdit(format!(
-                "User Names index {index} is outside the collection"
-            ))
+            Error::refused(
+                RefusalKind::InvalidValue,
+                "edit user names",
+                "User Names index is outside the collection",
+            )
         })?;
         let updated = current.with_user_name(name)?;
         if updated == current {
@@ -334,9 +302,11 @@ impl Transaction {
         opened_at: crate::revision_records::ShortDtr,
     ) -> Result<&mut Self> {
         let current = self.users().get(index).cloned().ok_or_else(|| {
-            Error::UnsafeEdit(format!(
-                "User Names index {index} is outside the collection"
-            ))
+            Error::refused(
+                RefusalKind::InvalidValue,
+                "edit user names",
+                "User Names index is outside the collection",
+            )
         })?;
         let updated = current.with_opened_at(opened_at);
         if updated == current {
@@ -400,12 +370,6 @@ impl Transaction {
         Ok(removed)
     }
 
-    /// Discard staged changes and return the original source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
-    }
-
     /// Validate and publish the candidate with a reversible source-checked patch.
     /// # Errors
     ///
@@ -418,10 +382,7 @@ impl Transaction {
         } = self;
         if candidate.as_ref() == source.bytes() {
             let patch = Patch::new(source.clone(), source.clone());
-            return Ok(Commit {
-                snapshot: source,
-                patch,
-            });
+            return Ok(Commit::new(source, patch, Diagnostics::UNCHANGED));
         }
         let snapshot = Snapshot {
             fingerprint: fingerprint(&candidate),
@@ -432,7 +393,8 @@ impl Transaction {
             package,
         };
         let patch = Patch::new(source, snapshot.clone());
-        Ok(Commit { snapshot, patch })
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(snapshot, patch, diagnostics))
     }
 
     fn replace_candidate(&mut self, candidate: Vec<u8>) -> Result<()> {
@@ -450,24 +412,6 @@ impl Transaction {
         self.candidate = bytes;
         self.package = Arc::new(package);
         Ok(())
-    }
-
-    fn parse_candidate(&self, bytes: Arc<[u8]>) -> Result<Snapshot> {
-        let package = if let Some(guids) = &self.package.revision_guids {
-            Package::parse_with_revision_guids_and_source(
-                &bytes,
-                self.package.limits,
-                Arc::clone(guids),
-                self.package.revision_log_source.clone(),
-            )?
-        } else {
-            Package::parse(&bytes, self.package.limits)?
-        };
-        Ok(Snapshot {
-            fingerprint: fingerprint(&bytes),
-            bytes,
-            package: Arc::new(package),
-        })
     }
 }
 
@@ -528,12 +472,6 @@ impl Patch {
         self.before == self.after
     }
 
-    /// Alias for [`Self::is_noop`].
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.is_noop()
-    }
-
     /// Apply this patch only to its exact source snapshot.
     /// # Errors
     ///
@@ -544,9 +482,10 @@ impl Patch {
             || source.package.revision_guids != self.source_revision_guids
             || source.package.revision_log_source != self.source_revision_log_source
         {
-            return Err(Error::UnsafeEdit(
-                "User Names patch source does not match its base snapshot".to_string(),
-            ));
+            return Err(Error::PatchConflict {
+                operation: "edit user names",
+                reason: "User Names patch source does not match its base snapshot",
+            });
         }
         if self.is_noop() {
             Ok(source.clone())
@@ -558,7 +497,7 @@ impl Patch {
                 source.package.revision_log_source.clone(),
             )
         } else {
-            Snapshot::parse_shared_with_limits(Arc::clone(&self.after), source.package.limits)
+            Snapshot::parse_shared(Arc::clone(&self.after), source.package.limits)
         }
     }
 
@@ -572,9 +511,10 @@ impl Patch {
             || target.package.revision_guids != self.target_revision_guids
             || target.package.revision_log_source != self.target_revision_log_source
         {
-            return Err(Error::UnsafeEdit(
-                "User Names patch target does not match its committed snapshot".to_string(),
-            ));
+            return Err(Error::PatchConflict {
+                operation: "edit user names",
+                reason: "User Names patch target does not match its committed snapshot",
+            });
         }
         if self.is_noop() {
             Ok(target.clone())
@@ -586,7 +526,7 @@ impl Patch {
                 target.package.revision_log_source.clone(),
             )
         } else {
-            Snapshot::parse_shared_with_limits(Arc::clone(&self.before), target.package.limits)
+            Snapshot::parse_shared(Arc::clone(&self.before), target.package.limits)
         }
     }
 
@@ -606,56 +546,12 @@ impl Patch {
     }
 }
 
-/// A successful edit publication containing its snapshot and reversible patch.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
+/// A published edit: the new snapshot, its reversible patch and
+/// diagnostics.
+pub type Commit = litchi_core::edit::Commit<Snapshot, Patch>;
 
-impl Commit {
-    /// Whether publication changed any stream byte.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        !self.patch.is_noop()
-    }
-
-    /// Resulting immutable snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Reversible source-checked patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consume the publication into its snapshot.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
-    }
-
-    /// Consume the publication into its patch.
-    #[must_use]
-    pub fn into_patch(self) -> Patch {
-        self.patch
-    }
-
-    /// Consume the publication into exact stream bytes.
-    #[must_use]
-    pub fn into_bytes(self) -> Vec<u8> {
-        self.snapshot.finish()
-    }
-
-    /// Consume the publication into both artifacts.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
-    }
-}
+/// Content-free diagnostics of one commit.
+pub use litchi_core::edit::Diagnostics;
 
 fn copy_bytes(bytes: &[u8], context: &'static str) -> Result<Arc<[u8]>> {
     let mut owned = Vec::new();
@@ -668,43 +564,44 @@ fn copy_bytes(bytes: &[u8], context: &'static str) -> Result<Arc<[u8]>> {
 
 fn ensure_source_bound(bytes: &[u8], limits: Limits) -> Result<()> {
     if bytes.len() > limits.max_stream_bytes {
-        return Err(Error::UnsafeEdit(format!(
-            "User Names stream has {} bytes; maximum is {}",
-            bytes.len(),
-            limits.max_stream_bytes
-        )));
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit user names",
+            "the User Names stream exceeds its byte limit",
+        ));
     }
     Ok(())
 }
 
 fn ensure_revision_log_bound(bytes: &[u8], limits: Limits) -> Result<()> {
     if bytes.len() > limits.max_stream_bytes {
-        return Err(Error::UnsafeEdit(format!(
-            "Revision Log stream has {} bytes; maximum is {}",
-            bytes.len(),
-            limits.max_stream_bytes
-        )));
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit user names",
+            "the Revision Log stream exceeds its byte limit",
+        ));
     }
     Ok(())
 }
 
 fn copy_guids(guids: &[[u8; 16]], limits: Limits) -> Result<Arc<[UserGuid]>> {
     if guids.len() > limits.max_revision_guids {
-        return Err(Error::UnsafeEdit(format!(
-            "Revision Log contains {} GUIDs; maximum is {}",
-            guids.len(),
-            limits.max_revision_guids
-        )));
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit user names",
+            "the Revision Log exceeds its GUID limit",
+        ));
     }
     let byte_count = guids
         .len()
         .checked_mul(size_of::<UserGuid>())
         .ok_or(Error::Allocation("sizing Revision Log GUID closure"))?;
     if byte_count > limits.max_stream_bytes {
-        return Err(Error::UnsafeEdit(format!(
-            "Revision Log GUID closure requires {byte_count} bytes; maximum is {}",
-            limits.max_stream_bytes
-        )));
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit user names",
+            "the Revision Log GUID closure exceeds the stream byte limit",
+        ));
     }
     let mut owned = Vec::new();
     owned

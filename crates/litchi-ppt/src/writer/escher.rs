@@ -38,7 +38,8 @@ pub(crate) use model::{
 
 pub(crate) use codec::{
     EscherBuilder, append_dg_container_with_charts, build_client_textbox,
-    create_dg_container_with_shapes, create_dgg_container, create_dgg_container_with_blips,
+    create_blank_dg_container, create_dg_container_with_shapes, create_dgg_container,
+    create_dgg_container_with_blips,
 };
 
 pub(crate) use semantic::{GroupChild, GroupShape};

@@ -16,7 +16,10 @@ impl UnknownRecord {
         if expected_length != self.record.data.len() {
             return corrupted("unknown ExObjList record has inconsistent payload length");
         }
-        self.to_record_bytes().map(|_| ())
+        if self.record.version > 0x000f || self.record.instance > 0x0fff {
+            return corrupted("unknown ExObjList record header exceeds its encoded domain");
+        }
+        Ok(())
     }
 }
 

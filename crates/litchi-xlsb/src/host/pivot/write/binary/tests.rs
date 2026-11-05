@@ -1,10 +1,10 @@
 //! Focused PivotCache binary-writer tests.
 
 use super::semantic::write_pivot_cache_definition;
+use crate::builder::{self, Builder};
 use crate::package::error::Error;
 use crate::package::pivot::model::*;
 use crate::package::pivot::parse_pivot_cache_definition;
-use crate::writer::{MutableWorksheet, WorkbookWriter};
 use std::io::Cursor;
 
 fn field(name: &str) -> PivotCacheField {
@@ -334,7 +334,7 @@ fn full_definition() -> PivotCacheDefinition {
 
 fn round_trip(definition: &PivotCacheDefinition) -> PivotCacheDefinition {
     let bytes = write_pivot_cache_definition(definition).unwrap();
-    parse_pivot_cache_definition(&bytes).unwrap()
+    parse_pivot_cache_definition(&bytes, crate::raw::Limits::DEFAULT).unwrap()
 }
 
 #[test]
@@ -641,15 +641,15 @@ fn written_caches_round_trip_through_the_package() {
         ..PivotCacheDefinition::default()
     };
 
-    let mut workbook = WorkbookWriter::new();
-    workbook.add_worksheet(MutableWorksheet::new("Sheet1"));
+    let mut workbook = Builder::new();
+    workbook.add_worksheet(builder::Worksheet::new("Sheet1"));
     let first_id = workbook.add_pivot_cache(&first).unwrap();
     let second_id = workbook.add_pivot_cache(&second).unwrap();
     assert_eq!(first_id, 1);
     assert_eq!(second_id, 2);
 
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook.build().unwrap().write_to(&mut output).unwrap();
     let reader = crate::package::Workbook::new(Cursor::new(output.into_inner())).unwrap();
 
     let definitions = reader.pivot_cache_definitions();
@@ -675,8 +675,8 @@ fn add_pivot_cache_surfaces_serializer_refusals() {
     };
     broken.fields = vec![broken_field];
 
-    let mut workbook = WorkbookWriter::new();
-    workbook.add_worksheet(MutableWorksheet::new("Sheet1"));
+    let mut workbook = Builder::new();
+    workbook.add_worksheet(builder::Worksheet::new("Sheet1"));
     assert!(matches!(
         workbook.add_pivot_cache(&broken),
         Err(Error::Unrecognized { .. })

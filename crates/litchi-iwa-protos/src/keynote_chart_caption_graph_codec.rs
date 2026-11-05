@@ -41,24 +41,32 @@ impl CaptionGraphKind {
         }
     }
 
-    const fn placement_anchors(self) -> (u64, u64) {
-        match self {
-            // TSA.CaptionPlacementArchive.caption_anchor_location,
-            // TSA.CaptionPlacementArchive.drawable_anchor_location.
-            Self::Caption => (7, 1),
-            Self::Title => (1, 7),
+    const fn placement_anchors(self, profile: CaptionGraphProfile) -> (u64, u64) {
+        // TSA.CaptionPlacementArchive.caption_anchor_location,
+        // TSA.CaptionPlacementArchive.drawable_anchor_location
+        // (1 = top, 7 = bottom).
+        match (self, profile) {
+            (Self::Caption, CaptionGraphProfile::Inline)
+            | (Self::Title, CaptionGraphProfile::Componentized) => (7, 1),
+            (Self::Title, CaptionGraphProfile::Inline)
+            | (Self::Caption, CaptionGraphProfile::Componentized) => (1, 7),
         }
     }
 }
 
 /// Layout profile for a fresh caption graph.
 ///
-/// Only the inline profile is currently admitted by this codec.  Keeping the
-/// profile typed leaves the componentized graph variant out of this narrowly
-/// bounded authoring seam instead of silently applying inline defaults to it.
+/// The two profiles author the same style, info and storage payloads; they
+/// differ in the placement anchors (and, outside this codec, in where the
+/// style lives and in the objects' metadata).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CaptionGraphProfile {
+    /// The graph all four objects of which live in the drawable's component.
     Inline,
+    /// The cross-component graph current Numbers files use for a drawable
+    /// stored beside the calculation engine: the label's style lives in the
+    /// document stylesheet, and the placement anchors are swapped.
+    Componentized,
 }
 
 /// Short aliases for callers that use the generic graph terminology.
@@ -330,9 +338,7 @@ pub fn encode_caption_graph_with_profile_with_report(
     profile: CaptionGraphProfile,
     options: EncodeOptions,
 ) -> Result<EncodeOutput, EncodeError> {
-    match profile {
-        CaptionGraphProfile::Inline => encode_inline_graph_with_report(write, kind, options),
-    }
+    encode_graph_with_report(write, kind, profile, options)
 }
 
 /// Encode a fresh inline title or caption graph with an explicit kind.
@@ -344,9 +350,10 @@ pub fn encode_caption_graph_with_kind_with_report(
     encode_caption_graph_with_profile_with_report(write, kind, CaptionGraphProfile::Inline, options)
 }
 
-fn encode_inline_graph_with_report(
+fn encode_graph_with_report(
     write: CaptionGraphWrite<'_>,
     kind: CaptionGraphKind,
+    profile: CaptionGraphProfile,
     options: EncodeOptions,
 ) -> Result<EncodeOutput, EncodeError> {
     validate_write(write)?;
@@ -354,7 +361,7 @@ fn encode_inline_graph_with_report(
         style_size(write, kind),
         info_size(write, kind),
         storage_size(write),
-        placement_size(kind),
+        placement_size(kind, profile),
     ];
     let output_bytes = sizes
         .into_iter()
@@ -386,7 +393,7 @@ fn encode_inline_graph_with_report(
     let mut storage = reserve_exact(sizes[2])?;
     encode_storage(&mut storage, write);
     let mut placement = reserve_exact(sizes[3])?;
-    encode_placement(&mut placement, kind);
+    encode_placement(&mut placement, kind, profile);
     if [style.len(), info.len(), storage.len(), placement.len()] != sizes {
         return Err(EncodeError::Verification);
     }
@@ -929,13 +936,13 @@ fn encode_storage(output: &mut Vec<u8>, write: CaptionGraphWrite<'_>) {
     encode_object_attribute(output, None);
 }
 
-fn placement_size(kind: CaptionGraphKind) -> usize {
-    let (caption_anchor, drawable_anchor) = kind.placement_anchors();
+fn placement_size(kind: CaptionGraphKind, profile: CaptionGraphProfile) -> usize {
+    let (caption_anchor, drawable_anchor) = kind.placement_anchors(profile);
     varint_field_size(1, caption_anchor) + varint_field_size(2, drawable_anchor)
 }
 
-fn encode_placement(output: &mut Vec<u8>, kind: CaptionGraphKind) {
-    let (caption_anchor, drawable_anchor) = kind.placement_anchors();
+fn encode_placement(output: &mut Vec<u8>, kind: CaptionGraphKind, profile: CaptionGraphProfile) {
+    let (caption_anchor, drawable_anchor) = kind.placement_anchors(profile);
     put_varint_field(output, 1, caption_anchor);
     put_varint_field(output, 2, drawable_anchor);
 }
@@ -1148,7 +1155,7 @@ mod tests {
     }
 
     fn oracle_placement_kind(kind: CaptionGraphKind) -> Vec<u8> {
-        let (caption_anchor, drawable_anchor) = kind.placement_anchors();
+        let (caption_anchor, drawable_anchor) = kind.placement_anchors(CaptionGraphProfile::Inline);
         tsa::CaptionPlacementArchive {
             caption_anchor_location: Some(caption_anchor as i32),
             drawable_anchor_location: Some(drawable_anchor as i32),
@@ -1228,6 +1235,46 @@ mod tests {
             tsa::CaptionPlacementArchive::decode(output.payloads().placement()).expect("placement");
         assert_eq!(placement.caption_anchor_location, Some(1));
         assert_eq!(placement.drawable_anchor_location, Some(7));
+    }
+
+    #[test]
+    fn componentized_profile_swaps_only_the_placement_anchors() {
+        let write = write("Componentized", Some("en"));
+        for (kind, anchors) in [
+            (CaptionGraphKind::Caption, (Some(1), Some(7))),
+            (CaptionGraphKind::Title, (Some(7), Some(1))),
+        ] {
+            let inline = encode_caption_graph_with_profile_with_report(
+                write,
+                kind,
+                CaptionGraphProfile::Inline,
+                EncodeOptions::for_text(write.text),
+            )
+            .expect("inline graph");
+            let componentized = encode_caption_graph_with_profile_with_report(
+                write,
+                kind,
+                CaptionGraphProfile::Componentized,
+                EncodeOptions::for_text(write.text),
+            )
+            .expect("componentized graph");
+            assert_eq!(componentized.payloads().style(), inline.payloads().style());
+            assert_eq!(componentized.payloads().info(), inline.payloads().info());
+            assert_eq!(
+                componentized.payloads().storage(),
+                inline.payloads().storage()
+            );
+            let placement =
+                tsa::CaptionPlacementArchive::decode(componentized.payloads().placement())
+                    .expect("placement");
+            assert_eq!(
+                (
+                    placement.caption_anchor_location,
+                    placement.drawable_anchor_location
+                ),
+                anchors
+            );
+        }
     }
 
     #[test]

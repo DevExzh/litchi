@@ -2,15 +2,16 @@
 
 use super::codec::{
     parse_comment_authors, parse_comment_authors_with, parse_slide_comments_strict,
-    parse_slide_comments_with_tolerance, validate_authors, validate_comment_list,
-    write_comment_authors, write_slide_comments,
+    parse_slide_comments_with_tolerance, validate_authors_with_limit,
+    validate_comment_list_with_limit, write_comment_authors, write_slide_comments,
 };
 use super::{
     AUTHORS_CONTENT_TYPE, AUTHORS_REL, Author, COMMENTS_CONTENT_TYPE, COMMENTS_REL, Comment,
-    Comments, Conformance, List, MAX_SLIDES, MAX_TOTAL_COMMENTS, SLIDE_CONTENT_TYPE, SLIDE_REL,
-    STRICT_AUTHORS_REL, STRICT_COMMENTS_REL, STRICT_SLIDE_REL, invalid,
+    Comments, Conformance, Limits, List, MAX_SLIDES, MAX_TOTAL_COMMENTS, SLIDE_CONTENT_TYPE,
+    SLIDE_REL, STRICT_AUTHORS_REL, STRICT_COMMENTS_REL, STRICT_SLIDE_REL, invalid, limit,
 };
 use crate::leniency::{CommentDefect, ToleranceReport};
+use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 use std::collections::{HashMap, HashSet};
@@ -46,7 +47,19 @@ pub fn load_presentation_comments_with_tolerance(
     package: &OpcPackage,
     tolerance: &mut ToleranceReport,
 ) -> Result<Option<Comments>> {
-    load_comments(package, Some(tolerance))
+    load_comments_with_limits(
+        package,
+        Some(tolerance),
+        Limits::from_source(package.read_limits()),
+    )
+}
+
+pub(crate) fn load_presentation_comments_with_tolerance_and_limits(
+    package: &OpcPackage,
+    tolerance: &mut ToleranceReport,
+    limits: Limits,
+) -> Result<Option<Comments>> {
+    load_comments_with_limits(package, Some(tolerance), limits)
 }
 
 /// Load the legacy comment graph without any repair: a comment index of `0`
@@ -59,17 +72,25 @@ pub fn load_presentation_comments_with_tolerance(
 /// Returns an error if the input cannot be read, is malformed, or would
 /// need a [`CommentDefect`] repair.
 pub fn load_presentation_comments_strict(package: &OpcPackage) -> Result<Option<Comments>> {
-    load_comments(package, None)
+    load_comments_with_limits(package, None, Limits::from_source(package.read_limits()))
 }
 
-fn load_comments(
+pub(crate) fn load_presentation_comments_strict_with_limits(
+    package: &OpcPackage,
+    limits: Limits,
+) -> Result<Option<Comments>> {
+    load_comments_with_limits(package, None, limits)
+}
+
+fn load_comments_with_limits(
     package: &OpcPackage,
     mut tolerance: Option<&mut ToleranceReport>,
+    limits: Limits,
 ) -> Result<Option<Comments>> {
     let presentation = package.main_document_part()?;
     require_presentation_content_type(presentation.content_type())?;
     let presentation_name = presentation.partname().to_string();
-    let slide_names = collect_slides(package, presentation)?;
+    let slide_names = collect_slides(package, presentation, limits.max_nodes)?;
     validate_relationship_sources(package, &presentation_name, &slide_names)?;
 
     let author_relationships: Vec<_> = presentation
@@ -119,12 +140,13 @@ fn load_comments(
         let comments = match tolerance.as_deref_mut() {
             Some(tolerance) => {
                 let mut repairs = ToleranceReport::default();
-                let comments = parse_slide_comments_with_tolerance(part.blob(), &mut repairs)?;
+                let comments =
+                    parse_slide_comments_with_tolerance(part.blob(), limits, &mut repairs)?;
                 repairs.locate_in_part(target.as_str());
                 tolerance.append(&repairs);
                 comments
             },
-            None => parse_slide_comments_strict(part.blob())?,
+            None => parse_slide_comments_strict(part.blob(), limits)?,
         };
         slide_lists.push(List {
             slide_part_name: slide_name.clone(),
@@ -157,29 +179,56 @@ fn load_comments(
         authors: match tolerance.as_deref_mut() {
             Some(tolerance) => {
                 let mut repairs = ToleranceReport::default();
-                let authors = parse_comment_authors_with(author_part.blob(), Some(&mut repairs))?;
+                let authors =
+                    parse_comment_authors_with(author_part.blob(), limits, Some(&mut repairs))?;
                 repairs.locate_in_part(author_target.as_str());
                 tolerance.append(&repairs);
                 authors
             },
-            None => parse_comment_authors(author_part.blob())?,
+            None => parse_comment_authors(author_part.blob(), limits)?,
         },
         slides: slide_lists,
     };
-    validate_package_value_with(&value, tolerance)?;
+    validate_package_value_with(&value, tolerance, limits)?;
     Ok(Some(value))
+}
+
+/// Validate one payload changed by a legacy-comment patch under the
+/// recipient's selected comment policy. The patch engine already verifies
+/// relationships and before bytes; only changed comment XML is parsed here.
+pub(crate) fn validate_replay_part(part: &dyn Part, limits: Limits) -> Result<()> {
+    match part.content_type() {
+        AUTHORS_CONTENT_TYPE => parse_comment_authors(part.blob(), limits).map(drop),
+        COMMENTS_CONTENT_TYPE => parse_slide_comments_strict(part.blob(), limits).map(drop),
+        _ => Ok(()),
+    }
 }
 
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
-pub fn store_presentation_comments(
+#[cfg(test)]
+pub(crate) fn store_presentation_comments(
     package: &mut OpcPackage,
     value: &Comments,
     conformance: Conformance,
 ) -> Result<()> {
-    validate_package_value(value)?;
-    if load_presentation_comments(package)?.is_some() {
+    store_presentation_comments_with_limits(
+        package,
+        value,
+        conformance,
+        Limits::from_source(package.read_limits()),
+    )
+}
+
+pub(crate) fn store_presentation_comments_with_limits(
+    package: &mut OpcPackage,
+    value: &Comments,
+    conformance: Conformance,
+    limits: Limits,
+) -> Result<()> {
+    validate_package_value_with(value, None, limits)?;
+    if load_comments_with_limits(package, None, limits)?.is_some() {
         return Err(invalid("package already contains presentation comments"));
     }
     if value.author_relationship_id.is_empty() {
@@ -195,13 +244,19 @@ pub fn store_presentation_comments(
     {
         return Err(invalid("comment-author relationship ID already exists"));
     }
-    let slide_names = collect_slides(package, presentation)?;
+    let slide_names = collect_slides(package, presentation, limits.max_nodes)?;
     let slide_set: HashSet<_> = slide_names.iter().cloned().collect();
     let author_uri = PackURI::new(&value.author_part_name).map_err(invalid)?;
     let mut part_names = HashSet::new();
     part_names.insert(author_uri.to_string());
-    let author_xml = write_comment_authors(&value.authors, conformance)?;
-    let mut pending = Vec::with_capacity(value.slides.len());
+    let author_xml = write_comment_authors(&value.authors, conformance, limits)?;
+    let mut pending = Vec::new();
+    pending
+        .try_reserve_exact(value.slides.len())
+        .map_err(|source| Error::Allocation {
+            resource: "presentation comment package parts",
+            source,
+        })?;
     for slide_list in &value.slides {
         if !slide_set.contains(&slide_list.slide_part_name) {
             return Err(invalid(format!(
@@ -230,7 +285,7 @@ pub fn store_presentation_comments(
             slide_uri,
             comment_uri,
             slide_list.relationship_id.clone(),
-            write_slide_comments(&slide_list.comments, conformance)?,
+            write_slide_comments(&slide_list.comments, conformance, limits)?,
         ));
     }
     for name in &part_names {
@@ -292,15 +347,23 @@ pub fn find_presentation_comment_author(
     }))
 }
 
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn add_presentation_comment_author(
+pub(crate) fn add_presentation_comment_author_with_limits(
     package: &mut OpcPackage,
     author: Author,
     conformance: Conformance,
+    limits: Limits,
 ) -> Result<()> {
-    let Some(mut graph) = load_presentation_comments_strict(package)? else {
+    let Some(mut graph) = load_presentation_comments_strict_with_limits(package, limits)? else {
         let presentation = package.main_document_part()?;
         let relationship_id = next_relationship_id(presentation, "rIdCommentAuthors")?;
         let part_name = next_legacy_author_part_name(package)?.to_string();
@@ -310,8 +373,9 @@ pub fn add_presentation_comment_author(
             authors: vec![author],
             slides: Vec::new(),
         };
-        store_presentation_comments(package, &graph, conformance)?;
-        package.unsign();
+        refuse_signed_change(package)?;
+        store_presentation_comments_with_limits(package, &graph, conformance, limits)?;
+        settle_unsigned_change(package)?;
         return Ok(());
     };
     if graph.authors.iter().any(|item| item.id == author.id) {
@@ -321,22 +385,30 @@ pub fn add_presentation_comment_author(
         )));
     }
     graph.authors.push(author);
-    commit_legacy_authors(package, &graph, conformance)
+    commit_legacy_authors_with_limits(package, &graph, conformance, limits)
 }
 
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn update_presentation_comment_author(
+pub(crate) fn update_presentation_comment_author_with_limits(
     package: &mut OpcPackage,
     author_id: u32,
     author: Author,
     conformance: Conformance,
+    limits: Limits,
 ) -> Result<()> {
     if author.id != author_id {
         return Err(invalid("replacement author ID must remain stable"));
     }
-    let mut graph = load_presentation_comments_strict(package)?
+    let mut graph = load_presentation_comments_strict_with_limits(package, limits)?
         .ok_or_else(|| invalid("legacy comment graph does not exist"))?;
     let target = graph
         .authors
@@ -344,30 +416,26 @@ pub fn update_presentation_comment_author(
         .find(|item| item.id == author_id)
         .ok_or_else(|| invalid(format!("comment author {author_id} was not found")))?;
     *target = author;
-    commit_legacy_authors(package, &graph, conformance)
+    commit_legacy_authors_with_limits(package, &graph, conformance, limits)
 }
 
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn replace_presentation_comment_author(
-    package: &mut OpcPackage,
-    author_id: u32,
-    author: Author,
-    conformance: Conformance,
-) -> Result<()> {
-    update_presentation_comment_author(package, author_id, author, conformance)
-}
-
-/// # Errors
-///
-/// Returns an error if the operation fails.
-pub fn remove_presentation_comment_author(
+pub(crate) fn remove_presentation_comment_author_with_limits(
     package: &mut OpcPackage,
     author_id: u32,
     conformance: Conformance,
+    limits: Limits,
 ) -> Result<bool> {
-    let Some(mut graph) = load_presentation_comments_strict(package)? else {
+    let Some(mut graph) = load_presentation_comments_strict_with_limits(package, limits)? else {
         return Ok(false);
     };
     if graph.slides.iter().any(|slide| {
@@ -386,19 +454,27 @@ pub fn remove_presentation_comment_author(
         return Ok(false);
     };
     graph.authors.remove(offset);
-    commit_legacy_authors(package, &graph, conformance)?;
+    commit_legacy_authors_with_limits(package, &graph, conformance, limits)?;
     Ok(true)
 }
 
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn reorder_presentation_comment_authors(
+pub(crate) fn reorder_presentation_comment_authors_with_limits(
     package: &mut OpcPackage,
     ordered_ids: &[u32],
     conformance: Conformance,
+    limits: Limits,
 ) -> Result<()> {
-    let mut graph = load_presentation_comments_strict(package)?
+    let mut graph = load_presentation_comments_strict_with_limits(package, limits)?
         .ok_or_else(|| invalid("legacy comment graph does not exist"))?;
     let expected = graph
         .authors
@@ -424,7 +500,7 @@ pub fn reorder_presentation_comment_authors(
                 })
         })
         .collect::<Result<Vec<_>>>()?;
-    commit_legacy_authors(package, &graph, conformance)
+    commit_legacy_authors_with_limits(package, &graph, conformance, limits)
 }
 
 /// # Errors
@@ -450,16 +526,24 @@ pub fn find_presentation_comment(
     }))
 }
 
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn add_presentation_comment(
+pub(crate) fn add_presentation_comment_with_limits(
     package: &mut OpcPackage,
     slide_part_name: &str,
     comment: Comment,
     conformance: Conformance,
+    limits: Limits,
 ) -> Result<()> {
-    let mut graph = load_presentation_comments_strict(package)?
+    let mut graph = load_presentation_comments_strict_with_limits(package, limits)?
         .ok_or_else(|| invalid("legacy comment graph does not exist"))?;
     let author = graph
         .authors
@@ -488,9 +572,10 @@ pub fn add_presentation_comment(
         .find(|slide| slide.slide_part_name == slide_part_name)
     {
         slide.comments.push(comment);
-        let xml = write_slide_comments(&slide.comments, conformance)?;
-        parse_slide_comments_strict(&xml)?;
+        let xml = write_slide_comments(&slide.comments, conformance, limits)?;
+        parse_slide_comments_strict(&xml, limits)?;
         let uri = PackURI::new(&slide.part_name).map_err(invalid)?;
+        refuse_signed_change(package)?;
         package.get_part_mut(&uri)?.set_blob(xml);
     } else {
         let slide_uri = PackURI::new(slide_part_name).map_err(invalid)?;
@@ -498,7 +583,8 @@ pub fn add_presentation_comment(
         require_content_type(slide, SLIDE_CONTENT_TYPE)?;
         let relationship_id = next_relationship_id(slide, "rIdComments")?;
         let part_uri = next_legacy_comment_part_name(package)?;
-        let xml = write_slide_comments(std::slice::from_ref(&comment), conformance)?;
+        let xml = write_slide_comments(std::slice::from_ref(&comment), conformance, limits)?;
+        refuse_signed_change(package)?;
         package.try_add_part(Box::new(BlobPart::new(
             part_uri.clone(),
             COMMENTS_CONTENT_TYPE.into(),
@@ -514,26 +600,34 @@ pub fn add_presentation_comment(
                 false,
             );
     }
-    commit_legacy_authors(package, &graph, conformance)?;
-    package.unsign();
+    commit_legacy_authors_with_limits(package, &graph, conformance, limits)?;
+    settle_unsigned_change(package)?;
     Ok(())
 }
 
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn update_presentation_comment(
+pub(crate) fn update_presentation_comment_with_limits(
     package: &mut OpcPackage,
     slide_part_name: &str,
     author_id: u32,
     index: u32,
     replacement: Comment,
     conformance: Conformance,
+    limits: Limits,
 ) -> Result<()> {
     if replacement.author_id != author_id || replacement.index != index {
         return Err(invalid("replacement comment identity must remain stable"));
     }
-    let graph = load_presentation_comments_strict(package)?
+    let graph = load_presentation_comments_strict_with_limits(package, limits)?
         .ok_or_else(|| invalid("legacy comment graph does not exist"))?;
     let slide = graph
         .slides
@@ -546,41 +640,28 @@ pub fn update_presentation_comment(
         .find(|item| item.author_id == author_id && item.index == index)
         .ok_or_else(|| invalid("comment was not found"))?;
     *target = replacement;
-    commit_legacy_slide_comments(package, slide, comments, conformance)
+    commit_legacy_slide_comments_with_limits(package, slide, comments, conformance, limits)
 }
 
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn replace_presentation_comment(
-    package: &mut OpcPackage,
-    slide_part_name: &str,
-    author_id: u32,
-    index: u32,
-    replacement: Comment,
-    conformance: Conformance,
-) -> Result<()> {
-    update_presentation_comment(
-        package,
-        slide_part_name,
-        author_id,
-        index,
-        replacement,
-        conformance,
-    )
-}
-
-/// # Errors
-///
-/// Returns an error if the operation fails.
-pub fn remove_presentation_comment(
+pub(crate) fn remove_presentation_comment_with_limits(
     package: &mut OpcPackage,
     slide_part_name: &str,
     author_id: u32,
     index: u32,
     conformance: Conformance,
+    limits: Limits,
 ) -> Result<bool> {
-    let Some(graph) = load_presentation_comments_strict(package)? else {
+    let Some(graph) = load_presentation_comments_strict_with_limits(package, limits)? else {
         return Ok(false);
     };
     let Some(slide) = graph
@@ -601,6 +682,7 @@ pub fn remove_presentation_comment(
     if comments.is_empty() {
         let slide_uri = PackURI::new(slide_part_name).map_err(invalid)?;
         let part_uri = PackURI::new(&slide.part_name).map_err(invalid)?;
+        refuse_signed_change(package)?;
         package
             .get_part_mut(&slide_uri)?
             .rels_mut()
@@ -608,23 +690,31 @@ pub fn remove_presentation_comment(
         if !part_is_referenced(package, &part_uri) {
             package.remove_part(&part_uri);
         }
-        package.unsign();
+        settle_unsigned_change(package)?;
     } else {
-        commit_legacy_slide_comments(package, slide, comments, conformance)?;
+        commit_legacy_slide_comments_with_limits(package, slide, comments, conformance, limits)?;
     }
     Ok(true)
 }
 
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn reorder_presentation_comments(
+pub(crate) fn reorder_presentation_comments_with_limits(
     package: &mut OpcPackage,
     slide_part_name: &str,
     ordered_keys: &[(u32, u32)],
     conformance: Conformance,
+    limits: Limits,
 ) -> Result<()> {
-    let graph = load_presentation_comments_strict(package)?
+    let graph = load_presentation_comments_strict_with_limits(package, limits)?
         .ok_or_else(|| invalid("legacy comment graph does not exist"))?;
     let slide = graph
         .slides
@@ -656,34 +746,140 @@ pub fn reorder_presentation_comments(
                 })
         })
         .collect::<Result<Vec<_>>>()?;
-    commit_legacy_slide_comments(package, slide, comments, conformance)
+    commit_legacy_slide_comments_with_limits(package, slide, comments, conformance, limits)
 }
 
-fn commit_legacy_authors(
+pub(crate) fn reattribute_presentation_comment_with_limits(
+    package: &mut OpcPackage,
+    slide_part_name: &str,
+    author_id: u32,
+    index: u32,
+    name: Option<&str>,
+    initials: Option<&str>,
+    conformance: Conformance,
+    limits: Limits,
+) -> Result<bool> {
+    let mut graph = load_presentation_comments_strict_with_limits(package, limits)?
+        .ok_or_else(|| invalid("legacy comment graph does not exist"))?;
+    let current = graph
+        .authors
+        .iter()
+        .find(|author| author.id == author_id)
+        .cloned()
+        .ok_or_else(|| invalid(format!("comment author {author_id} was not found")))?;
+    let name = name.unwrap_or(&current.name);
+    let initials = initials.unwrap_or(&current.initials);
+    if name == current.name && initials == current.initials {
+        return Ok(false);
+    }
+    let slide_offset = graph
+        .slides
+        .iter()
+        .position(|slide| slide.slide_part_name == slide_part_name)
+        .ok_or_else(|| invalid("slide has no legacy comments"))?;
+    let comment_offset = graph.slides[slide_offset]
+        .comments
+        .iter()
+        .position(|item| item.author_id == author_id && item.index == index)
+        .ok_or_else(|| invalid("comment was not found"))?;
+    let shared = graph.slides.iter().enumerate().any(|(slide, list)| {
+        list.comments.iter().enumerate().any(|(offset, item)| {
+            item.author_id == author_id && (slide, offset) != (slide_offset, comment_offset)
+        })
+    });
+    if !shared {
+        let author = graph
+            .authors
+            .iter_mut()
+            .find(|author| author.id == author_id)
+            .ok_or_else(|| invalid(format!("comment author {author_id} was not found")))?;
+        name.clone_into(&mut author.name);
+        initials.clone_into(&mut author.initials);
+        commit_legacy_authors_with_limits(package, &graph, conformance, limits)?;
+        return Ok(true);
+    }
+    let target = match graph
+        .authors
+        .iter()
+        .position(|author| author.name == name && author.initials == initials)
+    {
+        Some(offset) => offset,
+        None => {
+            let id = graph
+                .authors
+                .iter()
+                .map(|author| author.id)
+                .max()
+                .map_or(Some(0), |maximum| maximum.checked_add(1))
+                .ok_or_else(|| invalid("comment author identifiers are exhausted"))?;
+            graph.authors.push(Author::new(id, name, initials));
+            graph.authors.len() - 1
+        },
+    };
+    let author = &mut graph.authors[target];
+    let next = author
+        .last_index
+        .checked_add(1)
+        .ok_or_else(|| invalid("comment indexes are exhausted"))?;
+    author.last_index = next;
+    let new_author = author.id;
+    let slide = graph.slides[slide_offset].clone();
+    let mut comments = slide.comments.clone();
+    comments[comment_offset].author_id = new_author;
+    comments[comment_offset].index = next;
+    graph.slides[slide_offset].comments.clone_from(&comments);
+    validate_package_value_with(&graph, None, limits)?;
+    let before = package.clone();
+    let result =
+        commit_legacy_authors_with_limits(package, &graph, conformance, limits).and_then(|()| {
+            commit_legacy_slide_comments_with_limits(package, &slide, comments, conformance, limits)
+        });
+    if let Err(error) = result {
+        *package = before;
+        return Err(error);
+    }
+    Ok(true)
+}
+
+fn commit_legacy_authors_with_limits(
     package: &mut OpcPackage,
     graph: &Comments,
     conformance: Conformance,
+    limits: Limits,
 ) -> Result<()> {
-    validate_package_value(graph)?;
-    let xml = write_comment_authors(&graph.authors, conformance)?;
-    parse_comment_authors(&xml)?;
+    validate_package_value_with(graph, None, limits)?;
+    let xml = write_comment_authors(&graph.authors, conformance, limits)?;
+    parse_comment_authors(&xml, limits)?;
     let uri = PackURI::new(&graph.author_part_name).map_err(invalid)?;
+    // Authors that serialize to the stored bytes publish nothing, so an exact
+    // no-op keeps a signed package byte for byte.
+    if package.get_part(&uri)?.blob() == xml.as_slice() {
+        return Ok(());
+    }
+    refuse_signed_change(package)?;
     package.get_part_mut(&uri)?.set_blob(xml);
-    package.unsign();
+    settle_unsigned_change(package)?;
     Ok(())
 }
 
-fn commit_legacy_slide_comments(
+fn commit_legacy_slide_comments_with_limits(
     package: &mut OpcPackage,
     slide: &List,
     comments: Vec<Comment>,
     conformance: Conformance,
+    limits: Limits,
 ) -> Result<()> {
-    let xml = write_slide_comments(&comments, conformance)?;
-    parse_slide_comments_strict(&xml)?;
+    let xml = write_slide_comments(&comments, conformance, limits)?;
+    parse_slide_comments_strict(&xml, limits)?;
     let uri = PackURI::new(&slide.part_name).map_err(invalid)?;
+    // Comments that serialize to the stored bytes publish nothing, so an
+    // exact no-op keeps a signed package byte for byte.
+    if package.get_part(&uri)?.blob() == xml.as_slice() {
+        return Ok(());
+    }
+    refuse_signed_change(package)?;
     package.get_part_mut(&uri)?.set_blob(xml);
-    package.unsign();
+    settle_unsigned_change(package)?;
     Ok(())
 }
 
@@ -744,10 +940,6 @@ fn part_is_referenced(package: &OpcPackage, target: &PackURI) -> bool {
     })
 }
 
-fn validate_package_value(value: &Comments) -> Result<()> {
-    validate_package_value_with(value, None)
-}
-
 /// Validate a comment graph. With `tolerance`, the graph was read through the
 /// tolerant slide parser: comment-key repairs already recorded per slide are
 /// not re-checked, and a key repeated across slides is recorded as
@@ -755,10 +947,16 @@ fn validate_package_value(value: &Comments) -> Result<()> {
 fn validate_package_value_with(
     value: &Comments,
     mut tolerance: Option<&mut ToleranceReport>,
+    limits: Limits,
 ) -> Result<()> {
-    validate_authors(&value.authors)?;
-    if value.slides.len() > MAX_SLIDES {
-        return Err(invalid("commented-slide count exceeds limit"));
+    validate_authors_with_limit(&value.authors, limits.max_string_bytes, limits.max_nodes)?;
+    let slide_maximum = MAX_SLIDES.min(limits.max_nodes);
+    if value.slides.len() > slide_maximum {
+        return Err(limit(
+            crate::error::CodecLimitKind::Slides,
+            value.slides.len(),
+            slide_maximum,
+        ));
     }
     let authors: HashMap<_, _> = value
         .authors
@@ -783,14 +981,27 @@ fn validate_package_value_with(
             )));
         }
         if tolerance.is_none() {
-            validate_comment_list(&slide.comments)?;
+            validate_comment_list_with_limit(
+                &slide.comments,
+                limits.max_string_bytes,
+                limits.max_nodes,
+            )?;
         }
         let mut slide_keys = HashSet::new();
-        total = total
-            .checked_add(slide.comments.len())
-            .ok_or_else(|| invalid("comment count overflow"))?;
-        if total > MAX_TOTAL_COMMENTS {
-            return Err(invalid("total presentation comment count exceeds limit"));
+        total = total.checked_add(slide.comments.len()).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::CommentEntries,
+                usize::MAX,
+                MAX_TOTAL_COMMENTS.min(limits.max_nodes),
+            )
+        })?;
+        let comment_maximum = MAX_TOTAL_COMMENTS.min(limits.max_nodes);
+        if total > comment_maximum {
+            return Err(limit(
+                crate::error::CodecLimitKind::CommentEntries,
+                total,
+                comment_maximum,
+            ));
         }
         for comment in &slide.comments {
             let Some(last_index) = authors.get(&comment.author_id) else {
@@ -826,7 +1037,11 @@ fn validate_package_value_with(
 /// The presentation's slide parts in slide-list order (slides the list does
 /// not reference follow, by relationship ID), so a "first" comment is
 /// well defined for the duplicate-key repair.
-fn collect_slides(package: &OpcPackage, presentation: &dyn Part) -> Result<Vec<String>> {
+fn collect_slides(
+    package: &OpcPackage,
+    presentation: &dyn Part,
+    max_nodes: usize,
+) -> Result<Vec<String>> {
     let order: HashMap<String, usize> = crate::parts::PresentationPart::from_part(presentation)
         .and_then(|part| part.slide_references())
         .map(|references| {
@@ -864,10 +1079,15 @@ fn collect_slides(package: &OpcPackage, presentation: &dyn Part) -> Result<Vec<S
         }
         let slide = package.get_part(&target)?;
         require_content_type(slide, SLIDE_CONTENT_TYPE)?;
-        names.push(target.to_string());
-        if names.len() > MAX_SLIDES {
-            return Err(invalid("presentation slide count exceeds limit"));
+        let maximum = MAX_SLIDES.min(max_nodes);
+        if names.len() >= maximum {
+            return Err(limit(
+                crate::error::CodecLimitKind::Slides,
+                names.len().checked_add(1).unwrap_or(usize::MAX),
+                maximum,
+            ));
         }
+        names.push(target.to_string());
     }
     Ok(names)
 }
@@ -984,7 +1204,10 @@ fn is_authors_relationship(value: &str) -> bool {
     reason = "test assertions panic on failure by design"
 )]
 mod tests {
-    use super::super::codec::parse_slide_comments;
+    use super::super::codec::{
+        measured_comment_authors_string_bytes, measured_slide_comments_string_bytes,
+        parse_slide_comments,
+    };
     use super::super::{MAX_AUTHORS, MAX_DEPTH, MAX_PART_BYTES, PML, STRICT_PML};
     use super::*;
 
@@ -1059,9 +1282,11 @@ mod tests {
 
     #[test]
     fn loads_poi_and_libreoffice_reference_packages() {
-        let poi = load_presentation_comments(&OpcPackage::from_bytes(POI).unwrap())
-            .unwrap()
-            .unwrap();
+        let poi = load_presentation_comments(
+            &OpcPackage::from_bytes(POI, litchi_opc::SourceLimits::default()).unwrap(),
+        )
+        .unwrap()
+        .unwrap();
         assert_eq!(poi.authors.len(), 1);
         assert_eq!(poi.slides.len(), 2);
         assert_eq!(
@@ -1071,9 +1296,11 @@ mod tests {
                 .sum::<usize>(),
             2
         );
-        let libreoffice = load_presentation_comments(&OpcPackage::from_bytes(LIBREOFFICE).unwrap())
-            .unwrap()
-            .unwrap();
+        let libreoffice = load_presentation_comments(
+            &OpcPackage::from_bytes(LIBREOFFICE, litchi_opc::SourceLimits::default()).unwrap(),
+        )
+        .unwrap()
+        .unwrap();
         assert_eq!(libreoffice.authors[0].name, "Anonymous");
         assert_eq!(libreoffice.slides[0].comments[0].text, "Comment");
     }
@@ -1082,23 +1309,311 @@ mod tests {
     fn strict_writers_are_deterministic_and_round_trip() {
         let authors = vec![author()];
         let comments = vec![comment()];
-        let author_xml = write_comment_authors(&authors, Conformance::Strict).unwrap();
-        let comment_xml = write_slide_comments(&comments, Conformance::Strict).unwrap();
+        let author_xml =
+            write_comment_authors(&authors, Conformance::Strict, Limits::DEFAULT).unwrap();
+        let comment_xml =
+            write_slide_comments(&comments, Conformance::Strict, Limits::DEFAULT).unwrap();
         assert_eq!(
             author_xml,
-            write_comment_authors(&authors, Conformance::Strict).unwrap()
+            write_comment_authors(&authors, Conformance::Strict, Limits::DEFAULT).unwrap()
         );
         assert_eq!(
             comment_xml,
-            write_slide_comments(&comments, Conformance::Strict).unwrap()
+            write_slide_comments(&comments, Conformance::Strict, Limits::DEFAULT).unwrap()
         );
         assert!(
             std::str::from_utf8(&comment_xml)
                 .unwrap()
                 .contains(STRICT_PML)
         );
-        assert_eq!(parse_comment_authors(&author_xml).unwrap(), authors);
-        assert_eq!(parse_slide_comments(&comment_xml).unwrap(), comments);
+        assert_eq!(
+            parse_comment_authors(&author_xml, Limits::DEFAULT).unwrap(),
+            authors
+        );
+        assert_eq!(
+            parse_slide_comments(&comment_xml, Limits::DEFAULT).unwrap(),
+            comments
+        );
+    }
+
+    #[test]
+    fn writer_enforces_date_time_string_limit() {
+        let mut comment = comment();
+        comment.date_time = Some("2026-10-25T00:00:00Z".into());
+        let mut limits = Limits::DEFAULT;
+        limits.max_string_bytes = 4;
+        let error = write_slide_comments(&[comment], Conformance::Strict, limits).unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::StringBytes),
+                observed,
+                maximum: 4,
+            } if observed > 4
+        ));
+    }
+
+    #[test]
+    fn writers_charge_the_selected_string_budget_exactly() {
+        let author_budget =
+            measured_comment_authors_string_bytes(&[], Conformance::Strict).unwrap();
+        assert!(author_budget > 1);
+        assert!(
+            write_comment_authors(
+                &[],
+                Conformance::Strict,
+                Limits {
+                    max_string_bytes: author_budget,
+                    ..Limits::DEFAULT
+                }
+            )
+            .is_ok()
+        );
+        let author_error = write_comment_authors(
+            &[],
+            Conformance::Strict,
+            Limits {
+                max_string_bytes: author_budget - 1,
+                ..Limits::DEFAULT
+            },
+        )
+        .unwrap_err();
+        assert!(matches!(
+            author_error,
+            Error::Limit {
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::StringBytes),
+                observed,
+                maximum,
+            } if observed == author_budget && maximum == author_budget - 1
+        ));
+
+        let comment_budget =
+            measured_slide_comments_string_bytes(&[], Conformance::Strict).unwrap();
+        assert!(comment_budget > 1);
+        assert!(
+            write_slide_comments(
+                &[],
+                Conformance::Strict,
+                Limits {
+                    max_string_bytes: comment_budget,
+                    ..Limits::DEFAULT
+                }
+            )
+            .is_ok()
+        );
+        let comment_error = write_slide_comments(
+            &[],
+            Conformance::Strict,
+            Limits {
+                max_string_bytes: comment_budget - 1,
+                ..Limits::DEFAULT
+            },
+        )
+        .unwrap_err();
+        assert!(matches!(
+            comment_error,
+            Error::Limit {
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::StringBytes),
+                observed,
+                maximum,
+            } if observed == comment_budget && maximum == comment_budget - 1
+        ));
+
+        let authors = [author()];
+        let comments = [comment()];
+        let author_budget =
+            measured_comment_authors_string_bytes(&authors, Conformance::Strict).unwrap();
+        assert!(
+            write_comment_authors(
+                &authors,
+                Conformance::Strict,
+                Limits {
+                    max_string_bytes: author_budget,
+                    ..Limits::DEFAULT
+                }
+            )
+            .is_ok()
+        );
+        let author_error = write_comment_authors(
+            &authors,
+            Conformance::Strict,
+            Limits {
+                max_string_bytes: author_budget - 1,
+                ..Limits::DEFAULT
+            },
+        )
+        .unwrap_err();
+        assert!(matches!(
+            author_error,
+            Error::Limit {
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::StringBytes),
+                observed,
+                maximum,
+            } if observed == author_budget && maximum == author_budget - 1
+        ));
+        let comment_budget =
+            measured_slide_comments_string_bytes(&comments, Conformance::Strict).unwrap();
+        assert!(
+            write_slide_comments(
+                &comments,
+                Conformance::Strict,
+                Limits {
+                    max_string_bytes: comment_budget,
+                    ..Limits::DEFAULT
+                }
+            )
+            .is_ok()
+        );
+        let comment_error = write_slide_comments(
+            &comments,
+            Conformance::Strict,
+            Limits {
+                max_string_bytes: comment_budget - 1,
+                ..Limits::DEFAULT
+            },
+        )
+        .unwrap_err();
+        assert!(matches!(
+            comment_error,
+            Error::Limit {
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::StringBytes),
+                observed,
+                maximum,
+            } if observed == comment_budget && maximum == comment_budget - 1
+        ));
+    }
+
+    #[test]
+    fn writer_enforces_escaped_attribute_wire_limit_before_output() {
+        let mut value = author();
+        value.name = "&".repeat(10);
+        let physical = value.name.len() * b"&amp;".len();
+        assert!(physical > Conformance::Strict.namespace().len());
+        let exact = Limits {
+            max_attribute_bytes: physical,
+            ..Limits::DEFAULT
+        };
+        let xml = write_comment_authors(&[value.clone()], Conformance::Strict, exact).unwrap();
+        assert_eq!(
+            parse_comment_authors(&xml, exact).unwrap(),
+            vec![value.clone()]
+        );
+        let error = write_comment_authors(
+            &[value],
+            Conformance::Strict,
+            Limits {
+                max_attribute_bytes: physical - 1,
+                ..Limits::DEFAULT
+            },
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: crate::error::LimitKind::Codec(
+                    crate::error::CodecLimitKind::XmlAttributeBytes
+                ),
+                observed,
+                maximum,
+            } if observed == physical && maximum == physical - 1
+        ));
+    }
+
+    #[test]
+    fn writer_counts_numeric_whitespace_escapes_exactly() {
+        let mut value = author();
+        value.name = "\n\r".repeat(6);
+        let physical = value.name.len() * b"&#xA;".len();
+        assert!(physical > Conformance::Strict.namespace().len());
+        let exact = Limits {
+            max_attribute_bytes: physical,
+            ..Limits::DEFAULT
+        };
+        let xml = write_comment_authors(&[value.clone()], Conformance::Strict, exact).unwrap();
+        assert_eq!(
+            parse_comment_authors(&xml, exact).unwrap(),
+            vec![value.clone()]
+        );
+        let error = write_comment_authors(
+            &[value],
+            Conformance::Strict,
+            Limits {
+                max_attribute_bytes: physical - 1,
+                ..Limits::DEFAULT
+            },
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: crate::error::LimitKind::Codec(
+                    crate::error::CodecLimitKind::XmlAttributeBytes
+                ),
+                observed,
+                maximum,
+            } if observed == physical && maximum == physical - 1
+        ));
+    }
+
+    #[test]
+    fn raw_policy_admits_exact_wire_and_refuses_one_byte_under() {
+        let authors = vec![author()];
+        let comments = vec![comment()];
+        let author_xml =
+            write_comment_authors(&authors, Conformance::Transitional, Limits::DEFAULT).unwrap();
+        let comment_xml =
+            write_slide_comments(&comments, Conformance::Transitional, Limits::DEFAULT).unwrap();
+        let author_exact = Limits {
+            max_input_bytes: author_xml.len(),
+            max_output_bytes: author_xml.len(),
+            ..Limits::DEFAULT
+        };
+        let comment_exact = Limits {
+            max_input_bytes: comment_xml.len(),
+            max_output_bytes: comment_xml.len(),
+            ..Limits::DEFAULT
+        };
+        assert_eq!(
+            parse_comment_authors(&author_xml, author_exact).unwrap(),
+            authors
+        );
+        assert_eq!(
+            parse_slide_comments(&comment_xml, comment_exact).unwrap(),
+            comments
+        );
+        let write_error = write_comment_authors(
+            &authors,
+            Conformance::Transitional,
+            Limits {
+                max_output_bytes: author_xml.len().saturating_sub(1),
+                ..author_exact
+            },
+        )
+        .unwrap_err();
+        assert!(matches!(
+            write_error,
+            Error::Limit {
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlBytes),
+                observed,
+                maximum,
+            } if observed > maximum && maximum == author_xml.len().saturating_sub(1)
+        ));
+        let parse_error = parse_slide_comments(
+            &comment_xml,
+            Limits {
+                max_input_bytes: comment_xml.len().saturating_sub(1),
+                ..comment_exact
+            },
+        )
+        .unwrap_err();
+        assert!(matches!(
+            parse_error,
+            Error::Limit {
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlBytes),
+                observed,
+                maximum,
+            } if observed > maximum && maximum == comment_xml.len().saturating_sub(1)
+        ));
     }
 
     #[test]
@@ -1107,9 +1622,28 @@ mod tests {
             r#"<p:cmLst xmlns:p="{PML}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:future" mc:Ignorable="x"><mc:AlternateContent><mc:Choice Requires="x"><x:cm/></mc:Choice><mc:Fallback><p:cm authorId="7" idx="1"><p:pos x="1" y="2"/><p:text>fallback</p:text></p:cm></mc:Fallback></mc:AlternateContent></p:cmLst>"#
         );
         assert_eq!(
-            parse_slide_comments(xml.as_bytes()).unwrap()[0].text,
+            parse_slide_comments(xml.as_bytes(), Limits::DEFAULT).unwrap()[0].text,
             "fallback"
         );
+    }
+
+    #[test]
+    fn raw_attribute_cap_applies_before_mce_discards_inactive_choice() {
+        let oversized = "x".repeat(129);
+        let xml = format!(
+            r#"<p:cmLst xmlns:p="{PML}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:future"><mc:AlternateContent><mc:Choice Requires="x"><x:cm payload="{oversized}"/></mc:Choice><mc:Fallback><p:cm authorId="7" idx="1"><p:pos x="1" y="2"/><p:text>fallback</p:text></p:cm></mc:Fallback></mc:AlternateContent></p:cmLst>"#
+        );
+        let mut limits = Limits::DEFAULT;
+        limits.max_attribute_bytes = 128;
+        let error = parse_slide_comments(xml.as_bytes(), limits).unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlAttributeBytes),
+                observed,
+                maximum: 128,
+            } if observed > 128
+        ));
     }
 
     #[test]
@@ -1138,18 +1672,18 @@ mod tests {
             format!(r#"<!DOCTYPE x><p:cmLst xmlns:p="{PML}"/>"#),
         ] {
             assert!(if xml.contains("cmAuthorLst") {
-                parse_comment_authors(xml.as_bytes()).is_err()
+                parse_comment_authors(xml.as_bytes(), Limits::DEFAULT).is_err()
             } else {
-                parse_slide_comments_strict(xml.as_bytes()).is_err()
+                parse_slide_comments_strict(xml.as_bytes(), Limits::DEFAULT).is_err()
             });
         }
-        assert!(parse_slide_comments(&vec![b' '; MAX_PART_BYTES + 1]).is_err());
+        assert!(parse_slide_comments(&vec![b' '; MAX_PART_BYTES + 1], Limits::DEFAULT).is_err());
         let deep = format!(
             r#"<p:cmLst xmlns:p="{PML}">{}{} </p:cmLst>"#,
             "<p:extLst>".repeat(MAX_DEPTH),
             "</p:extLst>".repeat(MAX_DEPTH)
         );
-        assert!(parse_slide_comments(deep.as_bytes()).is_err());
+        assert!(parse_slide_comments(deep.as_bytes(), Limits::DEFAULT).is_err());
         let mut many = format!(r#"<p:cmAuthorLst xmlns:p="{PML}">"#);
         for id in 0..=MAX_AUTHORS {
             many.push_str(&format!(
@@ -1157,7 +1691,7 @@ mod tests {
             ));
         }
         many.push_str("</p:cmAuthorLst>");
-        assert!(parse_comment_authors(many.as_bytes()).is_err());
+        assert!(parse_comment_authors(many.as_bytes(), Limits::DEFAULT).is_err());
     }
 
     #[test]

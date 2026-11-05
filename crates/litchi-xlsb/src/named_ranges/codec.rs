@@ -31,8 +31,8 @@ const MAX_MACRO_DESCRIPTION_UNITS: usize = 32_767;
 /// This standalone function cannot report repairs, so it also rejects the
 /// reserved flag bits and trailing bytes an opened workbook repairs and
 /// records; see [`crate::leniency`].
-pub fn parse(data: &[u8]) -> Result<Definition> {
-    parse_with(data, 0, Tolerance::refusing())
+pub fn parse(data: &[u8], limits: Limits) -> Result<Definition> {
+    parse_with(data, 0, Tolerance::refusing(), limits)
 }
 
 /// Parse one `BrtName` payload, masking reserved flag bits and ignoring
@@ -42,12 +42,21 @@ pub(crate) fn parse_with(
     data: &[u8],
     ordinal: u32,
     mut tolerance: Tolerance<'_>,
+    limits: Limits,
 ) -> Result<Definition> {
+    limits.validate()?;
     if data.len() > MAX_RECORD_BYTES {
         return Err(Error::InvalidLength {
             expected: MAX_RECORD_BYTES,
             found: data.len(),
         });
+    }
+    if data.len() > limits.payload() {
+        return Err(Error::Wire(crate::raw::Error::PayloadLimit {
+            length: data.len(),
+            limit: limits.payload(),
+            offset: 0,
+        }));
     }
     if data.len() < 13 {
         return Err(Error::InvalidLength {
@@ -56,8 +65,11 @@ pub(crate) fn parse_with(
         });
     }
 
-    let limits = Limits::new(MAX_RECORD_BYTES, MAX_WIDE_STRING_UNITS);
-    let mut cursor = Cursor::with_limits(data, "BrtName", limits);
+    let parse_limits = Limits::new(
+        MAX_RECORD_BYTES.min(limits.payload()),
+        MAX_WIDE_STRING_UNITS.min(limits.string_units()),
+    );
+    let mut cursor = Cursor::new(data, "BrtName", parse_limits);
     let mut flags = cursor.read_u32()?;
     // MS-XLSB 2.4.647: the 14 reserved bits MUST be 0 and MUST be ignored.
     if flags & NAME_RESERVED_FLAGS != 0 {
@@ -66,7 +78,7 @@ pub(crate) fn parse_with(
             kind::NAME,
             ordinal,
             flags & NAME_RESERVED_FLAGS,
-            || Error::InvalidFormula(format!("BrtName reserved flags are nonzero: 0x{flags:08X}")),
+            || Error::InvalidFormula("BrtName reserved flags are nonzero"),
         )?;
         flags &= !NAME_RESERVED_FLAGS;
     }
@@ -76,26 +88,24 @@ pub(crate) fn parse_with(
     let f_proc = (flags & 0x0008) != 0;
     let function = f_proc;
     if (f_func || f_ob) && !f_proc {
-        return Err(Error::InvalidFormula(
-            "BrtName macro type requires fProc".to_string(),
-        ));
+        return Err(Error::InvalidFormula("BrtName macro type requires fProc"));
     }
     let function_group = (flags >> 6) & 0x01FF;
     if !f_proc && function_group != 0 {
         return Err(Error::InvalidFormula(
-            "BrtName non-macro has a function group".to_string(),
+            "BrtName non-macro has a function group",
         ));
     }
     let ch_key = cursor.read_u8()?;
     if (f_func || !f_proc) && ch_key != 0 {
-        return Err(Error::InvalidFormula(format!(
-            "BrtName has invalid macro shortcut key 0x{ch_key:02X}"
-        )));
+        return Err(Error::InvalidFormula(
+            "BrtName has invalid macro shortcut key",
+        ));
     }
     if f_proc && !f_func && ch_key < 0x20 {
-        return Err(Error::InvalidFormula(format!(
-            "BrtName has invalid macro shortcut key 0x{ch_key:02X}"
-        )));
+        return Err(Error::InvalidFormula(
+            "BrtName has invalid macro shortcut key",
+        ));
     }
 
     let sheet_id_raw = cursor.read_u32()? as i32;
@@ -107,16 +117,13 @@ pub(crate) fn parse_with(
 
     let name = tolerance.read_wide_string(&mut cursor, kind::NAME, ordinal)?;
     if name.encode_utf16().count() > MAX_NAME_UNITS {
-        return Err(Error::InvalidFormula(format!(
-            "defined name length {} is outside 1..=255",
-            name.encode_utf16().count()
-        )));
+        return Err(Error::InvalidFormula("defined name length is outside 1255"));
     }
     validate_name(&name)?;
 
     let formula_start = cursor.position();
     let (parsed_formula, formula_bytes) =
-        ParsedFormula::parse(&data[formula_start..]).map_err(Error::from)?;
+        ParsedFormula::parse(&data[formula_start..], parse_limits).map_err(Error::from)?;
     cursor.skip(formula_bytes)?;
 
     let comment = tolerance.read_nullable_wide_string(&mut cursor, kind::NAME, ordinal)?;
@@ -125,7 +132,7 @@ pub(crate) fn parse_with(
         .is_some_and(|value| value.encode_utf16().count() > MAX_COMMENT_UNITS)
     {
         return Err(Error::InvalidFormula(
-            "BrtName comment exceeds 255 characters".to_string(),
+            "BrtName comment exceeds 255 characters",
         ));
     }
 
@@ -134,7 +141,7 @@ pub(crate) fn parse_with(
             let value = tolerance.read_nullable_wide_string(&mut cursor, kind::NAME, ordinal)?;
             if matches!(index, 0 | 3) && value.is_some() {
                 return Err(Error::InvalidFormula(
-                    "BrtName macro unused string is not NULL".to_string(),
+                    "BrtName macro unused string is not NULL",
                 ));
             }
             if matches!(index, 1 | 2)
@@ -143,14 +150,14 @@ pub(crate) fn parse_with(
                     .is_some_and(|text| text.encode_utf16().count() > MAX_MACRO_DESCRIPTION_UNITS)
             {
                 return Err(Error::InvalidFormula(
-                    "BrtName macro description exceeds 32,767 characters".to_string(),
+                    "BrtName macro description exceeds 32,767 characters",
                 ));
             }
         }
     }
     let trailing = cursor.remaining();
     tolerance.tolerate_trailing(kind::NAME, ordinal, trailing, || {
-        Error::InvalidFormula(format!("BrtName has {trailing} trailing bytes"))
+        Error::InvalidFormula("BrtName has trailing bytes")
     })?;
 
     Ok(Definition {
@@ -164,13 +171,18 @@ pub(crate) fn parse_with(
 
 impl Definition {
     /// Parse one complete `BrtName` payload.
-    pub fn parse(data: &[u8]) -> Result<Self> {
-        parse(data)
+    pub fn parse(data: &[u8], limits: Limits) -> Result<Self> {
+        parse(data, limits)
     }
 
     /// Parse one `BrtName` payload, recording repairs through `tolerance`.
-    pub(crate) fn parse_with(data: &[u8], ordinal: u32, tolerance: Tolerance<'_>) -> Result<Self> {
-        parse_with(data, ordinal, tolerance)
+    pub(crate) fn parse_with(
+        data: &[u8],
+        ordinal: u32,
+        tolerance: Tolerance<'_>,
+        limits: Limits,
+    ) -> Result<Self> {
+        parse_with(data, ordinal, tolerance, limits)
     }
 
     /// Create a 3D area formula token stream for a workbook-local range.
@@ -199,17 +211,15 @@ pub fn area3d_formula(
 ) -> Result<Vec<u8>> {
     if first_row > last_row || last_row >= 1_048_576 || first_col > last_col || last_col >= 16_384 {
         return Err(Error::Formula(crate::formula::Error::InvalidCellReference(
-            format!("named range ({first_row}, {first_col})..=({last_row}, {last_col})"),
+            "named range (, )..=(, )",
         )));
     }
     let sheet_index = u16::try_from(sheet_id)
         .ok()
         .and_then(|value| value.checked_add(2))
-        .ok_or_else(|| {
-            Error::InvalidFormula(format!(
-                "sheet index {sheet_id} cannot be represented in the extern-sheet table"
-            ))
-        })?;
+        .ok_or(Error::InvalidFormula(
+            "sheet index cannot be represented in the extern-sheet table",
+        ))?;
     let mut formula = Vec::with_capacity(15);
     formula.push(ptg_types::PTG_AREA_3D);
     formula.extend_from_slice(&sheet_index.to_le_bytes());

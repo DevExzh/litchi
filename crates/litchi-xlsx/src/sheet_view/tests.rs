@@ -10,7 +10,7 @@ const T: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const S: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
 const MCE: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
 fn fixture(bytes: &[u8]) -> Collection {
-    let package = OpcPackage::from_bytes(bytes).unwrap();
+    let package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     let part = package
         .get_part(&PackURI::new("/xl/worksheets/sheet1.xml").unwrap())
         .unwrap();

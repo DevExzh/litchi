@@ -7,11 +7,11 @@
 
 use std::io::Cursor;
 
-use litchi_ppt::writer::{EncryptionProfile, Writer};
-use litchi_ppt::{Error, OpenOptions, Package};
+use litchi_ppt::writer::{Builder, EncryptionProfile};
+use litchi_ppt::{Error, OpenOptions, raw::Reader};
 
 fn encrypted_presentation(modify_password: &str, open_password: &str) -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_slide().unwrap();
     writer
         .set_password(
@@ -21,16 +21,14 @@ fn encrypted_presentation(modify_password: &str, open_password: &str) -> Vec<u8>
         .unwrap();
     writer.set_modify_password(modify_password).unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.set_encryption_entropy(litchi_ppt::EncryptionEntropy::generate().unwrap());
+    litchi_ppt::raw::encode(&mut writer, &mut output).unwrap();
     output.into_inner()
 }
 
 fn open(bytes: &[u8], password: Option<&str>) -> Result<litchi_ppt::Presentation, Error> {
-    let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
-    package.presentation_with_options(OpenOptions {
-        password,
-        ..Default::default()
-    })
+    let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
+    package.presentation_with_options(OpenOptions::new().password(password))
 }
 
 #[test]
@@ -51,7 +49,7 @@ fn encrypted_modify_password_round_trips_and_open_password_behavior_is_unchanged
 
 #[test]
 fn setter_replacement_clear_and_failures_are_atomic() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_slide().unwrap();
     writer.set_modify_password("first").unwrap();
     writer.set_modify_password("replacement").unwrap();
@@ -67,7 +65,7 @@ fn setter_replacement_clear_and_failures_are_atomic() {
     );
 
     let mut output = Cursor::new(Vec::new());
-    assert!(writer.write_to(&mut output).is_err());
+    assert!(litchi_ppt::raw::encode(&mut writer, &mut output).is_err());
     assert!(output.get_ref().is_empty());
 
     writer
@@ -75,7 +73,8 @@ fn setter_replacement_clear_and_failures_are_atomic() {
         .unwrap();
     writer.clear_modify_password();
     assert!(writer.modify_password().is_none());
-    writer.write_to(&mut output).unwrap();
+    writer.set_encryption_entropy(litchi_ppt::EncryptionEntropy::generate().unwrap());
+    litchi_ppt::raw::encode(&mut writer, &mut output).unwrap();
     let presentation = open(output.get_ref(), Some("open")).unwrap();
     assert!(presentation.modify_password().unwrap().is_none());
 }

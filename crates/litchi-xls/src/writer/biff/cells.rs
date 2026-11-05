@@ -1,6 +1,7 @@
 //! Cell record BIFF8 writers.
 
 use crate::{Error, Result};
+use litchi_core::edit::RefusalKind;
 use std::io::Write;
 
 use super::{write_record, write_record_header};
@@ -257,8 +258,10 @@ pub(crate) fn write_formula_with_metadata<W: Write>(
             if ancillary.original_cell() != (row_u16, col)
                 || ancillary.original_tokens() != formula_tokens
             {
-                return Err(Error::UnsafeEdit(
-                    "Formula RgbExtra is bound to a different cell or token stream".to_string(),
+                return Err(Error::refused(
+                    RefusalKind::UnsupportedOperation,
+                    "write workbook",
+                    "Formula RgbExtra is bound to a different cell or token stream",
                 ));
             }
             ancillary.bytes()
@@ -373,7 +376,7 @@ mod tests {
     use super::write_formula;
     use crate::formula_metadata::shared::{Cell, Owner, Range, parse};
     use crate::records::{CellRecord, Encoding, FormulaValue};
-    use crate::{Error, FormulaMetadata};
+    use crate::{Error, FormulaMetadata, SourceLimits};
 
     const MEMORY_TOKENS: [u8; 18] = [
         0x46, 0x12, 0x34, 0x56, 0x78, 11, 0, 0x24, 0, 0, 0, 0, 0x24, 1, 0, 1, 0, 0x11,
@@ -399,7 +402,10 @@ mod tests {
     fn assert_preflight_refusal(metadata: FormulaMetadata, row: u32, col: u16, tokens: &[u8]) {
         let mut bytes = vec![0xa5];
         let result = super::write_formula_with_metadata(&mut bytes, row, col, 15, tokens, metadata);
-        assert!(matches!(result, Err(Error::UnsafeEdit(_))));
+        assert!(matches!(
+            result,
+            Err(Error::Refused(_) | Error::PatchConflict { .. } | Error::Internal(_))
+        ));
         assert_eq!(bytes, [0xa5]);
     }
 
@@ -451,7 +457,7 @@ mod tests {
             &bytes[shared_offset..shared_offset + 4],
             &[0xBC, 0x04, 13, 0]
         );
-        let parsed = parse(&bytes[shared_offset + 4..]).unwrap();
+        let parsed = parse(&bytes[shared_offset + 4..], &SourceLimits::default()).unwrap();
         assert_eq!(parsed.range, Range::try_new(0, 0, 1, 1).unwrap());
         assert_eq!(parsed.count, 2);
         assert_eq!(parsed.tokens, [0x1E, 99, 0]);

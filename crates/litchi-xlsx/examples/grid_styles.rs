@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::io;
 
-use litchi_xlsx::{LocalStyle, Workbook};
+use litchi_xlsx::LocalStyle;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let arguments = std::env::args_os().skip(1).collect::<Vec<_>>();
@@ -13,8 +13,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         .into());
     };
 
-    let workbook = Workbook::open(input)?;
+    let workbook = litchi_xlsx::Package::open(input)?;
     let sheet = workbook
+        .workbook_ref()
         .sheet(0usize)?
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "first sheet is missing"))?;
     let style = sheet.style("A1")?.ok_or_else(|| {
@@ -35,7 +36,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let committed = edit.commit()?;
     let sheet = committed
-        .workbook()
+        .package()
+        .workbook_ref()
         .sheet(0usize)?
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "first sheet is missing"))?;
     let row_style = match sheet.row_style(3)? {
@@ -50,10 +52,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Err(io::Error::other("committed grid style changed identity").into());
     }
 
-    committed.workbook().save(output)?;
+    committed.package().save(output)?;
     println!(
         "applied A1's shared style to row 4 and width-12 column D in {} semantic changes",
-        committed.patch().len()
+        committed.patch().operation_count()
     );
     Ok(())
 }

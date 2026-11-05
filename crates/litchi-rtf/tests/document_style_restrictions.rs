@@ -9,20 +9,20 @@
 
 mod repair_support;
 
-use litchi_rtf::{DocumentStyleRestrictions, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{DocumentStyleRestrictions, write::Writer};
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
 #[test]
 fn parses_all_four_flags_as_passive_metadata() {
-    let document = RtfDocument::parse(
+    let document = Tree::parse(
         r"{\rtf1\stylelock\stylelockenforced\stylelockbackcomp\autofmtoverride Body}",
+        litchi_rtf::read::OpenOptions::default(),
     )
     .unwrap();
     assert_eq!(
@@ -62,7 +62,7 @@ fn accepts_independent_producer_combinations_without_enforcement() {
             },
         ),
     ] {
-        let document = RtfDocument::parse(source).unwrap();
+        let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
         assert_eq!(*document.style_restrictions(), expected);
         assert_eq!(document.text(), "Body");
     }
@@ -70,7 +70,7 @@ fn accepts_independent_producer_combinations_without_enforcement() {
 
 #[test]
 fn omission_remains_empty_and_is_not_serialized() {
-    let document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
+    let document = Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     assert!(document.style_restrictions().is_empty());
     let serialized = String::from_utf8(write(&document)).unwrap();
     assert!(!serialized.contains("stylelock"));
@@ -79,7 +79,8 @@ fn omission_remains_empty_and_is_not_serialized() {
 
 #[test]
 fn typed_api_round_trips_in_stable_order_and_clears_passively() {
-    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
+    let mut document =
+        Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     document.set_style_restrictions(DocumentStyleRestrictions {
         restrictions_present: true,
         enforced: true,
@@ -97,7 +98,7 @@ fn typed_api_round_trips_in_stable_order_and_clears_passively() {
     for pair in controls.windows(2) {
         assert!(serialized.find(pair[0]).unwrap() < serialized.find(pair[1]).unwrap());
     }
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.style_restrictions(), document.style_restrictions());
     assert_eq!(reparsed.text(), "Body");
 
@@ -108,13 +109,16 @@ fn typed_api_round_trips_in_stable_order_and_clears_passively() {
 
 #[test]
 fn coexists_with_modern_style_and_revision_policies() {
-    let document = RtfDocument::parse(concat!(
-        r#"{\rtf1\stylelock\stylelocktheme\trackmoves1"#,
-        r#"\stylelockenforced\usenormstyforlist\stylelockbackcomp Body}"#,
-    ))
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1\stylelock\stylelocktheme\trackmoves1"#,
+            r#"\stylelockenforced\usenormstyforlist\stylelockbackcomp Body}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     let output = write(&document);
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.style_restrictions(), document.style_restrictions());
     assert_eq!(reparsed.style_policies(), document.style_policies());
     assert_eq!(reparsed.revision_policies(), document.revision_policies());
@@ -123,16 +127,19 @@ fn coexists_with_modern_style_and_revision_policies() {
 
 #[test]
 fn coexists_with_word_style_protection_sequence_without_enforcing_it() {
-    let document = RtfDocument::parse(concat!(
-        r#"{\rtf1\stylelock\stylelockenforced\stylelockbackcomp\autofmtoverride"#,
-        r#"\readprot\enforceprot1\protlevel3 Body}"#,
-    ))
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1\stylelock\stylelockenforced\stylelockbackcomp\autofmtoverride"#,
+            r#"\readprot\enforceprot1\protlevel3 Body}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     assert!(document.style_restrictions().allow_auto_format_override);
     assert_eq!(document.text(), "Body");
 
     let output = write(&document);
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.style_restrictions(), document.style_restrictions());
     assert_eq!(reparsed.protection(), document.protection());
     assert_eq!(reparsed.text(), "Body");
@@ -149,7 +156,10 @@ fn rejects_parameters_duplicates_starred_grouped_and_late_flags() {
         for suffix in ["0", "1", "2147483647", "99999999999"] {
             let source = format!(r"{{\rtf1\{name}{suffix} Body}}");
             assert!(
-                repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(&source)),
+                repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                    &source,
+                    litchi_rtf::read::OpenOptions::default()
+                )),
                 "accepted malformed {source}"
             );
         }
@@ -160,7 +170,10 @@ fn rejects_parameters_duplicates_starred_grouped_and_late_flags() {
             format!(r"{{\rtf1 Body\{name}}}"),
         ] {
             assert!(
-                repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(&source)),
+                repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                    &source,
+                    litchi_rtf::read::OpenOptions::default()
+                )),
                 "accepted malformed {source}"
             );
         }

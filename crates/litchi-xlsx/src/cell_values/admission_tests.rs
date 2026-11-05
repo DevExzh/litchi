@@ -18,7 +18,8 @@ use litchi_core::OwnedSource;
 use litchi_opc::constants::content_type as ct;
 use soapberry_zip::office::StreamingArchiveWriter;
 
-use crate::cell_values::{CellValueEdit, SheetCellValueEdit, SourceBackedEditor};
+use crate::cell_values::test_editors::SourceBackedEditor;
+use crate::cell_values::{Change, SheetChange};
 use crate::error::EditBlock;
 use crate::{Address, Error, Number, Value};
 
@@ -106,7 +107,8 @@ fn package(sheet: &str, shape: &PackageShape) -> Vec<u8> {
     )];
     workbook_relationships.extend(shape.workbook_relationships.iter().cloned());
 
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .expect("content-types member");
@@ -156,13 +158,13 @@ fn edit_a1(sheet: &str, shape: &PackageShape) -> Result<Vec<u8>, Error> {
 fn edit_cell(sheet: &str, shape: &PackageShape, address: &str) -> Result<Vec<u8>, Error> {
     let editor = editor(sheet, shape)?;
     let commit = editor
-        .edit_many([SheetCellValueEdit::set(
+        .edit_many([SheetChange::set(
             "Sheet1",
             Address::from_a1(address).expect("A1 address"),
             Value::Number(Number::new("42").expect("numeral")),
         )])?
         .commit()?;
-    let snapshot = commit.snapshot();
+    let snapshot = commit.patch().after();
     Ok(snapshot
         .sheets()
         .first()
@@ -368,7 +370,7 @@ fn inline_rich_text_is_admitted_and_reads_back_complete() {
     );
     let editor = editor(&source, &PackageShape::default()).expect("rich inline worksheet");
     let commit = editor
-        .edit_many([SheetCellValueEdit::set(
+        .edit_many([SheetChange::set(
             "Sheet1",
             Address::from_a1("A1").expect("A1"),
             Value::Number(Number::new("42").expect("numeral")),
@@ -376,7 +378,7 @@ fn inline_rich_text_is_admitted_and_reads_back_complete() {
         .expect("plan beside a rich inline cell")
         .commit()
         .expect("commit beside a rich inline cell");
-    let snapshot = commit.snapshot();
+    let snapshot = commit.patch().after();
     assert_eq!(
         snapshot.value(0, Address::from_a1("B1").expect("B1")),
         Some(&Value::Text("bold".into())),
@@ -461,7 +463,7 @@ fn the_calculation_chain_is_dropped_with_its_relationship() {
     let editor = SourceBackedEditor::from_read_at(Arc::new(OwnedSource::new(bytes)))
         .expect("calcChain package");
     let commit = editor
-        .edit_many([SheetCellValueEdit::set(
+        .edit_many([SheetChange::set(
             "Sheet1",
             Address::from_a1("A1").expect("A1"),
             Value::Number(Number::new("42").expect("numeral")),
@@ -469,7 +471,7 @@ fn the_calculation_chain_is_dropped_with_its_relationship() {
         .expect("plan")
         .commit()
         .expect("commit");
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     let mut sink = Vec::new();
     editor
         .publish_multi_commit_to_stream(&mut sink, &commit)
@@ -514,7 +516,7 @@ fn a_shared_string_part_is_admitted_and_preserved() {
     let editor = SourceBackedEditor::from_read_at(Arc::new(OwnedSource::new(bytes)))
         .expect("shared-string package");
     let commit = editor
-        .edit_many([SheetCellValueEdit::set(
+        .edit_many([SheetChange::set(
             "Sheet1",
             Address::from_a1("A1").expect("A1"),
             Value::Number(Number::new("42").expect("numeral")),
@@ -524,7 +526,8 @@ fn a_shared_string_part_is_admitted_and_preserved() {
         .expect("commit beside a shared-string cell");
     assert_eq!(
         commit
-            .snapshot()
+            .patch()
+            .after()
             .value(0, Address::from_a1("B1").expect("B1")),
         Some(&Value::Text("a".into()))
     );
@@ -559,18 +562,20 @@ fn a_shared_string_cell_cannot_be_mutated_or_removed() {
         "<worksheet xmlns=\"{SML}\"><dimension ref=\"A1\"/><sheetData><row r=\"1\"><c r=\"A1\" t=\"s\"><v>0</v></c></row></sheetData></worksheet>"
     );
     for edit in [
-        CellValueEdit::set(
+        Change::set(
             Address::from_a1("A1").expect("A1"),
             Value::Number(Number::new("42").expect("numeral")),
         ),
-        CellValueEdit::clear(Address::from_a1("A1").expect("A1")),
-        CellValueEdit::remove(Address::from_a1("A1").expect("A1")),
+        Change::clear(Address::from_a1("A1").expect("A1")),
+        Change::remove(Address::from_a1("A1").expect("A1")),
     ] {
         let error = match editor(&source, &shape).and_then(|editor| {
-            editor.edit_many([SheetCellValueEdit {
-                selector: "Sheet1".into(),
-                edit,
-            }])
+            editor
+                .edit_many([SheetChange {
+                    selector: "Sheet1".into(),
+                    edit,
+                }])
+                .and_then(|edit| edit.commit().map(|_| ()))
         }) {
             Err(error) => error,
             Ok(_) => panic!("a shared-string cell mutation must be refused"),
@@ -626,7 +631,7 @@ fn a_large_shared_string_table_stays_within_the_retained_part_bound() {
     );
     let editor = editor(&source, &shape).expect("large shared-string package");
     let commit = editor
-        .edit_many([SheetCellValueEdit::set(
+        .edit_many([SheetChange::set(
             "Sheet1",
             Address::from_a1("A1").expect("A1"),
             Value::Number(Number::new("42").expect("numeral")),
@@ -636,7 +641,8 @@ fn a_large_shared_string_table_stays_within_the_retained_part_bound() {
         .expect("large shared-string table is bounded and readable");
     assert_eq!(
         commit
-            .snapshot()
+            .patch()
+            .after()
             .value(0, Address::from_a1("B1").expect("B1")),
         Some(&Value::Text(format!("shared-{}", ITEMS - 1).into()))
     );
@@ -724,7 +730,7 @@ fn multiple_shared_string_relationships_are_refused_before_parsing() {
         .expect_err("multiple shared-string relationships are ambiguous");
     assert_eq!(
         message(&error),
-        "invalid XLSX structure: cell edits require worksheet relationships and at most one styles, theme, shared-string, and calculation-chain relationship"
+        "invalid XLSX structure: workbook has multiple shared-string relationships"
     );
 }
 
@@ -945,7 +951,7 @@ fn an_exact_no_op_reproduces_the_producer_worksheet_byte_for_byte() {
     );
     let editor = editor(&source, &PackageShape::default()).expect("producer-shaped worksheet");
     let commit = editor
-        .edit_many([SheetCellValueEdit::set(
+        .edit_many([SheetChange::set(
             "Sheet1",
             Address::from_a1("A1").expect("A1"),
             Value::Number(Number::new("1").expect("the value already stored")),
@@ -953,10 +959,14 @@ fn an_exact_no_op_reproduces_the_producer_worksheet_byte_for_byte() {
         .expect("plan the no-op")
         .commit()
         .expect("commit the no-op");
-    assert!(!commit.changed(), "an exact no-op changes nothing");
+    assert!(
+        !commit.diagnostics().changed(),
+        "an exact no-op changes nothing"
+    );
     assert_eq!(
         commit
-            .snapshot()
+            .patch()
+            .after()
             .sheets()
             .first()
             .expect("one worksheet")
@@ -992,7 +1002,7 @@ fn publishing_a_producer_shaped_package_changes_only_the_expected_members() {
     let editor = SourceBackedEditor::from_read_at(Arc::new(OwnedSource::new(bytes.clone())))
         .expect("producer-shaped package");
     let commit = editor
-        .edit_many([SheetCellValueEdit::set(
+        .edit_many([SheetChange::set(
             "Sheet1",
             Address::from_a1("A1").expect("A1"),
             Value::Number(Number::new("42").expect("numeral")),

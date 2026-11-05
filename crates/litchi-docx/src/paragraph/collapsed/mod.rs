@@ -2,8 +2,8 @@
 //!
 //! The extension is intentionally owned by a focused paragraph module. The
 //! semantic value is a closed enum, the XML reader/writer is bounded and
-//! loss-preserving, and [`Transaction`] publishes a new snapshot only after
-//! the candidate paragraph has been validated.
+//! loss-preserving. Detached paragraph views change it through
+//! [`crate::Paragraph::set_collapsed`]; [`Snapshot`] reads it.
 
 mod codec;
 mod model;
@@ -15,6 +15,6 @@ mod validation;
 mod tests;
 
 pub use model::Collapsed;
-pub use transaction::{Commit, Patch, Snapshot, Transaction};
+pub use transaction::Snapshot;
 
 pub(crate) use codec::append_xml;

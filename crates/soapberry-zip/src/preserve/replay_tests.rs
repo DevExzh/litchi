@@ -1,7 +1,7 @@
 use super::{
     ExtraFieldId, ExtraFields, PreparedCentral, PreparedEntry, PreparedLocal, PreparedTail,
 };
-use crate::office::ArchiveReader;
+use crate::office::{ArchiveLimits, ArchiveReader};
 use crate::{
     CompressionMethod, PreservationIndex, RECOMMENDED_BUFFER_SIZE, ReaderAt, ReplayLimits,
     ReplayPass, ReplayProgress, ReplayPublicationError, ReplayResource, ZipArchive,
@@ -279,7 +279,7 @@ fn replay_to_vec(
     assert!(chunk_size > 0);
     let archive = ZipArchive::from_slice(source).unwrap().into_zip_archive();
     let mut buffer = vec![0; RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+    let index = PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
     let target = target_id(&index);
     index
         .write_replacing_with_replay(
@@ -304,7 +304,7 @@ fn replay_to_vec_with_accounting(
 ) -> (Vec<u8>, ZipOperationAccounting) {
     let archive = ZipArchive::from_slice(source).unwrap().into_zip_archive();
     let mut buffer = vec![0; RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+    let index = PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
     let target = target_id(&index);
     let mut accounting = ZipOperationAccounting::default();
     let output = index
@@ -424,7 +424,7 @@ fn replay_replaces_large_and_empty_store_and_deflate_members() {
     for method in [CompressionMethod::Store, CompressionMethod::Deflate] {
         for payload in [Vec::new(), large.clone()] {
             let output = replay_to_vec(&source_archive(), method, &payload, 4096);
-            let reader = ArchiveReader::new(&output).unwrap();
+            let reader = ArchiveReader::new(&output, ArchiveLimits::default()).unwrap();
             assert_eq!(reader.read(TARGET_NAME).unwrap(), payload);
             assert_eq!(archive_names(&output), archive_names(&source_archive()));
         }
@@ -452,7 +452,7 @@ fn replay_same_name_preserves_untouched_records_order_and_comment() {
         );
     }
     assert_eq!(
-        ArchiveReader::new(&output)
+        ArchiveReader::new(&output, ArchiveLimits::default())
             .unwrap()
             .read(TARGET_NAME)
             .unwrap(),
@@ -471,7 +471,7 @@ fn replay_output_is_independent_of_callback_chunk_boundaries() {
         let many_chunks = replay_to_vec(&source, method, &payload, 3);
         assert_eq!(one_chunk, many_chunks);
         assert_eq!(
-            ArchiveReader::new(&many_chunks)
+            ArchiveReader::new(&many_chunks, ArchiveLimits::default())
                 .unwrap()
                 .read(TARGET_NAME)
                 .unwrap(),
@@ -490,7 +490,8 @@ fn replay_measure_and_emit_allow_different_callback_chunk_boundaries() {
         let expected = replay_to_vec(&source, method, &payload, payload.len());
         let archive = ZipArchive::from_slice(&source).unwrap().into_zip_archive();
         let mut buffer = vec![0; RECOMMENDED_BUFFER_SIZE];
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
         let target = target_id(&index);
         let mut calls = 0;
         let output = index
@@ -518,6 +519,66 @@ fn replay_measure_and_emit_allow_different_callback_chunk_boundaries() {
 }
 
 #[test]
+fn replay_admission_runs_after_measurement_and_before_publication() {
+    let source = source_archive();
+    let payload = b"admitted replay payload";
+    let archive = ZipArchive::from_slice(&source).unwrap().into_zip_archive();
+    let mut buffer = vec![0; RECOMMENDED_BUFFER_SIZE];
+    let index = PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+    let target = target_id(&index);
+    let mut callback_calls = 0;
+    let mut admitted = None;
+    let output = index
+        .write_replacing_with_replay_with_admission(
+            target,
+            CompressionMethod::Deflate,
+            ReplayLimits::default(),
+            Vec::new(),
+            |writer| {
+                callback_calls += 1;
+                writer.write_all(payload)
+            },
+            |profile| {
+                admitted = Some((profile.archive_bytes(), profile.entry_count()));
+                Ok::<(), io::Error>(())
+            },
+        )
+        .unwrap();
+    assert_eq!(callback_calls, 2, "measurement and emission each run once");
+    assert_eq!(
+        admitted,
+        Some((output.len() as u64, index.entries().len() as u64))
+    );
+
+    let mut sink = Vec::new();
+    let mut rejected_calls = 0;
+    let error = index
+        .write_replacing_with_replay_with_admission(
+            target,
+            CompressionMethod::Deflate,
+            ReplayLimits::default(),
+            &mut sink,
+            |writer| {
+                rejected_calls += 1;
+                writer.write_all(payload)
+            },
+            |_profile| Err::<(), _>("secret policy".to_owned()),
+        )
+        .expect_err("admission must reject before publication");
+    assert_eq!(
+        rejected_calls, 1,
+        "rejection occurs before emission callback"
+    );
+    assert!(sink.is_empty());
+    assert!(matches!(error, ReplayPublicationError::Admission { .. }));
+    assert_eq!(error.admission().map(String::as_str), Some("secret policy"));
+    assert_eq!(
+        error.to_string(),
+        "replay output admission failed during Preflight"
+    );
+}
+
+#[test]
 fn replay_sink_short_writes_produce_exact_output() {
     let source = source_archive();
     let payload = b"short sink replacement payload repeated repeated";
@@ -525,7 +586,8 @@ fn replay_sink_short_writes_produce_exact_output() {
         let expected = replay_to_vec(&source, method, payload, 5);
         let archive = ZipArchive::from_slice(&source).unwrap().into_zip_archive();
         let mut buffer = vec![0; RECOMMENDED_BUFFER_SIZE];
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
         let target = target_id(&index);
         let mut sink = ShortSink::new(3);
         let result = index.write_replacing_with_replay(
@@ -571,7 +633,7 @@ fn replay_accounting_charges_only_emitted_compressed_payload() {
         );
         assert_eq!(accounting.precompressed_payload_bytes_emitted(), 0);
         assert_eq!(
-            ArchiveReader::new(&output)
+            ArchiveReader::new(&output, ArchiveLimits::default())
                 .unwrap()
                 .read(TARGET_NAME)
                 .unwrap(),
@@ -590,7 +652,8 @@ fn replay_partial_sink_accounting_counts_accepted_generated_payload() {
         let fail_after = payload_range.start + 3;
         let archive = ZipArchive::from_slice(&source).unwrap().into_zip_archive();
         let mut buffer = vec![0; RECOMMENDED_BUFFER_SIZE];
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
         let target = target_id(&index);
         let mut sink = FailAfterSink::new(fail_after);
         let mut accounting = ZipOperationAccounting::default();
@@ -641,7 +704,7 @@ fn replay_sink_failures_report_zero_overreport_interrupt_and_flush_states() {
 
     let archive = ZipArchive::from_slice(&source).unwrap().into_zip_archive();
     let mut buffer = vec![0; RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+    let index = PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
     let target = target_id(&index);
 
     let mut zero = ZeroSink::default();
@@ -788,7 +851,7 @@ fn replay_callback_errors_are_not_swallowed_and_preserve_publication_progress() 
     let payload = b"callback failure payload repeated repeated";
     let archive = ZipArchive::from_slice(&source).unwrap().into_zip_archive();
     let mut buffer = vec![0; RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+    let index = PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
     let target = target_id(&index);
 
     let mut before = Vec::new();
@@ -871,7 +934,7 @@ fn replay_swallowed_sticky_failure_does_not_flush_sink_again() {
     let payload_start = target_payload_range(&expected).start;
     let archive = ZipArchive::from_slice(&source).unwrap().into_zip_archive();
     let mut buffer = vec![0; RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+    let index = PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
     let target = target_id(&index);
 
     let mut sink = FlushCountingFailSink::new(payload_start);
@@ -918,7 +981,7 @@ fn replay_sink_error_preserves_typed_io_source() {
     let payload_start = target_payload_range(&expected).start;
     let archive = ZipArchive::from_slice(&source).unwrap().into_zip_archive();
     let mut buffer = vec![0; RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+    let index = PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
     let target = target_id(&index);
 
     let mut sink = TypedErrorSink::new(payload_start);
@@ -962,7 +1025,7 @@ fn replay_callback_panic_does_not_flush_extra_output_on_drop() {
     let payload_start = target_payload_range(&expected).start;
     let archive = ZipArchive::from_slice(&source).unwrap().into_zip_archive();
     let mut buffer = vec![0; RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+    let index = PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
     let target = target_id(&index);
     let mut sink = Vec::new();
     let mut calls = 0;
@@ -998,7 +1061,7 @@ fn replay_detects_equal_length_crc_collision_with_sha256() {
 
     let archive = ZipArchive::from_slice(&source).unwrap().into_zip_archive();
     let mut buffer = vec![0; RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+    let index = PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
     let target = target_id(&index);
     let mut sink = Vec::new();
     let mut calls = 0;
@@ -1039,7 +1102,7 @@ fn replay_layout_promotes_following_member_central_offset_to_zip64() {
     let source = source_archive();
     let archive = ZipArchive::from_slice(&source).unwrap().into_zip_archive();
     let mut buffer = vec![0; RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+    let index = PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
     let synthetic = PreservationIndex {
         source: index.source,
         entries: index.entries.clone(),
@@ -1095,7 +1158,7 @@ fn replay_layout_rejects_framing_and_compressed_length_overflow() {
     let source = source_archive();
     let archive = ZipArchive::from_slice(&source).unwrap().into_zip_archive();
     let mut buffer = vec![0; RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+    let index = PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
     let synthetic = PreservationIndex {
         source: index.source,
         entries: index.entries.clone(),
@@ -1141,7 +1204,7 @@ fn replay_limits_refuse_before_first_publication_byte() {
     let source = source_archive();
     let archive = ZipArchive::from_slice(&source).unwrap().into_zip_archive();
     let mut buffer = vec![0; RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+    let index = PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
     let target = target_id(&index);
 
     for (limits, resource) in [
@@ -1221,13 +1284,15 @@ fn replay_wrong_index_and_name_mismatch_refuse_before_callback_and_output() {
     let source = source_archive();
     let archive = ZipArchive::from_slice(&source).unwrap().into_zip_archive();
     let mut buffer = vec![0; RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+    let index = PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
     let wrong_id = target_id(&index);
 
     let empty = ZipArchiveWriter::new(Vec::new()).finish().unwrap();
     let empty_archive = ZipArchive::from_slice(&empty).unwrap().into_zip_archive();
     let mut empty_buffer = vec![0; RECOMMENDED_BUFFER_SIZE];
-    let empty_index = PreservationIndex::new(&empty_archive, &mut empty_buffer).unwrap();
+    let empty_index =
+        PreservationIndex::new(&empty_archive, &mut empty_buffer, ArchiveLimits::default())
+            .unwrap();
     let mut wrong_sink = Vec::new();
     let mut callback_calls = 0;
     let error = empty_index
@@ -1253,8 +1318,12 @@ fn replay_wrong_index_and_name_mismatch_refuse_before_callback_and_output() {
         .unwrap()
         .into_zip_archive();
     let mut mismatched_buffer = vec![0; RECOMMENDED_BUFFER_SIZE];
-    let mismatched_index =
-        PreservationIndex::new(&mismatched_archive, &mut mismatched_buffer).unwrap();
+    let mismatched_index = PreservationIndex::new(
+        &mismatched_archive,
+        &mut mismatched_buffer,
+        ArchiveLimits::default(),
+    )
+    .unwrap();
     let mismatched_id = entry_id(&mismatched_index, "keep.bin");
     let mut mismatch_sink = Vec::new();
     let error = mismatched_index

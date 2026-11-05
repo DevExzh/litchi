@@ -155,8 +155,35 @@ pub(crate) fn append_dg_container_with_charts(
         header_version::CONTAINER,
         0,
         record_type::DG_CONTAINER,
-        |output| append_dg_container_children(output, drawing_id, shapes, tables, charts),
+        |output| {
+            append_dg_container_children(
+                output,
+                drawing_id,
+                drawing_id << 10,
+                shapes,
+                tables,
+                charts,
+            )
+        },
     )
+}
+
+/// Creates the drawing container of a blank slide: the patriarch group shape
+/// and the background shape, numbered from `spid_base` instead of the
+/// builder's `drawing_id << 10` convention.
+///
+/// An opened presentation allocates a new drawing in a new shape-identifier
+/// cluster, whose base need not match the drawing identifier.
+pub(crate) fn create_blank_dg_container(drawing_id: u32, spid_base: u32) -> Result<Vec<u8>, Error> {
+    let mut output = Vec::new();
+    InPlaceRecord::write(
+        &mut output,
+        header_version::CONTAINER,
+        0,
+        record_type::DG_CONTAINER,
+        |output| append_dg_container_children(output, drawing_id, spid_base, &[], &[], &[]),
+    )?;
+    Ok(output)
 }
 
 /// Appends the children of the `DgContainer` [`append_dg_container_with_charts`]
@@ -165,6 +192,7 @@ pub(crate) fn append_dg_container_with_charts(
 fn append_dg_container_children(
     output: &mut Vec<u8>,
     drawing_id: u32,
+    spid_base: u32,
     shapes: &[UserShapeData],
     tables: &[crate::writer::table::PositionedTable],
     charts: &[crate::writer::chart::ChartFrame],
@@ -181,10 +209,10 @@ fn append_dg_container_children(
         reason = "the `DG` instance field carries the low 12 bits of the drawing id; `EscherHeader::new` masks it"
     )]
     let mut dg = EscherBuilder::new(header_version::DG, drawing_id as u16, record_type::DG);
-    dg.add_data(EscherDgData::new(total_shapes, drawing_id).as_bytes());
+    dg.add_data(EscherDgData::with_spid_base(total_shapes, spid_base).as_bytes());
     output.extend_from_slice(&dg.build()?);
 
-    let group_spid = drawing_id << 10;
+    let group_spid = spid_base;
     let bg_spid = group_spid + 1;
     InPlaceRecord::write(
         output,

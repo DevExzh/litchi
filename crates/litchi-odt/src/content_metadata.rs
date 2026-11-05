@@ -6,6 +6,7 @@
 //! inert typed view of those declarations.  RDFa CURIEs and datatypes are
 //! retained as strings; they are never resolved, fetched, or evaluated.
 
+#![cfg_attr(test, allow(dead_code))]
 #![allow(
     clippy::arbitrary_source_item_ordering,
     clippy::cast_possible_truncation,
@@ -20,7 +21,7 @@
     reason = "the metadata codec is a bounded XML projection with compatibility-oriented naming"
 )]
 
-use crate::core::ResolvedReader;
+use crate::core::{ResolvedReader, XmlStreamLimits};
 use crate::elements::field::{
     MetaFieldAttribute, MetaFieldContent, MetaFieldElement, MetaFieldNode,
 };
@@ -50,6 +51,29 @@ const MAX_TEXT_META_BYTES: usize = 16 * 1024 * 1024;
 // Every RDFa lexical field is independently bounded; this ceiling also
 // bounds repeated property tokens before any prefix index is built.
 const MAX_RDFA_CURIE_TOKENS: usize = MAX_TEXT_META_BYTES * 3;
+
+#[cfg(test)]
+fn xml_limits() -> Result<XmlStreamLimits> {
+    xml_limits_with_policy(XmlStreamLimits::default())
+}
+
+fn xml_limits_with_policy(policy: XmlStreamLimits) -> Result<XmlStreamLimits> {
+    XmlStreamLimits::new(
+        policy.max_bytes().min(MAX_XML_BYTES as u64),
+        policy.max_depth().min(MAX_TEXT_META_DEPTH),
+        policy.max_events().min(MAX_OCCURRENCES),
+        policy.max_attributes(),
+        policy.max_token_bytes().min(MAX_TEXT_META_BYTES),
+    )?
+    .namespace_limits(
+        policy.max_namespace_scope_depth().min(MAX_TEXT_META_DEPTH),
+        policy.max_namespace_declarations(),
+        policy.max_namespace_bindings().min(MAX_OCCURRENCES),
+        policy.max_namespace_bytes().min(MAX_TEXT_META_BYTES),
+        policy.max_namespace_prefix_bytes().min(MAX_TEXT_META_BYTES),
+        policy.max_namespace_uri_bytes().min(MAX_TEXT_META_BYTES),
+    )
+}
 
 /// Reservations for owned metadata parser state.
 ///
@@ -445,19 +469,33 @@ impl ContentMetadata {
     }
 }
 
-/// Parse in-content metadata from the supplied XML parts.
-pub(crate) fn parse_parts(parts: &[(&str, MetadataPart)]) -> Result<ContentMetadata> {
-    parse_parts_with_optional_budget(parts, None).map(|(metadata, _)| metadata)
+/// Parse in-content metadata under the raw XML policy retained by an opened
+/// owner.
+pub(crate) fn parse_parts_with_xml_limits(
+    parts: &[(&str, MetadataPart)],
+    xml_limits: XmlStreamLimits,
+) -> Result<ContentMetadata> {
+    parse_parts_with_optional_budget_and_limits(parts, None, xml_limits)
+        .map(|(metadata, _)| metadata)
 }
 
+#[cfg(test)]
 fn parse_parts_with_optional_budget(
     parts: &[(&str, MetadataPart)],
     budget: Option<&FlatMutationBudget>,
 ) -> Result<(ContentMetadata, Option<MemoryLease>)> {
+    parse_parts_with_optional_budget_and_limits(parts, budget, XmlStreamLimits::default())
+}
+
+fn parse_parts_with_optional_budget_and_limits(
+    parts: &[(&str, MetadataPart)],
+    budget: Option<&FlatMutationBudget>,
+    xml_limits: XmlStreamLimits,
+) -> Result<(ContentMetadata, Option<MemoryLease>)> {
     let mut memory = MetadataMemory::new(budget);
     let mut output = ContentMetadata::default();
     for (xml, part) in parts {
-        let parsed = parse_part_inner(xml, *part, &mut memory)?;
+        let parsed = parse_part_inner_with_limits(xml, *part, &mut memory, xml_limits)?;
         for item in parsed.rdfa {
             push_bounded_with_memory(
                 &mut output.rdfa,
@@ -480,37 +518,68 @@ fn parse_parts_with_optional_budget(
 }
 
 /// Parse in-content metadata while charging parser and projection ownership.
+#[cfg(test)]
 pub(crate) fn parse_parts_with_budget(
     parts: &[(&str, MetadataPart)],
     budget: &FlatMutationBudget,
 ) -> Result<(ContentMetadata, MemoryLease)> {
+    parse_parts_with_budget_and_limits(parts, budget, XmlStreamLimits::default())
+}
+
+pub(crate) fn parse_parts_with_budget_and_limits(
+    parts: &[(&str, MetadataPart)],
+    budget: &FlatMutationBudget,
+    xml_limits: XmlStreamLimits,
+) -> Result<(ContentMetadata, MemoryLease)> {
     budget.check()?;
-    let (metadata, memory) = parse_parts_with_optional_budget(parts, Some(budget))?;
+    let (metadata, memory) =
+        parse_parts_with_optional_budget_and_limits(parts, Some(budget), xml_limits)?;
     Ok((metadata, memory.unwrap_or_default()))
 }
 
 /// Parse one XML part.  This is crate-visible so mutable editors can inspect
 /// their authoritative content snapshot without retaining a second copy.
+#[cfg(test)]
 pub(crate) fn parse_part(xml: &str, part: MetadataPart) -> Result<ContentMetadata> {
-    parse_part_with_budget(xml, part, None).map(|(metadata, _)| metadata)
+    parse_part_with_xml_limits(xml, part, XmlStreamLimits::default())
+}
+
+/// Parse one XML part under the raw XML policy retained by an opened owner.
+pub(crate) fn parse_part_with_xml_limits(
+    xml: &str,
+    part: MetadataPart,
+    xml_limits: XmlStreamLimits,
+) -> Result<ContentMetadata> {
+    parse_part_with_budget_and_limits(xml, part, None, xml_limits).map(|(metadata, _)| metadata)
 }
 
 /// Parse one XML part while charging parser and projection ownership.
+#[cfg(test)]
 pub(crate) fn parse_part_with_budget(
     xml: &str,
     part: MetadataPart,
     budget: Option<&FlatMutationBudget>,
 ) -> Result<(ContentMetadata, Option<MemoryLease>)> {
+    parse_part_with_budget_and_limits(xml, part, budget, XmlStreamLimits::default())
+}
+
+fn parse_part_with_budget_and_limits(
+    xml: &str,
+    part: MetadataPart,
+    budget: Option<&FlatMutationBudget>,
+    xml_limits: XmlStreamLimits,
+) -> Result<(ContentMetadata, Option<MemoryLease>)> {
     let mut memory = MetadataMemory::new(budget);
-    let output = parse_part_inner(xml, part, &mut memory)?;
+    let output = parse_part_inner_with_limits(xml, part, &mut memory, xml_limits)?;
     let memory = memory.into_memory_lease();
     Ok((output, memory))
 }
 
-fn parse_part_inner(
+fn parse_part_inner_with_limits(
     xml: &str,
     part: MetadataPart,
     memory: &mut MetadataMemory<'_>,
+    xml_limits: XmlStreamLimits,
 ) -> Result<ContentMetadata> {
     if xml.len() > MAX_XML_BYTES {
         return Err(Error::InvalidFormat(format!(
@@ -518,7 +587,7 @@ fn parse_part_inner(
         )));
     }
     reserve_namespace_resolver_memory(xml, memory)?;
-    let mut reader = ResolvedReader::from_xml(xml);
+    let mut reader = ResolvedReader::from_xml(xml, xml_limits)?;
     reader.config_mut().check_end_names = true;
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
@@ -532,9 +601,9 @@ fn parse_part_inner(
     let mut seen = 0usize;
 
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event()
-            .map_err(|error| Error::InvalidFormat(format!("invalid ODF metadata XML: {error}")))?;
+        let (namespace, event) = reader.read_resolved_event().map_err(|error| {
+            crate::core::map_resolved_reader_error(error, "invalid ODF metadata XML")
+        })?;
         let namespace_uri = match &event {
             Event::Start(_) | Event::Empty(_) => {
                 resolved_namespace_with_memory(&namespace, memory)?
@@ -1337,10 +1406,11 @@ fn append_required_rdfa_namespaces(
     source: &str,
     attrs: &RdfaAttributes,
     namespace_declarations: &[String],
+    xml_limits: XmlStreamLimits,
     scratch: &mut MetadataMemory<'_>,
 ) -> Result<()> {
     for prefix in rdfa_prefixes_with_memory(attrs, scratch)? {
-        if source_namespace_binding(source, &prefix, scratch)?.is_some()
+        if source_namespace_binding(source, &prefix, xml_limits, scratch)?.is_some()
             || namespace_binding(namespace_declarations, &prefix).is_some()
         {
             continue;
@@ -2439,25 +2509,42 @@ struct ScannedSpans<'a> {
 }
 
 /// Set RDFa on a paragraph selected in document order.
+#[cfg(test)]
 pub(crate) fn set_paragraph_rdfa(
     xml: &str,
     position: Position,
     value: &RdfaAttributes,
 ) -> Result<String> {
-    set_paragraph_rdfa_with_limit(xml, position, value, MAX_XML_BYTES)
+    set_paragraph_rdfa_with_xml_limits(xml, position, value, XmlStreamLimits::default())
+}
+
+pub(crate) fn set_paragraph_rdfa_with_xml_limits(
+    xml: &str,
+    position: Position,
+    value: &RdfaAttributes,
+    xml_limits: XmlStreamLimits,
+) -> Result<String> {
+    set_paragraph_rdfa_with_limit_and_xml_limits(xml, position, value, MAX_XML_BYTES, xml_limits)
 }
 
 /// Set RDFa on a paragraph while charging the exact edited output.
+#[cfg(test)]
 pub(crate) fn set_paragraph_rdfa_with_limit(
     xml: &str,
     position: Position,
     value: &RdfaAttributes,
     maximum: usize,
 ) -> Result<String> {
-    set_paragraph_rdfa_with_limit_and_budget(xml, position, value, maximum, None)
-        .map(ChargedXml::into_string)
+    set_paragraph_rdfa_with_limit_and_xml_limits(
+        xml,
+        position,
+        value,
+        maximum,
+        XmlStreamLimits::default(),
+    )
 }
 
+#[cfg(test)]
 pub(crate) fn set_paragraph_rdfa_with_limit_and_budget(
     xml: &str,
     position: Position,
@@ -2465,11 +2552,43 @@ pub(crate) fn set_paragraph_rdfa_with_limit_and_budget(
     maximum: usize,
     budget: Option<&FlatMutationBudget>,
 ) -> Result<ChargedXml> {
+    set_paragraph_rdfa_with_limit_and_budget_and_xml_limits(
+        xml,
+        position,
+        value,
+        maximum,
+        budget,
+        XmlStreamLimits::default(),
+    )
+}
+
+pub(crate) fn set_paragraph_rdfa_with_limit_and_xml_limits(
+    xml: &str,
+    position: Position,
+    value: &RdfaAttributes,
+    maximum: usize,
+    xml_limits: XmlStreamLimits,
+) -> Result<String> {
+    set_paragraph_rdfa_with_limit_and_budget_and_xml_limits(
+        xml, position, value, maximum, None, xml_limits,
+    )
+    .map(ChargedXml::into_string)
+}
+
+pub(crate) fn set_paragraph_rdfa_with_limit_and_budget_and_xml_limits(
+    xml: &str,
+    position: Position,
+    value: &RdfaAttributes,
+    maximum: usize,
+    budget: Option<&FlatMutationBudget>,
+    xml_limits: XmlStreamLimits,
+) -> Result<ChargedXml> {
     value.validate()?;
-    let scanned = scan_spans_with_budget(
+    let scanned = scan_spans_with_budget_and_xml_limits(
         xml,
         |namespace, local| namespace == TEXTNS && local == "p",
         budget,
+        xml_limits,
     )?;
     let span = scanned.spans.get(position.get()).ok_or_else(|| {
         Error::InvalidFormat(format!(
@@ -2486,25 +2605,42 @@ pub(crate) fn set_paragraph_rdfa_with_limit_and_budget(
             memory,
         });
     }
-    rewrite_rdfa_with_limit_and_budget(xml, span, value, maximum, budget)
+    rewrite_rdfa_with_limit_and_budget(xml, span, value, maximum, budget, xml_limits)
 }
 
 /// Set RDFa on a uniquely named bookmark start.
+#[cfg(test)]
 pub(crate) fn set_bookmark_rdfa(xml: &str, name: &str, value: &RdfaAttributes) -> Result<String> {
-    set_bookmark_rdfa_with_limit(xml, name, value, MAX_XML_BYTES)
+    set_bookmark_rdfa_with_xml_limits(xml, name, value, XmlStreamLimits::default())
+}
+
+pub(crate) fn set_bookmark_rdfa_with_xml_limits(
+    xml: &str,
+    name: &str,
+    value: &RdfaAttributes,
+    xml_limits: XmlStreamLimits,
+) -> Result<String> {
+    set_bookmark_rdfa_with_limit_and_xml_limits(xml, name, value, MAX_XML_BYTES, xml_limits)
 }
 
 /// Set RDFa on a uniquely named bookmark start while charging the exact output.
+#[cfg(test)]
 pub(crate) fn set_bookmark_rdfa_with_limit(
     xml: &str,
     name: &str,
     value: &RdfaAttributes,
     maximum: usize,
 ) -> Result<String> {
-    set_bookmark_rdfa_with_limit_and_budget(xml, name, value, maximum, None)
-        .map(ChargedXml::into_string)
+    set_bookmark_rdfa_with_limit_and_xml_limits(
+        xml,
+        name,
+        value,
+        maximum,
+        XmlStreamLimits::default(),
+    )
 }
 
+#[cfg(test)]
 pub(crate) fn set_bookmark_rdfa_with_limit_and_budget(
     xml: &str,
     name: &str,
@@ -2512,11 +2648,43 @@ pub(crate) fn set_bookmark_rdfa_with_limit_and_budget(
     maximum: usize,
     budget: Option<&FlatMutationBudget>,
 ) -> Result<ChargedXml> {
+    set_bookmark_rdfa_with_limit_and_budget_and_xml_limits(
+        xml,
+        name,
+        value,
+        maximum,
+        budget,
+        XmlStreamLimits::default(),
+    )
+}
+
+pub(crate) fn set_bookmark_rdfa_with_limit_and_xml_limits(
+    xml: &str,
+    name: &str,
+    value: &RdfaAttributes,
+    maximum: usize,
+    xml_limits: XmlStreamLimits,
+) -> Result<String> {
+    set_bookmark_rdfa_with_limit_and_budget_and_xml_limits(
+        xml, name, value, maximum, None, xml_limits,
+    )
+    .map(ChargedXml::into_string)
+}
+
+pub(crate) fn set_bookmark_rdfa_with_limit_and_budget_and_xml_limits(
+    xml: &str,
+    name: &str,
+    value: &RdfaAttributes,
+    maximum: usize,
+    budget: Option<&FlatMutationBudget>,
+    xml_limits: XmlStreamLimits,
+) -> Result<ChargedXml> {
     value.validate()?;
-    let scanned = scan_spans_with_budget(
+    let scanned = scan_spans_with_budget_and_xml_limits(
         xml,
         |namespace, local| namespace == TEXTNS && local == "bookmark-start",
         budget,
+        xml_limits,
     )?;
     let mut matches = scanned
         .spans
@@ -2540,29 +2708,46 @@ pub(crate) fn set_bookmark_rdfa_with_limit_and_budget(
             memory,
         });
     }
-    rewrite_rdfa_with_limit_and_budget(xml, span, value, maximum, budget)
+    rewrite_rdfa_with_limit_and_budget(xml, span, value, maximum, budget, xml_limits)
 }
 
 /// Set RDFa on one inline `text:meta` occurrence.
+#[cfg(test)]
 pub(crate) fn set_text_meta_rdfa(
     xml: &str,
     position: Position,
     value: &RdfaAttributes,
 ) -> Result<String> {
-    set_text_meta_rdfa_with_limit(xml, position, value, MAX_XML_BYTES)
+    set_text_meta_rdfa_with_xml_limits(xml, position, value, XmlStreamLimits::default())
+}
+
+pub(crate) fn set_text_meta_rdfa_with_xml_limits(
+    xml: &str,
+    position: Position,
+    value: &RdfaAttributes,
+    xml_limits: XmlStreamLimits,
+) -> Result<String> {
+    set_text_meta_rdfa_with_limit_and_xml_limits(xml, position, value, MAX_XML_BYTES, xml_limits)
 }
 
 /// Set RDFa on one inline `text:meta` while charging the exact output.
+#[cfg(test)]
 pub(crate) fn set_text_meta_rdfa_with_limit(
     xml: &str,
     position: Position,
     value: &RdfaAttributes,
     maximum: usize,
 ) -> Result<String> {
-    set_text_meta_rdfa_with_limit_and_budget(xml, position, value, maximum, None)
-        .map(ChargedXml::into_string)
+    set_text_meta_rdfa_with_limit_and_xml_limits(
+        xml,
+        position,
+        value,
+        maximum,
+        XmlStreamLimits::default(),
+    )
 }
 
+#[cfg(test)]
 pub(crate) fn set_text_meta_rdfa_with_limit_and_budget(
     xml: &str,
     position: Position,
@@ -2570,11 +2755,43 @@ pub(crate) fn set_text_meta_rdfa_with_limit_and_budget(
     maximum: usize,
     budget: Option<&FlatMutationBudget>,
 ) -> Result<ChargedXml> {
+    set_text_meta_rdfa_with_limit_and_budget_and_xml_limits(
+        xml,
+        position,
+        value,
+        maximum,
+        budget,
+        XmlStreamLimits::default(),
+    )
+}
+
+pub(crate) fn set_text_meta_rdfa_with_limit_and_xml_limits(
+    xml: &str,
+    position: Position,
+    value: &RdfaAttributes,
+    maximum: usize,
+    xml_limits: XmlStreamLimits,
+) -> Result<String> {
+    set_text_meta_rdfa_with_limit_and_budget_and_xml_limits(
+        xml, position, value, maximum, None, xml_limits,
+    )
+    .map(ChargedXml::into_string)
+}
+
+pub(crate) fn set_text_meta_rdfa_with_limit_and_budget_and_xml_limits(
+    xml: &str,
+    position: Position,
+    value: &RdfaAttributes,
+    maximum: usize,
+    budget: Option<&FlatMutationBudget>,
+    xml_limits: XmlStreamLimits,
+) -> Result<ChargedXml> {
     value.validate()?;
-    let scanned = scan_spans_with_budget(
+    let scanned = scan_spans_with_budget_and_xml_limits(
         xml,
         |namespace, local| namespace == TEXTNS && local == "meta",
         budget,
+        xml_limits,
     )?;
     let span = scanned.spans.get(position.get()).ok_or_else(|| {
         Error::InvalidFormat(format!(
@@ -2592,25 +2809,42 @@ pub(crate) fn set_text_meta_rdfa_with_limit_and_budget(
             memory,
         });
     }
-    rewrite_rdfa_with_limit_and_budget(xml, span, value, maximum, budget)
+    rewrite_rdfa_with_limit_and_budget(xml, span, value, maximum, budget, xml_limits)
 }
 
 /// Insert an inline `text:meta` before the selected paragraph's end tag.
+#[cfg(test)]
 pub(crate) fn insert_text_meta(xml: &str, paragraph: Position, value: &TextMeta) -> Result<String> {
-    insert_text_meta_with_limit(xml, paragraph, value, MAX_XML_BYTES)
+    insert_text_meta_with_xml_limits(xml, paragraph, value, XmlStreamLimits::default())
+}
+
+pub(crate) fn insert_text_meta_with_xml_limits(
+    xml: &str,
+    paragraph: Position,
+    value: &TextMeta,
+    xml_limits: XmlStreamLimits,
+) -> Result<String> {
+    insert_text_meta_with_limit_and_xml_limits(xml, paragraph, value, MAX_XML_BYTES, xml_limits)
 }
 
 /// Insert an inline `text:meta` while charging every constructed fragment and output.
+#[cfg(test)]
 pub(crate) fn insert_text_meta_with_limit(
     xml: &str,
     paragraph: Position,
     value: &TextMeta,
     maximum: usize,
 ) -> Result<String> {
-    insert_text_meta_with_limit_and_budget(xml, paragraph, value, maximum, None)
-        .map(ChargedXml::into_string)
+    insert_text_meta_with_limit_and_xml_limits(
+        xml,
+        paragraph,
+        value,
+        maximum,
+        XmlStreamLimits::default(),
+    )
 }
 
+#[cfg(test)]
 pub(crate) fn insert_text_meta_with_limit_and_budget(
     xml: &str,
     paragraph: Position,
@@ -2618,10 +2852,42 @@ pub(crate) fn insert_text_meta_with_limit_and_budget(
     maximum: usize,
     budget: Option<&FlatMutationBudget>,
 ) -> Result<ChargedXml> {
-    let scanned = scan_spans_with_budget(
+    insert_text_meta_with_limit_and_budget_and_xml_limits(
+        xml,
+        paragraph,
+        value,
+        maximum,
+        budget,
+        XmlStreamLimits::default(),
+    )
+}
+
+pub(crate) fn insert_text_meta_with_limit_and_xml_limits(
+    xml: &str,
+    paragraph: Position,
+    value: &TextMeta,
+    maximum: usize,
+    xml_limits: XmlStreamLimits,
+) -> Result<String> {
+    insert_text_meta_with_limit_and_budget_and_xml_limits(
+        xml, paragraph, value, maximum, None, xml_limits,
+    )
+    .map(ChargedXml::into_string)
+}
+
+pub(crate) fn insert_text_meta_with_limit_and_budget_and_xml_limits(
+    xml: &str,
+    paragraph: Position,
+    value: &TextMeta,
+    maximum: usize,
+    budget: Option<&FlatMutationBudget>,
+    xml_limits: XmlStreamLimits,
+) -> Result<ChargedXml> {
+    let scanned = scan_spans_with_budget_and_xml_limits(
         xml,
         |namespace, local| namespace == TEXTNS && local == "p",
         budget,
+        xml_limits,
     )?;
     let span = scanned.spans.get(paragraph.get()).ok_or_else(|| {
         Error::InvalidFormat(format!(
@@ -2689,21 +2955,38 @@ pub(crate) fn insert_text_meta_with_limit_and_budget(
 }
 
 /// Replace one inline `text:meta` element.
+#[cfg(test)]
 pub(crate) fn replace_text_meta(xml: &str, position: Position, value: &TextMeta) -> Result<String> {
-    replace_text_meta_with_limit(xml, position, value, MAX_XML_BYTES)
+    replace_text_meta_with_xml_limits(xml, position, value, XmlStreamLimits::default())
+}
+
+pub(crate) fn replace_text_meta_with_xml_limits(
+    xml: &str,
+    position: Position,
+    value: &TextMeta,
+    xml_limits: XmlStreamLimits,
+) -> Result<String> {
+    replace_text_meta_with_limit_and_xml_limits(xml, position, value, MAX_XML_BYTES, xml_limits)
 }
 
 /// Replace one inline `text:meta` while charging every constructed fragment and output.
+#[cfg(test)]
 pub(crate) fn replace_text_meta_with_limit(
     xml: &str,
     position: Position,
     value: &TextMeta,
     maximum: usize,
 ) -> Result<String> {
-    replace_text_meta_with_limit_and_budget(xml, position, value, maximum, None)
-        .map(ChargedXml::into_string)
+    replace_text_meta_with_limit_and_xml_limits(
+        xml,
+        position,
+        value,
+        maximum,
+        XmlStreamLimits::default(),
+    )
 }
 
+#[cfg(test)]
 pub(crate) fn replace_text_meta_with_limit_and_budget(
     xml: &str,
     position: Position,
@@ -2711,10 +2994,42 @@ pub(crate) fn replace_text_meta_with_limit_and_budget(
     maximum: usize,
     budget: Option<&FlatMutationBudget>,
 ) -> Result<ChargedXml> {
-    let scanned = scan_spans_with_budget(
+    replace_text_meta_with_limit_and_budget_and_xml_limits(
+        xml,
+        position,
+        value,
+        maximum,
+        budget,
+        XmlStreamLimits::default(),
+    )
+}
+
+pub(crate) fn replace_text_meta_with_limit_and_xml_limits(
+    xml: &str,
+    position: Position,
+    value: &TextMeta,
+    maximum: usize,
+    xml_limits: XmlStreamLimits,
+) -> Result<String> {
+    replace_text_meta_with_limit_and_budget_and_xml_limits(
+        xml, position, value, maximum, None, xml_limits,
+    )
+    .map(ChargedXml::into_string)
+}
+
+pub(crate) fn replace_text_meta_with_limit_and_budget_and_xml_limits(
+    xml: &str,
+    position: Position,
+    value: &TextMeta,
+    maximum: usize,
+    budget: Option<&FlatMutationBudget>,
+    xml_limits: XmlStreamLimits,
+) -> Result<ChargedXml> {
+    let scanned = scan_spans_with_budget_and_xml_limits(
         xml,
         |namespace, local| namespace == TEXTNS && local == "meta",
         budget,
+        xml_limits,
     )?;
     let span = scanned.spans.get(position.get()).ok_or_else(|| {
         Error::InvalidFormat(format!(
@@ -2724,7 +3039,7 @@ pub(crate) fn replace_text_meta_with_limit_and_budget(
     })?;
     validate_text_meta_with_budget(value, budget)?;
     ensure_rdfa_namespace_context(&value.rdfa, &span.namespace_declarations)?;
-    let existing = parse_text_meta_span(xml, span, maximum, budget)?;
+    let existing = parse_text_meta_span(xml, span, maximum, budget, xml_limits)?;
     if text_meta_semantically_equal(&existing, value) {
         bounded_output_len_with_limit(xml.len(), "text:meta exact no-op", maximum)?;
         let (mut output, memory) = allocate_xml(budget, xml.len(), "ODT text:meta exact no-op")?;
@@ -2754,6 +3069,7 @@ fn parse_text_meta_span(
     span: &Span,
     maximum: usize,
     budget: Option<&FlatMutationBudget>,
+    xml_limits: XmlStreamLimits,
 ) -> Result<TextMeta> {
     let raw = xml
         .get(span.start..span.end)
@@ -2765,7 +3081,7 @@ fn parse_text_meta_span(
         budget,
     )?;
     let (parsed, _parsed_memory) =
-        parse_part_with_budget(&owned.xml, MetadataPart::Content, budget)?;
+        parse_part_with_budget_and_limits(&owned.xml, MetadataPart::Content, budget, xml_limits)?;
     parsed
         .text_meta
         .into_iter()
@@ -2781,30 +3097,67 @@ fn text_meta_semantically_equal(left: &TextMeta, right: &TextMeta) -> bool {
 }
 
 /// Remove one inline `text:meta` element.
+#[cfg(test)]
 pub(crate) fn remove_text_meta(xml: &str, position: Position) -> Result<String> {
-    remove_text_meta_with_limit(xml, position, MAX_XML_BYTES)
+    remove_text_meta_with_xml_limits(xml, position, XmlStreamLimits::default())
+}
+
+pub(crate) fn remove_text_meta_with_xml_limits(
+    xml: &str,
+    position: Position,
+    xml_limits: XmlStreamLimits,
+) -> Result<String> {
+    remove_text_meta_with_limit_and_xml_limits(xml, position, MAX_XML_BYTES, xml_limits)
 }
 
 /// Remove one inline `text:meta` while charging the exact shortened output.
+#[cfg(test)]
 pub(crate) fn remove_text_meta_with_limit(
     xml: &str,
     position: Position,
     maximum: usize,
 ) -> Result<String> {
-    remove_text_meta_with_limit_and_budget(xml, position, maximum, None)
-        .map(ChargedXml::into_string)
+    remove_text_meta_with_limit_and_xml_limits(xml, position, maximum, XmlStreamLimits::default())
 }
 
+#[cfg(test)]
 pub(crate) fn remove_text_meta_with_limit_and_budget(
     xml: &str,
     position: Position,
     maximum: usize,
     budget: Option<&FlatMutationBudget>,
 ) -> Result<ChargedXml> {
-    let scanned = scan_spans_with_budget(
+    remove_text_meta_with_limit_and_budget_and_xml_limits(
+        xml,
+        position,
+        maximum,
+        budget,
+        XmlStreamLimits::default(),
+    )
+}
+
+pub(crate) fn remove_text_meta_with_limit_and_xml_limits(
+    xml: &str,
+    position: Position,
+    maximum: usize,
+    xml_limits: XmlStreamLimits,
+) -> Result<String> {
+    remove_text_meta_with_limit_and_budget_and_xml_limits(xml, position, maximum, None, xml_limits)
+        .map(ChargedXml::into_string)
+}
+
+pub(crate) fn remove_text_meta_with_limit_and_budget_and_xml_limits(
+    xml: &str,
+    position: Position,
+    maximum: usize,
+    budget: Option<&FlatMutationBudget>,
+    xml_limits: XmlStreamLimits,
+) -> Result<ChargedXml> {
+    let scanned = scan_spans_with_budget_and_xml_limits(
         xml,
         |namespace, local| namespace == TEXTNS && local == "meta",
         budget,
+        xml_limits,
     )?;
     let span = scanned.spans.get(position.get()).ok_or_else(|| {
         Error::InvalidFormat(format!(
@@ -2821,6 +3174,7 @@ fn rewrite_rdfa_with_limit_and_budget(
     value: &RdfaAttributes,
     maximum: usize,
     budget: Option<&FlatMutationBudget>,
+    xml_limits: XmlStreamLimits,
 ) -> Result<ChargedXml> {
     value.validate()?;
     let source = xml
@@ -2845,6 +3199,7 @@ fn rewrite_rdfa_with_limit_and_budget(
         &span.namespace_declarations,
         maximum,
         budget,
+        xml_limits,
         &mut scratch,
     )?;
     splice_replace_with_limit_and_budget(
@@ -2865,6 +3220,7 @@ fn rewrite_start_tag_with_limit_and_budget(
     namespace_declarations: &[String],
     maximum: usize,
     budget: Option<&FlatMutationBudget>,
+    xml_limits: XmlStreamLimits,
     scratch: &mut MetadataMemory<'_>,
 ) -> Result<ChargedXml> {
     let bytes = source.as_bytes();
@@ -2879,6 +3235,7 @@ fn rewrite_start_tag_with_limit_and_budget(
         add_namespace,
         attrs,
         namespace_declarations,
+        xml_limits,
         scratch,
     )?;
     bounded_output_len_with_limit(output_len, "RDFa start-tag rewrite", maximum)?;
@@ -2932,7 +3289,7 @@ fn rewrite_start_tag_with_limit_and_budget(
         }
     }
     if add_namespace {
-        match source_namespace_binding(source, "xhtml", scratch)? {
+        match source_namespace_binding(source, "xhtml", xml_limits, scratch)? {
             Some(namespace) if namespace != XHTMLNS => {
                 return Err(Error::InvalidFormat(
                     "RDFa edit cannot shadow the xhtml namespace prefix".to_string(),
@@ -2950,6 +3307,7 @@ fn rewrite_start_tag_with_limit_and_budget(
             source,
             attrs,
             namespace_declarations,
+            xml_limits,
             scratch,
         )?;
     }
@@ -2967,6 +3325,7 @@ fn rewritten_start_tag_len(
     add_namespace: bool,
     attrs: &RdfaAttributes,
     namespace_declarations: &[String],
+    xml_limits: XmlStreamLimits,
     scratch: &mut MetadataMemory<'_>,
 ) -> Result<usize> {
     let bytes = source.as_bytes();
@@ -3025,7 +3384,7 @@ fn rewritten_start_tag_len(
         }
     }
     if add_namespace {
-        match source_namespace_binding(source, "xhtml", scratch)? {
+        match source_namespace_binding(source, "xhtml", xml_limits, scratch)? {
             Some(namespace) if namespace != XHTMLNS => {
                 return Err(Error::InvalidFormat(
                     "RDFa edit cannot shadow the xhtml namespace prefix".to_string(),
@@ -3037,7 +3396,7 @@ fn rewritten_start_tag_len(
             },
         }
         for prefix in rdfa_prefixes_with_memory(attrs, scratch)? {
-            if source_namespace_binding(source, &prefix, scratch)?.is_some()
+            if source_namespace_binding(source, &prefix, xml_limits, scratch)?.is_some()
                 || namespace_binding(namespace_declarations, &prefix).is_some()
             {
                 continue;
@@ -3078,14 +3437,15 @@ fn rewritten_start_tag_len(
 fn source_namespace_binding(
     source: &str,
     prefix: &str,
+    xml_limits: XmlStreamLimits,
     memory: &mut MetadataMemory<'_>,
 ) -> Result<Option<String>> {
     reserve_namespace_resolver_memory(source, memory)?;
-    let mut reader = ResolvedReader::from_xml(source);
+    let mut reader = ResolvedReader::from_xml(source, xml_limits_with_policy(xml_limits)?)?;
     reader.config_mut().trim_text(false);
     loop {
         let (_resolved_event, event) = reader.read_resolved_event().map_err(|error| {
-            Error::InvalidFormat(format!("invalid RDFa target start tag: {error}"))
+            crate::core::map_resolved_reader_error(error, "invalid RDFa target start tag")
         })?;
         match event {
             Event::Start(source) | Event::Empty(source) => {
@@ -3369,10 +3729,20 @@ fn metadata_present_namespace_names(
     Ok(output)
 }
 
+#[cfg(test)]
 fn scan_spans_with_budget<'a>(
     xml: &str,
     wanted: impl Fn(&str, &str) -> bool,
     budget: Option<&'a FlatMutationBudget>,
+) -> Result<ScannedSpans<'a>> {
+    scan_spans_with_budget_and_xml_limits(xml, wanted, budget, XmlStreamLimits::default())
+}
+
+fn scan_spans_with_budget_and_xml_limits<'a>(
+    xml: &str,
+    wanted: impl Fn(&str, &str) -> bool,
+    budget: Option<&'a FlatMutationBudget>,
+    xml_limits: XmlStreamLimits,
 ) -> Result<ScannedSpans<'a>> {
     if xml.len() > MAX_XML_BYTES {
         return Err(Error::InvalidFormat(format!(
@@ -3381,7 +3751,7 @@ fn scan_spans_with_budget<'a>(
     }
     let mut memory = MetadataMemory::new(budget);
     reserve_namespace_resolver_memory(xml, &mut memory)?;
-    let mut reader = ResolvedReader::from_xml(xml);
+    let mut reader = ResolvedReader::from_xml(xml, xml_limits_with_policy(xml_limits)?)?;
     reader.config_mut().check_end_names = true;
     reader.config_mut().trim_text(false);
     let mut stack: Vec<(Span, Vec<(String, Option<String>)>)> = Vec::new();
@@ -3392,7 +3762,7 @@ fn scan_spans_with_budget<'a>(
         let event_position = reader.buffer_position() as usize;
         let (namespace, event) = reader
             .read_resolved_event()
-            .map_err(|error| Error::InvalidFormat(format!("invalid ODF XML: {error}")))?;
+            .map_err(|error| crate::core::map_resolved_reader_error(error, "invalid ODF XML"))?;
         let namespace = match &event {
             Event::Start(_) | Event::Empty(_) => {
                 resolved_namespace_with_memory(&namespace, &mut memory)?.unwrap_or_default()
@@ -3983,7 +4353,13 @@ mod tests {
         );
         let probe_budget = metadata_budget(1 << 30);
         let mut probe_memory = MetadataMemory::new(Some(&probe_budget));
-        let parsed = parse_part_inner(&xml, MetadataPart::Content, &mut probe_memory).unwrap();
+        let parsed = parse_part_inner_with_limits(
+            &xml,
+            MetadataPart::Content,
+            &mut probe_memory,
+            XmlStreamLimits::default(),
+        )
+        .unwrap();
         assert_eq!(
             parsed.text_meta[0].content.display_text(),
             "first secondtail"

@@ -64,7 +64,7 @@ impl Reference {
     /// Returns an error if the referenced ID is zero or if the encoded
     /// record cannot be re-parsed.
     pub fn to_record(&self) -> Result<Record> {
-        Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
+        Ok(Record::parse(&self.to_record_bytes()?, 0, &crate::SourceLimits::default())?.0)
     }
 
     /// Serialize to the raw bytes of a complete `ExObjRefAtom` record.
@@ -147,7 +147,14 @@ mod tests {
         assert!(Reference::new(0).is_err());
         let mut bytes = Reference::new(1).unwrap().to_record_bytes().unwrap();
         bytes[0] = 1;
-        assert!(Reference::parse(&Record::parse(&bytes, 0).unwrap().0).is_err());
+        assert!(
+            Reference::parse(
+                &Record::parse(&bytes, 0, &crate::SourceLimits::default())
+                    .unwrap()
+                    .0
+            )
+            .is_err()
+        );
     }
 
     #[test]

@@ -19,7 +19,7 @@ pub(crate) const FIB_INDEX_DGG_INFO: usize = 50;
 const RECORD_HEADER_LEN: usize = 8;
 
 fn project(data: &[u8]) -> std::io::Result<Vec<Shape>> {
-    litchi_odraw::shape::parse(data)
+    litchi_odraw::shape::parse(data, Default::default())
         .map_err(invalid_data)?
         .iter()
         .map(Shape::from_office_art)
@@ -125,7 +125,8 @@ pub(crate) fn extract_dgg_shapes(
     let mut shapes = Vec::new();
     // The OfficeArtContent starts with the OfficeArtDggContainer; each
     // OfficeArtWordDrawing after it is a dgglbl byte + OfficeArtDgContainer.
-    let (first, first_size) = Record::parse(dgg_info, 0).map_err(invalid_data)?;
+    let (first, first_size) =
+        Record::parse(dgg_info, 0, litchi_odraw::Limits::default()).map_err(invalid_data)?;
     if first.kind() != RecordKind::DggContainer {
         return Err(invalid_data(
             "Word OfficeArtContent does not start with a DggContainer",
@@ -147,7 +148,9 @@ pub(crate) fn extract_dgg_shapes(
         if dgg_info.len().saturating_sub(record_offset) < RECORD_HEADER_LEN {
             return Err(invalid_data("truncated OfficeArtWordDrawing"));
         }
-        let (record, record_size) = Record::parse(dgg_info, record_offset).map_err(invalid_data)?;
+        let (record, record_size) =
+            Record::parse(dgg_info, record_offset, litchi_odraw::Limits::default())
+                .map_err(invalid_data)?;
         if record.kind() != RecordKind::DgContainer {
             return Err(invalid_data(
                 "OfficeArtWordDrawing does not contain a DgContainer",
@@ -209,7 +212,8 @@ fn invalid_data(error: impl ToString) -> std::io::Error {
 mod tests {
     use super::*;
     use crate::shape::{Anchor, Bounds, Flags, Kind, PropertyTable, ShapeId};
-    use litchi_odraw::write::{self, Atom, Container as OutContainer, ShapeBuilder};
+    use litchi_odraw::builder::ShapeBuilder;
+    use litchi_odraw::write::{self, Atom, Container as OutContainer};
 
     fn create_shape(
         shape_type: Kind,
@@ -341,72 +345,137 @@ mod tests {
             }
             ShapeBuilder::new(kind, id)
                 .with_flags(flags)
-                .write(&mut body)
+                .write(&mut body, Default::default())
                 .expect("write shape atom");
             if child {
-                write::child_anchor(&mut body, 10, 20, 110, 70).expect("write child anchor");
+                write::child_anchor(&mut body, 10, 20, 110, 70, litchi_odraw::Limits::default())
+                    .expect("write child anchor");
             } else {
                 let mut payload = Vec::new();
                 for coordinate in [10_i32, 20, 110, 70] {
                     payload.extend_from_slice(&coordinate.to_le_bytes());
                 }
-                write::atom(&mut body, 0, Atom::ClientAnchor, &payload).expect("write host anchor");
+                write::atom(
+                    &mut body,
+                    0,
+                    Atom::ClientAnchor,
+                    &payload,
+                    Default::default(),
+                )
+                .expect("write host anchor");
             }
             let mut record = Vec::new();
-            write::container(&mut record, 0, OutContainer::Sp, &body)
+            write::container(&mut record, 0, OutContainer::Sp, &body, Default::default())
                 .expect("write shape container");
             record
         }
 
         let mut group_header_body = Vec::new();
-        write::spgr(&mut group_header_body, 0, 0, 1000, 500).expect("write group bounds");
+        write::spgr(
+            &mut group_header_body,
+            0,
+            0,
+            1000,
+            500,
+            litchi_odraw::Limits::default(),
+        )
+        .expect("write group bounds");
         ShapeBuilder::new(litchi_odraw::shape::Native::FREEFORM, 3)
             .with_flags(Flags::GROUP | Flags::HAVE_ANCHOR)
-            .write(&mut group_header_body)
+            .write(&mut group_header_body, Default::default())
             .expect("write group shape");
         let mut group_anchor = Vec::new();
         for coordinate in [100_i32, 200, 500, 400] {
             group_anchor.extend_from_slice(&coordinate.to_le_bytes());
         }
-        write::atom(&mut group_header_body, 0, Atom::ClientAnchor, &group_anchor)
-            .expect("write group host anchor");
+        write::atom(
+            &mut group_header_body,
+            0,
+            Atom::ClientAnchor,
+            &group_anchor,
+            Default::default(),
+        )
+        .expect("write group host anchor");
         let mut group_header = Vec::new();
-        write::container(&mut group_header, 0, OutContainer::Sp, &group_header_body)
-            .expect("write group header");
+        write::container(
+            &mut group_header,
+            0,
+            OutContainer::Sp,
+            &group_header_body,
+            Default::default(),
+        )
+        .expect("write group header");
 
         let mut group_body = group_header;
         group_body.extend_from_slice(&shape(litchi_odraw::shape::Native::ELLIPSE, 4, true));
         let mut group = Vec::new();
-        write::container(&mut group, 0, OutContainer::Spgr, &group_body).expect("write group");
+        write::container(
+            &mut group,
+            0,
+            OutContainer::Spgr,
+            &group_body,
+            Default::default(),
+        )
+        .expect("write group");
 
         let mut patriarch_body = Vec::new();
-        write::spgr(&mut patriarch_body, 0, 0, 1000, 500).expect("write patriarch bounds");
+        write::spgr(
+            &mut patriarch_body,
+            0,
+            0,
+            1000,
+            500,
+            litchi_odraw::Limits::default(),
+        )
+        .expect("write patriarch bounds");
         ShapeBuilder::new(litchi_odraw::shape::Native::FREEFORM, 1)
             .with_flags(Flags::GROUP | Flags::PATRIARCH)
-            .write(&mut patriarch_body)
+            .write(&mut patriarch_body, Default::default())
             .expect("write patriarch shape");
         let mut patriarch = Vec::new();
-        write::container(&mut patriarch, 0, OutContainer::Sp, &patriarch_body)
-            .expect("write patriarch");
+        write::container(
+            &mut patriarch,
+            0,
+            OutContainer::Sp,
+            &patriarch_body,
+            Default::default(),
+        )
+        .expect("write patriarch");
 
         let mut root_body = patriarch;
         root_body.extend_from_slice(&shape(litchi_odraw::shape::Native::RECTANGLE, 2, false));
         root_body.extend_from_slice(&group);
         let mut root = Vec::new();
-        write::container(&mut root, 0, OutContainer::Spgr, &root_body).expect("write root group");
+        write::container(
+            &mut root,
+            0,
+            OutContainer::Spgr,
+            &root_body,
+            Default::default(),
+        )
+        .expect("write root group");
 
         let mut drawing_body = Vec::new();
-        write::dg(&mut drawing_body, 5, 5).expect("write drawing atom");
+        write::dg(&mut drawing_body, 5, 5, litchi_odraw::Limits::default())
+            .expect("write drawing atom");
         drawing_body.extend_from_slice(&root);
         let mut bytes = Vec::new();
-        write::container(&mut bytes, 0, OutContainer::Dg, &drawing_body).expect("write drawing");
+        write::container(
+            &mut bytes,
+            0,
+            OutContainer::Dg,
+            &drawing_body,
+            Default::default(),
+        )
+        .expect("write drawing");
         bytes
     }
 
     #[test]
     fn projection_exposes_group_identity_and_both_anchor_spaces() {
         let bytes = officeart_drawing();
-        let office_shapes = litchi_odraw::shape::parse(&bytes).expect("parse drawing");
+        let office_shapes =
+            litchi_odraw::shape::parse(&bytes, Default::default()).expect("parse drawing");
         let shapes = office_shapes
             .iter()
             .map(Shape::from_office_art)
@@ -431,7 +500,8 @@ mod tests {
         assert!(child.client_anchor().is_none());
         assert_eq!(group.find(ShapeId::from_raw(4)).map(Shape::id), Some(4));
 
-        let (drawing_record, _) = Record::parse(&bytes, 0).expect("parse drawing record");
+        let (drawing_record, _) = Record::parse(&bytes, 0, litchi_odraw::Limits::default())
+            .expect("parse drawing record");
         let drawing = litchi_odraw::Container::try_new(drawing_record).expect("drawing container");
         let root_record = drawing
             .find(RecordKind::SpgrContainer)
@@ -461,20 +531,37 @@ mod tests {
         let mut body = Vec::new();
         ShapeBuilder::new(litchi_odraw::shape::Native::RECTANGLE, 9)
             .with_flags(Flags::HAVE_ANCHOR | Flags::HAVE_SPT)
-            .write(&mut body)
+            .write(&mut body, Default::default())
             .expect("write shape atom");
         let extension = Atom::unknown(0xF123, 0).expect("unknown record kind");
-        write::atom(&mut body, 0, extension, &[0xAA, 0xBB, 0xCC]).expect("write unknown record");
-        write::atom(&mut body, 0, Atom::ClientAnchor, &[7, 0, 0, 0]).expect("write host anchor");
+        write::atom(
+            &mut body,
+            0,
+            extension,
+            &[0xAA, 0xBB, 0xCC],
+            Default::default(),
+        )
+        .expect("write unknown record");
+        write::atom(
+            &mut body,
+            0,
+            Atom::ClientAnchor,
+            &[7, 0, 0, 0],
+            Default::default(),
+        )
+        .expect("write host anchor");
 
         let mut source = Vec::new();
-        write::container(&mut source, 0, OutContainer::Sp, &body).expect("write shape container");
-        let office_shapes = litchi_odraw::shape::parse(&source).expect("parse shape");
+        write::container(&mut source, 0, OutContainer::Sp, &body, Default::default())
+            .expect("write shape container");
+        let office_shapes =
+            litchi_odraw::shape::parse(&source, Default::default()).expect("parse shape");
         let shape = Shape::from_office_art(&office_shapes[0]).expect("project shape");
 
         assert_eq!(shape.office_art_bytes(), source.as_slice());
         let (record, consumed) =
-            Record::parse(shape.office_art_bytes(), 0).expect("reparse retained shape container");
+            Record::parse(shape.office_art_bytes(), 0, litchi_odraw::Limits::default())
+                .expect("reparse retained shape container");
         assert_eq!(record.kind(), RecordKind::SpContainer);
         assert_eq!(consumed, source.len());
         assert_eq!(shape.unknown_records[0].data(), &[0xAA, 0xBB, 0xCC]);
@@ -485,23 +572,46 @@ mod tests {
         let mut body = Vec::new();
         ShapeBuilder::new(litchi_odraw::shape::Native::RECTANGLE, 9)
             .with_flags(Flags::HAVE_ANCHOR | Flags::HAVE_SPT)
-            .write(&mut body)
+            .write(&mut body, Default::default())
             .expect("write shape atom");
 
         let primary = [0xFE, 0xBF, 0x03, 0x00, 0x00, 0x00, 0xAA, 0xBB, 0xCC];
-        write::atom(&mut body, 1, Atom::Opt, &primary).expect("write primary property");
+        write::atom(&mut body, 1, Atom::Opt, &primary, Default::default())
+            .expect("write primary property");
 
         let secondary = [0xFD, 0x3F, 0xF9, 0xFF, 0xFF, 0xFF];
-        write::atom(&mut body, 1, Atom::SecondaryOpt, &secondary)
-            .expect("write secondary property");
+        write::atom(
+            &mut body,
+            1,
+            Atom::SecondaryOpt,
+            &secondary,
+            Default::default(),
+        )
+        .expect("write secondary property");
 
         let tertiary = [0xFC, 0xBF, 0x02, 0x00, 0x00, 0x00, 0x10, 0x20];
-        write::atom(&mut body, 1, Atom::TertiaryOpt, &tertiary).expect("write tertiary property");
-        write::atom(&mut body, 0, Atom::ClientAnchor, &[7, 0, 0, 0]).expect("write host anchor");
+        write::atom(
+            &mut body,
+            1,
+            Atom::TertiaryOpt,
+            &tertiary,
+            Default::default(),
+        )
+        .expect("write tertiary property");
+        write::atom(
+            &mut body,
+            0,
+            Atom::ClientAnchor,
+            &[7, 0, 0, 0],
+            Default::default(),
+        )
+        .expect("write host anchor");
 
         let mut bytes = Vec::new();
-        write::container(&mut bytes, 0, OutContainer::Sp, &body).expect("write shape container");
-        let office_shapes = litchi_odraw::shape::parse(&bytes).expect("parse shape");
+        write::container(&mut bytes, 0, OutContainer::Sp, &body, Default::default())
+            .expect("write shape container");
+        let office_shapes =
+            litchi_odraw::shape::parse(&bytes, Default::default()).expect("parse shape");
         let shape = Shape::from_office_art(&office_shapes[0]).expect("project shape");
 
         assert_eq!(shape.unknown_properties().len(), 3);

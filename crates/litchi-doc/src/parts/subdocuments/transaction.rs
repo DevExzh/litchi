@@ -122,8 +122,8 @@ impl Snapshot {
 
     /// Starts a failure-atomic semantic transaction.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub fn edit(&self) -> Edit {
+        Edit {
             before: self.clone(),
             working: self.clone(),
         }
@@ -158,12 +158,12 @@ impl ReferenceSelector {
 
 /// A staged candidate based on one immutable source snapshot.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub struct Edit {
     before: Snapshot,
     working: Snapshot,
 }
 
-impl Transaction {
+impl Edit {
     /// Creates a transaction from an immutable snapshot.
     #[must_use]
     pub fn new(snapshot: Snapshot) -> Self {
@@ -173,9 +173,9 @@ impl Transaction {
         }
     }
 
-    /// The current candidate snapshot.
+    /// The staged candidate snapshot, not yet committed.
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    pub fn staged(&self) -> &Snapshot {
         &self.working
     }
 
@@ -183,19 +183,6 @@ impl Transaction {
     #[must_use]
     pub fn before(&self) -> &Snapshot {
         &self.before
-    }
-
-    /// Whether the candidate differs semantically or in its terminal-CP
-    /// context from the source.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.before.collection != self.working.collection
-            || self.before.main_document_chars != self.working.main_document_chars
-    }
-
-    /// Restores the candidate to its source snapshot.
-    pub fn rollback(&mut self) {
-        self.working = self.before.clone();
     }
 
     /// Changes the `ccpText` context used for the WKB terminal CP.
@@ -408,10 +395,8 @@ impl Transaction {
             after: after.clone(),
             table: table_patch,
         };
-        Ok(Commit {
-            snapshot: after,
-            patch,
-        })
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(after, patch, diagnostics))
     }
 
     fn publish(&mut self, collection: Collection) -> Result<(), Error> {
@@ -500,7 +485,7 @@ impl Patch {
     /// Applies this semantic patch only to the exact source snapshot.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, Error> {
         if source != &self.before {
-            return Err(Error::Conflict);
+            return Err(Error::PatchConflict);
         }
         Ok(self.after.clone())
     }
@@ -516,32 +501,12 @@ impl Patch {
     }
 }
 
-/// The result of a committed transaction.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
+/// A published edit: the new snapshot, its reversible patch and
+/// diagnostics.
+pub type Commit = litchi_core::edit::Commit<Snapshot, Patch>;
 
-impl Commit {
-    /// The immutable candidate snapshot.
-    #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// The reversible semantic/wire patch.
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Splits the committed result into its snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
-    }
-}
+/// Content-free diagnostics of one commit.
+pub use litchi_core::edit::Diagnostics;
 
 /// A selector failed to resolve against the candidate.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -578,13 +543,14 @@ impl std::error::Error for SelectionError {}
 
 /// Errors produced while staging or applying a semantic subdocument edit.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// The candidate violates an MS-DOC invariant or wire limit.
     Invalid(PackageError),
     /// A selector could not be resolved.
     Selection(SelectionError),
     /// The patch was applied to a different semantic snapshot.
-    Conflict,
+    PatchConflict,
     /// The requested operation would require a package/FIB writer outside
     /// this bounded owner.
     Unsupported(&'static str),
@@ -597,7 +563,7 @@ impl fmt::Display for Error {
         match self {
             Self::Invalid(error) => error.fmt(formatter),
             Self::Selection(error) => error.fmt(formatter),
-            Self::Conflict => formatter.write_str("subdocument transaction snapshot conflict"),
+            Self::PatchConflict => formatter.write_str("subdocument transaction snapshot conflict"),
             Self::Unsupported(message) => formatter.write_str(message),
             Self::Patch(error) => error.fmt(formatter),
         }

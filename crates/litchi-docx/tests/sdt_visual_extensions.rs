@@ -13,7 +13,7 @@ fn reads_typed_visual_and_inert_web_extension_metadata() {
         r#"<w:document xmlns:w="{W}" xmlns:w15="{W15}" xmlns:mc="{MC}" mc:Ignorable="w15"><w:body><w:sdt><w:sdtPr><w:id w:val="7"/><w15:appearance w15:val="tags"/><w15:color w:val="a1B2c3"/><w15:webExtensionLinked w:val="0"/><w15:webExtensionCreated w:val="on"/></w:sdtPr></w:sdt></w:body></w:document>"#
     );
 
-    let inventory = Inventory::parse(source.as_bytes()).unwrap();
+    let inventory = Inventory::parse(source.as_bytes(), &Default::default()).unwrap();
     let control = inventory.occurrences()[0].control();
     assert_eq!(control.appearance(), Some(Appearance::Tags));
     assert_eq!(control.color(), Some(SdtColor::Rgb([0xA1, 0xB2, 0xC3])));
@@ -57,7 +57,7 @@ fn rejects_invalid_visual_extension_values() {
         );
         // Invalid values degrade only the property and are recorded
         // (leniency F2.8).
-        let inventory = Inventory::parse(source.as_bytes()).unwrap();
+        let inventory = Inventory::parse(source.as_bytes(), &Default::default()).unwrap();
         let control = inventory.occurrences()[0].control();
         assert_eq!(control.appearance(), None, "{body}");
         assert_eq!(control.color(), None, "{body}");

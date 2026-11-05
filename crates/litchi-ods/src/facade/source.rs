@@ -5,7 +5,7 @@
 //! existing-cell and direct-hyperlink edits publish through the source-backed
 //! `content.xml` path;
 //! callers explicitly call [`SourceBackedSpreadsheet::materialize`] before
-//! entering the complete owned/mutable [`super::Spreadsheet`] boundary.
+//! entering the complete immutable [`crate::Package`] boundary.
 
 use std::{
     fmt,
@@ -19,20 +19,22 @@ use std::{
 #[cfg(any(unix, windows))]
 use litchi_core::FileSource;
 use litchi_core::{
-    Error, Metadata, ReadAt, Result, SequentialTextWriter, SourceVersion, TextObjectKind,
-    TextOutputError, TextOutputOptions, TextOutputReport,
+    Error as CoreError, Metadata, ReadAt, Result as CoreResult, SequentialTextWriter,
+    SourceVersion, TextObjectKind, TextOutputError, TextOutputOptions, TextOutputReport,
 };
+use litchi_odf_common::{Error as OdfError, OpenOptions, XmlStreamLimits};
 use litchi_odf_common::{
     core::{
         SourceBackedPackage, SourceContentPublicationError, SourceContentPublicationOptions,
-        SourceContentPublicationReport, SourcePackageLimits, private::ContentDocumentValidator,
-        validate_content_part,
+        SourceContentPublicationReport, private::ContentDocumentValidator, validate_content_part,
     },
     package::{is_media_path, resolve_package_path},
 };
 #[cfg(any(unix, windows))]
 use std::path::Path;
 use zeroize::Zeroizing;
+
+type FamilyResult<T> = Result<T, OdfError>;
 
 use super::CellSelector;
 use crate::{
@@ -45,9 +47,6 @@ const ODF_SPREADSHEET: &str = "application/vnd.oasis.opendocument.spreadsheet";
 const BODY_MARKER: &str = "<office:spreadsheet";
 const FAMILY_NAME: &str = "ODS";
 
-/// The bounded ZIP-index policy used by positional ODF facades.
-pub type ReadLimits = SourcePackageLimits;
-
 /// ODS access over an immutable positional source.
 ///
 /// Opening validates the ZIP archive, MIME member, manifest, content root,
@@ -55,13 +54,13 @@ pub type ReadLimits = SourcePackageLimits;
 /// Package members such as pictures and embedded objects are read only when
 /// selected through [`Self::member_data`] or [`Self::media_data`].  Every
 /// public operation checks the captured [`SourceVersion`] and reports
-/// [`Error::SourceChanged`] when the source no longer identifies the same
+/// [`CoreError::SourceChanged`] when the source no longer identifies the same
 /// snapshot. [`Self::edit_cells`] adds a narrow existing-cell transaction
 /// without materializing the complete package.
 pub struct SourceBackedSpreadsheet {
-    pub(super) package: SourceBackedPackage,
+    pub(crate) package: Arc<SourceBackedPackage>,
     source: Arc<dyn ReadAt>,
-    pub(super) source_version: SourceVersion,
+    pub(crate) source_version: SourceVersion,
     pub(super) content_xml: Arc<str>,
     pub(super) styles_xml: Option<Arc<str>>,
     definitions: Vec<Definition>,
@@ -74,6 +73,20 @@ pub struct SourceBackedSpreadsheet {
     content_layout: OnceLock<crate::worksheet::package::ContentLayout>,
     /// Package repairs followed by the content repairs of the open parse.
     tolerance: litchi_odf_common::leniency::ToleranceReport,
+    /// The caller-selected raw XML policy retained by this source owner.
+    xml_limits: XmlStreamLimits,
+    /// Whether `content_xml` is a committed replacement of the source's
+    /// `content.xml` member rather than the member itself.
+    replaced: bool,
+    /// The committed `content.xml` of a source-backed edit, published when
+    /// this spreadsheet is written; reads parse it once (record 0358a).
+    deferred: Option<Arc<Deferred>>,
+}
+
+/// The pending `content.xml` of a committed source-backed spreadsheet.
+pub(crate) struct Deferred {
+    content_xml: Arc<str>,
+    projection: OnceLock<SourceBackedSpreadsheet>,
 }
 
 impl fmt::Debug for SourceBackedSpreadsheet {
@@ -88,130 +101,151 @@ impl fmt::Debug for SourceBackedSpreadsheet {
 }
 
 impl SourceBackedSpreadsheet {
-    /// Open an ODS from a regular filesystem file without slurping it.
+    /// Open an ODS spreadsheet from a regular filesystem file without slurping it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`litchi_odf_common::Error::Limit`] for an exceeded dimension
+    /// and [`litchi_odf_common::Error::Core`] for I/O or validation failures.
     #[cfg(any(unix, windows))]
-    pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_read_at(file_source(path)?)
+    pub fn open(path: impl AsRef<Path>) -> Result<Self, OdfError> {
+        Self::open_with_options(path, OpenOptions::new())
     }
 
-    /// Open an ODS from a regular filesystem file with explicit ZIP limits.
+    /// Open an ODS spreadsheet from a filesystem file under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
     #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
-        Self::from_read_at_with_limits(file_source(path)?, limits)
+    pub fn open_with_options(
+        path: impl AsRef<Path>,
+        options: OpenOptions,
+    ) -> Result<Self, OdfError> {
+        Self::from_read_at_with_options(file_source(path)?, options)
     }
 
-    /// Open a password-protected ODS from a regular filesystem file.
+    /// Open password-protected an ODS spreadsheet from a filesystem file.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
     #[cfg(any(unix, windows))]
-    pub fn from_path_with_password(
+    pub fn open_with_password(
         path: impl AsRef<Path>,
         password: impl Into<String>,
-    ) -> Result<Self> {
-        // Enter the zeroizing owner before any fallible source-backed work.
+    ) -> Result<Self, OdfError> {
+        Self::open_with_password_and_options(path, password, OpenOptions::new())
+    }
+
+    /// Open password-protected an ODS spreadsheet from a filesystem file under
+    /// caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    #[cfg(any(unix, windows))]
+    pub fn open_with_password_and_options(
+        path: impl AsRef<Path>,
+        password: impl Into<String>,
+        options: OpenOptions,
+    ) -> Result<Self, OdfError> {
         let mut password = Zeroizing::new(password.into());
         let source = file_source(path)?;
-        Self::from_read_at_with_password(source, std::mem::take(&mut *password))
-    }
-
-    /// Open a password-protected ODS from a regular filesystem file with
-    /// explicit ZIP limits.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits_and_password(
-        path: impl AsRef<Path>,
-        limits: ReadLimits,
-        password: impl Into<String>,
-    ) -> Result<Self> {
-        let mut password = Zeroizing::new(password.into());
-        let source = file_source(path)?;
-        Self::from_read_at_with_limits_and_password(source, limits, std::mem::take(&mut *password))
-    }
-
-    /// Alias for [`Self::from_path`].
-    #[cfg(any(unix, windows))]
-    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_path(path)
-    }
-
-    /// Alias for [`Self::from_path_with_limits`].
-    #[cfg(any(unix, windows))]
-    pub fn open_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
-        Self::from_path_with_limits(path, limits)
-    }
-
-    /// Alias for [`Self::from_path_with_password`].
-    #[cfg(any(unix, windows))]
-    pub fn open_with_password(path: impl AsRef<Path>, password: impl Into<String>) -> Result<Self> {
-        Self::from_path_with_password(path, password)
-    }
-
-    /// Alias for [`Self::from_path_with_limits_and_password`].
-    #[cfg(any(unix, windows))]
-    pub fn open_with_limits_and_password(
-        path: impl AsRef<Path>,
-        limits: ReadLimits,
-        password: impl Into<String>,
-    ) -> Result<Self> {
-        Self::from_path_with_limits_and_password(path, limits, password)
-    }
-
-    /// Open an ODS from a caller-provided positional source.
-    pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
-        Self::from_read_at_with_limits(source, ReadLimits::default())
-    }
-
-    /// Open a password-protected ODS from a caller-provided positional source.
-    pub fn from_read_at_with_password(
-        source: Arc<dyn ReadAt>,
-        password: impl Into<String>,
-    ) -> Result<Self> {
-        let mut password = Zeroizing::new(password.into());
-        Self::from_read_at_inner_with_password(
+        Self::from_read_at_with_password_and_options(
             source,
-            ReadLimits::default(),
             std::mem::take(&mut *password),
+            options,
         )
     }
 
-    /// Open an ODS from a positional source with explicit finite limits.
-    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: ReadLimits) -> Result<Self> {
-        Self::from_read_at_inner(source, limits)
+    /// Open an ODS spreadsheet from a caller-provided positional source.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self, OdfError> {
+        Self::from_read_at_with_options(source, OpenOptions::new())
     }
 
-    /// Open a password-protected ODS from a positional source with explicit
-    /// finite limits.
-    pub fn from_read_at_with_limits_and_password(
+    /// Open an ODS spreadsheet from a positional source under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_read_at_with_options(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
+        options: OpenOptions,
+    ) -> Result<Self, OdfError> {
+        Self::from_read_at_inner(source, options, None)
+    }
+
+    /// Open password-protected an ODS spreadsheet from a caller-provided positional
+    /// source.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_read_at_with_password(
+        source: Arc<dyn ReadAt>,
         password: impl Into<String>,
-    ) -> Result<Self> {
+    ) -> Result<Self, OdfError> {
+        Self::from_read_at_with_password_and_options(source, password, OpenOptions::new())
+    }
+
+    /// Open password-protected an ODS spreadsheet from a positional source under
+    /// caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_read_at_with_password_and_options(
+        source: Arc<dyn ReadAt>,
+        password: impl Into<String>,
+        options: OpenOptions,
+    ) -> Result<Self, OdfError> {
         let mut password = Zeroizing::new(password.into());
-        Self::from_read_at_inner_with_password(source, limits, std::mem::take(&mut *password))
+        Self::from_read_at_inner(source, options, Some(std::mem::take(&mut *password)))
     }
 
-    fn from_read_at_inner(source: Arc<dyn ReadAt>, limits: ReadLimits) -> Result<Self> {
-        let package = SourceBackedPackage::from_read_at_with_limits(Arc::clone(&source), limits)?;
-        Self::from_package(source, package)
-    }
-
-    fn from_read_at_inner_with_password(
+    fn from_read_at_inner(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
-        password: impl Into<String>,
-    ) -> Result<Self> {
-        // The common owner immediately wraps the credential in Zeroizing.
-        let package = SourceBackedPackage::from_read_at_with_limits_and_password(
-            Arc::clone(&source),
-            limits,
-            password,
-        )?;
-        Self::from_package(source, package)
+        options: OpenOptions,
+        password: Option<String>,
+    ) -> Result<Self, OdfError> {
+        let limits = options.source_limits_value();
+        let package = match password {
+            Some(password) => {
+                let mut password = Zeroizing::new(password);
+                SourceBackedPackage::from_read_at_with_password_and_options(
+                    Arc::clone(&source),
+                    std::mem::take(&mut *password),
+                    OpenOptions::new().source_limits(limits),
+                )?
+            },
+            None => SourceBackedPackage::from_read_at_with_options(
+                Arc::clone(&source),
+                OpenOptions::new().source_limits(limits),
+            )?,
+        };
+        check_semantic_part_sizes(&package, options.semantic_limits_value())?;
+        Ok(Self::from_package(
+            source,
+            package,
+            options.xml_limits_value(),
+        )?)
     }
 
-    fn from_package(source: Arc<dyn ReadAt>, package: SourceBackedPackage) -> Result<Self> {
+    fn from_package(
+        source: Arc<dyn ReadAt>,
+        package: SourceBackedPackage,
+        xml_limits: XmlStreamLimits,
+    ) -> CoreResult<Self> {
         let source_version = package.source_version()?;
         let parsed = (|| {
             let mimetype = package.mimetype()?;
             if mimetype != ODF_SPREADSHEET {
-                return Err(Error::InvalidFormat(format!(
+                return Err(CoreError::InvalidFormat(format!(
                     "expected {FAMILY_NAME} package MIME type '{ODF_SPREADSHEET}', found '{mimetype}'"
                 )));
             }
@@ -222,16 +256,18 @@ impl SourceBackedSpreadsheet {
             )?;
             let mut content_xml =
                 String::from_utf8(package.get_file("content.xml")?).map_err(|error| {
-                    Error::InvalidFormat(format!("{FAMILY_NAME} content.xml is not UTF-8: {error}"))
+                    CoreError::InvalidFormat(format!(
+                        "{FAMILY_NAME} content.xml is not UTF-8: {error}"
+                    ))
                 })?;
             let doctype =
                 litchi_odf_common::core::private::neutralize_prologue_doctype(&mut content_xml);
             validate_content_part(&content_xml, BODY_MARKER, FAMILY_NAME)?;
-            let open_parse = crate::open_parse::OpenParse::run(&content_xml)?;
+            let open_parse = crate::open_parse::OpenParse::run(&content_xml, xml_limits)?;
             let styles_xml = if package.has_file("styles.xml")? {
                 Some(
                     String::from_utf8(package.get_file("styles.xml")?).map_err(|error| {
-                        Error::InvalidFormat(format!(
+                        CoreError::InvalidFormat(format!(
                             "{FAMILY_NAME} styles.xml is not UTF-8: {error}"
                         ))
                     })?,
@@ -243,7 +279,7 @@ impl SourceBackedSpreadsheet {
             let metadata_source = if package.has_file("meta.xml")? {
                 Some(
                     String::from_utf8(package.get_file("meta.xml")?).map_err(|error| {
-                        Error::InvalidFormat(format!(
+                        CoreError::InvalidFormat(format!(
                             "{FAMILY_NAME} meta.xml is not UTF-8: {error}"
                         ))
                     })?,
@@ -251,7 +287,7 @@ impl SourceBackedSpreadsheet {
             } else {
                 None
             };
-            let metadata = crate::metadata::Snapshot::from_source(metadata_source)?;
+            let metadata = crate::metadata::Snapshot::from_source(metadata_source, xml_limits)?;
             let (settings, outputs) = open_parse.finish()?;
             // The location spans are validated by the fused parse (including
             // the semantic/XML disagreement check) but are not retained by
@@ -263,7 +299,7 @@ impl SourceBackedSpreadsheet {
                 mut sheets,
                 tolerance: content_tolerance,
             } = outputs;
-            crate::worksheet::codec::apply_table_metadata(&content_xml, &mut sheets)?;
+            crate::worksheet::codec::apply_table_metadata(&content_xml, &mut sheets, xml_limits)?;
             Ok((
                 content_xml,
                 styles_xml,
@@ -293,7 +329,7 @@ impl SourceBackedSpreadsheet {
         tolerance.append(&content_tolerance);
 
         Ok(Self {
-            package,
+            package: Arc::new(package),
             source,
             source_version,
             content_xml: Arc::from(content_xml),
@@ -307,7 +343,193 @@ impl SourceBackedSpreadsheet {
             edit_protection: OnceLock::new(),
             content_layout: OnceLock::new(),
             tolerance,
+            xml_limits,
+            replaced: false,
+            deferred: None,
         })
+    }
+
+    /// A share of this spreadsheet's source, retained parts and projection,
+    /// with fresh caches.
+    pub(crate) fn share(&self) -> Self {
+        Self {
+            package: Arc::clone(&self.package),
+            source: Arc::clone(&self.source),
+            source_version: self.source_version,
+            content_xml: Arc::clone(&self.content_xml),
+            styles_xml: self.styles_xml.clone(),
+            definitions: self.definitions.clone(),
+            sheets: Arc::clone(&self.sheets),
+            metadata: self.metadata.clone(),
+            settings: self.settings.clone(),
+            cell_queries: AtomicUsize::new(0),
+            cell_locator: OnceLock::new(),
+            edit_protection: OnceLock::new(),
+            content_layout: OnceLock::new(),
+            tolerance: self.tolerance.clone(),
+            xml_limits: self.xml_limits,
+            replaced: self.replaced,
+            deferred: self.deferred.clone(),
+        }
+    }
+
+    /// The spreadsheet that serves reads and edits: the parsed projection of
+    /// a committed `content.xml`, or `self`.
+    ///
+    /// A committed spreadsheet parses its `content.xml` on first use, once;
+    /// a caller that only writes it never pays the parse.
+    pub(crate) fn effective(&self) -> CoreResult<&Self> {
+        let Some(deferred) = &self.deferred else {
+            return Ok(self);
+        };
+        if let Some(projection) = deferred.projection.get() {
+            return Ok(projection);
+        }
+        let projection = self.reparsed(Arc::clone(&deferred.content_xml))?;
+        Ok(deferred.projection.get_or_init(|| projection))
+    }
+
+    /// The `content.xml` this spreadsheet writes.
+    pub(crate) fn written_content_xml(&self) -> &Arc<str> {
+        match &self.deferred {
+            Some(deferred) => &deferred.content_xml,
+            None => &self.content_xml,
+        }
+    }
+
+    /// Whether this spreadsheet writes the source's own `content.xml` member.
+    fn is_pristine(&self) -> bool {
+        self.deferred.is_none() && !self.replaced
+    }
+
+    /// The same source with `content_xml` as its committed `content.xml`,
+    /// validated by the caller; its projection is parsed on first read.
+    pub(crate) fn with_content(&self, content_xml: Arc<str>) -> Self {
+        let mut committed = self.share();
+        committed.deferred = Some(Arc::new(Deferred {
+            content_xml,
+            projection: OnceLock::new(),
+        }));
+        committed
+    }
+
+    /// The projection of `content_xml` over this spreadsheet's source and
+    /// its retained `styles.xml` and `meta.xml`.
+    fn reparsed(&self, content_xml: Arc<str>) -> CoreResult<Self> {
+        self.check_source_core()?;
+        let parsed = (|| {
+            validate_content_part(&content_xml, BODY_MARKER, FAMILY_NAME)?;
+            let open_parse = crate::open_parse::OpenParse::run(&content_xml, self.xml_limits)?;
+            let (settings, outputs) = open_parse.finish()?;
+            let crate::open_parse::OpenOutputs {
+                location: _location,
+                definitions,
+                mut sheets,
+                tolerance: content_tolerance,
+            } = outputs;
+            crate::worksheet::codec::apply_table_metadata(
+                &content_xml,
+                &mut sheets,
+                self.xml_limits,
+            )?;
+            Ok((definitions, sheets, settings, content_tolerance))
+        })();
+        let (definitions, sheets, settings, content_tolerance) =
+            prefer_current(self.source.as_ref(), self.source_version, parsed)?;
+        let mut tolerance = self.package.tolerance_report().clone();
+        tolerance.append(&content_tolerance);
+        Ok(Self {
+            content_xml,
+            definitions,
+            sheets: Arc::from(sheets),
+            settings,
+            tolerance,
+            replaced: true,
+            deferred: None,
+            ..self.share()
+        })
+    }
+
+    /// Write this spreadsheet as a complete ODS package: the source archive
+    /// with only `content.xml` replaced by the committed content (an
+    /// unedited spreadsheet writes its source; record 0358a).
+    ///
+    /// Every other member is copied raw from the retained source, so memory
+    /// stays bounded by `content.xml`. A source that changed since open is
+    /// refused before any byte is written.
+    ///
+    /// # Errors
+    ///
+    /// Returns the typed publication failure with the sink progress it
+    /// observed.
+    pub fn write_to<W: Write>(
+        &self,
+        writer: W,
+    ) -> Result<SourceContentPublicationReport, SourceContentPublicationError> {
+        self.write_to_with_options(writer, SourceContentPublicationOptions::default())
+    }
+
+    /// [`Self::write_to`] under explicit replacement and output ceilings,
+    /// cancellation, payload verification and execution policy.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::write_to`].
+    pub fn write_to_with_options<W: Write>(
+        &self,
+        writer: W,
+        options: SourceContentPublicationOptions,
+    ) -> Result<SourceContentPublicationReport, SourceContentPublicationError> {
+        if let Err(error) = self.check_source_core() {
+            return Err(match error {
+                CoreError::SourceChanged { expected, observed } => {
+                    SourceContentPublicationError::SourceChanged {
+                        expected,
+                        observed,
+                        progress:
+                            litchi_odf_common::core::SourceContentPublicationProgress::Untouched,
+                    }
+                },
+                other => SourceContentPublicationError::Core(other),
+            });
+        }
+        self.package.write_content_xml_to_stream_with_options(
+            writer,
+            self.written_content_xml().as_bytes(),
+            options,
+        )
+    }
+
+    /// Atomically replace `path` with this spreadsheet (full durability).
+    ///
+    /// # Errors
+    ///
+    /// Returns the publication or I/O failure; the destination is unchanged
+    /// unless the error is a committed-I/O payload.
+    #[cfg(any(unix, windows))]
+    pub fn save(&self, path: impl AsRef<Path>) -> Result<(), OdfError> {
+        self.save_with_durability(path, litchi_core::Durability::Full)
+    }
+
+    /// Atomically replace `path` with this spreadsheet under explicit
+    /// durability.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::save`].
+    #[cfg(any(unix, windows))]
+    pub fn save_with_durability(
+        &self,
+        path: impl AsRef<Path>,
+        durability: litchi_core::Durability,
+    ) -> Result<(), OdfError> {
+        litchi_core::atomic::save(
+            path.as_ref(),
+            durability,
+            litchi_core::atomic::Overwrite::Replace,
+            |writer| self.write_to(writer).map(drop).map_err(OdfError::from),
+            || self.check_source_core().map_err(OdfError::from),
+        )
     }
 
     /// Return the cached row-edit layout of the retained `content.xml`.
@@ -338,19 +560,27 @@ impl SourceBackedSpreadsheet {
     /// and `styles.xml` projections, so they are computed at most once per
     /// owner. Parse failures are not cached: every failed call re-runs the
     /// same validation and returns the same error.
-    pub(crate) fn edit_protection(&self) -> Result<&(bool, Vec<String>)> {
+    pub(crate) fn edit_protection(&self) -> CoreResult<&(bool, Vec<String>)> {
+        if self.deferred.is_some() {
+            return self.effective()?.edit_protection();
+        }
         if let Some(protection) = self.edit_protection.get() {
             return Ok(protection);
         }
         let computed = crate::protection::source_edit_protection(
             &self.content_xml,
             self.styles_xml.as_deref(),
+            &self.xml_limits,
         )?;
         Ok(self.edit_protection.get_or_init(|| computed))
     }
 
     /// Check the source identity and revision without reading a member.
-    pub fn check_source(&self) -> Result<()> {
+    pub fn check_source(&self) -> FamilyResult<()> {
+        Ok(self.check_source_core()?)
+    }
+
+    fn check_source_core(&self) -> CoreResult<()> {
         ensure_current(self.source_version, self.source.version()?)
     }
 
@@ -361,233 +591,210 @@ impl SourceBackedSpreadsheet {
     #[inline]
     #[must_use]
     pub fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
-        &self.tolerance
+        match self.effective() {
+            Ok(projection) => &projection.tolerance,
+            Err(_) => &self.tolerance,
+        }
     }
 
     /// Return the source identity captured during open.
     #[must_use = "the captured source version identifies this source snapshot"]
-    pub fn source_version(&self) -> Result<SourceVersion> {
-        self.check_source()?;
+    pub fn source_version(&self) -> FamilyResult<SourceVersion> {
+        self.check_source_core()?;
         let value = self.source_version;
-        self.check_source()?;
+        self.check_source_core()?;
         Ok(value)
     }
 
     /// Return the captured source length.
-    pub fn source_len(&self) -> Result<u64> {
-        self.check_source()?;
+    pub fn source_len(&self) -> FamilyResult<u64> {
+        self.check_source_core()?;
         let value = self.package.len();
-        self.check_source()?;
+        self.check_source_core()?;
         Ok(value)
     }
 
     /// Borrow the validated `content.xml` snapshot.
-    pub fn content_xml(&self) -> Result<&str> {
-        self.check_source()?;
-        let value = self.content_xml.as_ref();
-        self.check_source()?;
+    pub fn content_xml(&self) -> FamilyResult<&str> {
+        self.check_source_core()?;
+        let value = self.written_content_xml().as_ref();
+        self.check_source_core()?;
         Ok(value)
     }
 
-    pub(crate) fn content_xml_arc(&self) -> Result<Arc<str>> {
-        self.check_source()?;
-        let value = Arc::clone(&self.content_xml);
-        self.check_source()?;
+    pub(crate) fn content_xml_arc(&self) -> CoreResult<Arc<str>> {
+        self.check_source_core()?;
+        let value = Arc::clone(self.written_content_xml());
+        self.check_source_core()?;
         Ok(value)
     }
 
-    pub(crate) fn sheet_metadata_signed(&self) -> Result<bool> {
-        self.check_source()?;
+    pub(crate) fn sheet_metadata_signed(&self) -> CoreResult<bool> {
+        self.check_source_core()?;
         let signed = self
             .package
             .files()?
             .into_iter()
             .any(|path| litchi_odf_common::core::package::is_signature_owner_path(&path));
-        self.check_source()?;
+        self.check_source_core()?;
         Ok(signed)
     }
 
-    pub(crate) fn write_sheet_metadata_content<W: Write>(
-        &self,
-        writer: W,
-        replacement: &[u8],
-        options: SourceContentPublicationOptions,
-    ) -> std::result::Result<SourceContentPublicationReport, SourceContentPublicationError> {
-        if let Err(error) = self.check_source() {
-            return Err(match error {
-                Error::SourceChanged { expected, observed } => {
-                    SourceContentPublicationError::SourceChanged {
-                        expected,
-                        observed,
-                        progress:
-                            litchi_odf_common::core::SourceContentPublicationProgress::Untouched,
-                    }
-                },
-                other => SourceContentPublicationError::Core(other),
-            });
-        }
-        self.package
-            .write_content_xml_to_stream_with_options(writer, replacement, options)
-    }
-
     /// Borrow the optional validated `styles.xml` snapshot.
-    pub fn styles_xml(&self) -> Result<Option<&str>> {
-        self.check_source()?;
+    pub fn styles_xml(&self) -> FamilyResult<Option<&str>> {
+        self.check_source_core()?;
         let value = self.styles_xml.as_deref();
-        self.check_source()?;
+        self.check_source_core()?;
         Ok(value)
     }
 
     /// Capture the source-bound standalone table-template catalog.
-    pub fn table_templates(&self) -> Result<crate::styles::table_template::Snapshot> {
-        self.check_source()?;
+    pub fn table_templates(&self) -> FamilyResult<crate::styles::table_template::Snapshot> {
+        self.check_source_core()?;
         let result =
             crate::styles::table_template::Snapshot::from_source(self.styles_xml.as_deref());
-        prefer_current(self.source.as_ref(), self.source_version, result)
-    }
-
-    /// Capture inert DDE metadata bound to this live source owner.
-    ///
-    /// The returned snapshot supports exact-source edits and sequential package
-    /// publication. DDE declarations and cached data are never refreshed.
-    pub fn dde(&self) -> Result<crate::dde::SourceSnapshot<'_>> {
-        crate::dde::SourceSnapshot::from_owner(
-            self,
-            crate::dde::Limits::default(),
-            &crate::dde::default_context(),
-            false,
-        )
-    }
-
-    /// Capture source-bound DDE metadata under explicit limits and context.
-    pub fn dde_with(
-        &self,
-        limits: crate::dde::Limits,
-        context: &litchi_core::ExecutionContext,
-    ) -> Result<crate::dde::SourceSnapshot<'_>> {
-        crate::dde::SourceSnapshot::from_owner(self, limits, context, true)
-    }
-
-    /// Begin an inert DDE metadata edit against this live source.
-    pub fn edit_dde(&self) -> Result<crate::dde::SourceEdit<'_>> {
-        self.dde()?.edit()
-    }
-
-    /// Apply a DDE patch against this owner's current metadata snapshot.
-    ///
-    /// The patch must belong to this live owner and match its exact source XML.
-    pub fn apply_dde_patch<'source>(
-        &'source self,
-        patch: &crate::dde::SourcePatch<'source>,
-    ) -> Result<crate::dde::SourceCommit<'source>> {
-        patch.apply(&self.dde()?)
+        Ok(prefer_current(
+            self.source.as_ref(),
+            self.source_version,
+            result,
+        )?)
     }
 
     /// Capture source-bound, inert scenario declarations without applying
     /// values, evaluating formulas, or refreshing external data.
-    pub fn scenarios(&self) -> Result<crate::scenario::Snapshot> {
-        self.check_source()?;
+    pub fn scenarios(&self) -> FamilyResult<crate::scenario::Snapshot> {
+        if self.deferred.is_some() {
+            return self.effective()?.scenarios();
+        }
+        self.check_source_core()?;
         let result = crate::scenario::Snapshot::parse(&self.content_xml);
-        prefer_current(
+        Ok(prefer_current(
             self.source.as_ref(),
             self.source_version,
             result.map_err(|error| {
-                Error::InvalidFormat(format!("ODS scenario metadata inspection failed: {error}"))
+                CoreError::InvalidFormat(format!(
+                    "ODS scenario metadata inspection failed: {error}"
+                ))
             }),
-        )
+        )?)
     }
 
     /// Return compact cross-format metadata projected from `meta.xml`.
-    pub fn metadata(&self) -> Result<&Metadata> {
-        self.check_source()?;
+    pub fn metadata(&self) -> FamilyResult<&Metadata> {
+        self.check_source_core()?;
         let value = self.metadata.value();
-        self.check_source()?;
+        self.check_source_core()?;
         Ok(value)
     }
 
     /// Return the complete typed ODF metadata projection.
-    pub fn odf_metadata(&self) -> Result<&crate::metadata::Metadata> {
-        self.check_source()?;
+    pub fn odf_metadata(&self) -> FamilyResult<&crate::metadata::Metadata> {
+        self.check_source_core()?;
         let value = self.metadata.odf();
-        self.check_source()?;
+        self.check_source_core()?;
         Ok(value)
     }
 
     /// Return the retained metadata snapshot, including optional source XML.
-    pub fn metadata_snapshot(&self) -> Result<&crate::metadata::Snapshot> {
-        self.check_source()?;
+    pub fn metadata_snapshot(&self) -> FamilyResult<&crate::metadata::Snapshot> {
+        self.check_source_core()?;
         let value = &self.metadata;
-        self.check_source()?;
+        self.check_source_core()?;
         Ok(value)
     }
 
     /// Return spreadsheet calculation settings, if declared.
-    pub fn settings(&self) -> Result<Option<&Settings>> {
-        self.check_source()?;
+    pub fn settings(&self) -> FamilyResult<Option<&Settings>> {
+        if self.deferred.is_some() {
+            return self.effective()?.settings();
+        }
+        self.check_source_core()?;
         let value = self.settings.as_ref();
-        self.check_source()?;
+        self.check_source_core()?;
         Ok(value)
     }
 
     /// Alias for [`Self::settings`].
-    pub fn calculation_settings(&self) -> Result<Option<&Settings>> {
+    pub fn calculation_settings(&self) -> FamilyResult<Option<&Settings>> {
         self.settings()
     }
 
     /// Return named definitions in document order.
-    pub fn definitions(&self) -> Result<&[Definition]> {
-        self.check_source()?;
+    pub fn definitions(&self) -> FamilyResult<&[Definition]> {
+        if self.deferred.is_some() {
+            return self.effective()?.definitions();
+        }
+        self.check_source_core()?;
         let value = self.definitions.as_slice();
-        self.check_source()?;
+        self.check_source_core()?;
         Ok(value)
     }
 
     /// Return typed worksheets in document order.
-    pub fn sheets(&self) -> Result<&[Sheet]> {
-        self.check_source()?;
+    pub fn sheets(&self) -> FamilyResult<&[Sheet]> {
+        if self.deferred.is_some() {
+            return self.effective()?.sheets();
+        }
+        self.check_source_core()?;
         let value = self.sheets.as_ref();
-        self.check_source()?;
+        self.check_source_core()?;
         Ok(value)
     }
 
     /// Return the number of worksheets.
-    pub fn sheet_count(&self) -> Result<usize> {
-        self.check_source()?;
+    pub fn sheet_count(&self) -> FamilyResult<usize> {
+        if self.deferred.is_some() {
+            return self.effective()?.sheet_count();
+        }
+        self.check_source_core()?;
         let value = self.sheets.len();
-        self.check_source()?;
+        self.check_source_core()?;
         Ok(value)
     }
 
     /// Return worksheet names in document order.
-    pub fn sheet_names(&self) -> Result<Vec<String>> {
-        self.check_source()?;
+    pub fn sheet_names(&self) -> FamilyResult<Vec<String>> {
+        if self.deferred.is_some() {
+            return self.effective()?.sheet_names();
+        }
+        self.check_source_core()?;
         let result = (|| {
             let mut names = Vec::new();
             names
                 .try_reserve_exact(self.sheets.len())
-                .map_err(|source| Error::Allocation {
+                .map_err(|source| CoreError::Allocation {
                     resource: "ODS source worksheet names",
                     source,
                 })?;
             names.extend(self.sheets.iter().map(|sheet| sheet.name.clone()));
             Ok(names)
         })();
-        prefer_current(self.source.as_ref(), self.source_version, result)
+        Ok(prefer_current(
+            self.source.as_ref(),
+            self.source_version,
+            result,
+        )?)
     }
 
     /// Select one worksheet by exact ODF name.
-    pub fn sheet(&self, name: &str) -> Result<Option<&Sheet>> {
-        self.check_source()?;
+    pub fn sheet(&self, name: &str) -> FamilyResult<Option<&Sheet>> {
+        if self.deferred.is_some() {
+            return self.effective()?.sheet(name);
+        }
+        self.check_source_core()?;
         let value = self.sheets.iter().find(|sheet| sheet.name == name);
-        self.check_source()?;
+        self.check_source_core()?;
         Ok(value)
     }
 
     /// Select one worksheet by checked zero-based position.
-    pub fn sheet_at(&self, index: usize) -> Result<Option<&Sheet>> {
-        self.check_source()?;
+    pub fn sheet_at(&self, index: usize) -> FamilyResult<Option<&Sheet>> {
+        if self.deferred.is_some() {
+            return self.effective()?.sheet_at(index);
+        }
+        self.check_source_core()?;
         let value = self.sheets.get(index);
-        self.check_source()?;
+        self.check_source_core()?;
         Ok(value)
     }
 
@@ -597,10 +804,13 @@ impl SourceBackedSpreadsheet {
         sheet_name: &str,
         row: usize,
         column: usize,
-    ) -> Result<Option<CellView<'_>>> {
-        self.check_source()?;
+    ) -> FamilyResult<Option<CellView<'_>>> {
+        if self.deferred.is_some() {
+            return self.effective()?.cell(sheet_name, row, column);
+        }
+        self.check_source_core()?;
         let value = self.cell_unchecked(CellSelector::new(sheet_name, row, column));
-        self.check_source()?;
+        self.check_source_core()?;
         Ok(value)
     }
 
@@ -646,30 +856,36 @@ impl SourceBackedSpreadsheet {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::SourceChanged`] if the source is stale before or during
+    /// Returns [`CoreError::SourceChanged`] if the source is stale before or during
     /// the batch, a typed allocation error when the result vector cannot be
     /// reserved, or an invalid-format error when the selector bound is
     /// exceeded.  A stale source takes precedence over an operation error
     /// observed while finalizing the batch.
-    pub fn cell_batch(&self, selectors: &[CellSelector<'_>]) -> Result<Vec<Option<CellView<'_>>>> {
-        self.check_source()?;
+    pub fn cell_batch(
+        &self,
+        selectors: &[CellSelector<'_>],
+    ) -> FamilyResult<Vec<Option<CellView<'_>>>> {
+        if self.deferred.is_some() {
+            return self.effective()?.cell_batch(selectors);
+        }
+        self.check_source_core()?;
         let result = self.cell_batch_unchecked(selectors);
-        let final_check = self.check_source();
+        let final_check = self.check_source_core();
         match final_check {
-            Err(error) => Err(error),
-            Ok(()) => result,
+            Err(error) => Err(error.into()),
+            Ok(()) => Ok(result?),
         }
     }
 
     fn cell_batch_unchecked(
         &self,
         selectors: &[CellSelector<'_>],
-    ) -> Result<Vec<Option<CellView<'_>>>> {
+    ) -> CoreResult<Vec<Option<CellView<'_>>>> {
         super::validate_cell_batch_len(selectors.len())?;
         let mut values = Vec::new();
         values
             .try_reserve_exact(selectors.len())
-            .map_err(|source| Error::Allocation {
+            .map_err(|source| CoreError::Allocation {
                 resource: "ODS source cell lookup batch results",
                 source,
             })?;
@@ -680,16 +896,23 @@ impl SourceBackedSpreadsheet {
     }
 
     /// Alias for [`Self::cell_batch`].
-    pub fn cells(&self, selectors: &[CellSelector<'_>]) -> Result<Vec<Option<CellView<'_>>>> {
+    pub fn cells(&self, selectors: &[CellSelector<'_>]) -> FamilyResult<Vec<Option<CellView<'_>>>> {
         self.cell_batch(selectors)
     }
 
     /// Extract displayed worksheet text using tab-separated cells and
     /// newline-separated rows, preserving sheet order.
-    pub fn text(&self) -> Result<String> {
-        self.check_source()?;
+    pub fn text(&self) -> FamilyResult<String> {
+        if self.deferred.is_some() {
+            return self.effective()?.text();
+        }
+        self.check_source_core()?;
         let result = project_text(&self.sheets);
-        prefer_current(self.source.as_ref(), self.source_version, result)
+        Ok(prefer_current(
+            self.source.as_ref(),
+            self.source_version,
+            result,
+        )?)
     }
 
     /// Write displayed worksheet text to a caller-owned sequential sink.
@@ -713,64 +936,95 @@ impl SourceBackedSpreadsheet {
         &self,
         output: &mut W,
         options: TextOutputOptions<'_>,
-    ) -> std::result::Result<TextOutputReport, TextOutputError<Error>> {
+    ) -> Result<TextOutputReport, TextOutputError<CoreError>> {
+        if self.deferred.is_some() {
+            match self.effective() {
+                Ok(projection) => return projection.write_text_to(output, options),
+                Err(error) => {
+                    let writer = SequentialTextWriter::new(output, options);
+                    return Err(writer.document_error(error));
+                },
+            }
+        }
         let mut writer = SequentialTextWriter::new(output, options);
-        let conversion = match self.check_source() {
+        let conversion = match self.check_source_core() {
             Ok(()) => write_text_to_sheets(&self.sheets, &mut writer, options),
             Err(error) => Err(writer.document_error(error)),
         };
 
-        match self.check_source() {
+        match self.check_source_core() {
             Err(error) => Err(writer.document_error(error)),
             Ok(()) => conversion.map(|()| writer.finish()),
         }
     }
 
     /// List package members without reading their payloads.
-    pub fn files(&self) -> Result<Vec<String>> {
-        self.check_source()?;
+    pub fn files(&self) -> FamilyResult<Vec<String>> {
+        self.check_source_core()?;
         let result = self.package.files();
-        prefer_current(self.source.as_ref(), self.source_version, result)
+        Ok(prefer_current(
+            self.source.as_ref(),
+            self.source_version,
+            result,
+        )?)
     }
 
     /// List package media members without reading their payloads.
-    pub fn media_files(&self) -> Result<Vec<String>> {
-        self.check_source()?;
+    pub fn media_files(&self) -> FamilyResult<Vec<String>> {
+        self.check_source_core()?;
         let result = self.package.media_files();
-        prefer_current(self.source.as_ref(), self.source_version, result)
+        Ok(prefer_current(
+            self.source.as_ref(),
+            self.source_version,
+            result,
+        )?)
     }
 
     /// Read one safe, package-contained member on demand.
-    pub fn member_data(&self, path: &str) -> Result<Option<Vec<u8>>> {
-        self.check_source()?;
+    pub fn member_data(&self, path: &str) -> FamilyResult<Option<Vec<u8>>> {
+        self.check_source_core()?;
         let result = (|| {
             let path = resolve_package_path(path)?;
             if !self.package.has_file(&path)? {
                 return Ok(None);
             }
+            if !self.is_pristine() && path == "content.xml" {
+                return copy_member(self.written_content_xml().as_bytes()).map(Some);
+            }
             self.package.get_file(&path).map(Some)
         })();
-        prefer_current(self.source.as_ref(), self.source_version, result)
+        Ok(prefer_current(
+            self.source.as_ref(),
+            self.source_version,
+            result,
+        )?)
     }
 
     /// Read one safe package media member on demand.
-    pub fn media_data(&self, path: &str) -> Result<Option<Vec<u8>>> {
-        self.check_source()?;
+    pub fn media_data(&self, path: &str) -> FamilyResult<Option<Vec<u8>>> {
+        self.check_source_core()?;
         let result = (|| {
             let path = resolve_package_path(path)?;
             if !is_media_path(&path) {
                 return Ok(None);
             }
-            self.member_data(&path)
+            self.member_data(&path).map_err(CoreError::from)
         })();
-        prefer_current(self.source.as_ref(), self.source_version, result)
+        Ok(prefer_current(
+            self.source.as_ref(),
+            self.source_version,
+            result,
+        )?)
     }
 
     /// Read one package media member selected by the established ODF image
     /// inventory without following links or fragments.
-    pub fn image_data(&self, image: &litchi_odf_common::media::Image) -> Result<Option<Vec<u8>>> {
+    pub fn image_data(
+        &self,
+        image: &litchi_odf_common::media::Image,
+    ) -> FamilyResult<Option<Vec<u8>>> {
         let Some(path) = image.package_path() else {
-            self.check_source()?;
+            self.check_source_core()?;
             return Ok(None);
         };
         // `Image::package_path` is already a manifest-aware, safe package
@@ -779,43 +1033,81 @@ impl SourceBackedSpreadsheet {
         self.member_data(path)
     }
 
-    /// Explicitly materialize this source into the existing mutable ODS
-    /// spreadsheet owner.
-    pub fn materialize(self) -> Result<super::Spreadsheet> {
-        self.check_source()?;
+    /// Explicitly materialize this source into an immutable
+    /// [`crate::Package`]. The source-backed owner stays usable, so a
+    /// caller that retains it for reads can build the editable owner on
+    /// demand.
+    ///
+    /// # Errors
+    ///
+    /// Returns a source-changed, archive or family-validation failure.
+    pub fn materialize(&self) -> FamilyResult<crate::Package> {
+        self.check_source_core()?;
         let source = Arc::clone(&self.source);
         let source_version = self.source_version;
+        if !self.is_pristine() {
+            // A committed spreadsheet materializes the package it writes.
+            let mut bytes = Vec::new();
+            self.write_to(&mut bytes).map_err(|error| match error {
+                SourceContentPublicationError::Core(error) => error,
+                other => CoreError::from(OdfError::from(other)),
+            })?;
+            let result = crate::Package::from_bytes_with_options(
+                &bytes,
+                OpenOptions::new().xml_limits(self.xml_limits),
+            )
+            .map_err(CoreError::from);
+            return Ok(prefer_current(source.as_ref(), source_version, result)?);
+        }
         let package = prefer_current(source.as_ref(), source_version, self.package.materialize())?;
-        let result = super::Spreadsheet::from_owned_package(package);
-        prefer_current(source.as_ref(), source_version, result)
+        let result = crate::Package::from_materialized(
+            package,
+            OpenOptions::new().xml_limits(self.xml_limits),
+        );
+        Ok(prefer_current(source.as_ref(), source_version, result)?)
     }
+}
+
+fn copy_member(bytes: &[u8]) -> CoreResult<Vec<u8>> {
+    let mut copy = Vec::new();
+    copy.try_reserve_exact(bytes.len())
+        .map_err(|source| CoreError::Allocation {
+            resource: "ODS committed content.xml copy",
+            source,
+        })?;
+    copy.extend_from_slice(bytes);
+    Ok(copy)
 }
 
 #[cfg(any(unix, windows))]
-fn file_source(path: impl AsRef<Path>) -> Result<Arc<dyn ReadAt>> {
+fn file_source(path: impl AsRef<Path>) -> CoreResult<Arc<dyn ReadAt>> {
     Ok(Arc::new(FileSource::open(path)?))
 }
 
-fn ensure_current(expected: SourceVersion, observed: SourceVersion) -> Result<()> {
+fn ensure_current(expected: SourceVersion, observed: SourceVersion) -> CoreResult<()> {
     if expected == observed {
         Ok(())
     } else {
-        Err(Error::SourceChanged { expected, observed })
+        Err(CoreError::SourceChanged { expected, observed })
     }
 }
 
-fn prefer_current<T>(source: &dyn ReadAt, expected: SourceVersion, result: Result<T>) -> Result<T> {
+fn prefer_current<T>(
+    source: &dyn ReadAt,
+    expected: SourceVersion,
+    result: CoreResult<T>,
+) -> CoreResult<T> {
     let observed = source.version()?;
     ensure_current(expected, observed)?;
     result
 }
 
-pub(crate) fn project_text(sheets: &[Sheet]) -> Result<String> {
+pub(crate) fn project_text(sheets: &[Sheet]) -> CoreResult<String> {
     let capacity = text_capacity(sheets)?;
     let mut output = String::new();
     output
         .try_reserve_exact(capacity)
-        .map_err(|source| Error::Allocation {
+        .map_err(|source| CoreError::Allocation {
             resource: "ODS source text projection",
             source,
         })?;
@@ -853,7 +1145,7 @@ pub(crate) fn write_text_to_sheets<'options, 'output, W: Write + ?Sized>(
     sheets: &[Sheet],
     writer: &mut SequentialTextWriter<'options, 'output, W>,
     options: TextOutputOptions<'options>,
-) -> std::result::Result<(), TextOutputError<Error>> {
+) -> Result<(), TextOutputError<CoreError>> {
     let mut budget = SinkTextBudget {
         bytes: 0,
         logical_rows: 0,
@@ -907,25 +1199,25 @@ struct SinkTextBudget {
 }
 
 impl SinkTextBudget {
-    fn charge(&mut self, additional: usize) -> Result<()> {
+    fn charge(&mut self, additional: usize) -> CoreResult<()> {
         self.bytes = self
             .bytes
             .checked_add(additional)
-            .ok_or_else(|| Error::InvalidFormat("ODS source text size overflow".to_string()))?;
+            .ok_or_else(|| CoreError::InvalidFormat("ODS source text size overflow".to_string()))?;
         if self.bytes > crate::worksheet::validation::MAX_TEXT_BYTES {
-            return Err(Error::InvalidFormat(
+            return Err(CoreError::InvalidFormat(
                 "ODS source text projection exceeds the safety limit".to_string(),
             ));
         }
         Ok(())
     }
 
-    fn charge_logical_rows(&mut self, additional: usize) -> Result<()> {
+    fn charge_logical_rows(&mut self, additional: usize) -> CoreResult<()> {
         self.logical_rows = self.logical_rows.checked_add(additional).ok_or_else(|| {
-            Error::InvalidFormat("ODS logical row count overflows address space".to_string())
+            CoreError::InvalidFormat("ODS logical row count overflows address space".to_string())
         })?;
         if self.logical_rows > MAX_STREAM_LOGICAL_ROWS {
-            return Err(Error::InvalidFormat(format!(
+            return Err(CoreError::InvalidFormat(format!(
                 "ODS semantic text traversal exceeds the {MAX_STREAM_LOGICAL_ROWS} logical-row safety limit"
             )));
         }
@@ -944,7 +1236,7 @@ fn charge_sink_object<'options, 'output, W: Write + ?Sized>(
     options: TextOutputOptions<'options>,
     value_bytes: usize,
     included: bool,
-) -> std::result::Result<(), TextOutputError<Error>> {
+) -> Result<(), TextOutputError<CoreError>> {
     if !included {
         return Ok(());
     }
@@ -955,37 +1247,36 @@ fn charge_sink_object<'options, 'output, W: Write + ?Sized>(
     };
     let required = separator_bytes
         .checked_add(value_bytes)
-        .ok_or_else(|| Error::InvalidFormat("ODS source text size overflow".to_string()))
+        .ok_or_else(|| CoreError::InvalidFormat("ODS source text size overflow".to_string()))
         .map_err(|error| writer.document_error(error))?;
     budget
         .charge(required)
         .map_err(|error| writer.document_error(error))
 }
 
-fn row_text_bytes(row: &crate::worksheet::Row) -> Result<usize> {
+fn row_text_bytes(row: &crate::worksheet::Row) -> CoreResult<usize> {
     let mut fragments = 0usize;
     let mut bytes = 0usize;
     for cell in &row.cells {
         let repeat = cell.repeat();
         if fragments != 0 {
-            bytes = bytes
-                .checked_add(1)
-                .ok_or_else(|| Error::InvalidFormat("ODS source text size overflow".to_string()))?;
+            bytes = bytes.checked_add(1).ok_or_else(|| {
+                CoreError::InvalidFormat("ODS source text size overflow".to_string())
+            })?;
         }
-        bytes =
-            bytes
-                .checked_add(cell.text.len().checked_mul(repeat).ok_or_else(|| {
-                    Error::InvalidFormat("ODS source text size overflow".to_string())
-                })?)
-                .ok_or_else(|| Error::InvalidFormat("ODS source text size overflow".to_string()))?;
+        bytes = bytes
+            .checked_add(cell.text.len().checked_mul(repeat).ok_or_else(|| {
+                CoreError::InvalidFormat("ODS source text size overflow".to_string())
+            })?)
+            .ok_or_else(|| CoreError::InvalidFormat("ODS source text size overflow".to_string()))?;
         bytes = bytes
             .checked_add(repeat.checked_sub(1).ok_or_else(|| {
-                Error::InvalidFormat("ODS cell repetition must be positive".to_string())
+                CoreError::InvalidFormat("ODS cell repetition must be positive".to_string())
             })?)
-            .ok_or_else(|| Error::InvalidFormat("ODS source text size overflow".to_string()))?;
+            .ok_or_else(|| CoreError::InvalidFormat("ODS source text size overflow".to_string()))?;
         fragments = fragments
             .checked_add(repeat)
-            .ok_or_else(|| Error::InvalidFormat("ODS source text size overflow".to_string()))?;
+            .ok_or_else(|| CoreError::InvalidFormat("ODS source text size overflow".to_string()))?;
     }
     Ok(bytes)
 }
@@ -1028,15 +1319,15 @@ impl<'a> Iterator for RowTextFragments<'a> {
     }
 }
 
-fn text_capacity(sheets: &[Sheet]) -> Result<usize> {
+fn text_capacity(sheets: &[Sheet]) -> CoreResult<usize> {
     let mut total = 0usize;
     for (sheet_index, sheet) in sheets.iter().enumerate() {
         if sheet_index != 0 {
-            total = total
-                .checked_add(1)
-                .ok_or_else(|| Error::InvalidFormat("ODS source text size overflow".to_string()))?;
+            total = total.checked_add(1).ok_or_else(|| {
+                CoreError::InvalidFormat("ODS source text size overflow".to_string())
+            })?;
             if total > crate::worksheet::validation::MAX_TEXT_BYTES {
-                return Err(Error::InvalidFormat(
+                return Err(CoreError::InvalidFormat(
                     "ODS source text projection exceeds the safety limit".to_string(),
                 ));
             }
@@ -1044,7 +1335,7 @@ fn text_capacity(sheets: &[Sheet]) -> Result<usize> {
         for (row_index, row) in sheet.rows.iter().enumerate() {
             if row_index != 0 {
                 total = total.checked_add(1).ok_or_else(|| {
-                    Error::InvalidFormat("ODS source text size overflow".to_string())
+                    CoreError::InvalidFormat("ODS source text size overflow".to_string())
                 })?;
             }
             let row_repeat = row.repeat();
@@ -1053,31 +1344,35 @@ fn text_capacity(sheets: &[Sheet]) -> Result<usize> {
             for cell in &row.cells {
                 let repeat = cell.repeat();
                 let payload = cell.text.len().checked_mul(repeat).ok_or_else(|| {
-                    Error::InvalidFormat("ODS source text size overflow".to_string())
+                    CoreError::InvalidFormat("ODS source text size overflow".to_string())
                 })?;
                 row_size = row_size.checked_add(payload).ok_or_else(|| {
-                    Error::InvalidFormat("ODS source text size overflow".to_string())
+                    CoreError::InvalidFormat("ODS source text size overflow".to_string())
                 })?;
                 cells = cells.checked_add(repeat).ok_or_else(|| {
-                    Error::InvalidFormat("ODS source text size overflow".to_string())
+                    CoreError::InvalidFormat("ODS source text size overflow".to_string())
                 })?;
             }
             row_size = row_size
                 .checked_add(cells.saturating_sub(1))
-                .ok_or_else(|| Error::InvalidFormat("ODS source text size overflow".to_string()))?;
+                .ok_or_else(|| {
+                    CoreError::InvalidFormat("ODS source text size overflow".to_string())
+                })?;
             let repeated_row_separators = row_repeat.checked_sub(1).ok_or_else(|| {
-                Error::InvalidFormat("ODS row repetition must be positive".to_string())
+                CoreError::InvalidFormat("ODS row repetition must be positive".to_string())
             })?;
             total = total
                 .checked_add(row_size.checked_mul(row_repeat).ok_or_else(|| {
-                    Error::InvalidFormat("ODS source text size overflow".to_string())
+                    CoreError::InvalidFormat("ODS source text size overflow".to_string())
                 })?)
-                .ok_or_else(|| Error::InvalidFormat("ODS source text size overflow".to_string()))?;
-            total = total
-                .checked_add(repeated_row_separators)
-                .ok_or_else(|| Error::InvalidFormat("ODS source text size overflow".to_string()))?;
+                .ok_or_else(|| {
+                    CoreError::InvalidFormat("ODS source text size overflow".to_string())
+                })?;
+            total = total.checked_add(repeated_row_separators).ok_or_else(|| {
+                CoreError::InvalidFormat("ODS source text size overflow".to_string())
+            })?;
             if total > crate::worksheet::validation::MAX_TEXT_BYTES {
-                return Err(Error::InvalidFormat(
+                return Err(CoreError::InvalidFormat(
                     "ODS source text projection exceeds the safety limit".to_string(),
                 ));
             }
@@ -1086,12 +1381,31 @@ fn text_capacity(sheets: &[Sheet]) -> Result<usize> {
     Ok(total)
 }
 
+/// Check the caller's semantic part-size limits against the declared member
+/// sizes before any part is inflated.
+fn check_semantic_part_sizes(
+    package: &SourceBackedPackage,
+    limits: litchi_odf_common::SemanticLimits,
+) -> Result<(), OdfError> {
+    if limits.is_default() {
+        return Ok(());
+    }
+    if let Some(size) = package.member_materialized_size("content.xml")? {
+        limits.check(litchi_odf_common::SemanticLimitKind::ContentBytes, size)?;
+    }
+    if let Some(size) = package.member_materialized_size("styles.xml")? {
+        limits.check(litchi_odf_common::SemanticLimitKind::StylesBytes, size)?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{ReadLimits, SourceBackedSpreadsheet, project_text};
+    use super::{SourceBackedSpreadsheet, project_text};
     use crate::worksheet::{Cell, CellValue, Row, Sheet};
     use crate::{CellSelector, MAX_CELL_SELECTORS};
-    use litchi_core::{OwnedSource, ReadAt, SourceVersion, TextOutputOptions};
+    use litchi_core::{Error as CoreError, OwnedSource, ReadAt, SourceVersion, TextOutputOptions};
+    use litchi_odf_common::Error as OdfError;
     use std::io::{Cursor, Read, Write};
     use std::ptr;
     use std::sync::{
@@ -1109,7 +1423,9 @@ mod tests {
         let content = format!(
             r#"<office:document-content xmlns:office="{OFFICE}" xmlns:table="{TABLE}" xmlns:text="{TEXT}"><office:body><office:spreadsheet><table:table table:name="Sheet1"><table:table-row table:number-rows-repeated="2"><table:table-cell office:value-type="string"><text:p>hello</text:p></table:table-cell><table:table-cell office:value-type="string"><text:p>world</text:p></table:table-cell></table:table-row></table:table><table:table table:name="Sheet2"/></office:spreadsheet></office:body></office:document-content>"#
         );
-        let mut writer = litchi_odf_common::core::PackageWriter::new();
+        let mut writer = litchi_odf_common::core::PackageWriter::new(
+            litchi_odf_common::core::StreamingArchiveLimits::default(),
+        );
         writer.set_mimetype(MIME).expect("ODS MIME");
         writer
             .add_file("content.xml", content.as_bytes())
@@ -1117,6 +1433,20 @@ mod tests {
         writer
             .add_file_with_media_type("Pictures/sample.bin", b"media", "application/octet-stream")
             .expect("ODS media");
+        writer.finish_to_bytes().expect("ODS package")
+    }
+
+    fn non_repeated_package() -> Vec<u8> {
+        let content = format!(
+            r#"<office:document-content xmlns:office="{OFFICE}" xmlns:table="{TABLE}" xmlns:text="{TEXT}"><office:body><office:spreadsheet><table:table table:name="Sheet1"><table:table-row><table:table-cell office:value-type="string"><text:p>hello</text:p></table:table-cell><table:table-cell office:value-type="string"><text:p>world</text:p></table:table-cell></table:table-row></table:table></office:spreadsheet></office:body></office:document-content>"#
+        );
+        let mut writer = litchi_odf_common::core::PackageWriter::new(
+            litchi_odf_common::core::StreamingArchiveLimits::default(),
+        );
+        writer.set_mimetype(MIME).expect("ODS MIME");
+        writer
+            .add_file("content.xml", content.as_bytes())
+            .expect("ODS content");
         writer.finish_to_bytes().expect("ODS package")
     }
 
@@ -1146,10 +1476,10 @@ mod tests {
                 .contains("package href escapes the package root")
         );
 
-        let owned = crate::Spreadsheet::from_bytes(bytes).expect("owned ODS");
+        let owned = crate::Workbook::from_bytes(bytes).expect("owned ODS");
         assert_eq!(owned.sheets().len(), source.sheet_count().unwrap());
         let materialized = source.materialize().expect("materialize ODS");
-        assert_eq!(materialized.sheets(), owned.sheets());
+        assert_eq!(materialized.workbook().unwrap().sheets(), owned.sheets());
     }
 
     #[test]
@@ -1243,40 +1573,37 @@ mod tests {
         source.bump();
         assert!(matches!(
             spreadsheet.sheet_count(),
-            Err(litchi_core::Error::SourceChanged { .. })
+            Err(OdfError::Core(CoreError::SourceChanged { .. }))
         ));
         assert!(matches!(
             spreadsheet.text(),
-            Err(litchi_core::Error::SourceChanged { .. })
+            Err(OdfError::Core(CoreError::SourceChanged { .. }))
         ));
         assert!(matches!(
             spreadsheet.member_data("Pictures/sample.bin"),
-            Err(litchi_core::Error::SourceChanged { .. })
+            Err(OdfError::Core(CoreError::SourceChanged { .. }))
         ));
         assert!(matches!(
             spreadsheet.materialize(),
-            Err(litchi_core::Error::SourceChanged { .. })
+            Err(OdfError::Core(CoreError::SourceChanged { .. }))
         ));
     }
 
     #[test]
     fn source_edit_protection_is_lazy_and_shared_across_sequential_edits() {
-        let source = Arc::new(CountingSource::new(package()));
+        let source = Arc::new(CountingSource::new(non_repeated_package()));
         let spreadsheet =
             SourceBackedSpreadsheet::from_read_at(source.clone()).expect("source ODS");
         let after_open = source.reads();
 
         assert!(spreadsheet.edit_protection.get().is_none());
         let mut first = spreadsheet.edit_cells().expect("first edit");
-        let cached = spreadsheet
-            .edit_protection
-            .get()
-            .expect("protection cached after first edit");
-        assert_eq!(*cached, (false, Vec::new()));
+        assert!(spreadsheet.edit_protection.get().is_none());
         assert_eq!(source.reads(), after_open);
 
-        // The repeated physical row refusal is identical on the cached path.
-        assert!(
+        // A mutation initializes protection only when the first mutation
+        // needs it; construction itself remains read-free.
+        assert_eq!(
             first
                 .set_cell(
                     "Sheet1",
@@ -1284,8 +1611,14 @@ mod tests {
                     0,
                     Cell::new(CellValue::Text("changed".to_string()), "changed"),
                 )
-                .is_err()
+                .expect("cell mutation"),
+            Some(true)
         );
+        let cached = spreadsheet
+            .edit_protection
+            .get()
+            .expect("protection cached after first mutation");
+        assert_eq!(*cached, (false, Vec::new()));
         drop(first);
 
         let mut second = spreadsheet.edit_cells().expect("second edit");
@@ -1295,7 +1628,7 @@ mod tests {
             .expect("protection remains cached");
         assert!(ptr::eq(cached, reused));
         assert_eq!(source.reads(), after_open);
-        assert!(
+        assert_eq!(
             second
                 .set_cell(
                     "Sheet1",
@@ -1303,16 +1636,19 @@ mod tests {
                     0,
                     Cell::new(CellValue::Text("changed".to_string()), "changed"),
                 )
-                .is_err()
+                .expect("second cell mutation"),
+            Some(true)
         );
-        assert_eq!(second.changed_cells(), 0);
+        assert_eq!(second.changed_cells(), 1);
     }
 
     fn editable_package() -> Vec<u8> {
         let content = format!(
             r#"<office:document-content xmlns:office="{OFFICE}" xmlns:table="{TABLE}" xmlns:text="{TEXT}"><office:body><office:spreadsheet><table:table table:name="Data"><table:table-row><table:table-cell office:value-type="string"><text:p>alpha</text:p></table:table-cell></table:table-row><table:table-row><table:table-cell office:value-type="string"><text:p>beta</text:p></table:table-cell></table:table-row></table:table></office:spreadsheet></office:body></office:document-content>"#
         );
-        let mut writer = litchi_odf_common::core::PackageWriter::new();
+        let mut writer = litchi_odf_common::core::PackageWriter::new(
+            litchi_odf_common::core::StreamingArchiveLimits::default(),
+        );
         writer.set_mimetype(MIME).expect("ODS MIME");
         writer
             .add_file("content.xml", content.as_bytes())
@@ -1339,8 +1675,14 @@ mod tests {
             )
             .expect("first set_cell");
         let first_commit = first.commit().expect("first commit");
-        assert!(first_commit.changed());
-        assert!(first_commit.snapshot().content_xml().contains("one"));
+        assert!(first_commit.diagnostics().changed());
+        assert!(
+            first_commit
+                .package()
+                .content_xml()
+                .unwrap()
+                .contains("one")
+        );
         let cached = spreadsheet
             .content_layout
             .get()
@@ -1357,8 +1699,14 @@ mod tests {
             )
             .expect("second set_cell");
         let second_commit = second.commit().expect("second commit");
-        assert!(second_commit.changed());
-        assert!(second_commit.snapshot().content_xml().contains("two"));
+        assert!(second_commit.diagnostics().changed());
+        assert!(
+            second_commit
+                .package()
+                .content_xml()
+                .unwrap()
+                .contains("two")
+        );
         let reused = spreadsheet
             .content_layout
             .get()
@@ -1397,7 +1745,7 @@ mod tests {
         let source = Arc::new(CountingSource::new(package()));
         let spreadsheet =
             SourceBackedSpreadsheet::from_read_at(source.clone()).expect("source ODS");
-        let owned = crate::Spreadsheet::from_bytes(package()).expect("owned ODS");
+        let owned = crate::Workbook::from_bytes(package()).expect("owned ODS");
         let after_open_reads = source.reads();
         let after_open_versions = source.versions();
         let selectors = [
@@ -1472,7 +1820,7 @@ mod tests {
         let error = bounded.cell_batch(&selectors).expect_err("bound must fail");
         assert!(matches!(
             error,
-            litchi_core::Error::InvalidFormat(message)
+            OdfError::Core(CoreError::InvalidFormat(message))
                 if message.contains("selector safety limit")
         ));
         assert_eq!(bounded_source.reads(), bounded_reads);
@@ -1489,7 +1837,7 @@ mod tests {
         source.bump();
         assert!(matches!(
             spreadsheet.cell_batch(&selectors),
-            Err(litchi_core::Error::SourceChanged { .. })
+            Err(OdfError::Core(CoreError::SourceChanged { .. }))
         ));
 
         let source = Arc::new(MutableSource::new(package()));
@@ -1498,7 +1846,7 @@ mod tests {
         source.flip_after_next_version();
         assert!(matches!(
             spreadsheet.cell_batch(&selectors),
-            Err(litchi_core::Error::SourceChanged { .. })
+            Err(OdfError::Core(CoreError::SourceChanged { .. }))
         ));
     }
 
@@ -1649,7 +1997,7 @@ mod tests {
         source.bump();
         assert!(matches!(
             spreadsheet.cell("Sheet1", 0, 0),
-            Err(litchi_core::Error::SourceChanged { .. })
+            Err(OdfError::Core(CoreError::SourceChanged { .. }))
         ));
     }
 
@@ -1677,16 +2025,22 @@ mod tests {
     #[test]
     fn source_limits_and_passwords_fail_closed() {
         let bytes = package();
-        let limits = ReadLimits::default().with_max_source_bytes(1);
+        let limits = litchi_odf_common::SourceLimits::builder()
+            .max_input_bytes(1)
+            .unwrap()
+            .build()
+            .unwrap();
         assert!(matches!(
-            SourceBackedSpreadsheet::from_read_at_with_limits(
+            SourceBackedSpreadsheet::from_read_at_with_options(
                 Arc::new(OwnedSource::new(bytes.clone())),
-                limits,
+                litchi_odf_common::OpenOptions::new().source_limits(limits),
             ),
-            Err(litchi_core::Error::ResourceLimit(_))
+            Err(litchi_odf_common::Error::Limit { .. })
         ));
 
-        let mut writer = litchi_odf_common::core::PackageWriter::new();
+        let mut writer = litchi_odf_common::core::PackageWriter::new(
+            litchi_odf_common::core::StreamingArchiveLimits::default(),
+        );
         writer.set_mimetype(MIME).expect("ODS MIME");
         writer
             .set_encryption(
@@ -1723,7 +2077,9 @@ mod tests {
 
     #[test]
     fn owned_and_source_reject_manifest_aliases_before_password_use() {
-        let mut writer = litchi_odf_common::core::PackageWriter::new();
+        let mut writer = litchi_odf_common::core::PackageWriter::new(
+            litchi_odf_common::core::StreamingArchiveLimits::default(),
+        );
         writer.set_mimetype(MIME).expect("ODS MIME");
         writer
             .set_encryption(
@@ -1764,11 +2120,11 @@ mod tests {
                 "source wrong-password open must reject manifest alias {alias}"
             );
             assert!(
-                crate::Spreadsheet::from_bytes(aliased.clone()).is_err(),
+                crate::Workbook::from_bytes(aliased.clone()).is_err(),
                 "owned open must reject manifest alias {alias}"
             );
             assert!(
-                crate::Spreadsheet::from_bytes_with_password(aliased, "wrong").is_err(),
+                crate::Package::from_bytes_with_password(&aliased, "wrong").is_err(),
                 "owned wrong-password open must reject manifest alias {alias}"
             );
         }
@@ -1780,9 +2136,7 @@ mod tests {
             )
             .is_ok()
         );
-        assert!(
-            crate::Spreadsheet::from_bytes_with_password(canonical, "manifest-password").is_ok()
-        );
+        assert!(crate::Package::from_bytes_with_password(&canonical, "manifest-password").is_ok());
     }
 
     fn rewrite_manifest_content_path(bytes: &[u8], path: &str) -> Vec<u8> {

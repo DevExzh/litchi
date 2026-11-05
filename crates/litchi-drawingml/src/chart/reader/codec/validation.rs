@@ -5,6 +5,7 @@
 
 use crate::chart::axis::{AxisCrossBetween, AxisCrossMode, AxisLabelAlign, BuiltInUnit, TimeUnit};
 use crate::chart::data::NumberFormat;
+use crate::chart::limits::decoded_attribute_value_bytes;
 use crate::chart::types::{
     AxisOrientation, AxisPosition, BarGrouping, DataLabelPosition, DisplayBlanks, MarkerStyle,
     TickLabelPosition, TickMark,
@@ -177,12 +178,23 @@ pub(super) fn parse_data_label_position(element: &BytesStart<'_>) -> Result<Data
 pub(super) fn parse_number_format(
     element: &BytesStart<'_>,
     decoder: Decoder,
+    max_text_bytes: usize,
     description: &str,
 ) -> Result<NumberFormat> {
     let format_code = element
         .try_get_attribute(b"formatCode")
         .map_err(|error| Error::Xml(error.to_string()))?
-        .ok_or_else(|| missing_attribute(&format!("{description} number format code")))?
+        .ok_or_else(|| missing_attribute(&format!("{description} number format code")))?;
+    let decoded_length =
+        decoded_attribute_value_bytes(format_code.value.as_ref(), decoder).map_err(Error::Xml)?;
+    if decoded_length > max_text_bytes {
+        return Err(Error::limit(
+            crate::LimitKind::ChartTextBytes,
+            decoded_length,
+            max_text_bytes,
+        ));
+    }
+    let format_code = format_code
         .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
         .map_err(|error| Error::Xml(error.to_string()))?
         .into_owned();
@@ -239,16 +251,37 @@ pub(super) fn required_u32_attr(element: &BytesStart<'_>, description: &str) -> 
         .ok_or_else(|| invalid_attribute(description, &value))
 }
 
+/// A required axis ID attribute, read leniently by
+/// [`crate::chart::axis::parse_axis_id`] (negative producer spellings).
+pub(super) fn required_axis_id_attr(element: &BytesStart<'_>, description: &str) -> Result<u32> {
+    let value = get_attr(element, b"val").ok_or_else(|| missing_attribute(description))?;
+    std::str::from_utf8(&value)
+        .ok()
+        .and_then(crate::chart::axis::parse_axis_id)
+        .ok_or_else(|| invalid_attribute(description, &value))
+}
+
 pub(super) fn required_string_attr(
     element: &BytesStart<'_>,
     name: &[u8],
     decoder: Decoder,
+    max_text_bytes: usize,
     description: &str,
 ) -> Result<String> {
-    element
+    let value = element
         .try_get_attribute(name)
         .map_err(|error| Error::Xml(error.to_string()))?
-        .ok_or_else(|| missing_attribute(description))?
+        .ok_or_else(|| missing_attribute(description))?;
+    let decoded_length =
+        decoded_attribute_value_bytes(value.value.as_ref(), decoder).map_err(Error::Xml)?;
+    if decoded_length > max_text_bytes {
+        return Err(Error::limit(
+            crate::LimitKind::ChartTextBytes,
+            decoded_length,
+            max_text_bytes,
+        ));
+    }
+    value
         .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
         .map(std::borrow::Cow::into_owned)
         .map_err(|error| Error::Xml(error.to_string()))

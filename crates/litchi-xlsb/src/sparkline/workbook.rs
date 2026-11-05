@@ -8,10 +8,8 @@
 
 use super::worksheet::{self, Commit, Snapshot};
 use super::{Formula, FormulaKind, Groups, Limits};
-use crate::external_link::ExternalLinkLimits;
 use crate::package::error::{Error, Result};
 use crate::package::formula::{Context, SupportingLink};
-use crate::workbook::DrawingLoadPolicy;
 use litchi_opc::{OpcPackage, PackURI, Part};
 
 const WORKSHEET_CONTENT_TYPE: &str = "application/vnd.ms-excel.worksheet";
@@ -24,59 +22,7 @@ pub(crate) fn read_with_limits(
 ) -> Result<Snapshot> {
     let part = package.get_part(worksheet)?;
     require_worksheet(part)?;
-    worksheet::read_with_limits(part.blob(), limits).map_err(map_error)
-}
-
-/// The outcome of one validated sparkline publication.
-///
-/// Returning the parsed workbook lets a typed workbook owner publish the
-/// derived state that already validated the candidate bytes.
-pub(crate) enum Applied {
-    /// The patch reproduced the stored worksheet bytes exactly.
-    Unchanged(Snapshot),
-    /// The changed candidate passed complete workbook validation.
-    Published {
-        /// Snapshot read from the validated worksheet bytes.
-        snapshot: Snapshot,
-        /// Workbook parse that validated the candidate package.
-        workbook: Box<crate::Workbook>,
-    },
-}
-
-/// Apply a sparkline commit and retain the complete workbook parse used for
-/// candidate validation, parsed under the caller's drawing policy.
-pub(crate) fn apply_retaining_parse(
-    package: &OpcPackage,
-    worksheet: &PackURI,
-    commit: Commit,
-    external_link_limits: ExternalLinkLimits,
-    drawing_load_policy: DrawingLoadPolicy,
-) -> Result<Applied> {
-    let part = package.get_part(worksheet)?;
-    require_worksheet(part)?;
-    let current = part.blob();
-    let (_, limits, patch) = commit.into_publication();
-    let (changed, updated) = patch.apply_owned(current).map_err(map_error)?;
-    if !changed {
-        return Ok(Applied::Unchanged(
-            worksheet::read_owned(updated, limits).map_err(map_error)?,
-        ));
-    }
-
-    let snapshot = worksheet::read_with_limits(&updated, limits).map_err(map_error)?;
-    let mut candidate = package.clone();
-    crate::worksheet_index::maintain(&mut candidate, worksheet, current, &updated)?;
-    candidate.get_part_mut(worksheet)?.set_blob(updated);
-    candidate.unsign();
-    let workbook = crate::Workbook::reparse_candidate_with_policy(
-        candidate,
-        external_link_limits,
-        drawing_load_policy,
-    )?;
-    Ok(Applied::Published {
-        snapshot,
-        workbook: Box::new(workbook),
-    })
+    worksheet::read(part.blob(), limits).map_err(map_error)
 }
 
 /// Prove every structurally valid formula against its workbook-owned name and
@@ -118,10 +64,9 @@ fn validate_formula_context(formula: &Formula, context: &Context) -> Result<()> 
                 .ok()
                 .and_then(|value| value.checked_sub(1));
             if !resolved.is_some_and(|value| value < context.defined_names.len()) {
-                return Err(Error::InvalidFormula(format!(
-                    "sparkline PtgName index {index} exceeds {} workbook names",
-                    context.defined_names.len()
-                )));
+                return Err(Error::InvalidFormula(
+                    "sparkline PtgName index exceeds workbook names",
+                ));
             }
         },
         FormulaKind::ExternalName => validate_external_name(formula, context)?,
@@ -130,9 +75,9 @@ fn validate_formula_context(formula: &Formula, context: &Context) -> Result<()> 
                 .ixti()
                 .expect("structurally validated 3-D token has an XTI");
             if !context.is_internal_single_sheet_xti(ixti) {
-                return Err(Error::InvalidFormula(format!(
-                    "sparkline 3-D source XTI {ixti} must select exactly one valid internal worksheet"
-                )));
+                return Err(Error::InvalidFormula(
+                    "sparkline 3-D source XTI must select exactly one valid internal worksheet",
+                ));
             }
         },
     }
@@ -149,47 +94,45 @@ fn validate_external_name(formula: &Formula, context: &Context) -> Result<()> {
     let xti = context
         .external_sheets
         .get(usize::from(ixti))
-        .ok_or_else(|| {
-            Error::InvalidFormula(format!(
-                "sparkline PtgNameX XTI {ixti} exceeds {} entries",
-                context.external_sheets.len()
-            ))
-        })?;
+        .ok_or(Error::InvalidFormula(
+            "sparkline PtgNameX XTI exceeds entries",
+        ))?;
     let link_index = usize::try_from(xti.external_link)
-        .map_err(|_| Error::InvalidFormula("sparkline external-link index overflow".to_string()))?;
-    let link = context.supporting_links.get(link_index).ok_or_else(|| {
-        Error::InvalidFormula(format!(
-            "sparkline PtgNameX refers to missing supporting link {}",
-            xti.external_link
-        ))
-    })?;
+        .map_err(|_| Error::InvalidFormula("sparkline external-link index overflow"))?;
+    let link = context
+        .supporting_links
+        .get(link_index)
+        .ok_or(Error::InvalidFormula(
+            "sparkline PtgNameX refers to missing supporting link",
+        ))?;
     let SupportingLink::ExternalWorkbook(book_index) = link else {
         return Err(Error::InvalidFormula(
-            "sparkline PtgNameX must refer to an external BrtSupBookSrc".to_string(),
+            "sparkline PtgNameX must refer to an external BrtSupBookSrc",
         ));
     };
     let book_index = usize::try_from(*book_index)
-        .map_err(|_| Error::InvalidFormula("sparkline external-book index overflow".to_string()))?;
-    let book = context.external_books.get(book_index).ok_or_else(|| {
-        Error::InvalidFormula(format!(
-            "sparkline PtgNameX refers to missing external book {book_index}"
-        ))
-    })?;
+        .map_err(|_| Error::InvalidFormula("sparkline external-book index overflow"))?;
+    let book = context
+        .external_books
+        .get(book_index)
+        .ok_or(Error::InvalidFormula(
+            "sparkline PtgNameX refers to missing external book",
+        ))?;
     let metadata = book.metadata_ref();
     if !metadata.is_workbook() {
-        return Err(Error::UnsupportedFeature(
-            "sparkline PtgNameX refers to inert DDE or OLE data rather than an external workbook"
-                .to_string(),
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit_sparklines",
+            "the sparkline formula refers to inert external data",
         ));
     }
     let resolved = usize::try_from(name_index)
         .ok()
         .and_then(|value| value.checked_sub(1));
     if !resolved.is_some_and(|value| value < metadata.defined_names().len()) {
-        return Err(Error::InvalidFormula(format!(
-            "sparkline external name index {name_index} exceeds {} names",
-            metadata.defined_names().len()
-        )));
+        return Err(Error::InvalidFormula(
+            "sparkline external name index exceeds names",
+        ));
     }
     Ok(())
 }
@@ -199,12 +142,11 @@ fn require_worksheet(part: &dyn Part) -> Result<()> {
         Ok(())
     } else {
         Err(Error::InvalidContentType {
-            expected: WORKSHEET_CONTENT_TYPE.to_string(),
-            got: part.content_type().to_string(),
+            expected: WORKSHEET_CONTENT_TYPE,
         })
     }
 }
 
 fn map_error(error: super::Error) -> Error {
-    Error::InvalidFormat(error.to_string())
+    Error::Sparkline(error)
 }

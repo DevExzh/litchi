@@ -6,7 +6,7 @@ use std::sync::{Arc, OnceLock};
 use litchi_core::{ExecutionContext, ExecutionError, Selector as CoreSelector, SourceVersion};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    BlobPart, OpcError, OpcPackage, PackURI, Part, Relationship, Relationships, ReplacementSpan,
+    OpcError, OpcPackage, PackURI, Part, Relationship, Relationships, ReplacementSpan,
     SourceBackedPackage, SourceLineage, SourceRelationshipTarget, SourceTopologyPlan, TargetMode,
 };
 use litchi_sheet::{Cell as Address, Rect};
@@ -107,30 +107,16 @@ struct SourceCatalogCapture {
     source_version: SourceVersion,
 }
 
-struct OwnedCatalogCapture {
-    sheets: Vec<raw::Sheet>,
-    parts: Vec<crate::workbook::source::SheetPart>,
-    workbook_uri: PackURI,
-    workbook_content_type: Box<str>,
-    workbook_xml: SourcePayload,
-    owner_relationship: SourceRelationship,
-    package_relationships: Arc<[SourceRelationship]>,
-    workbook_relationships: Arc<[SourceRelationship]>,
-    calculation_chain: Option<CalculationChainState>,
-    shared_strings: Option<SharedStringsState>,
-    style_count: u32,
-    auxiliary: Arc<[PartState]>,
-    graph: Arc<[SheetGraphState]>,
-}
-
 pub(super) fn checked_multi_bytes(total: usize, next: usize, maximum: usize) -> Result<usize> {
     let updated = total
         .checked_add(next)
         .ok_or_else(|| invalid("multi-sheet worksheet XML size overflows usize"))?;
     if updated > maximum {
-        return Err(invalid(format!(
-            "multi-sheet worksheet XML exceeds {maximum} bytes"
-        )));
+        return Err(Error::limit(
+            super::LimitKind::WorksheetBytes,
+            updated,
+            maximum,
+        ));
     }
     Ok(updated)
 }
@@ -265,57 +251,6 @@ impl MultiSnapshot {
         Ok(snapshot)
     }
 
-    pub(crate) fn load_owned<I>(package: &OpcPackage, positions: I) -> Result<Self>
-    where
-        I: IntoIterator<Item = usize>,
-    {
-        let mut selected = Vec::new();
-        selected
-            .try_reserve_exact(MAX_SHEET_OWNERS)
-            .map_err(|source| allocation("multi-sheet owned selector snapshot", source))?;
-        for position in positions {
-            if selected.len() >= MAX_SHEET_OWNERS {
-                return Err(invalid(format!(
-                    "multi-sheet value edits exceed {MAX_SHEET_OWNERS} worksheet owners"
-                )));
-            }
-            if selected.contains(&position) {
-                return Err(invalid(
-                    "multi-sheet value edits contain a duplicate worksheet",
-                ));
-            }
-            selected.push(position);
-        }
-        selected.sort_unstable();
-        let capture = load_owned_catalog(package)?;
-        let mut sheets = Vec::new();
-        sheets
-            .try_reserve_exact(selected.len())
-            .map_err(|source| allocation("multi-sheet owned snapshots", source))?;
-        let mut aggregate_bytes = 0usize;
-        if let Some(shared_strings) = capture.shared_strings.as_ref() {
-            aggregate_bytes = checked_multi_bytes(
-                aggregate_bytes,
-                shared_strings.part.bytes.len(),
-                MAX_MULTI_WORKSHEET_BYTES,
-            )?;
-        }
-        for position in selected {
-            if position >= capture.sheets.len() {
-                return Err(invalid("multi-sheet worksheet position did not resolve"));
-            }
-            let remaining = MAX_MULTI_WORKSHEET_BYTES.saturating_sub(aggregate_bytes);
-            let snapshot = Snapshot::from_owned_selected(package, position, &capture, remaining)?;
-            aggregate_bytes = checked_multi_bytes(
-                aggregate_bytes,
-                snapshot.source_xml().len(),
-                MAX_MULTI_WORKSHEET_BYTES,
-            )?;
-            sheets.push(snapshot);
-        }
-        Self::from_sheets(sheets)
-    }
-
     pub(crate) fn sheets(&self) -> &[Snapshot] {
         &self.sheets
     }
@@ -369,6 +304,24 @@ impl MultiSnapshot {
                 .all(|(left, right)| left.same_source(right))
     }
 
+    /// The same selected worksheet closures, whatever source they were read
+    /// from (a replay compares content, record 0360).
+    pub(crate) fn same_content(&self, other: &Self) -> bool {
+        self.sheets.len() == other.sheets.len()
+            && self
+                .sheets
+                .iter()
+                .zip(&other.sheets)
+                .all(|(left, right)| left.same_content(right))
+    }
+
+    /// Whether these closures were read from `package`'s source.
+    pub(crate) fn same_lineage(&self, package: &SourceBackedPackage) -> bool {
+        self.sheets
+            .iter()
+            .any(|snapshot| snapshot.same_lineage(package))
+    }
+
     pub(crate) fn check_execution(&self) -> Result<()> {
         for snapshot in &self.sheets {
             snapshot.check_execution()?;
@@ -407,63 +360,6 @@ fn stored_entry_is_supported(entry: &Stored) -> bool {
 }
 
 impl Snapshot {
-    fn from_owned_selected(
-        package: &OpcPackage,
-        position: usize,
-        capture: &OwnedCatalogCapture,
-        remaining_bytes: usize,
-    ) -> Result<Self> {
-        let sheet = &capture.sheets[position];
-        let sheet_part = &capture.parts[position];
-        if sheet_part.kind != WorksheetKind::Worksheet {
-            return Err(Error::NotWorksheet {
-                sheet: sheet.name.clone(),
-            });
-        }
-        let worksheet = package.get_part(&sheet_part.uri)?;
-        validate_worksheet_relationships(worksheet.rels())?;
-        let worksheet_xml = worksheet.blob_arc();
-        checked_multi_bytes(0, worksheet_xml.len(), remaining_bytes)?;
-        validation::worksheet_xml(worksheet_xml.as_slice())?;
-        let shared_strings = capture.shared_strings.as_ref();
-        let cells = raw::worksheet::parse_refusing_repairs(worksheet_xml.as_slice(), || {
-            shared_strings.map(SharedStringsState::strings).transpose()
-        })?;
-        validate_style_references(&cells, capture.style_count)?;
-        validate_scalar_cells(&cells)?;
-        let graph = &capture.graph[position];
-        Ok(Self {
-            sheet_name: copy_boxed(&sheet.name, "value-only sheet name")?,
-            sheet_position: position,
-            cells: Arc::new(cells),
-            facts: None,
-            source: SourceState {
-                workbook: PartState::new(
-                    capture.workbook_uri.clone(),
-                    capture.workbook_content_type.as_ref(),
-                    capture.workbook_xml.clone(),
-                )?,
-                worksheet: PartState::new(
-                    worksheet.partname().clone(),
-                    worksheet.content_type(),
-                    SourcePayload::Owned(worksheet_xml),
-                )?,
-                owner_relationship: capture.owner_relationship.clone(),
-                sheet_relationship: graph.relationship.clone(),
-                package_relationships: Arc::clone(&capture.package_relationships),
-                workbook_relationships: Arc::clone(&capture.workbook_relationships),
-                calculation_chain: capture.calculation_chain.clone(),
-                shared_strings: capture.shared_strings.clone(),
-                auxiliary: Arc::clone(&capture.auxiliary),
-                graph: Arc::clone(&capture.graph),
-                context: None,
-                source_lineage: None,
-                source_version: None,
-                worksheet_replacement_hint: None,
-            },
-        })
-    }
-
     fn from_source_selected(
         package: &SourceBackedPackage,
         position: usize,
@@ -557,7 +453,7 @@ impl Snapshot {
         }
         let workbook_xml = SourcePayload::from_part_data(package, workbook.data()?)?;
         validation::workbook_xml(workbook_xml.as_bytes())?;
-        let catalog = raw::parse_catalog(workbook_xml.as_bytes())?;
+        let catalog = raw::parse_catalog(workbook_xml.as_bytes(), &package.read_limits())?;
         let sheet_parts = validate_sheet_graph(package, &workbook, &catalog.sheets)?;
         if require_single_sheet && catalog.sheets.len() != 1 {
             return Err(invalid(
@@ -649,7 +545,7 @@ impl Snapshot {
         }
         let workbook_xml = SourcePayload::Owned(workbook.blob_arc());
         validation::workbook_xml(workbook_xml.as_bytes())?;
-        let catalog = raw::parse_catalog(workbook_xml.as_bytes())?;
+        let catalog = raw::parse_catalog(workbook_xml.as_bytes(), &package.read_limits())?;
         let sheet_parts = validate_sheet_graph_owned(package, workbook, &catalog.sheets)?;
         if require_single_sheet && catalog.sheets.len() != 1 {
             return Err(invalid(
@@ -1062,9 +958,11 @@ impl Snapshot {
             .checked_mul(columns)
             .ok_or_else(|| invalid("shared formula range area overflows usize"))?;
         if area > maximum_members {
-            return Err(invalid(format!(
-                "shared formula group exceeds the bounded {maximum_members}-cell edit limit"
-            )));
+            return Err(Error::limit(
+                super::LimitKind::SharedFormulaMembers,
+                area,
+                maximum_members,
+            ));
         }
 
         let mut members = Vec::new();
@@ -1203,6 +1101,21 @@ impl Snapshot {
             && self.source.same_owner(&other.source)
     }
 
+    /// The same worksheet closure, whatever source it was read from.
+    pub(crate) fn same_content(&self, other: &Self) -> bool {
+        self.sheet_name == other.sheet_name
+            && self.sheet_position == other.sheet_position
+            && self.source.same_owner_content(&other.source)
+    }
+
+    /// Whether this closure was read from `package`'s source.
+    pub(crate) fn same_lineage(&self, package: &SourceBackedPackage) -> bool {
+        self.source
+            .source_lineage
+            .as_ref()
+            .is_some_and(|lineage| *lineage == package.source_lineage())
+    }
+
     pub(crate) fn check_execution(&self) -> Result<()> {
         self.source.check_execution()
     }
@@ -1241,82 +1154,17 @@ impl Snapshot {
         Ok(self.source_provenance(&lineage, version))
     }
 
-    pub(super) fn matches_current_source(&self, package: &OpcPackage) -> bool {
-        let Ok(workbook) = package.main_document_part() else {
-            return false;
-        };
-        if !self.source.workbook.matches_part(workbook)
-            || !unique_owner(package.rels())
-                .is_ok_and(|owner| self.source.owner_relationship.matches(owner))
-            || !relationships_match(package.rels(), &self.source.package_relationships)
-            || !relationships_match(workbook.rels(), &self.source.workbook_relationships)
-            || self.source.auxiliary.iter().any(|expected| {
-                package.get_part(&expected.uri).map_or(true, |part| {
-                    !expected.matches_part(part) || !part.rels().is_empty()
-                })
-            })
-        {
-            return false;
-        }
-        if let Some(chain) = &self.source.calculation_chain {
-            let Some(relationship) = workbook.rels().get(chain.relationship.id.as_ref()) else {
-                return false;
-            };
-            if !chain.relationship.matches(relationship)
-                || package.get_part(&chain.part.uri).map_or(true, |part| {
-                    !chain.part.matches_part(part) || !part.rels().is_empty()
-                })
-            {
-                return false;
-            }
-        }
-        let Ok(workbook_xml) = raw::parse_catalog(workbook.blob()) else {
-            return false;
-        };
-        let Ok(sheet_parts) = validate_sheet_graph_owned(package, workbook, &workbook_xml.sheets)
-        else {
-            return false;
-        };
-        let Ok(graph) =
-            capture_sheet_graph_owned(package, workbook, &workbook_xml.sheets, &sheet_parts)
-        else {
-            return false;
-        };
-        if graph.as_ref() != self.source.graph.as_ref() {
-            return false;
-        }
-        let Some(relationship) = workbook
-            .rels()
-            .get(self.source.sheet_relationship.id.as_ref())
-        else {
-            return false;
-        };
-        if !self.source.sheet_relationship.matches(relationship)
-            || relationship.target_partname().ok().as_ref() != Some(&self.source.worksheet.uri)
-        {
-            return false;
-        }
-        if let Some(shared_strings) = self.source.shared_strings.as_ref()
-            && !shared_strings.matches_current_source(package, workbook)
-        {
-            return false;
-        }
-        // Change 0602's D3 restates this assertion rather than deleting it:
-        // where it used to require the readback worksheet to carry no
-        // relationship at all, it now requires the readback part's
-        // relationships to equal the ones captured from the source, which is
-        // the strictly stronger preservation statement and the one that
-        // makes the byte-identity gate checkable on a relationship-bearing
-        // worksheet.
-        let Some(captured) = self.source.graph.get(self.sheet_position) else {
-            return false;
-        };
-        package
-            .get_part(&self.source.worksheet.uri)
-            .is_ok_and(|part| {
-                self.source.worksheet.matches_part(part)
-                    && relationships_match(part.rels(), &captured.relationships)
-            })
+    /// This snapshot with its worksheet payload copied out of any managed
+    /// reservation, under `maximum_bytes`.
+    pub(crate) fn materialized(&self, maximum_bytes: usize) -> Result<Self> {
+        let mut snapshot = self.clone();
+        snapshot.source.worksheet.bytes = SourcePayload::Owned(
+            self.source
+                .worksheet
+                .bytes
+                .materialized_arc(maximum_bytes, "source-backed value-only worksheet")?,
+        );
+        Ok(snapshot)
     }
 
     pub(super) fn topology_plan_from(&self, before: &Self) -> Result<SourceTopologyPlan> {
@@ -1324,29 +1172,6 @@ impl Snapshot {
         append_owner_topology(&mut plan, &before.source, &self.source)?;
         append_worksheet_replacement(&mut plan, &before.source, &self.source)?;
         Ok(plan)
-    }
-
-    pub(super) fn apply_owned_target(
-        before: &Self,
-        after: &Self,
-        package: &mut OpcPackage,
-        maximum_bytes: Option<usize>,
-    ) -> Result<()> {
-        let mut materialized = 0usize;
-        apply_owner_target(
-            &before.source,
-            &after.source,
-            package,
-            maximum_bytes,
-            &mut materialized,
-        )?;
-        apply_worksheet_target(
-            &before.source,
-            &after.source,
-            package,
-            maximum_bytes,
-            &mut materialized,
-        )
     }
 }
 
@@ -1371,43 +1196,6 @@ impl MultiSnapshot {
             append_worksheet_replacement(&mut plan, &before.source, &after.source)?;
         }
         Ok(plan)
-    }
-
-    pub(super) fn apply_owned_target(
-        before: &Self,
-        after: &Self,
-        package: &mut OpcPackage,
-        maximum_bytes: Option<usize>,
-    ) -> Result<()> {
-        if before.len() != after.len() {
-            return Err(invalid("multi-sheet patch owner count changed"));
-        }
-        let mut materialized = 0usize;
-        let first_before = before
-            .sheets()
-            .first()
-            .ok_or_else(|| invalid("multi-sheet patch has no source owner"))?;
-        let first_after = after
-            .sheets()
-            .first()
-            .ok_or_else(|| invalid("multi-sheet patch has no target owner"))?;
-        apply_owner_target(
-            &first_before.source,
-            &first_after.source,
-            package,
-            maximum_bytes,
-            &mut materialized,
-        )?;
-        for (before, after) in before.sheets().iter().zip(after.sheets()) {
-            apply_worksheet_target(
-                &before.source,
-                &after.source,
-                package,
-                maximum_bytes,
-                &mut materialized,
-            )?;
-        }
-        Ok(())
     }
 }
 
@@ -1487,6 +1275,18 @@ impl SourceState {
     }
 
     fn same_owner(&self, other: &Self) -> bool {
+        self.same_owner_content(other)
+            && match (&self.source_lineage, &other.source_lineage) {
+                (Some(left), Some(right)) => left == right,
+                (None, _) | (_, None) => true,
+            }
+            && match (self.source_version, other.source_version) {
+                (Some(left), Some(right)) => left == right,
+                (None, _) | (_, None) => true,
+            }
+    }
+
+    fn same_owner_content(&self, other: &Self) -> bool {
         self.workbook == other.workbook
             && self.worksheet == other.worksheet
             && self.owner_relationship == other.owner_relationship
@@ -1497,14 +1297,6 @@ impl SourceState {
             && optional_shared_strings_same(&self.shared_strings, &other.shared_strings)
             && self.auxiliary == other.auxiliary
             && self.graph == other.graph
-            && match (&self.source_lineage, &other.source_lineage) {
-                (Some(left), Some(right)) => left == right,
-                (None, _) | (_, None) => true,
-            }
-            && match (self.source_version, other.source_version) {
-                (Some(left), Some(right)) => left == right,
-                (None, _) | (_, None) => true,
-            }
     }
 }
 
@@ -1623,21 +1415,6 @@ impl SharedStringsState {
     fn same_source(&self, other: &Self) -> bool {
         self.relationship == other.relationship && self.part == other.part
     }
-
-    fn matches_current_source(&self, package: &OpcPackage, workbook: &dyn Part) -> bool {
-        let Some(relationship) = workbook.rels().get(self.relationship.id.as_ref()) else {
-            return false;
-        };
-        let Ok(uri) = relationship.target_partname() else {
-            return false;
-        };
-        let Ok(part) = package.get_part(&uri) else {
-            return false;
-        };
-        self.relationship.matches(relationship)
-            && self.part.matches_part(part)
-            && part.rels().is_empty()
-    }
 }
 
 impl PartState {
@@ -1647,11 +1424,6 @@ impl PartState {
             content_type: copy_boxed(content_type, "value-only content type")?,
             bytes,
         })
-    }
-    fn matches_part(&self, part: &dyn Part) -> bool {
-        part.partname() == &self.uri
-            && part.content_type() == self.content_type.as_ref()
-            && part.blob() == self.bytes.as_bytes()
     }
 }
 
@@ -1681,12 +1453,6 @@ impl SourceRelationship {
             target: copy_boxed(value.target_ref(), "value-only relationship target")?,
             mode: value.target_mode(),
         })
-    }
-    fn matches(&self, value: &Relationship) -> bool {
-        value.r_id() == self.id.as_ref()
-            && value.reltype() == self.kind.as_ref()
-            && value.target_ref() == self.target.as_ref()
-            && value.target_mode() == self.mode
     }
 }
 
@@ -1825,166 +1591,6 @@ fn append_owner_topology(
         (Some(_), Some(_)) | (None, None) => {},
     }
     Ok(())
-}
-
-fn materialized_part_arc(
-    part: &PartState,
-    maximum_bytes: Option<usize>,
-    materialized_bytes: &mut usize,
-    resource: &'static str,
-) -> Result<Arc<Vec<u8>>> {
-    match maximum_bytes {
-        Some(maximum) => {
-            let prior = *materialized_bytes;
-            let updated = prior
-                .checked_add(part.bytes.len())
-                .ok_or_else(|| invalid("cell patch materialization size overflows usize"))?;
-            if updated > maximum {
-                return Err(invalid(format!(
-                    "cell patch materialization exceeds the explicit bound {maximum} bytes"
-                )));
-            }
-            let output = part.bytes.materialized_arc(maximum - prior, resource)?;
-            *materialized_bytes = updated;
-            Ok(output)
-        },
-        None => part.bytes.detached_arc(),
-    }
-}
-
-fn apply_worksheet_target(
-    before: &SourceState,
-    after: &SourceState,
-    package: &mut OpcPackage,
-    maximum_bytes: Option<usize>,
-    materialized_bytes: &mut usize,
-) -> Result<()> {
-    if before.worksheet.uri != after.worksheet.uri
-        || before.worksheet.content_type != after.worksheet.content_type
-    {
-        return Err(invalid(
-            "worksheet topology changed during patch application",
-        ));
-    }
-    if before.worksheet.bytes != after.worksheet.bytes {
-        let bytes = materialized_part_arc(
-            &after.worksheet,
-            maximum_bytes,
-            materialized_bytes,
-            "cell patch worksheet materialization",
-        )?;
-        package
-            .get_part_mut(&after.worksheet.uri)?
-            .set_blob_shared(bytes);
-    }
-    Ok(())
-}
-
-fn apply_owner_target(
-    before: &SourceState,
-    after: &SourceState,
-    package: &mut OpcPackage,
-    maximum_bytes: Option<usize>,
-    materialized_bytes: &mut usize,
-) -> Result<()> {
-    if before.workbook.uri != after.workbook.uri
-        || before.workbook.content_type != after.workbook.content_type
-    {
-        return Err(invalid(
-            "workbook topology changed during patch application",
-        ));
-    }
-    if let (Some(before_chain), None) = (&before.calculation_chain, &after.calculation_chain)
-        && calculation_chain_is_referenced_elsewhere(
-            package,
-            &before_chain.part.uri,
-            &before.workbook.uri,
-            before_chain.relationship.id.as_ref(),
-        )?
-    {
-        return Err(invalid(
-            "calculation-chain Part has another inbound relationship",
-        ));
-    }
-    if before.workbook.bytes != after.workbook.bytes {
-        let bytes = materialized_part_arc(
-            &after.workbook,
-            maximum_bytes,
-            materialized_bytes,
-            "cell patch workbook materialization",
-        )?;
-        package
-            .get_part_mut(&after.workbook.uri)?
-            .set_blob_shared(bytes);
-    }
-    match (&before.calculation_chain, &after.calculation_chain) {
-        (Some(before_chain), None) => {
-            let removed = package
-                .get_part_mut(&after.workbook.uri)?
-                .rels_mut()
-                .remove(before_chain.relationship.id.as_ref());
-            if removed.is_none() || !package.remove_part(&before_chain.part.uri) {
-                return Err(invalid(
-                    "calculation-chain topology changed before patch application",
-                ));
-            }
-        },
-        (None, Some(after_chain)) => {
-            let bytes = materialized_part_arc(
-                &after_chain.part,
-                maximum_bytes,
-                materialized_bytes,
-                "cell patch calculation-chain materialization",
-            )?;
-            package.try_add_part(Box::new(BlobPart::new_shared(
-                after_chain.part.uri.clone(),
-                after_chain.part.content_type.to_string(),
-                bytes,
-            )))?;
-            package
-                .get_part_mut(&after.workbook.uri)?
-                .rels_mut()
-                .try_add_relationship(
-                    after_chain.relationship.kind.to_string(),
-                    after_chain.relationship.target.to_string(),
-                    after_chain.relationship.id.to_string(),
-                    after_chain.relationship.mode,
-                )?;
-        },
-        (Some(before_chain), Some(after_chain)) if before_chain != after_chain => {
-            return Err(invalid(
-                "calculation-chain replacement is outside the cell patch",
-            ));
-        },
-        (Some(_), Some(_)) | (None, None) => {},
-    }
-    Ok(())
-}
-
-fn calculation_chain_is_referenced_elsewhere(
-    package: &OpcPackage,
-    target: &PackURI,
-    workbook: &PackURI,
-    workbook_relationship: &str,
-) -> Result<bool> {
-    for part in package.iter_parts() {
-        for relationship in part.rels().iter() {
-            if part.partname() == workbook && relationship.r_id() == workbook_relationship {
-                continue;
-            }
-            if !relationship.is_external()
-                && relationship.target_partname()?.is_equivalent_to(target)
-            {
-                return Ok(true);
-            }
-        }
-    }
-    for relationship in package.rels().iter() {
-        if !relationship.is_external() && relationship.target_partname()?.is_equivalent_to(target) {
-            return Ok(true);
-        }
-    }
-    Ok(false)
 }
 
 fn calculation_chain_relationship(relationships: &Relationships) -> Result<Option<&Relationship>> {
@@ -2337,7 +1943,7 @@ fn load_source_catalog(package: &SourceBackedPackage) -> Result<SourceCatalogCap
     }
     let workbook_xml = SourcePayload::from_part_data(package, workbook.data()?)?;
     validation::workbook_xml(workbook_xml.as_bytes())?;
-    let catalog = raw::parse_catalog(workbook_xml.as_bytes())?;
+    let catalog = raw::parse_catalog(workbook_xml.as_bytes(), &package.read_limits())?;
     let parts = validate_sheet_graph(package, &workbook, &catalog.sheets)?;
     validate_workbook_relationships(workbook.rels(), false)?;
     let owner = unique_owner(package.rels())?;
@@ -2365,44 +1971,6 @@ fn load_source_catalog(package: &SourceBackedPackage) -> Result<SourceCatalogCap
         graph: Arc::from(graph),
         source_lineage: package.source_lineage(),
         source_version: package.source_version()?,
-    })
-}
-
-fn load_owned_catalog(package: &OpcPackage) -> Result<OwnedCatalogCapture> {
-    let workbook = package.main_document_part()?;
-    validate_package_relationships(package.rels())?;
-    if workbook.content_type() != ct::SML_SHEET_MAIN {
-        return Err(invalid(
-            "value-only edits require an ordinary XLSX workbook",
-        ));
-    }
-    let workbook_xml = SourcePayload::Owned(workbook.blob_arc());
-    validation::workbook_xml(workbook_xml.as_bytes())?;
-    let catalog = raw::parse_catalog(workbook_xml.as_bytes())?;
-    let parts = validate_sheet_graph_owned(package, workbook, &catalog.sheets)?;
-    validate_workbook_relationships(workbook.rels(), false)?;
-    let owner = unique_owner(package.rels())?;
-    let (style_count, auxiliary) = capture_auxiliary(package, workbook)?;
-    let shared_strings = capture_shared_strings_owned(package, workbook)?;
-    let calculation_chain = capture_calculation_chain_owned(package, workbook)?;
-    let graph = capture_sheet_graph_owned(package, workbook, &catalog.sheets, &parts)?;
-    Ok(OwnedCatalogCapture {
-        sheets: catalog.sheets.clone(),
-        parts,
-        workbook_uri: workbook.partname().clone(),
-        workbook_content_type: copy_boxed(
-            workbook.content_type(),
-            "value-only workbook content type",
-        )?,
-        workbook_xml,
-        owner_relationship: SourceRelationship::capture(owner)?,
-        package_relationships: Arc::from(capture_relationships(package.rels())?),
-        workbook_relationships: Arc::from(capture_relationships(workbook.rels())?),
-        calculation_chain,
-        shared_strings,
-        style_count,
-        auxiliary: Arc::from(auxiliary),
-        graph: Arc::from(graph),
     })
 }
 
@@ -2647,15 +2215,6 @@ fn capture_relationships(values: &Relationships) -> Result<Box<[SourceRelationsh
     Ok(output.into_boxed_slice())
 }
 
-fn relationships_match(values: &Relationships, expected: &[SourceRelationship]) -> bool {
-    values.len() == expected.len()
-        && values.iter().all(|value| {
-            expected
-                .binary_search_by(|item| item.id.as_ref().cmp(value.r_id()))
-                .is_ok_and(|index| expected[index].matches(value))
-        })
-}
-
 #[cfg(test)]
 mod tests {
     use std::num::{NonZeroU64, NonZeroUsize};
@@ -2666,7 +2225,7 @@ mod tests {
         Budget, CancellationSource, ExecutionContext, ExecutionLimits, FileSource,
         Limits as BudgetLimits, Resource,
     };
-    use litchi_opc::{OpcError, PackURI, ReadLimits, SourceBackedPackage, SourceTopologyPlan};
+    use litchi_opc::{OpcError, PackURI, SourceBackedPackage, SourceLimits, SourceTopologyPlan};
 
     use super::{checked_multi_bytes, try_replace_source_payload};
     use crate::error::Error;
@@ -2760,10 +2319,12 @@ mod tests {
         let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("tests/fixtures/form_control_properties/tdf134769.xlsx");
         let (budget, context) = managed_context();
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(FileSource::open(&fixture).expect("managed fixture source")),
-            ReadLimits::default(),
-            context,
+            SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            Some(context),
         )
         .expect("managed fixture package");
         let part = package
@@ -2809,13 +2370,14 @@ mod row_reuse_tests {
 
     use super::Snapshot;
     use crate::cell::{Cell, Store, Value};
-    use crate::cell_values::{CellValueEdit, SourceBackedEditor, SourceEdit};
+    use crate::cell_values::Change;
+    use crate::cell_values::test_editors::RowVisibilityEditor as RowVisibilitySourceBackedEditor;
+    use crate::cell_values::test_editors::SourceBackedEditor;
     use crate::formula::Formula;
     use crate::raw;
     use crate::raw::worksheet::edit::{
         Action, ValueOnlyRewrite, rewrite, rewrite_value_only_with_provenance,
     };
-    use crate::row_visibility::SourceBackedEditor as RowVisibilitySourceBackedEditor;
     use crate::{ErrorValue, Number};
 
     const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -2887,8 +2449,13 @@ mod row_reuse_tests {
         // the raw fixture writer so source parsing also covers indentation.
         let placeholder = format!(r#"<worksheet xmlns="{SML}"><sheetData/></worksheet>"#);
         let base = PackageWriter::to_bytes(&fixture_package(&placeholder)).unwrap();
-        let archive = ArchiveReader::new(base.as_slice()).unwrap();
-        let mut writer = StreamingArchiveWriter::new();
+        let archive = ArchiveReader::new(
+            base.as_slice(),
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         for name in archive.file_names() {
             let bytes = if name == "xl/worksheets/sheet1.xml" {
                 worksheet.as_bytes().to_vec()
@@ -2899,7 +2466,13 @@ mod row_reuse_tests {
         }
         let bytes = writer.finish_to_bytes().unwrap();
         SourceBackedEditor::from_source_backed_package(
-            SourceBackedPackage::from_vec(bytes).unwrap(),
+            SourceBackedPackage::from_vec(
+                bytes,
+                litchi_opc::SourceLimits::default(),
+                litchi_opc::SourceCacheLimits::default(),
+                None,
+            )
+            .unwrap(),
         )
         .unwrap()
     }
@@ -2997,12 +2570,12 @@ mod row_reuse_tests {
 
     fn commit_with(
         worksheet: &str,
-        stage: impl FnOnce(&mut SourceEdit) -> crate::Result<()>,
+        stage: impl FnOnce(&mut crate::cell_values::sheet::Edit) -> crate::Result<()>,
     ) -> crate::Result<Snapshot> {
         let editor = source_backed_editor(worksheet);
         let mut edit = editor.edit("Sheet1")?;
         stage(&mut edit)?;
-        Ok(edit.commit()?.into_parts().0)
+        Ok(edit.commit()?.patch().after().clone())
     }
 
     fn actions_for_sets(values: &[(&str, u32)]) -> BTreeMap<Address, Action> {
@@ -3113,6 +2686,9 @@ mod row_reuse_tests {
                 std::str::from_utf8(first.source_xml()).expect("worksheet XML is UTF-8"),
             ))
             .expect("visibility package archive"),
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            None,
         )
         .expect("visibility source package");
         let visibility_editor =
@@ -3122,10 +2698,12 @@ mod row_reuse_tests {
         visibility_edit
             .hide(Row::new(0).unwrap())
             .expect("visibility stage");
-        let (visibility_snapshot, _) = visibility_edit
+        let visibility_snapshot = visibility_edit
             .commit()
             .expect("visibility commit")
-            .into_parts();
+            .patch()
+            .after()
+            .clone();
         let visibility_rebound =
             Snapshot::from_rewritten_source(&first, visibility_snapshot.source_xml().to_vec())
                 .expect("visibility rebind");
@@ -3269,27 +2847,27 @@ mod row_reuse_tests {
         let worksheet = scalar_fixture();
         let candidate = commit_with(&worksheet, |edit| {
             edit.apply_batch([
-                CellValueEdit::set(Address::from_a1("A1").unwrap(), Number::new("42").unwrap()),
+                Change::set(Address::from_a1("A1").unwrap(), Number::new("42").unwrap()),
                 // B1 is source-implicit.  The rewritten owner must gain an
                 // explicit address before any preceding owners are omitted.
-                CellValueEdit::set(Address::from_a1("B1").unwrap(), 22u32),
-                CellValueEdit::set(Address::from_a1("C1").unwrap(), false),
-                CellValueEdit::set(Address::from_a1("D1").unwrap(), "new & < escaped"),
-                CellValueEdit::set(
+                Change::set(Address::from_a1("B1").unwrap(), 22u32),
+                Change::set(Address::from_a1("C1").unwrap(), false),
+                Change::set(Address::from_a1("D1").unwrap(), "new & < escaped"),
+                Change::set(
                     Address::from_a1("E1").unwrap(),
                     Value::date("2026-08-14").unwrap(),
                 ),
-                CellValueEdit::set(
+                Change::set(
                     Address::from_a1("F1").unwrap(),
                     Value::Error(ErrorValue::DivZero),
                 ),
-                CellValueEdit::set_formula(
+                Change::set_formula(
                     Address::from_a1("G1").unwrap(),
                     Formula::new("A1+C1").unwrap(),
                 ),
                 // The source dimension is intentionally stale.  The emitted
                 // dimension must be used by the merged Store.
-                CellValueEdit::set(Address::from_a1("H4").unwrap(), 9u32),
+                Change::set(Address::from_a1("H4").unwrap(), 9u32),
             ])
         })
         .expect("replacement-only candidate");
@@ -3580,11 +3158,11 @@ mod row_reuse_tests {
     fn no_op_source_edit_shares_the_original_semantic_store() {
         let editor = source_backed_editor(&scalar_fixture());
         let edit = editor.edit("Sheet1").unwrap();
-        let before = edit.before().clone();
+        let before = edit.before().unwrap().clone();
         let commit = edit.commit().unwrap();
-        assert!(!commit.changed());
-        assert!(commit.snapshot().shares_cell_store_with(&before));
-        assert_eq!(commit.snapshot().source_xml(), before.source_xml());
+        assert!(!commit.diagnostics().changed());
+        assert!(commit.patch().after().shares_cell_store_with(&before));
+        assert_eq!(commit.patch().after().source_xml(), before.source_xml());
     }
 
     #[test]
@@ -3612,7 +3190,8 @@ mod row_reuse_tests {
             .publish_commit_to_stream(&mut published, &commit)
             .unwrap();
 
-        let package = OpcPackage::from_bytes(&published).unwrap();
+        let package =
+            OpcPackage::from_bytes(&published, litchi_opc::SourceLimits::default()).unwrap();
         let published_workbook = package
             .get_part(&PackURI::new(MAIN).unwrap())
             .unwrap()

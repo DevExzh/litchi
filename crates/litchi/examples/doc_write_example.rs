@@ -5,18 +5,14 @@
 //! for implementation status.
 //!
 //! Run with: cargo run --example doc_write_example
-use litchi_doc::{CharacterFormatting, ParagraphFormatting, Writer};
+use litchi_doc::builder::Builder;
+use litchi_doc::{CharacterFormatting, ParagraphFormatting};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating a new DOC file...");
 
     // Create a new DOC writer
-    let mut writer = Writer::new();
-
-    // Set document properties
-    writer.set_property("Title", "Sample Document");
-    writer.set_property("Author", "Litchi Example");
-    writer.set_property("Subject", "Demonstrating DOC writing");
+    let mut writer = Builder::new();
 
     // Add a title paragraph with formatting
     let title_char = CharacterFormatting {
@@ -88,12 +84,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Save the file
     println!("Saving to output.doc...");
-    writer.save("output.doc")?;
+    writer.build()?.save("output.doc")?;
 
     println!("✅ DOC file created successfully!");
     println!("   - Multiple paragraphs with formatting");
     println!("   - Table with data");
-    println!("   - Document properties");
+    println!("   - Deterministic package publication");
 
     Ok(())
 }

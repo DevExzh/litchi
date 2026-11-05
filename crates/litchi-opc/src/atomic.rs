@@ -4,7 +4,7 @@ use std::fs::{self, File, Permissions};
 use std::io::{self, BufWriter, Write};
 use std::path::Path;
 
-use litchi_core::Durability;
+use litchi_core::{Durability, ExecutionContext, ExecutionError, Resource};
 use tempfile::{NamedTempFile, PersistError};
 
 use crate::error::{OpcError, Result};
@@ -140,6 +140,92 @@ where
     replace_with_steps(path, durability, &mut SystemSteps, write)
 }
 
+/// Atomically replace an artifact with an optional staging budget and final fence.
+///
+/// The execution context admits the fixed staging buffer before filesystem
+/// work. After flushing the artifact and performing the selected file sync,
+/// `before_commit` revalidates caller-owned source state. Cancellation is checked
+/// again immediately before replacement. A failure before replacement leaves the
+/// destination unchanged; post-replacement directory-sync failures remain Committed.
+///
+/// # Errors
+///
+/// Returns filesystem, execution or caller errors without flattening their types.
+/// The fence runs once after successful staging; it must not publish the artifact.
+pub fn replace_guarded_with_durability<E>(
+    path: &Path,
+    durability: Durability,
+    context: Option<&ExecutionContext>,
+    write: impl FnOnce(&mut AtomicSink<'_>) -> std::result::Result<(), E>,
+    before_commit: impl FnOnce() -> std::result::Result<(), E>,
+) -> std::result::Result<(), E>
+where
+    E: From<OpcError>,
+{
+    replace_with_guarded_steps(
+        path,
+        durability,
+        &mut SystemSteps,
+        context,
+        write,
+        before_commit,
+    )
+}
+
+/// Atomically create `path` without replacing an existing destination while
+/// preserving a caller-owned typed error.
+///
+/// The complete artifact is staged in a sibling temporary file before the
+/// no-clobber operation is attempted. The destination is therefore either
+/// created in one filesystem operation or left untouched. In particular, an
+/// existence check performed before staging is not used as the overwrite
+/// policy: a destination created concurrently after that check is still
+/// refused by the atomic finalization operation.
+pub fn replace_with_durability_noclobber<E>(
+    path: &Path,
+    durability: Durability,
+    write: impl FnOnce(&mut AtomicSink<'_>) -> std::result::Result<(), E>,
+) -> std::result::Result<(), E>
+where
+    E: From<OpcError>,
+{
+    replace_with_noclobber_steps(path, durability, &mut SystemSteps, write)
+}
+
+/// Atomically create `path` without replacing an existing destination and
+/// run a final caller-owned fence immediately before publication.
+///
+/// The fence and cancellation check both run after staging and the selected
+/// file synchronization, but before the atomic no-clobber operation. A
+/// destination that appears after the staging work is still refused without
+/// replacing that destination.
+pub fn replace_guarded_with_durability_noclobber<E>(
+    path: &Path,
+    durability: Durability,
+    context: Option<&ExecutionContext>,
+    write: impl FnOnce(&mut AtomicSink<'_>) -> std::result::Result<(), E>,
+    before_commit: impl FnOnce() -> std::result::Result<(), E>,
+) -> std::result::Result<(), E>
+where
+    E: From<OpcError>,
+{
+    replace_with_guarded_noclobber_steps(
+        path,
+        durability,
+        &mut SystemSteps,
+        context,
+        write,
+        before_commit,
+    )
+}
+
+fn execution_error(error: ExecutionError) -> OpcError {
+    match error {
+        ExecutionError::Cancelled => OpcError::Cancelled,
+        error => OpcError::Execution(error),
+    }
+}
+
 /// The filesystem operations of one replacement whose calls a test double
 /// can observe or fail. Production uses [`SystemSteps`].
 trait PublishSteps {
@@ -149,6 +235,14 @@ trait PublishSteps {
 
     /// Renames the staged temporary file over `destination`.
     fn persist(
+        &mut self,
+        temporary: NamedTempFile,
+        destination: &Path,
+    ) -> std::result::Result<File, PersistError>;
+
+    /// Creates `destination` without replacing an entry that appeared after
+    /// staging.
+    fn persist_noclobber(
         &mut self,
         temporary: NamedTempFile,
         destination: &Path,
@@ -173,6 +267,14 @@ impl PublishSteps for SystemSteps {
         destination: &Path,
     ) -> std::result::Result<File, PersistError> {
         temporary.persist(destination)
+    }
+
+    fn persist_noclobber(
+        &mut self,
+        temporary: NamedTempFile,
+        destination: &Path,
+    ) -> std::result::Result<File, PersistError> {
+        temporary.persist_noclobber(destination)
     }
 
     fn sync_parent(&mut self, parent: &Path) -> io::Result<()> {
@@ -210,6 +312,95 @@ where
     E: From<OpcError>,
     S: PublishSteps,
 {
+    replace_with_guarded_steps(path, durability, steps, None, write, || Ok(()))
+}
+
+fn replace_with_noclobber_steps<E, S>(
+    path: &Path,
+    durability: Durability,
+    steps: &mut S,
+    write: impl FnOnce(&mut AtomicSink<'_>) -> std::result::Result<(), E>,
+) -> std::result::Result<(), E>
+where
+    E: From<OpcError>,
+    S: PublishSteps,
+{
+    replace_with_guarded_noclobber_steps(path, durability, steps, None, write, || Ok(()))
+}
+
+fn replace_with_guarded_steps<E, S>(
+    path: &Path,
+    durability: Durability,
+    steps: &mut S,
+    context: Option<&ExecutionContext>,
+    write: impl FnOnce(&mut AtomicSink<'_>) -> std::result::Result<(), E>,
+    before_commit: impl FnOnce() -> std::result::Result<(), E>,
+) -> std::result::Result<(), E>
+where
+    E: From<OpcError>,
+    S: PublishSteps,
+{
+    replace_with_guarded_mode(
+        path,
+        durability,
+        steps,
+        context,
+        write,
+        before_commit,
+        PersistMode::Replace,
+    )
+}
+
+fn replace_with_guarded_noclobber_steps<E, S>(
+    path: &Path,
+    durability: Durability,
+    steps: &mut S,
+    context: Option<&ExecutionContext>,
+    write: impl FnOnce(&mut AtomicSink<'_>) -> std::result::Result<(), E>,
+    before_commit: impl FnOnce() -> std::result::Result<(), E>,
+) -> std::result::Result<(), E>
+where
+    E: From<OpcError>,
+    S: PublishSteps,
+{
+    replace_with_guarded_mode(
+        path,
+        durability,
+        steps,
+        context,
+        write,
+        before_commit,
+        PersistMode::NoClobber,
+    )
+}
+
+#[derive(Clone, Copy)]
+enum PersistMode {
+    Replace,
+    NoClobber,
+}
+
+fn replace_with_guarded_mode<E, S>(
+    path: &Path,
+    durability: Durability,
+    steps: &mut S,
+    context: Option<&ExecutionContext>,
+    write: impl FnOnce(&mut AtomicSink<'_>) -> std::result::Result<(), E>,
+    before_commit: impl FnOnce() -> std::result::Result<(), E>,
+    persist_mode: PersistMode,
+) -> std::result::Result<(), E>
+where
+    E: From<OpcError>,
+    S: PublishSteps,
+{
+    let _staging = context
+        .map(|context| {
+            context
+                .reserve(Resource::Memory, STAGING_BUFFER_BYTES as u64)
+                .map_err(execution_error)
+                .map_err(E::from)
+        })
+        .transpose()?;
     if path.file_name().is_none() {
         return Err(E::from(invalid_path(
             "package destination must name a file",
@@ -229,6 +420,11 @@ where
         .map_err(E::from)?;
 
     let mut sink = AtomicSink::new(temporary.as_file_mut());
+    if sink.inner.capacity() != STAGING_BUFFER_BYTES {
+        return Err(E::from(OpcError::IoError(io::Error::other(
+            "atomic staging allocation exceeded admitted capacity",
+        ))));
+    }
     write(&mut sink)?;
     sink.finish().map_err(OpcError::from).map_err(E::from)?;
     if let Some(existing_permissions) = permissions {
@@ -244,10 +440,24 @@ where
             .map_err(OpcError::from)
             .map_err(E::from)?;
     }
-    let _persisted = steps
-        .persist(temporary, path)
-        .map_err(|error| OpcError::IoError(error.error))
-        .map_err(E::from)?;
+    before_commit()?;
+    if let Some(context) = context {
+        context.check().map_err(execution_error).map_err(E::from)?;
+    }
+    match persist_mode {
+        PersistMode::Replace => {
+            steps
+                .persist(temporary, path)
+                .map_err(|error| OpcError::IoError(error.error))
+                .map_err(E::from)?;
+        },
+        PersistMode::NoClobber => {
+            steps
+                .persist_noclobber(temporary, path)
+                .map_err(|error| OpcError::IoError(error.error))
+                .map_err(E::from)?;
+        },
+    }
     if durability.syncs_directory() {
         steps
             .sync_parent(parent)
@@ -337,6 +547,14 @@ mod testing {
             temporary.persist(destination)
         }
 
+        fn persist_noclobber(
+            &mut self,
+            temporary: NamedTempFile,
+            destination: &Path,
+        ) -> Result<File, PersistError> {
+            temporary.persist_noclobber(destination)
+        }
+
         fn sync_parent(&mut self, parent: &Path) -> io::Result<()> {
             match self.sync.take() {
                 Some(sync) => sync(parent),
@@ -378,6 +596,15 @@ mod testing {
         ) -> Result<File, PersistError> {
             self.persists += 1;
             temporary.persist(destination)
+        }
+
+        fn persist_noclobber(
+            &mut self,
+            temporary: NamedTempFile,
+            destination: &Path,
+        ) -> Result<File, PersistError> {
+            self.persists += 1;
+            temporary.persist_noclobber(destination)
         }
 
         fn sync_parent(&mut self, parent: &Path) -> io::Result<()> {
@@ -463,6 +690,68 @@ mod tests {
         .expect("atomic replacement");
 
         assert_eq!(fs::read(destination).expect("read destination"), b"new");
+    }
+
+    #[test]
+    fn no_clobber_refuses_an_existing_destination_and_removes_the_staged_file() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let destination = directory.path().join("report.xlsx");
+        fs::write(&destination, b"original").expect("seed destination");
+
+        let result = replace_with_durability_noclobber::<OpcError>(
+            &destination,
+            Durability::Full,
+            |temporary| {
+                temporary.write_all(b"replacement")?;
+                Ok(())
+            },
+        );
+
+        assert!(matches!(
+            result,
+            Err(OpcError::IoError(error)) if error.kind() == io::ErrorKind::AlreadyExists
+        ));
+        assert_eq!(
+            fs::read(&destination).expect("read destination"),
+            b"original"
+        );
+        assert_eq!(
+            directory_entries(directory.path()),
+            vec![destination.file_name().unwrap().to_owned()]
+        );
+    }
+
+    #[test]
+    fn no_clobber_rechecks_the_destination_at_publication() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let destination = directory.path().join("report.xlsx");
+
+        let result = replace_guarded_with_durability_noclobber::<OpcError>(
+            &destination,
+            Durability::Full,
+            None,
+            |temporary| {
+                temporary.write_all(b"replacement")?;
+                Ok(())
+            },
+            || {
+                fs::write(&destination, b"racing writer")?;
+                Ok(())
+            },
+        );
+
+        assert!(matches!(
+            result,
+            Err(OpcError::IoError(error)) if error.kind() == io::ErrorKind::AlreadyExists
+        ));
+        assert_eq!(
+            fs::read(&destination).expect("read racing destination"),
+            b"racing writer"
+        );
+        assert_eq!(
+            directory_entries(directory.path()),
+            vec![destination.file_name().unwrap().to_owned()]
+        );
     }
 
     #[test]
@@ -854,5 +1143,248 @@ mod tests {
             matches!(&error, litchi_core::Error::Committed(source) if source.to_string() == "directory sync failed"),
             "{error:?}"
         );
+    }
+    fn managed_context(
+        memory: usize,
+    ) -> (
+        litchi_core::Budget,
+        litchi_core::CancellationSource,
+        ExecutionContext,
+    ) {
+        let budget = litchi_core::Budget::root(
+            "atomic-staging",
+            litchi_core::Limits::new(memory as u64, 1_000_000, 1_000_000, 1000, 32, 1_000_000),
+        );
+        let (cancel, token) = litchi_core::CancellationSource::pair();
+        let limits = litchi_core::ExecutionLimits::new(
+            std::num::NonZeroUsize::MIN,
+            std::num::NonZeroUsize::MIN,
+            std::num::NonZeroU64::new(memory.max(1) as u64).unwrap(),
+            0,
+        )
+        .unwrap();
+        (
+            budget.clone(),
+            cancel,
+            ExecutionContext::new(budget, token, limits),
+        )
+    }
+
+    #[test]
+    fn guarded_fence_runs_after_flush_and_selected_sync_without_replacing_on_failure() {
+        for durability in [Durability::Full, Durability::FileOnly, Durability::NoSync] {
+            let directory = tempfile::tempdir().unwrap();
+            let destination = directory.path().join("package.docx");
+            fs::write(&destination, b"original").unwrap();
+            let mut steps = testing::CountingSteps::default();
+            let result = replace_with_guarded_steps::<TypedError, _>(
+                &destination,
+                durability,
+                &mut steps,
+                None,
+                |sink| {
+                    sink.write_all(b"complete replacement").unwrap();
+                    Ok(())
+                },
+                || {
+                    let temporary = fs::read_dir(directory.path())
+                        .unwrap()
+                        .map(|entry| entry.unwrap().path())
+                        .find(|path| path != &destination)
+                        .unwrap();
+                    assert_eq!(fs::read(temporary).unwrap(), b"complete replacement");
+                    Err(TypedError::Write)
+                },
+            );
+            assert!(matches!(result, Err(TypedError::Write)));
+            assert_eq!(steps.file_syncs, usize::from(durability.syncs_file()));
+            assert_eq!(steps.persists, 0);
+            assert_eq!(fs::read(&destination).unwrap(), b"original");
+            assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
+        }
+    }
+
+    #[cfg(any(unix, windows))]
+    #[test]
+    fn source_changed_at_final_fence_preserves_destination() {
+        use litchi_core::ReadAt;
+        let directory = tempfile::tempdir().unwrap();
+        let source_path = directory.path().join("source.docx");
+        let destination = directory.path().join("destination.docx");
+        fs::write(&source_path, b"source").unwrap();
+        fs::write(&destination, b"original").unwrap();
+        let source = litchi_core::FileSource::open(&source_path).unwrap();
+        let expected = source.version().unwrap();
+        let mut steps = testing::CountingSteps::default();
+        let result = replace_with_guarded_steps::<OpcError, _>(
+            &destination,
+            Durability::Full,
+            &mut steps,
+            None,
+            |sink| {
+                sink.write_all(b"replacement")?;
+                Ok(())
+            },
+            || {
+                fs::write(&source_path, b"source changed after staging")?;
+                let actual = source.version()?;
+                assert_ne!(expected, actual);
+                Err(OpcError::SourceChanged { expected, actual })
+            },
+        );
+        assert!(matches!(result, Err(OpcError::SourceChanged { .. })));
+        assert_eq!(steps.file_syncs, 1);
+        assert_eq!(steps.persists, 0);
+        assert_eq!(fs::read(&destination).unwrap(), b"original");
+        assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 2);
+    }
+
+    #[test]
+    fn guarded_no_clobber_fence_runs_after_selected_sync_and_before_publication() {
+        for durability in LEVELS {
+            let directory = tempfile::tempdir().unwrap();
+            let destination = directory.path().join("package.docx");
+            let mut steps = testing::CountingSteps::default();
+            let result = replace_with_guarded_noclobber_steps::<TypedError, _>(
+                &destination,
+                durability,
+                &mut steps,
+                None,
+                |sink| {
+                    sink.write_all(b"complete replacement").unwrap();
+                    Ok(())
+                },
+                || {
+                    let temporary = fs::read_dir(directory.path())
+                        .unwrap()
+                        .map(|entry| entry.unwrap().path())
+                        .find(|path| path != &destination)
+                        .unwrap();
+                    assert_eq!(fs::read(temporary).unwrap(), b"complete replacement");
+                    Err(TypedError::Write)
+                },
+            );
+
+            assert!(matches!(result, Err(TypedError::Write)));
+            assert_eq!(steps.file_syncs, usize::from(durability.syncs_file()));
+            assert_eq!(steps.persists, 0);
+            assert_eq!(steps.parent_syncs, 0);
+            assert!(!destination.exists());
+            assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 0);
+        }
+    }
+
+    #[test]
+    fn guarded_no_clobber_parent_sync_failure_reports_committed_after_creation() {
+        let directory = tempfile::tempdir().unwrap();
+        let destination = directory.path().join("package.docx");
+        let mut steps = testing::CountingSteps {
+            fail_parent_sync: true,
+            ..Default::default()
+        };
+        let result = replace_with_guarded_noclobber_steps::<OpcError, _>(
+            &destination,
+            Durability::Full,
+            &mut steps,
+            None,
+            |sink| {
+                sink.write_all(b"replacement")?;
+                Ok(())
+            },
+            || Ok(()),
+        );
+
+        assert!(matches!(result, Err(OpcError::Committed { .. })));
+        assert_eq!(fs::read(&destination).unwrap(), b"replacement");
+        assert_eq!(steps.file_syncs, 1);
+        assert_eq!(steps.persists, 1);
+        assert_eq!(steps.parent_syncs, 1);
+    }
+
+    #[test]
+    fn guarded_staging_admits_exact_memory_and_refuses_one_under_before_io() {
+        let directory = tempfile::tempdir().unwrap();
+        let destination = directory.path().join("package.docx");
+        fs::write(&destination, b"original").unwrap();
+        let (budget, _, context) = managed_context(STAGING_BUFFER_BYTES);
+        replace_guarded_with_durability::<OpcError>(
+            &destination,
+            Durability::NoSync,
+            Some(&context),
+            |sink| {
+                assert_eq!(budget.used(Resource::Memory), STAGING_BUFFER_BYTES as u64);
+                sink.write_all(b"new")?;
+                Ok(())
+            },
+            || Ok(()),
+        )
+        .unwrap();
+        assert_eq!(budget.used(Resource::Memory), 0);
+        assert_eq!(fs::read(&destination).unwrap(), b"new");
+        let (budget, _, context) = managed_context(STAGING_BUFFER_BYTES - 1);
+        let result = replace_guarded_with_durability::<OpcError>(
+            &destination,
+            Durability::NoSync,
+            Some(&context),
+            |_| panic!("write before admission"),
+            || panic!("fence before admission"),
+        );
+        assert!(
+            matches!(result, Err(OpcError::Execution(ExecutionError::ResourceLimit(limit))) if limit.resource == Resource::Memory)
+        );
+        assert_eq!(budget.used(Resource::Memory), 0);
+        assert_eq!(fs::read(&destination).unwrap(), b"new");
+        assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
+    }
+
+    #[test]
+    fn cancellation_at_final_fence_preserves_destination_and_releases_staging() {
+        let directory = tempfile::tempdir().unwrap();
+        let destination = directory.path().join("package.docx");
+        fs::write(&destination, b"original").unwrap();
+        let (budget, cancel, context) = managed_context(STAGING_BUFFER_BYTES);
+        let result = replace_guarded_with_durability::<OpcError>(
+            &destination,
+            Durability::Full,
+            Some(&context),
+            |sink| {
+                sink.write_all(b"replacement")?;
+                Ok(())
+            },
+            || {
+                cancel.cancel();
+                Ok(())
+            },
+        );
+        assert!(matches!(result, Err(OpcError::Cancelled)));
+        assert_eq!(budget.used(Resource::Memory), 0);
+        assert_eq!(fs::read(&destination).unwrap(), b"original");
+        assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn guarded_post_rename_sync_failure_still_reports_committed() {
+        let directory = tempfile::tempdir().unwrap();
+        let destination = directory.path().join("package.docx");
+        let (budget, _, context) = managed_context(STAGING_BUFFER_BYTES);
+        let mut steps = testing::CountingSteps {
+            fail_parent_sync: true,
+            ..Default::default()
+        };
+        let result = replace_with_guarded_steps::<OpcError, _>(
+            &destination,
+            Durability::Full,
+            &mut steps,
+            Some(&context),
+            |sink| {
+                sink.write_all(b"replacement")?;
+                Ok(())
+            },
+            || Ok(()),
+        );
+        assert!(matches!(result, Err(OpcError::Committed { .. })));
+        assert_eq!(fs::read(&destination).unwrap(), b"replacement");
+        assert_eq!(budget.used(Resource::Memory), 0);
     }
 }

@@ -6,6 +6,7 @@ use crate::consts::RecordType;
 
 use super::package::{Error, Result};
 use super::records::Record;
+use crate::SourceLimits;
 
 const MAX_PASSWORD_BYTES: usize = 510;
 
@@ -67,8 +68,8 @@ impl ModifyPassword {
     }
 
     /// Discover the single modify-password atom in the PPT10 document tag.
-    pub(crate) fn parse_document(document: &Record) -> Result<Option<Self>> {
-        let records = document.versioned_binary_tag_records(10)?;
+    pub(crate) fn parse_document(document: &Record, limits: &SourceLimits) -> Result<Option<Self>> {
+        let records = document.versioned_binary_tag_records(10, limits)?;
         let mut matches = records
             .iter()
             .filter(|record| record.record_type == RecordType::CString && record.instance == 3);

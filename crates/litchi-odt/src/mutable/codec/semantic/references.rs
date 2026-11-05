@@ -6,19 +6,23 @@ use litchi_core::Result;
 
 impl MutableDocument {
     /// Return generated indexes from the current authoritative content XML.
-    pub fn text_indexes(&self) -> Result<Vec<TextIndex>> {
+    pub(crate) fn text_indexes(&self) -> Result<Vec<TextIndex>> {
         self.with_content_xml(crate::index::parse_text_indexes)
     }
 
     /// Append caller-authored index markup to `office:text` without refreshing its cache.
-    pub fn insert_text_index(&mut self, index: &TextIndex) -> Result<()> {
+    pub(crate) fn insert_text_index(&mut self, index: &TextIndex) -> Result<()> {
         let updated = self.with_content_xml(|xml| crate::insert_text_index_xml(xml, index))?;
         self.content_xml = Some(updated);
         Ok(())
     }
 
     /// Replace one named index and return its previous inert representation.
-    pub fn replace_text_index(&mut self, name: &str, replacement: &TextIndex) -> Result<TextIndex> {
+    pub(crate) fn replace_text_index(
+        &mut self,
+        name: &str,
+        replacement: &TextIndex,
+    ) -> Result<TextIndex> {
         let old = self
             .text_indexes()?
             .into_iter()
@@ -33,7 +37,7 @@ impl MutableDocument {
     }
 
     /// Remove one named index and return its previous inert representation.
-    pub fn remove_text_index(&mut self, name: &str) -> Result<TextIndex> {
+    pub(crate) fn remove_text_index(&mut self, name: &str) -> Result<TextIndex> {
         let old = self
             .text_indexes()?
             .into_iter()
@@ -47,12 +51,12 @@ impl MutableDocument {
     }
 
     /// Return typed point and resolved range index marks in document order.
-    pub fn text_index_marks(&self) -> Result<Vec<TextIndexMark>> {
+    pub(crate) fn text_index_marks(&self) -> Result<Vec<TextIndexMark>> {
         self.with_content_xml(crate::index_mark::parse_text_index_marks)
     }
 
     /// Insert a point mark at a paragraph end, or wrap the paragraph with a range mark.
-    pub fn insert_text_index_mark(
+    pub(crate) fn insert_text_index_mark(
         &mut self,
         paragraph_index: usize,
         mark: &TextIndexMark,
@@ -64,7 +68,7 @@ impl MutableDocument {
         Ok(())
     }
 
-    pub fn replace_text_index_mark(
+    pub(crate) fn replace_text_index_mark(
         &mut self,
         mark_index: usize,
         replacement: &TextIndexMark,
@@ -85,7 +89,7 @@ impl MutableDocument {
         Ok(old)
     }
 
-    pub fn remove_text_index_mark(&mut self, mark_index: usize) -> Result<TextIndexMark> {
+    pub(crate) fn remove_text_index_mark(&mut self, mark_index: usize) -> Result<TextIndexMark> {
         let old = self
             .text_index_marks()?
             .get(mark_index)
@@ -102,12 +106,12 @@ impl MutableDocument {
     }
 
     /// Return point and resolved range reference targets in document order.
-    pub fn reference_marks(&self) -> Result<Vec<ReferenceMark>> {
+    pub(crate) fn reference_marks(&self) -> Result<Vec<ReferenceMark>> {
         self.with_content_xml(crate::reference_mark::parse_reference_marks)
     }
 
     /// Insert a point reference at a paragraph end, or wrap the paragraph with a range reference.
-    pub fn insert_reference_mark(
+    pub(crate) fn insert_reference_mark(
         &mut self,
         paragraph_index: usize,
         mark: &ReferenceMark,
@@ -119,7 +123,7 @@ impl MutableDocument {
     }
 
     /// Replace a reference target selected in document order.
-    pub fn replace_reference_mark(
+    pub(crate) fn replace_reference_mark(
         &mut self,
         mark_index: usize,
         replacement: &ReferenceMark,
@@ -141,7 +145,7 @@ impl MutableDocument {
     }
 
     /// Remove marker elements while preserving enclosed text and markup.
-    pub fn remove_reference_mark(&mut self, mark_index: usize) -> Result<ReferenceMark> {
+    pub(crate) fn remove_reference_mark(&mut self, mark_index: usize) -> Result<ReferenceMark> {
         let old = self
             .reference_marks()?
             .get(mark_index)
@@ -158,12 +162,12 @@ impl MutableDocument {
     }
 
     /// Return point and resolved range bookmarks in document order.
-    pub fn bookmark_targets(&self) -> Result<Vec<BookmarkTarget>> {
+    pub(crate) fn bookmark_targets(&self) -> Result<Vec<BookmarkTarget>> {
         self.with_content_xml(crate::parse_bookmark_targets)
     }
 
     /// Insert a point bookmark at a paragraph end, or wrap the paragraph with a range bookmark.
-    pub fn insert_bookmark_target(
+    pub(crate) fn insert_bookmark_target(
         &mut self,
         paragraph_index: usize,
         target: &BookmarkTarget,
@@ -175,7 +179,7 @@ impl MutableDocument {
     }
 
     /// Replace a bookmark target selected in document order.
-    pub fn replace_bookmark_target(
+    pub(crate) fn replace_bookmark_target(
         &mut self,
         target_index: usize,
         replacement: &BookmarkTarget,
@@ -196,7 +200,7 @@ impl MutableDocument {
     }
 
     /// Remove bookmark markers while preserving enclosed text and markup.
-    pub fn remove_bookmark_target(&mut self, target_index: usize) -> Result<BookmarkTarget> {
+    pub(crate) fn remove_bookmark_target(&mut self, target_index: usize) -> Result<BookmarkTarget> {
         let old = self
             .bookmark_targets()?
             .get(target_index)

@@ -6,7 +6,9 @@ use litchi_iwa_archive::{Limits, package::Catalog};
 use litchi_iwa_common::wire::append_length_delimited_field;
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsch, tsd, tsk, tsp};
-use litchi_keynote::{ChartSelector, Package, SlideChartMetadataError, SlideSelector};
+use litchi_keynote::{
+    ChartSelector, Package, SlideSelector, chart::metadata::Error as SlideChartMetadataError,
+};
 use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -37,6 +39,7 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
@@ -83,8 +86,18 @@ fn chart_payload(non_style: u64) -> TestResult<Vec<u8>> {
         ..tsch::ChartArchive::default()
     };
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, 1, &drawable.encode_to_vec())?;
-    append_length_delimited_field(&mut payload, 10_000, &chart.encode_to_vec())?;
+    append_length_delimited_field(
+        &mut payload,
+        1,
+        &drawable.encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut payload,
+        10_000,
+        &chart.encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -140,7 +153,10 @@ fn metadata_package() -> TestResult<Vec<u8>> {
             non_style_payload(Some(true), Some("Revenue"))?,
         )?,
     ];
-    let component = SnappyStream::compress(&Archive { objects }.to_bytes()?)?;
+    let component = SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?;
     Ok(litchi_iwa_archive::package::to_bytes(
         [(DOCUMENT_MEMBER, component.as_slice())],
         Limits::default(),
@@ -153,23 +169,34 @@ fn non_style_payload(visible: Option<bool>, title: Option<&str>) -> TestResult<V
         litchi_iwa_common::wire::append_varint_field(&mut extension, 21, u64::from(visible))?;
     }
     if let Some(title) = title {
-        append_length_delimited_field(&mut extension, 23, title.as_bytes())?;
+        append_length_delimited_field(
+            &mut extension,
+            23,
+            title.as_bytes(),
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, 10_000, &extension)?;
+    append_length_delimited_field(
+        &mut payload,
+        10_000,
+        &extension,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
 fn replace_document(source: &[u8], mutate: impl FnOnce(&mut Archive)) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("missing synthetic document component"))?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let mut archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
     mutate(&mut archive);
-    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    let component =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             DOCUMENT_MEMBER,
@@ -255,7 +282,7 @@ fn synthetic_chart_metadata_rejects_duplicate_chart_messages() -> TestResult {
             .expect("synthetic chart message")
             .clone();
         chart
-            .push_message(duplicate)
+            .push_message(duplicate, Default::default())
             .expect("append duplicate chart message");
     })?;
     let package = Package::from_bytes(&malformed)?;

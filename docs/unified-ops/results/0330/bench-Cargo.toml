@@ -1,0 +1,14 @@
+[package]
+name = "rc-bench"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+litchi-ops = { path = "/home/zhuhe/code/litchi-worktrees/uo2-registry-consistency/crates/litchi-ops", features = ["xlsx"] }
+litchi-core = { path = "/home/zhuhe/code/litchi-worktrees/uo2-registry-consistency/crates/litchi-core" }
+
+[profile.release]
+debug = false
+
+[workspace]

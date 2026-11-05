@@ -1,0 +1,64 @@
+{
+  "record": "0362dvb-drawingml-theme-raw-contract",
+  "date": "2026-10-24",
+  "parent_source": {
+    "commit": "11728db894181ffbcdbcea3ae0008d51fdd2d8af",
+    "tree": "f036e87f21439a7d69f63adcf107a241d2cf4e65"
+  },
+  "source": {
+    "commit": "20c7dd4d4bd80c603eadae89626309d979f1f138",
+    "tree": "42d98afbb8634c0188b3cdc3140417fca0b772ca",
+    "files_changed": 13,
+    "canonical_raw_mutations": [
+      "theme::family::part::Snapshot::replace_family(Family, Limits)",
+      "theme::family::part::Snapshot::add_family(Family, Limits)",
+      "theme::family::part::Snapshot::add_family_with_uri(Family, &str, Limits)",
+      "theme::family::part::Snapshot::remove_family(Limits)",
+      "theme::family::part::replace_family(&[u8], &Family, Limits)",
+      "theme::family::part::add_family(&[u8], &Family, Limits)",
+      "theme::family::part::add_family_with_uri(&[u8], &Family, &str, Limits)",
+      "theme::family::part::remove_family(&[u8], Limits)"
+    ],
+    "retired_public_names": [
+      "replace_family_with_limit",
+      "add_family_with_limit",
+      "add_family_with_uri_limit",
+      "remove_family_with_limit"
+    ],
+    "consumer_files": 8,
+    "action_scalar_nul_classification": "invalid lexical value; only length overflow is LimitKind::ScalarBytes"
+  },
+  "lock": {
+    "sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+    "bytes": 139591
+  },
+  "validation": {
+    "drawingml_tests": {
+      "passed": 91,
+      "log": {
+        "name": "drawingml-theme-limits-rerun3.log",
+        "bytes": 9115,
+        "sha256": "22073f1494be02da4501e6f0cb9023ee23d3742c672e8ad600591ccbb8b57b1e"
+      }
+    },
+    "xlsb_theme_tests": {
+      "passed": 12,
+      "filtered": 767,
+      "log": {
+        "name": "xlsb-theme-limits-rerun.log",
+        "bytes": 1708,
+        "sha256": "d6ea9893c4270fdafc1dde480fc32478c178277429725d7073243af7a829a550"
+      }
+    },
+    "target": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/theme-family/target",
+      "bytes": 816108921
+    },
+    "fmt": true,
+    "diff_check": true,
+    "glossary_policy_json": true,
+    "large_evidence_guard": true,
+    "binary_guard": true
+  },
+  "scope_note": "Theme-family mutation policy only; other DrawingML raw codec ingress/output lanes remain separately owned."
+}

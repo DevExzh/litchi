@@ -365,11 +365,24 @@ pub(super) fn papx_in_table_state(grpprl: &[u8]) -> Result<bool> {
     let body = grpprl
         .get(2..)
         .ok_or_else(|| corrupted("PAPX has no style index"))?;
-    Ok(strict_sprms(body)?
+    Ok(papx_sprms(body)?
         .iter()
         .rev()
         .find(|sprm| sprm.opcode == SPRM_P_F_IN_TABLE)
         .is_some_and(|sprm| sprm.operand_byte() == Some(1)))
+}
+
+/// The SPRMs of a PAPX body (after its style index). A PAPX in an FKP is
+/// stored in whole words (`cb'` counts words), so a body whose SPRMs end on
+/// an odd byte carries one zero padding byte, which Word writes and the
+/// reader skips (record 0293). Any other trailing byte stays malformed.
+pub(super) fn papx_sprms(body: &[u8]) -> Result<Vec<crate::sprm::Sprm>> {
+    match parse_sprms(body) {
+        Err(crate::sprm::Error::Opcode { remaining: 1, .. }) if body.last() == Some(&0) => {
+            strict_sprms(body.get(..body.len() - 1).unwrap_or_default())
+        },
+        _ => strict_sprms(body),
+    }
 }
 
 pub(super) fn split_transform_chpx(
@@ -1378,5 +1391,23 @@ mod papx_cache_tests {
     #[test]
     fn papx_run_cache_is_send_sync() {
         assert_send_sync::<PapxRun>();
+    }
+}
+
+#[cfg(test)]
+mod papx_padding_tests {
+    use super::*;
+
+    #[test]
+    fn a_word_padding_byte_after_papx_sprms_is_admitted() {
+        // sprmPJc (0x2403, one-byte operand) then the zero pad of a
+        // word-aligned PAPX, as POI's test.doc stores it.
+        let body = [0x03, 0x24, 0x01, 0x00];
+        assert!(strict_sprms(&body).is_err());
+        let sprms = papx_sprms(&body).unwrap();
+        assert_eq!(sprms.len(), 1);
+        assert!(!papx_in_table_state(&[0, 0, 0x03, 0x24, 0x01, 0x00]).unwrap());
+        // A non-zero trailing byte is still malformed.
+        assert!(papx_sprms(&[0x03, 0x24, 0x01, 0x07]).is_err());
     }
 }

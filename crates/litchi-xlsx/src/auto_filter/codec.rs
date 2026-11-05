@@ -17,6 +17,90 @@ use super::model::{
 };
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
+trait XmlSink {
+    fn append(&mut self, bytes: &[u8]) -> Result<()>;
+
+    fn push(&mut self, byte: u8) -> Result<()> {
+        self.append(&[byte])
+    }
+
+    fn len(&self) -> usize;
+}
+
+struct XmlBuffer {
+    bytes: Vec<u8>,
+    limit: usize,
+}
+
+impl XmlBuffer {
+    fn new(limit: usize) -> Self {
+        Self {
+            bytes: Vec::new(),
+            limit: limit.min(MAX_FRAGMENT_BYTES),
+        }
+    }
+
+    fn finish(self) -> Vec<u8> {
+        self.bytes
+    }
+}
+
+impl XmlSink for XmlBuffer {
+    fn append(&mut self, bytes: &[u8]) -> Result<()> {
+        let length = self
+            .bytes
+            .len()
+            .checked_add(bytes.len())
+            .ok_or_else(|| invalid("autoFilter is too large"))?;
+        if length > self.limit {
+            return Err(invalid("autoFilter is too large"));
+        }
+        self.bytes
+            .try_reserve_exact(bytes.len())
+            .map_err(|source| Error::Allocation {
+                resource: "autoFilter XML output",
+                source,
+            })?;
+        self.bytes.extend_from_slice(bytes);
+        Ok(())
+    }
+
+    fn len(&self) -> usize {
+        self.bytes.len()
+    }
+}
+
+struct XmlSizer {
+    length: usize,
+    limit: usize,
+}
+
+impl XmlSizer {
+    fn new(limit: usize) -> Self {
+        Self {
+            length: 0,
+            limit: limit.min(MAX_FRAGMENT_BYTES),
+        }
+    }
+}
+
+impl XmlSink for XmlSizer {
+    fn append(&mut self, bytes: &[u8]) -> Result<()> {
+        self.length = self
+            .length
+            .checked_add(bytes.len())
+            .ok_or_else(|| invalid("autoFilter is too large"))?;
+        if self.length > self.limit {
+            return Err(invalid("autoFilter is too large"));
+        }
+        Ok(())
+    }
+
+    fn len(&self) -> usize {
+        self.length
+    }
+}
+
 struct ColumnBuilder {
     column_id: u32,
     hidden_button: bool,
@@ -69,26 +153,45 @@ pub(crate) fn write_auto_filter_fragment_in(
     value: &Definition,
     namespace: &[u8],
 ) -> Result<Vec<u8>> {
+    let mut output = XmlBuffer::new(MAX_FRAGMENT_BYTES);
+    write_auto_filter_to(&mut output, value, namespace)?;
+    Ok(output.finish())
+}
+
+/// Serialize one auto-filter fragment under an operation-owned output limit.
+/// A size-only pass admits the exact output before the byte buffer is grown.
+pub(crate) fn write_auto_filter_fragment_limited(
+    value: &Definition,
+    maximum: usize,
+) -> Result<Vec<u8>> {
+    let maximum = maximum.min(MAX_FRAGMENT_BYTES);
+    let mut size = XmlSizer::new(maximum);
+    write_auto_filter_to(&mut size, value, CORE)?;
+    let mut output = XmlBuffer::new(maximum);
+    write_auto_filter_to(&mut output, value, CORE)?;
+    Ok(output.finish())
+}
+
+fn write_auto_filter_to<S: XmlSink>(x: &mut S, value: &Definition, namespace: &[u8]) -> Result<()> {
     if namespace != CORE && namespace != STRICT {
         return Err(invalid("invalid autoFilter SpreadsheetML namespace"));
     }
-    let mut x = Vec::new();
-    x.extend_from_slice(b"<x:autoFilter xmlns:x=\"");
-    x.extend_from_slice(namespace);
-    x.push(b'\"');
+    x.append(b"<x:autoFilter xmlns:x=\"")?;
+    x.append(namespace)?;
+    x.push(b'\"')?;
     if let Some(r) = &value.reference {
         parse_range(r.as_str())?;
-        a(&mut x, "ref", r.as_str());
+        a(x, "ref", r.as_str())?;
     }
-    write_unknown_attributes(&mut x, value.opaque.as_deref())?;
+    write_unknown_attributes(x, value.opaque.as_deref())?;
     if value.columns.is_empty()
         && value.sort_state.is_none()
         && !has_unknown_children(value.opaque.as_deref())
     {
-        x.extend_from_slice(b"/>");
-        return Ok(x);
+        x.append(b"/>")?;
+        return Ok(());
     }
-    x.push(b'>');
+    x.push(b'>')?;
     let mut ids = HashSet::with_capacity(value.columns.len());
     let max_columns = u32::try_from(MAX_COLUMNS)
         .map_err(|_source| invalid("worksheet column limit exceeds the filterColumn wire type"))?;
@@ -105,16 +208,16 @@ pub(crate) fn write_auto_filter_fragment_in(
         for order in &opaque.order {
             match *order {
                 ChildOrder::Column(index) if index < value.columns.len() && !columns[index] => {
-                    write_column(&mut x, &value.columns[index])?;
+                    write_column(x, &value.columns[index])?;
                     columns[index] = true;
                 },
                 ChildOrder::SortState if !sort_written => {
                     if let Some(state) = value.sort_state.as_ref() {
-                        write_state(&mut x, state)?;
+                        write_state(x, state)?;
                         sort_written = true;
                     }
                 },
-                ChildOrder::Unknown(index) => write_unknown_index(&mut x, opaque, index)?,
+                ChildOrder::Unknown(index) => write_unknown_index(x, opaque, index)?,
                 ChildOrder::Column(_)
                 | ChildOrder::SortState
                 | ChildOrder::Payload
@@ -124,38 +227,35 @@ pub(crate) fn write_auto_filter_fragment_in(
             }
         }
         if opaque.order.is_empty() {
-            write_unknown_elements(&mut x, opaque)?;
+            write_unknown_elements(x, opaque)?;
         }
     }
     for (index, column) in value.columns.iter().enumerate() {
         if !columns[index] {
-            write_column(&mut x, column)?;
+            write_column(x, column)?;
         }
     }
     if !sort_written && let Some(state) = value.sort_state.as_ref() {
-        write_state(&mut x, state)?;
+        write_state(x, state)?;
     }
-    x.extend_from_slice(b"</x:autoFilter>");
-    if x.len() > MAX_FRAGMENT_BYTES {
-        return Err(invalid("autoFilter is too large"));
-    }
-    Ok(x)
+    x.append(b"</x:autoFilter>")?;
+    Ok(())
 }
-fn write_payload(x: &mut Vec<u8>, p: &Payload) -> Result<()> {
+fn write_payload<S: XmlSink>(x: &mut S, p: &Payload) -> Result<()> {
     match p {
         Payload::Values(v) => {
-            x.extend_from_slice(b"<x:filters");
+            x.append(b"<x:filters")?;
             if v.blank {
-                a(x, "blank", "1");
+                a(x, "blank", "1")?;
             }
             if v.calendar_type != Calendar::None {
-                a(x, "calendarType", calendar(v.calendar_type));
+                a(x, "calendarType", calendar(v.calendar_type))?;
             }
             write_unknown_attributes(x, v.opaque.as_deref())?;
             if v.items.is_empty() && !has_unknown_children(v.opaque.as_deref()) {
-                x.extend_from_slice(b"/>");
+                x.append(b"/>")?;
             } else {
-                x.push(b'>');
+                x.push(b'>')?;
                 let mut written = vec![false; v.items.len()];
                 if let Some(opaque) = v.opaque.as_deref() {
                     for order in &opaque.order {
@@ -179,19 +279,19 @@ fn write_payload(x: &mut Vec<u8>, p: &Payload) -> Result<()> {
                         write_item(x, item)?;
                     }
                 }
-                x.extend_from_slice(b"</x:filters>");
+                x.append(b"</x:filters>")?;
             }
         },
         Payload::Custom(v) => {
             if !(1..=2).contains(&v.filters.len()) {
                 return Err(invalid("customFilters requires one or two filters"));
             }
-            x.extend_from_slice(b"<x:customFilters");
+            x.append(b"<x:customFilters")?;
             if v.and {
-                a(x, "and", "1");
+                a(x, "and", "1")?;
             }
             write_unknown_attributes(x, v.opaque.as_deref())?;
-            x.push(b'>');
+            x.push(b'>')?;
             let mut written = vec![false; v.filters.len()];
             if let Some(opaque) = v.opaque.as_deref() {
                 for order in &opaque.order {
@@ -215,70 +315,70 @@ fn write_payload(x: &mut Vec<u8>, p: &Payload) -> Result<()> {
                     write_custom(x, filter)?;
                 }
             }
-            x.extend_from_slice(b"</x:customFilters>");
+            x.append(b"</x:customFilters>")?;
         },
         Payload::Dynamic(v) => {
-            x.extend_from_slice(b"<x:dynamicFilter");
-            a(x, "type", dynamic(v.filter_type));
+            x.append(b"<x:dynamicFilter")?;
+            a(x, "type", dynamic(v.filter_type))?;
             if let Some(q) = v.value {
-                a(x, "val", &q.to_string());
+                a(x, "val", &q.to_string())?;
             }
             if let Some(q) = v.max_value {
-                a(x, "maxVal", &q.to_string());
+                a(x, "maxVal", &q.to_string())?;
             }
             write_unknown_attributes(x, v.opaque.as_deref())?;
-            x.extend_from_slice(b"/>");
+            x.append(b"/>")?;
         },
         Payload::Color(v) => {
-            x.extend_from_slice(b"<x:colorFilter");
-            a(x, "dxfId", &v.differential_format_id.to_string());
+            x.append(b"<x:colorFilter")?;
+            a(x, "dxfId", &v.differential_format_id.to_string())?;
             if !v.cell_color {
-                a(x, "cellColor", "0");
+                a(x, "cellColor", "0")?;
             }
             write_unknown_attributes(x, v.opaque.as_deref())?;
-            x.extend_from_slice(b"/>");
+            x.append(b"/>")?;
         },
         Payload::Icon(v) => {
-            x.extend_from_slice(b"<x:iconFilter");
-            a(x, "iconSet", icon(v.icon_set));
-            a(x, "iconId", &v.icon_id.to_string());
+            x.append(b"<x:iconFilter")?;
+            a(x, "iconSet", icon(v.icon_set))?;
+            a(x, "iconId", &v.icon_id.to_string())?;
             write_unknown_attributes(x, v.opaque.as_deref())?;
-            x.extend_from_slice(b"/>");
+            x.append(b"/>")?;
         },
         Payload::Top10(v) => {
-            x.extend_from_slice(b"<x:top10");
+            x.append(b"<x:top10")?;
             if !v.top {
-                a(x, "top", "0");
+                a(x, "top", "0")?;
             }
             if v.percent {
-                a(x, "percent", "1");
+                a(x, "percent", "1")?;
             }
-            a(x, "val", &v.value.to_string());
+            a(x, "val", &v.value.to_string())?;
             if let Some(q) = v.filter_value {
-                a(x, "filterVal", &q.to_string());
+                a(x, "filterVal", &q.to_string())?;
             }
             write_unknown_attributes(x, v.opaque.as_deref())?;
-            x.extend_from_slice(b"/>");
+            x.append(b"/>")?;
         },
     }
     Ok(())
 }
 
-fn write_column(x: &mut Vec<u8>, value: &Column) -> Result<()> {
-    x.extend_from_slice(b"<x:filterColumn");
-    a(x, "colId", &value.column_id.to_string());
+fn write_column<S: XmlSink>(x: &mut S, value: &Column) -> Result<()> {
+    x.append(b"<x:filterColumn")?;
+    a(x, "colId", &value.column_id.to_string())?;
     if value.hidden_button {
-        a(x, "hiddenButton", "1");
+        a(x, "hiddenButton", "1")?;
     }
     if !value.show_button {
-        a(x, "showButton", "0");
+        a(x, "showButton", "0")?;
     }
     write_unknown_attributes(x, value.opaque.as_deref())?;
     if value.payload.is_none() && !has_unknown_children(value.opaque.as_deref()) {
-        x.extend_from_slice(b"/>");
+        x.append(b"/>")?;
         return Ok(());
     }
-    x.push(b'>');
+    x.push(b'>')?;
     let mut payload_written = false;
     if let Some(opaque) = value.opaque.as_deref() {
         for order in &opaque.order {
@@ -302,28 +402,28 @@ fn write_column(x: &mut Vec<u8>, value: &Column) -> Result<()> {
     if !payload_written && let Some(payload) = value.payload.as_ref() {
         write_payload(x, payload)?;
     }
-    x.extend_from_slice(b"</x:filterColumn>");
+    x.append(b"</x:filterColumn>")?;
     Ok(())
 }
 
-fn write_state(x: &mut Vec<u8>, value: &State) -> Result<()> {
-    x.extend_from_slice(b"<x:sortState");
-    a(x, "ref", value.reference.as_str());
+fn write_state<S: XmlSink>(x: &mut S, value: &State) -> Result<()> {
+    x.append(b"<x:sortState")?;
+    a(x, "ref", value.reference.as_str())?;
     if value.column_sort {
-        a(x, "columnSort", "1");
+        a(x, "columnSort", "1")?;
     }
     if value.case_sensitive {
-        a(x, "caseSensitive", "1");
+        a(x, "caseSensitive", "1")?;
     }
     if let Some(method) = value.sort_method {
-        a(x, "sortMethod", method.as_str());
+        a(x, "sortMethod", method.as_str())?;
     }
     write_unknown_attributes(x, value.opaque.as_deref())?;
     if value.conditions.is_empty() && !has_unknown_children(value.opaque.as_deref()) {
-        x.extend_from_slice(b"/>");
+        x.append(b"/>")?;
         return Ok(());
     }
-    x.push(b'>');
+    x.push(b'>')?;
     let mut written = vec![false; value.conditions.len()];
     if let Some(opaque) = value.opaque.as_deref() {
         for order in &opaque.order {
@@ -349,11 +449,11 @@ fn write_state(x: &mut Vec<u8>, value: &State) -> Result<()> {
             write_condition(x, value, condition)?;
         }
     }
-    x.extend_from_slice(b"</x:sortState>");
+    x.append(b"</x:sortState>")?;
     Ok(())
 }
 
-fn write_condition(x: &mut Vec<u8>, state: &State, value: &Condition) -> Result<()> {
+fn write_condition<S: XmlSink>(x: &mut S, state: &State, value: &Condition) -> Result<()> {
     validate_sort_condition(
         state.reference.as_str(),
         state.column_sort,
@@ -364,29 +464,29 @@ fn write_condition(x: &mut Vec<u8>, state: &State, value: &Condition) -> Result<
         value.icon_set,
         value.icon_id,
     )?;
-    x.extend_from_slice(b"<x:sortCondition");
-    a(x, "ref", value.reference.as_str());
+    x.append(b"<x:sortCondition")?;
+    a(x, "ref", value.reference.as_str())?;
     if value.descending {
-        a(x, "descending", "1");
+        a(x, "descending", "1")?;
     }
     if value.sort_by != SortBy::Value {
-        a(x, "sortBy", value.sort_by.as_str());
+        a(x, "sortBy", value.sort_by.as_str())?;
     }
     if let Some(custom_list) = value.custom_list.as_deref() {
-        a(x, "customList", custom_list);
+        a(x, "customList", custom_list)?;
     }
     if let Some(dxf) = value.differential_format_id {
-        a(x, "dxfId", &dxf.to_string());
+        a(x, "dxfId", &dxf.to_string())?;
     }
     if let Some(icon_set) = value.icon_set {
-        a(x, "iconSet", icon(icon_set));
+        a(x, "iconSet", icon(icon_set))?;
     }
     if let Some(icon_id) = value.icon_id {
-        a(x, "iconId", &icon_id.to_string());
+        a(x, "iconId", &icon_id.to_string())?;
     }
     write_unknown_attributes(x, value.opaque.as_deref())?;
     if has_unknown_children(value.opaque.as_deref()) {
-        x.push(b'>');
+        x.push(b'>')?;
         write_unknown_elements(
             x,
             value.opaque.as_deref().unwrap_or_else(|| {
@@ -395,28 +495,28 @@ fn write_condition(x: &mut Vec<u8>, state: &State, value: &Condition) -> Result<
                 )
             }),
         )?;
-        x.extend_from_slice(b"</x:sortCondition>");
+        x.append(b"</x:sortCondition>")?;
     } else {
-        x.extend_from_slice(b"/>");
+        x.append(b"/>")?;
     }
     Ok(())
 }
 
-fn write_item(x: &mut Vec<u8>, value: &Item) -> Result<()> {
+fn write_item<S: XmlSink>(x: &mut S, value: &Item) -> Result<()> {
     match value {
         Item::Value(value) => {
-            x.extend_from_slice(b"<x:filter");
-            a(x, "val", value);
-            x.extend_from_slice(b"/>");
+            x.append(b"<x:filter")?;
+            a(x, "val", value)?;
+            x.append(b"/>")?;
         },
         Item::DateGroup(value) => write_date_group(x, value)?,
     }
     Ok(())
 }
 
-fn write_date_group(x: &mut Vec<u8>, value: &DateGroup) -> Result<()> {
-    x.extend_from_slice(b"<x:dateGroupItem");
-    a(x, "year", &value.year.to_string());
+fn write_date_group<S: XmlSink>(x: &mut S, value: &DateGroup) -> Result<()> {
+    x.append(b"<x:dateGroupItem")?;
+    a(x, "year", &value.year.to_string())?;
     for (name, field) in [
         ("month", value.month),
         ("day", value.day),
@@ -425,13 +525,13 @@ fn write_date_group(x: &mut Vec<u8>, value: &DateGroup) -> Result<()> {
         ("second", value.second),
     ] {
         if let Some(value) = field {
-            a(x, name, &value.to_string());
+            a(x, name, &value.to_string())?;
         }
     }
-    a(x, "dateTimeGrouping", group(value.grouping));
+    a(x, "dateTimeGrouping", group(value.grouping))?;
     write_unknown_attributes(x, value.opaque.as_deref())?;
     if has_unknown_children(value.opaque.as_deref()) {
-        x.push(b'>');
+        x.push(b'>')?;
         write_unknown_elements(
             x,
             value.opaque.as_deref().unwrap_or_else(|| {
@@ -440,22 +540,22 @@ fn write_date_group(x: &mut Vec<u8>, value: &DateGroup) -> Result<()> {
                 )
             }),
         )?;
-        x.extend_from_slice(b"</x:dateGroupItem>");
+        x.append(b"</x:dateGroupItem>")?;
     } else {
-        x.extend_from_slice(b"/>");
+        x.append(b"/>")?;
     }
     Ok(())
 }
 
-fn write_custom(x: &mut Vec<u8>, value: &Custom) -> Result<()> {
-    x.extend_from_slice(b"<x:customFilter");
+fn write_custom<S: XmlSink>(x: &mut S, value: &Custom) -> Result<()> {
+    x.append(b"<x:customFilter")?;
     if value.operator != Operator::Equal {
-        a(x, "operator", custom(value.operator));
+        a(x, "operator", custom(value.operator))?;
     }
-    a(x, "val", &value.value);
+    a(x, "val", &value.value)?;
     write_unknown_attributes(x, value.opaque.as_deref())?;
     if has_unknown_children(value.opaque.as_deref()) {
-        x.push(b'>');
+        x.push(b'>')?;
         write_unknown_elements(
             x,
             value.opaque.as_deref().unwrap_or_else(|| {
@@ -464,9 +564,9 @@ fn write_custom(x: &mut Vec<u8>, value: &Custom) -> Result<()> {
                 )
             }),
         )?;
-        x.extend_from_slice(b"</x:customFilter>");
+        x.append(b"</x:customFilter>")?;
     } else {
-        x.extend_from_slice(b"/>");
+        x.append(b"/>")?;
     }
     Ok(())
 }
@@ -475,18 +575,18 @@ fn has_unknown_children(value: Option<&OpaqueFields>) -> bool {
     value.is_some_and(|value| !value.elements.is_empty())
 }
 
-fn write_unknown_attributes(x: &mut Vec<u8>, value: Option<&OpaqueFields>) -> Result<()> {
+fn write_unknown_attributes<S: XmlSink>(x: &mut S, value: Option<&OpaqueFields>) -> Result<()> {
     if let Some(value) = value {
         for attribute in &value.attributes {
-            a(x, attribute.name(), attribute.value());
+            a(x, attribute.name(), attribute.value())?;
         }
     }
     Ok(())
 }
 
-fn write_unknown_elements(x: &mut Vec<u8>, value: &OpaqueFields) -> Result<()> {
+fn write_unknown_elements<S: XmlSink>(x: &mut S, value: &OpaqueFields) -> Result<()> {
     for element in &value.elements {
-        x.extend_from_slice(element.as_xml());
+        x.append(element.as_xml())?;
         if x.len() > MAX_FRAGMENT_BYTES {
             return Err(invalid("autoFilter is too large"));
         }
@@ -494,31 +594,32 @@ fn write_unknown_elements(x: &mut Vec<u8>, value: &OpaqueFields) -> Result<()> {
     Ok(())
 }
 
-fn write_unknown_index(x: &mut Vec<u8>, value: &OpaqueFields, index: usize) -> Result<()> {
+fn write_unknown_index<S: XmlSink>(x: &mut S, value: &OpaqueFields, index: usize) -> Result<()> {
     let element = value
         .elements
         .get(index)
         .ok_or_else(|| invalid("invalid autoFilter unknown-child index"))?;
-    x.extend_from_slice(element.as_xml());
+    x.append(element.as_xml())?;
     if x.len() > MAX_FRAGMENT_BYTES {
         return Err(invalid("autoFilter is too large"));
     }
     Ok(())
 }
 
-fn a(x: &mut Vec<u8>, n: &str, v: &str) {
-    x.push(b' ');
-    x.extend_from_slice(n.as_bytes());
-    x.extend_from_slice(b"=\"");
+fn a<S: XmlSink>(x: &mut S, n: &str, v: &str) -> Result<()> {
+    x.push(b' ')?;
+    x.append(n.as_bytes())?;
+    x.append(b"=\"")?;
     for c in v.bytes() {
         match c {
-            b'&' => x.extend_from_slice(b"&amp;"),
-            b'<' => x.extend_from_slice(b"&lt;"),
-            b'"' => x.extend_from_slice(b"&quot;"),
-            _ => x.push(c),
+            b'&' => x.append(b"&amp;")?,
+            b'<' => x.append(b"&lt;")?,
+            b'"' => x.append(b"&quot;")?,
+            _ => x.push(c)?,
         }
     }
-    x.push(b'"');
+    x.push(b'"')?;
+    Ok(())
 }
 fn calendar(v: Calendar) -> &'static str {
     match v {

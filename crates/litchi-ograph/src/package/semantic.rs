@@ -1,10 +1,11 @@
 use std::io::Cursor;
+use std::sync::{Arc, Mutex, OnceLock};
 
 use litchi_biff::{Encoder, Records};
 use litchi_cfb::OleWriter;
 
 use crate::chart;
-use crate::{Limits, Result};
+use crate::{Limits, OpenOptions, Result};
 
 use super::validation::WorkbookLayout;
 use super::{codec, validation};
@@ -63,13 +64,21 @@ pub struct PackageRef<'a> {
 impl<'a> PackageRef<'a> {
     /// Validates borrowed bytes with conservative default limits.
     pub fn open(bytes: &'a [u8]) -> Result<Self> {
-        Self::with_limits(bytes, Limits::default())
+        Self::open_with_options(bytes, OpenOptions::default())
     }
 
     /// Validates borrowed bytes with explicit resource limits.
-    pub fn with_limits(bytes: &'a [u8], limits: Limits) -> Result<Self> {
+    // Retain the caller's policy at this boundary so default scalar checks can
+    // fold away. Structural admission remains in the shared codec.
+    #[inline(always)]
+    pub fn open_with_options(bytes: &'a [u8], options: OpenOptions) -> Result<Self> {
+        let limits = options.limits_value();
         let limits = limits.validate()?;
-        validation::check_limit("package bytes", bytes.len(), limits.max_package_bytes)?;
+        validation::check_limit(
+            crate::LimitKind::PackageBytes,
+            bytes.len(),
+            limits.max_package_bytes,
+        )?;
         let validated = validation::validate(bytes, limits)?;
         Ok(Self {
             bytes,
@@ -108,63 +117,122 @@ impl<'a> PackageRef<'a> {
     }
 }
 
-/// Move-owned, validated standalone `OGraph` package.
+/// Retains the caller's Vec until a shared borrow is requested. Promotion
+/// moves only its header; existing bytes and capacity never change. The empty
+/// Vec left in `owned` has no allocation. OnceLock serializes promotion, while
+/// Mutex permits the move through &self without exposing a mutable byte slice.
 #[derive(Debug)]
+pub(super) struct Bytes {
+    owned: Mutex<Vec<u8>>,
+    shared: OnceLock<Arc<Vec<u8>>>,
+}
+
+impl Bytes {
+    fn new(bytes: Vec<u8>) -> Self {
+        Self {
+            owned: Mutex::new(bytes),
+            shared: OnceLock::new(),
+        }
+    }
+
+    fn from_shared(bytes: Arc<Vec<u8>>) -> Self {
+        Self {
+            owned: Mutex::new(Vec::new()),
+            shared: OnceLock::from(bytes),
+        }
+    }
+
+    pub(super) fn shared(&self) -> &Arc<Vec<u8>> {
+        self.shared.get_or_init(|| {
+            let mut bytes = self
+                .owned
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            Arc::new(std::mem::take(&mut *bytes))
+        })
+    }
+
+    #[inline]
+    fn into_vec(self) -> Vec<u8> {
+        match self.shared.into_inner() {
+            Some(bytes) => Arc::unwrap_or_clone(bytes),
+            None => self
+                .owned
+                .into_inner()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+        }
+    }
+}
+
+impl Clone for Bytes {
+    fn clone(&self) -> Self {
+        Self::from_shared(Arc::clone(self.shared()))
+    }
+}
+
+impl std::ops::Deref for Bytes {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        self.shared()
+    }
+}
+
+/// Immutable, cheaply shared standalone `OGraph` package.
+#[derive(Debug, Clone)]
 pub struct Package {
-    bytes: Vec<u8>,
-    topology: Topology,
-    workbook: WorkbookLayout,
-    limits: Limits,
+    pub(super) bytes: Bytes,
+    pub(super) topology: Topology,
+    pub(super) workbook: WorkbookLayout,
+    pub(super) limits: Limits,
 }
 
 impl Package {
-    /// Builds a bounded standalone Graph package from a fresh, fully proven
-    /// chart model.
-    ///
-    /// The package contains the required `Workbook` stream with workbook
-    /// globals followed by one Graph chart sheet. The CFB container and the
-    /// Workbook stream are revalidated before this method returns, so callers
-    /// never receive a self-consistent but unowned chart payload.
-    pub fn from_chart(chart: chart::Chart) -> Result<Self> {
-        Self::from_chart_with_limits(chart, Limits::default())
-    }
-
     /// Builds a standalone Graph package under explicit resource bounds.
-    pub fn from_chart_with_limits(chart: chart::Chart, limits: Limits) -> Result<Self> {
-        let limits = limits.validate()?;
+    pub fn from_chart(chart: chart::Model, options: OpenOptions) -> Result<Self> {
+        let limits = options.limits_value().validate()?;
         let chart = chart.finish_graph_authoring()?;
         let chart_stream = chart.encode_with(limits)?.into_bytes();
-        let mut workbook = Encoder::with_limits(limits.biff)?;
+        let mut workbook = Encoder::new(limits.biff)?;
         workbook.push(validation::BOF, &bof(validation::GLOBALS))?;
         workbook.push(validation::EOF, &[])?;
-        for record in Records::with_limits(&chart_stream, limits.biff)? {
+        for record in Records::new(&chart_stream, limits.biff)? {
             workbook.push_ref(record?)?;
         }
         let workbook = workbook.finish();
-        validation::check_limit("Workbook bytes", workbook.len(), limits.max_workbook_bytes)?;
+        validation::check_limit(
+            crate::LimitKind::WorkbookBytes,
+            workbook.len(),
+            limits.max_workbook_bytes,
+        )?;
 
         let mut writer = OleWriter::new();
         writer.create_stream(&[codec::WORKBOOK], &workbook)?;
         let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output)?;
         let output = output.into_inner();
-        validation::check_limit("package bytes", output.len(), limits.max_package_bytes)?;
-        Self::with_limits(output, limits)
+        validation::check_limit(
+            crate::LimitKind::PackageBytes,
+            output.len(),
+            limits.max_package_bytes,
+        )?;
+        Self::open_with_options(output, OpenOptions::new().limits(limits))
     }
 
     /// Takes ownership and validates without copying the input allocation.
     pub fn open(bytes: Vec<u8>) -> Result<Self> {
-        Self::with_limits(bytes, Limits::default())
+        Self::open_with_options(bytes, OpenOptions::default())
     }
 
     /// Takes ownership and validates with explicit resource limits.
-    pub fn with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
-        let validated = PackageRef::with_limits(&bytes, limits)?;
+    pub fn open_with_options(bytes: Vec<u8>, options: OpenOptions) -> Result<Self> {
+        let limits = options.limits_value();
+        let validated = PackageRef::open_with_options(&bytes, OpenOptions::new().limits(limits))?;
         let topology = validated.topology;
         let workbook = validated.workbook;
         let limits = validated.limits;
         Ok(Self {
-            bytes,
+            bytes: Bytes::new(bytes),
             topology,
             workbook,
             limits,
@@ -182,20 +250,35 @@ impl Package {
         }
     }
 
-    /// Converts this validated package into an exact source snapshot for
-    /// contextual typed edits.
+    /// Exact compound-file bytes, including opaque streams.
     #[must_use]
-    pub fn snapshot(self) -> super::snapshot::Snapshot {
-        super::snapshot::Snapshot::from_package(self)
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.bytes
     }
 
-    /// Starts a source-checked transaction over the standalone Graph chart.
-    pub fn edit(self) -> Result<super::transaction::Transaction> {
-        self.snapshot().edit()
+    /// Starts an edit without reading or copying package content.
+    ///
+    /// Chart semantics are validated on the first staged operation or commit.
+    pub fn edit(&self) -> super::Edit {
+        super::Edit::new(self.clone())
     }
 
-    pub(super) fn into_snapshot_parts(self) -> (Vec<u8>, Topology, WorkbookLayout, Limits) {
-        (self.bytes, self.topology, self.workbook, self.limits)
+    /// Replays a patch against any package with identical recorded base bytes.
+    pub fn apply(&self, patch: &super::Patch) -> Result<super::Commit> {
+        patch.apply_to(self)
+    }
+
+    pub(super) fn from_shared(bytes: Arc<Vec<u8>>, limits: Limits) -> Result<Self> {
+        let view = PackageRef::open_with_options(&bytes, OpenOptions::new().limits(limits))?;
+        let topology = view.topology;
+        let workbook = view.workbook;
+        let limits = view.limits;
+        Ok(Self {
+            bytes: Bytes::from_shared(bytes),
+            topology,
+            workbook,
+            limits,
+        })
     }
 
     /// Validated stream topology.
@@ -211,12 +294,13 @@ impl Package {
 
     /// Consumes the structurally validated package as an opaque attachment payload.
     ///
-    /// This is a move: the compound-file allocation is neither cloned nor
-    /// rebuilt.
+    /// Recovers the original allocation when this package is uniquely owned;
+    /// otherwise copies its shared bytes without rebuilding the compound file.
     #[must_use]
+    #[inline]
     pub fn finish(self) -> Payload {
         Payload {
-            bytes: self.bytes,
+            bytes: self.bytes.into_vec(),
             topology: self.topology,
             workbook: self.workbook,
             limits: self.limits,
@@ -256,8 +340,9 @@ impl Payload {
     }
 
     /// Takes ownership and validates bytes with explicit resource limits.
-    pub fn with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
-        Package::with_limits(bytes, limits).map(Package::finish)
+    pub fn open_with_options(bytes: Vec<u8>, options: OpenOptions) -> Result<Self> {
+        let limits = options.limits_value();
+        Package::open_with_options(bytes, OpenOptions::new().limits(limits)).map(Package::finish)
     }
 
     /// Borrows the validated attachment bytes.
@@ -295,13 +380,18 @@ pub struct WorkbookRef<'a> {
 impl<'a> WorkbookRef<'a> {
     /// Validates the exact standalone globals-plus-chart topology.
     pub fn open(bytes: &'a [u8]) -> Result<Self> {
-        Self::with_limits(bytes, Limits::default())
+        Self::open_with_options(bytes, OpenOptions::default())
     }
 
     /// Validates the standalone topology with explicit resource bounds.
-    pub fn with_limits(bytes: &'a [u8], limits: Limits) -> Result<Self> {
+    pub fn open_with_options(bytes: &'a [u8], options: OpenOptions) -> Result<Self> {
+        let limits = options.limits_value();
         let limits = limits.validate()?;
-        validation::check_limit("Workbook bytes", bytes.len(), limits.max_workbook_bytes)?;
+        validation::check_limit(
+            crate::LimitKind::WorkbookBytes,
+            bytes.len(),
+            limits.max_workbook_bytes,
+        )?;
         let layout = validation::validate_workbook(bytes, limits)?;
         Ok(Self {
             bytes,
@@ -352,12 +442,13 @@ pub struct Workbook {
 impl Workbook {
     /// Takes ownership and validates without copying the input allocation.
     pub fn open(bytes: Vec<u8>) -> Result<Self> {
-        Self::with_limits(bytes, Limits::default())
+        Self::open_with_options(bytes, OpenOptions::default())
     }
 
     /// Takes ownership and validates under explicit resource bounds.
-    pub fn with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
-        let workbook = WorkbookRef::with_limits(&bytes, limits)?;
+    pub fn open_with_options(bytes: Vec<u8>, options: OpenOptions) -> Result<Self> {
+        let limits = options.limits_value();
+        let workbook = WorkbookRef::open_with_options(&bytes, OpenOptions::new().limits(limits))?;
         let layout = workbook.layout;
         let limits = workbook.limits;
         Ok(Self {

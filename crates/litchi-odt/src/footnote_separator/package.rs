@@ -4,7 +4,7 @@ use litchi_core::Result;
 
 use super::{MAX_SEPARATORS, Separator, codec::parse, invalid};
 
-impl crate::Package {
+impl crate::GenericPackage {
     pub fn style_footnote_separators(&self) -> Result<Vec<Separator>> {
         let mut values = parse(self.styles_xml()?.as_deref().unwrap_or_default())?;
         values.extend(parse(&self.content_xml()?)?);

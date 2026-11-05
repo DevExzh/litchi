@@ -1,10 +1,17 @@
-//! Source checked, lossless transactions for `p232:phTypeExt`.
+//! Source checked, lossless edits of `p232:phTypeExt` (record 0351 §2.3).
 //!
 //! The PowerPoint 2023 placeholder type extension is a scalar value, but its
 //! owner is an arbitrary shape tree that may contain markup this crate does
-//! not understand.  This module therefore edits only the local name of the
-//! existing `p232:cameo` or `p232:unknown` empty token.  It never serializes
-//! or replaces a complete shape.
+//! not understand.  This module therefore edits only the local name of an
+//! existing `p232:cameo` or `p232:unknown` empty token, or inserts or removes
+//! the complete typed extension.  It never serializes or replaces a complete
+//! shape.
+//!
+//! [`Package::placeholder_type_extension`](crate::Package::placeholder_type_extension)
+//! reads a [`Snapshot`]; [`Package::edit_placeholder_type_extension`](crate::Package::edit_placeholder_type_extension)
+//! starts an [`Edit`] whose [`Edit::commit`] publishes a new package with the
+//! reversible [`Patch`]. A changed edit of a signed package is refused: remove
+//! the signature explicitly first with [`Package::unsign`](crate::Package::unsign).
 
 use std::borrow::Cow;
 use std::ops::Range;
@@ -24,8 +31,9 @@ use super::codec::{
     scan_element_span, validate_xml10_chars,
 };
 use super::model::PlaceholderSpec;
+use crate::Result;
+use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::shape::{Key, PLACEHOLDER_TYPE_EXTENSION_URI, PlaceholderTypeExtension, Scene};
-use crate::{Error, Result};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const P232: &[u8] = b"http://schemas.microsoft.com/office/powerpoint/2023/02/main";
@@ -36,39 +44,26 @@ const STRICT_DML: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/main";
 const MAX_OWNER_BYTES: usize = 8 * 1024 * 1024;
 const MAX_GROWTH_BYTES: usize = 64 * 1024;
 
-/// Signature disposition for a changed source checked placeholder patch.
-///
-/// A no-op never needs a signature disposition.  A changed patch defaults to
-/// [`SignaturePolicy::Reject`], preserving the package's signature graph.  A
-/// caller that has deliberately accepted invalidating signatures must choose
-/// [`SignaturePolicy::Invalidate`] explicitly.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SignaturePolicy {
-    /// Refuse a changed patch while signature disposition is required.
-    Reject,
-    /// Remove the package signature infrastructure as part of publication.
-    Invalidate,
-}
-
 /// Finite bounds applied before staging a source checked patch.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Limits {
+pub(crate) struct Limits {
     /// Maximum bytes in the slide, master, or layout owner XML.
-    pub owner_bytes: usize,
+    pub(crate) owner_bytes: usize,
     /// Maximum increase in owner bytes caused by one scalar replacement.
-    pub growth_bytes: usize,
+    pub(crate) growth_bytes: usize,
 }
 
 impl Limits {
     /// Conservative bounded limits for one slide, master, or layout part.
-    pub const DEFAULT: Self = Self {
+    pub(crate) const DEFAULT: Self = Self {
         owner_bytes: MAX_OWNER_BYTES,
         growth_bytes: MAX_GROWTH_BYTES,
     };
 
     /// Construct finite, nonzero limits.
+    #[cfg(test)]
     #[must_use]
-    pub const fn new(owner_bytes: usize, growth_bytes: usize) -> Option<Self> {
+    pub(crate) const fn new(owner_bytes: usize, growth_bytes: usize) -> Option<Self> {
         if owner_bytes == 0 || growth_bytes == 0 {
             None
         } else {
@@ -82,8 +77,9 @@ impl Limits {
     fn check_source(self, bytes: usize) -> Result<()> {
         if bytes > self.owner_bytes {
             return Err(Error::Limit {
-                resource: "p232 placeholder owner XML bytes",
-                limit: self.owner_bytes,
+                kind: LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                observed: bytes,
+                maximum: self.owner_bytes,
             });
         }
         Ok(())
@@ -95,8 +91,9 @@ impl Limits {
         let growth = target.saturating_sub(source);
         if growth > self.growth_bytes {
             return Err(Error::Limit {
-                resource: "p232 placeholder patch growth bytes",
-                limit: self.growth_bytes,
+                kind: LimitKind::Codec(crate::opened::CodecLimitKind::PatchBytes),
+                observed: growth,
+                maximum: self.growth_bytes,
             });
         }
         Ok(())
@@ -107,408 +104,6 @@ impl Default for Limits {
     fn default() -> Self {
         Self::DEFAULT
     }
-}
-
-/// An exact source snapshot of one existing typed placeholder extension.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Snapshot {
-    owner: PackURI,
-    source: Arc<Vec<u8>>,
-    shape_index: usize,
-    shape_name: Option<String>,
-    placeholder_index: u32,
-    value: PlaceholderTypeExtension,
-    variant: VariantSpan,
-    limits: Limits,
-}
-
-impl Snapshot {
-    /// Owning slide, master, or layout part.
-    #[must_use]
-    pub fn owner(&self) -> &PackURI {
-        &self.owner
-    }
-
-    /// Exact owner XML captured by this snapshot.
-    #[must_use]
-    pub fn source_xml(&self) -> &[u8] {
-        self.source.as_slice()
-    }
-
-    /// Checked pre-order shape index used by this source snapshot.
-    #[must_use]
-    pub const fn shape_index(&self) -> usize {
-        self.shape_index
-    }
-
-    /// Shape name when the source supplied one.
-    #[must_use]
-    pub fn shape_name(&self) -> Option<&str> {
-        self.shape_name.as_deref()
-    }
-
-    /// Placeholder index (`idx`, defaulting to zero).
-    #[must_use]
-    pub const fn placeholder_index(&self) -> u32 {
-        self.placeholder_index
-    }
-
-    /// Typed p232 scalar value.
-    #[must_use]
-    pub const fn value(&self) -> PlaceholderTypeExtension {
-        self.value
-    }
-
-    /// Start a move-only edit tied to this exact owner source.
-    #[must_use]
-    pub fn edit(self) -> Edit {
-        Edit {
-            snapshot: self,
-            target: None,
-        }
-    }
-
-    fn same_source(&self, other: &Self) -> bool {
-        self.owner == other.owner
-            && self.source.as_slice() == other.source.as_slice()
-            && self.shape_index == other.shape_index
-            && self.shape_name == other.shape_name
-            && self.placeholder_index == other.placeholder_index
-            && self.value == other.value
-    }
-}
-
-/// A move-only scalar p232 edit.
-#[derive(Debug)]
-pub struct Edit {
-    snapshot: Snapshot,
-    target: Option<PlaceholderTypeExtension>,
-}
-
-impl Edit {
-    /// Value projected by this edit.
-    #[must_use]
-    pub fn value(&self) -> PlaceholderTypeExtension {
-        self.target.unwrap_or(self.snapshot.value)
-    }
-
-    /// Set the p232 token while retaining the source's spelling and layout.
-    pub fn set(&mut self, value: PlaceholderTypeExtension) {
-        self.target = Some(value);
-    }
-
-    /// Whether this edit changes the typed value.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.value() != self.snapshot.value
-    }
-
-    /// Consume this edit into a source checked, reversible commit.
-    ///
-    /// The staged bytes are bounded before the owner buffer is allocated.
-    /// Only the local token name changes; all shape and extension bytes remain
-    /// otherwise identical.
-    pub fn commit(self) -> Result<Commit> {
-        let target = self.value();
-        if target == self.snapshot.value {
-            return Ok(Commit {
-                snapshot: self.snapshot.clone(),
-                patch: Patch {
-                    before: self.snapshot.clone(),
-                    after: self.snapshot,
-                },
-            });
-        }
-        let staged = replace_variant(
-            self.snapshot.source.as_slice(),
-            &self.snapshot.variant,
-            target,
-            self.snapshot.limits,
-        )?;
-        let after = snapshot_from_source(
-            self.snapshot.owner.clone(),
-            Arc::new(staged),
-            self.snapshot.shape_index,
-            self.snapshot.limits,
-        )?;
-        if after.value != target {
-            return Err(Error::Invalid(
-                "staged p232 placeholder type did not round-trip".into(),
-            ));
-        }
-        Ok(Commit {
-            snapshot: after.clone(),
-            patch: Patch {
-                before: self.snapshot,
-                after,
-            },
-        })
-    }
-}
-
-/// A successful detached edit and its reversible source patch.
-#[derive(Clone, Debug)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
-
-impl Commit {
-    /// Snapshot expected after publication.
-    #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Reversible source patch represented by this commit.
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Whether this commit changes owner bytes.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.patch.is_changed()
-    }
-
-    /// Alias for callers that prefer a no-op predicate.
-    #[must_use]
-    pub fn is_noop(&self) -> bool {
-        !self.is_changed()
-    }
-
-    /// Consume this commit into its reversible patch.
-    #[must_use]
-    pub fn into_patch(self) -> Patch {
-        self.patch
-    }
-}
-
-/// A source checked, reversible p232 scalar replacement.
-#[derive(Clone, Debug)]
-pub struct Patch {
-    before: Snapshot,
-    after: Snapshot,
-}
-
-impl Patch {
-    /// Snapshot required before forward application.
-    #[must_use]
-    pub fn before(&self) -> &Snapshot {
-        &self.before
-    }
-
-    /// Snapshot expected after forward application.
-    #[must_use]
-    pub fn after(&self) -> &Snapshot {
-        &self.after
-    }
-
-    /// Whether this patch is an exact byte-preserving no-op.
-    #[must_use]
-    pub fn is_noop(&self) -> bool {
-        self.before.same_source(&self.after)
-    }
-
-    /// Alias used by transaction callers that prefer changed terminology.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.is_noop()
-    }
-
-    /// Return the exact inverse patch.
-    #[must_use]
-    pub fn inverse(&self) -> Self {
-        Self {
-            before: self.after.clone(),
-            after: self.before.clone(),
-        }
-    }
-
-    /// Apply with the default signature policy, which rejects a changed
-    /// signed source.
-    pub fn apply(&self, package: &mut OpcPackage) -> Result<Snapshot> {
-        apply_patch(package, self)
-    }
-
-    /// Apply with an explicit signature disposition.
-    pub fn apply_with_policy(
-        &self,
-        package: &mut OpcPackage,
-        policy: SignaturePolicy,
-    ) -> Result<Snapshot> {
-        apply_patch_with_policy(package, self, policy)
-    }
-}
-
-/// Load one existing p232 placeholder type extension from a slide, master, or layout.
-pub fn load_snapshot<'a>(
-    package: &OpcPackage,
-    owner: &PackURI,
-    key: impl Into<Key<'a>>,
-) -> Result<Snapshot> {
-    load_snapshot_with_limits(package, owner, key, Limits::DEFAULT)
-}
-
-/// Load one existing p232 placeholder type extension under finite limits.
-pub fn load_snapshot_with_limits<'a>(
-    package: &OpcPackage,
-    owner: &PackURI,
-    key: impl Into<Key<'a>>,
-    limits: Limits,
-) -> Result<Snapshot> {
-    let part = package.get_part(owner)?;
-    validate_owner(part)?;
-    let source = part.blob_arc();
-    snapshot_from_source_for_key(part.partname().clone(), source, key.into(), limits)
-}
-
-/// Apply a patch while rejecting any changed signature disposition.
-pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
-    apply_patch_with_policy(package, patch, SignaturePolicy::Reject)
-}
-
-/// Apply a patch after an exact source check and an explicit signature policy.
-pub fn apply_patch_with_policy(
-    package: &mut OpcPackage,
-    patch: &Patch,
-    policy: SignaturePolicy,
-) -> Result<Snapshot> {
-    let part = package.get_part(&patch.before.owner)?;
-    validate_owner(part)?;
-    patch.before.limits.check_source(part.blob().len())?;
-    if part.blob() != patch.before.source.as_slice() {
-        return Err(Error::StaleSource);
-    }
-    if patch.is_noop() {
-        return Ok(patch.before.clone());
-    }
-
-    patch
-        .before
-        .limits
-        .check_growth(patch.before.source.len(), patch.after.source.len())?;
-    if matches!(policy, SignaturePolicy::Reject)
-        && (package.is_signed() || package.requires_signature_edit_policy())
-    {
-        return Err(Error::Opc(
-            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy,
-        ));
-    }
-
-    // All source, semantic, growth, and signature checks complete before the
-    // package clone or its first mutation.
-    let mut candidate = package.clone();
-    let staged = Arc::clone(&patch.after.source);
-    candidate
-        .get_part_mut(&patch.after.owner)?
-        .set_blob_shared(staged);
-    let published = load_snapshot_with_limits(
-        &candidate,
-        &patch.after.owner,
-        Key::Index(patch.after.shape_index),
-        patch.after.limits,
-    )?;
-    if !published.same_source(&patch.after) {
-        return Err(Error::Invalid(
-            "published p232 placeholder patch differs from the commit".into(),
-        ));
-    }
-    if matches!(policy, SignaturePolicy::Invalidate) {
-        candidate.unsign();
-    }
-    *package = candidate;
-    Ok(published)
-}
-
-/// Apply a committed edit with the default signature policy.
-pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot> {
-    apply_patch(package, &commit.patch)
-}
-
-fn snapshot_from_source_for_key<'a>(
-    owner: PackURI,
-    source: Arc<Vec<u8>>,
-    key: Key<'a>,
-    limits: Limits,
-) -> Result<Snapshot> {
-    limits.check_source(source.len())?;
-    let scene = Scene::read(source.as_slice())?;
-    if scene.is_rewritten() {
-        return Err(Error::UnsafeEdit {
-            operation: "load_p232_placeholder_patch",
-            reason: "markup compatibility rewrote the owner; no source-preserving patch policy is available",
-        });
-    }
-    let shape = scene.shape(key)?;
-    let placeholder = shape
-        .placeholder()
-        .ok_or_else(|| Error::Invalid("selected shape is not a placeholder".into()))?;
-    let value = placeholder.type_extension().ok_or_else(|| {
-        Error::Invalid("selected placeholder has no p232:phTypeExt scalar".into())
-    })?;
-    let span = shape.span()?.range(scene.xml().len())?;
-    let (variant, variant_value) = locate_typed_variant(scene.xml(), span)?;
-    if variant_value != value {
-        return Err(Error::Invalid(
-            "typed p232 placeholder metadata disagrees with source XML".into(),
-        ));
-    }
-    let shape_index = shape.common().index();
-    let shape_name = shape.name().map(str::to_owned);
-    let placeholder_index = placeholder.index();
-    Ok(Snapshot {
-        owner,
-        source,
-        shape_index,
-        shape_name,
-        placeholder_index,
-        value,
-        variant,
-        limits,
-    })
-}
-
-fn snapshot_from_source(
-    owner: PackURI,
-    source: Arc<Vec<u8>>,
-    shape_index: usize,
-    limits: Limits,
-) -> Result<Snapshot> {
-    let scene = Scene::read(source.as_slice())?;
-    if scene.is_rewritten() {
-        return Err(Error::UnsafeEdit {
-            operation: "stage_p232_placeholder_patch",
-            reason: "markup compatibility rewrote the owner; no source-preserving patch policy is available",
-        });
-    }
-    let shape = scene.at(shape_index)?;
-    let placeholder = shape
-        .placeholder()
-        .ok_or_else(|| Error::Invalid("staged shape is no longer a placeholder".into()))?;
-    let value = placeholder
-        .type_extension()
-        .ok_or_else(|| Error::Invalid("staged placeholder has no p232:phTypeExt scalar".into()))?;
-    let span = shape.span()?.range(scene.xml().len())?;
-    let (variant, variant_value) = locate_typed_variant(scene.xml(), span)?;
-    if variant_value != value {
-        return Err(Error::Invalid(
-            "staged p232 placeholder metadata disagrees with source XML".into(),
-        ));
-    }
-    let shape_name = shape.name().map(str::to_owned);
-    let placeholder_index = placeholder.index();
-    Ok(Snapshot {
-        owner,
-        source,
-        shape_index,
-        shape_name,
-        placeholder_index,
-        value,
-        variant,
-        limits,
-    })
 }
 
 fn replace_variant(
@@ -535,24 +130,6 @@ fn replace_variant(
 struct VariantSpan {
     open_name: Range<usize>,
     close_name: Option<Range<usize>>,
-}
-
-fn locate_typed_variant(
-    source: &[u8],
-    shape: Range<usize>,
-) -> Result<(VariantSpan, PlaceholderTypeExtension)> {
-    let (location, value) = locate_slot(source, shape)?;
-    let SlotLocation::Existing { variant, .. } = location else {
-        return Err(Error::Invalid(
-            "selected placeholder has no p232 empty type token".into(),
-        ));
-    };
-    Ok((
-        variant,
-        value.ok_or_else(|| {
-            Error::Invalid("selected placeholder has no p232 empty type token".into())
-        })?,
-    ))
 }
 
 fn local_name_range(source: &[u8], start: usize, name: QName<'_>) -> Result<Range<usize>> {
@@ -651,11 +228,12 @@ impl PlaceholderTypeExtension {
 
 /// A source snapshot of a placeholder's optional p232 extension.
 ///
-/// Unlike [`Snapshot`], this state object also represents an absent extension.
-/// It is the transaction entry point for adding, replacing, and removing the
-/// extension on a placeholder in a slide, slide master, or slide layout.
+/// This state object also represents an absent extension.
+/// [`crate::Package::edit_placeholder_type_extension`] adds, replaces and
+/// removes the extension on a placeholder in a slide, slide master, or slide
+/// layout.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SlotSnapshot {
+pub struct Snapshot {
     owner: PackURI,
     source: Arc<Vec<u8>>,
     shape_index: usize,
@@ -664,9 +242,10 @@ pub struct SlotSnapshot {
     value: Option<PlaceholderTypeExtension>,
     location: SlotLocation,
     limits: Limits,
+    shape_limits: crate::shape::Limits,
 }
 
-impl SlotSnapshot {
+impl Snapshot {
     /// Owning slide, master, or layout part.
     #[must_use]
     pub fn owner(&self) -> &PackURI {
@@ -711,8 +290,8 @@ impl SlotSnapshot {
 
     /// Start a move-only add/remove/update edit tied to this exact source.
     #[must_use]
-    pub fn edit(self) -> SlotEdit {
-        SlotEdit {
+    pub(crate) fn edit(self) -> SlotDraft {
+        SlotDraft {
             snapshot: self,
             target: None,
             target_set: false,
@@ -726,21 +305,22 @@ impl SlotSnapshot {
             && self.shape_name == other.shape_name
             && self.placeholder_index == other.placeholder_index
             && self.value == other.value
+            && self.shape_limits == other.shape_limits
     }
 }
 
 /// A move-only source-preserving p232 add/remove/update edit.
 #[derive(Debug)]
-pub struct SlotEdit {
-    snapshot: SlotSnapshot,
+pub(crate) struct SlotDraft {
+    snapshot: Snapshot,
     target: Option<PlaceholderTypeExtension>,
     target_set: bool,
 }
 
-impl SlotEdit {
+impl SlotDraft {
     /// Value projected by this edit, or `None` for removal.
     #[must_use]
-    pub const fn value(&self) -> Option<PlaceholderTypeExtension> {
+    pub(crate) const fn value(&self) -> Option<PlaceholderTypeExtension> {
         if self.target_set {
             self.target
         } else {
@@ -749,44 +329,36 @@ impl SlotEdit {
     }
 
     /// Set or replace the p232 scalar.
-    pub fn set(&mut self, value: PlaceholderTypeExtension) {
-        self.target = Some(value);
-        self.target_set = true;
+    #[cfg(test)]
+    pub(crate) fn set(&mut self, value: PlaceholderTypeExtension) {
+        self.set_optional(Some(value));
+    }
+
+    /// Add or replace the extension with `value`.
+    #[cfg(test)]
+    pub(crate) fn add(&mut self, value: PlaceholderTypeExtension) {
+        self.set_optional(Some(value));
+    }
+
+    /// Remove the extension.
+    #[cfg(test)]
+    pub(crate) fn remove(&mut self) {
+        self.set_optional(None);
     }
 
     /// Set the optional scalar. `None` removes the complete typed extension.
-    pub fn set_optional(&mut self, value: Option<PlaceholderTypeExtension>) {
+    pub(crate) fn set_optional(&mut self, value: Option<PlaceholderTypeExtension>) {
         self.target = value;
         self.target_set = true;
     }
 
-    /// Add or replace the extension with `value`.
-    pub fn add(&mut self, value: PlaceholderTypeExtension) {
-        self.set(value);
-    }
-
-    /// Remove the extension.
-    pub fn remove(&mut self) {
-        self.target = None;
-        self.target_set = true;
-    }
-
-    /// Whether this edit changes owner bytes.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.value() != self.snapshot.value
-    }
-
-    /// Consume this edit into a source-checked reversible commit.
-    pub fn commit(self) -> Result<SlotCommit> {
+    /// Consume this edit into a source-checked reversible change.
+    pub(crate) fn commit(self) -> Result<SlotChange> {
         let target = self.value();
         if target == self.snapshot.value {
-            return Ok(SlotCommit {
-                snapshot: self.snapshot.clone(),
-                patch: SlotPatch {
-                    before: self.snapshot.clone(),
-                    after: self.snapshot,
-                },
+            return Ok(SlotChange {
+                before: self.snapshot.clone(),
+                after: self.snapshot,
             });
         }
         let staged = rewrite_slot(
@@ -800,155 +372,122 @@ impl SlotEdit {
             Arc::new(staged),
             self.snapshot.shape_index,
             self.snapshot.limits,
+            self.snapshot.shape_limits,
         )?;
         if after.value != target {
             return Err(Error::Invalid(
                 "staged p232 placeholder extension did not round-trip".into(),
             ));
         }
-        Ok(SlotCommit {
-            snapshot: after.clone(),
-            patch: SlotPatch {
-                before: self.snapshot,
-                after,
-            },
+        Ok(SlotChange {
+            before: self.snapshot,
+            after,
         })
-    }
-}
-
-/// A successful source-preserving p232 add/remove/update commit.
-#[derive(Clone, Debug)]
-pub struct SlotCommit {
-    snapshot: SlotSnapshot,
-    patch: SlotPatch,
-}
-
-impl SlotCommit {
-    /// Snapshot expected after publication.
-    #[must_use]
-    pub fn snapshot(&self) -> &SlotSnapshot {
-        &self.snapshot
-    }
-
-    /// Reversible source patch represented by this commit.
-    #[must_use]
-    pub fn patch(&self) -> &SlotPatch {
-        &self.patch
-    }
-
-    /// Whether this commit changes owner bytes.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.patch.is_changed()
-    }
-
-    /// Whether this commit is an exact byte-preserving no-op.
-    #[must_use]
-    pub fn is_noop(&self) -> bool {
-        !self.is_changed()
-    }
-
-    /// Consume this commit into its reversible patch.
-    #[must_use]
-    pub fn into_patch(self) -> SlotPatch {
-        self.patch
     }
 }
 
 /// A source-checked, reversible p232 add/remove/update patch.
 #[derive(Clone, Debug)]
-pub struct SlotPatch {
-    before: SlotSnapshot,
-    after: SlotSnapshot,
+pub(crate) struct SlotChange {
+    before: Snapshot,
+    after: Snapshot,
 }
 
-impl SlotPatch {
-    /// Snapshot required before forward application.
-    #[must_use]
-    pub fn before(&self) -> &SlotSnapshot {
-        &self.before
+impl SlotChange {
+    /// Test seam: the change itself, as the former commit exposed it.
+    #[cfg(test)]
+    pub(crate) const fn patch(&self) -> &Self {
+        self
     }
 
-    /// Snapshot expected after forward application.
-    #[must_use]
-    pub fn after(&self) -> &SlotSnapshot {
+    /// Test seam: the snapshot expected after publication.
+    #[cfg(test)]
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.after
     }
 
-    /// Whether this patch is an exact byte-preserving no-op.
-    #[must_use]
-    pub fn is_noop(&self) -> bool {
-        self.before.same_source(&self.after)
+    /// Test seam: the change itself.
+    #[cfg(test)]
+    pub(crate) fn into_patch(self) -> Self {
+        self
     }
 
-    /// Whether this patch changes owner bytes.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.is_noop()
+    /// Test seam: whether the change edits its owner.
+    #[cfg(test)]
+    pub(crate) fn diagnostics(&self) -> Diagnostics {
+        Diagnostics::new(!self.is_noop())
     }
 
-    /// Return the exact inverse patch.
-    #[must_use]
-    pub fn inverse(&self) -> Self {
+    /// Test seam: the exact inverse change.
+    #[cfg(test)]
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
         }
     }
 
-    /// Apply with the default signature policy, rejecting changed signed input.
-    pub fn apply(&self, package: &mut OpcPackage) -> Result<SlotSnapshot> {
-        apply_slot_patch(package, self)
-    }
-
-    /// Apply with an explicit signature disposition.
-    pub fn apply_with_policy(
-        &self,
-        package: &mut OpcPackage,
-        policy: SignaturePolicy,
-    ) -> Result<SlotSnapshot> {
-        apply_slot_patch_with_policy(package, self, policy)
+    /// Whether this patch is an exact byte-preserving no-op.
+    #[must_use]
+    pub(crate) fn is_noop(&self) -> bool {
+        self.before.same_source(&self.after)
     }
 }
 
 /// Load an optional p232 extension from a slide, master, or layout placeholder.
-pub fn load_slot_snapshot<'a>(
+#[cfg(test)]
+pub(crate) fn load_slot_snapshot<'a>(
     package: &OpcPackage,
     owner: &PackURI,
     key: impl Into<Key<'a>>,
-) -> Result<SlotSnapshot> {
-    load_slot_snapshot_with_limits(package, owner, key, Limits::DEFAULT)
+) -> Result<Snapshot> {
+    load_slot_snapshot_with_shape_limits(
+        package,
+        owner,
+        key,
+        Limits::DEFAULT,
+        crate::shape::Limits::DEFAULT,
+    )
 }
 
 /// Load an optional p232 extension under finite source and growth limits.
-pub fn load_slot_snapshot_with_limits<'a>(
+#[cfg(test)]
+pub(crate) fn load_slot_snapshot_with_limits<'a>(
     package: &OpcPackage,
     owner: &PackURI,
     key: impl Into<Key<'a>>,
     limits: Limits,
-) -> Result<SlotSnapshot> {
+) -> Result<Snapshot> {
+    load_slot_snapshot_with_shape_limits(package, owner, key, limits, crate::shape::Limits::DEFAULT)
+}
+
+/// Load an optional p232 extension with separate source and shape policies.
+pub(crate) fn load_slot_snapshot_with_shape_limits<'a>(
+    package: &OpcPackage,
+    owner: &PackURI,
+    key: impl Into<Key<'a>>,
+    limits: Limits,
+    shape_limits: crate::shape::Limits,
+) -> Result<Snapshot> {
     let part = package.get_part(owner)?;
     validate_owner(part)?;
-    slot_snapshot_from_source_for_key(part.partname().clone(), part.blob_arc(), key.into(), limits)
+    slot_snapshot_from_source_for_key(
+        part.partname().clone(),
+        part.blob_arc(),
+        key.into(),
+        limits,
+        shape_limits,
+    )
 }
 
-/// Apply an add/remove/update patch with the default signature policy.
-pub fn apply_slot_patch(package: &mut OpcPackage, patch: &SlotPatch) -> Result<SlotSnapshot> {
-    apply_slot_patch_with_policy(package, patch, SignaturePolicy::Reject)
-}
-
-/// Apply an add/remove/update patch after exact source, semantic, bound, and
-/// explicit signature checks.
-pub fn apply_slot_patch_with_policy(
-    package: &mut OpcPackage,
-    patch: &SlotPatch,
-    policy: SignaturePolicy,
-) -> Result<SlotSnapshot> {
+/// Apply an add/remove/update patch after exact source, semantic, bound and
+/// signature checks; a changed patch of a signed package is refused.
+pub(crate) fn apply_slot_patch(package: &mut OpcPackage, patch: &SlotChange) -> Result<Snapshot> {
     let part = package.get_part(&patch.before.owner)?;
     validate_owner(part)?;
     patch.before.limits.check_source(part.blob().len())?;
     if part.blob() != patch.before.source.as_slice() {
-        return Err(Error::StaleSource);
+        return Err(Error::PatchConflict);
     }
     if patch.is_noop() {
         return Ok(patch.before.clone());
@@ -957,9 +496,7 @@ pub fn apply_slot_patch_with_policy(
         .before
         .limits
         .check_growth(patch.before.source.len(), patch.after.source.len())?;
-    if matches!(policy, SignaturePolicy::Reject)
-        && (package.is_signed() || package.requires_signature_edit_policy())
-    {
+    if package.is_signed() || package.requires_signature_edit_policy() {
         return Err(Error::Opc(
             litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy,
         ));
@@ -970,27 +507,20 @@ pub fn apply_slot_patch_with_policy(
     candidate
         .get_part_mut(&patch.after.owner)?
         .set_blob_shared(Arc::clone(&patch.after.source));
-    let published = load_slot_snapshot_with_limits(
+    let published = load_slot_snapshot_with_shape_limits(
         &candidate,
         &patch.after.owner,
         Key::Index(patch.after.shape_index),
         patch.after.limits,
+        patch.after.shape_limits,
     )?;
     if !published.same_source(&patch.after) {
         return Err(Error::Invalid(
             "published p232 placeholder slot differs from the commit".into(),
         ));
     }
-    if matches!(policy, SignaturePolicy::Invalidate) {
-        candidate.unsign();
-    }
     *package = candidate;
     Ok(published)
-}
-
-/// Apply a committed add/remove/update patch with the default signature policy.
-pub fn apply_slot_commit(package: &mut OpcPackage, commit: SlotCommit) -> Result<SlotSnapshot> {
-    apply_slot_patch(package, &commit.patch)
 }
 
 /// Store one placeholder shape while preserving the bytes of an existing
@@ -1002,10 +532,18 @@ pub fn apply_slot_commit(package: &mut OpcPackage, commit: SlotCommit) -> Result
 /// and p232 slot; a new shape is appended only when the requested placeholder
 /// does not exist.  Slide, slide-master, and slide-layout owners are all
 /// accepted.
-pub fn store_placeholder_shape_source(
+///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+pub(crate) fn store_placeholder_shape_source_with_shape_limits(
     package: &mut OpcPackage,
     part_name: &PackURI,
     spec: &PlaceholderSpec,
+    shape_limits: crate::shape::Limits,
 ) -> Result<()> {
     validate_placeholder_spec(spec)?;
     let part = package.get_part(part_name)?;
@@ -1021,18 +559,20 @@ pub fn store_placeholder_shape_source(
             source,
         })?;
     source.extend_from_slice(blob);
-    let mut patched = prepare_placeholder_shape_source(&source, spec, limits)?;
+    let mut patched = prepare_placeholder_shape_source(&source, spec, limits, shape_limits)?;
 
     if patched == source {
         return Ok(());
     }
+    // A changed owner invalidates every signature, so this compatibility
+    // authoring API refuses a signed package (ADR 0006). Callers remove the
+    // signature explicitly first, or use the source checked slot transactions
+    // above with the explicit Invalidate policy.
+    refuse_signed_change(package)?;
     package
         .get_part_mut(part_name)?
         .set_blob(std::mem::take(&mut patched));
-    // This compatibility authoring API has always invalidated signatures on a
-    // changed owner.  Source checked slot transactions above expose the
-    // explicit Reject/Invalidate policy for callers that need that choice.
-    package.unsign();
+    settle_unsigned_change(package)?;
     Ok(())
 }
 
@@ -1044,15 +584,17 @@ fn prepare_placeholder_shape_source(
     source: &[u8],
     spec: &PlaceholderSpec,
     limits: Limits,
+    shape_limits: crate::shape::Limits,
 ) -> Result<Vec<u8>> {
     validate_placeholder_spec(spec)?;
     limits.check_source(source.len())?;
-    let scene = Scene::read(source)?;
+    let scene = Scene::read(source, shape_limits)?;
     if scene.is_rewritten() {
-        return Err(Error::UnsafeEdit {
-            operation: "store_placeholder_shape",
-            reason: "markup compatibility rewrote the owner; source-preserving shape authoring is unavailable",
-        });
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "store_placeholder_shape",
+            "markup compatibility rewrote the owner; source-preserving shape authoring is unavailable",
+        ));
     }
 
     let mut patched = if let Some((shape_index, shape)) = find_placeholder_shape(&scene, spec)? {
@@ -1076,7 +618,7 @@ fn prepare_placeholder_shape_source(
                 limits,
             )?)
         };
-        patch_existing_shape_fields(typed.as_ref(), shape_index, spec, limits)?
+        patch_existing_shape_fields(typed.as_ref(), shape_index, spec, limits, shape_limits)?
     } else {
         let tree = scan_element_span(source, "spTree", SPTREE_DEPTH)?
             .ok_or_else(|| invalid("owner has no shape tree"))?;
@@ -1089,12 +631,13 @@ fn prepare_placeholder_shape_source(
     };
 
     limits.check_source(patched.len())?;
-    let final_scene = Scene::read(&patched)?;
+    let final_scene = Scene::read(&patched, shape_limits)?;
     if final_scene.is_rewritten() {
-        return Err(Error::UnsafeEdit {
-            operation: "store_placeholder_shape",
-            reason: "staged owner requires markup compatibility rewriting",
-        });
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "store_placeholder_shape",
+            "staged owner requires markup compatibility rewriting",
+        ));
     }
     let (_, shape) = find_placeholder_shape(&final_scene, spec)?
         .ok_or_else(|| invalid("authored placeholder shape did not round-trip"))?;
@@ -1121,15 +664,17 @@ fn prepare_placeholder_shape_source(
 
 /// Validate the bounded inputs that the package facade must check before its
 /// generic transaction snapshots the whole OPC graph.
-pub(crate) fn preflight_store_placeholder_shape(
+pub(crate) fn preflight_store_placeholder_shape_with_shape_limits(
     package: &OpcPackage,
     part_name: &PackURI,
     spec: &PlaceholderSpec,
+    shape_limits: crate::shape::Limits,
 ) -> Result<bool> {
     validate_placeholder_spec(spec)?;
     let part = package.get_part(part_name)?;
     validate_owner(part)?;
-    let staged = prepare_placeholder_shape_source(part.blob(), spec, Limits::DEFAULT)?;
+    let staged =
+        prepare_placeholder_shape_source(part.blob(), spec, Limits::DEFAULT, shape_limits)?;
     Ok(staged.as_slice() == part.blob())
 }
 
@@ -1149,8 +694,9 @@ fn validate_placeholder_spec(spec: &PlaceholderSpec) -> Result<()> {
     {
         if escaped_xml_len(value)? > MAX_OWNER_BYTES {
             return Err(Error::Limit {
-                resource: "p232 placeholder escaped XML bytes",
-                limit: MAX_OWNER_BYTES,
+                kind: LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                observed: escaped_xml_len(value)?,
+                maximum: MAX_OWNER_BYTES,
             });
         }
     }
@@ -1185,13 +731,15 @@ fn patch_existing_shape_fields(
     shape_index: usize,
     spec: &PlaceholderSpec,
     limits: Limits,
+    shape_limits: crate::shape::Limits,
 ) -> Result<Vec<u8>> {
-    let scene = Scene::read(source)?;
+    let scene = Scene::read(source, shape_limits)?;
     if scene.is_rewritten() {
-        return Err(Error::UnsafeEdit {
-            operation: "store_placeholder_shape",
-            reason: "staged owner requires markup compatibility rewriting",
-        });
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "store_placeholder_shape",
+            "staged owner requires markup compatibility rewriting",
+        ));
     }
     let shape = scene.at(shape_index)?;
     let span = shape.span()?.range(scene.xml().len())?;
@@ -1297,8 +845,9 @@ fn apply_replacements(
             .checked_sub(replacement.range.end - replacement.range.start)
             .and_then(|value| value.checked_add(replacement.bytes.len()))
             .ok_or(Error::Limit {
-                resource: "p232 placeholder shape output bytes",
-                limit: limits.owner_bytes,
+                kind: LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+                observed: usize::MAX,
+                maximum: limits.owner_bytes,
             })?;
         previous_end = replacement.range.end;
     }
@@ -1329,8 +878,9 @@ fn escaped_xml_len(value: &str) -> Result<usize> {
             _ => character.len_utf8(),
         };
         length.checked_add(extra).ok_or(Error::Limit {
-            resource: "p232 placeholder escaped XML bytes",
-            limit: MAX_OWNER_BYTES,
+            kind: LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: usize::MAX,
+            maximum: MAX_OWNER_BYTES,
         })
     })
 }
@@ -1339,8 +889,9 @@ fn escape_xml_bounded(value: &str, limits: Limits) -> Result<Vec<u8>> {
     let length = escaped_xml_len(value)?;
     if length > limits.owner_bytes {
         return Err(Error::Limit {
-            resource: "p232 placeholder escaped XML bytes",
-            limit: limits.owner_bytes,
+            kind: LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: length,
+            maximum: limits.owner_bytes,
         });
     }
     let mut escaped = Vec::new();
@@ -1607,14 +1158,16 @@ fn slot_snapshot_from_source_for_key<'a>(
     source: Arc<Vec<u8>>,
     key: Key<'a>,
     limits: Limits,
-) -> Result<SlotSnapshot> {
+    shape_limits: crate::shape::Limits,
+) -> Result<Snapshot> {
     limits.check_source(source.len())?;
-    let scene = Scene::read(source.as_slice())?;
+    let scene = Scene::read(source.as_slice(), shape_limits)?;
     if scene.is_rewritten() {
-        return Err(Error::UnsafeEdit {
-            operation: "load_p232_placeholder_slot",
-            reason: "markup compatibility rewrote the owner; no source-preserving patch policy is available",
-        });
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "load_p232_placeholder_slot",
+            "markup compatibility rewrote the owner; no source-preserving patch policy is available",
+        ));
     }
     let shape = scene.shape(key)?;
     let placeholder = shape
@@ -1630,7 +1183,7 @@ fn slot_snapshot_from_source_for_key<'a>(
     let shape_index = shape.common().index();
     let shape_name = shape.name().map(str::to_owned);
     let placeholder_index = placeholder.index();
-    Ok(SlotSnapshot {
+    Ok(Snapshot {
         owner,
         source,
         shape_index,
@@ -1639,6 +1192,7 @@ fn slot_snapshot_from_source_for_key<'a>(
         value: source_value,
         location,
         limits,
+        shape_limits,
     })
 }
 
@@ -1647,13 +1201,15 @@ fn slot_snapshot_from_source(
     source: Arc<Vec<u8>>,
     shape_index: usize,
     limits: Limits,
-) -> Result<SlotSnapshot> {
-    let scene = Scene::read(source.as_slice())?;
+    shape_limits: crate::shape::Limits,
+) -> Result<Snapshot> {
+    let scene = Scene::read(source.as_slice(), shape_limits)?;
     if scene.is_rewritten() {
-        return Err(Error::UnsafeEdit {
-            operation: "stage_p232_placeholder_slot",
-            reason: "markup compatibility rewrote the owner; no source-preserving patch policy is available",
-        });
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "stage_p232_placeholder_slot",
+            "markup compatibility rewrote the owner; no source-preserving patch policy is available",
+        ));
     }
     let shape = scene.at(shape_index)?;
     let placeholder = shape
@@ -1668,7 +1224,7 @@ fn slot_snapshot_from_source(
     }
     let shape_name = shape.name().map(str::to_owned);
     let placeholder_index = placeholder.index();
-    Ok(SlotSnapshot {
+    Ok(Snapshot {
         owner,
         source,
         shape_index,
@@ -1677,6 +1233,7 @@ fn slot_snapshot_from_source(
         value: source_value,
         location,
         limits,
+        shape_limits,
     })
 }
 
@@ -2077,16 +1634,18 @@ fn rewrite_slot(
                             length.checked_add(close_element_len(&prefix, b"extLst"))
                         })
                         .ok_or(Error::Limit {
-                            resource: "p232 placeholder patch output bytes",
-                            limit: limits.owner_bytes,
+                            kind: LimitKind::Codec(crate::opened::CodecLimitKind::PatchBytes),
+                            observed: usize::MAX,
+                            maximum: limits.owner_bytes,
                         })?;
                     let target_len = source
                         .len()
                         .checked_sub(list_len)
                         .and_then(|length| length.checked_add(replacement_len))
                         .ok_or(Error::Limit {
-                            resource: "p232 placeholder patch output bytes",
-                            limit: limits.owner_bytes,
+                            kind: LimitKind::Codec(crate::opened::CodecLimitKind::PatchBytes),
+                            observed: usize::MAX,
+                            maximum: limits.owner_bytes,
                         })?;
                     limits.check_growth(source.len(), target_len)?;
                     let extension = extension_bytes(&prefix, value)?;
@@ -2105,8 +1664,9 @@ fn rewrite_slot(
                             .len()
                             .checked_add(extension_len)
                             .ok_or(Error::Limit {
-                                resource: "p232 placeholder patch output bytes",
-                                limit: limits.owner_bytes,
+                                kind: LimitKind::Codec(crate::opened::CodecLimitKind::PatchBytes),
+                                observed: usize::MAX,
+                                maximum: limits.owner_bytes,
                             })?,
                     )?;
                     let extension = extension_bytes(&prefix, value)?;
@@ -2128,16 +1688,18 @@ fn rewrite_slot(
                                 })
                         })
                         .ok_or(Error::Limit {
-                            resource: "p232 placeholder patch output bytes",
-                            limit: limits.owner_bytes,
+                            kind: LimitKind::Codec(crate::opened::CodecLimitKind::PatchBytes),
+                            observed: usize::MAX,
+                            maximum: limits.owner_bytes,
                         })?;
                     let target_len = source
                         .len()
                         .checked_sub(placeholder_len)
                         .and_then(|length| length.checked_add(replacement_len))
                         .ok_or(Error::Limit {
-                            resource: "p232 placeholder patch output bytes",
-                            limit: limits.owner_bytes,
+                            kind: LimitKind::Codec(crate::opened::CodecLimitKind::PatchBytes),
+                            observed: usize::MAX,
+                            maximum: limits.owner_bytes,
                         })?;
                     limits.check_growth(source.len(), target_len)?;
                     let extension = extension_bytes(&prefix, value)?;
@@ -2161,8 +1723,9 @@ fn rewrite_slot(
                             length.checked_add(close_element_len(&prefix, b"extLst"))
                         })
                         .ok_or(Error::Limit {
-                            resource: "p232 placeholder patch output bytes",
-                            limit: limits.owner_bytes,
+                            kind: LimitKind::Codec(crate::opened::CodecLimitKind::PatchBytes),
+                            observed: usize::MAX,
+                            maximum: limits.owner_bytes,
                         })?;
                     limits.check_growth(
                         source.len(),
@@ -2170,8 +1733,9 @@ fn rewrite_slot(
                             .len()
                             .checked_add(insertion_len)
                             .ok_or(Error::Limit {
-                                resource: "p232 placeholder patch output bytes",
-                                limit: limits.owner_bytes,
+                                kind: LimitKind::Codec(crate::opened::CodecLimitKind::PatchBytes),
+                                observed: usize::MAX,
+                                maximum: limits.owner_bytes,
                             })?,
                     )?;
                     let extension = extension_bytes(&prefix, value)?;
@@ -2205,8 +1769,9 @@ fn replace_range(
         .checked_sub(old_len)
         .and_then(|value| value.checked_add(replacement.len()))
         .ok_or(Error::Limit {
-            resource: "p232 placeholder patch output bytes",
-            limit: limits.owner_bytes,
+            kind: LimitKind::Codec(crate::opened::CodecLimitKind::PatchBytes),
+            observed: usize::MAX,
+            maximum: limits.owner_bytes,
         })?;
     limits.check_growth(source.len(), target_len)?;
     let mut output = bytes_with_capacity(target_len, "p232 placeholder patch output bytes")?;
@@ -2226,8 +1791,9 @@ fn insert_range(source: &[u8], offset: usize, insertion: &[u8], limits: Limits) 
         .len()
         .checked_add(insertion.len())
         .ok_or(Error::Limit {
-            resource: "p232 placeholder patch output bytes",
-            limit: limits.owner_bytes,
+            kind: LimitKind::Codec(crate::opened::CodecLimitKind::PatchBytes),
+            observed: usize::MAX,
+            maximum: limits.owner_bytes,
         })?;
     limits.check_growth(source.len(), target_len)?;
     let mut output = bytes_with_capacity(target_len, "p232 placeholder patch output bytes")?;
@@ -2265,8 +1831,9 @@ fn extension_bytes_len(prefix: &[u8], value: PlaceholderTypeExtension) -> Result
     ];
     parts.into_iter().try_fold(0usize, |length, part| {
         length.checked_add(part).ok_or(Error::Limit {
-            resource: "p232 placeholder extension bytes",
-            limit: MAX_OWNER_BYTES,
+            kind: LimitKind::Codec(crate::opened::CodecLimitKind::ExtensionBytes),
+            observed: usize::MAX,
+            maximum: MAX_OWNER_BYTES,
         })
     })
 }
@@ -2319,4 +1886,145 @@ fn push_close(output: &mut Vec<u8>, prefix: &[u8], local: &[u8]) {
     }
     output.extend_from_slice(local);
     output.push(b'>');
+}
+
+// ============================================================================
+// Package family (record 0351 §2.3)
+// ============================================================================
+
+crate::part_edit::family!("placeholder type-extension");
+
+/// A staged placeholder type-extension edit of one [`crate::Package`].
+/// Dropping it discards it.
+#[derive(Debug)]
+pub struct Edit<'a> {
+    staged: crate::part_edit::Staged<'a>,
+}
+
+impl crate::Package {
+    /// The optional p232 type extension of the placeholder `key` in the
+    /// slide, layout or master `owner`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing or foreign owner part, a shape that is
+    /// not a placeholder, markup this route cannot read losslessly, or an
+    /// owner beyond the default bounds.
+    pub fn placeholder_type_extension<'o, 'a>(
+        &self,
+        owner: impl Into<crate::slide::Owner<'o>>,
+        key: impl Into<Key<'a>>,
+    ) -> Result<Snapshot> {
+        let opc = self.opc()?;
+        let owner = super::package::resolve_owner(opc, owner.into())?;
+        load_slot_snapshot_with_shape_limits(
+            opc,
+            &owner,
+            key,
+            Limits::DEFAULT,
+            self.semantic_limits().shape(),
+        )
+    }
+
+    /// Start a placeholder type-extension edit.
+    ///
+    /// # Errors
+    ///
+    /// Returns the encryption-policy error for a package whose typed
+    /// mutations are refused.
+    pub fn edit_placeholder_type_extension(&self) -> Result<Edit<'_>> {
+        Ok(Edit {
+            staged: crate::part_edit::Staged::new(self, "edit_placeholder_type_extension")?,
+        })
+    }
+
+    /// Apply a placeholder type-extension patch to a new package; this one
+    /// is unchanged. An empty patch returns an equal package.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when this package is not the patch's
+    /// before state, and the signature refusal for a changed patch of a
+    /// signed package.
+    pub fn apply_placeholder_type_extension(&self, patch: &Patch) -> Result<Commit> {
+        let package = patch.0.apply_with_replay_validation(
+            self,
+            "apply_placeholder_type_extension",
+            |package, target, patch| {
+                patch.validate_changed_shape_parts(target, package.semantic_limits().shape())
+            },
+        )?;
+        Ok(commit_of((package, patch.0.clone())))
+    }
+}
+
+impl Edit<'_> {
+    /// Set, add or replace the p232 type extension of the placeholder `key`
+    /// in `owner`. Returns whether anything changed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing or foreign owner, a shape that is not
+    /// a placeholder, markup this route cannot edit losslessly, an owner
+    /// beyond the default bounds, or a changed edit of a signed package.
+    pub fn set<'o, 'k>(
+        &mut self,
+        owner: impl Into<crate::slide::Owner<'o>>,
+        key: impl Into<Key<'k>>,
+        value: PlaceholderTypeExtension,
+    ) -> Result<bool> {
+        self.stage(owner.into(), key.into(), Some(value))
+    }
+
+    /// Remove the complete p232 type extension of the placeholder `key` in
+    /// `owner`. Returns whether anything changed.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::set`].
+    pub fn remove<'o, 'k>(
+        &mut self,
+        owner: impl Into<crate::slide::Owner<'o>>,
+        key: impl Into<Key<'k>>,
+    ) -> Result<bool> {
+        self.stage(owner.into(), key.into(), None)
+    }
+
+    fn stage(
+        &mut self,
+        owner: crate::slide::Owner<'_>,
+        key: Key<'_>,
+        value: Option<PlaceholderTypeExtension>,
+    ) -> Result<bool> {
+        let owner = super::package::resolve_owner(self.staged.opc(), owner)?;
+        let mut draft = load_slot_snapshot_with_shape_limits(
+            self.staged.opc(),
+            &owner,
+            key,
+            Limits::DEFAULT,
+            self.staged.shape_limits(),
+        )?
+        .edit();
+        draft.set_optional(value);
+        let staged = draft.commit()?;
+        if staged.is_noop() {
+            return Ok(false);
+        }
+        self.staged.update(|opc| apply_slot_patch(opc, &staged))?;
+        Ok(true)
+    }
+
+    /// Discard every staged change.
+    pub fn reset(&mut self) {
+        self.staged.reset();
+    }
+
+    /// Publish the staged changes to a new package.
+    ///
+    /// # Errors
+    ///
+    /// Returns the part-count limit of the patch.
+    pub fn commit(self) -> Result<Commit> {
+        Ok(commit_of(self.staged.commit()?))
+    }
 }

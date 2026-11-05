@@ -146,10 +146,18 @@ impl MtefEquationWriteOptions {
 
 impl Editor {
     /// Append a native Equation.3 EMBED field with a real PICF bitmap preview.
-    pub fn add_mtef_equation(&mut self, options: MtefEquationWriteOptions) -> Result<Reference> {
+    pub(crate) fn add_mtef_equation(
+        &mut self,
+        options: MtefEquationWriteOptions,
+    ) -> Result<Reference> {
         let mut picture_data = Vec::new();
-        write_picture_block(&options.preview, options.storage_id, &mut picture_data)
-            .map_err(|error| PackageError::Corrupted(error.to_string()))?;
+        write_picture_block(
+            &options.preview,
+            options.storage_id,
+            &mut picture_data,
+            litchi_odraw::image::Limits::default(),
+        )
+        .map_err(|error| PackageError::Corrupted(error.to_string()))?;
         let compound_file = equation_compound_file(options.equation)?;
         self.add(WriteOptions {
             storage_id: options.storage_id,

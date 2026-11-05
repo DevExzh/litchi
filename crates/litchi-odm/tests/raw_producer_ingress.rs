@@ -5,7 +5,7 @@
 
 use litchi_core::Position;
 use litchi_odf_common::compact_xml;
-use litchi_odm::{Master, transaction::SectionSpec};
+use litchi_odm::{Package, transaction::SectionSpec};
 use std::io::{Cursor, Write as _};
 
 const MIME: &str = "application/vnd.oasis.opendocument.text-master";
@@ -52,15 +52,19 @@ fn raw_pretty_producer_package_is_ingested_exactly_then_compacted_on_change() {
         .replace("<office:text>", "<office:text>\n    ")
         .replace("</office:text>", "\n  </office:text>");
     let original = raw_package(&pretty);
-    let source = Master::from_bytes(original.clone()).unwrap();
+    let source = Package::from_bytes(&original).unwrap();
     assert_eq!(source.as_bytes(), original);
 
     let mut edit = source.edit();
     edit.add_section(SectionSpec::new("B").unwrap()).unwrap();
-    let changed = edit.commit().unwrap().into_snapshot();
-    compact_xml::validate(changed.content_xml().as_bytes()).unwrap();
-    assert!(!changed.content_xml().contains('\n'));
-    assert!(Master::from_bytes(changed.as_bytes().to_vec()).is_ok());
+    let changed = edit.commit().unwrap().into_package();
+    compact_xml::validate(
+        changed.document().content_xml().as_bytes(),
+        compact_xml::Limits::default(),
+    )
+    .unwrap();
+    assert!(!changed.document().content_xml().contains('\n'));
+    assert!(Package::from_bytes(changed.as_bytes()).is_ok());
 }
 
 #[test]
@@ -70,13 +74,18 @@ fn raw_unsafe_xml_is_rejected_at_ingress_or_changed_publication() {
         "?><!DOCTYPE office:document-content [<!ENTITY x 'bad'>]>",
         1,
     );
-    assert!(Master::from_bytes(raw_package(&dtd)).is_err());
+    // A prologue DOCTYPE is ignored (leniency F9.11): it is blanked before
+    // any parser sees it, so its entity stays undeclared and a reference to
+    // it is still rejected.
+    assert!(Package::from_bytes(&raw_package(&dtd)).is_ok());
+    let dtd_reference = dtd.replacen(r#"text:name="A"/>"#, r#"text:name="A"/>&x;"#, 1);
+    assert!(Package::from_bytes(&raw_package(&dtd_reference)).is_err());
 
     let ambiguous = COMPACT_CONTENT.replace(
         "<office:text><text:section",
         "<office:text>   <text:section",
     );
-    let source = Master::from_bytes(raw_package(&ambiguous)).unwrap();
+    let source = Package::from_bytes(&raw_package(&ambiguous)).unwrap();
     let mut edit = source.edit();
     edit.add_section(SectionSpec::new("B").unwrap()).unwrap();
     assert!(edit.commit().is_err());
@@ -92,7 +101,7 @@ fn subtree_removal_checks_incoming_references_to_descendants() {
             r#"<text:section-source text:section-name="Child"/></text:section>"#,
         ),
     );
-    let source = Master::from_bytes(raw_package(&content)).unwrap();
+    let source = Package::from_bytes(&raw_package(&content)).unwrap();
     let mut edit = source.edit();
     edit.remove_section(Position::new(0)).unwrap();
     assert!(edit.commit().is_err());
@@ -104,7 +113,7 @@ fn generated_indexes_require_unique_addressable_names() {
         r#"<text:section text:name="A"/>"#,
         r"<text:table-of-content/>",
     );
-    assert!(Master::from_bytes(raw_package(&missing)).is_err());
+    assert!(Package::from_bytes(&raw_package(&missing)).is_err());
 
     let duplicate = COMPACT_CONTENT.replace(
         r#"<text:section text:name="A"/>"#,
@@ -113,7 +122,7 @@ fn generated_indexes_require_unique_addressable_names() {
             r#"<text:alphabetical-index text:name="Index"/>"#,
         ),
     );
-    assert!(Master::from_bytes(raw_package(&duplicate)).is_err());
+    assert!(Package::from_bytes(&raw_package(&duplicate)).is_err());
 }
 
 #[test]
@@ -122,12 +131,12 @@ fn common_body_children_are_schema_checked_at_raw_ingress() {
         r#"<text:section text:name="A"/>"#,
         r"<text:list><text:p>not-an-item</text:p></text:list>",
     );
-    assert!(Master::from_bytes(raw_package(&invalid_list)).is_err());
+    assert!(Package::from_bytes(&raw_package(&invalid_list)).is_err());
     let header_only_list = COMPACT_CONTENT.replace(
         r#"<text:section text:name="A"/>"#,
         r"<text:list><text:list-header><text:p>header</text:p></text:list-header></text:list>",
     );
-    assert!(Master::from_bytes(raw_package(&header_only_list)).is_err());
+    assert!(Package::from_bytes(&raw_package(&header_only_list)).is_err());
 
     let invalid_table = COMPACT_CONTENT
         .replace(
@@ -141,12 +150,12 @@ fn common_body_children_are_schema_checked_at_raw_ingress() {
             r#"<text:section text:name="A"/>"#,
             r"<table:table><text:p>not-a-row</text:p></table:table>",
         );
-    assert!(Master::from_bytes(raw_package(&invalid_table)).is_err());
+    assert!(Package::from_bytes(&raw_package(&invalid_table)).is_err());
     let no_row_table = invalid_table.replace(
         r"<table:table><text:p>not-a-row</text:p></table:table>",
         r"<table:table><table:table-column/></table:table>",
     );
-    assert!(Master::from_bytes(raw_package(&no_row_table)).is_err());
+    assert!(Package::from_bytes(&raw_package(&no_row_table)).is_err());
 
     let invalid_index = COMPACT_CONTENT.replace(
         r#"<text:section text:name="A"/>"#,
@@ -156,5 +165,5 @@ fn common_body_children_are_schema_checked_at_raw_ingress() {
             r#"</text:table-of-content>"#,
         ),
     );
-    assert!(Master::from_bytes(raw_package(&invalid_index)).is_err());
+    assert!(Package::from_bytes(&raw_package(&invalid_index)).is_err());
 }

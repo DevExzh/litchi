@@ -11,14 +11,14 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Write as _;
 
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, Part as OpcPart, TargetMode};
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use super::model::{Slide, Snapshot, invalid};
-use super::patch::Patch;
+use super::patch::Patch as OpenedPatch;
 use crate::{Error, Result, SlideCopyRefusal};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
@@ -44,7 +44,7 @@ const XML: &[u8] = b"http://www.w3.org/XML/1998/namespace";
 
 /// One raw part in a dependency-closed whole-slide copy plan.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SlideCopyPart {
+pub struct Part {
     pub(super) source: PackURI,
     pub(super) target: PackURI,
     pub(super) content_type: String,
@@ -52,7 +52,7 @@ pub struct SlideCopyPart {
     pub(super) relationships: usize,
 }
 
-impl SlideCopyPart {
+impl Part {
     /// Existing source part whose exact bytes and relationship IDs would be retained.
     #[must_use]
     pub const fn source(&self) -> &PackURI {
@@ -92,20 +92,20 @@ impl SlideCopyPart {
 /// use.  Arbitrary equal parts are never deduplicated: byte equality alone does
 /// not prove equivalent ownership or relationship semantics.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SlideCopyPlan {
+pub struct Plan {
     source: Slide,
     position: usize,
     slide_id: u32,
     presentation_relationship_id: String,
-    parts: Box<[SlideCopyPart]>,
+    parts: Box<[Part]>,
     reused_layout: PackURI,
     external_relationships: usize,
     planned_bytes: usize,
     source_revision: [u8; 32],
-    patch: Patch,
+    patch: OpenedPatch,
 }
 
-impl SlideCopyPlan {
+impl Plan {
     /// Source semantic slide identity captured by the immutable snapshot.
     #[must_use]
     pub const fn source(&self) -> &Slide {
@@ -132,7 +132,7 @@ impl SlideCopyPlan {
 
     /// Raw slide and private dependency parts in deterministic source-name order.
     #[must_use]
-    pub fn parts(&self) -> &[SlideCopyPart] {
+    pub fn parts(&self) -> &[Part] {
         &self.parts
     }
 
@@ -160,7 +160,7 @@ impl SlideCopyPlan {
         self.source_revision
     }
 
-    pub(crate) const fn patch(&self) -> &Patch {
+    pub(crate) const fn patch(&self) -> &OpenedPatch {
         &self.patch
     }
 }
@@ -187,9 +187,9 @@ impl Snapshot {
     /// limit/allocation/OPC/XML error while constructing the bounded inventory.
     pub fn plan_slide_copy<'s>(
         &self,
-        source: impl Into<crate::slide::Key<'s>>,
+        source: impl Into<crate::slide::Selector<'s>>,
         position: usize,
-    ) -> Result<SlideCopyPlan> {
+    ) -> Result<Plan> {
         if position > self.slides.len() {
             return Err(Error::SlideIndexOutOfBounds {
                 index: position,
@@ -210,6 +210,9 @@ impl Snapshot {
             .map_err(|error| Error::Xml(format!("presentation XML is not UTF-8: {error}")))?;
         if crate::presentation_properties::metadata::protection::Settings::parse_xml(
             presentation_text,
+            crate::presentation_properties::metadata::protection::Limits::from_source_limits(
+                self.package.read_limits(),
+            ),
         )?
         .is_protected()
         {
@@ -221,8 +224,9 @@ impl Snapshot {
         validate_slide_ids(&self.slides)?;
         if self.slides.len() == crate::parts::MAX_SLIDES {
             return Err(Error::Limit {
-                resource: "slide-copy presentation slides",
-                limit: crate::parts::MAX_SLIDES,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Slides),
+                observed: self.slides.len().checked_add(1).unwrap_or(usize::MAX),
+                maximum: crate::parts::MAX_SLIDES,
             });
         }
         // This validates that the reused layout is registered through exactly
@@ -240,8 +244,9 @@ impl Snapshot {
         validate_registered_layout(self.package.as_ref(), presentation, &reused_layout)?;
         if self.package.part_count() > self.limits.max_parts() {
             return Err(Error::Limit {
-                resource: "slide-copy package parts",
-                limit: self.limits.max_parts(),
+                kind: crate::opened::LimitKind::Parts,
+                observed: self.package.part_count(),
+                maximum: self.limits.max_parts(),
             });
         }
 
@@ -263,7 +268,7 @@ impl Snapshot {
             })?;
         for name in names {
             let part = self.package.get_part(&name)?;
-            parts.push(SlideCopyPart {
+            parts.push(Part {
                 target: available_copy_name(self.package.as_ref(), &name, self.limits.max_parts())?,
                 source: name,
                 content_type: try_copy_string(
@@ -286,13 +291,13 @@ impl Snapshot {
             &reused_layout,
             &parts,
         )?;
-        let patch = Patch::capture(
+        let patch = OpenedPatch::capture(
             self.package.as_ref(),
             &candidate,
             self.presentation_name.clone(),
             self.limits,
         )?;
-        Ok(SlideCopyPlan {
+        Ok(Plan {
             source,
             position,
             slide_id,
@@ -309,8 +314,8 @@ impl Snapshot {
 
 fn preflight_copy_candidate(
     snapshot: &Snapshot,
-    parts: &[SlideCopyPart],
-    presentation: &dyn Part,
+    parts: &[Part],
+    presentation: &dyn OpcPart,
     planned_bytes: usize,
 ) -> Result<()> {
     let resulting_parts = snapshot
@@ -320,8 +325,9 @@ fn preflight_copy_candidate(
         .ok_or_else(|| invalid("slide-copy resulting part count overflow"))?;
     if resulting_parts > snapshot.limits.max_parts() {
         return Err(Error::Limit {
-            resource: "slide-copy resulting package parts",
-            limit: snapshot.limits.max_parts(),
+            kind: crate::opened::LimitKind::Parts,
+            observed: resulting_parts,
+            maximum: snapshot.limits.max_parts(),
         });
     }
     let presentation_bytes = checked_plan_bytes(0, presentation)?;
@@ -349,8 +355,9 @@ fn preflight_copy_candidate(
         .ok_or_else(|| invalid("slide-copy candidate byte count overflow"))?;
     if conservative_patch_bytes > snapshot.limits.max_patch_bytes() {
         return Err(Error::Limit {
-            resource: "slide-copy candidate patch bytes",
-            limit: snapshot.limits.max_patch_bytes(),
+            kind: crate::opened::LimitKind::PatchBytes,
+            observed: conservative_patch_bytes,
+            maximum: snapshot.limits.max_patch_bytes(),
         });
     }
     let mut targets = HashSet::new();
@@ -379,7 +386,7 @@ fn build_copy_candidate(
     slide_id: u32,
     presentation_relationship_id: &str,
     reused_layout: &PackURI,
-    parts: &[SlideCopyPart],
+    parts: &[Part],
 ) -> Result<OpcPackage> {
     let mut mapping = HashMap::new();
     mapping
@@ -424,13 +431,9 @@ fn build_copy_candidate(
                 {
                     reused_layout
                 } else {
-                    mapping
-                        .get(&source_target)
-                        .ok_or_else(|| Error::SlideCopyPlan {
-                            kind: SlideCopyRefusal::AmbiguousTopology,
-                            detail: "an internal copied relationship escaped the planned closure"
-                                .to_owned(),
-                        })?
+                    mapping.get(&source_target).ok_or_else(|| {
+                        Error::slide_copy_refused(SlideCopyRefusal::AmbiguousTopology)
+                    })?
                 };
                 (
                     copied_target.relative_ref(planned.target.base_uri()),
@@ -469,10 +472,11 @@ fn build_copy_candidate(
         )?;
         staged.set_blob(xml);
     }
-    let captured = super::model::capture(
+    let captured = super::model::capture_with_provenance_and_semantic_limits(
         &candidate,
         snapshot.limits,
         snapshot.physical_source_provenance,
+        snapshot.owner_state.semantic_limits.clone(),
     )?;
     let published = captured
         .slides
@@ -536,16 +540,18 @@ pub(super) fn collect_owned_closure(
         }
         if owned.len() > limits.max_parts() {
             return Err(Error::Limit {
-                resource: "slide-copy dependency parts",
-                limit: limits.max_parts(),
+                kind: crate::opened::LimitKind::Parts,
+                observed: owned.len(),
+                maximum: limits.max_parts(),
             });
         }
         let part = package.get_part(&name)?;
         planned_bytes = checked_plan_bytes(planned_bytes, part)?;
         if planned_bytes > limits.max_patch_bytes() {
             return Err(Error::Limit {
-                resource: "slide-copy planned closure bytes",
-                limit: limits.max_patch_bytes(),
+                kind: crate::opened::LimitKind::PatchBytes,
+                observed: planned_bytes,
+                maximum: limits.max_patch_bytes(),
             });
         }
         let mut outgoing = Vec::new();
@@ -561,8 +567,11 @@ pub(super) fn collect_owned_closure(
                 .ok_or_else(|| invalid("slide-copy relationship count overflow"))?;
             if traversed_relationships > relationship_limit {
                 return Err(Error::Limit {
-                    resource: "slide-copy dependency relationships",
-                    limit: relationship_limit,
+                    kind: crate::opened::LimitKind::Codec(
+                        crate::opened::CodecLimitKind::Relationships,
+                    ),
+                    observed: traversed_relationships,
+                    maximum: relationship_limit,
                 });
             }
             if relationship.target_ref().is_empty() {
@@ -643,10 +652,8 @@ pub(super) fn collect_owned_closure(
         }
         edges.insert(name, outgoing);
     }
-    let reused_layout = reused_layout.ok_or_else(|| Error::SlideCopyPlan {
-        kind: SlideCopyRefusal::AmbiguousTopology,
-        detail: "the selected slide does not have exactly one reusable layout".to_owned(),
-    })?;
+    let reused_layout = reused_layout
+        .ok_or_else(|| Error::slide_copy_refused(SlideCopyRefusal::AmbiguousTopology))?;
     Ok((
         owned,
         edges,
@@ -656,7 +663,7 @@ pub(super) fn collect_owned_closure(
     ))
 }
 
-fn checked_plan_bytes(total: usize, part: &dyn Part) -> Result<usize> {
+fn checked_plan_bytes(total: usize, part: &dyn OpcPart) -> Result<usize> {
     let mut next = total
         .checked_add(part.partname().as_str().len())
         .and_then(|value| value.checked_add(part.content_type().len()))
@@ -736,7 +743,7 @@ fn owned_role(value: &str) -> Option<OwnedRole> {
     }
 }
 
-fn validate_owned_target(role: OwnedRole, part: &dyn Part) -> Result<()> {
+fn validate_owned_target(role: OwnedRole, part: &dyn OpcPart) -> Result<()> {
     let content_type = part.content_type();
     let valid = match role {
         OwnedRole::Image => content_type.starts_with("image/"),
@@ -773,7 +780,7 @@ fn validate_owned_target(role: OwnedRole, part: &dyn Part) -> Result<()> {
     }
 }
 
-fn validate_owned_surface(role: OwnedRole, part: &dyn Part) -> Result<()> {
+fn validate_owned_surface(role: OwnedRole, part: &dyn OpcPart) -> Result<()> {
     let surface = match role {
         OwnedRole::Chart => Some(XmlSurface::Chart),
         OwnedRole::ChartDrawing => Some(XmlSurface::ChartDrawing),
@@ -1264,7 +1271,7 @@ pub(super) fn available_copy_name_avoiding(
 
 pub(super) fn validate_registered_layout(
     package: &OpcPackage,
-    presentation_part: &dyn Part,
+    presentation_part: &dyn OpcPart,
     selected: &PackURI,
 ) -> Result<()> {
     let presentation = crate::Presentation::new(
@@ -1298,7 +1305,7 @@ fn validate_slide_ids(slides: &[Slide]) -> Result<()> {
     Ok(())
 }
 
-fn next_slide_id(slides: &[Slide]) -> Result<u32> {
+pub(super) fn next_slide_id(slides: &[Slide]) -> Result<u32> {
     let maximum = slides.iter().map(|slide| slide.id).max().unwrap_or(255);
     if maximum < MAX_SLIDE_ID {
         return maximum
@@ -1332,7 +1339,7 @@ fn next_slide_id(slides: &[Slide]) -> Result<u32> {
     )
 }
 
-fn next_relationship_id(relationships: &litchi_opc::Relationships) -> Result<String> {
+pub(super) fn next_relationship_id(relationships: &litchi_opc::Relationships) -> Result<String> {
     let mut used = Vec::new();
     used.try_reserve_exact(relationships.len())
         .map_err(|source| Error::Allocation {
@@ -1352,10 +1359,7 @@ fn next_relationship_id(relationships: &litchi_opc::Relationships) -> Result<Str
         if value == candidate {
             candidate = candidate
                 .checked_add(1)
-                .ok_or_else(|| Error::SlideCopyPlan {
-                    kind: SlideCopyRefusal::AmbiguousTopology,
-                    detail: "the presentation relationship-ID space is exhausted".to_owned(),
-                })?;
+                .ok_or_else(|| Error::slide_copy_refused(SlideCopyRefusal::AmbiguousTopology))?;
         } else if value > candidate {
             break;
         }
@@ -1363,7 +1367,7 @@ fn next_relationship_id(relationships: &litchi_opc::Relationships) -> Result<Str
     Ok(format!("rId{candidate}"))
 }
 
-pub(super) fn resolve_slide(snapshot: &Snapshot, key: crate::slide::Key<'_>) -> Result<Slide> {
+pub(super) fn resolve_slide(snapshot: &Snapshot, key: crate::slide::Selector<'_>) -> Result<Slide> {
     snapshot.resolve_slide(key)
 }
 
@@ -1376,9 +1380,6 @@ fn try_copy_string(value: &str, resource: &'static str) -> Result<String> {
     Ok(output)
 }
 
-fn refusal<T>(kind: SlideCopyRefusal, detail: impl Into<String>) -> Result<T> {
-    Err(Error::SlideCopyPlan {
-        kind,
-        detail: detail.into(),
-    })
+fn refusal<T>(kind: SlideCopyRefusal, _detail: impl Into<String>) -> Result<T> {
+    Err(Error::slide_copy_refused(kind))
 }

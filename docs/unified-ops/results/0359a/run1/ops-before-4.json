@@ -1,0 +1,68 @@
+[
+  {
+    "median_us": 759.6135999999999,
+    "min_us": 754.1896,
+    "samples": 31,
+    "scenario": "doc/open_get"
+  },
+  {
+    "median_us": 0.2146,
+    "min_us": 0.21259999999999998,
+    "samples": 31,
+    "scenario": "doc/get"
+  },
+  {
+    "median_us": 1635.6154000000001,
+    "min_us": 1618.8474,
+    "samples": 31,
+    "scenario": "doc/set"
+  },
+  {
+    "median_us": 634125.795,
+    "min_us": 609450.032,
+    "samples": 31,
+    "scenario": "doc/batch256"
+  },
+  {
+    "median_us": 161.18099999999998,
+    "min_us": 158.419,
+    "samples": 31,
+    "scenario": "xls/open_get"
+  },
+  {
+    "median_us": 99.11659999999999,
+    "min_us": 97.9026,
+    "samples": 31,
+    "scenario": "xls/set"
+  },
+  {
+    "median_us": 4407.726,
+    "min_us": 4367.285,
+    "samples": 31,
+    "scenario": "xls/batch1k"
+  },
+  {
+    "median_us": 206.99320000000003,
+    "min_us": 205.7672,
+    "samples": 31,
+    "scenario": "rtf/open_get"
+  },
+  {
+    "median_us": 337.52779999999996,
+    "min_us": 336.148,
+    "samples": 31,
+    "scenario": "rtf/set"
+  },
+  {
+    "median_us": 569.0414000000001,
+    "min_us": 567.0934,
+    "samples": 31,
+    "scenario": "rtf/add"
+  },
+  {
+    "median_us": 5539.732,
+    "min_us": 5512.9619999999995,
+    "samples": 31,
+    "scenario": "rtf/batch1k"
+  }
+]

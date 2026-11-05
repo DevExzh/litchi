@@ -3,6 +3,7 @@
 use std::ops::Range;
 use std::sync::Arc;
 
+use super::codec::Limits;
 use super::model::{Caption, DisplayLocation, MediaMetadata};
 use super::tracks_info::{self, Attr, Found};
 use super::validation::{validate_caption, validate_metadata};
@@ -18,6 +19,7 @@ pub struct Snapshot {
     pub(crate) source_xml: Arc<Vec<u8>>,
     pub(crate) layout: Found,
     pub(crate) metadata: MediaMetadata,
+    pub(crate) limits: Limits,
     pub(crate) revision: Revision,
 }
 
@@ -27,8 +29,9 @@ impl Snapshot {
         source_xml: Vec<u8>,
         layout: Found,
         metadata: MediaMetadata,
+        limits: Limits,
     ) -> Result<Self> {
-        validate_metadata(&metadata)?;
+        validate_metadata(&metadata, limits)?;
         let source_xml = Arc::new(source_xml);
         let revision = fingerprint(&source_xml);
         Ok(Self {
@@ -36,6 +39,7 @@ impl Snapshot {
             source_xml,
             layout,
             metadata,
+            limits,
             revision,
         })
     }
@@ -71,8 +75,8 @@ impl Snapshot {
     /// Start an atomic detached edit.
     #[inline]
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub(crate) fn edit(&self) -> Draft {
+        Draft {
             original: self.clone(),
             working: self.metadata.clone(),
         }
@@ -81,12 +85,12 @@ impl Snapshot {
 
 /// A bounded edit staged against one media shape.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub struct Draft {
     original: Snapshot,
     working: MediaMetadata,
 }
 
-impl Transaction {
+impl Draft {
     /// Borrow the projected typed metadata.
     #[inline]
     #[must_use]
@@ -94,11 +98,14 @@ impl Transaction {
         &self.working
     }
 
-    /// Return whether a source-changing edit has been staged.
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.original.metadata != self.working
+    }
+
+    /// The outcome of this edit or commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Change the schema-defined `tracksInfo/@displayLoc` value.
@@ -128,11 +135,12 @@ impl Transaction {
         id: impl Into<String>,
         label: impl Into<String>,
     ) -> Result<()> {
+        let limits = self.original.limits;
         let caption = self.caption_mut(index)?;
         let mut candidate = caption.clone();
         candidate.id = id.into();
         candidate.label = label.into();
-        validate_caption(&candidate)?;
+        validate_caption(&candidate, limits)?;
         *caption = candidate;
         Ok(())
     }
@@ -143,10 +151,11 @@ impl Transaction {
     ///
     /// Returns an error if the operation fails.
     pub fn set_caption_language(&mut self, index: usize, language: Option<String>) -> Result<()> {
+        let limits = self.original.limits;
         let caption = self.caption_mut(index)?;
         let mut candidate = caption.clone();
         candidate.language = language;
-        validate_caption(&candidate)?;
+        validate_caption(&candidate, limits)?;
         *caption = candidate;
         Ok(())
     }
@@ -172,32 +181,35 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn commit(self) -> Result<Commit> {
-        validate_metadata(&self.working)?;
+    pub(crate) fn commit(self) -> Result<Prepared> {
+        validate_metadata(&self.working, self.original.limits)?;
         let updated = encode_edit(&self.original, &self.working)?;
         let updated = Arc::new(updated);
         let layout = if updated.as_slice() == self.original.source_xml.as_slice() {
             self.original.layout.clone()
         } else {
-            tracks_info::discover(updated.as_slice(), &self.working.key)?.ok_or_else(|| {
-                invalid("edited media tracks no longer contain the selected shape")
-            })?
+            tracks_info::discover(updated.as_slice(), &self.working.key, self.original.limits)?
+                .ok_or_else(|| {
+                    invalid("edited media tracks no longer contain the selected shape")
+                })?
         };
         let snapshot = Snapshot {
             source_part_name: self.original.source_part_name.clone(),
             source_xml: Arc::clone(&updated),
             layout,
             metadata: self.working,
+            limits: self.original.limits,
             revision: fingerprint(&updated),
         };
-        let patch = Patch {
+        let patch = Change {
             source_part_name: self.original.source_part_name,
             key: snapshot.metadata.key.clone(),
             expected_revision: self.original.revision,
             expected_xml: Arc::clone(&self.original.source_xml),
             updated_xml: Arc::clone(&updated),
+            limits: self.original.limits,
         };
-        Ok(Commit { snapshot, patch })
+        Ok(Prepared { snapshot, patch })
     }
 
     fn caption_mut(&mut self, index: usize) -> Result<&mut Caption> {
@@ -211,64 +223,64 @@ impl Transaction {
 
 /// A committed metadata snapshot and its source-checked package patch.
 #[derive(Debug, Clone)]
-pub struct Commit {
+pub(crate) struct Prepared {
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the module's source-level tests")
+    )]
     snapshot: Snapshot,
-    patch: Patch,
+    patch: Change,
 }
 
-impl Commit {
+impl Prepared {
     /// Borrow the projected post-edit snapshot.
     #[inline]
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    #[cfg(test)]
+    pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
-    /// Borrow the source-checked patch for package publication.
-    #[inline]
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
+    #[cfg(test)]
+    fn is_changed(&self) -> bool {
+        self.patch.is_changed()
     }
 
-    /// Return whether this commit changes the owning slide bytes.
-    #[inline]
+    /// The outcome of this edit or commit.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.patch.is_changed()
+    #[cfg(test)]
+    pub(crate) fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Consume the commit and return its patch.
     #[inline]
     #[must_use]
-    pub fn into_patch(self) -> Patch {
+    pub(crate) fn into_patch(self) -> Change {
         self.patch
     }
 }
 
 /// A source-checked, atomic replacement of one owning slide XML part.
 #[derive(Debug, Clone)]
-pub struct Patch {
+pub(crate) struct Change {
     pub(crate) source_part_name: String,
     pub(crate) key: super::model::MediaKey,
     pub(crate) expected_revision: Revision,
     pub(crate) expected_xml: Arc<Vec<u8>>,
     pub(crate) updated_xml: Arc<Vec<u8>>,
+    pub(crate) limits: Limits,
 }
 
-impl Patch {
-    /// Return whether the patch is an exact no-op.
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+impl Change {
+    fn is_changed(&self) -> bool {
         self.expected_xml.as_slice() != self.updated_xml.as_slice()
     }
 
-    /// Return the source revision required for publication.
-    #[inline]
+    /// Whether this patch leaves its source unchanged.
     #[must_use]
-    pub const fn expected_revision(&self) -> Revision {
-        self.expected_revision
+    pub(crate) fn is_noop(&self) -> bool {
+        !self.is_changed()
     }
 }
 

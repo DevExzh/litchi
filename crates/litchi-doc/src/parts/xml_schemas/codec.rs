@@ -1,7 +1,7 @@
 //! Bounded MS-DOC `Hplxsdr` and `fcCustomXForm` codecs.
 
 use super::model::{Collection, Reference};
-use crate::package::{Error as PackageError, Result};
+use crate::package::{Error as PackageError, Result, SourceLimits};
 use crate::parts::fib::FileInformationBlock;
 
 /// Table-pointer index of `fcHplxsdr`/`lcbHplxsdr`.
@@ -27,8 +27,12 @@ pub(super) const MAX_CUSTOM_XFORM_BYTES: u32 = 4168;
 impl Collection {
     /// Parse the `Hplxsdr` addressed by the FIB, or `None` when the document
     /// carries none.
-    pub fn parse(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<Option<Collection>> {
-        let Some(data) = optional_slice(fib, table_stream, HPLXSDR, "Hplxsdr")? else {
+    pub fn parse(
+        fib: &FileInformationBlock,
+        table_stream: &[u8],
+        limits: &SourceLimits,
+    ) -> Result<Option<Collection>> {
+        let Some(data) = optional_slice(fib, table_stream, HPLXSDR, "Hplxsdr", limits)? else {
             return Ok(None);
         };
         if data.len() < 4 {
@@ -66,6 +70,7 @@ impl Collection {
 pub fn parse_custom_xml_transform(
     fib: &FileInformationBlock,
     table_stream: &[u8],
+    limits: &SourceLimits,
 ) -> Result<Option<String>> {
     let Some((offset, length)) = fib.get_table_pointer(CUSTOM_XFORM) else {
         return Ok(None);
@@ -88,6 +93,7 @@ pub fn parse_custom_xml_transform(
     let data = table_stream
         .get(start..end)
         .ok_or_else(|| corrupted("fcCustomXForm extends beyond the table stream"))?;
+    crate::parts::enforce_source_entry_limit(data, limits)?;
     let mut units = data
         .as_chunks::<2>()
         .0
@@ -210,6 +216,7 @@ fn optional_slice<'a>(
     table_stream: &'a [u8],
     index: usize,
     name: &str,
+    limits: &SourceLimits,
 ) -> Result<Option<&'a [u8]>> {
     let Some((offset, length)) = fib.get_table_pointer(index) else {
         return Ok(None);
@@ -224,10 +231,11 @@ fn optional_slice<'a>(
     let end = start
         .checked_add(length)
         .ok_or_else(|| corrupted(format!("{name} range overflows")))?;
-    table_stream
+    let data = table_stream
         .get(start..end)
-        .map(Some)
-        .ok_or_else(|| corrupted(format!("{name} extends beyond the table stream")))
+        .ok_or_else(|| corrupted(format!("{name} extends beyond the table stream")))?;
+    crate::parts::enforce_source_entry_limit(data, limits)?;
+    Ok(Some(data))
 }
 
 fn read_u16(data: &[u8], offset: usize, field: &str) -> Result<u16> {

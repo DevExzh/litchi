@@ -20,7 +20,9 @@ use litchi_iwa_common::{
 };
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::{image_adjustments_codec, tsd, tswp};
-use litchi_pages::{BodyImageAdjustmentsError, ImageSelector, Package, PackageError};
+use litchi_pages::{
+    ImageSelector, Package, PackageError, image::adjustments::Error as BodyImageAdjustmentsError,
+};
 use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -63,17 +65,17 @@ struct ImagePayload {
 }
 
 fn image_payload(source: &[u8]) -> TestResult<ImagePayload> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut found = None;
     for entry in catalog.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = match SnappyStream::decompress(entry.data()) {
+        let stream = match SnappyStream::decompress(entry.data(), Default::default()) {
             Ok(stream) => stream,
             Err(_) => continue,
         };
-        let archive = match Archive::parse(stream.as_bytes()) {
+        let archive = match Archive::parse(stream.as_bytes(), Default::default()) {
             Ok(archive) => archive,
             Err(_) => continue,
         };
@@ -114,12 +116,15 @@ fn rewrite_image_payload(
     location: &ImagePayload,
     replacement: &[u8],
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == location.member)
         .ok_or_else(|| io::Error::other("native image component is missing"))?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     let object = archive
         .object_mut(location.object_id)
         .ok_or_else(|| io::Error::other("native image ImageArchive object is missing"))?;
@@ -137,8 +142,10 @@ fn rewrite_image_payload(
             type_: IMAGE_MESSAGE_TYPE,
             data: replacement.to_vec(),
         },
+        Default::default(),
     )?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(&location.member, &compressed)],
         Limits::default(),
@@ -159,12 +166,15 @@ fn rewrite_message_payload(
     location: &MessageLocation,
     replacement: &[u8],
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == location.member)
         .ok_or_else(|| io::Error::other("native body component is missing"))?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     let object = archive
         .object_mut(location.object_id)
         .ok_or_else(|| io::Error::other("native body object is missing"))?;
@@ -182,8 +192,10 @@ fn rewrite_message_payload(
             type_: location.message_type,
             data: replacement.to_vec(),
         },
+        Default::default(),
     )?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(&location.member, &compressed)],
         Limits::default(),
@@ -191,17 +203,17 @@ fn rewrite_message_payload(
 }
 
 fn image_attachment_location(source: &[u8], image_identifier: u64) -> TestResult<MessageLocation> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut found = None;
     for entry in catalog.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = match SnappyStream::decompress(entry.data()) {
+        let stream = match SnappyStream::decompress(entry.data(), Default::default()) {
             Ok(stream) => stream,
             Err(_) => continue,
         };
-        let archive = match Archive::parse(stream.as_bytes()) {
+        let archive = match Archive::parse(stream.as_bytes(), Default::default()) {
             Ok(archive) => archive,
             Err(_) => continue,
         };
@@ -244,17 +256,17 @@ fn image_attachment_location(source: &[u8], image_identifier: u64) -> TestResult
 }
 
 fn body_storage_location(source: &[u8], attachment_identifier: u64) -> TestResult<MessageLocation> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut found = None;
     for entry in catalog.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = match SnappyStream::decompress(entry.data()) {
+        let stream = match SnappyStream::decompress(entry.data(), Default::default()) {
             Ok(stream) => stream,
             Err(_) => continue,
         };
-        let archive = match Archive::parse(stream.as_bytes()) {
+        let archive = match Archive::parse(stream.as_bytes(), Default::default()) {
             Ok(archive) => archive,
             Err(_) => continue,
         };
@@ -305,7 +317,7 @@ fn replace_length_delimited_field(
     number: u32,
     replacement: &[u8],
 ) -> TestResult<Vec<u8>> {
-    let view = WireView::parse(source)?;
+    let view = WireView::parse(source, WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(source.len().saturating_add(replacement.len()));
     let mut replaced = false;
     for field in view.fields() {
@@ -315,7 +327,7 @@ fn replace_length_delimited_field(
                     io::Error::other("native image fixture has duplicate mutation field").into(),
                 );
             }
-            append_length_delimited_field(&mut output, number, replacement)?;
+            append_length_delimited_field(&mut output, number, replacement, WireLimits::DEFAULT)?;
             replaced = true;
         } else {
             output.extend_from_slice(field.raw());
@@ -329,7 +341,7 @@ fn replace_length_delimited_field(
 
 fn with_data_reference_extension(source: &[u8]) -> TestResult<Vec<u8>> {
     let location = image_payload(source)?;
-    let image = WireView::parse(&location.bytes)?;
+    let image = WireView::parse(&location.bytes, WireLimits::DEFAULT)?;
     let data = image
         .fields()
         .find(|field| field.number() == IMAGE_DATA_FIELD)
@@ -343,7 +355,7 @@ fn with_data_reference_extension(source: &[u8]) -> TestResult<Vec<u8>> {
 
 fn with_wrong_image_parent(source: &[u8]) -> TestResult<Vec<u8>> {
     let location = image_payload(source)?;
-    let image = WireView::parse(&location.bytes)?;
+    let image = WireView::parse(&location.bytes, WireLimits::DEFAULT)?;
     let drawable = image
         .fields()
         .find(|field| field.number() == 1)
@@ -360,12 +372,12 @@ fn with_duplicate_body_attachment(source: &[u8]) -> TestResult<Vec<u8>> {
     let attachment = image_attachment_location(source, image.object_id)?;
     let attachment_identifier = attachment.object_id;
     let body = body_storage_location(source, attachment_identifier)?;
-    let body_view = WireView::parse(&body.bytes)?;
+    let body_view = WireView::parse(&body.bytes, WireLimits::DEFAULT)?;
     let table = body_view
         .fields()
         .find(|field| field.number() == BODY_ATTACHMENTS_FIELD)
         .ok_or_else(|| io::Error::other("native body attachment table is missing"))?;
-    let table_view = WireView::parse(table.payload())?;
+    let table_view = WireView::parse(table.payload(), WireLimits::DEFAULT)?;
     let mut table_payload = Vec::with_capacity(table.payload().len());
     let mut duplicated = false;
     for field in table_view.fields() {
@@ -373,12 +385,12 @@ fn with_duplicate_body_attachment(source: &[u8]) -> TestResult<Vec<u8>> {
         if field.number() != 1 || duplicated {
             continue;
         }
-        let entry = WireView::parse(field.payload())?;
+        let entry = WireView::parse(field.payload(), WireLimits::DEFAULT)?;
         let object = entry
             .fields()
             .find(|entry_field| entry_field.number() == 2)
             .ok_or_else(|| io::Error::other("native body attachment object is missing"))?;
-        let reference = WireView::parse(object.payload())?;
+        let reference = WireView::parse(object.payload(), WireLimits::DEFAULT)?;
         let identifier = reference
             .fields()
             .find(|reference_field| reference_field.number() == 1)
@@ -412,8 +424,8 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn assert_member_locality(source: &[u8], target: &[u8], changed_member: &str) -> TestResult {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     let mut changed = Vec::new();
     for entry in before.iter() {
         let candidate = after
@@ -438,8 +450,8 @@ fn assert_member_locality(source: &[u8], target: &[u8], changed_member: &str) ->
 }
 
 fn assert_image_assets_untouched(source: &[u8], target: &[u8]) -> TestResult {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     let mut assets = 0;
     for entry in before
         .iter()
@@ -462,7 +474,7 @@ fn assert_image_assets_untouched(source: &[u8], target: &[u8]) -> TestResult {
 }
 
 fn unknown_image_wire(source: &[u8]) -> TestResult<Vec<Vec<u8>>> {
-    let root = WireView::parse(source)?;
+    let root = WireView::parse(source, WireLimits::DEFAULT)?;
     let adjustments = root
         .fields()
         .find(|field| field.number() == IMAGE_ADJUSTMENTS_FIELD)
@@ -473,7 +485,7 @@ fn unknown_image_wire(source: &[u8]) -> TestResult<Vec<Vec<u8>>> {
         .map(|field| field.raw().to_vec())
         .collect::<Vec<_>>();
     records.extend(
-        WireView::parse(adjustments.payload())?
+        WireView::parse(adjustments.payload(), WireLimits::DEFAULT)?
             .fields()
             .filter(|field| !ADJUSTMENT_FIELDS.contains(&field.number()))
             .map(|field| field.raw().to_vec()),
@@ -482,12 +494,12 @@ fn unknown_image_wire(source: &[u8]) -> TestResult<Vec<Vec<u8>>> {
 }
 
 fn sharpness_wire(source: &[u8]) -> TestResult<Vec<Vec<u8>>> {
-    let root = WireView::parse(source)?;
+    let root = WireView::parse(source, WireLimits::DEFAULT)?;
     let adjustments = root
         .fields()
         .find(|field| field.number() == IMAGE_ADJUSTMENTS_FIELD)
         .ok_or_else(|| io::Error::other("native image-adjustments field is missing"))?;
-    Ok(WireView::parse(adjustments.payload())?
+    Ok(WireView::parse(adjustments.payload(), WireLimits::DEFAULT)?
         .fields()
         .filter(|field| field.number() == SHARPNESS_FIELD)
         .map(|field| field.raw().to_vec())

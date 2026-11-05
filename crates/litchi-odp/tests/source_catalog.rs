@@ -10,9 +10,9 @@ use std::sync::{
 };
 
 use litchi_core::{Error, ReadAt, SourceVersion};
-use litchi_odf_common::core::{PackageWriter, SourcePackageLimits};
+use litchi_odf_common::core::PackageWriter;
 use litchi_odp::model::Reference;
-use litchi_odp::{Presentation, SourceBackedPresentationCatalog};
+use litchi_odp::{Package, SourceBackedPresentationCatalog};
 
 const MIME: &str = "application/vnd.oasis.opendocument.presentation";
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -90,7 +90,7 @@ impl ReadAt for CountingSource {
 }
 
 fn package_with_content(content: &str) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", content.as_bytes()).unwrap();
     writer
@@ -100,7 +100,9 @@ fn package_with_content(content: &str) -> Vec<u8> {
 }
 
 fn raw_package_with_content(content: &str) -> Vec<u8> {
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     writer.write_stored("mimetype", MIME.as_bytes()).unwrap();
     writer
         .write_deflated("content.xml", content.as_bytes())
@@ -197,7 +199,7 @@ fn catalog_rejects_malformed_document_prologue_and_entities() {
         let source = Arc::new(CountingSource::new(raw_package_with_content(&content)));
         assert!(matches!(
             SourceBackedPresentationCatalog::from_read_at(source),
-            Err(Error::InvalidFormat(_))
+            Err(litchi_odp::Error::Core(Error::InvalidFormat(_)))
         ));
     }
 }
@@ -205,7 +207,7 @@ fn catalog_rejects_malformed_document_prologue_and_entities() {
 #[test]
 fn selected_slide_rereads_content_and_matches_owned_semantics() {
     let bytes = package();
-    let eager = Presentation::from_bytes(bytes.clone()).unwrap();
+    let eager = Package::from_bytes(&bytes).unwrap().presentation().unwrap();
     let source = Arc::new(CountingSource::new(bytes));
     let catalog = SourceBackedPresentationCatalog::from_read_at(source.clone()).unwrap();
     let before = source.reads();
@@ -278,7 +280,17 @@ fn catalog_reports_source_changes() {
 #[test]
 fn catalog_applies_source_limits_before_content_scan() {
     let source = Arc::new(CountingSource::new(package()));
-    let limits = SourcePackageLimits::default().with_max_source_bytes(1);
+    let limits = litchi_odf_common::SourceLimits::builder()
+        .max_input_bytes(1)
+        .unwrap()
+        .build()
+        .unwrap();
 
-    assert!(SourceBackedPresentationCatalog::from_read_at_with_limits(source, limits).is_err());
+    assert!(
+        SourceBackedPresentationCatalog::from_read_at_with_options(
+            source,
+            litchi_odf_common::OpenOptions::new().source_limits(limits)
+        )
+        .is_err()
+    );
 }

@@ -383,10 +383,7 @@ fn sparse_header_moves_borrow_records_and_reject_unknown_mutation() {
     .expect("unknown header no-op executes");
     assert_eq!(unknown_identity, unknown_source);
     assert_eq!(unknown_report.changed_records(), 0);
-    let unknown_moves = [
-        codec::HeaderRowMove::new(0, 9),
-        codec::HeaderRowMove::new(9, 0),
-    ];
+    let unknown_moves = [codec::RowMove::new(0, 9), codec::RowMove::new(9, 0)];
     assert!(
         codec::rewrite_header_storage_bucket_rows(
             &unknown_source,
@@ -400,10 +397,7 @@ fn sparse_header_moves_borrow_records_and_reject_unknown_mutation() {
 
     let source = header_fixture_clean();
     let before = source.clone();
-    let moves = [
-        codec::HeaderRowMove::new(0, 9),
-        codec::HeaderRowMove::new(9, 0),
-    ];
+    let moves = [codec::RowMove::new(0, 9), codec::RowMove::new(9, 0)];
     let plan = codec::plan_header_storage_bucket_rows(&source, 16, &moves, options(&source))
         .expect("valid sparse header plan");
     let records: Vec<_> = plan.records().collect();
@@ -455,9 +449,9 @@ fn sparse_header_moves_borrow_records_and_reject_unknown_mutation() {
     // Sorting the moves before validation is intentional, so duplicate source
     // indexes must be rejected even when they are separated in caller order.
     let nonadjacent_duplicate = [
-        codec::HeaderRowMove::new(0, 9),
-        codec::HeaderRowMove::new(4, 4),
-        codec::HeaderRowMove::new(0, 0),
+        codec::RowMove::new(0, 9),
+        codec::RowMove::new(4, 4),
+        codec::RowMove::new(0, 0),
     ];
     assert!(
         codec::plan_header_storage_bucket_rows(
@@ -470,7 +464,7 @@ fn sparse_header_moves_borrow_records_and_reject_unknown_mutation() {
     );
     // Header indexes are sparse; an absent source index is not an implicit
     // insertion and must fail before any rewrite is staged.
-    let missing_source = [codec::HeaderRowMove::new(1, 9)];
+    let missing_source = [codec::RowMove::new(1, 9)];
     assert!(
         codec::plan_header_storage_bucket_rows(&source, 16, &missing_source, options(&source),)
             .is_err()

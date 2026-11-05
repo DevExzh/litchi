@@ -14,7 +14,7 @@ mod tests;
 
 pub use codec::{decode, encode};
 pub use litchi_ograph::chart::Rect;
-pub use model::{Change, Commit, Patch, Snapshot};
-pub use transaction::Transaction;
+pub use model::{Change, Commit, Diagnostics, Patch, Snapshot};
+pub use transaction::Edit;
 
 pub(crate) use codec::patch;

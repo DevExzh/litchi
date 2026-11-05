@@ -1,6 +1,6 @@
 //! XLSX-owned compatibility model for `SpreadsheetML` Custom XML Maps.
 
-use litchi_core::sheet::Result;
+use crate::error::Result;
 
 use super::invalid;
 
@@ -80,10 +80,6 @@ pub struct XmlMapInfo {
     pub maps: Vec<XmlMap>,
 }
 
-/// Short compatibility name for [`XmlMapSchema`].
-pub type XmlSchema = XmlMapSchema;
-/// Short compatibility name for [`XmlMapDataBinding`].
-pub type DataBinding = XmlMapDataBinding;
 pub use litchi_ooxml_common::spreadsheet_xml_maps::XmlMapLimits;
 
 impl From<XmlMapConformance> for litchi_ooxml_common::spreadsheet_xml_maps::XmlMapConformance {
@@ -218,10 +214,18 @@ impl XmlMapInfo {
 
         let limits = XmlMapLimits::DEFAULT;
         if self.schemas.len() > limits.max_schemas {
-            return Err(invalid("custom XML maps schema limit exceeded"));
+            return Err(crate::Error::limit(
+                super::LimitKind::Schemas,
+                self.schemas.len(),
+                limits.max_schemas,
+            ));
         }
         if self.maps.len() > limits.max_maps {
-            return Err(invalid("custom XML maps map limit exceeded"));
+            return Err(crate::Error::limit(
+                super::LimitKind::Maps,
+                self.maps.len(),
+                limits.max_maps,
+            ));
         }
         let mut schemas = Vec::new();
         schemas

@@ -4,7 +4,7 @@
 )]
 
 use litchi_odp::core::OwnedPackage;
-use litchi_odp::{Builder, Presentation, image::Length as OdfLength};
+use litchi_odp::{Builder, Package, image::Length as OdfLength};
 
 const PNG: &[u8] = b"\x89PNG\r\n\x1a\nimage";
 const JPEG: &[u8] = b"\xff\xd8\xff\xe0image";
@@ -23,7 +23,7 @@ fn builder_inserts_a_picture_that_round_trips_with_exact_payload_and_mime() {
         .insert_image(0, PNG, &origin, &origin, &size, &size)
         .unwrap();
 
-    let bytes = builder.build().unwrap();
+    let bytes = builder.build().unwrap().to_bytes().unwrap();
     let package = OwnedPackage::from_bytes(bytes.clone()).unwrap();
     assert_eq!(package.get_file("Pictures/image1.png").unwrap(), PNG);
     let manifest = String::from_utf8(package.get_file("META-INF/manifest.xml").unwrap()).unwrap();
@@ -40,7 +40,7 @@ fn builder_inserts_a_picture_that_round_trips_with_exact_payload_and_mime() {
         assert!(content.contains(attribute), "missing {attribute}");
     }
 
-    let presentation = Presentation::from_bytes(bytes).unwrap();
+    let presentation = Package::from_bytes(&bytes).unwrap().presentation().unwrap();
     let slides = presentation.slides().unwrap();
     let shapes = slides[0].shapes().unwrap();
     assert_eq!(shapes[0].image_href(), Some("Pictures/image1.png"));
@@ -57,7 +57,7 @@ fn builder_allocates_picture_numbers_across_image_extensions() {
             .unwrap();
     }
 
-    let package = OwnedPackage::from_bytes(builder.build().unwrap()).unwrap();
+    let package = OwnedPackage::from_bytes(builder.build().unwrap().to_bytes().unwrap()).unwrap();
     assert_eq!(package.get_file("Pictures/image1.png").unwrap(), PNG);
     assert_eq!(package.get_file("Pictures/image2.jpg").unwrap(), JPEG);
     assert_eq!(package.get_file("Pictures/image3.gif").unwrap(), GIF);
@@ -89,7 +89,7 @@ fn rejected_image_inputs_do_not_stage_media_or_mutate_the_slide() {
     builder
         .insert_image(0, PNG, &origin, &origin, &size, &size)
         .unwrap();
-    let package = OwnedPackage::from_bytes(builder.build().unwrap()).unwrap();
+    let package = OwnedPackage::from_bytes(builder.build().unwrap().to_bytes().unwrap()).unwrap();
     assert_eq!(package.get_file("Pictures/image1.png").unwrap(), PNG);
     assert!(!package.has_file("Pictures/image2.png").unwrap());
     let content = String::from_utf8(package.get_file("content.xml").unwrap()).unwrap();

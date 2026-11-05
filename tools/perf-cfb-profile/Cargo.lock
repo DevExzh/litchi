@@ -555,6 +555,7 @@ dependencies = [
  "base64",
  "chrono",
  "fast-float2",
+ "libc",
  "once_cell",
  "rand 0.10.3",
  "serde",
@@ -612,6 +613,7 @@ name = "litchi-odraw"
 version = "0.0.1"
 dependencies = [
  "bitflags",
+ "litchi-core",
  "zerocopy",
  "zerocopy-derive",
 ]

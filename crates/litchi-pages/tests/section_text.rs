@@ -1,13 +1,14 @@
 use std::io;
 use std::sync::{Arc, Barrier};
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_common::{decode_varint_from_bytes, encode_varint_into, wire::WireView};
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tp, tsa, tsp, tswp};
 use litchi_pages::{
-    Limits, Package, PackageError, Position, SectionSelector, SectionTextError,
-    SectionTextLimitKind, TextPosition, TextSpan,
+    Package, PackageError, Position, SectionSelector, TextPosition, TextSpan,
+    section::text::Error as SectionTextError, section::text::LimitKind as SectionTextLimitKind,
 };
 use prost::Message as _;
 
@@ -52,19 +53,23 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
 fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn component_with_unknown_header(
     objects: Vec<ArchiveObject>,
     target_identifier: u64,
 ) -> TestResult<Vec<u8>> {
-    let bytes = Archive { objects }.to_bytes()?;
-    let parsed = Archive::parse(&bytes)?;
+    let bytes = Archive { objects }.to_bytes(Default::default())?;
+    let parsed = Archive::parse(&bytes, Default::default())?;
     let object = parsed
         .object(target_identifier)
         .ok_or_else(|| io::Error::other("synthetic target object is missing"))?;
@@ -97,9 +102,9 @@ fn component_with_unknown_header(
     with_unknown.extend_from_slice(&header);
     with_unknown.extend_from_slice(&bytes[data_offset..]);
 
-    let reparsed = Archive::parse(&with_unknown)?;
-    assert_eq!(reparsed.to_bytes()?, with_unknown);
-    Ok(SnappyStream::compress(&with_unknown)?)
+    let reparsed = Archive::parse(&with_unknown, Default::default())?;
+    assert_eq!(reparsed.to_bytes(Default::default())?, with_unknown);
+    Ok(SnappyStream::compress(&with_unknown, Default::default())?)
 }
 
 fn section_message(name: &str, unknown: u64) -> TestResult<RawMessage> {
@@ -165,7 +170,7 @@ fn synthetic_package_with_text<const N: usize>(fragments: [&str; N]) -> TestResu
     // Interleave an unknown field between the two repeated text records so a
     // changed splice must preserve both the record ordering and raw unknown
     // bytes rather than normalize the complete message.
-    let encoded_view = WireView::parse(&encoded_body)?;
+    let encoded_view = WireView::parse(&encoded_body, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut body_payload = Vec::with_capacity(encoded_body.len().saturating_add(8));
     let mut text_fields = 0usize;
     for field in encoded_view.fields() {
@@ -198,16 +203,23 @@ fn synthetic_package_with_text<const N: usize>(fragments: [&str; N]) -> TestResu
                 data: b"after-body-message".to_vec(),
             },
         ],
+        Default::default(),
     )?;
     let first = ArchiveObject::new(
         FIRST_SECTION_IDENTIFIER,
         vec![section_message("First", 11)?],
+        Default::default(),
     )?;
     let second = ArchiveObject::new(
         SECOND_SECTION_IDENTIFIER,
         vec![section_message("Middle", 22)?],
+        Default::default(),
     )?;
-    let third = ArchiveObject::new(THIRD_SECTION_IDENTIFIER, vec![section_message("Last", 33)?])?;
+    let third = ArchiveObject::new(
+        THIRD_SECTION_IDENTIFIER,
+        vec![section_message("Last", 33)?],
+        Default::default(),
+    )?;
     let mut zorder = object(
         DRAWABLES_ZORDER_IDENTIFIER,
         10_015,
@@ -264,7 +276,7 @@ fn rootless_fallback_package(fragments: &[&str]) -> TestResult<Vec<u8>> {
 }
 
 fn legacy_package_bytes(flat: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(flat)?;
+    let catalog = Catalog::from_bytes(flat, Default::default())?;
     let inner_entries = catalog
         .iter()
         .filter(|entry| {
@@ -290,7 +302,7 @@ fn legacy_package_bytes(flat: &[u8]) -> TestResult<Vec<u8>> {
 fn package_with_hidden_bookmark_reference() -> TestResult<Vec<u8>> {
     let bytes = synthetic_package()?;
     let stream = document_stream(&bytes)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     let body = archive
         .object_mut(BODY_IDENTIFIER)
         .ok_or_else(|| io::Error::other("missing synthetic body"))?;
@@ -318,9 +330,11 @@ fn package_with_hidden_bookmark_reference() -> TestResult<Vec<u8>> {
             type_: STORAGE_MESSAGE_TYPE,
             data: storage.encode_to_vec(),
         },
+        Default::default(),
     )?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(&bytes)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(&bytes, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             DOCUMENT_MEMBER,
@@ -333,7 +347,7 @@ fn package_with_hidden_bookmark_reference() -> TestResult<Vec<u8>> {
 fn package_with_duplicate_known_table() -> TestResult<Vec<u8>> {
     let bytes = synthetic_package()?;
     let stream = document_stream(&bytes)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     let body = archive
         .object_mut(BODY_IDENTIFIER)
         .ok_or_else(|| io::Error::other("missing synthetic body"))?;
@@ -343,17 +357,29 @@ fn package_with_duplicate_known_table() -> TestResult<Vec<u8>> {
         .position(|message| message.type_ == STORAGE_MESSAGE_TYPE)
         .ok_or_else(|| io::Error::other("missing synthetic body message"))?;
     let mut payload = body.messages[message_index].data.clone();
-    litchi_iwa_common::wire::append_length_delimited_field(&mut payload, 11, &[])?;
-    litchi_iwa_common::wire::append_length_delimited_field(&mut payload, 11, &[])?;
+    litchi_iwa_common::wire::append_length_delimited_field(
+        &mut payload,
+        11,
+        &[],
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    litchi_iwa_common::wire::append_length_delimited_field(
+        &mut payload,
+        11,
+        &[],
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     body.replace_message(
         message_index,
         RawMessage {
             type_: STORAGE_MESSAGE_TYPE,
             data: payload,
         },
+        Default::default(),
     )?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(&bytes)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(&bytes, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             DOCUMENT_MEMBER,
@@ -366,7 +392,7 @@ fn package_with_duplicate_known_table() -> TestResult<Vec<u8>> {
 fn package_with_wrong_known_table_wire() -> TestResult<Vec<u8>> {
     let bytes = synthetic_package()?;
     let stream = document_stream(&bytes)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     let body = archive
         .object_mut(BODY_IDENTIFIER)
         .ok_or_else(|| io::Error::other("missing synthetic body"))?;
@@ -386,9 +412,11 @@ fn package_with_wrong_known_table_wire() -> TestResult<Vec<u8>> {
             type_: STORAGE_MESSAGE_TYPE,
             data: payload,
         },
+        Default::default(),
     )?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(&bytes)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(&bytes, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             DOCUMENT_MEMBER,
@@ -424,7 +452,7 @@ fn opaque_unknown_wire() -> Vec<u8> {
 fn package_with_opaque_body_unknowns() -> TestResult<Vec<u8>> {
     let bytes = synthetic_package()?;
     let stream = document_stream(&bytes)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     let body = archive
         .object_mut(BODY_IDENTIFIER)
         .ok_or_else(|| io::Error::other("missing synthetic body"))?;
@@ -441,9 +469,11 @@ fn package_with_opaque_body_unknowns() -> TestResult<Vec<u8>> {
             type_: STORAGE_MESSAGE_TYPE,
             data: payload,
         },
+        Default::default(),
     )?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(&bytes)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(&bytes, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             DOCUMENT_MEMBER,
@@ -456,23 +486,29 @@ fn package_with_opaque_body_unknowns() -> TestResult<Vec<u8>> {
 fn package_with_unselected_body_alias() -> TestResult<Vec<u8>> {
     let bytes = synthetic_package()?;
     let stream = document_stream(&bytes)?;
-    let source_archive = Archive::parse(&stream)?;
-    let mut unrelated_archive = Archive::parse(&{
-        let catalog = Catalog::from_bytes(&bytes)?;
-        let entry = catalog
-            .iter()
-            .find(|entry| entry.name() == UNRELATED_MEMBER)
-            .ok_or_else(|| io::Error::other("missing unrelated component"))?;
-        SnappyStream::decompress(entry.data())?.into_bytes()
-    })?;
+    let source_archive = Archive::parse(&stream, Default::default())?;
+    let mut unrelated_archive = Archive::parse(
+        &{
+            let catalog = Catalog::from_bytes(&bytes, Default::default())?;
+            let entry = catalog
+                .iter()
+                .find(|entry| entry.name() == UNRELATED_MEMBER)
+                .ok_or_else(|| io::Error::other("missing unrelated component"))?;
+            SnappyStream::decompress(entry.data(), Default::default())?.into_bytes()
+        },
+        Default::default(),
+    )?;
     let mut alias = source_archive
         .object(BODY_IDENTIFIER)
         .cloned()
         .ok_or_else(|| io::Error::other("missing source body for alias"))?;
     alias.archive_info.identifier = Some(UNSELECTED_BODY_ALIAS_IDENTIFIER);
-    unrelated_archive.append_objects(vec![alias])?;
-    let compressed = SnappyStream::compress(&unrelated_archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(&bytes)?;
+    unrelated_archive.append_objects(vec![alias], Default::default())?;
+    let compressed = SnappyStream::compress(
+        &unrelated_archive.to_bytes(Default::default())?,
+        Default::default(),
+    )?;
+    let catalog = Catalog::from_bytes(&bytes, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             UNRELATED_MEMBER,
@@ -488,13 +524,13 @@ fn member_message_payload(
     identifier: u64,
     type_: u32,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| io::Error::other("missing requested component"))?;
-    let stream = SnappyStream::decompress(entry.data())?.into_bytes();
-    let archive = Archive::parse(&stream)?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing requested object"))?;
@@ -507,17 +543,17 @@ fn member_message_payload(
 }
 
 fn document_stream(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("missing synthetic Pages document member"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn message_payload(package: &[u8], identifier: u64, type_: u32) -> TestResult<Vec<u8>> {
     let stream = document_stream(package)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic Pages object"))?;
@@ -531,7 +567,7 @@ fn message_payload(package: &[u8], identifier: u64, type_: u32) -> TestResult<Ve
 
 fn object_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
     let stream = document_stream(package)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic Pages object"))?;
@@ -545,7 +581,7 @@ fn object_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
 }
 
 fn normalize_message_length(header: &[u8], target_index: usize) -> TestResult<Vec<u8>> {
-    let view = WireView::parse(header)?;
+    let view = WireView::parse(header, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(header.len());
     let mut message_index = 0usize;
     for field in view.fields() {
@@ -560,7 +596,7 @@ fn normalize_message_length(header: &[u8], target_index: usize) -> TestResult<Ve
         }
         output.extend_from_slice(field.key());
         output.extend_from_slice(b"<message-info>");
-        let message = WireView::parse(field.payload())?;
+        let message = WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
         let effective_length = message
             .fields()
             .enumerate()
@@ -584,26 +620,32 @@ fn normalize_message_length(header: &[u8], target_index: usize) -> TestResult<Ve
 }
 
 fn body_fields_except_text_and_sections(payload: &[u8]) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(payload)?
-        .fields()
-        .filter(|field| !matches!(field.number(), 3 | 17))
-        .map(|field| field.raw().to_vec())
-        .collect())
+    Ok(
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .filter(|field| !matches!(field.number(), 3 | 17))
+            .map(|field| field.raw().to_vec())
+            .collect(),
+    )
 }
 
 fn text_field_raw(payload: &[u8]) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(payload)?
-        .fields()
-        .filter(|field| field.number() == 3)
-        .map(|field| field.raw().to_vec())
-        .collect())
+    Ok(
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .filter(|field| field.number() == 3)
+            .map(|field| field.raw().to_vec())
+            .collect(),
+    )
 }
 
 fn field_numbers(payload: &[u8]) -> TestResult<Vec<u32>> {
-    Ok(WireView::parse(payload)?
-        .fields()
-        .map(litchi_iwa_common::wire::WireFieldView::number)
-        .collect())
+    Ok(
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .map(litchi_iwa_common::wire::WireFieldView::number)
+            .collect(),
+    )
 }
 
 fn section_snapshot(package: &Package) -> TestResult<Vec<(Option<String>, String)>> {
@@ -623,8 +665,8 @@ fn section_snapshot(package: &Package) -> TestResult<Vec<(Option<String>, String
 }
 
 fn assert_untouched_zip_members(before: &[u8], after: &[u8]) -> TestResult<()> {
-    let before_catalog = Catalog::from_bytes(before)?;
-    let after_catalog = Catalog::from_bytes(after)?;
+    let before_catalog = Catalog::from_bytes(before, Default::default())?;
+    let after_catalog = Catalog::from_bytes(after, Default::default())?;
     let before_entries = before_catalog.iter().collect::<Vec<_>>();
     let after_entries = after_catalog.iter().collect::<Vec<_>>();
     assert_eq!(before_entries.len(), after_entries.len());
@@ -673,7 +715,9 @@ fn selector_first_astral_edit_shifts_only_following_boundaries() -> TestResult<(
     );
     assert!(matches!(
         package.edit_body_text(),
-        Err(SectionTextError::BodySectionCount { actual: 3 })
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::BodySectionCount { actual: 3 }
+        ))
     ));
 
     let span = TextSpan::from_utf16_indexes(1, 1)?;
@@ -746,7 +790,9 @@ fn no_op_shares_exact_and_legacy_sources() -> TestResult<()> {
     changed.set("Changed")?;
     assert!(matches!(
         changed.commit(),
-        Err(SectionTextError::UnsupportedSource)
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::UnsupportedSource
+        ))
     ));
     Ok(())
 }
@@ -787,7 +833,9 @@ fn rootless_fallback_and_empty_body_semantics_remain_fail_closed() -> TestResult
     changed.set("replacement")?;
     assert!(matches!(
         changed.commit(),
-        Err(SectionTextError::UnsupportedSource)
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::UnsupportedSource
+        ))
     ));
     assert_eq!(exact_bytes(&package)?, bytes);
 
@@ -797,11 +845,13 @@ fn rootless_fallback_and_empty_body_semantics_remain_fail_closed() -> TestResult
     assert_eq!(empty.text()?, "");
     assert!(matches!(
         empty.edit_body_text(),
-        Err(SectionTextError::BodySectionCount { actual: 0 })
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::BodySectionCount { actual: 0 }
+        ))
     ));
     assert!(matches!(
         empty.section_text(SectionSelector::index(0)),
-        Err(SectionTextError::PositionNotFound { position })
+        Err(SectionTextError::Refused(litchi_pages::section::text::Refusal::PositionNotFound { position }))
             if position == Position::new(0)
     ));
     Ok(())
@@ -838,7 +888,7 @@ fn changed_text_preserves_unknown_data_headers_and_zip_and_is_reversible() -> Te
     );
     assert_eq!(field_numbers(&target_body)?, field_numbers(&source_body)?);
     assert!(
-        WireView::parse(&target_body)?
+        WireView::parse(&target_body, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .any(|field| field.number() == 99)
     );
@@ -847,7 +897,7 @@ fn changed_text_preserves_unknown_data_headers_and_zip_and_is_reversible() -> Te
         normalize_message_length(&source_header, 1)?
     );
     assert!(
-        WireView::parse(&target_header)?
+        WireView::parse(&target_header, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .any(|field| field.number() == 99)
     );
@@ -881,7 +931,7 @@ fn changed_text_preserves_unknown_data_headers_and_zip_and_is_reversible() -> Te
     assert_eq!(exact_bytes(restored.package())?, bytes);
     assert_eq!(section_snapshot(restored.package())?, source_snapshot);
 
-    let equivalent_bytes = Catalog::from_bytes(&bytes)?.reassemble_to_bytes(
+    let equivalent_bytes = Catalog::from_bytes(&bytes, Default::default())?.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             "Data/sentinel.bin",
             b"different unrelated ZIP sentinel",
@@ -1064,39 +1114,51 @@ fn selectors_spans_reserved_markers_and_dependent_content_are_typed() -> TestRes
     let package = Package::from_bytes(&bytes)?;
     assert!(matches!(
         package.edit_section_text(SectionSelector::name("Missing")),
-        Err(SectionTextError::NameNotFound)
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::NameNotFound
+        ))
     ));
     assert!(matches!(
         package.edit_section_text(SectionSelector::index(3)),
-        Err(SectionTextError::PositionNotFound { position }) if position == Position::new(3)
+        Err(SectionTextError::Refused(litchi_pages::section::text::Refusal::PositionNotFound { position })) if position == Position::new(3)
     ));
 
     let mut edit = package.edit_section_text(SectionSelector::index(0))?;
     assert!(matches!(
         edit.insert(TextPosition::ZERO, "bad\u{0004}break"),
-        Err(SectionTextError::SectionBreakReplacement)
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::SectionBreakReplacement
+        ))
     ));
     assert!(matches!(
         edit.insert(TextPosition::ZERO, "bad\u{000e}footnote"),
-        Err(SectionTextError::FootnoteAnchorReplacement)
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::FootnoteAnchorReplacement
+        ))
     ));
     assert!(matches!(
         edit.insert(TextPosition::ZERO, "bad\u{fffc}object"),
-        Err(SectionTextError::ObjectMarkerReplacement)
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::ObjectMarkerReplacement
+        ))
     ));
     assert!(matches!(
         edit.delete(TextSpan::from_utf16_indexes(100, 100)?),
-        Err(SectionTextError::SpanOutOfBounds { .. })
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::SpanOutOfBounds { .. }
+        ))
     ));
     assert!(matches!(
         edit.delete(TextSpan::from_utf16_indexes(6, 6)?),
-        Err(SectionTextError::SurrogateBoundary { position })
+        Err(SectionTextError::Refused(litchi_pages::section::text::Refusal::SurrogateBoundary { position }))
             if position == TextPosition::from_utf16_code_units(6)
     ));
     edit.insert(TextPosition::ZERO, "valid")?;
     assert!(matches!(
         edit.insert(TextPosition::ZERO, "second"),
-        Err(SectionTextError::OperationAlreadyStaged)
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::OperationAlreadyStaged
+        ))
     ));
 
     let dependent_bytes =
@@ -1105,12 +1167,16 @@ fn selectors_spans_reserved_markers_and_dependent_content_are_typed() -> TestRes
     let mut dependent_edit = dependent_package.edit_section_text(SectionSelector::index(0))?;
     assert!(matches!(
         dependent_edit.delete(TextSpan::from_utf16_indexes(5, 6)?),
-        Err(SectionTextError::DependentContent)
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::DependentContent
+        ))
     ));
     let mut object_edit = dependent_package.edit_section_text(SectionSelector::index(0))?;
     assert!(matches!(
         object_edit.delete(TextSpan::from_utf16_indexes(6, 7)?),
-        Err(SectionTextError::DependentContent)
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::DependentContent
+        ))
     ));
 
     let referenced_bytes = package_with_hidden_bookmark_reference()?;
@@ -1120,14 +1186,16 @@ fn selectors_spans_reserved_markers_and_dependent_content_are_typed() -> TestRes
     referenced_edit.delete(TextSpan::from_utf16_indexes(2, 3)?)?;
     assert!(matches!(
         referenced_edit.commit(),
-        Err(SectionTextError::DependentContent)
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::DependentContent
+        ))
     ));
     assert_eq!(exact_bytes(&referenced_package)?, referenced_source);
 
     let duplicate_name_bytes = {
         let duplicate_source = synthetic_package()?;
         let stream = document_stream(&duplicate_source)?;
-        let mut archive = Archive::parse(&stream)?;
+        let mut archive = Archive::parse(&stream, Default::default())?;
         let second = archive
             .object_mut(SECOND_SECTION_IDENTIFIER)
             .ok_or_else(|| io::Error::other("missing second section"))?;
@@ -1141,9 +1209,11 @@ fn selectors_spans_reserved_markers_and_dependent_content_are_typed() -> TestRes
                 }
                 .encode_to_vec(),
             },
+            Default::default(),
         )?;
-        let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-        let catalog = Catalog::from_bytes(&duplicate_source)?;
+        let compressed =
+            SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+        let catalog = Catalog::from_bytes(&duplicate_source, Default::default())?;
         catalog.reassemble_to_bytes(
             &[litchi_iwa_archive::package::EntryEdit::new(
                 DOCUMENT_MEMBER,
@@ -1155,7 +1225,7 @@ fn selectors_spans_reserved_markers_and_dependent_content_are_typed() -> TestRes
     let duplicate_name_package = Package::from_bytes(&duplicate_name_bytes)?;
     assert!(matches!(
         duplicate_name_package.edit_section_text(SectionSelector::name("First")),
-        Err(SectionTextError::AmbiguousSelector { first, duplicate })
+        Err(SectionTextError::Refused(litchi_pages::section::text::Refusal::AmbiguousSelector { first, duplicate }))
             if first == Position::new(0) && duplicate == Position::new(1)
     ));
     Ok(())
@@ -1234,12 +1304,15 @@ fn changed_text_respects_retained_output_limit() -> TestResult<()> {
     let bytes = synthetic_package()?;
     let input_bytes = u64::try_from(bytes.len())?;
     let limits = Limits::new(input_bytes, 8, 1_024 * 1_024, 1_024 * 1_024, 1_024 * 1_024)?;
-    let package = Package::from_bytes_with_limits(&bytes, limits)?;
+    let package = Package::from_bytes_with_options(
+        &bytes,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    )?;
     let mut edit = package.edit_section_text(SectionSelector::index(1))?;
     edit.insert(TextPosition::ZERO, &"expanded".repeat(1_024))?;
     assert!(matches!(
         edit.commit(),
-        Err(SectionTextError::LimitExceeded {
+        Err(SectionTextError::Limit {
             kind: SectionTextLimitKind::OutputBytes,
             ..
         })
@@ -1267,7 +1340,10 @@ fn changed_text_replays_exact_public_output_limit_and_is_atomic() -> TestResult<
         defaults.max_total_bytes(),
         defaults.max_iwa_stream_bytes(),
     )?;
-    let exact_package = Package::from_bytes_with_limits(&bytes, exact_limits)?;
+    let exact_package = Package::from_bytes_with_options(
+        &bytes,
+        litchi_pages::OpenOptions::new().__archive_limits(exact_limits),
+    )?;
     let exact_commit = exact_package.set_section_text(SectionSelector::index(1), replacement)?;
     assert_eq!(exact_bytes(exact_commit.package())?, target_bytes);
 
@@ -1278,13 +1354,16 @@ fn changed_text_replays_exact_public_output_limit_and_is_atomic() -> TestResult<
         defaults.max_total_bytes(),
         defaults.max_iwa_stream_bytes(),
     )?;
-    let limited_package = Package::from_bytes_with_limits(&bytes, limited_limits)?;
+    let limited_package = Package::from_bytes_with_options(
+        &bytes,
+        litchi_pages::OpenOptions::new().__archive_limits(limited_limits),
+    )?;
     let source_before = exact_bytes(&limited_package)?;
     let mut limited_edit = limited_package.edit_section_text(SectionSelector::index(1))?;
     limited_edit.set(replacement)?;
     assert!(matches!(
         limited_edit.commit(),
-        Err(SectionTextError::LimitExceeded {
+        Err(SectionTextError::Limit {
             kind: SectionTextLimitKind::OutputBytes,
             ..
         })
@@ -1336,7 +1415,13 @@ fn public_physical_read_limits_fail_closed_without_mutating_source_bytes() -> Te
         )?,
     ];
     for limits in profiles {
-        assert!(Package::from_bytes_with_limits(&bytes, limits).is_err());
+        assert!(
+            Package::from_bytes_with_options(
+                &bytes,
+                litchi_pages::OpenOptions::new().__archive_limits(limits)
+            )
+            .is_err()
+        );
         assert_eq!(bytes, source_snapshot);
     }
     Ok(())

@@ -33,11 +33,17 @@ pub struct Snapshot {
 impl Snapshot {
     /// Load and validate the complete chart graph owned by `document_name`.
     ///
+    /// The required raw policy is checked before the graph is allocated.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn load(package: &OpcPackage, document_name: &PackURI) -> Result<Self> {
-        let graph = package::load(package, document_name)?;
+    pub fn load(
+        package: &OpcPackage,
+        document_name: &PackURI,
+        limits: &super::Limits,
+    ) -> Result<Self> {
+        let graph = super::raw::load(package, document_name, limits)?;
         let document = package.get_part(document_name)?;
         let document_name = document.partname().clone();
         let source = Source::capture(package, &document_name, &graph)?;
@@ -49,12 +55,17 @@ impl Snapshot {
     }
 
     /// Alias emphasizing that the snapshot is bound to package source bytes.
+    /// The required raw policy is checked before the graph is allocated.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn read(package: &OpcPackage, document_name: &PackURI) -> Result<Self> {
-        Self::load(package, document_name)
+    pub fn read(
+        package: &OpcPackage,
+        document_name: &PackURI,
+        limits: &super::Limits,
+    ) -> Result<Self> {
+        Self::load(package, document_name, limits)
     }
 
     /// Borrow the validated semantic chart graph.
@@ -107,46 +118,30 @@ impl Snapshot {
 }
 
 /// A failure-atomic edit over one existing DOCX chart ownership graph.
-pub struct Transaction<'a> {
-    target: &'a mut OpcPackage,
+#[derive(Clone)]
+pub(crate) struct Transaction {
     before: Snapshot,
     draft: Graph,
 }
 
-impl<'a> Transaction<'a> {
+impl Transaction {
     /// Capture the current chart graph and begin a package-bound transaction.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn new(target: &'a mut OpcPackage, document_name: &PackURI) -> Result<Self> {
-        let before = Snapshot::load(target, document_name)?;
+    pub fn new(target: &OpcPackage, document_name: &PackURI) -> Result<Self> {
+        let before = Snapshot::load(target, document_name, &super::Limits::DEFAULT)?;
         Ok(Self {
             draft: before.graph().clone(),
-            target,
             before,
         })
-    }
-
-    /// Alias for [`Self::new`] at call sites that prefer a verb.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation cannot be completed.
-    pub fn begin(target: &'a mut OpcPackage, document_name: &PackURI) -> Result<Self> {
-        Self::new(target, document_name)
     }
 
     /// Borrow the immutable source snapshot used for conflict checks.
     #[must_use]
     pub const fn before(&self) -> &Snapshot {
         &self.before
-    }
-
-    /// Alias for [`Self::before`].
-    #[must_use]
-    pub const fn source(&self) -> &Snapshot {
-        self.before()
     }
 
     /// Borrow the currently staged semantic chart graph.
@@ -221,8 +216,8 @@ impl<'a> Transaction<'a> {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn commit(self) -> Result<Commit> {
-        let current = Snapshot::load(self.target, self.before.document_name())?;
+    pub fn commit(self, target: &mut OpcPackage) -> Result<Commit> {
+        let current = Snapshot::load(target, self.before.document_name(), &super::Limits::DEFAULT)?;
         if !current.same_source(&self.before) {
             return Err(invalid("chart transaction source is stale"));
         }
@@ -232,27 +227,30 @@ impl<'a> Transaction<'a> {
         }
 
         validate_graph_value(&self.draft)?;
-        let mut candidate = self.target.clone();
-        package::store(&mut candidate, self.before.document_name(), &self.draft)?;
-        let snapshot = Snapshot::load(&candidate, self.before.document_name())?;
+        let mut candidate = target.clone();
+        package::store_with_limits(
+            &mut candidate,
+            self.before.document_name(),
+            &self.draft,
+            &super::Limits::DEFAULT,
+        )?;
+        let snapshot = Snapshot::load(
+            &candidate,
+            self.before.document_name(),
+            &super::Limits::DEFAULT,
+        )?;
         if snapshot.graph() != &self.draft {
             return Err(invalid("chart publication changed the staged graph"));
         }
         let patch = Patch::new(self.before, snapshot.clone());
-        *self.target = candidate;
+        *target = candidate;
         Ok(Commit::new(snapshot, patch, true))
-    }
-
-    /// Discard staged changes and recover the source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.before
     }
 }
 
 /// A successful chart publication and its reversible source patch.
 #[derive(Clone, Debug)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     patch: Patch,
     changed: bool,
@@ -312,7 +310,7 @@ impl Commit {
 
 /// A reversible, source-checked replacement of one complete chart graph.
 #[derive(Clone, Debug)]
-pub struct Patch {
+pub(crate) struct Patch {
     before: Snapshot,
     after: Snapshot,
 }
@@ -367,7 +365,7 @@ impl Patch {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn apply(&self, target: &mut OpcPackage) -> Result<Snapshot> {
-        let current = Snapshot::load(target, self.before.document_name())?;
+        let current = Snapshot::load(target, self.before.document_name(), &super::Limits::DEFAULT)?;
         if !current.same_source(&self.before) {
             return Err(invalid("chart patch source is stale"));
         }
@@ -376,12 +374,17 @@ impl Patch {
         }
 
         let mut candidate = target.clone();
-        package::store(
+        package::store_with_limits(
             &mut candidate,
             self.after.document_name(),
             self.after.graph(),
+            &super::Limits::DEFAULT,
         )?;
-        let snapshot = Snapshot::load(&candidate, self.after.document_name())?;
+        let snapshot = Snapshot::load(
+            &candidate,
+            self.after.document_name(),
+            &super::Limits::DEFAULT,
+        )?;
         if !snapshot.same_source(&self.after) {
             return Err(invalid("chart patch publication changed the staged graph"));
         }

@@ -35,12 +35,12 @@ fn rsa_signer() -> Signer {
 }
 
 fn verify(bytes: &[u8], format: Format) -> litchi_sign::Result<Vec<cfb::Report>> {
-    let mut file = OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut file = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
     cfb::verify(&mut file, format, &Policy::strict())
 }
 
 fn signature_xml(bytes: &[u8]) -> (String, Vec<u8>) {
-    let mut file = OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut file = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
     let name = file.list_directory_entries(&["_xmlsignatures"]).unwrap()[0]
         .name
         .clone();
@@ -51,7 +51,7 @@ fn signature_xml(bytes: &[u8]) -> (String, Vec<u8>) {
 #[test]
 fn rsa_and_ecdsa_signatures_round_trip_with_chain_time_and_multiple_streams() {
     let original = ole(&[(&["Payload"], b"signed bytes")]);
-    let mut editor = Editor::open(original, Format::Doc).unwrap();
+    let mut editor = Editor::open(original, Format::Doc, Limits::standard()).unwrap();
     editor.add(&rsa_signer()).unwrap();
     let ecdsa = Signer::p256(EcdsaSigningKey::random(&mut OsRng))
         .time("2026-07-19T12:35:56Z")
@@ -74,7 +74,7 @@ fn rsa_and_ecdsa_signatures_round_trip_with_chain_time_and_multiple_streams() {
 #[test]
 fn stale_payload_is_reported_without_conflating_certificate_trust() {
     let original = ole(&[(&["Payload"], b"original")]);
-    let mut editor = Editor::open(original, Format::Doc).unwrap();
+    let mut editor = Editor::open(original, Format::Doc, Limits::standard()).unwrap();
     editor.add(&rsa_signer()).unwrap();
     let signed = editor.finish().unwrap();
     let (name, xml) = signature_xml(&signed);
@@ -92,20 +92,21 @@ fn stale_payload_is_reported_without_conflating_certificate_trust() {
 #[test]
 fn no_op_clear_and_resign_are_atomic_and_preserve_payload_streams() {
     let original = ole(&[(&["Payload"], b"preserve exactly")]);
-    let editor = Editor::open(original.clone(), Format::Doc).unwrap();
+    let editor = Editor::open(original.clone(), Format::Doc, Limits::standard()).unwrap();
     assert_eq!(editor.finish().unwrap(), original);
 
-    let mut editor = Editor::open(original, Format::Doc).unwrap();
+    let mut editor = Editor::open(original, Format::Doc, Limits::standard()).unwrap();
     editor.add(&rsa_signer()).unwrap();
     editor.resign(&rsa_signer()).unwrap();
     let signed = editor.finish().unwrap();
     assert_eq!(verify(&signed, Format::Doc).unwrap().len(), 1);
 
-    let mut editor = Editor::open(signed, Format::Doc).unwrap();
+    let mut editor = Editor::open(signed, Format::Doc, Limits::standard()).unwrap();
     editor.clear().unwrap();
     let cleared = editor.finish().unwrap();
     assert!(verify(&cleared, Format::Doc).unwrap().is_empty());
-    let mut file = OleFile::open(Cursor::new(cleared)).unwrap();
+    let mut file =
+        OleFile::open(Cursor::new(cleared), litchi_cfb::OleFileLimits::default()).unwrap();
     assert_eq!(file.open_stream(&["Payload"]).unwrap(), b"preserve exactly");
 }
 
@@ -125,17 +126,19 @@ fn malformed_legacy_encrypted_and_resource_hostile_containers_are_rejected() {
     assert!(matches!(verify(&legacy, Format::Doc), Err(Error::Legacy)));
     let encrypted = ole(&[(&["Payload"], b"x"), (&["EncryptionInfo"], b"encrypted")]);
     assert!(matches!(
-        Editor::open(encrypted, Format::Doc),
+        Editor::open(encrypted, Format::Doc, Limits::standard()),
         Err(Error::Encrypted)
     ));
 
     let original = ole(&[(&["Payload"], b"x")]);
-    let mut editor = Editor::open(original, Format::Doc).unwrap();
+    let mut editor = Editor::open(original, Format::Doc, Limits::standard()).unwrap();
     editor.add(&rsa_signer()).unwrap();
     let signed = editor.finish().unwrap();
     let limits = Limits::standard().signature_bytes(32).unwrap();
-    let policy = Policy::strict().with_limits(limits);
-    let mut file = OleFile::open(Cursor::new(signed)).unwrap();
+    let policy = Policy::strict().limits(limits.clone());
+    assert_eq!(policy.limits_value(), &limits);
+    let mut file =
+        OleFile::open(Cursor::new(signed), litchi_cfb::OleFileLimits::default()).unwrap();
     assert!(matches!(
         cfb::verify(&mut file, Format::Doc, &policy),
         Err(Error::Limit(_))
@@ -158,7 +161,7 @@ fn producer_fixtures_are_noop_exact() {
         ("test-data/ole/ppt/text-margins.ppt", Format::Ppt),
     ] {
         let bytes = std::fs::read(root.join(relative)).unwrap();
-        let editor = Editor::open(bytes.clone(), format).unwrap();
+        let editor = Editor::open(bytes.clone(), format, Limits::standard()).unwrap();
         assert_eq!(editor.finish().unwrap(), bytes);
     }
 }

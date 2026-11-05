@@ -1,0 +1,70 @@
+{
+  "source": "47caed4627ba3bfc03e59dea8b36078c381e213a",
+  "pid": 3033585,
+  "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation",
+  "command": [
+    "python3",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/run-semantic-checks-disk-guarded.py",
+    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/docx-clippy-runtime-v18-commands.json",
+    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/docx-clippy-runtime-v18"
+  ],
+  "started_unix_seconds": 1792785829.5507236,
+  "target": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target",
+  "lock_sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-docx",
+        "--all-features",
+        "--lib",
+        "--message-format=json-render-diagnostics",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 126.83672535300138,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/docx-clippy-runtime-v18/check-0.log",
+      "bytes": 351344,
+      "sha256": "8862e6073ba6cb31722e2c3250e3e1e94d53dbd261ca298f133430407b0514c4",
+      "target_bytes_before": 3635306026,
+      "completed_test_executables_pruned": [
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/litchi_docx-67ae2d927f03ad6a",
+          "bytes": 73535176,
+          "sha256": "4963ac9553802a6a9df8141cacc0e9dc4fa7e8b45549de3fcc275dbe31ac12ba"
+        }
+      ]
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--message-format=json-render-diagnostics",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 101,
+      "seconds": 46.223442700000305,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/docx-clippy-runtime-v18/check-1.log",
+      "bytes": 186396,
+      "sha256": "6e0f292e3644a2ceb0f2c3df26d86c65dbab04cfc4a3e63be8cb7c1b8aa265bf",
+      "target_bytes_before": 3635306026,
+      "completed_test_executables_pruned": []
+    }
+  ],
+  "test_summaries": [
+    "test result: ok. 1519 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 83.41s"
+  ],
+  "note": "All1519all-feature DOCX library tests pass. Workspace all-target/all-feature Clippy stops on four OPC production lints: two explicit drops of non-Drop borrowing sinks, split generic bounds and usize-to-usize conversion. Repair uses lexical scopes preserving guard-error extraction/drop order, identical generic constraints and direct known-usize length; no lint allowances."
+}

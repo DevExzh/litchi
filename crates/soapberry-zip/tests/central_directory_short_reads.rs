@@ -26,7 +26,8 @@ impl ReaderAt for Capped<'_> {
 }
 
 fn fixture() -> Vec<u8> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer.write_stored("a", b"").unwrap();
     writer.write_stored("b", b"").unwrap();
     writer.finish_to_bytes().unwrap()

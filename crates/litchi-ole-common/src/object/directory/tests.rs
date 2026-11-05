@@ -238,12 +238,12 @@ fn catalog_preserves_unknown_raw_entries_and_exact_no_op_source() {
     assert_eq!(future.raw().children[0].name, "Opaque Child");
 
     let commit = source.edit().commit().expect("no-op should commit");
-    assert!(!commit.changed());
+    assert!(!commit.diagnostics().changed());
     assert!(commit.patch().is_noop());
     assert!(commit.patch().change().is_none());
     assert!(Arc::ptr_eq(
         &source.raw_entries_shared(),
-        &commit.snapshot().raw_entries_shared()
+        &commit.package().raw_entries_shared()
     ));
 }
 
@@ -261,7 +261,7 @@ fn metadata_and_containment_edits_are_typed_and_raw_preserving() {
         .set_links(storage, Links::new(None, None, Some(payload)))
         .expect("containment links should be editable");
     let commit = transaction.commit().expect("metadata edit should commit");
-    let edited = commit.snapshot();
+    let edited = commit.package();
     assert_eq!(edited.metadata(payload).unwrap().stream_size(), 84);
     assert_eq!(
         edited.metadata(storage).unwrap().class_id(),
@@ -312,7 +312,11 @@ fn typed_metadata_edit_preserves_filetime_lexical_values() {
             Ok(())
         })
         .unwrap();
-    let snapshot = transaction.snapshot().unwrap();
+    let snapshot = transaction
+        .clone()
+        .commit()
+        .map(litchi_core::edit::Commit::into_package)
+        .unwrap();
     let metadata = snapshot.metadata(storage).unwrap();
     assert_eq!(metadata.state_bits(), 0xDEAD_BEEF);
     assert_eq!(metadata.creation_time(), 0xFEDC_BA98_7654_3210);
@@ -334,9 +338,9 @@ fn directory_patch_rejects_stale_sources_and_round_trips_inverse() {
     let stale = Snapshot::from_entries(stale_entries, Limits::default())
         .expect("stale catalog should still be valid");
     assert!(commit.patch().apply(&stale).is_err());
-    assert_eq!(commit.patch().apply(&source).unwrap(), *commit.snapshot());
+    assert_eq!(commit.patch().apply(&source).unwrap(), *commit.package());
     assert_eq!(
-        commit.patch().inverse().apply(commit.snapshot()).unwrap(),
+        commit.patch().inverse().apply(commit.package()).unwrap(),
         source
     );
 }
@@ -379,7 +383,14 @@ fn catalog_validation_is_bounded_and_failure_atomic() {
             })
             .is_err()
     );
-    assert!(!transaction.is_changed());
+    assert!(
+        !transaction
+            .clone()
+            .commit()
+            .unwrap()
+            .diagnostics()
+            .changed()
+    );
     assert!(super::codec::raw_catalog_equal(
         transaction.catalog().raw_entries(),
         &before

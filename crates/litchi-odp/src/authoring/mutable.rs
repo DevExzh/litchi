@@ -1,7 +1,7 @@
 //! Private staging engine for source-checked presentation transactions.
 //!
 //! The attached mutable root is intentionally not exported. Public mutation is
-//! available only through [`super::edit::Transaction`].
+//! available only through [`super::edit::Edit`].
 
 use crate::codec::content_source::ContentSource;
 use crate::core::{OwnedPackage, PackageWriter, Structure};
@@ -229,22 +229,22 @@ impl DependencyFreeBlankSlideCopy {
 /// # Examples
 ///
 /// ```
-/// use litchi_odp::{Builder, edit};
+/// use litchi_odp::Builder;
 ///
 /// # fn main() -> litchi_core::Result<()> {
 /// // Build a presentation and take an immutable editing snapshot
 /// let mut builder = Builder::new();
 /// builder.add_slide_with_title("Welcome", "First draft")?;
-/// let source = edit::Snapshot::from_bytes(builder.build()?)?;
+/// let source = builder.build()?;
 ///
 /// // Stage edits in an isolated transaction
-/// let mut transaction = source.transaction()?;
+/// let mut transaction = source.edit()?;
 /// transaction.add("New Slide", "Slide content")?;
 /// transaction.remove(0)?;
 ///
 /// // Publish atomically; the source snapshot is never mutated
 /// let commit = transaction.commit()?;
-/// assert_eq!(commit.snapshot().slides().len(), 1);
+/// assert_eq!(commit.package().slides()?.len(), 1);
 /// # Ok(())
 /// # }
 /// ```
@@ -310,13 +310,13 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```
-    /// use litchi_odp::{Builder, Presentation};
+    /// use litchi_odp::Builder;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let presentation = Presentation::from_bytes(Builder::new().build()?)?;
-    /// let snapshot = presentation.snapshot()?;
-    /// let transaction = snapshot.transaction()?;
-    /// assert!(transaction.slides().is_empty());
+    /// let snapshot = Builder::new().build()?;
+    /// let transaction = snapshot.edit()?;
+    /// let slides = transaction.slides()?;
+    /// assert!(slides.is_empty());
     /// # Ok(())
     /// # }
     /// ```
@@ -349,9 +349,12 @@ impl MutablePresentation {
             Some(source) if source.page_count() == slides.len() => Arc::clone(validated_slides),
             _ if slides.is_empty() => Arc::clone(validated_slides),
             _ => {
-                return Err(litchi_core::Error::Unsupported(
-                    "ODP source slide coverage is incomplete; transaction staging refuses regeneration"
-                        .to_string(),
+                return Err(litchi_core::Error::Refused(
+                    litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedOperation,
+                        "odp.authoring.mutable",
+                        "ODP source slide coverage is incomplete; transaction staging refuses regeneration",
+                    ),
                 ));
             },
         };
@@ -419,9 +422,12 @@ impl MutablePresentation {
     /// authored markup.
     pub(super) fn check_slide_move_supported(&mut self) -> Result<()> {
         if self.source_declarations.is_some() || self.settings.is_some() {
-            return Err(litchi_core::Error::Unsupported(
-                "ODP retained producer declarations or settings cannot yet be reordered losslessly"
-                    .to_string(),
+            return Err(litchi_core::Error::Refused(
+                litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odp.authoring.mutable",
+                    "ODP retained producer declarations or settings cannot yet be reordered losslessly",
+                ),
             ));
         }
         let supported = match self.slide_move_supported {
@@ -438,9 +444,12 @@ impl MutablePresentation {
             },
         };
         if !supported {
-            return Err(litchi_core::Error::Unsupported(
-                "ODP retained producer pages cannot be reordered losslessly by the current writer"
-                    .to_string(),
+            return Err(litchi_core::Error::Refused(
+                litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odp.authoring.mutable",
+                    "ODP retained producer pages cannot be reordered losslessly by the current writer",
+                ),
             ));
         }
         Ok(())
@@ -458,10 +467,11 @@ impl MutablePresentation {
     ) -> Result<DependencyFreeBlankSlideCopy> {
         self.check_slide_move_supported()?;
         let source_origin = self.origins.get(index).copied().flatten().ok_or_else(|| {
-            litchi_core::Error::Unsupported(
-                "ODP dependency-free blank-slide copy requires an exact retained source page"
-                    .to_string(),
-            )
+            litchi_core::Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odp.authoring.mutable",
+                "ODP dependency-free blank-slide copy requires an exact retained source page",
+            ))
         })?;
         if self
             .page_overrides
@@ -469,16 +479,20 @@ impl MutablePresentation {
             .and_then(Option::as_ref)
             .is_some()
         {
-            return Err(litchi_core::Error::Unsupported(
-                "ODP dependency-free blank-slide copy cannot use an already copied page"
-                    .to_string(),
+            return Err(litchi_core::Error::Refused(
+                litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odp.authoring.mutable",
+                    "ODP dependency-free blank-slide copy cannot use an already copied page",
+                ),
             ));
         }
         let source = self.content_source.as_ref().ok_or_else(|| {
-            litchi_core::Error::Unsupported(
-                "ODP dependency-free blank-slide copy requires retained content.xml fragments"
-                    .to_string(),
-            )
+            litchi_core::Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odp.authoring.mutable",
+                "ODP dependency-free blank-slide copy requires retained content.xml fragments",
+            ))
         })?;
         let page = source.page(source_origin).ok_or_else(|| {
             litchi_core::Error::InvalidFormat(
@@ -486,9 +500,13 @@ impl MutablePresentation {
             )
         })?;
         if page.len() > MAX_DEPENDENCY_FREE_COPY_PAGE_BYTES {
-            return Err(litchi_core::Error::Unsupported(format!(
-                "ODP dependency-free blank page exceeds {MAX_DEPENDENCY_FREE_COPY_PAGE_BYTES} bytes"
-            )));
+            return Err(litchi_core::Error::Refused(
+                litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odp.authoring.mutable",
+                    "ODP dependency-free blank page exceeds its byte bound",
+                ),
+            ));
         }
         let name_value = dependency_free_blank_name_value(page)?;
         let metadata = self
@@ -496,20 +514,27 @@ impl MutablePresentation {
             .as_ref()
             .and_then(|value| value.page(index))
             .ok_or_else(|| {
-                litchi_core::Error::Unsupported(
-                    "ODP dependency-free blank-slide copy requires parsed draw:name metadata"
-                        .to_string(),
-                )
+                litchi_core::Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odp.authoring.mutable",
+                    "ODP dependency-free blank-slide copy requires parsed draw:name metadata",
+                ))
             })?;
         let old_name = metadata.name.as_deref().ok_or_else(|| {
-            litchi_core::Error::Unsupported(
-                "ODP dependency-free blank-slide copy requires draw:name".to_string(),
-            )
+            litchi_core::Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odp.authoring.mutable",
+                "ODP dependency-free blank-slide copy requires draw:name",
+            ))
         })?;
         if old_name.len() > MAX_DEPENDENCY_FREE_COPY_NAME_BYTES {
-            return Err(litchi_core::Error::Unsupported(format!(
-                "ODP dependency-free blank page name exceeds {MAX_DEPENDENCY_FREE_COPY_NAME_BYTES} bytes"
-            )));
+            return Err(litchi_core::Error::Refused(
+                litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odp.authoring.mutable",
+                    "ODP dependency-free blank page name exceeds its byte bound",
+                ),
+            ));
         }
         let names = crate::model::page_metadata::effective_page_names(
             self.page_metadata.as_ref(),
@@ -527,9 +552,13 @@ impl MutablePresentation {
                 )
             })?;
         if new_page_len > MAX_DEPENDENCY_FREE_COPY_PAGE_BYTES {
-            return Err(litchi_core::Error::Unsupported(format!(
-                "ODP dependency-free copied page exceeds {MAX_DEPENDENCY_FREE_COPY_PAGE_BYTES} bytes"
-            )));
+            return Err(litchi_core::Error::Refused(
+                litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odp.authoring.mutable",
+                    "ODP dependency-free copied page exceeds its byte bound",
+                ),
+            ));
         }
         let mut copied_page = String::new();
         copied_page
@@ -613,26 +642,41 @@ impl MutablePresentation {
         self.check_slide_move_supported()?;
         self.check_foreign_transfer_destination_safety()?;
         if self.content_source.is_none() {
-            return Err(litchi_core::Error::Unsupported(
-                "ODP foreign slide transfer requires a retained destination presentation body"
-                    .to_string(),
+            return Err(litchi_core::Error::Refused(
+                litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "odp.authoring.mutable",
+                    "ODP foreign slide transfer requires a retained destination presentation body",
+                ),
             ));
         }
         if source_page.len() > MAX_DEPENDENCY_FREE_COPY_PAGE_BYTES {
-            return Err(litchi_core::Error::Unsupported(format!(
-                "ODP foreign blank page exceeds {MAX_DEPENDENCY_FREE_COPY_PAGE_BYTES} bytes"
-            )));
+            return Err(litchi_core::Error::Refused(
+                litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "odp.authoring.mutable",
+                    "ODP foreign blank page exceeds its byte bound",
+                ),
+            ));
         }
         let name_value = dependency_free_blank_name_value(source_page)?;
         if source_name.is_empty() {
-            return Err(litchi_core::Error::Unsupported(
-                "ODP foreign blank page requires a non-empty draw:name".to_string(),
+            return Err(litchi_core::Error::Refused(
+                litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "odp.authoring.mutable",
+                    "ODP foreign blank page requires a non-empty draw:name",
+                ),
             ));
         }
         if source_name.len() > MAX_DEPENDENCY_FREE_COPY_NAME_BYTES {
-            return Err(litchi_core::Error::Unsupported(format!(
-                "ODP foreign blank page name exceeds {MAX_DEPENDENCY_FREE_COPY_NAME_BYTES} bytes"
-            )));
+            return Err(litchi_core::Error::Refused(
+                litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "odp.authoring.mutable",
+                    "ODP foreign blank page name exceeds its byte bound",
+                ),
+            ));
         }
         if source_slide.title.is_some()
             || !source_slide.text.is_empty()
@@ -642,8 +686,12 @@ impl MutablePresentation {
             || source_slide.legacy_animation.is_some()
             || !source_slide.shapes.is_empty()
         {
-            return Err(litchi_core::Error::Unsupported(
-                "ODP foreign slide transfer requires a dependency-free blank page".to_string(),
+            return Err(litchi_core::Error::Refused(
+                litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "odp.authoring.mutable",
+                    "ODP foreign slide transfer requires a dependency-free blank page",
+                ),
             ));
         }
         let names = crate::model::page_metadata::effective_page_names(
@@ -662,9 +710,13 @@ impl MutablePresentation {
                 )
             })?;
         if new_page_len > MAX_DEPENDENCY_FREE_COPY_PAGE_BYTES {
-            return Err(litchi_core::Error::Unsupported(format!(
-                "ODP foreign copied page exceeds {MAX_DEPENDENCY_FREE_COPY_PAGE_BYTES} bytes"
-            )));
+            return Err(litchi_core::Error::Refused(
+                litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "odp.authoring.mutable",
+                    "ODP foreign copied page exceeds its byte bound",
+                ),
+            ));
         }
         let mut page = String::new();
         page.try_reserve_exact(new_page_len)
@@ -751,18 +803,23 @@ impl MutablePresentation {
         index: usize,
     ) -> Result<DependencyFreeBlankSlideRemoval> {
         if self.slides.len() <= 1 {
-            return Err(litchi_core::Error::Unsupported(
-                "ODP dependency-free blank-slide removal refuses the final slide".to_string(),
+            return Err(litchi_core::Error::Refused(
+                litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odp.authoring.mutable",
+                    "ODP dependency-free blank-slide removal refuses the final slide",
+                ),
             ));
         }
         self.check_slide_move_supported()?;
         self.check_dependency_free_removal_package_owners()?;
 
         let source_origin = self.origins.get(index).copied().flatten().ok_or_else(|| {
-            litchi_core::Error::Unsupported(
-                "ODP dependency-free blank-slide removal requires an exact retained source page"
-                    .to_string(),
-            )
+            litchi_core::Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odp.authoring.mutable",
+                "ODP dependency-free blank-slide removal requires an exact retained source page",
+            ))
         })?;
         if self
             .page_overrides
@@ -770,15 +827,20 @@ impl MutablePresentation {
             .and_then(Option::as_ref)
             .is_some()
         {
-            return Err(litchi_core::Error::Unsupported(
-                "ODP dependency-free blank-slide removal cannot use a copied page".to_string(),
+            return Err(litchi_core::Error::Refused(
+                litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odp.authoring.mutable",
+                    "ODP dependency-free blank-slide removal cannot use a copied page",
+                ),
             ));
         }
         let source = self.content_source.as_ref().ok_or_else(|| {
-            litchi_core::Error::Unsupported(
-                "ODP dependency-free blank-slide removal requires retained content.xml fragments"
-                    .to_string(),
-            )
+            litchi_core::Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odp.authoring.mutable",
+                "ODP dependency-free blank-slide removal requires retained content.xml fragments",
+            ))
         })?;
         let page = source.page(source_origin).ok_or_else(|| {
             litchi_core::Error::InvalidFormat(
@@ -786,9 +848,13 @@ impl MutablePresentation {
             )
         })?;
         if page.len() > MAX_DEPENDENCY_FREE_COPY_PAGE_BYTES {
-            return Err(litchi_core::Error::Unsupported(format!(
-                "ODP dependency-free blank page exceeds {MAX_DEPENDENCY_FREE_COPY_PAGE_BYTES} bytes"
-            )));
+            return Err(litchi_core::Error::Refused(
+                litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odp.authoring.mutable",
+                    "ODP dependency-free blank page exceeds its byte bound",
+                ),
+            ));
         }
         dependency_free_blank_name_value(page)?;
 
@@ -797,26 +863,36 @@ impl MutablePresentation {
             .as_ref()
             .and_then(|value| value.page(index))
             .ok_or_else(|| {
-                litchi_core::Error::Unsupported(
-                    "ODP dependency-free blank-slide removal requires parsed draw:name metadata"
-                        .to_string(),
-                )
+                litchi_core::Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odp.authoring.mutable",
+                    "ODP dependency-free blank-slide removal requires parsed draw:name metadata",
+                ))
             })?;
         let name = metadata.name.as_deref().ok_or_else(|| {
-            litchi_core::Error::Unsupported(
-                "ODP dependency-free blank-slide removal requires draw:name".to_string(),
-            )
+            litchi_core::Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odp.authoring.mutable",
+                "ODP dependency-free blank-slide removal requires draw:name",
+            ))
         })?;
         if name.is_empty() {
-            return Err(litchi_core::Error::Unsupported(
-                "ODP dependency-free blank-slide removal requires a non-empty draw:name"
-                    .to_string(),
+            return Err(litchi_core::Error::Refused(
+                litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odp.authoring.mutable",
+                    "ODP dependency-free blank-slide removal requires a non-empty draw:name",
+                ),
             ));
         }
         if name.len() > MAX_DEPENDENCY_FREE_COPY_NAME_BYTES {
-            return Err(litchi_core::Error::Unsupported(format!(
-                "ODP dependency-free blank page name exceeds {MAX_DEPENDENCY_FREE_COPY_NAME_BYTES} bytes"
-            )));
+            return Err(litchi_core::Error::Refused(
+                litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odp.authoring.mutable",
+                    "ODP dependency-free blank page name exceeds its byte bound",
+                ),
+            ));
         }
         self.check_dependency_free_removal_name_ownership(name)?;
 
@@ -850,10 +926,11 @@ impl MutablePresentation {
 
     fn check_dependency_free_removal_package_owners(&self) -> Result<()> {
         let package = self.source_package.as_ref().ok_or_else(|| {
-            litchi_core::Error::Unsupported(
-                "ODP dependency-free blank-slide removal requires a retained source package"
-                    .to_string(),
-            )
+            litchi_core::Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odp.authoring.mutable",
+                "ODP dependency-free blank-slide removal requires a retained source package",
+            ))
         })?;
         if package.files()?.iter().any(|path| {
             let path = path.trim_start_matches('/');
@@ -862,8 +939,12 @@ impl MutablePresentation {
                 || path == "Scripts"
                 || path.starts_with("Scripts/")
         }) {
-            return Err(litchi_core::Error::Unsupported(
-                "ODP dependency-free blank-slide removal refuses package macro owners".to_string(),
+            return Err(litchi_core::Error::Refused(
+                litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odp.authoring.mutable",
+                    "ODP dependency-free blank-slide removal refuses package macro owners",
+                ),
             ));
         }
         Ok(())
@@ -871,19 +952,22 @@ impl MutablePresentation {
 
     fn check_foreign_transfer_destination_safety(&self) -> Result<()> {
         let package = self.source_package.as_ref().ok_or_else(|| {
-            litchi_core::Error::Unsupported(
-                "ODP foreign blank-slide transfer requires a retained source package".to_string(),
-            )
+            litchi_core::Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "odp.authoring.mutable",
+                "ODP foreign blank-slide transfer requires a retained source package",
+            ))
         })?;
         ensure_foreign_transfer_package_safety(package, "destination")
     }
 
     fn check_dependency_free_removal_name_ownership(&self, selected_name: &str) -> Result<()> {
         let package = self.source_package.as_ref().ok_or_else(|| {
-            litchi_core::Error::Unsupported(
-                "ODP dependency-free blank-slide removal requires a retained source package"
-                    .to_string(),
-            )
+            litchi_core::Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odp.authoring.mutable",
+                "ODP dependency-free blank-slide removal requires a retained source package",
+            ))
         })?;
         let mut selected_name_owners = 0usize;
         let archive = package.package()?;
@@ -896,9 +980,13 @@ impl MutablePresentation {
             scan_dependency_owners(&path, &bytes, selected_name, &mut selected_name_owners)?;
         }
         if selected_name_owners != 1 {
-            return Err(litchi_core::Error::Unsupported(format!(
-                "ODP dependency-free blank-slide removal requires exactly one selected page-name owner; found {selected_name_owners}"
-            )));
+            return Err(litchi_core::Error::Refused(
+                litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odp.authoring.mutable",
+                    "ODP dependency-free blank-slide removal requires exactly one selected page-name owner; found",
+                ),
+            ));
         }
         Ok(())
     }
@@ -935,9 +1023,11 @@ impl MutablePresentation {
             validate_media_change(change)?;
         }
         let source_package = self.source_package.clone().ok_or_else(|| {
-            litchi_core::Error::Unsupported(
-                "ODP media changes require a retained source package".to_string(),
-            )
+            litchi_core::Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odp.authoring.mutable",
+                "ODP media changes require a retained source package",
+            ))
         })?;
         let archive = source_package.package()?;
         let mut files = self.media_files.clone();
@@ -985,16 +1075,24 @@ impl MutablePresentation {
                     let existing_type = archive.manifest().get_media_type(path);
                     let previous = files.get(path);
                     if source_exists && previous.is_none() && existing_type.is_none() {
-                        return Err(litchi_core::Error::Unsupported(format!(
-                            "ODP media replacement refuses member '{path}' without manifest metadata"
-                        )));
+                        return Err(litchi_core::Error::Refused(
+                            litchi_core::edit::Refusal::new(
+                                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                                "odp.authoring.mutable",
+                                "ODP media replacement refuses member without manifest metadata",
+                            ),
+                        ));
                     }
                     if let Some(existing_type) = existing_type
                         && existing_type != media_type.as_str()
                     {
-                        return Err(litchi_core::Error::Unsupported(format!(
-                            "ODP media replacement cannot change manifest type for '{path}'"
-                        )));
+                        return Err(litchi_core::Error::Refused(
+                            litchi_core::edit::Refusal::new(
+                                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                                "odp.authoring.mutable",
+                                "ODP media replacement cannot change manifest type for",
+                            ),
+                        ));
                     }
                     if let Some(previous) = previous {
                         if previous.bytes.as_slice() == payload.as_slice()
@@ -1043,9 +1141,13 @@ impl MutablePresentation {
                 super::edit::MediaChange::Remove { .. } => {
                     let source_exists = archive.has_file(path);
                     if source_exists && self.source_media_is_referenced(path)? {
-                        return Err(litchi_core::Error::Unsupported(format!(
-                            "ODP media removal refuses referenced member '{path}'"
-                        )));
+                        return Err(litchi_core::Error::Refused(
+                            litchi_core::edit::Refusal::new(
+                                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                                "odp.authoring.mutable",
+                                "ODP media removal refuses referenced member",
+                            ),
+                        ));
                     }
                     if files.remove(path).is_some() {
                         if source_exists {
@@ -1106,9 +1208,11 @@ impl MutablePresentation {
     fn source_media_is_referenced(&mut self, path: &str) -> Result<bool> {
         if self.media_reference_index.is_none() {
             let source_package = self.source_package.clone().ok_or_else(|| {
-                litchi_core::Error::Unsupported(
-                    "ODP media references require a retained source package".to_string(),
-                )
+                litchi_core::Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odp.authoring.mutable",
+                    "ODP media references require a retained source package",
+                ))
             })?;
             self.media_reference_index = Some(MediaReferenceIndex::build(&source_package)?);
         }
@@ -1180,18 +1284,19 @@ impl MutablePresentation {
     ///
     /// # Examples
     ///
-    /// The public equivalent starts from [`crate::edit::Snapshot::transaction`].
+    /// The public equivalent starts from [`crate::Package::edit`].
     ///
     /// ```
-    /// use litchi_odp::{Builder, edit};
+    /// use litchi_odp::Builder;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let source = edit::Snapshot::from_bytes(Builder::new().build()?)?;
-    /// let mut transaction = source.transaction()?;
+    /// let source = Builder::new().build()?;
+    /// let mut transaction = source.edit()?;
     /// transaction.add("First", "Content 1")?;
     /// transaction.add("Third", "Content 3")?;
     /// transaction.add_before(1, "Second", "Content 2")?;
-    /// assert_eq!(transaction.slides()[1].title.as_deref(), Some("Second"));
+    /// let slides = transaction.slides()?;
+    /// assert_eq!(slides[1].title.as_deref(), Some("Second"));
     /// # Ok(())
     /// # }
     /// ```
@@ -1249,19 +1354,20 @@ impl MutablePresentation {
     ///
     /// # Examples
     ///
-    /// The public equivalent starts from [`crate::edit::Snapshot::transaction`].
+    /// The public equivalent starts from [`crate::Package::edit`].
     ///
     /// ```
-    /// use litchi_odp::{Builder, edit};
+    /// use litchi_odp::Builder;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let source = edit::Snapshot::from_bytes(Builder::new().build()?)?;
-    /// let mut transaction = source.transaction()?;
+    /// let source = Builder::new().build()?;
+    /// let mut transaction = source.edit()?;
     /// transaction.add("Slide 1", "Content 1")?;
     /// transaction.add("Slide 2", "Content 2")?;
     /// let removed = transaction.remove(0)?; // Remove first slide
     /// assert_eq!(removed.and_then(|slide| slide.title).as_deref(), Some("Slide 1"));
-    /// assert_eq!(transaction.slides().len(), 1);
+    /// let slides = transaction.slides()?;
+    /// assert_eq!(slides.len(), 1);
     /// # Ok(())
     /// # }
     /// ```
@@ -1365,18 +1471,19 @@ impl MutablePresentation {
     ///
     /// # Examples
     ///
-    /// The public equivalent starts from [`crate::edit::Snapshot::transaction`].
+    /// The public equivalent starts from [`crate::Package::edit`].
     ///
     /// ```
-    /// use litchi_odp::{Builder, edit};
+    /// use litchi_odp::Builder;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let source = edit::Snapshot::from_bytes(Builder::new().build()?)?;
-    /// let mut transaction = source.transaction()?;
+    /// let source = Builder::new().build()?;
+    /// let mut transaction = source.edit()?;
     /// transaction.add("Old Title", "Old content")?;
     /// transaction.replace(0, "New Title", "New content")?;
-    /// assert_eq!(transaction.slides()[0].title.as_deref(), Some("New Title"));
-    /// assert_eq!(transaction.slides()[0].text, "New content");
+    /// let slides = transaction.slides()?;
+    /// assert_eq!(slides[0].title.as_deref(), Some("New Title"));
+    /// assert_eq!(slides[0].text, "New content");
     /// # Ok(())
     /// # }
     /// ```
@@ -1407,13 +1514,14 @@ impl MutablePresentation {
     /// use litchi_odp::{Builder, Shape, edit};
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let source = edit::Snapshot::from_bytes(Builder::new().build()?)?;
-    /// let mut transaction = source.transaction()?;
+    /// let source = Builder::new().build()?;
+    /// let mut transaction = source.edit()?;
     /// transaction.add("Slide 1", "Content")?;
     /// let mut shape = Shape::new();
     /// shape.text = "Shape text".to_string();
     /// transaction.add_shape(0, shape)?;
-    /// assert_eq!(transaction.slides()[0].shapes.len(), 1);
+    /// let slides = transaction.slides()?;
+    /// assert_eq!(slides[0].shapes.len(), 1);
     /// # Ok(())
     /// # }
     /// ```
@@ -1437,20 +1545,21 @@ impl MutablePresentation {
     ///
     /// # Examples
     ///
-    /// The public equivalent starts from [`crate::edit::Snapshot::transaction`].
+    /// The public equivalent starts from [`crate::Package::edit`].
     ///
     /// ```
     /// use litchi_odp::{Builder, Shape, edit};
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let source = edit::Snapshot::from_bytes(Builder::new().build()?)?;
-    /// let mut transaction = source.transaction()?;
+    /// let source = Builder::new().build()?;
+    /// let mut transaction = source.edit()?;
     /// transaction.add("Slide 1", "Content")?;
     /// // Add shape first, then remove it
     /// transaction.add_shape(0, Shape::new())?;
     /// let removed = transaction.remove_shape(0, 0)?;
     /// assert!(removed.is_some());
-    /// assert!(transaction.slides()[0].shapes.is_empty());
+    /// let slides = transaction.slides()?;
+    /// assert!(slides[0].shapes.is_empty());
     /// # Ok(())
     /// # }
     /// ```
@@ -1475,18 +1584,19 @@ impl MutablePresentation {
     ///
     /// # Examples
     ///
-    /// The public equivalent starts from [`crate::edit::Snapshot::transaction`].
+    /// The public equivalent starts from [`crate::Package::edit`].
     ///
     /// ```
-    /// use litchi_odp::{Builder, edit};
+    /// use litchi_odp::Builder;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let source = edit::Snapshot::from_bytes(Builder::new().build()?)?;
-    /// let mut transaction = source.transaction()?;
+    /// let source = Builder::new().build()?;
+    /// let mut transaction = source.edit()?;
     /// transaction.add("Slide 1", "Content")?;
     /// transaction.clear(0)?;
-    /// assert!(transaction.slides()[0].title.is_none());
-    /// assert!(transaction.slides()[0].text.is_empty());
+    /// let slides = transaction.slides()?;
+    /// assert!(slides[0].title.is_none());
+    /// assert!(slides[0].text.is_empty());
     /// # Ok(())
     /// # }
     /// ```
@@ -1758,17 +1868,17 @@ impl MutablePresentation {
     ///
     /// # Examples
     ///
-    /// The public equivalent starts from [`crate::edit::Snapshot::transaction`].
+    /// The public equivalent starts from [`crate::Package::edit`].
     ///
     /// ```
-    /// use litchi_odp::{Builder, edit};
+    /// use litchi_odp::Builder;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let source = edit::Snapshot::from_bytes(Builder::new().build()?)?;
-    /// let mut transaction = source.transaction()?;
+    /// let source = Builder::new().build()?;
+    /// let mut transaction = source.edit()?;
     /// transaction.add("Slide 1", "Content")?;
     /// let commit = transaction.commit()?;
-    /// let bytes = commit.snapshot().bytes();
+    /// let bytes = commit.package().as_bytes();
     /// assert!(!bytes.is_empty());
     /// # Ok(())
     /// # }
@@ -1779,7 +1889,10 @@ impl MutablePresentation {
     /// verbatim, so the accounting below intentionally claims only authored
     /// members plus a conservative default manifest bound.
     fn serialize_bounded(&self, limit: usize) -> Result<SerializedPublication> {
-        let mut writer = PackageWriter::new_bounded(limit);
+        let mut writer = PackageWriter::new_bounded(
+            limit,
+            litchi_odf_common::core::StreamingArchiveLimits::default(),
+        );
         let source_manifest = self
             .source_package
             .as_ref()
@@ -1874,23 +1987,35 @@ pub(super) fn ensure_foreign_transfer_package_safety(
     let archive = package.package()?;
     let files = archive.files()?;
     if files.iter().any(|path| is_macro_owner_path(path)) {
-        return Err(litchi_core::Error::Unsupported(format!(
-            "ODP foreign blank-slide transfer refuses {side} package macro owners"
-        )));
+        return Err(litchi_core::Error::Refused(
+            litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "odp.authoring.mutable",
+                "ODP foreign blank-slide transfer refuses package macro owners",
+            ),
+        ));
     }
     if files
         .iter()
         .any(|path| crate::core::is_signature_owner_path(path))
     {
-        return Err(litchi_core::Error::Unsupported(format!(
-            "ODP foreign blank-slide transfer refuses {side} signature owners"
-        )));
+        return Err(litchi_core::Error::Refused(
+            litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::Protected,
+                "odp.authoring.mutable",
+                "ODP foreign blank-slide transfer refuses signature owners",
+            ),
+        ));
     }
     let manifest = archive.manifest();
     if manifest.has_encrypted_entries() {
-        return Err(litchi_core::Error::Unsupported(format!(
-            "ODP foreign blank-slide transfer refuses encrypted {side} package entries"
-        )));
+        return Err(litchi_core::Error::Refused(
+            litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "odp.authoring.mutable",
+                "ODP foreign blank-slide transfer refuses encrypted package entries",
+            ),
+        ));
     }
     for path in files {
         if !is_xml_owner_part(&path, manifest.get_media_type(&path)) {
@@ -1998,9 +2123,13 @@ fn effective_namespace_scope(
             })?;
         scope.insert(prefix, value.into_owned());
         if scope.len() > MAX_NAMESPACE_BINDINGS {
-            return Err(litchi_core::Error::Unsupported(format!(
-                "ODP foreign blank-slide transfer refuses {side} namespace scope above {MAX_NAMESPACE_BINDINGS} bindings"
-            )));
+            return Err(litchi_core::Error::Refused(
+                litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "odp.authoring.mutable",
+                    "ODP foreign blank-slide transfer refuses namespace scope above bindings",
+                ),
+            ));
         }
     }
     Ok(scope)
@@ -2029,9 +2158,13 @@ fn validate_namespace_ancestor(
     side: &str,
 ) -> Result<()> {
     if target == "office:presentation" && empty {
-        return Err(litchi_core::Error::Unsupported(format!(
-            "ODP foreign blank-slide transfer refuses self-closing {side} office:presentation"
-        )));
+        return Err(litchi_core::Error::Refused(
+            litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "odp.authoring.mutable",
+                "ODP foreign blank-slide transfer refuses self-closing office:presentation",
+            ),
+        ));
     }
     let Some(root) = root else {
         return Err(litchi_core::Error::InvalidFormat(format!(
@@ -2039,9 +2172,13 @@ fn validate_namespace_ancestor(
         )));
     };
     if root.get("") != current.get("") {
-        return Err(litchi_core::Error::Unsupported(format!(
-            "ODP foreign blank-slide transfer refuses {side} default-namespace rebinding at {target}"
-        )));
+        return Err(litchi_core::Error::Refused(
+            litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "odp.authoring.mutable",
+                "ODP foreign blank-slide transfer refuses default-namespace rebinding",
+            ),
+        ));
     }
     const REQUIRED: [(&str, &str); 12] = [
         ("office", OFFICE_NAMESPACE),
@@ -2061,16 +2198,24 @@ fn validate_namespace_ancestor(
         let root_binding = root.get(prefix);
         let current_binding = current.get(prefix);
         if root_binding != current_binding {
-            return Err(litchi_core::Error::Unsupported(format!(
-                "ODP foreign blank-slide transfer refuses {side} namespace rebinding of '{prefix}' at {target}"
-            )));
+            return Err(litchi_core::Error::Refused(
+                litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "odp.authoring.mutable",
+                    "ODP foreign blank-slide transfer refuses namespace rebinding",
+                ),
+            ));
         }
         if let Some(binding) = current_binding
             && binding != expected
         {
-            return Err(litchi_core::Error::Unsupported(format!(
-                "ODP foreign blank-slide transfer refuses {side} prefix '{prefix}' bound to '{binding}' at {target}"
-            )));
+            return Err(litchi_core::Error::Refused(
+                litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "odp.authoring.mutable",
+                    "ODP foreign blank-slide transfer refuses prefix bound elsewhere",
+                ),
+            ));
         }
     }
     Ok(())
@@ -2093,23 +2238,35 @@ pub(super) fn ensure_no_macro_xml_owners(content: &str, side: &str) -> Result<()
         })? {
             Event::Start(element) => {
                 if is_macro_owner_name(element.local_name().as_ref()) {
-                    return Err(litchi_core::Error::Unsupported(format!(
-                        "ODP foreign blank-slide transfer refuses {side} XML macro owners"
-                    )));
+                    return Err(litchi_core::Error::Refused(
+                        litchi_core::edit::Refusal::new(
+                            litchi_core::edit::RefusalKind::UnsupportedContent,
+                            "odp.authoring.mutable",
+                            "ODP foreign blank-slide transfer refuses XML macro owners",
+                        ),
+                    ));
                 }
             },
             Event::Empty(element) => {
                 let local_name = element.local_name();
                 if is_macro_owner_name(local_name.as_ref()) && local_name.as_ref() != b"scripts" {
-                    return Err(litchi_core::Error::Unsupported(format!(
-                        "ODP foreign blank-slide transfer refuses {side} XML macro owners"
-                    )));
+                    return Err(litchi_core::Error::Refused(
+                        litchi_core::edit::Refusal::new(
+                            litchi_core::edit::RefusalKind::UnsupportedContent,
+                            "odp.authoring.mutable",
+                            "ODP foreign blank-slide transfer refuses XML macro owners",
+                        ),
+                    ));
                 }
             },
             Event::DocType(_) | Event::GeneralRef(_) => {
-                return Err(litchi_core::Error::Unsupported(format!(
-                    "ODP foreign blank-slide transfer refuses {side} DTD or entity owners"
-                )));
+                return Err(litchi_core::Error::Refused(
+                    litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
+                        "odp.authoring.mutable",
+                        "ODP foreign blank-slide transfer refuses DTD or entity owners",
+                    ),
+                ));
             },
             Event::Eof => break,
             _ => {},
@@ -2139,16 +2296,24 @@ pub(super) fn ensure_no_protected_xml(content: &str, side: &str) -> Result<()> {
                         local_name.as_ref(),
                         b"protect" | b"protected" | b"protection-key" | b"protection-key-digest"
                     ) {
-                        return Err(litchi_core::Error::Unsupported(format!(
-                            "ODP foreign blank-slide transfer refuses {side} protected XML"
-                        )));
+                        return Err(litchi_core::Error::Refused(
+                            litchi_core::edit::Refusal::new(
+                                litchi_core::edit::RefusalKind::Protected,
+                                "odp.authoring.mutable",
+                                "ODP foreign blank-slide transfer refuses protected XML",
+                            ),
+                        ));
                     }
                 }
             },
             Event::DocType(_) | Event::GeneralRef(_) => {
-                return Err(litchi_core::Error::Unsupported(format!(
-                    "ODP foreign blank-slide transfer refuses {side} DTD or entity owners"
-                )));
+                return Err(litchi_core::Error::Refused(
+                    litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
+                        "odp.authoring.mutable",
+                        "ODP foreign blank-slide transfer refuses DTD or entity owners",
+                    ),
+                ));
             },
             Event::Eof => break,
             _ => {},
@@ -2179,15 +2344,21 @@ fn count_selected_name_owners(
         let key = attribute.key.as_ref();
         let local_key = attribute.key.local_name();
         if matches!(local_key.as_ref(), b"macro-name" | b"language") {
-            return Err(litchi_core::Error::Unsupported(
-                "ODP dependency-free blank-slide removal refuses macro binding attributes"
-                    .to_string(),
+            return Err(litchi_core::Error::Refused(
+                litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odp.authoring.mutable",
+                    "ODP dependency-free blank-slide removal refuses macro binding attributes",
+                ),
             ));
         }
         if (key == b"href" || key.ends_with(b":href")) && value.contains('#') {
-            return Err(litchi_core::Error::Unsupported(
-                "ODP dependency-free blank-slide removal refuses fragment hyperlink owners"
-                    .to_string(),
+            return Err(litchi_core::Error::Refused(
+                litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odp.authoring.mutable",
+                    "ODP dependency-free blank-slide removal refuses fragment hyperlink owners",
+                ),
             ));
         }
         if value.contains(selected_name) {
@@ -2223,9 +2394,12 @@ fn scan_dependency_owners(
             Event::Start(element) => {
                 let local_name = element.local_name();
                 if is_macro_owner_name(local_name.as_ref()) {
-                    return Err(litchi_core::Error::Unsupported(
-                        "ODP dependency-free blank-slide removal refuses content macro owners"
-                            .to_string(),
+                    return Err(litchi_core::Error::Refused(
+                        litchi_core::edit::Refusal::new(
+                            litchi_core::edit::RefusalKind::UnsupportedOperation,
+                            "odp.authoring.mutable",
+                            "ODP dependency-free blank-slide removal refuses content macro owners",
+                        ),
                     ));
                 }
                 count_selected_name_owners(&reader, &element, selected_name, selected_name_owners)?;
@@ -2233,17 +2407,23 @@ fn scan_dependency_owners(
             Event::Empty(element) => {
                 let local_name = element.local_name();
                 if is_macro_owner_name(local_name.as_ref()) && local_name.as_ref() != b"scripts" {
-                    return Err(litchi_core::Error::Unsupported(
-                        "ODP dependency-free blank-slide removal refuses content macro owners"
-                            .to_string(),
+                    return Err(litchi_core::Error::Refused(
+                        litchi_core::edit::Refusal::new(
+                            litchi_core::edit::RefusalKind::UnsupportedOperation,
+                            "odp.authoring.mutable",
+                            "ODP dependency-free blank-slide removal refuses content macro owners",
+                        ),
                     ));
                 }
                 count_selected_name_owners(&reader, &element, selected_name, selected_name_owners)?;
             },
             Event::DocType(_) => {
-                return Err(litchi_core::Error::Unsupported(
-                    "ODP dependency-free blank-slide removal refuses DTD/entity ownership"
-                        .to_string(),
+                return Err(litchi_core::Error::Refused(
+                    litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedOperation,
+                        "odp.authoring.mutable",
+                        "ODP dependency-free blank-slide removal refuses DTD/entity ownership",
+                    ),
                 ));
             },
             Event::Eof => break,
@@ -2321,8 +2501,12 @@ fn ensure_media_manifest_rewritable(
         .values()
         .any(|entry| entry.size.is_some() || entry.encryption.is_some())
     {
-        return Err(litchi_core::Error::Unsupported(
-            "ODP media changes refuse manifest metadata the writer cannot preserve".to_string(),
+        return Err(litchi_core::Error::Refused(
+            litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "odp.authoring.mutable",
+                "ODP media changes refuse manifest metadata the writer cannot preserve",
+            ),
         ));
     }
     Ok(())
@@ -2506,9 +2690,13 @@ fn scan_media_reference_xml(
                 })?;
             },
             Event::DocType(_) | Event::GeneralRef(_) => {
-                return Err(litchi_core::Error::Unsupported(format!(
-                    "ODP media reference XML part '{owner_path}' contains a DTD or entity reference"
-                )));
+                return Err(litchi_core::Error::Refused(
+                    litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedOperation,
+                        "odp.authoring.mutable",
+                        "ODP media reference XML part contains a DTD or entity reference",
+                    ),
+                ));
             },
             Event::Eof => break,
             _ => {},
@@ -2628,9 +2816,11 @@ fn resolve_owner_relative_reference(owner_path: &str, value: &str) -> Result<Opt
     } else {
         format!("{base}/{target}")
     };
-    let resolved = resolve_package_path(&joined).map_err(|error| {
-        litchi_core::Error::Unsupported(format!(
-            "ODP media reference '{value}' in '{owner_path}' is not a safe package path: {error}"
+    let resolved = resolve_package_path(&joined).map_err(|_error| {
+        litchi_core::Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odp.authoring.mutable",
+            "ODP media reference in is not a safe package path",
         ))
     })?;
     if is_linked_href(&resolved) {
@@ -2680,9 +2870,13 @@ fn dependency_free_copy_name(old_name: &str, names: &[String]) -> Result<String>
             )
         })?;
         if candidate_len > MAX_DEPENDENCY_FREE_COPY_NAME_BYTES {
-            return Err(litchi_core::Error::Unsupported(format!(
-                "ODP dependency-free copied page name exceeds {MAX_DEPENDENCY_FREE_COPY_NAME_BYTES} bytes"
-            )));
+            return Err(litchi_core::Error::Refused(
+                litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odp.authoring.mutable",
+                    "ODP dependency-free copied page name exceeds its byte bound",
+                ),
+            ));
         }
         let mut candidate = String::new();
         candidate
@@ -2725,15 +2919,21 @@ fn dependency_free_blank_name_value(page: &str) -> Result<std::ops::Range<usize>
         ))
     })?;
     let Event::Empty(element) = event else {
-        return Err(litchi_core::Error::Unsupported(
-            "ODP dependency-free blank-slide copy requires a self-closing page with no children"
-                .to_string(),
+        return Err(litchi_core::Error::Refused(
+            litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odp.authoring.mutable",
+                "ODP dependency-free blank-slide copy requires a self-closing page with no children",
+            ),
         ));
     };
     if element.name().as_ref() != b"draw:page" {
-        return Err(litchi_core::Error::Unsupported(
-            "ODP dependency-free blank-slide copy requires the canonical draw:page prefix"
-                .to_string(),
+        return Err(litchi_core::Error::Refused(
+            litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odp.authoring.mutable",
+                "ODP dependency-free blank-slide copy requires the canonical draw:page prefix",
+            ),
         ));
     }
     let mut saw_name = false;
@@ -2752,20 +2952,31 @@ fn dependency_free_blank_name_value(page: &str) -> Result<std::ops::Range<usize>
             }
             saw_name = true;
         } else if key != b"xmlns" && !key.starts_with(b"xmlns:") {
-            return Err(litchi_core::Error::Unsupported(format!(
-                "ODP dependency-free blank-slide copy refuses attribute '{}'",
-                String::from_utf8_lossy(key)
-            )));
+            return Err(litchi_core::Error::Refused(
+                litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odp.authoring.mutable",
+                    "ODP dependency-free blank-slide copy refuses attribute",
+                ),
+            ));
         }
     }
     if !saw_name {
-        return Err(litchi_core::Error::Unsupported(
-            "ODP dependency-free blank-slide copy requires draw:name".to_string(),
+        return Err(litchi_core::Error::Refused(
+            litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odp.authoring.mutable",
+                "ODP dependency-free blank-slide copy requires draw:name",
+            ),
         ));
     }
     if !matches!(reader.read_event(), Ok(Event::Eof)) {
-        return Err(litchi_core::Error::Unsupported(
-            "ODP dependency-free blank-slide copy refuses content outside the page tag".to_string(),
+        return Err(litchi_core::Error::Refused(
+            litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odp.authoring.mutable",
+                "ODP dependency-free blank-slide copy refuses content outside the page tag",
+            ),
         ));
     }
     locate_attribute_value(page, "draw:name").ok_or_else(|| {
@@ -2888,7 +3099,10 @@ mod tests {
         let mut builder = Builder::new();
         builder.add_slide_with_title("First", "First body")?;
         builder.add_slide_with_title("Second", "Second body")?;
-        Presentation::from_bytes(builder.build()?)
+        builder
+            .build()?
+            .presentation()
+            .map_err(litchi_core::Error::from)
     }
 
     #[test]
@@ -3199,7 +3413,7 @@ mod tests {
     fn presentation_with_auxiliary_member() -> Result<Presentation> {
         let mut builder = Builder::new();
         builder.add_slide_with_title("First", "First body")?;
-        let base = Presentation::from_bytes(builder.build()?)?;
+        let base = builder.build()?.presentation()?;
         let base_package = base.owned_package();
         let package = base_package.package()?;
         let mut manifest = b"\xef\xbb\xbf<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!-- retained noncompact manifest -->\n<m:manifest xmlns:m=\"urn:oasis:names:tc:opendocument:xmlns:manifest:1.0\" m:version=\"1.3\">\n".to_vec();
@@ -3216,7 +3430,8 @@ mod tests {
             b"  <m:file-entry m:full-path=\"vendor/foreign.xml\" m:media-type=\"text/xml\"/>\n  <m:file-entry m:full-path=\"vendor/opaque.bin\" m:media-type=\"application/octet-stream\"/>\n</m:manifest>\n",
         );
 
-        let mut archive = StreamingArchiveWriter::new();
+        let mut archive =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         archive
             .write_stored("mimetype", base_package.mimetype()?.as_bytes())
             .unwrap();

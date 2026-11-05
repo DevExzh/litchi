@@ -9,21 +9,21 @@
 
 mod repair_support;
 
+use litchi_rtf::raw::Tree;
 use litchi_rtf::{
-    RtfDocument, RtfWriter, TableAutoformatFlag, TableAutoformatFlags, TableRowBandIndex,
-    TableRowBanding,
+    TableAutoformatFlag, TableAutoformatFlags, TableRowBandIndex, TableRowBanding, write::Writer,
 };
 
-fn write(document: &RtfDocument<'_>) -> String {
+fn write(document: &Tree<'_>) -> String {
     let mut bytes = Vec::new();
-    RtfWriter::new(&mut bytes).write_document(document).unwrap();
+    Writer::new(&mut bytes).write_document(document).unwrap();
     String::from_utf8(bytes).unwrap()
 }
 
 #[test]
 fn parses_all_flags_and_canonically_round_trips() {
     let source = r"{\rtf1\trowd\irow7\irowband-1\tbllknocolband\tbllklastcol\tbllkborder\tbllkshading\tbllkfont\tbllkcolor\tbllkbestfit\tbllkhdrrows\tbllklastrow\tbllkhdrcols\tbllknorowband\lastrow\cellx1000\intbl X\cell\row}";
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let row = &document.tables()[0].rows()[0];
     assert_eq!(
         row.banding(),
@@ -50,7 +50,7 @@ fn parses_all_flags_and_canonically_round_trips() {
     }
     let first = write(&document);
     assert!(first.contains(r"\irow7\irowband-1\tbllkborder\tbllkshading\tbllkfont\tbllkcolor\tbllkbestfit\tbllkhdrrows\tbllklastrow\tbllkhdrcols\tbllklastcol\tbllknorowband\tbllknocolband\lastrow"));
-    let reparsed = RtfDocument::parse(&first).unwrap();
+    let reparsed = Tree::parse(&first, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.tables()[0].rows()[0].banding(), row.banding());
     assert_eq!(
         reparsed.tables()[0].rows()[0].autoformat_flags(),
@@ -62,7 +62,7 @@ fn parses_all_flags_and_canonically_round_trips() {
 #[test]
 fn restores_groups_resets_trowd_and_preserves_owned_rows() {
     let source = r"{\rtf1\trowd{\irow9\irowband2\tbllkborder\lastrow}\cellx1000\intbl A\cell\row\trowd\irow1\irowband0\tbllkhdrrows\cellx1000\intbl B\cell\row\trowd\cellx1000\intbl C\cell\row}";
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let expected_banding;
     let expected_flags;
     {
@@ -79,7 +79,8 @@ fn restores_groups_resets_trowd_and_preserves_owned_rows() {
         expected_banding = rows[1].banding();
         expected_flags = rows[1].autoformat_flags();
     }
-    let owned = RtfDocument::parse_bytes(source.as_bytes()).unwrap();
+    let owned =
+        Tree::parse_bytes(source.as_bytes(), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(owned.tables()[0].rows()[1].banding(), expected_banding);
     assert_eq!(
         owned.tables()[0].rows()[1].autoformat_flags(),
@@ -90,7 +91,7 @@ fn restores_groups_resets_trowd_and_preserves_owned_rows() {
 #[test]
 fn snapshots_end_defined_nested_rows() {
     let source = r"{\rtf1\trowd\cellx3000\intbl\itap2 X\nestcell{\*\nesttableprops\itap2\trowd\irow4\irowband3\tbllknorowband\lastrow\cellx1000\nestrow}\intbl\itap1\cell\row}";
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let row = &document.tables()[0].rows()[0].cells()[0].nested_tables()[0]
         .table
         .rows()[0];
@@ -108,7 +109,8 @@ fn snapshots_end_defined_nested_rows() {
     );
     let expected_banding = row.banding();
     let expected_flags = row.autoformat_flags();
-    let reparsed = RtfDocument::parse(&write(&document)).unwrap();
+    let reparsed =
+        Tree::parse(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     let round_trip = &reparsed.tables()[0].rows()[0].cells()[0].nested_tables()[0]
         .table
         .rows()[0];
@@ -134,13 +136,19 @@ fn rejects_missing_parameters_parameters_on_flags_duplicates_and_out_of_range_va
     ] {
         let source = format!(r"{{\rtf1\trowd\{controls}\cellx1000\intbl X\cell\row}}");
         assert!(
-            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(&source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                &source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted {controls}"
         );
     }
     assert!(
-        RtfDocument::parse(r"{\rtf1\trowd\irow65535\irowband65535\cellx1000\intbl X\cell\row}")
-            .is_ok()
+        Tree::parse(
+            r"{\rtf1\trowd\irow65535\irowband65535\cellx1000\intbl X\cell\row}",
+            litchi_rtf::read::OpenOptions::default()
+        )
+        .is_ok()
     );
 }
 
@@ -149,7 +157,7 @@ fn parses_real_libreoffice_row_banding_fixture() {
     let bytes = include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfimport/data/tdf148544.rtf"
     );
-    let document = RtfDocument::parse_bytes(bytes).unwrap();
+    let document = Tree::parse_bytes(bytes, litchi_rtf::read::OpenOptions::default()).unwrap();
     let rows = document
         .tables()
         .iter()

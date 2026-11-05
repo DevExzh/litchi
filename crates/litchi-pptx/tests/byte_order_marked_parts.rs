@@ -16,6 +16,9 @@
 //! member behind one mark, and a mark appears only on a member whose input
 //! had one. Members an edit never touched keep their mark byte for byte.
 
+mod in_place;
+use in_place::InPlace as _;
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use litchi_pptx::Package;
@@ -37,7 +40,8 @@ fn is_xml_member(name: &str) -> bool {
 }
 
 fn members(archive: &[u8]) -> BTreeMap<String, Vec<u8>> {
-    let reader = ArchiveReader::new(archive).unwrap();
+    let reader =
+        ArchiveReader::new(archive, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     let names: Vec<String> = reader.file_names().map(str::to_owned).collect();
     names
         .into_iter()
@@ -75,7 +79,8 @@ fn rebuild(
     mark: &dyn Fn(&str) -> bool,
     indented: bool,
 ) -> (Vec<u8>, BTreeSet<String>) {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     let mut marked = BTreeSet::new();
     for (name, bytes) in members(archive) {
         let body = bytes.strip_prefix(BOM).unwrap_or(&bytes);
@@ -143,8 +148,8 @@ fn differential(
         let (plain, _) = rebuild(archive, &|_| false, indented);
         let (marked, marked_input) = rebuild(archive, &mark, indented);
         assert!(!marked_input.is_empty(), "the scenario must mark a member");
-        let mut plain_package = Package::from_vec(plain).unwrap();
-        let mut marked_package = Package::from_vec(marked).unwrap();
+        let mut plain_package = Package::from_reader(std::io::Cursor::new(plain)).unwrap();
+        let mut marked_package = Package::from_reader(std::io::Cursor::new(marked)).unwrap();
         let plain_observed = scenario(&mut plain_package);
         let marked_observed = scenario(&mut marked_package);
         assert_eq!(marked_observed, plain_observed, "indented: {indented}");
@@ -157,9 +162,9 @@ fn differential(
 }
 
 fn text_deck() -> Vec<u8> {
-    let mut package = Package::new().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
     {
-        let presentation = package.presentation_mut().unwrap();
+        let presentation = builder.presentation().unwrap();
         for slide_index in 0..3_i64 {
             let slide = presentation.add_slide().unwrap();
             for shape in 0..3_i64 {
@@ -173,6 +178,7 @@ fn text_deck() -> Vec<u8> {
             }
         }
     }
+    let package = builder.build().unwrap();
     package.to_bytes().unwrap()
 }
 
@@ -208,8 +214,8 @@ fn scene_spans_are_byte_offsets_into_the_marked_slide() {
     let slide = members(&deck)["ppt/slides/slide1.xml"].clone();
     assert!(!slide.starts_with(BOM));
     let marked = [BOM, slide.as_slice()].concat();
-    let plain_scene = Scene::read(&slide).unwrap();
-    let marked_scene = Scene::read(&marked).unwrap();
+    let plain_scene = Scene::read(&slide, litchi_pptx::shape::Limits::DEFAULT).unwrap();
+    let marked_scene = Scene::read(&marked, litchi_pptx::shape::Limits::DEFAULT).unwrap();
     assert_eq!(marked_scene.len(), plain_scene.len());
     assert!(!marked_scene.is_rewritten());
     assert_eq!(marked_scene.xml(), marked.as_slice());
@@ -236,16 +242,16 @@ fn scene_spans_are_byte_offsets_into_the_marked_slide() {
 fn opened_transaction_edits_of_marked_slides_match_unmarked_edits() {
     let deck = text_deck();
     let (kept, _) = differential(&deck, is_xml_member, |package| {
-        let mut edit = package.opened_presentation_transaction().unwrap();
+        let mut edit = package.edit().unwrap();
         assert!(
             edit.set_shape_text(0_usize, 1_usize, "edited & <ok>")
                 .unwrap()
         );
         assert!(edit.remove_shape(1_usize, 0_usize).is_ok());
         edit.add_text_box(2_usize, "added", (5, 6, 7, 8)).unwrap();
-        assert!(edit.move_slide(0, 2).unwrap());
+        assert!(edit.move_slide(0, litchi_core::Position::new(2)).unwrap());
         let commit = edit.commit().unwrap();
-        package.apply_opened_presentation_commit(commit).unwrap();
+        *package = commit.into_package();
         slide_texts(package)
     });
     // The edited slides are spliced and compacted from their marked sources,
@@ -263,14 +269,14 @@ fn batched_text_edits_of_a_marked_slide_match_unmarked_edits() {
         &deck,
         |name| name == "ppt/slides/slide2.xml",
         |package| {
-            let mut edit = package.opened_presentation_transaction().unwrap();
+            let mut edit = package.edit().unwrap();
             let replacements = [
                 litchi_pptx::opened::ShapeTextReplacement::at(0, "first"),
                 litchi_pptx::opened::ShapeTextReplacement::at(2, "third"),
             ];
             assert_eq!(edit.set_shape_texts(1_usize, &replacements).unwrap(), 2);
             let commit = edit.commit().unwrap();
-            package.apply_opened_presentation_commit(commit).unwrap();
+            *package = commit.into_package();
             slide_texts(package)
         },
     );
@@ -295,7 +301,7 @@ fn real_shape_tag_deck_marked_everywhere_reads_and_edits_like_the_original() {
             .add(litchi_pptx::tag::Tag::new("Reviewer", "Ada").unwrap())
             .unwrap();
         let old = package
-            .put_shape_tags(0_usize, "Objekt 2", replacement)
+            .put_shape_tags_in_place(0_usize, "Objekt 2", replacement)
             .unwrap();
         observed.push_str(&format!("{old:?}"));
         observed
@@ -324,10 +330,10 @@ fn layout_placeholder_and_font_edits_of_marked_parts_match_unmarked_edits() {
     differential(&deck, is_xml_member, |package| {
         let master = litchi_opc::PackURI::new("/ppt/slideMasters/slideMaster1.xml").unwrap();
         let first = package
-            .add_slide_layout(&master, SlideLayoutKind::Blank, "First added", &[])
+            .add_slide_layout_in_place(&master, SlideLayoutKind::Blank, "First added", &[])
             .unwrap();
         let second = package
-            .add_slide_layout(
+            .add_slide_layout_in_place(
                 &master,
                 SlideLayoutKind::Title,
                 "Second added",
@@ -335,20 +341,24 @@ fn layout_placeholder_and_font_edits_of_marked_parts_match_unmarked_edits() {
             )
             .unwrap();
         package
-            .store_placeholder_shape(
+            .store_placeholder_shape_in_place(
                 &second.part_name,
                 &PlaceholderSpec::new(PlaceholderKind::CenteredTitle).with_text("retitled"),
             )
             .unwrap();
-        package.remove_slide_layout(&first.part_name).unwrap();
+        package
+            .remove_slide_layout_in_place(&first.part_name)
+            .unwrap();
         package.validate_master_layout_graph().unwrap();
         let mut fonts = litchi_pptx::font::Fonts::new();
         fonts
             .add(litchi_pptx::font::Font::new("Example Sans").unwrap())
             .unwrap();
-        let put = package.put_fonts(fonts).map_err(|error| error.to_string());
+        let put = package
+            .put_fonts_in_place(fonts)
+            .map_err(|error| error.to_string());
         let removed = package
-            .remove_fonts()
+            .remove_fonts_in_place()
             .map(|fonts| fonts.map(|fonts| fonts.len()))
             .map_err(|error| error.to_string());
         format!("{put:?}|{removed:?}|{}", slide_texts(package))
@@ -360,23 +370,22 @@ fn theme_scheme_replacement_of_a_marked_theme_matches_the_unmarked_one() {
     // Base: an indented marked theme lost three indentation bytes and kept
     // the old scheme's tail (`me>`) as text inside `a:themeElements`, which
     // neither the read-back nor the publication audit refuses.
-    use litchi_pptx::shape::theme::{self, Color, Slot};
+    use litchi_pptx::shape::theme::{Color, Slot};
     let deck = text_deck();
     let (kept, _) = differential(&deck, is_xml_member, |package| {
-        package
-            .edit_opc(|opc| {
-                let name = "/ppt/theme/theme1.xml";
-                let current = theme::load(opc, name)?;
-                let colors = current
-                    .colors
-                    .clone()
-                    .with(Slot::Accent1, Color::rgb("123456").unwrap());
-                theme::put_colors(opc, name, &colors)?;
-                let fonts = current.fonts.clone();
-                theme::put_fonts(opc, name, &fonts)?;
-                Ok(format!("{:?}", theme::load(opc, name)?))
-            })
-            .unwrap()
+        let name = "/ppt/theme/theme1.xml";
+        let mut edit = package.edit_themes().unwrap();
+        let current = edit.theme(name).unwrap();
+        let colors = current
+            .colors
+            .clone()
+            .with(Slot::Accent1, Color::rgb("123456").unwrap());
+        edit.set_colors(name, &colors).unwrap();
+        let fonts = current.fonts.clone();
+        edit.set_fonts(name, &fonts).unwrap();
+        let summary = format!("{:?}", edit.theme(name).unwrap());
+        *package = edit.commit().unwrap().into_package();
+        summary
     });
     assert!(kept.contains("ppt/theme/theme1.xml"), "{kept:?}");
 }

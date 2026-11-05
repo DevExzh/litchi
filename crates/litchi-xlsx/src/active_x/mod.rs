@@ -5,13 +5,14 @@
 //! pictures, or follows an external relationship.
 
 mod codec;
+mod edit;
 mod model;
 mod package;
 mod validation;
 #[cfg(feature = "vba-inspection")]
 pub mod vba;
 
-use crate::error::{Error, Result};
+use crate::error::Result;
 use litchi_ooxml_common::Error as CommonError;
 
 const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -46,10 +47,9 @@ const MAX_DEPTH: usize = 256;
 const MAX_NODES: usize = 400_000;
 
 pub use codec::replace_controls_xml;
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 pub use model::*;
-pub use package::{
-    load_from_worksheet, remove_from_worksheet, replace_on_worksheet, store_on_worksheet,
-};
+pub use package::load_from_worksheet;
 #[cfg(feature = "vba-inspection")]
 pub use vba::Project;
 

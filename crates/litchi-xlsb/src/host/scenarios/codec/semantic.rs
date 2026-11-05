@@ -5,7 +5,7 @@ use super::super::model::{
 };
 use super::wire;
 use crate::package::error::{Error, Result};
-use crate::raw::{Record, Writer};
+use crate::raw::{Encoder, Record};
 
 #[derive(Default)]
 struct OpaqueBudget {
@@ -14,37 +14,38 @@ struct OpaqueBudget {
 }
 
 fn retain_unknown(record: &Record<'_>, budget: &mut OpaqueBudget) -> Result<UnknownRecord> {
-    budget.count = budget
-        .count
-        .checked_add(1)
-        .ok_or_else(|| Error::Unrecognized {
-            typ: "scenario unknown records".to_string(),
-            val: "record count overflow".to_string(),
-        })?;
+    budget.count = budget.count.checked_add(1).ok_or(Error::Unrecognized {
+        typ: "scenario unknown records",
+        val: "record count overflow",
+    })?;
     if budget.count > MAX_UNKNOWN_RECORDS {
         return Err(Error::Unrecognized {
-            typ: "scenario unknown records".to_string(),
-            val: format!("record count exceeds {MAX_UNKNOWN_RECORDS}"),
+            typ: "scenario unknown records",
+            val: "record count exceeds",
         });
     }
     budget.bytes = budget
         .bytes
         .checked_add(record.payload().len())
-        .ok_or_else(|| Error::Unrecognized {
-            typ: "scenario unknown records".to_string(),
-            val: "payload byte count overflow".to_string(),
+        .ok_or(Error::Unrecognized {
+            typ: "scenario unknown records",
+            val: "payload byte count overflow",
         })?;
     if budget.bytes > MAX_UNKNOWN_PAYLOAD {
         return Err(Error::Unrecognized {
-            typ: "scenario unknown records".to_string(),
-            val: format!("payload bytes exceed {MAX_UNKNOWN_PAYLOAD}"),
+            typ: "scenario unknown records",
+            val: "payload bytes exceed",
         });
     }
     UnknownRecord::new(record.kind().get(), record.payload())
 }
 
-pub(crate) fn parse_manager<'a>(header: &[u8], records: &[Record<'a>]) -> Result<Manager> {
-    let header = wire::parse_manager_header(header)?;
+pub(crate) fn parse_manager<'a>(
+    header: &[u8],
+    records: &[Record<'a>],
+    limits: crate::raw::Limits,
+) -> Result<Manager> {
+    let header = wire::parse_manager_header(header, limits)?;
     let current = if header.current == u16::MAX {
         None
     } else {
@@ -68,9 +69,13 @@ pub(crate) fn parse_manager<'a>(header: &[u8], records: &[Record<'a>]) -> Result
                     .iter()
                     .position(|candidate| candidate.kind() == wire::end_scenario())
                     .map(|offset| index + offset + 1)
-                    .ok_or_else(|| Error::UnexpectedEndOfStream("BrtEndSct".to_string()))?;
-                let scenario =
-                    parse_scenario(record.payload(), &records[index + 1..end], &mut budget)?;
+                    .ok_or(Error::UnexpectedEndOfStream("BrtEndSct"))?;
+                let scenario = parse_scenario(
+                    record.payload(),
+                    &records[index + 1..end],
+                    &mut budget,
+                    limits,
+                )?;
                 let scenario_index = scenarios.len();
                 scenarios.push(scenario);
                 order.push(Entry::Scenario(scenario_index));
@@ -84,8 +89,8 @@ pub(crate) fn parse_manager<'a>(header: &[u8], records: &[Record<'a>]) -> Result
             },
             kind if kind == wire::begin_manager() || kind == wire::end_manager() => {
                 return Err(Error::Unrecognized {
-                    typ: "Scenario Manager collection".to_string(),
-                    val: format!("unexpected record 0x{:04X}", kind.get()),
+                    typ: "Scenario Manager collection",
+                    val: "unexpected record",
                 });
             },
             _ => {
@@ -112,8 +117,9 @@ fn parse_scenario<'a>(
     header: &[u8],
     records: &[Record<'a>],
     budget: &mut OpaqueBudget,
+    limits: crate::raw::Limits,
 ) -> Result<Scenario> {
-    let header = wire::parse_scenario_header(header)?;
+    let header = wire::parse_scenario_header(header, limits)?;
     let mut changed_cells = Vec::new();
     let mut unknown = Vec::new();
     let mut order = Vec::new();
@@ -121,7 +127,7 @@ fn parse_scenario<'a>(
         match record.kind() {
             kind if kind == wire::scenario_cell() => {
                 let index = changed_cells.len();
-                changed_cells.push(wire::parse_changed_cell(record.payload())?);
+                changed_cells.push(wire::parse_changed_cell(record.payload(), limits)?);
                 order.push(Child::Changed(index));
             },
             kind if kind == wire::begin_scenario()
@@ -130,8 +136,8 @@ fn parse_scenario<'a>(
                 || kind == wire::end_manager() =>
             {
                 return Err(Error::Unrecognized {
-                    typ: "Scenario collection".to_string(),
-                    val: format!("unexpected record 0x{:04X}", kind.get()),
+                    typ: "Scenario collection",
+                    val: "unexpected record",
                 });
             },
             _ => {
@@ -144,12 +150,8 @@ fn parse_scenario<'a>(
     }
     if usize::from(header.count) != changed_cells.len() {
         return Err(Error::Unrecognized {
-            typ: "BrtBeginSct cref".to_string(),
-            val: format!(
-                "declared {}, found {} BrtSlc records",
-                header.count,
-                changed_cells.len()
-            ),
+            typ: "BrtBeginSct cref",
+            val: "declared, found BrtSlc records",
         });
     }
     Scenario::from_wire(
@@ -164,19 +166,24 @@ fn parse_scenario<'a>(
     )
 }
 
-pub(crate) fn write_manager(manager: &Manager) -> Result<Vec<u8>> {
+pub(crate) fn write_manager(manager: &Manager, limits: crate::raw::Limits) -> Result<Vec<u8>> {
     manager.validate()?;
     let mut bytes = Vec::new();
-    let mut writer = Writer::new(&mut bytes);
+    let mut writer = Encoder::new(&mut bytes, limits);
     wire::write_record(
         &mut writer,
         wire::begin_manager(),
-        &wire::write_manager_header(manager.current(), manager.shown(), manager.result_ranges())?,
+        &wire::write_manager_header(
+            manager.current(),
+            manager.shown(),
+            manager.result_ranges(),
+            limits,
+        )?,
     )?;
 
     if manager.order.is_empty() {
         for scenario in manager.scenarios() {
-            write_scenario(&mut writer, scenario)?;
+            write_scenario(&mut writer, scenario, limits)?;
         }
         for record in manager.unknown_records() {
             write_unknown(&mut writer, record)?;
@@ -186,22 +193,20 @@ pub(crate) fn write_manager(manager: &Manager) -> Result<Vec<u8>> {
             match *entry {
                 Entry::Scenario(index) => write_scenario(
                     &mut writer,
-                    manager
-                        .scenarios()
-                        .get(index)
-                        .ok_or_else(|| Error::Unrecognized {
-                            typ: "BrtBeginScenMan order".to_string(),
-                            val: "scenario index is invalid".to_string(),
-                        })?,
+                    manager.scenarios().get(index).ok_or(Error::Unrecognized {
+                        typ: "BrtBeginScenMan order",
+                        val: "scenario index is invalid",
+                    })?,
+                    limits,
                 )?,
                 Entry::Unknown(index) => write_unknown(
                     &mut writer,
                     manager
                         .unknown_records()
                         .get(index)
-                        .ok_or_else(|| Error::Unrecognized {
-                            typ: "BrtBeginScenMan order".to_string(),
-                            val: "unknown-record index is invalid".to_string(),
+                        .ok_or(Error::Unrecognized {
+                            typ: "BrtBeginScenMan order",
+                            val: "unknown-record index is invalid",
                         })?,
                 )?,
             }
@@ -211,7 +216,11 @@ pub(crate) fn write_manager(manager: &Manager) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
-fn write_scenario<W: std::io::Write>(writer: &mut Writer<W>, scenario: &Scenario) -> Result<()> {
+fn write_scenario<W: std::io::Write>(
+    writer: &mut Encoder<W>,
+    scenario: &Scenario,
+    limits: crate::raw::Limits,
+) -> Result<()> {
     wire::write_record(
         writer,
         wire::begin_scenario(),
@@ -222,6 +231,7 @@ fn write_scenario<W: std::io::Write>(writer: &mut Writer<W>, scenario: &Scenario
             scenario.name(),
             scenario.comment(),
             scenario.user_name(),
+            limits,
         )?,
     )?;
 
@@ -230,7 +240,7 @@ fn write_scenario<W: std::io::Write>(writer: &mut Writer<W>, scenario: &Scenario
             wire::write_record(
                 writer,
                 wire::scenario_cell(),
-                &wire::write_changed_cell(cell)?,
+                &wire::write_changed_cell(cell, limits)?,
             )?;
         }
         for record in scenario.unknown_records() {
@@ -242,21 +252,25 @@ fn write_scenario<W: std::io::Write>(writer: &mut Writer<W>, scenario: &Scenario
                 Child::Changed(index) => wire::write_record(
                     writer,
                     wire::scenario_cell(),
-                    &wire::write_changed_cell(scenario.changed_cells().get(index).ok_or_else(
-                        || Error::Unrecognized {
-                            typ: "BrtBeginSct order".to_string(),
-                            val: "changed-cell index is invalid".to_string(),
-                        },
-                    )?)?,
+                    &wire::write_changed_cell(
+                        scenario
+                            .changed_cells()
+                            .get(index)
+                            .ok_or(Error::Unrecognized {
+                                typ: "BrtBeginSct order",
+                                val: "changed-cell index is invalid",
+                            })?,
+                        limits,
+                    )?,
                 )?,
                 Child::Unknown(index) => write_unknown(
                     writer,
                     scenario
                         .unknown_records()
                         .get(index)
-                        .ok_or_else(|| Error::Unrecognized {
-                            typ: "BrtBeginSct order".to_string(),
-                            val: "unknown-record index is invalid".to_string(),
+                        .ok_or(Error::Unrecognized {
+                            typ: "BrtBeginSct order",
+                            val: "unknown-record index is invalid",
                         })?,
                 )?,
             }
@@ -265,7 +279,7 @@ fn write_scenario<W: std::io::Write>(writer: &mut Writer<W>, scenario: &Scenario
     wire::write_record(writer, wire::end_scenario(), &[])
 }
 
-fn write_unknown<W: std::io::Write>(writer: &mut Writer<W>, record: &UnknownRecord) -> Result<()> {
+fn write_unknown<W: std::io::Write>(writer: &mut Encoder<W>, record: &UnknownRecord) -> Result<()> {
     let kind = crate::raw::Kind::new(record.kind()).map_err(|error| Error::from(error))?;
     wire::write_record(writer, kind, record.payload())
 }

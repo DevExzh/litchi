@@ -15,11 +15,11 @@ use litchi_core::{
     Resource,
 };
 use litchi_odf_common::core::{GeneratedXmlLimits, PackageWriter};
+use litchi_odt::generic::Package;
 use litchi_odt::streaming::{
     PublicationFailureKind, StreamingError, StreamingLimits, stream_plain_paragraphs_to,
     try_stream_plain_paragraphs_to,
 };
-use litchi_odt::{Document, generic::Package};
 use quick_xml::{Reader, events::Event};
 
 type Paragraphs = Vec<Cow<'static, str>>;
@@ -129,7 +129,7 @@ fn run_with_budget(
 }
 
 fn package(bytes: &[u8]) -> Package {
-    Package::from_bytes(bytes.to_vec()).expect("successful ODT is a package")
+    Package::from_bytes(bytes).expect("successful ODT is a package")
 }
 
 fn member(bytes: &[u8], name: &str) -> Vec<u8> {
@@ -161,7 +161,7 @@ fn assert_five_member_topology(bytes: &[u8]) {
 }
 
 fn repack_with_content(source: &[u8], content: &[u8]) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype(std::str::from_utf8(ODT_MIME).expect("ODT MIME is UTF-8"))
         .expect("set ODT MIME");
@@ -197,7 +197,10 @@ fn independent_control_events(xml: &str) -> (usize, usize, usize) {
 }
 
 fn reopen_paragraphs(bytes: &[u8]) -> Vec<String> {
-    let document = Document::from_bytes(bytes.to_vec()).expect("ODT reopens");
+    let document = litchi_odt::Package::from_bytes(bytes)
+        .expect("ODT reopens")
+        .document()
+        .expect("ODT reopens");
     document
         .paragraphs()
         .expect("paragraphs parse")
@@ -208,7 +211,7 @@ fn reopen_paragraphs(bytes: &[u8]) -> Vec<String> {
 
 fn assert_unfinished_zip(bytes: &[u8]) {
     assert!(
-        Package::from_bytes(bytes.to_vec()).is_err(),
+        Package::from_bytes(bytes).is_err(),
         "failed publication must not leave a finalized ODT package"
     );
 }
@@ -436,7 +439,8 @@ fn mutated_namespace_or_control_cannot_satisfy_the_independent_oracle() {
     );
     assert_ne!(mutated_namespace, xml);
     let namespace_package = repack_with_content(&output, mutated_namespace.as_bytes());
-    match Document::from_bytes(namespace_package) {
+    match litchi_odt::Package::from_bytes(&namespace_package).and_then(|package| package.document())
+    {
         Err(_) => {},
         Ok(document) => {
             let actual = document
@@ -455,7 +459,7 @@ fn mutated_namespace_or_control_cannot_satisfy_the_independent_oracle() {
     let mutated_control = xml.replacen("<text:line-break/>", "<text:tab/>", 1);
     assert_ne!(mutated_control, xml);
     let control_package = repack_with_content(&output, mutated_control.as_bytes());
-    match Document::from_bytes(control_package) {
+    match litchi_odt::Package::from_bytes(&control_package).and_then(|package| package.document()) {
         Err(_) => {},
         Ok(document) => {
             let actual = document

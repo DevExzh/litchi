@@ -14,7 +14,7 @@ use std::sync::OnceLock;
 
 use libfuzzer_sys::fuzz_target;
 use litchi::keynote::{
-    Limits, Package, ReadOptions, SemanticLimits, SlideSelector,
+    OpenOptions, Package, SemanticLimits, SlideSelector, SourceLimits,
     slide::table::{
         TableSelector,
         appearance::{Appearance, Banding, GridlineVisibility, Gridlines, RowSizing},
@@ -59,27 +59,33 @@ fuzz_target!(|data: &[u8]| {
     exercise_semantic_limit(&command);
 });
 
-fn fuzz_options() -> ReadOptions {
-    static OPTIONS: OnceLock<ReadOptions> = OnceLock::new();
+fn fuzz_options() -> OpenOptions {
+    static OPTIONS: OnceLock<OpenOptions> = OnceLock::new();
     *OPTIONS.get_or_init(|| {
-        let archive = Limits::new(
-            MAX_INPUT_BYTES,
-            MAX_ENTRIES,
-            MAX_ENTRY_BYTES,
-            MAX_EXPANDED_BYTES,
-            MAX_IWA_STREAM_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid Keynote appearance archive limits: {error}"));
-        let semantic = SemanticLimits::new(
-            MAX_OBJECTS,
-            MAX_SLIDES,
-            MAX_REFERENCES,
-            MAX_TEXT_STORAGES,
-            MAX_TEXT_FRAGMENTS,
-            MAX_TEXT_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid Keynote appearance semantic limits: {error}"));
-        ReadOptions::new(archive, semantic)
+        let archive = SourceLimits::builder()
+            .max_input_bytes(MAX_INPUT_BYTES)
+            .and_then(|limits| limits.max_entries(MAX_ENTRIES))
+            .and_then(|limits| limits.max_entry_bytes(MAX_ENTRY_BYTES))
+            .and_then(|limits| limits.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+            .and_then(|limits| limits.max_component_bytes(MAX_IWA_STREAM_BYTES))
+            .and_then(|limits| limits.build())
+            .unwrap_or_else(|error| {
+                unreachable!("valid Keynote appearance archive limits: {error}")
+            });
+        let semantic = SemanticLimits::builder()
+            .max_objects(MAX_OBJECTS)
+            .and_then(|limits| limits.max_slides(MAX_SLIDES))
+            .and_then(|limits| limits.max_references(MAX_REFERENCES))
+            .and_then(|limits| limits.max_text_storages(MAX_TEXT_STORAGES))
+            .and_then(|limits| limits.max_text_fragments(MAX_TEXT_FRAGMENTS))
+            .and_then(|limits| limits.max_text_bytes(MAX_TEXT_BYTES))
+            .and_then(|limits| limits.build())
+            .unwrap_or_else(|error| {
+                unreachable!("valid Keynote appearance semantic limits: {error}")
+            });
+        OpenOptions::new()
+            .source_limits(archive)
+            .semantic_limits(semantic)
     })
 }
 
@@ -190,10 +196,32 @@ fn exercise_package(package: &Package, data: &[u8]) {
             return;
         },
     };
-    black_box(edit.path());
-    assert_eq!(edit.appearance(), before);
+    let path = match edit.path() {
+        Ok(path) => path,
+        Err(error) => {
+            observe_error(error);
+            assert_eq!(package_bytes(package), source);
+            return;
+        },
+    };
+    black_box(path);
+    match edit.appearance() {
+        Ok(appearance) => assert_eq!(appearance, before),
+        Err(error) => {
+            observe_error(error);
+            assert_eq!(package_bytes(package), source);
+            return;
+        },
+    }
     let edit = edit.set(after);
-    assert_eq!(edit.appearance(), after);
+    match edit.appearance() {
+        Ok(appearance) => assert_eq!(appearance, after),
+        Err(error) => {
+            observe_error(error);
+            assert_eq!(package_bytes(package), source);
+            return;
+        },
+    }
 
     let commit = match edit.commit() {
         Ok(commit) => commit,
@@ -373,15 +401,17 @@ fn exercise_input_limit() {
 }
 
 fn exercise_archive_limit() {
-    let archive = Limits::new(
-        MAX_INPUT_BYTES,
-        1,
-        MAX_ENTRY_BYTES,
-        MAX_EXPANDED_BYTES,
-        MAX_IWA_STREAM_BYTES,
-    )
-    .unwrap_or_else(|error| unreachable!("valid Keynote appearance entry limits: {error}"));
-    let options = ReadOptions::new(archive, fuzz_options().semantic());
+    let archive = SourceLimits::builder()
+        .max_input_bytes(MAX_INPUT_BYTES)
+        .and_then(|limits| limits.max_entries(1))
+        .and_then(|limits| limits.max_entry_bytes(MAX_ENTRY_BYTES))
+        .and_then(|limits| limits.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+        .and_then(|limits| limits.max_component_bytes(MAX_IWA_STREAM_BYTES))
+        .and_then(|limits| limits.build())
+        .unwrap_or_else(|error| unreachable!("valid Keynote appearance entry limits: {error}"));
+    let options = OpenOptions::new()
+        .source_limits(archive)
+        .semantic_limits(fuzz_options().semantic_limits_value());
     match Package::from_bytes_with_options(source_built_bytes(), options) {
         Ok(_) => panic!("a one-entry Keynote appearance limit accepted the package"),
         Err(error) => observe_error(error),
@@ -394,18 +424,20 @@ fn exercise_semantic_limit(data: &[u8]) {
     } else {
         MAX_OBJECTS
     };
-    let semantic = SemanticLimits::new(
-        max_objects,
-        1,
-        MAX_REFERENCES,
-        MAX_TEXT_STORAGES,
-        MAX_TEXT_FRAGMENTS,
-        MAX_TEXT_BYTES,
-    );
+    let semantic = SemanticLimits::builder()
+        .max_objects(max_objects)
+        .and_then(|limits| limits.max_slides(1))
+        .and_then(|limits| limits.max_references(MAX_REFERENCES))
+        .and_then(|limits| limits.max_text_storages(MAX_TEXT_STORAGES))
+        .and_then(|limits| limits.max_text_fragments(MAX_TEXT_FRAGMENTS))
+        .and_then(|limits| limits.max_text_bytes(MAX_TEXT_BYTES))
+        .and_then(|limits| limits.build());
     let Ok(semantic) = semantic else {
         return;
     };
-    let options = ReadOptions::new(fuzz_options().archive(), semantic);
+    let options = OpenOptions::new()
+        .source_limits(fuzz_options().source_limits_value())
+        .semantic_limits(semantic);
     match Package::from_bytes_with_options(source_built_bytes(), options) {
         Ok(package) => {
             let _ = black_box(package.show().map(|show| show.slides().len()));

@@ -93,10 +93,10 @@ pub(in crate::writer::core) struct TextRun {
     pub(in crate::writer::core) text: String,
     /// Character formatting
     pub(in crate::writer::core) formatting: CharacterFormatting,
-    /// Index into `Writer::pictures` when this run is a picture
+    /// Index into `Builder::pictures` when this run is a picture
     /// (a single 0x0001 inline or 0x0008 floating picture character).
     pub(in crate::writer::core) picture_index: Option<u32>,
-    /// Index into `Writer::shapes` when this run is a floating
+    /// Index into `Builder::shapes` when this run is a floating
     /// drawing-shape anchor (a single 0x0008 character).
     pub(in crate::writer::core) shape_index: Option<u32>,
 }
@@ -274,8 +274,8 @@ pub(in crate::writer::core) struct WriterShape {
 /// What kind of floating content a 0x0008 anchor character refers to.
 #[derive(Debug, Clone, Copy)]
 pub(in crate::writer::core) enum FloatingAnchorKind {
-    /// Index into `Writer::pictures`.
+    /// Index into `Builder::pictures`.
     Picture(u32),
-    /// Index into `Writer::shapes`.
+    /// Index into `Builder::shapes`.
     Shape(u32),
 }

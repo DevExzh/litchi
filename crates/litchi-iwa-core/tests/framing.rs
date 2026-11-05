@@ -9,8 +9,8 @@
 )]
 
 use litchi_iwa_core::{
-    Archive, ArchiveLimits, ArchiveObject, Error, FieldInfo, FieldPath, FieldType, HeaderKind,
-    HeaderOperation, KnownFieldRule, LimitKind, RawMessage, SnappyLimits, SnappyStream,
+    Archive, ArchiveObject, Error, FieldInfo, FieldPath, FieldType, HeaderKind, HeaderOperation,
+    KnownFieldRule, LimitKind, Limits as ArchiveLimits, RawMessage, SnappyLimits, SnappyStream,
     UnknownFieldRule,
 };
 use prost::Message;
@@ -33,8 +33,8 @@ fn round_trip_spans_multiple_frames() -> Result<(), Error> {
         .map(|value| value as u8)
         .collect();
 
-    let encoded = SnappyStream::compress(&input)?;
-    let decoded = SnappyStream::decompress(&encoded)?;
+    let encoded = SnappyStream::compress(&input, Default::default())?;
+    let decoded = SnappyStream::decompress(&encoded, Default::default())?;
 
     assert_eq!(decoded.as_bytes(), input.as_slice());
     assert_eq!(decoded.into_bytes(), input);
@@ -43,15 +43,19 @@ fn round_trip_spans_multiple_frames() -> Result<(), Error> {
 
 #[test]
 fn empty_stream_round_trips() -> Result<(), Error> {
-    let encoded = SnappyStream::compress(&[])?;
+    let encoded = SnappyStream::compress(&[], Default::default())?;
     assert!(encoded.is_empty());
-    assert!(SnappyStream::decompress(&encoded)?.as_bytes().is_empty());
+    assert!(
+        SnappyStream::decompress(&encoded, Default::default())?
+            .as_bytes()
+            .is_empty()
+    );
     Ok(())
 }
 
 #[test]
 fn truncated_header_and_payload_are_rejected() -> Result<(), Error> {
-    let error = SnappyStream::decompress(&[0, 1, 2]).err();
+    let error = SnappyStream::decompress(&[0, 1, 2], Default::default()).err();
     assert!(matches!(
         error,
         Some(Error::InvalidArchive {
@@ -60,8 +64,8 @@ fn truncated_header_and_payload_are_rejected() -> Result<(), Error> {
         })
     ));
 
-    let encoded = SnappyStream::compress(b"truncated")?;
-    let error = SnappyStream::decompress(&encoded[..encoded.len() - 1]).err();
+    let encoded = SnappyStream::compress(b"truncated", Default::default())?;
+    let error = SnappyStream::decompress(&encoded[..encoded.len() - 1], Default::default()).err();
     assert!(matches!(
         error,
         Some(Error::InvalidArchive {
@@ -74,9 +78,9 @@ fn truncated_header_and_payload_are_rejected() -> Result<(), Error> {
 
 #[test]
 fn configured_limits_are_enforced() -> Result<(), Error> {
-    let encoded = SnappyStream::compress(b"bounded")?;
+    let encoded = SnappyStream::compress(b"bounded", Default::default())?;
     let limits = SnappyLimits::new(1, 7)?;
-    let error = SnappyStream::decompress_with_limits(&encoded, limits).err();
+    let error = SnappyStream::decompress(&encoded, limits).err();
     assert!(matches!(
         error,
         Some(Error::Limit {
@@ -114,7 +118,7 @@ fn archive_limits_are_copyable_and_checked() -> Result<(), Error> {
 
 #[test]
 fn malformed_large_length_is_rejected_without_arithmetic_overflow() {
-    let error = SnappyStream::decompress(&[0, 0xff, 0xff, 0xff]).err();
+    let error = SnappyStream::decompress(&[0, 0xff, 0xff, 0xff], Default::default()).err();
     assert!(matches!(
         error,
         Some(Error::InvalidArchive {
@@ -137,9 +141,10 @@ fn archive_round_trip_preserves_order_and_payloads() -> Result<(), Error> {
                     },
                     RawMessage {
                         type_: 200,
-                        data: (0..300).map(|value| value as u8).collect(),
+                        data: (0u32..300).map(|value| value as u8).collect(),
                     },
                 ],
+                Default::default(),
             )?,
             ArchiveObject::new(
                 23,
@@ -147,13 +152,14 @@ fn archive_round_trip_preserves_order_and_payloads() -> Result<(), Error> {
                     type_: 300,
                     data: b"last".to_vec(),
                 }],
+                Default::default(),
             )?,
         ],
     };
 
-    let encoded = archive.to_bytes()?;
-    let parsed = Archive::parse(&encoded)?;
-    assert_eq!(parsed.to_bytes()?, encoded);
+    let encoded = archive.to_bytes(Default::default())?;
+    let parsed = Archive::parse(&encoded, Default::default())?;
+    assert_eq!(parsed.to_bytes(Default::default())?, encoded);
     assert_eq!(parsed.objects[0].archive_info.identifier, Some(17));
     assert_eq!(parsed.objects[1].primary_message_type(), Some(300));
     assert_eq!(parsed.objects[0].messages[1].data.len(), 300);
@@ -171,6 +177,7 @@ fn selected_archive_parse_retains_only_requested_objects_but_validates_all_frame
                     type_: 100,
                     data: vec![0x11; 1024],
                 }],
+                Default::default(),
             )?,
             ArchiveObject::new(
                 1,
@@ -178,12 +185,13 @@ fn selected_archive_parse_retains_only_requested_objects_but_validates_all_frame
                     type_: 200,
                     data: b"selected".to_vec(),
                 }],
+                Default::default(),
             )?,
         ],
     };
-    let encoded = archive.to_bytes()?;
+    let encoded = archive.to_bytes(Default::default())?;
 
-    let selected = Archive::parse_objects_with_identifier(&encoded, 1)?;
+    let selected = Archive::parse_objects_with_identifier(&encoded, 1, Default::default())?;
     assert_eq!(selected.objects.len(), 1);
     assert_eq!(selected.objects[0].archive_info.identifier, Some(1));
     assert_eq!(selected.objects[0].messages[0].data, b"selected");
@@ -191,11 +199,11 @@ fn selected_archive_parse_retains_only_requested_objects_but_validates_all_frame
     let discarded = Archive {
         objects: vec![archive.objects[0].clone()],
     }
-    .to_bytes()?;
+    .to_bytes(Default::default())?;
     let selected_only = Archive {
         objects: vec![archive.objects[1].clone()],
     }
-    .to_bytes()?;
+    .to_bytes(Default::default())?;
     let duplicate_discarded = [
         discarded.as_slice(),
         discarded.as_slice(),
@@ -203,7 +211,7 @@ fn selected_archive_parse_retains_only_requested_objects_but_validates_all_frame
     ]
     .concat();
     assert!(matches!(
-        Archive::parse_objects_with_identifier(&duplicate_discarded, 1),
+        Archive::parse_objects_with_identifier(&duplicate_discarded, 1, Default::default()),
         Err(Error::InvalidArchive {
             reason: "duplicate object identifier",
             ..
@@ -213,7 +221,7 @@ fn selected_archive_parse_retains_only_requested_objects_but_validates_all_frame
     let mut malformed_discarded = discarded;
     malformed_discarded.extend_from_slice(&[0x01, 0xff]);
     assert!(matches!(
-        Archive::parse_objects_with_identifier(&malformed_discarded, 1),
+        Archive::parse_objects_with_identifier(&malformed_discarded, 1, Default::default()),
         Err(Error::HeaderCodec {
             header: HeaderKind::ArchiveInfo,
             operation: HeaderOperation::Decode,
@@ -224,7 +232,7 @@ fn selected_archive_parse_retains_only_requested_objects_but_validates_all_frame
     let mut truncated = encoded;
     truncated.pop();
     assert!(matches!(
-        Archive::parse_objects_with_identifier(&truncated, 1),
+        Archive::parse_objects_with_identifier(&truncated, 1, Default::default()),
         Err(Error::InvalidArchive {
             reason: "truncated message payload",
             ..
@@ -233,7 +241,7 @@ fn selected_archive_parse_retains_only_requested_objects_but_validates_all_frame
 
     let limited = ArchiveLimits::default().with_objects(1)?;
     assert!(matches!(
-        Archive::parse_objects_with_identifier_with_limits(&archive.to_bytes()?, 1, limited),
+        Archive::parse_objects_with_identifier(&archive.to_bytes(Default::default())?, 1, limited),
         Err(Error::Limit {
             kind: LimitKind::Objects,
             observed: 2,
@@ -245,7 +253,7 @@ fn selected_archive_parse_retains_only_requested_objects_but_validates_all_frame
 
 #[test]
 fn archive_rejects_malformed_lengths_and_truncated_payloads() -> Result<(), Error> {
-    let error = Archive::parse(&[0x80]).err();
+    let error = Archive::parse(&[0x80], Default::default()).err();
     assert!(matches!(
         error,
         Some(Error::InvalidArchive {
@@ -254,7 +262,7 @@ fn archive_rejects_malformed_lengths_and_truncated_payloads() -> Result<(), Erro
         })
     ));
 
-    let error = Archive::parse(&[0xff; 10]).err();
+    let error = Archive::parse(&[0xff; 10], Default::default()).err();
     assert!(matches!(
         error,
         Some(Error::InvalidArchive {
@@ -270,11 +278,12 @@ fn archive_rejects_malformed_lengths_and_truncated_payloads() -> Result<(), Erro
                 type_: 9,
                 data: b"payload".to_vec(),
             }],
+            Default::default(),
         )?],
     };
-    let mut encoded = archive.to_bytes()?;
+    let mut encoded = archive.to_bytes(Default::default())?;
     encoded.pop();
-    let error = Archive::parse(&encoded).err();
+    let error = Archive::parse(&encoded, Default::default()).err();
     assert!(matches!(
         error,
         Some(Error::InvalidArchive {
@@ -294,22 +303,22 @@ fn archive_limits_bound_objects_messages_payloads_and_metadata() -> Result<(), E
                 type_: 9,
                 data: b"payload".to_vec(),
             }],
+            Default::default(),
         )?],
     };
-    let encoded = archive.to_bytes()?;
+    let encoded = archive.to_bytes(Default::default())?;
 
     let error = ArchiveLimits::default().with_objects(0).err();
     assert!(matches!(error, Some(Error::InvalidLimits { .. })));
 
-    let error = Archive::parse_with_limits(
+    let error = Archive::parse(
         &encoded,
         ArchiveLimits::default().with_messages_per_object(1)?,
     )
     .err();
     assert!(error.is_none());
 
-    let error =
-        Archive::parse_with_limits(&encoded, ArchiveLimits::default().with_message_bytes(6)?).err();
+    let error = Archive::parse(&encoded, ArchiveLimits::default().with_message_bytes(6)?).err();
     assert!(matches!(
         error,
         Some(Error::Limit {
@@ -318,9 +327,7 @@ fn archive_limits_bound_objects_messages_payloads_and_metadata() -> Result<(), E
         })
     ));
 
-    let error =
-        Archive::parse_with_limits(&encoded, ArchiveLimits::default().with_metadata_items(3)?)
-            .err();
+    let error = Archive::parse(&encoded, ArchiveLimits::default().with_metadata_items(3)?).err();
     assert!(matches!(
         error,
         Some(Error::Limit {
@@ -329,7 +336,7 @@ fn archive_limits_bound_objects_messages_payloads_and_metadata() -> Result<(), E
         })
     ));
 
-    let error = Archive::parse_with_limits(
+    let error = Archive::parse(
         &encoded,
         ArchiveLimits::default().with_object_bytes(encoded.len() - 1)?,
     )
@@ -352,6 +359,7 @@ fn archive_crud_rejects_duplicates_and_preserves_order() -> Result<(), Error> {
             type_: 1,
             data: b"first".to_vec(),
         }],
+        Default::default(),
     )?;
     let second = ArchiveObject::new(
         22,
@@ -359,6 +367,7 @@ fn archive_crud_rejects_duplicates_and_preserves_order() -> Result<(), Error> {
             type_: 2,
             data: b"second".to_vec(),
         }],
+        Default::default(),
     )?;
     let duplicate = ArchiveObject::new(
         11,
@@ -366,10 +375,11 @@ fn archive_crud_rejects_duplicates_and_preserves_order() -> Result<(), Error> {
             type_: 3,
             data: b"duplicate".to_vec(),
         }],
+        Default::default(),
     )?;
     let mut archive = Archive::new();
-    archive.insert_object(first)?;
-    archive.insert_object(second)?;
+    archive.insert_object(first, Default::default())?;
+    archive.insert_object(second, Default::default())?;
     assert_eq!(
         archive
             .object(11)
@@ -378,7 +388,9 @@ fn archive_crud_rejects_duplicates_and_preserves_order() -> Result<(), Error> {
     );
     assert_eq!(archive.objects.len(), 2);
 
-    let error = archive.insert_object(duplicate.clone()).err();
+    let error = archive
+        .insert_object(duplicate.clone(), Default::default())
+        .err();
     assert!(matches!(
         error,
         Some(Error::InvalidArchive {
@@ -388,7 +400,7 @@ fn archive_crud_rejects_duplicates_and_preserves_order() -> Result<(), Error> {
     ));
     assert_eq!(archive.objects.len(), 2);
 
-    let previous = archive.upsert_object(duplicate)?;
+    let previous = archive.upsert_object(duplicate, Default::default())?;
     assert_eq!(
         previous.and_then(|object| object.primary_message_type()),
         Some(1)
@@ -418,12 +430,13 @@ fn archive_validation_rejects_duplicate_structural_ids() -> Result<(), Error> {
             type_: 1,
             data: vec![1],
         }],
+        Default::default(),
     )?;
     let archive = Archive {
         objects: vec![object.clone(), object],
     };
     assert!(matches!(
-        archive.validate(),
+        archive.validate(Default::default()),
         Err(Error::InvalidArchive {
             reason: "duplicate object identifier",
             ..
@@ -440,11 +453,12 @@ fn message_mutations_are_atomic_and_update_metadata() -> Result<(), Error> {
             type_: 10,
             data: b"old".to_vec(),
         }],
+        Default::default(),
     )?;
     let before_info = object.archive_info.clone();
     let limits = ArchiveLimits::default().with_message_bytes(3)?;
     let error = object
-        .replace_message_with_limits(
+        .replace_message(
             0,
             RawMessage {
                 type_: 20,
@@ -470,6 +484,7 @@ fn message_mutations_are_atomic_and_update_metadata() -> Result<(), Error> {
             type_: 20,
             data: b"new".to_vec(),
         },
+        Default::default(),
     )?;
     assert_eq!(old.data, b"old");
     assert_eq!(object.archive_info.message_infos[0].type_, 20);
@@ -478,7 +493,7 @@ fn message_mutations_are_atomic_and_update_metadata() -> Result<(), Error> {
     let count_limited = ArchiveLimits::default().with_messages_per_object(1)?;
     let before_push = object.clone();
     let error = object
-        .push_message_with_limits(
+        .push_message(
             RawMessage {
                 type_: 30,
                 data: vec![4],
@@ -496,10 +511,13 @@ fn message_mutations_are_atomic_and_update_metadata() -> Result<(), Error> {
     assert_eq!(object.messages, before_push.messages);
     assert_eq!(object.archive_info, before_push.archive_info);
 
-    object.push_message(RawMessage {
-        type_: 30,
-        data: vec![4],
-    })?;
+    object.push_message(
+        RawMessage {
+            type_: 30,
+            data: vec![4],
+        },
+        Default::default(),
+    )?;
     assert_eq!(object.messages.len(), 2);
     assert_eq!(
         object.remove_message(0).map(|message| message.type_),
@@ -513,22 +531,27 @@ fn message_mutations_are_atomic_and_update_metadata() -> Result<(), Error> {
 #[test]
 fn upsert_failure_rolls_back_without_replacing_existing_object() -> Result<(), Error> {
     let mut archive = Archive::new();
-    archive.insert_object(ArchiveObject::new(
-        1,
-        vec![RawMessage {
-            type_: 1,
-            data: vec![1],
-        }],
-    )?)?;
+    archive.insert_object(
+        ArchiveObject::new(
+            1,
+            vec![RawMessage {
+                type_: 1,
+                data: vec![1],
+            }],
+            Default::default(),
+        )?,
+        Default::default(),
+    )?;
     let replacement = ArchiveObject::new(
         1,
         vec![RawMessage {
             type_: 2,
             data: vec![2, 3, 4],
         }],
+        Default::default(),
     )?;
     let limits = ArchiveLimits::default().with_message_bytes(1)?;
-    let error = archive.upsert_object_with_limits(replacement, limits).err();
+    let error = archive.upsert_object(replacement, limits).err();
     assert!(matches!(
         error,
         Some(Error::Limit {
@@ -555,17 +578,18 @@ fn reader_headers_are_bounded_and_truncation_is_structured() -> Result<(), Error
                 type_: 41,
                 data: b"payload".to_vec(),
             }],
+            Default::default(),
         )?],
     };
-    let encoded = archive.to_bytes()?;
+    let encoded = archive.to_bytes(Default::default())?;
     let (header_length, prefix_length) = decode_test_varint(&encoded);
     let mut reader = Cursor::new(&encoded[prefix_length..prefix_length + header_length]);
-    let info = litchi_iwa_core::ArchiveInfo::parse(&mut reader)?;
+    let info = litchi_iwa_core::ArchiveInfo::parse(&mut reader, Default::default())?;
     assert_eq!(info.identifier, Some(31));
 
     let mut truncated = Cursor::new(vec![0x80]);
     assert!(matches!(
-        litchi_iwa_core::ArchiveInfo::parse(&mut truncated),
+        litchi_iwa_core::ArchiveInfo::parse(&mut truncated, Default::default()),
         Err(Error::HeaderCodec {
             header: HeaderKind::ArchiveInfo,
             operation: HeaderOperation::Decode,
@@ -576,7 +600,7 @@ fn reader_headers_are_bounded_and_truncation_is_structured() -> Result<(), Error
     let mut oversized = Cursor::new(vec![0, 0]);
     let limits = ArchiveLimits::default().with_header_bytes(1)?;
     assert!(matches!(
-        litchi_iwa_core::ArchiveInfo::parse_with_limits(&mut oversized, limits),
+        litchi_iwa_core::ArchiveInfo::parse(&mut oversized, limits),
         Err(Error::Limit {
             kind: LimitKind::HeaderBytes,
             ..
@@ -590,13 +614,13 @@ fn message_info_reader_and_io_errors_are_reported() -> Result<(), Error> {
     // required type=61, packed version=[1, 0, 5], required length=2
     let encoded = [0x08, 0x3d, 0x12, 0x03, 0x01, 0x00, 0x05, 0x18, 0x02];
     let mut reader = Cursor::new(encoded);
-    let info = litchi_iwa_core::MessageInfo::parse(&mut reader)?;
+    let info = litchi_iwa_core::MessageInfo::parse(&mut reader, Default::default())?;
     assert_eq!(info.type_, 61);
     assert_eq!(info.length, 2);
 
     let mut failing = FailingReader;
     assert!(matches!(
-        litchi_iwa_core::MessageInfo::parse(&mut failing),
+        litchi_iwa_core::MessageInfo::parse(&mut failing, Default::default()),
         Err(Error::Io(_))
     ));
     Ok(())
@@ -604,7 +628,11 @@ fn message_info_reader_and_io_errors_are_reported() -> Result<(), Error> {
 
 #[test]
 fn neutral_field_metadata_preserves_presence_and_unknown_enum_values() -> Result<(), Error> {
-    let absent = FieldInfo::new(vec![1]);
+    let absent = FieldInfo::new(
+        FieldPath::new(vec![1], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     assert_eq!(absent.effective_type(), FieldType::Value);
     assert_eq!(
         absent.effective_unknown_field_rule(),
@@ -613,21 +641,21 @@ fn neutral_field_metadata_preserves_presence_and_unknown_enum_values() -> Result
     assert_eq!(absent.effective_known_field_rule(), KnownFieldRule::None);
 
     let explicit_defaults = FieldInfo {
-        path: FieldPath::new(vec![2]),
+        path: FieldPath::new(vec![2], litchi_iwa_core::Limits::default()).unwrap(),
         r#type: Some(FieldType::Value),
         unknown_field_rule: Some(UnknownFieldRule::IgnoreAndPreserveUntilModified),
         known_field_rule: Some(KnownFieldRule::None),
         ..Default::default()
     };
     let known = FieldInfo {
-        path: FieldPath::new(vec![3]),
+        path: FieldPath::new(vec![3], litchi_iwa_core::Limits::default()).unwrap(),
         r#type: Some(FieldType::Message),
         unknown_field_rule: Some(UnknownFieldRule::NotSupported),
         known_field_rule: Some(KnownFieldRule::PreserveNewerValue),
         ..Default::default()
     };
     let unrecognized = FieldInfo {
-        path: FieldPath::new(vec![4]),
+        path: FieldPath::new(vec![4], litchi_iwa_core::Limits::default()).unwrap(),
         r#type: Some(FieldType::Unrecognized(99)),
         unknown_field_rule: Some(UnknownFieldRule::Unrecognized(-2)),
         known_field_rule: Some(KnownFieldRule::Unrecognized(77)),
@@ -641,18 +669,19 @@ fn neutral_field_metadata_preserves_presence_and_unknown_enum_values() -> Result
             type_: 92,
             data: Vec::new(),
         }],
+        Default::default(),
     )?;
     object.archive_info.message_infos[0].field_infos = expected.clone();
     let archive = Archive {
         objects: vec![object],
     };
-    let encoded = archive.to_bytes()?;
-    let parsed = Archive::parse(&encoded)?;
+    let encoded = archive.to_bytes(Default::default())?;
+    let parsed = Archive::parse(&encoded, Default::default())?;
     assert_eq!(
         parsed.objects[0].archive_info.message_infos[0].field_infos,
         expected
     );
-    assert_eq!(parsed.to_bytes()?, encoded);
+    assert_eq!(parsed.to_bytes(Default::default())?, encoded);
     Ok(())
 }
 
@@ -662,13 +691,114 @@ fn missing_required_field_info_path_is_rejected_before_publication() {
     // required path.
     let missing_path = [0x08, 0x01, 0x18, 0x00, 0x22, 0x00];
     assert!(matches!(
-        litchi_iwa_core::MessageInfo::decode(&missing_path),
+        litchi_iwa_core::MessageInfo::decode(&missing_path, Default::default()),
         Err(Error::HeaderCodec {
             header: HeaderKind::MessageInfo,
             operation: HeaderOperation::Decode,
             ..
         })
     ));
+}
+
+#[test]
+fn retained_unknown_header_obeys_stricter_field_limits() -> Result<(), Error> {
+    // One identifier and two unknown scalar fields; the decoded model has
+    // only the identifier, but exact publication retains all three records.
+    let source = [6, 0x08, 1, 0x20, 0, 0x20, 0];
+    let archive = Archive::parse(&source, ArchiveLimits::default())?;
+    let exact = ArchiveLimits::default().with_header_fields(3)?;
+    assert_eq!(archive.to_bytes(exact)?, source);
+    let strict = ArchiveLimits::default().with_header_fields(1)?;
+    assert!(matches!(
+        Archive::parse(&source, strict),
+        Err(Error::Limit {
+            kind: LimitKind::HeaderFields,
+            observed: 2,
+            maximum: 1,
+        })
+    ));
+    let results = [
+        archive.objects[0].validate(strict),
+        archive.validate(strict),
+        archive.encoded_len(strict).map(|_| ()),
+        archive.to_bytes(strict).map(|_| ()),
+    ];
+    assert_eq!(
+        results.map(|result| matches!(
+            result,
+            Err(Error::Limit {
+                kind: LimitKind::HeaderFields,
+                observed: 2,
+                maximum: 1,
+            })
+        )),
+        [true; 4],
+        "object/archive validation and encoded/publication admission must include retained fields"
+    );
+    let mut changed = archive;
+    changed.objects[0].archive_info.identifier = Some(2);
+    // The existing canonical-publication rule discards the old header when
+    // its model no longer matches. Unused provenance must not consume the
+    // new output's field budget.
+    assert_eq!(changed.to_bytes(strict)?, [2, 0x08, 2]);
+    Ok(())
+}
+
+#[test]
+fn retained_header_resource_admission_matches_fresh_ingress() -> Result<(), Error> {
+    let source = [6, 0x08, 1, 0x20, 0, 0x20, 0];
+    let archive = Archive::parse(&source, ArchiveLimits::default())?;
+    let memory = match Archive::parse(
+        &source,
+        ArchiveLimits::default().with_header_memory_bytes(1)?,
+    ) {
+        Err(Error::Limit {
+            kind: LimitKind::HeaderMemoryBytes,
+            observed,
+            ..
+        }) => observed,
+        result => panic!("expected a retained header memory charge: {result:?}"),
+    };
+    let profiles = [
+        (
+            LimitKind::HeaderBytes,
+            6,
+            ArchiveLimits::default().with_header_bytes(5)?,
+            ArchiveLimits::default().with_header_bytes(6)?,
+        ),
+        (
+            LimitKind::ObjectBytes,
+            source.len(),
+            ArchiveLimits::default().with_object_bytes(source.len() - 1)?,
+            ArchiveLimits::default().with_object_bytes(source.len())?,
+        ),
+        (
+            LimitKind::HeaderMemoryBytes,
+            memory,
+            ArchiveLimits::default().with_header_memory_bytes(memory - 1)?,
+            ArchiveLimits::default().with_header_memory_bytes(memory)?,
+        ),
+    ];
+    for (kind, expected, below, exact) in profiles {
+        archive.objects[0].validate(exact)?;
+        archive.validate(exact)?;
+        assert_eq!(archive.encoded_len(exact)?, source.len());
+        assert_eq!(archive.to_bytes(exact)?, source);
+        for result in [
+            archive.objects[0].validate(below),
+            archive.validate(below),
+            archive.encoded_len(below).map(|_| ()),
+            archive.to_bytes(below).map(|_| ()),
+        ] {
+            assert!(matches!(result, Err(Error::Limit {
+                kind: actual,
+                observed,
+                maximum,
+            }) if actual == kind && observed == expected && maximum == expected - 1));
+        }
+    }
+    assert_eq!(archive.to_bytes(ArchiveLimits::default())?, source);
+    Ok(())
 }
 
 #[test]
@@ -680,9 +810,10 @@ fn unknown_and_noncanonical_header_bytes_round_trip_byte_for_byte() -> Result<()
                 type_: 81,
                 data: vec![0, 1, 2, 255],
             }],
+            Default::default(),
         )?],
     };
-    let encoded = archive.to_bytes()?;
+    let encoded = archive.to_bytes(Default::default())?;
     let (header_length, prefix_length) = decode_test_varint(&encoded);
     let duplicate_identifier = [0x08, 71];
     let unknown_field = [0xa2, 0x06, 0x01, 0xff];
@@ -694,11 +825,11 @@ fn unknown_and_noncanonical_header_bytes_round_trip_byte_for_byte() -> Result<()
     modified.extend_from_slice(&noncanonical_header_suffix);
     modified.extend_from_slice(&encoded[prefix_length + header_length..]);
 
-    let parsed = Archive::parse(&modified)?;
+    let parsed = Archive::parse(&modified, Default::default())?;
     assert_eq!(parsed.objects[0].messages[0].data, vec![0, 1, 2, 255]);
-    assert_eq!(parsed.to_bytes()?, modified);
-    let selected = Archive::parse_objects_with_identifier(&modified, 71)?;
-    assert_eq!(selected.to_bytes()?, modified);
+    assert_eq!(parsed.to_bytes(Default::default())?, modified);
+    let selected = Archive::parse_objects_with_identifier(&modified, 71, Default::default())?;
+    assert_eq!(selected.to_bytes(Default::default())?, modified);
     Ok(())
 }
 
@@ -732,11 +863,11 @@ fn nested_duplicates_and_unknown_wire_payloads_preserve_the_raw_header() -> Resu
     let mut source = vec![one_byte_length(header.len())];
     source.extend_from_slice(&header);
     source.extend_from_slice(&[0xde, 0xad, 0xbe]);
-    let archive = Archive::parse(&source)?;
+    let archive = Archive::parse(&source, Default::default())?;
     assert_eq!(archive.objects[0].archive_info.identifier, Some(42));
     assert_eq!(archive.objects[0].messages[0].type_, 7);
     assert_eq!(archive.objects[0].messages[0].data, [0xde, 0xad, 0xbe]);
-    assert_eq!(archive.to_bytes()?, source);
+    assert_eq!(archive.to_bytes(Default::default())?, source);
     Ok(())
 }
 
@@ -751,10 +882,10 @@ fn hostile_native_header_bytes_remain_the_no_op_authority() -> Result<(), Error>
     source.extend_from_slice(&header);
     source.extend_from_slice(&[0x5a; 11]);
 
-    let archive = Archive::parse(&source)?;
+    let archive = Archive::parse(&source, Default::default())?;
     assert_eq!(archive.objects[0].archive_info.identifier, Some(42));
     assert_eq!(archive.objects[0].messages[0].type_, 7);
-    assert_eq!(archive.to_bytes()?, source);
+    assert_eq!(archive.to_bytes(Default::default())?, source);
     Ok(())
 }
 
@@ -802,7 +933,7 @@ fn preserving_replacement_retains_adversarial_header_bytes_and_restores_exactly(
     let mut source = vec![one_byte_length(header.len())];
     source.extend_from_slice(&header);
     source.extend_from_slice(&[0xde, 0xad, 0xbe]);
-    let mut archive = Archive::parse(&source)?;
+    let mut archive = Archive::parse(&source, Default::default())?;
 
     let old = archive.objects[0].replace_message_preserving_header(
         0,
@@ -810,11 +941,12 @@ fn preserving_replacement_retains_adversarial_header_bytes_and_restores_exactly(
             type_: 9,
             data: vec![0x5a; 130],
         },
+        Default::default(),
     )?;
     assert_eq!(old.type_, 7);
     assert_eq!(old.data, [0xde, 0xad, 0xbe]);
 
-    let changed = archive.to_bytes()?;
+    let changed = archive.to_bytes(Default::default())?;
     let (changed_header_length, changed_prefix_length) = decode_test_varint(&changed);
     let changed_header =
         &changed[changed_prefix_length..changed_prefix_length + changed_header_length];
@@ -831,14 +963,15 @@ fn preserving_replacement_retains_adversarial_header_bytes_and_restores_exactly(
     ));
     assert_eq!(changed_header, expected_header);
 
-    let reparsed = Archive::parse(&changed)?;
+    let reparsed = Archive::parse(&changed, Default::default())?;
     assert_eq!(reparsed.objects[0].messages[0].type_, 9);
     assert_eq!(reparsed.objects[0].messages[0].data, vec![0x5a; 130]);
 
-    let replaced = archive.objects[0].replace_message_preserving_header(0, old)?;
+    let replaced =
+        archive.objects[0].replace_message_preserving_header(0, old, Default::default())?;
     assert_eq!(replaced.type_, 9);
     assert_eq!(replaced.data, vec![0x5a; 130]);
-    assert_eq!(archive.to_bytes()?, source);
+    assert_eq!(archive.to_bytes(Default::default())?, source);
 
     let object_before_failure = archive.objects[0].clone();
     let object_limit = header.len() + 3;
@@ -846,7 +979,7 @@ fn preserving_replacement_retains_adversarial_header_bytes_and_restores_exactly(
         .with_object_bytes(object_limit)?
         .with_header_bytes(header.len())?;
     let error = archive.objects[0]
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             0,
             RawMessage {
                 type_: 9,
@@ -864,7 +997,7 @@ fn preserving_replacement_retains_adversarial_header_bytes_and_restores_exactly(
         }) if observed == object_limit + 1 && maximum == object_limit
     ));
     assert_eq!(archive.objects[0], object_before_failure);
-    assert_eq!(archive.to_bytes()?, source);
+    assert_eq!(archive.to_bytes(Default::default())?, source);
     Ok(())
 }
 
@@ -886,7 +1019,7 @@ fn preserving_replacement_grows_scalar_and_enclosing_length_widths() -> Result<(
     let mut source = vec![0x83, 0x01]; // 131-byte ArchiveInfo
     source.extend_from_slice(&header);
     source.push(0xcc);
-    let mut archive = Archive::parse(&source)?;
+    let mut archive = Archive::parse(&source, Default::default())?;
 
     archive.objects[0].replace_message_preserving_header(
         0,
@@ -894,8 +1027,9 @@ fn preserving_replacement_grows_scalar_and_enclosing_length_widths() -> Result<(
             type_: 1,
             data: vec![0xdd; 130],
         },
+        Default::default(),
     )?;
-    let changed = archive.to_bytes()?;
+    let changed = archive.to_bytes(Default::default())?;
     let (changed_header_length, changed_prefix_length) = decode_test_varint(&changed);
     assert_eq!(changed_header_length, 133);
     let changed_header =
@@ -963,7 +1097,7 @@ fn buffa_preflight_rejects_malformed_deferred_children() {
     for (context, malformed_message) in malformed_messages {
         assert!(
             matches!(
-                litchi_iwa_core::MessageInfo::decode(malformed_message),
+                litchi_iwa_core::MessageInfo::decode(malformed_message, Default::default()),
                 Err(Error::HeaderCodec {
                     header: HeaderKind::MessageInfo,
                     operation: HeaderOperation::Decode,
@@ -978,7 +1112,7 @@ fn buffa_preflight_rejects_malformed_deferred_children() {
         malformed_archive.extend_from_slice(malformed_message);
         assert!(
             matches!(
-                litchi_iwa_core::ArchiveInfo::decode(&malformed_archive),
+                litchi_iwa_core::ArchiveInfo::decode(&malformed_archive, Default::default()),
                 Err(Error::HeaderCodec {
                     header: HeaderKind::ArchiveInfo,
                     operation: HeaderOperation::Decode,
@@ -1006,11 +1140,11 @@ fn buffa_preflight_enforces_field_nesting_and_memory_budgets() -> Result<(), Err
         should_merge: None,
     }
     .encode_to_vec();
-    assert!(litchi_iwa_core::ArchiveInfo::decode(&nested).is_ok());
+    assert!(litchi_iwa_core::ArchiveInfo::decode(&nested, Default::default()).is_ok());
 
     let nesting_limits = ArchiveLimits::default().with_header_nesting(2)?;
     assert!(matches!(
-        litchi_iwa_core::ArchiveInfo::decode_with_limits(&nested, nesting_limits),
+        litchi_iwa_core::ArchiveInfo::decode(&nested, nesting_limits),
         Err(Error::Limit {
             kind: LimitKind::HeaderNesting,
             ..
@@ -1020,7 +1154,7 @@ fn buffa_preflight_enforces_field_nesting_and_memory_budgets() -> Result<(), Err
     let fields = [0x08, 0x01, 0x20, 0x00, 0x20, 0x00];
     let field_limits = ArchiveLimits::default().with_header_fields(2)?;
     assert!(matches!(
-        litchi_iwa_core::ArchiveInfo::decode_with_limits(&fields, field_limits),
+        litchi_iwa_core::ArchiveInfo::decode(&fields, field_limits),
         Err(Error::Limit {
             kind: LimitKind::HeaderFields,
             ..
@@ -1030,7 +1164,7 @@ fn buffa_preflight_enforces_field_nesting_and_memory_budgets() -> Result<(), Err
     let one_empty_message = [0x08, 0x01, 0x12, 0x00];
     let memory_limits = ArchiveLimits::default().with_header_memory_bytes(1)?;
     assert!(matches!(
-        litchi_iwa_core::ArchiveInfo::decode_with_limits(&one_empty_message, memory_limits),
+        litchi_iwa_core::ArchiveInfo::decode(&one_empty_message, memory_limits),
         Err(Error::Limit {
             kind: LimitKind::HeaderMemoryBytes,
             ..
@@ -1045,7 +1179,7 @@ fn buffa_preflight_counts_packed_metadata_before_decode() -> Result<(), Error> {
     let message_info = [0x08, 0x01, 0x12, 0x02, 0x01, 0x02, 0x18, 0x00];
     let limits = ArchiveLimits::default().with_metadata_items(1)?;
     assert!(matches!(
-        litchi_iwa_core::MessageInfo::decode_with_limits(&message_info, limits),
+        litchi_iwa_core::MessageInfo::decode(&message_info, limits),
         Err(Error::Limit {
             kind: LimitKind::MetadataItems,
             observed: 2,
@@ -1072,7 +1206,7 @@ fn buffa_preflight_charges_unrecognized_closed_enum_records() -> Result<(), Erro
 
     let limits = ArchiveLimits::default().with_header_memory_bytes(4_096)?;
     assert!(matches!(
-        litchi_iwa_core::MessageInfo::decode_with_limits(&message_info, limits),
+        litchi_iwa_core::MessageInfo::decode(&message_info, limits),
         Err(Error::Limit {
             kind: LimitKind::HeaderMemoryBytes,
             observed,
@@ -1087,12 +1221,10 @@ fn buffa_preflight_byte_and_field_limits_are_inclusive() -> Result<(), Error> {
     let minimal_message = [0x08, 0x01, 0x18, 0x00];
 
     let exact_bytes = ArchiveLimits::default().with_header_bytes(minimal_message.len())?;
-    assert!(
-        litchi_iwa_core::MessageInfo::decode_with_limits(&minimal_message, exact_bytes).is_ok()
-    );
+    assert!(litchi_iwa_core::MessageInfo::decode(&minimal_message, exact_bytes).is_ok());
     let below_bytes = ArchiveLimits::default().with_header_bytes(minimal_message.len() - 1)?;
     assert!(matches!(
-        litchi_iwa_core::MessageInfo::decode_with_limits(&minimal_message, below_bytes),
+        litchi_iwa_core::MessageInfo::decode(&minimal_message, below_bytes),
         Err(Error::Limit {
             kind: LimitKind::HeaderBytes,
             observed: 4,
@@ -1101,12 +1233,10 @@ fn buffa_preflight_byte_and_field_limits_are_inclusive() -> Result<(), Error> {
     ));
 
     let exact_fields = ArchiveLimits::default().with_header_fields(2)?;
-    assert!(
-        litchi_iwa_core::MessageInfo::decode_with_limits(&minimal_message, exact_fields).is_ok()
-    );
+    assert!(litchi_iwa_core::MessageInfo::decode(&minimal_message, exact_fields).is_ok());
     let below_fields = ArchiveLimits::default().with_header_fields(1)?;
     assert!(matches!(
-        litchi_iwa_core::MessageInfo::decode_with_limits(&minimal_message, below_fields),
+        litchi_iwa_core::MessageInfo::decode(&minimal_message, below_fields),
         Err(Error::Limit {
             kind: LimitKind::HeaderFields,
             observed: 2,
@@ -1133,10 +1263,10 @@ fn buffa_preflight_nesting_and_memory_limits_are_inclusive() -> Result<(), Error
     }
     .encode_to_vec();
     let exact_nesting = ArchiveLimits::default().with_header_nesting(3)?;
-    assert!(litchi_iwa_core::ArchiveInfo::decode_with_limits(&nested, exact_nesting).is_ok());
+    assert!(litchi_iwa_core::ArchiveInfo::decode(&nested, exact_nesting).is_ok());
     let below_nesting = ArchiveLimits::default().with_header_nesting(2)?;
     assert!(matches!(
-        litchi_iwa_core::ArchiveInfo::decode_with_limits(&nested, below_nesting),
+        litchi_iwa_core::ArchiveInfo::decode(&nested, below_nesting),
         Err(Error::Limit {
             kind: LimitKind::HeaderNesting,
             observed: 3,
@@ -1145,7 +1275,7 @@ fn buffa_preflight_nesting_and_memory_limits_are_inclusive() -> Result<(), Error
     ));
 
     let one_message = [0x08, 0x01, 0x12, 0x04, 0x08, 0x01, 0x18, 0x00];
-    let observed_memory = match litchi_iwa_core::ArchiveInfo::decode_with_limits(
+    let observed_memory = match litchi_iwa_core::ArchiveInfo::decode(
         &one_message,
         ArchiveLimits::default().with_header_memory_bytes(1)?,
     ) {
@@ -1158,10 +1288,10 @@ fn buffa_preflight_nesting_and_memory_limits_are_inclusive() -> Result<(), Error
     };
     assert!(observed_memory > 1);
     let exact_memory = ArchiveLimits::default().with_header_memory_bytes(observed_memory)?;
-    assert!(litchi_iwa_core::ArchiveInfo::decode_with_limits(&one_message, exact_memory).is_ok());
+    assert!(litchi_iwa_core::ArchiveInfo::decode(&one_message, exact_memory).is_ok());
     let below_memory = ArchiveLimits::default().with_header_memory_bytes(observed_memory - 1)?;
     assert!(matches!(
-        litchi_iwa_core::ArchiveInfo::decode_with_limits(&one_message, below_memory),
+        litchi_iwa_core::ArchiveInfo::decode(&one_message, below_memory),
         Err(Error::Limit {
             kind: LimitKind::HeaderMemoryBytes,
             observed,
@@ -1175,12 +1305,10 @@ fn buffa_preflight_nesting_and_memory_limits_are_inclusive() -> Result<(), Error
 fn buffa_preflight_metadata_and_message_count_limits_are_inclusive() -> Result<(), Error> {
     let packed_metadata = [0x08, 0x01, 0x12, 0x02, 0x01, 0x02, 0x18, 0x00];
     let exact_metadata = ArchiveLimits::default().with_metadata_items(2)?;
-    assert!(
-        litchi_iwa_core::MessageInfo::decode_with_limits(&packed_metadata, exact_metadata).is_ok()
-    );
+    assert!(litchi_iwa_core::MessageInfo::decode(&packed_metadata, exact_metadata).is_ok());
     let below_metadata = ArchiveLimits::default().with_metadata_items(1)?;
     assert!(matches!(
-        litchi_iwa_core::MessageInfo::decode_with_limits(&packed_metadata, below_metadata),
+        litchi_iwa_core::MessageInfo::decode(&packed_metadata, below_metadata),
         Err(Error::Limit {
             kind: LimitKind::MetadataItems,
             observed: 2,
@@ -1192,12 +1320,10 @@ fn buffa_preflight_metadata_and_message_count_limits_are_inclusive() -> Result<(
         0x08, 0x01, 0x12, 0x04, 0x08, 0x01, 0x18, 0x00, 0x12, 0x04, 0x08, 0x02, 0x18, 0x00,
     ];
     let exact_messages = ArchiveLimits::default().with_messages_per_object(2)?;
-    assert!(
-        litchi_iwa_core::ArchiveInfo::decode_with_limits(&two_messages, exact_messages).is_ok()
-    );
+    assert!(litchi_iwa_core::ArchiveInfo::decode(&two_messages, exact_messages).is_ok());
     let below_messages = ArchiveLimits::default().with_messages_per_object(1)?;
     assert!(matches!(
-        litchi_iwa_core::ArchiveInfo::decode_with_limits(&two_messages, below_messages),
+        litchi_iwa_core::ArchiveInfo::decode(&two_messages, below_messages),
         Err(Error::Limit {
             kind: LimitKind::MessagesPerObject,
             observed: 2,
@@ -1216,10 +1342,11 @@ fn parse_does_not_reserve_object_slots_from_payload_size() -> Result<(), Error> 
                 type_: 300,
                 data: vec![0x5a; 64 * 1024],
             }],
+            Default::default(),
         )?],
     };
-    let encoded = archive.to_bytes()?;
-    let parsed = Archive::parse(&encoded)?;
+    let encoded = archive.to_bytes(Default::default())?;
+    let parsed = Archive::parse(&encoded, Default::default())?;
 
     assert_eq!(parsed.objects.len(), 1);
     assert!(

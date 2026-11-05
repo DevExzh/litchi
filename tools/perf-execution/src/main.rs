@@ -11,7 +11,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, ReadAt, Resource,
     SourceVersion,
 };
-use litchi_opc::{OpenSession, PackURI, ReadLimits, SourceBackedPackage};
+use litchi_opc::{OpenSession, PackURI, SourceBackedPackage, SourceLimits};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use soapberry_zip::office::StreamingArchiveWriter;
@@ -478,7 +478,8 @@ fn build_opc(payloads: &[Vec<u8>], manifests: &[MemberManifest]) -> AnyResult<Ve
     }
     root_relationships.push_str("</Relationships>");
 
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer.write_deflated("[Content_Types].xml", content_types.as_bytes())?;
     writer.write_deflated("_rels/.rels", root_relationships.as_bytes())?;
     for (payload, manifest) in payloads.iter().zip(manifests) {
@@ -976,14 +977,14 @@ fn run_opc_sample(config: &Config, corpus: &Corpus, sample: usize) -> AnyResult<
     let (root, context) = make_context(config.workers, config.task_floor)?;
     let session = OpenSession::new(context.clone())?;
     if config.state == State::Primed {
-        let preload = session.from_bytes(&corpus.opc_bytes, ReadLimits::default())?;
+        let preload = session.from_bytes(&corpus.opc_bytes, SourceLimits::default())?;
         let _ = verify_opc(&preload, corpus)?;
         drop(preload);
     }
     let before_operation = resource_snapshot(&root);
     let (package, wall_ns, cpu_ns) = measure(|| {
         session
-            .from_bytes(&corpus.opc_bytes, ReadLimits::default())
+            .from_bytes(&corpus.opc_bytes, SourceLimits::default())
             .map_err(|error| boxed_error(error.to_string()))
     })?;
     let after_operation = resource_snapshot(&root);
@@ -1019,7 +1020,7 @@ fn run_cfb_sample(config: &Config, corpus: &Corpus, sample: usize) -> AnyResult<
         config.source_delay_us,
     ));
     let source_for_reader: Arc<dyn ReadAt> = source.clone();
-    let file = SharedOleFile::open_with_limits(source_for_reader, SharedOleFileLimits::default())?;
+    let file = SharedOleFile::open(source_for_reader, SharedOleFileLimits::default())?;
     let session: SharedOleBulkRead<'_> = file.bulk_read(context.clone());
     let names: Vec<String> = corpus
         .members
@@ -1078,10 +1079,12 @@ fn run_parts_sample(config: &Config, corpus: &Corpus, sample: usize) -> AnyResul
         config.source_delay_us,
     ));
     let source_for_reader: Arc<dyn ReadAt> = source.clone();
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         source_for_reader,
-        ReadLimits::default(),
-        context.clone(),
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        Some(context.clone()),
     )?;
     let uris = part_uris(corpus)?;
     if config.state == State::Primed {
@@ -1545,9 +1548,8 @@ mod tests {
         let corpus = build_corpus(Shape::Small).expect("corpus");
         let source = Arc::new(ReadCountingSource::new(corpus.cfb_bytes.clone()));
         let source_for_reader: Arc<dyn ReadAt> = source.clone();
-        let file =
-            SharedOleFile::open_with_limits(source_for_reader, SharedOleFileLimits::default())
-                .expect("open CFB source");
+        let file = SharedOleFile::open(source_for_reader, SharedOleFileLimits::default())
+            .expect("open CFB source");
         source.reads.store(0, Ordering::Relaxed);
 
         let root = Budget::root(

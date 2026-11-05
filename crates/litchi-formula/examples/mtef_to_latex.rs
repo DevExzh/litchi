@@ -19,6 +19,7 @@
 use std::fs;
 use std::path::PathBuf;
 
+use litchi_formula::mtef::Limits;
 use litchi_formula::{Formula, MtefParser, mtef_to_latex};
 
 /// A minimal but structurally valid MTEF byte sequence.
@@ -74,7 +75,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // create a dedicated `Formula` for this scope.
     {
         let formula = Formula::new();
-        let parser = MtefParser::new(formula.arena(), &bytes);
+        let parser = MtefParser::new(formula.arena(), &bytes, Limits::DEFAULT);
         println!("Parser valid  : {}", parser.is_valid());
         if let Some((mtef_version, platform, product, version, sub)) = parser.version_info() {
             println!(
@@ -90,7 +91,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // sample contains no glyphs, so the output for it is essentially an
     // empty display-style block - that is intentional and demonstrates
     // that the pipeline runs end-to-end without errors.
-    match mtef_to_latex(&bytes) {
+    match mtef_to_latex(&bytes, &Limits::DEFAULT) {
         Ok(latex) => {
             if latex.is_empty() {
                 println!("LaTeX         : <empty - sample contains no equation body>");

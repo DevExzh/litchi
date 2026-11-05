@@ -5077,10 +5077,6 @@ pub struct ControlCellSpecTableReferenceEdit {
     replacement_identifier: u64,
 }
 
-/// Exact precondition for inserting or replacing DataStore field 19
-/// (`comment_storage_table`).
-pub type CommentStorageTableReferenceEdit = ControlCellSpecTableReferenceEdit;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum DataStoreReferenceRoute {
     CommentStorageTable,
@@ -5470,34 +5466,13 @@ pub fn rewrite_data_store_control_cell_spec_table(
     plan.execute(limits)
 }
 
-/// Explicit `Reference`-suffix aliases used by package owners that prefer
-/// naming the wire transition rather than the semantic table route.
-pub type PreparedDataStoreControlCellSpecTableReferenceRewrite<'source> =
-    PreparedDataStoreControlCellSpecTableRewrite<'source>;
-
-pub fn prepare_data_store_control_cell_spec_table_reference_rewrite<'source>(
-    source: &'source [u8],
-    edit: ControlCellSpecTableReferenceEdit,
-    options: DecodeOptions,
-) -> Result<PreparedDataStoreControlCellSpecTableReferenceRewrite<'source>, DecodeError> {
-    prepare_data_store_control_cell_spec_table_rewrite(source, edit, options)
-}
-
-pub fn rewrite_data_store_control_cell_spec_table_reference(
-    source: &[u8],
-    edit: ControlCellSpecTableReferenceEdit,
-    options: DecodeOptions,
-) -> Result<(Vec<u8>, StorageReferenceRewriteReport), DecodeError> {
-    rewrite_data_store_control_cell_spec_table(source, edit, options)
-}
-
 /// Prepared DataStore field-19 insertion/replacement.
 pub type PreparedDataStoreCommentStorageTableRewrite<'source> =
     PreparedDataStoreControlCellSpecTableRewrite<'source>;
 
 pub fn prepare_data_store_comment_storage_table_rewrite<'source>(
     source: &'source [u8],
-    edit: CommentStorageTableReferenceEdit,
+    edit: ControlCellSpecTableReferenceEdit,
     options: DecodeOptions,
 ) -> Result<PreparedDataStoreCommentStorageTableRewrite<'source>, DecodeError> {
     prepare_data_store_reference_rewrite(
@@ -5510,7 +5485,7 @@ pub fn prepare_data_store_comment_storage_table_rewrite<'source>(
 
 pub fn rewrite_data_store_comment_storage_table(
     source: &[u8],
-    edit: CommentStorageTableReferenceEdit,
+    edit: ControlCellSpecTableReferenceEdit,
     options: DecodeOptions,
 ) -> Result<(Vec<u8>, StorageReferenceRewriteReport), DecodeError> {
     let plan = prepare_data_store_comment_storage_table_rewrite(source, edit, options)?;
@@ -5697,32 +5672,13 @@ pub fn rewrite_table_model_control_cell_spec_table(
     plan.execute(limits)
 }
 
-pub type PreparedTableModelControlCellSpecTableReferenceRewrite<'source> =
-    PreparedTableModelControlCellSpecTableRewrite<'source>;
-
-pub fn prepare_table_model_control_cell_spec_table_reference_rewrite<'source>(
-    source: &'source [u8],
-    edit: ControlCellSpecTableReferenceEdit,
-    options: DecodeOptions,
-) -> Result<PreparedTableModelControlCellSpecTableReferenceRewrite<'source>, DecodeError> {
-    prepare_table_model_control_cell_spec_table_rewrite(source, edit, options)
-}
-
-pub fn rewrite_table_model_control_cell_spec_table_reference(
-    source: &[u8],
-    edit: ControlCellSpecTableReferenceEdit,
-    options: DecodeOptions,
-) -> Result<(Vec<u8>, StorageReferenceRewriteReport), DecodeError> {
-    rewrite_table_model_control_cell_spec_table(source, edit, options)
-}
-
 /// Prepared TableModel field-4/DataStore field-19 insertion/replacement.
 pub type PreparedTableModelCommentStorageTableRewrite<'source> =
     PreparedTableModelControlCellSpecTableRewrite<'source>;
 
 pub fn prepare_table_model_comment_storage_table_rewrite<'source>(
     source: &'source [u8],
-    edit: CommentStorageTableReferenceEdit,
+    edit: ControlCellSpecTableReferenceEdit,
     options: DecodeOptions,
 ) -> Result<PreparedTableModelCommentStorageTableRewrite<'source>, DecodeError> {
     prepare_table_model_reference_rewrite(
@@ -5735,7 +5691,7 @@ pub fn prepare_table_model_comment_storage_table_rewrite<'source>(
 
 pub fn rewrite_table_model_comment_storage_table(
     source: &[u8],
-    edit: CommentStorageTableReferenceEdit,
+    edit: ControlCellSpecTableReferenceEdit,
     options: DecodeOptions,
 ) -> Result<(Vec<u8>, StorageReferenceRewriteReport), DecodeError> {
     let plan = prepare_table_model_comment_storage_table_rewrite(source, edit, options)?;
@@ -10688,7 +10644,7 @@ mod tests {
         );
         let plan = prepare_data_store_comment_storage_table_rewrite(
             &source,
-            CommentStorageTableReferenceEdit::insert(41),
+            ControlCellSpecTableReferenceEdit::insert(41),
             rewrite_options,
         )
         .expect("comment-storage DataStore plan");
@@ -10709,7 +10665,7 @@ mod tests {
 
         let replaced = rewrite_data_store_comment_storage_table(
             &candidate,
-            CommentStorageTableReferenceEdit::replace(41, 42),
+            ControlCellSpecTableReferenceEdit::replace(41, 42),
             DecodeOptions::new(
                 candidate.len().saturating_add(64),
                 1_000_000,
@@ -10732,7 +10688,7 @@ mod tests {
         assert!(
             prepare_data_store_comment_storage_table_rewrite(
                 &candidate,
-                CommentStorageTableReferenceEdit::replace(99, 42),
+                ControlCellSpecTableReferenceEdit::replace(99, 42),
                 DecodeOptions::new(
                     candidate.len().saturating_add(64),
                     1_000_000,
@@ -10756,7 +10712,7 @@ mod tests {
         );
         let plan = prepare_table_model_comment_storage_table_rewrite(
             &model,
-            CommentStorageTableReferenceEdit::insert(51),
+            ControlCellSpecTableReferenceEdit::insert(51),
             model_rewrite_options,
         )
         .expect("comment-storage model plan");

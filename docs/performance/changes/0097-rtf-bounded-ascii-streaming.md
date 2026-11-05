@@ -2,7 +2,7 @@
 
 Date: 2026-08-14
 
-Status: Accepted for `StreamingRtfWriter`'s safe ASCII emission path.
+Status: Accepted for `streaming::Writer`'s safe ASCII emission path.
 
 ## Problem
 

@@ -14,7 +14,7 @@ use super::{
 use crate::constants::namespace;
 use crate::content_type::{ContentType, ContentTypeMap, validate_content_type};
 use crate::error::{OpcError, Result};
-use crate::limits::{ReadLimits, ReadResource};
+use crate::limits::{SourceLimitKind, SourceLimits};
 use crate::packuri::PackURI;
 use crate::xml_attributes::BytesStartExt as _;
 use litchi_core::xml::ReaderOrigin;
@@ -67,7 +67,7 @@ impl<'source> ContentTypesPlan<'source> {
         additions: Vec<ContentTypeOverride>,
         removals: &[PackURI],
         default_removals: Vec<String>,
-        limits: ReadLimits,
+        limits: SourceLimits,
     ) -> Result<Self> {
         Self::plan_with_defaults_owned(
             source,
@@ -80,7 +80,7 @@ impl<'source> ContentTypesPlan<'source> {
         )
     }
 
-    pub(crate) fn materialize_public(self, limits: ReadLimits) -> Result<Vec<u8>> {
+    pub(crate) fn materialize_public(self, limits: SourceLimits) -> Result<Vec<u8>> {
         self.materialize(limits, None, None).map(|(bytes, _)| bytes)
     }
 
@@ -95,7 +95,7 @@ impl<'source> ContentTypesPlan<'source> {
         source: &'source [u8],
         additions: &[ContentTypeOverride],
         removals: &[PackURI],
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: Option<&ExecutionContext>,
         reservation_failures: Option<&DiagnosticCounter>,
     ) -> Result<Self> {
@@ -118,7 +118,7 @@ impl<'source> ContentTypesPlan<'source> {
         source: &'source [u8],
         additions: Vec<ContentTypeOverride>,
         removals: &[PackURI],
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: Option<&ExecutionContext>,
         reservation_failures: Option<&DiagnosticCounter>,
     ) -> Result<Self> {
@@ -142,7 +142,7 @@ impl<'source> ContentTypesPlan<'source> {
         additions: &[ContentTypeOverride],
         removals: &[PackURI],
         default_removals: &[String],
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: Option<&ExecutionContext>,
         reservation_failures: Option<&DiagnosticCounter>,
     ) -> Result<Self> {
@@ -172,26 +172,26 @@ impl<'source> ContentTypesPlan<'source> {
         additions: Vec<ContentTypeOverride>,
         removals: &[PackURI],
         default_removals: Vec<String>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: Option<&ExecutionContext>,
         reservation_failures: Option<&DiagnosticCounter>,
     ) -> Result<Self> {
         limits.check(
-            ReadResource::ContentTypesBytes,
+            SourceLimitKind::ContentTypesBytes,
             source.len() as u64,
             limits.max_content_types_bytes() as u64,
         )?;
         limits.check(
-            ReadResource::ArchiveEntryBytes,
+            SourceLimitKind::EntryBytes,
             source.len() as u64,
-            limits.max_archive_entry_bytes(),
+            limits.max_entry_bytes(),
         )?;
         check_context(context)?;
 
         if additions.len() > limits.max_content_type_mappings() {
-            return Err(OpcError::ReadLimit {
-                resource: ReadResource::ContentTypeMappings,
-                actual: additions.len() as u64,
+            return Err(OpcError::Limit {
+                kind: SourceLimitKind::ContentTypeMappings,
+                observed: additions.len() as u64,
                 maximum: limits.max_content_type_mappings() as u64,
             });
         }
@@ -199,15 +199,15 @@ impl<'source> ContentTypesPlan<'source> {
             removals
                 .len()
                 .checked_add(default_removals.len())
-                .ok_or(OpcError::ReadLimit {
-                    resource: ReadResource::ContentTypeMappings,
-                    actual: u64::MAX,
+                .ok_or(OpcError::Limit {
+                    kind: SourceLimitKind::ContentTypeMappings,
+                    observed: u64::MAX,
                     maximum: limits.max_content_type_mappings() as u64,
                 })?;
         if removal_selector_count > limits.max_content_type_mappings() {
-            return Err(OpcError::ReadLimit {
-                resource: ReadResource::ContentTypeMappings,
-                actual: removal_selector_count as u64,
+            return Err(OpcError::Limit {
+                kind: SourceLimitKind::ContentTypeMappings,
+                observed: removal_selector_count as u64,
                 maximum: limits.max_content_type_mappings() as u64,
             });
         }
@@ -303,15 +303,15 @@ impl<'source> ContentTypesPlan<'source> {
 
         loop {
             check_context(context)?;
-            event_count = event_count.checked_add(1).ok_or(OpcError::ReadLimit {
-                resource: ReadResource::XmlEvents,
-                actual: u64::MAX,
-                maximum: limits.max_xml_events() as u64,
+            event_count = event_count.checked_add(1).ok_or(OpcError::Limit {
+                kind: SourceLimitKind::Events,
+                observed: u64::MAX,
+                maximum: limits.max_events() as u64,
             })?;
             limits.check(
-                ReadResource::XmlEvents,
+                SourceLimitKind::Events,
                 event_count as u64,
-                limits.max_xml_events() as u64,
+                limits.max_events() as u64,
             )?;
             let event_start = origin
                 .offset(reader.buffer_position())
@@ -538,26 +538,26 @@ impl<'source> ContentTypesPlan<'source> {
             })
             .ok_or_else(|| overlay_unavailable("content-type output length overflows"))?;
         limits.check(
-            ReadResource::ContentTypesBytes,
+            SourceLimitKind::ContentTypesBytes,
             final_len as u64,
             limits.max_content_types_bytes() as u64,
         )?;
         limits.check(
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             final_len as u64,
             limits.max_part_bytes(),
         )?;
         limits.check(
-            ReadResource::ArchiveEntryBytes,
+            SourceLimitKind::EntryBytes,
             final_len as u64,
-            limits.max_archive_entry_bytes(),
+            limits.max_entry_bytes(),
         )?;
         let mapping_count = mapping_count
             .checked_sub(removal_selector_count)
             .and_then(|value| value.checked_add(additions.len()))
             .ok_or_else(|| overlay_unavailable("content-type mapping count underflows"))?;
         limits.check(
-            ReadResource::ContentTypeMappings,
+            SourceLimitKind::ContentTypeMappings,
             mapping_count as u64,
             limits.max_content_type_mappings() as u64,
         )?;
@@ -569,9 +569,9 @@ impl<'source> ContentTypesPlan<'source> {
             })
             .ok_or_else(|| overlay_unavailable("content-type XML event count underflows"))?;
         limits.check(
-            ReadResource::XmlEvents,
+            SourceLimitKind::Events,
             event_count as u64,
-            limits.max_xml_events() as u64,
+            limits.max_events() as u64,
         )?;
 
         let insertion_offset = if additions.is_empty() || root_is_empty {
@@ -626,7 +626,7 @@ impl<'source> ContentTypesPlan<'source> {
     /// typed readback map, including decoded strings and hash tables.
     pub(super) fn materialize(
         self,
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: Option<&ExecutionContext>,
         reservation_failures: Option<&DiagnosticCounter>,
     ) -> Result<(Vec<u8>, Option<Arc<Reservation>>)> {
@@ -648,19 +648,19 @@ impl<'source> ContentTypesPlan<'source> {
 
         check_context(context)?;
         limits.check(
-            ReadResource::ContentTypesBytes,
+            SourceLimitKind::ContentTypesBytes,
             final_len as u64,
             limits.max_content_types_bytes() as u64,
         )?;
         limits.check(
-            ReadResource::ArchiveEntryBytes,
+            SourceLimitKind::EntryBytes,
             final_len as u64,
-            limits.max_archive_entry_bytes(),
+            limits.max_entry_bytes(),
         )?;
         limits.check(
-            ReadResource::XmlEvents,
+            SourceLimitKind::Events,
             event_count as u64,
-            limits.max_xml_events() as u64,
+            limits.max_events() as u64,
         )?;
         let reservation = reserve_memory(
             context,
@@ -899,30 +899,30 @@ fn is_xml_name_delimiter(byte: u8) -> bool {
     matches!(byte, b' ' | b'\t' | b'\r' | b'\n' | b'/' | b'>')
 }
 
-fn checked_mapping_count(current: usize, limits: ReadLimits) -> Result<usize> {
-    let next = current.checked_add(1).ok_or(OpcError::ReadLimit {
-        resource: ReadResource::ContentTypeMappings,
-        actual: u64::MAX,
+fn checked_mapping_count(current: usize, limits: SourceLimits) -> Result<usize> {
+    let next = current.checked_add(1).ok_or(OpcError::Limit {
+        kind: SourceLimitKind::ContentTypeMappings,
+        observed: u64::MAX,
         maximum: limits.max_content_type_mappings() as u64,
     })?;
     limits.check(
-        ReadResource::ContentTypeMappings,
+        SourceLimitKind::ContentTypeMappings,
         next as u64,
         limits.max_content_type_mappings() as u64,
     )?;
     Ok(next)
 }
 
-fn next_depth(depth: usize, limits: ReadLimits) -> Result<usize> {
-    let next = depth.checked_add(1).ok_or(OpcError::ReadLimit {
-        resource: ReadResource::XmlDepth,
-        actual: u64::MAX,
-        maximum: limits.max_xml_depth() as u64,
+fn next_depth(depth: usize, limits: SourceLimits) -> Result<usize> {
+    let next = depth.checked_add(1).ok_or(OpcError::Limit {
+        kind: SourceLimitKind::Depth,
+        observed: u64::MAX,
+        maximum: limits.max_depth() as u64,
     })?;
     limits.check(
-        ReadResource::XmlDepth,
+        SourceLimitKind::Depth,
         next as u64,
-        limits.max_xml_depth() as u64,
+        limits.max_depth() as u64,
     )?;
     Ok(next)
 }
@@ -1095,7 +1095,7 @@ mod tests {
             SOURCE,
             &additions,
             &[removal],
-            ReadLimits::default(),
+            SourceLimits::default(),
             None,
             None,
         )
@@ -1109,7 +1109,9 @@ mod tests {
                 + expected_fragment.len()
         );
         assert_eq!(plan.mapping_count(), 2);
-        let (output, _) = plan.materialize(ReadLimits::default(), None, None).unwrap();
+        let (output, _) = plan
+            .materialize(SourceLimits::default(), None, None)
+            .unwrap();
         assert!(
             output
                 .windows(b"<!-- preserve -->".len())
@@ -1126,7 +1128,7 @@ mod tests {
                 .any(|window| { window == expected_fragment })
         );
         assert_eq!(
-            ContentTypeMap::from_xml(&output, ReadLimits::default())
+            ContentTypeMap::from_xml(&output, SourceLimits::default())
                 .unwrap()
                 .mapping_count(),
             2
@@ -1140,13 +1142,13 @@ mod tests {
             "application/octet-stream".to_string(),
         )];
         let first =
-            ContentTypesPlan::plan(SOURCE, &additions, &[], ReadLimits::default(), None, None)
+            ContentTypesPlan::plan(SOURCE, &additions, &[], SourceLimits::default(), None, None)
                 .unwrap();
         let final_len = first.final_len();
-        let exact = ReadLimits::builder()
+        let exact = SourceLimits::builder()
             .max_content_types_bytes(final_len)
             .unwrap()
-            .max_archive_entry_bytes(final_len as u64)
+            .max_entry_bytes(final_len as u64)
             .unwrap()
             .build()
             .unwrap();
@@ -1155,17 +1157,17 @@ mod tests {
         let (output, _) = exact_plan.materialize(exact, None, None).unwrap();
         assert_eq!(output.len(), final_len);
 
-        let below = ReadLimits::builder()
+        let below = SourceLimits::builder()
             .max_content_types_bytes(final_len - 1)
             .unwrap()
-            .max_archive_entry_bytes((final_len - 1) as u64)
+            .max_entry_bytes((final_len - 1) as u64)
             .unwrap()
             .build()
             .unwrap();
         assert!(matches!(
             ContentTypesPlan::plan(SOURCE, &additions, &[], below, None, None),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::ContentTypesBytes,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::ContentTypesBytes,
                 ..
             })
         ));
@@ -1174,7 +1176,7 @@ mod tests {
     #[test]
     fn plan_rejects_unknown_direct_children_instead_of_counting_them() {
         let source = br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Future/></Types>"#;
-        let error = ContentTypesPlan::plan(source, &[], &[], ReadLimits::default(), None, None)
+        let error = ContentTypesPlan::plan(source, &[], &[], SourceLimits::default(), None, None)
             .unwrap_err();
         assert!(matches!(error, OpcError::InvalidContentTypesManifest(_)));
     }
@@ -1188,15 +1190,17 @@ mod tests {
             "application/octet-stream".to_string(),
         )];
         let plan =
-            ContentTypesPlan::plan(source, &additions, &[], ReadLimits::default(), None, None)
+            ContentTypesPlan::plan(source, &additions, &[], SourceLimits::default(), None, None)
                 .unwrap();
-        let (output, _) = plan.materialize(ReadLimits::default(), None, None).unwrap();
+        let (output, _) = plan
+            .materialize(SourceLimits::default(), None, None)
+            .unwrap();
         assert_eq!(
             output,
             br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Override PartName="/word/new.bin" ContentType="application/octet-stream"/></Types>"#
         );
         assert_eq!(
-            ContentTypeMap::from_xml(&output, ReadLimits::default())
+            ContentTypeMap::from_xml(&output, SourceLimits::default())
                 .unwrap()
                 .mapping_count(),
             1
@@ -1208,9 +1212,11 @@ mod tests {
         let source =
             br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>"#;
         let plan =
-            ContentTypesPlan::plan(source, &[], &[], ReadLimits::default(), None, None).unwrap();
+            ContentTypesPlan::plan(source, &[], &[], SourceLimits::default(), None, None).unwrap();
         let final_len = plan.final_len();
-        let (output, _) = plan.materialize(ReadLimits::default(), None, None).unwrap();
+        let (output, _) = plan
+            .materialize(SourceLimits::default(), None, None)
+            .unwrap();
         assert_eq!(output, source);
         assert_eq!(final_len, source.len());
     }
@@ -1223,15 +1229,17 @@ mod tests {
             "application/octet-stream".to_string(),
         )];
         let plan =
-            ContentTypesPlan::plan(source, &additions, &[], ReadLimits::default(), None, None)
+            ContentTypesPlan::plan(source, &additions, &[], SourceLimits::default(), None, None)
                 .unwrap();
-        let (output, _) = plan.materialize(ReadLimits::default(), None, None).unwrap();
+        let (output, _) = plan
+            .materialize(SourceLimits::default(), None, None)
+            .unwrap();
         assert_eq!(
             output,
             br#"<ct:Types xmlns:ct="http://schemas.openxmlformats.org/package/2006/content-types"><!-- keep --><ct:Override PartName="/word/new.bin" ContentType="application/octet-stream"/></ct:Types>"#
         );
         assert_eq!(
-            ContentTypeMap::from_xml(&output, ReadLimits::default())
+            ContentTypeMap::from_xml(&output, SourceLimits::default())
                 .unwrap()
                 .mapping_count(),
             1
@@ -1247,15 +1255,17 @@ mod tests {
             "application/octet-stream".to_string(),
         )];
         let plan =
-            ContentTypesPlan::plan(source, &additions, &[], ReadLimits::default(), None, None)
+            ContentTypesPlan::plan(source, &additions, &[], SourceLimits::default(), None, None)
                 .unwrap();
-        let (output, _) = plan.materialize(ReadLimits::default(), None, None).unwrap();
+        let (output, _) = plan
+            .materialize(SourceLimits::default(), None, None)
+            .unwrap();
         assert_eq!(
             output,
             br#"<ct:Types xmlns:ct="http://schemas.openxmlformats.org/package/2006/content-types"><ct:Override PartName="/word/new.bin" ContentType="application/octet-stream"/></ct:Types>"#
         );
         assert_eq!(
-            ContentTypeMap::from_xml(&output, ReadLimits::default())
+            ContentTypeMap::from_xml(&output, SourceLimits::default())
                 .unwrap()
                 .mapping_count(),
             1

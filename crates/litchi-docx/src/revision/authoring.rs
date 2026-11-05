@@ -38,7 +38,11 @@ use quick_xml::{
 };
 
 use crate::package::story::{StoryLimits, capture};
-use crate::{Error, Package, Result};
+use crate::{Package, Result};
+
+#[path = "authoring/edit.rs"]
+mod edit;
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 use litchi_ooxml_common::properties::time::DateTime;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::PackURI;
@@ -133,30 +137,35 @@ impl Limits {
     pub fn validate(self) -> Result<Self> {
         for (resource, value, maximum, nonzero) in [
             (
-                "source bytes",
+                LimitKind::SourceBytes,
                 self.max_source_bytes,
                 MAX_SOURCE_BYTES,
                 true,
             ),
-            ("events", self.max_events, MAX_EVENTS, true),
-            ("depth", self.max_depth, MAX_DEPTH, true),
-            ("attributes", self.max_attributes, MAX_ATTRIBUTES, true),
+            (LimitKind::Events, self.max_events, MAX_EVENTS, true),
+            (LimitKind::Depth, self.max_depth, MAX_DEPTH, true),
             (
-                "attribute bytes",
+                LimitKind::Attributes,
+                self.max_attributes,
+                MAX_ATTRIBUTES,
+                true,
+            ),
+            (
+                LimitKind::AttributeBytes,
                 self.max_attribute_bytes,
                 MAX_ATTRIBUTE_BYTES,
                 true,
             ),
-            ("changes", self.max_changes, MAX_CHANGES, false),
-            ("move ranges", self.max_ranges, MAX_RANGES, false),
+            (LimitKind::Changes, self.max_changes, MAX_CHANGES, false),
+            (LimitKind::MoveRanges, self.max_ranges, MAX_RANGES, false),
             (
-                "metadata bytes",
+                LimitKind::MetadataBytes,
                 self.max_metadata_bytes,
                 MAX_METADATA_BYTES,
                 false,
             ),
             (
-                "output bytes",
+                LimitKind::OutputBytes,
                 self.max_output_bytes,
                 MAX_OUTPUT_BYTES,
                 false,
@@ -367,23 +376,13 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-    /// Parse one standalone WordprocessingML main-document XML source.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for malformed XML, unsupported property/paragraph
-    /// revisions, incomplete move ownership, or exhausted limits.
-    pub fn from_xml(source: impl Into<Vec<u8>>) -> Result<Self> {
-        Self::from_xml_with_limits(source, Limits::default())
-    }
-
     /// Parse one standalone source under explicit bounded limits.
     ///
     /// # Errors
     ///
     /// Returns an error when the source is outside the supported owner or the
     /// supplied policy.
-    pub fn from_xml_with_limits(source: impl Into<Vec<u8>>, limits: Limits) -> Result<Self> {
+    pub fn from_xml(source: impl Into<Vec<u8>>, limits: Limits) -> Result<Self> {
         let source = Arc::new(source.into());
         Self::from_source(source, limits, None)
     }
@@ -392,7 +391,7 @@ impl Snapshot {
         let limits = limits.validate()?;
         if source.len() > limits.max_source_bytes {
             return Err(limit_error(
-                "source bytes",
+                LimitKind::SourceBytes,
                 source.len(),
                 limits.max_source_bytes,
             ));
@@ -451,8 +450,8 @@ impl Snapshot {
 
     /// Start a failure-atomic tracked-change disposition transaction.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction::new(self.clone())
+    pub(crate) fn edit(&self) -> Draft {
+        Draft::new(self.clone())
     }
 
     fn source_owner(&self) -> Arc<Vec<u8>> {
@@ -470,12 +469,16 @@ impl Snapshot {
 
 /// One failure-atomic tracked-change transaction.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub(crate) struct Draft {
     base: Snapshot,
     dispositions: Vec<Option<Disposition>>,
 }
 
-impl Transaction {
+#[allow(
+    dead_code,
+    reason = "the detached draft API is exercised by unit tests"
+)]
+impl Draft {
     fn new(base: Snapshot) -> Self {
         Self {
             dispositions: Vec::new(),
@@ -485,13 +488,13 @@ impl Transaction {
 
     /// Borrow the immutable source snapshot.
     #[must_use]
-    pub const fn source(&self) -> &Snapshot {
+    pub(crate) const fn source(&self) -> &Snapshot {
         &self.base
     }
 
     /// Whether at least one disposition is staged.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
+    pub(crate) fn is_changed(&self) -> bool {
         self.dispositions.iter().any(Option::is_some)
     }
 
@@ -500,7 +503,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an out-of-bounds error for an unknown source-order index.
-    pub fn accept(&mut self, index: usize) -> Result<&mut Self> {
+    pub(crate) fn accept(&mut self, index: usize) -> Result<&mut Self> {
         self.set(index, Disposition::Accept)
     }
 
@@ -509,7 +512,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an out-of-bounds error for an unknown source-order index.
-    pub fn reject(&mut self, index: usize) -> Result<&mut Self> {
+    pub(crate) fn reject(&mut self, index: usize) -> Result<&mut Self> {
         self.set(index, Disposition::Reject)
     }
 
@@ -518,7 +521,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an out-of-bounds error for an unknown source-order index.
-    pub fn set(&mut self, index: usize, disposition: Disposition) -> Result<&mut Self> {
+    pub(crate) fn set(&mut self, index: usize, disposition: Disposition) -> Result<&mut Self> {
         let len = self.base.changes().len();
         if index >= len {
             return Err(Error::OutOfBounds {
@@ -539,7 +542,7 @@ impl Transaction {
     ///
     /// Returns an allocation error only if the internal disposition table could
     /// not be retained; the table is pre-sized by the source snapshot.
-    pub fn accept_all(&mut self) -> Result<&mut Self> {
+    pub(crate) fn accept_all(&mut self) -> Result<&mut Self> {
         self.ensure_dispositions(self.base.changes().len())?;
         self.dispositions.fill(Some(Disposition::Accept));
         Ok(self)
@@ -551,7 +554,7 @@ impl Transaction {
     ///
     /// Returns an allocation error only if the internal disposition table could
     /// not be retained; the table is pre-sized by the source snapshot.
-    pub fn reject_all(&mut self) -> Result<&mut Self> {
+    pub(crate) fn reject_all(&mut self) -> Result<&mut Self> {
         self.ensure_dispositions(self.base.changes().len())?;
         self.dispositions.fill(Some(Disposition::Reject));
         Ok(self)
@@ -565,11 +568,11 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an XML, ownership, or resource-limit error.
-    pub fn commit(&self) -> Result<Commit> {
+    pub(crate) fn commit(&self) -> Result<DraftCommit> {
         let before = self.base.source_owner();
         let source_limits = self.base.limits();
         if !self.is_changed() {
-            return Ok(Commit::new(
+            return Ok(DraftCommit::new(
                 self.base.clone(),
                 Arc::clone(&before),
                 before,
@@ -609,7 +612,7 @@ impl Transaction {
             target_limits,
             self.base.binding().cloned(),
         )?;
-        Ok(Commit::new(
+        Ok(DraftCommit::new(
             snapshot,
             before,
             after,
@@ -634,12 +637,16 @@ impl Transaction {
 
 /// A successful tracked-change disposition commit.
 #[derive(Debug, Clone)]
-pub struct Commit {
+pub(crate) struct DraftCommit {
     snapshot: Snapshot,
-    patch: Patch,
+    patch: DraftPatch,
 }
 
-impl Commit {
+#[allow(
+    dead_code,
+    reason = "the detached draft API is exercised by unit tests"
+)]
+impl DraftCommit {
     fn new(
         snapshot: Snapshot,
         before: Arc<Vec<u8>>,
@@ -650,44 +657,44 @@ impl Commit {
         let binding = snapshot.binding().cloned();
         Self {
             snapshot,
-            patch: Patch::new(before, after, source_limits, target_limits, binding),
+            patch: DraftPatch::new(before, after, source_limits, target_limits, binding),
         }
     }
 
     /// Whether the disposition changes any source byte.
     #[must_use]
-    pub fn changed(&self) -> bool {
+    pub(crate) fn changed(&self) -> bool {
         !self.patch.is_noop()
     }
 
     /// Borrow the fully reparsed candidate.
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Borrow the reversible patch.
     #[must_use]
-    pub const fn patch(&self) -> &Patch {
+    pub(crate) const fn patch(&self) -> &DraftPatch {
         &self.patch
     }
 
     /// Move the candidate snapshot out of the commit.
     #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
+    pub(crate) fn into_snapshot(self) -> Snapshot {
         self.snapshot
     }
 
     /// Move the patch out of the commit.
     #[must_use]
-    pub fn into_patch(self) -> Patch {
+    pub(crate) fn into_patch(self) -> DraftPatch {
         self.patch
     }
 }
 
 /// An exact, reversible, source-bound XML replacement.
 #[derive(Debug, Clone)]
-pub struct Patch {
+pub(crate) struct DraftPatch {
     source_fingerprint: u64,
     target_fingerprint: u64,
     before: Arc<Vec<u8>>,
@@ -698,7 +705,11 @@ pub struct Patch {
     gate: Arc<AtomicU8>,
 }
 
-impl Patch {
+#[allow(
+    dead_code,
+    reason = "the detached draft API is exercised by unit tests"
+)]
+impl DraftPatch {
     fn new(
         before: Arc<Vec<u8>>,
         after: Arc<Vec<u8>>,
@@ -720,43 +731,43 @@ impl Patch {
 
     /// Return the compact source fingerprint.
     #[must_use]
-    pub const fn source_fingerprint(&self) -> u64 {
+    pub(crate) const fn source_fingerprint(&self) -> u64 {
         self.source_fingerprint
     }
 
     /// Return the compact target fingerprint.
     #[must_use]
-    pub const fn target_fingerprint(&self) -> u64 {
+    pub(crate) const fn target_fingerprint(&self) -> u64 {
         self.target_fingerprint
     }
 
     /// Borrow the exact source bytes required by this patch.
     #[must_use]
-    pub fn before_bytes(&self) -> &[u8] {
+    pub(crate) fn before_bytes(&self) -> &[u8] {
         self.before.as_slice()
     }
 
     /// Borrow the exact target bytes produced by this patch.
     #[must_use]
-    pub fn after_bytes(&self) -> &[u8] {
+    pub(crate) fn after_bytes(&self) -> &[u8] {
         self.after.as_slice()
     }
 
     /// Return the target parsing/publication policy.
     #[must_use]
-    pub const fn limits(&self) -> Limits {
+    pub(crate) const fn limits(&self) -> Limits {
         self.target_limits
     }
 
     /// Whether this patch preserves every source byte.
     #[must_use]
-    pub fn is_noop(&self) -> bool {
+    pub(crate) fn is_noop(&self) -> bool {
         self.before.as_slice() == self.after.as_slice()
     }
 
     /// Whether this patch or one of its clones has been successfully applied.
     #[must_use]
-    pub fn is_applied(&self) -> bool {
+    pub(crate) fn is_applied(&self) -> bool {
         self.gate.load(Ordering::Acquire) == GATE_APPLIED
     }
 
@@ -765,7 +776,7 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an exact-source, policy, binding, or target-parse error.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         let claim = self.claim_publication()?;
         if source.inner.limits != self.source_limits
             || source.binding() != self.binding.as_ref()
@@ -787,7 +798,7 @@ impl Patch {
 
     /// Build a fresh inverse patch.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self::new(
             Arc::clone(&self.after),
             Arc::clone(&self.before),
@@ -842,7 +853,7 @@ impl Package {
     /// Returns an error when the main document is stale, unsupported, malformed,
     /// or outside the requested policy.
     pub fn tracked_revisions(&self) -> Result<Snapshot> {
-        self.tracked_revisions_with_limits(Limits::default())
+        self.tracked_revisions_bounded(self.semantic_limits().tracked_revisions_value())
     }
 
     /// Read tracked revisions from the main document under explicit limits.
@@ -851,11 +862,11 @@ impl Package {
     ///
     /// Returns an error when the main document is stale, unsupported, malformed,
     /// or outside the requested policy.
-    pub fn tracked_revisions_with_limits(&self, limits: Limits) -> Result<Snapshot> {
+    pub(crate) fn tracked_revisions_bounded(&self, limits: Limits) -> Result<Snapshot> {
         let limits = limits.validate()?;
-        self.ensure_conflict_opc_current("tracked_revisions_with_limits")?;
+        self.ensure_conflict_opc_current("tracked_revisions_bounded")?;
         let story_limits = package_story_limits(limits);
-        let inventory = self.story_inventory_with_limits(story_limits)?;
+        let inventory = self.story_inventory_bounded(story_limits)?;
         let story = inventory
             .get(inventory.main())
             .ok_or_else(|| invalid("resolved main document is missing from the story inventory"))?;
@@ -873,8 +884,11 @@ impl Package {
     ///
     /// Returns an exact-source, signature-policy, stale-package, or target
     /// validation error without publishing a partial package mutation.
-    pub fn apply_tracked_revisions(&mut self, commit: &Commit) -> Result<Snapshot> {
-        self.apply_tracked_revision_patch(commit.patch())
+    pub(crate) fn publish_tracked_revision_draft(
+        &mut self,
+        commit: &DraftCommit,
+    ) -> Result<Snapshot> {
+        self.publish_tracked_revision_draft_patch(commit.patch())
     }
 
     /// Publish a reversible tracked-revision patch against the resolved main
@@ -889,9 +903,12 @@ impl Package {
     ///
     /// Returns an exact-source, signature-policy, stale-package, or target
     /// validation error without publishing a partial package mutation.
-    pub fn apply_tracked_revision_patch(&mut self, patch: &Patch) -> Result<Snapshot> {
+    pub(crate) fn publish_tracked_revision_draft_patch(
+        &mut self,
+        patch: &DraftPatch,
+    ) -> Result<Snapshot> {
         let claim = patch.claim_publication()?;
-        self.ensure_conflict_opc_current("apply_tracked_revision_patch")?;
+        self.ensure_conflict_opc_current("publish_tracked_revision_draft_patch")?;
         let binding = patch
             .binding
             .as_ref()
@@ -900,7 +917,7 @@ impl Package {
         let source_limits = patch.source_limits;
         let target_limits = patch.target_limits;
         let story_limits = package_story_limits(source_limits);
-        let inventory = self.story_inventory_with_limits(story_limits)?;
+        let inventory = self.story_inventory_bounded(story_limits)?;
         if inventory.topology().as_bytes() != binding.topology.as_ref() {
             return Err(invalid("tracked revision package owner topology is stale"));
         }
@@ -935,7 +952,7 @@ impl Package {
         let replacement = Arc::clone(&patch.after);
         let expected_topology = Arc::clone(&binding.topology);
         let published =
-            self.edit_semantic_opc("apply_tracked_revision_patch", move |candidate| {
+            self.edit_semantic_opc("publish_tracked_revision_draft_patch", move |candidate| {
                 let staged = capture(candidate, story_limits)?;
                 if staged.topology().as_bytes() != expected_topology.as_ref() {
                     return Err(invalid("tracked revision package owner topology is stale"));
@@ -1019,6 +1036,15 @@ struct OpenRange {
 }
 
 fn parse(source: &[u8], limits: Limits) -> Result<Vec<Group>> {
+    // Names are resolved on namespace values as written: a binding that
+    // spells the markup-compatibility namespace with references would hide
+    // alternatives and scope directives from this scan while readers apply
+    // them.
+    if litchi_ooxml_common::mce::binds_namespace_by_reference(source) {
+        return Err(invalid(
+            "tracked revision XML spells the markup-compatibility namespace with references",
+        ));
+    }
     let mut reader = NsReader::from_reader(source);
     let origin = ReaderOrigin::of(source);
     reader.config_mut().trim_text(false);
@@ -1054,7 +1080,7 @@ fn parse(source: &[u8], limits: Limits) -> Result<Vec<Group>> {
                 .checked_add(1)
                 .ok_or_else(|| invalid("tracked revision event counter overflow"))?;
             if events > limits.max_events {
-                return Err(limit_error("events", events, limits.max_events));
+                return Err(limit_error(LimitKind::Events, events, limits.max_events));
             }
         }
         let resolver = reader.resolver().clone();
@@ -1081,7 +1107,7 @@ fn parse(source: &[u8], limits: Limits) -> Result<Vec<Group>> {
                     .checked_add(1)
                     .ok_or_else(|| invalid("tracked revision XML depth overflow"))?;
                 if depth > limits.max_depth {
-                    return Err(limit_error("depth", depth, limits.max_depth));
+                    return Err(limit_error(LimitKind::Depth, depth, limits.max_depth));
                 }
                 validate_attributes(
                     &element,
@@ -1434,7 +1460,7 @@ fn parse(source: &[u8], limits: Limits) -> Result<Vec<Group>> {
                         }
                         if ranges.len() >= limits.max_ranges {
                             return Err(limit_error(
-                                "move ranges",
+                                LimitKind::MoveRanges,
                                 ranges.len() + 1,
                                 limits.max_ranges,
                             ));
@@ -1766,9 +1792,9 @@ fn ensure_group_slot(
     let next = groups
         .len()
         .checked_add(1)
-        .ok_or_else(|| limit_error("changes", usize::MAX, limit))?;
+        .ok_or_else(|| limit_error(LimitKind::Changes, usize::MAX, limit))?;
     if next > limit {
-        return Err(limit_error("changes", next, limit));
+        return Err(limit_error(LimitKind::Changes, next, limit));
     }
     groups
         .try_reserve(1)
@@ -2465,11 +2491,15 @@ fn validate_attributes(
             .checked_add(1)
             .ok_or_else(|| invalid("tracked revision attribute counter overflow"))?;
         if count > limits.max_attributes {
-            return Err(limit_error("attributes", count, limits.max_attributes));
+            return Err(limit_error(
+                LimitKind::Attributes,
+                count,
+                limits.max_attributes,
+            ));
         }
         if attribute.value.len() > limits.max_attribute_bytes {
             return Err(limit_error(
-                "attribute bytes",
+                LimitKind::AttributeBytes,
                 attribute.value.len(),
                 limits.max_attribute_bytes,
             ));
@@ -2650,7 +2680,7 @@ fn raw_tag_attributes(tag: &[u8], limits: Limits) -> Result<Vec<RawAttribute>> {
             .ok_or_else(|| invalid("tracked revision attribute value is unterminated"))?;
         if value.len() > limits.max_attribute_bytes {
             return Err(limit_error(
-                "attribute bytes",
+                LimitKind::AttributeBytes,
                 value.len(),
                 limits.max_attribute_bytes,
             ));
@@ -2673,7 +2703,7 @@ fn raw_tag_attributes(tag: &[u8], limits: Limits) -> Result<Vec<RawAttribute>> {
         )?;
         if output.len() > limits.max_attributes {
             return Err(limit_error(
-                "attributes",
+                LimitKind::Attributes,
                 output.len(),
                 limits.max_attributes,
             ));
@@ -2749,12 +2779,16 @@ fn collapse_xml_whitespace(value: &str) -> String {
 }
 
 fn charge_metadata(total: &mut usize, added: usize, limits: Limits) -> Result<()> {
-    *total = total
-        .checked_add(added)
-        .ok_or_else(|| limit_error("metadata bytes", usize::MAX, limits.max_metadata_bytes))?;
+    *total = total.checked_add(added).ok_or_else(|| {
+        limit_error(
+            LimitKind::MetadataBytes,
+            usize::MAX,
+            limits.max_metadata_bytes,
+        )
+    })?;
     if *total > limits.max_metadata_bytes {
         return Err(limit_error(
-            "metadata bytes",
+            LimitKind::MetadataBytes,
             *total,
             limits.max_metadata_bytes,
         ));
@@ -3054,7 +3088,7 @@ fn apply_splices(source: &[u8], splices: &mut [Splice], limit: usize) -> Result<
         .and_then(|value| value.checked_add(added))
         .ok_or_else(|| invalid("tracked revision output size overflow"))?;
     if output_len > limit {
-        return Err(limit_error("output bytes", output_len, limit));
+        return Err(limit_error(LimitKind::OutputBytes, output_len, limit));
     }
     let mut output = Vec::new();
     output
@@ -3102,9 +3136,9 @@ fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
         .ok_or_else(|| invalid("tracked revision XML offset does not fit usize"))
 }
 
-fn limit_error(resource: &'static str, actual: usize, maximum: usize) -> Error {
+fn limit_error(resource: LimitKind, actual: usize, maximum: usize) -> Error {
     Error::RevisionLimit {
-        resource,
+        kind: resource,
         actual,
         maximum,
     }
@@ -3144,7 +3178,7 @@ fn fingerprint(bytes: &[u8]) -> u64 {
 mod tests {
     use std::io::Cursor;
 
-    use super::{ChangeKind, Error, Limits, Snapshot};
+    use super::{ChangeKind, Error, LimitKind, Limits, Snapshot};
     use crate::Package;
     use crate::writer::{RevisionKind, RevisionMetadata};
 
@@ -3159,7 +3193,8 @@ mod tests {
         let source = document(
             r#"<w:p><w:r><w:t>base</w:t></w:r><w:ins w:id="1" w:author="Alice"><w:r><w:t xml:space="preserve"> add </w:t></w:r></w:ins><w:del w:id="2" w:author="Bob"><w:r><w:delText xml:space="preserve"> old </w:delText></w:r></w:del></w:p>"#,
         );
-        let snapshot = Snapshot::from_xml(source.clone()).expect("parse inline revisions");
+        let snapshot =
+            Snapshot::from_xml(source.clone(), Default::default()).expect("parse inline revisions");
         assert_eq!(snapshot.changes().len(), 2);
         assert_eq!(snapshot.changes()[0].kind(), ChangeKind::Insert);
         assert_eq!(snapshot.changes()[1].kind(), ChangeKind::Delete);
@@ -3221,7 +3256,8 @@ mod tests {
         let source = document(
             r#"<w:p><w:ins w:id="1" w:author="Alice" xmlns:x="urn:opaque" xmlns:c="http://schemas.openxmlformats.org/markup-compatibility/2006" c:Ignorable="x" xml:space="preserve" xml:lang="en"><w:r x:vendor="a>b"><x:opaque>  <x:child/>  payload<![CDATA[ & ]]></x:opaque><w:t> x </w:t></w:r></w:ins></w:p>"#,
         );
-        let snapshot = Snapshot::from_xml(source.clone()).expect("parse scoped payload");
+        let snapshot =
+            Snapshot::from_xml(source.clone(), Default::default()).expect("parse scoped payload");
         let mut transaction = snapshot.edit();
         transaction.accept(0).expect("accept insertion");
         let commit = transaction.commit().expect("commit scoped payload");
@@ -3251,7 +3287,7 @@ mod tests {
         let source = document(
             r#"<w:p><w:del w:id="1" w:author="Alice"><w:r><w:delText>old</w:delText></w:r></w:del></w:p>"#,
         );
-        let snapshot = Snapshot::from_xml(source).expect("parse deleted text");
+        let snapshot = Snapshot::from_xml(source, Default::default()).expect("parse deleted text");
         let mut transaction = snapshot.edit();
         transaction.reject(0).expect("reject deletion");
         let commit = transaction.commit().expect("commit deletion rejection");
@@ -3264,7 +3300,7 @@ mod tests {
                 .windows(b"w:w:t".len())
                 .any(|window| { window == b"w:w:t" })
         );
-        Snapshot::from_xml(expected).expect("reopen exact accepted XML");
+        Snapshot::from_xml(expected, Default::default()).expect("reopen exact accepted XML");
     }
 
     #[test]
@@ -3272,13 +3308,14 @@ mod tests {
         let source = document(
             r#"<w:p><w:ins w:id="1" w:author="Alice" xmlns:x="urn:opaque" xml:space="preserve"/></w:p>"#,
         );
-        let snapshot = Snapshot::from_xml(source).expect("parse empty scoped insertion");
+        let snapshot =
+            Snapshot::from_xml(source, Default::default()).expect("parse empty scoped insertion");
         let mut transaction = snapshot.edit();
         transaction.accept(0).expect("accept empty insertion");
         let commit = transaction.commit().expect("remove empty insertion");
         let expected = document(r#"<w:p></w:p>"#);
         assert_eq!(commit.snapshot().source(), expected.as_slice());
-        Snapshot::from_xml(expected).expect("reopen empty-wrapper result");
+        Snapshot::from_xml(expected, Default::default()).expect("reopen empty-wrapper result");
     }
 
     #[test]
@@ -3292,7 +3329,7 @@ mod tests {
                 r#"<w:p><w:ins w:id="1" w:author="Alice">{child}</w:ins></w:p>"#
             ));
             assert!(
-                Snapshot::from_xml(source).is_err(),
+                Snapshot::from_xml(source, Default::default()).is_err(),
                 "direct wrapper child unexpectedly accepted: {child}"
             );
         }
@@ -3300,49 +3337,49 @@ mod tests {
         let nested_wrapper = document(
             r#"<w:p><w:r><w:ins w:id="1" w:author="Alice"><w:r><w:t>x</w:t></w:r></w:ins></w:r></w:p>"#,
         );
-        assert!(Snapshot::from_xml(nested_wrapper).is_err());
+        assert!(Snapshot::from_xml(nested_wrapper, Default::default()).is_err());
 
         let range_in_run = document(
             r#"<w:p><w:r><w:moveFromRangeStart w:id="1" w:author="Alice" w:date="2026-01-01T00:00:00Z" w:name="m"/></w:r></w:p>"#,
         );
-        assert!(Snapshot::from_xml(range_in_run).is_err());
+        assert!(Snapshot::from_xml(range_in_run, Default::default()).is_err());
     }
 
     #[test]
     fn unqualified_and_nested_word_run_content_are_refused() {
         let unqualified_direct =
             document(r#"<w:p><w:ins w:id="1" w:author="Alice"><t>unqualified</t></w:ins></w:p>"#);
-        assert!(Snapshot::from_xml(unqualified_direct).is_err());
+        assert!(Snapshot::from_xml(unqualified_direct, Default::default()).is_err());
 
         let unknown_nested_word = document(
             r#"<w:p><w:ins w:id="1" w:author="Alice"><w:r><w:unknownWord/></w:r></w:ins></w:p>"#,
         );
-        assert!(Snapshot::from_xml(unknown_nested_word).is_err());
+        assert!(Snapshot::from_xml(unknown_nested_word, Default::default()).is_err());
 
         let unknown_run_properties = document(
             r#"<w:p><w:ins w:id="1" w:author="Alice"><w:r><w:rPr><w:unknownWord/></w:rPr><w:t>x</w:t></w:r></w:ins></w:p>"#,
         );
-        assert!(Snapshot::from_xml(unknown_run_properties).is_err());
+        assert!(Snapshot::from_xml(unknown_run_properties, Default::default()).is_err());
 
         let valid_run_properties = document(
             r#"<w:p><w:ins w:id="1" w:author="Alice"><w:r><w:rPr><w:b w:val="1"/></w:rPr><w:t>x</w:t></w:r></w:ins></w:p>"#,
         );
-        assert!(Snapshot::from_xml(valid_run_properties).is_ok());
+        assert!(Snapshot::from_xml(valid_run_properties, Default::default()).is_ok());
 
         let unqualified_nested = document(
             r#"<w:p><w:ins w:id="1" w:author="Alice"><w:r><t>unqualified</t></w:r></w:ins></w:p>"#,
         );
-        assert!(Snapshot::from_xml(unqualified_nested).is_err());
+        assert!(Snapshot::from_xml(unqualified_nested, Default::default()).is_err());
 
         let unknown_in_move_range = document(
             r#"<w:p><w:moveFromRangeStart w:id="1" w:author="Alice" w:date="2026-01-01T00:00:00Z" w:name="m"/><w:r><w:unknownWord/></w:r><w:moveFromRangeEnd w:id="1"/><w:moveToRangeStart w:id="2" w:author="Alice" w:date="2026-01-01T00:00:00Z" w:name="m"/><w:r><w:t>x</w:t></w:r><w:moveToRangeEnd w:id="2"/></w:p>"#,
         );
-        assert!(Snapshot::from_xml(unknown_in_move_range).is_err());
+        assert!(Snapshot::from_xml(unknown_in_move_range, Default::default()).is_err());
 
         let foreign_payload = document(
             r#"<w:p><w:ins w:id="1" w:author="Alice"><w:r><x:opaque xmlns:x="urn:opaque"/></w:r></w:ins></w:p>"#,
         );
-        assert!(Snapshot::from_xml(foreign_payload).is_ok());
+        assert!(Snapshot::from_xml(foreign_payload, Default::default()).is_ok());
     }
 
     #[test]
@@ -3350,17 +3387,17 @@ mod tests {
         let alternate_inside_wrapper = document(
             r#"<w:p><w:ins w:id="1" w:author="Alice"><mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><mc:Fallback><w:r><w:t>x</w:t></w:r></mc:Fallback></mc:AlternateContent></w:ins></w:p>"#,
         );
-        assert!(Snapshot::from_xml(alternate_inside_wrapper).is_err());
+        assert!(Snapshot::from_xml(alternate_inside_wrapper, Default::default()).is_err());
 
         let alternate_inside_run = document(
             r#"<w:p><w:ins w:id="1" w:author="Alice"><w:r><mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><mc:Fallback><w:t>x</w:t></mc:Fallback></mc:AlternateContent></w:r></w:ins></w:p>"#,
         );
-        assert!(Snapshot::from_xml(alternate_inside_run).is_err());
+        assert!(Snapshot::from_xml(alternate_inside_run, Default::default()).is_err());
 
         let revision_inside_alternate = document(
             r#"<w:p><mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><mc:Choice Requires="w"><w:ins w:id="1" w:author="Alice"><w:r><w:t>x</w:t></w:r></w:ins></mc:Choice><mc:Fallback><w:r><w:t>fallback</w:t></w:r></mc:Fallback></mc:AlternateContent></w:p>"#,
         );
-        assert!(Snapshot::from_xml(revision_inside_alternate).is_err());
+        assert!(Snapshot::from_xml(revision_inside_alternate, Default::default()).is_err());
     }
 
     #[test]
@@ -3375,7 +3412,7 @@ mod tests {
                 r#"<w:p><w:ins w:id="1" w:author="Alice">{content}</w:ins></w:p>"#
             ));
             assert!(
-                Snapshot::from_xml(source).is_err(),
+                Snapshot::from_xml(source, Default::default()).is_err(),
                 "invalid character data unexpectedly accepted: {content}"
             );
         }
@@ -3383,13 +3420,15 @@ mod tests {
         let source = document(
             "<w:p><w:ins w:id=\"1\" w:author=\"Alice\"><w:r> \n <w:rPr>\t </w:rPr> \n <w:t>x</w:t>\n</w:r></w:ins></w:p>",
         );
-        let snapshot = Snapshot::from_xml(source.clone()).expect("parse whitespace-only run");
+        let snapshot = Snapshot::from_xml(source.clone(), Default::default())
+            .expect("parse whitespace-only run");
         let mut transaction = snapshot.edit();
         transaction.accept(0).expect("accept insertion");
         let commit = transaction.commit().expect("remove insertion");
         let expected = document("<w:p><w:r> \n <w:rPr>\t </w:rPr> \n <w:t>x</w:t>\n</w:r></w:p>");
         assert_eq!(commit.snapshot().source(), expected.as_slice());
-        Snapshot::from_xml(expected).expect("reopen whitespace-preserving output");
+        Snapshot::from_xml(expected, Default::default())
+            .expect("reopen whitespace-preserving output");
     }
 
     #[test]
@@ -3397,22 +3436,22 @@ mod tests {
         let duplicate_rpr = document(
             r#"<w:p><w:ins w:id="1" w:author="Alice"><w:r><w:rPr/><w:rPr/><w:t>x</w:t></w:r></w:ins></w:p>"#,
         );
-        assert!(Snapshot::from_xml(duplicate_rpr).is_err());
+        assert!(Snapshot::from_xml(duplicate_rpr, Default::default()).is_err());
 
         let late_rpr = document(
             r#"<w:p><w:ins w:id="1" w:author="Alice"><w:r><w:t>x</w:t><w:rPr/></w:r></w:ins></w:p>"#,
         );
-        assert!(Snapshot::from_xml(late_rpr).is_err());
+        assert!(Snapshot::from_xml(late_rpr, Default::default()).is_err());
 
         let duplicate_base_property = document(
             r#"<w:p><w:ins w:id="1" w:author="Alice"><w:r><w:rPr><w:b/><w:b/></w:rPr><w:t>x</w:t></w:r></w:ins></w:p>"#,
         );
-        assert!(Snapshot::from_xml(duplicate_base_property).is_err());
+        assert!(Snapshot::from_xml(duplicate_base_property, Default::default()).is_err());
 
         let unordered_base_properties = document(
             r#"<w:p><w:ins w:id="1" w:author="Alice"><w:r><w:rPr><w:i/><w:b/></w:rPr><w:t>x</w:t></w:r></w:ins></w:p>"#,
         );
-        assert!(Snapshot::from_xml(unordered_base_properties).is_ok());
+        assert!(Snapshot::from_xml(unordered_base_properties, Default::default()).is_ok());
     }
 
     #[test]
@@ -3420,12 +3459,12 @@ mod tests {
         let content_part = document(
             r#"<w:p><w:ins w:id="1" w:author="Alice"><w:r><w:contentPart xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:id="rId1"/></w:r></w:ins></w:p>"#,
         );
-        assert!(Snapshot::from_xml(content_part).is_err());
+        assert!(Snapshot::from_xml(content_part, Default::default()).is_err());
 
         let custom_xml_closure = document(
             r#"<w:p><w:customXmlInsRangeStart w:id="9" w:author="Alice" w:date="2026-01-01T00:00:00Z"/><w:ins w:id="1" w:author="Alice"><w:r><w:t>x</w:t></w:r></w:ins><w:customXmlInsRangeEnd w:id="9"/></w:p>"#,
         );
-        assert!(Snapshot::from_xml(custom_xml_closure).is_err());
+        assert!(Snapshot::from_xml(custom_xml_closure, Default::default()).is_err());
     }
 
     #[test]
@@ -3433,7 +3472,8 @@ mod tests {
         let source = document(
             r#"<w:p><w:moveFromRangeStart w:id="2" w:author="Alice" w:date="2026-01-01T00:00:00Z" w:name="move1"/><w:moveFrom w:id="3" w:author="Alice"><w:r><w:delText>old</w:delText></w:r></w:moveFrom><w:moveFromRangeEnd w:id="2"/><w:moveToRangeStart w:id="0" w:author="Alice" w:date="2026-01-01T00:00:00Z" w:name="move1"/><w:moveTo w:id="1" w:author="Alice"><w:r><w:t>new</w:t></w:r></w:moveTo><w:moveToRangeEnd w:id="0"/></w:p>"#,
         );
-        let snapshot = Snapshot::from_xml(source.clone()).expect("parse tracked move");
+        let snapshot =
+            Snapshot::from_xml(source.clone(), Default::default()).expect("parse tracked move");
         assert_eq!(snapshot.changes().len(), 1);
         assert_eq!(snapshot.changes()[0].kind(), ChangeKind::Move);
 
@@ -3470,7 +3510,8 @@ mod tests {
         let source = document(
             r#"<w:p><w:moveToRangeStart w:id="0" w:author="Alice" w:date="2026-01-01T00:00:00Z" w:name="move1"/><w:r><w:t>to-ordinary</w:t></w:r><w:moveTo w:id="1" w:author="Alice"><w:r><w:t>new</w:t></w:r></w:moveTo><w:moveToRangeEnd w:id="0"/><w:moveFromRangeStart w:id="2" w:author="Alice" w:date="2026-01-01T00:00:00Z" w:name="move1"/><w:r><w:t>from-ordinary</w:t></w:r><w:moveFrom w:id="3" w:author="Alice"><w:r><w:delText>old</w:delText></w:r></w:moveFrom><w:moveFromRangeEnd w:id="2"/></w:p>"#,
         );
-        let snapshot = Snapshot::from_xml(source.clone()).expect("parse named move");
+        let snapshot =
+            Snapshot::from_xml(source.clone(), Default::default()).expect("parse named move");
         assert_eq!(snapshot.changes().len(), 1);
         assert_eq!(snapshot.changes()[0].id(), "0");
         assert_eq!(snapshot.changes()[0].name(), Some("move1"));
@@ -3487,7 +3528,8 @@ mod tests {
             r#"<w:p><w:r><w:t>to-ordinary</w:t></w:r><w:r><w:t>new</w:t></w:r><w:r><w:t>from-ordinary</w:t></w:r></w:p>"#,
         );
         assert_eq!(accepted.snapshot().source(), accepted_expected.as_slice());
-        Snapshot::from_xml(accepted_expected).expect("reopen exact accepted move XML");
+        Snapshot::from_xml(accepted_expected, Default::default())
+            .expect("reopen exact accepted move XML");
         assert_eq!(
             accepted
                 .patch()
@@ -3510,7 +3552,8 @@ mod tests {
             r#"<w:p><w:r><w:t>to-ordinary</w:t></w:r><w:r><w:t>from-ordinary</w:t></w:r><w:r><w:t>old</w:t></w:r></w:p>"#,
         );
         assert_eq!(rejected.snapshot().source(), rejected_expected.as_slice());
-        Snapshot::from_xml(rejected_expected).expect("reopen exact rejected move XML");
+        Snapshot::from_xml(rejected_expected, Default::default())
+            .expect("reopen exact rejected move XML");
         assert_eq!(
             rejected
                 .patch()
@@ -3527,7 +3570,7 @@ mod tests {
         let source = document(
             r#"<w:p><w:moveFrom w:id="4" w:author="Alice"><w:r><w:delText>old</w:delText></w:r></w:moveFrom><w:moveTo w:id="4" w:author="Alice"><w:r><w:t>new</w:t></w:r></w:moveTo></w:p>"#,
         );
-        assert!(Snapshot::from_xml(source).is_err());
+        assert!(Snapshot::from_xml(source, Default::default()).is_err());
     }
 
     #[test]
@@ -3535,7 +3578,7 @@ mod tests {
         let source = document(
             r#"<w:p><w:moveFromRangeStart w:id="1" w:author="A" w:date="2026-01-01T00:00:00Z" w:name="m"/><w:moveFrom w:id="2" w:author="A"><w:r><w:delText>x</w:delText></w:r></w:moveFrom><w:moveFromRangeEnd w:id="1"/><w:moveToRangeStart w:id="1" w:author="A" w:date="2026-01-01T00:00:00Z" w:name="m"/><w:moveTo w:id="3" w:author="A"><w:r><w:t>x</w:t></w:r></w:moveTo><w:moveToRangeEnd w:id="1"/></w:p>"#,
         );
-        assert!(Snapshot::from_xml(source).is_err());
+        assert!(Snapshot::from_xml(source, Default::default()).is_err());
     }
 
     #[test]
@@ -3543,22 +3586,22 @@ mod tests {
         let invalid_name = document(
             r#"<w:p><w:ins w:id="1" w:author="A" w:name="not-a-move"><w:r><w:t>x</w:t></w:r></w:ins></w:p>"#,
         );
-        assert!(Snapshot::from_xml(invalid_name).is_err());
+        assert!(Snapshot::from_xml(invalid_name, Default::default()).is_err());
 
         let unknown_word_attribute = document(
             r#"<w:p><w:ins w:id="1" w:author="A" w:unsupported="x"><w:r><w:t>x</w:t></w:r></w:ins></w:p>"#,
         );
-        assert!(Snapshot::from_xml(unknown_word_attribute).is_err());
+        assert!(Snapshot::from_xml(unknown_word_attribute, Default::default()).is_err());
 
         let invalid_displacement = document(
             r#"<w:p><w:moveFromRangeStart w:id="1" w:author="A" w:date="2026-01-01T00:00:00Z" w:name="m" w:displacedByCustomXml="middle"/><w:moveFrom w:id="2" w:author="A"><w:r><w:delText>x</w:delText></w:r></w:moveFrom><w:moveFromRangeEnd w:id="1"/><w:moveToRangeStart w:id="2" w:author="A" w:date="2026-01-01T00:00:00Z" w:name="m"/><w:moveTo w:id="3" w:author="A"><w:r><w:t>x</w:t></w:r></w:moveTo><w:moveToRangeEnd w:id="2"/></w:p>"#,
         );
-        assert!(Snapshot::from_xml(invalid_displacement).is_err());
+        assert!(Snapshot::from_xml(invalid_displacement, Default::default()).is_err());
 
         let valid_displacement = document(
             r#"<w:p><w:moveFromRangeStart w:id="1" w:author="A" w:date="2026-01-01T00:00:00Z" w:name="m" w:displacedByCustomXml="next"/><w:moveFrom w:id="2" w:author="A"><w:r><w:delText>x</w:delText></w:r></w:moveFrom><w:moveFromRangeEnd w:id="1" w:displacedByCustomXml="prev"/><w:moveToRangeStart w:id="3" w:author="A" w:date="2026-01-01T00:00:00Z" w:name="m" w:displacedByCustomXml="next"/><w:moveTo w:id="4" w:author="A"><w:r><w:t>x</w:t></w:r></w:moveTo><w:moveToRangeEnd w:id="3" w:displacedByCustomXml="prev"/></w:p>"#,
         );
-        assert!(Snapshot::from_xml(valid_displacement).is_ok());
+        assert!(Snapshot::from_xml(valid_displacement, Default::default()).is_ok());
     }
 
     #[test]
@@ -3566,17 +3609,17 @@ mod tests {
         let simple_field = document(
             r#"<w:p><w:fldSimple w:instr="PAGE"><w:ins w:id="1" w:author="A"><w:r><w:t>x</w:t></w:r></w:ins></w:fldSimple></w:p>"#,
         );
-        assert!(Snapshot::from_xml(simple_field).is_err());
+        assert!(Snapshot::from_xml(simple_field, Default::default()).is_err());
 
         let control = document(
             r#"<w:p><w:sdt><w:sdtContent><w:ins w:id="1" w:author="A"><w:r><w:t>x</w:t></w:r></w:ins></w:sdtContent></w:sdt></w:p>"#,
         );
-        assert!(Snapshot::from_xml(control).is_err());
+        assert!(Snapshot::from_xml(control, Default::default()).is_err());
 
         let range_in_control = document(
             r#"<w:p><w:sdt><w:sdtContent><w:moveFromRangeStart w:id="1" w:author="A" w:date="2026-01-01T00:00:00Z" w:name="m"/></w:sdtContent></w:sdt></w:p>"#,
         );
-        assert!(Snapshot::from_xml(range_in_control).is_err());
+        assert!(Snapshot::from_xml(range_in_control, Default::default()).is_err());
     }
 
     #[test]
@@ -3584,35 +3627,36 @@ mod tests {
         let nested = document(
             r#"<w:p><w:ins w:id="1" w:author="A"><w:ins w:id="2" w:author="B"><w:r><w:t>x</w:t></w:r></w:ins></w:ins></w:p>"#,
         );
-        assert!(Snapshot::from_xml(nested).is_err());
+        assert!(Snapshot::from_xml(nested, Default::default()).is_err());
 
         let foreign_parent = document(
             r#"<x:p xmlns:x="urn:foreign"><w:ins w:id="1" w:author="A"><w:r><w:t>x</w:t></w:r></w:ins></x:p>"#,
         );
-        assert!(Snapshot::from_xml(foreign_parent).is_err());
+        assert!(Snapshot::from_xml(foreign_parent, Default::default()).is_err());
 
         let incomplete_move = document(
             r#"<w:p><w:moveFrom w:id="1" w:author="A"><w:r><w:delText>x</w:delText></w:r></w:moveFrom></w:p>"#,
         );
-        assert!(Snapshot::from_xml(incomplete_move).is_err());
+        assert!(Snapshot::from_xml(incomplete_move, Default::default()).is_err());
 
         let missing_move_name = document(
             r#"<w:p><w:moveFromRangeStart w:id="1" w:author="A" w:date="2026-01-01T00:00:00Z"/><w:moveFromRangeEnd w:id="1"/><w:moveToRangeStart w:id="2" w:author="A" w:date="2026-01-01T00:00:00Z" w:name="m"/><w:moveToRangeEnd w:id="2"/></w:p>"#,
         );
-        assert!(Snapshot::from_xml(missing_move_name).is_err());
+        assert!(Snapshot::from_xml(missing_move_name, Default::default()).is_err());
 
         let property =
             document(r#"<w:p><w:pPrChange w:id="1" w:author="A"><w:pPr/></w:pPrChange></w:p>"#);
-        assert!(Snapshot::from_xml(property).is_err());
+        assert!(Snapshot::from_xml(property, Default::default()).is_err());
 
         let field = document(
             r#"<w:p><w:ins w:id="1" w:author="A"><w:r><w:fldChar w:fldCharType="begin"/></w:r></w:ins></w:p>"#,
         );
-        assert!(Snapshot::from_xml(field).is_err());
+        assert!(Snapshot::from_xml(field, Default::default()).is_err());
 
-        let source = Snapshot::from_xml(document(
-            r#"<w:p><w:ins w:id="1" w:author="A"><w:r><w:t>x</w:t></w:r></w:ins></w:p>"#,
-        ))
+        let source = Snapshot::from_xml(
+            document(r#"<w:p><w:ins w:id="1" w:author="A"><w:r><w:t>x</w:t></w:r></w:ins></w:p>"#),
+            Default::default(),
+        )
         .unwrap();
         let mut transaction = source.edit();
         assert!(transaction.accept(1).is_err());
@@ -3623,7 +3667,7 @@ mod tests {
     fn no_op_and_limits_are_bounded_and_retryable() {
         let source_bytes =
             document(r#"<w:p><w:ins w:id="1" w:author="A"><w:r><w:t>x</w:t></w:r></w:ins></w:p>"#);
-        let source = Snapshot::from_xml(source_bytes.clone()).unwrap();
+        let source = Snapshot::from_xml(source_bytes.clone(), Default::default()).unwrap();
         let commit = source.edit().commit().expect("empty commit");
         assert!(!commit.changed());
         assert!(commit.patch().is_noop());
@@ -3636,11 +3680,11 @@ mod tests {
             max_events: 1,
             ..Limits::default()
         };
-        let error = Snapshot::from_xml_with_limits(source_bytes, limits).unwrap_err();
+        let error = Snapshot::from_xml(source_bytes, limits).unwrap_err();
         assert!(matches!(
             error,
             Error::RevisionLimit {
-                resource: "events",
+                kind: LimitKind::Events,
                 ..
             }
         ));
@@ -3649,7 +3693,7 @@ mod tests {
             max_changes: 0,
             ..Limits::default()
         };
-        let error = Snapshot::from_xml_with_limits(
+        let error = Snapshot::from_xml(
             document(r#"<w:p><w:ins w:id="1" w:author="A"><w:r/></w:ins></w:p>"#),
             change_limits,
         )
@@ -3657,7 +3701,7 @@ mod tests {
         assert!(matches!(
             error,
             Error::RevisionLimit {
-                resource: "changes",
+                kind: LimitKind::Changes,
                 ..
             }
         ));
@@ -3666,7 +3710,7 @@ mod tests {
             max_metadata_bytes: 2,
             ..Limits::default()
         };
-        let error = Snapshot::from_xml_with_limits(
+        let error = Snapshot::from_xml(
             document(r#"<w:p><w:ins w:id="1" w:author="Alice"><w:r/></w:ins></w:p>"#),
             metadata_limits,
         )
@@ -3674,7 +3718,7 @@ mod tests {
         assert!(matches!(
             error,
             Error::RevisionLimit {
-                resource: "metadata bytes",
+                kind: LimitKind::MetadataBytes,
                 ..
             }
         ));
@@ -3682,15 +3726,16 @@ mod tests {
 
     #[test]
     fn package_owner_binds_story_topology_and_publishes_inverse() {
-        let mut package = Package::new().expect("new package");
+        let mut builder = crate::Builder::new().expect("new package");
         let metadata = RevisionMetadata::new("1", "Alice").expect("revision metadata");
-        package
-            .document_mut()
+        builder
+            .document()
             .expect("document writer")
             .add_paragraph()
             .add_revision(RevisionKind::Insert, metadata)
             .add_run_with_text("new");
         let mut bytes = Cursor::new(Vec::new());
+        let package = builder.build().expect("new package");
         package
             .to_plain_stream(&mut bytes)
             .expect("materialize package");
@@ -3701,7 +3746,7 @@ mod tests {
         transaction.accept(0).expect("accept package revision");
         let commit = transaction.commit().expect("commit package revision");
         let published = package
-            .apply_tracked_revisions(&commit)
+            .publish_tracked_revision_draft(&commit)
             .expect("publish package revision");
         assert!(
             !std::str::from_utf8(published.source())
@@ -3711,7 +3756,7 @@ mod tests {
 
         let inverse = commit.patch().inverse();
         let restored = package
-            .apply_tracked_revision_patch(&inverse)
+            .publish_tracked_revision_draft_patch(&inverse)
             .expect("publish package inverse");
         assert_eq!(restored.source(), snapshot.source());
     }

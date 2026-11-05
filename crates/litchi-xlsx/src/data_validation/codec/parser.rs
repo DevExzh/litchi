@@ -71,7 +71,11 @@ pub fn parse_data_validation_collections(xml: &[u8]) -> Result<Vec<Collection>> 
 
 /// In-flight capture state for a single `dataValidation` element.
 fn parse_collection(fragment: &Captured) -> Result<Collection> {
-    let wrapped = wrap(&fragment.prefix, &fragment.bytes)?;
+    let wrapped = wrap(
+        &fragment.prefix,
+        &fragment.bytes,
+        fragment.source == Source::Core,
+    )?;
     let mut reader = NsReader::from_reader(wrapped.as_slice());
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
@@ -148,7 +152,7 @@ fn parse_collection(fragment: &Captured) -> Result<Collection> {
                     return Err(invalid("too many data validations"));
                 }
                 let raw = writer.into_inner();
-                let value = parse_rule(&raw, fragment.source)?;
+                let value = parse_rule(&raw, fragment.source, &fragment.prefix)?;
                 reserve_vec(&mut validations, 1, "data-validation rules")?;
                 validations.push(value);
             }
@@ -210,7 +214,7 @@ fn parse_collection(fragment: &Captured) -> Result<Collection> {
                     return Err(invalid("dataValidation rule is too large"));
                 }
                 let raw = writer.into_inner();
-                let value = parse_rule(&raw, fragment.source)?;
+                let value = parse_rule(&raw, fragment.source, &fragment.prefix)?;
                 reserve_vec(&mut validations, 1, "data-validation rules")?;
                 validations.push(value);
             },
@@ -301,11 +305,17 @@ fn text_target_matches(
     }
 }
 
-fn parse_rule(raw: &[u8], source: Source) -> Result<Validation> {
+fn parse_rule(raw: &[u8], source: Source, prefix: &[u8]) -> Result<Validation> {
     if raw.len() > MAX_FRAGMENT_BYTES {
         return Err(invalid("dataValidation rule is too large"));
     }
-    let wrapped = wrap(if source == Source::Core { b"" } else { b"x14" }, raw)?;
+    // A core rule keeps its collection's prefix (`x:dataValidation` under a
+    // prefixed worksheet root), so it is bound here too.
+    let wrapped = if source == Source::Core {
+        wrap(prefix, raw, true)?
+    } else {
+        wrap(b"x14", raw, false)?
+    };
     let mut reader = NsReader::from_reader(wrapped.as_slice());
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;

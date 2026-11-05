@@ -23,6 +23,6 @@ pub(super) fn owner_formula_resolution<T>(result: Result<T>) -> crate::formula::
             crate::formula::Error::UnresolvedDependency(dependency)
         },
         Error::Encoding(message) => crate::formula::Error::Encoding(message),
-        error => crate::formula::Error::InvalidFormula(error.to_string()),
+        _error => crate::formula::Error::InvalidFormula("the formula is not valid"),
     })
 }

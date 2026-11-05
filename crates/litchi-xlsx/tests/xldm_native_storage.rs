@@ -59,7 +59,7 @@ fn native_tabular_xpress_members_decode_with_explicit_framing_and_limits() {
         (51516, 35, 64),
         (51555, 34, 64),
     ];
-    let raw = OpcPackage::from_bytes(SOURCE).unwrap();
+    let raw = OpcPackage::from_bytes(SOURCE, litchi_opc::SourceLimits::default()).unwrap();
     let part = raw
         .get_part(&PackURI::new("/xl/model/item.data").unwrap())
         .unwrap();
@@ -95,22 +95,25 @@ fn native_tabular_xpress_members_decode_with_explicit_framing_and_limits() {
 #[test]
 fn native_outer_storage_is_borrowed_exact_and_checks_member_crcs() {
     use litchi_xlsx::package::xldm::{StorageProfile, inspect, write};
-    let package = OpcPackage::from_bytes(SOURCE).unwrap();
+    let package = OpcPackage::from_bytes(SOURCE, litchi_opc::SourceLimits::default()).unwrap();
     let part = package
         .get_part(&PackURI::new("/xl/model/item.data").unwrap())
         .unwrap();
     let bytes = part.blob();
-    let storage = inspect(bytes).unwrap();
+    let storage = inspect(bytes, &litchi_xlsx::package::xldm::Limits::DEFAULT).unwrap();
     assert_eq!(storage.profile(), StorageProfile::Tabular150);
     assert_eq!(storage.files.len(), 48);
     assert!(std::ptr::eq(storage.bytes().as_ptr(), bytes.as_ptr()));
-    assert_eq!(write(&storage).unwrap(), bytes);
+    assert_eq!(
+        write(&storage, &litchi_xlsx::package::xldm::Limits::DEFAULT).unwrap(),
+        bytes
+    );
     for entry in &storage.files {
         let mut corrupt = bytes.to_vec();
         let crc_byte = usize::try_from(entry.offset.0 + entry.stored_size.0 - 1).unwrap();
         corrupt[crc_byte] ^= 1;
         assert!(
-            inspect(&corrupt).is_err(),
+            inspect(&corrupt, &litchi_xlsx::package::xldm::Limits::DEFAULT,).is_err(),
             "accepted corrupt CRC for {}",
             entry.path
         );

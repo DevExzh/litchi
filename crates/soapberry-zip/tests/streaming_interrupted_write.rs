@@ -39,7 +39,10 @@ fn interrupted_owned_payload_writes_resume_without_poisoning_or_double_counting(
         })
         .collect();
     for method in [CompressionMethod::Store, CompressionMethod::Deflate] {
-        let writer = StreamingArchiveWriter::with_writer(ShortInterruptedSink::default());
+        let writer = StreamingArchiveWriter::with_writer(
+            ShortInterruptedSink::default(),
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         let mut entry = writer.start_entry("payload", method).unwrap();
         let mut accepted = 0;
         let mut interruptions = 0;
@@ -60,7 +63,9 @@ fn interrupted_owned_payload_writes_resume_without_poisoning_or_double_counting(
         assert!(interruptions > 0);
         assert_eq!(entry.uncompressed_bytes(), payload.len() as u64);
         let sink = entry.finish().unwrap().finish().unwrap();
-        let archive = ArchiveReader::new(&sink.bytes).unwrap();
+        let archive =
+            ArchiveReader::new(&sink.bytes, soapberry_zip::office::ArchiveLimits::default())
+                .unwrap();
         assert_eq!(archive.read("payload").unwrap(), payload);
     }
 }

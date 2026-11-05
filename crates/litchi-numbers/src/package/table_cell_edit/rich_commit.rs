@@ -127,16 +127,15 @@ pub(super) fn prepare_unique_rich_text_to_text<'source, 'replacement>(
     if target.path() != path {
         return Err(Error::InvalidSource { path });
     }
-    let key_bytes =
-        changes
-            .len()
-            .checked_mul(size_of::<Option<u32>>())
-            .ok_or(Error::LimitExceeded {
-                kind: LimitKind::RetainedBytes,
-                observed: u64::MAX,
-                maximum: budget.limits().max_retained_bytes,
-                path,
-            })?;
+    let key_bytes = changes
+        .len()
+        .checked_mul(size_of::<Option<u32>>())
+        .ok_or(Error::Limit {
+            kind: LimitKind::RetainedBytes,
+            observed: u64::MAX,
+            maximum: budget.limits().max_retained_bytes,
+            path,
+        })?;
     budget.reserve_retained(
         usize_u64(changes.len()),
         usize_u64(key_bytes),
@@ -165,10 +164,12 @@ pub(super) fn prepare_unique_rich_text_to_text<'source, 'replacement>(
                 .binary_search_by_key(&tile_id, |route| route.tile_id)
                 .ok()
                 .and_then(|index| target.storage.tiles.get(index))
-                .ok_or(Error::UnsupportedDependency {
-                    path,
-                    kind: DependencyKind::CellStorage,
-                })?;
+                .ok_or(Error::Refused(
+                    crate::package::table_cells::Refusal::UnsupportedDependency {
+                        path,
+                        kind: DependencyKind::CellStorage,
+                    },
+                ))?;
             let scratch_element_bytes = size_of::<tile::TileReadPosition>()
                 .checked_add(size_of::<usize>())
                 .and_then(|bytes| bytes.checked_add(size_of::<tile::PreclassifiedCell>()))
@@ -176,7 +177,7 @@ pub(super) fn prepare_unique_rich_text_to_text<'source, 'replacement>(
             let scratch_bytes =
                 text_count
                     .checked_mul(scratch_element_bytes)
-                    .ok_or(Error::LimitExceeded {
+                    .ok_or(Error::Limit {
                         kind: LimitKind::PeakScratchBytes,
                         observed: u64::MAX,
                         maximum: budget.limits().max_scratch_bytes,
@@ -345,7 +346,7 @@ fn prepare_unique<'source, 'target, 'replacement>(
         .ok_or(Error::InvalidSource { path })?;
     let scratch_bytes = field_count
         .checked_mul(size_of::<rich::FieldReferences<'_>>())
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: LimitKind::PeakScratchBytes,
             observed: u64::MAX,
             maximum: budget.limits().max_scratch_bytes,
@@ -511,7 +512,7 @@ fn rich_limits(
         .and_then(|limits| limits.with_output_bytes(output.min(WireLimits::MAX_OUTPUT_BYTES)))
         .and_then(|limits| limits.with_nesting(64))
         .and_then(|limits| limits.with_rewrite_work(work.min(WireLimits::MAX_REWRITE_WORK)))
-        .map_err(|_error| Error::LimitExceeded {
+        .map_err(|_error| Error::Limit {
             kind: LimitKind::WireWork,
             observed: u64::MAX,
             maximum: remaining.wire_work,
@@ -533,7 +534,7 @@ fn rich_limits(
         output,
         work,
     )
-    .map_err(|_error| Error::LimitExceeded {
+    .map_err(|_error| Error::Limit {
         kind: LimitKind::WireWork,
         observed: u64::MAX,
         maximum: remaining.wire_work,
@@ -616,7 +617,7 @@ fn bounded_usize(value: u64, maximum: usize, path: Path) -> Result<usize, Error>
     let value = usize::try_from(value).map_err(|_error| Error::InvalidSource { path })?;
     let bounded = value.min(maximum);
     if bounded == 0 {
-        Err(Error::LimitExceeded {
+        Err(Error::Limit {
             kind: LimitKind::TransactionWork,
             observed: 1,
             maximum: 0,
@@ -647,7 +648,7 @@ fn map_rich_error(error: rich::Error, budget: &budget::TransactionBudget, path: 
             kind: LimitKind::RetainedBytes,
             amount,
         },
-        rich::Error::Limit => Error::LimitExceeded {
+        rich::Error::Limit => Error::Limit {
             kind: LimitKind::WireWork,
             observed: u64::MAX,
             maximum: budget.limits().max_wire_work,
@@ -658,10 +659,12 @@ fn map_rich_error(error: rich::Error, budget: &budget::TransactionBudget, path: 
 }
 
 fn rich_refusal(path: Path) -> Error {
-    Error::UnsupportedDependency {
-        path,
-        kind: DependencyKind::RichText,
-    }
+    Error::Refused(
+        crate::package::table_cells::Refusal::UnsupportedDependency {
+            path,
+            kind: DependencyKind::RichText,
+        },
+    )
 }
 
 const fn usize_u64(value: usize) -> u64 {
@@ -676,7 +679,7 @@ mod tests {
         Package,
         package::table_cells::Path as CellPath,
         table::{
-            CellPosition,
+            At,
             cells::{Change, Input},
         },
     };
@@ -691,7 +694,7 @@ mod tests {
     #[test]
     fn native_plain_text_preparation_defers_to_string_planner() {
         let source = Package::open(checked_in_fixture()).expect("native Numbers fixture opens");
-        let position = CellPosition::from_a1("C2").expect("C2 is canonical");
+        let position = At::from_a1("C2").expect("C2 is canonical");
         let (target, _report) = resolve::resolve_changed_target(&source, 0, 0, &[position])
             .expect("native rich route resolves");
         let mut transaction =
@@ -722,7 +725,7 @@ mod tests {
             "/private/tmp/litchi-numbers-cell-batch-native.wuaiMp/oracle-preserved.numbers",
         );
         let source = Package::open(oracle).expect("frozen formula-rich oracle opens");
-        let position = CellPosition::from_a1("C2").expect("C2 is canonical");
+        let position = At::from_a1("C2").expect("C2 is canonical");
         let (target, _report) = resolve::resolve_changed_target(&source, 0, 0, &[position])
             .expect("frozen formula-rich route resolves");
         let mut transaction =
@@ -765,7 +768,7 @@ mod tests {
         source
             .write_to(&mut source_bytes)
             .expect("source package serializes");
-        let position = CellPosition::from_a1("C2").expect("C2 is canonical");
+        let position = At::from_a1("C2").expect("C2 is canonical");
         let commit = source
             .edit_table_cells(0usize, 0usize)
             .expect("table edit starts")

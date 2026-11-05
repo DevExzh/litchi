@@ -5,11 +5,19 @@
 )]
 
 use litchi_rtf::{
-    Document, UnderlineStyle,
-    edit::{Error, Limits, TextSpan, TransferPlan},
+    EditOptions, Package, SemanticLimitKind, SemanticLimits, UnderlineStyle,
+    edit::{Error, TextSpan, TransferPlan},
 };
 use std::num::NonZeroU16;
 use std::path::{Path, PathBuf};
+
+fn semantic_limits(max_operations: usize) -> SemanticLimits {
+    SemanticLimits::builder()
+        .max_operations(max_operations)
+        .unwrap()
+        .build()
+        .unwrap()
+}
 
 fn corpus(relative: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -36,12 +44,12 @@ fn large_libreoffice_producer_artifacts_round_trip_exactly() {
     let mut accepted = 0usize;
     for fixture in fixtures {
         let bytes = std::fs::read(corpus(fixture)).unwrap();
-        if let Ok(document) = Document::from_bytes(&bytes) {
+        if let Ok(document) = Package::from_bytes(&bytes) {
             accepted = accepted.saturating_add(1);
             assert_eq!(document.to_bytes().unwrap(), bytes, "fixture: {fixture}");
             let commit = document.edit().commit().unwrap();
-            assert!(commit.snapshot().same_snapshot(&document));
-            assert_eq!(commit.snapshot().to_bytes().unwrap(), bytes);
+            assert!(commit.package().same_snapshot(&document));
+            assert_eq!(commit.package().to_bytes().unwrap(), bytes);
         }
     }
     assert!(accepted > 0, "no large producer fixture was accepted");
@@ -61,7 +69,7 @@ fn hostile_large_corpus_is_bounded_and_never_normalized_on_open() {
     ];
     for fixture in fixtures {
         let bytes = std::fs::read(corpus(fixture)).unwrap();
-        if let Ok(document) = Document::from_bytes(&bytes) {
+        if let Ok(document) = Package::from_bytes(&bytes) {
             assert_eq!(document.to_bytes().unwrap(), bytes, "fixture: {fixture}");
         }
     }
@@ -73,7 +81,7 @@ fn lossy_multibyte_tail_retains_text_and_exact_transport() {
     source.push(0x82);
     source.push(b'}');
 
-    let document = Document::from_bytes(&source).unwrap();
+    let document = Package::from_bytes(&source).unwrap();
     assert_eq!(document.text(), "ordinary \u{fffd}");
     assert_eq!(document.to_bytes().unwrap(), source);
 }
@@ -81,17 +89,19 @@ fn lossy_multibyte_tail_retains_text_and_exact_transport() {
 #[test]
 fn hostile_operation_fanout_stops_at_the_caller_bound() {
     let body = "x".repeat(600);
-    let source = Document::parse(&format!(r"{{\rtf1\ansi {body}}}")).unwrap();
-    let mut edit = source.edit_with_limits(Limits::new(256));
+    let source = Package::parse(&format!(r"{{\rtf1\ansi {body}}}")).unwrap();
+    let mut edit =
+        source.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(256)));
     for position in 0..256 {
         edit.replace_text(TextSpan::new(position, position).unwrap(), "y")
             .unwrap();
     }
     assert!(matches!(
         edit.replace_text(TextSpan::new(300, 300).unwrap(), "z"),
-        Err(Error::OperationLimit {
+        Err(Error::Limit {
+            kind: SemanticLimitKind::Operations,
             observed: 257,
-            limit: 256
+            maximum: 256
         })
     ));
 }
@@ -99,51 +109,51 @@ fn hostile_operation_fanout_stops_at_the_caller_bound() {
 #[test]
 fn microsoft_and_libreoffice_corpus_policy_and_output_reopen() {
     let microsoft_bytes = std::fs::read(corpus("test-data/rtf/testNegativeUnicode.rtf")).unwrap();
-    let microsoft = Document::from_bytes(&microsoft_bytes).unwrap();
-    let microsoft_target = Document::parse(r"{\rtf1\ansi Microsoft interop target}").unwrap();
+    let microsoft = Package::from_bytes(&microsoft_bytes).unwrap();
+    let microsoft_target = Package::parse(r"{\rtf1\ansi Microsoft interop target}").unwrap();
     assert!(matches!(
         TransferPlan::field(&microsoft, 0, &microsoft_target),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
-    let microsoft_reopened = Document::from_bytes(&microsoft.to_bytes().unwrap()).unwrap();
+    let microsoft_reopened = Package::from_bytes(&microsoft.to_bytes().unwrap()).unwrap();
     assert_eq!(microsoft_reopened.fields().len(), 1);
     assert_eq!(
         microsoft_reopened.fields()[0].instruction,
         microsoft.fields()[0].instruction
     );
 
-    let passive = Document::parse(r"{\rtf1\ansi{\field{\*\fldinst PAGE}{\fldrslt 1}}}").unwrap();
+    let passive = Package::parse(r"{\rtf1\ansi{\field{\*\fldinst PAGE}{\fldrslt 1}}}").unwrap();
     let changed = TransferPlan::field(&passive, 0, &microsoft_target)
         .unwrap()
         .commit()
         .unwrap()
-        .into_snapshot();
+        .into_package();
     assert_ne!(
         changed.to_bytes().unwrap(),
         microsoft_target.to_bytes().unwrap()
     );
-    let reopened = Document::from_bytes(&changed.to_bytes().unwrap()).unwrap();
+    let reopened = Package::from_bytes(&changed.to_bytes().unwrap()).unwrap();
     assert_eq!(reopened.fields().len(), 1);
     assert_eq!(
         reopened.fields()[0].instruction,
         passive.fields()[0].instruction
     );
 
-    let libreoffice = Document::from_bytes(
+    let libreoffice = Package::from_bytes(
         &std::fs::read(corpus(
             "test-data/libreoffice-core/sw/qa/extras/rtfimport/data/ole-inline.rtf",
         ))
         .unwrap(),
     )
     .unwrap();
-    let target = Document::parse(r"{\rtf1\ansi Interop target}").unwrap();
+    let target = Package::parse(r"{\rtf1\ansi Interop target}").unwrap();
     let transferred = TransferPlan::object(&libreoffice, 0, &target)
         .unwrap()
         .commit()
         .unwrap()
-        .into_snapshot();
+        .into_package();
     assert_ne!(transferred.to_bytes().unwrap(), target.to_bytes().unwrap());
-    let reopened = Document::from_bytes(&transferred.to_bytes().unwrap()).unwrap();
+    let reopened = Package::from_bytes(&transferred.to_bytes().unwrap()).unwrap();
     assert_eq!(reopened.objects().len(), 1);
     assert_eq!(reopened.objects()[0].data, libreoffice.objects()[0].data);
 }
@@ -152,7 +162,7 @@ fn microsoft_and_libreoffice_corpus_policy_and_output_reopen() {
 fn character_edit_refuses_to_drop_real_paragraph_page_break_state() {
     let fixture = "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/margmirror.rtf";
     let bytes = std::fs::read(corpus(fixture)).unwrap();
-    let document = Document::from_bytes(&bytes).unwrap();
+    let document = Package::from_bytes(&bytes).unwrap();
     let mut body_position = 0usize;
     for paragraph in document.body().paragraphs() {
         let mut run_position = body_position;
@@ -162,13 +172,17 @@ fn character_edit_refuses_to_drop_real_paragraph_page_break_state() {
                 let span = TextSpan::new(run_position, end).unwrap();
                 let mut edit = document.edit();
                 if let Err(error) = edit.set_text_italic(span, !run.format().italic()) {
-                    assert!(matches!(error, Error::UnsupportedSource(_)));
+                    assert!(
+                        matches!(error, Error::Refused(refusal) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent)
+                    );
                     return;
                 }
                 let Err(error) = edit.commit() else {
                     panic!("character publication discarded page-break state: {fixture}");
                 };
-                assert!(matches!(error, Error::UnsupportedSource(_)));
+                assert!(
+                    matches!(error, Error::Refused(refusal) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent)
+                );
                 return;
             }
             run_position = end;
@@ -184,7 +198,7 @@ fn character_edit_refuses_to_drop_real_paragraph_page_break_state() {
 fn one_real_libreoffice_run_accepts_checked_italic_edit_when_closure_holds() {
     let fixture = "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/n751020.rtf";
     let bytes = std::fs::read(corpus(fixture)).unwrap();
-    let Ok(document) = Document::from_bytes(&bytes) else {
+    let Ok(document) = Package::from_bytes(&bytes) else {
         panic!("real producer fixture was not accepted: {fixture}");
     };
     let mut body_position = 0usize;
@@ -200,7 +214,7 @@ fn one_real_libreoffice_run_accepts_checked_italic_edit_when_closure_holds() {
                     && let Ok(commit) = edit.commit()
                 {
                     let reopened =
-                        Document::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
+                        Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
                     assert_eq!(reopened.text(), document.text(), "fixture: {fixture}");
                     return;
                 }
@@ -218,7 +232,7 @@ fn one_real_libreoffice_run_accepts_checked_italic_edit_when_closure_holds() {
 fn one_real_libreoffice_run_accepts_checked_underline_edit_when_closure_holds() {
     let fixture = "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/n751020.rtf";
     let bytes = std::fs::read(corpus(fixture)).unwrap();
-    let Ok(document) = Document::from_bytes(&bytes) else {
+    let Ok(document) = Package::from_bytes(&bytes) else {
         panic!("real producer fixture was not accepted: {fixture}");
     };
     let mut body_position = 0usize;
@@ -239,7 +253,7 @@ fn one_real_libreoffice_run_accepts_checked_underline_edit_when_closure_holds() 
                     && let Ok(commit) = edit.commit()
                 {
                     let reopened =
-                        Document::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
+                        Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
                     assert_eq!(reopened.text(), document.text(), "fixture: {fixture}");
                     return;
                 }
@@ -257,7 +271,7 @@ fn one_real_libreoffice_run_accepts_checked_underline_edit_when_closure_holds() 
 fn one_real_libreoffice_run_accepts_checked_strike_edit_when_closure_holds() {
     let fixture = "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/n751020.rtf";
     let bytes = std::fs::read(corpus(fixture)).unwrap();
-    let Ok(document) = Document::from_bytes(&bytes) else {
+    let Ok(document) = Package::from_bytes(&bytes) else {
         panic!("real producer fixture was not accepted: {fixture}");
     };
     let mut body_position = 0usize;
@@ -273,7 +287,7 @@ fn one_real_libreoffice_run_accepts_checked_strike_edit_when_closure_holds() {
                     && let Ok(commit) = edit.commit()
                 {
                     let reopened =
-                        Document::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
+                        Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
                     assert_eq!(reopened.text(), document.text(), "fixture: {fixture}");
                     return;
                 }
@@ -291,7 +305,7 @@ fn one_real_libreoffice_run_accepts_checked_strike_edit_when_closure_holds() {
 fn one_real_libreoffice_run_accepts_checked_hidden_edit_when_closure_holds() {
     let fixture = "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/n751020.rtf";
     let bytes = std::fs::read(corpus(fixture)).unwrap();
-    let Ok(document) = Document::from_bytes(&bytes) else {
+    let Ok(document) = Package::from_bytes(&bytes) else {
         panic!("real producer fixture was not accepted: {fixture}");
     };
     let mut body_position = 0usize;
@@ -307,7 +321,7 @@ fn one_real_libreoffice_run_accepts_checked_hidden_edit_when_closure_holds() {
                     && let Ok(commit) = edit.commit()
                 {
                     let reopened =
-                        Document::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
+                        Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
                     assert_eq!(reopened.text(), document.text(), "fixture: {fixture}");
                     assert!(reopened.body().runs().any(|candidate| {
                         candidate.text() == run.text() && candidate.format().hidden()
@@ -328,7 +342,7 @@ fn one_real_libreoffice_run_accepts_checked_hidden_edit_when_closure_holds() {
 fn one_real_libreoffice_run_accepts_checked_small_caps_edit_when_closure_holds() {
     let fixture = "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/n751020.rtf";
     let bytes = std::fs::read(corpus(fixture)).unwrap();
-    let Ok(document) = Document::from_bytes(&bytes) else {
+    let Ok(document) = Package::from_bytes(&bytes) else {
         panic!("real producer fixture was not accepted: {fixture}");
     };
     let mut body_position = 0usize;
@@ -344,7 +358,7 @@ fn one_real_libreoffice_run_accepts_checked_small_caps_edit_when_closure_holds()
                     && let Ok(commit) = edit.commit()
                 {
                     let reopened =
-                        Document::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
+                        Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
                     assert_eq!(reopened.text(), document.text(), "fixture: {fixture}");
                     assert!(reopened.body().runs().any(|candidate| {
                         candidate.text() == run.text() && candidate.format().small_caps()
@@ -365,7 +379,7 @@ fn one_real_libreoffice_run_accepts_checked_small_caps_edit_when_closure_holds()
 fn one_real_libreoffice_run_accepts_checked_all_caps_edit_when_closure_holds() {
     let fixture = "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/n751020.rtf";
     let bytes = std::fs::read(corpus(fixture)).unwrap();
-    let Ok(document) = Document::from_bytes(&bytes) else {
+    let Ok(document) = Package::from_bytes(&bytes) else {
         panic!("real producer fixture was not accepted: {fixture}");
     };
     let mut body_position = 0usize;
@@ -381,7 +395,7 @@ fn one_real_libreoffice_run_accepts_checked_all_caps_edit_when_closure_holds() {
                     && let Ok(commit) = edit.commit()
                 {
                     let reopened =
-                        Document::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
+                        Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
                     assert_eq!(reopened.text(), document.text(), "fixture: {fixture}");
                     let all_caps_text = reopened
                         .body()
@@ -406,7 +420,7 @@ fn one_real_libreoffice_run_accepts_checked_all_caps_edit_when_closure_holds() {
 fn one_real_libreoffice_run_accepts_checked_double_strike_edit_when_closure_holds() {
     let fixture = "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/n751020.rtf";
     let bytes = std::fs::read(corpus(fixture)).unwrap();
-    let Ok(document) = Document::from_bytes(&bytes) else {
+    let Ok(document) = Package::from_bytes(&bytes) else {
         panic!("real producer fixture was not accepted: {fixture}");
     };
     let mut body_position = 0usize;
@@ -422,7 +436,7 @@ fn one_real_libreoffice_run_accepts_checked_double_strike_edit_when_closure_hold
                     && let Ok(commit) = edit.commit()
                 {
                     let reopened =
-                        Document::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
+                        Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
                     assert_eq!(reopened.text(), document.text(), "fixture: {fixture}");
                     let double_strike_text = reopened
                         .body()
@@ -447,7 +461,7 @@ fn one_real_libreoffice_run_accepts_checked_double_strike_edit_when_closure_hold
 fn one_real_libreoffice_run_accepts_checked_font_size_edit_when_closure_holds() {
     let fixture = "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/n751020.rtf";
     let bytes = std::fs::read(corpus(fixture)).unwrap();
-    let Ok(document) = Document::from_bytes(&bytes) else {
+    let Ok(document) = Package::from_bytes(&bytes) else {
         panic!("real producer fixture was not accepted: {fixture}");
     };
     let mut body_position = 0usize;
@@ -468,7 +482,7 @@ fn one_real_libreoffice_run_accepts_checked_font_size_edit_when_closure_holds() 
                     && let Ok(commit) = edit.commit()
                 {
                     let reopened =
-                        Document::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
+                        Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
                     assert_eq!(reopened.text(), document.text(), "fixture: {fixture}");
                     let changed_text = reopened
                         .body()

@@ -34,7 +34,6 @@
 
 use std::path::PathBuf;
 
-use litchi_cfb::OleWriter;
 use litchi_ole_common::property_set::{
     CodePage, DOCUMENT_SUMMARY_INFORMATION_FMTID, Section, Stream, Value,
 };
@@ -68,8 +67,13 @@ fn property_blob() -> Vec<u8> {
 fn doc_facade_discovers_unsigned_signature_state() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let mut doc =
-        litchi_doc::Package::open(root.join("test-data/ole/doc/documentProperties.doc")).unwrap();
-    assert!(doc.signatures().unwrap().is_empty());
+        litchi_doc::raw::Reader::open(root.join("test-data/ole/doc/documentProperties.doc"))
+            .unwrap();
+    assert!(
+        doc.signatures(&litchi_sign::Policy::strict())
+            .unwrap()
+            .is_empty()
+    );
 }
 
 #[test]
@@ -95,57 +99,58 @@ fn public_property_set_facade_reads_and_edits_vba_signature_payloads() {
         "PIDDSI must serialize VT_BLOB with one 56-byte size before raw cb=48 DigSigBlob"
     );
 
-    let mut writer = OleWriter::new();
-    const DOP_INDEX: usize = 31;
-    const POINTER_COUNT: usize = 136;
-    let pointer_end = 154 + POINTER_COUNT * 8;
-    let mut word = vec![0u8; pointer_end + 4];
-    word[0..2].copy_from_slice(&0xa5ecu16.to_le_bytes());
-    // FibBase.csw and cslw are fixed MS-DOC counts.
-    word[32..34].copy_from_slice(&0x000eu16.to_le_bytes());
-    word[62..64].copy_from_slice(&0x0016u16.to_le_bytes());
-    word[2..4].copy_from_slice(&0x00c1u16.to_le_bytes());
-    word[152..154].copy_from_slice(&(POINTER_COUNT as u16).to_le_bytes());
-    word[pointer_end..pointer_end + 2].copy_from_slice(&2u16.to_le_bytes());
-    word[pointer_end + 2..pointer_end + 4].copy_from_slice(&0x0101u16.to_le_bytes());
-    let table = vec![0u8; 500];
-    let dop_pointer = 154 + DOP_INDEX * 8;
-    word[dop_pointer..dop_pointer + 4].copy_from_slice(&0u32.to_le_bytes());
-    word[dop_pointer + 4..dop_pointer + 8].copy_from_slice(&500u32.to_le_bytes());
-    writer.create_stream(&["WordDocument"], &word).unwrap();
-    writer.create_stream(&["0Table"], &table).unwrap();
-    writer
-        .create_stream(&["\u{0005}DocumentSummaryInformation"], &stream)
+    let bytes = common::with_stream(
+        common::authored_document("signed body"),
+        "\u{0005}DocumentSummaryInformation",
+        stream,
+    );
+    let mut package = litchi_doc::raw::Reader::from_reader(Cursor::new(bytes.clone())).unwrap();
+    let package_signature = package
+        .vba_signature(litchi_ole_common::vba_signature::Limits::default())
+        .unwrap()
         .unwrap();
-    let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
-
-    let bytes = common::with_valid_word97_dop(output.into_inner());
-    let mut package = litchi_doc::Package::from_reader(Cursor::new(bytes.clone())).unwrap();
-    let package_signature = package.vba_signature().unwrap().unwrap();
     assert_eq!(package_signature.info().signature(), [1, 2, 3]);
 
-    let source = litchi_doc::package::Snapshot::from_bytes(bytes).unwrap();
+    let package = litchi_doc::Package::from_bytes(&bytes).unwrap();
+    let source = package.property_sets().unwrap();
     let signature = source.vba_signature().unwrap().unwrap();
     assert_eq!(signature.kind(), litchi_doc::vba_signature::Kind::Property);
     assert_eq!(signature.info().signature(), [1, 2, 3]);
 
-    let mut no_op = source.transaction().unwrap();
-    assert!(!no_op.edit_vba_signature(|_| Ok(())).unwrap());
+    let mut no_op = package.edit_property_sets().unwrap();
+    assert!(
+        !no_op
+            .edit_vba_signature(litchi_ole_common::vba_signature::Limits::default(), |_| Ok(
+                ()
+            ))
+            .unwrap()
+    );
     let no_op_commit = no_op.commit().unwrap();
-    assert!(!no_op_commit.changed());
-    assert_eq!(no_op_commit.snapshot().bytes(), source.bytes());
+    assert!(!no_op_commit.diagnostics().changed());
+    assert_eq!(no_op_commit.package().to_bytes().unwrap(), source.bytes());
 
-    let mut transaction = source.transaction().unwrap();
+    let mut transaction = package.edit_property_sets().unwrap();
     assert!(
         transaction
-            .edit_vba_signature(|edit| edit.set_signature([9, 8]).map(|_| ()))
+            .edit_vba_signature(
+                litchi_ole_common::vba_signature::Limits::default(),
+                |edit| edit.set_signature([9, 8]).map(|_| ())
+            )
             .unwrap()
     );
     let commit = transaction.commit().unwrap();
-    let edited = commit.snapshot().vba_signature().unwrap().unwrap();
+    let edited = commit
+        .package()
+        .property_sets()
+        .unwrap()
+        .vba_signature()
+        .unwrap()
+        .unwrap();
     assert_eq!(edited.info().signature(), [9, 8]);
     assert_eq!(edited.info().certificate_store(), [4, 5, 6, 7]);
-    let reverted = commit.patch().revert(commit.snapshot()).unwrap();
-    assert_eq!(reverted.bytes(), source.bytes());
+    let reverted = commit
+        .package()
+        .apply_property_sets(&commit.patch().inverse())
+        .unwrap();
+    assert_eq!(reverted.package().to_bytes().unwrap(), source.bytes());
 }

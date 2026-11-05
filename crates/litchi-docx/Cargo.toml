@@ -10,7 +10,7 @@ rust-version.workspace = true
 
 [features]
 default = []
-encryption = ["dep:litchi-crypto"]
+encryption = ["dep:litchi-crypto", "litchi-ooxml-common/encryption"]
 # Format-independent font models, caller-supplied resolution, and glyph collection.
 fonts = ["dep:litchi-fonts"]
 # OpenType glyph subsetting without native system-font discovery.

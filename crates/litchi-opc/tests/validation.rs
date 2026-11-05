@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
 use litchi_core::{CheckStatus, OwnedSource, ReadAt, SourceVersion, ValidationLimits};
-use litchi_opc::{OpcError, ReadLimits, validate_read_at, validate_read_at_with_limits};
+use litchi_opc::{OpcError, SourceLimits, validate_read_at};
 
 const CONTENT_TYPES: &[u8] = br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#;
 const EMPTY_CONTENT_TYPES: &[u8] =
@@ -17,7 +17,9 @@ const EMPTY_CONTENT_TYPES: &[u8] =
 const ROOT_RELS: &[u8] = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#;
 
 fn package_bytes(content_types: &[u8], relationships: &[u8], payload: &[u8]) -> Vec<u8> {
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     writer
         .write_stored("[Content_Types].xml", content_types)
         .unwrap();
@@ -123,15 +125,20 @@ fn phase_vector(report: &litchi_core::ValidateReport) -> Vec<String> {
 }
 
 fn assert_structural_phase(bytes: Vec<u8>, check: &str, phases: [&str; 4]) {
-    let report = validate_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
+    let report = validate_read_at(
+        Arc::new(OwnedSource::new(bytes)),
+        SourceLimits::default(),
+        ValidationLimits::default(),
+    )
+    .unwrap();
     assert!(report.has_errors());
     assert_eq!(report.issues().len(), 1);
     assert_eq!(report.issues()[0].check().as_str(), check);
     assert_eq!(phase_vector(&report), phases);
 }
 
-fn assert_limit_phase(bytes: Vec<u8>, read_limits: ReadLimits, phases: [&str; 4]) {
-    let report = validate_read_at_with_limits(
+fn assert_limit_phase(bytes: Vec<u8>, read_limits: SourceLimits, phases: [&str; 4]) {
+    let report = validate_read_at(
         Arc::new(OwnedSource::new(bytes)),
         read_limits,
         ValidationLimits::default(),
@@ -147,8 +154,18 @@ fn valid_catalog_is_complete_deterministic_and_does_not_read_payload() {
     let bytes = package_bytes(CONTENT_TYPES, ROOT_RELS, &payload);
     let source = Arc::new(CountingSource::new(bytes.clone()));
 
-    let first = validate_read_at(source.clone()).unwrap();
-    let second = validate_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
+    let first = validate_read_at(
+        source.clone(),
+        SourceLimits::default(),
+        ValidationLimits::default(),
+    )
+    .unwrap();
+    let second = validate_read_at(
+        Arc::new(OwnedSource::new(bytes)),
+        SourceLimits::default(),
+        ValidationLimits::default(),
+    )
+    .unwrap();
 
     assert!(first.is_complete());
     assert!(!first.has_errors());
@@ -177,7 +194,12 @@ fn malformed_content_types_and_relationships_are_conclusive_issues() {
             ["complete", "blocked", "complete", "blocked"],
         ),
     ] {
-        let report = validate_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
+        let report = validate_read_at(
+            Arc::new(OwnedSource::new(bytes)),
+            SourceLimits::default(),
+            ValidationLimits::default(),
+        )
+        .unwrap();
         assert!(!report.is_complete());
         assert!(report.has_errors());
         assert!(matches!(
@@ -219,11 +241,15 @@ fn parser_errors_and_invalid_uris_keep_exact_manifest_phase() {
     // ingress repair (the relationship stays dangling), not a structural
     // rejection, so validation admits the package.
     let invalid_relationship_uri = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="urn:test" Target="../escape.xml"/></Relationships>"#;
-    let report = validate_read_at(Arc::new(OwnedSource::new(package_bytes(
-        EMPTY_CONTENT_TYPES,
-        invalid_relationship_uri,
-        b"document",
-    ))))
+    let report = validate_read_at(
+        Arc::new(OwnedSource::new(package_bytes(
+            EMPTY_CONTENT_TYPES,
+            invalid_relationship_uri,
+            b"document",
+        ))),
+        SourceLimits::default(),
+        ValidationLimits::default(),
+    )
     .unwrap();
     assert!(!report.has_errors());
     assert_eq!(
@@ -243,17 +269,17 @@ fn shared_xml_limits_keep_content_type_and_relationship_phase() {
     let relationship_phases = ["complete", "blocked", "blocked", "blocked"];
 
     for limits in [
-        ReadLimits::builder()
-            .max_xml_events(1)
+        SourceLimits::builder()
+            .max_events(1)
             .unwrap()
             .build()
             .unwrap(),
-        ReadLimits::builder()
-            .max_xml_depth(1)
+        SourceLimits::builder()
+            .max_depth(1)
             .unwrap()
             .build()
             .unwrap(),
-        ReadLimits::builder()
+        SourceLimits::builder()
             .max_xml_attribute_bytes(8)
             .unwrap()
             .max_relationship_target_bytes(8)
@@ -261,7 +287,7 @@ fn shared_xml_limits_keep_content_type_and_relationship_phase() {
             .build()
             .unwrap(),
     ] {
-        let content_types = if limits.max_xml_depth() == 1 {
+        let content_types = if limits.max_depth() == 1 {
             br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Wrapper><Default Extension="xml" ContentType="application/xml"/></Wrapper></Types>"#.as_slice()
         } else {
             CONTENT_TYPES
@@ -273,26 +299,26 @@ fn shared_xml_limits_keep_content_type_and_relationship_phase() {
         );
     }
 
-    let relationship_documents: [(&[u8], ReadLimits); 3] = [
+    let relationship_documents: [(&[u8], SourceLimits); 3] = [
         (
             ROOT_RELS,
-            ReadLimits::builder()
-                .max_xml_events(2)
+            SourceLimits::builder()
+                .max_events(2)
                 .unwrap()
                 .build()
                 .unwrap(),
         ),
         (
             br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Wrapper><Relationship Id="rId1" Type="urn:test" Target="word/document.xml"/></Wrapper></Relationships>"#,
-            ReadLimits::builder()
-                .max_xml_depth(1)
+            SourceLimits::builder()
+                .max_depth(1)
                 .unwrap()
                 .build()
                 .unwrap(),
         ),
         (
             ROOT_RELS,
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_xml_attribute_bytes(8)
                 .unwrap()
                 .max_relationship_target_bytes(8)
@@ -312,7 +338,9 @@ fn shared_xml_limits_keep_content_type_and_relationship_phase() {
 
 #[test]
 fn loaded_relationship_capability_includes_admitted_unreferenced_parts() {
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     writer
         .write_stored("[Content_Types].xml", CONTENT_TYPES)
         .unwrap();
@@ -334,7 +362,9 @@ fn loaded_relationship_capability_includes_admitted_unreferenced_parts() {
 
 #[test]
 fn physical_relationship_part_limits_belong_to_catalog_admission() {
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     writer
         .write_stored("[Content_Types].xml", CONTENT_TYPES)
         .unwrap();
@@ -351,7 +381,7 @@ fn physical_relationship_part_limits_belong_to_catalog_admission() {
 
     assert_limit_phase(
         writer.finish_to_bytes().unwrap(),
-        ReadLimits::builder()
+        SourceLimits::builder()
             .max_relationship_parts(1)
             .unwrap()
             .build()
@@ -367,7 +397,9 @@ fn physical_relationship_part_limits_belong_to_catalog_admission() {
 
 #[test]
 fn relationship_part_source_topology_belongs_to_catalog_admission() {
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     writer
         .write_stored("[Content_Types].xml", CONTENT_TYPES)
         .unwrap();
@@ -382,9 +414,11 @@ fn relationship_part_source_topology_belongs_to_catalog_admission() {
         )
         .unwrap();
 
-    let report = validate_read_at(Arc::new(OwnedSource::new(
-        writer.finish_to_bytes().unwrap(),
-    )))
+    let report = validate_read_at(
+        Arc::new(OwnedSource::new(writer.finish_to_bytes().unwrap())),
+        SourceLimits::default(),
+        ValidationLimits::default(),
+    )
     .unwrap();
     assert!(report.has_errors());
     assert_eq!(report.issues().len(), 1);
@@ -404,7 +438,12 @@ fn duplicate_physical_entries_are_reported_as_structural_rejection() {
     // duplicate-physical-entry rejection path.
     let bytes = duplicate_package_bytes();
 
-    let report = validate_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
+    let report = validate_read_at(
+        Arc::new(OwnedSource::new(bytes)),
+        SourceLimits::default(),
+        ValidationLimits::default(),
+    )
+    .unwrap();
     assert!(report.has_errors());
     assert!(matches!(
         status(&report, "opc.package.ingress"),
@@ -419,12 +458,12 @@ fn duplicate_physical_entries_are_reported_as_structural_rejection() {
 #[test]
 fn zip_and_relationship_ceilings_are_blocked_without_issues() {
     let bytes = package_bytes(CONTENT_TYPES, ROOT_RELS, b"document");
-    let input_limits = ReadLimits::builder()
+    let input_limits = SourceLimits::builder()
         .max_input_bytes((bytes.len() - 1) as u64)
         .unwrap()
         .build()
         .unwrap();
-    let input = validate_read_at_with_limits(
+    let input = validate_read_at(
         Arc::new(OwnedSource::new(bytes.clone())),
         input_limits,
         ValidationLimits::default(),
@@ -445,8 +484,8 @@ fn zip_and_relationship_ceilings_are_blocked_without_issues() {
         ]
     );
 
-    let archive_limits = ReadLimits::builder()
-        .max_archive_members(1)
+    let archive_limits = SourceLimits::builder()
+        .max_members(1)
         .unwrap()
         .max_relationship_parts(1)
         .unwrap()
@@ -454,7 +493,7 @@ fn zip_and_relationship_ceilings_are_blocked_without_issues() {
         .unwrap()
         .build()
         .unwrap();
-    let archive = validate_read_at_with_limits(
+    let archive = validate_read_at(
         Arc::new(OwnedSource::new(bytes.clone())),
         archive_limits,
         ValidationLimits::default(),
@@ -470,12 +509,12 @@ fn zip_and_relationship_ceilings_are_blocked_without_issues() {
         ]
     );
 
-    let declared_size_limits = ReadLimits::builder()
-        .max_archive_total_bytes(32)
+    let declared_size_limits = SourceLimits::builder()
+        .max_aggregate_bytes(32)
         .unwrap()
         .build()
         .unwrap();
-    let declared_size = validate_read_at_with_limits(
+    let declared_size = validate_read_at(
         Arc::new(OwnedSource::new(bytes.clone())),
         declared_size_limits,
         ValidationLimits::default(),
@@ -491,12 +530,12 @@ fn zip_and_relationship_ceilings_are_blocked_without_issues() {
         ]
     );
 
-    let catalog_limits = ReadLimits::builder()
+    let catalog_limits = SourceLimits::builder()
         .max_content_types_bytes(16)
         .unwrap()
         .build()
         .unwrap();
-    let catalog = validate_read_at_with_limits(
+    let catalog = validate_read_at(
         Arc::new(OwnedSource::new(bytes.clone())),
         catalog_limits,
         ValidationLimits::default(),
@@ -512,12 +551,12 @@ fn zip_and_relationship_ceilings_are_blocked_without_issues() {
         ]
     );
 
-    let relationship_limits = ReadLimits::builder()
+    let relationship_limits = SourceLimits::builder()
         .max_relationship_xml_bytes(16)
         .unwrap()
         .build()
         .unwrap();
-    let relationships = validate_read_at_with_limits(
+    let relationships = validate_read_at(
         Arc::new(OwnedSource::new(bytes)),
         relationship_limits,
         ValidationLimits::default(),
@@ -539,9 +578,9 @@ fn report_limits_are_fallible_errors_not_unbounded_retention() {
     let bytes = package_bytes(CONTENT_TYPES, ROOT_RELS, b"document");
     let tiny = ValidationLimits::new(1, 1, 1, 1, 8, 8, 8, 8, 8, 32);
     assert!(matches!(
-        validate_read_at_with_limits(
+        validate_read_at(
             Arc::new(OwnedSource::new(bytes)),
-            ReadLimits::default(),
+            SourceLimits::default(),
             tiny,
         ),
         Err(OpcError::ValidationReport(_))
@@ -552,7 +591,9 @@ fn report_limits_are_fallible_errors_not_unbounded_retention() {
 fn signature_presence_is_information_not_signature_validity() {
     let content_types = br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/_xmlsignatures/origin.sigs" ContentType="application/vnd.openxmlformats-package.digital-signature-origin"/></Types>"#;
     let relationships = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/origin" Target="_xmlsignatures/origin.sigs"/></Relationships>"#;
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     writer
         .write_stored("[Content_Types].xml", content_types)
         .unwrap();
@@ -563,9 +604,11 @@ fn signature_presence_is_information_not_signature_validity() {
     writer
         .write_stored("_xmlsignatures/origin.sigs", b"not a signature")
         .unwrap();
-    let report = validate_read_at(Arc::new(OwnedSource::new(
-        writer.finish_to_bytes().unwrap(),
-    )))
+    let report = validate_read_at(
+        Arc::new(OwnedSource::new(writer.finish_to_bytes().unwrap())),
+        SourceLimits::default(),
+        ValidationLimits::default(),
+    )
     .unwrap();
 
     assert!(report.is_complete());
@@ -586,7 +629,9 @@ fn signature_presence_is_information_not_signature_validity() {
 fn macro_payload_is_inert_and_not_claimed_as_a_validation_capability() {
     let content_types = br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/vbaProject.bin" ContentType="application/vnd.ms-office.vbaProject"/></Types>"#;
     let relationships = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.microsoft.com/office/2006/relationships/vbaProject" Target="word/vbaProject.bin"/></Relationships>"#;
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     writer
         .write_stored("[Content_Types].xml", content_types)
         .unwrap();
@@ -597,9 +642,11 @@ fn macro_payload_is_inert_and_not_claimed_as_a_validation_capability() {
     writer
         .write_stored("word/vbaProject.bin", b"inert")
         .unwrap();
-    let report = validate_read_at(Arc::new(OwnedSource::new(
-        writer.finish_to_bytes().unwrap(),
-    )))
+    let report = validate_read_at(
+        Arc::new(OwnedSource::new(writer.finish_to_bytes().unwrap())),
+        SourceLimits::default(),
+        ValidationLimits::default(),
+    )
     .unwrap();
 
     assert!(report.is_complete());
@@ -614,22 +661,32 @@ fn macro_payload_is_inert_and_not_claimed_as_a_validation_capability() {
 #[test]
 fn io_and_source_change_failures_remain_errors() {
     let bytes = package_bytes(CONTENT_TYPES, ROOT_RELS, b"document");
-    let io_error = validate_read_at(Arc::new(FailingSource::new(bytes.clone()))).unwrap_err();
+    let io_error = validate_read_at(
+        Arc::new(FailingSource::new(bytes.clone())),
+        SourceLimits::default(),
+        ValidationLimits::default(),
+    )
+    .unwrap_err();
     assert!(matches!(
         io_error,
         OpcError::IoError(error) if error.kind() == io::ErrorKind::BrokenPipe
     ));
 
-    let stale = validate_read_at(Arc::new(MutatingSource::new(bytes))).unwrap_err();
+    let stale = validate_read_at(
+        Arc::new(MutatingSource::new(bytes)),
+        SourceLimits::default(),
+        ValidationLimits::default(),
+    )
+    .unwrap_err();
     assert!(matches!(stale, OpcError::SourceChanged { .. }));
 
     let blocked_bytes = package_bytes(CONTENT_TYPES, ROOT_RELS, b"document");
-    let blocked_limits = ReadLimits::builder()
+    let blocked_limits = SourceLimits::builder()
         .max_input_bytes((blocked_bytes.len() - 1) as u64)
         .unwrap()
         .build()
         .unwrap();
-    let blocked_stale = validate_read_at_with_limits(
+    let blocked_stale = validate_read_at(
         Arc::new(LengthMutatingSource::new(blocked_bytes)),
         blocked_limits,
         ValidationLimits::default(),
@@ -637,8 +694,12 @@ fn io_and_source_change_failures_remain_errors() {
     .unwrap_err();
     assert!(matches!(blocked_stale, OpcError::SourceChanged { .. }));
 
-    let structural_stale =
-        validate_read_at(Arc::new(MutatingSource::new(b"not a zip".to_vec()))).unwrap_err();
+    let structural_stale = validate_read_at(
+        Arc::new(MutatingSource::new(b"not a zip".to_vec())),
+        SourceLimits::default(),
+        ValidationLimits::default(),
+    )
+    .unwrap_err();
     assert!(matches!(structural_stale, OpcError::SourceChanged { .. }));
 }
 
@@ -783,4 +844,49 @@ impl ReadAt for MutatingSource {
             self.revision.load(Ordering::SeqCst),
         ))
     }
+}
+
+/// `validate_parts` reports a dangling internal relationship and a malformed
+/// XML part, and nothing for a well-formed package (record 0336).
+#[test]
+fn part_validation_reports_dangling_targets_and_malformed_xml() {
+    let clean = package_bytes(CONTENT_TYPES, ROOT_RELS, b"<document/>");
+    let package = litchi_opc::OpcPackage::from_bytes(&clean, SourceLimits::default()).unwrap();
+    let report = litchi_opc::validate_parts(&package, ValidationLimits::default()).unwrap();
+    assert!(report.is_complete());
+    assert!(report.issues().is_empty());
+
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
+    writer
+        .write_stored("[Content_Types].xml", CONTENT_TYPES)
+        .unwrap();
+    writer.write_stored("_rels/.rels", ROOT_RELS).unwrap();
+    writer
+        .write_stored("word/document.xml", b"<document><p></document>")
+        .unwrap();
+    writer
+        .write_stored(
+            "word/_rels/document.xml.rels",
+            br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId7" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>"#,
+        )
+        .unwrap();
+    let broken = writer.finish_to_bytes().unwrap();
+    let package = litchi_opc::OpcPackage::from_bytes(&broken, SourceLimits::default()).unwrap();
+    let report = litchi_opc::validate_parts(&package, ValidationLimits::default()).unwrap();
+    let codes: Vec<&str> = report.issues().iter().map(|issue| issue.code()).collect();
+    assert!(
+        codes.contains(&"opc.relationship.target_missing"),
+        "{codes:?}"
+    );
+    assert!(codes.contains(&"opc.xml.malformed"), "{codes:?}");
+    assert!(report.has_errors());
+    let dangling = report
+        .issues()
+        .iter()
+        .find(|issue| issue.code() == "opc.relationship.target_missing")
+        .unwrap();
+    assert_eq!(dangling.locations()[0].part(), Some("/word/document.xml"));
+    assert_eq!(dangling.locations()[0].path(), Some("rId7"));
 }

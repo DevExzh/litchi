@@ -366,6 +366,32 @@ impl Relationships {
         self.source_capture.as_ref()
     }
 
+    /// Whether both collections still point at the same admitted source
+    /// capture. A clone keeps this handle until a relationship mutation
+    /// invalidates it, so pointer equality proves the semantic graph has not
+    /// changed and avoids rebinding every relationship entry.
+    pub(crate) fn same_source_capture(&self, other: &Self) -> bool {
+        self.source_capture
+            .as_ref()
+            .zip(other.source_capture.as_ref())
+            .is_some_and(|(left, right)| Arc::ptr_eq(left, right))
+    }
+
+    /// Compare the semantic relationship collection while ignoring its
+    /// publication provenance handle.
+    pub(crate) fn semantically_eq(&self, other: &Self) -> bool {
+        self.base_uri == other.base_uri
+            && self.source_uri == other.source_uri
+            && self.rels.len() == other.rels.len()
+            && self.rels.iter().all(|(id, relationship)| {
+                other.rels.get(id).is_some_and(|candidate| {
+                    relationship.reltype() == candidate.reltype()
+                        && relationship.target_ref() == candidate.target_ref()
+                        && relationship.target_mode() == candidate.target_mode()
+                })
+            })
+    }
+
     /// Drop the open-time proof because this collection is about to change.
     fn invalidate_source_capture(&mut self) {
         self.source_capture = None;
@@ -668,6 +694,20 @@ impl Relationships {
     #[inline]
     pub fn iter(&self) -> impl Iterator<Item = &Relationship> {
         self.rels.values()
+    }
+
+    /// Whether both collections hold the same relationships: the same IDs
+    /// with the same types, target references and target modes.
+    #[must_use]
+    pub fn same_entries(&self, other: &Self) -> bool {
+        self.rels.len() == other.rels.len()
+            && self.rels.iter().all(|(id, relationship)| {
+                other.rels.get(id).is_some_and(|candidate| {
+                    candidate.reltype == relationship.reltype
+                        && candidate.target_ref == relationship.target_ref
+                        && candidate.target_mode == relationship.target_mode
+                })
+            })
     }
 
     /// Get the number of relationships in the collection.

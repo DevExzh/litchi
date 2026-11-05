@@ -62,20 +62,20 @@ where
         let mut flags = binary::read_u16_le_at(data, 16)?;
         if first_column > last_column || last_column >= 0x4000 {
             return Err(Error::Unrecognized {
-                typ: "BrtColInfo range".to_string(),
-                val: format!("{first_column}..={last_column}"),
+                typ: "BrtColInfo range",
+                val: "..=",
             });
         }
         if width_raw > 0xFFFF {
             return Err(Error::Unrecognized {
-                typ: "BrtColInfo coldx".to_string(),
-                val: width_raw.to_string(),
+                typ: "BrtColInfo coldx",
+                val: "unexpected value",
             });
         }
         if style_id as usize >= cell_xf_count {
             return Err(Error::Unrecognized {
-                typ: "BrtColInfo ixfe".to_string(),
-                val: format!("{style_id} (cell XF count {cell_xf_count})"),
+                typ: "BrtColInfo ixfe",
+                val: "(cell XF count )",
             });
         }
         // MS-XLSB 2.4.323: reserved1, unused1, and reserved2 MUST be ignored.
@@ -87,8 +87,8 @@ where
                 first_column,
                 u32::from(reserved),
                 || Error::Unrecognized {
-                    typ: "BrtColInfo flags".to_string(),
-                    val: format!("0x{flags:04X}"),
+                    typ: "BrtColInfo flags",
+                    val: "0x",
                 },
             )?;
             flags &= COLUMN_INFO_DEFINED_FLAGS;
@@ -128,14 +128,14 @@ where
         let span_count = binary::read_u32_le_at(data, 13)? as usize;
         if span_count > 16 {
             return Err(Error::Unrecognized {
-                typ: "BrtRowHdr ccolspan".to_string(),
-                val: span_count.to_string(),
+                typ: "BrtRowHdr ccolspan",
+                val: "unexpected value",
             });
         }
         let expected = span_count
             .checked_mul(8)
             .and_then(|size| size.checked_add(17))
-            .ok_or_else(|| Error::Encoding("BrtRowHdr size overflow".to_string()))?;
+            .ok_or(Error::Encoding("BrtRowHdr size overflow"))?;
         if data.len() != expected {
             return Err(Error::InvalidLength {
                 expected,
@@ -144,14 +144,14 @@ where
         }
         if row >= 0x10_0000 || previous_row.is_some_and(|previous| row <= previous) {
             return Err(Error::Unrecognized {
-                typ: "BrtRowHdr rw".to_string(),
-                val: row.to_string(),
+                typ: "BrtRowHdr rw",
+                val: "unexpected value",
             });
         }
         if height_twips > 0x2000 {
             return Err(Error::Unrecognized {
-                typ: "BrtRowHdr miyRw".to_string(),
-                val: height_twips.to_string(),
+                typ: "BrtRowHdr miyRw",
+                val: "unexpected value",
             });
         }
         // MS-XLSB 2.4.726: reserved1, fReserved, and unused2 MUST be ignored.
@@ -163,8 +163,8 @@ where
                 row,
                 u32::from_le_bytes([reserved[0], reserved[1], reserved[2], 0]),
                 || Error::Unrecognized {
-                    typ: "BrtRowHdr flags".to_string(),
-                    val: format!("0x{flags1:02X}/0x{flags2:02X}/0x{phonetic_flags:02X}"),
+                    typ: "BrtRowHdr flags",
+                    val: "0x/0x/0x",
                 },
             )?;
             flags1 &= 0x03;
@@ -174,8 +174,8 @@ where
         let style_applied = flags2 & 0x40 != 0;
         if style_applied && raw_style_id as usize >= cell_xf_count {
             return Err(Error::Unrecognized {
-                typ: "BrtRowHdr ixfe".to_string(),
-                val: format!("{raw_style_id} (cell XF count {cell_xf_count})"),
+                typ: "BrtRowHdr ixfe",
+                val: "(cell XF count )",
             });
         }
 
@@ -191,8 +191,8 @@ where
                 || previous_segment.is_some_and(|previous| segment <= previous)
             {
                 return Err(Error::Unrecognized {
-                    typ: "BrtRowHdr BrtColSpan".to_string(),
-                    val: format!("{first}..={last}"),
+                    typ: "BrtRowHdr BrtColSpan",
+                    val: "..=",
                 });
             }
             previous_segment = Some(segment);
@@ -256,8 +256,8 @@ where
                 row,
                 u32::from(flags & 0xFE),
                 || Error::Unrecognized {
-                    typ: "Cell flags".to_string(),
-                    val: format!("0x{flags:02X}"),
+                    typ: "Cell flags",
+                    val: "0x",
                 },
             )?;
         }
@@ -265,8 +265,8 @@ where
         let style_id = u32::from(data[4]) | (u32::from(data[5]) << 8) | (u32::from(data[6]) << 16);
         if style_id as usize >= cell_xf_count {
             return Err(Error::Unrecognized {
-                typ: "Cell iStyleRef".to_string(),
-                val: format!("{style_id} (cell XF count {cell_xf_count})"),
+                typ: "Cell iStyleRef",
+                val: "(cell XF count )",
             });
         }
         Ok(CellHeader {
@@ -286,17 +286,17 @@ where
                 let Some(guid) = rule.classic_extension_guid else {
                     continue;
                 };
-                let bar = rule.data_bar.as_ref().ok_or_else(|| Error::Unrecognized {
-                    typ: "BrtCFRuleExt".to_string(),
-                    val: "is attached to a non-data-bar rule".to_string(),
+                let bar = rule.data_bar.as_ref().ok_or(Error::Unrecognized {
+                    typ: "BrtCFRuleExt",
+                    val: "is attached to a non-data-bar rule",
                 })?;
                 if classic
                     .insert(guid, (rule.priority, bar.min_length, bar.max_length))
                     .is_some()
                 {
                     return Err(Error::Unrecognized {
-                        typ: "BrtCFRuleExt".to_string(),
-                        val: "duplicate GUID".to_string(),
+                        typ: "BrtCFRuleExt",
+                        val: "duplicate GUID",
                     });
                 }
             }
@@ -324,8 +324,8 @@ where
                 };
                 if !matched.insert(metadata.guid) {
                     return Err(Error::Unrecognized {
-                        typ: "BrtBeginCFRule14".to_string(),
-                        val: "multiple data-bar extensions use the same GUID".to_string(),
+                        typ: "BrtBeginCFRule14",
+                        val: "multiple data-bar extensions use the same GUID",
                     });
                 }
                 let bar = rule
@@ -339,17 +339,17 @@ where
                 };
                 if (classic_min, classic_max) != expected_lengths {
                     return Err(Error::Unrecognized {
-                        typ: "BrtBeginDatabar14".to_string(),
-                        val: "widths do not agree with the linked classic data bar".to_string(),
+                        typ: "BrtBeginDatabar14",
+                        val: "widths do not agree with the linked classic data bar",
                     });
                 }
                 metadata.linked_classic_priority = Some(priority);
             }
         }
-        if let Some(orphan) = classic.keys().find(|guid| !matched.contains(*guid)) {
+        if let Some(_orphan) = classic.keys().find(|guid| !matched.contains(*guid)) {
             return Err(Error::Unrecognized {
-                typ: "BrtCFRuleExt".to_string(),
-                val: format!("GUID {orphan:02X?} has no matching data-bar extension"),
+                typ: "BrtCFRuleExt",
+                val: "GUID has no matching data-bar extension",
             });
         }
         Ok(())
@@ -366,11 +366,11 @@ where
                 kind::D_VAL_LIST => {
                     if pending_list.is_some() {
                         return Err(Error::Unrecognized {
-                            typ: "BrtDValList".to_string(),
-                            val: "consecutive list overrides".to_string(),
+                            typ: "BrtDValList",
+                            val: "consecutive list overrides",
                         });
                     }
-                    pending_list = Some(parse_dval_list(&self.buf)?);
+                    pending_list = Some(parse_dval_list(&self.buf, self.raw_limits)?);
                 },
                 kind::D_VAL => {
                     let location = u32::try_from(self.data_validations.len()).unwrap_or(u32::MAX);
@@ -378,6 +378,7 @@ where
                         &self.buf,
                         pending_list.take(),
                         self.formula_context,
+                        self.raw_limits,
                         &mut Tolerance::recording(&mut self.tolerance),
                         location,
                     )?;
@@ -392,16 +393,16 @@ where
                     }
                     if pending_list.is_some() {
                         return Err(Error::Unrecognized {
-                            typ: "BrtDValList".to_string(),
-                            val: "not followed by BrtDVal".to_string(),
+                            typ: "BrtDValList",
+                            val: "not followed by BrtDVal",
                         });
                     }
                     break;
                 },
                 _ => {
                     return Err(Error::Unrecognized {
-                        typ: "BrtBeginDVals collection".to_string(),
-                        val: format!("unexpected record 0x{typ:04X}"),
+                        typ: "BrtBeginDVals collection",
+                        val: "unexpected record",
                     });
                 },
             }
@@ -409,8 +410,8 @@ where
         let found = self.data_validations.len() - start;
         if found != expected_count as usize {
             return Err(Error::Unrecognized {
-                typ: "BrtBeginDVals count".to_string(),
-                val: format!("declared {expected_count}, found {found}"),
+                typ: "BrtBeginDVals count",
+                val: "declared",
             });
         }
         Ok(())
@@ -429,6 +430,7 @@ where
                         .push(Validation::parse_extension14_with(
                             &self.buf,
                             self.formula_context,
+                            self.raw_limits,
                             &mut Tolerance::recording(&mut self.tolerance),
                             location,
                         )?);
@@ -444,8 +446,8 @@ where
                 },
                 _ => {
                     return Err(Error::Unrecognized {
-                        typ: "BrtBeginDVals14 collection".to_string(),
-                        val: format!("unexpected record 0x{typ:04X}"),
+                        typ: "BrtBeginDVals14 collection",
+                        val: "unexpected record",
                     });
                 },
             }
@@ -453,8 +455,8 @@ where
         let found = self.data_validations.len() - start;
         if found != expected_count as usize {
             return Err(Error::Unrecognized {
-                typ: "BrtBeginDVals14 count".to_string(),
-                val: format!("declared {expected_count}, found {found}"),
+                typ: "BrtBeginDVals14 count",
+                val: "declared",
             });
         }
         Ok(())
@@ -472,7 +474,12 @@ where
             let _ = self.iter.fill_buffer(&mut self.buf)?;
             match typ {
                 kind::BEGIN_CF_RULE => {
-                    let mut rule = Rule::parse_with_context(&self.buf, base, self.formula_context)?;
+                    let mut rule = Rule::parse_with_context(
+                        &self.buf,
+                        base,
+                        self.formula_context,
+                        self.raw_limits,
+                    )?;
                     if formatting
                         .rules
                         .iter()
@@ -480,8 +487,8 @@ where
                         .any(|existing| existing.priority == rule.priority)
                     {
                         return Err(Error::Unrecognized {
-                            typ: "BrtBeginCFRule priority".to_string(),
-                            val: format!("duplicate {}", rule.priority),
+                            typ: "BrtBeginCFRule priority",
+                            val: "duplicate",
                         });
                     }
                     self.consume_conditional_rule(&mut rule, base)?;
@@ -498,19 +505,16 @@ where
                 },
                 _ => {
                     return Err(Error::Unrecognized {
-                        typ: "BrtBeginConditionalFormatting collection".to_string(),
-                        val: format!("unexpected record 0x{typ:04X}"),
+                        typ: "BrtBeginConditionalFormatting collection",
+                        val: "unexpected record",
                     });
                 },
             }
         }
         if formatting.rules.len() != expected_count as usize {
             return Err(Error::Unrecognized {
-                typ: "BrtBeginConditionalFormatting count".to_string(),
-                val: format!(
-                    "declared {expected_count}, found {}",
-                    formatting.rules.len()
-                ),
+                typ: "BrtBeginConditionalFormatting count",
+                val: "declared",
             });
         }
         Ok(())
@@ -532,6 +536,7 @@ where
                         &self.buf,
                         base,
                         self.formula_context,
+                        self.raw_limits,
                     )?;
                     let signed_priority = rule
                         .extension14
@@ -546,8 +551,8 @@ where
                             .any(|existing| existing.priority == rule.priority)
                     {
                         return Err(Error::Unrecognized {
-                            typ: "BrtBeginCFRule14 priority".to_string(),
-                            val: format!("duplicate {}", rule.priority),
+                            typ: "BrtBeginCFRule14 priority",
+                            val: "duplicate",
                         });
                     }
                     self.consume_extension_conditional_rule(&mut rule, base)?;
@@ -564,19 +569,16 @@ where
                 },
                 _ => {
                     return Err(Error::Unrecognized {
-                        typ: "BrtBeginConditionalFormatting14 collection".to_string(),
-                        val: format!("unexpected record 0x{typ:04X}"),
+                        typ: "BrtBeginConditionalFormatting14 collection",
+                        val: "unexpected record",
                     });
                 },
             }
         }
         if formatting.rules.len() != expected_count as usize {
             return Err(Error::Unrecognized {
-                typ: "BrtBeginConditionalFormatting14 count".to_string(),
-                val: format!(
-                    "declared {expected_count}, found {}",
-                    formatting.rules.len()
-                ),
+                typ: "BrtBeginConditionalFormatting14 count",
+                val: "declared",
             });
         }
         Ok(())
@@ -595,8 +597,8 @@ where
                 kind::BEGIN_COLOR_SCALE14 => {
                     if rule.color_scale14.is_some() || !self.buf.is_empty() {
                         return Err(Error::Unrecognized {
-                            typ: "BrtBeginColorScale14".to_string(),
-                            val: "duplicate record or nonempty payload".to_string(),
+                            typ: "BrtBeginColorScale14",
+                            val: "duplicate record or nonempty payload",
                         });
                     }
                     rule.color_scale14 = Some(self.consume_color_scale14(base)?);
@@ -604,8 +606,8 @@ where
                 kind::BEGIN_DATABAR14 => {
                     if rule.data_bar14.is_some() {
                         return Err(Error::Unrecognized {
-                            typ: "BrtBeginDatabar14".to_string(),
-                            val: "duplicate record".to_string(),
+                            typ: "BrtBeginDatabar14",
+                            val: "duplicate record",
                         });
                     }
                     let begin = self.buf.clone();
@@ -619,8 +621,8 @@ where
                 kind::BEGIN_ICON_SET14 => {
                     if rule.icon_set14.is_some() {
                         return Err(Error::Unrecognized {
-                            typ: "BrtBeginIconSet14".to_string(),
-                            val: "duplicate record".to_string(),
+                            typ: "BrtBeginIconSet14",
+                            val: "duplicate record",
                         });
                     }
                     let begin = self.buf.clone();
@@ -637,8 +639,8 @@ where
                 },
                 _ => {
                     return Err(Error::Unrecognized {
-                        typ: "BrtBeginCFRule14 collection".to_string(),
-                        val: format!("unexpected record 0x{typ:04X}"),
+                        typ: "BrtBeginCFRule14 collection",
+                        val: "unexpected record",
                     });
                 },
             }
@@ -667,8 +669,8 @@ where
         };
         if !valid_visual {
             return Err(Error::Unrecognized {
-                typ: "BrtBeginCFRule14 collection".to_string(),
-                val: "visualization records do not match rule type".to_string(),
+                typ: "BrtBeginCFRule14 collection",
+                val: "visualization records do not match rule type",
             });
         }
         Ok(())
@@ -687,8 +689,8 @@ where
                 kind::BEGIN_COLOR_SCALE => {
                     if rule.color_scale.is_some() || !self.buf.is_empty() {
                         return Err(Error::Unrecognized {
-                            typ: "BrtBeginColorScale".to_string(),
-                            val: "duplicate record or nonempty payload".to_string(),
+                            typ: "BrtBeginColorScale",
+                            val: "duplicate record or nonempty payload",
                         });
                     }
                     rule.color_scale = Some(self.consume_color_scale(base)?);
@@ -696,8 +698,8 @@ where
                 kind::BEGIN_DATABAR => {
                     if rule.data_bar.is_some() {
                         return Err(Error::Unrecognized {
-                            typ: "BrtBeginDatabar".to_string(),
-                            val: "duplicate record".to_string(),
+                            typ: "BrtBeginDatabar",
+                            val: "duplicate record",
                         });
                     }
                     let begin = self.buf.clone();
@@ -706,8 +708,8 @@ where
                 kind::BEGIN_ICON_SET => {
                     if rule.icon_set.is_some() {
                         return Err(Error::Unrecognized {
-                            typ: "BrtBeginIconSet".to_string(),
-                            val: "duplicate record".to_string(),
+                            typ: "BrtBeginIconSet",
+                            val: "duplicate record",
                         });
                     }
                     let begin = self.buf.clone();
@@ -716,11 +718,12 @@ where
                 kind::CF_RULE_EXT => {
                     if rule.classic_extension_guid.is_some() {
                         return Err(Error::Unrecognized {
-                            typ: "BrtCFRuleExt".to_string(),
-                            val: "duplicate record".to_string(),
+                            typ: "BrtCFRuleExt",
+                            val: "duplicate record",
                         });
                     }
-                    rule.classic_extension_guid = Some(parse_rule_extension_guid(&self.buf)?);
+                    rule.classic_extension_guid =
+                        Some(parse_rule_extension_guid(&self.buf, self.raw_limits)?);
                 },
                 kind::END_CF_RULE => {
                     if !self.buf.is_empty() {
@@ -733,8 +736,8 @@ where
                 },
                 _ => {
                     return Err(Error::Unrecognized {
-                        typ: "BrtBeginCFRule collection".to_string(),
-                        val: format!("unexpected record 0x{typ:04X}"),
+                        typ: "BrtBeginCFRule collection",
+                        val: "unexpected record",
                     });
                 },
             }
@@ -753,8 +756,8 @@ where
         };
         if !valid_visual {
             return Err(Error::Unrecognized {
-                typ: "BrtBeginCFRule collection".to_string(),
-                val: "visualization records do not match rule type".to_string(),
+                typ: "BrtBeginCFRule collection",
+                val: "visualization records do not match rule type",
             });
         }
         Ok(())
@@ -772,21 +775,22 @@ where
                     &self.buf,
                     base,
                     self.formula_context,
+                    self.raw_limits,
                 )?),
-                kind::COLOR => colors.push(Color::parse(&self.buf)?),
+                kind::COLOR => colors.push(Color::parse(&self.buf, self.raw_limits)?),
                 kind::END_COLOR_SCALE if self.buf.is_empty() => break,
                 _ => {
                     return Err(Error::Unrecognized {
-                        typ: "BrtBeginColorScale collection".to_string(),
-                        val: format!("unexpected record 0x{typ:04X}"),
+                        typ: "BrtBeginColorScale collection",
+                        val: "unexpected record",
                     });
                 },
             }
         }
         if !(cfvos.len() == 2 || cfvos.len() == 3) || colors.len() != cfvos.len() {
             return Err(Error::Unrecognized {
-                typ: "BrtBeginColorScale collection".to_string(),
-                val: format!("{} thresholds and {} colors", cfvos.len(), colors.len()),
+                typ: "BrtBeginColorScale collection",
+                val: "thresholds and colors",
             });
         }
         if cfvos.first().is_some_and(|cfvo| cfvo.cfvo_type == 3)
@@ -794,30 +798,30 @@ where
             || (cfvos.len() == 3 && matches!(cfvos[1].cfvo_type, 2 | 3))
         {
             return Err(Error::Unrecognized {
-                typ: "BrtBeginColorScale collection".to_string(),
-                val: "invalid min/mid/max threshold type".to_string(),
+                typ: "BrtBeginColorScale collection",
+                val: "invalid min/mid/max threshold type",
             });
         }
         let has_middle = colors.len() == 3;
         let mut cfvos = cfvos.into_iter();
-        let min_cfvo = cfvos.next().ok_or_else(|| Error::Unrecognized {
-            typ: "BrtBeginColorScale collection".to_string(),
-            val: "missing minimum threshold".to_string(),
+        let min_cfvo = cfvos.next().ok_or(Error::Unrecognized {
+            typ: "BrtBeginColorScale collection",
+            val: "missing minimum threshold",
         })?;
         let middle_cfvo = if has_middle { cfvos.next() } else { None };
-        let max_cfvo = cfvos.next().ok_or_else(|| Error::Unrecognized {
-            typ: "BrtBeginColorScale collection".to_string(),
-            val: "missing maximum threshold".to_string(),
+        let max_cfvo = cfvos.next().ok_or(Error::Unrecognized {
+            typ: "BrtBeginColorScale collection",
+            val: "missing maximum threshold",
         })?;
         let mut colors = colors.into_iter();
-        let min_color_record = colors.next().ok_or_else(|| Error::Unrecognized {
-            typ: "BrtBeginColorScale collection".to_string(),
-            val: "missing minimum color".to_string(),
+        let min_color_record = colors.next().ok_or(Error::Unrecognized {
+            typ: "BrtBeginColorScale collection",
+            val: "missing minimum color",
         })?;
         let mid_color_record = if has_middle { colors.next() } else { None };
-        let max_color_record = colors.next().ok_or_else(|| Error::Unrecognized {
-            typ: "BrtBeginColorScale collection".to_string(),
-            val: "missing maximum color".to_string(),
+        let max_color_record = colors.next().ok_or(Error::Unrecognized {
+            typ: "BrtBeginColorScale collection",
+            val: "missing maximum color",
         })?;
         Ok(Scale {
             min_cfvo,
@@ -840,15 +844,20 @@ where
             let typ = self.iter.read_type()?;
             let _ = self.iter.fill_buffer(&mut self.buf)?;
             match typ {
-                kind::CFVO14 if colors.is_empty() => cfvos.push(
-                    Value::parse_extension14_with_context(&self.buf, base, self.formula_context)?,
-                ),
-                kind::COLOR14 => colors.push(Color::parse_extension14(&self.buf)?),
+                kind::CFVO14 if colors.is_empty() => {
+                    cfvos.push(Value::parse_extension14_with_context(
+                        &self.buf,
+                        base,
+                        self.formula_context,
+                        self.raw_limits,
+                    )?)
+                },
+                kind::COLOR14 => colors.push(Color::parse_extension14(&self.buf, self.raw_limits)?),
                 kind::END_COLOR_SCALE14 if self.buf.is_empty() => break,
                 _ => {
                     return Err(Error::Unrecognized {
-                        typ: "BrtBeginColorScale14 collection".to_string(),
-                        val: format!("unexpected record 0x{typ:04X}"),
+                        typ: "BrtBeginColorScale14 collection",
+                        val: "unexpected record",
                     });
                 },
             }
@@ -859,8 +868,8 @@ where
     pub(super) fn consume_data_bar(&mut self, begin: &[u8], base: (u32, u32)) -> Result<Bar> {
         if begin.len() != 3 || begin[0] > begin[1] || begin[1] > 100 || begin[2] > 1 {
             return Err(Error::Unrecognized {
-                typ: "BrtBeginDatabar".to_string(),
-                val: "invalid width or show-value field".to_string(),
+                typ: "BrtBeginDatabar",
+                val: "invalid width or show-value field",
             });
         }
         let mut cfvos = Vec::new();
@@ -874,37 +883,40 @@ where
                     &self.buf,
                     base,
                     self.formula_context,
+                    self.raw_limits,
                 )?),
-                kind::COLOR if color.is_none() => color = Some(Color::parse(&self.buf)?),
+                kind::COLOR if color.is_none() => {
+                    color = Some(Color::parse(&self.buf, self.raw_limits)?)
+                },
                 kind::END_DATABAR if self.buf.is_empty() => break,
                 _ => {
                     return Err(Error::Unrecognized {
-                        typ: "BrtBeginDatabar collection".to_string(),
-                        val: format!("unexpected record 0x{typ:04X}"),
+                        typ: "BrtBeginDatabar collection",
+                        val: "unexpected record",
                     });
                 },
             }
         }
         if cfvos.len() != 2 || color.is_none() {
             return Err(Error::Unrecognized {
-                typ: "BrtBeginDatabar collection".to_string(),
-                val: format!("{} thresholds, color={}", cfvos.len(), color.is_some()),
+                typ: "BrtBeginDatabar collection",
+                val: "thresholds",
             });
         }
         if cfvos[0].cfvo_type == 3 || cfvos[1].cfvo_type == 2 {
             return Err(Error::Unrecognized {
-                typ: "BrtBeginDatabar collection".to_string(),
-                val: "invalid minimum/maximum threshold type".to_string(),
+                typ: "BrtBeginDatabar collection",
+                val: "invalid minimum/maximum threshold type",
             });
         }
         let [min_cfvo, max_cfvo]: [Value; 2] =
             cfvos.try_into().map_err(|_| Error::Unrecognized {
-                typ: "BrtBeginDatabar collection".to_string(),
-                val: "invalid threshold count".to_string(),
+                typ: "BrtBeginDatabar collection",
+                val: "invalid threshold count",
             })?;
-        let color_record = color.ok_or_else(|| Error::Unrecognized {
-            typ: "BrtBeginDatabar collection".to_string(),
-            val: "missing color".to_string(),
+        let color_record = color.ok_or(Error::Unrecognized {
+            typ: "BrtBeginDatabar collection",
+            val: "missing color",
         })?;
         Ok(Bar {
             min_cfvo,
@@ -923,7 +935,7 @@ where
         base: (u32, u32),
         priority: i32,
     ) -> Result<Bar14> {
-        let header = Bar14::parse_header(begin)?;
+        let header = Bar14::parse_header(begin, self.raw_limits)?;
         let mut cfvos = Vec::new();
         let mut colors = Vec::new();
         loop {
@@ -931,15 +943,20 @@ where
             let typ = self.iter.read_type()?;
             let _ = self.iter.fill_buffer(&mut self.buf)?;
             match typ {
-                kind::CFVO14 if colors.is_empty() => cfvos.push(
-                    Value::parse_extension14_with_context(&self.buf, base, self.formula_context)?,
-                ),
-                kind::COLOR14 => colors.push(Color::parse_extension14(&self.buf)?),
+                kind::CFVO14 if colors.is_empty() => {
+                    cfvos.push(Value::parse_extension14_with_context(
+                        &self.buf,
+                        base,
+                        self.formula_context,
+                        self.raw_limits,
+                    )?)
+                },
+                kind::COLOR14 => colors.push(Color::parse_extension14(&self.buf, self.raw_limits)?),
                 kind::END_DATABAR14 if self.buf.is_empty() => break,
                 _ => {
                     return Err(Error::Unrecognized {
-                        typ: "BrtBeginDatabar14 collection".to_string(),
-                        val: format!("unexpected record 0x{typ:04X}"),
+                        typ: "BrtBeginDatabar14 collection",
+                        val: "unexpected record",
                     });
                 },
             }
@@ -949,8 +966,8 @@ where
             || matches!(cfvos[1].cfvo_type, 2 | 8)
         {
             return Err(Error::Unrecognized {
-                typ: "BrtBeginDatabar14 collection".to_string(),
-                val: "invalid minimum/maximum thresholds".to_string(),
+                typ: "BrtBeginDatabar14 collection",
+                val: "invalid minimum/maximum thresholds",
             });
         }
         let expected_colors = usize::from(priority != -1)
@@ -960,8 +977,8 @@ where
             + usize::from(header.axis_position != AxisPosition14::None);
         if colors.len() != expected_colors {
             return Err(Error::Unrecognized {
-                typ: "BrtBeginDatabar14 collection".to_string(),
-                val: format!("expected {expected_colors} colors, found {}", colors.len()),
+                typ: "BrtBeginDatabar14 collection",
+                val: "expected colors",
             });
         }
         let [min_cfvo, max_cfvo]: [Value; 2] = cfvos.try_into().expect("validated two thresholds");
@@ -1007,8 +1024,8 @@ where
         let flags = binary::read_u16_le_at(begin, 4)?;
         if icon_set > 16 || flags & !0x7e != 0 {
             return Err(Error::Unrecognized {
-                typ: "BrtBeginIconSet".to_string(),
-                val: format!("set {icon_set}, flags 0x{flags:04X}"),
+                typ: "BrtBeginIconSet",
+                val: "set, flags",
             });
         }
         let expected = if icon_set <= 7 {
@@ -1028,20 +1045,21 @@ where
                     &self.buf,
                     base,
                     self.formula_context,
+                    self.raw_limits,
                 )?),
                 kind::END_ICON_SET if self.buf.is_empty() => break,
                 _ => {
                     return Err(Error::Unrecognized {
-                        typ: "BrtBeginIconSet collection".to_string(),
-                        val: format!("unexpected record 0x{typ:04X}"),
+                        typ: "BrtBeginIconSet collection",
+                        val: "unexpected record",
                     });
                 },
             }
         }
         if cfvos.len() != expected {
             return Err(Error::Unrecognized {
-                typ: "BrtBeginIconSet collection".to_string(),
-                val: format!("expected {expected} thresholds, found {}", cfvos.len()),
+                typ: "BrtBeginIconSet collection",
+                val: "expected thresholds",
             });
         }
         if cfvos
@@ -1049,8 +1067,8 @@ where
             .any(|cfvo| matches!(cfvo.cfvo_type, 2 | 3 | 8 | 9) || !cfvo.save_greater_than_or_equal)
         {
             return Err(Error::Unrecognized {
-                typ: "BrtBeginIconSet collection".to_string(),
-                val: "invalid threshold type or fSaveGTE flag".to_string(),
+                typ: "BrtBeginIconSet collection",
+                val: "invalid threshold type or fSaveGTE flag",
             });
         }
         Ok(IconSet {
@@ -1066,7 +1084,7 @@ where
         begin: &[u8],
         base: (u32, u32),
     ) -> Result<IconSet14> {
-        let header = IconSet14::parse_header(begin)?;
+        let header = IconSet14::parse_header(begin, self.raw_limits)?;
         let expected = icon_count14(header.icon_set_type);
         let mut cfvos = Vec::new();
         let mut icons = Vec::new();
@@ -1075,15 +1093,20 @@ where
             let typ = self.iter.read_type()?;
             let _ = self.iter.fill_buffer(&mut self.buf)?;
             match typ {
-                kind::CFVO14 if icons.is_empty() => cfvos.push(
-                    Value::parse_extension14_with_context(&self.buf, base, self.formula_context)?,
-                ),
-                kind::CF_ICON => icons.push(Icon::parse(&self.buf)?),
+                kind::CFVO14 if icons.is_empty() => {
+                    cfvos.push(Value::parse_extension14_with_context(
+                        &self.buf,
+                        base,
+                        self.formula_context,
+                        self.raw_limits,
+                    )?)
+                },
+                kind::CF_ICON => icons.push(Icon::parse(&self.buf, self.raw_limits)?),
                 kind::END_ICON_SET14 if self.buf.is_empty() => break,
                 _ => {
                     return Err(Error::Unrecognized {
-                        typ: "BrtBeginIconSet14 collection".to_string(),
-                        val: format!("unexpected record 0x{typ:04X}"),
+                        typ: "BrtBeginIconSet14 collection",
+                        val: "unexpected record",
                     });
                 },
             }
@@ -1094,14 +1117,14 @@ where
             })
         {
             return Err(Error::Unrecognized {
-                typ: "BrtBeginIconSet14 collection".to_string(),
-                val: format!("invalid set of {} thresholds", cfvos.len()),
+                typ: "BrtBeginIconSet14 collection",
+                val: "invalid set of thresholds",
             });
         }
         if (header.custom && icons.len() != expected) || (!header.custom && !icons.is_empty()) {
             return Err(Error::Unrecognized {
-                typ: "BrtBeginIconSet14 collection".to_string(),
-                val: format!("invalid set of {} custom icons", icons.len()),
+                typ: "BrtBeginIconSet14 collection",
+                val: "invalid set of custom icons",
             });
         }
         Ok(IconSet14 {
@@ -1131,10 +1154,8 @@ where
             || last_column >= 0x4000
         {
             return Err(Error::Unrecognized {
-                typ: "BrtBeginAFilter rfx".to_string(),
-                val: format!(
-                    "rows {first_row}..={last_row}, columns {first_column}..={last_column}"
-                ),
+                typ: "BrtBeginAFilter rfx",
+                val: "rows, columns",
             });
         }
         Ok(AutoFilter {
@@ -1161,8 +1182,8 @@ where
             }
             if typ == kind::BEGIN_A_FILTER {
                 return Err(Error::Unrecognized {
-                    typ: "BrtBeginAFilter".to_string(),
-                    val: "nested AutoFilter".to_string(),
+                    typ: "BrtBeginAFilter",
+                    val: "nested AutoFilter",
                 });
             }
         }
@@ -1181,8 +1202,8 @@ where
             let value = binary::read_u32_le_at(data, 2 + index * 4)?;
             if value > 1 {
                 return Err(Error::Unrecognized {
-                    typ: "BrtSheetProtection Boolean".to_string(),
-                    val: format!("field {index}: {value}"),
+                    typ: "BrtSheetProtection Boolean",
+                    val: "field",
                 });
             }
             *flag = value != 0;
@@ -1241,8 +1262,8 @@ where
         let spin_count = binary::read_u32_le_at(data, 0)?;
         if spin_count > 10_000_000 {
             return Err(Error::Unrecognized {
-                typ: "BrtSheetProtectionIso dwSpinCount".to_string(),
-                val: spin_count.to_string(),
+                typ: "BrtSheetProtectionIso dwSpinCount",
+                val: "unexpected value",
             });
         }
         let mut flags = [false; 16];
@@ -1250,8 +1271,8 @@ where
             let value = binary::read_u32_le_at(data, 4 + index * 4)?;
             if value > 1 {
                 return Err(Error::Unrecognized {
-                    typ: "BrtSheetProtectionIso Boolean".to_string(),
-                    val: format!("field {index}: {value}"),
+                    typ: "BrtSheetProtectionIso Boolean",
+                    val: "field",
                 });
             }
             *flag = value != 0;
@@ -1260,21 +1281,21 @@ where
         let hash = Self::read_length_prefixed_bytes(data, &mut offset, "rgbHash")?;
         if hash.is_empty() {
             return Err(Error::Unrecognized {
-                typ: "BrtSheetProtectionIso rgbHash".to_string(),
-                val: "empty".to_string(),
+                typ: "BrtSheetProtectionIso rgbHash",
+                val: "empty",
             });
         }
         let salt = Self::read_length_prefixed_bytes(data, &mut offset, "rgbSalt")?;
         let algorithm = Self::read_nullable_wide_string(data, &mut offset)?
             .filter(|value| !value.is_empty())
-            .ok_or_else(|| Error::Unrecognized {
-                typ: "BrtSheetProtectionIso szAlgName".to_string(),
-                val: "null or empty".to_string(),
+            .ok_or(Error::Unrecognized {
+                typ: "BrtSheetProtectionIso szAlgName",
+                val: "null or empty",
             })?;
         if offset != data.len() {
             return Err(Error::Unrecognized {
-                typ: "BrtSheetProtectionIso".to_string(),
-                val: format!("{} trailing bytes", data.len() - offset),
+                typ: "BrtSheetProtectionIso",
+                val: "trailing bytes",
             });
         }
         Ok((
@@ -1291,11 +1312,11 @@ where
     pub(super) fn read_length_prefixed_bytes(
         data: &[u8],
         offset: &mut usize,
-        field: &str,
+        _field: &str,
     ) -> Result<Vec<u8>> {
-        let data_offset = offset.checked_add(4).ok_or_else(|| {
-            Error::Encoding(format!("BrtSheetProtectionIso {field} offset overflow"))
-        })?;
+        let data_offset = offset
+            .checked_add(4)
+            .ok_or(Error::Encoding("BrtSheetProtectionIso offset overflow"))?;
         if data_offset > data.len() {
             return Err(Error::InvalidLength {
                 expected: data_offset,
@@ -1303,9 +1324,9 @@ where
             });
         }
         let count = binary::read_u32_le_at(data, *offset)? as usize;
-        let end = data_offset.checked_add(count).ok_or_else(|| {
-            Error::Encoding(format!("BrtSheetProtectionIso {field} size overflow"))
-        })?;
+        let end = data_offset
+            .checked_add(count)
+            .ok_or(Error::Encoding("BrtSheetProtectionIso size overflow"))?;
         if end > data.len() {
             return Err(Error::InvalidLength {
                 expected: end,
@@ -1322,7 +1343,7 @@ where
     ) -> Result<Option<String>> {
         let text_offset = offset
             .checked_add(4)
-            .ok_or_else(|| Error::Encoding("ISO algorithm offset overflow".to_string()))?;
+            .ok_or(Error::Encoding("ISO algorithm offset overflow"))?;
         if text_offset > data.len() {
             return Err(Error::InvalidLength {
                 expected: text_offset,
@@ -1336,10 +1357,10 @@ where
         }
         let byte_count = (count as usize)
             .checked_mul(2)
-            .ok_or_else(|| Error::Encoding("ISO algorithm size overflow".to_string()))?;
+            .ok_or(Error::Encoding("ISO algorithm size overflow"))?;
         let end = text_offset
             .checked_add(byte_count)
-            .ok_or_else(|| Error::Encoding("ISO algorithm end overflow".to_string()))?;
+            .ok_or(Error::Encoding("ISO algorithm end overflow"))?;
         if end > data.len() {
             return Err(Error::InvalidLength {
                 expected: end,
@@ -1353,7 +1374,7 @@ where
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect::<Vec<_>>();
         let value = String::from_utf16(&units)
-            .map_err(|error| Error::Encoding(format!("invalid ISO algorithm: {error}")))?;
+            .map_err(|_error| Error::Encoding("invalid ISO algorithm"))?;
         *offset = end;
         Ok(Some(value))
     }

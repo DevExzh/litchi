@@ -1,5 +1,6 @@
 //! Package-level authoring and relationship-graph operations.
 
+use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
@@ -90,10 +91,17 @@ pub(crate) fn preflight_add_slide_layout(
 /// slide-master relationship plus a `p:sldMasterId` entry whose ID is one
 /// above the current maximum (starting at [`MIN_MASTER_OR_LAYOUT_ID`]).
 ///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn add_slide_master(package: &mut OpcPackage) -> Result<AuthoredSlideMaster> {
+pub(crate) fn add_slide_master(package: &mut OpcPackage) -> Result<AuthoredSlideMaster> {
     let mut candidate = package.clone();
     let result = add_slide_master_inner(&mut candidate)?;
     *package = candidate;
@@ -114,6 +122,7 @@ fn add_slide_master_inner(package: &mut OpcPackage) -> Result<AuthoredSlideMaste
 
     let (theme_target, new_theme) = theme_target_for_new_master(package, master_dir)?;
 
+    refuse_signed_change(package)?;
     let presentation = package.get_part_mut(&presentation_name)?;
     let relationship_id = presentation.relate_to(
         &format!("slideMasters/slideMaster{master_index}.xml"),
@@ -152,7 +161,7 @@ fn add_slide_master_inner(package: &mut OpcPackage) -> Result<AuthoredSlideMaste
     master_part.relate_to(&theme_target, rt::THEME);
     package.add_part(Box::new(master_part));
 
-    invalidate_signatures(package);
+    settle_unsigned_change(package)?;
     validate_master_layout_graph(package)?;
     Ok(AuthoredSlideMaster {
         master_id,
@@ -169,10 +178,17 @@ fn add_slide_master_inner(package: &mut OpcPackage) -> Result<AuthoredSlideMaste
 /// optional placeholder shapes, and carries the required relationship back to
 /// its owning master.
 ///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn add_slide_layout(
+pub(crate) fn add_slide_layout(
     package: &mut OpcPackage,
     master_part_name: &PackURI,
     kind: SlideLayoutKind,
@@ -213,6 +229,7 @@ fn add_slide_layout_inner(
         .map_err(|error| Error::Uri(format!("slide layout partname: {error}")))?;
     let layout_xml = layout_xml(kind, name, placeholders)?;
 
+    refuse_signed_change(package)?;
     let master_part = package.get_part_mut(&master_uri)?;
     let relationship_id = master_part.relate_to(
         &format!("../slideLayouts/slideLayout{layout_index}.xml"),
@@ -247,7 +264,7 @@ fn add_slide_layout_inner(
     );
     package.add_part(Box::new(layout_part));
 
-    invalidate_signatures(package);
+    settle_unsigned_change(package)?;
     validate_master_layout_graph(package)?;
     Ok(AuthoredSlideLayout {
         layout_id,
@@ -266,15 +283,42 @@ fn add_slide_layout_inner(
 /// shape is appended to the shape tree with the next free shape ID. The
 /// optional text replaces the placeholder's prompt text.
 ///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
-pub fn store_placeholder_shape(
+#[cfg(test)]
+pub(crate) fn store_placeholder_shape(
     package: &mut OpcPackage,
     part_name: &PackURI,
     spec: &PlaceholderSpec,
 ) -> Result<()> {
-    super::placeholder::store_placeholder_shape_source(package, part_name, spec)
+    store_placeholder_shape_with_shape_limits(
+        package,
+        part_name,
+        spec,
+        crate::shape::Limits::DEFAULT,
+    )
+}
+
+pub(crate) fn store_placeholder_shape_with_shape_limits(
+    package: &mut OpcPackage,
+    part_name: &PackURI,
+    spec: &PlaceholderSpec,
+    shape_limits: crate::shape::Limits,
+) -> Result<()> {
+    super::placeholder::store_placeholder_shape_source_with_shape_limits(
+        package,
+        part_name,
+        spec,
+        shape_limits,
+    )
 }
 
 /// Delete a slide layout that is not referenced by any slide.
@@ -283,10 +327,20 @@ pub fn store_placeholder_shape(
 /// together with the layout part itself. Layouts still referenced by a slide,
 /// or not owned by any master, are rejected.
 ///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn remove_slide_layout(package: &mut OpcPackage, layout_part_name: &PackURI) -> Result<()> {
+pub(crate) fn remove_slide_layout(
+    package: &mut OpcPackage,
+    layout_part_name: &PackURI,
+) -> Result<()> {
     let layout_uri = layout_part_name.clone();
     let layout_part = package.get_part(&layout_uri)?;
     if layout_part.content_type() != ct::PML_SLIDE_LAYOUT {
@@ -356,6 +410,7 @@ pub fn remove_slide_layout(package: &mut OpcPackage, layout_part_name: &PackURI)
 
     let master_xml = package.get_part(&master_uri)?.blob().to_vec();
     let patched = remove_id_list_entry(&master_xml, "sldLayoutId", &relationship_id)?;
+    refuse_signed_change(package)?;
     let master_part = package.get_part_mut(&master_uri)?;
     master_part.set_blob(patched);
     if master_part.rels_mut().remove(&relationship_id).is_none() {
@@ -365,7 +420,7 @@ pub fn remove_slide_layout(package: &mut OpcPackage, layout_part_name: &PackURI)
     }
     package.remove_part(&layout_uri);
 
-    invalidate_signatures(package);
+    settle_unsigned_change(package)?;
     validate_master_layout_graph(package)?;
     Ok(())
 }
@@ -497,6 +552,128 @@ fn validate_master_layouts(package: &OpcPackage, master_part: &dyn Part) -> Resu
         }
     }
     Ok(())
+}
+
+/// The part of the slide master `id` (record 0356a).
+pub(crate) fn resolve_master(package: &OpcPackage, id: crate::slide::MasterId) -> Result<PackURI> {
+    let presentation = package.main_document_part()?;
+    let (_, relationship_id) = parse_master_id_list(presentation.blob())?
+        .into_iter()
+        .find(|(candidate, _)| *candidate == id.0)
+        .ok_or_else(|| {
+            Error::refused(
+                litchi_core::edit::RefusalKind::NotFound,
+                "resolve_master",
+                "no slide master has this ID",
+            )
+        })?;
+    internal_target(presentation, &relationship_id, "slide-master")
+}
+
+/// The part of the slide layout `id`, searched in every master in master
+/// order (record 0356a).
+pub(crate) fn resolve_layout(package: &OpcPackage, id: crate::slide::LayoutId) -> Result<PackURI> {
+    let presentation = package.main_document_part()?;
+    for (_, master_relationship) in parse_master_id_list(presentation.blob())? {
+        let master_name = internal_target(presentation, &master_relationship, "slide-master")?;
+        let master = package.get_part(&master_name)?;
+        if let Some(reference) = parse_layout_id_list(master.blob())?
+            .into_iter()
+            .find(|reference| reference.layout_id() == Some(id.0))
+        {
+            return internal_target(master, reference.relationship_id(), "slide-layout");
+        }
+    }
+    Err(Error::refused(
+        litchi_core::edit::RefusalKind::NotFound,
+        "resolve_layout",
+        "no slide layout has this ID",
+    ))
+}
+
+/// The part of a slide, slide layout or slide master (record 0356a).
+pub(crate) fn resolve_owner(
+    package: &OpcPackage,
+    owner: crate::slide::Owner<'_>,
+) -> Result<PackURI> {
+    match owner {
+        crate::slide::Owner::Slide(slide) => crate::package::resolve_slide(package, slide),
+        crate::slide::Owner::Layout(id) => resolve_layout(package, id),
+        crate::slide::Owner::Master(id) => resolve_master(package, id),
+    }
+}
+
+/// The typed ID of the slide master whose part is `part_name`, when one is.
+pub(crate) fn master_id_of(package: &OpcPackage, part_name: &PackURI) -> Result<Option<u32>> {
+    let presentation = package.main_document_part()?;
+    for (master_id, master_relationship) in parse_master_id_list(presentation.blob())? {
+        if internal_target(presentation, &master_relationship, "slide-master")? == *part_name {
+            return Ok(Some(master_id));
+        }
+    }
+    Ok(None)
+}
+
+/// The typed ID of the slide layout whose part is `part_name`, when one is.
+pub(crate) fn layout_id_of(package: &OpcPackage, part_name: &PackURI) -> Result<Option<u32>> {
+    let presentation = package.main_document_part()?;
+    for (_, master_relationship) in parse_master_id_list(presentation.blob())? {
+        let master_name = internal_target(presentation, &master_relationship, "slide-master")?;
+        let master = package.get_part(&master_name)?;
+        for reference in parse_layout_id_list(master.blob())? {
+            if internal_target(master, reference.relationship_id(), "slide-layout")? == *part_name {
+                return Ok(reference.layout_id());
+            }
+        }
+    }
+    Ok(None)
+}
+
+/// Test fixture seam: the [`Owner`](crate::slide::Owner) whose part is
+/// `part_name`.
+#[cfg(test)]
+pub(crate) fn owner_of_part(
+    package: &OpcPackage,
+    part_name: &PackURI,
+) -> Result<crate::slide::Owner<'static>> {
+    if let Some(id) = master_id_of(package, part_name)? {
+        return Ok(crate::slide::MasterId(id).into());
+    }
+    if let Some(id) = layout_id_of(package, part_name)? {
+        return Ok(crate::slide::LayoutId(id).into());
+    }
+    let presentation = crate::Presentation::new(
+        crate::parts::PresentationPart::from_package(package)?,
+        package,
+    );
+    for index in 0..presentation.slide_count()? {
+        if let Some(slide) = presentation.slide(index)?
+            && slide.part().part().partname() == part_name
+        {
+            return Ok(index.into());
+        }
+    }
+    Err(Error::refused(
+        litchi_core::edit::RefusalKind::NotFound,
+        "owner_of_part",
+        "no slide, layout or master has this part",
+    ))
+}
+
+fn internal_target(part: &dyn Part, relationship_id: &str, what: &str) -> Result<PackURI> {
+    let relationship = part.rels().get(relationship_id).ok_or_else(|| {
+        Error::Relationship(format!("missing {what} relationship '{relationship_id}'"))
+    })?;
+    if relationship.is_external() {
+        return Err(Error::Relationship(format!(
+            "{what} relationship '{relationship_id}' is external"
+        )));
+    }
+    relationship.target_partname().map_err(|error| {
+        Error::Relationship(format!(
+            "invalid {what} relationship '{relationship_id}': {error}"
+        ))
+    })
 }
 
 // ============================================================================
@@ -929,8 +1106,4 @@ fn require_placeholders(placeholders: &[PlaceholderSpec]) -> Result<()> {
         }
     }
     Ok(())
-}
-
-fn invalidate_signatures(package: &mut OpcPackage) {
-    package.unsign();
 }

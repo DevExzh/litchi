@@ -1,5 +1,7 @@
 //! Namespace, attribute, and structural validation for ODP XML.
 
+use std::io::BufRead;
+
 use super::super::{
     Attribute, Attributes, BytesStart, DR3D_NAMESPACE, DRAW_NAMESPACE, DrawingAttribute,
     DrawingAttributeNamespace, DrawingShapeKind, Element, Error, HashSet, LocalName, Namespace,
@@ -128,8 +130,8 @@ impl Parser {
         Ok(())
     }
 
-    pub(super) fn require_simple_xlink(
-        reader: &NsReader<&[u8]>,
+    pub(super) fn require_simple_xlink<R: BufRead>(
+        reader: &NsReader<R>,
         element: &BytesStart<'_>,
         description: &str,
     ) -> Result<()> {
@@ -165,8 +167,8 @@ impl Parser {
         element_depth.saturating_sub(1)
     }
 
-    pub(super) fn animation_attributes(
-        reader: &NsReader<&[u8]>,
+    pub(super) fn animation_attributes<R: BufRead>(
+        reader: &NsReader<R>,
         element: &BytesStart<'_>,
     ) -> Result<Vec<Attribute>> {
         if element.attributes().count() > 256 {
@@ -226,8 +228,8 @@ impl Parser {
         Ok(attributes)
     }
 
-    pub(super) fn exact_geometry_attributes(
-        reader: &NsReader<&[u8]>,
+    pub(super) fn exact_geometry_attributes<R: BufRead>(
+        reader: &NsReader<R>,
         element: &BytesStart<'_>,
     ) -> Result<Vec<DrawingAttribute>> {
         let mut attributes = Vec::new();
@@ -266,8 +268,8 @@ impl Parser {
     }
 
     /// Helper to extract attribute values
-    pub(super) fn get_attr(
-        reader: &NsReader<&[u8]>,
+    pub(super) fn get_attr<R: BufRead>(
+        reader: &NsReader<R>,
         element: &BytesStart<'_>,
         namespace_uri: &[u8],
         local_name: &[u8],
@@ -348,9 +350,9 @@ impl<'event, 'resolver> ElementAttrs<'event, 'resolver> {
     }
 
     /// Looks up `namespace_uri:local_name`, continuing the shared scan.
-    pub(super) fn get(
+    pub(super) fn get<R: BufRead>(
         &mut self,
-        reader: &'resolver NsReader<&[u8]>,
+        reader: &'resolver NsReader<R>,
         namespace_uri: &[u8],
         local_name: &[u8],
     ) -> Result<Option<String>> {
@@ -382,9 +384,9 @@ impl<'event, 'resolver> ElementAttrs<'event, 'resolver> {
     }
 
     /// Looks up a required attribute, failing with `qualified_name` when absent.
-    pub(super) fn required(
+    pub(super) fn required<R: BufRead>(
         &mut self,
-        reader: &'resolver NsReader<&[u8]>,
+        reader: &'resolver NsReader<R>,
         namespace: &[u8],
         local_name: &[u8],
         qualified_name: &str,
@@ -395,9 +397,9 @@ impl<'event, 'resolver> ElementAttrs<'event, 'resolver> {
     }
 
     /// Requires `xlink:type="simple"` on the element.
-    pub(super) fn require_simple_xlink(
+    pub(super) fn require_simple_xlink<R: BufRead>(
         &mut self,
-        reader: &'resolver NsReader<&[u8]>,
+        reader: &'resolver NsReader<R>,
         description: &str,
     ) -> Result<()> {
         let link_type = self.required(reader, XLINK_NAMESPACE, b"type", "xlink:type")?;
@@ -411,8 +413,8 @@ impl<'event, 'resolver> ElementAttrs<'event, 'resolver> {
 
     /// Resolves one freshly scanned attribute key exactly once with the
     /// current resolver, snapshotting the outcome next to the raw attribute.
-    fn resolve_at_scan(
-        reader: &'resolver NsReader<&[u8]>,
+    fn resolve_at_scan<R: BufRead>(
+        reader: &'resolver NsReader<R>,
         attribute: RawAttribute<'event>,
     ) -> ResolvedAttribute<'event, 'resolver> {
         let (namespace, local_name) = reader.resolver().resolve_attribute(attribute.key);
@@ -431,8 +433,8 @@ impl<'event, 'resolver> ElementAttrs<'event, 'resolver> {
     /// Matches one cached attribute and decodes its value on a hit, exactly
     /// like [`Parser::get_attr`]: the snapshotted resolution stands in for a
     /// fresh resolver call, and only the matching attribute is decoded.
-    fn lookup(
-        reader: &NsReader<&[u8]>,
+    fn lookup<R: BufRead>(
+        reader: &NsReader<R>,
         cached: &ResolvedAttribute<'event, 'resolver>,
         namespace_uri: &[u8],
         local_name: &[u8],
@@ -475,9 +477,9 @@ impl<'event, 'resolver> ElementAttrs<'event, 'resolver> {
     ///   without decoding, and every harvested attribute is decoded at the
     ///   same position as in the fresh scan, so decode-error positions and
     ///   messages are unchanged.
-    pub(super) fn drawing_attributes(
+    pub(super) fn drawing_attributes<R: BufRead>(
         &mut self,
-        reader: &'resolver NsReader<&[u8]>,
+        reader: &'resolver NsReader<R>,
     ) -> Result<Vec<DrawingAttribute>> {
         let mut attributes = Vec::new();
         for cached in &self.parsed {
@@ -502,8 +504,8 @@ impl<'event, 'resolver> ElementAttrs<'event, 'resolver> {
     /// scan: DRAW/SVG/DR3D/TABLE namespaces are kept, names modeled by
     /// dedicated `ShapeBuilder` fields are skipped, and the value of each
     /// harvested attribute is decoded with the same decoder settings.
-    fn harvest_drawing_attribute(
-        reader: &NsReader<&[u8]>,
+    fn harvest_drawing_attribute<R: BufRead>(
+        reader: &NsReader<R>,
         cached: &ResolvedAttribute<'event, 'resolver>,
     ) -> Result<Option<DrawingAttribute>> {
         let namespace = if cached.namespace.matches(DRAW_NAMESPACE) {

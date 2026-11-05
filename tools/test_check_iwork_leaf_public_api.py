@@ -13,13 +13,14 @@ def document(
     argument: str = "selector",
     semantic: bool = False,
 ) -> dict:
-    """Build a small rustdoc document with one public document reader."""
+    """Build a small rustdoc document with one public semantic reader."""
+    module = public_api.semantic_module(crate)
     paths: dict[str, dict[str, object]] = {
         "0": {"path": [crate], "kind": "module"},
-        "1": {"path": [crate, "document"], "kind": "module"},
-        "2": {"path": [crate, "document", "Document"], "kind": "struct"},
+        "1": {"path": [crate, module], "kind": "module"},
+        "2": {"path": [crate, module, "Document"], "kind": "struct"},
         "3": {
-            "path": [crate, "document", "Document", "open"],
+            "path": [crate, module, "Document", "open"],
             "kind": "function",
         },
         "4": {"path": [crate, "Document"], "kind": "struct"},
@@ -31,7 +32,7 @@ def document(
             "inner": {"module": {"items": ["1", "4"]}},
         },
         "1": {
-            "name": "document",
+            "name": module,
             "crate_id": 0,
             "inner": {"module": {"items": ["2", "3"]}},
         },
@@ -66,7 +67,7 @@ def document(
             "crate_id": 0,
             "inner": {
                 "use": {
-                    "source": "crate::document::Document",
+                    "source": f"crate::{module}::Document",
                     "name": "Document",
                     "id": "2",
                     "is_glob": False,
@@ -75,7 +76,7 @@ def document(
         },
     }
     if leak_name is not None:
-        paths["5"] = {"path": [crate, "document", leak_name], "kind": "struct"}
+        paths["5"] = {"path": [crate, module, leak_name], "kind": "struct"}
         index["5"] = {
             "name": leak_name,
             "crate_id": 0,
@@ -94,7 +95,7 @@ def document(
     if semantic:
         for item_id, name in (("5", "DocumentIdentifier"), ("6", "NodeId")):
             paths[item_id] = {
-                "path": [crate, "document", name],
+                "path": [crate, module, name],
                 "kind": "struct",
             }
             index[item_id] = {
@@ -134,11 +135,11 @@ def keynote_selector_error_bridge() -> dict:
         "inner": {"enum": {"variants": [], "impls": ["7"]}},
     }
     value["paths"]["6"] = {
-        "path": ["litchi_keynote", "package", "edit", "EditError"],
+        "path": ["litchi_keynote", "package", "edit", "Error"],
         "kind": "enum",
     }
     value["index"]["6"] = {
-        "name": "EditError",
+        "name": "Error",
         "crate_id": 0,
         "inner": {"enum": {"variants": [], "impls": []}},
     }
@@ -259,6 +260,59 @@ class IworkLeafPublicApiGateTests(unittest.TestCase):
         self.assertEqual(len(failures), 1)
         self.assertIn("non-allowlisted crate", failures[0])
 
+    def test_shared_table_value_modules_are_allowlisted_narrowly(self) -> None:
+        for path in (
+            "litchi_iwa_common::table::model::Table",
+            "litchi_iwa_common::table::model::Builder",
+            "litchi_iwa_common::table::coordinate::At",
+            "litchi_iwa_common::table::cell::value::Value",
+        ):
+            with self.subTest(path=path):
+                self.assertEqual(
+                    public_api.violations(document(leak=path), "litchi_numbers"), []
+                )
+        for path in (
+            # Sibling modules and the crate root stay forbidden.
+            "litchi_iwa_common::table::merge::Region",
+            "litchi_iwa_common::wire::RawWireField",
+            "litchi_iwa_common::table::model",
+            # An allowlisted module cannot launder a physical name.
+            "litchi_iwa_common::table::model::WireView",
+        ):
+            with self.subTest(path=path):
+                self.assertEqual(
+                    len(public_api.violations(document(leak=path), "litchi_numbers")),
+                    1,
+                )
+
+    def test_allowlisted_value_modules_import_no_physical_crate(self) -> None:
+        source_root = public_api.ROOT / "crates" / "litchi-iwa-common" / "src"
+        sibling_modules = {prefix[1:] for prefix in public_api.ALLOWED_SEMANTIC_MODULES}
+        for prefix, reason in public_api.ALLOWED_SEMANTIC_MODULES.items():
+            with self.subTest(module="::".join(prefix)):
+                self.assertTrue(reason)
+                self.assertEqual(prefix[0], "litchi_iwa_common")
+                source = source_root.joinpath(*prefix[1:-1], f"{prefix[-1]}.rs")
+                text = source.read_text(encoding="utf-8")
+                production = text.split("#[cfg(test)]", 1)[0]
+                for line in production.splitlines():
+                    statement = line.strip()
+                    if not statement.startswith(("use ", "pub use ", "mod ", "pub mod ")):
+                        continue
+                    if statement.startswith(("use std::", "pub use std::")):
+                        continue
+                    if statement.startswith(("use super::", "pub use super::")):
+                        target = statement.split("super::", 1)[1].split("::")
+                        module = tuple(prefix[1:-1]) + tuple(
+                            part.strip("{};, ") for part in target[:-1]
+                        )
+                        self.assertTrue(
+                            any(module == sibling[: len(module)] for sibling in sibling_modules),
+                            f"{source}: {statement}",
+                        )
+                        continue
+                    self.fail(f"{source}: unexpected import or module `{statement}`")
+
     def test_local_generated_wire_archive_and_raw_names_are_rejected(self) -> None:
         for name, expected in (
             ("GeneratedSettings", "generated type"),
@@ -291,7 +345,7 @@ class IworkLeafPublicApiGateTests(unittest.TestCase):
         value["index"]["0"]["inner"]["module"]["items"].remove("4")
         self.assertEqual(
             public_api.violations(value, "litchi_numbers"),
-            ["missing public module `litchi_numbers::document`"],
+            ["missing public module `litchi_numbers::workbook`"],
         )
 
     def test_private_pages_document_module_is_reached_through_root_reexport(
@@ -319,10 +373,18 @@ class IworkLeafPublicApiGateTests(unittest.TestCase):
         self.assertEqual(len(failures), 1)
         self.assertIn("physical package type", failures[0])
 
-    def test_public_keynote_document_module_remains_supported(self) -> None:
+    def test_public_keynote_presentation_module_is_the_semantic_root(self) -> None:
         self.assertEqual(
             public_api.violations(document(crate="litchi_keynote"), "litchi_keynote"),
             [],
+        )
+        self.assertEqual(public_api.semantic_module("litchi_keynote"), "presentation")
+
+    def test_retired_keynote_document_module_is_not_the_semantic_root(self) -> None:
+        value = document(crate="litchi_numbers")
+        failures = public_api.violations(value, "litchi_keynote")
+        self.assertEqual(
+            failures, ["missing public module `litchi_keynote::presentation`"]
         )
 
     def test_blanket_dependency_impls_are_ignored(self) -> None:

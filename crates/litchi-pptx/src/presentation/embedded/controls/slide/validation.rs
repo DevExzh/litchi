@@ -6,7 +6,11 @@ use crate::{Error, Result};
 
 pub(crate) fn validate_text(value: &str, label: &'static str, allow_empty: bool) -> Result<()> {
     if value.len() > MAX_ATTRIBUTE_BYTES {
-        return Err(limit(label, MAX_ATTRIBUTE_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlAttributeBytes,
+            value.len(),
+            MAX_ATTRIBUTE_BYTES,
+        ));
     }
     if !allow_empty && value.is_empty() {
         return Err(invalid(format!("{label} cannot be empty")));
@@ -22,14 +26,22 @@ pub(crate) fn validate_text(value: &str, label: &'static str, allow_empty: bool)
 
 pub(crate) fn validate_binary(bytes: &[u8]) -> Result<()> {
     if bytes.len() > MAX_BINARY_BYTES {
-        return Err(limit("control binary bytes", MAX_BINARY_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::PayloadBytes,
+            bytes.len(),
+            MAX_BINARY_BYTES,
+        ));
     }
     Ok(())
 }
 
-pub(crate) fn validate_source_size(bytes: &[u8], label: &'static str) -> Result<()> {
+pub(crate) fn validate_source_size(bytes: &[u8], _label: &'static str) -> Result<()> {
     if bytes.len() > MAX_SLIDE_XML_BYTES {
-        return Err(limit(label, MAX_SLIDE_XML_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            bytes.len(),
+            MAX_SLIDE_XML_BYTES,
+        ));
     }
     Ok(())
 }

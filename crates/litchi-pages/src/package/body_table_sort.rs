@@ -15,11 +15,11 @@ use std::fmt;
 use std::sync::Arc;
 
 use litchi_iwa_archive::package::{EntryEdit, OwnedExactArtifacts, SharedBytes};
-use litchi_iwa_archive::{Error as ArchiveError, LimitKind as ArchiveLimitKind, SourceCatalog};
+use litchi_iwa_archive::{Error as ArchiveError, LimitKind as ArchiveLimitKind};
 use litchi_iwa_common::{decode_varint_from_bytes, varint::encoded_len};
 use litchi_iwa_core::{Error as CoreError, LimitKind as CoreLimitKind, RawMessage};
 use litchi_iwa_protos::table_sort_order_codec as codec;
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::{Package, PackageError, page_layout, table_lock};
 use crate::selector::BodyTableSelector;
@@ -35,7 +35,7 @@ const SORT_TRACKER_REFERENCE_EXTERNAL_FIELD: u32 = 3;
 /// Content-free location associated with a body-table sort transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum BodyTableSortPath {
+pub enum Path {
     /// The complete Pages package.
     Package,
     /// One rooted body table at a checked zero-based position.
@@ -45,7 +45,7 @@ pub enum BodyTableSortPath {
 /// Finite resources governed by one Pages persisted-sort transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum BodyTableSortLimitKind {
+pub enum LimitKind {
     InputBytes,
     OutputBytes,
     Entries,
@@ -70,7 +70,7 @@ pub enum BodyTableSortLimitKind {
     WireScratchBytes,
 }
 
-impl fmt::Display for BodyTableSortLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -100,24 +100,18 @@ impl fmt::Display for BodyTableSortLimitKind {
 }
 
 /// Failure from a Pages body-table persisted-sort read or transaction.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum BodyTableSortError {
-    #[error("the Pages body has no table matching the requested selector")]
-    TableNotFound,
-    #[error("the Pages body has more than one table with the requested name")]
-    AmbiguousTableName,
-    #[error("the Pages body-table sort selector is ambiguous")]
-    AmbiguousSelector,
-    #[error("the Pages package source does not support exact body-table sort editing")]
-    UnsupportedSource,
+pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     #[error("the selected Pages body-table sort source is invalid")]
     InvalidSource,
-    #[error("the selected Pages body table is locked")]
-    TableLocked,
     #[error("Pages body-table sort {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
-        kind: BodyTableSortLimitKind,
+    Limit {
+        kind: LimitKind,
         observed: u64,
         maximum: u64,
     },
@@ -129,6 +123,45 @@ pub enum BodyTableSortError {
     PatchConflict,
 }
 
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
+    #[error("the Pages body has no table matching the requested selector")]
+    TableNotFound,
+    #[error("the Pages body has more than one table with the requested name")]
+    AmbiguousTableName,
+    #[error("the Pages body-table sort selector is ambiguous")]
+    AmbiguousSelector,
+    #[error("the Pages package source does not support exact body-table sort editing")]
+    UnsupportedSource,
+    #[error("the selected Pages body table is locked")]
+    TableLocked,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::TableNotFound { .. } => RefusalKind::NotFound,
+            Self::AmbiguousTableName { .. } | Self::AmbiguousSelector { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+            Self::TableLocked { .. } => RefusalKind::Protected,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
+}
+
 #[derive(Clone, PartialEq, Eq)]
 struct Target {
     native: table_lock::BodyTableTarget,
@@ -137,42 +170,59 @@ struct Target {
 }
 
 /// A mutable semantic persisted-sort edit.
-pub struct BodyTableSortEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
-    target: Target,
+    selector: table_lock::OwnedBodyTableSelector,
+    target: Option<Target>,
     after: Option<Order>,
+    staged: bool,
 }
 
-impl fmt::Debug for BodyTableSortEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("BodyTableSortEdit")
-            .field("table_position", &self.target.native.table_position)
-            .field("before", &self.target.before)
+            .debug_struct("Edit")
+            .field("resolved", &self.target.is_some())
             .field("after", &self.after)
             .finish_non_exhaustive()
     }
 }
 
-impl BodyTableSortEdit<'_> {
-    /// Return the selected table path without exposing native identifiers.
-    #[must_use]
-    pub const fn path(&self) -> BodyTableSortPath {
-        BodyTableSortPath::Table {
-            table: self.target.native.table_position,
+impl Edit<'_> {
+    fn target(&mut self) -> Result<&Target, Error> {
+        if self.target.is_none() {
+            let mut budget = transaction_budget(self.source)?;
+            let target = resolve_target_owned(self.source, &self.selector, &mut budget)?;
+            if !self.staged {
+                self.after = target.before.clone();
+            }
+            self.target = Some(target);
         }
+        self.target.as_ref().ok_or(Error::InvalidSource)
+    }
+
+    /// Return the selected table path without exposing native identifiers.
+    pub fn path(&mut self) -> Result<Path, Error> {
+        self.target()?;
+        self.target
+            .as_ref()
+            .map(|target| Path::Table {
+                table: target.native.table_position,
+            })
+            .ok_or(Error::InvalidSource)
     }
 
     /// Return the staged order, or `None` when the native field is absent or cleared.
-    #[must_use]
-    pub fn order(&self) -> Option<&Order> {
-        self.after.as_ref()
+    pub fn order(&mut self) -> Result<Option<&Order>, Error> {
+        self.target()?;
+        Ok(self.after.as_ref())
     }
 
     /// Stage a persisted sort order without moving table rows.
     #[must_use]
     pub fn set(mut self, order: Order) -> Self {
         self.after = Some(order);
+        self.staged = true;
         self
     }
 
@@ -180,6 +230,7 @@ impl BodyTableSortEdit<'_> {
     #[must_use]
     pub fn clear(mut self) -> Self {
         self.after = None;
+        self.staged = true;
         self
     }
 
@@ -190,24 +241,25 @@ impl BodyTableSortEdit<'_> {
     }
 
     /// Validate and publish this edit atomically.
-    pub fn commit(self) -> Result<BodyTableSortCommit, BodyTableSortError> {
+    pub fn commit(mut self) -> Result<Commit, Error> {
+        self.target()?;
         commit_edit(self)
     }
 }
 
 /// Reversible exact-source patch for one body-table sort field.
 #[derive(Clone, PartialEq, Eq)]
-pub struct BodyTableSortPatch {
+pub struct Patch {
     artifacts: OwnedExactArtifacts,
     target: Target,
     before: Option<Order>,
     after: Option<Order>,
 }
 
-impl fmt::Debug for BodyTableSortPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("BodyTableSortPatch")
+            .debug_struct("Patch")
             .field("table_position", &self.target.native.table_position)
             .field("before", &self.before)
             .field("after", &self.after)
@@ -215,11 +267,11 @@ impl fmt::Debug for BodyTableSortPatch {
     }
 }
 
-impl BodyTableSortPatch {
+impl Patch {
     /// Return the selected table path without exposing native identifiers.
     #[must_use]
-    pub const fn path(&self) -> BodyTableSortPath {
-        BodyTableSortPath::Table {
+    pub const fn path(&self) -> Path {
+        Path::Table {
             table: self.target.native.table_position,
         }
     }
@@ -268,14 +320,14 @@ impl BodyTableSortPatch {
 
 /// Content-free transaction diagnostics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct BodyTableSortDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     deleted_previews: usize,
     full_reparse_performed: bool,
 }
 
-impl BodyTableSortDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -318,13 +370,13 @@ impl BodyTableSortDiagnostics {
 /// Fully reopened result of one body-table sort transaction.
 #[must_use = "a body-table sort commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct BodyTableSortCommit {
+pub struct Commit {
     package: Package,
-    patch: BodyTableSortPatch,
-    diagnostics: BodyTableSortDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl BodyTableSortCommit {
+impl Commit {
     #[must_use]
     pub const fn package(&self) -> &Package {
         &self.package
@@ -335,13 +387,19 @@ impl BodyTableSortCommit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
     #[must_use]
-    pub const fn patch(&self) -> &BodyTableSortPatch {
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
+    #[must_use]
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     #[must_use]
-    pub const fn diagnostics(&self) -> &BodyTableSortDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
@@ -351,7 +409,7 @@ impl Package {
     pub fn body_table_sort_order<'table>(
         &self,
         selector: impl Into<BodyTableSelector<'table>>,
-    ) -> Result<Option<Order>, BodyTableSortError> {
+    ) -> Result<Option<Order>, Error> {
         let mut budget = transaction_budget(self)?;
         let target = resolve_target(self, selector.into(), &mut budget)?;
         Ok(target.before)
@@ -361,21 +419,19 @@ impl Package {
     pub fn edit_body_table_sort_order<'table>(
         &self,
         selector: impl Into<BodyTableSelector<'table>>,
-    ) -> Result<BodyTableSortEdit<'_>, BodyTableSortError> {
-        let mut budget = transaction_budget(self)?;
-        let target = resolve_target(self, selector.into(), &mut budget)?;
-        Ok(BodyTableSortEdit {
+    ) -> Result<Edit<'_>, Error> {
+        Ok(Edit {
             source: self,
-            after: target.before.clone(),
-            target,
+            selector: table_lock::OwnedBodyTableSelector::try_from(self, selector.into())
+                .map_err(map_lock_error)?,
+            target: None,
+            after: None,
+            staged: false,
         })
     }
 
     /// Apply a reversible exact-source persisted-sort patch.
-    pub fn apply_body_table_sort_order(
-        &self,
-        patch: &BodyTableSortPatch,
-    ) -> Result<BodyTableSortCommit, BodyTableSortError> {
+    pub fn apply_body_table_sort_order(&self, patch: &Patch) -> Result<Commit, Error> {
         let mut budget = transaction_budget(self)?;
         let current = self.state.source.source_bytes();
         budget
@@ -384,7 +440,7 @@ impl Package {
         if fingerprint(current) != patch.source_fingerprint()
             || current != patch.artifacts.source_owner().as_ref()
         {
-            return Err(BodyTableSortError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let selected = resolve_target(
             self,
@@ -394,13 +450,13 @@ impl Package {
         if selected.native.model_identifier != patch.target.native.model_identifier
             || selected.before != patch.before
         {
-            return Err(BodyTableSortError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if patch.is_noop() {
-            return Ok(BodyTableSortCommit {
-                package: self.snapshot(),
+            return Ok(Commit {
+                package: self.clone(),
                 patch: patch.clone(),
-                diagnostics: BodyTableSortDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         let target_owner = patch.artifacts.target_owner();
@@ -410,7 +466,7 @@ impl Package {
         if !self.state.source.source_is_exact()
             || fingerprint(target_owner.as_ref()) != patch.target_fingerprint()
         {
-            return Err(BodyTableSortError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let candidate = reopen_candidate(self, &target_owner, &mut budget)?;
         let verified = resolve_target(
@@ -421,13 +477,13 @@ impl Package {
         if verified.native.model_identifier != patch.target.native.model_identifier
             || verified.before != patch.after
         {
-            return Err(BodyTableSortError::Verification);
+            return Err(Error::Verification);
         }
         verify_locality(self, &candidate, &patch.target.native, &mut budget)?;
-        Ok(BodyTableSortCommit {
+        Ok(Commit {
             package: candidate,
             patch: patch.clone(),
-            diagnostics: BodyTableSortDiagnostics::published(),
+            diagnostics: Diagnostics::published(),
         })
     }
 }
@@ -436,12 +492,12 @@ fn resolve_target(
     package: &Package,
     selector: BodyTableSelector<'_>,
     budget: &mut table_lock::WireBudget,
-) -> Result<Target, BodyTableSortError> {
+) -> Result<Target, Error> {
     let native = package
         .resolve_body_table_with_budget(selector, budget)
         .map_err(map_lock_error)?;
     if native.model_message_type != TABLE_MODEL_MESSAGE_TYPE {
-        return Err(BodyTableSortError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     table_lock::validate_body_table_target(package, &native, budget).map_err(map_lock_error)?;
     let message = model_message(package, &native)?;
@@ -456,7 +512,31 @@ fn resolve_target(
     })
 }
 
-fn transaction_budget(package: &Package) -> Result<table_lock::WireBudget, BodyTableSortError> {
+fn resolve_target_owned(
+    package: &Package,
+    selector: &table_lock::OwnedBodyTableSelector,
+    budget: &mut table_lock::WireBudget,
+) -> Result<Target, Error> {
+    let native = selector
+        .resolve_with_budget(package, budget)
+        .map_err(map_lock_error)?;
+    if native.model_message_type != TABLE_MODEL_MESSAGE_TYPE {
+        return Err(Error::InvalidSource);
+    }
+    table_lock::validate_body_table_target(package, &native, budget).map_err(map_lock_error)?;
+    let message = model_message(package, &native)?;
+    validate_sort_tracker(package, &native, message, budget)?;
+    validate_model_ownership(package, &native, budget)?;
+    let columns = model_columns(&message.data, budget)?;
+    let before = decode_sort(&message.data, columns, budget)?;
+    Ok(Target {
+        native,
+        columns,
+        before,
+    })
+}
+
+fn transaction_budget(package: &Package) -> Result<table_lock::WireBudget, Error> {
     let mut budget =
         table_lock::WireBudget::new(package.state.source.limits()).map_err(map_lock_error)?;
     budget
@@ -465,97 +545,98 @@ fn transaction_budget(package: &Package) -> Result<table_lock::WireBudget, BodyT
     Ok(budget)
 }
 
-fn commit_edit(edit: BodyTableSortEdit<'_>) -> Result<BodyTableSortCommit, BodyTableSortError> {
+fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     let source = edit.source;
-    if edit.target.before == edit.after {
-        return Ok(BodyTableSortCommit {
-            package: source.snapshot(),
-            patch: BodyTableSortPatch {
+    let target = edit.target.ok_or(Error::InvalidSource)?;
+    if target.before == edit.after {
+        return Ok(Commit {
+            package: source.clone(),
+            patch: Patch {
                 artifacts: OwnedExactArtifacts::new(
                     SharedBytes::from_shared_slice(source.state.source.shared_source()),
                     SharedBytes::from_shared_slice(source.state.source.shared_source()),
                 ),
-                target: edit.target,
+                target,
                 before: edit.after.clone(),
                 after: edit.after,
             },
-            diagnostics: BodyTableSortDiagnostics::unchanged(),
+            diagnostics: Diagnostics::unchanged(),
         });
     }
-    if edit.target.native.explicit_locked == Some(true) {
-        return Err(BodyTableSortError::TableLocked);
+    if target.native.explicit_locked == Some(true) {
+        return Err(Error::Refused(Refusal::TableLocked));
     }
     if let Some(order) = &edit.after {
-        validate_order_columns(order, edit.target.columns)?;
+        validate_order_columns(order, target.columns)?;
     }
     if !source.state.source.source_is_exact() {
-        return Err(BodyTableSortError::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let mut budget =
         table_lock::WireBudget::new(source.state.source.limits()).map_err(map_lock_error)?;
     budget
         .charge_source_catalog(&source.state.source)
         .map_err(map_lock_error)?;
-    table_lock::validate_body_table_target(source, &edit.target.native, &mut budget)
+    table_lock::validate_body_table_target(source, &target.native, &mut budget)
         .map_err(map_lock_error)?;
-    let package = rewrite_model(source, &edit.target, edit.after.clone(), &mut budget)?;
+    let package = rewrite_model(source, &target, edit.after.clone(), &mut budget)?;
     let candidate_target = resolve_target(
         &package,
-        BodyTableSelector::index(edit.target.native.table_position),
+        BodyTableSelector::index(target.native.table_position),
         &mut budget,
     )?;
-    if candidate_target.native.model_identifier != edit.target.native.model_identifier
+    if candidate_target.native.model_identifier != target.native.model_identifier
         || candidate_target.before != edit.after
     {
-        return Err(BodyTableSortError::Verification);
+        return Err(Error::Verification);
     }
-    verify_locality(source, &package, &edit.target.native, &mut budget)?;
+    verify_locality(source, &package, &target.native, &mut budget)?;
     let package_source = SharedBytes::from_shared_slice(package.state.source.shared_source());
-    Ok(BodyTableSortCommit {
+    Ok(Commit {
         package,
-        patch: BodyTableSortPatch {
+        patch: Patch {
             artifacts: OwnedExactArtifacts::new(
                 SharedBytes::from_shared_slice(source.state.source.shared_source()),
                 package_source,
             ),
-            target: edit.target.clone(),
-            before: edit.target.before,
+            target: target.clone(),
+            before: target.before,
             after: edit.after,
         },
-        diagnostics: BodyTableSortDiagnostics::published(),
+        diagnostics: Diagnostics::published(),
     })
 }
 
 fn model_message<'a>(
     package: &'a Package,
     target: &table_lock::BodyTableTarget,
-) -> Result<&'a RawMessage, BodyTableSortError> {
+) -> Result<&'a RawMessage, Error> {
     let component = package
         .state
         .source
         .components()
         .get_index(target.model_component_index)
-        .ok_or(BodyTableSortError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let object = component
         .archive()
         .objects
         .get(target.model_object_index)
-        .ok_or(BodyTableSortError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if object.archive_info.identifier != Some(target.model_identifier.get()) {
-        return Err(BodyTableSortError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let message = object
         .messages
         .get(target.model_message_index)
         .filter(|message| message.type_ == TABLE_MODEL_MESSAGE_TYPE)
-        .ok_or(BodyTableSortError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if object
         .archive_info
         .message_infos
         .get(target.model_message_index)
         .is_none()
     {
-        return Err(BodyTableSortError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(message)
 }
@@ -565,7 +646,7 @@ fn validate_sort_tracker(
     target: &table_lock::BodyTableTarget,
     model: &RawMessage,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableSortError> {
+) -> Result<(), Error> {
     let model_view = budget.parse(&model.data, 1).map_err(map_lock_error)?;
     let mut tracker_payload = None;
     for field in model_view
@@ -644,7 +725,7 @@ fn validate_sort_tracker(
                 .message_infos
                 .get(target.model_message_index)
         })
-        .ok_or(BodyTableSortError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if model_info
         .object_references
         .iter()
@@ -699,7 +780,7 @@ fn validate_model_ownership(
     package: &Package,
     target: &table_lock::BodyTableTarget,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableSortError> {
+) -> Result<(), Error> {
     let mut physical = None;
     for (component_index, component) in package.state.source.components().iter().enumerate() {
         for (object_index, object) in component.archive().objects.iter().enumerate() {
@@ -765,11 +846,11 @@ fn validate_model_ownership(
     Ok(())
 }
 
-fn decode_nonzero_varint(source: &[u8]) -> Result<std::num::NonZeroU64, BodyTableSortError> {
+fn decode_nonzero_varint(source: &[u8]) -> Result<std::num::NonZeroU64, Error> {
     std::num::NonZeroU64::new(decode_canonical_varint(source)?).ok_or_else(invalid_source)
 }
 
-fn decode_canonical_varint(source: &[u8]) -> Result<u64, BodyTableSortError> {
+fn decode_canonical_varint(source: &[u8]) -> Result<u64, Error> {
     let (value, length) = decode_varint_from_bytes(source).map_err(|_| invalid_source())?;
     if length != source.len() || encoded_len(value) != length {
         return Err(invalid_source());
@@ -777,10 +858,7 @@ fn decode_canonical_varint(source: &[u8]) -> Result<u64, BodyTableSortError> {
     Ok(value)
 }
 
-fn model_columns(
-    source: &[u8],
-    budget: &mut table_lock::WireBudget,
-) -> Result<u32, BodyTableSortError> {
+fn model_columns(source: &[u8], budget: &mut table_lock::WireBudget) -> Result<u32, Error> {
     let view = budget.parse(source, 1).map_err(map_lock_error)?;
     budget
         .charge_payload_work(view.len())
@@ -812,7 +890,7 @@ fn decode_sort(
     source: &[u8],
     columns: u32,
     budget: &mut table_lock::WireBudget,
-) -> Result<Option<Order>, BodyTableSortError> {
+) -> Result<Option<Order>, Error> {
     let options = codec_options(budget, source.len(), columns)?;
     let (snapshot, report) =
         codec::decode_table_sort_order_with_report(source, options).map_err(map_codec_error)?;
@@ -842,13 +920,13 @@ fn decode_sort(
             };
             Ok(Rule::new(column, direction))
         })
-        .collect::<Result<Vec<_>, BodyTableSortError>>()?;
+        .collect::<Result<Vec<_>, Error>>()?;
     let order = Order::with_scope(scope, rules).map_err(|_| invalid_source())?;
     validate_order_columns(&order, columns)?;
     Ok(Some(order))
 }
 
-fn snapshot_from_order(order: &Order) -> Result<codec::SortOrderSnapshot, BodyTableSortError> {
+fn snapshot_from_order(order: &Order) -> Result<codec::SortOrderSnapshot, Error> {
     let scope = match order.scope() {
         Scope::EntireTable => codec::SortScope::EntireTable,
         Scope::SelectedRows => codec::SortScope::SelectedRows,
@@ -872,7 +950,7 @@ fn rewrite_model(
     target: &Target,
     after: Option<Order>,
     budget: &mut table_lock::WireBudget,
-) -> Result<Package, BodyTableSortError> {
+) -> Result<Package, Error> {
     let catalog = &source.state.source;
     // The conservative rewritten-message/archive/Snappy/ZIP and candidate
     // inventory bounds are charged before editable archive or codec-owned
@@ -883,24 +961,24 @@ fn rewrite_model(
     let component = catalog
         .components()
         .get_index(target.native.model_component_index)
-        .ok_or(BodyTableSortError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let component_name = component.name();
     let entry = catalog
         .package()
         .iter()
         .find(|entry| entry.name() == component_name)
-        .ok_or(BodyTableSortError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(BodyTableSortError::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let (mut archive, archive_limits) =
         page_layout::editable_archive(source, component_name).map_err(map_page_layout_error)?;
     let object = archive
         .objects
         .get_mut(target.native.model_object_index)
-        .ok_or(BodyTableSortError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if object.archive_info.identifier != Some(target.native.model_identifier.get()) {
-        return Err(BodyTableSortError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     page_layout::validate_selected_metadata(object, target.native.model_message_index)
         .map_err(|_| invalid_source())?;
@@ -908,11 +986,11 @@ fn rewrite_model(
         .messages
         .get(target.native.model_message_index)
         .filter(|message| message.type_ == target.native.model_message_type)
-        .ok_or(BodyTableSortError::InvalidSource)?
+        .ok_or(Error::InvalidSource)?
         .data
         .clone();
     if decode_sort(&original, target.columns, budget)? != target.before {
-        return Err(BodyTableSortError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let desired = after.as_ref().map(snapshot_from_order).transpose()?;
     let options = codec_options(budget, original.len(), target.columns)?;
@@ -933,11 +1011,11 @@ fn rewrite_model(
         || report.retained_bytes() != requirements.retained_bytes
         || report.scratch_bytes() != requirements.scratch_bytes
     {
-        return Err(BodyTableSortError::Verification);
+        return Err(Error::Verification);
     }
     let replacement = output.into_bytes();
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             target.native.model_message_index,
             RawMessage {
                 type_: TABLE_MODEL_MESSAGE_TYPE,
@@ -946,10 +1024,10 @@ fn rewrite_model(
             archive_limits,
         )
         .map_err(map_core_error)?;
-    let compressed =
-        page_layout::compress_archive(archive, archive_limits).map_err(map_page_layout_error)?;
+    let compressed = page_layout::compress_archive(source, archive, archive_limits)
+        .map_err(map_page_layout_error)?;
     if compressed.len() > bounds.compressed_bound {
-        return Err(BodyTableSortError::Verification);
+        return Err(Error::Verification);
     }
     let edits = [EntryEdit::new(component_name, compressed.as_slice())];
     let prepared_reassembly = catalog
@@ -958,15 +1036,13 @@ fn rewrite_model(
         .map_err(map_archive_error)?;
     let reassembly_requirements = prepared_reassembly.execution_requirements();
     if reassembly_requirements.output_bytes() > bounds.package_output_bound {
-        return Err(BodyTableSortError::Verification);
+        return Err(Error::Verification);
     }
     charge_reassembly_requirements(budget, reassembly_requirements)?;
     let output = prepared_reassembly
         .execute(reassembly_requirements.exact_limits())
         .map_err(map_archive_error)?;
-    let candidate_source =
-        SourceCatalog::from_shared_bytes_with_limits(output.into(), catalog.limits())
-            .map_err(map_archive_error)?;
+    let candidate_source = catalog.reopen(output.into()).map_err(map_archive_error)?;
     table_lock::charge_reopen_work(&candidate_source, budget).map_err(map_lock_error)?;
     Package::from_source_catalog(candidate_source).map_err(map_package_error)
 }
@@ -982,7 +1058,7 @@ fn preflight_sort_rewrite(
     target: &Target,
     after: Option<&Order>,
     budget: &mut table_lock::WireBudget,
-) -> Result<SortRewriteBounds, BodyTableSortError> {
+) -> Result<SortRewriteBounds, Error> {
     const MAX_VARINT_BYTES: usize = 10;
     const MAX_RULE_REWRITE_BYTES: usize = 64;
 
@@ -990,14 +1066,14 @@ fn preflight_sort_rewrite(
     let component = catalog
         .components()
         .get_index(target.native.model_component_index)
-        .ok_or(BodyTableSortError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let entry = catalog
         .package()
         .iter()
         .find(|entry| entry.name() == component.name())
-        .ok_or(BodyTableSortError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(BodyTableSortError::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let original = model_message(source, &target.native)?;
     page_layout::validate_selected_metadata(
@@ -1005,7 +1081,7 @@ fn preflight_sort_rewrite(
             .archive()
             .objects
             .get(target.native.model_object_index)
-            .ok_or(BodyTableSortError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
         target.native.model_message_index,
     )
     .map_err(map_page_layout_error)?;
@@ -1016,32 +1092,30 @@ fn preflight_sort_rewrite(
         .checked_add(
             rule_count
                 .checked_mul(MAX_RULE_REWRITE_BYTES)
-                .ok_or(BodyTableSortError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )
         .and_then(|value| value.checked_add(MAX_RULE_REWRITE_BYTES))
-        .ok_or(BodyTableSortError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let archive_source_length = parsed_archive_source_length(component.archive())?;
     let archive_bound = archive_source_length
         .checked_sub(original.data.len())
         .and_then(|value| value.checked_add(rewritten_message_bound))
         .and_then(|value| value.checked_add(MAX_VARINT_BYTES.saturating_mul(2)))
-        .ok_or(BodyTableSortError::InvalidSource)?;
-    let compressed_bound = table_lock::snappy_compressed_bound(archive_bound)
-        .ok_or(BodyTableSortError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
+    let compressed_bound =
+        table_lock::snappy_compressed_bound(archive_bound).ok_or(Error::InvalidSource)?;
     let old_compressed_size =
-        usize::try_from(entry.metadata().compressed_size()).map_err(|_| {
-            BodyTableSortError::LimitExceeded {
-                kind: BodyTableSortLimitKind::EntryBytes,
-                observed: u64::MAX,
-                maximum: catalog.limits().max_entry_bytes(),
-            }
+        usize::try_from(entry.metadata().compressed_size()).map_err(|_| Error::Limit {
+            kind: LimitKind::EntryBytes,
+            observed: u64::MAX,
+            maximum: catalog.limits().max_entry_bytes(),
         })?;
     let package_output_bound = catalog
         .source_bytes()
         .len()
         .checked_sub(old_compressed_size)
         .and_then(|value| value.checked_add(compressed_bound))
-        .ok_or(BodyTableSortError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget
         .charge_output_bytes(package_output_bound)
         .and_then(|_| {
@@ -1063,24 +1137,22 @@ fn preflight_sort_rewrite(
     })
 }
 
-fn parsed_archive_source_length(
-    archive: &litchi_iwa_core::Archive,
-) -> Result<usize, BodyTableSortError> {
+fn parsed_archive_source_length(archive: &litchi_iwa_core::Archive) -> Result<usize, Error> {
     let Some(last) = archive.objects.last() else {
         return Ok(0);
     };
     let length = last
         .data_offset
         .checked_add(last.data_length)
-        .ok_or(BodyTableSortError::InvalidSource)?;
-    usize::try_from(length).map_err(|_| BodyTableSortError::InvalidSource)
+        .ok_or(Error::InvalidSource)?;
+    usize::try_from(length).map_err(|_| Error::InvalidSource)
 }
 
 fn reopen_candidate(
     source: &Package,
     bytes: &SharedBytes,
     budget: &mut table_lock::WireBudget,
-) -> Result<Package, BodyTableSortError> {
+) -> Result<Package, Error> {
     // Apply receives an already materialized exact target artifact.  Its
     // complete output and reopen work are charged on the shared transaction
     // budget before ZIP parsing; the ZIP/catalog parser itself remains a
@@ -1089,11 +1161,11 @@ fn reopen_candidate(
         .charge_output_bytes(bytes.len())
         .and_then(|_| budget.charge_payload_work(bytes.len()))
         .map_err(map_lock_error)?;
-    let catalog = SourceCatalog::from_shared_bytes_with_limits(
-        Arc::<[u8]>::from(bytes.as_ref()),
-        source.state.source.limits(),
-    )
-    .map_err(map_archive_error)?;
+    let catalog = source
+        .state
+        .source
+        .reopen(Arc::<[u8]>::from(bytes.as_ref()))
+        .map_err(map_archive_error)?;
     budget
         .charge_source_catalog(&catalog)
         .and_then(|_| table_lock::charge_reopen_work(&catalog, budget))
@@ -1101,7 +1173,7 @@ fn reopen_candidate(
     Package::from_source_catalog(catalog).map_err(map_package_error)
 }
 
-fn validate_order_columns(order: &Order, columns: u32) -> Result<(), BodyTableSortError> {
+fn validate_order_columns(order: &Order, columns: u32) -> Result<(), Error> {
     if order
         .rules()
         .iter()
@@ -1116,28 +1188,28 @@ fn codec_options(
     budget: &table_lock::WireBudget,
     source_bytes: usize,
     columns: u32,
-) -> Result<codec::DecodeOptions, BodyTableSortError> {
+) -> Result<codec::DecodeOptions, Error> {
     let limits = budget.wire_limits();
     let fields = budget.remaining_wire_fields();
     if fields == 0 {
-        return Err(BodyTableSortError::LimitExceeded {
-            kind: BodyTableSortLimitKind::WireFields,
+        return Err(Error::Limit {
+            kind: LimitKind::WireFields,
             observed: 1,
             maximum: 0,
         });
     }
     let work = budget.remaining_wire_work();
     if work == 0 {
-        return Err(BodyTableSortError::LimitExceeded {
-            kind: BodyTableSortLimitKind::WireWork,
+        return Err(Error::Limit {
+            kind: LimitKind::WireWork,
             observed: 1,
             maximum: 0,
         });
     }
     let references = budget.remaining_payload_references();
     if references == 0 {
-        return Err(BodyTableSortError::LimitExceeded {
-            kind: BodyTableSortLimitKind::WireRules,
+        return Err(Error::Limit {
+            kind: LimitKind::WireRules,
             observed: 1,
             maximum: 0,
         });
@@ -1158,7 +1230,7 @@ fn charge_codec_requirements(
     budget: &mut table_lock::WireBudget,
     requirements: codec::RewriteExecutionRequirements,
     source_bytes: usize,
-) -> Result<(), BodyTableSortError> {
+) -> Result<(), Error> {
     budget
         .charge_payload_work(source_bytes)
         .and_then(|_| {
@@ -1179,7 +1251,7 @@ fn charge_codec_requirements(
 fn charge_reassembly_requirements(
     budget: &mut table_lock::WireBudget,
     requirements: litchi_iwa_archive::package::ReassemblyExecutionRequirements,
-) -> Result<(), BodyTableSortError> {
+) -> Result<(), Error> {
     budget
         .charge_payload_work(requirements.output_bytes())
         .and_then(|_| budget.charge_payload_work(requirements.retained_bytes()))
@@ -1193,13 +1265,13 @@ fn verify_locality(
     candidate: &Package,
     target: &table_lock::BodyTableTarget,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableSortError> {
+) -> Result<(), Error> {
     let left = &source.state.source;
     let right = &candidate.state.source;
     if left.components().len() != right.components().len()
         || left.package().len() != right.package().len()
     {
-        return Err(BodyTableSortError::Verification);
+        return Err(Error::Verification);
     }
     for (before, after) in left.package().iter().zip(right.package().iter()) {
         budget
@@ -1216,7 +1288,7 @@ fn verify_locality(
             == left
                 .components()
                 .get_index(target.model_component_index)
-                .ok_or(BodyTableSortError::Verification)?
+                .ok_or(Error::Verification)?
                 .name();
         if before.name() != after.name()
             || before.raw_name() != after.raw_name()
@@ -1229,7 +1301,7 @@ fn verify_locality(
                     )
                     || before.data() != after.data()))
         {
-            return Err(BodyTableSortError::Verification);
+            return Err(Error::Verification);
         }
     }
     for (component_index, (before, after)) in left
@@ -1241,7 +1313,7 @@ fn verify_locality(
         if before.name() != after.name()
             || before.archive().objects.len() != after.archive().objects.len()
         {
-            return Err(BodyTableSortError::Verification);
+            return Err(Error::Verification);
         }
         for (object_index, (before_object, after_object)) in before
             .archive()
@@ -1296,7 +1368,7 @@ fn verify_locality(
                 || object_index != target.model_object_index
             {
                 if !before_object.same_content_ignoring_offsets(after_object) {
-                    return Err(BodyTableSortError::Verification);
+                    return Err(Error::Verification);
                 }
                 continue;
             }
@@ -1307,21 +1379,21 @@ fn verify_locality(
                     != after_object.archive_info.message_infos.len()
                 || before_object.header_length != after_object.header_length
             {
-                return Err(BodyTableSortError::Verification);
+                return Err(Error::Verification);
             }
             let mut expected_archive_info = before_object.archive_info.clone();
             let selected_before_info = expected_archive_info
                 .message_infos
                 .get_mut(target.model_message_index)
-                .ok_or(BodyTableSortError::Verification)?;
+                .ok_or(Error::Verification)?;
             let selected_after_info = after_object
                 .archive_info
                 .message_infos
                 .get(target.model_message_index)
-                .ok_or(BodyTableSortError::Verification)?;
+                .ok_or(Error::Verification)?;
             selected_before_info.length = selected_after_info.length;
             if expected_archive_info != after_object.archive_info {
-                return Err(BodyTableSortError::Verification);
+                return Err(Error::Verification);
             }
             for (index, (before_message, after_message)) in before_object
                 .messages
@@ -1333,21 +1405,21 @@ fn verify_locality(
                     .archive_info
                     .message_infos
                     .get(index)
-                    .ok_or(BodyTableSortError::Verification)?;
+                    .ok_or(Error::Verification)?;
                 let after_info = after_object
                     .archive_info
                     .message_infos
                     .get(index)
-                    .ok_or(BodyTableSortError::Verification)?;
+                    .ok_or(Error::Verification)?;
                 if index == target.model_message_index {
                     let mut normalized_info = before_info.clone();
                     normalized_info.length = after_info.length;
                     if before_message.type_ != after_message.type_ || normalized_info != *after_info
                     {
-                        return Err(BodyTableSortError::Verification);
+                        return Err(Error::Verification);
                     }
                 } else if before_message != after_message || before_info != after_info {
-                    return Err(BodyTableSortError::Verification);
+                    return Err(Error::Verification);
                 }
             }
         }
@@ -1364,72 +1436,50 @@ fn fingerprint(bytes: &[u8]) -> u64 {
     value
 }
 
-fn invalid_source() -> BodyTableSortError {
-    BodyTableSortError::InvalidSource
+fn invalid_source() -> Error {
+    Error::InvalidSource
 }
 
-fn map_lock_error(error: table_lock::BodyTableLockError) -> BodyTableSortError {
+fn map_lock_error(error: table_lock::Error) -> Error {
     match error {
-        table_lock::BodyTableLockError::TableNotFound => BodyTableSortError::TableNotFound,
-        table_lock::BodyTableLockError::AmbiguousTableName => {
-            BodyTableSortError::AmbiguousTableName
+        table_lock::Error::Refused(crate::table::lock::Refusal::TableNotFound) => {
+            Error::Refused(Refusal::TableNotFound)
         },
-        table_lock::BodyTableLockError::AmbiguousSelector => BodyTableSortError::AmbiguousSelector,
-        table_lock::BodyTableLockError::UnsupportedSource => BodyTableSortError::UnsupportedSource,
-        table_lock::BodyTableLockError::InvalidSource => BodyTableSortError::InvalidSource,
-        table_lock::BodyTableLockError::PatchConflict => BodyTableSortError::PatchConflict,
-        table_lock::BodyTableLockError::Verification => BodyTableSortError::Verification,
-        table_lock::BodyTableLockError::Allocation { amount } => {
-            BodyTableSortError::Allocation { amount }
+        table_lock::Error::Refused(crate::table::lock::Refusal::AmbiguousTableName) => {
+            Error::Refused(Refusal::AmbiguousTableName)
         },
-        table_lock::BodyTableLockError::LimitExceeded {
+        table_lock::Error::Refused(crate::table::lock::Refusal::AmbiguousSelector) => {
+            Error::Refused(Refusal::AmbiguousSelector)
+        },
+        table_lock::Error::Refused(crate::table::lock::Refusal::UnsupportedSource) => {
+            Error::Refused(Refusal::UnsupportedSource)
+        },
+        table_lock::Error::InvalidSource => Error::InvalidSource,
+        table_lock::Error::PatchConflict => Error::PatchConflict,
+        table_lock::Error::Verification => Error::Verification,
+        table_lock::Error::Allocation { amount } => Error::Allocation { amount },
+        table_lock::Error::Limit {
             kind,
             observed,
             maximum,
-        } => BodyTableSortError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                table_lock::BodyTableLockLimitKind::InputBytes => {
-                    BodyTableSortLimitKind::InputBytes
-                },
-                table_lock::BodyTableLockLimitKind::OutputBytes => {
-                    BodyTableSortLimitKind::OutputBytes
-                },
-                table_lock::BodyTableLockLimitKind::Entries => BodyTableSortLimitKind::Entries,
-                table_lock::BodyTableLockLimitKind::EntryBytes => {
-                    BodyTableSortLimitKind::EntryBytes
-                },
-                table_lock::BodyTableLockLimitKind::TotalEntryBytes => {
-                    BodyTableSortLimitKind::TotalEntryBytes
-                },
-                table_lock::BodyTableLockLimitKind::PackageBytes => {
-                    BodyTableSortLimitKind::PackageBytes
-                },
-                table_lock::BodyTableLockLimitKind::PayloadBytes => {
-                    BodyTableSortLimitKind::PayloadBytes
-                },
-                table_lock::BodyTableLockLimitKind::TotalPayloadBytes => {
-                    BodyTableSortLimitKind::TotalPayloadBytes
-                },
-                table_lock::BodyTableLockLimitKind::PayloadObjects => {
-                    BodyTableSortLimitKind::PayloadObjects
-                },
-                table_lock::BodyTableLockLimitKind::PayloadMessages => {
-                    BodyTableSortLimitKind::PayloadMessages
-                },
-                table_lock::BodyTableLockLimitKind::PayloadItems => {
-                    BodyTableSortLimitKind::PayloadItems
-                },
-                table_lock::BodyTableLockLimitKind::PayloadReferences => {
-                    BodyTableSortLimitKind::PayloadReferences
-                },
-                table_lock::BodyTableLockLimitKind::WireBytes => BodyTableSortLimitKind::WireBytes,
-                table_lock::BodyTableLockLimitKind::WireFields => {
-                    BodyTableSortLimitKind::WireFields
-                },
-                table_lock::BodyTableLockLimitKind::WireNesting => {
-                    BodyTableSortLimitKind::WireNesting
-                },
-                table_lock::BodyTableLockLimitKind::WireWork => BodyTableSortLimitKind::WireWork,
+                table_lock::LimitKind::InputBytes => LimitKind::InputBytes,
+                table_lock::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                table_lock::LimitKind::Entries => LimitKind::Entries,
+                table_lock::LimitKind::EntryBytes => LimitKind::EntryBytes,
+                table_lock::LimitKind::TotalEntryBytes => LimitKind::TotalEntryBytes,
+                table_lock::LimitKind::PackageBytes => LimitKind::PackageBytes,
+                table_lock::LimitKind::PayloadBytes => LimitKind::PayloadBytes,
+                table_lock::LimitKind::TotalPayloadBytes => LimitKind::TotalPayloadBytes,
+                table_lock::LimitKind::PayloadObjects => LimitKind::PayloadObjects,
+                table_lock::LimitKind::PayloadMessages => LimitKind::PayloadMessages,
+                table_lock::LimitKind::PayloadItems => LimitKind::PayloadItems,
+                table_lock::LimitKind::PayloadReferences => LimitKind::PayloadReferences,
+                table_lock::LimitKind::WireBytes => LimitKind::WireBytes,
+                table_lock::LimitKind::WireFields => LimitKind::WireFields,
+                table_lock::LimitKind::WireNesting => LimitKind::WireNesting,
+                table_lock::LimitKind::WireWork => LimitKind::WireWork,
             },
             observed,
             maximum,
@@ -1437,78 +1487,78 @@ fn map_lock_error(error: table_lock::BodyTableLockError) -> BodyTableSortError {
     }
 }
 
-fn map_codec_error(error: codec::DecodeError) -> BodyTableSortError {
+fn map_codec_error(error: codec::DecodeError) -> Error {
     if let Some(amount) = error.allocation_amount() {
-        return BodyTableSortError::Allocation { amount };
+        return Error::Allocation { amount };
     }
     let Some(limit) = error.resource_limit() else {
         return invalid_source();
     };
     let (kind, observed, maximum) = match limit {
         codec::DecodeLimit::InputBytes { observed, maximum } => {
-            (BodyTableSortLimitKind::WireBytes, observed, maximum)
+            (LimitKind::WireBytes, observed, maximum)
         },
         codec::DecodeLimit::OutputBytes { observed, maximum } => {
-            (BodyTableSortLimitKind::WireOutputBytes, observed, maximum)
+            (LimitKind::WireOutputBytes, observed, maximum)
         },
         codec::DecodeLimit::Fields { observed, maximum } => {
-            (BodyTableSortLimitKind::WireFields, observed, maximum)
+            (LimitKind::WireFields, observed, maximum)
         },
         codec::DecodeLimit::WorkBytes { observed, maximum } => {
-            (BodyTableSortLimitKind::WireWork, observed, maximum)
+            (LimitKind::WireWork, observed, maximum)
         },
         codec::DecodeLimit::Nesting { observed, maximum } => {
-            return BodyTableSortError::LimitExceeded {
-                kind: BodyTableSortLimitKind::WireNesting,
+            return Error::Limit {
+                kind: LimitKind::WireNesting,
                 observed: u64::from(observed),
                 maximum: u64::from(maximum),
             };
         },
         codec::DecodeLimit::Rules { observed, maximum } => {
-            (BodyTableSortLimitKind::WireRules, observed, maximum)
+            (LimitKind::WireRules, observed, maximum)
         },
         codec::DecodeLimit::Columns { observed, maximum } => {
-            (BodyTableSortLimitKind::WireColumns, observed, maximum)
+            (LimitKind::WireColumns, observed, maximum)
         },
         codec::DecodeLimit::Allocations { observed, maximum } => {
-            (BodyTableSortLimitKind::WireAllocations, observed, maximum)
+            (LimitKind::WireAllocations, observed, maximum)
         },
         codec::DecodeLimit::RetainedBytes { observed, maximum } => {
-            (BodyTableSortLimitKind::WireRetainedBytes, observed, maximum)
+            (LimitKind::WireRetainedBytes, observed, maximum)
         },
         codec::DecodeLimit::ScratchBytes { observed, maximum } => {
-            (BodyTableSortLimitKind::WireScratchBytes, observed, maximum)
+            (LimitKind::WireScratchBytes, observed, maximum)
         },
         _ => return invalid_source(),
     };
-    BodyTableSortError::LimitExceeded {
+    Error::Limit {
         kind,
         observed: observed as u64,
         maximum: maximum as u64,
     }
 }
 
-fn map_archive_error(error: ArchiveError) -> BodyTableSortError {
+fn map_archive_error(error: ArchiveError) -> Error {
     match error {
-        ArchiveError::Allocation { amount, .. } => BodyTableSortError::Allocation { amount },
+        ArchiveError::Allocation { amount, .. } => Error::Allocation { amount },
         ArchiveError::Limit {
             kind,
             observed,
             maximum,
-        } => BodyTableSortError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                ArchiveLimitKind::InputBytes => BodyTableSortLimitKind::InputBytes,
-                ArchiveLimitKind::OutputBytes => BodyTableSortLimitKind::OutputBytes,
-                ArchiveLimitKind::Entries => BodyTableSortLimitKind::Entries,
+                ArchiveLimitKind::InputBytes => LimitKind::InputBytes,
+                ArchiveLimitKind::OutputBytes => LimitKind::OutputBytes,
+                ArchiveLimitKind::Entries => LimitKind::Entries,
                 ArchiveLimitKind::MemberNameBytes | ArchiveLimitKind::MetadataBytes => {
-                    BodyTableSortLimitKind::PackageBytes
+                    LimitKind::PackageBytes
                 },
                 ArchiveLimitKind::CompressedEntryBytes | ArchiveLimitKind::EntryBytes => {
-                    BodyTableSortLimitKind::EntryBytes
+                    LimitKind::EntryBytes
                 },
-                ArchiveLimitKind::TotalBytes => BodyTableSortLimitKind::TotalEntryBytes,
-                ArchiveLimitKind::IwaStreamBytes => BodyTableSortLimitKind::PayloadBytes,
-                ArchiveLimitKind::IwaTotalBytes => BodyTableSortLimitKind::TotalPayloadBytes,
+                ArchiveLimitKind::TotalBytes => LimitKind::TotalEntryBytes,
+                ArchiveLimitKind::IwaStreamBytes => LimitKind::PayloadBytes,
+                ArchiveLimitKind::IwaTotalBytes => LimitKind::TotalPayloadBytes,
             },
             observed,
             maximum,
@@ -1518,112 +1568,98 @@ fn map_archive_error(error: ArchiveError) -> BodyTableSortError {
     }
 }
 
-fn map_page_layout_error(error: page_layout::PageLayoutError) -> BodyTableSortError {
+fn map_page_layout_error(error: page_layout::Error) -> Error {
     match error {
-        page_layout::PageLayoutError::UnsupportedSource => BodyTableSortError::UnsupportedSource,
-        page_layout::PageLayoutError::InvalidSource
-        | page_layout::PageLayoutError::InvalidLayout(_) => BodyTableSortError::InvalidSource,
-        page_layout::PageLayoutError::LimitExceeded {
+        page_layout::Error::Refused(
+            crate::page_layout::transaction::Refusal::UnsupportedSource,
+        ) => Error::Refused(Refusal::UnsupportedSource),
+        page_layout::Error::InvalidSource | page_layout::Error::InvalidLayout(_) => {
+            Error::InvalidSource
+        },
+        page_layout::Error::Limit {
             kind,
             observed,
             maximum,
-        } => BodyTableSortError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                page_layout::PageLayoutLimitKind::InputBytes => BodyTableSortLimitKind::InputBytes,
-                page_layout::PageLayoutLimitKind::OutputBytes => {
-                    BodyTableSortLimitKind::OutputBytes
-                },
-                page_layout::PageLayoutLimitKind::Entries => BodyTableSortLimitKind::Entries,
-                page_layout::PageLayoutLimitKind::EntryBytes => BodyTableSortLimitKind::EntryBytes,
-                page_layout::PageLayoutLimitKind::TotalEntryBytes => {
-                    BodyTableSortLimitKind::TotalEntryBytes
-                },
-                page_layout::PageLayoutLimitKind::PackageBytes => {
-                    BodyTableSortLimitKind::PackageBytes
-                },
-                page_layout::PageLayoutLimitKind::PayloadBytes => {
-                    BodyTableSortLimitKind::PayloadBytes
-                },
-                page_layout::PageLayoutLimitKind::TotalPayloadBytes => {
-                    BodyTableSortLimitKind::TotalPayloadBytes
-                },
-                page_layout::PageLayoutLimitKind::PayloadObjects => {
-                    BodyTableSortLimitKind::PayloadObjects
-                },
-                page_layout::PageLayoutLimitKind::PayloadMessages => {
-                    BodyTableSortLimitKind::PayloadMessages
-                },
-                page_layout::PageLayoutLimitKind::PayloadItems => {
-                    BodyTableSortLimitKind::PayloadItems
-                },
-                page_layout::PageLayoutLimitKind::WireBytes => BodyTableSortLimitKind::WireBytes,
-                page_layout::PageLayoutLimitKind::WireFields => BodyTableSortLimitKind::WireFields,
-                page_layout::PageLayoutLimitKind::WireNesting => {
-                    BodyTableSortLimitKind::WireNesting
-                },
-                page_layout::PageLayoutLimitKind::WireWork => BodyTableSortLimitKind::WireWork,
+                page_layout::LimitKind::InputBytes => LimitKind::InputBytes,
+                page_layout::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                page_layout::LimitKind::Entries => LimitKind::Entries,
+                page_layout::LimitKind::EntryBytes => LimitKind::EntryBytes,
+                page_layout::LimitKind::TotalEntryBytes => LimitKind::TotalEntryBytes,
+                page_layout::LimitKind::PackageBytes => LimitKind::PackageBytes,
+                page_layout::LimitKind::PayloadBytes => LimitKind::PayloadBytes,
+                page_layout::LimitKind::TotalPayloadBytes => LimitKind::TotalPayloadBytes,
+                page_layout::LimitKind::PayloadObjects => LimitKind::PayloadObjects,
+                page_layout::LimitKind::PayloadMessages => LimitKind::PayloadMessages,
+                page_layout::LimitKind::PayloadItems => LimitKind::PayloadItems,
+                page_layout::LimitKind::WireBytes => LimitKind::WireBytes,
+                page_layout::LimitKind::WireFields => LimitKind::WireFields,
+                page_layout::LimitKind::WireNesting => LimitKind::WireNesting,
+                page_layout::LimitKind::WireWork => LimitKind::WireWork,
             },
             observed,
             maximum,
         },
-        page_layout::PageLayoutError::Allocation { amount } => {
-            BodyTableSortError::Allocation { amount }
-        },
-        page_layout::PageLayoutError::Verification => BodyTableSortError::Verification,
-        page_layout::PageLayoutError::PatchConflict => BodyTableSortError::PatchConflict,
+        page_layout::Error::Allocation { amount } => Error::Allocation { amount },
+        page_layout::Error::Verification => Error::Verification,
+        page_layout::Error::PatchConflict => Error::PatchConflict,
     }
 }
 
-fn map_package_error(error: PackageError) -> BodyTableSortError {
+fn map_package_error(error: PackageError) -> Error {
     match error {
         PackageError::Archive(error) => map_archive_error(error),
-        PackageError::Allocation { amount } => BodyTableSortError::Allocation { amount },
-        PackageError::ObjectLimit { observed, limit } => BodyTableSortError::LimitExceeded {
-            kind: BodyTableSortLimitKind::PayloadObjects,
+        PackageError::Allocation { amount } => Error::Allocation { amount },
+        PackageError::ObjectLimit { observed, limit } => Error::Limit {
+            kind: LimitKind::PayloadObjects,
             observed: observed as u64,
             maximum: limit as u64,
         },
         PackageError::PayloadLimit { observed, limit }
-        | PackageError::SectionNamesTooLarge { observed, limit } => {
-            BodyTableSortError::LimitExceeded {
-                kind: BodyTableSortLimitKind::PayloadBytes,
-                observed: observed as u64,
-                maximum: limit as u64,
-            }
+        | PackageError::SectionNamesTooLarge { observed, limit } => Error::Limit {
+            kind: LimitKind::PayloadBytes,
+            observed: observed as u64,
+            maximum: limit as u64,
         },
         PackageError::Io(_)
         | PackageError::Detection(_)
-        | PackageError::NotPages
+        | PackageError::UnexpectedFormat { .. }
+        | PackageError::NotOfficeFile
+        | PackageError::MissingIdentity
+        | PackageError::InvalidLanguage(_)
+        | PackageError::InvalidLocale
+        | PackageError::InvalidTable { .. }
+        | PackageError::InvalidLimit { .. }
+        | PackageError::Limit { .. }
         | PackageError::InvalidFormat(_)
-        | PackageError::Semantic(_) => BodyTableSortError::InvalidSource,
+        | PackageError::Semantic(_) => Error::InvalidSource,
     }
 }
 
-fn map_core_error(error: CoreError) -> BodyTableSortError {
+fn map_core_error(error: CoreError) -> Error {
     match error {
-        CoreError::Allocation { requested, .. } => {
-            BodyTableSortError::Allocation { amount: requested }
-        },
+        CoreError::Allocation { requested, .. } => Error::Allocation { amount: requested },
         CoreError::Limit {
             kind,
             observed,
             maximum,
-        } => BodyTableSortError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                CoreLimitKind::ArchiveBytes => BodyTableSortLimitKind::TotalPayloadBytes,
-                CoreLimitKind::Objects => BodyTableSortLimitKind::PayloadObjects,
+                CoreLimitKind::ArchiveBytes => LimitKind::TotalPayloadBytes,
+                CoreLimitKind::Objects => LimitKind::PayloadObjects,
                 CoreLimitKind::Messages | CoreLimitKind::MessagesPerObject => {
-                    BodyTableSortLimitKind::PayloadMessages
+                    LimitKind::PayloadMessages
                 },
                 CoreLimitKind::ObjectBytes
                 | CoreLimitKind::MessageBytes
                 | CoreLimitKind::HeaderBytes
-                | CoreLimitKind::HeaderMemoryBytes => BodyTableSortLimitKind::PayloadBytes,
+                | CoreLimitKind::HeaderMemoryBytes => LimitKind::PayloadBytes,
                 CoreLimitKind::HeaderFields | CoreLimitKind::MetadataItems => {
-                    BodyTableSortLimitKind::PayloadItems
+                    LimitKind::PayloadItems
                 },
-                CoreLimitKind::HeaderNesting => BodyTableSortLimitKind::WireNesting,
-                _ => BodyTableSortLimitKind::PayloadBytes,
+                CoreLimitKind::HeaderNesting => LimitKind::WireNesting,
+                _ => LimitKind::PayloadBytes,
             },
             observed: u64::try_from(observed).unwrap_or(u64::MAX),
             maximum: u64::try_from(maximum).unwrap_or(u64::MAX),

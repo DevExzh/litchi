@@ -1,6 +1,6 @@
 //! Focused DrawingML chart reader and writer conformance tests.
 
-use super::read;
+use super::read as read_with_limits;
 
 use crate::chart::axis::{
     Axis, AxisCrossBetween, AxisCrossMode, AxisLabelAlign, BuiltInUnit, CategoryAxis, DateAxis,
@@ -30,6 +30,10 @@ use crate::chart::types::{
     TickLabelPosition, TickMark,
 };
 
+fn read<R: std::io::BufRead>(reader: R) -> crate::Result<Chart> {
+    read_with_limits(reader, &crate::chart::Limits::DEFAULT)
+}
+
 #[test]
 fn round_trips_and_validates_chart_language_and_pivot_source() {
     let xml = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
@@ -43,7 +47,7 @@ fn round_trips_and_validates_chart_language_and_pivot_source() {
     assert_eq!(source.format_id, 42);
 
     let mut output = Vec::new();
-    crate::chart::writer::write(&mut output, &chart).unwrap();
+    crate::chart::writer::write(&mut output, &chart, &crate::chart::Limits::DEFAULT).unwrap();
     let reparsed = read(output.as_slice()).unwrap();
     assert_eq!(reparsed.language.as_deref(), Some("zh-Hant"));
     assert_eq!(reparsed.pivot_source.as_ref().unwrap().name, "Pivot & One");
@@ -64,6 +68,31 @@ fn round_trips_and_validates_chart_language_and_pivot_source() {
 }
 
 #[test]
+fn retained_chart_attributes_are_bounded_before_owned_decode() {
+    let mut limits = crate::chart::Limits::DEFAULT;
+    limits.max_text_bytes = 3;
+    let language = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:lang val="a&#x1F600;"/><c:chart><c:plotArea/></c:chart></c:chartSpace>"#;
+    assert!(matches!(
+        read_with_limits(language.as_slice(), &limits),
+        Err(crate::Error::Limit {
+            kind: crate::LimitKind::ChartTextBytes,
+            observed: 5,
+            maximum: 3,
+        })
+    ));
+
+    let number_format = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:valAx><c:axId val="1"/><c:scaling/><c:axPos val="l"/><c:numFmt formatCode="a&#x1F600;"/><c:crossAx val="2"/></c:valAx></c:plotArea></c:chart></c:chartSpace>"#;
+    assert!(matches!(
+        read_with_limits(number_format.as_slice(), &limits),
+        Err(crate::Error::Limit {
+            kind: crate::LimitKind::ChartTextBytes,
+            observed: 5,
+            maximum: 3,
+        })
+    ));
+}
+
+#[test]
 fn round_trips_and_validates_chart_protection() {
     let xml = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
         <c:protection><c:chartObject/><c:data val="0"/><c:formatting val="true"/>
@@ -78,7 +107,7 @@ fn round_trips_and_validates_chart_protection() {
     assert_eq!(protection.user_interface, Some(true));
 
     let mut output = Vec::new();
-    crate::chart::writer::write(&mut output, &chart).unwrap();
+    crate::chart::writer::write(&mut output, &chart, &crate::chart::Limits::DEFAULT).unwrap();
     let reparsed = read(output.as_slice()).unwrap();
     let protection = reparsed.protection.as_ref().unwrap();
     assert_eq!(protection.chart_object, Some(true));
@@ -125,7 +154,7 @@ fn round_trips_and_validates_chart_color_map_overrides() {
     assert_eq!(mapping.followed_hyperlink, ColorSchemeIndex::Light2);
 
     let mut output = Vec::new();
-    crate::chart::writer::write(&mut output, &chart).unwrap();
+    crate::chart::writer::write(&mut output, &chart, &crate::chart::Limits::DEFAULT).unwrap();
     let reparsed = read(output.as_slice()).unwrap();
     assert_eq!(reparsed.color_map_override, chart.color_map_override);
 
@@ -166,7 +195,7 @@ fn round_trips_and_validates_chart_external_data() {
     assert_eq!(external_data.auto_update, Some(false));
 
     let mut output = Vec::new();
-    crate::chart::writer::write(&mut output, &chart).unwrap();
+    crate::chart::writer::write(&mut output, &chart, &crate::chart::Limits::DEFAULT).unwrap();
     let reparsed = read(output.as_slice()).unwrap();
     assert_eq!(reparsed.external_data, chart.external_data);
 
@@ -200,7 +229,10 @@ fn round_trips_and_validates_chart_external_data() {
 
     let mut pending = Chart::new();
     pending.external_data = Some(ExternalData::pending());
-    assert!(crate::chart::writer::write(&mut Vec::new(), &pending).is_err());
+    assert!(
+        crate::chart::writer::write(&mut Vec::new(), &pending, &crate::chart::Limits::DEFAULT)
+            .is_err()
+    );
 }
 
 #[test]
@@ -221,7 +253,7 @@ fn round_trips_and_validates_chart_user_shapes_relationships() {
         Some("shapeRel")
     );
     let mut output = Vec::new();
-    crate::chart::writer::write(&mut output, &chart).unwrap();
+    crate::chart::writer::write(&mut output, &chart, &crate::chart::Limits::DEFAULT).unwrap();
     assert_eq!(
         read(output.as_slice()).unwrap().user_shapes,
         chart.user_shapes
@@ -278,7 +310,7 @@ fn preserves_chart_space_drawing_and_extension_fragments() {
     );
 
     let mut output = Vec::new();
-    crate::chart::writer::write(&mut output, &chart).unwrap();
+    crate::chart::writer::write(&mut output, &chart, &crate::chart::Limits::DEFAULT).unwrap();
     let reparsed = read(output.as_slice()).unwrap();
     assert_eq!(reparsed.shape_properties, chart.shape_properties);
     assert_eq!(reparsed.text_properties, chart.text_properties);
@@ -346,7 +378,7 @@ fn round_trips_chart_surface_shape_and_picture_options() {
     );
 
     let mut output = Vec::new();
-    crate::chart::writer::write(&mut output, &chart).unwrap();
+    crate::chart::writer::write(&mut output, &chart, &crate::chart::Limits::DEFAULT).unwrap();
     let reparsed = read(output.as_slice()).unwrap();
     let reparsed_floor = reparsed.floor.unwrap();
     assert_eq!(reparsed_floor.thickness, floor.thickness);
@@ -425,7 +457,7 @@ fn round_trips_series_and_data_point_formatting_fragments() {
     );
 
     let mut output = Vec::new();
-    crate::chart::writer::write(&mut output, &chart).unwrap();
+    crate::chart::writer::write(&mut output, &chart, &crate::chart::Limits::DEFAULT).unwrap();
     let reparsed = read(output.as_slice()).unwrap();
     let TypeGroup::Bar(reparsed_group) = &reparsed.plot_area.type_groups[0] else {
         panic!("expected a bar chart");
@@ -454,7 +486,14 @@ fn round_trips_series_and_data_point_formatting_fragments() {
             <c:pictureOptions/></c:ser></c:lineChart></c:plotArea></c:chart>
         </c:chartSpace>"#;
     let unsupported = read(unsupported.as_slice()).unwrap();
-    assert!(crate::chart::writer::write(&mut Vec::new(), &unsupported).is_err());
+    assert!(
+        crate::chart::writer::write(
+            &mut Vec::new(),
+            &unsupported,
+            &crate::chart::Limits::DEFAULT
+        )
+        .is_err()
+    );
 
     let unsupported_shape =
         br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
@@ -462,7 +501,14 @@ fn round_trips_series_and_data_point_formatting_fragments() {
             <c:shape val="cone"/></c:ser></c:lineChart></c:plotArea></c:chart>
         </c:chartSpace>"#;
     let unsupported_shape = read(unsupported_shape.as_slice()).unwrap();
-    assert!(crate::chart::writer::write(&mut Vec::new(), &unsupported_shape).is_err());
+    assert!(
+        crate::chart::writer::write(
+            &mut Vec::new(),
+            &unsupported_shape,
+            &crate::chart::Limits::DEFAULT
+        )
+        .is_err()
+    );
 
     for invalid_shape in [
         br#"<c:shape val="sphere"/>"#.as_slice(),
@@ -490,7 +536,10 @@ fn round_trips_series_and_data_point_formatting_fragments() {
     });
     bar.common.series.push(series);
     invalid.plot_area.type_groups.push(TypeGroup::Bar(bar));
-    assert!(crate::chart::writer::write(&mut Vec::new(), &invalid).is_err());
+    assert!(
+        crate::chart::writer::write(&mut Vec::new(), &invalid, &crate::chart::Limits::DEFAULT)
+            .is_err()
+    );
 
     for supported in [
         br#"<c:areaChart><c:grouping val="standard"/><c:ser><c:idx val="0"/><c:order val="0"/><c:pictureOptions/></c:ser></c:areaChart>"#.as_slice(),
@@ -501,7 +550,7 @@ fn round_trips_series_and_data_point_formatting_fragments() {
         document.extend_from_slice(supported);
         document.extend_from_slice(b"</c:plotArea></c:chart></c:chartSpace>");
         let supported = read(document.as_slice()).unwrap();
-        crate::chart::writer::write(&mut Vec::new(), &supported).unwrap();
+        crate::chart::writer::write(&mut Vec::new(), &supported, &crate::chart::Limits::DEFAULT).unwrap();
     }
 }
 
@@ -542,7 +591,7 @@ fn round_trips_and_validates_chart_print_settings() {
     assert_eq!(setup.copies, 2);
 
     let mut output = Vec::new();
-    crate::chart::writer::write(&mut output, &chart).unwrap();
+    crate::chart::writer::write(&mut output, &chart, &crate::chart::Limits::DEFAULT).unwrap();
     let reparsed = read(output.as_slice()).unwrap();
     assert_eq!(
         reparsed
@@ -581,7 +630,10 @@ fn round_trips_and_validates_chart_print_settings() {
     let mut settings = PrintSettings::new();
     settings.page_margins = Some(PageMargins::new(f64::NAN, 0.3, 0.4, 0.5, 0.1, 0.15));
     invalid.print_settings = Some(settings);
-    assert!(crate::chart::writer::write(&mut Vec::new(), &invalid).is_err());
+    assert!(
+        crate::chart::writer::write(&mut Vec::new(), &invalid, &crate::chart::Limits::DEFAULT)
+            .is_err()
+    );
 }
 
 #[test]
@@ -631,7 +683,7 @@ fn round_trips_and_validates_pivot_chart_formats() {
     assert!(formats[1].marker.is_some());
 
     let mut output = Vec::new();
-    crate::chart::writer::write(&mut output, &chart).unwrap();
+    crate::chart::writer::write(&mut output, &chart, &crate::chart::Limits::DEFAULT).unwrap();
     let reparsed = read(output.as_slice()).unwrap();
     assert_eq!(reparsed.pivot_formats.as_ref().unwrap().len(), 2);
     let reparsed_format = &reparsed.pivot_formats.as_ref().unwrap()[0];
@@ -664,7 +716,10 @@ fn round_trips_and_validates_pivot_chart_formats() {
 
     let mut invalid = Chart::new();
     invalid.pivot_formats = Some(vec![PivotFormat::new(3), PivotFormat::new(3)]);
-    assert!(crate::chart::writer::write(&mut Vec::new(), &invalid).is_err());
+    assert!(
+        crate::chart::writer::write(&mut Vec::new(), &invalid, &crate::chart::Limits::DEFAULT)
+            .is_err()
+    );
 
     let mut invalid = Chart::new();
     let mut format = PivotFormat::new(3);
@@ -674,7 +729,10 @@ fn round_trips_and_validates_pivot_chart_formats() {
         ..Marker::default()
     });
     invalid.pivot_formats = Some(vec![format]);
-    assert!(crate::chart::writer::write(&mut Vec::new(), &invalid).is_err());
+    assert!(
+        crate::chart::writer::write(&mut Vec::new(), &invalid, &crate::chart::Limits::DEFAULT)
+            .is_err()
+    );
 }
 
 #[test]
@@ -692,7 +750,7 @@ fn preserves_explicit_empty_series_and_point_markers() {
     assert!(series.data_points[0].marker_present);
 
     let mut output = Vec::new();
-    crate::chart::writer::write(&mut output, &chart).unwrap();
+    crate::chart::writer::write(&mut output, &chart, &crate::chart::Limits::DEFAULT).unwrap();
     let reparsed = read(output.as_slice()).unwrap();
     let TypeGroup::Line(group) = &reparsed.plot_area.type_groups[0] else {
         panic!("expected line chart");
@@ -848,7 +906,7 @@ fn preserves_automatic_display_units_labels() {
     assert!(display_units.layout.is_none());
 
     let mut output = Vec::new();
-    crate::chart::writer::write(&mut output, &chart).unwrap();
+    crate::chart::writer::write(&mut output, &chart, &crate::chart::Limits::DEFAULT).unwrap();
     assert!(
         std::str::from_utf8(&output)
             .unwrap()
@@ -908,7 +966,7 @@ fn round_trips_display_units_label_formatting_and_extensions() {
     );
 
     let mut output = Vec::new();
-    crate::chart::writer::write(&mut output, &chart).unwrap();
+    crate::chart::writer::write(&mut output, &chart, &crate::chart::Limits::DEFAULT).unwrap();
     let reparsed = read(output.as_slice()).unwrap();
     let Axis::Value(reparsed_axis) = &reparsed.plot_area.axes[0] else {
         panic!("expected value axis");
@@ -961,7 +1019,7 @@ fn parses_and_validates_chart_data_tables() {
     );
 
     let mut output = Vec::new();
-    crate::chart::writer::write(&mut output, &chart).unwrap();
+    crate::chart::writer::write(&mut output, &chart, &crate::chart::Limits::DEFAULT).unwrap();
     let reparsed = read(output.as_slice()).unwrap();
     let reparsed = reparsed.plot_area.data_table.unwrap();
     assert_eq!(reparsed.shape_properties, table.shape_properties);
@@ -1035,7 +1093,10 @@ fn preserves_and_validates_chart_group_axis_bindings() {
         let mut line = LineTypeGroup::new(BarGrouping::Standard);
         line.common.axis_ids = axis_ids;
         chart.plot_area.type_groups.push(TypeGroup::Line(line));
-        assert!(crate::chart::writer::write(&mut Vec::new(), &chart).is_err());
+        assert!(
+            crate::chart::writer::write(&mut Vec::new(), &chart, &crate::chart::Limits::DEFAULT)
+                .is_err()
+        );
     }
 }
 
@@ -1138,7 +1199,7 @@ fn round_trips_chart_lines_and_up_down_bars() {
     assert!(stock.up_down_bars.is_some());
 
     let mut output = Vec::new();
-    crate::chart::writer::write(&mut output, &chart).unwrap();
+    crate::chart::writer::write(&mut output, &chart, &crate::chart::Limits::DEFAULT).unwrap();
     let reparsed = read(output.as_slice()).unwrap();
     let TypeGroup::Line(line) = &reparsed.plot_area.type_groups[3] else {
         panic!("expected line chart");
@@ -1183,7 +1244,10 @@ fn round_trips_chart_lines_and_up_down_bars() {
         ..UpDownBars::default()
     });
     invalid.plot_area.type_groups.push(TypeGroup::Line(line));
-    assert!(crate::chart::writer::write(&mut Vec::new(), &invalid).is_err());
+    assert!(
+        crate::chart::writer::write(&mut Vec::new(), &invalid, &crate::chart::Limits::DEFAULT)
+            .is_err()
+    );
 }
 
 #[test]
@@ -1234,7 +1298,7 @@ fn round_trips_and_validates_surface_band_formats() {
     assert!(surface.band_formats.as_ref().unwrap().is_empty());
 
     let mut output = Vec::new();
-    crate::chart::writer::write(&mut output, &chart).unwrap();
+    crate::chart::writer::write(&mut output, &chart, &crate::chart::Limits::DEFAULT).unwrap();
     let reparsed = read(output.as_slice()).unwrap();
     let TypeGroup::Surface(surface) = &reparsed.plot_area.type_groups[0] else {
         panic!("expected surface chart");
@@ -1260,7 +1324,10 @@ fn round_trips_and_validates_surface_band_formats() {
         .plot_area
         .type_groups
         .push(TypeGroup::Surface(surface));
-    assert!(crate::chart::writer::write(&mut Vec::new(), &invalid).is_err());
+    assert!(
+        crate::chart::writer::write(&mut Vec::new(), &invalid, &crate::chart::Limits::DEFAULT)
+            .is_err()
+    );
 }
 
 #[test]
@@ -1326,7 +1393,10 @@ fn rejects_invalid_of_pie_input_and_output() {
             .plot_area
             .type_groups
             .push(TypeGroup::OfPie(invalid_group));
-        assert!(crate::chart::writer::write(&mut Vec::new(), &chart).is_err());
+        assert!(
+            crate::chart::writer::write(&mut Vec::new(), &chart, &crate::chart::Limits::DEFAULT)
+                .is_err()
+        );
     }
 }
 
@@ -1403,7 +1473,10 @@ fn writer_rejects_invalid_chart_group_ranges() {
     ] {
         let mut chart = Chart::new();
         chart.plot_area.type_groups.push(group);
-        assert!(crate::chart::writer::write(&mut Vec::new(), &chart).is_err());
+        assert!(
+            crate::chart::writer::write(&mut Vec::new(), &chart, &crate::chart::Limits::DEFAULT)
+                .is_err()
+        );
     }
 }
 
@@ -1415,20 +1488,29 @@ fn writer_rejects_invalid_axes_and_duplicate_legend_entries() {
     units.built_in_unit = Some(BuiltInUnit::Thousands);
     axis.display_units = Some(Box::new(units));
     chart.plot_area.axes.push(Axis::Value(axis));
-    assert!(crate::chart::writer::write(&mut Vec::new(), &chart).is_err());
+    assert!(
+        crate::chart::writer::write(&mut Vec::new(), &chart, &crate::chart::Limits::DEFAULT)
+            .is_err()
+    );
 
     let mut chart = Chart::new();
     let mut axis = CategoryAxis::new(1, AxisPosition::Bottom, 2);
     axis.min = Some(2.0);
     axis.max = Some(1.0);
     chart.plot_area.axes.push(Axis::Category(axis));
-    assert!(crate::chart::writer::write(&mut Vec::new(), &chart).is_err());
+    assert!(
+        crate::chart::writer::write(&mut Vec::new(), &chart, &crate::chart::Limits::DEFAULT)
+            .is_err()
+    );
 
     let mut chart = Chart::new();
     let mut axis = ValueAxis::new(1, AxisPosition::Left, 2);
     axis.display_units = Some(Box::new(DisplayUnits::custom(f64::NAN)));
     chart.plot_area.axes.push(Axis::Value(axis));
-    assert!(crate::chart::writer::write(&mut Vec::new(), &chart).is_err());
+    assert!(
+        crate::chart::writer::write(&mut Vec::new(), &chart, &crate::chart::Limits::DEFAULT)
+            .is_err()
+    );
 
     let mut chart = Chart::new();
     let legend = Legend {
@@ -1436,7 +1518,10 @@ fn writer_rejects_invalid_axes_and_duplicate_legend_entries() {
         ..Legend::default()
     };
     chart.legend = Some(legend);
-    assert!(crate::chart::writer::write(&mut Vec::new(), &chart).is_err());
+    assert!(
+        crate::chart::writer::write(&mut Vec::new(), &chart, &crate::chart::Limits::DEFAULT)
+            .is_err()
+    );
 }
 
 #[test]
@@ -1481,7 +1566,7 @@ fn round_trips_legend_and_entry_formatting_fragments() {
     );
 
     let mut output = Vec::new();
-    crate::chart::writer::write(&mut output, &chart).unwrap();
+    crate::chart::writer::write(&mut output, &chart, &crate::chart::Limits::DEFAULT).unwrap();
     let reparsed = read(output.as_slice()).unwrap();
     let reparsed = reparsed.legend.as_ref().unwrap();
     assert_eq!(reparsed.shape_properties, legend.shape_properties);
@@ -1519,7 +1604,10 @@ fn round_trips_legend_and_entry_formatting_fragments() {
     );
     legend.entries.push(entry);
     invalid.legend = Some(legend);
-    assert!(crate::chart::writer::write(&mut Vec::new(), &invalid).is_err());
+    assert!(
+        crate::chart::writer::write(&mut Vec::new(), &invalid, &crate::chart::Limits::DEFAULT)
+            .is_err()
+    );
 }
 
 #[test]
@@ -1611,7 +1699,7 @@ fn round_trips_chart_and_axis_title_formatting_fragments() {
     );
 
     let mut output = Vec::new();
-    crate::chart::writer::write(&mut output, &chart).unwrap();
+    crate::chart::writer::write(&mut output, &chart, &crate::chart::Limits::DEFAULT).unwrap();
     let reparsed = read(output.as_slice()).unwrap();
     assert_eq!(
         reparsed.title_shape_properties,
@@ -1942,7 +2030,7 @@ fn writer_round_trips_every_modeled_chart_group() {
     }
 
     let mut xml = Vec::new();
-    crate::chart::writer::write(&mut xml, &chart).unwrap();
+    crate::chart::writer::write(&mut xml, &chart, &crate::chart::Limits::DEFAULT).unwrap();
     assert!(
         std::str::from_utf8(&xml)
             .unwrap()
@@ -2319,7 +2407,7 @@ fn writer_round_trips_modeled_axis_properties_in_one_scaling_block() {
     ];
 
     let mut xml = Vec::new();
-    crate::chart::writer::write(&mut xml, &chart).unwrap();
+    crate::chart::writer::write(&mut xml, &chart, &crate::chart::Limits::DEFAULT).unwrap();
     let xml_text = std::str::from_utf8(&xml).unwrap();
     assert_eq!(xml_text.matches("<c:scaling>").count(), 4);
     let parsed = read(xml.as_slice()).unwrap();
@@ -2549,4 +2637,51 @@ fn chart_fragment_roots_of_many_repeated_names_are_refused_as_before() {
         ),
         "{error}"
     );
+}
+
+/// Record 0290 F2: PowerPoint and Excel write axis IDs at or above 2^31 as
+/// negative signed integers (`ooxml/pptx/radar-chart.pptx`). The reader takes
+/// them as the same 32 bits, so the bindings still match, and the writer
+/// spells them as the schema's unsigned decimals.
+#[test]
+fn reads_negative_producer_axis_ids_as_the_same_bits() {
+    let xml = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+        <c:chart><c:plotArea>
+            <c:radarChart><c:radarStyle val="marker"/><c:axId val="-1884094432"/><c:axId val="-1884097184"/></c:radarChart>
+            <c:catAx><c:axId val="-1884094432"/><c:scaling/><c:axPos val="b"/><c:crossAx val="-1884097184"/></c:catAx>
+            <c:valAx><c:axId val="-1884097184"/><c:scaling/><c:axPos val="l"/><c:crossAx val="-1884094432"/></c:valAx>
+        </c:plotArea></c:chart>
+    </c:chartSpace>"#;
+    let chart = read(xml.as_slice()).unwrap();
+    let first = (-1_884_094_432_i32).cast_unsigned();
+    let second = (-1_884_097_184_i32).cast_unsigned();
+    let TypeGroup::Radar(radar) = &chart.plot_area.type_groups[0] else {
+        panic!("expected radar chart");
+    };
+    assert_eq!(radar.common.axis_ids, [first, second]);
+    assert_eq!(chart.plot_area.axes[0].common().axis_id, first);
+    assert_eq!(chart.plot_area.axes[0].common().cross_axis_id, second);
+    assert_eq!(chart.plot_area.axes[1].common().axis_id, second);
+
+    let mut written = Vec::new();
+    crate::chart::writer::write(&mut written, &chart, &crate::chart::Limits::DEFAULT).unwrap();
+    let written = String::from_utf8(written).unwrap();
+    assert!(
+        written.contains(&format!(r#"<c:axId val="{first}"/>"#)),
+        "{written}"
+    );
+    assert!(!written.contains("val=\"-"), "{written}");
+    assert_eq!(
+        read(written.as_bytes()).unwrap().plot_area.axes[0]
+            .common()
+            .axis_id,
+        first
+    );
+
+    for invalid in ["-2147483649", "4294967296", "x"] {
+        let xml = format!(
+            r#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:valAx><c:axId val="{invalid}"/><c:scaling/><c:axPos val="l"/><c:crossAx val="1"/></c:valAx></c:plotArea></c:chart></c:chartSpace>"#
+        );
+        assert!(read(xml.as_bytes()).is_err(), "{invalid}");
+    }
 }

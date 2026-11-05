@@ -38,11 +38,6 @@ impl Snapshot {
         })
     }
 
-    /// Alias for [`Self::load`] emphasizing the source-bound result.
-    pub fn read(package: &OpcPackage, worksheet: &PackURI) -> Result<Self> {
-        Self::load(package, worksheet)
-    }
-
     /// Worksheet selected by this snapshot.
     #[must_use]
     pub fn worksheet(&self) -> &PackURI {
@@ -53,12 +48,6 @@ impl Snapshot {
     #[must_use]
     pub fn objects(&self) -> Option<&OleObjects> {
         self.objects.as_ref()
-    }
-
-    /// Contextual alias for [`Self::objects`].
-    #[must_use]
-    pub fn ole_objects(&self) -> Option<&OleObjects> {
-        self.objects()
     }
 
     /// Exact worksheet XML captured by this snapshot.

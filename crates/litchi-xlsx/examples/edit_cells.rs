@@ -1,13 +1,13 @@
 use std::error::Error;
 use std::io;
 
-use litchi_xlsx::{Formula, Workbook};
+use litchi_xlsx::Formula;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let arguments = std::env::args_os().skip(1).collect::<Vec<_>>();
     let (workbook, path) = match arguments.as_slice() {
-        [output] => (Workbook::new()?, output),
-        [input, output] => (Workbook::open(input)?, output),
+        [output] => (litchi_xlsx::Package::new()?, output),
+        [input, output] => (litchi_xlsx::Package::open(input)?, output),
         _ => {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
@@ -32,7 +32,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             .remove("E5")?;
     }
     let commit = edit.commit()?;
-    std::fs::write(path, commit.workbook().to_bytes()?)?;
-    println!("committed {} semantic changes", commit.patch().len());
+    std::fs::write(path, commit.package().to_bytes()?)?;
+    println!(
+        "committed {} semantic changes",
+        commit.patch().operation_count()
+    );
     Ok(())
 }

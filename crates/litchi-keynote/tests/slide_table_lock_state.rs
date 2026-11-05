@@ -16,15 +16,18 @@ use litchi_iwa_common::{
     decode_varint_from_bytes,
     wire::{WireView, append_length_delimited_field, append_varint_field},
 };
-use litchi_iwa_core::{
-    Archive, ArchiveObject, FieldInfo, FieldPath, FieldType, RawMessage, SnappyStream,
-};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldType, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsd, tsk, tsp, tst, tswp};
 use litchi_keynote::slide::table::lock::State;
 use litchi_keynote::{
-    Package, ReadOptions, SemanticLimits, SlideSelector, SlideTableLockStateCommit,
-    SlideTableLockStateDiagnostics, SlideTableLockStateEdit, SlideTableLockStateError,
-    SlideTableLockStateLimitKind, SlideTableLockStatePatch, SlideTableLockStatePath, TableSelector,
+    OpenOptions, Package, SemanticLimits, SlideSelector, TableSelector,
+    slide::table::lock::transaction::Commit as SlideTableLockStateCommit,
+    slide::table::lock::transaction::Diagnostics as SlideTableLockStateDiagnostics,
+    slide::table::lock::transaction::Edit as SlideTableLockStateEdit,
+    slide::table::lock::transaction::Error as SlideTableLockStateError,
+    slide::table::lock::transaction::LimitKind as SlideTableLockStateLimitKind,
+    slide::table::lock::transaction::Patch as SlideTableLockStatePatch,
+    slide::table::lock::transaction::Path as SlideTableLockStatePath,
 };
 use prost::Message as _;
 
@@ -68,8 +71,12 @@ fn reference(identifier: u64) -> tsp::Reference {
     }
 }
 
-fn field_reference(path: impl Into<FieldPath>, references: &[u64]) -> FieldInfo {
-    let mut field = FieldInfo::new(path);
+fn field_reference(path: Vec<u32>, references: &[u64]) -> FieldInfo {
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(path, litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     field.object_references.extend_from_slice(references);
     field
 }
@@ -80,7 +87,11 @@ fn object(
     data: Vec<u8>,
     references: &[u64],
 ) -> TestResult<ArchiveObject> {
-    let mut object = ArchiveObject::new(identifier, vec![RawMessage { type_, data }])?;
+    let mut object = ArchiveObject::new(
+        identifier,
+        vec![RawMessage { type_, data }],
+        Default::default(),
+    )?;
     object.archive_info.message_infos[0]
         .object_references
         .extend_from_slice(references);
@@ -152,8 +163,18 @@ fn metadata_payload() -> TestResult<Vec<u8>> {
     let model_component = component_payload(2, "CalculationEngine", MODELS);
     let mut payload = Vec::new();
     append_varint_field(&mut payload, 1, METADATA_OBJECT)?;
-    append_length_delimited_field(&mut payload, 3, &document_component)?;
-    append_length_delimited_field(&mut payload, 3, &model_component)?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &document_component,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &model_component,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -279,13 +300,15 @@ fn synthetic_package(states: [Option<bool>; 3]) -> TestResult<Vec<u8>> {
         &Archive {
             objects: document_objects,
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     let model_component = SnappyStream::compress(
         &Archive {
             objects: model_objects,
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     let metadata_component = SnappyStream::compress(
         &Archive {
@@ -296,7 +319,8 @@ fn synthetic_package(states: [Option<bool>; 3]) -> TestResult<Vec<u8>> {
                 &[],
             )?],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     Ok(litchi_iwa_archive::package::to_bytes(
         [
@@ -319,7 +343,7 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn member_bytes(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
-    Ok(Catalog::from_bytes(package)?
+    Ok(Catalog::from_bytes(package, Default::default())?
         .iter()
         .find(|entry| entry.name() == name)
         .ok_or_else(|| io::Error::other("missing package member"))?
@@ -330,7 +354,8 @@ fn member_bytes(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
 fn archive(package: &[u8], member: &str) -> TestResult<Archive> {
     let bytes = member_bytes(package, member)?;
     Ok(Archive::parse(
-        SnappyStream::decompress(&bytes)?.as_bytes(),
+        SnappyStream::decompress(&bytes, Default::default())?.as_bytes(),
+        Default::default(),
     )?)
 }
 
@@ -339,10 +364,11 @@ fn rewrite_member_archive(
     member: &str,
     mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let mut archive = archive(package, member)?;
     mutate(&mut archive)?;
-    let replacement = SnappyStream::compress(&archive.to_bytes()?)?;
+    let replacement =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(&[EntryEdit::new(member, &replacement)], Limits::default())?)
 }
 
@@ -395,6 +421,7 @@ fn replace_metadata_payload(package: &[u8], payload: Vec<u8>) -> TestResult<Vec<
                 type_: METADATA_MESSAGE_TYPE,
                 data: payload,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -426,6 +453,7 @@ fn replace_table_info_payload(
                 type_: TABLE_INFO_MESSAGE_TYPE,
                 data: payload,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -437,7 +465,7 @@ fn rewrite_table_info_super(
     mutate: impl FnOnce(&mut Vec<u8>) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
     let payload = table_info_payload(package, identifier)?;
-    let fields = WireView::parse(&payload)?;
+    let fields = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     let super_field = fields
         .fields()
         .find(|field| field.number() == TABLE_SUPER_FIELD)
@@ -447,7 +475,12 @@ fn rewrite_table_info_super(
     let mut rewritten = Vec::with_capacity(payload.len() + super_payload.len());
     for field in fields.fields() {
         if field.number() == TABLE_SUPER_FIELD {
-            append_length_delimited_field(&mut rewritten, TABLE_SUPER_FIELD, &super_payload)?;
+            append_length_delimited_field(
+                &mut rewritten,
+                TABLE_SUPER_FIELD,
+                &super_payload,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         } else {
             rewritten.extend_from_slice(field.raw());
         }
@@ -457,12 +490,15 @@ fn rewrite_table_info_super(
 
 fn lock_field(package: &[u8], identifier: u64) -> TestResult<Option<bool>> {
     let payload = table_info_payload(package, identifier)?;
-    let outer = WireView::parse(&payload)?;
+    let outer = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     let super_field = outer
         .fields()
         .find(|field| field.number() == TABLE_SUPER_FIELD)
         .ok_or_else(|| io::Error::other("missing table-info super field"))?;
-    let drawable = WireView::parse(super_field.payload())?;
+    let drawable = WireView::parse(
+        super_field.payload(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let Some(field) = drawable
         .fields()
         .find(|field| field.number() == DRAWABLE_LOCKED_FIELD)
@@ -481,19 +517,22 @@ fn lock_field(package: &[u8], identifier: u64) -> TestResult<Option<bool>> {
 }
 
 fn has_unknown_table_info_field(package: &[u8], identifier: u64) -> TestResult<bool> {
-    Ok(WireView::parse(&table_info_payload(package, identifier)?)?
-        .fields()
-        .any(|field| {
-            field.number() == UNKNOWN_TABLE_INFO_FIELD
-                && decode_varint_from_bytes(field.payload()).is_ok_and(|(value, width)| {
-                    value == UNKNOWN_TABLE_INFO_VALUE && width == field.payload().len()
-                })
-        }))
+    Ok(WireView::parse(
+        &table_info_payload(package, identifier)?,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?
+    .fields()
+    .any(|field| {
+        field.number() == UNKNOWN_TABLE_INFO_FIELD
+            && decode_varint_from_bytes(field.payload()).is_ok_and(|(value, width)| {
+                value == UNKNOWN_TABLE_INFO_VALUE && width == field.payload().len()
+            })
+    }))
 }
 
 fn assert_locality(source: &[u8], target: &[u8]) -> TestResult {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     let changed = before
         .iter()
         .filter(|entry| {
@@ -536,6 +575,7 @@ fn assert_rejected_atomically(source: &[u8]) -> TestResult {
     assert!(
         package
             .edit_slide_table_lock_state(SlideSelector::index(0), TableSelector::index(0))
+            .and_then(|edit| edit.commit())
             .is_err()
     );
     assert_eq!(exact_bytes(&package)?, before);
@@ -628,7 +668,11 @@ fn foreign_data_inbound(package: &[u8]) -> TestResult<Vec<u8>> {
 fn foreign_field_data_inbound(package: &[u8]) -> TestResult<Vec<u8>> {
     rewrite_document_archive(package, |archive| {
         let mut foreign = object(904, 7_002, vec![0x08, 0x01], &[])?;
-        let mut field = FieldInfo::new(vec![77]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![77], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.r#type = Some(FieldType::DataReference);
         field.data_references.push(TABLE_INFOS[0]);
         foreign.archive_info.message_infos[0]
@@ -642,7 +686,11 @@ fn foreign_field_data_inbound(package: &[u8]) -> TestResult<Vec<u8>> {
 fn foreign_field_object_inbound(package: &[u8]) -> TestResult<Vec<u8>> {
     rewrite_document_archive(package, |archive| {
         let mut foreign = object(905, 7_003, vec![0x08, 0x01], &[])?;
-        let mut field = FieldInfo::new(vec![78]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![78], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.r#type = Some(FieldType::ObjectReference);
         field.object_references.push(TABLE_INFOS[0]);
         foreign.archive_info.message_infos[0]
@@ -701,6 +749,7 @@ fn duplicate_slide_z_order(package: &[u8]) -> TestResult<Vec<u8>> {
                 type_: SLIDE_MESSAGE_TYPE,
                 data: slide.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -780,9 +829,11 @@ fn lock_and_unlock_are_exact_source_bound_local_and_reversible() -> TestResult {
     let source = synthetic_package([None, Some(false), Some(true)])?;
     let package = Package::from_bytes(&source)?;
     let mut edit = package.edit_slide_table_lock_state("Tables", TableSelector::index(0))?;
-    assert_eq!(edit.before(), State::Unlocked);
+    assert!(format!("{edit:?}").contains("has_selection: false"));
+    assert_eq!(edit.before()?, State::Unlocked);
+    assert!(format!("{edit:?}").contains("has_selection: true"));
     edit.lock();
-    assert_eq!(edit.state(), State::Locked);
+    assert_eq!(edit.state()?, State::Locked);
     let commit = edit.commit()?;
     assert_eq!(
         commit.package().slide_table_lock_state(0usize, 0usize)?,
@@ -840,7 +891,7 @@ fn unlock_round_trip_preserves_explicit_false_and_inverse() -> TestResult {
     let source = synthetic_package([Some(true), Some(false), None])?;
     let package = Package::from_bytes(&source)?;
     let mut edit = package.edit_slide_table_lock_state(0usize, 0usize)?;
-    assert_eq!(edit.before(), State::Locked);
+    assert_eq!(edit.before()?, State::Locked);
     edit.unlock();
     let commit = edit.commit()?;
     assert_eq!(
@@ -871,7 +922,12 @@ fn malformed_lock_wire_and_role_routes_fail_closed_without_source_mutation() -> 
         Ok(())
     })?;
     let wrong_wire = rewrite_table_info_super(&source, TABLE_INFOS[0], |super_payload| {
-        append_length_delimited_field(super_payload, DRAWABLE_LOCKED_FIELD, &[1])?;
+        append_length_delimited_field(
+            super_payload,
+            DRAWABLE_LOCKED_FIELD,
+            &[1],
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         Ok(())
     })?;
     let noncanonical = rewrite_table_info_super(&source, TABLE_INFOS[0], |super_payload| {
@@ -931,18 +987,19 @@ fn opaque_metadata_and_data_or_missing_identifier_routes_fail_closed() -> TestRe
 #[test]
 fn lock_state_limits_fail_before_publication_and_keep_source_exact() -> TestResult {
     let source = synthetic_package([None, Some(false), Some(true)])?;
-    let semantic =
-        SemanticLimits::new(1_000_000, 65_536, 1, 1_000_000, 1_000_000, 64 * 1024 * 1024)?;
+    let semantic = SemanticLimits::builder().max_references(1)?.build()?;
     let package =
-        Package::from_bytes_with_options(&source, ReadOptions::new(Limits::default(), semantic))?;
+        Package::from_bytes_with_options(&source, OpenOptions::new().semantic_limits(semantic))?;
     let before = exact_bytes(&package)?;
     assert!(matches!(
         package.slide_table_lock_state(0usize, 0usize),
-        Err(SlideTableLockStateError::LimitExceeded { .. })
+        Err(SlideTableLockStateError::Limit { .. })
     ));
     assert!(matches!(
-        package.edit_slide_table_lock_state(0usize, 0usize),
-        Err(SlideTableLockStateError::LimitExceeded { .. })
+        package
+            .edit_slide_table_lock_state(0usize, 0usize)
+            .and_then(|edit| edit.commit()),
+        Err(SlideTableLockStateError::Limit { .. })
     ));
     assert_eq!(exact_bytes(&package)?, before);
     Ok(())

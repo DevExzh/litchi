@@ -13,8 +13,9 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, OwnedSource,
 };
 use litchi_opc::{
-    OpcError, OpcPackage, PackURI, ReadLimits, SourceBackedPackage, SourceTopologyPlan,
+    OpcError, OpcPackage, PackURI, SourceBackedPackage, SourceLimits, SourceTopologyPlan,
 };
+use litchi_opc::{SourceCacheLimits, SourceReadPolicy};
 
 const CONTENT_TYPES_NS: &str = "http://schemas.openxmlformats.org/package/2006/content-types";
 const RELATIONSHIPS_NS: &str = "http://schemas.openxmlformats.org/package/2006/relationships";
@@ -221,7 +222,14 @@ fn source_bytes(
 }
 
 fn open(bytes: &[u8]) -> SourceBackedPackage {
-    SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes.to_vec()))).unwrap()
+    SourceBackedPackage::from_read_at(
+        Arc::new(OwnedSource::new(bytes.to_vec())),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap()
 }
 
 fn publish(bytes: &[u8], plan: SourceTopologyPlan) -> litchi_opc::Result<Vec<u8>> {
@@ -272,10 +280,13 @@ fn raw_records(bytes: &[u8]) -> BTreeMap<String, RawRecord> {
 }
 
 fn zip_member(bytes: &[u8], wanted: &str) -> Vec<u8> {
-    soapberry_zip::office::ArchiveReader::new(bytes)
-        .unwrap()
-        .read(wanted)
-        .unwrap()
+    soapberry_zip::office::ArchiveReader::new(
+        bytes,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap()
+    .read(wanted)
+    .unwrap()
 }
 
 fn mark_entry_encrypted(bytes: Vec<u8>, wanted: &str) -> Vec<u8> {
@@ -626,7 +637,7 @@ fn empty_topology_plan_is_an_exact_source_copy() {
 fn topology_publish_replaces_adds_and_links_parts_atomically() {
     let source = source_bytes(false, false, false);
     let output = publish(&source, add_basic_topology_plan()).unwrap();
-    let package = OpcPackage::from_bytes(&output).unwrap();
+    let package = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
 
     assert_eq!(
         package
@@ -758,7 +769,7 @@ fn noncanonical_existing_relationships_allow_append_preserving_source() {
     );
     assert_eq!(zip_member(&output, "custom/new.xml"), b"<new/>");
 
-    let reopened = OpcPackage::from_bytes(&output).unwrap();
+    let reopened = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
     let relationships = reopened
         .get_part(&pack("/word/document.xml"))
         .unwrap()
@@ -898,16 +909,21 @@ fn topology_publish_rejects_invalid_xml_and_part_byte_limits_before_output() {
     assert!(matches!(error, OpcError::XmlPublication { .. }));
     assert!(output.is_empty());
 
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_part_bytes(64)
         .unwrap()
         .max_total_part_bytes(32)
         .unwrap()
         .build()
         .unwrap();
-    let package =
-        SourceBackedPackage::from_read_at_with_limits(Arc::new(OwnedSource::new(source)), limits)
-            .unwrap();
+    let package = SourceBackedPackage::from_read_at(
+        Arc::new(OwnedSource::new(source)),
+        limits,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
     let mut oversized = SourceTopologyPlan::new();
     oversized
         .try_add_part(
@@ -920,7 +936,7 @@ fn topology_publish_rejects_invalid_xml_and_part_byte_limits_before_output() {
     let error = package
         .write_topology_to_stream(&mut output, oversized)
         .unwrap_err();
-    assert!(matches!(error, OpcError::ReadLimit { .. }));
+    assert!(matches!(error, OpcError::Limit { .. }));
     assert!(output.is_empty());
 }
 
@@ -1041,7 +1057,13 @@ fn topology_publication_refuses_trailing_data_before_writing() {
 #[test]
 fn source_admission_refuses_an_encrypted_entry() {
     let source = mark_entry_encrypted(source_bytes(false, false, false), "custom/untouched.xml");
-    let error = match SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(source))) {
+    let error = match SourceBackedPackage::from_read_at(
+        Arc::new(OwnedSource::new(source)),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    ) {
         Ok(_) => panic!("encrypted source must be refused during admission"),
         Err(error) => error,
     };
@@ -1057,7 +1079,13 @@ fn source_admission_checks_strong_and_local_only_encryption_flags() {
             local_flags,
             central_flags,
         );
-        let error = match SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(source))) {
+        let error = match SourceBackedPackage::from_read_at(
+            Arc::new(OwnedSource::new(source)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        ) {
             Ok(_) => panic!("encrypted source must be refused during admission"),
             Err(error) => error,
         };
@@ -1112,7 +1140,7 @@ fn raw_signature_non_part_materialization_is_owned_mutation_locked() {
         .unwrap()
         .set_blob(b"<after/>".to_vec());
     let mut output = Vec::new();
-    let error = changed.to_stream(&mut output).unwrap_err();
+    let error = changed.write_to(&mut output).unwrap_err();
     assert!(matches!(
         error,
         OpcError::SignedSourceRequiresExplicitPolicy
@@ -1218,7 +1246,7 @@ fn topology_output_is_deterministic_and_reopens_after_repeated_publication() {
     let first = publish(&source, add_basic_topology_plan()).unwrap();
     let second = publish(&source, add_basic_topology_plan()).unwrap();
     assert_eq!(first, second);
-    let reopened = OpcPackage::from_bytes(&first).unwrap();
+    let reopened = OpcPackage::from_bytes(&first, SourceLimits::default()).unwrap();
     assert_eq!(
         reopened.get_part(&pack("/custom/new.xml")).unwrap().blob(),
         b"<new/>"
@@ -1287,7 +1315,7 @@ fn case_equivalent_relationship_owners_group_once_and_refuse_duplicate_ids() {
         .unwrap();
     let second = publish(&source, repeated).unwrap();
     assert_eq!(first, second);
-    let package = OpcPackage::from_bytes(&first).unwrap();
+    let package = OpcPackage::from_bytes(&first, SourceLimits::default()).unwrap();
     let rels = package
         .get_part(&pack("/word/document.xml"))
         .unwrap()
@@ -1333,7 +1361,7 @@ fn existing_canonical_relationships_are_regenerated_with_new_relationships() {
     )
     .unwrap();
     let output = publish(&source, plan).unwrap();
-    let package = OpcPackage::from_bytes(&output).unwrap();
+    let package = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
     let rels = package
         .get_part(&pack("/word/document.xml"))
         .unwrap()
@@ -1349,10 +1377,12 @@ fn existing_canonical_relationships_are_regenerated_with_new_relationships() {
 fn managed_cancellation_before_topology_publication_writes_nothing() {
     let source = source_bytes(false, false, false);
     let (cancellation_source, context) = managed_context();
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(source)),
-        ReadLimits::default(),
-        context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     cancellation_source.cancel();
@@ -1455,7 +1485,7 @@ fn one_existing_part_can_be_deleted_without_affecting_reopenable_package() {
         )
         .unwrap();
 
-    let reopened = OpcPackage::from_bytes(&output).unwrap();
+    let reopened = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
     assert!(reopened.get_part(&pack("/custom/existing.xml")).is_err());
     assert_eq!(
         reopened
@@ -1479,7 +1509,7 @@ fn replacement_and_deletion_are_published_in_one_sequential_output() {
         )
         .unwrap();
 
-    let reopened = OpcPackage::from_bytes(&output).unwrap();
+    let reopened = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
     assert_eq!(
         reopened
             .get_part(&pack("/word/document.xml"))
@@ -1637,7 +1667,7 @@ fn topology_remove_part_detaches_inbound_relationship_and_omits_owned_members() 
     plan.try_remove_relationship(pack("/"), "rIdDrop").unwrap();
 
     let output = publish(&source, plan).unwrap();
-    let reopened = OpcPackage::from_bytes(&output).unwrap();
+    let reopened = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
     assert!(reopened.get_part(&pack("/custom/existing.xml")).is_err());
 
     let content_types = String::from_utf8(zip_member(&output, "[Content_Types].xml")).unwrap();
@@ -1676,4 +1706,40 @@ fn topology_remove_part_refuses_dangling_inbound_relationship_before_output() {
         .unwrap_err();
     assert!(matches!(error, OpcError::InvalidRelationship(_)));
     assert!(output.is_empty());
+}
+
+#[test]
+fn prepared_materialization_preserves_signature_and_non_part_policy() {
+    for source in [
+        signed_source_bytes(),
+        source_bytes_with_non_part_signature_member("_xmlsignatures/orphan.sigs"),
+    ] {
+        let package = open(&source);
+        let non_parts: Vec<_> = package
+            .non_part_members()
+            .iter()
+            .map(|member| (member.name().to_owned(), member.reason()))
+            .collect();
+        let candidate = package.prepare_topology(SourceTopologyPlan::new()).unwrap();
+        let mut owned = candidate.to_opc_package().unwrap();
+        assert!(owned.is_signed());
+        assert_eq!(
+            owned
+                .non_part_members()
+                .iter()
+                .map(|member| (member.name().to_owned(), member.reason()))
+                .collect::<Vec<_>>(),
+            non_parts
+        );
+        owned
+            .get_part_mut(&pack("/word/document.xml"))
+            .unwrap()
+            .set_blob(b"<after/>".to_vec());
+        let mut output = Vec::new();
+        assert!(matches!(
+            owned.write_to(&mut output),
+            Err(OpcError::SignedSourceRequiresExplicitPolicy)
+        ));
+        assert!(output.is_empty());
+    }
 }

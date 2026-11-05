@@ -14,10 +14,10 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::phys_pkg::{PhysPkgReader, PhysPkgWriter};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, TargetMode};
 use litchi_xlsx::drawing::{
-    DrawingAnchor, DrawingDialect, PictureSelector, RelationshipDialect, SourceDrawing,
+    DrawingAnchor, DrawingDialect, PictureSelector, RelationshipDialect, ScanLimits, SourceDrawing,
     SvgOwnerState, WorksheetSourceLimits, WorksheetSourceScan,
 };
-use litchi_xlsx::{Package, ReadLimits, Workbook};
+use litchi_xlsx::{Package, SourceLimits};
 
 const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const XDR: &str = "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing";
@@ -39,8 +39,10 @@ const OTHER_MEDIA: &str = "/xl/media/other.bin";
 const NEW_SVG: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0 L4 4"/></svg>"#;
 const PNG: &[u8] = b"synthetic-png-payload";
 
+// LibreOffice `sc/qa/unit/data/xlsx/tdf169496_hidden_graphic.xlsx`, vendored
+// byte-for-byte; see `test-data/libreoffice-core/PROVENANCE.md`.
 const NATIVE_XLSX: &[u8] = include_bytes!(
-    "../../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf169496_hidden_graphic.xlsx"
+    "../../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf169496_hidden_graphic.xlsx"
 );
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -175,7 +177,7 @@ fn package_bytes(
     worksheet: Option<Vec<u8>>,
     fault: MediaFault,
 ) -> Vec<u8> {
-    let mut package = Package::create().unwrap().into_plain_opc();
+    let mut package = Package::new().unwrap().into_plain_opc();
     package
         .get_part_mut(&PackURI::new(SHEET).unwrap())
         .unwrap()
@@ -319,7 +321,7 @@ fn synthetic_fixture(strict: bool, picture_count: usize, svg: bool) -> Vec<u8> {
 }
 
 fn rewrite_sheet(bytes: &[u8], source: Vec<u8>) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).unwrap();
+    let mut package = OpcPackage::from_bytes(bytes, SourceLimits::default()).unwrap();
     package
         .get_part_mut(&PackURI::new(SHEET).unwrap())
         .unwrap()
@@ -332,7 +334,7 @@ fn rewrite_physical_member(
     wanted: &str,
     rewrite: impl FnOnce(Vec<u8>) -> Vec<u8>,
 ) -> Vec<u8> {
-    let reader = PhysPkgReader::new(bytes).unwrap();
+    let reader = PhysPkgReader::new(bytes, SourceLimits::default()).unwrap();
     let members = reader.member_names().unwrap();
     let mut writer = PhysPkgWriter::new();
     let mut rewrite = Some(rewrite);
@@ -390,8 +392,8 @@ fn encoded_drawing_namespace_fixture(bytes: &[u8]) -> Vec<u8> {
     })
 }
 
-fn workbook(bytes: &[u8]) -> Workbook {
-    Workbook::from_bytes(bytes.to_vec()).unwrap()
+fn workbook(bytes: &[u8]) -> Package {
+    Package::from_bytes(bytes).unwrap()
 }
 
 fn worksheet_source(inner: &str) -> Vec<u8> {
@@ -410,13 +412,13 @@ fn nested_worksheet_source() -> Vec<u8> {
 fn source_limits_reject(source: &[u8], mutate: impl FnOnce(&mut WorksheetSourceLimits)) {
     let mut limits = WorksheetSourceLimits::default();
     mutate(&mut limits);
-    assert!(WorksheetSourceScan::scan_with_limits(source, limits).is_err());
+    assert!(WorksheetSourceScan::scan(source, limits).is_err());
 }
 
 #[test]
 fn native_fixture_pairs_typed_source_and_borrows_svg_payload() {
     let workbook = workbook(NATIVE_XLSX);
-    let worksheet = workbook.sheet("Sheet1").unwrap().unwrap();
+    let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
     let drawing = worksheet.drawing(0).unwrap();
 
     assert_eq!(drawing.source().dialect(), DrawingDialect::Transitional);
@@ -467,6 +469,7 @@ fn native_fixture_pairs_typed_source_and_borrows_svg_payload() {
     assert_eq!(first.bytes(), second.bytes());
     assert_eq!(first_ptr, second.bytes().as_ptr());
     let workbook_read = workbook
+        .workbook_ref()
         .read_svg_image("Sheet1", PictureSelector::new(0, 1))
         .unwrap();
     assert_eq!(workbook_read.bytes(), first.bytes());
@@ -475,7 +478,7 @@ fn native_fixture_pairs_typed_source_and_borrows_svg_payload() {
 #[test]
 fn synthetic_all_anchor_forms_pair_source_and_typed_geometry() {
     let workbook = workbook(&synthetic_fixture(false, 3, true));
-    let worksheet = workbook.sheet("Sheet1").unwrap().unwrap();
+    let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
     let drawing = worksheet.drawing(0).unwrap();
     assert_eq!(drawing.picture_count(), 3);
     assert!(matches!(
@@ -511,7 +514,7 @@ fn synthetic_all_anchor_forms_pair_source_and_typed_geometry() {
 #[test]
 fn strict_core_with_transitional_svg_attribute_is_read_as_strict() {
     let workbook = workbook(&synthetic_fixture(true, 1, true));
-    let worksheet = workbook.sheet("Sheet1").unwrap().unwrap();
+    let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
     let drawing = worksheet.drawing(0).unwrap();
     assert_eq!(drawing.source().dialect(), DrawingDialect::Strict);
     assert_eq!(
@@ -531,7 +534,7 @@ fn strict_core_with_transitional_svg_attribute_is_read_as_strict() {
 #[test]
 fn strict_mce_is_canonical_and_foreign_purl_wrappers_stay_opaque() {
     let canonical = drawing_with_mce_wrapped_svg(true, MCE, "mc");
-    let canonical_source = SourceDrawing::scan(&canonical).unwrap();
+    let canonical_source = SourceDrawing::scan(&canonical, 0, ScanLimits::default()).unwrap();
     assert_eq!(canonical_source.dialect(), DrawingDialect::Strict);
     assert_eq!(canonical_source.pictures().len(), 1);
     assert!(matches!(
@@ -540,7 +543,7 @@ fn strict_mce_is_canonical_and_foreign_purl_wrappers_stay_opaque() {
     ));
 
     let foreign = drawing_with_mce_wrapped_svg(true, FOREIGN_MCE, "pmc");
-    let foreign_source = SourceDrawing::scan(&foreign).unwrap();
+    let foreign_source = SourceDrawing::scan(&foreign, 0, ScanLimits::default()).unwrap();
     assert_eq!(foreign_source.dialect(), DrawingDialect::Strict);
     assert_eq!(foreign_source.pictures().len(), 1);
     let foreign_picture = foreign_source.picture(0).unwrap();
@@ -563,26 +566,40 @@ fn worksheet_namespace_aliases_and_opaque_lookalikes_keep_direct_ownership() {
     let alias = String::from(
         r#"<ws:worksheet xmlns:ws="http://schemas.openxmlformats.org/spreadsheetml/2006/mai&#110;" xmlns:rr="http://schemas.openxmlformats.org/officeDocument/2006/relationship&#115;"><ws:sheetData/><ws:drawing rr:id="rIdDrawing"/></ws:worksheet>"#,
     );
-    let scan = WorksheetSourceScan::scan(alias.as_bytes()).unwrap();
+    let scan =
+        WorksheetSourceScan::scan(alias.as_bytes(), WorksheetSourceLimits::default()).unwrap();
     assert_eq!(scan.relationship_ids().collect::<Vec<_>>(), ["rIdDrawing"]);
     let bytes = rewrite_sheet(&synthetic_fixture(false, 1, true), alias.into_bytes());
-    let worksheet = workbook(&bytes).sheet("Sheet1").unwrap().unwrap();
+    let worksheet = workbook(&bytes)
+        .workbook_ref()
+        .sheet("Sheet1")
+        .unwrap()
+        .unwrap();
     assert_eq!(worksheet.drawing(0).unwrap().picture_count(), 1);
 
     let opaque = format!(
         r#"<ws:worksheet xmlns:ws="{SML}" xmlns:r="{REL}" xmlns:mc="{MCE}" xmlns:foreign="urn:litchi:foreign"><ws:sheetData/><ws:drawing r:id="rIdDrawing"/><ws:extLst><foreign:payload><ws:drawing r:id="rIdWrong"/><mc:AlternateContent><mc:Choice Requires="foreign"><ws:drawing r:id="rIdWrong"/></mc:Choice><mc:Fallback/></mc:AlternateContent></foreign:payload></ws:extLst></ws:worksheet>"#
     );
-    let scan = WorksheetSourceScan::scan(opaque.as_bytes()).unwrap();
+    let scan =
+        WorksheetSourceScan::scan(opaque.as_bytes(), WorksheetSourceLimits::default()).unwrap();
     assert_eq!(scan.drawings().len(), 1);
     let bytes = rewrite_sheet(&synthetic_fixture(false, 1, true), opaque.into_bytes());
-    let worksheet = workbook(&bytes).sheet("Sheet1").unwrap().unwrap();
+    let worksheet = workbook(&bytes)
+        .workbook_ref()
+        .sheet("Sheet1")
+        .unwrap()
+        .unwrap();
     assert_eq!(worksheet.drawing(0).unwrap().picture_count(), 1);
 }
 
 #[test]
 fn case_variant_svg_media_target_resolves_the_canonical_package_part() {
     let bytes = case_variant_svg_target_fixture(&synthetic_fixture(false, 1, true));
-    let worksheet = workbook(&bytes).sheet("Sheet1").unwrap().unwrap();
+    let worksheet = workbook(&bytes)
+        .workbook_ref()
+        .sheet("Sheet1")
+        .unwrap()
+        .unwrap();
     let image = worksheet
         .read_svg_image(PictureSelector::new(0, 0))
         .unwrap();
@@ -593,13 +610,13 @@ fn case_variant_svg_media_target_resolves_the_canonical_package_part() {
 #[test]
 fn entity_escaped_drawing_namespace_uris_pair_source_and_typed_reads() {
     let bytes = encoded_drawing_namespace_fixture(&synthetic_fixture(false, 1, true));
-    let package = OpcPackage::from_bytes(&bytes).unwrap();
+    let package = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
     let drawing_bytes = package
         .get_part(&PackURI::new(DRAWING).unwrap())
         .unwrap()
         .blob()
         .to_vec();
-    let source = SourceDrawing::scan(&drawing_bytes).unwrap();
+    let source = SourceDrawing::scan(&drawing_bytes, 0, ScanLimits::default()).unwrap();
     assert_eq!(source.dialect(), DrawingDialect::Transitional);
     assert_eq!(source.pictures().len(), 1);
     assert_eq!(
@@ -608,7 +625,7 @@ fn entity_escaped_drawing_namespace_uris_pair_source_and_typed_reads() {
     );
 
     let workbook = workbook(&bytes);
-    let worksheet = workbook.sheet("Sheet1").unwrap().unwrap();
+    let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
     let drawing = worksheet.drawing(0).unwrap();
     assert_eq!(drawing.picture_count(), 1);
     assert_eq!(drawing.typed().pictures().count(), 1);
@@ -626,44 +643,64 @@ fn mce_foreign_wrappers_are_opaque_but_direct_choice_drawings_refuse() {
     let foreign_wrapper = format!(
         r#"<ws:worksheet xmlns:ws="{SML}" xmlns:r="{REL}" xmlns:mc="{MCE}" xmlns:foreign="urn:litchi:foreign"><ws:sheetData/><mc:AlternateContent><mc:Choice Requires="foreign"><foreign:wrapper><ws:drawing r:id="rIdHidden"/></foreign:wrapper></mc:Choice><mc:Fallback/></mc:AlternateContent></ws:worksheet>"#
     );
-    let scan = WorksheetSourceScan::scan(foreign_wrapper.as_bytes()).unwrap();
+    let scan =
+        WorksheetSourceScan::scan(foreign_wrapper.as_bytes(), WorksheetSourceLimits::default())
+            .unwrap();
     assert!(scan.drawings().is_empty());
     let bytes = rewrite_sheet(
         &synthetic_fixture(false, 1, true),
         foreign_wrapper.into_bytes(),
     );
-    let worksheet = workbook(&bytes).sheet("Sheet1").unwrap().unwrap();
+    let worksheet = workbook(&bytes)
+        .workbook_ref()
+        .sheet("Sheet1")
+        .unwrap()
+        .unwrap();
     assert!(worksheet.drawing(0).is_err());
 
     let direct_choice = format!(
         r#"<ws:worksheet xmlns:ws="{SML}" xmlns:r="{REL}" xmlns:mc="{MCE}" xmlns:x="urn:litchi:choice"><ws:sheetData/><mc:AlternateContent><mc:Choice Requires="x"><ws:drawing r:id="rIdHidden"/></mc:Choice><mc:Fallback/></mc:AlternateContent></ws:worksheet>"#
     );
-    assert!(WorksheetSourceScan::scan(direct_choice.as_bytes()).is_err());
+    assert!(
+        WorksheetSourceScan::scan(direct_choice.as_bytes(), WorksheetSourceLimits::default())
+            .is_err()
+    );
 }
 
 #[test]
 fn duplicate_direct_and_hidden_mce_drawing_owners_are_refused() {
     let duplicate = worksheet_source(r#"<ws:drawing r:id="rIdOne"/><ws:drawing r:id="rIdTwo"/>"#);
-    assert!(WorksheetSourceScan::scan(&duplicate).is_err());
+    assert!(WorksheetSourceScan::scan(&duplicate, WorksheetSourceLimits::default()).is_err());
 
     let canonical = format!(
         r#"<ws:worksheet xmlns:ws="{STRICT_SML}" xmlns:r="{STRICT_REL}" xmlns:mc="{MCE}" xmlns:x="urn:litchi:choice"><ws:sheetData/><mc:AlternateContent><mc:Choice Requires="x"><ws:drawing r:id="rIdHidden"/></mc:Choice><mc:Fallback/></mc:AlternateContent><ws:drawing r:id="rIdDirect"/></ws:worksheet>"#
     );
-    assert!(WorksheetSourceScan::scan(canonical.as_bytes()).is_err());
+    assert!(
+        WorksheetSourceScan::scan(canonical.as_bytes(), WorksheetSourceLimits::default()).is_err()
+    );
     let bytes = rewrite_sheet(&synthetic_fixture(true, 1, true), canonical.into_bytes());
-    let worksheet = workbook(&bytes).sheet("Sheet1").unwrap().unwrap();
+    let worksheet = workbook(&bytes)
+        .workbook_ref()
+        .sheet("Sheet1")
+        .unwrap()
+        .unwrap();
     assert!(worksheet.drawing(0).is_err());
 
     let foreign = format!(
         r#"<ws:worksheet xmlns:ws="{STRICT_SML}" xmlns:r="{STRICT_REL}" xmlns:pmc="{FOREIGN_MCE}" xmlns:x="urn:litchi:choice"><ws:sheetData/><pmc:AlternateContent pmc:Ignorable="x"><pmc:Choice Requires="x"><ws:drawing r:id="rIdHidden"/></pmc:Choice><pmc:Fallback/></pmc:AlternateContent><ws:drawing r:id="rIdDrawing"/></ws:worksheet>"#
     );
-    let scan = WorksheetSourceScan::scan(foreign.as_bytes()).unwrap();
+    let scan =
+        WorksheetSourceScan::scan(foreign.as_bytes(), WorksheetSourceLimits::default()).unwrap();
     assert_eq!(scan.relationship_ids().collect::<Vec<_>>(), ["rIdDrawing"]);
     let bytes = rewrite_sheet(&synthetic_fixture(true, 1, true), foreign.into_bytes());
-    let worksheet = workbook(&bytes).sheet("Sheet1").unwrap().unwrap();
+    let worksheet = workbook(&bytes)
+        .workbook_ref()
+        .sheet("Sheet1")
+        .unwrap()
+        .unwrap();
     assert_eq!(worksheet.drawing(0).unwrap().picture_count(), 1);
 
-    let package = OpcPackage::from_bytes(&bytes).unwrap();
+    let package = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
     let retained = package
         .get_part(&PackURI::new(SHEET).unwrap())
         .unwrap()
@@ -686,7 +723,7 @@ fn worksheet_source_preserves_legal_opaque_events_and_rejects_xml_seam_errors() 
         r#"<?keep?><ws:worksheet xmlns:ws="{SML}" xmlns:r="{REL}"><!--comment--><ws:sheetData><![CDATA[opaque]]></ws:sheetData><?after?><ws:drawing r:id="rIdDrawing"/></ws:worksheet>"#
     );
     assert_eq!(
-        WorksheetSourceScan::scan(legal.as_bytes())
+        WorksheetSourceScan::scan(legal.as_bytes(), WorksheetSourceLimits::default())
             .unwrap()
             .relationship_ids()
             .collect::<Vec<_>>(),
@@ -722,7 +759,7 @@ fn worksheet_source_preserves_legal_opaque_events_and_rejects_xml_seam_errors() 
     ];
     for source in malformed {
         assert!(
-            WorksheetSourceScan::scan(&source).is_err(),
+            WorksheetSourceScan::scan(&source, WorksheetSourceLimits::default()).is_err(),
             "malformed worksheet source was admitted: {:?}",
             String::from_utf8_lossy(&source)
         );
@@ -732,7 +769,7 @@ fn worksheet_source_preserves_legal_opaque_events_and_rejects_xml_seam_errors() 
 #[test]
 fn source_drawing_retains_opaque_comment_cdata_and_pi_bytes() {
     let source_bytes = drawing_xml(false, 1, true, true);
-    let source = SourceDrawing::scan(&source_bytes).unwrap();
+    let source = SourceDrawing::scan(&source_bytes, 0, ScanLimits::default()).unwrap();
     assert_eq!(source.source(), source_bytes.as_slice());
     let picture = source.picture(0).unwrap();
     let bytes = picture.picture_bytes(&source_bytes).unwrap();
@@ -767,26 +804,28 @@ fn worksheet_source_caller_caps_are_enforced_before_reference_publication() {
 #[test]
 fn worksheet_source_empty_and_exact_limit_boundaries_are_deterministic() {
     let empty = format!(r#"<ws:worksheet xmlns:ws="{SML}" xmlns:r="{REL}"/>"#);
-    let empty_scan = WorksheetSourceScan::scan(empty.as_bytes()).unwrap();
+    let empty_scan =
+        WorksheetSourceScan::scan(empty.as_bytes(), WorksheetSourceLimits::default()).unwrap();
     assert!(empty_scan.drawings().is_empty());
 
     let root_depth_zero = WorksheetSourceLimits {
         max_depth: 0,
         ..WorksheetSourceLimits::default()
     };
-    assert!(WorksheetSourceScan::scan_with_limits(empty.as_bytes(), root_depth_zero).is_err());
+    assert!(WorksheetSourceScan::scan(empty.as_bytes(), root_depth_zero).is_err());
     let empty_child =
         format!(r#"<ws:worksheet xmlns:ws="{SML}" xmlns:r="{REL}"><ws:sheetData/></ws:worksheet>"#);
     let child_depth_one = WorksheetSourceLimits {
         max_depth: 1,
         ..WorksheetSourceLimits::default()
     };
-    assert!(
-        WorksheetSourceScan::scan_with_limits(empty_child.as_bytes(), child_depth_one).is_err()
-    );
+    assert!(WorksheetSourceScan::scan(empty_child.as_bytes(), child_depth_one).is_err());
 
     let second_root = format!(r#"{empty}<ws:worksheet xmlns:ws="{SML}" xmlns:r="{REL}"/>"#);
-    assert!(WorksheetSourceScan::scan(second_root.as_bytes()).is_err());
+    assert!(
+        WorksheetSourceScan::scan(second_root.as_bytes(), WorksheetSourceLimits::default())
+            .is_err()
+    );
 
     let source = worksheet_source(r#"<ws:drawing r:id="rIdDrawing"/>"#);
     let exact = WorksheetSourceLimits {
@@ -800,7 +839,7 @@ fn worksheet_source_empty_and_exact_limit_boundaries_are_deterministic() {
         ..WorksheetSourceLimits::default()
     };
     assert_eq!(
-        WorksheetSourceScan::scan_with_limits(&source, exact)
+        WorksheetSourceScan::scan(&source, exact)
             .unwrap()
             .relationship_ids()
             .collect::<Vec<_>>(),
@@ -824,10 +863,16 @@ fn caller_part_xml_cap_refuses_mce_heavy_worksheet_before_read_projection() {
         &synthetic_fixture(false, 1, true),
         source.clone().into_bytes(),
     );
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_part_bytes((source.len() - 1) as u64)
         .unwrap();
-    assert!(Workbook::from_bytes_with_limits(bytes, limits.build().unwrap()).is_err());
+    assert!(
+        Package::from_bytes_with_options(
+            &bytes,
+            litchi_xlsx::OpenOptions::new().source_limits(limits.build().unwrap())
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -840,7 +885,7 @@ fn media_relationship_graph_faults_are_refused_without_payload_guessing() {
         MediaFault::RasterOutbound,
     ] {
         let workbook = workbook(&package_bytes(false, 1, true, None, fault));
-        let worksheet = workbook.sheet("Sheet1").unwrap().unwrap();
+        let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
         assert!(
             worksheet.picture(PictureSelector::new(0, 0)).is_err(),
             "raster graph fault {fault:?} was admitted"
@@ -854,7 +899,7 @@ fn media_relationship_graph_faults_are_refused_without_payload_guessing() {
         MediaFault::SvgOutbound,
     ] {
         let workbook = workbook(&package_bytes(false, 1, true, None, fault));
-        let worksheet = workbook.sheet("Sheet1").unwrap().unwrap();
+        let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
         let picture = worksheet.picture(PictureSelector::new(0, 0)).unwrap();
         assert!(
             picture.svg().is_err(),

@@ -5,7 +5,7 @@ use super::super::super::cache as chart_cache;
 use super::super::super::format::{self, Format};
 use super::super::super::layout;
 use super::super::super::model::{
-    Cache, Chart, DataKind, Family, Group, Link, Owner, Role, RowCol, Source,
+    Cache, DataKind, Family, Group, Link, Model, Owner, Role, RowCol, Source,
 };
 use super::super::super::{
     BOF, BOF_BYTES, EOF, EXCEL_DOC_TYPE, EXCEL_VERSION, GRAPH_DOC_TYPE, GRAPH_VERSION,
@@ -27,16 +27,20 @@ use super::wire::{
 use crate::{Error, Limits, Result};
 use litchi_biff::Encoder;
 
-pub(crate) fn encode(chart: &Chart, limits: Limits) -> Result<Vec<u8>> {
+pub(crate) fn encode(chart: &Model, limits: Limits) -> Result<Vec<u8>> {
     if !chart.authoring_proven {
-        return Err(Error::UnsupportedAuthoring {
-            reason: "the host prelude, attached-label/frame grammar, and complete axis ownership are not yet proven",
-        });
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "author",
+            "the host prelude, attached-label/frame grammar, and complete axis ownership are not yet proven",
+        )));
     }
     if chart.parents.len() != 1 || !(1..=4).contains(&chart.groups.len()) {
-        return Err(Error::UnsupportedAuthoring {
-            reason: "secondary-axis chart-group ownership is not yet modeled",
-        });
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "author",
+            "secondary-axis chart-group ownership is not yet modeled",
+        )));
     }
     validate::validate(chart, limits, true)?;
     if chart.graph_authoring_profile {
@@ -66,15 +70,15 @@ pub(crate) fn encode(chart: &Chart, limits: Limits) -> Result<Vec<u8>> {
                     resource: "Graph title retained metadata",
                 })?;
             if retained > limits.max_unknown_bytes {
-                return Err(Error::LimitExceeded {
-                    resource: "unknown chart bytes",
+                return Err(Error::Limit {
+                    kind: crate::LimitKind::UnknownBytes,
                     observed: crate::limits::as_u64(retained),
                     maximum: crate::limits::as_u64(limits.max_unknown_bytes),
                 });
             }
         }
     }
-    let mut out = Encoder::with_limits(limits.biff)?;
+    let mut out = Encoder::new(limits.biff)?;
     push_record(&mut out, BOF, &bof(chart.context.kind()))?;
     if chart.graph_authoring_profile {
         // CHARTSHEETCONTENT requires a complete DATASHEET before the optional

@@ -1,5 +1,5 @@
-use litchi::sheet::{CellValue, FormulaEvaluator, functions::open_workbook};
-use litchi::xlsx::{Formula, Number, Workbook};
+use litchi::sheet::{CellValue, FormulaEvaluator};
+use litchi::xlsx::{Formula, Number, Package};
 use tempfile::tempdir;
 
 const TOL: f64 = 1e-9;
@@ -12,8 +12,9 @@ async fn eval_pduration_and_rri() {
 
     build_financial_workbook(path_str);
 
-    let wb = open_workbook(path_str).expect("open workbook");
-    let evaluator = FormulaEvaluator::new(wb.as_ref());
+    let file = litchi::open(path_str).expect("open workbook");
+    let workbook = file.workbook().expect("workbook view");
+    let evaluator = FormulaEvaluator::new(&workbook);
 
     // PDURATION(rate, pv, fv)
     match evaluator
@@ -37,7 +38,7 @@ async fn eval_pduration_and_rri() {
 }
 
 fn build_financial_workbook(path: &str) {
-    let wb = Workbook::create().expect("create workbook");
+    let wb = Package::new().expect("create workbook");
     let mut edit = wb.edit().expect("start workbook edit");
     edit.tab(0)
         .expect("worksheet tab lookup")
@@ -69,7 +70,7 @@ fn build_financial_workbook(path: &str) {
 
     edit.commit()
         .expect("commit workbook edit")
-        .workbook()
+        .package()
         .save(path)
         .expect("save workbook");
 }

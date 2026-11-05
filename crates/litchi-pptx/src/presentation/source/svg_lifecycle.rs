@@ -33,13 +33,13 @@ const MAX_GENERATED_NAME_ATTEMPTS: usize = 100_000;
 
 /// A caller-owned SVG payload and optional advanced package identity.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SourceSvgAttachmentReplacement {
+pub struct SvgAttachmentReplacement {
     svg: Arc<Vec<u8>>,
     svg_part_uri: Option<PackURI>,
     relationship_id: Option<String>,
 }
 
-impl SourceSvgAttachmentReplacement {
+impl SvgAttachmentReplacement {
     /// Construct an ordinary attach request.  The package editor allocates a
     /// relationship ID and media URI that do not collide with the source.
     #[must_use]
@@ -88,14 +88,14 @@ impl SourceSvgAttachmentReplacement {
 
 /// The attached SVG resource in one source-backed lifecycle snapshot.
 #[derive(Clone)]
-pub struct SourceSvgAttachment {
+pub struct AttachedSvg {
     relationship_id: String,
     relationship_type: String,
     part_uri: PackURI,
     payload: SourcePayload,
 }
 
-impl SourceSvgAttachment {
+impl AttachedSvg {
     /// Relationship ID carried by the native `asvg:svgBlip` element.
     #[must_use]
     pub fn relationship_id(&self) -> &str {
@@ -124,26 +124,26 @@ impl SourceSvgAttachment {
 /// Immutable source/target state for an existing raster picture's optional
 /// SVG owner.
 #[derive(Clone)]
-pub struct SourceBackedSvgAttachmentSnapshot {
+pub struct SvgAttachment {
     pub(super) slide: SourceBackedSlideSnapshot,
     image_position: usize,
     raster_relationship_id: String,
     raster_relationship_type: String,
     raster_part_uri: PackURI,
-    svg: Option<SourceSvgAttachment>,
+    svg: Option<AttachedSvg>,
     default_relationship_id: String,
     default_part_uri: PackURI,
     existing_relationship_ids: Arc<[String]>,
     physical_member_names: Arc<[String]>,
-    limits: litchi_opc::ReadLimits,
+    limits: litchi_opc::SourceLimits,
 }
 
 /// One-shot source-backed attach/detach edit.
-pub struct SourceBackedSvgAttachmentEdit<'a> {
+pub(crate) struct SourceBackedSvgAttachmentEdit<'a> {
     editor: &'a SourceBackedPresentationEditor,
-    source: SourceBackedSvgAttachmentSnapshot,
+    source: SvgAttachment,
     slide: SourceBackedSlideSnapshot,
-    svg: Option<SourceSvgAttachment>,
+    svg: Option<AttachedSvg>,
     operation_used: bool,
     default_relationship_id: String,
     default_part_uri: PackURI,
@@ -151,18 +151,22 @@ pub struct SourceBackedSvgAttachmentEdit<'a> {
 
 /// Exact-source reversible patch for an SVG attach/detach operation.
 #[derive(Clone)]
-pub struct SourceBackedSvgAttachmentPatch {
-    before: SourceBackedSvgAttachmentSnapshot,
-    after: SourceBackedSvgAttachmentSnapshot,
+pub(crate) struct SourceBackedSvgAttachmentPatch {
+    before: SvgAttachment,
+    after: SvgAttachment,
 }
 
 /// Checked attach/detach transaction ready for publication.
-pub struct SourceBackedSvgAttachmentCommit {
-    snapshot: SourceBackedSvgAttachmentSnapshot,
+pub(crate) struct SourceBackedSvgAttachmentCommit {
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the source-level engine tests")
+    )]
+    snapshot: SvgAttachment,
     patch: SourceBackedSvgAttachmentPatch,
 }
 
-impl SourceBackedSvgAttachmentSnapshot {
+impl SvgAttachment {
     /// Zero-based presentation position of the selected slide.
     #[must_use]
     pub const fn slide_position(&self) -> usize {
@@ -195,7 +199,7 @@ impl SourceBackedSvgAttachmentSnapshot {
 
     /// Current optional SVG attachment.
     #[must_use]
-    pub fn svg(&self) -> Option<&SourceSvgAttachment> {
+    pub fn svg(&self) -> Option<&AttachedSvg> {
         self.svg.as_ref()
     }
 
@@ -233,12 +237,14 @@ impl SourceBackedSvgAttachmentSnapshot {
 impl<'a> SourceBackedSvgAttachmentEdit<'a> {
     /// Exact immutable source snapshot against which this edit was created.
     #[must_use]
-    pub const fn source(&self) -> &SourceBackedSvgAttachmentSnapshot {
+    #[cfg(test)]
+    pub(crate) const fn source(&self) -> &SvgAttachment {
         &self.source
     }
 
     /// Attach one SVG using collision-free generated package identities.
-    pub fn attach_svg(&mut self, svg: &[u8]) -> Result<bool> {
+    #[cfg(test)]
+    pub(crate) fn attach_svg(&mut self, svg: &[u8]) -> Result<bool> {
         let (relationship_id, part_uri) = self.prepare_attachment(svg.len(), None, None)?;
         let mut owned = Vec::new();
         owned
@@ -248,7 +254,7 @@ impl<'a> SourceBackedSvgAttachmentEdit<'a> {
                 source,
             })?;
         owned.extend_from_slice(svg);
-        let replacement = SourceSvgAttachmentReplacement {
+        let replacement = SvgAttachmentReplacement {
             svg: Arc::new(owned),
             svg_part_uri: None,
             relationship_id: None,
@@ -257,7 +263,7 @@ impl<'a> SourceBackedSvgAttachmentEdit<'a> {
     }
 
     /// Attach one SVG with optional advanced package identities.
-    pub fn attach(&mut self, replacement: &SourceSvgAttachmentReplacement) -> Result<bool> {
+    pub(crate) fn attach(&mut self, replacement: &SvgAttachmentReplacement) -> Result<bool> {
         let (relationship_id, part_uri) = self.prepare_attachment(
             replacement.svg.len(),
             replacement.relationship_id.as_deref(),
@@ -273,10 +279,11 @@ impl<'a> SourceBackedSvgAttachmentEdit<'a> {
         requested_part_uri: Option<&PackURI>,
     ) -> Result<(String, PackURI)> {
         if self.operation_used {
-            return Err(Error::UnsafeEdit {
-                operation: "attach_svg",
-                reason: "SVG lifecycle edits support one atomic attach or detach",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "attach_svg",
+                "SVG lifecycle edits support one atomic attach or detach",
+            ));
         }
         if self.svg.is_some() {
             return Err(Error::Relationship(
@@ -332,7 +339,7 @@ impl<'a> SourceBackedSvgAttachmentEdit<'a> {
         payload: Arc<Vec<u8>>,
     ) -> Result<bool> {
         let payload = SourcePayload::Edited(payload);
-        let svg = SourceSvgAttachment {
+        let svg = AttachedSvg {
             relationship_id: relationship_id.clone(),
             relationship_type: self.source.raster_relationship_type.clone(),
             part_uri: part_uri.clone(),
@@ -353,12 +360,13 @@ impl<'a> SourceBackedSvgAttachmentEdit<'a> {
     }
 
     /// Detach the selected SVG while retaining the raster fallback.
-    pub fn detach(&mut self) -> Result<bool> {
+    pub(crate) fn detach(&mut self) -> Result<bool> {
         if self.operation_used {
-            return Err(Error::UnsafeEdit {
-                operation: "detach_svg",
-                reason: "SVG lifecycle edits support one atomic attach or detach",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "detach_svg",
+                "SVG lifecycle edits support one atomic attach or detach",
+            ));
         }
         let Some(svg) = self.svg.as_ref() else {
             self.operation_used = true;
@@ -382,9 +390,9 @@ impl<'a> SourceBackedSvgAttachmentEdit<'a> {
     /// Validate the selected dependency closure and freeze the edit into an
     /// exact-source patch. The validation plan is discarded; publication
     /// recaptures the source and rebuilds the physical plan.
-    pub fn commit(self) -> Result<SourceBackedSvgAttachmentCommit> {
+    pub(crate) fn commit(self) -> Result<SourceBackedSvgAttachmentCommit> {
         self.editor.package.check_execution()?;
-        let snapshot = SourceBackedSvgAttachmentSnapshot {
+        let snapshot = SvgAttachment {
             slide: self.slide,
             image_position: self.source.image_position,
             raster_relationship_id: self.source.raster_relationship_id.clone(),
@@ -411,33 +419,38 @@ impl<'a> SourceBackedSvgAttachmentEdit<'a> {
 
     /// Alias for [`Self::commit`], retained for callers that make the
     /// execution check explicit.
-    pub fn commit_checked(self) -> Result<SourceBackedSvgAttachmentCommit> {
+    pub(crate) fn commit_checked(self) -> Result<SourceBackedSvgAttachmentCommit> {
         self.commit()
     }
 }
 
 impl SourceBackedSvgAttachmentPatch {
-    /// Exact source snapshot required by this patch.
-    #[must_use]
-    pub const fn source(&self) -> &SourceBackedSvgAttachmentSnapshot {
-        &self.before
+    /// The slide and picture positions this patch addresses.
+    pub(crate) fn location(&self) -> (usize, usize) {
+        (self.before.slide.position(), self.before.image_position)
     }
 
-    /// Exact target snapshot produced by this patch.
-    #[must_use]
-    pub const fn target(&self) -> &SourceBackedSvgAttachmentSnapshot {
-        &self.after
+    /// The commit that publishes this patch.
+    pub(crate) fn to_commit(&self) -> SourceBackedSvgAttachmentCommit {
+        SourceBackedSvgAttachmentCommit {
+            snapshot: self.after.clone(),
+            patch: self.clone(),
+        }
     }
 
-    /// Whether the selected slide/relationship closure changes.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         !same_attachment_state(&self.before, &self.after)
+    }
+
+    /// Whether this patch leaves its source unchanged.
+    #[must_use]
+    pub(crate) fn is_noop(&self) -> bool {
+        !self.is_changed()
     }
 
     /// Return the exact inverse patch.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
@@ -445,14 +458,11 @@ impl SourceBackedSvgAttachmentPatch {
     }
 
     /// Apply only to the exact source snapshot captured by this patch.
-    pub fn apply(
-        &self,
-        source: &SourceBackedSvgAttachmentSnapshot,
-    ) -> Result<SourceBackedSvgAttachmentSnapshot> {
+    pub(crate) fn apply(&self, source: &SvgAttachment) -> Result<SvgAttachment> {
         self.before.slide.check_execution()?;
         source.slide.check_execution()?;
         if !source.same_source(&self.before) {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         Ok(if self.is_changed() {
             self.after.clone()
@@ -465,28 +475,33 @@ impl SourceBackedSvgAttachmentPatch {
 impl SourceBackedSvgAttachmentCommit {
     /// Candidate target snapshot after this edit.
     #[must_use]
-    pub const fn snapshot(&self) -> &SourceBackedSvgAttachmentSnapshot {
+    #[cfg(test)]
+    pub(crate) const fn snapshot(&self) -> &SvgAttachment {
         &self.snapshot
     }
 
     /// Exact-source patch for this edit.
     #[must_use]
-    pub const fn patch(&self) -> &SourceBackedSvgAttachmentPatch {
+    pub(crate) const fn patch(&self) -> &SourceBackedSvgAttachmentPatch {
         &self.patch
-    }
-
-    /// Whether the selected closure changes.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.patch.is_changed()
     }
 }
 
 impl SourceBackedPresentationEditor {
+    /// Capture the attach/detach state of one direct raster picture.
+    pub(crate) fn svg_attachment_snapshot(
+        &self,
+        slide_position: usize,
+        image_position: usize,
+    ) -> Result<SvgAttachment> {
+        self.package.check_execution()?;
+        capture_svg_attachment_snapshot(self, slide_position, image_position, "svg_attachment")
+    }
+
     /// Begin an exact-source SVG attach/detach transaction on one direct
     /// raster picture.  Existing linked SVGs and MCE-owned picture branches
     /// are refused before an edit handle is returned.
-    pub fn edit_svg_attachment(
+    pub(crate) fn edit_svg_attachment(
         &self,
         slide_position: usize,
         image_position: usize,
@@ -501,11 +516,11 @@ impl SourceBackedPresentationEditor {
 
     /// Publish one exact-source SVG attach/detach commit atomically through a
     /// bounded OPC topology plan.
-    pub fn publish_svg_attachment_commit_to_stream<W: std::io::Write>(
+    pub(crate) fn publish_svg_attachment_commit_to_stream<W: std::io::Write>(
         self,
         writer: W,
         commit: &SourceBackedSvgAttachmentCommit,
-    ) -> Result<SourceBackedSvgAttachmentSnapshot> {
+    ) -> Result<SvgAttachment> {
         self.package.check_execution()?;
         let current = capture_svg_attachment_snapshot(
             &self,
@@ -514,7 +529,7 @@ impl SourceBackedPresentationEditor {
             "publish_svg_attachment_commit_to_stream",
         )?;
         if !current.same_source(&commit.patch.before) {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         let target = commit.patch.apply(&current)?;
         if !target.is_changed_from(&current) {
@@ -526,27 +541,15 @@ impl SourceBackedPresentationEditor {
         self.package.write_topology_to_stream(writer, plan)?;
         Ok(target)
     }
-
-    /// Compatibility alias with the operation noun used by replacement APIs.
-    pub fn publish_svg_lifecycle_commit_to_stream<W: std::io::Write>(
-        self,
-        writer: W,
-        commit: &SourceBackedSvgAttachmentCommit,
-    ) -> Result<SourceBackedSvgAttachmentSnapshot> {
-        self.publish_svg_attachment_commit_to_stream(writer, commit)
-    }
 }
 
-impl SourceBackedSvgAttachmentSnapshot {
+impl SvgAttachment {
     fn is_changed_from(&self, other: &Self) -> bool {
         !same_attachment_state(self, other)
     }
 }
 
-fn same_attachment_state(
-    left: &SourceBackedSvgAttachmentSnapshot,
-    right: &SourceBackedSvgAttachmentSnapshot,
-) -> bool {
+fn same_attachment_state(left: &SvgAttachment, right: &SvgAttachment) -> bool {
     left.slide.xml.as_bytes() == right.slide.xml.as_bytes()
         && left.image_position == right.image_position
         && left.raster_relationship_id == right.raster_relationship_id
@@ -555,10 +558,7 @@ fn same_attachment_state(
         && same_attachment(&left.svg, &right.svg)
 }
 
-fn same_attachment(
-    left: &Option<SourceSvgAttachment>,
-    right: &Option<SourceSvgAttachment>,
-) -> bool {
+fn same_attachment(left: &Option<AttachedSvg>, right: &Option<AttachedSvg>) -> bool {
     match (left, right) {
         (None, None) => true,
         (Some(left), Some(right)) => {
@@ -571,14 +571,15 @@ fn same_attachment(
     }
 }
 
-fn validate_svg_payload(limits: &litchi_opc::ReadLimits, bytes: usize) -> Result<()> {
+fn validate_svg_payload(limits: &litchi_opc::SourceLimits, bytes: usize) -> Result<()> {
     if bytes == 0 {
         return Err(Error::Invalid("SVG payload cannot be empty".into()));
     }
     if bytes as u64 > limits.max_part_bytes() {
         return Err(Error::Limit {
-            resource: "SVG attachment Part bytes",
-            limit: usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PartBytes),
+            observed: bytes,
+            maximum: usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX),
         });
     }
     Ok(())
@@ -715,7 +716,7 @@ fn capture_svg_attachment_snapshot(
     slide_position: usize,
     image_position: usize,
     _operation: &'static str,
-) -> Result<SourceBackedSvgAttachmentSnapshot> {
+) -> Result<SvgAttachment> {
     // SVG ownership validates the complete slide with its own bounded raw
     // scanner.  Do not run the legacy transition grammar here: it rejects
     // processing instructions and markup-compatibility payloads nested in
@@ -798,7 +799,7 @@ fn capture_svg_attachment_snapshot(
                 svg_relationship.id
             ))
         })?;
-        Some(SourceSvgAttachment {
+        Some(AttachedSvg {
             relationship_id: svg_relationship.id.clone(),
             relationship_type: relation.reltype().to_owned(),
             part_uri,
@@ -811,7 +812,7 @@ fn capture_svg_attachment_snapshot(
         allocate_svg_identity(&editor.package, &view, &raster_part_uri)?;
     let (existing_relationship_ids, physical_member_names) =
         capture_identity_inventory(&editor.package, &view)?;
-    Ok(SourceBackedSvgAttachmentSnapshot {
+    Ok(SvgAttachment {
         slide,
         image_position,
         raster_relationship_id: relationship.id,
@@ -877,8 +878,9 @@ fn allocate_svg_identity(
         })
         .find(|candidate| view.rels().get(candidate).is_none())
         .ok_or(Error::Limit {
-            resource: "generated SVG relationship ID candidates",
-            limit: MAX_GENERATED_NAME_ATTEMPTS,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Relationships),
+            observed: MAX_GENERATED_NAME_ATTEMPTS,
+            maximum: MAX_GENERATED_NAME_ATTEMPTS,
         })?;
     // Keep the ordinary authoring name stable and recognizable.  Collision
     // probing below still makes this safe when a package already contains a
@@ -917,8 +919,9 @@ fn allocate_svg_identity(
         }
     }
     Err(Error::Limit {
-        resource: "generated SVG media Part candidates",
-        limit: MAX_GENERATED_NAME_ATTEMPTS,
+        kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Parts),
+        observed: MAX_GENERATED_NAME_ATTEMPTS,
+        maximum: MAX_GENERATED_NAME_ATTEMPTS,
     })
 }
 
@@ -926,7 +929,7 @@ fn rewrite_picture_svg(
     slide_xml: &[u8],
     layout: &PictureLayout,
     attachment: Option<&str>,
-    limits: &litchi_opc::ReadLimits,
+    limits: &litchi_opc::SourceLimits,
 ) -> Result<Vec<u8>> {
     // Keep an unprefixed DrawingML owner unprefixed. A synthetic `a:` name
     // would require an inherited declaration that the source may not have;
@@ -1114,11 +1117,12 @@ fn generated_ext_list_len(drawing_prefix: &[u8], ext_len: usize) -> Result<usize
         .ok_or_else(|| Error::Invalid("generated extLst size overflows".into()))
 }
 
-fn check_slide_output_len(output_len: usize, limits: &litchi_opc::ReadLimits) -> Result<()> {
+fn check_slide_output_len(output_len: usize, limits: &litchi_opc::SourceLimits) -> Result<()> {
     if output_len as u64 > limits.max_part_bytes() {
         return Err(Error::Limit {
-            resource: "SVG lifecycle slide XML bytes",
-            limit: usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: output_len,
+            maximum: usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX),
         });
     }
     Ok(())
@@ -1344,7 +1348,7 @@ fn ext_list_contains_only_svg(xml: &[u8], ext_list: &ElementRange, svg: ByteRang
 fn splice_checked(
     source: &[u8],
     mut replacements: Vec<(ByteRange, Vec<u8>)>,
-    limits: &litchi_opc::ReadLimits,
+    limits: &litchi_opc::SourceLimits,
 ) -> Result<Vec<u8>> {
     replacements.sort_unstable_by_key(|(range, _)| range.start);
     let mut output_len = source.len();
@@ -1363,8 +1367,9 @@ fn splice_checked(
     }
     if output_len as u64 > limits.max_part_bytes() {
         return Err(Error::Limit {
-            resource: "SVG lifecycle slide XML bytes",
-            limit: usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: output_len,
+            maximum: usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX),
         });
     }
     let mut output = Vec::new();
@@ -1386,8 +1391,8 @@ fn splice_checked(
 
 fn build_attachment_topology_plan(
     package: &litchi_opc::SourceBackedPackage,
-    current: &SourceBackedSvgAttachmentSnapshot,
-    target: &SourceBackedSvgAttachmentSnapshot,
+    current: &SvgAttachment,
+    target: &SvgAttachment,
 ) -> Result<SourceTopologyPlan> {
     if current.slide.position() != target.slide.position()
         || current.image_position != target.image_position
@@ -1395,7 +1400,7 @@ fn build_attachment_topology_plan(
         || current.raster_relationship_type != target.raster_relationship_type
         || current.raster_part_uri != target.raster_part_uri
     {
-        return Err(Error::StaleSource);
+        return Err(Error::PatchConflict);
     }
     let owner = current.slide.part_uri.clone();
     let mut plan = SourceTopologyPlan::new();
@@ -1457,7 +1462,9 @@ fn build_attachment_topology_plan(
                 svg.part_uri.clone(),
                 "image/svg+xml".to_owned(),
                 match &svg.payload {
-                    SourcePayload::Edited(bytes) => Arc::clone(bytes),
+                    SourcePayload::Edited(bytes) | SourcePayload::ReservedEdit { bytes, .. } => {
+                        Arc::clone(bytes)
+                    },
                     SourcePayload::Original(_) => {
                         return Err(Error::Invalid(
                             "new SVG attachment payload is not edit-owned".into(),
@@ -1490,10 +1497,11 @@ fn build_attachment_topology_plan(
             }
         },
         (Some(_), Some(_)) => {
-            return Err(Error::UnsafeEdit {
-                operation: "SVG lifecycle publication",
-                reason: "attach/detach transactions cannot replace an existing SVG; use edit_svg_image",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "SVG lifecycle publication",
+                "attach/detach transactions cannot replace an existing SVG; use edit_svg_image",
+            ));
         },
         (None, None) => {},
     }

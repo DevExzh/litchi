@@ -24,7 +24,7 @@
 
 //! Typed Rich Text Format documents.
 //!
-//! [`Document`] is the ordinary immutable, lifetime-free snapshot. Parsing and
+//! [`Package`] is the immutable owner; [`Document`] is its read-only projection. Parsing and
 //! opening live in [`read`], streaming serialization lives in [`mod@write`], and
 //! Outlook's compressed-RTF transport lives in [`transport`]. The retained
 //! mutable parser model is an advanced interface under [`raw`].
@@ -33,7 +33,7 @@
 //!
 //! The crate keeps format mechanics behind responsibility-focused boundaries:
 //!
-//! - `api` owns the immutable [`Document`] facade and borrowed [`text::Story`]
+//! - `api` owns immutable [`Package`] snapshots, [`Document`] projections and [`text::Story`]
 //!   views.
 //! - `codec` owns bounded transport decoding, tokenization, parsing, and
 //!   serialization.
@@ -49,11 +49,11 @@
 //! # Example
 //!
 //! ```rust,no_run
-//! use litchi_rtf::{Document, Result};
+//! use litchi_rtf::{Package, Result};
 //!
 //! # fn main() -> Result<()> {
 //! let rtf_text = r#"{\rtf1\ansi{\fonttbl{\f0\fswiss Helvetica;}}\f0\pard Hello World!\par}"#;
-//! let doc = Document::parse(rtf_text)?;
+//! let doc = Package::parse(rtf_text)?;
 //! assert_eq!(doc.text(), "Hello World!\n");
 //! assert_eq!(doc.body().paragraphs().count(), 1);
 //! # Ok(())
@@ -65,6 +65,7 @@
     reason = "items stay grouped by RTF feature area rather than by item kind"
 )]
 mod api;
+pub mod builder;
 mod codec;
 mod content;
 mod drawing;
@@ -77,6 +78,11 @@ mod policy;
 pub mod redact;
 mod resource;
 pub mod review;
+pub mod source_backed;
+#[cfg(test)]
+extern crate self as litchi_rtf;
+#[cfg(test)]
+mod internal_tests;
 pub mod streaming;
 pub mod tail_append;
 pub mod text;
@@ -86,12 +92,14 @@ pub use content::{field, math, section, table};
 pub use drawing::{picture, shape};
 pub use numbering::list;
 
-// Crate-private compatibility aliases keep the retained model isolated from
-// the source layout. New code should depend on its responsibility module.
+// Crate-private implementation imports keep the retained model isolated from
+// the source layout. New public code should depend on its responsibility
+// module.
 use api::story;
 use codec::{compressed, error, lexer, limits, parser, writer};
 use content::{equation, form_field, math_properties};
 use drawing::{legacy_drawing, legacy_text_box, object, page_border, picture_compatibility};
+use metadata::info::Timestamp;
 use metadata::{
     custom_xml, data_store, document_origin, document_variable, external_reference, file_table,
     generator, info, mail_merge, smart_tag, theme, user_property, window_caption,
@@ -122,8 +130,10 @@ use text::{
 
 /// Concise document-opening facade.
 pub mod read {
-    pub use crate::api::Document;
-    pub use crate::codec::limits::{ParseLimits as Limits, ParseOptions as Options};
+    pub use crate::api::{Document, Package};
+    pub use crate::codec::limits::{
+        OpenOptions, SourceLimitKind, SourceLimits, SourceLimitsBuilder,
+    };
     pub use crate::leniency::{Leniency, ToleranceReport};
 }
 
@@ -131,19 +141,16 @@ pub mod read {
 pub mod write {
     pub use crate::codec::writer::{
         Charset, DEFAULT_TAB_WIDTH_TWIPS, DefaultTabWidthPolicy as TabWidth,
-        MAX_DEFAULT_TAB_WIDTH_TWIPS, RtfWriter as Writer, WriterOptions as Options,
+        MAX_DEFAULT_TAB_WIDTH_TWIPS, Options, Writer,
     };
     pub use crate::model::types::Formatting as Format;
-    pub use crate::streaming::{
-        StreamingRtfError, StreamingRtfLimits, StreamingRtfOptions, StreamingRtfWriter,
-    };
 }
 
 /// Bounded Outlook/MAPI compressed-RTF transport codec.
 pub mod transport {
     pub use crate::codec::compressed::{
-        DEFAULT_MAX_DECOMPRESSED_RTF_BYTES, DecompressionLimits as Limits, compress, decompress,
-        decompress_with_limits, is_compressed_rtf,
+        CompressionLimits, DEFAULT_MAX_COMPRESSED_RTF_BYTES, DEFAULT_MAX_DECOMPRESSED_RTF_BYTES,
+        DecompressionLimits, compress, decompress, is_compressed_rtf,
     };
 }
 
@@ -152,7 +159,7 @@ pub mod transport {
 /// This interface exposes format-specific structure. Ordinary read-only code
 /// should prefer [`crate::Document`].
 pub mod raw {
-    pub use crate::model::document::RtfDocument as Document;
+    pub use crate::model::document::Tree;
     pub use crate::native::*;
 }
 
@@ -186,14 +193,13 @@ pub mod style {
     };
 }
 
-pub use api::Document;
-pub use codec::error::{RtfError as Error, RtfResult as Result};
+pub use api::{Document, Package};
+pub use builder::Builder;
+pub use codec::error::{Error, Result};
 pub use tail_append::{
-    DurableTailAppendPatch, PlainParagraph, PlainRun, TailAppendCommit, TailAppendDiagnostics,
-    TailAppendEdit, TailAppendError, TailAppendLimits, TailAppendOutputProgress, TailAppendPatch,
+    DurableTailAppendPatch, PlainParagraph, PlainRun, TailAppendOutputProgress,
     TailAppendPublicationError, TailAppendPublicationLimits, TailAppendPublicationPlan,
-    TailAppendPublicationReport, TailAppendSourceEdit, TailAppendSourceProof,
-    TailAppendSourcePublicationPlan, TailAppendSourcePublicationReport, TailSelector,
+    TailAppendPublicationReport, TailSelector,
 };
 pub use validation::{
     ValidationCheck, ValidationCounts, ValidationDependency, ValidationLimits, ValidationReport,
@@ -205,7 +211,7 @@ pub use validation::{
 mod native {
     use super::{
         annotation, bookmark, border, character_positioning, compressed, custom_xml, data_store,
-        document, document_asian_grid_compatibility, document_booklet_printing,
+        document_asian_grid_compatibility, document_booklet_printing,
         document_compatibility_policy, document_default_formatting, document_drawing_grid,
         document_east_asian_compatibility, document_embedding_policies, document_file_settings,
         document_legacy_layout_compatibility, document_line_spacing_compatibility, document_origin,
@@ -214,7 +220,7 @@ mod native {
         document_save_preferences, document_style_policies, document_style_restrictions,
         document_table_layout_compatibility, document_theme_languages, document_variable,
         document_view, document_word_2003_compatibility, document_xml_policies, editable_region,
-        equation, error, external_reference, field, file_table, form_field, generated_list_marker,
+        equation, external_reference, field, file_table, form_field, generated_list_marker,
         generator, hyphenation, info, kinsoku, language, latent_style, legacy_drawing,
         legacy_numbering, legacy_paragraph_numbering, legacy_text_box, limits, list, mail_merge,
         math, math_properties, move_bookmark, navigation_entry, note_options, note_separator,
@@ -237,12 +243,11 @@ mod native {
         MAX_CHARACTER_KERNING_HALF_POINTS, MAX_CHARACTER_SCALE_PERCENT,
     };
     pub use compressed::{
-        DEFAULT_MAX_DECOMPRESSED_RTF_BYTES, DecompressionLimits, compress, decompress,
-        decompress_with_limits, is_compressed_rtf,
+        CompressionLimits, DEFAULT_MAX_COMPRESSED_RTF_BYTES, DEFAULT_MAX_DECOMPRESSED_RTF_BYTES,
+        DecompressionLimits, compress, decompress, is_compressed_rtf,
     };
     pub use custom_xml::{CustomXmlAttribute, CustomXmlTag};
     pub use data_store::DocumentDataStore;
-    pub use document::RtfDocument;
     pub use document_asian_grid_compatibility::DocumentAsianGridCompatibility;
     pub use document_booklet_printing::DocumentBookletPrinting;
     pub use document_compatibility_policy::{DocumentCompatibilityPolicy, DocumentFeatureThrottle};
@@ -292,7 +297,6 @@ mod native {
         EquationGroup, EquationIntegral, EquationIntegralSymbol, EquationModel, EquationOverstrike,
         EquationScript, EquationSegment, EquationSpacing, EquationSwitch,
     };
-    pub use error::{RtfError, RtfResult};
     pub use external_reference::{
         DocumentExternalReferences, MAX_DOCUMENT_EXTERNAL_REFERENCE_BYTES,
         MAX_DOCUMENT_EXTERNAL_REFERENCE_TOTAL_BYTES,
@@ -321,7 +325,6 @@ mod native {
         TableOfAuthoritiesEntryOption, TableOfAuthoritiesField, TableOfAuthoritiesOption,
         TableOfContentsEntryField, TableOfContentsEntryOption, TableOfContentsField,
         TableOfContentsOption, UserIdentityField, UserIdentityFieldKind, UserIdentityFormatting,
-        parse_field_code,
     };
     pub use field::{AdvanceField, AdvanceFieldAdjustment, AdvanceFieldOperation};
     pub use file_table::{FileLocation, FileSystemValidity, FileTable, FileTableEntry};
@@ -333,7 +336,7 @@ mod native {
     };
     pub use info::{
         DocumentInfo, DocumentProtection, MAX_PASSWORD_HASH_BYTES, PasswordHash, ProtectionLevel,
-        ProtectionType, RtfTimestamp,
+        ProtectionType,
     };
     pub use kinsoku::DocumentKinsoku;
     pub use language::{DocumentLanguageDefaults, LanguageId};
@@ -360,7 +363,7 @@ mod native {
     pub use legacy_text_box::{
         LegacyHorizontalAnchor, LegacyTextBox, LegacyTextDirection, LegacyVerticalAnchor,
     };
-    pub use limits::{ParseLimits, ParseOptions};
+    pub use limits::{OpenOptions, SourceLimitKind, SourceLimits, SourceLimitsBuilder};
     pub use list::{
         List, ListFollow, ListJustification, ListLevel, ListLevelType, ListOverride,
         ListOverrideLevel, ListOverrideTable, ListTable,
@@ -474,7 +477,6 @@ mod native {
     };
     pub use writer::{
         Charset, DEFAULT_TAB_WIDTH_TWIPS, DefaultTabWidthPolicy, MAX_DEFAULT_TAB_WIDTH_TWIPS,
-        RtfWriter, WriterOptions,
     };
     pub use xml_namespace::XmlNamespace;
     pub use xsl_transform::{
@@ -482,9 +484,20 @@ mod native {
     };
 }
 
+/// The retained tree at the crate root for the unit tests; the public path is
+/// [`raw::Tree`].
+#[cfg(test)]
+pub(crate) use model::document::Tree;
+
 #[cfg(doc)]
 pub(crate) use native::*;
 
 #[cfg(not(doc))]
 #[doc(hidden)]
 pub use native::*;
+
+/// Atomic filesystem publication policy.
+pub mod save;
+
+/// Checked primary-edit policy types.
+pub use edit::{EditOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsBuilder};

@@ -1,4 +1,4 @@
-use super::{ControlWord, Cow, ParsedBodyStoryEvent, Parser, RtfError, RtfResult, Token};
+use super::{ControlWord, Cow, ParsedBodyStoryEvent, Parser, Token};
 
 impl<'a> Parser<'a> {
     pub(super) fn is_math_scoped_control(control: &ControlWord<'_>) -> bool {
@@ -270,9 +270,9 @@ impl<'a> Parser<'a> {
     /// Expects `self.pos` at the zone control word and consumes tokens through
     /// the group's closing brace. Math run text is stored in the typed zone
     /// tree only and never enters the body story (like field results).
-    pub(super) fn parse_math_zone_destination(&mut self, display: bool) -> RtfResult<()> {
+    pub(super) fn parse_math_zone_destination(&mut self, display: bool) -> crate::Result<()> {
         if self.math_zones.len() >= crate::math::MAX_MATH_ZONES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF math zone count exceeds the safety limit".to_string(),
             ));
         }
@@ -288,7 +288,7 @@ impl<'a> Parser<'a> {
                 Some(Token::OpenBrace) => match self.tokens.get(self.pos + 1) {
                     Some(Token::Control(ControlWord::MathZoneParagraphProperties)) => {
                         if !display || paragraph_properties.is_some() || !content.is_empty() {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF math paragraph properties are misplaced".to_string(),
                             ));
                         }
@@ -309,13 +309,13 @@ impl<'a> Parser<'a> {
                     Some(Token::Control(_)) => {
                         content.push(self.parse_math_object(1)?);
                         if content.len() > crate::math::MAX_MATH_OBJECTS_PER_CONTAINER {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF math object count exceeds the safety limit".to_string(),
                             ));
                         }
                     },
                     _ => {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF math zone contains unsupported grouped content".to_string(),
                         ));
                     },
@@ -324,7 +324,7 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 _ => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF math zone contains ungrouped, binary, or active data".to_string(),
                     ));
                 },
@@ -345,16 +345,19 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse one math object group; `self.pos` is at its opening brace.
-    pub(super) fn parse_math_object(&mut self, depth: usize) -> RtfResult<crate::MathObject<'a>> {
+    pub(super) fn parse_math_object(
+        &mut self,
+        depth: usize,
+    ) -> crate::Result<crate::MathObject<'a>> {
         if depth > crate::math::MAX_MATH_DEPTH {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF math nesting depth exceeds the safety limit".to_string(),
             ));
         }
         let control = match self.tokens.get(self.pos + 1) {
             Some(Token::Control(control)) => *control,
             _ => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF math object group must start with a control word".to_string(),
                 ));
             },
@@ -363,7 +366,7 @@ impl<'a> Parser<'a> {
             return self.parse_math_run(depth);
         }
         let Some(kind) = Self::math_structure_kind(&control) else {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF math zone contains an unsupported object destination".to_string(),
             ));
         };
@@ -375,7 +378,7 @@ impl<'a> Parser<'a> {
         &mut self,
         kind: crate::MathStructureKind,
         depth: usize,
-    ) -> RtfResult<crate::MathObject<'a>> {
+    ) -> crate::Result<crate::MathObject<'a>> {
         self.pos += 2; // opening brace and structure control
         let mut properties = None;
         let mut children = Vec::new();
@@ -390,7 +393,7 @@ impl<'a> Parser<'a> {
                         if Self::math_structure_properties_kind(control) == Some(kind) =>
                     {
                         if properties.is_some() || !children.is_empty() {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF math structure properties are misplaced".to_string(),
                             ));
                         }
@@ -408,7 +411,7 @@ impl<'a> Parser<'a> {
                     },
                     Some(Token::Control(control)) => {
                         let Some(role) = Self::math_element_role(control) else {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF math structure contains an unsupported child destination"
                                     .to_string(),
                             ));
@@ -418,7 +421,7 @@ impl<'a> Parser<'a> {
                         ));
                     },
                     _ => {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF math structure contains unsupported grouped content".to_string(),
                         ));
                     },
@@ -427,13 +430,13 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 _ => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF math structure contains ungrouped, binary, or active data".to_string(),
                     ));
                 },
             }
             if children.len() > crate::math::MAX_MATH_OBJECTS_PER_CONTAINER {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF math object count exceeds the safety limit".to_string(),
                 ));
             }
@@ -449,7 +452,7 @@ impl<'a> Parser<'a> {
         &mut self,
         role: crate::MathElementRole,
         depth: usize,
-    ) -> RtfResult<crate::MathElement<'a>> {
+    ) -> crate::Result<crate::MathElement<'a>> {
         self.pos += 2; // opening brace and element control
         let mut argument_properties = None;
         let mut content = Vec::new();
@@ -462,7 +465,7 @@ impl<'a> Parser<'a> {
                 Some(Token::OpenBrace) => match self.tokens.get(self.pos + 1) {
                     Some(Token::Control(ControlWord::MathArgumentProperties)) => {
                         if argument_properties.is_some() || !content.is_empty() {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF math argument properties are misplaced".to_string(),
                             ));
                         }
@@ -475,7 +478,7 @@ impl<'a> Parser<'a> {
                         content.push(self.parse_math_object(depth + 1)?);
                     },
                     _ => {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF math argument contains unsupported grouped content".to_string(),
                         ));
                     },
@@ -484,13 +487,13 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 _ => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF math argument contains ungrouped, binary, or active data".to_string(),
                     ));
                 },
             }
             if content.len() > crate::math::MAX_MATH_OBJECTS_PER_CONTAINER {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF math object count exceeds the safety limit".to_string(),
                 ));
             }
@@ -506,7 +509,7 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_math_matrix_row(
         &mut self,
         depth: usize,
-    ) -> RtfResult<crate::MathMatrixRow<'a>> {
+    ) -> crate::Result<crate::MathMatrixRow<'a>> {
         self.pos += 2; // opening brace and row control
         let mut cells = Vec::new();
         loop {
@@ -520,7 +523,7 @@ impl<'a> Parser<'a> {
                         self.tokens.get(self.pos + 1),
                         Some(Token::Control(ControlWord::MathElement))
                     ) {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF math matrix rows may contain only me cell destinations"
                                 .to_string(),
                         ));
@@ -531,14 +534,14 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 _ => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF math matrix row contains ungrouped, binary, or active data"
                             .to_string(),
                     ));
                 },
             }
             if cells.len() > crate::math::MAX_MATH_OBJECTS_PER_CONTAINER {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF math object count exceeds the safety limit".to_string(),
                 ));
             }
@@ -550,7 +553,7 @@ impl<'a> Parser<'a> {
     ///
     /// Character formatting controls inside the run are passive and skipped;
     /// only the text, the `\mnor` flag, and `\mrPr` properties are retained.
-    pub(super) fn parse_math_run(&mut self, depth: usize) -> RtfResult<crate::MathObject<'a>> {
+    pub(super) fn parse_math_run(&mut self, depth: usize) -> crate::Result<crate::MathObject<'a>> {
         self.pos += 2; // opening brace and run control
         let mut properties = None;
         let mut normal_text = false;
@@ -570,7 +573,7 @@ impl<'a> Parser<'a> {
                             Some(Token::Control(ControlWord::MathRunProperties))
                         )
                     {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF math run contains an unsupported group".to_string(),
                         ));
                     }
@@ -583,11 +586,11 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Some(Token::Binary(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF math run contains binary data".to_string(),
                     ));
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
                 _ => {
                     if !self.consume_destination_text_token(
                         &mut text,
@@ -599,7 +602,7 @@ impl<'a> Parser<'a> {
                         self.pos += 1;
                     }
                     if text.len() > crate::math::MAX_MATH_RUN_TEXT_BYTES {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF math run text exceeds the safety limit".to_string(),
                         ));
                     }
@@ -608,7 +611,7 @@ impl<'a> Parser<'a> {
         }
         self.math_text_bytes = self.math_text_bytes.saturating_add(text.len());
         if self.math_text_bytes > crate::math::MAX_MATH_TOTAL_TEXT_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF math aggregate text exceeds the safety limit".to_string(),
             ));
         }
@@ -625,9 +628,9 @@ impl<'a> Parser<'a> {
         &mut self,
         kind: crate::MathPropertiesKind,
         depth: usize,
-    ) -> RtfResult<crate::MathProperties<'a>> {
+    ) -> crate::Result<crate::MathProperties<'a>> {
         if depth > crate::math::MAX_MATH_DEPTH {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF math nesting depth exceeds the safety limit".to_string(),
             ));
         }
@@ -645,7 +648,7 @@ impl<'a> Parser<'a> {
                 Some(Token::OpenBrace) => match self.tokens.get(self.pos + 1) {
                     Some(Token::Control(ControlWord::MathControlProperties)) => {
                         if control.is_some() {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF math destination contains multiple control properties"
                                     .to_string(),
                             ));
@@ -662,7 +665,7 @@ impl<'a> Parser<'a> {
                             )
                             || saw_matrix_columns
                         {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF math matrix columns are misplaced".to_string(),
                             ));
                         }
@@ -671,19 +674,19 @@ impl<'a> Parser<'a> {
                     },
                     Some(Token::Control(property_control)) => {
                         let Some((name, param)) = Self::math_property_name(property_control) else {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF math destination contains an unsupported property".to_string(),
                             ));
                         };
                         properties.push(self.parse_math_property(name, param)?);
                         if properties.len() > crate::math::MAX_MATH_PROPERTIES_PER_DESTINATION {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF math property count exceeds the safety limit".to_string(),
                             ));
                         }
                     },
                     _ => {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF math property destination contains unsupported grouped content"
                                 .to_string(),
                         ));
@@ -693,7 +696,7 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 _ => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF math property destination contains ungrouped, binary, or active data"
                             .to_string(),
                     ));
@@ -715,7 +718,7 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_math_matrix_columns(
         &mut self,
         depth: usize,
-    ) -> RtfResult<Vec<crate::MathMatrixColumn<'a>>> {
+    ) -> crate::Result<Vec<crate::MathMatrixColumn<'a>>> {
         self.pos += 2; // opening brace and mmcs control
         let mut columns = Vec::new();
         loop {
@@ -729,13 +732,13 @@ impl<'a> Parser<'a> {
                         self.tokens.get(self.pos + 1),
                         Some(Token::Control(ControlWord::MathMatrixColumn))
                     ) {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF math matrix columns may contain only mmc destinations".to_string(),
                         ));
                     }
                     columns.push(self.parse_math_matrix_column(depth)?);
                     if columns.len() > crate::math::MAX_MATH_OBJECTS_PER_CONTAINER {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF math matrix column count exceeds the safety limit".to_string(),
                         ));
                     }
@@ -744,7 +747,7 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 _ => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF math matrix columns contain ungrouped, binary, or active data"
                             .to_string(),
                     ));
@@ -752,7 +755,7 @@ impl<'a> Parser<'a> {
             }
         }
         if columns.is_empty() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF math matrix columns must contain at least one mmc destination".to_string(),
             ));
         }
@@ -764,7 +767,7 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_math_matrix_column(
         &mut self,
         depth: usize,
-    ) -> RtfResult<crate::MathMatrixColumn<'a>> {
+    ) -> crate::Result<crate::MathMatrixColumn<'a>> {
         self.pos += 2; // opening brace and mmc control
         let mut properties = None;
         loop {
@@ -780,7 +783,7 @@ impl<'a> Parser<'a> {
                             Some(Token::Control(ControlWord::MathMatrixColumnProperties))
                         )
                     {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF math matrix column contains an unsupported group".to_string(),
                         ));
                     }
@@ -793,7 +796,7 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 _ => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF math matrix column contains ungrouped, binary, or active data"
                             .to_string(),
                     ));
@@ -811,7 +814,7 @@ impl<'a> Parser<'a> {
         &mut self,
         name: crate::MathPropertyName,
         param: Option<i32>,
-    ) -> RtfResult<crate::MathProperty<'a>> {
+    ) -> crate::Result<crate::MathProperty<'a>> {
         self.pos += 2; // opening brace and property control
         let mut value = String::new();
         let mut unicode_skip = self.current_state()?.unicode_skip.max(0).cast_unsigned() as usize;
@@ -822,7 +825,7 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                     break;
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
                 _ => {
                     if !self.consume_destination_text_token(
                         &mut value,
@@ -830,13 +833,13 @@ impl<'a> Parser<'a> {
                         &mut fallback_skip,
                         "property value",
                     )? {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF math property contains grouped, binary, or active data"
                                 .to_string(),
                         ));
                     }
                     if value.len() > crate::math::MAX_MATH_PROPERTY_VALUE_BYTES {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF math property value exceeds the safety limit".to_string(),
                         ));
                     }
@@ -846,7 +849,7 @@ impl<'a> Parser<'a> {
         let mut property_value = value.trim().to_string();
         if let Some(parameter_value) = param {
             if !property_value.is_empty() {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF math property has conflicting parameter and text values".to_string(),
                 ));
             }
@@ -854,7 +857,7 @@ impl<'a> Parser<'a> {
         }
         self.math_text_bytes = self.math_text_bytes.saturating_add(property_value.len());
         if self.math_text_bytes > crate::math::MAX_MATH_TOTAL_TEXT_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF math aggregate text exceeds the safety limit".to_string(),
             ));
         }

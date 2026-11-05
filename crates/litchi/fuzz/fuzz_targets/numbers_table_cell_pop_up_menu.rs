@@ -6,10 +6,9 @@ use std::{fmt::Debug, fmt::Display, hint::black_box, sync::OnceLock};
 
 use libfuzzer_sys::fuzz_target;
 use litchi::numbers::{
-    Package, PackageError, PackageLimits, PackageReadOptions, PackageSemanticLimits, SheetSelector,
-    TableSelector,
+    Error as PackageError, Package, SheetSelector, TableSelector,
     cell::data_format::pop_up_menu::{InitialSelection, Item, PopUpMenu, transaction::Patch},
-    table::CellPosition,
+    table::At,
 };
 
 const MAX_INPUT_BYTES: u64 = 512 * 1024;
@@ -49,23 +48,32 @@ fuzz_target!(|data: &[u8]| {
     exercise_input_limit();
 });
 
-fn options() -> PackageReadOptions {
-    static OPTIONS: OnceLock<PackageReadOptions> = OnceLock::new();
+fn options() -> litchi::numbers::OpenOptions {
+    static OPTIONS: OnceLock<litchi::numbers::OpenOptions> = OnceLock::new();
     *OPTIONS.get_or_init(|| {
-        let archive = PackageLimits::new(
-            MAX_INPUT_BYTES,
-            MAX_ENTRIES,
-            MAX_ENTRY_BYTES,
-            MAX_EXPANDED_BYTES,
-            MAX_IWA_STREAM_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid popup archive limits: {error}"));
-        let semantic =
-            PackageSemanticLimits::new(MAX_OBJECTS, MAX_SHEETS, MAX_TABLES, MAX_REFERENCES)
-                .unwrap_or_else(|error| unreachable!("valid popup semantic limits: {error}"))
-                .with_projection_limits(MAX_MATERIALIZED_CELLS, MAX_TEXT_BYTES)
-                .unwrap_or_else(|error| unreachable!("valid popup projection limits: {error}"));
-        PackageReadOptions::new(archive, semantic)
+        let archive = litchi::numbers::SourceLimits::builder()
+            .max_input_bytes(MAX_INPUT_BYTES)
+            .and_then(|b| b.max_members(MAX_ENTRIES))
+            .and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES))
+            .and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+            .and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid popup archive limits: {error}"));
+        let semantic = litchi::numbers::SemanticLimits::builder()
+            .max_objects(MAX_OBJECTS)
+            .and_then(|b| b.max_sheets(MAX_SHEETS))
+            .and_then(|b| b.max_tables(MAX_TABLES))
+            .and_then(|b| b.max_references(MAX_REFERENCES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid popup semantic limits: {error}"))
+            .to_builder()
+            .max_materialized_cells(MAX_MATERIALIZED_CELLS)
+            .and_then(|b| b.max_output_text_bytes(MAX_TEXT_BYTES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid popup projection limits: {error}"));
+        litchi::numbers::OpenOptions::new()
+            .source_limits(archive)
+            .semantic_limits(semantic)
     })
 }
 
@@ -95,7 +103,7 @@ fn split_component_package() -> Option<&'static Package> {
 fn exercise_package(package: &Package, data: &[u8]) {
     let sheet = SheetSelector::index(0);
     let table = TableSelector::index(0);
-    let position = CellPosition::new(
+    let position = At::new(
         u32::from(read_u16(data, 0) % 8),
         u32::from(read_u16(data, 2) % 8),
     );
@@ -193,7 +201,7 @@ fn exercise_package(package: &Package, data: &[u8]) {
     // model when the source has a writable number cell at this coordinate.
     // Sparse or non-number cells are valid refusals, so this branch remains
     // observational and never turns an unsupported source into a failure.
-    let other_position = CellPosition::new(position.row().saturating_add(1), position.column());
+    let other_position = At::new(position.row().saturating_add(1), position.column());
     if other_position != position
         && let Ok(second_edit) =
             commit
@@ -257,9 +265,9 @@ fn exercise_split_component_source(data: &[u8]) {
     let Some(package) = split_component_package() else {
         return;
     };
-    let popup_position = CellPosition::new(4, 0);
-    let create_position = CellPosition::new(0, 1);
-    let sibling_position = CellPosition::new(1, 1);
+    let popup_position = At::new(4, 0);
+    let create_position = At::new(0, 1);
+    let sibling_position = At::new(1, 1);
     let desired = menu(data);
 
     if let Ok(Some(before)) = package.table_cell_pop_up_menu_format(
@@ -276,7 +284,7 @@ fn exercise_split_component_source(data: &[u8]) {
 
 fn exercise_split_existing_popup(
     package: &Package,
-    position: CellPosition,
+    position: At,
     before: PopUpMenu,
     desired: PopUpMenu,
     data: &[u8],
@@ -352,8 +360,8 @@ fn exercise_split_existing_popup(
 
 fn exercise_split_create_reuse(
     package: &Package,
-    create_position: CellPosition,
-    sibling_position: CellPosition,
+    create_position: At,
+    sibling_position: At,
     desired: PopUpMenu,
     data: &[u8],
 ) {
@@ -517,7 +525,7 @@ fn exercise_split_reopened_replay(
     source_bytes: &[u8],
     target_bytes: &[u8],
     patch: &Patch,
-    position: CellPosition,
+    position: At,
     touched_components: usize,
 ) {
     let source = Package::from_bytes_with_options(source_bytes, options())
@@ -553,34 +561,38 @@ fn exercise_split_component_limits() {
     ONCE.get_or_init(|| {
         let source_len = u64::try_from(SPLIT_COMPONENT_NUMBERS.len())
             .unwrap_or_else(|error| panic!("split popup source length conversion failed: {error}"));
-        let exact_archive = PackageLimits::new(
-            source_len,
-            MAX_ENTRIES,
-            MAX_ENTRY_BYTES,
-            MAX_EXPANDED_BYTES,
-            MAX_IWA_STREAM_BYTES,
-        )
-        .unwrap_or_else(|error| panic!("split popup exact limits invalid: {error}"));
+        let exact_archive = litchi::numbers::SourceLimits::builder()
+            .max_input_bytes(source_len)
+            .and_then(|b| b.max_members(MAX_ENTRIES))
+            .and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES))
+            .and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+            .and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| panic!("split popup exact limits invalid: {error}"));
         let exact = Package::from_bytes_with_options(
             SPLIT_COMPONENT_NUMBERS,
-            PackageReadOptions::new(exact_archive, PackageSemanticLimits::default()),
+            litchi::numbers::OpenOptions::new()
+                .source_limits(exact_archive)
+                .semantic_limits(litchi::numbers::SemanticLimits::DEFAULT),
         )
         .unwrap_or_else(|error| {
             panic!("split popup source rejected at exact input ceiling: {error}")
         });
         black_box(exact);
 
-        let tight_archive = PackageLimits::new(
-            source_len.saturating_sub(1),
-            MAX_ENTRIES,
-            MAX_ENTRY_BYTES,
-            MAX_EXPANDED_BYTES,
-            MAX_IWA_STREAM_BYTES,
-        )
-        .unwrap_or_else(|error| panic!("split popup tight limits invalid: {error}"));
+        let tight_archive = litchi::numbers::SourceLimits::builder()
+            .max_input_bytes(source_len.saturating_sub(1))
+            .and_then(|b| b.max_members(MAX_ENTRIES))
+            .and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES))
+            .and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+            .and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| panic!("split popup tight limits invalid: {error}"));
         let tight = Package::from_bytes_with_options(
             SPLIT_COMPONENT_NUMBERS,
-            PackageReadOptions::new(tight_archive, PackageSemanticLimits::default()),
+            litchi::numbers::OpenOptions::new()
+                .source_limits(tight_archive)
+                .semantic_limits(litchi::numbers::SemanticLimits::DEFAULT),
         );
         assert!(tight.is_err(), "split popup input-minus-one was admitted");
         black_box(tight.err().map(|error| error.to_string()));
@@ -588,60 +600,67 @@ fn exercise_split_component_limits() {
         for (label, limits) in [
             (
                 "entries",
-                PackageLimits::new(
-                    source_len,
-                    1,
-                    MAX_ENTRY_BYTES,
-                    MAX_EXPANDED_BYTES,
-                    MAX_IWA_STREAM_BYTES,
-                ),
+                litchi::numbers::SourceLimits::builder()
+                    .max_input_bytes(source_len)
+                    .and_then(|b| b.max_members(1))
+                    .and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES))
+                    .and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+                    .and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES))
+                    .and_then(|b| b.build()),
             ),
             (
                 "entry-bytes",
-                PackageLimits::new(
-                    source_len,
-                    MAX_ENTRIES,
-                    1,
-                    MAX_EXPANDED_BYTES,
-                    MAX_IWA_STREAM_BYTES,
-                ),
+                litchi::numbers::SourceLimits::builder()
+                    .max_input_bytes(source_len)
+                    .and_then(|b| b.max_members(MAX_ENTRIES))
+                    .and_then(|b| b.max_entry_bytes(1))
+                    .and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+                    .and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES))
+                    .and_then(|b| b.build()),
             ),
             (
                 "total-bytes",
-                PackageLimits::new(
-                    source_len,
-                    MAX_ENTRIES,
-                    MAX_ENTRY_BYTES,
-                    1,
-                    MAX_IWA_STREAM_BYTES,
-                ),
+                litchi::numbers::SourceLimits::builder()
+                    .max_input_bytes(source_len)
+                    .and_then(|b| b.max_members(MAX_ENTRIES))
+                    .and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES))
+                    .and_then(|b| b.max_aggregate_bytes(1))
+                    .and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES))
+                    .and_then(|b| b.build()),
             ),
             (
                 "iwa-stream-bytes",
-                PackageLimits::new(
-                    source_len,
-                    MAX_ENTRIES,
-                    MAX_ENTRY_BYTES,
-                    MAX_EXPANDED_BYTES,
-                    1,
-                ),
+                litchi::numbers::SourceLimits::builder()
+                    .max_input_bytes(source_len)
+                    .and_then(|b| b.max_members(MAX_ENTRIES))
+                    .and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES))
+                    .and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+                    .and_then(|b| b.max_component_bytes(1))
+                    .and_then(|b| b.build()),
             ),
         ] {
             let limits = limits
                 .unwrap_or_else(|error| panic!("split popup {label} limits invalid: {error}"));
             let result = Package::from_bytes_with_options(
                 SPLIT_COMPONENT_NUMBERS,
-                PackageReadOptions::new(limits, PackageSemanticLimits::default()),
+                litchi::numbers::OpenOptions::new()
+                    .source_limits(limits)
+                    .semantic_limits(litchi::numbers::SemanticLimits::DEFAULT),
             );
             assert!(result.is_err(), "split popup {label} limit admitted source");
             black_box(result.err().map(|error| error.to_string()));
         }
 
-        let object_limit = PackageSemanticLimits::new(1, MAX_SHEETS, MAX_TABLES, MAX_REFERENCES)
+        let object_limit = litchi::numbers::SemanticLimits::builder()
+            .max_objects(1)
+            .and_then(|b| b.max_sheets(MAX_SHEETS))
+            .and_then(|b| b.max_tables(MAX_TABLES))
+            .and_then(|b| b.max_references(MAX_REFERENCES))
+            .and_then(|b| b.build())
             .unwrap_or_else(|error| panic!("split popup object limit invalid: {error}"));
         let result = Package::from_bytes_with_options(
             SPLIT_COMPONENT_NUMBERS,
-            PackageReadOptions::new(PackageLimits::default(), object_limit),
+            litchi::numbers::OpenOptions::new().semantic_limits(object_limit),
         );
         assert!(result.is_err(), "split popup object-minus-one was admitted");
         black_box(result.err().map(|error| error.to_string()));
@@ -672,7 +691,7 @@ fn exercise_split_corruption_probes(data: &[u8]) {
                     observe_result(package.table_cell_pop_up_menu_format(
                         SheetSelector::index(0),
                         TableSelector::index(0),
-                        CellPosition::new(4, 0),
+                        At::new(4, 0),
                     ));
                     black_box(package_bytes(&package));
                 },

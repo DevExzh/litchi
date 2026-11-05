@@ -1,3 +1,4 @@
+use litchi_odf_common::XmlStreamLimits;
 use litchi_odt::Builder;
 use litchi_odt::section_properties::{
     BackgroundRepeat, SectionBackgroundColor, SectionBackgroundImage, SectionLength,
@@ -10,12 +11,16 @@ fn document(body: &str) -> Vec<u8> {
     format!("{PREFIX}{body}{SUFFIX}").into_bytes()
 }
 
+fn limits() -> XmlStreamLimits {
+    XmlStreamLimits::owner_default_value()
+}
+
 #[test]
 fn parses_all_values_aliases_and_round_trips() {
     let xml = document(
         r##"<s:style s:name="Sect" s:family="section"><s:section-properties f:background-color="#1a2B3c" f:margin-left="-0.5cm" f:margin-right="2in" s:editable="false" s:protect="true" s:writing-mode="tb-rl" t:dont-balance-text-columns="false"><s:background-image x:href="Pictures/a.png" s:repeat="no-repeat" s:position="top left" s:filter-name="soft" d:opacity="75%" x:type="simple" x:show="embed" x:actuate="onLoad"/></s:section-properties></s:style>"##,
     );
-    let set = parse_section_style_properties(&xml).unwrap();
+    let set = parse_section_style_properties(&xml, &limits()).unwrap();
     let style = set.get("Sect").unwrap();
     assert_eq!(
         style.properties.background_color,
@@ -34,7 +39,7 @@ fn parses_all_values_aliases_and_round_trips() {
         Some(BackgroundRepeat::NoRepeat)
     );
     let fragment = style.to_xml_fragment().unwrap();
-    let reparsed = parse_section_style_properties(&document(&fragment)).unwrap();
+    let reparsed = parse_section_style_properties(&document(&fragment), &limits()).unwrap();
     assert_eq!(set, reparsed);
     assert_eq!(
         fragment,
@@ -60,8 +65,8 @@ fn builder_and_package_accessor() {
     builder
         .add_section_property_style(SectionStyleProperties::new("S1", properties).unwrap())
         .unwrap();
-    let package = builder.build().unwrap();
-    let parsed = litchi_odt::generic::Package::from_bytes(package)
+    let package = builder.build().unwrap().to_bytes().unwrap();
+    let parsed = litchi_odt::generic::Package::from_bytes(&package)
         .unwrap()
         .section_style_properties()
         .unwrap();
@@ -77,7 +82,7 @@ fn accepts_odfpy_odfdo_and_libreoffice_shapes() {
     ];
     for sample in samples {
         assert_eq!(
-            parse_section_style_properties(&document(sample))
+            parse_section_style_properties(&document(sample), &limits())
                 .unwrap()
                 .styles
                 .len(),
@@ -100,7 +105,7 @@ fn enforces_namespace_order_cardinality_and_values() {
     ];
     for sample in bad {
         assert!(
-            parse_section_style_properties(&document(sample)).is_err(),
+            parse_section_style_properties(&document(sample), &limits()).is_err(),
             "accepted {sample}"
         );
     }
@@ -111,6 +116,6 @@ fn validates_existing_notes_and_rejects_dtd() {
     let bad_notes = document(
         r#"<s:style s:name="x" s:family="section"><s:section-properties><t:notes-configuration t:note-class="bogus"/></s:section-properties></s:style>"#,
     );
-    assert!(parse_section_style_properties(&bad_notes).is_err());
-    assert!(parse_section_style_properties(b"<!DOCTYPE x><x/>").is_err());
+    assert!(parse_section_style_properties(&bad_notes, &limits()).is_err());
+    assert!(parse_section_style_properties(b"<!DOCTYPE x><x/>", &limits()).is_err());
 }

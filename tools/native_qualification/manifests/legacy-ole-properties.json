@@ -1,0 +1,137 @@
+{
+  "schema": "litchi.native-qualification.v1",
+  "lane": "legacy-ole-properties",
+  "output_dir": "$OLE_NATIVE_QUAL_OUTPUT",
+  "path_prepend": ["$LITCHI_COORD_BIN"],
+  "rounds": 31,
+  "abba_order": ["before", "after", "after", "before"],
+  "environment": {
+    "CARGO_PROFILE_RELEASE_DEBUG": "0",
+    "TMPDIR": "$OLE_NATIVE_TMP"
+  },
+  "preparation_receipt": "$OLE_NATIVE_PREPARATION_RECEIPT",
+  "validators": [
+    {
+      "id": "legacy-native-contract",
+      "script": "$LITCHI_NATIVE_QUAL_ROOT/tools/native_qualification/legacy_native_validator.py",
+      "argv": [
+        "python3",
+        "$LITCHI_NATIVE_QUAL_ROOT/tools/native_qualification/legacy_native_validator.py",
+        "{output_dir}",
+        "legacy-ole-properties",
+        "$OLE_BASELINE_REVISION",
+        "$OLE_CANDIDATE_REVISION",
+        "$OLE_TARGET_ROOT/before",
+        "$OLE_TARGET_ROOT/after",
+        "{manifest_path}"
+      ],
+      "cwd": "{output_dir}",
+      "outputs": ["{output_dir}/summary.json"],
+      "require_stdout": true
+    }
+  ],
+  "shared": {
+    "probe_paths": ["tools/perf-baseline/examples/ole_w5_probe.rs"],
+    "fixture_paths": []
+  },
+  "legs": {
+    "before": {
+      "source_root": "$OLE_BEFORE_SOURCE",
+      "target_dir": "$OLE_TARGET_ROOT/before",
+      "allow_dirty": true,
+      "allowed_dirty_paths": [
+        "tools/perf-baseline/Cargo.toml",
+        "tools/perf-baseline/Cargo.lock",
+        "tools/perf-baseline/examples/ole_w5_probe.rs"
+      ],
+      "lock_paths": ["tools/perf-baseline/Cargo.lock"],
+      "build": [
+        {
+          "id": "ole_properties_probe",
+          "argv": [
+            "cargo",
+            "build",
+            "--release",
+            "--manifest-path",
+            "tools/perf-baseline/Cargo.toml",
+            "--no-default-features",
+            "--features",
+            "current-owner-api,legacy-property-api",
+            "--example",
+            "ole_w5_probe"
+          ],
+          "artifacts": ["{target_dir}/release/examples/ole_w5_probe"]
+        }
+      ],
+      "programs": [
+        {
+          "id": "read",
+          "binary": "{target_dir}/release/examples/ole_w5_probe",
+          "argv": ["--route", "read", "--warmup", "20", "--samples", "500", "--batch", "1"],
+          "outputs": [],
+          "stdout": "{output_dir}/ole-read-block-{block}-{leg}-{index}.csv",
+          "stderr": "{output_dir}/ole-read-block-{block}-{leg}-{index}.stderr",
+          "require_stdout": true
+        },
+        {
+          "id": "edit",
+          "binary": "{target_dir}/release/examples/ole_w5_probe",
+          "argv": ["--route", "edit", "--warmup", "20", "--samples", "500", "--batch", "1"],
+          "outputs": [],
+          "stdout": "{output_dir}/ole-edit-block-{block}-{leg}-{index}.csv",
+          "stderr": "{output_dir}/ole-edit-block-{block}-{leg}-{index}.stderr",
+          "require_stdout": true
+        }
+      ]
+    },
+    "after": {
+      "source_root": "$OLE_AFTER_SOURCE",
+      "target_dir": "$OLE_TARGET_ROOT/after",
+      "allow_dirty": true,
+      "allowed_dirty_paths": [
+        "tools/perf-baseline/Cargo.toml",
+        "tools/perf-baseline/Cargo.lock",
+        "tools/perf-baseline/examples/ole_w5_probe.rs"
+      ],
+      "lock_paths": ["tools/perf-baseline/Cargo.lock"],
+      "build": [
+        {
+          "id": "ole_properties_probe",
+          "argv": [
+            "cargo",
+            "build",
+            "--release",
+            "--manifest-path",
+            "tools/perf-baseline/Cargo.toml",
+            "--no-default-features",
+            "--features",
+            "current-owner-api,current-property-api",
+            "--example",
+            "ole_w5_probe"
+          ],
+          "artifacts": ["{target_dir}/release/examples/ole_w5_probe"]
+        }
+      ],
+      "programs": [
+        {
+          "id": "read",
+          "binary": "{target_dir}/release/examples/ole_w5_probe",
+          "argv": ["--route", "read", "--warmup", "20", "--samples", "500", "--batch", "1"],
+          "outputs": [],
+          "stdout": "{output_dir}/ole-read-block-{block}-{leg}-{index}.csv",
+          "stderr": "{output_dir}/ole-read-block-{block}-{leg}-{index}.stderr",
+          "require_stdout": true
+        },
+        {
+          "id": "edit",
+          "binary": "{target_dir}/release/examples/ole_w5_probe",
+          "argv": ["--route", "edit", "--warmup", "20", "--samples", "500", "--batch", "1"],
+          "outputs": [],
+          "stdout": "{output_dir}/ole-edit-block-{block}-{leg}-{index}.csv",
+          "stderr": "{output_dir}/ole-edit-block-{block}-{leg}-{index}.stderr",
+          "require_stdout": true
+        }
+      ]
+    }
+  }
+}

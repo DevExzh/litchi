@@ -1,4 +1,8 @@
 //! `OpenDocument` Drawing support with semantic responsibility layers.
+//!
+//! [`Package`] is the immutable owner of one ODG/OTG package and owns every
+//! state verb (open, edit, apply, save). [`Drawing`] is its read-only
+//! projection. The primary transaction family lives in [`edit`].
 #![forbid(unsafe_code)]
 #![allow(
     clippy::arbitrary_source_item_ordering,
@@ -8,38 +12,18 @@
 mod authoring;
 mod codec;
 mod facade;
-mod flat;
+pub mod flat;
+pub mod metadata;
 mod model;
 mod package;
 #[path = "model/transition.rs"]
 pub mod transition;
 
-pub use facade::{
-    ActiveContentStatus as PackageActiveContentStatus,
-    ActiveContentWritePolicy as PackageActiveContentWritePolicy, Change as PackageChange,
-    Commit as PackageCommit, ControlReferenceChange as PackageControlReferenceChange,
-    DurablePatch as PackageDurablePatch, GeometryChange as PackageGeometryChange,
-    History as PackageHistory, HistoryLimits as PackageHistoryLimits,
-    JoinedEdits as PackageJoinedEdits, LayerChange as PackageLayerChange,
-    Lineage as PackageLineage, MergePlan as PackageMergePlan, NameChange as PackageNameChange,
-    PageNameChange as PackagePageNameChange, PageStyleChange as PackagePageStyleChange,
-    PageTransitionChange as PackagePageTransitionChange, Patch as PackagePatch,
-    PathChange as PackagePathChange, PreparedEdit as PackagePreparedEdit,
-    ResourceChange as PackageResourceChange, SecurityCapabilities as PackageSecurityCapabilities,
-    SecurityLifecycleDisposition as PackageSecurityLifecycleDisposition,
-    SecurityLifecycleOperation as PackageSecurityLifecycleOperation,
-    SecurityLifecycleRefusal as PackageSecurityLifecycleRefusal,
-    SecurityStatus as PackageSecurityStatus, SecurityWritePolicy as PackageSecurityWritePolicy,
-    ShapeTransfer as PackageShapeTransfer, Snapshot as PackageSnapshot,
-    StructureChange as PackageStructureChange, StyleChange as PackageStyleChange,
-    TextChange as PackageTextChange, Transaction as PackageTransaction,
-    TransferControl as PackageTransferControl, TransferResource as PackageTransferResource,
-    TransferStyle as PackageTransferStyle, TransferStyleResource as PackageTransferStyleResource,
-};
+pub use facade::edit;
 pub use facade::{Builder, Drawing};
-pub use flat::{
-    FlatDrawing, FlatDrawingCommit, FlatDrawingEdit, FlatDrawingPatch, FlatPage, FlatShape,
-    TextChange,
+pub use litchi_odf_common::{
+    Error, LimitKind, OpenOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsBuilder,
+    SourceLimitKind, SourceLimits, SourceLimitsBuilder,
 };
 pub use litchi_odf_common::{
     core::Profile as EncryptionProfile,
@@ -54,4 +38,5 @@ pub use model::{
     ImageMapArea, ImageMapAreaShape, auxiliary, enhanced, form, group, layer, page, resource,
     shape, style, style_resource,
 };
+pub use package::Package;
 pub use transition::{Sound as TransitionSound, Transition};

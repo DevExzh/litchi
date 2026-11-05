@@ -1,6 +1,16 @@
-//! Bounded, byte-preserving flat `OpenDocument` Chart snapshots and axis edits.
+//! Bounded, byte-preserving flat (single-file) `OpenDocument` Chart owners
+//! and axis edits.
+//!
+//! [`Chart`] is the immutable owner of one `.fodc` document, opened under one
+//! [`OpenOptions`] envelope: the source `input_bytes` bound the XML and the
+//! semantic chart dimensions (`depth`, `axes`, `series`, `data_points`,
+//! `cached_rows`, `cached_cells`, `range_items`, `resources`, `history`,
+//! `scalar_bytes`) bound the chart model. [`Chart::edit`] stages an
+//! [`Edit`]; [`Edit::commit`] publishes a new [`Chart`] with its [`Patch`]
+//! and [`Diagnostics`]; [`Chart::apply`] replays a patch onto its exact
+//! source.
 
-use litchi_core::{Error, FileFormat, Result};
+use litchi_core::{Error as CoreError, FileFormat, Result};
 use litchi_odf_common::chart::{self, Element, PlotArea};
 use quick_xml::{
     XmlVersion,
@@ -8,7 +18,18 @@ use quick_xml::{
     name::{Namespace, ResolveResult},
     reader::NsReader,
 };
-use std::{collections::BTreeSet, ops::Range, sync::Arc};
+use std::{collections::BTreeSet, io::Read, ops::Range, path::Path, sync::Arc};
+
+/// Whether a commit changed the chart bytes.
+pub use litchi_core::edit::Diagnostics;
+/// The family error: typed limits and refusals plus the common-core payload.
+pub use litchi_odf_common::Error;
+/// The dimension named by [`Error::Limit`] and [`Error::InvalidLimit`].
+pub use litchi_odf_common::LimitKind;
+pub use litchi_odf_common::OpenOptions;
+
+/// A committed flat edit: the published chart, its patch and diagnostics.
+pub type Commit = litchi_core::edit::Commit<Chart, Patch>;
 
 const OFFICE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const CHART: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:chart:1.0";
@@ -61,32 +82,93 @@ struct AxisRecord {
     prefix: Option<String>,
 }
 
-/// An immutable, byte-exact flat ODC snapshot.
+/// The immutable, byte-exact owner of one flat ODC document.
+///
+/// Cheap to clone; a commit publishes a new chart and never changes its
+/// source. The chart keeps the [`OpenOptions`] it was opened with; its edits
+/// and replays use them.
 #[derive(Clone, Debug)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "the public name distinguishes a flat chart from a packaged chart"
-)]
-pub struct FlatChart(Arc<State>);
+pub struct Chart(Arc<State>);
 
-impl FlatChart {
-    /// Opens a flat ODC document from owned UTF-8 XML bytes.
+impl Chart {
+    /// Opens a flat ODC document from a path with the default
+    /// [`OpenOptions`].
     ///
     /// # Errors
     ///
-    /// Returns an error when the input is not a bounded, structurally valid
-    /// flat ODC document.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, crate::Limits::default())
+    /// As [`Self::from_bytes_with_options`], plus the read failure.
+    pub fn open(path: impl AsRef<Path>) -> std::result::Result<Self, Error> {
+        Self::open_with_options(path, OpenOptions::new())
     }
 
-    /// Opens flat ODC XML under caller-selected limits retained by edits.
+    /// Opens a flat ODC document from a path under caller-selected limits.
     ///
     /// # Errors
     ///
-    /// Returns an error when XML structure, semantics, or a limit is invalid.
-    pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: crate::Limits) -> Result<Self> {
-        parse(bytes, RootKind::Flat, limits).map(|state| Self(Arc::new(state)))
+    /// As [`Self::from_bytes_with_options`], plus the read failure.
+    pub fn open_with_options(
+        path: impl AsRef<Path>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, Error> {
+        let file = std::fs::File::open(path)?;
+        Self::from_reader_with_options(file, options)
+    }
+
+    /// Reads a flat ODC document from a stream with the default
+    /// [`OpenOptions`].
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::from_bytes_with_options`], plus the read failure.
+    pub fn from_reader(reader: impl Read) -> std::result::Result<Self, Error> {
+        Self::from_reader_with_options(reader, OpenOptions::new())
+    }
+
+    /// Reads a flat ODC document from a stream under caller-selected limits;
+    /// the stream is read through an `input_bytes + 1` guard.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::from_bytes_with_options`], plus the read failure.
+    pub fn from_reader_with_options(
+        reader: impl Read,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, Error> {
+        let limits = crate::Limits::from_options(options);
+        let mut bytes = Vec::new();
+        let guard = u64::try_from(limits.max_package_bytes())
+            .unwrap_or(u64::MAX)
+            .saturating_add(1);
+        reader.take(guard).read_to_end(&mut bytes)?;
+        Ok(parse(bytes, RootKind::Flat, limits).map(|state| Self(Arc::new(state)))?)
+    }
+
+    /// Opens a flat ODC document with the default [`OpenOptions`]; the bytes
+    /// are copied.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::from_bytes_with_options`].
+    pub fn from_bytes(bytes: &[u8]) -> std::result::Result<Self, Error> {
+        Self::from_bytes_with_options(bytes, OpenOptions::new())
+    }
+
+    /// Opens a flat ODC document under caller-selected limits, retained by
+    /// its edits and replays; the bytes are copied.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Limit`] when a selected dimension is exceeded and
+    /// [`Error::Core`] when the XML structure or chart semantics are invalid.
+    pub fn from_bytes_with_options(
+        bytes: &[u8],
+        options: OpenOptions,
+    ) -> std::result::Result<Self, Error> {
+        let limits = crate::Limits::from_options(options);
+        if bytes.len() > limits.max_package_bytes() {
+            return Err(limits.input_exceeded(bytes.len()).into());
+        }
+        Ok(parse(bytes.to_vec(), RootKind::Flat, limits).map(|state| Self(Arc::new(state)))?)
     }
 
     pub(crate) fn from_content_xml(bytes: Vec<u8>, limits: crate::Limits) -> Result<Self> {
@@ -119,10 +201,30 @@ impl FlatChart {
         &self.0.bytes
     }
 
-    /// Return the limits retained for subsequent edits and patch application.
-    #[must_use]
-    pub fn limits(&self) -> crate::Limits {
-        self.0.limits
+    /// The options this chart was opened with, retained for its edits and
+    /// patch replays.
+    pub fn options(&self) -> OpenOptions {
+        self.0.limits.options()
+    }
+
+    /// Replays a patch onto this exact source chart.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when this chart is not the patch's
+    /// exact source.
+    pub fn apply(&self, patch: &Patch) -> std::result::Result<Commit, Error> {
+        if !patch.is_applicable_to(self) {
+            return Err(Error::patch_conflict(
+                "flat.apply",
+                "the chart is not the patch source",
+            ));
+        }
+        Ok(Commit::new(
+            patch.target.clone(),
+            patch.clone(),
+            Diagnostics::new(!patch.is_noop()),
+        ))
     }
 
     /// Return one controlled attribute value after namespace resolution.
@@ -139,10 +241,10 @@ impl FlatChart {
         Ok(self.tag(target)?.value(attribute))
     }
 
-    /// Starts a detached transaction bound to this source snapshot.
+    /// Starts a detached edit bound to this source chart.
     #[must_use]
-    pub fn edit(&self) -> FlatChartEdit {
-        FlatChartEdit {
+    pub fn edit(&self) -> Edit {
+        Edit {
             source: self.clone(),
             changes: Vec::new(),
             exact_changes: Vec::new(),
@@ -373,18 +475,26 @@ impl AxisUpdate {
     }
 }
 
-/// A staged, source-bound flat chart transaction.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "the public name associates this transaction with FlatChart"
-)]
-pub struct FlatChartEdit {
-    source: FlatChart,
+/// A staged, source-bound flat chart edit.
+pub struct Edit {
+    source: Chart,
     changes: Vec<AxisChange>,
     exact_changes: Vec<ExactChange>,
 }
 
-impl FlatChartEdit {
+impl Edit {
+    /// The source chart this edit stages against.
+    #[must_use]
+    pub fn package(&self) -> &Chart {
+        &self.source
+    }
+
+    /// Discards every staged change in place.
+    pub fn reset(&mut self) {
+        self.changes.clear();
+        self.exact_changes.clear();
+    }
+
     /// Stage a controlled chart attribute edit using an exact source span.
     ///
     /// `None` removes an existing optional attribute. Adding an absent
@@ -503,8 +613,12 @@ impl FlatChartEdit {
     ///
     /// Returns an error when a change cannot be applied losslessly or the
     /// candidate fails structural validation and typed readback.
-    pub fn commit(self) -> Result<FlatChartCommit> {
-        let FlatChartEdit {
+    pub fn commit(self) -> std::result::Result<Commit, Error> {
+        Ok(self.commit_core()?)
+    }
+
+    pub(crate) fn commit_core(self) -> Result<Commit> {
+        let Edit {
             source,
             changes,
             exact_changes: staged_exact_changes,
@@ -558,7 +672,7 @@ impl FlatChartEdit {
             bytes.splice(replacement.range.clone(), replacement.value);
             previous = replacement.range.start;
         }
-        let snapshot = FlatChart(Arc::new(parse(bytes, source.0.root_kind, source.0.limits)?));
+        let snapshot = Chart(Arc::new(parse(bytes, source.0.root_kind, source.0.limits)?));
         for change in &changes {
             if snapshot.axis_name(change.index)? != change.after.as_deref() {
                 return Err(invalid_error("flat ODC edit failed typed readback"));
@@ -575,62 +689,30 @@ impl FlatChartEdit {
             }
         }
         let exact_changes = exact_changes_between(&source, &snapshot);
-        Ok(FlatChartCommit {
-            snapshot: snapshot.clone(),
-            patch: FlatChartPatch {
+        let changed = source.as_bytes() != snapshot.as_bytes();
+        Ok(Commit::new(
+            snapshot.clone(),
+            Patch {
                 source,
                 target: snapshot,
                 changes,
                 exact_changes,
             },
-        })
-    }
-}
-
-/// A committed flat chart snapshot and its reversible semantic patch.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "the public name associates this commit with FlatChart"
-)]
-pub struct FlatChartCommit {
-    snapshot: FlatChart,
-    patch: FlatChartPatch,
-}
-
-impl FlatChartCommit {
-    /// Returns the committed snapshot.
-    #[must_use]
-    pub fn snapshot(&self) -> &FlatChart {
-        &self.snapshot
-    }
-
-    /// Returns the source-bound patch.
-    #[must_use]
-    pub fn patch(&self) -> &FlatChartPatch {
-        &self.patch
-    }
-
-    /// Consumes the commit and returns its snapshot.
-    #[must_use]
-    pub fn into_snapshot(self) -> FlatChart {
-        self.snapshot
+            Diagnostics::new(changed),
+        ))
     }
 }
 
 /// A source-checked, reversible collection of axis changes.
 #[derive(Clone, Debug)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "the public name associates this patch with FlatChart"
-)]
-pub struct FlatChartPatch {
-    source: FlatChart,
-    target: FlatChart,
+pub struct Patch {
+    source: Chart,
+    target: Chart,
     changes: Vec<AxisChange>,
     exact_changes: Vec<ExactChange>,
 }
 
-impl PartialEq for FlatChartPatch {
+impl PartialEq for Patch {
     fn eq(&self, other: &Self) -> bool {
         self.source.as_bytes() == other.source.as_bytes()
             && self.target.as_bytes() == other.target.as_bytes()
@@ -639,13 +721,19 @@ impl PartialEq for FlatChartPatch {
     }
 }
 
-impl Eq for FlatChartPatch {}
+impl Eq for Patch {}
 
-impl FlatChartPatch {
+impl Patch {
     /// Returns whether this patch was committed from the exact supplied XML.
     #[must_use]
-    pub fn is_applicable_to(&self, source: &FlatChart) -> bool {
+    pub fn is_applicable_to(&self, source: &Chart) -> bool {
         self.source.as_bytes() == source.as_bytes()
+    }
+
+    /// Whether replaying this patch keeps the source bytes.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.source.as_bytes() == self.target.as_bytes()
     }
 
     /// Returns the ordered semantic changes.
@@ -759,22 +847,6 @@ impl FlatChartPatch {
                 .collect(),
         }
     }
-
-    /// Applies the patch only to its exact immutable source snapshot.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when `source` is not the exact snapshot from which
-    /// this patch was committed.
-    pub fn apply(&self, source: &FlatChart) -> Result<FlatChartCommit> {
-        if !self.is_applicable_to(source) {
-            return Err(invalid_error("flat ODC patch source does not match"));
-        }
-        Ok(FlatChartCommit {
-            snapshot: self.target.clone(),
-            patch: self.clone(),
-        })
-    }
 }
 
 /// One selector-bound axis name and style-reference change.
@@ -876,7 +948,7 @@ enum NamespaceKind {
     Other,
 }
 
-pub(crate) fn exact_changes_between(source: &FlatChart, target: &FlatChart) -> Vec<ExactChange> {
+pub(crate) fn exact_changes_between(source: &Chart, target: &Chart) -> Vec<ExactChange> {
     if source.0.axes.len() != target.0.axes.len()
         || source.0.series_tags.len() != target.0.series_tags.len()
     {
@@ -1185,7 +1257,10 @@ fn parse(bytes: Vec<u8>, root_kind: RootKind, limits: crate::Limits) -> Result<S
         ));
     }
     if root_kind == RootKind::Flat
-        && litchi_odf_common::detect::flat(&bytes) != Some(FileFormat::Odc)
+        && litchi_odf_common::detect::flat(&bytes, litchi_odf_common::detect::Limits::default())
+            .ok()
+            .flatten()
+            != Some(FileFormat::Odc)
     {
         return Err(invalid_error("input is not a flat ODC document"));
     }
@@ -1596,7 +1671,7 @@ fn parse(bytes: Vec<u8>, root_kind: RootKind, limits: crate::Limits) -> Result<S
     };
     let normalized_xml = std::str::from_utf8(&normalized_bytes)
         .map_err(|_utf8_error| invalid_error("normalized ODC is not UTF-8"))?;
-    let chart = chart::read(normalized_xml)?;
+    let chart = chart::read(normalized_xml, limits.options().xml_limits_value())?;
     let _ = chart.chart_class()?;
     crate::codec::validate_tree(&chart, limits)?;
     if let Some(plot_area) = chart.plot_area() {
@@ -1768,7 +1843,7 @@ fn push_axis(
 }
 
 fn stage_axis_attribute(
-    source: &FlatChart,
+    source: &Chart,
     axis: &AxisRecord,
     local: &str,
     after: Option<&String>,
@@ -1787,8 +1862,10 @@ fn stage_axis_attribute(
         }),
         (Some(new_value), None, None) => {
             let prefix = axis.prefix.as_deref().ok_or_else(|| {
-                Error::Unsupported(format!(
-                    "cannot add chart:{local} without a lossless chart namespace prefix"
+                CoreError::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odc.flat",
+                    "cannot add a chart element without a lossless chart namespace prefix",
                 ))
             })?;
             let raw = &source.as_bytes()[axis.tag.clone()];
@@ -1808,7 +1885,7 @@ fn stage_axis_attribute(
 }
 
 fn stage_exact_attribute(
-    source: &FlatChart,
+    source: &Chart,
     tag: &EditableTag,
     attribute: ExactAttribute,
     after: Option<&String>,
@@ -1827,13 +1904,17 @@ fn stage_exact_attribute(
         (Some(new_value), None) => {
             let (namespace, local) = attribute_name(attribute);
             if namespace != CHART {
-                return Err(Error::Unsupported(format!(
-                    "cannot add {local} without a lossless namespace-prefix proof"
+                return Err(CoreError::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odc.flat",
+                    "cannot add an element without a lossless namespace-prefix proof",
                 )));
             }
             let prefix = tag.prefix.as_deref().ok_or_else(|| {
-                Error::Unsupported(format!(
-                    "cannot add chart:{local} without a lossless chart namespace prefix"
+                CoreError::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odc.flat",
+                    "cannot add a chart element without a lossless chart namespace prefix",
                 ))
             })?;
             let relative = insertion_offset(&source.as_bytes()[tag.tag.clone()])?;
@@ -1961,6 +2042,6 @@ fn escape_attribute(value: &str) -> String {
     quick_xml::escape::escape(value).into_owned()
 }
 
-fn invalid_error(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn invalid_error(message: impl Into<String>) -> CoreError {
+    CoreError::InvalidFormat(message.into())
 }

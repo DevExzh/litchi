@@ -108,7 +108,9 @@
 //! objects but does not garbage-collect media: data payloads remain preserved
 //! even when their former owner was on the deleted slide. Only the supported
 //! flat native ownership topology is admitted; a surviving child backlink or
-//! other inbound owner is refused as ambiguous ownership.
+//! other inbound owner is refused as ambiguous ownership. A view state's
+//! weak selection reference to the deleted slide node is not ownership: its
+//! registry record is removed with the node.
 //!
 //! ```no_run
 //! use litchi_keynote::{Package, SlideSelector};
@@ -123,6 +125,72 @@
 //!     .package()
 //!     .apply_slide_deletion(&commit.patch().inverse())?;
 //! assert_eq!(restored.package().show()?.slides().len(), package.show()?.slides().len());
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! # Duplicate slides and add slides from layouts
+//!
+//! [`Package::edit_slide_creation`] stages any number of
+//! [`slide::creation::Edit::duplicate_slide`] and
+//! [`slide::creation::Edit::add_slide`] operations and commits them as one
+//! verified package. Selectors resolve against the base snapshot;
+//! destinations are final positions in the slide list as it is when each
+//! operation runs. A duplicate copies the slide's own component (its
+//! drawables, text and notes); a fresh slide materializes a theme layout
+//! ([`Package::slide_layouts`]) with empty title, body and notes. Slides
+//! whose content lives in other components (tables, charts, comments) are
+//! refused with a typed [`slide::creation::Refusal::UnsupportedContent`].
+//!
+//! ```no_run
+//! use litchi_keynote::{Package, Position, SlideSelector};
+//!
+//! let package = Package::open("input.key")?;
+//! let mut edit = package.edit_slide_creation();
+//! edit.duplicate_slide(SlideSelector::index(0), Position::new(1))?
+//!     .add_slide("Title & Bullets", Position::new(2))?;
+//! let commit = edit.commit()?;
+//! assert_eq!(commit.package().slides()?.len(), package.slides()?.len() + 2);
+//!
+//! let restored = commit
+//!     .package()
+//!     .apply_slide_creation(&commit.patch().inverse())?;
+//! assert_eq!(restored.package().slides()?.len(), package.slides()?.len());
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! # Slide drawables: inventory, geometry, removal, z-order and creation
+//!
+//! [`Package::slide_drawable_list`] reads the drawables a slide owns in
+//! source order (kind, frame, text, shape name, lock state and z-order
+//! position); [`DrawableSelector`] addresses that order. The
+//! [`slide::drawable`] family stages any number of
+//! [`slide::drawable::Edit::set_geometry`], [`slide::drawable::Edit::remove`],
+//! [`slide::drawable::Edit::move_to`], [`slide::drawable::Edit::add_text_box`],
+//! [`slide::drawable::Edit::add_shape`] and
+//! [`slide::drawable::Edit::add_image`] operations and commits them as one
+//! verified package; selectors resolve against the base snapshot. Removing
+//! tables, charts, groups, movies and placeholders, and character-style
+//! writes, are typed [`slide::drawable::Refusal::Unsupported`] refusals;
+//! [`Package::slide_drawable_text_runs`] reads character runs.
+//!
+//! ```no_run
+//! use litchi_keynote::slide::drawable::{Geometry, Preset};
+//! use litchi_keynote::{DrawableSelector, Package, SlideSelector};
+//!
+//! let package = Package::open("input.key")?;
+//! let slide = SlideSelector::index(0);
+//! let mut edit = package.edit_slide_drawables();
+//! edit.remove(slide, DrawableSelector::index(0))?
+//!     .add_shape(slide, Preset::Ellipse, Geometry::new(100.0, 100.0, 200.0, 200.0), "Hi")?;
+//! let commit = edit.commit()?;
+//! let created = commit.created()[0].drawable();
+//! let drawables = commit.package().slide_drawable_list(slide)?;
+//! assert_eq!(drawables[created.as_index()].text(), Some("Hi"));
+//!
+//! let restored = commit
+//!     .package()
+//!     .apply_slide_drawables(&commit.patch().inverse())?;
+//! assert_eq!(restored.package().slide_drawable_list(slide)?, package.slide_drawable_list(slide)?);
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
@@ -410,8 +478,12 @@ mod time;
 
 pub mod background;
 pub mod build;
+pub mod builder;
 pub mod chart;
-pub mod document;
+pub mod edit;
+pub mod identity;
+pub mod limits;
+pub mod presentation;
 pub mod show;
 pub mod slide;
 pub mod soundtrack;
@@ -419,19 +491,20 @@ pub mod transition;
 
 pub use background::{Angle, Background, Gradient, Kind, Stop};
 pub use build::{AnimationType, Build};
+pub use builder::Builder;
 pub use chart::{
     Axis, ChartArrangement, ChartCatalog, ChartDescriptor, ChartSelector, ChartSelectorError,
 };
-pub use document::{
-    Document, DocumentIoKind, DocumentReadError, DocumentReadLimitKind, DocumentReadOptions,
-    DocumentSemanticLimitKind, DocumentSemanticLimits, DocumentSemanticLimitsError,
-    DocumentSourceLimitKind, DocumentSourceLimits, DocumentSourceLimitsError, DocumentStats,
-};
 pub use error::{Error, Result};
+pub use identity::Identity;
+pub use limits::{
+    LimitKind, OpenOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsBuilder,
+    SourceLimitKind, SourceLimits, SourceLimitsBuilder,
+};
 pub use litchi_core::Position;
 pub use litchi_iwa_common::chart::data::ChartData;
 /// Maximum canonical `Metadata/Properties.plist` bytes retained by
-/// archive-free document ingress.
+/// archive-free [`Presentation`] ingress.
 pub use litchi_iwa_detect::MAX_PROPERTIES_BYTES as MAX_DOCUMENT_PROPERTIES_BYTES;
 pub use litchi_iwa_text::{TextPosition, TextSpan};
 #[cfg(feature = "internal-iwork-source")]
@@ -442,7 +515,7 @@ pub use package::__decode_slide_drawable_projection;
 pub use package::__decode_slide_node_projection;
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
-pub use package::__semantic_document_from_prepared_source;
+pub use package::__presentation_from_prepared_source;
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
 pub use package::{
@@ -455,114 +528,22 @@ pub use package::{__decode_image_adjustments_payload, ImageAdjustmentsError};
 #[doc(hidden)]
 pub use package::{__invalidate_slide_preview, SlidePreviewInvalidationError};
 pub use package::{
-    ChartArrangementCommit, ChartArrangementDiagnostics, ChartArrangementEdit,
-    ChartArrangementError, ChartArrangementLimitKind, ChartArrangementPatch, ChartAxisTitleCommit,
-    ChartAxisTitleDiagnostics, ChartAxisTitleEdit, ChartAxisTitleError, ChartAxisTitleLimitKind,
-    ChartAxisTitlePatch, ChartCaptionCommit, ChartCaptionDiagnostics, ChartCaptionEdit,
-    ChartCaptionError, ChartCaptionLimitKind, ChartCaptionPatch, ChartLegendVisibilityCommit,
-    ChartLegendVisibilityDiagnostics, ChartLegendVisibilityEdit, ChartLegendVisibilityError,
-    ChartLegendVisibilityLimitKind, ChartLegendVisibilityPatch, ChartTitleCommit,
-    ChartTitleDiagnostics, ChartTitleEdit, ChartTitleError, ChartTitleLimitKind, ChartTitlePatch,
-    Commit, Diagnostics, Edit, EditError, KEYNOTE_PHYSICAL_SORT_OWNER_ACTIVE, Limits, MAX_OBJECTS,
-    MAX_REFERENCES, MAX_SLIDES, MAX_TEXT_BYTES, MAX_TEXT_FRAGMENTS, MAX_TEXT_STORAGES, Package,
-    Patch, PayloadLimitKind, ReadError, ReadOptions, SaveError, SemanticLimitKind, SemanticLimits,
-    SemanticLimitsError, SemanticPath, SlideBackgroundCommit, SlideBackgroundDiagnostics,
-    SlideBackgroundEdit, SlideBackgroundError, SlideBackgroundLimitKind, SlideBackgroundPatch,
-    SlideBuildOrderCommit, SlideBuildOrderDiagnostics, SlideBuildOrderEdit, SlideBuildOrderError,
-    SlideBuildOrderLimitKind, SlideBuildOrderPatch, SlideImageAdjustmentsCommit,
-    SlideImageAdjustmentsDiagnostics, SlideImageAdjustmentsEdit, SlideImageAdjustmentsError,
-    SlideImageAdjustmentsLimitKind, SlideImageAdjustmentsPatch, SlideMovieCaptionCommit,
-    SlideMovieCaptionDiagnostics, SlideMovieCaptionEdit, SlideMovieCaptionError,
-    SlideMovieCaptionLimitKind, SlideMovieCaptionPatch, SlideMovieGeometryCommit,
-    SlideMovieGeometryDiagnostics, SlideMovieGeometryEdit, SlideMovieGeometryError,
-    SlideMovieGeometryLimitKind, SlideMovieGeometryPatch, SlideMoviePlaybackCommit,
-    SlideMoviePlaybackDiagnostics, SlideMoviePlaybackEdit, SlideMoviePlaybackError,
-    SlideMoviePlaybackLimitKind, SlideMoviePlaybackPatch, SlideMovieTitleCommit,
-    SlideMovieTitleDiagnostics, SlideMovieTitleEdit, SlideMovieTitleError,
-    SlideMovieTitleLimitKind, SlideMovieTitlePatch, SlideNotesCommit, SlideNotesDiagnostics,
-    SlideNotesEdit, SlideNotesError, SlideNotesLimitKind, SlideNotesPatch, SlideOrderCommit,
-    SlideOrderDiagnostics, SlideOrderEdit, SlideOrderError, SlideOrderLimitKind, SlideOrderPatch,
-    SlideTableAppearanceCommit, SlideTableAppearanceDiagnostics, SlideTableAppearanceEdit,
-    SlideTableAppearanceError, SlideTableAppearanceLimitKind, SlideTableAppearancePatch,
-    SlideTableAppearancePath, SlideTableDimensionCommit, SlideTableDimensionDiagnostics,
-    SlideTableDimensionEdit, SlideTableDimensionError, SlideTableDimensionLimitKind,
-    SlideTableDimensionPatch, SlideTableDimensionPath, SlideTableHeaderCommit,
-    SlideTableHeaderDiagnostics, SlideTableHeaderEdit, SlideTableHeaderError,
-    SlideTableHeaderInvalidReason, SlideTableHeaderLimitKind, SlideTableHeaderPatch,
-    SlideTableHeaderPath, SlideTableLockStateCommit, SlideTableLockStateDiagnostics,
-    SlideTableLockStateEdit, SlideTableLockStateError, SlideTableLockStateLimitKind,
-    SlideTableLockStatePatch, SlideTableLockStatePath, SlideTableNameCommit,
-    SlideTableNameDiagnostics, SlideTableNameEdit, SlideTableNameError, SlideTableNameLimitKind,
-    SlideTableNamePatch, SlideTableNamePath, SlideTablePhysicalSortCommit,
-    SlideTablePhysicalSortDiagnostics, SlideTablePhysicalSortEdit, SlideTablePhysicalSortError,
-    SlideTablePhysicalSortLimitKind, SlideTablePhysicalSortPatch, SlideTablePhysicalSortPath,
-    SlideTableSortCommit, SlideTableSortDiagnostics, SlideTableSortEdit, SlideTableSortError,
-    SlideTableSortLimitKind, SlideTableSortPatch, SlideTableSortPath, SlideTableTitleCommit,
-    SlideTableTitleDiagnostics, SlideTableTitleEdit, SlideTableTitleError,
-    SlideTableTitleLimitKind, SlideTableTitlePatch, SlideTextCommit, SlideTextDiagnostics,
-    SlideTextEdit, SlideTextError, SlideTextLimitKind, SlideTextPatch, Stats, TextStorageFailure,
-    WriteError,
+    KEYNOTE_PHYSICAL_SORT_OWNER_ACTIVE, Package, PayloadLimitKind, ReadError, SaveError,
+    SemanticPath, Stats, TextStorageFailure, WriteError,
 };
-pub use package::{
-    ChartValueAxisCommit, ChartValueAxisDiagnostics, ChartValueAxisEdit, ChartValueAxisError,
-    ChartValueAxisLimitKind, ChartValueAxisPatch,
-};
-pub use package::{
-    DrawableSummary, SlideDrawableCommentCommit, SlideDrawableCommentDiagnostics,
-    SlideDrawableCommentEdit, SlideDrawableCommentError, SlideDrawableCommentLimitKind,
-    SlideDrawableCommentPatch,
-};
-pub use package::{
-    MediaPart, SlideMediaData, SlideMediaDataCommit, SlideMediaDataDiagnostics, SlideMediaDataEdit,
-    SlideMediaDataError, SlideMediaDataLimitKind, SlideMediaDataPatch, SlideMediaPropertiesCommit,
-    SlideMediaPropertiesDiagnostics, SlideMediaPropertiesEdit, SlideMediaPropertiesError,
-    SlideMediaPropertiesLimitKind, SlideMediaPropertiesPatch,
-};
-pub use package::{
-    MergeReader, SlideTableMergesCommit, SlideTableMergesDiagnostics, SlideTableMergesEdit,
-    SlideTableMergesError, SlideTableMergesLimitKind, SlideTableMergesPatch, SlideTableMergesPath,
-};
-pub use package::{
-    SlideAudioPositionCommit, SlideAudioPositionDiagnostics, SlideAudioPositionEdit,
-    SlideAudioPositionError, SlideAudioPositionLimitKind, SlideAudioPositionPatch,
-};
-pub use package::{
-    SlideChartDataCommit, SlideChartDataDiagnostics, SlideChartDataEdit, SlideChartDataError,
-    SlideChartDataLimitKind, SlideChartDataPatch,
-};
-pub use package::{SlideChartMetadataError, SlideChartMetadataLimitKind};
-pub use package::{
-    SlideMediaLifecycleCommit, SlideMediaLifecycleDiagnostics, SlideMediaLifecycleError,
-    SlideMediaLifecycleLimitKind, SlideMediaLifecyclePatch,
-};
-pub use package::{
-    SlideTableCellNumberFormatCommit, SlideTableCellNumberFormatDiagnostics,
-    SlideTableCellNumberFormatEdit, SlideTableCellNumberFormatError,
-    SlideTableCellNumberFormatLimitKind, SlideTableCellNumberFormatPatch,
-    SlideTableCellNumberFormatPath,
-};
-pub use package::{SlideTableCellsError, SlideTableCellsLimitKind, SlideTableCellsPath};
+pub use presentation::Presentation;
 pub use selector::{
     DrawableSelector, ReplySelector, SlideSelector, SlideSelectorError, SlideSelectorResult,
 };
-pub use slide::audio::creation::{
-    SlideAudioCreationCommit, SlideAudioCreationDiagnostics, SlideAudioCreationError,
-    SlideAudioCreationLimitKind, SlideAudioCreationPatch,
-};
 pub use slide::comment::{Comment, CommentAuthor, CommentTimestamp, DrawableKind, Reply};
 pub use slide::image::ImageSelector;
-pub use slide::media::{MediaInfo, MediaProperties, MovieInfo, MovieKind};
+pub use slide::media::{MediaProperties, MovieInfo, MovieKind};
 pub use slide::movie::MovieSelector;
-pub use slide::movie::creation::{
-    SlideMovieCreationCommit, SlideMovieCreationDiagnostics, SlideMovieCreationError,
-    SlideMovieCreationLimitKind, SlideMovieCreationPatch,
-};
 pub use slide::table::TableSelector;
 pub use slide::table::merge::Region;
-pub use slide::table::name::{Error as SlideTableNameValueError, Name as SlideTableName};
 pub use slide::table::number_format::{
-    CellPosition, CellPositionError, DecimalPlaces, FixedDecimalPlaces, NegativeStyle, Number,
-    NumberError, ThousandsSeparator,
+    At, AtError, DecimalPlaces, FixedDecimalPlaces, NegativeStyle, Number, NumberError,
+    ThousandsSeparator,
 };
 pub use slide::{Slide, Transition};
 pub use time::Seconds;

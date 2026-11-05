@@ -14,6 +14,7 @@
 
 #![allow(clippy::module_name_repetitions)]
 
+use crate::docx_family_publication::StreamPlanPublish as _;
 use std::{
     collections::BTreeMap,
     ffi::OsString,
@@ -1794,7 +1795,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
 
 fn member_identities(bytes: &[u8]) -> BenchResult<Vec<MemberIdentity>> {
     let archive = ZipArchive::from_slice(bytes)?;
-    let reader = ArchiveReader::new(bytes)?;
+    let reader = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())?;
     let mut records = Vec::new();
     for result in archive.entries() {
         let entry = result?;
@@ -1954,7 +1955,10 @@ fn source_record(
     source_count: usize,
 ) -> BenchResult<SourceRecord> {
     let members = member_identities(source_archive)?;
-    let reader = ArchiveReader::new(source_archive)?;
+    let reader = ArchiveReader::new(
+        source_archive,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
     let main = reader.read(MAIN_PATH)?;
     let opaque = reader.read(OPAQUE_PATH)?;
     let (semantic, texts) = semantic_record(source_archive)?;
@@ -2193,12 +2197,12 @@ struct TimedArtifactProof {
 
 impl TimedArtifactProof {
     fn from_publication(
-        publication: &litchi_docx::source_backed::tail_append_stream::ParagraphStreamPublication,
-    ) -> Self {
-        Self {
-            length: publication.candidate_artifact_length(),
-            sha256: publication.candidate_artifact_fingerprint().into_sha256(),
-        }
+        publication: &crate::docx_family_publication::StreamPublication,
+    ) -> Result<Self, litchi_docx::source_backed::tail_append_stream::Error> {
+        Ok(Self {
+            length: publication.candidate_artifact_length()?,
+            sha256: publication.candidate_artifact_fingerprint()?.into_sha256(),
+        })
     }
 }
 
@@ -2486,7 +2490,8 @@ fn export_fixture(
     }
     write_fixture_file(&source_path, fixture.source_archive.as_ref())?;
     write_fixture_file(&candidate_path, candidate)?;
-    let candidate_reader = ArchiveReader::new(candidate)?;
+    let candidate_reader =
+        ArchiveReader::new(candidate, soapberry_zip::office::ArchiveLimits::default())?;
     let candidate_main = candidate_reader.read(MAIN_PATH)?;
     let manifest = FixtureManifest {
         schema: "docx-replayable-tail-append-fixture-v1",
@@ -2613,8 +2618,14 @@ fn verify_candidate_oracles(
 ) -> BenchResult<OracleRecord> {
     let source_members = member_identities(source_archive)?;
     let candidate_members = member_identities(candidate_archive)?;
-    let source_reader = ArchiveReader::new(source_archive)?;
-    let candidate_reader = ArchiveReader::new(candidate_archive)?;
+    let source_reader = ArchiveReader::new(
+        source_archive,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
+    let candidate_reader = ArchiveReader::new(
+        candidate_archive,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
     let source_main = source_reader.read(MAIN_PATH)?;
     let candidate_main = candidate_reader.read(MAIN_PATH)?;
     let (candidate_semantic, candidate_texts) = semantic_record(candidate_archive)?;
@@ -2725,7 +2736,7 @@ fn build_fixture(
         &authored_record,
     );
     let mut output = Vec::new();
-    let publication = plan.write_to_stream(&mut output)?;
+    let publication = plan.write_to(&mut output)?;
     let candidate_archive = output;
     let candidate_bytes: Arc<[u8]> = Arc::from(candidate_archive.clone());
     let candidate_source = Arc::new(MeasureSource::new(
@@ -2999,7 +3010,7 @@ where
             &fixture.authored_record,
         );
         let mut output = Vec::new();
-        let publication = plan.write_to_stream(&mut output)?;
+        let publication = plan.write_to(&mut output)?;
         let candidate_bytes: Arc<[u8]> = Arc::from(output.clone());
         let candidate_source = Arc::new(MeasureSource::new(
             Arc::clone(&candidate_bytes),
@@ -3011,7 +3022,10 @@ where
         publication.write_inverse_to_stream(&candidate_package, &mut inverse)?;
         (output, inverse, proof)
     };
-    let candidate_reader = ArchiveReader::new(&candidate_archive)?;
+    let candidate_reader = ArchiveReader::new(
+        &candidate_archive,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
     let candidate_xml = candidate_reader.read(MAIN_PATH)?;
     let expected_candidate_xml = independent_candidate_xml(
         &source_main_xml(fixture.source_record.semantic.paragraph_count)?,
@@ -3066,15 +3080,15 @@ fn publish_alternative_plan(
     match publication {
         PublicationMode::CountingSink => {
             let mut output = CountingSink::new(sink_write_bytes)?;
-            let publication = plan.write_to_stream(&mut output)?;
-            let proof = TimedArtifactProof::from_publication(&publication);
+            let publication = plan.write_to(&mut output)?;
+            let proof = TimedArtifactProof::from_publication(&publication)?;
             drop(publication);
             Ok((output.finish(), proof))
         },
         PublicationMode::AtomicPath => {
             let path = atomic_path.ok_or("atomic publication has no prepared destination")?;
-            let publication = plan.commit().write_to_path(path)?;
-            let proof = TimedArtifactProof::from_publication(&publication);
+            let publication = plan.write_to_path(path)?;
+            let proof = TimedArtifactProof::from_publication(&publication)?;
             drop(publication);
             Ok((SinkObservation::atomic(proof.length), proof))
         },
@@ -3145,7 +3159,7 @@ fn run_iteration(
                 let plan = edit.prepare()?;
                 if config.publication.is_default() {
                     let mut output = HashingSink::new(sink_write_bytes)?;
-                    let _publication = plan.write_to_stream(&mut output)?;
+                    let _publication = plan.write_to(&mut output)?;
                     (None, output.finish(), None)
                 } else {
                     let (output, proof) = publish_alternative_plan(
@@ -3204,7 +3218,7 @@ fn run_iteration(
                 let plan = edit.prepare()?;
                 if config.publication.is_default() {
                     let mut output = HashingSink::new(sink_write_bytes)?;
-                    let _publication = plan.write_to_stream(&mut output)?;
+                    let _publication = plan.write_to(&mut output)?;
                     (Some(replay_counters.snapshot()), output.finish(), None)
                 } else {
                     let (output, proof) = publish_alternative_plan(
@@ -4208,8 +4222,12 @@ mod tests {
         let source_members = member_identities(&source).expect("source members");
         let mutated_members = member_identities(&mutated).expect("mutated members");
         assert_eq!(source_members, mutated_members);
-        let source_reader = ArchiveReader::new(&source).expect("source reader");
-        let mutated_reader = ArchiveReader::new(&mutated).expect("mutated reader");
+        let source_reader =
+            ArchiveReader::new(&source, soapberry_zip::office::ArchiveLimits::default())
+                .expect("source reader");
+        let mutated_reader =
+            ArchiveReader::new(&mutated, soapberry_zip::office::ArchiveLimits::default())
+                .expect("mutated reader");
         assert_eq!(
             source_reader.read(OPAQUE_PATH).expect("source opaque"),
             mutated_reader.read(OPAQUE_PATH).expect("mutated opaque")
@@ -4396,7 +4414,9 @@ mod tests {
         for profile in [CompressionProfile::Store, CompressionProfile::Deflate] {
             let archive =
                 source_archive_with_compression(&xml, 0, profile).expect("profiled source archive");
-            let reader = ArchiveReader::new(&archive).expect("archive reader");
+            let reader =
+                ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())
+                    .expect("archive reader");
             assert_eq!(reader.read(MAIN_PATH).expect("main XML"), xml);
             assert_eq!(
                 reader.read(OPAQUE_PATH).expect("opaque payload").len(),

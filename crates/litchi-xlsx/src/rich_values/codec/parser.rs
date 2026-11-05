@@ -14,8 +14,8 @@ use crate::rich_values::validation::{
     validate_arrays, validate_bags, validate_data, validate_rich_value_rels, validate_structures,
 };
 use crate::rich_values::{
-    FEATURE_BAG, RELATIONSHIPS, RICH_DATA, RICH_DATA_2, RICH_VALUE_REL, SPREADSHEETML, invalid,
-    limit,
+    FEATURE_BAG, LimitKind, RELATIONSHIPS, RICH_DATA, RICH_DATA_2, RICH_VALUE_REL, SPREADSHEETML,
+    invalid, limit,
 };
 
 const MAX_CHILDREN: usize = 1_000_000;
@@ -33,7 +33,7 @@ pub fn parse_data(xml: &[u8]) -> Result<RichValueData> {
     for child in &root.children {
         match (child.namespace.as_str(), child.name.as_str()) {
             (RICH_DATA, "rv") if !extension_seen => {
-                push_limit(&mut values, MAX_CHILDREN, "rich values")?;
+                push_limit(&values, MAX_CHILDREN, LimitKind::ValueItems)?;
                 values.push(parse_value(child)?);
             },
             (SPREADSHEETML, "extLst") if !extension_seen => {
@@ -68,7 +68,7 @@ pub fn parse_structures(xml: &[u8]) -> Result<Structures> {
     for child in &root.children {
         match (child.namespace.as_str(), child.name.as_str()) {
             (RICH_DATA, "s") if !extension_seen => {
-                push_limit(&mut values, MAX_CHILDREN, "rich-value structures")?;
+                push_limit(&values, MAX_CHILDREN, LimitKind::StructureItems)?;
                 values.push(parse_structure(child)?);
             },
             (SPREADSHEETML, "extLst") if !extension_seen => {
@@ -103,7 +103,7 @@ pub fn parse_arrays(xml: &[u8]) -> Result<ArrayData> {
     for child in &root.children {
         match (child.namespace.as_str(), child.name.as_str()) {
             (RICH_DATA_2, "a") if !extension_seen => {
-                push_limit(&mut values, MAX_CHILDREN, "rich arrays")?;
+                push_limit(&values, MAX_CHILDREN, LimitKind::ArrayItems)?;
                 values.push(parse_array(child)?);
             },
             (SPREADSHEETML, "extLst") if !extension_seen => {
@@ -141,16 +141,12 @@ pub fn parse_feature_property_bags(xml: &[u8]) -> Result<Bags> {
     for child in &root.children {
         match (child.namespace.as_str(), child.name.as_str()) {
             (FEATURE_BAG, "bagExt") if stage == 0 => {
-                push_limit(
-                    &mut bag_extensions,
-                    MAX_CHILDREN,
-                    "feature property bag extensions",
-                )?;
+                push_limit(&bag_extensions, MAX_CHILDREN, LimitKind::ExtensionItems)?;
                 bag_extensions.push(opaque(child)?);
             },
             (FEATURE_BAG, "bag") if stage <= 1 => {
                 stage = 1;
-                push_limit(&mut values, MAX_CHILDREN, "feature property bags")?;
+                push_limit(&values, MAX_CHILDREN, LimitKind::BagItems)?;
                 values.push(parse_bag(child)?);
             },
             (SPREADSHEETML, "extLst") if stage <= 2 => {
@@ -511,9 +507,13 @@ fn parse_u32(value: &str, name: &str) -> Result<u32> {
         .map_err(|_source| invalid(format!("{name} must be an unsigned integer")))
 }
 
-fn push_limit<T>(values: &mut [T], limit_value: usize, name: &str) -> Result<()> {
+fn push_limit<T>(values: &[T], limit_value: usize, kind: LimitKind) -> Result<()> {
     if values.len() >= limit_value {
-        Err(limit(name))
+        Err(limit(
+            kind,
+            values.len().checked_add(1).unwrap_or(usize::MAX),
+            limit_value,
+        ))
     } else {
         Ok(())
     }

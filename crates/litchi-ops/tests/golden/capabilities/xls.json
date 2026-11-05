@@ -1,0 +1,2490 @@
+{
+  "format": "xls",
+  "state": "open",
+  "verbs": {
+    "get": {
+      "supported": true
+    },
+    "find": {
+      "supported": true
+    },
+    "query": {
+      "supported": true
+    },
+    "view": {
+      "supported": true
+    },
+    "evaluate": {
+      "supported": true
+    },
+    "set": {
+      "supported": true
+    },
+    "add": {
+      "supported": true
+    },
+    "remove": {
+      "supported": true
+    },
+    "move": {
+      "supported": true
+    },
+    "swap": {
+      "supported": true
+    },
+    "edit": {
+      "supported": true
+    },
+    "batch": {
+      "supported": true
+    },
+    "import": {
+      "supported": true
+    },
+    "merge": {
+      "supported": true
+    },
+    "replace": {
+      "supported": true
+    },
+    "refresh": {
+      "supported": true
+    },
+    "save": {
+      "supported": true
+    },
+    "create": {
+      "supported": true
+    },
+    "dump": {
+      "supported": true
+    },
+    "raw": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0336: package parts exist in OOXML and packaged ODF only",
+      "reason": "this format has no package parts"
+    },
+    "validate": {
+      "supported": true
+    },
+    "add-part": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0336: package parts exist in OOXML and packaged ODF only",
+      "reason": "this format has no package parts"
+    },
+    "raw-set": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0336: package parts exist in OOXML and packaged ODF only",
+      "reason": "this format has no package parts"
+    }
+  },
+  "views": {
+    "text": {
+      "supported": true
+    },
+    "annotated": {
+      "supported": true
+    },
+    "outline": {
+      "supported": true
+    },
+    "stats": {
+      "supported": true
+    },
+    "issues": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    "forms": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    "html": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "svg": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "screenshot": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "pdf": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    }
+  },
+  "elements": [
+    {
+      "format": "xls",
+      "element": "workbook",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/"
+        ]
+      },
+      "children": [
+        {
+          "element": "sheet",
+          "pathSegment": "<sheet>"
+        },
+        {
+          "element": "namedrange",
+          "pathSegment": "namedrange"
+        }
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "author": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "subject": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "keywords": {
+          "type": "list",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "description": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "category": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "lastModifiedBy": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "revisionNumber": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "created": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "modified": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "workbook.date1904": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      }
+    },
+    {
+      "format": "xls",
+      "element": "sheet",
+      "parent": "workbook",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "stable": [
+          "/<sheet>",
+          "<sheet>!<A1>"
+        ],
+        "positional": [
+          "/sheet[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "column",
+          "pathSegment": "col"
+        },
+        {
+          "element": "row",
+          "pathSegment": "row"
+        },
+        {
+          "element": "cell",
+          "pathSegment": "<A1>"
+        },
+        {
+          "element": "table",
+          "pathSegment": "table"
+        },
+        {
+          "element": "comment",
+          "pathSegment": "comment"
+        },
+        {
+          "element": "chart",
+          "pathSegment": "chart"
+        },
+        {
+          "element": "pivottable",
+          "pathSegment": "pivottable"
+        },
+        {
+          "element": "slicer",
+          "pathSegment": "slicer"
+        },
+        {
+          "element": "sparkline",
+          "pathSegment": "sparkline"
+        },
+        {
+          "element": "dataValidation",
+          "pathSegment": "dataValidation"
+        },
+        {
+          "element": "conditionalFormatting",
+          "pathSegment": "cf"
+        },
+        {
+          "element": "autofilter",
+          "pathSegment": "autofilter"
+        },
+        {
+          "element": "hyperlink",
+          "pathSegment": "hyperlink"
+        },
+        {
+          "element": "mergeCell",
+          "pathSegment": "mergeCell"
+        },
+        {
+          "element": "picture",
+          "pathSegment": "picture"
+        },
+        {
+          "element": "shape",
+          "pathSegment": "shape"
+        },
+        {
+          "element": "ole",
+          "pathSegment": "ole"
+        },
+        {
+          "element": "rowbreak",
+          "pathSegment": "rowbreak"
+        },
+        {
+          "element": "colbreak",
+          "pathSegment": "colbreak"
+        }
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "hidden": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "visibility": {
+          "type": "enum",
+          "values": [
+            "visible",
+            "hidden",
+            "veryHidden"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xls",
+      "element": "cell",
+      "parent": [
+        "sheet",
+        "range"
+      ],
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "stable": [
+          "/<sheet>/<A1>"
+        ]
+      },
+      "children": [
+        {
+          "element": "run",
+          "pathSegment": "run"
+        }
+      ],
+      "properties": {
+        "type": {
+          "type": "enum",
+          "values": [
+            "Number",
+            "String",
+            "SharedString",
+            "Boolean",
+            "Error",
+            "InlineString",
+            "Date",
+            "Unknown"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "formula": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "cachedValue": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "empty": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "font.bold": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "font.italic": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "strike": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "underline": {
+          "type": "enum",
+          "values": [
+            "single",
+            "double",
+            "singleAccounting",
+            "doubleAccounting"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "font.color": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "font.size": {
+          "type": "font-size",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "font.name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "fill": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "fillPattern": {
+          "type": "enum",
+          "values": [
+            "none",
+            "solid",
+            "mediumGray",
+            "darkGray",
+            "lightGray",
+            "darkHorizontal",
+            "darkVertical",
+            "darkDown",
+            "darkUp",
+            "darkGrid",
+            "darkTrellis",
+            "lightHorizontal",
+            "lightVertical",
+            "lightDown",
+            "lightUp",
+            "lightGrid",
+            "lightTrellis",
+            "gray125",
+            "gray0625"
+          ],
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "fillBg": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "border.left": {
+          "type": "enum",
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot"
+          ],
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "border.right": {
+          "type": "enum",
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot"
+          ],
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "border.top": {
+          "type": "enum",
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot"
+          ],
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "border.bottom": {
+          "type": "enum",
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot"
+          ],
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "alignment.wrapText": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "alignment.horizontal": {
+          "type": "enum",
+          "values": [
+            "general",
+            "left",
+            "center",
+            "right",
+            "fill",
+            "justify",
+            "centerContinuous",
+            "distributed"
+          ],
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "alignment.vertical": {
+          "type": "enum",
+          "values": [
+            "top",
+            "center",
+            "bottom",
+            "justify",
+            "distributed"
+          ],
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "alignment.indent": {
+          "type": "int",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "alignment.shrinkToFit": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "protection.locked": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "protection.hidden": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "numberformat": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "value": {
+          "type": "scalar",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "clear": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type",
+          "value"
+        ],
+        "aliases": {
+          "bold": "font.bold",
+          "color": "font.color",
+          "font": "font.name",
+          "italic": "font.italic",
+          "size": "font.size"
+        }
+      }
+    },
+    {
+      "format": "xls",
+      "element": "range",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/<sheet>/<A1>:<A1>"
+        ]
+      },
+      "children": [
+        {
+          "element": "cell",
+          "pathSegment": "<A1>"
+        }
+      ],
+      "properties": {}
+    },
+    {
+      "format": "xls",
+      "element": "row",
+      "parent": "sheet",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "stable": [
+          "<sheet>!N:N"
+        ],
+        "positional": [
+          "/<sheet>/row[N]"
+        ]
+      },
+      "properties": {
+        "height": {
+          "type": "length",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "hidden": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "outlineLevel": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "collapsed": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "customHeight": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xls",
+      "element": "column",
+      "parent": "sheet",
+      "elementAliases": [
+        "col"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "stable": [
+          "/<sheet>/col[<letters>]",
+          "<sheet>!B:B"
+        ],
+        "positional": [
+          "/<sheet>/col[N]"
+        ]
+      },
+      "properties": {
+        "width": {
+          "type": "number",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "hidden": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "customWidth": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "outlineLevel": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "collapsed": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xls",
+      "element": "table",
+      "parent": [
+        "sheet",
+        "workbook"
+      ],
+      "elementAliases": [
+        "listobject"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/<sheet>/table[@name=<name>]",
+          "/table[@name=<name>]"
+        ],
+        "positional": [
+          "/<sheet>/table[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R6b)",
+        "reason": "the legacy XLS Package read bridge does not project ListObject records into unified nodes yet"
+      }
+    },
+    {
+      "format": "xls",
+      "element": "namedrange",
+      "parent": "workbook",
+      "elementAliases": [
+        "definedname"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/namedrange[<name>]",
+          "/namedrange[@name=<name>]"
+        ],
+        "positional": [
+          "/namedrange[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "ref": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "scope": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "comment": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "volatile": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xls",
+      "element": "comment",
+      "parent": "sheet",
+      "elementAliases": [
+        "note"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/comment[N]"
+        ]
+      },
+      "properties": {
+        "ref": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "author": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "anchoredTo": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xls",
+      "element": "chart",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/chart[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "series",
+          "pathSegment": "series"
+        },
+        {
+          "element": "axis",
+          "pathSegment": "axis"
+        }
+      ],
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R6b)",
+        "reason": "legacy XLS chart metadata is not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xls",
+      "element": "series",
+      "parent": "chart",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/chart[N]/series[K]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R6b)",
+        "reason": "legacy XLS chart series are not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xls",
+      "element": "axis",
+      "parent": "chart",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/chart[N]/axis[@role=<role>]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R6b)",
+        "reason": "legacy XLS chart axes are not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xls",
+      "element": "pivottable",
+      "parent": "sheet",
+      "elementAliases": [
+        "pivot"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/pivottable[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R6b)",
+        "reason": "legacy XLS pivot tables are not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xls",
+      "element": "slicer",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/slicer[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R6b)",
+        "reason": "legacy XLS slicers are not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xls",
+      "element": "sparkline",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/sparkline[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R6b)",
+        "reason": "legacy XLS sparkline groups are not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xls",
+      "element": "dataValidation",
+      "parent": "sheet",
+      "elementAliases": [
+        "validation"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/dataValidation[N]"
+        ]
+      },
+      "properties": {
+        "ref": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "type": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "operator": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "formula1": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "formula2": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "allowBlank": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "showError": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "showInput": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "errorTitle": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "error": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "promptTitle": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "prompt": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "errorStyle": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "inCellDropdown": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xls",
+      "element": "conditionalFormatting",
+      "parent": "sheet",
+      "elementAliases": [
+        "cf"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/cf[N]"
+        ]
+      },
+      "properties": {
+        "type": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "ref": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "priority": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "stopIfTrue": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "dxfId": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "operator": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "value": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "value2": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "formula": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "rank": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "percent": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "bottom": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "aboveAverage": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "equalAverage": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "stdDev": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "period": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "min": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "max": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "minLength": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "maxLength": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "showValue": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "minColor": {
+          "type": "color",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "midColor": {
+          "type": "color",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "maxColor": {
+          "type": "color",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "midpoint": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "iconset": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "reverse": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "fill": {
+          "type": "color",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.color": {
+          "type": "color",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.bold": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.italic": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.strike": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.underline": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.size": {
+          "type": "font-size",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "negativeColor": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "axisColor": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "axisPosition": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "direction": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xls",
+      "element": "autofilter",
+      "parent": "sheet",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "stable": [
+          "/<sheet>/autofilter"
+        ]
+      },
+      "properties": {
+        "range": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "criteria0": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xls",
+      "element": "hyperlink",
+      "parent": "sheet",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/hyperlink[N]"
+        ]
+      },
+      "properties": {
+        "ref": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "url": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "location": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "display": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "tooltip": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xls",
+      "element": "mergeCell",
+      "parent": "sheet",
+      "elementAliases": [
+        "merge",
+        "mergedrange"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/mergeCell[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R6b)",
+        "reason": "legacy XLS merged ranges are not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xls",
+      "element": "picture",
+      "parent": "sheet",
+      "elementAliases": [
+        "image",
+        "media"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/picture[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "title": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "decorative": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "hyperlink": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "y": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "width": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "height": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "anchorMode": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "rotation": {
+          "type": "number",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "flip": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "contentType": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "fileSize": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "src": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "anchor": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "flipH": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "flipV": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "flipBoth": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "crop": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "opacity": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "shadow": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "glow": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "reflection": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "softEdge": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xls",
+      "element": "shape",
+      "parent": "sheet",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/shape[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "geometry": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "y": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "width": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "height": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "fill": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "line": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "size": {
+          "type": "font-size",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "bold": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "italic": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "underline": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "color": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "align": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "valign": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "rotation": {
+          "type": "number",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "flip": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "hyperlink": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "anchor": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "flipH": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "flipV": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "flipBoth": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "margin": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "gradientFill": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "shadow": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "glow": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "reflection": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "softEdge": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xls",
+      "element": "ole",
+      "parent": "sheet",
+      "elementAliases": [
+        "embed",
+        "object",
+        "oleobject"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/ole[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R6b)",
+        "reason": "legacy XLS OLE objects are not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xls",
+      "element": "rowbreak",
+      "parent": "sheet",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/rowbreak[N]"
+        ]
+      },
+      "properties": {
+        "row": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "manual": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "min": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "max": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xls",
+      "element": "colbreak",
+      "parent": "sheet",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/colbreak[N]"
+        ]
+      },
+      "properties": {
+        "col": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "manual": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "min": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "max": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xls",
+      "element": "run",
+      "parent": "cell",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/<A1>/run[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R6b)",
+        "reason": "legacy XLS rich-text runs are flattened by the native cell projection"
+      }
+    }
+  ],
+  "gaps": [
+    {
+      "subject": "element",
+      "element": "table",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R6b)",
+      "reason": "the legacy XLS Package read bridge does not project ListObject records into unified nodes yet"
+    },
+    {
+      "subject": "element",
+      "element": "chart",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R6b)",
+      "reason": "legacy XLS chart metadata is not projected into unified nodes yet"
+    },
+    {
+      "subject": "element",
+      "element": "series",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R6b)",
+      "reason": "legacy XLS chart series are not projected into unified nodes yet"
+    },
+    {
+      "subject": "element",
+      "element": "axis",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R6b)",
+      "reason": "legacy XLS chart axes are not projected into unified nodes yet"
+    },
+    {
+      "subject": "element",
+      "element": "pivottable",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R6b)",
+      "reason": "legacy XLS pivot tables are not projected into unified nodes yet"
+    },
+    {
+      "subject": "element",
+      "element": "slicer",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R6b)",
+      "reason": "legacy XLS slicers are not projected into unified nodes yet"
+    },
+    {
+      "subject": "element",
+      "element": "sparkline",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R6b)",
+      "reason": "legacy XLS sparkline groups are not projected into unified nodes yet"
+    },
+    {
+      "subject": "element",
+      "element": "mergeCell",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R6b)",
+      "reason": "legacy XLS merged ranges are not projected into unified nodes yet"
+    },
+    {
+      "subject": "element",
+      "element": "ole",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R6b)",
+      "reason": "legacy XLS OLE objects are not projected into unified nodes yet"
+    },
+    {
+      "subject": "element",
+      "element": "run",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R6b)",
+      "reason": "legacy XLS rich-text runs are flattened by the native cell projection"
+    },
+    {
+      "subject": "element",
+      "element": "detectedtable",
+      "code": "unsupported_capability",
+      "followUp": "WP10 (record 0339 F5): header-row table detection in queries",
+      "reason": "OfficeCLI's detectedtable is a header-row block found heuristically in unstructured cells and reported by table queries; Litchi's queries return declared tables only"
+    },
+    {
+      "subject": "operation",
+      "verb": "query",
+      "element": "row",
+      "context": "header-column-predicates",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R6b)",
+      "reason": "legacy XLS does not yet bind row predicate names to header columns"
+    },
+    {
+      "subject": "operation",
+      "verb": "get",
+      "element": "cell",
+      "context": "non-worksheet-tab",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R6b)",
+      "reason": "chart and macro tabs retain catalog positions but do not expose ordinary worksheet cells"
+    },
+    {
+      "subject": "operation",
+      "verb": "view",
+      "element": "workbook",
+      "context": "non-worksheet-content",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R6b)",
+      "reason": "text, outline and cell statistics cover ordinary worksheets; chart and macro payloads remain unprojected"
+    },
+    {
+      "subject": "property",
+      "element": "workbook",
+      "key": "activeTab",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R6b)",
+      "reason": "the legacy XLS Package read bridge does not project the workbook window selection"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "evaluated",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R6b)",
+      "reason": "the XLS adapter has no formula evaluator or stable cached-result admission flag"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "arrayformula",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R6b)",
+      "reason": "array-formula metadata is not projected by the Package read bridge"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "arrayref",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R6b)",
+      "reason": "array-formula ranges are not projected by the Package read bridge"
+    },
+    {
+      "subject": "operation",
+      "verb": "create",
+      "element": "workbook",
+      "context": "template",
+      "code": "unsupported_capability",
+      "followUp": "use Flavor::Document; M2 XLS template creation",
+      "reason": "the XLS creator currently authors ordinary workbooks and refuses template requests"
+    },
+    {
+      "subject": "operation",
+      "verb": "create",
+      "element": "workbook",
+      "context": "strict-conformance",
+      "code": "unsupported_capability",
+      "followUp": "CreateOptions::conformance(Conformance::Transitional)",
+      "reason": "the XLS creator emits binary BIFF8 workbooks and refuses Strict requests"
+    },
+    {
+      "subject": "operation",
+      "verb": "create",
+      "element": "workbook",
+      "context": "unrepresentable-initial-metadata",
+      "code": "unsupported_capability",
+      "followUp": "CreateOptions::metadata (OLE property sets, record 0254)",
+      "reason": "initial metadata is written to the OLE property sets; identifier, hyperlink_base and unzoned timestamps have no property-set slot and are refused rather than dropped"
+    },
+    {
+      "subject": "operation",
+      "verb": "get",
+      "element": "metadata",
+      "context": "path-read",
+      "code": "unsupported_capability",
+      "followUp": "File::metadata(); /metadata node reads with the shared metadata vocabulary",
+      "reason": "`set(\"/metadata\", ..)` writes the OLE document properties (root-metadata keys and custom.<name>); the path is set-only, and reads go through File::metadata()"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "cell",
+      "context": "native-dependency-closure",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLS dependency-complete cell removal",
+      "reason": "formula cells and unrepresented range or drawing dependencies remain refused; removing the last rich or opaque string identity requires a semantic inverse that retains its metadata"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "cell",
+      "context": "non-scalar-properties",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLS font, number-format and protection setters",
+      "reason": "alignment, border line styles and palette fill colors are written through a reused or authored XF; font, border colors, number format, protection, rotation and reading order are read-only because a new XF must keep an existing font/number-format/protection prefix, and formatting is set in its own call rather than together with value, clear or formula"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "cell",
+      "context": "existing-formula-cells",
+      "code": "unsupported_capability",
+      "followUp": "M4 XLS dependency-aware formula replacement",
+      "reason": "an existing Formula record (possibly a shared, array or table owner, or a string-cache group) is not replaced by a value, clear or new formula; authored formulas use the BIFF8 tokenizer, which refuses 3-D, external and name references, and carry an empty cached result with always-recalculate set"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "cell",
+      "context": "native-dependency-closure",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLS dependency-complete scalar replacement",
+      "reason": "admitted scalar storage-family replacements preserve the XF and use native row-block and SST rewrites; packed MulBlank cells, unsupported formula ownership, non-adjacent ExtSST records and removal of the last rich or opaque string identity remain typed refusals until their dependency closures and semantic inverses are represented"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "sheet",
+      "context": "tab-state",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLS worksheet visibility setters",
+      "reason": "the XLS writer renames worksheets but does not change hidden or very-hidden tab state; added tabs are visible"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "sheet",
+      "context": "native-dependency-closure",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLS dependency-closing tab removal",
+      "reason": "one ordinary worksheet per call; tabs that an internal 3-D reference range, a sheet-scoped name, a pivot data connection, a drawing or a pivot view still uses are refused, as are the last tab, the last visible tab, chart/macro tabs and macro-bearing or structure-protected workbooks"
+    },
+    {
+      "subject": "operation",
+      "verb": "move",
+      "element": "sheet",
+      "context": "native-dependency-closure",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLS 3-D range rewriting",
+      "reason": "tab order changes that would make an internal 3-D reference range noncontiguous, or that a protected or shared workbook structure forbids, are refused; cells, rows and columns do not move"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "row",
+      "context": "outline-and-defaults",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLS outline and default-layout setters",
+      "reason": "row height and hidden and column width and hidden are written; outline level, collapsed state, clearing a custom size and worksheet default sizes are read-only"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "namedrange",
+      "context": "native-editor",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLS defined-name editor",
+      "reason": "defined names are read from the workbook's Lbl records; adding, changing and removing them needs a native Lbl/ExternSheet editor the leaf does not have"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "row",
+      "context": "native-dependency-closure",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLS formula and name rewriting for axis shifts",
+      "reason": "row and column insertion requires an explicit position and takes no properties; workbooks whose formulas, names, tables or array/shared formulas the native axis shift cannot rewrite are refused, and deletion is limited to empty rows and columns"
+    },
+    {
+      "subject": "view",
+      "mode": "issues",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "forms",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "html",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "svg",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "screenshot",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "pdf",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    }
+  ]
+}

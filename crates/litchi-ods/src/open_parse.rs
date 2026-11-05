@@ -20,8 +20,8 @@
 //! the content validation has completed.
 
 use litchi_core::{Error, Result};
-use litchi_odf_common::ResolvedReader;
 use litchi_odf_common::calculation::{CalculationHandler, Settings};
+use litchi_odf_common::{ResolvedReader, XmlStreamLimits};
 use quick_xml::events::Event;
 
 use crate::authoring::ValidateHandler;
@@ -83,7 +83,7 @@ impl OpenParse {
     /// pre-stream pass errors: the handlers stay inactive and
     /// [`OpenParse::finish`] reports them at their original precedence
     /// positions.
-    pub(crate) fn run(content_xml: &str) -> Result<Self> {
+    pub(crate) fn run(content_xml: &str, xml_limits: XmlStreamLimits) -> Result<Self> {
         crate::authoring::validate_size(content_xml)?;
         let mut calculation_error =
             litchi_odf_common::calculation::validate_size(content_xml).err();
@@ -92,7 +92,7 @@ impl OpenParse {
         let mut worksheet_error =
             crate::worksheet::validation::validate_content_xml_size(content_xml).err();
 
-        let mut reader = ResolvedReader::from_xml(content_xml);
+        let mut reader = ResolvedReader::from_xml(content_xml, xml_limits)?;
         let mut buffer = Vec::new();
         let mut validate = ValidateHandler::default();
         let mut calculation = CalculationHandler::default();
@@ -115,23 +115,30 @@ impl OpenParse {
                     // loop above and its end-of-stream errors end it), so
                     // the later arms exist only for structural completeness.
                     if validate_error.is_none() {
-                        validate_error = Some(Error::InvalidFormat(format!(
-                            "invalid ODS content.xml: {error}"
-                        )));
+                        validate_error = Some(litchi_odf_common::map_resolved_reader_error(
+                            error,
+                            "invalid ODS content.xml",
+                        ));
                     } else if calculation_error.is_none() {
-                        calculation_error =
-                            Some(Error::InvalidFormat(format!("XML parsing error: {error}")));
+                        calculation_error = Some(litchi_odf_common::map_resolved_reader_error(
+                            error,
+                            "XML parsing error",
+                        ));
                     } else if locate_error.is_none() {
-                        locate_error = Some(Error::InvalidFormat(format!(
-                            "invalid ODS content.xml: {error}"
-                        )));
+                        locate_error = Some(litchi_odf_common::map_resolved_reader_error(
+                            error,
+                            "invalid ODS content.xml",
+                        ));
                     } else if names_error.is_none() {
-                        names_error = Some(Error::InvalidFormat(format!(
-                            "invalid ODS content.xml: {error}"
-                        )));
+                        names_error = Some(litchi_odf_common::map_resolved_reader_error(
+                            error,
+                            "invalid ODS content.xml",
+                        ));
                     } else if worksheet_error.is_none() {
-                        worksheet_error =
-                            Some(Error::InvalidFormat(format!("invalid ODS XML: {error}")));
+                        worksheet_error = Some(litchi_odf_common::map_resolved_reader_error(
+                            error,
+                            "invalid ODS XML",
+                        ));
                     }
                     break;
                 },
@@ -285,6 +292,7 @@ impl OpenParse {
 mod tests {
     use super::{OpenOutputs, OpenParse};
     use litchi_core::{Error, Result};
+    use litchi_odf_common::XmlStreamLimits;
     use std::io::Read as _;
     use std::path::{Path, PathBuf};
 
@@ -300,10 +308,35 @@ mod tests {
         Vec<crate::worksheet::Sheet>,
     );
 
+    /// The standalone calculation-settings parse under the historical
+    /// envelope that the fused handler applies (64 MiB, depth 256, one
+    /// million events, owner defaults elsewhere).
+    fn calculation(xml: &str) -> Result<Option<litchi_odf_common::calculation::Settings>> {
+        let owner = XmlStreamLimits::owner_default_value();
+        let limits = XmlStreamLimits::new(
+            64 * 1_048_576,
+            256,
+            1_000_000,
+            owner.max_attributes(),
+            owner.max_token_bytes(),
+        )
+        .and_then(|limits| {
+            limits.namespace_limits(
+                owner.max_namespace_scope_depth(),
+                owner.max_namespace_declarations(),
+                owner.max_namespace_bindings(),
+                owner.max_namespace_bytes(),
+                owner.max_namespace_prefix_bytes(),
+                owner.max_namespace_uri_bytes(),
+            )
+        })?;
+        litchi_odf_common::calculation::parse(xml, limits).map_err(Error::from)
+    }
+
     /// The original sequential open passes with their exact error precedence.
     fn sequential(xml: &str) -> Result<Compared> {
         crate::authoring::validate_content_xml(xml)?;
-        let calculation = litchi_odf_common::calculation::parse(xml)?;
+        let calculation = calculation(xml)?;
         let location = crate::settings::codec::locate(xml)?;
         if calculation.is_some() != location.calculation.is_some() {
             return Err(Error::InvalidFormat(DISAGREE.to_string()));
@@ -320,7 +353,8 @@ mod tests {
 
     /// The fused two-phase open parse with the same comparison projection.
     fn fused(xml: &str) -> Result<Compared> {
-        let (calculation, outputs) = OpenParse::run(xml)?.finish()?;
+        let (calculation, outputs) =
+            OpenParse::run(xml, XmlStreamLimits::owner_default_value())?.finish()?;
         Ok((
             format!("{calculation:?}"),
             format!("{:?}", outputs.location),
@@ -394,8 +428,7 @@ mod tests {
         let xml = format!(
             r#"<office:document-content xmlns:office="{OFFICE}" xmlns:table="{TABLE}" xmlns:text="{TEXT}"><office:body><office:spreadsheet><table:calculation-settings table:case-sensitive="true"/><table:table table:name="Sheet1"><table:table-row><table:table-cell office:value-type="string"><text:p>hi</text:p></table:table-cell></table:table-row></table:table></office:spreadsheet></office:body></office:document-content>"#
         );
-        let calculation =
-            litchi_odf_common::calculation::parse(&xml).expect("minimal document parses");
+        let calculation = calculation(&xml).expect("minimal document parses");
         assert!(calculation.is_some(), "fixture must declare settings");
         assert_equivalent("minimal", &xml);
     }
@@ -408,13 +441,12 @@ mod tests {
         let xml = format!(
             r#"<office:document-content xmlns:office="{OFFICE}" xmlns:table="{TABLE}"><office:body><office:spreadsheet><table:calculation-settings/><table:calculation-settings/></office:spreadsheet></office:body><office:body/></office:document-content>"#
         );
-        let semantic = litchi_odf_common::calculation::parse(&xml)
-            .expect_err("semantic parse must fail on duplicates");
+        let semantic = calculation(&xml).expect_err("semantic parse must fail on duplicates");
         assert_eq!(
             semantic.to_string(),
             "Invalid format: duplicate table:calculation-settings"
         );
-        let fused = OpenParse::run(&xml)
+        let fused = OpenParse::run(&xml, XmlStreamLimits::owner_default_value())
             .err()
             .expect("content validation must fail in run");
         assert_eq!(
@@ -455,8 +487,8 @@ mod tests {
             r#"<office:document-content xmlns:office="{OFFICE}" xmlns:table="{TABLE}"><office:body><office:spreadsheet><table:calculation-settings table:bogus="1"/><table:named-expressions><table:named-expressions/></table:named-expressions></office:spreadsheet></office:body></office:document-content>"#
         );
         crate::authoring::validate_content_xml(&xml).expect("structure is valid");
-        let calculation = litchi_odf_common::calculation::parse(&xml)
-            .expect("unknown attributes are inert to the semantic parse");
+        let calculation =
+            calculation(&xml).expect("unknown attributes are inert to the semantic parse");
         assert!(calculation.is_some(), "fixture must declare settings");
         assert!(
             crate::codec::names::parse(&xml).is_err(),
@@ -479,8 +511,7 @@ mod tests {
             r#"<office:document-content xmlns:office="{OFFICE}" xmlns:table="{TABLE}"><office:body><office:spreadsheet><table:named-expressions><table:named-expressions/></table:named-expressions></office:spreadsheet><office:text><table:calculation-settings/></office:text></office:body></office:document-content>"#
         );
         crate::authoring::validate_content_xml(&xml).expect("structure is valid");
-        let calculation =
-            litchi_odf_common::calculation::parse(&xml).expect("sibling settings parse");
+        let calculation = calculation(&xml).expect("sibling settings parse");
         assert!(calculation.is_some(), "fixture must disagree semantically");
         assert!(
             crate::codec::names::parse(&xml).is_err(),
@@ -532,15 +563,51 @@ mod tests {
         // size limits also trip but lose the selection).
         let xml = past_calculation_limit_xml(r#"<office:spreadsheet/>"#);
         crate::authoring::validate_content_xml(&xml).expect("structure is valid");
-        let semantic =
-            litchi_odf_common::calculation::parse(&xml).expect_err("semantic size check must fail");
+        let semantic = calculation(&xml).expect_err("semantic size check must fail");
         let fused = fused(&xml).expect_err("fused parse must fail");
         assert_eq!(fused.to_string(), semantic.to_string());
-        assert_eq!(
-            fused.to_string(),
-            "Invalid format: calculation settings XML exceeds the size limit"
-        );
+        let Error::ResourceLimit(limit) = &fused else {
+            panic!("calculation size refusal is not a typed limit: {fused}");
+        };
+        assert_eq!(limit.scope.as_ref(), "ODF raw XML input bytes");
+        assert_eq!(limit.observed, xml.len() as u64);
+        assert_eq!(limit.limit, 64 * 1_048_576);
         assert_equivalent("calculation-size-limit", &xml);
+    }
+
+    #[test]
+    fn owner_default_keeps_large_tokens_but_explicit_token_policy_is_exact() {
+        let padding = "x".repeat(64 * 1024 + 1);
+        let xml = format!(
+            r#"<office:document-content xmlns:office="{OFFICE}"><office:body><!--{padding}--><office:spreadsheet/></office:body></office:document-content>"#
+        );
+
+        // The owner ingress profile follows the established content-member
+        // envelope, so the raw reader does not narrow a legal comment before
+        // the format handler sees it.
+        OpenParse::run(&xml, XmlStreamLimits::owner_default_value())
+            .and_then(OpenParse::finish)
+            .expect("the owner default admits the historical token envelope");
+
+        // A caller-selected raw policy remains authoritative.  This is a
+        // typed raw-token refusal, rather than a generic ODS format error.
+        let strict =
+            XmlStreamLimits::new(256 * 1024 * 1024, 4_096, 4_000_000, 1_000_000, 64 * 1024)
+                .expect("strict token policy is finite");
+        let result = OpenParse::run(&xml, strict);
+        assert!(result.is_err(), "strict token policy must refuse");
+        let error = match result {
+            Err(error) => error,
+            Ok(_) => return,
+        };
+        assert!(matches!(
+            error,
+            Error::ResourceLimit(limit)
+                if limit.resource == litchi_core::Resource::Memory
+                    && limit.scope.as_ref() == "ODF raw XML token bytes"
+                    && limit.observed > 64 * 1024
+                    && limit.limit == 64 * 1024
+        ));
     }
 
     #[test]
@@ -553,8 +620,8 @@ mod tests {
             r#"<office:spreadsheet><table:calculation-settings table:bogus="1"/></office:spreadsheet>"#,
         );
         crate::authoring::validate_content_xml(&xml).expect("structure is valid");
-        let calculation = litchi_odf_common::calculation::parse(&xml)
-            .expect("unknown attributes are inert to the semantic parse");
+        let calculation =
+            calculation(&xml).expect("unknown attributes are inert to the semantic parse");
         assert!(calculation.is_some(), "fixture must declare settings");
         let fused = fused(&xml).expect_err("fused parse must fail");
         assert!(
@@ -619,9 +686,10 @@ mod tests {
         let xml = format!(
             r#"<office:document-content xmlns:office="{OFFICE}" xmlns:table="{TABLE}"><office:body><office:spreadsheet/></office:body></office:document-content>"#
         );
-        let (calculation, outputs): (_, OpenOutputs) = OpenParse::run(&xml)
-            .and_then(OpenParse::finish)
-            .expect("fused parse");
+        let (calculation, outputs): (_, OpenOutputs) =
+            OpenParse::run(&xml, XmlStreamLimits::owner_default_value())
+                .and_then(OpenParse::finish)
+                .expect("fused parse");
         assert!(calculation.is_none());
         assert!(outputs.definitions.is_empty());
         assert!(outputs.sheets.is_empty());

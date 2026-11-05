@@ -26,7 +26,7 @@ impl Integer {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn parse_with_limits(value: &str, limits: &Limits) -> Result<Self> {
+    pub(crate) fn parse_with_limits(value: &str, limits: &Limits) -> Result<Self> {
         canonical_integer(value, false, limits.max_integer_digits()).map(Self)
     }
 
@@ -76,7 +76,7 @@ impl PositiveInteger {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn parse_with_limits(value: &str, limits: &Limits) -> Result<Self> {
+    pub(crate) fn parse_with_limits(value: &str, limits: &Limits) -> Result<Self> {
         canonical_integer(value, true, limits.max_integer_digits()).map(Self)
     }
 
@@ -467,11 +467,12 @@ impl Change {
         }
     }
 
+    #[cfg(test)]
     /// Validate this record's local grammar and values without resolving IDs.
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn validate_with_limits(&self, limits: &Limits) -> Result<()> {
+    pub(crate) fn validate_with_limits(&self, limits: &Limits) -> Result<()> {
         self.resources_with_limits(limits).map(|_| ())
     }
 
@@ -570,7 +571,7 @@ pub(crate) struct Validated {
     pub(crate) limits: Limits,
 }
 
-/// Spreadsheet-wide tracked-change state and ordered change records.
+/// Workbook-wide tracked-change state and ordered change records.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Changes {
     pub enabled: bool,
@@ -590,7 +591,7 @@ impl Changes {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn validate_with_limits(&self, limits: &Limits) -> Result<()> {
+    pub(crate) fn validate_with_limits(&self, limits: &Limits) -> Result<()> {
         self.validate_indexed_with_limits(limits).map(|_| ())
     }
 
@@ -654,7 +655,7 @@ impl Changes {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn validate_graph_with_limits(&self, limits: &Limits) -> Result<()> {
+    pub(crate) fn validate_graph_with_limits(&self, limits: &Limits) -> Result<()> {
         if self.changes.len() > limits.max_changes() || self.changes.len() > limits.max_nodes() {
             return tracked_invalid("spreadsheet tracked-change graph exceeds resource limit");
         }
@@ -732,17 +733,6 @@ impl Changes {
     /// Validate one known simultaneous-deletion group without searching for it.
     pub(crate) fn validate_multi_deletion_group_at(&self, index: usize) -> Result<()> {
         validate_multi_deletion_group_at(&self.changes, index)
-    }
-
-    /// Fallibly clone a validated semantic graph without attacker-sized
-    /// infallible string or vector allocations.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the clone would exceed the supplied limits.
-    pub fn try_clone_with_limits(&self, limits: &Limits) -> Result<Self> {
-        let validated = self.validate_indexed_with_limits(limits)?;
-        self.try_clone_validated_with_limits(&validated, limits)
     }
 
     /// Fallibly clone using a cache produced by validation of this exact graph.

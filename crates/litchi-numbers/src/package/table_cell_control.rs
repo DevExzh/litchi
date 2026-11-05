@@ -18,7 +18,7 @@ use litchi_iwa_core::SnappyStream;
 
 use super::table_cell_control_native as native;
 use super::{Package, table_cell_pop_up_menu as popup};
-use crate::{CellPosition, SheetSelector, TableSelector, cell::data_format::control::CellControl};
+use crate::{At, SheetSelector, TableSelector, cell::data_format::control::CellControl};
 
 /// Content-redacted errors shared by every cell-control transaction.
 ///
@@ -134,7 +134,9 @@ impl Edit<'_> {
             position,
         )?;
         if target.locked {
-            return Err(Error::TableLocked { path: self.path });
+            return Err(Error::Refused(
+                crate::package::table_cell_pop_up_menu::Refusal::TableLocked { path: self.path },
+            ));
         }
         if self.before == self.after {
             return no_op_commit(self.source, self.path, self.before, self.after);
@@ -275,6 +277,12 @@ impl Commit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the exact patch.
     #[must_use]
     pub const fn patch(&self) -> &Patch {
@@ -294,10 +302,10 @@ impl Package {
         &self,
         sheet: impl Into<SheetSelector<'sheet>>,
         table: impl Into<TableSelector<'table>>,
-        position: CellPosition,
+        position: At,
     ) -> Result<Option<CellControl>, Error> {
         let target = popup::resolve_cell(self, sheet, table, position)?;
-        popup::read_cell_control(self, target)
+        Ok(popup::read_cell_control(self, target)?)
     }
 
     /// Start a selector-first complete-control edit.
@@ -305,15 +313,15 @@ impl Package {
         &self,
         sheet: impl Into<SheetSelector<'sheet>>,
         table: impl Into<TableSelector<'table>>,
-        position: CellPosition,
+        position: At,
     ) -> Result<Edit<'_>, Error> {
         let target = popup::resolve_cell(self, sheet, table, position)?;
         let before = popup::read_cell_control(self, target)?;
         Ok(Edit {
             source: self,
             path: Path::Cell {
-                sheet: target.sheet_position,
-                table: target.table_position,
+                sheet: target.scope,
+                table: target.table,
                 position,
             },
             before: before.clone(),
@@ -323,8 +331,9 @@ impl Package {
 
     /// Apply a previously-created exact control patch.
     pub fn apply_table_cell_control_format(&self, patch: &Patch) -> Result<Commit, Error> {
-        let catalog = super::table_headers::rewrite::physical_source(self)
-            .map_err(|_| Error::UnsupportedSource)?;
+        let catalog = super::table_headers::rewrite::physical_source(self).map_err(|_| {
+            Error::Refused(crate::package::table_cell_pop_up_menu::Refusal::UnsupportedSource)
+        })?;
         let owner = catalog.__source_owner();
         if !patch.artifacts.authorizes_owner(&owner) {
             return Err(Error::PatchConflict);
@@ -354,23 +363,23 @@ impl Package {
         }
         let target_owner = patch.artifacts.target_owner();
         let mut budget = popup::TransactionBudget::new(self);
-        budget.charge_package_source(catalog, patch.path)?;
-        budget.charge_output(target_owner.as_ref().len(), patch.path)?;
-        budget.charge_allocations(2, patch.path)?;
+        budget.charge_package_source(catalog, patch.path.into())?;
+        budget.charge_output(target_owner.as_ref().len(), patch.path.into())?;
+        budget.charge_allocations(2, patch.path.into())?;
         budget.charge_transaction_work(
             target_owner
                 .as_ref()
                 .len()
                 .saturating_mul(2)
                 .saturating_add(catalog.package().iter().count().saturating_mul(1024)),
-            patch.path,
+            patch.path.into(),
         )?;
-        budget.charge_candidate_input_bytes(target_owner.as_ref().len(), patch.path)?;
+        budget.charge_candidate_input_bytes(target_owner.as_ref().len(), patch.path.into())?;
         let candidate = Package::from_source_owner_with_options(target_owner, self.state.options)
             .map_err(|_| Error::Verification)?;
         let candidate_catalog = super::table_headers::rewrite::physical_source(&candidate)
             .map_err(|_| Error::Verification)?;
-        budget.charge_candidate_reopen(candidate_catalog, patch.path)?;
+        budget.charge_candidate_reopen(candidate_catalog, patch.path.into())?;
         let after = candidate.table_cell_control_format(
             SheetSelector::index(sheet),
             TableSelector::index(table),
@@ -381,10 +390,10 @@ impl Package {
         }
         let target_catalog = super::table_headers::rewrite::physical_source(&candidate)
             .map_err(|_| Error::Verification)?;
-        budget.charge_payload_items(target_catalog.package().iter().count(), patch.path)?;
+        budget.charge_payload_items(target_catalog.package().iter().count(), patch.path.into())?;
         budget.charge_transaction_work(
             target_catalog.source_bytes().len().saturating_mul(2),
-            patch.path,
+            patch.path.into(),
         )?;
         let touched_components = changed_component_count(self, &candidate)?;
         let deleted_previews = catalog
@@ -417,8 +426,9 @@ fn no_op_commit(
     before: Option<CellControl>,
     after: Option<CellControl>,
 ) -> Result<Commit, Error> {
-    let catalog = super::table_headers::rewrite::physical_source(source)
-        .map_err(|_| Error::UnsupportedSource)?;
+    let catalog = super::table_headers::rewrite::physical_source(source).map_err(|_| {
+        Error::Refused(crate::package::table_cell_pop_up_menu::Refusal::UnsupportedSource)
+    })?;
     let owner = catalog.__source_owner();
     Ok(Commit {
         package: source.snapshot(),
@@ -447,7 +457,9 @@ fn rewrite(
         return Err(Error::InvalidSource { path });
     };
     let source_owner = super::table_headers::rewrite::physical_source(source)
-        .map_err(|_| Error::UnsupportedSource)?
+        .map_err(|_| {
+            Error::Refused(crate::package::table_cell_pop_up_menu::Refusal::UnsupportedSource)
+        })?
         .__source_owner();
     let target = popup::resolve_cell(
         source,
@@ -562,47 +574,55 @@ fn rewrite(
         position,
     )?;
     let mut budget = popup::TransactionBudget::for_cell_control(source);
-    let catalog = super::table_headers::rewrite::physical_source(source)
-        .map_err(|_| Error::UnsupportedSource)?;
+    let catalog = super::table_headers::rewrite::physical_source(source).map_err(|_| {
+        Error::Refused(crate::package::table_cell_pop_up_menu::Refusal::UnsupportedSource)
+    })?;
     if !catalog.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedSource,
+        ));
     }
+    let snappy_limits = catalog
+        .limits()
+        .snappy_limits()
+        .map_err(|_| Error::InvalidSource { path })?;
     // Charge the complete source ZIP and native archive before the scalar
     // owner clones any archive or stages a list candidate.  The native helper
     // returns a conservative private-candidate bound; its exact serialized
     // size is checked again before compression.
-    budget.charge_package_source(catalog, path)?;
+    budget.charge_package_source(catalog, path.into())?;
     let native_bound =
-        native::preflight_copy_on_write_scalar_control(source, target, path, &mut budget)?;
+        native::preflight_copy_on_write_scalar_control(source, target, path.into(), &mut budget)?;
     let native_output = native::rewrite_scalar_control(
         source,
         target,
         before.as_ref(),
         after.as_ref(),
-        path,
+        path.into(),
         &mut budget,
     )?;
     for member in &native_output.members {
         if member.archive_bytes.len() > native_bound.archive_bytes
-            || SnappyStream::maximum_compressed_len(member.archive_bytes.len())
-                .map_err(|_| Error::Verification)?
+            || SnappyStream::maximum_compressed_len(member.archive_bytes.len(), snappy_limits)
+                .map_err(|error| popup::map_core_error(error, path.into()))?
                 > native_bound.compressed_bytes
         {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::PayloadBytes,
                 observed: u64::try_from(member.archive_bytes.len()).unwrap_or(u64::MAX),
                 maximum: u64::try_from(native_bound.archive_bytes).unwrap_or(u64::MAX),
                 path,
             });
         }
-        let maximum_compressed = SnappyStream::maximum_compressed_len(member.archive_bytes.len())
-            .map_err(|_| Error::Verification)?;
-        budget.charge_compressed_bytes(maximum_compressed, path)?;
+        let maximum_compressed =
+            SnappyStream::maximum_compressed_len(member.archive_bytes.len(), snappy_limits)
+                .map_err(|error| popup::map_core_error(error, path.into()))?;
+        budget.charge_compressed_bytes(maximum_compressed, path.into())?;
     }
     let metadata_bytes = popup::rewrite_component_save_tokens(
         source,
         &native_output.component_indices,
-        path,
+        path.into(),
         &mut budget,
     )?;
     let previews = super::table_headers::rewrite::root_preview_deletions(catalog)
@@ -611,13 +631,14 @@ fn rewrite(
     // bounded private staging allowance before asking the archive package to
     // build that plan; the exact requirements are charged immediately after
     // preparation and before its output buffer is allocated.
-    budget.charge_allocations(2, path)?;
-    budget.charge_transaction_work(catalog.source_bytes().len().saturating_mul(2), path)?;
+    budget.charge_allocations(2, path.into())?;
+    budget.charge_transaction_work(catalog.source_bytes().len().saturating_mul(2), path.into())?;
     let compressed_members = native_output
         .members
         .iter()
         .map(|member| {
-            SnappyStream::compress(&member.archive_bytes).map_err(|_| Error::Verification)
+            SnappyStream::compress(&member.archive_bytes, snappy_limits)
+                .map_err(|error| popup::map_core_error(error, path.into()))
         })
         .collect::<Result<Vec<_>, _>>()?;
     let mut changed_names = native_output
@@ -642,26 +663,26 @@ fn rewrite(
         .prepare_reassembly_with_deletions(&edits, &previews, catalog.limits())
         .map_err(|_| Error::Verification)?;
     let requirements = prepared.execution_requirements();
-    budget.preflight_reassembly(requirements, path)?;
+    budget.preflight_reassembly(requirements, path.into())?;
     // Candidate parsing/readback is a second private phase.  It is charged
     // before execute so an allocation or semantic reread limit cannot occur
     // after the final ZIP buffer has been published.
-    budget.charge_allocations(2, path)?;
+    budget.charge_allocations(2, path.into())?;
     budget.charge_transaction_work(
         requirements
             .output_bytes()
             .saturating_mul(2)
             .saturating_add(catalog.package().iter().count().saturating_mul(1024)),
-        path,
+        path.into(),
     )?;
     let limits = requirements.exact_limits();
-    budget.charge_candidate_input_bytes(requirements.output_bytes(), path)?;
+    budget.charge_candidate_input_bytes(requirements.output_bytes(), path.into())?;
     let bytes = prepared.execute(limits).map_err(|_| Error::Verification)?;
     let candidate = Package::from_owned_bytes_with_options(bytes, source.state.options)
         .map_err(|_| Error::Verification)?;
     let candidate_catalog = super::table_headers::rewrite::physical_source(&candidate)
         .map_err(|_| Error::Verification)?;
-    budget.charge_candidate_reopen(candidate_catalog, path)?;
+    budget.charge_candidate_reopen(candidate_catalog, path.into())?;
     let candidate_value = candidate.table_cell_control_format(
         SheetSelector::index(sheet),
         TableSelector::index(table),

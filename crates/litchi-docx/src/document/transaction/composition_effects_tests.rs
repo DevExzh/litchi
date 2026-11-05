@@ -73,7 +73,7 @@ fn revision_actions_in_separate_paragraphs_remain_disjoint_and_inverse_symmetric
 
     let mut composition = source.compose(limits());
     composition.join(first).unwrap().join(second).unwrap();
-    let committed = composition.commit().unwrap();
+    let committed = super::super::commit_composition_for_test(composition);
     let xml = std::str::from_utf8(committed.snapshot().xml_bytes()).unwrap();
     assert!(xml.contains("<w:t>first</w:t>"));
     assert!(xml.contains("<w:t>second</w:t>"));

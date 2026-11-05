@@ -4,31 +4,33 @@
     reason = "integration tests deliberately panic on unexpected failures"
 )]
 
-use std::io::Cursor;
-
 use litchi_odf_common::constants::ODF_FORMULA;
 use litchi_odf_common::core::{OwnedPackage, PackageWriter};
 use litchi_odf_formula::authoring::{self, Display};
 use litchi_odf_formula::codec;
-use litchi_odf_formula::{Formula, Limits, NodePath, StarMathVersion};
+use litchi_odf_formula::codec::Limits;
+use litchi_odf_formula::{
+    Builder, Error, LimitKind, NodePath, OpenOptions, Package, SourceLimitKind, SourceLimits,
+    StarMathVersion,
+};
 
 const MATHML: &str = r#"<math xmlns="http://www.w3.org/1998/Math/MathML"><mi>x</mi></math>"#;
 
 #[test]
 fn root_transaction_is_atomic_source_checked_and_reversible() {
-    let source = Formula::create(MATHML).expect("source");
-    let source_bytes = source.to_bytes();
+    let source = create(MATHML).expect("source");
+    let source_bytes = source.to_bytes().expect("source bytes");
     let replacement = authoring::document_root(authoring::number("42"), Display::Block);
 
     let mut edit = source.edit();
     edit.set_root(replacement.clone()).expect("stage root");
     let commit = edit.commit().expect("commit root");
 
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert!(commit.diagnostics().candidate_reopened());
     assert_eq!(
         commit.patch().change().expect("change").before(),
-        source.root()
+        source.formula().root()
     );
     assert_eq!(
         commit.patch().change().expect("change").after(),
@@ -37,34 +39,35 @@ fn root_transaction_is_atomic_source_checked_and_reversible() {
     assert_eq!(source.as_bytes(), source_bytes);
     assert!(commit.patch().is_applicable_to(&source));
 
-    let published = commit.patch().apply(&source).expect("apply");
-    assert_eq!(published.root(), &replacement);
-    let restored = commit.patch().inverse().apply(&published).expect("inverse");
-    assert_eq!(restored.as_bytes(), source_bytes);
+    let published = source.apply(commit.patch()).expect("apply").into_package();
+    assert_eq!(published.formula().root(), &replacement);
+    let restored = published.apply(&commit.patch().inverse()).expect("inverse");
+    assert_eq!(restored.into_package().as_bytes(), source_bytes);
 
-    let unrelated =
-        Formula::create(r#"<math xmlns="http://www.w3.org/1998/Math/MathML"><mi>z</mi></math>"#)
-            .expect("unrelated");
+    let unrelated = create(r#"<math xmlns="http://www.w3.org/1998/Math/MathML"><mi>z</mi></math>"#)
+        .expect("unrelated");
     assert!(!commit.patch().is_applicable_to(&unrelated));
-    assert!(commit.patch().apply(&unrelated).is_err());
+    assert!(unrelated.apply(commit.patch()).is_err());
 }
 
 #[test]
 fn semantic_noop_reuses_exact_package_and_skips_reopen() {
-    let source = Formula::create(MATHML).expect("source");
+    let source = create(MATHML).expect("source");
     let mut edit = source.edit();
-    edit.set_root(source.root().clone()).expect("stage no-op");
+    edit.set_root(source.formula().root().clone())
+        .expect("stage no-op");
     let commit = edit.commit().expect("commit no-op");
 
-    assert!(!commit.changed());
+    assert!(!commit.diagnostics().changed());
     assert!(!commit.diagnostics().candidate_reopened());
     assert!(commit.patch().change().is_none());
-    assert_eq!(commit.formula().as_bytes(), source.as_bytes());
+    assert!(commit.patch().is_noop());
+    assert_eq!(commit.package().as_bytes(), source.as_bytes());
 }
 
 #[test]
 fn transaction_preserves_auxiliary_members() {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(ODF_FORMULA).expect("mimetype");
     writer
         .add_file("content.xml", MATHML.as_bytes())
@@ -72,7 +75,7 @@ fn transaction_preserves_auxiliary_members() {
     writer
         .add_file("Configurations2/accelerator/current.xml", b"<config/>")
         .expect("auxiliary");
-    let source = Formula::from_bytes(writer.finish_to_bytes().expect("package")).expect("open");
+    let source = Package::from_bytes(&writer.finish_to_bytes().expect("package")).expect("open");
 
     let mut edit = source.edit();
     edit.set_root(authoring::document_root(
@@ -80,8 +83,9 @@ fn transaction_preserves_auxiliary_members() {
         Display::Inline,
     ))
     .expect("stage");
-    let target = edit.commit().expect("commit").into_formula();
-    let package = OwnedPackage::from_bytes(target.to_bytes()).expect("reopen raw package");
+    let target = edit.commit().expect("commit").into_package();
+    let package =
+        OwnedPackage::from_bytes(target.to_bytes().expect("bytes")).expect("reopen raw package");
 
     assert_eq!(
         package
@@ -95,7 +99,7 @@ fn transaction_preserves_auxiliary_members() {
 fn changed_libreoffice_formula_reopens_with_non_content_members_exact() {
     let bytes =
         include_bytes!("../../../test-data/libreoffice-core/starmath/qa/extras/data/tdf151842.odf");
-    let source = Formula::from_bytes(bytes.to_vec()).expect("LibreOffice source");
+    let source = Package::from_bytes(bytes).expect("LibreOffice source");
     let original = OwnedPackage::from_bytes(bytes.to_vec()).expect("raw source package");
     let mut token_edit = source.edit();
     token_edit
@@ -110,24 +114,38 @@ fn changed_libreoffice_formula_reopens_with_non_content_members_exact() {
         .expect("join producer edits");
     let commit = token_edit.commit().expect("publish");
     assert!(commit.diagnostics().candidate_reopened());
-    assert_eq!(commit.record().expect("commit record").changes().len(), 2);
-    let published = commit.formula();
+    let published = commit.package();
     assert_eq!(
-        commit
-            .patch()
-            .inverse()
-            .apply(published)
+        published
+            .formula()
+            .commit_history()
+            .last()
+            .expect("commit record")
+            .changes()
+            .len(),
+        2
+    );
+    assert_eq!(
+        published
+            .apply(&commit.patch().inverse())
             .expect("inverse")
+            .into_package()
             .as_bytes(),
         source.as_bytes()
     );
-    let reopened = Formula::from_bytes(published.to_bytes()).expect("full Formula reopen");
+    let reopened = Package::from_bytes(published.as_bytes()).expect("full Formula reopen");
     assert_eq!(
-        reopened.starmath().expect("StarMath").opaque().source(),
+        reopened
+            .formula()
+            .starmath()
+            .expect("StarMath")
+            .opaque()
+            .source(),
         "changed + 1"
     );
 
-    let changed = OwnedPackage::from_bytes(reopened.to_bytes()).expect("raw changed package");
+    let changed =
+        OwnedPackage::from_bytes(reopened.to_bytes().expect("bytes")).expect("raw changed package");
     let mut original_names = original.files().expect("source members");
     let mut changed_names = changed.files().expect("changed members");
     original_names.retain(|name| !name.ends_with('/'));
@@ -157,19 +175,28 @@ fn selected_limits_apply_at_exact_boundaries_and_survive_edits() {
         .expect("node limit")
         .with_text_bytes(1)
         .expect("text limit");
-    let source = Formula::create_with_limits(MATHML, exact).expect("exact-limit formula");
-    assert_eq!(source.limits(), exact);
+    let source = Builder::from_mathml(MATHML)
+        .limits(exact)
+        .build()
+        .expect("exact-limit formula");
+    assert_eq!(source.formula().limits(), exact);
 
     assert!(
-        Formula::create_with_limits(
-            MATHML,
-            exact
-                .with_xml_bytes(MATHML.len() - 1)
-                .expect("smaller XML limit")
-        )
-        .is_err()
+        Builder::from_mathml(MATHML)
+            .limits(
+                exact
+                    .with_xml_bytes(MATHML.len() - 1)
+                    .expect("smaller XML limit")
+            )
+            .build()
+            .is_err()
     );
-    assert!(Formula::create_with_limits(MATHML, exact.with_nodes(1).expect("one node")).is_err());
+    assert!(
+        Builder::from_mathml(MATHML)
+            .limits(exact.with_nodes(1).expect("one node"))
+            .build()
+            .is_err()
+    );
 
     let mut edit = source.edit();
     assert!(
@@ -183,18 +210,37 @@ fn selected_limits_apply_at_exact_boundaries_and_survive_edits() {
 
 #[test]
 fn stream_and_owned_package_byte_limits_are_enforced() {
-    let package = Formula::create(MATHML).expect("package").to_bytes();
-    let exact = Limits::new()
-        .with_package_bytes(package.len())
-        .expect("exact package limit");
-    assert!(Formula::from_bytes_with_limits(package.clone(), exact).is_ok());
-    assert!(Formula::from_reader_with_limits(Cursor::new(package.clone()), exact).is_ok());
+    let package = create(MATHML).expect("package").to_bytes().expect("bytes");
+    let length = u64::try_from(package.len()).expect("length");
+    let exact = OpenOptions::new().source_limits(
+        SourceLimits::builder()
+            .max_input_bytes(length)
+            .expect("exact input limit")
+            .build()
+            .expect("limits"),
+    );
+    assert!(Package::from_bytes_with_options(&package, exact).is_ok());
+    assert!(Package::from_reader_with_options(package.as_slice(), exact).is_ok());
 
-    let smaller = exact
-        .with_package_bytes(package.len() - 1)
-        .expect("smaller package limit");
-    assert!(Formula::from_bytes_with_limits(package.clone(), smaller).is_err());
-    assert!(Formula::from_reader_with_limits(Cursor::new(package), smaller).is_err());
+    let smaller = OpenOptions::new().source_limits(
+        SourceLimits::builder()
+            .max_input_bytes(length - 1)
+            .expect("smaller input limit")
+            .build()
+            .expect("limits"),
+    );
+    for error in [
+        Package::from_bytes_with_options(&package, smaller).unwrap_err(),
+        Package::from_reader_with_options(package.as_slice(), smaller).unwrap_err(),
+    ] {
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::Source(SourceLimitKind::InputBytes),
+                ..
+            }
+        ));
+    }
 }
 
 #[test]
@@ -211,7 +257,10 @@ fn serializer_assigns_foreign_prefixes_in_first_use_order() {
 
     let expected = r#"<math xmlns="http://www.w3.org/1998/Math/MathML" xmlns:ns1="urn:vendor:first" xmlns:ns2="urn:vendor:second" display="inline"><mi>x</mi><ns1:one/><ns2:two/></math>"#;
     for _ in 0..16 {
-        assert_eq!(codec::serialize(&root), expected);
+        assert_eq!(
+            codec::serialize(&root, &Limits::default()).expect("serialize root"),
+            expected
+        );
     }
 }
 
@@ -234,9 +283,14 @@ fn libreoffice_formula_fixtures_open_and_remain_byte_exact() {
     ];
 
     for bytes in fixtures {
-        let formula = Formula::from_bytes(bytes.to_vec()).expect("LibreOffice formula fixture");
-        assert_eq!(formula.as_bytes(), bytes);
+        let package = Package::from_bytes(bytes).expect("LibreOffice formula fixture");
+        assert_eq!(package.as_bytes(), bytes);
+        let formula = package.formula();
         assert_eq!(formula.mimetype(), ODF_FORMULA);
         assert!(!formula.files().expect("files").is_empty());
     }
+}
+
+fn create(mathml: &str) -> Result<Package, Error> {
+    Builder::from_mathml(mathml).build()
 }

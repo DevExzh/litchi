@@ -1,0 +1,87 @@
+{
+  "schema": "litchi-iwa-constructor-admission.v5",
+  "status": "exact follow-up qualification; native timing pending a quiet host",
+  "source": {
+    "base_commit": "ddf2ac8ae2117cd78829ef94bcb610d6cbdfa0e2",
+    "candidate_commit": "ceb87be1d3141124d2f1af29da3281b3fcf364d0",
+    "candidate_tip_with_docs": "4ab0ce48ee210e5aee3f5973d43fb6a7c0136895",
+    "probe_source_sha256": "e2e16d88f9fa70c621599b9d6ac85fef85d2a1997810be311bcaaeae447366ad",
+    "probe_lock_sha256": "21e7fece767541aa3d8a189f49368dcb5a1d27a7b3ca6d137f93d4452c7d6c65"
+  },
+  "binaries": {
+    "allocation_base": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v22-alloc-base/iwa-constructor-probe-ceb-alloc",
+      "bytes": 653552,
+      "sha256": "868370074002ba8d17972b5a6193958bcbe55e72d354827043971f7a916096d3"
+    },
+    "allocation_candidate": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v22-alloc-candidate/iwa-constructor-probe-ceb",
+      "bytes": 679088,
+      "sha256": "1907ee4530c1da36c02ee129fe860e2047409154371861e1b425b5e8e10c87fc"
+    },
+    "callgrind_base": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v22-alloc-base/iwa-constructor-probe-ceb-native",
+      "bytes": 630256,
+      "sha256": "06af91d3772d5d347ea7c5b62c047bed2582025039993d5ee49d61957178a675"
+    },
+    "callgrind_candidate": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v22-alloc-candidate/iwa-constructor-probe-ceb-native",
+      "bytes": 658216,
+      "sha256": "bf6eb6505296fd1fced8e2041dced00ab66869cc01b3c8e6fdd25716edff293a"
+    }
+  },
+  "allocation": {
+    "method": "ABBA, 100 iterations per route; tuple is [peak, retained, allocated, allocations]",
+    "summary_path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v22-alloc-ceb-matched-alloc/summary.json",
+    "summary_bytes": 55855,
+    "summary_sha256": "859aef313e4094578f8d85cea0e4a6cd9372dbefbfb05de77237aaea6a903127",
+    "rows": [
+      {"route":"field_path","base":[0,0,0,0],"candidate":[0,0,0,0],"output_bytes":8299,"output_sha256":"8b436827ca0ea648569e590e9a37fca13b42c6c63c93a4e45955b62a02b98d15"},
+      {"route":"field_info","base":[0,0,0,0],"candidate":[0,0,0,0],"output_bytes":8299,"output_sha256":"8b436827ca0ea648569e590e9a37fca13b42c6c63c93a4e45955b62a02b98d15"},
+      {"route":"message_info","base":[12,0,1200,100],"candidate":[12,0,1200,100],"output_bytes":8299,"output_sha256":"8b436827ca0ea648569e590e9a37fca13b42c6c63c93a4e45955b62a02b98d15"},
+      {"route":"archive_info","base":[0,0,0,0],"candidate":[0,0,0,0],"output_bytes":8299,"output_sha256":"8b436827ca0ea648569e590e9a37fca13b42c6c63c93a4e45955b62a02b98d15"},
+      {"route":"archive_object","base":[5664,0,566400,2700],"candidate":[1760,0,176000,900],"output_bytes":8299,"output_sha256":"8b436827ca0ea648569e590e9a37fca13b42c6c63c93a4e45955b62a02b98d15"},
+      {"route":"archive_object_reject","base":[1480,0,148000,1000],"candidate":[64,0,6400,100],"output_bytes":8299,"output_sha256":"8b436827ca0ea648569e590e9a37fca13b42c6c63c93a4e45955b62a02b98d15"},
+      {"route":"parse","base":[14708,0,2286200,7800],"candidate":[10708,0,1886200,6000],"output_bytes":8299,"output_sha256":"8b436827ca0ea648569e590e9a37fca13b42c6c63c93a4e45955b62a02b98d15"},
+      {"route":"validate","base":[3956,0,395600,1900],"candidate":[52,0,5200,100],"output_bytes":8299,"output_sha256":"8b436827ca0ea648569e590e9a37fca13b42c6c63c93a4e45955b62a02b98d15"},
+      {"route":"encode","base":[14069,0,2016900,5700],"candidate":[14069,0,1626500,3900],"output_bytes":8299,"output_sha256":"8b436827ca0ea648569e590e9a37fca13b42c6c63c93a4e45955b62a02b98d15"},
+      {"route":"retained_parse","base":[15176,0,2337600,8100],"candidate":[11376,0,1968200,6400],"output_bytes":8556,"output_sha256":"7bc9a96f894c2361619db11643c80373d56202f07e376de6930ecdadce0146af"},
+      {"route":"retained_validate","base":[3956,0,395600,1900],"candidate":[52,0,5200,100],"output_bytes":8556,"output_sha256":"7bc9a96f894c2361619db11643c80373d56202f07e376de6930ecdadce0146af"},
+      {"route":"retained_encoded_len","base":[0,0,0,0],"candidate":[0,0,0,0],"output_bytes":8556,"output_sha256":"7bc9a96f894c2361619db11643c80373d56202f07e376de6930ecdadce0146af"},
+      {"route":"retained_encode","base":[14326,0,2042600,5700],"candidate":[14326,0,1652200,3900],"output_bytes":8556,"output_sha256":"7bc9a96f894c2361619db11643c80373d56202f07e376de6930ecdadce0146af"},
+      {"route":"retained_validate_tight","base":[3956,0,395600,1900],"candidate":[52,0,5200,100],"output_bytes":8556,"output_sha256":"7bc9a96f894c2361619db11643c80373d56202f07e376de6930ecdadce0146af"},
+      {"route":"retained_encode_tight","base":[14326,0,2042600,5700],"candidate":[14326,0,1652200,3900],"output_bytes":8556,"output_sha256":"7bc9a96f894c2361619db11643c80373d56202f07e376de6930ecdadce0146af"}
+    ]
+  },
+  "callgrind": {
+    "method": "valgrind --tool=callgrind --collect-jumps=no --error-exitcode=99; Ir/op=(Ir at 12000 - Ir at 2000)/10000",
+    "manifest_path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v22-ceb-matched/manifest.json",
+    "manifest_bytes": 49463,
+    "manifest_sha256": "2a8d736e8a7788657b4a1d66cf0736a6bdd907130fb4ab2c00faa4b6d99cd8fb",
+    "capture_files": 180,
+    "capture_bytes": 6636707,
+    "rows": [
+      {"route":"field_path","base_ir":36.0024,"candidate_ir":83.0036,"candidate_base":2.305502},
+      {"route":"field_info","base_ir":65.0034,"candidate_ir":195.0026,"candidate_base":2.999883},
+      {"route":"message_info","base_ir":168.0042,"candidate_ir":274.0053,"candidate_base":1.630943},
+      {"route":"archive_info","base_ir":51.005,"candidate_ir":294.0051,"candidate_base":5.764241},
+      {"route":"archive_object","base_ir":13723.9943,"candidate_ir":3333.004,"candidate_base":0.242860},
+      {"route":"archive_object_reject","base_ir":3440.0046,"candidate_ir":371.0051,"candidate_base":0.107850},
+      {"route":"parse","base_ir":53467.036,"candidate_ir":48204.473,"candidate_base":0.901574},
+      {"route":"validate","base_ir":9061.0046,"candidate_ir":3188.0057,"candidate_base":0.351838},
+      {"route":"encode","base_ir":37737.7921,"candidate_ir":31832.9945,"candidate_base":0.843531},
+      {"route":"retained_parse","base_ir":89533.6377,"candidate_ir":90051.1457,"candidate_base":1.005780},
+      {"route":"retained_validate","base_ir":9067.0046,"candidate_ir":7194.0046,"candidate_base":0.793427},
+      {"route":"retained_encoded_len","base_ir":15585.0046,"candidate_ir":7363.0101,"candidate_base":0.472442},
+      {"route":"retained_encode","base_ir":46978.0197,"candidate_ir":35921.619,"candidate_base":0.764647},
+      {"route":"retained_validate_tight","base_ir":9134.0046,"candidate_ir":7266.0035,"candidate_base":0.795489},
+      {"route":"retained_encode_tight","base_ir":46157.3053,"candidate_ir":35749.6491,"candidate_base":0.774518}
+    ]
+  },
+  "validation": {
+    "outputs": "All 15 routes matched checksum, output byte length and output SHA-256 for each equal-iteration base/candidate pair.",
+    "allocation_abba": "All four allocation counters were stable across each endpoint's ABBA legs.",
+    "core_tests": "cargo test --offline --locked --manifest-path crates/litchi-iwa-core/Cargo.toml --lib: 83 passed, 0 failed.",
+    "native_timing": "Not run; the host was not verified quiet while other builds were active."
+  }
+}

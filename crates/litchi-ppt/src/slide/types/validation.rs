@@ -40,15 +40,23 @@ pub(crate) fn is_isolatable_shape_error(error: &crate::package::Error) -> bool {
                 | litchi_odraw::Error::MalformedImage { .. }
                 | litchi_odraw::Error::InvalidBlipId { .. }
         ),
-        Error::Io(_)
+        Error::Authoring(_)
+        | Error::Io(_)
         | Error::Ole(_)
+        | Error::Object(_)
+        | Error::CustomXml(_)
         | Error::Graph(_)
         | Error::StreamNotFound(_)
+        | Error::InvalidLimit { .. }
+        | Error::Limit { .. }
         | Error::ResourceLimit(_)
         | Error::AllocationFailed(_)
+        | Error::EncryptionPolicy
         | Error::PasswordRequired
         | Error::InvalidPassword
         | Error::UnsupportedEncryption(_)
         | Error::MalformedEncryptionHeader(_) => false,
+        #[cfg(feature = "sign")]
+        Error::Signature(_) => false,
     }
 }

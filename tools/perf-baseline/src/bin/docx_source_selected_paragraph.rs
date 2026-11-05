@@ -970,7 +970,8 @@ fn build_corpus() -> AnyResult<Corpus> {
         .into());
     }
     let ranges = parse_zip_ranges(&archive)?;
-    let archive_reader = ArchiveReader::new(&archive)?;
+    let archive_reader =
+        ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?;
     let mut members = BTreeMap::new();
     for name in archive_reader.file_names() {
         let bytes = archive_reader.read(name)?;
@@ -1418,7 +1419,7 @@ fn typed_source_changed(error: &litchi_docx::Error) -> bool {
 }
 
 fn run_eager_oracle(corpus: &Corpus) -> AnyResult<OracleStatus> {
-    let opc = OpcPackage::from_bytes(&corpus.archive)?;
+    let opc = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     let package = litchi_docx::Package::from_opc_package(opc)?;
     let document = package.document()?;
     let count = document.paragraph_count()?;
@@ -1479,7 +1480,10 @@ fn run_facade_oracle(corpus: &Corpus) -> AnyResult<FacadeStatus> {
     let owner = create_temp_corpus(&corpus.archive)?;
     let path = owner.path.clone();
     let result = (|| {
-        let document = litchi::Document::open(&path)?;
+        // The facade's document API: `litchi::open` and the document view
+        // (M0a step S9 deleted the `litchi::Document` this oracle used).
+        let file = litchi::open(&path)?;
+        let document = file.document()?;
         let selected = document.paragraph_text(TARGET_INDEX)?;
         let out_of_bounds = document.paragraph_text(usize::MAX)?.is_none();
         if selected.as_deref() != Some(TARGET_TEXT) || !out_of_bounds {
@@ -1490,12 +1494,12 @@ fn run_facade_oracle(corpus: &Corpus) -> AnyResult<FacadeStatus> {
         append.flush()?;
         let stale = matches!(
             document.paragraph_text(TARGET_INDEX),
-            Err(litchi_core::Error::SourceChanged { .. })
+            Err(error) if is_source_change(&error)
         );
         if !stale {
             return Err("facade stale-source oracle failed".into());
         }
-        drop(document);
+        drop(file);
         Ok(FacadeStatus {
             selected_text: selected.ok_or("facade selected paragraph was absent")?,
             out_of_bounds_none: out_of_bounds,
@@ -1504,6 +1508,20 @@ fn run_facade_oracle(corpus: &Corpus) -> AnyResult<FacadeStatus> {
     })();
     drop(owner);
     result
+}
+
+/// Whether a unified error reports a source that changed after open, as the
+/// typed leaf of whichever layer noticed it.
+fn is_source_change(error: &litchi::Error) -> bool {
+    use litchi::error::Source;
+    use litchi_opc::OpcError;
+
+    matches!(
+        error.leaf(),
+        Source::Core(litchi_core::Error::SourceChanged { .. })
+            | Source::Opc(OpcError::SourceChanged { .. })
+            | Source::Docx(litchi_docx::Error::Opc(OpcError::SourceChanged { .. }))
+    )
 }
 
 fn managed_context(
@@ -1546,10 +1564,11 @@ fn run_source(corpus: &Corpus, managed: bool) -> AnyResult<SourceRun> {
         let (managed_budget, managed_cancellation, context) =
             managed_context(corpus.archive.len())?;
         memory_before_open = managed_budget.used(Resource::Memory);
-        let package = source_backed::Package::from_read_at_with_execution_context(
+        let package = source_backed::Package::from_read_at_with_options(
             source_for_package,
-            litchi_docx::ReadLimits::default(),
-            context,
+            litchi_docx::OpenOptions::default()
+                .source_limits(litchi_docx::SourceLimits::default())
+                .execution_context(context),
         )?;
         budget = Some(managed_budget);
         cancellation_source = Some(managed_cancellation);

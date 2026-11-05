@@ -6,7 +6,16 @@
 
 use crate::Error;
 
+use super::package::store;
 use super::*;
+
+fn parse(xml: &[u8]) -> Result<List> {
+    super::parse(xml, Limits::DEFAULT)
+}
+
+fn write_pictures(value: &List, conformance: Conformance) -> Result<Vec<u8>> {
+    super::write_pictures(value, conformance, Limits::DEFAULT)
+}
 
 const POI_AUDIO: &[u8] =
     include_bytes!("../../../../test-data/poi/test-data/slideshow/EmbeddedAudio.pptx");
@@ -99,6 +108,38 @@ fn strict_xml_round_trip_covers_typed_extension_properties() {
 }
 
 #[test]
+fn raw_policy_admits_exact_media_wire_and_refuses_one_byte_under() {
+    let expected = value();
+    let wire =
+        super::write_pictures(&expected, Conformance::Transitional, Limits::DEFAULT).unwrap();
+    let input = slide_xml(Conformance::Transitional, &wire);
+    let exact = Limits {
+        max_input_bytes: input.len(),
+        max_output_bytes: wire.len(),
+        ..Limits::DEFAULT
+    };
+    assert_eq!(
+        super::write_pictures(&expected, Conformance::Transitional, exact).unwrap(),
+        wire
+    );
+    assert_eq!(
+        super::parse(&input, exact).unwrap().pictures.len(),
+        expected.pictures.len()
+    );
+    assert!(
+        super::write_pictures(
+            &expected,
+            Conformance::Transitional,
+            Limits {
+                max_output_bytes: wire.len().saturating_sub(1),
+                ..exact
+            },
+        )
+        .is_err()
+    );
+}
+
+#[test]
 fn media_transform_round_trips_coordinate_offsets_and_integer_extents() {
     let mut expected = value();
     expected.pictures[0].transform = Some(Transform::new(
@@ -178,6 +219,7 @@ fn opaque_media_extensions_round_trip_canonically() {
                 r#"<p:extLst xmlns:p="{PML}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:z="urn:example" mc:Ignorable="z"><p:ext uri="{{EXAMPLE}}"><z:data z:flag="a&amp;b">before<![CDATA[<literal>]]><z:inner/>after &amp; done</z:data></p:ext></p:extLst>"#
             )
             .as_bytes(),
+            Limits::DEFAULT,
         )
         .unwrap();
     assert!(opaque.as_str().contains("before&lt;literal&gt;<z:inner"));
@@ -202,7 +244,7 @@ fn opaque_media_extensions_round_trip_canonically() {
             .unwrap()
             .extensions
             .as_ref(),
-        Some(&opaque)
+        Some(&opaque),
     );
 }
 
@@ -229,8 +271,14 @@ fn rejects_duplicate_and_misordered_media_children() {
 
 #[test]
 fn opaque_media_extension_constructor_is_bounded_and_typed() {
-    assert!(ExtensionList::parse(b"<not-an-extension-list/>").is_err());
-    assert!(ExtensionList::parse(&vec![b' '; MAX_MEDIA_EXTENSION_XML_BYTES + 1]).is_err());
+    assert!(ExtensionList::parse(b"<not-an-extension-list/>", Limits::DEFAULT).is_err());
+    assert!(
+        ExtensionList::parse(
+            &vec![b' '; MAX_MEDIA_EXTENSION_XML_BYTES + 1],
+            Limits::DEFAULT,
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -252,7 +300,7 @@ fn loads_poi_audio_and_video_resources_without_decoding() {
         (POI_AUDIO, Kind::Audio, 52_079usize),
         (POI_VIDEO, Kind::Video, 101_799usize),
     ] {
-        let package = OpcPackage::from_bytes(bytes).unwrap();
+        let package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
         let uri = PackURI::new("/ppt/slides/slide1.xml").unwrap();
         let media = load(&package, &uri).unwrap();
         assert_eq!(media.pictures.len(), 1);
@@ -287,6 +335,39 @@ fn transitional_package_writer_round_trips_complete_graph() {
     let expected = value();
     store(&mut package, &uri, &expected, Conformance::Transitional).unwrap();
     assert_eq!(load(&package, &uri).unwrap(), expected);
+}
+
+#[test]
+fn replay_resource_only_change_checks_unchanged_slide_aggregate() {
+    let (mut package, uri) = test_package(Conformance::Transitional);
+    store(&mut package, &uri, &value(), Conformance::Transitional).unwrap();
+    let changed = PackURI::new("/ppt/media/media1.mp4").unwrap();
+    package.get_part_mut(&changed).unwrap().set_blob(vec![0; 5]);
+    let changed_resources = [changed];
+    let exact = Limits {
+        max_total_payload_bytes: 9,
+        ..Limits::DEFAULT
+    };
+    let index = crate::package::replay_index::ReplayIndex::from_package(&package).unwrap();
+    assert!(validate_replay_references(&package, &index, &changed_resources, &[], exact,).is_ok());
+    let under = Limits {
+        max_total_payload_bytes: 8,
+        ..exact
+    };
+    assert!(matches!(
+        validate_replay_references(
+            &package,
+            &index,
+            &changed_resources,
+            &[],
+            under,
+        ),
+        Err(Error::Limit {
+            kind: LimitKind::Codec(CodecLimitKind::PayloadBytes),
+            observed,
+            maximum: 8,
+        }) if observed > 8
+    ));
 }
 
 #[test]
@@ -384,9 +465,10 @@ fn escaped_media_output_is_preflighted_against_a_typed_budget() {
     assert!(matches!(
         error,
         Error::Limit {
-            resource: "slide media serialized XML bytes",
-            limit,
-        } if limit == maximum
+            kind: LimitKind::Codec(CodecLimitKind::OutputBytes),
+            observed,
+            maximum: actual_maximum,
+        } if observed > maximum && actual_maximum == maximum
     ));
     assert!(output.bytes.len() <= maximum);
 }
@@ -394,7 +476,7 @@ fn escaped_media_output_is_preflighted_against_a_typed_budget() {
 #[test]
 fn media_output_budget_is_aggregate_across_pictures() {
     let picture = value().pictures.pop().unwrap();
-    let mut single = BoundedXml::new();
+    let mut single = BoundedXml::new(MAX_XML_BYTES, MAX_STRING_BYTES);
     write_picture(&mut single, &picture, Conformance::Transitional).unwrap();
     let single_len = single.bytes.len();
     let maximum = single_len + single_len / 2;
@@ -406,9 +488,10 @@ fn media_output_budget_is_aggregate_across_pictures() {
     assert!(matches!(
         error,
         Error::Limit {
-            resource: "slide media serialized XML bytes",
-            limit,
-        } if limit == maximum
+            kind: LimitKind::Codec(CodecLimitKind::OutputBytes),
+            observed,
+            maximum: actual_maximum,
+        } if observed > maximum && actual_maximum == maximum
     ));
     assert!(output.bytes.len() >= single_len);
     assert!(output.bytes.len() <= maximum);

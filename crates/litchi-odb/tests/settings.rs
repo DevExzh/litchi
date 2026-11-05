@@ -5,9 +5,9 @@
 
 use litchi_odb::{
     ApplicationConnectionSettings, AutoIncrementSettings, BooleanComparisonMode,
-    CharacterSetSettings, Connection, DataSourceSetting, DataSourceSettingType, Database,
-    DelimiterSettings, DriverSettings, FileDatabaseTarget, Limits, LoginSettings,
-    ServerDatabaseTarget, TableFilter, TableSetting, TableTypeFilter,
+    CharacterSetSettings, Connection, DataSourceSetting, DataSourceSettingType, DelimiterSettings,
+    DriverSettings, FileDatabaseTarget, Limits, LoginSettings, Package, ServerDatabaseTarget,
+    TableFilter, TableSetting, TableTypeFilter,
 };
 
 const SOURCE: &str = concat!(
@@ -37,24 +37,21 @@ const SOURCE: &str = concat!(
     r#"</db:data-source></office:database></office:body></office:document-content>"#,
 );
 
-fn database() -> Database {
+fn database() -> Package {
     database_from(SOURCE)
 }
 
-fn database_from(source: &str) -> Database {
-    Database::from_bytes(
-        litchi_odb::Builder::new()
-            .content_xml(source)
-            .build()
-            .unwrap(),
-    )
-    .unwrap()
+fn database_from(source: &str) -> Package {
+    litchi_odb::Builder::new()
+        .content_xml(source)
+        .build()
+        .unwrap()
 }
 
 #[test]
 fn reads_all_settings_families_without_execution() {
     let database = database();
-    let settings = database.settings().unwrap();
+    let settings = database.database().settings().unwrap();
     let login = settings.login().unwrap();
     assert_eq!(login.user_name(), Some("alice"));
     assert_eq!(login.password_required(), Some(true));
@@ -106,7 +103,7 @@ fn reads_all_settings_families_without_execution() {
 #[test]
 fn settings_edit_reopens_and_keeps_unknown_children() {
     let source = database();
-    let settings = source.settings().unwrap();
+    let settings = source.database().settings().unwrap();
     let replacement = settings
         .clone()
         .with_login(Some(LoginSettings::new().with_user_name("bob")))
@@ -136,46 +133,57 @@ fn settings_edit_reopens_and_keeps_unknown_children() {
     let mut edit = source.edit();
     edit.set_settings(replacement.clone()).unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert!(
         commit
+            .package()
             .database()
             .content_xml()
             .contains("lo:driver-extension")
     );
     assert!(
         commit
+            .package()
             .database()
             .content_xml()
             .contains("lo:application-extension")
     );
-    assert_eq!(commit.database().settings().unwrap(), &replacement);
+    assert_eq!(
+        commit.package().database().settings().unwrap(),
+        &replacement
+    );
     assert_eq!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.database())
+            .package()
+            .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         source.as_bytes()
     );
 
-    let reopened = Database::from_bytes(commit.database().as_bytes().to_vec()).unwrap();
-    assert_eq!(reopened.settings().unwrap(), &replacement);
+    let reopened = Package::from_bytes(commit.package().as_bytes()).unwrap();
+    assert_eq!(reopened.database().settings().unwrap(), &replacement);
 }
 
 #[test]
 fn fresh_builder_and_changed_publications_reopen_the_typed_projection() {
-    let fresh = Database::from_bytes(litchi_odb::Builder::new().build().unwrap()).unwrap();
-    assert!(fresh.settings().unwrap().is_empty());
+    let fresh = litchi_odb::Builder::new().build().unwrap();
+    assert!(fresh.database().settings().unwrap().is_empty());
 
     let mut edit = fresh.edit();
     edit.set_login_settings(Some(LoginSettings::new().with_user_name("fresh-user")))
         .unwrap();
     let commit = edit.commit().unwrap();
-    let reopened = Database::from_bytes(commit.database().as_bytes().to_vec()).unwrap();
+    let reopened = Package::from_bytes(commit.package().as_bytes()).unwrap();
     assert_eq!(
-        reopened.settings().unwrap().login().unwrap().user_name(),
+        reopened
+            .database()
+            .settings()
+            .unwrap()
+            .login()
+            .unwrap()
+            .user_name(),
         Some("fresh-user")
     );
 }
@@ -184,6 +192,7 @@ fn fresh_builder_and_changed_publications_reopen_the_typed_projection() {
 fn settings_limits_refuse_unbounded_values_before_mutation() {
     let database = database();
     let catalog = database
+        .database()
         .catalog_with(Limits::default().with_max_filter_patterns(0))
         .unwrap();
     let error = catalog.settings().unwrap_err();
@@ -197,8 +206,10 @@ fn character_set_names_follow_odf_text_encoding_syntax() {
         let malformed = database_from(&xml);
         assert!(
             matches!(
-                malformed.settings(),
-                Err(litchi_core::Error::InvalidFormat(_))
+                malformed.database().settings(),
+                Err(litchi_odb::Error::Core(litchi_core::Error::InvalidFormat(
+                    _
+                )))
             ),
             "{encoding:?}"
         );
@@ -213,7 +224,12 @@ fn character_set_names_follow_odf_text_encoding_syntax() {
             } else {
                 DriverSettings::new().with_character_set(Some(charset))
             };
-            let replacement = source.settings().unwrap().clone().with_driver(Some(driver));
+            let replacement = source
+                .database()
+                .settings()
+                .unwrap()
+                .clone()
+                .with_driver(Some(driver));
             let mut edit = source.edit();
             assert!(
                 matches!(
@@ -223,7 +239,7 @@ fn character_set_names_follow_odf_text_encoding_syntax() {
                 "{encoding:?}"
             );
             assert_eq!(
-                edit.commit().unwrap().database().as_bytes(),
+                edit.commit().unwrap().package().as_bytes(),
                 source.as_bytes()
             );
         }
@@ -232,6 +248,7 @@ fn character_set_names_follow_odf_text_encoding_syntax() {
     for encoding in ["UTF-8", "ISO_8859-1", "a", "x.custom-1"] {
         let source = database();
         let replacement = source
+            .database()
             .settings()
             .unwrap()
             .clone()
@@ -243,6 +260,7 @@ fn character_set_names_follow_odf_text_encoding_syntax() {
         let commit = edit.commit().unwrap();
         assert_eq!(
             commit
+                .package()
                 .database()
                 .settings()
                 .unwrap()
@@ -270,7 +288,7 @@ fn authored_setting_values_use_one_aggregate_budget() {
         Err(litchi_core::Error::InvalidFormat(_))
     ));
     let committed = edit.commit().unwrap();
-    assert_eq!(committed.database().as_bytes(), before.as_slice());
+    assert_eq!(committed.package().as_bytes(), before.as_slice());
 }
 
 #[test]
@@ -283,8 +301,9 @@ fn tab_heavy_attribute_names_are_rejected_by_the_preflight_budget() {
         })
         .collect();
     let source = database();
-    let before = source.content_xml().to_owned();
+    let before = source.database().content_xml().to_owned();
     let replacement = source
+        .database()
         .settings()
         .unwrap()
         .clone()
@@ -312,6 +331,7 @@ fn settings_splice_empty_containers_and_lexical_extensions() {
         );
     let database = database_from(&source);
     let replacement = database
+        .database()
         .settings()
         .unwrap()
         .clone()
@@ -326,7 +346,13 @@ fn settings_splice_empty_containers_and_lexical_extensions() {
         ));
     let mut edit = database.edit();
     edit.set_settings(replacement).unwrap();
-    let content = edit.commit().unwrap().database().content_xml().to_owned();
+    let content = edit
+        .commit()
+        .unwrap()
+        .package()
+        .database()
+        .content_xml()
+        .to_owned();
     assert!(content.contains(r#"lo:marker="keep""#));
     assert!(content.contains(r#"<!--retain-->"#));
     assert!(content.contains(r#"<lo:filter-extension lo:value="x"/>"#));
@@ -342,6 +368,7 @@ fn settings_replacement_keeps_comments_and_foreign_pattern_children() {
     );
     let database = database_from(&source);
     let replacement = database
+        .database()
         .settings()
         .unwrap()
         .clone()
@@ -352,7 +379,13 @@ fn settings_replacement_keeps_comments_and_foreign_pattern_children() {
         ));
     let mut edit = database.edit();
     edit.set_settings(replacement).unwrap();
-    let content = edit.commit().unwrap().database().content_xml().to_owned();
+    let content = edit
+        .commit()
+        .unwrap()
+        .package()
+        .database()
+        .content_xml()
+        .to_owned();
     assert!(content.contains(r#"lo:marker="keep""#));
     assert!(content.contains(r#"<!--retain-->"#));
     assert!(content.contains("orders*"));
@@ -361,7 +394,7 @@ fn settings_replacement_keeps_comments_and_foreign_pattern_children() {
 #[test]
 fn login_only_edit_leaves_other_families_byte_exact() {
     let database = database();
-    let original = database.content_xml().to_owned();
+    let original = database.database().content_xml().to_owned();
     let driver_start = original.find("<db:driver-settings").unwrap();
     let driver_end = original[driver_start..]
         .find("</db:driver-settings>")
@@ -371,7 +404,13 @@ fn login_only_edit_leaves_other_families_byte_exact() {
     let mut edit = database.edit();
     edit.set_login_settings(Some(LoginSettings::new().with_user_name("bob")))
         .unwrap();
-    let content = edit.commit().unwrap().database().content_xml().to_owned();
+    let content = edit
+        .commit()
+        .unwrap()
+        .package()
+        .database()
+        .content_xml()
+        .to_owned();
     assert!(content.contains(driver));
 }
 
@@ -388,11 +427,13 @@ fn settings_updates_preserve_unknown_markup_inside_repeated_items() {
         );
     let database = database_from(&source);
     let replacement = database
+        .database()
         .settings()
         .unwrap()
         .clone()
         .with_driver(Some(
             database
+                .database()
                 .settings()
                 .unwrap()
                 .driver()
@@ -402,6 +443,7 @@ fn settings_updates_preserve_unknown_markup_inside_repeated_items() {
         ))
         .with_application_connection(Some(
             database
+                .database()
                 .settings()
                 .unwrap()
                 .application_connection()
@@ -414,7 +456,13 @@ fn settings_updates_preserve_unknown_markup_inside_repeated_items() {
         ));
     let mut edit = database.edit();
     edit.set_settings(replacement).unwrap();
-    let content = edit.commit().unwrap().database().content_xml().to_owned();
+    let content = edit
+        .commit()
+        .unwrap()
+        .package()
+        .database()
+        .content_xml()
+        .to_owned();
     assert!(content.contains(r#"lo:marker="table""#));
     assert!(content.contains("<lo:table-extension/>"));
     assert!(content.contains(r#"lo:marker="setting""#));
@@ -435,6 +483,7 @@ fn removing_modeled_filters_rejects_an_invalid_required_container_atomically() {
         );
     let database = database_from(&source);
     let mut application = database
+        .database()
         .settings()
         .unwrap()
         .application_connection()
@@ -452,7 +501,7 @@ fn removing_modeled_filters_rejects_an_invalid_required_container_atomically() {
     assert!(edit.staged_content_xml().contains(r#"lo:marker="keep""#));
     assert!(edit.staged_content_xml().contains("<lo:extension/>"));
     assert_eq!(
-        edit.commit().unwrap().database().as_bytes(),
+        edit.commit().unwrap().package().as_bytes(),
         before.as_slice()
     );
 }
@@ -464,7 +513,13 @@ fn settings_writer_reuses_an_aliased_database_namespace() {
     let mut edit = database.edit();
     edit.set_login_settings(Some(LoginSettings::new().with_user_name("bob")))
         .unwrap();
-    let content = edit.commit().unwrap().database().content_xml().to_owned();
+    let content = edit
+        .commit()
+        .unwrap()
+        .package()
+        .database()
+        .content_xml()
+        .to_owned();
     assert!(content.contains("<d:login"));
     assert!(!content.contains("<db:login"));
 }
@@ -475,18 +530,30 @@ fn repeated_child_insertion_uses_the_real_close_tag_after_comment_text() {
         r#"<db:delimiter db:field="," db:string="&quot;" db:decimal="." db:thousand=","/>"#,
         r#"<!-- producer text contains </db:not-a-real-element> -->"#,
     ));
-    let replacement = source.settings().unwrap().clone().with_driver(Some(
-        source
-            .settings()
-            .unwrap()
-            .driver()
-            .unwrap()
-            .clone()
-            .with_delimiter(Some(DelimiterSettings::new().with_field(";"))),
-    ));
+    let replacement = source
+        .database()
+        .settings()
+        .unwrap()
+        .clone()
+        .with_driver(Some(
+            source
+                .database()
+                .settings()
+                .unwrap()
+                .driver()
+                .unwrap()
+                .clone()
+                .with_delimiter(Some(DelimiterSettings::new().with_field(";"))),
+        ));
     let mut edit = source.edit();
     edit.set_settings(replacement).unwrap();
-    let content = edit.commit().unwrap().database().content_xml().to_owned();
+    let content = edit
+        .commit()
+        .unwrap()
+        .package()
+        .database()
+        .content_xml()
+        .to_owned();
     let comment = "<!-- producer text contains </db:not-a-real-element> -->";
     let comment_end = content.find(comment).unwrap() + comment.len();
     let delimiter = content.find("<db:delimiter").unwrap();
@@ -503,7 +570,11 @@ fn repeated_child_insertion_uses_the_real_close_tag_after_comment_text() {
 }
 
 fn edit_content_settings(content: &str) -> litchi_odb::DatabaseSettings {
-    database_from(content).settings().unwrap().clone()
+    database_from(content)
+        .database()
+        .settings()
+        .unwrap()
+        .clone()
 }
 
 #[test]
@@ -512,19 +583,24 @@ fn settings_reader_rejects_invalid_typed_children_and_empty_required_groups() {
         r#"<db:login db:user-name="alice" db:is-password-required="true" db:login-timeout="30"/>"#,
         r#"<db:login db:user-name="alice">unexpected</db:login>"#,
     );
-    assert!(database_from(&text_in_login).settings().is_err());
+    assert!(database_from(&text_in_login).database().settings().is_err());
 
     let empty_include = SOURCE.replace(
         r#"<db:table-include-filter><db:table-filter-pattern>customers*</db:table-filter-pattern></db:table-include-filter>"#,
         r#"<db:table-include-filter/>"#,
     );
-    assert!(database_from(&empty_include).settings().is_err());
+    assert!(database_from(&empty_include).database().settings().is_err());
 
     let empty_settings = SOURCE.replace(
         r#"<db:data-source-settings><db:data-source-setting db:data-source-setting-name="timeout" db:data-source-setting-type="int"><db:data-source-setting-value>15</db:data-source-setting-value></db:data-source-setting></db:data-source-settings>"#,
         r#"<db:data-source-settings/>"#,
     );
-    assert!(database_from(&empty_settings).settings().is_err());
+    assert!(
+        database_from(&empty_settings)
+            .database()
+            .settings()
+            .is_err()
+    );
 
     let empty_types = SOURCE.replace(
         r#"<db:table-type-filter><db:table-type>TABLE</db:table-type><db:table-type>VIEW</db:table-type></db:table-type-filter>"#,
@@ -532,6 +608,7 @@ fn settings_reader_rejects_invalid_typed_children_and_empty_required_groups() {
     );
     assert!(
         database_from(&empty_types)
+            .database()
             .settings()
             .unwrap()
             .application_connection()
@@ -546,13 +623,18 @@ fn settings_reader_rejects_invalid_typed_children_and_empty_required_groups() {
         r#"<db:data-source-setting db:data-source-setting-name="timeout" db:data-source-setting-type="int"><db:data-source-setting-value>15</db:data-source-setting-value></db:data-source-setting>"#,
         r#"<db:data-source-setting db:data-source-setting-name="timeout" db:data-source-setting-type="int"/>"#,
     );
-    assert!(database_from(&empty_values).settings().is_err());
+    assert!(database_from(&empty_values).database().settings().is_err());
 
     let duplicate_table_child = SOURCE.replace(
         r#"<db:character-set db:encoding="ISO-8859-1"/>"#,
         r#"<db:delimiter/><db:delimiter/><db:character-set db:encoding="ISO-8859-1"/>"#,
     );
-    assert!(database_from(&duplicate_table_child).settings().is_err());
+    assert!(
+        database_from(&duplicate_table_child)
+            .database()
+            .settings()
+            .is_err()
+    );
 }
 
 #[test]
@@ -570,20 +652,25 @@ fn settings_reader_does_not_use_opaque_markup_to_satisfy_one_or_more() {
                 r#"<db:table-exclude-filter><db:table-filter-pattern>customers_tmp</db:table-filter-pattern></db:table-exclude-filter>"#,
                 replacement,
             );
-        assert!(database_from(&source).settings().is_err());
+        assert!(database_from(&source).database().settings().is_err());
     }
 
     let foreign_settings = SOURCE.replace(
         r#"<db:data-source-settings><db:data-source-setting db:data-source-setting-name="timeout" db:data-source-setting-type="int"><db:data-source-setting-value>15</db:data-source-setting-value></db:data-source-setting></db:data-source-settings>"#,
         r#"<db:data-source-settings><!--comment-only--><lo:foreign-setting/></db:data-source-settings>"#,
     );
-    assert!(database_from(&foreign_settings).settings().is_err());
+    assert!(
+        database_from(&foreign_settings)
+            .database()
+            .settings()
+            .is_err()
+    );
 
     let foreign_value = SOURCE.replace(
         r#"<db:data-source-setting db:data-source-setting-name="timeout" db:data-source-setting-type="int"><db:data-source-setting-value>15</db:data-source-setting-value></db:data-source-setting>"#,
         r#"<db:data-source-setting db:data-source-setting-name="timeout" db:data-source-setting-type="int"><lo:foreign-value/></db:data-source-setting>"#,
     );
-    assert!(database_from(&foreign_value).settings().is_err());
+    assert!(database_from(&foreign_value).database().settings().is_err());
 }
 
 #[test]
@@ -598,14 +685,17 @@ fn settings_reader_requires_typed_connection_resource_attributes_and_empty_conte
             r#"<db:connection-resource xlink:type="simple" xlink:href="sdbc:demo"/>"#,
             target,
         );
-        assert!(database_from(&source).settings().is_err(), "{target}");
+        assert!(
+            database_from(&source).database().settings().is_err(),
+            "{target}"
+        );
     }
 
     let empty_href = SOURCE.replace(
         r#"<db:connection-resource xlink:type="simple" xlink:href="sdbc:demo"/>"#,
         r#"<db:connection-resource xlink:type="simple" xlink:href=""/>"#,
     );
-    assert!(database_from(&empty_href).settings().is_ok());
+    assert!(database_from(&empty_href).database().settings().is_ok());
 }
 
 #[test]
@@ -614,7 +704,7 @@ fn changed_login_cannot_publish_an_invalid_connection_resource() {
         r#"<db:connection-resource xlink:type="simple" xlink:href="sdbc:demo"/>"#,
         r#"<db:connection-resource xlink:href="sdbc:demo"/>"#,
     ));
-    assert!(malformed.settings().is_err());
+    assert!(malformed.database().settings().is_err());
     let before = malformed.as_bytes().to_vec();
     let mut edit = malformed.edit();
     assert!(
@@ -622,7 +712,7 @@ fn changed_login_cannot_publish_an_invalid_connection_resource() {
             .is_err()
     );
     assert_eq!(
-        edit.commit().unwrap().database().as_bytes(),
+        edit.commit().unwrap().package().as_bytes(),
         before.as_slice()
     );
 }
@@ -637,20 +727,23 @@ fn settings_reader_requires_exactly_one_database_description_target() {
         r#"<db:database-description><db:file-based-database xlink:type="simple" xlink:href="file:///demo"/><db:server-database db:hostname="db" db:database-name="demo"/></db:database-description>"#,
     ] {
         let source = SOURCE.replace(connection_resource, owner);
-        assert!(database_from(&source).settings().is_err(), "{owner}");
+        assert!(
+            database_from(&source).database().settings().is_err(),
+            "{owner}"
+        );
     }
 
     let valid_file = SOURCE.replace(
         connection_resource,
         r#"<db:database-description><db:file-based-database xlink:type="simple" xlink:href="file:///demo" db:media-type="application/octet-stream"/></db:database-description>"#,
     );
-    assert!(database_from(&valid_file).settings().is_ok());
+    assert!(database_from(&valid_file).database().settings().is_ok());
 
     let valid_server = SOURCE.replace(
         connection_resource,
         r#"<db:database-description><db:server-database db:type="sdbc:generic" db:hostname="db" db:database-name="demo"/></db:database-description>"#,
     );
-    assert!(database_from(&valid_server).settings().is_ok());
+    assert!(database_from(&valid_server).database().settings().is_ok());
 }
 
 #[test]
@@ -663,20 +756,25 @@ fn normative_connection_targets_read_and_write_without_opening_drivers() {
     );
     let file_database = database_from(&file_source);
     assert!(matches!(
-        file_database.catalog().unwrap().connection(),
+        file_database.database().catalog().unwrap().connection(),
         Some(Connection::FileTarget(target))
             if target.href() == "file:///demo"
                 && target.media_type() == "application/octet-stream"
                 && target.extension() == Some("db")
     ));
-    assert!(file_database.settings().is_ok());
+    assert!(file_database.database().settings().is_ok());
 
-    let existing_file = file_database.catalog().unwrap().connection().cloned();
+    let existing_file = file_database
+        .database()
+        .catalog()
+        .unwrap()
+        .connection()
+        .cloned();
     let mut no_op_edit = file_database.edit();
     no_op_edit.set_connection(existing_file).unwrap();
     let no_op = no_op_edit.commit().unwrap();
-    assert!(!no_op.changed());
-    assert_eq!(no_op.database().as_bytes(), file_database.as_bytes());
+    assert!(!no_op.diagnostics().changed());
+    assert_eq!(no_op.package().as_bytes(), file_database.as_bytes());
 
     let fresh_source = database();
     let mut fresh_file_edit = fresh_source.edit();
@@ -686,20 +784,26 @@ fn normative_connection_targets_read_and_write_without_opening_drivers() {
             "application/vnd.demo",
         )))
         .unwrap();
-    let fresh_file = fresh_file_edit.commit().unwrap().into_database();
-    assert!(fresh_file.content_xml().contains("xlink:type=\"simple\""));
+    let fresh_file = fresh_file_edit.commit().unwrap().into_package();
     assert!(
         fresh_file
+            .database()
+            .content_xml()
+            .contains("xlink:type=\"simple\"")
+    );
+    assert!(
+        fresh_file
+            .database()
             .content_xml()
             .contains("db:media-type=\"application/vnd.demo\"")
     );
     assert!(matches!(
-        fresh_file.catalog().unwrap().connection(),
+        fresh_file.database().catalog().unwrap().connection(),
         Some(Connection::FileTarget(target))
             if target.href() == "file:///fresh"
                 && target.media_type() == "application/vnd.demo"
     ));
-    assert!(fresh_file.settings().is_ok());
+    assert!(fresh_file.database().settings().is_ok());
 
     let mut file_edit = file_database.edit();
     file_edit
@@ -710,21 +814,32 @@ fn normative_connection_targets_read_and_write_without_opening_drivers() {
             None,
         )))
         .unwrap();
-    let changed = file_edit.commit().unwrap().into_database();
-    assert!(changed.content_xml().contains("db:type=\"sdbc:firebird\""));
+    let changed = file_edit.commit().unwrap().into_package();
     assert!(
         changed
+            .database()
+            .content_xml()
+            .contains("db:type=\"sdbc:firebird\"")
+    );
+    assert!(
+        changed
+            .database()
             .content_xml()
             .contains("db:local-socket=\"/run/firebird.sock\"")
     );
-    assert!(!changed.content_xml().contains("db:database-name="));
+    assert!(
+        !changed
+            .database()
+            .content_xml()
+            .contains("db:database-name=")
+    );
     assert!(matches!(
-        changed.catalog().unwrap().connection(),
+        changed.database().catalog().unwrap().connection(),
         Some(Connection::ServerTarget(target))
             if target.database_type() == "sdbc:firebird"
                 && target.database_name().is_none()
     ));
-    assert!(changed.settings().is_ok());
+    assert!(changed.database().settings().is_ok());
 
     let mut host_edit = changed.edit();
     host_edit
@@ -735,9 +850,14 @@ fn normative_connection_targets_read_and_write_without_opening_drivers() {
                 .with_database_name(Some("ledger".to_owned())),
         )))
         .unwrap();
-    let host_database = host_edit.commit().unwrap().into_database();
-    assert!(host_database.settings().is_ok());
-    assert!(host_database.content_xml().contains("db:port=\"5432\""));
+    let host_database = host_edit.commit().unwrap().into_package();
+    assert!(host_database.database().settings().is_ok());
+    assert!(
+        host_database
+            .database()
+            .content_xml()
+            .contains("db:port=\"5432\"")
+    );
 
     let opaque_source = SOURCE.replace(
         connection_resource,
@@ -755,23 +875,24 @@ fn normative_connection_targets_read_and_write_without_opening_drivers() {
         )))
         .unwrap();
     let opaque_commit = opaque_edit.commit().unwrap();
-    let opaque_changed = opaque_commit.database();
+    let opaque_changed = opaque_commit.package();
     assert!(
         opaque_changed
+            .database()
             .content_xml()
             .contains(r#"lo:description="retain""#)
     );
     assert!(
         opaque_changed
+            .database()
             .content_xml()
             .contains(r#"lo:target="retain""#)
     );
     assert_eq!(
-        opaque_commit
-            .patch()
-            .inverse()
-            .apply(opaque_changed)
+        opaque_changed
+            .apply(&opaque_commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         opaque_database.as_bytes()
     );
@@ -793,6 +914,7 @@ fn normative_connection_targets_read_and_write_without_opening_drivers() {
     let local_namespace_changed = local_namespace_edit.commit().unwrap();
     assert!(
         local_namespace_changed
+            .package()
             .database()
             .content_xml()
             .contains(r#"xmlns:ext="urn:example:local" ext:target="retain""#)
@@ -810,6 +932,7 @@ fn normative_connection_targets_read_and_write_without_opening_drivers() {
     let empty_description_changed = empty_description_edit.commit().unwrap();
     assert!(
         empty_description_changed
+            .package()
             .database()
             .content_xml()
             .contains(r#"xmlns:ext="urn:example:empty" ext:owner="retain""#)
@@ -831,10 +954,10 @@ fn connection_resource_conversion_carries_ancestor_extension_bindings() {
     edit.set_connection(Some(Connection::Resource("sdbc:recovered".to_owned())))
         .unwrap();
     let commit = edit.commit().unwrap();
-    let content = commit.database().content_xml();
+    let content = commit.package().database().content_xml();
     assert!(content.contains(r#"xmlns:lo="urn:example:ancestor""#));
     assert!(content.contains(r#"lo:target="retain""#));
-    assert!(commit.database().settings().is_ok());
+    assert!(commit.package().database().settings().is_ok());
 }
 
 #[test]
@@ -849,20 +972,28 @@ fn connection_target_conversion_carries_locally_owned_xlink_binding() {
     let mut edit = database.edit();
     edit.set_connection(Some(Connection::Resource("sdbc:recovered".to_owned())))
         .unwrap();
-    let committed = edit.commit().unwrap().into_database();
+    let committed = edit.commit().unwrap().into_package();
     assert!(
         committed
+            .database()
             .content_xml()
             .contains(r#"<db:connection-resource x:href="sdbc:recovered" x:type="simple""#)
     );
     assert!(
         committed
+            .database()
             .content_xml()
             .contains(r#"xmlns:x="http://www.w3.org/1999/xlink""#)
     );
-    let reopened = Database::from_bytes(committed.as_bytes().to_vec()).unwrap();
+    let reopened = Package::from_bytes(committed.as_bytes()).unwrap();
     assert_eq!(
-        reopened.catalog().unwrap().connection().unwrap().clone(),
+        reopened
+            .database()
+            .catalog()
+            .unwrap()
+            .connection()
+            .unwrap()
+            .clone(),
         Connection::Resource("sdbc:recovered".to_owned())
     );
 }
@@ -874,7 +1005,7 @@ fn connection_target_content_blocks_all_target_replacements_atomically() {
         r#"<db:connection-resource xlink:type="simple" xlink:href="sdbc:demo"><lo:foreign-child/></db:connection-resource>"#,
     );
     let database = database_from(&source);
-    let before = database.content_xml().to_owned();
+    let before = database.database().content_xml().to_owned();
     let mut edit = database.edit();
     assert!(
         edit.set_connection(Some(Connection::file_with_media_type(
@@ -884,7 +1015,10 @@ fn connection_target_content_blocks_all_target_replacements_atomically() {
         .is_err()
     );
     assert_eq!(edit.staged_content_xml(), before);
-    assert_eq!(edit.commit().unwrap().database().content_xml(), before);
+    assert_eq!(
+        edit.commit().unwrap().package().database().content_xml(),
+        before
+    );
 }
 
 #[test]
@@ -899,9 +1033,15 @@ fn reserved_odf_names_are_not_accepted_as_opaque_target_markup() {
             r#"<db:connection-resource xlink:type="simple" xlink:href="sdbc:demo"/>"#,
             target,
         ));
-        assert!(database.catalog().is_err(), "catalog accepted {target}");
-        assert!(database.settings().is_err(), "settings accepted {target}");
-        let before = database.content_xml().to_owned();
+        assert!(
+            database.database().catalog().is_err(),
+            "catalog accepted {target}"
+        );
+        assert!(
+            database.database().settings().is_err(),
+            "settings accepted {target}"
+        );
+        let before = database.database().content_xml().to_owned();
         let mut edit = database.edit();
         assert!(
             edit.set_connection(Some(Connection::Resource("sdbc:replacement".to_owned())))
@@ -918,8 +1058,8 @@ fn server_type_qnames_require_binding_or_explicit_authoring_namespace() {
         r#"<db:database-description><db:server-database db:type="nope:generic" db:hostname="db"/></db:database-description>"#,
     );
     let unbound = database_from(&unbound);
-    assert!(unbound.catalog().is_err());
-    assert!(unbound.settings().is_err());
+    assert!(unbound.database().catalog().is_err());
+    assert!(unbound.database().settings().is_err());
 
     let unbound_database = database();
     let mut unbound_edit = unbound_database.edit();
@@ -944,14 +1084,21 @@ fn server_type_qnames_require_binding_or_explicit_authoring_namespace() {
         None,
     )))
     .unwrap();
-    let committed = edit.commit().unwrap().into_database();
+    let committed = edit.commit().unwrap().into_package();
     assert!(
         committed
+            .database()
             .content_xml()
             .contains(r#"xmlns:vendor="urn:example:vendor-db""#)
     );
     assert_eq!(
-        committed.catalog().unwrap().connection().unwrap().clone(),
+        committed
+            .database()
+            .catalog()
+            .unwrap()
+            .connection()
+            .unwrap()
+            .clone(),
         Connection::server_with_type_namespace(
             "vendor:generic",
             "urn:example:vendor-db",
@@ -971,18 +1118,18 @@ fn server_target_without_address_is_normative_and_reversible() {
     let mut edit = database.edit();
     edit.set_connection(Some(Connection::ServerTarget(target.clone())))
         .unwrap();
-    let committed = edit.commit().unwrap().into_database();
-    let content = committed.content_xml();
+    let committed = edit.commit().unwrap().into_package();
+    let content = committed.database().content_xml();
     assert!(content.contains(r#"db:type="vendor:generic""#));
     assert!(content.contains(r#"db:database-name="ledger""#));
     assert!(!content.contains("db:hostname="));
     assert!(!content.contains("db:local-socket="));
-    let reopened = Database::from_bytes(committed.as_bytes().to_vec()).unwrap();
+    let reopened = Package::from_bytes(committed.as_bytes()).unwrap();
     assert_eq!(
-        reopened.catalog().unwrap().connection(),
+        reopened.database().catalog().unwrap().connection(),
         Some(&Connection::ServerTarget(target))
     );
-    assert!(reopened.settings().is_ok());
+    assert!(reopened.database().settings().is_ok());
 }
 
 #[test]
@@ -993,7 +1140,13 @@ fn numeric_attribute_references_preserve_login_control_characters() {
     ));
     let expected = "a\tb\nc\rd";
     assert_eq!(
-        source.settings().unwrap().login().unwrap().user_name(),
+        source
+            .database()
+            .settings()
+            .unwrap()
+            .login()
+            .unwrap()
+            .user_name(),
         Some(expected)
     );
     let mut edit = source.edit();
@@ -1003,14 +1156,21 @@ fn numeric_attribute_references_preserve_login_control_characters() {
             .with_password_required(Some(false)),
     ))
     .unwrap();
-    let committed = edit.commit().unwrap().into_database();
+    let committed = edit.commit().unwrap().into_package();
     assert!(
         committed
+            .database()
             .content_xml()
             .contains(r#"db:user-name="a&#x9;b&#xA;c&#xD;d""#)
     );
     assert_eq!(
-        committed.settings().unwrap().login().unwrap().user_name(),
+        committed
+            .database()
+            .settings()
+            .unwrap()
+            .login()
+            .unwrap()
+            .user_name(),
         Some(expected)
     );
 }
@@ -1019,6 +1179,7 @@ fn numeric_attribute_references_preserve_login_control_characters() {
 fn text_node_carriage_returns_are_numeric_and_reopen_equal() {
     let expected = "a\tb\nc\rd";
     let replacement = database()
+        .database()
         .settings()
         .unwrap()
         .clone()
@@ -1038,21 +1199,24 @@ fn text_node_carriage_returns_are_numeric_and_reopen_equal() {
     let source = database();
     let mut edit = source.edit();
     edit.set_settings(replacement.clone()).unwrap();
-    let committed = edit.commit().unwrap().into_database();
-    assert!(committed.content_xml().contains("a\tb\nc&#xD;d"));
-    let reopened = Database::from_bytes(committed.as_bytes().to_vec()).unwrap();
-    assert_eq!(reopened.settings().unwrap(), &replacement);
+    let committed = edit.commit().unwrap().into_package();
+    assert!(committed.database().content_xml().contains("a\tb\nc&#xD;d"));
+    let reopened = Package::from_bytes(committed.as_bytes()).unwrap();
+    assert_eq!(reopened.database().settings().unwrap(), &replacement);
 }
 
 #[test]
 fn connection_target_validation_failure_is_atomic() {
     let database = database();
-    let before = database.content_xml().to_owned();
+    let before = database.database().content_xml().to_owned();
     let mut edit = database.edit();
     let invalid = Connection::ServerTarget(ServerDatabaseTarget::new("not-a-qname"));
     assert!(edit.set_connection(Some(invalid)).is_err());
     assert_eq!(edit.staged_content_xml(), before);
-    assert_eq!(edit.commit().unwrap().database().content_xml(), before);
+    assert_eq!(
+        edit.commit().unwrap().package().database().content_xml(),
+        before
+    );
 
     let mut second = database.edit();
     let oversized = Connection::FileTarget(FileDatabaseTarget::new(
@@ -1075,15 +1239,15 @@ fn connection_no_op_keeps_legacy_source_without_claiming_typed_validity() {
     );
     let database = database_from(&legacy_source);
     assert!(matches!(
-        database.catalog().unwrap().connection(),
+        database.database().catalog().unwrap().connection(),
         Some(Connection::File(value)) if value == "file:///legacy"
     ));
     let mut edit = database.edit();
     edit.set_connection(Some(Connection::File("file:///legacy".to_owned())))
         .unwrap();
     let commit = edit.commit().unwrap();
-    assert!(!commit.changed());
-    assert_eq!(commit.database().as_bytes(), database.as_bytes());
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().as_bytes(), database.as_bytes());
 }
 
 #[test]
@@ -1102,8 +1266,14 @@ fn normative_connection_target_grammar_rejects_missing_and_conflicting_fields() 
     ] {
         let source = SOURCE.replace(connection_resource, target);
         let database = database_from(&source);
-        assert!(database.catalog().is_err(), "catalog accepted {target}");
-        assert!(database.settings().is_err(), "settings accepted {target}");
+        assert!(
+            database.database().catalog().is_err(),
+            "catalog accepted {target}"
+        );
+        assert!(
+            database.database().settings().is_err(),
+            "settings accepted {target}"
+        );
     }
 }
 
@@ -1118,7 +1288,11 @@ fn settings_reader_applies_schema_whitespace_collapse_to_tokens() {
             r#"db:boolean-comparison-mode="equal-boolean""#,
             "db:boolean-comparison-mode=\"&#x20;equal-boolean&#x20;\"",
         );
-    let settings = database_from(&source).settings().unwrap().clone();
+    let settings = database_from(&source)
+        .database()
+        .settings()
+        .unwrap()
+        .clone();
     let application = settings.application_connection().unwrap();
     assert_eq!(application.enable_sql92_check(), Some(true));
     assert_eq!(
@@ -1131,7 +1305,13 @@ fn settings_reader_applies_schema_whitespace_collapse_to_tokens() {
         "db:show-deleted=\"&#x9;1&#xA;\"",
     ));
     assert_eq!(
-        numeric.settings().unwrap().driver().unwrap().show_deleted(),
+        numeric
+            .database()
+            .settings()
+            .unwrap()
+            .driver()
+            .unwrap()
+            .show_deleted(),
         Some(true)
     );
 }
@@ -1140,39 +1320,50 @@ fn settings_reader_applies_schema_whitespace_collapse_to_tokens() {
 fn settings_reader_requires_the_normative_connection_owner_and_target() {
     let connection_data = r#"<db:connection-data><db:connection-resource xlink:type="simple" xlink:href="sdbc:demo"/><db:login db:user-name="alice" db:is-password-required="true" db:login-timeout="30"/></db:connection-data>"#;
     let missing_owner = SOURCE.replace(connection_data, "");
-    assert!(database_from(&missing_owner).settings().is_err());
+    assert!(database_from(&missing_owner).database().settings().is_err());
 
     let missing_target = SOURCE.replace(
         r#"<db:connection-resource xlink:type="simple" xlink:href="sdbc:demo"/>"#,
         "",
     );
-    assert!(database_from(&missing_target).settings().is_err());
+    assert!(
+        database_from(&missing_target)
+            .database()
+            .settings()
+            .is_err()
+    );
 
     let duplicate_target = SOURCE.replace(
         r#"<db:connection-resource xlink:type="simple" xlink:href="sdbc:demo"/>"#,
         r#"<db:connection-resource xlink:type="simple" xlink:href="sdbc:demo"/><db:database-description/>"#,
     );
-    assert!(database_from(&duplicate_target).settings().is_err());
+    assert!(
+        database_from(&duplicate_target)
+            .database()
+            .settings()
+            .is_err()
+    );
 }
 
 #[test]
 fn failed_settings_edit_cannot_republish_a_source_without_connection_data() {
     let connection_data = r#"<db:connection-data><db:connection-resource xlink:type="simple" xlink:href="sdbc:demo"/><db:login db:user-name="alice" db:is-password-required="true" db:login-timeout="30"/></db:connection-data>"#;
     let malformed = database_from(&SOURCE.replace(connection_data, ""));
-    let before = malformed.content_xml().to_owned();
+    let before = malformed.database().content_xml().to_owned();
     let mut edit = malformed.edit();
     assert!(
         edit.set_login_settings(Some(LoginSettings::new().with_user_name("bob")))
             .is_err()
     );
     let committed = edit.commit().unwrap();
-    assert_eq!(committed.database().content_xml(), before);
+    assert_eq!(committed.package().database().content_xml(), before);
 }
 
 #[test]
 fn settings_reader_has_dedicated_table_setting_and_integer_limits() {
     let database = database();
     let catalog = database
+        .database()
         .catalog_with(Limits::default().with_max_table_settings(0))
         .unwrap();
     assert!(catalog.settings().is_err());
@@ -1181,13 +1372,23 @@ fn settings_reader_has_dedicated_table_setting_and_integer_limits() {
         r#"db:login-timeout="30""#,
         r#"db:login-timeout="18446744073709551616""#,
     );
-    assert!(database_from(&login_overflow).settings().is_err());
+    assert!(
+        database_from(&login_overflow)
+            .database()
+            .settings()
+            .is_err()
+    );
 
     let row_count_overflow = SOURCE.replace(
         r#"db:max-row-count="100""#,
         r#"db:max-row-count="9223372036854775808""#,
     );
-    assert!(database_from(&row_count_overflow).settings().is_err());
+    assert!(
+        database_from(&row_count_overflow)
+            .database()
+            .settings()
+            .is_err()
+    );
 }
 
 #[test]
@@ -1199,6 +1400,7 @@ fn settings_reader_bounds_entity_expansion_before_text_growth() {
     let database = database_from(&source);
     assert!(
         database
+            .database()
             .catalog_with(Limits::default().with_max_attribute_bytes(4))
             .unwrap()
             .settings()

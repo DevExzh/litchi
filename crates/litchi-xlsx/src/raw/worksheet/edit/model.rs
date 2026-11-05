@@ -12,7 +12,7 @@ use crate::layout::{self, Descent};
 use crate::outline::Outline;
 use crate::row::Height;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Payload {
     Set(Content),
     /// Reuse one exact workbook shared-string item, retaining rich runs.
@@ -27,6 +27,12 @@ pub(crate) enum Payload {
         reference: Box<str>,
         formula: Option<Formula>,
     },
+    /// Replace the cached result of an existing formula cell, keeping its
+    /// `f` element byte for byte (record 0279).
+    Cache(crate::cell::Value),
+    /// Write rich text as the cell's own inline string, each run keeping
+    /// its run properties (record 0295).
+    Rich(Box<crate::cell::RichText>),
     /// Ensure an explicit empty cell record exists.
     Clear,
     /// Clear only when another effect or the base snapshot retains the cell.
@@ -43,7 +49,7 @@ pub(crate) enum StyleEffect {
 ///
 /// `Remove` owns the whole record. An `Update` may independently change its
 /// payload and local style, allowing proven-disjoint effects to be joined.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Action {
     Update {
         payload: Option<Payload>,
@@ -71,6 +77,20 @@ impl Action {
                 reference: reference.into(),
                 formula,
             }),
+            style: None,
+        }
+    }
+
+    pub(crate) const fn cache(value: crate::cell::Value) -> Self {
+        Self::Update {
+            payload: Some(Payload::Cache(value)),
+            style: None,
+        }
+    }
+
+    pub(crate) fn rich(text: crate::cell::RichText) -> Self {
+        Self::Update {
+            payload: Some(Payload::Rich(Box::new(text))),
             style: None,
         }
     }
@@ -112,7 +132,12 @@ impl Action {
             Self::Update { payload, style } => {
                 matches!(
                     payload,
-                    Some(Payload::Set(_) | Payload::SharedString { .. } | Payload::Clear)
+                    Some(
+                        Payload::Set(_)
+                            | Payload::SharedString { .. }
+                            | Payload::Rich(_)
+                            | Payload::Clear
+                    )
                 ) || matches!(style, Some(StyleEffect::Set(_)))
             },
             Self::Remove => false,

@@ -1,17 +1,43 @@
 //! Shared DOC fixture normalization for integration tests.
 
+#![allow(
+    dead_code,
+    reason = "each integration test binary uses a subset of the shared fixtures"
+)]
+
+use litchi_doc::builder::Builder;
 use litchi_doc::parts::fib::FileInformationBlock;
-use litchi_doc::writer::Writer;
-use litchi_ole_common::object::{Editor as ObjectEditor, Limits, Targets};
+use litchi_ole_common::object::{
+    Edit as ObjectEditor, Limits, OpenOptions, Package as ObjectPackage, Targets,
+};
 use std::io::Cursor;
 
 const DOP_INDEX: usize = 31;
 const FIB_POINTERS: usize = 154;
 const WORD97_DOP_LENGTH: usize = 500;
 
+fn open_object(bytes: Vec<u8>, targets: Targets, limits: Limits) -> ObjectEditor {
+    ObjectPackage::open_with_options(bytes, OpenOptions::new().targets(targets).limits(limits))
+        .expect("DOC object package should open")
+        .edit()
+        .expect("DOC object package should be editable")
+}
+
+fn object_bytes(editor: &ObjectEditor) -> Vec<u8> {
+    let package = editor
+        .clone()
+        .commit()
+        .expect("object editor should commit")
+        .into_package();
+    let mut bytes = Vec::new();
+    package
+        .write_to(&mut bytes)
+        .expect("object package should write");
+    bytes
+}
+
 fn extract_dop(bytes: Vec<u8>) -> (Vec<u8>, FileInformationBlock) {
-    let package = ObjectEditor::open(bytes, Targets::default(), Limits::default())
-        .expect("DOC fixture object editor");
+    let package = open_object(bytes, Targets::default(), Limits::default());
     let word_path = ["WordDocument".to_string()];
     let word = package.stream(&word_path).expect("WordDocument stream");
     let fib = FileInformationBlock::parse(word).expect("DOC fixture FIB");
@@ -35,12 +61,16 @@ fn extract_dop(bytes: Vec<u8>) -> (Vec<u8>, FileInformationBlock) {
 
 /// Returns a canonical, valid Word 97 DOP payload from the checked-in writer.
 pub(crate) fn valid_word97_dop() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer
         .add_paragraph("DOP fixture")
         .expect("DOP fixture paragraph");
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).expect("DOP fixture DOC");
+    writer
+        .build()
+        .unwrap()
+        .write_to(&mut output)
+        .expect("DOP fixture DOC");
     let (mut dop, _) = extract_dop(output.into_inner());
     dop.truncate(WORD97_DOP_LENGTH);
     assert_eq!(dop.len(), WORD97_DOP_LENGTH);
@@ -125,8 +155,7 @@ fn normalize_fib_shape(word: &mut [u8]) {
 /// is unrelated to malformed producer-specific DOP lengths.
 pub(crate) fn with_valid_word97_dop(bytes: Vec<u8>) -> Vec<u8> {
     let word_path = ["WordDocument".to_string()];
-    let mut package = ObjectEditor::open(bytes, Targets::default(), Limits::default())
-        .expect("DOC fixture object editor");
+    let mut package = open_object(bytes, Targets::default(), Limits::default());
     let original_word = package.stream(&word_path).expect("WordDocument stream");
     let mut word = original_word.to_vec();
     normalize_fib_shape(&mut word);
@@ -194,7 +223,54 @@ pub(crate) fn with_valid_word97_dop(bytes: Vec<u8>) -> Vec<u8> {
     package
         .put_stream(&table_path, table)
         .expect("normalized table stream");
+    object_bytes(&package)
+}
+
+/// A Builder-authored DOC package with one body paragraph, so package-level
+/// edit families can open it as a complete DOC.
+pub(crate) fn authored_document(text: &str) -> Vec<u8> {
+    let mut writer = Builder::new();
+    writer.add_paragraph(text).expect("fixture paragraph");
+    let mut output = Cursor::new(Vec::new());
+    writer
+        .build()
+        .expect("fixture document")
+        .write_to(&mut output)
+        .expect("fixture bytes");
+    output.into_inner()
+}
+
+/// [`authored_document`] marked as a template (`FibBase.fDot`), preserving
+/// every other stream and byte.
+pub(crate) fn authored_template(text: &str) -> Vec<u8> {
+    let word_path = ["WordDocument".to_string()];
+    let mut package = open_object(
+        authored_document(text),
+        Targets::default(),
+        Limits::default(),
+    );
+    let mut word = package
+        .stream(&word_path)
+        .expect("WordDocument stream")
+        .to_vec();
+    word[10] |= 0x01;
     package
-        .finish()
-        .expect("normalized DOC fixture publication")
+        .put_stream(&word_path, word)
+        .expect("template WordDocument stream");
+    object_bytes(&package)
+}
+
+/// `bytes` with the root stream `name` set to `data`, preserving every other
+/// stream and byte range.
+pub(crate) fn with_stream(bytes: Vec<u8>, name: &str, data: Vec<u8>) -> Vec<u8> {
+    let mut package = open_object(bytes, Targets::default(), Limits::default());
+    let path = [name.to_string()];
+    if package.stream(&path).is_some() {
+        package.put_stream(&path, data).expect("fixture stream");
+    } else {
+        package
+            .add_stream(path.to_vec(), data)
+            .expect("fixture stream");
+    }
+    object_bytes(&package)
 }

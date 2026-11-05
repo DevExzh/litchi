@@ -106,6 +106,42 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The retained source cannot support an unambiguous sheet-order move.
+    #[error("rooted sheet-order source is invalid")]
+    InvalidSource,
+    /// A finite transaction limit was exceeded.
+    #[error("{kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        /// Resource category.
+        kind: LimitKind,
+        /// Rejected observed amount.
+        observed: u64,
+        /// Retained maximum.
+        maximum: u64,
+    },
+    /// A bounded allocation failed.
+    #[error("could not allocate {amount} sheet-order items or bytes")]
+    Allocation {
+        /// Requested capacity or byte count.
+        amount: usize,
+    },
+    /// The validated candidate did not reproduce the requested move exactly.
+    #[error("sheet-order candidate verification failed")]
+    Verification,
+    /// The patch was applied to an artifact other than its exact retained source.
+    #[error("sheet-order patch conflicts with this package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The semantic selector did not resolve one source sheet.
     #[error("sheet selector did not resolve")]
     SheetNotFound,
@@ -127,31 +163,28 @@ pub enum Error {
     /// for a changed move.
     #[error("source representation does not support changed sheet ordering")]
     UnsupportedSource,
-    /// The retained source cannot support an unambiguous sheet-order move.
-    #[error("rooted sheet-order source is invalid")]
-    InvalidSource,
-    /// A finite transaction limit was exceeded.
-    #[error("{kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
-        /// Resource category.
-        kind: LimitKind,
-        /// Rejected observed amount.
-        observed: u64,
-        /// Retained maximum.
-        maximum: u64,
-    },
-    /// A bounded allocation failed.
-    #[error("could not allocate {amount} sheet-order items or bytes")]
-    Allocation {
-        /// Requested capacity or byte count.
-        amount: usize,
-    },
-    /// The validated candidate did not reproduce the requested move exactly.
-    #[error("sheet-order candidate verification failed")]
-    Verification,
-    /// The patch was applied to an artifact other than its exact retained source.
-    #[error("sheet-order patch conflicts with this package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::SheetNotFound { .. } => RefusalKind::NotFound,
+            Self::DestinationOutOfRange { .. } => RefusalKind::InvalidValue,
+            Self::OperationAlreadyStaged { .. } | Self::NoStagedOperation { .. } => {
+                RefusalKind::UnsupportedOperation
+            },
+            Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -187,9 +220,9 @@ impl Edit<'_> {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::SheetNotFound`] when the selector does not resolve,
-    /// [`Error::DestinationOutOfRange`] when `destination` is not an existing
-    /// source position, and [`Error::OperationAlreadyStaged`] after one move.
+    /// Returns [`Refusal::SheetNotFound`] when the selector does not resolve,
+    /// [`Refusal::DestinationOutOfRange`] when `destination` is not an existing
+    /// source position, and [`Refusal::OperationAlreadyStaged`] after one move.
     /// A changed move can also return content-redacted source, allocation, or
     /// resource errors. Failure leaves the edit unchanged.
     ///
@@ -205,7 +238,7 @@ impl Edit<'_> {
         destination: usize,
     ) -> Result<Self, Error> {
         if self.operation.is_some() {
-            return Err(Error::OperationAlreadyStaged);
+            return Err(Error::Refused(Refusal::OperationAlreadyStaged));
         }
         let selected = self
             .source
@@ -213,13 +246,13 @@ impl Edit<'_> {
             .document
             .sheet(selector)
             .map_err(|semantic_error| map_read_error(super::Error::Semantic(semantic_error)))?
-            .ok_or(Error::SheetNotFound)?;
+            .ok_or(Error::Refused(Refusal::SheetNotFound))?;
         let sheet_count = self.source.state.document.sheet_count();
         if destination >= sheet_count {
-            return Err(Error::DestinationOutOfRange {
+            return Err(Error::Refused(Refusal::DestinationOutOfRange {
                 position: destination,
                 sheet_count,
-            });
+            }));
         }
         let operation = Operation {
             source_position: selected.index(),
@@ -240,15 +273,15 @@ impl Edit<'_> {
 
     /// Validate and atomically publish the staged immutable candidate.
     ///
-    /// A changed move requires exactly the three canonical root preview assets,
-    /// updates both order owners together, removes those assets (three to
-    /// zero), and preserves all unrelated retained data. An equal-position
+    /// A changed move requires the three canonical root preview assets or
+    /// none of them, updates both order owners together, removes present
+    /// assets (three to zero), and preserves all unrelated retained data. An equal-position
     /// move shares the source artifact unchanged.
     ///
     /// # Errors
     ///
-    /// Returns [`Error::NoStagedOperation`] for an empty edit. A changed move
-    /// returns [`Error::UnsupportedSource`] if the exact source or any required
+    /// Returns [`Refusal::NoStagedOperation`] for an empty edit. A changed move
+    /// returns [`Refusal::UnsupportedSource`] if the exact source or any required
     /// canonical preview asset is unavailable; it can also return
     /// content-redacted resource, allocation, or verification errors. Failure
     /// never publishes a partial package.
@@ -260,7 +293,9 @@ impl Edit<'_> {
     /// three-preview profile, rewrites the two order owners, removes the three
     /// previews, reassembles once, and fully reopens one candidate.
     pub fn commit(self) -> Result<Commit, Error> {
-        let operation = self.operation.ok_or(Error::NoStagedOperation)?;
+        let operation = self
+            .operation
+            .ok_or(Error::Refused(Refusal::NoStagedOperation))?;
         let source_catalog = physical_source(self.source)?;
         let source_bytes = source_catalog.__source_owner();
         if operation.source_position == operation.destination_position {
@@ -281,14 +316,17 @@ impl Edit<'_> {
             });
         }
         if !source_catalog.source_is_exact() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         let mut budget = self.budget.ok_or(Error::InvalidSource)?;
         preflight_transaction_work(self.source, None, &mut budget)?;
         let target = self.target.ok_or(Error::InvalidSource)?;
         let previews = root_preview_deletions(source_catalog)?;
-        if previews.len() != ROOT_PREVIEWS.len() {
-            return Err(Error::UnsupportedSource);
+        // A package carries either the complete canonical preview set (which
+        // a changed move removes as stale) or none at all (a fresh workbook,
+        // or one an earlier transaction already stripped): record 0297.
+        if !previews.is_empty() && previews.len() != ROOT_PREVIEWS.len() {
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         let rewritten = rewrite::rewrite(
             self.source,
@@ -530,6 +568,12 @@ impl Commit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the reversible exact-source patch.
     #[must_use]
     pub const fn patch(&self) -> &Patch {
@@ -604,7 +648,7 @@ impl Package {
         let expected_target = patch.target_target.as_deref().ok_or(Error::PatchConflict)?;
         if !matches!(
             (patch.source_previews, patch.target_previews),
-            (3, 0) | (0, 3)
+            (3, 0) | (0, 3) | (0, 0)
         ) {
             return Err(Error::PatchConflict);
         }

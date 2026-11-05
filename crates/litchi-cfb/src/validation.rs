@@ -48,7 +48,7 @@ impl From<ValidationReportError> for CfbValidationError {
     }
 }
 
-/// Validates a positional CFB source under the default finite source and
+/// Validates a positional CFB source under caller-selected finite source and
 /// report limits without changing it.
 ///
 /// The single declared `cfb.container.ingress` capability runs the crate's
@@ -62,21 +62,6 @@ impl From<ValidationReportError> for CfbValidationError {
 /// application-level stream semantics are outside this capability and are not
 /// claimed by the report.
 ///
-/// # Errors
-///
-/// Returns an error if the source cannot be read consistently, a bounded
-/// parser allocation fails, or the bounded report cannot be retained.
-pub fn validate_source(source: Arc<dyn ReadAt>) -> Result<ValidateReport, CfbValidationError> {
-    validate_source_with_limits(
-        source,
-        SharedOleFileLimits::default(),
-        ValidationLimits::default(),
-    )
-}
-
-/// Validates a positional CFB source under explicit finite source and report
-/// limits without changing it.
-///
 /// Input, directory, or allocation-table data exceeding `source_limits`
 /// produces a complete report value whose ingress capability is `Blocked`; it
 /// is not treated as malformed CFB. A structural parser rejection instead
@@ -88,7 +73,7 @@ pub fn validate_source(source: Arc<dyn ReadAt>) -> Result<ValidateReport, CfbVal
 ///
 /// Returns an error if the source cannot be read consistently, a bounded
 /// parser allocation fails, or `report_limits` cannot retain the result.
-pub fn validate_source_with_limits(
+pub fn validate_source(
     source: Arc<dyn ReadAt>,
     source_limits: SharedOleFileLimits,
     report_limits: ValidationLimits,
@@ -105,7 +90,7 @@ pub fn validate_source_with_limits(
         return Ok(report);
     }
 
-    let report = match SharedOleFile::open_with_limits(source.clone(), source_limits) {
+    let report = match SharedOleFile::open(source.clone(), source_limits) {
         Ok(validated) if validated.tolerance_report().is_clean() => complete_report(report_limits),
         Ok(validated) => tolerated_report(validated.tolerance_report(), report_limits),
         Err(error) if is_directory_limit_error(&error) => blocked_report(
@@ -153,8 +138,7 @@ impl SharedOleFile {
                 limits.with_max_allocation_table_bytes(self.limits.max_allocation_table_bytes())
             })
             .map_err(CfbValidationError::Ingress)?;
-        let report =
-            validate_source_with_limits(self.source.clone(), source_limits, report_limits)?;
+        let report = validate_source(self.source.clone(), source_limits, report_limits)?;
         self.check_source_version()
             .map_err(CfbValidationError::Ingress)?;
         Ok(report)

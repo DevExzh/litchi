@@ -5,6 +5,7 @@
 )]
 
 use super::{Authors, Catalog, parse_slide_comments};
+use crate::SourceLimits;
 use crate::consts::RecordType;
 use crate::presentation::ParsedSlideComments;
 use crate::records::Record;
@@ -86,7 +87,7 @@ fn author_container(seed: i32) -> Vec<u8> {
 #[test]
 fn parses_comments_and_author_metadata() {
     let comment_root = root(vec![prog_tags_record(10, &comment_container(7))]);
-    let comments = parse_slide_comments(&comment_root).unwrap();
+    let comments = parse_slide_comments(&comment_root, &SourceLimits::default()).unwrap();
     assert_eq!(comments.len(), 1);
     let comment = &comments[0];
     assert_eq!(comment.author, "Ada Lovelace");
@@ -98,7 +99,7 @@ fn parses_comments_and_author_metadata() {
     assert_eq!((comment.x, comment.y), (-12, 34));
 
     let author_root = root(vec![prog_tags_record(10, &author_container(7))]);
-    let authors = Authors::parse(&author_root).unwrap();
+    let authors = Authors::parse(&author_root, &SourceLimits::default()).unwrap();
     let author = authors.find("Ada Lovelace").unwrap();
     assert_eq!(author.color_index, Some(3));
     assert_eq!(author.comment_index_seed, Some(7));
@@ -107,18 +108,32 @@ fn parses_comments_and_author_metadata() {
 
 #[test]
 fn rejects_comment_indices_above_author_seed() {
-    let comments =
-        parse_slide_comments(&root(vec![prog_tags_record(10, &comment_container(8))])).unwrap();
-    let authors = Authors::parse(&root(vec![prog_tags_record(10, &author_container(7))])).unwrap();
+    let comments = parse_slide_comments(
+        &root(vec![prog_tags_record(10, &comment_container(8))]),
+        &SourceLimits::default(),
+    )
+    .unwrap();
+    let authors = Authors::parse(
+        &root(vec![prog_tags_record(10, &author_container(7))]),
+        &SourceLimits::default(),
+    )
+    .unwrap();
 
     assert!(authors.validate_comments(&comments).is_err());
 }
 
 #[test]
 fn catalog_joins_slide_comments_and_author_seeds() {
-    let comments =
-        parse_slide_comments(&root(vec![prog_tags_record(10, &comment_container(7))])).unwrap();
-    let authors = Authors::parse(&root(vec![prog_tags_record(10, &author_container(7))])).unwrap();
+    let comments = parse_slide_comments(
+        &root(vec![prog_tags_record(10, &comment_container(7))]),
+        &SourceLimits::default(),
+    )
+    .unwrap();
+    let authors = Authors::parse(
+        &root(vec![prog_tags_record(10, &author_container(7))]),
+        &SourceLimits::default(),
+    )
+    .unwrap();
     let catalog = Catalog::from_parts(
         authors,
         vec![ParsedSlideComments {
@@ -139,8 +154,17 @@ fn catalog_joins_slide_comments_and_author_seeds() {
 fn ignores_comments_from_other_programmable_tag_versions() {
     let document = root(vec![prog_tags_record(9, &comment_container(7))]);
 
-    assert!(parse_slide_comments(&document).unwrap().is_empty());
-    assert!(Authors::parse(&document).unwrap().authors.is_empty());
+    assert!(
+        parse_slide_comments(&document, &SourceLimits::default())
+            .unwrap()
+            .is_empty()
+    );
+    assert!(
+        Authors::parse(&document, &SourceLimits::default())
+            .unwrap()
+            .authors
+            .is_empty()
+    );
 }
 
 #[test]
@@ -162,7 +186,7 @@ fn rejects_malformed_comment_containers() {
     ];
     for record in malformed {
         let document = root(vec![prog_tags_record(10, &record)]);
-        assert!(parse_slide_comments(&document).is_err());
+        assert!(parse_slide_comments(&document, &SourceLimits::default()).is_err());
     }
 }
 
@@ -182,6 +206,6 @@ fn rejects_malformed_comment_authors() {
     ];
     for record in malformed {
         let document = root(vec![prog_tags_record(10, &record)]);
-        assert!(Authors::parse(&document).is_err());
+        assert!(Authors::parse(&document, &SourceLimits::default()).is_err());
     }
 }

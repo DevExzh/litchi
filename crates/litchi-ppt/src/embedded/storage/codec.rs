@@ -221,7 +221,7 @@ impl Storage {
     ///
     /// Returns an error if the operation fails.
     pub fn to_record(&self) -> Result<Record> {
-        Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
+        Ok(Record::parse(&self.to_record_bytes()?, 0, &crate::SourceLimits::default())?.0)
     }
 
     /// Encode the complete record without an intermediate parsed view.
@@ -279,7 +279,7 @@ impl Snapshot<'_> {
     /// Returns an error if the view fails to serialize or if the encoded
     /// record cannot be re-parsed.
     pub fn to_record(self) -> Result<Record> {
-        Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
+        Ok(Record::parse(&self.to_record_bytes()?, 0, &crate::SourceLimits::default())?.0)
     }
 }
 

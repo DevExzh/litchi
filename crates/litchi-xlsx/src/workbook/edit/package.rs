@@ -29,6 +29,7 @@ pub(super) fn commit_removals(edit: Edit) -> Result<Commit> {
         svg_projected_owners: _,
         svg_staged_payload_bytes: _,
         svg_base_part_bytes: _,
+        ..
     } = edit;
     let first_position = removed
         .iter()
@@ -175,7 +176,7 @@ pub(super) fn commit_removals(edit: Edit) -> Result<Commit> {
         },
     )?;
     after_workbook = raw::recalc::invalidate(&after_workbook)?;
-    let catalog = raw::parse_catalog(&after_workbook)?;
+    let catalog = raw::parse_catalog(&after_workbook, &base.inner.package.read_limits())?;
     if catalog.sheets.len() != retained_len || catalog.active_sheet_index != final_active_position {
         return Err(invalid("workbook worksheet-removal verification failed"));
     }
@@ -341,7 +342,7 @@ pub(super) fn commit_removals(edit: Edit) -> Result<Commit> {
     }
     let workbook = Workbook::from_package_with_styles(package, Some(&base))?;
     Ok(Commit {
-        workbook: workbook.clone(),
+        package: crate::Package::from_workbook(workbook.clone()),
         patch: Patch {
             changes: changes.into_boxed_slice(),
             package_changes: Box::new([]),
@@ -357,6 +358,7 @@ pub(super) fn commit_removals(edit: Edit) -> Result<Commit> {
             authority: None,
             svg_read_guards: Box::new([]),
             svg_final_guards: Box::new([]),
+            retained: std::sync::OnceLock::new(),
         },
     })
 }

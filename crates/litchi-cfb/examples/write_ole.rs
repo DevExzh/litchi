@@ -64,7 +64,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     head.truncate(n);
     assert!(is_ole_file(&head), "output is not a valid CFB file");
 
-    let mut ole = OleFile::open(File::open(&out_path)?)?;
+    let mut ole = OleFile::open(File::open(&out_path)?, litchi_cfb::OleFileLimits::default())?;
     writeln!(out, "\nStreams in re-opened file:")?;
     for path in ole.list_streams() {
         let refs: Vec<&str> = path.iter().map(String::as_str).collect();

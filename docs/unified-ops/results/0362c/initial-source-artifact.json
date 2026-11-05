@@ -1,0 +1,7 @@
+{
+  "path": "/home/zhuhe/code/litchi-worktrees/.coord/odraw-limits/probe/initial-after-sources.tar.gz",
+  "bytes": 86084,
+  "sha256": "096cc9dc75674b978e6e2de067e14272ad77a0ad93ec80bfe373fd395a5661b4",
+  "build": "cargo build --release --offline --manifest-path <extracted>/Cargo.toml",
+  "reason": "Retains the initial candidate used in initial-abba.json and longer-abba.json; not accepted performance closure."
+}

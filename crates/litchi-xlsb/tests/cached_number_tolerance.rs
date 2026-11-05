@@ -13,37 +13,49 @@ use std::io::Cursor;
 
 use litchi_core::sheet::{Cell as _, CellValue};
 use litchi_opc::{OpcPackage, PackURI};
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::cell_values::{CellError, Reference, Value};
-use litchi_xlsb::raw::{Kind, Records, Writer, kind};
-use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
+use litchi_xlsb::raw::{Encoder, Kind, Records, kind};
 use litchi_xlsb::{
     CachedNumberDefect, Defect, Leniency, SourceBackedWorkbook, ToleranceReport, Workbook,
 };
+
+#[path = "support/projection.rs"]
+mod projection;
+use projection::OwnedWorkbook as _;
 
 const SHEET1: &str = "/xl/worksheets/sheet1.bin";
 
 /// One sheet with `1.5` at A1 and `2.5` at B1, both stored as `BrtCellReal`.
 fn numbers_workbook() -> Vec<u8> {
-    let mut sheet = MutableWorksheet::new("Numbers");
+    let mut sheet = builder::Worksheet::new("Numbers");
     sheet.set_cell(0, 0, 1.5);
     sheet.set_cell(0, 1, 2.5);
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(sheet);
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output).unwrap();
+    writer
+        .build()
+        .expect("build package")
+        .write_to(&mut output)
+        .unwrap();
     output.into_inner()
 }
 
 /// Replace the cached `Xnum` of the first record of `record_type`.
 fn with_cached_number(source: &[u8], record_type: Kind, value: f64) -> Vec<u8> {
-    let mut package = OpcPackage::from_reader(Cursor::new(source)).unwrap();
+    let mut package =
+        OpcPackage::from_reader(Cursor::new(source), litchi_opc::SourceLimits::default()).unwrap();
     let uri = PackURI::new(SHEET1).unwrap();
-    let mut stream: Vec<(Kind, Vec<u8>)> = Records::new(package.get_part(&uri).unwrap().blob())
-        .map(|record| {
-            let record = record.unwrap();
-            (record.kind(), record.payload().to_vec())
-        })
-        .collect();
+    let mut stream: Vec<(Kind, Vec<u8>)> = Records::new(
+        package.get_part(&uri).unwrap().blob(),
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .map(|record| {
+        let record = record.unwrap();
+        (record.kind(), record.payload().to_vec())
+    })
+    .collect();
     let payload = &mut stream
         .iter_mut()
         .find(|(kind, _)| *kind == record_type)
@@ -51,13 +63,13 @@ fn with_cached_number(source: &[u8], record_type: Kind, value: f64) -> Vec<u8> {
         .1;
     payload[8..16].copy_from_slice(&value.to_le_bytes());
     let mut blob = Vec::new();
-    let mut writer = Writer::new(&mut blob);
+    let mut writer = Encoder::new(&mut blob, litchi_xlsb::raw::Limits::DEFAULT);
     for (kind, payload) in &stream {
         writer.write_record(*kind, payload).unwrap();
     }
     package.get_part_mut(&uri).unwrap().set_blob(blob);
     let mut output = Cursor::new(Vec::new());
-    package.to_stream(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     output.into_inner()
 }
 
@@ -109,9 +121,9 @@ fn a_nan_cache_is_still_refused_by_default() {
 fn the_opt_in_reads_non_finite_caches_as_num_errors_and_records_them() {
     for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
         let bytes = with_cached_number(&numbers_workbook(), kind::CELL_REAL, value);
-        let workbook = Workbook::new_with_leniency(
+        let workbook = Workbook::new_with_options(
             Cursor::new(bytes.clone()),
-            Leniency::TolerateCachedNumbers,
+            litchi_xlsb::OpenOptions::new().leniency(Leniency::TolerateCachedNumbers),
         )
         .unwrap();
         assert!(workbook.tolerance_report().is_clean());
@@ -148,9 +160,9 @@ fn the_opt_in_reads_non_finite_caches_as_num_errors_and_records_them() {
             value,
         );
 
-        let source = SourceBackedWorkbook::from_reader_with_leniency(
+        let source = SourceBackedWorkbook::from_reader_with_options(
             Cursor::new(bytes),
-            Leniency::TolerateCachedNumbers,
+            litchi_xlsb::OpenOptions::new().leniency(Leniency::TolerateCachedNumbers),
         )
         .unwrap();
         let sheet = source.worksheet_by_index(0).unwrap().unwrap();
@@ -179,9 +191,11 @@ fn the_opt_in_reads_non_finite_caches_as_num_errors_and_records_them() {
 fn the_opt_in_reads_denormalized_caches_as_zero_and_records_them() {
     for value in [-0.0, f64::MIN_POSITIVE / 2.0] {
         let bytes = with_cached_number(&numbers_workbook(), kind::CELL_REAL, value);
-        let workbook =
-            Workbook::new_with_leniency(Cursor::new(bytes), Leniency::TolerateCachedNumbers)
-                .unwrap();
+        let workbook = Workbook::new_with_options(
+            Cursor::new(bytes),
+            litchi_xlsb::OpenOptions::new().leniency(Leniency::TolerateCachedNumbers),
+        )
+        .unwrap();
         let snapshot = workbook.cell_values(0).unwrap();
         let Value::Number(read) = *snapshot.cell(a1()).unwrap().unwrap().value() else {
             panic!("expected a number");
@@ -211,8 +225,11 @@ fn the_opt_in_keeps_a_formula_and_caches_num_for_a_nan_result() {
             .is_err()
     );
 
-    let workbook =
-        Workbook::new_with_leniency(Cursor::new(bytes), Leniency::TolerateCachedNumbers).unwrap();
+    let workbook = Workbook::new_with_options(
+        Cursor::new(bytes),
+        litchi_xlsb::OpenOptions::new().leniency(Leniency::TolerateCachedNumbers),
+    )
+    .unwrap();
     let snapshot = workbook.cell_values(0).unwrap();
     let repaired: Vec<_> = snapshot
         .cells()
@@ -231,38 +248,29 @@ fn the_opt_in_keeps_a_formula_and_caches_num_for_a_nan_result() {
 #[test]
 fn a_tolerant_snapshot_still_commits_edits_to_other_cells() {
     let bytes = with_cached_number(&numbers_workbook(), kind::CELL_REAL, f64::NAN);
-    let workbook =
-        Workbook::new_with_leniency(Cursor::new(bytes), Leniency::TolerateCachedNumbers).unwrap();
-    let mut edit = workbook.cell_values(0).unwrap().edit();
-    edit.set_value(b1(), Value::Number(3.5)).unwrap();
-    let commit = edit.commit().unwrap();
+    let workbook = Workbook::new_with_options(
+        Cursor::new(bytes),
+        litchi_xlsb::OpenOptions::new().leniency(Leniency::TolerateCachedNumbers),
+    )
+    .unwrap();
+    let mut draft = workbook.cell_values(0).unwrap().draft();
+    draft.set_value(b1(), Value::Number(3.5)).unwrap();
+    let (snapshot, _) = draft.finish().unwrap();
     assert_eq!(
-        commit
-            .snapshot()
-            .cell(b1())
-            .unwrap()
-            .unwrap()
-            .value()
-            .clone(),
+        snapshot.cell(b1()).unwrap().unwrap().value().clone(),
         Value::Number(3.5)
     );
     assert_eq!(
-        commit
-            .snapshot()
-            .cell(a1())
-            .unwrap()
-            .unwrap()
-            .value()
-            .clone(),
+        snapshot.cell(a1()).unwrap().unwrap().value().clone(),
         Value::Error(CellError::Number)
     );
 }
 
 #[test]
 fn the_opt_in_changes_nothing_on_a_conformant_workbook() {
-    let workbook = Workbook::new_with_leniency(
+    let workbook = Workbook::new_with_options(
         Cursor::new(numbers_workbook()),
-        Leniency::TolerateCachedNumbers,
+        litchi_xlsb::OpenOptions::new().leniency(Leniency::TolerateCachedNumbers),
     )
     .unwrap();
     assert!(
@@ -278,4 +286,35 @@ fn the_opt_in_changes_nothing_on_a_conformant_workbook() {
         *worksheet.get_cell(0, 0).unwrap().value(),
         CellValue::Float(1.5)
     );
+}
+
+#[test]
+fn package_adoption_and_publication_keep_opt_in_cached_number_reads() {
+    let bytes = with_cached_number(&numbers_workbook(), kind::CELL_REAL, f64::NAN);
+    let workbook = Workbook::new_with_options(
+        Cursor::new(bytes.clone()),
+        litchi_xlsb::OpenOptions::new().leniency(Leniency::TolerateCachedNumbers),
+    )
+    .unwrap();
+    let package = workbook.into_package();
+    let projected = package.owned_workbook().unwrap();
+    let published = package.unsign().owned_workbook().unwrap();
+    for workbook in [projected, published] {
+        let snapshot = workbook.cell_values(0).unwrap();
+        assert_eq!(
+            snapshot.cell(a1()).unwrap().unwrap().value(),
+            &Value::Error(CellError::Number)
+        );
+        assert_single(
+            snapshot.tolerance_report(),
+            CachedNumberDefect::NonFinite,
+            kind::CELL_REAL,
+            f64::NAN,
+        );
+    }
+    let strict = litchi_xlsb::Package::from_bytes(&bytes)
+        .unwrap()
+        .owned_workbook()
+        .unwrap();
+    assert!(strict.cell_values(0).is_err());
 }

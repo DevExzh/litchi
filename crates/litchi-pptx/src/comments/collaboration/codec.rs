@@ -20,11 +20,9 @@ use super::ParentComment;
 use super::{
     NAMESPACE, PRESENCE_EXTENSION_URI, PresenceInfo, THREADING_EXTENSION_URI, ThreadingInfo,
 };
-use crate::comments::{MAX_DEPTH, MAX_NODES, MAX_PART_BYTES, MAX_STRING_BYTES, PML, STRICT_PML};
+use crate::comments::{Limits, PML, STRICT_PML};
 use crate::{Error, Result};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
-
-pub(crate) const MAX_OFFSETS: usize = MAX_NODES;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Kind {
@@ -93,18 +91,74 @@ struct Scan {
     root: Option<usize>,
     processing_instructions: Vec<Range<usize>>,
     non_whitespace_text: Vec<(usize, Range<usize>)>,
+    index: NodeIndex,
+}
+
+#[derive(Debug, Default)]
+struct NodeIndex {
+    nearest_non_mce_parent: Vec<Option<usize>>,
+    direct_non_mce_children: Vec<Vec<usize>>,
+}
+
+impl NodeIndex {
+    fn build(nodes: &[Node]) -> Result<Self> {
+        let mut nearest_non_mce_parent = Vec::new();
+        nearest_non_mce_parent
+            .try_reserve_exact(nodes.len())
+            .map_err(|source| Error::Allocation {
+                resource: "legacy comment collaboration parent index",
+                source,
+            })?;
+        nearest_non_mce_parent.resize(nodes.len(), None);
+        for (index, node) in nodes.iter().enumerate() {
+            let mut parent = node.parent;
+            while let Some(value) = parent {
+                if !mce_namespace(&nodes[value].namespace) {
+                    break;
+                }
+                parent = nearest_non_mce_parent[value];
+            }
+            nearest_non_mce_parent[index] = parent;
+        }
+
+        let mut direct_non_mce_children = Vec::new();
+        direct_non_mce_children
+            .try_reserve_exact(nodes.len())
+            .map_err(|source| Error::Allocation {
+                resource: "legacy comment collaboration child index",
+                source,
+            })?;
+        direct_non_mce_children.resize_with(nodes.len(), Vec::new);
+        for (index, parent) in nearest_non_mce_parent.iter().enumerate() {
+            let Some(parent) = parent else {
+                continue;
+            };
+            direct_non_mce_children[*parent]
+                .try_reserve(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "legacy comment collaboration child index",
+                    source,
+                })?;
+            direct_non_mce_children[*parent].push(index);
+        }
+        Ok(Self {
+            nearest_non_mce_parent,
+            direct_non_mce_children,
+        })
+    }
 }
 
 /// Locate and parse one selected author or comment extension in a complete
 /// legacy comment part. The source is never normalized by this operation.
-pub(crate) fn locate(source: &[u8], kind: Kind, owner: Owner) -> Result<Located> {
-    if source.len() > MAX_PART_BYTES {
+pub(crate) fn locate(source: &[u8], kind: Kind, owner: Owner, limits: Limits) -> Result<Located> {
+    if source.len() > limits.max_input_bytes {
         return Err(limit(
-            "legacy comment collaboration XML bytes",
-            MAX_PART_BYTES,
+            crate::error::CodecLimitKind::XmlBytes,
+            source.len(),
+            limits.max_input_bytes,
         ));
     }
-    let scan = scan_raw(source)?;
+    let scan = scan_raw(source, limits)?;
     let root_index = scan
         .root
         .ok_or_else(|| invalid("legacy comment collaboration root is missing"))?;
@@ -118,43 +172,24 @@ pub(crate) fn locate(source: &[u8], kind: Kind, owner: Owner) -> Result<Located>
             "legacy comment collaboration owner has the wrong root",
         ));
     }
-
+    let mce_source = MceSource::new(source, &scan.processing_instructions)?;
     let capabilities = capabilities();
-    let mce_limits = mce_limits();
+    let mce_limits = mce_limits(limits);
+    let processed = process_semantic_source(&mce_source, &capabilities, &mce_limits)?;
+    validate_processed_part(processed.as_ref(), kind, limits, false)?;
+
     // The common MCE selector intentionally rejects processing instructions.
     // They are inert in this owner, so remove them only from the temporary
     // MCE input while retaining a mapping back to the original source offsets.
-    let mce_source = MceSource::new(source, &scan.processing_instructions)?;
-    let processed = process_markup_compatibility(mce_source.bytes(), &capabilities, &mce_limits)
-        .map_err(Error::MarkupCompatibility)?
-        .xml;
-    if processed.len() > MAX_PART_BYTES {
-        return Err(limit(
-            "MCE-expanded legacy comment collaboration XML bytes",
-            MAX_PART_BYTES,
-        ));
-    }
-    // The existing comment parser validates the surrounding legacy comment
-    // grammar and required fields. It is intentionally only a validator here;
-    // all bytes used for the source-bound owner remain in `source`.
-    match kind {
-        Kind::Presence => {
-            let _ = crate::comments::parse_comment_authors(&processed)?;
-        },
-        Kind::Threading => {
-            let _ = crate::comments::parse_slide_comments(&processed)?;
-        },
-    }
-
     let item_indices = item_indices(&scan, root_index, kind, owner)?;
-    let offsets = collect_offsets(&scan, &item_indices);
+    let offsets = collect_offsets(&scan, &item_indices, limits)?;
     let active = if offsets.is_empty() {
         HashSet::new()
     } else {
         let limits = OffsetLimits {
-            max_source_bytes: MAX_PART_BYTES,
-            max_offsets: MAX_OFFSETS,
-            max_marked_bytes: MAX_PART_BYTES,
+            max_source_bytes: limits.max_input_bytes,
+            max_offsets: limits.max_nodes,
+            max_marked_bytes: limits.max_input_bytes,
             processing: mce_limits,
         };
         let translated_offsets = mce_source.translate_offsets(&offsets)?;
@@ -190,7 +225,7 @@ pub(crate) fn locate(source: &[u8], kind: Kind, owner: Owner) -> Result<Located>
     let item_index = active_item[0];
     let item = &scan.nodes[item_index];
 
-    let ext_lists = direct_non_mce_children(&scan, item_index)
+    let ext_lists = direct_non_mce_children(&scan.index, item_index)
         .filter(|index| {
             let node = &scan.nodes[*index];
             is_active(&node.span, &active)
@@ -233,7 +268,7 @@ pub(crate) fn locate(source: &[u8], kind: Kind, owner: Owner) -> Result<Located>
     let mut payloads = Vec::new();
     if let Some(target_index) = target_index {
         let target = &scan.nodes[target_index];
-        for child in direct_non_mce_children(&scan, target_index) {
+        for child in direct_non_mce_children(&scan.index, target_index) {
             let node = &scan.nodes[child];
             if !is_active(&node.span, &active) {
                 continue;
@@ -253,7 +288,7 @@ pub(crate) fn locate(source: &[u8], kind: Kind, owner: Owner) -> Result<Located>
         }
         let payload_index = payloads[0];
         let parent_index = if kind == Kind::Threading {
-            let parents = direct_non_mce_children(&scan, payload_index)
+            let parents = direct_non_mce_children(&scan.index, payload_index)
                 .filter(|index| {
                     let node = &scan.nodes[*index];
                     is_active(&node.span, &active)
@@ -266,7 +301,7 @@ pub(crate) fn locate(source: &[u8], kind: Kind, owner: Owner) -> Result<Located>
                     "threadingInfo contains duplicate parentCm elements",
                 ));
             }
-            for child in direct_non_mce_children(&scan, payload_index) {
+            for child in direct_non_mce_children(&scan.index, payload_index) {
                 let node = &scan.nodes[child];
                 if is_active(&node.span, &active)
                     && !(p15_namespace(&node.namespace) && node.local.as_slice() == b"parentCm")
@@ -276,7 +311,7 @@ pub(crate) fn locate(source: &[u8], kind: Kind, owner: Owner) -> Result<Located>
             }
             parents.first().copied()
         } else {
-            if direct_non_mce_children(&scan, payload_index)
+            if direct_non_mce_children(&scan.index, payload_index)
                 .any(|index| is_active(&scan.nodes[index].span, &active))
             {
                 return Err(invalid("presenceInfo must not contain child elements"));
@@ -285,14 +320,20 @@ pub(crate) fn locate(source: &[u8], kind: Kind, owner: Owner) -> Result<Located>
         };
         let payload = &scan.nodes[payload_index];
         let value = match kind {
-            Kind::Presence => {
-                Value::Presence(parse_presence(payload, payload_index, &scan, &active)?)
-            },
+            Kind::Presence => Value::Presence(parse_presence(
+                payload,
+                payload_index,
+                &scan,
+                &scan.index,
+                &active,
+                limits.max_string_bytes,
+            )?),
             Kind::Threading => Value::Threading(parse_threading(
                 payload,
                 payload_index,
                 parent_index,
                 &scan,
+                &scan.index,
                 &active,
             )?),
         };
@@ -328,15 +369,568 @@ pub(crate) fn locate(source: &[u8], kind: Kind, owner: Owner) -> Result<Located>
     })
 }
 
+/// Validate the ordinary comment grammar after MCE has selected the semantic
+/// branches.  The processed parser admits each borrowed event's aggregate
+/// decoded-string bytes before it owns that event's attribute or text value,
+/// then checks the complete comment grammar and stores only values that have
+/// already passed those bounds.
+///
+/// The aggregate includes every selected attribute name/value and text byte,
+/// including extension and namespace markup, while the per-field checks cover
+/// author names/initials, comment text, and `dt`.  MCE-inactive bytes are not
+/// in `source` here and therefore do not consume this semantic budget.  The
+/// raw source scan still charges those bytes against the independent physical
+/// input, event, depth, node, and per-attribute ceilings.
+fn validate_processed_part(
+    source: &[u8],
+    kind: Kind,
+    limits: Limits,
+    strict_threading: bool,
+) -> Result<()> {
+    match kind {
+        Kind::Presence => {
+            crate::comments::parse_comment_authors_processed(source, limits).map(drop)
+        },
+        Kind::Threading => {
+            crate::comments::parse_slide_comments_processed(source, limits, strict_threading)
+                .map(drop)
+        },
+    }
+}
+
+#[cfg(test)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SemanticElement {
+    Author,
+    Comment,
+    Text,
+    Other,
+}
+
+#[cfg(test)]
+struct SemanticFrame {
+    element: SemanticElement,
+    text_bytes: usize,
+}
+
+#[cfg(test)]
+fn preflight_processed_strings(source: &[u8], kind: Kind, limits: Limits) -> Result<usize> {
+    if source.len() > limits.max_input_bytes {
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            source.len(),
+            limits.max_input_bytes,
+        ));
+    }
+    let mut reader = NsReader::from_reader(source);
+    reader.config_mut().trim_text(false);
+    let mut stack = Vec::new();
+    let mut nodes = 0usize;
+    let mut strings = 0usize;
+    loop {
+        let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
+        match event {
+            Event::Start(element) => {
+                let depth = stack.len().checked_add(1).unwrap_or(usize::MAX);
+                if depth > limits.max_depth {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        limits.max_depth,
+                    ));
+                }
+                let semantic = semantic_element(&namespace, element.local_name().as_ref());
+                preflight_element_attributes(&element, semantic, kind, &mut strings, limits)?;
+                nodes = checked_preflight_count(
+                    nodes,
+                    limits.max_nodes,
+                    crate::error::CodecLimitKind::XmlNodes,
+                )?;
+                stack.push(SemanticFrame {
+                    element: semantic,
+                    text_bytes: 0,
+                });
+            },
+            Event::Empty(element) => {
+                let semantic = semantic_element(&namespace, element.local_name().as_ref());
+                preflight_element_attributes(&element, semantic, kind, &mut strings, limits)?;
+                nodes = checked_preflight_count(
+                    nodes,
+                    limits.max_nodes,
+                    crate::error::CodecLimitKind::XmlNodes,
+                )?;
+            },
+            Event::End(_) => {
+                if stack.pop().is_none() {
+                    return Err(invalid("unexpected XML end element"));
+                }
+            },
+            Event::Text(text) => {
+                let length = decoded_xml_len(text.as_ref())?;
+                add_preflight_strings(&mut strings, length, limits.max_string_bytes)?;
+                if let Some(frame) = stack.last_mut()
+                    && frame.element == SemanticElement::Text
+                {
+                    frame.text_bytes = frame
+                        .text_bytes
+                        .checked_add(length)
+                        .ok_or_else(|| limit_string(usize::MAX, limits.max_string_bytes))?;
+                    ensure_preflight_string(frame.text_bytes, limits.max_string_bytes)?;
+                }
+            },
+            Event::GeneralRef(reference) => {
+                let length = entity_value_len(reference.as_ref())?;
+                add_preflight_strings(&mut strings, length, limits.max_string_bytes)?;
+                if let Some(frame) = stack.last_mut()
+                    && frame.element == SemanticElement::Text
+                {
+                    frame.text_bytes = frame
+                        .text_bytes
+                        .checked_add(length)
+                        .ok_or_else(|| limit_string(usize::MAX, limits.max_string_bytes))?;
+                    ensure_preflight_string(frame.text_bytes, limits.max_string_bytes)?;
+                }
+            },
+            Event::CData(_) => {
+                return Err(invalid("CDATA is rejected in presentation comment parts"));
+            },
+            Event::DocType(_) => {
+                return Err(invalid("DTD is rejected in presentation comment parts"));
+            },
+            Event::PI(_) | Event::Decl(_) | Event::Comment(_) => {},
+            Event::Eof => break,
+        }
+    }
+    if !stack.is_empty() {
+        return Err(invalid("unterminated presentation comment XML"));
+    }
+    Ok(strings)
+}
+
+#[cfg(test)]
+pub(super) fn selected_string_budget(source: &[u8], kind: Kind, limits: Limits) -> Result<usize> {
+    let scan = scan_raw(source, limits)?;
+    let mce_source = MceSource::new(source, &scan.processing_instructions)?;
+    let capabilities = capabilities();
+    let mce_limits = mce_limits(limits);
+    let processed = process_semantic_source(&mce_source, &capabilities, &mce_limits)?;
+    preflight_processed_strings(processed.as_ref(), kind, limits)
+}
+
+#[cfg(test)]
+fn preflight_element_attributes(
+    element: &BytesStart<'_>,
+    semantic: SemanticElement,
+    kind: Kind,
+    strings: &mut usize,
+    limits: Limits,
+) -> Result<()> {
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(xml_error)?;
+        if attribute.value.len() > limits.max_attribute_bytes {
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlAttributeBytes,
+                attribute.value.len(),
+                limits.max_attribute_bytes,
+            ));
+        }
+        let key = std::str::from_utf8(attribute.key.as_ref())
+            .map_err(|_| invalid("legacy comment collaboration attribute is not UTF-8"))?;
+        let value_length = decoded_xml_len(attribute.value.as_ref())?;
+        let attribute_length = key
+            .len()
+            .checked_add(value_length)
+            .ok_or_else(|| limit_string(usize::MAX, limits.max_string_bytes))?;
+        add_preflight_strings(strings, attribute_length, limits.max_string_bytes)?;
+        let field = match (kind, semantic, attribute.key.as_ref()) {
+            (Kind::Presence, SemanticElement::Author, b"name")
+            | (Kind::Presence, SemanticElement::Author, b"initials")
+            | (Kind::Threading, SemanticElement::Comment, b"dt") => Some(value_length),
+            _ => None,
+        };
+        if let Some(length) = field {
+            ensure_preflight_string(length, limits.max_string_bytes)?;
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+fn semantic_element(namespace: &ResolveResult<'_>, local: &[u8]) -> SemanticElement {
+    let ResolveResult::Bound(Namespace(value)) = namespace else {
+        return SemanticElement::Other;
+    };
+    if !pml_namespace(value) {
+        return SemanticElement::Other;
+    }
+    match local {
+        b"cmAuthor" => SemanticElement::Author,
+        b"cm" => SemanticElement::Comment,
+        b"text" => SemanticElement::Text,
+        _ => SemanticElement::Other,
+    }
+}
+
+#[cfg(test)]
+fn checked_preflight_count(
+    current: usize,
+    maximum: usize,
+    kind: crate::error::CodecLimitKind,
+) -> Result<usize> {
+    let next = current.checked_add(1).unwrap_or(usize::MAX);
+    if next > maximum {
+        Err(limit(kind, next, maximum))
+    } else {
+        Ok(next)
+    }
+}
+
+#[cfg(test)]
+fn add_preflight_strings(current: &mut usize, amount: usize, maximum: usize) -> Result<()> {
+    *current = current
+        .checked_add(amount)
+        .ok_or_else(|| limit_string(usize::MAX, maximum))?;
+    ensure_preflight_string(*current, maximum)
+}
+
+#[cfg(test)]
+fn ensure_preflight_string(observed: usize, maximum: usize) -> Result<()> {
+    if observed > maximum {
+        Err(limit_string(observed, maximum))
+    } else {
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+fn limit_string(observed: usize, maximum: usize) -> Error {
+    limit(crate::error::CodecLimitKind::StringBytes, observed, maximum)
+}
+
+/// Count the bytes produced by XML entity decoding without constructing the
+/// decoded value.  Attribute whitespace normalization does not change its
+/// byte length, so the same bounded scanner covers attributes and text.
+#[cfg(test)]
+fn decoded_xml_len(value: &[u8]) -> Result<usize> {
+    let mut length = 0usize;
+    let mut start = 0usize;
+    while let Some(relative) = value[start..].iter().position(|&byte| byte == b'&') {
+        let ampersand = start + relative;
+        length = length
+            .checked_add(
+                std::str::from_utf8(&value[start..ampersand])
+                    .map_err(xml_error)?
+                    .len(),
+            )
+            .ok_or_else(|| invalid("legacy comment collaboration XML string length overflow"))?;
+        let end = value[ampersand + 1..]
+            .iter()
+            .position(|&byte| byte == b';')
+            .map(|offset| ampersand + 1 + offset)
+            .ok_or_else(|| invalid("legacy comment collaboration XML entity is unterminated"))?;
+        length = length
+            .checked_add(entity_value_len(&value[ampersand + 1..end])?)
+            .ok_or_else(|| invalid("legacy comment collaboration XML string length overflow"))?;
+        start = end + 1;
+    }
+    length = length
+        .checked_add(
+            std::str::from_utf8(&value[start..])
+                .map_err(xml_error)?
+                .len(),
+        )
+        .ok_or_else(|| invalid("legacy comment collaboration XML string length overflow"))?;
+    Ok(length)
+}
+
+#[cfg(test)]
+fn entity_value_len(value: &[u8]) -> Result<usize> {
+    match value {
+        b"amp" | b"lt" | b"gt" | b"apos" | b"quot" => Ok(1),
+        value if value.starts_with(b"#x") || value.starts_with(b"#X") => {
+            let number =
+                u32::from_str_radix(std::str::from_utf8(&value[2..]).map_err(xml_error)?, 16)
+                    .map_err(|_| {
+                        invalid("legacy comment collaboration XML character reference is invalid")
+                    })?;
+            char::from_u32(number).map(char::len_utf8).ok_or_else(|| {
+                invalid("legacy comment collaboration XML character reference is invalid")
+            })
+        },
+        value if value.starts_with(b"#") => {
+            let number = std::str::from_utf8(&value[1..])
+                .ok()
+                .and_then(|digits| digits.parse::<u32>().ok())
+                .ok_or_else(|| {
+                    invalid("legacy comment collaboration XML character reference is invalid")
+                })?;
+            char::from_u32(number).map(char::len_utf8).ok_or_else(|| {
+                invalid("legacy comment collaboration XML character reference is invalid")
+            })
+        },
+        _ => Err(invalid(
+            "custom XML entity is rejected in presentation comment parts",
+        )),
+    }
+}
+
+/// Validate the active typed collaboration extensions in one changed part
+/// under the recipient's selected policy. The ordinary comment codec accepts
+/// extension lists as opaque; replay must additionally apply the typed
+/// payload grammar. One source scan and one MCE selection are shared by all
+/// owners, so a large multi-owner part remains linear rather than invoking
+/// [`locate`] once per author or comment.
+fn validate_replay_extensions(
+    source: &[u8],
+    kind: Kind,
+    limits: Limits,
+    strict_threading: bool,
+) -> Result<()> {
+    if source.len() > limits.max_input_bytes {
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            source.len(),
+            limits.max_input_bytes,
+        ));
+    }
+    let scan = scan_raw(source, limits)?;
+    let root_index = scan
+        .root
+        .ok_or_else(|| invalid("legacy comment collaboration root is missing"))?;
+    let root = &scan.nodes[root_index];
+    let expected_root = match kind {
+        Kind::Presence => b"cmAuthorLst".as_slice(),
+        Kind::Threading => b"cmLst".as_slice(),
+    };
+    if !pml_namespace(&root.namespace) || root.local.as_slice() != expected_root {
+        return Err(invalid(
+            "legacy comment collaboration owner has the wrong root",
+        ));
+    }
+    let mce_source = MceSource::new(source, &scan.processing_instructions)?;
+    let capabilities = capabilities();
+    let mce_limits = mce_limits(limits);
+    let processed = process_semantic_source(&mce_source, &capabilities, &mce_limits)?;
+    validate_processed_part(processed.as_ref(), kind, limits, strict_threading)?;
+
+    let mut candidate_items = Vec::new();
+    let mut candidate_set = HashSet::new();
+    for (target_index, _target) in scan.nodes.iter().enumerate() {
+        if let Some(item_index) = target_extension_owner(&scan, target_index, kind) {
+            candidate_set
+                .try_reserve(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "legacy comment collaboration replay owner set",
+                    source,
+                })?;
+            if candidate_set.insert(item_index) {
+                candidate_items
+                    .try_reserve(1)
+                    .map_err(|source| Error::Allocation {
+                        resource: "legacy comment collaboration replay owners",
+                        source,
+                    })?;
+                candidate_items.push(item_index);
+            }
+        }
+    }
+    if candidate_items.is_empty() {
+        return Ok(());
+    }
+    let offsets = collect_offsets(&scan, &candidate_items, limits)?;
+    let translated_offsets = mce_source.translate_offsets(&offsets)?;
+    let active_offsets = active_offsets(
+        mce_source.bytes(),
+        &translated_offsets,
+        &capabilities,
+        &OffsetLimits {
+            max_source_bytes: limits.max_input_bytes,
+            max_offsets: limits.max_nodes,
+            max_marked_bytes: limits.max_input_bytes,
+            processing: mce_limits,
+        },
+    )
+    .map_err(Error::MarkupCompatibility)?;
+    let mut active = HashSet::new();
+    active
+        .try_reserve(active_offsets.len())
+        .map_err(|source| Error::Allocation {
+            resource: "legacy comment collaboration replay active offsets",
+            source,
+        })?;
+    for offset in active_offsets {
+        let index = translated_offsets
+            .binary_search(&offset)
+            .ok()
+            .and_then(|index| offsets.get(index).copied())
+            .ok_or_else(|| invalid("MCE active offset is not source-bound"))?;
+        active.insert(index);
+    }
+
+    let mut owners = HashSet::new();
+    owners
+        .try_reserve(candidate_items.len())
+        .map_err(|source| Error::Allocation {
+            resource: "legacy comment collaboration replay active owners",
+            source,
+        })?;
+    for (target_index, target) in scan.nodes.iter().enumerate() {
+        let Some(item_index) = target_extension_owner(&scan, target_index, kind) else {
+            continue;
+        };
+        if !is_active(&target.span, &active) || !is_active(&scan.nodes[item_index].span, &active) {
+            continue;
+        }
+        if !owners.insert(item_index) {
+            return Err(invalid(
+                "legacy comment collaboration owner has duplicate typed extensions",
+            ));
+        }
+        validate_active_extension(&scan, item_index, target_index, kind, &active, limits)?;
+    }
+    Ok(())
+}
+
+fn validate_active_extension(
+    scan: &Scan,
+    item_index: usize,
+    target_index: usize,
+    kind: Kind,
+    active: &HashSet<u32>,
+    limits: Limits,
+) -> Result<()> {
+    let target_ext_list = nearest_non_mce_parent(&scan.index, target_index)
+        .ok_or_else(|| invalid("legacy comment collaboration extension list is missing"))?;
+    let mut ext_list_count = 0usize;
+    let mut target_in_active_ext_list = false;
+    for index in direct_non_mce_children(&scan.index, item_index) {
+        let node = &scan.nodes[index];
+        if !is_active(&node.span, active)
+            || !pml_namespace(&node.namespace)
+            || node.local.as_slice() != b"extLst"
+        {
+            continue;
+        }
+        ext_list_count += 1;
+        target_in_active_ext_list |= index == target_ext_list;
+    }
+    if ext_list_count > 1 {
+        return Err(invalid(
+            "legacy comment collaboration owner has duplicate extLst",
+        ));
+    }
+    if !target_in_active_ext_list {
+        return Err(invalid(
+            "legacy comment collaboration extension list is inactive",
+        ));
+    }
+
+    let mut payload_index = None;
+    for index in direct_non_mce_children(&scan.index, target_index) {
+        let node = &scan.nodes[index];
+        if !is_active(&node.span, active) {
+            continue;
+        }
+        if !payload_name(node, kind) {
+            return Err(invalid(
+                "recognized legacy comment extension contains an unexpected child",
+            ));
+        }
+        if payload_index.replace(index).is_some() {
+            return Err(invalid(
+                "recognized legacy comment extension requires exactly one typed payload",
+            ));
+        }
+    }
+    let payload_index = payload_index.ok_or_else(|| {
+        invalid("recognized legacy comment extension requires exactly one typed payload")
+    })?;
+    let payload = &scan.nodes[payload_index];
+    match kind {
+        Kind::Presence => {
+            if direct_non_mce_children(&scan.index, payload_index)
+                .any(|index| is_active(&scan.nodes[index].span, active))
+            {
+                return Err(invalid("presenceInfo must not contain child elements"));
+            }
+            parse_presence(
+                payload,
+                payload_index,
+                scan,
+                &scan.index,
+                active,
+                limits.max_string_bytes,
+            )
+            .map(drop)
+        },
+        Kind::Threading => {
+            let mut parent_index = None;
+            for index in direct_non_mce_children(&scan.index, payload_index) {
+                let node = &scan.nodes[index];
+                if !is_active(&node.span, active) {
+                    continue;
+                }
+                if p15_namespace(&node.namespace) && node.local.as_slice() == b"parentCm" {
+                    if parent_index.replace(index).is_some() {
+                        return Err(invalid(
+                            "threadingInfo contains duplicate parentCm elements",
+                        ));
+                    }
+                } else {
+                    return Err(invalid("threadingInfo contains an unexpected child"));
+                }
+            }
+            parse_threading(
+                payload,
+                payload_index,
+                parent_index,
+                scan,
+                &scan.index,
+                active,
+            )
+            .map(drop)
+        },
+    }
+}
+
+/// Validate active presence extensions in one changed author part.
+pub(crate) fn validate_presence_replay(source: &[u8], limits: Limits) -> Result<()> {
+    validate_replay_extensions(source, Kind::Presence, limits, false)
+}
+
+/// Validate active threading extensions in one changed comment part.
+pub(crate) fn validate_threading_replay(source: &[u8], limits: Limits) -> Result<()> {
+    validate_replay_extensions(source, Kind::Threading, limits, true)
+}
+
 /// Source-splice a typed value. A `None` value removes every recognized
 /// branch for the selected item so an inactive MCE fallback cannot silently
 /// resurrect the supposedly removed owner.
-pub(crate) fn rewrite(source: &[u8], located: &Located, value: Option<Value>) -> Result<Vec<u8>> {
+pub(crate) fn rewrite(
+    source: &[u8],
+    located: &Located,
+    value: Option<Value>,
+    limits: Limits,
+) -> Result<Vec<u8>> {
+    if source.len() > limits.max_input_bytes {
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            source.len(),
+            limits.max_input_bytes,
+        ));
+    }
     if located.value == value {
-        return copy_source(source);
+        if source.len() > limits.max_output_bytes {
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                source.len(),
+                limits.max_output_bytes,
+            ));
+        }
+        return copy_source(source, limits.max_output_bytes);
     }
     if let Some(value) = &value {
-        validate_value(located.kind, value)?;
+        validate_value_with_limit(located.kind, value, limits.max_string_bytes)?;
     }
     let mut replacements = Vec::new();
     match (&located.value, value) {
@@ -368,13 +962,21 @@ pub(crate) fn rewrite(source: &[u8], located: &Located, value: Option<Value>) ->
                         (&user_attr.value_range, user_len),
                         (&provider_attr.value_range, provider_len),
                     ],
+                    limits.max_output_bytes,
                 )?;
-                replace_required_attribute(&mut replacements, node, b"userId", &after.user_id)?;
+                replace_required_attribute(
+                    &mut replacements,
+                    node,
+                    b"userId",
+                    &after.user_id,
+                    limits.max_output_bytes,
+                )?;
                 replace_required_attribute(
                     &mut replacements,
                     node,
                     b"providerId",
                     &after.provider_id,
+                    limits.max_output_bytes,
                 )?;
             }
         },
@@ -411,8 +1013,12 @@ pub(crate) fn rewrite(source: &[u8], located: &Located, value: Option<Value>) ->
                     let child_len = parent_length(qname_prefix(&payload.qname), after_parent)?;
                     let close_len = closing_length(&payload.qname)?;
                     let replacement_len = checked_sum(&[opening_len, child_len, close_len])?;
-                    ensure_xml_size(replacement_len)?;
-                    preflight_replacement_sizes(source, &[(&payload.range, replacement_len)])?;
+                    ensure_xml_size(replacement_len, limits.max_output_bytes)?;
+                    preflight_replacement_sizes(
+                        source,
+                        &[(&payload.range, replacement_len)],
+                        limits.max_output_bytes,
+                    )?;
                     replacements.push(Replacement {
                         range: payload.range.clone(),
                         value: expand_self_closing_payload(
@@ -423,6 +1029,7 @@ pub(crate) fn rewrite(source: &[u8], located: &Located, value: Option<Value>) ->
                             bias_plan.as_ref(),
                             after_parent,
                             replacement_len,
+                            limits.max_output_bytes,
                         )?,
                     });
                 },
@@ -461,7 +1068,11 @@ pub(crate) fn rewrite(source: &[u8], located: &Located, value: Option<Value>) ->
                             before_index.as_deref(),
                             after_index.as_deref(),
                         )?;
-                        preflight_size_plans(source, [bias_plan, author_plan, index_plan])?;
+                        preflight_size_plans(
+                            source,
+                            [bias_plan, author_plan, index_plan],
+                            limits.max_output_bytes,
+                        )?;
                         replace_optional_i32_attribute(
                             source,
                             &mut replacements,
@@ -469,6 +1080,7 @@ pub(crate) fn rewrite(source: &[u8], located: &Located, value: Option<Value>) ->
                             b"timeZoneBias",
                             before.time_zone_bias,
                             after.time_zone_bias,
+                            limits.max_output_bytes,
                         )?;
                         replace_optional_u32_attribute(
                             source,
@@ -477,6 +1089,7 @@ pub(crate) fn rewrite(source: &[u8], located: &Located, value: Option<Value>) ->
                             b"authorId",
                             before_parent.author_id,
                             after_parent.author_id,
+                            limits.max_output_bytes,
                         )?;
                         replace_optional_u32_attribute(
                             source,
@@ -485,6 +1098,7 @@ pub(crate) fn rewrite(source: &[u8], located: &Located, value: Option<Value>) ->
                             b"idx",
                             before_parent.index,
                             after_parent.index,
+                            limits.max_output_bytes,
                         )?;
                     },
                     (Some(_), None) => {
@@ -505,7 +1119,11 @@ pub(crate) fn rewrite(source: &[u8], located: &Located, value: Option<Value>) ->
                             range: parent_comment.range.clone(),
                             length: 0,
                         });
-                        preflight_size_plans(source, [bias_plan, parent_plan])?;
+                        preflight_size_plans(
+                            source,
+                            [bias_plan, parent_plan],
+                            limits.max_output_bytes,
+                        )?;
                         replace_optional_i32_attribute(
                             source,
                             &mut replacements,
@@ -513,6 +1131,7 @@ pub(crate) fn rewrite(source: &[u8], located: &Located, value: Option<Value>) ->
                             b"timeZoneBias",
                             before.time_zone_bias,
                             after.time_zone_bias,
+                            limits.max_output_bytes,
                         )?;
                         replacements.push(Replacement {
                             range: parent_comment.range.clone(),
@@ -538,7 +1157,11 @@ pub(crate) fn rewrite(source: &[u8], located: &Located, value: Option<Value>) ->
                             range: at..at,
                             length: fragment_len,
                         });
-                        preflight_size_plans(source, [bias_plan, parent_plan])?;
+                        preflight_size_plans(
+                            source,
+                            [bias_plan, parent_plan],
+                            limits.max_output_bytes,
+                        )?;
                         replace_optional_i32_attribute(
                             source,
                             &mut replacements,
@@ -546,9 +1169,20 @@ pub(crate) fn rewrite(source: &[u8], located: &Located, value: Option<Value>) ->
                             b"timeZoneBias",
                             before.time_zone_bias,
                             after.time_zone_bias,
+                            limits.max_output_bytes,
                         )?;
-                        let fragment = parent_fragment(qname_prefix(&payload.qname), after_parent)?;
-                        insert_child(source, payload, fragment, &mut replacements)?;
+                        let fragment = parent_fragment(
+                            qname_prefix(&payload.qname),
+                            after_parent,
+                            limits.max_output_bytes,
+                        )?;
+                        insert_child(
+                            source,
+                            payload,
+                            fragment,
+                            &mut replacements,
+                            limits.max_output_bytes,
+                        )?;
                     },
                     (None, None) => {
                         let before_bias = before.time_zone_bias.map(|value| value.to_string());
@@ -560,7 +1194,7 @@ pub(crate) fn rewrite(source: &[u8], located: &Located, value: Option<Value>) ->
                             before_bias.as_deref(),
                             after_bias.as_deref(),
                         )?;
-                        preflight_size_plans(source, [bias_plan])?;
+                        preflight_size_plans(source, [bias_plan], limits.max_output_bytes)?;
                         replace_optional_i32_attribute(
                             source,
                             &mut replacements,
@@ -568,6 +1202,7 @@ pub(crate) fn rewrite(source: &[u8], located: &Located, value: Option<Value>) ->
                             b"timeZoneBias",
                             before.time_zone_bias,
                             after.time_zone_bias,
+                            limits.max_output_bytes,
                         )?;
                     },
                 },
@@ -592,7 +1227,7 @@ pub(crate) fn rewrite(source: &[u8], located: &Located, value: Option<Value>) ->
             if remove_item {
                 replacements.push(Replacement {
                     range: located.item.range.clone(),
-                    value: self_closing_opening(source, &located.item)?,
+                    value: self_closing_opening(source, &located.item, limits.max_output_bytes)?,
                 });
             } else if let Some(ext_list) = ext_list.filter(|_| remove_ext_list) {
                 replacements.push(Replacement {
@@ -627,14 +1262,22 @@ pub(crate) fn rewrite(source: &[u8], located: &Located, value: Option<Value>) ->
                     let opening_len = empty_opening_length(source, ext_list)?;
                     let close_len = closing_length(&ext_list.qname)?;
                     let replacement_len = checked_sum(&[opening_len, extension_len, close_len])?;
-                    ensure_xml_size(replacement_len)?;
-                    preflight_replacement_sizes(source, &[(&ext_list.range, replacement_len)])?;
+                    ensure_xml_size(replacement_len, limits.max_output_bytes)?;
+                    preflight_replacement_sizes(
+                        source,
+                        &[(&ext_list.range, replacement_len)],
+                        limits.max_output_bytes,
+                    )?;
                 } else {
                     let at = ext_list
                         .close_start
                         .ok_or_else(|| invalid("extLst closing source is missing"))?;
                     let insertion = at..at;
-                    preflight_replacement_sizes(source, &[(&insertion, extension_len)])?;
+                    preflight_replacement_sizes(
+                        source,
+                        &[(&insertion, extension_len)],
+                        limits.max_output_bytes,
+                    )?;
                 }
             } else {
                 let ext_list_len = wrapped_fragment_length(ext_list_qname_len, extension_len)?;
@@ -642,28 +1285,46 @@ pub(crate) fn rewrite(source: &[u8], located: &Located, value: Option<Value>) ->
                     let opening_len = empty_opening_length(source, &located.item)?;
                     let close_len = closing_length(&located.item.qname)?;
                     let replacement_len = checked_sum(&[opening_len, ext_list_len, close_len])?;
-                    ensure_xml_size(replacement_len)?;
-                    preflight_replacement_sizes(source, &[(&located.item.range, replacement_len)])?;
+                    ensure_xml_size(replacement_len, limits.max_output_bytes)?;
+                    preflight_replacement_sizes(
+                        source,
+                        &[(&located.item.range, replacement_len)],
+                        limits.max_output_bytes,
+                    )?;
                 } else {
                     let at = located
                         .item
                         .close_start
                         .ok_or_else(|| invalid("comment item closing source is missing"))?;
                     let insertion = at..at;
-                    preflight_replacement_sizes(source, &[(&insertion, ext_list_len)])?;
+                    preflight_replacement_sizes(
+                        source,
+                        &[(&insertion, ext_list_len)],
+                        limits.max_output_bytes,
+                    )?;
                 }
             }
-            let ext_qname = qualified(ext_list_prefix, b"ext")?;
+            let ext_qname = qualified(ext_list_prefix, b"ext", limits.max_output_bytes)?;
             let ext_list_qname: Cow<'_, [u8]> = match located.ext_list.as_ref() {
                 Some(span) => Cow::Borrowed(span.qname.as_slice()),
-                None => Cow::Owned(qualified(ext_list_prefix, b"extLst")?),
+                None => Cow::Owned(qualified(
+                    ext_list_prefix,
+                    b"extLst",
+                    limits.max_output_bytes,
+                )?),
             };
-            let extension = extension_fragment_for_value(located.kind, &ext_qname, &value)?;
+            let extension = extension_fragment_for_value(
+                located.kind,
+                &ext_qname,
+                &value,
+                limits.max_output_bytes,
+            )?;
             if let Some(ext_list) = &located.ext_list {
                 if ext_list.empty {
-                    let opening = empty_opening(source, ext_list)?;
-                    let close = closing(&ext_list.qname)?;
-                    let replacement = concat_fragments(&[&opening, &extension, &close])?;
+                    let opening = empty_opening(source, ext_list, limits.max_output_bytes)?;
+                    let close = closing(&ext_list.qname, limits.max_output_bytes)?;
+                    let replacement =
+                        concat_fragments(&[&opening, &extension, &close], limits.max_output_bytes)?;
                     replacements.push(Replacement {
                         range: ext_list.range.clone(),
                         value: replacement,
@@ -678,11 +1339,15 @@ pub(crate) fn rewrite(source: &[u8], located: &Located, value: Option<Value>) ->
                     });
                 }
             } else {
-                let ext_list_fragment = wrapped_fragment(&ext_list_qname, &extension)?;
+                let ext_list_fragment =
+                    wrapped_fragment(&ext_list_qname, &extension, limits.max_output_bytes)?;
                 if located.item.empty {
-                    let opening = empty_opening(source, &located.item)?;
-                    let close = closing(&located.item.qname)?;
-                    let replacement = concat_fragments(&[&opening, &ext_list_fragment, &close])?;
+                    let opening = empty_opening(source, &located.item, limits.max_output_bytes)?;
+                    let close = closing(&located.item.qname, limits.max_output_bytes)?;
+                    let replacement = concat_fragments(
+                        &[&opening, &ext_list_fragment, &close],
+                        limits.max_output_bytes,
+                    )?;
                     replacements.push(Replacement {
                         range: located.item.range.clone(),
                         value: replacement,
@@ -705,10 +1370,10 @@ pub(crate) fn rewrite(source: &[u8], located: &Located, value: Option<Value>) ->
             return Err(invalid("typed collaboration value kind changed"));
         },
     }
-    apply_replacements(source, replacements)
+    apply_replacements(source, replacements, limits)
 }
 
-fn scan_raw(source: &[u8]) -> Result<Scan> {
+fn scan_raw(source: &[u8], limits: Limits) -> Result<Scan> {
     let mut reader = NsReader::from_reader(source);
     let origin = ReaderOrigin::of(source);
     reader.config_mut().trim_text(false);
@@ -718,17 +1383,22 @@ fn scan_raw(source: &[u8]) -> Result<Scan> {
     let mut nodes_seen = 0usize;
     loop {
         let before = position(&reader, origin)?;
-        let event = reader
-            .read_event_into(&mut buffer)
-            .map_err(xml_error)?
-            .into_owned();
+        let event = reader.read_event_into(&mut buffer).map_err(xml_error)?;
+        if let Event::Start(element) | Event::Empty(element) = &event {
+            check_raw_attribute_bytes(element, limits.max_attribute_bytes)?;
+        }
+        let event = event.into_owned();
         let after = position(&reader, origin)?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         match event {
             Event::Start(element) => {
-                if stack.len() >= MAX_DEPTH {
-                    return Err(limit("legacy comment collaboration XML depth", MAX_DEPTH));
+                if stack.len() >= limits.max_depth {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        stack.len().checked_add(1).unwrap_or(usize::MAX),
+                        limits.max_depth,
+                    ));
                 }
                 let node = make_node(
                     &element,
@@ -738,10 +1408,21 @@ fn scan_raw(source: &[u8]) -> Result<Scan> {
                     before,
                     after,
                     stack.last().copied(),
+                    limits.max_attribute_bytes,
                 )?;
-                nodes_seen = nodes_seen.saturating_add(1);
-                if nodes_seen > MAX_NODES {
-                    return Err(limit("legacy comment collaboration XML nodes", MAX_NODES));
+                nodes_seen = nodes_seen.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_nodes,
+                    )
+                })?;
+                if nodes_seen > limits.max_nodes {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        nodes_seen,
+                        limits.max_nodes,
+                    ));
                 }
                 let index = scan.nodes.len();
                 attach_node(&mut scan, node, &mut stack, index)?;
@@ -756,11 +1437,22 @@ fn scan_raw(source: &[u8]) -> Result<Scan> {
                     before,
                     after,
                     stack.last().copied(),
+                    limits.max_attribute_bytes,
                 )?;
                 node.span.empty = true;
-                nodes_seen = nodes_seen.saturating_add(1);
-                if nodes_seen > MAX_NODES {
-                    return Err(limit("legacy comment collaboration XML nodes", MAX_NODES));
+                nodes_seen = nodes_seen.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_nodes,
+                    )
+                })?;
+                if nodes_seen > limits.max_nodes {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        nodes_seen,
+                        limits.max_nodes,
+                    ));
                 }
                 let index = scan.nodes.len();
                 attach_node(&mut scan, node, &mut stack, index)?;
@@ -787,10 +1479,14 @@ fn scan_raw(source: &[u8]) -> Result<Scan> {
                 ));
             },
             Event::PI(_) => {
-                if scan.processing_instructions.len() >= MAX_NODES {
+                if scan.processing_instructions.len() >= limits.max_nodes {
                     return Err(limit(
-                        "legacy comment collaboration processing instructions",
-                        MAX_NODES,
+                        crate::error::CodecLimitKind::XmlEvents,
+                        scan.processing_instructions
+                            .len()
+                            .checked_add(1)
+                            .unwrap_or(usize::MAX),
+                        limits.max_nodes,
                     ));
                 }
                 scan.processing_instructions.push(before..after);
@@ -799,7 +1495,12 @@ fn scan_raw(source: &[u8]) -> Result<Scan> {
                 let decoded = text.decode().map_err(xml_error)?;
                 let decoded = quick_xml::escape::unescape(&decoded).map_err(xml_error)?;
                 if !decoded.chars().all(char::is_whitespace) {
-                    record_non_whitespace_text(&mut scan, stack.last().copied(), before..after)?;
+                    record_non_whitespace_text(
+                        &mut scan,
+                        stack.last().copied(),
+                        before..after,
+                        limits.max_nodes,
+                    )?;
                 }
             },
             Event::GeneralRef(reference) => {
@@ -808,7 +1509,12 @@ fn scan_raw(source: &[u8]) -> Result<Scan> {
                     .map_err(xml_error)?
                     .is_none_or(|character| !character.is_whitespace());
                 if non_whitespace {
-                    record_non_whitespace_text(&mut scan, stack.last().copied(), before..after)?;
+                    record_non_whitespace_text(
+                        &mut scan,
+                        stack.last().copied(),
+                        before..after,
+                        limits.max_nodes,
+                    )?;
                 }
             },
             Event::Decl(_) | Event::Comment(_) => {},
@@ -824,6 +1530,7 @@ fn scan_raw(source: &[u8]) -> Result<Scan> {
     if !stack.is_empty() {
         return Err(invalid("unterminated legacy comment collaboration XML"));
     }
+    scan.index = NodeIndex::build(&scan.nodes)?;
     Ok(scan)
 }
 
@@ -831,14 +1538,22 @@ fn record_non_whitespace_text(
     scan: &mut Scan,
     owner: Option<usize>,
     range: Range<usize>,
+    max_nodes: usize,
 ) -> Result<()> {
     let Some(owner) = owner else {
         return Err(invalid(
             "non-whitespace text is outside legacy comment collaboration XML",
         ));
     };
-    if scan.non_whitespace_text.len() >= MAX_NODES {
-        return Err(limit("legacy comment collaboration text nodes", MAX_NODES));
+    if scan.non_whitespace_text.len() >= max_nodes {
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlNodes,
+            scan.non_whitespace_text
+                .len()
+                .checked_add(1)
+                .unwrap_or(usize::MAX),
+            max_nodes,
+        ));
     }
     scan.non_whitespace_text.push((owner, range));
     Ok(())
@@ -984,6 +1699,7 @@ fn make_node(
     before: usize,
     after: usize,
     parent: Option<usize>,
+    max_attribute_bytes: usize,
 ) -> Result<Node> {
     let namespace = match namespace {
         ResolveResult::Bound(Namespace(value)) => value.to_vec(),
@@ -1000,6 +1716,13 @@ fn make_node(
     let mut seen = HashSet::new();
     for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
+        if attribute.value.len() > max_attribute_bytes {
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlAttributeBytes,
+                attribute.value.len(),
+                max_attribute_bytes,
+            ));
+        }
         let key = String::from_utf8(attribute.key.as_ref().to_vec())
             .map_err(|_| invalid("legacy comment collaboration attribute is not UTF-8"))?;
         if key != "xmlns"
@@ -1051,6 +1774,20 @@ fn make_node(
     })
 }
 
+fn check_raw_attribute_bytes(element: &BytesStart<'_>, maximum: usize) -> Result<()> {
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(xml_error)?;
+        if attribute.value.len() > maximum {
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlAttributeBytes,
+                attribute.value.len(),
+                maximum,
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn item_indices(scan: &Scan, root: usize, kind: Kind, owner: Owner) -> Result<Vec<usize>> {
     let expected = match kind {
         Kind::Presence => b"cmAuthor".as_slice(),
@@ -1061,7 +1798,7 @@ fn item_indices(scan: &Scan, root: usize, kind: Kind, owner: Owner) -> Result<Ve
         if !pml_namespace(&node.namespace) || node.local.as_slice() != expected {
             continue;
         }
-        if nearest_non_mce_parent(scan, index) != Some(root) {
+        if nearest_non_mce_parent(&scan.index, index) != Some(root) {
             continue;
         }
         let matches = match owner {
@@ -1086,36 +1823,44 @@ fn item_indices(scan: &Scan, root: usize, kind: Kind, owner: Owner) -> Result<Ve
     Ok(result)
 }
 
-fn collect_offsets(scan: &Scan, items: &[usize]) -> Vec<u32> {
+fn collect_offsets(scan: &Scan, items: &[usize], limits: Limits) -> Result<Vec<u32>> {
     let mut offsets = Vec::new();
-    offsets.extend(
-        items
-            .iter()
-            .map(|item| scan.nodes[*item].span.range.start as u32),
-    );
-    let item_set = items.iter().copied().collect::<HashSet<_>>();
-    for (index, node) in scan.nodes.iter().enumerate() {
-        let mut current = Some(index);
-        let mut selected = false;
-        while let Some(value) = current {
-            if item_set.contains(&value) {
-                selected = true;
-                break;
+    offsets
+        .try_reserve(items.len())
+        .map_err(|source| Error::Allocation {
+            resource: "legacy comment collaboration MCE offsets",
+            source,
+        })?;
+    let mut pending = Vec::new();
+    pending
+        .try_reserve(items.len())
+        .map_err(|source| Error::Allocation {
+            resource: "legacy comment collaboration MCE offset traversal",
+            source,
+        })?;
+    for &item in items {
+        pending.push(item);
+        while let Some(index) = pending.pop() {
+            offsets.push(scan.nodes[index].span.range.start as u32);
+            for &child in scan.nodes[index].children.iter().rev() {
+                pending.try_reserve(1).map_err(|source| Error::Allocation {
+                    resource: "legacy comment collaboration MCE offset traversal",
+                    source,
+                })?;
+                pending.push(child);
             }
-            current = scan.nodes[value].parent;
         }
-        if !selected {
-            continue;
-        }
-        // Ask the MCE selector about every node in the selected owner, not
-        // only recognized schema nodes. Otherwise an active foreign child
-        // would be absent from `active` and could be mistaken for an
-        // inactive MCE branch by the closed typed grammar.
-        offsets.push(node.span.range.start as u32);
     }
     offsets.sort_unstable();
     offsets.dedup();
-    offsets
+    if offsets.len() > limits.max_nodes {
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlNodes,
+            offsets.len(),
+            limits.max_nodes,
+        ));
+    }
+    Ok(offsets)
 }
 
 fn target_extension_owner(scan: &Scan, index: usize, kind: Kind) -> Option<usize> {
@@ -1123,12 +1868,12 @@ fn target_extension_owner(scan: &Scan, index: usize, kind: Kind) -> Option<usize
     if !pml_namespace(&node.namespace) || node.local.as_slice() != b"ext" {
         return None;
     }
-    let parent = nearest_non_mce_parent(scan, index)?;
+    let parent = nearest_non_mce_parent(&scan.index, index)?;
     let parent_node = &scan.nodes[parent];
     if !(pml_namespace(&parent_node.namespace) && parent_node.local.as_slice() == b"extLst") {
         return None;
     }
-    let item = nearest_non_mce_parent(scan, parent)?;
+    let item = nearest_non_mce_parent(&scan.index, parent)?;
     let item_node = &scan.nodes[item];
     let expected_item = match kind {
         Kind::Presence => b"cmAuthor".as_slice(),
@@ -1152,23 +1897,12 @@ fn payload_name(node: &Node, kind: Kind) -> bool {
             }
 }
 
-fn nearest_non_mce_parent(scan: &Scan, index: usize) -> Option<usize> {
-    let mut current = scan.nodes[index].parent;
-    while let Some(value) = current {
-        if !mce_namespace(&scan.nodes[value].namespace) {
-            return Some(value);
-        }
-        current = scan.nodes[value].parent;
-    }
-    None
+fn nearest_non_mce_parent(index: &NodeIndex, node: usize) -> Option<usize> {
+    index.nearest_non_mce_parent[node]
 }
 
-fn direct_non_mce_children<'a>(scan: &'a Scan, parent: usize) -> impl Iterator<Item = usize> + 'a {
-    scan.nodes
-        .iter()
-        .enumerate()
-        .filter(move |(index, _)| nearest_non_mce_parent(scan, *index) == Some(parent))
-        .map(|(index, _)| index)
+fn direct_non_mce_children(index: &NodeIndex, parent: usize) -> impl Iterator<Item = usize> + '_ {
+    index.direct_non_mce_children[parent].iter().copied()
 }
 
 fn is_active(span: &Span, active: &HashSet<u32>) -> bool {
@@ -1187,7 +1921,9 @@ fn parse_presence(
     node: &Node,
     payload_index: usize,
     scan: &Scan,
+    index: &NodeIndex,
     active: &HashSet<u32>,
+    max_string_bytes: usize,
 ) -> Result<PresenceInfo> {
     ensure_only_attributes(node, &[b"userId", b"providerId"], "presenceInfo")?;
     if has_active_non_whitespace_text(scan, payload_index, active) {
@@ -1195,13 +1931,13 @@ fn parse_presence(
     }
     let user_id = attr_required(node, b"userId", "presenceInfo")?;
     let provider_id = attr_required(node, b"providerId", "presenceInfo")?;
-    if direct_non_mce_children(scan, payload_index)
+    if direct_non_mce_children(index, payload_index)
         .any(|index| is_active(&scan.nodes[index].span, active))
     {
         return Err(invalid("presenceInfo must not contain child elements"));
     }
-    validate_string(&user_id, "presenceInfo userId")?;
-    validate_string(&provider_id, "presenceInfo providerId")?;
+    validate_string_with_limit(&user_id, "presenceInfo userId", max_string_bytes)?;
+    validate_string_with_limit(&provider_id, "presenceInfo providerId", max_string_bytes)?;
     Ok(PresenceInfo::new(user_id, provider_id))
 }
 
@@ -1210,6 +1946,7 @@ fn parse_threading(
     payload_index: usize,
     parent_index: Option<usize>,
     scan: &Scan,
+    index: &NodeIndex,
     active: &HashSet<u32>,
 ) -> Result<ThreadingInfo> {
     ensure_only_attributes(node, &[b"timeZoneBias"], "threadingInfo")?;
@@ -1219,7 +1956,7 @@ fn parse_threading(
     let time_zone_bias = attr_i32(node, b"timeZoneBias")?;
     let mut parent = None;
     let mut element_count = 0usize;
-    for child in direct_non_mce_children(scan, payload_index) {
+    for child in direct_non_mce_children(index, payload_index) {
         if !is_active(&scan.nodes[child].span, active) {
             continue;
         }
@@ -1233,7 +1970,7 @@ fn parse_threading(
             if has_active_non_whitespace_text(scan, child, active) {
                 return Err(invalid("parentCm must contain only whitespace text"));
             }
-            if direct_non_mce_children(scan, child)
+            if direct_non_mce_children(index, child)
                 .any(|index| is_active(&scan.nodes[index].span, active))
             {
                 return Err(invalid("parentCm must not contain child elements"));
@@ -1300,11 +2037,19 @@ fn attr_i32(node: &Node, key: &[u8]) -> Result<Option<i32>> {
         .map_err(|_| invalid("threadingInfo timeZoneBias is not an xsd:int"))
 }
 
-pub(crate) fn validate_value(kind: Kind, value: &Value) -> Result<()> {
+pub(crate) fn validate_value_with_limit(
+    kind: Kind,
+    value: &Value,
+    max_string_bytes: usize,
+) -> Result<()> {
     match (kind, value) {
         (Kind::Presence, Value::Presence(value)) => {
-            validate_string(&value.user_id, "presenceInfo userId")?;
-            validate_string(&value.provider_id, "presenceInfo providerId")
+            validate_string_with_limit(&value.user_id, "presenceInfo userId", max_string_bytes)?;
+            validate_string_with_limit(
+                &value.provider_id,
+                "presenceInfo providerId",
+                max_string_bytes,
+            )
         },
         (Kind::Threading, Value::Threading(_)) => Ok(()),
         _ => Err(invalid(
@@ -1313,9 +2058,13 @@ pub(crate) fn validate_value(kind: Kind, value: &Value) -> Result<()> {
     }
 }
 
-fn validate_string(value: &str, label: &str) -> Result<()> {
-    if value.len() > MAX_STRING_BYTES {
-        return Err(invalid(format!("{label} exceeds XML string limits")));
+fn validate_string_with_limit(value: &str, label: &str, max_string_bytes: usize) -> Result<()> {
+    if value.len() > max_string_bytes {
+        return Err(limit(
+            crate::error::CodecLimitKind::StringBytes,
+            value.len(),
+            max_string_bytes,
+        ));
     }
     if let Some(character) = value.chars().find(|&character| !is_xml_10_char(character)) {
         return Err(invalid(format!(
@@ -1339,6 +2088,7 @@ fn replace_required_attribute(
     node: &Node,
     key: &[u8],
     value: &str,
+    max_output_bytes: usize,
 ) -> Result<()> {
     let attr = node
         .attrs
@@ -1347,7 +2097,7 @@ fn replace_required_attribute(
         .ok_or_else(|| invalid("required typed collaboration attribute source is missing"))?;
     replacements.push(Replacement {
         range: attr.value_range.clone(),
-        value: escaped(value)?,
+        value: escaped(value, max_output_bytes)?,
     });
     Ok(())
 }
@@ -1359,6 +2109,7 @@ fn replace_optional_i32_attribute(
     key: &[u8],
     before: Option<i32>,
     after: Option<i32>,
+    max_output_bytes: usize,
 ) -> Result<()> {
     replace_optional_attribute(
         source,
@@ -1367,6 +2118,7 @@ fn replace_optional_i32_attribute(
         key,
         before.map(|value| value.to_string()),
         after.map(|value| value.to_string()),
+        max_output_bytes,
     )
 }
 
@@ -1377,6 +2129,7 @@ fn replace_optional_u32_attribute(
     key: &[u8],
     before: Option<u32>,
     after: Option<u32>,
+    max_output_bytes: usize,
 ) -> Result<()> {
     replace_optional_attribute(
         source,
@@ -1385,6 +2138,7 @@ fn replace_optional_u32_attribute(
         key,
         before.map(|value| value.to_string()),
         after.map(|value| value.to_string()),
+        max_output_bytes,
     )
 }
 
@@ -1434,6 +2188,7 @@ fn replace_optional_attribute(
     key: &[u8],
     before: Option<String>,
     after: Option<String>,
+    max_output_bytes: usize,
 ) -> Result<()> {
     if before == after {
         return Ok(());
@@ -1442,10 +2197,10 @@ fn replace_optional_attribute(
     match (existing, after) {
         (Some(attr), Some(value)) => {
             let length = escaped_len(&value)?;
-            preflight_replacement_sizes(source, &[(&attr.value_range, length)])?;
+            preflight_replacement_sizes(source, &[(&attr.value_range, length)], max_output_bytes)?;
             replacements.push(Replacement {
                 range: attr.value_range.clone(),
-                value: escaped(&value)?,
+                value: escaped(&value, max_output_bytes)?,
             });
         },
         (Some(attr), None) => replacements.push(Replacement {
@@ -1457,10 +2212,13 @@ fn replace_optional_attribute(
             let escaped_len = escaped_len(&value)?;
             let fragment_len = checked_sum(&[1, key.len(), 2, escaped_len, 1])?;
             let insertion = at..at;
-            preflight_replacement_sizes(source, &[(&insertion, fragment_len)])?;
-            let escaped = escaped(&value)?;
-            let mut fragment =
-                new_xml_buffer(fragment_len, "legacy comment collaboration attribute")?;
+            preflight_replacement_sizes(source, &[(&insertion, fragment_len)], max_output_bytes)?;
+            let escaped = escaped(&value, max_output_bytes)?;
+            let mut fragment = new_xml_buffer(
+                fragment_len,
+                "legacy comment collaboration attribute",
+                max_output_bytes,
+            )?;
             fragment.push(b' ');
             fragment.extend_from_slice(key);
             fragment.extend_from_slice(b"=\"");
@@ -1484,6 +2242,7 @@ fn expand_self_closing_payload(
     bias_plan: Option<&SizePlan>,
     parent: &ParentComment,
     output_len: usize,
+    max_output_bytes: usize,
 ) -> Result<Vec<u8>> {
     let raw = source
         .get(payload.range.start..payload.start_end)
@@ -1495,7 +2254,7 @@ fn expand_self_closing_payload(
     let base_end = opening_end
         .checked_sub(2)
         .ok_or_else(|| invalid("self-closing threadingInfo opening size underflow"))?;
-    let mut output = new_xml_buffer(output_len, "expanded threadingInfo XML")?;
+    let mut output = new_xml_buffer(output_len, "expanded threadingInfo XML", max_output_bytes)?;
     if let Some(plan) = bias_plan {
         let start = plan
             .range
@@ -1555,11 +2314,12 @@ fn insert_child(
     parent: &Span,
     fragment: Vec<u8>,
     replacements: &mut Vec<Replacement>,
+    max_output_bytes: usize,
 ) -> Result<()> {
     if parent.empty {
-        let opening = empty_opening(source, parent)?;
-        let close = closing(&parent.qname)?;
-        let replacement = concat_fragments(&[&opening, &fragment, &close])?;
+        let opening = empty_opening(source, parent, max_output_bytes)?;
+        let close = closing(&parent.qname, max_output_bytes)?;
+        let replacement = concat_fragments(&[&opening, &fragment, &close], max_output_bytes)?;
         replacements.push(Replacement {
             range: parent.range.clone(),
             value: replacement,
@@ -1576,9 +2336,13 @@ fn insert_child(
     Ok(())
 }
 
-fn parent_fragment(prefix: &[u8], value: &ParentComment) -> Result<Vec<u8>> {
+fn parent_fragment(
+    prefix: &[u8],
+    value: &ParentComment,
+    max_output_bytes: usize,
+) -> Result<Vec<u8>> {
     let length = parent_length(prefix, value)?;
-    let mut out = new_xml_buffer(length, "parentCm XML")?;
+    let mut out = new_xml_buffer(length, "parentCm XML", max_output_bytes)?;
     append_parent_fragment(&mut out, prefix, value);
     Ok(out)
 }
@@ -1689,10 +2453,19 @@ fn append_payload(out: &mut Vec<u8>, kind: Kind, value: &Value) -> Result<()> {
     Ok(())
 }
 
-fn extension_fragment_for_value(kind: Kind, qname: &[u8], value: &Value) -> Result<Vec<u8>> {
+fn extension_fragment_for_value(
+    kind: Kind,
+    qname: &[u8],
+    value: &Value,
+    max_output_bytes: usize,
+) -> Result<Vec<u8>> {
     let payload_size = payload_length(kind, value)?;
     let length = extension_fragment_length(kind, qname.len(), payload_size)?;
-    let mut output = new_xml_buffer(length, "legacy comment collaboration extension XML")?;
+    let mut output = new_xml_buffer(
+        length,
+        "legacy comment collaboration extension XML",
+        max_output_bytes,
+    )?;
     output.push(b'<');
     output.extend_from_slice(qname);
     output.extend_from_slice(b" uri=\"");
@@ -1745,11 +2518,32 @@ fn capabilities() -> Capabilities {
     capabilities
 }
 
-fn mce_limits() -> MceLimits {
+fn process_semantic_source<'a>(
+    source: &'a MceSource<'_>,
+    capabilities: &Capabilities,
+    limits: &MceLimits,
+) -> Result<Cow<'a, [u8]>> {
+    // PIs are inert for this owner.  The raw scan already validated and
+    // recorded them, and `MceSource` supplies the single filtered view for
+    // both semantic parsing and offset translation.
+    let processed = process_markup_compatibility(source.bytes(), capabilities, limits)
+        .map_err(Error::MarkupCompatibility)?
+        .xml;
+    if processed.len() > limits.max_input_bytes {
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            processed.len(),
+            limits.max_input_bytes,
+        ));
+    }
+    Ok(processed)
+}
+
+fn mce_limits(limits: Limits) -> MceLimits {
     MceLimits {
-        max_input_bytes: MAX_PART_BYTES,
-        max_output_bytes: MAX_PART_BYTES,
-        max_depth: MAX_DEPTH,
+        max_input_bytes: limits.max_input_bytes,
+        max_output_bytes: limits.max_input_bytes,
+        max_depth: limits.max_depth,
         max_namespace_bindings: 4096,
         max_directive_tokens: 4096,
         max_choices_per_alternate: 1024,
@@ -1776,12 +2570,16 @@ fn opening_insert_position(source: &[u8], span: &Span) -> Result<usize> {
     }
 }
 
-fn empty_opening(source: &[u8], span: &Span) -> Result<Vec<u8>> {
+fn empty_opening(source: &[u8], span: &Span, max_output_bytes: usize) -> Result<Vec<u8>> {
     let raw = source
         .get(span.range.clone())
         .ok_or_else(|| invalid("legacy comment collaboration empty span escapes source"))?;
     let opening_len = empty_opening_length_from_raw(raw)?;
-    let mut value = new_xml_buffer(opening_len, "legacy comment collaboration opening")?;
+    let mut value = new_xml_buffer(
+        opening_len,
+        "legacy comment collaboration opening",
+        max_output_bytes,
+    )?;
     let end = raw
         .iter()
         .rposition(|byte| !byte.is_ascii_whitespace())
@@ -1812,7 +2610,7 @@ fn empty_opening_length_from_raw(raw: &[u8]) -> Result<usize> {
         .ok_or_else(|| invalid("legacy comment collaboration opening size underflow"))
 }
 
-fn self_closing_opening(source: &[u8], span: &Span) -> Result<Vec<u8>> {
+fn self_closing_opening(source: &[u8], span: &Span, max_output_bytes: usize) -> Result<Vec<u8>> {
     let raw = source
         .get(span.range.start..span.start_end)
         .ok_or_else(|| invalid("legacy comment collaboration opening escapes source"))?;
@@ -1831,7 +2629,11 @@ fn self_closing_opening(source: &[u8], span: &Span) -> Result<Vec<u8>> {
     let length = body_end
         .checked_add(if slash { 1 } else { 2 })
         .ok_or_else(|| invalid("legacy comment collaboration opening size overflow"))?;
-    let mut result = new_xml_buffer(length, "legacy comment collaboration opening")?;
+    let mut result = new_xml_buffer(
+        length,
+        "legacy comment collaboration opening",
+        max_output_bytes,
+    )?;
     result.extend_from_slice(&raw[..body_end]);
     if !slash {
         result.push(b'/');
@@ -1872,9 +2674,13 @@ fn only_whitespace_after_ranges(source: &[u8], container: &Span, ranges: &[Span]
     source[cursor..body_end].iter().all(u8::is_ascii_whitespace)
 }
 
-fn closing(qname: &[u8]) -> Result<Vec<u8>> {
+fn closing(qname: &[u8], max_output_bytes: usize) -> Result<Vec<u8>> {
     let length = closing_length(qname)?;
-    let mut result = new_xml_buffer(length, "legacy comment collaboration closing")?;
+    let mut result = new_xml_buffer(
+        length,
+        "legacy comment collaboration closing",
+        max_output_bytes,
+    )?;
     result.extend_from_slice(b"</");
     result.extend_from_slice(qname);
     result.push(b'>');
@@ -1892,9 +2698,13 @@ fn qname_prefix(qname: &[u8]) -> &[u8] {
         .map_or(&[][..], |index| &qname[..index])
 }
 
-fn qualified(prefix: &[u8], local: &[u8]) -> Result<Vec<u8>> {
+fn qualified(prefix: &[u8], local: &[u8], max_output_bytes: usize) -> Result<Vec<u8>> {
     let length = qualified_length(prefix, local)?;
-    let mut result = new_xml_buffer(length, "legacy comment collaboration QName")?;
+    let mut result = new_xml_buffer(
+        length,
+        "legacy comment collaboration QName",
+        max_output_bytes,
+    )?;
     append_qualified(&mut result, prefix, local);
     Ok(result)
 }
@@ -1956,9 +2766,13 @@ fn append_signed_decimal(output: &mut Vec<u8>, value: i32) {
     }
 }
 
-fn escaped(value: &str) -> Result<Vec<u8>> {
+fn escaped(value: &str, max_output_bytes: usize) -> Result<Vec<u8>> {
     let length = escaped_len(value)?;
-    let mut output = new_xml_buffer(length, "legacy comment collaboration escaped XML")?;
+    let mut output = new_xml_buffer(
+        length,
+        "legacy comment collaboration escaped XML",
+        max_output_bytes,
+    )?;
     for character in value.chars() {
         match character {
             '&' => output.extend_from_slice(b"&amp;"),
@@ -1994,7 +2808,6 @@ fn escaped_len(value: &str) -> Result<usize> {
             .checked_add(addition)
             .ok_or_else(|| invalid("legacy comment collaboration escaped XML size overflow"))?;
     }
-    ensure_xml_size(length)?;
     Ok(length)
 }
 
@@ -2027,6 +2840,7 @@ fn checked_sum(parts: &[usize]) -> Result<usize> {
 fn preflight_replacement_sizes(
     source: &[u8],
     replacements: &[(&Range<usize>, usize)],
+    max_output_bytes: usize,
 ) -> Result<()> {
     let mut removed = 0usize;
     let mut added = 0usize;
@@ -2048,12 +2862,13 @@ fn preflight_replacement_sizes(
         .checked_sub(removed)
         .and_then(|length| length.checked_add(added))
         .ok_or_else(|| invalid("serialized legacy comment collaboration size overflow"))?;
-    ensure_xml_size(output_len)
+    ensure_xml_size(output_len, max_output_bytes)
 }
 
 fn preflight_size_plans(
     source: &[u8],
     plans: impl IntoIterator<Item = Option<SizePlan>>,
+    max_output_bytes: usize,
 ) -> Result<()> {
     let mut removed = 0usize;
     let mut added = 0usize;
@@ -2075,21 +2890,26 @@ fn preflight_size_plans(
         .checked_sub(removed)
         .and_then(|length| length.checked_add(added))
         .ok_or_else(|| invalid("serialized legacy comment collaboration size overflow"))?;
-    ensure_xml_size(output_len)
+    ensure_xml_size(output_len, max_output_bytes)
 }
 
-fn ensure_xml_size(length: usize) -> Result<()> {
-    if length > MAX_PART_BYTES {
+fn ensure_xml_size(length: usize, max_output_bytes: usize) -> Result<()> {
+    if length > max_output_bytes {
         return Err(limit(
-            "serialized legacy comment collaboration XML bytes",
-            MAX_PART_BYTES,
+            crate::error::CodecLimitKind::XmlBytes,
+            length,
+            max_output_bytes,
         ));
     }
     Ok(())
 }
 
-fn new_xml_buffer(length: usize, resource: &'static str) -> Result<Vec<u8>> {
-    ensure_xml_size(length)?;
+fn new_xml_buffer(
+    length: usize,
+    resource: &'static str,
+    max_output_bytes: usize,
+) -> Result<Vec<u8>> {
+    ensure_xml_size(length, max_output_bytes)?;
     let mut output = Vec::new();
     output
         .try_reserve_exact(length)
@@ -2097,22 +2917,29 @@ fn new_xml_buffer(length: usize, resource: &'static str) -> Result<Vec<u8>> {
     Ok(output)
 }
 
-fn concat_fragments(fragments: &[&[u8]]) -> Result<Vec<u8>> {
+fn concat_fragments(fragments: &[&[u8]], max_output_bytes: usize) -> Result<Vec<u8>> {
     let mut length = 0usize;
     for fragment in fragments {
         length = length
             .checked_add(fragment.len())
             .ok_or_else(|| invalid("legacy comment collaboration XML size overflow"))?;
     }
-    let mut output = new_xml_buffer(length, "legacy comment collaboration XML fragment")?;
+    let mut output = new_xml_buffer(
+        length,
+        "legacy comment collaboration XML fragment",
+        max_output_bytes,
+    )?;
     for fragment in fragments {
         output.extend_from_slice(fragment);
     }
     Ok(output)
 }
 
-fn wrapped_fragment(qname: &[u8], body: &[u8]) -> Result<Vec<u8>> {
-    concat_fragments(&[b"<", qname, b">", body, b"</", qname, b">"])
+fn wrapped_fragment(qname: &[u8], body: &[u8], max_output_bytes: usize) -> Result<Vec<u8>> {
+    concat_fragments(
+        &[b"<", qname, b">", body, b"</", qname, b">"],
+        max_output_bytes,
+    )
 }
 
 fn wrapped_fragment_length(qname_len: usize, body_len: usize) -> Result<usize> {
@@ -2125,7 +2952,8 @@ struct Replacement {
     value: Vec<u8>,
 }
 
-fn copy_source(source: &[u8]) -> Result<Vec<u8>> {
+fn copy_source(source: &[u8], max_output_bytes: usize) -> Result<Vec<u8>> {
+    ensure_xml_size(source.len(), max_output_bytes)?;
     let mut output = Vec::new();
     output
         .try_reserve_exact(source.len())
@@ -2137,7 +2965,11 @@ fn copy_source(source: &[u8]) -> Result<Vec<u8>> {
     Ok(output)
 }
 
-fn apply_replacements(source: &[u8], mut replacements: Vec<Replacement>) -> Result<Vec<u8>> {
+fn apply_replacements(
+    source: &[u8],
+    mut replacements: Vec<Replacement>,
+    limits: Limits,
+) -> Result<Vec<u8>> {
     replacements.sort_by_key(|replacement| replacement.range.start);
     let mut removed = 0usize;
     let mut added = 0usize;
@@ -2162,10 +2994,11 @@ fn apply_replacements(source: &[u8], mut replacements: Vec<Replacement>) -> Resu
         .checked_sub(removed)
         .and_then(|length| length.checked_add(added))
         .ok_or_else(|| invalid("serialized legacy comment collaboration size overflow"))?;
-    if output_len > MAX_PART_BYTES {
+    if output_len > limits.max_output_bytes {
         return Err(limit(
-            "serialized legacy comment collaboration XML bytes",
-            MAX_PART_BYTES,
+            crate::error::CodecLimitKind::XmlBytes,
+            output_len,
+            limits.max_output_bytes,
         ));
     }
     let mut output = Vec::new();
@@ -2338,10 +3171,11 @@ fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
         .ok_or_else(|| invalid("legacy comment collaboration XML offset does not fit usize"))
 }
 
-fn limit(resource: &'static str, maximum: usize) -> Error {
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
     Error::Limit {
-        resource,
-        limit: maximum,
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
     }
 }
 
@@ -2527,7 +3361,7 @@ mod tests {
             }
         }
         source.push_str("/></p:cmLst>");
-        let scan = scan_raw(source.as_bytes()).unwrap();
+        let scan = scan_raw(source.as_bytes(), Limits::DEFAULT).unwrap();
         let attributes = &scan.nodes[1].attrs;
         assert_eq!(attributes.len(), count + 1);
         for attribute in attributes {

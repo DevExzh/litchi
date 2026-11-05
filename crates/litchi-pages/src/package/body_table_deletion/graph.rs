@@ -23,8 +23,8 @@ use litchi_numbers_wire::table_data_list;
 use litchi_numbers_wire::table_sidecars;
 
 use super::{
-    BodyTableDeletionError, DeletionObjectIndex, DeletionObjectLocation, DeletionRequest,
-    GraphPlan, ObjectRemoval, Package, RemovalPlan, body_table_catalog, table_lock,
+    DeletionObjectIndex, DeletionObjectLocation, DeletionRequest, Error, GraphPlan, ObjectRemoval,
+    Package, RemovalPlan, body_table_catalog, table_lock,
 };
 
 const COMMENT_STORAGE_MESSAGE_KIND: u32 = table_sidecars::COMMENT_STORAGE_MESSAGE_KIND;
@@ -83,23 +83,20 @@ impl TableGraph {
     }
 }
 
-fn insert_set_with_reserve<T: Eq + Hash>(
-    set: &mut HashSet<T>,
-    value: T,
-) -> Result<bool, BodyTableDeletionError> {
+fn insert_set_with_reserve<T: Eq + Hash>(set: &mut HashSet<T>, value: T) -> Result<bool, Error> {
     if set.contains(&value) {
         return Ok(false);
     }
     set.try_reserve(1)
-        .map_err(|_| BodyTableDeletionError::Allocation { amount: 1 })?;
+        .map_err(|_| Error::Allocation { amount: 1 })?;
     Ok(set.insert(value))
 }
 
-fn try_clone_identifiers(values: &[NonZeroU64]) -> Result<Vec<NonZeroU64>, BodyTableDeletionError> {
+fn try_clone_identifiers(values: &[NonZeroU64]) -> Result<Vec<NonZeroU64>, Error> {
     let mut cloned = Vec::new();
     cloned
         .try_reserve_exact(values.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: values.len(),
         })?;
     for value in values {
@@ -118,7 +115,7 @@ pub(super) fn prepare(
     source: &Package,
     request: DeletionRequest,
     budget: &mut table_lock::WireBudget,
-) -> Result<GraphPlan, BodyTableDeletionError> {
+) -> Result<GraphPlan, Error> {
     // Recheck the selector-owned evidence before building any graph vectors.
     // This keeps the source witness used by the transaction aligned with the
     // one that admitted the request.
@@ -129,16 +126,13 @@ pub(super) fn prepare(
     let targets = table_lock::body_table_catalog_with_budget(source, budget)
         .map_err(super::map_lock_error)?;
     if targets.is_empty() {
-        return Err(BodyTableDeletionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
-    let root_capacity = targets
-        .len()
-        .checked_mul(4)
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+    let root_capacity = targets.len().checked_mul(4).ok_or(Error::InvalidSource)?;
     let mut protected_roots = HashSet::new();
     protected_roots
         .try_reserve(root_capacity)
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: root_capacity,
         })?;
     for target in &targets {
@@ -151,19 +145,19 @@ pub(super) fn prepare(
     let mut source_tables = Vec::new();
     source_tables
         .try_reserve_exact(targets.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: targets.len(),
         })?;
     let mut graphs = Vec::new();
     graphs
         .try_reserve_exact(targets.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: targets.len(),
         })?;
 
     for target in targets {
         source_tables.push(
-            body_table_catalog::BodyTableSnapshot::from_target(target.clone())
+            body_table_catalog::Snapshot::from_target(target.clone())
                 .map_err(super::map_catalog_error)?,
         );
         graphs.push(discover_table_graph(
@@ -178,10 +172,8 @@ pub(super) fn prepare(
     let selected_position = graphs
         .iter()
         .position(|graph| graph.target == request.target)
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
-    let selected = graphs
-        .get(selected_position)
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
+    let selected = graphs.get(selected_position).ok_or(Error::InvalidSource)?;
 
     // Every selected root must remain private to this body-table attachment.
     // A sibling root alias is an invalid source even when the payload bytes
@@ -199,13 +191,13 @@ pub(super) fn prepare(
             .iter()
             .any(|identifier| sibling.roles.contains_key(identifier))
         {
-            return Err(BodyTableDeletionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     let mut shared = HashSet::new();
     shared
         .try_reserve(selected.roles.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: selected.roles.len(),
         })?;
     for (sibling_index, sibling) in graphs.iter().enumerate() {
@@ -218,7 +210,7 @@ pub(super) fn prepare(
                     // A physical object cannot be both canonical table data
                     // and a root/sidecar under two roles.  Fail closed rather
                     // than guessing which ownership edge should win.
-                    return Err(BodyTableDeletionError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 shared.insert(*identifier);
             }
@@ -227,7 +219,7 @@ pub(super) fn prepare(
     let mut private_ids = Vec::new();
     private_ids
         .try_reserve_exact(selected.roles.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: selected.roles.len(),
         })?;
     for (identifier, role) in &selected.roles {
@@ -258,7 +250,7 @@ pub(super) fn prepare(
     let mut removed_ids = HashSet::new();
     removed_ids
         .try_reserve(private_ids.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: private_ids.len(),
         })?;
     for identifier in &private_ids {
@@ -281,12 +273,12 @@ pub(super) fn prepare(
         .len()
         .checked_mul(3)
         .and_then(|value| value.checked_add(1))
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
-    excluded_contexts.try_reserve(root_capacity).map_err(|_| {
-        BodyTableDeletionError::Allocation {
+        .ok_or(Error::InvalidSource)?;
+    excluded_contexts
+        .try_reserve(root_capacity)
+        .map_err(|_| Error::Allocation {
             amount: root_capacity,
-        }
-    })?;
+        })?;
     for graph in &graphs {
         excluded_contexts.insert(graph.target.attachment_identifier);
         excluded_contexts.insert(graph.target.drawable_identifier);
@@ -310,13 +302,11 @@ pub(super) fn prepare(
     removals
         .object_removals
         .try_reserve_exact(private_ids.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: private_ids.len(),
         })?;
     for identifier in private_ids {
-        let location = index
-            .get(identifier)
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+        let location = index.get(identifier).ok_or(Error::InvalidSource)?;
         removals.object_removals.push(ObjectRemoval {
             component_index: location.component_index,
             object_index: location.object_index,
@@ -333,7 +323,7 @@ pub(super) fn prepare(
     removals
         .formula_contexts
         .try_reserve_exact(contexts.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: contexts.len(),
         })?;
     removals.formula_contexts = contexts;
@@ -358,24 +348,24 @@ fn retain_externally_referenced_storage(
     private_ids: &mut Vec<NonZeroU64>,
     removed: &mut HashSet<NonZeroU64>,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableDeletionError> {
+) -> Result<(), Error> {
     let externally_referenced = collect_surviving_inbound_ids(source, index, removed, budget)?;
     let mut retained = HashSet::new();
     retained
         .try_reserve(private_ids.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: private_ids.len(),
         })?;
     let mut pending = Vec::new();
     pending
         .try_reserve(private_ids.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: private_ids.len(),
         })?;
 
     for identifier in private_ids.iter().copied() {
         let Some(role) = selected.roles.get(&identifier).copied() else {
-            return Err(BodyTableDeletionError::InvalidSource);
+            return Err(Error::InvalidSource);
         };
         if is_mandatory_root(role) {
             continue;
@@ -395,7 +385,7 @@ fn retain_externally_referenced_storage(
                 continue;
             }
             let Some(role) = selected.roles.get(&child).copied() else {
-                return Err(BodyTableDeletionError::InvalidSource);
+                return Err(Error::InvalidSource);
             };
             if is_mandatory_root(role) {
                 continue;
@@ -403,7 +393,7 @@ fn retain_externally_referenced_storage(
             insert_set_with_reserve(&mut retained, child)?;
             pending
                 .try_reserve(1)
-                .map_err(|_| BodyTableDeletionError::Allocation { amount: 1 })?;
+                .map_err(|_| Error::Allocation { amount: 1 })?;
             pending.push(child);
         }
     }
@@ -430,13 +420,13 @@ fn collect_surviving_inbound_ids(
     index: &DeletionObjectIndex,
     removed: &HashSet<NonZeroU64>,
     budget: &mut table_lock::WireBudget,
-) -> Result<HashSet<NonZeroU64>, BodyTableDeletionError> {
+) -> Result<HashSet<NonZeroU64>, Error> {
     let mut referenced = HashSet::new();
-    referenced.try_reserve(index.ordered.len()).map_err(|_| {
-        BodyTableDeletionError::Allocation {
+    referenced
+        .try_reserve(index.ordered.len())
+        .map_err(|_| Error::Allocation {
             amount: index.ordered.len(),
-        }
-    })?;
+        })?;
     for location in index.iter() {
         if removed.contains(&location.identifier) {
             continue;
@@ -453,9 +443,9 @@ fn collect_surviving_inbound_ids(
                         .try_fold(0usize, |count, field| {
                             count.checked_add(field.object_references.len())
                         })
-                        .ok_or(BodyTableDeletionError::InvalidSource)?,
+                        .ok_or(Error::InvalidSource)?,
                 )
-                .ok_or(BodyTableDeletionError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             budget
                 .charge_payload_references(reference_count)
                 .and_then(|_| budget.charge_payload_work(reference_count))
@@ -465,8 +455,7 @@ fn collect_surviving_inbound_ids(
                     .iter()
                     .flat_map(|field| field.object_references.iter()),
             ) {
-                let reference =
-                    NonZeroU64::new(*reference).ok_or(BodyTableDeletionError::InvalidSource)?;
+                let reference = NonZeroU64::new(*reference).ok_or(Error::InvalidSource)?;
                 insert_set_with_reserve(&mut referenced, reference)?;
             }
         }
@@ -477,18 +466,18 @@ fn collect_surviving_inbound_ids(
 fn build_object_index(
     source: &Package,
     budget: &mut table_lock::WireBudget,
-) -> Result<DeletionObjectIndex, BodyTableDeletionError> {
+) -> Result<DeletionObjectIndex, Error> {
     let components = source.state.source.components();
     let mut object_count = 0usize;
     let mut message_count = 0usize;
     for component in components.iter() {
         object_count = object_count
             .checked_add(component.archive().objects.len())
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         for object in &component.archive().objects {
             message_count = message_count
                 .checked_add(object.messages.len())
-                .ok_or(BodyTableDeletionError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
         }
     }
     budget
@@ -500,13 +489,13 @@ fn build_object_index(
     let mut by_identifier = HashMap::new();
     by_identifier
         .try_reserve(object_count)
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: object_count,
         })?;
     let mut ordered = Vec::new();
     ordered
         .try_reserve_exact(object_count)
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: object_count,
         })?;
 
@@ -516,7 +505,7 @@ fn build_object_index(
                 .archive_info
                 .identifier
                 .and_then(NonZeroU64::new)
-                .ok_or(BodyTableDeletionError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             let component_name = clone_component_name(component.name(), budget)?;
             let location = DeletionObjectLocation {
                 identifier,
@@ -526,7 +515,7 @@ fn build_object_index(
             };
             let ordered_index = ordered.len();
             if by_identifier.insert(identifier, ordered_index).is_some() {
-                return Err(BodyTableDeletionError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             ordered.push(location);
         }
@@ -540,14 +529,14 @@ fn build_object_index(
 fn clone_component_name(
     name: &str,
     budget: &mut table_lock::WireBudget,
-) -> Result<Box<str>, BodyTableDeletionError> {
+) -> Result<Box<str>, Error> {
     budget
         .charge_payload_work(name.len())
         .map_err(super::map_lock_error)?;
     let mut value = String::new();
     value
         .try_reserve_exact(name.len())
-        .map_err(|_| BodyTableDeletionError::Allocation { amount: name.len() })?;
+        .map_err(|_| Error::Allocation { amount: name.len() })?;
     value.push_str(name);
     Ok(value.into_boxed_str())
 }
@@ -558,7 +547,7 @@ fn discover_table_graph(
     target: table_lock::BodyTableTarget,
     protected_roots: &HashSet<NonZeroU64>,
     budget: &mut table_lock::WireBudget,
-) -> Result<TableGraph, BodyTableDeletionError> {
+) -> Result<TableGraph, Error> {
     let mut graph = TableGraph::new(target.clone());
     insert_role(
         &mut graph,
@@ -592,7 +581,7 @@ fn discover_table_graph(
         .archive_info
         .message_infos
         .get(target.info_message_index)
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     collect_context_references(info, &mut graph.formula_contexts, budget)?;
 
     let model_object = object_at_route(
@@ -605,17 +594,17 @@ fn discover_table_graph(
         .messages
         .get(target.model_message_index)
         .filter(|message| message.type_ == target.model_message_type)
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let model_info = model_object
         .archive_info
         .message_infos
         .get(target.model_message_index)
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     collect_context_references(model_info, &mut graph.formula_contexts, budget)?;
     graph
         .formula_contexts
         .try_reserve(2)
-        .map_err(|_| BodyTableDeletionError::Allocation { amount: 2 })?;
+        .map_err(|_| Error::Allocation { amount: 2 })?;
     graph.formula_contexts.push(target.drawable_identifier);
     graph.formula_contexts.push(target.model_identifier);
 
@@ -710,7 +699,7 @@ fn insert_storage_reference(
     reference: storage::ReferenceSnapshot,
     role: OwnershipRole,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableDeletionError> {
+) -> Result<(), Error> {
     let Some(identifier) = local_storage_identifier(reference)? else {
         // Native Numbers uses the generated proto2 zero reference as the
         // sentinel for an omitted optional route. The host ownership helper
@@ -722,9 +711,9 @@ fn insert_storage_reference(
 
 fn local_storage_identifier(
     reference: storage::ReferenceSnapshot,
-) -> Result<Option<NonZeroU64>, BodyTableDeletionError> {
+) -> Result<Option<NonZeroU64>, Error> {
     if reference.deprecated_is_external() == Some(true) {
-        return Err(BodyTableDeletionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(NonZeroU64::new(reference.identifier()))
 }
@@ -735,20 +724,20 @@ fn insert_role(
     identifier: NonZeroU64,
     role: OwnershipRole,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableDeletionError> {
+) -> Result<(), Error> {
     if index.get(identifier).is_none() {
-        return Err(BodyTableDeletionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if let Some(existing) = graph.roles.get(&identifier) {
         if *existing != role {
-            return Err(BodyTableDeletionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         return Ok(());
     }
     graph
         .roles
         .try_reserve(1)
-        .map_err(|_| BodyTableDeletionError::Allocation { amount: 1 })?;
+        .map_err(|_| Error::Allocation { amount: 1 })?;
     budget
         .charge_payload_items(1)
         .and_then(|_| budget.charge_payload_work(1))
@@ -761,44 +750,43 @@ fn collect_context_references(
     info: &litchi_iwa_core::MessageInfo,
     contexts: &mut Vec<NonZeroU64>,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableDeletionError> {
+) -> Result<(), Error> {
     charge_metadata_items(info, budget)?;
     let field_count = info.field_infos.iter().try_fold(0usize, |count, field| {
         count
             .checked_add(field.object_references.len())
             .and_then(|value| value.checked_add(field.data_references.len()))
     });
-    let field_count = field_count.ok_or(BodyTableDeletionError::InvalidSource)?;
+    let field_count = field_count.ok_or(Error::InvalidSource)?;
     let references = info
         .object_references
         .len()
         .checked_add(info.data_references.len())
         .and_then(|value| value.checked_add(field_count))
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget
         .charge_payload_references(references)
         .and_then(|_| budget.charge_payload_work(references))
         .map_err(super::map_lock_error)?;
     contexts
         .try_reserve(references)
-        .map_err(|_| BodyTableDeletionError::Allocation { amount: references })?;
+        .map_err(|_| Error::Allocation { amount: references })?;
     for identifier in &info.object_references {
-        contexts.push(NonZeroU64::new(*identifier).ok_or(BodyTableDeletionError::InvalidSource)?);
+        contexts.push(NonZeroU64::new(*identifier).ok_or(Error::InvalidSource)?);
     }
     for identifier in &info.data_references {
         // Data references are metadata-owned edges, so they do not become
         // formula roots here.  They still participate in source validation;
         // an all-zero or malformed edge must never be silently treated as a
         // missing optional field.
-        NonZeroU64::new(*identifier).ok_or(BodyTableDeletionError::InvalidSource)?;
+        NonZeroU64::new(*identifier).ok_or(Error::InvalidSource)?;
     }
     for field in &info.field_infos {
         for identifier in &field.object_references {
-            contexts
-                .push(NonZeroU64::new(*identifier).ok_or(BodyTableDeletionError::InvalidSource)?);
+            contexts.push(NonZeroU64::new(*identifier).ok_or(Error::InvalidSource)?);
         }
         for identifier in &field.data_references {
-            NonZeroU64::new(*identifier).ok_or(BodyTableDeletionError::InvalidSource)?;
+            NonZeroU64::new(*identifier).ok_or(Error::InvalidSource)?;
         }
     }
     Ok(())
@@ -807,10 +795,10 @@ fn collect_context_references(
 fn charge_metadata_items(
     info: &litchi_iwa_core::MessageInfo,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableDeletionError> {
+) -> Result<(), Error> {
     let items = 1usize
         .checked_add(info.field_infos.len())
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget
         .charge_payload_items(items)
         .and_then(|_| budget.charge_payload_work(items))
@@ -942,11 +930,11 @@ fn walk_data_lists(
     index: &DeletionObjectIndex,
     graph: &mut TableGraph,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableDeletionError> {
+) -> Result<(), Error> {
     let mut pending = Vec::new();
     pending
         .try_reserve(graph.roles.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: graph.roles.len(),
         })?;
     for (identifier, role) in &graph.roles {
@@ -957,7 +945,7 @@ fn walk_data_lists(
     let mut visited = HashSet::new();
     visited
         .try_reserve(pending.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: pending.len(),
         })?;
     while let Some(identifier) = pending.pop() {
@@ -975,7 +963,7 @@ fn walk_data_lists(
                 continue;
             }
             if root_seen {
-                return Err(BodyTableDeletionError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             root_seen = true;
             let mut visitor = ListEdgeVisitor::default();
@@ -995,12 +983,12 @@ fn walk_data_lists(
             }
             for segment in visitor.segments {
                 if segment == identifier {
-                    return Err(BodyTableDeletionError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 insert_role(graph, index, segment, OwnershipRole::Data, budget)?;
                 pending
                     .try_reserve(1)
-                    .map_err(|_| BodyTableDeletionError::Allocation { amount: 1 })?;
+                    .map_err(|_| Error::Allocation { amount: 1 })?;
                 pending.push(segment);
                 let segment_visitor =
                     validate_list_segment(source, index, segment, snapshot.list_type(), budget)?;
@@ -1024,7 +1012,7 @@ fn validate_list_segment(
     identifier: NonZeroU64,
     expected_type: i32,
     budget: &mut table_lock::WireBudget,
-) -> Result<ListEdgeVisitor, BodyTableDeletionError> {
+) -> Result<ListEdgeVisitor, Error> {
     let object = object_at_index(source, index, identifier)?;
     let mut selected = None;
     for message in &object.messages {
@@ -1032,11 +1020,11 @@ fn validate_list_segment(
             continue;
         }
         if selected.is_some() {
-            return Err(BodyTableDeletionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         selected = Some(message);
     }
-    let message = selected.ok_or(BodyTableDeletionError::InvalidSource)?;
+    let message = selected.ok_or(Error::InvalidSource)?;
     let mut visitor = ListEdgeVisitor::default();
     let options = storage_options(budget, message.data.as_slice())?;
     let (snapshot, report) = storage::decode_table_data_list_segment_with_visitor(
@@ -1047,7 +1035,7 @@ fn validate_list_segment(
     .map_err(map_storage_error)?;
     charge_storage_report(budget, report)?;
     if snapshot.list_type() != expected_type || !visitor.segments.is_empty() {
-        return Err(BodyTableDeletionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(visitor)
 }
@@ -1057,11 +1045,11 @@ fn walk_comment_sidecars(
     index: &DeletionObjectIndex,
     graph: &mut TableGraph,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableDeletionError> {
+) -> Result<(), Error> {
     let mut rich_text_ids = Vec::new();
     rich_text_ids
         .try_reserve(graph.sidecar_hints.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: graph.sidecar_hints.len(),
         })?;
     for (identifier, hint) in &graph.sidecar_hints {
@@ -1077,8 +1065,8 @@ fn walk_comment_sidecars(
             storage::decode_rich_text_payload_with_report(message.data.as_slice(), options)
                 .map_err(map_storage_error)?;
         charge_storage_report(budget, report)?;
-        let storage_identifier = local_storage_identifier(payload.storage())?
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+        let storage_identifier =
+            local_storage_identifier(payload.storage())?.ok_or(Error::InvalidSource)?;
         insert_role(
             graph,
             index,
@@ -1095,7 +1083,7 @@ fn walk_comment_sidecars(
             SidecarHint::Comment => {
                 pending
                     .try_reserve(1)
-                    .map_err(|_| BodyTableDeletionError::Allocation { amount: 1 })?;
+                    .map_err(|_| Error::Allocation { amount: 1 })?;
                 pending.push(*identifier);
             },
             SidecarHint::RichText => {
@@ -1114,27 +1102,27 @@ fn walk_comment_sidecars(
     let mut queued = HashSet::new();
     processed
         .try_reserve(pending.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: pending.len(),
         })?;
     queued
         .try_reserve(pending.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: pending.len(),
         })?;
     for identifier in &pending {
         if !insert_set_with_reserve(&mut queued, *identifier)? {
-            return Err(BodyTableDeletionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     while let Some(identifier) = pending.pop() {
         queued.remove(&identifier);
         if !insert_set_with_reserve(&mut processed, identifier)? {
-            return Err(BodyTableDeletionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let object = object_at_index(source, index, identifier)?;
         if object.messages.len() != 1 {
-            return Err(BodyTableDeletionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let message = unique_message(object, COMMENT_STORAGE_MESSAGE_KIND)?;
         let mut visitor = ReplyVisitor::default();
@@ -1148,7 +1136,7 @@ fn walk_comment_sidecars(
             .map_err(map_comment_error)?;
         charge_comment_report(budget, report)?;
         if visitor.allocation_failed {
-            return Err(BodyTableDeletionError::Allocation {
+            return Err(Error::Allocation {
                 amount: report.replies().max(1),
             });
         }
@@ -1161,16 +1149,16 @@ fn walk_comment_sidecars(
         for reply in visitor.replies {
             let reply = local_comment_identifier(reply)?;
             if reply == identifier || processed.contains(&reply) || queued.contains(&reply) {
-                return Err(BodyTableDeletionError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             insert_role(graph, index, reply, OwnershipRole::Sidecar, budget)?;
             merge_sidecar_hint(graph, reply, SidecarHint::Comment)?;
             if !insert_set_with_reserve(&mut queued, reply)? {
-                return Err(BodyTableDeletionError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             pending
                 .try_reserve(1)
-                .map_err(|_| BodyTableDeletionError::Allocation { amount: 1 })?;
+                .map_err(|_| Error::Allocation { amount: 1 })?;
             pending.push(reply);
         }
     }
@@ -1187,11 +1175,11 @@ fn expand_sidecar_references(
     graph: &mut TableGraph,
     protected_roots: &HashSet<NonZeroU64>,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableDeletionError> {
+) -> Result<(), Error> {
     let mut pending = Vec::new();
     pending
         .try_reserve(graph.sidecar_hints.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: graph.sidecar_hints.len(),
         })?;
     for identifier in graph.sidecar_hints.keys().copied() {
@@ -1200,7 +1188,7 @@ fn expand_sidecar_references(
     let mut visited = HashSet::new();
     visited
         .try_reserve(pending.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: pending.len(),
         })?;
     while let Some(identifier) = pending.pop() {
@@ -1219,9 +1207,9 @@ fn expand_sidecar_references(
                         .try_fold(0usize, |count, field| {
                             count.checked_add(field.object_references.len())
                         })
-                        .ok_or(BodyTableDeletionError::InvalidSource)?,
+                        .ok_or(Error::InvalidSource)?,
                 )
-                .ok_or(BodyTableDeletionError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             budget
                 .charge_payload_references(reference_count)
                 .and_then(|_| budget.charge_payload_work(reference_count))
@@ -1231,8 +1219,7 @@ fn expand_sidecar_references(
                     .iter()
                     .flat_map(|field| field.object_references.iter()),
             ) {
-                let reference =
-                    NonZeroU64::new(*reference).ok_or(BodyTableDeletionError::InvalidSource)?;
+                let reference = NonZeroU64::new(*reference).ok_or(Error::InvalidSource)?;
                 if protected_roots.contains(&reference) || graph.roles.contains_key(&reference) {
                     continue;
                 }
@@ -1240,7 +1227,7 @@ fn expand_sidecar_references(
                 merge_sidecar_hint(graph, reference, SidecarHint::Generic)?;
                 pending
                     .try_reserve(1)
-                    .map_err(|_| BodyTableDeletionError::Allocation { amount: 1 })?;
+                    .map_err(|_| Error::Allocation { amount: 1 })?;
                 pending.push(reference);
             }
         }
@@ -1272,13 +1259,13 @@ fn merge_sidecar_hint(
     graph: &mut TableGraph,
     identifier: NonZeroU64,
     hint: SidecarHint,
-) -> Result<(), BodyTableDeletionError> {
+) -> Result<(), Error> {
     match graph.sidecar_hints.get(&identifier).copied() {
         None => {
             graph
                 .sidecar_hints
                 .try_reserve(1)
-                .map_err(|_| BodyTableDeletionError::Allocation { amount: 1 })?;
+                .map_err(|_| Error::Allocation { amount: 1 })?;
             graph.sidecar_hints.insert(identifier, hint);
         },
         Some(existing) if existing == hint || existing == SidecarHint::Generic => {
@@ -1288,7 +1275,7 @@ fn merge_sidecar_hint(
         },
         Some(SidecarHint::Comment) if hint == SidecarHint::Generic => {},
         Some(SidecarHint::RichText) if hint == SidecarHint::Generic => {},
-        Some(_) => return Err(BodyTableDeletionError::InvalidSource),
+        Some(_) => return Err(Error::InvalidSource),
     }
     Ok(())
 }
@@ -1304,11 +1291,11 @@ fn expand_formula_contexts(
     contexts: &mut Vec<NonZeroU64>,
     excluded: &HashSet<NonZeroU64>,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableDeletionError> {
+) -> Result<(), Error> {
     contexts.retain(|identifier| !excluded.contains(identifier));
     let mut seen = HashSet::new();
     seen.try_reserve(contexts.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: contexts.len(),
         })?;
     for identifier in contexts.iter().copied() {
@@ -1320,9 +1307,7 @@ fn expand_formula_contexts(
     let mut cursor = 0usize;
     while cursor < contexts.len() {
         let identifier = contexts[cursor];
-        cursor = cursor
-            .checked_add(1)
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+        cursor = cursor.checked_add(1).ok_or(Error::InvalidSource)?;
         // The legacy helper deliberately leaves an unresolved context for
         // later formula validation. Preserve that behavior for references
         // outside the local archive index; selected owned storage itself has
@@ -1349,9 +1334,9 @@ fn expand_formula_contexts(
                         .try_fold(0usize, |count, field| {
                             count.checked_add(field.object_references.len())
                         })
-                        .ok_or(BodyTableDeletionError::InvalidSource)?,
+                        .ok_or(Error::InvalidSource)?,
                 )
-                .ok_or(BodyTableDeletionError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             budget
                 .charge_payload_references(edge_count)
                 .and_then(|_| budget.charge_payload_work(edge_count))
@@ -1361,15 +1346,14 @@ fn expand_formula_contexts(
                     .iter()
                     .flat_map(|field| field.object_references.iter()),
             ) {
-                let reference =
-                    NonZeroU64::new(*reference).ok_or(BodyTableDeletionError::InvalidSource)?;
+                let reference = NonZeroU64::new(*reference).ok_or(Error::InvalidSource)?;
                 if excluded.contains(&reference) || !insert_set_with_reserve(&mut seen, reference)?
                 {
                     continue;
                 }
                 contexts
                     .try_reserve(1)
-                    .map_err(|_| BodyTableDeletionError::Allocation { amount: 1 })?;
+                    .map_err(|_| Error::Allocation { amount: 1 })?;
                 contexts.push(reference);
             }
         }
@@ -1381,21 +1365,19 @@ fn build_planned_reference_removals(
     graph: &RemovalPlan,
     formula: &RemovalPlan,
     budget: &mut table_lock::WireBudget,
-) -> Result<HashSet<PlannedObjectReferenceRemoval>, BodyTableDeletionError> {
+) -> Result<HashSet<PlannedObjectReferenceRemoval>, Error> {
     let edits = graph
         .message_edits
         .len()
         .checked_add(formula.message_edits.len())
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let mut references = 0usize;
     for edit in graph.message_edits.iter().chain(&formula.message_edits) {
         references = references
             .checked_add(edit.remove_object_references.len())
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
-    let work = edits
-        .checked_add(references)
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+    let work = edits.checked_add(references).ok_or(Error::InvalidSource)?;
     budget
         .charge_payload_items(edits)
         .and_then(|_| budget.charge_payload_references(references))
@@ -1405,7 +1387,7 @@ fn build_planned_reference_removals(
     let mut planned = HashSet::new();
     planned
         .try_reserve(references)
-        .map_err(|_| BodyTableDeletionError::Allocation { amount: references })?;
+        .map_err(|_| Error::Allocation { amount: references })?;
     for edit in graph.message_edits.iter().chain(&formula.message_edits) {
         for target in &edit.remove_object_references {
             insert_set_with_reserve(
@@ -1437,17 +1419,17 @@ pub(super) fn complete_removals(
     graph: &GraphPlan,
     formula: &mut super::FormulaPlan,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableDeletionError> {
+) -> Result<(), Error> {
     let mut removed = HashSet::new();
     let removal_capacity = graph
         .removals
         .object_removals
         .len()
         .checked_add(formula.removals.object_removals.len())
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     removed
         .try_reserve(removal_capacity)
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: removal_capacity,
         })?;
     for removal in graph
@@ -1457,7 +1439,7 @@ pub(super) fn complete_removals(
         .chain(&formula.removals.object_removals)
     {
         if !insert_set_with_reserve(&mut removed, removal.identifier)? {
-            return Err(BodyTableDeletionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
 
@@ -1467,7 +1449,7 @@ pub(super) fn complete_removals(
     let mut protected = HashSet::new();
     protected
         .try_reserve(1usize.saturating_add(graph.source_tables.len().saturating_mul(3)))
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: 1usize.saturating_add(graph.source_tables.len().saturating_mul(3)),
         })?;
     protected.insert(graph.request.target.body_identifier);
@@ -1480,26 +1462,26 @@ pub(super) fn complete_removals(
     let mut pending = try_clone_identifiers(&graph.removals.formula_contexts)?;
     pending
         .try_reserve(formula.removals.formula_contexts.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: formula.removals.formula_contexts.len(),
         })?;
     pending.extend(formula.removals.formula_contexts.iter().copied());
     let mut queued = HashSet::new();
     queued
         .try_reserve(pending.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: pending.len(),
         })?;
     for identifier in pending.iter().copied() {
         if NonZeroU64::new(identifier.get()).is_none() {
-            return Err(BodyTableDeletionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         insert_set_with_reserve(&mut queued, identifier)?;
     }
     let mut examined = HashSet::new();
     examined
         .try_reserve(pending.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: pending.len(),
         })?;
 
@@ -1525,15 +1507,12 @@ pub(super) fn complete_removals(
         let mut child_references = Vec::new();
         collect_object_references(object, &mut child_references, budget)?;
 
-        let location = graph
-            .index
-            .get(identifier)
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+        let location = graph.index.get(identifier).ok_or(Error::InvalidSource)?;
         formula
             .removals
             .object_removals
             .try_reserve(1)
-            .map_err(|_| BodyTableDeletionError::Allocation { amount: 1 })?;
+            .map_err(|_| Error::Allocation { amount: 1 })?;
         budget
             .charge_payload_items(1)
             .and_then(|_| budget.charge_payload_work(1))
@@ -1544,7 +1523,7 @@ pub(super) fn complete_removals(
             identifier,
         });
         if !insert_set_with_reserve(&mut removed, identifier)? {
-            return Err(BodyTableDeletionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
 
         for child in child_references {
@@ -1556,7 +1535,7 @@ pub(super) fn complete_removals(
             }
             pending
                 .try_reserve(1)
-                .map_err(|_| BodyTableDeletionError::Allocation { amount: 1 })?;
+                .map_err(|_| Error::Allocation { amount: 1 })?;
             pending.push(child);
         }
     }
@@ -1570,11 +1549,11 @@ fn source_table_targets(
     source: &Package,
     graph: &GraphPlan,
     budget: &mut table_lock::WireBudget,
-) -> Result<Vec<table_lock::BodyTableTarget>, BodyTableDeletionError> {
+) -> Result<Vec<table_lock::BodyTableTarget>, Error> {
     let targets = table_lock::body_table_catalog_with_budget(source, budget)
         .map_err(super::map_lock_error)?;
     if targets.len() != graph.source_tables.len() {
-        return Err(BodyTableDeletionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if targets
         .iter()
@@ -1586,7 +1565,7 @@ fn source_table_targets(
                 || target.table_columns != snapshot.columns()
         })
     {
-        return Err(BodyTableDeletionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(targets)
 }
@@ -1598,7 +1577,7 @@ fn object_has_surviving_inbound_reference(
     removed: &HashSet<NonZeroU64>,
     planned_references: &HashSet<PlannedObjectReferenceRemoval>,
     budget: &mut table_lock::WireBudget,
-) -> Result<bool, BodyTableDeletionError> {
+) -> Result<bool, Error> {
     for location in index.iter() {
         if removed.contains(&location.identifier) {
             continue;
@@ -1615,9 +1594,9 @@ fn object_has_surviving_inbound_reference(
                         .try_fold(0usize, |count, field| {
                             count.checked_add(field.object_references.len())
                         })
-                        .ok_or(BodyTableDeletionError::InvalidSource)?,
+                        .ok_or(Error::InvalidSource)?,
                 )
-                .ok_or(BodyTableDeletionError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             budget
                 .charge_payload_references(reference_count)
                 .and_then(|_| budget.charge_payload_work(reference_count))
@@ -1627,8 +1606,7 @@ fn object_has_surviving_inbound_reference(
                     .iter()
                     .flat_map(|field| field.object_references.iter()),
             ) {
-                let reference =
-                    NonZeroU64::new(*reference).ok_or(BodyTableDeletionError::InvalidSource)?;
+                let reference = NonZeroU64::new(*reference).ok_or(Error::InvalidSource)?;
                 let planned = PlannedObjectReferenceRemoval {
                     component_index: location.component_index,
                     object_index: location.object_index,
@@ -1648,7 +1626,7 @@ fn collect_object_references(
     object: &ArchiveObject,
     references: &mut Vec<NonZeroU64>,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableDeletionError> {
+) -> Result<(), Error> {
     for info in &object.archive_info.message_infos {
         charge_metadata_items(info, budget)?;
         let count = info
@@ -1660,23 +1638,22 @@ fn collect_object_references(
                     .try_fold(0usize, |count, field| {
                         count.checked_add(field.object_references.len())
                     })
-                    .ok_or(BodyTableDeletionError::InvalidSource)?,
+                    .ok_or(Error::InvalidSource)?,
             )
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         budget
             .charge_payload_references(count)
             .and_then(|_| budget.charge_payload_work(count))
             .map_err(super::map_lock_error)?;
         references
             .try_reserve(count)
-            .map_err(|_| BodyTableDeletionError::Allocation { amount: count })?;
+            .map_err(|_| Error::Allocation { amount: count })?;
         for reference in info.object_references.iter().chain(
             info.field_infos
                 .iter()
                 .flat_map(|field| field.object_references.iter()),
         ) {
-            references
-                .push(NonZeroU64::new(*reference).ok_or(BodyTableDeletionError::InvalidSource)?);
+            references.push(NonZeroU64::new(*reference).ok_or(Error::InvalidSource)?);
         }
     }
     Ok(())
@@ -1688,7 +1665,7 @@ fn prove_inbound_references(
     selected: &TableGraph,
     removed: &HashSet<NonZeroU64>,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableDeletionError> {
+) -> Result<(), Error> {
     let selected_roots = [
         selected.target.attachment_identifier,
         selected.target.drawable_identifier,
@@ -1720,7 +1697,7 @@ fn prove_inbound_references(
                             .and_then(|value| value.checked_add(field.data_references.len()))
                     })
                 })
-                .ok_or(BodyTableDeletionError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             budget
                 .charge_payload_references(metadata_count)
                 .and_then(|_| budget.charge_payload_work(metadata_count))
@@ -1731,7 +1708,7 @@ fn prove_inbound_references(
                 if body_message && *identifier == selected_attachment_identifier.get() {
                     body_aggregate_edges = body_aggregate_edges
                         .checked_add(1)
-                        .ok_or(BodyTableDeletionError::InvalidSource)?;
+                        .ok_or(Error::InvalidSource)?;
                 }
                 check_inbound(
                     location.identifier,
@@ -1755,13 +1732,13 @@ fn prove_inbound_references(
                 if body_table_field {
                     body_field_declarations = body_field_declarations
                         .checked_add(1)
-                        .ok_or(BodyTableDeletionError::InvalidSource)?;
+                        .ok_or(Error::InvalidSource)?;
                 }
                 for identifier in &field.object_references {
                     if body_table_field && *identifier == selected_attachment_identifier.get() {
                         body_field_edges = body_field_edges
                             .checked_add(1)
-                            .ok_or(BodyTableDeletionError::InvalidSource)?;
+                            .ok_or(Error::InvalidSource)?;
                     }
                     check_inbound(
                         location.identifier,
@@ -1784,7 +1761,7 @@ fn prove_inbound_references(
         }
     }
     if body_aggregate_edges != 1 || (body_field_declarations != 0 && body_field_edges != 1) {
-        return Err(BodyTableDeletionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -1801,8 +1778,8 @@ fn check_inbound(
     selected_attachment_identifier: NonZeroU64,
     selected_roots: &[NonZeroU64; 3],
     removed: &HashSet<NonZeroU64>,
-) -> Result<(), BodyTableDeletionError> {
-    let target = NonZeroU64::new(target_identifier).ok_or(BodyTableDeletionError::InvalidSource)?;
+) -> Result<(), Error> {
+    let target = NonZeroU64::new(target_identifier).ok_or(Error::InvalidSource)?;
     if !removed.contains(&target) || source_identifier == target {
         return Ok(());
     }
@@ -1823,7 +1800,9 @@ fn check_inbound(
     if formula_source && selected_roots.contains(&target) {
         return Ok(());
     }
-    Err(BodyTableDeletionError::UnsupportedDependency)
+    Err(Error::Refused(
+        crate::table::deletion::Refusal::UnsupportedDependency,
+    ))
 }
 
 fn check_data_inbound(
@@ -1831,9 +1810,9 @@ fn check_data_inbound(
     target_identifier: u64,
     _source_removed: bool,
     _removed: &HashSet<NonZeroU64>,
-) -> Result<(), BodyTableDeletionError> {
+) -> Result<(), Error> {
     let Some(target) = NonZeroU64::new(target_identifier) else {
-        return Err(BodyTableDeletionError::InvalidSource);
+        return Err(Error::InvalidSource);
     };
     // Data-reference identifiers live in the package data namespace, while
     // `removed` contains archive-object identifiers.  Metadata preparation
@@ -1848,10 +1827,8 @@ fn object_at_index<'a>(
     source: &'a Package,
     index: &DeletionObjectIndex,
     identifier: NonZeroU64,
-) -> Result<&'a ArchiveObject, BodyTableDeletionError> {
-    let location = index
-        .get(identifier)
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+) -> Result<&'a ArchiveObject, Error> {
+    let location = index.get(identifier).ok_or(Error::InvalidSource)?;
     object_at_route(
         source,
         location.component_index,
@@ -1865,20 +1842,20 @@ fn object_at_route(
     component_index: usize,
     object_index: usize,
     identifier: NonZeroU64,
-) -> Result<&ArchiveObject, BodyTableDeletionError> {
+) -> Result<&ArchiveObject, Error> {
     let component = source
         .state
         .source
         .components()
         .get_index(component_index)
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let object = component
         .archive()
         .objects
         .get(object_index)
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if object.archive_info.identifier != Some(identifier.get()) {
-        return Err(BodyTableDeletionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(object)
 }
@@ -1886,36 +1863,36 @@ fn object_at_route(
 fn unique_message(
     object: &ArchiveObject,
     message_type: u32,
-) -> Result<&litchi_iwa_core::RawMessage, BodyTableDeletionError> {
+) -> Result<&litchi_iwa_core::RawMessage, Error> {
     let mut selected = None;
     for message in &object.messages {
         if message.type_ != message_type {
             continue;
         }
         if selected.is_some() {
-            return Err(BodyTableDeletionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         selected = Some(message);
     }
-    selected.ok_or(BodyTableDeletionError::InvalidSource)
+    selected.ok_or(Error::InvalidSource)
 }
 
 fn storage_options(
     budget: &table_lock::WireBudget,
     source: &[u8],
-) -> Result<storage::DecodeOptions, BodyTableDeletionError> {
+) -> Result<storage::DecodeOptions, Error> {
     let limits = budget.wire_limits();
     let input = source.len().max(1);
     let fields = budget.remaining_wire_fields();
     let work = budget.remaining_wire_work();
     if input > limits.max_input_bytes() || fields == 0 || work == 0 {
-        return Err(BodyTableDeletionError::LimitExceeded {
+        return Err(Error::Limit {
             kind: if input > limits.max_input_bytes() {
-                super::BodyTableDeletionLimitKind::WireBytes
+                super::LimitKind::WireBytes
             } else if fields == 0 {
-                super::BodyTableDeletionLimitKind::WireFields
+                super::LimitKind::WireFields
             } else {
-                super::BodyTableDeletionLimitKind::WireWork
+                super::LimitKind::WireWork
             },
             observed: if input > limits.max_input_bytes() {
                 usize_to_u64(input)
@@ -1944,7 +1921,7 @@ fn storage_options(
 fn charge_storage_report(
     budget: &mut table_lock::WireBudget,
     report: storage::DecodeReport,
-) -> Result<(), BodyTableDeletionError> {
+) -> Result<(), Error> {
     budget
         .charge_payload_work(report.source_bytes())
         .and_then(|_| {
@@ -1962,19 +1939,19 @@ fn charge_storage_report(
 fn comment_options(
     budget: &table_lock::WireBudget,
     source: &[u8],
-) -> Result<comment_storage_codec::DecodeOptions, BodyTableDeletionError> {
+) -> Result<comment_storage_codec::DecodeOptions, Error> {
     let limits = budget.wire_limits();
     let input = source.len().max(1);
     let fields = budget.remaining_wire_fields();
     let work = budget.remaining_wire_work();
     if input > limits.max_input_bytes() || fields == 0 || work == 0 {
-        return Err(BodyTableDeletionError::LimitExceeded {
+        return Err(Error::Limit {
             kind: if input > limits.max_input_bytes() {
-                super::BodyTableDeletionLimitKind::WireBytes
+                super::LimitKind::WireBytes
             } else if fields == 0 {
-                super::BodyTableDeletionLimitKind::WireFields
+                super::LimitKind::WireFields
             } else {
-                super::BodyTableDeletionLimitKind::WireWork
+                super::LimitKind::WireWork
             },
             observed: usize_to_u64(input.max(1)),
             maximum: usize_to_u64(limits.max_input_bytes()),
@@ -1993,7 +1970,7 @@ fn comment_options(
 fn charge_comment_report(
     budget: &mut table_lock::WireBudget,
     report: comment_storage_codec::DecodeReport,
-) -> Result<(), BodyTableDeletionError> {
+) -> Result<(), Error> {
     budget
         .charge_payload_work(report.source_bytes())
         .and_then(|_| {
@@ -2012,91 +1989,77 @@ fn charge_comment_report(
 
 fn local_comment_identifier(
     reference: comment_storage_codec::ReferenceSnapshot,
-) -> Result<NonZeroU64, BodyTableDeletionError> {
+) -> Result<NonZeroU64, Error> {
     if reference.deprecated_is_external() == Some(true) {
-        return Err(BodyTableDeletionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
-    NonZeroU64::new(reference.identifier()).ok_or(BodyTableDeletionError::InvalidSource)
+    NonZeroU64::new(reference.identifier()).ok_or(Error::InvalidSource)
 }
 
-fn map_storage_error(error: storage::DecodeError) -> BodyTableDeletionError {
+fn map_storage_error(error: storage::DecodeError) -> Error {
     let Some(limit) = error.resource_limit() else {
-        return BodyTableDeletionError::InvalidSource;
+        return Error::InvalidSource;
     };
     match limit {
-        storage::DecodeLimit::Bytes { observed, maximum } => {
-            BodyTableDeletionError::LimitExceeded {
-                kind: super::BodyTableDeletionLimitKind::WireBytes,
-                observed: usize_to_u64(observed),
-                maximum: usize_to_u64(maximum),
-            }
-        },
-        storage::DecodeLimit::References { observed, maximum } => {
-            BodyTableDeletionError::LimitExceeded {
-                kind: super::BodyTableDeletionLimitKind::PayloadReferences,
-                observed: usize_to_u64(observed),
-                maximum: usize_to_u64(maximum),
-            }
-        },
-        storage::DecodeLimit::Text { observed, maximum } => BodyTableDeletionError::LimitExceeded {
-            kind: super::BodyTableDeletionLimitKind::WireWork,
+        storage::DecodeLimit::Bytes { observed, maximum } => Error::Limit {
+            kind: super::LimitKind::WireBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         },
-        storage::DecodeLimit::Fields { observed, maximum } => {
-            BodyTableDeletionError::LimitExceeded {
-                kind: super::BodyTableDeletionLimitKind::WireFields,
-                observed: usize_to_u64(observed),
-                maximum: usize_to_u64(maximum),
-            }
+        storage::DecodeLimit::References { observed, maximum } => Error::Limit {
+            kind: super::LimitKind::PayloadReferences,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(maximum),
+        },
+        storage::DecodeLimit::Text { observed, maximum } => Error::Limit {
+            kind: super::LimitKind::WireWork,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(maximum),
+        },
+        storage::DecodeLimit::Fields { observed, maximum } => Error::Limit {
+            kind: super::LimitKind::WireFields,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(maximum),
         },
         storage::DecodeLimit::Work { observed, maximum }
-        | storage::DecodeLimit::Retained { observed, maximum } => {
-            BodyTableDeletionError::LimitExceeded {
-                kind: super::BodyTableDeletionLimitKind::WireWork,
-                observed: usize_to_u64(observed),
-                maximum: usize_to_u64(maximum),
-            }
+        | storage::DecodeLimit::Retained { observed, maximum } => Error::Limit {
+            kind: super::LimitKind::WireWork,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(maximum),
         },
-        storage::DecodeLimit::Nesting { observed, maximum } => {
-            BodyTableDeletionError::LimitExceeded {
-                kind: super::BodyTableDeletionLimitKind::WireNesting,
-                observed: u64::from(observed),
-                maximum: u64::from(maximum),
-            }
+        storage::DecodeLimit::Nesting { observed, maximum } => Error::Limit {
+            kind: super::LimitKind::WireNesting,
+            observed: u64::from(observed),
+            maximum: u64::from(maximum),
         },
-        storage::DecodeLimit::Allocation { requested } => {
-            BodyTableDeletionError::Allocation { amount: requested }
-        },
-        _ => BodyTableDeletionError::InvalidSource,
+        storage::DecodeLimit::Allocation { requested } => Error::Allocation { amount: requested },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_comment_error(error: comment_storage_codec::DecodeError) -> BodyTableDeletionError {
+fn map_comment_error(error: comment_storage_codec::DecodeError) -> Error {
     let Some(limit) = error.resource_limit() else {
-        return BodyTableDeletionError::InvalidSource;
+        return Error::InvalidSource;
     };
     match limit {
         comment_storage_codec::DecodeLimit::Bytes { observed, maximum }
-        | comment_storage_codec::DecodeLimit::OutputBytes { observed, maximum } => {
-            BodyTableDeletionError::LimitExceeded {
-                kind: if matches!(
-                    limit,
-                    comment_storage_codec::DecodeLimit::OutputBytes { .. }
-                ) {
-                    super::BodyTableDeletionLimitKind::WireOutputBytes
-                } else {
-                    super::BodyTableDeletionLimitKind::WireBytes
-                },
-                observed: usize_to_u64(observed),
-                maximum: usize_to_u64(maximum),
-            }
+        | comment_storage_codec::DecodeLimit::OutputBytes { observed, maximum } => Error::Limit {
+            kind: if matches!(
+                limit,
+                comment_storage_codec::DecodeLimit::OutputBytes { .. }
+            ) {
+                super::LimitKind::WireOutputBytes
+            } else {
+                super::LimitKind::WireBytes
+            },
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(maximum),
         },
         comment_storage_codec::DecodeLimit::References { observed, maximum }
         | comment_storage_codec::DecodeLimit::Replies { observed, maximum }
         | comment_storage_codec::DecodeLimit::ReferenceBytes { observed, maximum } => {
-            BodyTableDeletionError::LimitExceeded {
-                kind: super::BodyTableDeletionLimitKind::PayloadReferences,
+            Error::Limit {
+                kind: super::LimitKind::PayloadReferences,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(maximum),
             }
@@ -2104,35 +2067,27 @@ fn map_comment_error(error: comment_storage_codec::DecodeError) -> BodyTableDele
         comment_storage_codec::DecodeLimit::Text { observed, maximum }
         | comment_storage_codec::DecodeLimit::Work { observed, maximum }
         | comment_storage_codec::DecodeLimit::Scratch { observed, maximum }
-        | comment_storage_codec::DecodeLimit::Retained { observed, maximum } => {
-            BodyTableDeletionError::LimitExceeded {
-                kind: super::BodyTableDeletionLimitKind::WireWork,
-                observed: usize_to_u64(observed),
-                maximum: usize_to_u64(maximum),
-            }
+        | comment_storage_codec::DecodeLimit::Retained { observed, maximum } => Error::Limit {
+            kind: super::LimitKind::WireWork,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(maximum),
         },
-        comment_storage_codec::DecodeLimit::Fields { observed, maximum } => {
-            BodyTableDeletionError::LimitExceeded {
-                kind: super::BodyTableDeletionLimitKind::WireFields,
-                observed: usize_to_u64(observed),
-                maximum: usize_to_u64(maximum),
-            }
+        comment_storage_codec::DecodeLimit::Fields { observed, maximum } => Error::Limit {
+            kind: super::LimitKind::WireFields,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(maximum),
         },
-        comment_storage_codec::DecodeLimit::Nesting { observed, maximum } => {
-            BodyTableDeletionError::LimitExceeded {
-                kind: super::BodyTableDeletionLimitKind::WireNesting,
-                observed: u64::from(observed),
-                maximum: u64::from(maximum),
-            }
+        comment_storage_codec::DecodeLimit::Nesting { observed, maximum } => Error::Limit {
+            kind: super::LimitKind::WireNesting,
+            observed: u64::from(observed),
+            maximum: u64::from(maximum),
         },
-        comment_storage_codec::DecodeLimit::Allocations { observed, maximum } => {
-            BodyTableDeletionError::LimitExceeded {
-                kind: super::BodyTableDeletionLimitKind::WireWork,
-                observed: usize_to_u64(observed),
-                maximum: usize_to_u64(maximum),
-            }
+        comment_storage_codec::DecodeLimit::Allocations { observed, maximum } => Error::Limit {
+            kind: super::LimitKind::WireWork,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(maximum),
         },
-        _ => BodyTableDeletionError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 

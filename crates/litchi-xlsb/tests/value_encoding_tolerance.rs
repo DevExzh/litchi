@@ -12,9 +12,9 @@ use std::io::Cursor;
 
 use litchi_core::sheet::{Cell as _, CellValue};
 use litchi_opc::{OpcPackage, PackURI};
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::cell_values::{CellError, Reference, Value};
-use litchi_xlsb::raw::{Kind, Records, Writer, kind};
-use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
+use litchi_xlsb::raw::{Encoder, Kind, Records, kind};
 use litchi_xlsb::{
     Defect, SourceBackedWorkbook, ToleranceReport, Validation, ValueEncodingDefect, Workbook,
 };
@@ -25,7 +25,7 @@ const SST: &str = "/xl/sharedStrings.bin";
 /// A1 TRUE, B1 #DIV/0!, C1 a shared string, D1 a Boolean formula, and one
 /// classic whole-number validation on A2:A4.
 fn fixture() -> Vec<u8> {
-    let mut sheet = MutableWorksheet::new("Values");
+    let mut sheet = builder::Worksheet::new("Values");
     sheet.set_cell(0, 0, true);
     sheet.set_cell(0, 1, CellValue::Error("#DIV/0!".to_string()));
     sheet.set_cell(0, 2, "text\u{e9}");
@@ -44,10 +44,14 @@ fn fixture() -> Vec<u8> {
     rule.formula1 = Some("1".to_string());
     rule.formula2 = Some("4".to_string());
     sheet.add_data_validation(rule);
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(sheet);
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output).unwrap();
+    writer
+        .build()
+        .expect("build package")
+        .write_to(&mut output)
+        .unwrap();
     output.into_inner()
 }
 
@@ -57,14 +61,18 @@ fn rewrite(
     record_type: Kind,
     edit: impl FnOnce(&mut Vec<u8>),
 ) -> Vec<u8> {
-    let mut package = OpcPackage::from_reader(Cursor::new(source)).unwrap();
+    let mut package =
+        OpcPackage::from_reader(Cursor::new(source), litchi_opc::SourceLimits::default()).unwrap();
     let uri = PackURI::new(part).unwrap();
-    let mut stream: Vec<(Kind, Vec<u8>)> = Records::new(package.get_part(&uri).unwrap().blob())
-        .map(|record| {
-            let record = record.unwrap();
-            (record.kind(), record.payload().to_vec())
-        })
-        .collect();
+    let mut stream: Vec<(Kind, Vec<u8>)> = Records::new(
+        package.get_part(&uri).unwrap().blob(),
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .map(|record| {
+        let record = record.unwrap();
+        (record.kind(), record.payload().to_vec())
+    })
+    .collect();
     edit(
         &mut stream
             .iter_mut()
@@ -73,13 +81,13 @@ fn rewrite(
             .1,
     );
     let mut blob = Vec::new();
-    let mut writer = Writer::new(&mut blob);
+    let mut writer = Encoder::new(&mut blob, litchi_xlsb::raw::Limits::DEFAULT);
     for (kind, payload) in &stream {
         writer.write_record(*kind, payload).unwrap();
     }
     package.get_part_mut(&uri).unwrap().set_blob(blob);
     let mut output = Cursor::new(Vec::new());
-    package.to_stream(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     output.into_inner()
 }
 

@@ -41,12 +41,92 @@ use litchi_docx::source_backed::tail_append_stream::{
     MemoryReplayStore, ParagraphCursor, ParagraphEventSink, ParagraphStreamLimits,
     PlainParagraphEvent, ReplayableParagraphSource,
 };
-use litchi_docx::source_backed::{self, TailAppendLimits};
+use litchi_docx::source_backed::{self, tail_append::Limits as TailAppendLimits};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{PackURI, SourceBackedPackage};
 use sha2::{Digest as _, Sha256};
 use soapberry_zip::office::StreamingArchiveWriter;
 use tempfile::tempdir;
+
+/// Record 0355a: a prepared stream plan commits to a new source-backed
+/// package, and writing that package is the publication. These helpers
+/// keep the publication-shaped assertions of this suite.
+struct Published {
+    commit: source_backed::paragraph_stream::Commit,
+}
+
+impl fmt::Debug for Published {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_struct("Published").finish_non_exhaustive()
+    }
+}
+
+impl Published {
+    fn durable_patch(&self) -> Result<ParagraphStreamPatch, StreamError> {
+        self.commit.patch().durable()
+    }
+
+    fn candidate_artifact_length(&self) -> u64 {
+        self.durable_patch()
+            .expect("a committed forward stream patch is durable")
+            .candidate()
+            .archive
+            .len
+    }
+
+    fn write_inverse_to_stream(
+        &self,
+        current: &source_backed::Package,
+        writer: impl Write,
+    ) -> Result<(), StreamError> {
+        current
+            .apply_paragraph_stream(&self.commit.patch().inverse())?
+            .package()
+            .write_to(writer)?;
+        Ok(())
+    }
+}
+
+trait WritePlan {
+    fn write_to(self, writer: impl Write) -> Result<Published, StreamError>;
+    fn write_to_path(self, path: impl AsRef<Path>) -> Result<Published, StreamError>;
+}
+
+impl WritePlan for source_backed::tail_append_stream::ParagraphStreamPlan<'_> {
+    fn write_to(self, writer: impl Write) -> Result<Published, StreamError> {
+        let commit = self.commit()?;
+        commit.package().write_to(writer)?;
+        Ok(Published { commit })
+    }
+
+    fn write_to_path(self, path: impl AsRef<Path>) -> Result<Published, StreamError> {
+        let commit = self.commit()?;
+        commit.package().save(path)?;
+        Ok(Published { commit })
+    }
+}
+
+trait ApplyDurable {
+    fn apply_durable_to<R: AuthoredReplayResolver>(
+        &self,
+        durable: &ParagraphStreamPatch,
+        resolver: &R,
+        writer: impl Write,
+    ) -> Result<Published, StreamError>;
+}
+
+impl ApplyDurable for source_backed::Package {
+    fn apply_durable_to<R: AuthoredReplayResolver>(
+        &self,
+        durable: &ParagraphStreamPatch,
+        resolver: &R,
+        writer: impl Write,
+    ) -> Result<Published, StreamError> {
+        let commit = self.apply_tail_append_stream_patch(durable, resolver)?;
+        commit.package().write_to(writer)?;
+        Ok(Published { commit })
+    }
+}
 
 const WORD: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const STRICT_WORD: &str = "http://purl.oclc.org/ooxml/wordprocessingml/main";
@@ -248,7 +328,8 @@ fn archive(main: &[u8], strict: bool, compression: Compression) -> Vec<u8> {
     let relationships = format!(
         r#"<Relationships xmlns="{RELATIONSHIPS}"><Relationship Id="rIdDocument" Type="{office_document}" Target="{MAIN}"/></Relationships>"#
     );
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .expect("content-types fixture must be writable");
@@ -303,6 +384,22 @@ fn limits(source_xml_bytes: usize) -> ParagraphStreamLimits {
     stream
 }
 
+#[test]
+fn package_stream_edit_uses_the_focused_public_type() {
+    let source_xml = source_xml(false, 0);
+    let package = open_package(archive(&source_xml, false, Compression::Store));
+    let edit: source_backed::paragraph_stream::Edit<'_, EventSource> = package
+        .tail_append_plain_paragraphs(
+            EventSource::new(vec![
+                EventData::Start,
+                EventData::Text("focused".to_owned()),
+                EventData::End,
+            ]),
+            limits(source_xml.len()),
+        );
+    assert_eq!(edit.limits(), limits(source_xml.len()));
+}
+
 fn managed_context(memory: u64, output: u64) -> (Budget, ExecutionContext) {
     let (budget, _cancellation_source, context) =
         managed_context_with_objects(memory, output, u64::MAX);
@@ -335,10 +432,11 @@ fn managed_context_with_objects(
 
 fn managed_package(archive: Vec<u8>, memory: u64, output: u64) -> (Budget, source_backed::Package) {
     let (budget, context) = managed_context(memory, output);
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         Arc::new(VersionedArchiveSource::new(archive)),
-        litchi_opc::ReadLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(litchi_opc::SourceLimits::default())
+            .execution_context(context),
     )
     .expect("managed source-backed DOCX fixture must open");
     (budget, package)
@@ -351,24 +449,30 @@ fn managed_package_with_cancellation(
 ) -> (Budget, CancellationSource, source_backed::Package) {
     let (budget, cancellation_source, context) =
         managed_context_with_objects(memory, output, u64::MAX);
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         Arc::new(VersionedArchiveSource::new(archive)),
-        litchi_opc::ReadLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(litchi_opc::SourceLimits::default())
+            .execution_context(context),
     )
     .expect("managed source-backed DOCX fixture must open");
     (budget, cancellation_source, package)
 }
 
 fn main_bytes(archive: &[u8]) -> Vec<u8> {
-    SourceBackedPackage::from_vec(archive.to_vec())
-        .expect("published archive must reopen")
-        .part(&PackURI::new(MAIN_URI).expect("main URI must be valid"))
-        .expect("main part must exist")
-        .data()
-        .expect("main part must decode")
-        .as_bytes()
-        .to_vec()
+    SourceBackedPackage::from_vec(
+        archive.to_vec(),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .expect("published archive must reopen")
+    .part(&PackURI::new(MAIN_URI).expect("main URI must be valid"))
+    .expect("main part must exist")
+    .data()
+    .expect("main part must decode")
+    .as_bytes()
+    .to_vec()
 }
 
 fn semantic_texts(archive: &[u8]) -> Vec<String> {
@@ -383,7 +487,7 @@ fn semantic_texts(archive: &[u8]) -> Vec<String> {
 }
 
 fn path_semantic_texts(path: &Path) -> Vec<String> {
-    let package = source_backed::Package::from_path(path).expect("published path must reopen");
+    let package = source_backed::Package::open(path).expect("published path must reopen");
     package
         .document_snapshot()
         .expect("published path document must decode")
@@ -517,8 +621,13 @@ impl OriginalArtifactProvider for TestOriginalProvider {
         _reference: &OriginalArtifactReference,
     ) -> Result<litchi_opc::SourceArtifact, OriginalArtifactError> {
         let bytes = self.bytes.clone().ok_or(OriginalArtifactError::Missing)?;
-        let package = SourceBackedPackage::from_vec(bytes)
-            .map_err(|error| OriginalArtifactError::Provider(Box::new(error)))?;
+        let package = SourceBackedPackage::from_vec(
+            bytes,
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            None,
+        )
+        .map_err(|error| OriginalArtifactError::Provider(Box::new(error)))?;
         Ok(package.source_artifact())
     }
 }
@@ -535,8 +644,13 @@ impl OriginalArtifactProvider for CountingOriginalProvider {
         _reference: &OriginalArtifactReference,
     ) -> Result<litchi_opc::SourceArtifact, OriginalArtifactError> {
         self.opens.fetch_add(1, Ordering::AcqRel);
-        let package = SourceBackedPackage::from_vec(self.bytes.clone())
-            .map_err(|error| OriginalArtifactError::Provider(Box::new(error)))?;
+        let package = SourceBackedPackage::from_vec(
+            self.bytes.clone(),
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            None,
+        )
+        .map_err(|error| OriginalArtifactError::Provider(Box::new(error)))?;
         Ok(package.source_artifact())
     }
 }
@@ -860,7 +974,7 @@ fn replayable_stream_escapes_borrowed_chunks_and_preserves_section_and_inverse()
 
             let mut output = Vec::new();
             let publication = plan
-                .write_to_stream(&mut output)
+                .write_to(&mut output)
                 .expect("replayable stream must publish");
             assert_ne!(output, source_archive);
             assert_eq!(
@@ -917,7 +1031,7 @@ fn default_and_shadowed_namespaces_cannot_capture_generated_prefix() {
         .prepare()
         .expect("default namespace source must prepare");
     let mut output = Vec::new();
-    plan.write_to_stream(&mut output)
+    plan.write_to(&mut output)
         .expect("shadowed namespace source must publish");
     assert_eq!(semantic_texts(&output), vec!["seed", "tail"]);
     assert!(
@@ -941,7 +1055,7 @@ fn default_stream_limits_accept_a_tiny_valid_append() {
         .expect("default stream limits must admit a tiny valid append");
     assert_eq!(plan.authored_proof().paragraph_count, 1);
     let mut output = Vec::new();
-    plan.write_to_stream(&mut output)
+    plan.write_to(&mut output)
         .expect("default stream limits must publish a tiny valid append");
     assert_eq!(semantic_texts(&output), vec!["seed", "default limits"]);
 }
@@ -1085,7 +1199,7 @@ fn each_replay_pass_opens_one_cursor_independent_of_encoded_window_count() {
         "sealing, DOCX candidate validation, and OPC candidate validation each open once"
     );
     let mut output = Vec::new();
-    plan.write_to_stream(&mut output)
+    plan.write_to(&mut output)
         .expect("large authored output must publish");
     assert_eq!(
         opens.load(Ordering::Acquire),
@@ -1155,7 +1269,7 @@ fn one_shot_producer_requires_and_uses_explicit_replay_store() {
     let plan = edit.prepare().expect("one-shot stream must prepare");
     assert_eq!(runs.load(Ordering::Acquire), 1);
     let mut output = Vec::new();
-    plan.write_to_stream(&mut output)
+    plan.write_to(&mut output)
         .expect("one-shot stream must publish");
     assert_eq!(semantic_texts(&output), vec!["seed", "one-shot"]);
 }
@@ -1222,7 +1336,7 @@ fn explicit_store_capacity_must_fit_selected_replay_limit_before_producer() {
     assert!(matches!(
         result,
         Err(StreamError::Replay(AuthoredReplayError::Limit {
-            resource: "replay bytes",
+            kind: source_backed::tail_append_stream::LimitKind::ReplayBytes,
             actual: 4096,
             maximum: 1024,
         }))
@@ -1328,7 +1442,7 @@ fn managed_external_output_is_charged_once_for_one_publication() {
             .prepare()
             .expect("unmanaged candidate must prepare");
         let mut output = Vec::new();
-        plan.write_to_stream(&mut output)
+        plan.write_to(&mut output)
             .expect("unmanaged candidate must publish");
         output
     };
@@ -1342,7 +1456,7 @@ fn managed_external_output_is_charged_once_for_one_publication() {
         .prepare()
         .expect("managed candidate must prepare");
     let mut output = Vec::new();
-    plan.write_to_stream(&mut output)
+    plan.write_to(&mut output)
         .expect("one publication must fit the exact external output budget");
     assert_eq!(output, expected);
     assert_eq!(output.len() as u64, expected_len);
@@ -1430,7 +1544,7 @@ fn durable_resolver_cancellation_refuses_before_replay_reader_or_output() {
         .expect("durable producer must prepare");
     let mut candidate = Vec::new();
     let publication = plan
-        .write_to_stream(&mut candidate)
+        .write_to(&mut candidate)
         .expect("durable producer must publish");
     let patch = publication
         .durable_patch()
@@ -1457,7 +1571,7 @@ fn durable_resolver_cancellation_refuses_before_replay_reader_or_output() {
         cancellation,
     };
     let mut output = Vec::new();
-    let result = current.apply_tail_append_stream_patch(&decoded, &resolver, &mut output);
+    let result = current.apply_durable_to(&decoded, &resolver, &mut output);
     assert!(matches!(
         result,
         Err(StreamError::TailAppend(TailAppendError::Execution(
@@ -1496,18 +1610,28 @@ fn durable_forward_and_inverse_authorizations_are_compact_canonical_wire() {
     let authored_proof = plan.authored_proof();
     let candidate_proof = plan.candidate_proof();
     let mut candidate_archive = Vec::new();
-    plan.write_to_stream(&mut candidate_archive)
+    plan.write_to(&mut candidate_archive)
         .expect("durable patch fixture must publish");
     let source_artifact = artifact_proof(
-        &SourceBackedPackage::from_vec(source_archive.clone())
-            .expect("source artifact package must open")
-            .source_artifact(),
+        &SourceBackedPackage::from_vec(
+            source_archive.clone(),
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            None,
+        )
+        .expect("source artifact package must open")
+        .source_artifact(),
     )
     .expect("source artifact fingerprint must be bounded");
     let candidate_artifact = artifact_proof(
-        &SourceBackedPackage::from_vec(candidate_archive.clone())
-            .expect("candidate artifact package must open")
-            .source_artifact(),
+        &SourceBackedPackage::from_vec(
+            candidate_archive.clone(),
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            None,
+        )
+        .expect("candidate artifact package must open")
+        .source_artifact(),
     )
     .expect("candidate artifact fingerprint must be bounded");
     let patch = ParagraphStreamPatch::from_tail_append_proofs(
@@ -1684,7 +1808,7 @@ fn durable_forward_patch_resolves_after_reopen_and_refuses_wrong_source_or_provi
     let plan = edit.prepare().expect("durable producer must prepare");
     let mut expected_candidate = Vec::new();
     let publication = plan
-        .write_to_stream(&mut expected_candidate)
+        .write_to(&mut expected_candidate)
         .expect("durable producer must publish");
     let patch = publication
         .durable_patch()
@@ -1711,7 +1835,7 @@ fn durable_forward_patch_resolves_after_reopen_and_refuses_wrong_source_or_provi
     .expect("reopened source with a different process-local version must open");
     let mut applied = Vec::new();
     reopened
-        .apply_tail_append_stream_patch(&decoded, &resolver, &mut applied)
+        .apply_durable_to(&decoded, &resolver, &mut applied)
         .expect("durable forward patch must apply after reopening");
     assert_eq!(applied, expected_candidate);
     assert_eq!(semantic_texts(&applied), vec!["seed", "reopened"]);
@@ -1723,7 +1847,7 @@ fn durable_forward_patch_resolves_after_reopen_and_refuses_wrong_source_or_provi
     );
     let mut managed_applied = Vec::new();
     managed_reopened
-        .apply_tail_append_stream_patch(&decoded, &resolver, &mut managed_applied)
+        .apply_durable_to(&decoded, &resolver, &mut managed_applied)
         .expect("managed durable forward patch must apply once to the external sink");
     assert_eq!(managed_applied, expected_candidate);
     assert_eq!(
@@ -1744,7 +1868,7 @@ fn durable_forward_patch_resolves_after_reopen_and_refuses_wrong_source_or_provi
     let mut source_mismatch_output = Vec::new();
     assert!(
         mutated_source
-            .apply_tail_append_stream_patch(&decoded, &resolver, &mut source_mismatch_output,)
+            .apply_durable_to(&decoded, &resolver, &mut source_mismatch_output,)
             .is_err()
     );
     assert!(
@@ -1762,11 +1886,8 @@ fn durable_forward_patch_resolves_after_reopen_and_refuses_wrong_source_or_provi
         handle: resolver.handle.clone(),
     };
     let mut provider_mismatch_output = Vec::new();
-    let provider_mismatch = reopened.apply_tail_append_stream_patch(
-        &decoded,
-        &wrong_resolver,
-        &mut provider_mismatch_output,
-    );
+    let provider_mismatch =
+        reopened.apply_durable_to(&decoded, &wrong_resolver, &mut provider_mismatch_output);
     assert!(matches!(
         provider_mismatch,
         Err(StreamError::Patch(PatchError::ReplayResolver(
@@ -1809,7 +1930,7 @@ fn durable_resolver_error_yields_source_mismatch_when_resolver_mutates_current()
         .expect("durable producer must prepare");
     let mut candidate = Vec::new();
     let publication = plan
-        .write_to_stream(&mut candidate)
+        .write_to(&mut candidate)
         .expect("durable producer must publish");
     let patch = publication
         .durable_patch()
@@ -1822,7 +1943,7 @@ fn durable_resolver_error_yields_source_mismatch_when_resolver_mutates_current()
         .expect("mutable current source must open");
     let resolver = MutatingMissingReplayResolver { source };
     let mut output = Vec::new();
-    let result = current.apply_tail_append_stream_patch(&decoded, &resolver, &mut output);
+    let result = current.apply_durable_to(&decoded, &resolver, &mut output);
     assert!(matches!(
         result,
         Err(StreamError::Opc(
@@ -1901,7 +2022,7 @@ fn finite_limits_cancellation_and_partial_sink_errors_remain_at_public_boundary(
         .prepare()
         .expect("partial sink fixture plan must prepare");
     let mut sink = PrefixFailSink::after(32);
-    assert!(plan.write_to_stream(&mut sink).is_err());
+    assert!(plan.write_to(&mut sink).is_err());
     assert!(
         !sink.bytes.is_empty(),
         "sink failure must retain accepted prefix"
@@ -1925,7 +2046,7 @@ fn source_change_after_preparation_refuses_without_archive_output() {
     source.bump();
     let mut output = Vec::new();
     assert!(
-        plan.write_to_stream(&mut output).is_err(),
+        plan.write_to(&mut output).is_err(),
         "stale source must refuse publication"
     );
     assert!(
@@ -1950,7 +2071,7 @@ fn path_publication_replaces_new_and_existing_destinations_with_exact_reopenable
                     .prepare()
                     .expect("path fixture must prepare for stream comparison");
                 let mut output = Vec::new();
-                plan.write_to_stream(&mut output)
+                plan.write_to(&mut output)
                     .expect("path fixture stream comparison must publish");
                 output
             };
@@ -2049,12 +2170,12 @@ fn path_publication_retains_durable_forward_and_inverse_authorizations() {
     .expect("durable path source must reopen");
     let mut applied = Vec::new();
     reopened_source
-        .apply_tail_append_stream_patch(&decoded, &resolver, &mut applied)
+        .apply_durable_to(&decoded, &resolver, &mut applied)
         .expect("durable path patch must apply after reopen");
     assert_eq!(applied, candidate);
     assert_eq!(semantic_texts(&applied), vec!["seed", "path durable"]);
 
-    let reopened_candidate = source_backed::Package::from_path(&destination)
+    let reopened_candidate = source_backed::Package::open(&destination)
         .expect("durable path candidate must reopen from its destination");
     let mut restored = Vec::new();
     publication
@@ -2125,7 +2246,7 @@ fn path_publication_can_replace_the_open_source_path_and_inverse_from_the_new_in
     let source_path = directory.path().join("source.docx");
     fs::write(&source_path, &source_archive).expect("source path fixture");
     let package =
-        source_backed::Package::from_path(&source_path).expect("filesystem source path must open");
+        source_backed::Package::open(&source_path).expect("filesystem source path must open");
     let plan = package
         .tail_append_plain_paragraphs(
             EventSource::new(events_for(&["same path"])),
@@ -2143,7 +2264,7 @@ fn path_publication_can_replace_the_open_source_path_and_inverse_from_the_new_in
         publication.candidate_artifact_length(),
         replaced.len() as u64
     );
-    let reopened_candidate = source_backed::Package::from_path(&source_path)
+    let reopened_candidate = source_backed::Package::open(&source_path)
         .expect("replacement inode must reopen independently");
     let mut restored = Vec::new();
     publication
@@ -2164,8 +2285,8 @@ fn path_publication_hardlink_destination_preserves_the_original_source_inode() {
     fs::write(&source_path, &source_archive).expect("hardlink source fixture");
     fs::hard_link(&source_path, &destination).expect("hardlink destination fixture");
 
-    let package = source_backed::Package::from_path(&source_path)
-        .expect("hardlink filesystem source must open");
+    let package =
+        source_backed::Package::open(&source_path).expect("hardlink filesystem source must open");
     let plan = package
         .tail_append_plain_paragraphs(
             EventSource::new(events_for(&["hardlink path"])),
@@ -2190,7 +2311,7 @@ fn path_publication_hardlink_destination_preserves_the_original_source_inode() {
         path_semantic_texts(&destination),
         vec!["seed", "hardlink path"]
     );
-    let reopened_candidate = source_backed::Package::from_path(&destination)
+    let reopened_candidate = source_backed::Package::open(&destination)
         .expect("hardlink candidate replacement must reopen");
     let mut restored = Vec::new();
     publication
@@ -2244,10 +2365,11 @@ fn path_publication_cancellation_leaves_destination_and_managed_memory_untouched
     let source_archive = archive(&source_xml, false, Compression::Store);
     let (budget, cancellation_source, context) =
         managed_context_with_objects(64 * 1024 * 1024, u64::MAX, u64::MAX);
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         Arc::new(VersionedArchiveSource::new(source_archive.clone())),
-        litchi_opc::ReadLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(litchi_opc::SourceLimits::default())
+            .execution_context(context),
     )
     .expect("cancelled managed path source must open");
     let directory = tempdir().expect("cancelled path temporary directory");
@@ -2293,7 +2415,7 @@ fn path_publication_late_managed_output_failure_leaves_destination_and_no_tempor
             .prepare()
             .expect("late output-limit comparison must prepare");
         let mut output = Vec::new();
-        plan.write_to_stream(&mut output)
+        plan.write_to(&mut output)
             .expect("late output-limit comparison must publish");
         output
     };
@@ -2434,7 +2556,7 @@ fn path_publication_releases_managed_workspace_after_success() {
             .prepare()
             .expect("managed path comparison must prepare");
         let mut output = Vec::new();
-        plan.write_to_stream(&mut output)
+        plan.write_to(&mut output)
             .expect("managed path comparison must publish");
         output
     };

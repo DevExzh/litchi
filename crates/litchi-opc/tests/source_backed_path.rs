@@ -9,7 +9,8 @@
 
 use std::fs;
 
-use litchi_opc::{OpcError, PackURI, ReadLimits, SourceBackedPackage};
+use litchi_opc::SourceCacheLimits;
+use litchi_opc::{OpcError, PackURI, SourceBackedPackage, SourceLimits};
 use soapberry_zip::office::StreamingArchiveWriter;
 use tempfile::NamedTempFile;
 
@@ -35,7 +36,8 @@ fn archive_bytes(selected: &[u8], unused: &[u8]) -> Vec<u8> {
         r#"<Relationships xmlns="{RELATIONSHIPS_NS}"><Relationship Id="rId1" Type="{OFFICE_DOCUMENT_REL}" Target="{SELECTED_MEMBER}"/></Relationships>"#
     );
 
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .unwrap();
@@ -132,8 +134,14 @@ fn path_default_catalog_and_selected_data_match_from_vec_without_eager_unselecte
     );
     let file = write_fixture(&source);
 
-    let from_vec = SourceBackedPackage::from_vec(source).unwrap();
-    let from_path = SourceBackedPackage::from_path(file.path()).unwrap();
+    let from_vec = SourceBackedPackage::from_vec(
+        source,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
+    let from_path = SourceBackedPackage::from_path(file.path(), SourceLimits::default()).unwrap();
 
     assert_eq!(catalog(&from_path), catalog(&from_vec));
     assert_eq!(
@@ -160,64 +168,70 @@ fn path_with_limits_matches_from_vec_and_rejects_exact_too_small_input_and_part_
     let source = archive_bytes(SELECTED_PAYLOAD, &unused);
     let file = write_fixture(&source);
 
-    let exact_input = ReadLimits::builder()
+    let exact_input = SourceLimits::builder()
         .max_input_bytes(source.len() as u64)
         .unwrap()
         .build()
         .unwrap();
-    let from_path = SourceBackedPackage::from_path_with_limits(file.path(), exact_input).unwrap();
-    let from_vec = SourceBackedPackage::from_vec_with_limits(
+    let from_path = SourceBackedPackage::from_path(file.path(), exact_input).unwrap();
+    let from_vec = SourceBackedPackage::from_vec(
         source.clone(),
-        ReadLimits::builder()
+        SourceLimits::builder()
             .max_input_bytes(source.len() as u64)
             .unwrap()
             .build()
             .unwrap(),
+        SourceCacheLimits::default(),
+        None,
     )
     .unwrap();
     assert_eq!(catalog(&from_path), catalog(&from_vec));
     assert_eq!(selected_payload(&from_path), SELECTED_PAYLOAD);
 
-    let too_small_input = ReadLimits::builder()
+    let too_small_input = SourceLimits::builder()
         .max_input_bytes((source.len() - 1) as u64)
         .unwrap()
         .build()
         .unwrap();
     assert!(matches!(
-        SourceBackedPackage::from_path_with_limits(file.path(), too_small_input),
-        Err(OpcError::ReadLimit { .. })
+        SourceBackedPackage::from_path(file.path(), too_small_input),
+        Err(OpcError::Limit { .. })
     ));
     assert!(matches!(
-        SourceBackedPackage::from_vec_with_limits(
+        SourceBackedPackage::from_vec(
             source.clone(),
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_input_bytes((source.len() - 1) as u64)
                 .unwrap()
                 .build()
                 .unwrap(),
+            SourceCacheLimits::default(),
+            None
         ),
-        Err(OpcError::ReadLimit { .. })
+        Err(OpcError::Limit { .. })
     ));
 
-    let too_small_part = ReadLimits::builder()
+    let too_small_part = SourceLimits::builder()
         .max_part_bytes((unused.len() - 1) as u64)
         .unwrap()
         .build()
         .unwrap();
     assert!(matches!(
-        SourceBackedPackage::from_path_with_limits(file.path(), too_small_part),
-        Err(OpcError::ReadLimit { .. })
+        SourceBackedPackage::from_path(file.path(), too_small_part),
+        Err(OpcError::Limit { .. })
     ));
     assert!(matches!(
-        SourceBackedPackage::from_vec_with_limits(
+        SourceBackedPackage::from_vec(
             source,
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_part_bytes((unused.len() - 1) as u64)
                 .unwrap()
                 .build()
                 .unwrap(),
+            SourceCacheLimits::default(),
+            None
         ),
-        Err(OpcError::ReadLimit { .. })
+        Err(OpcError::Limit { .. })
     ));
 }
 
@@ -226,7 +240,7 @@ fn path_source_reports_external_change_without_retargeting_or_stale_hydration() 
     let original = archive_bytes(SELECTED_PAYLOAD, UNUSED_PAYLOAD);
     let replacement = archive_bytes(b"<document>replacement</document>", UNUSED_PAYLOAD);
     let file = write_fixture(&original);
-    let package = SourceBackedPackage::from_path(file.path()).unwrap();
+    let package = SourceBackedPackage::from_path(file.path(), SourceLimits::default()).unwrap();
     let selected = package.part(&pack(SELECTED_URI)).unwrap();
     fs::write(file.path(), replacement).unwrap();
 
@@ -239,7 +253,7 @@ fn path_source_reports_external_change_without_retargeting_or_stale_hydration() 
         Err(OpcError::SourceChanged { .. })
     ));
 
-    let reopened = SourceBackedPackage::from_path(file.path()).unwrap();
+    let reopened = SourceBackedPackage::from_path(file.path(), SourceLimits::default()).unwrap();
     assert_eq!(
         selected_payload(&reopened),
         b"<document>replacement</document>"

@@ -1042,7 +1042,7 @@ mod tests {
             "3cm".parse().unwrap(),
         ));
         builder.add_layout(layout).unwrap();
-        let presentation = crate::Presentation::from_bytes(builder.build().unwrap()).unwrap();
+        let presentation = builder.build().unwrap().presentation().unwrap();
         assert_eq!(
             presentation.layouts().unwrap().layouts[0].name,
             "builder_layout"

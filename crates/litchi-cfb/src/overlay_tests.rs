@@ -1,6 +1,7 @@
+use crate::overlay::{PhysicalSpan, finish_overlay_plan};
 use crate::{
-    OleFile, OleWriter, OutputProgress, OverlayError, OverlayLimits, OverlaySourceMode,
-    SameLengthStreamOverlay, SharedOleFile,
+    OleFile, OleFileLimits, OleWriter, OutputProgress, OverlayError, OverlayLimits,
+    OverlaySourceMode, SameLengthStreamOverlay, SharedOleFile, SharedOleFileLimits,
 };
 use litchi_core::{OwnedSource, ReadAt, SourceVersion};
 use std::io::{self, Cursor, Write};
@@ -55,8 +56,122 @@ fn small_bytes() -> Vec<u8> {
     output.into_inner()
 }
 
+fn directory_and_allocation_expanding_artifacts() -> (Vec<u8>, Vec<u8>) {
+    let mut expanded_writer = OleWriter::new();
+    for index in 0..100_u8 {
+        expanded_writer
+            .create_stream(&[&format!("Mini{index:03}")], &vec![index; 1_000])
+            .unwrap();
+    }
+    let mut expanded_output = Cursor::new(Vec::new());
+    expanded_writer.write_to(&mut expanded_output).unwrap();
+    let expanded = expanded_output.into_inner();
+
+    // Fill the source with one regular stream so its own FAT covers the full
+    // extent. Both artifacts then have the same physical length without
+    // relying on unclaimed trailing sectors, while the target still has a
+    // larger directory and MiniFAT that the default profile accepts.
+    for payload_len in (4_096..expanded.len()).step_by(512) {
+        let mut source_writer = OleWriter::new();
+        source_writer
+            .create_stream(&["Payload"], &vec![0x55; payload_len])
+            .unwrap();
+        let mut source_output = Cursor::new(Vec::new());
+        source_writer.write_to(&mut source_output).unwrap();
+        let source = source_output.into_inner();
+        if source.len() == expanded.len() {
+            return (source, expanded);
+        }
+    }
+    panic!(
+        "could not build a one-stream source with target length {}",
+        expanded.len()
+    );
+}
+
+fn full_replacement_span(target: &[u8]) -> PhysicalSpan {
+    let length = target.len();
+    PhysicalSpan {
+        offset: 0,
+        replacement: Arc::from(target.to_vec().into_boxed_slice()),
+        replacement_range: 0..length,
+    }
+}
+
 fn shared(bytes: Vec<u8>) -> SharedOleFile {
-    SharedOleFile::open(Arc::new(OwnedSource::new(bytes))).unwrap()
+    SharedOleFile::open(
+        Arc::new(OwnedSource::new(bytes)),
+        SharedOleFileLimits::default(),
+    )
+    .unwrap()
+}
+
+#[test]
+fn overlay_snapshot_retains_custom_physical_profile() {
+    let bytes = small_bytes();
+    let input = u64::try_from(bytes.len()).unwrap();
+    let custom = SharedOleFileLimits::new(input)
+        .unwrap()
+        .with_max_directory_bytes(4 * 1024)
+        .unwrap()
+        .with_max_allocation_table_bytes(4 * 1024)
+        .unwrap();
+    let file = SharedOleFile::open(Arc::new(OwnedSource::new(bytes)), custom).unwrap();
+    assert_eq!(file.plan_source_snapshot().limits, custom);
+    file.plan_same_length_stream_overlays(vec![replacement("Fragment", 0x77, 4_097)], limits())
+        .unwrap();
+}
+
+#[test]
+fn composed_overlay_reuses_tight_directory_and_allocation_limits() {
+    let (source, target) = directory_and_allocation_expanding_artifacts();
+    OleFile::open(Cursor::new(target.clone()), OleFileLimits::default())
+        .expect("the expanded target is valid under the default profile");
+    let source_len = u64::try_from(source.len()).unwrap();
+    let tight = SharedOleFileLimits::new(source_len)
+        .unwrap()
+        .with_max_directory_bytes(512)
+        .unwrap()
+        .with_max_allocation_table_bytes(64 * 1024 * 1024)
+        .unwrap();
+    let file = SharedOleFile::open(Arc::new(OwnedSource::new(source.clone())), tight).unwrap();
+    let result = finish_overlay_plan(
+        file.plan_source_snapshot(),
+        vec![full_replacement_span(&target)],
+        |_source, _candidate| Ok::<(), OverlayError>(()),
+    );
+    assert!(
+        matches!(
+            &result,
+            Err(OverlayError::Ole(error))
+                if error.to_string().contains("directory bytes")
+        ),
+        "unexpected tight-directory result: {result:?}"
+    );
+
+    // Keep the directory ceiling wide for a second composition so this one
+    // reaches the retained allocation-table ceiling instead of short-circuiting
+    // on the first physical dimension.
+    let allocation_tight = SharedOleFileLimits::new(source_len)
+        .unwrap()
+        .with_max_directory_bytes(64 * 1024)
+        .unwrap()
+        .with_max_allocation_table_bytes(4 * 1024)
+        .unwrap();
+    let file = SharedOleFile::open(Arc::new(OwnedSource::new(source)), allocation_tight).unwrap();
+    let result = finish_overlay_plan(
+        file.plan_source_snapshot(),
+        vec![full_replacement_span(&target)],
+        |_source, _candidate| Ok::<(), OverlayError>(()),
+    );
+    assert!(
+        matches!(
+            &result,
+            Err(OverlayError::Ole(error))
+                if error.to_string().contains("allocation table bytes")
+        ),
+        "unexpected tight-allocation result: {result:?}"
+    );
 }
 
 fn limits() -> OverlayLimits {
@@ -188,11 +303,14 @@ fn operation_shape_matches_generic_and_owned_overlay_policy() {
     let generic = shared(bytes.clone())
         .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x66, 4_096)], limits())
         .unwrap();
-    let owned =
-        SharedOleFile::open_owned(Arc::from(bytes.clone()), SourceVersion::new(0xcafe_0261, 0))
-            .unwrap()
-            .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x66, 4_096)], limits())
-            .unwrap();
+    let owned = SharedOleFile::open_owned(
+        Arc::from(bytes.clone()),
+        SourceVersion::new(0xcafe_0261, 0),
+        SharedOleFileLimits::default(),
+    )
+    .unwrap()
+    .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x66, 4_096)], limits())
+    .unwrap();
 
     assert_operation_shape(
         generic.operation_shape(),
@@ -206,22 +324,28 @@ fn operation_shape_matches_generic_and_owned_overlay_policy() {
         bytes.len() as u64,
         false,
     );
-    let owned_vec =
-        SharedOleFile::open_owned_vec(Arc::new(bytes.clone()), SourceVersion::new(0xcafe_0748, 0))
-            .unwrap()
-            .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x66, 4_096)], limits())
-            .unwrap();
+    let owned_vec = SharedOleFile::open_owned_vec(
+        Arc::new(bytes.clone()),
+        SourceVersion::new(0xcafe_0748, 0),
+        SharedOleFileLimits::default(),
+    )
+    .unwrap()
+    .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x66, 4_096)], limits())
+    .unwrap();
     assert_operation_shape(
         owned_vec.operation_shape(),
         OverlaySourceMode::OwnedImmutableArc,
         bytes.len() as u64,
         false,
     );
-    let owned_noop =
-        SharedOleFile::open_owned(Arc::from(bytes.clone()), SourceVersion::new(0xcafe_0749, 0))
-            .unwrap()
-            .plan_same_length_stream_overlays(vec![noop_overlay()], limits())
-            .unwrap();
+    let owned_noop = SharedOleFile::open_owned(
+        Arc::from(bytes.clone()),
+        SourceVersion::new(0xcafe_0749, 0),
+        SharedOleFileLimits::default(),
+    )
+    .unwrap()
+    .plan_same_length_stream_overlays(vec![noop_overlay()], limits())
+    .unwrap();
     assert!(owned_noop.is_noop());
     assert_operation_shape(
         owned_noop.operation_shape(),
@@ -276,10 +400,10 @@ fn overlays_minifat_and_fat_cutover_and_preserves_unselected_bytes() {
     assert!(plan.changed_spans() >= 3);
     let mut output = Vec::new();
     let report = plan.write_to(&mut output).unwrap();
-    assert_eq!(report.bytes(), source.len() as u64);
+    assert_eq!(report.output_bytes(), source.len() as u64);
     assert_eq!(output.len(), source.len());
 
-    let mut reopened = OleFile::open(Cursor::new(output)).unwrap();
+    let mut reopened = OleFile::open(Cursor::new(output), OleFileLimits::default()).unwrap();
     assert_eq!(
         reopened.open_stream(&["Mini4095"]).unwrap(),
         vec![0xa1; 4_095]
@@ -321,7 +445,7 @@ fn mini_overlay_preserves_a_neighbor_in_the_same_host_sector() {
         .unwrap();
     let mut output = Vec::new();
     plan.write_to(&mut output).unwrap();
-    let mut reopened = OleFile::open(Cursor::new(output)).unwrap();
+    let mut reopened = OleFile::open(Cursor::new(output), OleFileLimits::default()).unwrap();
     assert_eq!(reopened.open_stream(&["MiniTiny"]).unwrap(), vec![0xb1; 70]);
     assert_eq!(
         reopened.open_stream(&["MiniNeighbor"]).unwrap(),
@@ -342,7 +466,7 @@ fn version_four_sector_geometry_publishes_mini_and_fat_overlays() {
         .unwrap();
     let mut output = Vec::new();
     plan.write_to(&mut output).unwrap();
-    let mut reopened = OleFile::open(Cursor::new(output)).unwrap();
+    let mut reopened = OleFile::open(Cursor::new(output), OleFileLimits::default()).unwrap();
     assert_eq!(reopened.sector_size(), 4_096);
     assert_eq!(reopened.open_stream(&["Mini"]).unwrap(), vec![0xc1; 1_003]);
     assert_eq!(reopened.open_stream(&["Fat"]).unwrap(), vec![0xc2; 5_003]);
@@ -417,8 +541,8 @@ fn short_and_interrupted_sink_writes_complete_exactly() {
         interrupt: true,
     };
     let report = plan.write_to(&mut sink).unwrap();
-    assert_eq!(report.bytes(), source.len() as u64);
-    let mut reopened = OleFile::open(Cursor::new(sink.bytes)).unwrap();
+    assert_eq!(report.output_bytes(), source.len() as u64);
+    let mut reopened = OleFile::open(Cursor::new(sink.bytes), OleFileLimits::default()).unwrap();
     assert_eq!(
         reopened.open_stream(&["Fat4097"]).unwrap(),
         vec![0x91; 4_097]
@@ -470,6 +594,7 @@ fn hostile_sink_progress_is_typed() {
     let sealed = SharedOleFile::open_owned(
         Arc::from(source.clone()),
         SourceVersion::new(0xcafe_0748, 1),
+        SharedOleFileLimits::default(),
     )
     .unwrap()
     .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x81, 4_096)], limits())
@@ -572,7 +697,7 @@ fn fragmented_fat_chain_yields_sorted_nonoverlapping_publication() {
     assert!(plan.changed_spans() >= 3);
     let mut output = Vec::new();
     plan.write_to(&mut output).unwrap();
-    let mut reopened = OleFile::open(Cursor::new(output)).unwrap();
+    let mut reopened = OleFile::open(Cursor::new(output), OleFileLimits::default()).unwrap();
     assert_eq!(
         reopened.open_stream(&["Fragment"]).unwrap(),
         vec![0x77; 4_097]
@@ -658,7 +783,7 @@ impl ReadAt for MutableSource {
 #[test]
 fn direct_write_to_retains_three_complete_source_scans() {
     let source = Arc::new(MutableSource::new(sample_bytes()));
-    let file = SharedOleFile::open(source.clone()).unwrap();
+    let file = SharedOleFile::open(source.clone(), SharedOleFileLimits::default()).unwrap();
     let plan = file
         .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x64, 4_096)], limits())
         .unwrap();
@@ -708,13 +833,13 @@ fn owned_composed_view_and_direct_write_take_no_recheck_scan() {
         reads.load(Ordering::SeqCst),
         publication_chunks(file.file_size())
     );
-    assert_eq!(report.bytes(), file.file_size());
+    assert_eq!(report.output_bytes(), file.file_size());
     assert_eq!(output, viewed);
     assert_eq!(report.source_fingerprint().as_bytes(), &sha256_of(&source));
     assert_eq!(report.target_fingerprint().as_bytes(), &sha256_of(&output));
     assert_eq!(report.source_fingerprint(), plan.source_fingerprint());
     assert_eq!(report.target_fingerprint(), plan.target_fingerprint());
-    let mut reopened = OleFile::open(Cursor::new(output)).unwrap();
+    let mut reopened = OleFile::open(Cursor::new(output), OleFileLimits::default()).unwrap();
     assert_eq!(
         reopened.open_stream(&["Fat4096"]).unwrap(),
         vec![0x67; 4_096]
@@ -724,15 +849,19 @@ fn owned_composed_view_and_direct_write_take_no_recheck_scan() {
 #[test]
 fn public_owned_arc_source_publishes_exactly() {
     let source: Arc<[u8]> = Arc::from(sample_bytes());
-    let file =
-        SharedOleFile::open_owned(Arc::clone(&source), SourceVersion::new(0xcafe_0181, 0)).unwrap();
+    let file = SharedOleFile::open_owned(
+        Arc::clone(&source),
+        SourceVersion::new(0xcafe_0181, 0),
+        SharedOleFileLimits::default(),
+    )
+    .unwrap();
     let plan = file
         .plan_same_length_stream_overlays(vec![replacement("Fat4097", 0x68, 4_097)], limits())
         .unwrap();
     let mut output = Vec::new();
     let report = plan.write_to(&mut output).unwrap();
-    assert_eq!(report.bytes(), source.len() as u64);
-    let mut reopened = OleFile::open(Cursor::new(output)).unwrap();
+    assert_eq!(report.output_bytes(), source.len() as u64);
+    let mut reopened = OleFile::open(Cursor::new(output), OleFileLimits::default()).unwrap();
     assert_eq!(
         reopened.open_stream(&["Fat4097"]).unwrap(),
         vec![0x68; 4_097]
@@ -743,7 +872,8 @@ fn public_owned_arc_source_publishes_exactly() {
 fn owned_overlay_planning_elides_only_the_final_complete_fingerprint() {
     let bytes = sample_bytes();
     let generic_source = Arc::new(MutableSource::new(bytes.clone()));
-    let generic_file = SharedOleFile::open(generic_source.clone()).unwrap();
+    let generic_file =
+        SharedOleFile::open(generic_source.clone(), SharedOleFileLimits::default()).unwrap();
     generic_source.reads.store(0, Ordering::SeqCst);
     let generic_plan = generic_file
         .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x6a, 4_096)], limits())
@@ -777,7 +907,7 @@ fn owned_overlay_planning_elides_only_the_final_complete_fingerprint() {
 #[test]
 fn fingerprint_requests_are_coalesced_without_widening_publication_chunks() {
     let source = Arc::new(MutableSource::new(sample_bytes()));
-    let file = SharedOleFile::open(source.clone()).unwrap();
+    let file = SharedOleFile::open(source.clone(), SharedOleFileLimits::default()).unwrap();
     let plan = file
         .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x66, 4_096)], limits())
         .unwrap();
@@ -820,7 +950,7 @@ fn atomic_save_skips_only_the_duplicate_post_emission_source_scan() {
     std::fs::write(&destination, b"old destination").unwrap();
 
     let source = Arc::new(MutableSource::new(sample_bytes()));
-    let file = SharedOleFile::open(source.clone()).unwrap();
+    let file = SharedOleFile::open(source.clone(), SharedOleFileLimits::default()).unwrap();
     let plan = file
         .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x65, 4_096)], limits())
         .unwrap();
@@ -834,7 +964,7 @@ fn atomic_save_skips_only_the_duplicate_post_emission_source_scan() {
         source.reads.load(Ordering::SeqCst),
         fingerprint_chunks(file.file_size()) * 2 + publication_chunks(file.file_size())
     );
-    assert_eq!(report.bytes(), file.file_size());
+    assert_eq!(report.output_bytes(), file.file_size());
     assert_eq!(std::fs::read_dir(&directory).unwrap().count(), 1);
 
     std::fs::remove_file(destination).unwrap();
@@ -869,7 +999,7 @@ fn owned_atomic_save_reads_only_its_emission() {
         reads.load(Ordering::SeqCst),
         publication_chunks(file.file_size())
     );
-    assert_eq!(report.bytes(), file.file_size());
+    assert_eq!(report.output_bytes(), file.file_size());
     assert_eq!(std::fs::read_dir(&directory).unwrap().count(), 1);
     let published = std::fs::read(&destination).unwrap();
     assert_eq!(report.source_fingerprint().as_bytes(), &sha256_of(&source));
@@ -896,7 +1026,8 @@ fn owned_vec_source_is_sealed_and_publishes_the_generic_bytes() {
     let overlays = || vec![replacement("Fat4097", 0x6b, 4_097)];
 
     let generic_source = Arc::new(MutableSource::new(bytes.clone()));
-    let generic_file = SharedOleFile::open(generic_source.clone()).unwrap();
+    let generic_file =
+        SharedOleFile::open(generic_source.clone(), SharedOleFileLimits::default()).unwrap();
     generic_source.reads.store(0, Ordering::SeqCst);
     let generic = generic_file
         .plan_same_length_stream_overlays(overlays(), limits())
@@ -935,7 +1066,8 @@ fn owned_vec_source_is_sealed_and_publishes_the_generic_bytes() {
         view.version().unwrap(),
         SharedOleFile::open_owned_vec(
             Arc::clone(&sealed_bytes),
-            SourceVersion::new(0xcafe_0181, 0)
+            SourceVersion::new(0xcafe_0181, 0),
+            SharedOleFileLimits::default()
         )
         .unwrap()
         .plan_same_length_stream_overlays(overlays(), limits())
@@ -960,10 +1092,14 @@ fn owned_vec_source_is_sealed_and_publishes_the_generic_bytes() {
     assert_eq!(sealed_report, generic_report);
 
     // The public constructor seals the same provenance.
-    let public = SharedOleFile::open_owned_vec(sealed_bytes, SourceVersion::new(0xcafe_0748, 2))
-        .unwrap()
-        .plan_same_length_stream_overlays(overlays(), limits())
-        .unwrap();
+    let public = SharedOleFile::open_owned_vec(
+        sealed_bytes,
+        SourceVersion::new(0xcafe_0748, 2),
+        SharedOleFileLimits::default(),
+    )
+    .unwrap()
+    .plan_same_length_stream_overlays(overlays(), limits())
+    .unwrap();
     assert_eq!(
         public.operation_shape().source_mode,
         OverlaySourceMode::OwnedImmutableArc
@@ -997,15 +1133,19 @@ fn assert_provenances_agree_with(
     let owned_arc = SharedOleFile::open_owned(
         Arc::from(bytes.to_vec()),
         SourceVersion::new(0xcafe_0748, 3),
+        SharedOleFileLimits::default(),
     )
     .unwrap()
     .plan_same_length_stream_overlays(overlays(), limits)
     .unwrap();
-    let owned_vec =
-        SharedOleFile::open_owned_vec(Arc::new(bytes.to_vec()), SourceVersion::new(0xcafe_0748, 4))
-            .unwrap()
-            .plan_same_length_stream_overlays(overlays(), limits)
-            .unwrap();
+    let owned_vec = SharedOleFile::open_owned_vec(
+        Arc::new(bytes.to_vec()),
+        SourceVersion::new(0xcafe_0748, 4),
+        SharedOleFileLimits::default(),
+    )
+    .unwrap()
+    .plan_same_length_stream_overlays(overlays(), limits)
+    .unwrap();
 
     let mut expected = Vec::new();
     let expected_report = generic.write_to(&mut expected).unwrap();
@@ -1146,7 +1286,7 @@ fn sealed_and_generic_plans_agree_across_fingerprint_and_publication_chunks() {
         assert_ne!(published[boundary], bytes[boundary]);
     }
     assert_eq!(&published[base..base + payload.len()], &edited[..]);
-    let mut reopened = OleFile::open(Cursor::new(published)).unwrap();
+    let mut reopened = OleFile::open(Cursor::new(published), OleFileLimits::default()).unwrap();
     assert_eq!(reopened.open_stream(&["Big"]).unwrap(), edited.to_vec());
     assert_eq!(reopened.open_stream(&["Small"]).unwrap(), vec![0x6b; 1_000]);
 }
@@ -1159,7 +1299,7 @@ fn generic_composed_view_still_rechecks_both_digests() {
     // A byte change under a stable version token, in a payload no check but
     // the complete fingerprint reads, is refused before a view is returned.
     let source = Arc::new(MutableSource::new(bytes.clone()));
-    let file = SharedOleFile::open(source.clone()).unwrap();
+    let file = SharedOleFile::open(source.clone(), SharedOleFileLimits::default()).unwrap();
     let plan = file
         .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x6c, 4_096)], limits())
         .unwrap();
@@ -1186,7 +1326,7 @@ fn generic_composed_view_still_rechecks_both_digests() {
 
     // A version change is refused by name.
     let source = Arc::new(MutableSource::new(bytes));
-    let file = SharedOleFile::open(source.clone()).unwrap();
+    let file = SharedOleFile::open(source.clone(), SharedOleFileLimits::default()).unwrap();
     let plan = file
         .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x6d, 4_096)], limits())
         .unwrap();
@@ -1211,7 +1351,7 @@ fn generic_atomic_save_still_hashes_its_emission() {
 
     let bytes = sample_bytes();
     let source = Arc::new(MutableSource::new(bytes.clone()));
-    let file = SharedOleFile::open(source.clone()).unwrap();
+    let file = SharedOleFile::open(source.clone(), SharedOleFileLimits::default()).unwrap();
     let plan = file
         .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x6e, 4_096)], limits())
         .unwrap();
@@ -1250,7 +1390,7 @@ fn generic_atomic_save_still_hashes_its_emission() {
 #[test]
 fn version_and_stable_token_byte_changes_are_caught_before_output() {
     let source = Arc::new(MutableSource::new(sample_bytes()));
-    let file = SharedOleFile::open(source.clone()).unwrap();
+    let file = SharedOleFile::open(source.clone(), SharedOleFileLimits::default()).unwrap();
     let plan = file
         .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x71, 4_096)], limits())
         .unwrap();
@@ -1263,7 +1403,7 @@ fn version_and_stable_token_byte_changes_are_caught_before_output() {
     assert!(output.is_empty());
 
     let source = Arc::new(MutableSource::new(sample_bytes()));
-    let file = SharedOleFile::open(source.clone()).unwrap();
+    let file = SharedOleFile::open(source.clone(), SharedOleFileLimits::default()).unwrap();
     let plan = file
         .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x72, 4_096)], limits())
         .unwrap();
@@ -1279,7 +1419,7 @@ fn version_and_stable_token_byte_changes_are_caught_before_output() {
 #[test]
 fn hostile_read_during_emission_reports_exact_sink_prefix() {
     let source = Arc::new(MutableSource::new(sample_bytes()));
-    let file = SharedOleFile::open(source.clone()).unwrap();
+    let file = SharedOleFile::open(source.clone(), SharedOleFileLimits::default()).unwrap();
     let plan = file
         .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x61, 4_096)], limits())
         .unwrap();
@@ -1305,7 +1445,7 @@ fn hostile_read_during_emission_reports_exact_sink_prefix() {
 #[test]
 fn hostile_read_overreport_during_emission_reports_the_exact_sink_prefix() {
     let source = Arc::new(MutableSource::new(sample_bytes()));
-    let file = SharedOleFile::open(source.clone()).unwrap();
+    let file = SharedOleFile::open(source.clone(), SharedOleFileLimits::default()).unwrap();
     let plan = file
         .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x62, 4_096)], limits())
         .unwrap();
@@ -1332,7 +1472,7 @@ fn hostile_read_overreport_during_emission_reports_the_exact_sink_prefix() {
 #[test]
 fn stable_token_mutation_of_an_emitted_chunk_is_caught_before_success() {
     let source = Arc::new(MutableSource::new(sample_bytes()));
-    let file = SharedOleFile::open(source.clone()).unwrap();
+    let file = SharedOleFile::open(source.clone(), SharedOleFileLimits::default()).unwrap();
     let plan = file
         .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x63, 4_096)], limits())
         .unwrap();
@@ -1372,8 +1512,8 @@ fn atomic_path_publication_replaces_after_complete_staging() {
         .unwrap();
     let report = plan.save(&destination).unwrap();
     let output = std::fs::read(&destination).unwrap();
-    assert_eq!(report.bytes(), output.len() as u64);
-    let mut reopened = OleFile::open(Cursor::new(output)).unwrap();
+    assert_eq!(report.output_bytes(), output.len() as u64);
+    let mut reopened = OleFile::open(Cursor::new(output), OleFileLimits::default()).unwrap();
     assert_eq!(
         reopened.open_stream(&["Fat4096"]).unwrap(),
         vec![0x51; 4_096]
@@ -1395,7 +1535,7 @@ fn atomic_path_preflight_failure_leaves_destination_and_directory_unchanged() {
     let destination = directory.join("document.ole");
     std::fs::write(&destination, b"old destination").unwrap();
     let source = Arc::new(MutableSource::new(sample_bytes()));
-    let file = SharedOleFile::open(source.clone()).unwrap();
+    let file = SharedOleFile::open(source.clone(), SharedOleFileLimits::default()).unwrap();
     let plan = file
         .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x52, 4_096)], limits())
         .unwrap();
@@ -1422,7 +1562,7 @@ fn atomic_path_late_stable_token_mutation_leaves_destination_unchanged() {
     let destination = directory.join("document.ole");
     std::fs::write(&destination, b"old destination").unwrap();
     let source = Arc::new(MutableSource::new(sample_bytes()));
-    let file = SharedOleFile::open(source.clone()).unwrap();
+    let file = SharedOleFile::open(source.clone(), SharedOleFileLimits::default()).unwrap();
     let plan = file
         .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x53, 4_096)], limits())
         .unwrap();
@@ -1527,7 +1667,7 @@ fn noop_plan_reports_the_source_digest_as_both_identities() {
 fn noop_plan_retains_every_complete_source_scan() {
     let bytes = sample_bytes();
     let source = Arc::new(MutableSource::new(bytes.clone()));
-    let file = SharedOleFile::open(source.clone()).unwrap();
+    let file = SharedOleFile::open(source.clone(), SharedOleFileLimits::default()).unwrap();
     let chunks = fingerprint_chunks(file.file_size());
     source.reads.store(0, Ordering::SeqCst);
     source.request_sizes.lock().unwrap().clear();
@@ -1544,7 +1684,8 @@ fn noop_plan_retains_every_complete_source_scan() {
         .count();
 
     let effective_source = Arc::new(MutableSource::new(bytes.clone()));
-    let effective_file = SharedOleFile::open(effective_source.clone()).unwrap();
+    let effective_file =
+        SharedOleFile::open(effective_source.clone(), SharedOleFileLimits::default()).unwrap();
     effective_source.reads.store(0, Ordering::SeqCst);
     effective_source.request_sizes.lock().unwrap().clear();
     let effective = effective_file
@@ -1582,7 +1723,7 @@ fn noop_plan_retains_every_complete_source_scan() {
 fn noop_plan_catches_a_stable_token_mutation_between_planning_scans() {
     let bytes = sample_bytes();
     let probe = Arc::new(MutableSource::new(bytes.clone()));
-    let probe_file = SharedOleFile::open(probe.clone()).unwrap();
+    let probe_file = SharedOleFile::open(probe.clone(), SharedOleFileLimits::default()).unwrap();
     probe.request_sizes.lock().unwrap().clear();
     probe_file
         .plan_same_length_stream_overlays(vec![noop_overlay()], limits())
@@ -1590,7 +1731,7 @@ fn noop_plan_catches_a_stable_token_mutation_between_planning_scans() {
     let boundary = first_fingerprint_read(&probe_file, &probe);
 
     let source = Arc::new(MutableSource::new(bytes.clone()));
-    let file = SharedOleFile::open(source.clone()).unwrap();
+    let file = SharedOleFile::open(source.clone(), SharedOleFileLimits::default()).unwrap();
     source.request_sizes.lock().unwrap().clear();
     source.reads.store(0, Ordering::SeqCst);
     // Mutate immediately after the first complete planning fingerprint. The
@@ -1614,7 +1755,7 @@ fn noop_plan_catches_a_stable_token_mutation_between_planning_scans() {
 fn noop_direct_write_catches_a_late_stable_token_mutation() {
     let bytes = sample_bytes();
     let source = Arc::new(MutableSource::new(bytes.clone()));
-    let file = SharedOleFile::open(source.clone()).unwrap();
+    let file = SharedOleFile::open(source.clone(), SharedOleFileLimits::default()).unwrap();
     let plan = file
         .plan_same_length_stream_overlays(vec![noop_overlay()], limits())
         .unwrap();
@@ -1648,7 +1789,7 @@ fn noop_direct_write_catches_a_late_stable_token_mutation() {
 fn noop_direct_write_catches_a_mutation_inside_the_emission_scan() {
     let bytes = sample_bytes();
     let source = Arc::new(MutableSource::new(bytes.clone()));
-    let file = SharedOleFile::open(source.clone()).unwrap();
+    let file = SharedOleFile::open(source.clone(), SharedOleFileLimits::default()).unwrap();
     let plan = file
         .plan_same_length_stream_overlays(vec![noop_overlay()], limits())
         .unwrap();
@@ -1734,13 +1875,13 @@ fn caller_bracketed_identity_is_the_empty_splice_digest_in_one_scan() {
     let expected = sha256_of(&bytes);
 
     let counted = Arc::new(ScanCountingSource::new(bytes.clone()));
-    let file = SharedOleFile::open(counted.clone()).unwrap();
+    let file = SharedOleFile::open(counted.clone(), SharedOleFileLimits::default()).unwrap();
     counted.complete_reads.store(0, Ordering::SeqCst);
     let single = file.caller_bracketed_identity_fingerprint().unwrap();
     let single_scans = counted.complete_reads.load(Ordering::SeqCst);
 
     let counted = Arc::new(ScanCountingSource::new(bytes));
-    let file = SharedOleFile::open(counted.clone()).unwrap();
+    let file = SharedOleFile::open(counted.clone(), SharedOleFileLimits::default()).unwrap();
     counted.complete_reads.store(0, Ordering::SeqCst);
     let plan = file
         .plan_same_length_stream_splices(Vec::new(), crate::StreamSpliceLimits::default())
@@ -1762,7 +1903,7 @@ fn caller_bracketed_identity_still_reopens_the_composed_candidate() {
     // mutation of the CFB header after the planning scan must still be
     // reported by it, as `Ole`, and not silently accepted.
     let source = Arc::new(MutableSource::new(sample_bytes()));
-    let file = SharedOleFile::open(source.clone()).unwrap();
+    let file = SharedOleFile::open(source.clone(), SharedOleFileLimits::default()).unwrap();
     // Byte 30 is the sector shift: flipping it makes every later parse fail.
     source.mutate_offset.store(30, Ordering::SeqCst);
     let after_planning_scan = source.reads.load(Ordering::SeqCst) + 1;
@@ -1783,7 +1924,7 @@ fn unbracketed_source_fingerprint_is_the_same_digest_with_no_reopen() {
     let expected = sha256_of(&bytes);
 
     let counted = Arc::new(ScanCountingSource::new(bytes));
-    let file = SharedOleFile::open(counted.clone()).unwrap();
+    let file = SharedOleFile::open(counted.clone(), SharedOleFileLimits::default()).unwrap();
     counted.reads.store(0, Ordering::SeqCst);
     counted.complete_reads.store(0, Ordering::SeqCst);
     let digest = file.unbracketed_source_fingerprint().unwrap();
@@ -1806,7 +1947,7 @@ fn only_the_unbracketed_digest_survives_an_index_damaged_under_the_read() {
     // moved — which is what makes the caller's writer, not the file, the thing
     // the reported error blames.
     let source = Arc::new(MutableSource::new(sample_bytes()));
-    let file = SharedOleFile::open(source.clone()).unwrap();
+    let file = SharedOleFile::open(source.clone(), SharedOleFileLimits::default()).unwrap();
     let clean = file.unbracketed_source_fingerprint().unwrap();
     assert_eq!(clean.as_bytes(), &sha256_of(&sample_bytes()));
 

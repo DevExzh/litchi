@@ -17,8 +17,7 @@ use core::fmt;
 use std::str;
 
 use litchi_iwa_common::wire::{
-    RawWireField, RawWireFields, RawWireLimits, WireDescent, WirePreflight,
-    preflight_wire_tree_with_limits,
+    RawWireField, RawWireFields, RawWireLimits, WireDescent, WirePreflight, preflight_wire_tree,
 };
 use litchi_iwa_common::{Error, LimitKind, WireLimits};
 use litchi_iwa_protos::group_node_category_codec;
@@ -394,7 +393,7 @@ impl Decoder {
         }
         let raw_limits =
             RawWireLimits::new(source.len().max(1), remaining_fields, 0, remaining_work)?;
-        let mut fields = RawWireFields::with_limits(source, raw_limits);
+        let mut fields = RawWireFields::new(source, raw_limits);
         loop {
             let before_fields = fields.fields();
             let before_work = fields.work();
@@ -807,7 +806,7 @@ fn preflight_categories(
         ));
     }
     let mut nodes = 1usize;
-    let report = preflight_wire_tree_with_limits(source, limits.wire, |visit| {
+    let report = preflight_wire_tree(source, limits.wire, |visit| {
         *attempted_fields = attempted_fields
             .checked_add(1)
             .ok_or_else(|| invalid("formula category field count overflow"))?;
@@ -864,7 +863,7 @@ fn validate_category_uuid(source: &[u8]) -> Result<(), Error> {
         .with_input_bytes(source.len().max(1))
         .and_then(|limits| limits.with_fields(source.len().clamp(1, WireLimits::MAX_FIELDS)))
         .and_then(|limits| limits.with_nesting(1))?;
-    preflight_wire_tree_with_limits(source, limits, |visit| {
+    preflight_wire_tree(source, limits, |visit| {
         let field = visit.field();
         if field.number() == 1 || field.number() == 2 {
             if field.wire_type() != 0 {
@@ -888,7 +887,7 @@ fn validate_category_value(source: &[u8]) -> Result<(), Error> {
         )
         .and_then(|limits| limits.with_fields(source.len().clamp(1, WireLimits::MAX_FIELDS)))
         .and_then(|limits| limits.with_nesting(2))?;
-    preflight_wire_tree_with_limits(source, limits, |visit| {
+    preflight_wire_tree(source, limits, |visit| {
         let field = visit.field();
         match (visit.path(), field.number()) {
             ([], 2..=5) => {

@@ -1,12 +1,14 @@
 //! OPC relationship and part lifecycle for presentation properties.
 
+use super::codec::Limits;
 use super::model::Properties;
 use super::{CONTENT_TYPE, REL, STRICT_REL};
 use crate::leniency::ToleranceReport;
+use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
-use litchi_opc::{OpcPackage, PackURI};
+use litchi_opc::{OpcPackage, PackURI, Part};
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
@@ -21,8 +23,8 @@ fn invalid(message: impl Into<String>) -> Error {
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn load_from_package(package: &OpcPackage) -> Result<Option<Properties>> {
-    load_from_package_with_tolerance(package, &mut ToleranceReport::default())
+pub fn load_from_package(package: &OpcPackage, limits: Limits) -> Result<Option<Properties>> {
+    load_from_package_with_tolerance(package, &mut ToleranceReport::default(), limits)
 }
 
 /// [`load_from_package`], appending the read's repairs to `tolerance`,
@@ -34,19 +36,21 @@ pub fn load_from_package(package: &OpcPackage) -> Result<Option<Properties>> {
 pub fn load_from_package_with_tolerance(
     package: &OpcPackage,
     tolerance: &mut ToleranceReport,
+    limits: Limits,
 ) -> Result<Option<Properties>> {
-    load(package, Some(tolerance))
+    load(package, Some(tolerance), limits)
 }
 
 /// Load for an edit transaction: a part whose read would need a repair is
 /// refused, so a rewrite never drops what the repair skipped.
-fn load_strict(package: &OpcPackage) -> Result<Option<Properties>> {
-    load(package, None)
+fn load_strict(package: &OpcPackage, limits: Limits) -> Result<Option<Properties>> {
+    load(package, None, limits)
 }
 
 fn load(
     package: &OpcPackage,
     tolerance: Option<&mut ToleranceReport>,
+    limits: Limits,
 ) -> Result<Option<Properties>> {
     let Some(uri) = find_properties_part(package)? else {
         return Ok(None);
@@ -55,12 +59,12 @@ fn load(
     let mut value = match tolerance {
         Some(tolerance) => {
             let mut repairs = ToleranceReport::default();
-            let value = Properties::parse_with_tolerance(part.blob(), &mut repairs)?;
+            let value = Properties::parse_with_tolerance(part.blob(), &mut repairs, limits)?;
             repairs.locate_in_part(uri.as_str());
             tolerance.append(&repairs);
             value
         },
-        None => Properties::parse_strict(part.blob())?,
+        None => Properties::parse_strict(part.blob(), limits)?,
     };
     hydrate_html_target(part, &mut value)?;
     Ok(Some(value))
@@ -73,29 +77,61 @@ fn load(
 /// Returns an error if the input cannot be read or is malformed.
 pub fn load_math_from_package(
     package: &OpcPackage,
+    limits: Limits,
 ) -> Result<Option<crate::presentation_properties::math::Properties>> {
-    Ok(load_from_package(package)?.and_then(|value| value.math().cloned()))
+    Ok(load_from_package(package, limits)?.and_then(|value| value.math().cloned()))
+}
+
+/// Validate one presentation-properties payload changed by a typed patch
+/// under the recipient's selected policy. The replay engine already checks
+/// the exact before image and relationship graph; only the changed XML part
+/// is physically scanned and parsed here.
+pub(crate) fn validate_replay_part(
+    part: &dyn Part,
+    limits: Limits,
+    source_limits: litchi_opc::SourceLimits,
+) -> Result<()> {
+    if part.content_type() == CONTENT_TYPE {
+        // `Limits` carries the presentation-properties semantic ceilings, but
+        // the retained source profile's event budget is physical: it counts
+        // every XML parser event, including the extension branch that a
+        // typed edit may add. Keep this scan before the vocabulary parser so
+        // MCE or opaque extension content cannot hide that charge.
+        crate::source_limits::validate_xml_limits(part.blob(), source_limits)?;
+        Properties::parse_strict(part.blob(), limits).map(drop)
+    } else {
+        Ok(())
+    }
 }
 
 /// Replace the typed document-level math defaults as one package transaction.
 ///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn put_math_to_package(
+pub(crate) fn put_math_to_package(
     package: &mut OpcPackage,
     value: crate::presentation_properties::math::Properties,
+    limits: Limits,
 ) -> Result<Option<crate::presentation_properties::math::Properties>> {
     value.validate()?;
-    let previous = load_math_from_package(package)?;
+    let previous = load_math_from_package(package, limits)?;
     if previous.as_ref() == Some(&value) {
         return Ok(previous);
     }
+    refuse_signed_change(package)?;
 
     let mut staged = package.clone();
     let properties = find_properties_part(&staged)?;
     let mut snapshot = if properties.is_some() {
-        load_strict(&staged)?.ok_or_else(|| {
+        load_strict(&staged, limits)?.ok_or_else(|| {
             invalid("presentation-properties relationship disappeared during staging")
         })?
     } else {
@@ -107,8 +143,8 @@ pub fn put_math_to_package(
         .map(|uri| is_strict_root(staged.get_part(uri)?.blob()))
         .transpose()?
         .unwrap_or(false);
-    let blob = snapshot.to_xml(strict)?;
-    let parsed = Properties::parse(&blob)?;
+    let blob = snapshot.to_xml(strict, limits)?;
+    let parsed = Properties::parse(&blob, limits)?;
     if parsed.math() != Some(&value) {
         return Err(invalid("staged presentation math did not round-trip"));
     }
@@ -128,8 +164,8 @@ pub fn put_math_to_package(
             .get_part_mut(&presentation)?
             .relate_to(&target, rt::PRES_PROPS);
     }
-    staged.unsign();
-    if load_math_from_package(&staged)?.as_ref() != Some(&value) {
+    settle_unsigned_change(&mut staged)?;
+    if load_math_from_package(&staged, limits)?.as_ref() != Some(&value) {
         return Err(invalid("published presentation math did not validate"));
     }
     *package = staged;
@@ -138,22 +174,31 @@ pub fn put_math_to_package(
 
 /// Remove the typed document-level math defaults as one package transaction.
 ///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn remove_math_from_package(
+pub(crate) fn remove_math_from_package(
     package: &mut OpcPackage,
+    limits: Limits,
 ) -> Result<Option<crate::presentation_properties::math::Properties>> {
-    let previous = load_math_from_package(package)?;
+    let previous = load_math_from_package(package, limits)?;
     let Some(previous_value) = previous.clone() else {
         return Ok(None);
     };
+    refuse_signed_change(package)?;
 
     let mut staged = package.clone();
     let uri = find_properties_part(&staged)?.ok_or_else(|| {
         invalid("presentation-properties relationship disappeared during staging")
     })?;
-    let mut snapshot = load_strict(&staged)?.ok_or_else(|| {
+    let mut snapshot = load_strict(&staged, limits)?.ok_or_else(|| {
         invalid("presentation-properties relationship disappeared during staging")
     })?;
     let removed = snapshot.remove_math();
@@ -161,15 +206,15 @@ pub fn remove_math_from_package(
         return Err(invalid("presentation math snapshot changed during staging"));
     }
     let strict = is_strict_root(staged.get_part(&uri)?.blob())?;
-    let blob = snapshot.to_xml(strict)?;
-    if Properties::parse(&blob)?.math().is_some() {
+    let blob = snapshot.to_xml(strict, limits)?;
+    if Properties::parse(&blob, limits)?.math().is_some() {
         return Err(invalid(
             "staged presentation math removal did not round-trip",
         ));
     }
     staged.get_part_mut(&uri)?.set_blob(blob);
-    staged.unsign();
-    if load_math_from_package(&staged)?.is_some() {
+    settle_unsigned_change(&mut staged)?;
+    if load_math_from_package(&staged, limits)?.is_some() {
         return Err(invalid(
             "published presentation math removal did not validate",
         ));
@@ -208,7 +253,7 @@ fn find_properties_part(package: &OpcPackage) -> Result<Option<PackURI>> {
     Ok(Some(uri))
 }
 
-fn hydrate_html_target(part: &dyn litchi_opc::Part, value: &mut Properties) -> Result<()> {
+fn hydrate_html_target(part: &dyn Part, value: &mut Properties) -> Result<()> {
     if let Some(html) = value.html_publish.as_mut() {
         let target = part
             .rels()

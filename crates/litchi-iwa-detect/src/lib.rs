@@ -14,7 +14,7 @@ use litchi_iwa_archive::{
     FrozenDirectoryBundle, LogicalEntryLimits, LogicalSourceCatalog, SemanticMetadataSidecars,
     SemanticProfile, SemanticProjection, SourceCatalog,
 };
-use litchi_iwa_common::wire::{WireField, parse_wire_fields};
+use litchi_iwa_common::wire::{WireField, visit_wire_fields};
 use litchi_iwa_core::{Archive, SnappyLimits, SnappyStream};
 use litchi_iwa_package::FrozenEntryStore;
 use std::{
@@ -204,9 +204,7 @@ impl From<litchi_iwa_core::Error> for Error {
             litchi_iwa_core::Error::Allocation { requested, .. } => {
                 Self::Allocation { amount: requested }
             },
-            other @ (litchi_iwa_core::Error::InvalidArchive { .. }
-            | litchi_iwa_core::Error::HeaderCodec { .. }
-            | litchi_iwa_core::Error::Snappy { .. }) => Self::IwaCore(other),
+            other => Self::IwaCore(other),
         }
     }
 }
@@ -235,7 +233,7 @@ impl From<litchi_iwa_common::Error> for Error {
             },
             litchi_iwa_common::Error::Allocation { amount, .. } => Self::Allocation { amount },
             litchi_iwa_common::Error::InvalidLimit { .. } => Self::InvalidLimits,
-            invalid @ litchi_iwa_common::Error::InvalidFormat(_) => Self::IwaCommon(invalid),
+            other => Self::IwaCommon(other),
         }
     }
 }
@@ -426,7 +424,7 @@ impl fmt::Debug for PreparedSource {
 }
 
 impl PreparedSource {
-    /// Prepare borrowed package bytes under the default detection profile.
+    /// Prepare borrowed package bytes under caller-selected detection limits.
     ///
     /// The bytes are copied once into immutable shared ownership. Use
     /// [`Self::from_shared_bytes`] when the caller already owns an `Arc`.
@@ -436,21 +434,12 @@ impl PreparedSource {
     /// Returns an error when the package is malformed, ambiguous, encrypted,
     /// or exceeds a physical resource ceiling. Non-ZIP and unrecognized iWork
     /// inputs return `Ok(None)`.
-    pub fn from_bytes(value: &[u8]) -> Result<Option<Self>> {
-        Self::from_bytes_with_limits(value, Limits::default())
-    }
-
-    /// Prepare borrowed package bytes under explicit detection limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns the same errors as [`Self::from_bytes`].
-    pub fn from_bytes_with_limits(value: &[u8], limits: Limits) -> Result<Option<Self>> {
+    pub fn from_bytes(value: &[u8], limits: Limits) -> Result<Option<Self>> {
         if !check_prepared_candidate(value, limits)? {
             return Ok(None);
         }
-        let catalog = SourceCatalog::from_bytes_with_limits(value, archive_limits(limits)?)
-            .map_err(map_archive_error)?;
+        let catalog =
+            SourceCatalog::from_bytes(value, archive_limits(limits)?).map_err(map_archive_error)?;
         Self::from_catalog(catalog, limits)
     }
 
@@ -463,7 +452,7 @@ impl PreparedSource {
     ///
     /// # Errors
     ///
-    /// Returns the same errors as [`Self::from_bytes_with_limits`], plus a
+    /// Returns the same errors as [`Self::from_bytes`], plus a
     /// refusal when a selected Pages metadata authority violates its physical
     /// profile.
     #[doc(hidden)]
@@ -484,11 +473,11 @@ impl PreparedSource {
     /// in the exact source allocation but are not materialized as package
     /// entries. This route is intended for read-only metadata, list, and
     /// one-query workflows; preserve-mode owners continue to use
-    /// [`Self::from_bytes_with_limits`].
+    /// [`Self::from_bytes`].
     ///
     /// # Errors
     ///
-    /// Returns the same errors as [`Self::from_bytes_with_limits`], plus a
+    /// Returns the same errors as [`Self::from_bytes`], plus a
     /// refusal when a selected semantic metadata authority violates its
     /// physical profile.
     #[doc(hidden)]
@@ -509,7 +498,7 @@ impl PreparedSource {
     ///
     /// # Errors
     ///
-    /// Returns the same errors as [`Self::from_bytes_with_limits`], plus a
+    /// Returns the same errors as [`Self::from_bytes`], plus a
     /// refusal when a selected canonical metadata authority violates its
     /// physical profile.
     #[doc(hidden)]
@@ -564,12 +553,9 @@ impl PreparedSource {
         if format != expected {
             return Ok(Some(Self::format_only(format, limits, archive_limits)));
         }
-        let projection = SemanticProjection::from_bytes_with_limits(
-            value,
-            archive_limits,
-            SemanticProfile::Metadata,
-        )
-        .map_err(map_archive_error)?;
+        let projection =
+            SemanticProjection::from_bytes(value, archive_limits, SemanticProfile::Metadata)
+                .map_err(map_archive_error)?;
         let (components, sidecars, projected_limits) = projection.into_parts();
         Ok(Some(Self {
             backing: PreparedBacking::Semantic {
@@ -582,18 +568,8 @@ impl PreparedSource {
         }))
     }
 
-    /// Prepare already-owned immutable package bytes without copying them.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the package is malformed, ambiguous, encrypted,
-    /// or exceeds a physical resource ceiling. Non-ZIP and unrecognized iWork
-    /// inputs return `Ok(None)`.
-    pub fn from_shared_bytes(value: Arc<[u8]>) -> Result<Option<Self>> {
-        Self::from_shared_bytes_with_limits(value, Limits::default())
-    }
-
-    /// Prepare an immutable package under explicit physical limits.
+    /// Prepare already-owned immutable package bytes without copying them,
+    /// under caller-selected detection limits.
     ///
     /// The same checked profile is retained by the underlying catalog so a
     /// selected format owner cannot accidentally reinterpret already-validated
@@ -604,11 +580,11 @@ impl PreparedSource {
     /// Returns an error when the package is malformed, ambiguous, encrypted,
     /// or exceeds a physical resource ceiling. Non-ZIP and unrecognized iWork
     /// inputs return `Ok(None)`.
-    pub fn from_shared_bytes_with_limits(value: Arc<[u8]>, limits: Limits) -> Result<Option<Self>> {
+    pub fn from_shared_bytes(value: Arc<[u8]>, limits: Limits) -> Result<Option<Self>> {
         if !check_prepared_candidate(&value, limits)? {
             return Ok(None);
         }
-        let catalog = SourceCatalog::from_shared_bytes_with_limits(value, archive_limits(limits)?)
+        let catalog = SourceCatalog::from_shared_bytes(value, archive_limits(limits)?)
             .map_err(map_archive_error)?;
         Self::from_catalog(catalog, limits)
     }
@@ -618,7 +594,7 @@ impl PreparedSource {
     ///
     /// # Errors
     ///
-    /// Returns the same errors as [`Self::from_shared_bytes_with_limits`],
+    /// Returns the same errors as [`Self::from_shared_bytes`],
     /// plus a refusal when a selected Pages metadata authority violates its
     /// physical profile.
     #[doc(hidden)]
@@ -644,7 +620,7 @@ impl PreparedSource {
     ///
     /// # Errors
     ///
-    /// Returns the same errors as [`Self::from_shared_bytes_with_limits`],
+    /// Returns the same errors as [`Self::from_shared_bytes`],
     /// plus a refusal when a selected semantic metadata authority violates
     /// its physical profile.
     #[doc(hidden)]
@@ -665,7 +641,7 @@ impl PreparedSource {
     ///
     /// # Errors
     ///
-    /// Returns the same errors as [`Self::from_shared_bytes_with_limits`],
+    /// Returns the same errors as [`Self::from_shared_bytes`],
     /// plus a refusal when a selected canonical metadata authority violates
     /// its physical profile.
     #[doc(hidden)]
@@ -703,7 +679,8 @@ impl PreparedSource {
         Self::from_catalog(catalog, limits)
     }
 
-    /// Prepare an immutable, already-normalized logical entry snapshot.
+    /// Prepare immutable logical entries under caller-selected physical
+    /// limits.
     ///
     /// This explicitly unstable integration route performs no synthetic ZIP
     /// serialization and never claims exact-package provenance. The frozen
@@ -711,33 +688,19 @@ impl PreparedSource {
     /// classification, then is released before the selected format decoder
     /// receives the component-only semantic snapshot.
     ///
-    /// # Errors
-    ///
-    /// Returns an error when any entry is unsafe, ambiguous, encrypted,
-    /// malformed, or exceeds a physical resource ceiling. An entry set with
-    /// no recognized canonical application root returns `Ok(None)`.
-    #[doc(hidden)]
-    pub fn from_frozen_entries(value: FrozenEntryStore) -> Result<Option<Self>> {
-        Self::from_frozen_entries_with_limits(value, Limits::default())
-    }
-
-    /// Prepare immutable logical entries under explicit physical limits.
-    ///
     /// The input-byte ceiling is not reinterpreted as an expanded logical
     /// payload ceiling; per-entry and aggregate expanded ceilings govern the
     /// already-decoded member payloads.
     ///
     /// # Errors
     ///
-    /// Returns the same errors as [`Self::from_frozen_entries`].
+    /// Returns an error when any entry is unsafe, ambiguous, encrypted,
+    /// malformed, or exceeds a physical resource ceiling. An entry set with
+    /// no recognized canonical application root returns `Ok(None)`.
     #[doc(hidden)]
-    pub fn from_frozen_entries_with_limits(
-        value: FrozenEntryStore,
-        limits: Limits,
-    ) -> Result<Option<Self>> {
-        let logical =
-            LogicalSourceCatalog::from_frozen_entries_with_limits(value, archive_limits(limits)?)
-                .map_err(map_archive_error)?;
+    pub fn from_frozen_entries(value: FrozenEntryStore, limits: Limits) -> Result<Option<Self>> {
+        let logical = LogicalSourceCatalog::from_frozen_entries(value, archive_limits(limits)?)
+            .map_err(map_archive_error)?;
         let Some(format) = component_catalog(logical.components())? else {
             return Ok(None);
         };
@@ -758,7 +721,8 @@ impl PreparedSource {
         }))
     }
 
-    /// Prepare a packaged file or app-authored directory bundle.
+    /// Prepare a packaged file or app-authored directory bundle under
+    /// caller-selected physical limits.
     ///
     /// Regular files are opened once, read through a bounded stable file
     /// handle, and classified from the retained package catalog. Directories
@@ -772,17 +736,7 @@ impl PreparedSource {
     /// during capture, or exceeds a physical resource ceiling. An accessible
     /// regular file or directory that is not recognized as iWork returns
     /// `Ok(None)`.
-    pub fn from_path(value: impl AsRef<Path>) -> Result<Option<Self>> {
-        Self::from_path_with_limits(value, Limits::default())
-    }
-
-    /// Prepare a packaged file or app-authored directory bundle under
-    /// explicit physical limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns the same errors as [`Self::from_path`].
-    pub fn from_path_with_limits(value: impl AsRef<Path>, limits: Limits) -> Result<Option<Self>> {
+    pub fn from_path(value: impl AsRef<Path>, limits: Limits) -> Result<Option<Self>> {
         Self::from_path_with_profile(value.as_ref(), limits, PathProfile::IndexOnly)
     }
 
@@ -823,7 +777,7 @@ impl PreparedSource {
     ///
     /// # Errors
     ///
-    /// Returns the same errors as [`Self::from_path_with_limits`], plus a
+    /// Returns the same errors as [`Self::from_path`], plus a
     /// refusal when a selected semantic metadata authority is unsafe.
     #[doc(hidden)]
     pub fn __from_path_with_semantic_metadata(
@@ -843,7 +797,7 @@ impl PreparedSource {
     ///
     /// # Errors
     ///
-    /// Returns the same errors as [`Self::from_path_with_limits`], plus a
+    /// Returns the same errors as [`Self::from_path`], plus a
     /// refusal when a selected canonical metadata authority is unsafe.
     #[doc(hidden)]
     pub fn __from_path_with_pages_metadata(
@@ -867,7 +821,7 @@ impl PreparedSource {
     ///
     /// # Errors
     ///
-    /// Returns the same errors as [`Self::from_path_with_limits`], plus a
+    /// Returns the same errors as [`Self::from_path`], plus a
     /// refusal when a selected canonical metadata authority is unsafe.
     #[doc(hidden)]
     pub fn __from_path_with_numbers_semantics(
@@ -914,7 +868,7 @@ impl PreparedSource {
                     },
                     PathProfile::KeynoteProperties => {
                         #[cfg(windows)]
-                        return Self::from_shared_bytes_with_limits(source.into(), limits);
+                        return Self::from_shared_bytes(source.into(), limits);
                         #[cfg(not(windows))]
                         Self::from_shared_bytes_with_catalog_profile(
                             source.into(),
@@ -928,7 +882,7 @@ impl PreparedSource {
                         // Windows, whose path adapter cannot promise the
                         // semantic profile's no-reparse capture invariant.
                         #[cfg(windows)]
-                        return Self::from_shared_bytes_with_limits(source.into(), limits);
+                        return Self::from_shared_bytes(source.into(), limits);
                         #[cfg(not(windows))]
                         Self::from_shared_bytes_with_catalog_profile(
                             source.into(),
@@ -938,7 +892,7 @@ impl PreparedSource {
                         )
                     },
                     PathProfile::IndexOnly | PathProfile::Properties => {
-                        Self::from_shared_bytes_with_limits(source.into(), limits)
+                        Self::from_shared_bytes(source.into(), limits)
                     },
                 }
             },
@@ -946,7 +900,7 @@ impl PreparedSource {
                 let archive = archive_limits(limits)?;
                 let directory = match profile {
                     PathProfile::IndexOnly => {
-                        FrozenDirectoryBundle::open_with_limits(path, archive)
+                        FrozenDirectoryBundle::open(path, archive)
                     },
                     PathProfile::Properties => {
                         FrozenDirectoryBundle::open_with_properties(path, archive)
@@ -1578,18 +1532,8 @@ impl Default for Limits {
 /// # Errors
 ///
 /// Returns a typed error when the package is malformed, ambiguous, encrypted,
-/// or exceeds a configured resource ceiling.
-pub fn bytes(value: &[u8]) -> Result<Option<Format>> {
-    bytes_with_limits(value, Limits::default())
-}
-
-/// Detect an iWork application using caller-selected resource ceilings.
-///
-/// # Errors
-///
-/// Returns a typed error when the package is malformed, ambiguous, encrypted,
 /// or exceeds the supplied resource ceilings.
-pub fn bytes_with_limits(value: &[u8], limits: Limits) -> Result<Option<Format>> {
+pub fn bytes(value: &[u8], limits: Limits) -> Result<Option<Format>> {
     let input_size = u64::try_from(value.len()).unwrap_or(u64::MAX);
     if input_size > limits.max_input_bytes {
         return Err(Error::LimitExceeded {
@@ -1694,6 +1638,7 @@ fn map_archive_error(archive_error: litchi_iwa_archive::Error) -> Error {
         litchi_iwa_archive::Error::Reassembly(message) => {
             Error::Archive(format!("iWork archive reassembly: {message}"))
         },
+        _ => Error::Archive("iWork archive ingress rejected the source".to_owned()),
     }
 }
 
@@ -1770,26 +1715,26 @@ pub fn __classify_application_payload(payload: &[u8]) -> Result<Option<Format>> 
 }
 
 fn classify_application_payload(payload: &[u8]) -> Result<Option<Format>> {
-    let fields = parse_canonical_wire_fields(payload)?;
-    let pages = match unique_field(payload, &fields, 15, 2)? {
+    let fields = CanonicalFieldSet::parse(payload)?;
+    let pages = match fields.unique(15, 2)? {
         Some(shared) => valid_shared_document(shared)?,
         None => false,
     };
     let mut numbers = true;
     for field in [4, 5, 6] {
-        numbers &= match unique_field(payload, &fields, field, 2)? {
+        numbers &= match fields.unique(field, 2)? {
             Some(reference) => valid_reference(reference)?,
             None => false,
         };
     }
-    numbers &= match unique_field(payload, &fields, 8, 2)? {
+    numbers &= match fields.unique(8, 2)? {
         Some(shared) => valid_shared_document(shared)?,
         None => false,
     };
-    let keynote = match unique_field(payload, &fields, 2, 2)? {
+    let keynote = match fields.unique(2, 2)? {
         Some(reference) => valid_reference(reference)?,
         None => false,
-    } && match unique_field(payload, &fields, 3, 2)? {
+    } && match fields.unique(3, 2)? {
         Some(shared) => valid_shared_document(shared)?,
         None => false,
     };
@@ -1801,30 +1746,105 @@ fn classify_application_payload(payload: &[u8]) -> Result<Option<Format>> {
         _ => None,
     };
     if resolved.is_none() && !pages && !numbers && !keynote {
-        validate_malformed_application_authority(payload, &fields)?;
+        validate_malformed_application_authority(&fields)?;
     }
     Ok(resolved)
 }
 
-fn unique_field<'a>(
-    payload: &'a [u8],
-    fields: &[WireField],
-    number: u32,
-    wire_type: u8,
-) -> Result<Option<&'a [u8]>> {
-    let mut matches = fields.iter().filter(|field| field.number() == number);
-    let Some(field) = matches.next() else {
-        return Ok(None);
-    };
-    if matches.next().is_some() || field.wire_type() != wire_type {
-        return Ok(None);
+/// Borrowed canonical field slots for application-authority classification.
+///
+/// Only field numbers 1..=15 participate in an application authority, so the
+/// classifier keeps one borrowed descriptor per slot plus a duplicate bit set
+/// instead of an input-sized field vector. Every field of the payload is
+/// still parsed and checked for canonical framing in one pass, with the same
+/// error precedence as the former collected parse (every parse error before
+/// any framing error, framing errors in field order).
+struct CanonicalFieldSet<'source> {
+    payload: &'source [u8],
+    slots: [Option<WireField>; 16],
+    duplicates: u16,
+}
+
+impl<'source> CanonicalFieldSet<'source> {
+    fn parse(payload: &'source [u8]) -> Result<Self> {
+        let mut result = Self {
+            payload,
+            slots: [None; 16],
+            duplicates: 0,
+        };
+        // A parse error anywhere outranks a noncanonical field, and the first
+        // noncanonical field in order outranks later ones: remember the first
+        // framing error and report it only once the whole payload parsed.
+        let mut framing = None;
+        visit_wire_fields(payload, litchi_iwa_common::WireLimits::DEFAULT, |field| {
+            if framing.is_none()
+                && let Err(error) = field.validate_canonical_framing(payload)
+            {
+                framing = Some(error);
+            }
+            if let Some(slot) = usize::try_from(field.number())
+                .ok()
+                .and_then(|index| result.slots.get_mut(index))
+            {
+                if slot.is_some() {
+                    result.duplicates |= 1 << field.number();
+                } else {
+                    *slot = Some(field);
+                }
+            }
+            Ok(())
+        })?;
+        if let Some(error) = framing {
+            return Err(error.into());
+        }
+        Ok(result)
     }
-    Ok(Some(field.checked_payload(payload)?))
+
+    fn present(&self, number: u32) -> bool {
+        self.field(number).is_some()
+    }
+
+    fn field(&self, number: u32) -> Option<WireField> {
+        usize::try_from(number)
+            .ok()
+            .and_then(|index| self.slots.get(index))
+            .copied()
+            .flatten()
+    }
+
+    fn duplicated(&self, number: u32) -> bool {
+        number < 16 && self.duplicates & (1 << number) != 0
+    }
+
+    fn unique(&self, number: u32, wire_type: u8) -> Result<Option<&'source [u8]>> {
+        let Some(field) = self.field(number) else {
+            return Ok(None);
+        };
+        if self.duplicated(number) || field.wire_type() != wire_type {
+            return Ok(None);
+        }
+        Ok(Some(field.checked_payload(self.payload)?))
+    }
+
+    fn strict(&self, number: u32, wire_type: u8) -> Result<&'source [u8]> {
+        let Some(field) = self.field(number) else {
+            return Err(invalid_application_authority(number, "is missing"));
+        };
+        if self.duplicated(number) {
+            return Err(invalid_application_authority(number, "is duplicated"));
+        }
+        if field.wire_type() != wire_type {
+            return Err(invalid_application_authority(
+                number,
+                "has the wrong wire type",
+            ));
+        }
+        Ok(field.checked_payload(self.payload)?)
+    }
 }
 
 fn valid_reference(payload: &[u8]) -> Result<bool> {
-    let fields = parse_canonical_wire_fields(payload)?;
-    let Some(identifier) = unique_field(payload, &fields, 1, 0)? else {
+    let Some(identifier) = CanonicalFieldSet::parse(payload)?.unique(1, 0)? else {
         return Ok(false);
     };
     Ok(is_canonical_reference_identifier(identifier))
@@ -1838,73 +1858,37 @@ fn is_canonical_reference_identifier(payload: &[u8]) -> bool {
 }
 
 fn valid_shared_document(payload: &[u8]) -> Result<bool> {
-    let fields = parse_canonical_wire_fields(payload)?;
-    let Some(document) = unique_field(payload, &fields, 1, 2)? else {
+    let Some(document) = CanonicalFieldSet::parse(payload)?.unique(1, 2)? else {
         return Ok(false);
     };
-    let _fields = parse_canonical_wire_fields(document)?;
+    CanonicalFieldSet::parse(document)?;
     Ok(true)
 }
 
-fn parse_canonical_wire_fields(payload: &[u8]) -> Result<Vec<WireField>> {
-    let fields = parse_wire_fields(payload)?;
-    for field in &fields {
-        field.validate_canonical_framing(payload)?;
-    }
-    Ok(fields)
-}
-
-fn validate_malformed_application_authority(payload: &[u8], fields: &[WireField]) -> Result<()> {
-    if fields.iter().any(|field| field.number() == 15) {
-        let shared = strict_unique_field(payload, fields, 15, 2)?;
-        validate_strict_shared_document(shared)?;
+fn validate_malformed_application_authority(fields: &CanonicalFieldSet<'_>) -> Result<()> {
+    if fields.present(15) {
+        validate_strict_shared_document(fields.strict(15, 2)?)?;
         return Ok(());
     }
     if [4, 5, 6, 8]
-        .iter()
-        .all(|number| fields.iter().any(|field| field.number() == *number))
+        .into_iter()
+        .all(|number| fields.present(number))
     {
         for number in [4, 5, 6] {
-            validate_strict_reference(strict_unique_field(payload, fields, number, 2)?)?;
+            validate_strict_reference(fields.strict(number, 2)?)?;
         }
-        validate_strict_shared_document(strict_unique_field(payload, fields, 8, 2)?)?;
+        validate_strict_shared_document(fields.strict(8, 2)?)?;
         return Ok(());
     }
-    if [2, 3]
-        .iter()
-        .all(|number| fields.iter().any(|field| field.number() == *number))
-    {
-        validate_strict_reference(strict_unique_field(payload, fields, 2, 2)?)?;
-        validate_strict_shared_document(strict_unique_field(payload, fields, 3, 2)?)?;
+    if fields.present(2) && fields.present(3) {
+        validate_strict_reference(fields.strict(2, 2)?)?;
+        validate_strict_shared_document(fields.strict(3, 2)?)?;
     }
     Ok(())
 }
 
-fn strict_unique_field<'a>(
-    payload: &'a [u8],
-    fields: &[WireField],
-    number: u32,
-    wire_type: u8,
-) -> Result<&'a [u8]> {
-    let mut matches = fields.iter().filter(|field| field.number() == number);
-    let Some(field) = matches.next() else {
-        return Err(invalid_application_authority(number, "is missing"));
-    };
-    if matches.next().is_some() {
-        return Err(invalid_application_authority(number, "is duplicated"));
-    }
-    if field.wire_type() != wire_type {
-        return Err(invalid_application_authority(
-            number,
-            "has the wrong wire type",
-        ));
-    }
-    Ok(field.checked_payload(payload)?)
-}
-
 fn validate_strict_reference(payload: &[u8]) -> Result<()> {
-    let fields = parse_canonical_wire_fields(payload)?;
-    let identifier = strict_unique_field(payload, &fields, 1, 0)?;
+    let identifier = CanonicalFieldSet::parse(payload)?.strict(1, 0)?;
     if !is_canonical_reference_identifier(identifier) {
         return Err(invalid_application_authority(
             1,
@@ -1915,9 +1899,8 @@ fn validate_strict_reference(payload: &[u8]) -> Result<()> {
 }
 
 fn validate_strict_shared_document(payload: &[u8]) -> Result<()> {
-    let fields = parse_canonical_wire_fields(payload)?;
-    let document = strict_unique_field(payload, &fields, 1, 2)?;
-    let _document_fields = parse_canonical_wire_fields(document)?;
+    let document = CanonicalFieldSet::parse(payload)?.strict(1, 2)?;
+    CanonicalFieldSet::parse(document)?;
     Ok(())
 }
 
@@ -1929,11 +1912,10 @@ fn invalid_application_authority(number: u32, reason: &str) -> Error {
 }
 
 fn root_format(data: &[u8], limits: Limits) -> Result<Option<Format>> {
-    let stream = SnappyStream::decompress_with_limits(data, limits.snappy_limits()?)?;
+    let stream = SnappyStream::decompress(data, limits.snappy_limits()?)?;
     let archive_limits =
         litchi_iwa_core::Limits::default().with_archive_bytes(limits.max_iwa_stream_size())?;
-    let archive =
-        Archive::parse_objects_with_identifier_with_limits(stream.as_bytes(), 1, archive_limits)?;
+    let archive = Archive::parse_objects_with_identifier(stream.as_bytes(), 1, archive_limits)?;
     root_format_archive(&archive)
 }
 
@@ -1969,18 +1951,8 @@ fn root_format_archive(archive: &Archive) -> Result<Option<Format>> {
 /// # Errors
 ///
 /// Returns a typed error when the stream cannot be inspected, restored, or
-/// contains malformed or over-limit iWork input.
-pub fn reader<R: Read + Seek>(value: &mut R) -> Result<Option<Format>> {
-    reader_with_limits(value, Limits::default())
-}
-
-/// Detect an iWork application from a seekable stream under explicit limits.
-///
-/// # Errors
-///
-/// Returns a typed error when the stream cannot be inspected, restored, or
-/// contains malformed or over-limit iWork input.
-pub fn reader_with_limits<R: Read + Seek>(value: &mut R, limits: Limits) -> Result<Option<Format>> {
+/// contains malformed or over-limit iWork input under the supplied limits.
+pub fn reader<R: Read + Seek>(value: &mut R, limits: Limits) -> Result<Option<Format>> {
     let original = value.stream_position()?;
     let detected = (|| {
         let input_length = value.seek(SeekFrom::End(0))?;
@@ -2010,7 +1982,7 @@ pub fn reader_with_limits<R: Read + Seek>(value: &mut R, limits: Limits) -> Resu
                 "iWork detection source changed while it was being read".to_owned(),
             ));
         }
-        bytes_with_limits(&data, limits)
+        bytes(&data, limits)
     })();
     value.seek(SeekFrom::Start(original))?;
     detected
@@ -2024,21 +1996,11 @@ pub fn reader_with_limits<R: Read + Seek>(value: &mut R, limits: Limits) -> Resu
 /// # Errors
 ///
 /// Returns a typed error when the path is inaccessible, unsafe, malformed, or
-/// exceeds a configured resource ceiling.
-pub fn path(value: impl AsRef<Path>) -> Result<Option<Format>> {
-    path_with_limits(value, Limits::default())
-}
-
-/// Detect a packaged file or legacy directory bundle under explicit limits.
-///
-/// # Errors
-///
-/// Returns a typed error when the path is inaccessible, unsafe, malformed, or
 /// exceeds the supplied resource ceilings.
-pub fn path_with_limits(value: impl AsRef<Path>, limits: Limits) -> Result<Option<Format>> {
+pub fn path(value: impl AsRef<Path>, limits: Limits) -> Result<Option<Format>> {
     let path = value.as_ref();
     match kind(path)? {
-        Kind::File => reader_with_limits(&mut File::open(path)?, limits),
+        Kind::File => reader(&mut File::open(path)?, limits),
         Kind::Dir => directory(path, limits),
         Kind::Missing => Ok(None),
     }
@@ -2058,7 +2020,7 @@ fn directory(root: &Path, limits: Limits) -> Result<Option<Format>> {
 
     let index_zip = root.join("Index.zip");
     evidence = evidence.merge(match kind(&index_zip)? {
-        Kind::File => match reader_with_limits(&mut File::open(&index_zip)?, limits)? {
+        Kind::File => match reader(&mut File::open(&index_zip)?, limits)? {
             Some(format) => Outcome::Found(format),
             None => Outcome::Conflict,
         },
@@ -2414,11 +2376,16 @@ mod tests {
                         type_: message_type,
                         data: payload,
                     }],
+                    Default::default(),
                 )
                 .unwrap(),
             ],
         };
-        SnappyStream::compress(&archive.to_bytes().unwrap()).unwrap()
+        SnappyStream::compress(
+            &archive.to_bytes(Default::default()).unwrap(),
+            Default::default(),
+        )
+        .unwrap()
     }
 
     fn document_package(format: Format, extra_names: &[&str]) -> Vec<u8> {
@@ -2522,7 +2489,7 @@ mod tests {
     }
 
     fn frozen_package(bytes: &[u8]) -> FrozenEntryStore {
-        let catalog = litchi_iwa_archive::package::Catalog::from_bytes(bytes)
+        let catalog = litchi_iwa_archive::package::Catalog::from_bytes(bytes, Default::default())
             .expect("parse logical test package");
         let entries = catalog
             .into_iter()
@@ -2654,53 +2621,72 @@ mod tests {
     #[test]
     fn detects_root_application_with_shared_table_components() {
         assert_eq!(
-            bytes(&document_package(Format::Pages, &[])).unwrap(),
+            bytes(&document_package(Format::Pages, &[]), Limits::default()).unwrap(),
             Some(Format::Pages)
         );
         assert_eq!(
-            bytes(&document_package(
-                Format::Keynote,
-                &[
-                    "Index/MasterSlide-12.iwa",
-                    "Index/Slide-1.iwa",
-                    "Index/TemplateSlide-31.iwa",
-                    "Index/CalculationEngine-81.iwa"
-                ]
-            ))
+            bytes(
+                &document_package(
+                    Format::Keynote,
+                    &[
+                        "Index/MasterSlide-12.iwa",
+                        "Index/Slide-1.iwa",
+                        "Index/TemplateSlide-31.iwa",
+                        "Index/CalculationEngine-81.iwa"
+                    ]
+                ),
+                Limits::default()
+            )
             .unwrap(),
             Some(Format::Keynote)
         );
         assert_eq!(
-            bytes(&document_package(
-                Format::Numbers,
-                &["Index/CalculationEngine-174.iwa"]
-            ))
+            bytes(
+                &document_package(Format::Numbers, &["Index/CalculationEngine-174.iwa"]),
+                Limits::default()
+            )
             .unwrap(),
             Some(Format::Numbers)
         );
         assert_eq!(
-            bytes(&document_package(
-                Format::Pages,
-                &["Index/CalculationEngine.iwa"]
-            ))
+            bytes(
+                &document_package(Format::Pages, &["Index/CalculationEngine.iwa"]),
+                Limits::default()
+            )
             .unwrap(),
             Some(Format::Pages)
         );
-        assert!(bytes(&document_package(Format::Numbers, &["Index/Slide-1.iwa"])).is_err());
         assert!(
-            bytes(&document_package(
-                Format::Pages,
-                &["Index/MasterSlide-12.iwa"]
-            ))
+            bytes(
+                &document_package(Format::Numbers, &["Index/Slide-1.iwa"]),
+                Limits::default()
+            )
             .is_err()
         );
-        assert!(bytes(&package(&[("Index/Document.iwa", b"not iwa")])).is_err());
+        assert!(
+            bytes(
+                &document_package(Format::Pages, &["Index/MasterSlide-12.iwa"]),
+                Limits::default()
+            )
+            .is_err()
+        );
+        assert!(
+            bytes(
+                &package(&[("Index/Document.iwa", b"not iwa")]),
+                Limits::default()
+            )
+            .is_err()
+        );
         assert_eq!(
-            bytes(&package(&[("Index/Unknown.iwa", b"iwa")])).unwrap(),
+            bytes(
+                &package(&[("Index/Unknown.iwa", b"iwa")]),
+                Limits::default()
+            )
+            .unwrap(),
             None
         );
         assert_eq!(
-            bytes(&package(&[("Data/image.png", b"iwa")])).unwrap(),
+            bytes(&package(&[("Data/image.png", b"iwa")]), Limits::default()).unwrap(),
             None
         );
 
@@ -2712,6 +2698,7 @@ mod tests {
                         type_: 10_000,
                         data: document_payload(Format::Pages),
                     }],
+                    Default::default(),
                 )
                 .unwrap(),
                 ArchiveObject::new(
@@ -2720,6 +2707,7 @@ mod tests {
                         type_: 10_000,
                         data: document_payload(Format::Pages),
                     }],
+                    Default::default(),
                 )
                 .unwrap(),
             ],
@@ -2731,7 +2719,7 @@ mod tests {
     fn detects_from_the_same_parsed_component_snapshot() {
         for expected in [Format::Pages, Format::Numbers, Format::Keynote] {
             let bytes = document_package(expected, &[]);
-            let source = SourceCatalog::from_bytes(&bytes).unwrap();
+            let source = SourceCatalog::from_bytes(&bytes, Default::default()).unwrap();
 
             assert_eq!(
                 component_catalog(source.components()).unwrap(),
@@ -2739,18 +2727,18 @@ mod tests {
             );
             assert_eq!(
                 component_catalog(source.components()).unwrap(),
-                super::bytes(&bytes).unwrap()
+                super::bytes(&bytes, Limits::default()).unwrap()
             );
         }
 
         let media_package = package(&[("Data/image.png", b"not an IWA component")]);
-        let source = SourceCatalog::from_bytes(&media_package).unwrap();
+        let source = SourceCatalog::from_bytes(&media_package, Default::default()).unwrap();
         assert_eq!(component_catalog(source.components()).unwrap(), None);
 
         let pages_root = document(Format::Pages);
         let legacy_index = package(&[("Document.iwa", &pages_root)]);
         let legacy = package(&[("legacy.pages/Index.zip", &legacy_index)]);
-        let legacy_source = SourceCatalog::from_bytes(&legacy).unwrap();
+        let legacy_source = SourceCatalog::from_bytes(&legacy, Default::default()).unwrap();
         assert_eq!(
             component_catalog(legacy_source.components()).unwrap(),
             Some(Format::Pages)
@@ -2760,7 +2748,7 @@ mod tests {
             ("Index/Document.iwa", &pages_root),
             ("Document.iwa", &pages_root),
         ]);
-        let duplicate_source = SourceCatalog::from_bytes(&duplicate).unwrap();
+        let duplicate_source = SourceCatalog::from_bytes(&duplicate, Default::default()).unwrap();
         assert!(component_catalog(duplicate_source.components()).is_err());
     }
 
@@ -2776,7 +2764,7 @@ mod tests {
         )
         .unwrap();
 
-        let prepared = PreparedSource::from_shared_bytes_with_limits(Arc::clone(&bytes), limits)
+        let prepared = PreparedSource::from_shared_bytes(Arc::clone(&bytes), limits)
             .unwrap()
             .unwrap();
         assert_eq!(prepared.format(), Format::Pages);
@@ -2829,11 +2817,11 @@ mod tests {
         let mut exact = Vec::new();
         catalog
             .package()
-            .write_to(&mut exact)
+            .write_to(&mut exact, Default::default())
             .expect("selective preparation must preserve exact source bytes");
         assert_eq!(exact, source.as_ref());
 
-        let full = SourceCatalog::from_shared_bytes(catalog.shared_source())
+        let full = SourceCatalog::from_shared_bytes(catalog.shared_source(), Default::default())
             .expect("an explicit full package request should materialize media");
         assert!(
             full.package()
@@ -2918,17 +2906,19 @@ mod tests {
     fn frozen_logical_preparation_matches_packaged_classification() {
         for expected in [Format::Pages, Format::Numbers, Format::Keynote] {
             let bytes = document_package(expected, &[]);
-            let prepared = PreparedSource::from_frozen_entries(frozen_package(&bytes))
-                .unwrap()
-                .expect("recognized logical source");
+            let prepared =
+                PreparedSource::from_frozen_entries(frozen_package(&bytes), Limits::default())
+                    .unwrap()
+                    .expect("recognized logical source");
             assert_eq!(prepared.format(), expected);
             assert!(prepared.__into_source_catalog().is_none());
 
-            let component_prepared = PreparedSource::from_frozen_entries(frozen_package(&bytes))
-                .unwrap()
-                .expect("recognized logical source");
+            let component_prepared =
+                PreparedSource::from_frozen_entries(frozen_package(&bytes), Limits::default())
+                    .unwrap()
+                    .expect("recognized logical source");
             let (logical, retained_limits) = component_prepared.__into_components();
-            let packaged = SourceCatalog::from_bytes(&bytes).unwrap();
+            let packaged = SourceCatalog::from_bytes(&bytes, Default::default()).unwrap();
             assert_eq!(retained_limits, archive_limits(Limits::default()).unwrap());
             assert_eq!(
                 logical
@@ -2947,10 +2937,13 @@ mod tests {
     #[test]
     fn frozen_logical_preparation_skips_operation_storage() {
         let root = document(Format::Pages);
-        let prepared = PreparedSource::from_frozen_entries(frozen_entries(&[
-            ("Index/Document.iwa", &root),
-            ("Index/OperationStorage.iwa", b"bvxn operation log"),
-        ]))
+        let prepared = PreparedSource::from_frozen_entries(
+            frozen_entries(&[
+                ("Index/Document.iwa", &root),
+                ("Index/OperationStorage.iwa", b"bvxn operation log"),
+            ]),
+            Limits::default(),
+        )
         .unwrap()
         .expect("recognized Pages source");
         let (components, _limits) = prepared.__into_components();
@@ -2994,7 +2987,7 @@ mod tests {
             ),
         ];
         for (entries, limits, expected) in cases {
-            let error = PreparedSource::from_frozen_entries_with_limits(entries, limits)
+            let error = PreparedSource::from_frozen_entries(entries, limits)
                 .expect_err("logical limit must be retained");
             assert!(matches!(
                 error,
@@ -3006,11 +2999,17 @@ mod tests {
     #[test]
     fn frozen_logical_preparation_rejects_encryption_and_unexpanded_indexes() {
         assert!(matches!(
-            PreparedSource::from_frozen_entries(frozen_entries(&[("Metadata/.iwpv2", b"marker")])),
+            PreparedSource::from_frozen_entries(
+                frozen_entries(&[("Metadata/.iwpv2", b"marker")]),
+                Limits::default(),
+            ),
             Err(Error::Encrypted)
         ));
         assert!(matches!(
-            PreparedSource::from_frozen_entries(frozen_entries(&[("legacy/Index.zip", b"nested")])),
+            PreparedSource::from_frozen_entries(
+                frozen_entries(&[("legacy/Index.zip", b"nested")]),
+                Limits::default(),
+            ),
             Err(Error::Archive(_))
         ));
     }
@@ -3018,7 +3017,7 @@ mod tests {
     #[test]
     fn prepared_source_leaves_unrecognized_inputs_unclaimed() {
         assert!(
-            PreparedSource::from_bytes(b"not a ZIP package")
+            PreparedSource::from_bytes(b"not a ZIP package", Limits::default())
                 .unwrap()
                 .is_none()
         );
@@ -3043,7 +3042,7 @@ mod tests {
         )
         .into();
 
-        let prepared = PreparedSource::from_shared_bytes(Arc::clone(&bytes))
+        let prepared = PreparedSource::from_shared_bytes(Arc::clone(&bytes), Limits::default())
             .unwrap()
             .expect("fixture has a Pages root");
         let semantic = prepared
@@ -3304,7 +3303,7 @@ mod tests {
         patch_zip_member_compression_to_opaque(&mut bytes, "Metadata/BuildVersionHistory.plist");
         patch_zip_member_compression_to_opaque(&mut bytes, "Metadata/DocumentIdentifier");
 
-        let prepared = PreparedSource::from_bytes(&bytes)
+        let prepared = PreparedSource::from_bytes(&bytes, Limits::default())
             .unwrap()
             .expect("fixture has a Keynote root");
         let (_components, _limits, captured) = prepared
@@ -3322,7 +3321,7 @@ mod tests {
             );
             patch_zip_member_compression_to_opaque(&mut bytes, authority);
 
-            let prepared = PreparedSource::from_bytes(&bytes)
+            let prepared = PreparedSource::from_bytes(&bytes, Limits::default())
                 .unwrap()
                 .expect("fixture has a Pages root");
             let error = prepared
@@ -3341,7 +3340,7 @@ mod tests {
         for authority in SEMANTIC_METADATA_AUTHORITIES.map(|(authority, _sidecar)| authority) {
             let exact = vec![b'x'; MAX_PROPERTIES_BYTES];
             let accepted = document_package_with_members(Format::Pages, &[(authority, &exact)]);
-            let prepared = PreparedSource::from_bytes(&accepted)
+            let prepared = PreparedSource::from_bytes(&accepted, Limits::default())
                 .unwrap()
                 .expect("fixture has a Pages root");
             let sidecars = prepared
@@ -3359,7 +3358,7 @@ mod tests {
 
             let oversized = vec![b'x'; MAX_PROPERTIES_BYTES + 1];
             let rejected = document_package_with_members(Format::Pages, &[(authority, &oversized)]);
-            let prepared = PreparedSource::from_bytes(&rejected)
+            let prepared = PreparedSource::from_bytes(&rejected, Limits::default())
                 .unwrap()
                 .expect("fixture has a Pages root");
             assert!(matches!(
@@ -3392,7 +3391,7 @@ mod tests {
         fs::write(bundle.join("Metadata/DocumentIdentifier"), identifier)?;
         fs::write(bundle.join("Metadata/Properties.plist.bak"), b"decoy")?;
 
-        let generic = PreparedSource::from_path(&bundle)
+        let generic = PreparedSource::from_path(&bundle, Limits::default())
             .unwrap()
             .expect("fixture has a Pages root")
             .__into_pages_semantic_source()
@@ -3488,23 +3487,29 @@ mod tests {
         let root = document(Format::Pages);
         let index = package(&[("Document.iwa", &root)]);
         let outer = package(&[("legacy.pages/Index.zip", &index)]);
-        assert_eq!(bytes(&outer).unwrap(), Some(Format::Pages));
+        assert_eq!(
+            bytes(&outer, Limits::default()).unwrap(),
+            Some(Format::Pages)
+        );
 
         let mixed = package(&[
             ("legacy.pages/Index.zip", &index),
             ("Index/CalculationEngine.iwa", b"iwa"),
         ]);
-        assert!(bytes(&mixed).is_err());
+        assert!(bytes(&mixed, Limits::default()).is_err());
 
         let ambiguous = package(&[("a/Index.zip", &index), ("b/Index.zip", &index)]);
-        assert!(bytes(&ambiguous).is_err());
+        assert!(bytes(&ambiguous, Limits::default()).is_err());
 
         let root = document(Format::Pages);
         let encrypted = package(&[
             ("Index/Document.iwa", &root),
             ("Metadata/.iwpv2", b"encryption metadata"),
         ]);
-        assert!(matches!(bytes(&encrypted), Err(Error::Encrypted)));
+        assert!(matches!(
+            bytes(&encrypted, Limits::default()),
+            Err(Error::Encrypted)
+        ));
     }
 
     #[test]
@@ -3587,10 +3592,7 @@ mod tests {
     fn checked_limits_preserve_defaults_and_bound_each_layer() {
         let valid = document_package(Format::Pages, &[]);
         let defaults = Limits::default();
-        assert_eq!(
-            bytes_with_limits(&valid, defaults).unwrap(),
-            Some(Format::Pages)
-        );
+        assert_eq!(bytes(&valid, defaults).unwrap(), Some(Format::Pages));
         assert_eq!(defaults.max_input_bytes(), Limits::HARD_MAX_INPUT_BYTES);
         assert_eq!(defaults.max_files(), Limits::HARD_MAX_FILES);
         assert_eq!(defaults.max_entry_size(), Limits::HARD_MAX_ENTRY_SIZE);
@@ -3601,7 +3603,7 @@ mod tests {
         );
 
         let input_bound = Limits::new(1, 1, 1, 1, 1).unwrap();
-        assert!(bytes_with_limits(&valid, input_bound).is_err());
+        assert!(bytes(&valid, input_bound).is_err());
 
         let stream_bound = Limits::new(
             Limits::HARD_MAX_INPUT_BYTES,
@@ -3611,7 +3613,7 @@ mod tests {
             1,
         )
         .unwrap();
-        assert!(bytes_with_limits(&valid, stream_bound).is_err());
+        assert!(bytes(&valid, stream_bound).is_err());
     }
 
     #[test]
@@ -3632,12 +3634,15 @@ mod tests {
     fn reader_restores_nonzero_cursor_on_success_and_rejection() {
         let mut valid = Cursor::new(document_package(Format::Pages, &[]));
         valid.set_position(9);
-        assert_eq!(reader(&mut valid).unwrap(), Some(Format::Pages));
+        assert_eq!(
+            reader(&mut valid, Limits::default()).unwrap(),
+            Some(Format::Pages)
+        );
         assert_eq!(valid.position(), 9);
 
         let mut invalid = Cursor::new(b"not an iWork package".to_vec());
         invalid.set_position(4);
-        assert_eq!(reader(&mut invalid).unwrap(), None);
+        assert_eq!(reader(&mut invalid, Limits::default()).unwrap(), None);
         assert_eq!(invalid.position(), 4);
     }
 
@@ -3647,12 +3652,18 @@ mod tests {
 
         let packaged = temp.0.join("document.pages");
         fs::write(&packaged, document_package(Format::Pages, &[]))?;
-        assert_eq!(path(&packaged).unwrap(), Some(Format::Pages));
+        assert_eq!(
+            path(&packaged, Limits::default()).unwrap(),
+            Some(Format::Pages)
+        );
 
         let legacy = temp.0.join("legacy.key");
         fs::create_dir(&legacy)?;
         fs::write(legacy.join("index.apxl"), [])?;
-        assert_eq!(path(&legacy).unwrap(), Some(Format::Keynote));
+        assert_eq!(
+            path(&legacy, Limits::default()).unwrap(),
+            Some(Format::Keynote)
+        );
 
         let bundle = temp.0.join("sheet.numbers");
         fs::create_dir(&bundle)?;
@@ -3660,7 +3671,10 @@ mod tests {
             bundle.join("Index.zip"),
             document_package(Format::Numbers, &["Index/CalculationEngine-174.iwa"]),
         )?;
-        assert_eq!(path(&bundle).unwrap(), Some(Format::Numbers));
+        assert_eq!(
+            path(&bundle, Limits::default()).unwrap(),
+            Some(Format::Numbers)
+        );
 
         let agreeing = temp.0.join("agreeing.pages");
         fs::create_dir(&agreeing)?;
@@ -3669,7 +3683,10 @@ mod tests {
             agreeing.join("Index.zip"),
             document_package(Format::Pages, &[]),
         )?;
-        assert_eq!(path(&agreeing).unwrap(), Some(Format::Pages));
+        assert_eq!(
+            path(&agreeing, Limits::default()).unwrap(),
+            Some(Format::Pages)
+        );
 
         let unpacked = temp.0.join("unpacked.key");
         fs::create_dir_all(unpacked.join("Index"))?;
@@ -3678,11 +3695,14 @@ mod tests {
             document(Format::Keynote),
         )?;
         fs::write(unpacked.join("Index/Slide-1.iwa"), [])?;
-        assert_eq!(path(&unpacked).unwrap(), Some(Format::Keynote));
+        assert_eq!(
+            path(&unpacked, Limits::default()).unwrap(),
+            Some(Format::Keynote)
+        );
 
         let tight = Limits::new(1, 1, 1, 1, 1).unwrap();
-        assert!(path_with_limits(&packaged, tight).is_err());
-        assert!(path_with_limits(&unpacked, tight).is_err());
+        assert!(path(&packaged, tight).is_err());
+        assert!(path(&unpacked, tight).is_err());
         Ok(())
     }
 
@@ -3702,7 +3722,7 @@ mod tests {
             Limits::HARD_MAX_IWA_STREAM_SIZE,
         )
         .unwrap();
-        let error = path_with_limits(&unpacked, limits).unwrap_err();
+        let error = path(&unpacked, limits).unwrap_err();
         assert!(error.to_string().contains("more than the 1 entry limit"));
         Ok(())
     }
@@ -3724,7 +3744,7 @@ mod tests {
             Limits::HARD_MAX_IWA_STREAM_SIZE,
         )
         .unwrap();
-        let error = path_with_limits(&unpacked, limits).unwrap_err();
+        let error = path(&unpacked, limits).unwrap_err();
         assert!(error.to_string().contains("iWork index directory contains"));
         assert!(error.to_string().contains("byte limit"));
         Ok(())
@@ -3737,20 +3757,20 @@ mod tests {
         let generic = temp.0.join("generic");
         fs::create_dir_all(generic.join("Index"))?;
         fs::write(generic.join("Index/Unknown.iwa"), [])?;
-        assert!(path(&generic).is_err());
+        assert!(path(&generic, Limits::default()).is_err());
 
         let media = temp.0.join("media-only");
         fs::create_dir_all(media.join("Data"))?;
         fs::create_dir(media.join("Assets"))?;
         fs::write(media.join("theme-preview.jpg"), [])?;
-        assert_eq!(path(&media).unwrap(), None);
+        assert_eq!(path(&media, Limits::default()).unwrap(), None);
 
         let conflict = temp.0.join("conflict");
         fs::create_dir_all(conflict.join("Index"))?;
         fs::write(conflict.join("Index/Document.iwa"), document(Format::Pages))?;
         fs::write(conflict.join("Index/Slide.iwa"), [])?;
         fs::write(conflict.join("Index/CalculationEngine.iwa"), [])?;
-        assert!(path(&conflict).is_err());
+        assert!(path(&conflict, Limits::default()).is_err());
 
         let legacy_conflict = temp.0.join("legacy-conflict");
         fs::create_dir(&legacy_conflict)?;
@@ -3759,7 +3779,7 @@ mod tests {
             legacy_conflict.join("Index.zip"),
             document_package(Format::Numbers, &[]),
         )?;
-        assert!(path(&legacy_conflict).is_err());
+        assert!(path(&legacy_conflict, Limits::default()).is_err());
 
         let representation_conflict = temp.0.join("representation-conflict");
         fs::create_dir_all(representation_conflict.join("Index"))?;
@@ -3772,7 +3792,7 @@ mod tests {
             document(Format::Keynote),
         )?;
         fs::write(representation_conflict.join("Index/Slide-1.iwa"), [])?;
-        assert!(path(&representation_conflict).is_err());
+        assert!(path(&representation_conflict, Limits::default()).is_err());
         Ok(())
     }
 

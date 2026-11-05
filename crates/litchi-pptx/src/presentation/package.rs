@@ -6,13 +6,13 @@
 use litchi_core::{
     SequentialTextWriter, TextObjectKind, TextOutputError, TextOutputOptions, TextOutputReport,
 };
-use litchi_opc::OpcPackage;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+use litchi_opc::{OpcPackage, SourceLimits};
 use std::io::Write;
 
 use crate::notes::SlideRootProof;
 use crate::parts::{MceCapture, PresentationPart, SlideMasterPart, SlidePart, SlideReference};
-use crate::slide::{Key, Slide, SlideLayout, SlideMaster};
+use crate::slide::{Selector, Slide, SlideLayout, SlideMaster};
 use crate::{Error, Result};
 
 use super::Presentation;
@@ -28,6 +28,21 @@ pub(crate) struct CaptureSlides<'a> {
     pub(crate) slides: Vec<CaptureSlide<'a>>,
     pub(crate) first_name_error: Option<(usize, Error)>,
     pub(crate) slide_root_proofs: Option<Vec<SlideRootProof<'a>>>,
+}
+
+/// Validate and wrap a slide after an earlier producer-name projection has
+/// failed. The caller deliberately keeps this root-only fallback so the first
+/// name error retains its deferred ordering, but physical source admission
+/// must still precede the MCE parse.
+pub(crate) fn root_only_slide_with_source_limits<'a>(
+    part: &'a dyn litchi_opc::Part,
+    source_limits: Option<SourceLimits>,
+) -> Result<SlidePart<'a>> {
+    if let Some(source_limits) = source_limits {
+        let source = crate::parts::raw_xml(part)?;
+        crate::parts::validate_source_part_xml(source, source_limits)?;
+    }
+    SlidePart::from_part(part)
 }
 
 pub(super) fn validate_slide_catalog(
@@ -48,7 +63,7 @@ pub(super) fn validate_slide_catalog(
 
 #[cfg(test)]
 pub(crate) fn capture_slides<'a>(presentation: &Presentation<'a>) -> Result<CaptureSlides<'a>> {
-    capture_slides_inner(presentation, None, None)
+    capture_slides_inner(presentation, None, None, None)
 }
 
 /// Capture every slide, reusing MCE projections the parent snapshot retained
@@ -58,14 +73,21 @@ pub(crate) fn capture_slides_with_mce<'a, 'parent>(
     presentation: &Presentation<'a>,
     capture: &mut MceCapture<'a, 'parent>,
     proved_roots: Option<&crate::notes::SlideRootMemo>,
+    source_limits: SourceLimits,
 ) -> Result<CaptureSlides<'a>> {
-    capture_slides_inner(presentation, Some(capture), proved_roots)
+    capture_slides_inner(
+        presentation,
+        Some(capture),
+        proved_roots,
+        Some(source_limits),
+    )
 }
 
 fn capture_slides_inner<'a, 'parent>(
     presentation: &Presentation<'a>,
     mut capture: Option<&mut MceCapture<'a, 'parent>>,
     proved_roots: Option<&crate::notes::SlideRootMemo>,
+    source_limits: Option<SourceLimits>,
 ) -> Result<CaptureSlides<'a>> {
     let package = presentation.package();
     let references = presentation.catalog()?;
@@ -94,12 +116,20 @@ fn capture_slides_inner<'a, 'parent>(
         )?;
         let (slide_part, name) = if first_name_error.is_none() {
             let (slide_part, name, notes_proof) = match capture.as_deref_mut() {
-                Some(capture) => SlidePart::from_part_with_name_with_capture(
-                    part,
-                    collect_notes_proofs,
-                    capture,
-                    proved_roots,
-                )?,
+                Some(capture) => {
+                    let Some(source_limits) = source_limits else {
+                        return Err(Error::Invalid(
+                            "captured slides lack source limits".to_owned(),
+                        ));
+                    };
+                    SlidePart::from_part_with_name_with_capture(
+                        part,
+                        collect_notes_proofs,
+                        capture,
+                        proved_roots,
+                        source_limits,
+                    )?
+                },
                 None => SlidePart::from_part_with_name(part, collect_notes_proofs)?,
             };
             if let Some(proof) = notes_proof {
@@ -119,10 +149,18 @@ fn capture_slides_inner<'a, 'parent>(
             };
             (slide_part, name)
         } else {
-            (SlidePart::from_part(part)?, None)
+            (
+                root_only_slide_with_source_limits(part, source_limits)?,
+                None,
+            )
         };
         slides.push(CaptureSlide {
-            slide: Slide::new(package, slide_part),
+            slide: Slide::new_with_shape_and_semantic_limits(
+                package,
+                slide_part,
+                presentation.shape_limits(),
+                presentation.semantic_limits.clone(),
+            ),
             name,
         });
     }
@@ -188,8 +226,9 @@ pub(super) fn styles(package: &OpcPackage) -> Result<Option<crate::table::style:
 pub(super) fn notes(
     package: &OpcPackage,
     presentation: &PresentationPart<'_>,
+    limits: crate::notes::Limits,
 ) -> Result<Option<crate::notes::Graph>> {
-    crate::notes::load(package, presentation.part().partname())
+    crate::notes::load_with_limits(package, presentation.part().partname(), limits)
 }
 
 #[cfg(feature = "vba-inspection")]
@@ -274,16 +313,21 @@ pub(super) fn slide<'a>(
         return Ok(None);
     };
     let part = slide_part(package, presentation.part(), reference)?;
-    Ok(Some(Slide::new(package, part)))
+    Ok(Some(Slide::new_with_shape_and_semantic_limits(
+        package,
+        part,
+        presentation.shape_limits(),
+        presentation.semantic_limits.clone(),
+    )))
 }
 
 pub(super) fn find_slide<'a>(
     presentation: &Presentation<'a>,
-    key: Key<'_>,
+    key: Selector<'_>,
 ) -> Result<Option<Slide<'a>>> {
     match key {
-        Key::Index(index) => slide(presentation, index),
-        Key::Name(name) => {
+        Selector::Position(position) => slide(presentation, position.get()),
+        Selector::Name(name) => {
             let mut found = None;
             let mut matches = 0usize;
             for slide in slides(presentation)? {
@@ -308,9 +352,14 @@ pub(super) fn slides<'a>(presentation: &Presentation<'a>) -> Result<Vec<Slide<'a
     let references = presentation.catalog()?;
     let mut slides = Vec::with_capacity(references.len());
     for reference in references {
-        slides.push(Slide::new(
+        slides.push(Slide::new_with_shape_and_semantic_limits(
             package,
             slide_part(package, presentation.part(), reference)?,
+            presentation.shape_limits(),
+            // The semantic profile is retained by every slide projection.
+            // Keep this call in the same constructor family as `slide` so a
+            // projection never silently falls back to the default policy.
+            presentation.semantic_limits.clone(),
         ));
     }
     Ok(slides)
@@ -319,6 +368,7 @@ pub(super) fn slides<'a>(presentation: &Presentation<'a>) -> Result<Vec<Slide<'a
 pub(super) fn slide_masters<'a>(
     package: &'a OpcPackage,
     presentation: &PresentationPart<'a>,
+    shape_limits: crate::shape::Limits,
 ) -> Result<Vec<SlideMaster<'a>>> {
     let relationship_ids = presentation.slide_master_references()?;
     let mut masters = Vec::with_capacity(relationship_ids.len());
@@ -354,7 +404,11 @@ pub(super) fn slide_masters<'a>(
                 actual: part.content_type().to_string(),
             });
         }
-        masters.push(SlideMaster::new(package, SlideMasterPart::from_part(part)?));
+        masters.push(SlideMaster::new_with_shape_limits(
+            package,
+            SlideMasterPart::from_part(part)?,
+            shape_limits,
+        ));
     }
     Ok(masters)
 }
@@ -362,9 +416,10 @@ pub(super) fn slide_masters<'a>(
 pub(super) fn slide_layouts<'a>(
     package: &'a OpcPackage,
     presentation: &PresentationPart<'a>,
+    shape_limits: crate::shape::Limits,
 ) -> Result<Vec<SlideLayout<'a>>> {
     let mut layouts = Vec::new();
-    for master in slide_masters(package, presentation)? {
+    for master in slide_masters(package, presentation, shape_limits)? {
         layouts.extend(master.layouts()?);
     }
     Ok(layouts)
@@ -386,8 +441,12 @@ pub(super) fn text(presentation: &Presentation<'_>) -> Result<String> {
 
 pub(super) fn slide_sync(
     package: &OpcPackage,
+    limits: crate::presentation_properties::metadata::slide_sync::Limits,
 ) -> Result<Vec<crate::presentation_properties::metadata::slide_sync::Part>> {
-    crate::presentation_properties::metadata::slide_sync::load(package)
+    crate::presentation_properties::metadata::slide_sync::load(
+        package,
+        limits.constrained_by_source(package.read_limits()),
+    )
 }
 
 fn slide_part<'a>(
@@ -402,4 +461,34 @@ fn slide_part<'a>(
         |part| part.content_type(),
     )?;
     SlidePart::from_part(part)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::root_only_slide_with_source_limits;
+    use crate::Error;
+    use litchi_opc::{BlobPart, OpcError, PackURI, SourceLimitKind, SourceLimits};
+
+    #[test]
+    fn root_only_fallback_admits_source_before_mce() {
+        let xml = br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:x/></p:sld>"#;
+        let part = BlobPart::new(
+            PackURI::new("/ppt/slides/fallback.xml").expect("valid part name"),
+            crate::notes::SLIDE_CT.to_owned(),
+            xml.to_vec(),
+        );
+        let limits = SourceLimits::builder()
+            .max_events(2)
+            .expect("valid event limit")
+            .build()
+            .expect("valid source profile");
+        assert!(matches!(
+            root_only_slide_with_source_limits(&part, Some(limits)),
+            Err(Error::Opc(OpcError::Limit {
+                kind: SourceLimitKind::Events,
+                observed: 3,
+                maximum: 2,
+            }))
+        ));
+    }
 }

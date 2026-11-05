@@ -1,8 +1,8 @@
 //! Typed record and snapshot planning for the PPT writer model.
 
-use super::{SerializedHeaderFooters, WriteError, Writer};
+use super::{Builder, SerializedHeaderFooters, WriteError};
 #[cfg(feature = "encryption")]
-use crate::encryption::{WriterEncryptionMaterial, prepare_writer_encryption};
+use crate::encryption::{EncryptionEntropy, WriterEncryptionMaterial, prepare_writer_encryption};
 use crate::header_footer::{
     HeaderFooter, HeaderFooterParent, HeaderFooterParentOrdinal, HeaderFooterScope,
 };
@@ -11,7 +11,29 @@ use crate::writer::chart::ChartPlan;
 use crate::writer::persist::PersistPtrBuilder;
 use crate::writer::records::{RecordBuilder, record_type};
 
-impl Writer {
+impl Builder {
+    #[cfg(feature = "encryption")]
+    pub(in crate::writer::core) fn encryption_password(&self) -> Option<&str> {
+        self.encryption
+            .as_ref()
+            .map(|encryption| encryption.password.as_str())
+    }
+
+    #[cfg(feature = "encryption")]
+    pub(in crate::writer::core) fn take_encryption_entropy(
+        &mut self,
+    ) -> Result<Option<EncryptionEntropy>, WriteError> {
+        let encrypted = self.encryption.as_ref().is_some();
+        if encrypted {
+            self.encryption_entropy
+                .take()
+                .map(Some)
+                .ok_or(WriteError::EncryptionEntropyRequired)
+        } else {
+            Ok(None)
+        }
+    }
+
     pub(in crate::writer::core) fn build_modify_password_atom(
         &self,
     ) -> Result<Option<Vec<u8>>, WriteError> {
@@ -34,16 +56,20 @@ impl Writer {
     #[cfg(feature = "encryption")]
     pub(in crate::writer::core) fn prepare_encryption(
         &self,
+        entropy: Option<&EncryptionEntropy>,
     ) -> Result<Option<WriterEncryptionMaterial>, WriteError> {
         self.encryption
             .as_ref()
-            .map(|value| prepare_writer_encryption(value.profile, value.password.as_str()))
+            .map(|value| {
+                let entropy = entropy.ok_or(WriteError::EncryptionEntropyRequired)?;
+                prepare_writer_encryption(value.profile, value.password.as_str(), entropy)
+                    .map_err(WriteError::InvalidData)
+            })
             .transpose()
-            .map_err(WriteError::InvalidData)
     }
 }
 
-impl Writer {
+impl Builder {
     pub(in crate::writer::core) fn serialize_header_footers(
         &self,
     ) -> Result<SerializedHeaderFooters, WriteError> {
@@ -96,7 +122,7 @@ impl Writer {
     }
 }
 
-impl Writer {
+impl Builder {
     /// Assign external-object and persist identifiers to every chart.
     ///
     /// Chart object identifiers continue above the hyperlink identifier seed

@@ -5,6 +5,7 @@ use super::{Annotation, AnnotationAnchor, AnnotationHost, AnnotationUpdate, anno
 use crate::core::OwnedPackage;
 use crate::package::charts::rebuild_package;
 use litchi_core::Result;
+use litchi_odf_common::XmlStreamLimits;
 
 pub(crate) fn add(
     package: &OwnedPackage,
@@ -12,8 +13,9 @@ pub(crate) fn add(
     host: AnnotationHost,
     anchor: &AnnotationAnchor,
     annotation: &Annotation,
+    limits: &XmlStreamLimits,
 ) -> Result<(Vec<u8>, usize)> {
-    let (updated, index) = add_xml(content, host, anchor, annotation)?;
+    let (updated, index) = add_xml(content, host, anchor, annotation, limits)?;
     rebuild(package, &updated).map(|bytes| (bytes, index))
 }
 
@@ -23,8 +25,12 @@ pub(crate) fn replace(
     host: AnnotationHost,
     index: usize,
     annotation: &Annotation,
+    limits: &XmlStreamLimits,
 ) -> Result<Vec<u8>> {
-    rebuild(package, &replace_xml(content, host, index, annotation)?)
+    rebuild(
+        package,
+        &replace_xml(content, host, index, annotation, limits)?,
+    )
 }
 
 pub(crate) fn update(
@@ -33,8 +39,9 @@ pub(crate) fn update(
     host: AnnotationHost,
     index: usize,
     update: &AnnotationUpdate,
+    limits: &XmlStreamLimits,
 ) -> Result<Vec<u8>> {
-    let items = annotations(content, host)?;
+    let items = annotations(content, host, limits)?;
     let len = items.len();
     let mut info = items
         .into_iter()
@@ -55,7 +62,7 @@ pub(crate) fn update(
     if let Some(value) = update.display {
         info.annotation.set_display(value);
     }
-    replace(package, content, host, index, &info.annotation)
+    replace(package, content, host, index, &info.annotation, limits)
 }
 
 pub(crate) fn remove(
@@ -63,8 +70,9 @@ pub(crate) fn remove(
     content: &str,
     host: AnnotationHost,
     index: usize,
+    limits: &XmlStreamLimits,
 ) -> Result<Vec<u8>> {
-    rebuild(package, &remove_xml(content, host, index)?)
+    rebuild(package, &remove_xml(content, host, index, limits)?)
 }
 
 pub(crate) fn reorder(
@@ -73,8 +81,9 @@ pub(crate) fn reorder(
     host: AnnotationHost,
     from: usize,
     to: usize,
+    limits: &XmlStreamLimits,
 ) -> Result<Vec<u8>> {
-    rebuild(package, &reorder_xml(content, host, from, to)?)
+    rebuild(package, &reorder_xml(content, host, from, to, limits)?)
 }
 
 fn rebuild(package: &OwnedPackage, content: &str) -> Result<Vec<u8>> {

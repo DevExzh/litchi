@@ -11,7 +11,9 @@ use crate::custom_xml::Part as CustomXmlPart;
 use crate::error::{Error, Result};
 use crate::footnote::Note;
 use crate::header_footer::{Kind, Story};
-use crate::mail_merge::{Recipients, extract_recipients, is_settings_relationship};
+use crate::mail_merge::{
+    Recipients, extract_recipients, is_settings_relationship, mce_limits_for_source,
+};
 use crate::numbering::{Collection, Snapshot, parse_part, parse_snapshot_part};
 use crate::settings::{DocumentSettings, extract_document_variables};
 use crate::theme::Theme;
@@ -21,7 +23,7 @@ use litchi_opc::constants::relationship_type;
 
 use super::super::model::{Document, ImageWatermarkPart};
 
-impl Document<'_> {
+impl Document {
     /// Return the package's glossary/building-block catalog and dialect.
     ///
     /// # Errors
@@ -30,7 +32,7 @@ impl Document<'_> {
     pub fn glossary(
         &self,
     ) -> Result<Option<(crate::glossary::Catalog, crate::glossary::Conformance)>> {
-        crate::glossary::load(self.opc)
+        crate::glossary::load(&self.opc, &self.limits.glossary_value())
     }
 
     /// Load the typed, inert `SmartArt` (`DrawingML` diagram) inventory anchored
@@ -45,7 +47,7 @@ impl Document<'_> {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn smart_arts(&self) -> Result<Vec<crate::smartart::Diagram>> {
-        crate::smartart::load_smart_arts(self.opc, self.part.part().partname())
+        crate::smartart::load_smart_arts(&self.opc, self.part.part().partname())
     }
 
     /// Load the typed, inert text-box and `WordArt` inventory anchored in this
@@ -86,7 +88,7 @@ impl Document<'_> {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn headers(&self) -> Result<Vec<Story>> {
-        crate::header_footer::load_headers(self.opc, &self.part)
+        crate::header_footer::load_headers(&self.opc, &self.part)
     }
 
     /// Return distinct standard VML text watermarks from document headers.
@@ -122,7 +124,7 @@ impl Document<'_> {
     /// Returns an error if the operation cannot be completed.
     pub fn image_watermarks(&self) -> Result<Vec<ImageWatermarkPart<'_>>> {
         let mut parts = Vec::new();
-        for image in crate::header_footer::image_watermarks(self.opc, &self.part)? {
+        for image in crate::header_footer::image_watermarks(&self.opc, &self.part)? {
             parts.push(ImageWatermarkPart {
                 source_header_name: image.source_header_name,
                 relationship_id: image.relationship_id,
@@ -157,7 +159,7 @@ impl Document<'_> {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn footers(&self) -> Result<Vec<Story>> {
-        crate::header_footer::load_footers(self.opc, &self.part)
+        crate::header_footer::load_footers(&self.opc, &self.part)
     }
 
     /// Get a specific header by type.
@@ -434,6 +436,35 @@ impl Document<'_> {
         }
     }
 
+    /// The entries of the `commentsExtended` part (record 0345): each
+    /// comment paragraph's reply parent and resolved state, keyed by the
+    /// paragraph's `w14:paraId`; empty when the document has no such part.
+    ///
+    /// ```
+    /// let package = litchi_docx::Builder::new()?.build()?;
+    /// assert!(package.document()?.comments_extended()?.is_empty());
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the part is missing or malformed.
+    pub fn comments_extended(&self) -> Result<Vec<crate::modern_comments::Extended>> {
+        let main_part = self.opc.main_document_part()?;
+        match main_part
+            .rels()
+            .part_with_reltype(crate::modern_comments::COMMENTS_EXTENDED_RELATIONSHIP)
+        {
+            Ok(rel) => {
+                let target = rel.target_partname()?;
+                let part = self.opc.get_part(&target)?;
+                let limits = mce_limits_for_source(&self.opc.read_limits());
+                crate::modern_comments::parse_comments_extended(part.blob(), &limits)
+            },
+            Err(_) => Ok(Vec::new()),
+        }
+    }
+
     /// Get the number of comments in the document.
     ///
     /// # Examples
@@ -631,7 +662,8 @@ impl Document<'_> {
         }
         let target = rel.target_partname()?;
         let settings_part = self.opc.get_part(&target)?;
-        let settings = DocumentSettings::extract_from_part(settings_part)?;
+        let limits = mce_limits_for_source(&self.opc.read_limits());
+        let settings = DocumentSettings::extract_from_part_with_mce_limits(settings_part, &limits)?;
         // The settings carry their own repairs; merge them into the
         // document-level aggregation as well (see `crate::leniency`).
         self.merge_tolerance(settings.tolerance_report());
@@ -669,7 +701,8 @@ impl Document<'_> {
             ))
         })?;
         let recipient_part = self.opc.get_part(&relationship.target_partname()?)?;
-        Ok(Some(extract_recipients(recipient_part)?))
+        let limits = mce_limits_for_source(&self.opc.read_limits());
+        Ok(Some(extract_recipients(recipient_part, &limits)?))
     }
 
     /// Read the document's typed web-output settings and conformance family.
@@ -678,7 +711,7 @@ impl Document<'_> {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn web(&self) -> Result<Option<(web::Settings, web::Conformance)>> {
-        web::load(self.opc)
+        web::load(&self.opc, &web::Limits::DEFAULT)
     }
     /// Get document variables.
     ///
@@ -729,7 +762,8 @@ impl Document<'_> {
         }
         let target = relationship.target_partname()?;
         let settings_part = self.opc.get_part(&target)?;
-        Ok(Some(extract_document_variables(settings_part)?))
+        let limits = mce_limits_for_source(&self.opc.read_limits());
+        Ok(Some(extract_document_variables(settings_part, &limits)?))
     }
 
     /// Get the document theme.

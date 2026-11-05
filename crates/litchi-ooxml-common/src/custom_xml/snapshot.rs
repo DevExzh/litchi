@@ -29,15 +29,6 @@ impl Snapshot {
         Self::load_scoped(package, &[])
     }
 
-    /// Alias for [`Self::load`] emphasizing source-bound parsing.
-    /// # Errors
-    ///
-    /// Returns an error when input violates OOXML constraints, exceeds a configured
-    /// bound, or an underlying XML or package operation fails.
-    pub fn read(package: &OpcPackage) -> Result<Self> {
-        Self::load(package)
-    }
-
     /// Borrow items in stable source-part and relationship-ID order.
     #[must_use]
     pub fn items(&self) -> &[Item] {
@@ -91,7 +82,8 @@ impl Snapshot {
 
     pub(crate) fn load_scoped(package: &OpcPackage, hints: &[PackURI]) -> Result<Self> {
         let items = package::discover(package)?;
-        validation::items(&items)?;
+        let source_limits = package.read_limits();
+        validation::items(&items, &source_limits)?;
 
         let mut names = Vec::with_capacity(hints.len() + items.len() * 3);
         for name in hints {
@@ -108,13 +100,17 @@ impl Snapshot {
 
         let mut parts = Vec::with_capacity(names.len());
         for name in names {
-            let Ok(part) = package.get_part(&name) else {
-                // Hints intentionally include parts that a remove operation
-                // may have detached. Discovered item-owned parts are checked
-                // by `discover` above and therefore cannot be missing here.
-                continue;
-            };
-            parts.push(PartState::capture(part));
+            match package.get_part(&name) {
+                Ok(part) => parts.push(PartState::capture(part)),
+                Err(litchi_opc::OpcError::PartNotFound(_)) => {
+                    // Hints intentionally include parts that a remove operation may have
+                    // detached. Keeping the absence in the source projection lets the caller
+                    // classify a different recipient as PatchConflict. Other failures (for
+                    // example a deferred payload decode or a malformed relationship graph)
+                    // remain corruption and must not be hidden as an absent hint.
+                },
+                Err(error) => return Err(error.into()),
+            }
         }
         let source = SourceState { parts };
         Ok(Self { items, source })
@@ -188,5 +184,5 @@ fn push_unique(names: &mut Vec<PackURI>, candidate: &PackURI) {
 }
 
 pub(crate) fn source_mismatch() -> Error {
-    Error::Relationship("custom XML patch source graph changed".into())
+    Error::PatchConflict
 }

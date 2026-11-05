@@ -33,8 +33,7 @@
 //!
 //! ## ✅ Package Writing (`writer.rs`) - COMPLETE
 //! - ✅ `PackageWriter<W>` - Generic ZIP archive writer
-//! - ✅ `new()` / `with_writer()` - Create writers
-//! - ✅ `with_writer_and_limits()` - Create bounded sequential writers
+//! - ✅ `new(limits)` / `with_writer(limits)` - Create bounded writers
 //! - ✅ `set_mimetype()` - Set MIME type (stored uncompressed)
 //! - ✅ `set_mimetype_streaming()` - Set MIME type with typed sink progress
 //! - ✅ `add_file()` - Add files to package
@@ -101,6 +100,7 @@ pub mod private {
     pub use super::stream_xml::{XmlStreamEvent, XmlStreamLimits, XmlStreamReport, scan_xml};
 }
 
+pub use crate::limits::SourceLimits;
 pub use encryption::{Cipher, Kdf, Profile, StartKey};
 pub use family::{Package, PreparedPackage, validate_content_document_part, validate_content_part};
 pub use generated_xml::{
@@ -121,10 +121,9 @@ pub use metadata::{
 };
 pub use metadata::{MetaXmlPatch, patch_meta_xml};
 pub use package::{
-    OwnedPackage, SourceBackedPackage, SourceMemberReaderError, SourcePackageLimits,
-    is_signature_owner_path,
+    OwnedPackage, SourceBackedPackage, SourceMemberReaderError, is_signature_owner_path,
 };
-pub use resolved_reader::ResolvedReader;
+pub use resolved_reader::{ResolvedReader, map_resolved_reader_error};
 pub use source_publication::{
     SourceContentInsertionCallbackError, SourceContentInsertionError, SourceContentInsertionPlan,
     SourceContentPublicationError, SourceContentPublicationOptions,
@@ -134,7 +133,7 @@ pub use source_publication::{
 pub use stream_xml::XmlStreamLimits;
 pub use writer::{
     PackageCompression, PackageWriter, PackageWriterError, PackageWriterLimitExceeded,
-    PackageWriterLimitResource, PackageWriterLimits, PackageWriterResult, Structure,
+    PackageWriterLimitResource, PackageWriterResult, StreamingArchiveLimits, Structure,
 };
 pub use xml::{Content, Meta, Styles};
 pub use xml_splice::{

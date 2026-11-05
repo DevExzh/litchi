@@ -2,11 +2,14 @@
 
 use std::{collections::BTreeMap, io, time::Duration};
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_common::shape::geometry::Point;
 use litchi_keynote::{
-    Limits, MediaPart, MovieKind, MovieSelector, Package, ReadOptions, SemanticLimits,
-    SlideAudioCreationError, SlideAudioCreationLimitKind, SlideSelector, slide::audio::Options,
+    MovieKind, MovieSelector, OpenOptions, Package, SlideSelector, SourceLimits,
+    slide::audio::Options, slide::audio::creation::Error as SlideAudioCreationError,
+    slide::audio::creation::LimitKind as SlideAudioCreationLimitKind,
+    slide::media::data::MediaPart,
 };
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -53,7 +56,7 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn members(source: &[u8]) -> TestResult<BTreeMap<String, Vec<u8>>> {
-    Ok(Catalog::from_bytes(source)?
+    Ok(Catalog::from_bytes(source, Default::default())?
         .iter()
         .map(|entry| (entry.name().to_owned(), entry.data().to_vec()))
         .collect())
@@ -65,8 +68,10 @@ fn creates_audio_on_native_source_and_restores_exact_source() -> TestResult {
     let before = source.slides()?[0].movies().to_vec();
     let requested = options()?;
     let data = audio();
-    let commit =
-        source.add_slide_audio(SlideSelector::index(0), "fresh-pcm.wav", &data, requested)?;
+    let commit = source
+        .edit_slide_audio_creation()
+        .add(SlideSelector::index(0), "fresh-pcm.wav", &data, requested)
+        .and_then(|edit| edit.commit())?;
     let patch = commit.patch();
     assert!(commit.diagnostics().changed());
     assert_eq!(patch.source_media_count(), before.len());
@@ -122,14 +127,20 @@ fn creates_audio_on_native_source_and_restores_exact_source() -> TestResult {
 fn repeated_audio_content_reuses_one_data_record() -> TestResult {
     let source = Package::from_bytes(NATIVE_SOURCE)?;
     let data = audio();
-    let first =
-        source.add_slide_audio(SlideSelector::index(0), "fresh-pcm.wav", &data, options()?)?;
-    let second = first.package().add_slide_audio(
-        SlideSelector::index(0),
-        "same-content.wav",
-        &data,
-        Options::new(Point { x: 321.0, y: 42.0 }, Duration::from_millis(100))?,
-    )?;
+    let first = source
+        .edit_slide_audio_creation()
+        .add(SlideSelector::index(0), "fresh-pcm.wav", &data, options()?)
+        .and_then(|edit| edit.commit())?;
+    let second = first
+        .package()
+        .edit_slide_audio_creation()
+        .add(
+            SlideSelector::index(0),
+            "same-content.wav",
+            &data,
+            Options::new(Point { x: 321.0, y: 42.0 }, Duration::from_millis(100))?,
+        )
+        .and_then(|edit| edit.commit())?;
     assert_eq!(first.patch().created_data(), 1);
     assert_eq!(second.patch().created_data(), 0);
     assert_eq!(second.patch().created_objects(), 5);
@@ -165,14 +176,24 @@ fn rejects_unsafe_names_or_non_audio_without_mutating_source() -> TestResult {
         "audio\0.wav",
     ] {
         assert!(matches!(
-            source.add_slide_audio(SlideSelector::index(0), name, &data, options()?),
-            Err(SlideAudioCreationError::InvalidFilename),
+            source
+                .edit_slide_audio_creation()
+                .add(SlideSelector::index(0), name, &data, options()?)
+                .and_then(|edit| edit.commit()),
+            Err(SlideAudioCreationError::Refused(
+                litchi_keynote::slide::audio::creation::Refusal::InvalidFilename
+            )),
         ));
     }
     for invalid in [b"".as_slice(), b"not an audio payload".as_slice()] {
         assert!(matches!(
-            source.add_slide_audio(SlideSelector::index(0), "audio.wav", invalid, options()?),
-            Err(SlideAudioCreationError::UnsupportedAudio),
+            source
+                .edit_slide_audio_creation()
+                .add(SlideSelector::index(0), "audio.wav", invalid, options()?)
+                .and_then(|edit| edit.commit()),
+            Err(SlideAudioCreationError::Refused(
+                litchi_keynote::slide::audio::creation::Refusal::UnsupportedAudio
+            )),
         ));
     }
     assert_eq!(exact_bytes(&source)?, NATIVE_SOURCE);
@@ -182,8 +203,10 @@ fn rejects_unsafe_names_or_non_audio_without_mutating_source() -> TestResult {
 #[test]
 fn patch_requires_the_exact_source_snapshot() -> TestResult {
     let source = Package::from_bytes(NATIVE_SOURCE)?;
-    let first =
-        source.add_slide_audio(SlideSelector::index(0), "fresh.wav", &audio(), options()?)?;
+    let first = source
+        .edit_slide_audio_creation()
+        .add(SlideSelector::index(0), "fresh.wav", &audio(), options()?)
+        .and_then(|edit| edit.commit())?;
     assert!(matches!(
         first.package().apply_slide_audio_creation(first.patch()),
         Err(SlideAudioCreationError::PatchConflict),
@@ -199,17 +222,27 @@ fn patch_requires_the_exact_source_snapshot() -> TestResult {
 fn source_selector_is_semantic_and_out_of_range_is_atomic() -> TestResult {
     let source = Package::from_bytes(NATIVE_SOURCE)?;
     assert!(matches!(
-        source.add_slide_audio(
-            SlideSelector::index(usize::MAX),
-            "audio.wav",
-            &audio(),
-            options()?
-        ),
-        Err(SlideAudioCreationError::SlidePositionNotFound { .. }),
+        source
+            .edit_slide_audio_creation()
+            .add(
+                SlideSelector::index(usize::MAX),
+                "audio.wav",
+                &audio(),
+                options()?
+            )
+            .and_then(|edit| edit.commit()),
+        Err(SlideAudioCreationError::Refused(
+            litchi_keynote::slide::audio::creation::Refusal::SlidePositionNotFound { .. }
+        )),
     ));
     assert!(matches!(
-        source.add_slide_audio(SlideSelector::name(""), "audio.wav", &audio(), options()?),
-        Err(SlideAudioCreationError::EmptySlideName),
+        source
+            .edit_slide_audio_creation()
+            .add(SlideSelector::name(""), "audio.wav", &audio(), options()?)
+            .and_then(|edit| edit.commit()),
+        Err(SlideAudioCreationError::Refused(
+            litchi_keynote::slide::audio::creation::Refusal::EmptySlideName
+        )),
     ));
     assert_eq!(exact_bytes(&source)?, NATIVE_SOURCE);
     Ok(())
@@ -217,27 +250,29 @@ fn source_selector_is_semantic_and_out_of_range_is_atomic() -> TestResult {
 
 #[test]
 fn oversized_audio_reports_entry_limit_without_changing_source() -> TestResult {
-    let largest = Catalog::from_bytes(NATIVE_SOURCE)?
+    let largest = Catalog::from_bytes(NATIVE_SOURCE, Default::default())?
         .iter()
         .map(|entry| entry.data().len())
         .max()
         .ok_or_else(|| io::Error::other("empty native fixture"))?;
     let defaults = Limits::default();
-    let limits = Limits::new(
-        defaults.max_input_bytes(),
-        defaults.max_entries(),
-        largest as u64,
-        defaults.max_total_bytes(),
-        defaults.max_iwa_stream_bytes(),
-    )?;
-    let source = Package::from_bytes_with_options(
-        NATIVE_SOURCE,
-        ReadOptions::new(limits, SemanticLimits::default()),
-    )?;
+    let limits = SourceLimits::builder()
+        .max_input_bytes(defaults.max_input_bytes())?
+        .max_entries(defaults.max_entries())?
+        .max_entry_bytes(largest as u64)?
+        .max_aggregate_bytes(defaults.max_total_bytes())?
+        .max_component_bytes(defaults.max_iwa_stream_bytes())?
+        .build()?;
+    let source =
+        Package::from_bytes_with_options(NATIVE_SOURCE, OpenOptions::new().source_limits(limits))?;
     let mut data = audio();
     data.resize(largest + 1, 0);
-    match source.add_slide_audio(SlideSelector::index(0), "oversized.wav", &data, options()?) {
-        Err(SlideAudioCreationError::LimitExceeded {
+    match source
+        .edit_slide_audio_creation()
+        .add(SlideSelector::index(0), "oversized.wav", &data, options()?)
+        .and_then(|edit| edit.commit())
+    {
+        Err(SlideAudioCreationError::Limit {
             kind: SlideAudioCreationLimitKind::EntryBytes,
             observed,
             maximum,
@@ -254,12 +289,15 @@ fn oversized_audio_reports_entry_limit_without_changing_source() -> TestResult {
 #[test]
 fn created_audio_composes_with_existing_semantic_editors() -> TestResult {
     let source = Package::from_bytes(NATIVE_SOURCE)?;
-    let creation = source.add_slide_audio(
-        SlideSelector::index(0),
-        "editable.wav",
-        &audio(),
-        options()?,
-    )?;
+    let creation = source
+        .edit_slide_audio_creation()
+        .add(
+            SlideSelector::index(0),
+            "editable.wav",
+            &audio(),
+            options()?,
+        )
+        .and_then(|edit| edit.commit())?;
     let selector = MovieSelector::position(creation.patch().movie_position());
     let moved = creation
         .package()
@@ -283,11 +321,61 @@ fn created_audio_composes_with_existing_semantic_editors() -> TestResult {
     );
     let removed = described
         .package()
-        .remove_slide_media(SlideSelector::index(0), selector)?;
+        .edit_slide_media_lifecycle()
+        .remove(SlideSelector::index(0), selector)
+        .and_then(|edit| edit.commit())?;
     assert_eq!(
         removed.package().slides()?[0].movies(),
         source.slides()?[0].movies(),
     );
     assert_eq!(exact_bytes(&source)?, NATIVE_SOURCE);
+    Ok(())
+}
+
+#[test]
+fn the_edit_stages_exactly_one_audio_creation() -> TestResult {
+    let source = Package::from_bytes(NATIVE_SOURCE)?;
+    let data = audio();
+    assert!(matches!(
+        source.edit_slide_audio_creation().commit(),
+        Err(SlideAudioCreationError::Refused(
+            litchi_keynote::slide::audio::creation::Refusal::NoStagedOperation
+        ))
+    ));
+    assert!(matches!(
+        source
+            .edit_slide_audio_creation()
+            .add(SlideSelector::index(0), "fresh-pcm.wav", &data, options()?)?
+            .add(SlideSelector::index(0), "fresh-pcm.wav", &data, options()?),
+        Err(SlideAudioCreationError::Refused(
+            litchi_keynote::slide::audio::creation::Refusal::OperationAlreadyStaged
+        ))
+    ));
+    // Discarding a staged edit leaves the source untouched.
+    let _discarded = source.edit_slide_audio_creation().add(
+        SlideSelector::index(0),
+        "fresh-pcm.wav",
+        &data,
+        options()?,
+    )?;
+    assert_eq!(exact_bytes(&source)?, NATIVE_SOURCE);
+    Ok(())
+}
+
+/// Record 0428: the new objects' metadata UUIDs, the build UUID and the build
+/// seed are derived, not drawn, so the same edit is byte-identical.
+#[test]
+fn audio_creation_output_is_deterministic() -> TestResult {
+    let data = audio();
+    let mut outputs = Vec::new();
+    for _ in 0..2 {
+        let source = Package::from_bytes(NATIVE_SOURCE)?;
+        let commit = source
+            .edit_slide_audio_creation()
+            .add(SlideSelector::index(0), "fresh-pcm.wav", &data, options()?)
+            .and_then(|edit| edit.commit())?;
+        outputs.push(exact_bytes(commit.package())?);
+    }
+    assert_eq!(outputs[0], outputs[1]);
     Ok(())
 }

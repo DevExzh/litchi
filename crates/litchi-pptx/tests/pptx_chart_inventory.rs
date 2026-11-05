@@ -6,7 +6,7 @@
 
 use litchi_opc::constants::relationship_type::{CHART, STRICT_CHART};
 use litchi_opc::{OpcError, OpcPackage, PackURI};
-use litchi_pptx::chart::{self, Chart, Series, Type};
+use litchi_pptx::chart::{Chart, Series, Type};
 use litchi_pptx::{Error, Package};
 
 #[test]
@@ -95,7 +95,7 @@ fn package_inventory_rejects_missing_chart_targets() {
 }
 
 fn generated_package() -> Package {
-    let mut package = Package::new().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
     let chart = Chart::new(Type::Bar, 914400, 914400, 4572000, 2743200)
         .with_title("Quarterly sales")
         .add_series(
@@ -105,17 +105,17 @@ fn generated_package() -> Package {
         );
 
     {
-        package.presentation_mut().unwrap().add_slide().unwrap();
+        builder.presentation().unwrap().add_slide().unwrap();
     }
-    let bytes = package.to_bytes().unwrap();
-    let mut opc = OpcPackage::from_bytes(&bytes).unwrap();
-    chart::add(&mut opc, "/ppt/slides/slide1.xml", &chart).unwrap();
-    Package::from_opc_package(opc).unwrap()
+    let package = builder.build().unwrap();
+    let mut edit = package.edit_charts().unwrap();
+    edit.add(0_usize, &chart).unwrap();
+    edit.commit().unwrap().into_package()
 }
 
-fn edit_package(mut package: Package, edit: impl FnOnce(&mut OpcPackage)) -> Package {
+fn edit_package(package: Package, edit: impl FnOnce(&mut OpcPackage)) -> Package {
     let bytes = package.to_bytes().unwrap();
-    let mut opc = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut opc = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     edit(&mut opc);
     Package::from_opc_package(opc).unwrap()
 }

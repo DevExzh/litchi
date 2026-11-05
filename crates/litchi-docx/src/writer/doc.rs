@@ -15,9 +15,8 @@ mod package;
 #[path = "doc/tests.rs"]
 mod tests;
 
-pub use super::super::format::ImageFormat;
 pub(crate) use codec::compact_changed_document_xml;
-pub use model::{MutableDocument, Protection};
+pub use model::{Document, Protection};
 pub(crate) use package::{BodyElement, DocumentBody};
 
 /// The UTF-8 byte order mark, as it appears at the head of a part written by

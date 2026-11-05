@@ -1,4 +1,4 @@
-//! Private pivot-chart defaults used by [`super::Chart`].
+//! Private pivot-chart defaults used by [`super::builder::Chart`].
 
 use super::model::{Chart, for_each_series_mut};
 use crate::Result;

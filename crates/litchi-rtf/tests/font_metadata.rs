@@ -7,7 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
-use litchi_rtf::{FontPage, FontPitch, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{FontPage, FontPitch, write::Writer};
 
 const SYNTHETIC: &str = r"{\rtf1\ansi\ansicpg1250\uc1
 {\fonttbl
@@ -17,7 +18,7 @@ const SYNTHETIC: &str = r"{\rtf1\ansi\ansicpg1250\uc1
 
 #[test]
 fn parses_decodes_and_round_trips_extended_font_metadata() {
-    let doc = RtfDocument::parse(SYNTHETIC).unwrap();
+    let doc = Tree::parse(SYNTHETIC, litchi_rtf::read::OpenOptions::default()).unwrap();
     let table = doc.font_table();
     let primary = table.get(0).unwrap();
     assert_eq!(primary.name, "Primary你");
@@ -31,13 +32,11 @@ fn parses_decodes_and_round_trips_extended_font_metadata() {
     assert_eq!(table.get(2).unwrap().pitch, FontPitch::Fixed);
 
     let mut first = Vec::new();
-    RtfWriter::new(&mut first).write_document(&doc).unwrap();
-    let reparsed = RtfDocument::parse_bytes(&first).unwrap();
+    Writer::new(&mut first).write_document(&doc).unwrap();
+    let reparsed = Tree::parse_bytes(&first, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(doc.font_table(), reparsed.font_table());
     let mut second = Vec::new();
-    RtfWriter::new(&mut second)
-        .write_document(&reparsed)
-        .unwrap();
+    Writer::new(&mut second).write_document(&reparsed).unwrap();
     assert_eq!(first, second);
 }
 
@@ -47,7 +46,7 @@ fn font_pages_decode_names_independently_from_the_header() {
 {\fonttbl
 {\f0\fnil\fcharset128{\*\fname \'82\'a0;}\'82\'a2{\*\falt \'82\'a4};}
 {\f1\fnil\fcharset0\cpg932{\*\fname \'82\'a0;}\'82\'a2{\*\falt \'82\'a4};}}}";
-    let doc = RtfDocument::parse(source).unwrap();
+    let doc = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
 
     for font_ref in [0, 1] {
         let font = doc.font_table().get(font_ref).unwrap();
@@ -73,7 +72,7 @@ fn rejects_malformed_extended_font_metadata() {
     ];
     for source in malformed {
         assert!(
-            RtfDocument::parse(source).is_err(),
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
             "accepted malformed RTF: {source}"
         );
     }
@@ -87,8 +86,8 @@ fn rejects_malformed_extended_font_metadata() {
         r"{\rtf1{\fonttbl{\f0\fnil\fcharset3 Arial;}}}",
         r"{\rtf1\ansi\ansicpg1252{\fonttbl{\f0\fnil\fcharset78 \'82\'a0;}}}",
     ] {
-        let document =
-            RtfDocument::parse(source).unwrap_or_else(|error| panic!("{source}: {error}"));
+        let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default())
+            .unwrap_or_else(|error| panic!("{source}: {error}"));
         let report = document.tolerance_report();
         assert!(!report.is_clean(), "{source}");
         assert!(
@@ -128,7 +127,7 @@ fn parses_real_libreoffice_font_metadata_fixture() {
     let mut isolated = br"{\rtf1\ansi\ansicpg1252".to_vec();
     isolated.extend_from_slice(&fixture[start..end.unwrap()]);
     isolated.push(b'}');
-    let doc = RtfDocument::parse_bytes(&isolated).unwrap();
+    let doc = Tree::parse_bytes(&isolated, litchi_rtf::read::OpenOptions::default()).unwrap();
     let first = doc.font_table().get(0).unwrap();
     assert_eq!(first.name, "Times New Roman");
     assert_eq!(first.alternate_name.as_deref(), Some("Bookman Old Style"));

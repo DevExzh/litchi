@@ -4,10 +4,10 @@
 //! owner transactionally publishes custom shows and sections into the OPC
 //! presentation graph.
 
-use litchi_pptx::presentation_properties::metadata::custom_show::Show;
+use litchi_pptx::Package;
+use litchi_pptx::presentation_properties::metadata::custom_show::{Limits, Show};
 use litchi_pptx::presentation_properties::metadata::sections::Section;
 use litchi_pptx::presentation_properties::metadata::structure;
-use litchi_pptx::{MutablePresentation, Package};
 use std::error::Error as StdError;
 
 const X: i64 = 914_400;
@@ -39,7 +39,7 @@ fn main() -> Result<(), Box<dyn StdError>> {
 }
 
 fn add_slides(
-    presentation: &mut MutablePresentation,
+    presentation: &mut litchi_pptx::builder::Presentation,
     titles: &[&str],
     content_prefix: &str,
     height: i64,
@@ -59,30 +59,24 @@ fn publish_structure(
     shows: Vec<ShowPlan>,
     sections: Vec<SectionPlan>,
 ) -> Result<(), Box<dyn StdError>> {
-    // Publish the mutable slide snapshot first. The structure owner operates
-    // on the canonical OPC graph and therefore cannot observe stale writer
-    // state.
-    let bytes = package.to_bytes()?;
-    let mut package = Package::from_bytes(&bytes)?;
+    // The builder already finalized the canonical OPC graph.
     let slide_ids = package
-        .with_opc(structure::load)?
+        .with_opc(|opc| structure::load(opc, Limits::DEFAULT))?
         .slides
         .into_iter()
         .map(|slide| slide.slide_id)
         .collect::<Vec<_>>();
     assert_eq!(slide_ids.len(), slide_count);
 
-    package.edit_opc(|opc| {
+    {
+        let mut edit = package.edit_structure()?;
         for (id, plan) in shows.iter().enumerate() {
             let selected = plan
                 .positions
                 .iter()
                 .map(|&position| slide_ids[position])
                 .collect::<Vec<_>>();
-            structure::add_custom_show(
-                opc,
-                Show::new((id + 1) as u32, plan.name).with_slides(selected),
-            )?;
+            edit.add_custom_show(Show::new((id + 1) as u32, plan.name).with_slides(selected))?;
         }
 
         for plan in &sections {
@@ -91,12 +85,12 @@ fn publish_structure(
                 .iter()
                 .map(|&position| slide_ids[position])
                 .collect::<Vec<_>>();
-            structure::add_section(opc, Section::new(plan.name, plan.id).with_slides(selected))?;
+            edit.add_section(Section::new(plan.name, plan.id).with_slides(selected))?;
         }
-        Ok(())
-    })?;
+        package = edit.commit()?.into_package();
+    }
 
-    let graph = package.with_opc(structure::load)?;
+    let graph = package.with_opc(|opc| structure::load(opc, Limits::DEFAULT))?;
     assert_eq!(graph.slides.len(), slide_count);
     assert_eq!(graph.custom_shows.shows.len(), shows.len());
     assert_eq!(graph.sections.len(), sections.len());
@@ -107,7 +101,7 @@ fn publish_structure(
 
     package.save(output)?;
     let reopened = Package::open(output)?;
-    let graph = reopened.with_opc(structure::load)?;
+    let graph = reopened.with_opc(|opc| structure::load(opc, Limits::DEFAULT))?;
     assert_eq!(graph.custom_shows.shows.len(), shows.len());
     assert_eq!(graph.sections.len(), sections.len());
     println!(
@@ -138,15 +132,15 @@ fn test_executive_presentation() -> Result<(), Box<dyn StdError>> {
         "Future Projections",
         "Q&A",
     ];
-    let mut package = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
     add_slides(
-        package.presentation_mut()?,
+        builder.presentation()?,
         &titles,
         "Executive content: ",
         2_500_000,
     )?;
     publish_structure(
-        package,
+        builder.build()?,
         "customshow_executive.pptx",
         titles.len(),
         vec![
@@ -235,15 +229,15 @@ fn test_training_presentation() -> Result<(), Box<dyn StdError>> {
         "Q&A Session",
         "Feedback & Next Steps",
     ];
-    let mut package = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
     add_slides(
-        package.presentation_mut()?,
+        builder.presentation()?,
         &titles,
         "Training content for ",
         3_000_000,
     )?;
     publish_structure(
-        package,
+        builder.build()?,
         "customshow_training.pptx",
         titles.len(),
         vec![
@@ -296,15 +290,15 @@ fn test_product_demo() -> Result<(), Box<dyn StdError>> {
         "ROI Calculator",
         "Next Steps",
     ];
-    let mut package = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
     add_slides(
-        package.presentation_mut()?,
+        builder.presentation()?,
         &titles,
         "Demo content: ",
         3_500_000,
     )?;
     publish_structure(
-        package,
+        builder.build()?,
         "customshow_product_demo.pptx",
         titles.len(),
         vec![
@@ -360,15 +354,15 @@ fn test_conference_presentation() -> Result<(), Box<dyn StdError>> {
         "Q&A",
         "Thank You & Contact Info",
     ];
-    let mut package = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
     add_slides(
-        package.presentation_mut()?,
+        builder.presentation()?,
         &titles,
         "Conference content: ",
         3_200_000,
     )?;
     publish_structure(
-        package,
+        builder.build()?,
         "customshow_conference.pptx",
         titles.len(),
         vec![

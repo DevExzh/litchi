@@ -434,10 +434,13 @@ mod tests {
 
     #[test]
     fn reads_fixture_sheet_calc_pr() {
-        let package = OpcPackage::from_bytes(include_bytes!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../test-data/ooxml/xlsx/FormatChoiceTests.xlsx"
-        )))
+        let package = OpcPackage::from_bytes(
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../test-data/ooxml/xlsx/FormatChoiceTests.xlsx"
+            )),
+            litchi_opc::SourceLimits::default(),
+        )
         .unwrap();
         let part = package
             .get_part(&PackURI::new("/xl/worksheets/sheet1.xml").unwrap())

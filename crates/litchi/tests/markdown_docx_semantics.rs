@@ -1,11 +1,23 @@
+//! DOCX package semantics in Markdown, through `litchi::open`,
+//! `litchi::open_bytes` and the eager owner (`SourceMode::Eager`).
+//!
+//! M0a step S8c ported these tests from the facade's `Document`. The two
+//! projection tests compared the path route with the facade's byte route
+//! only; they now also pin the Markdown the facade produced for their
+//! documents, recorded before the facade types were removed.
+
 #![cfg(all(feature = "docx", feature = "markdown"))]
+#![allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    clippy::panic,
+    reason = "test assertions panic on failure by design"
+)]
 
 use std::io::{Cursor, Write};
 
-use litchi::{
-    Document,
-    markdown::{MarkdownOptions, ToMarkdown},
-};
+use litchi::markdown::{MarkdownOptions, ToMarkdown};
+use litchi::{Code, File, FileFormat, OpenOptions, SourceMode};
 use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
 
 const CONTENT_TYPES: &str = r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Default Extension="bin" ContentType="application/vnd.openxmlformats-officedocument.oleObject"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/footnotes.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml"/><Override PartName="/word/endnotes.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml"/></Types>"#;
@@ -38,7 +50,62 @@ fn docx(document_xml: &str) -> Vec<u8> {
     archive.finish().unwrap().into_inner()
 }
 
-fn table_text(table: &litchi::document::Table) -> String {
+/// The three routes of one in-memory DOCX: the positional source of a
+/// temporary file, the owned bytes, and the eager owner.
+fn routes(bytes: &[u8]) -> (tempfile::NamedTempFile, [(&'static str, File); 3]) {
+    let temporary = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(temporary.path(), bytes).unwrap();
+    let files = [
+        ("path", litchi::open(temporary.path()).unwrap()),
+        ("bytes", litchi::open_bytes(bytes.to_vec()).unwrap()),
+        (
+            "eager",
+            litchi::open_bytes_with(
+                bytes.to_vec(),
+                &OpenOptions::new().source_mode(SourceMode::Eager),
+            )
+            .unwrap(),
+        ),
+    ];
+    (temporary, files)
+}
+
+/// `error` reports that the source changed after open.
+#[track_caller]
+fn assert_source_changed(error: &litchi::Error) {
+    use litchi::error::Source;
+    use litchi::opc::OpcError;
+
+    assert_eq!(error.code(), Code::IoError, "{error:?}");
+    let changed = matches!(
+        error.leaf(),
+        Source::Core(litchi::common::Error::SourceChanged { .. })
+            | Source::Opc(OpcError::SourceChanged { .. })
+            | Source::Docx(litchi::docx::Error::Opc(OpcError::SourceChanged { .. }))
+    );
+    assert!(changed, "expected a source change, got {error:?}");
+}
+
+/// `result` is the typed refusal of a DOCX construct Markdown cannot place,
+/// naming it.
+#[track_caller]
+fn assert_refused(result: litchi::Result<String>, needle: &str, route: &str) {
+    let error = result.expect_err("Markdown refuses the construct");
+    assert_eq!(error.code(), Code::UnsupportedElement, "{route}: {error:?}");
+    assert!(error.message().contains(needle), "{route}: {error:?}");
+    assert_eq!(error.format(), Some(FileFormat::Docx), "{route}: {error:?}");
+}
+
+/// Every route of `document_xml` renders `expected`.
+#[track_caller]
+fn assert_markdown(document_xml: &str, expected: &str) {
+    let (_temporary, routes) = routes(&docx(document_xml));
+    for (route, file) in &routes {
+        assert_eq!(file.to_markdown().unwrap(), expected, "{route}");
+    }
+}
+
+fn table_text(table: &litchi::compat::word::Table) -> String {
     let mut text = String::new();
     for row in table.rows().unwrap() {
         for cell in row.cells().unwrap() {
@@ -53,12 +120,12 @@ fn table_text(table: &litchi::document::Table) -> String {
 fn package_semantics_have_compact_golden_markdown() {
     let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:body><w:p><w:r><w:t xml:space="preserve">Before </w:t></w:r><w:hyperlink r:id="rIdLink" w:tooltip="tip &quot;q&quot;"><w:r><w:rPr><w:b/></w:rPr><w:t>site [x]</w:t></w:r></w:hyperlink><w:r><w:t xml:space="preserve"> after</w:t></w:r></w:p><w:p><w:r><w:drawing><wp:inline><wp:extent cx="1" cy="1"/><wp:docPr id="1" name="Picture &quot;one&quot;" descr="alt [image]"/><a:graphic><a:graphicData><pic:pic><pic:blipFill><a:blip r:embed="rIdImage"/></pic:blipFill></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p><w:p><w:r><w:t>With note</w:t></w:r><w:r><w:footnoteReference w:id="1"/></w:r><w:r><w:t xml:space="preserve"> and end</w:t></w:r><w:r><w:endnoteReference w:id="2"/></w:r></w:p></w:body></w:document>"#;
     let bytes = docx(document_xml);
-    let document = Document::from_bytes(bytes.clone()).unwrap();
+    let document = litchi::open_bytes(bytes.clone()).unwrap();
     let temporary = tempfile::NamedTempFile::new().unwrap();
     std::fs::write(temporary.path(), bytes).unwrap();
-    let source_document = Document::open(temporary.path()).unwrap();
+    let source_document = litchi::open(temporary.path()).unwrap();
 
-    let expected = "Before [**site \\[x\\]**](<https://example.test/a%20b> \"tip \\\"q\\\"\") after\n\n![alt \\[image\\]](<data:image/png;base64,iVBORw0KGgo=> \"Picture &quot;one&quot;\")\n\nWith note[^fn-1] and end[^en-2]\n\n[^fn-1]: note \\& \\*body\\*\n[^en-2]: end note\n";
+    let expected = "Before [**site \\[x\\]**](<https://example.test/a%20b> \"tip \\\"q\\\"\") after\n\n![alt \\[image\\]](<data:image/png;base64,iVBORw0KGgo=> \"Picture \\\"one\\\"\")\n\nWith note[^fn-1] and end[^en-2]\n\n[^fn-1]: note \\& \\*body\\*\n[^en-2]: end note\n";
     assert_eq!(document.to_markdown().unwrap(), expected);
     assert_eq!(source_document.to_markdown().unwrap(), expected);
 
@@ -67,16 +134,13 @@ fn package_semantics_have_compact_golden_markdown() {
         .open(temporary.path())
         .unwrap();
     file.write_all(b"source mutation").unwrap();
-    assert!(matches!(
-        source_document.to_markdown(),
-        Err(litchi_core::Error::SourceChanged { .. })
-    ));
+    assert_source_changed(&source_document.to_markdown().unwrap_err());
 }
 
 #[test]
 fn parallel_option_preserves_serial_docx_markdown_output() {
     let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>First</w:t></w:r></w:p><w:p><w:r><w:t>Second</w:t></w:r></w:p></w:body></w:document>"#;
-    let document = Document::from_bytes(docx(document_xml)).unwrap();
+    let document = litchi::open_bytes(docx(document_xml)).unwrap();
 
     let serial = document
         .to_markdown_with_options(&MarkdownOptions::new().with_parallel(false))
@@ -86,99 +150,90 @@ fn parallel_option_preserves_serial_docx_markdown_output() {
         .unwrap();
 
     assert_eq!(requested_parallel, serial);
+    assert_eq!(serial, "First\n\nSecond\n\n");
 }
+
+/// The Markdown the facade's `Document` produced for the table document.
+const TABLE_MARKDOWN: &str =
+    "Before\n\n| A | B |\n|----------|----------|\n| C | D |\n\n\nAfter\n\n";
 
 #[test]
 fn source_path_table_projection_matches_eager_markdown() {
     let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Before</w:t></w:r></w:p><w:tbl><w:tr><w:tc><w:p><w:r><w:t>A</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>B</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:tc><w:p><w:r><w:t>C</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>D</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p><w:r><w:t>After</w:t></w:r></w:p></w:body></w:document>"#;
-    let bytes = docx(document_xml);
-    let eager = Document::from_bytes(bytes.clone()).unwrap();
-    let temporary = tempfile::NamedTempFile::new().unwrap();
-    std::fs::write(temporary.path(), bytes).unwrap();
-    let source = Document::open(temporary.path()).unwrap();
-
-    let eager_tables = eager
-        .tables()
-        .unwrap()
-        .into_iter()
-        .map(|table| table_text(&table))
-        .collect::<Vec<_>>();
-    let source_tables = source
-        .tables()
-        .unwrap()
-        .into_iter()
-        .map(|table| table_text(&table))
-        .collect::<Vec<_>>();
-    assert_eq!(source_tables, eager_tables);
-    assert_eq!(source.to_markdown().unwrap(), eager.to_markdown().unwrap());
+    let (_temporary, routes) = routes(&docx(document_xml));
+    for (route, file) in &routes {
+        let tables = file
+            .document()
+            .unwrap()
+            .tables()
+            .unwrap()
+            .into_iter()
+            .map(|table| table_text(&table))
+            .collect::<Vec<_>>();
+        assert_eq!(tables, ["A|B|C|D|"], "{route}");
+        assert_eq!(file.to_markdown().unwrap(), TABLE_MARKDOWN, "{route}");
+    }
 }
 
 #[test]
 fn source_path_mce_projection_matches_eager_markdown() {
     let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:unsupported"><w:body><mc:AlternateContent><mc:Choice Requires="x"><w:p><w:r><w:t>choice</w:t></w:r></w:p></mc:Choice><mc:Fallback><w:p><w:r><w:t>fallback</w:t></w:r></w:p></mc:Fallback></mc:AlternateContent></w:body></w:document>"#;
-    let bytes = docx(document_xml);
-    let eager = Document::from_bytes(bytes.clone()).unwrap();
-    let temporary = tempfile::NamedTempFile::new().unwrap();
-    std::fs::write(temporary.path(), bytes).unwrap();
-    let source = Document::open(temporary.path()).unwrap();
-
-    assert_eq!(source.text().unwrap(), "fallback");
-    assert_eq!(source.to_markdown().unwrap(), eager.to_markdown().unwrap());
+    let (_temporary, routes) = routes(&docx(document_xml));
+    for (route, file) in &routes {
+        assert_eq!(file.text().unwrap(), "fallback", "{route}");
+        // The Markdown the facade's `Document` produced.
+        assert_eq!(file.to_markdown().unwrap(), "fallback\n\n", "{route}");
+    }
 }
 
 #[test]
 fn unsupported_link_placement_metadata_is_refused() {
     let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body><w:p><w:hyperlink r:id="rIdLink" w:tgtFrame="_blank"><w:r><w:t>site</w:t></w:r></w:hyperlink></w:p></w:body></w:document>"#;
-    let document = Document::from_bytes(docx(document_xml)).unwrap();
-    assert!(matches!(
-        document.to_markdown(),
-        Err(litchi_core::Error::Unsupported(message)) if message.contains("w:tgtFrame")
-    ));
+    let (_temporary, routes) = routes(&docx(document_xml));
+    for (route, file) in &routes {
+        assert_refused(file.to_markdown(), "w:tgtFrame", route);
+    }
 }
 
 #[test]
 fn mixed_text_and_drawing_run_is_refused() {
     let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:body><w:p><w:r><w:t>before</w:t><w:drawing><wp:inline><wp:docPr id="1" name="p" descr="a"/><a:graphic><a:graphicData><pic:pic><pic:blipFill><a:blip r:embed="rIdImage"/></pic:blipFill></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p></w:body></w:document>"#;
-    let document = Document::from_bytes(docx(document_xml)).unwrap();
-    assert!(matches!(
-        document.to_markdown(),
-        Err(litchi_core::Error::Unsupported(message)) if message.contains("interleaved DOCX text and embedded semantics")
-    ));
+    let (_temporary, routes) = routes(&docx(document_xml));
+    for (route, file) in &routes {
+        assert_refused(
+            file.to_markdown(),
+            "interleaved DOCX text and embedded semantics",
+            route,
+        );
+    }
 }
 
 #[test]
 fn embedded_ole_object_projects_its_preview_image() {
     let document_xml = r##"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body><w:p><w:r><w:t xml:space="preserve">Solve </w:t></w:r><w:r><w:object><v:shape id="_x0000_i1025" type="#_x0000_t75" alt="equation" style="width:16.7pt;height:14pt" o:ole=""><v:imagedata r:id="rIdImage" o:title="equation"/></v:shape><o:OLEObject Type="Embed" ProgID="Equation.DSMT4" ShapeID="_x0000_i1025" DrawAspect="Content" ObjectID="_1468075725" r:id="rIdOle"/></w:object></w:r><w:r><w:t xml:space="preserve"> now</w:t></w:r></w:p></w:body></w:document>"##;
-    let document = Document::from_bytes(docx(document_xml)).unwrap();
-    assert_eq!(
-        document.to_markdown().unwrap(),
-        "Solve ![equation](<data:image/png;base64,iVBORw0KGgo=> \"equation\") now\n\n"
+    assert_markdown(
+        document_xml,
+        "Solve ![equation](<data:image/png;base64,iVBORw0KGgo=> \"equation\") now\n\n",
     );
 }
 
 #[test]
 fn embedded_ole_object_with_unresolvable_preview_degrades_to_alt_text() {
     let document_xml = r##"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body><w:p><w:r><w:t xml:space="preserve">Value: </w:t></w:r><w:r><w:object><v:shape id="_x0000_i1025" type="#_x0000_t75" alt="equation preview" style="width:16.7pt;height:14pt" o:ole=""><v:imagedata r:id="rIdMissing" o:title=""/></v:shape><o:OLEObject Type="Embed" ProgID="Equation.DSMT4" ShapeID="_x0000_i1025" DrawAspect="Content" ObjectID="_1468075725" r:id="rIdOle"/></w:object></w:r></w:p></w:body></w:document>"##;
-    let document = Document::from_bytes(docx(document_xml)).unwrap();
-    assert_eq!(
-        document.to_markdown().unwrap(),
-        "Value: ![equation preview]\n\n"
-    );
+    assert_markdown(document_xml, "Value: ![equation preview]\n\n");
 }
 
 #[test]
 fn floating_drawing_projects_as_image() {
     let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:body><w:p><w:r><w:drawing><wp:anchor simplePos="0" relativeHeight="251658240" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1"><wp:positionH relativeFrom="page"><wp:posOffset>11430000</wp:posOffset></wp:positionH><wp:extent cx="1" cy="1"/><wp:docPr id="1" name="floater"/><a:graphic><a:graphicData><pic:pic><pic:blipFill><a:blip r:embed="rIdImage"/></pic:blipFill></pic:pic></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r></w:p></w:body></w:document>"#;
-    let document = Document::from_bytes(docx(document_xml)).unwrap();
-    assert_eq!(
-        document.to_markdown().unwrap(),
-        "![](<data:image/png;base64,iVBORw0KGgo=> \"floater\")\n\n"
+    assert_markdown(
+        document_xml,
+        "![](<data:image/png;base64,iVBORw0KGgo=> \"floater\")\n\n",
     );
 }
 
 #[test]
 fn bookmark_boundaries_are_invisible_to_markdown() {
     let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:bookmarkStart w:id="0" w:name="_GoBack"/><w:r><w:t>kept</w:t></w:r><w:bookmarkEnd w:id="0"/></w:p></w:body></w:document>"#;
-    let document = Document::from_bytes(docx(document_xml)).unwrap();
-    assert_eq!(document.to_markdown().unwrap(), "kept\n\n");
+    assert_markdown(document_xml, "kept\n\n");
 }

@@ -5,9 +5,7 @@ use litchi_iwa_archive::{
     package::{Catalog, EntryEdit, EntryInsertion, ExactArtifacts},
 };
 use litchi_iwa_common::wire::{WireView, append_length_delimited_field, append_varint_field};
-use litchi_iwa_core::{
-    Archive, ArchiveObject, FieldInfo, FieldPath, FieldType, RawMessage, SnappyStream,
-};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldType, RawMessage, SnappyStream};
 use litchi_iwa_protos::tsp;
 use prost::Message as _;
 
@@ -50,7 +48,7 @@ fn native_chart_title_package_with_stylesheet_registration() -> (Vec<u8>, Packag
                 ..tsp::Reference::default()
             }
             .encode_to_vec();
-            let has_reference = WireView::parse(payload)
+            let has_reference = WireView::parse(payload, WireLimits::DEFAULT)
                 .expect("stylesheet payload")
                 .fields()
                 .filter(|field| field.number() == STYLESHEET_STYLES_FIELD)
@@ -58,8 +56,13 @@ fn native_chart_title_package_with_stylesheet_registration() -> (Vec<u8>, Packag
                 .filter_map(|payload| tsp::Reference::decode(payload).ok())
                 .any(|candidate| candidate.identifier == selection.non_style_identifier);
             if !has_reference {
-                append_length_delimited_field(payload, STYLESHEET_STYLES_FIELD, &reference)
-                    .expect("stylesheet wire registration");
+                append_length_delimited_field(
+                    payload,
+                    STYLESHEET_STYLES_FIELD,
+                    &reference,
+                    WireLimits::DEFAULT,
+                )
+                .expect("stylesheet wire registration");
             }
         });
         let info = &mut object.archive_info.message_infos[message_index];
@@ -101,17 +104,17 @@ fn reassemble_object<F>(source: &[u8], identifier: u64, mutate: F) -> Vec<u8>
 where
     F: FnOnce(&mut ArchiveObject),
 {
-    let catalog = Catalog::from_bytes(source).expect("source catalog");
+    let catalog = Catalog::from_bytes(source, Default::default()).expect("source catalog");
     let mut component_name = None;
     let mut selected_archive = None;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let Ok(stream) = SnappyStream::decompress(entry.data()) else {
+        let Ok(stream) = SnappyStream::decompress(entry.data(), Default::default()) else {
             continue;
         };
-        let Ok(archive) = Archive::parse(stream.as_bytes()) else {
+        let Ok(archive) = Archive::parse(stream.as_bytes(), Default::default()) else {
             continue;
         };
         if archive.object(identifier).is_some() {
@@ -130,8 +133,11 @@ where
             .object_mut(identifier)
             .expect("selected object in archive"),
     );
-    let encoded = archive.to_bytes().expect("mutated archive");
-    let compressed = SnappyStream::compress(&encoded).expect("mutated component");
+    let encoded = archive
+        .to_bytes(Default::default())
+        .expect("mutated archive");
+    let compressed =
+        SnappyStream::compress(&encoded, Default::default()).expect("mutated component");
     catalog
         .reassemble_to_bytes(
             &[EntryEdit::new(&component_name, compressed.as_slice())],
@@ -158,6 +164,7 @@ where
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )
         .expect("replace message payload");
 }
@@ -171,7 +178,7 @@ fn message_index(object: &ArchiveObject, message_type: u32) -> usize {
 }
 
 fn replace_first_wire_field(payload: &[u8], number: u32, replacement: &[u8]) -> Vec<u8> {
-    let view = WireView::parse(payload).expect("wire payload");
+    let view = WireView::parse(payload, WireLimits::DEFAULT).expect("wire payload");
     let mut output = Vec::with_capacity(payload.len() + replacement.len());
     let mut replaced = false;
     for field in view.fields() {
@@ -205,11 +212,7 @@ fn stylesheet_registration(package: &Package, target_identifier: u64) -> (u64, u
                     .message_infos
                     .get(message_index)
                     .expect("stylesheet message metadata");
-                if info
-                    .object_references
-                    .iter()
-                    .any(|identifier| *identifier == target_identifier)
-                {
+                if info.object_references.contains(&target_identifier) {
                     assert!(
                         selected
                             .replace((object_identifier, message_index))
@@ -276,7 +279,7 @@ fn assert_budgeted_rejects(source: &[u8]) {
 }
 
 fn append_nonzero_mediator(payload: &mut Vec<u8>) {
-    let outer = WireView::parse(payload).expect("chart payload");
+    let outer = WireView::parse(payload, WireLimits::DEFAULT).expect("chart payload");
     let chart = outer
         .fields()
         .find(|field| field.number() == CHART_EXTENSION_FIELD)
@@ -288,9 +291,14 @@ fn append_nonzero_mediator(payload: &mut Vec<u8>) {
     .encode_to_vec();
     let mut chart_payload = chart.payload().to_vec();
     let mut mediator = Vec::new();
-    append_length_delimited_field(&mut mediator, CHART_MEDIATOR_FIELD, &reference)
-        .expect("mediator field");
-    if WireView::parse(&chart_payload)
+    append_length_delimited_field(
+        &mut mediator,
+        CHART_MEDIATOR_FIELD,
+        &reference,
+        WireLimits::DEFAULT,
+    )
+    .expect("mediator field");
+    if WireView::parse(&chart_payload, WireLimits::DEFAULT)
         .expect("chart extension payload")
         .fields()
         .any(|field| field.number() == CHART_MEDIATOR_FIELD)
@@ -300,21 +308,26 @@ fn append_nonzero_mediator(payload: &mut Vec<u8>) {
         chart_payload.extend_from_slice(&mediator);
     }
     let mut replacement = Vec::new();
-    append_length_delimited_field(&mut replacement, CHART_EXTENSION_FIELD, &chart_payload)
-        .expect("chart extension replacement");
+    append_length_delimited_field(
+        &mut replacement,
+        CHART_EXTENSION_FIELD,
+        &chart_payload,
+        WireLimits::DEFAULT,
+    )
+    .expect("chart extension replacement");
     *payload = replace_first_wire_field(payload, CHART_EXTENSION_FIELD, &replacement);
 }
 
 fn first_unrelated_object(source: &[u8], selection: &ChartSelection) -> (u64, usize) {
-    let catalog = Catalog::from_bytes(source).expect("source catalog");
+    let catalog = Catalog::from_bytes(source, Default::default()).expect("source catalog");
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let Ok(stream) = SnappyStream::decompress(entry.data()) else {
+        let Ok(stream) = SnappyStream::decompress(entry.data(), Default::default()) else {
             continue;
         };
-        let Ok(archive) = Archive::parse(stream.as_bytes()) else {
+        let Ok(archive) = Archive::parse(stream.as_bytes(), Default::default()) else {
             continue;
         };
         for object in &archive.objects {
@@ -346,11 +359,19 @@ fn assert_public_rejects(source: &[u8]) {
     let package = Package::from_bytes(source).expect("mutated fixture package");
     assert!(matches!(
         package.slide_chart_title(SlideSelector::index(0), ChartSelector::index(0)),
-        Err(ChartTitleError::InvalidSource)
+        Err(Error::InvalidSource)
     ));
+    let edit = package
+        .edit_slide_chart_title(SlideSelector::index(0), ChartSelector::index(0))
+        .expect("malformed chart edit entry must remain lazy");
+    assert!(format!("{edit:?}").contains("has_selection: false"));
+    drop(edit);
+    assert_eq!(exact_bytes(&package), source);
     assert!(matches!(
-        package.edit_slide_chart_title(SlideSelector::index(0), ChartSelector::index(0)),
-        Err(ChartTitleError::InvalidSource)
+        package
+            .edit_slide_chart_title(SlideSelector::index(0), ChartSelector::index(0))
+            .and_then(|edit| edit.commit()),
+        Err(Error::InvalidSource)
     ));
 }
 
@@ -379,11 +400,23 @@ fn chart_title_rejects_mediator_and_merge_diff_metadata() {
                         .push(1),
                     3 => {
                         object.archive_info.message_infos[selection.non_style_message_index]
-                            .diff_field_path = Some(FieldPath::new(vec![1]))
+                            .diff_field_path = Some(
+                            litchi_iwa_core::FieldPath::new(
+                                vec![1],
+                                litchi_iwa_core::Limits::default(),
+                            )
+                            .unwrap(),
+                        )
                     },
                     4 => object.archive_info.message_infos[selection.non_style_message_index]
                         .fields_to_remove
-                        .push(FieldPath::new(vec![1])),
+                        .push(
+                            litchi_iwa_core::FieldPath::new(
+                                vec![1],
+                                litchi_iwa_core::Limits::default(),
+                            )
+                            .unwrap(),
+                        ),
                     5 => object.archive_info.message_infos[selection.non_style_message_index]
                         .diff_read_version
                         .push(1),
@@ -482,7 +515,7 @@ fn chart_title_rejects_malformed_stylesheet_registration_wire_membership() {
             &package,
             selection.non_style_identifier,
             |payload| {
-                let view = WireView::parse(payload).expect("stylesheet wire");
+                let view = WireView::parse(payload, WireLimits::DEFAULT).expect("stylesheet wire");
                 let mut output = Vec::new();
                 let mut matched = false;
                 for field in view.fields() {
@@ -526,7 +559,15 @@ fn chart_title_rejects_duplicate_foreign_or_field_stylesheet_metadata() {
                     0 => info.object_references.push(selection.non_style_identifier),
                     1 => info.data_references.push(selection.non_style_identifier),
                     2 => {
-                        let mut field = FieldInfo::new(vec![1]);
+                        let mut field = FieldInfo::new(
+                            litchi_iwa_core::FieldPath::new(
+                                vec![1],
+                                litchi_iwa_core::Limits::default(),
+                            )
+                            .unwrap(),
+                            litchi_iwa_core::Limits::default(),
+                        )
+                        .unwrap();
                         field.r#type = Some(FieldType::ObjectReference);
                         field.object_references.push(selection.non_style_identifier);
                         info.field_infos.push(field);
@@ -557,7 +598,12 @@ fn chart_title_accepts_one_expected_chart_field_metadata_edge() {
     let candidate = if existing_field_edges == 0 {
         reassemble_object(&source, selection.chart_identifier, |object| {
             let info = &mut object.archive_info.message_infos[chart_message_index];
-            let mut field = FieldInfo::new(vec![1]);
+            let mut field = FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default())
+                    .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap();
             field.r#type = Some(FieldType::ObjectReference);
             field.object_references.push(selection.non_style_identifier);
             info.field_infos.push(field);
@@ -590,11 +636,7 @@ fn exact_bytes(package: &Package) -> Vec<u8> {
     bytes
 }
 
-fn forge_patch(
-    source_bytes: &[u8],
-    patch: &ChartTitlePatch,
-    target_bytes: Vec<u8>,
-) -> ChartTitlePatch {
+fn forge_patch(source_bytes: &[u8], patch: &Patch, target_bytes: Vec<u8>) -> Patch {
     let mut forged = patch.clone();
     forged.artifacts = ExactArtifacts::new(
         Arc::<[u8]>::from(source_bytes.to_vec()),
@@ -604,7 +646,7 @@ fn forge_patch(
 }
 
 fn mutate_unrelated_member(source: &[u8]) -> Vec<u8> {
-    let catalog = Catalog::from_bytes(source).expect("candidate catalog");
+    let catalog = Catalog::from_bytes(source, Default::default()).expect("candidate catalog");
     let entry = catalog
         .iter()
         .find(|entry| {
@@ -641,12 +683,13 @@ fn mutate_selected_payload(source: &[u8], selection: &ChartSelection) -> Vec<u8>
 }
 
 fn restore_one_preview(source: &[u8], preview_source: &[u8]) -> Vec<u8> {
-    let source_catalog = Catalog::from_bytes(preview_source).expect("preview source catalog");
+    let source_catalog =
+        Catalog::from_bytes(preview_source, Default::default()).expect("preview source catalog");
     let preview = source_catalog
         .iter()
         .find(|entry| entry.name() == "preview.jpg")
         .expect("native preview");
-    Catalog::from_bytes(source)
+    Catalog::from_bytes(source, Default::default())
         .expect("candidate catalog")
         .reassemble_with_insertions_to_bytes(
             &[EntryInsertion::new("preview.jpg", preview.data())],
@@ -677,7 +720,7 @@ fn chart_title_candidate_verification_rejects_unrelated_drift_and_stale_preview(
         let forged = forge_patch(&source_bytes, &patch, candidate_bytes);
         assert!(matches!(
             source.apply_slide_chart_title(&forged),
-            Err(ChartTitleError::Verification)
+            Err(Error::Verification)
         ));
     }
 }
@@ -709,7 +752,14 @@ fn chart_graph_owner_scan_admits_exact_work_and_rejects_one_under() {
     let with_empty_field_info = reassemble_object(&source, unrelated_identifier, |object| {
         object.archive_info.message_infos[unrelated_message_index]
             .field_infos
-            .push(FieldInfo::new(vec![99]));
+            .push(
+                FieldInfo::new(
+                    litchi_iwa_core::FieldPath::new(vec![99], litchi_iwa_core::Limits::default())
+                        .unwrap(),
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap(),
+            );
     });
     let augmented_package =
         Package::from_bytes(&with_empty_field_info).expect("empty field-info package");
@@ -726,13 +776,14 @@ fn unknown_reference_metadata_is_preserved_for_reads_and_noops_but_blocks_title_
     let (component, _) = package
         .object_with_component(identifier)
         .expect("unrelated component");
-    let catalog = Catalog::from_bytes(&source).expect("source catalog");
+    let catalog = Catalog::from_bytes(&source, Default::default()).expect("source catalog");
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == component)
         .expect("component entry");
-    let stream = SnappyStream::decompress(entry.data()).expect("component stream");
-    let archive = Archive::parse(stream.as_bytes()).expect("component archive");
+    let stream =
+        SnappyStream::decompress(entry.data(), Default::default()).expect("component stream");
+    let archive = Archive::parse(stream.as_bytes(), Default::default()).expect("component archive");
     let object = archive.object(identifier).expect("unrelated object");
     let offset = usize::try_from(object.header_offset).expect("header offset");
     let (length, prefix) =
@@ -748,7 +799,8 @@ fn unknown_reference_metadata_is_preserved_for_reads_and_noops_but_blocks_title_
     );
     rewritten.extend_from_slice(&header);
     rewritten.extend_from_slice(&stream.as_bytes()[end..]);
-    let compressed = SnappyStream::compress(&rewritten).expect("changed component");
+    let compressed =
+        SnappyStream::compress(&rewritten, Default::default()).expect("changed component");
     let opaque = catalog
         .reassemble_to_bytes(&[EntryEdit::new(component, &compressed)], Limits::default())
         .expect("opaque package");
@@ -772,7 +824,7 @@ fn unknown_reference_metadata_is_preserved_for_reads_and_noops_but_blocks_title_
             .set("changed")
             .expect("title")
             .commit(),
-        Err(ChartTitleError::InvalidSource)
+        Err(Error::InvalidSource)
     ));
     let changed = package
         .edit_slide_chart_title(0usize, 0usize)
@@ -784,7 +836,7 @@ fn unknown_reference_metadata_is_preserved_for_reads_and_noops_but_blocks_title_
     let forged = forge_patch(&opaque, changed.patch(), exact_bytes(changed.package()));
     assert!(matches!(
         opaque_package.apply_slide_chart_title(&forged),
-        Err(ChartTitleError::InvalidSource)
+        Err(Error::InvalidSource)
     ));
     assert_eq!(exact_bytes(&opaque_package), opaque);
 }

@@ -1,0 +1,24 @@
+{
+  "source": "7e2dacd74375493b478f6fcc9b5154fb374fe050",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--all-features"
+      ],
+      "exit": 101,
+      "seconds": 183.84191211895086,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v5/check-0.log",
+      "bytes": 4202,
+      "sha256": "7add5240b15bd95c3c538d4f3545526d1e4f39831ee1fbd24e98696416f33ab1",
+      "target_bytes_before": 18304513705,
+      "completed_test_executables_pruned": []
+    }
+  ],
+  "note": "DOCX library progressed; two ODT durable replay return expressions still return CoreError instead of the ODF family error. Harness not reached."
+}

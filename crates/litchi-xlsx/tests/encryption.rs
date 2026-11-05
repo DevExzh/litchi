@@ -5,7 +5,7 @@ use std::io::Cursor;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, Part, Relationship, TargetMode};
 use litchi_xlsx::encryption::{Error as CryptoError, Limits, Mode};
-use litchi_xlsx::{Error, Package, ReadLimits, Workbook};
+use litchi_xlsx::{Error, Package, SourceLimits};
 
 const PASSWORD: &str = "Litchi XLSX password 42!";
 const NEW_PASSWORD: &str = "Litchi XLSX changed password 7!";
@@ -13,23 +13,23 @@ const NEW_PASSWORD: &str = "Litchi XLSX changed password 7!";
 #[test]
 fn package_and_workbook_round_trip_managed_encryption() {
     for mode in [Mode::Standard, Mode::Agile] {
-        let package = Package::create().unwrap();
+        let package = Package::new().unwrap();
         let encrypted = package.to_encrypted(PASSWORD, mode).unwrap();
         assert_eq!(package.encryption(), None);
 
         let package = Package::from_reader_with_password(Cursor::new(encrypted), PASSWORD).unwrap();
         assert_eq!(package.encryption(), Some(mode));
-        let workbook = package.into_workbook().unwrap();
+        let workbook = package;
         assert_eq!(workbook.encryption(), Some(mode));
-        assert_eq!(workbook.len(), 1);
+        assert_eq!(workbook.workbook_ref().len(), 1);
     }
 }
 
 #[test]
 fn encrypted_provenance_blocks_implicit_plaintext_and_mutation() {
-    let source = Package::create().unwrap();
+    let source = Package::new().unwrap();
     let encrypted = source.to_encrypted(PASSWORD, Mode::Standard).unwrap();
-    let mut package = Package::from_bytes_with_password(encrypted, PASSWORD).unwrap();
+    let package = Package::from_bytes_with_password(&encrypted, PASSWORD).unwrap();
 
     assert!(matches!(
         package.to_bytes(),
@@ -47,7 +47,7 @@ fn encrypted_provenance_blocks_implicit_plaintext_and_mutation() {
     ));
     assert_eq!(&package.to_plain_bytes().unwrap()[..2], b"PK");
 
-    let workbook = package.workbook().unwrap();
+    let workbook = package.clone();
     assert!(matches!(
         workbook.edit(),
         Err(Error::EncryptionPolicy {
@@ -62,9 +62,9 @@ fn encrypted_provenance_blocks_implicit_plaintext_and_mutation() {
 fn reencrypted_output_retains_mode_and_atomic_failure_retains_state() {
     let directory = tempfile::tempdir().unwrap();
     let target = directory.path().join("reencrypted.xlsx");
-    let package = Package::create().unwrap();
+    let package = Package::new().unwrap();
     let encrypted = package.to_encrypted(PASSWORD, Mode::Standard).unwrap();
-    let mut package = Package::from_bytes_with_password(encrypted, PASSWORD).unwrap();
+    let package = Package::from_bytes_with_password(&encrypted, PASSWORD).unwrap();
 
     package.save_reencrypted(&target, NEW_PASSWORD).unwrap();
     assert!(matches!(
@@ -100,7 +100,56 @@ fn reencrypted_output_retains_mode_and_atomic_failure_retains_state() {
     package
         .save_encrypted(&selected, NEW_PASSWORD, Mode::Agile)
         .unwrap();
-    assert_eq!(package.encryption(), Some(Mode::Agile));
+    // Saving is an output: the package keeps the profile it was opened with.
+    assert_eq!(package.encryption(), before);
+    assert_eq!(
+        Package::open_with_password(&selected, NEW_PASSWORD)
+            .unwrap()
+            .encryption(),
+        Some(Mode::Agile)
+    );
+}
+
+#[test]
+fn encrypted_outputs_use_the_encryption_limits_the_package_was_opened_with() {
+    let encrypted = Package::new()
+        .unwrap()
+        .to_encrypted(PASSWORD, Mode::Standard)
+        .unwrap();
+    let limits = Limits {
+        max_output_bytes: 512,
+        ..Limits::default()
+    };
+    let package = Package::from_bytes_with_password_and_options(
+        &encrypted,
+        PASSWORD,
+        litchi_xlsx::OpenOptions::new().encryption_limits(limits),
+    )
+    .unwrap();
+    let error = package.to_reencrypted(NEW_PASSWORD).unwrap_err();
+    assert!(
+        matches!(error, Error::Encryption(CryptoError::Limit { .. })),
+        "{error:?}"
+    );
+    // A commit carries the limits to the package it publishes.
+    let mut edit = Package::from_bytes_with_password_and_options(
+        &Package::new().unwrap().to_bytes().unwrap(),
+        PASSWORD,
+        litchi_xlsx::OpenOptions::new().encryption_limits(limits),
+    )
+    .unwrap()
+    .edit()
+    .unwrap();
+    edit.sheet(0_usize)
+        .unwrap()
+        .expect("a first worksheet")
+        .set("A1", 1)
+        .unwrap();
+    let after = edit.commit().unwrap().into_package();
+    assert!(matches!(
+        after.to_encrypted(PASSWORD, Mode::Standard),
+        Err(Error::Encryption(CryptoError::Limit { .. }))
+    ));
 }
 
 #[test]
@@ -109,11 +158,12 @@ fn outer_crypto_limit_is_independent_and_typed() {
         max_input_bytes: 4,
         ..Limits::default()
     };
-    let error = Package::from_reader_with_password_and_limits(
+    let error = Package::from_reader_with_password_and_options(
         Cursor::new(vec![0u8; 5]),
         PASSWORD,
-        &limits,
-        ReadLimits::default(),
+        litchi_xlsx::OpenOptions::new()
+            .encryption_limits(limits)
+            .source_limits(SourceLimits::default()),
     )
     .unwrap_err();
     assert!(matches!(
@@ -128,7 +178,7 @@ fn outer_crypto_limit_is_independent_and_typed() {
 
 #[test]
 fn byte_generation_does_not_change_source_provenance() {
-    let workbook = Workbook::new().unwrap();
+    let workbook = Package::new().unwrap();
     assert!(matches!(
         workbook.to_reencrypted(PASSWORD),
         Err(Error::EncryptionPolicy {
@@ -140,7 +190,7 @@ fn byte_generation_does_not_change_source_provenance() {
     let clone = workbook.clone();
     assert_eq!(clone.encryption(), None);
     assert_eq!(
-        Workbook::from_slice_with_password(&encrypted, PASSWORD)
+        Package::from_bytes_with_password(&encrypted, PASSWORD)
             .unwrap()
             .encryption(),
         Some(Mode::Standard)
@@ -149,28 +199,31 @@ fn byte_generation_does_not_change_source_provenance() {
 
 #[test]
 fn password_aware_ingress_accepts_plain_zip_without_provenance() {
-    let plaintext = Package::create().unwrap().to_plain_bytes().unwrap();
-    let package = Package::from_bytes_with_password(plaintext, "irrelevant password").unwrap();
+    let plaintext = Package::new().unwrap().to_plain_bytes().unwrap();
+    let package = Package::from_bytes_with_password(&plaintext, "irrelevant password").unwrap();
 
     assert_eq!(package.encryption(), None);
 }
 
 #[test]
 fn restrictive_inner_opc_limits_reject_valid_encrypted_xlsx() {
-    let plaintext = Package::create().unwrap().to_plain_bytes().unwrap();
-    let encrypted = litchi_xlsx::encryption::encrypt(plaintext, PASSWORD, Mode::Standard).unwrap();
-    let opc_limits = ReadLimits::builder()
+    let plaintext = Package::new().unwrap().to_plain_bytes().unwrap();
+    let encrypted =
+        litchi_xlsx::encryption::encrypt(plaintext, PASSWORD, Mode::Standard, &Limits::default())
+            .unwrap();
+    let opc_limits = SourceLimits::builder()
         .max_input_bytes(4)
         .unwrap()
         .build()
         .unwrap();
 
     assert!(matches!(
-        Package::from_bytes_with_password_and_limits(
-            encrypted,
+        Package::from_bytes_with_password_and_options(
+            &encrypted,
             PASSWORD,
-            &Limits::default(),
-            opc_limits,
+            litchi_xlsx::OpenOptions::new()
+                .encryption_limits(Limits::default())
+                .source_limits(opc_limits)
         ),
         Err(Error::Package(_))
     ));
@@ -198,10 +251,12 @@ fn decrypted_wrong_family_package_is_rejected() {
         )
         .unwrap();
     let plaintext = PackageWriter::to_bytes(&presentation).unwrap();
-    let encrypted = litchi_xlsx::encryption::encrypt(plaintext, PASSWORD, Mode::Standard).unwrap();
+    let encrypted =
+        litchi_xlsx::encryption::encrypt(plaintext, PASSWORD, Mode::Standard, &Limits::default())
+            .unwrap();
 
     assert!(matches!(
-        Package::from_bytes_with_password(encrypted, PASSWORD),
+        Package::from_bytes_with_password(&encrypted, PASSWORD),
         Err(Error::Invalid(_))
     ));
 }
@@ -269,7 +324,7 @@ fn signature_snapshot(package: &Package) -> SignatureSnapshot {
 
 #[test]
 fn signed_inner_opc_survives_encryption_and_reencryption_unchanged() {
-    let mut raw = Package::create().unwrap().into_plain_opc();
+    let mut raw = Package::new().unwrap().into_plain_opc();
     let origin_uri = PackURI::new("/_xmlsignatures/origin.sigs").unwrap();
     let signature_uri = PackURI::new("/_xmlsignatures/sig1.xml").unwrap();
     let mut origin = BlobPart::new(
@@ -309,21 +364,23 @@ fn signed_inner_opc_survives_encryption_and_reencryption_unchanged() {
     let clear = signed.to_plain_bytes().unwrap();
 
     let encrypted = signed.to_encrypted(PASSWORD, Mode::Standard).unwrap();
-    let opened = Package::from_bytes_with_password(encrypted, PASSWORD).unwrap();
+    let opened = Package::from_bytes_with_password(&encrypted, PASSWORD).unwrap();
     assert_eq!(signature_snapshot(&opened), expected);
     assert_eq!(opened.to_plain_bytes().unwrap(), clear);
 
     let reencrypted = opened.to_reencrypted(NEW_PASSWORD).unwrap();
-    let reopened = Package::from_bytes_with_password(reencrypted, NEW_PASSWORD).unwrap();
+    let reopened = Package::from_bytes_with_password(&reencrypted, NEW_PASSWORD).unwrap();
     assert_eq!(signature_snapshot(&reopened), expected);
     assert_eq!(reopened.to_plain_bytes().unwrap(), clear);
 }
 
 #[test]
 fn encrypted_source_raw_declassification_is_explicit() {
-    let plaintext = Package::create().unwrap().to_plain_bytes().unwrap();
-    let encrypted = litchi_xlsx::encryption::encrypt(plaintext, PASSWORD, Mode::Standard).unwrap();
-    let package = Package::from_bytes_with_password(encrypted, PASSWORD).unwrap();
+    let plaintext = Package::new().unwrap().to_plain_bytes().unwrap();
+    let encrypted =
+        litchi_xlsx::encryption::encrypt(plaintext, PASSWORD, Mode::Standard, &Limits::default())
+            .unwrap();
+    let package = Package::from_bytes_with_password(&encrypted, PASSWORD).unwrap();
     assert_eq!(package.encryption(), Some(Mode::Standard));
 
     let raw = package.into_plain_opc();

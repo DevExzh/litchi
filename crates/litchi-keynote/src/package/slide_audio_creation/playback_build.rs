@@ -19,7 +19,9 @@ use litchi_iwa_protos::keynote_media_lifecycle_codec as lifecycle_codec;
 use litchi_iwa_protos::keynote_media_lifecycle_codec::node_cache;
 
 use super::{CreationBudget, CreationContext, CreationIds};
-use crate::slide::audio::creation::{SlideAudioCreationError, SlideAudioCreationLimitKind};
+use crate::slide::audio::creation::{
+    Error as SlideAudioCreationError, LimitKind as SlideAudioCreationLimitKind,
+};
 
 const BUILD_MESSAGE_TYPE: u32 = 8;
 const BUILD_CHUNK_MESSAGE_TYPE: u32 = 153;
@@ -96,7 +98,7 @@ fn prepare_start_builds(
 
     let build_payload = build.into_bytes();
     let chunk_payload = chunk.into_bytes();
-    let mut build_object = ArchiveObject::new_with_limits(
+    let mut build_object = ArchiveObject::new(
         ids.build,
         vec![RawMessage {
             type_: BUILD_MESSAGE_TYPE,
@@ -106,7 +108,7 @@ fn prepare_start_builds(
     )
     .map_err(map_archive_error)?;
     set_object_reference(&mut build_object, ids.drawable, budget)?;
-    let mut chunk_object = ArchiveObject::new_with_limits(
+    let mut chunk_object = ArchiveObject::new(
         ids.chunk,
         vec![RawMessage {
             type_: BUILD_CHUNK_MESSAGE_TYPE,
@@ -170,12 +172,11 @@ pub(super) fn rewrite_node_cache(
     limits: WireLimits,
     budget: &mut CreationBudget,
 ) -> Result<Vec<u8>, SlideAudioCreationError> {
-    let event_count =
-        u32::try_from(event_count).map_err(|_| SlideAudioCreationError::LimitExceeded {
-            kind: SlideAudioCreationLimitKind::WireFields,
-            observed: u64::try_from(event_count).unwrap_or(u64::MAX),
-            maximum: u64::from(u32::MAX),
-        })?;
+    let event_count = u32::try_from(event_count).map_err(|_| SlideAudioCreationError::Limit {
+        kind: SlideAudioCreationLimitKind::WireFields,
+        observed: u64::try_from(event_count).unwrap_or(u64::MAX),
+        maximum: u64::from(u32::MAX),
+    })?;
     let options = node_cache_options(source, limits, budget);
     let (output, report) = node_cache::rewrite_slide_node_build_cache_for_event_count_with_report(
         source,
@@ -339,7 +340,7 @@ fn limit_error(
     observed: usize,
     maximum: usize,
 ) -> SlideAudioCreationError {
-    SlideAudioCreationError::LimitExceeded {
+    SlideAudioCreationError::Limit {
         kind,
         observed: u64::try_from(observed).unwrap_or(u64::MAX),
         maximum: u64::try_from(maximum).unwrap_or(u64::MAX),

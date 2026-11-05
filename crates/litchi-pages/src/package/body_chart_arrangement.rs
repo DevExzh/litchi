@@ -20,18 +20,19 @@ use std::sync::Arc;
 
 use litchi_core::Position;
 use litchi_iwa_archive::package::{EntryEdit, OwnedExactArtifacts, SharedBytes};
-use litchi_iwa_archive::{Error as ArchiveError, LimitKind as ArchiveLimitKind, SourceCatalog};
+use litchi_iwa_archive::{Error as ArchiveError, LimitKind as ArchiveLimitKind};
 use litchi_iwa_common::chart::arrangement::ChartArrangement;
 use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes,
     varint::encoded_len,
-    wire::{WireDescent, WireFieldView, WireView, preflight_wire_tree_with_limits},
+    wire::{WireDescent, WireFieldView, WireView, preflight_wire_tree},
 };
 use litchi_iwa_core::{ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{
-    chart_arrangement_codec as codec, pages_body_codec, pages_drawable_order_codec,
+    chart_arrangement_codec as codec, chart_style_codec, pages_body_codec,
+    pages_drawable_order_codec,
 };
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::{Package, page_layout};
 use crate::selector::BodyChartSelector;
@@ -61,7 +62,7 @@ const WIRE_VIEW_SPAN_BYTES_PER_FIELD: usize = size_of::<[usize; 8]>();
 /// Finite resources governed by one Pages body-chart Arrange operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum BodyChartArrangementLimitKind {
+pub enum LimitKind {
     /// Complete package input bytes.
     InputBytes,
     /// Complete rewritten package bytes.
@@ -104,7 +105,7 @@ pub enum BodyChartArrangementLimitKind {
     WireScratchBytes,
 }
 
-impl fmt::Display for BodyChartArrangementLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -132,19 +133,13 @@ impl fmt::Display for BodyChartArrangementLimitKind {
 }
 
 /// Failure from a Pages body-chart Arrange read or exact-source transaction.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum BodyChartArrangementError {
-    /// No ordinary body chart matched the checked source-order selector.
-    #[error("the Pages body has no chart at position {position:?}")]
-    ChartNotFound { position: Position },
-    /// Alias used by callers that name checked positions explicitly.
-    #[error("the Pages body has no chart at position {position:?}")]
-    ChartPositionNotFound { position: Position },
-    /// The source does not retain an exact physical artifact suitable for a
-    /// changed publication.
-    #[error("this Pages source does not support exact body-chart arrangement edits")]
-    UnsupportedSource,
+pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     /// The rooted chart graph or selected payload was malformed or ambiguous.
     #[error("the selected Pages body-chart arrangement source is invalid")]
     InvalidSource,
@@ -152,9 +147,9 @@ pub enum BodyChartArrangementError {
     #[error(
         "Pages body-chart arrangement {kind} limit exceeded: observed {observed}, maximum {maximum}"
     )]
-    LimitExceeded {
+    Limit {
         /// Resource category.
-        kind: BodyChartArrangementLimitKind,
+        kind: LimitKind,
         /// Observed or requested amount.
         observed: u64,
         /// Configured maximum.
@@ -171,19 +166,56 @@ pub enum BodyChartArrangementError {
     PatchConflict,
 }
 
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
+    /// No ordinary body chart matched the checked source-order selector.
+    #[error("the Pages body has no chart at position {position:?}")]
+    ChartNotFound { position: Position },
+    /// Alias used by callers that name checked positions explicitly.
+    #[error("the Pages body has no chart at position {position:?}")]
+    ChartPositionNotFound { position: Position },
+    /// The source does not retain an exact physical artifact suitable for a
+    /// changed publication.
+    #[error("this Pages source does not support exact body-chart arrangement edits")]
+    UnsupportedSource,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::ChartNotFound { .. } | Self::ChartPositionNotFound { .. } => {
+                RefusalKind::NotFound
+            },
+            Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
+}
+
 /// One mutable semantic chart Arrange value staged against an immutable
 /// package snapshot.
-pub struct BodyChartArrangementEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
     target: ChartTarget,
     before: ChartArrangement,
     after: ChartArrangement,
 }
 
-impl fmt::Debug for BodyChartArrangementEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("BodyChartArrangementEdit")
+            .debug_struct("Edit")
             .field("position", &self.target.position)
             .field("before", &self.before)
             .field("after", &self.after)
@@ -191,7 +223,7 @@ impl fmt::Debug for BodyChartArrangementEdit<'_> {
     }
 }
 
-impl BodyChartArrangementEdit<'_> {
+impl Edit<'_> {
     /// Return the selected body-chart source position.
     #[must_use]
     pub const fn position(&self) -> Position {
@@ -218,14 +250,14 @@ impl BodyChartArrangementEdit<'_> {
     }
 
     /// Validate and publish the staged exact-source edit.
-    pub fn commit(self) -> Result<BodyChartArrangementCommit, BodyChartArrangementError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         commit_edit(self)
     }
 }
 
 /// Exact-source checked reversible body-chart Arrange patch.
 #[derive(Clone, PartialEq, Eq)]
-pub struct BodyChartArrangementPatch {
+pub struct Patch {
     artifacts: OwnedExactArtifacts,
     target: ChartTarget,
     before: ChartArrangement,
@@ -235,10 +267,10 @@ pub struct BodyChartArrangementPatch {
     target_payload: Option<Arc<[u8]>>,
 }
 
-impl fmt::Debug for BodyChartArrangementPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("BodyChartArrangementPatch")
+            .debug_struct("Patch")
             .field("position", &self.target.position)
             .field("before", &self.before)
             .field("after", &self.after)
@@ -246,7 +278,7 @@ impl fmt::Debug for BodyChartArrangementPatch {
     }
 }
 
-impl BodyChartArrangementPatch {
+impl Patch {
     /// Return the selected body-chart source position.
     #[must_use]
     pub const fn position(&self) -> Position {
@@ -306,14 +338,14 @@ impl BodyChartArrangementPatch {
 
 /// Compact evidence describing one committed body-chart transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct BodyChartArrangementDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     deleted_previews: usize,
     full_reparse_performed: bool,
 }
 
-impl BodyChartArrangementDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -363,13 +395,13 @@ impl BodyChartArrangementDiagnostics {
 /// Fully reopened immutable result of one body-chart Arrange transaction.
 #[must_use = "a Pages body-chart arrangement commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct BodyChartArrangementCommit {
+pub struct Commit {
     package: Package,
-    patch: BodyChartArrangementPatch,
-    diagnostics: BodyChartArrangementDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl BodyChartArrangementCommit {
+impl Commit {
     /// Borrow the fully reopened package snapshot.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -382,15 +414,21 @@ impl BodyChartArrangementCommit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the exact-source reversible patch.
     #[must_use]
-    pub const fn patch(&self) -> &BodyChartArrangementPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Borrow compact publication diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> &BodyChartArrangementDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
@@ -502,19 +540,26 @@ pub(super) struct ArrangementBudget {
     max_work: usize,
     max_nesting: usize,
     max_references: usize,
+    max_registry_entries: usize,
+    max_identifiers: usize,
     max_allocations: usize,
     max_retained: usize,
+    max_scratch: usize,
     input: usize,
     output: usize,
     fields: usize,
     work: usize,
     references: usize,
+    registry_entries: usize,
+    identifiers: usize,
     allocations: usize,
     retained: usize,
+    scratch: usize,
+    pub(super) workspace_source_admitted: bool,
 }
 
 impl ArrangementBudget {
-    pub(super) fn new(package: &Package) -> Result<Self, BodyChartArrangementError> {
+    pub(super) fn new(package: &Package) -> Result<Self, Error> {
         let physical = package.state.source.limits();
         let archive = physical
             .effective_archive_limits()
@@ -523,6 +568,7 @@ impl ArrangementBudget {
         let limits = WireLimits::default()
             .with_input_bytes(message.min(WireLimits::MAX_INPUT_BYTES))
             .and_then(|value| value.with_output_bytes(message.min(WireLimits::MAX_OUTPUT_BYTES)))
+            .and_then(|value| value.with_fields(WireLimits::MAX_FIELDS))
             .and_then(|value| {
                 value.with_rewrite_work(
                     message
@@ -532,10 +578,10 @@ impl ArrangementBudget {
             })
             .map_err(map_wire_error)?;
         let max_output = usize::try_from(physical.max_input_bytes())
-            .map_err(|_| BodyChartArrangementError::InvalidSource)?
+            .map_err(|_| Error::InvalidSource)?
             .max(1);
         let max_work = usize::try_from(physical.max_total_bytes())
-            .map_err(|_| BodyChartArrangementError::InvalidSource)?
+            .map_err(|_| Error::InvalidSource)?
             .saturating_mul(32)
             .max(limits.max_rewrite_work());
         Ok(Self {
@@ -546,15 +592,22 @@ impl ArrangementBudget {
             max_work,
             max_nesting: limits.max_nesting(),
             max_references: archive.max_metadata_items().saturating_mul(16).max(1),
+            max_registry_entries: archive.max_metadata_items().saturating_mul(16).max(1),
+            max_identifiers: archive.max_metadata_items().saturating_mul(16).max(1),
             max_allocations: archive.max_metadata_items().saturating_mul(16).max(1),
             max_retained: max_output,
+            max_scratch: max_output,
             input: 0,
             output: 0,
             fields: 0,
             work: 0,
             references: 0,
+            registry_entries: 0,
+            identifiers: 0,
             allocations: 0,
             retained: 0,
+            scratch: 0,
+            workspace_source_admitted: false,
         })
     }
 
@@ -562,13 +615,11 @@ impl ArrangementBudget {
         current: &mut usize,
         amount: usize,
         maximum: usize,
-        kind: BodyChartArrangementLimitKind,
-    ) -> Result<(), BodyChartArrangementError> {
-        let observed = current
-            .checked_add(amount)
-            .ok_or(BodyChartArrangementError::InvalidSource)?;
+        kind: LimitKind,
+    ) -> Result<(), Error> {
+        let observed = current.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > maximum {
-            return Err(BodyChartArrangementError::LimitExceeded {
+            return Err(Error::Limit {
                 kind,
                 observed: observed as u64,
                 maximum: maximum as u64,
@@ -578,66 +629,88 @@ impl ArrangementBudget {
         Ok(())
     }
 
-    pub(super) fn input(&mut self, amount: usize) -> Result<(), BodyChartArrangementError> {
+    pub(super) fn input(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.input,
             amount,
             self.max_input,
-            BodyChartArrangementLimitKind::InputBytes,
+            LimitKind::InputBytes,
         )
     }
 
-    fn output(&mut self, amount: usize) -> Result<(), BodyChartArrangementError> {
-        Self::add(
-            &mut self.output,
-            amount,
-            self.max_output,
-            BodyChartArrangementLimitKind::OutputBytes,
-        )
-    }
-
-    pub(super) fn fields(&mut self, amount: usize) -> Result<(), BodyChartArrangementError> {
+    pub(super) fn fields(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.fields,
             amount,
             self.max_fields,
-            BodyChartArrangementLimitKind::WireFields,
+            LimitKind::WireFields,
         )
     }
 
-    pub(super) fn work(&mut self, amount: usize) -> Result<(), BodyChartArrangementError> {
-        Self::add(
-            &mut self.work,
-            amount,
-            self.max_work,
-            BodyChartArrangementLimitKind::WireWork,
-        )
+    pub(super) fn work(&mut self, amount: usize) -> Result<(), Error> {
+        Self::add(&mut self.work, amount, self.max_work, LimitKind::WireWork)
     }
 
-    pub(super) fn references(&mut self, amount: usize) -> Result<(), BodyChartArrangementError> {
+    pub(super) fn references(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.references,
             amount,
             self.max_references,
-            BodyChartArrangementLimitKind::PayloadReferences,
+            LimitKind::PayloadReferences,
         )
     }
 
-    pub(super) fn allocations(&mut self, amount: usize) -> Result<(), BodyChartArrangementError> {
+    pub(super) fn registry_entries(&mut self, amount: usize) -> Result<(), Error> {
+        Self::add(
+            &mut self.registry_entries,
+            amount,
+            self.max_registry_entries,
+            LimitKind::PayloadItems,
+        )
+    }
+
+    pub(super) fn identifiers(&mut self, amount: usize) -> Result<(), Error> {
+        Self::add(
+            &mut self.identifiers,
+            amount,
+            self.max_identifiers,
+            LimitKind::PayloadObjects,
+        )
+    }
+
+    pub(super) fn allocations(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.allocations,
             amount,
             self.max_allocations,
-            BodyChartArrangementLimitKind::WireAllocations,
+            LimitKind::WireAllocations,
         )
     }
 
-    pub(super) fn retained(&mut self, amount: usize) -> Result<(), BodyChartArrangementError> {
+    pub(super) fn retained(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.retained,
             amount,
             self.max_retained,
-            BodyChartArrangementLimitKind::WireRetainedBytes,
+            LimitKind::WireRetainedBytes,
+        )
+    }
+
+    pub(super) fn output(&mut self, amount: usize) -> Result<(), Error> {
+        Self::add(
+            &mut self.output,
+            amount,
+            self.max_output,
+            LimitKind::OutputBytes,
+        )
+    }
+
+    pub(super) fn scratch(&mut self, amount: usize) -> Result<(), Error> {
+        Self::add(
+            &mut self.scratch,
+            amount,
+            self.max_scratch,
+            LimitKind::WireScratchBytes,
         )
     }
 
@@ -645,19 +718,18 @@ impl ArrangementBudget {
         &mut self,
         source: &'a [u8],
         depth: usize,
-    ) -> Result<WireView<'a>, BodyChartArrangementError> {
+    ) -> Result<WireView<'a>, Error> {
         if depth > self.max_nesting {
-            return Err(BodyChartArrangementError::LimitExceeded {
-                kind: BodyChartArrangementLimitKind::WireNesting,
+            return Err(Error::Limit {
+                kind: LimitKind::WireNesting,
                 observed: depth as u64,
                 maximum: self.max_nesting as u64,
             });
         }
-        let preflight =
-            preflight_wire_tree_with_limits(source, self.residual_wire_limits()?, |_| {
-                Ok(WireDescent::Skip)
-            })
-            .map_err(map_wire_error)?;
+        let preflight = preflight_wire_tree(source, self.residual_wire_limits()?, |_| {
+            Ok(WireDescent::Skip)
+        })
+        .map_err(map_wire_error)?;
         self.input(preflight.scanned_bytes())?;
         self.work(preflight.scanned_bytes())?;
         self.fields(preflight.fields())?;
@@ -665,13 +737,12 @@ impl ArrangementBudget {
             .fields()
             .checked_mul(4)
             .and_then(|capacity| capacity.checked_mul(WIRE_VIEW_SPAN_BYTES_PER_FIELD))
-            .ok_or(BodyChartArrangementError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         // Include incremental reserve events and cumulative span capacities.
         let span_allocations = preflight.fields();
         self.preflight_allocations(span_allocations)?;
         self.preflight_retained(span_bytes)?;
-        let view = WireView::parse_with_limits(source, self.residual_wire_limits()?)
-            .map_err(map_wire_error)?;
+        let view = WireView::parse(source, self.residual_wire_limits()?).map_err(map_wire_error)?;
         self.allocations(span_allocations)?;
         self.retained(span_bytes)?;
         self.input(source.len())?;
@@ -680,22 +751,22 @@ impl ArrangementBudget {
         Ok(view)
     }
 
-    pub(super) fn residual_wire_limits(&self) -> Result<WireLimits, BodyChartArrangementError> {
+    pub(super) fn residual_wire_limits(&self) -> Result<WireLimits, Error> {
         let input = self
             .max_input
             .checked_sub(self.input)
-            .ok_or(BodyChartArrangementError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let fields = self
             .max_fields
             .checked_sub(self.fields)
-            .ok_or(BodyChartArrangementError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let work = self
             .max_work
             .checked_sub(self.work)
-            .ok_or(BodyChartArrangementError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if input == 0 || fields == 0 || work == 0 {
-            return Err(BodyChartArrangementError::LimitExceeded {
-                kind: BodyChartArrangementLimitKind::WireWork,
+            return Err(Error::Limit {
+                kind: LimitKind::WireWork,
                 observed: 1,
                 maximum: 0,
             });
@@ -708,43 +779,122 @@ impl ArrangementBudget {
             .map_err(map_wire_error)
     }
 
-    pub(super) fn residual_output_bytes(&self) -> Result<usize, BodyChartArrangementError> {
+    /// Build chart-reference codec limits from the operation's residual wire
+    /// ledger. A global ownership proof must not use process-wide defaults.
+    pub(super) fn reference_codec_limits(
+        &self,
+        payload: &[u8],
+    ) -> Result<chart_style_codec::Limits, Error> {
+        let limits = self.residual_wire_limits()?;
+        chart_style_codec::Limits::DEFAULT
+            .with_max_bytes(
+                limits
+                    .max_input_bytes()
+                    .min(payload.len().max(1))
+                    .min(256 * 1024 * 1024),
+            )
+            .and_then(|value| value.with_max_fields(limits.max_fields().clamp(1, 16 * 1024 * 1024)))
+            .map_err(|_| Error::InvalidSource)
+    }
+
+    /// Admit work and temporary vector capacity before reference discovery
+    /// enters the codec.
+    pub(super) fn preflight_reference_scan(&self, payload: &[u8]) -> Result<(), Error> {
+        self.preflight_work(payload.len())?;
+        self.preflight_allocations(1)?;
+        self.preflight_retained(
+            payload
+                .len()
+                .checked_mul(size_of::<u64>())
+                .ok_or(Error::InvalidSource)?,
+        )
+    }
+
+    /// Charge a completed reference scan using the actual vector cardinality.
+    pub(super) fn charge_reference_scan(
+        &mut self,
+        payload: &[u8],
+        references: usize,
+    ) -> Result<(), Error> {
+        self.work(payload.len())?;
+        self.allocations(1)?;
+        self.retained(
+            references
+                .checked_mul(size_of::<u64>())
+                .ok_or(Error::InvalidSource)?,
+        )?;
+        self.references(references)
+    }
+
+    pub(super) fn residual_output_bytes(&self) -> Result<usize, Error> {
         self.max_output
             .checked_sub(self.output)
-            .ok_or(BodyChartArrangementError::InvalidSource)
+            .ok_or(Error::InvalidSource)
     }
 
-    pub(super) fn residual_allocations(&self) -> Result<usize, BodyChartArrangementError> {
+    pub(super) fn residual_input_bytes(&self) -> Result<usize, Error> {
+        self.max_input
+            .checked_sub(self.input)
+            .ok_or(Error::InvalidSource)
+    }
+
+    pub(super) fn residual_work_bytes(&self) -> Result<usize, Error> {
+        self.max_work
+            .checked_sub(self.work)
+            .ok_or(Error::InvalidSource)
+    }
+
+    pub(super) fn residual_allocations(&self) -> Result<usize, Error> {
         self.max_allocations
             .checked_sub(self.allocations)
-            .ok_or(BodyChartArrangementError::InvalidSource)
+            .ok_or(Error::InvalidSource)
     }
 
-    pub(super) fn residual_retained_bytes(&self) -> Result<usize, BodyChartArrangementError> {
+    pub(super) fn residual_retained_bytes(&self) -> Result<usize, Error> {
         self.max_retained
             .checked_sub(self.retained)
-            .ok_or(BodyChartArrangementError::InvalidSource)
+            .ok_or(Error::InvalidSource)
     }
 
-    fn codec_options(
-        &self,
-        source: &[u8],
-    ) -> Result<codec::DecodeOptions, BodyChartArrangementError> {
+    pub(super) fn residual_scratch_bytes(&self) -> Result<usize, Error> {
+        self.max_scratch
+            .checked_sub(self.scratch)
+            .ok_or(Error::InvalidSource)
+    }
+
+    pub(super) fn residual_references(&self) -> Result<usize, Error> {
+        self.max_references
+            .checked_sub(self.references)
+            .ok_or(Error::InvalidSource)
+    }
+
+    pub(super) fn residual_registry_entries(&self) -> Result<usize, Error> {
+        self.max_registry_entries
+            .checked_sub(self.registry_entries)
+            .ok_or(Error::InvalidSource)
+    }
+
+    pub(super) fn residual_identifiers(&self) -> Result<usize, Error> {
+        self.max_identifiers
+            .checked_sub(self.identifiers)
+            .ok_or(Error::InvalidSource)
+    }
+
+    fn codec_options(&self, source: &[u8]) -> Result<codec::DecodeOptions, Error> {
         let limits = self.residual_wire_limits()?;
         let output = self
             .max_output
             .checked_sub(self.output)
-            .ok_or(BodyChartArrangementError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let allocations = self
             .max_allocations
             .checked_sub(self.allocations)
-            .ok_or(BodyChartArrangementError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let retained = self
             .max_retained
             .checked_sub(self.retained)
-            .ok_or(BodyChartArrangementError::InvalidSource)?;
-        let recursion = u32::try_from(limits.max_nesting())
-            .map_err(|_| BodyChartArrangementError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
+        let recursion = u32::try_from(limits.max_nesting()).map_err(|_| Error::InvalidSource)?;
         Ok(codec::DecodeOptions::new(
             limits
                 .max_input_bytes()
@@ -760,10 +910,7 @@ impl ArrangementBudget {
         .with_max_scratch_bytes(retained.clamp(1, MAX_CODEC_LIMIT)))
     }
 
-    fn charge_arrangement_report(
-        &mut self,
-        report: codec::DecodeReport,
-    ) -> Result<(), BodyChartArrangementError> {
+    fn charge_arrangement_report(&mut self, report: codec::DecodeReport) -> Result<(), Error> {
         self.input(report.source_bytes())?;
         self.fields(report.fields())?;
         self.work(report.work_bytes())?;
@@ -771,8 +918,8 @@ impl ArrangementBudget {
         self.retained(report.retained_bytes())?;
         self.retained(report.scratch_bytes())?;
         if usize::try_from(report.max_depth()).unwrap_or(usize::MAX) > self.max_nesting {
-            return Err(BodyChartArrangementError::LimitExceeded {
-                kind: BodyChartArrangementLimitKind::WireNesting,
+            return Err(Error::Limit {
+                kind: LimitKind::WireNesting,
                 observed: u64::from(report.max_depth()),
                 maximum: self.max_nesting as u64,
             });
@@ -783,7 +930,7 @@ impl ArrangementBudget {
     fn charge_rewrite(
         &mut self,
         requirements: codec::RewriteExecutionRequirements,
-    ) -> Result<(), BodyChartArrangementError> {
+    ) -> Result<(), Error> {
         self.charge_rewrite_values(
             requirements.output_bytes,
             requirements.fields,
@@ -804,7 +951,7 @@ impl ArrangementBudget {
         allocations: usize,
         retained_bytes: usize,
         scratch_bytes: usize,
-    ) -> Result<(), BodyChartArrangementError> {
+    ) -> Result<(), Error> {
         self.output(output_bytes)?;
         self.fields(fields)?;
         self.work(work_bytes)?;
@@ -812,8 +959,8 @@ impl ArrangementBudget {
         self.retained(retained_bytes)?;
         self.retained(scratch_bytes)?;
         if usize::try_from(max_depth).unwrap_or(usize::MAX) > self.max_nesting {
-            return Err(BodyChartArrangementError::LimitExceeded {
-                kind: BodyChartArrangementLimitKind::WireNesting,
+            return Err(Error::Limit {
+                kind: LimitKind::WireNesting,
                 observed: u64::from(max_depth),
                 maximum: self.max_nesting as u64,
             });
@@ -824,7 +971,7 @@ impl ArrangementBudget {
     fn order_options(
         &self,
         source: &[u8],
-    ) -> Result<pages_drawable_order_codec::DecodeOptions, BodyChartArrangementError> {
+    ) -> Result<pages_drawable_order_codec::DecodeOptions, Error> {
         let limits = self.residual_wire_limits()?;
         let source_len = source.len().max(1);
         Ok(pages_drawable_order_codec::DecodeOptions::new(
@@ -843,7 +990,7 @@ impl ArrangementBudget {
     fn charge_order_report(
         &mut self,
         report: pages_drawable_order_codec::DecodeReport,
-    ) -> Result<(), BodyChartArrangementError> {
+    ) -> Result<(), Error> {
         self.input(report.input_bytes())?;
         self.fields(report.fields())?;
         self.work(report.work_bytes())?;
@@ -851,8 +998,8 @@ impl ArrangementBudget {
         self.allocations(report.allocations())?;
         self.retained(report.retained_bytes())?;
         if usize::try_from(report.max_depth()).unwrap_or(usize::MAX) > self.max_nesting {
-            return Err(BodyChartArrangementError::LimitExceeded {
-                kind: BodyChartArrangementLimitKind::WireNesting,
+            return Err(Error::Limit {
+                kind: LimitKind::WireNesting,
                 observed: u64::from(report.max_depth()),
                 maximum: self.max_nesting as u64,
             });
@@ -860,14 +1007,14 @@ impl ArrangementBudget {
         Ok(())
     }
 
-    fn preflight_output(&self, amount: usize) -> Result<(), BodyChartArrangementError> {
+    pub(super) fn preflight_output(&self, amount: usize) -> Result<(), Error> {
         let observed = self
             .output
             .checked_add(amount)
-            .ok_or(BodyChartArrangementError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if observed > self.max_output {
-            return Err(BodyChartArrangementError::LimitExceeded {
-                kind: BodyChartArrangementLimitKind::OutputBytes,
+            return Err(Error::Limit {
+                kind: LimitKind::OutputBytes,
                 observed: observed as u64,
                 maximum: self.max_output as u64,
             });
@@ -875,14 +1022,26 @@ impl ArrangementBudget {
         Ok(())
     }
 
-    fn preflight_work(&self, amount: usize) -> Result<(), BodyChartArrangementError> {
+    pub(super) fn preflight_scratch(&self, amount: usize) -> Result<(), Error> {
         let observed = self
-            .work
+            .scratch
             .checked_add(amount)
-            .ok_or(BodyChartArrangementError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
+        if observed > self.max_scratch {
+            return Err(Error::Limit {
+                kind: LimitKind::WireScratchBytes,
+                observed: observed as u64,
+                maximum: self.max_scratch as u64,
+            });
+        }
+        Ok(())
+    }
+
+    pub(super) fn preflight_work(&self, amount: usize) -> Result<(), Error> {
+        let observed = self.work.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > self.max_work {
-            return Err(BodyChartArrangementError::LimitExceeded {
-                kind: BodyChartArrangementLimitKind::WireWork,
+            return Err(Error::Limit {
+                kind: LimitKind::WireWork,
                 observed: observed as u64,
                 maximum: self.max_work as u64,
             });
@@ -890,17 +1049,14 @@ impl ArrangementBudget {
         Ok(())
     }
 
-    pub(super) fn preflight_allocations(
-        &self,
-        amount: usize,
-    ) -> Result<(), BodyChartArrangementError> {
+    pub(super) fn preflight_allocations(&self, amount: usize) -> Result<(), Error> {
         let observed = self
             .allocations
             .checked_add(amount)
-            .ok_or(BodyChartArrangementError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if observed > self.max_allocations {
-            return Err(BodyChartArrangementError::LimitExceeded {
-                kind: BodyChartArrangementLimitKind::WireAllocations,
+            return Err(Error::Limit {
+                kind: LimitKind::WireAllocations,
                 observed: observed as u64,
                 maximum: self.max_allocations as u64,
             });
@@ -908,17 +1064,14 @@ impl ArrangementBudget {
         Ok(())
     }
 
-    pub(super) fn preflight_retained(
-        &self,
-        amount: usize,
-    ) -> Result<(), BodyChartArrangementError> {
+    pub(super) fn preflight_retained(&self, amount: usize) -> Result<(), Error> {
         let observed = self
             .retained
             .checked_add(amount)
-            .ok_or(BodyChartArrangementError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if observed > self.max_retained {
-            return Err(BodyChartArrangementError::LimitExceeded {
-                kind: BodyChartArrangementLimitKind::WireRetainedBytes,
+            return Err(Error::Limit {
+                kind: LimitKind::WireRetainedBytes,
                 observed: observed as u64,
                 maximum: self.max_retained as u64,
             });
@@ -928,10 +1081,7 @@ impl ArrangementBudget {
 
     // This ledger admits the transaction's artifact copy. SourceCatalog and
     // semantic Package reconstruction separately enforce their ingress limits.
-    pub(super) fn candidate_reopen(
-        &mut self,
-        bytes: usize,
-    ) -> Result<(), BodyChartArrangementError> {
+    pub(super) fn candidate_reopen(&mut self, bytes: usize) -> Result<(), Error> {
         self.input(bytes)?;
         self.work(bytes)?;
         self.preflight_allocations(1)?;
@@ -943,7 +1093,7 @@ impl ArrangementBudget {
     fn reassembly(
         &mut self,
         requirements: litchi_iwa_archive::package::ReassemblyExecutionRequirements,
-    ) -> Result<(), BodyChartArrangementError> {
+    ) -> Result<(), Error> {
         self.output(requirements.output_bytes())?;
         self.work(requirements.output_bytes())?;
         self.allocations(requirements.allocations())?;
@@ -957,7 +1107,7 @@ impl Package {
     pub fn body_chart_arrangement(
         &self,
         selector: impl Into<BodyChartSelector>,
-    ) -> Result<ChartArrangement, BodyChartArrangementError> {
+    ) -> Result<ChartArrangement, Error> {
         let mut budget = ArrangementBudget::new(self)?;
         let target = resolve_target(self, selector.into(), &mut budget)?;
         Ok(target.before)
@@ -966,9 +1116,7 @@ impl Package {
     /// Read every rooted body chart's Arrange-panel state in one checked body
     /// traversal. The order is the ordinary chart-attachment order in the
     /// body storage, and contains no native identifiers.
-    pub fn body_chart_arrangements(
-        &self,
-    ) -> Result<Box<[ChartArrangement]>, BodyChartArrangementError> {
+    pub fn body_chart_arrangements(&self) -> Result<Box<[ChartArrangement]>, Error> {
         let mut budget = ArrangementBudget::new(self)?;
         let targets = resolve_targets(self, &mut budget)?;
         budget.allocations(usize::from(!targets.is_empty()))?;
@@ -976,14 +1124,14 @@ impl Package {
             targets
                 .len()
                 .checked_mul(size_of::<ChartArrangement>())
-                .ok_or(BodyChartArrangementError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )?;
         let mut arrangements = Vec::new();
-        arrangements.try_reserve_exact(targets.len()).map_err(|_| {
-            BodyChartArrangementError::Allocation {
+        arrangements
+            .try_reserve_exact(targets.len())
+            .map_err(|_| Error::Allocation {
                 amount: targets.len(),
-            }
-        })?;
+            })?;
         for target in targets {
             arrangements.push(target.before);
         }
@@ -994,11 +1142,11 @@ impl Package {
     pub fn edit_body_chart_arrangement(
         &self,
         selector: impl Into<BodyChartSelector>,
-    ) -> Result<BodyChartArrangementEdit<'_>, BodyChartArrangementError> {
+    ) -> Result<Edit<'_>, Error> {
         let mut budget = ArrangementBudget::new(self)?;
         let target = resolve_target(self, selector.into(), &mut budget)?;
         let before = target.before;
-        Ok(BodyChartArrangementEdit {
+        Ok(Edit {
             source: self,
             target,
             before,
@@ -1007,14 +1155,11 @@ impl Package {
     }
 
     /// Apply an exact-source checked reversible body-chart Arrange patch.
-    pub fn apply_body_chart_arrangement(
-        &self,
-        patch: &BodyChartArrangementPatch,
-    ) -> Result<BodyChartArrangementCommit, BodyChartArrangementError> {
+    pub fn apply_body_chart_arrangement(&self, patch: &Patch) -> Result<Commit, Error> {
         let source = self.state.source.shared_source();
         let source_owner = SharedBytes::from_shared_slice(Arc::clone(&source));
         if !patch.artifacts.authorizes_owner(&source_owner) {
-            return Err(BodyChartArrangementError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let mut budget = ArrangementBudget::new(self)?;
         let current = resolve_target(
@@ -1023,24 +1168,24 @@ impl Package {
             &mut budget,
         )?;
         if !current.same_identity(&patch.target) || current.before != patch.before {
-            return Err(BodyChartArrangementError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if let Some(expected) = patch.source_payload.as_deref() {
-            let actual = selected_chart_payload(self, &patch.target)
-                .map_err(|_| BodyChartArrangementError::PatchConflict)?;
+            let actual =
+                selected_chart_payload(self, &patch.target).map_err(|_| Error::PatchConflict)?;
             if actual != expected {
-                return Err(BodyChartArrangementError::PatchConflict);
+                return Err(Error::PatchConflict);
             }
         }
         if patch.is_noop() {
-            return Ok(BodyChartArrangementCommit {
-                package: self.snapshot(),
+            return Ok(Commit {
+                package: self.clone(),
                 patch: patch.clone(),
-                diagnostics: BodyChartArrangementDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         if !self.state.source.source_is_exact() {
-            return Err(BodyChartArrangementError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let target_owner = patch.artifacts.target_owner();
         let target_len = target_owner.as_ref().len();
@@ -1049,18 +1194,19 @@ impl Package {
         // the transaction has crossed its last checked boundary.
         budget.candidate_reopen(target_len)?;
         let target_bytes = Arc::<[u8]>::from(target_owner.as_ref());
-        let catalog =
-            SourceCatalog::from_shared_bytes_with_limits(target_bytes, self.state.source.limits())
-                .map_err(map_archive_error)?;
-        let candidate = Package::from_source_catalog(catalog)
-            .map_err(|_| BodyChartArrangementError::Verification)?;
+        let catalog = self
+            .state
+            .source
+            .reopen(target_bytes)
+            .map_err(map_archive_error)?;
+        let candidate = Package::from_source_catalog(catalog).map_err(|_| Error::Verification)?;
         let verified = resolve_target(
             &candidate,
             BodyChartSelector::position(patch.target.position),
             &mut budget,
         )?;
         if !verified.same_identity(&patch.target) || verified.before != patch.after {
-            return Err(BodyChartArrangementError::Verification);
+            return Err(Error::Verification);
         }
         verify_locality(
             self,
@@ -1071,24 +1217,22 @@ impl Package {
             ChartPayloadMutation::Arrangement,
             &mut budget,
         )?;
-        Ok(BodyChartArrangementCommit {
+        Ok(Commit {
             package: candidate,
             patch: patch.clone(),
-            diagnostics: BodyChartArrangementDiagnostics::published(),
+            diagnostics: Diagnostics::published(),
         })
     }
 }
 
-fn commit_edit(
-    edit: BodyChartArrangementEdit<'_>,
-) -> Result<BodyChartArrangementCommit, BodyChartArrangementError> {
+fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     let source = edit.source;
     let source_bytes = source.state.source.shared_source();
     if edit.before == edit.after {
         let source_owner = SharedBytes::from_shared_slice(Arc::clone(&source_bytes));
-        return Ok(BodyChartArrangementCommit {
-            package: source.snapshot(),
-            patch: BodyChartArrangementPatch {
+        return Ok(Commit {
+            package: source.clone(),
+            patch: Patch {
                 artifacts: OwnedExactArtifacts::new(source_owner.clone(), source_owner),
                 target: edit.target,
                 before: edit.before,
@@ -1097,11 +1241,11 @@ fn commit_edit(
                 source_payload: None,
                 target_payload: None,
             },
-            diagnostics: BodyChartArrangementDiagnostics::unchanged(),
+            diagnostics: Diagnostics::unchanged(),
         });
     }
     if !source.state.source.source_is_exact() {
-        return Err(BodyChartArrangementError::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let mut budget = ArrangementBudget::new(source)?;
     let current = resolve_target(
@@ -1110,7 +1254,7 @@ fn commit_edit(
         &mut budget,
     )?;
     if current != edit.target || current.before != edit.before {
-        return Err(BodyChartArrangementError::PatchConflict);
+        return Err(Error::PatchConflict);
     }
     let candidate = rewrite_chart(source, &edit.target, edit.after, &mut budget)?;
     let verified = resolve_target(
@@ -1119,7 +1263,7 @@ fn commit_edit(
         &mut budget,
     )?;
     if !verified.same_identity(&edit.target) || verified.before != edit.after {
-        return Err(BodyChartArrangementError::Verification);
+        return Err(Error::Verification);
     }
     let source_payload = selected_chart_payload(source, &edit.target)?;
     let target_payload = selected_chart_payload(&candidate, &edit.target)?;
@@ -1137,9 +1281,9 @@ fn commit_edit(
     let target_bytes = candidate.state.source.shared_source();
     let source_owner = SharedBytes::from_shared_slice(source_bytes);
     let target_owner = SharedBytes::from_shared_slice(Arc::clone(&target_bytes));
-    Ok(BodyChartArrangementCommit {
+    Ok(Commit {
         package: candidate,
-        patch: BodyChartArrangementPatch {
+        patch: Patch {
             artifacts: OwnedExactArtifacts::new(source_owner, target_owner),
             target: edit.target,
             before: edit.before,
@@ -1148,7 +1292,7 @@ fn commit_edit(
             source_payload: Some(source_payload),
             target_payload: Some(target_payload),
         },
-        diagnostics: BodyChartArrangementDiagnostics::published(),
+        diagnostics: Diagnostics::published(),
     })
 }
 
@@ -1156,20 +1300,20 @@ pub(super) fn resolve_target(
     package: &Package,
     selector: BodyChartSelector,
     budget: &mut ArrangementBudget,
-) -> Result<ChartTarget, BodyChartArrangementError> {
+) -> Result<ChartTarget, Error> {
     let requested = selector.as_position();
     resolve_targets(package, budget)?
         .into_iter()
         .find(|target| target.position == requested)
-        .ok_or(BodyChartArrangementError::ChartNotFound {
+        .ok_or(Error::Refused(Refusal::ChartNotFound {
             position: requested,
-        })
+        }))
 }
 
 pub(super) fn resolve_targets(
     package: &Package,
     budget: &mut ArrangementBudget,
-) -> Result<Vec<ChartTarget>, BodyChartArrangementError> {
+) -> Result<Vec<ChartTarget>, Error> {
     let (
         body,
         body_identifier,
@@ -1189,13 +1333,13 @@ pub(super) fn resolve_targets(
         table_view
             .len()
             .checked_mul(size_of::<BodyEntry>())
-            .ok_or(BodyChartArrangementError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
-    entries.try_reserve_exact(table_view.len()).map_err(|_| {
-        BodyChartArrangementError::Allocation {
+    entries
+        .try_reserve_exact(table_view.len())
+        .map_err(|_| Error::Allocation {
             amount: table_view.len(),
-        }
-    })?;
+        })?;
     for field in table_view
         .fields()
         .filter(|field| field.number() == TABLE_ENTRIES_FIELD)
@@ -1206,14 +1350,14 @@ pub(super) fn resolve_targets(
     let sorting_work = entries
         .len()
         .checked_mul(entries.len().checked_ilog2().unwrap_or(0) as usize + 1)
-        .ok_or(BodyChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.work(sorting_work)?;
     entries.sort_unstable_by_key(|entry| entry.character_index);
     if entries
         .windows(2)
         .any(|window| window[0].character_index == window[1].character_index)
     {
-        return Err(BodyChartArrangementError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     validate_body_anchors(body_payload, &entries, budget)?;
 
@@ -1224,16 +1368,16 @@ pub(super) fn resolve_targets(
         entries
             .len()
             .checked_mul(size_of::<NonZeroU64>() * 2)
-            .ok_or(BodyChartArrangementError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     seen_attachments
         .try_reserve_exact(entries.len())
-        .map_err(|_| BodyChartArrangementError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: entries.len(),
         })?;
     seen_drawables
         .try_reserve_exact(entries.len())
-        .map_err(|_| BodyChartArrangementError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: entries.len(),
         })?;
 
@@ -1243,24 +1387,24 @@ pub(super) fn resolve_targets(
         entries
             .len()
             .checked_mul(size_of::<ChartTarget>())
-            .ok_or(BodyChartArrangementError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
-    targets.try_reserve_exact(entries.len()).map_err(|_| {
-        BodyChartArrangementError::Allocation {
+    targets
+        .try_reserve_exact(entries.len())
+        .map_err(|_| Error::Allocation {
             amount: entries.len(),
-        }
-    })?;
+        })?;
     for entry in entries {
         budget.work(
             seen_attachments
                 .len()
                 .checked_add(seen_drawables.len())
-                .ok_or(BodyChartArrangementError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )?;
         if entry.attachment_identifier == order_identifier
             || seen_drawables.contains(&entry.attachment_identifier)
         {
-            return Err(BodyChartArrangementError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if !object_metadata_is_owned(
             body.object,
@@ -1269,14 +1413,14 @@ pub(super) fn resolve_targets(
             &[BODY_ATTACHMENTS_FIELD],
             true,
         ) {
-            return Err(BodyChartArrangementError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let attachment = locate_unique_object(package, entry.attachment_identifier, budget)?;
         if attachment.object.archive_info.identifier == Some(ROOT_OBJECT_IDENTIFIER)
             || attachment.object.archive_info.identifier == Some(body_identifier.get())
             || !push_unique(&mut seen_attachments, entry.attachment_identifier)
         {
-            return Err(BodyChartArrangementError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let Some((attachment_message_index, attachment_message)) =
             unique_optional_message(attachment.object, ATTACHMENT_MESSAGE_TYPE)?
@@ -1295,18 +1439,18 @@ pub(super) fn resolve_targets(
             &[ATTACHMENT_DRAWABLE_FIELD],
             true,
         ) {
-            return Err(BodyChartArrangementError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         budget.work(
             seen_attachments
                 .len()
                 .checked_add(seen_drawables.len())
-                .ok_or(BodyChartArrangementError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )?;
         if drawable_identifier == order_identifier
             || seen_attachments.contains(&drawable_identifier)
         {
-            return Err(BodyChartArrangementError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let drawable = locate_unique_object(package, drawable_identifier, budget)?;
         if drawable.component_index != attachment.component_index
@@ -1314,7 +1458,7 @@ pub(super) fn resolve_targets(
             || drawable.object.archive_info.identifier == Some(body_identifier.get())
             || !push_unique(&mut seen_drawables, drawable_identifier)
         {
-            return Err(BodyChartArrangementError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let Some((drawable_message_index, drawable_message)) =
             unique_optional_message(drawable.object, CHART_MESSAGE_TYPE)?
@@ -1332,7 +1476,7 @@ pub(super) fn resolve_targets(
                 false,
             )
         {
-            return Err(BodyChartArrangementError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         validate_drawable_order(package, order_identifier, drawable_identifier, budget)?;
         let arrangement = decode_arrangement(drawable_message.data.as_slice(), budget)?;
@@ -1341,7 +1485,7 @@ pub(super) fn resolve_targets(
             .source
             .components()
             .get_index(drawable.component_index)
-            .ok_or(BodyChartArrangementError::InvalidSource)?
+            .ok_or(Error::InvalidSource)?
             .name();
         budget.allocations(1)?;
         budget.retained(component_name.len())?;
@@ -1383,46 +1527,46 @@ fn body_storage_payload<'a>(
         u32,
         NonZeroU64,
     ),
-    BodyChartArrangementError,
+    Error,
 > {
     let document = package
         .state
         .source
         .components()
         .get(DOCUMENT_COMPONENT)
-        .ok_or(BodyChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let root = document
         .archive()
         .object(ROOT_OBJECT_IDENTIFIER)
-        .ok_or(BodyChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.work(archive_object_work(root)?)?;
     let (root_message_index, root_message) = unique_message(root, ROOT_MESSAGE_TYPE)?;
     validate_message_metadata(root, root_message_index)?;
     let root_payload = root_message.data.as_slice();
     let options = root_projection_options(root_payload, budget, true)?;
     let body_facts = pages_body_codec::decode_document_body(root_payload, options)
-        .map_err(|_| BodyChartArrangementError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?;
     let options = root_projection_options(root_payload, budget, false)?;
     let root_facts = pages_body_codec::decode_document_root(root_payload, options)
-        .map_err(|_| BodyChartArrangementError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?;
     let body_identifier = body_facts
         .body_storage()
         .map(|reference| reference.identifier())
-        .ok_or(BodyChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let order_identifier = root_facts
         .drawables_zorder()
         .map(|reference| reference.identifier())
-        .ok_or(BodyChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if body_identifier == order_identifier
         || body_identifier.get() == ROOT_OBJECT_IDENTIFIER
         || order_identifier.get() == ROOT_OBJECT_IDENTIFIER
     {
-        return Err(BodyChartArrangementError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if !object_metadata_is_owned(root, root_message_index, body_identifier, &[4], true)
         || !object_metadata_is_owned(root, root_message_index, order_identifier, &[20], true)
     {
-        return Err(BodyChartArrangementError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let body = locate_unique_object(package, body_identifier, budget)?;
     let (body_message_index, body_message) = unique_text_message(body.object)?;
@@ -1445,11 +1589,11 @@ fn root_projection_options(
     source: &[u8],
     budget: &mut ArrangementBudget,
     body_only: bool,
-) -> Result<pages_body_codec::DecodeOptions, BodyChartArrangementError> {
+) -> Result<pages_body_codec::DecodeOptions, Error> {
     // Selected descent is one level, requiring one small path vector.
     budget.allocations(1)?;
     budget.retained(size_of::<[u32; 4]>())?;
-    let report = preflight_wire_tree_with_limits(source, budget.residual_wire_limits()?, |visit| {
+    let report = preflight_wire_tree(source, budget.residual_wire_limits()?, |visit| {
         let selected = visit.path().is_empty()
             && if body_only {
                 matches!(visit.field().number(), 4 | 5)
@@ -1473,7 +1617,7 @@ fn root_projection_options(
         report
             .scanned_bytes()
             .checked_mul(2)
-            .ok_or(BodyChartArrangementError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     Ok(options)
 }
@@ -1481,31 +1625,26 @@ fn root_projection_options(
 fn pages_body_options(
     budget: &ArrangementBudget,
     source: &[u8],
-) -> Result<pages_body_codec::DecodeOptions, BodyChartArrangementError> {
+) -> Result<pages_body_codec::DecodeOptions, Error> {
     let limits = budget.residual_wire_limits()?;
     Ok(pages_body_codec::DecodeOptions::new(
         limits.max_input_bytes().min(source.len().max(1)),
         limits.max_fields(),
         limits.max_rewrite_work(),
-        u32::try_from(limits.max_nesting())
-            .map_err(|_| BodyChartArrangementError::InvalidSource)?,
+        u32::try_from(limits.max_nesting()).map_err(|_| Error::InvalidSource)?,
     ))
 }
 
-fn parse_body_entry(
-    source: &[u8],
-    budget: &mut ArrangementBudget,
-) -> Result<BodyEntry, BodyChartArrangementError> {
+fn parse_body_entry(source: &[u8], budget: &mut ArrangementBudget) -> Result<BodyEntry, Error> {
     let view = budget.parse(source, 3)?;
-    let character = unique_field(&view, ENTRY_CHARACTER_INDEX_FIELD, 0)?
-        .ok_or(BodyChartArrangementError::InvalidSource)?;
-    let (character, width) = decode_varint_from_bytes(character.payload())
-        .map_err(|_| BodyChartArrangementError::InvalidSource)?;
+    let character =
+        unique_field(&view, ENTRY_CHARACTER_INDEX_FIELD, 0)?.ok_or(Error::InvalidSource)?;
+    let (character, width) =
+        decode_varint_from_bytes(character.payload()).map_err(|_| Error::InvalidSource)?;
     if width != encoded_len(character) || character > u64::from(u32::MAX) {
-        return Err(BodyChartArrangementError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
-    let object = unique_field(&view, ENTRY_OBJECT_FIELD, 2)?
-        .ok_or(BodyChartArrangementError::InvalidSource)?;
+    let object = unique_field(&view, ENTRY_OBJECT_FIELD, 2)?.ok_or(Error::InvalidSource)?;
     Ok(BodyEntry {
         character_index: character as u32,
         attachment_identifier: parse_object_reference(object.payload(), budget)?,
@@ -1516,7 +1655,7 @@ fn validate_body_anchors(
     payload: &[u8],
     entries: &[BodyEntry],
     budget: &mut ArrangementBudget,
-) -> Result<(), BodyChartArrangementError> {
+) -> Result<(), Error> {
     let view = budget.parse(payload, 1)?;
     let mut next = 0usize;
     let mut utf16_index = 0usize;
@@ -1525,30 +1664,27 @@ fn validate_body_anchors(
         .filter(|field| field.number() == BODY_TEXT_FIELD)
     {
         if field.wire_type() != 2 {
-            return Err(BodyChartArrangementError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field.validate_canonical_framing().map_err(map_wire_error)?;
-        let text = std::str::from_utf8(field.payload())
-            .map_err(|_| BodyChartArrangementError::InvalidSource)?;
+        let text = std::str::from_utf8(field.payload()).map_err(|_| Error::InvalidSource)?;
         for character in text.chars() {
             if entries
                 .get(next)
                 .is_some_and(|entry| entry.character_index as usize == utf16_index)
             {
                 if character != '\u{fffc}' {
-                    return Err(BodyChartArrangementError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
-                next = next
-                    .checked_add(1)
-                    .ok_or(BodyChartArrangementError::InvalidSource)?;
+                next = next.checked_add(1).ok_or(Error::InvalidSource)?;
             }
             utf16_index = utf16_index
                 .checked_add(character.len_utf16())
-                .ok_or(BodyChartArrangementError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
         }
     }
     if next != entries.len() {
-        return Err(BodyChartArrangementError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     budget.work(utf16_index)
 }
@@ -1556,37 +1692,34 @@ fn validate_body_anchors(
 fn parse_object_reference(
     source: &[u8],
     budget: &mut ArrangementBudget,
-) -> Result<NonZeroU64, BodyChartArrangementError> {
+) -> Result<NonZeroU64, Error> {
     let view = budget.parse(source, 4)?;
-    let field = unique_field(&view, 1, 0)?.ok_or(BodyChartArrangementError::InvalidSource)?;
-    let (identifier, width) = decode_varint_from_bytes(field.payload())
-        .map_err(|_| BodyChartArrangementError::InvalidSource)?;
+    let field = unique_field(&view, 1, 0)?.ok_or(Error::InvalidSource)?;
+    let (identifier, width) =
+        decode_varint_from_bytes(field.payload()).map_err(|_| Error::InvalidSource)?;
     if width != encoded_len(identifier) {
-        return Err(BodyChartArrangementError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     for number in [2, 3] {
         if let Some(field) = unique_field(&view, number, 0)? {
-            let (value, consumed) = decode_varint_from_bytes(field.payload())
-                .map_err(|_| BodyChartArrangementError::InvalidSource)?;
+            let (value, consumed) =
+                decode_varint_from_bytes(field.payload()).map_err(|_| Error::InvalidSource)?;
             if consumed != encoded_len(value) || (number == 3 && value != 0) {
-                return Err(BodyChartArrangementError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
     }
-    NonZeroU64::new(identifier).ok_or(BodyChartArrangementError::InvalidSource)
+    NonZeroU64::new(identifier).ok_or(Error::InvalidSource)
 }
 
-fn parse_chart_parent(
-    source: &[u8],
-    budget: &mut ArrangementBudget,
-) -> Result<NonZeroU64, BodyChartArrangementError> {
+fn parse_chart_parent(source: &[u8], budget: &mut ArrangementBudget) -> Result<NonZeroU64, Error> {
     let chart = budget.parse(source, 1)?;
     let super_payload = unique_field(&chart, CHART_DRAWABLE_FIELD, 2)?
-        .ok_or(BodyChartArrangementError::InvalidSource)?
+        .ok_or(Error::InvalidSource)?
         .payload();
     let drawable = budget.parse(super_payload, 2)?;
     let parent = unique_field(&drawable, DRAWABLE_PARENT_FIELD, 2)?
-        .ok_or(BodyChartArrangementError::InvalidSource)?
+        .ok_or(Error::InvalidSource)?
         .payload();
     parse_object_reference(parent, budget)
 }
@@ -1594,13 +1727,13 @@ fn parse_chart_parent(
 fn decode_arrangement(
     source: &[u8],
     budget: &mut ArrangementBudget,
-) -> Result<ChartArrangement, BodyChartArrangementError> {
+) -> Result<ChartArrangement, Error> {
     let options = budget.codec_options(source)?;
     let (snapshot, report) =
         codec::decode_chart_arrangement_with_report(source, options).map_err(map_codec_error)?;
     budget.charge_arrangement_report(report)?;
     if !snapshot.has_drawable() {
-        return Err(BodyChartArrangementError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(ChartArrangement::new(
         snapshot.is_locked(),
@@ -1612,14 +1745,14 @@ pub(super) fn locate_unique_object<'a>(
     package: &'a Package,
     identifier: NonZeroU64,
     budget: &mut ArrangementBudget,
-) -> Result<LocatedObject<'a>, BodyChartArrangementError> {
+) -> Result<LocatedObject<'a>, Error> {
     budget.work(package.state.object_count)?;
     let mut found = None;
     for (component_index, component) in package.state.source.components().iter().enumerate() {
         for (object_index, object) in component.archive().objects.iter().enumerate() {
             if object.archive_info.identifier == Some(identifier.get()) {
                 if found.is_some() {
-                    return Err(BodyChartArrangementError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 found = Some(LocatedObject {
                     component_index,
@@ -1629,7 +1762,7 @@ pub(super) fn locate_unique_object<'a>(
             }
         }
     }
-    let found = found.ok_or(BodyChartArrangementError::InvalidSource)?;
+    let found = found.ok_or(Error::InvalidSource)?;
     budget.work(archive_object_work(found.object)?)?;
     Ok(found)
 }
@@ -1637,9 +1770,9 @@ pub(super) fn locate_unique_object<'a>(
 fn unique_message(
     object: &ArchiveObject,
     message_type: u32,
-) -> Result<(usize, &RawMessage), BodyChartArrangementError> {
+) -> Result<(usize, &RawMessage), Error> {
     if object.messages.len() != object.archive_info.message_infos.len() {
-        return Err(BodyChartArrangementError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut selected = None;
     for (index, message) in object.messages.iter().enumerate() {
@@ -1647,25 +1780,25 @@ fn unique_message(
             .archive_info
             .message_infos
             .get(index)
-            .ok_or(BodyChartArrangementError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if info.type_ != message.type_
             || usize::try_from(info.length).ok() != Some(message.data.len())
         {
-            return Err(BodyChartArrangementError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if message.type_ == message_type && selected.replace((index, message)).is_some() {
-            return Err(BodyChartArrangementError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
-    selected.ok_or(BodyChartArrangementError::InvalidSource)
+    selected.ok_or(Error::InvalidSource)
 }
 
 pub(super) fn unique_optional_message(
     object: &ArchiveObject,
     message_type: u32,
-) -> Result<Option<(usize, &RawMessage)>, BodyChartArrangementError> {
+) -> Result<Option<(usize, &RawMessage)>, Error> {
     if object.messages.len() != object.archive_info.message_infos.len() {
-        return Err(BodyChartArrangementError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut selected = None;
     for (index, message) in object.messages.iter().enumerate() {
@@ -1673,44 +1806,42 @@ pub(super) fn unique_optional_message(
             .archive_info
             .message_infos
             .get(index)
-            .ok_or(BodyChartArrangementError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if info.type_ != message.type_
             || usize::try_from(info.length).ok() != Some(message.data.len())
         {
-            return Err(BodyChartArrangementError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if message.type_ == message_type && selected.replace((index, message)).is_some() {
-            return Err(BodyChartArrangementError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(selected)
 }
 
-fn unique_text_message(
-    object: &ArchiveObject,
-) -> Result<(usize, &RawMessage), BodyChartArrangementError> {
+fn unique_text_message(object: &ArchiveObject) -> Result<(usize, &RawMessage), Error> {
     let mut selected = None;
     for (index, message) in object.messages.iter().enumerate() {
         if matches!(message.type_, 2_001 | 2_022) && selected.replace((index, message)).is_some() {
-            return Err(BodyChartArrangementError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
-    selected.ok_or(BodyChartArrangementError::InvalidSource)
+    selected.ok_or(Error::InvalidSource)
 }
 
 fn unique_field<'a>(
     view: &WireView<'a>,
     number: u32,
     wire_type: u8,
-) -> Result<Option<WireFieldView<'a>>, BodyChartArrangementError> {
+) -> Result<Option<WireFieldView<'a>>, Error> {
     let mut found = None;
     for field in view.fields().filter(|field| field.number() == number) {
         if field.wire_type() != wire_type {
-            return Err(BodyChartArrangementError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field.validate_canonical_framing().map_err(map_wire_error)?;
         if found.replace(field).is_some() {
-            return Err(BodyChartArrangementError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(found)
@@ -1721,22 +1852,22 @@ fn unique_field_payload<'a>(
     number: u32,
     wire_type: u8,
     budget: &mut ArrangementBudget,
-) -> Result<&'a [u8], BodyChartArrangementError> {
+) -> Result<&'a [u8], Error> {
     let view = budget.parse(source, 1)?;
     unique_field(&view, number, wire_type)?
         .map(|field| field.payload())
-        .ok_or(BodyChartArrangementError::InvalidSource)
+        .ok_or(Error::InvalidSource)
 }
 
 pub(super) fn validate_message_metadata(
     object: &ArchiveObject,
     message_index: usize,
-) -> Result<(), BodyChartArrangementError> {
+) -> Result<(), Error> {
     let info = object
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(BodyChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if object.archive_info.should_merge == Some(true)
         || info.base_message_index.is_some()
         || !info.diff_merge_version.is_empty()
@@ -1744,7 +1875,7 @@ pub(super) fn validate_message_metadata(
         || !info.fields_to_remove.is_empty()
         || !info.diff_read_version.is_empty()
     {
-        return Err(BodyChartArrangementError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -1799,7 +1930,7 @@ fn validate_drawable_order(
     order_identifier: NonZeroU64,
     drawable_identifier: NonZeroU64,
     budget: &mut ArrangementBudget,
-) -> Result<(), BodyChartArrangementError> {
+) -> Result<(), Error> {
     let order = locate_unique_object(package, order_identifier, budget)?;
     let (message_index, message) = unique_message(order.object, DRAWABLE_ORDER_MESSAGE_TYPE)?;
     validate_message_metadata(order.object, message_index)?;
@@ -1816,7 +1947,7 @@ fn validate_drawable_order(
         .count()
         != 1
     {
-        return Err(BodyChartArrangementError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -1826,7 +1957,7 @@ fn rewrite_chart(
     target: &ChartTarget,
     after: ChartArrangement,
     budget: &mut ArrangementBudget,
-) -> Result<Package, BodyChartArrangementError> {
+) -> Result<Package, Error> {
     let original = selected_chart_payload(source, target)?;
     let rewritten = rewrite_arrangement(original, after, budget)?;
     Ok(rewrite_chart_payload(
@@ -1852,15 +1983,15 @@ pub(super) fn rewrite_chart_payload(
     rewritten: Vec<u8>,
     preview_mode: PreviewDeletionMode,
     budget: &mut ArrangementBudget,
-) -> Result<ChartPayloadPublication, BodyChartArrangementError> {
+) -> Result<ChartPayloadPublication, Error> {
     let component = source
         .state
         .source
         .components()
         .get_index(target.component_index)
-        .ok_or(BodyChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if component.name() != target.component_name.as_ref() {
-        return Err(BodyChartArrangementError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let entry = source
         .state
@@ -1868,9 +1999,9 @@ pub(super) fn rewrite_chart_payload(
         .package()
         .iter()
         .find(|entry| entry.name() == target.component_name.as_ref())
-        .ok_or(BodyChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(BodyChartArrangementError::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let archive_limits = source
         .state
@@ -1882,15 +2013,15 @@ pub(super) fn rewrite_chart_payload(
         .archive()
         .objects
         .get(target.drawable_object_index)
-        .ok_or(BodyChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if object.archive_info.identifier != Some(target.drawable_identifier.get()) {
-        return Err(BodyChartArrangementError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let original = object
         .messages
         .get(target.drawable_message_index)
         .filter(|message| message.type_ == CHART_MESSAGE_TYPE)
-        .ok_or(BodyChartArrangementError::InvalidSource)?
+        .ok_or(Error::InvalidSource)?
         .data
         .as_slice();
     let encoded_len = component
@@ -1905,16 +2036,18 @@ pub(super) fn rewrite_chart_payload(
                         .ok()
                         .and_then(|length| offset.checked_add(length))
                 })
-                .ok_or(BodyChartArrangementError::InvalidSource)?;
-            Ok::<_, BodyChartArrangementError>(bound.max(end))
+                .ok_or(Error::InvalidSource)?;
+            Ok::<_, Error>(bound.max(end))
         })?;
+    let physical = source.state.source.limits();
+    let snappy_limits = physical.snappy_limits().map_err(map_archive_error)?;
     let replacement_bound = encoded_len
         .checked_sub(original.len())
         .and_then(|value| value.checked_add(rewritten.len()))
         .and_then(|value| value.checked_add(64))
-        .ok_or(BodyChartArrangementError::InvalidSource)?;
-    let compressed_bound =
-        SnappyStream::maximum_compressed_len(replacement_bound).map_err(map_core_error)?;
+        .ok_or(Error::InvalidSource)?;
+    let compressed_bound = SnappyStream::maximum_compressed_len(replacement_bound, snappy_limits)
+        .map_err(map_core_error)?;
     let package_bound = source
         .state
         .source
@@ -1922,57 +2055,53 @@ pub(super) fn rewrite_chart_payload(
         .len()
         .checked_sub(entry.data().len())
         .and_then(|value| value.checked_add(compressed_bound))
-        .ok_or(BodyChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let (clone_allocations, clone_retained, clone_work) =
         archive_clone_requirements(&component.archive().objects, encoded_len)?;
     let (header_allocations, header_retained, header_work) =
         archive_header_rewrite_requirements(object)?;
     let (serialization_allocations, serialization_retained, serialization_work) =
         archive_serialization_requirements(component.archive())?;
-    let physical = source.state.source.limits();
-    let maximum_entry = usize::try_from(physical.max_entry_bytes())
-        .map_err(|_| BodyChartArrangementError::InvalidSource)?;
-    let maximum_compressed = physical
-        .snappy_limits()
-        .map_err(map_archive_error)?
-        .max_compressed_stream();
+    let maximum_entry =
+        usize::try_from(physical.max_entry_bytes()).map_err(|_| Error::InvalidSource)?;
+    let maximum_compressed = snappy_limits.max_compressed_stream();
     if replacement_bound > maximum_entry || compressed_bound > maximum_entry.min(maximum_compressed)
     {
-        return Err(BodyChartArrangementError::LimitExceeded {
-            kind: BodyChartArrangementLimitKind::EntryBytes,
+        return Err(Error::Limit {
+            kind: LimitKind::EntryBytes,
             observed: replacement_bound.max(compressed_bound) as u64,
             maximum: maximum_entry.min(maximum_compressed) as u64,
         });
     }
     let frame_count = replacement_bound.div_ceil(SnappyStream::WRITE_CHUNK_SIZE);
-    let compression_scratch =
-        SnappyStream::maximum_compressed_len(replacement_bound.min(SnappyStream::WRITE_CHUNK_SIZE))
-            .map_err(map_core_error)?
-            .checked_add(32 * 1024)
-            .ok_or(BodyChartArrangementError::InvalidSource)?;
+    let compression_scratch = SnappyStream::maximum_compressed_len(
+        replacement_bound.min(SnappyStream::WRITE_CHUNK_SIZE),
+        snappy_limits,
+    )
+    .map_err(map_core_error)?
+    .checked_add(32 * 1024)
+    .ok_or(Error::InvalidSource)?;
     // Pinned snap 1.1.2 retains a 16,384-entry u16 encoder table. Include it
     // alongside the decompressed stream, output, and transient frame buffers.
-    let framing_allocations = frame_count
-        .checked_add(3)
-        .ok_or(BodyChartArrangementError::InvalidSource)?;
+    let framing_allocations = frame_count.checked_add(3).ok_or(Error::InvalidSource)?;
     let total_allocations = clone_allocations
         .checked_add(header_allocations)
         .and_then(|value| value.checked_add(serialization_allocations))
         .and_then(|value| value.checked_add(framing_allocations))
-        .ok_or(BodyChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let total_work = clone_work
         .checked_add(header_work)
         .and_then(|value| value.checked_add(serialization_work))
         .and_then(|value| value.checked_add(replacement_bound))
         .and_then(|value| value.checked_add(compressed_bound))
-        .ok_or(BodyChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let temporary_retained = clone_retained
         .checked_add(header_retained)
         .and_then(|value| value.checked_add(serialization_retained))
         .and_then(|value| value.checked_add(replacement_bound))
         .and_then(|value| value.checked_add(compressed_bound))
         .and_then(|value| value.checked_add(compression_scratch))
-        .ok_or(BodyChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.preflight_output(replacement_bound)?;
     budget.preflight_output(compressed_bound)?;
     budget.preflight_output(package_bound)?;
@@ -1991,13 +2120,13 @@ pub(super) fn rewrite_chart_payload(
     budget.retained(compression_scratch)?;
 
     let (mut archive, _) = page_layout::editable_archive(source, target.component_name.as_ref())
-        .map_err(|_| BodyChartArrangementError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?;
     let object = archive
         .objects
         .get_mut(target.drawable_object_index)
-        .ok_or(BodyChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             target.drawable_message_index,
             RawMessage {
                 type_: CHART_MESSAGE_TYPE,
@@ -2006,8 +2135,8 @@ pub(super) fn rewrite_chart_payload(
             archive_limits,
         )
         .map_err(map_core_error)?;
-    let compressed = page_layout::compress_archive(archive, archive_limits)
-        .map_err(|_| BodyChartArrangementError::InvalidSource)?;
+    let encoded = archive.to_bytes(archive_limits).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&encoded, snappy_limits).map_err(map_core_error)?;
     let edits = [EntryEdit::new(target.component_name.as_ref(), &compressed)];
     let deleted_previews = match preview_mode {
         PreviewDeletionMode::Preserve => Vec::new(),
@@ -2025,11 +2154,12 @@ pub(super) fn rewrite_chart_payload(
     let output = prepared
         .execute(requirements.exact_limits())
         .map_err(map_archive_error)?;
-    let catalog =
-        SourceCatalog::from_shared_bytes_with_limits(output.into(), source.state.source.limits())
-            .map_err(map_archive_error)?;
-    let package = Package::from_source_catalog(catalog)
-        .map_err(|_| BodyChartArrangementError::Verification)?;
+    let catalog = source
+        .state
+        .source
+        .reopen(output.into())
+        .map_err(map_archive_error)?;
+    let package = Package::from_source_catalog(catalog).map_err(|_| Error::Verification)?;
     let target_previews = match preview_mode {
         PreviewDeletionMode::Preserve => 0,
         PreviewDeletionMode::DeleteCanonicalRoot => root_preview_names(&package, budget)?.len(),
@@ -2045,7 +2175,7 @@ fn rewrite_arrangement(
     source: &[u8],
     after: ChartArrangement,
     budget: &mut ArrangementBudget,
-) -> Result<Vec<u8>, BodyChartArrangementError> {
+) -> Result<Vec<u8>, Error> {
     let options = budget.codec_options(source)?;
     let prepared = codec::prepare_chart_arrangement_rewrite(
         source,
@@ -2065,30 +2195,30 @@ fn rewrite_arrangement(
 pub(super) fn selected_chart_payload<'source>(
     package: &'source Package,
     target: &ChartTarget,
-) -> Result<&'source [u8], BodyChartArrangementError> {
+) -> Result<&'source [u8], Error> {
     let component = package
         .state
         .source
         .components()
         .get_index(target.component_index)
-        .ok_or(BodyChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if component.name() != target.component_name.as_ref() {
-        return Err(BodyChartArrangementError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let object = component
         .archive()
         .objects
         .get(target.drawable_object_index)
-        .ok_or(BodyChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if object.archive_info.identifier != Some(target.drawable_identifier.get()) {
-        return Err(BodyChartArrangementError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let message = object
         .messages
         .get(target.drawable_message_index)
-        .ok_or(BodyChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if message.type_ != CHART_MESSAGE_TYPE {
-        return Err(BodyChartArrangementError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(message.data.as_slice())
 }
@@ -2098,13 +2228,13 @@ pub(super) fn selected_chart_payload<'source>(
 fn root_preview_names(
     package: &Package,
     budget: &mut ArrangementBudget,
-) -> Result<Vec<&'static str>, BodyChartArrangementError> {
+) -> Result<Vec<&'static str>, Error> {
     budget.preflight_allocations(ROOT_PREVIEW_NAMES.len())?;
     budget.preflight_retained(
         ROOT_PREVIEW_NAMES
             .len()
             .checked_mul(size_of::<&'static str>())
-            .ok_or(BodyChartArrangementError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     budget.work(
         package
@@ -2113,12 +2243,12 @@ fn root_preview_names(
             .package()
             .len()
             .checked_mul(ROOT_PREVIEW_NAMES.len())
-            .ok_or(BodyChartArrangementError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     let mut names = Vec::new();
     names
         .try_reserve_exact(ROOT_PREVIEW_NAMES.len())
-        .map_err(|_| BodyChartArrangementError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: ROOT_PREVIEW_NAMES.len(),
         })?;
     for name in ROOT_PREVIEW_NAMES {
@@ -2137,7 +2267,7 @@ fn root_preview_names(
         ROOT_PREVIEW_NAMES
             .len()
             .checked_mul(size_of::<&'static str>())
-            .ok_or(BodyChartArrangementError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     Ok(names)
 }
@@ -2146,12 +2276,12 @@ pub(super) fn retain_payload_pair(
     source: &[u8],
     target: &[u8],
     budget: &mut ArrangementBudget,
-) -> Result<(Arc<[u8]>, Arc<[u8]>), BodyChartArrangementError> {
+) -> Result<(Arc<[u8]>, Arc<[u8]>), Error> {
     let allocations = usize::from(!source.is_empty()) + usize::from(!target.is_empty());
     let retained = source
         .len()
         .checked_add(target.len())
-        .ok_or(BodyChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.preflight_allocations(allocations)?;
     budget.preflight_retained(retained)?;
     let source = Arc::<[u8]>::from(source);
@@ -2166,7 +2296,7 @@ fn verify_payload_locality(
     candidate: &[u8],
     mutation: ChartPayloadMutation,
     budget: &mut ArrangementBudget,
-) -> Result<(), BodyChartArrangementError> {
+) -> Result<(), Error> {
     match mutation {
         ChartPayloadMutation::Arrangement => {
             verify_arrangement_payload_locality(source, candidate, budget)
@@ -2181,14 +2311,14 @@ fn verify_arrangement_payload_locality(
     source: &[u8],
     candidate: &[u8],
     budget: &mut ArrangementBudget,
-) -> Result<(), BodyChartArrangementError> {
+) -> Result<(), Error> {
     let source_view = budget.parse(source, 1)?;
     let candidate_view = budget.parse(candidate, 1)?;
     let source_super = unique_field(&source_view, CHART_DRAWABLE_FIELD, 2)?
-        .ok_or(BodyChartArrangementError::Verification)?
+        .ok_or(Error::Verification)?
         .payload();
     let candidate_super = unique_field(&candidate_view, CHART_DRAWABLE_FIELD, 2)?
-        .ok_or(BodyChartArrangementError::Verification)?
+        .ok_or(Error::Verification)?
         .payload();
     if !same_raw_except_numbers(
         source_view.fields(),
@@ -2196,7 +2326,7 @@ fn verify_arrangement_payload_locality(
         &[CHART_DRAWABLE_FIELD],
         budget,
     )? {
-        return Err(BodyChartArrangementError::Verification);
+        return Err(Error::Verification);
     }
     let source_super_view = budget.parse(source_super, 2)?;
     let candidate_super_view = budget.parse(candidate_super, 2)?;
@@ -2214,10 +2344,10 @@ fn verify_arrangement_payload_locality(
     .flatten()
     {
         field.validate_canonical_framing().map_err(map_wire_error)?;
-        let (value, width) = decode_varint_from_bytes(field.payload())
-            .map_err(|_| BodyChartArrangementError::Verification)?;
+        let (value, width) =
+            decode_varint_from_bytes(field.payload()).map_err(|_| Error::Verification)?;
         if width != encoded_len(value) || value > 1 {
-            return Err(BodyChartArrangementError::Verification);
+            return Err(Error::Verification);
         }
     }
     if !same_raw_except_numbers(
@@ -2226,7 +2356,7 @@ fn verify_arrangement_payload_locality(
         &[5, 7],
         budget,
     )? {
-        return Err(BodyChartArrangementError::Verification);
+        return Err(Error::Verification);
     }
     Ok(())
 }
@@ -2240,14 +2370,14 @@ fn verify_chart_data_payload_locality(
     source: &[u8],
     candidate: &[u8],
     budget: &mut ArrangementBudget,
-) -> Result<(), BodyChartArrangementError> {
+) -> Result<(), Error> {
     let source_view = budget.parse(source, 1)?;
     let candidate_view = budget.parse(candidate, 1)?;
     let source_chart = unique_field(&source_view, MODERN_CHART_EXTENSION_FIELD, 2)?
-        .ok_or(BodyChartArrangementError::Verification)?
+        .ok_or(Error::Verification)?
         .payload();
     let candidate_chart = unique_field(&candidate_view, MODERN_CHART_EXTENSION_FIELD, 2)?
-        .ok_or(BodyChartArrangementError::Verification)?
+        .ok_or(Error::Verification)?
         .payload();
     if !same_raw_except_numbers(
         source_view.fields(),
@@ -2255,16 +2385,16 @@ fn verify_chart_data_payload_locality(
         &[MODERN_CHART_EXTENSION_FIELD],
         budget,
     )? {
-        return Err(BodyChartArrangementError::Verification);
+        return Err(Error::Verification);
     }
 
     let source_chart_view = budget.parse(source_chart, 2)?;
     let candidate_chart_view = budget.parse(candidate_chart, 2)?;
     let source_grid = unique_field(&source_chart_view, MODERN_CHART_GRID_FIELD, 2)?
-        .ok_or(BodyChartArrangementError::Verification)?
+        .ok_or(Error::Verification)?
         .payload();
     let candidate_grid = unique_field(&candidate_chart_view, MODERN_CHART_GRID_FIELD, 2)?
-        .ok_or(BodyChartArrangementError::Verification)?
+        .ok_or(Error::Verification)?
         .payload();
     if !same_raw_except_numbers(
         source_chart_view.fields(),
@@ -2272,7 +2402,7 @@ fn verify_chart_data_payload_locality(
         &[MODERN_CHART_GRID_FIELD],
         budget,
     )? {
-        return Err(BodyChartArrangementError::Verification);
+        return Err(Error::Verification);
     }
 
     let source_grid_view = budget.parse(source_grid, 3)?;
@@ -2289,13 +2419,13 @@ fn verify_chart_data_payload_locality(
         &[MODERN_CHART_GRID_ROW_FIELD],
         budget,
     )? {
-        return Err(BodyChartArrangementError::Verification);
+        return Err(Error::Verification);
     }
     loop {
         match (source_rows.next(), candidate_rows.next()) {
             (Some(source_row), Some(candidate_row)) => {
                 if source_row.wire_type() != 2 || candidate_row.wire_type() != 2 {
-                    return Err(BodyChartArrangementError::Verification);
+                    return Err(Error::Verification);
                 }
                 source_row
                     .validate_canonical_framing()
@@ -2306,7 +2436,7 @@ fn verify_chart_data_payload_locality(
                 verify_chart_data_row(source_row.payload(), candidate_row.payload(), budget)?;
             },
             (None, None) => break,
-            _ => return Err(BodyChartArrangementError::Verification),
+            _ => return Err(Error::Verification),
         }
     }
     Ok(())
@@ -2316,7 +2446,7 @@ fn verify_chart_data_row(
     source: &[u8],
     candidate: &[u8],
     budget: &mut ArrangementBudget,
-) -> Result<(), BodyChartArrangementError> {
+) -> Result<(), Error> {
     let source_view = budget.parse(source, 4)?;
     let candidate_view = budget.parse(candidate, 4)?;
     if !same_raw_except_numbers(
@@ -2325,7 +2455,7 @@ fn verify_chart_data_row(
         &[MODERN_CHART_GRID_VALUE_FIELD],
         budget,
     )? {
-        return Err(BodyChartArrangementError::Verification);
+        return Err(Error::Verification);
     }
     let mut source_values = source_view
         .fields()
@@ -2337,7 +2467,7 @@ fn verify_chart_data_row(
         match (source_values.next(), candidate_values.next()) {
             (Some(source_value), Some(candidate_value)) => {
                 if source_value.wire_type() != 2 || candidate_value.wire_type() != 2 {
-                    return Err(BodyChartArrangementError::Verification);
+                    return Err(Error::Verification);
                 }
                 source_value
                     .validate_canonical_framing()
@@ -2348,7 +2478,7 @@ fn verify_chart_data_row(
                 verify_chart_data_value(source_value.payload(), candidate_value.payload(), budget)?;
             },
             (None, None) => break,
-            _ => return Err(BodyChartArrangementError::Verification),
+            _ => return Err(Error::Verification),
         }
     }
     Ok(())
@@ -2358,7 +2488,7 @@ fn verify_chart_data_value(
     source: &[u8],
     candidate: &[u8],
     budget: &mut ArrangementBudget,
-) -> Result<(), BodyChartArrangementError> {
+) -> Result<(), Error> {
     let source_view = budget.parse(source, 5)?;
     let candidate_view = budget.parse(candidate, 5)?;
     let _source_numeric = unique_field(&source_view, MODERN_CHART_GRID_VALUE_FIELD, 1)?;
@@ -2369,7 +2499,7 @@ fn verify_chart_data_value(
         &[MODERN_CHART_GRID_VALUE_FIELD],
         budget,
     )? {
-        return Err(BodyChartArrangementError::Verification);
+        return Err(Error::Verification);
     }
     Ok(())
 }
@@ -2379,7 +2509,7 @@ fn same_raw_except_numbers<'left, 'right>(
     right: impl Iterator<Item = WireFieldView<'right>>,
     excluded: &[u32],
     budget: &mut ArrangementBudget,
-) -> Result<bool, BodyChartArrangementError> {
+) -> Result<bool, Error> {
     let mut left = left.filter(|field| !excluded.contains(&field.number()));
     let mut right = right.filter(|field| !excluded.contains(&field.number()));
     loop {
@@ -2389,7 +2519,7 @@ fn same_raw_except_numbers<'left, 'right>(
                     left.raw()
                         .len()
                         .checked_add(right.raw().len())
-                        .ok_or(BodyChartArrangementError::InvalidSource)?,
+                        .ok_or(Error::InvalidSource)?,
                 )?;
                 if left.raw() != right.raw() {
                     return Ok(false);
@@ -2406,20 +2536,18 @@ fn add_clone_vec(
     element_size: usize,
     allocations: &mut usize,
     retained: &mut usize,
-) -> Result<(), BodyChartArrangementError> {
+) -> Result<(), Error> {
     if length == 0 {
         return Ok(());
     }
-    *allocations = allocations
-        .checked_add(1)
-        .ok_or(BodyChartArrangementError::InvalidSource)?;
+    *allocations = allocations.checked_add(1).ok_or(Error::InvalidSource)?;
     *retained = retained
         .checked_add(
             length
                 .checked_mul(element_size)
-                .ok_or(BodyChartArrangementError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )
-        .ok_or(BodyChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     Ok(())
 }
 
@@ -2427,7 +2555,7 @@ fn add_clone_bytes(
     length: usize,
     allocations: &mut usize,
     retained: &mut usize,
-) -> Result<(), BodyChartArrangementError> {
+) -> Result<(), Error> {
     add_clone_vec(length, 1, allocations, retained)
 }
 
@@ -2435,17 +2563,17 @@ fn add_clone_bytes(
 /// locality proof operations.  Archive metadata contains several nested
 /// vectors; counting only top-level objects would leave those walks outside
 /// the transaction ledger.
-fn archive_object_work(object: &ArchiveObject) -> Result<usize, BodyChartArrangementError> {
+fn archive_object_work(object: &ArchiveObject) -> Result<usize, Error> {
     let mut work = size_of::<ArchiveObject>();
     work = work
         .checked_add(object.messages.len())
         .and_then(|value| value.checked_add(object.archive_info.message_infos.len()))
-        .ok_or(BodyChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     for message in &object.messages {
         work = work
             .checked_add(size_of::<RawMessage>())
             .and_then(|value| value.checked_add(message.data.len()))
-            .ok_or(BodyChartArrangementError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     for info in &object.archive_info.message_infos {
         work = work
@@ -2457,16 +2585,16 @@ fn archive_object_work(object: &ArchiveObject) -> Result<usize, BodyChartArrange
             .and_then(|value| value.checked_add(info.diff_merge_version.len()))
             .and_then(|value| value.checked_add(info.fields_to_remove.len()))
             .and_then(|value| value.checked_add(info.diff_read_version.len()))
-            .ok_or(BodyChartArrangementError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if let Some(path) = info.diff_field_path.as_ref() {
             work = work
                 .checked_add(path.path.len())
-                .ok_or(BodyChartArrangementError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
         }
         for path in &info.fields_to_remove {
             work = work
                 .checked_add(path.path.len())
-                .ok_or(BodyChartArrangementError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
         }
         for field in &info.field_infos {
             work = work
@@ -2475,11 +2603,11 @@ fn archive_object_work(object: &ArchiveObject) -> Result<usize, BodyChartArrange
                 .and_then(|value| value.checked_add(field.object_references.len()))
                 .and_then(|value| value.checked_add(field.data_references.len()))
                 .and_then(|value| value.checked_add(field.known_field_version.len()))
-                .ok_or(BodyChartArrangementError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             if let Some(identifier) = field.known_field_feature_identifier.as_ref() {
                 work = work
                     .checked_add(identifier.len())
-                    .ok_or(BodyChartArrangementError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
             }
         }
     }
@@ -2489,7 +2617,7 @@ fn archive_object_work(object: &ArchiveObject) -> Result<usize, BodyChartArrange
 fn archive_clone_requirements(
     objects: &[ArchiveObject],
     encoded_len: usize,
-) -> Result<(usize, usize, usize), BodyChartArrangementError> {
+) -> Result<(usize, usize, usize), Error> {
     let mut allocations = 0usize;
     let mut retained = encoded_len;
     let mut work = 0usize;
@@ -2502,7 +2630,7 @@ fn archive_clone_requirements(
     for object in objects {
         work = work
             .checked_add(archive_object_work(object)?)
-            .ok_or(BodyChartArrangementError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         add_clone_vec(
             object.messages.len(),
             size_of::<RawMessage>(),
@@ -2516,17 +2644,15 @@ fn archive_clone_requirements(
             &mut retained,
         )?;
         if object.header_length != 0 {
-            allocations = allocations
-                .checked_add(2)
-                .ok_or(BodyChartArrangementError::InvalidSource)?;
+            allocations = allocations.checked_add(2).ok_or(Error::InvalidSource)?;
             retained = retained
                 .checked_add(
                     usize::try_from(object.header_length)
-                        .map_err(|_| BodyChartArrangementError::InvalidSource)?
+                        .map_err(|_| Error::InvalidSource)?
                         .checked_mul(2)
-                        .ok_or(BodyChartArrangementError::InvalidSource)?,
+                        .ok_or(Error::InvalidSource)?,
                 )
-                .ok_or(BodyChartArrangementError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
         }
         for message in &object.messages {
             add_clone_bytes(message.data.len(), &mut allocations, &mut retained)?;
@@ -2626,37 +2752,35 @@ fn archive_clone_requirements(
 
 fn archive_header_rewrite_requirements(
     object: &ArchiveObject,
-) -> Result<(usize, usize, usize), BodyChartArrangementError> {
-    let header = usize::try_from(object.header_length)
-        .map_err(|_| BodyChartArrangementError::InvalidSource)?;
+) -> Result<(usize, usize, usize), Error> {
+    let header = usize::try_from(object.header_length).map_err(|_| Error::InvalidSource)?;
     let retained = header
         .checked_add(64)
         .and_then(|value| value.checked_mul(3))
-        .ok_or(BodyChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     Ok((3, retained, archive_object_work(object)?))
 }
 
 fn archive_serialization_requirements(
     archive: &litchi_iwa_core::Archive,
-) -> Result<(usize, usize, usize), BodyChartArrangementError> {
+) -> Result<(usize, usize, usize), Error> {
     let mut retained = 0usize;
     let mut work = 0usize;
     for object in &archive.objects {
-        let header = usize::try_from(object.header_length)
-            .map_err(|_| BodyChartArrangementError::InvalidSource)?;
+        let header = usize::try_from(object.header_length).map_err(|_| Error::InvalidSource)?;
         retained = retained
             .checked_add(header)
             .and_then(|amount| amount.checked_add(64))
-            .ok_or(BodyChartArrangementError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         work = work
             .checked_add(archive_object_work(object)?)
-            .ok_or(BodyChartArrangementError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     let allocations = archive
         .objects
         .len()
         .checked_add(2)
-        .ok_or(BodyChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     Ok((allocations, retained, work))
 }
 
@@ -2664,23 +2788,23 @@ fn archive_object_clone_requirements(
     source: &ArchiveObject,
     candidate: &ArchiveObject,
     replacement_len: usize,
-) -> Result<(usize, usize, usize), BodyChartArrangementError> {
+) -> Result<(usize, usize, usize), Error> {
     let (mut allocations, mut retained, work) =
         archive_clone_requirements(std::slice::from_ref(source), 0)?;
     let (header_allocations, header_retained, header_work) =
         archive_header_rewrite_requirements(source)?;
     allocations = allocations
         .checked_add(header_allocations)
-        .ok_or(BodyChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     retained = retained
         .checked_add(header_retained)
-        .ok_or(BodyChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     add_clone_bytes(replacement_len, &mut allocations, &mut retained)?;
     let work = work
         .checked_add(header_work)
         .and_then(|value| value.checked_add(replacement_len))
         .and_then(|value| value.checked_add(archive_object_work(candidate).ok()?))
-        .ok_or(BodyChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     Ok((allocations, retained, work))
 }
 
@@ -2692,7 +2816,7 @@ pub(super) fn verify_locality(
     preview_counts: Option<(usize, usize)>,
     mutation: ChartPayloadMutation,
     budget: &mut ArrangementBudget,
-) -> Result<(), BodyChartArrangementError> {
+) -> Result<(), Error> {
     let source_entries = source.state.source.package();
     let candidate_entries = candidate.state.source.package();
     let source_preview_names = root_preview_names(source, budget)?;
@@ -2703,7 +2827,7 @@ pub(super) fn verify_locality(
         || candidate_preview_names.len() != candidate_preview_count
         || (preview_counts.is_none() && source_preview_names != candidate_preview_names)
     {
-        return Err(BodyChartArrangementError::Verification);
+        return Err(Error::Verification);
     }
     for name in ROOT_PREVIEW_NAMES {
         let source_preview = source_entries.iter().find(|entry| entry.name() == name);
@@ -2725,7 +2849,7 @@ pub(super) fn verify_locality(
             ]
             .into_iter()
             .try_fold(0usize, |total, amount| total.checked_add(amount))
-            .ok_or(BodyChartArrangementError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
             budget.work(work)?;
             if before.raw_name() != after.raw_name()
                 || before.data() != after.data()
@@ -2738,7 +2862,7 @@ pub(super) fn verify_locality(
                 )
                 || before.raw_record().compressed_data() != after.raw_record().compressed_data()
             {
-                return Err(BodyChartArrangementError::Verification);
+                return Err(Error::Verification);
             }
         }
     }
@@ -2746,9 +2870,9 @@ pub(super) fn verify_locality(
         .len()
         .checked_sub(source_preview_names.len())
         .and_then(|count| count.checked_add(candidate_preview_names.len()))
-        .ok_or(BodyChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if candidate_entries.len() != expected_entry_count {
-        return Err(BodyChartArrangementError::Verification);
+        return Err(Error::Verification);
     }
     for (before, after) in source_entries
         .iter()
@@ -2768,22 +2892,17 @@ pub(super) fn verify_locality(
                 entry.raw_record().local_record().len(),
                 entry.raw_record().central_directory_record().len(),
             ] {
-                work = work
-                    .checked_add(amount)
-                    .ok_or(BodyChartArrangementError::InvalidSource)?;
+                work = work.checked_add(amount).ok_or(Error::InvalidSource)?;
             }
         }
-        budget.work(
-            work.checked_mul(2)
-                .ok_or(BodyChartArrangementError::InvalidSource)?,
-        )?;
+        budget.work(work.checked_mul(2).ok_or(Error::InvalidSource)?)?;
         if before.name() != after.name()
             || before.raw_name() != after.raw_name()
             || before.is_opaque() != after.is_opaque()
             || before.metadata().local() != after.metadata().local()
             || before.metadata().central() != after.metadata().central()
         {
-            return Err(BodyChartArrangementError::Verification);
+            return Err(Error::Verification);
         }
         if before.name() == target.component_name.as_ref() {
             if !zip_local_header_preserved(
@@ -2794,7 +2913,7 @@ pub(super) fn verify_locality(
                 after.raw_record().central_directory_record(),
                 &[(16, 28), (42, 46)],
             ) {
-                return Err(BodyChartArrangementError::Verification);
+                return Err(Error::Verification);
             }
         } else if before.data() != after.data()
             || before.raw_record().local_record() != after.raw_record().local_record()
@@ -2804,13 +2923,13 @@ pub(super) fn verify_locality(
                 &[(42, 46)],
             )
         {
-            return Err(BodyChartArrangementError::Verification);
+            return Err(Error::Verification);
         }
     }
     let source_components = source.state.source.components();
     let candidate_components = candidate.state.source.components();
     if source_components.len() != candidate_components.len() {
-        return Err(BodyChartArrangementError::Verification);
+        return Err(Error::Verification);
     }
     let archive_limits = source
         .state
@@ -2825,7 +2944,7 @@ pub(super) fn verify_locality(
         if before_component.name() != after_component.name()
             || before_component.archive().objects.len() != after_component.archive().objects.len()
         {
-            return Err(BodyChartArrangementError::Verification);
+            return Err(Error::Verification);
         }
         for (object_index, (before, after)) in before_component
             .archive()
@@ -2836,13 +2955,13 @@ pub(super) fn verify_locality(
         {
             let work = archive_object_work(before)?
                 .checked_add(archive_object_work(after)?)
-                .ok_or(BodyChartArrangementError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             budget.work(work)?;
             let selected = before_component.name() == target.component_name.as_ref()
                 && object_index == target.drawable_object_index;
             if !selected {
                 if !before.same_content_ignoring_offsets(after) {
-                    return Err(BodyChartArrangementError::Verification);
+                    return Err(Error::Verification);
                 }
                 continue;
             }
@@ -2851,17 +2970,17 @@ pub(super) fn verify_locality(
                 .messages
                 .get(target.drawable_message_index)
                 .filter(|message| message.type_ == CHART_MESSAGE_TYPE)
-                .ok_or(BodyChartArrangementError::Verification)?;
+                .ok_or(Error::Verification)?;
             if let Some(expected) = expected_payload {
                 budget.work(
                     message
                         .data
                         .len()
                         .checked_add(expected.len())
-                        .ok_or(BodyChartArrangementError::InvalidSource)?,
+                        .ok_or(Error::InvalidSource)?,
                 )?;
                 if message.data != expected {
-                    return Err(BodyChartArrangementError::Verification);
+                    return Err(Error::Verification);
                 }
             }
             verify_payload_locality(
@@ -2869,7 +2988,7 @@ pub(super) fn verify_locality(
                     .messages
                     .get(target.drawable_message_index)
                     .filter(|message| message.type_ == CHART_MESSAGE_TYPE)
-                    .ok_or(BodyChartArrangementError::Verification)?
+                    .ok_or(Error::Verification)?
                     .data
                     .as_slice(),
                 message.data.as_slice(),
@@ -2883,7 +3002,7 @@ pub(super) fn verify_locality(
             budget.work(clone_work)?;
             let mut expected = before.clone();
             expected
-                .replace_message_preserving_header_with_limits(
+                .replace_message_preserving_header(
                     target.drawable_message_index,
                     RawMessage {
                         type_: message.type_,
@@ -2895,12 +3014,12 @@ pub(super) fn verify_locality(
             expected.header_length = after.header_length;
             expected.data_length = after.data_length;
             if !expected.same_content_ignoring_offsets(after) {
-                return Err(BodyChartArrangementError::Verification);
+                return Err(Error::Verification);
             }
         }
     }
     if !selected_seen {
-        return Err(BodyChartArrangementError::Verification);
+        return Err(Error::Verification);
     }
     Ok(())
 }
@@ -2959,203 +3078,164 @@ fn push_unique(values: &mut Vec<NonZeroU64>, value: NonZeroU64) -> bool {
     }
 }
 
-fn map_codec_error(error: codec::DecodeError) -> BodyChartArrangementError {
+fn map_codec_error(error: codec::DecodeError) -> Error {
     if let Some(amount) = error.allocation_amount() {
-        return BodyChartArrangementError::Allocation { amount };
+        return Error::Allocation { amount };
     }
     let Some(limit) = error.resource_limit() else {
-        return BodyChartArrangementError::InvalidSource;
+        return Error::InvalidSource;
     };
     let (kind, observed, maximum) = match limit {
         codec::DecodeLimit::Bytes { observed, maximum } => {
-            (BodyChartArrangementLimitKind::WireBytes, observed, maximum)
+            (LimitKind::WireBytes, observed, maximum)
         },
-        codec::DecodeLimit::Output { observed, maximum } => (
-            BodyChartArrangementLimitKind::WireOutputBytes,
-            observed,
-            maximum,
-        ),
+        codec::DecodeLimit::Output { observed, maximum } => {
+            (LimitKind::WireOutputBytes, observed, maximum)
+        },
         codec::DecodeLimit::Fields { observed, maximum } => {
-            (BodyChartArrangementLimitKind::WireFields, observed, maximum)
+            (LimitKind::WireFields, observed, maximum)
         },
-        codec::DecodeLimit::Work { observed, maximum } => {
-            (BodyChartArrangementLimitKind::WireWork, observed, maximum)
-        },
+        codec::DecodeLimit::Work { observed, maximum } => (LimitKind::WireWork, observed, maximum),
         codec::DecodeLimit::Nesting { observed, maximum } => {
-            return BodyChartArrangementError::LimitExceeded {
-                kind: BodyChartArrangementLimitKind::WireNesting,
+            return Error::Limit {
+                kind: LimitKind::WireNesting,
                 observed: u64::from(observed),
                 maximum: u64::from(maximum),
             };
         },
-        codec::DecodeLimit::Allocations { observed, maximum } => (
-            BodyChartArrangementLimitKind::WireAllocations,
-            observed,
-            maximum,
-        ),
-        codec::DecodeLimit::Retained { observed, maximum } => (
-            BodyChartArrangementLimitKind::WireRetainedBytes,
-            observed,
-            maximum,
-        ),
-        codec::DecodeLimit::Scratch { observed, maximum } => (
-            BodyChartArrangementLimitKind::WireScratchBytes,
-            observed,
-            maximum,
-        ),
-        _ => return BodyChartArrangementError::InvalidSource,
+        codec::DecodeLimit::Allocations { observed, maximum } => {
+            (LimitKind::WireAllocations, observed, maximum)
+        },
+        codec::DecodeLimit::Retained { observed, maximum } => {
+            (LimitKind::WireRetainedBytes, observed, maximum)
+        },
+        codec::DecodeLimit::Scratch { observed, maximum } => {
+            (LimitKind::WireScratchBytes, observed, maximum)
+        },
+        _ => return Error::InvalidSource,
     };
-    BodyChartArrangementError::LimitExceeded {
+    Error::Limit {
         kind,
         observed: observed as u64,
         maximum: maximum as u64,
     }
 }
 
-fn map_drawable_order_error(
-    error: pages_drawable_order_codec::DecodeError,
-) -> BodyChartArrangementError {
+fn map_drawable_order_error(error: pages_drawable_order_codec::DecodeError) -> Error {
     if let Some(limit) = error.resource_limit() {
         let (kind, observed, maximum) = match limit {
             pages_drawable_order_codec::WireResourceLimit::InputBytes { observed, maximum } => {
-                (BodyChartArrangementLimitKind::WireBytes, observed, maximum)
+                (LimitKind::WireBytes, observed, maximum)
             },
-            pages_drawable_order_codec::WireResourceLimit::OutputBytes { observed, maximum } => (
-                BodyChartArrangementLimitKind::WireOutputBytes,
-                observed,
-                maximum,
-            ),
+            pages_drawable_order_codec::WireResourceLimit::OutputBytes { observed, maximum } => {
+                (LimitKind::WireOutputBytes, observed, maximum)
+            },
             pages_drawable_order_codec::WireResourceLimit::Fields { observed, maximum } => {
-                (BodyChartArrangementLimitKind::WireFields, observed, maximum)
+                (LimitKind::WireFields, observed, maximum)
             },
             pages_drawable_order_codec::WireResourceLimit::WorkBytes { observed, maximum } => {
-                (BodyChartArrangementLimitKind::WireWork, observed, maximum)
+                (LimitKind::WireWork, observed, maximum)
             },
             pages_drawable_order_codec::WireResourceLimit::Nesting { observed, maximum } => {
-                return BodyChartArrangementError::LimitExceeded {
-                    kind: BodyChartArrangementLimitKind::WireNesting,
+                return Error::Limit {
+                    kind: LimitKind::WireNesting,
                     observed: observed as u64,
                     maximum: maximum as u64,
                 };
             },
-            pages_drawable_order_codec::WireResourceLimit::References { observed, maximum } => (
-                BodyChartArrangementLimitKind::PayloadReferences,
-                observed,
-                maximum,
-            ),
-            _ => return BodyChartArrangementError::InvalidSource,
+            pages_drawable_order_codec::WireResourceLimit::References { observed, maximum } => {
+                (LimitKind::PayloadReferences, observed, maximum)
+            },
+            _ => return Error::InvalidSource,
         };
-        return BodyChartArrangementError::LimitExceeded {
+        return Error::Limit {
             kind,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some(amount) = error.allocation_amount() {
-        return BodyChartArrangementError::Allocation { amount };
+        return Error::Allocation { amount };
     }
-    BodyChartArrangementError::InvalidSource
+    Error::InvalidSource
 }
 
-fn map_wire_error(error: litchi_iwa_common::Error) -> BodyChartArrangementError {
+fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
     match error {
         litchi_iwa_common::Error::LimitExceeded {
             kind,
             observed,
             limit,
-        } => BodyChartArrangementError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_common::LimitKind::InputBytes => {
-                    BodyChartArrangementLimitKind::WireBytes
-                },
-                litchi_iwa_common::LimitKind::OutputBytes => {
-                    BodyChartArrangementLimitKind::WireOutputBytes
-                },
-                litchi_iwa_common::LimitKind::Fields => BodyChartArrangementLimitKind::WireFields,
-                litchi_iwa_common::LimitKind::Nesting => BodyChartArrangementLimitKind::WireNesting,
-                litchi_iwa_common::LimitKind::RewriteWork => {
-                    BodyChartArrangementLimitKind::WireWork
-                },
-                _ => BodyChartArrangementLimitKind::PayloadItems,
+                litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
+                litchi_iwa_common::LimitKind::OutputBytes => LimitKind::WireOutputBytes,
+                litchi_iwa_common::LimitKind::Fields => LimitKind::WireFields,
+                litchi_iwa_common::LimitKind::Nesting => LimitKind::WireNesting,
+                litchi_iwa_common::LimitKind::RewriteWork => LimitKind::WireWork,
+                _ => LimitKind::PayloadItems,
             },
             observed: observed as u64,
             maximum: limit as u64,
         },
-        litchi_iwa_common::Error::Allocation { amount, .. } => {
-            BodyChartArrangementError::Allocation { amount }
-        },
-        litchi_iwa_common::Error::InvalidFormat(_)
-        | litchi_iwa_common::Error::InvalidLimit { .. } => BodyChartArrangementError::InvalidSource,
+        litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_archive_error(error: ArchiveError) -> BodyChartArrangementError {
+fn map_archive_error(error: ArchiveError) -> Error {
     match error {
         ArchiveError::Limit {
             kind,
             observed,
             maximum,
-        } => BodyChartArrangementError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                ArchiveLimitKind::InputBytes => BodyChartArrangementLimitKind::InputBytes,
-                ArchiveLimitKind::OutputBytes => BodyChartArrangementLimitKind::OutputBytes,
-                ArchiveLimitKind::Entries => BodyChartArrangementLimitKind::Entries,
+                ArchiveLimitKind::InputBytes => LimitKind::InputBytes,
+                ArchiveLimitKind::OutputBytes => LimitKind::OutputBytes,
+                ArchiveLimitKind::Entries => LimitKind::Entries,
                 ArchiveLimitKind::MemberNameBytes | ArchiveLimitKind::MetadataBytes => {
-                    BodyChartArrangementLimitKind::PackageBytes
+                    LimitKind::PackageBytes
                 },
                 ArchiveLimitKind::CompressedEntryBytes | ArchiveLimitKind::EntryBytes => {
-                    BodyChartArrangementLimitKind::EntryBytes
+                    LimitKind::EntryBytes
                 },
-                ArchiveLimitKind::TotalBytes => BodyChartArrangementLimitKind::TotalEntryBytes,
-                ArchiveLimitKind::IwaStreamBytes => BodyChartArrangementLimitKind::PayloadBytes,
-                ArchiveLimitKind::IwaTotalBytes => BodyChartArrangementLimitKind::TotalPayloadBytes,
+                ArchiveLimitKind::TotalBytes => LimitKind::TotalEntryBytes,
+                ArchiveLimitKind::IwaStreamBytes => LimitKind::PayloadBytes,
+                ArchiveLimitKind::IwaTotalBytes => LimitKind::TotalPayloadBytes,
             },
             observed,
             maximum,
         },
-        ArchiveError::Allocation { amount, .. } => BodyChartArrangementError::Allocation { amount },
+        ArchiveError::Allocation { amount, .. } => Error::Allocation { amount },
         ArchiveError::Iwa(error) => map_core_error(error),
-        ArchiveError::Reassembly(_) => BodyChartArrangementError::UnsupportedSource,
-        ArchiveError::Io(_)
-        | ArchiveError::Zip { .. }
-        | ArchiveError::InvalidLimits(_)
-        | ArchiveError::Encrypted
-        | ArchiveError::SourceChanged { .. }
-        | ArchiveError::DirectoryChanged { .. }
-        | ArchiveError::InvalidBundle(_) => BodyChartArrangementError::InvalidSource,
+        ArchiveError::Reassembly(_) => Error::Refused(Refusal::UnsupportedSource),
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_core_error(error: litchi_iwa_core::Error) -> BodyChartArrangementError {
+fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Allocation { requested, .. } => {
-            BodyChartArrangementError::Allocation { amount: requested }
+            Error::Allocation { amount: requested }
         },
         litchi_iwa_core::Error::Limit {
             kind,
             observed,
             maximum,
-        } => BodyChartArrangementError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_core::LimitKind::Objects => {
-                    BodyChartArrangementLimitKind::PayloadObjects
-                },
+                litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
                 litchi_iwa_core::LimitKind::Messages
-                | litchi_iwa_core::LimitKind::MessagesPerObject => {
-                    BodyChartArrangementLimitKind::PayloadMessages
-                },
-                litchi_iwa_core::LimitKind::HeaderFields => {
-                    BodyChartArrangementLimitKind::WireFields
-                },
-                litchi_iwa_core::LimitKind::HeaderNesting => {
-                    BodyChartArrangementLimitKind::WireNesting
-                },
-                _ => BodyChartArrangementLimitKind::PayloadBytes,
+                | litchi_iwa_core::LimitKind::MessagesPerObject => LimitKind::PayloadMessages,
+                litchi_iwa_core::LimitKind::HeaderFields => LimitKind::WireFields,
+                litchi_iwa_core::LimitKind::HeaderNesting => LimitKind::WireNesting,
+                _ => LimitKind::PayloadBytes,
             },
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        _ => BodyChartArrangementError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 

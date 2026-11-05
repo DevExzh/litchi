@@ -13,7 +13,7 @@ use std::ffi::OsString;
 use std::io;
 use std::path::PathBuf;
 
-use litchi_keynote::{CellPosition, DecimalPlaces, Package, SlideSelector, TableSelector};
+use litchi_keynote::{At, DecimalPlaces, Package, SlideSelector, TableSelector};
 
 const USAGE: &str = "usage: edit_table_cell_number_format \
                      <input.key> <output.key> <slide-index> <table-index> \
@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "table index",
     )?;
     let cell = required_text(&mut arguments, "missing A1 cell coordinate")?;
-    let position = CellPosition::from_a1(&cell)?;
+    let position = At::from_a1(&cell)?;
     let decimal_places = parse_u8(
         required_argument(&mut arguments, "missing decimal places")?,
         "decimal places",

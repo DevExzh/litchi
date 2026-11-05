@@ -6,6 +6,7 @@
 //! catalog, so it stays independent of a particular `Presentation` parser.
 
 mod codec;
+pub(crate) mod locate;
 pub mod metadata;
 mod model;
 mod validation;
@@ -30,19 +31,20 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn masters(&self) -> Result<Inventory<'_>> {
-        let records = self.parser.try_find_records_ref()?;
+        self.check_source()?;
+        let records = self.inner.parser.try_find_records_ref()?;
         let mut persisted = Vec::new();
-        for (&persist_id, &offset) in self.persist_mapping.iter() {
+        for (&persist_id, &offset) in self.inner.persist_mapping.iter() {
             if persist_id == 0 {
                 continue;
             }
             let persist_offset = usize::try_from(offset).map_err(|_err| {
                 crate::package::Error::Corrupted("persist offset exceeds usize".into())
             })?;
-            let (resolved, _) = Record::parse_with_limits(
+            let (resolved, _) = Record::parse(
                 self.document_stream(),
                 persist_offset,
-                self.record_limits,
+                &self.inner.source_limits,
             )?;
             if let Some(record) = records
                 .iter()

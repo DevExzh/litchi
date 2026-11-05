@@ -14,20 +14,24 @@ use super::{
 /// This is the package-free counterpart of [`super::Edit`]. It keeps the
 /// source XML until commit so a failed closure or validation leaves the
 /// builder unchanged.
-pub struct ContentEdit {
+pub struct Draft {
     source: String,
     location: codec::Location,
     original: Option<Vec<Range>>,
     draft: Option<Vec<Range>>,
 }
 
-impl ContentEdit {
+impl Draft {
     pub(crate) fn from_source(source: &str) -> Result<Self> {
-        let location = codec::locate(source)?;
+        let location = codec::locate(
+            source,
+            &litchi_odf_common::XmlStreamLimits::owner_default_value(),
+        )?;
         let original = if let Some(container) = &location.container {
             let fragment = codec::owner_fragment(source, container)?;
             Some(crate::model::database_range::parse_database_ranges(
                 &fragment,
+                &litchi_odf_common::XmlStreamLimits::owner_default_value(),
             )?)
         } else {
             None
@@ -69,21 +73,26 @@ impl ContentEdit {
     }
 
     /// Open semantic CRUD verbs over this edit.
-    pub fn editor(&mut self) -> ContentEditor<'_> {
-        ContentEditor { edit: self }
+    pub fn editor(&mut self) -> DraftEditor<'_> {
+        DraftEditor { edit: self }
     }
 
     /// Publish the candidate content XML.
-    pub fn commit(self) -> Result<ContentCommit> {
+    pub(crate) fn commit(self) -> Result<DraftCommit> {
         validation::validate_candidate(&self.location, &self.original, &self.draft)?;
         if self.original == self.draft {
-            return Ok(ContentCommit {
+            return Ok(DraftCommit {
                 source_xml: self.source,
                 changed: false,
             });
         }
-        let source_xml = codec::replace(&self.source, &self.location, self.draft.as_deref())?;
-        Ok(ContentCommit {
+        let source_xml = codec::replace(
+            &self.source,
+            &self.location,
+            self.draft.as_deref(),
+            &litchi_odf_common::XmlStreamLimits::owner_default_value(),
+        )?;
+        Ok(DraftCommit {
             source_xml,
             changed: true,
         })
@@ -91,11 +100,11 @@ impl ContentEdit {
 }
 
 /// Semantic CRUD verbs over a builder content edit.
-pub struct ContentEditor<'edit> {
-    edit: &'edit mut ContentEdit,
+pub struct DraftEditor<'edit> {
+    edit: &'edit mut Draft,
 }
 
-impl ContentEditor<'_> {
+impl DraftEditor<'_> {
     /// Borrow the current staged declarations.
     #[must_use]
     pub fn ranges(&self) -> &[Range] {
@@ -161,21 +170,21 @@ impl ContentEditor<'_> {
 }
 
 /// Result of publishing a builder content edit.
-pub struct ContentCommit {
+pub(crate) struct DraftCommit {
     source_xml: String,
     changed: bool,
 }
 
-impl ContentCommit {
+impl DraftCommit {
     /// Return whether the content XML changed.
     #[must_use]
-    pub const fn changed(&self) -> bool {
+    pub(crate) const fn changed(&self) -> bool {
         self.changed
     }
 
     /// Consume the commit into content XML.
     #[must_use]
-    pub fn into_source_xml(self) -> String {
+    pub(crate) fn into_source_xml(self) -> String {
         self.source_xml
     }
 }

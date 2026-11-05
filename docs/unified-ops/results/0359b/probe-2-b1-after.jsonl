@@ -1,0 +1,8 @@
+{"scenario":"open_1k","median_us":149.861}
+{"scenario":"noop_1k","median_us":0.042300000000000004}
+{"scenario":"text_commit_1k","median_us":214.46099999999998}
+{"scenario":"text_commit_save_1k","median_us":214.40099999999998}
+{"scenario":"replay_1k","median_us":0.0113}
+{"scenario":"tail_commit_1k","median_us":168.691}
+{"scenario":"unsupported_content","median_us":0.014}
+{"scenario":"protected_commit","median_us":0.1866}

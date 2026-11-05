@@ -1,0 +1,22 @@
+per call = (15 loops - 5 loops) / 10; docx_large_bench DOCX_LARGE_PROFILE=1
+build leg Ir I1mr D1mr D1mw
+base leaf_set 17062653 2543 23132 4135
+base auto_set 9994050 4671 22458 3457
+base committed_set 10221509 3391 41626 6029
+base eager_set 17074175 2882 23165 4258
+base leaf_add 24084326 2266 21309 4924
+base eager_add 8086031 2939 12864 9195
+base auto_add 9986259 5129 16789 6177
+base committed_add 10424855 4104 43308 11201
+base fresh_auto_add 40304731 9962 54055 16189
+base fresh_eager_add 30715679 7570 38081 19899
+after leaf_set 17067083 2567 23047 3980
+after auto_set 9999285 4839 22432 3490
+after committed_set 10221051 3447 41682 6054
+after eager_set 17056710 2915 23111 4240
+after leaf_add 24091248 2299 21322 4890
+after eager_add 8085181 2925 12889 9249
+after auto_add 906463 5120 16741 6189
+after committed_add 5884652 4068 44480 11282
+after fresh_auto_add 31585636 10255 53704 16365
+after fresh_eager_add 30706919 7630 37995 19884

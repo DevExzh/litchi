@@ -19,10 +19,10 @@ use super::super::{
     DocumentThemeLanguages, DocumentThumbnailPreference, DocumentView, DocumentWindowCaption,
     DocumentWord2003Compatibility, DocumentWriteReservations, DocumentXmlPolicies,
     DocumentXslTransform, DocumentXslTransformUsage, HtmlEmailVersion, MAX_DEFAULT_TAB_WIDTH_TWIPS,
-    RtfDocument, RtfWriter, TextDirection, Write, io,
+    TextDirection, Tree, Write, Writer, io,
 };
 
-impl<W: Write> RtfWriter<W> {
+impl<W: Write> Writer<W> {
     /// Write document header
     ///
     /// # Errors
@@ -140,7 +140,7 @@ impl<W: Write> RtfWriter<W> {
     ///
     /// # Errors
     /// Returns an error when writing to the underlying output fails.
-    pub fn write_document_direction(&mut self, doc: &RtfDocument<'_>) -> io::Result<()> {
+    pub fn write_document_direction(&mut self, doc: &Tree<'_>) -> io::Result<()> {
         if let Some(direction) = doc.document_direction() {
             self.write_control_word(
                 match direction {

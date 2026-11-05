@@ -17,16 +17,47 @@ mod workbook;
 #[cfg(test)]
 mod tests;
 
+pub use litchi_core::edit::Diagnostics;
 pub use model::{
     ChainPart, HARD_MAX_GRAPH_PARTS, HARD_MAX_PART_BYTES, HARD_MAX_RECORDS, HARD_MAX_RELATIONSHIPS,
-    ReadLimits,
+    SemanticLimits,
 };
 pub use package::{CONTENT_TYPE, RELATIONSHIP_TYPE};
 pub use patch::{Commit, Patch};
 pub use snapshot::Snapshot;
-pub use transaction::Transaction;
+pub use transaction::{Edit, EditOptions};
 
 /// Alias matching the concise limits naming used by other XLSB feature owners.
-pub type Limits = ReadLimits;
-
 pub use crate::package::error::{Error, Result};
+
+/// A bounded dimension of this family; an exceeded bound is reported as
+/// [`crate::package::PackageError::Limit`] with this kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Bytes of the Calculation Chain part.
+    PartBytes,
+    /// Records of the Calculation Chain part.
+    Records,
+    /// Relationships of the Calculation Chain closure.
+    Relationships,
+    /// Parts of the Calculation Chain closure.
+    GraphParts,
+    /// Bytes of the workbook part read while binding the chain.
+    WorkbookBytes,
+    /// Bytes of the captured Calculation Chain source closure.
+    SourceBytes,
+}
+
+impl std::fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::PartBytes => "Calculation Chain part bytes",
+            Self::Records => "Calculation Chain records",
+            Self::Relationships => "Calculation Chain relationships",
+            Self::GraphParts => "Calculation Chain graph parts",
+            Self::WorkbookBytes => "Calculation Chain workbook bytes",
+            Self::SourceBytes => "Calculation Chain source closure bytes",
+        })
+    }
+}

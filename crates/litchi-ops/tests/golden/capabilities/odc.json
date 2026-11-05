@@ -1,0 +1,464 @@
+{
+  "format": "odc",
+  "state": "open",
+  "verbs": {
+    "get": {
+      "supported": true
+    },
+    "find": {
+      "supported": true
+    },
+    "query": {
+      "supported": true
+    },
+    "view": {
+      "supported": true
+    },
+    "evaluate": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "none: import and evaluation are worksheet operations",
+      "reason": "this format has no worksheets"
+    },
+    "set": {
+      "supported": true
+    },
+    "add": {
+      "supported": true
+    },
+    "remove": {
+      "supported": true
+    },
+    "move": {
+      "supported": true
+    },
+    "swap": {
+      "supported": true
+    },
+    "edit": {
+      "supported": true
+    },
+    "batch": {
+      "supported": true
+    },
+    "import": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "none: import and evaluation are worksheet operations",
+      "reason": "this format has no worksheets"
+    },
+    "merge": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "template merge for the ODF object formats and iWork (record 0295)",
+      "reason": "template merge fills word-processing, presentation and spreadsheet templates"
+    },
+    "replace": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0295 follow-up: a find adapter over the format's text edits",
+      "reason": "find/replace is not integrated for this format"
+    },
+    "refresh": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0295 follow-up: field refresh for PPT, RTF and the ODF object formats",
+      "reason": "this format has no field refresh adapter"
+    },
+    "save": {
+      "supported": true
+    },
+    "create": {
+      "supported": true
+    },
+    "dump": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0336 follow-up: dump plans for the remaining formats",
+      "reason": "this format's write verbs cannot yet rebuild its node tree on a created document"
+    },
+    "raw": {
+      "supported": true
+    },
+    "validate": {
+      "supported": true
+    },
+    "add-part": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0336 follow-up: raw ODF part writes through the ODF package publisher",
+      "reason": "raw part writes cover OOXML (DOCX, XLSX, PPTX, XLSB)"
+    },
+    "raw-set": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0336 follow-up: raw ODF part writes through the ODF package publisher",
+      "reason": "raw part writes cover OOXML (DOCX, XLSX, PPTX, XLSB)"
+    }
+  },
+  "views": {
+    "text": {
+      "supported": true
+    },
+    "annotated": {
+      "supported": true
+    },
+    "outline": {
+      "supported": true
+    },
+    "stats": {
+      "supported": true
+    },
+    "issues": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    "forms": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    "html": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "svg": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "screenshot": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "pdf": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    }
+  },
+  "elements": [
+    {
+      "format": "odc",
+      "element": "chart",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/"
+        ]
+      },
+      "children": [
+        {
+          "element": "axis",
+          "pathSegment": "axis"
+        },
+        {
+          "element": "series",
+          "pathSegment": "series"
+        },
+        {
+          "element": "legend",
+          "pathSegment": "legend"
+        }
+      ],
+      "properties": {
+        "chartType": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "title": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "subtitle": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "axisCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "seriesCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "dataRange": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      }
+    },
+    {
+      "format": "odc",
+      "element": "axis",
+      "parent": "chart",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/axis[N]"
+        ]
+      },
+      "properties": {
+        "dimension": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "title": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "categories": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "style": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odc",
+      "element": "series",
+      "parent": "chart",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/series[N]"
+        ]
+      },
+      "properties": {
+        "values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "label": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "chartType": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "axis": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "pointCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odc",
+      "element": "legend",
+      "parent": "chart",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "stable": [
+          "/legend"
+        ]
+      },
+      "properties": {
+        "position": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    }
+  ],
+  "gaps": [
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "chart",
+      "context": "a chart outside the leaf's lossless typed definition surface",
+      "code": "unsupported_capability",
+      "followUp": "0288 ODC lossless producer definitions",
+      "reason": "title, type, size, series and axis writes replace the chart through its typed definition; a producer chart the leaf cannot project losslessly is refused rather than rewritten"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "series",
+      "context": "data points, data labels, regressions and series styles",
+      "code": "unsupported_capability",
+      "followUp": "0288 ODC series detail writes",
+      "reason": "the unified registry writes a series' ranges, label, class and axis; its data points, labels, regression curves and styles stay as authored"
+    },
+    {
+      "subject": "operation",
+      "verb": "move",
+      "element": "series",
+      "context": "a chart outside the leaf's lossless typed definition surface",
+      "code": "unsupported_capability",
+      "followUp": "0288 ODC lossless producer definitions",
+      "reason": "series and axes reorder, and the legend is added or removed, through the chart's typed definition; a producer chart the leaf cannot project losslessly is refused rather than rewritten"
+    },
+    {
+      "subject": "operation",
+      "verb": "move",
+      "element": "legend",
+      "context": "the chart's single legend",
+      "code": "unsupported_capability",
+      "followUp": "none: a chart has at most one legend",
+      "reason": "the legend has no siblings to reorder; set its `position` instead"
+    },
+    {
+      "subject": "operation",
+      "verb": "get",
+      "element": "metadata",
+      "context": "path-read",
+      "code": "unsupported_capability",
+      "followUp": "0288 ODF object metadata node",
+      "reason": "`set(\"/metadata\", ..)` writes meta.xml through the ODF metadata family; the path is set-only, and reads go through File::metadata()"
+    },
+    {
+      "subject": "view",
+      "mode": "issues",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "forms",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "html",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "svg",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "screenshot",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "pdf",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    }
+  ]
+}

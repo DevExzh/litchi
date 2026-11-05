@@ -3,10 +3,6 @@
     reason = "items remain grouped by OOXML schema family and package lifecycle"
 )]
 #![expect(
-    clippy::module_name_repetitions,
-    reason = "public names retain established OOXML facade terminology"
-)]
-#![expect(
     clippy::shadow_reuse,
     reason = "parser bindings are intentionally refined after validation"
 )]
@@ -25,9 +21,9 @@ use std::collections::HashSet;
 use std::fmt::Write as FmtWrite;
 
 // Import shared format types
-pub use super::super::format::TableBorderStyle;
+pub(crate) use super::super::format::TableBorderStyle;
 // Import paragraph types
-use super::paragraph::MutableParagraph;
+use super::paragraph::Paragraph;
 use super::revision::{
     CellRevisionKind, ConflictKind, RevisionMetadata, RowRevisionKind, TableCellMergeRevisionState,
     conflict_element_name, write_conflict_attributes,
@@ -165,16 +161,16 @@ fn write_property_conflict_markers(
 }
 
 /// A mutable table.
-#[derive(Debug)]
-pub struct MutableTable {
+#[derive(Debug, Clone)]
+pub struct Table {
     /// Table rows
-    pub(crate) rows: Vec<MutableRow>,
+    pub(crate) rows: Vec<Row>,
     /// Table properties
     pub(crate) properties: TableProperties,
     property_change: Option<PropertyChange<TableProperties>>,
 }
 
-impl MutableTable {
+impl Table {
     pub(crate) fn new(rows: usize, cols: usize) -> Self {
         let mut table = Self {
             rows: Vec::with_capacity(rows),
@@ -192,8 +188,8 @@ impl MutableTable {
     /// # Panics
     ///
     /// Panics if an internal writer invariant is violated.
-    pub fn add_row(&mut self, cols: usize) -> &mut MutableRow {
-        self.rows.push(MutableRow::new(cols));
+    pub fn add_row(&mut self, cols: usize) -> &mut Row {
+        self.rows.push(Row::new(cols));
         self.rows.last_mut().unwrap()
     }
 
@@ -213,7 +209,7 @@ impl MutableTable {
     }
 
     /// Get a cell by row and column index.
-    pub fn cell(&mut self, row: usize, col: usize) -> Option<&mut MutableCell> {
+    pub fn cell(&mut self, row: usize, col: usize) -> Option<&mut Cell> {
         self.rows.get_mut(row)?.cell(col)
     }
 
@@ -224,7 +220,7 @@ impl MutableTable {
     }
 
     /// Get a row by index.
-    pub fn row(&mut self, index: usize) -> Option<&mut MutableRow> {
+    pub fn row(&mut self, index: usize) -> Option<&mut Row> {
         self.rows.get_mut(index)
     }
 
@@ -301,7 +297,7 @@ impl MutableTable {
     pub fn set_property_change(
         &mut self,
         metadata: RevisionMetadata,
-        previous: &MutableTable,
+        previous: &Table,
     ) -> Result<&mut Self> {
         if self.property_change.is_some() {
             return Err(Error::InvalidFormat(
@@ -457,10 +453,10 @@ impl MutableTable {
 }
 
 /// A mutable table row.
-#[derive(Debug)]
-pub struct MutableRow {
+#[derive(Debug, Clone)]
+pub struct Row {
     /// Table cells in this row
-    pub(crate) cells: Vec<MutableCell>,
+    pub(crate) cells: Vec<Cell>,
     /// HTML division ID referenced by this row
     pub(crate) division_id: Option<String>,
     /// Word 2010 row-level extension identifiers.
@@ -470,7 +466,7 @@ pub struct MutableRow {
     property_conflicts: Vec<PropertyConflictMarker>,
 }
 
-impl MutableRow {
+impl Row {
     pub(crate) fn new(cols: usize) -> Self {
         let mut row = Self {
             cells: Vec::with_capacity(cols),
@@ -481,13 +477,13 @@ impl MutableRow {
             property_conflicts: Vec::new(),
         };
         for _ in 0..cols {
-            row.cells.push(MutableCell::new());
+            row.cells.push(Cell::new());
         }
         row
     }
 
     /// Get a cell by index.
-    pub fn cell(&mut self, index: usize) -> Option<&mut MutableCell> {
+    pub fn cell(&mut self, index: usize) -> Option<&mut Cell> {
         self.cells.get_mut(index)
     }
 
@@ -496,8 +492,8 @@ impl MutableRow {
     /// # Panics
     ///
     /// Panics if an internal writer invariant is violated.
-    pub fn add_cell(&mut self) -> &mut MutableCell {
-        self.cells.push(MutableCell::new());
+    pub fn add_cell(&mut self) -> &mut Cell {
+        self.cells.push(Cell::new());
         self.cells.last_mut().unwrap()
     }
 
@@ -561,7 +557,7 @@ impl MutableRow {
     pub fn set_property_change(
         &mut self,
         metadata: RevisionMetadata,
-        previous: &MutableRow,
+        previous: &Row,
     ) -> Result<&mut Self> {
         if self.property_change.is_some() {
             return Err(Error::InvalidFormat(
@@ -704,13 +700,13 @@ impl MutableRow {
 
 #[cfg(test)]
 mod tests {
-    use super::{ConflictKind, MutableRow, RevisionMetadata};
+    use super::{ConflictKind, RevisionMetadata, Row};
     use crate::revision::conflict::{Id, Metadata};
-    use crate::table::Row;
+    use crate::table::Row as ReadRow;
 
     #[test]
     fn writes_row_division_id_for_reader_round_trip() {
-        let mut row = MutableRow::new(1);
+        let mut row = Row::new(1);
         row.set_division_id("-123456789012345678901234567890")
             .unwrap();
 
@@ -718,7 +714,7 @@ mod tests {
 
         let mut xml = String::new();
         row.to_xml(&mut xml).unwrap();
-        let parsed = Row::new(xml.into_bytes());
+        let parsed = ReadRow::new(xml.into_bytes());
         assert_eq!(
             parsed.division_id().unwrap().as_deref(),
             Some("-123456789012345678901234567890")
@@ -732,17 +728,17 @@ mod tests {
 
     #[test]
     fn rejects_invalid_row_division_id() {
-        let mut row = MutableRow::new(0);
+        let mut row = Row::new(0);
         assert!(row.set_division_id("+").is_err());
         assert_eq!(row.division_id(), None);
     }
 
     #[test]
     fn writes_ordered_row_property_conflicts_after_property_change() {
-        let mut previous = MutableRow::new(0);
+        let mut previous = Row::new(0);
         previous.set_division_id("7").unwrap();
 
-        let mut row = MutableRow::new(0);
+        let mut row = Row::new(0);
         row.set_division_id("8").unwrap();
         row.set_property_change(RevisionMetadata::new("40", "editor").unwrap(), &previous)
             .unwrap();
@@ -778,10 +774,10 @@ mod tests {
 }
 
 /// A mutable table cell.
-#[derive(Debug)]
-pub struct MutableCell {
+#[derive(Debug, Clone)]
+pub struct Cell {
     /// Paragraphs in this cell
-    pub(crate) paragraphs: Vec<MutableParagraph>,
+    pub(crate) paragraphs: Vec<Paragraph>,
     /// Cell properties
     pub(crate) properties: CellProperties,
     revision: Option<(CellRevisionKind, RevisionMetadata)>,
@@ -789,10 +785,10 @@ pub struct MutableCell {
     property_change: Option<PropertyChange<CellProperties>>,
 }
 
-impl MutableCell {
+impl Cell {
     pub(crate) fn new() -> Self {
         Self {
-            paragraphs: vec![MutableParagraph::new()],
+            paragraphs: vec![Paragraph::new()],
             properties: CellProperties::default(),
             revision: None,
             merge_change: None,
@@ -805,8 +801,8 @@ impl MutableCell {
     /// # Panics
     ///
     /// Panics if an internal writer invariant is violated.
-    pub fn add_paragraph(&mut self) -> &mut MutableParagraph {
-        self.paragraphs.push(MutableParagraph::new());
+    pub fn add_paragraph(&mut self) -> &mut Paragraph {
+        self.paragraphs.push(Paragraph::new());
         self.paragraphs.last_mut().unwrap()
     }
 
@@ -817,7 +813,7 @@ impl MutableCell {
     }
 
     /// Get a paragraph by index.
-    pub fn paragraph(&mut self, index: usize) -> Option<&mut MutableParagraph> {
+    pub fn paragraph(&mut self, index: usize) -> Option<&mut Paragraph> {
         self.paragraphs.get_mut(index)
     }
 
@@ -901,7 +897,7 @@ impl MutableCell {
     pub fn set_property_change(
         &mut self,
         metadata: RevisionMetadata,
-        previous: &MutableCell,
+        previous: &Cell,
     ) -> Result<&mut Self> {
         if self.property_change.is_some() {
             return Err(Error::InvalidFormat(
@@ -968,7 +964,7 @@ impl MutableCell {
             }
         }
         if let Some(borders) = &properties.borders {
-            MutableTable::write_borders(xml, "tcBorders", borders, false)?;
+            Table::write_borders(xml, "tcBorders", borders, false)?;
         }
         if let Some(color) = &properties.background_color {
             write!(
@@ -1030,7 +1026,7 @@ impl MutableCell {
 mod revision_tests {
     use super::*;
     use crate::revision::RevisionType;
-    use crate::table::Table;
+    use crate::table::Table as ReadTable;
 
     fn metadata(id: &str) -> RevisionMetadata {
         let mut metadata = RevisionMetadata::new(id, "表 & \"作者\"").unwrap();
@@ -1045,9 +1041,9 @@ mod revision_tests {
 
     #[test]
     fn writes_and_parses_all_table_row_and_cell_revision_types() {
-        let mut previous_table = MutableTable::new(1, 1);
+        let mut previous_table = Table::new(1, 1);
         previous_table.set_width_percent(42);
-        let mut table = MutableTable::new(2, 2);
+        let mut table = Table::new(2, 2);
         table.set_width_percent(80);
         table
             .set_row_revisions(RowRevisionKind::Insert, [metadata("1"), metadata("2")])
@@ -1056,14 +1052,14 @@ mod revision_tests {
             .set_property_change(metadata("10"), &previous_table)
             .unwrap();
 
-        let mut previous_row = MutableRow::new(1);
+        let mut previous_row = Row::new(1);
         previous_row.set_division_id("17").unwrap();
         let row = table.row(0).unwrap();
         row.set_division_id("18").unwrap();
         row.set_property_change(metadata("11"), &previous_row)
             .unwrap();
 
-        let mut previous_cell = MutableCell::new();
+        let mut previous_cell = Cell::new();
         previous_cell.set_width_dxa(720);
         previous_cell.set_background_color("00FF00");
         previous_cell.set_vertical_merge(Some(VMergeState::Restart));
@@ -1114,7 +1110,7 @@ mod revision_tests {
         let cell_change = xml.find("<w:tcPrChange").unwrap();
         assert!(cell_marker < cell_merge && cell_merge < cell_change);
 
-        let parsed = Table::new(xml.into_bytes()).revisions().unwrap();
+        let parsed = ReadTable::new(xml.into_bytes()).revisions().unwrap();
         let kinds: Vec<_> = parsed
             .iter()
             .map(|revision| revision.revision_type())
@@ -1140,7 +1136,7 @@ mod revision_tests {
 
     #[test]
     fn writes_table_row_deletions_and_parses_strict_namespace() {
-        let mut table = MutableTable::new(1, 1);
+        let mut table = Table::new(1, 1);
         table
             .set_row_revisions(RowRevisionKind::Delete, [metadata("10")])
             .unwrap();
@@ -1153,14 +1149,14 @@ mod revision_tests {
             "<w:tbl xmlns:w=\"http://purl.oclc.org/ooxml/wordprocessingml/main\">",
             1,
         );
-        let revisions = Table::new(strict.into_bytes()).revisions().unwrap();
+        let revisions = ReadTable::new(strict.into_bytes()).revisions().unwrap();
         assert_eq!(revisions.len(), 1);
         assert_eq!(revisions[0].revision_type(), RevisionType::RowDelete);
     }
 
     #[test]
     fn row_revision_batches_validate_count_ids_and_conflicts_atomically() {
-        let mut too_few = MutableTable::new(2, 1);
+        let mut too_few = Table::new(2, 1);
         assert!(
             too_few
                 .set_row_revisions(RowRevisionKind::Insert, [metadata("20")])
@@ -1169,7 +1165,7 @@ mod revision_tests {
         assert_eq!(too_few.row(0).unwrap().revision_kind(), None);
         assert_eq!(too_few.row(1).unwrap().revision_kind(), None);
 
-        let mut too_many = MutableTable::new(1, 1);
+        let mut too_many = Table::new(1, 1);
         assert!(
             too_many
                 .set_row_revisions(RowRevisionKind::Delete, [metadata("21"), metadata("22")])
@@ -1177,7 +1173,7 @@ mod revision_tests {
         );
         assert_eq!(too_many.row(0).unwrap().revision_kind(), None);
 
-        let mut duplicate = MutableTable::new(2, 1);
+        let mut duplicate = Table::new(2, 1);
         assert!(
             duplicate
                 .set_row_revisions(RowRevisionKind::Insert, [metadata("30"), metadata("30")])
@@ -1186,7 +1182,7 @@ mod revision_tests {
         assert_eq!(duplicate.row(0).unwrap().revision_kind(), None);
         assert_eq!(duplicate.row(1).unwrap().revision_kind(), None);
 
-        let mut conflict = MutableTable::new(2, 1);
+        let mut conflict = Table::new(2, 1);
         conflict
             .row(0)
             .unwrap()
@@ -1203,9 +1199,9 @@ mod revision_tests {
         );
         assert_eq!(conflict.row(1).unwrap().revision_kind(), None);
 
-        let mut previous = MutableTable::new(2, 1);
+        let mut previous = Table::new(2, 1);
         previous.set_width_percent(42);
-        let mut with_property = MutableTable::new(2, 1);
+        let mut with_property = Table::new(2, 1);
         with_property
             .set_property_change(metadata("50"), &previous)
             .unwrap();
@@ -1217,23 +1213,23 @@ mod revision_tests {
         assert_eq!(with_property.row(0).unwrap().revision_kind(), None);
         assert_eq!(with_property.row(1).unwrap().revision_kind(), None);
 
-        let mut with_history = MutableTable::new(1, 1);
+        let mut with_history = Table::new(1, 1);
         with_history
             .set_row_revisions(RowRevisionKind::Insert, [metadata("60")])
             .unwrap();
         with_history
-            .set_property_change(metadata("61"), &MutableTable::new(1, 1))
+            .set_property_change(metadata("61"), &Table::new(1, 1))
             .unwrap();
         let mut xml = String::new();
         with_history.to_xml(&mut xml).unwrap();
         assert!(xml.contains("<w:ins w:id=\"60\""));
         assert!(xml.contains("<w:tblPrChange w:id=\"61\""));
 
-        let mut previous_with_history = MutableTable::new(1, 1);
+        let mut previous_with_history = Table::new(1, 1);
         previous_with_history
-            .set_property_change(metadata("70"), &MutableTable::new(1, 1))
+            .set_property_change(metadata("70"), &Table::new(1, 1))
             .unwrap();
-        let mut target = MutableTable::new(1, 1);
+        let mut target = Table::new(1, 1);
         assert!(
             target
                 .set_property_change(metadata("71"), &previous_with_history)

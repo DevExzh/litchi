@@ -23,6 +23,11 @@ pub enum SaveError {
     Write(WriteError),
     /// The staged package could not be published to the destination.
     Publication(PublicationError),
+    /// A package directory's files could not be written into its staging
+    /// directory ([`super::Package::save_directory`]).
+    Bundling(std::io::Error),
+    /// The bundle's `Index.zip` could not be assembled.
+    Bundle(litchi_iwa_archive::Error),
 }
 
 impl fmt::Debug for SaveError {
@@ -38,6 +43,14 @@ impl fmt::Debug for SaveError {
                 debug
                     .field("kind", &"publication")
                     .field("was_committed", &error.was_committed());
+            },
+            Self::Bundling(error) => {
+                debug
+                    .field("kind", &"bundling")
+                    .field("io_kind", &error.kind());
+            },
+            Self::Bundle(_) => {
+                debug.field("kind", &"bundle");
             },
         }
         debug.finish_non_exhaustive()
@@ -62,7 +75,7 @@ impl SaveError {
     pub const fn write_error(&self) -> Option<&WriteError> {
         match self {
             Self::Write(error) => Some(error),
-            Self::Publication(_) => None,
+            Self::Publication(_) | Self::Bundling(_) | Self::Bundle(_) => None,
         }
     }
 
@@ -71,7 +84,7 @@ impl SaveError {
     #[must_use]
     pub const fn publication_error(&self) -> Option<&PublicationError> {
         match self {
-            Self::Write(_) => None,
+            Self::Write(_) | Self::Bundling(_) | Self::Bundle(_) => None,
             Self::Publication(error) => Some(error),
         }
     }
@@ -83,7 +96,7 @@ impl SaveError {
     #[must_use]
     pub fn was_committed(&self) -> bool {
         match self {
-            Self::Write(_) => false,
+            Self::Write(_) | Self::Bundling(_) | Self::Bundle(_) => false,
             Self::Publication(error) => error.was_committed(),
         }
     }
@@ -93,7 +106,7 @@ impl SaveError {
     pub fn into_write_error(self) -> Option<WriteError> {
         match self {
             Self::Write(error) => Some(error),
-            Self::Publication(_) => None,
+            Self::Publication(_) | Self::Bundling(_) | Self::Bundle(_) => None,
         }
     }
 
@@ -102,7 +115,7 @@ impl SaveError {
     #[must_use]
     pub fn into_publication_error(self) -> Option<PublicationError> {
         match self {
-            Self::Write(_) => None,
+            Self::Write(_) | Self::Bundling(_) | Self::Bundle(_) => None,
             Self::Publication(error) => Some(error),
         }
     }
@@ -113,6 +126,8 @@ impl fmt::Display for SaveError {
         formatter.write_str(match self {
             Self::Write(_) => "could not write Pages package while staging it",
             Self::Publication(_) => "could not publish Pages package",
+            Self::Bundling(_) => "could not write Pages package directory files",
+            Self::Bundle(_) => "could not assemble Pages package directory index",
         })
     }
 }
@@ -122,6 +137,8 @@ impl std::error::Error for SaveError {
         match self {
             Self::Write(error) => Some(error),
             Self::Publication(error) => Some(error),
+            Self::Bundling(error) => Some(error),
+            Self::Bundle(error) => Some(error),
         }
     }
 }

@@ -16,8 +16,8 @@ mod validation;
 mod tests;
 
 pub use model::{Catalog, Selector};
-pub use snapshot::{Commit, Edit, OwnedEditor, Patch, Snapshot};
-pub use transaction::{Commit as CatalogCommit, Editor, Transaction};
+pub use snapshot::{Edit, OwnedEditor, Snapshot};
+pub use transaction::Editor;
 
 pub use crate::model::data_pilot::{
     DisplayInfo, DisplayMemberMode, Field, FieldReference, GrandTotal, GrandTotalElement,

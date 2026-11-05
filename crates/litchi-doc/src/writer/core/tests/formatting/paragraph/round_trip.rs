@@ -61,13 +61,13 @@ fn preserves_ordered_paragraph_property_revision_state() {
     assert_eq!(previous.indent_left, Some(100));
     assert_eq!(previous.indent_right, None);
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer
         .add_formatted_paragraph("Tracked formatting", formatting)
         .unwrap();
     let mut cursor = Cursor::new(Vec::new());
-    writer.write_to(&mut cursor).unwrap();
-    let mut package = crate::Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut cursor).unwrap();
+    let mut package = crate::raw::Reader::from_reader(Cursor::new(cursor.into_inner())).unwrap();
     let document = package.document().unwrap();
     let paragraphs = document.paragraphs().unwrap();
     let properties = paragraphs[0].properties();
@@ -151,7 +151,7 @@ fn test_paragraph_formatting_writer_reader_round_trip() {
         prefix: "§(".to_string(),
         suffix: ")".to_string(),
     };
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer
         .add_formatted_paragraph(
             "Exactly spaced",
@@ -277,8 +277,8 @@ fn test_paragraph_formatting_writer_reader_round_trip() {
         .unwrap();
 
     let mut cursor = Cursor::new(Vec::new());
-    writer.write_to(&mut cursor).unwrap();
-    let mut package = crate::Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut cursor).unwrap();
+    let mut package = crate::raw::Reader::from_reader(Cursor::new(cursor.into_inner())).unwrap();
     let document = package.document().unwrap();
     let paragraphs = document.paragraphs().unwrap();
 

@@ -9,8 +9,7 @@ use litchi_iwa_archive::{
 use litchi_iwa_common::wire::WireView;
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_keynote::{
-    MAX_OBJECTS, MAX_SLIDES, MAX_TEXT_BYTES, MAX_TEXT_FRAGMENTS, MAX_TEXT_STORAGES, Package,
-    ReadOptions, SemanticLimits, SlideSelector,
+    OpenOptions, Package, SemanticLimits, SlideSelector,
     slide::placeholder::{Error, Kind, State},
 };
 
@@ -39,13 +38,13 @@ fn rewrite_slide_payload(
     source: &[u8],
     rewrite: impl FnOnce(&[u8]) -> TestResult<Vec<u8>>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == SLIDE_MEMBER)
         .ok_or_else(|| io::Error::other("missing native slide member"))?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let mut archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
     let slide = archive
         .object_mut(SLIDE_IDENTIFIER)
         .ok_or_else(|| io::Error::other("missing native slide object"))?;
@@ -61,8 +60,10 @@ fn rewrite_slide_payload(
             type_: SLIDE_MESSAGE_TYPE,
             data: rewritten,
         },
+        Default::default(),
     )?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(SLIDE_MEMBER, &compressed)],
         Limits::default(),
@@ -71,7 +72,7 @@ fn rewrite_slide_payload(
 
 fn without_body_placeholder(source: &[u8]) -> TestResult<Vec<u8>> {
     rewrite_slide_payload(source, |payload| {
-        let view = WireView::parse(payload)?;
+        let view = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?;
         let body_reference = view
             .fields()
             .find(|field| field.number() == BODY_REFERENCE_FIELD)
@@ -95,7 +96,7 @@ fn without_body_placeholder(source: &[u8]) -> TestResult<Vec<u8>> {
 
 fn with_mismatched_body_membership(source: &[u8]) -> TestResult<Vec<u8>> {
     rewrite_slide_payload(source, |payload| {
-        let view = WireView::parse(payload)?;
+        let view = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?;
         let body_reference = view
             .fields()
             .find(|field| field.number() == BODY_REFERENCE_FIELD)
@@ -116,13 +117,18 @@ fn with_mismatched_body_membership(source: &[u8]) -> TestResult<Vec<u8>> {
 
 fn length_field(number: u32, payload: &[u8]) -> TestResult<Vec<u8>> {
     let mut output = Vec::with_capacity(payload.len().saturating_add(8));
-    litchi_iwa_common::wire::append_length_delimited_field(&mut output, number, payload)?;
+    litchi_iwa_common::wire::append_length_delimited_field(
+        &mut output,
+        number,
+        payload,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(output)
 }
 
 fn malformed_body_reference(source: &[u8], mode: u8) -> TestResult<Vec<u8>> {
     rewrite_slide_payload(source, |payload| {
-        let view = WireView::parse(payload)?;
+        let view = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?;
         let body = view
             .fields()
             .find(|field| field.number() == BODY_REFERENCE_FIELD)
@@ -152,7 +158,7 @@ fn malformed_body_reference(source: &[u8], mode: u8) -> TestResult<Vec<u8>> {
 
 fn malformed_slide_number_reference(source: &[u8], mode: u8) -> TestResult<Vec<u8>> {
     rewrite_slide_payload(source, |payload| {
-        let view = WireView::parse(payload)?;
+        let view = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?;
         let number = view
             .fields()
             .find(|field| field.number() == SLIDE_NUMBER_REFERENCE_FIELD)
@@ -216,8 +222,8 @@ fn native_visible_noop_hide_apply_inverse_and_locality() -> TestResult<()> {
     );
     let target = bytes(commit.package())?;
     assert_eq!(commit.diagnostics().deleted_previews(), 3);
-    let before = Catalog::from_bytes(&source)?;
-    let after = Catalog::from_bytes(&target)?;
+    let before = Catalog::from_bytes(&source, Default::default())?;
+    let after = Catalog::from_bytes(&target, Default::default())?;
     for (left, right) in before.iter().zip(after.iter()) {
         if left.data() == right.data() {
             assert_eq!(
@@ -268,7 +274,9 @@ fn missing_body_is_none_for_reads_and_typed_for_edits() -> TestResult<()> {
     );
     assert!(matches!(
         package.edit_slide_placeholder_visibility(0usize, Kind::Body),
-        Err(Error::PlaceholderNotFound { .. })
+        Err(Error::Refused(
+            litchi_keynote::slide::placeholder::Refusal::PlaceholderNotFound { .. }
+        ))
     ));
     Ok(())
 }
@@ -305,20 +313,13 @@ fn nested_body_reference_corruption_fails_closed_and_preserves_bytes() -> TestRe
 #[test]
 fn reference_limit_is_charged_on_placeholder_edit_admission() -> TestResult<()> {
     let source = std::fs::read(fixture())?;
-    let limits = SemanticLimits::new(
-        MAX_OBJECTS,
-        MAX_SLIDES,
-        1,
-        MAX_TEXT_STORAGES,
-        MAX_TEXT_FRAGMENTS,
-        MAX_TEXT_BYTES,
-    )?;
+    let limits = SemanticLimits::builder().max_references(1)?.build()?;
     let package =
-        Package::from_bytes_with_options(&source, ReadOptions::new(Limits::default(), limits))?;
+        Package::from_bytes_with_options(&source, OpenOptions::new().semantic_limits(limits))?;
     let before = bytes(&package)?;
     assert!(matches!(
         package.edit_slide_placeholder_visibility(0usize, Kind::Title),
-        Err(Error::LimitExceeded {
+        Err(Error::Limit {
             kind: litchi_keynote::slide::placeholder::LimitKind::References,
             observed: 2,
             maximum: 1

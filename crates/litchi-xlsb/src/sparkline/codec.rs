@@ -5,7 +5,7 @@
 
 //! Strict BIFF12 sparkline block codec.
 
-use crate::raw::{self, Cursor, Record, Records, Writer, kind};
+use crate::raw::{self, Cursor, Encoder, Record, Records, kind};
 use litchi_sheet::sparkline::{AxisType, EmptyCells, SparklineType};
 
 use super::model::{
@@ -16,12 +16,16 @@ use super::model::{
 const GROUP_FIXED_BYTES: usize = 2 + 8 * 8 + 3 * 8 + 4;
 const LOCATION_HEADER_BYTES: usize = 4 + 4 + 4 + 4 + 16;
 
+fn raw_limits(limits: Limits) -> raw::Limits {
+    raw::Limits::new(limits.record_bytes(), 1)
+}
+
 /// Parse one block beginning at `BrtBeginSparklineGroups` and return the
 /// number of source bytes consumed through `BrtEndSparklineGroups`.
 pub(crate) fn parse_block(input: &[u8], limits: Limits) -> Result<(Groups, usize)> {
     limits.validate()?;
     let raw_limits = raw::Limits::new(limits.record_bytes(), 1);
-    let mut records = Records::with_limits(input, raw_limits);
+    let mut records = Records::new(input, raw_limits);
 
     let begin = next(&mut records, "BrtBeginSparklineGroups")?;
     enforce_block_bytes(records.offset(), limits)?;
@@ -66,7 +70,7 @@ pub(crate) fn parse_block(input: &[u8], limits: Limits) -> Result<(Groups, usize
     }
     let consumed = records.offset();
     enforce_block_bytes(consumed, limits)?;
-    Ok((Groups::with_limits(groups, limits)?, consumed))
+    Ok((Groups::new(groups, limits)?, consumed))
 }
 
 /// Validate and buffer one complete sparkline block before exposing bytes.
@@ -79,7 +83,7 @@ pub(crate) fn encode_block(value: &Groups, limits: Limits) -> Result<Vec<u8>> {
     output
         .try_reserve_exact(encoded_len)
         .map_err(|_| allocation("encoded block"))?;
-    let mut writer = Writer::with_limits(output, raw::Limits::new(limits.record_bytes(), 1));
+    let mut writer = Encoder::new(output, raw::Limits::new(limits.record_bytes(), 1));
     writer.write_record(kind::BEGIN_SPARKLINE_GROUPS, &[])?;
     for group in value.as_slice() {
         let payload = encode_group_payload(group, limits)?;
@@ -110,6 +114,7 @@ fn parse_group(
             .get(header_bytes..)
             .ok_or_else(|| value("BrtBeginSparklineGroup", "FRTHeader length overflow"))?,
         "BrtBeginSparklineGroup",
+        raw_limits(limits),
     );
     let flags = cursor.read_u16()?;
     let date_axis = flags & 0x0001 != 0;
@@ -117,10 +122,10 @@ fn parse_group(
         0 => EmptyCells::Zero,
         1 => EmptyCells::Gap,
         2 => EmptyCells::Span,
-        other => {
+        _other => {
             return Err(value(
                 "BrtBeginSparklineGroup",
-                format!("fShowEmptyCellAsZero {other} is reserved"),
+                "fShowEmptyCellAsZero is reserved",
             ));
         },
     };
@@ -174,11 +179,8 @@ fn parse_group(
         0 => SparklineType::Line,
         1 => SparklineType::Column,
         2 => SparklineType::Stacked,
-        other => {
-            return Err(value(
-                "BrtBeginSparklineGroup",
-                format!("isltype {other} is outside 0..=2"),
-            ));
+        _other => {
+            return Err(value("BrtBeginSparklineGroup", "isltype is outside 0..=2"));
         },
     };
     cursor.finish()?;
@@ -239,12 +241,12 @@ fn parse_group(
 }
 
 fn parse_sparkline(payload: &[u8], limits: Limits) -> Result<Sparkline> {
-    let mut cursor = Cursor::new(payload, "BrtSparkline");
+    let mut cursor = Cursor::new(payload, "BrtSparkline", raw_limits(limits));
     let flags = cursor.read_u32()?;
     if !matches!(flags, 0x02 | 0x06) {
         return Err(value(
             "BrtSparkline",
-            format!("FRTHeader flags 0x{flags:08X} must be 0x02 or 0x06"),
+            "FRTHeader flags 0x must be 0x02 or 0x06",
         ));
     }
     if cursor.read_u32()? != 1 {
@@ -255,10 +257,7 @@ fn parse_sparkline(payload: &[u8], limits: Limits) -> Result<Sparkline> {
     }
     let state_flags = cursor.read_u32()?;
     if state_flags & 0x02 == 0 || state_flags & !0x0001_000f != 0 {
-        return Err(value(
-            "BrtSparkline",
-            format!("invalid FRTSqref state flags 0x{state_flags:08X}"),
-        ));
+        return Err(value("BrtSparkline", "invalid FRTSqref state flags"));
     }
     if cursor.read_i32()? != 1 {
         return Err(value(
@@ -287,12 +286,12 @@ fn parse_sparkline(payload: &[u8], limits: Limits) -> Result<Sparkline> {
 }
 
 fn parse_formula_header(payload: &[u8], limits: Limits) -> Result<(Option<Formula>, usize)> {
-    let mut cursor = Cursor::new(payload, "BrtBeginSparklineGroup");
+    let mut cursor = Cursor::new(payload, "BrtBeginSparklineGroup", raw_limits(limits));
     let flags = cursor.read_u32()?;
     if !matches!(flags, 0x00 | 0x04) {
         return Err(value(
             "BrtBeginSparklineGroup",
-            format!("FRTHeader flags 0x{flags:08X} must be zero or 0x04"),
+            "FRTHeader flags 0x must be zero or 0x04",
         ));
     }
     let formula = if flags == 0x04 {
@@ -312,7 +311,7 @@ fn parse_formula_from_cursor(cursor: &mut Cursor<'_>, limits: Limits) -> Result<
     if formula_flags != 0x02 {
         return Err(value(
             "FRTFormula",
-            format!("reserved flags must equal 0x00000002, found 0x{formula_flags:08X}"),
+            "reserved flags must equal 0x00000002, found 0x",
         ));
     }
     let cce = usize::try_from(cursor.read_u32()?)
@@ -550,7 +549,7 @@ fn next<'a>(records: &mut Records<'a>, expected: &'static str) -> Result<Record<
         Some(Err(error)) => Err(error.into()),
         None => Err(Error::Record {
             expected,
-            found: "end of input".to_string(),
+            found: "end of input",
         }),
     }
 }
@@ -561,7 +560,7 @@ fn expect_kind(record: Record<'_>, expected: raw::Kind, name: &'static str) -> R
     } else {
         Err(Error::Record {
             expected: name,
-            found: record.kind().to_string(),
+            found: "an unexpected record",
         })
     }
 }

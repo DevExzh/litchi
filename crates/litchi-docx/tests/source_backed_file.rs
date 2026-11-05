@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits as CoreLimits, Resource,
 };
-use litchi_docx::{Error, Package, ReadLimits, source_backed};
+use litchi_docx::{Error, Package, SourceLimits, source_backed};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
     BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, Part, SourceCacheLimits, TargetMode,
@@ -163,25 +163,29 @@ fn open_and_catalog_leave_payloads_cold_until_selected_queries() {
 }
 
 #[test]
-fn from_path_variants_forward_limits_and_managed_cache_policy() {
+fn path_options_forward_limits_and_managed_cache_policy() {
     let directory = tempfile::tempdir().unwrap();
     let (path, bytes) = write_fixture(&directory, "limits");
 
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_input_bytes((bytes.len() - 1) as u64)
         .unwrap()
         .build()
         .unwrap();
     assert!(matches!(
-        source_backed::Package::from_path_with_limits(&path, limits),
-        Err(Error::Opc(OpcError::ReadLimit { .. }))
+        source_backed::Package::open_with_options(
+            &path,
+            litchi_docx::OpenOptions::default().source_limits(limits)
+        ),
+        Err(Error::Opc(OpcError::Limit { .. }))
     ));
 
     let cache_limits = SourceCacheLimits::new(1 << 20, 8).unwrap();
-    let package = source_backed::Package::from_path_with_limits_and_cache_limits(
+    let package = source_backed::Package::open_with_options(
         &path,
-        ReadLimits::default(),
-        cache_limits,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .cache_limits(cache_limits),
     )
     .unwrap();
     assert!(!package.cache_diagnostics().budget_managed);
@@ -191,14 +195,14 @@ fn from_path_variants_forward_limits_and_managed_cache_policy() {
     );
 
     let (budget, context) = managed_context(1 << 20);
-    let managed =
-        source_backed::Package::from_path_with_limits_and_cache_limits_and_execution_context(
-            &path,
-            ReadLimits::default(),
-            cache_limits,
-            context,
-        )
-        .unwrap();
+    let managed = source_backed::Package::open_with_options(
+        &path,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .cache_limits(cache_limits)
+            .execution_context(context),
+    )
+    .unwrap();
     assert!(managed.cache_diagnostics().budget_managed);
     assert_eq!(budget.used(Resource::Memory), 0);
     assert_eq!(
@@ -219,22 +223,32 @@ fn exact_noop_and_changed_document_overlay_preserve_raw_unselected_members() {
     let directory = tempfile::tempdir().unwrap();
     let (path, source_bytes) = write_fixture(&directory, "before");
 
-    let package = source_backed::Package::from_path(&path).unwrap();
-    let noop = package.edit_document().unwrap().commit().unwrap();
+    let package = source_backed::Package::open(&path).unwrap();
+    let noop = package.edit().unwrap().commit().unwrap();
     let mut output = Vec::new();
     package
-        .publish_document_commit_to_stream(&mut output, &noop)
+        .apply(noop.patch())
+        .and_then(|committed| {
+            let committed = committed.into_package();
+            committed.write_to(&mut output)?;
+            committed.document_snapshot()
+        })
         .unwrap();
     assert_eq!(output, source_bytes);
 
-    let package = source_backed::Package::from_path(&path).unwrap();
-    let mut edit = package.edit_document().unwrap();
+    let package = source_backed::Package::open(&path).unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(litchi_core::Position::new(0), "after")
         .unwrap();
     let commit = edit.commit().unwrap();
     let mut changed = Vec::new();
     package
-        .publish_document_commit_to_stream(&mut changed, &commit)
+        .apply(commit.patch())
+        .and_then(|committed| {
+            let committed = committed.into_package();
+            committed.write_to(&mut changed)?;
+            committed.document_snapshot()
+        })
         .unwrap();
     assert_ne!(changed, source_bytes);
     assert_eq!(
@@ -262,7 +276,7 @@ fn replacing_the_path_keeps_the_open_source_pinned() {
     let replacement = fixture("replacement");
     fs::write(&replacement_path, &replacement).unwrap();
 
-    let package = source_backed::Package::from_path(&path).unwrap();
+    let package = source_backed::Package::open(&path).unwrap();
     let version = package.source_version().unwrap();
     fs::remove_file(&path).unwrap();
     fs::rename(&replacement_path, &path).unwrap();
@@ -274,7 +288,7 @@ fn replacing_the_path_keeps_the_open_source_pinned() {
     );
     assert_ne!(fs::read(&path).unwrap(), original);
     assert_eq!(
-        source_backed::Package::from_path(&path)
+        source_backed::Package::open(&path)
             .unwrap()
             .document()
             .unwrap()
@@ -288,7 +302,7 @@ fn replacing_the_path_keeps_the_open_source_pinned() {
 fn in_place_file_change_is_reported_as_source_changed() {
     let directory = tempfile::tempdir().unwrap();
     let (path, bytes) = write_fixture(&directory, "changed");
-    let package = source_backed::Package::from_path(&path).unwrap();
+    let package = source_backed::Package::open(&path).unwrap();
     let original_version = package.source_version().unwrap();
 
     let mut file = OpenOptions::new().write(true).open(&path).unwrap();
@@ -312,11 +326,11 @@ fn filesystem_path_errors_are_typed() {
     let directory = tempfile::tempdir().unwrap();
     let missing = directory.path().join("missing.docx");
     assert!(matches!(
-        source_backed::Package::from_path(&missing),
+        source_backed::Package::open(&missing),
         Err(Error::Io(error)) if error.kind() == std::io::ErrorKind::NotFound
     ));
     assert!(matches!(
-        source_backed::Package::from_path(directory.path()),
+        source_backed::Package::open(directory.path()),
         Err(Error::Io(error))
             if matches!(
                 error.kind(),
@@ -325,4 +339,92 @@ fn filesystem_path_errors_are_typed() {
                     | std::io::ErrorKind::IsADirectory
             )
     ));
+}
+
+#[test]
+fn atomic_save_preserves_physical_bytes_at_each_durability() {
+    let directory = tempfile::tempdir().unwrap();
+    let (path, bytes) = write_fixture(&directory, "saved");
+    let (budget, context) = managed_context(4 << 20);
+    let package = source_backed::Package::open_with_options(
+        &path,
+        litchi_docx::OpenOptions::default().execution_context(context),
+    )
+    .unwrap();
+    for durability in [
+        litchi_core::Durability::Full,
+        litchi_core::Durability::FileOnly,
+        litchi_core::Durability::NoSync,
+    ] {
+        let destination = directory.path().join("saved.docx");
+        fs::write(&destination, b"previous").unwrap();
+        package
+            .save_with_durability(&destination, durability)
+            .unwrap();
+        assert_eq!(fs::read(destination).unwrap(), bytes);
+        assert_eq!(budget.used(Resource::Memory), 0);
+        assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 2);
+    }
+}
+
+#[test]
+fn atomic_save_publishes_effective_edit_over_original_path() {
+    let directory = tempfile::tempdir().unwrap();
+    let (path, original) = write_fixture(&directory, "before");
+    let source = source_backed::Package::open(&path).unwrap();
+    let mut edit = source.edit().unwrap();
+    edit.replace_paragraph_text(litchi_core::Position::new(0), "after")
+        .unwrap();
+    let changed = edit.commit().unwrap().into_package();
+    changed.save(&path).unwrap();
+    let output = fs::read(&path).unwrap();
+    assert_eq!(
+        package_part_payload(&output, UNUSED),
+        package_part_payload(&original, UNUSED)
+    );
+    let reopened = source_backed::Package::open(&path).unwrap();
+    assert_eq!(
+        reopened.document().unwrap().extract_text().unwrap(),
+        "after"
+    );
+    assert_eq!(source.document().unwrap().extract_text().unwrap(), "before");
+    assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
+}
+
+#[test]
+fn atomic_save_of_changed_source_preserves_destination() {
+    let directory = tempfile::tempdir().unwrap();
+    let (path, _) = write_fixture(&directory, "before");
+    let package = source_backed::Package::open(&path).unwrap();
+    let destination = directory.path().join("destination.docx");
+    fs::write(&destination, b"sentinel").unwrap();
+    fs::write(&path, fixture("changed source")).unwrap();
+    assert!(package.save(&destination).is_err());
+    assert_eq!(fs::read(destination).unwrap(), b"sentinel");
+    assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 2);
+}
+
+#[test]
+fn atomic_save_output_refusal_preserves_destination_and_releases_memory() {
+    let directory = tempfile::tempdir().unwrap();
+    let (path, _) = write_fixture(&directory, "before");
+    let budget = Budget::root(
+        "refused-save",
+        CoreLimits::new(4 << 20, u64::MAX, 1, u64::MAX, u64::MAX, u64::MAX),
+    );
+    let (_, token) = CancellationSource::pair();
+    let (_, template) = managed_context(4 << 20);
+    let context = ExecutionContext::new(budget.clone(), token, template.limits());
+    let package = source_backed::Package::open_with_options(
+        &path,
+        litchi_docx::OpenOptions::default().execution_context(context),
+    )
+    .unwrap();
+    let destination = directory.path().join("destination.docx");
+    fs::write(&destination, b"sentinel").unwrap();
+    assert!(package.save(&destination).is_err());
+    assert_eq!(fs::read(destination).unwrap(), b"sentinel");
+    assert_eq!(budget.used(Resource::Memory), 0);
+    assert!(budget.used(Resource::OutputBytes) <= 1);
+    assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 2);
 }

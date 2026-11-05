@@ -14,7 +14,9 @@ use std::ffi::OsString;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use litchi_pages::{BodyChartDataError, BodyChartSelector, ChartData, Package};
+use litchi_pages::{
+    BodyChartSelector, ChartData, Package, chart::data::Error as BodyChartDataError,
+};
 use tempfile::NamedTempFile;
 
 const USAGE: &str = "usage: edit_body_chart_data <input.pages> <output.pages> \

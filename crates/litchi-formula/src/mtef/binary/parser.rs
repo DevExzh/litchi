@@ -8,8 +8,9 @@
 //! that can be converted to AST nodes.
 
 use super::objects::*;
-use crate::mtef::MtefError;
 use crate::mtef::constants::*;
+use crate::mtef::{LimitKind, Limits, MtefError};
+use std::cell::Cell;
 use zerocopy::{FromBytes, I16, LE, U16};
 
 /// Binary MTEF parser
@@ -39,6 +40,14 @@ pub struct MtefBinaryParser<'arena> {
     pub inline: u8,
     /// Current math/text mode (EQN_MODE_TEXT, EQN_MODE_INLINE, EQN_MODE_DISPLAY)
     pub mode: i32,
+    /// Caller-selected resource policy.
+    pub(crate) limits: Limits,
+    /// Work charged while scanning records and converting them.
+    work: Cell<usize>,
+    /// Retained records/AST items charged before allocation.
+    items: Cell<usize>,
+    /// Current nested object-list depth.
+    list_depth: Cell<usize>,
 }
 
 impl<'arena> MtefBinaryParser<'arena> {
@@ -75,7 +84,18 @@ impl<'arena> MtefBinaryParser<'arena> {
     }
 
     /// Create a new MTEF binary parser
-    pub fn new(arena: &'arena bumpalo::Bump, data: &'arena [u8]) -> Result<Self, MtefError> {
+    pub fn new(
+        arena: &'arena bumpalo::Bump,
+        data: &'arena [u8],
+        limits: Limits,
+    ) -> Result<Self, MtefError> {
+        if data.len() > limits.max_input_bytes() {
+            return Err(MtefError::LimitExceeded {
+                kind: LimitKind::InputBytes,
+                limit: limits.max_input_bytes(),
+                actual: data.len(),
+            });
+        }
         if data.len() < 28 {
             return Err(MtefError::InvalidFormat(
                 "Data too short for OLE header".to_string(),
@@ -116,6 +136,10 @@ impl<'arena> MtefBinaryParser<'arena> {
             version_sub: 0,
             inline: 0,
             mode: EQN_MODE_DISPLAY, // Default to display mode
+            limits,
+            work: Cell::new(0),
+            items: Cell::new(0),
+            list_depth: Cell::new(0),
         };
 
         parser.read_mtef_header()?;
@@ -173,12 +197,14 @@ impl<'arena> MtefBinaryParser<'arena> {
                 self.version_sub = self.read_u8()?;
 
                 // Application key (null-terminated string)
+                let application_key_start = self.pos;
                 while self.pos < self.data.len() && self.data[self.pos] != 0 {
                     self.pos += 1;
                 }
                 if self.pos >= self.data.len() {
                     return Err(MtefError::UnexpectedEof);
                 }
+                self.check_string_bytes(self.pos - application_key_start)?;
                 self.pos += 1; // Skip null terminator
 
                 self.inline = self.read_u8()?;
@@ -209,16 +235,28 @@ impl<'arena> MtefBinaryParser<'arena> {
         &mut self,
         num_objs: usize,
     ) -> Result<Option<Box<MtefObjectList>>, MtefError> {
+        let depth = self.list_depth.get().saturating_add(1);
+        if depth > self.limits.max_depth() {
+            return Err(MtefError::LimitExceeded {
+                kind: LimitKind::Depth,
+                limit: self.limits.max_depth(),
+                actual: depth,
+            });
+        }
+        self.list_depth.set(depth);
+        let result = self.parse_object_list_inner(num_objs);
+        self.list_depth.set(depth.saturating_sub(1));
+        result
+    }
+
+    fn parse_object_list_inner(
+        &mut self,
+        num_objs: usize,
+    ) -> Result<Option<Box<MtefObjectList>>, MtefError> {
         let mut head: Option<Box<MtefObjectList>> = None;
         // Tail slot: always points at the `next` cell to fill (safe tail-pointer idiom).
         let mut tail = &mut head;
         let mut tally = 0;
-        let start_pos = self.pos; // For error reporting
-
-        // Prevent infinite loops by limiting iterations
-        let mut iterations = 0;
-        const MAX_ITERATIONS: usize = 10000;
-
         loop {
             // Lenient EOF handling: if we reach the end of data, treat it as implicit END tag
             // This matches rtf2latex2e behavior and handles slightly truncated MTEF data
@@ -227,14 +265,10 @@ impl<'arena> MtefBinaryParser<'arena> {
                 break;
             }
 
-            // Prevent infinite loops
-            iterations += 1;
-            if iterations > MAX_ITERATIONS {
-                return Err(MtefError::ParseError(format!(
-                    "Too many objects parsed (>{}), possible infinite loop at position {}",
-                    MAX_ITERATIONS, start_pos
-                )));
-            }
+            self.charge_work(1)?;
+            // Charge the record before any branch can allocate its boxed
+            // representation or a nested object list.
+            self.charge_item()?;
 
             // Get current tag based on MTEF version
             let curr_tag = if self.mtef_version == 5 {
@@ -388,6 +422,51 @@ impl<'arena> MtefBinaryParser<'arena> {
         }
 
         Ok(head)
+    }
+
+    /// Charge one unit of parser work before processing an input record.
+    pub(crate) fn charge_work(&self, amount: usize) -> Result<(), MtefError> {
+        let actual = self.work.get().saturating_add(amount);
+        if actual > self.limits.max_work() {
+            return Err(MtefError::LimitExceeded {
+                kind: LimitKind::Work,
+                limit: self.limits.max_work(),
+                actual,
+            });
+        }
+        self.work.set(actual);
+        Ok(())
+    }
+
+    /// Charge a retained record or AST item before allocating it.
+    pub(crate) fn charge_item(&self) -> Result<(), MtefError> {
+        self.charge_items(1)
+    }
+
+    /// Charge several retained records or AST items before allocating them.
+    pub(crate) fn charge_items(&self, amount: usize) -> Result<(), MtefError> {
+        let actual = self.items.get().saturating_add(amount);
+        if actual > self.limits.max_items() {
+            return Err(MtefError::LimitExceeded {
+                kind: LimitKind::Items,
+                limit: self.limits.max_items(),
+                actual,
+            });
+        }
+        self.items.set(actual);
+        Ok(())
+    }
+
+    /// Reject a source string before converting it to an owned `String`.
+    pub(crate) fn check_string_bytes(&self, actual: usize) -> Result<(), MtefError> {
+        if actual > self.limits.max_string_bytes() {
+            return Err(MtefError::LimitExceeded {
+                kind: LimitKind::StringBytes,
+                limit: self.limits.max_string_bytes(),
+                actual,
+            });
+        }
+        Ok(())
     }
 
     fn parse_char(&mut self) -> Result<MtefChar, MtefError> {
@@ -570,6 +649,15 @@ impl<'arena> MtefBinaryParser<'arena> {
         let rows = self.read_u8()?;
         let cols = self.read_u8()?;
 
+        // A matrix's dimensions are input-controlled and the converter later
+        // materializes one vector per cell. Reserve that item budget before
+        // any matrix-shaped allocation can occur.
+        self.charge_items(
+            (rows as usize)
+                .saturating_mul(cols as usize)
+                .saturating_add(1),
+        )?;
+
         // Read row and column partitions
         let mut row_parts = [0u8; 16];
         let mut col_parts = [0u8; 16];
@@ -628,6 +716,8 @@ impl<'arena> MtefBinaryParser<'arena> {
             if tag != crate::mtef::constants::EMBELL {
                 break;
             }
+            self.charge_work(1)?;
+            self.charge_item()?;
             embellishments.push(self.parse_embell()?);
         }
 
@@ -681,6 +771,8 @@ impl<'arena> MtefBinaryParser<'arena> {
         let mut tail = &mut head;
 
         for _ in 0..n_stops {
+            self.charge_work(1)?;
+            self.charge_item()?;
             let r#type = self.read_u8()? as i16;
             let offset = self.read_i16()?;
 
@@ -714,6 +806,8 @@ impl<'arena> MtefBinaryParser<'arena> {
         if self.pos >= self.data.len() {
             return Err(MtefError::UnexpectedEof);
         }
+
+        self.check_string_bytes(self.pos - start_pos)?;
 
         let font_name = std::str::from_utf8(&self.data[start_pos..self.pos])
             .map_err(|_| MtefError::ParseError("Invalid font name encoding".to_string()))?

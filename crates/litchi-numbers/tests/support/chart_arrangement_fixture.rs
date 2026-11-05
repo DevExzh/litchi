@@ -19,9 +19,7 @@ use litchi_iwa_archive::{
     package::{Catalog, EntryEdit},
 };
 use litchi_iwa_common::wire::{WireView, append_length_delimited_field, append_varint_field};
-use litchi_iwa_core::{
-    Archive, ArchiveObject, FieldInfo, FieldPath, FieldType, RawMessage, SnappyStream,
-};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldType, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tn, tsa, tsce, tsch, tsd, tsk, tsp, tss};
 use prost::Message as _;
 
@@ -174,13 +172,17 @@ fn object(
     data: Vec<u8>,
     references: &[u64],
 ) -> TestResult<ArchiveObject> {
-    let mut object = ArchiveObject::new(identifier, vec![RawMessage { type_, data }])?;
+    let mut object = ArchiveObject::new(
+        identifier,
+        vec![RawMessage { type_, data }],
+        Default::default(),
+    )?;
     let info = object
         .archive_info
         .message_infos
         .first_mut()
         .ok_or_else(|| io::Error::other("source fixture object has no message info"))?;
-    info.versions = vec![1, 0, 5];
+    info.versions = vec![1, 0, 5].into();
     info.object_references = references.to_vec();
     Ok(object)
 }
@@ -198,7 +200,11 @@ fn object_with_field_references(
         .message_infos
         .first_mut()
         .ok_or_else(|| io::Error::other("source fixture object has no message info"))?;
-    let mut field_info = FieldInfo::new(FieldPath::new(vec![field]));
+    let mut field_info = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![field], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     field_info.r#type = Some(FieldType::ObjectReference);
     field_info.object_references = references.to_vec();
     info.field_infos = vec![field_info];
@@ -216,42 +222,34 @@ fn style_payload(type_: u32) -> Vec<u8> {
     match type_ {
         CHART_STYLE_MESSAGE_TYPE => tsch::ChartStyleArchive {
             super_: Some(style_base()),
-            ..tsch::ChartStyleArchive::default()
         }
         .encode_to_vec(),
         CHART_NON_STYLE_MESSAGE_TYPE => tsch::ChartNonStyleArchive {
             super_: Some(style_base()),
-            ..tsch::ChartNonStyleArchive::default()
         }
         .encode_to_vec(),
         LEGEND_STYLE_MESSAGE_TYPE => tsch::LegendStyleArchive {
             super_: Some(style_base()),
-            ..tsch::LegendStyleArchive::default()
         }
         .encode_to_vec(),
         LEGEND_NON_STYLE_MESSAGE_TYPE => tsch::LegendNonStyleArchive {
             super_: Some(style_base()),
-            ..tsch::LegendNonStyleArchive::default()
         }
         .encode_to_vec(),
         AXIS_STYLE_MESSAGE_TYPE => tsch::ChartAxisStyleArchive {
             super_: Some(style_base()),
-            ..tsch::ChartAxisStyleArchive::default()
         }
         .encode_to_vec(),
         AXIS_NON_STYLE_MESSAGE_TYPE => tsch::ChartAxisNonStyleArchive {
             super_: Some(style_base()),
-            ..tsch::ChartAxisNonStyleArchive::default()
         }
         .encode_to_vec(),
         SERIES_STYLE_MESSAGE_TYPE => tsch::ChartSeriesStyleArchive {
             super_: Some(style_base()),
-            ..tsch::ChartSeriesStyleArchive::default()
         }
         .encode_to_vec(),
         SERIES_NON_STYLE_MESSAGE_TYPE => tsch::ChartSeriesNonStyleArchive {
             super_: Some(style_base()),
-            ..tsch::ChartSeriesNonStyleArchive::default()
         }
         .encode_to_vec(),
         _ => Vec::new(),
@@ -376,10 +374,21 @@ fn chart_payload(
             &mut drawable_payload,
             UNKNOWN_DRAWABLE_BYTES_FIELD,
             b"opaque chart drawable metadata",
+            litchi_iwa_common::WireLimits::DEFAULT,
         )?;
     }
-    append_length_delimited_field(&mut payload, DRAWABLE_SUPER_FIELD, &drawable_payload)?;
-    append_length_delimited_field(&mut payload, CHART_EXTENSION_FIELD, &chart.encode_to_vec())?;
+    append_length_delimited_field(
+        &mut payload,
+        DRAWABLE_SUPER_FIELD,
+        &drawable_payload,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut payload,
+        CHART_EXTENSION_FIELD,
+        &chart.encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -401,7 +410,13 @@ fn chart_objects(
             .collect::<Vec<_>>()
             .as_slice(),
     )?;
-    chart_object.archive_info.message_infos[0].field_infos = vec![FieldInfo::new(vec![1])];
+    chart_object.archive_info.message_infos[0].field_infos = vec![
+        FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap(),
+    ];
     objects.push(chart_object);
     objects.push(object(
         ids.caption,
@@ -483,7 +498,10 @@ fn chart_objects(
 }
 
 fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 #[allow(deprecated)]
@@ -739,12 +757,21 @@ pub(crate) fn fixture() -> TestResult<Vec<u8>> {
 }
 
 pub(crate) fn component_stream(source: &[u8], member: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| io::Error::other(format!("missing fixture member {member}")))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
+}
+
+pub(crate) fn central_record(source: &[u8], member: &str) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(source, Default::default())?;
+    let entry = catalog
+        .iter()
+        .find(|entry| entry.name() == member)
+        .ok_or_else(|| io::Error::other(format!("missing fixture member {member}")))?;
+    Ok(entry.raw_record().central_directory_record().to_vec())
 }
 
 pub(crate) fn rewrite_component(
@@ -752,10 +779,11 @@ pub(crate) fn rewrite_component(
     member: &str,
     mutate: impl FnOnce(&mut Archive) -> TestResult,
 ) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(&component_stream(source, member)?)?;
+    let mut archive = Archive::parse(&component_stream(source, member)?, Default::default())?;
     mutate(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    Ok(Catalog::from_bytes(source)?
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    Ok(Catalog::from_bytes(source, Default::default())?
         .reassemble_to_bytes(&[EntryEdit::new(member, &compressed)], Limits::default())?)
 }
 
@@ -765,7 +793,7 @@ pub(crate) fn object_message(
     identifier: u64,
     type_: u32,
 ) -> TestResult<Vec<u8>> {
-    let archive = Archive::parse(&component_stream(source, member)?)?;
+    let archive = Archive::parse(&component_stream(source, member)?, Default::default())?;
     archive
         .object(identifier)
         .and_then(|object| {
@@ -811,7 +839,7 @@ pub(crate) fn chart_payload_from_source(source: &[u8], chart: usize) -> TestResu
 
 pub(crate) fn drawable_payload_from_source(source: &[u8], chart: usize) -> TestResult<Vec<u8>> {
     let payload = chart_payload_from_source(source, chart)?;
-    WireView::parse(&payload)?
+    WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == DRAWABLE_SUPER_FIELD)
         .map(|field| field.payload().to_vec())
@@ -823,13 +851,14 @@ pub(crate) fn raw_drawable_fields(
     chart: usize,
     number: u32,
 ) -> TestResult<Vec<Vec<u8>>> {
-    Ok(
-        WireView::parse(&drawable_payload_from_source(source, chart)?)?
-            .fields()
-            .filter(|field| field.number() == number)
-            .map(|field| field.raw().to_vec())
-            .collect(),
-    )
+    Ok(WireView::parse(
+        &drawable_payload_from_source(source, chart)?,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?
+    .fields()
+    .filter(|field| field.number() == number)
+    .map(|field| field.raw().to_vec())
+    .collect())
 }
 
 pub(crate) fn with_drawable_wire(
@@ -838,17 +867,22 @@ pub(crate) fn with_drawable_wire(
     mutate: impl FnOnce(&mut Vec<u8>) -> TestResult,
 ) -> TestResult<Vec<u8>> {
     let original = chart_payload_from_source(source, chart)?;
-    let drawable = WireView::parse(&original)?
+    let drawable = WireView::parse(&original, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == DRAWABLE_SUPER_FIELD)
         .ok_or_else(|| io::Error::other("chart drawable envelope is missing"))?;
     let mut payload = drawable.payload().to_vec();
     mutate(&mut payload)?;
     let mut replacement = Vec::new();
-    append_length_delimited_field(&mut replacement, DRAWABLE_SUPER_FIELD, &payload)?;
+    append_length_delimited_field(
+        &mut replacement,
+        DRAWABLE_SUPER_FIELD,
+        &payload,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let mut rewritten = Vec::new();
     let mut replaced = false;
-    for field in WireView::parse(&original)?.fields() {
+    for field in WireView::parse(&original, litchi_iwa_common::WireLimits::DEFAULT)?.fields() {
         if !replaced && field.number() == DRAWABLE_SUPER_FIELD {
             rewritten.extend_from_slice(&replacement);
             replaced = true;
@@ -906,7 +940,7 @@ pub(crate) fn with_duplicate_sheet_name(source: &[u8]) -> TestResult<Vec<u8>> {
 pub(crate) fn with_foreign_chart_non_style(source: &[u8]) -> TestResult<Vec<u8>> {
     let original = chart_payload_from_source(source, 0)?;
     let mut chart = None;
-    for field in WireView::parse(&original)?.fields() {
+    for field in WireView::parse(&original, litchi_iwa_common::WireLimits::DEFAULT)?.fields() {
         if field.number() == CHART_EXTENSION_FIELD {
             chart = Some(tsch::ChartArchive::decode(field.payload())?);
             break;
@@ -918,9 +952,14 @@ pub(crate) fn with_foreign_chart_non_style(source: &[u8]) -> TestResult<Vec<u8>>
     let replacement = chart.encode_to_vec();
     let mut rewritten = Vec::new();
     let mut replaced = false;
-    for field in WireView::parse(&original)?.fields() {
+    for field in WireView::parse(&original, litchi_iwa_common::WireLimits::DEFAULT)?.fields() {
         if !replaced && field.number() == CHART_EXTENSION_FIELD {
-            append_length_delimited_field(&mut rewritten, CHART_EXTENSION_FIELD, &replacement)?;
+            append_length_delimited_field(
+                &mut rewritten,
+                CHART_EXTENSION_FIELD,
+                &replacement,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
             replaced = true;
         } else {
             rewritten.extend_from_slice(field.raw());
@@ -937,7 +976,71 @@ pub(crate) fn with_foreign_chart_non_style(source: &[u8]) -> TestResult<Vec<u8>>
             .first_mut()
             .ok_or_else(|| io::Error::other("first chart metadata is missing"))?;
         info.object_references.push(foreign_identifier);
-        let mut field = FieldInfo::new(FieldPath::new(vec![1, 2]));
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![1, 2], litchi_iwa_core::Limits::default())
+                .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
+        field.r#type = Some(FieldType::ObjectReference);
+        field.object_references.push(foreign_identifier);
+        info.field_infos.push(field);
+        Ok(())
+    })
+}
+
+/// Point one chart's series theme style at the other chart's style object.
+/// A symbol write must refuse the shared-owner graph rather than rewriting the
+/// second chart's style in place.
+pub(crate) fn with_foreign_chart_series_style(source: &[u8]) -> TestResult<Vec<u8>> {
+    let original = chart_payload_from_source(source, 0)?;
+    let mut chart = None;
+    for field in WireView::parse(&original, litchi_iwa_common::WireLimits::DEFAULT)?.fields() {
+        if field.number() == CHART_EXTENSION_FIELD {
+            chart = Some(tsch::ChartArchive::decode(field.payload())?);
+            break;
+        }
+    }
+    let mut chart = chart.ok_or_else(|| io::Error::other("chart extension is missing"))?;
+    let foreign_identifier = ids(1).series_styles[0];
+    let first = chart
+        .series_theme_styles
+        .first_mut()
+        .ok_or_else(|| io::Error::other("chart has no series theme style"))?;
+    first.identifier = foreign_identifier;
+    let replacement = chart.encode_to_vec();
+    let mut rewritten = Vec::new();
+    let mut replaced = false;
+    for field in WireView::parse(&original, litchi_iwa_common::WireLimits::DEFAULT)?.fields() {
+        if !replaced && field.number() == CHART_EXTENSION_FIELD {
+            append_length_delimited_field(
+                &mut rewritten,
+                CHART_EXTENSION_FIELD,
+                &replacement,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
+            replaced = true;
+        } else {
+            rewritten.extend_from_slice(field.raw());
+        }
+    }
+    let rewritten = with_chart_payload(source, 0, rewritten)?;
+    rewrite_component(&rewritten, CALCULATION_MEMBER, |archive| {
+        let object = archive
+            .object_mut(ids(0).drawable)
+            .ok_or_else(|| io::Error::other("first chart is missing"))?;
+        let info = object
+            .archive_info
+            .message_infos
+            .first_mut()
+            .ok_or_else(|| io::Error::other("first chart metadata is missing"))?;
+        info.object_references.push(foreign_identifier);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![1, 2], litchi_iwa_core::Limits::default())
+                .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.r#type = Some(FieldType::ObjectReference);
         field.object_references.push(foreign_identifier);
         info.field_infos.push(field);
@@ -993,7 +1096,7 @@ pub(crate) fn with_single_rooted_sheet(source: &[u8]) -> TestResult<Vec<u8>> {
 
 pub(crate) fn with_parent_mismatch(source: &[u8]) -> TestResult<Vec<u8>> {
     with_drawable_wire(source, 0, |payload| {
-        let field = WireView::parse(payload)?
+        let field = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .find(|field| field.number() == 2)
             .ok_or_else(|| io::Error::other("chart parent is missing"))?;
@@ -1003,9 +1106,15 @@ pub(crate) fn with_parent_mismatch(source: &[u8]) -> TestResult<Vec<u8>> {
         }
         .encode_to_vec();
         let mut out = Vec::new();
-        for candidate in WireView::parse(payload)?.fields() {
+        for candidate in WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?.fields()
+        {
             if candidate.number() == 2 {
-                append_length_delimited_field(&mut out, 2, &replacement)?;
+                append_length_delimited_field(
+                    &mut out,
+                    2,
+                    &replacement,
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )?;
             } else {
                 out.extend_from_slice(candidate.raw());
             }
@@ -1041,7 +1150,7 @@ pub(crate) fn with_duplicate_chart_message(source: &[u8]) -> TestResult<Vec<u8>>
             .first()
             .cloned()
             .ok_or_else(|| io::Error::other("chart message is missing"))?;
-        object.push_message(message)?;
+        object.push_message(message, Default::default())?;
         Ok(())
     })
 }

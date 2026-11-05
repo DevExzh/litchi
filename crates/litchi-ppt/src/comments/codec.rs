@@ -1,6 +1,7 @@
 //! Strict codecs for `PowerPoint` 10 presentation-comment records.
 
 use super::model::{Author, Authors};
+use crate::SourceLimits;
 use crate::consts::RecordType;
 use crate::package::{Error, Result};
 use crate::records::Record;
@@ -16,11 +17,11 @@ impl Authors {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(root: &Record) -> Result<Self> {
+    pub fn parse(root: &Record, limits: &SourceLimits) -> Result<Self> {
         let mut authors = Vec::new();
-        for record in root.versioned_binary_tag_records(10)? {
+        for record in root.versioned_binary_tag_records(10, limits)? {
             if record.record_type == RecordType::CommentIndex10 {
-                authors.push(parse_author(&record)?);
+                authors.push(parse_author(&record, limits)?);
             }
         }
         Ok(Self { authors })
@@ -29,11 +30,14 @@ impl Authors {
 
 /// Parse the ordered `Comment2000` records from one slide's `___PPT10`
 /// extension.
-pub(crate) fn parse_slide_comments(root: &Record) -> Result<Vec<ParsedComment>> {
+pub(crate) fn parse_slide_comments(
+    root: &Record,
+    limits: &SourceLimits,
+) -> Result<Vec<ParsedComment>> {
     let mut comments = Vec::new();
-    for record in root.versioned_binary_tag_records(10)? {
+    for record in root.versioned_binary_tag_records(10, limits)? {
         if record.record_type == RecordType::Comment2000 {
-            comments.push(parse_comment(&record)?);
+            comments.push(parse_comment(&record, limits)?);
         }
     }
     Ok(comments)
@@ -43,7 +47,7 @@ pub(crate) fn parse_slide_comments(root: &Record) -> Result<Vec<ParsedComment>> 
     clippy::wildcard_enum_match_arm,
     reason = "`RecordType` has hundreds of variants; any type other than the two author children is rejected by the fallback arm"
 )]
-fn parse_author(record: &Record) -> Result<Author> {
+fn parse_author(record: &Record, limits: &SourceLimits) -> Result<Author> {
     if record.record_type != RecordType::CommentIndex10
         || record.version != 0x0f
         || record.instance != 0
@@ -52,7 +56,8 @@ fn parse_author(record: &Record) -> Result<Author> {
             "CommentIndex10Container has an invalid record header".to_string(),
         ));
     }
-    let children = Record::parse_sequence_strict(&record.data, "comment author")?;
+    let children =
+        Record::parse_sequence_strict_with_limits(&record.data, "comment author", *limits)?;
     let mut name = None;
     let mut color_index = None;
     let mut comment_index_seed = None;
@@ -104,7 +109,7 @@ fn parse_author(record: &Record) -> Result<Author> {
     })
 }
 
-fn parse_comment(record: &Record) -> Result<ParsedComment> {
+fn parse_comment(record: &Record, limits: &SourceLimits) -> Result<ParsedComment> {
     if record.record_type != RecordType::Comment2000
         || record.version != 0x0f
         || record.instance != 0
@@ -113,7 +118,8 @@ fn parse_comment(record: &Record) -> Result<ParsedComment> {
             "Comment10Container has an invalid record header".to_string(),
         ));
     }
-    let children = Record::parse_sequence_strict(&record.data, "presentation comment")?;
+    let children =
+        Record::parse_sequence_strict_with_limits(&record.data, "presentation comment", *limits)?;
     let mut comment = ParsedComment::default();
     let mut stage = 0u8;
     let mut has_atom = false;

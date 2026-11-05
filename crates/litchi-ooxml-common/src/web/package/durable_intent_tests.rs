@@ -5,6 +5,7 @@
     reason = "these tests construct deliberately small durable intent fixtures"
 )]
 
+use crate::web::custom_function;
 use std::ops::Range;
 use std::sync::Arc;
 
@@ -27,9 +28,9 @@ fn pane(id: &str, relationship_id: &str, image: Option<(&str, &[u8])>) -> Pane {
 
 fn custom_intent(
     additions: Vec<Pane>,
-    operations: Vec<(OwnerSelector, CustomFunctionOperation)>,
+    operations: Vec<(OwnerSelector, custom_function::Operation)>,
 ) -> WebIntent {
-    WebIntent::CustomFunctions(CustomFunctionEdit::ensure(additions, operations))
+    WebIntent::CustomFunctions(custom_function::Change::ensure(additions, operations))
 }
 
 fn encode_test_intent(intent: &WebIntent) -> Vec<u8> {
@@ -126,11 +127,11 @@ fn custom_add_in_spans(bytes: &[u8]) -> Vec<Range<usize>> {
 fn assert_limit<T>(result: Result<T>, resource: &str, maximum: usize, actual: usize) {
     match result {
         Err(Error::Limit {
-            resource: actual_resource,
-            max: actual_maximum,
-            actual: actual_value,
+            kind: crate::LimitKind::Web(actual_resource),
+            maximum: actual_maximum,
+            observed: actual_value,
         }) => {
-            assert_eq!(actual_resource, resource);
+            assert_eq!(actual_resource.as_str(), resource);
             assert_eq!(actual_maximum, maximum);
             assert_eq!(actual_value, actual);
         },
@@ -276,7 +277,7 @@ fn intent_charges_xml_derived_and_direct_strings_cumulatively() {
         vec![first.clone(), second.clone()],
         vec![(
             OwnerSelector::PaneIndex(0),
-            CustomFunctionOperation::InsertId {
+            custom_function::Operation::InsertId {
                 index: 0,
                 id: operation_id.clone(),
             },

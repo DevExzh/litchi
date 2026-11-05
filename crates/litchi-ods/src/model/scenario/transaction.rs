@@ -11,7 +11,7 @@ use quick_xml::{
     name::{Namespace, ResolveResult},
     reader::NsReader,
 };
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TABLE: &str = "urn:oasis:names:tc:opendocument:xmlns:table:1.0";
@@ -223,15 +223,10 @@ impl Edit {
     }
 
     /// Validate and materialize this edit as a source-checked commit.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
         if self.draft == self.before.scenarios {
-            let source = Arc::clone(&self.before.content);
             return Ok(Commit {
                 snapshot: self.before,
-                patch: Patch {
-                    source: Arc::clone(&source),
-                    target: source,
-                },
                 changed: false,
             });
         }
@@ -249,82 +244,31 @@ impl Edit {
                 "ODS scenario commit failed typed readback or changed document order",
             ));
         }
-        let source = Arc::clone(&self.before.content);
-        let target_source: Arc<str> = Arc::from(target_xml);
         Ok(Commit {
             snapshot: target,
-            patch: Patch {
-                source,
-                target: Arc::clone(&target_source),
-            },
             changed: true,
-        })
-    }
-}
-
-/// An exact-source, reversible `content.xml` scenario patch.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Patch {
-    source: Arc<str>,
-    target: Arc<str>,
-}
-
-impl Patch {
-    /// Whether this patch leaves `content.xml` byte-for-byte unchanged.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.source.as_ref() == self.target.as_ref()
-    }
-
-    /// Return the exact inverse patch.
-    #[must_use]
-    pub fn inverse(&self) -> Self {
-        Self {
-            source: Arc::clone(&self.target),
-            target: Arc::clone(&self.source),
-        }
-    }
-
-    /// Apply this patch only to the exact source snapshot from which it came.
-    pub fn apply(&self, snapshot: &Snapshot) -> Result<Commit> {
-        if snapshot.content.as_ref() != self.source.as_ref() {
-            return Err(invalid("ODS scenario patch source snapshot does not match"));
-        }
-        let target =
-            Snapshot::parse_with(self.target.as_ref(), snapshot.limits).map_err(model_error)?;
-        Ok(Commit {
-            snapshot: target,
-            patch: self.clone(),
-            changed: !self.is_empty(),
         })
     }
 }
 
 /// A fully rehydrated scenario commit.
 #[derive(Clone, Debug)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
-    patch: Patch,
     changed: bool,
 }
 
 impl Commit {
     /// Whether the package content changed.
     #[must_use]
-    pub const fn changed(&self) -> bool {
+    pub(crate) const fn changed(&self) -> bool {
         self.changed
     }
 
     /// Borrow the resulting scenario snapshot.
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
-    }
-
-    /// Borrow the reversible content patch.
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
     }
 }
 

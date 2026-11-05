@@ -8,11 +8,11 @@ use litchi_opc::{BlobPart, PackURI, Part, TargetMode};
 
 use super::*;
 use crate::Package;
-use crate::raw::{Kind, Writer};
+use crate::raw::{Encoder, Kind};
 
 fn opaque_records() -> Vec<u8> {
     let mut bytes = Vec::new();
-    let mut writer = Writer::new(&mut bytes);
+    let mut writer = Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT);
     writer
         .write_record(Kind::new(0x123).expect("kind"), &[0x01, 0x02])
         .expect("first record");
@@ -30,7 +30,7 @@ fn package_with_chain(bytes: Vec<u8>) -> Package {
 }
 
 fn package_with_chain_at(bytes: Vec<u8>, physical_name: &str, target_ref: &str) -> Package {
-    let mut package = Package::create().expect("base package").into_opc();
+    let mut package = Package::new().expect("base package").into_opc();
     let workbook_name = package
         .main_document_part()
         .expect("workbook")
@@ -62,13 +62,17 @@ fn opened_package_with_explicit_empty_chain_relationships(bytes: Vec<u8>) -> Pac
 
     let package = package_with_chain(bytes).into_opc();
     let root = PackURI::new("/").expect("package URI");
-    let content_types = package.source_content_types().expect("content types");
+    let content_types = package
+        .source_content_types(litchi_opc::SourceLimits::default())
+        .expect("content types");
     let root_relationships = package
-        .source_relationships(&root)
+        .source_relationships(&root, litchi_opc::SourceLimits::default())
         .expect("root relationships");
     let chain = PackURI::new("/xl/calcChain.bin").expect("chain URI");
 
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     writer
         .write_stored("[Content_Types].xml", content_types.bytes())
         .expect("content types member");
@@ -86,7 +90,7 @@ fn opened_package_with_explicit_empty_chain_relationships(bytes: Vec<u8>) -> Pac
             .write_stored(part.partname().membername(), part.blob())
             .expect("part member");
         let relationships = package
-            .source_relationships(part.partname())
+            .source_relationships(part.partname(), litchi_opc::SourceLimits::default())
             .expect("part relationships");
         if part.partname().is_equivalent_to(&chain) {
             let member = part
@@ -111,7 +115,7 @@ fn opened_package_with_explicit_empty_chain_relationships(bytes: Vec<u8>) -> Pac
         }
     }
 
-    Package::from_bytes(writer.finish_to_bytes().expect("ZIP bytes")).expect("opened package")
+    Package::from_bytes(&writer.finish_to_bytes().expect("ZIP bytes")).expect("opened package")
 }
 
 fn package_with_unrelated_root_relationship(id: String) -> Package {
@@ -168,15 +172,17 @@ fn removal_and_inverse_restore_case_equivalent_physical_source() {
     let mut transaction = before.edit();
     assert!(transaction.remove().expect("remove"));
     let commit = transaction.commit().expect("commit");
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
 
     let removed = package
-        .apply_calculation_chain(&commit)
+        .apply_calculation_chain(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("remove publication");
     assert!(!removed.calculation_chain().expect("removed").is_present());
 
     let restored = removed
-        .apply_calculation_chain_patch(&commit.patch().inverse())
+        .apply_calculation_chain(&commit.patch().inverse())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("inverse publication");
     let after = restored.calculation_chain().expect("restored");
     assert_eq!(after, before);
@@ -189,10 +195,11 @@ fn exact_noop_does_not_publish_a_changed_patch() {
     let package = package_with_chain(opaque_records());
     let before = package.calculation_chain().expect("before");
     let commit = before.edit().commit().expect("no-op");
-    assert!(!commit.changed());
-    assert!(commit.patch().is_empty());
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.patch().is_noop());
     let after = package
-        .apply_calculation_chain(&commit)
+        .apply_calculation_chain(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("no-op publication");
     assert_eq!(after.calculation_chain().expect("after"), before);
 }
@@ -212,10 +219,12 @@ fn empty_owner_relationships_are_captured_and_restored() {
     transaction.remove().expect("remove");
     let commit = transaction.commit().expect("commit");
     let removed = package
-        .apply_calculation_chain(&commit)
+        .apply_calculation_chain(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("remove publication");
     let restored = removed
-        .apply_calculation_chain_patch(&commit.patch().inverse())
+        .apply_calculation_chain(&commit.patch().inverse())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("inverse publication");
     let restored_snapshot = restored.calculation_chain().expect("restored");
     assert_eq!(restored_snapshot, before);
@@ -227,11 +236,12 @@ fn empty_owner_relationships_are_captured_and_restored() {
     assert!(restored_owner.relationships.member_present());
     assert_eq!(restored_owner.relationships.bytes(), EMPTY_RELATIONSHIPS);
 
-    let reopened = Package::from_bytes(restored.to_bytes().expect("restored ZIP")).expect("reopen");
+    let reopened =
+        Package::from_bytes(&restored.to_bytes().expect("restored ZIP")).expect("reopen");
     let chain = PackURI::new("/xl/calcChain.bin").expect("chain URI");
     let restored_member = reopened
         .opc_package()
-        .source_relationships(&chain)
+        .source_relationships(&chain, litchi_opc::SourceLimits::default())
         .expect("reopened chain relationships");
     assert!(restored_member.member_present());
     assert_eq!(restored_member.bytes(), EMPTY_RELATIONSHIPS);
@@ -305,8 +315,8 @@ fn workbook_bytes_changed_with_owner_and_relationships_unchanged_is_stale() {
         .to_vec();
     let payload_offset = {
         let raw_limits = crate::raw::Limits::new(bytes.len(), 0);
-        let mut records = crate::raw::Records::try_with_limits(&bytes, raw_limits)
-            .expect("workbook record stream");
+        let mut records =
+            crate::raw::Records::bounded(&bytes, raw_limits).expect("workbook record stream");
         let record = loop {
             let record = records
                 .next()
@@ -326,12 +336,17 @@ fn workbook_bytes_changed_with_owner_and_relationships_unchanged_is_stale() {
         .expect("workbook")
         .set_blob(bytes);
     let changed = Package::from_opc(changed).expect("changed package");
-    assert!(changed.apply_calculation_chain(&commit).is_err());
+    assert!(
+        changed
+            .apply_calculation_chain(commit.patch())
+            .map(litchi_core::edit::Commit::into_package)
+            .is_err()
+    );
 }
 
 #[test]
 fn authored_relationship_metadata_exact_opc_attribute_limit_is_accepted() {
-    let maximum = litchi_opc::ReadLimits::default().max_xml_attribute_bytes();
+    let maximum = litchi_opc::SourceLimits::default().max_xml_attribute_bytes();
     let id = "x".repeat(maximum - "Id".len());
     let package = package_with_unrelated_root_relationship(id);
     assert!(package.calculation_chain().is_ok());
@@ -339,13 +354,13 @@ fn authored_relationship_metadata_exact_opc_attribute_limit_is_accepted() {
 
 #[test]
 fn huge_unrelated_authored_relationship_metadata_is_rejected_before_capture() {
-    let maximum = litchi_opc::ReadLimits::default().max_xml_attribute_bytes();
+    let maximum = litchi_opc::SourceLimits::default().max_xml_attribute_bytes();
     let id = "x".repeat(maximum - "Id".len() + 1);
     let package = package_with_unrelated_root_relationship(id);
     assert!(matches!(
         package.calculation_chain(),
-        Err(Error::Opc(litchi_opc::OpcError::ReadLimit {
-            resource: litchi_opc::ReadResource::XmlAttributeBytes,
+        Err(Error::Opc(litchi_opc::OpcError::Limit {
+            kind: litchi_opc::SourceLimitKind::XmlAttributeBytes,
             ..
         }))
     ));
@@ -359,12 +374,14 @@ fn public_package_facade_preflights_oversized_stale_metadata_before_clone() {
     transaction.remove().expect("remove");
     let commit = transaction.commit().expect("commit");
 
-    let maximum = litchi_opc::ReadLimits::default().max_xml_attribute_bytes();
+    let maximum = litchi_opc::SourceLimits::default().max_xml_attribute_bytes();
     let stale = package_with_unrelated_root_relationship("x".repeat(maximum - "Id".len() + 1));
     assert!(matches!(
-        stale.apply_calculation_chain(&commit),
-        Err(Error::Opc(litchi_opc::OpcError::ReadLimit {
-            resource: litchi_opc::ReadResource::XmlAttributeBytes,
+        stale
+            .apply_calculation_chain(commit.patch())
+            .map(litchi_core::edit::Commit::into_package),
+        Err(Error::Opc(litchi_opc::OpcError::Limit {
+            kind: litchi_opc::SourceLimitKind::XmlAttributeBytes,
             ..
         }))
     ));
@@ -387,10 +404,7 @@ fn checked_publication_keeps_signature_policy_after_source_preflight() {
         .patch()
         .apply_checked(&mut signed_candidate, current)
         .expect_err("changed signed candidate must require an explicit policy");
-    assert!(matches!(
-        error,
-        Error::Opc(litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
-    ));
+    assert!(matches!(error, Error::Signed));
 }
 
 #[test]
@@ -455,8 +469,8 @@ fn long_relationship_owner_and_many_short_edges_are_bounded_before_clone() {
     let package = Package::from_opc(package).expect("authored package");
     assert!(matches!(
         package.calculation_chain(),
-        Err(Error::Opc(litchi_opc::OpcError::ReadLimit {
-            resource: litchi_opc::ReadResource::TotalRelationshipXmlBytes,
+        Err(Error::Opc(litchi_opc::OpcError::Limit {
+            kind: litchi_opc::SourceLimitKind::TotalRelationshipXmlBytes,
             ..
         }))
     ));
@@ -485,17 +499,17 @@ fn signed_source_allows_exact_noop_but_refuses_changed_publication() {
     let signed = signed_package(package.clone());
     let before = signed.calculation_chain().expect("signed before");
     let noop = before.edit().commit().expect("signed no-op");
-    assert!(!noop.changed());
-    assert!(signed.apply_calculation_chain(&noop).is_ok());
+    assert!(!noop.diagnostics().changed());
+    assert!(
+        signed
+            .apply_calculation_chain(noop.patch())
+            .map(litchi_core::edit::Commit::into_package)
+            .is_ok()
+    );
 
     let mut transaction = before.edit();
     transaction.remove().expect("signed remove");
-    assert!(matches!(
-        transaction.commit(),
-        Err(Error::Opc(
-            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
-        ))
-    ));
+    assert!(matches!(transaction.commit(), Err(Error::Signed)));
 }
 
 #[test]
@@ -513,7 +527,12 @@ fn owner_bytes_changed_with_workbook_bytes_unchanged_is_stale() {
         .expect("chain")
         .set_blob(vec![0x99, 0x88]);
     let changed = Package::from_opc(changed).expect("changed package");
-    assert!(changed.apply_calculation_chain(&commit).is_err());
+    assert!(
+        changed
+            .apply_calculation_chain(commit.patch())
+            .map(litchi_core::edit::Commit::into_package)
+            .is_err()
+    );
 }
 
 #[test]
@@ -532,7 +551,12 @@ fn relationship_source_changed_with_owner_and_workbook_bytes_unchanged_is_stale(
         true,
     );
     let changed = Package::from_opc(changed).expect("changed package");
-    assert!(changed.apply_calculation_chain(&commit).is_err());
+    assert!(
+        changed
+            .apply_calculation_chain(commit.patch())
+            .map(litchi_core::edit::Commit::into_package)
+            .is_err()
+    );
 }
 
 #[test]
@@ -543,7 +567,8 @@ fn inverse_refuses_a_foreign_edge_to_the_removed_physical_target() {
     transaction.remove().expect("remove");
     let commit = transaction.commit().expect("commit");
     let removed = package
-        .apply_calculation_chain(&commit)
+        .apply_calculation_chain(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("remove publication");
 
     let mut changed = removed.into_opc();
@@ -562,7 +587,8 @@ fn inverse_refuses_a_foreign_edge_to_the_removed_physical_target() {
     let changed = Package::from_opc(changed).expect("changed package");
     assert!(
         changed
-            .apply_calculation_chain_patch(&commit.patch().inverse())
+            .apply_calculation_chain(&commit.patch().inverse())
+            .map(litchi_core::edit::Commit::into_package)
             .is_err()
     );
 }
@@ -582,18 +608,29 @@ fn content_types_source_changed_with_owner_and_workbook_bytes_unchanged_is_stale
         "application/octet-stream".to_string(),
         Vec::new(),
     )));
-    let current = changed.source_content_types().expect("content types");
+    let current = changed
+        .source_content_types(litchi_opc::SourceLimits::default())
+        .expect("content types");
     let replacement = current
         .without_parts(
             std::slice::from_ref(&stale_part),
-            ReadLimits::DEFAULT.max_part_bytes,
+            SemanticLimits::DEFAULT.max_part_bytes,
         )
         .expect("replacement content types");
     changed
-        .try_replace_content_types(current.bytes(), &replacement)
+        .try_replace_content_types(
+            current.bytes(),
+            &replacement,
+            litchi_opc::SourceLimits::default(),
+        )
         .expect("replace content types");
     let changed = Package::from_opc(changed).expect("changed package");
-    assert!(changed.apply_calculation_chain(&commit).is_err());
+    assert!(
+        changed
+            .apply_calculation_chain(commit.patch())
+            .map(litchi_core::edit::Commit::into_package)
+            .is_err()
+    );
 }
 
 #[test]
@@ -601,60 +638,67 @@ fn finite_byte_graph_limits_and_explicit_record_diagnostics_are_enforced() {
     let bytes = opaque_records();
     let package = package_with_chain(bytes.clone());
     let mut large_bytes = Vec::new();
-    let mut writer = Writer::new(&mut large_bytes);
+    let mut writer = Encoder::new(&mut large_bytes, crate::raw::Limits::DEFAULT);
     writer
         .write_record(Kind::new(0x123).expect("kind"), &[0_u8; 1024])
         .expect("large record");
     let large_package = package_with_chain(large_bytes.clone());
-    let small_bytes = ReadLimits {
+    let small_bytes = SemanticLimits {
         max_part_bytes: large_bytes.len() - 1,
-        ..ReadLimits::DEFAULT
+        ..SemanticLimits::DEFAULT
     };
     assert!(matches!(
-        large_package.calculation_chain_with_limits(small_bytes),
-        Err(Error::LimitExceeded {
-            resource: "Calculation Chain part bytes",
+        large_package
+            .with_semantic_limits(crate::SemanticLimits::new().calculation_chain(small_bytes))
+            .calculation_chain(),
+        Err(Error::Limit {
+            kind: crate::package::LimitKind::CalculationChain(LimitKind::PartBytes),
             ..
         })
     ));
 
-    let small_records = ReadLimits {
+    let small_records = SemanticLimits {
         max_records: 2,
-        ..ReadLimits::DEFAULT
+        ..SemanticLimits::DEFAULT
     };
     let snapshot = package
-        .calculation_chain_with_limits(small_records)
+        .with_semantic_limits(crate::SemanticLimits::new().calculation_chain(small_records))
+        .calculation_chain()
         .expect("record quota does not reject opaque admission");
     let before_diagnostic = snapshot.part().expect("part").bytes().to_vec();
     assert!(matches!(
         snapshot.part().expect("part").record_count(),
-        Err(Error::LimitExceeded {
-            resource: "Calculation Chain records",
+        Err(Error::Limit {
+            kind: crate::package::LimitKind::CalculationChain(LimitKind::Records),
             ..
         })
     ));
     assert_eq!(snapshot.part().expect("part").bytes(), before_diagnostic);
 
-    let no_relationships = ReadLimits {
+    let no_relationships = SemanticLimits {
         max_relationships: 0,
-        ..ReadLimits::DEFAULT
+        ..SemanticLimits::DEFAULT
     };
     assert!(matches!(
-        package.calculation_chain_with_limits(no_relationships),
-        Err(Error::LimitExceeded {
-            resource: "Calculation Chain relationships",
+        package
+            .with_semantic_limits(crate::SemanticLimits::new().calculation_chain(no_relationships))
+            .calculation_chain(),
+        Err(Error::Limit {
+            kind: crate::package::LimitKind::CalculationChain(LimitKind::Relationships),
             ..
         })
     ));
 
-    let no_parts = ReadLimits {
+    let no_parts = SemanticLimits {
         max_graph_parts: 0,
-        ..ReadLimits::DEFAULT
+        ..SemanticLimits::DEFAULT
     };
     assert!(matches!(
-        package.calculation_chain_with_limits(no_parts),
-        Err(Error::LimitExceeded {
-            resource: "Calculation Chain graph parts",
+        package
+            .with_semantic_limits(crate::SemanticLimits::new().calculation_chain(no_parts))
+            .calculation_chain(),
+        Err(Error::Limit {
+            kind: crate::package::LimitKind::CalculationChain(LimitKind::GraphParts),
             ..
         })
     ));
@@ -662,7 +706,7 @@ fn finite_byte_graph_limits_and_explicit_record_diagnostics_are_enforced() {
 
 #[test]
 fn orphan_and_foreign_owner_edges_are_rejected_when_requested() {
-    let mut orphan = Package::create().expect("base package").into_opc();
+    let mut orphan = Package::new().expect("base package").into_opc();
     orphan.add_part(Box::new(BlobPart::new(
         PackURI::new("/xl/orphanCalcChain.bin").expect("URI"),
         CONTENT_TYPE.to_string(),
@@ -671,7 +715,7 @@ fn orphan_and_foreign_owner_edges_are_rejected_when_requested() {
     let orphan = Package::from_opc(orphan).expect("package");
     assert!(orphan.calculation_chain().is_err());
 
-    let mut foreign = Package::create().expect("base package").into_opc();
+    let mut foreign = Package::new().expect("base package").into_opc();
     let workbook_name = foreign
         .main_document_part()
         .expect("workbook")
@@ -728,11 +772,13 @@ fn malformed_or_non_biff_opaque_payload_removes_and_restores_exactly() {
     transaction.remove().expect("remove");
     let commit = transaction.commit().expect("commit");
     let removed = package
-        .apply_calculation_chain(&commit)
+        .apply_calculation_chain(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("remove publication");
     assert!(!removed.calculation_chain().expect("removed").is_present());
     let restored = removed
-        .apply_calculation_chain_patch(&commit.patch().inverse())
+        .apply_calculation_chain(&commit.patch().inverse())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("inverse publication");
     let after = restored.calculation_chain().expect("restored");
     assert_eq!(after.part().expect("part").bytes(), bytes.as_slice());
@@ -740,27 +786,25 @@ fn malformed_or_non_biff_opaque_payload_removes_and_restores_exactly() {
 }
 
 #[test]
-#[ignore = "requires the vendored native XLSB corpus and exercises producer-specific streams"]
 fn native_calculation_chain_fixtures_are_opaque_inventory_cases() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../3rdparty");
+    // Byte-for-byte Apache POI and LibreOffice fixtures vendored under
+    // `test-data/`; see `test-data/poi/PROVENANCE.md` and
+    // `test-data/libreoffice-core/PROVENANCE.md`.
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data");
     let fixtures = [
-        "poi/test-data/spreadsheet/sample.xlsb",
+        "ooxml/xlsb/sample.xlsb",
         "poi/test-data/spreadsheet/testVarious.xlsb",
-        "poi/test-data/spreadsheet/bug66682.xlsb",
+        "ooxml/xlsb/bug66682.xlsb",
         "poi/test-data/spreadsheet/62815.xlsb",
         "libreoffice-core/sc/qa/unit/data/xlsb/tdf94627.xlsb",
         "libreoffice-core/sc/qa/unit/data/xlsb/pivottable_error_item_filter.xlsb",
-        "libreoffice-core/sc/qa/unit/data/xlsb/universal-content.xlsb",
+        "ooxml/xlsb/universal-content.xlsb",
         "libreoffice-core/sc/qa/unit/data/xlsb/shared_formula.xlsb",
     ];
-    let mut found = 0usize;
     for fixture in fixtures {
         let path = root.join(fixture);
-        if !path.is_file() {
-            continue;
-        }
-        found += 1;
-        let package = Package::open(&path).expect("native XLSB package");
+        let package = Package::open(&path)
+            .unwrap_or_else(|error| panic!("native XLSB package {fixture}: {error}"));
         let snapshot = package.calculation_chain().expect("Calculation Chain");
         assert!(snapshot.is_present());
         assert!(!snapshot.part().expect("part").bytes().is_empty());
@@ -769,5 +813,4 @@ fn native_calculation_chain_fixtures_are_opaque_inventory_cases() {
         // parser recognizes them.
         let _ = snapshot.part().expect("part").record_count();
     }
-    assert!(found > 0, "native fixture corpus is unavailable");
 }

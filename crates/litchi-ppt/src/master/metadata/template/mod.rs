@@ -12,7 +12,7 @@ pub(super) mod validation;
 #[cfg(test)]
 mod tests;
 
-pub use crate::master_layout::{Change, ChangeSet, Context, Limits, Revision};
+pub use crate::master_layout::{Change, Context, Limits, Revision};
 pub use model::{MAX_NAME_BYTES, Name};
 
 use super as metadata;
@@ -31,17 +31,8 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn from_record(root: Record) -> Result<Self> {
-        Self::from_inner(metadata::Snapshot::from_record(Context::Main, root)?)
-    }
-
-    /// Validate and capture one main-master record under explicit limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn from_record_with_limits(root: Record, limits: Limits) -> Result<Self> {
-        Self::from_inner(metadata::Snapshot::from_record_with_limits(
+    pub fn from_record(root: Record, limits: &Limits) -> Result<Self> {
+        Self::from_inner(metadata::Snapshot::from_record(
             Context::Main,
             root,
             limits,
@@ -53,21 +44,8 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(bytes: &[u8]) -> Result<Self> {
-        Self::from_inner(metadata::Snapshot::parse(Context::Main, bytes)?)
-    }
-
-    /// Parse one complete main-master record under explicit limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_with_limits(bytes: &[u8], limits: Limits) -> Result<Self> {
-        Self::from_inner(metadata::Snapshot::parse_with_limits(
-            Context::Main,
-            bytes,
-            limits,
-        )?)
+    pub fn parse(bytes: &[u8], limits: &Limits) -> Result<Self> {
+        Self::from_inner(metadata::Snapshot::parse(Context::Main, bytes, limits)?)
     }
 
     fn from_inner(inner: metadata::Snapshot) -> Result<Self> {
@@ -109,9 +87,10 @@ impl Snapshot {
     }
 
     /// Open an isolated semantic edit.
+    #[cfg(test)]
     #[must_use]
-    pub fn edit(&self) -> Editor {
-        Editor {
+    pub(crate) fn edit(&self) -> RecordEdit {
+        RecordEdit {
             inner: self.inner.edit(),
         }
     }
@@ -119,14 +98,22 @@ impl Snapshot {
 
 /// A transactional semantic edit of one main-master design name.
 #[derive(Debug, Clone)]
-pub struct Editor {
-    inner: metadata::Editor,
+#[allow(
+    dead_code,
+    reason = "the record-level design-name editor; master::metadata::Edit::set_template_name is the public route and this surface stays exercised by the unit tests (record 0357)"
+)]
+pub(crate) struct RecordEdit {
+    inner: metadata::RecordEdit,
 }
 
-impl Editor {
+#[allow(
+    dead_code,
+    reason = "the record-level design-name editor; master::metadata::Edit::set_template_name is the public route and this surface stays exercised by the unit tests (record 0357)"
+)]
+impl RecordEdit {
     /// The contextual master kind being edited.
     #[must_use]
-    pub const fn context(&self) -> Context {
+    pub(crate) const fn context(&self) -> Context {
         Context::Main
     }
 
@@ -135,19 +122,13 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn name(&self) -> Result<Option<Name>> {
+    pub(crate) fn name(&self) -> Result<Option<Name>> {
         codec::read(self.context(), self.inner.record())
-    }
-
-    /// Whether this editor contains an uncommitted change.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.inner.is_changed()
     }
 
     /// The current structural change set.
     #[must_use]
-    pub fn changes(&self) -> &[Change] {
+    pub(crate) fn changes(&self) -> &[Change] {
         self.inner.changes()
     }
 
@@ -156,7 +137,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_name(&mut self, value: impl Into<String>) -> Result<()> {
+    pub(crate) fn set_name(&mut self, value: impl Into<String>) -> Result<()> {
         self.inner.set_template_name(value)
     }
 
@@ -165,17 +146,8 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn clear_name(&mut self) -> Result<bool> {
+    pub(crate) fn clear_name(&mut self) -> Result<bool> {
         self.inner.clear_template_name()
-    }
-
-    /// Capture the current candidate without publishing it.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn snapshot(&self) -> Result<Snapshot> {
-        Snapshot::from_inner(self.inner.snapshot()?)
     }
 
     /// Validate and publish the candidate as an immutable snapshot and patch.
@@ -183,40 +155,40 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<RecordCommit> {
         let commit = self.inner.commit()?;
-        Ok(Commit {
+        Ok(RecordCommit {
             snapshot: Snapshot::from_inner(commit.snapshot().clone())?,
             changes: commit.changes().clone(),
         })
-    }
-
-    /// Discard the candidate and recover the original snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        Snapshot {
-            inner: self.inner.rollback(),
-        }
     }
 }
 
 /// A successful semantic commit.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
+#[allow(
+    dead_code,
+    reason = "the record-level design-name editor; master::metadata::Edit::set_template_name is the public route and this surface stays exercised by the unit tests (record 0357)"
+)]
+pub(crate) struct RecordCommit {
     snapshot: Snapshot,
-    changes: ChangeSet,
+    changes: crate::master_layout::RecordPatch,
 }
 
-impl Commit {
+#[allow(
+    dead_code,
+    reason = "the record-level design-name editor; master::metadata::Edit::set_template_name is the public route and this surface stays exercised by the unit tests (record 0357)"
+)]
+impl RecordCommit {
     /// The immutable target snapshot.
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// The structural patch produced by the semantic edit.
     #[must_use]
-    pub const fn changes(&self) -> &ChangeSet {
+    pub(crate) const fn changes(&self) -> &crate::master_layout::RecordPatch {
         &self.changes
     }
 
@@ -225,7 +197,7 @@ impl Commit {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
         let inner = self.changes.undo(&current.inner.inner)?;
         Snapshot::from_inner(metadata::Snapshot::from_inner(inner)?)
     }
@@ -235,14 +207,14 @@ impl Commit {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
         let inner = self.changes.redo(&current.inner.inner)?;
         Snapshot::from_inner(metadata::Snapshot::from_inner(inner)?)
     }
 
     /// Split the commit into its target and reusable patch.
     #[must_use]
-    pub fn into_parts(self) -> (Snapshot, ChangeSet) {
+    pub(crate) fn into_parts(self) -> (Snapshot, crate::master_layout::RecordPatch) {
         (self.snapshot, self.changes)
     }
 }

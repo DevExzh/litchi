@@ -38,21 +38,29 @@ impl Builder {
         self
     }
 
-    /// Validates and packages the document bytes.
+    /// Validates the document and returns the immutable package.
+    ///
+    /// Output (bytes, streams, files) lives on the returned
+    /// [`crate::Package`].
     ///
     /// # Errors
     ///
     /// Returns an error if content validation or package writing fails.
-    pub fn build(self) -> Result<Vec<u8>> {
-        compact_xml::validate(self.content_xml.as_bytes())?;
+    pub fn build(self) -> std::result::Result<crate::Package, litchi_odf_common::Error> {
+        Ok(crate::Package::from_vec(self.build_bytes()?)?)
+    }
+
+    fn build_bytes(self) -> Result<Vec<u8>> {
+        compact_xml::validate(self.content_xml.as_bytes(), compact_xml::Limits::default())?;
         crate::codec::validate(&self.content_xml)?;
         let mut content_xml = self.content_xml;
         for item in &self.body_items {
             content_xml = crate::edit_ops::append_body_item(&content_xml, item)?;
         }
-        compact_xml::validate(content_xml.as_bytes())?;
+        compact_xml::validate(content_xml.as_bytes(), compact_xml::Limits::default())?;
         crate::codec::validate(&content_xml)?;
-        let mut writer = PackageWriter::new();
+        let mut writer =
+            PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
         writer.set_mimetype(crate::package::MIMETYPE)?;
         writer.add_file("content.xml", content_xml.as_bytes())?;
         writer.finish_to_bytes()

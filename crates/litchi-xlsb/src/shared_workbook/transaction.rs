@@ -1,7 +1,13 @@
-//! Source-checked snapshot edits for shared-workbook revision metadata.
+//! Immutable edits of shared-workbook revision metadata (record 0360b).
 //!
-//! The transaction owns metadata and opaque BIFF12 record envelopes only. It
-//! never coordinates users, acquires locks, or applies revision records.
+//! [`crate::Package::edit_shared_workbook`] starts an [`Edit`] that owns
+//! metadata and opaque BIFF12 record envelopes only: it never coordinates
+//! users, acquires locks, or applies revision records. [`Edit::commit`]
+//! stores the staged catalog, reads it back and returns a [`Commit`] with the
+//! new package, the exact part-level [`Patch`] and the [`Diagnostics`];
+//! [`crate::Package::apply_shared_workbook`] replays a patch onto an equal
+//! package. An unchanged catalog publishes nothing, and a changed edit of a
+//! signed workbook is refused with [`crate::shared_workbook::Error::Signed`].
 
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -12,7 +18,55 @@ use super::model::{
     Catalog, Header, Info, RawRecord, RevisionHeaders, RevisionLog, User, UserNames,
 };
 use super::{Result, package, validation};
-use crate::package::error::Error;
+use crate::part_edit::{Staged, family};
+
+family!("shared-workbook", shared_error);
+
+/// A bounded dimension of this family.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Revision logs of the workbook.
+    Revisions,
+    /// Users of the current-user log.
+    Users,
+}
+
+impl crate::Package {
+    /// The shared-workbook revision metadata of this package.
+    ///
+    /// # Errors
+    ///
+    /// Returns the owner graph, decoding and validation errors.
+    pub fn shared_workbook(&self) -> Result<Snapshot> {
+        Snapshot::read(self.opc_package(), self.raw_limits_value())
+    }
+
+    /// Start a shared-workbook metadata edit. Starting one copies no part
+    /// payload.
+    ///
+    /// The owner graph is read on the first operation or commit, so dropping
+    /// an untouched edit does not decode shared-workbook metadata.
+    pub fn edit_shared_workbook(&self) -> Result<Edit> {
+        Ok(Edit {
+            staged: Staged::of_package(self)?,
+            raw_limits: self.raw_limits_value(),
+            catalog: Catalog::empty(),
+            base: None,
+        })
+    }
+
+    /// Apply a shared-workbook patch to a new package; this one is unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::shared_workbook::Error::PatchConflict`] when this package is not the patch's
+    /// before state and [`crate::shared_workbook::Error::Signed`] for a changed patch of a signed
+    /// workbook.
+    pub fn apply_shared_workbook(&self, patch: &Patch) -> Result<Commit> {
+        Ok(Commit::new((patch.0.apply(self)?, patch.0.clone())))
+    }
+}
 
 /// An immutable shared-workbook metadata snapshot bound to package source.
 #[derive(Debug, Clone)]
@@ -22,9 +76,10 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-    /// Read and validate the shared-workbook owner from an OPC package.
-    pub fn read(package: &OpcPackage) -> Result<Self> {
-        let catalog = package::load(package)?;
+    /// Read and validate the shared-workbook owner from an OPC package under
+    /// the owner's raw profile.
+    pub(crate) fn read(package: &OpcPackage, raw_limits: crate::raw::Limits) -> Result<Self> {
+        let catalog = package::load(package, raw_limits)?;
         let source = SourceState::capture(package, &catalog)?;
         Ok(Self {
             catalog,
@@ -75,15 +130,6 @@ impl Snapshot {
     pub fn is_empty(&self) -> bool {
         self.catalog == Catalog::empty()
     }
-
-    /// Start a detached transaction against this snapshot.
-    #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
-            base: self.clone(),
-            catalog: self.catalog.clone(),
-        }
-    }
 }
 
 impl PartialEq for Snapshot {
@@ -94,27 +140,56 @@ impl PartialEq for Snapshot {
 
 impl Eq for Snapshot {}
 
-/// A detached, failure-atomic metadata transaction.
+/// A staged shared-workbook metadata edit. Dropping it discards it.
 #[derive(Debug, Clone)]
-pub struct Transaction {
-    base: Snapshot,
+pub struct Edit {
+    staged: Staged,
+    raw_limits: crate::raw::Limits,
+    base: Option<Snapshot>,
     catalog: Catalog,
 }
 
-impl Transaction {
+impl Edit {
+    fn ensure_prepared(&mut self) -> Result<()> {
+        if self.base.is_some() {
+            return Ok(());
+        }
+        let base = Snapshot::read(self.staged.opc(), self.raw_limits)?;
+        self.catalog = base.catalog.clone();
+        self.base = Some(base);
+        Ok(())
+    }
+
+    fn snapshot(&self) -> Result<&Snapshot> {
+        self.base
+            .as_ref()
+            .ok_or_else(|| super::invalid("shared-workbook edit is not prepared"))
+    }
+
+    /// Discard every staged change.
+    pub fn reset(&mut self) -> Result<()> {
+        self.ensure_prepared()?;
+        let catalog = self.snapshot()?.catalog.clone();
+        self.catalog = catalog;
+        Ok(())
+    }
+
     /// Borrow the currently staged metadata graph.
     #[must_use]
-    pub const fn catalog(&self) -> &Catalog {
-        &self.catalog
+    pub fn catalog(&mut self) -> Result<&Catalog> {
+        self.ensure_prepared()?;
+        Ok(&self.catalog)
     }
 
     /// Replace the complete metadata graph after validating its local shape.
     pub fn replace(&mut self, catalog: Catalog) -> Result<()> {
+        self.ensure_prepared()?;
         self.apply_candidate(catalog)
     }
 
     /// Replace the current-user metadata.
     pub fn set_users(&mut self, users: Option<UserNames>) -> Result<()> {
+        self.ensure_prepared()?;
         let mut candidate = self.catalog.clone();
         candidate.users = users;
         self.apply_candidate(candidate)
@@ -122,6 +197,7 @@ impl Transaction {
 
     /// Replace revision-header metadata while retaining the existing log list.
     pub fn set_headers(&mut self, headers: Option<RevisionHeaders>) -> Result<()> {
+        self.ensure_prepared()?;
         let mut candidate = self.catalog.clone();
         candidate.headers = headers;
         if candidate.headers.is_none() {
@@ -132,6 +208,7 @@ impl Transaction {
 
     /// Replace all revision logs in header order.
     pub fn set_logs(&mut self, logs: Vec<RevisionLog>) -> Result<()> {
+        self.ensure_prepared()?;
         let mut candidate = self.catalog.clone();
         candidate.logs = logs;
         self.apply_candidate(candidate)
@@ -139,6 +216,7 @@ impl Transaction {
 
     /// Replace the typed `BrtInfo` metadata.
     pub fn set_info(&mut self, info: Info) -> Result<()> {
+        self.ensure_prepared()?;
         let mut candidate = self.catalog.clone();
         let headers = candidate
             .headers
@@ -150,6 +228,7 @@ impl Transaction {
 
     /// Add or replace a currently open user by stable id or GUID.
     pub fn upsert_user(&mut self, user: User) -> Result<()> {
+        self.ensure_prepared()?;
         let mut candidate = self.catalog.clone();
         let users = candidate
             .users
@@ -176,6 +255,7 @@ impl Transaction {
 
     /// Remove a currently open user by id.
     pub fn remove_user(&mut self, id: u32) -> Result<Option<User>> {
+        self.ensure_prepared()?;
         let mut candidate = self.catalog.clone();
         let Some(users) = candidate.users.as_mut() else {
             return Ok(None);
@@ -190,6 +270,7 @@ impl Transaction {
 
     /// Replace one revision header and its corresponding opaque log.
     pub fn set_revision(&mut self, index: usize, header: Header, log: RevisionLog) -> Result<()> {
+        self.ensure_prepared()?;
         let mut candidate = self.catalog.clone();
         let headers = candidate
             .headers
@@ -210,6 +291,7 @@ impl Transaction {
 
     /// Add a revision header and its opaque log at the end of the owner.
     pub fn push_revision(&mut self, header: Header, log: RevisionLog) -> Result<()> {
+        self.ensure_prepared()?;
         let mut candidate = self.catalog.clone();
         candidate
             .headers
@@ -223,6 +305,7 @@ impl Transaction {
 
     /// Remove one revision header and its corresponding log.
     pub fn remove_revision(&mut self, index: usize) -> Result<Option<(Header, RevisionLog)>> {
+        self.ensure_prepared()?;
         let mut candidate = self.catalog.clone();
         let headers = candidate
             .headers
@@ -239,6 +322,7 @@ impl Transaction {
 
     /// Replace the opaque records of one revision log.
     pub fn set_log_records(&mut self, index: usize, records: Vec<RawRecord>) -> Result<()> {
+        self.ensure_prepared()?;
         let mut candidate = self.catalog.clone();
         let log = candidate
             .logs
@@ -250,6 +334,7 @@ impl Transaction {
 
     /// Append one opaque BIFF12 record to a revision log.
     pub fn push_log_record(&mut self, index: usize, record: RawRecord) -> Result<()> {
+        self.ensure_prepared()?;
         let mut candidate = self.catalog.clone();
         let log = candidate
             .logs
@@ -261,6 +346,7 @@ impl Transaction {
 
     /// Remove one opaque BIFF12 record from a revision log.
     pub fn remove_log_record(&mut self, index: usize, record: usize) -> Result<Option<RawRecord>> {
+        self.ensure_prepared()?;
         let mut candidate = self.catalog.clone();
         let log = candidate
             .logs
@@ -274,25 +360,30 @@ impl Transaction {
         Ok(Some(value))
     }
 
-    /// Validate and produce a source-checked commit.
-    pub fn commit(self) -> Result<Commit> {
+    /// Validate the staged catalog, store it, check that the result reads
+    /// back and publish a new package. An unchanged catalog returns the source package.
+    ///
+    /// # Errors
+    ///
+    /// Returns the catalog validation errors, [`crate::shared_workbook::Error::Signed`] for a changed
+    /// edit of a signed workbook and the workbook validation errors of the
+    /// result.
+    pub fn commit(mut self) -> Result<Commit> {
+        self.ensure_prepared()?;
         self.validate_candidate(&self.catalog)?;
-        let source =
-            Arc::clone(self.base.source.as_ref().ok_or_else(|| {
-                super::unsupported("shared-workbook snapshot is not source bound")
-            })?);
-        let changed = self.catalog != self.base.catalog;
-        Ok(Commit {
-            snapshot: Snapshot {
-                catalog: self.catalog.clone(),
-                source: (!changed).then_some(Arc::clone(&source)),
-            },
-            patch: Patch {
-                before: source,
-                after: self.catalog,
-                changed,
-            },
-        })
+        let changed = {
+            let base = self.snapshot()?;
+            self.catalog != base.catalog
+        };
+        if changed {
+            let catalog = self.catalog.clone();
+            let raw_limits = self.staged.raw_limits();
+            self.staged.update(|candidate| {
+                package::store(candidate, &catalog, raw_limits)?;
+                Snapshot::read(candidate, raw_limits).map(drop)
+            })?;
+        }
+        Ok(Commit::new(self.staged.commit()?))
     }
 
     fn apply_candidate(&mut self, candidate: Catalog) -> Result<()> {
@@ -302,11 +393,12 @@ impl Transaction {
     }
 
     fn validate_candidate(&self, candidate: &Catalog) -> Result<()> {
+        let base = self.snapshot()?;
         validation::validate_local(candidate)?;
         match (&candidate.users, &candidate.headers) {
             (None, None) if candidate.logs.is_empty() => Ok(()),
             (Some(_), Some(headers)) if candidate.logs.len() == headers.headers.len() => {
-                if self.base.is_empty() {
+                if base.is_empty() {
                     validate_new_graph(candidate)
                 } else {
                     validation::validate_catalog(candidate)
@@ -318,82 +410,6 @@ impl Transaction {
             )),
         }
     }
-}
-
-/// A successful immutable transaction result.
-#[derive(Debug, Clone)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
-
-impl Commit {
-    /// Borrow the committed semantic snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Borrow the source-checked package patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consume the commit into its snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
-    }
-}
-
-/// A clone-staged patch guarded by the exact owner source image.
-#[derive(Debug, Clone)]
-pub struct Patch {
-    before: Arc<SourceState>,
-    after: Catalog,
-    changed: bool,
-}
-
-impl Patch {
-    /// Whether applying this patch is a source-preserving no-op.
-    #[must_use]
-    pub const fn is_empty(&self) -> bool {
-        !self.changed
-    }
-
-    /// Apply the patch atomically after checking its owner source image.
-    pub fn apply(&self, package: &mut OpcPackage) -> Result<Snapshot> {
-        let current = SourceState::capture_current(package)?;
-        if current != *self.before {
-            return Err(Error::UnsupportedFeature(
-                "shared-workbook patch source snapshot does not match".to_string(),
-            ));
-        }
-        if !self.changed {
-            return Snapshot::read(package);
-        }
-        let mut candidate = package.clone();
-        package::store(&mut candidate, &self.after)?;
-        let snapshot = Snapshot::read(&candidate)?;
-        *package = candidate;
-        Ok(snapshot)
-    }
-
-    /// Commit this source-checked patch to the package.
-    pub fn commit(&self, package: &mut OpcPackage) -> Result<Snapshot> {
-        self.apply(package)
-    }
-}
-
-/// Read shared-workbook metadata from an OPC package.
-pub fn read(package: &OpcPackage) -> Result<Snapshot> {
-    Snapshot::read(package)
-}
-
-/// Apply a source-checked shared-workbook patch atomically.
-pub fn apply(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
-    patch.apply(package)
 }
 
 fn validate_new_graph(catalog: &Catalog) -> Result<()> {
@@ -468,7 +484,7 @@ impl SourceState {
             });
         }
         for name in names {
-            let uri = litchi_opc::PackURI::new(&name).map_err(Error::InvalidUri)?;
+            let uri = litchi_opc::PackURI::new(&name)?;
             let part = package.get_part(&uri)?;
             parts.push(SourcePart {
                 part_name: part.partname().to_string(),
@@ -479,11 +495,6 @@ impl SourceState {
         }
         parts.sort_by(|left, right| left.part_name.cmp(&right.part_name));
         Ok(Self { parts })
-    }
-
-    fn capture_current(package: &OpcPackage) -> Result<Self> {
-        let catalog = package::load(package)?;
-        Self::capture(package, &catalog)
     }
 }
 

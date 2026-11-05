@@ -1,0 +1,35 @@
+{
+  "baseline_commit": "249dbd658f",
+  "constructor_body_unchanged": true,
+  "constructor_body_sha256": "51f863ef44b4327e2761c9e3532e9b32271159232930c3812f94f1e836adf202",
+  "source": "crates/litchi-iwa-common/src/wire.rs",
+  "validation": {
+    "iwa_common_core_text_numbers_wire": {
+      "passed": 546,
+      "failed": 0,
+      "ignored": 0
+    },
+    "numbers_formats": {
+      "passed": 53,
+      "failed": 0,
+      "ignored": 0
+    },
+    "pages_hidden_axes": {
+      "passed": 40,
+      "failed": 0,
+      "ignored": 0
+    },
+    "clippy_all_targets_all_features": "passed: iwa-common, iwa-core, iwa-text-wire, numbers-wire, pages, numbers",
+    "iwa_common_glossary": "passed: 6 banned names",
+    "gate_unit_tests": "28 passed",
+    "pages_fuzz_target": "passed: cargo check --offline --manifest-path crates/litchi-pages/fuzz/Cargo.toml --bin pages_body_table_hidden_axes"
+  },
+  "commands": [
+    "cargo test -q -p litchi-iwa-common -p litchi-iwa-core -p litchi-iwa-text-wire -p litchi-numbers-wire --all-features --no-fail-fast",
+    "cargo test -q -p litchi-numbers --all-features --test table_cell_date_time_format --test table_cell_custom_format --test table_cell_duration_format",
+    "cargo test -q -p litchi-pages --all-features --test body_table_hidden_axes",
+    "cargo clippy -q -p litchi-iwa-common -p litchi-iwa-core -p litchi-iwa-text-wire -p litchi-numbers-wire -p litchi-pages -p litchi-numbers --all-features --all-targets -- -D warnings",
+    "python3 tools/check_api_glossary.py --profile iwa-common",
+    "python3 -m unittest tools.test_check_api_glossary"
+  ]
+}

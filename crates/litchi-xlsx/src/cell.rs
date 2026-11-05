@@ -2,6 +2,7 @@
 
 use std::fmt;
 use std::hash::{Hash, Hasher};
+use std::mem::{size_of, size_of_val};
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -231,6 +232,15 @@ impl Value {
         }
         Ok(())
     }
+
+    pub(crate) fn retained_bytes(&self) -> usize {
+        size_of::<Self>().saturating_add(match self {
+            Self::Number(number) => number.as_str().len(),
+            Self::Text(text) | Self::Date(Date(text)) => text.as_str().len(),
+            Self::Error(error) => error.as_str().len(),
+            Self::Bool(_) => 0,
+        })
+    }
 }
 
 /// A checked ISO 8601 lexical value for a `SpreadsheetML` date cell.
@@ -333,7 +343,7 @@ macro_rules! exact_integer_value {
 
 exact_integer_value!(i8, i16, i32, u8, u16, u32);
 
-/// Primary payload accepted by [`crate::WorksheetEdit::set`].
+/// Primary payload accepted by [`crate::workbook::edit::Sheet::set`].
 ///
 /// Plain strings are always inert text. Formula interpretation requires an
 /// explicit checked [`Formula`].
@@ -362,11 +372,31 @@ impl Content {
         }
     }
 
+    /// Whether `cell` is exactly `self.as_cell()`, without building it.
+    pub(crate) fn same_as_cell(&self, cell: &Cell) -> bool {
+        match (self, cell) {
+            (Self::Value(value), Cell::Value(other)) => value == other,
+            (Self::Formula(formula), Cell::Formula(other)) => formula == other,
+            _ => false,
+        }
+    }
+
     pub(crate) fn as_cell(&self) -> Cell {
         match self {
             Self::Value(value) => Cell::Value(value.clone()),
             Self::Formula(formula) => Cell::Formula(formula.clone()),
         }
+    }
+
+    pub(crate) fn retained_bytes(&self) -> usize {
+        size_of::<Self>().saturating_add(match self {
+            Self::Value(value) => value.retained_bytes(),
+            Self::Formula(formula) => formula.text().len().saturating_add(
+                formula
+                    .cached()
+                    .map_or(0, |cache| cache.value().retained_bytes()),
+            ),
+        })
     }
 }
 
@@ -483,6 +513,532 @@ impl fmt::Debug for Number {
 impl fmt::Display for Number {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(&self.0)
+    }
+}
+
+/// The rich-text runs of one cell (record 0295): each run's text and its
+/// run properties (`rPr`) exactly as the source item spells them, so a run
+/// text can change while every run keeps its formatting.
+///
+/// Read with [`crate::Worksheet::rich_text`], changed with
+/// [`RichText::set_run_text`], written with
+/// [`crate::workbook::edit::Sheet::set_rich_text`] as the cell's own inline rich
+/// string.
+///
+/// ```
+/// # fn main() -> litchi_xlsx::Result<()> {
+/// use litchi_xlsx::{Package, RichText};
+///
+/// let mut edit = Package::new()?.edit()?;
+/// let mut rich = RichText::plain("Hello");
+/// rich.set_run_text(0, "Bye")?;
+/// edit.sheet("Sheet1")?.expect("worksheet").set_rich_text("A1", rich)?;
+/// let workbook = edit.commit()?.into_package().workbook();
+/// let sheet = workbook.sheet("Sheet1")?.expect("worksheet");
+/// assert!(sheet.has_rich_text("A1")?);
+/// # Ok(())
+/// # }
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RichText {
+    runs: Vec<RichRun>,
+}
+
+/// One run of a [`RichText`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RichRun {
+    /// The `rPr` children as `(local name, raw attributes)`; `None` for a
+    /// run without `rPr`.
+    pub(crate) properties: Option<Box<[(Box<str>, Box<str>)]>>,
+    text: String,
+}
+
+impl RichText {
+    /// One unformatted run holding `text`.
+    #[must_use]
+    pub fn plain(text: impl Into<String>) -> Self {
+        Self {
+            runs: vec![RichRun {
+                properties: None,
+                text: text.into(),
+            }],
+        }
+    }
+
+    /// The runs `runs`, in order (record 0338). Writing needs at least one.
+    ///
+    /// ```
+    /// use litchi_xlsx::{FontChange, RichRun, RichText};
+    ///
+    /// let mut bold = RichRun::new("Bold");
+    /// bold.apply_font(&FontChange::new().bold(Some(true)))?;
+    /// let rich = RichText::new(vec![bold, RichRun::new(" plain")]);
+    /// assert_eq!(rich.text(), "Bold plain");
+    /// assert!(rich.runs()[0].font()?.bold);
+    /// # Ok::<(), litchi_xlsx::Error>(())
+    /// ```
+    #[must_use]
+    pub fn new(runs: Vec<RichRun>) -> Self {
+        Self { runs }
+    }
+
+    pub(crate) fn from_runs(runs: Vec<RichRun>) -> Self {
+        Self { runs }
+    }
+
+    /// The runs, in order.
+    #[must_use]
+    pub fn runs(&self) -> &[RichRun] {
+        &self.runs
+    }
+
+    /// The run at `index`, to change it in place (record 0338).
+    pub fn run_mut(&mut self, index: usize) -> Option<&mut RichRun> {
+        self.runs.get_mut(index)
+    }
+
+    /// Insert `run` before position `index` (`runs().len()` appends).
+    ///
+    /// # Errors
+    ///
+    /// An invalid-input error for an index past the end.
+    pub fn insert_run(&mut self, index: usize, run: RichRun) -> Result<()> {
+        if index > self.runs.len() {
+            return Err(invalid("rich-text run index is out of range"));
+        }
+        self.runs
+            .try_reserve(1)
+            .map_err(|source| allocation("rich-text runs", source))?;
+        self.runs.insert(index, run);
+        Ok(())
+    }
+
+    /// Remove and return the run at `index`.
+    ///
+    /// # Errors
+    ///
+    /// An invalid-input error for an index past the last run.
+    pub fn remove_run(&mut self, index: usize) -> Result<RichRun> {
+        if index >= self.runs.len() {
+            return Err(invalid("rich-text run index is out of range"));
+        }
+        Ok(self.runs.remove(index))
+    }
+
+    /// The visible text: every run's text, joined.
+    #[must_use]
+    pub fn text(&self) -> String {
+        self.runs.iter().map(|run| run.text.as_str()).collect()
+    }
+
+    /// Replace the text of run `index`, keeping its properties.
+    ///
+    /// # Errors
+    ///
+    /// An invalid-input error for an index past the last run.
+    pub fn set_run_text(&mut self, index: usize, text: impl Into<String>) -> Result<()> {
+        let run = self
+            .runs
+            .get_mut(index)
+            .ok_or_else(|| invalid("rich-text run index is out of range"))?;
+        run.text = text.into();
+        Ok(())
+    }
+
+    pub(crate) fn validate_for_write(&self) -> Result<()> {
+        if self.runs.is_empty() {
+            return Err(invalid("rich text needs at least one run"));
+        }
+        let count: usize = self.runs.iter().map(|run| run.text.chars().count()).sum();
+        if count > MAX_CELL_CHARACTERS {
+            return Err(invalid(format!(
+                "cell text exceeds {MAX_CELL_CHARACTERS} characters"
+            )));
+        }
+        Ok(())
+    }
+
+    /// Conservative logical bytes retained by this authored rich string.
+    ///
+    /// The transaction capture budget accounts for the run text and the
+    /// lexical run properties that are copied into the pending cell action;
+    /// allocator capacity is deliberately not folded into the package/cache
+    /// census.
+    #[doc(hidden)]
+    pub fn retained_bytes(&self) -> usize {
+        self.runs.iter().fold(size_of::<Self>(), |bytes, run| {
+            let properties = run.properties.as_deref().map_or(0, |items| {
+                items
+                    .iter()
+                    .fold(size_of_val(items), |bytes, (name, value)| {
+                        bytes.saturating_add(name.len()).saturating_add(value.len())
+                    })
+            });
+            bytes
+                .saturating_add(size_of::<RichRun>())
+                .saturating_add(run.text.len())
+                .saturating_add(properties)
+        })
+    }
+}
+
+impl RichRun {
+    /// An unformatted run holding `text` (record 0338).
+    #[must_use]
+    pub fn new(text: impl Into<String>) -> Self {
+        Self {
+            properties: None,
+            text: text.into(),
+        }
+    }
+
+    pub(crate) fn with_properties(
+        properties: Option<Box<[(Box<str>, Box<str>)]>>,
+        text: String,
+    ) -> Self {
+        Self { properties, text }
+    }
+
+    /// The run's text.
+    #[must_use]
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
+    /// Replace the run's text, keeping its properties (record 0338).
+    pub fn set_text(&mut self, text: impl Into<String>) {
+        self.text = text.into();
+    }
+
+    /// Whether the run carries run properties (`rPr`).
+    #[must_use]
+    pub fn is_formatted(&self) -> bool {
+        self.properties.is_some()
+    }
+
+    /// The run's typed font, read from its run properties (record 0338):
+    /// `rFont` is the font name, and an absent property is the default (no
+    /// flag, no value). Properties the [`Font`] model has no field for
+    /// (`outline`, `shadow`, `condense`, `extend`) are not read.
+    ///
+    /// [`Font`]: crate::style::stylesheet::font::Font
+    ///
+    /// # Errors
+    ///
+    /// An invalid-input error for a property value that is not its
+    /// `SpreadsheetML` lexical form.
+    pub fn font(&self) -> Result<crate::style::stylesheet::font::Font> {
+        rich_font::read(self.properties.as_deref().unwrap_or_default())
+    }
+
+    /// Apply `change` to the run's properties (record 0338): each property
+    /// the change mentions is replaced (`Some`) or removed (`None`); the
+    /// others, and properties the change has no setter for, keep their
+    /// markup. A new property is placed in Excel's run-property order.
+    ///
+    /// # Errors
+    ///
+    /// An invalid-input error for a value the change cannot spell.
+    pub fn apply_font(&mut self, change: &crate::style::FontChange) -> Result<()> {
+        let mut properties = self.properties.take().map(Vec::from).unwrap_or_default();
+        let result = rich_font::apply(&mut properties, change);
+        self.properties = (!properties.is_empty()).then(|| properties.into_boxed_slice());
+        result
+    }
+}
+
+/// Typed reads and writes of a rich-text run's `rPr` children (record
+/// 0338), kept as `(local name, raw attributes)` pairs.
+mod rich_font {
+    use litchi_core::xml::escape_xml;
+    use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
+    use quick_xml::events::Event;
+
+    use crate::error::{Result, invalid};
+    use crate::style::FontChange;
+    use crate::style::stylesheet::border::Tint;
+    use crate::style::stylesheet::font::{
+        Font, FontColor, FontColorKind, Scheme, Script, Underline,
+    };
+
+    /// Excel's order of run properties, used to place a new one.
+    const ORDER: [&str; 15] = [
+        "b",
+        "i",
+        "strike",
+        "condense",
+        "extend",
+        "outline",
+        "shadow",
+        "u",
+        "vertAlign",
+        "sz",
+        "color",
+        "rFont",
+        "family",
+        "charset",
+        "scheme",
+    ];
+
+    type Property = (Box<str>, Box<str>);
+
+    /// The attributes of one property, unescaped.
+    fn attributes(raw: &str) -> Result<Vec<(String, String)>> {
+        let xml = format!("<x {raw}/>");
+        let mut reader = quick_xml::Reader::from_str(&xml);
+        let Ok(Event::Empty(element)) = reader.read_event() else {
+            return Err(invalid("malformed rich-text run property attributes"));
+        };
+        let mut out = Vec::new();
+        for attribute in element.checked_attributes() {
+            let attribute = attribute
+                .map_err(|error| invalid(format!("rich-text run property attribute: {error}")))?;
+            let name = String::from_utf8_lossy(attribute.key.local_name().as_ref()).into_owned();
+            let value = attribute
+                .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, reader.decoder())
+                .map_err(|error| invalid(format!("rich-text run property value: {error}")))?
+                .into_owned();
+            out.push((name, value));
+        }
+        Ok(out)
+    }
+
+    fn value<'a>(attributes: &'a [(String, String)], name: &str) -> Option<&'a str> {
+        attributes
+            .iter()
+            .find(|(key, _)| key == name)
+            .map(|(_, value)| value.as_str())
+    }
+
+    fn flag(attributes: &[(String, String)], name: &str) -> Result<bool> {
+        match value(attributes, "val") {
+            None | Some("1" | "true") => Ok(true),
+            Some("0" | "false") => Ok(false),
+            Some(other) => Err(invalid(format!(
+                "invalid run property {name} value '{other}'"
+            ))),
+        }
+    }
+
+    fn number(attributes: &[(String, String)], name: &str) -> Result<Option<u32>> {
+        value(attributes, "val")
+            .map(|text| {
+                text.parse()
+                    .map_err(|_| invalid(format!("invalid run property {name} value '{text}'")))
+            })
+            .transpose()
+    }
+
+    pub(super) fn read(properties: &[Property]) -> Result<Font> {
+        let mut font = Font::new();
+        for (name, raw) in properties {
+            let attributes = attributes(raw)?;
+            match &**name {
+                "b" => font.bold = flag(&attributes, name)?,
+                "i" => font.italic = flag(&attributes, name)?,
+                "strike" => font.strike = flag(&attributes, name)?,
+                "u" => {
+                    let token = value(&attributes, "val").unwrap_or("single");
+                    font.underline = Some(
+                        token
+                            .parse::<Underline>()
+                            .map_err(|error| invalid(error.to_string()))?,
+                    );
+                },
+                "vertAlign" => {
+                    font.script = match value(&attributes, "val") {
+                        Some("baseline") => Some(Script::Baseline),
+                        Some("superscript") => Some(Script::Superscript),
+                        Some("subscript") => Some(Script::Subscript),
+                        other => {
+                            return Err(invalid(format!(
+                                "invalid run vertAlign value '{}'",
+                                other.unwrap_or_default()
+                            )));
+                        },
+                    };
+                },
+                "sz" => {
+                    let text = value(&attributes, "val").unwrap_or_default();
+                    let size: f64 = text
+                        .parse()
+                        .map_err(|_| invalid(format!("invalid run font size '{text}'")))?;
+                    if !size.is_finite() || size <= 0.0 {
+                        return Err(invalid(format!("invalid run font size '{text}'")));
+                    }
+                    font.size = Some(size);
+                },
+                "color" => font.color = Some(color(&attributes)?),
+                "rFont" => font.name = value(&attributes, "val").map(str::to_owned),
+                "family" => font.family = number(&attributes, name)?,
+                "charset" => font.charset = number(&attributes, name)?,
+                "scheme" => {
+                    font.scheme = value(&attributes, "val")
+                        .map(|token| {
+                            token
+                                .parse::<Scheme>()
+                                .map_err(|error| invalid(error.to_string()))
+                        })
+                        .transpose()?;
+                },
+                _ => {},
+            }
+        }
+        Ok(font)
+    }
+
+    fn color(attributes: &[(String, String)]) -> Result<FontColor> {
+        let tint = value(attributes, "tint")
+            .map(|text| {
+                text.parse::<f64>()
+                    .ok()
+                    .and_then(|tint| Tint::new(tint).ok())
+                    .ok_or_else(|| invalid(format!("invalid run color tint '{text}'")))
+            })
+            .transpose()?;
+        let mut color = if let Some(rgb) = value(attributes, "rgb") {
+            FontColor::rgb(
+                rgb.parse()
+                    .map_err(|error| invalid(format!("invalid run RGB color '{rgb}': {error}")))?,
+            )
+        } else if let Some(theme) = value(attributes, "theme") {
+            FontColor::theme(
+                theme
+                    .parse()
+                    .map_err(|_| invalid(format!("invalid run theme color '{theme}'")))?,
+            )
+        } else if let Some(indexed) = value(attributes, "indexed") {
+            FontColor::indexed(
+                indexed
+                    .parse()
+                    .map_err(|_| invalid(format!("invalid run indexed color '{indexed}'")))?,
+            )
+        } else if matches!(value(attributes, "auto"), Some("1" | "true")) {
+            FontColor::automatic()
+        } else {
+            FontColor::default_base()
+        };
+        if let Some(tint) = tint {
+            color = color.with_tint(tint);
+        }
+        Ok(color)
+    }
+
+    fn val(text: &str) -> Box<str> {
+        format!("val=\"{}\"", escape_xml(text)).into_boxed_str()
+    }
+
+    fn flag_value(value: bool) -> Box<str> {
+        if value {
+            Box::default()
+        } else {
+            "val=\"0\"".into()
+        }
+    }
+
+    fn color_value(color: &FontColor) -> Result<Box<str>> {
+        let mut xml = String::new();
+        crate::style::stylesheet::writer::write_font_color(&mut xml, "color", color)?;
+        let inner = xml
+            .strip_prefix("<color")
+            .and_then(|rest| rest.strip_suffix("/>"))
+            .unwrap_or_default()
+            .trim();
+        if matches!(color.kind(), FontColorKind::Default) && inner.is_empty() {
+            return Ok(Box::default());
+        }
+        Ok(inner.into())
+    }
+
+    /// Replace (`Some`) or remove (`None`) the property `name`.
+    fn put(properties: &mut Vec<Property>, name: &str, value: Option<Box<str>>) {
+        let existing = properties.iter().position(|(held, _)| &**held == name);
+        properties.retain(|(held, _)| &**held != name);
+        let Some(value) = value else {
+            return;
+        };
+        let at = existing.unwrap_or_else(|| {
+            let rank = ORDER
+                .iter()
+                .position(|item| *item == name)
+                .unwrap_or(ORDER.len());
+            properties
+                .iter()
+                .position(|(held, _)| {
+                    ORDER
+                        .iter()
+                        .position(|item| *item == &**held)
+                        .is_some_and(|other| other > rank)
+                })
+                .unwrap_or(properties.len())
+        });
+        let at = at.min(properties.len());
+        properties.insert(at, (name.into(), value));
+    }
+
+    pub(super) fn apply(properties: &mut Vec<Property>, change: &FontChange) -> Result<()> {
+        for (name, value) in [
+            ("b", change.bold_change()),
+            ("i", change.italic_change()),
+            ("strike", change.strike_change()),
+            ("condense", change.condense_change()),
+            ("extend", change.extend_change()),
+            ("outline", change.outline_change()),
+            ("shadow", change.shadow_change()),
+        ] {
+            if let Some(value) = value {
+                put(properties, name, value.map(flag_value));
+            }
+        }
+        if let Some(value) = change.underline_change() {
+            put(
+                properties,
+                "u",
+                value.map(|underline| match underline {
+                    Underline::Single => Box::default(),
+                    other => val(other.as_str()),
+                }),
+            );
+        }
+        if let Some(value) = change.script_change() {
+            put(
+                properties,
+                "vertAlign",
+                value.map(|script| val(script.as_str())),
+            );
+        }
+        if let Some(value) = change.size_change() {
+            put(properties, "sz", value.map(|size| val(&size.to_string())));
+        }
+        if let Some(value) = change.color_change() {
+            let value = value.map(color_value).transpose()?;
+            put(properties, "color", value);
+        }
+        if let Some(value) = change.name_change() {
+            put(properties, "rFont", value.map(val));
+        }
+        if let Some(value) = change.family_change() {
+            put(
+                properties,
+                "family",
+                value.map(|family| val(&family.to_string())),
+            );
+        }
+        if let Some(value) = change.charset_change() {
+            put(
+                properties,
+                "charset",
+                value.map(|charset| val(&charset.to_string())),
+            );
+        }
+        if let Some(value) = change.scheme_change() {
+            put(
+                properties,
+                "scheme",
+                value.map(|scheme| val(scheme.as_str())),
+            );
+        }
+        Ok(())
     }
 }
 
@@ -1045,13 +1601,29 @@ impl Store {
     }
 
     pub(crate) fn cells(&self, range: Rect) -> Cells<'_> {
+        Cells {
+            entries: self.entries_in(range),
+        }
+    }
+
+    /// The stored record at `index` of the row-major record order, in O(1).
+    pub(crate) fn record(&self, index: RecordIndex) -> Option<(Address, &Cell)> {
+        self.cells
+            .get(index.0)
+            .map(|entry| (entry.address, &entry.cell))
+    }
+
+    /// Stored records inside `range`, in row-major order, with their
+    /// record-level metadata.
+    pub(crate) fn entries_in(&self, range: Rect) -> Entries<'_> {
         let start = self
             .cell_rows
             .partition_point(|entry| entry.row < range.start().row());
-        Cells {
+        Entries {
             cells: &self.cells,
             rows: &self.cell_rows[start..],
             current: &[],
+            position: 0,
             range,
         }
     }
@@ -1059,6 +1631,87 @@ impl Store {
     pub(crate) const fn extents(&self) -> &Extents {
         &self.extents
     }
+
+    /// Logical retained weight of this parsed store, in bytes.
+    ///
+    /// The weight counts the store's record arrays, its merge index, its
+    /// repair report, and the payload text each record owns. Shared-string
+    /// text belongs to the workbook's shared-string table and is not counted
+    /// again. Allocator rounding is ignored, so this is a cache weight, not a
+    /// resident-memory measurement.
+    pub(crate) fn weight_bytes(&self) -> usize {
+        let arrays = [
+            (self.cells.len(), size_of::<Stored>()),
+            (self.cell_rows.len(), size_of::<CellRowStart>()),
+            (self.rows.len(), size_of::<row::Stored>()),
+            (self.columns.len(), size_of::<column::Stored>()),
+            (
+                self.tolerance.defects().len(),
+                size_of::<crate::leniency::ToleratedDefect>(),
+            ),
+        ];
+        let mut weight = size_of::<Self>().saturating_add(self.merges.weight_bytes());
+        for (count, size) in arrays {
+            weight = weight.saturating_add(count.saturating_mul(size));
+        }
+        self.cells.iter().fold(weight, |weight, entry| {
+            weight.saturating_add(entry.owned_bytes())
+        })
+    }
+}
+
+/// Modeled header of one shared text allocation (its strong and weak counts).
+const SHARED_TEXT_HEADER_BYTES: usize = 2 * size_of::<usize>();
+
+impl Stored {
+    /// Payload bytes this record owns outside its inline size.
+    fn owned_bytes(&self) -> usize {
+        let cell = match &self.cell {
+            Cell::Empty => 0,
+            Cell::Value(value) => value_owned_bytes(value, self.shared_string.is_some()),
+            Cell::Formula(formula) => formula_owned_bytes(formula),
+            Cell::Unknown(unknown) => text_owned_bytes(&unknown.kind)
+                .saturating_add(unknown.value.as_ref().map_or(0, text_owned_bytes))
+                .saturating_add(unknown.formula.as_ref().map_or(0, text_owned_bytes)),
+        };
+        cell.saturating_add(
+            self.shared_formula
+                .as_ref()
+                .map_or(0, |shared| shared.reference.len()),
+        )
+    }
+}
+
+fn text_owned_bytes(text: &Text) -> usize {
+    text.len().saturating_add(SHARED_TEXT_HEADER_BYTES)
+}
+
+/// `shared` text is owned by the shared-string table, not by the record.
+fn value_owned_bytes(value: &Value, shared: bool) -> usize {
+    match value {
+        Value::Bool(_) => 0,
+        Value::Number(number) => number.as_str().len(),
+        Value::Text(_) if shared => 0,
+        Value::Text(text) => text_owned_bytes(text),
+        Value::Date(date) => text_owned_bytes(&date.0),
+        Value::Error(ErrorValue::Unknown(text)) => text_owned_bytes(text),
+        Value::Error(_) => 0,
+    }
+}
+
+fn formula_owned_bytes(formula: &Formula) -> usize {
+    let kind = match formula.kind() {
+        Kind::Scalar => 0,
+        Kind::Array { range } | Kind::DataTable { range } => {
+            range.as_ref().map_or(0, text_owned_bytes)
+        },
+        Kind::Unknown(text) => text_owned_bytes(text),
+    };
+    formula.text().len().saturating_add(kind).saturating_add(
+        formula
+            .cached()
+            .map_or(0, |cache| value_owned_bytes(cache.value(), false)),
+    )
 }
 
 fn omitted_ranges_are_ordered(ranges: &[Rect]) -> bool {
@@ -1136,20 +1789,109 @@ impl Bounds {
 /// Borrowed sparse cells inside a half-open range.
 #[derive(Debug)]
 pub struct Cells<'a> {
-    cells: &'a [Stored],
-    rows: &'a [CellRowStart],
-    current: &'a [Stored],
-    range: Rect,
+    entries: Entries<'a>,
+}
+
+impl<'a> Cells<'a> {
+    /// The same traversal, with each record's position in its grid's
+    /// row-major record order, which reads the record again in O(1)
+    /// ([`crate::workbook::source::Grid::record`], [`crate::Worksheet::record`]).
+    ///
+    /// ```
+    /// # fn demo(grid: &litchi_xlsx::workbook::source::Grid) -> litchi_xlsx::Result<()> {
+    /// for (index, at, cell) in grid.cells("A1:C10")?.indexed() {
+    ///     assert_eq!(grid.record(index), Some((at, cell)));
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn indexed(self) -> IndexedCells<'a> {
+        IndexedCells {
+            entries: self.entries,
+        }
+    }
 }
 
 impl<'a> Iterator for Cells<'a> {
     type Item = (Address, &'a Cell);
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
+        self.entries
+            .next()
+            .map(|entry| (entry.address, &entry.cell))
+    }
+}
+
+/// The position of a stored record in its grid's row-major record order.
+///
+/// It reads the record again in O(1) from the grid that produced it
+/// ([`Cells::indexed`]); a position from another grid reads another record
+/// or none.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct RecordIndex(usize);
+
+impl RecordIndex {
+    /// The zero-based position.
+    #[must_use]
+    pub const fn get(self) -> usize {
+        self.0
+    }
+
+    /// The record position `index`.
+    #[must_use]
+    pub const fn new(index: usize) -> Self {
+        Self(index)
+    }
+}
+
+/// Borrowed sparse cells inside a half-open range, each with its
+/// [`RecordIndex`] ([`Cells::indexed`]).
+#[derive(Debug)]
+pub struct IndexedCells<'a> {
+    entries: Entries<'a>,
+}
+
+impl<'a> Iterator for IndexedCells<'a> {
+    type Item = (RecordIndex, Address, &'a Cell);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let (index, entry) = self.entries.next_indexed()?;
+        Some((RecordIndex(index), entry.address, &entry.cell))
+    }
+}
+
+/// Borrowed stored records inside a half-open range, in row-major order.
+#[derive(Debug)]
+pub(crate) struct Entries<'a> {
+    cells: &'a [Stored],
+    rows: &'a [CellRowStart],
+    current: &'a [Stored],
+    /// The record position of `current`'s first entry.
+    position: usize,
+    range: Rect,
+}
+
+impl<'a> Iterator for Entries<'a> {
+    type Item = &'a Stored;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next_indexed().map(|(_, entry)| entry)
+    }
+}
+
+impl<'a> Entries<'a> {
+    /// The next record with its position in the record order.
+    fn next_indexed(&mut self) -> Option<(usize, &'a Stored)> {
         loop {
             if let Some((entry, remaining)) = self.current.split_first() {
                 self.current = remaining;
-                return Some((entry.address, &entry.cell));
+                let index = self.position;
+                self.position += 1;
+                return Some((index, entry));
             }
 
             let (row, remaining_rows) = self.rows.split_first()?;
@@ -1182,6 +1924,7 @@ impl<'a> Iterator for Cells<'a> {
                 selected.partition_point(|entry| entry.address.column().get() < self.range.end().1)
             };
             self.current = &selected[..selected_len];
+            self.position = row.start + start;
         }
     }
 }
@@ -1189,6 +1932,37 @@ impl<'a> Iterator for Cells<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn indexed_cells_read_their_records_again() {
+        let addresses = [(0, 0), (0, 3), (0, 7), (2, 1), (2, 2), (5, 0), (5, 9)];
+        let store = empty_store(&addresses);
+        let whole = Rect::new(Address::at(0, 0).expect("start"), 10, 10).expect("range");
+        let indexed: Vec<_> = store.cells(whole).indexed().collect();
+        assert_eq!(indexed.len(), addresses.len());
+        for (position, (index, at, cell)) in indexed.iter().enumerate() {
+            assert_eq!(index.get(), position, "the whole grid lists every record");
+            assert_eq!(store.record(*index), Some((*at, *cell)));
+        }
+        // A range that starts and ends mid-row lists the records it covers,
+        // each at its position in the whole order.
+        let inner = Rect::new(Address::at(0, 1).expect("start"), 6, 8).expect("range");
+        let plain: Vec<_> = store.cells(inner).collect();
+        let indexed: Vec<_> = store.cells(inner).indexed().collect();
+        assert_eq!(plain.len(), indexed.len());
+        for ((at, cell), (index, indexed_at, indexed_cell)) in plain.iter().zip(&indexed) {
+            assert_eq!((at, cell), (indexed_at, indexed_cell));
+            assert_eq!(store.record(*index), Some((*at, *cell)));
+        }
+        assert_eq!(
+            indexed
+                .iter()
+                .map(|(index, ..)| index.get())
+                .collect::<Vec<_>>(),
+            [1, 2, 3, 4]
+        );
+        assert_eq!(store.record(RecordIndex::new(addresses.len())), None);
+    }
 
     fn empty_store(addresses: &[(u32, u32)]) -> Store {
         let cells = addresses

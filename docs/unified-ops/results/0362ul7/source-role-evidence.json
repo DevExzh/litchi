@@ -1,0 +1,293 @@
+{
+  "schema": "uo2-final-acceptance-source-role-evidence/v1",
+  "source_commit": "0dcc767c68967f765412379f0234ed92c21fbc1a",
+  "inventory": {
+    "path": "/tmp/uo2-result-contract-inventory-final.tsv",
+    "sha256": "a0166f99f9c1c30d30967bd5ad14d7d6ef56dbad5363788821d62d0ab90db840",
+    "rows": 156,
+    "selected_rows": 55
+  },
+  "scope": {
+    "selected_categories": ["mut_draft", "edit_type"],
+    "excluded_active_lanes": {
+      "litchi-cfb": 7,
+      "litchi-drawingml": 22
+    },
+    "source_proof_counts": {
+      "raw_methods_present_at_source": 38,
+      "raw_paths_absent_at_source": 6,
+      "descriptor_rows": 11
+    },
+    "note": "This receipt records source roles only. It does not alter the checker, add a wildcard allowance, or classify any row as fixed. The six absent paths are retained only to distinguish old diagnostic names from current canonical methods."
+  },
+  "rule_basis": [
+    {
+      "record": "0351 §2.1.6",
+      "rule": "A raw module may expose a mutable codec model under a non-owner noun; it is not a Package/projection owner or a format staging Edit."
+    },
+    {
+      "record": "0359a §4",
+      "rule": "DOC and XLS raw::Reader methods are cursor-backed codec reads/outputs; they are not reachable through the immutable Package owner."
+    },
+    {
+      "record": "0358a §3",
+      "rule": "The ODB and ODG litchi_core::SubEdit aliases are composition values; package publication remains on the format route."
+    },
+    {
+      "record": "0361b §(NestedFieldEdit)",
+      "rule": "NestedFieldEdit is a Copy borrowed wire descriptor consumed by a bounded raw function and has no package/staging/commit lifecycle."
+    },
+    {
+      "record": "0361c §(EntryEdit)",
+      "rule": "EntryEdit is a Copy borrowed archive descriptor consumed by bounded physical reassembly and has no package/staging/commit lifecycle."
+    }
+  ],
+  "raw_reader_groups": [
+    {
+      "crate": "litchi-doc",
+      "public_surface": "litchi_doc::raw::Reader",
+      "declaration": [
+        "crates/litchi-doc/src/lib.rs:156-160",
+        "crates/litchi-doc/src/package/mod.rs:9-12",
+        "crates/litchi-doc/src/package/model.rs:601-628"
+      ],
+      "definition_role": "The model documentation calls Reader a cursor-backed low-level mutable codec reader and identifies Package as the immutable owner. The public raw module reexports that Reader; it does not reexport Package as a mutable projection.",
+      "implementation_context": "crates/litchi-doc/src/package/codec.rs:47-422 (impl<R: Read + Seek> Reader<R>)",
+      "lifecycle_absence": "Every listed method reads/seeks the underlying OleFile, copies source bytes, or emits a typed raw projection. No method returns a package Commit/Patch/Diagnostics triad or stages an Edit; package publication is implemented by litchi_doc::Package elsewhere.",
+      "rows": [
+        {"category":"mut_draft","path":"litchi_doc::raw::Reader::custom_xml_data_store","source":"crates/litchi-doc/src/package/codec.rs:329-335","receiver":"&mut self","operation":"bounded custom-XML inspection via litchi_ole_common::custom_xml::inspect(&mut self.ole, limits)","status":"present_raw_reader_method"},
+        {"category":"mut_draft","path":"litchi_doc::raw::Reader::data_spaces","source":"crates/litchi-doc/src/package/codec.rs:236-246","receiver":"&mut self","operation":"inert DataSpaces graph inspection over the OLE cursor","status":"present_raw_reader_method"},
+        {"category":"mut_draft","path":"litchi_doc::raw::Reader::data_spaces_snapshot","source":"crates/litchi-doc/src/package/codec.rs:248-256","receiver":"&mut self","operation":"source DataSpaces snapshot read from the OLE cursor","status":"present_raw_reader_method"},
+        {"category":"mut_draft","path":"litchi_doc::raw::Reader::document","source":"crates/litchi-doc/src/package/codec.rs:170-183","receiver":"&mut self","operation":"Document::from_ole_with_options(&mut self.ole, ...)","status":"present_raw_reader_method"},
+        {"category":"mut_draft","path":"litchi_doc::raw::Reader::document_summary_information","source":"crates/litchi-doc/src/package/codec.rs:380-389","receiver":"&mut self","operation":"read one CFB property-set stream","status":"present_raw_reader_method"},
+        {"category":"mut_draft","path":"litchi_doc::raw::Reader::document_with_options","source":"crates/litchi-doc/src/package/codec.rs:185-191","receiver":"&mut self","operation":"document decode with narrowed raw open options","status":"present_raw_reader_method"},
+        {"category":"mut_draft","path":"litchi_doc::raw::Reader::ole_file","source":"crates/litchi-doc/src/package/codec.rs:272-278","receiver":"&mut self","operation":"explicit low-level OleFile escape hatch","status":"present_raw_reader_method"},
+        {"category":"mut_draft","path":"litchi_doc::raw::Reader::save","source":"crates/litchi-doc/src/package/codec.rs:220-223","receiver":"&mut self","operation":"copy retained source through the raw reader save path","status":"present_raw_reader_method"},
+        {"category":"mut_draft","path":"litchi_doc::raw::Reader::save_with_durability","source":"crates/litchi-doc/src/package/codec.rs:225-234","receiver":"&mut self","operation":"copy retained source with explicit durability","status":"present_raw_reader_method"},
+        {"category":"mut_draft","path":"litchi_doc::raw::Reader::signatures","source":"crates/litchi-doc/src/package/codec.rs:348-355","receiver":"&mut self","operation":"raw CFB signature verification over the cursor","status":"present_raw_reader_method"},
+        {"category":"mut_draft","path":"litchi_doc::raw::Reader::signatures_with","source":"crates/litchi-doc/src/package/codec.rs:348-355 (nearest current raw signature method is signatures)","receiver":null,"operation":"no exact signatures_with definition at source_commit; current Reader signature entry is signatures(&mut self, policy)","status":"not_present_at_source"},
+        {"category":"mut_draft","path":"litchi_doc::raw::Reader::summary_information","source":"crates/litchi-doc/src/package/codec.rs:337-346","receiver":"&mut self","operation":"read the SummaryInformation CFB property stream","status":"present_raw_reader_method"},
+        {"category":"mut_draft","path":"litchi_doc::raw::Reader::to_bytes","source":"crates/litchi-doc/src/package/codec.rs:198-212","receiver":"&mut self","operation":"copy the exact retained source bytes","status":"present_raw_reader_method"},
+        {"category":"mut_draft","path":"litchi_doc::raw::Reader::user_defined_hyperlinks","source":"crates/litchi-doc/src/package/codec.rs:397-421","receiver":"&mut self","operation":"read property-set metadata and discover inert document field candidates","status":"present_raw_reader_method"},
+        {"category":"mut_draft","path":"litchi_doc::raw::Reader::user_defined_properties","source":"crates/litchi-doc/src/package/codec.rs:391-395","receiver":"&mut self","operation":"project the user-defined property section from DocumentSummaryInformation","status":"present_raw_reader_method"},
+        {"category":"mut_draft","path":"litchi_doc::raw::Reader::vba","source":"crates/litchi-doc/src/package/codec.rs:305-327","receiver":"&mut self","operation":"bounded inert VBA project decode from the raw OLE cursor","status":"present_raw_reader_method"},
+        {"category":"mut_draft","path":"litchi_doc::raw::Reader::vba_signature","source":"crates/litchi-doc/src/package/codec.rs:357-378","receiver":"&mut self","operation":"read the inert PIDDSI VBA signature blob under required limits","status":"present_raw_reader_method"},
+        {"category":"mut_draft","path":"litchi_doc::raw::Reader::vba_signature_with","source":"crates/litchi-doc/src/package/codec.rs:368-378 (nearest current raw signature accessor is vba_signature)","receiver":null,"operation":"no exact vba_signature_with definition on raw::Reader at source_commit; the with-limits helper is on an internal property-set projection","status":"not_present_at_source"},
+        {"category":"mut_draft","path":"litchi_doc::raw::Reader::vba_with","source":"crates/litchi-doc/src/package/codec.rs:305-327 (nearest current raw VBA accessor is vba)","receiver":null,"operation":"no exact vba_with definition at source_commit; current Reader VBA entry is vba(&mut self, limits)","status":"not_present_at_source"},
+        {"category":"mut_draft","path":"litchi_doc::raw::Reader::write_data_spaces_patch","source":"crates/litchi-doc/src/package/codec.rs:258-270","receiver":"&mut self","operation":"write a validated DataSpaces patch to a fresh seekable output","status":"present_raw_reader_method"},
+        {"category":"mut_draft","path":"litchi_doc::raw::Reader::write_to","source":"crates/litchi-doc/src/package/codec.rs:214-218","receiver":"&mut self","operation":"stream retained source bytes to a sink","status":"present_raw_reader_method"}
+      ]
+    },
+    {
+      "crate": "litchi-ppt",
+      "public_surface": "litchi_ppt::raw::Reader",
+      "declaration": [
+        "crates/litchi-ppt/src/raw.rs:7-9",
+        "crates/litchi-ppt/src/package/model.rs:891-918",
+        "crates/litchi-ppt/src/package/codec.rs:51-80"
+      ],
+      "definition_role": "The model documentation calls Reader the low-level eager generic Read + Seek entry point and keeps the source-preserving Package owner separate. The raw module is an explicit namespace for this mutable native projection.",
+      "implementation_context": "crates/litchi-ppt/src/package/codec.rs:180-366, crates/litchi-ppt/src/font/package.rs:29-40, crates/litchi-ppt/src/picture_bullets/record.rs:1587-1598",
+      "lifecycle_absence": "Methods seek/read the underlying OLE source or project inert metadata. The only package publication lifecycle is on litchi_ppt::Package and its edit modules; raw Reader methods do not stage package edits.",
+      "rows": [
+        {"category":"mut_draft","path":"litchi_ppt::raw::Reader::custom_xml_data_store","source":"crates/litchi-ppt/src/package/codec.rs:290-300","receiver":"&mut self","operation":"bounded custom-XML inspection via the raw OLE cursor","status":"present_raw_reader_method"},
+        {"category":"mut_draft","path":"litchi_ppt::raw::Reader::document_comparison","source":"crates/litchi-ppt/src/package/codec.rs:262-269","receiver":"&mut self","operation":"read the document-comparison projection through presentation()","status":"present_raw_reader_method"},
+        {"category":"mut_draft","path":"litchi_ppt::raw::Reader::document_summary_information","source":"crates/litchi-ppt/src/package/codec.rs:334-350","receiver":"&mut self","operation":"read one CFB property-set stream","status":"present_raw_reader_method"},
+        {"category":"mut_draft","path":"litchi_ppt::raw::Reader::fonts","source":"crates/litchi-ppt/src/font/package.rs:29-39","receiver":"&mut self","operation":"read font semantics through presentation() under required font limits","status":"present_raw_reader_method"},
+        {"category":"mut_draft","path":"litchi_ppt::raw::Reader::ole_file","source":"crates/litchi-ppt/src/package/codec.rs:271-277","receiver":"&mut self","operation":"explicit low-level OleFile escape hatch","status":"present_raw_reader_method"},
+        {"category":"mut_draft","path":"litchi_ppt::raw::Reader::picture_bullets","source":"crates/litchi-ppt/src/picture_bullets/record.rs:1587-1598","receiver":"&mut self","operation":"read picture-bullet records through presentation() under required limits","status":"present_raw_reader_method"},
+        {"category":"mut_draft","path":"litchi_ppt::raw::Reader::presentation","source":"crates/litchi-ppt/src/package/codec.rs:180-196","receiver":"&mut self","operation":"Presentation::from_ole_with_options(&mut self.ole, ...)","status":"present_raw_reader_method"},
+        {"category":"mut_draft","path":"litchi_ppt::raw::Reader::presentation_with_options","source":"crates/litchi-ppt/src/package/codec.rs:198-215","receiver":"&mut self","operation":"presentation decode with narrowed raw open options","status":"present_raw_reader_method"},
+        {"category":"mut_draft","path":"litchi_ppt::raw::Reader::signatures","source":"crates/litchi-ppt/src/package/codec.rs:320-332","receiver":"&mut self","operation":"raw CFB signature verification over the cursor","status":"present_raw_reader_method"},
+        {"category":"mut_draft","path":"litchi_ppt::raw::Reader::signatures_with","source":"crates/litchi-ppt/src/package/codec.rs:320-332 (nearest current raw signature method is signatures)","receiver":null,"operation":"no exact signatures_with definition at source_commit; current Reader signature entry is signatures(&mut self, policy)","status":"not_present_at_source"},
+        {"category":"mut_draft","path":"litchi_ppt::raw::Reader::summary_information","source":"crates/litchi-ppt/src/package/codec.rs:302-318","receiver":"&mut self","operation":"read the SummaryInformation CFB property stream","status":"present_raw_reader_method"},
+        {"category":"mut_draft","path":"litchi_ppt::raw::Reader::user_defined_properties","source":"crates/litchi-ppt/src/package/codec.rs:352-365","receiver":"&mut self","operation":"project the user-defined property section from DocumentSummaryInformation","status":"present_raw_reader_method"}
+      ]
+    },
+    {
+      "crate": "litchi-xls",
+      "public_surface": "litchi_xls::raw::Reader",
+      "declaration": [
+        "crates/litchi-xls/src/raw.rs:1-17",
+        "crates/litchi-xls/src/workbook/model.rs:23-30",
+        "crates/litchi-xls/src/lib.rs:602-603"
+      ],
+      "definition_role": "The raw module documents Reader as the legacy generic eager BIFF projection over a Read + Seek source; ordinary package ownership APIs are separate. Reader retains physical source limits for lazy package-stream reads.",
+      "implementation_context": "crates/litchi-xls/src/workbook/package.rs:363-630",
+      "lifecycle_absence": "Methods read CFB streams, parse inert metadata, or decode a bounded BIFF/VBA projection. They are not Package mutators and do not return package Edit/Commit/Patch values.",
+      "rows": [
+        {"category":"mut_draft","path":"litchi_xls::raw::Reader::custom_xml_data_store","source":"crates/litchi-xls/src/workbook/package.rs:363-372","receiver":"&mut self","operation":"bounded custom-XML inspection via the raw OLE cursor","status":"present_raw_reader_method"},
+        {"category":"mut_draft","path":"litchi_xls::raw::Reader::document_summary_information","source":"crates/litchi-xls/src/workbook/package.rs:406-418","receiver":"&mut self","operation":"read one CFB property-set stream","status":"present_raw_reader_method"},
+        {"category":"mut_draft","path":"litchi_xls::raw::Reader::revision_log","source":"crates/litchi-xls/src/workbook/package.rs:496-530","receiver":"&mut self","operation":"bounded inert Revision Log stream parse with required SourceLimits","status":"present_raw_reader_method"},
+        {"category":"mut_draft","path":"litchi_xls::raw::Reader::signatures","source":"crates/litchi-xls/src/workbook/package.rs:394-404","receiver":"&mut self","operation":"raw CFB signature verification over the cursor","status":"present_raw_reader_method"},
+        {"category":"mut_draft","path":"litchi_xls::raw::Reader::signatures_with","source":"crates/litchi-xls/src/workbook/package.rs:394-404 (nearest current raw signature method is signatures)","receiver":null,"operation":"no exact signatures_with definition at source_commit; current Reader signature entry is signatures(&mut self, policy)","status":"not_present_at_source"},
+        {"category":"mut_draft","path":"litchi_xls::raw::Reader::summary_information","source":"crates/litchi-xls/src/workbook/package.rs:380-392","receiver":"&mut self","operation":"read the SummaryInformation CFB property stream","status":"present_raw_reader_method"},
+        {"category":"mut_draft","path":"litchi_xls::raw::Reader::toolbar","source":"crates/litchi-xls/src/workbook/package.rs:420-435","receiver":"&mut self","operation":"bounded inert XCB toolbar stream parse","status":"present_raw_reader_method"},
+        {"category":"mut_draft","path":"litchi_xls::raw::Reader::user_defined_properties","source":"crates/litchi-xls/src/workbook/package.rs:438-445","receiver":"&mut self","operation":"project the user-defined property section from DocumentSummaryInformation","status":"present_raw_reader_method"},
+        {"category":"mut_draft","path":"litchi_xls::raw::Reader::user_names","source":"crates/litchi-xls/src/workbook/package.rs:532-630","receiver":"&mut self","operation":"bounded lazy User Names and Revision Log dependency parse","status":"present_raw_reader_method"},
+        {"category":"mut_draft","path":"litchi_xls::raw::Reader::vba","source":"crates/litchi-xls/src/workbook/package.rs:462-488","receiver":"&mut self","operation":"bounded inert VBA project decode from the raw OLE cursor","status":"present_raw_reader_method"},
+        {"category":"mut_draft","path":"litchi_xls::raw::Reader::vba_with","source":"crates/litchi-xls/src/workbook/package.rs:462-488 (nearest current raw VBA accessor is vba)","receiver":null,"operation":"no exact vba_with definition at source_commit; current Reader VBA entry is vba(&mut self, limits)","status":"not_present_at_source"}
+      ]
+    }
+  ],
+  "descriptor_rows": [
+    {
+      "category": "edit_type",
+      "path": "litchi_core::SubEdit",
+      "source": "crates/litchi-core/src/patch.rs:1271-1343",
+      "use": "JoinedSubEdits::new/join/sub_edits at crates/litchi-core/src/patch.rs:1355-1425; format composition aliases consume payload/effects.",
+      "source_role": "generic bounded composition envelope carrying lineage, effect keys, an identifier, and a format-owned payload",
+      "lifecycle_absence": "It is not a Package/projection owner and has no format publication or package commit method. The package route consumes the joined payload and performs the format Edit/Commit.",
+      "record_basis": ["0351 inventory heuristic note"],
+      "recommended_exact_category": "COMPOSITION_DESCRIPTOR",
+      "status": "non_lifecycle_descriptor"
+    },
+    {
+      "category": "edit_type",
+      "path": "litchi_doc::body_text::SubEdit",
+      "source": "crates/litchi-doc/src/body_text.rs:4174-4214",
+      "use": "Package::prepare_replace/prepare_bold/prepare_text/prepare_format return it at crates/litchi-doc/src/package/body.rs:108-169; JoinedEdits::join/commit consume it at crates/litchi-doc/src/package/body.rs:281-333.",
+      "source_role": "prepared body-text composition descriptor wrapping CoreSubEdit<Lineage, PreparedOperation>; public access is limited to identifier() and target()",
+      "lifecycle_absence": "The descriptor has no commit, apply, rollback, snapshot, or package owner. Publication is explicitly JoinedEdits::commit -> body_text::Edit::commit; dropping JoinedEdits discards the prepared work.",
+      "record_basis": ["0351 §2.1.6 composition is distinct from owner staging", "0359a §3 and §10 package route owns body engine"],
+      "recommended_exact_category": "COMPOSITION_DESCRIPTOR",
+      "status": "non_lifecycle_descriptor_requires_exact_allowlist_review"
+    },
+    {
+      "category": "edit_type",
+      "path": "litchi_odb::SubEdit",
+      "source": "crates/litchi-odb/src/authoring/composition.rs:16-27",
+      "use": "Patch::prepare constructs the alias at crates/litchi-odb/src/authoring/composition.rs:35-55; compose consumes JoinedEdits at :58-150.",
+      "source_role": "type alias of litchi_core::SubEdit<Lineage, Patch> for deterministic ODB composition",
+      "lifecycle_absence": "The alias adds no owner or methods. ODB publication validates and rebuilds a new Package in composition::compose; it is not a Package edit family named SubEdit.",
+      "record_basis": ["0358a §3"],
+      "recommended_exact_category": "COMPOSITION_DESCRIPTOR",
+      "status": "non_lifecycle_descriptor"
+    },
+    {
+      "category": "edit_type",
+      "path": "litchi_odg::edit::SubEdit",
+      "source": "crates/litchi-odg/src/package/snapshot.rs:5465-5493, 5496-5514; reexport crates/litchi-odg/src/facade/mod.rs:16-26",
+      "use": "Patch::prepare creates the alias; Snapshot::joined_edits and Edit::join validate/hold JoinedEdits at crates/litchi-odg/src/package/snapshot.rs:1171-1175 and :1593-1655.",
+      "source_role": "type alias of litchi_core::SubEdit<Lineage, DurablePatch> for deterministic ODG composition",
+      "lifecycle_absence": "The alias has no owner or publication operation. ODG Edit receives the joined descriptor and its normal commit path publishes the package.",
+      "record_basis": ["0358a §3"],
+      "recommended_exact_category": "COMPOSITION_DESCRIPTOR",
+      "status": "non_lifecycle_descriptor"
+    },
+    {
+      "category": "edit_type",
+      "path": "litchi_iwa_archive::package::EntryEdit",
+      "source": "crates/litchi-iwa-archive/src/package.rs:837-869",
+      "use": "Archive reassembly accepts &[EntryEdit] at crates/litchi-iwa-archive/src/package.rs:2365-2390 and :2428-2438; it is passed to bounded physical preparation/execution.",
+      "source_role": "Copy descriptor containing only a borrowed normalized member name and replacement decoded bytes",
+      "lifecycle_absence": "It owns no archive/package, has no staged mutable state and has no commit/apply lifecycle; reassemble_to_bytes performs the bounded physical operation and returns bytes.",
+      "record_basis": ["0361c §EntryEdit", "0361c §(remaining row)"],
+      "recommended_exact_category": "RAW_ARCHIVE_DESCRIPTOR",
+      "status": "non_lifecycle_descriptor"
+    },
+    {
+      "category": "edit_type",
+      "path": "litchi_iwa_common::wire::NestedFieldEdit",
+      "source": "crates/litchi-iwa-common/src/wire.rs:1273-1319",
+      "use": "patch_nested_fields_batched consumes &[NestedFieldEdit] with required WireLimits at crates/litchi-iwa-common/src/wire.rs:1871-1925.",
+      "source_role": "Copy descriptor containing a borrowed protobuf field path, expected-presence bit, and typed replacement value",
+      "lifecycle_absence": "It owns no package or staged model and exposes only a constructor/value getters; the bounded raw function returns rewritten bytes, not a package Commit.",
+      "record_basis": ["0361b §NestedFieldEdit"],
+      "recommended_exact_category": "RAW_WIRE_DESCRIPTOR",
+      "status": "non_lifecycle_descriptor"
+    },
+    {
+      "category": "edit_type",
+      "path": "litchi_opc::ContentTypeEdit",
+      "source": "crates/litchi-opc/src/package/content_types.rs:16-27; public reexports at crates/litchi-opc/src/package.rs:27-33 and src/lib.rs:74-80",
+      "use": "OwnedContentTypes::plan_edit and plan_edit_with_defaults accept &[ContentTypeEdit] and required SourceLimits at crates/litchi-opc/src/package/content_types.rs:134-160.",
+      "source_role": "Copy borrowed selector/value pair (PackURI plus MIME string) used as input to an exact source-preserving metadata plan",
+      "lifecycle_absence": "The value has no owner, source token, staged state, commit, or package publication method. The plan computes bounded XML metrics and materialize creates an OwnedContentTypes projection; the format/package route owns publication.",
+      "record_basis": ["0351 §2.1.6 raw/codec boundary", "0362rd OPC source/consumer canonicalization"],
+      "recommended_exact_category": "OPC_SOURCE_PLAN_DESCRIPTOR",
+      "status": "non_lifecycle_descriptor_requires_exact_allowlist_review"
+    },
+    {
+      "category": "edit_type",
+      "path": "litchi_opc::ContentTypeFragmentEdit",
+      "source": "crates/litchi-opc/src/package/content_types/fragments.rs:103-110; public reexports at crates/litchi-opc/src/package.rs:27-33",
+      "use": "OwnedContentTypes::plan_fragment_edits accepts &[ContentTypeFragmentEdit] and required SourceLimits at crates/litchi-opc/src/package/content_types/fragments.rs:124-156.",
+      "source_role": "Copy guarded before/after lexical mapping descriptor; it carries borrowed source-fragment views, not an edit owner",
+      "lifecycle_absence": "The descriptor has no package or commit lifecycle. FragmentPlan validates source anchors and materialize produces an OwnedContentTypes value under limits; package publication remains outside this descriptor.",
+      "record_basis": ["0351 §2.1.6 raw/codec boundary", "0362rd OPC source/consumer canonicalization"],
+      "recommended_exact_category": "OPC_SOURCE_PLAN_DESCRIPTOR",
+      "status": "non_lifecycle_descriptor_requires_exact_allowlist_review"
+    },
+    {
+      "category": "edit_type",
+      "path": "litchi_opc::RelationshipEdit",
+      "source": "crates/litchi-opc/src/package/relationships.rs:87-98; public reexports at crates/litchi-opc/src/package.rs:34-38 and src/lib.rs:77-80",
+      "use": "OwnedRelationships::plan_edit accepts &[RelationshipEdit] and required SourceLimits at crates/litchi-opc/src/package/relationships.rs:478-495.",
+      "source_role": "Copy borrowed relationship-edge values (id, type, target and TargetMode) used by a source-bound plan",
+      "lifecycle_absence": "The value has no package, staged state, commit or publication operation. The source-bound plan computes exact XML metrics and materialize returns an OwnedRelationships projection; dependency-closure publication is caller-owned.",
+      "record_basis": ["0351 §2.1.6 raw/codec boundary", "0362rd OPC source/consumer canonicalization"],
+      "recommended_exact_category": "OPC_SOURCE_PLAN_DESCRIPTOR",
+      "status": "non_lifecycle_descriptor_requires_exact_allowlist_review"
+    },
+    {
+      "category": "edit_type",
+      "path": "litchi_opc::RelationshipFragmentEdit",
+      "source": "crates/litchi-opc/src/package/relationships/fragments.rs:71-77; public reexports at crates/litchi-opc/src/package.rs:34-38",
+      "use": "OwnedRelationships::plan_fragment_edits accepts &[RelationshipFragmentEdit] and required SourceLimits at crates/litchi-opc/src/package/relationships/fragments.rs:88-128.",
+      "source_role": "Copy guarded before/after lexical relationship-element descriptor; it carries borrowed source-fragment views",
+      "lifecycle_absence": "The descriptor has no package or commit lifecycle. FragmentPlan validates exact relationship anchors and materialize returns an OwnedRelationships projection under limits.",
+      "record_basis": ["0351 §2.1.6 raw/codec boundary", "0362rd OPC source/consumer canonicalization"],
+      "recommended_exact_category": "OPC_SOURCE_PLAN_DESCRIPTOR",
+      "status": "non_lifecycle_descriptor_requires_exact_allowlist_review"
+    },
+    {
+      "category": "edit_type",
+      "path": "litchi_opc::OwnedElementEdit",
+      "source": "crates/litchi-opc/src/xml_splice/owned/elements.rs:9-20; public reexports at crates/litchi-opc/src/lib.rs:105-108",
+      "use": "OwnedXmlPart::update_elements consumes &[OwnedElementUpdate] containing this enum at crates/litchi-opc/src/xml_splice/owned/elements.rs:69-90; the enum is matched only during one bounded source scan at :185-232.",
+      "source_role": "Borrowed XML splice action enum containing insert/append/replace bytes or Remove",
+      "lifecycle_absence": "It has no owner, source provenance, staged package state, commit or patch. OwnedXmlPart::update_elements returns a new XML projection after bounded validation and one allocation; package publication is outside the enum.",
+      "record_basis": ["0351 §2.1.6 raw/codec boundary", "0362rd OPC source/consumer canonicalization"],
+      "recommended_exact_category": "OPC_XML_SPLICE_DESCRIPTOR",
+      "status": "non_lifecycle_descriptor_requires_exact_allowlist_review"
+    }
+  ],
+  "recommended_exact_categories": [
+    {
+      "name": "RAW_READER_METHOD",
+      "matching": "exact 38 currently present paths listed under raw_reader_groups; retain the six absent-at-source diagnostic paths as source-resolution debt, not as a wildcard",
+      "required_proof": ["public raw::Reader reexport", "Reader/non-owner declaration", "&mut self cursor/codec operation", "no Package/Edit/Commit publication lifecycle"]
+    },
+    {
+      "name": "COMPOSITION_DESCRIPTOR",
+      "matching": ["litchi_core::SubEdit", "litchi_doc::body_text::SubEdit", "litchi_odb::SubEdit", "litchi_odg::edit::SubEdit"],
+      "required_proof": ["exact listed nominal identity", "lineage/effect/payload or format composition semantics", "publication remains on JoinedEdits/format Edit route"]
+    },
+    {
+      "name": "RAW_ARCHIVE_DESCRIPTOR",
+      "matching": ["litchi_iwa_archive::package::EntryEdit"],
+      "required_proof": ["exact listed nominal identity", "Copy borrowed fields only", "bounded archive function consumes it and returns bytes"]
+    },
+    {
+      "name": "RAW_WIRE_DESCRIPTOR",
+      "matching": ["litchi_iwa_common::wire::NestedFieldEdit"],
+      "required_proof": ["exact listed nominal identity", "Copy borrowed wire selector/value only", "bounded wire function consumes it and returns bytes"]
+    },
+    {
+      "name": "OPC_SOURCE_PLAN_DESCRIPTOR",
+      "matching": ["litchi_opc::ContentTypeEdit", "litchi_opc::ContentTypeFragmentEdit", "litchi_opc::RelationshipEdit", "litchi_opc::RelationshipFragmentEdit"],
+      "required_proof": ["exact listed nominal identity", "borrowed metadata selector only", "required SourceLimits plan/materialize path", "no package publication lifecycle"]
+    },
+    {
+      "name": "OPC_XML_SPLICE_DESCRIPTOR",
+      "matching": ["litchi_opc::OwnedElementEdit"],
+      "required_proof": ["exact listed nominal identity", "borrowed splice action only", "OwnedXmlPart bounded update consumes it and returns a projection"]
+    }
+  ],
+  "review_notes": [
+    "The six diagnostic paths marked not_present_at_source are not evidence for a new exception; the target source has the canonical raw method under a different name or no public method at that path.",
+    "The body_text and OPC descriptor rows are source-proven non-lifecycle values, but their exact categories are not present in the current AST/WIRE semantic allowlist. Coordinator/tooling review must register only the exact nominal paths above or retain them as explicit unresolved rows; no broad suffix/category waiver is justified.",
+    "This artifact intentionally contains no Cargo receipt and no production or PROGRESS changes."
+  ]
+}

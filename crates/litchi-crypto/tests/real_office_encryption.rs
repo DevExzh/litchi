@@ -27,7 +27,11 @@ fn fixture(path: &[&str]) -> PathBuf {
 }
 
 fn stream(path: &Path, name: &str) -> Vec<u8> {
-    let mut ole = OleFile::open(File::open(path).expect("open fixture")).expect("open OLE");
+    let mut ole = OleFile::open(
+        File::open(path).expect("open fixture"),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .expect("open OLE");
     ole.open_stream(&[name]).expect("read fixture stream")
 }
 
@@ -147,7 +151,8 @@ fn inspects_apache_poi_xor_workbook_without_claiming_unsupported_decryption() {
         0
     );
     assert_eq!(
-        spaces::inspect_bytes(&bytes).expect("inspect actual CFB fixture"),
+        spaces::inspect_bytes(&bytes, &spaces::Limits::default())
+            .expect("inspect actual CFB fixture"),
         None,
         "legacy XOR workbook must not be mistaken for an IRM DataSpaces graph"
     );

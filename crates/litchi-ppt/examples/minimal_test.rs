@@ -5,14 +5,14 @@
 
 //! Minimal PPT test - single empty slide
 
-use litchi_ppt::writer::Writer;
+use litchi_ppt::writer::Builder;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating minimal PPT with empty slide...");
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_slide()?;
-    writer.save("output_minimal.ppt")?;
+    writer.build()?.save("output_minimal.ppt")?;
 
     println!("Created output_minimal.ppt");
     Ok(())

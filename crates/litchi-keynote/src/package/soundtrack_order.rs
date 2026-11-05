@@ -14,7 +14,7 @@ use litchi_iwa_archive::{Limits, SourceCatalog, package::EntryEdit};
 use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes,
     varint::encoded_len,
-    wire::{WireDescent, WirePreflight, WireView, preflight_wire_tree_with_limits},
+    wire::{WireDescent, WirePreflight, WireView, preflight_wire_tree},
 };
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::keynote_soundtrack_settings_codec as soundtrack_codec;
@@ -99,6 +99,38 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The selected graph or wire payload is not safely reorderable.
+    #[error("the Keynote soundtrack graph cannot be reordered safely")]
+    InvalidSource,
+    /// A finite resource ceiling was exceeded.
+    #[error(
+        "Keynote soundtrack-order {kind} limit exceeded: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        kind: LimitKind,
+        observed: u64,
+        maximum: u64,
+    },
+    /// A bounded destination allocation failed.
+    #[error("could not allocate {amount} soundtrack-order items or bytes")]
+    Allocation { amount: usize },
+    /// Candidate readback did not reproduce the requested order.
+    #[error("the reordered Keynote soundtrack failed verification")]
+    Verification,
+    /// The patch was applied to a different exact source.
+    #[error("the Keynote soundtrack-order patch conflicts with this package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The package has no exact physical source that can be changed.
     #[error("this Keynote source does not support physical soundtrack-order edits")]
     UnsupportedSource,
@@ -120,27 +152,30 @@ pub enum Error {
     /// Commit was requested before staging a move.
     #[error("no soundtrack-order operation is staged")]
     NoStagedOperation,
-    /// The selected graph or wire payload is not safely reorderable.
-    #[error("the Keynote soundtrack graph cannot be reordered safely")]
-    InvalidSource,
-    /// A finite resource ceiling was exceeded.
-    #[error(
-        "Keynote soundtrack-order {kind} limit exceeded: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        kind: LimitKind,
-        observed: u64,
-        maximum: u64,
-    },
-    /// A bounded destination allocation failed.
-    #[error("could not allocate {amount} soundtrack-order items or bytes")]
-    Allocation { amount: usize },
-    /// Candidate readback did not reproduce the requested order.
-    #[error("the reordered Keynote soundtrack failed verification")]
-    Verification,
-    /// The patch was applied to a different exact source.
-    #[error("the Keynote soundtrack-order patch conflicts with this package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+            Self::SoundtrackNotFound { .. } | Self::SourcePositionNotFound { .. } => {
+                RefusalKind::NotFound
+            },
+            Self::DestinationOutOfRange { .. } => RefusalKind::InvalidValue,
+            Self::OperationAlreadyStaged { .. } | Self::NoStagedOperation { .. } => {
+                RefusalKind::UnsupportedOperation
+            },
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -222,7 +257,7 @@ impl TransactionBudget {
 
     fn require_depth(self, depth: usize) -> Result<(), Error> {
         if depth > self.max_nesting {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: depth as u64,
                 maximum: self.max_nesting as u64,
@@ -250,9 +285,8 @@ fn preflight_wire_message(
     budget: &TransactionBudget,
 ) -> Result<WirePreflight, Error> {
     let bounded_limits = remaining_wire_limits(limits, budget)?;
-    let report =
-        preflight_wire_tree_with_limits(source, bounded_limits, |_visit| Ok(WireDescent::Skip))
-            .map_err(map_wire_error)?;
+    let report = preflight_wire_tree(source, bounded_limits, |_visit| Ok(WireDescent::Skip))
+        .map_err(map_wire_error)?;
     ensure_wire_preflight_budget(report, budget)?;
     budget.require_depth(1)?;
     Ok(report)
@@ -270,7 +304,7 @@ fn preflight_soundtrack_payload(
     budget: &TransactionBudget,
 ) -> Result<WirePreflight, Error> {
     let bounded_limits = remaining_wire_limits(limits, budget)?;
-    let report = preflight_wire_tree_with_limits(source, bounded_limits, |visit| {
+    let report = preflight_wire_tree(source, bounded_limits, |visit| {
         let field = visit.field();
         if field.wire_type() == 3 || field.wire_type() == 4 {
             return Err(litchi_iwa_common::Error::InvalidFormat(
@@ -311,7 +345,7 @@ fn ensure_wire_preflight_budget(
             .fields
             .checked_add(report.fields())
             .ok_or(Error::InvalidSource)?;
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireFields,
             observed: observed as u64,
             maximum: budget.max_fields as u64,
@@ -322,7 +356,7 @@ fn ensure_wire_preflight_budget(
             .work
             .checked_add(report.scanned_bytes())
             .ok_or(Error::InvalidSource)?;
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireWork,
             observed: observed as u64,
             maximum: budget.max_work as u64,
@@ -333,7 +367,7 @@ fn ensure_wire_preflight_budget(
 
 fn check_wire_output_bound(output_bytes: usize, limits: WireLimits) -> Result<(), Error> {
     if output_bytes > limits.max_output_bytes() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: output_bytes as u64,
             maximum: limits.max_output_bytes() as u64,
@@ -350,7 +384,7 @@ fn checked_charge(
 ) -> Result<usize, Error> {
     let observed = current.checked_add(amount).ok_or(Error::InvalidSource)?;
     if observed > maximum {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -392,21 +426,23 @@ impl Edit<'_> {
         destination: Position,
     ) -> Result<&mut Self, Error> {
         if self.intent.is_some() {
-            return Err(Error::OperationAlreadyStaged);
+            return Err(Error::Refused(Refusal::OperationAlreadyStaged));
         }
         let mut budget = TransactionBudget::new(self.source)?;
         let Some(selection) = resolve_selection(self.source, &mut budget, false)? else {
-            return Err(Error::SoundtrackNotFound);
+            return Err(Error::Refused(Refusal::SoundtrackNotFound));
         };
         let item_count = selection.media.len();
         if source.get() >= item_count {
-            return Err(Error::SourcePositionNotFound { position: source });
+            return Err(Error::Refused(Refusal::SourcePositionNotFound {
+                position: source,
+            }));
         }
         if destination.get() >= item_count {
-            return Err(Error::DestinationOutOfRange {
+            return Err(Error::Refused(Refusal::DestinationOutOfRange {
                 position: destination,
                 item_count,
-            });
+            }));
         }
         self.intent = Some(Intent {
             source,
@@ -419,7 +455,9 @@ impl Edit<'_> {
 
     /// Validate and atomically publish the staged move.
     pub fn commit(self) -> Result<Commit, Error> {
-        let intent = self.intent.ok_or(Error::NoStagedOperation)?;
+        let intent = self
+            .intent
+            .ok_or(Error::Refused(Refusal::NoStagedOperation))?;
         let source = physical_source(self.source)?;
         let source_bytes = source.shared_source();
         let selection = self.selection.ok_or(Error::InvalidSource)?;
@@ -443,7 +481,7 @@ impl Edit<'_> {
             });
         }
         if !source.source_is_exact() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         preflight_rewrite_output(physical_source(self.source)?)?;
         validate_mutation_source(self.source, &selection, &mut budget)?;
@@ -616,6 +654,12 @@ impl Commit {
     #[must_use]
     pub fn into_package(self) -> Package {
         self.package
+    }
+
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
     }
 
     /// Borrow the reversible exact-source patch.
@@ -895,8 +939,8 @@ fn validate_soundtrack_media_references(
 ) -> Result<(), Error> {
     preflight_soundtrack_payload(source, limits, budget)?;
     budget.charge_work(source.len())?;
-    let view = WireView::parse_with_limits(source, remaining_wire_limits(limits, budget)?)
-        .map_err(map_wire_error)?;
+    let view =
+        WireView::parse(source, remaining_wire_limits(limits, budget)?).map_err(map_wire_error)?;
     budget.charge_fields(view.len())?;
     let mut observed = 0usize;
     for field in view.fields() {
@@ -922,7 +966,7 @@ fn validate_soundtrack_media_references(
 fn check_item_budget(package: &Package, item_count: usize) -> Result<(), Error> {
     let maximum = package.semantic_limits().max_references();
     if item_count > maximum {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::Items,
             observed: item_count as u64,
             maximum: maximum as u64,
@@ -938,7 +982,7 @@ fn validate_mutation_source(
 ) -> Result<(), Error> {
     let catalog = physical_source(package)?;
     if !catalog.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     budget.charge_work(catalog.components().len())?;
     validate_selected_metadata(selection.root, selection.root_message_index)?;
@@ -1656,7 +1700,7 @@ fn validate_reference_role_disjointness(
     )?;
     budget.charge_work(show_payload.len())?;
     let bounded_limits = remaining_wire_limits(limits, budget)?;
-    let show = WireView::parse_with_limits(show_payload, bounded_limits).map_err(map_wire_error)?;
+    let show = WireView::parse(show_payload, bounded_limits).map_err(map_wire_error)?;
     budget.charge_fields(show.len())?;
     let mut slide_tree_payload = None;
     for field in show.fields() {
@@ -1689,7 +1733,7 @@ fn reject_selected_identifier_in_reference_fields(
     preflight_wire_message(source, limits, budget)?;
     budget.charge_work(source.len())?;
     let bounded_limits = remaining_wire_limits(limits, budget)?;
-    let view = WireView::parse_with_limits(source, bounded_limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, bounded_limits).map_err(map_wire_error)?;
     budget.charge_fields(view.len())?;
     for field in view.fields() {
         if !reference_fields.contains(&field.number()) {
@@ -2295,7 +2339,7 @@ fn archive_output_upper_bound(
 fn check_archive_output_bound(output_bound: usize, limits: Limits) -> Result<(), Error> {
     let observed = u64::try_from(output_bound).map_err(|_| Error::InvalidSource)?;
     if observed > limits.max_input_bytes() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::OutputBytes,
             observed,
             maximum: limits.max_input_bytes(),
@@ -2350,7 +2394,7 @@ fn strict_optional_reference(
     preflight_wire_message(source, limits, budget)?;
     budget.charge_work(source.len())?;
     let bounded_limits = remaining_wire_limits(limits, budget)?;
-    let view = WireView::parse_with_limits(source, bounded_limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, bounded_limits).map_err(map_wire_error)?;
     budget.charge_fields(view.len())?;
     let mut result = None;
     for field in view.fields() {
@@ -2378,7 +2422,7 @@ fn strict_reference(
     preflight_wire_message(source, limits, budget)?;
     budget.charge_work(source.len())?;
     let bounded_limits = remaining_wire_limits(limits, budget)?;
-    let view = WireView::parse_with_limits(source, bounded_limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, bounded_limits).map_err(map_wire_error)?;
     budget.charge_fields(view.len())?;
     let mut identifier = None;
     let mut deprecated_type = None;
@@ -2453,7 +2497,7 @@ fn permute_payload(
     budget: &mut TransactionBudget,
 ) -> Result<Vec<u8>, Error> {
     if source.len() > limits.max_input_bytes() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireBytes,
             observed: source.len() as u64,
             maximum: limits.max_input_bytes() as u64,
@@ -2471,8 +2515,8 @@ fn permute_payload(
     // the actual rewrite work.
     preflight_soundtrack_payload(source, limits, budget)?;
     budget.charge_work(source.len())?;
-    let view = WireView::parse_with_limits(source, remaining_wire_limits(limits, budget)?)
-        .map_err(map_wire_error)?;
+    let view =
+        WireView::parse(source, remaining_wire_limits(limits, budget)?).map_err(map_wire_error)?;
     budget.charge_fields(view.len())?;
     budget.charge_work(
         source
@@ -2563,7 +2607,7 @@ fn rewrite(
     // archive parsing, or any rewrite buffer is allocated.
     preflight_rewrite_output(catalog)?;
     let snappy_limits = transaction_snappy_limits(source, budget, entry.data().len(), 2)?;
-    let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
+    let stream = SnappyStream::decompress(entry.data(), snappy_limits)
         .map_err(|error| map_transaction_snappy_error(error, budget))?;
     let stream_bytes = stream.as_bytes();
     budget.charge_work(
@@ -2578,10 +2622,9 @@ fn rewrite(
             )
             .ok_or(Error::InvalidSource)?,
     )?;
-    let mut archive =
-        Archive::parse_with_limits(stream_bytes, archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream_bytes, archive_limits).map_err(map_core_error)?;
     archive
-        .validate_canonical_object_framing(stream_bytes)
+        .validate_canonical_object_framing(stream_bytes, Default::default())
         .map_err(map_core_error)?;
     let object = archive
         .object(selection.soundtrack_identifier)
@@ -2618,7 +2661,7 @@ fn rewrite(
         .object_mut(selection.soundtrack_identifier)
         .ok_or(Error::InvalidSource)?;
     object
-        .replace_message_reordering_data_references_preserving_header_with_limits(
+        .replace_message_reordering_data_references_preserving_header(
             message_index,
             RawMessage {
                 type_: SOUNDTRACK_MESSAGE_TYPE,
@@ -2628,13 +2671,11 @@ fn rewrite(
             archive_limits,
         )
         .map_err(map_core_error)?;
-    let serialized = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
+    let serialized = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     if serialized.len() > serialized_bound {
         return Err(Error::Verification);
     }
-    let compressed = SnappyStream::compress(&serialized).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&serialized, snappy_limits).map_err(map_core_error)?;
     let output = catalog
         .package()
         .reassemble_to_bytes(
@@ -2676,7 +2717,7 @@ fn transaction_snappy_limits(
         .checked_sub(compressed_bytes)
         .map_or(0, |available| available / decoded_passes);
     if decoded_allowance == 0 {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireWork,
             observed: budget
                 .work
@@ -2710,7 +2751,7 @@ fn map_transaction_snappy_error(
                 | litchi_iwa_core::LimitKind::SnappyStreamBytes,
             observed,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: LimitKind::WireWork,
             observed: budget.work.saturating_add(observed) as u64,
             maximum: budget.max_work as u64,
@@ -2755,15 +2796,15 @@ fn moved_ids(before: &[u64], intent: Intent) -> Result<Vec<u64>, Error> {
 
 fn validate_intent(intent: Intent, item_count: usize) -> Result<(), Error> {
     if intent.source.get() >= item_count {
-        return Err(Error::SourcePositionNotFound {
+        return Err(Error::Refused(Refusal::SourcePositionNotFound {
             position: intent.source,
-        });
+        }));
     }
     if intent.destination.get() >= item_count {
-        return Err(Error::DestinationOutOfRange {
+        return Err(Error::Refused(Refusal::DestinationOutOfRange {
             position: intent.destination,
             item_count,
-        });
+        }));
     }
     Ok(())
 }
@@ -2773,14 +2814,14 @@ fn remaining_wire_limits(
     budget: &TransactionBudget,
 ) -> Result<WireLimits, Error> {
     if budget.remaining_fields() == 0 {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireFields,
             observed: budget.max_fields.saturating_add(1) as u64,
             maximum: budget.max_fields as u64,
         });
     }
     if budget.remaining_work() == 0 {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireWork,
             observed: budget.max_work.saturating_add(1) as u64,
             maximum: budget.max_work as u64,
@@ -2795,7 +2836,7 @@ fn remaining_wire_limits(
 fn physical_source(package: &Package) -> Result<&SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
-        PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
+        PhysicalSource::Semantic(_) => Err(Error::Refused(Refusal::UnsupportedSource)),
     }
 }
 
@@ -2809,7 +2850,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
                 litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -2825,8 +2866,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             maximum: limit as u64,
         },
         litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
-        litchi_iwa_common::Error::InvalidFormat(_)
-        | litchi_iwa_common::Error::InvalidLimit { .. } => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
@@ -2839,22 +2879,22 @@ fn map_codec_error(error: soundtrack_codec::DecodeError, budget: &TransactionBud
         return Error::InvalidSource;
     };
     match limit {
-        soundtrack_codec::DecodeLimit::Bytes { observed, maximum } => Error::LimitExceeded {
+        soundtrack_codec::DecodeLimit::Bytes { observed, maximum } => Error::Limit {
             kind: LimitKind::WireBytes,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        soundtrack_codec::DecodeLimit::Fields { observed, maximum } => Error::LimitExceeded {
+        soundtrack_codec::DecodeLimit::Fields { observed, maximum } => Error::Limit {
             kind: LimitKind::WireFields,
             observed: budget.fields.saturating_add(observed) as u64,
             maximum: budget.fields.saturating_add(maximum) as u64,
         },
-        soundtrack_codec::DecodeLimit::Work { observed, maximum } => Error::LimitExceeded {
+        soundtrack_codec::DecodeLimit::Work { observed, maximum } => Error::Limit {
             kind: LimitKind::WireWork,
             observed: budget.work.saturating_add(observed) as u64,
             maximum: budget.work.saturating_add(maximum) as u64,
         },
-        soundtrack_codec::DecodeLimit::Nesting { observed, maximum } => Error::LimitExceeded {
+        soundtrack_codec::DecodeLimit::Nesting { observed, maximum } => Error::Limit {
             kind: LimitKind::WireNesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),
@@ -2873,7 +2913,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 super::SemanticLimitKind::Objects => LimitKind::Entries,
                 super::SemanticLimitKind::Slides => LimitKind::Slides,
@@ -2890,7 +2930,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 super::PayloadLimitKind::Bytes => LimitKind::WireBytes,
                 super::PayloadLimitKind::Fields => LimitKind::WireFields,
@@ -2904,7 +2944,7 @@ fn map_read_error(error: ReadError) -> Error {
         ReadError::Archive(archive_error) => map_archive_error(archive_error),
         ReadError::Io(_)
         | ReadError::Detection(_)
-        | ReadError::NotKeynote
+        | ReadError::UnexpectedFormat { .. }
         | ReadError::InvalidFormat(_)
         | ReadError::Decode(_)
         | ReadError::TextStorage { .. }
@@ -2922,7 +2962,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -2940,14 +2980,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
         },
         litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
         litchi_iwa_archive::Error::Iwa(core_error) => map_core_error(core_error),
-        litchi_iwa_archive::Error::Io(_)
-        | litchi_iwa_archive::Error::Zip { .. }
-        | litchi_iwa_archive::Error::InvalidLimits(_)
-        | litchi_iwa_archive::Error::Encrypted
-        | litchi_iwa_archive::Error::SourceChanged { .. }
-        | litchi_iwa_archive::Error::DirectoryChanged { .. }
-        | litchi_iwa_archive::Error::Reassembly(_)
-        | litchi_iwa_archive::Error::InvalidBundle(_) => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
@@ -2961,7 +2994,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::Objects
                 | litchi_iwa_core::LimitKind::Messages
@@ -2986,11 +3019,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
         litchi_iwa_core::Error::Allocation { requested, .. } => {
             Error::Allocation { amount: requested }
         },
-        litchi_iwa_core::Error::InvalidArchive { .. }
-        | litchi_iwa_core::Error::InvalidLimits { .. }
-        | litchi_iwa_core::Error::HeaderCodec { .. }
-        | litchi_iwa_core::Error::Io(_)
-        | litchi_iwa_core::Error::Snappy { .. } => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
@@ -3097,7 +3126,7 @@ mod tests {
         let mut transaction_budget = budget();
         assert!(matches!(
             charge_output_upper_bound(8, 16, limits, &mut transaction_budget),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: super::LimitKind::OutputBytes,
                 observed: 1_064,
                 maximum: 1_063,
@@ -3168,7 +3197,7 @@ mod tests {
         fields.max_fields = 1;
         assert!(matches!(
             preflight_soundtrack_payload(&payload, WireLimits::default(), &fields),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: super::LimitKind::WireFields,
                 ..
             })
@@ -3180,7 +3209,7 @@ mod tests {
         work.max_work = payload.len() - 1;
         assert!(matches!(
             preflight_soundtrack_payload(&payload, WireLimits::default(), &work),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: super::LimitKind::WireWork,
                 ..
             })
@@ -3192,7 +3221,7 @@ mod tests {
         nesting.max_nesting = 1;
         assert!(matches!(
             preflight_soundtrack_payload(&payload, WireLimits::default(), &nesting),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: super::LimitKind::WireNesting,
                 ..
             })
@@ -3206,7 +3235,7 @@ mod tests {
         let transaction_budget = budget();
         assert!(matches!(
             check_wire_output_bound(4, WireLimits::default().with_output_bytes(3).unwrap()),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: super::LimitKind::OutputBytes,
                 observed: 4,
                 maximum: 3,
@@ -3231,7 +3260,7 @@ mod tests {
         fields.max_fields = 1;
         assert!(matches!(
             permute_payload(&payload, intent, 1, WireLimits::default(), &mut fields,),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: super::LimitKind::WireFields,
                 ..
             })
@@ -3244,7 +3273,7 @@ mod tests {
         work.max_work = payload.len() - 1;
         assert!(matches!(
             permute_payload(&payload, intent, 1, WireLimits::default(), &mut work,),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: super::LimitKind::WireWork,
                 ..
             })
@@ -3257,7 +3286,7 @@ mod tests {
         nesting.max_nesting = 1;
         assert!(matches!(
             permute_payload(&payload, intent, 1, WireLimits::default(), &mut nesting,),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: super::LimitKind::WireNesting,
                 ..
             })
@@ -3272,7 +3301,7 @@ mod tests {
             .expect("payload length is non-zero");
         assert!(matches!(
             permute_payload(&payload, intent, 1, output_limits, &mut output),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: super::LimitKind::OutputBytes,
                 ..
             })
@@ -3398,7 +3427,7 @@ mod tests {
         assert!(fields.charge_fields(1).is_ok());
         assert!(matches!(
             fields.charge_fields(1),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: super::LimitKind::WireFields,
                 observed: 2,
                 maximum: 1,
@@ -3411,7 +3440,7 @@ mod tests {
         assert!(work.charge_work(1).is_ok());
         assert!(matches!(
             work.charge_work(1),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: super::LimitKind::WireWork,
                 observed: 2,
                 maximum: 1,
@@ -3424,7 +3453,7 @@ mod tests {
         assert!(nesting.require_depth(1).is_ok());
         assert!(matches!(
             nesting.require_depth(2),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: super::LimitKind::WireNesting,
                 observed: 2,
                 maximum: 1,

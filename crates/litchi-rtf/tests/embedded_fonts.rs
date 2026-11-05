@@ -7,7 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
-use litchi_rtf::{EmbeddedFontFormat, FontPage, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{EmbeddedFontFormat, FontPage, write::Writer};
 
 const SYNTHETIC: &str = r"{\rtf1\ansi\uc1
 {\fonttbl
@@ -18,7 +19,7 @@ const SYNTHETIC: &str = r"{\rtf1\ansi\uc1
 
 #[test]
 fn parses_decodes_and_round_trips_embedded_fonts() {
-    let doc = RtfDocument::parse(SYNTHETIC).unwrap();
+    let doc = Tree::parse(SYNTHETIC, litchi_rtf::read::OpenOptions::default()).unwrap();
     let table = doc.font_table();
 
     let first = table.get(0).unwrap();
@@ -41,13 +42,12 @@ fn parses_decodes_and_round_trips_embedded_fonts() {
     assert_eq!(table.get(2).unwrap().embedded, None);
 
     let mut first_pass = Vec::new();
-    RtfWriter::new(&mut first_pass)
-        .write_document(&doc)
-        .unwrap();
-    let reparsed = RtfDocument::parse_bytes(&first_pass).unwrap();
+    Writer::new(&mut first_pass).write_document(&doc).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&first_pass, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(doc.font_table(), reparsed.font_table());
     let mut second_pass = Vec::new();
-    RtfWriter::new(&mut second_pass)
+    Writer::new(&mut second_pass)
         .write_document(&reparsed)
         .unwrap();
     assert_eq!(first_pass, second_pass);
@@ -56,7 +56,7 @@ fn parses_decodes_and_round_trips_embedded_fonts() {
 #[test]
 fn accepts_fontemb_without_ignorable_destination_marker() {
     let source = r"{\rtf1{\fonttbl{\f0\fnil{\fontemb\fttruetype{\fontfile times.ttf}}Times;}}}";
-    let doc = RtfDocument::parse(source).unwrap();
+    let doc = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let embedded = doc.font_table().get(0).unwrap().embedded.as_ref().unwrap();
     assert_eq!(embedded.format, EmbeddedFontFormat::TrueType);
     assert_eq!(embedded.file_name.as_deref(), Some("times.ttf"));
@@ -66,7 +66,7 @@ fn accepts_fontemb_without_ignorable_destination_marker() {
 fn fontfile_code_page_decodes_name_independently_from_the_header() {
     let source = r"{\rtf1\ansi\ansicpg1252
 {\fonttbl{\f0\fnil{\*\fontemb\ftnil{\*\fontfile\cpg932 \'82\'a0.ttf}}Arial;}}}";
-    let doc = RtfDocument::parse(source).unwrap();
+    let doc = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let embedded = doc.font_table().get(0).unwrap().embedded.as_ref().unwrap();
 
     assert_eq!(embedded.file_name.as_deref(), Some("あ.ttf"));
@@ -99,7 +99,7 @@ fn rejects_malformed_embedded_fonts() {
     ];
     for source in malformed {
         assert!(
-            RtfDocument::parse(source).is_err(),
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
             "accepted malformed RTF: {source}"
         );
     }
@@ -111,8 +111,8 @@ fn rejects_malformed_embedded_fonts() {
         r"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\ftnil{\*\fontfile\cpg1200 a.ttf}}Arial;}}}",
         r"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\ftnil{\*\fontfile\cpg65000 a.ttf}}Arial;}}}",
     ] {
-        let document =
-            RtfDocument::parse(source).unwrap_or_else(|error| panic!("{source}: {error}"));
+        let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default())
+            .unwrap_or_else(|error| panic!("{source}: {error}"));
         let report = document.tolerance_report();
         assert!(!report.is_clean(), "{source}");
         assert!(

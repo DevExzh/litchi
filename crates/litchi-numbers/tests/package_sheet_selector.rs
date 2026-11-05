@@ -58,6 +58,6 @@ fn package_table_selects_semantics_without_leaking_package_objects() -> TestResu
     // Package-derived semantic snapshots intentionally do not claim source
     // acquisition diagnostics; adding the convenience lookup must not alter
     // the existing stats contract.
-    assert_eq!(package.document().stats(), None);
+    assert_eq!(package.workbook_ref().stats(), None);
     Ok(())
 }

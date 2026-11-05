@@ -16,13 +16,18 @@ pub const MAX_MERGED_CELL_COLUMN: u32 = 16_383;
 /// Maximum number of `BrtMergeCell` records in one worksheet collection.
 pub const MAX_MERGED_CELL_RANGES: usize = 1_048_576;
 
+pub mod edit;
+
 /// Result type for merged-cell parsing and validation.
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// A typed `BrtMergeCell` failure.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum Error {
+    /// The raw BIFF12 profile rejected the fixed-width payload.
+    #[error(transparent)]
+    Wire(#[from] crate::raw::Error),
     /// The payload was not the fixed width required by the record.
     #[error("invalid BrtMergeCell payload length: expected {expected} bytes, found {found}")]
     InvalidLength {
@@ -71,7 +76,15 @@ impl MergedCell {
     }
 
     /// Parse one fixed-width `BrtMergeCell` payload.
-    pub fn parse(data: &[u8]) -> Result<Self> {
+    pub fn parse(data: &[u8], limits: crate::raw::Limits) -> Result<Self> {
+        limits.validate()?;
+        if data.len() > limits.payload() {
+            return Err(Error::Wire(crate::raw::Error::PayloadLimit {
+                length: data.len(),
+                limit: limits.payload(),
+                offset: 0,
+            }));
+        }
         if data.len() != LEN {
             return Err(Error::InvalidLength {
                 expected: LEN,
@@ -117,13 +130,22 @@ impl MergedCell {
 
     /// Serialize to one fixed-width `BrtMergeCell` payload.
     #[must_use]
-    pub fn serialize(&self) -> Vec<u8> {
+    pub fn serialize(&self, limits: crate::raw::Limits) -> Result<Vec<u8>> {
+        limits.validate()?;
+        if LEN > limits.payload() {
+            return Err(Error::Wire(crate::raw::Error::PayloadLimit {
+                length: LEN,
+                limit: limits.payload(),
+                offset: 0,
+            }));
+        }
+        self.validate()?;
         let mut data = Vec::with_capacity(LEN);
         data.extend_from_slice(&self.row_first.to_le_bytes());
         data.extend_from_slice(&self.row_last.to_le_bytes());
         data.extend_from_slice(&self.col_first.to_le_bytes());
         data.extend_from_slice(&self.col_last.to_le_bytes());
-        data
+        Ok(data)
     }
 
     /// Render the range using A1 notation, such as `A1:B2`.
@@ -179,20 +201,24 @@ mod tests {
     #[test]
     fn serialize_parse_round_trip() {
         let merged = MergedCell::new(0, 1, 0, 1);
-        let data = merged.serialize();
+        let data = merged.serialize(crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(data.len(), LEN);
-        assert_eq!(MergedCell::parse(&data), Ok(merged));
+        assert!(matches!(
+            MergedCell::parse(&data, crate::raw::Limits::DEFAULT),
+            Ok(value) if value == merged
+        ));
     }
 
     #[test]
     fn rejects_invalid_payload_and_ranges() {
-        assert_eq!(
-            MergedCell::parse(&[0; LEN - 1]),
+        assert!(matches!(
+            MergedCell::parse(&[0; LEN - 1], crate::raw::Limits::DEFAULT),
             Err(Error::InvalidLength {
                 expected: LEN,
-                found: LEN - 1,
+                found,
             })
-        );
+                if found == LEN - 1
+        ));
         assert!(matches!(
             MergedCell::new(2, 1, 0, 0).validate(),
             Err(Error::InvalidRange { .. })
@@ -210,5 +236,20 @@ mod tests {
         let separate = MergedCell::new(2, 3, 2, 3);
         assert!(left.overlaps(&touching));
         assert!(!left.overlaps(&separate));
+    }
+
+    #[test]
+    fn raw_limits_bound_fixed_width_records() {
+        let merged = MergedCell::new(0, 1, 0, 1);
+        let data = merged.serialize(crate::raw::Limits::DEFAULT).unwrap();
+        let tight = crate::raw::Limits::new(LEN - 1, 16);
+        assert!(matches!(
+            MergedCell::parse(&data, tight),
+            Err(Error::Wire(crate::raw::Error::PayloadLimit { .. }))
+        ));
+        assert!(matches!(
+            merged.serialize(tight),
+            Err(Error::Wire(crate::raw::Error::PayloadLimit { .. }))
+        ));
     }
 }

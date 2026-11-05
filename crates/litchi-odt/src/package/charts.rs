@@ -266,11 +266,11 @@ pub(crate) fn validate_chart_content(chart_content: &str) -> Result<()> {
     if chart_content.len() > MAX_CONTENT_BYTES {
         return invalid("embedded chart content exceeds the safety limit");
     }
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(constants::ODF_CHART)?;
     writer.add_file(constants::ODF_CONTENT, chart_content.as_bytes())?;
     let bytes = writer.finish_to_bytes()?;
-    Document::from_bytes(bytes).map(|_| ())?;
+    Document::from_vec(bytes).map(|_| ())?;
     Ok(())
 }
 
@@ -340,7 +340,7 @@ fn open_subdocument(
     if !paths.iter().any(|path| path == &content_path) {
         return invalid("embedded chart has no content.xml");
     }
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(media_type)?;
     let mut total = 0usize;
     let mut ordered = vec![content_path.clone()];
@@ -368,7 +368,7 @@ fn open_subdocument(
         });
         writer.add_file_with_media_type(relative, &bytes, entry_media)?;
     }
-    Document::from_bytes(writer.finish_to_bytes()?)
+    Document::from_vec(writer.finish_to_bytes()?)
 }
 
 fn open_inline(xml: &str) -> Result<Document> {
@@ -377,10 +377,10 @@ fn open_inline(xml: &str) -> Result<Document> {
     }
     let media_type = inline_chart_mimetype(xml)?;
     let content = rename_document_root(xml, "document", "document-content", None)?;
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(&media_type)?;
     writer.add_file(constants::ODF_CONTENT, content.as_bytes())?;
-    Document::from_bytes(writer.finish_to_bytes()?)
+    Document::from_vec(writer.finish_to_bytes()?)
 }
 
 fn inline_chart_mimetype(xml: &str) -> Result<String> {

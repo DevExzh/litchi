@@ -11,6 +11,18 @@ pub enum WriteError {
     Ole(OleError),
     /// MS-OVBA project authoring error
     Vba(litchi_vba::Error),
+    /// The staged document assembled, but its package could not be parsed.
+    Package(crate::package::Error),
+    /// The metadata given to [`super::Builder::set_metadata`] cannot be
+    /// stored in the OLE property sets.
+    Metadata(litchi_ole_common::property_set::summary_properties::MetadataError),
+    /// Document properties were combined with `CryptoAPI` RC4 encryption.
+    ///
+    /// Office keeps the properties of such a document in an encrypted summary
+    /// stream ([MS-OFFCRYPTO] 2.3.5.4), which this writer does not produce;
+    /// it refuses rather than store them in plaintext beside the encrypted
+    /// document.
+    EncryptedMetadata,
 }
 
 impl From<std::io::Error> for WriteError {
@@ -22,6 +34,12 @@ impl From<std::io::Error> for WriteError {
 impl From<OleError> for WriteError {
     fn from(err: OleError) -> Self {
         WriteError::Ole(err)
+    }
+}
+
+impl From<litchi_ole_common::property_set::summary_properties::MetadataError> for WriteError {
+    fn from(err: litchi_ole_common::property_set::summary_properties::MetadataError) -> Self {
+        WriteError::Metadata(err)
     }
 }
 
@@ -38,6 +56,11 @@ impl std::fmt::Display for WriteError {
             WriteError::InvalidData(s) => write!(f, "Invalid data: {s}"),
             WriteError::Ole(e) => write!(f, "OLE error: {e}"),
             WriteError::Vba(e) => write!(f, "VBA project error: {e}"),
+            WriteError::Package(e) => write!(f, "DOC package error: {e}"),
+            WriteError::Metadata(e) => write!(f, "DOC metadata error: {e}"),
+            WriteError::EncryptedMetadata => f.write_str(
+                "DOC document properties cannot be written with CryptoAPI RC4 encryption",
+            ),
         }
     }
 }
@@ -47,7 +70,10 @@ impl std::error::Error for WriteError {
             Self::Io(error) => Some(error),
             Self::Ole(error) => Some(error),
             Self::Vba(error) => Some(error),
+            Self::Package(error) => Some(error),
             Self::InvalidData(_) => None,
+            Self::Metadata(error) => Some(error),
+            Self::EncryptedMetadata => None,
         }
     }
 }

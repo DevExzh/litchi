@@ -9,7 +9,7 @@ const PREFIX: &str = r#"<office:document-content xmlns:office="urn:oasis:names:t
 const SUFFIX: &str = "</office:spreadsheet></office:body></office:document-content>";
 
 fn parse(fragment: &str) -> Result<Option<Changes>> {
-    parse_tracked_changes(&format!("{PREFIX}{fragment}{SUFFIX}"))
+    parse_tracked_changes(&format!("{PREFIX}{fragment}{SUFFIX}"), &Limits::default())
 }
 
 #[test]
@@ -76,7 +76,8 @@ fn applies_defaults_and_rejects_malformed_change_graphs() {
         assert!(parse(&fragment).is_err(), "accepted {fragment}");
     }
     assert!(parse_tracked_changes(
-        r#"<table:tracked-changes xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"/>"#
+        r#"<table:tracked-changes xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"/>"#,
+        &Limits::default(),
     )
     .is_err());
 }
@@ -98,7 +99,7 @@ fn rejects_wrong_host_and_odf_child_order() {
 
     let misplaced =
         format!(r#"{PREFIX}<table:table table:name="S"/><table:tracked-changes/>{SUFFIX}"#,);
-    assert!(parse_tracked_changes(&misplaced).is_err());
+    assert!(parse_tracked_changes(&misplaced, &Limits::default()).is_err());
 }
 
 #[test]
@@ -174,9 +175,9 @@ fn opaque_owner_pi_and_foreign_children_are_preserved_and_flagged() {
         &xml[owner.element.whole.start..owner.element.whole.end],
         fragment
     );
-    assert!(parse_tracked_changes(&xml).is_ok());
+    assert!(parse_tracked_changes(&xml, &Limits::default()).is_ok());
     let dtd = format!("<!DOCTYPE x [<!ENTITY e 'boom'>]>{xml}");
-    assert!(parse_tracked_changes(&dtd).is_err());
+    assert!(parse_tracked_changes(&dtd, &Limits::default()).is_err());
 }
 
 #[test]
@@ -248,7 +249,7 @@ fn error_and_xsd_double_specials_round_trip_with_exact_attribute_choice() {
             other => panic!("unexpected parsed value {other:?}"),
         }
         let written = changes
-            .to_xml_fragment()
+            .to_xml_fragment(&Limits::default())
             .expect("test fixture or operation should succeed");
         assert!(written.contains(expected));
     }
@@ -287,8 +288,10 @@ fn parses_libreoffice_change_tracking_fixtures() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let tracked_path =
         root.join("test-data/libreoffice-core/sc/qa/unit/data/ods/change-tracking.ods");
-    let tracked =
-        crate::Spreadsheet::open(tracked_path).expect("test fixture or operation should succeed");
+    let tracked = crate::Package::open(tracked_path)
+        .expect("test fixture or operation should succeed")
+        .workbook()
+        .expect("test fixture or operation should succeed");
     let changes = tracked
         .tracked_changes()
         .expect("test fixture or operation should succeed");
@@ -311,8 +314,10 @@ fn parses_libreoffice_change_tracking_fixtures() {
 
     let protected_path = root
         .join("test-data/libreoffice-core/sc/qa/extras/testdocuments/RecordChangesProtected.ods");
-    let protected =
-        crate::Spreadsheet::open(protected_path).expect("test fixture or operation should succeed");
+    let protected = crate::Package::open(protected_path)
+        .expect("test fixture or operation should succeed")
+        .workbook()
+        .expect("test fixture or operation should succeed");
     assert!(
         protected
             .tracked_changes()

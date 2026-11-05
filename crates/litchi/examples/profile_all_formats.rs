@@ -8,6 +8,12 @@
 //! Files are loaded into memory first to avoid disk I/O interference with profiling.
 //! The focus is on the hot path: parsing, markdown conversion, and formatting.
 //!
+//! Office and OpenDocument files open through `litchi::open_bytes`, which
+//! detects the format from the content: documents and presentations convert to
+//! Markdown, and workbooks yield their plain text. Apple iWork files open the
+//! same way (record 0306): Pages and Keynote convert to Markdown, and Numbers
+//! yields its plain text.
+//!
 //! # Features
 //!
 //! - **Memory-based**: All files loaded into RAM to eliminate I/O from profiles
@@ -52,7 +58,7 @@
 //! 2. **Per-Format Statistics**:
 //!    - Average processing time (milliseconds)
 //!    - Throughput (MB/second)
-//!    - Markdown output size (characters)
+//!    - Output size: Markdown (`md chars`) or plain text (`text chars`)
 //! 3. **Summary Statistics**: Overall throughput and success rate
 //! 4. **Profiling Data**: For analysis in Firefox Profiler or other tools
 //!
@@ -61,7 +67,7 @@
 //! ```text
 //! ═══ Processing Documents ═══
 //!   ✓ test.doc           1.8 MB │  25.57 ms │  13.81 MB/s │  35079 md chars
-//!   ✓ test.pages       241.6 KB │   0.98 ms │  48.31 MB/s │   1677 md chars
+//!   ✓ test.pages       241.6 KB │   0.98 ms │  48.31 MB/s │   1677 text chars
 //!
 //! ═══ Summary ═══
 //!   Files processed: 10
@@ -86,7 +92,6 @@
 //! - Profiling build profile should be configured in Cargo.toml
 
 use litchi::markdown::ToMarkdown;
-use litchi::{Document, Presentation};
 use std::collections::HashMap;
 use std::time::Instant;
 
@@ -101,8 +106,10 @@ struct FileStats {
     iterations: u32,
     /// Total time spent across all iterations (microseconds)
     total_time_us: u64,
-    /// Markdown output size in characters (if applicable)
+    /// Output size in characters (if applicable)
     char_count: Option<usize>,
+    /// What one iteration produced from the file
+    work: Work,
     /// Processing status
     status: ProcessStatus,
 }
@@ -139,43 +146,46 @@ impl FileStats {
     }
 }
 
-/// Profile a document file (DOC, DOCX, ODT, Pages)
-fn profile_document(name: &str, data: &[u8], iterations: u32) -> FileStats {
+/// What one profiled iteration produces from a file's bytes.
+#[derive(Debug, Clone, Copy)]
+enum Work {
+    /// Open with `litchi::open_bytes`, then convert to Markdown.
+    Markdown,
+    /// Open with `litchi::open_bytes`, then extract the plain text.
+    Text,
+}
+
+impl Work {
+    /// The unit the output size is reported in.
+    fn unit(self) -> &'static str {
+        match self {
+            Work::Markdown => "md chars",
+            Work::Text => "text chars",
+        }
+    }
+}
+
+/// Profile one file: open its bytes and produce its output `iterations` times.
+/// `kind` names the file's family in failure messages.
+fn profile(name: &str, kind: &str, data: &[u8], iterations: u32, work: Work) -> FileStats {
     let mut total_time = 0u64;
     let mut char_count = None;
 
     for _ in 0..iterations {
         let start = Instant::now();
 
-        match Document::from_bytes(data.to_vec()) {
-            Ok(doc) => {
-                // Convert to markdown - this is the hot path
-                match doc.to_markdown() {
-                    Ok(markdown) => {
-                        char_count = Some(markdown.len());
-                        // Keep the markdown in scope briefly to ensure it's not optimized away
-                        std::hint::black_box(&markdown);
-                    },
-                    Err(e) => {
-                        return FileStats {
-                            name: name.to_string(),
-                            size: data.len(),
-                            iterations: 0,
-                            total_time_us: 0,
-                            char_count: None,
-                            status: ProcessStatus::Failed(format!("Markdown conversion: {}", e)),
-                        };
-                    },
-                }
-            },
-            Err(e) => {
+        // Open and convert - this is the hot path
+        match run_once(kind, data, work) {
+            Ok(chars) => char_count = Some(chars),
+            Err(message) => {
                 return FileStats {
                     name: name.to_string(),
                     size: data.len(),
                     iterations: 0,
                     total_time_us: 0,
                     char_count: None,
-                    status: ProcessStatus::Failed(format!("Document open: {}", e)),
+                    work,
+                    status: ProcessStatus::Failed(message),
                 };
             },
         }
@@ -189,141 +199,40 @@ fn profile_document(name: &str, data: &[u8], iterations: u32) -> FileStats {
         iterations,
         total_time_us: total_time,
         char_count,
+        work,
         status: ProcessStatus::Success,
     }
 }
 
-/// Profile a presentation file (PPT, PPTX, ODP, Keynote)
-fn profile_presentation(name: &str, data: &[u8], iterations: u32) -> FileStats {
-    let mut total_time = 0u64;
-    let mut char_count = None;
-
-    for _ in 0..iterations {
-        let start = Instant::now();
-
-        match Presentation::from_bytes(data.to_vec()) {
-            Ok(pres) => {
-                // Convert to markdown - this is the hot path
-                match pres.to_markdown() {
-                    Ok(markdown) => {
-                        char_count = Some(markdown.len());
-                        // Keep the markdown in scope briefly to ensure it's not optimized away
-                        std::hint::black_box(&markdown);
-                    },
-                    Err(e) => {
-                        return FileStats {
-                            name: name.to_string(),
-                            size: data.len(),
-                            iterations: 0,
-                            total_time_us: 0,
-                            char_count: None,
-                            status: ProcessStatus::Failed(format!("Markdown conversion: {}", e)),
-                        };
-                    },
-                }
-            },
-            Err(e) => {
-                return FileStats {
-                    name: name.to_string(),
-                    size: data.len(),
-                    iterations: 0,
-                    total_time_us: 0,
-                    char_count: None,
-                    status: ProcessStatus::Failed(format!("Presentation open: {}", e)),
-                };
-            },
-        }
-
-        total_time += start.elapsed().as_micros() as u64;
-    }
-
-    FileStats {
-        name: name.to_string(),
-        size: data.len(),
-        iterations,
-        total_time_us: total_time,
-        char_count,
-        status: ProcessStatus::Success,
-    }
+/// One iteration: open the bytes and produce the output, returning its size.
+fn run_once(kind: &str, data: &[u8], work: Work) -> Result<usize, String> {
+    // The format is detected from the content.
+    let open = || {
+        litchi::open_bytes(data.to_vec()).map_err(|e| format!("{kind} open: {}", with_causes(&e)))
+    };
+    let output = match work {
+        Work::Markdown => open()?
+            .to_markdown()
+            .map_err(|e| format!("Markdown conversion: {}", with_causes(&e)))?,
+        Work::Text => open()?
+            .text()
+            .map_err(|e| format!("Text extraction: {}", with_causes(&e)))?,
+    };
+    // Keep the output in scope briefly to ensure it's not optimized away
+    Ok(std::hint::black_box(&output).len())
 }
 
-/// Profile a spreadsheet file (XLS, XLSX, XLSB, ODS, Numbers)
-#[cfg(any(
-    feature = "xls",
-    feature = "ooxml",
-    feature = "odf",
-    feature = "numbers"
-))]
-fn profile_spreadsheet(name: &str, data: &[u8], iterations: u32) -> FileStats {
-    use litchi::sheet::Workbook;
-
-    let mut total_time = 0u64;
-    let mut char_count = None;
-
-    for _ in 0..iterations {
-        let start = Instant::now();
-
-        match Workbook::from_bytes(data.to_vec()) {
-            Ok(workbook) => {
-                // Extract text from all sheets - this is the hot path
-                match workbook.text() {
-                    Ok(text) => {
-                        char_count = Some(text.len());
-                        // Keep the text in scope briefly to ensure it's not optimized away
-                        std::hint::black_box(&text);
-                    },
-                    Err(e) => {
-                        return FileStats {
-                            name: name.to_string(),
-                            size: data.len(),
-                            iterations: 0,
-                            total_time_us: 0,
-                            char_count: None,
-                            status: ProcessStatus::Failed(format!("Text extraction: {}", e)),
-                        };
-                    },
-                }
-            },
-            Err(e) => {
-                return FileStats {
-                    name: name.to_string(),
-                    size: data.len(),
-                    iterations: 0,
-                    total_time_us: 0,
-                    char_count: None,
-                    status: ProcessStatus::Failed(format!("Workbook open: {}", e)),
-                };
-            },
-        }
-
-        total_time += start.elapsed().as_micros() as u64;
+/// The error followed by its causes. A `litchi::Error` displays its code and
+/// a summary; the error of the format crate that failed is its source.
+fn with_causes(error: &dyn std::error::Error) -> String {
+    let mut text = error.to_string();
+    let mut cause = error.source();
+    while let Some(error) = cause {
+        text.push_str(": ");
+        text.push_str(&error.to_string());
+        cause = error.source();
     }
-
-    FileStats {
-        name: name.to_string(),
-        size: data.len(),
-        iterations,
-        total_time_us: total_time,
-        char_count,
-        status: ProcessStatus::Success,
-    }
-}
-
-#[cfg(not(any(
-    feature = "xls",
-    feature = "ooxml",
-    feature = "odf",
-    feature = "numbers"
-)))]
-fn profile_spreadsheet(name: &str, data: &[u8], _iterations: u32) -> FileStats {
-    FileStats {
-        name: name.to_string(),
-        size: data.len(),
-        iterations: 0,
-        total_time_us: 0,
-        char_count: None,
-        status: ProcessStatus::Skipped("Spreadsheet features not enabled".to_string()),
-    }
+    text
 }
 
 /// Load a file into memory, returning None if it doesn't exist
@@ -358,6 +267,16 @@ fn determine_file_type(filename: &str) -> Option<&'static str> {
     }
 }
 
+/// What profiling a file produces: Markdown for documents and presentations
+/// (Pages and Keynote included), plain text for workbooks (Numbers included).
+fn work_for(file_type: &str, filename: &str) -> Work {
+    if filename.to_lowercase().ends_with(".numbers") || file_type == "spreadsheet" {
+        Work::Text
+    } else {
+        Work::Markdown
+    }
+}
+
 fn format_size(bytes: usize) -> String {
     if bytes < 1024 {
         format!("{} B", bytes)
@@ -386,7 +305,7 @@ fn print_stats(stats: &FileStats) {
                 stats.throughput_mb_per_sec()
             );
             if let Some(chars) = stats.char_count {
-                print!(" │ {:>8} md chars", chars);
+                print!(" │ {:>8} {}", chars, stats.work.unit());
             }
             println!();
         },
@@ -461,7 +380,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if *file_type == "document"
             && let Some(data) = file_data.get(filename)
         {
-            let stats = profile_document(filename.as_str(), data, iterations);
+            let work = work_for(file_type, filename);
+            let stats = profile(filename.as_str(), "Document", data, iterations, work);
             print_stats(&stats);
             all_stats.push(stats);
         }
@@ -474,7 +394,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if *file_type == "presentation"
             && let Some(data) = file_data.get(filename)
         {
-            let stats = profile_presentation(filename.as_str(), data, iterations);
+            let work = work_for(file_type, filename);
+            let stats = profile(filename.as_str(), "Presentation", data, iterations, work);
             print_stats(&stats);
             all_stats.push(stats);
         }
@@ -487,7 +408,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if *file_type == "spreadsheet"
             && let Some(data) = file_data.get(filename)
         {
-            let stats = profile_spreadsheet(filename.as_str(), data, iterations);
+            let work = work_for(file_type, filename);
+            let stats = profile(filename.as_str(), "Workbook", data, iterations, work);
             print_stats(&stats);
             all_stats.push(stats);
         }

@@ -117,22 +117,6 @@ struct ParsedReference<'a> {
     end: usize,
 }
 
-/// One simultaneous local-sheet rename. External workbook indexes are never
-/// matched against this mapping.
-#[derive(Debug, Clone, Copy)]
-pub(super) struct Rename<'a> {
-    pub(super) before: &'a str,
-    pub(super) after: &'a str,
-}
-
-/// Result of scanning one formula-like value. `text` is allocated only when
-/// at least one byte must change; `matched` also reports case-preserving no-ops.
-#[derive(Debug)]
-pub(super) struct RenameResult {
-    pub(super) text: Option<String>,
-    pub(super) matched: bool,
-}
-
 pub(super) fn translate(
     formula: &str,
     origin_row: u32,
@@ -172,75 +156,6 @@ pub(super) fn translate(
         index += character.len_utf8();
     }
     output
-}
-
-/// Rewrite local single-sheet and 3-D prefixes in one pass.
-///
-/// String constants, structured-reference brackets, and nonzero/external
-/// workbook prefixes remain exact. All mappings observe the source formula,
-/// so swaps such as `One <-> Two` do not cascade.
-pub(super) fn rename_sheets(formula: &str, renames: &[Rename<'_>]) -> RenameResult {
-    if formula.is_empty() || renames.is_empty() {
-        return RenameResult {
-            text: None,
-            matched: false,
-        };
-    }
-    let bytes = formula.as_bytes();
-    let mut output = None::<String>;
-    let mut copied = 0usize;
-    let mut index = 0usize;
-    let mut matched = false;
-
-    while index < bytes.len() {
-        if bytes[index] == b'"' {
-            index = quoted_string_end(bytes, index);
-            continue;
-        }
-
-        let candidate = if bytes[index] == b'\'' {
-            quoted_sheet_prefix_end(bytes, index).map(|end| (end, true))
-        } else if is_prefix_start(bytes, index) {
-            unquoted_sheet_prefix_end(bytes, index).map(|end| (end, false))
-        } else {
-            None
-        };
-        if let Some((end, quoted)) = candidate {
-            let prefix_end = end - 1;
-            let raw = &formula[index..prefix_end];
-            if let Some(rewritten) = rewrite_sheet_prefix(raw, quoted, renames) {
-                matched = true;
-                if rewritten != raw {
-                    let target = output.get_or_insert_with(|| {
-                        let mut value = String::with_capacity(formula.len());
-                        value.push_str(&formula[..index]);
-                        value
-                    });
-                    if copied != 0 {
-                        target.push_str(&formula[copied..index]);
-                    }
-                    target.push_str(&rewritten);
-                    target.push('!');
-                    copied = end;
-                }
-            }
-            index = end;
-            continue;
-        }
-
-        let Some(character) = formula[index..].chars().next() else {
-            break;
-        };
-        index += character.len_utf8();
-    }
-
-    if let Some(output) = output.as_mut() {
-        output.push_str(&formula[copied..]);
-    }
-    RenameResult {
-        text: output,
-        matched,
-    }
 }
 
 /// Whether a formula-like value has a local sheet reference whose meaning
@@ -431,56 +346,6 @@ fn is_prefix_start(bytes: &[u8], start: usize) -> bool {
     is_prefix_byte(bytes[start]) && (start == 0 || !is_prefix_byte(bytes[start - 1]))
 }
 
-fn rewrite_sheet_prefix(raw: &str, quoted: bool, renames: &[Rename<'_>]) -> Option<String> {
-    let decoded;
-    let prefix = if quoted {
-        let inner = raw.strip_prefix('\'')?.strip_suffix('\'')?;
-        decoded = if inner.contains("''") {
-            Cow::Owned(inner.replace("''", "'"))
-        } else {
-            Cow::Borrowed(inner)
-        };
-        decoded.as_ref()
-    } else {
-        raw
-    };
-    let (book, sheets) = local_workbook_prefix(prefix)?;
-    let (first, last) = sheets
-        .split_once(':')
-        .map_or((sheets, None), |(first, last)| (first, Some(last)));
-    if first.is_empty()
-        || last.is_some_and(str::is_empty)
-        || last.is_some_and(|last| last.contains(':'))
-    {
-        return None;
-    }
-
-    let mut matched = false;
-    let first = mapped_name(first, renames, &mut matched);
-    let last = last.map(|last| mapped_name(last, renames, &mut matched));
-    if !matched {
-        return None;
-    }
-
-    let quote = quoted
-        || !formula_name_is_unquoted(first)
-        || last.is_some_and(|last| !formula_name_is_unquoted(last));
-    let mut output = String::with_capacity(raw.len());
-    if quote {
-        output.push('\'');
-    }
-    output.push_str(book);
-    push_formula_name(&mut output, first, quote);
-    if let Some(last) = last {
-        output.push(':');
-        push_formula_name(&mut output, last, quote);
-    }
-    if quote {
-        output.push('\'');
-    }
-    Some(output)
-}
-
 fn local_workbook_prefix(prefix: &str) -> Option<(&str, &str)> {
     if let Some(rest) = prefix.strip_prefix('[') {
         let close = rest.find(']')?;
@@ -497,36 +362,6 @@ fn local_workbook_prefix(prefix: &str) -> Option<(&str, &str)> {
         return None;
     }
     Some(("", prefix))
-}
-
-fn mapped_name<'a>(name: &'a str, renames: &[Rename<'a>], matched: &mut bool) -> &'a str {
-    for rename in renames {
-        if crate::sheet::equivalent(name, rename.before) {
-            *matched = true;
-            return rename.after;
-        }
-    }
-    name
-}
-
-fn formula_name_is_unquoted(name: &str) -> bool {
-    !name.is_empty()
-        && name
-            .chars()
-            .all(|character| character.is_alphanumeric() || matches!(character, '_' | '.'))
-}
-
-fn push_formula_name(output: &mut String, name: &str, quoted: bool) {
-    if quoted {
-        for character in name.chars() {
-            output.push(character);
-            if character == '\'' {
-                output.push('\'');
-            }
-        }
-    } else {
-        output.push_str(name);
-    }
 }
 
 fn quoted_string_end(bytes: &[u8], start: usize) -> usize {
@@ -782,44 +617,6 @@ mod tests {
     }
 
     #[test]
-    fn renames_local_prefixes_simultaneously_and_preserves_external_references() {
-        let renames = [
-            Rename {
-                before: "One",
-                after: "Two",
-            },
-            Rename {
-                before: "Two",
-                after: "One",
-            },
-        ];
-        let result = rename_sheets(
-            r#"One!A1+Two!LocalName+'One:Two'!$A$1+[0]One!A1+[1]One!A1+'[Book.xlsx]One'!A1+INDIRECT("One!A1")"#,
-            &renames,
-        );
-        assert!(result.matched);
-        assert_eq!(
-            result.text.as_deref(),
-            Some(
-                r#"Two!A1+One!LocalName+'Two:One'!$A$1+[0]Two!A1+[1]One!A1+'[Book.xlsx]One'!A1+INDIRECT("One!A1")"#
-            )
-        );
-    }
-
-    #[test]
-    fn renames_quoted_apostrophes_and_unicode_caseless_names() {
-        let renames = [Rename {
-            before: "Straße",
-            after: "O'Brien 2026",
-        }];
-        let result = rename_sheets("STRASSE!A1+'Straße'!Named", &renames);
-        assert_eq!(
-            result.text.as_deref(),
-            Some("'O''Brien 2026'!A1+'O''Brien 2026'!Named")
-        );
-    }
-
-    #[test]
     fn detects_direct_and_implicit_three_d_sheet_dependencies() {
         let sheets = ["One", "Middle", "Three"];
         assert!(depends_on_sheet("Middle!A1", "Middle", 1, &sheets));
@@ -844,18 +641,5 @@ mod tests {
         assert!(!has_dynamic_reference(
             r#""INDIRECT(Middle!A1)"+Table1[INDIRECT()]"#
         ));
-    }
-
-    #[test]
-    fn rename_scan_does_not_allocate_without_a_local_match() {
-        let result = rename_sheets(
-            r#"[2]One!A1+Table1[One]+"One!A1""#,
-            &[Rename {
-                before: "One",
-                after: "Renamed",
-            }],
-        );
-        assert!(!result.matched);
-        assert!(result.text.is_none());
     }
 }

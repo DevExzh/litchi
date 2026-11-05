@@ -14,7 +14,7 @@ use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_common::wire::WireView;
 use litchi_iwa_core::{Archive, SnappyStream};
 use litchi_iwa_protos::{kn, package_metadata_media_codec, tsa, tsd, tsp, tswp};
-use litchi_keynote::{MediaPart, MovieSelector, Package, SlideSelector};
+use litchi_keynote::{MovieSelector, Package, SlideSelector, slide::media::data::MediaPart};
 use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -70,7 +70,7 @@ struct MovieGraph {
 }
 
 fn member_bytes(source: &[u8], name: &str) -> TestResult<Vec<u8>> {
-    Catalog::from_bytes(source)?
+    Catalog::from_bytes(source, Default::default())?
         .iter()
         .find(|entry| entry.name() == name)
         .map(|entry| entry.data().to_vec())
@@ -79,22 +79,22 @@ fn member_bytes(source: &[u8], name: &str) -> TestResult<Vec<u8>> {
 }
 
 fn has_member(source: &[u8], name: &str) -> TestResult<bool> {
-    Ok(Catalog::from_bytes(source)?
+    Ok(Catalog::from_bytes(source, Default::default())?
         .iter()
         .any(|entry| entry.name() == name))
 }
 
 fn component_archives(source: &[u8]) -> TestResult<Vec<(String, Archive)>> {
     let mut archives = Vec::new();
-    for entry in Catalog::from_bytes(source)?.iter() {
+    for entry in Catalog::from_bytes(source, Default::default())?.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = match SnappyStream::decompress(entry.data()) {
+        let stream = match SnappyStream::decompress(entry.data(), Default::default()) {
             Ok(stream) => stream.into_bytes(),
             Err(_) => continue,
         };
-        let archive = match Archive::parse(&stream) {
+        let archive = match Archive::parse(&stream, Default::default()) {
             Ok(archive) => archive,
             Err(_) => continue,
         };
@@ -111,7 +111,7 @@ fn component_containing_object(source: &[u8], identifier: u64) -> TestResult<(St
         .map_err(Into::into)
 }
 
-fn object_message<'a>(archive: &'a Archive, identifier: u64, type_: u32) -> TestResult<&'a [u8]> {
+fn object_message(archive: &Archive, identifier: u64, type_: u32) -> TestResult<&[u8]> {
     archive
         .object(identifier)
         .and_then(|object| {
@@ -247,11 +247,13 @@ fn metadata(source: &[u8]) -> TestResult<tsp::PackageMetadata> {
 }
 
 fn metadata_root_field(payload: &[u8], number: u32) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(payload)?
-        .fields()
-        .filter(|field| field.number() == number)
-        .map(|field| field.raw().to_vec())
-        .collect())
+    Ok(
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .filter(|field| field.number() == number)
+            .map(|field| field.raw().to_vec())
+            .collect(),
+    )
 }
 
 fn data_metadata_map_payload(source: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
@@ -269,9 +271,7 @@ fn metadata_from_payload(payload: &[u8]) -> TestResult<tsp::PackageMetadata> {
     Ok(metadata)
 }
 
-fn document_component<'a>(
-    metadata: &'a tsp::PackageMetadata,
-) -> TestResult<&'a tsp::ComponentInfo> {
+fn document_component(metadata: &tsp::PackageMetadata) -> TestResult<&tsp::ComponentInfo> {
     metadata
         .components
         .iter()
@@ -420,7 +420,9 @@ fn native_lifecycle_oracles_expose_strict_source_order_and_shared_bytes() -> Tes
             MovieSelector::index(0),
             MediaPart::Poster,
         ),
-        Err(litchi_keynote::SlideMediaDataError::AudioPoster)
+        Err(litchi_keynote::slide::media::data::Error::Refused(
+            litchi_keynote::slide::media::data::Refusal::AudioPoster
+        ))
     ));
     assert!(matches!(
         removed.slide_media_data(
@@ -428,7 +430,9 @@ fn native_lifecycle_oracles_expose_strict_source_order_and_shared_bytes() -> Tes
             MovieSelector::index(2),
             MediaPart::Content,
         ),
-        Err(litchi_keynote::SlideMediaDataError::MoviePositionNotFound { .. })
+        Err(litchi_keynote::slide::media::data::Error::Refused(
+            litchi_keynote::slide::media::data::Refusal::MoviePositionNotFound { .. }
+        ))
     ));
     Ok(())
 }

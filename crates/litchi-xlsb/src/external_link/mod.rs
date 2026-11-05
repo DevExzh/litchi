@@ -36,7 +36,7 @@ pub enum Error {
     Wire(#[from] WireError),
     /// A modeled external-link invariant was violated.
     #[error("invalid external link: {0}")]
-    InvalidFormula(String),
+    InvalidFormula(&'static str),
     /// A fixed-width or length-prefixed structure has the wrong size.
     #[error("invalid length: expected {expected}, found {found}")]
     InvalidLength { expected: usize, found: usize },
@@ -57,6 +57,9 @@ pub enum Error {
         /// Configured maximum.
         maximum: usize,
     },
+    /// A patch was applied to a different source stream.
+    #[error("external-link patch conflicts with its source")]
+    PatchConflict,
 }
 
 pub(crate) const MAX_COLLECTION_ITEMS: usize = 65_535;
@@ -90,17 +93,13 @@ pub const MAX_UNKNOWN_RECORDS: usize = 65_535;
 /// Maximum aggregate bytes retained for opaque BIFF12 records.
 pub const MAX_UNKNOWN_BYTES: usize = 8 * 1024 * 1024;
 pub use codec::{
-    parse_external_link, parse_external_link_model, parse_external_link_model_with_limits,
-    parse_external_link_with_limits, parse_external_link_with_relationship,
-    parse_external_link_with_relationship_with_limits,
+    parse_external_link, parse_external_link_model, parse_external_link_with_relationship,
 };
 pub use model::{
     AreaReference, CachedValue, CellLocation, CellReference, DdeItem, DefinedName, Entries,
     ErrorValue, Kind, Link, NameFormula, NameFormulaKind, OleItem, Parsed, SheetRange,
     UnknownRecord, ValueMatrix, validate_number,
 };
-pub use package::{write_external_link_stream, write_external_link_stream_with_limits};
-pub use transaction::{
-    Commit, Patch, Snapshot, Transaction, apply, apply_with_limits, read, read_with_limits,
-};
+pub use package::write_external_link_stream;
+pub use transaction::{Draft, Patch, Snapshot, apply, read};
 pub use validation::validate_link;

@@ -9,7 +9,7 @@ use quick_xml::{
 };
 use std::{borrow::Cow, ops::Range};
 
-use crate::{Master, style::Origin};
+use crate::{Package, style::Origin};
 
 const OFFICE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const MAX_VALUE_BYTES: usize = 16 * 1024;
@@ -567,7 +567,7 @@ impl BodyItemSpec {
         }
     }
 
-    pub(crate) fn imported(source: &Master, item: Position) -> Result<Self> {
+    pub(crate) fn imported(source: &Package, item: Position) -> Result<Self> {
         let kind = *source
             .structure()
             .items()
@@ -694,7 +694,7 @@ pub(crate) struct MutatedParts {
 }
 
 pub(crate) fn mutate_xml(
-    source: &Master,
+    source: &Package,
     links: &[(Position, String)],
     sections: &[SectionChange],
     generated_indexes: &[GeneratedIndexChange],
@@ -809,7 +809,7 @@ pub(crate) fn mutate_xml(
 }
 
 fn stage_body_item(
-    source: &Master,
+    source: &Package,
     intent: &BodyItemChange,
     edits: &mut Vec<(Range<usize>, String)>,
 ) -> Result<()> {
@@ -837,7 +837,7 @@ fn stage_body_item(
 }
 
 fn stage_generated_index(
-    source: &Master,
+    source: &Package,
     intent: &GeneratedIndexChange,
     edits: &mut Vec<(Range<usize>, String)>,
 ) -> Result<()> {
@@ -875,21 +875,21 @@ const fn empty_styles_part() -> &'static str {
     )
 }
 
-pub(crate) fn stage_metadata(source: &Master, metadata: &Metadata) -> Result<String> {
+pub(crate) fn stage_metadata(source: &Package, metadata: &Metadata) -> Result<String> {
     use litchi_odf_common::core::{
         MetaXmlPatch, metadata::Metadata as OdfMetadata, patch_meta_xml,
     };
     let source_xml = source
         .meta_xml()?
         .ok_or_else(|| invalid("ODM metadata editing requires meta.xml"))?;
-    let parsed = OdfMetadata::from_xml(&source_xml)?;
+    let parsed = OdfMetadata::from_xml(&source_xml, source.xml_limits_value())?;
     let patch = MetaXmlPatch::preserve_all().diff_simple_fields(&parsed, metadata);
-    patch_meta_xml(&source_xml, &patch)?
+    patch_meta_xml(&source_xml, &patch, source.xml_limits_value())?
         .ok_or_else(|| invalid("ODM metadata editing requires office:meta"))
 }
 
 fn stage_section(
-    source: &Master,
+    source: &Package,
     intent: &SectionChange,
     edits: &mut Vec<(Range<usize>, String)>,
 ) -> Result<()> {
@@ -943,7 +943,7 @@ fn stage_section(
 }
 
 fn stage_style(
-    source: &Master,
+    source: &Package,
     intent: &StyleChange,
     removed_content_spans: &[Range<usize>],
     content_edits: &mut Vec<(Range<usize>, String)>,
@@ -989,7 +989,7 @@ fn stage_style(
 }
 
 fn style_is_referenced(
-    source: &Master,
+    source: &Package,
     name: &str,
     removed_content_spans: &[Range<usize>],
 ) -> Result<bool> {
@@ -1007,7 +1007,7 @@ fn style_is_referenced(
 }
 
 fn removed_content_spans(
-    source: &Master,
+    source: &Package,
     sections: &[SectionChange],
     body_items: &[BodyItemChange],
 ) -> Result<Vec<Range<usize>>> {

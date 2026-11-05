@@ -25,9 +25,14 @@ HISTORICAL_INDEX_PATH = ROOT / "docs/performance/crud-coverage-index-v1.json"
 CATALOG_PATH = ROOT / "docs/performance/results/perf-corpus-manifest-v2.json"
 SELECTOR_PATH = ROOT / "tools/perf-baseline/src/lib.rs"
 CHECKLIST_PATH = ROOT / "docs/CRUD_Scenario_Checklist.md"
-EXPECTED_SELECTOR_COUNT = 533
+# The authoritative registry now has 633 names: the existing 605-name
+# catalog plus the 28 PPT text batch routes added by the current harness
+# (record 0220; renamed `_aggregate_v2` -> `_aggregate_v3` by record 0272).
+# Earlier changes added `xlsx_producer_medium_source_full_cell_scan`, paired
+# unified/leaf routes, and removed predecessor selectors for deleted facades.
+EXPECTED_SELECTOR_COUNT = 633
 EXPECTED_SELECTOR_NAMES_SHA256 = (
-    "fcbd9d80c9c32e6e98c80b44d5a3253e0252efff4bad16304e9517c0e108c1ec"
+    "c1df7e401764ac59b0e3ae8e4f504383eac5c63eea28c1dc2ad7c9f2fa915c5c"
 )
 EXPECTED_HISTORICAL_INDEX_SHA256 = (
     "5002b254d1f2111dcbf86bf2401fe56891c4c257ab1b064c273bba0984ad82ce"

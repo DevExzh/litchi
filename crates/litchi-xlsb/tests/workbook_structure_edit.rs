@@ -11,26 +11,31 @@
 )]
 
 use litchi_core::sheet::{CellValue, traits::WorkbookTrait};
+use litchi_xlsb::builder::chart::{Anchor, Chart, ExternalDataPart};
+use litchi_xlsb::builder::{self, Builder, Image, ImageFormat};
+use litchi_xlsb::builder::{ConnectionEndSpec, ConnectionShapeSpec, GroupSpec, ShapeSpec};
+use litchi_xlsb::cell_values::structure::{AuthoredStyle, History, LimitKind, Patch};
 use litchi_xlsb::cell_values::{
-    AuthoredStyle, CellFormula, DrawingTransferRefusal, Reference, TransferLimits, Value,
-    WorkbookHistory, WorkbookPatch,
+    CellFormula, DrawingTransferRefusal, Reference, TransferLimits, Value,
 };
-use litchi_xlsb::chart::{Chart, ExternalDataPart};
 use litchi_xlsb::named_ranges::Definition as NamedRange;
 use litchi_xlsb::package::table::{Column, Range as TableRange, Table, Type as TableType};
-use litchi_xlsb::package::{SharedString, SharedStringRun};
+use litchi_xlsb::package::{PackageError, SharedString, SharedStringRun};
+use litchi_xlsb::raw::{Encoder, Records, kind};
 use litchi_xlsb::shapes::{
     Anchor as ShapeAnchor, CellMarker, EditAs, Emu, EmuExtent, EmuOffset, Object as ShapeObject,
     Preset,
 };
 use litchi_xlsb::styles::{Alignment, Fill, Font, HorizontalAlignment, VerticalAlignment};
-use litchi_xlsb::writer::{ChartAnchor, Image, ImageFormat, MutableWorksheet, WorkbookWriter};
-use litchi_xlsb::writer::{ConnectionEndSpec, ConnectionShapeSpec, GroupSpec, ShapeSpec};
 use litchi_xlsb::{Package, Workbook};
 use litchi_xlsb::{Parser, TableColumns, TableDataType, TableReference, TableRowType, Token};
 use std::fs::File;
 use std::io::Cursor;
 use std::path::PathBuf;
+
+#[path = "support/projection.rs"]
+mod projection;
+use projection::{InPlace as _, OwnedWorkbook as _};
 
 fn fixture(relative: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -39,15 +44,146 @@ fn fixture(relative: &str) -> PathBuf {
 }
 
 fn producer_workbook(name: &str, initial_value: Option<&str>) -> Workbook {
-    let mut sheet = MutableWorksheet::new(name);
+    let mut sheet = builder::Worksheet::new(name);
     if let Some(value) = initial_value {
         sheet.set_cell(0, 0, value);
     }
-    let mut producer = WorkbookWriter::new();
+    let mut producer = Builder::new();
     producer.add_worksheet(sheet);
     let mut bytes = Cursor::new(Vec::new());
-    producer.save(&mut bytes).expect("producer save");
+    producer
+        .build()
+        .expect("build package")
+        .write_to(&mut bytes)
+        .expect("producer save");
     Workbook::new(Cursor::new(bytes.into_inner())).expect("producer reopen")
+}
+
+fn two_operation_patch() -> Patch {
+    let source = producer_workbook("Source", Some("transferred value"));
+    let target = producer_workbook("Target", None);
+    let mut edit = target.to_package().edit().expect("two-operation edit");
+    edit.set_sheet_name(0, "Renamed".to_owned())
+        .expect("rename operation")
+        .expect("resolved worksheet selector");
+    edit.transfer_cell(
+        &source,
+        0,
+        Reference::new(0, 0).expect("source reference"),
+        0,
+        Reference::new(1, 0).expect("target reference"),
+    )
+    .expect("transfer operation");
+    edit.commit().expect("two-operation commit").patch().clone()
+}
+
+fn workbook_with_bundle_suffix(workbook: &Workbook, suffix: &[u8]) -> Workbook {
+    let mut package = workbook.to_package().into_opc();
+    let workbook_uri = litchi_opc::PackURI::new("/xl/workbook.bin").expect("workbook URI");
+    let original = package
+        .get_part(&workbook_uri)
+        .expect("workbook part")
+        .blob()
+        .to_vec();
+    let mut rewritten = Vec::new();
+    {
+        let mut writer = Encoder::new(&mut rewritten, litchi_xlsb::raw::Limits::DEFAULT);
+        for record in Records::new(&original, litchi_xlsb::raw::Limits::DEFAULT) {
+            let record = record.expect("workbook record");
+            let mut payload = record.payload().to_vec();
+            if record.kind() == kind::BUNDLE_SH {
+                payload.extend_from_slice(suffix);
+            }
+            writer
+                .write_record(record.kind(), &payload)
+                .expect("rewrite workbook record");
+        }
+    }
+    package
+        .get_part_mut(&workbook_uri)
+        .expect("workbook part")
+        .set_blob(rewritten);
+    Package::from_opc(package)
+        .expect("suffix-tolerant package")
+        .owned_workbook()
+        .expect("suffix-tolerant workbook")
+}
+
+fn workbook_with_unpaired_bundle_name(workbook: &Workbook) -> Workbook {
+    let mut package = workbook.to_package().into_opc();
+    let workbook_uri = litchi_opc::PackURI::new("/xl/workbook.bin").expect("workbook URI");
+    let original = package
+        .get_part(&workbook_uri)
+        .expect("workbook part")
+        .blob()
+        .to_vec();
+    let mut rewritten = Vec::new();
+    {
+        let mut writer = Encoder::new(&mut rewritten, litchi_xlsb::raw::Limits::DEFAULT);
+        for record in Records::new(&original, litchi_xlsb::raw::Limits::DEFAULT) {
+            let record = record.expect("workbook record");
+            let mut payload = record.payload().to_vec();
+            if record.kind() == kind::BUNDLE_SH {
+                let current_id = u32::from_le_bytes(payload[4..8].try_into().expect("tab ID"));
+                let strings_offset = if (1..=0xffff).contains(&current_id) {
+                    8
+                } else {
+                    12
+                };
+                let relationship_units = u32::from_le_bytes(
+                    payload[strings_offset..strings_offset + 4]
+                        .try_into()
+                        .expect("relationship length"),
+                );
+                let name_offset = strings_offset
+                    .checked_add(4)
+                    .and_then(|offset| {
+                        usize::try_from(relationship_units)
+                            .ok()?
+                            .checked_mul(2)
+                            .and_then(|bytes| offset.checked_add(bytes))
+                    })
+                    .expect("name offset")
+                    .checked_add(4)
+                    .expect("name length offset");
+                let name_units = u32::from_le_bytes(
+                    payload[name_offset - 4..name_offset]
+                        .try_into()
+                        .expect("name length"),
+                );
+                assert_eq!(name_units, 1, "fixture name must contain one UTF-16 unit");
+                payload[name_offset..name_offset + 2].copy_from_slice(&0xd800_u16.to_le_bytes());
+            }
+            writer
+                .write_record(record.kind(), &payload)
+                .expect("rewrite workbook record");
+        }
+    }
+    package
+        .get_part_mut(&workbook_uri)
+        .expect("workbook part")
+        .set_blob(rewritten);
+    Package::from_opc(package)
+        .expect("unpaired-name package")
+        .owned_workbook()
+        .expect("unpaired-name workbook")
+}
+
+fn assert_limit(error: PackageError, expected: LimitKind) {
+    let PackageError::Limit { kind, .. } = error else {
+        panic!("expected typed limit error, got {error:?}");
+    };
+    assert_eq!(kind, expected.into());
+}
+
+fn publish_structure_patch(workbook: &mut Workbook, patch: &Patch) {
+    *workbook = workbook
+        .to_package()
+        .apply(patch)
+        .map(litchi_xlsb::cell_values::structure::Commit::into_package)
+        .expect("publish structure patch")
+        .owned_workbook()
+        .expect("reopen published structure patch");
 }
 
 fn shape_marker(column: u32, row: u32) -> CellMarker {
@@ -99,7 +235,7 @@ fn shape_graph_workbook(name: &str) -> Workbook {
             site: 2,
         },
     );
-    let mut sheet = MutableWorksheet::new(name);
+    let mut sheet = builder::Worksheet::new(name);
     sheet
         .add_shape(ShapeSpec::shape(
             "Standalone",
@@ -110,10 +246,14 @@ fn shape_graph_workbook(name: &str) -> Workbook {
         .expect("standalone shape");
     sheet.add_group(group).expect("shape group");
     sheet.add_connection(connection).expect("shape connection");
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(sheet);
     let mut bytes = Cursor::new(Vec::new());
-    writer.save(&mut bytes).expect("shape graph save");
+    writer
+        .build()
+        .expect("build package")
+        .write_to(&mut bytes)
+        .expect("shape graph save");
     Workbook::new(Cursor::new(bytes.into_inner())).expect("shape graph reopen")
 }
 
@@ -151,8 +291,11 @@ fn collect_object_names(object: &ShapeObject, output: &mut Vec<String>) {
 
 fn standard_drawing_xml(workbook: &Workbook) -> Vec<u8> {
     let mut bytes = Cursor::new(Vec::new());
-    workbook.save(&mut bytes).expect("workbook package save");
-    let package = Package::from_slice(bytes.get_ref()).expect("package reopen");
+    workbook
+        .to_package()
+        .write_to(&mut bytes)
+        .expect("workbook package save");
+    let package = Package::from_bytes(bytes.get_ref()).expect("package reopen");
     package
         .opc_package()
         .try_iter_parts()
@@ -168,8 +311,11 @@ fn standard_drawing_xml(workbook: &Workbook) -> Vec<u8> {
 
 fn standard_drawing_external_hyperlinks(workbook: &Workbook) -> Vec<(String, String)> {
     let mut bytes = Cursor::new(Vec::new());
-    workbook.save(&mut bytes).expect("workbook package save");
-    let package = Package::from_slice(bytes.get_ref()).expect("package reopen");
+    workbook
+        .to_package()
+        .write_to(&mut bytes)
+        .expect("workbook package save");
+    let package = Package::from_bytes(bytes.get_ref()).expect("package reopen");
     let drawing = package
         .opc_package()
         .iter_parts()
@@ -195,7 +341,7 @@ fn standard_drawing_external_hyperlinks(workbook: &Workbook) -> Vec<(String, Str
 }
 
 fn formula_dependency_workbook(source_order: bool) -> Workbook {
-    let mut data = MutableWorksheet::new("Data");
+    let mut data = builder::Worksheet::new("Data");
     data.set_cell(0, 0, "Region");
     data.set_cell(0, 1, "Amount");
     data.set_cell(1, 0, "North");
@@ -227,7 +373,7 @@ fn formula_dependency_workbook(source_order: bool) -> Workbook {
         ..Table::default()
     })
     .expect("valid structured table");
-    let mut summary = MutableWorksheet::new("Summary");
+    let mut summary = builder::Worksheet::new("Summary");
     summary.set_cell(
         0,
         0,
@@ -238,7 +384,7 @@ fn formula_dependency_workbook(source_order: bool) -> Workbook {
             array_range: None,
         },
     );
-    let mut producer = WorkbookWriter::new();
+    let mut producer = Builder::new();
     if source_order {
         producer.add_worksheet(data);
         producer.add_worksheet(summary);
@@ -259,7 +405,11 @@ fn formula_dependency_workbook(source_order: bool) -> Workbook {
         );
     }
     let mut bytes = Cursor::new(Vec::new());
-    producer.save(&mut bytes).expect("dependency producer save");
+    producer
+        .build()
+        .expect("build package")
+        .write_to(&mut bytes)
+        .expect("dependency producer save");
     Workbook::new(Cursor::new(bytes.into_inner())).expect("dependency producer reopen")
 }
 
@@ -269,11 +419,10 @@ fn producer_reopen_transfers_sst_and_renames_on_a_durable_root() {
     let mut target = producer_workbook("Target", None);
     let destination = Reference::new(4, 3).expect("destination");
 
-    let mut edit = target
-        .edit_workbook_structure()
-        .expect("detached workbook edit");
-    edit.rename_sheet(0, "Imported".to_string())
-        .expect("rename");
+    let mut edit = target.to_package().edit().expect("detached workbook edit");
+    edit.set_sheet_name(0, "Imported".to_string())
+        .expect("rename")
+        .expect("resolved worksheet selector");
     edit.transfer_cell(
         &source,
         0,
@@ -287,9 +436,15 @@ fn producer_reopen_transfers_sst_and_renames_on_a_durable_root() {
         .patch()
         .to_bytes(TransferLimits::DEFAULT)
         .expect("durable patch");
-    let decoded = WorkbookPatch::from_bytes(&encoded, TransferLimits::DEFAULT)
-        .expect("validated durable patch");
-    decoded.apply(&mut target).expect("atomic publication");
+    let decoded = Patch::from_bytes(
+        &encoded,
+        TransferLimits::DEFAULT,
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .expect("validated durable patch");
+    target
+        .apply_structure(&decoded)
+        .expect("atomic publication");
 
     assert_eq!(target.worksheet_names(), &["Imported".to_string()]);
     let snapshot = target.cell_values(0).expect("target cells");
@@ -306,7 +461,10 @@ fn producer_reopen_transfers_sst_and_renames_on_a_durable_root() {
     );
 
     let mut bytes = Cursor::new(Vec::new());
-    target.save(&mut bytes).expect("save transferred workbook");
+    target
+        .to_package()
+        .write_to(&mut bytes)
+        .expect("save transferred workbook");
     let reopened = Workbook::new(Cursor::new(bytes.into_inner())).expect("consumer reopen");
     assert_eq!(reopened.worksheet_names(), &["Imported".to_string()]);
     assert!(
@@ -366,7 +524,7 @@ fn ordinary_root_authors_sst_rich_style_and_formula_resources() {
         }],
         phonetic: None,
     };
-    let mut edit = workbook.edit_workbook_structure().expect("root edit");
+    let mut edit = workbook.to_package().edit().expect("root edit");
     edit.insert_shared_string(0, shared_ref, string.clone(), &style)
         .expect("SST authoring");
     edit.insert_rich_string(0, rich_ref, string, &style)
@@ -375,7 +533,13 @@ fn ordinary_root_authors_sst_rich_style_and_formula_resources() {
         0,
         formula_ref,
         2.0,
-        CellFormula::new(0, vec![0x1e, 2, 0], vec![]).expect("constant formula"),
+        CellFormula::new(
+            0,
+            vec![0x1e, 2, 0],
+            vec![],
+            litchi_xlsb::raw::Limits::DEFAULT,
+        )
+        .expect("constant formula"),
         &style,
     )
     .expect("formula authoring");
@@ -383,14 +547,21 @@ fn ordinary_root_authors_sst_rich_style_and_formula_resources() {
         0,
         formula_string_ref,
         Value::FormulaStringCache("two".to_string()),
-        CellFormula::new(0, vec![0x1e, 2, 0], vec![]).expect("constant string-cache formula"),
+        CellFormula::new(
+            0,
+            vec![0x1e, 2, 0],
+            vec![],
+            litchi_xlsb::raw::Limits::DEFAULT,
+        )
+        .expect("constant string-cache formula"),
         &style,
     )
     .expect("string-cache formula authoring");
     let image = Image::new(
         GIF_1X1.to_vec(),
         ImageFormat::Gif,
-        ChartAnchor::new(0, 3, 2, 7),
+        Anchor::new(0, 3, 2, 7),
+        &litchi_xlsb::package::drawing_image::Limits::DEFAULT,
     )
     .expect("valid image")
     .with_description("authored one-pixel image")
@@ -401,9 +572,13 @@ fn ordinary_root_authors_sst_rich_style_and_formula_resources() {
         .patch()
         .to_bytes(TransferLimits::DEFAULT)
         .expect("durable resources");
-    let patch = WorkbookPatch::from_bytes(&bytes, TransferLimits::DEFAULT)
-        .expect("durable resource replay");
-    patch.apply(&mut workbook).expect("publish resources");
+    let patch = Patch::from_bytes(
+        &bytes,
+        TransferLimits::DEFAULT,
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .expect("durable resource replay");
+    workbook.apply_structure(&patch).expect("publish resources");
 
     let snapshot = workbook.cell_values(0).expect("authored snapshot");
     assert!(matches!(
@@ -443,7 +618,10 @@ fn ordinary_root_authors_sst_rich_style_and_formula_resources() {
     assert_eq!(drawing.images.len(), 1);
     assert_eq!(drawing.images[0].data.as_ref(), GIF_1X1);
     let mut reopened_bytes = Cursor::new(Vec::new());
-    workbook.save(&mut reopened_bytes).expect("save authored");
+    workbook
+        .to_package()
+        .write_to(&mut reopened_bytes)
+        .expect("save authored");
     let reopened =
         Workbook::new(Cursor::new(reopened_bytes.into_inner())).expect("reopen authored");
     assert_eq!(
@@ -461,15 +639,14 @@ fn ordinary_root_authors_sst_rich_style_and_formula_resources() {
 
     let mut transfer_target = producer_workbook("Image target", None);
     let mut transfer = transfer_target
-        .edit_workbook_structure()
+        .to_package()
+        .edit()
         .expect("image transfer edit");
     transfer
-        .transfer_image(&reopened, 0, 0, 0, ChartAnchor::new(3, 4, 6, 9))
+        .transfer_image(&reopened, 0, 0, 0, Anchor::new(3, 4, 6, 9))
         .expect("dependency-closed image transfer");
     let transfer_commit = transfer.commit().expect("image transfer commit");
-    transfer_target
-        .apply_workbook_structure(&transfer_commit)
-        .expect("publish transferred image");
+    publish_structure_patch(&mut transfer_target, transfer_commit.patch());
     let transferred = transfer_target
         .sheet_drawing(0)
         .expect("transferred drawing");
@@ -482,13 +659,15 @@ fn ordinary_root_authors_sst_rich_style_and_formula_resources() {
     let appended = Image::new(
         GIF_1X1.to_vec(),
         ImageFormat::Gif,
-        ChartAnchor::new(7, 4, 9, 8),
+        Anchor::new(7, 4, 9, 8),
+        &litchi_xlsb::package::drawing_image::Limits::DEFAULT,
     )
     .expect("valid appended image")
     .with_description("appended image")
     .expect("valid appended description");
     let mut append_edit = transfer_target
-        .edit_workbook_structure()
+        .to_package()
+        .edit()
         .expect("existing drawing edit");
     append_edit
         .insert_image(0, appended)
@@ -498,10 +677,15 @@ fn ordinary_root_authors_sst_rich_style_and_formula_resources() {
         .patch()
         .to_bytes(TransferLimits::DEFAULT)
         .expect("durable appended image");
-    WorkbookPatch::from_bytes(&append_bytes, TransferLimits::DEFAULT)
-        .expect("decode appended image patch")
-        .apply(&mut transfer_target)
-        .expect("publish appended image");
+    publish_structure_patch(
+        &mut transfer_target,
+        &Patch::from_bytes(
+            &append_bytes,
+            TransferLimits::DEFAULT,
+            litchi_xlsb::raw::Limits::DEFAULT,
+        )
+        .expect("decode appended image patch"),
+    );
     let appended_drawing = transfer_target.sheet_drawing(0).expect("appended drawing");
     assert_eq!(appended_drawing.images.len(), 2);
     assert_eq!(
@@ -515,15 +699,14 @@ fn durable_drawing_transfer_closes_connector_graph_and_remaps_collisions() {
     let source = shape_graph_workbook("Source shapes");
     let mut empty_target = producer_workbook("Empty target", None);
     let mut empty_edit = empty_target
-        .edit_workbook_structure()
+        .to_package()
+        .edit()
         .expect("empty drawing edit");
     empty_edit
         .transfer_drawing_object(&source, 0, 2, 0)
         .expect("new connector drawing transfer");
     let empty_commit = empty_edit.commit().expect("new drawing commit");
-    empty_target
-        .apply_workbook_structure(&empty_commit)
-        .expect("publish new drawing");
+    publish_structure_patch(&mut empty_target, empty_commit.patch());
     assert_eq!(
         empty_target
             .sheet_drawing(0)
@@ -538,7 +721,7 @@ fn durable_drawing_transfer_closes_connector_graph_and_remaps_collisions() {
     let before = target.sheet_drawing(0).expect("target drawing");
     assert_eq!(before.drawing.anchors.len(), 3);
 
-    let mut drawing_edit = target.edit_workbook_structure().expect("drawing edit");
+    let mut drawing_edit = target.to_package().edit().expect("drawing edit");
     drawing_edit
         .transfer_drawing_object(&source, 0, 2, 0)
         .expect("connector closure transfer");
@@ -547,20 +730,27 @@ fn durable_drawing_transfer_closes_connector_graph_and_remaps_collisions() {
         .patch()
         .to_bytes(TransferLimits::DEFAULT)
         .expect("durable drawing patch");
-    let drawing_patch =
-        WorkbookPatch::from_bytes(&durable, TransferLimits::DEFAULT).expect("drawing patch replay");
+    let drawing_patch = Patch::from_bytes(
+        &durable,
+        TransferLimits::DEFAULT,
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .expect("drawing patch replay");
 
-    let mut rename_edit = target.edit_workbook_structure().expect("rename edit");
+    let mut rename_edit = target.to_package().edit().expect("rename edit");
     rename_edit
-        .rename_sheet(0, "Transferred graphs".to_string())
-        .expect("rename");
+        .set_sheet_name(0, "Transferred graphs".to_string())
+        .expect("rename")
+        .expect("resolved worksheet selector");
     let rename_commit = rename_edit.commit().expect("rename commit");
     let merged = drawing_patch
         .merge_three_way(rename_commit.patch())
         .expect("drawing/name merge");
     assert!(merged.conflicts().is_empty());
     let merged = merged.patch().expect("merged drawing patch").clone();
-    merged.apply(&mut target).expect("publish drawing graph");
+    target
+        .apply_structure(&merged)
+        .expect("publish drawing graph");
 
     let drawing = target.sheet_drawing(0).expect("transferred drawing");
     assert_eq!(drawing.drawing.anchors.len(), 5);
@@ -594,9 +784,9 @@ fn durable_drawing_transfer_closes_connector_graph_and_remaps_collisions() {
     assert!(connection.start.is_some());
     assert!(connection.end.is_some());
 
-    let mut history = WorkbookHistory::new(TransferLimits::DEFAULT).expect("drawing history");
+    let mut history = History::new(TransferLimits::DEFAULT).expect("drawing history");
     history.push(merged).expect("retain drawing patch");
-    history.undo(&mut target).expect("undo drawing graph");
+    target.undo_with(&mut history).expect("undo drawing graph");
     assert_eq!(
         target
             .sheet_drawing(0)
@@ -606,7 +796,7 @@ fn durable_drawing_transfer_closes_connector_graph_and_remaps_collisions() {
             .len(),
         3
     );
-    history.redo(&mut target).expect("redo drawing graph");
+    target.redo_with(&mut history).expect("redo drawing graph");
     assert_eq!(
         target.worksheet_names(),
         &["Transferred graphs".to_string()]
@@ -624,44 +814,51 @@ fn ordinary_chart_graph_transfer_retains_existing_drawing_and_resource_payloads(
         "Transferred chart",
         "Source!$A$1:$A$2",
         "Source!$B$1:$B$2",
-        ChartAnchor::new(0, 0, 7, 12),
+        Anchor::new(0, 0, 7, 12),
     )
     .expect("chart")
     .with_external_data_part(
         ExternalDataPart::embedded_workbook(b"PK exact chart workbook".to_vec()),
         Some(false),
     );
-    let mut source_sheet = MutableWorksheet::new("Source");
+    let mut source_sheet = builder::Worksheet::new("Source");
     source_sheet.add_chart(chart).expect("source chart");
-    let mut source_writer = WorkbookWriter::new();
+    let mut source_writer = Builder::new();
     source_writer.add_worksheet(source_sheet);
     let mut source_bytes = Cursor::new(Vec::new());
-    source_writer.save(&mut source_bytes).expect("source save");
+    source_writer
+        .build()
+        .expect("build package")
+        .write_to(&mut source_bytes)
+        .expect("source save");
     let source = Workbook::new(Cursor::new(source_bytes.into_inner())).expect("source reopen");
 
-    let mut target_sheet = MutableWorksheet::new("Target");
+    let mut target_sheet = builder::Worksheet::new("Target");
     target_sheet
         .add_image(
             Image::new(
                 GIF_1X1.to_vec(),
                 ImageFormat::Gif,
-                ChartAnchor::new(8, 1, 10, 4),
+                Anchor::new(8, 1, 10, 4),
+                &litchi_xlsb::package::drawing_image::Limits::DEFAULT,
             )
             .expect("target image")
             .with_description("retained target image")
             .expect("target description"),
         )
         .expect("add target image");
-    let mut target_writer = WorkbookWriter::new();
+    let mut target_writer = Builder::new();
     target_writer.add_worksheet(target_sheet);
     let mut target_bytes = Cursor::new(Vec::new());
-    target_writer.save(&mut target_bytes).expect("target save");
+    target_writer
+        .build()
+        .expect("build package")
+        .write_to(&mut target_bytes)
+        .expect("target save");
     let mut target = Workbook::new(Cursor::new(target_bytes.into_inner())).expect("target reopen");
     let existing_drawing_xml = standard_drawing_xml(&target);
 
-    let mut edit = target
-        .edit_workbook_structure()
-        .expect("chart transfer edit");
+    let mut edit = target.to_package().edit().expect("chart transfer edit");
     edit.transfer_drawing_object(&source, 0, 0, 0)
         .expect("chart graph transfer");
     let commit = edit.commit().expect("chart transfer commit");
@@ -669,10 +866,15 @@ fn ordinary_chart_graph_transfer_retains_existing_drawing_and_resource_payloads(
         .patch()
         .to_bytes(TransferLimits::DEFAULT)
         .expect("durable chart graph");
-    WorkbookPatch::from_bytes(&durable, TransferLimits::DEFAULT)
-        .expect("chart graph replay")
-        .apply(&mut target)
-        .expect("publish chart graph");
+    publish_structure_patch(
+        &mut target,
+        &Patch::from_bytes(
+            &durable,
+            TransferLimits::DEFAULT,
+            litchi_xlsb::raw::Limits::DEFAULT,
+        )
+        .expect("chart graph replay"),
+    );
 
     let transferred_drawing_xml = standard_drawing_xml(&target);
     let root_close = existing_drawing_xml
@@ -700,14 +902,12 @@ fn ordinary_chart_graph_transfer_retains_existing_drawing_and_resource_payloads(
         .external_data_part
         .as_ref()
         .expect("transferred embedded workbook");
-    let litchi_xlsb::chart::ExternalDataTarget::Embedded { data, .. } = &external.target else {
+    let builder::chart::ExternalDataTarget::Embedded { data, .. } = &external.target else {
         panic!("chart external data should stay embedded")
     };
     assert_eq!(data, b"PK exact chart workbook");
 
-    let mut picture_edit = target
-        .edit_workbook_structure()
-        .expect("picture refusal edit");
+    let mut picture_edit = target.to_package().edit().expect("picture refusal edit");
     let error = picture_edit
         .transfer_drawing_object(&target, 0, 0, 0)
         .expect_err("pictures use the image API");
@@ -733,7 +933,7 @@ fn genuine_shape_hyperlink_transfer_is_durable_mergeable_and_reversible() {
         vec![("rId1".to_string(), "http://lucene.apache.org/".to_string())]
     );
     let mut target = producer_workbook("Hyperlink target", None);
-    let mut drawing_edit = target.edit_workbook_structure().expect("hyperlink edit");
+    let mut drawing_edit = target.to_package().edit().expect("hyperlink edit");
     drawing_edit
         .transfer_drawing_object(&source, 0, 0, 0)
         .expect("genuine shape hyperlink transfer");
@@ -742,34 +942,46 @@ fn genuine_shape_hyperlink_transfer_is_durable_mergeable_and_reversible() {
         .patch()
         .to_bytes(TransferLimits::DEFAULT)
         .expect("durable hyperlink patch");
-    let drawing_patch = WorkbookPatch::from_bytes(&durable, TransferLimits::DEFAULT)
-        .expect("durable hyperlink replay");
+    let drawing_patch = Patch::from_bytes(
+        &durable,
+        TransferLimits::DEFAULT,
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .expect("durable hyperlink replay");
 
-    let mut rename_edit = target.edit_workbook_structure().expect("rename edit");
+    let mut rename_edit = target.to_package().edit().expect("rename edit");
     rename_edit
-        .rename_sheet(0, "Hyperlinked shape".to_string())
-        .expect("rename");
+        .set_sheet_name(0, "Hyperlinked shape".to_string())
+        .expect("rename")
+        .expect("resolved worksheet selector");
     let rename_commit = rename_edit.commit().expect("rename commit");
     let merged = drawing_patch
         .merge_three_way(rename_commit.patch())
         .expect("hyperlink/name merge");
     assert!(merged.conflicts().is_empty());
     let merged = merged.patch().expect("merged hyperlink patch").clone();
-    merged.apply(&mut target).expect("publish hyperlink shape");
+    target
+        .apply_structure(&merged)
+        .expect("publish hyperlink shape");
     assert_eq!(
         standard_drawing_external_hyperlinks(&target),
         vec![("rId1".to_string(), "http://lucene.apache.org/".to_string())]
     );
 
-    let mut history = WorkbookHistory::new(TransferLimits::DEFAULT).expect("hyperlink history");
+    let mut history = History::new(TransferLimits::DEFAULT).expect("hyperlink history");
     history.push(merged).expect("retain hyperlink patch");
-    history.undo(&mut target).expect("inverse hyperlink patch");
+    target
+        .undo_with(&mut history)
+        .expect("inverse hyperlink patch");
     assert!(target.sheet_drawing(0).is_none());
-    history.redo(&mut target).expect("redo hyperlink patch");
+    target
+        .redo_with(&mut history)
+        .expect("redo hyperlink patch");
 
     let mut reopened_bytes = Cursor::new(Vec::new());
     target
-        .save(&mut reopened_bytes)
+        .to_package()
+        .write_to(&mut reopened_bytes)
         .expect("save transferred hyperlink workbook");
     let reopened = Workbook::new(Cursor::new(reopened_bytes.into_inner()))
         .expect("full reopen transferred hyperlink workbook");
@@ -867,15 +1079,16 @@ fn checked_in_unique_standard_drawing_corpus_transfers_every_anchor() {
             };
             for anchor in 0..drawing.drawing.anchors.len() {
                 let mut target = producer_workbook("Corpus target", None);
-                let mut edit = target.edit_workbook_structure().expect("corpus edit");
+                let mut edit = target.to_package().edit().expect("corpus edit");
                 edit.transfer_drawing_object(&source, worksheet_ordinal, anchor, 0)
                     .expect("corpus drawing transfer");
                 let commit = edit.commit().expect("corpus commit");
-                target
-                    .apply_workbook_structure(&commit)
-                    .expect("publish corpus drawing");
+                publish_structure_patch(&mut target, commit.patch());
                 let mut bytes = Cursor::new(Vec::new());
-                target.save(&mut bytes).expect("save corpus transfer");
+                target
+                    .to_package()
+                    .write_to(&mut bytes)
+                    .expect("save corpus transfer");
                 let reopened = Workbook::new(Cursor::new(bytes.into_inner()))
                     .expect("full reopen corpus transfer");
                 let reopened_drawing = reopened
@@ -914,16 +1127,19 @@ fn durable_transfer_remaps_name_sheet_and_table_formula_dependencies() {
         .expect("unique contextual formula")
         .expect("contextual formula");
     let contextual_formula = contextual.formula().expect("formula payload");
-    let source_xti =
-        Parser::with_extra(contextual_formula.tokens(), contextual_formula.ancillary())
-            .parse()
-            .expect("parse contextual formula")
-            .into_iter()
-            .find_map(|token| match token {
-                Token::CellRef3d { sheet_index, .. } => Some(sheet_index),
-                _ => None,
-            })
-            .expect("Data XTI");
+    let source_xti = Parser::with_extra(
+        contextual_formula.tokens(),
+        contextual_formula.ancillary(),
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .parse()
+    .expect("parse contextual formula")
+    .into_iter()
+    .find_map(|token| match token {
+        Token::CellRef3d { sheet_index, .. } => Some(sheet_index),
+        _ => None,
+    })
+    .expect("Data XTI");
     let (table_tokens, table_extra) = Token::TableReference(TableReference {
         sheet_index: source_xti,
         row_type: Some(TableRowType::Data),
@@ -935,7 +1151,7 @@ fn durable_transfer_remaps_name_sheet_and_table_formula_dependencies() {
         list_index: Some(3),
         external: None,
     })
-    .to_extended_binary()
+    .to_extended_binary(litchi_xlsb::raw::Limits::DEFAULT)
     .expect("structured-reference encoding");
     let table_formula_ref = Reference::new(0, 1).expect("table formula reference");
     let rich_ref = Reference::new(0, 2).expect("rich resource reference");
@@ -957,13 +1173,19 @@ fn durable_transfer_remaps_name_sheet_and_table_formula_dependencies() {
         }],
         phonetic: None,
     };
-    let mut source_edit = source.edit_workbook_structure().expect("source root edit");
+    let mut source_edit = source.to_package().edit().expect("source root edit");
     source_edit
         .insert_formula(
             source_summary,
             table_formula_ref,
             Value::FormulaNumberCache(42.5),
-            CellFormula::new(0, table_tokens, table_extra).expect("table cell formula"),
+            CellFormula::new(
+                0,
+                table_tokens,
+                table_extra,
+                litchi_xlsb::raw::Limits::DEFAULT,
+            )
+            .expect("table cell formula"),
             &rich_style,
         )
         .expect("table formula authoring");
@@ -971,15 +1193,13 @@ fn durable_transfer_remaps_name_sheet_and_table_formula_dependencies() {
         .insert_rich_string(source_summary, rich_ref, rich, &rich_style)
         .expect("rich resource authoring");
     let source_commit = source_edit.commit().expect("source dependency commit");
-    source
-        .apply_workbook_structure(&source_commit)
-        .expect("publish source dependencies");
+    publish_structure_patch(&mut source, source_commit.patch());
 
     let mut target = formula_dependency_workbook(false);
     let name_target_ref = Reference::new(4, 0).expect("name target");
     let table_target_ref = Reference::new(4, 1).expect("table target");
     let rich_target_ref = Reference::new(4, 2).expect("rich target");
-    let mut transfer = target.edit_workbook_structure().expect("transfer edit");
+    let mut transfer = target.to_package().edit().expect("transfer edit");
     transfer
         .transfer_cell(&source, source_summary, contextual_ref, 0, name_target_ref)
         .expect("name and sheet dependency remap");
@@ -1000,9 +1220,15 @@ fn durable_transfer_remaps_name_sheet_and_table_formula_dependencies() {
         .patch()
         .to_bytes(TransferLimits::DEFAULT)
         .expect("durable dependency patch");
-    let patch = WorkbookPatch::from_bytes(&durable, TransferLimits::DEFAULT)
-        .expect("decode dependency patch");
-    patch.apply(&mut target).expect("publish dependency patch");
+    let patch = Patch::from_bytes(
+        &durable,
+        TransferLimits::DEFAULT,
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .expect("decode dependency patch");
+    target
+        .apply_structure(&patch)
+        .expect("publish dependency patch");
 
     let cells = target.cell_values(0).expect("target cells");
     let name_formula = cells
@@ -1011,9 +1237,13 @@ fn durable_transfer_remaps_name_sheet_and_table_formula_dependencies() {
         .expect("name target")
         .formula()
         .expect("name target formula");
-    let name_tokens = Parser::with_extra(name_formula.tokens(), name_formula.ancillary())
-        .parse()
-        .expect("parse remapped name formula");
+    let name_tokens = Parser::with_extra(
+        name_formula.tokens(),
+        name_formula.ancillary(),
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .parse()
+    .expect("parse remapped name formula");
     assert!(
         name_tokens
             .iter()
@@ -1025,9 +1255,13 @@ fn durable_transfer_remaps_name_sheet_and_table_formula_dependencies() {
         .expect("table target")
         .formula()
         .expect("table target formula");
-    let table_tokens = Parser::with_extra(table_formula.tokens(), table_formula.ancillary())
-        .parse()
-        .expect("parse remapped table formula");
+    let table_tokens = Parser::with_extra(
+        table_formula.tokens(),
+        table_formula.ancillary(),
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .parse()
+    .expect("parse remapped table formula");
     assert!(table_tokens.iter().any(|token| {
         matches!(
             token,
@@ -1046,7 +1280,10 @@ fn durable_transfer_remaps_name_sheet_and_table_formula_dependencies() {
         Value::RichString(_)
     ));
     let mut bytes = Cursor::new(Vec::new());
-    target.save(&mut bytes).expect("save dependency target");
+    target
+        .to_package()
+        .write_to(&mut bytes)
+        .expect("save dependency target");
     let reopened = Workbook::new(Cursor::new(bytes.into_inner())).expect("reopen dependencies");
     assert_eq!(
         reopened
@@ -1084,13 +1321,11 @@ fn third_party_fixture_cell_transfers_with_its_style_dependency_closure() {
         .expect("a third-party fixture contains a direct stored cell");
     let destination = Reference::new(10, 7).expect("destination");
     let mut target = producer_workbook("Target", None);
-    let mut edit = target.edit_workbook_structure().expect("root edit");
+    let mut edit = target.to_package().edit().expect("root edit");
     edit.transfer_cell(&source, sheet, source_reference, 0, destination)
         .expect("third-party transfer plan");
     let commit = edit.commit().expect("third-party transfer commit");
-    target
-        .apply_workbook_structure(&commit)
-        .expect("publish third-party transfer");
+    publish_structure_patch(&mut target, commit.patch());
 
     let transferred_snapshot = target.cell_values(0).expect("transferred snapshot");
     let transferred = transferred_snapshot
@@ -1104,7 +1339,10 @@ fn third_party_fixture_cell_transfers_with_its_style_dependency_closure() {
             .is_some()
     );
     let mut bytes = Cursor::new(Vec::new());
-    target.save(&mut bytes).expect("save transferred fixture");
+    target
+        .to_package()
+        .write_to(&mut bytes)
+        .expect("save transferred fixture");
     let reopened = Workbook::new(Cursor::new(bytes.into_inner())).expect("reopen transfer");
     assert!(
         reopened
@@ -1122,13 +1360,14 @@ fn three_way_history_and_adversarial_envelope_remain_atomic() {
     let mut target = producer_workbook("Target", None);
     let destination = Reference::new(8, 2).expect("destination");
 
-    let mut left_edit = target.edit_workbook_structure().expect("left plan");
+    let mut left_edit = target.to_package().edit().expect("left plan");
     left_edit
-        .rename_sheet(0, "Merged".to_string())
-        .expect("rename");
+        .set_sheet_name(0, "Merged".to_string())
+        .expect("rename")
+        .expect("resolved worksheet selector");
     let left_commit = left_edit.commit().expect("left commit");
 
-    let mut right_edit = target.edit_workbook_structure().expect("right plan");
+    let mut right_edit = target.to_package().edit().expect("right plan");
     right_edit
         .transfer_cell(
             &source,
@@ -1151,19 +1390,29 @@ fn three_way_history_and_adversarial_envelope_remain_atomic() {
         .expect("encoded merge");
     let last = corrupt.len().checked_sub(1).expect("nonempty patch");
     corrupt[last] ^= 0x5a;
-    assert!(WorkbookPatch::from_bytes(&corrupt, TransferLimits::DEFAULT).is_err());
+    assert!(
+        Patch::from_bytes(
+            &corrupt,
+            TransferLimits::DEFAULT,
+            litchi_xlsb::raw::Limits::DEFAULT
+        )
+        .is_err()
+    );
     assert_eq!(target.worksheet_names(), &["Target".to_string()]);
 
-    merged.apply(&mut target).expect("apply merge");
+    target.apply_structure(&merged).expect("apply merge");
     assert_eq!(target.worksheet_names(), &["Merged".to_string()]);
-    assert!(
-        merged.apply(&mut target).is_err(),
-        "stale reapply must fail"
-    );
+    let error = target
+        .apply_structure(&merged)
+        .expect_err("stale reapply must fail");
+    assert!(matches!(
+        error,
+        PackageError::PatchConflict { part: "workbook" }
+    ));
 
-    let mut history = WorkbookHistory::new(TransferLimits::DEFAULT).expect("history");
+    let mut history = History::new(TransferLimits::DEFAULT).expect("history");
     history.push(merged).expect("retain patch");
-    history.undo(&mut target).expect("undo");
+    target.undo_with(&mut history).expect("undo");
     assert_eq!(target.worksheet_names(), &["Target".to_string()]);
     assert!(
         target
@@ -1173,6 +1422,248 @@ fn three_way_history_and_adversarial_envelope_remain_atomic() {
             .expect("unique destination")
             .is_none()
     );
-    history.redo(&mut target).expect("redo");
+    target.redo_with(&mut history).expect("redo");
     assert_eq!(target.worksheet_names(), &["Merged".to_string()]);
+}
+
+#[test]
+fn structural_diagnostics_distinguish_images_from_operation_counts() {
+    let mut workbook = producer_workbook("Original", None);
+    let empty = workbook
+        .to_package()
+        .edit()
+        .expect("edit")
+        .commit()
+        .expect("commit");
+    assert!(!empty.diagnostics().changed());
+    assert!(empty.patch().is_noop());
+    assert!(empty.patch().inverse().is_noop());
+
+    let mut edit = workbook.to_package().edit().expect("edit");
+    edit.set_sheet_name(0, "Original".to_owned())
+        .expect("same name")
+        .expect("resolved worksheet selector");
+    let same = edit.commit().expect("same-name commit");
+    assert_eq!(same.patch().operation_count(), 1);
+    assert!(!same.diagnostics().changed());
+    assert!(same.patch().is_noop());
+    let wire = same
+        .patch()
+        .to_bytes(TransferLimits::DEFAULT)
+        .expect("wire");
+    let decoded = Patch::from_bytes(
+        &wire,
+        TransferLimits::DEFAULT,
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .expect("decode");
+    assert!(decoded.is_noop());
+    workbook.apply_structure(&decoded).expect("no-op apply");
+    assert_eq!(workbook.worksheet_names(), &["Original".to_owned()]);
+
+    let mut edit = workbook.to_package().edit().expect("edit");
+    edit.set_sheet_name(0, "Changed".to_owned())
+        .expect("rename")
+        .expect("resolved worksheet selector");
+    let changed = edit.commit().expect("changed commit");
+    assert!(changed.diagnostics().changed());
+    assert!(!changed.patch().is_noop());
+    workbook.apply_structure(changed.patch()).expect("apply");
+    assert!(workbook.apply_structure(empty.patch()).is_err());
+    assert!(workbook.apply_structure(same.patch()).is_err());
+    assert_eq!(workbook.worksheet_names(), &["Changed".to_owned()]);
+    let inverse = changed.patch().inverse();
+    assert_eq!(inverse.operation_count(), 0);
+    assert!(!inverse.is_noop());
+    let wire = inverse
+        .to_bytes(TransferLimits::DEFAULT)
+        .expect("inverse wire");
+    let decoded = Patch::from_bytes(
+        &wire,
+        TransferLimits::DEFAULT,
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .expect("inverse decode");
+    assert!(!decoded.is_noop());
+    workbook.apply_structure(&decoded).expect("inverse apply");
+    assert_eq!(workbook.worksheet_names(), &["Original".to_owned()]);
+    assert_eq!(changed.patch().before(), empty.patch().before());
+    assert_eq!(changed.clone().diagnostics(), changed.diagnostics());
+}
+
+#[test]
+fn rename_preserves_tolerated_bundle_sheet_suffix() {
+    const SUFFIX: &[u8] = &[0xde, 0xad, 0xbe, 0xef];
+
+    let workbook = workbook_with_bundle_suffix(&producer_workbook("Original", None), SUFFIX);
+    let mut edit = workbook.to_package().edit().expect("suffix edit");
+    edit.set_sheet_name(0, "Renamed".to_owned())
+        .expect("rename with suffix")
+        .expect("resolved worksheet selector");
+    let commit = edit.commit().expect("rename commit");
+    let wire = commit
+        .patch()
+        .to_bytes(TransferLimits::DEFAULT)
+        .expect("encode suffix patch");
+    let decoded = Patch::from_bytes(
+        &wire,
+        TransferLimits::DEFAULT,
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .expect("decode suffix patch");
+    let replayed = workbook
+        .to_package()
+        .apply(&decoded)
+        .map(litchi_xlsb::cell_values::structure::Commit::into_package)
+        .expect("replay suffix patch");
+    assert_eq!(
+        replayed.to_bytes().unwrap(),
+        commit.package().to_bytes().unwrap()
+    );
+    let restored = replayed
+        .apply(&decoded.inverse())
+        .map(litchi_xlsb::cell_values::structure::Commit::into_package)
+        .expect("inverse suffix patch");
+    assert_eq!(
+        restored.to_bytes().unwrap(),
+        workbook.to_package().to_bytes().unwrap()
+    );
+    let renamed = commit
+        .into_package()
+        .owned_workbook()
+        .expect("renamed workbook");
+
+    let package = renamed.to_package().into_opc();
+    let workbook_uri = litchi_opc::PackURI::new("/xl/workbook.bin").expect("workbook URI");
+    let bundle = Records::new(
+        package
+            .get_part(&workbook_uri)
+            .expect("workbook part")
+            .blob(),
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .map(|record| record.expect("workbook record"))
+    .find(|record| record.kind() == kind::BUNDLE_SH)
+    .expect("bundle sheet");
+    assert_eq!(renamed.worksheet_names(), &["Renamed".to_owned()]);
+    assert!(bundle.payload().ends_with(SUFFIX));
+}
+
+#[test]
+fn same_tolerated_unpaired_name_is_an_exact_durable_noop() {
+    let workbook = workbook_with_unpaired_bundle_name(&producer_workbook("X", None));
+    assert_eq!(workbook.worksheet_names(), &["\u{fffd}".to_owned()]);
+    let source_bytes = workbook.to_package().to_bytes().expect("source bytes");
+
+    let mut edit = workbook.to_package().edit().expect("no-op edit");
+    edit.set_sheet_name(0, "\u{fffd}".to_owned())
+        .expect("same tolerated name")
+        .expect("resolved worksheet selector");
+    let commit = edit.commit().expect("no-op commit");
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.patch().is_noop());
+    assert_eq!(
+        commit.package().to_bytes().expect("commit bytes"),
+        source_bytes
+    );
+
+    let wire = commit
+        .patch()
+        .to_bytes(TransferLimits::DEFAULT)
+        .expect("durable no-op");
+    let decoded = Patch::from_bytes(
+        &wire,
+        TransferLimits::DEFAULT,
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .expect("decode no-op");
+    assert!(decoded.is_noop());
+    let applied = workbook
+        .to_package()
+        .apply(&decoded)
+        .map(litchi_xlsb::cell_values::structure::Commit::into_package)
+        .expect("apply no-op");
+    assert_eq!(applied.to_bytes().expect("applied bytes"), source_bytes);
+}
+
+#[test]
+fn structural_quotas_return_typed_limit_errors() {
+    let source = producer_workbook("Source", Some("transferred value"));
+    let target = producer_workbook("Target", None);
+    let limits = TransferLimits::new(
+        TransferLimits::DEFAULT.bytes(),
+        1,
+        TransferLimits::DEFAULT.history_entries(),
+        TransferLimits::DEFAULT.history_bytes(),
+    );
+    let mut edit = target
+        .to_package()
+        .edit_with_options(
+            litchi_xlsb::cell_values::structure::EditOptions::new().transfer_limits(limits),
+        )
+        .expect("limited edit");
+    edit.set_sheet_name(0, "Renamed".to_owned())
+        .expect("first operation")
+        .expect("resolved worksheet selector");
+    let error = edit
+        .transfer_cell(
+            &source,
+            0,
+            Reference::new(0, 0).expect("source reference"),
+            0,
+            Reference::new(1, 0).expect("target reference"),
+        )
+        .expect_err("second operation quota");
+    assert_limit(error, LimitKind::Changes);
+
+    let patch = two_operation_patch();
+    let wire = patch
+        .to_bytes(TransferLimits::DEFAULT)
+        .expect("default patch encoding");
+
+    let operation_limits = TransferLimits::new(
+        TransferLimits::DEFAULT.bytes(),
+        1,
+        TransferLimits::DEFAULT.history_entries(),
+        TransferLimits::DEFAULT.history_bytes(),
+    );
+    assert_limit(
+        patch
+            .to_bytes(operation_limits)
+            .expect_err("patch operation quota"),
+        LimitKind::Changes,
+    );
+    assert_limit(
+        Patch::from_bytes(&wire, operation_limits, litchi_xlsb::raw::Limits::DEFAULT)
+            .expect_err("decoded operation quota"),
+        LimitKind::Changes,
+    );
+
+    let byte_limits = TransferLimits::new(
+        wire.len().saturating_sub(1),
+        TransferLimits::DEFAULT.changes(),
+        TransferLimits::DEFAULT.history_entries(),
+        TransferLimits::DEFAULT.history_bytes(),
+    );
+    assert_limit(
+        patch.to_bytes(byte_limits).expect_err("patch byte quota"),
+        LimitKind::PatchBytes,
+    );
+    assert_limit(
+        Patch::from_bytes(&wire, byte_limits, litchi_xlsb::raw::Limits::DEFAULT)
+            .expect_err("decoded byte quota"),
+        LimitKind::PatchBytes,
+    );
+
+    let history_limits = TransferLimits::new(
+        TransferLimits::DEFAULT.bytes(),
+        TransferLimits::DEFAULT.changes(),
+        TransferLimits::DEFAULT.history_entries(),
+        1,
+    );
+    let mut history = History::new(history_limits).expect("limited history");
+    assert_limit(
+        history.push(patch).expect_err("history byte quota"),
+        LimitKind::HistoryBytes,
+    );
 }

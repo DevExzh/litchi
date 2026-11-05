@@ -2,6 +2,7 @@
 
 use crate::package::{Error as PackageError, Result};
 use crate::parts::fib::FileInformationBlock;
+use litchi_ole_common::object::Package as ObjectPackage;
 use litchi_ole_common::object::Patch as ObjectPatch;
 
 use super::Ranges;
@@ -256,14 +257,19 @@ impl PackagePatch {
     /// capability. The source bytes must still match exactly.
     pub fn apply_with_policy(&self, source: &[u8], policy: ProtectionPolicy) -> Result<Vec<u8>> {
         if source != self.inner.before() {
-            return Err(PackageError::InvalidFormat(
-                "DOC package patch source snapshot does not match".into(),
-            ));
+            return Err(PackageError::PatchConflict);
         }
         if !self.inner.is_noop() {
             policy.authorize(self.before_protection)?;
         }
-        self.inner.apply(source).map_err(PackageError::from)
+        let package = ObjectPackage::open(source.to_vec()).map_err(PackageError::from)?;
+        let commit = self.inner.apply(&package).map_err(PackageError::from)?;
+        let mut output = Vec::new();
+        commit
+            .package()
+            .write_to(&mut output)
+            .map_err(PackageError::from)?;
+        Ok(output)
     }
 }
 

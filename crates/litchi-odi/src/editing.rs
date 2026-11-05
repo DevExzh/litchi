@@ -6,7 +6,7 @@ use litchi_core::Result;
 /// The common lossless frame mutation surface implemented by both artifact kinds.
 ///
 /// Generic callers can stage the same semantic edits on [`crate::Edit`] and
-/// [`crate::FlatImageTransaction`]. Publication remains artifact-specific so a
+/// [`crate::flat::Edit`]. Publication remains artifact-specific so a
 /// package can also stage resource and metadata changes.
 pub trait FrameEditor {
     /// Replaces one optional frame name.
@@ -81,55 +81,55 @@ macro_rules! impl_frame_editor {
     ($type:ty) => {
         impl FrameEditor for $type {
             fn set_frame_name(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-                <$type>::set_frame_name(self, frame, value)
+                <$type>::set_frame_name(self, frame, value).map_err(litchi_core::Error::from)
             }
             fn set_source(&mut self, frame: usize, value: Source) -> Result<()> {
-                <$type>::set_source(self, frame, value)
+                <$type>::set_source(self, frame, value).map_err(litchi_core::Error::from)
             }
             fn set_frame_xml_id(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-                <$type>::set_frame_xml_id(self, frame, value)
+                <$type>::set_frame_xml_id(self, frame, value).map_err(litchi_core::Error::from)
             }
             fn set_frame_title(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-                <$type>::set_frame_title(self, frame, value)
+                <$type>::set_frame_title(self, frame, value).map_err(litchi_core::Error::from)
             }
             fn set_frame_description(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-                <$type>::set_frame_description(self, frame, value)
+                <$type>::set_frame_description(self, frame, value).map_err(litchi_core::Error::from)
             }
             fn set_image_media_type(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-                <$type>::set_image_media_type(self, frame, value)
+                <$type>::set_image_media_type(self, frame, value).map_err(litchi_core::Error::from)
             }
             fn set_image_xml_id(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-                <$type>::set_image_xml_id(self, frame, value)
+                <$type>::set_image_xml_id(self, frame, value).map_err(litchi_core::Error::from)
             }
             fn set_filter_name(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-                <$type>::set_filter_name(self, frame, value)
+                <$type>::set_filter_name(self, frame, value).map_err(litchi_core::Error::from)
             }
             fn set_link_type(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-                <$type>::set_link_type(self, frame, value)
+                <$type>::set_link_type(self, frame, value).map_err(litchi_core::Error::from)
             }
             fn set_show(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-                <$type>::set_show(self, frame, value)
+                <$type>::set_show(self, frame, value).map_err(litchi_core::Error::from)
             }
             fn set_actuate(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-                <$type>::set_actuate(self, frame, value)
+                <$type>::set_actuate(self, frame, value).map_err(litchi_core::Error::from)
             }
             fn set_style_name(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-                <$type>::set_style_name(self, frame, value)
+                <$type>::set_style_name(self, frame, value).map_err(litchi_core::Error::from)
             }
             fn set_text_style_name(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-                <$type>::set_text_style_name(self, frame, value)
+                <$type>::set_text_style_name(self, frame, value).map_err(litchi_core::Error::from)
             }
             fn set_layer(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-                <$type>::set_layer(self, frame, value)
+                <$type>::set_layer(self, frame, value).map_err(litchi_core::Error::from)
             }
             fn set_z_index(&mut self, frame: usize, value: Option<u32>) -> Result<()> {
-                <$type>::set_z_index(self, frame, value)
+                <$type>::set_z_index(self, frame, value).map_err(litchi_core::Error::from)
             }
             fn set_transform(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-                <$type>::set_transform(self, frame, value)
+                <$type>::set_transform(self, frame, value).map_err(litchi_core::Error::from)
             }
             fn set_anchor_type(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-                <$type>::set_anchor_type(self, frame, value)
+                <$type>::set_anchor_type(self, frame, value).map_err(litchi_core::Error::from)
             }
             fn set_geometry(
                 &mut self,
@@ -140,6 +140,7 @@ macro_rules! impl_frame_editor {
                 height: Option<String>,
             ) -> Result<()> {
                 <$type>::set_geometry(self, frame, x, y, width, height)
+                    .map_err(litchi_core::Error::from)
             }
             fn set_relative_size(
                 &mut self,
@@ -148,36 +149,37 @@ macro_rules! impl_frame_editor {
                 height: Option<String>,
             ) -> Result<()> {
                 <$type>::set_relative_size(self, frame, width, height)
+                    .map_err(litchi_core::Error::from)
             }
             fn set_image_map(&mut self, frame: usize, value: Option<ImageMap>) -> Result<()> {
-                <$type>::set_image_map(self, frame, value)
+                <$type>::set_image_map(self, frame, value).map_err(litchi_core::Error::from)
             }
             fn set_x(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-                <$type>::set_x(self, frame, value)
+                <$type>::set_x(self, frame, value).map_err(litchi_core::Error::from)
             }
             fn set_y(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-                <$type>::set_y(self, frame, value)
+                <$type>::set_y(self, frame, value).map_err(litchi_core::Error::from)
             }
             fn set_width(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-                <$type>::set_width(self, frame, value)
+                <$type>::set_width(self, frame, value).map_err(litchi_core::Error::from)
             }
             fn set_height(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-                <$type>::set_height(self, frame, value)
+                <$type>::set_height(self, frame, value).map_err(litchi_core::Error::from)
             }
             fn set_relative_width(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-                <$type>::set_relative_width(self, frame, value)
+                <$type>::set_relative_width(self, frame, value).map_err(litchi_core::Error::from)
             }
             fn set_relative_height(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-                <$type>::set_relative_height(self, frame, value)
+                <$type>::set_relative_height(self, frame, value).map_err(litchi_core::Error::from)
             }
             fn set_copy_of(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-                <$type>::set_copy_of(self, frame, value)
+                <$type>::set_copy_of(self, frame, value).map_err(litchi_core::Error::from)
             }
         }
     };
 }
 
-impl_frame_editor!(crate::FlatImageTransaction);
+impl_frame_editor!(crate::flat::Edit);
 impl_frame_editor!(crate::Edit<'_>);
 
 /// Common metadata mutation contract for flat and packaged ODI transactions.
@@ -190,31 +192,31 @@ pub trait MetadataEditor {
     fn set_subject(&mut self, value: Option<String>) -> Result<()>;
     /// Replaces the document description.
     fn set_description(&mut self, value: Option<String>) -> Result<()>;
-    /// Replaces the comma-separated keyword value.
-    fn set_keywords(&mut self, value: Option<String>) -> Result<()>;
+    /// Replaces the keyword list; an empty list removes it.
+    fn set_keywords(&mut self, keywords: Vec<String>) -> Result<()>;
 }
 
 macro_rules! impl_metadata_editor {
     ($type:ty) => {
         impl MetadataEditor for $type {
             fn set_title(&mut self, value: Option<String>) -> Result<()> {
-                <$type>::set_title(self, value)
+                <$type>::set_title(self, value).map_err(litchi_core::Error::from)
             }
             fn set_author(&mut self, value: Option<String>) -> Result<()> {
-                <$type>::set_author(self, value)
+                <$type>::set_author(self, value).map_err(litchi_core::Error::from)
             }
             fn set_subject(&mut self, value: Option<String>) -> Result<()> {
-                <$type>::set_subject(self, value)
+                <$type>::set_subject(self, value).map_err(litchi_core::Error::from)
             }
             fn set_description(&mut self, value: Option<String>) -> Result<()> {
-                <$type>::set_description(self, value)
+                <$type>::set_description(self, value).map_err(litchi_core::Error::from)
             }
-            fn set_keywords(&mut self, value: Option<String>) -> Result<()> {
-                <$type>::set_keywords(self, value)
+            fn set_keywords(&mut self, keywords: Vec<String>) -> Result<()> {
+                <$type>::set_keywords(self, keywords).map_err(litchi_core::Error::from)
             }
         }
     };
 }
 
-impl_metadata_editor!(crate::FlatImageTransaction);
+impl_metadata_editor!(crate::flat::Edit);
 impl_metadata_editor!(crate::Edit<'_>);

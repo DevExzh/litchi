@@ -3,8 +3,9 @@
 //! This example shows how to read and write various text-based spreadsheet formats
 //! with optional BOM handling and different configurations.
 
+use litchi::common::BomKind;
 use litchi::sheet::CellValue;
-use litchi::sheet::text::formats::*;
+use litchi::sheet::text::{delimited, dif, fixed_width, sylk};
 use std::error::Error;
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Write};
@@ -80,17 +81,16 @@ fn test_csv(data: &[Vec<CellValue>]) -> ExampleResult<()> {
     let file = File::create("demo.csv")?;
     let mut writer = BufWriter::new(file);
 
-    let config = DelimitedConfig::csv().with_write_bom(Some(litchi::common::BomKind::Utf8));
+    let config = delimited::Options::csv().write_bom(Some(BomKind::Utf8));
 
-    write_delimited(data, &mut writer, config)?;
+    delimited::write(data, &mut writer, &config)?;
     writer.flush()?;
 
     println!("  ✓ Generated demo.csv with UTF-8 BOM");
 
     // Read back
     let file = File::open("demo.csv")?;
-    let mut read_file = BufReader::new(file);
-    let data_read = read_delimited(&mut read_file, DelimitedConfig::csv())?;
+    let data_read = delimited::read(BufReader::new(file), &delimited::Options::csv())?;
 
     println!("  ✓ Read back {} rows", data_read.len());
     Ok(())
@@ -102,9 +102,9 @@ fn test_tsv(data: &[Vec<CellValue>]) -> ExampleResult<()> {
     let file = File::create("demo.tsv")?;
     let mut writer = BufWriter::new(file);
 
-    let config = DelimitedConfig::tsv();
+    let config = delimited::Options::tsv();
 
-    write_delimited(data, &mut writer, config)?;
+    delimited::write(data, &mut writer, &config)?;
     writer.flush()?;
 
     println!("  ✓ Generated demo.tsv");
@@ -117,9 +117,9 @@ fn test_prn_delimited(data: &[Vec<CellValue>]) -> ExampleResult<()> {
     let file = File::create("demo_delimited.prn")?;
     let mut writer = BufWriter::new(file);
 
-    let config = DelimitedConfig::prn();
+    let config = delimited::Options::prn();
 
-    write_delimited(data, &mut writer, config)?;
+    delimited::write(data, &mut writer, &config)?;
     writer.flush()?;
 
     println!("  ✓ Generated demo_delimited.prn");
@@ -132,15 +132,9 @@ fn test_prn_fixed_width(data: &[Vec<CellValue>]) -> ExampleResult<()> {
     let file = File::create("demo_fixed.prn")?;
     let mut writer = BufWriter::new(file);
 
-    let config = FixedWidthConfig {
-        column_widths: vec![20, 8, 12, 8, 30],
-        auto_detect_widths: false,
-        trim_fields: true,
-        strip_bom: true,
-        write_bom: None,
-    };
+    let config = fixed_width::Options::default().column_widths(vec![20, 8, 12, 8, 30]);
 
-    write_fixed_width(data, &mut writer, config)?;
+    fixed_width::write(data, &mut writer, &config)?;
     writer.flush()?;
 
     println!("  ✓ Generated demo_fixed.prn");
@@ -149,8 +143,7 @@ fn test_prn_fixed_width(data: &[Vec<CellValue>]) -> ExampleResult<()> {
     let file = File::create("demo_auto.prn")?;
     let mut writer = BufWriter::new(file);
 
-    let auto_config = FixedWidthConfig::default();
-    write_fixed_width(data, &mut writer, auto_config)?;
+    fixed_width::write(data, &mut writer, &fixed_width::Options::default())?;
     writer.flush()?;
 
     println!("  ✓ Generated demo_auto.prn (auto-detected widths)");
@@ -163,8 +156,8 @@ fn test_sylk(data: &[Vec<CellValue>]) -> ExampleResult<()> {
     let file = File::create("demo.slk")?;
     let mut writer = BufWriter::new(file);
 
-    let config = SylkConfig::default();
-    write_sylk(data, &mut writer, config.clone())?;
+    let config = sylk::Options::default();
+    sylk::write(data, &mut writer, &config)?;
     writer.flush()?;
 
     println!("  ✓ Generated demo.slk");
@@ -191,7 +184,7 @@ fn test_sylk(data: &[Vec<CellValue>]) -> ExampleResult<()> {
 
     let file = File::create("demo_formulas.slk")?;
     let mut writer = BufWriter::new(file);
-    write_sylk(&formula_data, &mut writer, config)?;
+    sylk::write(&formula_data, &mut writer, &config)?;
     writer.flush()?;
 
     println!("  ✓ Generated demo_formulas.slk (with formulas)");
@@ -204,8 +197,7 @@ fn test_dif(data: &[Vec<CellValue>]) -> ExampleResult<()> {
     let file = File::create("demo.dif")?;
     let mut writer = BufWriter::new(file);
 
-    let config = DifConfig::default();
-    write_dif(data, &mut writer, config)?;
+    dif::write(data, &mut writer, &dif::Options::default())?;
     writer.flush()?;
 
     println!("  ✓ Generated demo.dif");
@@ -214,14 +206,11 @@ fn test_dif(data: &[Vec<CellValue>]) -> ExampleResult<()> {
     let file = File::create("demo_utf16.dif")?;
     let mut writer = BufWriter::new(file);
 
-    let config = DifConfig {
-        strip_bom: true,
-        write_bom: Some(litchi::common::BomKind::Utf16Le),
-    };
-    write_dif(data, &mut writer, config)?;
+    let config = dif::Options::default().write_bom(Some(BomKind::Utf16Le));
+    dif::write(data, &mut writer, &config)?;
     writer.flush()?;
 
-    println!("  ✓ Generated demo_utf16.dif (with UTF-16 LE BOM)");
+    println!("  ✓ Generated demo_utf16.dif (UTF-16 LE with its BOM)");
     Ok(())
 }
 
@@ -229,11 +218,9 @@ fn test_bom_variants(data: &[Vec<CellValue>]) -> ExampleResult<()> {
     println!("Testing BOM variants...");
 
     let boms = vec![
-        ("UTF-8", litchi::common::BomKind::Utf8),
-        ("UTF-16 LE", litchi::common::BomKind::Utf16Le),
-        ("UTF-16 BE", litchi::common::BomKind::Utf16Be),
-        ("UTF-32 LE", litchi::common::BomKind::Utf32Le),
-        ("UTF-32 BE", litchi::common::BomKind::Utf32Be),
+        ("UTF-8", BomKind::Utf8),
+        ("UTF-16 LE", BomKind::Utf16Le),
+        ("UTF-16 BE", BomKind::Utf16Be),
     ];
 
     for (name, bom_kind) in boms {
@@ -241,9 +228,9 @@ fn test_bom_variants(data: &[Vec<CellValue>]) -> ExampleResult<()> {
         let file = File::create(&filename)?;
         let mut writer = BufWriter::new(file);
 
-        let config = DelimitedConfig::csv().with_write_bom(Some(bom_kind));
+        let config = delimited::Options::csv().write_bom(Some(bom_kind));
 
-        write_delimited(data, &mut writer, config)?;
+        delimited::write(data, &mut writer, &config)?;
         writer.flush()?;
 
         println!("  ✓ Generated {} with {} BOM", filename, name);

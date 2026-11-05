@@ -18,7 +18,7 @@
 
 use crate::Workbook;
 use crate::package::error::{Error, Result};
-use crate::raw::{Header, Limits as RawLimits, Records, Writer as BinaryWriter, kind};
+use crate::raw::{Encoder as BinaryEncoder, Header, Limits as RawLimits, Records, kind};
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
@@ -231,13 +231,17 @@ pub(super) fn transfer(
     target_sheet: usize,
 ) -> Result<()> {
     if target.drawing_load_policy() == crate::workbook::DrawingLoadPolicy::Skipped {
-        return Err(Error::UnsupportedFeature(
-            "drawing transfer requires an eager drawing projection".to_string(),
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "transfer_drawing",
+            "drawing transfer requires an eager drawing projection",
         ));
     }
-    let source = super::root::validated_workbook_with_external_link_limits(
+    crate::signature_policy::ensure_unsigned(&target.package)?;
+    let source = super::structure::validated_workbook_with_external_link_limits(
         source_bytes,
         target.external_link_limits(),
+        target.raw_limits_value(),
     )?;
     let source_plan = plan_source(&source, source_sheet, source_anchor)?;
     let target_plan = plan_target(target, target_sheet)?;
@@ -270,8 +274,11 @@ pub(super) fn transfer(
         &name_mapping,
         &relationship_mapping,
     )?;
-    let drawing_xml =
-        crate::package::drawing_write::append_drawing_anchors(&target_plan.xml, &fragments)?;
+    let drawing_xml = crate::package::drawing_write::append_drawing_anchors(
+        &target_plan.xml,
+        &fragments,
+        target.semantic_limits().xml_parts_value(),
+    )?;
     install_transfer(
         &mut package,
         target,
@@ -281,7 +288,6 @@ pub(super) fn transfer(
         target_chart,
         target_relationships,
     )?;
-    package.unsign();
     let validated = target.reparse_candidate(package)?;
     *target = validated;
     validate_readback(
@@ -297,11 +303,12 @@ fn plan_source(source: &Workbook, source_sheet: usize, source_anchor: usize) -> 
         .ok_or_else(|| refused(DrawingTransferRefusal::SourceDrawingMissing))?;
     let source_part = source.package.get_part(&source_location.uri)?;
     let source_catalog_position = source.catalog_position_for_worksheet(source_sheet)?;
-    let source_inventory = source
-        .sheet_drawing(source_catalog_position)
-        .ok_or_else(|| {
-            Error::InvalidFormat("source BrtDrawing has no decoded drawing inventory".to_string())
-        })?;
+    let source_inventory =
+        source
+            .sheet_drawing(source_catalog_position)
+            .ok_or(Error::InvalidFormat(
+                "source BrtDrawing has no decoded drawing inventory",
+            ))?;
     let source_xml = effective_drawing_xml(source_part.blob())?;
     let layout = drawing_layout(&source_xml)?;
     if layout.anchors.len() != source_inventory.drawing.anchors.len() {
@@ -417,9 +424,11 @@ fn copy_selected_chart(
     }
     let graph = collect_chart_graph(source, source_relationship.target_partname()?)?;
     let mapping = copy_chart_graph(source, package, &graph)?;
-    let copied_chart_uri = mapping.get(graph.root.as_str()).ok_or_else(|| {
-        Error::InvalidFormat("copied chart graph has no root mapping".to_string())
-    })?;
+    let copied_chart_uri = mapping
+        .get(graph.root.as_str())
+        .ok_or(Error::InvalidFormat(
+            "copied chart graph has no root mapping",
+        ))?;
     let relationship_id = if target_plan.location.is_some() {
         package.get_part_mut(&target_plan.uri)?.relate_to(
             &copied_chart_uri.relative_ref(target_plan.uri.base_uri()),
@@ -446,9 +455,11 @@ fn copy_shape_relationships(
     let source_part = source.package.get_part(&source_plan.drawing_uri)?;
     let mut references = BTreeSet::new();
     for index in &source_plan.selected {
-        let anchor = source_plan.layout.anchors.get(*index).ok_or_else(|| {
-            Error::InvalidFormat("selected drawing anchor disappeared".to_string())
-        })?;
+        let anchor = source_plan
+            .layout
+            .anchors
+            .get(*index)
+            .ok_or(Error::InvalidFormat("selected drawing anchor disappeared"))?;
         for reference in &anchor.relationship_references {
             if source_plan.chart_relationship.as_deref() != Some(reference.value.as_str()) {
                 references.insert(reference.value.clone());
@@ -582,16 +593,15 @@ fn validate_shape_dependency(
         rt::IMAGE | rt::STRICT_IMAGE => {
             if !part.partname().as_str().starts_with("/xl/media/") {
                 return Err(Error::InvalidFormat(
-                    "drawing image dependency is outside /xl/media".to_string(),
+                    "drawing image dependency is outside /xl/media",
                 ));
             }
             let format =
                 crate::package::drawing_image::ImageFormat::from_content_type(part.content_type())
-                    .ok_or_else(|| {
-                        Error::InvalidFormat(format!(
-                            "drawing image dependency has unsupported content type {:?}",
-                            part.content_type()
-                        ))
+                    .ok_or({
+                        Error::InvalidFormat(
+                            "drawing image dependency has unsupported content type",
+                        )
                     })?;
             format.validate_payload(part.blob())
         },
@@ -616,10 +626,9 @@ fn validate_embedded_shape_dependency(part: &dyn Part, expected_content_type: &s
         || part.content_type() != expected_content_type
         || part.blob().is_empty()
     {
-        return Err(Error::InvalidFormat(format!(
-            "drawing embedded dependency '{}' has invalid path, content type, or payload",
-            part.partname()
-        )));
+        return Err(Error::InvalidFormat(
+            "drawing embedded dependency has invalid path, content type, or payload",
+        ));
     }
     Ok(())
 }
@@ -678,7 +687,7 @@ fn free_relationship_id(used: &BTreeSet<String>) -> Result<String> {
         }
     }
     Err(Error::InvalidFormat(
-        "no collision-free drawing relationship ID remains".to_string(),
+        "no collision-free drawing relationship ID remains",
     ))
 }
 
@@ -690,12 +699,17 @@ fn rewrite_selected_anchors(
 ) -> Result<Vec<Vec<u8>>> {
     let mut fragments = Vec::new();
     for index in &source.selected {
-        let info = source.layout.anchors.get(*index).ok_or_else(|| {
-            Error::InvalidFormat("selected drawing anchor disappeared".to_string())
-        })?;
-        let fragment = source.xml.get(info.start..info.end).ok_or_else(|| {
-            Error::InvalidFormat("drawing anchor range is outside its part".to_string())
-        })?;
+        let info = source
+            .layout
+            .anchors
+            .get(*index)
+            .ok_or(Error::InvalidFormat("selected drawing anchor disappeared"))?;
+        let fragment = source
+            .xml
+            .get(info.start..info.end)
+            .ok_or(Error::InvalidFormat(
+                "drawing anchor range is outside its part",
+            ))?;
         fragments.push(rewrite_anchor(
             fragment,
             &source.layout.namespaces,
@@ -742,7 +756,13 @@ fn install_transfer(
             )?;
         }
         package.try_add_part(Box::new(drawing_part))?;
-        attach_drawing_to_worksheet(package, target, target_sheet, &plan.uri)?;
+        attach_drawing_to_worksheet(
+            package,
+            target,
+            target_sheet,
+            &plan.uri,
+            target.raw_limits_value(),
+        )?;
     }
     Ok(())
 }
@@ -756,9 +776,9 @@ fn validate_readback(
     let target_catalog_position = target.catalog_position_for_worksheet(target_sheet)?;
     let after = target
         .sheet_drawing(target_catalog_position)
-        .ok_or_else(|| {
-            Error::InvalidFormat("transferred drawing failed semantic readback".to_string())
-        })?;
+        .ok_or(Error::InvalidFormat(
+            "transferred drawing failed semantic readback",
+        ))?;
     let expected = plan
         .layout
         .anchors
@@ -769,7 +789,7 @@ fn validate_readback(
         })?;
     if after.drawing.anchors.len() != expected {
         return Err(Error::InvalidFormat(
-            "transferred drawing anchor count failed readback".to_string(),
+            "transferred drawing anchor count failed readback",
         ));
     }
     Ok(())
@@ -783,31 +803,31 @@ fn locate_drawing(workbook: &Workbook, sheet: usize) -> Result<Option<LocatedDra
     let worksheet_uri = workbook.worksheet_uri(sheet)?;
     let worksheet = workbook.package.get_part(&worksheet_uri)?;
     let mut relationship_id = None;
-    for item in Records::new(worksheet.blob()) {
+    let raw_limits = workbook.raw_limits_value();
+    for item in Records::new(worksheet.blob(), raw_limits) {
         let record = item?;
         if record.kind() == kind::DRAWING {
             if relationship_id.is_some() {
                 return Err(Error::InvalidFormat(
-                    "worksheet contains multiple BrtDrawing records".to_string(),
+                    "worksheet contains multiple BrtDrawing records",
                 ));
             }
-            let mut cursor = crate::raw::Cursor::new(record.payload(), "BrtDrawing");
+            let mut cursor = crate::raw::Cursor::new(record.payload(), "BrtDrawing", raw_limits);
             relationship_id = Some(cursor.read_wide_string()?);
         }
     }
     let Some(relationship_id) = relationship_id else {
         return Ok(None);
     };
-    let relationship = worksheet.rels().get(&relationship_id).ok_or_else(|| {
-        Error::InvalidFormat(format!(
-            "BrtDrawing relationship {relationship_id:?} is absent"
-        ))
-    })?;
+    let relationship = worksheet
+        .rels()
+        .get(&relationship_id)
+        .ok_or(Error::InvalidFormat("BrtDrawing relationship is absent"))?;
     if relationship.is_external()
         || !matches!(relationship.reltype(), rt::DRAWING | rt::STRICT_DRAWING)
     {
         return Err(Error::InvalidFormat(
-            "BrtDrawing relationship is external or has the wrong type".to_string(),
+            "BrtDrawing relationship is external or has the wrong type",
         ));
     }
     Ok(Some(LocatedDrawing {
@@ -832,7 +852,7 @@ fn ensure_drawing_ownership(
         .any(|relationship| matches!(relationship.reltype(), rt::DRAWING | rt::STRICT_DRAWING))
     {
         return Err(Error::InvalidFormat(
-            "worksheet has a Drawing relationship without BrtDrawing ownership".to_string(),
+            "worksheet has a Drawing relationship without BrtDrawing ownership",
         ));
     }
     Ok(())
@@ -840,7 +860,7 @@ fn ensure_drawing_ownership(
 
 fn effective_drawing_xml(source: &[u8]) -> Result<Vec<u8>> {
     let source = std::str::from_utf8(source)
-        .map_err(|error| Error::Encoding(format!("drawing XML is not UTF-8: {error}")))?;
+        .map_err(|_error| Error::Encoding("drawing XML is not UTF-8"))?;
     Ok(litchi_ooxml_common::mce::process_str(source)?
         .into_owned()
         .into_bytes())
@@ -874,7 +894,7 @@ fn drawing_layout(xml: &[u8]) -> Result<DrawingLayout> {
             Event::End(element) => layout.end(&namespace, element, end)?,
             Event::DocType(_) | Event::PI(_) => {
                 return Err(Error::InvalidFormat(
-                    "drawing transfer rejects DTD and processing instructions".to_string(),
+                    "drawing transfer rejects DTD and processing instructions",
                 ));
             },
             Event::Eof => break,
@@ -911,7 +931,7 @@ impl LayoutBuilder {
         if self.depth == 0 {
             if !xdr(namespace) || element.local_name().as_ref() != b"wsDr" {
                 return Err(Error::InvalidFormat(
-                    "drawing transfer requires one xdr:wsDr root".to_string(),
+                    "drawing transfer requires one xdr:wsDr root",
                 ));
             }
             self.root_seen = true;
@@ -946,7 +966,7 @@ impl LayoutBuilder {
         self.depth = self
             .depth
             .checked_add(1)
-            .ok_or_else(|| Error::InvalidFormat("drawing XML nesting overflow".to_string()))?;
+            .ok_or(Error::InvalidFormat("drawing XML nesting overflow"))?;
         Ok(())
     }
 
@@ -957,15 +977,17 @@ impl LayoutBuilder {
         end: usize,
     ) -> Result<()> {
         if self.depth == 2 && xdr(namespace) && anchor_end(element) {
-            let anchor_start = self.open_anchor.take().ok_or_else(|| {
-                Error::InvalidFormat("drawing anchor close has no start".to_string())
-            })?;
-            let mut info = self.current.take().ok_or_else(|| {
-                Error::InvalidFormat("drawing anchor has no analysis state".to_string())
-            })?;
+            let anchor_start = self
+                .open_anchor
+                .take()
+                .ok_or(Error::InvalidFormat("drawing anchor close has no start"))?;
+            let mut info = self
+                .current
+                .take()
+                .ok_or(Error::InvalidFormat("drawing anchor has no analysis state"))?;
             if info.start != anchor_start {
                 return Err(Error::InvalidFormat(
-                    "drawing anchor range ownership changed".to_string(),
+                    "drawing anchor range ownership changed",
                 ));
             }
             info.end = end;
@@ -974,15 +996,13 @@ impl LayoutBuilder {
         self.depth = self
             .depth
             .checked_sub(1)
-            .ok_or_else(|| Error::InvalidFormat("drawing XML has an unmatched end".to_string()))?;
+            .ok_or(Error::InvalidFormat("drawing XML has an unmatched end"))?;
         Ok(())
     }
 
     fn finish(self) -> Result<DrawingLayout> {
         if !self.root_seen || self.depth != 0 || self.open_anchor.is_some() {
-            return Err(Error::InvalidFormat(
-                "drawing XML is incomplete".to_string(),
-            ));
+            return Err(Error::InvalidFormat("drawing XML is incomplete"));
         }
         Ok(DrawingLayout {
             strict: self.strict,
@@ -1067,7 +1087,7 @@ fn namespace_declarations(
     for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let key = std::str::from_utf8(attribute.key.as_ref())
-            .map_err(|error| Error::Encoding(format!("namespace name is not UTF-8: {error}")))?;
+            .map_err(|_error| Error::Encoding("namespace name is not UTF-8"))?;
         if key == "xmlns" || key.starts_with("xmlns:") {
             let value = attribute
                 .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
@@ -1210,9 +1230,10 @@ fn collision_mapping(
     let mut names = BTreeMap::new();
     let mut next_id = 1u32;
     for index in selected {
-        let info = source.anchors.get(*index).ok_or_else(|| {
-            Error::InvalidFormat("selected drawing anchor disappeared".to_string())
-        })?;
+        let info = source
+            .anchors
+            .get(*index)
+            .ok_or(Error::InvalidFormat("selected drawing anchor disappeared"))?;
         for (source_id, source_name) in &info.ids {
             if mapping.contains_key(source_id) {
                 return Err(refused(DrawingTransferRefusal::AmbiguousObjectId(
@@ -1220,9 +1241,9 @@ fn collision_mapping(
                 )));
             }
             while used_ids.contains(&next_id) {
-                next_id = next_id.checked_add(1).ok_or_else(|| {
-                    Error::InvalidFormat("drawing object ID space is exhausted".to_string())
-                })?;
+                next_id = next_id
+                    .checked_add(1)
+                    .ok_or(Error::InvalidFormat("drawing object ID space is exhausted"))?;
             }
             mapping.insert(*source_id, next_id);
             used_ids.insert(next_id);
@@ -1230,9 +1251,9 @@ fn collision_mapping(
                 let unique = unique_name(source_name, &mut used_names)?;
                 names.insert(*source_id, unique);
             }
-            next_id = next_id.checked_add(1).ok_or_else(|| {
-                Error::InvalidFormat("drawing object ID space is exhausted".to_string())
-            })?;
+            next_id = next_id
+                .checked_add(1)
+                .ok_or(Error::InvalidFormat("drawing object ID space is exhausted"))?;
         }
     }
     Ok((mapping, names))
@@ -1249,7 +1270,7 @@ fn unique_name(source: &str, used: &mut BTreeSet<String>) -> Result<String> {
         }
     }
     Err(Error::InvalidFormat(
-        "drawing object name space is exhausted".to_string(),
+        "drawing object name space is exhausted",
     ))
 }
 
@@ -1303,8 +1324,7 @@ fn rewrite_anchor(
             Event::Eof => break,
             Event::DocType(_) | Event::Decl(_) | Event::PI(_) => {
                 return Err(Error::InvalidFormat(
-                    "drawing anchor contains a declaration, DTD, or processing instruction"
-                        .to_string(),
+                    "drawing anchor contains a declaration, DTD, or processing instruction",
                 ));
             },
             Event::End(element) => writer.write_event(Event::End(element)).map_err(xml_error)?,
@@ -1336,7 +1356,7 @@ fn rewrite_element(
     inject_namespaces: bool,
 ) -> Result<BytesStart<'static>> {
     let element_name = std::str::from_utf8(source.name().as_ref())
-        .map_err(|error| Error::Encoding(format!("drawing element name is not UTF-8: {error}")))?
+        .map_err(|_error| Error::Encoding("drawing element name is not UTF-8"))?
         .to_string();
     let local = source.local_name();
     let local = local.as_ref();
@@ -1353,7 +1373,7 @@ fn rewrite_element(
     for attribute in source.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let key = std::str::from_utf8(attribute.key.as_ref())
-            .map_err(|error| Error::Encoding(format!("drawing attribute is not UTF-8: {error}")))?
+            .map_err(|_error| Error::Encoding("drawing attribute is not UTF-8"))?
             .to_string();
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
@@ -1545,9 +1565,11 @@ fn copy_chart_graph(
     }
     for source_uri in &graph.parts {
         let source_part = source.package.get_part(source_uri)?;
-        let target_uri = mapping.get(source_uri.as_str()).ok_or_else(|| {
-            Error::InvalidFormat("chart graph part has no target mapping".to_string())
-        })?;
+        let target_uri = mapping
+            .get(source_uri.as_str())
+            .ok_or(Error::InvalidFormat(
+                "chart graph part has no target mapping",
+            ))?;
         let mut target_part = if source_uri
             .as_str()
             .rsplit_once('.')
@@ -1607,7 +1629,7 @@ fn compact_xml(source: &[u8]) -> Result<Vec<u8>> {
             Event::Start(element) => {
                 if preserve_space.len() >= MAX_XML_DEPTH {
                     return Err(Error::InvalidFormat(
-                        "chart XML nesting exceeds transfer limits".to_string(),
+                        "chart XML nesting exceeds transfer limits",
                     ));
                 }
                 let inherited = preserve_space.last().copied().unwrap_or(false);
@@ -1617,9 +1639,9 @@ fn compact_xml(source: &[u8]) -> Result<Vec<u8>> {
                     .map_err(xml_error)?;
             },
             Event::End(element) => {
-                preserve_space.pop().ok_or_else(|| {
-                    Error::InvalidFormat("chart XML nesting underflow".to_string())
-                })?;
+                preserve_space
+                    .pop()
+                    .ok_or(Error::InvalidFormat("chart XML nesting underflow"))?;
                 writer
                     .write_event(Event::End(element.into_owned()))
                     .map_err(xml_error)?;
@@ -1632,9 +1654,7 @@ fn compact_xml(source: &[u8]) -> Result<Vec<u8>> {
                         .iter()
                         .any(|byte| matches!(byte, b'\n' | b'\r' | b'\t')) => {},
             Event::DocType(_) => {
-                return Err(Error::InvalidFormat(
-                    "chart XML transfer rejects DTDs".to_string(),
-                ));
+                return Err(Error::InvalidFormat("chart XML transfer rejects DTDs"));
             },
             Event::GeneralRef(reference)
                 if !matches!(
@@ -1643,7 +1663,7 @@ fn compact_xml(source: &[u8]) -> Result<Vec<u8>> {
                 ) =>
             {
                 return Err(Error::InvalidFormat(
-                    "chart XML transfer rejects named entities".to_string(),
+                    "chart XML transfer rejects named entities",
                 ));
             },
             Event::Eof => break,
@@ -1659,20 +1679,15 @@ fn compact_xml(source: &[u8]) -> Result<Vec<u8>> {
         }
     }
     if !preserve_space.is_empty() {
-        return Err(Error::InvalidFormat(
-            "chart XML nesting is incomplete".to_string(),
-        ));
+        return Err(Error::InvalidFormat("chart XML nesting is incomplete"));
     }
     Ok(writer.into_inner())
 }
 
 fn xml_space(element: &BytesStart<'_>) -> Result<Option<bool>> {
     for attribute in element.checked_attributes() {
-        let attribute = attribute.map_err(|error| {
-            Error::Encoding(format!(
-                "invalid chart XML attribute during compaction: {error}"
-            ))
-        })?;
+        let attribute = attribute
+            .map_err(|_error| Error::Encoding("invalid chart XML attribute during compaction"))?;
         if attribute.key.as_ref() == b"xml:space" {
             return Ok(Some(attribute.value.as_ref() == b"preserve"));
         }
@@ -1701,9 +1716,7 @@ fn allocate_graph_uri(
             return Ok(uri);
         }
     }
-    Err(Error::InvalidFormat(format!(
-        "no collision-free part name remains for {value}"
-    )))
+    Err(Error::InvalidFormat("no collision-free part name remains"))
 }
 
 fn allocate_new_drawing_uri(package: &litchi_opc::OpcPackage) -> Result<PackURI> {
@@ -1714,7 +1727,7 @@ fn allocate_new_drawing_uri(package: &litchi_opc::OpcPackage) -> Result<PackURI>
         }
     }
     Err(Error::InvalidFormat(
-        "no worksheet drawing part name remains".to_string(),
+        "no worksheet drawing part name remains",
     ))
 }
 
@@ -1740,6 +1753,7 @@ fn attach_drawing_to_worksheet(
     workbook: &Workbook,
     sheet: usize,
     drawing_uri: &PackURI,
+    raw_limits: RawLimits,
 ) -> Result<()> {
     let worksheet_uri = workbook.worksheet_uri(sheet)?;
     let worksheet_source = package.get_part(&worksheet_uri)?.blob().to_vec();
@@ -1753,20 +1767,20 @@ fn attach_drawing_to_worksheet(
         },
     );
     let mut payload = Vec::new();
-    BinaryWriter::new(&mut payload).write_wide_string(&relationship_id)?;
+    BinaryEncoder::new(&mut payload, raw_limits).write_wide_string(&relationship_id)?;
     let mut output = Vec::new();
     let mut inserted = false;
-    for item in Records::new(&worksheet_source) {
+    for item in Records::new(&worksheet_source, raw_limits) {
         let record = item?;
         if !inserted && matches!(record.kind(), kind::BEGIN_LIST_PARTS | kind::END_SHEET) {
-            BinaryWriter::new(&mut output).write_record(kind::DRAWING, &payload)?;
+            BinaryEncoder::new(&mut output, raw_limits).write_record(kind::DRAWING, &payload)?;
             inserted = true;
         }
-        copy_record(&worksheet_source, &record, &mut output)?;
+        copy_record(&worksheet_source, &record, raw_limits, &mut output)?;
     }
     if !inserted {
         return Err(Error::InvalidFormat(
-            "worksheet has no safe BrtDrawing insertion boundary".to_string(),
+            "worksheet has no safe BrtDrawing insertion boundary",
         ));
     }
     crate::worksheet_index::maintain(package, &worksheet_uri, &worksheet_source, &output)?;
@@ -1774,11 +1788,16 @@ fn attach_drawing_to_worksheet(
     Ok(())
 }
 
-fn copy_record(source: &[u8], record: &crate::raw::Record<'_>, output: &mut Vec<u8>) -> Result<()> {
-    let record_source = source.get(record.offset()..).ok_or_else(|| {
-        Error::InvalidFormat("record offset is outside worksheet.bin".to_string())
-    })?;
-    let (_, header_len) = Header::parse(record_source, RawLimits::DEFAULT)?;
+fn copy_record(
+    source: &[u8],
+    record: &crate::raw::Record<'_>,
+    raw_limits: RawLimits,
+    output: &mut Vec<u8>,
+) -> Result<()> {
+    let record_source = source.get(record.offset()..).ok_or(Error::InvalidFormat(
+        "record offset is outside worksheet.bin",
+    ))?;
+    let (_, header_len) = Header::parse(record_source, raw_limits)?;
     let end = record
         .offset()
         .checked_add(header_len)
@@ -1786,9 +1805,13 @@ fn copy_record(source: &[u8], record: &crate::raw::Record<'_>, output: &mut Vec<
         .ok_or(Error::CapacityOverflow {
             resource: "worksheet record range",
         })?;
-    output.extend_from_slice(source.get(record.offset()..end).ok_or_else(|| {
-        Error::InvalidFormat("record range is outside worksheet.bin".to_string())
-    })?);
+    output.extend_from_slice(
+        source
+            .get(record.offset()..end)
+            .ok_or(Error::InvalidFormat(
+                "record range is outside worksheet.bin",
+            ))?,
+    );
     Ok(())
 }
 
@@ -1812,11 +1835,11 @@ fn parse_object_id(value: &str) -> Result<u32> {
 fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
     origin
         .offset(reader.buffer_position())
-        .ok_or_else(|| Error::InvalidFormat("drawing XML position exceeds usize".to_string()))
+        .ok_or(Error::InvalidFormat("drawing XML position exceeds usize"))
 }
 
-fn xml_error(error: impl fmt::Display) -> Error {
-    Error::Encoding(format!("invalid drawing XML: {error}"))
+fn xml_error(_error: impl fmt::Display) -> Error {
+    Error::Encoding("invalid drawing XML")
 }
 
 fn xdr(namespace: &ResolveResult<'_>) -> bool {
@@ -2102,7 +2125,8 @@ mod tests {
         let extra_length =
             usize::from(u16::from_le_bytes([bytes[header + 28], bytes[header + 29]]));
         bytes[header + 30 + name_length + extra_length] ^= 0xff;
-        let package = litchi_opc::OpcPackage::from_vec(bytes).expect("the deferred open admits it");
+        let package = litchi_opc::OpcPackage::from_vec(bytes, litchi_opc::SourceLimits::default())
+            .expect("the deferred open admits it");
         let relationship = package
             .part_metadata(&chart_uri)
             .expect("chart part")

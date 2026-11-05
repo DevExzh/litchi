@@ -1,187 +1,140 @@
 //! Guarded source-backed publication for one XLSX worksheet hyperlink owner.
+//!
+//! [`SourceBackedWorkbook::edit_hyperlinks`] stages one worksheet without
+//! materializing any unselected part body; [`Edit::commit`] validates the
+//! edit and returns a [`Commit`] holding the new workbook, whose output is the
+//! byte-preserving splice the former stream publisher wrote (the selected
+//! worksheet XML is the only replaced member; every other ZIP member is
+//! raw-copied). An exact no-op returns the source workbook unchanged; a
+//! changed edit of a signed source is refused at commit.
+//! [`SourceBackedWorkbook::apply_hyperlinks`] replays a [`Patch`] onto a workbook
+//! holding its before state (record 0360).
 
-use std::collections::{HashMap, HashSet};
 use std::io::Write;
-use std::sync::Arc;
 
-use litchi_core::{ExecutionContext, ReadAt};
-use litchi_opc::{PackURI, ReadLimits, SourceBackedPackage, SourceCacheLimits};
+use litchi_opc::SourceBackedPackage;
 
 use super::snapshot::{Snapshot, SourceEntry};
-use super::{Commit, Patch};
-use crate::Selector;
-use crate::error::{Error, Result, allocation, invalid};
+use crate::error::{Result, allocation, invalid};
+use crate::{Selector, SourceBackedWorkbook};
+use litchi_opc::PackURI;
+use std::collections::{HashMap, HashSet};
 
 const MAX_HYPERLINKS: usize = 1_048_576;
 const MAX_INCREMENTAL_HYPERLINKS: usize = 65_536;
 const MAX_EDIT_MUTATIONS: usize = 256;
 const EXECUTION_CHECK_INTERVAL: usize = 256;
 
-/// An owning source-backed editor for one selected worksheet's direct links.
-pub struct SourceBackedEditor {
-    package: SourceBackedPackage,
+crate::workbook::source::deferred::source_family!("hyperlink", super::Patch);
+
+impl Patch {
+    /// The exact worksheet state the patch requires.
+    #[must_use]
+    pub fn before(&self) -> &Snapshot {
+        self.0.before()
+    }
+
+    /// The exact worksheet state the patch produces.
+    #[must_use]
+    pub fn after(&self) -> &Snapshot {
+        self.0.after()
+    }
 }
 
-/// An isolated hyperlink edit over one exact source worksheet.
-pub struct SourceEdit {
+impl crate::workbook::source::deferred::Change for super::Patch {
+    fn is_noop(&self) -> bool {
+        self.is_empty()
+    }
+
+    fn inverse(&self) -> Self {
+        super::Patch::inverse(self)
+    }
+
+    fn check(&self, package: &SourceBackedPackage) -> Result<()> {
+        // A replay compares content: the selected worksheet, its owner and
+        // relationships must hold the before state (record 0360).
+        let current = Snapshot::load_source_backed(package, self.before().sheet_position())?;
+        if !current.same_source(self.before()) {
+            return Err(Error::PatchConflict {
+                part: current.worksheet_part_name().to_string(),
+            });
+        }
+        Ok(())
+    }
+
+    fn write(&self, package: &SourceBackedPackage, writer: &mut dyn Write) -> Result<()> {
+        package.check_execution()?;
+        crate::workbook::source::deferred::Change::check(self, package)?;
+        validate_effective_publication_source(package, self.after().worksheet_part_name())?;
+        package.clone().write_part_overlay_shared_to_stream(
+            writer,
+            self.after().worksheet_part_name(),
+            self.after().source_arc()?,
+        )?;
+        Ok(())
+    }
+
+    fn write_authenticated(
+        &self,
+        package: &SourceBackedPackage,
+        writer: &mut dyn Write,
+    ) -> Result<()> {
+        package.check_execution()?;
+        validate_effective_publication_source(package, self.after().worksheet_part_name())?;
+        package.clone().write_part_overlay_shared_to_stream(
+            writer,
+            self.after().worksheet_part_name(),
+            self.after().source_arc()?,
+        )?;
+        Ok(())
+    }
+}
+
+impl SourceBackedWorkbook {
+    /// Begin an isolated hyperlink edit of one worksheet without materializing
+    /// any unselected part body.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the selector does not name a worksheet, its XML
+    /// is invalid, or the source cannot be read.
+    pub fn edit_hyperlinks<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Edit> {
+        if self.edit_package()?.has_encrypted_entries() {
+            return Err(Error::Unsupported {
+                feature: "encrypted XLSX source-backed hyperlink editing",
+            });
+        }
+        let before = Snapshot::load_source_backed(self.edit_package()?, selector)?;
+        Edit::new(self.clone(), before)
+    }
+
+    /// Replay a hyperlink patch onto this workbook.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when the selected worksheet does not
+    /// hold the patch's before state, and the signed-source refusal for a
+    /// changed patch on a signed source.
+    pub fn apply_hyperlinks(&self, patch: &Patch) -> Result<Commit> {
+        apply_change(self, patch)
+    }
+}
+
+/// An isolated hyperlink edit over one exact source worksheet of a
+/// [`SourceBackedWorkbook`]. Dropping it discards it.
+pub struct Edit {
+    workbook: SourceBackedWorkbook,
     before: Snapshot,
     staged: Vec<SourceEntry>,
     mutations: usize,
 }
 
-impl SourceBackedEditor {
-    /// Open with the standard bounded OPC policy.
-    pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
-        Self::from_read_at_with_limits(source, ReadLimits::default())
-    }
-
-    /// Open with an explicit bounded OPC policy.
-    pub fn from_read_at_with_limits(
-        source: Arc<dyn ReadAt>,
-        read_limits: ReadLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_limits(
-            source,
-            read_limits,
-        )?)
-    }
-
-    /// Open with an explicit finite deferred-payload cache policy.
-    pub fn from_read_at_with_cache_limits(
-        source: Arc<dyn ReadAt>,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_cache_limits(
-            source,
-            cache_limits,
-        )?)
-    }
-
-    /// Open with explicit read and cache policies.
-    pub fn from_read_at_with_limits_and_cache_limits(
-        source: Arc<dyn ReadAt>,
-        read_limits: ReadLimits,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
-                source,
-                read_limits,
-                cache_limits,
-            )?,
-        )
-    }
-
-    /// Open with an explicit managed execution context.
-    pub fn from_read_at_with_execution_context(
-        source: Arc<dyn ReadAt>,
-        read_limits: ReadLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_execution_context(
-            source,
-            read_limits,
-            context,
-        )?)
-    }
-
-    /// Open with explicit read and managed execution policies.
-    pub fn from_read_at_with_limits_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        read_limits: ReadLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_execution_context(source, read_limits, context)
-    }
-
-    /// Open with explicit read, cache, and managed execution policies.
-    pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        read_limits: ReadLimits,
-        cache_limits: SourceCacheLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                source,
-                read_limits,
-                cache_limits,
-                context,
-            )?,
-        )
-    }
-
-    /// Build an editor from an already opened deferred OPC package.
-    pub fn from_source_backed_package(package: SourceBackedPackage) -> Result<Self> {
-        package.check_execution()?;
-        if package.has_encrypted_entries() {
-            return Err(Error::Unsupported {
-                feature: "encrypted XLSX source-backed hyperlink editing",
-            });
-        }
-        Ok(Self { package })
-    }
-
-    /// Capture exact source-bound hyperlinks for one existing worksheet.
-    pub fn snapshot<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Snapshot> {
-        self.package.check_execution()?;
-        Snapshot::load_source_backed(&self.package, selector)
-    }
-
-    /// Begin an isolated edit without materializing unselected parts.
-    pub fn edit<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<SourceEdit> {
-        self.package.check_execution()?;
-        let snapshot = self.snapshot(selector)?;
-        SourceEdit::new(snapshot)
-    }
-
-    /// Return content-free payload-cache activity for the deferred package.
-    #[must_use]
-    pub fn cache_diagnostics(&self) -> litchi_opc::SourceCacheDiagnostics {
-        self.package.cache_diagnostics()
-    }
-
-    /// Publish an exact-source-checked commit to a sequential sink.
-    pub fn publish_commit_to_stream<W: Write>(
-        self,
-        writer: W,
-        commit: &Commit,
-    ) -> Result<Snapshot> {
-        self.package.check_execution()?;
-        if !commit
-            .patch()
-            .before()
-            .matches_source_backed(&self.package)?
-        {
-            return Err(Error::PatchConflict {
-                part: commit.patch().before().worksheet_part_name().to_string(),
-            });
-        }
-        let target = if commit.patch().is_empty() {
-            commit.patch().before().clone()
-        } else {
-            commit.patch().after().clone()
-        };
-        if commit.patch().is_empty() {
-            self.package
-                .write_part_overlays_shared_to_stream(writer, Vec::new())?;
-        } else {
-            validate_effective_publication_source(&self.package, target.worksheet_part_name())?;
-            self.package.write_part_overlay_shared_to_stream(
-                writer,
-                target.worksheet_part_name(),
-                target.source_arc()?,
-            )?;
-        }
-        Ok(target)
-    }
-}
-
-impl SourceEdit {
-    fn new(before: Snapshot) -> Result<Self> {
+impl Edit {
+    fn new(workbook: SourceBackedWorkbook, before: Snapshot) -> Result<Self> {
         let staged = before.source_entries()?;
         validate_entries(&staged, &before)?;
         Ok(Self {
+            workbook,
             before,
             staged,
             mutations: 0,
@@ -211,16 +164,6 @@ impl SourceEdit {
     /// only retain their exact target and private relationship ID.
     pub fn put(&mut self, value: super::Hyperlink) -> Result<bool> {
         self.replace_by_reference(value)
-    }
-
-    /// Alias for [`Self::put`].
-    pub fn put_hyperlink(&mut self, value: super::Hyperlink) -> Result<bool> {
-        self.put(value)
-    }
-
-    /// Alias for [`Self::put`].
-    pub fn replace_hyperlink(&mut self, value: super::Hyperlink) -> Result<bool> {
-        self.put(value)
     }
 
     /// Replace one existing hyperlink, allowing its reference to change.
@@ -279,14 +222,6 @@ impl SourceEdit {
         Ok(Some(removed))
     }
 
-    /// Alias for [`Self::remove`].
-    pub fn remove_hyperlink(
-        &mut self,
-        reference: super::HyperlinkReference,
-    ) -> Result<Option<super::Hyperlink>> {
-        self.remove(reference)
-    }
-
     /// Replace the complete staged hyperlink list.
     pub fn set(&mut self, values: Vec<super::Hyperlink>) -> Result<bool> {
         self.before.check_execution()?;
@@ -300,16 +235,6 @@ impl SourceEdit {
         self.record_mutation();
         self.before.check_execution()?;
         Ok(true)
-    }
-
-    /// Alias for [`Self::set`].
-    pub fn replace(&mut self, values: Vec<super::Hyperlink>) -> Result<bool> {
-        self.set(values)
-    }
-
-    /// Alias for [`Self::set`].
-    pub fn replace_all(&mut self, values: Vec<super::Hyperlink>) -> Result<bool> {
-        self.set(values)
     }
 
     /// Remove every hyperlink.
@@ -328,19 +253,13 @@ impl SourceEdit {
         Ok(true)
     }
 
-    /// Whether the authored semantic hyperlink state differs from its source.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.mutations != 0 && !self.before.matches_entries(&self.staged)
-    }
-
     /// Validate and freeze this isolated edit for source-backed publication.
     pub fn commit(self) -> Result<Commit> {
         self.before.check_execution()?;
         let changed = self.mutations != 0 && !self.before.matches_entries_checked(&self.staged)?;
         if !changed {
-            let patch = Patch::new(self.before.clone(), self.before.clone());
-            return Ok(Commit::new(self.before, patch, false));
+            let patch = super::Patch::new(self.before.clone(), self.before);
+            return commit_change(&self.workbook, patch);
         }
         if self.before.protected() {
             return Err(Error::Unsupported {
@@ -368,8 +287,7 @@ impl SourceEdit {
         )?;
         let snapshot = Snapshot::from_rewritten_source(&self.before, output, &self.staged)?;
         snapshot.check_execution()?;
-        let patch = Patch::new(self.before, snapshot.clone());
-        Ok(Commit::new(snapshot, patch, true))
+        commit_change(&self.workbook, super::Patch::new(self.before, snapshot))
     }
 
     fn replace_by_reference(&mut self, value: super::Hyperlink) -> Result<bool> {

@@ -1,5 +1,6 @@
 //! Typed, namespace-aware parsing of `META-INF/manifest.xml`.
 
+use crate::XmlStreamLimits;
 use crate::package as common_package;
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
@@ -294,7 +295,7 @@ impl Manifest {
     ///
     /// Returns an error when the XML is malformed or its ODF manifest and
     /// encryption descriptors are invalid.
-    pub fn parse(xml: &str) -> Result<Self> {
+    pub fn parse(xml: &str, limits: XmlStreamLimits) -> Result<Self> {
         let mut observer = TypedManifestObserver::default();
         let (
             common_package::Manifest {
@@ -302,7 +303,7 @@ impl Manifest {
                 entries: neutral_entries,
             },
             observer_error,
-        ) = common_package::parse_manifest_with_observer(xml, &mut observer)?;
+        ) = common_package::parse_manifest_with_observer(xml, &mut observer, limits)?;
         if let Some(error) = observer_error {
             return Err(error);
         }
@@ -790,7 +791,7 @@ mod tests {
             </m:encryption-data>
           </m:file-entry>
         </m:manifest>"#;
-        let manifest = Manifest::parse(xml).unwrap();
+        let manifest = Manifest::parse(xml, XmlStreamLimits::default()).unwrap();
         let encryption = manifest.entries["content.xml"].encryption.as_ref().unwrap();
         assert_eq!(encryption.start_key, ManifestStartKeyGeneration::Sha256);
         assert!(encryption.checksum.is_some());
@@ -803,22 +804,22 @@ mod tests {
     #[test]
     fn rejects_incomplete_and_excessive_encryption_metadata() {
         let incomplete = r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="content.xml" m:size="1"><m:encryption-data m:checksum-type="SHA1/1K" m:checksum="AAAAAAAAAAAAAAAAAAAAAAAAAAA="/></m:file-entry></m:manifest>"#;
-        assert!(Manifest::parse(incomplete).is_err());
+        assert!(Manifest::parse(incomplete, XmlStreamLimits::default()).is_err());
 
         let excessive = r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="content.xml" m:size="1"><m:encryption-data m:checksum-type="SHA1/1K" m:checksum="AAAAAAAAAAAAAAAAAAAAAAAAAAA="><m:algorithm m:algorithm-name="http://www.w3.org/2001/04/xmlenc#aes256-cbc" m:initialisation-vector="AAAAAAAAAAAAAAAAAAAAAA=="/><m:start-key-generation m:start-key-generation-name="SHA1" m:key-size="20"/><m:key-derivation m:key-derivation-name="PBKDF2" m:salt="AQ==" m:iteration-count="10000001" m:key-size="32"/></m:encryption-data></m:file-entry></m:manifest>"#;
-        assert!(Manifest::parse(excessive).is_err());
+        assert!(Manifest::parse(excessive, XmlStreamLimits::default()).is_err());
     }
 
     #[test]
     fn rejects_cipher_and_derived_key_size_mismatch() {
         let xml = r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="content.xml" m:size="1"><m:encryption-data m:checksum-type="SHA1/1K" m:checksum="AAAAAAAAAAAAAAAAAAAAAAAAAAA="><m:algorithm m:algorithm-name="http://www.w3.org/2001/04/xmlenc#aes128-cbc" m:initialisation-vector="AAAAAAAAAAAAAAAAAAAAAA=="/><m:start-key-generation m:start-key-generation-name="SHA1" m:key-size="20"/><m:key-derivation m:key-derivation-name="PBKDF2" m:salt="AQ==" m:iteration-count="1000" m:key-size="32"/></m:encryption-data></m:file-entry></m:manifest>"#;
-        assert!(Manifest::parse(xml).is_err());
+        assert!(Manifest::parse(xml, XmlStreamLimits::default()).is_err());
     }
 
     #[test]
     fn accepts_checksumless_gcm_but_not_checksumless_cbc() {
         let gcm = r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="content.xml" m:size="1"><m:encryption-data><m:algorithm m:algorithm-name="http://www.w3.org/2009/xmlenc11#aes256-gcm" m:initialisation-vector="AAAAAAAAAAAAAAAA"/><m:start-key-generation m:start-key-generation-name="SHA1" m:key-size="20"/><m:key-derivation m:key-derivation-name="PBKDF2" m:salt="AQ==" m:iteration-count="1000" m:key-size="32"/></m:encryption-data></m:file-entry></m:manifest>"#;
-        let parsed = Manifest::parse(gcm).unwrap();
+        let parsed = Manifest::parse(gcm, XmlStreamLimits::default()).unwrap();
         assert!(
             parsed.entries["content.xml"]
                 .encryption
@@ -834,13 +835,13 @@ mod tests {
                 "http://www.w3.org/2001/04/xmlenc#aes256-cbc",
             )
             .replace("AAAAAAAAAAAAAAAA", "AAAAAAAAAAAAAAAAAAAAAA==");
-        assert!(Manifest::parse(&cbc).is_err());
+        assert!(Manifest::parse(&cbc, XmlStreamLimits::default()).is_err());
     }
 
     #[test]
     fn validates_standard_argon2id_parameters_and_resource_limits() {
         let xml = r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0"><m:file-entry m:full-path="content.xml" m:size="1"><m:encryption-data><m:algorithm m:algorithm-name="http://www.w3.org/2009/xmlenc11#aes256-gcm" m:initialisation-vector="AAAAAAAAAAAAAAAA"/><m:start-key-generation m:start-key-generation-name="http://www.w3.org/2001/04/xmlenc#sha256" m:key-size="32"/><m:key-derivation m:key-derivation-name="urn:oasis:names:tc:opendocument:xmlns:manifest:1.5#argon2id" m:salt="AAAAAAAAAAAAAAAAAAAAAA==" m:argon2-iterations="1" m:argon2-memory="1024" m:argon2-lanes="1"/></m:encryption-data></m:file-entry></m:manifest>"#;
-        let parsed = Manifest::parse(xml).unwrap();
+        let parsed = Manifest::parse(xml, XmlStreamLimits::default()).unwrap();
         assert!(matches!(
             parsed.entries["content.xml"]
                 .encryption
@@ -857,14 +858,14 @@ mod tests {
         ));
 
         let excessive = xml.replace("m:argon2-memory=\"1024\"", "m:argon2-memory=\"262145\"");
-        assert!(Manifest::parse(&excessive).is_err());
+        assert!(Manifest::parse(&excessive, XmlStreamLimits::default()).is_err());
         let incomplete = xml.replace(" m:argon2-lanes=\"1\"", "");
-        assert!(Manifest::parse(&incomplete).is_err());
+        assert!(Manifest::parse(&incomplete, XmlStreamLimits::default()).is_err());
         let mixed = xml.replace(
             "m:argon2-lanes=\"1\"",
             "m:argon2-lanes=\"1\" loext:argon2-lanes=\"1\"",
         );
-        assert!(Manifest::parse(&mixed).is_err());
+        assert!(Manifest::parse(&mixed, XmlStreamLimits::default()).is_err());
     }
 
     #[test]
@@ -879,8 +880,8 @@ mod tests {
             </p:encryption-data>
           </p:file-entry>
         </p:manifest>"#;
-        let neutral = crate::package::parse_manifest(xml).unwrap();
-        let typed = Manifest::parse(xml).unwrap();
+        let neutral = crate::package::parse_manifest(xml, XmlStreamLimits::default()).unwrap();
+        let typed = Manifest::parse(xml, XmlStreamLimits::default()).unwrap();
 
         assert_eq!(typed.mimetype, neutral.mimetype);
         for (path, neutral_entry) in &neutral.entries {
@@ -899,12 +900,14 @@ mod tests {
         );
 
         let within_limit = manifest_with_entry_count(crate::package::MAX_MANIFEST_ENTRIES);
-        let parsed = Manifest::parse(&within_limit).unwrap();
+        let parsed = Manifest::parse(&within_limit, XmlStreamLimits::default()).unwrap();
         assert_eq!(parsed.entries.len(), crate::package::MAX_MANIFEST_ENTRIES);
 
         let over_limit = manifest_with_entry_count(crate::package::MAX_MANIFEST_ENTRIES + 1);
         assert_eq!(
-            Manifest::parse(&over_limit).unwrap_err().to_string(),
+            Manifest::parse(&over_limit, XmlStreamLimits::default())
+                .unwrap_err()
+                .to_string(),
             "Invalid format: manifest file entries exceed the configured ODF ceiling"
         );
     }
@@ -920,7 +923,7 @@ mod tests {
             </encryption-data>
           </file-entry>
         </manifest>"#;
-        let manifest = Manifest::parse(xml).unwrap();
+        let manifest = Manifest::parse(xml, XmlStreamLimits::default()).unwrap();
         assert!(manifest.entries["content.xml"].encryption.is_some());
     }
 
@@ -928,25 +931,31 @@ mod tests {
     fn preserves_exact_encryption_error_precedence_and_messages() {
         let misplaced = r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:algorithm m:algorithm-name="vendor" m:initialisation-vector="not-base64"/></m:manifest>"#;
         assert_eq!(
-            Manifest::parse(misplaced).unwrap_err().to_string(),
+            Manifest::parse(misplaced, XmlStreamLimits::default())
+                .unwrap_err()
+                .to_string(),
             "Invalid format: Encryption child appears outside encryption-data"
         );
 
         let missing = r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="content.xml" m:size="1"><m:encryption-data><m:algorithm m:initialisation-vector="AAAAAAAAAAAAAAAAAAAAAA=="/></m:encryption-data></m:file-entry></m:manifest>"#;
         assert_eq!(
-            Manifest::parse(missing).unwrap_err().to_string(),
+            Manifest::parse(missing, XmlStreamLimits::default())
+                .unwrap_err()
+                .to_string(),
             "Invalid format: Missing manifest attribute 'algorithm-name'"
         );
 
         let empty = r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="content.xml" m:size="1"><m:encryption-data/></m:file-entry></m:manifest>"#;
         assert_eq!(
-            Manifest::parse(empty).unwrap_err().to_string(),
+            Manifest::parse(empty, XmlStreamLimits::default())
+                .unwrap_err()
+                .to_string(),
             "Invalid format: ODF package has encrypted entries with incomplete encryption metadata"
         );
 
         let duplicate_algorithm = r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="content.xml" m:size="1"><m:encryption-data><m:algorithm m:algorithm-name="http://www.w3.org/2009/xmlenc11#aes256-gcm" m:initialisation-vector="AAAAAAAAAAAAAAAA"/><m:algorithm m:algorithm-name="http://www.w3.org/2009/xmlenc11#aes256-gcm" m:initialisation-vector="AAAAAAAAAAAAAAAA"/></m:encryption-data></m:file-entry></m:manifest>"#;
         assert_eq!(
-            Manifest::parse(duplicate_algorithm)
+            Manifest::parse(duplicate_algorithm, XmlStreamLimits::default())
                 .unwrap_err()
                 .to_string(),
             "Invalid format: Duplicate manifest algorithm element"
@@ -957,7 +966,9 @@ mod tests {
     fn rejects_encrypted_entries_without_plaintext_size() {
         let xml = r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="content.xml"><m:encryption-data><m:algorithm m:algorithm-name="http://www.w3.org/2009/xmlenc11#aes256-gcm" m:initialisation-vector="AAAAAAAAAAAAAAAA"/><m:start-key-generation m:start-key-generation-name="SHA1" m:key-size="20"/><m:key-derivation m:key-derivation-name="PBKDF2" m:salt="AQ==" m:iteration-count="1000" m:key-size="32"/></m:encryption-data></m:file-entry></m:manifest>"#;
         assert_eq!(
-            Manifest::parse(xml).unwrap_err().to_string(),
+            Manifest::parse(xml, XmlStreamLimits::default())
+                .unwrap_err()
+                .to_string(),
             "Invalid format: Encrypted manifest entry 'content.xml' has no plaintext size"
         );
     }
@@ -998,11 +1009,13 @@ mod tests {
         );
 
         let malformed = r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="content.xml" m:size="1"><m:encryption-data><m:algorithm m:algorithm-name="vendor" m:initialisation-vector="AQ=="/></m:file-entry></m:manifest>"#;
-        let error = Manifest::parse(malformed).unwrap_err().to_string();
+        let error = Manifest::parse(malformed, XmlStreamLimits::default())
+            .unwrap_err()
+            .to_string();
         assert!(error.starts_with("Invalid format: Invalid manifest XML:"));
 
         let xml = r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="content.xml" m:size="1"><m:encryption-data><m:algorithm m:algorithm-name="http://www.w3.org/2009/xmlenc11#aes256-gcm" m:initialisation-vector="AAAAAAAAAAAAAAAA"/><m:start-key-generation m:start-key-generation-name="SHA1" m:key-size="20"/><m:key-derivation m:key-derivation-name="PBKDF2" m:salt="AQ==" m:iteration-count="1000" m:key-size="32"/></m:encryption-data><m:encryption-data><m:algorithm m:algorithm-name="http://www.w3.org/2009/xmlenc11#aes256-gcm" m:initialisation-vector="AQEBAQEBAQEBAQEB"/><m:start-key-generation m:start-key-generation-name="SHA1" m:key-size="20"/><m:key-derivation m:key-derivation-name="PBKDF2" m:salt="AQ==" m:iteration-count="1000" m:key-size="32"/></m:encryption-data></m:file-entry></m:manifest>"#;
-        let manifest = Manifest::parse(xml).unwrap();
+        let manifest = Manifest::parse(xml, XmlStreamLimits::default()).unwrap();
         assert!(matches!(
             manifest.entries["content.xml"].encryption.as_ref().unwrap().algorithm,
             ManifestEncryptionAlgorithm::Aes256Gcm { iv } if iv == [1; 12]
@@ -1014,14 +1027,16 @@ mod tests {
         let valid = r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="/" m:media-type="application/vnd.oasis.opendocument.text"/><m:file-entry m:full-path="content.xml" m:media-type="text/xml"/></m:manifest>"#;
         for length in 0..=valid.len() {
             let truncated = &valid[..length];
-            let outcome = std::panic::catch_unwind(|| Manifest::parse(truncated));
+            let outcome =
+                std::panic::catch_unwind(|| Manifest::parse(truncated, XmlStreamLimits::default()));
             assert!(outcome.is_ok(), "truncation at byte {length} panicked");
         }
         for offset in (0..valid.len()).step_by(5) {
             let mut mutated = valid.as_bytes().to_vec();
             mutated[offset] = b'X';
             let mutated = String::from_utf8(mutated).unwrap();
-            let outcome = std::panic::catch_unwind(|| Manifest::parse(&mutated));
+            let outcome =
+                std::panic::catch_unwind(|| Manifest::parse(&mutated, XmlStreamLimits::default()));
             assert!(outcome.is_ok(), "mutation at byte {offset} panicked");
         }
     }
@@ -1030,7 +1045,9 @@ mod tests {
     fn ignores_wrong_namespace_encryption_children() {
         let xml = r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="content.xml" m:size="1"><m:encryption-data><x:algorithm xmlns:x="urn:example:not-an-odf-namespace" x:algorithm-name="vendor" x:initialisation-vector="AQ=="/></m:encryption-data></m:file-entry></m:manifest>"#;
         assert_eq!(
-            Manifest::parse(xml).unwrap_err().to_string(),
+            Manifest::parse(xml, XmlStreamLimits::default())
+                .unwrap_err()
+                .to_string(),
             "Invalid format: Missing encryption algorithm"
         );
     }
@@ -1038,7 +1055,9 @@ mod tests {
     #[test]
     fn keeps_neutral_xml_errors_ahead_of_observer_errors() {
         let xml = r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="content.xml" m:size="1"><m:encryption-data><m:algorithm m:algorithm-name="vendor" m:initialisation-vector="AQ=="/></m:encryption-data></m:file-entry><m:broken"#;
-        let error = Manifest::parse(xml).unwrap_err().to_string();
+        let error = Manifest::parse(xml, XmlStreamLimits::default())
+            .unwrap_err()
+            .to_string();
         assert!(error.starts_with("Invalid format: Invalid manifest XML:"));
     }
 
@@ -1052,7 +1071,7 @@ mod tests {
           </m:file-entry>
           <m:file-entry m:full-path="content.xml" m:media-type="text/xml"/>
         </m:manifest>"#;
-        let error = Manifest::parse(duplicate_after_bad_encryption)
+        let error = Manifest::parse(duplicate_after_bad_encryption, XmlStreamLimits::default())
             .unwrap_err()
             .to_string();
         assert_eq!(
@@ -1065,7 +1084,7 @@ mod tests {
             <m:encryption-data><m:algorithm m:algorithm-name="vendor-cipher" m:initialisation-vector="AQ=="/></m:encryption-data>
           </m:file-entry>
         </m:manifest>"#;
-        let error = Manifest::parse(malformed_size_before_encryption)
+        let error = Manifest::parse(malformed_size_before_encryption, XmlStreamLimits::default())
             .unwrap_err()
             .to_string();
         assert!(error.contains("Invalid manifest size for 'content.xml'"));
@@ -1078,7 +1097,9 @@ mod tests {
           <alt:file-entry alt:full-path="content.xml" alt:media-type="text/xml"/>
           <alt:file-entry alt:full-path="content.xml" alt:media-type="text/xml"/>
         </alt:manifest>"#;
-        let error = Manifest::parse(xml).unwrap_err().to_string();
+        let error = Manifest::parse(xml, XmlStreamLimits::default())
+            .unwrap_err()
+            .to_string();
         assert_eq!(
             error,
             "Invalid format: Duplicate manifest file entry 'content.xml'"

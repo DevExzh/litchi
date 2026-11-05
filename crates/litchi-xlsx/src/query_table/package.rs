@@ -74,7 +74,11 @@ pub fn find_worksheet_query_table(
 }
 
 /// Add an inert query-table part. The referenced connection must already exist.
-pub fn add_worksheet_query_table(
+///
+/// Adding changes the package, so a signed package is refused with
+/// [`crate::Error::Signed`] before anything is changed: remove the signature
+/// explicitly first ([`OpcPackage::unsign`]).
+pub(crate) fn add_worksheet_query_table(
     package: &mut OpcPackage,
     worksheet_part: &PackURI,
     query_table: Table,
@@ -90,6 +94,7 @@ pub fn add_worksheet_query_table(
         Conformance::Transitional => QUERY_TABLE_RELATIONSHIP_TYPE,
         Conformance::Strict => STRICT_QUERY_TABLE_RELATIONSHIP_TYPE,
     };
+    crate::signature_policy::ensure_unsigned(package)?;
     package.try_add_part(Box::new(BlobPart::new(
         part_name.clone(),
         QUERY_TABLE_CONTENT_TYPE.into(),
@@ -104,7 +109,6 @@ pub fn add_worksheet_query_table(
             relationship_id.clone(),
             false,
         );
-    package.unsign();
     Ok(Part::new(
         relationship_id,
         part_name.to_string(),
@@ -112,7 +116,13 @@ pub fn add_worksheet_query_table(
     ))
 }
 
-pub fn replace_worksheet_query_table(
+/// Replace the definition of one existing query-table part.
+///
+/// Replacing always writes the part, so a signed package is refused with
+/// [`crate::Error::Signed`] before anything is changed, even when the
+/// serialized definition equals the stored one: remove the signature
+/// explicitly first ([`OpcPackage::unsign`]).
+pub(crate) fn replace_worksheet_query_table(
     package: &mut OpcPackage,
     worksheet_part: &PackURI,
     relationship_id: &str,
@@ -125,32 +135,22 @@ pub fn replace_worksheet_query_table(
     let xml = query_table.to_xml(conformance)?;
     parse_query_table(&xml)?;
     let part_name = PackURI::new(existing.part_name()).map_err(invalid)?;
+    crate::signature_policy::ensure_unsigned(package)?;
     package.add_part(Box::new(BlobPart::new(
         part_name,
         QUERY_TABLE_CONTENT_TYPE.into(),
         xml,
     )));
-    package.unsign();
     Ok(())
 }
 
-pub fn update_worksheet_query_table(
-    package: &mut OpcPackage,
-    worksheet_part: &PackURI,
-    relationship_id: &str,
-    query_table: Table,
-    conformance: Conformance,
-) -> Result<()> {
-    replace_worksheet_query_table(
-        package,
-        worksheet_part,
-        relationship_id,
-        query_table,
-        conformance,
-    )
-}
-
-pub fn remove_worksheet_query_table(
+/// Remove one query-table relationship and its unreferenced part.
+///
+/// An absent relationship leaves the package untouched and returns `false`,
+/// signed or not. Removing a query table changes the package, so a signed
+/// package is refused with [`crate::Error::Signed`]: remove the signature
+/// explicitly first ([`OpcPackage::unsign`]).
+pub(crate) fn remove_worksheet_query_table(
     package: &mut OpcPackage,
     worksheet_part: &PackURI,
     relationship_id: &str,
@@ -160,6 +160,7 @@ pub fn remove_worksheet_query_table(
         return Ok(false);
     };
     let part_name = PackURI::new(existing.part_name()).map_err(invalid)?;
+    crate::signature_policy::ensure_unsigned(package)?;
     package
         .get_part_mut(worksheet_part)?
         .rels_mut()
@@ -167,12 +168,18 @@ pub fn remove_worksheet_query_table(
     if !package_part_is_referenced(package, &part_name) {
         package.remove_part(&part_name);
     }
-    package.unsign();
     Ok(true)
 }
 
 /// Reassign deterministic query-table relationship IDs in caller-specified order.
-pub fn reorder_worksheet_query_tables(
+///
+/// When every relationship already carries its deterministic ID, type and
+/// target in the requested order (always the case for a worksheet without
+/// query tables), nothing is published and a signed package keeps its
+/// signature byte for byte. Any other reorder changes the package, so a signed
+/// package is refused with [`crate::Error::Signed`]: remove the signature
+/// explicitly first ([`OpcPackage::unsign`]).
+pub(crate) fn reorder_worksheet_query_tables(
     package: &mut OpcPackage,
     worksheet_part: &PackURI,
     ordered_relationship_ids: &[String],
@@ -215,6 +222,10 @@ pub fn reorder_worksheet_query_tables(
             || QUERY_TABLE_RELATIONSHIP_TYPE.into(),
             |relationship| relationship.reltype().to_string(),
         );
+    if relationships_already_ordered(package, worksheet_part, &ordered, &relationship_type)? {
+        return Ok(ordered);
+    }
+    crate::signature_policy::ensure_unsigned(package)?;
     let worksheet = package.get_part_mut(worksheet_part)?;
     for item in &existing {
         worksheet.rels_mut().remove(&item.relationship_id);
@@ -231,12 +242,43 @@ pub fn reorder_worksheet_query_tables(
         );
         result.push(Part::new(id, item.part_name, item.query_table));
     }
-    package.unsign();
     Ok(result)
 }
 
+/// Whether the worksheet's query-table relationships already are exactly the
+/// ones [`reorder_worksheet_query_tables`] would write for `ordered`: the
+/// deterministic ID at each position, the selected relationship type and the
+/// same relative target. Such a reorder publishes nothing.
+fn relationships_already_ordered(
+    package: &OpcPackage,
+    worksheet_part: &PackURI,
+    ordered: &[Part],
+    relationship_type: &str,
+) -> Result<bool> {
+    let worksheet = package.get_part(worksheet_part)?;
+    for (offset, item) in ordered.iter().enumerate() {
+        if item.relationship_id != format!("rIdQueryTable{}", offset + 1) {
+            return Ok(false);
+        }
+        let target = PackURI::new(item.part_name())
+            .map_err(invalid)?
+            .relative_ref(worksheet_part.base_uri());
+        let Some(relationship) = worksheet.rels().get(&item.relationship_id) else {
+            return Ok(false);
+        };
+        if relationship.reltype() != relationship_type
+            || relationship.is_external()
+            || relationship.target_ref() != target
+        {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
 fn validate_query_table_connection(package: &OpcPackage, connection_id: u32) -> Result<()> {
-    let connections = crate::connections::load_from_package(package)
+    let limits = package.read_limits();
+    let connections = crate::connections::load_from_package(package, &limits)
         .map_err(|_source| invalid("connections graph is invalid"))?
         .ok_or_else(|| invalid("query table requires a connections part"))?;
     if connections

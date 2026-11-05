@@ -92,9 +92,14 @@ fn memory_ranges_and_token_boundaries_are_checked_before_retention() {
     let mut overrun = payload(&tokens, &extra);
     overrun[20..22].copy_from_slice(&u16::MAX.to_le_bytes());
     assert!(parse(&overrun).is_err());
+    // Reserved Formula flags "MUST be ignored" ([MS-XLS] 2.4.127): they
+    // neither reject nor change the parse (record 0308).
     let mut reserved_flags = payload(&tokens, &extra);
     reserved_flags[14] = 0x02;
-    assert!(parse(&reserved_flags).is_err());
+    assert_eq!(
+        parse(&reserved_flags).is_ok(),
+        parse(&payload(&tokens, &extra)).is_ok()
+    );
 }
 
 #[test]

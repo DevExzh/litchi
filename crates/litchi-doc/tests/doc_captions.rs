@@ -32,10 +32,11 @@
     reason = "integration-test fixtures favor explicit wire values and concise panic-driven assertions over production-style ergonomics"
 )]
 
-use litchi_cfb::{OleFile, OleWriter};
+use litchi_cfb::OleFile;
+use litchi_doc::Package;
 use litchi_doc::captions::{
-    AutoEntry, AutoTable, Definition, Editor, Format, Heading, Info, LabelTable, Location,
-    Numbering, Separator, Tables,
+    AutoEntry, AutoTable, Definition, Format, Heading, Info, LabelTable, Location, Numbering,
+    Separator, Tables,
 };
 use std::io::Cursor;
 
@@ -76,31 +77,48 @@ fn facade_exposes_contextual_caption_types_without_repeated_prefixes() {
 }
 
 #[test]
-fn package_editor_publishes_caption_crud_without_rewriting_unrelated_table_bytes() {
-    let original_table = b"opaque table prefix\0";
-    let original = base_template(original_table);
-    let mut editor = Editor::open(original).expect("template package opens");
-    assert!(!editor.captions().is_present());
+fn package_edit_publishes_caption_crud_without_rewriting_unrelated_table_bytes() {
+    let original = common::authored_template("caption source");
+    let original_table = table_stream(&original);
+    let package = Package::from_bytes(&original).expect("template package opens");
+    let mut edit = package.edit_captions().expect("template edit opens");
+    assert!(!edit.captions().expect("caption snapshot").is_present());
 
     let tables = sample_tables();
-    let committed = editor.set(tables.clone()).expect("caption tables publish");
-    let bytes = committed
-        .snapshot()
-        .finish()
-        .expect("package snapshot renders");
-    let reopened = Editor::open(bytes.clone()).expect("published package reopens");
-    assert_eq!(reopened.tables(), &tables);
-    assert!(!reopened.is_changed());
+    edit.set(tables.clone()).expect("caption tables stage");
+    let committed = edit.commit().expect("caption tables publish");
+    assert!(committed.diagnostics().changed());
+    let bytes = committed.patch().after_bytes().to_vec();
+    let mut reopened = committed
+        .package()
+        .edit_captions()
+        .expect("published package reopens");
+    assert_eq!(reopened.tables().expect("caption tables"), &tables);
 
-    let mut ole = OleFile::open(Cursor::new(bytes.clone())).expect("published CFB opens");
-    let table = ole.open_stream(&["0Table"]).expect("table stream exists");
-    assert!(table.starts_with(original_table));
-    assert!(committed.package_patch().inverse().apply(&bytes).is_ok());
+    let table = table_stream(&bytes);
+    assert!(table.starts_with(&original_table));
+    let restored = committed
+        .package()
+        .apply_captions(&committed.patch().inverse())
+        .expect("inverse patch applies");
+    assert_eq!(restored.package().to_bytes().unwrap(), original);
 
-    let mut cleared = Editor::open(bytes).expect("published package opens for clear");
-    let cleared = cleared.clear().expect("caption ranges clear");
-    let cleared_bytes = cleared.snapshot().finish().expect("clear renders");
-    let mut ole = OleFile::open(Cursor::new(cleared_bytes)).expect("cleared CFB opens");
+    let mut cleared = committed
+        .package()
+        .edit_captions()
+        .expect("published package opens for clear");
+    cleared.clear().expect("caption ranges clear");
+    let cleared_bytes = cleared
+        .commit()
+        .expect("clear renders")
+        .patch()
+        .after_bytes()
+        .to_vec();
+    let mut ole = OleFile::open(
+        Cursor::new(cleared_bytes),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .expect("cleared CFB opens");
     let word = ole
         .open_stream(&["WordDocument"])
         .expect("WordDocument stream exists");
@@ -111,22 +129,30 @@ fn package_editor_publishes_caption_crud_without_rewriting_unrelated_table_bytes
 }
 
 #[test]
-fn package_editor_rejects_stale_transactions_and_keeps_noop_bytes_exact() {
-    let mut editor = Editor::open(base_template(b"untouched")).expect("template opens");
+fn package_edit_rejects_stale_record_edits_and_keeps_noop_bytes_exact() {
+    let package =
+        Package::from_bytes(&common::authored_template("untouched")).expect("template opens");
+    let mut edit = package.edit_captions().expect("template edit opens");
     let labels = sample_tables().labels().cloned().expect("labels");
-    editor
-        .replace_labels(labels.clone())
-        .expect("labels publish");
-    let published = editor.snapshot().expect("snapshot captures");
-    let exact = published.finish().expect("snapshot renders");
+    edit.replace_labels(labels).expect("labels stage");
+    let published = edit.commit().expect("labels publish");
+    let exact = published.patch().after_bytes().to_vec();
 
-    let mut noop = Editor::open(exact.clone()).expect("published package reopens");
-    let noop_commit = noop
-        .set(noop.tables().clone())
-        .expect("semantic no-op publishes");
-    assert_eq!(noop_commit.snapshot().finish().unwrap(), exact);
+    let mut noop = published
+        .package()
+        .edit_captions()
+        .expect("published package reopens");
+    let tables = noop.tables().expect("caption tables").clone();
+    noop.set(tables).expect("semantic no-op stages");
+    let noop_commit = noop.commit().expect("semantic no-op publishes");
+    assert!(!noop_commit.diagnostics().changed());
+    assert_eq!(noop_commit.package().to_bytes().unwrap(), exact);
 
-    let stale = editor.edit();
+    let mut editor = published
+        .package()
+        .edit_captions()
+        .expect("published package reopens");
+    let stale = editor.captions().expect("caption snapshot").edit();
     editor
         .replace_auto(
             AutoTable::try_new(vec![
@@ -134,13 +160,28 @@ fn package_editor_rejects_stale_transactions_and_keeps_noop_bytes_exact() {
             ])
             .unwrap(),
         )
-        .expect("auto-caption rules publish");
+        .expect("auto-caption rules stage");
     assert!(editor.apply(stale).is_err());
 }
 
 #[test]
-fn package_editor_rejects_caption_ranges_on_ordinary_documents() {
-    assert!(Editor::open(base_document(b"table", false)).is_err());
+fn package_edit_defers_caption_range_rejection_on_ordinary_documents() {
+    let package = Package::from_bytes(&common::authored_document("table")).expect("document opens");
+    let mut edit = package
+        .edit_captions()
+        .expect("caption edit construction is deferred");
+    assert!(edit.captions().is_err());
+}
+
+fn table_stream(bytes: &[u8]) -> Vec<u8> {
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+        .expect("fixture CFB opens");
+    let name = if ole.exists(&["1Table"]) {
+        "1Table"
+    } else {
+        "0Table"
+    };
+    ole.open_stream(&[name]).expect("table stream exists")
 }
 
 fn sample_tables() -> Tables {
@@ -152,38 +193,4 @@ fn sample_tables() -> Tables {
     ])
     .unwrap();
     Tables::try_new(Some(labels), Some(auto)).unwrap()
-}
-
-fn base_template(table: &[u8]) -> Vec<u8> {
-    base_document(table, true)
-}
-
-fn base_document(table: &[u8], template: bool) -> Vec<u8> {
-    const DOP_INDEX: usize = 31;
-    let pointer_count = 136usize;
-    let pointer_end = 154 + pointer_count * 8;
-    let mut word = vec![0; pointer_end + 4];
-    word[0..2].copy_from_slice(&0xa5ecu16.to_le_bytes());
-    // FibBase.csw and cslw are fixed MS-DOC counts.
-    word[32..34].copy_from_slice(&0x000eu16.to_le_bytes());
-    word[62..64].copy_from_slice(&0x0016u16.to_le_bytes());
-    word[2..4].copy_from_slice(&0x00c1u16.to_le_bytes());
-    word[10..12].copy_from_slice(&u16::from(template).to_le_bytes());
-    word[152..154].copy_from_slice(&(pointer_count as u16).to_le_bytes());
-    word[pointer_end..pointer_end + 2].copy_from_slice(&2u16.to_le_bytes());
-    word[pointer_end + 2..pointer_end + 4].copy_from_slice(&0x0101u16.to_le_bytes());
-
-    let mut table = table.to_vec();
-    let dop_offset = table.len();
-    table.extend_from_slice(&[0u8; 500]);
-    let dop_pointer = 154 + DOP_INDEX * 8;
-    word[dop_pointer..dop_pointer + 4].copy_from_slice(&(dop_offset as u32).to_le_bytes());
-    word[dop_pointer + 4..dop_pointer + 8].copy_from_slice(&500u32.to_le_bytes());
-
-    let mut writer = OleWriter::new();
-    writer.create_stream(&["WordDocument"], &word).unwrap();
-    writer.create_stream(&["0Table"], &table).unwrap();
-    let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
-    common::with_valid_word97_dop(output.into_inner())
 }

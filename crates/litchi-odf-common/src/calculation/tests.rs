@@ -63,7 +63,9 @@ fn parses_all_settings_with_namespace_aliases() {
             <t:iteration t:status="enable" t:steps="100" t:maximum-difference="NaN"/>
           </t:calculation-settings></o:spreadsheet></o:body>
         </o:document-content>"#;
-    let settings = parse(xml).unwrap().unwrap();
+    let settings = parse(xml, crate::XmlStreamLimits::default())
+        .unwrap()
+        .unwrap();
     assert_eq!(settings.case_sensitive, Some(true));
     assert_eq!(settings.null_year.unwrap().get(), 1930);
     assert_eq!(
@@ -85,14 +87,15 @@ fn rejects_invalid_settings_and_records_out_of_order_ones() {
             <t:iteration t:steps="0"/><t:null-date t:date-value="not-a-date"/>
           </t:calculation-settings></o:spreadsheet></o:body>
         </o:document-content>"#;
-    assert!(parse(invalid).is_err());
+    assert!(parse(invalid, crate::XmlStreamLimits::default()).is_err());
     let out_of_order = invalid
         .replace("t:null-year=\"0\"", "t:null-year=\"1930\"")
         .replace("t:steps=\"0\"", "t:steps=\"1\"")
         .replace("not-a-date", "1899-12-30");
     // LENIENCY_AUDIT F9.9: LibreOffice reads either child order, so the
     // reordered settings are accepted and the repair is recorded.
-    let (settings, report) = super::codec::parse_with_report(&out_of_order).unwrap();
+    let (settings, report) =
+        super::codec::parse_with_report(&out_of_order, crate::XmlStreamLimits::default()).unwrap();
     let settings = settings.unwrap();
     assert!(settings.null_date.is_some() && settings.iteration.is_some());
     assert_eq!(report.defects().len(), 1);
@@ -103,20 +106,20 @@ fn rejects_invalid_settings_and_records_out_of_order_ones() {
         )
     );
     let duplicate_child = out_of_order.replace("<t:iteration t:steps=\"1\"/>", "<t:null-date/>");
-    assert!(parse(&duplicate_child).is_err());
+    assert!(parse(&duplicate_child, crate::XmlStreamLimits::default()).is_err());
     let duplicate = r#"<o:document-content
           xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
           xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0">
           <o:body><o:spreadsheet><t:calculation-settings/><t:calculation-settings/>
           </o:spreadsheet></o:body></o:document-content>"#;
-    assert!(parse(duplicate).is_err());
+    assert!(parse(duplicate, crate::XmlStreamLimits::default()).is_err());
     let nested = r#"<o:document-content
           xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
           xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0">
           <o:body><o:spreadsheet><t:table t:name="Bad"><t:table-row><t:table-cell>
             <t:calculation-settings/></t:table-cell></t:table-row></t:table>
           </o:spreadsheet></o:body></o:document-content>"#;
-    assert!(parse(nested).is_err());
+    assert!(parse(nested, crate::XmlStreamLimits::default()).is_err());
 }
 
 #[cfg(test)]
@@ -133,7 +136,9 @@ mod chart_document_tests {
   <table:calculation-settings table:case-sensitive="true" table:precision-as-shown="false"/>
  </office:chart></office:body>
 </office:document-content>"#;
-        let settings = parse(xml).unwrap().unwrap();
+        let settings = parse(xml, crate::XmlStreamLimits::default())
+            .unwrap()
+            .unwrap();
         assert_eq!(settings.case_sensitive, Some(true));
         assert_eq!(settings.precision_as_shown, Some(false));
     }
@@ -148,7 +153,7 @@ mod chart_document_tests {
   <table:calculation-settings/>
  </chart:chart></office:chart></office:body>
 </office:document-content>"#;
-        assert!(parse(xml).is_err());
+        assert!(parse(xml, crate::XmlStreamLimits::default()).is_err());
     }
 }
 
@@ -219,7 +224,7 @@ mod handler_tests {
             text_inside,
             unterminated,
         ] {
-            let expected = parse(&xml)
+            let expected = parse(&xml, crate::XmlStreamLimits::default())
                 .map(|settings| format!("{settings:?}"))
                 .map_err(|error| error.to_string());
             let actual = handler_parse(&xml)

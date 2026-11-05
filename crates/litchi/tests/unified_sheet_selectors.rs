@@ -1,9 +1,26 @@
+//! XLSX worksheet selection through the `Xlsx` handle's `sheet` method.
+//!
+//! Selection is XLSX's: names match case-insensitively (`"dAtA"` selects
+//! `Data`), positions are zero-based, selecting is catalog-only, and cell
+//! reads keep the exact XLSX cell state and the typed XLSX error.
+//!
+//! M0a step S8c ported these tests from the facade workbook's sheet selector
+//! to `litchi::open` / `File::Xlsx(xlsx) => xlsx.sheet(..)`.
+
 #![cfg(feature = "xlsx")]
+#![allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    clippy::panic,
+    reason = "test assertions panic on failure by design"
+)]
 
 use std::io::{Cursor, Write};
 
-use litchi::sheet::{SelectedCellView, SelectedWorksheet, Workbook};
+use litchi::error::Source;
+use litchi::format::xlsx::{SelectedCellView, SelectedWorksheet, Xlsx};
 use litchi::xlsx::{Cell, Error as XlsxError, Value};
+use litchi::{Code, File};
 use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
 
 const CONTENT_TYPES: &str = "http://schemas.openxmlformats.org/package/2006/content-types";
@@ -59,12 +76,46 @@ fn valid_second_sheet() -> &'static [u8] {
 
 fn assert_send_sync<T: Send + Sync>() {}
 
+/// The XLSX handle of an opened workbook.
+#[track_caller]
+fn xlsx(file: &File) -> &Xlsx {
+    match file {
+        File::Xlsx(xlsx) => xlsx,
+        other => panic!("expected an XLSX workbook, got {other:?}"),
+    }
+}
+
+/// The XLSX error a selection or cell read reported.
+#[track_caller]
+fn xlsx_error(error: &litchi::Error) -> &XlsxError {
+    match error.leaf() {
+        Source::Xlsx(error) => error,
+        other => panic!("expected an XLSX error, got {other:?}"),
+    }
+}
+
+/// `error` reports that the source changed after open.
+#[track_caller]
+fn assert_source_changed(error: &litchi::Error) {
+    assert_eq!(error.code(), Code::IoError, "{error:?}");
+    let changed = matches!(
+        error.leaf(),
+        Source::Core(litchi::common::Error::SourceChanged { .. })
+            | Source::Opc(litchi::opc::OpcError::SourceChanged { .. })
+            | Source::Xlsx(XlsxError::Package(
+                litchi::opc::OpcError::SourceChanged { .. }
+            ))
+    );
+    assert!(changed, "expected a source change, got {error:?}");
+}
+
 #[test]
 fn public_selector_preserves_exact_owned_cell_semantics() {
     assert_send_sync::<SelectedWorksheet>();
 
-    let workbook = Workbook::from_bytes(workbook_bytes("7", valid_second_sheet()))
+    let file = litchi::open_bytes(workbook_bytes("7", valid_second_sheet()))
         .expect("open source-backed unified XLSX");
+    let workbook = xlsx(&file);
     let selected = workbook
         .sheet("dAtA")
         .expect("select by case-folded name")
@@ -123,23 +174,28 @@ fn public_selector_preserves_exact_owned_cell_semantics() {
         cells[..5]
     );
 
+    // A coordinate or range the caller passed is the caller's error, not a
+    // corrupt file (M0a S9); the typed leaf is unchanged.
     let coordinate_error = selected.cell("A0").unwrap_err();
     assert!(matches!(
-        coordinate_error.downcast_ref::<XlsxError>(),
-        Some(XlsxError::Coordinate(_))
+        xlsx_error(&coordinate_error),
+        XlsxError::Coordinate(_)
     ));
+    assert_eq!(coordinate_error.code(), Code::InvalidArgument);
     let range_error = selected.cells((1_u32, 1_u32, 1_u32, 2_u32)).unwrap_err();
-    assert!(matches!(
-        range_error.downcast_ref::<XlsxError>(),
-        Some(XlsxError::Range(_))
-    ));
+    assert!(matches!(xlsx_error(&range_error), XlsxError::Range(_)));
+    assert_eq!(range_error.code(), Code::InvalidArgument);
+    let outside = selected.cell((1_048_576_u32, 0_u32)).unwrap_err();
+    assert!(matches!(xlsx_error(&outside), XlsxError::Coordinate(_)));
+    assert_eq!(outside.code(), Code::OutOfRange);
 }
 
 #[test]
 fn selected_access_defers_unselected_malformed_worksheet() {
     let malformed = br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1">"#;
-    let workbook = Workbook::from_bytes(workbook_bytes("7", malformed))
+    let file = litchi::open_bytes(workbook_bytes("7", malformed))
         .expect("catalog does not read malformed worksheet payload");
+    let workbook = xlsx(&file);
 
     let data = workbook.sheet("Data").unwrap().unwrap();
     assert!(matches!(
@@ -155,15 +211,21 @@ fn selected_access_defers_unselected_malformed_worksheet() {
 
 #[test]
 fn non_grid_sheet_returns_typed_not_worksheet_error() {
-    let workbook = Workbook::from_bytes(workbook_bytes("7", valid_second_sheet())).unwrap();
-    let chart = workbook.sheet("Chart").unwrap().unwrap();
+    let file = litchi::open_bytes(workbook_bytes("7", valid_second_sheet())).unwrap();
+    let chart = xlsx(&file).sheet("Chart").unwrap().unwrap();
     let error = chart.cell("A1").unwrap_err();
+    assert_eq!(error.code(), Code::UnsupportedType, "{error:?}");
     assert!(matches!(
-        error.downcast_ref::<XlsxError>(),
-        Some(XlsxError::NotWorksheet { sheet }) if sheet == "Chart"
+        xlsx_error(&error),
+        XlsxError::NotWorksheet { sheet } if sheet == "Chart"
     ));
 }
 
+/// The facade workbook's selector refused a non-XLSX workbook at run time
+/// (`Unsupported("... only for XLSX")`). The selector is now a method of
+/// the XLSX handle, so the refusal is static: an XLSB workbook opens as
+/// `File::Xlsb`, whose handle has no `sheet` method, and its generic
+/// workbook view still reads.
 #[cfg(feature = "xlsb")]
 #[test]
 fn non_xlsx_workbook_returns_explicit_unsupported_error() {
@@ -172,37 +234,34 @@ fn non_xlsx_workbook_returns_explicit_unsupported_error() {
         "/../../test-data/ooxml/xlsb/Simple.xlsb"
     ))
     .expect("read XLSB fixture");
-    let workbook = Workbook::from_bytes(bytes).expect("open unified XLSB workbook");
-    let error = workbook.sheet(0usize).unwrap_err();
-    assert!(matches!(
-        error.downcast_ref::<litchi::Error>(),
-        Some(litchi::Error::Unsupported(message)) if message.contains("only for XLSX")
-    ));
+    let file = litchi::open_bytes(bytes).expect("open unified XLSB workbook");
+    assert!(matches!(file, File::Xlsb(_)), "{file:?}");
+    assert!(
+        !file
+            .workbook()
+            .unwrap()
+            .worksheet_names()
+            .unwrap()
+            .is_empty()
+    );
 }
 
 #[cfg(any(unix, windows))]
 #[test]
 fn selected_handle_preserves_source_change_error() {
-    let file = tempfile::NamedTempFile::new().expect("temporary XLSX");
-    std::fs::write(file.path(), workbook_bytes("7", valid_second_sheet()))
+    let temporary = tempfile::NamedTempFile::new().expect("temporary XLSX");
+    std::fs::write(temporary.path(), workbook_bytes("7", valid_second_sheet()))
         .expect("write initial XLSX");
-    let workbook = Workbook::open(file.path()).expect("open positional XLSX");
+    let file = litchi::open(temporary.path()).expect("open positional XLSX");
+    let workbook = xlsx(&file);
     let selected = workbook.sheet("Data").unwrap().unwrap();
 
     std::fs::write(
-        file.path(),
+        temporary.path(),
         workbook_bytes("12345678901234567890", valid_second_sheet()),
     )
     .expect("replace XLSX source");
 
-    let error = selected.cell("A1").unwrap_err();
-    assert!(matches!(
-        error.downcast_ref::<litchi::Error>(),
-        Some(litchi::Error::SourceChanged { .. })
-    ));
-    let selection_error = workbook.sheet("Data").unwrap_err();
-    assert!(matches!(
-        selection_error.downcast_ref::<litchi::Error>(),
-        Some(litchi::Error::SourceChanged { .. })
-    ));
+    assert_source_changed(&selected.cell("A1").unwrap_err());
+    assert_source_changed(&workbook.sheet("Data").unwrap_err());
 }

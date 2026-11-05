@@ -28,6 +28,7 @@ use litchi_opc::{
     OpcError, SourceArtifact, SourceArtifactFingerprint, SourceArtifactRestoreProof,
     SourceBackedPackage, SpliceResource,
 };
+use litchi_opc::{SourceCacheLimits, SourceLimits, SourceReadPolicy};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const CONTENT_TYPES_NS: &str = "http://schemas.openxmlformats.org/package/2006/content-types";
@@ -59,7 +60,8 @@ fn archive_bytes_with_extra(extra: &[u8]) -> Vec<u8> {
     let relationships = format!(
         r#"<Relationships xmlns="{RELATIONSHIPS_NS}"><Relationship Id="rDoc" Type="{OFFICE_DOCUMENT_REL}" Target="{DOCUMENT_MEMBER}"/></Relationships>"#
     );
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .expect("content types fixture must be writable");
@@ -78,8 +80,14 @@ fn archive_bytes_with_extra(extra: &[u8]) -> Vec<u8> {
 }
 
 fn open_unmanaged(bytes: Vec<u8>) -> SourceBackedPackage {
-    SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes)))
-        .expect("fixture package must open")
+    SourceBackedPackage::from_read_at(
+        Arc::new(OwnedSource::new(bytes)),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .expect("fixture package must open")
 }
 
 fn proof_for(current: &SourceArtifact, original: &SourceArtifact) -> SourceArtifactRestoreProof {
@@ -575,10 +583,22 @@ fn restore_detects_both_artifact_versions_during_authentication() {
         let bytes = archive_bytes();
         let current_source = MutableSource::new(bytes.clone());
         let original_source = MutableSource::new(bytes);
-        let current = SourceBackedPackage::from_read_at(current_source.clone())
-            .expect("mutable current package must open");
-        let original = SourceBackedPackage::from_read_at(original_source.clone())
-            .expect("mutable original package must open");
+        let current = SourceBackedPackage::from_read_at(
+            current_source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .expect("mutable current package must open");
+        let original = SourceBackedPackage::from_read_at(
+            original_source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .expect("mutable original package must open");
         let current_artifact = current.source_artifact();
         let original_artifact = original.source_artifact();
         let proof = proof_for(&current_artifact, &original_artifact);
@@ -611,10 +631,22 @@ fn restore_detects_both_artifact_versions_from_write_and_flush_callbacks() {
         let bytes = archive_bytes();
         let current_source = MutableSource::new(bytes.clone());
         let original_source = MutableSource::new(bytes);
-        let current = SourceBackedPackage::from_read_at(current_source.clone())
-            .expect("mutable current package must open");
-        let original = SourceBackedPackage::from_read_at(original_source.clone())
-            .expect("mutable original package must open");
+        let current = SourceBackedPackage::from_read_at(
+            current_source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .expect("mutable current package must open");
+        let original = SourceBackedPackage::from_read_at(
+            original_source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .expect("mutable original package must open");
         let current_artifact = current.source_artifact();
         let original_artifact = original.source_artifact();
         let proof = proof_for(&current_artifact, &original_artifact);
@@ -644,8 +676,14 @@ fn restore_rehashes_original_after_output_started_when_version_is_stable() {
     let bytes = archive_bytes();
     let current = open_unmanaged(bytes.clone());
     let original_source = MutableSource::new(bytes);
-    let original = SourceBackedPackage::from_read_at(original_source.clone())
-        .expect("mutable original package must open");
+    let original = SourceBackedPackage::from_read_at(
+        original_source.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .expect("mutable original package must open");
     let current_artifact = current.source_artifact();
     let original_artifact = original.source_artifact();
     let proof = proof_for(&current_artifact, &original_artifact);
@@ -685,10 +723,22 @@ fn restore_rejects_truncated_and_overreported_providers_before_output() {
             let bytes = archive_bytes();
             let current_source = FaultSource::new(bytes.clone());
             let original_source = FaultSource::new(bytes);
-            let current = SourceBackedPackage::from_read_at(current_source.clone())
-                .expect("faulting current package must open");
-            let original = SourceBackedPackage::from_read_at(original_source.clone())
-                .expect("faulting original package must open");
+            let current = SourceBackedPackage::from_read_at(
+                current_source.clone(),
+                SourceLimits::default(),
+                SourceCacheLimits::default(),
+                SourceReadPolicy::exact(),
+                None,
+            )
+            .expect("faulting current package must open");
+            let original = SourceBackedPackage::from_read_at(
+                original_source.clone(),
+                SourceLimits::default(),
+                SourceCacheLimits::default(),
+                SourceReadPolicy::exact(),
+                None,
+            )
+            .expect("faulting original package must open");
             let current_artifact = current.source_artifact();
             let original_artifact = original.source_artifact();
             let proof = proof_for(&current_artifact, &original_artifact);
@@ -728,16 +778,20 @@ fn restore_uses_current_context_for_all_io_work_and_output() {
         managed_context(64 * 1024 * 1024, u64::MAX);
     let (original_budget, _original_cancel, original_context) =
         managed_context(64 * 1024 * 1024, u64::MAX);
-    let current = SourceBackedPackage::from_read_at_with_execution_context(
+    let current = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(bytes.clone())),
-        litchi_opc::ReadLimits::default(),
-        current_context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(current_context),
     )
     .expect("managed current package must open");
-    let original = SourceBackedPackage::from_read_at_with_execution_context(
+    let original = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(bytes.clone())),
-        litchi_opc::ReadLimits::default(),
-        original_context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(original_context),
     )
     .expect("managed original package must open");
     let current_artifact = current.source_artifact();
@@ -779,16 +833,20 @@ fn restore_observes_original_context_cancellation_after_an_exact_short_prefix() 
         managed_context(64 * 1024 * 1024, u64::MAX);
     let (original_budget, original_cancel, original_context) =
         managed_context(64 * 1024 * 1024, u64::MAX);
-    let current = SourceBackedPackage::from_read_at_with_execution_context(
+    let current = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(bytes.clone())),
-        litchi_opc::ReadLimits::default(),
-        current_context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(current_context),
     )
     .expect("managed current package must open");
-    let original = SourceBackedPackage::from_read_at_with_execution_context(
+    let original = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(bytes)),
-        litchi_opc::ReadLimits::default(),
-        original_context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(original_context),
     )
     .expect("managed original package must open");
     let current_artifact = current.source_artifact();
@@ -823,10 +881,12 @@ fn managed_restore_releases_workspace_on_memory_hash_and_sink_failures() {
     const PREFIX: usize = 29;
     let bytes = archive_bytes();
     let (budget, _cancellation, context) = managed_context(64 * 1024 * 1024, u64::MAX);
-    let current = SourceBackedPackage::from_read_at_with_execution_context(
+    let current = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(bytes.clone())),
-        litchi_opc::ReadLimits::default(),
-        context.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context.clone()),
     )
     .expect("managed current package must open");
     let original = open_unmanaged(bytes);
@@ -906,19 +966,61 @@ fn managed_restore_releases_workspace_on_memory_hash_and_sink_failures() {
 }
 
 #[test]
+fn managed_restore_authenticates_with_bounded_stack_when_memory_is_full() {
+    let current_bytes = archive_bytes_with_extra(b"current-source");
+    let original_bytes = archive_bytes();
+    let (budget, _cancellation, context) = managed_context(64 * 1024 * 1024, u64::MAX);
+    let current = SourceBackedPackage::from_read_at(
+        Arc::new(OwnedSource::new(current_bytes)),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context.clone()),
+    )
+    .expect("managed current package must open");
+    let original = open_unmanaged(original_bytes.clone());
+    let current_artifact = current.source_artifact();
+    let original_artifact = original.source_artifact();
+    let proof = proof_for(&current_artifact, &original_artifact);
+    let available = budget
+        .limit(Resource::Memory)
+        .checked_sub(budget.used(Resource::Memory))
+        .expect("managed package must fit inside its memory budget");
+    let occupied = context
+        .reserve(Resource::Memory, available)
+        .expect("test must consume the remaining recipient memory");
+
+    let mut output = Vec::new();
+    current
+        .restore_source_artifact_to_stream(
+            &original_artifact,
+            proof,
+            original_artifact.len(),
+            &mut output,
+        )
+        .expect("exact restore must use the bounded stack window");
+    assert_eq!(output, original_bytes);
+    drop(occupied);
+}
+
+#[test]
 fn managed_restore_charges_shared_output_once_and_releases_memory_lease() {
     let bytes = archive_bytes();
     let (budget, _cancellation, context) = managed_context(64 * 1024 * 1024, u64::MAX);
-    let current = SourceBackedPackage::from_read_at_with_execution_context(
+    let current = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(bytes.clone())),
-        litchi_opc::ReadLimits::default(),
-        context.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context.clone()),
     )
     .expect("managed current package must open");
-    let original = SourceBackedPackage::from_read_at_with_execution_context(
+    let original = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(bytes.clone())),
-        litchi_opc::ReadLimits::default(),
-        context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .expect("managed original package must open");
     let current_artifact = current.source_artifact();
@@ -952,10 +1054,12 @@ fn managed_restore_charges_shared_output_once_and_releases_memory_lease() {
 fn restore_observes_cancellation_before_output_and_from_sink_callbacks() {
     let bytes = archive_bytes();
     let (budget, cancellation, context) = managed_context(64 * 1024 * 1024, u64::MAX);
-    let current = SourceBackedPackage::from_read_at_with_execution_context(
+    let current = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(bytes.clone())),
-        litchi_opc::ReadLimits::default(),
-        context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .expect("managed package must open");
     let original = open_unmanaged(bytes);
@@ -980,10 +1084,12 @@ fn restore_observes_cancellation_before_output_and_from_sink_callbacks() {
 
     let bytes = archive_bytes();
     let (budget, cancellation, context) = managed_context(64 * 1024 * 1024, u64::MAX);
-    let current = SourceBackedPackage::from_read_at_with_execution_context(
+    let current = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(bytes.clone())),
-        litchi_opc::ReadLimits::default(),
-        context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .expect("managed package must open");
     let original = open_unmanaged(bytes);
@@ -1006,10 +1112,12 @@ fn restore_observes_cancellation_before_output_and_from_sink_callbacks() {
 
     let bytes = archive_bytes();
     let (budget, cancellation, context) = managed_context(64 * 1024 * 1024, u64::MAX);
-    let current = SourceBackedPackage::from_read_at_with_execution_context(
+    let current = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(bytes.clone())),
-        litchi_opc::ReadLimits::default(),
-        context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .expect("managed package must open");
     let original = open_unmanaged(bytes);

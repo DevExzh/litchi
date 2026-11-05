@@ -7,6 +7,7 @@ use super::super::model::{
 };
 use super::binary::{filetime_to_date, filetime_to_duration};
 use super::support::allocation;
+use crate::Error;
 use litchi_cfb::{OleError, OleFile, SharedOleFile};
 use std::io::{Read, Seek};
 
@@ -28,7 +29,7 @@ pub trait PropertySetReader {
     ///
     /// Returns an error if a present standard stream cannot be read or parsed,
     /// or if its metadata cannot be projected.
-    fn get_metadata(&mut self) -> Result<Metadata, OleError> {
+    fn get_metadata(&mut self) -> Result<Metadata, Error> {
         project_metadata(|binding| self.property_set(binding))
     }
 
@@ -40,7 +41,7 @@ pub trait PropertySetReader {
     ///
     /// Returns an error if the bound stream cannot be opened or is not a valid
     /// Property Set stream.
-    fn property_set(&mut self, binding: Binding) -> Result<Stream, OleError> {
+    fn property_set(&mut self, binding: Binding) -> Result<Stream, Error> {
         let name = binding.name();
         self.property_set_stream(&[name.as_str()])
     }
@@ -53,7 +54,7 @@ pub trait PropertySetReader {
     ///
     /// Returns an error if the stream cannot be opened or is not a valid
     /// Property Set stream.
-    fn property_set_stream(&mut self, path: &[&str]) -> Result<Stream, OleError>;
+    fn property_set_stream(&mut self, path: &[&str]) -> Result<Stream, Error>;
 }
 
 /// Read property sets through an immutable positional CFB view.
@@ -79,7 +80,7 @@ pub trait SharedPropertySetReader {
     ///
     /// Returns an error if a present standard stream cannot be read or parsed,
     /// or if its metadata cannot be projected.
-    fn get_metadata(&self) -> Result<Metadata, OleError> {
+    fn get_metadata(&self) -> Result<Metadata, Error> {
         project_metadata(|binding| self.property_set(binding))
     }
 
@@ -91,7 +92,7 @@ pub trait SharedPropertySetReader {
     ///
     /// Returns an error if the bound stream cannot be opened or is not a valid
     /// Property Set stream.
-    fn property_set(&self, binding: Binding) -> Result<Stream, OleError> {
+    fn property_set(&self, binding: Binding) -> Result<Stream, Error> {
         let name = binding.name();
         self.property_set_stream(&[name.as_str()])
     }
@@ -104,29 +105,29 @@ pub trait SharedPropertySetReader {
     ///
     /// Returns an error if the stream cannot be opened or is not a valid
     /// Property Set stream.
-    fn property_set_stream(&self, path: &[&str]) -> Result<Stream, OleError>;
+    fn property_set_stream(&self, path: &[&str]) -> Result<Stream, Error>;
 }
 
 impl<R: Read + Seek> PropertySetReader for OleFile<R> {
     /// Parse a Property Set stream at path, applying and recording (in
     /// [`Stream::tolerance_report`]) the reference-compatible repairs of
     /// [`Stream::parse`].
-    fn property_set_stream(&mut self, path: &[&str]) -> Result<Stream, OleError> {
+    fn property_set_stream(&mut self, path: &[&str]) -> Result<Stream, Error> {
         let data = self.open_stream(path)?;
-        Stream::parse(&data)
+        Ok(Stream::parse(&data)?)
     }
 }
 
 impl SharedPropertySetReader for SharedOleFile {
-    fn property_set_stream(&self, path: &[&str]) -> Result<Stream, OleError> {
+    fn property_set_stream(&self, path: &[&str]) -> Result<Stream, Error> {
         let data = self.open_stream(path)?;
-        Stream::parse(&data)
+        Ok(Stream::parse(&data)?)
     }
 }
 
-fn project_metadata<F>(mut property_set: F) -> Result<Metadata, OleError>
+fn project_metadata<F>(mut property_set: F) -> Result<Metadata, Error>
 where
-    F: FnMut(Binding) -> Result<Stream, OleError>,
+    F: FnMut(Binding) -> Result<Stream, Error>,
 {
     let mut metadata = Metadata::default();
     match property_set(Binding::SummaryInformation) {
@@ -137,7 +138,7 @@ where
                 .ok_or_else(|| invalid("SummaryInformation has no section"))?;
             extract_summary_info(&mut metadata, section)?;
         },
-        Err(OleError::StreamNotFound) => {},
+        Err(Error::Cfb(OleError::StreamNotFound)) => {},
         Err(error) => return Err(error),
     }
     match property_set(Binding::DocumentSummaryInformation) {
@@ -156,7 +157,8 @@ where
                     if metadata.custom_properties.contains_key(property_name) {
                         return Err(invalid(format!(
                             "Duplicate custom property name '{property_name}'"
-                        )));
+                        ))
+                        .into());
                     }
                     let owned_name = try_clone_string(property_name, "custom property name")?;
                     let owned_value = try_clone_property_value(property_value)?;
@@ -164,7 +166,7 @@ where
                 }
             }
         },
-        Err(OleError::StreamNotFound) => {},
+        Err(Error::Cfb(OleError::StreamNotFound)) => {},
         Err(error) => return Err(error),
     }
     Ok(metadata)

@@ -2,36 +2,36 @@
 
 use super::super::lexer::Lexer;
 use super::super::model::Token;
-use crate::codec::error::{RtfError, RtfResult};
+
 use std::borrow::Cow;
 
 impl<'a> Lexer<'a> {
     /// Consume and arena-copy the exact byte payload declared by `\\binN`.
-    pub(super) fn parse_binary_payload(&mut self, declared_size: i32) -> RtfResult<Token<'a>> {
+    pub(super) fn parse_binary_payload(&mut self, declared_size: i32) -> crate::Result<Token<'a>> {
         let size = usize::try_from(declared_size).map_err(|_err| {
-            RtfError::MalformedDocument("RTF binary length cannot be negative".to_string())
+            crate::Error::MalformedDocument("RTF binary length cannot be negative".to_string())
         })?;
         let binary_limit = self.binary_destination_limit();
         if size > binary_limit {
-            return Err(RtfError::LimitExceeded {
-                resource: "binary payload bytes",
+            return Err(crate::Error::Limit {
+                kind: crate::SourceLimitKind::BinaryBytes,
                 observed: size,
-                limit: binary_limit,
+                maximum: binary_limit,
             });
         }
         let total_binary_bytes =
             self.total_binary_bytes
                 .checked_add(size)
-                .ok_or(RtfError::LimitExceeded {
-                    resource: "aggregate binary payload bytes",
+                .ok_or(crate::Error::Limit {
+                    kind: crate::SourceLimitKind::AggregateBinaryBytes,
                     observed: usize::MAX,
-                    limit: self.limits.max_total_binary_bytes(),
+                    maximum: self.limits.max_aggregate_binary_bytes(),
                 })?;
-        if total_binary_bytes > self.limits.max_total_binary_bytes() {
-            return Err(RtfError::LimitExceeded {
-                resource: "aggregate binary payload bytes",
+        if total_binary_bytes > self.limits.max_aggregate_binary_bytes() {
+            return Err(crate::Error::Limit {
+                kind: crate::SourceLimitKind::AggregateBinaryBytes,
                 observed: total_binary_bytes,
-                limit: self.limits.max_total_binary_bytes(),
+                maximum: self.limits.max_aggregate_binary_bytes(),
             });
         }
 
@@ -45,9 +45,11 @@ impl<'a> Lexer<'a> {
                 .input
                 .get(payload_end..)
                 .and_then(|remaining| remaining.chars().next())
-                .ok_or(RtfError::UnexpectedEof)?;
+                .ok_or(crate::Error::UnexpectedEof)?;
             u8::try_from(u32::from(ch)).map_err(|_err| {
-                RtfError::MalformedDocument("RTF binary payload is not byte-preserving".to_string())
+                crate::Error::MalformedDocument(
+                    "RTF binary payload is not byte-preserving".to_string(),
+                )
             })?;
             payload_end += ch.len_utf8();
         }
@@ -56,7 +58,9 @@ impl<'a> Lexer<'a> {
         let allocated = self.arena.alloc_slice_fill_copy(size, 0u8);
         for (slot, ch) in allocated.iter_mut().zip(payload.chars()) {
             *slot = u8::try_from(u32::from(ch)).map_err(|_err| {
-                RtfError::MalformedDocument("RTF binary payload is not byte-preserving".to_string())
+                crate::Error::MalformedDocument(
+                    "RTF binary payload is not byte-preserving".to_string(),
+                )
             })?;
         }
         self.pos = payload_end;

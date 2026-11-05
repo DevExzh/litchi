@@ -73,10 +73,93 @@ const MAX_REVISION_DATE_UTC_BYTES: usize = 128;
 
 pub mod authoring;
 pub mod conflict;
+mod kind;
 mod limits;
 #[cfg(test)]
 mod limits_tests;
+pub use kind::LimitKind;
 pub use limits::Limits;
+
+/// A revision reader under explicit budgets (record 0355a): the
+/// configurable form of `Paragraph::revisions`, `Table::revisions`,
+/// `Row::revisions` and `Cell::revisions`, which read under
+/// [`Limits::default`]. [`Reader::for_package`] takes the budgets a package
+/// was opened with ([`crate::SemanticLimits::revisions`]).
+///
+/// ```
+/// use litchi_docx::revision::{Limits, Reader};
+///
+/// let mut builder = litchi_docx::Builder::new()?;
+/// builder.document()?.add_paragraph_with_text("plain");
+/// let package = builder.build()?;
+/// let paragraph = package.document()?.paragraphs()?.remove(0);
+/// let reader = Reader::new(Limits { max_revisions: 0, ..Limits::default() });
+/// assert!(reader.paragraph(&paragraph)?.is_empty());
+/// assert!(Reader::for_package(&package).paragraph(&paragraph)?.is_empty());
+/// # Ok::<(), litchi_docx::Error>(())
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Reader {
+    limits: Limits,
+}
+
+impl Reader {
+    /// A reader under `limits`.
+    #[must_use]
+    pub const fn new(limits: Limits) -> Self {
+        Self { limits }
+    }
+
+    /// A reader under the revision budgets `package` was opened with.
+    #[must_use]
+    pub fn for_package(package: &crate::Package) -> Self {
+        Self::new(package.semantic_limits().revisions_value())
+    }
+
+    /// The reader's budgets.
+    #[must_use]
+    pub const fn limits(&self) -> Limits {
+        self.limits
+    }
+
+    /// The paragraph's revisions in source order; nested annotations keep
+    /// their own metadata and affected text.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for malformed revision XML or an exceeded budget
+    /// ([`crate::Error::RevisionLimit`]).
+    pub fn paragraph(&self, paragraph: &crate::Paragraph) -> Result<SmallVec<[Revision; 4]>> {
+        paragraph.revisions_bounded(self.limits)
+    }
+
+    /// The table's revisions, its rows and cells included.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::paragraph`].
+    pub fn table(&self, table: &crate::Table) -> Result<Vec<Revision>> {
+        table.revisions_bounded(self.limits)
+    }
+
+    /// The row's revisions, its cells included.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::paragraph`].
+    pub fn row(&self, row: &crate::Row) -> Result<Vec<Revision>> {
+        row.revisions_bounded(self.limits)
+    }
+
+    /// The cell's revisions.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::paragraph`].
+    pub fn cell(&self, cell: &crate::Cell) -> Result<Vec<Revision>> {
+        cell.revisions_bounded(self.limits)
+    }
+}
 use limits::{charge, check};
 
 /// Type of tracked change.
@@ -479,22 +562,26 @@ pub(crate) fn parse_revisions_tolerant(
     tolerance: &mut ToleranceReport,
 ) -> Result<SmallVec<[Revision; 4]>> {
     let limits = limits.validate()?;
-    check("source bytes", xml_bytes.len(), limits.max_source_bytes)?;
     check(
-        "inherited namespaces",
+        LimitKind::SourceBytes,
+        xml_bytes.len(),
+        limits.max_source_bytes,
+    )?;
+    check(
+        LimitKind::InheritedNamespaces,
         inherited_namespaces.len(),
         limits.max_inherited_namespaces,
     )?;
     let mut namespace_bytes = 0;
     for (prefix, namespace) in inherited_namespaces {
         charge(
-            "inherited namespace bytes",
+            LimitKind::InheritedNamespaceBytes,
             &mut namespace_bytes,
             prefix.as_ref().map_or(0, Vec::len),
             limits.max_inherited_namespace_bytes,
         )?;
         charge(
-            "inherited namespace bytes",
+            LimitKind::InheritedNamespaceBytes,
             &mut namespace_bytes,
             namespace.len(),
             limits.max_inherited_namespace_bytes,
@@ -615,13 +702,17 @@ pub(crate) fn parse_revisions_tolerant(
         limits: Limits,
         metadata_bytes: &mut usize,
     ) -> Result<String> {
-        check("value bytes", attribute.value.len(), limits.max_value_bytes)?;
+        check(
+            LimitKind::ValueBytes,
+            attribute.value.len(),
+            limits.max_value_bytes,
+        )?;
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
             .map_err(|error| Error::Xml(error.to_string()))?;
         validate_xml_characters(&value)?;
         charge(
-            "metadata bytes",
+            LimitKind::MetadataBytes,
             metadata_bytes,
             value.len(),
             limits.max_metadata_bytes,
@@ -706,7 +797,11 @@ pub(crate) fn parse_revisions_tolerant(
         let mut original_numbering = None;
 
         for (index, attr) in element.checked_attributes().enumerate() {
-            check("attributes", index.saturating_add(1), limits.max_attributes)?;
+            check(
+                LimitKind::Attributes,
+                index.saturating_add(1),
+                limits.max_attributes,
+            )?;
             let attr = attr.map_err(|error| Error::Xml(error.to_string()))?;
             let local_name = attr.key.local_name();
             let (namespace, _) = resolver.resolve_attribute(attr.key);
@@ -817,7 +912,7 @@ pub(crate) fn parse_revisions_tolerant(
             .read_resolved_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
         if !matches!(event, Event::Eof) {
-            charge("events", &mut events, 1, limits.max_events)?;
+            charge(LimitKind::Events, &mut events, 1, limits.max_events)?;
         }
         if first_element && matches!(&event, Event::Start(_) | Event::Empty(_)) {
             first_element = false;
@@ -853,7 +948,7 @@ pub(crate) fn parse_revisions_tolerant(
                         "revision text cannot contain child elements".into(),
                     ));
                 }
-                charge("depth", &mut element_depth, 1, limits.max_depth)?;
+                charge(LimitKind::Depth, &mut element_depth, 1, limits.max_depth)?;
                 let local_name_ref = e.local_name();
                 let local_name = local_name_ref.as_ref();
                 validate_history_child(scopes.last_mut(), local_name, is_word_element)?;
@@ -879,7 +974,7 @@ pub(crate) fn parse_revisions_tolerant(
                 scopes.push(revision_scope(local_name, parent, is_word_element, kind));
                 if let Some(kind) = kind {
                     check(
-                        "records",
+                        LimitKind::Records,
                         revisions.len().saturating_add(1),
                         limits.max_revisions,
                     )?;
@@ -941,7 +1036,11 @@ pub(crate) fn parse_revisions_tolerant(
                         "revision text cannot contain child elements".into(),
                     ));
                 }
-                check("depth", element_depth.saturating_add(1), limits.max_depth)?;
+                check(
+                    LimitKind::Depth,
+                    element_depth.saturating_add(1),
+                    limits.max_depth,
+                )?;
                 validate_history_child(
                     scopes.last_mut(),
                     e.local_name().as_ref(),
@@ -969,7 +1068,7 @@ pub(crate) fn parse_revisions_tolerant(
                         Some(kind),
                     ))?;
                     check(
-                        "records",
+                        LimitKind::Records,
                         revisions.len().saturating_add(1),
                         limits.max_revisions,
                     )?;
@@ -1074,7 +1173,7 @@ pub(crate) fn parse_revisions_tolerant(
             },
             Event::GeneralRef(reference) => {
                 check(
-                    "value bytes",
+                    LimitKind::ValueBytes,
                     reference.as_ref().len(),
                     limits.max_value_bytes,
                 )?;
@@ -1318,11 +1417,16 @@ fn append_revision_text(
         .len()
         .checked_mul(active.len())
         .ok_or(Error::RevisionLimit {
-            resource: "text bytes",
+            kind: LimitKind::TextBytes,
             actual: usize::MAX,
             maximum: limits.max_text_bytes,
         })?;
-    charge("text bytes", text_bytes, additional, limits.max_text_bytes)?;
+    charge(
+        LimitKind::TextBytes,
+        text_bytes,
+        additional,
+        limits.max_text_bytes,
+    )?;
     for &(index, _) in active {
         let revision = revisions.get_mut(index).ok_or_else(|| {
             Error::InvalidFormat("revision text scope has no owning record".into())

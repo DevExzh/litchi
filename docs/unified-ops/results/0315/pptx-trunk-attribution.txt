@@ -1,0 +1,24 @@
+pptx_large_bytes_all_shape_v1 base/unified-query 1805.7 6.46
+pptx_large_bytes_all_shape_v1 trunk-uq 2419.9 8.7
+pptx_large_bytes_all_shape_v1 after/unified-query 2261.4 8.07
+pptx_large_bytes_all_shape_v1 after/unified-query 2234.0 8.01
+pptx_large_bytes_all_shape_v1 trunk-uq 1985.5 7.15
+pptx_large_bytes_all_shape_v1 base/unified-query 1720.2 6.21
+pptx_large_bytes_all_shape_v1 base/unified-query 1719.4 6.12
+pptx_large_bytes_all_shape_v1 trunk-uq 2197.9 7.87
+pptx_large_bytes_all_shape_v1 after/unified-query 1958.9 7.05
+pptx_large_bytes_all_shape_owned_v1 base/unified-query 1660.9 2.08
+pptx_large_bytes_all_shape_owned_v1 trunk-uq 2192.8 2.76
+pptx_large_bytes_all_shape_owned_v1 after/unified-query 1799.9 2.27
+pptx_large_bytes_all_shape_owned_v1 after/unified-query 2218.5 2.78
+pptx_large_bytes_all_shape_owned_v1 trunk-uq 1775.2 2.24
+pptx_large_bytes_all_shape_owned_v1 base/unified-query 1758.3 2.22
+pptx_large_bytes_all_shape_owned_v1 base/unified-query 1903.7 2.39
+pptx_large_bytes_all_shape_owned_v1 trunk-uq 1775.6 2.25
+pptx_large_bytes_all_shape_owned_v1 after/unified-query 1878.8 2.36
+pptx_large_bytes_all_shape_v1 trunk [2545.61, 2206.98, 2206.0, 1766.77] after [2251.15, 2378.06, 2278.81, 2126.95] 1.204
+pptx_small_bytes_all_shape_v1 trunk [10.48, 12.1, 12.91, 9.95] after [10.22, 12.2, 10.21, 10.3] 1.026
+pptx_large_bytes_all_shape_contains_v1 trunk [1626.81, 1571.8, 1631.05, 1614.16] after [1506.08, 1527.64, 1512.8, 1536.86] 0.958
+xlsx_1000_bytes_all_cell_v1 trunk [147.19, 147.26, 147.31, 147.35] after [148.23, 132.56, 135.26, 132.49] 0.900
+xlsx_1000_bytes_all_cell_value_gt_v1 trunk [236.47, 245.87, 244.63, 239.65] after [200.11, 203.21, 199.14, 199.03] 0.842
+xlsb_1000_bytes_all_cell_value_gt_v1 trunk [358.35, 352.08, 356.84, 349.22] after [354.39, 350.68, 353.38, 356.51] 1.004

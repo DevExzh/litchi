@@ -44,7 +44,10 @@ fn apply_durable(
     package: &mut Package,
     patch: &CorePatch<Reversible>,
 ) -> litchi_docx::Result<bool> {
-    package.apply_durable_task_panes_patch(patch)
+    let mut edit = package.edit_task_panes();
+    let changed = edit.apply_durable(patch)?;
+    *package = edit.commit()?.into_package();
+    Ok(changed)
 }
 
 fn apply_durable_with_limits(
@@ -52,7 +55,12 @@ fn apply_durable_with_limits(
     patch: &CorePatch<Reversible>,
     limits: &web::Limits,
 ) -> litchi_docx::Result<bool> {
-    package.apply_durable_task_panes_patch_with_limits(patch, limits)
+    let mut edit = package.edit_task_panes_with_options(
+        litchi_docx::task_panes::EditOptions::default().limits(*limits),
+    );
+    let changed = edit.apply_durable(patch)?;
+    *package = edit.commit()?.into_package();
+    Ok(changed)
 }
 
 fn apply_and_inverse(original: &[u8], durable: &CorePatch<Reversible>) {
@@ -69,14 +77,14 @@ fn assert_rejected_unchanged(
     source: &[u8],
     durable: &CorePatch<Reversible>,
     label: &str,
-) -> String {
+) -> litchi_docx::Error {
     let mut package = Package::from_reader(Cursor::new(source)).unwrap();
     let before = members(&package_bytes(&package));
     let error = apply_durable(&mut package, durable)
         .err()
         .unwrap_or_else(|| panic!("{label}: durable patch was accepted"));
     assert_eq!(members(&package_bytes(&package)), before, "{label}");
-    error.to_string()
+    error
 }
 
 fn wire_blob(wire: &[u8], collection: &str) -> (String, String, Vec<u8>) {
@@ -232,9 +240,11 @@ fn decode_wire(wire: &[u8]) -> CorePatch<Reversible> {
 fn source_with_unrelated_add_in_markup() -> Vec<u8> {
     let (panes, _) = authored_panes();
     let mut authored = Package::new().unwrap();
-    authored
-        .put_task_panes(panes, web::Conformance::Transitional)
-        .unwrap();
+    authored = {
+        let mut edit = authored.edit_task_panes();
+        edit.put(panes, web::Conformance::Transitional).unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let source = package_bytes(&authored);
     rewrite_member(&source, "webextensions/webextension1.xml", |content| {
         insert_before(
@@ -260,9 +270,12 @@ fn durable_creation_roundtrips_and_inverse_restores_exact_members_after_reopen()
 #[test]
 fn durable_custom_only_two_pane_edit_roundtrips_and_inverse_is_exact() {
     let mut source = Package::new().unwrap();
-    source
-        .put_task_panes(two_authored_panes(), web::Conformance::Transitional)
-        .unwrap();
+    source = {
+        let mut edit = source.edit_task_panes();
+        edit.put(two_authored_panes(), web::Conformance::Transitional)
+            .unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let original = package_bytes(&source);
     let source = Package::from_reader(Cursor::new(&original)).unwrap();
     let desired = panes_with_metadata(&source, changed_custom_functions());
@@ -277,9 +290,11 @@ fn durable_custom_only_two_pane_edit_roundtrips_and_inverse_is_exact() {
 fn durable_transitional_custom_edit_ignores_unrelated_strict_namespace_text() {
     let (panes, _) = authored_panes();
     let mut authored = Package::new().unwrap();
-    authored
-        .put_task_panes(panes, web::Conformance::Transitional)
-        .unwrap();
+    authored = {
+        let mut edit = authored.edit_task_panes();
+        edit.put(panes, web::Conformance::Transitional).unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let source = package_bytes(&authored);
     let original = rewrite_member(&source, "word/document.xml", |content| {
         insert_before(
@@ -293,7 +308,7 @@ fn durable_transitional_custom_edit_ignores_unrelated_strict_namespace_text() {
     let ordinary = package
         .plan_task_panes(desired, web::Conformance::Transitional)
         .unwrap();
-    assert!(!ordinary.is_empty());
+    assert!(!ordinary.is_noop());
     let durable = durable_patch(&ordinary);
     assert!(apply_durable(&mut package, &durable).unwrap());
 
@@ -311,9 +326,11 @@ fn durable_transitional_custom_edit_ignores_unrelated_strict_namespace_text() {
 fn durable_removal_roundtrips_and_inverse_restores_exact_members_after_reopen() {
     let (panes, _) = authored_panes();
     let mut source = Package::new().unwrap();
-    source
-        .put_task_panes(panes, web::Conformance::Strict)
-        .unwrap();
+    source = {
+        let mut edit = source.edit_task_panes();
+        edit.put(panes, web::Conformance::Strict).unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let original = package_bytes(&source);
     let source = Package::from_reader(Cursor::new(&original)).unwrap();
     let patch = source.plan_remove_task_panes().unwrap();
@@ -325,21 +342,28 @@ fn durable_removal_roundtrips_and_inverse_restores_exact_members_after_reopen() 
 fn durable_noop_is_deterministic_and_preserves_signed_source() {
     let (panes, _) = authored_panes();
     let mut package = Package::new().unwrap();
-    package
-        .put_task_panes(panes, web::Conformance::Transitional)
+    package = {
+        let mut edit = package.edit_task_panes();
+        edit.put(panes, web::Conformance::Transitional).unwrap();
+        edit.commit().unwrap().into_package()
+    };
+    package = {
+        let mut edit = package.edit_opc();
+        (|opc: &mut litchi_opc::OpcPackage| -> litchi_docx::Result<_> {
+            {
+                opc.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
+                Ok(())
+            }
+        })(edit.package_mut())
         .unwrap();
-    package
-        .edit_opc(|opc| {
-            opc.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
-            Ok(())
-        })
-        .unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let before = members(&package_bytes(&package));
     let loaded = package.task_panes().unwrap().unwrap();
     let patch = package
         .plan_task_panes(loaded, web::Conformance::Transitional)
         .unwrap();
-    assert!(patch.is_empty());
+    assert!(patch.is_noop());
     let durable = durable_patch(&patch);
     let wire = durable.to_deterministic_json().unwrap();
     assert_eq!(wire, decode_wire(&wire).to_deterministic_json().unwrap());
@@ -352,14 +376,16 @@ fn durable_noop_is_deterministic_and_preserves_signed_source() {
 fn durable_exact_noop_exports_with_zero_blob_allowance() {
     let (panes, _) = authored_panes();
     let mut package = Package::new().unwrap();
-    package
-        .put_task_panes(panes, web::Conformance::Transitional)
-        .unwrap();
+    package = {
+        let mut edit = package.edit_task_panes();
+        edit.put(panes, web::Conformance::Transitional).unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let loaded = package.task_panes().unwrap().unwrap();
     let ordinary = package
         .plan_task_panes(loaded, web::Conformance::Transitional)
         .unwrap();
-    assert!(ordinary.is_empty());
+    assert!(ordinary.is_noop());
     let limits = zero_blob_noop_limits();
     let durable = ordinary.to_durable(limits).unwrap();
     let wire = durable.to_deterministic_json().unwrap();
@@ -394,9 +420,11 @@ fn durable_creation_and_removal_roundtrip_in_both_conformances() {
         apply_and_inverse(&original, &durable_patch(&creation));
 
         let mut populated = Package::new().unwrap();
-        populated
-            .put_task_panes(authored_panes().0, conformance)
-            .unwrap();
+        populated = {
+            let mut edit = populated.edit_task_panes();
+            edit.put(authored_panes().0, conformance).unwrap();
+            edit.commit().unwrap().into_package()
+        };
         let original = package_bytes(&populated);
         let source = Package::from_reader(Cursor::new(&original)).unwrap();
         let removal = source.plan_remove_task_panes().unwrap();
@@ -408,15 +436,22 @@ fn durable_creation_and_removal_roundtrip_in_both_conformances() {
 fn durable_changed_signed_patch_requires_unsign_and_replan() {
     let (panes, _) = authored_panes();
     let mut package = Package::new().unwrap();
-    package
-        .put_task_panes(panes, web::Conformance::Transitional)
+    package = {
+        let mut edit = package.edit_task_panes();
+        edit.put(panes, web::Conformance::Transitional).unwrap();
+        edit.commit().unwrap().into_package()
+    };
+    package = {
+        let mut edit = package.edit_opc();
+        (|opc: &mut litchi_opc::OpcPackage| -> litchi_docx::Result<_> {
+            {
+                opc.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
+                Ok(())
+            }
+        })(edit.package_mut())
         .unwrap();
-    package
-        .edit_opc(|opc| {
-            opc.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
-            Ok(())
-        })
-        .unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let changed = changed_panes(&package);
     let ordinary = package
         .plan_task_panes(changed.clone(), web::Conformance::Transitional)
@@ -424,13 +459,19 @@ fn durable_changed_signed_patch_requires_unsign_and_replan() {
     let durable = durable_patch(&ordinary);
     let before = members(&package_bytes(&package));
     let error = apply_durable(&mut package, &durable).unwrap_err();
-    assert!(error.to_string().contains("explicit Package::unsign"));
+    assert!(matches!(
+        error,
+        litchi_docx::Error::Opc(litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    ));
     assert_eq!(members(&package_bytes(&package)), before);
 
-    package.unsign();
+    package = package.unsign();
     let after_unsign = members(&package_bytes(&package));
     let error = apply_durable(&mut package, &durable).unwrap_err();
-    assert!(error.to_string().to_ascii_lowercase().contains("source"));
+    assert_patch_conflict(
+        &error,
+        "signed durable patch did not become stale after unsign",
+    );
     assert_eq!(members(&package_bytes(&package)), after_unsign);
 
     let replanned = durable_patch(
@@ -456,15 +497,12 @@ fn durable_stale_and_wire_tampering_are_atomic() {
         insert_before(content, b"</Types>", b"<!-- stale durable source -->")
     });
     let stale_error = assert_rejected_unchanged(&stale, &durable, "stale content types");
-    assert!(
-        stale_error.contains("Web Extensions durable typed replay target mismatch"),
-        "unexpected stale-source error: {stale_error}"
-    );
+    assert_patch_conflict(&stale_error, "unexpected stale-source error");
 
     let wire = durable.to_deterministic_json().unwrap();
     let op_tampered = decode_wire(&durable_replace_once(&wire, b"web.edit", b"web.edIt"));
     let op_error = assert_rejected_unchanged(&original, &op_tampered, "operation tamper");
-    assert!(op_error.to_ascii_lowercase().contains("unsupported"));
+    assert_common_invalid(&op_error, "unexpected operation-tamper error");
 
     let target_tampered = {
         let target = wire_target_hash(&wire);
@@ -477,7 +515,7 @@ fn durable_stale_and_wire_tampering_are_atomic() {
     };
     let target_error =
         assert_rejected_unchanged(&original, &decode_wire(&target_tampered), "target tamper");
-    assert!(target_error.to_ascii_lowercase().contains("target"));
+    assert_patch_conflict(&target_error, "unexpected target-tamper error");
 
     let (_, _, intent) = wire_blob(&wire, "forward_blobs");
     let altered_intent = durable_replace_once(&intent, b"runtime-public", b"runtime-stale");
@@ -488,10 +526,7 @@ fn durable_stale_and_wire_tampering_are_atomic() {
         &altered_intent,
     ));
     let blob_error = assert_rejected_unchanged(&original, &blob_tampered, "intent tamper");
-    assert!(
-        blob_error.to_ascii_lowercase().contains("target"),
-        "unexpected intent-tamper error: {blob_error}"
-    );
+    assert_patch_conflict(&blob_error, "unexpected intent-tamper error");
 }
 
 #[test]
@@ -552,12 +587,7 @@ fn durable_altered_unrelated_restore_reaches_forward_replay_mismatch() {
     let mut reopened = Package::from_reader(Cursor::new(published_bytes)).unwrap();
     let before = members(&package_bytes(&reopened));
     let error = apply_durable(&mut reopened, &tampered).unwrap_err();
-    assert!(
-        error
-            .to_string()
-            .contains("Web Extensions durable restore forward replay mismatch"),
-        "unexpected altered-restore error: {error}"
-    );
+    assert_patch_conflict(&error, "unexpected altered-restore error");
     assert_eq!(members(&package_bytes(&reopened)), before);
 }
 
@@ -569,22 +599,27 @@ fn durable_inverse_rejects_unrelated_binary_closure_record() {
     let forged_content_type = "application/octet-stream";
     let original_payload = b"original durable binary";
     let forged_payload = b"forged durable binary";
-    source
-        .edit_opc(|opc| {
-            opc.add_part(Box::new(BlobPart::new(
-                forged_name.clone(),
-                forged_content_type.to_owned(),
-                original_payload.to_vec(),
-            )));
-            Ok(())
-        })
+    source = {
+        let mut edit = source.edit_opc();
+        (|opc: &mut litchi_opc::OpcPackage| -> litchi_docx::Result<_> {
+            {
+                opc.add_part(Box::new(BlobPart::new(
+                    forged_name.clone(),
+                    forged_content_type.to_owned(),
+                    original_payload.to_vec(),
+                )));
+                Ok(())
+            }
+        })(edit.package_mut())
         .unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let source_part = source.opc_package().get_part(&forged_name).unwrap();
     assert_eq!(source_part.content_type(), forged_content_type);
     assert_eq!(source_part.blob(), original_payload);
     let source_relationships = source
         .opc_package()
-        .source_relationships(&forged_name)
+        .source_relationships(&forged_name, litchi_opc::SourceLimits::default())
         .unwrap();
     let original = package_bytes(&source);
     let ordinary = source
@@ -618,11 +653,7 @@ fn durable_inverse_rejects_unrelated_binary_closure_record() {
     let mut reopened = Package::from_reader(Cursor::new(published_bytes)).unwrap();
     let before = members(&package_bytes(&reopened));
     let error = apply_durable(&mut reopened, &forged).unwrap_err();
-    let message = error.to_string();
-    assert_eq!(
-        message,
-        "shared OOXML error: invalid OOXML relationship: Web Extensions durable restore forward replay mismatch"
-    );
+    assert_patch_conflict(&error, "unexpected inverse-closure error");
     assert_eq!(members(&package_bytes(&reopened)), before);
 }
 
@@ -662,14 +693,4 @@ fn durable_caller_limits_and_dirty_facade_leave_packages_unchanged() {
         "unexpected XML-limit error: {error}"
     );
     assert_eq!(members(&package_bytes(&xml_limited)), before);
-
-    let mut dirty = Package::from_reader(Cursor::new(&original)).unwrap();
-    dirty
-        .document_mut()
-        .unwrap()
-        .add_paragraph_with_text("unmaterialized durable edit");
-    let before = members(&package_bytes(&dirty));
-    let error = apply_durable(&mut dirty, &durable).unwrap_err();
-    assert!(error.to_string().contains("unmaterialized changes"));
-    assert_eq!(members(&package_bytes(&dirty)), before);
 }

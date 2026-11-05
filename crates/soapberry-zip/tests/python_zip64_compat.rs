@@ -313,9 +313,15 @@ fn assert_seekable_shape(data: &[u8]) {
 }
 
 fn assert_read_paths(data: &[u8], entries: &[Fixture<'_>], expect_archive_zip64: bool) {
-    let archive = ArchiveReader::new(data).unwrap();
+    let archive =
+        ArchiveReader::new(data, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     assert_eq!(archive.len(), entries.len());
-    let indexed = IndexedArchive::from_reader(data, data.len() as u64).unwrap();
+    let indexed = IndexedArchive::from_reader(
+        data,
+        data.len() as u64,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
     assert_eq!(indexed.len(), entries.len());
     assert_eq!(indexed.archive_is_zip64(), expect_archive_zip64);
 
@@ -526,8 +532,14 @@ fn many_small_controls_cover_zip32_local_only_and_central_local_zip64() {
         (MANY_SMALL_CENTRAL_LOCAL, true),
         (MANY_SMALL_CENTRAL_LOCAL_ZIP32_TAIL, false),
     ] {
-        let reader = ArchiveReader::new(data).unwrap();
-        let indexed = IndexedArchive::from_reader(data, data.len() as u64).unwrap();
+        let reader =
+            ArchiveReader::new(data, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+        let indexed = IndexedArchive::from_reader(
+            data,
+            data.len() as u64,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
         assert_eq!(indexed.archive_is_zip64(), global_zip64);
         for index in 0_u8..=u8::MAX {
             let name = format!("parts/p{index:03}.bin");
@@ -548,10 +560,15 @@ fn many_small_controls_cover_zip32_local_only_and_central_local_zip64() {
 }
 
 fn assert_strict_read_rejected(data: &[u8], name: &str) {
-    let reader = ArchiveReader::new(data).unwrap();
+    let reader = ArchiveReader::new(data, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     let mut output = Vec::new();
     assert!(reader.read_to(name, &mut output).is_err());
-    let indexed = IndexedArchive::from_reader(data, data.len() as u64).unwrap();
+    let indexed = IndexedArchive::from_reader(
+        data,
+        data.len() as u64,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
     assert!(indexed.read(name).is_err());
 }
 
@@ -593,9 +610,7 @@ struct RawRecord {
 fn raw_records(data: &[u8]) -> HashMap<Vec<u8>, RawRecord> {
     let archive = ZipArchive::from_slice(data).unwrap().into_zip_archive();
     let mut scratch = vec![0; RECOMMENDED_BUFFER_SIZE];
-    let index =
-        PreservationIndex::new_with_limits(&archive, &mut scratch, ArchiveLimits::UNBOUNDED)
-            .unwrap();
+    let index = PreservationIndex::new(&archive, &mut scratch, ArchiveLimits::UNBOUNDED).unwrap();
     index
         .entries()
         .iter()

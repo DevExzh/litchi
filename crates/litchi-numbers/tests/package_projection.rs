@@ -10,11 +10,8 @@ use std::error::Error as StdError;
 use litchi_iwa_archive::Limits as ArchiveLimits;
 use litchi_iwa_common::wire::{append_length_delimited_field, append_varint_field};
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
-use litchi_iwa_protos::{tn, tsa, tsk, tsp, tswp};
-use litchi_numbers::{
-    MAX_MATERIALIZED_CELLS, Package, PackageError, PackageLimits, PackageReadOptions,
-    PackageSemanticLimits, PackageSemanticPath, SemanticLimitKind,
-};
+use litchi_iwa_protos::{tn, tsa, tsk, tsp};
+use litchi_numbers::{Error as PackageError, Package, SemanticPath as PackageSemanticPath};
 use prost::Message as _;
 
 const DOCUMENT_MESSAGE_TYPE: u32 = 1;
@@ -54,11 +51,15 @@ fn object(identifier: u64, message_type: u32, data: Vec<u8>) -> TestResult<Archi
             type_: message_type,
             data,
         }],
+        Default::default(),
     )?)
 }
 
 fn package_bytes(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    let iwa = SnappyStream::compress(&Archive { objects }.to_bytes()?)?;
+    let iwa = SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?;
     Ok(litchi_iwa_archive::package::to_bytes(
         [("Index/Document.iwa", iwa.as_slice())],
         ArchiveLimits::default(),
@@ -99,67 +100,6 @@ fn form_sheet_projection_matches_standard_sheet_semantics_and_ignores_unknowns()
     assert_eq!(package.sheets()[0].index(), 0);
     assert_eq!(package.sheets()[0].name(), "Form projection");
     assert!(package.sheets()[0].tables().next().is_none());
-    Ok(())
-}
-
-#[test]
-#[allow(deprecated)]
-fn package_text_preserves_storage_fragment_boundaries_and_skips_malformed_storage() -> TestResult {
-    let root = numbers_root([]).encode_to_vec();
-    let first = tswp::StorageArchive {
-        text: vec!["first fragment".to_owned(), "second fragment".to_owned()],
-        ..Default::default()
-    };
-    let empty = tswp::StorageArchive::default();
-    let second = tswp::StorageArchive {
-        text: vec!["last fragment".to_owned()],
-        ..Default::default()
-    };
-    let bytes = package_bytes(vec![
-        object(1, DOCUMENT_MESSAGE_TYPE, root)?,
-        object(2, 200, first.encode_to_vec())?,
-        // A malformed compatibility storage is intentionally ignorable.
-        object(3, 200, vec![0xff])?,
-        object(4, 200, empty.encode_to_vec())?,
-        object(5, 201, second.encode_to_vec())?,
-    ])?;
-
-    let package = Package::from_bytes(&bytes)?;
-    assert_eq!(
-        package.text()?,
-        "first fragment\nsecond fragment\nlast fragment"
-    );
-    Ok(())
-}
-
-#[test]
-#[allow(deprecated)]
-fn package_text_enforces_the_selected_aggregate_output_budget() -> TestResult {
-    let root = numbers_root([]).encode_to_vec();
-    let storage = tswp::StorageArchive {
-        text: vec!["12345".to_owned(), "67890".to_owned()],
-        ..Default::default()
-    };
-    let bytes = package_bytes(vec![
-        object(1, DOCUMENT_MESSAGE_TYPE, root)?,
-        object(2, 200, storage.encode_to_vec())?,
-    ])?;
-    let semantic = PackageSemanticLimits::default()
-        .with_projection_limits(MAX_MATERIALIZED_CELLS, "12345\n67890".len() - 1)?;
-    let package = Package::from_bytes_with_options(
-        &bytes,
-        PackageReadOptions::new(PackageLimits::default(), semantic),
-    )?;
-
-    assert!(matches!(
-        package.text(),
-        Err(PackageError::SemanticLimit {
-            kind: SemanticLimitKind::OutputTextBytes,
-            observed: 11,
-            maximum: 10,
-            path: PackageSemanticPath::Package,
-        })
-    ));
     Ok(())
 }
 
@@ -207,6 +147,7 @@ fn duplicate_sheet_payload_ownership_is_rejected_before_projection() -> TestResu
                     data: form,
                 },
             ],
+            Default::default(),
         )?,
     ])?;
     assert!(matches!(
@@ -224,13 +165,17 @@ fn length_delimited_wire_fields_are_not_accidentally_treated_as_scalars() -> Tes
     // Field 99 is unknown, but its payload is deliberately framed as a
     // length-delimited value.  The root projection must skip it without
     // recursing into arbitrary bytes or changing semantic output.
-    append_length_delimited_field(&mut root, 99, b"opaque root bytes")?;
+    append_length_delimited_field(
+        &mut root,
+        99,
+        b"opaque root bytes",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let package = Package::from_bytes(&package_bytes(vec![object(
         1,
         DOCUMENT_MESSAGE_TYPE,
         root,
     )?])?)?;
     assert!(package.sheets().is_empty());
-    assert_eq!(package.text()?, "");
     Ok(())
 }

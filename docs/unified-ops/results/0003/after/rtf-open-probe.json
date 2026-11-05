@@ -1,0 +1,284 @@
+{
+ "schema": "litchi.unified-ops.0003.s10-rtf-open-probe.v1",
+ "source": "rtf_open_probe.rs",
+ "binary_sha256": "883012301a2cb4650a06ee1137009ad0a50ca024f6a26fa6ce28a83fd5ec4b87",
+ "cpu": 20,
+ "loops": {
+  "bare_default": [
+   {
+    "shape": "large",
+    "loop": "bare",
+    "block": 0,
+    "leg": "unified",
+    "p50_ns": 1683932,
+    "open_minor_faults_p50": 0
+   },
+   {
+    "shape": "large",
+    "loop": "bare",
+    "block": 0,
+    "leg": "leaf",
+    "p50_ns": 1679117,
+    "open_minor_faults_p50": 0
+   },
+   {
+    "shape": "large",
+    "loop": "bare",
+    "block": 0,
+    "leg": "leaf",
+    "p50_ns": 1680893,
+    "open_minor_faults_p50": 0
+   },
+   {
+    "shape": "large",
+    "loop": "bare",
+    "block": 0,
+    "leg": "unified",
+    "p50_ns": 1686197,
+    "open_minor_faults_p50": 0
+   },
+   {
+    "shape": "large",
+    "loop": "bare",
+    "block": 1,
+    "leg": "unified",
+    "p50_ns": 1685583,
+    "open_minor_faults_p50": 0
+   },
+   {
+    "shape": "large",
+    "loop": "bare",
+    "block": 1,
+    "leg": "leaf",
+    "p50_ns": 1678517,
+    "open_minor_faults_p50": 0
+   },
+   {
+    "shape": "large",
+    "loop": "bare",
+    "block": 1,
+    "leg": "leaf",
+    "p50_ns": 1680917,
+    "open_minor_faults_p50": 0
+   },
+   {
+    "shape": "large",
+    "loop": "bare",
+    "block": 1,
+    "leg": "unified",
+    "p50_ns": 1686387,
+    "open_minor_faults_p50": 0
+   }
+  ],
+  "harness_default": [
+   {
+    "shape": "large",
+    "loop": "harness",
+    "block": 0,
+    "leg": "unified",
+    "p50_ns": 3118273,
+    "open_minor_faults_p50": 2684
+   },
+   {
+    "shape": "large",
+    "loop": "harness",
+    "block": 0,
+    "leg": "leaf",
+    "p50_ns": 2976183,
+    "open_minor_faults_p50": 2684
+   },
+   {
+    "shape": "large",
+    "loop": "harness",
+    "block": 0,
+    "leg": "leaf",
+    "p50_ns": 2969168,
+    "open_minor_faults_p50": 2684
+   },
+   {
+    "shape": "large",
+    "loop": "harness",
+    "block": 0,
+    "leg": "unified",
+    "p50_ns": 3123828,
+    "open_minor_faults_p50": 2684
+   },
+   {
+    "shape": "large",
+    "loop": "harness",
+    "block": 1,
+    "leg": "unified",
+    "p50_ns": 3126763,
+    "open_minor_faults_p50": 2684
+   },
+   {
+    "shape": "large",
+    "loop": "harness",
+    "block": 1,
+    "leg": "leaf",
+    "p50_ns": 2963598,
+    "open_minor_faults_p50": 2684
+   },
+   {
+    "shape": "large",
+    "loop": "harness",
+    "block": 1,
+    "leg": "leaf",
+    "p50_ns": 2967458,
+    "open_minor_faults_p50": 2684
+   },
+   {
+    "shape": "large",
+    "loop": "harness",
+    "block": 1,
+    "leg": "unified",
+    "p50_ns": 3139254,
+    "open_minor_faults_p50": 2684
+   }
+  ],
+  "bare_tunables": [
+   {
+    "shape": "large",
+    "loop": "bare",
+    "block": 0,
+    "leg": "unified",
+    "p50_ns": 1669272,
+    "open_minor_faults_p50": 0
+   },
+   {
+    "shape": "large",
+    "loop": "bare",
+    "block": 0,
+    "leg": "leaf",
+    "p50_ns": 1665092,
+    "open_minor_faults_p50": 0
+   },
+   {
+    "shape": "large",
+    "loop": "bare",
+    "block": 0,
+    "leg": "leaf",
+    "p50_ns": 1672987,
+    "open_minor_faults_p50": 0
+   },
+   {
+    "shape": "large",
+    "loop": "bare",
+    "block": 0,
+    "leg": "unified",
+    "p50_ns": 1675782,
+    "open_minor_faults_p50": 0
+   },
+   {
+    "shape": "large",
+    "loop": "bare",
+    "block": 1,
+    "leg": "unified",
+    "p50_ns": 1676987,
+    "open_minor_faults_p50": 0
+   },
+   {
+    "shape": "large",
+    "loop": "bare",
+    "block": 1,
+    "leg": "leaf",
+    "p50_ns": 1673547,
+    "open_minor_faults_p50": 0
+   },
+   {
+    "shape": "large",
+    "loop": "bare",
+    "block": 1,
+    "leg": "leaf",
+    "p50_ns": 1674612,
+    "open_minor_faults_p50": 0
+   },
+   {
+    "shape": "large",
+    "loop": "bare",
+    "block": 1,
+    "leg": "unified",
+    "p50_ns": 1677313,
+    "open_minor_faults_p50": 0
+   }
+  ],
+  "harness_tunables": [
+   {
+    "shape": "large",
+    "loop": "harness",
+    "block": 0,
+    "leg": "unified",
+    "p50_ns": 1866908,
+    "open_minor_faults_p50": 0
+   },
+   {
+    "shape": "large",
+    "loop": "harness",
+    "block": 0,
+    "leg": "leaf",
+    "p50_ns": 1783452,
+    "open_minor_faults_p50": 0
+   },
+   {
+    "shape": "large",
+    "loop": "harness",
+    "block": 0,
+    "leg": "leaf",
+    "p50_ns": 1774477,
+    "open_minor_faults_p50": 0
+   },
+   {
+    "shape": "large",
+    "loop": "harness",
+    "block": 0,
+    "leg": "unified",
+    "p50_ns": 1844963,
+    "open_minor_faults_p50": 0
+   },
+   {
+    "shape": "large",
+    "loop": "harness",
+    "block": 1,
+    "leg": "unified",
+    "p50_ns": 1849458,
+    "open_minor_faults_p50": 0
+   },
+   {
+    "shape": "large",
+    "loop": "harness",
+    "block": 1,
+    "leg": "leaf",
+    "p50_ns": 1770668,
+    "open_minor_faults_p50": 0
+   },
+   {
+    "shape": "large",
+    "loop": "harness",
+    "block": 1,
+    "leg": "leaf",
+    "p50_ns": 1772403,
+    "open_minor_faults_p50": 0
+   },
+   {
+    "shape": "large",
+    "loop": "harness",
+    "block": 1,
+    "leg": "unified",
+    "p50_ns": 1852708,
+    "open_minor_faults_p50": 0
+   }
+  ]
+ },
+ "flat_probe": [
+  {
+   "shape": "large",
+   "bytes": 540051,
+   "flat_probe_p50_ns": 3860
+  },
+  {
+   "shape": "medium",
+   "bytes": 10851,
+   "flat_probe_p50_ns": 170
+  }
+ ]
+}

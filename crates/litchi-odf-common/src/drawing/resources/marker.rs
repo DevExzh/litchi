@@ -1,10 +1,10 @@
 //! Typed, inert ODF drawing marker resources.
 
+use crate::core::{ResolvedReader, XmlStreamLimits};
 use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
-use quick_xml::reader::NsReader;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::str::FromStr;
@@ -12,7 +12,6 @@ use std::str::FromStr;
 const OFFICE_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const DRAW_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
 const SVG_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0";
-const MAX_XML_BYTES: usize = 64 * 1_048_576;
 const MAX_DEPTH: usize = 256;
 const MAX_MARKERS: usize = 65_536;
 const MAX_VALUE_BYTES: usize = 65_536;
@@ -241,15 +240,15 @@ type Attributes = HashMap<(NamespaceKind, String), String>;
 ///
 /// Returns an error if the XML is malformed, uses invalid namespaced content,
 /// or violates a bounded marker resource rule.
-pub fn parse_drawing_markers(xml: &str) -> Result<Collection> {
+pub fn parse_drawing_markers(
+    xml: &str,
+    limits: XmlStreamLimits,
+) -> std::result::Result<Collection, crate::Error> {
+    let mut reader = ResolvedReader::from_xml(xml, limits)?;
     if !xml.contains("marker") {
         return Ok(Collection::default());
     }
-    if xml.len() > MAX_XML_BYTES {
-        return invalid("drawing marker XML exceeds 64 MiB");
-    }
 
-    let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
     let mut stack = Vec::<Frame>::new();
@@ -258,16 +257,14 @@ pub fn parse_drawing_markers(xml: &str) -> Result<Collection> {
     let mut aggregate = 0usize;
 
     loop {
-        let (resolved, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(|error| make_error(format!("invalid drawing marker XML: {error}")))?;
+        let (resolved, event) = reader.read_resolved_event_into(&mut buffer)?;
         let namespace = namespace_kind(&resolved)?;
         match event {
             Event::Start(ref element) => {
                 let local = decode(element.local_name().as_ref(), "element name")?;
                 reject_spoofed_name(namespace, &local)?;
                 if active.is_some() {
-                    return invalid("draw:marker cannot contain child elements");
+                    return invalid_odf("draw:marker cannot contain child elements");
                 }
                 if namespace == NamespaceKind::Draw && local == "marker" {
                     ensure_location(&stack)?;
@@ -279,14 +276,14 @@ pub fn parse_drawing_markers(xml: &str) -> Result<Collection> {
                 }
                 stack.push(Frame { namespace, local });
                 if stack.len() > MAX_DEPTH {
-                    return invalid(format!("drawing marker XML exceeds {MAX_DEPTH} levels"));
+                    return invalid_odf(format!("drawing marker XML exceeds {MAX_DEPTH} levels"));
                 }
             },
             Event::Empty(ref element) => {
                 let local = decode(element.local_name().as_ref(), "element name")?;
                 reject_spoofed_name(namespace, &local)?;
                 if active.is_some() {
-                    return invalid("draw:marker cannot contain child elements");
+                    return invalid_odf("draw:marker cannot contain child elements");
                 }
                 if namespace == NamespaceKind::Draw && local == "marker" {
                     ensure_location(&stack)?;
@@ -305,7 +302,7 @@ pub fn parse_drawing_markers(xml: &str) -> Result<Collection> {
                     .is_some_and(|marker| marker.parent_depth == stack.len())
                 {
                     if frame.namespace != NamespaceKind::Draw || frame.local != "marker" {
-                        return invalid("unexpected drawing marker end element");
+                        return invalid_odf("unexpected drawing marker end element");
                     }
                     let marker = active.take().ok_or_else(|| {
                         make_error("drawing marker ended without an active definition")
@@ -318,14 +315,16 @@ pub fn parse_drawing_markers(xml: &str) -> Result<Collection> {
                     .xml_content(XmlVersion::Explicit1_0)
                     .map_err(|error| make_error(format!("invalid marker text: {error}")))?;
                 if !value.chars().all(char::is_whitespace) {
-                    return invalid("draw:marker must be empty");
+                    return invalid_odf("draw:marker must be empty");
                 }
             },
             Event::CData(_) | Event::GeneralRef(_) if active.is_some() => {
-                return invalid("draw:marker cannot contain character data");
+                return invalid_odf("draw:marker cannot contain character data");
             },
             Event::DocType(_) | Event::PI(_) => {
-                return invalid("DTDs and processing instructions are prohibited in marker XML");
+                return invalid_odf(
+                    "DTDs and processing instructions are prohibited in marker XML",
+                );
             },
             Event::Eof => break,
             Event::Text(_)
@@ -337,7 +336,7 @@ pub fn parse_drawing_markers(xml: &str) -> Result<Collection> {
         buffer.clear();
     }
     if !stack.is_empty() || active.is_some() {
-        return invalid("unterminated drawing marker XML");
+        return invalid_odf("unterminated drawing marker XML");
     }
     result.validate()?;
     Ok(result)
@@ -352,7 +351,7 @@ fn ensure_count(count: usize) -> Result<()> {
 }
 
 fn parse_marker(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     aggregate: &mut usize,
 ) -> Result<Definition> {
@@ -373,7 +372,7 @@ fn parse_marker(
 }
 
 fn attributes(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     aggregate: &mut usize,
 ) -> Result<Attributes> {
@@ -530,6 +529,10 @@ fn decode(value: &[u8], what: &str) -> Result<String> {
 
 fn invalid<T>(message: impl Into<String>) -> Result<T> {
     Err(make_error(message))
+}
+
+fn invalid_odf<T>(message: impl Into<String>) -> std::result::Result<T, crate::Error> {
+    Err(crate::Error::from(make_error(message)))
 }
 
 fn make_error(message: impl Into<String>) -> Error {

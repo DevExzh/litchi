@@ -1,0 +1,86 @@
+{
+  "record": "0359re",
+  "status": "final-source-measured-native-open",
+  "source_commit": "f75941fc7d",
+  "probe_source": "crates/litchi-rtf/examples/refusal_contract_bench.rs",
+  "probe_source_sha256": "9d9e91c639e47ccc94f154464f6f97a0dc0002a3b2fb37251f61b17bf71cdb22",
+  "build": {
+    "profile": "release",
+    "jobs": 1,
+    "incremental": false,
+    "debug": 0,
+    "memory_max": "20G",
+    "target_dir": "/home/zhuhe/code/litchi-worktrees/.coord/rtf-refusals/target-replay-arc",
+    "target_size": "671M",
+    "binary_sha256": "6d47549df0be90cee8f5830685fc18d108824b1c68d0db8d84f800697b01bb52"
+  },
+  "original_binary": {
+    "sha256": "4693bd12232d92a61ef2f437de2d623e345a106288d5d0a5c5638cf27677420a",
+    "role": "pre-api-0359b-baseline"
+  },
+  "heaptrack": {
+    "order": ["original", "final", "final", "original"],
+    "host_contaminated": true,
+    "accepted_for_native": false,
+    "original_allocations": [177971, 177971],
+    "final_allocations": [177974, 177974],
+    "temporary": [1258, 1258, 1258, 1258],
+    "peak_heap": [3570000, 3570000, 3570000, 3570000],
+    "leaked": [544, 544, 544, 544],
+    "final_minus_original_allocations": 3,
+    "promotion_edge": "litchi_rtf::edit::ChangeStorage::to_shared",
+    "captures": [
+      {"name": "heap-01-baseline.zst", "size": 18654, "sha256": "1293d50bea19c26bdc9e869a49416e37fe90bdc5aab726be4322d5bc7aee9e0e"},
+      {"name": "heap-02-candidate.zst", "size": 19293, "sha256": "c5a7ce9bc5f2acf9ff0a36649a776523d6c6b282c9ee9edc7452ceed5516c2dc"},
+      {"name": "heap-03-candidate.zst", "size": 19098, "sha256": "7e01042dbafab4d951b75ae45428e2a1d53c0441a4e686d4ad4f7b7780017724"},
+      {"name": "heap-04-baseline.zst", "size": 18725, "sha256": "873ad46cc48717ac60dea11b17dff98a45870a2297c343fc0c4d66bbd249b76a"}
+    ]
+  },
+  "callgrind": {
+    "order": ["original", "final", "final", "original"],
+    "tool": "callgrind-3.26.0",
+    "original_ir": [627542591, 627541901],
+    "final_ir": [624872284, 624871461],
+    "final_median_minus_original_median": -2670374,
+    "final_package_apply_inclusive_ir": 511098,
+    "final_package_apply_calls": 3400,
+    "final_promotion_inclusive_ir": 1008,
+    "final_promotion_calls": 1,
+    "old_api_package_apply_inclusive_ir": 1679600,
+    "old_api_commit_staged_ir": 347723593,
+    "final_commit_staged_ir": 347843299,
+    "old_api_commit_new_ir": 24709,
+    "final_commit_new_ir": 24847,
+    "old_api_commit_drop_ir": 13382208,
+    "final_commit_drop_ir": 12968314,
+    "old_api_arc_drop_ir": 25398727,
+    "final_arc_drop_ir": 25400592,
+    "files": [
+      {"name": "01-baseline.callgrind", "size": 135852, "sha256": "6a38efe0dbf55d7a2f6d32836d4380d5b06368415667cbb8a628a36b5af93e8a"},
+      {"name": "02-candidate.callgrind", "size": 136718, "sha256": "026214703ac4c99e8b7e2db99d9515f953d7497a43efc50926826e7a840643e8"},
+      {"name": "03-candidate.callgrind", "size": 136775, "sha256": "aa506e9b2c458a9a0341ca4f6360f1979ebb952ea140bca578b53b5a4c51666c"},
+      {"name": "04-baseline.callgrind", "size": 136246, "sha256": "2df9d5d4a37ae633aaf11cbdb83f5dcb5d25b784833569a7d59e28727e1d9563"}
+    ]
+  },
+  "tests": {
+    "focused": {
+      "destination_splice": 9,
+      "paragraph_lifecycle": 16,
+      "run_format_native": 5,
+      "canonical_primary": 4
+    },
+    "canonical_primary_includes": "repeated replay after source patch drop"
+  },
+  "native": {
+    "accepted": false,
+    "status": "pending-clean-window",
+    "heap_rejection": "compiler processes observed during all four captures"
+  },
+  "prototype_comparison": {
+    "binary_sha256": "74cfeddc1fef9669bca6a2faea89a4a3a96f2fbfc84e7545b3a2d98a81f4ed91",
+    "allocations": 177975,
+    "promotion_ir": 1191,
+    "final_reduces_promotion_allocations_by": 1,
+    "final_reduces_promotion_ir_by": 183
+  }
+}

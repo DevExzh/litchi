@@ -419,7 +419,8 @@ fn zero_crc_composition_matches_small_direct_hashes() {
 #[test]
 fn default_office_streaming_bytes_are_readable_and_accounted() {
     let payload = mixed_payload(128 * 1024 + 17);
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     let mut accounting = ZipOperationAccounting::default();
     writer
         .write_deflated_stream_with_accounting(
@@ -435,7 +436,8 @@ fn default_office_streaming_bytes_are_readable_and_accounted() {
     assert_eq!(accounting.stored_payload_bytes_emitted(), 0);
     assert!(!ZipArchive::from_slice(&bytes).unwrap().is_zip64());
 
-    let reader = ArchiveReader::new(&bytes).unwrap();
+    let reader =
+        ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     assert_eq!(reader.file_names().collect::<Vec<_>>(), ["content.xml"]);
     assert_eq!(
         reader.metadata("content.xml").unwrap().uncompressed_size(),
@@ -465,7 +467,7 @@ fn default_office_streaming_bytes_are_readable_and_accounted() {
 
     let raised_limits =
         StreamingArchiveLimits::new(4, 64, 4096).with_byte_limits(ZIP32_MAX, ZIP32_MAX, 1 << 20);
-    let mut raised = StreamingArchiveWriter::with_limits(raised_limits);
+    let mut raised = StreamingArchiveWriter::new(raised_limits);
     raised
         .write_deflated_stream("zip64.bin", Cursor::new(payload.as_slice()))
         .unwrap();
@@ -483,7 +485,10 @@ fn office_owned_entry_round_trips_through_short_borrowed_sink() {
     let payload = mixed_payload(96 * 1024 + 3);
     let mut sink = ShortSink::new(3);
     {
-        let writer = StreamingArchiveWriter::with_writer(&mut sink);
+        let writer = StreamingArchiveWriter::with_writer(
+            &mut sink,
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         let mut entry = writer
             .start_entry("owned.bin", CompressionMethod::Deflate)
             .unwrap();
@@ -494,7 +499,8 @@ fn office_owned_entry_round_trips_through_short_borrowed_sink() {
         writer.finish().unwrap();
     }
 
-    let reader = ArchiveReader::new(&sink.bytes).unwrap();
+    let reader =
+        ArchiveReader::new(&sink.bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     let mut decoded = Vec::new();
     reader.read_to("owned.bin", &mut decoded).unwrap();
     assert_eq!(decoded, payload);
@@ -601,9 +607,12 @@ fn generated_offset_promotes_at_below_at_and_above_zip32_boundary() {
 fn owned_stream_reports_sink_failure_with_progress() {
     let name = "failure.bin";
     let mut sink = FailingSink::new(30 + name.len());
-    let mut entry = StreamingArchiveWriter::with_writer(&mut sink)
-        .start_entry(name, CompressionMethod::Store)
-        .unwrap();
+    let mut entry = StreamingArchiveWriter::with_writer(
+        &mut sink,
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    )
+    .start_entry(name, CompressionMethod::Store)
+    .unwrap();
     let immediate = entry.write(b"payload").unwrap_err();
     assert_eq!(immediate.kind(), io::ErrorKind::BrokenPipe);
     assert!(entry.is_poisoned());
@@ -612,10 +621,7 @@ fn owned_stream_reports_sink_failure_with_progress() {
         Ok(_) => panic!("poisoned entry unexpectedly finished"),
         Err(failure) => failure,
     };
-    assert!(matches!(
-        failure.error().kind(),
-        ErrorKind::IO(_) | ErrorKind::Io(_)
-    ));
+    assert!(matches!(failure.error().kind(), ErrorKind::IO(_)));
     assert!(failure.progress().is_poisoned());
     assert!(failure.progress().output_bytes() <= sink.fail_after as u64);
 }
@@ -623,7 +629,8 @@ fn owned_stream_reports_sink_failure_with_progress() {
 #[test]
 fn output_limit_boundary_is_reported_after_entry_publication() {
     let payload = b"output limit payload";
-    let mut probe = StreamingArchiveWriter::new();
+    let mut probe =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     probe
         .write_deflated_stream("payload.bin", Cursor::new(payload))
         .unwrap();
@@ -631,14 +638,14 @@ fn output_limit_boundary_is_reported_after_entry_publication() {
 
     let exact_limits =
         StreamingArchiveLimits::new(4, 64, 64).with_byte_limits(1024, 1024, expected.len() as u64);
-    let mut exact = StreamingArchiveWriter::with_limits(exact_limits);
+    let mut exact = StreamingArchiveWriter::new(exact_limits);
     exact
         .write_deflated_stream("payload.bin", Cursor::new(payload))
         .unwrap();
     assert_eq!(exact.finish_to_bytes().unwrap(), expected);
 
     let short_limits = exact_limits.with_byte_limits(1024, 1024, expected.len() as u64 - 1);
-    let mut short = StreamingArchiveWriter::with_limits(short_limits);
+    let mut short = StreamingArchiveWriter::new(short_limits);
     short
         .write_deflated_stream("payload.bin", Cursor::new(payload))
         .unwrap();
@@ -664,10 +671,7 @@ fn one_bounded_zero_reader_crosses_zip64_size_boundary() {
         64 * 1024 * 1024,
     );
     let mut accounting = ZipOperationAccounting::default();
-    let writer = StreamingArchiveWriter::with_writer_and_limits(
-        BoundedVecSink::new(64 * 1024 * 1024),
-        limits,
-    );
+    let writer = StreamingArchiveWriter::with_writer(BoundedVecSink::new(64 * 1024 * 1024), limits);
     let mut writer = writer;
     writer
         .write_deflated_stream_with_accounting("zeros.bin", &mut source, &mut accounting)
@@ -698,7 +702,7 @@ fn one_bounded_zero_reader_crosses_zip64_size_boundary() {
         max_total_size: HUGE_ZERO_RUN,
         ..ArchiveLimits::default()
     };
-    let office = ArchiveReader::new_with_limits(&sink.bytes, read_limits).unwrap();
+    let office = ArchiveReader::new(&sink.bytes, read_limits).unwrap();
     assert_eq!(
         office.metadata("zeros.bin").unwrap().uncompressed_size(),
         HUGE_ZERO_RUN

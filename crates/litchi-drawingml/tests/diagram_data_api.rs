@@ -1,6 +1,11 @@
+use litchi_drawingml::diagram::Limits;
 use litchi_drawingml::diagram::data::{
     Conformance, Connection, ConnectionType, DiagramDataModel, Id, Point, PointType,
 };
+
+fn parse(xml: &str) -> litchi_drawingml::Result<DiagramDataModel> {
+    DiagramDataModel::parse(xml, &Limits::default())
+}
 
 #[test]
 fn typed_diagram_data_crud_round_trips_without_raw_identifier_strings() {
@@ -39,10 +44,12 @@ fn typed_diagram_data_crud_round_trips_without_raw_identifier_strings() {
         .unwrap();
 
     assert_eq!(model.point(child).unwrap().text, "A & B");
-    let xml = model.to_xml(Conformance::Strict).unwrap();
+    let xml = model
+        .to_xml(Conformance::Strict, &Limits::default())
+        .unwrap();
     assert!(xml.contains("parTransId=\"20\" sibTransId=\"21\""));
     assert!(xml.contains("A &amp; B"));
-    assert_eq!(DiagramDataModel::parse(&xml).unwrap(), model);
+    assert_eq!(parse(&xml).unwrap(), model);
 }
 
 #[test]
@@ -53,5 +60,16 @@ fn invalid_fixed_domain_values_never_reach_the_public_model() {
         "<dgm:ptLst><dgm:pt modelId=\"1\" type=\"custom\"/></dgm:ptLst>",
         "</dgm:dataModel>"
     );
-    assert!(DiagramDataModel::parse(xml).is_err());
+    assert!(parse(xml).is_err());
+}
+
+#[test]
+fn nested_data_model_root_is_rejected() {
+    let xml = concat!(
+        "<dgm:dataModel xmlns:dgm=\"http://schemas.openxmlformats.org/drawingml/2006/diagram\">",
+        "<dgm:ptLst><dgm:pt modelId=\"1\"/></dgm:ptLst>",
+        "<dgm:dataModel><dgm:ptLst/></dgm:dataModel>",
+        "</dgm:dataModel>"
+    );
+    assert!(parse(xml).is_err());
 }

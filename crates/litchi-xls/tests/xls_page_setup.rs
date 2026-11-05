@@ -1,12 +1,12 @@
 use std::io::Cursor;
 
-use litchi_xls::Workbook;
-use litchi_xls::writer::{PageSetupOptions, Writer};
+use litchi_xls::raw::Reader;
+use litchi_xls::writer::{Builder, PageSetupOptions};
 use litchi_xls::{PrintComments, PrintErrors, PrintOrder, PrintOrientation};
 
 #[test]
 fn page_settings_round_trip_with_breaks_and_continued_pls() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Print").unwrap();
     let options = PageSetupOptions {
         print_headers: true,
@@ -44,8 +44,8 @@ fn page_settings_round_trip_with_breaks_and_continued_pls() {
     writer.add_vertical_page_break(sheet, 5, 0, 100).unwrap();
 
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
-    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let page = workbook.xls_worksheet(0).unwrap().page_setup().unwrap();
 
     assert!(page.print_headers());
@@ -70,7 +70,7 @@ fn page_settings_round_trip_with_breaks_and_continued_pls() {
 
 #[test]
 fn writer_rejects_invalid_dimensions_and_breaks() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Print").unwrap();
     let invalid = PageSetupOptions {
         left_margin_inches: f64::NAN,

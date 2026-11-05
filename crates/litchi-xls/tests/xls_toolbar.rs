@@ -1,7 +1,7 @@
 use std::io::Cursor;
 
 use litchi_ole_common::toolbar::{Flags, Header, Restrictions, Type, WString};
-use litchi_xls::{Toolbar, Workbook, Wrapper, Writer};
+use litchi_xls::{Builder, Toolbar, Wrapper, raw::Reader};
 
 fn toolbar() -> Toolbar<'static> {
     Toolbar::new(
@@ -20,16 +20,16 @@ fn toolbar() -> Toolbar<'static> {
 
 #[test]
 fn writer_and_workbook_facades_round_trip_xcb_stream() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_worksheet("Sheet1").unwrap();
     writer
         .set_toolbar(Wrapper::new(vec![toolbar()]).unwrap())
         .unwrap();
 
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
 
-    let mut workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let mut workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let decoded = workbook.toolbar().unwrap().unwrap();
     assert_eq!(decoded.toolbars().len(), 1);
     assert_eq!(decoded.toolbars()[0].header().name().text(), "XCB");
@@ -37,7 +37,7 @@ fn writer_and_workbook_facades_round_trip_xcb_stream() {
 
 #[test]
 fn writer_can_clear_xcb_stream() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_worksheet("Sheet1").unwrap();
     writer
         .set_toolbar(Wrapper::new(vec![toolbar()]).unwrap())
@@ -45,7 +45,7 @@ fn writer_can_clear_xcb_stream() {
     writer.clear_toolbar();
 
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
-    let mut workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
+    let mut workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     assert!(workbook.toolbar().unwrap().is_none());
 }

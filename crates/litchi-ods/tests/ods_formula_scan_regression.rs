@@ -45,7 +45,7 @@ fn assert_cell_ref(
 
 fn assert_invalid_format(source: &str) {
     let error = FormulaParser::new(source)
-        .parse()
+        .parse(&Default::default())
         .expect_err("malformed legacy scan suffix should be rejected");
     assert!(
         matches!(error, Error::InvalidFormat(_)),
@@ -57,7 +57,7 @@ fn assert_invalid_format(source: &str) {
 fn repeated_partial_cells_keep_boundaries_with_spaces_and_tabs() {
     let source = "=A1 A1\tA1\nA1";
     let formula = FormulaParser::new(source)
-        .parse()
+        .parse(&Default::default())
         .expect("whitespace-separated partial cells should remain independent");
 
     assert_eq!(formula.text, source);
@@ -71,7 +71,7 @@ fn repeated_partial_cells_keep_boundaries_with_spaces_and_tabs() {
 fn contiguous_partial_cells_and_a_dot_tail_keep_legacy_tokens() {
     let source = "=A1A1A1A1";
     let formula = FormulaParser::new(source)
-        .parse()
+        .parse(&Default::default())
         .expect("contiguous cell-shaped text should retain partial-cell tokens");
 
     assert_eq!(formula.text, source);
@@ -82,7 +82,7 @@ fn contiguous_partial_cells_and_a_dot_tail_keep_legacy_tokens() {
 
     let source = "=A1A1A1 .B2";
     let formula = FormulaParser::new(source)
-        .parse()
+        .parse(&Default::default())
         .expect("a separated current-sheet dot tail should remain parseable");
     assert_eq!(formula.text, source);
     assert_eq!(formula.tokens.len(), 1);
@@ -90,7 +90,7 @@ fn contiguous_partial_cells_and_a_dot_tail_keep_legacy_tokens() {
 
     let source = "=A1A1A1.A1";
     let formula = FormulaParser::new(source)
-        .parse()
+        .parse(&Default::default())
         .expect("a dot directly after a partial-cell run should retain its sheet prefix");
     assert_eq!(formula.text, source);
     assert_eq!(formula.tokens.len(), 1);
@@ -101,7 +101,7 @@ fn contiguous_partial_cells_and_a_dot_tail_keep_legacy_tokens() {
 fn tabs_underscores_and_digit_boundaries_preserve_tokens_and_refusals() {
     let source = "=A1\tSheet_2.C3+AA10 2";
     let formula = FormulaParser::new(source)
-        .parse()
+        .parse(&Default::default())
         .expect("tab, underscore, and digit boundaries should parse");
 
     assert_eq!(formula.text, source);
@@ -122,7 +122,7 @@ fn a_dot_after_a_long_suffix_uses_the_legacy_sheet_fallback() {
     let sheet = "VeryLongSheetName_0123456789";
     let source = "=VeryLongSheetName_0123456789.A1";
     let formula = FormulaParser::new(source)
-        .parse()
+        .parse(&Default::default())
         .expect("a long sheet prefix followed by a dot should parse");
 
     assert_eq!(formula.text, source);
@@ -133,14 +133,14 @@ fn a_dot_after_a_long_suffix_uses_the_legacy_sheet_fallback() {
 #[test]
 fn absolute_and_range_forms_retain_the_legacy_fallback_shape() {
     let absolute = FormulaParser::new("=$a$1")
-        .parse()
+        .parse(&Default::default())
         .expect("absolute cell should use the legacy parser");
     assert_eq!(absolute.tokens.len(), 1);
     assert_cell(&absolute.tokens[0], None, "A", 1, true, true);
 
     let source = "=Sheet_2.$a$1:.$B$2";
     let formula = FormulaParser::new(source)
-        .parse()
+        .parse(&Default::default())
         .expect("absolute range should retain both fallback endpoints");
     assert_eq!(formula.text, source);
     assert_eq!(formula.tokens.len(), 1);
@@ -155,7 +155,7 @@ fn absolute_and_range_forms_retain_the_legacy_fallback_shape() {
 fn formula_prefixes_normalize_for_scanning_but_retain_original_text() {
     for source in ["=A1+$b$2", "OF:=A1+$b$2", "  of:=A1+$b$2  "] {
         let formula = FormulaParser::new(source)
-            .parse()
+            .parse(&Default::default())
             .expect("supported formula prefixes should share token semantics");
         assert_eq!(formula.text, source);
         assert_eq!(formula.tokens.len(), 3);

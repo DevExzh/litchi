@@ -10,8 +10,9 @@ use super::super::{
     BINARY_CONTENT_TYPE, BINARY_RELATIONSHIP, CONTROL_RELATIONSHIP, DESCRIPTOR_CONTENT_TYPE,
     Limits, STRICT_CONTROL_RELATIONSHIP,
 };
-use super::transaction::{BinarySource, Commit, Patch, RelationshipState, Snapshot};
+use super::transaction::{BinarySource, Change, Prepared, RelationshipState, Snapshot};
 use super::validation::invalid_revision;
+use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::presentation::embedded::invalid;
 use crate::{Error, Result};
 
@@ -78,10 +79,17 @@ pub fn load(
 
 /// Apply a source-checked patch to its owning slide atomically.
 ///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
+pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Change) -> Result<Snapshot> {
     let before = patch.before();
     let slide = package.get_part(&before.slide_part_name)?;
     let current = load(
@@ -98,8 +106,9 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
         return Ok(current);
     }
 
+    refuse_signed_change(package)?;
     let mut staged = package.clone();
-    staged.unsign();
+    settle_unsigned_change(&mut staged)?;
     install_patch(&mut staged, patch)?;
     let slide = staged.get_part(&before.slide_part_name)?;
     let resulting = load(
@@ -120,15 +129,22 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
 
 /// Apply a committed transaction and return the validated post-publication snapshot.
 ///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot> {
+pub(crate) fn apply_commit(package: &mut OpcPackage, commit: Prepared) -> Result<Snapshot> {
     let patch = commit.into_patch();
     apply_patch(package, &patch)
 }
 
-fn install_patch(package: &mut OpcPackage, patch: &Patch) -> Result<()> {
+fn install_patch(package: &mut OpcPackage, patch: &Change) -> Result<()> {
     let before = patch.before();
     let after = patch.after();
     let slide = package.get_part_mut(&before.slide_part_name)?;

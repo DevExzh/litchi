@@ -1,0 +1,186 @@
+{
+ "record": "0255",
+ "method": "release builds, taskset -c 2, run order R P P R R P P R; per run the median of 21 batch means; cell = median of the 4 runs",
+ "units": "ns per call",
+ "scenarios": {
+  "get_docx_p10_d0": {
+   "python_runs": [
+    62774.4,
+    62553.2,
+    62464.9,
+    63328.2
+   ],
+   "python_median": 62663.8,
+   "rust_runs": [
+    60455.8,
+    60507.5,
+    61004.5,
+    60910.4
+   ],
+   "rust_median": 60708.95,
+   "ratio": 1.032
+  },
+  "get_docx_p10_d1": {
+   "python_runs": [
+    159112.8,
+    157975.5,
+    157190.5,
+    159026.4
+   ],
+   "python_median": 158500.95,
+   "rust_runs": [
+    154252.7,
+    153540.4,
+    155423.9,
+    155948.5
+   ],
+   "rust_median": 154838.3,
+   "ratio": 1.024
+  },
+  "get_xlsx_cell_d0": {
+   "python_runs": [
+    6611.6,
+    6613.4,
+    6635.2,
+    6637.1
+   ],
+   "python_median": 6624.299999999999,
+   "rust_runs": [
+    5991.4,
+    6059.4,
+    6009.4,
+    6007.6
+   ],
+   "rust_median": 6008.5,
+   "ratio": 1.102
+  },
+  "query_docx_paragraph": {
+   "python_runs": [
+    7447848.5,
+    7394370.6,
+    7389701.2,
+    7417826.4
+   ],
+   "python_median": 7406098.5,
+   "rust_runs": [
+    7121232.0,
+    7181550.3,
+    7111798.0,
+    7078653.7
+   ],
+   "rust_median": 7116515.0,
+   "ratio": 1.041
+  },
+  "query_xlsx_cell_100": {
+   "python_runs": [
+    484258.1,
+    483059.2,
+    477181.4,
+    482263.1
+   ],
+   "python_median": 482661.15,
+   "rust_runs": [
+    473983.8,
+    478179.5,
+    470285.7,
+    553629.4
+   ],
+   "rust_median": 476081.65,
+   "ratio": 1.014
+  },
+  "set_docx_run_bold": {
+   "python_runs": [
+    109585.9,
+    121722.3,
+    109040.3,
+    107592.2
+   ],
+   "python_median": 109313.1,
+   "rust_runs": [
+    106122.6,
+    106926.7,
+    105780.2,
+    108303.2
+   ],
+   "rust_median": 106524.65,
+   "ratio": 1.026
+  },
+  "set_xlsx_cell": {
+   "python_runs": [
+    22312.6,
+    22268.7,
+    21809.5,
+    22019.5
+   ],
+   "python_median": 22144.1,
+   "rust_runs": [
+    21804.9,
+    21598.3,
+    21499.8,
+    21832.3
+   ],
+   "rust_median": 21701.6,
+   "ratio": 1.02
+  },
+  "batch_xlsx_1k": {
+   "python_runs": [
+    2440378.9,
+    2444319.3,
+    2398136.5,
+    2387308.5
+   ],
+   "python_median": 2419257.7,
+   "rust_runs": [
+    2063125.1,
+    2064234.9,
+    2076179.9,
+    2084122.6
+   ],
+   "rust_median": 2070207.4,
+   "ratio": 1.169
+  },
+  "edit_xlsx_1k": {
+   "python_runs": [
+    2295225.6,
+    2337245.0,
+    2251766.9,
+    2263384.2
+   ],
+   "python_median": 2279304.9000000004,
+   "rust_runs": [
+    1996808.2,
+    2005949.6,
+    2021459.0,
+    2017673.3
+   ],
+   "rust_median": 2011811.4500000002,
+   "ratio": 1.133
+  },
+  "batch_docx_1k": {
+   "python_runs": [
+    23207545.6,
+    23458867.7,
+    23152159.5,
+    23188331.1
+   ],
+   "python_median": 23197938.35,
+   "rust_runs": [
+    22113966.9,
+    22182192.4,
+    22449220.3,
+    22481962.2
+   ],
+   "rust_median": 22315706.35,
+   "ratio": 1.04
+  },
+  "batch_xlsx_1k_json": {
+   "python_runs": [
+    2368602.3,
+    2349162.6,
+    2334024.3,
+    2319109.7
+   ],
+   "python_median": 2341593.45
+  }
+ }
+}

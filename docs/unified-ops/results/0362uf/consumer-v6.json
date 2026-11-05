@@ -1,0 +1,20 @@
+{
+  "source": "a814baa1de47c0844eb1ea092805b73e7d7bb4ae",
+  "command": [
+    "cargo",
+    "check",
+    "--offline",
+    "--locked",
+    "--workspace",
+    "--all-targets",
+    "--all-features",
+    "--keep-going"
+  ],
+  "outcome": "compiler_errors; runner ended without persisting its final exit receipt",
+  "exit": null,
+  "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v6/check-0.log",
+  "bytes": 260683,
+  "sha256": "3d62f2357c481a2f22db17fd2696953d3f7dcf6e20f332172c39ab033e1455bb",
+  "harness_reached": false,
+  "note": "All-format libraries reached the facade. Keep-going exposed remaining ODF facade/native consumer error conversions, PPTX stable refusal guard patterns, and DOCX/IWA test lints. Process/session absence verified; no success or exact elapsed duration inferred."
+}

@@ -1,8 +1,11 @@
 #![allow(clippy::unwrap_used, reason = "test assertions use unwrap for clarity")]
 
+use litchi_core::edit::RefusalKind;
+use litchi_odf_common::Error as PackageError;
+use litchi_odi::flat::Image as FlatImage;
 use litchi_odi::{
-    Builder, ConflictKind, FlatImage, FrameProperty, History, Image, OperationKey,
-    ProtectionDisposition, SecurityPolicy, SemanticValue, StyleDependencyState, SurfaceDisposition,
+    Builder, ConflictKind, FrameProperty, History, OperationKey, Package, ProtectionDisposition,
+    SecurityPolicy, SemanticPatch, SemanticValue, StyleDependencyState, SurfaceDisposition,
     SurfaceKind,
     frame::Frame,
     map::{Area, ImageMap},
@@ -28,24 +31,21 @@ const ODFDOM_ORIGINAL: &[u8] = include_bytes!("fixtures/odfdom-0.13.0-original.o
 const ODFDOM_CHANGED: &[u8] = include_bytes!("fixtures/odfdom-0.13.0-changed.odi");
 
 fn flat() -> FlatImage {
-    FlatImage::from_bytes(FLAT.as_bytes().to_vec()).unwrap()
+    FlatImage::from_bytes(FLAT.as_bytes()).unwrap()
 }
 
-fn package() -> Image {
+fn package() -> Package {
     let frame = Frame::new(Source::Linked("Pictures/photo.png".into()))
         .with_name("Photo")
         .with_style_name("gr1")
         .with_layer("layout")
         .with_geometry("1cm", "2cm", "3cm", "4cm");
-    Image::from_bytes(
-        Builder::new()
-            .frame(&frame)
-            .meta_xml(META)
-            .resource("Pictures/photo.png", "image/png", b"image".to_vec())
-            .build()
-            .unwrap(),
-    )
-    .unwrap()
+    Builder::new()
+        .frame(&frame)
+        .meta_xml(META)
+        .resource("Pictures/photo.png", "image/png", b"image".to_vec())
+        .build()
+        .unwrap()
 }
 
 fn map() -> ImageMap {
@@ -63,7 +63,7 @@ fn map() -> ImageMap {
 #[test]
 fn retained_frame_image_and_style_semantics_share_the_durable_wire() {
     let source = flat();
-    let mut edit = source.transaction();
+    let mut edit = source.edit();
     edit.set_frame_xml_id(0, Some("frame-xml-id".into()))
         .unwrap();
     edit.set_frame_title(0, Some("Accessible title".into()))
@@ -82,7 +82,7 @@ fn retained_frame_image_and_style_semantics_share_the_durable_wire() {
     edit.set_copy_of(0, Some("OtherFrame".into())).unwrap();
     edit.set_image_map(0, Some(map())).unwrap();
     let commit = edit.commit().unwrap();
-    let frame = commit.snapshot().frame().unwrap();
+    let frame = commit.package().frame().unwrap();
     assert_eq!(frame.xml_id(), Some("frame-xml-id"));
     assert_eq!(frame.title(), Some("Accessible title"));
     assert_eq!(frame.description(), Some("Accessible description"));
@@ -94,7 +94,10 @@ fn retained_frame_image_and_style_semantics_share_the_durable_wire() {
     assert_eq!(frame.actuate(), Some("onLoad"));
     assert_eq!(frame.copy_of(), Some("OtherFrame"));
 
-    let patch = commit.semantic_patch(&SecurityPolicy::default()).unwrap();
+    let patch = commit
+        .patch()
+        .semantic_patch(&SecurityPolicy::default())
+        .unwrap();
     assert_eq!(patch.operations().len(), 11);
     let package_source = package();
     let transfer = patch.plan_package(&package_source);
@@ -102,15 +105,14 @@ fn retained_frame_image_and_style_semantics_share_the_durable_wire() {
     let transferred = transfer
         .commit_package(&package_source, &SecurityPolicy::default())
         .unwrap();
-    assert_eq!(transferred.image().frame().unwrap(), frame);
+    assert_eq!(transferred.package().image().frame().unwrap(), frame);
 
     let mut styles_edit = package_source.edit();
     styles_edit.set_styles_xml(Some(STYLES.into())).unwrap();
     let styles_commit = styles_edit.commit().unwrap();
-    assert_eq!(styles_commit.image().styles_xml(), Some(STYLES));
-    let styles_patch = styles_commit
-        .semantic_patch(&SecurityPolicy::default())
-        .unwrap();
+    assert_eq!(styles_commit.package().image().styles_xml(), Some(STYLES));
+    let styles_patch =
+        SemanticPatch::from_package_commit(&styles_commit, &SecurityPolicy::default()).unwrap();
     assert!(
         styles_patch
             .operations()
@@ -118,22 +120,27 @@ fn retained_frame_image_and_style_semantics_share_the_durable_wire() {
             .any(|operation| operation.key() == &OperationKey::Styles)
     );
     assert!(
-        styles_commit
-            .semantic_patch(&SecurityPolicy::default().with_xml_bytes(1))
-            .is_err()
+        SemanticPatch::from_package_commit(
+            &styles_commit,
+            &SecurityPolicy::default().with_xml_bytes(1)
+        )
+        .is_err()
     );
     assert_eq!(
         styles_patch
             .inverse()
-            .apply_package(styles_commit.image())
+            .apply_package(styles_commit.package())
             .unwrap()
             .as_bytes(),
         package_source.as_bytes()
     );
 
-    let mut remove = styles_commit.image().edit();
+    let mut remove = styles_commit.package().edit();
     remove.set_styles_xml(None).unwrap();
-    assert_eq!(remove.commit().unwrap().image().styles_xml(), None);
+    assert_eq!(
+        remove.commit().unwrap().package().image().styles_xml(),
+        None
+    );
 
     let mut noncompact = package_source.edit();
     assert!(
@@ -145,7 +152,7 @@ fn retained_frame_image_and_style_semantics_share_the_durable_wire() {
 
 #[test]
 fn checked_in_normative_synthetic_fodi_is_explicitly_non_producer_evidence() {
-    let image = FlatImage::from_bytes(NORMATIVE_SYNTHETIC.to_vec()).unwrap();
+    let image = FlatImage::from_bytes(NORMATIVE_SYNTHETIC).unwrap();
     assert_eq!(
         image.metadata().unwrap().title.as_deref(),
         Some("Normative synthetic ODI evidence")
@@ -157,8 +164,10 @@ fn checked_in_normative_synthetic_fodi_is_explicitly_non_producer_evidence() {
 
 #[test]
 fn checked_in_odfdom_producer_round_trip_is_genuine_odi_evidence() {
-    let original = Image::from_bytes(ODFDOM_ORIGINAL.to_vec()).unwrap();
-    let changed = Image::from_bytes(ODFDOM_CHANGED.to_vec()).unwrap();
+    let original_package = Package::from_bytes(ODFDOM_ORIGINAL).unwrap();
+    let changed_package = Package::from_bytes(ODFDOM_CHANGED).unwrap();
+    let original = original_package.image();
+    let changed = changed_package.image();
     assert_eq!(
         original.frame().unwrap().name(),
         Some("ODFDOM-0.13.0-Original")
@@ -175,8 +184,8 @@ fn checked_in_odfdom_producer_round_trip_is_genuine_odi_evidence() {
         changed.frame().unwrap().source(),
         Source::Embedded(_)
     ));
-    assert_eq!(original.as_bytes(), ODFDOM_ORIGINAL);
-    assert_eq!(changed.as_bytes(), ODFDOM_CHANGED);
+    assert_eq!(original_package.as_bytes(), ODFDOM_ORIGINAL);
+    assert_eq!(changed_package.as_bytes(), ODFDOM_CHANGED);
 }
 
 #[test]
@@ -192,7 +201,7 @@ fn public_form_and_extension_inventory_is_inert_and_exact() {
             r#"<office:forms><form:form form:name="Search"><form:text form:id="query"/></form:form></office:forms><vendor:item vendor:flag="1"/><office:body>"#,
             1,
         );
-    let image = FlatImage::from_bytes(xml.clone().into_bytes()).unwrap();
+    let image = FlatImage::from_bytes(xml.clone().as_bytes()).unwrap();
     assert_eq!(image.forms().len(), 3);
     assert_eq!(image.forms()[1].name(), Some("Search"));
     assert_eq!(image.forms()[2].control_id(), Some("query"));
@@ -207,18 +216,15 @@ fn public_form_and_extension_inventory_is_inert_and_exact() {
 
 #[test]
 fn automatic_style_transfer_carries_transitive_exact_parent_closure() {
-    let prepared = Image::from_bytes(
-        Builder::new()
-            .content_xml(TRANSITIVE_CONTENT)
-            .styles_xml(TRANSITIVE_STYLES)
-            .build()
-            .unwrap(),
-    )
-    .unwrap();
+    let prepared = Builder::new()
+        .content_xml(TRANSITIVE_CONTENT)
+        .styles_xml(TRANSITIVE_STYLES)
+        .build()
+        .unwrap();
     let mut edit = prepared.edit();
     edit.set_style_name(0, Some("auto-child".into())).unwrap();
     let commit = edit.commit().unwrap();
-    let patch = commit.semantic_patch(&SecurityPolicy::default()).unwrap();
+    let patch = SemanticPatch::from_package_commit(&commit, &SecurityPolicy::default()).unwrap();
     let destination = package();
     let plan = patch.plan_package(&destination);
     assert!(plan.is_conflict_free(), "{:?}", plan.conflicts());
@@ -227,6 +233,7 @@ fn automatic_style_transfer_carries_transitive_exact_parent_closure() {
         .unwrap();
     assert_eq!(
         transferred
+            .package()
             .image()
             .style_dependency_state("auto-child", "graphic")
             .unwrap(),
@@ -234,29 +241,29 @@ fn automatic_style_transfer_carries_transitive_exact_parent_closure() {
     );
     assert_eq!(
         transferred
+            .package()
             .image()
             .style_dependency_state("named-parent", "graphic")
             .unwrap(),
         StyleDependencyState::Named
     );
-    let styles = transferred.image().styles_xml().unwrap();
+    let transferred_image = transferred.package().image();
+    let styles = transferred_image.styles_xml().unwrap();
     assert!(styles.contains(r#"style:name="auto-child""#));
     assert!(styles.contains(r#"style:name="named-parent""#));
 }
 
 #[test]
 fn protection_inventory_exposes_exact_signed_rewrite_disposition() {
-    let signed = Image::from_bytes(
-        Builder::new()
-            .resource(
-                "META-INF/vendor-signatures-v2.xml",
-                "text/xml",
-                br"<signature/>".to_vec(),
-            )
-            .build()
-            .unwrap(),
-    )
-    .unwrap();
+    let signed = Builder::new()
+        .resource(
+            "META-INF/vendor-signatures-v2.xml",
+            "text/xml",
+            br"<signature/>".to_vec(),
+        )
+        .build()
+        .unwrap()
+        .image();
     assert_eq!(
         signed.protection().signature_members(),
         &["META-INF/vendor-signatures-v2.xml".to_owned()]
@@ -271,12 +278,15 @@ fn protection_inventory_exposes_exact_signed_rewrite_disposition() {
 #[test]
 fn semantic_patch_is_deterministic_exact_reopenable_and_transferable() {
     let source = flat();
-    let mut edit = source.transaction();
+    let mut edit = source.edit();
     edit.set_style_name(0, Some("gr2".into())).unwrap();
     edit.set_x(0, Some("5cm".into())).unwrap();
     edit.set_image_map(0, Some(map())).unwrap();
     let commit = edit.commit().unwrap();
-    let patch = commit.semantic_patch(&SecurityPolicy::default()).unwrap();
+    let patch = commit
+        .patch()
+        .semantic_patch(&SecurityPolicy::default())
+        .unwrap();
 
     assert!(
         patch
@@ -292,32 +302,49 @@ fn semantic_patch_is_deterministic_exact_reopenable_and_transferable() {
             }
     }));
     let exact = patch.apply_flat(&source).unwrap();
-    assert_eq!(exact.as_bytes(), commit.snapshot().as_bytes());
+    assert_eq!(exact.as_bytes(), commit.package().as_bytes());
     assert_eq!(
         patch.inverse().apply_flat(&exact).unwrap().as_bytes(),
         source.as_bytes()
     );
-    let stale = FlatImage::from_bytes(FLAT.replace("gr1", "other").into_bytes()).unwrap();
-    assert!(patch.apply_flat(&stale).is_err());
+    let stale = FlatImage::from_bytes(FLAT.replace("gr1", "other").as_bytes()).unwrap();
+    assert!(matches!(
+        patch.apply_flat(&stale),
+        Err(PackageError::PatchConflict { .. })
+    ));
 
     let package_source = {
         let package_without_styles = package();
         let mut style_setup = package_without_styles.edit();
         style_setup.set_styles_xml(Some(STYLES.into())).unwrap();
-        style_setup.commit().unwrap().image().clone()
+        style_setup.commit().unwrap().package().clone()
     };
+    assert!(matches!(
+        patch.apply_package(&package_source),
+        Err(PackageError::Refused(refusal))
+            if refusal.kind() == RefusalKind::UnsupportedContent
+    ));
     let transfer = patch.plan_package(&package_source);
     assert!(transfer.is_conflict_free());
     let package_commit = transfer
         .commit_package(&package_source, &SecurityPolicy::default())
         .unwrap();
     assert_eq!(
-        package_commit.image().frame().unwrap().style_name(),
+        package_commit
+            .package()
+            .image()
+            .frame()
+            .unwrap()
+            .style_name(),
         Some("gr2")
     );
-    assert_eq!(package_commit.image().frame().unwrap().x(), Some("5cm"));
+    assert_eq!(
+        package_commit.package().image().frame().unwrap().x(),
+        Some("5cm")
+    );
     assert_eq!(
         package_commit
+            .package()
             .image()
             .frame()
             .unwrap()
@@ -327,13 +354,8 @@ fn semantic_patch_is_deterministic_exact_reopenable_and_transferable() {
             .len(),
         2
     );
-    let first_area = &package_commit
-        .image()
-        .frame()
-        .unwrap()
-        .image_map()
-        .unwrap()
-        .areas()[0];
+    let package_image = package_commit.package().image();
+    let first_area = &package_image.frame().unwrap().image_map().unwrap().areas()[0];
     assert_eq!(first_area.target_frame_name(), Some("_blank"));
     assert_eq!(first_area.show(), Some("new"));
     assert_eq!(first_area.actuate(), Some("onRequest"));
@@ -351,14 +373,14 @@ fn package_transfer_copies_complete_resource_and_style_dependencies() {
             b"replacement".to_vec(),
         )
         .unwrap();
-    let prepared = prepare.commit().unwrap().image().clone();
+    let prepared = prepare.commit().unwrap().package().clone();
 
     let mut edit = prepared.edit();
     edit.set_source(0, Source::Linked("Pictures/replacement.png".into()))
         .unwrap();
     edit.set_style_name(0, Some("gr2".into())).unwrap();
     let commit = edit.commit().unwrap();
-    let patch = commit.semantic_patch(&SecurityPolicy::default()).unwrap();
+    let patch = SemanticPatch::from_package_commit(&commit, &SecurityPolicy::default()).unwrap();
 
     let destination = package();
     let plan = patch.plan_package(&destination);
@@ -374,16 +396,17 @@ fn package_transfer_copies_complete_resource_and_style_dependencies() {
     let transferred = plan
         .commit_package(&destination, &SecurityPolicy::default())
         .unwrap();
-    assert_eq!(transferred.image().styles_xml(), Some(STYLES));
+    assert_eq!(transferred.package().image().styles_xml(), Some(STYLES));
     assert_eq!(
         transferred
+            .package()
             .image()
             .member_bytes("Pictures/replacement.png")
             .unwrap(),
         Some(b"replacement".to_vec())
     );
     assert_eq!(
-        transferred.image().frame().unwrap().source(),
+        transferred.package().image().frame().unwrap().source(),
         &Source::Linked("Pictures/replacement.png".into())
     );
     assert!(
@@ -406,7 +429,7 @@ fn package_transfer_copies_complete_resource_and_style_dependencies() {
             b"different".to_vec(),
         )
         .unwrap();
-    let mismatched = seed_mismatch.commit().unwrap().image().clone();
+    let mismatched = seed_mismatch.commit().unwrap().package().clone();
     let refused = patch.plan_package(&mismatched);
     assert!(refused.conflicts().iter().any(|conflict| {
         conflict.kind() == ConflictKind::MissingDependency
@@ -418,7 +441,10 @@ fn package_transfer_copies_complete_resource_and_style_dependencies() {
             .is_err()
     );
     assert_eq!(
-        mismatched.member_bytes("Pictures/replacement.png").unwrap(),
+        mismatched
+            .image()
+            .member_bytes("Pictures/replacement.png")
+            .unwrap(),
         Some(b"different".to_vec())
     );
 }
@@ -426,12 +452,15 @@ fn package_transfer_copies_complete_resource_and_style_dependencies() {
 #[test]
 fn flat_transfer_reports_dependencies_it_cannot_supply() {
     let source = flat();
-    let mut edit = source.transaction();
+    let mut edit = source.edit();
     edit.set_source(0, Source::Linked("Pictures/absent.png".into()))
         .unwrap();
     edit.set_style_name(0, Some("absent-style".into())).unwrap();
     let commit = edit.commit().unwrap();
-    let patch = commit.semantic_patch(&SecurityPolicy::default()).unwrap();
+    let patch = commit
+        .patch()
+        .semantic_patch(&SecurityPolicy::default())
+        .unwrap();
     let destination = package();
     let plan = patch.plan_package(&destination);
 
@@ -447,25 +476,34 @@ fn flat_transfer_reports_dependencies_it_cannot_supply() {
         plan.commit_package(&destination, &SecurityPolicy::default())
             .is_err()
     );
-    assert_eq!(destination.frame().unwrap().style_name(), Some("gr1"));
+    assert_eq!(
+        destination.image().frame().unwrap().style_name(),
+        Some("gr1")
+    );
 }
 
 #[test]
 fn compatible_join_and_divergent_three_way_plans_are_non_mutating() {
     let source = flat();
-    let mut style_edit = source.transaction();
+    let mut style_edit = source.edit();
     style_edit
         .set_style_name(0, Some("joined-style".into()))
         .unwrap();
     let style = style_edit.commit().unwrap();
-    let style_patch = style.semantic_patch(&SecurityPolicy::default()).unwrap();
+    let style_patch = style
+        .patch()
+        .semantic_patch(&SecurityPolicy::default())
+        .unwrap();
 
-    let mut layer_edit = source.transaction();
+    let mut layer_edit = source.edit();
     layer_edit
         .set_layer(0, Some("joined-layer".into()))
         .unwrap();
     let layer = layer_edit.commit().unwrap();
-    let layer_patch = layer.semantic_patch(&SecurityPolicy::default()).unwrap();
+    let layer_patch = layer
+        .patch()
+        .semantic_patch(&SecurityPolicy::default())
+        .unwrap();
 
     let joined = style_patch.join(&layer_patch);
     assert!(joined.is_conflict_free());
@@ -475,27 +513,28 @@ fn compatible_join_and_divergent_three_way_plans_are_non_mutating() {
         .commit_flat(&source, &SecurityPolicy::default())
         .unwrap();
     assert_eq!(
-        committed.snapshot().frame().unwrap().style_name(),
+        committed.package().frame().unwrap().style_name(),
         Some("joined-style")
     );
     assert_eq!(
-        committed.snapshot().frame().unwrap().layer(),
+        committed.package().frame().unwrap().layer(),
         Some("joined-layer")
     );
 
-    let mut competing_edit = source.transaction();
+    let mut competing_edit = source.edit();
     competing_edit
         .set_style_name(0, Some("competing".into()))
         .unwrap();
     let competing = competing_edit.commit().unwrap();
     let competing_patch = competing
+        .patch()
         .semantic_patch(&SecurityPolicy::default())
         .unwrap();
     let conflict = style_patch.join(&competing_patch);
     assert!(!conflict.is_conflict_free());
     assert_eq!(conflict.conflicts()[0].kind(), ConflictKind::Diverged);
 
-    let three_way = style_patch.plan_flat(competing.snapshot());
+    let three_way = style_patch.plan_flat(competing.package());
     assert_eq!(three_way.conflicts()[0].kind(), ConflictKind::Diverged);
     assert!(matches!(
         three_way.conflicts()[0].actual(),
@@ -503,7 +542,7 @@ fn compatible_join_and_divergent_three_way_plans_are_non_mutating() {
     ));
     assert!(
         joined
-            .commit_flat(competing.snapshot(), &SecurityPolicy::default())
+            .commit_flat(competing.package(), &SecurityPolicy::default())
             .is_err()
     );
 }
@@ -520,22 +559,27 @@ fn package_metadata_and_resource_crud_have_transferable_inverse_patches() {
     )
     .unwrap();
     let commit = edit.commit().unwrap();
-    let patch = commit.semantic_patch(&SecurityPolicy::default()).unwrap();
+    let patch = SemanticPatch::from_package_commit(&commit, &SecurityPolicy::default()).unwrap();
     assert_eq!(patch.operations().len(), 2);
     assert_eq!(
         patch.apply_package(&source).unwrap().as_bytes(),
-        commit.image().as_bytes()
+        commit.package().as_bytes()
     );
+    assert!(matches!(
+        patch.apply_package(commit.package()),
+        Err(PackageError::PatchConflict { .. })
+    ));
     assert_eq!(
         patch
             .inverse()
-            .apply_package(commit.image())
+            .apply_package(commit.package())
             .unwrap()
             .as_bytes(),
         source.as_bytes()
     );
     assert!(
         commit
+            .package()
             .image()
             .meta_xml()
             .unwrap()
@@ -544,6 +588,7 @@ fn package_metadata_and_resource_crud_have_transferable_inverse_patches() {
     );
     assert_eq!(
         commit
+            .package()
             .image()
             .member_bytes("Thumbnails/preview.webp")
             .unwrap(),
@@ -556,17 +601,24 @@ fn package_metadata_and_resource_crud_have_transferable_inverse_patches() {
         .commit_package(&source, &SecurityPolicy::default())
         .unwrap();
     assert_eq!(
-        replay.image().metadata().unwrap().title.as_deref(),
+        replay
+            .package()
+            .image()
+            .metadata()
+            .unwrap()
+            .title
+            .as_deref(),
         Some("After")
     );
 
-    let mut removal = commit.image().edit();
+    let mut removal = commit.package().edit();
     removal
         .remove_member("Thumbnails/preview.webp".into())
         .unwrap();
     let removed = removal.commit().unwrap();
     assert_eq!(
         removed
+            .package()
             .image()
             .member_bytes("Thumbnails/preview.webp")
             .unwrap(),
@@ -578,13 +630,16 @@ fn package_metadata_and_resource_crud_have_transferable_inverse_patches() {
 fn flat_metadata_patch_preserves_opaque_nodes_and_transfers_to_package() {
     let source = flat();
     assert_eq!(source.metadata().unwrap().title.as_deref(), Some("Before"));
-    let mut edit = source.transaction();
+    let mut edit = source.edit();
     edit.set_title(Some("Flat After".into())).unwrap();
     edit.set_author(Some("Flat Author".into())).unwrap();
     let commit = edit.commit().unwrap();
-    let xml = std::str::from_utf8(commit.snapshot().as_bytes()).unwrap();
+    let xml = std::str::from_utf8(commit.package().as_bytes()).unwrap();
     assert!(xml.contains("opaque"));
-    let patch = commit.semantic_patch(&SecurityPolicy::default()).unwrap();
+    let patch = commit
+        .patch()
+        .semantic_patch(&SecurityPolicy::default())
+        .unwrap();
     assert_eq!(patch.operations().len(), 2);
 
     let package = package();
@@ -594,11 +649,23 @@ fn flat_metadata_patch_preserves_opaque_nodes_and_transfers_to_package() {
         .commit_package(&package, &SecurityPolicy::default())
         .unwrap();
     assert_eq!(
-        transferred.image().metadata().unwrap().title.as_deref(),
+        transferred
+            .package()
+            .image()
+            .metadata()
+            .unwrap()
+            .title
+            .as_deref(),
         Some("Flat After")
     );
     assert_eq!(
-        transferred.image().metadata().unwrap().author.as_deref(),
+        transferred
+            .package()
+            .image()
+            .metadata()
+            .unwrap()
+            .author
+            .as_deref(),
         Some("Flat Author")
     );
 }
@@ -606,17 +673,17 @@ fn flat_metadata_patch_preserves_opaque_nodes_and_transfers_to_package() {
 #[test]
 fn commit_coupled_history_is_byte_bounded_and_stale_safe() {
     let source = flat();
-    let mut edit = source.transaction();
+    let mut edit = source.edit();
     edit.set_layer(0, Some("next".into())).unwrap();
     let commit = edit.commit().unwrap();
-    let budget = source.as_bytes().len() + commit.snapshot().as_bytes().len();
+    let budget = source.as_bytes().len() + commit.package().as_bytes().len();
     let mut history = History::with_byte_budget(source.clone(), 4, budget).unwrap();
     assert!(history.record_commit(&commit).unwrap());
     assert_eq!(history.stored_bytes(), budget);
     assert_eq!(history.undo().unwrap().as_bytes(), source.as_bytes());
     assert_eq!(
         history.redo().unwrap().as_bytes(),
-        commit.snapshot().as_bytes()
+        commit.package().as_bytes()
     );
     assert!(history.record_commit(&commit).is_err());
 
@@ -629,37 +696,42 @@ fn commit_coupled_history_is_byte_bounded_and_stale_safe() {
 #[test]
 fn hostile_policy_and_lossless_boundaries_refuse_before_publication() {
     let source = flat();
-    let mut external_edit = source.transaction();
+    let mut external_edit = source.edit();
     external_edit
         .set_source(0, Source::Linked("javascript:alert(1)".into()))
         .unwrap();
     let external_commit = external_edit.commit().unwrap();
     assert!(
         external_commit
+            .patch()
             .semantic_patch(&SecurityPolicy::strict())
             .is_err()
     );
     assert!(
         external_commit
+            .patch()
             .semantic_patch(&SecurityPolicy::default().with_operations(0))
             .is_err()
     );
 
-    let mut map_edit = source.transaction();
+    let mut map_edit = source.edit();
     map_edit.set_image_map(0, Some(map())).unwrap();
     let map_commit = map_edit.commit().unwrap();
     assert!(
         map_commit
+            .patch()
             .semantic_patch(&SecurityPolicy::strict())
             .is_err()
     );
     assert!(
         map_commit
+            .patch()
             .semantic_patch(&SecurityPolicy::default().with_map_areas(1))
             .is_err()
     );
     assert!(
         map_commit
+            .patch()
             .semantic_patch(&SecurityPolicy::default().with_patch_bytes(1))
             .is_err()
     );
@@ -681,11 +753,6 @@ fn hostile_policy_and_lossless_boundaries_refuse_before_publication() {
         "</draw:frame>",
         r#"<draw:image-map><draw:area-rectangle svg:x="0cm" svg:y="0cm" svg:width="1cm" svg:height="1cm"><office:event-listeners/></draw:area-rectangle></draw:image-map></draw:frame>"#,
     );
-    let eventful = FlatImage::from_bytes(eventful_xml.into_bytes()).unwrap();
-    assert!(
-        eventful
-            .transaction()
-            .set_image_map(0, Some(map()))
-            .is_err()
-    );
+    let eventful = FlatImage::from_bytes(eventful_xml.as_bytes()).unwrap();
+    assert!(eventful.edit().set_image_map(0, Some(map())).is_err());
 }

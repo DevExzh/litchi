@@ -2,6 +2,7 @@
 
 /// Validation failures for value-axis bounds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     /// A bound was not finite.
     #[error("chart axis bound must be finite")]

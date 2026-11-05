@@ -1,4 +1,4 @@
-use super::{Ligatures, NumForm, NumSpacing, OnOff, OpenType, Snapshot, StyleSet, StyleSetId};
+use super::{Ligatures, Limits, NumForm, NumSpacing, OnOff, OpenType};
 
 const WORD: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const W14: &str = "http://schemas.microsoft.com/office/word/2010/wordml";
@@ -26,7 +26,7 @@ fn sample() -> Vec<u8> {
 
 #[test]
 fn parses_typed_open_type_family_and_authored_defaults() {
-    let value = OpenType::parse(&sample()).expect("OpenType sample should parse");
+    let value = OpenType::parse(&sample(), &Limits::DEFAULT).expect("OpenType sample should parse");
     assert_eq!(value.ligatures, Some(Ligatures::StandardContextual));
     assert_eq!(value.num_form, Some(NumForm::OldStyle));
     assert_eq!(value.num_spacing, Some(NumSpacing::Tabular));
@@ -40,47 +40,12 @@ fn parses_typed_open_type_family_and_authored_defaults() {
 }
 
 #[test]
-fn snapshot_noop_and_edit_preserve_unknown_xml() {
-    let source = sample();
-    let snapshot = Snapshot::from_xml(source.clone()).expect("snapshot");
-    let noop = snapshot.edit().commit().expect("no-op commit");
-    assert_eq!(noop.snapshot().xml_bytes(), source.as_slice());
-
-    let mut edit = snapshot.edit();
-    edit.set_ligatures(Some(Ligatures::All));
-    let changed = edit.commit().expect("OpenType edit");
-    let output = changed.snapshot().xml_bytes();
-    assert!(
-        output
-            .windows(
-                b"<x:future xmlns:x=\"urn:future\"><x:data>retain me</x:data></x:future>".len()
-            )
-            .any(|window| {
-                window == b"<x:future xmlns:x=\"urn:future\"><x:data>retain me</x:data></x:future>"
-            })
-    );
-    assert_eq!(
-        OpenType::parse(output).unwrap().ligatures,
-        Some(Ligatures::All)
-    );
-
-    let restored = changed
-        .patch()
-        .inverse()
-        .apply(changed.snapshot())
-        .expect("inverse patch");
-    assert_eq!(
-        OpenType::parse(restored.xml_bytes()).unwrap(),
-        OpenType::parse(&source).unwrap()
-    );
-    assert!(String::from_utf8_lossy(restored.xml_bytes()).contains("retain me"));
-}
-
-#[test]
 fn absent_and_explicit_on_off_forms_remain_distinct() {
-    let absent =
-        OpenType::parse(format!(r#"<w:rPr xmlns:w="{WORD}" xmlns:w14="{W14}"/>"#).as_bytes())
-            .unwrap();
+    let absent = OpenType::parse(
+        format!(r#"<w:rPr xmlns:w="{WORD}" xmlns:w14="{W14}"/>"#).as_bytes(),
+        &Limits::DEFAULT,
+    )
+    .unwrap();
     assert_eq!(absent.cntxt_alts, None);
     assert!(!absent.stylistic_sets_present());
 
@@ -89,6 +54,7 @@ fn absent_and_explicit_on_off_forms_remain_distinct() {
             r#"<w:rPr xmlns:w="{WORD}" xmlns:w14="{W14}"><w14:cntxtAlts w14:val="1"/><w14:stylisticSets/></w:rPr>"#
         )
         .as_bytes(),
+        &Limits::DEFAULT,
     )
     .unwrap();
     assert_eq!(authored.cntxt_alts, Some(OnOff::on()));
@@ -101,41 +67,10 @@ fn absent_and_explicit_on_off_forms_remain_distinct() {
             r#"<w:rPr xmlns:w="{WORD}" xmlns:w14="{W14}"><w14:cntxtAlts w14:val="false"/></w:rPr>"#
         )
         .as_bytes(),
+        &Limits::DEFAULT,
     )
     .unwrap();
     assert_eq!(explicit_false.cntxt_alts, Some(OnOff::off()));
-}
-
-#[test]
-fn transactions_validate_domains_and_handle_empty_roots() {
-    let id = StyleSetId::new(3).unwrap();
-    let mut value = OpenType::default();
-    value
-        .set_style_set(StyleSet::new(id).with_enabled(Some(true)))
-        .unwrap();
-    assert!(value.stylistic_sets_present());
-
-    let xml = format!(r#"<w:rPr xmlns:w="{WORD}" xmlns:w14="{W14}"/>"#);
-    let snapshot = Snapshot::from_xml(xml.as_bytes().to_vec()).unwrap();
-    let mut edit = snapshot.edit();
-    edit.set_num_form(Some(NumForm::Lining));
-    edit.set_cntxt_alts(Some(OnOff::off()));
-    edit.set_style_set(StyleSet::new(id)).unwrap();
-    let committed = edit.commit().unwrap();
-    assert_eq!(
-        OpenType::parse(committed.snapshot().xml_bytes())
-            .unwrap()
-            .num_form,
-        Some(NumForm::Lining)
-    );
-    let output = String::from_utf8_lossy(committed.snapshot().xml_bytes());
-    assert!(output.contains("mc:Ignorable=\"w14\""));
-    assert!(output.contains("w14:styleSet w14:id=\"3\""));
-
-    let invalid = format!(
-        r#"<w:rPr xmlns:w="{WORD}" xmlns:w14="{W14}"><w14:stylisticSets><w14:styleSet w14:id="21"/></w14:stylisticSets></w:rPr>"#
-    );
-    assert!(OpenType::parse(invalid.as_bytes()).is_err());
 }
 
 #[test]

@@ -116,6 +116,7 @@ pub(super) fn validate_web_integrity(workbook: &Workbook) -> Result<()> {
         let sheet = Worksheet {
             owner: Arc::clone(&workbook.inner),
             data: Arc::clone(data),
+            policy: None,
         };
         check_web_bindings(&refs, &data.name, sheet.web_bindings()?)?;
     }
@@ -269,6 +270,15 @@ pub(super) fn create_sheets(
             defaults,
             web,
             cells,
+            fonts,
+            alignments,
+            fills,
+            staged_fill_bytes: _,
+            borders,
+            staged_border_bytes: _,
+            protections,
+            quote_prefixes,
+            number_formats,
             rows,
             columns,
             merges,
@@ -279,6 +289,41 @@ pub(super) fn create_sheets(
             hyperlinks,
             form_control_scalars,
         } = actions;
+        if !fonts.is_empty() {
+            return Err(Error::Unsupported {
+                feature: "font changes on newly created worksheets",
+            });
+        }
+        if !alignments.is_empty() {
+            return Err(Error::Unsupported {
+                feature: "alignment changes on newly created worksheets",
+            });
+        }
+        if !fills.is_empty() {
+            return Err(Error::Unsupported {
+                feature: "fill changes on newly created worksheets",
+            });
+        }
+        if !borders.is_empty() {
+            return Err(Error::Unsupported {
+                feature: "border changes on newly created worksheets",
+            });
+        }
+        if !protections.is_empty() {
+            return Err(Error::Unsupported {
+                feature: "protection changes on newly created worksheets",
+            });
+        }
+        if !quote_prefixes.is_empty() {
+            return Err(Error::Unsupported {
+                feature: "quote-prefix changes on newly created worksheets",
+            });
+        }
+        if !number_formats.is_empty() {
+            return Err(Error::Unsupported {
+                feature: "number-format changes on newly created worksheets",
+            });
+        }
         if !hyperlinks.is_empty() {
             return Err(Error::Unsupported {
                 feature: "hyperlink actions on newly created worksheets",
@@ -299,7 +344,7 @@ pub(super) fn create_sheets(
                 after: after.clone(),
             });
         }
-        let merge_projection = project_merges(name.as_str(), None, merges, &cells)?;
+        let merge_projection = project_merges(name.as_str(), None, None, merges, &cells)?;
         for (range, change) in &merge_projection.changes {
             changes.push(Change::Merge {
                 sheet: name.as_str().into(),
@@ -406,7 +451,7 @@ pub(super) fn create_sheets(
             )?;
         }
         if let Some(bindings) = &web {
-            content = raw::web::replace(&content, bindings)?;
+            content = raw::web::replace(&content, bindings, &workbook.inner.package.read_limits())?;
         }
         if let Some(page_breaks) = &page_breaks
             && page_breaks != &crate::page_breaks::PageBreaks::new()
@@ -563,7 +608,8 @@ pub(super) fn create_sheets(
                     after: expected,
                     ..
                 } => {
-                    if raw::web::read(&content)? != *expected {
+                    if raw::web::read(&content, &workbook.inner.package.read_limits())? != *expected
+                    {
                         return Err(invalid(format!(
                             "new worksheet web-binding verification failed at {sheet}"
                         )));

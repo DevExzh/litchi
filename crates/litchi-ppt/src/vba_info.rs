@@ -43,6 +43,23 @@ impl Default for VbaProjectLimits {
     }
 }
 
+/// Derive the physical reader policy for the embedded VBA CFB.
+///
+/// This policy is scoped to the decompressed `VbaProjectStg` payload. The
+/// outer PPT CFB remains governed by `SourceLimits`; only the nested VBA
+/// reader gets these directory and allocation-table ceilings.
+pub(crate) fn vba_cfb_limits(
+    limits: &VbaProjectLimits,
+) -> std::result::Result<litchi_cfb::OleFileLimits, litchi_vba::Error> {
+    let maximum = u64::try_from(limits.max_cfb_bytes.min(limits.project.max_cfb_bytes))
+        .map_err(|_| litchi_vba::Error::invalid("VBA CFB byte limit does not fit in u64"))?;
+    let directory_maximum = maximum.min(litchi_cfb::OleFileLimits::MAX_DIRECTORY_BYTES);
+    let allocation_maximum = maximum.min(litchi_cfb::OleFileLimits::MAX_ALLOCATION_TABLE_BYTES);
+    Ok(litchi_cfb::OleFileLimits::new(maximum)?
+        .with_max_directory_bytes(directory_maximum)?
+        .with_max_allocation_table_bytes(allocation_maximum)?)
+}
+
 /// Error returned while resolving or parsing a `PowerPoint` VBA project.
 #[derive(Debug)]
 pub enum VbaProjectError {
@@ -467,5 +484,21 @@ mod tests {
         let summary = VbaProjectStorage::from_info_and_storage(empty, None).unwrap();
         assert!(!summary.has_persisted_storage());
         assert!(!summary.may_contain_macro_code());
+    }
+
+    #[test]
+    fn nested_cfb_policy_follows_selected_vba_budget() {
+        let limits = VbaProjectLimits {
+            max_cfb_bytes: 8 * 1024 * 1024,
+            project: litchi_vba::Limits {
+                max_cfb_bytes: 4 * 1024 * 1024,
+                ..litchi_vba::Limits::default()
+            },
+            ..VbaProjectLimits::default()
+        };
+        let cfb = vba_cfb_limits(&limits).unwrap();
+        assert_eq!(cfb.max_input_bytes(), 4 * 1024 * 1024);
+        assert_eq!(cfb.max_directory_bytes(), 4 * 1024 * 1024);
+        assert_eq!(cfb.max_allocation_table_bytes(), 4 * 1024 * 1024);
     }
 }

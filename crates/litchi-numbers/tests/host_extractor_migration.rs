@@ -9,9 +9,9 @@
 use std::{error::Error, fs, path::PathBuf};
 
 use litchi_numbers::{
-    Package, PackageError, PackageLimits, PackageReadOptions, PackageSemanticLimits,
+    Error as PackageError, Package,
     cell::Value,
-    table::{CellPosition, Dimensions},
+    table::{At, Dimensions},
 };
 
 fn fixture(name: &str) -> PathBuf {
@@ -28,14 +28,14 @@ fn exact_bytes(package: &Package) -> Result<Vec<u8>, Box<dyn Error>> {
 
 fn table_dimensions(package: &Package) -> Result<Dimensions, Box<dyn Error>> {
     Ok(package
-        .document()
+        .workbook_ref()
         .table("Sheet 1", "shared-model")?
         .ok_or_else(|| std::io::Error::other("native fixture has no shared-model table"))?
         .dimensions())
 }
 
 fn assert_cell(package: &Package, address: &str, expected: &Value) -> Result<(), Box<dyn Error>> {
-    let position = CellPosition::from_a1(address)?;
+    let position = At::from_a1(address)?;
     let state = package.table_cell("Sheet 1", "shared-model", position)?;
     assert_eq!(
         state.storage(),
@@ -74,14 +74,14 @@ fn cell_value_native_fixture_reads_semantic_values_comments_and_exact_source()
     assert_cell(&package, "B6", &Value::Formula("=(B2+1)".to_owned()))?;
     assert_cell(&package, "B7", &Value::Formula("=(1/0)".to_owned()))?;
 
-    let missing = package.table_cell("Sheet 1", "shared-model", CellPosition::from_a1("B8")?)?;
+    let missing = package.table_cell("Sheet 1", "shared-model", At::from_a1("B8")?)?;
     assert!(matches!(
         missing.storage(),
         litchi_numbers::table::cells::Storage::Missing
     ));
 
     let comment = package
-        .table_cell_comment("Sheet 1", "shared-model", CellPosition::from_a1("B6")?)?
+        .table_cell_comment("Sheet 1", "shared-model", At::from_a1("B6")?)?
         .ok_or_else(|| std::io::Error::other("native B6 comment is missing"))?;
     assert_eq!(comment.text(), "Shared cell value control — 北京");
 
@@ -104,10 +104,10 @@ fn table_data_list_native_fixture_reads_shared_values_comments_and_exact_source(
     assert_cell(&package, "C10", &Value::Formula("=(1/0)".to_owned()))?;
 
     let b6 = package
-        .table_cell_comment("Sheet 1", "shared-model", CellPosition::from_a1("B6")?)?
+        .table_cell_comment("Sheet 1", "shared-model", At::from_a1("B6")?)?
         .ok_or_else(|| std::io::Error::other("native B6 comment is missing"))?;
     let b10 = package
-        .table_cell_comment("Sheet 1", "shared-model", CellPosition::from_a1("B10")?)?
+        .table_cell_comment("Sheet 1", "shared-model", At::from_a1("B10")?)?
         .ok_or_else(|| std::io::Error::other("native B10 comment is missing"))?;
     assert_eq!(b6.text(), "Shared cell value control — 北京");
     assert_eq!(b10.text(), "Sidecar value control — Café 北京");
@@ -121,11 +121,18 @@ fn native_formula_projection_reports_selected_render_budget_without_mutating_sou
 -> Result<(), Box<dyn Error>> {
     let source = fs::read(fixture("formula-budget-native.numbers"))?;
     let original = source.clone();
-    let semantic = PackageSemanticLimits::default()
-        .with_formula_render_limits(1, PackageSemanticLimits::MAX_FORMULA_RENDER_DEPTH)?;
+    let semantic = litchi_numbers::SemanticLimits::DEFAULT
+        .to_builder()
+        .max_formula_render_work(1)
+        .and_then(|b| {
+            b.max_formula_render_depth(
+                litchi_numbers::SemanticLimits::MAXIMUM.max_formula_render_depth(),
+            )
+        })
+        .and_then(|b| b.build())?;
     let result = Package::from_bytes_with_options(
         &source,
-        PackageReadOptions::new(PackageLimits::default(), semantic),
+        litchi_numbers::OpenOptions::new().semantic_limits(semantic),
     );
     let error = result.expect_err("native formulas must exceed a one-node render budget");
     // Formula conversion currently adds the cell context through the public

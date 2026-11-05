@@ -6,17 +6,16 @@
 
 //! OPC package assembly for XLSB workbooks.
 
-use super::model::{SheetSlot, WorkbookWriter};
+use super::model::{Builder, SheetSlot};
 use crate::package::error::{Error, Result};
 use crate::package::formula::{
     CompilationContext, Context, DefinedName, ExternalSheet, SupportingLink,
 };
-use crate::raw::Writer;
+use crate::raw::Encoder;
 use litchi_core::xml::escape_xml;
 use litchi_opc::constants::{content_type as ct, relationship_type as rel};
 use litchi_opc::part::Part;
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
-use std::io::{Seek, Write};
 use std::sync::Arc;
 
 pub(super) fn checked_capacity(resource: &'static str, terms: &[usize]) -> Result<usize> {
@@ -35,13 +34,26 @@ fn reserved_vec<T>(capacity: usize, resource: &'static str) -> Result<Vec<T>> {
     Ok(values)
 }
 
-impl WorkbookWriter {
-    /// Save the workbook to a writer
-    ///
-    /// # Arguments
-    ///
-    /// * `writer` - A writer that implements `Write` and `Seek`
-    pub fn save<W: Write + Seek>(&mut self, writer: W) -> Result<()> {
+impl Builder {
+    /// Build a validated XLSB package from the authored workbook.
+    pub fn build(&mut self) -> Result<crate::Package> {
+        // String indices and occurrence counts describe this build's cells,
+        // not prior successful builds. Keep the previous scratch state only
+        // so a failed attempt leaves the builder available for correction.
+        let previous_strings = std::mem::take(&mut self.shared_strings);
+        let result = self.build_package();
+        if result.is_err() {
+            self.shared_strings = previous_strings;
+        }
+        result
+    }
+
+    fn build_package(&mut self) -> Result<crate::Package> {
+        if self.sheet_order.is_empty() {
+            return Err(Error::InvalidFormat(
+                "an XLSB workbook must contain at least one worksheet or chart sheet",
+            ));
+        }
         if let Some(model) = self.data_model.as_ref() {
             crate::data_model::validate_model_for_write(model, self.connections.as_ref())?;
         }
@@ -94,9 +106,9 @@ impl WorkbookWriter {
         }
 
         for (index, link) in self.external_links.iter().enumerate() {
-            let one_based_index = index.checked_add(1).ok_or_else(|| {
-                Error::InvalidFormula("external-link part index overflow".to_string())
-            })?;
+            let one_based_index = index
+                .checked_add(1)
+                .ok_or(Error::InvalidFormula("external-link part index overflow"))?;
             package.add_part(Box::new(crate::package::external_link::author_part(
                 link,
                 one_based_index,
@@ -119,7 +131,10 @@ impl WorkbookWriter {
             package.add_part(Box::new(BlobPart::new(
                 connections_uri.clone(),
                 "application/vnd.ms-excel.connections".to_string(),
-                crate::package::connections::write::write_connections_part(connections)?,
+                crate::package::connections::write::write_connections_part(
+                    connections,
+                    crate::raw::Limits::DEFAULT,
+                )?,
             )));
             package
                 .get_part_mut(&PackURI::new("/xl/workbook.bin")?)?
@@ -145,10 +160,11 @@ impl WorkbookWriter {
             )));
         }
 
-        // Save package to output
-        package.to_stream(writer)?;
-
-        Ok(())
+        // Validate the complete authored OPC graph before returning it.  The
+        // caller owns publication through `Package::write_to`/`save`.
+        let workbook = crate::Workbook::from_opc_package(package)?;
+        crate::cell_values::structure::validate_all_worksheets(&workbook)?;
+        Ok(crate::Package::from_validated_workbook(workbook))
     }
 
     fn authored_pivot_tables(&self) -> Vec<(String, String)> {
@@ -164,10 +180,10 @@ impl WorkbookWriter {
     }
 
     fn normalized_pivot_chart(
-        chart: &crate::chart::Chart,
+        chart: &crate::builder::chart::Chart,
         host_sheet_name: &str,
         authored_pivot_tables: &[(String, String)],
-    ) -> Result<crate::chart::Chart> {
+    ) -> Result<crate::builder::chart::Chart> {
         let Some(source) = chart.chart.pivot_source.as_ref() else {
             return Ok(chart.clone());
         };
@@ -175,8 +191,7 @@ impl WorkbookWriter {
             &source.name,
             host_sheet_name,
             authored_pivot_tables,
-        )
-        .map_err(|error| Error::InvalidFormula(error.to_string()))?;
+        )?;
         let mut normalized = chart.clone();
         normalized
             .chart
@@ -244,20 +259,33 @@ impl WorkbookWriter {
     /// Add the writer-selected Theme part.
     fn add_theme(&self, package: &mut OpcPackage) -> Result<()> {
         let mut theme_xml = if let Some(theme) = self.theme.as_ref() {
-            litchi_drawingml::theme::codec::encode_part(&theme.name, &theme.colors, &theme.fonts)?
+            litchi_drawingml::theme::codec::encode_part(
+                &theme.name,
+                &theme.colors,
+                &theme.fonts,
+                litchi_drawingml::theme::codec::Limits::DEFAULT,
+            )?
         } else {
             self.create_minimal_theme().as_bytes().to_vec()
         };
         if let Some(family) = self.theme_family.as_ref() {
-            let has_family =
-                litchi_drawingml::theme::family::part::read_family(&theme_xml)?.is_some();
+            let has_family = litchi_drawingml::theme::family::part::read_family(
+                &theme_xml,
+                litchi_drawingml::theme::family::part::Limits::DEFAULT,
+            )?
+            .is_some();
             theme_xml = if has_family {
-                litchi_drawingml::theme::family::part::replace_family(&theme_xml, family)?
+                litchi_drawingml::theme::family::part::replace_family(
+                    &theme_xml,
+                    family,
+                    litchi_drawingml::theme::family::part::Limits::DEFAULT,
+                )?
             } else {
                 litchi_drawingml::theme::family::part::add_family_with_uri(
                     &theme_xml,
                     family,
                     litchi_drawingml::theme::family::part::NATIVE_EXTENSION_URI,
+                    litchi_drawingml::theme::family::part::Limits::DEFAULT,
                 )?
             };
         }
@@ -367,12 +395,14 @@ impl WorkbookWriter {
 
         // Write workbook structure
         let mut workbook_data = Vec::new();
-        let mut writer = Writer::new(&mut workbook_data);
+        let raw_limits = crate::raw::Limits::DEFAULT;
+        let mut writer = Encoder::new(&mut workbook_data, raw_limits);
         self.write_workbook(
             &mut writer,
             formula_sheet_ranges,
             &pivot_cache_rel_ids,
             &external_link_rel_ids,
+            raw_limits,
         )?;
         workbook_part.set_blob(workbook_data);
 
@@ -438,7 +468,7 @@ impl WorkbookWriter {
         )?;
         for (i, worksheet) in self.worksheets.iter_mut().enumerate() {
             let current_sheet = u32::try_from(worksheet_sheet_indexes[&i])
-                .map_err(|_| Error::InvalidFormula("worksheet index overflow".to_string()))?;
+                .map_err(|_| Error::InvalidFormula("worksheet index overflow"))?;
             let formula_context = CompilationContext {
                 worksheet_names: &worksheet_names,
                 defined_names: &defined_names,
@@ -491,7 +521,7 @@ impl WorkbookWriter {
             });
             for sheet in 0..self.sheet_order.len() {
                 let sheet = i32::try_from(sheet)
-                    .map_err(|_| Error::InvalidFormula("worksheet index overflow".to_string()))?;
+                    .map_err(|_| Error::InvalidFormula("worksheet index overflow"))?;
                 external_sheets.push(ExternalSheet {
                     external_link: 0,
                     first_sheet: sheet,
@@ -501,12 +531,10 @@ impl WorkbookWriter {
             for &(first, last) in ranges.iter() {
                 external_sheets.push(ExternalSheet {
                     external_link: 0,
-                    first_sheet: i32::try_from(first).map_err(|_| {
-                        Error::InvalidFormula("first formula sheet index overflow".to_string())
-                    })?,
-                    last_sheet: i32::try_from(last).map_err(|_| {
-                        Error::InvalidFormula("last formula sheet index overflow".to_string())
-                    })?,
+                    first_sheet: i32::try_from(first)
+                        .map_err(|_| Error::InvalidFormula("first formula sheet index overflow"))?,
+                    last_sheet: i32::try_from(last)
+                        .map_err(|_| Error::InvalidFormula("last formula sheet index overflow"))?,
                 });
             }
             drop(ranges);
@@ -546,9 +574,10 @@ impl WorkbookWriter {
                         })
                     })
                 }) {
-                    return Err(Error::UnsupportedFeature(
-                        "new XLSB writer cannot author the external-workbook BrtExternSheet entry required by sparkline PtgNameX"
-                            .to_string(),
+                    return Err(Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
+                        "build_xlsb",
+                        "external-workbook sparkline formulas are outside this XLSB writer route",
                     ));
                 }
                 crate::sparkline::workbook::validate_groups_context(groups, &sparkline_context)?;
@@ -616,7 +645,7 @@ impl WorkbookWriter {
                     sheet_part.relate_to(&format!("../{comments_name}"), rel::COMMENTS);
                     let mut comments_data = Vec::new();
                     crate::comments::write(
-                        &mut Writer::new(&mut comments_data),
+                        &mut Encoder::new(&mut comments_data, crate::raw::Limits::DEFAULT),
                         worksheet.comments(),
                     )?;
                     Some(BlobPart::new(
@@ -650,10 +679,9 @@ impl WorkbookWriter {
                     xml_maps_plan.worksheets[i].single_cells.take()
                 {
                     let name = format!("tableSingleCells{next_single_cell_index}.bin");
-                    next_single_cell_index =
-                        next_single_cell_index.checked_add(1).ok_or_else(|| {
-                            Error::InvalidFormula("single-cell XML part index overflow".to_string())
-                        })?;
+                    next_single_cell_index = next_single_cell_index
+                        .checked_add(1)
+                        .ok_or(Error::InvalidFormula("single-cell XML part index overflow"))?;
                     sheet_part.relate_to(
                             &format!("../tables/{name}"),
                             "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tableSingleCells",
@@ -675,28 +703,19 @@ impl WorkbookWriter {
                         .pivot_caches
                         .iter()
                         .position(|cache| cache.id == view.cache_id())
-                        .ok_or_else(|| {
-                            Error::InvalidFormula(format!(
-                                "PivotTable view {:?} references unknown cache {}",
-                                view.name(),
-                                view.cache_id()
-                            ))
-                        })?;
+                        .ok_or(Error::InvalidFormula(
+                            "PivotTable view references unknown cache",
+                        ))?;
                     let cache_version_created = self.pivot_caches[cache_index].version_created;
                     if (view.version_created() >= 3) != (cache_version_created >= 3) {
-                        return Err(Error::InvalidFormula(format!(
-                            "PivotTable view {:?} functionality level {} is incompatible with cache {} level {}",
-                            view.name(),
-                            view.version_created(),
-                            view.cache_id(),
-                            cache_version_created
-                        )));
+                        return Err(Error::InvalidFormula(
+                            "PivotTable view functionality level is incompatible with cache level",
+                        ));
                     }
                     let pivot_name = format!("pivotTable{next_pivot_table_index}.bin");
-                    next_pivot_table_index =
-                        next_pivot_table_index.checked_add(1).ok_or_else(|| {
-                            Error::InvalidFormula("PivotTable part index overflow".to_string())
-                        })?;
+                    next_pivot_table_index = next_pivot_table_index
+                        .checked_add(1)
+                        .ok_or(Error::InvalidFormula("PivotTable part index overflow"))?;
                     sheet_part.relate_to(&format!("../pivotTables/{pivot_name}"), rel::PIVOT_TABLE);
                     let mut part = BlobPart::new(
                         PackURI::new(format!("/xl/pivotTables/{pivot_name}"))?,
@@ -734,11 +753,12 @@ impl WorkbookWriter {
                         worksheet.shapes(),
                         worksheet.groups(),
                         worksheet.connections(),
+                        crate::SemanticLimits::new().xml_parts_value(),
                     )?;
                     let drawing_name = format!("drawing{next_drawing_index}.xml");
-                    next_drawing_index = next_drawing_index.checked_add(1).ok_or_else(|| {
-                        Error::InvalidFormula("drawing part index overflow".to_string())
-                    })?;
+                    next_drawing_index = next_drawing_index
+                        .checked_add(1)
+                        .ok_or(Error::InvalidFormula("drawing part index overflow"))?;
                     let mut part = BlobPart::new(
                         PackURI::new(format!("/xl/drawings/{drawing_name}"))?,
                         ct::OFC_DRAWING.to_string(),
@@ -747,16 +767,16 @@ impl WorkbookWriter {
                     for (image_ordinal, image) in worksheet.images().iter().enumerate() {
                         let image_name =
                             format!("image{next_image_index}.{}", image.format().extension());
-                        next_image_index = next_image_index.checked_add(1).ok_or_else(|| {
-                            Error::InvalidFormula("image part index overflow".to_string())
-                        })?;
+                        next_image_index = next_image_index
+                            .checked_add(1)
+                            .ok_or(Error::InvalidFormula("image part index overflow"))?;
                         let relationship_id =
                             part.relate_to(&format!("../media/{image_name}"), rel::IMAGE);
                         let expected_relationship_id = format!("rId{}", image_ordinal + 1);
                         if relationship_id != expected_relationship_id {
-                            return Err(Error::InvalidFormula(format!(
-                                "drawing image relationship allocation mismatch: expected {expected_relationship_id}, got {relationship_id}"
-                            )));
+                            return Err(Error::InvalidFormula(
+                                "drawing image relationship allocation mismatch",
+                            ));
                         }
                         image_parts.push(BlobPart::new(
                             PackURI::new(format!("/xl/media/{image_name}"))?,
@@ -770,17 +790,17 @@ impl WorkbookWriter {
                             chart,
                             next_chart_index,
                         )?;
-                        next_chart_index = next_chart_index.checked_add(1).ok_or_else(|| {
-                            Error::InvalidFormula("chart part index overflow".to_string())
-                        })?;
+                        next_chart_index = next_chart_index
+                            .checked_add(1)
+                            .ok_or(Error::InvalidFormula("chart part index overflow"))?;
                         let relationship_id =
                             part.relate_to(&format!("../charts/{chart_name}"), rel::CHART);
                         let expected_relationship_id =
                             format!("rId{}", worksheet.images().len() + chart_ordinal + 1);
                         if relationship_id != expected_relationship_id {
-                            return Err(Error::InvalidFormula(format!(
-                                "drawing chart relationship allocation mismatch: expected {expected_relationship_id}, got {relationship_id}"
-                            )));
+                            return Err(Error::InvalidFormula(
+                                "drawing chart relationship allocation mismatch",
+                            ));
                         }
                         chart_parts.push(graph.chart_part);
                         chart_parts.extend(graph.related_parts);
@@ -797,7 +817,7 @@ impl WorkbookWriter {
                 // in the hyperlink records.
                 let mut sheet_data = Vec::new();
                 let worksheet_write_result = {
-                    let mut writer = Writer::new(&mut sheet_data);
+                    let mut writer = Encoder::new(&mut sheet_data, crate::raw::Limits::DEFAULT);
                     worksheet.write_with_sparkline_block(
                         &mut writer,
                         &mut self.shared_strings,
@@ -810,10 +830,8 @@ impl WorkbookWriter {
                     sheet_part.blob(),
                     crate::binary_index::Limits::publication_default(),
                 )
-                .map_err(|error| {
-                    Error::InvalidFormat(format!(
-                        "unable to generate worksheet binary index: {error}"
-                    ))
+                .map_err(|_error| {
+                    Error::InvalidFormat("unable to generate worksheet binary index")
                 })?;
                 binary_index_part.set_blob(binary_index);
 
@@ -864,24 +882,24 @@ impl WorkbookWriter {
             .filter(|sheet| sheet.has_drawing_objects())
             .count()
             .checked_add(1)
-            .ok_or_else(|| Error::InvalidFormula("drawing part index overflow".to_string()))?;
+            .ok_or(Error::InvalidFormula("drawing part index overflow"))?;
         let mut next_chart_index = self
             .worksheets
             .iter()
             .try_fold(1usize, |next, sheet| next.checked_add(sheet.charts().len()))
-            .ok_or_else(|| Error::InvalidFormula("chart part index overflow".to_string()))?;
+            .ok_or(Error::InvalidFormula("chart part index overflow"))?;
 
         for (index, sheet) in self.chart_sheets.iter().enumerate() {
             sheet.validate()?;
             let drawing_name = format!("drawing{next_drawing_index}.xml");
             next_drawing_index = next_drawing_index
                 .checked_add(1)
-                .ok_or_else(|| Error::InvalidFormula("drawing part index overflow".to_string()))?;
+                .ok_or(Error::InvalidFormula("drawing part index overflow"))?;
             let chart_index = next_chart_index;
             let chart_name = format!("chart{chart_index}.xml");
             next_chart_index = next_chart_index
                 .checked_add(1)
-                .ok_or_else(|| Error::InvalidFormula("chart part index overflow".to_string()))?;
+                .ok_or(Error::InvalidFormula("chart part index overflow"))?;
             let normalized_chart = Self::normalized_pivot_chart(
                 sheet.chart(),
                 sheet.name(),
@@ -900,9 +918,9 @@ impl WorkbookWriter {
             let drawing_rel_id =
                 chart_sheet_part.relate_to(&format!("../drawings/{drawing_name}"), rel::DRAWING);
             if drawing_rel_id != "rId1" {
-                return Err(Error::InvalidFormula(format!(
-                    "chart-sheet drawing relationship allocation mismatch: {drawing_rel_id}"
-                )));
+                return Err(Error::InvalidFormula(
+                    "chart-sheet drawing relationship allocation mismatch",
+                ));
             }
 
             let mut printer_part = None;
@@ -931,14 +949,17 @@ impl WorkbookWriter {
             let mut drawing_part = BlobPart::new(
                 PackURI::new(format!("/xl/drawings/{drawing_name}"))?,
                 ct::OFC_DRAWING.to_string(),
-                crate::package::drawing_write::serialize_chart_sheet_drawing(sheet.name())?,
+                crate::package::drawing_write::serialize_chart_sheet_drawing(
+                    sheet.name(),
+                    crate::SemanticLimits::new().xml_parts_value(),
+                )?,
             );
             let chart_rel_id =
                 drawing_part.relate_to(&format!("../charts/{chart_name}"), rel::CHART);
             if chart_rel_id != "rId1" {
-                return Err(Error::InvalidFormula(format!(
-                    "chart-sheet chart relationship allocation mismatch: {chart_rel_id}"
-                )));
+                return Err(Error::InvalidFormula(
+                    "chart-sheet chart relationship allocation mismatch",
+                ));
             }
             package.add_part(Box::new(chart_sheet_part));
             package.add_part(Box::new(drawing_part));
@@ -956,7 +977,7 @@ impl WorkbookWriter {
     /// Add shared strings part to the package
     fn add_shared_strings_part(&self, package: &mut OpcPackage) -> Result<()> {
         let mut sst_data = Vec::new();
-        let mut writer = Writer::new(&mut sst_data);
+        let mut writer = Encoder::new(&mut sst_data, crate::raw::Limits::DEFAULT);
 
         self.shared_strings.write(&mut writer)?;
 
@@ -975,7 +996,7 @@ impl WorkbookWriter {
     /// Add styles part to the package
     fn add_styles_part(&self, package: &mut OpcPackage) -> Result<()> {
         let mut styles_data = Vec::new();
-        let mut writer = Writer::new(&mut styles_data);
+        let mut writer = Encoder::new(&mut styles_data, crate::raw::Limits::DEFAULT);
 
         self.styles.write(&mut writer)?;
 

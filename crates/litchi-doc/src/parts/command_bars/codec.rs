@@ -9,7 +9,7 @@ use super::model::{
     XString,
 };
 use super::validation::validate_count;
-use crate::package::{Error as PackageError, Result};
+use crate::package::{Error as PackageError, Result, SourceLimits};
 use litchi_ole_common::toolbar::Header;
 use std::borrow::Cow;
 
@@ -24,11 +24,16 @@ const MCD_SIZE: usize = 24;
 const ACD_SIZE: usize = 4;
 const KME_SIZE: usize = 14;
 const TB_DELTA_SIZE: usize = 18;
+const XST_MIN_SIZE: usize = 2;
+const XSTZ_MIN_SIZE: usize = 4;
+const CUSTOMIZATION_MIN_SIZE: usize = 8;
+const CONTROL_HEADER_MIN_SIZE: usize = 11;
 const CTB_DATA_OVERHEAD: usize = 112;
 const MAX_BITMAP_SIZE: i32 = 65_576;
 
 /// Parse exactly one complete `Tcg` payload.
-pub fn parse_bytes(data: &[u8]) -> Result<CommandBars<'_>> {
+pub fn parse_bytes<'a>(data: &'a [u8], limits: &SourceLimits) -> Result<CommandBars<'a>> {
+    crate::parts::enforce_source_entry_limit(data, limits)?;
     let mut reader = Reader::new(data);
     let version = reader.u8("Tcg nTcgVer")?;
     if version != TCG_VERSION {
@@ -49,9 +54,9 @@ pub fn parse_bytes(data: &[u8]) -> Result<CommandBars<'_>> {
             PLF_MCD => Entry::MacroCommands(parse_macro_commands(&mut reader)?),
             PLF_ACD => Entry::AllocatedCommands(parse_allocated_commands(&mut reader)?),
             PLF_KME | PLF_KME_MISMATCHED => Entry::KeyMaps(parse_key_maps(&mut reader)?),
-            0x10 => Entry::CommandStrings(parse_command_strings(&mut reader)?),
-            0x11 => Entry::MacroNames(parse_macro_names(&mut reader)?),
-            CTB_WRAPPER => Entry::Toolbar(parse_toolbar_wrapper(&mut reader)?),
+            0x10 => Entry::CommandStrings(parse_command_strings(&mut reader, limits)?),
+            0x11 => Entry::MacroNames(parse_macro_names(&mut reader, limits)?),
+            CTB_WRAPPER => Entry::Toolbar(parse_toolbar_wrapper(&mut reader, limits)?),
             other => {
                 return Err(unsupported(format!(
                     "Tcg255 record tag 0x{other:02X} is not safely bounded"
@@ -75,9 +80,11 @@ pub fn parse_bytes(data: &[u8]) -> Result<CommandBars<'_>> {
 }
 
 /// Serialize one complete `Tcg` payload.
-pub fn to_bytes(value: &CommandBars<'_>) -> Result<Vec<u8>> {
+pub fn to_bytes(value: &CommandBars<'_>, limits: &SourceLimits) -> Result<Vec<u8>> {
     value.validate()?;
-    let mut output = Vec::new();
+    let capacity = command_bars_encoded_len(value)?;
+    crate::parts::enforce_source_entry_size(capacity, limits)?;
+    let mut output = Vec::with_capacity(capacity);
     output.push(value.version);
     for entry in &value.entries {
         match entry {
@@ -95,7 +102,12 @@ pub fn to_bytes(value: &CommandBars<'_>) -> Result<Vec<u8>> {
 
 impl<'a> XString<'a> {
     /// Parse one `Xst` and return the number of bytes consumed.
-    pub fn parse_prefix(data: &'a [u8]) -> Result<(Self, usize)> {
+    pub fn parse_prefix(data: &'a [u8], limits: &SourceLimits) -> Result<(Self, usize)> {
+        crate::parts::enforce_source_entry_limit(data, limits)?;
+        Self::parse_prefix_unchecked(data)
+    }
+
+    fn parse_prefix_unchecked(data: &'a [u8]) -> Result<(Self, usize)> {
         let mut reader = Reader::new(data);
         let count = usize::from(reader.u16("Xst cch")?);
         let byte_len = count
@@ -106,8 +118,8 @@ impl<'a> XString<'a> {
     }
 
     /// Parse exactly one `Xst`.
-    pub fn parse(data: &'a [u8]) -> Result<Self> {
-        let (value, consumed) = Self::parse_prefix(data)?;
+    pub fn parse(data: &'a [u8], limits: &SourceLimits) -> Result<Self> {
+        let (value, consumed) = Self::parse_prefix(data, limits)?;
         if consumed != data.len() {
             return Err(corrupted("Xst has trailing bytes"));
         }
@@ -115,8 +127,9 @@ impl<'a> XString<'a> {
     }
 
     /// Parse an `Xstz` prefix: an `Xst` followed by its required null word.
-    pub fn parse_terminated_prefix(data: &'a [u8]) -> Result<(Self, usize)> {
-        let (value, consumed) = Self::parse_prefix(data)?;
+    pub fn parse_terminated_prefix(data: &'a [u8], limits: &SourceLimits) -> Result<(Self, usize)> {
+        crate::parts::enforce_source_entry_limit(data, limits)?;
+        let (value, consumed) = Self::parse_prefix_unchecked(data)?;
         let end = consumed
             .checked_add(2)
             .ok_or_else(|| corrupted("Xstz terminator range overflows"))?;
@@ -130,16 +143,32 @@ impl<'a> XString<'a> {
     }
 
     /// Serialize the `Xstz` form used by `MacroName`.
-    #[must_use]
-    pub fn to_terminated_bytes(&self) -> Vec<u8> {
-        let mut output = self.to_bytes();
+    #[must_use = "the serialized Xstz bytes should be consumed"]
+    pub fn to_terminated_bytes(&self, limits: &SourceLimits) -> Result<Vec<u8>> {
+        let capacity = self
+            .encoded
+            .len()
+            .checked_add(4)
+            .ok_or_else(|| corrupted("Xstz serialized size overflows"))?;
+        crate::parts::enforce_source_entry_size(capacity, limits)?;
+        let mut output = self.to_bytes_unchecked();
         output.extend_from_slice(&[0, 0]);
-        output
+        Ok(output)
     }
 
     /// Serialize the two-byte length and the exact UTF-16 payload.
-    #[must_use]
-    pub fn to_bytes(&self) -> Vec<u8> {
+    #[must_use = "the serialized Xst bytes should be consumed"]
+    pub fn to_bytes(&self, limits: &SourceLimits) -> Result<Vec<u8>> {
+        let capacity = self
+            .encoded
+            .len()
+            .checked_add(2)
+            .ok_or_else(|| corrupted("Xst serialized size overflows"))?;
+        crate::parts::enforce_source_entry_size(capacity, limits)?;
+        Ok(self.to_bytes_unchecked())
+    }
+
+    fn to_bytes_unchecked(&self) -> Vec<u8> {
         let mut output = Vec::with_capacity(2 + self.encoded.len());
         output.extend_from_slice(&(self.len() as u16).to_le_bytes());
         output.extend_from_slice(&self.encoded);
@@ -226,7 +255,10 @@ fn parse_key_maps(reader: &mut Reader<'_>) -> Result<KeyMaps> {
     KeyMaps::new(kind, entries)
 }
 
-fn parse_command_strings<'a>(reader: &mut Reader<'a>) -> Result<CommandStrings<'a>> {
+fn parse_command_strings<'a>(
+    reader: &mut Reader<'a>,
+    limits: &SourceLimits,
+) -> Result<CommandStrings<'a>> {
     reader.expect(0x10, "TcgSttbf tag")?;
     if reader.u16("TcgSttbfCore fExtend")? != u16::MAX {
         return Err(corrupted("TcgSttbfCore fExtend must be 0xFFFF"));
@@ -236,9 +268,13 @@ fn parse_command_strings<'a>(reader: &mut Reader<'a>) -> Result<CommandStrings<'
     if reader.u16("TcgSttbfCore cbExtra")? != 2 {
         return Err(corrupted("TcgSttbfCore cbExtra must be 2"));
     }
+    let minimum = count
+        .checked_mul(XST_MIN_SIZE + 2)
+        .ok_or_else(|| corrupted("TcgSttbfCore minimum size overflows"))?;
+    reader.ensure(minimum, "TcgSttbfCore entries")?;
     let mut strings = Vec::with_capacity(count);
     for _ in 0..count {
-        let (text, consumed) = XString::parse_prefix(reader.remaining())?;
+        let (text, consumed) = XString::parse_prefix(reader.remaining(), limits)?;
         reader.advance(consumed, "TcgSttbfCore Data")?;
         strings.push(CommandString::new(
             text,
@@ -248,21 +284,28 @@ fn parse_command_strings<'a>(reader: &mut Reader<'a>) -> Result<CommandStrings<'
     CommandStrings::new(strings)
 }
 
-fn parse_macro_names<'a>(reader: &mut Reader<'a>) -> Result<MacroNames<'a>> {
+fn parse_macro_names<'a>(reader: &mut Reader<'a>, limits: &SourceLimits) -> Result<MacroNames<'a>> {
     reader.expect(0x11, "MacroNames tag")?;
     let count = usize::from(reader.u16("MacroNames iMac")?);
     validate_count(count, "MacroNames iMac")?;
+    let minimum = count
+        .checked_mul(XSTZ_MIN_SIZE + 2)
+        .ok_or_else(|| corrupted("MacroNames minimum size overflows"))?;
+    reader.ensure(minimum, "MacroNames entries")?;
     let mut names = Vec::with_capacity(count);
     for _ in 0..count {
         let index = reader.u16("MacroName ibst")?;
-        let (name, consumed) = XString::parse_terminated_prefix(reader.remaining())?;
+        let (name, consumed) = XString::parse_terminated_prefix(reader.remaining(), limits)?;
         reader.advance(consumed, "MacroName xstz")?;
         names.push(MacroName::new(index, name)?);
     }
     MacroNames::new(names)
 }
 
-fn parse_toolbar_wrapper<'a>(reader: &mut Reader<'a>) -> Result<ToolbarWrapper<'a>> {
+fn parse_toolbar_wrapper<'a>(
+    reader: &mut Reader<'a>,
+    limits: &SourceLimits,
+) -> Result<ToolbarWrapper<'a>> {
     reader.expect(CTB_WRAPPER, "CTBWRAPPER tag")?;
     let reserved1 = reader.u8("CTBWRAPPER reserved1")?;
     let reserved2 = reader.u16("CTBWRAPPER reserved2")?;
@@ -275,9 +318,13 @@ fn parse_toolbar_wrapper<'a>(reader: &mut Reader<'a>) -> Result<ToolbarWrapper<'
     let controls = reader.take(controls_len, "CTBWRAPPER rtbdc")?;
     let delta_controls = control::parse_many(controls)?;
 
+    let minimum = customization_count
+        .checked_mul(CUSTOMIZATION_MIN_SIZE)
+        .ok_or_else(|| corrupted("CTBWRAPPER minimum size overflows"))?;
+    reader.ensure(minimum, "CTBWRAPPER customizations")?;
     let mut customizations = Vec::with_capacity(customization_count);
     for _ in 0..customization_count {
-        customizations.push(parse_customization(reader, customization_count)?);
+        customizations.push(parse_customization(reader, customization_count, limits)?);
     }
     let value = ToolbarWrapper {
         reserved1,
@@ -297,6 +344,7 @@ fn parse_toolbar_wrapper<'a>(reader: &mut Reader<'a>) -> Result<ToolbarWrapper<'
 fn parse_customization<'a>(
     reader: &mut Reader<'a>,
     customization_count: usize,
+    limits: &SourceLimits,
 ) -> Result<Customization<'a>> {
     let toolbar_id = reader.u32("Customization tbidForTBD")?;
     let reserved = reader.u16("Customization reserved1")?;
@@ -305,7 +353,7 @@ fn parse_customization<'a>(
         if delta_count != 0 {
             return Err(corrupted("Customization CTB has nonzero ctbds"));
         }
-        let (toolbar, consumed) = parse_toolbar(reader.remaining(), customization_count)?;
+        let (toolbar, consumed) = parse_toolbar(reader.remaining(), customization_count, limits)?;
         reader.advance(consumed, "Customization CTB")?;
         CustomizationData::Toolbar(toolbar)
     } else {
@@ -331,8 +379,12 @@ fn parse_customization<'a>(
     Ok(value)
 }
 
-fn parse_toolbar(data: &[u8], customization_count: usize) -> Result<(Toolbar<'_>, usize)> {
-    let (name, name_size) = XString::parse_prefix(data)?;
+fn parse_toolbar<'a>(
+    data: &'a [u8],
+    customization_count: usize,
+    limits: &SourceLimits,
+) -> Result<(Toolbar<'a>, usize)> {
+    let (name, name_size) = XString::parse_prefix(data, limits)?;
     let mut reader = Reader::new(&data[name_size..]);
     let cb_tbd = nonnegative_i32(reader.i32("CTB cbTBData")?, "cbTBData")?;
     if cb_tbd < CTB_DATA_OVERHEAD {
@@ -362,6 +414,10 @@ fn parse_toolbar(data: &[u8], customization_count: usize) -> Result<(Toolbar<'_>
 
     let control_count = nonnegative_i32(reader.i32("CTB cCtls")?, "CTB cCtls")?;
     validate_count(control_count, "CTB cCtls")?;
+    let minimum = control_count
+        .checked_mul(CONTROL_HEADER_MIN_SIZE)
+        .ok_or_else(|| corrupted("CTB control minimum size overflows"))?;
+    reader.ensure(minimum, "CTB controls")?;
     let mut controls = Vec::with_capacity(control_count);
     for _ in 0..control_count {
         controls.push(control::parse_one(&mut reader)?);
@@ -455,7 +511,7 @@ fn encode_command_strings(output: &mut Vec<u8>, value: &CommandStrings<'_>) -> R
     );
     output.extend_from_slice(&2u16.to_le_bytes());
     for string in &value.strings {
-        output.extend_from_slice(&string.text.to_bytes());
+        output.extend_from_slice(&string.text.to_bytes_unchecked());
         output.extend_from_slice(&string.references.to_le_bytes());
     }
     Ok(())
@@ -471,7 +527,9 @@ fn encode_macro_names(output: &mut Vec<u8>, value: &MacroNames<'_>) -> Result<()
     );
     for name in &value.names {
         output.extend_from_slice(&name.index.to_le_bytes());
-        output.extend_from_slice(&name.name.to_terminated_bytes());
+        let bytes = name.name.to_bytes_unchecked();
+        output.extend_from_slice(&bytes);
+        output.extend_from_slice(&[0, 0]);
     }
     Ok(())
 }
@@ -525,7 +583,7 @@ fn encode_toolbar(output: &mut Vec<u8>, value: &Toolbar<'_>) -> Result<()> {
         .checked_add(CTB_DATA_OVERHEAD)
         .ok_or_else(|| corrupted("CTB cbTBData overflows"))?;
     let cb_tbd = i32::try_from(cb_tbd).map_err(|_| corrupted("CTB cbTBData exceeds i32::MAX"))?;
-    output.extend_from_slice(&value.name.to_bytes());
+    output.extend_from_slice(&value.name.to_bytes_unchecked());
     output.extend_from_slice(&cb_tbd.to_le_bytes());
     output.extend_from_slice(&toolbar);
     output.extend_from_slice(&value.visual_data);
@@ -544,24 +602,40 @@ fn encode_toolbar(output: &mut Vec<u8>, value: &Toolbar<'_>) -> Result<()> {
 }
 
 /// Serialize one complete DOC toolbar-control record.
-pub fn to_control_bytes(value: &Control<'_>) -> Result<Vec<u8>> {
-    let mut output = Vec::new();
+pub fn to_control_bytes(value: &Control<'_>, limits: &SourceLimits) -> Result<Vec<u8>> {
+    value.validate()?;
+    let capacity = control_encoded_len(value)?;
+    crate::parts::enforce_source_entry_size(capacity, limits)?;
+    let mut output = Vec::with_capacity(capacity);
     encode_control(&mut output, value)?;
     Ok(output)
 }
 
 impl Control<'_> {
     /// Serialize one complete DOC toolbar-control record.
-    pub fn to_bytes(&self) -> Result<Vec<u8>> {
-        to_control_bytes(self)
+    pub fn to_bytes(&self, limits: &SourceLimits) -> Result<Vec<u8>> {
+        to_control_bytes(self, limits)
     }
 }
 
 impl<'a> ToolbarWrapper<'a> {
     /// Attach typed rtbdc controls while retaining their serialized bytes.
-    pub fn with_delta_controls(mut self, controls: Vec<Control<'a>>) -> Result<Self> {
+    pub fn with_delta_controls(
+        mut self,
+        controls: Vec<Control<'a>>,
+        limits: &SourceLimits,
+    ) -> Result<Self> {
         validate_count(controls.len(), "CTBWRAPPER rtbdc")?;
-        let mut encoded = Vec::new();
+        for control in &controls {
+            control.validate()?;
+        }
+        let capacity = controls.iter().try_fold(0usize, |total, control| {
+            total
+                .checked_add(control_encoded_len(control)?)
+                .ok_or_else(|| corrupted("CTBWRAPPER rtbdc size overflows"))
+        })?;
+        crate::parts::enforce_source_entry_size(capacity, limits)?;
+        let mut encoded = Vec::with_capacity(capacity);
         for control in &controls {
             encode_control(&mut encoded, control)?;
         }
@@ -570,6 +644,119 @@ impl<'a> ToolbarWrapper<'a> {
         self.validate()?;
         Ok(self)
     }
+}
+
+fn control_encoded_len(value: &Control<'_>) -> Result<usize> {
+    let command = value.command().map_or(0, |_| 4);
+    let data = value.data().map_or(0, |data| data.encoded_len());
+    value
+        .header()
+        .encoded_len()
+        .checked_add(command)
+        .and_then(|length| length.checked_add(data))
+        .ok_or_else(|| corrupted("TBC control size overflows"))
+}
+
+fn toolbar_encoded_len(value: &Toolbar<'_>) -> Result<usize> {
+    let controls = value.controls().iter().try_fold(0usize, |total, control| {
+        total
+            .checked_add(control_encoded_len(control)?)
+            .ok_or_else(|| corrupted("CTB controls size overflows"))
+    })?;
+    (2usize)
+        .checked_add(value.name().encoded_bytes().len())
+        .and_then(|length| length.checked_add(4))
+        .and_then(|length| length.checked_add(value.header().encoded_len()))
+        .and_then(|length| length.checked_add(100))
+        .and_then(|length| length.checked_add(4 + 2 + 2 + 4))
+        .and_then(|length| length.checked_add(controls))
+        .ok_or_else(|| corrupted("CTB size overflows"))
+}
+
+fn customization_encoded_len(value: &Customization<'_>) -> Result<usize> {
+    let data = match value.data() {
+        CustomizationData::Toolbar(toolbar) => toolbar_encoded_len(toolbar)?,
+        CustomizationData::Deltas(deltas) => deltas
+            .len()
+            .checked_mul(TB_DELTA_SIZE)
+            .ok_or_else(|| corrupted("Customization delta size overflows"))?,
+    };
+    8usize
+        .checked_add(data)
+        .ok_or_else(|| corrupted("Customization size overflows"))
+}
+
+fn wrapper_encoded_len(value: &ToolbarWrapper<'_>) -> Result<usize> {
+    let customizations =
+        value
+            .customizations()
+            .iter()
+            .try_fold(0usize, |total, customization| {
+                total
+                    .checked_add(customization_encoded_len(customization)?)
+                    .ok_or_else(|| corrupted("CTBWRAPPER customizations size overflows"))
+            })?;
+    17usize
+        .checked_add(value.toolbar_controls().len())
+        .and_then(|length| length.checked_add(customizations))
+        .ok_or_else(|| corrupted("CTBWRAPPER size overflows"))
+}
+
+fn entry_encoded_len(value: &Entry<'_>) -> Result<usize> {
+    match value {
+        Entry::MacroCommands(commands) => commands
+            .commands()
+            .len()
+            .checked_mul(MCD_SIZE)
+            .and_then(|length| length.checked_add(5))
+            .ok_or_else(|| corrupted("PlfMcd size overflows")),
+        Entry::AllocatedCommands(commands) => commands
+            .commands()
+            .len()
+            .checked_mul(ACD_SIZE)
+            .and_then(|length| length.checked_add(5))
+            .ok_or_else(|| corrupted("PlfAcd size overflows")),
+        Entry::KeyMaps(maps) => maps
+            .entries()
+            .len()
+            .checked_mul(KME_SIZE)
+            .and_then(|length| length.checked_add(5))
+            .ok_or_else(|| corrupted("PlfKme size overflows")),
+        Entry::CommandStrings(strings) => {
+            let entries = strings.strings().iter().try_fold(0usize, |total, string| {
+                total
+                    .checked_add(4)
+                    .and_then(|length| length.checked_add(string.text().encoded_bytes().len()))
+                    .ok_or_else(|| corrupted("TcgSttbf string size overflows"))
+            })?;
+            entries
+                .checked_add(7)
+                .ok_or_else(|| corrupted("TcgSttbf size overflows"))
+        },
+        Entry::MacroNames(names) => {
+            let entries = names.names().iter().try_fold(0usize, |total, name| {
+                total
+                    .checked_add(6)
+                    .and_then(|length| length.checked_add(name.name().encoded_bytes().len()))
+                    .ok_or_else(|| corrupted("MacroNames size overflows"))
+            })?;
+            entries
+                .checked_add(3)
+                .ok_or_else(|| corrupted("MacroNames size overflows"))
+        },
+        Entry::Toolbar(wrapper) => wrapper_encoded_len(wrapper),
+    }
+}
+
+fn command_bars_encoded_len(value: &CommandBars<'_>) -> Result<usize> {
+    let entries = value.entries().iter().try_fold(0usize, |total, entry| {
+        total
+            .checked_add(entry_encoded_len(entry)?)
+            .ok_or_else(|| corrupted("Tcg entries size overflows"))
+    })?;
+    entries
+        .checked_add(2)
+        .ok_or_else(|| corrupted("Tcg size overflows"))
 }
 
 fn encode_control(output: &mut Vec<u8>, value: &Control<'_>) -> Result<()> {

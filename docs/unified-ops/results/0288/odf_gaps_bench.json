@@ -1,0 +1,159 @@
+{
+ "record": "0288",
+ "example": "crates/litchi-ops/examples/odf_gaps_bench.rs",
+ "pinning": "taskset -c 9",
+ "rows": [
+  {
+   "format": "odg",
+   "scenario": "batch_1",
+   "leaf_us": 13049.6,
+   "unified_us": 13067.0,
+   "ratio_unified_leaf": 1.001,
+   "run": "full-3"
+  },
+  {
+   "format": "odg",
+   "scenario": "batch_10",
+   "leaf_us": 45492.4,
+   "unified_us": 45676.4,
+   "ratio_unified_leaf": 1.004,
+   "run": "full-3"
+  },
+  {
+   "format": "odg",
+   "scenario": "batch_100",
+   "leaf_us": 370351.1,
+   "unified_us": 370095.1,
+   "ratio_unified_leaf": 0.999,
+   "run": "full-3"
+  },
+  {
+   "format": "odg",
+   "scenario": "batch_1000",
+   "leaf_us": 3613078.2,
+   "unified_us": 3617156.2,
+   "ratio_unified_leaf": 1.001,
+   "run": "full-3"
+  },
+  {
+   "format": "odb",
+   "scenario": "batch_1",
+   "leaf_us": 2269.6,
+   "unified_us": 3057.4,
+   "ratio_unified_leaf": 1.347,
+   "run": "full-3"
+  },
+  {
+   "format": "odb",
+   "scenario": "batch_10",
+   "leaf_us": 9843.7,
+   "unified_us": 10653.3,
+   "ratio_unified_leaf": 1.082,
+   "run": "full-3"
+  },
+  {
+   "format": "odb",
+   "scenario": "batch_100",
+   "leaf_us": 85996.5,
+   "unified_us": 86941.8,
+   "ratio_unified_leaf": 1.011,
+   "run": "full-3"
+  },
+  {
+   "format": "odb",
+   "scenario": "batch_1000",
+   "leaf_us": 930517.8,
+   "unified_us": 916063.7,
+   "ratio_unified_leaf": 0.984,
+   "run": "full-3"
+  },
+  {
+   "format": "odf",
+   "scenario": "batch_1",
+   "leaf_us": 1590.0,
+   "unified_us": 1585.7,
+   "ratio_unified_leaf": 0.997,
+   "run": "full-3"
+  },
+  {
+   "format": "odf",
+   "scenario": "batch_10",
+   "leaf_us": 8405.4,
+   "unified_us": 8400.5,
+   "ratio_unified_leaf": 0.999,
+   "run": "full-3"
+  },
+  {
+   "format": "odf",
+   "scenario": "batch_100",
+   "leaf_us": 77883.7,
+   "unified_us": 77634.1,
+   "ratio_unified_leaf": 0.997,
+   "run": "full-3"
+  },
+  {
+   "format": "odf",
+   "scenario": "batch_1000",
+   "leaf_us": 816520.7,
+   "unified_us": 820504.8,
+   "ratio_unified_leaf": 1.005,
+   "run": "full-3"
+  },
+  {
+   "format": "odg",
+   "leaf_us": 1283.5244500000001,
+   "ratio_unified_leaf": 1.0011733707137405,
+   "scenario": "metadata_set",
+   "unified_us": 1285.0304999999998,
+   "run": "single"
+  },
+  {
+   "format": "odg",
+   "leaf_us": 1703.26025,
+   "ratio_unified_leaf": 1.0039571169467496,
+   "scenario": "insert_page",
+   "unified_us": 1710.0002499999998,
+   "run": "single"
+  },
+  {
+   "format": "odg",
+   "leaf_us": 1611.79425,
+   "ratio_unified_leaf": 1.000672542416627,
+   "scenario": "move_page",
+   "unified_us": 1612.8782500000002,
+   "run": "single"
+  },
+  {
+   "format": "ods",
+   "leaf_us": 556.1485,
+   "ratio_unified_leaf": 0.9997546518600698,
+   "scenario": "metadata_set",
+   "unified_us": 556.01205,
+   "run": "single"
+  },
+  {
+   "format": "odp",
+   "leaf_us": 997.1224,
+   "ratio_unified_leaf": 0.9999007142954567,
+   "scenario": "metadata_set",
+   "unified_us": 997.0234,
+   "run": "single"
+  },
+  {
+   "format": "odc",
+   "leaf_us": 149.3468,
+   "ratio_unified_leaf": 1.0091464966105734,
+   "scenario": "title_set",
+   "unified_us": 150.7128,
+   "run": "single"
+  },
+  {
+   "format": "odi",
+   "leaf_us": 161.47539999999998,
+   "ratio_unified_leaf": 1.0073076146583322,
+   "scenario": "geometry_set",
+   "unified_us": 162.65540000000001,
+   "run": "single"
+  }
+ ]
+}

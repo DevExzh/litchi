@@ -15,9 +15,7 @@ use litchi_iwa_archive::{
     package::{Catalog, EntryEdit},
 };
 use litchi_iwa_common::wire::{append_length_delimited_field, append_varint_field};
-use litchi_iwa_core::{
-    Archive, ArchiveObject, FieldInfo, FieldPath, FieldType, RawMessage, SnappyStream,
-};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldType, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsd, tsk, tsp, tss, tst, tswp};
 use litchi_keynote::slide::table::appearance::transaction::{
     Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path,
@@ -25,10 +23,7 @@ use litchi_keynote::slide::table::appearance::transaction::{
 use litchi_keynote::slide::table::appearance::{
     Appearance, Banding, GridlineVisibility, Gridlines, RowSizing,
 };
-use litchi_keynote::{
-    MAX_OBJECTS, MAX_SLIDES, MAX_TEXT_BYTES, MAX_TEXT_FRAGMENTS, MAX_TEXT_STORAGES, Package,
-    ReadOptions, SemanticLimits, SlideSelector, TableSelector,
-};
+use litchi_keynote::{OpenOptions, Package, SemanticLimits, SlideSelector, TableSelector};
 use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn StdError>>;
@@ -86,8 +81,12 @@ fn reference(identifier: u64) -> tsp::Reference {
     }
 }
 
-fn field_reference(path: impl Into<FieldPath>, identifiers: &[u64]) -> FieldInfo {
-    let mut field = FieldInfo::new(path);
+fn field_reference(path: Vec<u32>, identifiers: &[u64]) -> FieldInfo {
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(path, litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     field.r#type = Some(FieldType::ObjectReference);
     field.object_references.extend_from_slice(identifiers);
     field
@@ -99,7 +98,11 @@ fn object(
     data: Vec<u8>,
     references: &[u64],
 ) -> TestResult<ArchiveObject> {
-    let mut object = ArchiveObject::new(identifier, vec![RawMessage { type_, data }])?;
+    let mut object = ArchiveObject::new(
+        identifier,
+        vec![RawMessage { type_, data }],
+        Default::default(),
+    )?;
     object.archive_info.message_infos[0]
         .object_references
         .extend_from_slice(references);
@@ -342,9 +345,24 @@ fn metadata_payload() -> TestResult<Vec<u8>> {
         ..Default::default()
     }
     .encode_to_vec();
-    append_length_delimited_field(&mut payload, 3, &document)?;
-    append_length_delimited_field(&mut payload, 3, &calculation)?;
-    append_length_delimited_field(&mut payload, 3, &stylesheet)?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &document,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &calculation,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &stylesheet,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -611,19 +629,22 @@ fn synthetic_package(locked: bool, with_unknown_group: bool) -> TestResult<Vec<u
         &Archive {
             objects: document_objects,
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     let model_component = SnappyStream::compress(
         &Archive {
             objects: model_objects,
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     let stylesheet_component = SnappyStream::compress(
         &Archive {
             objects: stylesheet_objects,
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     let metadata_component = SnappyStream::compress(
         &Archive {
@@ -634,7 +655,8 @@ fn synthetic_package(locked: bool, with_unknown_group: bool) -> TestResult<Vec<u
                 &[],
             )?],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
 
     let mut members: Vec<(&str, &[u8])> = vec![
@@ -662,7 +684,7 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn member_bytes(source: &[u8], name: &str) -> TestResult<Vec<u8>> {
-    Ok(Catalog::from_bytes(source)?
+    Ok(Catalog::from_bytes(source, Default::default())?
         .iter()
         .find(|entry| entry.name() == name)
         .ok_or_else(|| io::Error::other(format!("missing member {name}")))?
@@ -672,7 +694,8 @@ fn member_bytes(source: &[u8], name: &str) -> TestResult<Vec<u8>> {
 
 fn member_archive(source: &[u8], name: &str) -> TestResult<Archive> {
     Ok(Archive::parse(
-        SnappyStream::decompress(&member_bytes(source, name)?)?.as_bytes(),
+        SnappyStream::decompress(&member_bytes(source, name)?, Default::default())?.as_bytes(),
+        Default::default(),
     )?)
 }
 
@@ -681,10 +704,11 @@ fn replace_member_archive(
     name: &str,
     mutate: impl FnOnce(&mut Archive) -> TestResult,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut archive = member_archive(source, name)?;
     mutate(&mut archive)?;
-    let replacement = SnappyStream::compress(&archive.to_bytes()?)?;
+    let replacement =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(&[EntryEdit::new(name, &replacement)], Limits::default())?)
 }
 
@@ -710,7 +734,7 @@ where
             data: message.data.clone(),
         };
         rewrite(&mut replacement)?;
-        object.replace_message_preserving_header(0, replacement)?;
+        object.replace_message_preserving_header(0, replacement, Default::default())?;
         Ok(())
     })
 }
@@ -854,7 +878,7 @@ fn assert_rejected_atomically_at(source: &[u8], table: usize, label: &str) -> Te
 }
 
 fn member_names(source: &[u8]) -> TestResult<Vec<String>> {
-    let mut names = Catalog::from_bytes(source)?
+    let mut names = Catalog::from_bytes(source, Default::default())?
         .iter()
         .map(|entry| entry.name().to_owned())
         .collect::<Vec<_>>();
@@ -974,6 +998,7 @@ fn direct_preset_and_default_resolution_preserve_precedence() -> TestResult {
             payload,
             TABLE_MODEL_PRESET_FIELD,
             &reference_payload(9_999),
+            litchi_iwa_common::WireLimits::DEFAULT,
         )?;
         Ok(())
     })?;
@@ -1113,7 +1138,7 @@ fn changed_appearance_cows_shared_style_and_preserves_locality() -> TestResult {
     assert_unaffected_members_exact(&source, &target, &[DOCUMENT_MEMBER, SENTINEL_MEMBER])?;
     for preview in PREVIEWS {
         assert!(
-            Catalog::from_bytes(&target)?
+            Catalog::from_bytes(&target, Default::default())?
                 .iter()
                 .all(|entry| entry.name() != preview)
         );
@@ -1146,7 +1171,9 @@ fn no_op_is_exact_and_apply_conflict_is_source_bound() -> TestResult {
     let package = Package::from_bytes(&source)?;
     let appearance = package.slide_table_appearance(0usize, 0usize)?;
     let edit = package.edit_slide_table_appearance(0usize, 0usize)?;
-    assert_eq!(edit.before(), appearance);
+    assert!(format!("{edit:?}").contains("has_selection: false"));
+    assert_eq!(edit.before()?, appearance);
+    assert!(format!("{edit:?}").contains("has_selection: true"));
     let commit = edit.set(appearance).commit()?;
     assert!(commit.patch().is_noop());
     assert!(!commit.diagnostics().changed());
@@ -1156,14 +1183,14 @@ fn no_op_is_exact_and_apply_conflict_is_source_bound() -> TestResult {
         .edit_slide_table_appearance(0usize, 0usize)?
         .set(custom_appearance())
         .commit()?;
-    let unrelated = Catalog::from_bytes(&source)?.reassemble_to_bytes(
+    let unrelated = Catalog::from_bytes(&source, Default::default())?.reassemble_to_bytes(
         &[EntryEdit::new(SENTINEL_MEMBER, b"a different sentinel")],
         Limits::default(),
     )?;
     let unrelated_package = Package::from_bytes(&unrelated)?;
     assert!(matches!(
         unrelated_package.apply_slide_table_appearance(changed.patch()),
-        Err(litchi_keynote::SlideTableAppearanceError::PatchConflict)
+        Err(Error::PatchConflict)
     ));
     Ok(())
 }
@@ -1197,6 +1224,7 @@ fn malformed_role_and_archive_info_routes_fail_closed_atomically() -> TestResult
             payload,
             TABLE_MODEL_STYLE_FIELD,
             &reference_payload(SHARED_STYLE_ID),
+            litchi_iwa_common::WireLimits::DEFAULT,
         )?;
         Ok(())
     })?;
@@ -1243,20 +1271,32 @@ fn broad_native_archive_metadata_and_omitted_false_flags_roundtrip_exactly() -> 
     let source = synthetic_package(false, false)?;
     let source = rewrite_archive_info(&source, DOCUMENT_MEMBER, SLIDE_ID, |info| {
         info.object_references.push(SHOW_ID);
-        let mut unrelated = FieldInfo::new(vec![45]);
+        let mut unrelated = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![45], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         unrelated.r#type = Some(FieldType::Message);
         info.field_infos = vec![unrelated];
     })?;
     let source = rewrite_archive_info(&source, DOCUMENT_MEMBER, TABLE_INFO_IDS[0], |info| {
         info.object_references.push(SHOW_ID);
-        let mut unrelated = FieldInfo::new(vec![10]);
+        let mut unrelated = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![10], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         unrelated.r#type = Some(FieldType::Message);
         info.field_infos = vec![unrelated];
     })?;
     let source = rewrite_archive_info(&source, MODEL_MEMBER, TABLE_MODEL_IDS[0], |info| {
         info.object_references.push(SHOW_ID);
         info.object_references.push(NON_TABLE_DRAWABLE_ID);
-        let mut unrelated = FieldInfo::new(vec![70]);
+        let mut unrelated = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![70], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         unrelated.r#type = Some(FieldType::Message);
         unrelated.object_references.push(NON_TABLE_DRAWABLE_ID);
         info.field_infos = vec![unrelated];
@@ -1269,7 +1309,11 @@ fn broad_native_archive_metadata_and_omitted_false_flags_roundtrip_exactly() -> 
         info.object_references
             .retain(|identifier| *identifier != PRESET_STYLE_ID);
         info.object_references.push(NON_TABLE_DRAWABLE_ID);
-        let mut unrelated = FieldInfo::new(vec![14]);
+        let mut unrelated = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![14], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         unrelated.r#type = Some(FieldType::Message);
         unrelated.object_references.push(NON_TABLE_DRAWABLE_ID);
         info.field_infos = vec![unrelated];
@@ -1403,7 +1447,12 @@ fn unrelated_archive_field_and_data_references_are_authoritative() -> TestResult
 
     let undeclared_field_reference =
         rewrite_archive_info(&source, MODEL_MEMBER, TABLE_MODEL_IDS[0], |info| {
-            let mut field = FieldInfo::new(vec![70]);
+            let mut field = FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(vec![70], litchi_iwa_core::Limits::default())
+                    .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap();
             field.r#type = Some(FieldType::Message);
             field.object_references.push(9_999_999);
             info.field_infos.push(field);
@@ -1503,6 +1552,7 @@ fn inbound_roles_are_classified_by_the_exact_referencing_message() -> TestResult
                     data: style_payload(FOREIGN_INBOUND_ID, None, [None; 7], false)?,
                 },
             ],
+            Default::default(),
         )?;
         object.archive_info.message_infos[0]
             .object_references
@@ -1610,11 +1660,8 @@ fn surviving_style_uuid_ownership_accepts_unregistered_registry_and_rejects_conf
 #[test]
 fn missing_stylesheet_metadata_and_foreign_inbound_are_atomic() -> TestResult {
     let source = synthetic_package(false, false)?;
-    let missing_metadata = Catalog::from_bytes(&source)?.reassemble_with_deletions_to_bytes(
-        &[],
-        &[METADATA_MEMBER],
-        Limits::default(),
-    )?;
+    let missing_metadata = Catalog::from_bytes(&source, Default::default())?
+        .reassemble_with_deletions_to_bytes(&[], &[METADATA_MEMBER], Limits::default())?;
     assert_rejected_atomically(&missing_metadata, "missing PackageMetadata")?;
 
     let missing_style = replace_member_archive(&source, STYLESHEET_MEMBER, |archive| {
@@ -1673,20 +1720,15 @@ fn metadata_uuid_and_locator_collisions_fail_before_publication() -> TestResult 
 #[test]
 fn finite_semantic_limits_refuse_before_candidate_publication() -> TestResult {
     // Variation work is private to the prepared rewrite and has no public
-    // ReadOptions/SemanticLimits setter, so a deterministic max-minus-one
+    // OpenOptions/SemanticLimits setter, so a deterministic max-minus-one
     // variation case is not caller-accessible at this integration boundary.
     let source = synthetic_package(false, false)?;
     let mut saw_limit = false;
     for references in 1..=64 {
-        let semantic = SemanticLimits::new(
-            MAX_OBJECTS,
-            MAX_SLIDES,
-            references,
-            MAX_TEXT_STORAGES,
-            MAX_TEXT_FRAGMENTS,
-            MAX_TEXT_BYTES,
-        )?;
-        let options = ReadOptions::new(Limits::default(), semantic);
+        let semantic = SemanticLimits::builder()
+            .max_references(references)?
+            .build()?;
+        let options = OpenOptions::new().semantic_limits(semantic);
         let Ok(package) = Package::from_bytes_with_options(&source, options) else {
             continue;
         };
@@ -1694,10 +1736,7 @@ fn finite_semantic_limits_refuse_before_candidate_publication() -> TestResult {
         let result = package
             .edit_slide_table_appearance(0usize, 0usize)
             .and_then(|edit| edit.set(custom_appearance()).commit());
-        if matches!(
-            result,
-            Err(litchi_keynote::SlideTableAppearanceError::LimitExceeded { .. })
-        ) {
+        if matches!(result, Err(Error::Limit { .. })) {
             assert_eq!(exact_bytes(&package)?, before);
             saw_limit = true;
             break;

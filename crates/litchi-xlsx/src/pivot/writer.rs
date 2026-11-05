@@ -1,4 +1,5 @@
-use litchi_core::sheet::Result as SheetResult;
+use crate::Result as SheetResult;
+use crate::error::{fmt_error, invalid};
 use litchi_core::xml::escape_xml;
 use std::fmt::Write as FmtWrite;
 
@@ -47,7 +48,7 @@ pub fn write_pivot_table(def: &TableDefinition<'_>) -> SheetResult<String> {
         SPREADSHEET_NS,
         escape_xml(name),
         cache_id
-    )?;
+    ).map_err(fmt_error)?;
 
     write_location(&mut xml, location)?;
 
@@ -56,9 +57,9 @@ pub fn write_pivot_table(def: &TableDefinition<'_>) -> SheetResult<String> {
     }
 
     if !row_fields.is_empty() {
-        write!(&mut xml, r#"<rowFields count="{}">"#, row_fields.len())?;
+        write!(&mut xml, r#"<rowFields count="{}">"#, row_fields.len()).map_err(fmt_error)?;
         for field in row_fields {
-            write!(&mut xml, r#"<field x="{}"/>"#, field.x)?;
+            write!(&mut xml, r#"<field x="{}"/>"#, field.x).map_err(fmt_error)?;
         }
         xml.push_str("</rowFields>");
     }
@@ -68,9 +69,9 @@ pub fn write_pivot_table(def: &TableDefinition<'_>) -> SheetResult<String> {
     }
 
     if !col_fields.is_empty() {
-        write!(&mut xml, r#"<colFields count="{}">"#, col_fields.len())?;
+        write!(&mut xml, r#"<colFields count="{}">"#, col_fields.len()).map_err(fmt_error)?;
         for field in col_fields {
-            write!(&mut xml, r#"<field x="{}"/>"#, field.x)?;
+            write!(&mut xml, r#"<field x="{}"/>"#, field.x).map_err(fmt_error)?;
         }
         xml.push_str("</colFields>");
     }
@@ -108,13 +109,14 @@ fn write_location(xml: &mut String, location: &Location) -> SheetResult<()> {
         location.first_header_row,
         location.first_data_row,
         location.first_data_col
-    )?;
+    )
+    .map_err(fmt_error)?;
 
     if let Some(row_page_count) = location.row_page_count {
-        write!(xml, r#" rowPageCount="{row_page_count}""#)?;
+        write!(xml, r#" rowPageCount="{row_page_count}""#).map_err(fmt_error)?;
     }
     if let Some(col_page_count) = location.col_page_count {
-        write!(xml, r#" colPageCount="{col_page_count}""#)?;
+        write!(xml, r#" colPageCount="{col_page_count}""#).map_err(fmt_error)?;
     }
 
     xml.push_str("/>");
@@ -122,23 +124,24 @@ fn write_location(xml: &mut String, location: &Location) -> SheetResult<()> {
 }
 
 fn write_pivot_fields(xml: &mut String, fields: &[Field]) -> SheetResult<()> {
-    write!(xml, r#"<pivotFields count="{}">"#, fields.len())?;
+    write!(xml, r#"<pivotFields count="{}">"#, fields.len()).map_err(fmt_error)?;
 
     for field in fields {
         xml.push_str("<pivotField");
 
         if let Some(name) = &field.name {
-            write!(xml, r#" name="{}""#, escape_xml(name))?;
+            write!(xml, r#" name="{}""#, escape_xml(name)).map_err(fmt_error)?;
         }
         if let Some(axis) = &field.axis {
-            write!(xml, r#" axis="{}""#, axis.as_str())?;
+            write!(xml, r#" axis="{}""#, axis.as_str()).map_err(fmt_error)?;
         }
         if let Some(data_field) = field.data_field {
             write!(
                 xml,
                 r#" dataField="{}""#,
                 if data_field { "1" } else { "0" }
-            )?;
+            )
+            .map_err(fmt_error)?;
         }
 
         if !field.show_drop_downs {
@@ -175,10 +178,10 @@ fn write_pivot_fields(xml: &mut String, fields: &[Field]) -> SheetResult<()> {
             xml.push_str(r#" topAutoShow="0""#);
         }
         if field.item_page_count != 10 {
-            write!(xml, r#" itemPageCount="{}""#, field.item_page_count)?;
+            write!(xml, r#" itemPageCount="{}""#, field.item_page_count).map_err(fmt_error)?;
         }
         if field.sort_type.as_str() != "manual" {
-            write!(xml, r#" sortType="{}""#, field.sort_type.as_str())?;
+            write!(xml, r#" sortType="{}""#, field.sort_type.as_str()).map_err(fmt_error)?;
         }
         if !field.default_subtotal {
             xml.push_str(r#" defaultSubtotal="0""#);
@@ -189,35 +192,40 @@ fn write_pivot_fields(xml: &mut String, fields: &[Field]) -> SheetResult<()> {
                 xml,
                 r#" sumSubtotal="{}""#,
                 if sum_subtotal { "1" } else { "0" }
-            )?;
+            )
+            .map_err(fmt_error)?;
         }
         if let Some(count_a_subtotal) = field.count_a_subtotal {
             write!(
                 xml,
                 r#" countASubtotal="{}""#,
                 if count_a_subtotal { "1" } else { "0" }
-            )?;
+            )
+            .map_err(fmt_error)?;
         }
         if let Some(avg_subtotal) = field.avg_subtotal {
             write!(
                 xml,
                 r#" avgSubtotal="{}""#,
                 if avg_subtotal { "1" } else { "0" }
-            )?;
+            )
+            .map_err(fmt_error)?;
         }
         if let Some(max_subtotal) = field.max_subtotal {
             write!(
                 xml,
                 r#" maxSubtotal="{}""#,
                 if max_subtotal { "1" } else { "0" }
-            )?;
+            )
+            .map_err(fmt_error)?;
         }
         if let Some(min_subtotal) = field.min_subtotal {
             write!(
                 xml,
                 r#" minSubtotal="{}""#,
                 if min_subtotal { "1" } else { "0" }
-            )?;
+            )
+            .map_err(fmt_error)?;
         }
 
         if field.items.is_empty() {
@@ -234,25 +242,25 @@ fn write_pivot_fields(xml: &mut String, fields: &[Field]) -> SheetResult<()> {
 }
 
 fn write_field_items(xml: &mut String, items: &[FieldItem]) -> SheetResult<()> {
-    write!(xml, r#"<items count="{}">"#, items.len())?;
+    write!(xml, r#"<items count="{}">"#, items.len()).map_err(fmt_error)?;
 
     for item in items {
         xml.push_str("<item");
 
         if let Some(name) = &item.name {
-            write!(xml, r#" n="{}""#, escape_xml(name))?;
+            write!(xml, r#" n="{}""#, escape_xml(name)).map_err(fmt_error)?;
         }
 
         let item_type_str = item.item_type.as_str();
         if item_type_str != "data" {
-            write!(xml, r#" t="{item_type_str}""#)?;
+            write!(xml, r#" t="{item_type_str}""#).map_err(fmt_error)?;
         }
 
         if let Some(hidden) = item.hidden {
-            write!(xml, r#" h="{}""#, if hidden { "1" } else { "0" })?;
+            write!(xml, r#" h="{}""#, if hidden { "1" } else { "0" }).map_err(fmt_error)?;
         }
         if let Some(selected) = item.selected {
-            write!(xml, r#" s="{}""#, if selected { "1" } else { "0" })?;
+            write!(xml, r#" s="{}""#, if selected { "1" } else { "0" }).map_err(fmt_error)?;
         }
         if !item.show_detail {
             xml.push_str(r#" sd="0""#);
@@ -266,20 +274,20 @@ fn write_field_items(xml: &mut String, items: &[FieldItem]) -> SheetResult<()> {
 }
 
 fn write_row_col_items(xml: &mut String, tag_name: &str, items: &[AxisItem]) -> SheetResult<()> {
-    write!(xml, r#"<{} count="{}">"#, tag_name, items.len())?;
+    write!(xml, r#"<{} count="{}">"#, tag_name, items.len()).map_err(fmt_error)?;
 
     for item in items {
         xml.push_str("<i");
 
         let item_type_str = item.item_type.as_str();
         if item_type_str != "data" {
-            write!(xml, r#" t="{item_type_str}""#)?;
+            write!(xml, r#" t="{item_type_str}""#).map_err(fmt_error)?;
         }
         if item.r != 0 {
-            write!(xml, r#" r="{}""#, item.r)?;
+            write!(xml, r#" r="{}""#, item.r).map_err(fmt_error)?;
         }
         if item.i != 0 {
-            write!(xml, r#" i="{}""#, item.i)?;
+            write!(xml, r#" i="{}""#, item.i).map_err(fmt_error)?;
         }
 
         if item.x.is_empty() {
@@ -287,33 +295,33 @@ fn write_row_col_items(xml: &mut String, tag_name: &str, items: &[AxisItem]) -> 
         } else {
             xml.push('>');
             for &x_val in &item.x {
-                write!(xml, r#"<x v="{x_val}"/>"#)?;
+                write!(xml, r#"<x v="{x_val}"/>"#).map_err(fmt_error)?;
             }
             xml.push_str("</i>");
         }
     }
 
-    write!(xml, "</{tag_name}>")?;
+    write!(xml, "</{tag_name}>").map_err(fmt_error)?;
     Ok(())
 }
 
 fn write_page_fields(xml: &mut String, page_fields: &[PageField]) -> SheetResult<()> {
-    write!(xml, r#"<pageFields count="{}">"#, page_fields.len())?;
+    write!(xml, r#"<pageFields count="{}">"#, page_fields.len()).map_err(fmt_error)?;
 
     for field in page_fields {
-        write!(xml, r#"<pageField fld="{}""#, field.fld)?;
+        write!(xml, r#"<pageField fld="{}""#, field.fld).map_err(fmt_error)?;
 
         if let Some(item) = field.item {
-            write!(xml, r#" item="{item}""#)?;
+            write!(xml, r#" item="{item}""#).map_err(fmt_error)?;
         }
         if let Some(hier) = field.hier {
-            write!(xml, r#" hier="{hier}""#)?;
+            write!(xml, r#" hier="{hier}""#).map_err(fmt_error)?;
         }
         if let Some(name) = &field.name {
-            write!(xml, r#" name="{}""#, escape_xml(name))?;
+            write!(xml, r#" name="{}""#, escape_xml(name)).map_err(fmt_error)?;
         }
         if let Some(cap) = &field.cap {
-            write!(xml, r#" cap="{}""#, escape_xml(cap))?;
+            write!(xml, r#" cap="{}""#, escape_xml(cap)).map_err(fmt_error)?;
         }
 
         xml.push_str("/>");
@@ -324,33 +332,34 @@ fn write_page_fields(xml: &mut String, page_fields: &[PageField]) -> SheetResult
 }
 
 fn write_data_fields(xml: &mut String, data_fields: &[DataField]) -> SheetResult<()> {
-    write!(xml, r#"<dataFields count="{}">"#, data_fields.len())?;
+    write!(xml, r#"<dataFields count="{}">"#, data_fields.len()).map_err(fmt_error)?;
 
     for field in data_fields {
-        write!(xml, r"<dataField")?;
+        write!(xml, r"<dataField").map_err(fmt_error)?;
 
         if let Some(name) = &field.name {
-            write!(xml, r#" name="{}""#, escape_xml(name))?;
+            write!(xml, r#" name="{}""#, escape_xml(name)).map_err(fmt_error)?;
         }
 
-        write!(xml, r#" fld="{}""#, field.fld)?;
+        write!(xml, r#" fld="{}""#, field.fld).map_err(fmt_error)?;
 
         let subtotal_str = field.subtotal.as_str();
         if subtotal_str != "sum" {
-            write!(xml, r#" subtotal="{subtotal_str}""#)?;
+            write!(xml, r#" subtotal="{subtotal_str}""#).map_err(fmt_error)?;
         }
 
         if field.show_data_as != "normal" {
-            write!(xml, r#" showDataAs="{}""#, escape_xml(&field.show_data_as))?;
+            write!(xml, r#" showDataAs="{}""#, escape_xml(&field.show_data_as))
+                .map_err(fmt_error)?;
         }
         if field.base_field != -1 {
-            write!(xml, r#" baseField="{}""#, field.base_field)?;
+            write!(xml, r#" baseField="{}""#, field.base_field).map_err(fmt_error)?;
         }
         if field.base_item != 1_048_832 {
-            write!(xml, r#" baseItem="{}""#, field.base_item)?;
+            write!(xml, r#" baseItem="{}""#, field.base_item).map_err(fmt_error)?;
         }
         if let Some(num_fmt_id) = field.num_fmt_id {
-            write!(xml, r#" numFmtId="{num_fmt_id}""#)?;
+            write!(xml, r#" numFmtId="{num_fmt_id}""#).map_err(fmt_error)?;
         }
 
         xml.push_str("/>");
@@ -361,7 +370,7 @@ fn write_data_fields(xml: &mut String, data_fields: &[DataField]) -> SheetResult
 }
 
 fn write_filters(xml: &mut String, filters: &[Filter]) -> SheetResult<()> {
-    write!(xml, r#"<filters count="{}">"#, filters.len())?;
+    write!(xml, r#"<filters count="{}">"#, filters.len()).map_err(fmt_error)?;
 
     for filter in filters {
         write!(
@@ -370,25 +379,26 @@ fn write_filters(xml: &mut String, filters: &[Filter]) -> SheetResult<()> {
             filter.fld,
             escape_xml(&filter.filter_type),
             filter.id
-        )?;
+        )
+        .map_err(fmt_error)?;
 
         if let Some(mp_fld) = filter.mp_fld {
-            write!(xml, r#" mpFld="{mp_fld}""#)?;
+            write!(xml, r#" mpFld="{mp_fld}""#).map_err(fmt_error)?;
         }
         if let Some(eval_order) = filter.eval_order {
-            write!(xml, r#" evalOrder="{eval_order}""#)?;
+            write!(xml, r#" evalOrder="{eval_order}""#).map_err(fmt_error)?;
         }
         if let Some(name) = &filter.name {
-            write!(xml, r#" name="{}""#, escape_xml(name))?;
+            write!(xml, r#" name="{}""#, escape_xml(name)).map_err(fmt_error)?;
         }
         if let Some(desc) = &filter.description {
-            write!(xml, r#" description="{}""#, escape_xml(desc))?;
+            write!(xml, r#" description="{}""#, escape_xml(desc)).map_err(fmt_error)?;
         }
         if let Some(sv1) = &filter.string_value1 {
-            write!(xml, r#" stringValue1="{}""#, escape_xml(sv1))?;
+            write!(xml, r#" stringValue1="{}""#, escape_xml(sv1)).map_err(fmt_error)?;
         }
         if let Some(sv2) = &filter.string_value2 {
-            write!(xml, r#" stringValue2="{}""#, escape_xml(sv2))?;
+            write!(xml, r#" stringValue2="{}""#, escape_xml(sv2)).map_err(fmt_error)?;
         }
 
         xml.push_str("/>");
@@ -402,42 +412,47 @@ fn write_pivot_table_style(xml: &mut String, style: &Style) -> SheetResult<()> {
     xml.push_str("<pivotTableStyleInfo");
 
     if let Some(name) = &style.name {
-        write!(xml, r#" name="{}""#, escape_xml(name))?;
+        write!(xml, r#" name="{}""#, escape_xml(name)).map_err(fmt_error)?;
     }
     if let Some(show_row_headers) = style.show_row_headers {
         write!(
             xml,
             r#" showRowHeaders="{}""#,
             if show_row_headers { "1" } else { "0" }
-        )?;
+        )
+        .map_err(fmt_error)?;
     }
     if let Some(show_col_headers) = style.show_col_headers {
         write!(
             xml,
             r#" showColHeaders="{}""#,
             if show_col_headers { "1" } else { "0" }
-        )?;
+        )
+        .map_err(fmt_error)?;
     }
     if let Some(show_row_stripes) = style.show_row_stripes {
         write!(
             xml,
             r#" showRowStripes="{}""#,
             if show_row_stripes { "1" } else { "0" }
-        )?;
+        )
+        .map_err(fmt_error)?;
     }
     if let Some(show_col_stripes) = style.show_col_stripes {
         write!(
             xml,
             r#" showColStripes="{}""#,
             if show_col_stripes { "1" } else { "0" }
-        )?;
+        )
+        .map_err(fmt_error)?;
     }
     if let Some(show_last_column) = style.show_last_column {
         write!(
             xml,
             r#" showLastColumn="{}""#,
             if show_last_column { "1" } else { "0" }
-        )?;
+        )
+        .map_err(fmt_error)?;
     }
 
     xml.push_str("/>");
@@ -445,57 +460,66 @@ fn write_pivot_table_style(xml: &mut String, style: &Style) -> SheetResult<()> {
 }
 
 fn write_bool_attribute(xml: &mut String, name: &str, value: bool) -> SheetResult<()> {
-    write!(xml, r#" {name}="{}""#, if value { "1" } else { "0" })?;
+    write!(xml, r#" {name}="{}""#, if value { "1" } else { "0" }).map_err(fmt_error)?;
     Ok(())
 }
 
 fn validate_pivot_cache_definition(cache_def: &Definition) -> SheetResult<()> {
     if cache_def.id.as_deref() == Some("") {
-        return Err("pivot cache records relationship ID cannot be empty".into());
+        return Err(invalid(
+            "pivot cache records relationship ID cannot be empty",
+        ));
     }
     if cache_def.source_relationship_id.as_deref() == Some("") {
-        return Err("pivot cache source relationship ID cannot be empty".into());
+        return Err(invalid(
+            "pivot cache source relationship ID cannot be empty",
+        ));
     }
     if !matches!(
         cache_def.source_type.as_str(),
         "worksheet" | "external" | "consolidation" | "scenario"
     ) {
-        return Err(format!(
+        return Err(invalid(format!(
             "invalid pivot cache source type '{}'",
             cache_def.source_type
-        )
-        .into());
+        )));
     }
     let has_worksheet_source = cache_def.source_worksheet.is_some()
         || cache_def.source_ref.is_some()
         || cache_def.source_name.is_some()
         || cache_def.source_relationship_id.is_some();
     if cache_def.source_type == "worksheet" && !has_worksheet_source {
-        return Err("worksheet pivot cache is missing worksheetSource metadata".into());
+        return Err(invalid(
+            "worksheet pivot cache is missing worksheetSource metadata",
+        ));
     }
     if cache_def.source_type != "worksheet" && has_worksheet_source {
-        return Err("worksheetSource metadata requires a worksheet pivot-cache source".into());
+        return Err(invalid(
+            "worksheetSource metadata requires a worksheet pivot-cache source",
+        ));
     }
     if cache_def.cache_fields.is_empty() {
-        return Err("pivot cache must contain at least one cache field".into());
+        return Err(invalid("pivot cache must contain at least one cache field"));
     }
     if cache_def
         .refreshed_date
         .is_some_and(|value| !value.is_finite())
     {
-        return Err("pivot cache refreshedDate must be finite".into());
+        return Err(invalid("pivot cache refreshedDate must be finite"));
     }
     for field in &cache_def.cache_fields {
         if field.name.is_empty() {
-            return Err("pivot cache field name cannot be empty".into());
+            return Err(invalid("pivot cache field name cannot be empty"));
         }
         for item in &field.shared_items {
             match item {
                 Item::Index(_) => {
-                    return Err("shared-item indexes are only valid in pivot cache records".into());
+                    return Err(invalid(
+                        "shared-item indexes are only valid in pivot cache records",
+                    ));
                 },
                 Item::Number(value) if !value.is_finite() => {
-                    return Err("pivot cache shared number must be finite".into());
+                    return Err(invalid("pivot cache shared number must be finite"));
                 },
                 Item::Missing
                 | Item::Number(_)
@@ -517,10 +541,10 @@ pub fn write_pivot_cache_definition(cache_def: &Definition) -> SheetResult<Strin
     write!(
         xml,
         r#"<pivotCacheDefinition xmlns="{SPREADSHEET_NS}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships""#
-    )?;
+    ).map_err(fmt_error)?;
 
     if let Some(id) = &cache_def.id {
-        write!(xml, r#" r:id="{}""#, escape_xml(id))?;
+        write!(xml, r#" r:id="{}""#, escape_xml(id)).map_err(fmt_error)?;
     }
 
     if cache_def.invalid {
@@ -539,28 +563,29 @@ pub fn write_pivot_cache_definition(cache_def: &Definition) -> SheetResult<Strin
         xml.push_str(r#" enableRefresh="0""#);
     }
     if let Some(value) = &cache_def.refreshed_by {
-        write!(xml, r#" refreshedBy="{}""#, escape_xml(value))?;
+        write!(xml, r#" refreshedBy="{}""#, escape_xml(value)).map_err(fmt_error)?;
     }
     if let Some(value) = cache_def.refreshed_date {
-        write!(xml, r#" refreshedDate="{value}""#)?;
+        write!(xml, r#" refreshedDate="{value}""#).map_err(fmt_error)?;
     }
     if let Some(value) = &cache_def.refreshed_date_iso {
-        write!(xml, r#" refreshedDateIso="{}""#, escape_xml(value))?;
+        write!(xml, r#" refreshedDateIso="{}""#, escape_xml(value)).map_err(fmt_error)?;
     }
     if cache_def.background_query {
         xml.push_str(r#" backgroundQuery="1""#);
     }
     if let Some(value) = cache_def.missing_items_limit {
-        write!(xml, r#" missingItemsLimit="{value}""#)?;
+        write!(xml, r#" missingItemsLimit="{value}""#).map_err(fmt_error)?;
     }
 
     write!(
         xml,
         r#" createdVersion="{}" refreshedVersion="{}" minRefreshableVersion="{}""#,
         cache_def.created_version, cache_def.refreshed_version, cache_def.min_refreshable_version
-    )?;
+    )
+    .map_err(fmt_error)?;
     if let Some(value) = cache_def.record_count {
-        write!(xml, r#" recordCount="{value}""#)?;
+        write!(xml, r#" recordCount="{value}""#).map_err(fmt_error)?;
     }
     if let Some(value) = cache_def.upgrade_on_refresh {
         write_bool_attribute(&mut xml, "upgradeOnRefresh", value)?;
@@ -576,25 +601,25 @@ pub fn write_pivot_cache_definition(cache_def: &Definition) -> SheetResult<Strin
     }
     xml.push('>');
 
-    write!(xml, r#"<cacheSource type="{}""#, cache_def.source_type)?;
+    write!(xml, r#"<cacheSource type="{}""#, cache_def.source_type).map_err(fmt_error)?;
     if let Some(connection_id) = cache_def.source_connection_id {
-        write!(xml, r#" connectionId="{connection_id}""#)?;
+        write!(xml, r#" connectionId="{connection_id}""#).map_err(fmt_error)?;
     }
     if cache_def.source_type == "worksheet" {
         xml.push('>');
         xml.push_str("<worksheetSource");
 
         if let Some(sheet) = &cache_def.source_worksheet {
-            write!(xml, r#" sheet="{}""#, escape_xml(sheet))?;
+            write!(xml, r#" sheet="{}""#, escape_xml(sheet)).map_err(fmt_error)?;
         }
         if let Some(ref_str) = &cache_def.source_ref {
-            write!(xml, r#" ref="{}""#, escape_xml(ref_str))?;
+            write!(xml, r#" ref="{}""#, escape_xml(ref_str)).map_err(fmt_error)?;
         }
         if let Some(name) = &cache_def.source_name {
-            write!(xml, r#" name="{}""#, escape_xml(name))?;
+            write!(xml, r#" name="{}""#, escape_xml(name)).map_err(fmt_error)?;
         }
         if let Some(relationship_id) = &cache_def.source_relationship_id {
-            write!(xml, r#" r:id="{}""#, escape_xml(relationship_id))?;
+            write!(xml, r#" r:id="{}""#, escape_xml(relationship_id)).map_err(fmt_error)?;
         }
 
         xml.push_str("/>");
@@ -611,22 +636,22 @@ pub fn write_pivot_cache_definition(cache_def: &Definition) -> SheetResult<Strin
 }
 
 fn write_cache_fields(xml: &mut String, fields: &[CacheField]) -> SheetResult<()> {
-    write!(xml, r#"<cacheFields count="{}">"#, fields.len())?;
+    write!(xml, r#"<cacheFields count="{}">"#, fields.len()).map_err(fmt_error)?;
 
     for field in fields {
-        write!(xml, r#"<cacheField name="{}""#, escape_xml(&field.name))?;
+        write!(xml, r#"<cacheField name="{}""#, escape_xml(&field.name)).map_err(fmt_error)?;
 
         if let Some(num_fmt_id) = field.num_fmt_id {
-            write!(xml, r#" numFmtId="{num_fmt_id}""#)?;
+            write!(xml, r#" numFmtId="{num_fmt_id}""#).map_err(fmt_error)?;
         }
         if !field.database_field {
             xml.push_str(r#" databaseField="0""#);
         }
         if let Some(caption) = &field.caption {
-            write!(xml, r#" caption="{}""#, escape_xml(caption))?;
+            write!(xml, r#" caption="{}""#, escape_xml(caption)).map_err(fmt_error)?;
         }
         if let Some(property_name) = &field.property_name {
-            write!(xml, r#" propertyName="{}""#, escape_xml(property_name))?;
+            write!(xml, r#" propertyName="{}""#, escape_xml(property_name)).map_err(fmt_error)?;
         }
         if let Some(server_field) = field.server_field {
             write_bool_attribute(xml, "serverField", server_field)?;
@@ -635,19 +660,19 @@ fn write_cache_fields(xml: &mut String, fields: &[CacheField]) -> SheetResult<()
             xml.push_str(r#" uniqueList="0""#);
         }
         if let Some(formula) = &field.formula {
-            write!(xml, r#" formula="{}""#, escape_xml(formula))?;
+            write!(xml, r#" formula="{}""#, escape_xml(formula)).map_err(fmt_error)?;
         }
         if let Some(sql_type) = field.sql_type {
-            write!(xml, r#" sqlType="{sql_type}""#)?;
+            write!(xml, r#" sqlType="{sql_type}""#).map_err(fmt_error)?;
         }
         if let Some(hierarchy) = field.hierarchy {
-            write!(xml, r#" hierarchy="{hierarchy}""#)?;
+            write!(xml, r#" hierarchy="{hierarchy}""#).map_err(fmt_error)?;
         }
         if let Some(level) = field.level {
-            write!(xml, r#" level="{level}""#)?;
+            write!(xml, r#" level="{level}""#).map_err(fmt_error)?;
         }
         if let Some(mapping_count) = field.mapping_count {
-            write!(xml, r#" mappingCount="{mapping_count}""#)?;
+            write!(xml, r#" mappingCount="{mapping_count}""#).map_err(fmt_error)?;
         }
         if let Some(member_property_field) = field.member_property_field {
             write_bool_attribute(xml, "memberPropertyField", member_property_field)?;
@@ -667,19 +692,23 @@ fn write_cache_fields(xml: &mut String, fields: &[CacheField]) -> SheetResult<()
 }
 
 fn write_shared_items(xml: &mut String, items: &[Item]) -> SheetResult<()> {
-    write!(xml, r#"<sharedItems count="{}">"#, items.len())?;
+    write!(xml, r#"<sharedItems count="{}">"#, items.len()).map_err(fmt_error)?;
 
     for item in items {
         match item {
             Item::Missing => xml.push_str("<m/>"),
             Item::Index(_) => {
-                return Err("shared-item indexes are only valid in pivot cache records".into());
+                return Err(invalid(
+                    "shared-item indexes are only valid in pivot cache records",
+                ));
             },
-            Item::Number(n) => write!(xml, r#"<n v="{n}"/>"#)?,
-            Item::Boolean(b) => write!(xml, r#"<b v="{}"/>"#, if *b { "1" } else { "0" })?,
-            Item::Error(e) => write!(xml, r#"<e v="{}"/>"#, escape_xml(e))?,
-            Item::String(s) => write!(xml, r#"<s v="{}"/>"#, escape_xml(s))?,
-            Item::DateTime(d) => write!(xml, r#"<d v="{}"/>"#, escape_xml(d))?,
+            Item::Number(n) => write!(xml, r#"<n v="{n}"/>"#).map_err(fmt_error)?,
+            Item::Boolean(b) => {
+                write!(xml, r#"<b v="{}"/>"#, if *b { "1" } else { "0" }).map_err(fmt_error)?
+            },
+            Item::Error(e) => write!(xml, r#"<e v="{}"/>"#, escape_xml(e)).map_err(fmt_error)?,
+            Item::String(s) => write!(xml, r#"<s v="{}"/>"#, escape_xml(s)).map_err(fmt_error)?,
+            Item::DateTime(d) => write!(xml, r#"<d v="{}"/>"#, escape_xml(d)).map_err(fmt_error)?,
         }
     }
 
@@ -694,7 +723,7 @@ pub fn write_pivot_cache_records(records: &Records) -> SheetResult<String> {
             .iter()
             .any(|value| matches!(value, Item::Number(number) if !number.is_finite()))
         {
-            return Err("pivot cache record number must be finite".into());
+            return Err(invalid("pivot cache record number must be finite"));
         }
     }
     let mut xml = String::with_capacity(4096);
@@ -705,19 +734,28 @@ pub fn write_pivot_cache_records(records: &Records) -> SheetResult<String> {
         r#"<pivotCacheRecords xmlns="{}" count="{}">"#,
         SPREADSHEET_NS,
         records.records.len()
-    )?;
+    )
+    .map_err(fmt_error)?;
 
     for record in &records.records {
         xml.push_str("<r>");
         for value in &record.values {
             match value {
                 Item::Missing => xml.push_str("<m/>"),
-                Item::Index(index) => write!(xml, r#"<x v="{index}"/>"#)?,
-                Item::Number(n) => write!(xml, r#"<n v="{n}"/>"#)?,
-                Item::Boolean(b) => write!(xml, r#"<b v="{}"/>"#, if *b { "1" } else { "0" })?,
-                Item::Error(e) => write!(xml, r#"<e v="{}"/>"#, escape_xml(e))?,
-                Item::String(s) => write!(xml, r#"<s v="{}"/>"#, escape_xml(s))?,
-                Item::DateTime(d) => write!(xml, r#"<d v="{}"/>"#, escape_xml(d))?,
+                Item::Index(index) => write!(xml, r#"<x v="{index}"/>"#).map_err(fmt_error)?,
+                Item::Number(n) => write!(xml, r#"<n v="{n}"/>"#).map_err(fmt_error)?,
+                Item::Boolean(b) => {
+                    write!(xml, r#"<b v="{}"/>"#, if *b { "1" } else { "0" }).map_err(fmt_error)?
+                },
+                Item::Error(e) => {
+                    write!(xml, r#"<e v="{}"/>"#, escape_xml(e)).map_err(fmt_error)?
+                },
+                Item::String(s) => {
+                    write!(xml, r#"<s v="{}"/>"#, escape_xml(s)).map_err(fmt_error)?
+                },
+                Item::DateTime(d) => {
+                    write!(xml, r#"<d v="{}"/>"#, escape_xml(d)).map_err(fmt_error)?
+                },
             }
         }
         xml.push_str("</r>");

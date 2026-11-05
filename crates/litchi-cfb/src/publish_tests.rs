@@ -11,8 +11,9 @@
 use crate::writer::testing::CountingSteps;
 use crate::writer::{PublishFailure, PublishSteps, TemporaryIdentity, publish_staged};
 use crate::{
-    OleError, OleWriter, OverlayError, OverlayLimits, SameLengthStreamOverlay, SequentialOleWriter,
-    SequentialWriteError, SequentialWriteProgress, SharedOleFile, ValidatedOverlayPlan,
+    OleError, OleFileLimits, OleWriter, OverlayError, OverlayLimits, SameLengthStreamOverlay,
+    SequentialOleWriter, SequentialWriteError, SequentialWriteProgress, SharedOleFile,
+    SharedOleFileLimits, ValidatedOverlayPlan,
 };
 use litchi_core::{Durability, OwnedSource, ReadAt, SourceVersion};
 use std::ffi::OsString;
@@ -168,11 +169,20 @@ impl RouteError {
 }
 
 fn owned_file() -> SharedOleFile {
-    SharedOleFile::open_owned(Arc::from(source_bytes()), SourceVersion::new(0x761, 0)).unwrap()
+    SharedOleFile::open_owned(
+        Arc::from(source_bytes()),
+        SourceVersion::new(0x761, 0),
+        SharedOleFileLimits::default(),
+    )
+    .unwrap()
 }
 
 fn generic_file() -> SharedOleFile {
-    SharedOleFile::open(Arc::new(OwnedSource::new(source_bytes()))).unwrap()
+    SharedOleFile::open(
+        Arc::new(OwnedSource::new(source_bytes())),
+        SharedOleFileLimits::default(),
+    )
+    .unwrap()
 }
 
 /// Publishes `route` through the crate-private steps seam.
@@ -403,7 +413,7 @@ fn a_late_generic_source_change_is_refused_before_rename_at_every_level() {
         let scratch = Scratch::new("late-change");
         let destination = scratch.seeded_destination();
         let source = Arc::new(LateMutation::new(source_bytes()));
-        let file = SharedOleFile::open(source.clone()).unwrap();
+        let file = SharedOleFile::open(source.clone(), SharedOleFileLimits::default()).unwrap();
         let plan = overlay_plan(&file);
         // Small source: one read per complete fingerprint pass and one per
         // emission pass. Mutate after the emission, so only the mandatory
@@ -531,4 +541,66 @@ fn a_substituted_temporary_is_refused_before_rename_at_every_level() {
         );
         assert_eq!(fs::read(&displaced).unwrap(), b"staged artifact");
     }
+}
+
+#[test]
+fn source_publication_preserves_artifact_and_reader_position() {
+    let bytes = source_bytes();
+    let mut source =
+        crate::OleFile::open(Cursor::new(bytes.clone()), OleFileLimits::default()).unwrap();
+    let position = source.get_ref().position();
+    let mut output = Vec::new();
+    source.copy_source_to(&mut output).unwrap();
+    assert_eq!(output, bytes);
+    assert_eq!(source.get_ref().position(), position);
+
+    struct Failure;
+    impl Write for Failure {
+        fn write(&mut self, _: &[u8]) -> io::Result<usize> {
+            Err(io::Error::new(io::ErrorKind::BrokenPipe, "test sink"))
+        }
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+    assert!(matches!(
+        source.copy_source_to(Failure),
+        Err(OleError::Io(_))
+    ));
+    assert_eq!(source.get_ref().position(), position);
+    assert_eq!(source.open_stream(&[STREAM]).unwrap(), payload(0x21));
+
+    let scratch = Scratch::new("source-publication");
+    for durability in LEVELS {
+        let destination = scratch.seeded_destination();
+        source
+            .save_source_with_durability(&destination, durability)
+            .unwrap();
+        assert_eq!(fs::read(destination).unwrap(), bytes);
+        assert_eq!(scratch.entries(), scratch.only_destination());
+    }
+}
+
+#[test]
+fn changed_source_extent_refuses_atomic_publication() {
+    let scratch = Scratch::new("source-extent");
+    let source_path = scratch.join("input.ole");
+    let bytes = source_bytes();
+    fs::write(&source_path, &bytes).unwrap();
+    let mut source =
+        crate::OleFile::open(File::open(&source_path).unwrap(), OleFileLimits::default()).unwrap();
+    fs::OpenOptions::new()
+        .write(true)
+        .open(&source_path)
+        .unwrap()
+        .set_len(u64::try_from(bytes.len()).unwrap() + 512)
+        .unwrap();
+    let destination = scratch.seeded_destination();
+    assert!(
+        source
+            .save_source_with_durability(&destination, Durability::NoSync)
+            .is_err()
+    );
+    assert_eq!(fs::read(destination).unwrap(), OLD_DESTINATION);
+    assert_eq!(scratch.entries().len(), 2);
 }

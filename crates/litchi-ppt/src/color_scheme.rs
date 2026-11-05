@@ -209,7 +209,7 @@ impl ColorSchemeAtom {
     /// Returns an error if the operation fails.
     pub fn to_record(&self) -> Result<Record> {
         let bytes = self.to_record_bytes();
-        let (record, end) = Record::parse(&bytes, 0)?;
+        let (record, end) = Record::parse(&bytes, 0, &crate::SourceLimits::default())?;
         if end != bytes.len() {
             return corrupted("canonical ColorSchemeAtom did not consume its bytes");
         }
@@ -284,12 +284,16 @@ mod tests {
         let atom = ColorSchemeAtom::new_slide_scheme(sample_scheme());
         let mut bad_instance = atom.to_record_bytes();
         bad_instance[1] = 0x20; // record instance 2
-        let bad_instance_record = Record::parse(&bad_instance, 0).unwrap().0;
+        let bad_instance_record = Record::parse(&bad_instance, 0, &crate::SourceLimits::default())
+            .unwrap()
+            .0;
         assert!(ColorSchemeAtom::parse(&bad_instance_record).is_err());
 
         let mut bad_version = atom.to_record_bytes();
         bad_version[0] = 0x0f;
-        let bad_version_record = Record::parse(&bad_version, 0).unwrap().0;
+        let bad_version_record = Record::parse(&bad_version, 0, &crate::SourceLimits::default())
+            .unwrap()
+            .0;
         assert!(ColorSchemeAtom::parse(&bad_version_record).is_err());
 
         let short = Record {
@@ -339,7 +343,7 @@ mod tests {
     fn presentation_exposes_real_color_schemes() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../test-data/ole/ppt/SampleShow.ppt");
-        let mut package = crate::Package::open(path).unwrap();
+        let mut package = crate::raw::Reader::open(path).unwrap();
         let presentation = package.presentation().unwrap();
         let schemes = presentation.color_schemes().unwrap();
 

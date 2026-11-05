@@ -1,10 +1,8 @@
 //! Parser for data-pilot levels and their display, sort, and layout metadata.
 
 use litchi_core::Result;
-use quick_xml::{
-    events::{BytesStart, Event},
-    reader::NsReader,
-};
+use litchi_odf_common::{ResolvedReader, XmlStreamLimits};
+use quick_xml::events::{BytesStart, Event};
 
 use crate::model::data_pilot::model::{
     DisplayInfo, DisplayMemberMode, LayoutInfo, LayoutMode, Level, Member, SortInfo, SortMode,
@@ -19,7 +17,10 @@ use super::super::xml::{
 use super::support::{parse_empty_children, xml_error};
 use crate::model::data_pilot::invalid_message;
 
-pub(super) fn level_from_start(reader: &NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Level> {
+pub(super) fn level_from_start(
+    reader: &ResolvedReader<'_>,
+    start: &BytesStart<'_>,
+) -> Result<Level> {
     Ok(Level {
         show_empty: optional_bool(reader, start, b"show-empty")?,
         repeat_item_labels: optional_ns_bool(
@@ -32,21 +33,22 @@ pub(super) fn level_from_start(reader: &NsReader<&[u8]>, start: &BytesStart<'_>)
     })
 }
 
-pub(super) fn parse_level(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Level> {
+pub(super) fn parse_level(
+    reader: &mut ResolvedReader<'_>,
+    start: &BytesStart<'_>,
+    limits: &XmlStreamLimits,
+) -> Result<Level> {
     let mut level = level_from_start(reader, start)?;
     let mut subtotals_seen = false;
     let mut members_seen = false;
-    let mut buf = Vec::new();
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buf)
-            .map_err(xml_error)?;
+        let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         match event {
             Event::Start(ref element) if is_table(&namespace, element, b"data-pilot-subtotals") => {
                 if std::mem::replace(&mut subtotals_seen, true) {
                     return Err(invalid_message("duplicate data-pilot subtotals"));
                 }
-                level.subtotals = parse_subtotals(reader)?;
+                level.subtotals = parse_subtotals(reader, limits)?;
             },
             Event::Empty(ref element) if is_table(&namespace, element, b"data-pilot-subtotals") => {
                 if std::mem::replace(&mut subtotals_seen, true) {
@@ -57,7 +59,7 @@ pub(super) fn parse_level(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) 
                 if std::mem::replace(&mut members_seen, true) {
                     return Err(invalid_message("duplicate data-pilot members"));
                 }
-                level.members = parse_members(reader)?;
+                level.members = parse_members(reader, limits)?;
             },
             Event::Empty(ref element) if is_table(&namespace, element, b"data-pilot-members") => {
                 if std::mem::replace(&mut members_seen, true) {
@@ -111,31 +113,36 @@ pub(super) fn parse_level(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) 
                 return Err(invalid_message("invalid child in table:data-pilot-level"));
             },
         }
-        buf.clear();
     }
     Ok(level)
 }
 
-fn parse_subtotals(reader: &mut NsReader<&[u8]>) -> Result<Vec<String>> {
+fn parse_subtotals(
+    reader: &mut ResolvedReader<'_>,
+    limits: &XmlStreamLimits,
+) -> Result<Vec<String>> {
     parse_empty_children(
         reader,
         b"data-pilot-subtotals",
         b"data-pilot-subtotal",
         b"function",
+        limits,
     )
 }
 
-fn parse_members(reader: &mut NsReader<&[u8]>) -> Result<Vec<Member>> {
+fn parse_members(reader: &mut ResolvedReader<'_>, limits: &XmlStreamLimits) -> Result<Vec<Member>> {
     let mut members = Vec::new();
-    let mut buf = Vec::new();
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buf)
-            .map_err(xml_error)?;
+        let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         match event {
             Event::Start(ref element) | Event::Empty(ref element)
                 if is_table(&namespace, element, b"data-pilot-member") =>
             {
+                if members.len() >= limits.max_events() {
+                    return Err(invalid_message(
+                        "data-pilot member collection exceeds the configured event limit",
+                    ));
+                }
                 members.push(Member {
                     name: required_attr(reader, element, b"name")?,
                     display: optional_bool(reader, element, b"display")?,
@@ -161,12 +168,11 @@ fn parse_members(reader: &mut NsReader<&[u8]>) -> Result<Vec<Member>> {
                 return Err(invalid_message("invalid child in table:data-pilot-members"));
             },
         }
-        buf.clear();
     }
     Ok(members)
 }
 
-fn parse_display(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<DisplayInfo> {
+fn parse_display(reader: &ResolvedReader<'_>, element: &BytesStart<'_>) -> Result<DisplayInfo> {
     Ok(DisplayInfo {
         enabled: required_bool(reader, element, b"enabled")?,
         data_field: required_attr(reader, element, b"data-field")?,
@@ -175,7 +181,7 @@ fn parse_display(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<D
     })
 }
 
-fn parse_sort(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<SortInfo> {
+fn parse_sort(reader: &ResolvedReader<'_>, element: &BytesStart<'_>) -> Result<SortInfo> {
     Ok(SortInfo {
         mode: SortMode::parse(&required_attr(reader, element, b"sort-mode")?)?,
         data_field: optional_attr(reader, element, b"data-field")?,
@@ -183,7 +189,7 @@ fn parse_sort(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Sort
     })
 }
 
-fn parse_layout(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<LayoutInfo> {
+fn parse_layout(reader: &ResolvedReader<'_>, element: &BytesStart<'_>) -> Result<LayoutInfo> {
     Ok(LayoutInfo {
         mode: LayoutMode::parse(&required_attr(reader, element, b"layout-mode")?)?,
         add_empty_lines: required_bool(reader, element, b"add-empty-lines")?,

@@ -6,7 +6,6 @@
 
 use crate::{
     CfbValidationError, OleError, OleWriter, SharedOleFile, SharedOleFileLimits, validate_source,
-    validate_source_with_limits,
 };
 use litchi_core::{
     CheckStatus, OwnedSource, ReadAt, SourceVersion, ValidationLimitKind, ValidationLimits,
@@ -181,7 +180,12 @@ impl ReadAt for MutableSource {
 fn valid_source_completes_the_single_truthful_ingress_capability() {
     let bytes = sample_file();
     let source = Arc::new(CountingSource::new(bytes.clone()));
-    let report = validate_source(source.clone()).unwrap();
+    let report = validate_source(
+        source.clone(),
+        SharedOleFileLimits::default(),
+        ValidationLimits::default(),
+    )
+    .unwrap();
 
     assert!(report.is_complete());
     assert!(!report.has_errors());
@@ -210,8 +214,18 @@ fn fat_topology_rejection_is_a_deterministic_structured_issue() {
     let marker_offset = (first_fat_sector + 1) * sector_size + first_fat_sector * 4;
     write_u32(&mut bytes, marker_offset, 0xffff_ffff);
 
-    let first = validate_source(Arc::new(OwnedSource::new(bytes.clone()))).unwrap();
-    let second = validate_source(Arc::new(OwnedSource::new(bytes))).unwrap();
+    let first = validate_source(
+        Arc::new(OwnedSource::new(bytes.clone())),
+        SharedOleFileLimits::default(),
+        ValidationLimits::default(),
+    )
+    .unwrap();
+    let second = validate_source(
+        Arc::new(OwnedSource::new(bytes)),
+        SharedOleFileLimits::default(),
+        ValidationLimits::default(),
+    )
+    .unwrap();
 
     assert_eq!(first, second);
     assert!(first.is_complete());
@@ -238,7 +252,12 @@ fn tolerated_repairs_complete_with_a_warning_rather_than_a_clean_pass() {
     let marker_offset = (first_fat_sector + 1) * sector_size + orphan * 4;
     write_u32(&mut bytes, marker_offset, 0xffff_fffe);
 
-    let report = validate_source(Arc::new(OwnedSource::new(bytes))).unwrap();
+    let report = validate_source(
+        Arc::new(OwnedSource::new(bytes)),
+        SharedOleFileLimits::default(),
+        ValidationLimits::default(),
+    )
+    .unwrap();
 
     assert!(report.is_complete());
     assert!(!report.has_errors());
@@ -255,7 +274,12 @@ fn directory_topology_rejection_is_a_structured_issue() {
     let directory_offset = (directory_sector + 1) * sector_size;
     bytes[directory_offset + 66] = 2;
 
-    let report = validate_source(Arc::new(OwnedSource::new(bytes))).unwrap();
+    let report = validate_source(
+        Arc::new(OwnedSource::new(bytes)),
+        SharedOleFileLimits::default(),
+        ValidationLimits::default(),
+    )
+    .unwrap();
 
     assert!(report.is_complete());
     assert!(report.has_errors());
@@ -267,7 +291,7 @@ fn directory_topology_rejection_is_a_structured_issue() {
 fn configured_input_ceiling_blocks_without_calling_the_input_malformed() {
     let bytes = sample_file();
     let source_limit = SharedOleFileLimits::new(bytes.len() as u64 - 1).unwrap();
-    let report = validate_source_with_limits(
+    let report = validate_source(
         Arc::new(OwnedSource::new(bytes)),
         source_limit,
         ValidationLimits::default(),
@@ -286,7 +310,7 @@ fn configured_input_ceiling_blocks_without_calling_the_input_malformed() {
 #[test]
 fn report_limits_are_enforced_before_retention() {
     let limits = ValidationLimits::new(0, 4, 2, 2, 128, 256, 128, 128, 128, 1_024);
-    let error = validate_source_with_limits(
+    let error = validate_source(
         Arc::new(OwnedSource::new(sample_file())),
         SharedOleFileLimits::default(),
         limits,
@@ -311,7 +335,11 @@ fn source_instability_and_io_failure_remain_errors() {
         switch_after: 1,
     });
     assert!(matches!(
-        validate_source(unstable),
+        validate_source(
+            unstable,
+            SharedOleFileLimits::default(),
+            ValidationLimits::default()
+        ),
         Err(CfbValidationError::Ingress(OleError::SourceChanged { .. }))
     ));
 
@@ -319,7 +347,11 @@ fn source_instability_and_io_failure_remain_errors() {
         length: sample_file().len() as u64,
     });
     assert!(matches!(
-        validate_source(failing),
+        validate_source(
+            failing,
+            SharedOleFileLimits::default(),
+            ValidationLimits::default()
+        ),
         Err(CfbValidationError::Ingress(OleError::Io(_)))
     ));
 }
@@ -333,7 +365,7 @@ fn directory_byte_limit_is_a_blocked_cfb_validation_ingress() {
         .with_max_directory_bytes(511)
         .unwrap();
 
-    let report = validate_source_with_limits(source, limits, ValidationLimits::default())
+    let report = validate_source(source, limits, ValidationLimits::default())
         .expect("directory ceiling should be represented in the report");
     assert!(!report.is_complete());
     assert!(!report.has_errors());
@@ -351,7 +383,7 @@ fn allocation_table_byte_limit_is_a_blocked_cfb_validation_ingress() {
         .with_max_allocation_table_bytes(1)
         .unwrap();
 
-    let report = validate_source_with_limits(source, limits, ValidationLimits::default())
+    let report = validate_source(source, limits, ValidationLimits::default())
         .expect("allocation-table ceiling should be represented in the report");
     assert!(!report.is_complete());
     assert!(!report.has_errors());
@@ -370,7 +402,11 @@ fn version_change_between_preflight_and_canonical_ingress_is_an_error() {
     });
 
     assert!(matches!(
-        validate_source(unstable),
+        validate_source(
+            unstable,
+            SharedOleFileLimits::default(),
+            ValidationLimits::default()
+        ),
         Err(CfbValidationError::Ingress(OleError::SourceChanged { .. }))
     ));
 }
@@ -378,7 +414,7 @@ fn version_change_between_preflight_and_canonical_ingress_is_an_error() {
 #[test]
 fn shared_view_revalidation_refuses_a_changed_source_version() {
     let source = Arc::new(MutableSource::new(sample_file()));
-    let shared = SharedOleFile::open(source.clone()).unwrap();
+    let shared = SharedOleFile::open(source.clone(), SharedOleFileLimits::default()).unwrap();
     source.mutate();
 
     assert!(matches!(
@@ -390,7 +426,7 @@ fn shared_view_revalidation_refuses_a_changed_source_version() {
 #[test]
 fn shared_view_revalidation_reuses_selected_allocation_table_limit() {
     let source = Arc::new(MutableSource::new(sample_file()));
-    let mut shared = SharedOleFile::open(source).unwrap();
+    let mut shared = SharedOleFile::open(source, SharedOleFileLimits::default()).unwrap();
     shared.limits = shared.limits.with_max_allocation_table_bytes(1).unwrap();
 
     let report = shared

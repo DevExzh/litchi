@@ -11,7 +11,11 @@ pub(crate) const MAX_RELATIONSHIPS: usize = 16_384;
 
 pub(crate) fn validate_source(bytes: &[u8]) -> Result<()> {
     if bytes.len() > MAX_SLIDE_BYTES {
-        return Err(limit("OLE slide XML bytes", MAX_SLIDE_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            bytes.len(),
+            MAX_SLIDE_BYTES,
+        ));
     }
     Ok(())
 }
@@ -21,14 +25,22 @@ pub(crate) fn validate_payload(bytes: &[u8]) -> Result<()> {
         return Err(invalid("embedded OLE payload cannot be empty"));
     }
     if bytes.len() > MAX_PART_BYTES || bytes.len() > MAX_PAYLOAD_BYTES {
-        return Err(limit("embedded OLE payload bytes", MAX_PART_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::PayloadBytes,
+            bytes.len(),
+            MAX_PART_BYTES,
+        ));
     }
     Ok(())
 }
 
 pub(crate) fn validate_text(value: &str, label: &'static str, allow_empty: bool) -> Result<()> {
     if value.len() > MAX_ATTRIBUTE_BYTES {
-        return Err(limit(label, MAX_ATTRIBUTE_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::StringBytes,
+            value.len(),
+            MAX_ATTRIBUTE_BYTES,
+        ));
     }
     if !allow_empty && value.is_empty() {
         return Err(invalid(format!("{label} cannot be empty")));
